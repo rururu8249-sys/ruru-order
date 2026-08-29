@@ -1240,61 +1240,35 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     }
   };
   const copyTextToClipboard = async (text:string) => { if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(text);return;} const ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta); };
-  // [2026-08-29 사장님 요청] "왔다 갔다 복사하고 정신없다"
-  //   예전: [📢 채팅] = 클립보드 복사만. 유튜브로 옮겨가서 붙여넣고 엔터까지 쳐야 했다.
-  //   지금: 버튼 한 번에  ① 위젯 고정  ② 채팅봇 현재상품 지정  ③ 유튜브 채팅에 봇이 직접 게시
-  //   봇 게시가 실패하면(유튜브 미연결·쿼터 초과) 예전처럼 클립보드에 복사해 준다.
-  const announceProduct = async (p: ProductRow, detail?: DetailProduct) => {
+  // [2026-08-29] 채팅 안내 문구에서 "현재상품" 글씨를 뺐다 (사장님 지시).
+  //   ✅ 현재상품 ✅ BB(버버리)-67 …  →  ✅ BB(버버리)-67 …
+  //   위젯에 이미 지금 상품이 보이므로 같은 말을 두 번 할 필요가 없다.
+  //
+  //   ⚠️ 봇이 채팅에 자동으로 올리는 방식은 사장님 지시로 하지 않는다.
+  //      (유튜브 쿼터가 넉넉하지 않다 — 봇 글은 하루 60건 상한을 여러 기능이 나눠 쓴다)
+  //      예전처럼 클립보드에 복사만 하고, 사장님이 채팅에 붙여넣는다.
+  const setChatCurrentAndCopy = async (p: ProductRow, detail?: DetailProduct) => {
     const pid = productId(p);
     if (!pid) return;
     const detailName = detail?.detailName || "";
-    setBcPinBusy(true);
+    const line = detail
+      ? buildDetailChatLine(detail)
+      : buildChatAnnounceText(p).replace(/[\r\n]+/g, " ").trim();
+    const text = `✅ ${line}`;
     try {
-      // ① 위젯 고정 (기존 함수 그대로 — 고정 로직 무변경)
-      await pinBroadcastProduct(p, detail);
-
-      // ② 채팅봇 "현재상품" 지정 (손님이 상품명 없이 주문해도 이 상품으로 잡힌다)
-      const cur = await fetch("/api/chat-orders/current", {
+      const res = await fetch("/api/chat-orders/current", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ productId: pid, productName: productName(p), detailName }),
       });
-      const curJson = await cur.json().catch(() => null);
-      if (!cur.ok || curJson?.ok === false) throw new Error(curJson?.error?.message || "현재상품 지정 실패");
-
-      // ③ 유튜브 채팅에 봇이 직접 게시
-      const res = await fetch("/api/admin-live/product-announce", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId: pid, detailName }),
-      });
-      const json = (await res.json().catch(() => null)) as
-        { ok?: boolean; error?: string; message?: string; announceUsed?: number; announceCap?: number } | null;
-
-      if (res.ok && json?.ok) {
-        // 남은 횟수를 같이 보여준다 — 유튜브 쿼터를 다 쓰면 손님 주문 안내가 못 나간다.
-        const left = typeof json.announceCap === "number" && typeof json.announceUsed === "number"
-          ? `\n\n오늘 상품소개 ${json.announceUsed}/${json.announceCap}회`
-          : "";
-        showAdminToast(`고정 + 채팅 게시 완료\n\n${json.message || ""}${left}`, "success");
-        return;
-      }
-
-      // 봇이 못 올렸으면 복사로 대체 — 방송이 멈추면 안 되므로
-      const fallback = json?.message || "";
-      if (fallback) {
-        try { await copyTextToClipboard(fallback); } catch { /* 복사 실패는 무시 */ }
-        showAdminToast(`고정은 됐지만 채팅은 못 올렸어요.\n${json?.error || ""}\n\n문구를 복사해 뒀습니다 — 채팅에 붙여넣어 주세요.\n\n${fallback}`, "warning");
-      } else {
-        showAdminToast(`고정은 됐지만 채팅은 못 올렸어요.\n\n${json?.error || "알 수 없는 오류"}`, "warning");
-      }
+      const j = await res.json().catch(() => null);
+      if (!res.ok || j?.ok === false) throw new Error(j?.error?.message || "현재상품 저장 실패");
+      await copyTextToClipboard(text);
+      showAdminToast(`채팅 현재상품 지정 + 복사 완료\n\n${text}`, "success");
     } catch (e) {
-      showAdminToast("상품 소개 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
-    } finally {
-      setBcPinBusy(false);
+      showAdminToast("채팅 현재상품 지정/복사 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
     }
   };
-
 
   // --- 전체상품 탭 위젯 액션 ---
   // 여기서는 방송 순환 포함/제외만 관리한다. 정확한 고정은 방송 상품 탭의 세부행에서
@@ -1789,11 +1763,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             <span onClick={(e) => { e.stopPropagation(); if (img) setLightbox(img); }} style={{ width: "48px", height: "48px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: img ? "zoom-in" : "default" }}>{img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "18px" }}>🖼</span>}</span>
                             <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div><div style={{ fontSize: "11px", fontWeight: 800, color: isBrandFolder ? "var(--color-ink-soft)" : "var(--color-rose-deep)", marginTop: "2px" }}>{isBrandFolder ? `브랜드 그룹 · 세부상품 ${allDetails.length}개` : productPriceLabel(p)}</div></div>
                             {isBrandFolder && !bcCopyMode ? <button type="button" onClick={(e) => { e.stopPropagation(); setBcExpanded((prev) => { const next = new Set(prev); if (next.has(pid)) next.delete(pid); else next.add(pid); return next; }); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }}>{expanded ? "접기" : "세부상품"}</button> : null}
-                            {!isBrandFolder && !bcCopyMode ? <><button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void pinBroadcastProduct(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, borderRadius: "6px", padding: "6px 10px", cursor: bcPinBusy ? "wait" : "pointer", color: parentPinned ? "#fff" : "var(--color-ink-soft)", background: parentPinned ? "var(--color-rose-deep)" : "var(--color-surface-2)", border: `1px solid ${parentPinned ? "var(--color-rose-deep)" : "var(--color-line)"}` }}>{parentPinned ? "📌 고정중" : "📌 고정"}</button><button type="button" disabled={bcPinBusy} title="고정 + 채팅 안내를 한 번에 (봇이 직접 올립니다)" onClick={(e) => { e.stopPropagation(); void announceProduct(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "#fff", background: "#0F6E56", border: "1px solid #0F6E56", borderRadius: "6px", padding: "6px 10px", cursor: bcPinBusy ? "wait" : "pointer", whiteSpace: "nowrap" }}>📢 소개</button></> : null}
+                            {!isBrandFolder && !bcCopyMode ? <><button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void pinBroadcastProduct(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, borderRadius: "6px", padding: "6px 10px", cursor: bcPinBusy ? "wait" : "pointer", color: parentPinned ? "#fff" : "var(--color-ink-soft)", background: parentPinned ? "var(--color-rose-deep)" : "var(--color-surface-2)", border: `1px solid ${parentPinned ? "var(--color-rose-deep)" : "var(--color-line)"}` }}>{parentPinned ? "📌 고정중" : "📌 고정"}</button><button type="button" onClick={(e) => { e.stopPropagation(); void setChatCurrentAndCopy(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }}>📢 채팅</button></> : null}
                             <button type="button" onClick={(e) => { e.stopPropagation(); editProduct(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }}>수정</button>
                             <button type="button" disabled={bcBusy} onClick={(e) => { e.stopPropagation(); void removeBcProduct(pid); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", border: "none", borderRadius: "6px", padding: "6px 10px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcBusy ? 0.6 : 1 }}>빼기</button>
                           </div>
-                          {isBrandFolder && expanded ? <div style={{ borderTop: "1px solid var(--color-line)", padding: "8px", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", gap: "6px" }}>{detailRows.map((detail) => { const pinned=isBroadcastPinned(pid,detail.detailName); const optionText=[detail.colors.length?`색상 ${detail.colors.join(",")}`:"",detail.sizes.length?`사이즈 ${detail.sizes.join(",")}`:""].filter(Boolean).join(" · ")||"옵션 없음"; return <div key={broadcastPinKey(pid,detail.detailName)} style={{ display:"grid",gridTemplateColumns:"44px minmax(0,1fr) auto auto",gap:"8px",alignItems:"center",border:pinned?"2px solid var(--color-rose-deep)":"1px solid var(--color-line)",borderRadius:"8px",padding:"7px",background:pinned?"var(--color-rose-soft)":"var(--color-surface)" }}><button type="button" onClick={()=>detail.image&&setLightbox(detail.image)} style={{width:42,height:42,border:0,borderRadius:7,overflow:"hidden",padding:0,background:"var(--color-surface-2)"}}>{detail.image?<img src={detail.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🖼"}</button><div style={{minWidth:0}}><div style={{fontSize:"12px",fontWeight:900,color:"var(--color-ink)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{detail.detailName}</div><div style={{fontSize:"11px",fontWeight:800,color:"var(--color-rose-deep)",marginTop:2}}>{detail.price.toLocaleString("ko-KR")}원</div><div style={{fontSize:"10px",fontWeight:700,color:"var(--color-ink-soft)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{optionText}{detail.stockManaged&&detail.stock!==null?` · 재고 ${detail.stock}`:""}</div></div><button type="button" disabled={bcPinBusy} onClick={()=>void pinBroadcastProduct(p,detail)} style={{fontSize:"11px",fontWeight:900,borderRadius:6,padding:"6px 9px",color:pinned?"#fff":"var(--color-ink-soft)",background:pinned?"var(--color-rose-deep)":"var(--color-surface-2)",border:`1px solid ${pinned?"var(--color-rose-deep)":"var(--color-line)"}`}}>{pinned?"📌 고정중":"📌 고정"}</button><button type="button" disabled={bcPinBusy} title="고정 + 채팅 안내를 한 번에 (봇이 직접 올립니다)" onClick={()=>void announceProduct(p,detail)} style={{fontSize:"11px",fontWeight:900,color:"#fff",background:"#0F6E56",border:"1px solid #0F6E56",borderRadius:6,padding:"6px 9px",cursor:bcPinBusy?"wait":"pointer",whiteSpace:"nowrap"}}>📢 소개</button></div>})}</div> : null}
+                          {isBrandFolder && expanded ? <div style={{ borderTop: "1px solid var(--color-line)", padding: "8px", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", gap: "6px" }}>{detailRows.map((detail) => { const pinned=isBroadcastPinned(pid,detail.detailName); const optionText=[detail.colors.length?`색상 ${detail.colors.join(",")}`:"",detail.sizes.length?`사이즈 ${detail.sizes.join(",")}`:""].filter(Boolean).join(" · ")||"옵션 없음"; return <div key={broadcastPinKey(pid,detail.detailName)} style={{ display:"grid",gridTemplateColumns:"44px minmax(0,1fr) auto auto",gap:"8px",alignItems:"center",border:pinned?"2px solid var(--color-rose-deep)":"1px solid var(--color-line)",borderRadius:"8px",padding:"7px",background:pinned?"var(--color-rose-soft)":"var(--color-surface)" }}><button type="button" onClick={()=>detail.image&&setLightbox(detail.image)} style={{width:42,height:42,border:0,borderRadius:7,overflow:"hidden",padding:0,background:"var(--color-surface-2)"}}>{detail.image?<img src={detail.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🖼"}</button><div style={{minWidth:0}}><div style={{fontSize:"12px",fontWeight:900,color:"var(--color-ink)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{detail.detailName}</div><div style={{fontSize:"11px",fontWeight:800,color:"var(--color-rose-deep)",marginTop:2}}>{detail.price.toLocaleString("ko-KR")}원</div><div style={{fontSize:"10px",fontWeight:700,color:"var(--color-ink-soft)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{optionText}{detail.stockManaged&&detail.stock!==null?` · 재고 ${detail.stock}`:""}</div></div><button type="button" disabled={bcPinBusy} onClick={()=>void pinBroadcastProduct(p,detail)} style={{fontSize:"11px",fontWeight:900,borderRadius:6,padding:"6px 9px",color:pinned?"#fff":"var(--color-ink-soft)",background:pinned?"var(--color-rose-deep)":"var(--color-surface-2)",border:`1px solid ${pinned?"var(--color-rose-deep)":"var(--color-line)"}`}}>{pinned?"📌 고정중":"📌 고정"}</button><button type="button" onClick={()=>void setChatCurrentAndCopy(p,detail)} style={{fontSize:"11px",fontWeight:900,color:"var(--color-ink-soft)",background:"var(--color-surface-2)",border:"1px solid var(--color-line)",borderRadius:6,padding:"6px 9px"}}>📢 채팅</button></div>})}</div> : null}
                         </div>
                       );
                     })}
