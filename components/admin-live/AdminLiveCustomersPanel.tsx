@@ -485,19 +485,19 @@ function CustomerDetailDrawer({
     if (nextPhone.length < 10 || nextPhone.length > 11) { showAdminToast("전화번호는 숫자 10~11자리여야 합니다.", "warning"); return; }
     if (nextPhone === currentPhone) { showAdminToast("지금 번호와 같습니다.", "warning"); return; }
 
+    // [2026-08-30 사장님 지시] "난독증 환자도 이해되게" — 짧은 말로.
     const ok = await showAdminConfirm(
       [
-        "회원 전화번호를 바꿀까요?",
+        "이 손님 전화번호를 바꿉니다.",
         "",
-        `${formatPhone(currentPhone)}  →  ${formatPhone(nextPhone)}`,
+        `${formatPhone(currentPhone)}   →   ${formatPhone(nextPhone)}`,
         "",
         fUnifyOrders
-          ? "· 이 회원의 기존 주문 번호도 함께 바꿉니다 (합배송·입금매칭이 번호 기준이라 권장)"
-          : "· 주문은 그대로 둡니다 — 옛 주문과 갈라져 택배비가 다시 붙을 수 있습니다",
-        "· 포인트 잔액·이력·차단은 새 번호로 따라옵니다",
-        "· 다른 회원이 쓰는 번호면 저장되지 않고 중단됩니다",
+          ? "지난 주문도 새 번호로 같이 바뀝니다."
+          : "지난 주문은 옛 번호 그대로 둡니다.\n(택배비가 다시 붙을 수 있어요)",
+        "포인트도 새 번호로 따라옵니다.",
       ].join("\n"),
-      { title: "전화번호 변경", confirmText: "변경하기" },
+      { title: "전화번호 바꾸기", confirmText: "바꾸기" },
     );
     if (!ok) return;
 
@@ -759,13 +759,12 @@ function CustomerDetailDrawer({
                         onChange={(e) => setFUnifyOrders(e.target.checked)}
                         style={{ width: "15px", height: "15px", accentColor: "var(--color-rose-deep)", cursor: "pointer" }}
                       />
-                      <span style={{ fontSize: "11.5px", fontWeight: 800, color: "var(--color-ink)" }}>이 회원의 기존 주문 번호도 같이 바꾸기 <b style={{ color: "var(--color-rose-deep)" }}>(권장)</b></span>
+                      <span style={{ fontSize: "11.5px", fontWeight: 800, color: "var(--color-ink)" }}>지난 주문도 같이 바꾸기 <b style={{ color: "var(--color-rose-deep)" }}>(권장)</b></span>
                     </label>
-                    <div style={{ fontSize: "10.5px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.7, marginBottom: "8px" }}>
-                      · 포인트 잔액·이력·차단은 새 번호로 따라옵니다<br />
-                      · 합배송 택배비와 무통장 자동입금확인이 번호 기준이라, 주문까지 같이 바꾸지 않으면 옛 주문과 갈라집니다<br />
-                      · 다른 회원이 이미 쓰는 번호면 저장되지 않고 중단됩니다<br />
-                      · 받는분 연락처는 주문자 번호와 같았던 주문만 함께 바뀝니다
+                    <div style={{ fontSize: "10.5px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.8, marginBottom: "8px" }}>
+                      · 포인트도 새 번호로 따라옵니다<br />
+                      · 다른 사람이 쓰는 번호면 안 바뀝니다<br />
+                      · 지난 주문도 같이 바꿔야 택배비가 또 안 붙습니다
                     </div>
                     <button
                       type="button"

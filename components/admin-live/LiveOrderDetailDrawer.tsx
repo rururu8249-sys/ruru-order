@@ -727,17 +727,23 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       //   → 번호가 바뀌었으면 회원 번호도 함께 바꿀지 그 자리에서 물어본다.
       const beforePhone = originalPhoneRef.current;
       if (beforePhone && phoneDigits && beforePhone !== phoneDigits) {
+        // [2026-08-30 사장님 지시] "난독증 환자도 이해되게" — 짧은 말로 바꿨다.
+        //   이 창은 관리자 화면에만 뜬다(손님에게 안 보임).
+        const dash = (d: string) =>
+          d.length === 11 ? `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`
+          : d.length === 10 ? `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`
+          : d;
+
         const syncOk = await showAdminConfirm(
           [
-            "회원 정보의 전화번호도 바꿀까요?",
+            "이 손님 회원정보도 새 번호로 바꿀까요?",
             "",
-            `${beforePhone}  →  ${phoneDigits}`,
+            `${dash(beforePhone)}   →   ${dash(phoneDigits)}`,
             "",
-            "· 안 바꾸면 손님이 다시 로그인할 때 옛 번호가 되살아납니다",
-            "· 이 회원의 다른 주문도 새 번호로 통일됩니다 (합배송·입금매칭 기준)",
-            "· 다른 회원이 쓰는 번호면 저장되지 않고 중단됩니다",
+            "안 바꾸면 손님이 다음에 로그인할 때",
+            "옛날 번호가 다시 나타납니다.",
           ].join("\n"),
-          { title: "회원 번호 동기화", confirmText: "회원 번호도 바꾸기", cancelText: "이 주문만" },
+          { title: "전화번호", confirmText: "같이 바꾸기", cancelText: "이 주문만" },
         );
 
         if (syncOk) {
