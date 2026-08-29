@@ -7,6 +7,13 @@ import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { resolveProductImageUrl } from "./productImageUrl";
 import { compressProductImage, isHeicLikeImage } from "./compressProductImage";
+import {
+  addDetailRow as addDetailRowState,
+  removeDetailRow as removeDetailRowState,
+  renameDetail as renameDetailState,
+  setDetailAxis as setDetailAxisState,
+  type BrandDetailState,
+} from "@/lib/brandDetailTableOps";
 import { brandWordmarkThumbnail, normalizeBrandKorean } from "@/lib/brandWordmarkThumbnail";
 import { detailCode } from "@/lib/productDetailModel";
 
@@ -1408,122 +1415,57 @@ export default function QuickProductFastForm({
   //   아래 함수들이 그 왕복 없이 표 안에서 바로 값을 바꾼다.
   //   ⚠️ 저장되는 형태(option_pricing · detail_options · stock_variants)는 창에서 고칠 때와 완전히 동일하다.
 
+  // [2026-08-29] 표 편집의 "계산"은 lib/brandDetailTableOps.ts 로 빼놨다.
+  //   화면 안에 있으면 시뮬레이션 검사를 돌릴 수 없기 때문이다.
+  //   (scripts/test-brand-detail-table.mjs 가 이 함수들을 그대로 돌려서 검사한다)
+  const collectDetailState = (): BrandDetailState => ({
+    details,
+    detailPlus,
+    detailPhotos,
+    photoSets: brandGroupDetailPhotoSets,
+    categories: brandGroupDetailCategories,
+    options: brandGroupDetailOptions,
+    hidden: detailHidden,
+    variantRows,
+  });
+
+  const applyDetailState = (next: BrandDetailState) => {
+    setFormTouched(true);
+    setDetailText(next.details.join(", "));
+    setDetailPlus(next.detailPlus);
+    setDetailPhotos(next.detailPhotos);
+    setBrandGroupDetailPhotoSets(next.photoSets);
+    setBrandGroupDetailCategories(next.categories);
+    setBrandGroupDetailOptions(next.options);
+    setDetailHidden(next.hidden);
+    setVariantRows(next.variantRows);
+  };
+
   // 세부상품 이름 바꾸기 — 이름이 재고 키의 앞부분이라 관련된 곳을 전부 같이 옮겨야 한다.
   const renameDetailEverywhere = (oldName: string, rawNext: string) => {
-    const nextName = String(rawNext || "").trim();
-    if (!oldName || !nextName || oldName === nextName) return false;
-    if (details.includes(nextName)) {
-      showAdminToast("같은 상품명이 이미 있어요.", "error");
+    const result = renameDetailState(collectDetailState(), oldName, rawNext);
+    if (!result.ok) {
+      if (result.reason !== "같은 이름입니다") showAdminToast(result.reason, "error");
       return false;
     }
-    const moveKey = <T,>(source: Record<string, T>) => {
-      const next = { ...source };
-      if (oldName in next) { next[nextName] = next[oldName]; delete next[oldName]; }
-      return next;
-    };
-    setFormTouched(true);
-    setDetailText(details.map((n) => (n === oldName ? nextName : n)).join(", "));
-    setDetailPlus((prev) => moveKey(prev));
-    setDetailPhotos((prev) => moveKey(prev));
-    setBrandGroupDetailPhotoSets((prev) => moveKey(prev));
-    setBrandGroupDetailCategories((prev) => moveKey(prev));
-    setBrandGroupDetailOptions((prev) => moveKey(prev));
-    setDetailHidden((prev) => prev.map((n) => (n === oldName ? nextName : n)));
-    setVariantRows((prev) =>
-      prev.map((row) =>
-        row.detail === oldName
-          ? {
-              ...row,
-              detail: nextName,
-              color: [nextName, row.colorOnly].filter(Boolean).join(AXIS_JOIN),
-              key: `${[nextName, row.colorOnly].filter(Boolean).join(AXIS_JOIN) || "__EMPTY_COLOR__"}__${row.size || "__EMPTY_SIZE__"}`,
-            }
-          : row,
-      ),
-    );
+    applyDetailState(result.state);
     return true;
   };
 
   // 색상 / 사이즈를 쉼표로 적으면 그 세부상품의 조합을 다시 만든다 (기존 수량은 살린다).
   const setDetailAxisValues = (name: string, axis: "colors" | "sizes", raw: string) => {
-    const values = unique(splitOptions(raw));
-    setFormTouched(true);
-    setBrandGroupDetailOptions((prev) => {
-      const cfg = prev[name] || { colors: [], sizes: [], variants: [] };
-      const colors = axis === "colors" ? values : (cfg.colors || []);
-      const sizes = axis === "sizes" ? values : (cfg.sizes || []);
-      const cs = colors.length ? colors : ["없음"];
-      const ss = sizes.length ? sizes : ["없음"];
-      const variants = cs.flatMap((c) => ss.map((z) => ({ color: c, size: z })));
-      return { ...prev, [name]: { colors, sizes, variants } };
-    });
-    setVariantRows((prev) => {
-      const others = prev.filter((row) => row.detail !== name);
-      const cfgColors = axis === "colors" ? values : (brandGroupDetailOptions[name]?.colors || []);
-      const cfgSizes = axis === "sizes" ? values : (brandGroupDetailOptions[name]?.sizes || []);
-      const cs = cfgColors.length ? cfgColors : ["없음"];
-      const ss = cfgSizes.length ? cfgSizes : ["없음"];
-      const made = cs.flatMap((c) =>
-        ss.map((z) => {
-          const storedColor = [name, c].filter(Boolean).join(AXIS_JOIN);
-          const size = z === "없음" ? "" : z;
-          const before = prev.find((row) => row.detail === name && row.colorOnly === c && String(row.size || "") === size);
-          return {
-            key: `${storedColor || "__EMPTY_COLOR__"}__${size || "__EMPTY_SIZE__"}`,
-            color: storedColor,
-            size,
-            stock: Number(before?.stock || 0),
-            detail: name,
-            colorOnly: c,
-          };
-        }),
-      );
-      return [...others, ...made];
-    });
+    applyDetailState(setDetailAxisState(collectDetailState(), name, axis, raw));
   };
 
   // 표에 새 줄 추가 — 색상·사이즈는 바로 윗줄 것을 물려받는다(대부분 같은 구성이라 손이 덜 감).
   const addDetailRow = (rawName?: string, salePrice?: number) => {
-    const base = moneyNumber(priceText);
-    const previous = details[details.length - 1];
-    const cfg = previous ? brandGroupDetailOptions[previous] : undefined;
-    let name = String(rawName || "").trim();
-    if (!name) {
-      let i = details.length + 1;
-      while (details.includes(`새 상품 ${i}`)) i += 1;
-      name = `새 상품 ${i}`;
-    }
-    if (details.includes(name)) return name;
-
-    setFormTouched(true);
-    setDetailText([...details, name].join(", "));
-    if (typeof salePrice === "number" && salePrice > 0) {
-      setDetailPlus((prev) => ({ ...prev, [name]: String(Math.max(0, salePrice - base)) }));
-    }
-    if (previous && cfg) {
-      const colors = cfg.colors || [];
-      const sizes = cfg.sizes || [];
-      const cs = colors.length ? colors : ["없음"];
-      const ss = sizes.length ? sizes : ["없음"];
-      setBrandGroupDetailOptions((prev) => ({
-        ...prev,
-        [name]: { colors, sizes, variants: cs.flatMap((c) => ss.map((z) => ({ color: c, size: z }))) },
-      }));
-      setVariantRows((prev) => [
-        ...prev,
-        ...cs.flatMap((c) =>
-          ss.map((z) => {
-            const storedColor = [name, c].filter(Boolean).join(AXIS_JOIN);
-            const size = z === "없음" ? "" : z;
-            return { key: `${storedColor}__${size || "__EMPTY_SIZE__"}`, color: storedColor, size, stock: 0, detail: name, colorOnly: c };
-          }),
-        ),
-      ]);
-      if (brandGroupDetailCategories[previous]) {
-        setBrandGroupDetailCategories((prev) => ({ ...prev, [name]: brandGroupDetailCategories[previous] }));
-      }
-    }
-    return name;
+    const result = addDetailRowState(collectDetailState(), {
+      name: rawName,
+      salePrice,
+      basePrice: moneyNumber(priceText),
+    });
+    applyDetailState(result.state);
+    return result.name;
   };
 
   // 표에서 줄 지우기 (창 안 열고)
@@ -1532,21 +1474,14 @@ export default function QuickProductFastForm({
       showAdminToast("마지막 상품은 지울 수 없어요.\n상품 자체를 감추려면 아래 [고객 노출]을 끄세요.", "warning");
       return;
     }
-    const ok = await showAdminConfirm(
+    const confirmed = await showAdminConfirm(
       `"${target}" 을(를) 목록에서 뺄까요?\n\n손님 화면에서는 사라지지만 이미 들어온 주문은 그대로 있습니다.`,
       { title: "상품 빼기", confirmText: "빼기", cancelText: "취소", tone: "danger" },
     );
-    if (!ok) return;
-    const removeKey = <T,>(source: Record<string, T>) => { const next = { ...source }; delete next[target]; return next; };
-    setFormTouched(true);
-    setDetailText(details.filter((n) => n !== target).join(", "));
-    setDetailPlus((prev) => removeKey(prev));
-    setDetailPhotos((prev) => removeKey(prev));
-    setBrandGroupDetailPhotoSets((prev) => removeKey(prev));
-    setBrandGroupDetailCategories((prev) => removeKey(prev));
-    setBrandGroupDetailOptions((prev) => removeKey(prev));
-    setDetailHidden((prev) => prev.filter((n) => n !== target));
-    setVariantRows((prev) => prev.filter((row) => row.detail !== target));
+    if (!confirmed) return;
+    const result = removeDetailRowState(collectDetailState(), target);
+    if (!result.ok) { showAdminToast(result.reason, "warning"); return; }
+    applyDetailState(result.state);
   };
 
   // 사진 여러 장을 한꺼번에 놓으면 → 장수만큼 줄을 만들고 파일 이름을 상품명으로 쓴다.
