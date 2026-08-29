@@ -53,11 +53,8 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
   const pasteValue = [nickname, summary].filter(Boolean).join(" ");
 
   // [2026-08-30 사장님 확인] 카드결제 링크는 "돈 내는 사람"에게 간다.
-  //   선물 주문이면 배송지와 받는분 번호는 다르지만, 결제 링크는 주문자(계정 주인)에게 보내야 한다.
+  //   받는 곳이 본인 집이 아닐 수 있지만(선물·다른 집 수령 등) 결제는 계정 주인이 한다.
   //   order.phone = 주문자 번호, order.recipientPhone = 택배 받는분 번호 (별개)
-  const recipientPhoneDigits = String(order.recipientPhone || "").replace(/[^0-9]/g, "");
-  const isGiftOrder = Boolean(recipientPhoneDigits) && recipientPhoneDigits !== phone;
-
   const fields: { key: string; label: string; value: string; hint?: string; highlight?: boolean }[] = [
     { key: "paste", label: "상품명 칸", value: pasteValue, hint: "닉네임 + 상품명", highlight: true },
     { key: "amount", label: "결제금액", value: String(amount), hint: "카드 7% 포함" },
@@ -228,14 +225,6 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
           </button>
 
           <div className="mb-2 text-[12px] font-bold text-ink-soft">금액·전화번호는 페이스터 입력칸이 따로라 아래에서 복사하세요 (숫자키 1~3)</div>
-
-          {/* 선물 주문 주의 — 받는분 번호로 링크를 보내면 엉뚱한 사람이 결제하게 된다 */}
-          {isGiftOrder ? (
-            <div className="mb-2 rounded-xl border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[11px] font-bold leading-5 text-ink-soft">
-              🎁 <b>선물 주문입니다.</b> 받는 분은 다른 번호({recipientPhoneDigits})예요.
-              <br />결제 링크는 <b className="text-rose-deep">주문자 번호</b>로 보내세요 — 아래 번호가 주문자 번호입니다.
-            </div>
-          ) : null}
 
           <div className="space-y-2">
             {fields.map((f, fieldIndex) => (
