@@ -5593,6 +5593,18 @@ export default function OrderPage() {
               >
                 확인
               </button>
+              {/* [2026-08-30 사장님 요청] 공지를 닫아도 다시 볼 곳으로 안내한다.
+                  누르면 오른쪽 아래 🔔 쪽지함이 열린다(공지 + 내 쪽지가 한자리). */}
+              <button
+                type="button"
+                onClick={() => {
+                  setPopupOpen(false);
+                  try { window.dispatchEvent(new Event("ruru-open-notice-box")); } catch { /* 무시 */ }
+                }}
+                style={{ height: "46px", borderRadius: "13px", background: "#fff", color: popupNoticeColor, border: `1.5px solid ${popupNoticeColor}`, fontSize: "14px", fontWeight: 800, cursor: "pointer" }}
+              >
+                📬 공지 · 쪽지 전체보기
+              </button>
               <button
                 type="button"
                 onClick={() => {

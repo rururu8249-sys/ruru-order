@@ -64,7 +64,27 @@ export async function GET(request: NextRequest) {
       if (boxError) return NextResponse.json({ ok: false, error: boxError.message }, { status: 500 });
       const box = (rows || []) as Array<Record<string, unknown>>;
       const unread = box.filter((r) => !r.seen_at).length;
-      return NextResponse.json({ ok: true, box, unread });
+
+      // [2026-08-30 사장님 요청] "쪽지함을 공지사항별로 상단 고정"
+      //   공지는 이미 notices 표에 있고 is_pinned(상단 고정)까지 있다. 새로 만들지 않고 그대로 쓴다.
+      //   손님이 🔔 하나만 보면 공지 + 내 쪽지를 한자리에서 본다.
+      //   실패해도 쪽지함 자체는 그대로 열린다.
+      let notices: Array<Record<string, unknown>> = [];
+      try {
+        const { data: nRows } = await sb
+          .from("notices")
+          .select("id,title,content,category,is_pinned,created_at")
+          .eq("is_visible", true)
+          .order("is_pinned", { ascending: false })
+          .order("sort_order", { ascending: true })
+          .order("created_at", { ascending: false })
+          .limit(10);
+        notices = (nRows || []) as Array<Record<string, unknown>>;
+      } catch {
+        /* 공지 조회 실패는 쪽지함 표시를 막지 않는다 */
+      }
+
+      return NextResponse.json({ ok: true, box, unread, notices });
     }
     const { data, error } = await matchTarget(
       sb

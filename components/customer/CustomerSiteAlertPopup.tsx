@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 type SiteAlert = { id: number; kind: string; title: string; message: string; created_at: string; expires_at: string };
 type BoxItem = SiteAlert & { seen_at?: string | null; dismissed_at?: string | null };
+type NoticeItem = { id: number; title: string; content: string; category?: string | null; is_pinned?: boolean | null; created_at: string };
 
 // 쪽지 종류에 맞는 아이콘 — 주문 재촉(🛒)과 사장님 쪽지(📩)를 구분한다.
 const iconOf = (kind: string) => (kind === "admin_note" ? "📩" : "🛒");
@@ -34,6 +35,7 @@ export default function CustomerSiteAlertPopup() {
   const [box, setBox] = useState<BoxItem[]>([]);
   const [unread, setUnread] = useState(0);
   const [hasAny, setHasAny] = useState(false);
+  const [notices, setNotices] = useState<NoticeItem[]>([]);
 
   useEffect(() => {
     if (typeof window === "undefined" || window.location.pathname.startsWith("/admin")) return;
@@ -60,17 +62,27 @@ export default function CustomerSiteAlertPopup() {
         const j2 = await r2.json().catch(() => null);
         if (!stopped && r2.ok && j2?.ok) {
           const list = Array.isArray(j2.box) ? (j2.box as BoxItem[]) : [];
+          const nots = Array.isArray(j2.notices) ? (j2.notices as NoticeItem[]) : [];
           setBox(list);
+          setNotices(nots);
           setUnread(Number(j2.unread) || 0);
-          setHasAny(list.length > 0);
+          setHasAny(list.length > 0 || nots.length > 0);
         }
       } catch { /* 쪽지함은 보조 기능 */ }
     };
     void load();
     const timer = window.setInterval(() => { if (document.visibilityState === "visible") void load(); }, 15000);
     const onFocus = () => void load();
+    // 접속 팝업 공지의 [📬 공지 · 쪽지 전체보기] 에서 열 수 있게
+    const onOpenBox = () => { setBoxOpen(true); void load(); };
     window.addEventListener("focus", onFocus);
-    return () => { stopped = true; window.clearInterval(timer); window.removeEventListener("focus", onFocus); };
+    window.addEventListener("ruru-open-notice-box", onOpenBox);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("ruru-open-notice-box", onOpenBox);
+    };
   }, []);
 
   const dismiss = async (goOrder: boolean) => {
@@ -118,13 +130,37 @@ export default function CustomerSiteAlertPopup() {
         <div className="fixed inset-0 z-[490] flex items-end justify-center bg-black/50" onClick={(e) => { if (e.target === e.currentTarget) setBoxOpen(false); }}>
           <div className="flex max-h-[76vh] w-full max-w-[480px] flex-col overflow-hidden rounded-t-[26px] bg-white">
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-              <h2 className="text-[17px] font-black text-slate-950">📬 쪽지함</h2>
+              <h2 className="text-[17px] font-black text-slate-950">📬 공지 · 쪽지함</h2>
               <button type="button" onClick={() => setBoxOpen(false)} className="text-lg font-black text-slate-400">✕</button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-              {box.length === 0 ? (
+              {/* 공지사항 — 상단 고정. notices 표의 is_pinned 가 먼저 온다(관리자 공지 화면에서 이미 쓰는 기능). */}
+              {notices.length > 0 ? (
+                <div className="mb-3">
+                  <div className="mb-1.5 px-1 text-[11px] font-black tracking-wide text-slate-400">공지사항</div>
+                  <ul className="space-y-2">
+                    {notices.map((n) => (
+                      <li key={`n-${n.id}`} className="rounded-2xl border border-[#E7D2DA] bg-[#FBF3F6] p-3.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">{n.is_pinned ? "📌" : "📢"}</span>
+                          <span className="min-w-0 flex-1 truncate text-[14px] font-black text-slate-900">{n.title}</span>
+                          {n.is_pinned ? <span className="shrink-0 rounded-full bg-[#7B2D43] px-2 py-0.5 text-[10px] font-black text-white">고정</span> : null}
+                        </div>
+                        <p className="mt-1.5 whitespace-pre-line text-[13px] font-bold leading-6 text-slate-600">{n.content}</p>
+                        <div className="mt-1.5 text-[11px] font-bold text-slate-400">{timeText(n.created_at)}</div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {notices.length > 0 && box.length > 0 ? (
+                <div className="mb-1.5 px-1 text-[11px] font-black tracking-wide text-slate-400">내 쪽지</div>
+              ) : null}
+
+              {box.length === 0 && notices.length === 0 ? (
                 <div className="py-12 text-center text-sm font-bold text-slate-400">받은 쪽지가 없어요.</div>
-              ) : (
+              ) : box.length === 0 ? null : (
                 <ul className="space-y-2">
                   {box.map((b) => (
                     <li key={b.id} className={`rounded-2xl border p-3.5 ${b.seen_at ? "border-slate-100 bg-white" : "border-rose-200 bg-rose-50/60"}`}>
