@@ -713,7 +713,6 @@ export default function QuickProductFastForm({
   const [formTouched, setFormTouched] = useState(false);
   // [2026-08-29 사장님 요청] 등록하면서 손님 화면이 어떻게 보이는지 바로 확인
   const [previewOpen, setPreviewOpen] = useState(true);
-  const [photoDropTarget, setPhotoDropTarget] = useState("");   // 지금 드래그가 올라와 있는 카드
   const [photoHoverTarget, setPhotoHoverTarget] = useState("");  // 붙여넣기(Ctrl+V) 대상 카드
   const bulkDetailPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const bulkDetailPhotoTargetRef = useRef("");
@@ -778,6 +777,12 @@ export default function QuickProductFastForm({
   // [2026-08-29 개선 A] 세부상품 "실제 판매가"를 직접 입력 — 추가금은 시스템이 역산한다.
   //   치는 도중(예: "1" → "12" → "129000")에 값이 튀지 않도록 입력 중인 글자를 따로 들고 있는다.
   const [salePriceDraft, setSalePriceDraft] = useState<Record<string, string>>({});
+  const [nameDraft, setNameDraft] = useState<Record<string, string>>({});
+  const [bulkRowBusy, setBulkRowBusy] = useState(false);
+  const [bulkNamesOpen, setBulkNamesOpen] = useState(false);
+  const [bulkNamesText, setBulkNamesText] = useState("");
+  const [rowDropTarget, setRowDropTarget] = useState("");
+  const bulkRowPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const [brandGroupNew, setBrandGroupNew] = useState(false);
   const [brandKoText, setBrandKoText] = useState("");
   const [brandEnText, setBrandEnText] = useState("");
@@ -1003,15 +1008,6 @@ export default function QuickProductFastForm({
     () => unique(details.map((name) => String(brandGroupDetailCategories[name] || "").trim()).filter(Boolean)),
     [details, brandGroupDetailCategories],
   );
-  const filteredBrandDetails = useMemo(() => {
-    const query = brandDetailSearch.trim().toLocaleLowerCase("ko-KR");
-    return details.filter((name) => {
-      const detailCategory = String(brandGroupDetailCategories[name] || "").trim();
-      if (brandDetailCategoryFilter !== "전체" && detailCategory !== brandDetailCategoryFilter) return false;
-      if (!query) return true;
-      return `${name} ${detailCategory}`.toLocaleLowerCase("ko-KR").includes(query);
-    });
-  }, [details, brandGroupDetailCategories, brandDetailCategoryFilter, brandDetailSearch]);
   // 사용 중인 축 개수(1~3). 0이면 옵션 없는 단일 상품.
   const usedAxisCount = (details.length ? 1 : 0) + (colors.length ? 1 : 0) + (sizes.length ? 1 : 0);
 
@@ -1405,6 +1401,170 @@ export default function QuickProductFastForm({
 
   const toggleDetailHidden = (name: string) => {
     setDetailHidden((prev) => (prev.includes(name) ? prev.filter((x) => x !== name) : [...prev, name]));
+  };
+
+  // ── [2026-08-29] 표에서 바로 고치기 위한 공용 함수들 ─────────────────────
+  //   예전에는 세부상품 하나 고치려면 카드클릭 → 창 → 적용 → 저장 을 왕복해야 했다.
+  //   아래 함수들이 그 왕복 없이 표 안에서 바로 값을 바꾼다.
+  //   ⚠️ 저장되는 형태(option_pricing · detail_options · stock_variants)는 창에서 고칠 때와 완전히 동일하다.
+
+  // 세부상품 이름 바꾸기 — 이름이 재고 키의 앞부분이라 관련된 곳을 전부 같이 옮겨야 한다.
+  const renameDetailEverywhere = (oldName: string, rawNext: string) => {
+    const nextName = String(rawNext || "").trim();
+    if (!oldName || !nextName || oldName === nextName) return false;
+    if (details.includes(nextName)) {
+      showAdminToast("같은 상품명이 이미 있어요.", "error");
+      return false;
+    }
+    const moveKey = <T,>(source: Record<string, T>) => {
+      const next = { ...source };
+      if (oldName in next) { next[nextName] = next[oldName]; delete next[oldName]; }
+      return next;
+    };
+    setFormTouched(true);
+    setDetailText(details.map((n) => (n === oldName ? nextName : n)).join(", "));
+    setDetailPlus((prev) => moveKey(prev));
+    setDetailPhotos((prev) => moveKey(prev));
+    setBrandGroupDetailPhotoSets((prev) => moveKey(prev));
+    setBrandGroupDetailCategories((prev) => moveKey(prev));
+    setBrandGroupDetailOptions((prev) => moveKey(prev));
+    setDetailHidden((prev) => prev.map((n) => (n === oldName ? nextName : n)));
+    setVariantRows((prev) =>
+      prev.map((row) =>
+        row.detail === oldName
+          ? {
+              ...row,
+              detail: nextName,
+              color: [nextName, row.colorOnly].filter(Boolean).join(AXIS_JOIN),
+              key: `${[nextName, row.colorOnly].filter(Boolean).join(AXIS_JOIN) || "__EMPTY_COLOR__"}__${row.size || "__EMPTY_SIZE__"}`,
+            }
+          : row,
+      ),
+    );
+    return true;
+  };
+
+  // 색상 / 사이즈를 쉼표로 적으면 그 세부상품의 조합을 다시 만든다 (기존 수량은 살린다).
+  const setDetailAxisValues = (name: string, axis: "colors" | "sizes", raw: string) => {
+    const values = unique(splitOptions(raw));
+    setFormTouched(true);
+    setBrandGroupDetailOptions((prev) => {
+      const cfg = prev[name] || { colors: [], sizes: [], variants: [] };
+      const colors = axis === "colors" ? values : (cfg.colors || []);
+      const sizes = axis === "sizes" ? values : (cfg.sizes || []);
+      const cs = colors.length ? colors : ["없음"];
+      const ss = sizes.length ? sizes : ["없음"];
+      const variants = cs.flatMap((c) => ss.map((z) => ({ color: c, size: z })));
+      return { ...prev, [name]: { colors, sizes, variants } };
+    });
+    setVariantRows((prev) => {
+      const others = prev.filter((row) => row.detail !== name);
+      const cfgColors = axis === "colors" ? values : (brandGroupDetailOptions[name]?.colors || []);
+      const cfgSizes = axis === "sizes" ? values : (brandGroupDetailOptions[name]?.sizes || []);
+      const cs = cfgColors.length ? cfgColors : ["없음"];
+      const ss = cfgSizes.length ? cfgSizes : ["없음"];
+      const made = cs.flatMap((c) =>
+        ss.map((z) => {
+          const storedColor = [name, c].filter(Boolean).join(AXIS_JOIN);
+          const size = z === "없음" ? "" : z;
+          const before = prev.find((row) => row.detail === name && row.colorOnly === c && String(row.size || "") === size);
+          return {
+            key: `${storedColor || "__EMPTY_COLOR__"}__${size || "__EMPTY_SIZE__"}`,
+            color: storedColor,
+            size,
+            stock: Number(before?.stock || 0),
+            detail: name,
+            colorOnly: c,
+          };
+        }),
+      );
+      return [...others, ...made];
+    });
+  };
+
+  // 표에 새 줄 추가 — 색상·사이즈는 바로 윗줄 것을 물려받는다(대부분 같은 구성이라 손이 덜 감).
+  const addDetailRow = (rawName?: string, salePrice?: number) => {
+    const base = moneyNumber(priceText);
+    const previous = details[details.length - 1];
+    const cfg = previous ? brandGroupDetailOptions[previous] : undefined;
+    let name = String(rawName || "").trim();
+    if (!name) {
+      let i = details.length + 1;
+      while (details.includes(`새 상품 ${i}`)) i += 1;
+      name = `새 상품 ${i}`;
+    }
+    if (details.includes(name)) return name;
+
+    setFormTouched(true);
+    setDetailText([...details, name].join(", "));
+    if (typeof salePrice === "number" && salePrice > 0) {
+      setDetailPlus((prev) => ({ ...prev, [name]: String(Math.max(0, salePrice - base)) }));
+    }
+    if (previous && cfg) {
+      const colors = cfg.colors || [];
+      const sizes = cfg.sizes || [];
+      const cs = colors.length ? colors : ["없음"];
+      const ss = sizes.length ? sizes : ["없음"];
+      setBrandGroupDetailOptions((prev) => ({
+        ...prev,
+        [name]: { colors, sizes, variants: cs.flatMap((c) => ss.map((z) => ({ color: c, size: z }))) },
+      }));
+      setVariantRows((prev) => [
+        ...prev,
+        ...cs.flatMap((c) =>
+          ss.map((z) => {
+            const storedColor = [name, c].filter(Boolean).join(AXIS_JOIN);
+            const size = z === "없음" ? "" : z;
+            return { key: `${storedColor}__${size || "__EMPTY_SIZE__"}`, color: storedColor, size, stock: 0, detail: name, colorOnly: c };
+          }),
+        ),
+      ]);
+      if (brandGroupDetailCategories[previous]) {
+        setBrandGroupDetailCategories((prev) => ({ ...prev, [name]: brandGroupDetailCategories[previous] }));
+      }
+    }
+    return name;
+  };
+
+  // 표에서 줄 지우기 (창 안 열고)
+  const removeDetailRow = async (target: string) => {
+    if (details.length <= 1) {
+      showAdminToast("마지막 상품은 지울 수 없어요.\n상품 자체를 감추려면 아래 [고객 노출]을 끄세요.", "warning");
+      return;
+    }
+    const ok = await showAdminConfirm(
+      `"${target}" 을(를) 목록에서 뺄까요?\n\n손님 화면에서는 사라지지만 이미 들어온 주문은 그대로 있습니다.`,
+      { title: "상품 빼기", confirmText: "빼기", cancelText: "취소", tone: "danger" },
+    );
+    if (!ok) return;
+    const removeKey = <T,>(source: Record<string, T>) => { const next = { ...source }; delete next[target]; return next; };
+    setFormTouched(true);
+    setDetailText(details.filter((n) => n !== target).join(", "));
+    setDetailPlus((prev) => removeKey(prev));
+    setDetailPhotos((prev) => removeKey(prev));
+    setBrandGroupDetailPhotoSets((prev) => removeKey(prev));
+    setBrandGroupDetailCategories((prev) => removeKey(prev));
+    setBrandGroupDetailOptions((prev) => removeKey(prev));
+    setDetailHidden((prev) => prev.filter((n) => n !== target));
+    setVariantRows((prev) => prev.filter((row) => row.detail !== target));
+  };
+
+  // 사진 여러 장을 한꺼번에 놓으면 → 장수만큼 줄을 만들고 파일 이름을 상품명으로 쓴다.
+  //   거래처 사진이 보통 "BB-39.jpg" 처럼 코드명으로 오기 때문에 이게 제일 빠르다.
+  const addRowsFromPhotoFiles = async (fileList: File[]) => {
+    const files = fileList.filter((f) => f && String(f.type || "").startsWith("image/"));
+    if (files.length === 0) return;
+    setBulkRowBusy(true);
+    try {
+      for (const file of files) {
+        const bare = String(file.name || "").replace(/\.[A-Za-z0-9]+$/, "").trim();
+        const name = addDetailRow(bare || undefined);
+        await addDetailPhotos(name, [file]);
+      }
+      showAdminToast(`사진 ${files.length}장으로 상품 ${files.length}줄을 만들었어요.\n가격만 채우고 저장하세요.`, "success");
+    } finally {
+      setBulkRowBusy(false);
+    }
   };
 
   const deleteBrandDetail = async () => {
@@ -2220,177 +2380,253 @@ export default function QuickProductFastForm({
                 {optionStateHint(sizeText) ? <span style={{ fontSize: "11.5px", fontWeight: 700, color: optionStateHint(sizeText)!.color, whiteSpace: "nowrap" }}>{optionStateHint(sizeText)!.text}</span> : null}
               </div>
 
-              {/* 엑셀 브랜드 대표상품: 재고관리를 꺼도 세부상품별 사진을 관리자가 바로 확인할 수 있게 한다. */}
+              {/* ── [2026-08-29 재설계] 이 브랜드의 상품 — 표에서 바로 고친다 ──
+                  예전: 카드 클릭 → 창 뜸 → 고침 → [변경내용 적용] → 창 닫음 → 또 [저장]  (상품 20개면 20번)
+                  지금: 표에서 칸을 누르면 그 자리에서 고쳐진다. 창은 색상·사이즈를 세밀하게 손볼 때만 연다.
+                  저장되는 형태는 창에서 고칠 때와 완전히 동일하다. */}
               {brandGroupActive ? (
-                <div style={{ marginTop: "10px", borderTop: "1px solid #E8E2DD", paddingTop: "10px" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "7px" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>세부상품 관리</span>
-                    <span style={{ display: "flex", alignItems: "center", gap: "7px" }}>
-                      <span style={{ fontSize: "11px", fontWeight: 800, color: "#0F6E56" }}>{details.length}개 상품 · 총 {brandGroupDetailPhotoCount}장</span>
-                      {/* [2026-08-29 사장님 요청] 브랜드 상품에 새 세부상품을 폼에서 바로 추가 */}
-                      <button
-                        type="button"
-                        onClick={openBrandDetailEditorForNew}
-                        style={{ border: "1px solid #7B2D43", borderRadius: "7px", background: "#7B2D43", color: "#fff", padding: "5px 9px", fontSize: "11px", fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap" }}
-                      >
-                        ＋ 세부상품 추가
-                      </button>
-                    </span>
+                <div style={{ marginTop: "10px", borderTop: "1px solid #E8E2DD", paddingTop: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "9px" }}>
+                    <span style={{ fontSize: "12.5px", fontWeight: 900, color: "var(--color-ink)" }}>이 브랜드의 상품</span>
+                    <span style={{ fontSize: "11px", fontWeight: 800, color: "#0F6E56" }}>{details.length}개 · 사진 {brandGroupDetailPhotoCount}장</span>
                   </div>
-                  {/* [2026-08-29 사장님 요청] 예전에는 사진 한 장 넣는 데
-                      카드 클릭 → 모달 → +추가 → 파일선택 → 변경내용 적용 → 저장 = 5단계였다.
-                      → 이제 카드에 그냥 끌어다 놓거나, 카드 위에서 Ctrl+V 로 붙여넣으면 바로 들어간다. */}
-                  <div style={{ marginBottom: "7px", borderRadius: "8px", background: "#F3F8F6", border: "1px dashed #BFE3D5", padding: "6px 8px", fontSize: "10.5px", fontWeight: 800, color: "#0F6E56", lineHeight: 1.5 }}>
-                    📸 사진은 아래 카드에 <b>끌어다 놓거나</b>, 카드 위에 마우스를 올리고 <b>Ctrl+V(붙여넣기)</b> 하면 바로 들어갑니다. 여러 장 한 번에 됩니다.
+
+                  {/* 사진 몽땅 놓기 — 장수만큼 줄이 생기고 파일 이름이 상품명이 된다 */}
+                  <div
+                    onDragOver={(event) => { event.preventDefault(); setRowDropTarget("__bulk__"); }}
+                    onDragLeave={() => setRowDropTarget((prev) => (prev === "__bulk__" ? "" : prev))}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      setRowDropTarget("");
+                      void addRowsFromPhotoFiles(Array.from(event.dataTransfer?.files || []));
+                    }}
+                    onClick={() => bulkRowPhotoInputRef.current?.click()}
+                    style={{
+                      cursor: "pointer", textAlign: "center", borderRadius: "11px", padding: "16px 12px", marginBottom: "9px",
+                      border: `2px dashed ${rowDropTarget === "__bulk__" ? "#0F6E56" : "#D9C5CC"}`,
+                      background: rowDropTarget === "__bulk__" ? "#EAF6F1" : "#FBF7F9",
+                    }}
+                  >
+                    <div style={{ fontSize: "12.5px", fontWeight: 900, color: "#7B2D43" }}>
+                      {bulkRowBusy ? "사진 올리는 중…" : "📸 사진을 여기에 몽땅 끌어다 놓으세요"}
+                    </div>
+                    <div style={{ marginTop: "4px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.6 }}>
+                      놓은 장수만큼 줄이 자동으로 생기고, <b>파일 이름이 상품명</b>으로 들어갑니다 (BB-39.jpg → BB-39)
+                    </div>
                   </div>
                   <input
-                    ref={bulkDetailPhotoInputRef}
+                    ref={bulkRowPhotoInputRef}
                     type="file"
                     accept="image/*"
                     multiple
-                    onChange={handleBulkDetailPhotoInput}
+                    onChange={(event) => { const files = Array.from(event.target.files || []); event.target.value = ""; void addRowsFromPhotoFiles(files); }}
                     style={{ display: "none" }}
                   />
-                  <input
-                    aria-label="세부상품 검색"
-                    value={brandDetailSearch}
-                    onChange={(event) => setBrandDetailSearch(event.target.value)}
-                    placeholder="상품코드·상품명·구분 검색"
-                    style={{ ...fieldInput, marginBottom: "7px", padding: "7px 10px", fontSize: "11.5px" }}
-                  />
-                  {brandDetailCategories.length > 0 ? (
-                    <div style={{ display: "flex", gap: "5px", overflowX: "auto", paddingBottom: "7px" }}>
-                      {["전체", ...brandDetailCategories].map((detailCategory) => {
-                        const selected = brandDetailCategoryFilter === detailCategory;
-                        return (
-                          <button
-                            key={`brand-detail-filter-${detailCategory}`}
-                            type="button"
-                            onClick={() => setBrandDetailCategoryFilter(detailCategory)}
-                            style={{ flexShrink: 0, border: `1px solid ${selected ? "#7B2D43" : "#E1D5D9"}`, borderRadius: "999px", padding: "4px 8px", background: selected ? "#7B2D43" : "#fff", color: selected ? "#fff" : "var(--color-ink-soft)", fontSize: "10.5px", fontWeight: 800, cursor: "pointer" }}
-                          >
-                            {detailCategory}
-                          </button>
-                        );
-                      })}
+
+                  {details.length === 0 ? (
+                    <div style={{ padding: "20px 14px", textAlign: "center", border: "2px dashed #D9C5CC", borderRadius: "11px", background: "var(--color-surface)" }}>
+                      <div style={{ fontSize: "13px", fontWeight: 900, color: "#7B2D43" }}>아직 상품이 없습니다</div>
+                      <div style={{ marginTop: "5px", fontSize: "11.5px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.6 }}>
+                        위에 사진을 놓거나, 아래 [＋ 한 줄 추가]를 누르세요.
+                      </div>
                     </div>
-                  ) : null}
-                  <div
-                    onPaste={(event) => {
-                      const target = photoHoverTarget;
-                      if (!target) return;
-                      const files = Array.from(event.clipboardData?.files || []);
-                      if (files.length === 0) return;
-                      event.preventDefault();
-                      void addDetailPhotos(target, files);
-                    }}
-                    style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: "6px", maxHeight: "340px", overflowY: "auto", paddingRight: "3px" }}
-                  >
-                    {details.length === 0 ? (
-                      <div style={{ gridColumn: "1 / -1", padding: "22px 14px", textAlign: "center", border: "2px dashed #D9C5CC", borderRadius: "10px", background: "#FFF9FB" }}>
-                        <div style={{ fontSize: "13px", fontWeight: 900, color: "#7B2D43" }}>아직 상품이 없습니다</div>
-                        <div style={{ marginTop: "5px", fontSize: "11.5px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.6 }}>
-                          이 브랜드에 넣을 상품을 하나씩 추가해 주세요.
-                          <br />상품마다 <b>사진 · 판매가 · 색상 · 사이즈</b>를 따로 정합니다.
-                        </div>
+                  ) : (
+                    <div
+                      onPaste={(event) => {
+                        const files = Array.from(event.clipboardData?.files || []).filter((f) => String(f.type || "").startsWith("image/"));
+                        if (files.length === 0) return;
+                        event.preventDefault();
+                        // 마우스가 어느 줄 위에 있으면 그 줄에, 아니면 새 줄을 만든다.
+                        if (photoHoverTarget) void addDetailPhotos(photoHoverTarget, files);
+                        else void addRowsFromPhotoFiles(files);
+                      }}
+                      style={{ border: "1px solid #E8E2DD", borderRadius: "11px", overflow: "hidden", background: "var(--color-surface)" }}
+                    >
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ borderCollapse: "collapse", width: "100%", minWidth: "560px" }}>
+                          <thead>
+                            <tr style={{ background: "#F7F2F4" }}>
+                              {["사진", "상품명", "판매가", "색상", "사이즈", ""].map((h, i) => (
+                                <th
+                                  key={`h-${i}`}
+                                  style={{
+                                    textAlign: i === 2 ? "right" : "left", fontSize: "10px", fontWeight: 900,
+                                    color: "var(--color-ink-mute)", letterSpacing: "0.04em", padding: "8px 8px", whiteSpace: "nowrap",
+                                    width: i === 0 ? "56px" : i === 2 ? "104px" : i === 3 ? "104px" : i === 4 ? "116px" : i === 5 ? "70px" : undefined,
+                                  }}
+                                >{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {details.map((name) => {
+                              const photos = brandGroupDetailPhotoSets[name] || (detailPhotos[name] ? [detailPhotos[name]] : []);
+                              const thumbnail = photos[0] || detailPhotos[name] || "";
+                              const off = detailHidden.includes(name);
+                              const base = moneyNumber(priceText);
+                              const plusNow = Math.max(0, Number(detailPlus[name]) || 0);
+                              const draft = salePriceDraft[name];
+                              const shownPrice = draft !== undefined
+                                ? formatNumberWithComma(draft)
+                                : (detailPlus[name] === "" ? "" : formatNumberWithComma(String(base + plusNow)));
+                              const typedNum = Number(String(draft ?? "").replace(/[^0-9]/g, "")) || 0;
+                              const tooLow = draft !== undefined && String(draft).trim() !== "" && typedNum < base;
+                              const cfg = brandGroupDetailOptions[name] || { colors: [], sizes: [], variants: [] };
+                              const cellStyle: CSSProperties = {
+                                width: "100%", height: "34px", padding: "0 8px", borderRadius: "8px",
+                                border: "1.5px solid transparent", background: "transparent",
+                                color: "var(--color-ink)", fontSize: "12px", fontWeight: 700, outline: "none",
+                              };
+                              return (
+                                <tr
+                                  key={`row-${name}`}
+                                  onMouseEnter={() => setPhotoHoverTarget(name)}
+                                  onMouseLeave={() => setPhotoHoverTarget((prev) => (prev === name ? "" : prev))}
+                                  style={{ borderTop: "1px solid #EFE7EA", opacity: off ? 0.45 : 1, background: photoHoverTarget === name ? "#FBF7F9" : "transparent" }}
+                                >
+                                  <td style={{ padding: "6px 8px" }}>
+                                    <div
+                                      title="사진 끌어놓기 · 클릭하면 여러 장 고르기 · 우클릭하면 대표사진 빼기"
+                                      onClick={() => { bulkDetailPhotoTargetRef.current = name; bulkDetailPhotoInputRef.current?.click(); }}
+                                      onContextMenu={(event) => {
+                                        event.preventDefault();
+                                        if (!thumbnail) return;
+                                        void (async () => {
+                                          const ok = await showAdminConfirm(`"${name}" 대표사진을 뺄까요?`, { title: "사진 빼기", confirmText: "빼기", cancelText: "취소", tone: "danger" });
+                                          if (ok) removeDetailPhoto(name);
+                                        })();
+                                      }}
+                                      onDragOver={(event) => { event.preventDefault(); setRowDropTarget(name); }}
+                                      onDragLeave={() => setRowDropTarget((prev) => (prev === name ? "" : prev))}
+                                      onDrop={(event) => {
+                                        event.preventDefault();
+                                        setRowDropTarget("");
+                                        void addDetailPhotos(name, Array.from(event.dataTransfer?.files || []));
+                                      }}
+                                      style={{
+                                        position: "relative", width: "46px", height: "46px", borderRadius: "9px", cursor: "pointer",
+                                        overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
+                                        border: rowDropTarget === name ? "2px dashed #0F6E56" : thumbnail ? "1px solid #E8E2DD" : "1.5px dashed #C9A8B4",
+                                        background: rowDropTarget === name ? "#EAF6F1" : thumbnail ? "#F1ECE8" : "var(--color-surface-2)",
+                                        fontSize: "14px", fontWeight: 800, color: "#B08A99",
+                                      }}
+                                    >
+                                      {detailPhotoUploading === name ? "…" : thumbnail ? (
+                                        <>
+                                          <img src={resolveProductImageUrl(thumbnail)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                          {photos.length > 1 ? (
+                                            <span style={{ position: "absolute", right: "2px", bottom: "2px", background: "rgba(0,0,0,0.72)", color: "#fff", fontSize: "8px", fontWeight: 900, borderRadius: "5px", padding: "1px 4px" }}>{photos.length}</span>
+                                          ) : null}
+                                        </>
+                                      ) : "＋"}
+                                    </div>
+                                  </td>
+
+                                  <td style={{ padding: "6px 8px" }}>
+                                    <input
+                                      style={cellStyle}
+                                      value={nameDraft[name] ?? name}
+                                      placeholder="상품명"
+                                      onChange={(event) => setNameDraft((prev) => ({ ...prev, [name]: event.target.value }))}
+                                      onBlur={(event) => {
+                                        const next = event.target.value;
+                                        setNameDraft((prev) => { const copy = { ...prev }; delete copy[name]; return copy; });
+                                        renameDetailEverywhere(name, next);
+                                      }}
+                                      onKeyDown={(event) => { if (event.key === "Enter") (event.target as HTMLInputElement).blur(); }}
+                                    />
+                                  </td>
+
+                                  <td style={{ padding: "6px 8px" }}>
+                                    <input
+                                      style={{ ...cellStyle, textAlign: "right", fontWeight: 800, borderColor: tooLow ? "#C0392B" : "transparent" }}
+                                      inputMode="numeric"
+                                      placeholder="판매가"
+                                      title="손님이 실제로 내는 금액"
+                                      value={shownPrice}
+                                      onFocus={(event) => { const t = event.currentTarget; requestAnimationFrame(() => t.select()); }}
+                                      onChange={(event) => applySalePrice(name, event.target.value)}
+                                      onBlur={() => clearSalePriceDraft(name)}
+                                    />
+                                    <div style={{ fontSize: "9px", fontWeight: 800, textAlign: "right", paddingRight: "8px", color: tooLow ? "#C0392B" : "var(--color-ink-mute)" }}>
+                                      {tooLow ? "대표가보다 낮음" : `추가금 +${plusNow.toLocaleString("ko-KR")}`}
+                                    </div>
+                                  </td>
+
+                                  <td style={{ padding: "6px 8px" }}>
+                                    <input
+                                      style={cellStyle}
+                                      placeholder="블랙"
+                                      defaultValue={(cfg.colors || []).join(", ")}
+                                      key={`c-${name}-${(cfg.colors || []).join(",")}`}
+                                      onBlur={(event) => setDetailAxisValues(name, "colors", event.target.value)}
+                                      onKeyDown={(event) => { if (event.key === "Enter") (event.target as HTMLInputElement).blur(); }}
+                                    />
+                                  </td>
+
+                                  <td style={{ padding: "6px 8px" }}>
+                                    <input
+                                      style={cellStyle}
+                                      placeholder="S,M,L"
+                                      defaultValue={(cfg.sizes || []).join(", ")}
+                                      key={`s-${name}-${(cfg.sizes || []).join(",")}`}
+                                      onBlur={(event) => setDetailAxisValues(name, "sizes", event.target.value)}
+                                      onKeyDown={(event) => { if (event.key === "Enter") (event.target as HTMLInputElement).blur(); }}
+                                    />
+                                  </td>
+
+                                  <td style={{ padding: "6px 8px", whiteSpace: "nowrap" }}>
+                                    <button
+                                      type="button"
+                                      title={off ? "숨김 — 누르면 손님에게 보임" : "보이는 중 — 누르면 숨김"}
+                                      onClick={() => { setFormTouched(true); toggleDetailHidden(name); }}
+                                      style={{ width: "28px", height: "28px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", border: `1px solid ${off ? "#E1D5D9" : "#BFE3D5"}`, background: off ? "var(--color-surface-2)" : "#EAF6F1", color: off ? "var(--color-ink-mute)" : "#0F6E56" }}
+                                    >{off ? "🚫" : "👁"}</button>
+                                    <button
+                                      type="button"
+                                      title="색상·사이즈 조합을 자세히 손보기"
+                                      onClick={() => openBrandDetailEditor(name)}
+                                      style={{ marginLeft: "4px", width: "28px", height: "28px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", border: "1px solid #E1D5D9", background: "var(--color-surface)", color: "var(--color-ink-mute)" }}
+                                    >⋯</button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center", padding: "9px 10px", borderTop: "1px solid #EFE7EA", background: "#F7F2F4" }}>
                         <button
                           type="button"
-                          onClick={openBrandDetailEditorForNew}
-                          style={{ marginTop: "12px", border: "none", borderRadius: "9px", background: "#7B2D43", color: "#fff", padding: "10px 18px", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}
-                        >
-                          ＋ 첫 번째 상품 추가
-                        </button>
-                      </div>
-                    ) : null}
-                    {filteredBrandDetails.map((name) => {
-                      const photos = brandGroupDetailPhotoSets[name] || (detailPhotos[name] ? [detailPhotos[name]] : []);
-                      const thumbnail = photos[0] || detailPhotos[name] || "";
-                      const categoryLabel = String(brandGroupDetailCategories[name] || "").trim();
-                      const plus = Math.max(0, Number(detailPlus[name]) || 0);
-                      const unitPrice = moneyNumber(priceText) + plus;
-                      return (
-                        <div
-                          key={`brand-photo-${name}`}
-                          onClick={() => openBrandDetailEditor(name)}
-                          onMouseEnter={() => setPhotoHoverTarget(name)}
-                          onMouseLeave={() => setPhotoHoverTarget((prev) => (prev === name ? "" : prev))}
-                          onDragOver={(event) => { event.preventDefault(); setPhotoDropTarget(name); }}
-                          onDragLeave={() => setPhotoDropTarget((prev) => (prev === name ? "" : prev))}
-                          onDrop={(event) => {
-                            event.preventDefault();
-                            setPhotoDropTarget("");
-                            const files = Array.from(event.dataTransfer?.files || []);
-                            if (files.length > 0) void addDetailPhotos(name, files);
+                          onClick={() => { addDetailRow(); }}
+                          style={{ border: "none", borderRadius: "8px", background: "#7B2D43", color: "#fff", padding: "8px 13px", fontSize: "11.5px", fontWeight: 900, cursor: "pointer" }}
+                        >＋ 한 줄 추가</button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const last = details[details.length - 1];
+                            if (!last) { addDetailRow(); return; }
+                            const base = moneyNumber(priceText);
+                            const plus = Math.max(0, Number(detailPlus[last]) || 0);
+                            addDetailRow(undefined, base + plus);
                           }}
-                          style={{
-                            minWidth: 0,
-                            display: "grid",
-                            gridTemplateColumns: "46px minmax(0, 1fr) auto",
-                            gap: "8px",
-                            alignItems: "center",
-                            padding: "6px",
-                            border: photoDropTarget === name ? "2px dashed #0F6E56" : photoHoverTarget === name ? "1px solid #7B2D43" : "1px solid #E8E2DD",
-                            borderRadius: "8px",
-                            background: photoDropTarget === name ? "#EAF6F1" : "var(--color-surface)",
-                            cursor: "pointer",
-                          }}
-                        >
-                          <button
-                            type="button"
-                            disabled={!thumbnail}
-                            onClick={(event) => { event.stopPropagation(); if (thumbnail) setDetailPreviewImage(resolveProductImageUrl(thumbnail)); }}
-                            title={thumbnail ? "클릭하면 크게 보기" : "등록된 사진 없음"}
-                            style={{ width: "46px", height: "46px", border: "none", borderRadius: "7px", padding: 0, overflow: "hidden", background: "#F1ECE8", cursor: thumbnail ? "zoom-in" : "default", display: "flex", alignItems: "center", justifyContent: "center" }}
-                          >
-                            {thumbnail ? <img src={resolveProductImageUrl(thumbnail)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "10px", color: "var(--color-ink-mute)" }}>사진 없음</span>}
-                          </button>
-                          <span style={{ minWidth: 0 }}>
-                            <span style={{ display: "block", fontSize: "11.5px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
-                            <span style={{ display: "block", marginTop: "2px", fontSize: "10.5px", color: "var(--color-ink-mute)" }}>
-                              {[categoryLabel, `사진 ${photos.length}장`, unitPrice > 0 ? `${unitPrice.toLocaleString("ko-KR")}원` : ""].filter(Boolean).join(" · ")}
-                            </span>
-                          </span>
-                          <span style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "5px", whiteSpace: "nowrap" }}>
-                            {detailHidden.includes(name) ? (
-                              <span
-                                title="고객 주문서에서 숨김 상태"
-                                style={{
-                                  padding: "3px 6px",
-                                  borderRadius: "999px",
-                                  background: "#F1ECE8",
-                                  color: "#75676D",
-                                  border: "1px solid #E1D5D9",
-                                  fontSize: "9.5px",
-                                  fontWeight: 900,
-                                }}
-                              >
-                                숨김
-                              </span>
-                            ) : null}
-                            {detailPhotoUploading === name ? (
-                              <span style={{ fontSize: "10px", fontWeight: 900, color: "#0F6E56" }}>올리는 중…</span>
-                            ) : (
-                              <button
-                                type="button"
-                                title="이 세부상품에 사진 여러 장 추가"
-                                onClick={(event) => { event.stopPropagation(); bulkDetailPhotoTargetRef.current = name; bulkDetailPhotoInputRef.current?.click(); }}
-                                style={{ border: "1px solid #BFE3D5", borderRadius: "6px", background: "#F3F8F6", color: "#0F6E56", padding: "3px 6px", fontSize: "10px", fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap" }}
-                              >
-                                ＋사진
-                              </button>
-                            )}
-                            <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#7B2D43" }}>수정 ›</span>
-                          </span>
-                        </div>
-                      );
-                    })}
-                    {filteredBrandDetails.length === 0 ? (
-                      <div style={{ gridColumn: "1 / -1", padding: "18px 10px", textAlign: "center", color: "var(--color-ink-mute)", fontSize: "11.5px", border: "1px dashed #D9C5CC", borderRadius: "8px" }}>
-                        조건에 맞는 세부상품이 없습니다.
+                          style={{ border: "1px solid #D9C5CC", borderRadius: "8px", background: "var(--color-surface)", color: "var(--color-ink)", padding: "8px 12px", fontSize: "11.5px", fontWeight: 800, cursor: "pointer" }}
+                        >⧉ 윗줄 복제</button>
+                        <button
+                          type="button"
+                          onClick={() => { setBulkNamesText(""); setBulkNamesOpen(true); }}
+                          style={{ border: "1px solid #D9C5CC", borderRadius: "8px", background: "var(--color-surface)", color: "var(--color-ink)", padding: "8px 12px", fontSize: "11.5px", fontWeight: 800, cursor: "pointer" }}
+                        >📋 이름 여러 개 붙여넣기</button>
+                        <span style={{ marginLeft: "auto", fontSize: "10.5px", fontWeight: 700, color: "var(--color-ink-mute)" }}>칸을 누르면 바로 고쳐집니다</span>
                       </div>
-                    ) : null}
+                    </div>
+                  )}
+
+                  <div style={{ marginTop: "7px", fontSize: "10.5px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.6 }}>
+                    사진칸: <b>끌어놓기</b> · <b>클릭</b>하면 여러 장 고르기 · <b>우클릭</b>하면 대표사진 빼기<br />
+                    <b>Ctrl+V</b>: 줄 위에 마우스를 올린 채 붙여넣으면 그 줄에, 그냥 붙여넣으면 새 줄이 생깁니다 · <b>⋯</b> 는 색상·사이즈 조합을 자세히 손볼 때
                   </div>
-                  <div style={{ marginTop: "6px", fontSize: "10.5px", color: "var(--color-ink-mute)" }}>카드를 누르면 상품명·구분·추가금·색상·사이즈를 수정할 수 있어요. 썸네일은 클릭하면 크게 보입니다.</div>
                 </div>
               ) : null}
 
@@ -2660,6 +2896,52 @@ export default function QuickProductFastForm({
         </div>
 
       </div>
+
+      {/* [2026-08-29] 이름 여러 개 붙여넣기 — 거래처 목록을 그대로 긁어 넣을 때 */}
+      {bulkNamesOpen ? (
+        <div
+          onClick={(event) => { if (event.target === event.currentTarget) setBulkNamesOpen(false); }}
+          style={{ position: "fixed", inset: 0, zIndex: 130, background: "rgba(20,12,16,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}
+        >
+          <div style={{ width: "min(440px, 94vw)", borderRadius: "14px", overflow: "hidden", background: "var(--color-surface)", boxShadow: "0 20px 60px rgba(0,0,0,0.28)" }}>
+            <div style={{ padding: "13px 16px", borderBottom: "1px solid #E8E2DD", fontSize: "13.5px", fontWeight: 900, color: "var(--color-ink)" }}>이름 여러 개 붙여넣기</div>
+            <div style={{ padding: "15px" }}>
+              <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", marginBottom: "7px", lineHeight: 1.6 }}>
+                한 줄에 하나씩 넣으세요. <b>이름, 판매가</b> 로 써도 됩니다.
+              </div>
+              <textarea
+                value={bulkNamesText}
+                onChange={(event) => setBulkNamesText(event.target.value)}
+                placeholder={"BB-39 코트, 179000\nBB-40 코트, 179000\nBB-41 코트"}
+                style={{ width: "100%", height: "140px", padding: "11px 12px", borderRadius: "10px", border: "1.5px solid #D9C5CC", background: "var(--color-surface)", color: "var(--color-ink)", fontSize: "13px", fontWeight: 600, outline: "none", resize: "vertical", lineHeight: 1.6 }}
+              />
+              <div style={{ marginTop: "7px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.6 }}>
+                색상·사이즈는 <b>맨 아랫줄 상품과 똑같이</b> 채워집니다. 나중에 표에서 고치면 됩니다.
+              </div>
+            </div>
+            <div style={{ padding: "11px 15px", borderTop: "1px solid #E8E2DD", background: "var(--color-surface-2)", display: "flex", gap: "7px", justifyContent: "flex-end" }}>
+              <button type="button" onClick={() => setBulkNamesOpen(false)} style={{ padding: "9px 14px", borderRadius: "8px", border: "1px solid #D9C5CC", background: "var(--color-surface)", color: "var(--color-ink)", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}>취소</button>
+              <button
+                type="button"
+                onClick={() => {
+                  const base = moneyNumber(priceText);
+                  const rowsToAdd = bulkNamesText.split(/\r?\n+/).map((line) => line.trim()).filter(Boolean);
+                  if (rowsToAdd.length === 0) { setBulkNamesOpen(false); return; }
+                  rowsToAdd.forEach((line) => {
+                    const parts = line.split(",");
+                    const nm = String(parts[0] || "").trim();
+                    const sale = Number(String(parts[1] || "").replace(/[^0-9]/g, "")) || 0;
+                    addDetailRow(nm || undefined, sale > base ? sale : undefined);
+                  });
+                  setBulkNamesOpen(false);
+                  showAdminToast(`${rowsToAdd.length}줄을 추가했어요. 사진과 가격을 채우고 저장하세요.`, "success");
+                }}
+                style={{ padding: "9px 15px", borderRadius: "8px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "12px", fontWeight: 900, cursor: "pointer" }}
+              >추가</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {brandDetailEditDraft ? (
         <div style={{ position: "fixed", inset: 0, zIndex: 100002, background: "rgba(39,28,33,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "18px" }}>
