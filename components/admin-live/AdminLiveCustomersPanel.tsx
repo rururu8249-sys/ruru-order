@@ -449,6 +449,13 @@ function CustomerDetailDrawer({
   const [fZip, setFZip] = useState("");
   const [fAddr, setFAddr] = useState("");
   const [fDetail, setFDetail] = useState("");
+  // [2026-08-30 사장님 지시] 전화번호를 화면에서 바꿀 수 있게 한다.
+  //   예전엔 식별키라 잠가놔서 사장님이 매번 SQL 을 돌려야 했다.
+  //   번호는 포인트·합배송·입금매칭의 기준이라 전용 API 로만 처리한다.
+  const [phoneEditOpen, setPhoneEditOpen] = useState(false);
+  const [fNewPhone, setFNewPhone] = useState("");
+  const [fUnifyOrders, setFUnifyOrders] = useState(true);
+  const [phoneSaving, setPhoneSaving] = useState(false);
 
   if (!customer) return null;
 
@@ -462,7 +469,64 @@ function CustomerDetailDrawer({
     setFZip(clean((defaultShipping as any)?.zipcode) || clean(profile?.zipcode));
     setFAddr(clean((defaultShipping as any)?.address) || clean(profile?.address));
     setFDetail(clean((defaultShipping as any)?.detailAddress) || clean(profile?.detail_address));
+    setFNewPhone("");
+    setFUnifyOrders(true);
+    setPhoneEditOpen(false);
     setEditOpen(true);
+  };
+
+  // 전화번호 변경 — 서버 API 가 중복 검사 · 회원 변경 · 주문 통일을 한 번에 처리한다.
+  const savePhoneChange = async () => {
+    const currentPhone = digitsOnly(customer?.phone || profile?.customer_phone || "");
+    const nextPhone = digitsOnly(fNewPhone);
+
+    if (!currentPhone) { showAdminToast("지금 번호를 찾지 못했습니다.", "warning"); return; }
+    if (!nextPhone) { showAdminToast("새 전화번호를 입력해주세요.", "warning"); return; }
+    if (nextPhone.length < 10 || nextPhone.length > 11) { showAdminToast("전화번호는 숫자 10~11자리여야 합니다.", "warning"); return; }
+    if (nextPhone === currentPhone) { showAdminToast("지금 번호와 같습니다.", "warning"); return; }
+
+    const ok = await showAdminConfirm(
+      [
+        "회원 전화번호를 바꿀까요?",
+        "",
+        `${formatPhone(currentPhone)}  →  ${formatPhone(nextPhone)}`,
+        "",
+        fUnifyOrders
+          ? "· 이 회원의 기존 주문 번호도 함께 바꿉니다 (합배송·입금매칭이 번호 기준이라 권장)"
+          : "· 주문은 그대로 둡니다 — 옛 주문과 갈라져 택배비가 다시 붙을 수 있습니다",
+        "· 포인트 잔액·이력·차단은 새 번호로 따라옵니다",
+        "· 다른 회원이 쓰는 번호면 저장되지 않고 중단됩니다",
+      ].join("\n"),
+      { title: "전화번호 변경", confirmText: "변경하기" },
+    );
+    if (!ok) return;
+
+    setPhoneSaving(true);
+    try {
+      const res = await fetch("/api/admin-live/customer-phone-change", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ currentPhone, newPhone: nextPhone, unifyOrders: fUnifyOrders }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j?.ok) throw new Error(j?.message || `요청 실패(${res.status})`);
+
+      showAdminToast(
+        `전화번호를 ${formatPhone(nextPhone)} 로 바꿨습니다.` +
+          (j.ordersUpdated ? ` (주문 ${j.ordersUpdated}건 통일)` : "") +
+          (j.warning ? `\n\n${j.warning}` : ""),
+        j.warning ? "warning" : "success",
+      );
+      setPhoneEditOpen(false);
+      setEditOpen(false);
+      onSaved?.({ customer_phone: nextPhone });
+      onClose();
+    } catch (e) {
+      showAdminToast("전화번호 변경 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally {
+      setPhoneSaving(false);
+    }
   };
 
   // 카카오(다음) 우편번호 검색 — LiveOrderDetailDrawer/order page와 동일 방식. 주소·우편번호를 채운다(상세주소는 직접 입력).
@@ -517,7 +581,7 @@ function CustomerDetailDrawer({
         "",
         "※ 닉네임/이름은 이 회원의 주문서 표시에도 반영됩니다.",
         "※ 미입금 주문은 입금 자동매칭 기준(입금자명)도 새 닉네임으로 바뀝니다.",
-        "※ 전화번호는 안전을 위해 여기서 바꾸지 않습니다.",
+        "※ 전화번호는 위의 [📞 번호 변경] 으로 따로 바꿉니다.",
       ].join("\n")
     );
     if (!ok) return;
@@ -636,7 +700,7 @@ function CustomerDetailDrawer({
             </div>
           </div>
 
-          {/* 정보 수정 폼 (닉네임/이름/주소 교정 — 전화번호는 안전상 제외) */}
+          {/* 정보 수정 폼 (닉네임/이름/주소 교정 + [📞 번호 변경] 전용 블록) */}
           {editOpen ? (
             <div style={{ marginBottom: "14px", border: "1px solid var(--color-rose-line)", borderRadius: "12px", background: "var(--color-surface-2)", padding: "12px 13px" }}>
               <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "9px" }}>✎ 회원 정보 수정 <span style={{ fontWeight: 700, color: "var(--color-ink-mute)" }}>(기본배송지 기준)</span></div>
@@ -664,6 +728,53 @@ function CustomerDetailDrawer({
                   style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid var(--color-line)", background: "var(--color-surface-2)", padding: "0 11px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none", marginBottom: "6px" }} />
                 <input value={fDetail} onChange={(e) => setFDetail(e.target.value)} placeholder="상세주소 (동/호수 등 직접 입력)"
                   style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "0 11px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none" }} />
+              </div>
+
+              {/* [2026-08-30] 전화번호 변경 — 식별키라 전용 API 로만 처리한다.
+                  손님이 번호를 잘못 넣은 경우가 실제로 반복돼서(루루짱929, 히무0) 화면에서 바로 고치게 한다. */}
+              <div style={{ margin: "10px 0", border: "1px solid var(--color-rose-line)", borderRadius: "10px", background: "var(--color-surface)", padding: "10px 11px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)" }}>전화번호</span>
+                  <span style={{ fontSize: "13px", fontWeight: 900, color: "var(--color-ink)" }}>{formatPhone(customer.phone) || "-"}</span>
+                  <button
+                    type="button"
+                    onClick={() => { setPhoneEditOpen((v) => !v); setFNewPhone(""); }}
+                    style={{ marginLeft: "auto", height: "30px", padding: "0 11px", borderRadius: "8px", border: "1px solid var(--color-rose-line)", background: phoneEditOpen ? "var(--color-surface-2)" : "var(--color-rose-soft)", color: "var(--color-rose-deep)", fontSize: "11.5px", fontWeight: 900, cursor: "pointer" }}
+                  >{phoneEditOpen ? "취소" : "📞 번호 변경"}</button>
+                </div>
+
+                {phoneEditOpen ? (
+                  <div style={{ marginTop: "9px" }}>
+                    <input
+                      value={fNewPhone}
+                      onChange={(e) => setFNewPhone(e.target.value)}
+                      inputMode="numeric"
+                      placeholder="새 전화번호 (숫자만, 예: 01083834389)"
+                      style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "0 11px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none", boxSizing: "border-box" }}
+                    />
+                    <label style={{ display: "flex", alignItems: "center", gap: "6px", margin: "8px 0", cursor: "pointer", userSelect: "none" }}>
+                      <input
+                        type="checkbox"
+                        checked={fUnifyOrders}
+                        onChange={(e) => setFUnifyOrders(e.target.checked)}
+                        style={{ width: "15px", height: "15px", accentColor: "var(--color-rose-deep)", cursor: "pointer" }}
+                      />
+                      <span style={{ fontSize: "11.5px", fontWeight: 800, color: "var(--color-ink)" }}>이 회원의 기존 주문 번호도 같이 바꾸기 <b style={{ color: "var(--color-rose-deep)" }}>(권장)</b></span>
+                    </label>
+                    <div style={{ fontSize: "10.5px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.7, marginBottom: "8px" }}>
+                      · 포인트 잔액·이력·차단은 새 번호로 따라옵니다<br />
+                      · 합배송 택배비와 무통장 자동입금확인이 번호 기준이라, 주문까지 같이 바꾸지 않으면 옛 주문과 갈라집니다<br />
+                      · 다른 회원이 이미 쓰는 번호면 저장되지 않고 중단됩니다<br />
+                      · 받는분 연락처는 주문자 번호와 같았던 주문만 함께 바뀝니다
+                    </div>
+                    <button
+                      type="button"
+                      onClick={savePhoneChange}
+                      disabled={phoneSaving}
+                      style={{ width: "100%", height: "40px", borderRadius: "10px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "13.5px", fontWeight: 900, cursor: phoneSaving ? "not-allowed" : "pointer", opacity: phoneSaving ? 0.6 : 1 }}
+                    >{phoneSaving ? "변경 중…" : "📞 전화번호 변경하기"}</button>
+                  </div>
+                ) : null}
               </div>
 
               <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-warn-tx)", lineHeight: 1.6, margin: "4px 0 9px" }}>
