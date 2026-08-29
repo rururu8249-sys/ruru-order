@@ -84,7 +84,7 @@ import CustomerManualAddressPanel from "@/components/customer/CustomerManualAddr
 import CustomerMissingDetailAddressPanel from "@/components/customer/CustomerMissingDetailAddressPanel";
 import GroupBuyQuickSelect, { type GroupBuyQuickSelectProduct } from "@/components/order/GroupBuyQuickSelect";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
-import { detailCode, detailPricePresentation } from "@/lib/productDetailModel";
+import { detailCode, detailPricePresentation, detailProducts } from "@/lib/productDetailModel";
 import CustomerSizeChartSheet from "@/components/customer/CustomerSizeChartSheet";
 import { resolveSizeChart } from "@/lib/sizeChart";
 import { registeredProductEditManualPrice, registeredProductPriceMode } from "@/lib/registeredProductPricePolicy";
@@ -3874,13 +3874,15 @@ export default function OrderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [youtubeNickname, customerPhone, hasSavedInfo]);
 
-  const openRegisteredOptionSelectSheet = (product: BroadcastProduct) => {
+  // [2026-08-29] preselectDetail — 목록에서 세부상품을 직접 눌러 들어온 경우 1단계를 건너뛴다.
+  //   값이 없으면 예전과 완전히 같다(기존 호출부 무변경).
+  const openRegisteredOptionSelectSheet = (product: BroadcastProduct, preselectDetail?: string) => {
     void fetchCartReservations(); // 담기 직전 — 다른 고객이 방금 담은 것까지 반영해 품절을 정확히 보여준다
     setRegisteredOptionSelectProduct(product);
     setRegisteredOptionColor("");
     setRegisteredOptionSize("");
     setRegisteredOptionCustomerDetail("");
-    setRegisteredOptionDetail("");
+    setRegisteredOptionDetail(String(preselectDetail ?? "").trim());
     setRegisteredOptionQty(1);
     setRegisteredOptionManualPrice(0);
     setRegisteredOptionComboSearch("");
@@ -5904,6 +5906,47 @@ export default function OrderPage() {
                                 </div>
                               );
                             })()}
+                            {/* [2026-08-29 사장님 요청] 예전에는 "80"을 검색해도 브랜드 카드(버버리) 한 장만 떠서
+                                정작 찾던 BB-80 이 안 보였다. → 검색어와 맞는 세부상품을 카드 안에 그대로 펼쳐,
+                                누르면 그 상품이 이미 선택된 채로 열리게 한다. (표시 전용 — 재고·금액 계산 로직 무변경) */}
+                            {(() => {
+                              const dq = productSearchText.trim();
+                              if (!dq) return null;
+                              const nq = normalizeSuggestionText(dq);
+                              if (!nq) return null;
+                              const matchedDetails = detailProducts(product as unknown as Record<string, unknown>, { includeHidden: false })
+                                .filter((d) => normalizeSuggestionText(d.detailName).includes(nq));
+                              if (matchedDetails.length === 0) return null;
+                              const shown = matchedDetails.slice(0, 12);
+                              return (
+                                <div style={{ marginTop: "8px", display: "grid", gap: "5px" }}>
+                                  <div style={{ fontSize: "11px", fontWeight: 900, color: "#7A1E47" }}>
+                                    &ldquo;{dq}&rdquo; 검색결과 {matchedDetails.length}개
+                                  </div>
+                                  {shown.map((d) => (
+                                    <button
+                                      key={`${String(product.id)}-${d.detailName}`}
+                                      type="button"
+                                      onClick={() => openRegisteredOptionSelectSheet(product as BroadcastProduct, d.detailName)}
+                                      style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", padding: "6px", borderRadius: "10px", border: "1px solid #EFE3E8", background: "#FFFDFB", textAlign: "left", cursor: "pointer" }}
+                                    >
+                                      <span style={{ width: "38px", height: "38px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "#F0EBE8" }}>
+                                        {d.image ? <img src={d.image} alt="" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
+                                      </span>
+                                      <span style={{ flex: 1, minWidth: 0, fontSize: "12px", fontWeight: 800, color: "#3F3438", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                        {orderDetailDisplayName(String(product.product_name ?? ""), d.detailName)}
+                                      </span>
+                                      <span style={{ flexShrink: 0, fontSize: "12px", fontWeight: 900, color: "#7A1E47" }}>{won(Number(d.price) || 0)}</span>
+                                    </button>
+                                  ))}
+                                  {matchedDetails.length > shown.length ? (
+                                    <div style={{ fontSize: "10.5px", fontWeight: 700, color: "#8B7D83" }}>
+                                      나머지 {matchedDetails.length - shown.length}개는 아래 [상품 선택]에서 볼 수 있어요
+                                    </div>
+                                  ) : null}
+                                </div>
+                              );
+                            })()}
                             <div style={listView === "grid"
                               ? { marginTop: "auto", paddingTop: "6px", display: "flex", flexDirection: "column", alignItems: "stretch", gap: "6px" }
                               : { marginTop: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
@@ -6484,7 +6527,16 @@ export default function OrderPage() {
                 <div data-registered-option-scroll="true" style={{ minHeight: 0, flex: 1, overflowY: "auto", padding: "16px" }}>
                   {registeredOptionColorMode === "none" && registeredOptionSizeMode === "none" && !(registeredOptionSelectProduct && (readOrderAxes3(registeredOptionSelectProduct) || readComboInfoOrderProduct(registeredOptionSelectProduct))) ? (
                     <div style={{ padding: "12px 16px 0", fontSize: "12px", color: "#7B736D" }}>
-                      이 상품은 옵션이 없습니다. 수량만 선택해 주세요.
+                      {/* [2026-08-29] 예전에는 색상·사이즈만 보고 "옵션이 없습니다. 수량만 선택"이라고 했는데,
+                          세부상품명이나 금액을 손님이 직접 적어야 하는 상품에서도 같은 문구가 떠서 말이 안 맞았다.
+                          → 이 상품에서 실제로 뭘 입력해야 하는지 그대로 알려준다. */}
+                      {registeredOptionCustomerDetailRequired && registeredOptionNeedsManualPrice
+                        ? "세부상품명과 금액, 수량을 입력해 주세요."
+                        : registeredOptionCustomerDetailRequired
+                          ? "세부상품명과 수량을 입력해 주세요."
+                          : registeredOptionNeedsManualPrice
+                            ? "금액과 수량을 입력해 주세요."
+                            : "이 상품은 옵션이 없습니다. 수량만 선택해 주세요."}
                     </div>
                   ) : null}
 
