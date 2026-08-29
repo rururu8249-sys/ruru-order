@@ -3482,12 +3482,31 @@ export default function OrderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasSavedInfo, quickGroupBuyProducts.length]);
 
-  // 45초마다: 내 예약 연장(하트비트) + 다른 고객 예약 반영 (탭 보일 때만)
+  // [2026-08-30 사고수정 · 근본] 45초 하트비트가 "옛 장바구니"를 되살리던 문제
+  //
+  //   증상: 손님이 주문서를 제출(또는 취소)했는데도 관리자 담김 현황에 그 상품이 계속 남았다.
+  //         담김 시각이 주문 시각보다 나중이라 "다시 담았나?" 싶었지만 아니었다.
+  //         (실측: 임언냐 01:52 제출 → 담김 01:57 갱신 / 채승희 21:40 주문 → 담김 21:41)
+  //
+  //   원인: 아래 setInterval 은 만들어질 때의 syncCartReservations 를 붙잡는다.
+  //         그 함수는 그 시점의 items 를 읽는다. deps 에 items 가 없어서 타이머는 다시 만들어지지 않는다.
+  //         → 제출로 items 가 비어도 타이머는 계속 "옛 items" 로 동기화한다.
+  //         claim_cart_hold 은 매번 delete 후 insert 라, 45초마다 선점이 되살아났다.
+  //         (그래서 created_at 이 계속 갱신돼 "담음 시각"이 주문보다 나중으로 보였다)
+  //
+  //   수정: 타이머는 ref 를 통해 "지금 이 순간의" 동기화 함수를 부른다. 옛 장바구니를 볼 수 없다.
+  //         ⚠️ 서버 쪽에도 방어를 뒀다 — 주문 제출 API 가 그 세션의 선점을 직접 지운다.
+  //            (손님이 제출 직후 창을 닫아 이 타이머가 못 도는 경우까지 확실히 풀리게)
+  const syncCartReservationsRef = useRef(syncCartReservations);
+  syncCartReservationsRef.current = syncCartReservations;
+  const fetchCartReservationsRef = useRef(fetchCartReservations);
+  fetchCartReservationsRef.current = fetchCartReservations;
+
   useEffect(() => {
     if (!hasSavedInfo) return;
     const t = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
-      void syncCartReservations().then(() => fetchCartReservations());
+      void syncCartReservationsRef.current().then(() => fetchCartReservationsRef.current());
     }, 45000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps

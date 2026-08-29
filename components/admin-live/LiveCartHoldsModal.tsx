@@ -16,6 +16,9 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "expires", label: "남은 시간 짧은순" }, { value: "recent", label: "최신 담김순" }, { value: "qty", label: "담긴 수량 많은순" }, { value: "name", label: "닉네임순" },
 ];
 const phoneFmt = (p: string) => { const d = String(p || "").replace(/[^0-9]/g, ""); return d.length === 11 ? `${d.slice(0,3)}-${d.slice(3,7)}-${d.slice(7)}` : d.length === 10 ? `${d.slice(0,3)}-${d.slice(3,6)}-${d.slice(6)}` : d; };
+// [2026-08-30] "담음"이 아니라 "마지막 확인"이다.
+//   claim_cart_hold 은 동기화마다 delete 후 insert 라 created_at 이 매번 새로 찍힌다.
+//   그래서 이 값은 손님 화면이 마지막으로 신호를 보낸 시각이지, 처음 담은 시각이 아니다.
 const createdText = (ms: number) => !Number.isFinite(ms) || ms <= 0 ? "" : new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(ms));
 const remainText = (expiresMs: number, nowMs: number) => { const m = Math.max(0, Math.round((expiresMs-nowMs)/60000)); if (m >= 1440) return `${Math.floor(m/1440)}일 ${Math.floor((m%1440)/60)}시간 남음`; if (m >= 60) return `${Math.floor(m/60)}시간 ${m%60}분 남음`; return `${m}분 남음`; };
 const won = (n: number) => `${Math.max(0, Math.floor(n)).toLocaleString("ko-KR")}원`;
@@ -89,7 +92,7 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
         const presentations=g.items.map(it=>cartHoldPresentation({productName:it.productName,fallbackProductName:it.fallbackProductName,color:it.color,size:it.size,qty:it.qty,unitPrice:it.unitPrice,legacySnapshot:it.legacySnapshot}));
         const knownTotal=presentations.reduce((s,p)=>s+(p.rowTotal??0),0); const unknown=presentations.some(p=>p.rowTotal===null);
         return <div key={g.sessionKey} className="overflow-hidden rounded-2xl border border-line">
-          <div className="flex flex-wrap items-center gap-2 bg-surface-2 px-3 py-2"><span className="min-w-0 flex-1 text-[13px] font-black text-ink">👤 {groupLabel(g)}{g.phone?<span className="ml-1.5 text-[11px] font-bold text-ink-mute">📱 {phoneFmt(g.phone)}</span>:null}</span>{g.maxCreated>0?<span className="text-[11px] font-bold text-ink-mute">🕒 {createdText(g.maxCreated)} 담음</span>:null}<span className="text-[11px] font-black text-rose-deep">{remainText(g.minExpires,now)}</span>
+          <div className="flex flex-wrap items-center gap-2 bg-surface-2 px-3 py-2"><span className="min-w-0 flex-1 text-[13px] font-black text-ink">👤 {groupLabel(g)}{g.phone?<span className="ml-1.5 text-[11px] font-bold text-ink-mute">📱 {phoneFmt(g.phone)}</span>:null}</span>{g.maxCreated>0?<span className="text-[11px] font-bold text-ink-mute" title="손님 화면이 45초마다 보내는 신호의 마지막 시각입니다. 처음 담은 시각이 아닙니다.">🕒 {createdText(g.maxCreated)} 확인</span>:null}<span className="text-[11px] font-black text-rose-deep">{remainText(g.minExpires,now)}</span>
             <button type="button" disabled={Boolean(reminding)} onClick={()=>void remind(g)} className="rounded-lg border border-[#7B2D43]/20 bg-white px-2 py-1 text-[11px] font-black text-[#7B2D43] disabled:opacity-50">{reminding===g.sessionKey?"전송중":"🔔 결제 요청"}</button>
             <button type="button" disabled={clearing===g.sessionKey} onClick={()=>void clearSession(g)} className="rounded-lg border border-line bg-surface px-2 py-1 text-[11px] font-black text-ink-soft hover:bg-danger-bg hover:text-danger-tx disabled:opacity-50">{clearing===g.sessionKey?"해제중":"선점 해제"}</button>
           </div>
