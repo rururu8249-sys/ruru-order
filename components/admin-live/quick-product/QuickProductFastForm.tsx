@@ -9,8 +9,6 @@ import { resolveProductImageUrl } from "./productImageUrl";
 import { compressProductImage, isHeicLikeImage } from "./compressProductImage";
 import { brandWordmarkThumbnail, normalizeBrandKorean } from "@/lib/brandWordmarkThumbnail";
 import { detailCode } from "@/lib/productDetailModel";
-import DesignGroupPanel from "./DesignGroupPanel";
-import type { DesignGroupRecord, DesignGroupSuggestInput } from "@/lib/designGroupSuggest";
 
 type ProductRow = Record<string, unknown>;
 
@@ -708,9 +706,6 @@ export default function QuickProductFastForm({
   const [brandGroupDetailOptions, setBrandGroupDetailOptions] = useState<Record<string, BrandDetailOptionConfig>>({});
   const [brandDetailEditDraft, setBrandDetailEditDraft] = useState<BrandDetailEditDraft | null>(null);
   const [brandDetailSearch, setBrandDetailSearch] = useState("");
-  // [2026-08-29] 같은 디자인 묶기 — product_note.design_groups 편집용. 저장은 아래 saveProduct 에서 한 번에 한다.
-  const [designGroups, setDesignGroups] = useState<DesignGroupRecord[]>([]);
-  const [designGroupPanelOpen, setDesignGroupPanelOpen] = useState(false);
   const [brandDetailCategoryFilter, setBrandDetailCategoryFilter] = useState("전체");
   const [detailPhotoUploading, setDetailPhotoUploading] = useState("");
   const [brandDetailPhotoUploading, setBrandDetailPhotoUploading] = useState(false);
@@ -861,20 +856,6 @@ export default function QuickProductFastForm({
     setBrandGroupDetailPhotoSets(normalizedPhotoSets);
     setBrandGroupDetailCategories(normalizedDetailCategories);
     setBrandGroupDetailOptions(normalizedDetailOptions);
-    // 같은 디자인 묶음 복원 — 형식이 깨진 값은 버리고 회원 2개 이상인 것만 살린다.
-    setDesignGroups(
-      (Array.isArray((productNote as { design_groups?: unknown } | null)?.design_groups)
-        ? ((productNote as { design_groups?: unknown[] }).design_groups as Array<Record<string, unknown>>)
-        : []
-      )
-        .map((group, index) => ({
-          id: String(group?.id || `design-${index + 1}`),
-          ...(group?.title ? { title: String(group.title) } : {}),
-          members: (Array.isArray(group?.members) ? group.members : []).map((m) => String(m ?? "").trim()).filter(Boolean),
-        }))
-        .filter((group) => group.members.length >= 2),
-    );
-    setDesignGroupPanelOpen(false);
     setBrandDetailEditDraft(null);
     setBrandDetailSearch("");
     setBrandDetailCategoryFilter("전체");
@@ -987,24 +968,6 @@ export default function QuickProductFastForm({
   }, [initialProduct]);
 
   const details = useMemo(() => unique(splitOptions(detailText)), [detailText]);
-
-  // [2026-08-29] 같은 디자인 묶기 입력값 — 지금 편집 중인 값 기준(저장 전 값도 그대로 반영된다).
-  //   실제 판매가 = 대표가 + 세부상품 추가금 (인계서 가격 공식 그대로)
-  const designGroupInputs = useMemo<DesignGroupSuggestInput[]>(() => {
-    const base = moneyNumber(priceText);
-    return details.map((name) => ({
-      detailName: name,
-      code: detailCode(name),
-      price: base + Math.max(0, Number(detailPlus[name]) || 0),
-      colors: brandGroupDetailOptions[name]?.colors || [],
-      sizes: brandGroupDetailOptions[name]?.sizes || [],
-    }));
-  }, [details, priceText, detailPlus, brandGroupDetailOptions]);
-
-  const designGroupPhotoOf = (name: string) => {
-    const photo = (brandGroupDetailPhotoSets[name] || [])[0] || detailPhotos[name] || "";
-    return photo ? resolveProductImageUrl(photo) : "";
-  };
 
   const colors = useMemo(() => unique(splitOptions(colorText)), [colorText]);
   const sizes = useMemo(() => unique(splitOptions(sizeText)), [sizeText]);
@@ -1218,12 +1181,6 @@ export default function QuickProductFastForm({
     setBrandGroupDetailPhotoSets((prev) => moveKey(prev, brandDetailEditDraft.photos.length ? [...brandDetailEditDraft.photos] : undefined));
     setBrandGroupDetailCategories((prev) => moveKey(prev, brandDetailEditDraft.category.trim()));
     setBrandGroupDetailOptions((prev) => moveKey(prev, { colors, sizes, variants: nextVariants }));
-    // 이름이 바뀌면 묶음 안의 세부상품명도 같이 바꾼다(안 바꾸면 묶음이 조용히 풀린다).
-    setDesignGroups((prev) =>
-      prev
-        .map((group) => ({ ...group, members: group.members.map((member) => (member === oldName ? nextName : member)) }))
-        .filter((group) => group.members.length >= 2),
-    );
     setDetailHidden((prev) => {
       const withoutEdited = prev.filter((name) => name !== oldName && name !== nextName);
       return brandDetailEditDraft.hidden
@@ -1347,12 +1304,6 @@ export default function QuickProductFastForm({
     setBrandGroupDetailPhotoSets((prev) => removeKey(prev));
     setBrandGroupDetailCategories((prev) => removeKey(prev));
     setBrandGroupDetailOptions((prev) => removeKey(prev));
-    // 삭제된 세부상품은 묶음에서도 빼고, 1개만 남은 묶음은 없앤다.
-    setDesignGroups((prev) =>
-      prev
-        .map((group) => ({ ...group, members: group.members.filter((member) => member !== target) }))
-        .filter((group) => group.members.length >= 2),
-    );
     setDetailHidden((prev) => prev.filter((name) => name !== target));
     setVariantRows((prev) => prev.filter((row) => row.detail !== target));
     setBrandDetailEditDraft(null);
@@ -1396,8 +1347,6 @@ export default function QuickProductFastForm({
     setBrandGroupDetailPhotoSets({});
     setBrandGroupDetailCategories({});
     setBrandGroupDetailOptions({});
-    setDesignGroups([]);
-    setDesignGroupPanelOpen(false);
     setBrandDetailEditDraft(null);
     setBrandDetailSearch("");
     setBrandDetailCategoryFilter("전체");
@@ -1504,10 +1453,9 @@ export default function QuickProductFastForm({
               detail_options: brandGroupDetailOptions,
             },
             detail_photo_sets: brandGroupDetailPhotoSets,
-            // 🔴 [2026-08-29 사고 방지] 예전에는 여기서 design_groups 를 안 넘겨,
-            //    브랜드 상품을 한 번 수정·저장하면 같은디자인 묶음이 통째로 사라졌다.
-            //    지금은 편집 중인 값(designGroups)을 그대로 저장한다.
-            ...(designGroups.length > 0 ? { design_groups: designGroups } : {}),
+            // [2026-08-29] 같은 디자인 묶기는 사장님 지시로 되돌렸다.
+            //   여기서 design_groups 를 다시 넣지 않으므로, 이 상품을 한 번 저장하면
+            //   예전에 남아 있던 묶음 데이터도 함께 사라진다(추가 작업 불필요).
             ...(initialProductNote?.import_batch ? { import_batch: initialProductNote.import_batch } : {}),
             ...(initialProductNote?.vendor_code ? { vendor_code: initialProductNote.vendor_code } : {}),
           }
@@ -1957,14 +1905,6 @@ export default function QuickProductFastForm({
                     <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>세부상품 관리</span>
                     <span style={{ display: "flex", alignItems: "center", gap: "7px" }}>
                       <span style={{ fontSize: "11px", fontWeight: 800, color: "#0F6E56" }}>{details.length}개 상품 · 총 {brandGroupDetailPhotoCount}장</span>
-                      {/* [2026-08-29 사장님 요청] 색상만 다른 상품을 한 박스로 묶어 손님이 고르기 쉽게 */}
-                      <button
-                        type="button"
-                        onClick={() => setDesignGroupPanelOpen(true)}
-                        style={{ border: "1px solid #D9C5CC", borderRadius: "7px", background: "#fff", color: "#7B2D43", padding: "5px 9px", fontSize: "11px", fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap" }}
-                      >
-                        🎨 같은 디자인 묶기{designGroups.length > 0 ? ` ${designGroups.length}` : ""}
-                      </button>
                     </span>
                   </div>
                   <input
@@ -1998,8 +1938,6 @@ export default function QuickProductFastForm({
                       const categoryLabel = String(brandGroupDetailCategories[name] || "").trim();
                       const plus = Math.max(0, Number(detailPlus[name]) || 0);
                       const unitPrice = moneyNumber(priceText) + plus;
-                      const sameDesignGrouped = designGroups.some((group) => group.members.includes(name));
-                      const hasKnownColor = (brandGroupDetailOptions[name]?.colors || []).some((value) => { const normalized=String(value||"").trim().toLowerCase(); return normalized!=="" && !["없음","없슴","무","-","none","n/a","na"].includes(normalized); });
                       return (
                         <div key={`brand-photo-${name}`} onClick={() => openBrandDetailEditor(name)} style={{ minWidth: 0, display: "grid", gridTemplateColumns: "46px minmax(0, 1fr) auto", gap: "8px", alignItems: "center", padding: "6px", border: "1px solid #E8E2DD", borderRadius: "8px", background: "var(--color-surface)", cursor: "pointer" }}>
                           <button
@@ -2018,8 +1956,6 @@ export default function QuickProductFastForm({
                             </span>
                           </span>
                           <span style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "5px", whiteSpace: "nowrap" }}>
-                            {sameDesignGrouped ? <span title="같은 디자인 묶음에 들어 있습니다. 손님 주문서에서 한 박스로 보입니다." style={{ padding:"3px 6px",borderRadius:"999px",background:"#EAF6F1",color:"#0F6E56",border:"1px solid #BFE3D5",fontSize:"9px",fontWeight:900 }}>🎨 묶음</span> : null}
-                            {sameDesignGrouped && !hasKnownColor ? <span title="같은 디자인 그룹이지만 색상명이 등록되지 않았습니다. 고객 화면에서는 옵션 번호와 상품코드로 구분됩니다." style={{ padding:"3px 6px",borderRadius:"999px",background:"#FFF4D6",color:"#8A5A00",border:"1px solid #F0D28A",fontSize:"9px",fontWeight:900 }}>⚠ 색상명 미기재</span> : null}
                             {detailHidden.includes(name) ? (
                               <span
                                 title="고객 주문서에서 숨김 상태"
@@ -2390,17 +2326,6 @@ export default function QuickProductFastForm({
             </div>
           </div>
         </div>
-      ) : null}
-
-      {designGroupPanelOpen ? (
-        <DesignGroupPanel
-          details={designGroupInputs}
-          groups={designGroups}
-          photoOf={designGroupPhotoOf}
-          isMobile={isMobile}
-          onChange={setDesignGroups}
-          onClose={() => setDesignGroupPanelOpen(false)}
-        />
       ) : null}
 
       {detailPreviewImage ? (

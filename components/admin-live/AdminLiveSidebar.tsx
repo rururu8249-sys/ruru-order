@@ -1,6 +1,7 @@
 import { ADMIN_LIVE_MENUS, type AdminLiveMenuKey } from "./adminLiveMenu";
 import AdminSoundControl from "./AdminSoundControl";
 import AdminLiveLogoutButton from "./AdminLiveLogoutButton";
+import AdminLiveSidebarPresence from "./AdminLiveSidebarPresence";
 
 type Props = {
   activeMenu: AdminLiveMenuKey;
@@ -128,6 +129,9 @@ export default function AdminLiveSidebar({
             <span className="ml-auto shrink-0 text-[10px] font-black opacity-40">↗</span>
           </a>
         </nav>
+
+        {/* [2026-08-29 사장님 요청] 실시간 접속자 — 사이드바에서 바로 보이게 */}
+        <AdminLiveSidebarPresence />
 
         {activeMenu === "broadcast" ? (
           <section

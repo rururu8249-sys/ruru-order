@@ -37,6 +37,9 @@ function phoneDigits(order: LiveOrder) {
 export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusChange }: Props) {
   const [copiedKey, setCopiedKey] = useState("");
   const [saving, setSaving] = useState(false);
+  // [2026-08-29] 카톡으로 결제링크 보낸 뒤, 유튜브 채팅에 자동 안내
+  const [chatNoticeSending, setChatNoticeSending] = useState(false);
+  const [chatNoticeSent, setChatNoticeSent] = useState(false);
 
   const amount = cardAmount(order);
   const summary = orderSummary(order);
@@ -56,6 +59,54 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
       window.setTimeout(() => setCopiedKey((k) => (k === key ? "" : k)), 1500);
     } catch {
       showAdminToast("복사 실패 — 길게 눌러 직접 복사해주세요.", "warning");
+    }
+  };
+
+  // [2026-08-29 사장님 요청] 카톡 발송했다고 유튜브 채팅에 자동 안내.
+  //   ⚠️ 주문상태·금액·입금·배송은 전혀 건드리지 않는다. 채팅 글만 올린다.
+  //   ⚠️ 문구·닉네임은 서버가 DB에서 확인해서 만든다(화면 값 그대로 안 보냄).
+  const handleChatNotice = async () => {
+    const items = Array.isArray(order.items) ? order.items : [];
+    const rowIds = items.map((i) => Number(i.id)).filter((id) => Number.isFinite(id));
+
+    if (rowIds.length === 0) {
+      showAdminToast("주문 번호가 없어 채팅 안내를 보낼 수 없습니다.", "warning");
+      return;
+    }
+
+    const ok = await showAdminConfirm(
+      [
+        "유튜브 채팅에 이렇게 올릴까요?",
+        "",
+        `💳 ${order.nickname}님 카카오톡으로 카드결제 링크 보내드렸어요! 📩 확인하시고 결제 부탁드립니다 🙏`,
+        "",
+        "※ 금액·전화번호는 공개 채팅이라 넣지 않습니다.",
+      ].join("\n"),
+    );
+
+    if (!ok) return;
+
+    setChatNoticeSending(true);
+    try {
+      const res = await fetch("/api/admin-live/card-pay-notice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ orderRowIds: rowIds }),
+      });
+      const payload = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+
+      if (!res.ok || !payload?.ok) {
+        showAdminToast("채팅 안내 실패\n\n" + (payload?.error || "잠시 후 다시 시도해 주세요."), "error");
+        return;
+      }
+
+      setChatNoticeSent(true);
+      showAdminToast("유튜브 채팅에 안내를 올렸습니다.", "success");
+    } catch (e) {
+      showAdminToast("채팅 안내 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally {
+      setChatNoticeSending(false);
     }
   };
 
@@ -152,6 +203,21 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
               </div>
             ))}
           </div>
+
+          <button
+            type="button"
+            disabled={chatNoticeSending}
+            onClick={handleChatNotice}
+            title="카카오톡으로 결제링크를 보낸 뒤 누르세요. 유튜브 채팅에 안내글이 자동으로 올라갑니다."
+            className={[
+              "mt-3 w-full rounded-xl px-4 py-2.5 text-sm font-black shadow-sm transition disabled:opacity-50",
+              chatNoticeSent
+                ? "border border-emerald-600 bg-emerald-50 text-emerald-700"
+                : "bg-rose-deep text-white hover:opacity-90",
+            ].join(" ")}
+          >
+            {chatNoticeSending ? "채팅 올리는 중…" : chatNoticeSent ? "✔ 채팅 안내 완료 · 다시 보내기" : "📢 카톡 발송완료 → 채팅 안내"}
+          </button>
 
           <button
             type="button"
