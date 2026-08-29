@@ -284,7 +284,7 @@ export default function CustomerInfoEditBottomSheet({
             </div>
 
             {shippingAddresses.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "48px 0", color: "#ABA5A0", fontSize: "14px" }}>
+              <div style={{ textAlign: "center", padding: "48px 0", color: "#7B736D", fontSize: "14px" }}>
                 등록된 배송지가 없어요
               </div>
             ) : (
@@ -339,9 +339,9 @@ export default function CustomerInfoEditBottomSheet({
         <div style={{ padding: "12px 20px 10px", borderBottom: "1px solid #F0EBE6", background: "#fff", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
             <span style={{ fontSize: "20px", fontWeight: 800, color: "#7A1E47" }}>정보수정</span>
-            <span style={{ fontSize: "13px", color: "#ABA5A0", fontWeight: 600 }}>배송정보 확인</span>
+            <span style={{ fontSize: "13px", color: "#7B736D", fontWeight: 600 }}>배송정보 확인</span>
           </div>
-          <div style={{ fontSize: "12px", color: "#ABA5A0", marginTop: "4px" }}>주문 전 닉네임, 연락처, 주소가 맞는지 확인해 주세요.</div>
+          <div style={{ fontSize: "12px", color: "#7B736D", marginTop: "4px" }}>주문 전 닉네임, 연락처, 주소가 맞는지 확인해 주세요.</div>
         </div>
 
         {/* 본문 */}
@@ -355,7 +355,7 @@ export default function CustomerInfoEditBottomSheet({
               {youtubeNicknameError ? (
                 <div style={{ marginTop: "6px", fontSize: "12px", color: "#e74c3c", fontWeight: 600 }}>{youtubeNicknameError}</div>
               ) : (
-                <div style={{ marginTop: "6px", fontSize: "12px", color: "#ABA5A0" }}>현재 보이는 닉네임과 다르면 주문 누락이 생길 수 있습니다.</div>
+                <div style={{ marginTop: "6px", fontSize: "12px", color: "#7B736D" }}>현재 보이는 닉네임과 다르면 주문 누락이 생길 수 있습니다.</div>
               )}
             </div>
 
@@ -378,7 +378,7 @@ export default function CustomerInfoEditBottomSheet({
                 </button>
               ) : (
                 <button type="button" onClick={() => setScreen("shipping_list")}
-                  style={{ width: "100%", padding: "14px", border: "1px dashed #E5E1DC", borderRadius: "12px", background: "#fff", fontSize: "13px", color: "#ABA5A0", cursor: "pointer" }}>
+                  style={{ width: "100%", padding: "14px", border: "1px dashed #E5E1DC", borderRadius: "12px", background: "#fff", fontSize: "13px", color: "#7B736D", cursor: "pointer" }}>
                   + 배송지 추가
                 </button>
               )}

@@ -10,6 +10,7 @@ import { useBulkPointGrant, type BulkGrantResult } from "./useBulkPointGrant";
 // 일괄지급 사유 프리셋(고객에게 보이는 문구). "직접입력" 선택 시 직접 작성.
 const BULK_POINT_REASON_PRESETS = ["방송 이벤트 당첨", "단골 감사", "리뷰 감사", "오지급 보정", "직접입력"];
 import { supabase } from "@/lib/supabase";
+import { buildCustomerIdentityResolver, type CustomerIdentityRef } from "@/lib/customerIdentity";
 import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import type { LiveOrder } from "./types";
@@ -328,9 +329,16 @@ function blockReason(order: LooseLiveOrder) {
   return clean(order.block_reason) || clean(order.customer_block_reason);
 }
 
-function buildCustomerKey(order: LooseLiveOrder) {
-  const phone = digitsOnly(orderPhone(order));
-  if (phone) return `phone:${phone}`;
+function orderKakaoId(order: LooseLiveOrder) {
+  return readFirst(order, ["kakao_id", "kakaoId"]);
+}
+
+// [2026-08-29] 같은 사람이 여러 명으로 갈라지던 문제 수정.
+//   전화번호만 보던 것을 "카카오ID 또는 전화번호로 이어지면 한 사람"으로 바꾼다.
+//   resolve 는 lib/customerIdentity 의 합치기 전용 식별자(쪼개지 않음).
+function buildCustomerKey(order: LooseLiveOrder, resolve: (ref: CustomerIdentityRef) => string) {
+  const identity = resolve({ kakaoId: orderKakaoId(order), phone: orderPhone(order) });
+  if (identity) return identity;
 
   const nickname = orderNickname(order);
   const name = orderName(order);
@@ -342,9 +350,10 @@ function customerProfileFullAddress(profile: CustomerProfile) {
   return [clean(profile.zipcode), clean(profile.address), clean(profile.detail_address)].filter(Boolean).join(" ").trim();
 }
 
-function customerProfileKey(profile: CustomerProfile) {
-  const phone = digitsOnly(profile.customer_phone);
-  if (phone) return `phone:${phone}`;
+function customerProfileKey(profile: CustomerProfile, resolve: (ref: CustomerIdentityRef) => string) {
+  // 주문 쪽과 반드시 같은 규칙을 써야 프로필이 엉뚱한 행으로 떨어지지 않는다.
+  const identity = resolve({ kakaoId: profile.kakao_id, phone: profile.customer_phone });
+  if (identity) return identity;
 
   return `profile:${clean(profile.id) || clean(profile.customer_name) || clean(profile.youtube_nickname) || "unknown"}`;
 }
@@ -902,8 +911,21 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
       directPhoneBlocks.map((block) => [digitsOnly(block.phone), block.reason] as const).filter(([phone]) => Boolean(phone))
     );
 
+    // [2026-08-29] 주문과 회원 프로필에 들어 있는 카카오ID·전화번호를 모두 모아
+    //   "이어지는 것끼리 한 사람"으로 묶는 식별자를 만든다. 묶기만 하므로 고객 수가 늘지 않는다.
+    const resolveIdentity = buildCustomerIdentityResolver([
+      ...(orders as LooseLiveOrder[]).map((order) => ({
+        kakaoId: orderKakaoId(order),
+        phone: orderPhone(order),
+      })),
+      ...customerProfiles.map((profile) => ({
+        kakaoId: profile.kakao_id,
+        phone: profile.customer_phone,
+      })),
+    ]);
+
     (orders as LooseLiveOrder[]).forEach((order) => {
-      const key = buildCustomerKey(order);
+      const key = buildCustomerKey(order, resolveIdentity);
       const current = map.get(key);
       const amount = orderAmount(order);
       const latestOrderAt = orderCreatedSortValue(order);
@@ -955,7 +977,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
     });
 
     customerProfiles.forEach((profile) => {
-      const key = customerProfileKey(profile);
+      const key = customerProfileKey(profile, resolveIdentity);
       const phoneKey = digitsOnly(profile.customer_phone);
       const current = map.get(key);
       const override = phoneKey ? blockOverrides[phoneKey] : undefined;

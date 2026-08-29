@@ -199,3 +199,37 @@ body {
 .dark .ruru-event-sian .nick.win { background: var(--color-rose-deep); color: #1a1a18; }
 .dark .ruru-event-sian .nick.out { background: var(--color-surface-2); color: var(--color-ink-mute); }
 .dark .ruru-event-sian .tog.off { background: var(--color-surface-3); }
+
+/* ============================================================================
+   [2026-08-29 P1-7] 터치 기기에서 입력 요소 글씨 최소 16px 보장
+   ----------------------------------------------------------------------------
+   목적 두 가지
+   1) 가독성 — 손님 주문서의 검색·정렬·금액·세부상품명 입력칸이 13~15px이라
+      휴대폰에서 읽기 어렵다. KRDS(대한민국 정부 디자인시스템)는 본문 최소 16px,
+      표준 17px을 권고한다. https://www.krds.go.kr/html/site/style/style_03.html
+   2) iOS 입력칸 자동확대 예방 — iOS Safari(WebKit)는 입력 요소의 렌더링 글씨가
+      16px 미만이면 포커스 시 화면을 자동 확대하고, 포커스가 풀려도 되돌리지 않는다.
+      (15px 이하 확대 / 16px 이상 확대 없음 — 2026년 현재도 동작 확인됨)
+      https://css-tricks.com/16px-or-larger-text-prevents-ios-form-zoom/
+      https://github.com/anomalyco/opencode/issues/6784
+
+   이 프로젝트는 인라인 style을 많이 쓰므로(인라인이 스타일시트보다 우선) 하한을
+   강제하려면 !important 가 필요하다. max()로 하한만 올리므로 이미 16px 이상인
+   입력칸은 그대로 유지된다(글씨가 작아지는 일은 없음).
+
+   적용 범위: 손가락 입력 기기에만 적용한다(hover 불가 + 굵은 포인터).
+   맥북/데스크톱 관리자 화면은 hover:hover / pointer:fine 이라 해당되지 않는다.
+
+   ※ app/order/layout.tsx 의 viewport(maximumScale:1, userScalable:false)는
+     아직 그대로다. 그 설정이 지금 iOS 자동확대를 막고 있으므로, 위 규칙은
+     현재 동작을 바꾸지 않고 가독성만 올린다. viewport를 푸는 작업은
+     실제 아이폰에서 주문서 입력칸을 눌러 확대가 안 튀는지 확인한 뒤에 한다.
+   ============================================================================ */
+@media (hover: none) and (pointer: coarse) {
+  input,
+  select,
+  textarea,
+  [contenteditable="true"] {
+    font-size: max(16px, 1em) !important;
+  }
+}

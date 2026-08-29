@@ -16,6 +16,11 @@ import { getCustomerOrderStatusLabel } from "@/lib/admin-v2/statusDisplay";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import {
+  CUSTOMER_ORDER_LOOKUP_LIMIT,
+  customerOrderLookupSinceIso,
+  buildOrderLookupOrFilter,
+} from "@/lib/customerOrderLookup";
 import CustomerTopNav from "@/components/customer/CustomerTopNav";
 import MyOrderPageHero from "@/components/myorder/MyOrderPageHero";
 import CustomerPaymentGuideBottomSheet from "@/components/customer/CustomerPaymentGuideBottomSheet";
@@ -228,27 +233,23 @@ export default function MyOrderPage() {
     setLoading(true);
     setSearched(true);
 
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
+    // [2026-08-29] 조회 기간을 7일 → CUSTOMER_ORDER_LOOKUP_DAYS 로. 사유는 lib/customerOrderLookup.ts 참고.
+    //   (해외원정방송은 배송에 2~3주가 걸리는데 7일이 지나면 주문내역이 화면에서 사라졌다)
     // 카카오 정체성(안 바뀌는 값). 관리자가 전화/이름/주소를 수정해도 이 값으로 조회하면 주문이 안 사라진다.
     const rawKakaoId =
       typeof window !== "undefined"
         ? (localStorage.getItem("ruru_kakao_id") || "").trim()
         : "";
-    // 카카오 user id는 숫자만 → 조회 필터 문자열 안전을 위해 숫자만 허용, 아니면 무시(전화번호 폴백).
-    const kakaoId = /^[0-9]+$/.test(rawKakaoId) ? rawKakaoId : "";
+    const orFilter = buildOrderLookupOrFilter(rawKakaoId, cleanPhone);
 
     let query = supabase
       .from("orders")
       .select("*")
-      .gte("created_at", sevenDaysAgo.toISOString());
+      .gte("created_at", customerOrderLookupSinceIso());
 
-    if (kakaoId) {
+    if (orFilter) {
       // 카카오 로그인: kakao_id 일치(주문에 찍힌 것) OR 옛 주문(kakao_id 없음)은 전화번호로 폴백 → 누락 없이 둘 다.
-      query = query.or(
-        `kakao_id.eq.${kakaoId},and(kakao_id.is.null,customer_phone.eq.${cleanPhone})`
-      );
+      query = query.or(orFilter);
     } else {
       // 카카오 정체성이 없으면(레거시/비카카오) 기존 방식 유지.
       query = query.eq("customer_phone", cleanPhone);
@@ -257,7 +258,10 @@ export default function MyOrderPage() {
       }
     }
 
-    const { data, error } = await query.order("created_at", { ascending: false });
+    // [2026-08-29] 기간을 늘린 만큼 상한을 둔다(기존에는 상한이 아예 없었다).
+    const { data, error } = await query
+      .order("created_at", { ascending: false })
+      .limit(CUSTOMER_ORDER_LOOKUP_LIMIT);
 
     if (error) {
       setLoading(false);

@@ -223,6 +223,10 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
       finalDetails: string[];
       finalPhotoCount: number;
       finalVariantCount: number;
+      // [2026-08-29 P0-6] 저장 후 "실제 판매가 불변" 재대조용
+      detailPriceChecks: Array<{ name: string; before: number; after: number; isNew: boolean }>;
+      basePriceBefore: number;
+      basePriceAfter: number;
     }> = [];
     const uploadBlob = async (blob: Blob, fileName: string) => {
       let lastMessage = "사진 업로드 실패";
@@ -331,6 +335,10 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
         finalDetails: merged.finalDetails,
         finalPhotoCount: merged.finalPhotoCount,
         finalVariantCount: merged.finalVariantCount,
+        // [2026-08-29 P0-6] 저장 후 DB에서 실제 판매가가 그대로인지 재대조하기 위한 기대값
+        detailPriceChecks: merged.detailPriceChecks,
+        basePriceBefore: merged.basePriceBefore,
+        basePriceAfter: merged.basePriceAfter,
       });
       setProgress({ done: index + 1, total: targets.length, ok: 0, fail: 0 });
     }
@@ -350,7 +358,7 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
       }
       const { data, error } = await supabase
         .from("products")
-        .select("id, product_name, product_note")
+        .select("id, product_name, price, product_note")
         .in("id", plans.map((plan) => plan.id));
       if (error) throw new Error(`등록 결과 확인 실패: ${error.message}`);
       const verified = (data as Array<Record<string, unknown>>) || [];
@@ -369,6 +377,23 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
           if (!(detail in pricing)) throw new Error(`${detail}: 저장 누락`);
           if (!Array.isArray(photoSets[detail]) || (photoSets[detail] as unknown[]).length === 0) throw new Error(`${detail}: 사진 저장 누락`);
         }
+        // [2026-08-29 P0-6] 돈 검수 — DB에 실제로 저장된 값으로 세부상품 판매가를 다시 계산해
+        //   병합 전 판매가와 1원이라도 다르면 즉시 전체 롤백한다(아래 catch에서 backup 복구).
+        const savedBase = Math.max(0, Number(row.price) || 0);
+        const priceMismatch = plan.detailPriceChecks
+          .map((check) => ({
+            name: check.name,
+            expected: check.before,
+            saved: savedBase + Math.max(0, Math.floor(Number(pricing[check.name]) || 0)),
+          }))
+          .filter((check) => check.expected !== check.saved);
+        if (priceMismatch.length > 0) {
+          const sample = priceMismatch
+            .slice(0, 3)
+            .map((check) => `${check.name} ${check.expected.toLocaleString("ko-KR")}원 → ${check.saved.toLocaleString("ko-KR")}원`)
+            .join(" / ");
+          throw new Error(`${plan.name}: 세부상품 판매가가 달라졌어요(${priceMismatch.length}개). 되돌립니다. ${sample}`);
+        }
       }
     } catch (error) {
       for (const plan of updated.reverse()) {
@@ -385,7 +410,15 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
     const addedCount = plans.reduce((sum, plan) => sum + plan.addedDetails.length, 0);
     setProgress({ done: targets.length, total: targets.length, ok: targets.length, fail: 0 });
     setStep("done");
-    showAdminToast(`추가 등록 완료\n\n대표상품 ${plans.length}개 · 신규 세부상품 ${addedCount}개 · 중복 0개`, "success");
+    const checkedPriceCount = plans.reduce((sum, plan) => sum + plan.detailPriceChecks.length, 0);
+    const basePriceMoved = plans.filter((plan) => plan.basePriceBefore !== plan.basePriceAfter);
+    const basePriceNote = basePriceMoved.length > 0
+      ? `\n대표가 변경 ${basePriceMoved.length}개 — 추가금 자동 보정으로 판매가는 그대로입니다`
+      : "";
+    showAdminToast(
+      `추가 등록 완료\n\n대표상품 ${plans.length}개 · 신규 세부상품 ${addedCount}개 · 중복 0개\n판매가 불변 검수 ${checkedPriceCount}개 통과${basePriceNote}`,
+      "success",
+    );
     onDone?.(plans.map((plan) => plan.id));
   };
 

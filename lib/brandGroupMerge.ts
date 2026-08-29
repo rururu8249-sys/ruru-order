@@ -36,6 +36,10 @@ export type BrandGroupMergeResult = {
   finalDetails: string[];
   finalPhotoCount: number;
   finalVariantCount: number;
+  // [2026-08-29 P0-6] 저장 전/후 대조용 — 화면과 검수 로그가 "실제 판매가가 안 변했다"를 확인할 수 있게 한다.
+  basePriceBefore: number;
+  basePriceAfter: number;
+  detailPriceChecks: Array<{ name: string; before: number; after: number; isNew: boolean }>;
 };
 
 // 기존 브랜드 대표상품 한 행에 신규 세부상품만 안전하게 합친다.
@@ -105,10 +109,59 @@ export function mergeBrandGroupProduct(
     ? existingNote.import_batches.map(String)
     : (existingNote.import_batch ? [String(existingNote.import_batch)] : []);
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // [2026-08-29 P0-6] 기존 세부상품 "실제 판매가" 불변 보장
+  //
+  //   세부상품 실제가 = products.price(대표가) + option_pricing[세부상품명](추가금)
+  //   병합 대표가는 최저가(Math.min)로 내려가는데, 추가금을 그대로 두면
+  //   기존 세부상품 수십 개의 판매가가 한꺼번에 내려간다(방송 중이면 그대로 팔림).
+  //
+  //   → 대표가가 내려간 만큼 추가금을 다시 계산해서 실제 판매가를 고정한다.
+  //     저장 형태(option_pricing)와 DB 구조는 그대로라 주문·재고·제출검증 경로 무변경.
+  //     테스트: scripts/test-brand-group-price-guard.mjs
+  // ──────────────────────────────────────────────────────────────────────────
+  const plusOf = (value: unknown) => Math.max(0, Math.floor(Number(value) || 0));
+  const basePriceBefore = Math.max(0, Number(existingRow.price) || 0);
+  const incomingBasePrice = Math.max(0, Number(incomingPayload.price) || 0);
+  const positivePrices = [basePriceBefore, incomingBasePrice].filter((price) => Number.isFinite(price) && price > 0);
+  if (positivePrices.length === 0) throw new Error(`${existingName}: 대표가격이 올바르지 않아요.`);
+  const basePriceAfter = Math.min(...positivePrices);
+
+  const actualBefore = new Map<string, number>();
+  for (const name of oldDetails) actualBefore.set(name, basePriceBefore + plusOf(oldPricing[name]));
+  for (const name of newDetails) actualBefore.set(name, incomingBasePrice + plusOf(newPricing[name]));
+
+  const preservedPricing: Record<string, number> = {};
+  for (const [name, actual] of actualBefore) preservedPricing[name] = actual - basePriceAfter;
+
+  // 추가금은 0 이상이어야 한다(대표가가 최저가이므로 정상적으로는 항상 성립).
+  const negativePlus = Object.entries(preservedPricing).filter(([, plus]) => plus < 0);
+  if (negativePlus.length > 0) {
+    throw new Error(`${existingName}: 추가금이 음수가 되는 세부상품이 있어요(${negativePlus[0][0]}). 저장을 중단했습니다.`);
+  }
+
+  // 안전검사 — 실제 판매가가 1원이라도 달라지면 저장하지 않는다.
+  const detailPriceChecks = [...actualBefore.entries()].map(([name, before]) => ({
+    name,
+    before,
+    after: basePriceAfter + preservedPricing[name],
+    isNew: newDetails.includes(name),
+  }));
+  const priceDrift = detailPriceChecks.filter((row) => row.before !== row.after);
+  if (priceDrift.length > 0) {
+    const sample = priceDrift
+      .slice(0, 3)
+      .map((row) => `${row.name} ${row.before.toLocaleString("ko-KR")}원 → ${row.after.toLocaleString("ko-KR")}원`)
+      .join(" / ");
+    throw new Error(
+      `${existingName}: 세부상품 판매가가 바뀝니다(${priceDrift.length}개). 저장을 중단했어요. ${sample}`,
+    );
+  }
+
   const mergedNote: Row = {
     ...existingNote,
     stock_variants: [...oldVariants, ...newVariants],
-    option_pricing: { ...oldPricing, ...newPricing },
+    option_pricing: preservedPricing,
     detail_photos: mergedDetailPhotos,
     detail_photo_sets: mergedPhotoSets,
     option_axes: [
@@ -129,13 +182,9 @@ export function mergeBrandGroupProduct(
   const newDetailUrls = stringArray(incomingPayload.detail_image_urls);
   const finalPhotoCount = Object.values(mergedPhotoSets)
     .reduce<number>((sum, urls) => sum + stringArray(urls).length, 0);
-  const positivePrices = [Number(existingRow.price), Number(incomingPayload.price)]
-    .filter((price) => Number.isFinite(price) && price > 0);
-  if (positivePrices.length === 0) throw new Error(`${existingName}: 대표가격이 올바르지 않아요.`);
-
   return {
     values: {
-      price: Math.min(...positivePrices),
+      price: basePriceAfter,
       stock: Math.max(0, Number(existingRow.stock) || 0) + Math.max(0, Number(incomingPayload.stock) || 0),
       color_options: finalDetails,
       size_options: allSizes,
@@ -146,5 +195,8 @@ export function mergeBrandGroupProduct(
     finalDetails,
     finalPhotoCount,
     finalVariantCount: oldVariants.length + newVariants.length,
+    basePriceBefore,
+    basePriceAfter,
+    detailPriceChecks,
   };
 }

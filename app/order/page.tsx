@@ -42,6 +42,11 @@ import { HOWTO_DEFAULT, parseHowtoSteps } from "@/lib/howto";
 import { supabase } from "@/lib/supabase";
 import { isRemoteAreaAddress } from "@/lib/order/shippingAddress";
 import { formatOrderPhone, normalizeOrderPhone } from "@/lib/order/phone";
+import {
+  CUSTOMER_ORDER_LOOKUP_LIMIT,
+  customerOrderLookupSinceIso,
+  buildOrderLookupOrFilter,
+} from "@/lib/customerOrderLookup";
 import { brandWordmarkThumbnail, normalizeBrandKorean } from "@/lib/brandWordmarkThumbnail";
 import {
   CUSTOMER_SESSION_VERSION_KEY,
@@ -4816,16 +4821,27 @@ export default function OrderPage() {
       return;
     }
 
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    // [2026-08-29] 이 시트가 /myorder 와 다른 규칙을 쓰고 있어서 같은 손님인데 화면마다 결과가 달랐다.
+    //   ① 조회 기간 7일 → CUSTOMER_ORDER_LOOKUP_DAYS
+    //   ② 전화번호만 보던 것을 카카오 계정(kakao_id) 우선 + 전화번호 폴백으로 통일
+    //      (제출 API의 설계 원칙: "고객 식별 = 카카오 계정, 전화번호는 폴백")
+    //      번호가 바뀐 손님의 과거 주문이 통째로 사라지던 문제를 막는다.
+    //   조회(읽기) 전용 — orders 를 쓰지 않는다.
+    const rawKakaoIdForLookup =
+      typeof window !== "undefined" ? (localStorage.getItem("ruru_kakao_id") || "").trim() : "";
+    const lookupOrFilter = buildOrderLookupOrFilter(rawKakaoIdForLookup, cleanPhone);
 
-    const { data, error } = await supabase
+    let lookupQuery = supabase
       .from("orders")
       .select("*")
-      .eq("customer_phone", cleanPhone)
-      .gte("created_at", sevenDaysAgo.toISOString())
+      .gte("created_at", customerOrderLookupSinceIso());
+    lookupQuery = lookupOrFilter
+      ? lookupQuery.or(lookupOrFilter)
+      : lookupQuery.eq("customer_phone", cleanPhone);
+
+    const { data, error } = await lookupQuery
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(CUSTOMER_ORDER_LOOKUP_LIMIT);
 
     if (error) {
       setOrderLookupOrders([]);
@@ -5639,7 +5655,7 @@ export default function OrderPage() {
                 <section style={{ margin: "12px auto 0", width: "100%", maxWidth: "560px" }}>
                   <div style={{ padding: "44px 26px", textAlign: "center", color: "#7A1E47", fontSize: "16px", fontWeight: 800, border: "1px solid #D9C5CC", borderRadius: "16px", background: "#fff", lineHeight: 1.8 }}>
                     🛍 쇼핑몰 준비 중입니다
-                    <div style={{ marginTop: "6px", fontSize: "13px", fontWeight: 600, color: "#ABA5A0" }}>잠시 후 다시 찾아 주세요.</div>
+                    <div style={{ marginTop: "6px", fontSize: "13px", fontWeight: 600, color: "#7B736D" }}>잠시 후 다시 찾아 주세요.</div>
                   </div>
                 </section>
               );
@@ -5698,7 +5714,7 @@ export default function OrderPage() {
                   value={productSearchText}
                   onChange={(e) => { setProductSearchText(e.target.value); setProductPage(1); setVisibleProductCount(10); }}
                   placeholder="🔍 상품 이름 검색"
-                  style={{ width: "100%", height: "48px", boxSizing: "border-box", border: "1px solid #D9C5CC", borderRadius: "14px", padding: "0 16px", fontSize: "15px", fontWeight: 700, color: "#333", outline: "none" }}
+                  style={{ width: "100%", height: "48px", boxSizing: "border-box", border: "1px solid #B08794", borderRadius: "14px", padding: "0 16px", fontSize: "15px", fontWeight: 700, color: "#333", outline: "none" }}
                 />
                 {/* [2026-08-12 리뉴얼 4단계] 카테고리 칩
                     · 실제 등록된 카테고리만 나옴(기존 로직 유지)
@@ -5736,7 +5752,7 @@ export default function OrderPage() {
                   <select
                     value={productSort}
                     onChange={(e) => { setProductSort(e.target.value as typeof productSort); setVisibleProductCount(10); }}
-                    style={{ height: "34px", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 700, padding: "0 10px", cursor: "pointer", outline: "none" }}
+                    style={{ height: "34px", borderRadius: "10px", border: "1px solid #B08794", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 700, padding: "0 10px", cursor: "pointer", outline: "none" }}
                   >
                     <option value="default">기본순 (방송 순서)</option>
                     <option value="price_asc">낮은 가격순</option>
@@ -5933,7 +5949,7 @@ export default function OrderPage() {
             {selectedItemEntries.length === 0 ? (
               <div style={{ padding: "40px 18px", textAlign: "center" }}>
                 <p style={{ fontSize: "14px", fontWeight: 800, color: "#1A1A1A" }}>아직 담은 상품이 없습니다.</p>
-                <p style={{ marginTop: "6px", fontSize: "12px", fontWeight: 600, color: "#ABA5A0", lineHeight: 1.6 }}>상품목록에서 [담기]를 누르거나 [직접 입력]으로 담아 주세요.</p>
+                <p style={{ marginTop: "6px", fontSize: "12px", fontWeight: 600, color: "#7B736D", lineHeight: 1.6 }}>상품목록에서 [담기]를 누르거나 [직접 입력]으로 담아 주세요.</p>
               </div>
             ) : (
               <div>
@@ -5964,7 +5980,7 @@ export default function OrderPage() {
                         {imageUrl ? (
                           <img src={imageUrl} alt={item.product_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                         ) : (
-                          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", fontWeight: 800, color: "#ABA5A0", textAlign: "center", padding: "0 4px" }}>{itemSourceLabel}</div>
+                          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", fontWeight: 800, color: "#7B736D", textAlign: "center", padding: "0 4px" }}>{itemSourceLabel}</div>
                         )}
                       </div>
 
@@ -5972,7 +5988,7 @@ export default function OrderPage() {
                         {/* [2026-08-13] 주문서 확인에서도 상품명·옵션명이 잘리면 손님이 제출 전에
                             뭘 담았는지 확인을 못 한다(옵션명 = 조합형 세부상품명이라 특히 김) → 2줄 줄바꿈 */}
                         <div style={{ fontSize: "13px", fontWeight: 600, color: "#1A1A1A", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{item.product_name || "상품명 없음"}{item.chat_source === "Y" ? <span style={{ marginLeft: "5px", verticalAlign: "1px", display: "inline-block", padding: "1.5px 6px", borderRadius: "6px", background: "#F9EEF3", color: "#7A1E47", fontSize: "9.5px", fontWeight: 900 }}>채팅주문</span> : null}</div>
-                        <div style={{ fontSize: "11px", color: "#ABA5A0", marginTop: "2px", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{optionSummaryText} · 단가 {won(toNumber(item.product_price))}</div>
+                        <div style={{ fontSize: "11px", color: "#7B736D", marginTop: "2px", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{optionSummaryText} · 단가 {won(toNumber(item.product_price))}</div>
                         {itemIsRegisteredProduct && !itemHasNoOptions ? (
                           <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · 옵션 변경`, "바꿀게요", () => openSheetItemOptionEdit(index))}
                             style={{ marginTop: "5px", padding: "4px 10px", borderRadius: "8px", border: "1px solid #E8D5DD", background: "#fff", color: "#7A1E47", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>
@@ -6453,7 +6469,7 @@ export default function OrderPage() {
 
                 <div data-registered-option-scroll="true" style={{ minHeight: 0, flex: 1, overflowY: "auto", padding: "16px" }}>
                   {registeredOptionColorMode === "none" && registeredOptionSizeMode === "none" && !(registeredOptionSelectProduct && (readOrderAxes3(registeredOptionSelectProduct) || readComboInfoOrderProduct(registeredOptionSelectProduct))) ? (
-                    <div style={{ padding: "12px 16px 0", fontSize: "12px", color: "#ABA5A0" }}>
+                    <div style={{ padding: "12px 16px 0", fontSize: "12px", color: "#7B736D" }}>
                       이 상품은 옵션이 없습니다. 수량만 선택해 주세요.
                     </div>
                   ) : null}
@@ -6542,7 +6558,7 @@ export default function OrderPage() {
                         return (
                           <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>
                             {registeredOptionAxes3 ? `1단계 · ${registeredOptionAxes3.detailLabel}` : "종류"} 선택{" "}
-                            <span style={{ fontSize: "12px", fontWeight: 700, color: "#ABA5A0" }}>
+                            <span style={{ fontSize: "12px", fontWeight: 700, color: "#7B736D" }}>
                               {soldCount > 0 ? `(판매중 ${total - soldCount}가지 · 품절 ${soldCount}가지)` : `(${total}가지)`}
                             </span>
                           </div>
@@ -6648,7 +6664,7 @@ export default function OrderPage() {
                         if (list.length === 0) {
                           return (
                             <div style={{ padding: "18px 14px", textAlign: "center", border: "1px solid #F0EAE0", borderRadius: "12px" }}>
-                              <div style={{ fontSize: "13px", fontWeight: 700, color: "#ABA5A0" }}>검색 결과가 없어요</div>
+                              <div style={{ fontSize: "13px", fontWeight: 700, color: "#7B736D" }}>검색 결과가 없어요</div>
                               <button type="button" onClick={() => setRegisteredOptionComboSearch("")} style={{ marginTop: "10px", height: "36px", padding: "0 16px", borderRadius: "10px", border: "1.5px solid #E8E2DD", background: "#fff", fontSize: "13px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>전체 보기</button>
                             </div>
                           );
@@ -6691,7 +6707,7 @@ export default function OrderPage() {
                                 const members = entry.group.members.map(m=>m.detailName).filter(name=>list.includes(name));
                                 if (members.length < 2) {
                                   const name = members[0]; if (!name) return null; const m=metaOf(name);
-                                  return <button key={name} type="button" onClick={()=>chooseDetail(name,m.soldOut)} disabled={m.soldOut} style={{display:"flex",alignItems:"center",gap:"8px",width:"100%",padding:"9px",border:"1px solid #E8E2DD",borderRadius:"12px",background:m.selected?"#7A1E47":"#fff",opacity:m.soldOut?.45:1}}>{m.cover?<img src={m.cover} alt="" style={{width:"48px",height:"48px",objectFit:"cover",borderRadius:"8px",flexShrink:0}}/>:null}<span style={{flex:1,minWidth:0,textAlign:"left",fontSize:"13px",fontWeight:800,color:m.selected?"#fff":"#333",overflow:"hidden",textOverflow:"ellipsis"}}>{orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name??""),name)}</span><span style={{flexShrink:0,textAlign:"right",lineHeight:1.15}}><b style={{display:"block",fontSize:"12px",fontWeight:900,color:m.selected?"#F5D9E5":"#7A1E47"}}>{m.priceView.actualLabel}</b><span style={{display:"block",marginTop:3,fontSize:"9px",fontWeight:800,color:m.selected?"#F1CBDC":"#9D697C"}}>{m.priceView.surchargeLabel}</span></span></button>;
+                                  return <button key={name} type="button" onClick={()=>chooseDetail(name,m.soldOut)} disabled={m.soldOut} style={{display:"flex",alignItems:"center",gap:"8px",width:"100%",padding:"9px",border:"1px solid #E8E2DD",borderRadius:"12px",background:m.selected?"#7A1E47":"#fff",opacity:m.soldOut?.45:1}}>{m.cover?<img src={m.cover} alt="" loading="lazy" decoding="async" style={{width:"48px",height:"48px",objectFit:"cover",borderRadius:"8px",flexShrink:0}}/>:null}<span style={{flex:1,minWidth:0,textAlign:"left",fontSize:"13px",fontWeight:800,color:m.selected?"#fff":"#333",overflow:"hidden",textOverflow:"ellipsis"}}>{orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name??""),name)}</span><span style={{flexShrink:0,textAlign:"right",lineHeight:1.15}}><b style={{display:"block",fontSize:"12px",fontWeight:900,color:m.selected?"#F5D9E5":"#7A1E47"}}>{m.priceView.actualLabel}</b></span></button>;
                                 }
                                 const selected = members.some(n=>metaOf(n).selected);
                                 return (
@@ -6703,7 +6719,7 @@ export default function OrderPage() {
                                     <div style={{display:"grid",gap:"5px"}}>
                                       {members.map((name,idx)=>{const m=metaOf(name); const label=m.knownColor?`${m.code} · ${m.knownColor}`:`옵션 ${idx+1} · ${m.code}`; return <button key={name} type="button" disabled={m.soldOut} onClick={()=>chooseDetail(name,m.soldOut)} style={{display:"flex",alignItems:"center",gap:"8px",width:"100%",minWidth:0,padding:"6px",borderRadius:"10px",border:`1.5px solid ${m.selected?"#7A1E47":"#E9E1E4"}`,background:m.selected?"#FFF0F5":"#FFFDFB",opacity:m.soldOut?.45:1,textAlign:"left"}}>
                                         <span onClick={e=>{if(m.gallery.length>1){e.stopPropagation();openLightbox(m.cover,m.gallery,orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name??""),name));}}} style={{position:"relative",width:44,height:44,flexShrink:0,borderRadius:8,overflow:"hidden",background:"#F0EBE8",cursor:m.gallery.length>1?"zoom-in":"default"}}>
-                                          {m.cover?<img src={m.cover} alt={`${name} ${label}`} style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"9px",fontWeight:900,color:"#A99CA1"}}>사진 없음</span>}
+                                          {m.cover?<img src={m.cover} alt={`${name} ${label}`} loading="lazy" decoding="async" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"9px",fontWeight:900,color:"#A99CA1"}}>사진 없음</span>}
                                           <span style={{position:"absolute",left:2,right:2,bottom:2,borderRadius:5,background:"rgba(34,25,29,.76)",padding:"2px 3px",color:"#fff",fontSize:"8px",fontWeight:900,textAlign:"center",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{m.knownColor||m.code}</span>
                                           {m.gallery.length>1?<span style={{position:"absolute",right:2,top:2,borderRadius:999,background:"rgba(0,0,0,.7)",padding:"1px 3px",color:"#fff",fontSize:"7px",fontWeight:900}}>{m.gallery.length}장</span>:null}
                                         </span>
@@ -6711,14 +6727,14 @@ export default function OrderPage() {
                                           <span style={{display:"block",fontSize:"11.5px",fontWeight:900,color:"#3F3438",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{label}</span>
                                           {m.soldOut?<span style={{display:"block",marginTop:3,fontSize:"9px",fontWeight:900,color:"#C0392B"}}>품절</span>:m.remain!==null&&m.remain<=5?<span style={{display:"block",marginTop:3,fontSize:"9px",fontWeight:900,color:"#C0392B"}}>{m.remain}개 남음</span>:null}
                                         </span>
-                                        <span style={{flexShrink:0,textAlign:"right",lineHeight:1.15}}><b style={{display:"block",fontSize:"12px",fontWeight:900,color:"#7A1E47"}}>{m.priceView.actualLabel}</b><span style={{display:"block",marginTop:3,fontSize:"9px",fontWeight:800,color:"#9D697C"}}>{m.priceView.surchargeLabel}</span></span>
+                                        <span style={{flexShrink:0,textAlign:"right",lineHeight:1.15}}><b style={{display:"block",fontSize:"12px",fontWeight:900,color:"#7A1E47"}}>{m.priceView.actualLabel}</b></span>
                                       </button>})}
                                     </div>
                                   </div>
                                 );
                               }
                               const name=entry.name, m=metaOf(name);
-                              return <button key={name} type="button" onClick={()=>chooseDetail(name,m.soldOut)} disabled={m.soldOut} style={{display:"flex",alignItems:"center",gap:"8px",width:"100%",padding:"9px",border:"1px solid #F0EAE0",borderRadius:"12px",background:m.selected?"#7A1E47":"#FFFDFB",opacity:m.soldOut?.45:1}}>{m.cover?<span onClick={e=>{e.stopPropagation();openLightbox(m.cover,m.gallery,orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name??""),name));}} style={{position:"relative",width:48,height:48,flexShrink:0}}><img src={m.cover} alt="" style={{width:48,height:48,objectFit:"cover",borderRadius:8}}/>{m.gallery.length>1?<span style={{position:"absolute",right:2,bottom:2,borderRadius:999,background:"rgba(0,0,0,.68)",padding:"1px 4px",color:"#fff",fontSize:"8px",fontWeight:900}}>사진 {m.gallery.length}장</span>:null}</span>:null}<span style={{flex:1,minWidth:0,textAlign:"left",fontSize:"13px",fontWeight:800,color:m.selected?"#fff":"#333",overflow:"hidden",textOverflow:"ellipsis"}}>{orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name??""),name)}</span><span style={{flexShrink:0,textAlign:"right",lineHeight:1.15}}><b style={{display:"block",fontSize:"12px",fontWeight:900,color:m.selected?"#F5D9E5":"#7A1E47"}}>{m.priceView.actualLabel}</b><span style={{display:"block",marginTop:3,fontSize:"9px",fontWeight:800,color:m.selected?"#F1CBDC":"#9D697C"}}>{m.priceView.surchargeLabel}</span></span></button>;
+                              return <button key={name} type="button" onClick={()=>chooseDetail(name,m.soldOut)} disabled={m.soldOut} style={{display:"flex",alignItems:"center",gap:"8px",width:"100%",padding:"9px",border:"1px solid #F0EAE0",borderRadius:"12px",background:m.selected?"#7A1E47":"#FFFDFB",opacity:m.soldOut?.45:1}}>{m.cover?<span onClick={e=>{e.stopPropagation();openLightbox(m.cover,m.gallery,orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name??""),name));}} style={{position:"relative",width:48,height:48,flexShrink:0}}><img src={m.cover} alt="" loading="lazy" decoding="async" style={{width:48,height:48,objectFit:"cover",borderRadius:8}}/>{m.gallery.length>1?<span style={{position:"absolute",right:2,bottom:2,borderRadius:999,background:"rgba(0,0,0,.68)",padding:"1px 4px",color:"#fff",fontSize:"8px",fontWeight:900}}>사진 {m.gallery.length}장</span>:null}</span>:null}<span style={{flex:1,minWidth:0,textAlign:"left",fontSize:"13px",fontWeight:800,color:m.selected?"#fff":"#333",overflow:"hidden",textOverflow:"ellipsis"}}>{orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name??""),name)}</span><span style={{flexShrink:0,textAlign:"right",lineHeight:1.15}}><b style={{display:"block",fontSize:"12px",fontWeight:900,color:m.selected?"#F5D9E5":"#7A1E47"}}>{m.priceView.actualLabel}</b></span></button>;
                             })}
                           </div>
                         );
@@ -6732,7 +6748,7 @@ export default function OrderPage() {
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>
                         색상
                         {registeredOptionAxes3 && !registeredOptionDetail.trim()
-                          ? <span style={{ marginLeft: "6px", fontSize: "12px", fontWeight: 700, color: "#ABA5A0" }}>— {registeredOptionAxes3.detailLabel}부터 선택</span>
+                          ? <span style={{ marginLeft: "6px", fontSize: "12px", fontWeight: 700, color: "#7B736D" }}>— {registeredOptionAxes3.detailLabel}부터 선택</span>
                           : null}
                       </div>
                       {registeredOptionColorChoices.length <= 4 ? (
@@ -6777,7 +6793,7 @@ export default function OrderPage() {
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>
                         사이즈
                         {registeredOptionAxes3 && !registeredOptionDetail.trim()
-                          ? <span style={{ marginLeft: "6px", fontSize: "12px", fontWeight: 700, color: "#ABA5A0" }}>— {registeredOptionAxes3.detailLabel}부터 선택</span>
+                          ? <span style={{ marginLeft: "6px", fontSize: "12px", fontWeight: 700, color: "#7B736D" }}>— {registeredOptionAxes3.detailLabel}부터 선택</span>
                           : null}
                       </div>
                       {registeredOptionSizeChoices.length <= 4 ? (
@@ -6883,7 +6899,7 @@ export default function OrderPage() {
                 {registeredOptionDetailSelected && registeredOptionNeedsManualPrice ? (
                   <div style={{ flexShrink: 0, borderTop: "1px solid #F0EAE0", background: "#FFF8FA", padding: "12px 18px" }}>
                     <label style={{ display: "block", fontSize: "12px", fontWeight: 900, color: "#7A1E47", marginBottom: "6px" }}>상품 금액</label>
-                    <input inputMode="numeric" value={registeredOptionManualPrice > 0 ? registeredOptionManualPrice.toLocaleString("ko-KR") : ""} onChange={(e) => setRegisteredOptionManualPrice(Math.max(0, Number(e.target.value.replace(/[^0-9]/g, "")) || 0))} placeholder="금액을 입력해 주세요" style={{ width: "100%", height: "46px", boxSizing: "border-box", borderRadius: "12px", border: `1.5px solid ${registeredOptionManualPrice > 0 ? "#D9C5CC" : "#E8B5B0"}`, padding: "0 13px", fontSize: "16px", fontWeight: 900, color: "#222", background: "#fff", outline: "none" }} />
+                    <input inputMode="numeric" value={registeredOptionManualPrice > 0 ? registeredOptionManualPrice.toLocaleString("ko-KR") : ""} onChange={(e) => setRegisteredOptionManualPrice(Math.max(0, Number(e.target.value.replace(/[^0-9]/g, "")) || 0))} placeholder="금액을 입력해 주세요" style={{ width: "100%", height: "46px", boxSizing: "border-box", borderRadius: "12px", border: `1.5px solid ${registeredOptionManualPrice > 0 ? "#B08794" : "#E8B5B0"}`, padding: "0 13px", fontSize: "16px", fontWeight: 900, color: "#222", background: "#fff", outline: "none" }} />
                     {registeredOptionManualPrice < 1 ? <div style={{ marginTop: "5px", fontSize: "11px", fontWeight: 800, color: "#C0392B" }}>이 상품은 고객이 금액을 직접 입력하는 상품입니다.</div> : null}
                   </div>
                 ) : null}
@@ -7278,7 +7294,7 @@ export default function OrderPage() {
                 <button
                   type="button"
                   onClick={() => { localStorage.setItem("ruru_howto_hide_until", String(Date.now() + 86400000)); setHowToOpen(false); }}
-                  style={{ border: "1px solid #E5E1DC", background: "#fff", borderRadius: "10px", padding: "11px", fontSize: "13px", color: "#ABA5A0", cursor: "pointer", width: "100%" }}
+                  style={{ border: "1px solid #E5E1DC", background: "#fff", borderRadius: "10px", padding: "11px", fontSize: "13px", color: "#7B736D", cursor: "pointer", width: "100%" }}
                 >
                   오늘 하루 열지 않기
                 </button>

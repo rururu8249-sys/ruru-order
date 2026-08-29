@@ -217,7 +217,7 @@ export default function CustomerOrderLookupBottomSheet({
                 })}
 
                 {hasMore ? (
-                  <div style={{ padding: "12px 0", textAlign: "center", fontSize: "12px", fontWeight: 700, color: "#ABA5A0" }}>
+                  <div style={{ padding: "12px 0", textAlign: "center", fontSize: "12px", fontWeight: 700, color: "#7B736D" }}>
                     더 불러오는 중…
                   </div>
                 ) : null}

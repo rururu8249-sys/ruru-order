@@ -157,7 +157,7 @@ export default function CustomerPaymentGuideBottomSheet({
           {isOrderComplete ? (
             <header>
               <div style={{ fontSize: "13px", color: "#6B6460" }}>✅ 주문 접수됐어요</div>
-              <div style={{ fontSize: "12px", color: "#ABA5A0", marginTop: "3px" }}>
+              <div style={{ fontSize: "12px", color: "#7B736D", marginTop: "3px" }}>
                 {isFullyPaidByPoints ? "추가 결제 없이 접수됐어요" : showCardGuide ? "카카오톡으로 전송되는 결제링크에서 결제해 주세요" : "아래 계좌로 입금해 주세요"}
               </div>
             </header>
@@ -209,7 +209,7 @@ export default function CustomerPaymentGuideBottomSheet({
                   {nicknameCopyDone ? "고객 닉네임 복사 완료" : "입금자명(닉네임) 복사"}
                 </button>              </div>
 
-              <div style={{ textAlign: "center", fontSize: "18px", color: "#ABA5A0", margin: "8px 0" }}>↓</div>
+              <div style={{ textAlign: "center", fontSize: "18px", color: "#7B736D", margin: "8px 0" }}>↓</div>
 
               <div style={{ position: "relative", background: "#F9EEF3", borderRadius: "12px", padding: "16px", paddingRight: "28px" }}>
                 <div style={{ fontSize: "11px", color: "#6B6460", marginBottom: "6px" }}>입금금액</div>
