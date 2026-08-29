@@ -5848,7 +5848,9 @@ export default function OrderPage() {
                           <div onClick={() => { if (img) openLightbox(img, [img], String(product.product_name || "상품")); }} style={listView === "grid"
                             ? { position: "relative", width: "100%", aspectRatio: "1 / 1", borderRadius: "10px", background: "#F0EBE8", overflow: "hidden", cursor: img ? "zoom-in" : "default" }
                             : { position: "relative", flexShrink: 0, width: "84px", height: "84px", borderRadius: "10px", background: "#F0EBE8", overflow: "hidden", cursor: img ? "zoom-in" : "default" }}>
-                            {brandGroup ? (
+                            {/* [2026-08-29] 브랜드 상품이라도 관리자가 대표사진을 올렸으면 그 사진을 쓴다.
+                                안 올렸을 때만 브랜드 글자 썸네일을 자동으로 보여준다. */}
+                            {brandGroup && !img ? (
                               <img
                                 src={brandWordmarkThumbnail(brandGroup.brandEn, brandGroup.brandKo)}
                                 alt={`${brandGroup.brandKo} 브랜드 로고`}

@@ -1812,16 +1812,32 @@ export default function QuickProductFastForm({
             {/* [2026-08-29] 모바일에선 1열로 떨어지는데 폭이 120px 로 고정돼 있어 화면이 어색했다 */}
             <div style={{ width: isMobile ? "100%" : "120px" }}>
               {brandGroupActive ? (
-                <div>
-                  <img
-                    src={brandWordmarkImage}
-                    alt={`${String(initialProductNote?.brand_group?.brand_ko || productName || "브랜드")} 대표 썸네일`}
-                    style={{ width: isMobile ? "100%" : "120px", maxWidth: "220px", height: "120px", display: "block", objectFit: "cover", borderRadius: "10px", border: "1px solid #E1D5D9", background: "#FFFDFB" }}
-                  />
-                  <div style={{ marginTop: "5px", textAlign: "center", fontSize: "10px", lineHeight: 1.25, fontWeight: 800, color: "#7B2D43" }}>
-                    브랜드 대표 썸네일<br />자동 적용
+                // [2026-08-29] 예전에는 브랜드 상품이면 글자 썸네일로 고정돼 사진을 올릴 수가 없었다.
+                //   → 사진을 올리면 그 사진을, 안 올리면 지금처럼 글자 썸네일을 쓴다.
+                coverImages.length > 0 ? (
+                  <div>
+                    <ImagePicker label="" value={coverImages} maxFiles={1} uploadKind="cover" mode="cover" onChange={(next) => { setFormTouched(true); setCoverImages(next); }} triggerRef={coverUploadRef} />
+                    <div style={{ marginTop: "5px", textAlign: "center", fontSize: "10px", lineHeight: 1.3, fontWeight: 800, color: "#0F6E56" }}>
+                      올린 사진이 대표로 쓰입니다<br />
+                      <span style={{ color: "var(--color-ink-mute)", fontWeight: 700 }}>지우면 글자 썸네일로 돌아감</span>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div>
+                    <img
+                      src={brandWordmarkImage}
+                      alt={`${effectiveBrandKo} 대표 썸네일`}
+                      style={{ width: isMobile ? "100%" : "120px", maxWidth: "220px", height: "120px", display: "block", objectFit: "cover", borderRadius: "10px", border: "1px solid #E1D5D9", background: "#FFFDFB" }}
+                    />
+                    <div style={{ marginTop: "6px" }}>
+                      <ImagePicker label="" value={coverImages} maxFiles={1} uploadKind="cover" mode="cover" onChange={(next) => { setFormTouched(true); setCoverImages(next); }} triggerRef={coverUploadRef} />
+                    </div>
+                    <div style={{ marginTop: "5px", textAlign: "center", fontSize: "10px", lineHeight: 1.3, fontWeight: 800, color: "#7B2D43" }}>
+                      브랜드 글자 썸네일 자동 적용<br />
+                      <span style={{ color: "var(--color-ink-mute)", fontWeight: 700 }}>사진을 올리면 그걸 씁니다</span>
+                    </div>
+                  </div>
+                )
               ) : (
                 <ImagePicker label="" value={coverImages} maxFiles={1} uploadKind="cover" mode="cover" onChange={(next) => { setFormTouched(true); setCoverImages(next); }} triggerRef={coverUploadRef} />
               )}
@@ -1953,8 +1969,9 @@ export default function QuickProductFastForm({
                       : `${basePrice.toLocaleString("ko-KR")}원`
                     : "가격 직접입력";
 
+              const uploadedCover = resolveProductImageUrl(coverImages[0] || "");
               const cover = brandGroupActive
-                ? brandWordmarkImage
+                ? (uploadedCover || brandWordmarkImage)
                 : resolveProductImageUrl(coverImages[0] || detailImages[0] || Object.values(detailPhotos)[0] || "");
 
               const badgeChip = (bg: string, color: string, text: string) => (
@@ -2204,7 +2221,7 @@ export default function QuickProductFastForm({
               </div>
 
               {/* 엑셀 브랜드 대표상품: 재고관리를 꺼도 세부상품별 사진을 관리자가 바로 확인할 수 있게 한다. */}
-              {brandGroupActive && details.length > 0 ? (
+              {brandGroupActive ? (
                 <div style={{ marginTop: "10px", borderTop: "1px solid #E8E2DD", paddingTop: "10px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "7px" }}>
                     <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>세부상품 관리</span>
@@ -2269,6 +2286,22 @@ export default function QuickProductFastForm({
                     }}
                     style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: "6px", maxHeight: "340px", overflowY: "auto", paddingRight: "3px" }}
                   >
+                    {details.length === 0 ? (
+                      <div style={{ gridColumn: "1 / -1", padding: "22px 14px", textAlign: "center", border: "2px dashed #D9C5CC", borderRadius: "10px", background: "#FFF9FB" }}>
+                        <div style={{ fontSize: "13px", fontWeight: 900, color: "#7B2D43" }}>아직 상품이 없습니다</div>
+                        <div style={{ marginTop: "5px", fontSize: "11.5px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.6 }}>
+                          이 브랜드에 넣을 상품을 하나씩 추가해 주세요.
+                          <br />상품마다 <b>사진 · 판매가 · 색상 · 사이즈</b>를 따로 정합니다.
+                        </div>
+                        <button
+                          type="button"
+                          onClick={openBrandDetailEditorForNew}
+                          style={{ marginTop: "12px", border: "none", borderRadius: "9px", background: "#7B2D43", color: "#fff", padding: "10px 18px", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}
+                        >
+                          ＋ 첫 번째 상품 추가
+                        </button>
+                      </div>
+                    ) : null}
                     {filteredBrandDetails.map((name) => {
                       const photos = brandGroupDetailPhotoSets[name] || (detailPhotos[name] ? [detailPhotos[name]] : []);
                       const thumbnail = photos[0] || detailPhotos[name] || "";
@@ -2361,7 +2394,7 @@ export default function QuickProductFastForm({
                 </div>
               ) : null}
 
-              {usedAxisCount === 0 ? (
+              {usedAxisCount === 0 && !brandGroupActive ? (
                 <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", padding: "2px 2px 0" }}>옵션 없는 단일 상품으로 등록됩니다. 손님은 수량만 고릅니다.</div>
               ) : null}
 
