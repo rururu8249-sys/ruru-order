@@ -772,11 +772,21 @@ export default function QuickProductFastForm({
   const isEditMode = Boolean(editingProductId);
   const initialProductNote = useMemo(() => parseProductNote(initialProduct), [initialProduct]);
   const isBrandGroupEdit = initialProductNote?.brand_group?.enabled === true;
-  const brandWordmarkImage = isBrandGroupEdit
-    ? brandWordmarkThumbnail(
-        String(initialProductNote?.brand_group?.brand_en || ""),
-        String(initialProductNote?.brand_group?.brand_ko || productName || "브랜드"),
-      )
+  // [2026-08-29 사장님 요청] "무슨 상품이든 등록할 수 있어야 한다"
+  //   예전에는 브랜드 묶음 상품(버버리·몽클레어처럼 세부상품 여러 개)을 엑셀로만 만들 수 있었다.
+  //   → 폼에서도 새로 만들 수 있게 스위치를 둔다. 저장 형태는 엑셀로 만든 것과 완전히 같다.
+  const [brandGroupNew, setBrandGroupNew] = useState(false);
+  const [brandKoText, setBrandKoText] = useState("");
+  const [brandEnText, setBrandEnText] = useState("");
+  const brandGroupActive = isBrandGroupEdit || brandGroupNew;
+  const effectiveBrandKo = isBrandGroupEdit
+    ? String(initialProductNote?.brand_group?.brand_ko || productName || "브랜드")
+    : (brandKoText.trim() || productName.trim() || "브랜드");
+  const effectiveBrandEn = isBrandGroupEdit
+    ? String(initialProductNote?.brand_group?.brand_en || "")
+    : brandEnText.trim();
+  const brandWordmarkImage = brandGroupActive
+    ? brandWordmarkThumbnail(effectiveBrandEn, effectiveBrandKo)
     : "";
   // [2026-08-16 사장님 요청] 재고를 3가지로 나눠 보여준다 — 실재고 / 담김(주문서 제출 전 선점) / 지금 판매가능
   //   담김은 cart_reservations(표시용 선점)에서 읽는다. 읽기 전용 — 재고·주문·돈 로직 무접촉.
@@ -869,6 +879,9 @@ export default function QuickProductFastForm({
     setBrandDetailSearch("");
     setBrandDetailCategoryFilter("전체");
     setFormTouched(false);
+    setBrandGroupNew(false);
+    setBrandKoText("");
+    setBrandEnText("");
 
     setCategory(normalizeBrandKorean(String((productNote as { category?: unknown } | null)?.category || "")));
     setCustomerCategoryVisible(productNote?.customer_category_visible !== false);
@@ -981,7 +994,7 @@ export default function QuickProductFastForm({
 
   const colors = useMemo(() => unique(splitOptions(colorText)), [colorText]);
   const sizes = useMemo(() => unique(splitOptions(sizeText)), [sizeText]);
-  const customerDetailInputUnavailable = details.length > 0 || isBrandGroupEdit;
+  const customerDetailInputUnavailable = details.length > 0 || brandGroupActive;
   const brandGroupDetailPhotoCount = Object.values(brandGroupDetailPhotoSets).reduce((sum, photos) => sum + photos.length, 0);
   const brandDetailCategories = useMemo(
     () => unique(details.map((name) => String(brandGroupDetailCategories[name] || "").trim()).filter(Boolean)),
@@ -1016,9 +1029,9 @@ export default function QuickProductFastForm({
     if (stockMode !== "option") return [];
     // 브랜드 대표상품은 세부상품마다 허용 색상·사이즈가 다르다.
     // 전체 색상×전체 사이즈를 곱하면 존재하지 않는 수천 개 조합이 생기므로 저장된 실제 조합만 사용한다.
-    if (isBrandGroupEdit) return variantRows;
+    if (brandGroupActive) return variantRows;
     return buildVariantRows(details, colors, sizes, variantRows);
-  }, [details, colors, sizes, stockMode, variantRows, isBrandGroupEdit]);
+  }, [details, colors, sizes, stockMode, variantRows, brandGroupActive]);
 
   const totalStock = useMemo(() => {
     if (stockMode === "option") {
@@ -1094,6 +1107,9 @@ export default function QuickProductFastForm({
   const optionStateHint = (text: string) => {
     const v = text.trim();
     if (!v) return { text: "✏️ 손님 직접입력", color: "var(--color-info-tx)" };
+    // [2026-08-29] 예전에는 저장 버튼을 눌러야 "/ 를 쓸 수 없다"는 걸 알았다 → 치는 즉시 알려준다.
+    //   세부상품 + 색상을 같이 쓰면 재고를 "세부상품 / 색상" 으로 관리해서 충돌한다.
+    if (v.includes("/")) return { text: "⚠ / 는 쓸 수 없어요", color: "var(--color-danger-tx)" };
     if (splitOptions(v).length > 0 && splitOptions(v).every((x) => x === "없음")) {
       return { text: "🚫 사용 안 함", color: "var(--color-ink-mute)" };
     }
@@ -1123,7 +1139,7 @@ export default function QuickProductFastForm({
   });
 
   const updateVariantStock = (targetKey: string, stock: number) => {
-    const baseRows = isBrandGroupEdit ? variantRows : buildVariantRows(details, colors, sizes, variantRows);
+    const baseRows = brandGroupActive ? variantRows : buildVariantRows(details, colors, sizes, variantRows);
     const nextRows = baseRows.map((row) =>
       row.key === targetKey ? { ...row, stock } : row,
     );
@@ -1135,7 +1151,7 @@ export default function QuickProductFastForm({
   const [bulkStockText, setBulkStockText] = useState("10");
   const applyBulkStock = () => {
     const n = Math.max(0, Math.floor(Number(String(bulkStockText).replace(/[^0-9]/g, "")) || 0));
-    const baseRows = isBrandGroupEdit ? variantRows : buildVariantRows(details, colors, sizes, variantRows);
+    const baseRows = brandGroupActive ? variantRows : buildVariantRows(details, colors, sizes, variantRows);
     setVariantRows(baseRows.map((row) => ({ ...row, stock: n })));
   };
 
@@ -1451,6 +1467,9 @@ export default function QuickProductFastForm({
     setBrandDetailSearch("");
     setBrandDetailCategoryFilter("전체");
     setFormTouched(false);
+    setBrandGroupNew(false);
+    setBrandKoText("");
+    setBrandEnText("");
     setBulkStockText("10");
   };
 
@@ -1519,6 +1538,16 @@ export default function QuickProductFastForm({
       }
     }
 
+    // [2026-08-29] 브랜드 묶음으로 켜두고 세부상품을 하나도 안 만들면
+    //   손님 화면에 "고를 게 없는 브랜드 카드"만 뜬다. 저장 전에 막는다.
+    if (brandGroupNew && details.length === 0) {
+      showAdminToast(
+        "브랜드 묶음 상품은 세부상품이 1개 이상 있어야 합니다.\n\n아래 [세부상품 관리]의 [＋ 세부상품 추가]로 먼저 만들어 주세요.",
+        "error",
+      );
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -1534,22 +1563,25 @@ export default function QuickProductFastForm({
       //   기존 축1·축2 상품의 note 키 구성이 지금과 100% 동일하게 유지된다.
       const brandColors = unique(Object.values(brandGroupDetailOptions).flatMap((config) => config.colors || []));
       const brandSizes = unique(Object.values(brandGroupDetailOptions).flatMap((config) => config.sizes || []));
-      const needAxes = detailActive && (isBrandGroupEdit || colors.length > 0 || sizes.length > 0);
+      const needAxes = detailActive && (brandGroupActive || colors.length > 0 || sizes.length > 0);
       const optionAxesPayload = needAxes
         ? [
             { key: "detail" as const, label: detailLabel, values: details },
-            ...((isBrandGroupEdit ? brandColors : colors).length > 0 ? [{ key: "color" as const, label: "색상", values: isBrandGroupEdit ? brandColors : colors }] : []),
-            ...((isBrandGroupEdit ? brandSizes : sizes).length > 0 ? [{ key: "size" as const, label: "사이즈", values: isBrandGroupEdit ? brandSizes : sizes }] : []),
+            ...((brandGroupActive ? brandColors : colors).length > 0 ? [{ key: "color" as const, label: "색상", values: brandGroupActive ? brandColors : colors }] : []),
+            ...((brandGroupActive ? brandSizes : sizes).length > 0 ? [{ key: "size" as const, label: "사이즈", values: brandGroupActive ? brandSizes : sizes }] : []),
           ]
         : null;
 
       // 브랜드 대표상품의 엑셀 전용 구조는 일반 수정폼에서 새로 만들 수 없는 데이터다.
       // 수정 저장 시 세부상품별 옵션·다중사진·가져오기 식별자를 반드시 보존한다.
-      const preservedBrandNote = isBrandGroupEdit
+      const preservedBrandNote = brandGroupActive
         ? {
             brand_group: {
               ...(initialProductNote?.brand_group || {}),
-              brand_ko: normalizeBrandKorean(String(initialProductNote?.brand_group?.brand_ko || name)),
+              // [2026-08-29] 폼에서 새로 만드는 브랜드 묶음도 엑셀로 만든 것과 같은 형태로 저장한다.
+              enabled: true,
+              brand_ko: normalizeBrandKorean(String(initialProductNote?.brand_group?.brand_ko || effectiveBrandKo || name)),
+              ...(effectiveBrandEn ? { brand_en: effectiveBrandEn } : {}),
               detail_categories: brandGroupDetailCategories,
               detail_options: brandGroupDetailOptions,
             },
@@ -1572,7 +1604,7 @@ export default function QuickProductFastForm({
         registered_order_enabled: registeredOrderEnabled,
         // 고객 세부상품명 직접입력은 일반 상품 전용.
         // 기존 세부상품 조합형/브랜드 대표상품은 product_name이 재고 식별자라 저장 단계에서도 강제로 OFF한다.
-        customer_detail_input_enabled: !detailActive && !isBrandGroupEdit && customerDetailInputEnabled,
+        customer_detail_input_enabled: !detailActive && !brandGroupActive && customerDetailInputEnabled,
         // [조합형] 직접입력 추천 제외(추가금 누락 방지) / [무료나눔] 추천 제외(직접입력 경로는 0원 금지 정책이라 혼선 방지)
         name_suggestion_enabled: detailActive || freeProductEnabled ? false : nameSuggestionEnabled,
         suggestion_keywords: suggestionKeywordsText
@@ -1615,17 +1647,17 @@ export default function QuickProductFastForm({
         // 브랜드 대표 썸네일은 화면에서 워드마크로 대체하되, 기존 상품사진 URL은 다른 화면과의 호환을 위해 보존한다.
         image_url: coverImages[0] || null,
         // color_options: 3단이면 "색상" 목록, 세부상품만 쓰면 노출 세부상품명(= 기존 조합형과 동일)
-        color_options: isBrandGroupEdit
+        color_options: brandGroupActive
           ? exposedDetails
           : (detailActive && colors.length === 0 ? exposedDetails : colors),
-        size_options: isBrandGroupEdit ? brandSizes : sizes,
-        color_option_enabled: isBrandGroupEdit ? true : (detailActive ? true : colors.length > 0),
-        size_option_enabled: isBrandGroupEdit
+        size_options: brandGroupActive ? brandSizes : sizes,
+        color_option_enabled: brandGroupActive ? true : (detailActive ? true : colors.length > 0),
+        size_option_enabled: brandGroupActive
           ? brandSizes.some((value) => value !== "없음")
           : sizes.length > 0,
         product_description: normalizeTextareaText(description).trim() || null,
         // 브랜드 대표상품은 이 배열에 전체 세부사진이 함께 들어 있다. 일반폼의 5장 제한으로 잘라 저장하지 않는다.
-        detail_image_urls: isBrandGroupEdit
+        detail_image_urls: brandGroupActive
           ? Array.from(new Set(Object.values(brandGroupDetailPhotoSets).flat().filter(Boolean)))
           : detailImages,
         is_visible: isVisible,
@@ -1753,13 +1785,14 @@ export default function QuickProductFastForm({
 
           {/* .top-row : 사진(120) + 필드 */}
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "120px 1fr", gap: "14px", marginBottom: "14px" }}>
-            <div style={{ width: "120px" }}>
-              {isBrandGroupEdit ? (
+            {/* [2026-08-29] 모바일에선 1열로 떨어지는데 폭이 120px 로 고정돼 있어 화면이 어색했다 */}
+            <div style={{ width: isMobile ? "100%" : "120px" }}>
+              {brandGroupActive ? (
                 <div>
                   <img
                     src={brandWordmarkImage}
                     alt={`${String(initialProductNote?.brand_group?.brand_ko || productName || "브랜드")} 대표 썸네일`}
-                    style={{ width: "120px", height: "120px", display: "block", objectFit: "cover", borderRadius: "10px", border: "1px solid #E1D5D9", background: "#FFFDFB" }}
+                    style={{ width: isMobile ? "100%" : "120px", maxWidth: "220px", height: "120px", display: "block", objectFit: "cover", borderRadius: "10px", border: "1px solid #E1D5D9", background: "#FFFDFB" }}
                   />
                   <div style={{ marginTop: "5px", textAlign: "center", fontSize: "10px", lineHeight: 1.25, fontWeight: 800, color: "#7B2D43" }}>
                     브랜드 대표 썸네일<br />자동 적용
@@ -1805,6 +1838,58 @@ export default function QuickProductFastForm({
             </div>
           </div>
 
+          {/* [2026-08-29 사장님 요청] 브랜드 묶음 상품 만들기
+              예전에는 엑셀 대량등록으로만 만들 수 있었다(폼은 수정 전용).
+              → 여기서 켜면 세부상품마다 사진·가격·색상·사이즈를 따로 넣는 브랜드 상품이 된다.
+              이미 브랜드 상품을 수정 중일 때는 이 스위치를 보여주지 않는다(끄면 손님 화면이 깨지므로). */}
+          {!isBrandGroupEdit ? (
+            <div style={{ marginBottom: "14px", border: `1px solid ${brandGroupNew ? "#7B2D43" : "#E8E2DD"}`, borderRadius: "10px", background: brandGroupNew ? "#FFF9FB" : "var(--color-surface)", padding: "10px 12px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: "13px", fontWeight: 900, color: "var(--color-ink)" }}>브랜드 묶음 상품</div>
+                  <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "2px", lineHeight: 1.5 }}>
+                    한 브랜드 아래에 <b>여러 상품</b>을 넣고, 상품마다 <b>사진·가격·색상·사이즈를 따로</b> 정합니다.
+                    <br />손님은 <b>브랜드 → 상품 → 색상 → 사이즈</b> 순으로 고릅니다. (버버리·몽클레어처럼)
+                  </div>
+                </div>
+                <div
+                  onClick={() => { setFormTouched(true); setBrandGroupNew((v) => !v); }}
+                  style={tgStyle(brandGroupNew)}
+                ><span style={tgKnob(brandGroupNew)} /></div>
+              </div>
+
+              {brandGroupNew ? (
+                <div style={{ marginTop: "10px", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "8px" }}>
+                  <div>
+                    <label style={fieldLabel}>브랜드 이름 (한글)</label>
+                    <input
+                      style={fieldInput}
+                      type="text"
+                      placeholder="예: 버버리"
+                      value={brandKoText}
+                      onChange={(e) => { setFormTouched(true); setBrandKoText(e.target.value); }}
+                    />
+                  </div>
+                  <div>
+                    <label style={fieldLabel}>브랜드 이름 (영문) <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(썸네일용·선택)</span></label>
+                    <input
+                      style={fieldInput}
+                      type="text"
+                      placeholder="예: BURBERRY"
+                      value={brandEnText}
+                      onChange={(e) => { setFormTouched(true); setBrandEnText(e.target.value); }}
+                    />
+                  </div>
+                  <div style={{ gridColumn: isMobile ? "auto" : "1 / -1", fontSize: "11px", fontWeight: 800, color: details.length === 0 ? "#C0392B" : "#0F6E56", lineHeight: 1.5 }}>
+                    {details.length === 0
+                      ? "· 아래 [세부상품 관리]의 [＋ 세부상품 추가]로 상품을 1개 이상 만들어야 저장됩니다."
+                      : `· 세부상품 ${details.length}개 등록됨. 대표사진은 브랜드 썸네일이 자동으로 들어갑니다.`}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
           {/* [2026-08-29 사장님 요청] 손님 화면 미리보기
               예전에는 등록을 마치고 주문서를 직접 열어봐야 어떻게 보이는지 알 수 있었다.
               → 지금 입력 중인 값 그대로, 손님 상품목록에 나올 카드를 그 자리에서 보여준다.
@@ -1827,7 +1912,7 @@ export default function QuickProductFastForm({
               const maxPlus = plusList.length > 0 ? Math.max(...plusList) : 0;
               const lowest = basePrice + minPlus;
 
-              const priceText2 = isBrandGroupEdit
+              const priceText2 = brandGroupActive
                 ? `최저가 ${lowest.toLocaleString("ko-KR")}원 부터 ~`
                 : freeProductEnabled
                   ? "0원 · 🎁 무료나눔"
@@ -1837,7 +1922,7 @@ export default function QuickProductFastForm({
                       : `${basePrice.toLocaleString("ko-KR")}원`
                     : "가격 직접입력";
 
-              const cover = isBrandGroupEdit
+              const cover = brandGroupActive
                 ? brandWordmarkImage
                 : resolveProductImageUrl(coverImages[0] || detailImages[0] || Object.values(detailPhotos)[0] || "");
 
@@ -1869,7 +1954,7 @@ export default function QuickProductFastForm({
                       </div>
                       {details.length > 1 ? (
                         <div style={{ fontSize: "10.5px", color: "#8A8A8A", marginTop: "2px" }}>
-                          {isBrandGroupEdit
+                          {brandGroupActive
                             ? `세부상품 ${details.length - detailHidden.length}가지 · 상품별 금액이 달라요`
                             : `종류 ${details.length}가지 · 눌러서 선택`}
                         </div>
@@ -1884,7 +1969,7 @@ export default function QuickProductFastForm({
                   {/* 손님이 못 보는 상태를 미리 알려준다 */}
                   <div style={{ marginTop: "7px", display: "flex", flexDirection: "column", gap: "3px" }}>
                     {!productName.trim() ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#C0392B" }}>· 상품명이 없으면 저장되지 않습니다</span> : null}
-                    {!isBrandGroupEdit && !cover ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#8A5A00" }}>· 사진이 없어 손님 목록에 회색 네모로 보입니다</span> : null}
+                    {!brandGroupActive && !cover ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#8A5A00" }}>· 사진이 없어 손님 목록에 회색 네모로 보입니다</span> : null}
                     {!isVisible ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#8A5A00" }}>· 고객 노출이 꺼져 있어 손님 화면에 아예 안 보입니다</span> : null}
                     {details.length > 0 && detailHidden.length === details.length ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#C0392B" }}>· 세부상품이 전부 숨김이라 손님이 고를 수 있는 게 없습니다</span> : null}
                   </div>
@@ -2023,7 +2108,7 @@ export default function QuickProductFastForm({
                 <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>값 넣으면 고르기 · 비우면 손님 직접입력</span>
               </div>
 
-              {isBrandGroupEdit ? (
+              {brandGroupActive ? (
                 <div style={{ padding: "9px 10px", marginBottom: "8px", borderRadius: "8px", background: "#EEF6F3", border: "1px solid #CFE4DB", fontSize: "11.5px", lineHeight: 1.55, color: "#0F6E56" }}>
                   <b>브랜드 대표상품 · 세부상품 {details.length}개</b><br />
                   색상과 사이즈는 상품마다 다르게 저장되어 있어요. 아래 목록에는 각 상품에 실제 등록된 옵션만 표시됩니다.
@@ -2031,14 +2116,14 @@ export default function QuickProductFastForm({
               ) : null}
 
               {/* 슬롯 1 — 세부상품(라벨 변경 가능). A-1 / A-2 / A-3 처럼 한 상품 안의 여러 상품 */}
-              <div style={isBrandGroupEdit ? { ...optRow, display: "none" } : optRow}>
+              <div style={brandGroupActive ? { ...optRow, display: "none" } : optRow}>
                 <span style={optLabel}>세부상품</span>
                 <input style={optInput} type="text" placeholder="A-1, A-2, A-3 (쉼표로 구분)" value={detailText} onChange={(e) => { setFormTouched(true); setDetailText(e.target.value); }} />
                 {!detailText.trim() ? <span style={{ fontSize: "11.5px", fontWeight: 700, color: "var(--color-ink-mute)", whiteSpace: "nowrap" }}>🚫 사용 안 함</span> : null}
               </div>
 
               {/* 슬롯 2 — 색상 */}
-              <div style={isBrandGroupEdit ? { ...optRow, display: "none" } : optRow}>
+              <div style={brandGroupActive ? { ...optRow, display: "none" } : optRow}>
                 <span style={optLabel}>색상</span>
                 <input style={optInput} type="text" placeholder="화이트, 블랙, 베이지" value={colorText} onChange={(e) => setColorText(e.target.value)} />
                 <div ref={colorPresetRef} style={{ position: "relative", display: "inline-block" }}>
@@ -2063,7 +2148,7 @@ export default function QuickProductFastForm({
               </div>
 
               {/* 슬롯 3 — 사이즈 */}
-              <div style={isBrandGroupEdit ? { ...optRow, display: "none" } : optRow}>
+              <div style={brandGroupActive ? { ...optRow, display: "none" } : optRow}>
                 <span style={optLabel}>사이즈</span>
                 <input style={optInput} type="text" placeholder="220, 230, 240" value={sizeText} onChange={(e) => setSizeText(e.target.value)} />
                 <div ref={sizePresetRef} style={{ position: "relative", display: "inline-block" }}>
@@ -2088,7 +2173,7 @@ export default function QuickProductFastForm({
               </div>
 
               {/* 엑셀 브랜드 대표상품: 재고관리를 꺼도 세부상품별 사진을 관리자가 바로 확인할 수 있게 한다. */}
-              {isBrandGroupEdit && details.length > 0 ? (
+              {brandGroupActive && details.length > 0 ? (
                 <div style={{ marginTop: "10px", borderTop: "1px solid #E8E2DD", paddingTop: "10px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "7px" }}>
                     <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>세부상품 관리</span>
@@ -2325,7 +2410,7 @@ export default function QuickProductFastForm({
                                 <input
                                   style={{ fontSize: "11px", padding: "4px 6px", border: "1px solid #D9C5CC", borderRadius: "5px", textAlign: "right", width: "100%", background: "#fff" }}
                                   type="text" inputMode="numeric" placeholder="추가금"
-                                  value={formatNumberWithComma(detailPlus[group.detail] ?? "0") || "0"}
+                                  value={formatNumberWithComma(detailPlus[group.detail] ?? "")}
                                   onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }}
                                   onChange={(e) => { setFormTouched(true); setDetailPlus((prev) => ({ ...prev, [group.detail]: onlyNumber(e.target.value) })); }}
                                 />
@@ -2458,7 +2543,7 @@ export default function QuickProductFastForm({
           <div style={{ height: "1px", background: "#E8E2DD", margin: "12px 0" }} />
 
           {/* 일반 상품 공통 상세사진 / 브랜드 대표상품은 위의 세부상품별 사진 목록으로 확인 */}
-          {!isBrandGroupEdit ? (
+          {!brandGroupActive ? (
             <div style={{ marginBottom: "14px" }}>
               <ImagePicker label="상세사진 (최대 5장)" value={detailImages} maxFiles={5} uploadKind="detail" mode="detail" onChange={(next) => { setFormTouched(true); setDetailImages(next); }} />
             </div>
