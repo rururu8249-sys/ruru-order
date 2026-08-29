@@ -38,6 +38,8 @@ export default function CustomerSiteAlertPopup() {
   const [notices, setNotices] = useState<NoticeItem[]>([]);
   // [2026-08-30] 접속 공지 팝업이 떠 있으면 쪽지 팝업은 기다린다(팝업 두 개 겹침 방지).
   const [noticePopupOpen, setNoticePopupOpen] = useState(false);
+  // [2026-08-30] 하단 메뉴에 「공지·쪽지」가 있는 화면이면 🔔 버튼은 숨긴다(중복 + 화면 가림).
+  const [noticeMenuOn, setNoticeMenuOn] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined" || window.location.pathname.startsWith("/admin")) return;
@@ -81,18 +83,24 @@ export default function CustomerSiteAlertPopup() {
     const onOpenBox = () => { setBoxOpen(true); void load(); };
     // 접속 공지 팝업이 떠 있는지 — 떠 있으면 쪽지 팝업을 미룬다
     const onNoticePopup = (e: Event) => setNoticePopupOpen(Boolean((e as CustomEvent).detail));
+    // 하단 메뉴(공지·쪽지)가 떠 있는지 — 떠 있으면 🔔 버튼을 숨긴다
+    const onNoticeMenu = (e: Event) => setNoticeMenuOn(Boolean((e as CustomEvent).detail));
     try {
-      setNoticePopupOpen(Boolean((window as unknown as Record<string, unknown>).__ruruNoticePopupOpen));
+      const w = window as unknown as Record<string, unknown>;
+      setNoticePopupOpen(Boolean(w.__ruruNoticePopupOpen));
+      setNoticeMenuOn(Boolean(w.__ruruNoticeMenuOn));
     } catch { /* 무시 */ }
     window.addEventListener("focus", onFocus);
     window.addEventListener("ruru-open-notice-box", onOpenBox);
     window.addEventListener("ruru-notice-popup", onNoticePopup as EventListener);
+    window.addEventListener("ruru-notice-menu", onNoticeMenu as EventListener);
     return () => {
       stopped = true;
       window.clearInterval(timer);
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("ruru-open-notice-box", onOpenBox);
       window.removeEventListener("ruru-notice-popup", onNoticePopup as EventListener);
+      window.removeEventListener("ruru-notice-menu", onNoticeMenu as EventListener);
     };
   }, []);
 
@@ -120,7 +128,7 @@ export default function CustomerSiteAlertPopup() {
     <>
       {/* [2026-08-30] 쪽지함 버튼 — 팝업을 실수로 닫아도 여기서 다시 본다.
           일반 쇼핑몰의 알림함과 같은 자리(오른쪽 아래 떠 있는 버튼). */}
-      {hasAny && !alert && !noticePopupOpen ? (
+      {hasAny && !alert && !noticePopupOpen && !noticeMenuOn ? (
         <button
           type="button"
           onClick={() => setBoxOpen(true)}

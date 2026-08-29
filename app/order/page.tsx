@@ -3146,6 +3146,22 @@ export default function OrderPage() {
     return () => { if (open) tell(false); };
   }, [popupOpen, hasSavedInfo]);
 
+  // [2026-08-30 사장님 지적] 오른쪽 아래 떠 있는 🔔 버튼이 상품/장바구니 바를 가린다.
+  //   게다가 하단 메뉴에 이미 「📬 공지·쪽지」가 안 읽은 개수까지 달고 있어서 같은 게 두 개다.
+  //   → 하단 메뉴가 보이는 화면에서는 🔔 버튼을 숨긴다. (하단 메뉴가 없는 화면에서만 🔔 이 나온다)
+  useEffect(() => {
+    const on = hasSavedInfo && broadcastLoaded && !orderSheetOpen;
+    const tell = (v: boolean) => {
+      try {
+        (window as unknown as Record<string, unknown>).__ruruNoticeMenuOn = v;
+        window.dispatchEvent(new CustomEvent("ruru-notice-menu", { detail: v }));
+      } catch { /* 무시 */ }
+    };
+    tell(on);
+    // 이 화면을 벗어나면 반드시 "하단 메뉴 없음"으로 되돌린다(깃발이 켜진 채 남지 않게)
+    return () => { if (on) tell(false); };
+  }, [hasSavedInfo, broadcastLoaded, orderSheetOpen]);
+
   // 쪽지함(CustomerSiteAlertPopup)이 안 읽은 개수를 알려오면 하단 메뉴 배지에 반영한다.
   useEffect(() => {
     const onCount = (e: Event) => {
