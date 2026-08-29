@@ -775,6 +775,9 @@ export default function QuickProductFastForm({
   // [2026-08-29 사장님 요청] "무슨 상품이든 등록할 수 있어야 한다"
   //   예전에는 브랜드 묶음 상품(버버리·몽클레어처럼 세부상품 여러 개)을 엑셀로만 만들 수 있었다.
   //   → 폼에서도 새로 만들 수 있게 스위치를 둔다. 저장 형태는 엑셀로 만든 것과 완전히 같다.
+  // [2026-08-29 개선 A] 세부상품 "실제 판매가"를 직접 입력 — 추가금은 시스템이 역산한다.
+  //   치는 도중(예: "1" → "12" → "129000")에 값이 튀지 않도록 입력 중인 글자를 따로 들고 있는다.
+  const [salePriceDraft, setSalePriceDraft] = useState<Record<string, string>>({});
   const [brandGroupNew, setBrandGroupNew] = useState(false);
   const [brandKoText, setBrandKoText] = useState("");
   const [brandEnText, setBrandEnText] = useState("");
@@ -1289,6 +1292,27 @@ export default function QuickProductFastForm({
     } finally {
       setDetailPhotoUploading("");
     }
+  };
+
+  // [2026-08-29 개선 A] 판매가를 입력하면 추가금을 역산해서 저장한다.
+  //   저장되는 값은 예전과 똑같이 "추가금"이다. 계산식(실제가 = 대표가 + 추가금)은 바뀌지 않는다.
+  //   대표가보다 낮은 판매가는 추가금이 음수가 되어 저장할 수 없으므로 적용하지 않고 빨간 글씨로 알린다.
+  const applySalePrice = (detailName: string, typed: string) => {
+    setFormTouched(true);
+    setSalePriceDraft((prev) => ({ ...prev, [detailName]: typed }));
+    const digits = String(typed || "").replace(/[^0-9]/g, "");
+    if (!digits) {
+      setDetailPlus((prev) => ({ ...prev, [detailName]: "" }));
+      return;
+    }
+    const sale = Number(digits) || 0;
+    const base = moneyNumber(priceText);
+    if (sale < base) return;                       // 음수 추가금은 만들지 않는다
+    setDetailPlus((prev) => ({ ...prev, [detailName]: String(sale - base) }));
+  };
+
+  const clearSalePriceDraft = (detailName: string) => {
+    setSalePriceDraft((prev) => { const next = { ...prev }; delete next[detailName]; return next; });
   };
 
   // [2026-08-29] 저장하지 않고 닫으려 하면 한 번 물어본다(예전에는 그냥 날아갔다).
@@ -1826,6 +1850,13 @@ export default function QuickProductFastForm({
                   <input type="checkbox" checked={freeProductEnabled} onChange={(e) => setFreeProductEnabled(e.target.checked)} style={{ accentColor: "#0F6E56" }} />
                   🎁 무료나눔 상품 (0원 — 손님에게 선물)
                 </label>
+                {/* [2026-08-29] 세부상품 판매가는 "대표가 + 추가금"이라 대표가를 바꾸면 같이 움직인다.
+                    모르고 바꾸면 여러 상품 값이 한꺼번에 틀어지므로 미리 알려준다. */}
+                {details.length > 0 && !freeProductEnabled ? (
+                  <div style={{ marginTop: "5px", fontSize: "10.5px", fontWeight: 800, color: "#8A5A00", lineHeight: 1.45 }}>
+                    ⚠ 이 값을 바꾸면 세부상품 {details.length}개의 판매가가 <b>같이 움직입니다</b> (판매가 = 이 값 + 추가금)
+                  </div>
+                ) : null}
               </div>
               <div>
                 <label style={fieldLabel}>배송</label>
@@ -2370,7 +2401,7 @@ export default function QuickProductFastForm({
                       {variantGroups.map((group) => (
                         <div key={`grp-${group.detail || "__none__"}`} style={{ marginBottom: "4px" }}>
                           {group.detail ? (
-                            <div style={{ display: "grid", gridTemplateColumns: "36px 1fr 82px 34px", gap: "6px", alignItems: "center", background: "#F5E6EB", borderRadius: "6px", padding: "5px 8px", marginBottom: "3px" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "36px 1fr 100px 34px", gap: "6px", alignItems: "center", background: "#F5E6EB", borderRadius: "6px", padding: "5px 8px", marginBottom: "3px" }}>
                               {/* [2026-08-11] 세부상품별 대표사진 — 손님이 종류 고를 때 사진으로 구분 (스마트스토어·쿠팡의 옵션별 이미지와 동일 개념) */}
                               <button
                                 type="button"
@@ -2405,16 +2436,35 @@ export default function QuickProductFastForm({
                                   );
                                 })()}
                               </span>
-                              <span style={{ display: "flex", alignItems: "center", gap: "3px" }}>
-                                <span style={{ fontSize: "10px", color: "#7B2D43", fontWeight: 700 }}>+</span>
-                                <input
-                                  style={{ fontSize: "11px", padding: "4px 6px", border: "1px solid #D9C5CC", borderRadius: "5px", textAlign: "right", width: "100%", background: "#fff" }}
-                                  type="text" inputMode="numeric" placeholder="추가금"
-                                  value={formatNumberWithComma(detailPlus[group.detail] ?? "")}
-                                  onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }}
-                                  onChange={(e) => { setFormTouched(true); setDetailPlus((prev) => ({ ...prev, [group.detail]: onlyNumber(e.target.value) })); }}
-                                />
-                              </span>
+                              {/* [2026-08-29 개선 A] 예전에는 "추가금"만 넣어서 실제로 얼마에 팔리는지
+                                  머릿속으로 더해야 했다. → 팔 금액을 그대로 넣고, 추가금은 시스템이 역산한다.
+                                  저장되는 값·계산식은 예전과 동일(실제가 = 대표가 + 추가금). */}
+                              {(() => {
+                                const base = moneyNumber(priceText);
+                                const plusNow = Math.max(0, Number(detailPlus[group.detail]) || 0);
+                                const draft = salePriceDraft[group.detail];
+                                const shown = draft !== undefined
+                                  ? formatNumberWithComma(draft)
+                                  : (detailPlus[group.detail] === "" ? "" : formatNumberWithComma(String(base + plusNow)));
+                                const typedNum = Number(String(draft ?? "").replace(/[^0-9]/g, "")) || 0;
+                                const tooLow = draft !== undefined && String(draft).trim() !== "" && typedNum < base;
+                                return (
+                                  <span style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
+                                    <input
+                                      style={{ fontSize: "11px", padding: "4px 6px", border: `1px solid ${tooLow ? "#C0392B" : "#D9C5CC"}`, borderRadius: "5px", textAlign: "right", width: "100%", background: "#fff", fontWeight: 800 }}
+                                      type="text" inputMode="numeric" placeholder="판매가"
+                                      title="손님이 실제로 내는 금액. 대표가와의 차액이 추가금으로 자동 저장됩니다."
+                                      value={shown}
+                                      onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }}
+                                      onChange={(e) => applySalePrice(group.detail, e.target.value)}
+                                      onBlur={() => clearSalePriceDraft(group.detail)}
+                                    />
+                                    <span style={{ fontSize: "9px", fontWeight: 800, color: tooLow ? "#C0392B" : "#8B7D83", textAlign: "right", whiteSpace: "nowrap" }}>
+                                      {tooLow ? "대표가보다 낮음" : `추가금 +${plusNow.toLocaleString("ko-KR")}`}
+                                    </span>
+                                  </span>
+                                );
+                              })()}
                               <button type="button" title={detailHidden.includes(group.detail) ? "숨김 — 누르면 노출" : "노출 중 — 누르면 숨김"} onClick={() => toggleDetailHidden(group.detail)} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: "14px", padding: 0 }}>
                                 {detailHidden.includes(group.detail) ? "🚫" : "👁"}
                               </button>
@@ -2600,15 +2650,44 @@ export default function QuickProductFastForm({
                 </label>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "10px", marginTop: "10px" }}>
-                <label style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>기본가 대비 추가금
-                  <div style={{ position: "relative", marginTop: "4px" }}>
-                    <input value={formatNumberWithComma(brandDetailEditDraft.plus)} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, plus: onlyNumber(event.target.value) } : prev)} inputMode="numeric" style={{ ...fieldInput, paddingRight: "28px" }} />
-                    <span style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", color: "var(--color-ink-mute)", fontSize: "12px" }}>원</span>
-                  </div>
-                </label>
-                <div style={{ padding: "20px 11px 0", fontSize: "12px", color: "#7B2D43", fontWeight: 900 }}>
-                  판매가 {(moneyNumber(priceText) + Math.max(0, Number(brandDetailEditDraft.plus) || 0)).toLocaleString("ko-KR")}원
-                </div>
+                {/* [2026-08-29 개선 A] 팔 금액을 그대로 넣는다. 추가금은 시스템이 역산해서 저장한다. */}
+                {(() => {
+                  const base = moneyNumber(priceText);
+                  const plusNow = Math.max(0, Number(brandDetailEditDraft.plus) || 0);
+                  const draft = salePriceDraft["__modal__"];
+                  const shown = draft !== undefined ? formatNumberWithComma(draft) : formatNumberWithComma(String(base + plusNow));
+                  const typedNum = Number(String(draft ?? "").replace(/[^0-9]/g, "")) || 0;
+                  const tooLow = draft !== undefined && String(draft).trim() !== "" && typedNum < base;
+                  return (
+                    <>
+                      <label style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>판매가 <span style={{ fontWeight: 700 }}>(손님이 내는 금액)</span>
+                        <div style={{ position: "relative", marginTop: "4px" }}>
+                          <input
+                            value={shown}
+                            inputMode="numeric"
+                            style={{ ...fieldInput, paddingRight: "28px", fontWeight: 800, borderColor: tooLow ? "#C0392B" : undefined }}
+                            onChange={(event) => {
+                              const typed = event.target.value;
+                              setSalePriceDraft((prev) => ({ ...prev, __modal__: typed }));
+                              const digits = String(typed || "").replace(/[^0-9]/g, "");
+                              if (!digits) { setBrandDetailEditDraft((prev) => (prev ? { ...prev, plus: "0" } : prev)); return; }
+                              const sale = Number(digits) || 0;
+                              if (sale < base) return;   // 음수 추가금은 만들지 않는다
+                              setBrandDetailEditDraft((prev) => (prev ? { ...prev, plus: String(sale - base) } : prev));
+                            }}
+                            onBlur={() => setSalePriceDraft((prev) => { const next = { ...prev }; delete next.__modal__; return next; })}
+                          />
+                          <span style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", color: "var(--color-ink-mute)", fontSize: "12px" }}>원</span>
+                        </div>
+                      </label>
+                      <div style={{ padding: "20px 11px 0", fontSize: "11.5px", fontWeight: 900, color: tooLow ? "#C0392B" : "#7B2D43", lineHeight: 1.5 }}>
+                        {tooLow
+                          ? <>대표가({base.toLocaleString("ko-KR")}원)보다<br />낮게는 못 넣습니다</>
+                          : <>대표가 {base.toLocaleString("ko-KR")}원<br />+ 추가금 {plusNow.toLocaleString("ko-KR")}원</>}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
               <div style={{ marginTop: "14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
