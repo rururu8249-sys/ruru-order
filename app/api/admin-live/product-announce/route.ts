@@ -22,7 +22,16 @@ import { buildProductAnnounceLine } from "@/lib/productAnnounce";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const DAILY_CAP = 60;             // lib/chatOrderPipeline.ts 의 BOT_DAILY_CAP 과 같은 기준
+// 유튜브 쿼터 보호
+//   봇이 채팅에 글을 쓰는 것(liveChatMessages.insert)은 읽기보다 훨씬 비싸다.
+//   그래서 봇 글은 하루 60건으로 묶어 관리한다(lib/chatOrderPipeline.ts 의 BOT_DAILY_CAP 과 같은 기준).
+//
+//   ⚠️ 여기가 중요하다 — 그 60건은 아래 넷이 **같이 나눠 쓴다**:
+//        ① 채팅주문 안내(다시 적어달라)  ② 주문 접수확인  ③ 카드결제 링크 안내  ④ 상품 소개(이 파일)
+//      상품 소개를 마구 누르면 **손님 주문 접수확인이 안 나가는 사고**가 생긴다.
+//      → 상품 소개는 하루 25건까지만 쓰게 따로 묶어, 나머지 35건을 주문 쪽에 남겨둔다.
+const DAILY_CAP = 60;              // 봇 채팅 전체 상한 (모든 종류 합산)
+const ANNOUNCE_DAILY_CAP = 25;     // 그중 "상품 소개" 가 쓸 수 있는 몫
 const SAME_PRODUCT_GAP_MS = 20 * 1000;
 
 function getSupabaseAdmin() {
@@ -104,6 +113,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 상품 소개 몫 확인 — 주문 접수확인이 밀리지 않게
+    const announceKey = `product_announce_count_${day}`;
+    const announcedToday = Number(await readSetting(sb, announceKey)) || 0;
+    if (announcedToday >= ANNOUNCE_DAILY_CAP) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `오늘 상품 소개는 ${ANNOUNCE_DAILY_CAP}건까지만 자동으로 올려요.\n(손님 주문 접수확인 안내를 위해 남겨둡니다)\n문구를 복사해 뒀으니 채팅에 붙여넣어 주세요.`,
+          message: line,
+        },
+        { status: 429 },
+      );
+    }
+
     const botChatId = await readSetting(sb, "chat_order_chat_id");
     const result = await postLiveChatMessage(line, { forceEvenIfDisabled: true, liveChatId: botChatId });
 
@@ -116,13 +139,21 @@ export async function POST(request: NextRequest) {
     }
 
     await writeSetting(sb, dedupeKey, String(Date.now()));
+    await writeSetting(sb, announceKey, String(announcedToday + 1));
     if (usage) {
       await sb.from("youtube_api_usage").update({ calls: sentToday + 1 }).eq("day", day).eq("method", "liveChatMessages.insert");
     } else {
       await sb.from("youtube_api_usage").insert({ day, method: "liveChatMessages.insert", calls: 1 });
     }
 
-    return NextResponse.json({ ok: true, message: line });
+    return NextResponse.json({
+      ok: true,
+      message: line,
+      announceUsed: announcedToday + 1,
+      announceCap: ANNOUNCE_DAILY_CAP,
+      botUsed: sentToday + 1,
+      botCap: DAILY_CAP,
+    });
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : String(error) },

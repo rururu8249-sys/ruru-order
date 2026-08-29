@@ -1268,10 +1268,15 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ productId: pid, detailName }),
       });
-      const json = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; message?: string } | null;
+      const json = (await res.json().catch(() => null)) as
+        { ok?: boolean; error?: string; message?: string; announceUsed?: number; announceCap?: number } | null;
 
       if (res.ok && json?.ok) {
-        showAdminToast(`고정 + 채팅 게시 완료\n\n${json.message || ""}`, "success");
+        // 남은 횟수를 같이 보여준다 — 유튜브 쿼터를 다 쓰면 손님 주문 안내가 못 나간다.
+        const left = typeof json.announceCap === "number" && typeof json.announceUsed === "number"
+          ? `\n\n오늘 상품소개 ${json.announceUsed}/${json.announceCap}회`
+          : "";
+        showAdminToast(`고정 + 채팅 게시 완료\n\n${json.message || ""}${left}`, "success");
         return;
       }
 
