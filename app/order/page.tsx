@@ -5268,12 +5268,9 @@ export default function OrderPage() {
             {/* [2026-08-12 리뉴얼 1단계] 로고 — 집(대문) 아이콘 + 「루루동이 / 집구석 LIVE」 워드마크.
                 방송 중이면 LIVE 배지가 빨갛게, 아니면 차분한 로즈. 클릭 동작(/order)은 기존과 동일. */}
             <Link href="/order" style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "3px", textDecoration: "none" }}>
-              <svg width="30" height="28" viewBox="5 9 30 27.4" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden>
-                <path d="M6.4 21 L18.4 10.6 a2.4 2.4 0 0 1 3.2 0 L33.6 21" stroke="#5E1837" strokeWidth="2.7" fill="none" />
-                <path d="M9.8 19.6 V31.6 a3.2 3.2 0 0 0 3.2 3.2 H27 a3.2 3.2 0 0 0 3.2 -3.2 V19.6" stroke="#5E1837" strokeWidth="2.7" fill="#F6DBE7" fillOpacity="0.6" />
-                <path d="M16 34.8 V28.9 a4 4 0 0 1 8 0 V34.8" stroke="#5E1837" strokeWidth="2.4" fill="#FFFFFF" />
-                <circle cx="21" cy="31.6" r="0.95" fill="#5E1837" />
-              </svg>
+              {/* [2026-08-30 사장님 요청] 직접 그린 집 아이콘이 어설퍼서 표준 집 이모지(🏠)로 교체.
+                  기기(아이폰/안드로이드/윈도우)마다 그림이 조금씩 다르게 나오는 건 이모지 특성이다. */}
+              <span style={{ fontSize: "25px", lineHeight: 1, display: "block" }} aria-hidden>🏠</span>
               <span style={{ lineHeight: 1.05 }}>
                 <span style={{ display: "block", fontSize: "15.5px", fontWeight: 900, letterSpacing: "-0.02em", color: "#7A1E47" }}>루루동이</span>
                 <span style={{ display: "flex", alignItems: "center", gap: "3px", marginTop: "2px", fontSize: "10px", fontWeight: 800, color: "#A8807F" }}>
