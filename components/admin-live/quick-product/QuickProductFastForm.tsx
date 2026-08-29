@@ -2377,17 +2377,34 @@ export default function QuickProductFastForm({
                       }}
                       style={{ border: "1px solid #E8E2DD", borderRadius: "11px", overflow: "hidden", background: "var(--color-surface)" }}
                     >
+                      {/* [2026-08-29 사장님 지시] "숨김처리 된거 어떻게 풀어?"
+                          원인: 표 minWidth 560px = 팝업 폭이라 맨 오른쪽 👁/🚫 칸이 잘려
+                                가로 스크롤을 해야만 보였다. → 마지막 칸을 오른쪽에 고정(sticky)하고
+                                숨김 줄에는 「숨김」 딱지를 붙인다. 위에 숨김 개수 + [전부 노출] 도 둔다. */}
+                      {details.some((n) => detailHidden.includes(n)) ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "8px 10px", borderBottom: "1px solid #EFE7EA", background: "#FFF4F6" }}>
+                          <span style={{ fontSize: "11px", fontWeight: 900, color: "#B03A55" }}>
+                            🚫 숨김 {details.filter((n) => detailHidden.includes(n)).length}개 — 손님에게 안 보입니다
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => { setFormTouched(true); setDetailHidden([]); }}
+                            style={{ marginLeft: "auto", border: "1px solid #BFE3D5", borderRadius: "8px", background: "#EAF6F1", color: "#0F6E56", padding: "5px 11px", fontSize: "11px", fontWeight: 900, cursor: "pointer" }}
+                          >👁 전부 다시 보이게</button>
+                        </div>
+                      ) : null}
                       <div style={{ overflowX: "auto" }}>
                         <table style={{ borderCollapse: "collapse", width: "100%", minWidth: "560px" }}>
                           <thead>
                             <tr style={{ background: "#F7F2F4" }}>
-                              {["사진", "상품명", "판매가", "색상", "사이즈", ""].map((h, i) => (
+                              {["사진", "상품명", "판매가", "색상", "사이즈", "노출"].map((h, i) => (
                                 <th
                                   key={`h-${i}`}
                                   style={{
-                                    textAlign: i === 2 ? "right" : "left", fontSize: "10px", fontWeight: 900,
+                                    textAlign: i === 2 ? "right" : i === 5 ? "center" : "left", fontSize: "10px", fontWeight: 900,
                                     color: "var(--color-ink-mute)", letterSpacing: "0.04em", padding: "8px 8px", whiteSpace: "nowrap",
-                                    width: i === 0 ? "56px" : i === 2 ? "104px" : i === 3 ? "104px" : i === 4 ? "116px" : i === 5 ? "70px" : undefined,
+                                    width: i === 0 ? "56px" : i === 2 ? "104px" : i === 3 ? "104px" : i === 4 ? "116px" : i === 5 ? "74px" : undefined,
+                                    ...(i === 5 ? { position: "sticky" as const, right: 0, zIndex: 2, background: "#F7F2F4", boxShadow: "-7px 0 7px -7px rgba(0,0,0,0.22)" } : {}),
                                   }}
                                 >{h}</th>
                               ))}
@@ -2458,6 +2475,12 @@ export default function QuickProductFastForm({
                                   </td>
 
                                   <td style={{ padding: "6px 8px" }}>
+                                    {/* 숨김 줄은 흐리게만 하면 눈에 안 띈다 — 딱지를 붙여 확실히 보이게 */}
+                                    {off ? (
+                                      <span style={{ display: "inline-block", marginBottom: "3px", borderRadius: "999px", background: "#FBE3E8", color: "#B03A55", fontSize: "9.5px", fontWeight: 900, padding: "2px 7px" }}>
+                                        🚫 숨김 · 손님에게 안 보임
+                                      </span>
+                                    ) : null}
                                     <input
                                       style={cellStyle}
                                       value={nameDraft[name] ?? name}
@@ -2510,7 +2533,7 @@ export default function QuickProductFastForm({
                                     />
                                   </td>
 
-                                  <td style={{ padding: "6px 8px", whiteSpace: "nowrap" }}>
+                                  <td style={{ padding: "6px 8px", whiteSpace: "nowrap", textAlign: "center", position: "sticky", right: 0, zIndex: 1, background: photoHoverTarget === name ? "#FBF7F9" : "var(--color-surface)", boxShadow: "-7px 0 7px -7px rgba(0,0,0,0.22)" }}>
                                     <button
                                       type="button"
                                       title={off ? "숨김 — 누르면 손님에게 보임" : "보이는 중 — 누르면 숨김"}
