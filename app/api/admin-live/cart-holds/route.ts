@@ -121,7 +121,37 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json({ ok: true, holds, scope: allowedProductIds ? "broadcast" : "all", broadcastTitle });
+    // [2026-08-30 사장님 지적] "클릭해도 아무 반응없음" — 실제로는 발송됐는데
+    //   보냈는지·손님이 봤는지 화면에서 확인할 방법이 없어 안 된 것처럼 보였다.
+    //   → 장바구니마다 마지막 알림의 발송/확인 상태를 같이 내려준다. (읽기 전용)
+    const alertBySession: Record<string, { sentAt: string; seenAt: string }> = {};
+    try {
+      const sessionKeys = Array.from(new Set(rows.map((r) => String(r.session_key ?? "")).filter(Boolean))).slice(0, 250);
+      if (sessionKeys.length > 0) {
+        const { data: alertRows } = await supabase
+          .from("customer_site_alerts")
+          .select("target_session_key, created_at, seen_at")
+          .in("target_session_key", sessionKeys)
+          .eq("kind", "checkout_reminder")
+          .order("created_at", { ascending: false })
+          .limit(1000);
+        for (const a of (alertRows || []) as Record<string, unknown>[]) {
+          const k = String(a.target_session_key ?? "");
+          if (!k || alertBySession[k]) continue;   // 최신순이라 첫 줄이 마지막 알림
+          alertBySession[k] = { sentAt: String(a.created_at ?? ""), seenAt: String(a.seen_at ?? "") };
+        }
+      }
+    } catch {
+      /* 알림 상태 표시는 보조 기능 — 실패해도 담김 목록은 정상 표시 */
+    }
+
+    return NextResponse.json({
+      ok: true,
+      holds,
+      alerts: alertBySession,
+      scope: allowedProductIds ? "broadcast" : "all",
+      broadcastTitle,
+    });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: { message: String(e?.message ?? e) } }, { status: 500 });
   }

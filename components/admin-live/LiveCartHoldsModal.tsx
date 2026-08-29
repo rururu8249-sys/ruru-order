@@ -32,6 +32,8 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
   const [scopeAll, setScopeAll] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("expires");
   const [scopeInfo, setScopeInfo] = useState<{scope:string;broadcastTitle:string}>({scope:"all",broadcastTitle:""});
+  // [2026-08-30] 장바구니별 마지막 알림 상태(보냄/봄) — 사장님이 결과를 눈으로 확인할 수 있게
+  const [alerts, setAlerts] = useState<Record<string, { sentAt: string; seenAt: string }>>({});
 
   const load = async () => {
     setLoading(true);
@@ -40,6 +42,7 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.ok) { showAdminToast("담김 현황 불러오기 실패\n\n" + (json?.error?.message || `요청 실패(${res.status})`), "error"); return; }
       setHolds(Array.isArray(json.holds) ? json.holds : []);
+      setAlerts(json.alerts && typeof json.alerts === "object" ? json.alerts : {});
       setScopeInfo({ scope: String(json.scope || "all"), broadcastTitle: String(json.broadcastTitle || "") });
       setNow(Date.now());
     } finally { setLoading(false); }
@@ -67,12 +70,12 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
     setClearing(g.sessionKey); try { const res=await fetch("/api/admin-live/cart-holds",{method:"POST",headers:{"Content-Type":"application/json"},cache:"no-store",body:JSON.stringify({action:"clear",sessionKey:g.sessionKey})}); const json=await res.json().catch(()=>null); if(!res.ok||!json?.ok){showAdminToast("선점 해제 실패\n\n"+(json?.error?.message||`요청 실패(${res.status})`),"error");return;} showAdminToast("선점을 해제했습니다."); await load(); } finally { setClearing(""); }
   };
   const remind=async(g:Group)=>{
-    setReminding(g.sessionKey); try { const res=await fetch("/api/admin-live/cart-holds",{method:"POST",headers:{"Content-Type":"application/json"},cache:"no-store",body:JSON.stringify({action:"remind",sessionKey:g.sessionKey})}); const json=await res.json().catch(()=>null); if(!res.ok||!json?.ok){showAdminToast("결제 요청 알림 실패\n\n"+(json?.error?.message||`요청 실패(${res.status})`),"error");return;} showAdminToast(json.sent>0?`${groupLabel(g)}님께 주문 확인 알림을 보냈습니다.`:"최근에 이미 알림을 보냈어요. 잠시 후 다시 보낼 수 있습니다."); } finally { setReminding(""); }
+    setReminding(g.sessionKey); try { const res=await fetch("/api/admin-live/cart-holds",{method:"POST",headers:{"Content-Type":"application/json"},cache:"no-store",body:JSON.stringify({action:"remind",sessionKey:g.sessionKey})}); const json=await res.json().catch(()=>null); if(!res.ok||!json?.ok){showAdminToast("결제 요청 알림 실패\n\n"+(json?.error?.message||`요청 실패(${res.status})`),"error");return;} showAdminToast(json.sent>0?`${groupLabel(g)}님께 주문 확인 알림을 보냈습니다.`:"최근에 이미 알림을 보냈어요. 잠시 후 다시 보낼 수 있습니다."); await load(); } finally { setReminding(""); }
   };
   const remindAll=async()=>{
     if(groups.length===0)return;
     if(!(await showAdminConfirm(`현재 목록의 미제출 고객 ${groups.length}명에게 주문 확인 알림을 보낼까요?`,{title:"전체 결제 요청",confirmText:"알림 보내기"})))return;
-    setReminding("__all__"); try { const res=await fetch("/api/admin-live/cart-holds",{method:"POST",headers:{"Content-Type":"application/json"},cache:"no-store",body:JSON.stringify({action:"remind-all",sessionKeys:groups.map(g=>g.sessionKey)})}); const json=await res.json().catch(()=>null); if(!res.ok||!json?.ok){showAdminToast("전체 알림 실패\n\n"+(json?.error?.message||`요청 실패(${res.status})`),"error");return;} showAdminToast(`주문 확인 알림 ${Number(json.sent)||0}명 전송${Number(json.skipped)>0?` · 최근 발송/만료 제외 ${Number(json.skipped)}명`:""}`); } finally { setReminding(""); }
+    setReminding("__all__"); try { const res=await fetch("/api/admin-live/cart-holds",{method:"POST",headers:{"Content-Type":"application/json"},cache:"no-store",body:JSON.stringify({action:"remind-all",sessionKeys:groups.map(g=>g.sessionKey)})}); const json=await res.json().catch(()=>null); if(!res.ok||!json?.ok){showAdminToast("전체 알림 실패\n\n"+(json?.error?.message||`요청 실패(${res.status})`),"error");return;} showAdminToast(`주문 확인 알림 ${Number(json.sent)||0}명 전송${Number(json.skipped)>0?` · 최근 발송/만료 제외 ${Number(json.skipped)}명`:""}`); await load(); } finally { setReminding(""); }
   };
 
   return <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
@@ -92,7 +95,7 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
         const presentations=g.items.map(it=>cartHoldPresentation({productName:it.productName,fallbackProductName:it.fallbackProductName,color:it.color,size:it.size,qty:it.qty,unitPrice:it.unitPrice,legacySnapshot:it.legacySnapshot}));
         const knownTotal=presentations.reduce((s,p)=>s+(p.rowTotal??0),0); const unknown=presentations.some(p=>p.rowTotal===null);
         return <div key={g.sessionKey} className="overflow-hidden rounded-2xl border border-line">
-          <div className="flex flex-wrap items-center gap-2 bg-surface-2 px-3 py-2"><span className="min-w-0 flex-1 text-[13px] font-black text-ink">👤 {groupLabel(g)}{g.phone?<span className="ml-1.5 text-[11px] font-bold text-ink-mute">📱 {phoneFmt(g.phone)}</span>:null}</span>{g.maxCreated>0?<span className="text-[11px] font-bold text-ink-mute" title="손님 화면이 45초마다 보내는 신호의 마지막 시각입니다. 처음 담은 시각이 아닙니다.">🕒 {createdText(g.maxCreated)} 확인</span>:null}<span className="text-[11px] font-black text-rose-deep">{remainText(g.minExpires,now)}</span>
+          <div className="flex flex-wrap items-center gap-2 bg-surface-2 px-3 py-2"><span className="min-w-0 flex-1 text-[13px] font-black text-ink">👤 {groupLabel(g)}{g.phone?<span className="ml-1.5 text-[11px] font-bold text-ink-mute">📱 {phoneFmt(g.phone)}</span>:null}</span>{g.maxCreated>0?<span className="text-[11px] font-bold text-ink-mute" title="손님 화면이 45초마다 보내는 신호의 마지막 시각입니다. 처음 담은 시각이 아닙니다.">🕒 {createdText(g.maxCreated)} 확인</span>:null}{(()=>{const a=alerts[g.sessionKey];if(!a?.sentAt)return null;const sent=new Date(a.sentAt).getTime();return a.seenAt?<span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-black text-emerald-700" title={`보냄 ${createdText(sent)} · 손님이 확인함`}>✅ 알림 봄</span>:<span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-black text-amber-700" title={`보냄 ${createdText(sent)} · 아직 손님 화면에 안 뜸(사이트에 들어와야 보입니다)`}>📨 보냄 {createdText(sent)}</span>;})()}<span className="text-[11px] font-black text-rose-deep">{remainText(g.minExpires,now)}</span>
             <button type="button" disabled={Boolean(reminding)} onClick={()=>void remind(g)} className="rounded-lg border border-[#7B2D43]/20 bg-white px-2 py-1 text-[11px] font-black text-[#7B2D43] disabled:opacity-50">{reminding===g.sessionKey?"전송중":"🔔 결제 요청"}</button>
             <button type="button" disabled={clearing===g.sessionKey} onClick={()=>void clearSession(g)} className="rounded-lg border border-line bg-surface px-2 py-1 text-[11px] font-black text-ink-soft hover:bg-danger-bg hover:text-danger-tx disabled:opacity-50">{clearing===g.sessionKey?"해제중":"선점 해제"}</button>
           </div>

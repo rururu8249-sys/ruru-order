@@ -8,6 +8,13 @@ function sessionKey() {
   try { return localStorage.getItem("ruru_cart_session_key") || ""; } catch { return ""; }
 }
 
+// [2026-08-30 근본 수정] 알림을 브라우저가 아니라 "사람"에게 붙인다.
+//   장바구니 세션키는 브라우저마다 다르다 — 폰에서 담고 PC로 들어오면 못 받았다.
+//   전화번호를 같이 보내서, 기기를 바꿔도 그 손님이면 받게 한다.
+function customerPhone() {
+  try { return (localStorage.getItem("ruru_customer_phone") || "").replace(/[^0-9]/g, ""); } catch { return ""; }
+}
+
 export default function CustomerSiteAlertPopup() {
   const [alert, setAlert] = useState<SiteAlert | null>(null);
 
@@ -16,9 +23,13 @@ export default function CustomerSiteAlertPopup() {
     let stopped = false;
     const load = async () => {
       const key = sessionKey();
-      if (!key) return;
+      const phone = customerPhone();
+      if (!key && !phone) return;
       try {
-        const res = await fetch(`/api/customer-site-alerts?sessionKey=${encodeURIComponent(key)}`, { cache: "no-store" });
+        const qs = new URLSearchParams();
+        if (key) qs.set("sessionKey", key);
+        if (phone) qs.set("phone", phone);
+        const res = await fetch(`/api/customer-site-alerts?${qs.toString()}`, { cache: "no-store" });
         const json = await res.json().catch(() => null);
         if (!stopped && res.ok && json?.ok) setAlert(json.alert || null);
       } catch { /* 개인알림 실패는 주문 흐름에 영향 없음 */ }
@@ -35,11 +46,12 @@ export default function CustomerSiteAlertPopup() {
     setAlert(null);
     if (current) {
       const key = sessionKey();
-      if (key) {
+      const phone = customerPhone();
+      if (key || phone) {
         void fetch("/api/customer-site-alerts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: current.id, sessionKey: key }),
+          body: JSON.stringify({ id: current.id, sessionKey: key, phone }),
         }).catch(() => undefined);
       }
     }
