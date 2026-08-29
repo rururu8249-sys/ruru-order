@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
@@ -40,6 +40,10 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
   // [2026-08-29] 카톡으로 결제링크 보낸 뒤, 유튜브 채팅에 자동 안내
   const [chatNoticeSending, setChatNoticeSending] = useState(false);
   const [chatNoticeSent, setChatNoticeSent] = useState(false);
+  // [2026-08-29 사장님 요청] 페이스터는 남의 사이트라 자동 입력이 안 된다(브라우저 동일출처 정책).
+  //   대신 "복사 → 붙여넣기"를 순서대로 한 자리에서 하게 만들어 손이 헤매지 않게 한다.
+  const [copyStep, setCopyStep] = useState(0);
+  const copyStepRef = useRef(0);
 
   const amount = cardAmount(order);
   const summary = orderSummary(order);
@@ -61,6 +65,33 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
       showAdminToast("복사 실패 — 길게 눌러 직접 복사해주세요.", "warning");
     }
   };
+
+  // 순서대로 복사: 누르면 그 칸을 복사하고 다음 칸으로 넘어간다.
+  const copyStepValue = async (index: number) => {
+    const field = fields[index];
+    if (!field || !field.value) return;
+    await copyValue(field.key, field.value);
+    const next = index + 1;
+    setCopyStep(next);
+    copyStepRef.current = next;
+  };
+
+  // 숫자키 1~4 로도 복사 (마우스 안 옮기고 붙여넣기만 반복할 수 있게)
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const el = document.activeElement as HTMLElement | null;
+      const tag = String(el?.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || el?.isContentEditable) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const index = ["1", "2", "3", "4"].indexOf(event.key);
+      if (index < 0) return;
+      event.preventDefault();
+      void copyStepValue(index);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order]);
 
   // [2026-08-29 사장님 요청] 카톡 발송했다고 유튜브 채팅에 자동 안내.
   //   ⚠️ 주문상태·금액·입금·배송은 전혀 건드리지 않는다. 채팅 글만 올린다.
@@ -171,17 +202,45 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
         </div>
 
         <div className="px-5 py-4">
-          <div className="mb-3 text-[12px] font-bold text-ink-soft">필요한 칸 복사 → 페이스터에 붙여넣기</div>
+          <div className="mb-2 text-[12px] font-bold text-ink-soft">순서대로 복사 → 오른쪽 페이스터에 붙여넣기 (숫자키 1~4 로도 복사됩니다)</div>
+
+          {/* [2026-08-29] 큰 버튼 하나가 "지금 복사할 칸"을 계속 알려준다.
+              마우스를 한 자리에 두고 [복사] → ⌘V → [복사] → ⌘V 만 반복하면 된다. */}
+          {copyStep < fields.length ? (
+            <button
+              type="button"
+              onClick={() => void copyStepValue(copyStep)}
+              disabled={!fields[copyStep]?.value}
+              className="mb-3 w-full rounded-xl bg-rose-deep px-4 py-3 text-left text-white shadow-sm transition hover:opacity-90 disabled:opacity-40"
+            >
+              <span className="block text-[10px] font-black opacity-80">{copyStep + 1} / {fields.length} 단계</span>
+              <span className="block text-[15px] font-black">
+                {copyStep + 1}️⃣ {fields[copyStep]?.label} 복사하기
+              </span>
+              <span className="block truncate text-[12px] font-bold opacity-90">
+                {fields[copyStep]?.value || "값 없음"}
+              </span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => { setCopyStep(0); copyStepRef.current = 0; }}
+              className="mb-3 w-full rounded-xl border border-emerald-600 bg-emerald-50 px-4 py-3 text-[14px] font-black text-emerald-700"
+            >
+              ✔ {fields.length}칸 모두 복사했습니다 · 처음부터 다시
+            </button>
+          )}
 
           <div className="space-y-2">
-            {fields.map((f) => (
+            {fields.map((f, fieldIndex) => (
               <div
                 key={f.key}
                 className={[
                   "flex items-center gap-2 rounded-xl border px-3 py-2",
-                  f.highlight ? "border-rose-line bg-rose-soft/50" : "border-line",
+                  copyStep === fieldIndex ? "border-rose-deep bg-rose-soft" : f.highlight ? "border-rose-line bg-rose-soft/50" : "border-line",
                 ].join(" ")}
               >
+                <span className="w-[16px] shrink-0 text-[11px] font-black text-ink-mute">{fieldIndex + 1}</span>
                 <div className="w-[64px] shrink-0">
                   <div className={["text-[11px] font-black", f.highlight ? "text-rose-deep" : "text-ink-mute"].join(" ")}>{f.label}</div>
                   {f.hint ? <div className="text-[9px] font-bold text-ink-mute">{f.hint}</div> : null}
@@ -191,7 +250,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
                 </div>
                 <button
                   type="button"
-                  onClick={() => copyValue(f.key, f.value)}
+                  onClick={() => void copyStepValue(fieldIndex)}
                   disabled={!f.value}
                   className={[
                     "h-8 shrink-0 rounded-lg px-2.5 text-[11px] font-black transition disabled:opacity-40",
