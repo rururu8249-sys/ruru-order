@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
@@ -41,18 +41,20 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
   const [chatNoticeSending, setChatNoticeSending] = useState(false);
   const [chatNoticeSent, setChatNoticeSent] = useState(false);
   // [2026-08-29 사장님 요청] 페이스터는 남의 사이트라 자동 입력이 안 된다(브라우저 동일출처 정책).
-  //   대신 "복사 → 붙여넣기"를 순서대로 한 자리에서 하게 만들어 손이 헤매지 않게 한다.
-  const [copyStep, setCopyStep] = useState(0);
-  const copyStepRef = useRef(0);
-
+  //   예전: 상품명·금액·닉네임·전화번호를 1→2→3→4 순서로 네 번 복사해야 했다.
+  //   지금: 닉네임과 상품명을 하나로 합쳐서 "한 번만" 복사한다. 닉네임이 앞에 온다(매칭 기준).
+  //         금액·전화번호는 페이스터에서 입력칸이 따로라 합칠 수 없어 보조 복사로 남긴다.
   const amount = cardAmount(order);
   const summary = orderSummary(order);
   const phone = phoneDigits(order);
+  const nickname = String(order.nickname || "").trim();
+
+  // 페이스터 「상품명」 칸에 그대로 붙여넣는 값 — 닉네임 먼저, 뒤에 상품명
+  const pasteValue = [nickname, summary].filter(Boolean).join(" ");
 
   const fields: { key: string; label: string; value: string; hint?: string; highlight?: boolean }[] = [
-    { key: "product", label: "상품명", value: summary },
+    { key: "paste", label: "상품명 칸", value: pasteValue, hint: "닉네임 + 상품명", highlight: true },
     { key: "amount", label: "결제금액", value: String(amount), hint: "카드 7% 포함" },
-    { key: "nickname", label: "닉네임", value: order.nickname || "", hint: "매칭 기준 · 이름 아님", highlight: true },
     { key: "phone", label: "전화번호", value: phone, hint: "- 없이" },
   ];
 
@@ -66,27 +68,24 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
     }
   };
 
-  // 순서대로 복사: 누르면 그 칸을 복사하고 다음 칸으로 넘어간다.
-  const copyStepValue = async (index: number) => {
+  // 칸 하나를 바로 복사한다(순서·단계 없음).
+  const copyFieldValue = async (index: number) => {
     const field = fields[index];
     if (!field || !field.value) return;
     await copyValue(field.key, field.value);
-    const next = index + 1;
-    setCopyStep(next);
-    copyStepRef.current = next;
   };
 
-  // 숫자키 1~4 로도 복사 (마우스 안 옮기고 붙여넣기만 반복할 수 있게)
+  // 숫자키 1~3 으로도 복사 (마우스 안 옮기고 붙여넣기만 반복할 수 있게)
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const el = document.activeElement as HTMLElement | null;
       const tag = String(el?.tagName || "").toLowerCase();
       if (tag === "input" || tag === "textarea" || el?.isContentEditable) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
-      const index = ["1", "2", "3", "4"].indexOf(event.key);
+      const index = ["1", "2", "3"].indexOf(event.key);
       if (index < 0) return;
       event.preventDefault();
-      void copyStepValue(index);
+      void copyFieldValue(index);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -202,34 +201,27 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
         </div>
 
         <div className="px-5 py-4">
-          <div className="mb-2 text-[12px] font-bold text-ink-soft">순서대로 복사 → 오른쪽 페이스터에 붙여넣기 (숫자키 1~4 로도 복사됩니다)</div>
+          {/* [2026-08-29 사장님 요청] 닉네임 먼저 + 상품명 을 하나로 합쳐서 한 번만 복사한다.
+              이 값을 오른쪽 페이스터 「상품명」 칸에 그대로 붙여넣으면 된다. */}
+          <button
+            type="button"
+            onClick={() => void copyValue("paste", pasteValue)}
+            disabled={!pasteValue}
+            className={[
+              "mb-3 w-full rounded-xl px-4 py-3 text-left shadow-sm transition disabled:opacity-40",
+              copiedKey === "paste" ? "bg-emerald-600 text-white" : "bg-rose-deep text-white hover:opacity-90",
+            ].join(" ")}
+          >
+            <span className="block text-[10px] font-black opacity-80">페이스터 「상품명」 칸에 붙여넣기</span>
+            <span className="block text-[15px] font-black">
+              {copiedKey === "paste" ? "✔ 복사됐습니다 · ⌘V 로 붙여넣기" : "⧉ 닉네임 + 상품명 복사하기"}
+            </span>
+            <span className="block truncate text-[12px] font-bold opacity-90">
+              {pasteValue || "값 없음"}
+            </span>
+          </button>
 
-          {/* [2026-08-29] 큰 버튼 하나가 "지금 복사할 칸"을 계속 알려준다.
-              마우스를 한 자리에 두고 [복사] → ⌘V → [복사] → ⌘V 만 반복하면 된다. */}
-          {copyStep < fields.length ? (
-            <button
-              type="button"
-              onClick={() => void copyStepValue(copyStep)}
-              disabled={!fields[copyStep]?.value}
-              className="mb-3 w-full rounded-xl bg-rose-deep px-4 py-3 text-left text-white shadow-sm transition hover:opacity-90 disabled:opacity-40"
-            >
-              <span className="block text-[10px] font-black opacity-80">{copyStep + 1} / {fields.length} 단계</span>
-              <span className="block text-[15px] font-black">
-                {copyStep + 1}️⃣ {fields[copyStep]?.label} 복사하기
-              </span>
-              <span className="block truncate text-[12px] font-bold opacity-90">
-                {fields[copyStep]?.value || "값 없음"}
-              </span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => { setCopyStep(0); copyStepRef.current = 0; }}
-              className="mb-3 w-full rounded-xl border border-emerald-600 bg-emerald-50 px-4 py-3 text-[14px] font-black text-emerald-700"
-            >
-              ✔ {fields.length}칸 모두 복사했습니다 · 처음부터 다시
-            </button>
-          )}
+          <div className="mb-2 text-[12px] font-bold text-ink-soft">금액·전화번호는 페이스터 입력칸이 따로라 아래에서 복사하세요 (숫자키 1~3)</div>
 
           <div className="space-y-2">
             {fields.map((f, fieldIndex) => (
@@ -237,7 +229,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
                 key={f.key}
                 className={[
                   "flex items-center gap-2 rounded-xl border px-3 py-2",
-                  copyStep === fieldIndex ? "border-rose-deep bg-rose-soft" : f.highlight ? "border-rose-line bg-rose-soft/50" : "border-line",
+                  f.highlight ? "border-rose-line bg-rose-soft/50" : "border-line",
                 ].join(" ")}
               >
                 <span className="w-[16px] shrink-0 text-[11px] font-black text-ink-mute">{fieldIndex + 1}</span>
@@ -250,7 +242,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
                 </div>
                 <button
                   type="button"
-                  onClick={() => void copyStepValue(fieldIndex)}
+                  onClick={() => void copyFieldValue(fieldIndex)}
                   disabled={!f.value}
                   className={[
                     "h-8 shrink-0 rounded-lg px-2.5 text-[11px] font-black transition disabled:opacity-40",
@@ -288,7 +280,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
           </button>
 
           <div className="mt-3 rounded-xl bg-info-bg px-3 py-2 text-[10px] font-bold leading-4 text-info-tx">
-            닉네임으로 넣어야 나중에 어느 주문인지 매칭됩니다(이름 X). 페이스터는 남의 서버라 자동 채우기가 안 돼요 — 칸별로 복사해 붙여넣어 주세요.
+            상품명 칸은 「닉네임 상품명」 순서로 넣어야 나중에 어느 주문인지 매칭됩니다(이름 X). 페이스터는 남의 서버라 자동 채우기가 안 돼요.
           </div>
         </div>
         </div>
