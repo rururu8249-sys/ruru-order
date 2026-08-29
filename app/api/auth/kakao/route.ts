@@ -141,7 +141,11 @@ export async function GET(request: Request) {
         .from("customers")
         .select("customer_name, customer_phone, zipcode, address, detail_address")
         .eq("kakao_id", kakaoIdText)
-        .order("created_at", { ascending: true })
+        // [2026-08-30 수정] 예전엔 ascending: true(가장 오래된 줄)를 봤다.
+        //   그런데 customer-login-sync 는 ascending: false(가장 최근 줄)를 정본으로 쓴다.
+        //   같은 카카오 계정에 회원 줄이 둘 이상이면 두 API 가 서로 다른 번호를 보게 되어,
+        //   로그인할 때마다 옛 번호가 되살아나는 사고의 원인이 된다. → 최근 줄 기준으로 통일한다.
+        .order("created_at", { ascending: false })
         .limit(1);
       const dbCustomer = Array.isArray(dbRows) ? dbRows[0] : null;
       if (dbCustomer) {

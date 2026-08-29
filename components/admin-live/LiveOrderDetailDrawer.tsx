@@ -2,7 +2,7 @@
 
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { LiveOrder, LiveOrderItem } from "./types";
 import { isLiveOrderCanceled, useLiveOrderCancelRestore } from "./useLiveOrderCancelRestore";
@@ -668,10 +668,15 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     }
   };
 
+  // [2026-08-30] 편집을 시작할 때의 번호를 기억한다 — 저장 시 "번호가 바뀌었는지" 판단용.
+  const originalPhoneRef = useRef("");
+
   const startEditCustomer = () => {
     const row = order as any;
     setEditName(clean(row.name) || clean(row.customerName) || clean(row.customer_name));
-    setEditPhone(clean(orderForView.phone) || clean(row.phone) || clean(row.customer_phone));
+    const startPhone = clean(orderForView.phone) || clean(row.phone) || clean(row.customer_phone);
+    originalPhoneRef.current = startPhone.replace(/[^0-9]/g, "");
+    setEditPhone(startPhone);
     setEditZipcode(clean(row.zipcode) || clean(row.zip_code));
     setEditAddress(clean(row.address) || clean(row.customerAddress) || clean(row.shippingAddress));
     setEditDetailAddress(clean(row.detailAddress) || clean(row.detail_address));
@@ -714,6 +719,51 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       }
       showAdminToast("고객/배송 정보가 저장됐습니다.", "success");
       setEditingCustomer(false);
+
+      // [2026-08-30 사고 재발 방지] 여기서는 orders 만 바뀐다.
+      //   회원(customers)의 번호는 그대로라서, 손님이 다시 로그인하면
+      //   /api/auth/kakao 가 회원 번호를 내려줘 주문서에 옛 번호가 다시 채워졌다.
+      //   (루루짱929·히무0 실제 사례 — 사장님이 고칠 때마다 원복됐다)
+      //   → 번호가 바뀌었으면 회원 번호도 함께 바꿀지 그 자리에서 물어본다.
+      const beforePhone = originalPhoneRef.current;
+      if (beforePhone && phoneDigits && beforePhone !== phoneDigits) {
+        const syncOk = await showAdminConfirm(
+          [
+            "회원 정보의 전화번호도 바꿀까요?",
+            "",
+            `${beforePhone}  →  ${phoneDigits}`,
+            "",
+            "· 안 바꾸면 손님이 다시 로그인할 때 옛 번호가 되살아납니다",
+            "· 이 회원의 다른 주문도 새 번호로 통일됩니다 (합배송·입금매칭 기준)",
+            "· 다른 회원이 쓰는 번호면 저장되지 않고 중단됩니다",
+          ].join("\n"),
+          { title: "회원 번호 동기화", confirmText: "회원 번호도 바꾸기", cancelText: "이 주문만" },
+        );
+
+        if (syncOk) {
+          try {
+            const res = await fetch("/api/admin-live/customer-phone-change", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              cache: "no-store",
+              body: JSON.stringify({ currentPhone: beforePhone, newPhone: phoneDigits, unifyOrders: true }),
+            });
+            const j = await res.json().catch(() => ({}));
+            if (!res.ok || !j?.ok) {
+              showAdminToast("회원 번호 변경 실패\n\n" + (j?.message || `요청 실패(${res.status})`), "error");
+            } else {
+              showAdminToast(
+                `회원 번호도 바꿨습니다.` + (j.ordersUpdated ? ` (주문 ${j.ordersUpdated}건 통일)` : ""),
+                "success",
+              );
+            }
+          } catch (e) {
+            showAdminToast("회원 번호 변경 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+          }
+        }
+        originalPhoneRef.current = phoneDigits;
+      }
+
       await onAfterStatusChange?.();
     } finally {
       setSavingCustomer(false);
