@@ -50,9 +50,13 @@ const VISIT_SESSION_GAP_MS = 30 * 60 * 1000;
 const VISIT_TOUCH_MS = 5 * 60 * 1000;
 const BROADCAST_CACHE_MS = 60 * 1000;
 
-let broadcastCache: { at: number; id: number | null } = { at: 0, id: null };
+// ⚠️ broadcasts.id 는 UUID 다 (supabase/sql/broadcast_end_reports.sql: broadcast_id uuid references broadcasts(id)).
+//    [2026-08-29 사고] 처음에 Number(id) 로 숫자 변환해서 UUID 가 NaN → null 이 됐다.
+//    그래서 방송 중인데도 방송 번호가 안 붙고 "방송별 기록 없음 / 방송중 0" 으로만 나왔다.
+//    숫자로 바꾸지 말고 문자열 그대로 쓴다.
+let broadcastCache: { at: number; id: string | null } = { at: 0, id: null };
 
-async function currentBroadcastId(supabase: Supa) {
+async function currentBroadcastId(supabase: Supa): Promise<string | null> {
   if (Date.now() - broadcastCache.at < BROADCAST_CACHE_MS) return broadcastCache.id;
   try {
     const { data } = await supabase
@@ -63,8 +67,8 @@ async function currentBroadcastId(supabase: Supa) {
     const active = ((data || []) as Record<string, unknown>[]).find(
       (row) => row.is_deleted !== true && String(row.status || "").toUpperCase() === "ON",
     );
-    const id = active?.id != null ? Number(active.id) : null;
-    broadcastCache = { at: Date.now(), id: Number.isFinite(id as number) ? (id as number) : null };
+    const id = active?.id != null ? String(active.id).trim() : "";
+    broadcastCache = { at: Date.now(), id: id || null };
   } catch {
     broadcastCache = { at: Date.now(), id: null };
   }

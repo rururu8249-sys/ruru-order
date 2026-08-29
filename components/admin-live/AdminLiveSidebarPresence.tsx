@@ -12,7 +12,7 @@
 //   화면 전체가 아니라 사이드바(220px) 기준으로 잡혔다.
 //   → 창을 document.body 로 빼내서(포털) 화면 한가운데 제대로 뜨게 한다.
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 type Visitor = {
@@ -32,24 +32,24 @@ type Payload = {
   visitors?: Visitor[];
 };
 
+type VisitPerson = { name: string; visits: number; lastAt: string; live: boolean };
+
 type VisitStats = {
   ok?: boolean;
   available?: boolean;
   days?: number;
   totals?: { visitors: number; visits: number; capped: boolean } | null;
-  daily?: Array<{ date: string; visitors: number; visits: number; live: number; shop: number }>;
-  broadcasts?: Array<{ broadcastId: string; title: string; visitors: number; visits: number; startedAt: string }>;
+  daily?: Array<{ date: string; visitors: number; visits: number; live: number; shop: number; names?: VisitPerson[]; namesCapped?: boolean }>;
+  broadcasts?: Array<{ broadcastId: string; title: string; visitors: number; visits: number; startedAt: string; names?: VisitPerson[]; namesCapped?: boolean }>;
 };
 
 const POLL_MS = 20000;
 
-function maskNickname(value: string) {
-  const text = String(value || "").trim();
-  if (!text) return "손님";
-  const chars = Array.from(text);
-  if (chars.length <= 1) return `${chars[0]}*`;
-  if (chars.length <= 3) return `${chars[0]}**`;
-  return `${chars.slice(0, 2).join("")}**`;
+// [2026-08-29 사장님 지시] 닉네임 가리지 않는다.
+//   관리자 본인만 보는 화면이고, 유튜브 채팅에 이미 공개된 닉네임이라 가릴 이유가 없다.
+//   가려 놓으면 "누가 지금 주문서를 쓰고 있나"를 채팅과 맞춰볼 수가 없어 실무에서 쓸모가 없었다.
+function displayNickname(value: string) {
+  return String(value || "").trim() || "비회원";
 }
 
 function agoText(iso: string) {
@@ -72,6 +72,9 @@ export default function AdminLiveSidebarPresence() {
   const [stats, setStats] = useState<VisitStats | null>(null);
   const [statsTab, setStatsTab] = useState<"date" | "broadcast">("date");
   const [statsLoading, setStatsLoading] = useState(false);
+  // 날짜/방송 줄을 누르면 그날(그 방송에) 누가 왔었는지 펼친다.
+  const [openRows, setOpenRows] = useState<Record<string, boolean>>({});
+  const toggleRow = (key: string) => setOpenRows((prev) => ({ ...prev, [key]: !prev[key] }));
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -126,6 +129,45 @@ export default function AdminLiveSidebarPresence() {
   const by = data.byType ?? { orderForm: 0, orderLookup: 0, admin: 0, others: 0 };
   const visitors = data.visitors ?? [];
   const more = Math.max(0, total - listed);
+
+  // 날짜/방송 줄 아래에 펼쳐지는 "누가 왔었나" 목록
+  const nameList = (people: VisitPerson[] | undefined, capped: boolean | undefined, colSpan: number) => (
+    <tr>
+      <td colSpan={colSpan} style={{ padding: "0 6px 12px" }}>
+        {!people || people.length === 0 ? (
+          <div style={{ padding: "10px", borderRadius: "10px", background: "var(--color-surface-2)", fontSize: "11.5px", fontWeight: 700, color: "var(--color-ink-mute)", textAlign: "center" }}>
+            이름이 남은 방문자가 없습니다.
+          </div>
+        ) : (
+          <>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
+              {people.map((p, i) => (
+                <span
+                  key={`${p.name}-${i}`}
+                  title={`${p.name} · ${p.visits}번 방문 · 마지막 ${String(p.lastAt).slice(0, 16).replace("T", " ")}`}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: "4px",
+                    borderRadius: "999px", padding: "4px 9px",
+                    fontSize: "11.5px", fontWeight: 800, whiteSpace: "nowrap",
+                    background: p.live ? "var(--color-rose-soft)" : "var(--color-surface-2)",
+                    color: p.live ? "var(--color-rose-deep)" : "var(--color-ink-soft)",
+                    border: "1px solid " + (p.live ? "var(--color-rose-line)" : "var(--color-line)"),
+                  }}
+                >
+                  {p.live ? "🔴" : ""}{p.name}
+                  {p.visits > 1 ? <b style={{ fontSize: "10px", opacity: 0.75 }}>×{p.visits}</b> : null}
+                </span>
+              ))}
+            </div>
+            <div style={{ marginTop: "7px", fontSize: "10px", fontWeight: 700, color: "var(--color-ink-mute)" }}>
+              🔴 = 방송 중 접속 · ×N = 그날 여러 번 들어옴
+              {capped ? " · 최근 120명까지만 표시" : ""}
+            </div>
+          </>
+        )}
+      </td>
+    </tr>
+  );
 
   const statsModal = statsOpen && mounted
     ? createPortal(
@@ -206,12 +248,22 @@ export default function AdminLiveSidebarPresence() {
                         </thead>
                         <tbody>
                           {(stats.daily || []).map((d) => (
-                            <tr key={d.date} style={{ borderTop: "1px solid var(--color-line)" }}>
-                              <td style={{ padding: "9px 6px", fontSize: "12.5px", fontWeight: 800, color: "var(--color-ink)", whiteSpace: "nowrap" }}>{d.date}</td>
+                            <Fragment key={d.date}>
+                            <tr
+                              onClick={() => toggleRow(`d:${d.date}`)}
+                              style={{ borderTop: "1px solid var(--color-line)", cursor: "pointer" }}
+                              title="누르면 그날 누가 왔었는지 펼쳐집니다"
+                            >
+                              <td style={{ padding: "9px 6px", fontSize: "12.5px", fontWeight: 800, color: "var(--color-ink)", whiteSpace: "nowrap" }}>
+                                <span style={{ marginRight: "5px", fontSize: "10px", color: "var(--color-ink-mute)" }}>{openRows[`d:${d.date}`] ? "▾" : "▸"}</span>
+                                {d.date}
+                              </td>
                               <td style={{ padding: "9px 6px", textAlign: "right", fontSize: "13.5px", fontWeight: 900, color: "var(--color-rose-deep)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{d.visitors.toLocaleString("ko-KR")}</td>
                               <td style={{ padding: "9px 6px", textAlign: "right", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-soft)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{d.live.toLocaleString("ko-KR")}</td>
                               <td style={{ padding: "9px 6px", textAlign: "right", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-soft)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{d.shop.toLocaleString("ko-KR")}</td>
                             </tr>
+                            {openRows[`d:${d.date}`] ? nameList(d.names, d.namesCapped, 4) : null}
+                            </Fragment>
                           ))}
                         </tbody>
                       </table>
@@ -232,13 +284,23 @@ export default function AdminLiveSidebarPresence() {
                       </thead>
                       <tbody>
                         {(stats.broadcasts || []).map((b) => (
-                          <tr key={b.broadcastId} style={{ borderTop: "1px solid var(--color-line)" }}>
+                          <Fragment key={b.broadcastId}>
+                          <tr
+                            onClick={() => toggleRow(`b:${b.broadcastId}`)}
+                            style={{ borderTop: "1px solid var(--color-line)", cursor: "pointer" }}
+                            title="누르면 그 방송에 누가 왔었는지 펼쳐집니다"
+                          >
                             <td style={{ padding: "9px 6px" }}>
-                              <div style={{ fontSize: "12.5px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "320px" }}>{b.title}</div>
+                              <div style={{ fontSize: "12.5px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "320px" }}>
+                                <span style={{ marginRight: "5px", fontSize: "10px", color: "var(--color-ink-mute)" }}>{openRows[`b:${b.broadcastId}`] ? "▾" : "▸"}</span>
+                                {b.title}
+                              </div>
                               <div style={{ marginTop: "2px", fontSize: "10.5px", fontWeight: 700, color: "var(--color-ink-mute)" }}>{String(b.startedAt).slice(0, 16).replace("T", " ")}</div>
                             </td>
                             <td style={{ padding: "9px 6px", textAlign: "right", fontSize: "13.5px", fontWeight: 900, color: "var(--color-rose-deep)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{b.visitors.toLocaleString("ko-KR")}명</td>
                           </tr>
+                          {openRows[`b:${b.broadcastId}`] ? nameList(b.names, b.namesCapped, 2) : null}
+                          </Fragment>
                         ))}
                       </tbody>
                     </table>
@@ -308,7 +370,7 @@ export default function AdminLiveSidebarPresence() {
             <ul className="mt-2 max-h-[240px] space-y-1 overflow-y-auto">
               {visitors.map((visitor) => (
                 <li key={visitor.id} className="flex items-center gap-2 rounded-xl bg-surface-2 px-2 py-1.5">
-                  <span className="min-w-0 flex-1 truncate text-[11.5px] font-black text-ink">{maskNickname(visitor.nickname)}</span>
+                  <span className="min-w-0 flex-1 truncate text-[11.5px] font-black text-ink">{displayNickname(visitor.nickname)}</span>
                   <span className="shrink-0 text-[9.5px] font-black text-ink-mute">{visitor.pageLabel}</span>
                   <span className="shrink-0 text-[9px] font-bold text-ink-mute tabular-nums">{agoText(visitor.lastSeenAt)}</span>
                 </li>
