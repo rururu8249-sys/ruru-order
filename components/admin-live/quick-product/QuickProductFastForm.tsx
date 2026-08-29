@@ -1155,6 +1155,26 @@ export default function QuickProductFastForm({
     });
   };
 
+  // [2026-08-29 사장님 요청] 예전에는 브랜드 상품에 세부상품을 "새로 추가"할 방법이 아예 없었다.
+  //   (엑셀로 만든 것만 수정 가능 = 새 상품이 들어오면 엑셀을 다시 돌려야 했다)
+  //   → 같은 수정창을 빈 상태로 열어서 새로 하나 만들 수 있게 한다.
+  const openBrandDetailEditorForNew = () => {
+    // 이미 있는 세부상품의 색상·사이즈 구성을 기본값으로 가져온다(대부분 같은 구성이라 손이 덜 감).
+    const sample = details.map((n) => brandGroupDetailOptions[n]).find((cfg) => cfg && (cfg.variants || []).length > 0);
+    const variants = sample && Array.isArray(sample.variants) && sample.variants.length > 0
+      ? sample.variants.map((v) => ({ color: String(v.color || "없음"), size: String(v.size || "없음") }))
+      : [{ color: "없음", size: "없음" }];
+    setBrandDetailEditDraft({
+      originalName: "",          // 빈 값 = 새로 만드는 중
+      name: "",
+      category: brandDetailCategoryFilter !== "전체" ? brandDetailCategoryFilter : "",
+      plus: "0",
+      hidden: false,
+      photos: [],
+      variants,
+    });
+  };
+
   const applyBrandDetailEditor = () => {
     if (!brandDetailEditDraft) return;
     const oldName = brandDetailEditDraft.originalName;
@@ -1167,6 +1187,7 @@ export default function QuickProductFastForm({
       showAdminToast("같은 세부상품명이 이미 있어요.", "error");
       return;
     }
+    const isNewDetail = !oldName;
     const nextVariants = brandDetailEditDraft.variants.map((variant) => ({
       color: String(variant.color || "").trim() || "없음",
       size: String(variant.size || "").trim() || "없음",
@@ -1185,7 +1206,12 @@ export default function QuickProductFastForm({
     };
     const colors = unique(nextVariants.map((variant) => variant.color));
     const sizes = unique(nextVariants.map((variant) => variant.size));
-    setDetailText(details.map((name) => name === oldName ? nextName : name).join(", "));
+    // 새로 만든 것이면 목록 끝에 더하고, 이름만 바꾼 것이면 그 자리에서 갈아끼운다.
+    setDetailText(
+      isNewDetail
+        ? [...details, nextName].join(", ")
+        : details.map((name) => (name === oldName ? nextName : name)).join(", "),
+    );
     setDetailPlus((prev) => moveKey(prev, String(Math.max(0, Number(brandDetailEditDraft.plus) || 0))));
     setDetailPhotos((prev) => moveKey(prev, brandDetailEditDraft.photos[0] || undefined));
     setBrandGroupDetailPhotoSets((prev) => moveKey(prev, brandDetailEditDraft.photos.length ? [...brandDetailEditDraft.photos] : undefined));
@@ -2068,6 +2094,14 @@ export default function QuickProductFastForm({
                     <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>세부상품 관리</span>
                     <span style={{ display: "flex", alignItems: "center", gap: "7px" }}>
                       <span style={{ fontSize: "11px", fontWeight: 800, color: "#0F6E56" }}>{details.length}개 상품 · 총 {brandGroupDetailPhotoCount}장</span>
+                      {/* [2026-08-29 사장님 요청] 브랜드 상품에 새 세부상품을 폼에서 바로 추가 */}
+                      <button
+                        type="button"
+                        onClick={openBrandDetailEditorForNew}
+                        style={{ border: "1px solid #7B2D43", borderRadius: "7px", background: "#7B2D43", color: "#fff", padding: "5px 9px", fontSize: "11px", fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap" }}
+                      >
+                        ＋ 세부상품 추가
+                      </button>
                     </span>
                   </div>
                   {/* [2026-08-29 사장님 요청] 예전에는 사진 한 장 넣는 데
@@ -2461,9 +2495,9 @@ export default function QuickProductFastForm({
 
       {brandDetailEditDraft ? (
         <div style={{ position: "fixed", inset: 0, zIndex: 100002, background: "rgba(39,28,33,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "18px" }}>
-          <div role="dialog" aria-modal="true" aria-label="세부상품 수정" style={{ width: "min(620px, 94vw)", maxHeight: "88vh", display: "flex", flexDirection: "column", borderRadius: "14px", overflow: "hidden", background: "var(--color-surface)", boxShadow: "0 22px 70px rgba(0,0,0,0.28)" }}>
+          <div role="dialog" aria-modal="true" aria-label={brandDetailEditDraft.originalName ? "세부상품 수정" : "세부상품 추가"} style={{ width: "min(620px, 94vw)", maxHeight: "88vh", display: "flex", flexDirection: "column", borderRadius: "14px", overflow: "hidden", background: "var(--color-surface)", boxShadow: "0 22px 70px rgba(0,0,0,0.28)" }}>
             <div style={{ padding: "13px 16px", borderBottom: "1px solid #E8E2DD", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#F7F5F3" }}>
-              <span style={{ fontSize: "14px", fontWeight: 900, color: "var(--color-ink)" }}>세부상품 수정</span>
+              <span style={{ fontSize: "14px", fontWeight: 900, color: "var(--color-ink)" }}>{brandDetailEditDraft.originalName ? "세부상품 수정" : "＋ 세부상품 추가"}</span>
               <button type="button" onClick={() => setBrandDetailEditDraft(null)} style={{ border: "none", background: "transparent", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer" }}>×</button>
             </div>
             <div style={{ overflowY: "auto", padding: "14px 16px" }}>
@@ -2508,22 +2542,25 @@ export default function QuickProductFastForm({
               <div style={{ marginTop: "7px", fontSize: "10.5px", color: "var(--color-ink-mute)" }}>색상이나 사이즈가 없는 상품은 `없음`으로 두세요. 존재하는 조합만 한 줄씩 등록됩니다.</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", padding: "11px 16px", borderTop: "1px solid #E8E2DD", background: "#F7F5F3", flexWrap: "wrap" }}>
-              <button
-                type="button"
-                onClick={() => void deleteBrandDetail()}
-                style={{
-                  padding: "8px 12px",
-                  border: "1px solid #F0C8C1",
-                  borderRadius: "8px",
-                  background: "#fff",
-                  color: "#C0392B",
-                  fontSize: "11.5px",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
-              >
-                삭제
-              </button>
+              {/* 새로 만드는 중일 때는 지울 게 없으므로 삭제 버튼을 숨긴다 */}
+              {brandDetailEditDraft.originalName ? (
+                <button
+                  type="button"
+                  onClick={() => void deleteBrandDetail()}
+                  style={{
+                    padding: "8px 12px",
+                    border: "1px solid #F0C8C1",
+                    borderRadius: "8px",
+                    background: "#fff",
+                    color: "#C0392B",
+                    fontSize: "11.5px",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                  }}
+                >
+                  삭제
+                </button>
+              ) : <span />}
 
               <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "7px", flexWrap: "wrap" }}>
                 <button
@@ -2565,7 +2602,7 @@ export default function QuickProductFastForm({
                   onClick={applyBrandDetailEditor}
                   style={{ padding: "8px 15px", border: "none", borderRadius: "8px", background: "#0F6E56", color: "#fff", fontWeight: 900, cursor: "pointer" }}
                 >
-                  변경내용 적용
+                  {brandDetailEditDraft.originalName ? "변경내용 적용" : "세부상품 추가"}
                 </button>
               </div>
             </div>
