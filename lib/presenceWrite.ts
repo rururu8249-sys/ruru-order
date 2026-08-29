@@ -84,14 +84,16 @@ async function recordVisit(
 
     const { data, error } = await supabase
       .from("visitor_visits")
-      .select("id,last_seen_at,nickname")
+      .select("id,last_seen_at,nickname,page_type,path")
       .eq("visitor_key", params.visitorKey)
       .order("last_seen_at", { ascending: false })
       .limit(1);
 
     if (error) return;   // 표가 아직 없으면 여기서 조용히 끝
 
-    const last = (data || [])[0] as { id?: number; last_seen_at?: string; nickname?: string | null } | undefined;
+    const last = (data || [])[0] as
+      { id?: number; last_seen_at?: string; nickname?: string | null; page_type?: string | null; path?: string | null }
+      | undefined;
     const lastMs = last?.last_seen_at ? Date.parse(last.last_seen_at) : 0;
     const gap = Date.now() - lastMs;
 
@@ -117,10 +119,21 @@ async function recordVisit(
     const knownNickname = String(last.nickname ?? "").trim();
     const nicknameArrived = Boolean(params.nickname) && !knownNickname;
 
-    if (gap > VISIT_TOUCH_MS || nicknameArrived) {
+    // [2026-08-30] 기록 줄이 "첫 페이지"에 갇혀 있던 문제도 같이 고친다.
+    //   손님은 / (카카오 로그인 시작 화면) 에서 시작해 /order 로 넘어간다.
+    //   그런데 30분 안에는 같은 방문으로 묶여서 줄이 새로 안 생기고,
+    //   page_type 은 처음 값(page) 그대로 남아 "이 사람이 주문서까지 갔는지"를 알 수 없었다.
+    //   → 갱신할 때 지금 보고 있는 페이지로 맞춘다.
+    const pageMoved = params.pageType && String(last.page_type ?? "") !== params.pageType;
+
+    if (gap > VISIT_TOUCH_MS || nicknameArrived || pageMoved) {
       await supabase
         .from("visitor_visits")
-        .update({ last_seen_at: params.nowIso, ...(params.nickname ? { nickname: params.nickname } : {}) })
+        .update({
+          last_seen_at: params.nowIso,
+          ...(params.nickname ? { nickname: params.nickname } : {}),
+          ...(pageMoved ? { page_type: params.pageType, path: params.path || null } : {}),
+        })
         .eq("id", last.id);
     }
   } catch {
