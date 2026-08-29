@@ -50,3 +50,9 @@ next-env.d.ts
 
 # 엑셀 일괄등록 임시 데이터(이미지·데이터셋)
 _bulk_register/
+
+# 작업용 임시 폴더 — 커밋 금지 + 타입체크 제외(tsconfig exclude 와 한 쌍)
+#   2026-08-29: 여기에 남아 있던 .tsx 조각 때문에 npm run build 가 타입체크에서 실패했음
+_to_delete/
+_cowork_tmp/
+.claude/
