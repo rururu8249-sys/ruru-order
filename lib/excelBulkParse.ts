@@ -84,6 +84,8 @@ export function isSizeLabel(v: unknown): boolean {
   const h = norm(v).toLowerCase();
   if (!h) return false;
   if (/^(x{0,3}[sml]|free|onesize|one size|jr|js)$/i.test(h)) return true;
+  // [2026-08-29] 2XL · 3XL · 4XL 표기도 사이즈로 인정 (엑셀 원본에 실제로 쓰임)
+  if (/^[2-5]x?l$/i.test(h)) return true;
   // 230 / 230mm / 230 mm / 230호 / 95(L) / 26인치
   const m = h.match(/^(\d{2,3})\s*(mm|호|인치|cm)?(\s*\(.+\))?$/);
   if (m) {
@@ -144,6 +146,21 @@ export function autoGuessConfig(rows: SheetCell[][]): BulkConfig {
     if (top >= 2 && top <= 12) { layout = "block"; blockSize = top; }
   }
 
+  // [2026-08-29 사고: 사이즈 누락·오등록]
+  //   원본 엑셀은 「컬러 | S | M | L | (빈칸) | (빈칸) | 수량 | 세일가」처럼
+  //   사이즈 칸 머리글이 중간부터 비어 있는 경우가 많다.
+  //   예전에는 머리글이 비어 있으면 그 칸을 아예 안 읽어서 4·5번째 사이즈(2XL, 54, 12 …)가 통째로 사라졌다.
+  //   → 컬러 칸 다음부터 수량 칸 앞까지는, 머리글이 비어 있어도 사이즈 칸으로 본다.
+  if (colColor >= 0 && colQty > colColor + 1) {
+    for (let i = colColor + 1; i < colQty; i += 1) {
+      if (i === colName || i === colPrice || i === colCode || i === colSize) continue;
+      const role = guessRole(hs[i] || "");
+      if (role && role !== "size") continue;   // 이미지·합계 등 다른 역할 칸은 제외
+      if (!sizeCols.includes(i)) sizeCols.push(i);
+    }
+    sizeCols.sort((a, b) => a - b);
+  }
+
   // 헤더에 사이즈 열이 없고, 사이즈 "값" 열 + 수량 열이 있으면 → 한 줄 = 한 옵션(variant)
   if (sizeCols.length === 0 && colSize >= 0 && colQty >= 0) {
     layout = "variant";
@@ -182,13 +199,28 @@ export function buildDraftCores(rows: SheetCell[][], c: BulkConfig, consumedOut?
   const headerCells = c.headerRow > 0 ? (rows[c.headerRow - 1] || []) : [];
   const firstDataRow = c.headerRow > 0 ? c.headerRow : 0; // 0-base 기준 시작 위치
 
+  // [2026-08-29 사고 수정] 사이즈 라벨을 정하는 규칙
+  //
+  //   예전 규칙의 문제 (실제 엑셀 2개로 확인, 201개 중 176개가 틀렸음)
+  //     ① 칸이 비어 있으면 머리글 글자를 대신 넣었다
+  //        → 「36,38,40 + 빈칸」이 「36,38,40,XL」로 등록됨 (45건)
+  //     ② 숫자 사이즈를 사이즈로 인정 안 했다 (4·6·8·10·12 / 1·2·3·4·5 / 0·1·2·3)
+  //        → 머리글로 대체되어 「S,M,L,XL」로 등록됨 (버버리 여성 27건 등)
+  //
+  //   새 규칙
+  //     · 수량 칸이 따로 있는 표 = 사이즈 칸에 들어있는 값이 "수량"일 수 없다 → 칸 값이 곧 사이즈
+  //     · 칸이 비어 있으면 그 사이즈는 없는 것 (머리글로 메우지 않는다)
+  //     · 수량 칸이 없는 표(머리글 자체가 230·240·250 인 신발 형식)는 예전대로 머리글을 쓴다
+  const cellIsSize = c.colQty >= 0;
   const sizeLabelsFor = (rowIdx0: number) => {
     const sizes: string[] = [];
     const colOf: Record<string, number> = {};
     for (const ci of c.sizeCols) {
       const fromHeader = norm(headerCells[ci]);
       const fromRow = norm((rows[rowIdx0] || [])[ci]);
-      const label = isSizeLabel(fromRow) ? fromRow : (isSizeLabel(fromHeader) || fromHeader ? fromHeader : "");
+      const label = cellIsSize
+        ? fromRow
+        : (isSizeLabel(fromRow) ? fromRow : (isSizeLabel(fromHeader) || fromHeader ? fromHeader : ""));
       if (label && !(label in colOf)) { sizes.push(label); colOf[label] = ci; }
     }
     return { sizes, colOf };
