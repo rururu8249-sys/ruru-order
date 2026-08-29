@@ -711,6 +711,8 @@ export default function QuickProductFastForm({
   // [2026-08-29 사장님 요청] 세부상품 사진을 모달 안 열고 카드에 바로 끌어다 놓기 / 붙여넣기
   // [2026-08-29] 저장 안 하고 닫으면 입력이 통째로 날아가던 문제 — 값이 바뀌었으면 확인하고 닫는다.
   const [formTouched, setFormTouched] = useState(false);
+  // [2026-08-29 사장님 요청] 등록하면서 손님 화면이 어떻게 보이는지 바로 확인
+  const [previewOpen, setPreviewOpen] = useState(true);
   const [photoDropTarget, setPhotoDropTarget] = useState("");   // 지금 드래그가 올라와 있는 카드
   const [photoHoverTarget, setPhotoHoverTarget] = useState("");  // 붙여넣기(Ctrl+V) 대상 카드
   const bulkDetailPhotoInputRef = useRef<HTMLInputElement | null>(null);
@@ -1775,6 +1777,94 @@ export default function QuickProductFastForm({
                 </select>
               </div>
             </div>
+          </div>
+
+          {/* [2026-08-29 사장님 요청] 손님 화면 미리보기
+              예전에는 등록을 마치고 주문서를 직접 열어봐야 어떻게 보이는지 알 수 있었다.
+              → 지금 입력 중인 값 그대로, 손님 상품목록에 나올 카드를 그 자리에서 보여준다.
+              ⚠️ 표시 전용이다. 저장되는 값과 계산식은 건드리지 않는다. */}
+          <div style={{ marginBottom: "14px", border: "1px solid #D9C5CC", borderRadius: "10px", background: "#FFF9FB", overflow: "hidden" }}>
+            <button
+              type="button"
+              onClick={() => setPreviewOpen((v) => !v)}
+              style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "8px 11px", border: "none", background: "transparent", cursor: "pointer" }}
+            >
+              <span style={{ fontSize: "12px", fontWeight: 900, color: "#7B2D43" }}>👀 손님 화면 미리보기</span>
+              <span style={{ fontSize: "10px", fontWeight: 800, color: "var(--color-ink-mute)" }}>{previewOpen ? "접기 ▲" : "펴기 ▼"}</span>
+            </button>
+
+            {previewOpen ? (() => {
+              // 손님 목록 카드와 같은 기준으로 값 만들기
+              const basePrice = freeProductEnabled ? 0 : moneyNumber(priceText);
+              const plusList = details.map((n) => Math.max(0, Number(detailPlus[n]) || 0));
+              const minPlus = plusList.length > 0 ? Math.min(...plusList) : 0;
+              const maxPlus = plusList.length > 0 ? Math.max(...plusList) : 0;
+              const lowest = basePrice + minPlus;
+
+              const priceText2 = isBrandGroupEdit
+                ? `최저가 ${lowest.toLocaleString("ko-KR")}원 부터 ~`
+                : freeProductEnabled
+                  ? "0원 · 🎁 무료나눔"
+                  : basePrice > 0
+                    ? maxPlus > 0
+                      ? `${lowest.toLocaleString("ko-KR")}원 ~`
+                      : `${basePrice.toLocaleString("ko-KR")}원`
+                    : "가격 직접입력";
+
+              const cover = isBrandGroupEdit
+                ? brandWordmarkImage
+                : resolveProductImageUrl(coverImages[0] || detailImages[0] || Object.values(detailPhotos)[0] || "");
+
+              const badgeChip = (bg: string, color: string, text: string) => (
+                <span key={text} style={{ fontSize: "9px", fontWeight: 800, color, background: bg, borderRadius: "4px", padding: "2px 5px" }}>{text}</span>
+              );
+
+              return (
+                <div style={{ padding: "0 11px 11px" }}>
+                  <div style={{ border: "1px solid #EFE6DE", borderRadius: "12px", background: "#fff", padding: "11px", display: "flex", gap: "10px", alignItems: "center" }}>
+                    <div style={{ width: "68px", height: "68px", flexShrink: 0, borderRadius: "9px", overflow: "hidden", background: "#F0EBE8", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {cover
+                        ? <img src={cover} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        : <span style={{ fontSize: "9px", fontWeight: 800, color: "#B0A5A9" }}>사진 없음</span>}
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ display: "flex", gap: "3px", flexWrap: "wrap", marginBottom: "3px" }}>
+                        {badgeTypes.includes("new") ? badgeChip("#E7F3EE", "#0F6E56", "NEW") : null}
+                        {badgeTypes.includes("hot") ? badgeChip("#FBEAE7", "#C0392B", "HOT") : null}
+                        {badgeTypes.includes("limit") ? badgeChip("#FBF1E0", "#854F0B", "한정") : null}
+                        {badgeTypes.includes("pick") ? badgeChip("#FFF8E7", "#B8860B", "⭐ MD픽") : null}
+                        {badgeTypes.includes("direct") ? badgeChip("#E8F0FE", "#1D4ED8", "🛒 바로구매") : null}
+                        {badgeTypes.includes("overseas") ? badgeChip("#EEF6F3", "#0F6E56", "✈️ 해외배송") : null}
+                        {freeProductEnabled ? badgeChip("#E7F3EE", "#0F6E56", "🎁 무료나눔") : null}
+                        {shippingType !== "normal" ? badgeChip("#EEF2FA", "#3B5BA5", "🚚 업체배송") : null}
+                      </div>
+                      <div style={{ fontSize: "13px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {productName.trim() || "상품명을 입력하세요"}
+                      </div>
+                      {details.length > 1 ? (
+                        <div style={{ fontSize: "10.5px", color: "#8A8A8A", marginTop: "2px" }}>
+                          {isBrandGroupEdit
+                            ? `세부상품 ${details.length - detailHidden.length}가지 · 상품별 금액이 달라요`
+                            : `종류 ${details.length}가지 · 눌러서 선택`}
+                        </div>
+                      ) : null}
+                      <div style={{ marginTop: "4px", fontSize: "15px", fontWeight: 800, color: "#7A1E47" }}>{priceText2}</div>
+                    </div>
+                    <div style={{ flexShrink: 0, height: "30px", padding: "0 13px", borderRadius: "7px", background: "#7A1E47", color: "#fff", fontSize: "11px", fontWeight: 800, display: "flex", alignItems: "center" }}>
+                      {details.length > 1 || colors.length > 0 || sizes.length > 0 ? "상품 선택" : "장바구니 담기"}
+                    </div>
+                  </div>
+
+                  {/* 손님이 못 보는 상태를 미리 알려준다 */}
+                  <div style={{ marginTop: "7px", display: "flex", flexDirection: "column", gap: "3px" }}>
+                    {!productName.trim() ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#C0392B" }}>· 상품명이 없으면 저장되지 않습니다</span> : null}
+                    {!isBrandGroupEdit && !cover ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#8A5A00" }}>· 사진이 없어 손님 목록에 회색 네모로 보입니다</span> : null}
+                    {!isVisible ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#8A5A00" }}>· 고객 노출이 꺼져 있어 손님 화면에 아예 안 보입니다</span> : null}
+                    {details.length > 0 && detailHidden.length === details.length ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#C0392B" }}>· 세부상품이 전부 숨김이라 손님이 고를 수 있는 게 없습니다</span> : null}
+                  </div>
+                </div>
+              );
+            })() : null}
           </div>
 
           {/* [2026-08-11] 카테고리·뱃지는 기본 접힘 — 방송 중엔 옵션·재고가 먼저 보이게 */}
