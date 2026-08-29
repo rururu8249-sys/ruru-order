@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { noteTimeText, noteAgoText } from "@/lib/noteTime";
 
 type SiteAlert = { id: number; kind: string; title: string; message: string; created_at: string; expires_at: string };
 type BoxItem = SiteAlert & { seen_at?: string | null; dismissed_at?: string | null };
@@ -9,13 +10,9 @@ type NoticeItem = { id: number; title: string; content: string; category?: strin
 // 쪽지 종류에 맞는 아이콘 — 주문 재촉(🛒)과 사장님 쪽지(📩)를 구분한다.
 const iconOf = (kind: string) => (kind === "admin_note" ? "📩" : "🛒");
 
-function timeText(iso: string) {
-  const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return "";
-  const d = new Date(t + 9 * 60 * 60 * 1000);
-  const p2 = (n: number) => String(n).padStart(2, "0");
-  return `${p2(d.getUTCMonth() + 1)}.${p2(d.getUTCDate())} ${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}`;
-}
+// 시각 표기는 lib/noteTime.ts 에 두고 테스트(scripts/test-note-time-format.mjs)와 같은 함수를 쓴다.
+const timeText = noteTimeText;
+const agoText = (iso: string) => noteAgoText(iso);
 
 function sessionKey() {
   try { return localStorage.getItem("ruru_cart_session_key") || ""; } catch { return ""; }
@@ -166,7 +163,9 @@ export default function CustomerSiteAlertPopup() {
                           {n.is_pinned ? <span className="shrink-0 rounded-full bg-[#7B2D43] px-2 py-0.5 text-[10px] font-black text-white">고정</span> : null}
                         </div>
                         <p className="mt-1.5 whitespace-pre-line text-[13px] font-bold leading-6 text-slate-600">{n.content}</p>
-                        <div className="mt-1.5 text-[11px] font-bold text-slate-400">{timeText(n.created_at)}</div>
+                        <div className="mt-1.5 text-[11px] font-bold text-slate-400">
+                          {timeText(n.created_at)}{agoText(n.created_at) ? ` · ${agoText(n.created_at)}` : ""}
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -186,10 +185,18 @@ export default function CustomerSiteAlertPopup() {
                       <div className="flex items-center gap-2">
                         <span className="text-base">{iconOf(b.kind)}</span>
                         <span className="min-w-0 flex-1 truncate text-[14px] font-black text-slate-900">{b.title}</span>
-                        {!b.seen_at ? <span className="shrink-0 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white">새 쪽지</span> : null}
+                        {/* [2026-08-30 사장님 지적] 읽음/안읽음이 눈에 안 들어온다 → 글자로 확실히 */}
+                        {b.seen_at ? (
+                          <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-400">읽음</span>
+                        ) : (
+                          <span className="shrink-0 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white">안 읽음</span>
+                        )}
                       </div>
                       <p className="mt-1.5 whitespace-pre-line text-[13px] font-bold leading-6 text-slate-600">{b.message}</p>
-                      <div className="mt-1.5 text-[11px] font-bold text-slate-400">{timeText(b.created_at)}</div>
+                      <div className="mt-1.5 text-[11px] font-bold text-slate-400">
+                        받은 날짜 {timeText(b.created_at)}{agoText(b.created_at) ? ` · ${agoText(b.created_at)}` : ""}
+                        {b.seen_at ? <span className="ml-1 text-slate-300">· 읽은 날짜 {timeText(b.seen_at)}</span> : null}
+                      </div>
                     </li>
                   ))}
                 </ul>
