@@ -965,6 +965,10 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
               <div style={{ fontSize: "12px", fontWeight: 800, color: "#5C4B52", marginBottom: "8px" }}>
                 미리보기 {drafts.length}개 · 등록 대상 <b style={{ color: "#7B2D43" }}>{useCount}</b>개
                 {drafts.some((d) => d.warns.length > 0) ? <span style={{ marginLeft: "8px", color: "#C0392B" }}>⚠ 확인 필요 {drafts.filter((d) => d.warns.length > 0).length}개</span> : null}
+                {/* [2026-08-29] 색상이 비어 있으면 나중에 「같은 디자인 묶기」에서 옵션1·옵션2로만 보인다 → 등록 전에 알려준다 */}
+                {drafts.filter((d) => d.use && d.colors.length === 0).length > 0 ? (
+                  <span style={{ marginLeft: "8px", color: "#8A5A00" }}>🎨 색상 없음 {drafts.filter((d) => d.use && d.colors.length === 0).length}개</span>
+                ) : null}
               </div>
               {drafts.length === 0 ? (
                 <div style={{ padding: "40px 0", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "#A08A92", lineHeight: 1.8 }}>
@@ -986,7 +990,8 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
                       <span style={{ fontSize: "11px", color: "#A08A92" }}>원</span>
                     </div>
                     <div style={{ marginTop: "4px", fontSize: "11.5px", fontWeight: 700, color: "#68575E" }}>
-                      {d.details && d.details.length > 0 ? `세부 ${d.details.map((n) => (d.detailPlus?.[n] ? `${n}(+${d.detailPlus[n].toLocaleString()}원)` : n)).join("·")} · ` : ""}
+                      {/* [2026-08-29] 추가금만 보이면 실제로 얼마에 팔리는지 모른 채 등록하게 된다 → 실제 판매가(대표가+추가금)를 함께 표기 */}
+                      {d.details && d.details.length > 0 ? `세부 ${d.details.map((n) => { const plus = Math.max(0, Number(d.detailPlus?.[n]) || 0); const real = Math.max(0, Number(d.price) || 0) + plus; return plus > 0 ? `${n} ${real.toLocaleString()}원(+${plus.toLocaleString()})` : `${n} ${real.toLocaleString()}원`; }).join(" · ")} · ` : ""}
                       {d.colors.length > 0 ? `색상 ${d.colors.join("·")} · ` : ""}사이즈 {d.sizes.join("·") || "없음"} · 총 {totalStock(d)}개
                       {d.code ? <span style={{ color: "#B0A5A0" }}> · {d.code}</span> : null}
                     </div>

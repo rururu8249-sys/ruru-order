@@ -1153,7 +1153,10 @@ export default function LiveOrderTable({
       <div className="h-[1180px] overflow-auto rounded-xl border border-line">
             {/* 헤더 행 (모바일 카드형에선 숨김) */}
             {!isMobile && (
-            <div className="grid min-w-[1000px] grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 border-b border-rose-line bg-rose-soft/40 text-[12px] font-black text-ink-soft">
+            /* [2026-08-29] 방송 중 아래로 스크롤하면 제목줄이 사라져 어느 칸이 금액인지 헷갈리던 문제.
+               제목줄을 맨 위에 고정한다. 배경을 불투명으로 바꿔야 주문 행이 비쳐 보이지 않는다.
+               표시 전용 — 주문·금액·입금 데이터와 무관. */
+            <div className="sticky top-0 z-20 grid min-w-[1000px] grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 border-b border-rose-line bg-rose-soft text-[12px] font-black text-ink-soft shadow-[0_2px_6px_rgba(39,28,33,0.07)]">
               <span className="flex items-center justify-center py-2.5">
                 <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} className="h-4 w-4 cursor-pointer accent-[var(--color-rose-deep)]" />
               </span>

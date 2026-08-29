@@ -85,6 +85,8 @@ import CustomerMissingDetailAddressPanel from "@/components/customer/CustomerMis
 import GroupBuyQuickSelect, { type GroupBuyQuickSelectProduct } from "@/components/order/GroupBuyQuickSelect";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { resolveDesignGroups, detailCode, detailPricePresentation } from "@/lib/productDetailModel";
+import CustomerSizeChartSheet from "@/components/customer/CustomerSizeChartSheet";
+import { resolveSizeChart } from "@/lib/sizeChart";
 import { registeredProductEditManualPrice, registeredProductPriceMode } from "@/lib/registeredProductPricePolicy";
 import { buildCartHoldSnapshotItem } from "@/lib/cartHoldDetail";
 import {
@@ -5392,6 +5394,21 @@ export default function OrderPage() {
     }
   }, [registeredOptionSelectProduct, registeredOptionSingleSize, registeredOptionSize]);
 
+  // [2026-08-29 사장님 요청] 사이즈 실측표 — 벤더 엑셀 원본에 치수가 적힌 상품에서만 뜬다.
+  //   치수 데이터가 없으면 버튼 자체가 안 생겨서 기존 화면과 100% 같다.
+  //   표시 전용 — 금액·재고·주문·입금에 무접촉.
+  const [sizeChartOpen, setSizeChartOpen] = useState(false);
+  const registeredOptionDetailNameForChart = registeredOptionAxes3
+    ? registeredOptionDetail
+    : registeredOptionColor;
+  const registeredOptionSizeChart = resolveSizeChart(
+    registeredOptionSelectProduct?.product_note,
+    registeredOptionDetailNameForChart,
+  );
+  useEffect(() => {
+    setSizeChartOpen(false);
+  }, [registeredOptionSelectProduct?.id, registeredOptionDetailNameForChart]);
+
   // [2026-08-28 P0-4] 손님이 아무것도 하기 전부터 빨간 에러가 떠 있던 문제.
   //   담기 버튼을 눌러 본 뒤에만 빨간색으로 바꾼다(그 전에는 회색 안내 문구).
   const [registeredOptionAttempted, setRegisteredOptionAttempted] = useState(false);
@@ -6790,11 +6807,21 @@ export default function OrderPage() {
 
                   {registeredOptionDetailSelected && registeredOptionSizeChoices.length > 0 ? (
                     <div style={{ marginBottom: "16px", opacity: registeredOptionAxes3 && !registeredOptionDetail.trim() ? 0.45 : 1, pointerEvents: registeredOptionAxes3 && !registeredOptionDetail.trim() ? "none" : "auto" }}>
-                      <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>
-                        사이즈
+                      <div style={{ marginBottom: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "14px", fontWeight: 800, color: "#333" }}>사이즈</span>
                         {registeredOptionAxes3 && !registeredOptionDetail.trim()
-                          ? <span style={{ marginLeft: "6px", fontSize: "12px", fontWeight: 700, color: "#7B736D" }}>— {registeredOptionAxes3.detailLabel}부터 선택</span>
+                          ? <span style={{ fontSize: "12px", fontWeight: 700, color: "#7B736D" }}>— {registeredOptionAxes3.detailLabel}부터 선택</span>
                           : null}
+                        {/* [2026-08-29] 치수가 등록된 상품에서만 나온다. 없으면 이 버튼 자체가 없다. */}
+                        {registeredOptionSizeChart ? (
+                          <button
+                            type="button"
+                            onClick={() => setSizeChartOpen(true)}
+                            style={{ marginLeft: "auto", border: "1.5px solid #7A1E47", borderRadius: "999px", background: "#fff", color: "#7A1E47", padding: "5px 11px", fontSize: "12px", fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap" }}
+                          >
+                            사이즈 실측 보기
+                          </button>
+                        ) : null}
                       </div>
                       {registeredOptionSizeChoices.length <= 4 ? (
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
@@ -7453,6 +7480,15 @@ export default function OrderPage() {
             setPaymentGuideOpen(true);
           }}
         />
+
+      {/* [2026-08-29] 사이즈 실측표 — 치수가 등록된 상품에서 「사이즈 실측 보기」를 눌렀을 때만 뜬다. */}
+      <CustomerSizeChartSheet
+        open={sizeChartOpen}
+        title={orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name ?? ""), registeredOptionDetailNameForChart)}
+        chart={registeredOptionSizeChart}
+        selectedSize={registeredOptionSize}
+        onClose={() => setSizeChartOpen(false)}
+      />
 
       <footer className="pt-8 pb-56 text-center text-[11px] font-bold tracking-[-0.03em] text-slate-400">
         <div className="mb-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
