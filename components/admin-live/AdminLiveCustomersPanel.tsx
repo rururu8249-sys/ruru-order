@@ -70,7 +70,22 @@ type CustomerProfile = {
   kakao_profile_image?: string | null;
   first_login_at?: string | null;
   last_login_at?: string | null;
-  customer_history?: Array<{ field: string; old_value: string; new_value: string; changed_at: string }> | null;
+  customer_history?: Array<{ field: string; old_value: string; new_value: string; changed_at: string; note?: string }> | null;
+};
+
+// [2026-08-29] 변경이력 항목명을 한글로 — 영문 컬럼명이 그대로 보이면 방송 중에 읽기 어렵다(표시 전용).
+const CUSTOMER_HISTORY_FIELD_LABEL: Record<string, string> = {
+  customer_name: "이름",
+  customer_phone: "전화번호",
+  address: "주소",
+  detail_address: "상세주소",
+  zipcode: "우편번호",
+  youtube_nickname: "유튜브 닉네임",
+  customer_phone_change_skipped: "⚠ 전화번호 변경 보류",
+};
+const customerHistoryFieldLabel = (field: unknown) => {
+  const key = String(field ?? "").trim();
+  return CUSTOMER_HISTORY_FIELD_LABEL[key] || key || "변경";
 };
 
 type SortMode = "latest" | "amount" | "orders" | "nickname" | "joinedDesc" | "joinedAsc" | "lastLogin";
@@ -747,7 +762,7 @@ function CustomerDetailDrawer({
                   .map((h, index) => (
                     <div key={`${h.field}-${h.changed_at}-${index}`} style={{ border: "1px solid var(--color-line)", borderRadius: "9px", padding: "8px 11px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px" }}>
-                        <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)" }}>{h.field}</span>
+                        <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)" }}>{customerHistoryFieldLabel(h.field)}</span>
                         <span style={{ marginLeft: "auto", fontSize: "10px", color: "var(--color-ink-mute)" }}>{formatOrderDateTime(h.changed_at)}</span>
                       </div>
                       <div style={{ fontSize: "11px", color: "var(--color-ink-soft)" }}>
@@ -755,6 +770,9 @@ function CustomerDetailDrawer({
                         <span style={{ margin: "0 5px", color: "var(--color-ink-mute)", fontWeight: 800 }}>→</span>
                         <span style={{ color: "var(--color-ink)", fontWeight: 700 }}>{h.new_value || "(없음)"}</span>
                       </div>
+                      {h.note ? (
+                        <div style={{ marginTop: "4px", fontSize: "10px", fontWeight: 700, color: "var(--color-danger-tx)" }}>{h.note}</div>
+                      ) : null}
                     </div>
                   ))}
               </div>

@@ -89,3 +89,79 @@ function equal(a, e, m) { if (a !== e) throw new Error(`${m}: expected=${String(
 }
 
 console.log("customer identity tests passed");
+
+// ── 8. 손님이 써 온 모든 번호 모으기 (번호 바꾼 손님의 옛 주문 연결용) ──
+{
+  const { collectKnownPhoneDigits } = await import("../lib/customerIdentity.ts");
+
+  // 실제 사례 형태: 프로필은 옛 번호, 로그인은 새 번호, 이력에 변경기록, 주문엔 배송지 번호
+  const phones = collectKnownPhoneDigits({
+    current: "010-2849-5209",
+    profilePhone: "01033995209",
+    history: [
+      { field: "customer_phone", old_value: "010-1111-2222", new_value: "010-3399-5209", changed_at: "x" },
+      { field: "address", old_value: "옛주소", new_value: "새주소", changed_at: "x" },
+    ],
+    linkedOrderPhones: ["010-9999-8888", "01028495209"],
+  });
+  const set = new Set(phones);
+  assert(set.has("01028495209"), "지금 번호 포함");
+  assert(set.has("01033995209"), "프로필 번호 포함");
+  assert(set.has("01011112222"), "변경 이력의 옛 번호 포함");
+  assert(set.has("01099998888"), "이미 연결된 주문의 번호 포함");
+  assert(!phones.some((p) => p.includes("주소")), "주소 이력은 번호로 안 들어간다");
+  equal(set.size, 4, "중복 없이 4개");
+
+  // 짧은 값·쓰레기 값은 버린다 (남의 주문 잡는 사고 방지)
+  const junk = collectKnownPhoneDigits({ current: "123", profilePhone: "", history: [{ field: "phone", old_value: "-", new_value: "abc" }] });
+  equal(junk.length, 0, "10자리 미만은 번호로 치지 않는다");
+
+  // 입력이 비어 있어도 안전
+  equal(collectKnownPhoneDigits({}).length, 0, "빈 입력이면 빈 배열");
+  equal(collectKnownPhoneDigits({ history: null, linkedOrderPhones: null }).length, 0, "null도 안전");
+}
+
+console.log("customer phone variants tests passed");
+
+// 9) 소급연결 대상 번호 고르기 — 번호 재사용으로 남의 주문을 끌어오면 안 된다
+{
+  const { selectBackfillPhoneDigits } = await import("../lib/customerIdentity.ts");
+  const MY = "5006208833";
+
+  // 옛 번호가 지금 "다른 카카오 회원"의 번호 → 제외
+  const picked = selectBackfillPhoneDigits({
+    knownDigits: ["01028495209", "01033995209", "01011112222"],
+    owners: [
+      { customer_phone: "01028495209", kakao_id: MY },        // 내 번호
+      { customer_phone: "01011112222", kakao_id: "9999999" },  // 남이 쓰는 옛 번호
+      { customer_phone: "01033995209", kakao_id: null },       // 카톡ID 없는 옛 회원(=본인 가능) → 허용
+    ],
+    kakaoId: MY,
+  });
+  equal(picked.length, 2, "남이 쓰는 번호 1개 제외");
+  assert(picked.includes("01028495209"), "내 번호 유지");
+  assert(picked.includes("01033995209"), "카톡ID 없는 회원 번호는 유지");
+  assert(!picked.includes("01011112222"), "다른 카카오 회원 번호는 제외");
+
+  // 형식이 달라도(하이픈) 같은 번호로 인식해 제외한다
+  const hyphen = selectBackfillPhoneDigits({
+    knownDigits: ["01011112222"],
+    owners: [{ customer_phone: "010-1111-2222", kakao_id: "9999999" }],
+    kakaoId: MY,
+  });
+  equal(hyphen.length, 0, "하이픈 표기여도 같은 번호로 보고 제외");
+
+  // 소유자 정보가 없으면 전부 통과 + 중복/짧은 값 제거
+  const plain = selectBackfillPhoneDigits({
+    knownDigits: ["010-2849-5209", "01028495209", "123", ""],
+    owners: [],
+    kakaoId: MY,
+  });
+  equal(plain.length, 1, "중복 합치고 짧은 값 버림");
+  equal(plain[0], "01028495209", "숫자만 형태로 반환");
+
+  // 방어: 잘못된 입력에도 터지지 않는다
+  equal(selectBackfillPhoneDigits({ knownDigits: null, owners: null, kakaoId: null }).length, 0, "null 입력 안전");
+}
+
+console.log("backfill phone selection tests passed");

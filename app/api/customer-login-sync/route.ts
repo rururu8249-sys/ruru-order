@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { collectKnownPhoneDigits, selectBackfillPhoneDigits } from "@/lib/customerIdentity";
 
 // app/api/customer-login-sync/route.ts
 // 목적:
@@ -154,21 +155,6 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminSupabase();
     const phoneVariants = makePhoneVariants(customerPhone);
 
-    // 기존 회원도 적용: 로그인 시 이 사람의 "kakao_id 없는 기존 주문"에 kakao_id를 소급 연결(전화번호 매칭).
-    //   - 신규 주문만이 아니라 옛 주문까지 안 바뀌는 정체성으로 묶어, 이후 전화/이름 수정돼도 조회 안 깨짐.
-    //   - kakao_id가 이미 있는 주문은 건드리지 않음(.is null). 다른 사람 주문 안 건드림(전화 일치만).
-    //   - 주문/입금/정산/포인트 로직과 무관(kakao_id 컬럼만). 실패해도 로그인은 정상 진행.
-    if (kakaoId && phoneVariants.length > 0) {
-      const { error: orderBackfillError } = await supabase
-        .from("orders")
-        .update({ kakao_id: kakaoId })
-        .is("kakao_id", null)
-        .in("customer_phone", phoneVariants);
-      if (orderBackfillError) {
-        console.warn("기존 주문 kakao_id 소급연결 실패(로그인은 정상):", orderBackfillError.message);
-      }
-    }
-
     const CUSTOMER_SELECT_COLUMNS =
       "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, customer_memo, is_blocked, last_order_at, created_at, kakao_id, kakao_nickname, kakao_profile_image, customer_history, live_alert_optin";
 
@@ -204,6 +190,76 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: false, message: selectError.message }, { status: 500 });
       }
       existing = Array.isArray(byPhone) ? (byPhone[0] as CustomerRow | undefined) : undefined;
+    }
+
+    // [2026-08-29] 번호가 바뀐 손님도 옛 주문이 보이게 — "알려진 모든 번호"로 kakao_id 소급 연결
+    //   왜 고쳤나(실측): 이전에는 이번 로그인에 담겨온 번호 하나로만 옛 주문을 찾았다.
+    //     번호를 바꾸거나 배송지 번호로 주문한 손님의 옛 주문은 kakao_id가 빈 채 남아
+    //     개인 주문내역에서 사라졌다(사고 사례: 루루짱929, 주문 3건 중 일부 미표시).
+    //   무엇을 모으나: 현재번호 + 회원 프로필 번호 + customer_history의 번호 변경이력
+    //                 + 이미 이 카카오계정에 연결된 주문의 번호.
+    //   안전장치:
+    //     · kakao_id가 이미 있는 주문은 절대 건드리지 않는다(.is null).
+    //     · 그 번호를 "다른 카카오 계정"의 회원이 쓰고 있으면 그 번호는 제외한다(번호 재사용 → 남의 주문 방지).
+    //     · 10자리 미만 값은 collectKnownPhoneDigits에서 이미 버린다.
+    //   금액/입금/정산/배송/주문상태/포인트 값은 하나도 건드리지 않는다(orders.kakao_id 컬럼 1개만 채움).
+    //   실패해도 로그인은 그대로 성공 처리한다.
+    if (kakaoId) {
+      try {
+        const { data: linkedOrderRows } = await supabase
+          .from("orders")
+          .select("customer_phone")
+          .eq("kakao_id", kakaoId)
+          .limit(500);
+
+        // 번호 개수 상한(20) — 쿼리 길이 폭주 방지. 앞쪽이 우선순위(현재번호 → 프로필 → 변경이력 → 연결주문).
+        const knownDigits = collectKnownPhoneDigits({
+          current: customerPhone,
+          profilePhone: existing?.customer_phone,
+          history: existing?.customer_history,
+          linkedOrderPhones: Array.isArray(linkedOrderRows)
+            ? linkedOrderRows.map((row) => (row as { customer_phone?: unknown }).customer_phone)
+            : [],
+        }).slice(0, 20);
+
+        if (knownDigits.length > 0) {
+          const lookupVariants = Array.from(
+            new Set(knownDigits.flatMap((digits) => makePhoneVariants(digits)))
+          ).filter(Boolean);
+
+          const { data: phoneOwnerRows } = await supabase
+            .from("customers")
+            .select("customer_phone, kakao_id")
+            .in("customer_phone", lookupVariants);
+
+          const allowedDigits = selectBackfillPhoneDigits({
+            knownDigits,
+            owners: Array.isArray(phoneOwnerRows)
+              ? (phoneOwnerRows as Array<{ customer_phone?: unknown; kakao_id?: unknown }>)
+              : [],
+            kakaoId,
+          });
+          const backfillVariants = Array.from(
+            new Set(allowedDigits.flatMap((digits) => makePhoneVariants(digits)))
+          ).filter(Boolean);
+
+          if (backfillVariants.length > 0) {
+            const { error: orderBackfillError } = await supabase
+              .from("orders")
+              .update({ kakao_id: kakaoId })
+              .is("kakao_id", null)
+              .in("customer_phone", backfillVariants);
+            if (orderBackfillError) {
+              console.warn("기존 주문 kakao_id 소급연결 실패(로그인은 정상):", orderBackfillError.message);
+            }
+          }
+        }
+      } catch (backfillError) {
+        console.warn(
+          "기존 주문 kakao_id 소급연결 건너뜀(로그인은 정상):",
+          backfillError instanceof Error ? backfillError.message : backfillError
+        );
+      }
     }
 
     if (existing?.id) {
@@ -272,6 +328,16 @@ export async function POST(request: NextRequest) {
           console.warn(
             `전화번호 변경 스킵(다른 고객이 사용 중): ${customerPhoneDigits}`
           );
+          // [2026-08-29] 서버 로그만 남기면 사장님이 알 방법이 없어, 회원 변경이력에도 남긴다.
+          //   회원카드 변경이력에 뜨므로 "번호가 왜 옛날 거지?" 를 바로 알 수 있다.
+          //   customer_history 는 표시 전용 — 주문/입금/정산/포인트에 영향 없음.
+          history.push({
+            field: "customer_phone_change_skipped",
+            old_value: cleanText(existing.customer_phone),
+            new_value: customerPhoneDigits,
+            note: "다른 회원이 이미 이 번호를 쓰고 있어 번호를 바꾸지 않았습니다(수동 확인 필요)",
+            changed_at: nowIso,
+          });
         } else {
           updateData.customer_phone = customerPhoneDigits;
           recordChange("customer_phone", existing.customer_phone, customerPhoneDigits);

@@ -77,3 +77,99 @@ export function buildCustomerIdentityResolver(refs: CustomerIdentityRef[]) {
     return "";
   };
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// [2026-08-29] 손님이 지금까지 써 온 "모든 전화번호" 모으기
+//
+//   왜 필요한가
+//     로그인할 때 옛 주문에 카카오ID를 붙여 주는 로직이 있는데(customer-login-sync),
+//     지금 쓰는 번호로만 찾아서 "번호를 바꾼 손님"의 옛 주문은 영영 연결되지 않았다.
+//     그래서 번호를 바꾸면 그 이전 주문이 손님 화면에서 사라진다.
+//
+//   어디서 모으나
+//     ① 지금 로그인에 실려 온 번호
+//     ② 회원 프로필에 저장된 번호 (아직 안 바뀐 옛 번호일 수 있다)
+//     ③ customers.customer_history 의 전화번호 변경 이력 (바꾸기 전 번호가 그대로 남아 있다)
+//     ④ 이미 이 사람(카카오ID)으로 연결된 주문들의 전화번호
+//        — 배송지 번호로 주문했거나 예전에 다른 번호를 썼던 흔적이 여기 남는다
+//
+//   안전
+//     반환값은 "이 사람의 번호 후보"일 뿐이고, 실제 연결은 kakao_id 가 비어 있는 주문에만 한다.
+//     이미 주인이 있는 주문은 절대 건드리지 않는다.
+// ────────────────────────────────────────────────────────────────────────────
+
+const PHONE_FIELD = /phone|전화|연락/i;
+
+function toPhoneDigits(value: unknown): string {
+  return String(value ?? "").replace(/\D/g, "");
+}
+
+export function collectKnownPhoneDigits(input: {
+  current?: unknown;
+  profilePhone?: unknown;
+  history?: unknown;
+  linkedOrderPhones?: unknown;
+}): string[] {
+  const found = new Set<string>();
+  const push = (value: unknown) => {
+    const digits = toPhoneDigits(value);
+    // 10자리 미만은 전화번호로 보지 않는다(잘못 매칭되어 남의 주문을 잡는 것을 막는다)
+    if (digits.length >= 10) found.add(digits);
+  };
+
+  push(input?.current);
+  push(input?.profilePhone);
+
+  const history = Array.isArray(input?.history) ? input.history : [];
+  for (const entry of history) {
+    if (!entry || typeof entry !== "object") continue;
+    const record = entry as Record<string, unknown>;
+    const field = String(record.field ?? "");
+    if (!PHONE_FIELD.test(field)) continue;
+    push(record.old_value);
+    push(record.new_value);
+  }
+
+  const linked = Array.isArray(input?.linkedOrderPhones) ? input.linkedOrderPhones : [];
+  for (const value of linked) push(value);
+
+  return [...found];
+}
+
+// [2026-08-29] 소급연결 대상 번호 고르기 — "번호 재사용"으로 남의 주문을 끌어오는 사고 방지
+//
+// 상황: 손님이 예전에 쓰던 번호가 통신사에서 해지·재판매되어 지금은 다른 손님의 회원번호일 수 있다.
+//       그 번호로 kakao_id를 소급 연결하면 남의 주문이 내 주문내역에 뜬다(개인정보 사고).
+// 규칙: 그 번호를 "kakao_id가 있는 다른 회원"이 쓰고 있으면 제외한다.
+//       kakao_id가 비어 있는 회원 번호는 제외하지 않는다(옛 전화번호 로그인 시절 본인 계정일 수 있음).
+// 금액/입금/정산/배송 로직과 무관. 순수 함수.
+export function selectBackfillPhoneDigits(input: {
+  knownDigits: string[];
+  owners: Array<{ customer_phone?: unknown; kakao_id?: unknown }>;
+  kakaoId: unknown;
+}): string[] {
+  const myKakaoId = String(input?.kakaoId ?? "").trim();
+  const blocked = new Set<string>();
+
+  for (const owner of Array.isArray(input?.owners) ? input.owners : []) {
+    if (!owner || typeof owner !== "object") continue;
+    const ownerKakaoId = String(owner.kakao_id ?? "").trim();
+    if (!ownerKakaoId) continue;
+    if (myKakaoId && ownerKakaoId === myKakaoId) continue;
+    const digits = toPhoneDigits(owner.customer_phone);
+    if (digits) blocked.add(digits);
+  }
+
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of Array.isArray(input?.knownDigits) ? input.knownDigits : []) {
+    const digits = toPhoneDigits(value);
+    if (digits.length < 10) continue;
+    if (blocked.has(digits)) continue;
+    if (seen.has(digits)) continue;
+    seen.add(digits);
+    result.push(digits);
+  }
+
+  return result;
+}
