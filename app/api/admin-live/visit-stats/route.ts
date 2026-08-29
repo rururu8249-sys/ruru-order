@@ -55,6 +55,20 @@ export async function GET(request: NextRequest) {
 
     const rows = (data || []) as Array<Record<string, unknown>>;
 
+    // [2026-08-30] 같은 사람인데 어떤 방문에는 이름이 있고 어떤 방문에는 없다.
+    //   (사이트를 연 순간엔 로그인 전이라 이름이 없고, 로그인 뒤 방문에는 이름이 있다)
+    //   → visitor_key 하나당 "알려진 이름"을 30일 전체에서 먼저 모아두고,
+    //     이름이 비어 있던 방문에도 그 이름을 붙인다. 그래야 비회원으로 잘못 세지 않는다.
+    const nameByVisitor = new Map<string, string>();
+    for (const row of rows) {
+      const key = String(row.visitor_key ?? "").trim();
+      const nick = String(row.nickname ?? "").trim();
+      if (!key || !nick) continue;
+      const before = nameByVisitor.get(key);
+      // 나중 기록(rows 는 최신순)보다 먼저 담긴 값을 유지 = 가장 최근에 쓴 이름
+      if (!before) nameByVisitor.set(key, nick);
+    }
+
     // 방문자 한 명(visitor_key)당 한 줄. 이름은 있으면 쓰고, 없으면 "비회원".
     type Person = { name: string; visits: number; lastAt: string; live: boolean };
     type DayBucket = { visitors: Set<string>; visits: number; live: number; shop: number; people: Map<string, Person> };
@@ -84,7 +98,7 @@ export async function GET(request: NextRequest) {
       if (!key || !date) continue;
       allVisitors.add(key);
 
-      const name = String(row.nickname ?? "").trim() || "비회원";
+      const name = String(row.nickname ?? "").trim() || nameByVisitor.get(key) || "비회원";
       const lastAt = String(row.last_seen_at ?? "") || startedAt;
       const isLive = String(row.shop_mode ?? "") === "live";
 

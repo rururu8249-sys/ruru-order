@@ -84,14 +84,14 @@ async function recordVisit(
 
     const { data, error } = await supabase
       .from("visitor_visits")
-      .select("id,last_seen_at")
+      .select("id,last_seen_at,nickname")
       .eq("visitor_key", params.visitorKey)
       .order("last_seen_at", { ascending: false })
       .limit(1);
 
     if (error) return;   // 표가 아직 없으면 여기서 조용히 끝
 
-    const last = (data || [])[0] as { id?: number; last_seen_at?: string } | undefined;
+    const last = (data || [])[0] as { id?: number; last_seen_at?: string; nickname?: string | null } | undefined;
     const lastMs = last?.last_seen_at ? Date.parse(last.last_seen_at) : 0;
     const gap = Date.now() - lastMs;
 
@@ -109,7 +109,15 @@ async function recordVisit(
       return;
     }
 
-    if (gap > VISIT_TOUCH_MS) {
+    // [2026-08-30 사장님 지적] "카톡 로그인하면 닉네임이 넘어올 텐데 왜 비회원으로 잡히냐"
+    //   원인: 손님이 사이트를 열자마자 신호가 먼저 간다. 그때는 아직 로그인 전이라 닉네임이 없어
+    //         기록이 nickname=null 로 만들어졌다. 그 뒤 로그인해서 닉네임이 생겨도
+    //         아래 갱신이 "5분 지났을 때"만 돌아서, 5분 안에 나간 손님은 영영 비회원으로 남았다.
+    //   수정: 닉네임이 비어 있던 기록에 이름이 생기면 5분을 기다리지 않고 바로 채운다.
+    const knownNickname = String(last.nickname ?? "").trim();
+    const nicknameArrived = Boolean(params.nickname) && !knownNickname;
+
+    if (gap > VISIT_TOUCH_MS || nicknameArrived) {
       await supabase
         .from("visitor_visits")
         .update({ last_seen_at: params.nowIso, ...(params.nickname ? { nickname: params.nickname } : {}) })
