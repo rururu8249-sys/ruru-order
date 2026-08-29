@@ -6329,23 +6329,56 @@ export default function OrderPage() {
               onSubmit={applyManualAddress}
             />
 
+            {/* [2026-08-30 사장님 지시] "주소검색이 안된다"는 문의가 간헐적으로 온다.
+                원인: 주소검색 창은 카카오(다음) 서버의 postcode.v2.js 를 손님 폰이 직접 받아온다.
+                      인앱브라우저·광고차단·회사망 등에서 못 받아오면 흰 화면만 남았고,
+                      그때 손님이 할 수 있는 게 화면에 아무것도 없었다.
+                수정: ① 스크립트 실패 시(errorMessage) 안내 + [직접 입력] 버튼
+                      ② 실패가 아니어도 아래에 [직접 입력] 을 항상 둔다
+                      ③ 이미 만들어져 있던 CustomerManualAddressPanel 을 여기서 연다
+                      (직접 입력해도 주문은 정상 제출된다 — 검증은 주소 유무만 본다) */}
             {addressSearchOpen ? (
               <div
                 onClick={(e) => { if (e.target === e.currentTarget) setAddressSearchOpen(false); }}
                 style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: "0 12px" }}
               >
-                <div style={{ width: "100%", maxWidth: "480px", height: "80vh", background: "#fff", borderRadius: "20px 20px 0 0", overflow: "hidden", position: "relative" }}>
-                  <KakaoPostcodeEmbed
-                    onComplete={handleAddressSearchComplete}
-                    onClose={(state) => { if (state === "FORCE_CLOSE") setAddressSearchOpen(false); }}
-                    autoClose={false}
-                    style={{ width: "100%", height: "100%" }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setAddressSearchOpen(false)}
-                    style={{ position: "absolute", bottom: "16px", left: "50%", transform: "translateX(-50%)", zIndex: 1, background: "#f1f1f1", border: "none", borderRadius: "20px", fontSize: "14px", color: "#555", cursor: "pointer", padding: "8px 24px", fontWeight: 700 }}
-                  >✕ 닫기</button>
+                <div style={{ width: "100%", maxWidth: "480px", height: "80vh", background: "#fff", borderRadius: "20px 20px 0 0", overflow: "hidden", position: "relative", display: "flex", flexDirection: "column" }}>
+                  <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+                    <KakaoPostcodeEmbed
+                      onComplete={handleAddressSearchComplete}
+                      onClose={(state) => { if (state === "FORCE_CLOSE") setAddressSearchOpen(false); }}
+                      autoClose={false}
+                      style={{ width: "100%", height: "100%" }}
+                      errorMessage={
+                        <div style={{ padding: "28px 20px", textAlign: "center" }}>
+                          <div style={{ fontSize: "34px" }}>😥</div>
+                          <div style={{ marginTop: "10px", fontSize: "16px", fontWeight: 900, color: "#0f172a" }}>주소검색 창을 열지 못했어요</div>
+                          <div style={{ marginTop: "8px", fontSize: "13px", fontWeight: 700, lineHeight: 1.7, color: "#64748b" }}>
+                            카카오톡·인스타 안에서 열었거나 인터넷이 불안정하면
+                            <br />주소검색 창이 안 뜰 수 있어요.
+                            <br />아래에서 <b>주소를 직접 입력</b>하셔도 주문됩니다.
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => { setAddressSearchOpen(false); setManualAddressOpen(true); }}
+                            style={{ marginTop: "18px", height: "48px", padding: "0 22px", borderRadius: "16px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "15px", fontWeight: 900, cursor: "pointer" }}
+                          >✏️ 주소 직접 입력하기</button>
+                        </div>
+                      }
+                    />
+                  </div>
+                  <div style={{ flexShrink: 0, display: "flex", gap: "8px", alignItems: "center", padding: "10px 12px", borderTop: "1px solid #eee", background: "#fafafa" }}>
+                    <button
+                      type="button"
+                      onClick={() => setAddressSearchOpen(false)}
+                      style={{ height: "42px", padding: "0 18px", background: "#f1f1f1", border: "none", borderRadius: "14px", fontSize: "14px", color: "#555", cursor: "pointer", fontWeight: 800 }}
+                    >✕ 닫기</button>
+                    <button
+                      type="button"
+                      onClick={() => { setAddressSearchOpen(false); setManualAddressOpen(true); }}
+                      style={{ flex: 1, height: "42px", background: "#fff", border: "1.5px solid #7B2D43", borderRadius: "14px", fontSize: "14px", color: "#7B2D43", cursor: "pointer", fontWeight: 900 }}
+                    >✏️ 검색이 안 되면 직접 입력</button>
+                  </div>
                 </div>
               </div>
             ) : null}
