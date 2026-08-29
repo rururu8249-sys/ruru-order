@@ -40,19 +40,27 @@ export async function GET() {
     const supabase = getSupabase();
     const activeSince = new Date(Date.now() - 1000 * 120).toISOString();
 
+    // [2026-08-29] 접속자가 100명이 넘어도 숫자는 정확해야 한다.
+    //   → 총 인원은 count 로 세고, 목록은 최근 60명만 가져온다(화면에 다 못 넣으므로).
+    const { count: totalCount } = await supabase
+      .from("visitor_presence")
+      .select("id", { count: "exact", head: true })
+      .gte("last_seen_at", activeSince);
+
     const { data, error } = await supabase
       .from("visitor_presence")
       .select("id, visitor_key, nickname, page_type, last_seen_at")
       .gte("last_seen_at", activeSince)
       .order("last_seen_at", { ascending: false })
-      .limit(60);
+      .limit(500);   // 분류(주문서/조회/기타) 숫자를 정확히 세기 위해 넉넉히 읽고, 목록은 아래에서 자른다
 
     if (error) {
       // 표가 아직 없거나 권한 문제여도 관리자 화면을 막지 않는다.
       return NextResponse.json({ ok: true, available: false, total: 0, byType: { orderForm: 0, orderLookup: 0, admin: 0, others: 0 }, visitors: [] });
     }
 
-    const visitors = (data || []).map((row) => ({
+    const allRows = (data || []) as Array<Record<string, unknown>>;
+    const visitors = allRows.slice(0, 60).map((row) => ({
       id: String(row.id),
       nickname: clean(row.nickname) || "비회원 방문자",
       pageType: clean(row.page_type) || "page",
@@ -60,15 +68,21 @@ export async function GET() {
       lastSeenAt: clean(row.last_seen_at),
     }));
 
+    // 분류 숫자는 읽어온 전체(최대 500)로 센다 — 목록은 60명만 보여줘도 숫자는 맞아야 한다.
     const byType = { orderForm: 0, orderLookup: 0, admin: 0, others: 0 };
-    visitors.forEach((v) => {
-      if (v.pageType === "order_form") byType.orderForm += 1;
-      else if (v.pageType === "order_lookup") byType.orderLookup += 1;
-      else if (v.pageType === "admin") byType.admin += 1;
+    allRows.forEach((row) => {
+      const t = clean(row.page_type) || "page";
+      if (t === "order_form") byType.orderForm += 1;
+      else if (t === "order_lookup") byType.orderLookup += 1;
+      else if (t === "admin") byType.admin += 1;
       else byType.others += 1;
     });
 
-    return NextResponse.json({ ok: true, available: true, total: visitors.length, byType, visitors });
+    const total = Number.isFinite(totalCount as number) && (totalCount as number) >= visitors.length
+      ? (totalCount as number)
+      : visitors.length;
+
+    return NextResponse.json({ ok: true, available: true, total, listed: visitors.length, byType, visitors });
   } catch (error) {
     return NextResponse.json(
       { ok: false, message: error instanceof Error ? error.message : String(error) },
