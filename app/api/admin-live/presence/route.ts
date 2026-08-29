@@ -77,6 +77,86 @@ export async function GET() {
   }
 }
 
+// ── [2026-08-29 사장님 요청] 접속 "기록" 남기기 ─────────────────────────────
+//   visitor_presence 는 같은 줄을 계속 덮어써서 "지금 몇 명"만 알 수 있고
+//   "어제 몇 명 왔는지", "지난 방송에 몇 명이었는지"는 남지 않는다.
+//   → public.visitor_visits 에 방문 기록을 쌓는다.
+//
+// 부하 보호 (방송 피크에 DB 터지지 않게)
+//   · 진행 중인 방송 조회는 60초 캐시 — 손님 수와 무관하게 1분에 1번만 조회
+//   · 신호는 30초마다 오지만, 같은 방문 기록은 5분에 한 번만 갱신
+//   · 30분 이상 끊겼다 다시 오면 새 방문으로 본다
+//   · 표가 아직 없거나 오류가 나면 조용히 넘어간다 (손님 화면·현재 접속자에 영향 없음)
+const VISIT_SESSION_GAP_MS = 30 * 60 * 1000;
+const VISIT_TOUCH_MS = 5 * 60 * 1000;
+const BROADCAST_CACHE_MS = 60 * 1000;
+
+let broadcastCache: { at: number; id: number | null } = { at: 0, id: null };
+
+async function currentBroadcastId(supabase: ReturnType<typeof getSupabase>) {
+  if (Date.now() - broadcastCache.at < BROADCAST_CACHE_MS) return broadcastCache.id;
+  try {
+    const { data } = await supabase
+      .from("broadcasts")
+      .select("id,status,is_deleted,started_at")
+      .order("started_at", { ascending: false })
+      .limit(20);
+    const active = ((data || []) as Record<string, unknown>[]).find(
+      (row) => row.is_deleted !== true && String(row.status || "").toUpperCase() === "ON",
+    );
+    const id = active?.id != null ? Number(active.id) : null;
+    broadcastCache = { at: Date.now(), id: Number.isFinite(id as number) ? (id as number) : null };
+  } catch {
+    broadcastCache = { at: Date.now(), id: null };
+  }
+  return broadcastCache.id;
+}
+
+async function recordVisit(
+  supabase: ReturnType<typeof getSupabase>,
+  params: { visitorKey: string; nickname: string; pageType: string; path: string; nowIso: string },
+) {
+  try {
+    const broadcastId = await currentBroadcastId(supabase);
+
+    const { data, error } = await supabase
+      .from("visitor_visits")
+      .select("id,last_seen_at")
+      .eq("visitor_key", params.visitorKey)
+      .order("last_seen_at", { ascending: false })
+      .limit(1);
+
+    if (error) return;   // 표가 아직 없으면 여기서 조용히 끝
+
+    const last = (data || [])[0] as { id?: number; last_seen_at?: string } | undefined;
+    const lastMs = last?.last_seen_at ? Date.parse(last.last_seen_at) : 0;
+    const gap = Date.now() - lastMs;
+
+    if (!last || !lastMs || gap > VISIT_SESSION_GAP_MS) {
+      await supabase.from("visitor_visits").insert({
+        visitor_key: params.visitorKey,
+        nickname: params.nickname || null,
+        page_type: params.pageType,
+        path: params.path || null,
+        broadcast_id: broadcastId,
+        shop_mode: broadcastId ? "live" : "shop",
+        started_at: params.nowIso,
+        last_seen_at: params.nowIso,
+      });
+      return;
+    }
+
+    if (gap > VISIT_TOUCH_MS) {
+      await supabase
+        .from("visitor_visits")
+        .update({ last_seen_at: params.nowIso, ...(params.nickname ? { nickname: params.nickname } : {}) })
+        .eq("id", last.id);
+    }
+  } catch {
+    // 기록 실패는 접속 표시를 막지 않는다.
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
@@ -117,6 +197,9 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
+
+    // 기록은 실패해도 응답을 막지 않는다.
+    await recordVisit(supabase, { visitorKey, nickname, pageType, path, nowIso });
 
     return NextResponse.json({ ok: true, lastSeenAt: nowIso });
   } catch (error) {
