@@ -88,4 +88,51 @@ assert.equal(isSizeLabel("XXL"), true);
   assert.deepEqual(core.sizes, ["230", "240", "250"], "머리글이 사이즈인 형식은 머리글을 그대로 씀");
 }
 
-console.log("test-excel-size-parse: 통과 (11개 검사)");
+// ── ⑦ 색상 칸 걸러내기 (2026-08-29 사장님 승인 A안) ──
+//   원본 「컬러」 칸에는 브랜드(몽클) · 성별(남자) · 중국어 상품설명(女肯长款风衣)이 섞여 있다.
+//   진짜 색상은 「올리브(军绿色）」처럼 한글+괄호(중국어) 형태다.
+{
+  const colorBlock = (no, code, colorLines, sizes, price) => {
+    const out = block(no, code, colorLines[0] || "", sizes, price);
+    colorLines.slice(1).forEach((v, i) => { if (out[i + 1]) out[i + 1][3] = v; });
+    return out;
+  };
+  const rows = [
+    H,
+    ...colorBlock(1, "MC-101M", ["몽클", "남자", "올리브(军绿色）"], ["1", "2", "3", "4", "5"], 165000),
+    ...colorBlock(2, "MC-102M", ["몽클", "남자", "블랙(黑色）"], ["1", "2", "3", "4", "5"], 165000),
+    ...colorBlock(3, "MC-103M", ["몽클", "남자", "베이지(杏色）"], ["1", "2", "3", "4", "5"], 165000),
+    ...colorBlock(4, "MC-51M", ["몽클", "남자"], ["S", "M", "L", "XL"], 139000),
+    ...colorBlock(5, "BB-80", ["女肯长款风衣"], ["4", "6", "8", "10", "12"], 265000),
+    ...colorBlock(6, "ZN-1M", ["제니아 ZEGNA", "남자", "블랙(黑色）"], ["48", "50", "52", "54", "56"], 189000),
+  ];
+  const cfg = autoGuessConfig(rows);
+  const cores = buildDraftCores(rows, cfg);
+  const colorsOf = (code) => (cores.find((c) => (c.code || c.name || "").trim() === code)?.colors || []).join(",");
+
+  assert.equal(colorsOf("MC-101M"), "올리브(军绿色）", "브랜드(몽클)·성별(남자)은 색상이 아님");
+  assert.equal(colorsOf("MC-102M"), "블랙(黑色）");
+  assert.equal(colorsOf("MC-51M"), "", "색상 줄이 없으면 색상 없음 (브랜드명이 색상으로 남으면 안 됨)");
+  assert.equal(colorsOf("BB-80"), "", "중국어 상품설명은 색상이 아님");
+  assert.equal(colorsOf("ZN-1M"), "블랙(黑色）", "브랜드(제니아 ZEGNA)는 색상이 아님");
+
+  // 제외한 값은 숨기지 말고 경고로 보여준다
+  const zn = cores.find((c) => (c.code || c.name || "").trim() === "ZN-1M");
+  assert.ok(zn.warns.some((w) => w.includes("제니아 ZEGNA")), "제외한 값은 미리보기에 표시해야 함");
+}
+
+// ── ⑧ 괄호 없는 평범한 색상만 있는 표는 그대로 살린다 ──
+{
+  const rows = [
+    H,
+    ...block(1, "AA-1", "블랙", ["S", "M", "L"], 39000),
+    ...block(2, "AA-2", "화이트", ["S", "M", "L"], 39000),
+  ];
+  const cfg = autoGuessConfig(rows);
+  const cores = buildDraftCores(rows, cfg);
+  const pick = (code) => cores.find((c) => (c.code || c.name || "").trim() === code);
+  assert.equal(pick("AA-1").colors.join(","), "블랙", "평범한 한글 색상은 그대로");
+  assert.equal(pick("AA-2").colors.join(","), "화이트");
+}
+
+console.log("test-excel-size-parse: 통과 (사이즈 11 + 색상 7 = 18개 검사)");

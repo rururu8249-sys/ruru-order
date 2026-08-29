@@ -95,6 +95,55 @@ export function isSizeLabel(v: unknown): boolean {
   return false;
 }
 
+// ── 색상 칸 걸러내기 (2026-08-29 사장님 승인 A안) ──
+//
+//   왜 필요한가 — 원본 엑셀의 「컬러」 칸에는 색상이 아닌 것이 섞여 있다.
+//     몽클레어 MC-101M 의 컬러 칸 3줄:  「몽클」(브랜드) / 「남자」(성별) / 「올리브(军绿色）」(진짜 색상)
+//     버버리 BB-80 의 컬러 칸:          「女肯长款风衣」(중국어 상품설명 — 색상 아님)
+//   예전에는 이걸 전부 색상으로 등록해서 손님 화면에 「몽클 / 남자 / 올리브」로 나왔다.
+//
+//   규칙 (사장님 지시: 한글 색상만 인정, 브랜드·성별·중국어설명은 버림)
+//     · 한글이 하나도 없으면 색상 아님   → 「女肯长款风衣」 제외
+//     · 성별·구분 낱말이면 색상 아님     → 「남자」「여 女款」「세트」 제외
+//     · 그 줄의 브랜드 이름과 같으면 색상 아님 → 「몽클」「버버리」 제외
+//     · 괄호 안(중국어)은 판정에서 무시한다  → 「올리브(军绿色）」 는 「올리브」로 보고 통과
+export const NON_COLOR_WORDS = [
+  "남자", "여자", "남", "여", "남성", "여성", "공용", "세트", "상의", "하의", "아우터",
+  "키즈", "아동", "신상", "기타",
+];
+
+// 「올리브(军绿色）」처럼 한글 + 괄호(중국어) 로 된 값 = 판매처가 색상으로 쓴 표기
+export function hasColorParen(value: unknown): boolean {
+  return /[가-힣].*[（(][^)）]+[)）]\s*$/.test(norm(value));
+}
+
+export function isLikelyColorValue(value: unknown, brandKo?: string): boolean {
+  const raw = norm(value);
+  if (!raw) return false;
+  if (!/[가-힣]/.test(raw)) return false;                       // 한글 없음 = 중국어 상품설명 등
+  // 괄호 안(중국어)과 한글이 아닌 글자를 떼어내고 본다: 「여 女款」 → 「여」
+  const bare = raw.replace(/[（(][^)）]*[)）]/g, " ").replace(/[^가-힣]/g, " ").replace(/\s+/g, " ").trim();
+  if (!bare) return false;
+  if (NON_COLOR_WORDS.includes(bare)) return false;
+  if (brandKo) {
+    const b = normalizeBrandKorean(bare);
+    const brand = normalizeBrandKorean(brandKo);
+    if (b && brand && (b === brand || brand.startsWith(b) || b.startsWith(brand))) return false;
+  }
+  return true;
+}
+
+// 한 상품에서 나온 색상 후보들 중 진짜 색상만 남긴다.
+//   「올리브(军绿色）」처럼 색상 표기가 하나라도 있으면 그것들만 남기고
+//   「몽클」「제니아 ZEGNA」 같은 브랜드 줄은 버린다.
+//   색상 표기가 하나도 없으면(예: 「블랙」만 적힌 표) 후보를 그대로 둔다.
+export function pickRealColors(candidates: string[]): { kept: string[]; dropped: string[] } {
+  const list = candidates.filter(Boolean);
+  const withParen = list.filter((v) => hasColorParen(v));
+  if (withParen.length === 0) return { kept: list, dropped: [] };
+  return { kept: withParen, dropped: list.filter((v) => !hasColorParen(v)) };
+}
+
 // ── 구조 자동 추측 ──
 export function autoGuessConfig(rows: SheetCell[][]): BulkConfig {
   const scan = Math.min(12, rows.length);
@@ -196,6 +245,9 @@ export function autoGuessConfig(rows: SheetCell[][]): BulkConfig {
 export function buildDraftCores(rows: SheetCell[][], c: BulkConfig, consumedOut?: Set<string>): DraftCore[] {
   const mark = (r1: number, c0: number) => { consumedOut?.add(`${r1}|${c0}`); };
   const list: DraftCore[] = [];
+  // [2026-08-29] 이 표 안에서 한 번이라도 "색상이 아니다"로 판정된 값 (예: 「몽클」「제니아 ZEGNA」)
+  //   같은 표 안의 다른 상품에서도 색상이 아니다. 마지막에 전부 걷어낸다.
+  const sheetNonColors = new Set<string>();
   const headerCells = c.headerRow > 0 ? (rows[c.headerRow - 1] || []) : [];
   const firstDataRow = c.headerRow > 0 ? c.headerRow : 0; // 0-base 기준 시작 위치
 
@@ -283,14 +335,23 @@ export function buildDraftCores(rows: SheetCell[][], c: BulkConfig, consumedOut?
       if (c.colCode >= 0) mark(r, c.colCode);
       const { sizes, colOf } = sizeLabelsFor(r - 1);
       const colors: string[] = [];
+      const droppedColors: string[] = [];
+      // 색상 판정에 쓸 브랜드 이름 — 상품명 앞의 브랜드 표기(예: "몽클레어") 기준
+      const brandKoForColor = normalizeBrandKorean(name);
       const stocks: Record<string, number> = {};
 
       if (c.layout === "block") {
         for (let k = 0; k < c.blockSize; k += 1) {
           const rr = rows[r - 1 + k] || [];
           if (c.colColor >= 0) mark(r + k, c.colColor);
-          const color = c.colColor >= 0 ? norm(rr[c.colColor]) : "";
-          if (!color) continue;
+          const rawColor = c.colColor >= 0 ? norm(rr[c.colColor]) : "";
+          if (!rawColor) continue;
+          // [2026-08-29 A안] 색상이 아닌 값(브랜드명·성별·중국어설명)은 색상으로 등록하지 않는다.
+          if (!isLikelyColorValue(rawColor, brandKoForColor)) {
+            if (!droppedColors.includes(rawColor)) droppedColors.push(rawColor);
+            continue;
+          }
+          const color = rawColor;
           if (!colors.includes(color)) colors.push(color);
           for (const sz of sizes) {
             const cell = rr[colOf[sz]];
@@ -328,12 +389,43 @@ export function buildDraftCores(rows: SheetCell[][], c: BulkConfig, consumedOut?
         }
       }
 
+      const picked = pickRealColors(colors);
+      const allDropped = [...droppedColors, ...picked.dropped];
+      for (const v of allDropped) sheetNonColors.add(v);
+
       list.push({
         row: r, name,
         price: c.colPrice >= 0 ? num(row[c.colPrice]) : 0,
         code: c.colCode >= 0 ? norm(row[c.colCode]) : "",
-        colors, sizes, stocks, warns: [],
+        colors: picked.kept, sizes, stocks,
+        // 색상으로 안 본 값은 숨기지 말고 미리보기에 그대로 보여준다(사장님이 눈으로 확인하도록).
+        warns: allDropped.length > 0 ? [`색상 아님으로 제외: ${allDropped.join(" / ")}`] : [],
       });
+    }
+  }
+
+  // [2026-08-29 A안 마무리] 시트 전체에서 되풀이되는 값은 색상이 아니라 브랜드·구분 줄이다.
+  //   예: 삼촌 파일 「몽클」은 41개 상품 중 25개에 똑같이 들어 있다 → 상품 색상일 수 없다.
+  //   단, 「블랙(黑色）」처럼 색상 표기 형태인 값은 아무리 자주 나와도 건드리지 않는다
+  //   (검정 옷만 파는 날에 색상이 통째로 사라지면 안 되므로).
+  {
+    const freq: Record<string, number> = {};
+    for (const d of list) for (const v of d.colors) freq[v] = (freq[v] || 0) + 1;
+    const limit = Math.max(3, Math.ceil(list.length * 0.4));
+    const commonNonColor = new Set(
+      Object.entries(freq)
+        .filter(([v, n]) => list.length >= 5 && n >= limit && !hasColorParen(v))
+        .map(([v]) => v),
+    );
+    // 색상 표기 형태(「블랙(黑色）」)는 아무리 자주 나와도 색상으로 인정한다.
+    for (const v of sheetNonColors) if (!hasColorParen(v)) commonNonColor.add(v);
+    if (commonNonColor.size > 0) {
+      for (const d of list) {
+        const removed = d.colors.filter((v) => commonNonColor.has(v));
+        if (removed.length === 0) continue;
+        d.colors = d.colors.filter((v) => !commonNonColor.has(v));
+        d.warns.push(`색상 아님으로 제외: ${removed.join(" / ")}`);
+      }
     }
   }
 
