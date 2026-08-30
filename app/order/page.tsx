@@ -1519,6 +1519,9 @@ export default function OrderPage() {
   const [popupNoticeEnabled, setPopupNoticeEnabled] = useState(false);
   const [popupNoticeTitle, setPopupNoticeTitle] = useState("");
   const [popupNoticeText, setPopupNoticeText] = useState("");
+  // [2026-08-30] 띠에 보여줄 한 줄 — 관리자에서 직접 적는다. 비우면 제목/본문 첫 줄로 자동.
+  //   본문 첫 줄이 「해외방송 주문건은」처럼 문장 조각이면 손님이 무슨 말인지 모른다.
+  const [popupNoticeBarLine, setPopupNoticeBarLine] = useState("");
   const [popupNoticeFontSize, setPopupNoticeFontSize] = useState("normal"); // normal | large | xlarge
   const [popupNoticeColor, setPopupNoticeColor] = useState("#7B2D43"); // 제목·확인버튼 강조색
   const [popupBandUrl, setPopupBandUrl] = useState("https://band.us/@ruru8249");
@@ -1527,7 +1530,8 @@ export default function OrderPage() {
   //   ✕ 로 닫아도 "이번 접속에만" 숨긴다(sessionStorage). 다시 들어오면 또 보인다.
   //   중요한 공지를 한 번 닫았다고 영영 못 보면 문의가 늘어난다.
   const [noticeBarHidden, setNoticeBarHidden] = useState(false);
-  const [pwaBannerOn, setPwaBannerOn] = useState(false);
+  // [2026-08-30 사장님 지적] 앱설치 배너가 뜨면 밴드 띠를 접게 했더니 밴드가 아예 안 보였다.
+  //   밴드 노출은 사장님이 실제로 효과를 보신 부분이라 접지 않는다. 대신 띠 높이를 줄였다.
   // [2026-08-11 사고분석] 기본값을 false 로 둔다.
   //   예전엔 true 라서, DB가 느려 설정 조회가 실패하면(1889행 return) 관리자가 OFF 해둬도
   //   손님 화면엔 "직접 입력하기" 버튼이 떠버렸다(8/10 23:25 장애 때 실제로 발생 — 없는 상품 "반바지" 주문 접수).
@@ -2159,6 +2163,7 @@ export default function OrderPage() {
         "popup_notice_enabled",
         "popup_notice_title",
         "popup_notice_text",
+        "popup_notice_bar",
         "popup_notice_fontsize",
         "popup_notice_color",
         "popup_band_url",
@@ -2230,6 +2235,7 @@ export default function OrderPage() {
     const pColor = String((data || []).find((i: any) => i.key === "popup_notice_color")?.value || "").trim() || "#7B2D43";
     setPopupNoticeEnabled(pEnabled);
     setPopupNoticeText(pText);
+    setPopupNoticeBarLine(String((data || []).find((i: any) => i.key === "popup_notice_bar")?.value || "").trim());
     setPopupBandUrl(pBand);
     setPopupNoticeTitle(pTitle);
     setPopupNoticeFontSize(pFont);
@@ -3183,19 +3189,21 @@ export default function OrderPage() {
   }, [hasSavedInfo, broadcastLoaded, orderSheetOpen]);
 
   // 띠에 보여줄 한 줄 — 규칙은 lib/noticeBar.ts (테스트가 같은 함수를 쓴다)
-  const noticeBarText = noticeBarLine(popupNoticeTitle, popupNoticeText);
+  //   관리자에서 「띠 한 줄」을 직접 적어두면 그걸 쓰고, 비어 있으면 제목/본문 첫 줄을 쓴다.
+  const noticeBarText = noticeBarLine(popupNoticeBarLine || popupNoticeTitle, popupNoticeText);
+
+  // [2026-08-30] 「자세히」는 공지·쪽지함을 연다.
+  //   예전엔 팝업을 열고, 그 안에서 「공지·쪽지 전체보기」를 또 눌러야 했다(두 번 누름).
+  //   공지의 집은 쪽지함이다 — 공지와 내 쪽지를 한자리에서 본다.
+  const openNoticeBox = () => {
+    try { window.dispatchEvent(new Event("ruru-open-notice-box")); } catch { setPopupOpen(true); }
+  };
 
   // [2026-08-30] 공지 띠 — 이번 접속에서 닫았는지 복원 + 앱설치 배너가 떠 있는지 구독
   useEffect(() => {
     try {
       if (sessionStorage.getItem("ruru_notice_bar_hidden") === "1") setNoticeBarHidden(true);
     } catch { /* 무시 */ }
-    const onPwa = (e: Event) => setPwaBannerOn(Boolean((e as CustomEvent).detail));
-    try {
-      setPwaBannerOn(Boolean((window as unknown as Record<string, unknown>).__ruruPwaBannerOn));
-    } catch { /* 무시 */ }
-    window.addEventListener("ruru-pwa-banner", onPwa as EventListener);
-    return () => window.removeEventListener("ruru-pwa-banner", onPwa as EventListener);
   }, []);
 
   // 쪽지함(CustomerSiteAlertPopup)이 안 읽은 개수를 알려오면 하단 메뉴 배지에 반영한다.
@@ -5609,18 +5617,18 @@ export default function OrderPage() {
           띠는 최대 두 개까지만 — 앱설치 배너가 떠 있으면 밴드 띠는 접는다(상품이 안 보이면 주문이 준다). */}
       {hasSavedInfo && popupNoticeEnabled && popupNoticeText.trim() && !noticeBarHidden ? (
         <div style={{ background: popupNoticeColor, color: "#fff" }}>
-          <div style={{ margin: "0 auto", width: "100%", maxWidth: "560px", display: "flex", alignItems: "center", gap: "8px", padding: "9px 12px" }}>
+          <div style={{ margin: "0 auto", width: "100%", maxWidth: "560px", display: "flex", alignItems: "center", gap: "8px", padding: "7px 12px" }}>
             <span style={{ flexShrink: 0, fontSize: "14px" }}>📢</span>
             <button
               type="button"
-              onClick={() => setPopupOpen(true)}
+              onClick={openNoticeBox}
               style={{ minWidth: 0, flex: 1, textAlign: "left", border: "none", background: "none", padding: 0, cursor: "pointer", color: "#fff", fontSize: "12.5px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
             >
               {noticeBarText}
             </button>
             <button
               type="button"
-              onClick={() => setPopupOpen(true)}
+              onClick={openNoticeBox}
               style={{ flexShrink: 0, border: "none", background: "rgba(255,255,255,0.22)", color: "#fff", borderRadius: "999px", padding: "5px 11px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}
             >
               자세히
@@ -5642,9 +5650,9 @@ export default function OrderPage() {
 
       {/* 밴드 가입 띠 — 사장님 실측: 노출하면 은근히 많이 가입한다.
           팝업(하루 한 번 몇 초)보다 여기가 접속해 있는 내내 보인다. 닫기는 막지 않는다. */}
-      {hasSavedInfo && popupBandUrl && !pwaBannerOn ? (
+      {hasSavedInfo && popupBandUrl ? (
         <div style={{ background: "#EAFBEF", borderBottom: "1px solid #CDEBD7" }}>
-          <div style={{ margin: "0 auto", width: "100%", maxWidth: "560px", display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px" }}>
+          <div style={{ margin: "0 auto", width: "100%", maxWidth: "560px", display: "flex", alignItems: "center", gap: "8px", padding: "6px 12px" }}>
             <span style={{ flexShrink: 0, fontSize: "13px" }}>🟢</span>
             <span style={{ minWidth: 0, flex: 1, fontSize: "12px", fontWeight: 700, color: "#0B5A24", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               밴드 가입하고 방송 알림 받기

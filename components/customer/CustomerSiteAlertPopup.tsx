@@ -5,6 +5,7 @@ import { noteTimeText, noteAgoText } from "@/lib/noteTime";
 
 type SiteAlert = { id: number; kind: string; title: string; message: string; created_at: string; expires_at: string };
 type BoxItem = SiteAlert & { seen_at?: string | null; dismissed_at?: string | null };
+type BoxTab = "all" | "notice" | "mine";
 type NoticeItem = { id: number; title: string; content: string; category?: string | null; is_pinned?: boolean | null; created_at: string };
 
 // 쪽지 종류에 맞는 아이콘 — 주문 재촉(🛒)과 사장님 쪽지(📩)를 구분한다.
@@ -59,6 +60,9 @@ export default function CustomerSiteAlertPopup() {
   const [noticePopupOpen, setNoticePopupOpen] = useState(false);
   // [2026-08-30] 하단 메뉴에 「공지·쪽지」가 있는 화면이면 🔔 버튼은 숨긴다(중복 + 화면 가림).
   const [noticeMenuOn, setNoticeMenuOn] = useState(false);
+  // [2026-08-30] 게시판형 쪽지함 — 탭 + 하나만 펼치기
+  const [boxTab, setBoxTab] = useState<BoxTab>("all");
+  const [openKey, setOpenKey] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined" || window.location.pathname.startsWith("/admin")) return;
@@ -166,69 +170,139 @@ export default function CustomerSiteAlertPopup() {
               <h2 className="text-[17px] font-black text-slate-950">📬 공지 · 쪽지함</h2>
               <button type="button" onClick={() => setBoxOpen(false)} className="text-lg font-black text-slate-400">✕</button>
             </div>
+            {/* [2026-08-30 사장님 지적] 내용이 전부 펼쳐져 있어서 「내 쪽지」가 아래 있는지 몰랐다.
+                → 게시판처럼 제목만 보이고, 누르면 펼쳐진다. 탭으로 공지/내 쪽지를 나눈다.
+                   안 읽은 쪽지는 처음부터 펼쳐 둔다(놓치면 안 되는 것). */}
+            <div className="flex gap-1.5 border-b border-slate-100 px-4 py-2.5">
+              {([
+                { key: "all", label: "전체", n: unread },
+                { key: "notice", label: "공지", n: 0 },
+                { key: "mine", label: "내 쪽지", n: unread },
+              ] as { key: BoxTab; label: string; n: number }[]).map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setBoxTab(t.key)}
+                  className={`rounded-full px-3.5 py-1.5 text-[12.5px] font-black transition ${boxTab === t.key ? "bg-[#7B2D43] text-white" : "bg-slate-100 text-slate-500"}`}
+                >
+                  {t.label}
+                  {t.n > 0 ? (
+                    <span className={`ml-1 rounded-full px-1.5 text-[10px] ${boxTab === t.key ? "bg-white/25 text-white" : "bg-red-500 text-white"}`}>{t.n}</span>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-              {/* [2026-08-30 회귀 복구] 쇼핑 전 꼭 확인 — 설정 → 주문서 표시 → 「주문서 공지 문구」.
-                  사이즈 오차·교환반품 비용처럼 늘 해당되는 안내라 항상 맨 위에 둔다. */}
-              {shopGuide ? (
-                <div className="mb-3">
-                  <div className="mb-1.5 px-1 text-[11px] font-black tracking-wide text-slate-400">📌 쇼핑 전 꼭 확인</div>
-                  <div className="rounded-2xl border border-[#E7D2DA] bg-[#FBF3F6] p-3.5">
-                    <p className="whitespace-pre-line text-[13px] font-bold leading-6 text-slate-700">{shopGuide}</p>
+              {/* 쇼핑 전 꼭 확인 — 늘 해당되는 안내(사이즈 오차·교환반품 비용). 접어 둔다. */}
+              {shopGuide && boxTab !== "mine" ? (
+                <button
+                  type="button"
+                  onClick={() => setOpenKey(openKey === "guide" ? "" : "guide")}
+                  className="mb-2 w-full rounded-2xl border border-[#E7D2DA] bg-[#FBF3F6] p-3.5 text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">📌</span>
+                    <span className="min-w-0 flex-1 text-[14px] font-black text-slate-900">쇼핑 전 꼭 확인</span>
+                    <span className="shrink-0 text-[11px] font-black text-slate-400">{openKey === "guide" ? "접기 ▲" : "펼치기 ▼"}</span>
                   </div>
-                </div>
+                  {openKey === "guide" ? (
+                    <p className="mt-2 whitespace-pre-line text-[13px] font-bold leading-6 text-slate-700">{shopGuide}</p>
+                  ) : (
+                    <p className="mt-1 truncate text-[12px] font-bold text-slate-400">{shopGuide.replace(/\s+/g, " ")}</p>
+                  )}
+                </button>
               ) : null}
 
-              {/* 공지사항 — 상단 고정. notices 표의 is_pinned 가 먼저 온다(관리자 공지 화면에서 이미 쓰는 기능). */}
-              {notices.length > 0 ? (
-                <div className="mb-3">
-                  <div className="mb-1.5 px-1 text-[11px] font-black tracking-wide text-slate-400">공지사항</div>
-                  <ul className="space-y-2">
-                    {notices.map((n) => (
-                      <li key={`n-${n.id}`} className="rounded-2xl border border-[#E7D2DA] bg-[#FBF3F6] p-3.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-base">{n.is_pinned ? "📌" : "📢"}</span>
-                          <span className="min-w-0 flex-1 truncate text-[14px] font-black text-slate-900">{n.title}</span>
-                          {n.is_pinned ? <span className="shrink-0 rounded-full bg-[#7B2D43] px-2 py-0.5 text-[10px] font-black text-white">고정</span> : null}
-                        </div>
-                        <p className="mt-1.5 whitespace-pre-line text-[13px] font-bold leading-6 text-slate-600">{n.content}</p>
-                        <div className="mt-1.5 text-[11px] font-bold text-slate-400">
-                          {timeText(n.created_at)}{agoText(n.created_at) ? ` · ${agoText(n.created_at)}` : ""}
-                        </div>
+              {/* 공지사항 — 제목만. 누르면 펼쳐진다. */}
+              {boxTab !== "mine" && notices.length > 0 ? (
+                <ul className="mb-2 space-y-2">
+                  {notices.map((n) => {
+                    const k = `n-${n.id}`;
+                    const on = openKey === k;
+                    return (
+                      <li key={k}>
+                        <button
+                          type="button"
+                          onClick={() => setOpenKey(on ? "" : k)}
+                          className="w-full rounded-2xl border border-[#E7D2DA] bg-[#FBF3F6] p-3.5 text-left"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">{n.is_pinned ? "📌" : "📢"}</span>
+                            <span className="min-w-0 flex-1 truncate text-[14px] font-black text-slate-900">{n.title}</span>
+                            {n.is_pinned ? <span className="shrink-0 rounded-full bg-[#7B2D43] px-2 py-0.5 text-[10px] font-black text-white">고정</span> : null}
+                            <span className="shrink-0 text-[11px] font-black text-slate-400">{on ? "▲" : "▼"}</span>
+                          </div>
+                          {on ? (
+                            <>
+                              <p className="mt-2 whitespace-pre-line text-[13px] font-bold leading-6 text-slate-700">{n.content}</p>
+                              <div className="mt-1.5 text-[11px] font-bold text-slate-400">
+                                {timeText(n.created_at)}{agoText(n.created_at) ? ` · ${agoText(n.created_at)}` : ""}
+                              </div>
+                            </>
+                          ) : (
+                            <p className="mt-1 truncate text-[12px] font-bold text-slate-400">{String(n.content ?? "").replace(/\s+/g, " ")}</p>
+                          )}
+                        </button>
                       </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-
-              {notices.length > 0 && box.length > 0 ? (
-                <div className="mb-1.5 px-1 text-[11px] font-black tracking-wide text-slate-400">내 쪽지</div>
-              ) : null}
-
-              {box.length === 0 && notices.length === 0 && !shopGuide ? (
-                <div className="py-12 text-center text-sm font-bold text-slate-400">받은 쪽지가 없어요.</div>
-              ) : box.length === 0 ? null : (
-                <ul className="space-y-2">
-                  {box.map((b) => (
-                    <li key={b.id} className={`rounded-2xl border p-3.5 ${b.seen_at ? "border-slate-100 bg-white" : "border-rose-200 bg-rose-50/60"}`}>
-                      <div className="flex items-center gap-2">
-                        <span className="text-base">{iconOf(b.kind)}</span>
-                        <span className="min-w-0 flex-1 truncate text-[14px] font-black text-slate-900">{b.title}</span>
-                        {/* [2026-08-30 사장님 지적] 읽음/안읽음이 눈에 안 들어온다 → 글자로 확실히 */}
-                        {b.seen_at ? (
-                          <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-400">읽음</span>
-                        ) : (
-                          <span className="shrink-0 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white">안 읽음</span>
-                        )}
-                      </div>
-                      <p className="mt-1.5 whitespace-pre-line text-[13px] font-bold leading-6 text-slate-600">{b.message}</p>
-                      <div className="mt-1.5 text-[11px] font-bold text-slate-400">
-                        받은 날짜 {timeText(b.created_at)}{agoText(b.created_at) ? ` · ${agoText(b.created_at)}` : ""}
-                        {b.seen_at ? <span className="ml-1 text-slate-300">· 읽은 날짜 {timeText(b.seen_at)}</span> : null}
-                      </div>
-                    </li>
-                  ))}
+                    );
+                  })}
                 </ul>
-              )}
+              ) : null}
+
+              {/* 내 쪽지 — 안 읽은 것은 펼친 채로 시작한다. */}
+              {boxTab !== "notice" ? (
+                box.length === 0 ? (
+                  boxTab === "mine" ? (
+                    <div className="py-12 text-center text-sm font-bold text-slate-400">받은 쪽지가 없어요.</div>
+                  ) : null
+                ) : (
+                  <ul className="space-y-2">
+                    {box.map((b) => {
+                      const k = `b-${b.id}`;
+                      const on = openKey === k || (!openKey && !b.seen_at);
+                      return (
+                        <li key={k}>
+                          <button
+                            type="button"
+                            onClick={() => setOpenKey(on ? `close-${k}` : k)}
+                            className={`w-full rounded-2xl border p-3.5 text-left ${b.seen_at ? "border-slate-100 bg-white" : "border-rose-200 bg-rose-50/60"}`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="text-base">{iconOf(b.kind)}</span>
+                              <span className="min-w-0 flex-1 truncate text-[14px] font-black text-slate-900">{b.title}</span>
+                              {b.seen_at ? (
+                                <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-400">읽음</span>
+                              ) : (
+                                <span className="shrink-0 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white">안 읽음</span>
+                              )}
+                              <span className="shrink-0 text-[11px] font-black text-slate-400">{on ? "▲" : "▼"}</span>
+                            </div>
+                            {on ? (
+                              <>
+                                <p className="mt-2 whitespace-pre-line text-[13px] font-bold leading-6 text-slate-600">{b.message}</p>
+                                <div className="mt-1.5 text-[11px] font-bold text-slate-400">
+                                  받은 날짜 {timeText(b.created_at)}{agoText(b.created_at) ? ` · ${agoText(b.created_at)}` : ""}
+                                  {b.seen_at ? <span className="ml-1 text-slate-300">· 읽은 날짜 {timeText(b.seen_at)}</span> : null}
+                                </div>
+                              </>
+                            ) : (
+                              <p className="mt-1 truncate text-[12px] font-bold text-slate-400">{String(b.message ?? "").replace(/\s+/g, " ")}</p>
+                            )}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )
+              ) : null}
+
+              {boxTab === "all" && box.length === 0 && notices.length === 0 && !shopGuide ? (
+                <div className="py-12 text-center text-sm font-bold text-slate-400">받은 쪽지가 없어요.</div>
+              ) : null}
+              {boxTab === "notice" && notices.length === 0 && !shopGuide ? (
+                <div className="py-12 text-center text-sm font-bold text-slate-400">등록된 공지가 없어요.</div>
+              ) : null}
             </div>
             <div className="border-t border-slate-100 p-4">
               <button

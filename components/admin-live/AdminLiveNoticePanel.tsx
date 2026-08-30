@@ -17,12 +17,14 @@ import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { NOTE_PRESETS, safeSearchTerm } from "@/lib/customerNotePresets";
 import { noteTimeText } from "@/lib/noteTime";
+import { noticeBarLine } from "@/lib/noticeBar";
 
 /** 이 화면이 저장하는 키 — 여기 없는 키는 절대 건드리지 않는다. */
 const NOTICE_KEYS = [
   "popup_notice_enabled",
   "popup_notice_title",
   "popup_notice_text",
+  "popup_notice_bar",
   "popup_notice_fontsize",
   "popup_notice_color",
   "popup_band_url",
@@ -66,6 +68,9 @@ export default function AdminLiveNoticePanel() {
   const [popupEnabled, setPopupEnabled] = useState(false);
   const [popupTitle, setPopupTitle] = useState("");
   const [popupText, setPopupText] = useState("");
+  // [2026-08-30 사장님 지적] 띠에 본문 첫 줄이 그대로 나가서 「해외방송 주문건은」 처럼 잘렸다.
+  //   띠에 나갈 한 줄은 따로 적는다. 비우면 예전처럼 제목/본문 첫 줄로 자동.
+  const [barLine, setBarLine] = useState("");
   const [popupFont, setPopupFont] = useState("normal");
   const [popupColor, setPopupColor] = useState("#7B2D43");
   const [popupBandUrl, setPopupBandUrl] = useState(DEFAULT_BAND_URL);
@@ -105,6 +110,7 @@ export default function AdminLiveNoticePanel() {
         setPopupEnabled(clean(get("popup_notice_enabled")) === "true");
         setPopupTitle(String(get("popup_notice_title") ?? ""));
         setPopupText(String(get("popup_notice_text") ?? ""));
+        setBarLine(String(get("popup_notice_bar") ?? ""));
         setPopupFont(clean(get("popup_notice_fontsize")) || "normal");
         setPopupColor(clean(get("popup_notice_color")) || "#7B2D43");
         setPopupBandUrl(clean(get("popup_band_url")) || DEFAULT_BAND_URL);
@@ -124,6 +130,7 @@ export default function AdminLiveNoticePanel() {
           { key: "popup_notice_enabled", value: popupEnabled ? "true" : "false" },
           { key: "popup_notice_title", value: popupTitle.trim() },
           { key: "popup_notice_text", value: popupText },
+          { key: "popup_notice_bar", value: barLine.trim() },
           { key: "popup_notice_fontsize", value: popupFont },
           { key: "popup_notice_color", value: popupColor },
           { key: "popup_band_url", value: popupBandUrl.trim() },
@@ -378,6 +385,29 @@ export default function AdminLiveNoticePanel() {
                 >
                   {popupEnabled ? "팝업 ON" : "팝업 OFF"}
                 </button>
+              </div>
+
+              {/* 띠 한 줄 — 손님이 맨 처음 보는 문장이라 여기가 제일 중요하다 */}
+              <div className="mt-3 rounded-xl border border-rose-line bg-rose-soft/40 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[12px] font-black text-ink">📢 띠에 보여줄 한 줄</span>
+                  <span className={`text-[11px] font-black ${barLine.trim().length > 30 ? "text-danger-tx" : "text-ink-mute"}`}>
+                    {barLine.trim().length} / 30자
+                  </span>
+                </div>
+                <input
+                  value={barLine}
+                  onChange={(e) => setBarLine(e.target.value)}
+                  placeholder="예) 해외배송은 9/2 이후 순차 발송돼요"
+                  className={input}
+                />
+                <div className="mt-2 rounded-lg px-2.5 py-1.5" style={{ background: popupColor }}>
+                  <span className="text-[11.5px] font-bold text-white">📢 {noticeBarLine(barLine || popupTitle, popupText)}</span>
+                </div>
+                <span className={help}>
+                  손님 화면 맨 위에 <b>이 한 줄</b>만 보입니다. 비우면 제목이나 본문 첫 줄이 자동으로 들어가는데,
+                  문장 중간에서 잘릴 수 있으니 <b>직접 적는 편이 좋습니다.</b> 30자를 넘으면 「…」로 잘립니다.
+                </span>
               </div>
 
               <label className="mt-3 block">
