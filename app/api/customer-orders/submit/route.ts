@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { assertValidCustomerPointPhone } from "@/lib/customerPoints";
 import { registeredProductPriceMode, registeredProductSubmittedPriceValid } from "@/lib/registeredProductPricePolicy";
 import { buildYoutubeOrderAnnouncementMessages } from "@/lib/orderYoutubeAnnouncement";
+import { koreanPhoneVariants } from "@/lib/order/phone";
 import {
   canonicalCustomerDetailProductName,
   customerDetailInputEnabled,
@@ -451,12 +452,12 @@ async function assertShippingFeeNotSkipped(
   //   "이 주소로 주문이 처음인 손님"은 손님 화면이 배송비를 100% 부과하므로(1448~1450행) 0원일 수가 없다.
   // orders.customer_phone 은 하이픈 있는 값과 없는 값이 섞여 저장돼 있어 둘 다로 조회한다
   //   (손님 화면 checkAlreadyPaidShippingGroups 2404행과 동일).
+  // [2026-08-31] 예전 식은 010(11자리) 기준으로만 하이픈을 만들어
+  //   10자리(0264906376→026-4906-376)·9자리 번호가 틀린 형태가 됐다.
+  //   → 이전 주문을 못 찾아 합배송 손님이 "배송비가 빠져 있어요"로 부당하게 막혔다.
+  //   koreanPhoneVariants 는 숫자/옛 하이픈/새 하이픈을 모두 만든다(같은 번호의 표기들뿐이라 안전).
   const digits = phone.replace(/[^0-9]/g, "").slice(0, 11);
-  const hyphenated =
-    digits.length > 7
-      ? `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}`
-      : digits;
-  const phoneValues = Array.from(new Set([phone, digits, hyphenated].filter(Boolean)));
+  const phoneValues = Array.from(new Set([phone, ...koreanPhoneVariants(digits)].filter(Boolean)));
 
   const { data, error } = await supabase
     .from("orders")
@@ -553,13 +554,16 @@ async function assertPurchaseLimit(
 
     if (safeKakaoId && safePhone) {
       // kakao_id 일치 OR (kakao_id 없는 옛 주문 + 현재 전화번호)
+      // [2026-08-31] 하이픈으로 저장된 옛 주문도 구매수량에 합산되도록 모든 표기로 찾는다.
+      //   (범위를 넓히면 제한이 "더 정확히" 걸릴 뿐, 느슨해지는 방향이 아니다)
+      const limitPhoneValues = koreanPhoneVariants(safePhone);
       priorQuery = priorQuery.or(
-        `kakao_id.eq.${safeKakaoId},and(kakao_id.is.null,customer_phone.eq.${safePhone})`
+        `kakao_id.eq.${safeKakaoId},and(kakao_id.is.null,customer_phone.in.(${limitPhoneValues.join(",")}))`
       );
     } else if (safeKakaoId) {
       priorQuery = priorQuery.eq("kakao_id", safeKakaoId);
     } else {
-      priorQuery = priorQuery.eq("customer_phone", safePhone);
+      priorQuery = priorQuery.in("customer_phone", koreanPhoneVariants(safePhone));
     }
 
     const { data: priorRows, error: priorError } = await priorQuery;

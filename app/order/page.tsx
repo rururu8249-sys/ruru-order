@@ -46,6 +46,7 @@ import {
   CUSTOMER_ORDER_LOOKUP_LIMIT,
   customerOrderLookupSinceIso,
   buildOrderLookupOrFilter,
+  orderLookupPhoneValues,
 } from "@/lib/customerOrderLookup";
 import { brandWordmarkThumbnail, normalizeBrandKorean } from "@/lib/brandWordmarkThumbnail";
 import {
@@ -4307,14 +4308,23 @@ export default function OrderPage() {
       if (Array.isArray(byKakao) && byKakao.length > 0) targetRowId = (byKakao[0] as any).id;
     }
 
+    let adoptKakaoId = false; // 폴백으로 찾은 줄에 카카오 계정이 비어 있으면 이번에 심는다
+
     if (targetRowId === null) {
       const { data: rows, error: findError } = await supabase
         .from("customers")
-        .select("id")
+        .select("id, kakao_id")
         .eq("customer_phone", lookupPhone)
         .limit(1);
       if (findError) throw findError;
-      if (rows && rows.length > 0) targetRowId = (rows[0] as any).id;
+      if (rows && rows.length > 0) {
+        targetRowId = (rows[0] as any).id;
+        // [2026-08-31 재검산 보강] 옛 회원(카카오 도입 전) 줄을 번호로 찾았을 때
+        //   카카오 계정을 안 심으면 다음에도 계속 번호로만 찾게 되어 갈라질 여지가 남는다.
+        //   비어 있을 때만 심는다 — 다른 카카오 계정이 이미 있으면 남의 줄이므로 건드리지 않는다.
+        const rowKakao = String((rows[0] as any).kakao_id || "").trim();
+        if (kakaoIdForSave && !rowKakao) adoptKakaoId = true;
+      }
     }
 
     if (targetRowId !== null) {
@@ -4327,8 +4337,9 @@ export default function OrderPage() {
         .neq("id", targetRowId)
         .limit(1);
 
-      const patch = { ...customerData };
+      const patch: any = { ...customerData };
       if (Array.isArray(conflict) && conflict.length > 0) delete patch.customer_phone;
+      if (adoptKakaoId) patch.kakao_id = kakaoIdForSave;
 
       const { error } = await supabase.from("customers").update(patch).eq("id", targetRowId);
       if (error) throw error;
@@ -5057,7 +5068,7 @@ export default function OrderPage() {
       .gte("created_at", customerOrderLookupSinceIso());
     lookupQuery = lookupOrFilter
       ? lookupQuery.or(lookupOrFilter)
-      : lookupQuery.eq("customer_phone", cleanPhone);
+      : lookupQuery.in("customer_phone", orderLookupPhoneValues(cleanPhone));
 
     const { data, error } = await lookupQuery
       .order("created_at", { ascending: false })

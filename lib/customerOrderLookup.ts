@@ -1,3 +1,4 @@
+import { koreanPhoneVariants } from "./order/phone";
 // [2026-08-29] 손님 「주문내역」 조회 규칙 — 두 화면이 같은 규칙을 쓰도록 한 곳에 모은다.
 //
 // 문제 (실제 신고: 루루짱929 님이 본인 주문내역이 안 보인다고 하심)
@@ -43,13 +44,25 @@ export function normalizeLookupPhone(raw: unknown): string {
   return String(raw ?? "").replace(/[^0-9]/g, "");
 }
 
+// [2026-08-31 실사고] "주문내역이 안 보인다"는 문의가 반복됐다.
+//   orders.customer_phone 은 숫자만("01012345678")과 하이픈("010-1234-5678")이 섞여 저장돼 있는데
+//   (제출 API app/api/customer-orders/submit/route.ts 주석에 명시된 사실),
+//   조회는 숫자만으로 정확 일치할 때만 찾았다 → 하이픈으로 저장된 옛 주문이 통째로 안 보였다.
+//   → 같은 번호의 모든 저장 형식(숫자/옛 하이픈/새 하이픈)으로 찾는다.
+//   값은 숫자와 하이픈뿐이라 PostgREST in() 문자열에 안전하다.
+export function orderLookupPhoneValues(phoneRaw: unknown): string[] {
+  const phone = normalizeLookupPhone(phoneRaw);
+  if (!phone) return [];
+  return koreanPhoneVariants(phone);
+}
+
 // Supabase .or() 에 넣을 문자열.
-//   kakao_id 가 있으면: 내 카카오 주문 전부 + (카카오ID 없는 옛 주문 중 내 번호)
-//   없으면 null 을 돌려주고, 호출부가 .eq("customer_phone", ...) 로 폴백한다.
+//   kakao_id 가 있으면: 내 카카오 주문 전부 + (카카오ID 없는 옛 주문 중 내 번호의 모든 저장형식)
+//   없으면 null 을 돌려주고, 호출부가 .in("customer_phone", orderLookupPhoneValues(...)) 로 폴백한다.
 export function buildOrderLookupOrFilter(kakaoIdRaw: unknown, phoneRaw: unknown): string | null {
   const kakaoId = normalizeLookupKakaoId(kakaoIdRaw);
-  const phone = normalizeLookupPhone(phoneRaw);
+  const phoneValues = orderLookupPhoneValues(phoneRaw);
   if (!kakaoId) return null;
-  if (!phone) return `kakao_id.eq.${kakaoId}`;
-  return `kakao_id.eq.${kakaoId},and(kakao_id.is.null,customer_phone.eq.${phone})`;
+  if (phoneValues.length === 0) return `kakao_id.eq.${kakaoId}`;
+  return `kakao_id.eq.${kakaoId},and(kakao_id.is.null,customer_phone.in.(${phoneValues.join(",")}))`;
 }

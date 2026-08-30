@@ -20,6 +20,7 @@ import {
   CUSTOMER_ORDER_LOOKUP_LIMIT,
   customerOrderLookupSinceIso,
   buildOrderLookupOrFilter,
+  orderLookupPhoneValues,
 } from "@/lib/customerOrderLookup";
 import CustomerTopNav from "@/components/customer/CustomerTopNav";
 import MyOrderPageHero from "@/components/myorder/MyOrderPageHero";
@@ -251,8 +252,8 @@ export default function MyOrderPage() {
       // 카카오 로그인: kakao_id 일치(주문에 찍힌 것) OR 옛 주문(kakao_id 없음)은 전화번호로 폴백 → 누락 없이 둘 다.
       query = query.or(orFilter);
     } else {
-      // 카카오 정체성이 없으면(레거시/비카카오) 기존 방식 유지.
-      query = query.eq("customer_phone", cleanPhone);
+      // 카카오 정체성이 없으면(레거시/비카카오) 번호로 — 모든 저장형식(숫자/하이픈)으로 찾는다.
+      query = query.in("customer_phone", orderLookupPhoneValues(cleanPhone));
       if (useLegacyNameFilter) {
         query = query.eq("customer_name", name);
       }
