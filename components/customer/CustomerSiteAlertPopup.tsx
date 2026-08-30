@@ -217,7 +217,8 @@ export default function CustomerSiteAlertPopup() {
       {/* 쪽지함 목록 */}
       {boxOpen ? (
         <div className="fixed inset-0 z-[490] flex items-end justify-center bg-black/50" onClick={(e) => { if (e.target === e.currentTarget) { setBoxOpen(false); setDetail(null); } }}>
-          <div className="flex max-h-[76vh] w-full max-w-[480px] flex-col overflow-hidden rounded-t-[26px] bg-white">
+          {/* [2026-08-31 사장님 지적] 내용 양에 따라 창이 커졌다 작아졌다 정신없음 → 높이 76vh 고정, 목록만 안에서 스크롤 */}
+          <div className="flex h-[76vh] w-full max-w-[480px] flex-col overflow-hidden rounded-t-[26px] bg-white">
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
               <h2 className="text-[17px] font-black text-slate-950">📬 공지 · 쪽지함</h2>
               <button type="button" onClick={() => { setBoxOpen(false); setDetail(null); }} className="text-lg font-black text-slate-400">✕</button>

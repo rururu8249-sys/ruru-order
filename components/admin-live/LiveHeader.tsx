@@ -3,6 +3,10 @@
 import { useMemo, useState } from "react";
 import type { AdminLiveBroadcast } from "./liveBroadcastController";
 import { formatBroadcastTime } from "./liveBroadcastController";
+import { supabase } from "@/lib/supabase";
+import { showAdminToast } from "@/lib/adminToast";
+import { buildChatAnnounceText } from "@/lib/chatAnnounce";
+import { buildDetailChatLine, detailProducts } from "@/lib/productDetailModel";
 
 type VideoRatio = "vertical" | "wide" | "auto";
 
@@ -57,6 +61,47 @@ export default function LiveHeader({
   const [titleSavedAt, setTitleSavedAt] = useState("");
   const [urlAppliedAt, setUrlAppliedAt] = useState("");
   const [editOpen, setEditOpen] = useState(false);
+
+  // [2026-08-31 사장님 요청] 지금 고정된 상품의 채팅 안내문구를 어디서든 재복사 —
+  //   상품관리 📢 채팅 버튼과 같은 문구(lib/chatAnnounce 공용). 복사만 한다(채팅봇 현재상품·고정은 안 건드림).
+  //   중간에 다른 걸 복사해서 클립보드가 날아가도 여기서 한 번에 되살린다.
+  const [copyingCurrent, setCopyingCurrent] = useState(false);
+  const [currentCopied, setCurrentCopied] = useState(false);
+  const copyCurrentProductLine = async () => {
+    if (!activeBroadcast?.id || copyingCurrent) return;
+    setCopyingCurrent(true);
+    try {
+      const { data: bc } = await supabase
+        .from("broadcasts")
+        .select("widget_pin_mode,widget_pin_product_id,widget_pin_detail_name")
+        .eq("id", activeBroadcast.id)
+        .maybeSingle();
+      const row = bc as Record<string, unknown> | null;
+      const pid = String(row?.widget_pin_product_id ?? "").trim();
+      if (String(row?.widget_pin_mode || "auto") !== "pin" || !pid) {
+        showAdminToast("고정된 현재상품이 없습니다.\n\n상품 관리에서 「▶ 방송」 또는 「📌 고정」을 먼저 눌러주세요.", "warning");
+        return;
+      }
+      const { data: prow } = await supabase.from("products").select("*").eq("id", pid).maybeSingle();
+      if (!prow) { showAdminToast("고정된 상품을 찾지 못했습니다.", "error"); return; }
+      const detailName = String(row?.widget_pin_detail_name ?? "").trim();
+      let line = "";
+      if (detailName) {
+        const d = detailProducts(prow as never, { includeHidden: true }).find((x) => x.detailName === detailName);
+        if (d) line = buildDetailChatLine(d);
+      }
+      if (!line) line = buildChatAnnounceText(prow as Record<string, unknown>).replace(/[\r\n]+/g, " ").trim();
+      const text = `✅ ${line}`;
+      await navigator.clipboard.writeText(text);
+      setCurrentCopied(true);
+      window.setTimeout(() => setCurrentCopied(false), 1800);
+      showAdminToast(`현재상품 문구 복사 완료\n\n${text}`, "success");
+    } catch (e) {
+      showAdminToast("현재상품 문구 복사 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally {
+      setCopyingCurrent(false);
+    }
+  };
 
   // 방송알림: 대상(신청자/전체) 선택 + 이미 받은 사람 제외(증분) + 미리보기
   const [alertOpen, setAlertOpen] = useState(false);
@@ -196,6 +241,19 @@ export default function LiveHeader({
         <span className="hidden text-ink-mute md:inline">· 주문묶음=방송 시작~종료 기준</span>
 
         <div className="ml-auto flex items-center gap-2">
+          {/* [2026-08-31 사장님 요청] 현재 고정 상품 안내문구 재복사 — 상품관리 안 열고도 원클릭 */}
+          <button
+            type="button"
+            disabled={!activeBroadcast || copyingCurrent}
+            onClick={() => void copyCurrentProductLine()}
+            className={[
+              "h-7 rounded-lg px-2.5 text-[11px] font-black transition disabled:cursor-not-allowed disabled:opacity-40",
+              currentCopied ? "bg-emerald-600 text-white" : "bg-rose-soft text-rose-deep",
+            ].join(" ")}
+            title={activeBroadcast ? "지금 고정된 상품의 채팅 안내문구를 다시 복사합니다 — 유튜브 채팅에 붙여넣기만 하세요" : "방송 중에만 사용할 수 있습니다"}
+          >
+            {copyingCurrent ? "복사 중…" : currentCopied ? "✔ 복사됨" : "📢 현재상품 복사"}
+          </button>
           {/* [2026-07-12] 위젯 상품카드 ON/OFF — 방송 중에만 활성. 카드만 숨김(위젯 투명), 배너는 PRISM 소스라 무관 */}
           <button
             type="button"
