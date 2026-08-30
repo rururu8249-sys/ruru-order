@@ -10,7 +10,7 @@ export default function MyOrderEmptyState() {
       </div>
 
       <h2 className="mt-4 text-[22px] font-black tracking-[-0.06em] text-[#151923]">
-        최근 7일 주문내역이 없습니다
+        최근 6개월 주문내역이 없습니다
       </h2>
 
       <p className="mt-2 break-keep text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">

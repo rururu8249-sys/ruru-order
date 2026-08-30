@@ -22,7 +22,7 @@ export default function MyOrderPageHero({
       <div className="flex items-end justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[12px] font-black tracking-[-0.04em] text-blue-700">
-            최근 7일
+            최근 6개월
           </p>
           <h1 className="mt-0.5 text-[24px] font-black leading-tight tracking-[-0.07em] text-slate-950">
             주문조회
@@ -46,7 +46,7 @@ export default function MyOrderPageHero({
       ) : (
         <div className="mt-3 rounded-[18px] bg-white px-4 py-3 ring-1 ring-slate-200">
           <p className="break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
-            주문조회는 저장된 전화번호 기준으로 최근 7일 주문내역을 확인합니다.
+            주문조회는 저장된 전화번호 기준으로 최근 6개월 주문내역을 확인합니다.
           </p>
         </div>
       )}

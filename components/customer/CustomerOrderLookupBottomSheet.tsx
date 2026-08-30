@@ -114,7 +114,7 @@ export default function CustomerOrderLookupBottomSheet({
           <header style={{ flexShrink: 0, padding: "16px 16px 8px" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: "8px", whiteSpace: "nowrap" }}>
               <h2 style={{ fontSize: "26px", fontWeight: 800, lineHeight: 1, letterSpacing: "-0.08em", color: "#7B2D43" }}>주문조회</h2>
-              <span style={{ fontSize: "12px", fontWeight: 800, color: "#999" }}>최근 7일 주문내역</span>
+              <span style={{ fontSize: "12px", fontWeight: 800, color: "#999" }}>최근 6개월 주문내역</span>
             </div>
 
             <div style={{ marginTop: "14px", display: "grid", gridTemplateColumns: `repeat(${filters.length}, 1fr)`, borderRadius: "14px", background: "#F5F1F2", padding: "4px", gap: "2px" }}>

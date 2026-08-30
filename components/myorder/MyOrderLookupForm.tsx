@@ -23,7 +23,7 @@ export default function MyOrderLookupForm({
     <section className="rounded-[26px] bg-white p-4 shadow-[0_12px_28px_rgba(30,64,175,0.08)] ring-1 ring-blue-100 min-[390px]:rounded-[28px] min-[390px]:p-5">
       <div className="mb-4">
         <h2 className="break-keep text-[21px] font-black leading-tight tracking-[-0.055em] text-[#151923] min-[390px]:text-[22px]">
-          최근 7일 주문조회
+          최근 6개월 주문조회
         </h2>
 
         <p className="mt-1 break-keep text-sm font-bold leading-relaxed text-slate-600">
