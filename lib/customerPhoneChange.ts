@@ -20,6 +20,12 @@ export function phoneVariants(d: string): string[] {
   else if (digits.length === 10) set.add(`${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`);
   // 서울 9자리 (02-777-1234)
   else if (digits.length === 9 && digits.startsWith("02")) set.add(`${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`);
+
+  // [2026-08-30] 서울 10자리는 옛 저장분("026-4906-376")과 새 표기("02-6490-6376")가 섞인다.
+  //   번호 변경 때 옛 주문을 놓치면 안 되므로 두 형태를 모두 후보에 넣는다.
+  if (digits.length === 10 && digits.startsWith("02")) {
+    set.add(`${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6)}`);
+  }
   return [...set];
 }
 

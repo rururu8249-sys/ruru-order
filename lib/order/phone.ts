@@ -29,11 +29,24 @@ export const normalizeOrderPhone = (value: string) => {
   return onlyOrderPhoneDigits(value);
 };
 
+// [2026-08-30 손님 화면 오표기] 02-6490-6376 이 "026-4906-376" 으로 보였다.
+//   010 기준(앞 3자리)으로만 쪼개고 있었기 때문. 일반전화를 열었으니 지역번호도 제대로 쪼갠다.
+//   · 02  → 02-6490-6376 (10자리) / 02-777-1234 (9자리)
+//   · 그 밖 → 010-1234-5678 (11자리) / 031-668-0167 (10자리)
+//   입력 도중(자릿수가 덜 찬 상태)에도 깨지지 않아야 한다.
 export const formatOrderPhone = (value: string) => {
   const numbers = onlyOrderPhoneDigits(value);
 
+  if (numbers.startsWith("02")) {
+    if (numbers.length <= 2) return numbers;
+    if (numbers.length <= 5) return `${numbers.slice(0, 2)}-${numbers.slice(2)}`;
+    if (numbers.length <= 9) return `${numbers.slice(0, 2)}-${numbers.slice(2, 5)}-${numbers.slice(5)}`;
+    return `${numbers.slice(0, 2)}-${numbers.slice(2, 6)}-${numbers.slice(6, 10)}`;
+  }
+
   if (numbers.length <= 3) return numbers;
   if (numbers.length <= 7) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+  if (numbers.length === 10) return `${numbers.slice(0, 3)}-${numbers.slice(3, 6)}-${numbers.slice(6)}`;
 
   return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
 };

@@ -71,5 +71,17 @@ eq(normalizeOrderPhone("821234"), "821234", "82 로 시작해도 너무 짧으�
   console.log("\n집·사무실 전화 허용 테스트 통과");
 }
 
+
+console.log("\n── [2026-08-30] 화면 표기 (손님이 026-4906-376 을 보던 버그) ──");
+eq(formatOrderPhone("0264906376"),  "02-6490-6376", "서울 10자리");
+eq(formatOrderPhone("027771234"),   "02-777-1234",  "서울 9자리");
+eq(formatOrderPhone("01023012231"), "010-2301-2231","휴대폰 11자리");
+eq(formatOrderPhone("0316680167"),  "031-668-0167", "경기 10자리");
+eq(formatOrderPhone("07012345678"), "070-1234-5678","인터넷전화 11자리");
+eq(formatOrderPhone("0111234567"),  "011-123-4567", "011 10자리");
+eq(formatOrderPhone("02"),          "02",           "입력 중 02");
+eq(formatOrderPhone("02649"),       "02-649",       "입력 중 02-649");
+eq(formatOrderPhone("0264906"),     "02-649-06",    "입력 중 02-649-06");
+
 console.log(fail ? "\n주문서 전화번호 테스트 실패" : "\n주문서 전화번호 테스트 통과");
 process.exit(fail);
