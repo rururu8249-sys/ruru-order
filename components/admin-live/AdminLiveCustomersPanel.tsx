@@ -20,6 +20,7 @@ import AdminLivePhoneBlockPanel from "./AdminLivePhoneBlockPanel";
 import AdminLiveCustomerBlockReasonModal from "./AdminLiveCustomerBlockReasonModal";
 import AdminLiveCustomerPointPanel from "./AdminLiveCustomerPointPanel";
 import { CUSTOMER_TERMS } from "./adminLiveCustomerTerms";
+import { formatKoreanPhone } from "@/lib/order/phone";
 
 type Props = {
   orders: LiveOrder[];
@@ -142,21 +143,11 @@ function readFirst(row: Record<string, any>, keys: string[]) {
   return "";
 }
 
+// [2026-08-30] 표기는 lib/order/phone.ts 로 통일 (02-6490-6376 처럼 지역번호도 제대로)
 function formatPhone(value: unknown) {
   const digits = digitsOnly(value);
-
-  if (digits.length === 11) {
-    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
-  }
-
-  if (digits.length === 9 && digits.startsWith("02")) {
-    return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`;
-  }
-  if (digits.length === 10) {
-    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
-  }
-
-  return clean(value) || "-";
+  if (!digits) return clean(value) || "-";
+  return formatKoreanPhone(digits) || clean(value) || "-";
 }
 
 function orderPhone(order: LooseLiveOrder) {

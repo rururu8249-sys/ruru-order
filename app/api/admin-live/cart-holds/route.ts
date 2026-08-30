@@ -85,8 +85,18 @@ export async function GET(request: NextRequest) {
           name: prev.name || String((o.customer_name as string) || (o.name as string) || "").trim(),
         };
       }
-      const hyph = (d: string) => d.length === 11 ? `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}` : d.length === 10 ? `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}` : d;
-      const phoneVariants = Array.from(new Set(phones.flatMap((p) => [p, hyph(p)])));
+      // [2026-08-30] 서울번호는 옛 표기(026-4906-376)와 새 표기(02-6490-6376)가 섞여 저장된다.
+      const hyphs = (d: string) => {
+        const out = [d];
+        if (d.length === 11) out.push(`${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`);
+        if (d.length === 10) {
+          out.push(`${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`);
+          if (d.startsWith("02")) out.push(`${d.slice(0, 2)}-${d.slice(2, 6)}-${d.slice(6)}`);
+        }
+        if (d.length === 9 && d.startsWith("02")) out.push(`${d.slice(0, 2)}-${d.slice(2, 5)}-${d.slice(5)}`);
+        return out;
+      };
+      const phoneVariants = Array.from(new Set(phones.flatMap((p) => hyphs(p))));
       const { data: custs } = await supabase.from("customers").select("customer_phone,youtube_nickname,customer_name").in("customer_phone", phoneVariants).limit(500);
       for (const c of (custs || []) as Record<string, unknown>[]) {
         const ph = String(c.customer_phone ?? "").replace(/[^0-9]/g, "");

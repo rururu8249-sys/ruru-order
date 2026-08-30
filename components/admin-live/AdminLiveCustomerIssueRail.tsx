@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 import { CUSTOMER_TERMS } from "./adminLiveCustomerTerms";
+import { formatKoreanPhone } from "@/lib/order/phone";
 
 type AdminIssueTask = {
   id?: string | number | null;
@@ -81,9 +82,7 @@ function digitsOnly(value: unknown) {
 function formatPhone(value: unknown) {
   const digits = digitsOnly(value);
 
-  if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
-  if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
-  if (digits.length === 9 && digits.startsWith("02")) return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`;
+  return formatKoreanPhone(digits);   // [2026-08-30] 표기 통일 (02-6490-6376)
 
   return clean(value) || "-";
 }

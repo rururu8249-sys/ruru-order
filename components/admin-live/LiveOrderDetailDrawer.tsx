@@ -12,6 +12,7 @@ import { useLiveOrderItemAdd, createInitialLiveOrderItemAddForm, type LiveOrderI
 import { useLiveOrderItemDelete } from "./useLiveOrderItemDelete";
 import LiveOrderRegisteredProductPicker from "./LiveOrderRegisteredProductPicker";
 import LiveOrderDangerActionGuide from "./LiveOrderDangerActionGuide";
+import { formatKoreanPhone } from "@/lib/order/phone";
 
 type Props = {
   order: LiveOrder;
@@ -852,12 +853,8 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   // [고객용 복사 · 2026-07-22 사장님 지시] 배송정보+주문내역+금액을 고객에게 붙여넣기 좋은 텍스트로 클립보드 복사.
   //   읽기 전용(어떤 데이터도 변경 없음). 금액 표기는 이 서랍 화면의 계산값(상품금액/배송비/카드추가금/포인트) 그대로.
   const copyCustomerOrderSummary = async () => {
-    const fmtPhone = (value?: string | null) => {
-      const digits = String(value || "").replace(/[^0-9]/g, "");
-      if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
-      if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
-      return String(value || "").trim();
-    };
+    // 표기는 lib/order/phone.ts 로 통일 (02-6490-6376 처럼 지역번호도 제대로 쪼갠다)
+    const fmtPhone = (value?: string | null) => formatKoreanPhone(value);
     const o = orderForView;
     const orderPhoneDigits = String(o.phone || "").replace(/[^0-9]/g, "");
     const recipientName = String(o.recipientName || "").trim();

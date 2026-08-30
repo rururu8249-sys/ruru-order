@@ -83,3 +83,38 @@ export const isLandlineOrderPhone = (value: string) => {
 // 주문서 제출에 쓸 수 있는 번호인가 (휴대폰 또는 국내 일반전화)
 export const isOrderablePhone = (value: string) =>
   isMobileOrderPhone(value) || isLandlineOrderPhone(value);
+
+// [2026-08-30] 화면·문자 표기가 파일마다 따로 구현돼 있어 02 번호가 제각각으로 쪼개졌다.
+//   (실사례: 사장님이 손님께 보낸 주문내역 문자에 "026-490-6376" 으로 나감)
+//   → 표기는 이 함수 하나로 통일한다.
+export const formatKoreanPhone = (value: unknown) => {
+  const digits = String(value ?? "").replace(/[^0-9]/g, "");
+  if (!digits) return String(value ?? "").trim();
+
+  if (digits.startsWith("02")) {
+    if (digits.length === 10) return `${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6)}`;
+    if (digits.length === 9) return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`;
+    return digits;
+  }
+
+  if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  return String(value ?? "").trim();
+};
+
+// 같은 번호가 DB에 여러 형태로 저장돼 있을 수 있어(숫자만 / 옛 하이픈 / 새 하이픈)
+// 조회·이동할 때 후보를 모두 만든다. 전부 같은 번호에서 나온 형태라 넓혀도 안전하다.
+export const koreanPhoneVariants = (value: unknown): string[] => {
+  const digits = String(value ?? "").replace(/[^0-9]/g, "");
+  if (!digits) return [];
+  const set = new Set<string>([digits]);
+
+  if (digits.length === 11) set.add(`${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`);
+  if (digits.length === 10) {
+    set.add(`${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`); // 옛 표기
+    if (digits.startsWith("02")) set.add(`${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6)}`); // 새 표기
+  }
+  if (digits.length === 9 && digits.startsWith("02")) set.add(`${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`);
+
+  return [...set];
+};

@@ -28,7 +28,12 @@ const digits = (v: unknown) => String(v ?? "").replace(/[^0-9]/g, "");
 function phoneVariants(d: string): string[] {
   const set = new Set<string>([d]);
   if (d.length === 11) set.add(`${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`);
-  else if (d.length === 10) set.add(`${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`);
+  else if (d.length === 10) {
+    set.add(`${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`);
+    // [2026-08-30] 서울 10자리는 옛 표기와 새 표기가 섞여 저장돼 있다.
+    if (d.startsWith("02")) set.add(`${d.slice(0, 2)}-${d.slice(2, 6)}-${d.slice(6)}`);
+  }
+  else if (d.length === 9 && d.startsWith("02")) set.add(`${d.slice(0, 2)}-${d.slice(2, 5)}-${d.slice(5)}`);
   return [...set];
 }
 

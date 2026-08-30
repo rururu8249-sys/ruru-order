@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 import { cartHoldPresentation } from "@/lib/cartHoldDetail";
+import { formatKoreanPhone } from "@/lib/order/phone";
 
 type Props = { onClose: () => void };
 type Hold = {
@@ -15,7 +16,7 @@ type SortKey = "expires" | "recent" | "qty" | "name";
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "expires", label: "남은 시간 짧은순" }, { value: "recent", label: "최신 담김순" }, { value: "qty", label: "담긴 수량 많은순" }, { value: "name", label: "닉네임순" },
 ];
-const phoneFmt = (p: string) => { const d = String(p || "").replace(/[^0-9]/g, ""); return d.length === 11 ? `${d.slice(0,3)}-${d.slice(3,7)}-${d.slice(7)}` : d.length === 10 ? `${d.slice(0,3)}-${d.slice(3,6)}-${d.slice(6)}` : d; };
+const phoneFmt = (p: string) => formatKoreanPhone(p);   // [2026-08-30] 표기 통일
 // [2026-08-30] "담음"이 아니라 "마지막 확인"이다.
 //   claim_cart_hold 은 동기화마다 delete 후 insert 라 created_at 이 매번 새로 찍힌다.
 //   그래서 이 값은 손님 화면이 마지막으로 신호를 보낸 시각이지, 처음 담은 시각이 아니다.

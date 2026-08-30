@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { formatKoreanPhone } from "@/lib/order/phone";
 
 type PointPanelCustomer = {
   phone: string;
@@ -85,18 +86,11 @@ function signedMoney(value: unknown) {
   return `${amount > 0 ? "+" : "-"}${Math.abs(amount).toLocaleString("ko-KR")}원`;
 }
 
+// [2026-08-30] 표기는 lib/order/phone.ts 로 통일
 function formatPhone(value: unknown) {
   const phone = digitsOnly(value);
-
-  if (phone.length === 11) {
-    return `${phone.slice(0, 3)}-${phone.slice(3, 7)}-${phone.slice(7)}`;
-  }
-
-  if (phone.length === 10) {
-    return `${phone.slice(0, 3)}-${phone.slice(3, 6)}-${phone.slice(6)}`;
-  }
-
-  return clean(value) || "-";
+  if (!phone) return clean(value) || "-";
+  return formatKoreanPhone(phone) || clean(value) || "-";
 }
 
 function ledgerLabel(row: PointLedgerRow) {

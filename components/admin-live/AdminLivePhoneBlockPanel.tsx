@@ -5,6 +5,7 @@
 // 주의: 브라우저 alert/confirm/prompt 사용 금지. 주문/입금/배송/정산 로직 없음.
 
 import { useState } from "react";
+import { formatKoreanPhone } from "@/lib/order/phone";
 
 type BlockResult = {
   phone: string;
@@ -25,9 +26,7 @@ function digitsOnly(value: unknown) {
 function formatPhone(value: unknown) {
   const digits = digitsOnly(value);
 
-  if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
-  if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
-  if (digits.length === 9 && digits.startsWith("02")) return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`;
+  return formatKoreanPhone(digits);   // [2026-08-30] 표기 통일 (02-6490-6376)
 
   return String(value ?? "").trim();
 }

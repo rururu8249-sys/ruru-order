@@ -3,6 +3,7 @@
 // 리팩토링 1단계: 기존 표시 로직 그대로 분리. 계산 결과 변경 없음.
 
 import type { OrderRow } from "./types";
+import { formatKoreanPhone as formatSharedPhone } from "@/lib/order/phone";
 
 export const money = (value: unknown) => `${Number(value || 0).toLocaleString()}원`;
 export const moneyNumber = (value: unknown) => Number(String(value ?? "0").replace(/[^0-9.-]/g, "")) || 0;
@@ -10,15 +11,13 @@ export const moneyInput = (value: unknown) => String(value ?? "").replace(/[^0-9
 
 export const digitsOnly = (value: unknown) => String(value ?? "").replace(/[^0-9]/g, "");
 
+// [2026-08-30] 표기는 lib/order/phone.ts 로 통일한다.
+//   예전엔 여기서 010 기준(3-4-4 / 3-3-4)으로만 쪼개서 02-6490-6376 이
+//   "026-490-6376" 으로 나갔다(사장님이 손님께 보낸 주문내역 문자 실사례).
 export const formatKoreanPhone = (value: unknown) => {
   const digits = digitsOnly(value);
-
   if (!digits) return "-";
-  if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}`;
-  if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
-  if (digits.length === 9 && digits.startsWith("02")) return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`;
-
-  return String(value ?? "").trim() || "-";
+  return formatSharedPhone(digits) || "-";
 };
 
 export const orderPhoneDigits = (row: Pick<OrderRow, "customer_phone" | "phone">) => {

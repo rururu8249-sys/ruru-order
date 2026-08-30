@@ -26,6 +26,8 @@ function phoneVariants(phone: string) {
 
   if (digits.length === 10) {
     variants.add(`${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`);
+    // [2026-08-30] 서울 10자리는 옛 저장분(026-4906-376)과 새 표기(02-6490-6376)가 섞인다.
+    if (digits.startsWith("02")) variants.add(`${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6)}`);
   }
 
   return Array.from(variants);
