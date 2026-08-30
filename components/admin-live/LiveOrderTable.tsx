@@ -1301,7 +1301,7 @@ export default function LiveOrderTable({
                           const extra = Number((order as any).cardExtraAmount || 0)
                             || Math.max(0, Number((order as any).cardPaymentTotalAmount || 0) - Number(order.productAmount || 0) - Number(order.shippingFee || 0));
                           if (extra <= 0) return null;
-                          return <div className="text-[10px] font-black text-purple-700">카드추가 +{money(extra)}</div>;
+                          return <div className="text-[10px] font-black text-purple-700">+{money(extra)}</div>;
                         })()}
                       </div>
                       {/* 8. 입금 */}
