@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 import { cartHoldPresentation } from "@/lib/cartHoldDetail";
+import { supabase } from "@/lib/supabase";
+import { detailProducts } from "@/lib/productDetailModel";
 import { formatKoreanPhone } from "@/lib/order/phone";
 
 type Props = { onClose: () => void };
 type Hold = {
-  sessionKey: string; phone: string; nickname: string; name: string; productName: string; fallbackProductName: string;
+  sessionKey: string; phone: string; nickname: string; name: string; productId: string; productName: string; fallbackProductName: string;
   detailName: string; unitPrice: number | null; legacySnapshot: boolean; color: string; size: string; qty: number; expiresAt: string; createdAt: string;
 };
 type Group = { sessionKey: string; phone: string; nickname: string; name: string; items: Hold[]; totalQty: number; minExpires: number; maxCreated: number };
@@ -35,6 +37,9 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
   const [scopeInfo, setScopeInfo] = useState<{scope:string;broadcastTitle:string}>({scope:"all",broadcastTitle:""});
   // [2026-08-30] 장바구니별 마지막 알림 상태(보냄/봄) — 사장님이 결과를 눈으로 확인할 수 있게
   const [alerts, setAlerts] = useState<Record<string, { sentAt: string; seenAt: string }>>({});
+  // [2026-08-31 사장님 요청] 사진 등록된 상품은 작은 사진 표시 + 클릭 확대 — 주문상세와 같은 방식(표시 전용)
+  const [holdImages, setHoldImages] = useState<Record<string, string>>({});
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -49,6 +54,49 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
     } finally { setLoading(false); }
   };
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [scopeAll]);
+
+  // 사진 조회 — 실패해도 목록은 정상 표시. 세부상품이면 그 사진, 아니면 대표사진.
+  useEffect(() => {
+    let stopped = false;
+    const ids = Array.from(new Set(holds.map((h) => String(h.productId || "").trim()).filter(Boolean)));
+    if (ids.length === 0) { setHoldImages({}); return; }
+    (async () => {
+      try {
+        const { data } = await supabase.from("products").select("*").in("id", ids);
+        if (stopped || !Array.isArray(data)) return;
+        const byId = new Map<string, Record<string, unknown>>();
+        for (const row of data as Record<string, unknown>[]) byId.set(String((row as { id?: unknown }).id ?? ""), row);
+        const next: Record<string, string> = {};
+        for (const h of holds) {
+          const pid = String(h.productId || "").trim();
+          if (!pid) continue;
+          const key = `${pid}|${String(h.detailName || "").trim()}`;
+          if (next[key]) continue;
+          const prow = byId.get(pid);
+          if (!prow) continue;
+          let url = "";
+          const dn = String(h.detailName || "").trim();
+          try {
+            if (dn) {
+              const d = detailProducts(prow as never, { includeHidden: true }).find((x) => x.detailName === dn);
+              if (d?.image) url = d.image;
+            }
+          } catch { /* 세부상품 해석 실패 → 대표사진 폴백 */ }
+          if (!url) {
+            const row = prow as Record<string, unknown>;
+            const arr0 = (v: unknown) => (Array.isArray(v) && v.length > 0 ? String(v[0] ?? "") : "");
+            url = String(row.image_url || row.cover_image_url || row.main_image_url || row.thumbnail_url || "").trim()
+              || arr0(row.detail_image_urls) || arr0(row.image_urls) || arr0(row.images);
+            url = String(url || "").trim();
+          }
+          if (url) next[key] = url;
+        }
+        setHoldImages(next);
+      } catch { /* 사진은 보조 표시 */ }
+    })();
+    return () => { stopped = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [holds]);
   useEffect(() => { const t=window.setInterval(()=>setNow(Date.now()),30000); return()=>window.clearInterval(t); },[]);
 
   const groups = useMemo<Group[]>(() => {
@@ -87,6 +135,7 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
   };
 
   return <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    {imagePreviewUrl?<div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 p-4" onClick={(e)=>{e.stopPropagation();setImagePreviewUrl("");}}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={imagePreviewUrl} alt="상품 사진 크게 보기" className="max-h-[85vh] max-w-full rounded-2xl object-contain shadow-2xl"/><button type="button" onClick={(e)=>{e.stopPropagation();setImagePreviewUrl("");}} className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1.5 text-sm font-black text-slate-700">✕ 닫기</button></div>:null}
     <div className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-surface shadow-2xl" onClick={(e)=>e.stopPropagation()}>
       <div className="flex items-center justify-between border-b border-line px-5 py-4">
         <div className="text-[15px] font-black text-ink">🛒 장바구니 <span className="text-ink-mute">(주문서 제출 전)</span></div>
@@ -108,7 +157,7 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
             <button type="button" disabled={Boolean(reminding)} onClick={()=>void remind(g)} className="rounded-lg border border-[#7B2D43]/20 bg-white px-2 py-1 text-[11px] font-black text-[#7B2D43] disabled:opacity-50">{reminding===g.sessionKey?"전송중":"🔔 결제 요청"}</button>
             <button type="button" disabled={clearing===g.sessionKey} onClick={()=>void clearSession(g)} className="rounded-lg border border-line bg-surface px-2 py-1 text-[11px] font-black text-ink-soft hover:bg-danger-bg hover:text-danger-tx disabled:opacity-50">{clearing===g.sessionKey?"비우는중":"🧹 비우기"}</button>
           </div>
-          <div className="divide-y divide-line">{g.items.map((it,i)=>{const p=presentations[i]; return <div key={i} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 px-3 py-2.5"><div className="min-w-0"><div className="break-words text-[13px] font-black leading-5 text-ink">{p.title}</div>{p.optionText?<div className="mt-0.5 text-[11px] font-bold text-ink-mute">옵션 · {p.optionText}</div>:null}{p.legacySnapshot?<div className="mt-0.5 text-[10px] font-bold text-amber-700">예전 담김 기록 · 세부상품/당시금액 기록 없음</div>:null}</div><div className="text-right"><div className="text-[13px] font-black text-ink">{p.qty}개</div>{p.unitPrice!==null?<><div className="mt-0.5 text-[11px] font-bold text-ink-soft">개당 {won(p.unitPrice)}</div>{p.qty>1?<div className="text-[11px] font-black text-[#7B2D43]">합계 {won(p.rowTotal||0)}</div>:null}</>:<div className="mt-0.5 text-[10px] font-bold text-ink-mute">금액 미기록</div>}</div></div>})}</div>
+          <div className="divide-y divide-line">{g.items.map((it,i)=>{const p=presentations[i]; const img=holdImages[`${String(it.productId||"").trim()}|${String(it.detailName||"").trim()}`]||""; return <div key={i} className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-3 px-3 py-2.5">{img?<button type="button" title="사진 크게 보기" onClick={()=>setImagePreviewUrl(img)} className="h-11 w-11 shrink-0 self-center overflow-hidden rounded-lg border border-line bg-surface-2">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={img} alt="" loading="lazy" className="h-full w-full object-cover"/></button>:<span className="h-11 w-11 shrink-0 self-center rounded-lg border border-line bg-surface-2 text-center text-[18px] leading-[44px]">🛍</span>}<div className="min-w-0"><div className="break-words text-[13px] font-black leading-5 text-ink">{p.title}</div>{p.optionText?<div className="mt-0.5 text-[11px] font-bold text-ink-mute">옵션 · {p.optionText}</div>:null}{p.legacySnapshot?<div className="mt-0.5 text-[10px] font-bold text-amber-700">예전 담김 기록 · 세부상품/당시금액 기록 없음</div>:null}</div><div className="text-right"><div className="text-[13px] font-black text-ink">{p.qty}개</div>{p.unitPrice!==null?<><div className="mt-0.5 text-[11px] font-bold text-ink-soft">개당 {won(p.unitPrice)}</div>{p.qty>1?<div className="text-[11px] font-black text-[#7B2D43]">합계 {won(p.rowTotal||0)}</div>:null}</>:<div className="mt-0.5 text-[10px] font-bold text-ink-mute">금액 미기록</div>}</div></div>})}</div>
           <div className="flex items-center justify-end gap-2 border-t border-line bg-white px-3 py-2 text-[11px] font-black"><span className="text-ink-mute">담긴 금액</span><span className="text-[#7B2D43]">{won(knownTotal)}{unknown?" + 미기록":""}</span></div>
         </div>})}</div>}</div>
     </div>
