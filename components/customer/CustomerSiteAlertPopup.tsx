@@ -33,6 +33,8 @@ export default function CustomerSiteAlertPopup() {
   const [unread, setUnread] = useState(0);
   const [hasAny, setHasAny] = useState(false);
   const [notices, setNotices] = useState<NoticeItem[]>([]);
+  // [2026-08-30 회귀 복구] 「주문서 공지 문구」(설정 → 주문서 표시). 쪽지함 맨 위에 항상 보인다.
+  const [shopGuide, setShopGuide] = useState("");
   // [2026-08-30] 접속 공지 팝업이 떠 있으면 쪽지 팝업은 기다린다(팝업 두 개 겹침 방지).
   const [noticePopupOpen, setNoticePopupOpen] = useState(false);
   // [2026-08-30] 하단 메뉴에 「공지·쪽지」가 있는 화면이면 🔔 버튼은 숨긴다(중복 + 화면 가림).
@@ -67,6 +69,9 @@ export default function CustomerSiteAlertPopup() {
           setBox(list);
           setNotices(nots);
           setUnread(Number(j2.unread) || 0);
+          const guide = String(j2.shopGuide ?? "").trim();
+          setShopGuide(guide);
+          // 떠 있는 🔔 버튼은 "받은 것이 있을 때"만 — 상시 안내 때문에 항상 떠 있으면 화면만 가린다.
           setHasAny(list.length > 0 || nots.length > 0);
           // 주문서 하단 메뉴 배지에 반영
           try { window.dispatchEvent(new CustomEvent("ruru-note-unread", { detail: Number(j2.unread) || 0 })); } catch { /* 무시 */ }
@@ -150,6 +155,17 @@ export default function CustomerSiteAlertPopup() {
               <button type="button" onClick={() => setBoxOpen(false)} className="text-lg font-black text-slate-400">✕</button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+              {/* [2026-08-30 회귀 복구] 쇼핑 전 꼭 확인 — 설정 → 주문서 표시 → 「주문서 공지 문구」.
+                  사이즈 오차·교환반품 비용처럼 늘 해당되는 안내라 항상 맨 위에 둔다. */}
+              {shopGuide ? (
+                <div className="mb-3">
+                  <div className="mb-1.5 px-1 text-[11px] font-black tracking-wide text-slate-400">📌 쇼핑 전 꼭 확인</div>
+                  <div className="rounded-2xl border border-[#E7D2DA] bg-[#FBF3F6] p-3.5">
+                    <p className="whitespace-pre-line text-[13px] font-bold leading-6 text-slate-700">{shopGuide}</p>
+                  </div>
+                </div>
+              ) : null}
+
               {/* 공지사항 — 상단 고정. notices 표의 is_pinned 가 먼저 온다(관리자 공지 화면에서 이미 쓰는 기능). */}
               {notices.length > 0 ? (
                 <div className="mb-3">
@@ -176,7 +192,7 @@ export default function CustomerSiteAlertPopup() {
                 <div className="mb-1.5 px-1 text-[11px] font-black tracking-wide text-slate-400">내 쪽지</div>
               ) : null}
 
-              {box.length === 0 && notices.length === 0 ? (
+              {box.length === 0 && notices.length === 0 && !shopGuide ? (
                 <div className="py-12 text-center text-sm font-bold text-slate-400">받은 쪽지가 없어요.</div>
               ) : box.length === 0 ? null : (
                 <ul className="space-y-2">

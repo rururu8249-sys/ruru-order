@@ -84,7 +84,20 @@ export async function GET(request: NextRequest) {
         /* 공지 조회 실패는 쪽지함 표시를 막지 않는다 */
       }
 
-      return NextResponse.json({ ok: true, box, unread, notices });
+      // [2026-08-30 회귀 복구] 「주문서 공지 문구」(settings.notice_text)를 손님이 볼 길이 사라져 있었다.
+      //   원래는 주문서 하단 메뉴 「📢 공지」 로 열렸는데, 커밋 22f2503 에서 그 자리를 쪽지함이 가져갔다.
+      //   그 안에 교환·반품 비용(택배비 포함 10,000원) 안내가 들어 있어 손님이 못 보면 분쟁이 된다.
+      //   → 쪽지함 맨 위에 항상 보이는 「쇼핑 전 꼭 확인」으로 되살린다.
+      //   설정 화면(관리자 → 설정 → 주문서 표시)은 그대로다. 읽는 곳만 늘렸다.
+      let shopGuide = "";
+      try {
+        const { data: sRows } = await sb.from("settings").select("key,value").eq("key", "notice_text").limit(1);
+        shopGuide = String((sRows || [])[0]?.value ?? "").trim();
+      } catch {
+        /* 안내 문구 조회 실패는 쪽지함 표시를 막지 않는다 */
+      }
+
+      return NextResponse.json({ ok: true, box, unread, notices, shopGuide });
     }
     const { data, error } = await matchTarget(
       sb
