@@ -411,15 +411,25 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   // [2026-07-16 사장님 지침] 물건챙기기 엑셀에 "챙김" 컬럼 추가 — 팝업에서 체크한 건 "챙김", 안 한 건 "안챙김".
   //   챙김 판정은 팝업과 동일한 picked id 집합(orders.picked_at 기반). pickedIds 없으면(옛 호출) 컬럼 생략.
   //   상품금액은 주문에 저장된 값(item.amount, 상품행 없으면 order.productAmount) 표시 전용 — 재계산 안 함.
+  // [2026-08-31 사장님 지시]
+  //   ① 상품금액에 쉼표(199,000) — 엑셀 표시형식만, 값은 숫자 그대로.
+  //   ② 「미결제 포함」으로 뽑을 때 미입금 줄은 진한 핑크 배경 + 「결제」 칸에 '미입금' 표기.
+  //      판정은 물건챙기기 팝업과 같은 기준(PAID_STATUSES). 화면 표시·엑셀 스타일만, 돈 데이터 무접촉.
+  const PICKING_PAID_STATUSES = ["paid", "auto_paid", "manual_paid", "card_paid"];
+  const isUnpaidOrder = (order: LiveOrder) => !PICKING_PAID_STATUSES.includes(clean(order.paymentStatus));
+  const hasUnpaid = exportOrders.some(isUnpaidOrder);
+
   const withPick = pickedIds instanceof Set;
-  const headers = withPick
-    ? ["닉네임", "상품명", "옵션", "수량", "상품금액", "챙김"]
-    : ["닉네임", "상품명", "옵션", "수량", "상품금액"];
+  const headers: WorkbookRow = ["닉네임", "상품명", "옵션", "수량", "상품금액"];
+  if (withPick) headers.push("챙김");
+  if (hasUnpaid) headers.push("결제");
   const pickLabel = (id: string) => (pickedIds?.has(id) ? "챙김" : "안챙김");
 
   const itemRows: WorkbookRow[] = [];
+  const unpaidRowFlags: boolean[] = []; // itemRows 와 같은 순서 — 스타일용
 
   exportOrders.forEach((order) => {
+    const unpaid = isUnpaidOrder(order);
     const items = order.items || [];
 
     if (!items.length) {
@@ -431,7 +441,9 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
         Number(order.productAmount || 0),
       ];
       if (withPick) row.push(pickLabel(String(order.id)));
+      if (hasUnpaid) row.push(unpaid ? "미입금" : "완료");
       itemRows.push(row);
+      unpaidRowFlags.push(unpaid);
       return;
     }
 
@@ -444,7 +456,9 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
         Number(item.amount || 0),
       ];
       if (withPick) row.push(pickLabel(String(item.id)));
+      if (hasUnpaid) row.push(unpaid ? "미입금" : "완료");
       itemRows.push(row);
+      unpaidRowFlags.push(unpaid);
     });
   });
 
@@ -458,6 +472,20 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   const sheet = workbook.addWorksheet("물건챙기기");
   addRows(sheet, rows);
   styleFilterSheet(sheet, 6, rows.length, headers.length);
+
+  // 데이터 줄 스타일 — 헤더(6행) 다음부터. styleFilterSheet 이후에 덮어써야 유지된다.
+  const firstDataRow = 7;
+  itemRows.forEach((_, index) => {
+    const row = sheet.getRow(firstDataRow + index);
+    row.getCell(5).numFmt = "#,##0"; // 상품금액 쉼표
+    if (unpaidRowFlags[index]) {
+      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        if (colNumber > headers.length) return;
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF48FB1" } }; // 진한 핑크
+        cell.font = { bold: true, color: { argb: "FF7A1E2E" } };
+      });
+    }
+  });
 
   await writeWorkbook(workbook, `pick_${safeFileDate()}.xlsx`);
 }
