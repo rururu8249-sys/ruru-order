@@ -13,11 +13,47 @@ function todayKstShort(): string {
   return `${String(kst.getUTCMonth() + 1).padStart(2, "0")}.${String(kst.getUTCDate()).padStart(2, "0")}(${wd})`;
 }
 
+// [2026-08-31 사장님 지시] 방송중 「중간보고」 — 화려하지 않게, 딱 필요한 것만:
+//   방송명·시작~지금 / 매출 / 미입금 / 잘나간 상품 TOP3 / 큰손 TOP3. (날짜별·고객이슈·월누적 없음)
+function formatLiveBrief(s: LiveSummary): string {
+  const unpaidTotal = s.unpaidBankSum + s.unpaidCardSum;
+  const unpaidCnt = s.unpaidBankCount + s.unpaidCardCount;
+  const L: string[] = [];
+  L.push(`📊 <b>중간보고</b> · ${s.title}`);
+  L.push(`🔴 ${kstDateTimeLabel(s.startedAt)} ~ 지금`);
+  L.push(`━━━━━━━━━━━━`);
+  L.push(`💰 매출  <b>${won(s.paidSum)}</b> · ${s.paidCount}건`);
+  L.push(unpaidCnt > 0
+    ? `⏳ 미입금  ${won(unpaidTotal)} · ${unpaidCnt}건 (무통장 ${s.unpaidBankCount} · 카드 ${s.unpaidCardCount})`
+    : `⏳ 미입금  없음 ✅`);
+  if (s.productRanking.length > 0) {
+    L.push(``, `🏆 <b>잘나간 상품</b>`);
+    s.productRanking.slice(0, 3).forEach((p, i) => {
+      const name = p.name.length > 16 ? p.name.slice(0, 16) + "…" : p.name;
+      L.push(`${i + 1}. ${name}  ${p.qty}개`);
+    });
+  }
+  if (s.buyerRanking.length > 0) {
+    L.push(``, `🧑 <b>큰손</b>`);
+    s.buyerRanking.slice(0, 3).forEach((b, i) => {
+      const name = b.name.length > 12 ? b.name.slice(0, 12) + "…" : b.name;
+      L.push(`${i + 1}. ${name}  ${won(b.sum)}`);
+    });
+  }
+  return L.join("\n");
+}
+
 // 초보자도 보자마자 이해되게: 날짜별로 쪼개 보여주고(오늘 표시) + 방송 누적/받을돈/랭킹/할일/월누적.
 //   방송을 종료 안 하면 여러 날이 한 방송으로 합쳐지므로, 날짜별 줄로 '구분'해서 보여줌.
 function formatReport(s: LiveSummary): string {
+  // [2026-08-31] 방송중이면 심플 중간보고로 — 아래 결산 포맷은 종료/오늘 기준일 때만
+  if (s.scope === "broadcast" && s.live) return formatLiveBrief(s);
+
   // 헤더: 제목 + 방송 날짜(시작~현재/종료) 같이 표시
-  const titleLine = `📊 <b>루루동이 결산</b> · ${s.title}`;
+  // [2026-08-31 사장님 지시] 방송중이면 「중간보고」, 종료·오늘 기준이면 「결산」 — 결산은 방송 끝 느낌이라 구분
+  const titleLine = s.scope === "broadcast" && s.live
+    ? `📊 <b>루루동이 중간보고</b> · ${s.title}`
+    : `📊 <b>루루동이 결산</b> · ${s.title}`;
   const when =
     s.scope === "broadcast"
       ? s.live
@@ -82,8 +118,10 @@ function formatReport(s: LiveSummary): string {
   // 6) 할 일(고객이슈)
   L.push(`📌 <b>처리할 고객이슈</b>  ${s.issues.length}건`);
 
-  // 7) 월 누적
-  L.push(`━━━━━━━━━━━━`, `🗓 <b>${s.monthLabel} 누적 매출</b>  ${won(s.monthSum)}`);
+  // 7) 월 누적 — [2026-08-31 사장님 지시] 방송중 「중간보고」에는 뺀다(그 방송 기준만 간단히). 종료 「결산」에만 표시.
+  if (!(s.scope === "broadcast" && s.live)) {
+    L.push(`━━━━━━━━━━━━`, `🗓 <b>${s.monthLabel} 누적 매출</b>  ${won(s.monthSum)}`);
+  }
 
   return L.join("\n");
 }

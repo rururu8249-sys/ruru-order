@@ -36,7 +36,7 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
         body: JSON.stringify({ action: "send-report" }),
       });
       const j = await r.json().catch(() => null);
-      if (j?.ok) showAdminToast("📊 현재 시점 결산을 텔레그램으로 보냈어요.", "success");
+      if (j?.ok) showAdminToast("📊 텔레그램으로 보냈어요 — 방송중이면 「중간보고」, 아니면 오늘 「결산」으로 갑니다.", "success");
       else showAdminToast("텔레그램 전송 실패\n\n" + (j?.reason || j?.error || "설정 → 텔레그램에서 봇 연결을 확인하세요"), "error");
     } catch (e) {
       showAdminToast("텔레그램 전송 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
@@ -113,7 +113,7 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
         type="button"
         disabled={tgSending}
         onClick={() => void sendTelegramReport()}
-        title="현재 시점 결산(방송명·번 돈·받을 돈·잘나간 상품 TOP3·큰손 TOP3)을 텔레그램으로 보냅니다"
+        title="현재 시점 리포트(방송명·번 돈·받을 돈·잘나간 상품 TOP3·큰손 TOP3)를 텔레그램으로 — 방송중이면 중간보고, 아니면 오늘 결산"
         className="ml-auto shrink-0 rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft transition hover:bg-surface-2 disabled:opacity-50"
       >
         {tgSending ? "전송 중…" : "📤 텔레그램"}
