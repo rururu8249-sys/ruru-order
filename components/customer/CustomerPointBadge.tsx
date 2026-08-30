@@ -40,7 +40,7 @@ export default function CustomerPointBadge({ className = "" }: CustomerPointBadg
 
     const phone = normalizePhone(window.localStorage.getItem("ruru_customer_phone") || "");
 
-    if (phone.length < 10) {
+    if (phone.length < 9) {
       setPointState({ loading: false, text: "포인트 0원" });
       return () => {
         alive = false;

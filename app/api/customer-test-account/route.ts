@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const phone = normalizeOperatorTestPhone(searchParams.get("phone"));
 
-  if (phone.length < 10) {
+  if (phone.length < 9) {
     return NextResponse.json({
       ok: true,
       phone,

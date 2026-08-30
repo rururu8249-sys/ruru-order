@@ -49,7 +49,7 @@ export default function CustomerPointGiftPopup() {
 
     const phone = normalizePhone(window.localStorage.getItem("ruru_customer_phone") || "");
 
-    if (phone.length < 10) {
+    if (phone.length < 9) {
       return () => {
         alive = false;
       };
@@ -99,7 +99,7 @@ export default function CustomerPointGiftPopup() {
     const phone = normalizePhone(window.localStorage.getItem("ruru_customer_phone") || "");
     const gift = giftState.gift;
 
-    if (!gift || !gift.id || phone.length < 10) {
+    if (!gift || !gift.id || phone.length < 9) {
       setGiftState({ loading: false, gift: null, closing: false });
       return;
     }

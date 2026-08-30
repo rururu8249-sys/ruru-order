@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     const phone = String(request.nextUrl.searchParams.get("phone") || "").replace(/\D/g, "");
     const showAll = request.nextUrl.searchParams.get("all") === "1";
     const selfMode = request.nextUrl.searchParams.get("self") === "1"; // 연결 손님 전용 「내 주문 다시 담기」 // 손님이 직접 「찾기」 — 담음 처리된 것도 포함(방송 전체 복구)
-    if ((!nick || nick.length < 2) && phone.length < 10) return NextResponse.json({ ok: true, enabled: false, rows: [] });
+    if ((!nick || nick.length < 2) && phone.length < 9) return NextResponse.json({ ok: true, enabled: false, rows: [] });
     const sb = sbAdmin();
     const { data: st } = await sb.from("settings").select("value").eq("key", SETTING_CUSTOMER_UI_ENABLED).limit(1).maybeSingle();
     if (String((st as Record<string, unknown> | null)?.value ?? "") !== "true") {
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
     }
     // [5단계] 인증(채널ID 연결) 고객은 채널ID로 확정 매칭 — 유튜브 이름이 바뀌어도, 닉 표기가 달라도 잡힌다.
     let verifiedChannel = "";
-    if (phone.length >= 10) {
+    if (phone.length >= 9) {
       const { data: cust } = await sb.from("customers")
         .select("youtube_channel_id").eq("customer_phone", phone)
         .not("youtube_channel_id", "is", null).limit(1).maybeSingle();
@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
       const phone = String(body.phone ?? "").replace(/\D/g, "");
       const chRow = ((data || []) as Record<string, unknown>[]).find((r) => sqz(r.display_name) === nick && String(r.channel_id ?? "").trim());
       const ch = String((chRow as Record<string, unknown> | undefined)?.channel_id ?? "").trim();
-      if (phone.length >= 10 && ch) {
+      if (phone.length >= 9 && ch) {
         const { data: cust } = await sb.from("customers")
           .select("youtube_channel_id").eq("customer_phone", phone).limit(1).maybeSingle();
         if (cust && !String((cust as Record<string, unknown>).youtube_channel_id ?? "").trim()) {

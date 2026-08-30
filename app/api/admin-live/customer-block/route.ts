@@ -19,6 +19,11 @@ function phoneVariants(phone: string) {
     variants.add(`${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`);
   }
 
+  // 서울 9자리 (02-777-1234)
+  if (digits.length === 9 && digits.startsWith("02")) {
+    variants.add(`${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`);
+  }
+
   if (digits.length === 10) {
     variants.add(`${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`);
   }
@@ -113,11 +118,11 @@ export async function POST(request: Request) {
   const blocked = body?.blocked !== false;
   const reason = clean(body?.reason);
 
-  if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+  if (phoneDigits.length < 9 || phoneDigits.length > 11) {
     return NextResponse.json(
       {
         ok: false,
-        message: "전화번호는 숫자 기준 10~11자리로 입력해주세요.",
+        message: "전화번호는 숫자 기준 9~11자리로 입력해주세요.",
       },
       { status: 400 }
     );

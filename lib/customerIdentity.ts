@@ -114,7 +114,7 @@ export function collectKnownPhoneDigits(input: {
   const push = (value: unknown) => {
     const digits = toPhoneDigits(value);
     // 10자리 미만은 전화번호로 보지 않는다(잘못 매칭되어 남의 주문을 잡는 것을 막는다)
-    if (digits.length >= 10) found.add(digits);
+    if (digits.length >= 9) found.add(digits);
   };
 
   push(input?.current);
@@ -164,7 +164,7 @@ export function selectBackfillPhoneDigits(input: {
   const result: string[] = [];
   for (const value of Array.isArray(input?.knownDigits) ? input.knownDigits : []) {
     const digits = toPhoneDigits(value);
-    if (digits.length < 10) continue;
+    if (digits.length < 9) continue;
     if (blocked.has(digits)) continue;
     if (seen.has(digits)) continue;
     seen.add(digits);

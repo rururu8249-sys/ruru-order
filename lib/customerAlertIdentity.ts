@@ -26,10 +26,10 @@ export function cleanSessionKey(v: unknown): string {
   return !t || t.length < 6 || t.length > 80 ? "" : t;
 }
 
-/** 전화번호 숫자만. 10~11자리가 아니면 버린다. */
+/** 전화번호 숫자만. 9~11자리가 아니면 버린다. (9자리 = 서울 02-777-1234) */
 export function cleanPhone(v: unknown): string {
   const d = phoneDigits(v);
-  return d.length >= 10 && d.length <= 11 ? d : "";
+  return d.length >= 9 && d.length <= 11 ? d : "";
 }
 
 export function cleanKakaoId(v: unknown): string {

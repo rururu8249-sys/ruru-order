@@ -58,6 +58,11 @@ const normalizePhone = (value: unknown) => {
     return `${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6)}`;
   }
 
+  // 서울 9자리 (02-777-1234)
+  if (digits.length === 9 && digits.startsWith("02")) {
+    return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`;
+  }
+
   if (digits.length === 10) {
     return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
   }
@@ -81,6 +86,10 @@ const makePhoneVariants = (value: unknown) => {
 
   if (digits.length === 10 && digits.startsWith("02")) {
     variants.add(`${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6)}`);
+  }
+
+  if (digits.length === 9 && digits.startsWith("02")) {
+    variants.add(`${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`);
   }
 
   if (digits.length === 10 && !digits.startsWith("02")) {
@@ -141,7 +150,7 @@ export async function POST(request: NextRequest) {
   const youtubeNickname = cleanText(body.youtube_nickname).slice(0, 80);
   const nowIso = new Date().toISOString();
 
-  if (customerPhoneDigits.length < 10) {
+  if (customerPhoneDigits.length < 9) {
     return NextResponse.json(
       {
         ok: false,

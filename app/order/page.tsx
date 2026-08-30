@@ -1799,7 +1799,7 @@ export default function OrderPage() {
   const getOperatorTestOrderFlags = async (phoneValue: string): Promise<OperatorTestOrderFlags> => {
     const cleanPhone = normalizePhone(phoneValue);
 
-    if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+    if (cleanPhone.length < 9 || cleanPhone.length > 11) {
       return EMPTY_OPERATOR_TEST_ORDER_FLAGS;
     }
 
@@ -1860,7 +1860,7 @@ export default function OrderPage() {
   const refreshCustomerBlockStatus = async (phoneValue: string) => {
     const cleanPhone = normalizePhone(phoneValue);
 
-    if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+    if (cleanPhone.length < 9 || cleanPhone.length > 11) {
       const result = { blocked: false, checking: false, message: "" };
       setCustomerBlockStatus(result);
       return result;
@@ -1913,7 +1913,7 @@ export default function OrderPage() {
 
     const cleanPhone = normalizePhone(customerPhone);
 
-    if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+    if (cleanPhone.length < 9 || cleanPhone.length > 11) {
       setCustomerBlockStatus({ blocked: false, checking: false, message: "" });
       return;
     }
@@ -2118,7 +2118,7 @@ export default function OrderPage() {
   useEffect(() => {
     const cleanPhone = normalizePhone(customerPhone);
 
-    if (cleanPhone.length < 10) {
+    if (cleanPhone.length < 9) {
       setAlreadyPaidShipping(false);
       return;
     }
@@ -2351,7 +2351,7 @@ export default function OrderPage() {
     const cleanPhone = normalizePhone(phoneValue);          // 표시/applyCustomerFromRow fallback(하이픈)
     const phoneKey = onlyNumber(phoneValue);                // DB customer_phone 키(숫자만, 2026-06-16 정규화)
 
-    if (phoneKey.length < 10) return false;
+    if (phoneKey.length < 9) return false;
 
     // DB는 숫자만으로 통일됨. 안전하게 숫자/하이픈 둘 다 조회(하이픈은 잔존 시 대비).
     const phoneValues = Array.from(new Set([phoneKey, cleanPhone].filter(Boolean)));
@@ -2684,7 +2684,7 @@ export default function OrderPage() {
 
     const cleanPhone = normalizePhone(phoneValue);
 
-    if (cleanPhone.length < 10) return;
+    if (cleanPhone.length < 9) return;
     if (!settings.startAt || !settings.endAt) return;
     if (!addressSignature) return;
 
@@ -2697,7 +2697,7 @@ export default function OrderPage() {
     const cleanPhone = normalizePhone(phoneValue);
     const addressSignature = currentShippingAddressSignature;
 
-    if (cleanPhone.length < 10 || !addressSignature) {
+    if (cleanPhone.length < 9 || !addressSignature) {
       setAlreadyPaidShipping(false);
       setPaidShippingGroups({ ...EMPTY_PAID_SHIPPING_GROUPS });
       return { ...EMPTY_PAID_SHIPPING_GROUPS };
@@ -2973,7 +2973,7 @@ export default function OrderPage() {
     try {
       const cleanNick = String(nickname || "").trim();
       const phone = normalizePhone(customerPhone);
-      if (!cleanNick || phone.length < 10) return;
+      if (!cleanNick || phone.length < 9) return;
       const dedupeKey = `ruru_nick_synced_${phone}_${cleanNick}`;
       if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(dedupeKey)) return;
       await fetch("/api/customer-login-sync", {
@@ -3019,7 +3019,7 @@ export default function OrderPage() {
 
     const hasRequiredCustomerInfo = Boolean(
       customerName.trim() &&
-      normalizePhone(customerPhone).length >= 10 &&
+      normalizePhone(customerPhone).length >= 9 &&
       address.trim() &&
       detailAddress.trim()
     );
@@ -3053,7 +3053,7 @@ export default function OrderPage() {
       return;
     }
 
-    if (cleanPhone.length < 10) {
+    if (cleanPhone.length < 9) {
       showCustomerNotice("전화번호를 정확히 입력해 주세요.");
       return;
     }
@@ -3131,14 +3131,14 @@ export default function OrderPage() {
       return;
     }
 
-    if (cleanPhone.length < 10) {
+    if (cleanPhone.length < 9) {
       showCustomerNotice("전화번호를 정확히 입력해 주세요.");
       return;
     }
 
     // [2026-08-30 사고수정] 예전엔 여기서 길이만 봤다. 그래서 집·사무실 번호(02…)를
     //   저장은 성공시켜 놓고, 정작 주문서 제출에서 막았다. 손님은 "저장했는데 왜 또 막히지" 하며 갇힌다.
-    //   → 저장하는 자리에서 바로 알려준다. 제출 검증(01X 10~11자리)과 같은 규칙.
+    //   → 저장하는 자리에서 바로 알려준다. 제출 검증(isOrderablePhone)과 같은 규칙.
     if (!isOrderablePhone(cleanPhone)) {
       showCustomerNotice(
         `연락처를 다시 확인해 주세요.\n\n지금 입력된 번호: ${cleanPhone}\n\n휴대폰(010…) 또는 집·사무실 전화(02…, 031…)를 넣어주세요.`,
@@ -3310,7 +3310,7 @@ export default function OrderPage() {
     let alive = true;
     const cleanPhone = normalizePhone(customerPhone);
 
-    if (cleanPhone.length < 10) {
+    if (cleanPhone.length < 9) {
       setCustomerPointBalance(0);
       setCustomerPointLoading(false);
       setPointUseInput("");
@@ -3987,7 +3987,7 @@ export default function OrderPage() {
   useEffect(() => {
     const nick = youtubeNickname.trim();
     const phone = normalizePhone(customerPhone);
-    if (!nick || phone.length < 10 || !hasSavedInfo) return;
+    if (!nick || phone.length < 9 || !hasSavedInfo) return;
     void syncYoutubeNicknameToServer(nick);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [youtubeNickname, customerPhone, hasSavedInfo]);
@@ -4026,14 +4026,14 @@ export default function OrderPage() {
     const cleanPhone = normalizePhone(customerPhone);
     const nick = youtubeNickname.trim();
     // 전화번호(10자리+) 또는 닉네임 중 하나라도 있어야 조회. 둘 다 없으면 검사 안 함.
-    if (cleanPhone.length < 10 && !nick) return false;
+    if (cleanPhone.length < 9 && !nick) return false;
     const nm = (s: unknown) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
     // 취소 주문 판정(기존 표준 정규식 재사용) — 취소된 주문은 중복으로 보지 않음.
     const CANCELED_RE = /주문서취소|주문취소|취소|환불|cancel|refund/i;
     try {
       // 번호 정확일치 OR 닉네임 정확일치(번호 오타 시에도 닉네임으로 잡음). 닉네임 값은 PostgREST or 구문 안전을 위해 따옴표 래핑.
       const orParts: string[] = [];
-      if (cleanPhone.length >= 10) orParts.push(`customer_phone.eq.${cleanPhone}`);
+      if (cleanPhone.length >= 9) orParts.push(`customer_phone.eq.${cleanPhone}`);
       if (nick && !nick.includes('"')) orParts.push(`youtube_nickname.eq."${nick}"`);
       if (orParts.length === 0) return false;
       let query = supabase
@@ -4342,7 +4342,7 @@ export default function OrderPage() {
   const saveShippingAddresses = async (addresses: any[]) => {
     setShippingAddresses(addresses);
     const phoneKey = onlyNumber(customerPhone);  // DB customer_phone 키는 숫자만(2026-06-16 정규화)
-    if (!phoneKey || phoneKey.length < 10) return;
+    if (!phoneKey || phoneKey.length < 9) return;
     // customers row가 아직 없으면(신규 사용자가 배송지부터 추가) insert로 보완해 DB 유실을 막는다.
     const { data: existing } = await supabase.from("customers").select("id").eq("customer_phone", phoneKey).limit(1);
     if (existing && existing.length > 0) {
@@ -4365,12 +4365,12 @@ export default function OrderPage() {
       return false;
     }
 
-    if (cleanPhone.length < 10) {
+    if (cleanPhone.length < 9) {
       showCustomerNotice("전화번호를 정확히 입력해 주세요.");
       return false;
     }
 
-    // [검증 강화 2026-07-06] 01X 시작 10~11자리만 허용 — 잘못된 번호는 입금매칭·알림톡·배송 연락 전부 깨짐
+    // [2026-07-06] 01X 만 허용했었다 → [2026-08-30] 집·사무실 전화도 허용(isOrderablePhone).
     // [2026-08-30] 손님이 "번호를 제대로 넣었는데 계속 막힌다"고 문의했을 때
     //   무엇이 들어왔는지 알 방법이 없어 원인을 못 찾았다.
     //   → 지금 읽힌 번호를 그대로 보여준다. 손님도 뭐가 틀렸는지 바로 알고,
@@ -4384,13 +4384,8 @@ export default function OrderPage() {
       //   손님은 "휴대폰을 넣었는데 왜 막히지" 하며 같은 자리에서 계속 막혔다.
       //   오류만 띄우면 어디를 고쳐야 하는지 알 수가 없다.
       //   → 안내와 함께 번호 고치는 화면을 바로 열어준다.
-      // 02 9자리(02-777-1234)는 시스템 전체가 10자리 이상을 전제로 만들어져 있어 아직 못 받는다.
-      //   (2026-08-30 확인: 해당 회원 0명) 그래도 문의가 오면 바로 알 수 있게 따로 안내한다.
-      const isShortSeoul = /^02[0-9]{7}$/.test(cleanPhone);
       showCustomerNotice(
-        isShortSeoul
-          ? `이 번호는 아직 등록이 어려워요.\n\n지금 입력된 번호: ${cleanPhone}\n\n다른 연락처(휴대폰이 가장 좋아요)로 넣어주시거나,\n카카오톡 채널로 말씀해 주시면 저희가 등록해 드릴게요 🙏`
-          : `연락처를 다시 확인해 주세요.\n\n지금 입력된 번호: ${cleanPhone || "(비어 있음)"}\n\n휴대폰(010…) 또는 집·사무실 전화(02…, 031…)를 넣어주세요.\n\n바로 아래 「내 정보」 창에서 고쳐주세요 🙏`,
+        `연락처를 다시 확인해 주세요.\n\n지금 입력된 번호: ${cleanPhone || "(비어 있음)"}\n\n휴대폰(010…) 또는 집·사무실 전화(02…, 031…)를 넣어주세요.\n\n바로 아래 「내 정보」 창에서 고쳐주세요 🙏`,
       );
       // 손님이 찾아 헤매지 않게 번호 고치는 창을 바로 띄운다.
       window.setTimeout(() => openCustomerInfoEditBottomSheet("info"), 400);
@@ -5371,7 +5366,7 @@ export default function OrderPage() {
   const customerInfoMissing =
     !youtubeNickname.trim() ||
     !customerName.trim() ||
-    normalizePhone(customerPhone).length < 10 ||
+    normalizePhone(customerPhone).length < 9 ||
     !address.trim() ||
     !detailAddress.trim();
 

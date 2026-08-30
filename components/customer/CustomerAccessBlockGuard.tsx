@@ -84,7 +84,7 @@ export default function CustomerAccessBlockGuard() {
 
     const phone = readStoredCustomerPhone();
 
-    if (phone.length < 10 || phone.length > 11) {
+    if (phone.length < 9 || phone.length > 11) {
       setState(INITIAL_STATE);
       return;
     }

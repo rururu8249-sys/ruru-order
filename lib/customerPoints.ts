@@ -40,7 +40,7 @@ export function normalizeCustomerPointPhone(value: unknown): string {
 export function assertValidCustomerPointPhone(value: unknown): string {
   const phone = normalizeCustomerPointPhone(value);
 
-  if (phone.length < 10) {
+  if (phone.length < 9) {
     throw new Error("전화번호가 올바르지 않습니다.");
   }
 

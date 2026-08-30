@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const phone = cleanPhone(body.phone);
-    if (phone.length < 10) return NextResponse.json({ ok: false, error: "전화번호가 필요합니다." }, { status: 400 });
+    if (phone.length < 9) return NextResponse.json({ ok: false, error: "전화번호가 필요합니다." }, { status: 400 });
     const sb = sbAdmin();
     const nowIso = new Date().toISOString();
     const { data: exist } = await sb.from("chat_auth_codes")
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const phone = cleanPhone(request.nextUrl.searchParams.get("phone"));
-    if (phone.length < 10) return NextResponse.json({ ok: true, verified: false });
+    if (phone.length < 9) return NextResponse.json({ ok: true, verified: false });
     const sb = sbAdmin();
     const { data: cust } = await sb.from("customers")
       .select("youtube_channel_id").eq("customer_phone", phone)

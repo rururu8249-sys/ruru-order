@@ -27,7 +27,7 @@ export default function CustomerTestAccountBadge() {
     const checkAccount = async () => {
       const phone = readCustomerPhoneFromStorage();
 
-      if (phone.length < 10) {
+      if (phone.length < 9) {
         if (alive) {
           setState({
             loading: false,

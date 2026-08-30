@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
     if (mode === "refund") {
       const groupEarned = Math.max(0, ...groupRows.map((r) => num(r.point_earned_amount)));
 
-      if (!phone || phone.length < 10) {
+      if (!phone || phone.length < 9) {
         reclaimNote = "전화번호가 없어 포인트 회수를 건너뜀";
       } else if (groupEarned <= 0) {
         reclaimNote = "이 주문으로 적립된 포인트 없음(회수 0원)";

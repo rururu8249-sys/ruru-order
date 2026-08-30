@@ -225,7 +225,7 @@ export default function MyOrderPage() {
       return;
     }
 
-    if (cleanPhone.length < 10) {
+    if (cleanPhone.length < 9) {
       showCustomerNotice("전화번호를 정확히 입력해주세요.");
       return;
     }

@@ -16,16 +16,17 @@ export const formatKoreanPhone = (value: unknown) => {
   if (!digits) return "-";
   if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}`;
   if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+  if (digits.length === 9 && digits.startsWith("02")) return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`;
 
   return String(value ?? "").trim() || "-";
 };
 
 export const orderPhoneDigits = (row: Pick<OrderRow, "customer_phone" | "phone">) => {
   const customerPhone = digitsOnly(row.customer_phone);
-  if (customerPhone.length >= 10) return customerPhone;
+  if (customerPhone.length >= 9) return customerPhone;
 
   const legacyPhone = digitsOnly(row.phone);
-  if (legacyPhone.length >= 10) return legacyPhone;
+  if (legacyPhone.length >= 9) return legacyPhone;
 
   return "";
 };

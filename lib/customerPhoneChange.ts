@@ -18,6 +18,8 @@ export function phoneVariants(d: string): string[] {
   set.add(digits);
   if (digits.length === 11) set.add(`${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`);
   else if (digits.length === 10) set.add(`${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`);
+  // 서울 9자리 (02-777-1234)
+  else if (digits.length === 9 && digits.startsWith("02")) set.add(`${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`);
   return [...set];
 }
 
@@ -31,7 +33,7 @@ export function validateNewPhone(currentRaw: unknown, nextRaw: unknown): PhoneCh
   const current = phoneDigits(currentRaw);
   const next = phoneDigits(nextRaw);
   if (!next) return { ok: false, message: "새 전화번호를 입력해주세요." };
-  if (next.length < 10 || next.length > 11) return { ok: false, message: "전화번호는 숫자 10~11자리여야 합니다." };
+  if (next.length < 9 || next.length > 11) return { ok: false, message: "전화번호는 숫자 9~11자리여야 합니다." };
   if (!current) return { ok: false, message: "지금 번호를 찾지 못했습니다." };
   if (next === current) return { ok: false, message: "지금 번호와 같습니다." };
   return { ok: true };

@@ -39,7 +39,7 @@ export function normalizeOperatorTestPhone(value: unknown): string {
 }
 
 export function isValidOperatorTestPhone(value: unknown): boolean {
-  return normalizeOperatorTestPhone(value).length >= 10;
+  return normalizeOperatorTestPhone(value).length >= 9;
 }
 
 export function operatorTestFlagsFromRow(row: OperatorTestAccountRow | null | undefined): OperatorTestAccountFlags {

@@ -149,6 +149,9 @@ function formatPhone(value: unknown) {
     return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
   }
 
+  if (digits.length === 9 && digits.startsWith("02")) {
+    return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`;
+  }
   if (digits.length === 10) {
     return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
   }
@@ -514,7 +517,7 @@ function CustomerDetailDrawer({
 
     if (!currentPhone) { showAdminToast("지금 번호를 찾지 못했습니다.", "warning"); return; }
     if (!nextPhone) { showAdminToast("새 전화번호를 입력해주세요.", "warning"); return; }
-    if (nextPhone.length < 10 || nextPhone.length > 11) { showAdminToast("전화번호는 숫자 10~11자리여야 합니다.", "warning"); return; }
+    if (nextPhone.length < 9 || nextPhone.length > 11) { showAdminToast("전화번호는 숫자 9~11자리여야 합니다.", "warning"); return; }
     if (nextPhone === currentPhone) { showAdminToast("지금 번호와 같습니다.", "warning"); return; }
 
     // [2026-08-30 사장님 지시] "난독증 환자도 이해되게" — 짧은 말로.
