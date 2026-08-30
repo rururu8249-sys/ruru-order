@@ -13,7 +13,7 @@ export type CleanTarget = { phone: string; sessionKey: string };
 
 export const cleanNotePhone = (v: unknown) => {
   const d = phoneDigits(v);
-  return d.length >= 10 && d.length <= 11 ? d : "";
+  return d.length >= 9 && d.length <= 11 ? d : "";
 };
 export const cleanNoteSessionKey = (v: unknown) => {
   const t = String(v ?? "").trim();

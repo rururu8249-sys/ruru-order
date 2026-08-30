@@ -85,3 +85,16 @@ eq(formatOrderPhone("0264906"),     "02-649-06",    "입력 중 02-649-06");
 
 console.log(fail ? "\n주문서 전화번호 테스트 실패" : "\n주문서 전화번호 테스트 통과");
 process.exit(fail);
+
+// ── [2026-08-31 재검수] 010 접두사 구멍 봉쇄 ──
+{
+  const { isOrderablePhone, isMobileOrderPhone } = await import("../lib/order/phone.ts");
+  const no = (v,why)=>{ if(isOrderablePhone(v)){console.error(`❌ ${why} → ${v} 가 통과하면 안 됨`); fail=1;} else console.log(`✅ ${why} → "${v}" 차단`); };
+  const yes = (v,why)=>{ if(!isOrderablePhone(v)){console.error(`❌ ${why} → ${v} 가 막히면 안 됨`); fail=1;} else console.log(`✅ ${why} → "${v}" 허용`); };
+  no("0102301223",  "010 을 치다 만 10자리(타이핑 중간값)");
+  yes("01023012231","010 11자리 완성");
+  yes("0111234567", "011 10자리(레거시)는 그대로 허용");
+  yes("01112345678","011 11자리도 허용");
+  if (isMobileOrderPhone("0101234567")) { console.error("❌ 010 10자리를 휴대폰 판정하면 안 됨"); fail=1; }
+  console.log("✅ 010=11자리 강제 확인");
+}

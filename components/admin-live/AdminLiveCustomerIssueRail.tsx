@@ -82,7 +82,7 @@ function digitsOnly(value: unknown) {
 function formatPhone(value: unknown) {
   const digits = digitsOnly(value);
 
-  return formatKoreanPhone(digits);   // [2026-08-30] 표기 통일 (02-6490-6376)
+  if (digits) return formatKoreanPhone(digits);   // [2026-08-30] 표기 통일 (02-6490-6376)
 
   return clean(value) || "-";
 }

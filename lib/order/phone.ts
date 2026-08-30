@@ -62,8 +62,13 @@ export const formatOrderPhone = (value: string) => {
 //   허용 대상은 국내 번호만. 해외 번호는 자릿수 규칙이 제각각이라 여기서 다루지 않는다.
 
 // 휴대폰 (010/011/016/017/018/019)
-export const isMobileOrderPhone = (value: string) =>
-  /^01[016789][0-9]{7,8}$/.test(onlyOrderPhoneDigits(value));
+// [2026-08-31 재검수] 010 은 현실에서 항상 11자리다(7자리 가입자번호는 2004년에 소멸).
+//   10자리도 허용하면 "01023012231 을 치다 만 0102301223"이 완성된 번호로 오인되어
+//   타이핑 중간값 차단 게이트를 뚫는다(실사고와 같은 유형). 011/016/017/018/019 만 10자리 허용.
+export const isMobileOrderPhone = (value: string) => {
+  const d = onlyOrderPhoneDigits(value);
+  return /^010[0-9]{8}$/.test(d) || /^01[16789][0-9]{7,8}$/.test(d);
+};
 
 // 국내 일반전화 · 인터넷전화
 //   02(서울) 9~10자리 / 지역번호(031~064) 10~11자리 / 070(인터넷) 11자리

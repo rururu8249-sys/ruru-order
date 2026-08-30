@@ -41,7 +41,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { HOWTO_DEFAULT, parseHowtoSteps } from "@/lib/howto";
 import { supabase } from "@/lib/supabase";
 import { isRemoteAreaAddress } from "@/lib/order/shippingAddress";
-import { formatOrderPhone, normalizeOrderPhone, isOrderablePhone, isMobileOrderPhone } from "@/lib/order/phone";
+import { formatOrderPhone, normalizeOrderPhone, isOrderablePhone, isMobileOrderPhone, koreanPhoneVariants } from "@/lib/order/phone";
 import {
   CUSTOMER_ORDER_LOOKUP_LIMIT,
   customerOrderLookupSinceIso,
@@ -4001,14 +4001,17 @@ export default function OrderPage() {
     const nick = youtubeNickname.trim();
     const phone = normalizePhone(customerPhone);
     if (!nick || !hasSavedInfo) return;
-    if (customerInfoEditSheetOpen) return;      // 편집 중 — 저장 전에는 서버로 안 보낸다
+    if (customerInfoEditSheetOpen) return;      // 바텀시트 편집 중 — 저장 전에는 안 보낸다
+    // [2026-08-31 재검수] 상단바 「정보수정」(/order?mode=edit)의 인라인 폼과 신규가입 폼도
+    //   글자마다 setCustomerPhone 을 호출한다. 여기도 편집 중이므로 같은 이유로 막는다.
+    if (isEditingCustomerInfo || customerMode === "new") return;
     if (!isOrderablePhone(phone)) return;       // 완성된 번호만
     const timer = window.setTimeout(() => {
       void syncYoutubeNicknameToServer(nick);
     }, 1500);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [youtubeNickname, customerPhone, hasSavedInfo, customerInfoEditSheetOpen]);
+  }, [youtubeNickname, customerPhone, hasSavedInfo, customerInfoEditSheetOpen, isEditingCustomerInfo, customerMode]);
 
   // [2026-08-29] preselectDetail — 목록에서 세부상품을 직접 눌러 들어온 경우 1단계를 건너뛴다.
   //   값이 없으면 예전과 완전히 같다(기존 호출부 무변경).
@@ -4297,14 +4300,17 @@ export default function OrderPage() {
     })();
 
     let targetRowId: number | string | null = null;
+    // [2026-08-31 재검수] 조회가 "에러"인데 "없음"으로 취급하면 일시 오류가 중복 회원을 만든다.
+    let kakaoLookupFailed = false;
 
     if (kakaoIdForSave) {
-      const { data: byKakao } = await supabase
+      const { data: byKakao, error: kakaoErr } = await supabase
         .from("customers")
         .select("id, customer_phone")
         .eq("kakao_id", kakaoIdForSave)
         .order("created_at", { ascending: false })
         .limit(1);
+      if (kakaoErr) kakaoLookupFailed = true;
       if (Array.isArray(byKakao) && byKakao.length > 0) targetRowId = (byKakao[0] as any).id;
     }
 
@@ -4313,8 +4319,8 @@ export default function OrderPage() {
     if (targetRowId === null) {
       const { data: rows, error: findError } = await supabase
         .from("customers")
-        .select("id, kakao_id")
-        .eq("customer_phone", lookupPhone)
+        .select("id, kakao_id, youtube_nickname")
+        .in("customer_phone", koreanPhoneVariants(lookupPhone))
         .limit(1);
       if (findError) throw findError;
       if (rows && rows.length > 0) {
@@ -4323,7 +4329,11 @@ export default function OrderPage() {
         //   카카오 계정을 안 심으면 다음에도 계속 번호로만 찾게 되어 갈라질 여지가 남는다.
         //   비어 있을 때만 심는다 — 다른 카카오 계정이 이미 있으면 남의 줄이므로 건드리지 않는다.
         const rowKakao = String((rows[0] as any).kakao_id || "").trim();
-        if (kakaoIdForSave && !rowKakao) adoptKakaoId = true;
+        // [2026-08-31 재검수] 번호를 오입력해 남의(카카오 없는 옛 회원) 줄이 잡혔을 때
+        //   kakao_id 를 심으면 그 줄을 영구 점유하게 된다 → 닉네임까지 같을 때만 "내 옛 줄"로 보고 입양.
+        const rowNick = String((rows[0] as any).youtube_nickname || "").replace(/\s+/g, "").toLowerCase();
+        const myNick = youtubeNickname.trim().replace(/\s+/g, "").toLowerCase();
+        if (kakaoIdForSave && !rowKakao && rowNick && rowNick === myNick) adoptKakaoId = true;
       }
     }
 
@@ -4333,7 +4343,7 @@ export default function OrderPage() {
       const { data: conflict } = await supabase
         .from("customers")
         .select("id")
-        .eq("customer_phone", phoneKey)
+        .in("customer_phone", koreanPhoneVariants(phoneKey))
         .neq("id", targetRowId)
         .limit(1);
 
@@ -4343,6 +4353,10 @@ export default function OrderPage() {
 
       const { error } = await supabase.from("customers").update(patch).eq("id", targetRowId);
       if (error) throw error;
+    } else if (kakaoLookupFailed) {
+      // 카카오 조회가 실패한 상태에서 만들면 같은 카카오 계정의 두 번째 줄이 생길 수 있다.
+      // 프로필 저장만 건너뛴다(주문 자체는 orders 에 모든 정보가 실려 있어 영향 없음).
+      console.warn("고객 프로필 저장 건너뜀: 카카오 조회 일시 실패");
     } else {
       // 정말 처음 오는 손님만 새로 만든다. 이때 카카오 계정을 같이 심어야 다음부터 안 갈라진다.
       const insertData: any = { ...customerData };
@@ -4365,7 +4379,7 @@ export default function OrderPage() {
 
   useEffect(() => {
     const key = onlyNumber(customerPhone || "");
-    if (!key || key.length < 10) return;
+    if (!key || key.length < 9) return;
     let cancelled = false;
     (async () => {
       const { data } = await supabase.from("customers")
@@ -4377,7 +4391,7 @@ export default function OrderPage() {
 
   const saveLiveAlertOptin = async (next: boolean) => {
     const key = onlyNumber(customerPhone || "");
-    if (!key || key.length < 10) { alert("로그인 후 신청할 수 있어요."); return; }
+    if (!key || key.length < 9) { alert("로그인 후 신청할 수 있어요."); return; }
     setLiveAlertSaving(true);
     try {
       const patch = {
@@ -4390,9 +4404,11 @@ export default function OrderPage() {
         try { return String(localStorage.getItem("ruru_kakao_id") || "").trim(); } catch { return ""; }
       })();
       let alertRowId: number | string | null = null;
+      let alertKakaoFailed = false;
       if (kakaoIdForAlert) {
-        const { data: byKakao } = await supabase.from("customers").select("id")
+        const { data: byKakao, error: e1 } = await supabase.from("customers").select("id")
           .eq("kakao_id", kakaoIdForAlert).order("created_at", { ascending: false }).limit(1);
+        if (e1) alertKakaoFailed = true;
         if (Array.isArray(byKakao) && byKakao.length > 0) alertRowId = (byKakao[0] as any).id;
       }
       if (alertRowId === null) {
@@ -4402,6 +4418,8 @@ export default function OrderPage() {
       }
       if (alertRowId !== null) {
         await supabase.from("customers").update(patch).eq("id", alertRowId);
+      } else if (alertKakaoFailed) {
+        // 카카오 조회 일시 실패 — 중복 줄 방지를 위해 이번 저장만 건너뛴다.
       } else {
         const row: any = {
           customer_phone: key,
@@ -4427,9 +4445,11 @@ export default function OrderPage() {
       try { return String(localStorage.getItem("ruru_kakao_id") || "").trim(); } catch { return ""; }
     })();
     let addrRowId: number | string | null = null;
+    let addrKakaoFailed = false;
     if (kakaoIdForAddr) {
-      const { data: byKakao } = await supabase.from("customers").select("id")
+      const { data: byKakao, error: e2 } = await supabase.from("customers").select("id")
         .eq("kakao_id", kakaoIdForAddr).order("created_at", { ascending: false }).limit(1);
+      if (e2) addrKakaoFailed = true;
       if (Array.isArray(byKakao) && byKakao.length > 0) addrRowId = (byKakao[0] as any).id;
     }
     if (addrRowId === null) {
@@ -4438,6 +4458,8 @@ export default function OrderPage() {
     }
     if (addrRowId !== null) {
       await supabase.from("customers").update({ shipping_addresses: addresses }).eq("id", addrRowId);
+    } else if (addrKakaoFailed) {
+      // 카카오 조회 일시 실패 — 중복 줄을 만들지 않기 위해 이번 저장만 건너뛴다(화면 상태에는 이미 반영됨).
     } else {
       const row: any = { customer_phone: phoneKey, youtube_nickname: youtubeNickname.trim() || "", customer_name: customerName.trim() || "", shipping_addresses: addresses };
       if (kakaoIdForAddr) row.kakao_id = kakaoIdForAddr;

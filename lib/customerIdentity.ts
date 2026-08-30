@@ -113,8 +113,12 @@ export function collectKnownPhoneDigits(input: {
   const found = new Set<string>();
   const push = (value: unknown) => {
     const digits = toPhoneDigits(value);
+    // [2026-08-31 재검수] 여기만은 9자리를 받지 않는다.
+    //   customer_history 에는 계정분리 사고 때 저장된 "9자리 타이핑 중간값"(026490637 등)이 실존하고,
+    //   10자리 서울번호의 9자리 접두사는 그 자체로 남의 유효한 9자리 번호일 수 있다.
+    //   이 목록은 옛 주문에 kakao_id 를 찍는(소급연결) 데 쓰이므로, 오염되면 남의 주문이 남의 내역에 뜬다.
     // 10자리 미만은 전화번호로 보지 않는다(잘못 매칭되어 남의 주문을 잡는 것을 막는다)
-    if (digits.length >= 9) found.add(digits);
+    if (digits.length >= 10) found.add(digits);
   };
 
   push(input?.current);
