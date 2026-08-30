@@ -34,6 +34,21 @@ export default function PWAInstallBanner() {
       return () => { window.removeEventListener("beforeinstallprompt", onBIP); window.removeEventListener("appinstalled", onInstalled); };
     }
   }, []);
+  // [2026-08-30] 손님 화면 위쪽에 띠가 세 개(앱설치+공지+밴드) 쌓이면 상품이 안 보인다.
+  //   이 배너가 떠 있는지를 알려주면, 공지 쪽에서 밴드 띠를 접어 최대 두 개로 유지한다.
+  useEffect(() => {
+    try {
+      (window as unknown as Record<string, unknown>).__ruruPwaBannerOn = show;
+      window.dispatchEvent(new CustomEvent("ruru-pwa-banner", { detail: show }));
+    } catch { /* 무시 */ }
+    return () => {
+      try {
+        (window as unknown as Record<string, unknown>).__ruruPwaBannerOn = false;
+        window.dispatchEvent(new CustomEvent("ruru-pwa-banner", { detail: false }));
+      } catch { /* 무시 */ }
+    };
+  }, [show]);
+
   if (!show) return null;
   const onInstall = async () => { if (!deferred) return; deferred.prompt(); const r = await deferred.userChoice; if (r.outcome === "accepted") setShow(false); setDeferred(null); };
   const onClose = () => {

@@ -83,6 +83,7 @@ import CustomerToastNotice from "@/components/customer/CustomerToastNotice";
 import CustomerManualAddressPanel from "@/components/customer/CustomerManualAddressPanel";
 import CustomerMissingDetailAddressPanel from "@/components/customer/CustomerMissingDetailAddressPanel";
 import GroupBuyQuickSelect, { type GroupBuyQuickSelectProduct } from "@/components/order/GroupBuyQuickSelect";
+import { noticeBarLine } from "@/lib/noticeBar";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { detailCode, detailPricePresentation, detailProducts } from "@/lib/productDetailModel";
 import CustomerSizeChartSheet from "@/components/customer/CustomerSizeChartSheet";
@@ -1522,6 +1523,11 @@ export default function OrderPage() {
   const [popupNoticeColor, setPopupNoticeColor] = useState("#7B2D43"); // 제목·확인버튼 강조색
   const [popupBandUrl, setPopupBandUrl] = useState("https://band.us/@ruru8249");
   const [popupOpen, setPopupOpen] = useState(false);
+  // [2026-08-30] 공지 띠 — 평소엔 이걸로 보이고, 「자세히」를 누르면 위 팝업이 열린다.
+  //   ✕ 로 닫아도 "이번 접속에만" 숨긴다(sessionStorage). 다시 들어오면 또 보인다.
+  //   중요한 공지를 한 번 닫았다고 영영 못 보면 문의가 늘어난다.
+  const [noticeBarHidden, setNoticeBarHidden] = useState(false);
+  const [pwaBannerOn, setPwaBannerOn] = useState(false);
   // [2026-08-11 사고분석] 기본값을 false 로 둔다.
   //   예전엔 true 라서, DB가 느려 설정 조회가 실패하면(1889행 return) 관리자가 OFF 해둬도
   //   손님 화면엔 "직접 입력하기" 버튼이 떠버렸다(8/10 23:25 장애 때 실제로 발생 — 없는 상품 "반바지" 주문 접수).
@@ -2228,14 +2234,28 @@ export default function OrderPage() {
     setPopupNoticeTitle(pTitle);
     setPopupNoticeFontSize(pFont);
     setPopupNoticeColor(pColor);
+    // [2026-08-30 공지 방식 변경] 전체 공지를 매번 팝업으로 덮지 않는다.
+    //   · 평소에는 화면 맨 위 「띠」로 계속 보인다 — 손님이 닫을 필요가 없다.
+    //   · 팝업은 「처음 들어온 손님」에게만 1회. (밴드 가입 노출은 사장님이 실제로 효과를 보신 부분이라 유지)
+    //   · 「24시간 안 보기」를 눌렀으면 그것도 존중한다.
+    //   근거: NN/g — 모달은 데이터 손실 방지·필수 입력에만.
+    //        구글 — 닫아야만 페이지를 볼 수 있는 팝업은 검색 순위 페널티(예외는 법적 고지).
+    //        업계 공통 — 같은 내용을 반복해서 띄우면 읽지 않고 닫는다.
     let suppressed = false;
+    let firstVisit = true;
     try {
       const hideUntil = Number(localStorage.getItem("ruru_popup_notice_hide_until") || "0");
       suppressed = Number.isFinite(hideUntil) && Date.now() < hideUntil;
+      firstVisit = !localStorage.getItem("ruru_popup_notice_seen");
     } catch {
       suppressed = false;
+      firstVisit = false;   // 저장소를 못 쓰면 팝업을 띄우지 않는다(매번 뜨는 것보다 낫다)
     }
-    setPopupOpen(pEnabled && pText.trim().length > 0 && !suppressed);
+    const hasNotice = pEnabled && pText.trim().length > 0;
+    setPopupOpen(hasNotice && firstVisit && !suppressed);
+    if (hasNotice && firstVisit) {
+      try { localStorage.setItem("ruru_popup_notice_seen", String(Date.now())); } catch { /* 무시 */ }
+    }
   };
 
   const loadSavedCustomerInfo = () => {
@@ -3161,6 +3181,22 @@ export default function OrderPage() {
     // 이 화면을 벗어나면 반드시 "하단 메뉴 없음"으로 되돌린다(깃발이 켜진 채 남지 않게)
     return () => { if (on) tell(false); };
   }, [hasSavedInfo, broadcastLoaded, orderSheetOpen]);
+
+  // 띠에 보여줄 한 줄 — 규칙은 lib/noticeBar.ts (테스트가 같은 함수를 쓴다)
+  const noticeBarText = noticeBarLine(popupNoticeTitle, popupNoticeText);
+
+  // [2026-08-30] 공지 띠 — 이번 접속에서 닫았는지 복원 + 앱설치 배너가 떠 있는지 구독
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem("ruru_notice_bar_hidden") === "1") setNoticeBarHidden(true);
+    } catch { /* 무시 */ }
+    const onPwa = (e: Event) => setPwaBannerOn(Boolean((e as CustomEvent).detail));
+    try {
+      setPwaBannerOn(Boolean((window as unknown as Record<string, unknown>).__ruruPwaBannerOn));
+    } catch { /* 무시 */ }
+    window.addEventListener("ruru-pwa-banner", onPwa as EventListener);
+    return () => window.removeEventListener("ruru-pwa-banner", onPwa as EventListener);
+  }, []);
 
   // 쪽지함(CustomerSiteAlertPopup)이 안 읽은 개수를 알려오면 하단 메뉴 배지에 반영한다.
   useEffect(() => {
@@ -5566,6 +5602,65 @@ export default function OrderPage() {
       {hasSavedInfo && <TopCustomerNav />}
       <PWAInstallBanner />
 
+      {/* [2026-08-30] 공지 띠 — 전체 공지는 팝업으로 화면을 덮지 않고 여기에 계속 둔다.
+          · 손님은 닫을 필요가 없다 → 바로 상품을 본다
+          · 스크롤을 올리면 공지는 언제나 그 자리에 있다
+          · 「자세히」를 누르면 기존 팝업(전문)이 그대로 열린다
+          띠는 최대 두 개까지만 — 앱설치 배너가 떠 있으면 밴드 띠는 접는다(상품이 안 보이면 주문이 준다). */}
+      {hasSavedInfo && popupNoticeEnabled && popupNoticeText.trim() && !noticeBarHidden ? (
+        <div style={{ background: popupNoticeColor, color: "#fff" }}>
+          <div style={{ margin: "0 auto", width: "100%", maxWidth: "560px", display: "flex", alignItems: "center", gap: "8px", padding: "9px 12px" }}>
+            <span style={{ flexShrink: 0, fontSize: "14px" }}>📢</span>
+            <button
+              type="button"
+              onClick={() => setPopupOpen(true)}
+              style={{ minWidth: 0, flex: 1, textAlign: "left", border: "none", background: "none", padding: 0, cursor: "pointer", color: "#fff", fontSize: "12.5px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+            >
+              {noticeBarText}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPopupOpen(true)}
+              style={{ flexShrink: 0, border: "none", background: "rgba(255,255,255,0.22)", color: "#fff", borderRadius: "999px", padding: "5px 11px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}
+            >
+              자세히
+            </button>
+            <button
+              type="button"
+              aria-label="공지 접기"
+              onClick={() => {
+                setNoticeBarHidden(true);
+                try { sessionStorage.setItem("ruru_notice_bar_hidden", "1"); } catch { /* 무시 */ }
+              }}
+              style={{ flexShrink: 0, border: "none", background: "none", color: "rgba(255,255,255,0.65)", fontSize: "15px", fontWeight: 700, cursor: "pointer", padding: "0 2px" }}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* 밴드 가입 띠 — 사장님 실측: 노출하면 은근히 많이 가입한다.
+          팝업(하루 한 번 몇 초)보다 여기가 접속해 있는 내내 보인다. 닫기는 막지 않는다. */}
+      {hasSavedInfo && popupBandUrl && !pwaBannerOn ? (
+        <div style={{ background: "#EAFBEF", borderBottom: "1px solid #CDEBD7" }}>
+          <div style={{ margin: "0 auto", width: "100%", maxWidth: "560px", display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px" }}>
+            <span style={{ flexShrink: 0, fontSize: "13px" }}>🟢</span>
+            <span style={{ minWidth: 0, flex: 1, fontSize: "12px", fontWeight: 700, color: "#0B5A24", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              밴드 가입하고 방송 알림 받기
+            </span>
+            <a
+              href={popupBandUrl}
+              target="_blank"
+              rel="noreferrer"
+              style={{ flexShrink: 0, background: "#03C75A", color: "#fff", borderRadius: "999px", padding: "5px 12px", fontSize: "11px", fontWeight: 800, textDecoration: "none" }}
+            >
+              가입
+            </a>
+          </div>
+        </div>
+      ) : null}
+
       {/* 접속 팝업 공지 — 카톡 로그인 후 주문서 첫 화면에 표시. 밴드 바로가기 + 24시간 안 보기 + 확인. 모든 모바일 대응. */}
       {popupOpen && hasSavedInfo ? (
         <div
@@ -5647,16 +5742,14 @@ export default function OrderPage() {
               >
                 📬 공지 · 쪽지 전체보기
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  try { localStorage.setItem("ruru_popup_notice_hide_until", String(Date.now() + 24 * 60 * 60 * 1000)); } catch {}
-                  setPopupOpen(false);
-                }}
-                style={{ height: "46px", borderRadius: "13px", background: "#F5F3F0", color: "#888", border: "none", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}
-              >
-                24시간 동안 열지 않기
-              </button>
+              {/* [2026-08-30] 「24시간 동안 열지 않기」 삭제.
+                  이제 이 팝업은 처음 들어온 손님에게만 1회 뜬다 — 안 눌러도 다시 안 뜬다.
+                  대신 공지는 화면 맨 위 띠에 계속 남는다(놓칠 일이 없다).
+                  ※ 예전에 이 버튼을 눌러둔 손님의 값(ruru_popup_notice_hide_until)은
+                    지금도 존중한다(위 불러오기에서 계속 확인한다). */}
+              <div style={{ paddingTop: "2px", textAlign: "center", fontSize: "12px", fontWeight: 700, color: "#A99BA0", lineHeight: 1.6 }}>
+                이 공지는 화면 맨 위에 계속 있어요
+              </div>
             </div>
           </div>
         </div>
