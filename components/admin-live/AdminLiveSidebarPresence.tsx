@@ -132,9 +132,8 @@ export default function AdminLiveSidebarPresence() {
     return () => { document.body.style.overflow = before; window.removeEventListener("keydown", onKey); };
   }, [statsOpen]);
 
-  if (!data || data.available === false) return null;
-
-  const total = data.total ?? 0;
+  // [2026-08-31 사고수정] 훅은 early return 앞에 선언해야 한다 — 뒤에 두면 React 훅 규칙 위반으로
+  //   위젯이 통째로 죽는다(실측: 접속자 위젯 사라짐 + 관리자 페이지 크래시).
   // [2026-08-31 사장님 요청] 접속자 줄 클릭 → 그 손님 장바구니(담긴 상품) 바로 보기
   //   이미 서버에 있는 담김 데이터(/api/admin-live/cart-holds)를 닉네임으로 연결만 한다. 표시 전용.
   const [cartFor, setCartFor] = useState("");
@@ -156,6 +155,9 @@ export default function AdminLiveSidebarPresence() {
     }
   };
 
+  if (!data || data.available === false) return null;
+
+  const total = data.total ?? 0;
   const listed = data.listed ?? (data.visitors?.length ?? 0);
   const by = data.byType ?? { orderForm: 0, orderLookup: 0, admin: 0, others: 0 };
   const visitors = data.visitors ?? [];
