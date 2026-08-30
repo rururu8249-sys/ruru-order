@@ -21,6 +21,7 @@ type Visitor = {
   pageType: string;
   pageLabel: string;
   lastSeenAt: string;
+  viewingProduct?: string;
 };
 
 type Payload = {
@@ -456,7 +457,12 @@ export default function AdminLiveSidebarPresence() {
                     title="누르면 이 손님이 장바구니에 담아둔 상품을 팝업으로 보여줍니다"
                     className={["flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left", cartFor === visitor.id ? "bg-rose-soft" : "bg-surface-2 hover:bg-surface-3"].join(" ")}
                   >
-                    <span className="min-w-0 flex-1 truncate text-[11.5px] font-black text-ink">{displayNickname(visitor.nickname)}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[11.5px] font-black text-ink">{displayNickname(visitor.nickname)}</span>
+                      {String(visitor.viewingProduct || "").trim() ? (
+                        <span className="block truncate text-[9.5px] font-bold text-rose-deep">👀 {String(visitor.viewingProduct).trim()}</span>
+                      ) : null}
+                    </span>
                     <span className="shrink-0 text-[9.5px] font-black text-ink-mute">{visitor.pageLabel}</span>
                     <span className="shrink-0 text-[9px] font-bold text-ink-mute tabular-nums">{agoText(visitor.lastSeenAt)}</span>
                   </button>
@@ -488,6 +494,9 @@ export default function AdminLiveSidebarPresence() {
                   <button type="button" onClick={() => setCartFor("")} className="text-lg leading-none text-ink-mute hover:text-ink">✕</button>
                 </div>
                 <div className="max-h-[50vh] overflow-y-auto px-4 py-3 text-[12.5px] font-bold leading-6 text-ink-soft">
+                  {String(visitor?.viewingProduct || "").trim() ? (
+                    <div className="mb-2 rounded-lg bg-rose-soft px-2.5 py-1.5 text-[11.5px] font-black text-rose-deep">👀 최근 담은 상품 · {String(visitor?.viewingProduct).trim()}</div>
+                  ) : null}
                   {!nick ? (
                     "비회원(닉네임 없음)은 장바구니를 연결할 수 없어요."
                   ) : cartLoading ? (

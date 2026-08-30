@@ -37,6 +37,8 @@ export function normalizePresenceInput(body: Record<string, unknown>) {
     pageType: PAGE_TYPES.has(rawType) ? rawType : "page",
     path: clean(body.path).slice(0, 200),
     nickname: clean(body.nickname).slice(0, 40),
+    // [2026-08-31] 손님이 마지막으로 담은 상품(표시 전용) — 기존 30초 신호에 얹혀 와서 요청 증가 없음
+    viewingProduct: clean(body.viewingProduct).slice(0, 80),
   };
 }
 
@@ -152,17 +154,25 @@ export async function writePresence(body: Record<string, unknown>): Promise<
   const supabase = getPresenceSupabase();
   const nowIso = new Date().toISOString();
 
-  const { error } = await supabase.from("visitor_presence").upsert(
-    {
-      visitor_key: input.visitorKey,
-      nickname: input.nickname || null,
-      page_type: input.pageType,
-      path: input.path,
-      last_seen_at: nowIso,
-      updated_at: nowIso,
-    },
+  const baseRow = {
+    visitor_key: input.visitorKey,
+    nickname: input.nickname || null,
+    page_type: input.pageType,
+    path: input.path,
+    last_seen_at: nowIso,
+    updated_at: nowIso,
+  };
+
+  // [2026-08-31] viewing_product 는 새 칸 — SQL 실행 전 배포돼도 접속 신호가 죽지 않게,
+  //   "칸 없음" 오류면 그 값만 빼고 한 번 더 저장한다. (customer-note 의 배포 순서 사고 방지 패턴)
+  let { error } = await supabase.from("visitor_presence").upsert(
+    { ...baseRow, viewing_product: input.viewingProduct || null },
     { onConflict: "visitor_key" },
   );
+  if (error && /column .* does not exist|could not find the .* column|PGRST204|42703/i.test(String(error.message ?? ""))) {
+    const retry = await supabase.from("visitor_presence").upsert(baseRow, { onConflict: "visitor_key" });
+    error = retry.error;
+  }
 
   if (error) return { ok: false, status: 500, message: error.message };
 

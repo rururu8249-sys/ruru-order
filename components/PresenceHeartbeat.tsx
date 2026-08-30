@@ -30,6 +30,19 @@ function getNickname() {
   );
 }
 
+// [2026-08-31] 손님이 마지막으로 담은 상품 — 주문 페이지가 담는 순간 기록. 10분 지나면 옛 정보라 안 보냄.
+function getViewingProduct() {
+  if (typeof window === "undefined") return "";
+  try {
+    const raw = window.localStorage.getItem("ruru_viewing_product");
+    if (!raw) return "";
+    const parsed = JSON.parse(raw) as { name?: unknown; at?: unknown };
+    const at = Number(parsed?.at) || 0;
+    if (!at || Date.now() - at > 10 * 60 * 1000) return "";
+    return String(parsed?.name || "").trim().slice(0, 80);
+  } catch { return ""; }
+}
+
 function detectPageType(pathname: string) {
   if (pathname.startsWith("/order")) return "order_form";
   if (pathname.startsWith("/myorder")) return "order_lookup";
@@ -66,6 +79,7 @@ export default function PresenceHeartbeat() {
             pageType,
             path: pathname,
             nickname: getNickname(),
+            viewingProduct: getViewingProduct(),
           }),
         });
       } catch {

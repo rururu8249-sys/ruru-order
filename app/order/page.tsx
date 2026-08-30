@@ -3841,7 +3841,11 @@ export default function OrderPage() {
     // 검색어는 유지 — 담기 후 검색이 풀려 전체목록이 떠 "안 담긴 것처럼" 보이던 혼란 방지.
     //   (담은 결과는 cart 카운트/토스트로 확인, 같은 검색으로 계속 담기 편함)
     // P6. 담기 완료 — confetti + "주문서에 담았어요!" 토스트(주문서 보기 / 계속 담기)
-    if (didAdd) { setCartAddedItem(clampedItem); setCartAddedOpen(true); }
+    if (didAdd) {
+      setCartAddedItem(clampedItem); setCartAddedOpen(true);
+      // [2026-08-31 사장님 요청] 접속자 옆 "지금 보는 상품" — 담는 순간의 상품명을 접속 신호에 얹는다(표시 전용, 10분 유효)
+      try { window.localStorage.setItem("ruru_viewing_product", JSON.stringify({ name: String(clampedItem?.product_name || "").trim().slice(0, 80), at: Date.now() })); } catch { /* 무시 */ }
+    }
   };
 
   // ── [채팅주문 4단계] 내 채팅 가주문 배너 — 표시 전용 ─────────────────────────

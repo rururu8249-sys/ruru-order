@@ -48,12 +48,22 @@ export async function GET() {
       .select("id", { count: "exact", head: true })
       .gte("last_seen_at", activeSince);
 
-    const { data, error } = await supabase
+    // [2026-08-31] viewing_product(지금 담은 상품) 포함 — 칸이 아직 없으면(SQL 전) 옛 select 로 폴백
+    let { data, error } = await supabase
       .from("visitor_presence")
-      .select("id, visitor_key, nickname, page_type, last_seen_at")
+      .select("id, visitor_key, nickname, page_type, last_seen_at, viewing_product")
       .gte("last_seen_at", activeSince)
       .order("last_seen_at", { ascending: false })
       .limit(500);   // 분류(주문서/조회/기타) 숫자를 정확히 세기 위해 넉넉히 읽고, 목록은 아래에서 자른다
+    if (error && /column .* does not exist|42703/i.test(String(error.message ?? ""))) {
+      const retry = await supabase
+        .from("visitor_presence")
+        .select("id, visitor_key, nickname, page_type, last_seen_at")
+        .gte("last_seen_at", activeSince)
+        .order("last_seen_at", { ascending: false })
+        .limit(500);
+      data = (retry.data ?? null) as typeof data; error = retry.error;
+    }
 
     if (error) {
       // 표가 아직 없거나 권한 문제여도 관리자 화면을 막지 않는다.
@@ -67,6 +77,7 @@ export async function GET() {
       pageType: clean(row.page_type) || "page",
       pageLabel: pageLabel(clean(row.page_type) || "page"),
       lastSeenAt: clean(row.last_seen_at),
+      viewingProduct: clean((row as { viewing_product?: unknown }).viewing_product),
     }));
 
     // 분류 숫자는 읽어온 전체(최대 500)로 센다 — 목록은 60명만 보여줘도 숫자는 맞아야 한다.
