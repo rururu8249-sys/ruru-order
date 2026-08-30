@@ -8,6 +8,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { isOrderablePhone, isMobileOrderPhone } from "@/lib/order/phone";
 import SheetGrabber from "@/components/customer/SheetGrabber";
+import { clearSavedCustomerInfo } from "@/lib/customer/customerSession";
 
 type ShippingAddress = {
   name: string;
@@ -431,6 +432,22 @@ export default function CustomerInfoEditBottomSheet({
                 </button>
               )}
             </div>
+
+            {/* [2026-08-31] 로그아웃 — 주문서 화면에는 로그아웃 버튼이 아예 없었다
+                (함수만 있고 버튼이 연결 안 된 죽은 코드). 가족 공용 폰에서 다른 카카오
+                계정으로 바꾸는 유일한 길이라 「내정보」 안에 조용히 둔다.
+                clearSavedCustomerInfo 가 카카오 키까지 지운다(89f490b). */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!window.confirm("로그아웃할까요?\n다시 접속하면 카카오 로그인을 새로 하게 됩니다.")) return;
+                try { clearSavedCustomerInfo(); } catch { /* 저장소 접근 불가 환경 */ }
+                window.location.href = "/";
+              }}
+              style={{ margin: "4px auto 0", display: "block", background: "none", border: "none", fontSize: "12px", fontWeight: 700, color: "#9A8F95", textDecoration: "underline", cursor: "pointer", padding: "8px" }}
+            >
+              로그아웃 · 다른 카카오 계정으로 바꾸기
+            </button>
 
           </div>
         </div>

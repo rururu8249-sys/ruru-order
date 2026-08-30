@@ -232,7 +232,7 @@ export default function CustomerOrderLookupBottomSheet({
                     → 빈 화면에서 스스로 해결할 수 있게 안내를 붙인다. */}
                 <p style={{ marginTop: "10px", fontSize: "12px", fontWeight: 700, color: "#7A1E47", lineHeight: 1.6 }}>
                   주문하셨는데 안 보이나요?<br />
-                  화면 위 「로그아웃」 후 <b>카카오 로그인을 다시 한 번</b> 해주세요.<br />
+                  화면 아래 「내정보」에서 로그아웃 후 <b>카카오 로그인을 다시 한 번</b> 해주세요.<br />
                   (다른 앱·브라우저에는 예전 정보가 남아 있을 수 있어요)
                 </p>
               </div>
