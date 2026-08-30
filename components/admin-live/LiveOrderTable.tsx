@@ -1295,9 +1295,14 @@ export default function LiveOrderTable({
                       {/* 7. 총금액 */}
                       <div className="px-3 py-3 text-center text-[14px] font-black text-ink">
                         {money(displayPayableAmount(order))}
-                        {String((order as any).paymentMethod || "").includes("카드") && Number((order as any).cardPaymentTotalAmount || 0) > 0 ? (
-                          <div className="text-[10px] font-black text-purple-700">카드 {money(Number((order as any).cardPaymentTotalAmount || 0))}</div>
-                        ) : null}
+                        {(() => {
+                          // [2026-08-31 사장님 지적] 보라 줄이 위 총금액과 같은 값을 반복했음 → 카드라서 더 붙은 추가금(+)만 작게 표시
+                          if (!String((order as any).paymentMethod || "").includes("카드")) return null;
+                          const extra = Number((order as any).cardExtraAmount || 0)
+                            || Math.max(0, Number((order as any).cardPaymentTotalAmount || 0) - Number(order.productAmount || 0) - Number(order.shippingFee || 0));
+                          if (extra <= 0) return null;
+                          return <div className="text-[10px] font-black text-purple-700">카드추가 +{money(extra)}</div>;
+                        })()}
                       </div>
                       {/* 8. 입금 */}
                       <div className="px-3 py-3 text-center">
