@@ -35,12 +35,12 @@ function kakaoId() {
 function youtubeNickname() {
   try { return (localStorage.getItem("ruru_youtube_nickname") || "").trim(); } catch { return ""; }
 }
-async function askAlerts(mode: "alert" | "box") {
+async function askAlerts(body: Record<string, unknown>) {
   const res = await fetch("/api/customer-site-alerts", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     cache: "no-store",
-    body: JSON.stringify({ mode, sessionKey: sessionKey(), phone: customerPhone(), kakaoId: kakaoId(), nickname: youtubeNickname() }),
+    body: JSON.stringify({ ...body, sessionKey: sessionKey(), phone: customerPhone(), kakaoId: kakaoId(), nickname: youtubeNickname() }),
   });
   if (!res.ok) return null;
   return await res.json().catch(() => null);
@@ -63,6 +63,10 @@ export default function CustomerSiteAlertPopup() {
   // [2026-08-30] 게시판형 쪽지함 — 탭 + 하나만 펼치기
   const [boxTab, setBoxTab] = useState<BoxTab>("all");
   const [openKey, setOpenKey] = useState("");
+  // 더 보기 — 예전엔 최근 30개에서 말없이 잘렸다
+  const [hasMore, setHasMore] = useState(false);
+  const [nextOffset, setNextOffset] = useState(0);
+  const [moreLoading, setMoreLoading] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined" || window.location.pathname.startsWith("/admin")) return;
@@ -71,18 +75,17 @@ export default function CustomerSiteAlertPopup() {
       const key = sessionKey();
       const phone = customerPhone();
       if (!key && !phone) return;
+      // [2026-08-30 부하 줄이기] 팝업용·쪽지함용 요청을 하나로 합쳤다(mode:"all").
+      //   방송 중 접속 100명이면 예전엔 분당 800건이었다.
       try {
-        const json = await askAlerts("alert");
-        if (!stopped && json?.ok) setAlert(json.alert || null);
-      } catch { /* 개인알림 실패는 주문 흐름에 영향 없음 */ }
-
-      // 쪽지함 개수(안 읽음 배지)도 같이 갱신 — 실패해도 무시
-      try {
-        const j2 = await askAlerts("box");
+        const j2 = await askAlerts({ mode: "all" });
         if (!stopped && j2?.ok) {
+          setAlert(j2.alert || null);
           const list = Array.isArray(j2.box) ? (j2.box as BoxItem[]) : [];
           const nots = Array.isArray(j2.notices) ? (j2.notices as NoticeItem[]) : [];
           setBox(list);
+          setHasMore(Boolean(j2.hasMore));
+          setNextOffset(Number(j2.nextOffset) || list.length);
           setNotices(nots);
           setUnread(Number(j2.unread) || 0);
           const guide = String(j2.shopGuide ?? "").trim();
@@ -92,10 +95,10 @@ export default function CustomerSiteAlertPopup() {
           // 주문서 하단 메뉴 배지에 반영
           try { window.dispatchEvent(new CustomEvent("ruru-note-unread", { detail: Number(j2.unread) || 0 })); } catch { /* 무시 */ }
         }
-      } catch { /* 쪽지함은 보조 기능 */ }
+      } catch { /* 쪽지함은 보조 기능 — 실패해도 주문 흐름에 영향 없음 */ }
     };
     void load();
-    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void load(); }, 15000);
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void load(); }, 30000);
     const onFocus = () => void load();
     // 접속 팝업 공지의 [📬 공지 · 쪽지 전체보기] 에서 열 수 있게
     const onOpenBox = () => { setBoxOpen(true); void load(); };
@@ -121,6 +124,23 @@ export default function CustomerSiteAlertPopup() {
       window.removeEventListener("ruru-notice-menu", onNoticeMenu as EventListener);
     };
   }, []);
+
+  // [2026-08-30] 읽음은 「팝업이 2초 이상 화면에 떠 있었을 때」만 찍는다.
+  //   예전엔 서버가 팝업을 내려주는 순간 읽음으로 찍어서,
+  //   손님이 화면을 안 보고 있어도 사장님 화면엔 「봤음」으로 나왔다.
+  //   화면이 가려져 있으면(다른 탭·앱) 세지 않는다.
+  useEffect(() => {
+    if (!alert?.id) return;
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+    const id = alert.id;
+    const t = window.setTimeout(() => {
+      void askAlerts({ action: "seen", alertId: id }).catch(() => undefined);
+      // 화면에서도 바로 읽음으로 보이게 (다음 갱신을 기다리지 않는다)
+      setBox((prev) => prev.map((b) => (b.id === id && !b.seen_at ? { ...b, seen_at: new Date().toISOString() } : b)));
+      setUnread((n) => Math.max(0, n - 1));
+    }, 2000);
+    return () => window.clearTimeout(t);
+  }, [alert?.id]);
 
   const dismiss = async (goOrder: boolean) => {
     const current = alert;
@@ -298,6 +318,34 @@ export default function CustomerSiteAlertPopup() {
                     })}
                   </ul>
                 )
+              ) : null}
+
+              {/* [2026-08-30] 예전엔 최근 30개에서 말없이 잘렸다 */}
+              {boxTab !== "notice" && hasMore ? (
+                <button
+                  type="button"
+                  disabled={moreLoading}
+                  onClick={async () => {
+                    setMoreLoading(true);
+                    try {
+                      const j = await askAlerts({ mode: "box", offset: nextOffset });
+                      if (j?.ok) {
+                        const more = Array.isArray(j.box) ? (j.box as BoxItem[]) : [];
+                        setBox((prev) => {
+                          const seen = new Set(prev.map((b) => b.id));
+                          return [...prev, ...more.filter((b) => !seen.has(b.id))];
+                        });
+                        setHasMore(Boolean(j.hasMore));
+                        setNextOffset(Number(j.nextOffset) || nextOffset + more.length);
+                      }
+                    } finally {
+                      setMoreLoading(false);
+                    }
+                  }}
+                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white py-3 text-[13px] font-black text-slate-500 disabled:opacity-50"
+                >
+                  {moreLoading ? "불러오는 중…" : "이전 쪽지 더 보기"}
+                </button>
               ) : null}
 
               {boxTab === "all" && box.length === 0 && notices.length === 0 && !shopGuide ? (

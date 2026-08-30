@@ -157,6 +157,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ⑤ [2026-08-30] 받은 쪽지도 새 번호로 옮긴다.
+    //   쪽지는 customer_phone 으로 찾는다. 번호만 바꾸고 여기를 안 옮기면
+    //   그 손님이 예전에 받은 쪽지·알림이 쪽지함에서 통째로 사라진다.
+    //   target_session_key 가 `phone:<옛번호>` 인 줄도 같이 고친다(번호로만 보낸 쪽지).
+    //   실패해도 번호 변경 자체는 되돌리지 않는다 — 쪽지는 보조 기능이다.
+    let alertsMoved = 0;
+    let alertsWarning = "";
+    try {
+      const { data: aRows, error: aErr } = await sb
+        .from("customer_site_alerts")
+        .update({ customer_phone: newPhone })
+        .in("customer_phone", phoneVariants(currentPhone))
+        .select("id");
+      if (aErr) alertsWarning = "쪽지 이동 실패: " + aErr.message;
+      else alertsMoved = Array.isArray(aRows) ? aRows.length : 0;
+
+      // 번호로만 보낸 쪽지는 대상 키가 `phone:01012345678` 형태다.
+      await sb
+        .from("customer_site_alerts")
+        .update({ target_session_key: `phone:${newPhone}` })
+        .in("target_session_key", phoneVariants(currentPhone).map((v) => `phone:${v.replace(/[^0-9]/g, "")}`));
+    } catch (e) {
+      alertsWarning = "쪽지 이동 중 오류: " + (e instanceof Error ? e.message : String(e));
+    }
+
     return NextResponse.json({
       ok: true,
       changed: true,
@@ -165,6 +190,8 @@ export async function POST(request: NextRequest) {
       to: newPhone,
       ordersUpdated,
       recipientUpdated,
+      alertsMoved,
+      ...(alertsWarning ? { alertsWarning } : {}),
       ...(ordersWarning ? { warning: ordersWarning } : {}),
     });
   } catch (e) {
