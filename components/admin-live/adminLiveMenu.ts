@@ -5,6 +5,7 @@ export type AdminLiveMenuKey =
   | "orders"
   | "payments"
   | "customers"
+  | "notice"
   | "event"
   | "point"
   | "settlement"
@@ -71,6 +72,17 @@ export const ADMIN_LIVE_MENUS: AdminLiveMenuItem[] = [
     readyTitle: "고객관리 화면 연결 준비중",
     readyDescription: "고객정보, 차단회원, 특이사항, 고객이슈를 한 화면에서 확인하도록 설계합니다.",
     checkpoints: ["고객 검색", "차단회원", "고객 특이사항", "고객이슈", "최근 주문"],
+  },
+  {
+    // [2026-08-30] 흩어져 있던 손님 공지를 한자리에. 설정 → 주문서 표시 안에 숨어 있던 것을 꺼냈다.
+    key: "notice",
+    label: "공지·쪽지",
+    icon: "📢",
+    desc: "손님 공지·쪽지",
+    sidebarNotice: "손님에게 보이는 공지와 쪽지를 여기서 관리합니다.",
+    readyTitle: "공지 · 쪽지",
+    readyDescription: "접속 팝업 공지, 상시 안내 문구, 공지사항 목록, 쪽지를 한 화면에서 관리합니다.",
+    checkpoints: ["접속 팝업 공지", "상시 안내 문구", "공지사항 목록", "쪽지 보내기"],
   },
   {
     key: "event",

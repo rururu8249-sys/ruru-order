@@ -22,6 +22,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import ManualPaymentMatchDrawer from "@/components/admin-v2/payment/ManualPaymentMatchDrawer";
 import AdminLiveCustomersPanel from "./AdminLiveCustomersPanel";
+import AdminLiveNoticePanel from "./AdminLiveNoticePanel";
 import AdminLiveMenuPlaceholder from "./AdminLiveMenuPlaceholder";
 import AdminLivePaymentPanel from "./AdminLivePaymentPanel";
 import AdminLiveSettlementPanel from "./AdminLiveSettlementPanel";
@@ -1786,6 +1787,21 @@ export default function AdminLiveDashboard() {
             </div>
           )}
 
+          {/* 공지·쪽지 팝업 — [2026-08-30] 설정 안에 숨어 있던 손님 공지를 여기로 꺼냈다 */}
+          {activeMenu === "notice" && (
+            <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 p-4" onClick={(e) => { if (e.target === e.currentTarget) setActiveMenu("broadcast"); }}>
+              <div className="flex h-[88vh] w-full max-w-[980px] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
+                <div className="flex shrink-0 items-center justify-between border-b border-rose-line px-5 py-3">
+                  <span className="text-[15px] font-black text-ink">📢 공지 · 쪽지</span>
+                  <button type="button" onClick={() => setActiveMenu("broadcast")} className="text-lg leading-none text-ink-mute hover:text-ink">✕</button>
+                </div>
+                <div className="min-h-0 flex-1">
+                  <AdminLiveNoticePanel />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 설정 팝업 */}
           {activeMenu === "settings" && (
             <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 p-4" onClick={(e) => { if (e.target === e.currentTarget) setActiveMenu("broadcast"); }}>
@@ -1810,7 +1826,7 @@ export default function AdminLiveDashboard() {
           )}
 
           {/* 알 수 없는 메뉴 */}
-          {activeMenu !== "broadcast" && activeMenu !== "products" && activeMenu !== "chatorder" && activeMenu !== "event" && activeMenu !== "orders" && activeMenu !== "payments" && activeMenu !== "customers" && activeMenu !== "settlement" && activeMenu !== "settings" && (
+          {activeMenu !== "broadcast" && activeMenu !== "products" && activeMenu !== "chatorder" && activeMenu !== "event" && activeMenu !== "orders" && activeMenu !== "payments" && activeMenu !== "customers" && activeMenu !== "settlement" && activeMenu !== "settings" && activeMenu !== "notice" && (
             <AdminLiveMenuPlaceholder menuKey={activeMenu} />
           )}
 

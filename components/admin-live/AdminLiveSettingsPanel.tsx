@@ -19,14 +19,7 @@ type SettingKey =
   | "point_auto_earn_enabled"
   | "point_earn_rate"
   | "cart_hold_minutes"
-  | "notice_text"
   | "direct_input_enabled"
-  | "popup_notice_enabled"
-  | "popup_notice_title"
-  | "popup_notice_text"
-  | "popup_notice_fontsize"
-  | "popup_notice_color"
-  | "popup_band_url"
   | "howto_enabled"
   | "howto_steps";
 
@@ -44,28 +37,14 @@ const SETTING_KEYS: SettingKey[] = [
   "point_auto_earn_enabled",
   "point_earn_rate",
   "cart_hold_minutes",
-  "notice_text",
   "direct_input_enabled",
-  "popup_notice_enabled",
-  "popup_notice_title",
-  "popup_notice_text",
-  "popup_notice_fontsize",
-  "popup_notice_color",
-  "popup_band_url",
   "howto_enabled",
   "howto_steps",
 ];
 
 type NumericSettingKey = Exclude<
   SettingKey,
-  | "notice_text"
   | "direct_input_enabled"
-  | "popup_notice_enabled"
-  | "popup_notice_title"
-  | "popup_notice_text"
-  | "popup_notice_fontsize"
-  | "popup_notice_color"
-  | "popup_band_url"
   | "howto_enabled"
   | "howto_steps"
 >;
@@ -180,7 +159,7 @@ const SETTINGS_TABS: { key: SettingsTab; label: string; icon: string; desc: stri
   { key: "payment", label: "결제·배송", icon: "💳", desc: "카드 수수료·배송비" },
   { key: "combine", label: "합배송", icon: "🚚", desc: "시간범위 수동설정" },
   { key: "point", label: "포인트 적립", icon: "🪙", desc: "자동적립·적립률" },
-  { key: "order", label: "주문서 표시", icon: "📝", desc: "공지·직접입력" },
+  { key: "order", label: "주문서 표시", icon: "📝", desc: "선점시간·직접입력" },
   { key: "youtube", label: "유튜브 알림", icon: "📺", desc: "라이브 채팅 자동알림" },
   { key: "telegram", label: "텔레그램 알림", icon: "📨", desc: "폰 푸시 알림" },
   { key: "trend", label: "트렌드 추천", icon: "📈", desc: "셀럽·인스타 트렌드" },
@@ -204,15 +183,9 @@ export default function AdminLiveSettingsPanel() {
   // [2026-07-13] 장바구니 선점 유지시간 (분으로 저장, 화면은 분/시간/일 선택)
   const [holdAmount, setHoldAmount] = useState(String(DEFAULTS.cart_hold_minutes));
   const [holdUnit, setHoldUnit] = useState<HoldUnit>("minute");
-  const [noticeText, setNoticeText] = useState("");
   const [directInputEnabled, setDirectInputEnabled] = useState(true);
-  // 접속 팝업 공지
-  const [popupEnabled, setPopupEnabled] = useState(false);
-  const [popupTitle, setPopupTitle] = useState("📢 공지");
-  const [popupText, setPopupText] = useState("");
-  const [popupFont, setPopupFont] = useState("normal"); // normal | large | xlarge
-  const [popupColor, setPopupColor] = useState("#7B2D43");
-  const [popupBandUrl, setPopupBandUrl] = useState("https://band.us/@ruru8249");
+  // [2026-08-30] 접속 팝업 공지 / 주문서 공지 문구는 「📢 공지·쪽지」 메뉴로 옮겼다.
+  //   같은 키를 두 화면이 저장하면 한쪽이 다른 쪽을 되돌려버려서, 여기서는 아예 뺐다.
   // [2026-07-10] 주문 방법 팝업 — 켜고/끄기 + 내용 수정
   const [howtoEnabled, setHowtoEnabled] = useState(true);
   const [howtoSteps, setHowtoSteps] = useState(HOWTO_DEFAULT.steps);
@@ -248,7 +221,6 @@ export default function AdminLiveSettingsPanel() {
           setHoldAmount(hold.amount);
           setHoldUnit(hold.unit);
         }
-        setNoticeText(String(rows.find((r) => r.key === "notice_text")?.value ?? ""));
         setDirectInputEnabled(clean(rows.find((r) => r.key === "direct_input_enabled")?.value || "true") !== "false");
         setHowtoEnabled(clean(rows.find((r) => r.key === "howto_enabled")?.value || "true") !== "false");
         {
@@ -256,12 +228,6 @@ export default function AdminLiveSettingsPanel() {
           setHowtoSteps(cfg.steps);
           setHowtoWarn(cfg.warn);
         }
-        setPopupEnabled(clean(rows.find((r) => r.key === "popup_notice_enabled")?.value) === "true");
-        setPopupTitle(String(rows.find((r) => r.key === "popup_notice_title")?.value ?? ""));
-        setPopupText(String(rows.find((r) => r.key === "popup_notice_text")?.value ?? ""));
-        setPopupFont(clean(rows.find((r) => r.key === "popup_notice_fontsize")?.value) || "normal");
-        setPopupColor(clean(rows.find((r) => r.key === "popup_notice_color")?.value) || "#7B2D43");
-        setPopupBandUrl(String(rows.find((r) => r.key === "popup_band_url")?.value ?? "").trim() || "https://band.us/@ruru8249");
       } finally {
         if (alive) setLoading(false);
       }
@@ -297,16 +263,9 @@ export default function AdminLiveSettingsPanel() {
           { key: "point_auto_earn_enabled", value: pointAutoEarn ? "true" : "false" },
           { key: "point_earn_rate", value: String(nextPointEarnRate) },
           { key: "cart_hold_minutes", value: String(nextHoldMinutes) },
-          { key: "notice_text", value: noticeText },
           { key: "direct_input_enabled", value: directInputEnabled ? "true" : "false" },
           { key: "howto_enabled", value: howtoEnabled ? "true" : "false" },
           { key: "howto_steps", value: JSON.stringify({ steps: howtoSteps, warn: howtoWarn }) },
-          { key: "popup_notice_enabled", value: popupEnabled ? "true" : "false" },
-          { key: "popup_notice_title", value: popupTitle.trim() },
-          { key: "popup_notice_text", value: popupText },
-          { key: "popup_notice_fontsize", value: popupFont },
-          { key: "popup_notice_color", value: popupColor },
-          { key: "popup_band_url", value: popupBandUrl.trim() },
         ],
         { onConflict: "key" },
       );
@@ -461,7 +420,7 @@ export default function AdminLiveSettingsPanel() {
           {/* ── 주문서 표시 ── */}
           {activeTab === "order" && (
             <div className={cardClass}>
-              {sectionTitle("주문서 공지 / 직접입력", "손님 주문서 상단 공지 문구와 “직접 입력하기” 버튼 노출 여부를 관리합니다.")}
+              {sectionTitle("주문서 표시", "장바구니 선점 유지시간, 주문 방법 팝업, “직접 입력하기” 버튼을 관리합니다. 공지는 「📢 공지·쪽지」 메뉴에 있습니다.")}
 
               {/* [2026-07-13 사장님 지침] 장바구니 선점 유지시간 — 담는 순간 다른 고객 화면 남은 수량에서
                   빠져 보이는 시간. 지나면 자동 해제(표시용 예약만 — 진짜 재고/주문/차감 로직 무관). */}
@@ -555,16 +514,13 @@ export default function AdminLiveSettingsPanel() {
                 ) : null}
               </div>
 
-              <div className="rounded-[20px] border border-line bg-surface-2 p-4">
-                <div className="text-sm font-black text-ink">주문서 공지 문구</div>
-                <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">비워두면 공지 배너가 표시되지 않습니다. 줄바꿈 가능.</div>
-                <textarea
-                  value={noticeText}
-                  onChange={(event) => setNoticeText(event.target.value)}
-                  placeholder="예) 오늘 방송은 21시 시작합니다. 입금자명은 닉네임과 동일하게 부탁드려요."
-                  rows={3}
-                  className="mt-3 w-full resize-none rounded-2xl border border-line bg-surface p-4 text-sm font-bold leading-relaxed outline-none transition focus:border-rose-deep focus:ring-4 focus:ring-rose-soft"
-                />
+              {/* [2026-08-30] 공지 문구·접속 팝업 공지는 사이드바 「📢 공지·쪽지」 메뉴로 옮겼다. */}
+              <div className="rounded-[20px] border border-line bg-warn-bg p-4">
+                <div className="text-sm font-black text-warn-tx">📢 공지는 「공지·쪽지」 메뉴로 옮겼습니다</div>
+                <div className="mt-1 text-xs font-bold leading-5 text-warn-tx">
+                  「주문서 공지 문구」와 「접속 팝업 공지」는 왼쪽 사이드바의 <b>📢 공지·쪽지</b> 에서 관리합니다.
+                  미리보기가 있어 손님 화면을 바로 확인할 수 있습니다.
+                </div>
               </div>
 
               <div className="mt-3 flex items-start justify-between gap-3 rounded-[20px] border border-line bg-surface-2 p-4">
@@ -581,99 +537,6 @@ export default function AdminLiveSettingsPanel() {
                 </button>
               </div>
 
-              {/* 접속 팝업 공지 */}
-              <div className="mt-4 rounded-[20px] border border-line bg-surface-2 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-black text-ink">📢 접속 팝업 공지</div>
-                    <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">손님이 사이트에 들어오자마자 뜨는 팝업입니다. 밴드 바로가기 + 24시간 안 보기 + 확인 버튼 포함.</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setPopupEnabled((v) => !v)}
-                    className={`shrink-0 rounded-full px-4 py-2 text-xs font-black transition ${popupEnabled ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}
-                  >
-                    {popupEnabled ? "팝업 ON" : "팝업 OFF"}
-                  </button>
-                </div>
-
-                <label className="mt-3 block">
-                  <span className="text-xs font-black text-ink-soft">제목 (팝업 위 색상 띠 글씨)</span>
-                  <input
-                    value={popupTitle}
-                    onChange={(e) => setPopupTitle(e.target.value)}
-                    placeholder="예) 📢 중요 공지  ·  비우면 제목 띠 없이 본문만 표시"
-                    className="mt-1 h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-deep"
-                  />
-                  <span className="mt-1 block text-[11px] font-bold text-ink-mute">여기 제목을 넣으세요. 본문에 제목을 또 쓰면 두 번 나옵니다.</span>
-                </label>
-
-                <div className="mt-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-black text-ink-soft">팝업 문구 (본문 · 줄바꿈 가능)</span>
-                    {/* [2026-07-29] 공지 여러 건을 항목별로 나눠 보이게 하는 구분선 */}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setPopupText((prev) => (prev.endsWith("\n") || prev === "" ? prev : prev + "\n") + "---\n")
-                      }
-                      className="shrink-0 rounded-full border border-line bg-surface px-3 py-1 text-[11px] font-black text-ink-soft"
-                    >
-                      ─ 구분선 넣기
-                    </button>
-                  </div>
-                  <textarea
-                    value={popupText}
-                    onChange={(e) => setPopupText(e.target.value)}
-                    placeholder={"예) 👜 롱샴 7/27(월) 출고완료\n---\n💄 향수&화장품 7/27(월)~ 업체 순차출고"}
-                    rows={6}
-                    className="mt-1 w-full resize-none rounded-xl border border-line bg-surface p-3 text-sm font-bold leading-relaxed text-ink outline-none focus:border-rose-deep"
-                  />
-                  <span className="mt-1 block text-[11px] font-bold leading-5 text-ink-mute">
-                    한 줄에 <b className="text-ink-soft">---</b> 만 쓰면 손님 팝업에서 그 자리에 가로 구분선이 그어집니다. (공지 여러 건을 항목별로 나눌 때)
-                  </span>
-                </div>
-
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  <label className="block">
-                    <span className="text-xs font-black text-ink-soft">글자 크기</span>
-                    <select
-                      value={popupFont}
-                      onChange={(e) => setPopupFont(e.target.value)}
-                      className="mt-1 h-10 w-full rounded-xl border border-line bg-surface px-2 text-sm font-bold text-ink outline-none focus:border-rose-deep"
-                    >
-                      <option value="normal">보통</option>
-                      <option value="large">크게</option>
-                      <option value="xlarge">아주 크게</option>
-                    </select>
-                  </label>
-                  <label className="block">
-                    <span className="text-xs font-black text-ink-soft">강조 색상 (제목·확인 버튼)</span>
-                    <select
-                      value={popupColor}
-                      onChange={(e) => setPopupColor(e.target.value)}
-                      className="mt-1 h-10 w-full rounded-xl border border-line bg-surface px-2 text-sm font-bold text-ink outline-none focus:border-rose-deep"
-                    >
-                      <option value="#7B2D43">딥로즈</option>
-                      <option value="#0F6E56">초록</option>
-                      <option value="#185FA5">파랑</option>
-                      <option value="#1A1A1A">검정</option>
-                      <option value="#C0392B">빨강</option>
-                    </select>
-                  </label>
-                </div>
-
-                <label className="mt-3 block">
-                  <span className="text-xs font-black text-ink-soft">밴드 바로가기 주소</span>
-                  <input
-                    value={popupBandUrl}
-                    onChange={(e) => setPopupBandUrl(e.target.value)}
-                    placeholder="https://band.us/@ruru8249"
-                    className="mt-1 h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-deep"
-                  />
-                  <span className="mt-1 block text-[11px] font-bold text-ink-mute">비우면 밴드 버튼이 숨겨집니다.</span>
-                </label>
-              </div>
             </div>
           )}
 
