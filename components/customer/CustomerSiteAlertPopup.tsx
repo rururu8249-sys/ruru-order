@@ -140,7 +140,10 @@ export default function CustomerSiteAlertPopup() {
   };
 
   // 팝업도 없고 쪽지함도 비었으면 아무것도 그리지 않는다.
-  if (!alert && !hasAny) return null;
+  // [2026-08-30 버그] 공지도 쪽지도 없는 손님이 상단 띠의 「자세히」를 누르면
+  //   boxOpen 은 켜지는데 여기서 먼저 끝나버려 아무것도 안 열렸다.
+  //   → 쪽지함을 열어달라는 요청(boxOpen)이 있으면 반드시 그린다.
+  if (!alert && !hasAny && !boxOpen) return null;
 
   return (
     <>
