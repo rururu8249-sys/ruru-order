@@ -521,8 +521,11 @@ const itemLabel = (item: OrderItem) => {
 
 
 
+// [2026-08-31 전수조사 수정] 색상 칸이 숫자를 지우고 있었다(bada14c, 사유 주석 없음).
+//   「1번 아이보리」를 치면 「번 아이보리」가 되고, 등록상품 색상이 자동으로 담길 때도
+//   같은 함수를 거쳐 변형돼 재고(variant) 매칭이 어긋났다. 숫자 차단만 풀고 30자 제한은 유지.
 const cleanColorText = (value: string) =>
-  String(value || "").replace(/[0-9]/g, "").slice(0, 30);
+  String(value || "").slice(0, 30);
 
 const cleanSizeText = (value: string) =>
   String(value || "").slice(0, 30);
@@ -5367,16 +5370,10 @@ export default function OrderPage() {
       return;
     }
 
-    if (!normalizeEmptyProductOptionValue(targetItem.color)) {
-      showCustomerNotice("색상을 입력해 주세요.", "warning");
-      return;
-    }
-
-    if (!normalizeEmptyProductOptionValue(targetItem.size)) {
-      showCustomerNotice("사이즈를 입력해 주세요.", "warning");
-      return;
-    }
-
+    // [2026-08-31 전수조사 수정] 색상·사이즈를 무조건 필수로 막았는데,
+    //   옵션이 없는 상품(가방·잡화·식품)은 채울 것이 없다. 손님이 「없음」「-」를 쳐도
+    //   빈칸으로 정규화돼 같은 오류만 반복됐다(제출 검증은 이미 빈 옵션을 허용한다 — 담기만 더 엄격했음).
+    //   → 담기도 제출과 같은 규칙: 옵션은 비워도 된다.
     if (!toNumber(targetItem.qty)) {
       showCustomerNotice("수량을 입력해 주세요.", "warning");
       return;
@@ -7561,7 +7558,7 @@ export default function OrderPage() {
                         <input
                           value={directInputItem.color}
                           onChange={(event) => updateItem(directInputTargetIndex, "color", event.target.value)}
-                          placeholder="색상입력"
+                          placeholder="색상 (없으면 비워두세요)"
                           className="h-12 min-w-0 w-full rounded-[17px] border border-slate-200 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none focus:border-rose-deep"
                         />
                       </label>
@@ -7571,7 +7568,7 @@ export default function OrderPage() {
                         <input
                           value={directInputItem.size}
                           onChange={(event) => updateItem(directInputTargetIndex, "size", event.target.value)}
-                          placeholder="사이즈입력"
+                          placeholder="사이즈 (없으면 비워두세요)"
                           className="h-12 min-w-0 w-full rounded-[17px] border border-slate-200 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none focus:border-rose-deep"
                         />
                       </label>

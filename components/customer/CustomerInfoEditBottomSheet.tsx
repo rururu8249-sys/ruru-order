@@ -130,13 +130,21 @@ export default function CustomerInfoEditBottomSheet({
   };
 
   const handleSaveAddrForm = () => {
+    // [2026-08-31 전수조사 수정 · 오배송 위험] 빈 주소도 저장되고,
+    //   새 주소를 "추가"해도 주문은 옛 기본배송지로 나갔다(방금 만든 주소가 적용 안 됨).
+    //   손님은 새 주소로 갈 거라 믿는데 택배는 옛 집으로 가는 구조였다.
+    if (!addrForm.name.trim()) { window.alert("받는 분 이름을 입력해 주세요."); return; }
+    if (!String(addrForm.phone || "").trim()) { window.alert("받는 분 연락처를 입력해 주세요."); return; }
+    if (!addrForm.address.trim()) { window.alert("주소를 입력해 주세요. (주소검색 버튼을 눌러주세요)"); return; }
+
     const nextAddresses = editingAddrIndex !== null
       ? shippingAddresses.map((a, i) => i === editingAddrIndex ? { ...addrForm } : a)
       : [...shippingAddresses, { ...addrForm, isDefault: shippingAddresses.length === 0 }];
     onSaveShippingAddresses?.(nextAddresses);
-    // 저장 직후 결과 배열의 기본배송지를 주문 단일 state에 즉시 동기화(추가/수정 후 바로 제출 시 옛 주소 박힘 방지).
-    const def = nextAddresses.find((a) => a.isDefault) ?? nextAddresses[0];
-    if (def) onSelectShippingAddress?.(def.address, def.detailAddress ?? "", def.name, def.phone, def.zipcode ?? "");
+    // 방금 저장한 주소(추가든 수정이든)를 이번 주문에 바로 적용한다.
+    //   방금 입력한 주소 = 손님이 지금 쓰려는 주소다. 기본배송지 별표는 그대로 둔다.
+    const saved = editingAddrIndex !== null ? nextAddresses[editingAddrIndex] : nextAddresses[nextAddresses.length - 1];
+    if (saved) onSelectShippingAddress?.(saved.address, saved.detailAddress ?? "", saved.name, saved.phone, saved.zipcode ?? "");
     setScreen("shipping_list");
     setEditingAddrIndex(null);
   };

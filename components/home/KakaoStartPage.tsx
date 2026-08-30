@@ -37,8 +37,10 @@ export default function KakaoStartPage() {
       savedYoutubeNickname.trim() &&
       savedName.trim() &&
       savedPhone.trim() &&
-      savedAddress.trim() &&
-      savedDetailAddress.trim()
+      savedAddress.trim()
+      // [2026-08-31 전수조사 수정] 상세주소는 조건에서 뺀다.
+      //   주문서는 상세주소 없이도 제출을 허용하는데(단독주택 등) 이 관문만 필수로 봐서,
+      //   상세주소 없는 손님은 로그인돼 있어도 접속할 때마다 로그인 화면부터 다시 만났다.
     ) {
       window.location.replace("/order");
       return;
