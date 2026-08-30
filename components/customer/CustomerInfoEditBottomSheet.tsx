@@ -97,6 +97,14 @@ export default function CustomerInfoEditBottomSheet({
 
   const defaultAddr = shippingAddresses.find((a) => a.isDefault) ?? shippingAddresses[0] ?? null;
 
+  // [2026-08-30 사고수정] 손님 김지영2231 님 문의 —
+  //   주문서에서 "주문하시는 분 연락처가 휴대폰이 아니라 못 냅니다" 라고 막혔는데,
+  //   정작 이 「정보수정」 화면에는 주문자 전화번호를 고칠 칸이 아예 없었다.
+  //   (있던 건 배송지 연락처뿐. 손님이 그걸 고쳐도 주문자 번호는 그대로라 계속 막힘.)
+  //   → 여기에 주문자 휴대폰 번호 칸을 만든다. 이게 회원 식별 + 알림톡 받는 번호다.
+  const ordererPhoneDigits = String(customerPhone || "").replace(/[^0-9]/g, "");
+  const ordererPhoneOk = /^01[016789][0-9]{7,8}$/.test(ordererPhoneDigits);
+
   if (!open) return null;
 
   const handleClose = () => {
@@ -356,6 +364,29 @@ export default function CustomerInfoEditBottomSheet({
                 <div style={{ marginTop: "6px", fontSize: "12px", color: "#e74c3c", fontWeight: 600 }}>{youtubeNicknameError}</div>
               ) : (
                 <div style={{ marginTop: "6px", fontSize: "12px", color: "#7B736D" }}>현재 보이는 닉네임과 다르면 주문 누락이 생길 수 있습니다.</div>
+              )}
+            </div>
+
+            {/* 주문하시는 분 휴대폰 번호 — 회원 식별 + 알림톡 받는 번호 */}
+            <div style={{ borderRadius: "16px", background: "#fff", padding: "14px", border: ordererPhoneOk ? "1px solid #E8E2DD" : "2px solid #e74c3c" }}>
+              <label style={labelStyle}>📱 주문하시는 분 휴대폰 번호</label>
+              <input
+                value={customerPhone}
+                onChange={(e) => onCustomerPhoneChange(e.target.value)}
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel"
+                placeholder="010-1234-5678"
+                style={{ ...inputStyle, ...(ordererPhoneOk ? {} : { borderColor: "#e74c3c", background: "#FFF5F5" }) }}
+              />
+              {ordererPhoneOk ? (
+                <div style={{ marginTop: "6px", fontSize: "12px", color: "#7B736D" }}>배송지 연락처와 달라도 괜찮습니다. 이 번호로 주문·입금 확인이 연결됩니다.</div>
+              ) : (
+                <div style={{ marginTop: "6px", fontSize: "12px", color: "#e74c3c", fontWeight: 700, lineHeight: 1.6 }}>
+                  이 번호로는 주문서를 낼 수 없어요.<br />
+                  010으로 시작하는 <b>휴대폰 번호</b>로 고쳐주세요.<br />
+                  <span style={{ fontWeight: 600, color: "#a94442" }}>(집·사무실 전화번호는 방송 알림톡을 받을 수 없어서 막아두었어요)</span>
+                </div>
               )}
             </div>
 

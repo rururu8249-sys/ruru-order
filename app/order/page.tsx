@@ -3136,6 +3136,16 @@ export default function OrderPage() {
       return;
     }
 
+    // [2026-08-30 사고수정] 예전엔 여기서 길이만 봤다. 그래서 집·사무실 번호(02…)를
+    //   저장은 성공시켜 놓고, 정작 주문서 제출에서 막았다. 손님은 "저장했는데 왜 또 막히지" 하며 갇힌다.
+    //   → 저장하는 자리에서 바로 알려준다. 제출 검증(01X 10~11자리)과 같은 규칙.
+    if (!/^01[016789][0-9]{7,8}$/.test(cleanPhone)) {
+      showCustomerNotice(
+        `휴대폰 번호로 입력해 주세요.\n\n지금 입력된 번호: ${cleanPhone}\n\n010으로 시작하는 휴대폰 번호가 필요해요.\n(집·사무실 전화는 방송 알림톡을 받을 수 없어요)`,
+      );
+      return;
+    }
+
     if (!address.trim()) {
       showCustomerNotice("주소를 입력해 주세요.");
       return;
