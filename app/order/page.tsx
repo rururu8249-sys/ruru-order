@@ -6195,6 +6195,49 @@ export default function OrderPage() {
                     <div>주소: {address.trim() ? `${address.trim()}${detailAddress.trim() ? " " + detailAddress.trim() : ""}` : "주소 미입력"}</div>
                   </div>
                 </div>
+
+                {/* [2026-08-30 손님 김지영2231 님 사례] 배송지 연락처만 화면에 보이고,
+                    정작 제출을 막는 「주문자 번호」는 아무 데도 안 보였다.
+                    손님은 배송지 연락처를 휴대폰으로 고쳐놓고 "고쳤는데 왜 안 되냐"며 막혔다.
+                    → 주문자 번호를 항상 같이 보여주고, 휴대폰이 아니면 제출 누르기 전에 미리 잡아준다. */}
+                {(() => {
+                  const ordererPhone = normalizePhone(customerPhone);
+                  const phoneOk = /^01[016789][0-9]{7,8}$/.test(ordererPhone);
+                  return (
+                    <div style={{ margin: "8px 16px 0", border: `1px solid ${phoneOk ? "#E5E1DC" : "#E0344B"}`, borderRadius: "12px", padding: "12px 14px", background: phoneOk ? "#FAF8F6" : "#FFF4F5" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "13px", fontWeight: 800, color: phoneOk ? "#1A1A1A" : "#B3202F" }}>
+                          📱 주문하시는 분 연락처
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => { setFinalSubmitAcknowledged(false); openCustomerInfoEditBottomSheet("info"); }}
+                          style={{ flexShrink: 0, border: phoneOk ? "1px solid #D9C5CC" : "none", background: phoneOk ? "#fff" : "#E0344B", color: phoneOk ? "#7A1E47" : "#fff", borderRadius: "8px", padding: "4px 12px", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}
+                        >
+                          {phoneOk ? "변경" : "고치기"}
+                        </button>
+                      </div>
+                      <div style={{ marginTop: "6px", fontSize: "13px", fontWeight: 800, color: phoneOk ? "#444" : "#B3202F" }}>
+                        {ordererPhone ? formatPhone(ordererPhone) : "번호 없음"}
+                      </div>
+                      {phoneOk ? (
+                        <div style={{ marginTop: "4px", fontSize: "11.5px", color: "#8A7A7D", lineHeight: 1.6 }}>
+                          입금 확인과 주문 조회에 쓰는 번호예요. 위 배송지 연락처와 달라도 괜찮습니다.
+                        </div>
+                      ) : (
+                        <div style={{ marginTop: "6px", fontSize: "12px", color: "#B3202F", fontWeight: 700, lineHeight: 1.7 }}>
+                          이 번호로는 주문서를 낼 수 없어요.<br />
+                          카카오 계정에 저장된 번호가 자동으로 들어온 거예요.<br />
+                          <b>위 「고치기」를 눌러 휴대폰 번호로 바꿔주세요.</b>
+                          <br />
+                          <span style={{ color: "#8A7A7D", fontWeight: 600 }}>
+                            ※ 배송지 연락처를 고쳐도 이 번호는 바뀌지 않아요.
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
             {selectedItemEntries.length === 0 ? (
               <div style={{ padding: "40px 18px", textAlign: "center" }}>
                 <p style={{ fontSize: "14px", fontWeight: 800, color: "#1A1A1A" }}>아직 담은 상품이 없습니다.</p>
