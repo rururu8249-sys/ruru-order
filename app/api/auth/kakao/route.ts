@@ -149,7 +149,10 @@ export async function GET(request: Request) {
         .limit(1);
       const dbCustomer = Array.isArray(dbRows) ? dbRows[0] : null;
       if (dbCustomer) {
-        dbPhone = String(dbCustomer.customer_phone || "").replace(/[^0-9]/g, "");
+        // [2026-08-30] 여기만 normalizeKakaoPhone 을 안 거치고 있었다.
+        //   DB 에 국제형식(+82…)으로 남은 번호가 있으면 그대로 손님 화면에 실려
+        //   주문서 제출에서 "휴대폰 번호를 확인해 주세요" 로 막힌다.
+        dbPhone = normalizeKakaoPhone(dbCustomer.customer_phone);
         dbName = String(dbCustomer.customer_name || "").trim();
         dbZipcode = String(dbCustomer.zipcode || "").trim();
         dbAddress = String(dbCustomer.address || "").trim();
