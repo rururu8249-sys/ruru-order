@@ -55,9 +55,10 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
   // [2026-08-30 사장님 확인] 카드결제 링크는 "돈 내는 사람"에게 간다.
   //   받는 곳이 본인 집이 아닐 수 있지만(선물·다른 집 수령 등) 결제는 계정 주인이 한다.
   //   order.phone = 주문자 번호, order.recipientPhone = 택배 받는분 번호 (별개)
+  // [2026-08-31 사장님 지시] 복사 순서: 1 결제금액 → 2 상품명 → 3 주문자 번호 (숫자키도 이 순서)
   const fields: { key: string; label: string; value: string; hint?: string; highlight?: boolean }[] = [
-    { key: "paste", label: "상품명 칸", value: pasteValue, hint: "닉네임 + 상품명", highlight: true },
     { key: "amount", label: "결제금액", value: String(amount), hint: "카드 7% 포함" },
+    { key: "paste", label: "상품명 칸", value: pasteValue, hint: "닉네임 + 상품명", highlight: true },
     { key: "phone", label: "주문자 번호", value: phone, hint: "결제하는 분 · - 없이" },
   ];
 
@@ -210,7 +211,8 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
       }}
       style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}
     >
-      <div style={{ display: "flex", flexDirection: "row", width: "960px", maxWidth: "95vw", height: "600px", borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+      {/* [2026-08-31 사장님 지시] 600px는 페이스터 화면이 절반만 보여 스크롤해야 했다 → 화면 높이의 92%까지 키움(고객정보 칸도 같이) */}
+      <div style={{ display: "flex", flexDirection: "row", width: "960px", maxWidth: "95vw", height: "min(1200px, 92vh)", borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
         <div style={{ width: "50%", height: "100%", background: "var(--color-surface)", overflowY: "auto" }}>
         <div className="flex items-center justify-between border-b border-rose-line px-5 py-3">
           <span className="text-[15px] font-black text-ink">💳 카드결제 — {order.nickname}</span>

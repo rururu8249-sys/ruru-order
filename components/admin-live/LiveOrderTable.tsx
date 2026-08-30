@@ -184,7 +184,9 @@ function renderOrderSummary(order: LiveOrder) {
   );
 }
 
-function statusBadge(order: LiveOrder) {
+// [2026-08-31 사장님 지시] 「매칭필요」「카드미결제」 배지 옆에 같은 뜻의 버튼이 또 있어 중복이었다.
+//   → 배지 자체를 누르면 입금매칭/카드결제가 열린다(핸들러가 넘어온 경우). 다른 상태 배지는 표시 전용 그대로.
+function statusBadge(order: LiveOrder, actions?: { onMatch?: () => void; onCardPay?: () => void }) {
   // 시안 ① 팔레트(딥로즈 테마): 입금확인=green / 매칭필요=amber / 대기·미결제=red / 취소=muted / 카드완료=blue
   const base = { borderRadius: "8px", padding: "3px 9px", fontSize: "11px", fontWeight: 800, display: "inline-block" } as const;
   const green = { background: "var(--color-ok-bg)", color: "var(--color-ok-tx)" };
@@ -197,9 +199,25 @@ function statusBadge(order: LiveOrder) {
     return <span style={{ ...base, ...muted }}>주문서취소</span>;
   }
   if (order.paymentStatus === "manual_match_needed") {
+    if (actions?.onMatch) {
+      return (
+        <button type="button" title="누르면 입금매칭이 열립니다" onClick={(e) => { e.stopPropagation(); actions.onMatch?.(); }}
+          style={{ ...base, ...amber, border: "1px solid var(--color-warn-tx)", cursor: "pointer" }}>
+          🔗 매칭필요
+        </button>
+      );
+    }
     return <span style={{ ...base, ...amber }}>매칭필요</span>;
   }
   if (order.paymentStatus === "card_unpaid") {
+    if (actions?.onCardPay) {
+      return (
+        <button type="button" title="누르면 카드결제 창이 열립니다" onClick={(e) => { e.stopPropagation(); actions.onCardPay?.(); }}
+          style={{ ...base, ...red, border: "1px solid var(--color-danger-tx)", cursor: "pointer" }}>
+          💳 카드미결제
+        </button>
+      );
+    }
     return <span style={{ ...base, ...red }}>카드미결제</span>;
   }
   if (order.paymentStatus === "unpaid") {
@@ -1180,19 +1198,16 @@ export default function LiveOrderTable({
                         <div style={{ fontSize: "12px", color: "#444", marginBottom: "7px", lineHeight: 1.4 }}>{renderOrderSummary(order)} · {getTotalQty(order)}개</div>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", flexWrap: "wrap" }}>
                           <div style={{ display: "flex", gap: "5px", alignItems: "center", flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
-                            {statusBadge(order)}
+                            {statusBadge(order, {
+                              onMatch: onSelectForMatch ? () => onSelectForMatch(order) : undefined,
+                              onCardPay: onOpenCardPay ? () => { openPaysterRightHalf(); onOpenCardPay(order); } : undefined,
+                            })}
                             <button type="button" onClick={() => void copyOrderForCustomer(order)}
                               style={{ fontSize: "10px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "6px", padding: "2px 7px", cursor: "pointer" }}>
                               📋 주문서 복사
                             </button>
                             {(order as any).shippingStatus ? (
                               <span className={`inline-flex items-center justify-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10px] font-black leading-none ${String((order as any).shippingStatus) === "출고완료" ? "bg-info-bg text-[var(--color-info-tx)]" : "bg-surface-2 text-ink-soft"}`}>{(order as any).shippingStatus}</span>
-                            ) : null}
-                            {order.paymentStatus === "manual_match_needed" ? (
-                              <button type="button" onClick={(e) => { e.stopPropagation(); onSelectForMatch?.(order); }} className="rounded-lg border border-orange-300 bg-warn-bg px-2 py-0.5 text-[10px] font-black text-warn-tx hover:bg-orange-100">🔗 입금매칭</button>
-                            ) : null}
-                            {order.paymentStatus === "card_unpaid" && onOpenCardPay ? (
-                              <button type="button" onClick={() => { openPaysterRightHalf(); onOpenCardPay(order); }} className="rounded-lg border border-info-tx bg-info-bg px-2 py-0.5 text-[10px] font-black text-info-tx hover:bg-info-bg">💳 카드결제</button>
                             ) : null}
                             {["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
                               <button type="button" title="결제요청 쪽지 보내기" aria-label="결제요청 쪽지 보내기" disabled={payRequestSending === order.id} onClick={() => void sendPaymentRequest(order)} style={{ border: "none", background: "none", padding: "0 2px", fontSize: "14px", lineHeight: 1, cursor: "pointer", opacity: payRequestSending === order.id ? 0.35 : 0.75 }}>🔔</button>
@@ -1286,18 +1301,11 @@ export default function LiveOrderTable({
                       </div>
                       {/* 8. 입금 */}
                       <div className="px-3 py-3 text-center">
-                        <div>{statusBadge(order)}</div>
+                        <div>{statusBadge(order, {
+                          onMatch: onSelectForMatch ? () => onSelectForMatch(order) : undefined,
+                          onCardPay: onOpenCardPay ? () => { openPaysterRightHalf(); onOpenCardPay(order); } : undefined,
+                        })}</div>
                         {order.paidAt && <div className="mt-0.5 text-[10px] text-ink-mute">{order.paidAt}</div>}
-                        {order.paymentStatus === "manual_match_needed" ? (
-                          <button type="button" onClick={(e) => { e.stopPropagation(); onSelectForMatch?.(order); }} className="mt-1 rounded-lg border border-orange-300 bg-warn-bg px-2 py-0.5 text-[10px] font-black text-warn-tx hover:bg-orange-100">
-                            🔗 입금매칭
-                          </button>
-                        ) : null}
-                        {order.paymentStatus === "card_unpaid" && onOpenCardPay ? (
-                          <button type="button" onClick={() => { openPaysterRightHalf(); onOpenCardPay(order); }} className="mt-1 rounded-lg border border-info-tx bg-info-bg px-2 py-0.5 text-[10px] font-black text-info-tx hover:bg-info-bg">
-                            💳 카드결제
-                          </button>
-                        ) : null}
                         {["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
                           <button type="button" title="결제요청 쪽지 보내기" aria-label="결제요청 쪽지 보내기" disabled={payRequestSending === order.id} onClick={(e) => { e.stopPropagation(); void sendPaymentRequest(order); }} className="mt-0.5 rounded-full px-1 text-[14px] leading-none opacity-70 transition hover:opacity-100 hover:drop-shadow disabled:opacity-35">
                             🔔
