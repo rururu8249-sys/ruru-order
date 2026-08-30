@@ -312,6 +312,18 @@ const readOrderDraftData = (): OrderDraftData | null => {
     const parsed = JSON.parse(rawValue) as OrderDraftData;
     if (!parsed || typeof parsed !== "object") return null;
 
+    // [2026-08-31 전수조사 수정] 임시 장바구니에 유통기한이 없어서, 몇 주 전에 담아둔
+    //   (지금은 내린) 상품이 재접속 때마다 되살아나 담김 현황에 유령 선점으로 잡혔다
+    //   (실측: 밤고래 님 — 예전 쇼핑몰 상품 4종이 계속 선점됨).
+    //   7일 지난 장바구니는 버린다. savedAt 이 없는 아주 옛 형식도 같은 이유로 버린다
+    //   (savedAt 저장은 이미 오래전부터 있었으므로, 없는 건 그보다 더 옛날 것뿐).
+    const DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+    const savedAt = Number(parsed.savedAt || 0);
+    if (!savedAt || Date.now() - savedAt > DRAFT_MAX_AGE_MS) {
+      try { window.localStorage.removeItem(ORDER_DRAFT_STORAGE_KEY); } catch { /* 무시 */ }
+      return null;
+    }
+
     return parsed;
   } catch {
     return null;
