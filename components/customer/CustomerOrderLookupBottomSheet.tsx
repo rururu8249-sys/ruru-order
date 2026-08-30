@@ -226,6 +226,15 @@ export default function CustomerOrderLookupBottomSheet({
               <div style={{ borderRadius: "16px", background: "#FAF6F2", padding: "20px", textAlign: "center", border: "1px solid #E8E2DD" }}>
                 <p style={{ fontSize: "15px", fontWeight: 800, letterSpacing: "-0.05em", color: "#555" }}>선택한 상태의 주문내역이 없습니다.</p>
                 <p style={{ marginTop: "4px", fontSize: "12px", fontWeight: 700, color: "#999" }}>다른 상태를 눌러 확인해 주세요.</p>
+                {/* [2026-08-31 실사고: 하루한켠_log 님] 주문·DB·조회 전부 정상인데 손님 화면만 비어 있었다.
+                    원인: 다른 브라우저(네이버앱 등)에 카카오 연결 전 옛 로그인 정보가 남아 조회 열쇠가 어긋남.
+                    서버는 고칠 게 없고, 손님이 그 브라우저에서 카카오 로그인만 다시 하면 해결된다.
+                    → 빈 화면에서 스스로 해결할 수 있게 안내를 붙인다. */}
+                <p style={{ marginTop: "10px", fontSize: "12px", fontWeight: 700, color: "#7A1E47", lineHeight: 1.6 }}>
+                  주문하셨는데 안 보이나요?<br />
+                  화면 위 「로그아웃」 후 <b>카카오 로그인을 다시 한 번</b> 해주세요.<br />
+                  (다른 앱·브라우저에는 예전 정보가 남아 있을 수 있어요)
+                </p>
               </div>
             )}
           </div>
