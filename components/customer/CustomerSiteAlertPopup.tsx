@@ -25,6 +25,26 @@ function customerPhone() {
   try { return (localStorage.getItem("ruru_customer_phone") || "").replace(/[^0-9]/g, ""); } catch { return ""; }
 }
 
+// [2026-08-30 보안] 전화번호만으로는 쪽지를 못 읽게 바뀌었다.
+//   본인 확인용으로 카카오 계정(이 프로젝트의 고객 식별 원칙) 또는 유튜브 닉네임을 같이 보낸다.
+//   주소창에 남지 않도록 POST 본문으로 보낸다.
+function kakaoId() {
+  try { return (localStorage.getItem("ruru_kakao_id") || "").trim(); } catch { return ""; }
+}
+function youtubeNickname() {
+  try { return (localStorage.getItem("ruru_youtube_nickname") || "").trim(); } catch { return ""; }
+}
+async function askAlerts(mode: "alert" | "box") {
+  const res = await fetch("/api/customer-site-alerts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+    body: JSON.stringify({ mode, sessionKey: sessionKey(), phone: customerPhone(), kakaoId: kakaoId(), nickname: youtubeNickname() }),
+  });
+  if (!res.ok) return null;
+  return await res.json().catch(() => null);
+}
+
 export default function CustomerSiteAlertPopup() {
   const [alert, setAlert] = useState<SiteAlert | null>(null);
   // [2026-08-30] 쪽지함 — 팝업을 닫아도 다시 볼 수 있게
@@ -48,22 +68,14 @@ export default function CustomerSiteAlertPopup() {
       const phone = customerPhone();
       if (!key && !phone) return;
       try {
-        const qs = new URLSearchParams();
-        if (key) qs.set("sessionKey", key);
-        if (phone) qs.set("phone", phone);
-        const res = await fetch(`/api/customer-site-alerts?${qs.toString()}`, { cache: "no-store" });
-        const json = await res.json().catch(() => null);
-        if (!stopped && res.ok && json?.ok) setAlert(json.alert || null);
+        const json = await askAlerts("alert");
+        if (!stopped && json?.ok) setAlert(json.alert || null);
       } catch { /* 개인알림 실패는 주문 흐름에 영향 없음 */ }
 
       // 쪽지함 개수(안 읽음 배지)도 같이 갱신 — 실패해도 무시
       try {
-        const qs2 = new URLSearchParams({ mode: "box" });
-        if (key) qs2.set("sessionKey", key);
-        if (phone) qs2.set("phone", phone);
-        const r2 = await fetch(`/api/customer-site-alerts?${qs2.toString()}`, { cache: "no-store" });
-        const j2 = await r2.json().catch(() => null);
-        if (!stopped && r2.ok && j2?.ok) {
+        const j2 = await askAlerts("box");
+        if (!stopped && j2?.ok) {
           const list = Array.isArray(j2.box) ? (j2.box as BoxItem[]) : [];
           const nots = Array.isArray(j2.notices) ? (j2.notices as NoticeItem[]) : [];
           setBox(list);
@@ -116,7 +128,7 @@ export default function CustomerSiteAlertPopup() {
         void fetch("/api/customer-site-alerts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: current.id, sessionKey: key, phone }),
+          body: JSON.stringify({ id: current.id, sessionKey: key, phone, kakaoId: kakaoId(), nickname: youtubeNickname() }),
         }).catch(() => undefined);
       }
     }
