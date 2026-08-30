@@ -31,7 +31,27 @@ export function detailNamesForProduct(row:ProductLike,includeHidden=true){const 
 function directImage(row:ProductLike){const d=str(row,["image_url","cover_image_url","main_image_url","thumbnail_url"]); if(d)return d; const a=Array.isArray(row.detail_image_urls)?row.detail_image_urls:Array.isArray(row.image_urls)?row.image_urls:Array.isArray(row.images)?row.images:[]; return a.length?String(a[0]||""):"";}
 export function detailProducts(row:ProductLike,opts?:{includeHidden?:boolean}):DetailProduct[]{const includeHidden=opts?.includeHidden??false; const note=parseProductNote(row); const names=detailNamesForProduct(row,true); if(!names.length)return []; const parentId=str(row,["id","product_id"]), parentName=str(row,["product_name","name","title"])||"상품", base=num(row,["price","sale_price","selling_price"]); const pricing=rec(note.option_pricing), hidden=new Set(arr(note.combo_hidden)), group=rec(note.brand_group), options=rec(group.detail_options), photos=rec(note.detail_photos), sets=rec(note.detail_photo_sets), managed=note.stock_management_enabled===true, raws=Array.isArray(note.stock_variants)?note.stock_variants as Array<Record<string,unknown>>:[]; return names.filter(n=>includeHidden||!hidden.has(n)).map(name=>{const o=rec(options[name]), colors=cleanOptionValues(o.colors), sizes=cleanOptionValues(o.sizes), set=arr(sets[name]), fallback=typeof photos[name]==="string"?String(photos[name]):"", images=[...new Set([...set,fallback].filter(Boolean))]; const pf=directImage(row); if(!images.length&&pf)images.push(pf); const variants=raws.map(v=>({rawColor:String(v?.color??"").trim(),size:String(v?.size??"").trim(),stock:Number(v?.stock??0)||0})).filter(v=>v.rawColor===name||v.rawColor.startsWith(`${name} / `)).map(v=>({color:v.rawColor===name?"":v.rawColor.slice(`${name} / `.length).trim(),size:EMPTY.has(v.size.toLowerCase())?"":v.size,stock:v.stock})); const stock=managed&&variants.length?variants.reduce((s,v)=>s+Math.max(0,v.stock),0):null; const plus=Number(pricing[name]??0); return {parentId,parentName,detailName:name,code:detailCode(name),hidden:hidden.has(name),price:Math.max(0,base+(Number.isFinite(plus)?plus:0)),images,image:images[0]||"",colors,sizes,stockManaged:managed,stockVariants:variants,stock};});}
 export function expandForWidget(row:ProductLike):ProductLike[]{const details=detailProducts(row,{includeHidden:false}); if(!details.length)return [row]; const note=parseProductNote(row); return details.map(d=>({...row,product_name:d.detailName,price:d.price,image_url:d.image||row.image_url||null,color_options:d.colors,size_options:d.sizes,stock:d.stock??row.stock,total_stock:d.stock??row.total_stock,product_note:{...note,stock_variants:d.stockVariants},__parent_product_id:d.parentId,__detail_name:d.detailName,__detail_code:d.code}));}
-export function adminDetailSearch(row:ProductLike,qraw:string){const q=String(qraw||"").replace(/\s+/g,"").toLowerCase(); if(!q)return []; return detailProducts(row,{includeHidden:true}).filter(d=>[d.detailName,d.code,...d.colors,...d.sizes].join(" ").replace(/\s+/g,"").toLowerCase().includes(q));}
+// [2026-08-30 사장님 지적] 「68」 로 검색했더니 68과 상관없는 상품이 잔뜩 나왔다.
+//
+// 원인: 예전엔 이름·코드·색상·사이즈를 공백으로 이어붙인 뒤 그 공백을 다시 지웠다.
+//   사이즈 ["4","6","8","10","12"] → "4 6 8 10 12" → "4681012" → 여기에 "68" 이 들어있다.
+//   칸 경계가 사라져서 없던 글자가 만들어진 것이다. (이름 끝 + 코드 앞이 붙는 문제도 같다)
+//
+// 고침: 칸을 이어붙이지 않고 하나씩 따로 본다.
+//   · 상품명 · 코드 · 색상 → 부분일치 (칸 안에서만 공백 무시 → "트렌치 코트" 로 "트렌치코트" 찾음)
+//   · 사이즈 → 정확히 같을 때만. 숫자라서 부분일치를 하면 "8" 이 "18"·"28" 에도 걸린다.
+const searchNorm = (v: unknown) => String(v ?? "").replace(/\s+/g, "").toLowerCase();
+
+export function adminDetailSearch(row: ProductLike, qraw: string): DetailProduct[] {
+  const q = searchNorm(qraw);
+  if (!q) return [];
+  return detailProducts(row, { includeHidden: true }).filter((d) =>
+    searchNorm(d.detailName).includes(q) ||
+    searchNorm(d.code).includes(q) ||
+    d.colors.some((c) => searchNorm(c).includes(q)) ||
+    d.sizes.some((s) => searchNorm(s) === q)
+  );
+}
 export function buildDetailChatLine(d:DetailProduct){const p=[d.detailName,`${Math.round(d.price).toLocaleString("ko-KR")}원`]; if(d.colors.length)p.push(`색상: ${d.colors.join(",")}`); if(d.sizes.length)p.push(`사이즈: ${d.sizes.join(",")}`); return p.join(" / ").replace(/[\r\n]+/g," ").trim();}
 function detailDescriptionWithoutCode(d:DetailProduct){let v=String(d.detailName||"").trim().replace(/^\S+\s*/,"").trim(); const c=d.colors[0]||""; if(c){const e=c.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"); v=v.replace(new RegExp(`\\s*[·/\\-]?\\s*${e}\\s*$`,"i"),"").trim();}return v||"상품";}
 function commonDescription(ms:DetailProduct[]){const vals=ms.map(detailDescriptionWithoutCode).filter(Boolean); if(!vals.length)return "상품"; if(vals.every(v=>v===vals[0]))return vals[0]; const rows=vals.map(v=>v.split(/\s+/).filter(Boolean)), min=Math.min(...rows.map(r=>r.length)), common:string[]=[]; for(let i=0;i<min;i++){const t=rows[0][i]; if(!rows.every(r=>r[i]===t))break; common.push(t);} return common.join(" ").trim()||"같은 디자인";}
