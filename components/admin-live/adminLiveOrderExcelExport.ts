@@ -417,12 +417,15 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   //      판정은 물건챙기기 팝업과 같은 기준(PAID_STATUSES). 화면 표시·엑셀 스타일만, 돈 데이터 무접촉.
   const PICKING_PAID_STATUSES = ["paid", "auto_paid", "manual_paid", "card_paid"];
   const isUnpaidOrder = (order: LiveOrder) => !PICKING_PAID_STATUSES.includes(clean(order.paymentStatus));
-  const hasUnpaid = exportOrders.some(isUnpaidOrder);
+  // [2026-08-31 사장님 피드백] 처음엔 미입금이 있을 때만 「결제」 칸을 만들었는데,
+  //   칸이 파일마다 있다 없다 하니 "카드결제가 누락됐나?" 하는 불안만 낳았다.
+  //   → 항상 넣는다. 전부 완료면 전부 '완료'로 보일 뿐이다.
+  const hasUnpaid = true;
 
   const withPick = pickedIds instanceof Set;
   const headers: WorkbookRow = ["닉네임", "상품명", "옵션", "수량", "상품금액"];
   if (withPick) headers.push("챙김");
-  if (hasUnpaid) headers.push("결제");
+  headers.push("결제");
   const pickLabel = (id: string) => (pickedIds?.has(id) ? "챙김" : "안챙김");
 
   const itemRows: WorkbookRow[] = [];
