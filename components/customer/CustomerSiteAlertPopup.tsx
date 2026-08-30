@@ -11,6 +11,17 @@ type NoticeItem = { id: number; title: string; content: string; category?: strin
 // 쪽지 종류에 맞는 아이콘 — 주문 재촉(🛒)과 사장님 쪽지(📩)를 구분한다.
 const iconOf = (kind: string) => (kind === "admin_note" ? "📩" : "🛒");
 
+// [2026-08-31 사장님 지적] 제목 안에 이미 이모지가 들어 있어(🛒🛒·📌📌) 아이콘이 겹쳐 보였다 — 표시할 때 앞 이모지를 뗀다.
+const stripLeadIcon = (s: unknown) => {
+  const t = String(s ?? "").trim();
+  const stripped = t.replace(/^(?:[\p{Extended_Pictographic}\uFE0F\u200D]+\s*)+/u, "").trim();
+  return stripped || t;
+};
+const shortDate = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isFinite(d.getTime()) ? `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}` : "";
+};
+
 // 시각 표기는 lib/noteTime.ts 에 두고 테스트(scripts/test-note-time-format.mjs)와 같은 함수를 쓴다.
 const timeText = noteTimeText;
 const agoText = (iso: string) => noteAgoText(iso);
@@ -60,9 +71,9 @@ export default function CustomerSiteAlertPopup() {
   const [noticePopupOpen, setNoticePopupOpen] = useState(false);
   // [2026-08-30] 하단 메뉴에 「공지·쪽지」가 있는 화면이면 🔔 버튼은 숨긴다(중복 + 화면 가림).
   const [noticeMenuOn, setNoticeMenuOn] = useState(false);
-  // [2026-08-30] 게시판형 쪽지함 — 탭 + 하나만 펼치기
+  // [2026-08-31 사장님 지시] 게시판형 — 번호+제목 목록, 누르면 내용 화면(「목록으로」 버튼), 맨 오른쪽 읽음 표시
   const [boxTab, setBoxTab] = useState<BoxTab>("all");
-  const [openKey, setOpenKey] = useState("");
+  const [detail, setDetail] = useState<{ kind: "guide" | "notice" | "note"; id?: number } | null>(null);
   // 더 보기 — 예전엔 최근 30개에서 말없이 잘렸다
   const [hasMore, setHasMore] = useState(false);
   const [nextOffset, setNextOffset] = useState(0);
@@ -137,10 +148,28 @@ export default function CustomerSiteAlertPopup() {
       void askAlerts({ action: "seen", alertId: id }).catch(() => undefined);
       // 화면에서도 바로 읽음으로 보이게 (다음 갱신을 기다리지 않는다)
       setBox((prev) => prev.map((b) => (b.id === id && !b.seen_at ? { ...b, seen_at: new Date().toISOString() } : b)));
-      setUnread((n) => Math.max(0, n - 1));
+      setUnread((n) => {
+        const next = Math.max(0, n - 1);
+        try { window.dispatchEvent(new CustomEvent("ruru-note-unread", { detail: next })); } catch { /* 무시 */ }
+        return next;
+      });
     }, 2000);
     return () => window.clearTimeout(t);
   }, [alert?.id]);
+
+  // [2026-08-31 사장님 지적] 쪽지를 열면 그 자리에서 바로 읽음 처리 — 화면 표시·배지·서버 모두 즉시 반영.
+  const openNote = (b: BoxItem) => {
+    setDetail({ kind: "note", id: b.id });
+    if (!b.seen_at) {
+      void askAlerts({ action: "seen", alertId: b.id }).catch(() => undefined);
+      setBox((prev) => prev.map((x) => (x.id === b.id && !x.seen_at ? { ...x, seen_at: new Date().toISOString() } : x)));
+      setUnread((n) => {
+        const next = Math.max(0, n - 1);
+        try { window.dispatchEvent(new CustomEvent("ruru-note-unread", { detail: next })); } catch { /* 무시 */ }
+        return next;
+      });
+    }
+  };
 
   const dismiss = async (goOrder: boolean) => {
     const current = alert;
@@ -187,11 +216,11 @@ export default function CustomerSiteAlertPopup() {
 
       {/* 쪽지함 목록 */}
       {boxOpen ? (
-        <div className="fixed inset-0 z-[490] flex items-end justify-center bg-black/50" onClick={(e) => { if (e.target === e.currentTarget) setBoxOpen(false); }}>
+        <div className="fixed inset-0 z-[490] flex items-end justify-center bg-black/50" onClick={(e) => { if (e.target === e.currentTarget) { setBoxOpen(false); setDetail(null); } }}>
           <div className="flex max-h-[76vh] w-full max-w-[480px] flex-col overflow-hidden rounded-t-[26px] bg-white">
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
               <h2 className="text-[17px] font-black text-slate-950">📬 공지 · 쪽지함</h2>
-              <button type="button" onClick={() => setBoxOpen(false)} className="text-lg font-black text-slate-400">✕</button>
+              <button type="button" onClick={() => { setBoxOpen(false); setDetail(null); }} className="text-lg font-black text-slate-400">✕</button>
             </div>
             {/* [2026-08-30 사장님 지적] 내용이 전부 펼쳐져 있어서 「내 쪽지」가 아래 있는지 몰랐다.
                 → 게시판처럼 제목만 보이고, 누르면 펼쳐진다. 탭으로 공지/내 쪽지를 나눈다.
@@ -205,7 +234,7 @@ export default function CustomerSiteAlertPopup() {
                 <button
                   key={t.key}
                   type="button"
-                  onClick={() => setBoxTab(t.key)}
+                  onClick={() => { setBoxTab(t.key); setDetail(null); }}
                   className={`rounded-full px-3.5 py-1.5 text-[12.5px] font-black transition ${boxTab === t.key ? "bg-[#7B2D43] text-white" : "bg-slate-100 text-slate-500"}`}
                 >
                   {t.label}
@@ -217,143 +246,147 @@ export default function CustomerSiteAlertPopup() {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-              {/* 쇼핑 전 꼭 확인 — 늘 해당되는 안내(사이즈 오차·교환반품 비용). 접어 둔다. */}
-              {shopGuide && boxTab !== "mine" ? (
-                <button
-                  type="button"
-                  onClick={() => setOpenKey(openKey === "guide" ? "" : "guide")}
-                  className="mb-2 w-full rounded-2xl border border-[#E7D2DA] bg-[#FBF3F6] p-3.5 text-left"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">📌</span>
-                    <span className="min-w-0 flex-1 text-[14px] font-black text-slate-900">쇼핑 전 꼭 확인</span>
-                    <span className="shrink-0 text-[11px] font-black text-slate-400">{openKey === "guide" ? "접기 ▲" : "펼치기 ▼"}</span>
+              {/* [2026-08-31 사장님 지시] 게시판형 — 목록엔 번호·제목·읽음만, 누르면 내용 화면으로 전환 */}
+              {detail ? (() => {
+                const back = (
+                  <button type="button" onClick={() => setDetail(null)} className="mb-3 inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-black text-slate-600 active:bg-slate-50">← 목록으로</button>
+                );
+                if (detail.kind === "guide") {
+                  return (
+                    <div>
+                      {back}
+                      <h3 className="text-[15px] font-black text-slate-950">쇼핑 전 꼭 확인</h3>
+                      <p className="mt-3 whitespace-pre-line text-[13.5px] font-bold leading-6 text-slate-700">{shopGuide}</p>
+                    </div>
+                  );
+                }
+                if (detail.kind === "notice") {
+                  const n = notices.find((x) => x.id === detail.id);
+                  if (!n) return <div className="py-12 text-center text-sm font-bold text-slate-400">공지를 찾을 수 없어요.</div>;
+                  return (
+                    <div>
+                      {back}
+                      <h3 className="text-[15px] font-black text-slate-950">{stripLeadIcon(n.title)}</h3>
+                      <div className="mt-1 text-[11px] font-bold text-slate-400">{timeText(n.created_at)}{agoText(n.created_at) ? ` · ${agoText(n.created_at)}` : ""}</div>
+                      <p className="mt-3 whitespace-pre-line text-[13.5px] font-bold leading-6 text-slate-700">{n.content}</p>
+                    </div>
+                  );
+                }
+                const b = box.find((x) => x.id === detail.id);
+                if (!b) return <div className="py-12 text-center text-sm font-bold text-slate-400">쪽지를 찾을 수 없어요.</div>;
+                return (
+                  <div>
+                    {back}
+                    <h3 className="text-[15px] font-black text-slate-950">{stripLeadIcon(b.title)}</h3>
+                    <div className="mt-1 text-[11px] font-bold text-slate-400">
+                      받은 날짜 {timeText(b.created_at)}{b.seen_at ? ` · 읽은 날짜 ${timeText(b.seen_at)}` : ""}
+                    </div>
+                    <p className="mt-3 whitespace-pre-line text-[13.5px] font-bold leading-6 text-slate-600">{b.message}</p>
                   </div>
-                  {openKey === "guide" ? (
-                    <p className="mt-2 whitespace-pre-line text-[13px] font-bold leading-6 text-slate-700">{shopGuide}</p>
-                  ) : (
-                    <p className="mt-1 truncate text-[12px] font-bold text-slate-400">{shopGuide.replace(/\s+/g, " ")}</p>
-                  )}
-                </button>
-              ) : null}
-
-              {/* 공지사항 — 제목만. 누르면 펼쳐진다. */}
-              {boxTab !== "mine" && notices.length > 0 ? (
-                <ul className="mb-2 space-y-2">
-                  {notices.map((n) => {
-                    const k = `n-${n.id}`;
-                    const on = openKey === k;
+                );
+              })() : (
+                <>
+                  {/* ── 공지 표 — 고정 공지가 맨 위, 그다음 「쇼핑 전 꼭 확인」, 나머지는 번호 순 ── */}
+                  {boxTab !== "mine" ? (() => {
+                    const pinned = notices.filter((n) => Boolean(n.is_pinned));
+                    const normal = notices.filter((n) => !n.is_pinned);
+                    type Row = { key: string; chip: string | number; title: string; date?: string; onClick: () => void };
+                    const rows: Row[] = [
+                      ...pinned.map((n): Row => ({ key: `n-${n.id}`, chip: "고정", title: stripLeadIcon(n.title), date: n.created_at, onClick: () => setDetail({ kind: "notice", id: n.id }) })),
+                      ...(shopGuide ? [{ key: "guide", chip: "필독", title: "쇼핑 전 꼭 확인", onClick: () => setDetail({ kind: "guide" }) } as Row] : []),
+                      ...normal.map((n, i): Row => ({ key: `n-${n.id}`, chip: i + 1, title: stripLeadIcon(n.title), date: n.created_at, onClick: () => setDetail({ kind: "notice", id: n.id }) })),
+                    ];
+                    if (rows.length === 0) return boxTab === "notice" ? <div className="py-12 text-center text-sm font-bold text-slate-400">등록된 공지가 없어요.</div> : null;
                     return (
-                      <li key={k}>
-                        <button
-                          type="button"
-                          onClick={() => setOpenKey(on ? "" : k)}
-                          className="w-full rounded-2xl border border-[#E7D2DA] bg-[#FBF3F6] p-3.5 text-left"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-base">{n.is_pinned ? "📌" : "📢"}</span>
-                            <span className="min-w-0 flex-1 truncate text-[14px] font-black text-slate-900">{n.title}</span>
-                            {n.is_pinned ? <span className="shrink-0 rounded-full bg-[#7B2D43] px-2 py-0.5 text-[10px] font-black text-white">고정</span> : null}
-                            <span className="shrink-0 text-[11px] font-black text-slate-400">{on ? "▲" : "▼"}</span>
-                          </div>
-                          {on ? (
-                            <>
-                              <p className="mt-2 whitespace-pre-line text-[13px] font-bold leading-6 text-slate-700">{n.content}</p>
-                              <div className="mt-1.5 text-[11px] font-bold text-slate-400">
-                                {timeText(n.created_at)}{agoText(n.created_at) ? ` · ${agoText(n.created_at)}` : ""}
-                              </div>
-                            </>
-                          ) : (
-                            <p className="mt-1 truncate text-[12px] font-bold text-slate-400">{String(n.content ?? "").replace(/\s+/g, " ")}</p>
-                          )}
-                        </button>
-                      </li>
+                      <div className="mb-3">
+                        {boxTab === "all" ? <div className="mb-1.5 px-1 text-[11px] font-black text-slate-400">공지</div> : null}
+                        <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                          {rows.map((r) => (
+                            <li key={r.key}>
+                              <button type="button" onClick={r.onClick} className="grid w-full grid-cols-[46px_minmax(0,1fr)_50px] items-center gap-2 px-2 py-3 text-left active:bg-slate-50">
+                                <span className="text-center">
+                                  {typeof r.chip === "number" ? (
+                                    <span className="text-[12px] font-black text-slate-400">{r.chip}</span>
+                                  ) : (
+                                    <span className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-black ${r.chip === "고정" ? "bg-[#7B2D43] text-white" : "border border-rose-200 bg-rose-50 text-[#7B2D43]"}`}>{r.chip}</span>
+                                  )}
+                                </span>
+                                <span className="truncate text-[13.5px] font-black text-slate-900">{r.title}</span>
+                                <span className="text-center text-[11px] font-bold text-slate-400">{r.date ? shortDate(r.date) : ""}</span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     );
-                  })}
-                </ul>
-              ) : null}
+                  })() : null}
 
-              {/* 내 쪽지 — 안 읽은 것은 펼친 채로 시작한다. */}
-              {boxTab !== "notice" ? (
-                box.length === 0 ? (
-                  boxTab === "mine" ? (
+                  {/* ── 내 쪽지 표 — 누르면 내용 화면 + 그 자리에서 읽음 처리 ── */}
+                  {boxTab !== "notice" ? (
+                    box.length === 0 ? (
+                      boxTab === "mine" ? (
+                        <div className="py-12 text-center text-sm font-bold text-slate-400">받은 쪽지가 없어요.</div>
+                      ) : null
+                    ) : (
+                      <div className="mb-1">
+                        {boxTab === "all" ? <div className="mb-1.5 px-1 text-[11px] font-black text-slate-400">내 쪽지</div> : null}
+                        <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                          {box.map((b, i) => (
+                            <li key={`b-${b.id}`}>
+                              <button type="button" onClick={() => openNote(b)} className={`grid w-full grid-cols-[46px_minmax(0,1fr)_62px] items-center gap-2 px-2 py-3 text-left active:bg-slate-50 ${b.seen_at ? "" : "bg-rose-50/50"}`}>
+                                <span className="text-center text-[12px] font-black text-slate-400">{i + 1}</span>
+                                <span className="min-w-0">
+                                  <span className={`block truncate text-[13.5px] ${b.seen_at ? "font-bold text-slate-600" : "font-black text-slate-900"}`}>{stripLeadIcon(b.title)}</span>
+                                  <span className="block text-[10.5px] font-bold text-slate-400">{shortDate(b.created_at)}{agoText(b.created_at) ? ` · ${agoText(b.created_at)}` : ""}</span>
+                                </span>
+                                <span className="text-center">
+                                  {b.seen_at ? (
+                                    <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-400">읽음</span>
+                                  ) : (
+                                    <span className="inline-block rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white">안 읽음</span>
+                                  )}
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )
+                  ) : null}
+
+                  {/* [2026-08-30] 예전엔 최근 30개에서 말없이 잘렸다 */}
+                  {boxTab !== "notice" && hasMore ? (
+                    <button
+                      type="button"
+                      disabled={moreLoading}
+                      onClick={async () => {
+                        setMoreLoading(true);
+                        try {
+                          const j = await askAlerts({ mode: "box", offset: nextOffset });
+                          if (j?.ok) {
+                            const more = Array.isArray(j.box) ? (j.box as BoxItem[]) : [];
+                            setBox((prev) => {
+                              const seen = new Set(prev.map((b) => b.id));
+                              return [...prev, ...more.filter((b) => !seen.has(b.id))];
+                            });
+                            setHasMore(Boolean(j.hasMore));
+                            setNextOffset(Number(j.nextOffset) || nextOffset + more.length);
+                          }
+                        } finally {
+                          setMoreLoading(false);
+                        }
+                      }}
+                      className="mt-2 w-full rounded-2xl border border-slate-200 bg-white py-3 text-[13px] font-black text-slate-500 disabled:opacity-50"
+                    >
+                      {moreLoading ? "불러오는 중…" : "이전 쪽지 더 보기"}
+                    </button>
+                  ) : null}
+
+                  {boxTab === "all" && box.length === 0 && notices.length === 0 && !shopGuide ? (
                     <div className="py-12 text-center text-sm font-bold text-slate-400">받은 쪽지가 없어요.</div>
-                  ) : null
-                ) : (
-                  <ul className="space-y-2">
-                    {box.map((b) => {
-                      const k = `b-${b.id}`;
-                      const on = openKey === k || (!openKey && !b.seen_at);
-                      return (
-                        <li key={k}>
-                          <button
-                            type="button"
-                            onClick={() => setOpenKey(on ? `close-${k}` : k)}
-                            className={`w-full rounded-2xl border p-3.5 text-left ${b.seen_at ? "border-slate-100 bg-white" : "border-rose-200 bg-rose-50/60"}`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="text-base">{iconOf(b.kind)}</span>
-                              <span className="min-w-0 flex-1 truncate text-[14px] font-black text-slate-900">{b.title}</span>
-                              {b.seen_at ? (
-                                <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-400">읽음</span>
-                              ) : (
-                                <span className="shrink-0 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white">안 읽음</span>
-                              )}
-                              <span className="shrink-0 text-[11px] font-black text-slate-400">{on ? "▲" : "▼"}</span>
-                            </div>
-                            {on ? (
-                              <>
-                                <p className="mt-2 whitespace-pre-line text-[13px] font-bold leading-6 text-slate-600">{b.message}</p>
-                                <div className="mt-1.5 text-[11px] font-bold text-slate-400">
-                                  받은 날짜 {timeText(b.created_at)}{agoText(b.created_at) ? ` · ${agoText(b.created_at)}` : ""}
-                                  {b.seen_at ? <span className="ml-1 text-slate-300">· 읽은 날짜 {timeText(b.seen_at)}</span> : null}
-                                </div>
-                              </>
-                            ) : (
-                              <p className="mt-1 truncate text-[12px] font-bold text-slate-400">{String(b.message ?? "").replace(/\s+/g, " ")}</p>
-                            )}
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )
-              ) : null}
-
-              {/* [2026-08-30] 예전엔 최근 30개에서 말없이 잘렸다 */}
-              {boxTab !== "notice" && hasMore ? (
-                <button
-                  type="button"
-                  disabled={moreLoading}
-                  onClick={async () => {
-                    setMoreLoading(true);
-                    try {
-                      const j = await askAlerts({ mode: "box", offset: nextOffset });
-                      if (j?.ok) {
-                        const more = Array.isArray(j.box) ? (j.box as BoxItem[]) : [];
-                        setBox((prev) => {
-                          const seen = new Set(prev.map((b) => b.id));
-                          return [...prev, ...more.filter((b) => !seen.has(b.id))];
-                        });
-                        setHasMore(Boolean(j.hasMore));
-                        setNextOffset(Number(j.nextOffset) || nextOffset + more.length);
-                      }
-                    } finally {
-                      setMoreLoading(false);
-                    }
-                  }}
-                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white py-3 text-[13px] font-black text-slate-500 disabled:opacity-50"
-                >
-                  {moreLoading ? "불러오는 중…" : "이전 쪽지 더 보기"}
-                </button>
-              ) : null}
-
-              {boxTab === "all" && box.length === 0 && notices.length === 0 && !shopGuide ? (
-                <div className="py-12 text-center text-sm font-bold text-slate-400">받은 쪽지가 없어요.</div>
-              ) : null}
-              {boxTab === "notice" && notices.length === 0 && !shopGuide ? (
-                <div className="py-12 text-center text-sm font-bold text-slate-400">등록된 공지가 없어요.</div>
-              ) : null}
+                  ) : null}
+                </>
+              )}
             </div>
             <div className="border-t border-slate-100 p-4">
               <button
@@ -373,7 +406,7 @@ export default function CustomerSiteAlertPopup() {
           <div className="w-full max-w-[420px] overflow-hidden rounded-[26px] bg-white shadow-2xl">
             <div className="px-6 pb-3 pt-6 text-center">
               <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-rose-50 text-3xl">{iconOf(alert.kind)}</div>
-              <h2 className="text-xl font-black tracking-tight text-slate-950">{alert.title}</h2>
+              <h2 className="text-xl font-black tracking-tight text-slate-950">{stripLeadIcon(alert.title)}</h2>
               <p className="mt-3 whitespace-pre-line text-sm font-bold leading-6 text-slate-600">{alert.message}</p>
             </div>
             <div className="grid gap-2 px-5 pb-5 pt-2">

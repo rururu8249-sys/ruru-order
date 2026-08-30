@@ -1004,7 +1004,7 @@ export default function LiveOrderTable({
             className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2"
             title="장바구니에 담기만 하고 아직 주문서 제출 안 한 고객 목록을 봅니다"
           >
-            🛒 담김 현황
+            🛒 장바구니
           </button>
 
             
