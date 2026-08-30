@@ -2973,7 +2973,9 @@ export default function OrderPage() {
     try {
       const cleanNick = String(nickname || "").trim();
       const phone = normalizePhone(customerPhone);
-      if (!cleanNick || phone.length < 9) return;
+      // [2026-08-30] 이 API 는 회원의 customer_phone 을 옮긴다.
+      //   반쪽짜리 번호가 절대 들어가면 안 된다(계정분리 사고). 완성된 번호만 보낸다.
+      if (!cleanNick || !isOrderablePhone(phone)) return;
       const dedupeKey = `ruru_nick_synced_${phone}_${cleanNick}`;
       if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(dedupeKey)) return;
       await fetch("/api/customer-login-sync", {
@@ -3984,13 +3986,28 @@ export default function OrderPage() {
 
   // [닉네임 자가치유] 이미 폰(localStorage)에만 닉네임이 있는 기존 고객 — 주문 페이지 열기만 하면
   //   회원 DB에 자동 반영(세션당 1회, 비어있거나 다를 때만 서버가 갱신). 표시/검색 필드만 — 돈 로직 무관.
+  //
+  // [2026-08-30 계정분리 사고 · 근본수정] 손님 김지영2231 님 회원이력 실측:
+  //   0264906376 → 026490637 → 81823812231 → 81023012231 → 812301223 → 01023012231 …
+  //   번호를 "타이핑하는 중간 글자"가 몇 초 간격으로 전부 DB에 저장돼 있었다.
+  //   이 useEffect 가 customerPhone 이 바뀔 때마다(=글자 하나 칠 때마다) 실행되고,
+  //   customer-login-sync 가 그 반쪽 번호로 회원의 customer_phone 을 옮겨버렸기 때문이다.
+  //   그 결과 화면 상태와 DB 번호가 어긋나 주문이 옛 번호로 나가고 회원이 둘로 갈라졌다.
+  //   → (1) 정보수정 창이 열려 있는 동안(=편집 중)에는 아예 보내지 않는다.
+  //     (2) 완성된 번호일 때만 보낸다.
+  //     (3) 1.5초 쉬었다가 보낸다 — 연타로 중간값이 나가는 것을 한 번 더 막는다.
   useEffect(() => {
     const nick = youtubeNickname.trim();
     const phone = normalizePhone(customerPhone);
-    if (!nick || phone.length < 9 || !hasSavedInfo) return;
-    void syncYoutubeNicknameToServer(nick);
+    if (!nick || !hasSavedInfo) return;
+    if (customerInfoEditSheetOpen) return;      // 편집 중 — 저장 전에는 서버로 안 보낸다
+    if (!isOrderablePhone(phone)) return;       // 완성된 번호만
+    const timer = window.setTimeout(() => {
+      void syncYoutubeNicknameToServer(nick);
+    }, 1500);
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [youtubeNickname, customerPhone, hasSavedInfo]);
+  }, [youtubeNickname, customerPhone, hasSavedInfo, customerInfoEditSheetOpen]);
 
   // [2026-08-29] preselectDetail — 목록에서 세부상품을 직접 눌러 들어온 경우 1단계를 건너뛴다.
   //   값이 없으면 예전과 완전히 같다(기존 호출부 무변경).

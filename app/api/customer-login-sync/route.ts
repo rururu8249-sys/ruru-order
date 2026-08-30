@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isOrderablePhone } from "@/lib/order/phone";
 import { createClient } from "@supabase/supabase-js";
 import { collectKnownPhoneDigits, selectBackfillPhoneDigits } from "@/lib/customerIdentity";
 
@@ -325,7 +326,14 @@ export async function POST(request: NextRequest) {
       //   단 다른 고객이 이미 그 번호를 쓰는 중이면(unique 충돌) 번호는 건드리지 않는다.
       //   (번호가 비어 있는 고객 row 도 이때 채워진다 — 그래야 포인트·주문과 연결된다)
       const existingPhoneDigits = phoneDigits(existing.customer_phone || "");
-      if (customerPhoneDigits && existingPhoneDigits !== customerPhoneDigits) {
+      // [2026-08-30 계정분리 사고 · 서버 안전장치] 손님이 번호를 타이핑하는 중간값
+      //   ("026490637", "81023012231" 등)이 여기까지 올라와 회원 번호를 옮겼다.
+      //   화면 쪽에서도 막았지만, 서버에서도 완성된 국내 번호가 아니면 옮기지 않는다.
+      //   ⚠️ 번호를 "옮기지 않을 뿐" 로그인·조회는 그대로 진행된다(손님이 막히지 않는다).
+      const incomingPhoneIsComplete = isOrderablePhone(customerPhoneDigits);
+      if (customerPhoneDigits && !incomingPhoneIsComplete && existingPhoneDigits) {
+        console.warn(`전화번호 변경 스킵(완성되지 않은 번호): ${customerPhoneDigits}`);
+      } else if (customerPhoneDigits && existingPhoneDigits !== customerPhoneDigits) {
         const { data: conflictRows } = await supabase
           .from("customers")
           .select("id")
