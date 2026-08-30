@@ -339,6 +339,10 @@ export function toAdminLiveOrder(group: OrderGroup): LiveOrder {
     phone: first.customer_phone || first.phone || "-",
     recipientName: (first as any).recipient_name || null,
     recipientPhone: (first as any).recipient_phone || null,
+    // [2026-08-31 실사고 수정] kakao_id 를 여기서 실어 나르지 않아서,
+    //   8/29에 만든 고객목록 "카카오 기준 묶기"(buildCustomerIdentityResolver)가 장님이 됐다.
+    //   루루짱929 님: DB엔 회원 1줄 + 주문 8건 전부 kakao_id 정상인데, 화면에서만 2명으로 갈라져 보였다.
+    kakao_id: (first as any).kakao_id || null,
     zipcode: first.zipcode || null,
     address: first.address || null,
     detailAddress: first.detail_address || null,

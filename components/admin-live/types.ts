@@ -73,6 +73,7 @@ export type LiveOrder = {
   phone: string;
   recipientName?: string | null;
   recipientPhone?: string | null;
+  kakao_id?: string | null; // [2026-08-31] 고객목록 카카오 기준 묶기용 — 어댑터가 실어 나른다
   zipcode?: string | null;
   address?: string | null;
   detailAddress?: string | null;
