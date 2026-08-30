@@ -110,7 +110,8 @@ export default function CustomerOrderLookupBottomSheet({
       <section data-sheet style={{ width: "100%", maxWidth: "560px", margin: "0 auto", overflow: "hidden", borderTopLeftRadius: "28px", borderTopRightRadius: "28px", background: "#fff", boxShadow: "0 -22px 70px rgba(15,23,42,0.22)" }}>
         <SheetGrabber onClose={onClose} style={{ paddingTop: "8px", paddingBottom: 0 }} />
 
-        <div style={{ display: "flex", maxHeight: "88dvh", flexDirection: "column" }}>
+        {/* [2026-08-31 사장님 지적] 탭·내용 양에 따라 시트가 커졌다 작아졌다 → 높이 고정, 목록만 안에서 스크롤 */}
+        <div style={{ display: "flex", height: "84dvh", flexDirection: "column" }}>
           <header style={{ flexShrink: 0, padding: "16px 16px 8px" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: "8px", whiteSpace: "nowrap" }}>
               <h2 style={{ fontSize: "26px", fontWeight: 800, lineHeight: 1, letterSpacing: "-0.08em", color: "#7B2D43" }}>주문조회</h2>
@@ -134,7 +135,7 @@ export default function CustomerOrderLookupBottomSheet({
             </div>
           </header>
 
-          <div ref={scrollRef} onScroll={handleScroll} style={{ minHeight: 0, overflowY: "auto", padding: "8px 16px" }}>
+          <div ref={scrollRef} onScroll={handleScroll} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "8px 16px" }}>
             {groups.length > 0 ? (
               <div style={{ display: "grid", gap: "10px" }}>
                 {groups.map((group) => {

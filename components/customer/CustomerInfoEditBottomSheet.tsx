@@ -196,6 +196,8 @@ export default function CustomerInfoEditBottomSheet({
     background: "#F7F4F1",
     borderRadius: "20px 20px 0 0",
     overflow: "hidden",
+    // [2026-08-31 사장님 지적] 화면(정보/배송지목록/배송지폼)마다 시트 크기가 달라 정신없음 → 높이 고정, 본문만 스크롤
+    height: "84dvh",
     maxHeight: "92vh",
     display: "flex",
     flexDirection: "column",
