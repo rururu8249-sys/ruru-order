@@ -67,7 +67,11 @@ export async function GET(request: Request) {
     }),
   });
 
-  const tokenData = await tokenResponse.json();
+  // [2026-08-31] 카카오가 JSON 아닌 응답을 주면 그대로 500 → 손님이 로딩 화면에 갇힌다.
+  const tokenData = await tokenResponse.json().catch(() => null);
+  if (!tokenData) {
+    return NextResponse.json({ error: "카카오 응답을 읽지 못했습니다. 다시 시도해 주세요." }, { status: 502 });
+  }
 
   if (!tokenData.access_token) {
     return NextResponse.json(
@@ -83,7 +87,10 @@ export async function GET(request: Request) {
     },
   });
 
-  const userData = await userResponse.json();
+  const userData = await userResponse.json().catch(() => null);
+  if (!userData) {
+    return NextResponse.json({ error: "카카오 프로필을 읽지 못했습니다. 다시 시도해 주세요." }, { status: 502 });
+  }
   const kakaoAccount = userData?.kakao_account || {};
 
   let shippingData: any = null;

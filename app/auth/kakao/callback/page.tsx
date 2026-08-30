@@ -26,8 +26,19 @@ export default function KakaoCallbackPage() {
         return;
       }
 
-      const res = await fetch(`/api/auth/kakao?code=${code}`);
-      const data = await res.json();
+      // [2026-08-31 전수조사 수정] 서버가 JSON 아닌 응답(502 등)을 주거나 네트워크가 끊기면
+      //   res.json() 예외를 아무도 안 잡아 "잠시만요!" 로딩 화면에 영원히 갇혔다.
+      //   (로딩 상태에서는 「처음 화면으로 돌아가기」 버튼도 안 보인다)
+      let res: Response;
+      let data: any;
+      try {
+        res = await fetch(`/api/auth/kakao?code=${code}`);
+        data = await res.json();
+      } catch {
+        setStatus("error");
+        setMessage("연결이 잠시 불안정했어요. 아래 버튼으로 돌아가서 다시 로그인해 주세요.");
+        return;
+      }
 
       if (!res.ok) {
         const detail = data?.detail;

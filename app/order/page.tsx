@@ -1545,6 +1545,8 @@ export default function OrderPage() {
   const [customerPointBalance, setCustomerPointBalance] = useState(0);
   const [shippingAddresses, setShippingAddresses] = useState<any[]>([]);
   const [customerPointLoading, setCustomerPointLoading] = useState(false);
+  // [2026-08-31] 포인트 조회 실패 표시 — 0원(정상)과 "못 불러옴"을 구분한다
+  const [customerPointLoadFailed, setCustomerPointLoadFailed] = useState(false);
   const [pointUseInput, setPointUseInput] = useState("");
   const [directInputOpen, setDirectInputOpen] = useState(false);
   const [directInputKeyboardInset, setDirectInputKeyboardInset] = useState(0);
@@ -3343,6 +3345,7 @@ export default function OrderPage() {
         if (!alive) return;
 
         setCustomerPointBalance(nextPoints);
+        setCustomerPointLoadFailed(false);
 
         if (nextPoints < 1000) {
           setPointUseInput("");
@@ -3352,6 +3355,9 @@ export default function OrderPage() {
 
         setCustomerPointBalance(0);
         setPointUseInput("");
+        // [2026-08-31 전수조사 수정] 조회 실패를 조용히 0원으로 보여주면
+        //   손님은 포인트가 사라진 줄 알거나 그냥 못 쓰고 결제한다. 실패를 알린다.
+        setCustomerPointLoadFailed(true);
       } finally {
         if (alive) {
           setCustomerPointLoading(false);
@@ -3763,6 +3769,14 @@ export default function OrderPage() {
         return prev.map((item, index) => index === sameIndex ? { ...item, qty: String(newQty) } : item);
       }
       const clampedQty = Math.min(addQty, effMax);
+      // [2026-08-31 전수조사 수정] 화면을 열어둔 사이 재고가 0이 되면 수량 0짜리 줄이
+      //   "담았어요!" 토스트와 함께 담겼다. 제출에서야 "수량을 입력해 주세요"가 떠서
+      //   손님이 어느 상품 때문인지 알 수 없었다. → 담지 않고 품절로 안내한다.
+      if (clampedQty <= 0) {
+        showCustomerNotice("[" + pnm + "] 방금 품절됐어요. 담지 못했습니다.", "warning");
+        didAdd = false;
+        return prev;
+      }
       if (clampedQty < addQty) showCustomerNotice(limitMsg(clampedQty));
       clampedItem = clampedQty !== addQty ? { ...nextItem, qty: String(clampedQty) } : nextItem;
       const emptyIndex = prev.findIndex((item) => !item.product_name.trim());
@@ -4226,7 +4240,12 @@ export default function OrderPage() {
     if (!pid.trim()) { deepLinkHandledRef.current = true; return; }
     deepLinkHandledRef.current = true;
     const target = quickGroupBuyProducts.find((pr: any) => String(pr?.id ?? "") === pid.trim());
-    if (!target) return; // 목록에 없으면(내려간 상품 등) 조용히 무시
+    if (!target) {
+      // [2026-08-31 전수조사 수정] 링크의 상품이 내려갔으면 아무 반응이 없어
+      //   손님이 링크가 고장난 줄 알고 나갔다. → 한 줄이라도 알려준다.
+      showCustomerNotice("링크의 상품은 지금은 판매가 끝났거나 내려갔어요. 다른 상품을 둘러봐 주세요 🙏");
+      return;
+    }
     if (isSoldOutOrderProduct(target as any)) { showCustomerNotice("앗, 링크의 상품은 품절됐어요. 다른 상품을 둘러봐 주세요."); return; }
     setTimeout(() => { try { selectQuickGroupBuyProduct(target as BroadcastProduct); } catch { /* 무시 */ } }, 350);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -6571,6 +6590,7 @@ export default function OrderPage() {
                   paymentMethod={paymentMethod === "카드결제" ? "카드결제" : "무통장입금"}
                   customerPointBalance={customerPointBalance}
                   customerPointLoading={customerPointLoading}
+                  customerPointLoadFailed={customerPointLoadFailed}
                   pointUseInput={commaNumberText(pointUseInput)}
                   pointUsedAmount={selectedPointUseAmount}
                   finalAmount={finalPaymentAmount}
