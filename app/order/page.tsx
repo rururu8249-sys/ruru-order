@@ -3159,6 +3159,21 @@ export default function OrderPage() {
       return;
     }
 
+    // [2026-08-31 전수조사 수정] 닉네임 중복 경고(5/24 신설)가 「닉네임 관문」에만 있고
+    //   이 「정보수정」 저장에는 없었다 — 뒷문. 실측: 둥이(7/1 두 명)·sunny(8/12) 등
+    //   경고 신설 이후에도 중복이 계속 생겼다(닉네임은 입금자명 매칭·채팅접수의 열쇠).
+    //   닉네임을 "바꿀 때만" 검사한다 — 이미 같은 닉네임을 공유 중인 기존 손님(가족 등,
+    //   실존: 삼겹살엔비냉·쥬쥬엉니)이 주소만 고치다 갇히면 안 되기 때문.
+    const nickChangedInEdit =
+      youtubeNickname.trim() !== String(customerInfoEditSnapshot?.youtubeNickname || "").trim();
+    if (nickChangedInEdit) {
+      const dupMessage = await getDuplicateYoutubeNicknameMessage(youtubeNickname.trim(), customerPhone);
+      if (dupMessage) {
+        showCustomerNotice(dupMessage);
+        return;
+      }
+    }
+
     try {
       await saveCustomer(customerInfoEditSnapshot?.customerPhone);
       setIsEditingCustomerInfo(false);
