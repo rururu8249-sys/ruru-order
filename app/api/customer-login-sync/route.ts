@@ -407,11 +407,27 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // [2026-08-31 사장님 지시] 남남 닉네임 재확인 — nickname_reconfirm 깃발이 켜진 회원은
+      //   로그인 후 유튜브 닉네임을 직접 다시 입력하게 한다(자동 통과 금지).
+      //   ⚠️ 칸이 아직 없어도(SQL 실행 전) 로그인은 절대 막지 않는다 — 조회 실패 시 false.
+      let needsNicknameConfirm = false;
+      try {
+        const { data: flagRows, error: flagError } = await supabase
+          .from("customers")
+          .select("nickname_reconfirm")
+          .eq("id", existing.id)
+          .limit(1);
+        if (!flagError) {
+          needsNicknameConfirm = Boolean((flagRows?.[0] as { nickname_reconfirm?: boolean } | undefined)?.nickname_reconfirm);
+        }
+      } catch { /* 깃발 조회 실패 → 재확인 없이 진행(로그인 보호) */ }
+
       return NextResponse.json({
         ok: true,
         mode: "updated",
         customer_id: existing.id,
         updated_fields: Object.keys(updateData),
+        needs_nickname_confirm: needsNicknameConfirm,
       });
     }
 

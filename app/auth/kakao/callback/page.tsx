@@ -85,6 +85,14 @@ export default function KakaoCallbackPage() {
         if (!syncResponse.ok) {
           const syncDetail = await syncResponse.json().catch(() => null);
           console.warn("카카오 고객 자동등록 실패:", syncDetail?.message || syncResponse.statusText);
+        } else {
+          // [2026-08-31 사장님 지시] 남남 닉네임 재확인 깃발 — 주문서에서 닉네임을 직접 확인시킨다
+          const syncData = await syncResponse.json().catch(() => null);
+          try {
+            // 깃발이 없는 계정이 같은 브라우저로 로그인하면 이전 깃발을 지운다(남의 깃발 상속 방지)
+            if (syncData?.needs_nickname_confirm) localStorage.setItem("ruru_nickname_reconfirm", "1");
+            else localStorage.removeItem("ruru_nickname_reconfirm");
+          } catch { /* 무시 */ }
         }
       } catch (syncError) {
         console.warn("카카오 고객 자동등록 요청 실패:", syncError);

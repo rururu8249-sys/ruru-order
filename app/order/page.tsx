@@ -3192,7 +3192,8 @@ export default function OrderPage() {
     //   실존: 삼겹살엔비냉·쥬쥬엉니)이 주소만 고치다 갇히면 안 되기 때문.
     const nickChangedInEdit =
       youtubeNickname.trim() !== String(customerInfoEditSnapshot?.youtubeNickname || "").trim();
-    if (nickChangedInEdit) {
+    // [2026-08-31 사장님 지시] 닉네임 재확인 깃발이 있으면 안 바꿨어도 중복검사를 돌린다
+    if (nickChangedInEdit || nicknameReconfirmRequired()) {
       const dupMessage = await getDuplicateYoutubeNicknameMessage(youtubeNickname.trim(), customerPhone);
       if (dupMessage) {
         showCustomerNotice(dupMessage);
@@ -3202,6 +3203,14 @@ export default function OrderPage() {
 
     try {
       await saveCustomer(customerInfoEditSnapshot?.customerPhone);
+      // [2026-08-31] 닉네임 재확인 완료 → 깃발 내리기(다음 로그인부터 다시 안 물음)
+      if (nicknameReconfirmRequired()) {
+        try {
+          const kid = String(localStorage.getItem("ruru_kakao_id") || "").trim();
+          if (kid) await supabase.from("customers").update({ nickname_reconfirm: false }).eq("kakao_id", kid);
+        } catch { /* 깃발 내리기 실패해도 저장은 유지 — 다음 로그인 때 한 번 더 물을 뿐 */ }
+        try { localStorage.removeItem("ruru_nickname_reconfirm"); } catch { /* 무시 */ }
+      }
       setIsEditingCustomerInfo(false);
       setIsCustomerInfoOpen(false);
       setCustomerInfoEditSheetOpen(false);
@@ -4570,6 +4579,13 @@ export default function OrderPage() {
       return false;
     }
 
+    // [2026-08-31 사장님 지시] 남남 닉네임 재확인 — 닉네임 확인·저장 전에는 주문서 제출 금지
+    if (nicknameReconfirmRequired()) {
+      showCustomerNotice("본인 확인을 위해 유튜브 닉네임 확인이 필요해요.\n\n「내 정보」 창에서 방송 채팅에서 쓰시는 유튜브 닉네임을 그대로 입력하고 저장을 눌러주세요.");
+      window.setTimeout(() => openCustomerInfoEditBottomSheet("info"), 400);
+      return false;
+    }
+
 
     if (!address.trim()) {
       showCustomerNotice("주소를 입력해 주세요.");
@@ -4972,6 +4988,21 @@ export default function OrderPage() {
     setCustomerInfoEditSheetOpen(false);
     setCustomerInfoEditSnapshot(null);
   };
+
+  // [2026-08-31 사장님 지시] 남남 닉네임 재확인 — 같은 닉네임을 서로 다른 두 사람이 쓰던 회원은
+  //   재로그인 때 자동 통과 없이 유튜브 닉네임을 직접 확인·저장해야 한다(중복이면 저장 불가).
+  //   깃발은 로그인 때 서버(customers.nickname_reconfirm)에서 내려와 localStorage 에 담긴다.
+  const nicknameReconfirmRequired = () => {
+    try { return localStorage.getItem("ruru_nickname_reconfirm") === "1"; } catch { return false; }
+  };
+  useEffect(() => {
+    if (!hasSavedInfo) return;
+    if (!nicknameReconfirmRequired()) return;
+    if (customerInfoEditSheetOpen || isEditingCustomerInfo) return;
+    openCustomerInfoEditBottomSheet("info");
+    showCustomerNotice("본인 확인을 위해 유튜브 닉네임을 다시 확인해 주세요.\n\n방송 채팅에서 쓰시는 유튜브 닉네임과 똑같이 입력하고 저장을 눌러주세요.");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasSavedInfo]);
 
   const ruruOrderLookupWon = (value: unknown) => {
     const amount = Number(value || 0);

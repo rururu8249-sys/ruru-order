@@ -73,6 +73,8 @@ export const clearSavedCustomerInfo = () => {
   CUSTOMER_STORAGE_KEYS.forEach((key) => {
     window.localStorage.removeItem(key);
   });
+  // [2026-08-31] 닉네임 재확인 깃발도 함께 청소 (세션 여부 판단 키가 아니라서 목록엔 안 넣는다)
+  try { window.localStorage.removeItem("ruru_nickname_reconfirm"); } catch { /* 무시 */ }
 };
 
 export const markCustomerSessionVersionCurrent = () => {
