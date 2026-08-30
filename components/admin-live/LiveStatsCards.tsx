@@ -1,4 +1,8 @@
+"use client";
+
+import { useState } from "react";
 import type { LiveOrder } from "./types";
+import { showAdminToast } from "@/lib/adminToast";
 
 type Props = {
   orders: LiveOrder[];
@@ -18,6 +22,28 @@ function isCanceled(order: LiveOrder) {
 }
 
 export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 500건 전체" }: Props) {
+  // [2026-08-31 사장님 요청] 현재 시점 결산을 텔레그램으로 — 기존 「지금 결산 보내기」(설정→텔레그램)와 같은 API.
+  //   방송중이면 방송 기준(시작~지금), 아니면 오늘 기준. 상품 TOP3·큰손 TOP3 포함. 읽기 전용.
+  const [tgSending, setTgSending] = useState(false);
+  const sendTelegramReport = async () => {
+    if (tgSending) return;
+    setTgSending(true);
+    try {
+      const r = await fetch("/api/admin-live/telegram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ action: "send-report" }),
+      });
+      const j = await r.json().catch(() => null);
+      if (j?.ok) showAdminToast("📊 현재 시점 결산을 텔레그램으로 보냈어요.", "success");
+      else showAdminToast("텔레그램 전송 실패\n\n" + (j?.reason || j?.error || "설정 → 텔레그램에서 봇 연결을 확인하세요"), "error");
+    } catch (e) {
+      showAdminToast("텔레그램 전송 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally {
+      setTgSending(false);
+    }
+  };
   const settlementOrders = orders.filter((order) => order.excludeFromSettlement !== true);
   const totalOrderAmount = settlementOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
   const activeOrders = settlementOrders.filter((order) => !isCanceled(order));
@@ -83,6 +109,15 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
       <span className="text-ink-soft">무통장미입금 <span className="text-warn-tx">{money(bankUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
       <span className="text-ink-soft">카드미결제 <span className="text-warn-tx">{money(cardUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
       <span className="text-ink-soft">전체미입금 <span className="text-danger-tx">{money(bankUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0)+cardUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
+      <button
+        type="button"
+        disabled={tgSending}
+        onClick={() => void sendTelegramReport()}
+        title="현재 시점 결산(방송명·번 돈·받을 돈·잘나간 상품 TOP3·큰손 TOP3)을 텔레그램으로 보냅니다"
+        className="ml-auto shrink-0 rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft transition hover:bg-surface-2 disabled:opacity-50"
+      >
+        {tgSending ? "전송 중…" : "📤 텔레그램"}
+      </button>
     </div>
   );
 }
