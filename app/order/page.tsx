@@ -1541,6 +1541,20 @@ export default function OrderPage() {
   const [popupNoticeFontSize, setPopupNoticeFontSize] = useState("normal"); // normal | large | xlarge
   const [popupNoticeColor, setPopupNoticeColor] = useState("#7B2D43"); // 제목·확인버튼 강조색
   const [popupBandUrl, setPopupBandUrl] = useState("https://band.us/@ruru8249");
+  // [2026-08-31 사장님 지시] 밴드 링크는 앱으로 열리게 — 안드로이드는 intent://(밴드 앱 있으면 앱, 없으면 웹 폴백),
+  //   아이폰은 band.us 유니버설 링크가 설치된 앱을 연다(없으면 웹). 실패 시엔 기본 링크 동작 유지.
+  const openBandInApp = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    try {
+      const url = String(popupBandUrl || "");
+      if (!url) return;
+      const ua = String(navigator.userAgent || "");
+      if (/android/i.test(ua)) {
+        e.preventDefault();
+        const rest = url.replace(/^https?:\/\//, "");
+        window.location.href = `intent://${rest}#Intent;scheme=https;package=com.nhn.android.band;S.browser_fallback_url=${encodeURIComponent(url)};end`;
+      }
+    } catch { /* 기본 링크 동작 유지 */ }
+  };
   const [popupOpen, setPopupOpen] = useState(false);
   // [2026-08-30] 공지 띠 — 평소엔 이걸로 보이고, 「자세히」를 누르면 위 팝업이 열린다.
   //   ✕ 로 닫아도 "이번 접속에만" 숨긴다(sessionStorage). 다시 들어오면 또 보인다.
@@ -5836,20 +5850,23 @@ export default function OrderPage() {
           팝업(하루 한 번 몇 초)보다 여기가 접속해 있는 내내 보인다. 닫기는 막지 않는다. */}
       {hasSavedInfo && popupBandUrl ? (
         <div style={{ background: "#EAFBEF", borderBottom: "1px solid #CDEBD7" }}>
-          <div style={{ margin: "0 auto", width: "100%", maxWidth: "560px", display: "flex", alignItems: "center", gap: "8px", padding: "6px 12px" }}>
-            <span style={{ flexShrink: 0, fontSize: "13px" }}>🟢</span>
-            <span style={{ minWidth: 0, flex: 1, fontSize: "12px", fontWeight: 700, color: "#0B5A24", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              밴드 가입하고 방송 알림 받기
+          {/* [2026-08-31 사장님 지적] 위 공지 띠처럼 칸 아무 데나 눌러도 밴드로 이동한다 */}
+          <a
+            href={popupBandUrl}
+            target="_blank"
+            rel="noreferrer"
+            onClick={openBandInApp}
+            style={{ margin: "0 auto", width: "100%", maxWidth: "560px", display: "flex", alignItems: "center", gap: "8px", padding: "6px 12px", textDecoration: "none" }}
+          >
+            <span style={{ flexShrink: 0, fontSize: "16px" }}>🟢</span>
+            {/* [2026-08-31 사장님 지적] 방송 알림은 사이트 자체 기능 — 밴드는 밴드대로 소개한다 */}
+            <span style={{ minWidth: 0, flex: 1, fontSize: "12px", fontWeight: 800, color: "#0B5A24", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              루루동이 네이버밴드 <span style={{ fontWeight: 700, color: "#3E8354" }}>— 택배송장 · 후기이벤트 · 공지</span>
             </span>
-            <a
-              href={popupBandUrl}
-              target="_blank"
-              rel="noreferrer"
-              style={{ flexShrink: 0, background: "#03C75A", color: "#fff", borderRadius: "999px", padding: "5px 12px", fontSize: "11px", fontWeight: 800, textDecoration: "none" }}
-            >
+            <span style={{ flexShrink: 0, background: "#03C75A", color: "#fff", borderRadius: "999px", padding: "5px 13px", fontSize: "11px", fontWeight: 800, boxShadow: "0 1px 3px rgba(3,199,90,0.35)" }}>
               가입
-            </a>
-          </div>
+            </span>
+          </a>
         </div>
       ) : null}
 
@@ -5910,6 +5927,7 @@ export default function OrderPage() {
                   href={popupBandUrl}
                   target="_blank"
                   rel="noreferrer"
+                  onClick={openBandInApp}
                   style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", height: "54px", borderRadius: "13px", background: "#03C75A", color: "#fff", fontSize: "16px", fontWeight: 800, textDecoration: "none" }}
                 >
                   👉 루루동이 밴드 바로가기

@@ -12,7 +12,7 @@ import { useLiveOrderItemAdd, createInitialLiveOrderItemAddForm, type LiveOrderI
 import { useLiveOrderItemDelete } from "./useLiveOrderItemDelete";
 import LiveOrderRegisteredProductPicker from "./LiveOrderRegisteredProductPicker";
 import LiveOrderDangerActionGuide from "./LiveOrderDangerActionGuide";
-import { formatKoreanPhone } from "@/lib/order/phone";
+import { buildCustomerOrderCopyText, buildPaymentRequestNote } from "./liveOrderCustomerCopy";
 
 type Props = {
   order: LiveOrder;
@@ -852,70 +852,28 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 
   // [고객용 복사 · 2026-07-22 사장님 지시] 배송정보+주문내역+금액을 고객에게 붙여넣기 좋은 텍스트로 클립보드 복사.
   //   읽기 전용(어떤 데이터도 변경 없음). 금액 표기는 이 서랍 화면의 계산값(상품금액/배송비/카드추가금/포인트) 그대로.
+  // [2026-08-31 사장님 요청] 주문 상세 안 결제알림 — 결제수단·입금상태별 쪽지 발송 (기존 쪽지 API 재사용, 데이터 무접촉)
+  const [payRequestSending, setPayRequestSending] = useState(false);
+  const sendPaymentRequest = async () => {
+    const note = buildPaymentRequestNote(orderForView);
+    if (!note) { showAdminToast("이미 결제·입금확인이 끝난 주문이에요 — 결제요청이 필요 없습니다."); return; }
+    const phone = String(orderForView.phone || "").replace(/[^0-9]/g, "");
+    if (!phone) { showAdminToast("전화번호가 없는 주문이라 쪽지를 보낼 수 없어요.", "error"); return; }
+    if (!(await showAdminConfirm(`${orderForView.nickname || orderForView.name}님께 아래 쪽지를 보낼까요?\n\n${note.message}`, { title: "결제요청 쪽지", confirmText: "보내기" }))) return;
+    if (payRequestSending) return;
+    setPayRequestSending(true);
+    try {
+      const res = await fetch("/api/admin-live/customer-note", { method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store", body: JSON.stringify({ phone, title: note.title, message: note.message }) });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) { showAdminToast("결제요청 쪽지 실패\n\n" + (json?.message || `요청 실패(${res.status})`), "error"); return; }
+      showAdminToast(json.duplicate || Number(json.sent) === 0 ? "조금 전에 이미 같은 쪽지를 보냈어요." : `${orderForView.nickname || orderForView.name}님께 결제요청 쪽지를 보냈어요.`, "success");
+    } finally { setPayRequestSending(false); }
+  };
+
   const copyCustomerOrderSummary = async () => {
-    // 표기는 lib/order/phone.ts 로 통일 (02-6490-6376 처럼 지역번호도 제대로 쪼갠다)
-    const fmtPhone = (value?: string | null) => formatKoreanPhone(value);
-    const o = orderForView;
-    const orderPhoneDigits = String(o.phone || "").replace(/[^0-9]/g, "");
-    const recipientName = String(o.recipientName || "").trim();
-    const recipientPhone = String(o.recipientPhone || "").trim();
-    const recipientDiffers =
-      (recipientName && recipientName !== String(o.name || "").trim()) ||
-      (recipientPhone && recipientPhone.replace(/[^0-9]/g, "") !== orderPhoneDigits);
-    const addressText = getCustomerAddress(o);
-    const zip = String(o.zipcode || "").trim();
-
-    const lines: string[] = [];
-    lines.push(`[루루동이 주문내역] ${String(o.orderNo || "").trim()}`.trim());
-    lines.push(`주문일: ${formatFullDateTime(o.createdAt, o.submittedAt)}`);
-    lines.push("");
-    if (String(o.nickname || "").trim()) lines.push(`닉네임: ${String(o.nickname).trim()}`);
-    lines.push(`주문자: ${String(o.name || "").trim()}${o.phone ? ` (${fmtPhone(o.phone)})` : ""}`);
-    if (recipientDiffers) {
-      lines.push(`받는분: ${recipientName || String(o.name || "").trim()}${recipientPhone ? ` (${fmtPhone(recipientPhone)})` : ""}`);
-    }
-    if (addressText) lines.push(`주소: ${zip ? `(${zip}) ` : ""}${addressText}`);
-    lines.push("");
-    lines.push("[주문상품]");
-    for (const item of items) {
-      const opt = [String(item.color || "").trim(), String(item.size || "").trim()]
-        .filter((value) => value && value !== "없음")
-        .join("/");
-      lines.push(`- ${item.productName}${opt ? ` (${opt})` : ""} ${Number(item.qty) || 1}개 · ${money(Number(item.amount) || 0)}`);
-    }
-    lines.push("");
-    lines.push(`상품금액 ${money(productAmount)}`);
-    lines.push(`배송비 ${money(shippingFee)}`);
-    if (isCardPaymentDisplay && cardPaymentExtraAmount > 0) lines.push(`카드수수료 ${money(cardPaymentExtraAmount)}`);
-    if (pointUsedAmount > 0) lines.push(`포인트 사용 -${money(pointUsedAmount)}`);
-    const payableTotal = isCardPaymentDisplay
-      ? cardPaymentExpectedTotal
-      : Math.max(0, totalAmount - (pointUsedAmount > 0 ? pointUsedAmount : 0));
-    lines.push(`총 결제금액 ${money(payableTotal)} · ${String(o.paymentMethod || "").trim() || "무통장입금"}`);
-    // [2026-08-22 사장님 지시] 입금 상태를 복사 텍스트에 표기 — 완료면 완료 표시,
-    //   입금 전(무통장)이면 계좌·입금액·확인 소요시간 안내까지 붙인다. (읽기 전용, 데이터 무변경)
-    {
-      const ps = String(o.paymentStatus || "");
-      if (["paid", "auto_paid", "manual_paid", "card_paid"].includes(ps)) {
-        lines.push("");
-        lines.push("✅ 입금확인 완료된 주문이에요. 감사합니다!");
-      } else if (ps === "unpaid" || ps === "manual_match_needed") {
-        lines.push("");
-        // 계좌는 주문서 페이지(app/order/page.tsx BANK_*)와 동일 값 — 계좌 변경 시 함께 수정
-        lines.push("💳 입금계좌: 새마을금고 9002186993725 (유혜원)");
-        lines.push(`입금하실 금액: ${money(payableTotal)}`);
-        lines.push("※ 입금 확인은 보통 10분, 늦어도 30분 안에 완료돼요. 이미 입금하셨다면 조금만 기다려주세요 🙂");
-      } else if (ps === "card_unpaid") {
-        lines.push("");
-        lines.push("💳 카드결제 확인 전 주문이에요.");
-      }
-    }
-    if (String(o.deliveryMemo || "").trim()) {
-      lines.push("");
-      lines.push(`배송메모: ${String(o.deliveryMemo).trim()}`);
-    }
-
-    const text = lines.join("\n");
+    // [2026-08-31] 텍스트 생성은 liveOrderCustomerCopy.ts 로 분리 — 주문서 목록의 「주문서 복사」와 같은 형식.
+    //   금액·문구 기준을 바꿀 땐 그 파일 한 곳만 고치면 두 버튼이 함께 바뀐다.
+    const text = buildCustomerOrderCopyText(orderForView, order);
     try {
       await navigator.clipboard.writeText(text);
       showAdminToast("고객용 주문내역이 복사됐어요. 카톡 등에 그대로 붙여넣으세요.", "success");
@@ -1057,6 +1015,16 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         >
           📋 고객용 복사
         </button>
+        {["unpaid", "manual_match_needed", "card_unpaid"].includes(orderForView.paymentStatus) ? (
+          <button
+            type="button"
+            disabled={payRequestSending}
+            onClick={() => void sendPaymentRequest()}
+            className="rounded-lg border border-[#7B2D43]/25 bg-white px-2.5 py-1 text-[11px] font-black text-[#7B2D43] transition hover:bg-rose-soft disabled:opacity-50"
+          >
+            🔔 결제요청
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={(event) => {

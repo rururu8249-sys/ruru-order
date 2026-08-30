@@ -70,6 +70,7 @@ export function cartHoldPresentation(input: CartHoldPresentationInput) {
 export function checkoutReminderCopy() {
   return {
     title: "🛒 주문 확인이 필요해요",
-    message: "담아두신 상품이 아직 주문서 제출 전입니다. 선점 시간이 지나면 자동 해제됩니다. 지금 주문 내용을 확인하고 결제를 진행해주세요.",
+    // [2026-08-31 사장님 지적] "선점 시간"은 손님이 못 알아듣는 말 — 누구나 아는 말로.
+    message: "장바구니에 담아두신 상품이 아직 주문 완료 전이에요. 시간이 지나면 장바구니가 자동으로 비워져요. 지금 주문서를 제출하고 결제까지 마쳐주세요 🙂",
   };
 }

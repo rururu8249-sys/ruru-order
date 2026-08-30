@@ -53,7 +53,8 @@ assert(placeholder.legacySnapshot === true, '기존 행 표시');
 
 const copy = checkoutReminderCopy();
 assert(copy.title.includes('주문 확인'), '알림 제목');
-assert(copy.message.includes('주문서 제출 전'), '알림 본문에 미제출 안내');
-assert(copy.message.includes('자동 해제'), '선점 자동해제 안내');
+// [2026-08-31 사장님 지적] "선점 시간·자동 해제"는 손님이 못 알아듣는 말 — 쉬운 문구로 교체됨
+assert(copy.message.includes('주문 완료 전'), '알림 본문에 미제출 안내');
+assert(copy.message.includes('자동으로 비워져요'), '장바구니 자동 비움 안내');
 
 console.log('cart hold detail / reminder tests passed');

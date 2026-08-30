@@ -12,6 +12,8 @@ import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
 import { openPaysterRightHalf } from "./AdminLiveCardPayPopup";
 import BroadcastCalendarPicker, { type BroadcastCalendarItem } from "./BroadcastCalendarPicker";
 import { useLiveOrderShipped } from "./useLiveOrderShipped";
+import { buildCustomerOrderCopyText, buildPaymentRequestNote } from "./liveOrderCustomerCopy";
+import { showAdminConfirm } from "@/lib/adminConfirm";
 
 // 총금액 표시 전용: 포인트 사용 주문은 실결제금액(상품금액 + 택배비 - 사용포인트)으로 표시한다.
 // - 단일상품: final_amount에 포인트가 이미 반영돼 기존 값과 동일(변화 없음)
@@ -83,23 +85,6 @@ function buildItemText(item: LiveOrder["items"][number]) {
 
 function getTotalQty(order: LiveOrder) {
   return (order.items || []).reduce((sum, item) => sum + Number(item.qty || 0), 0);
-}
-
-// ── [2026-08-22 사장님 요청] 같은 손님 주문 모아 복사 ──
-//   한 방송에서 주문서를 여러 번 낸 손님의 주문을 한 번에 텍스트로 복사(입금완료/입금대기 표시 포함).
-//   표시·클립보드 전용 — 주문/입금/정산 데이터는 일절 변경하지 않는다.
-const PAID_FOR_COPY = new Set(["paid", "auto_paid", "manual_paid", "card_paid"]);
-// 입금 안내용 계좌 — app/order/page.tsx 190~192(BANK_NAME/ACCOUNT/HOLDER)와 동일 값. 계좌 바뀌면 두 곳 함께 수정.
-const COPY_BANK_LINE = "새마을금고 9002186993725 (유혜원)";
-
-function customerCopyKey(o: LiveOrder) {
-  const d = String(o.phone || "").replace(/\D/g, "");
-  return d ? `p:${d}` : `n:${o.nickname}:${o.name}`;
-}
-
-function fullOrderText(order: LiveOrder) {
-  const items = (order.items || []).map(buildItemText).filter(Boolean);
-  return items.length > 0 ? items.join(", ") : (order.orderSummary || "-");
 }
 
 function compactOrderSummary(order: LiveOrder) {
@@ -484,49 +469,33 @@ export default function LiveOrderTable({
     return { orderIds, orderGroupId, expectedAmount };
   };
 
-  // [모아 복사] 조회범위(현재 orders) 안에서 손님별 주문 수 — 2건 이상일 때만 버튼 노출
-  const customerOrdersCountMap = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const o of orders) {
-      if (o.paymentStatus === "canceled") continue;
-      const k = customerCopyKey(o);
-      m.set(k, (m.get(k) || 0) + 1);
-    }
-    return m;
-  }, [orders]);
+  // [2026-08-31 사장님 요청] 닉네임 밑 「모아 복사」를 없애고 — 그 주문서 한 건을
+  //   주문 상세의 「고객용 복사」와 같은 형식(주소·입금상태·계좌 안내 포함)으로 바로 복사한다.
+  //   표시·클립보드 전용 — 주문/입금/정산 데이터는 일절 변경하지 않는다.
+  // [2026-08-31 사장님 요청] 제출된 주문서에 결제요청 — 결제수단·입금상태별 문구를 쪽지로 보낸다.
+  //   발송은 기존 쪽지 API(/api/admin-live/customer-note) 재사용. 주문/입금/정산 데이터 무접촉.
+  const [payRequestSending, setPayRequestSending] = useState("");
+  const sendPaymentRequest = async (order: LiveOrder) => {
+    const note = buildPaymentRequestNote(order);
+    if (!note) { showAdminToast("이미 결제·입금확인이 끝난 주문이에요 — 결제요청이 필요 없습니다."); return; }
+    const phone = String(order.phone || "").replace(/[^0-9]/g, "");
+    if (!phone) { showAdminToast("전화번호가 없는 주문이라 쪽지를 보낼 수 없어요.", "error"); return; }
+    if (!(await showAdminConfirm(`${order.nickname || order.name}님께 아래 쪽지를 보낼까요?\n\n${note.message}`, { title: "결제요청 쪽지", confirmText: "보내기" }))) return;
+    if (payRequestSending) return;
+    setPayRequestSending(order.id);
+    try {
+      const res = await fetch("/api/admin-live/customer-note", { method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store", body: JSON.stringify({ phone, title: note.title, message: note.message }) });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) { showAdminToast("결제요청 쪽지 실패\n\n" + (json?.message || `요청 실패(${res.status})`), "error"); return; }
+      showAdminToast(json.duplicate || Number(json.sent) === 0 ? "조금 전에 이미 같은 쪽지를 보냈어요." : `${order.nickname || order.name}님께 결제요청 쪽지를 보냈어요.`, "success");
+    } finally { setPayRequestSending(""); }
+  };
 
-  const copyCustomerOrders = async (target: LiveOrder) => {
-    const key = customerCopyKey(target);
-    const list = orders
-      .filter((o) => customerCopyKey(o) === key && o.paymentStatus !== "canceled")
-      .sort((a, b) => String(a.createdAt || a.submittedAt || "").localeCompare(String(b.createdAt || b.submittedAt || "")));
-    let paidSum = 0, paidCnt = 0, waitSum = 0, waitCnt = 0;
-    const lines = list.map((o, i) => {
-      const paid = PAID_FOR_COPY.has(o.paymentStatus);
-      const amt = Number(o.totalAmount || 0);
-      if (paid) { paidSum += amt; paidCnt += 1; } else { waitSum += amt; waitCnt += 1; }
-      const ship = Number(o.shippingFee || 0);
-      return `${i + 1}. ${fullOrderText(o)} · ${getTotalQty(o)}개 · ${money(amt)}${ship > 0 ? ` (택배비 ${money(ship)} 포함)` : ""} ${paid ? "✅입금완료" : "⏳입금대기"}`;
-    });
-    const text = [
-      `${target.nickname}${target.name ? ` (${target.name})` : ""} 주문내역 ${list.length}건`,
-      ...lines,
-      "──────────",
-      ...(paidCnt > 0 ? [`✅ 입금완료 ${paidCnt}건 · ${money(paidSum)}`] : []),
-      ...(waitCnt > 0 ? [`⏳ 입금대기 ${waitCnt}건 · ${money(waitSum)}`] : []),
-      `전체 ${list.length}건 · ${money(paidSum + waitSum)}`,
-      ...(waitCnt > 0
-        ? [
-            "──────────",
-            `💳 입금계좌: ${COPY_BANK_LINE}`,
-            `입금하실 금액: ${money(waitSum)}`,
-            "※ 입금 확인은 보통 10분, 늦어도 30분 안에 완료돼요. 이미 입금하셨다면 조금만 기다려주세요 🙂",
-          ]
-        : []),
-    ].join("\n");
+  const copyOrderForCustomer = async (order: LiveOrder) => {
+    const text = buildCustomerOrderCopyText(order);
     try {
       await navigator.clipboard.writeText(text);
-      showAdminToast(`${target.nickname} 주문 ${list.length}건 복사됐어요\n\n카톡 등에 붙여넣기 하세요.`, "success");
+      showAdminToast(`${order.nickname || order.name} 주문서가 복사됐어요\n\n카톡 등에 붙여넣기 하세요.`, "success");
     } catch {
       showAdminToast("복사에 실패했어요. 한 번 더 눌러주세요.", "error");
     }
@@ -1212,12 +1181,10 @@ export default function LiveOrderTable({
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", flexWrap: "wrap" }}>
                           <div style={{ display: "flex", gap: "5px", alignItems: "center", flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
                             {statusBadge(order)}
-                            {(customerOrdersCountMap.get(customerCopyKey(order)) || 0) > 0 ? (
-                              <button type="button" onClick={() => void copyCustomerOrders(order)}
-                                style={{ fontSize: "10px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "6px", padding: "2px 7px", cursor: "pointer" }}>
-                                📋 {(customerOrdersCountMap.get(customerCopyKey(order)) || 0) >= 2 ? `${customerOrdersCountMap.get(customerCopyKey(order))}건 복사` : "복사"}
-                              </button>
-                            ) : null}
+                            <button type="button" onClick={() => void copyOrderForCustomer(order)}
+                              style={{ fontSize: "10px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "6px", padding: "2px 7px", cursor: "pointer" }}>
+                              📋 주문서 복사
+                            </button>
                             {(order as any).shippingStatus ? (
                               <span className={`inline-flex items-center justify-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10px] font-black leading-none ${String((order as any).shippingStatus) === "출고완료" ? "bg-info-bg text-[var(--color-info-tx)]" : "bg-surface-2 text-ink-soft"}`}>{(order as any).shippingStatus}</span>
                             ) : null}
@@ -1226,6 +1193,9 @@ export default function LiveOrderTable({
                             ) : null}
                             {order.paymentStatus === "card_unpaid" && onOpenCardPay ? (
                               <button type="button" onClick={() => { openPaysterRightHalf(); onOpenCardPay(order); }} className="rounded-lg border border-info-tx bg-info-bg px-2 py-0.5 text-[10px] font-black text-info-tx hover:bg-info-bg">💳 카드결제</button>
+                            ) : null}
+                            {["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
+                              <button type="button" disabled={payRequestSending === order.id} onClick={() => void sendPaymentRequest(order)} className="rounded-lg border border-[#7B2D43]/25 bg-white px-2 py-0.5 text-[10px] font-black text-[#7B2D43] disabled:opacity-50">🔔 결제요청</button>
                             ) : null}
                           </div>
                           <span style={{ fontSize: "15px", fontWeight: 800, color: "#C0392B" }}>{money(displayPayableAmount(order))}</span>
@@ -1270,21 +1240,14 @@ export default function LiveOrderTable({
                             {order.nickname}
                           </button>
                         </div>
-                        {(() => {
-                          // [2026-08-23 사장님 피드백] 1건 손님도 상세 안 열고 바로 복사 — 모든 줄에 동일 버튼(일관성 우선)
-                          const copyCount = customerOrdersCountMap.get(customerCopyKey(order)) || 0;
-                          if (copyCount === 0) return null;
-                          return (
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); void copyCustomerOrders(order); }}
-                              title="이 손님이 조회범위에서 낸 주문 전체를 입금상태·계좌 안내와 함께 복사 (주소 포함 복사는 주문 상세의 고객용 복사)"
-                              className="mt-0.5 rounded-md border border-rose-line bg-rose-soft px-1.5 py-0.5 text-[10px] font-black text-rose-deep"
-                            >
-                              📋 {copyCount >= 2 ? `${copyCount}건 복사` : "복사"}
-                            </button>
-                          );
-                        })()}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); void copyOrderForCustomer(order); }}
+                          title="이 주문서 한 건을 상세 안 열고 고객용 형식(주소·입금상태·계좌 안내 포함)으로 복사"
+                          className="mt-0.5 rounded-md border border-rose-line bg-rose-soft px-1.5 py-0.5 text-[10px] font-black text-rose-deep"
+                        >
+                          📋 주문서 복사
+                        </button>
                         {(inventoryStatusBadge(order) || testOrderBadge(order) || returnBadge(order)) && (
                           <div className="flex flex-wrap gap-1 mt-0.5">
                             {inventoryStatusBadge(order)}
@@ -1333,6 +1296,11 @@ export default function LiveOrderTable({
                         {order.paymentStatus === "card_unpaid" && onOpenCardPay ? (
                           <button type="button" onClick={() => { openPaysterRightHalf(); onOpenCardPay(order); }} className="mt-1 rounded-lg border border-info-tx bg-info-bg px-2 py-0.5 text-[10px] font-black text-info-tx hover:bg-info-bg">
                             💳 카드결제
+                          </button>
+                        ) : null}
+                        {["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
+                          <button type="button" disabled={payRequestSending === order.id} onClick={(e) => { e.stopPropagation(); void sendPaymentRequest(order); }} className="mt-1 rounded-lg border border-[#7B2D43]/25 bg-white px-2 py-0.5 text-[10px] font-black text-[#7B2D43] hover:bg-rose-soft disabled:opacity-50">
+                            🔔 결제요청
                           </button>
                         ) : null}
                       </div>
