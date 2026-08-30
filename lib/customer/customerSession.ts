@@ -125,3 +125,26 @@ export const isYoutubeNicknameConfirmVersionCurrent = () => {
     REQUIRED_YOUTUBE_NICKNAME_CONFIRM_VERSION
   );
 };
+
+// [2026-08-31 사고수정] 로그아웃이 장바구니를 안 지웠다.
+//   실측: 사장님 계정 재로그인 테스트(02:31) 때 예전에 담아둔 상품이 복원되며
+//   담김 현황에 유령 선점으로 잡혔다. 공용 폰이면 남의 장바구니가 다음 사람에게 보인다.
+//   → 명시적 로그아웃에서만 부른다. (강제 재로그인/버전 청소에서는 부르지 않는다 —
+//      진행 중인 손님 장바구니를 일괄 날리면 팔릴 물건이 사라진다)
+export const clearCartOnLogout = () => {
+  if (typeof window === "undefined") return;
+  try {
+    const sessionKey = window.localStorage.getItem("ruru_cart_session_key") || "";
+    if (sessionKey) {
+      // 서버 선점도 지운다 — 페이지가 곧 이동하므로 keepalive 로 보낸다. 실패해도 TTL 로 풀린다.
+      void fetch("/api/cart-reservations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        keepalive: true,
+        body: JSON.stringify({ action: "clear", sessionKey }),
+      }).catch(() => {});
+    }
+    window.localStorage.removeItem("ruru_order_draft_v1");
+    window.localStorage.removeItem("ruru_cart_session_key");
+  } catch { /* 저장소 접근 불가 환경 */ }
+};

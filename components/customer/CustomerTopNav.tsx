@@ -15,6 +15,7 @@ import CustomerPointGiftPopup from "@/components/customer/CustomerPointGiftPopup
 import CustomerTestAccountBadge from "@/components/customer/CustomerTestAccountBadge";
 import {
   clearSavedCustomerInfo,
+  clearCartOnLogout,
   getCustomerGreetingName,
   hasSavedCustomerInfo,
   readSavedCustomerInfo,
@@ -72,6 +73,7 @@ export default function CustomerTopNav({
   const handleLogout = () => {
 
     clearSavedCustomerInfo();
+    clearCartOnLogout(); // [2026-08-31] 담긴 상품·서버 선점도 함께 정리 (유령 선점 방지)
     setCustomerInfo(initialInfo);
     window.location.href = "/";
   };

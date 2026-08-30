@@ -8,7 +8,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { isOrderablePhone, isMobileOrderPhone } from "@/lib/order/phone";
 import SheetGrabber from "@/components/customer/SheetGrabber";
-import { clearSavedCustomerInfo } from "@/lib/customer/customerSession";
+import { clearSavedCustomerInfo, clearCartOnLogout } from "@/lib/customer/customerSession";
 
 type ShippingAddress = {
   name: string;
@@ -442,6 +442,7 @@ export default function CustomerInfoEditBottomSheet({
               onClick={() => {
                 if (!window.confirm("로그아웃할까요?\n다시 접속하면 카카오 로그인을 새로 하게 됩니다.")) return;
                 try { clearSavedCustomerInfo(); } catch { /* 저장소 접근 불가 환경 */ }
+                try { clearCartOnLogout(); } catch { /* 담긴 상품·선점도 함께 정리 */ }
                 window.location.href = "/";
               }}
               style={{ margin: "4px auto 0", display: "block", background: "none", border: "none", fontSize: "12px", fontWeight: 700, color: "#9A8F95", textDecoration: "underline", cursor: "pointer", padding: "8px" }}
