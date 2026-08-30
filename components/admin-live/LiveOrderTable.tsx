@@ -870,8 +870,8 @@ export default function LiveOrderTable({
           ["전체", counts.total, "all", "rose"],
           ["결제완료", counts.paid, "paid", "green"],
           ["입금대기", counts.unpaid, "unpaid", "red"],
-          ["매칭필요", counts.manual, "manual_match_needed", "amber"],
-          ["입금확인", counts.bankPaid, "bank_paid", "green"],
+          // [2026-08-31 사장님 지시] 매칭필요·입금확인 배지 삭제 — 입금대기가 매칭필요를 포함하고(보조텍스트로 표시),
+          //   입금확인은 결제완료의 하위 단계라 배지가 겹쳤다. 상태 드롭다운에서는 여전히 고를 수 있다.
           ["주문서취소", counts.canceled, "canceled", "muted"],
           ["출고완료", counts.shipped, "shipped", "blue"],
         ].map(([label, count, status, tone]) => {
