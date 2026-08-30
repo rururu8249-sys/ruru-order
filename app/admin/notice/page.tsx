@@ -38,14 +38,6 @@ type Notice = {
   sort_order: number;
 };
 
-type PopupNotice = {
-  id: number;
-  title: string;
-  content: string;
-  is_enabled: boolean;
-  popup_size?: "compact" | "normal" | "large";
-};
-
 const emptyNotice = {
   id: 0,
   title: "",
@@ -61,13 +53,6 @@ export default function AdminNoticePage() {
   const [password, setPassword] = useState("");
   const [notices, setNotices] = useState<Notice[]>([]);
   const [noticeForm, setNoticeForm] = useState<Notice>(emptyNotice);
-  const [popup, setPopup] = useState<PopupNotice>({
-    id: 1,
-    title: "주문 전 필수 확인",
-    content: "",
-    is_enabled: true,
-    popup_size: "compact",
-  });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -94,7 +79,7 @@ export default function AdminNoticePage() {
 
   const loadAll = async () => {
     setLoading(true);
-    await Promise.all([loadNotices(), loadPopup()]);
+    await loadNotices();
     setLoading(false);
   };
 
@@ -137,23 +122,6 @@ export default function AdminNoticePage() {
     const normalized = await normalizeNoticeSortOrder(sorted);
 
     setNotices(normalized);
-  };
-
-  const loadPopup = async () => {
-    const { data, error } = await supabase
-      .from("popup_notice")
-      .select("*")
-      .eq("id", 1)
-      .single();
-
-    if (error) return;
-
-    if (data) {
-      setPopup({
-        ...data,
-        popup_size: data.popup_size || "compact",
-      });
-    }
   };
 
   const saveNotice = async () => {
@@ -262,36 +230,6 @@ export default function AdminNoticePage() {
     }
 
     await loadNotices();
-  };
-
-  const savePopup = async () => {
-    if (!popup.title.trim()) {
-      showAdminToast("팝업 제목을 입력해주세요.");
-      return;
-    }
-
-    if (!popup.content.trim()) {
-      showAdminToast("팝업 내용을 입력해주세요.");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("popup_notice")
-      .upsert({
-        id: 1,
-        title: popup.title.trim(),
-        content: popup.content.trim(),
-        is_enabled: popup.is_enabled,
-        popup_size: popup.popup_size || "compact",
-        updated_at: new Date().toISOString(),
-      });
-
-    if (error) {
-      showAdminToast("팝업 저장 실패\n" + error.message);
-      return;
-    }
-
-    showAdminToast("팝업 공지 저장 완료");
   };
 
   const inputClass =
@@ -464,73 +402,25 @@ export default function AdminNoticePage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl border border-gray-300 p-5 shadow-sm">
-            <h2 className="text-2xl font-extrabold mb-4 text-gray-950">
-              팝업공지 수정
+          {/* [2026-08-30] 「팝업공지 수정」 칸 제거.
+              이 칸은 popup_notice 표에 저장했는데, 그 표를 읽어서 손님에게 보여주는 화면이
+              하나도 없었다(읽는 곳은 app/components/NoticePopup.tsx 뿐인데 아무도 import 하지 않음).
+              즉 여기서 아무리 고쳐도 손님 화면은 그대로였다.
+              손님에게 실제로 뜨는 팝업은 관리자 → 📢 공지·쪽지 에서 관리한다.
+              표(popup_notice)와 그 안의 데이터는 지우지 않았다. 화면에서만 뺐다. */}
+          <div className="bg-amber-50 rounded-3xl border border-amber-300 p-5 shadow-sm">
+            <h2 className="text-2xl font-extrabold mb-3 text-amber-900">
+              📢 공지는 「공지·쪽지」 메뉴로 옮겼습니다
             </h2>
-
-            <div className="grid gap-3">
-              <label className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-2xl p-4 font-extrabold text-gray-950">
-                <input
-                  type="checkbox"
-                  checked={popup.is_enabled}
-                  onChange={(e) =>
-                    setPopup({ ...popup, is_enabled: e.target.checked })
-                  }
-                />
-                팝업 사용
-              </label>
-
-              <div>
-                <div className="text-sm font-extrabold mb-2 text-gray-950">
-                  팝업 크기
-                </div>
-
-                <select
-                  value={popup.popup_size || "compact"}
-                  onChange={(e) =>
-                    setPopup({
-                      ...popup,
-                      popup_size: e.target.value as "compact" | "normal" | "large",
-                    })
-                  }
-                  className={inputClass}
-                >
-                  <option value="compact">작게</option>
-                  <option value="normal">보통</option>
-                  <option value="large">크게</option>
-                </select>
-              </div>
-
-              <input
-                value={popup.title}
-                onChange={(e) =>
-                  setPopup({ ...popup, title: e.target.value })
-                }
-                placeholder="팝업 제목"
-                className={inputClass}
-              />
-
-              <textarea
-                value={popup.content}
-                onChange={(e) =>
-                  setPopup({ ...popup, content: e.target.value })
-                }
-                placeholder="팝업 내용"
-                className={`${textareaClass} min-h-[240px]`}
-              />
-
-              <button
-                onClick={savePopup}
-                className="bg-black text-white rounded-2xl p-4 font-extrabold"
-              >
-                팝업공지 저장
-              </button>
-
-              <div className="text-xs text-gray-600 font-bold leading-5">
-                팝업 내용을 수정하면 고객 화면 팝업에 바로 반영됩니다.
-                고객이 오늘 하루 닫기를 누른 경우에는 다음날 다시 보입니다.
-              </div>
+            <div className="text-sm font-bold leading-6 text-amber-900">
+              여기 있던 <b>「팝업공지 수정」</b>은 <b>손님 화면에 나오지 않는 칸</b>이었습니다.
+              고쳐도 손님에게는 아무 변화가 없었습니다.
+              <br /><br />
+              손님에게 실제로 뜨는 팝업과 상시 안내 문구는
+              <b> 관리자 → 사이드바 📢 공지·쪽지 </b> 에서 관리합니다.
+              미리보기가 있어 저장 전에 손님 화면을 확인할 수 있습니다.
+              <br /><br />
+              아래 <b>공지사항 목록</b>도 같은 메뉴 안 「📋 공지사항 목록」 탭에 똑같이 있습니다.
             </div>
           </div>
 

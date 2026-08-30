@@ -14,6 +14,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
+import { showAdminConfirm } from "@/lib/adminConfirm";
 
 /** 이 화면이 저장하는 키 — 여기 없는 키는 절대 건드리지 않는다. */
 const NOTICE_KEYS = [
@@ -32,6 +33,21 @@ const clean = (v: unknown) => String(v ?? "").trim();
 const FONT_LABEL: Record<string, string> = { normal: "보통", large: "크게", xlarge: "아주 크게" };
 const FONT_PX: Record<string, number> = { normal: 14, large: 16, xlarge: 18 };
 
+// [2026-08-30] 공지사항 목록 — /admin/notice 에 있던 기능을 그대로 가져왔다.
+//   표(notices)와 동작(등록/수정/삭제/고정/공개/순서)은 하나도 안 바꿨다. 자리만 옮겼다.
+type Notice = {
+  id: number;
+  title: string;
+  content: string;
+  category: string;
+  is_pinned: boolean;
+  is_visible: boolean;
+  sort_order: number;
+};
+const EMPTY_NOTICE: Notice = { id: 0, title: "", content: "", category: "공지", is_pinned: false, is_visible: true, sort_order: 0 };
+
+type PanelTab = "customer" | "list";
+
 export default function AdminLiveNoticePanel() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -43,6 +59,11 @@ export default function AdminLiveNoticePanel() {
   const [popupColor, setPopupColor] = useState("#7B2D43");
   const [popupBandUrl, setPopupBandUrl] = useState(DEFAULT_BAND_URL);
   const [noticeText, setNoticeText] = useState("");
+
+  const [tab, setTab] = useState<PanelTab>("customer");
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [form, setForm] = useState<Notice>(EMPTY_NOTICE);
+  const [listBusy, setListBusy] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -96,6 +117,92 @@ export default function AdminLiveNoticePanel() {
     }
   };
 
+  // ───────── 공지사항 목록 (notices 표) ─────────
+  const loadNotices = async () => {
+    const { data, error } = await supabase
+      .from("notices")
+      .select("id,title,content,category,is_pinned,is_visible,sort_order")
+      .order("is_pinned", { ascending: false })
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: false });
+    if (error) {
+      showAdminToast("공지 목록 불러오기 실패\n\n" + error.message, "error");
+      return;
+    }
+    setNotices((data || []) as Notice[]);
+  };
+
+  useEffect(() => { void loadNotices(); }, []);
+
+  const saveNotice = async () => {
+    if (!form.title.trim()) { showAdminToast("공지 제목을 입력해주세요."); return; }
+    if (!form.content.trim()) { showAdminToast("공지 내용을 입력해주세요."); return; }
+    setListBusy(true);
+    try {
+      // 새 글이면 맨 뒤 순서로. 기존 글이면 순서를 그대로 둔다(순서는 위/아래 버튼으로만 바뀐다).
+      const nextSort = form.id
+        ? Number(form.sort_order || 0)
+        : Math.max(0, ...notices.map((n) => Number(n.sort_order || 0))) + 1;
+      const payload = {
+        title: form.title.trim(),
+        content: form.content.trim(),
+        category: form.category.trim() || "공지",
+        is_pinned: form.is_pinned,
+        is_visible: form.is_visible,
+        sort_order: nextSort,
+        updated_at: new Date().toISOString(),
+      };
+      const { error } = form.id
+        ? await supabase.from("notices").update(payload).eq("id", form.id)
+        : await supabase.from("notices").insert(payload);
+      if (error) {
+        showAdminToast((form.id ? "공지 수정 실패" : "공지 등록 실패") + "\n\n" + error.message, "error");
+        return;
+      }
+      showAdminToast(form.id ? "공지를 수정했습니다." : "공지를 등록했습니다.", "success");
+      setForm(EMPTY_NOTICE);
+      await loadNotices();
+    } finally {
+      setListBusy(false);
+    }
+  };
+
+  const deleteNotice = async (n: Notice) => {
+    if (!(await showAdminConfirm(`「${n.title}」 공지를 삭제할까요?`))) return;
+    const { error } = await supabase.from("notices").delete().eq("id", n.id);
+    if (error) { showAdminToast("공지 삭제 실패\n\n" + error.message, "error"); return; }
+    if (form.id === n.id) setForm(EMPTY_NOTICE);
+    await loadNotices();
+  };
+
+  /** 위/아래 — 두 글의 sort_order 를 맞바꾼다(원래 /admin/notice 와 같은 방식). */
+  const moveNotice = async (n: Notice, dir: "up" | "down") => {
+    const i = notices.findIndex((x) => x.id === n.id);
+    if (i < 0) return;
+    const j = dir === "up" ? i - 1 : i + 1;
+    if (j < 0 || j >= notices.length) return;
+    const other = notices[j];
+    const a = Number(n.sort_order || i + 1);
+    const b = Number(other.sort_order || j + 1);
+    setListBusy(true);
+    try {
+      const r1 = await supabase.from("notices").update({ sort_order: b }).eq("id", n.id);
+      if (r1.error) { showAdminToast("순서 변경 실패\n\n" + r1.error.message, "error"); return; }
+      const r2 = await supabase.from("notices").update({ sort_order: a }).eq("id", other.id);
+      if (r2.error) { showAdminToast("순서 변경 실패\n\n" + r2.error.message, "error"); return; }
+      await loadNotices();
+    } finally {
+      setListBusy(false);
+    }
+  };
+
+  /** 고정·공개 토글 — 한 칸만 바꾼다 */
+  const toggleNotice = async (n: Notice, field: "is_pinned" | "is_visible") => {
+    const { error } = await supabase.from("notices").update({ [field]: !n[field] }).eq("id", n.id);
+    if (error) { showAdminToast("변경 실패\n\n" + error.message, "error"); return; }
+    await loadNotices();
+  };
+
   const card = "rounded-[20px] border border-line bg-surface-2 p-4";
   const input = "mt-1 h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-deep";
   const label = "text-xs font-black text-ink-soft";
@@ -110,7 +217,26 @@ export default function AdminLiveNoticePanel() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {/* 탭 — 손님에게 보이는 공지 / 공지사항 목록 */}
+      <div className="flex shrink-0 gap-2 border-b border-line bg-surface px-5 py-3">
+        {([
+          { key: "customer", label: "📢 손님 화면 공지", desc: "접속 팝업 · 상시 안내" },
+          { key: "list", label: "📋 공지사항 목록", desc: "등록 · 고정 · 순서" },
+        ] as { key: PanelTab; label: string; desc: string }[]).map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setTab(t.key)}
+            className={`rounded-xl px-4 py-2 text-left transition ${tab === t.key ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}
+          >
+            <span className="block text-[13px] font-black">{t.label}</span>
+            <span className={`block text-[10px] font-bold ${tab === t.key ? "text-white/70" : "text-ink-mute"}`}>{t.desc}</span>
+          </button>
+        ))}
+      </div>
+
       <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        {tab === "customer" ? (
         <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
           {/* ─────────── 왼쪽: 입력 ─────────── */}
           <div className="space-y-4">
@@ -270,22 +396,123 @@ export default function AdminLiveNoticePanel() {
             </div>
           </div>
         </div>
+        ) : (
+        /* ───────── 공지사항 목록 ───────── */
+        <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
+          {/* 쓰기 */}
+          <div className={`${card} lg:sticky lg:top-0 lg:self-start`}>
+            <div className="text-sm font-black text-ink">{form.id ? "✏️ 공지 수정" : "➕ 새 공지 쓰기"}</div>
+            <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
+              손님 <b className="text-ink-soft">쪽지함</b>과 <b className="text-ink-soft">공지사항 페이지</b>에 함께 나옵니다.
+            </div>
+
+            <label className="mt-3 block">
+              <span className={label}>제목</span>
+              <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="예) 추석 연휴 배송 안내" className={input} />
+            </label>
+
+            <label className="mt-3 block">
+              <span className={label}>내용</span>
+              <textarea
+                value={form.content}
+                onChange={(e) => setForm({ ...form, content: e.target.value })}
+                rows={6}
+                placeholder="줄바꿈 그대로 손님에게 보입니다."
+                className="mt-1 w-full resize-none rounded-xl border border-line bg-surface p-3 text-sm font-bold leading-relaxed text-ink outline-none focus:border-rose-deep"
+              />
+            </label>
+
+            <label className="mt-3 block">
+              <span className={label}>분류</span>
+              <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="공지" className={input} />
+            </label>
+
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, is_pinned: !form.is_pinned })}
+                className={`rounded-xl px-3 py-2 text-xs font-black transition ${form.is_pinned ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}
+              >
+                {form.is_pinned ? "📌 상단 고정" : "고정 안 함"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, is_visible: !form.is_visible })}
+                className={`rounded-xl px-3 py-2 text-xs font-black transition ${form.is_visible ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}
+              >
+                {form.is_visible ? "👁 공개" : "🙈 숨김"}
+              </button>
+            </div>
+
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={saveNotice}
+                disabled={listBusy}
+                className="flex-1 rounded-xl bg-rose-deep px-4 py-2.5 text-sm font-black text-white transition disabled:opacity-50"
+              >
+                {form.id ? "수정 저장" : "공지 등록"}
+              </button>
+              {form.id ? (
+                <button type="button" onClick={() => setForm(EMPTY_NOTICE)} className="rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-black text-ink-soft">
+                  취소
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          {/* 목록 */}
+          <div className="space-y-2">
+            {notices.length === 0 ? (
+              <div className={`${card} py-14 text-center text-sm font-bold text-ink-mute`}>등록된 공지가 없습니다.</div>
+            ) : (
+              notices.map((n, i) => (
+                <div key={n.id} className={`rounded-[18px] border p-4 ${n.is_visible ? "border-line bg-surface" : "border-line bg-surface-2 opacity-60"}`}>
+                  <div className="flex items-start gap-2">
+                    <span className="text-base">{n.is_pinned ? "📌" : "📢"}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[14px] font-black text-ink">{n.title}</span>
+                        {n.is_pinned ? <span className="rounded-full bg-rose-deep px-2 py-0.5 text-[10px] font-black text-white">고정</span> : null}
+                        {!n.is_visible ? <span className="rounded-full border border-line px-2 py-0.5 text-[10px] font-black text-ink-mute">숨김</span> : null}
+                        <span className="rounded-full border border-line px-2 py-0.5 text-[10px] font-black text-ink-mute">{n.category || "공지"}</span>
+                      </div>
+                      <p className="mt-1.5 whitespace-pre-line text-[12.5px] font-bold leading-6 text-ink-soft">{n.content}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    <button type="button" onClick={() => moveNotice(n, "up")} disabled={i === 0 || listBusy} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft disabled:opacity-30">↑ 위로</button>
+                    <button type="button" onClick={() => moveNotice(n, "down")} disabled={i === notices.length - 1 || listBusy} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft disabled:opacity-30">↓ 아래로</button>
+                    <button type="button" onClick={() => toggleNotice(n, "is_pinned")} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft">{n.is_pinned ? "고정 풀기" : "📌 상단 고정"}</button>
+                    <button type="button" onClick={() => toggleNotice(n, "is_visible")} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft">{n.is_visible ? "🙈 숨기기" : "👁 공개하기"}</button>
+                    <button type="button" onClick={() => setForm(n)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft">✏️ 수정</button>
+                    <button type="button" onClick={() => deleteNotice(n)} className="ml-auto rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-danger-tx">🗑 삭제</button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+        )}
       </div>
 
-      {/* 하단 저장바 */}
-      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-surface px-5 py-3">
-        <span className="text-xs font-bold text-ink-mute">
-          {loading ? "불러오는 중..." : "저장하면 손님이 새로 들어올 때부터 보입니다."}
-        </span>
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving || loading}
-          className="rounded-full bg-rose-deep px-6 py-2.5 text-sm font-black text-white transition disabled:opacity-50"
-        >
-          {saving ? "저장 중..." : "공지 저장"}
-        </button>
-      </div>
+      {/* 하단 저장바 — 손님 화면 공지 탭에서만. 목록 탭은 항목마다 바로 저장된다. */}
+      {tab === "customer" ? (
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-surface px-5 py-3">
+          <span className="text-xs font-bold text-ink-mute">
+            {loading ? "불러오는 중..." : "저장하면 손님이 새로 들어올 때부터 보입니다."}
+          </span>
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving || loading}
+            className="rounded-full bg-rose-deep px-6 py-2.5 text-sm font-black text-white transition disabled:opacity-50"
+          >
+            {saving ? "저장 중..." : "공지 저장"}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

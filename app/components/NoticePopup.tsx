@@ -1,3 +1,9 @@
+// [2026-08-30] ⚠️ 사용 안 함 — 이 파일을 import 하는 화면이 하나도 없습니다.
+//   popup_notice 표를 읽지만, 손님에게 실제로 뜨는 접속 팝업은
+//   settings 표의 popup_notice_* 키를 읽는 app/order/page.tsx 쪽입니다.
+//   관리 화면은 관리자 → 📢 공지·쪽지.
+//   지우지 않고 남겨둔 이유: 표·데이터 보호. 되살릴 일이 있으면 여기서 시작.
+
 // app/components/NoticePopup.tsx
 // 전체 교체용
 // 파일 위치:
