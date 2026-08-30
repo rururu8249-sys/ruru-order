@@ -13,6 +13,7 @@ import { useLiveOrderItemDelete } from "./useLiveOrderItemDelete";
 import LiveOrderRegisteredProductPicker from "./LiveOrderRegisteredProductPicker";
 import LiveOrderDangerActionGuide from "./LiveOrderDangerActionGuide";
 import { buildCustomerOrderCopyText, buildPaymentRequestNote } from "./liveOrderCustomerCopy";
+import { detailProducts } from "@/lib/productDetailModel";
 
 type Props = {
   order: LiveOrder;
@@ -514,6 +515,51 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const canChangePaymentMethod = !isCanceled && !canCancelPaymentConfirm && !isCardPaid;
   const nextPaymentMethod = isCardOrder ? "무통장입금" : "카드결제";
   const customerAddressText = getCustomerAddress(orderForView);
+
+  // [2026-08-31 사장님 요청] 등록상품으로 주문된 항목은 작은 사진 표시, 누르면 크게 — 표시 전용(데이터 무변경)
+  //   세부상품(3단) 주문이면 그 세부상품 사진을, 아니면 상품 대표사진을 쓴다. 실패해도 상세는 정상 표시.
+  const [itemImages, setItemImages] = useState<Record<string, string>>({});
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
+  useEffect(() => {
+    let stopped = false;
+    const ids = Array.from(new Set(items.map((it) => String(it.productId || "").trim()).filter(Boolean)));
+    if (ids.length === 0) { setItemImages({}); return; }
+    (async () => {
+      try {
+        const { data } = await supabase.from("products").select("*").in("id", ids);
+        if (stopped || !Array.isArray(data)) return;
+        const byId = new Map<string, Record<string, unknown>>();
+        for (const p of data as Record<string, unknown>[]) byId.set(String((p as { id?: unknown }).id ?? ""), p);
+        const next: Record<string, string> = {};
+        for (const it of items) {
+          const pid = String(it.productId || "").trim();
+          if (!pid) continue;
+          const prow = byId.get(pid);
+          if (!prow) continue;
+          let url = "";
+          try {
+            const details = detailProducts(prow as never, { includeHidden: true });
+            const itemName = String(it.productName || "").trim();
+            const hit = details
+              .filter((d) => d.detailName && (itemName === d.detailName || itemName.startsWith(d.detailName)))
+              .sort((a, b) => b.detailName.length - a.detailName.length)[0];
+            if (hit?.image) url = hit.image;
+          } catch { /* 세부상품 해석 실패 → 대표사진 폴백 */ }
+          if (!url) {
+            const p = prow as Record<string, unknown>;
+            const arr = (v: unknown) => (Array.isArray(v) && v.length > 0 ? String(v[0] ?? "") : "");
+            url = String(p.image_url || p.cover_image_url || p.main_image_url || p.thumbnail_url || "").trim()
+              || arr(p.detail_image_urls) || arr(p.image_urls) || arr(p.images);
+            url = String(url || "").trim();
+          }
+          if (url) next[String(it.id)] = url;
+        }
+        setItemImages(next);
+      } catch { /* 사진은 보조 표시 — 실패해도 상세는 정상 */ }
+    })();
+    return () => { stopped = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order.id, items.length]);
   const customerDeliveryMemoText = getCustomerDeliveryMemo(orderForView);
 
   const { savingAction, cancelOrder, restoreOrder } = useLiveOrderCancelRestore({
@@ -1018,11 +1064,13 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         {["unpaid", "manual_match_needed", "card_unpaid"].includes(orderForView.paymentStatus) ? (
           <button
             type="button"
+            title="결제요청 쪽지 보내기"
+            aria-label="결제요청 쪽지 보내기"
             disabled={payRequestSending}
             onClick={() => void sendPaymentRequest()}
-            className="rounded-lg border border-[#7B2D43]/25 bg-white px-2.5 py-1 text-[11px] font-black text-[#7B2D43] transition hover:bg-rose-soft disabled:opacity-50"
+            className="rounded-full px-1.5 text-[16px] leading-none opacity-75 transition hover:opacity-100 disabled:opacity-35"
           >
-            🔔 결제요청
+            🔔
           </button>
         ) : null}
         <button
@@ -1038,6 +1086,15 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           ×
         </button>
       </header>
+
+      {/* [2026-08-31] 상품 사진 크게 보기 — 아무 데나 누르면 닫힘 */}
+      {imagePreviewUrl ? (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4" onClick={() => setImagePreviewUrl("")}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={imagePreviewUrl} alt="상품 사진 크게 보기" className="max-h-[85vh] max-w-full rounded-2xl object-contain shadow-2xl" />
+          <button type="button" onClick={() => setImagePreviewUrl("")} className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1.5 text-sm font-black text-slate-700">✕ 닫기</button>
+        </div>
+      ) : null}
 
       {/* 목업 B panel-body */}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
@@ -1296,6 +1353,8 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                   canDelete={!isCanceled && items.length > 1}
                   deleting={deletingId === String(item.id)}
                   onDelete={() => handleDeleteItem(item)}
+                  imageUrl={itemImages[String(item.id)] || null}
+                  onImageClick={(url) => setImagePreviewUrl(url)}
                 />
               ))
             )}

@@ -17,6 +17,9 @@ type Props = {
   canDelete?: boolean;
   deleting?: boolean;
   onDelete?: () => void;
+  // [2026-08-31 사장님 요청] 등록상품 사진 — 있으면 작게 보여주고, 누르면 크게(부모가 띄움)
+  imageUrl?: string | null;
+  onImageClick?: (url: string) => void;
 };
 
 function money(value: unknown) {
@@ -160,7 +163,7 @@ function updateForm<K extends keyof LiveOrderItemEditForm>(
   };
 }
 
-export default function LiveOrderItemEditCard({ item, index, disabled = false, onAfterSave, canDelete = false, deleting = false, onDelete }: Props) {
+export default function LiveOrderItemEditCard({ item, index, disabled = false, onAfterSave, canDelete = false, deleting = false, onDelete, imageUrl = null, onImageClick }: Props) {
   const [editing, setEditing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [form, setForm] = useState(() => createInitialLiveOrderItemEditForm(item));
@@ -322,6 +325,17 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-surface p-3">
       <div className="flex items-start gap-2">
+        {imageUrl ? (
+          <button
+            type="button"
+            onClick={() => onImageClick?.(imageUrl)}
+            title="사진 크게 보기"
+            className="shrink-0 overflow-hidden rounded-xl border border-line bg-surface-2"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={imageUrl} alt={getItemName(item)} loading="lazy" className="h-12 w-12 object-cover" />
+          </button>
+        ) : null}
         <div className="min-w-0 flex-1">
           <div className="break-words text-sm font-black leading-5 text-ink">{getItemName(item)}</div>
           <div className="mt-1 whitespace-pre-line break-words text-xs font-bold leading-5 text-ink-soft">

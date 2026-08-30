@@ -38,6 +38,8 @@ export type LiveOrderItemChangeHistory = {
 
 export type LiveOrderItem = {
   id: string;
+  // [2026-08-31] 등록상품 주문이면 products.id — 주문상세 사진 표시용(표시 전용)
+  productId?: string | null;
   productName: string;
   optionText: string;
   color?: string;

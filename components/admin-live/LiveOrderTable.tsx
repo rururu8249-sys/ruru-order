@@ -1195,7 +1195,7 @@ export default function LiveOrderTable({
                               <button type="button" onClick={() => { openPaysterRightHalf(); onOpenCardPay(order); }} className="rounded-lg border border-info-tx bg-info-bg px-2 py-0.5 text-[10px] font-black text-info-tx hover:bg-info-bg">💳 카드결제</button>
                             ) : null}
                             {["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
-                              <button type="button" disabled={payRequestSending === order.id} onClick={() => void sendPaymentRequest(order)} className="rounded-lg border border-[#7B2D43]/25 bg-white px-2 py-0.5 text-[10px] font-black text-[#7B2D43] disabled:opacity-50">🔔 결제요청</button>
+                              <button type="button" title="결제요청 쪽지 보내기" aria-label="결제요청 쪽지 보내기" disabled={payRequestSending === order.id} onClick={() => void sendPaymentRequest(order)} style={{ border: "none", background: "none", padding: "0 2px", fontSize: "14px", lineHeight: 1, cursor: "pointer", opacity: payRequestSending === order.id ? 0.35 : 0.75 }}>🔔</button>
                             ) : null}
                           </div>
                           <span style={{ fontSize: "15px", fontWeight: 800, color: "#C0392B" }}>{money(displayPayableAmount(order))}</span>
@@ -1299,8 +1299,8 @@ export default function LiveOrderTable({
                           </button>
                         ) : null}
                         {["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
-                          <button type="button" disabled={payRequestSending === order.id} onClick={(e) => { e.stopPropagation(); void sendPaymentRequest(order); }} className="mt-1 rounded-lg border border-[#7B2D43]/25 bg-white px-2 py-0.5 text-[10px] font-black text-[#7B2D43] hover:bg-rose-soft disabled:opacity-50">
-                            🔔 결제요청
+                          <button type="button" title="결제요청 쪽지 보내기" aria-label="결제요청 쪽지 보내기" disabled={payRequestSending === order.id} onClick={(e) => { e.stopPropagation(); void sendPaymentRequest(order); }} className="mt-0.5 rounded-full px-1 text-[14px] leading-none opacity-70 transition hover:opacity-100 hover:drop-shadow disabled:opacity-35">
+                            🔔
                           </button>
                         ) : null}
                       </div>

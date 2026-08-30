@@ -243,6 +243,7 @@ function buildItem(row: OrderRow): LiveOrderItem {
 
   return {
     id: String(row.id),
+    productId: String((row as Record<string, unknown>).product_id ?? "").trim() || null,
     productName: row.product_name || "상품명 없음",
     optionText: optionParts.join(" / ") || "옵션 없음",
     color,
