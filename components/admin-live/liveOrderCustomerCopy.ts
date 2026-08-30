@@ -155,9 +155,10 @@ export function buildPaymentRequestNote(order: LiveOrder): { title: string; mess
   const nick = String(order.nickname || order.name || "고객").trim();
 
   if (ps === "card_unpaid") {
+    // [2026-08-31 사장님 지시] 카드결제 링크는 카카오톡으로 간다 — 어디서 뭘 누르면 되는지 구체적으로.
     return {
       title: "💳 카드결제 안내",
-      message: `${nick}님, 주문서 잘 받았어요! 카드결제가 아직 완료 전이에요.\n\n결제하실 금액: ${money(payableTotal)}\n보내드린 카드결제 링크에서 결제를 완료해주세요. 결제되면 확인 후 바로 처리해드릴게요 🙂`,
+      message: `${nick}님, 주문서 잘 받았어요! 카드결제가 아직 완료 전이에요.\n\n결제하실 금액: ${money(payableTotal)}\n\n📱 카카오톡으로 카드결제 링크를 보내드렸어요.\n카카오톡을 열어 「루루동이」가 보낸 메시지의 링크를 누르고, 안내에 따라 결제를 완료해주세요.\n\n결제가 확인되면 바로 주문 처리해드릴게요 🙂 링크가 안 보이시면 방송 채팅이나 쪽지로 말씀해주세요.`,
     };
   }
   // 무통장 (unpaid / manual_match_needed)
