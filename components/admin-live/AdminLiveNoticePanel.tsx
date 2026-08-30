@@ -15,6 +15,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
+import { NOTE_PRESETS, safeSearchTerm } from "@/lib/customerNotePresets";
+import { noteTimeText } from "@/lib/noteTime";
 
 /** 이 화면이 저장하는 키 — 여기 없는 키는 절대 건드리지 않는다. */
 const NOTICE_KEYS = [
@@ -46,7 +48,16 @@ type Notice = {
 };
 const EMPTY_NOTICE: Notice = { id: 0, title: "", content: "", category: "공지", is_pinned: false, is_visible: true, sort_order: 0 };
 
-type PanelTab = "customer" | "list";
+type PanelTab = "customer" | "list" | "send" | "sent";
+
+// 쪽지 보낼 손님 검색 결과
+type NoteCustomer = { id: number; youtube_nickname: string | null; customer_name: string | null; customer_phone: string | null };
+// 보낸 쪽지 한 줄
+type SentNote = {
+  id: number; title: string; message: string; customer_phone: string | null; target_session_key: string | null;
+  created_at: string; expires_at: string; seen_at: string | null; dismissed_at: string | null;
+  revoked_at?: string | null; sent_by: string | null; is_active: boolean;
+};
 
 export default function AdminLiveNoticePanel() {
   const [loading, setLoading] = useState(true);
@@ -64,6 +75,19 @@ export default function AdminLiveNoticePanel() {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [form, setForm] = useState<Notice>(EMPTY_NOTICE);
   const [listBusy, setListBusy] = useState(false);
+
+  // ── 쪽지 보내기 ──
+  const [q, setQ] = useState("");
+  const [found, setFound] = useState<NoteCustomer[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [picked, setPicked] = useState<NoteCustomer[]>([]);
+  const [noteText, setNoteText] = useState("");
+  const [noteHoursSel, setNoteHoursSel] = useState(12);
+  const [sending, setSending] = useState(false);
+
+  // ── 보낸 쪽지 ──
+  const [sent, setSent] = useState<SentNote[]>([]);
+  const [sentLoading, setSentLoading] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -203,6 +227,102 @@ export default function AdminLiveNoticePanel() {
     await loadNotices();
   };
 
+  // ───────── 쪽지 보내기 ─────────
+  const searchCustomers = async () => {
+    const term = safeSearchTerm(q);
+    if (!term) { setFound([]); return; }
+    setSearching(true);
+    try {
+      // 닉네임 / 이름 / 전화번호 중 아무거나 걸리면 나온다. 표시 전용(SELECT만).
+      const { data, error } = await supabase
+        .from("customers")
+        .select("id,youtube_nickname,customer_name,customer_phone")
+        .or(`youtube_nickname.ilike.%${term}%,customer_name.ilike.%${term}%,customer_phone.ilike.%${term}%`)
+        .order("last_order_at", { ascending: false, nullsFirst: false })
+        .limit(40);
+      if (error) { showAdminToast("손님 검색 실패\n\n" + error.message, "error"); return; }
+      setFound((data || []) as NoteCustomer[]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const togglePick = (c: NoteCustomer) => {
+    setPicked((prev) => (prev.some((p) => p.id === c.id) ? prev.filter((p) => p.id !== c.id) : [...prev, c]));
+  };
+
+  const sendNotes = async () => {
+    const msg = noteText.trim();
+    if (picked.length === 0) { showAdminToast("보낼 손님을 골라주세요.", "warning"); return; }
+    if (!msg) { showAdminToast("보낼 내용을 적어주세요.", "warning"); return; }
+
+    const noPhone = picked.filter((p) => !String(p.customer_phone || "").replace(/[^0-9]/g, ""));
+    const nameOf = (c: NoteCustomer) => String(c.youtube_nickname || c.customer_name || "이름없음").trim();
+    const who = picked.length === 1 ? `「${nameOf(picked[0])}」님` : `${picked.length}명`;
+    const warn = noPhone.length > 0 ? `\n\n※ ${noPhone.length}명은 전화번호가 없어 보낼 수 없습니다.` : "";
+    if (!(await showAdminConfirm(`${who}에게 쪽지를 보낼까요?\n\n${msg.slice(0, 80)}${msg.length > 80 ? "…" : ""}${warn}`))) return;
+
+    setSending(true);
+    try {
+      const res = await fetch("/api/admin-live/customer-note", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({
+          targets: picked.map((p) => ({ phone: p.customer_phone })),
+          message: msg,
+          hours: noteHoursSel,
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j?.ok) throw new Error(j?.message || `요청 실패(${res.status})`);
+      const parts = [`${j.sent || 0}명에게 보냈습니다.`];
+      if (j.skipped) parts.push(`${j.skipped}명은 방금 같은 쪽지를 이미 받아서 건너뛰었습니다.`);
+      showAdminToast(parts.join("\n"), (j.sent || 0) > 0 ? "success" : "warning");
+      setNoteText("");
+      setPicked([]);
+      void loadSent();
+    } catch (e) {
+      showAdminToast("쪽지 발송 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // ───────── 보낸 쪽지 ─────────
+  const loadSent = async () => {
+    setSentLoading(true);
+    try {
+      const res = await fetch("/api/admin-live/customer-note?limit=80", { cache: "no-store" });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j?.ok) { showAdminToast("보낸 쪽지 불러오기 실패\n\n" + (j?.message || res.status), "error"); return; }
+      setSent((j.notes || []) as SentNote[]);
+    } finally {
+      setSentLoading(false);
+    }
+  };
+
+  useEffect(() => { if (tab === "sent") void loadSent(); }, [tab]);
+
+  const revokeNote = async (n: SentNote) => {
+    const seenWarn = n.seen_at ? "\n\n⚠️ 손님이 이미 읽은 쪽지입니다. 화면에서는 내려가지만 이미 봤습니다." : "";
+    if (!(await showAdminConfirm(`이 쪽지를 회수할까요?${seenWarn}`))) return;
+    try {
+      const res = await fetch("/api/admin-live/customer-note", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ id: n.id }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j?.ok) throw new Error(j?.message || `요청 실패(${res.status})`);
+      showAdminToast(j.alreadySeen ? "회수했습니다. 다만 손님이 이미 읽었습니다." : "회수했습니다.", j.alreadySeen ? "warning" : "success");
+      void loadSent();
+    } catch (e) {
+      showAdminToast("회수 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    }
+  };
+
   const card = "rounded-[20px] border border-line bg-surface-2 p-4";
   const input = "mt-1 h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-deep";
   const label = "text-xs font-black text-ink-soft";
@@ -222,6 +342,8 @@ export default function AdminLiveNoticePanel() {
         {([
           { key: "customer", label: "📢 손님 화면 공지", desc: "접속 팝업 · 상시 안내" },
           { key: "list", label: "📋 공지사항 목록", desc: "등록 · 고정 · 순서" },
+          { key: "send", label: "📩 쪽지 보내기", desc: "검색 · 여러 명 한 번에" },
+          { key: "sent", label: "📤 보낸 쪽지", desc: "읽음 확인 · 회수" },
         ] as { key: PanelTab; label: string; desc: string }[]).map((t) => (
           <button
             key={t.key}
@@ -396,7 +518,7 @@ export default function AdminLiveNoticePanel() {
             </div>
           </div>
         </div>
-        ) : (
+        ) : tab === "list" ? (
         /* ───────── 공지사항 목록 ───────── */
         <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
           {/* 쓰기 */}
@@ -493,6 +615,164 @@ export default function AdminLiveNoticePanel() {
               ))
             )}
           </div>
+        </div>
+        ) : tab === "send" ? (
+        /* ───────── 쪽지 보내기 ───────── */
+        <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+          {/* 왼쪽: 손님 고르기 */}
+          <div className={card}>
+            <div className="text-sm font-black text-ink">① 받을 손님 고르기</div>
+            <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">닉네임 · 이름 · 전화번호 아무거나로 찾습니다.</div>
+            <div className="mt-3 flex gap-2">
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") void searchCustomers(); }}
+                placeholder="예) 루루짱  ·  임언냐  ·  01028495209"
+                className="h-10 flex-1 rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-deep"
+              />
+              <button type="button" onClick={() => void searchCustomers()} disabled={searching}
+                className="shrink-0 rounded-xl bg-rose-deep px-4 text-sm font-black text-white disabled:opacity-50">
+                {searching ? "찾는 중" : "🔍 찾기"}
+              </button>
+            </div>
+
+            {picked.length > 0 ? (
+              <div className="mt-3 rounded-xl border border-rose-line bg-rose-soft/40 p-2.5">
+                <div className="text-[11px] font-black text-ink-soft">받을 손님 {picked.length}명</div>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {picked.map((c) => (
+                    <button key={c.id} type="button" onClick={() => togglePick(c)}
+                      className="rounded-full bg-rose-deep px-2.5 py-1 text-[11px] font-black text-white">
+                      {String(c.youtube_nickname || c.customer_name || "이름없음")} ✕
+                    </button>
+                  ))}
+                </div>
+                <button type="button" onClick={() => setPicked([])} className="mt-2 text-[11px] font-black text-ink-mute underline">전부 지우기</button>
+              </div>
+            ) : null}
+
+            <div className="mt-3 max-h-[340px] space-y-1.5 overflow-y-auto">
+              {found.length === 0 ? (
+                <div className="py-10 text-center text-xs font-bold text-ink-mute">
+                  {q.trim() ? "찾은 손님이 없습니다." : "위에서 손님을 찾아주세요."}
+                </div>
+              ) : found.map((c) => {
+                const on = picked.some((p) => p.id === c.id);
+                const phone = String(c.customer_phone || "").replace(/[^0-9]/g, "");
+                return (
+                  <button key={c.id} type="button" onClick={() => togglePick(c)} disabled={!phone}
+                    className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left transition ${on ? "border-rose-deep bg-rose-soft/60" : "border-line bg-surface"} ${!phone ? "opacity-40" : ""}`}>
+                    <span className="text-sm">{on ? "☑️" : "⬜"}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] font-black text-ink">{String(c.youtube_nickname || c.customer_name || "이름없음")}</span>
+                      <span className="block text-[11px] font-bold text-ink-mute">
+                        {c.customer_name && c.youtube_nickname ? `${c.customer_name} · ` : ""}{c.customer_phone || "전화번호 없음 — 못 보냄"}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 오른쪽: 내용 쓰기 */}
+          <div className={card}>
+            <div className="text-sm font-black text-ink">② 보낼 내용</div>
+            <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
+              손님이 사이트에 들어오면 팝업으로 뜨고, 놓쳐도 쪽지함에 남습니다.
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {NOTE_PRESETS.map((pre) => (
+                <button key={pre.label} type="button" onClick={() => setNoteText(pre.text)}
+                  className="rounded-full border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ink-soft hover:bg-surface-2">
+                  {pre.label}
+                </button>
+              ))}
+            </div>
+
+            <textarea
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              rows={7}
+              maxLength={500}
+              placeholder="자주 쓰는 문구를 누르거나 직접 쓰세요."
+              className="mt-3 w-full resize-none rounded-xl border border-line bg-surface p-3 text-sm font-bold leading-relaxed text-ink outline-none focus:border-rose-deep"
+            />
+            <div className="mt-1 text-right text-[11px] font-bold text-ink-mute">{noteText.length} / 500자</div>
+
+            <label className="mt-2 block">
+              <span className={label}>쪽지함에 남는 기간</span>
+              <select value={noteHoursSel} onChange={(e) => setNoteHoursSel(Number(e.target.value))} className={input}>
+                <option value={6}>6시간</option>
+                <option value={12}>12시간 (기본)</option>
+                <option value={24}>24시간</option>
+                <option value={48}>2일</option>
+                <option value={72}>3일</option>
+              </select>
+            </label>
+
+            <button type="button" onClick={() => void sendNotes()} disabled={sending || picked.length === 0 || !noteText.trim()}
+              className="mt-4 h-12 w-full rounded-2xl bg-rose-deep text-[15px] font-black text-white transition disabled:opacity-40">
+              {sending ? "보내는 중…" : picked.length > 0 ? `📩 ${picked.length}명에게 보내기` : "받을 손님을 먼저 고르세요"}
+            </button>
+            <div className="mt-2 rounded-xl border border-line bg-warn-bg px-3 py-2 text-[11px] font-bold leading-5 text-warn-tx">
+              같은 손님에게 같은 내용을 <b>10분 안에 또 보내면 한 번만</b> 갑니다. 실수로 두 번 눌러도 손님에게 두 번 뜨지 않습니다.
+            </div>
+          </div>
+        </div>
+        ) : (
+        /* ───────── 보낸 쪽지 ───────── */
+        <div>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-black text-ink">📤 보낸 쪽지</div>
+              <div className="mt-0.5 text-xs font-bold text-ink-mute">누구에게 · 언제 · 읽었는지. 잘못 보낸 건 회수합니다.</div>
+            </div>
+            <button type="button" onClick={() => void loadSent()} disabled={sentLoading}
+              className="shrink-0 rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft disabled:opacity-50">
+              {sentLoading ? "불러오는 중" : "🔄 새로고침"}
+            </button>
+          </div>
+
+          {sent.length === 0 ? (
+            <div className={`${card} py-14 text-center text-sm font-bold text-ink-mute`}>
+              {sentLoading ? "불러오는 중…" : "보낸 쪽지가 없습니다."}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {sent.map((n) => {
+                const revoked = Boolean(n.revoked_at) || (!n.is_active && !n.dismissed_at);
+                const expired = new Date(n.expires_at).getTime() < Date.now();
+                return (
+                  <div key={n.id} className={`rounded-[18px] border p-4 ${revoked ? "border-line bg-surface-2 opacity-60" : "border-line bg-surface"}`}>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[13px] font-black text-ink">{n.customer_phone || String(n.target_session_key || "").replace(/^phone:/, "") || "대상 미상"}</span>
+                      {n.seen_at
+                        ? <span className="rounded-full bg-ok-bg px-2 py-0.5 text-[10px] font-black text-ok-tx">읽음</span>
+                        : <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white">안 읽음</span>}
+                      {revoked ? <span className="rounded-full border border-line px-2 py-0.5 text-[10px] font-black text-ink-mute">회수됨</span> : null}
+                      {!revoked && expired ? <span className="rounded-full border border-line px-2 py-0.5 text-[10px] font-black text-ink-mute">기간 지남</span> : null}
+                      {n.dismissed_at ? <span className="rounded-full border border-line px-2 py-0.5 text-[10px] font-black text-ink-mute">손님이 닫음</span> : null}
+                    </div>
+                    <p className="mt-1.5 whitespace-pre-line text-[12.5px] font-bold leading-6 text-ink-soft">{n.message}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-bold text-ink-mute">
+                      <span>보낸 날짜 {noteTimeText(n.created_at)}</span>
+                      {n.seen_at ? <span>읽은 날짜 {noteTimeText(n.seen_at)}</span> : null}
+                      {n.sent_by ? <span>보낸 사람 {n.sent_by}</span> : null}
+                      {!revoked ? (
+                        <button type="button" onClick={() => void revokeNote(n)}
+                          className="ml-auto rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-danger-tx">
+                          ↩︎ 회수
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
         )}
       </div>

@@ -5,6 +5,7 @@
 // 주의: 1차는 조회/화면 구성 전용. 고객 차단 저장, 메모 저장, 주문/입금/배송/정산 로직 없음.
 
 import { useEffect, useMemo, useState } from "react";
+import { NOTE_PRESETS } from "@/lib/customerNotePresets";
 import { useBulkPointGrant, type BulkGrantResult } from "./useBulkPointGrant";
 
 // 일괄지급 사유 프리셋(고객에게 보이는 문구). "직접입력" 선택 시 직접 작성.
@@ -993,14 +994,6 @@ function CustomerDetailDrawer({
 // [2026-08-30 사장님 요청] "많이 쓰는 멘트는 자동 프리셋"
 //   방송 중에 타이핑할 시간이 없다. 눌러서 넣고 필요하면 고쳐 쓴다.
 //   ⚠️ 문구만이다. 누르는 순간 나가지 않는다 — 입력창에 채워질 뿐이고 [보내기]를 눌러야 발송된다.
-const NOTE_PRESETS: { label: string; text: string }[] = [
-  { label: "제출 요청", text: "담아두신 상품이 아직 주문서 제출 전이에요! 🛒\n시간이 지나면 자동으로 풀리니 지금 제출 부탁드려요 🙏" },
-  { label: "입금 요청", text: "주문서 확인했습니다! 😊\n입금까지 완료해 주시면 바로 준비해 드릴게요 🙏" },
-  { label: "연락 부탁", text: "확인이 필요한 내용이 있어요 📩\n카카오톡 채널로 연락 주시면 빠르게 도와드릴게요!" },
-  { label: "품절 안내", text: "죄송합니다 🥲 담아두신 상품이 품절되었어요.\n다른 상품으로 도와드릴게요, 편하게 문의 주세요!" },
-  { label: "마감 임박", text: "오늘 방송 마감이 얼마 안 남았어요! ⏰\n주문 예정이시면 서둘러 주세요 🙏" },
-  { label: "배송 안내", text: "주문하신 상품 준비 중이에요 📦\n출고되면 다시 안내드릴게요, 조금만 기다려 주세요!" },
-];
 
 export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = "members" }: Props) {
   const [custTab, setCustTab] = useState<"members" | "issues">(initialTab);

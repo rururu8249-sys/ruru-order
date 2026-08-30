@@ -9,6 +9,7 @@ import {
   cleanNotePhone, cleanNoteSessionKey, cleanNoteText, noteHours,
   normalizeTargets, targetSessionKeyOf, buildNoteSourceKey, fingerprint,
 } from "../lib/customerNote.ts";
+import { NOTE_PRESETS, safeSearchTerm } from "../lib/customerNotePresets.ts";
 
 let fail = 0;
 const ok = (c, l) => { if (c) console.log(`✅ ${l}`); else { console.log(`❌ ${l}`); fail = 1; } };
@@ -63,6 +64,24 @@ ok(buildNoteSourceKey(T, "  입금 부탁드려요 ", now) === buildNoteSourceKe
 ok(buildNoteSourceKey(T, "가", now).length < 80, "열쇠값이 너무 길지 않다(인덱스 부담)");
 ok(fingerprint("가나다") !== fingerprint("가나라"), "글이 한 글자만 달라도 지문이 다르다");
 ok(fingerprint("") === fingerprint(""), "같은 글은 같은 지문");
+
+console.log("\n── 손님 검색어 방어 ──");
+// 쉼표·괄호가 그대로 들어가면 PostgREST or() 조건식이 깨져서 엉뚱한 손님이 나오거나 조회가 실패한다.
+eq(safeSearchTerm("루루짱"), "루루짱", "평범한 닉네임은 그대로");
+eq(safeSearchTerm("루루,짱"), "루루 짱", "쉼표 제거 (조건식 구분자)");
+eq(safeSearchTerm("루루(짱)"), "루루 짱", "괄호 제거 (조건식 묶음)");
+eq(safeSearchTerm("100%할인"), "100 할인", "퍼센트 제거 (ilike 와일드카드)");
+eq(safeSearchTerm("루루*짱"), "루루 짱", "별표 제거");
+eq(safeSearchTerm('루루"짱'), "루루 짱", "따옴표 제거");
+eq(safeSearchTerm("  루루   짱  "), "루루 짱", "공백 정리");
+eq(safeSearchTerm("가".repeat(60)).length, 40, "너무 길면 40자로 자름");
+eq(safeSearchTerm(",,,"), "", "구분자만 있으면 빈 검색어 → 조회 안 함");
+eq(safeSearchTerm(null), "", "값이 없으면 빈칸");
+
+console.log("\n── 자주 쓰는 문구 ──");
+ok(NOTE_PRESETS.length >= 6, `프리셋 ${NOTE_PRESETS.length}개 (고객카드·공지쪽지 화면이 같은 목록 사용)`);
+ok(NOTE_PRESETS.every((p) => p.label && p.text.trim().length > 0), "빈 프리셋이 없다");
+ok(NOTE_PRESETS.every((p) => p.text.length <= 500), "프리셋이 500자 제한을 넘지 않는다");
 
 console.log(fail ? "\n쪽지 발송 규칙 테스트 실패" : "\n쪽지 발송 규칙 테스트 통과");
 process.exit(fail);
