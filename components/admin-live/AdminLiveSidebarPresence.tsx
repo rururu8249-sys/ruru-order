@@ -449,43 +449,18 @@ export default function AdminLiveSidebarPresence() {
           <>
             <ul className="mt-2 max-h-[240px] space-y-1 overflow-y-auto">
               {visitors.map((visitor) => (
-                <Fragment key={visitor.id}>
-                  <li>
-                    <button
-                      type="button"
-                      onClick={() => void toggleVisitorCart(visitor.id, visitor.nickname)}
-                      title="누르면 이 손님이 장바구니에 담아둔 상품을 보여줍니다"
-                      className={["flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left", cartFor === visitor.id ? "bg-rose-soft" : "bg-surface-2 hover:bg-surface-3"].join(" ")}
-                    >
-                      <span className="min-w-0 flex-1 truncate text-[11.5px] font-black text-ink">{displayNickname(visitor.nickname)}</span>
-                      <span className="shrink-0 text-[9.5px] font-black text-ink-mute">{visitor.pageLabel}</span>
-                      <span className="shrink-0 text-[9px] font-bold text-ink-mute tabular-nums">{agoText(visitor.lastSeenAt)}</span>
-                    </button>
-                  </li>
-                  {cartFor === visitor.id ? (
-                    <li className="rounded-xl border border-rose-line bg-white px-2.5 py-2 text-[10.5px] font-bold leading-5 text-ink-soft">
-                      {!String(visitor.nickname || "").trim() ? (
-                        "비회원은 장바구니를 연결할 수 없어요."
-                      ) : cartLoading ? (
-                        "🛒 장바구니 확인 중…"
-                      ) : (() => {
-                        const nick = String(visitor.nickname).trim();
-                        const mine = (cartHolds || []).filter((h) => String(h.nickname || "").trim() === nick);
-                        if (mine.length === 0) return "🛒 지금 장바구니에 담긴 상품이 없어요.";
-                        const known = mine.reduce((sum, h) => sum + (h.unitPrice ? h.unitPrice * (Number(h.qty) || 0) : 0), 0);
-                        const hasUnknown = mine.some((h) => h.unitPrice === null || h.unitPrice === undefined);
-                        return (
-                          <>
-                            {mine.map((h, i) => (
-                              <div key={i} className="truncate">· {(h.detailName || h.productName || "상품").trim()} <b className="text-ink">{Number(h.qty) || 0}개</b></div>
-                            ))}
-                            <div className="mt-0.5 text-rose-deep">담긴 금액 {known.toLocaleString("ko-KR")}원{hasUnknown ? " +미기록" : ""}</div>
-                          </>
-                        );
-                      })()}
-                    </li>
-                  ) : null}
-                </Fragment>
+                <li key={visitor.id}>
+                  <button
+                    type="button"
+                    onClick={() => void toggleVisitorCart(visitor.id, visitor.nickname)}
+                    title="누르면 이 손님이 장바구니에 담아둔 상품을 팝업으로 보여줍니다"
+                    className={["flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left", cartFor === visitor.id ? "bg-rose-soft" : "bg-surface-2 hover:bg-surface-3"].join(" ")}
+                  >
+                    <span className="min-w-0 flex-1 truncate text-[11.5px] font-black text-ink">{displayNickname(visitor.nickname)}</span>
+                    <span className="shrink-0 text-[9.5px] font-black text-ink-mute">{visitor.pageLabel}</span>
+                    <span className="shrink-0 text-[9px] font-bold text-ink-mute tabular-nums">{agoText(visitor.lastSeenAt)}</span>
+                  </button>
+                </li>
               ))}
             </ul>
             {more > 0 ? (
@@ -495,6 +470,50 @@ export default function AdminLiveSidebarPresence() {
             ) : null}
           </>
         )
+      ) : null}
+
+      {/* [2026-08-31] 손님 장바구니 팝업 — 사이드바가 좁아 인라인 대신 화면 가운데로(포털) */}
+      {cartFor && typeof document !== "undefined" ? createPortal(
+        (() => {
+          const visitor = visitors.find((v) => v.id === cartFor);
+          const nick = String(visitor?.nickname || "").trim();
+          const mine = nick ? (cartHolds || []).filter((h) => String(h.nickname || "").trim() === nick) : [];
+          const known = mine.reduce((sum, h) => sum + (h.unitPrice ? h.unitPrice * (Number(h.qty) || 0) : 0), 0);
+          const hasUnknown = mine.some((h) => h.unitPrice === null || h.unitPrice === undefined);
+          return (
+            <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 p-4" onClick={() => setCartFor("")}>
+              <div className="w-full max-w-[360px] overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between border-b border-line px-4 py-3">
+                  <span className="text-[14px] font-black text-ink">🛒 {displayNickname(nick)} 장바구니</span>
+                  <button type="button" onClick={() => setCartFor("")} className="text-lg leading-none text-ink-mute hover:text-ink">✕</button>
+                </div>
+                <div className="max-h-[50vh] overflow-y-auto px-4 py-3 text-[12.5px] font-bold leading-6 text-ink-soft">
+                  {!nick ? (
+                    "비회원(닉네임 없음)은 장바구니를 연결할 수 없어요."
+                  ) : cartLoading ? (
+                    "장바구니 확인 중…"
+                  ) : mine.length === 0 ? (
+                    "지금 장바구니에 담긴 상품이 없어요."
+                  ) : (
+                    <>
+                      {mine.map((h, i) => (
+                        <div key={i} className="flex items-center justify-between gap-2 border-b border-line/60 py-1 last:border-0">
+                          <span className="min-w-0 flex-1 truncate">{(h.detailName || h.productName || "상품").trim()}</span>
+                          <span className="shrink-0 font-black text-ink">{Number(h.qty) || 0}개</span>
+                        </div>
+                      ))}
+                      <div className="mt-2 flex items-center justify-between text-[13px] font-black">
+                        <span className="text-ink-mute">담긴 금액</span>
+                        <span className="text-rose-deep">{known.toLocaleString("ko-KR")}원{hasUnknown ? " +미기록" : ""}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })(),
+        document.body,
       ) : null}
 
       <button
