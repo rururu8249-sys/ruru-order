@@ -61,6 +61,14 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
     { key: "phone", label: "주문자 번호", value: phone, hint: "결제하는 분 · - 없이" },
   ];
 
+  // [2026-08-31 실사고] 손님이 주문자 번호를 바꿔 주문하면 주문에는 옛 번호가 남아,
+  //   카드결제 링크가 손님이 안 쓰는 번호로 나갔다(루루짱929 님 건).
+  //   → 받는분 번호가 다르면 그것도 복사할 수 있게 같이 보여준다. 사장님이 골라 쓰면 된다.
+  const recipientPhoneForPick = String((order as { recipientPhone?: string | null }).recipientPhone || "").replace(/[^0-9]/g, "");
+  if (recipientPhoneForPick && recipientPhoneForPick !== phone) {
+    fields.push({ key: "recipientPhone", label: "받는분 번호", value: recipientPhoneForPick, hint: "주문자 번호와 다름 · 확인 후 사용" });
+  }
+
   // [2026-08-30] 집·사무실 전화(02 등)로도 주문할 수 있게 열었다.
   //   카드결제 링크는 문자로 가므로 휴대폰이 아니면 발송이 안 된다.
   //   → 관리자가 링크를 만들기 전에 눈으로 알 수 있게 경고를 띄운다.
@@ -86,14 +94,14 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
     await copyValue(field.key, field.value);
   };
 
-  // 숫자키 1~3 으로도 복사 (마우스 안 옮기고 붙여넣기만 반복할 수 있게)
+  // 숫자키 1~4 로도 복사 (마우스 안 옮기고 붙여넣기만 반복할 수 있게)
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const el = document.activeElement as HTMLElement | null;
       const tag = String(el?.tagName || "").toLowerCase();
       if (tag === "input" || tag === "textarea" || el?.isContentEditable) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
-      const index = ["1", "2", "3"].indexOf(event.key);
+      const index = ["1", "2", "3", "4"].indexOf(event.key);
       if (index < 0) return;
       event.preventDefault();
       void copyFieldValue(index);
@@ -232,7 +240,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
             </span>
           </button>
 
-          <div className="mb-2 text-[12px] font-bold text-ink-soft">금액·전화번호는 페이스터 입력칸이 따로라 아래에서 복사하세요 (숫자키 1~3)</div>
+          <div className="mb-2 text-[12px] font-bold text-ink-soft">금액·전화번호는 페이스터 입력칸이 따로라 아래에서 복사하세요 (숫자키 1~4)</div>
 
           <div className="space-y-2">
             {!phoneIsMobile && phone ? (

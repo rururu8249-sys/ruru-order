@@ -4285,23 +4285,58 @@ export default function OrderPage() {
     };
 
 
-    const { data: rows, error: findError } = await supabase
-      .from("customers")
-      .select("id")
-      .eq("customer_phone", lookupPhone)
-      .limit(1);
+    // [2026-08-31 계정분리 근본차단] 실측 사고 2건(루루짱929, 김도도)
+    //   손님이 주문자 번호를 바꿔서 제출하면 여기서 "새 번호로 조회 → 없음 → 새 회원 생성"이 되어
+    //   같은 사람이 회원 두 줄로 갈라졌다(카카오 연결된 옛 줄 + 주문이 붙은 새 줄).
+    //   회원의 정체성은 전화번호가 아니라 카카오 계정이다.
+    //   → 카카오 계정으로 먼저 찾는다. 있으면 그 줄을 갱신한다(번호만 바뀔 뿐 같은 사람).
+    //     번호로 찾는 건 카카오 계정이 없을 때(옛 손님)만.
+    const kakaoIdForSave = (() => {
+      try { return String(localStorage.getItem("ruru_kakao_id") || "").trim(); } catch { return ""; }
+    })();
 
-    if (findError) throw findError;
+    let targetRowId: number | string | null = null;
 
-    if (rows && rows.length > 0) {
-      const { error } = await supabase
+    if (kakaoIdForSave) {
+      const { data: byKakao } = await supabase
         .from("customers")
-        .update(customerData)
-        .eq("customer_phone", lookupPhone);
+        .select("id, customer_phone")
+        .eq("kakao_id", kakaoIdForSave)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (Array.isArray(byKakao) && byKakao.length > 0) targetRowId = (byKakao[0] as any).id;
+    }
 
+    if (targetRowId === null) {
+      const { data: rows, error: findError } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("customer_phone", lookupPhone)
+        .limit(1);
+      if (findError) throw findError;
+      if (rows && rows.length > 0) targetRowId = (rows[0] as any).id;
+    }
+
+    if (targetRowId !== null) {
+      // 새 번호를 다른 회원이 이미 쓰고 있으면 번호는 그대로 두고 나머지만 갱신한다.
+      //   (남의 번호를 뺏으면 그 사람 주문·입금이 어긋난다. 유니크 충돌로 저장 자체가 실패하기도 한다.)
+      const { data: conflict } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("customer_phone", phoneKey)
+        .neq("id", targetRowId)
+        .limit(1);
+
+      const patch = { ...customerData };
+      if (Array.isArray(conflict) && conflict.length > 0) delete patch.customer_phone;
+
+      const { error } = await supabase.from("customers").update(patch).eq("id", targetRowId);
       if (error) throw error;
     } else {
-      const { error } = await supabase.from("customers").insert(customerData);
+      // 정말 처음 오는 손님만 새로 만든다. 이때 카카오 계정을 같이 심어야 다음부터 안 갈라진다.
+      const insertData: any = { ...customerData };
+      if (kakaoIdForSave) insertData.kakao_id = kakaoIdForSave;
+      const { error } = await supabase.from("customers").insert(insertData);
       if (error) throw error;
     }
 
@@ -4339,17 +4374,32 @@ export default function OrderPage() {
         live_alert_optin_at: next ? new Date().toISOString() : null,
         live_alert_optin_source: next ? "order_rail" : null,
       };
-      const { data: existing } = await supabase.from("customers")
-        .select("id").eq("customer_phone", key).limit(1);
-      if (existing && existing.length > 0) {
-        await supabase.from("customers").update(patch).eq("customer_phone", key);
+      // [2026-08-31 계정분리 근본차단] 카카오 계정으로 먼저 찾는다.
+      const kakaoIdForAlert = (() => {
+        try { return String(localStorage.getItem("ruru_kakao_id") || "").trim(); } catch { return ""; }
+      })();
+      let alertRowId: number | string | null = null;
+      if (kakaoIdForAlert) {
+        const { data: byKakao } = await supabase.from("customers").select("id")
+          .eq("kakao_id", kakaoIdForAlert).order("created_at", { ascending: false }).limit(1);
+        if (Array.isArray(byKakao) && byKakao.length > 0) alertRowId = (byKakao[0] as any).id;
+      }
+      if (alertRowId === null) {
+        const { data: existing } = await supabase.from("customers")
+          .select("id").eq("customer_phone", key).limit(1);
+        if (existing && existing.length > 0) alertRowId = (existing[0] as any).id;
+      }
+      if (alertRowId !== null) {
+        await supabase.from("customers").update(patch).eq("id", alertRowId);
       } else {
-        await supabase.from("customers").insert({
+        const row: any = {
           customer_phone: key,
           youtube_nickname: youtubeNickname.trim() || "",
           customer_name: customerName.trim() || "",
           ...patch,
-        });
+        };
+        if (kakaoIdForAlert) row.kakao_id = kakaoIdForAlert;
+        await supabase.from("customers").insert(row);
       }
       setLiveAlertOptin(next);
       setAlertSheetOpen(false);
@@ -4361,11 +4411,26 @@ export default function OrderPage() {
     const phoneKey = onlyNumber(customerPhone);  // DB customer_phone 키는 숫자만(2026-06-16 정규화)
     if (!phoneKey || phoneKey.length < 9) return;
     // customers row가 아직 없으면(신규 사용자가 배송지부터 추가) insert로 보완해 DB 유실을 막는다.
-    const { data: existing } = await supabase.from("customers").select("id").eq("customer_phone", phoneKey).limit(1);
-    if (existing && existing.length > 0) {
-      await supabase.from("customers").update({ shipping_addresses: addresses }).eq("customer_phone", phoneKey);
+    // [2026-08-31 계정분리 근본차단] 카카오 계정으로 먼저 찾는다(번호는 바뀔 수 있다).
+    const kakaoIdForAddr = (() => {
+      try { return String(localStorage.getItem("ruru_kakao_id") || "").trim(); } catch { return ""; }
+    })();
+    let addrRowId: number | string | null = null;
+    if (kakaoIdForAddr) {
+      const { data: byKakao } = await supabase.from("customers").select("id")
+        .eq("kakao_id", kakaoIdForAddr).order("created_at", { ascending: false }).limit(1);
+      if (Array.isArray(byKakao) && byKakao.length > 0) addrRowId = (byKakao[0] as any).id;
+    }
+    if (addrRowId === null) {
+      const { data: existing } = await supabase.from("customers").select("id").eq("customer_phone", phoneKey).limit(1);
+      if (existing && existing.length > 0) addrRowId = (existing[0] as any).id;
+    }
+    if (addrRowId !== null) {
+      await supabase.from("customers").update({ shipping_addresses: addresses }).eq("id", addrRowId);
     } else {
-      await supabase.from("customers").insert({ customer_phone: phoneKey, youtube_nickname: youtubeNickname.trim() || "", customer_name: customerName.trim() || "", shipping_addresses: addresses });
+      const row: any = { customer_phone: phoneKey, youtube_nickname: youtubeNickname.trim() || "", customer_name: customerName.trim() || "", shipping_addresses: addresses };
+      if (kakaoIdForAddr) row.kakao_id = kakaoIdForAddr;
+      await supabase.from("customers").insert(row);
     }
   };
 
