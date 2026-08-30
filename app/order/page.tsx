@@ -41,7 +41,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { HOWTO_DEFAULT, parseHowtoSteps } from "@/lib/howto";
 import { supabase } from "@/lib/supabase";
 import { isRemoteAreaAddress } from "@/lib/order/shippingAddress";
-import { formatOrderPhone, normalizeOrderPhone } from "@/lib/order/phone";
+import { formatOrderPhone, normalizeOrderPhone, isOrderablePhone, isMobileOrderPhone } from "@/lib/order/phone";
 import {
   CUSTOMER_ORDER_LOOKUP_LIMIT,
   customerOrderLookupSinceIso,
@@ -3139,9 +3139,9 @@ export default function OrderPage() {
     // [2026-08-30 사고수정] 예전엔 여기서 길이만 봤다. 그래서 집·사무실 번호(02…)를
     //   저장은 성공시켜 놓고, 정작 주문서 제출에서 막았다. 손님은 "저장했는데 왜 또 막히지" 하며 갇힌다.
     //   → 저장하는 자리에서 바로 알려준다. 제출 검증(01X 10~11자리)과 같은 규칙.
-    if (!/^01[016789][0-9]{7,8}$/.test(cleanPhone)) {
+    if (!isOrderablePhone(cleanPhone)) {
       showCustomerNotice(
-        `휴대폰 번호로 입력해 주세요.\n\n지금 입력된 번호: ${cleanPhone}\n\n010으로 시작하는 휴대폰 번호가 필요해요.\n(집·사무실 전화는 방송 알림톡을 받을 수 없어요)`,
+        `연락처를 다시 확인해 주세요.\n\n지금 입력된 번호: ${cleanPhone}\n\n휴대폰(010…) 또는 집·사무실 전화(02…, 031…)를 넣어주세요.`,
       );
       return;
     }
@@ -4375,15 +4375,17 @@ export default function OrderPage() {
     //   무엇이 들어왔는지 알 방법이 없어 원인을 못 찾았다.
     //   → 지금 읽힌 번호를 그대로 보여준다. 손님도 뭐가 틀렸는지 바로 알고,
     //     문의가 와도 사장님이 화면만 보고 판단할 수 있다. (손님 본인 번호라 노출 문제 없음)
-    if (!/^01[016789][0-9]{7,8}$/.test(cleanPhone)) {
+    // [2026-08-30 사장님 결정] 집·사무실 전화(02·031…·070)도 허용한다.
+    //   막았던 이유는 "돈이 깨져서"가 아니라 "방송 알림톡을 못 받아서"였다.
+    //   입금매칭(입금자명 기준)·택배연락(배송지 연락처)·정산은 이 번호를 쓰지 않는다.
+    if (!isOrderablePhone(cleanPhone)) {
       // [2026-08-30 실사례] 손님 김지영2231 님 — 카카오 계정에 등록된 번호가
       //   집·사무실 전화(02-6490-6376)라 로그인할 때 그게 자동으로 채워졌고,
       //   손님은 "휴대폰을 넣었는데 왜 막히지" 하며 같은 자리에서 계속 막혔다.
       //   오류만 띄우면 어디를 고쳐야 하는지 알 수가 없다.
       //   → 안내와 함께 번호 고치는 화면을 바로 열어준다.
-      const isLandline = /^(02|0[3-6][0-9])/.test(cleanPhone);
       showCustomerNotice(
-        `휴대폰 번호를 다시 확인해 주세요.\n\n지금 입력된 번호: ${cleanPhone || "(비어 있음)"}${isLandline ? " ← 집·사무실 전화번호예요" : ""}\n\n카카오 계정에 저장된 번호가 자동으로 채워집니다.\n택배 연락과 입금 확인 때문에 휴대폰 번호가 꼭 필요해요.\n\n바로 아래 「내 정보」 창에서 휴대폰 번호로 고쳐주세요 🙏`,
+        `연락처를 다시 확인해 주세요.\n\n지금 입력된 번호: ${cleanPhone || "(비어 있음)"}\n\n휴대폰(010…) 또는 집·사무실 전화(02…, 031…)를 넣어주세요.\n\n바로 아래 「내 정보」 창에서 고쳐주세요 🙏`,
       );
       // 손님이 찾아 헤매지 않게 번호 고치는 창을 바로 띄운다.
       window.setTimeout(() => openCustomerInfoEditBottomSheet("info"), 400);
@@ -6212,7 +6214,8 @@ export default function OrderPage() {
                     → 주문자 번호를 항상 같이 보여주고, 휴대폰이 아니면 제출 누르기 전에 미리 잡아준다. */}
                 {(() => {
                   const ordererPhone = normalizePhone(customerPhone);
-                  const phoneOk = /^01[016789][0-9]{7,8}$/.test(ordererPhone);
+                  const phoneOk = isOrderablePhone(ordererPhone);
+                  const phoneIsMobile = isMobileOrderPhone(ordererPhone);
                   return (
                     <div style={{ margin: "8px 16px 0", border: `1px solid ${phoneOk ? "#E5E1DC" : "#E0344B"}`, borderRadius: "12px", padding: "12px 14px", background: phoneOk ? "#FAF8F6" : "#FFF4F5" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
@@ -6231,14 +6234,24 @@ export default function OrderPage() {
                         {ordererPhone ? formatPhone(ordererPhone) : "번호 없음"}
                       </div>
                       {phoneOk ? (
-                        <div style={{ marginTop: "4px", fontSize: "11.5px", color: "#8A7A7D", lineHeight: 1.6 }}>
-                          입금 확인과 주문 조회에 쓰는 번호예요. 위 배송지 연락처와 달라도 괜찮습니다.
-                        </div>
+                        phoneIsMobile ? (
+                          <div style={{ marginTop: "4px", fontSize: "11.5px", color: "#8A7A7D", lineHeight: 1.6 }}>
+                            입금 확인과 주문 조회에 쓰는 번호예요. 위 배송지 연락처와 달라도 괜찮습니다.
+                          </div>
+                        ) : (
+                          /* [2026-08-30] 집·사무실 전화도 주문은 되게 열었다.
+                             다만 카드결제 링크와 방송 알림톡은 휴대폰으로만 가므로 미리 알려준다. */
+                          <div style={{ marginTop: "6px", fontSize: "11.5px", color: "#8A6A1E", background: "#FFF8E6", border: "1px solid #F0E0B0", borderRadius: "8px", padding: "8px 10px", lineHeight: 1.7 }}>
+                            <b>집·사무실 전화번호로 주문하셔도 됩니다.</b><br />
+                            다만 이 번호로는 <b>카드결제 링크</b>와 <b>방송 시작 알림톡</b>을 보내드릴 수 없어요.<br />
+                            필요하시면 휴대폰 번호로 바꿔주세요.
+                          </div>
+                        )
                       ) : (
                         <div style={{ marginTop: "6px", fontSize: "12px", color: "#B3202F", fontWeight: 700, lineHeight: 1.7 }}>
                           이 번호로는 주문서를 낼 수 없어요.<br />
-                          카카오 계정에 저장된 번호가 자동으로 들어온 거예요.<br />
-                          <b>위 「고치기」를 눌러 휴대폰 번호로 바꿔주세요.</b>
+                          <b>위 「고치기」를 눌러 연락처를 고쳐주세요.</b><br />
+                          휴대폰(010…) 또는 집·사무실 전화(02…, 031…) 모두 됩니다.
                           <br />
                           <span style={{ color: "#8A7A7D", fontWeight: 600 }}>
                             ※ 배송지 연락처를 고쳐도 이 번호는 바뀌지 않아요.

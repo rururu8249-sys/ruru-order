@@ -6,6 +6,7 @@
 // 주의: UI 전용. DB/API/주문/입금/정산 로직 없음.
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { isOrderablePhone, isMobileOrderPhone } from "@/lib/order/phone";
 import SheetGrabber from "@/components/customer/SheetGrabber";
 
 type ShippingAddress = {
@@ -102,8 +103,10 @@ export default function CustomerInfoEditBottomSheet({
   //   정작 이 「정보수정」 화면에는 주문자 전화번호를 고칠 칸이 아예 없었다.
   //   (있던 건 배송지 연락처뿐. 손님이 그걸 고쳐도 주문자 번호는 그대로라 계속 막힘.)
   //   → 여기에 주문자 휴대폰 번호 칸을 만든다. 이게 회원 식별 + 알림톡 받는 번호다.
-  const ordererPhoneDigits = String(customerPhone || "").replace(/[^0-9]/g, "");
-  const ordererPhoneOk = /^01[016789][0-9]{7,8}$/.test(ordererPhoneDigits);
+  //   [2026-08-30] 집·사무실 전화(02·031…·070)도 주문 가능하게 열었다.
+  //   단, 카드결제 링크·방송 알림톡은 휴대폰으로만 가므로 그 경우엔 노란 안내를 띄운다.
+  const ordererPhoneOk = isOrderablePhone(customerPhone);
+  const ordererPhoneIsMobile = isMobileOrderPhone(customerPhone);
 
   if (!open) return null;
 
@@ -369,7 +372,7 @@ export default function CustomerInfoEditBottomSheet({
 
             {/* 주문하시는 분 휴대폰 번호 — 회원 식별 + 알림톡 받는 번호 */}
             <div style={{ borderRadius: "16px", background: "#fff", padding: "14px", border: ordererPhoneOk ? "1px solid #E8E2DD" : "2px solid #e74c3c" }}>
-              <label style={labelStyle}>📱 주문하시는 분 휴대폰 번호</label>
+              <label style={labelStyle}>📱 주문하시는 분 연락처</label>
               <input
                 value={customerPhone}
                 onChange={(e) => onCustomerPhoneChange(e.target.value)}
@@ -380,12 +383,18 @@ export default function CustomerInfoEditBottomSheet({
                 style={{ ...inputStyle, ...(ordererPhoneOk ? {} : { borderColor: "#e74c3c", background: "#FFF5F5" }) }}
               />
               {ordererPhoneOk ? (
-                <div style={{ marginTop: "6px", fontSize: "12px", color: "#7B736D" }}>배송지 연락처와 달라도 괜찮습니다. 이 번호로 주문·입금 확인이 연결됩니다.</div>
+                ordererPhoneIsMobile ? (
+                  <div style={{ marginTop: "6px", fontSize: "12px", color: "#7B736D" }}>배송지 연락처와 달라도 괜찮습니다. 이 번호로 주문·입금 확인이 연결됩니다.</div>
+                ) : (
+                  <div style={{ marginTop: "6px", fontSize: "11.5px", color: "#8A6A1E", background: "#FFF8E6", border: "1px solid #F0E0B0", borderRadius: "8px", padding: "8px 10px", lineHeight: 1.7 }}>
+                    <b>집·사무실 전화번호로 주문하셔도 됩니다.</b><br />
+                    다만 이 번호로는 <b>카드결제 링크</b>와 <b>방송 시작 알림톡</b>을 보내드릴 수 없어요.
+                  </div>
+                )
               ) : (
                 <div style={{ marginTop: "6px", fontSize: "12px", color: "#e74c3c", fontWeight: 700, lineHeight: 1.6 }}>
                   이 번호로는 주문서를 낼 수 없어요.<br />
-                  010으로 시작하는 <b>휴대폰 번호</b>로 고쳐주세요.<br />
-                  <span style={{ fontWeight: 600, color: "#a94442" }}>(집·사무실 전화번호는 방송 알림톡을 받을 수 없어서 막아두었어요)</span>
+                  휴대폰(010…) 또는 집·사무실 전화(02…, 031…)를 넣어주세요.
                 </div>
               )}
             </div>

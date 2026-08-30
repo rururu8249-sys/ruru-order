@@ -37,3 +37,34 @@ export const formatOrderPhone = (value: string) => {
 
   return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
 };
+
+// [2026-08-30 사장님 결정] 집·사무실 전화(02 등)로도 주문서를 낼 수 있게 허용한다.
+//   확인한 사실(코드 전수 확인):
+//     · 입금 자동매칭(Bankda) → 입금자명 + 금액 기준. 전화번호 안 씀.
+//     · 택배 연락 → 배송지 연락처(recipient_phone). 주문자 번호 안 씀.
+//     · 정산 / 포인트 / 합배송 / 주문조회 → 번호를 열쇠로만 쓰므로 형식과 무관.
+//     · 방송 알림톡(SOLAPI) → 이 번호로 감. 일반전화는 못 받음(발송 실패로 끝, 사고 아님).
+//     · 카드결제 링크 → 휴대폰이 필요. 관리자 카드결제 창에서 경고로 알린다.
+//   막은 이유가 "돈이 깨져서"가 아니라 "알림톡을 못 받아서"였으므로, 주문 자체는 막지 않는다.
+//   허용 대상은 국내 번호만. 해외 번호는 자릿수 규칙이 제각각이라 여기서 다루지 않는다.
+
+// 휴대폰 (010/011/016/017/018/019)
+export const isMobileOrderPhone = (value: string) =>
+  /^01[016789][0-9]{7,8}$/.test(onlyOrderPhoneDigits(value));
+
+// 국내 일반전화 · 인터넷전화
+//   02(서울) 9~10자리 / 지역번호(031~064) 10~11자리 / 070(인터넷) 11자리
+export const isLandlineOrderPhone = (value: string) => {
+  const d = onlyOrderPhoneDigits(value);
+  // 02 는 10자리(02-1234-5678)만 허용한다.
+  //   9자리(02-777-1234)를 열면 서버 쪽 포인트 검증(lib/customerPoints.ts, 10자리 미만 거부)에
+  //   걸려 주문이 500 으로 터진다. 돈 로직은 건드리지 않는다 → 여기서 미리 막고 안내한다.
+  if (/^02[0-9]{8}$/.test(d)) return true;
+  if (/^0(3[1-3]|4[1-4]|5[1-5]|6[1-4])[0-9]{7,8}$/.test(d)) return true; // 031~064 (10~11자리)
+  if (/^070[0-9]{8}$/.test(d)) return true;                              // 070 인터넷전화
+  return false;
+};
+
+// 주문서 제출에 쓸 수 있는 번호인가 (휴대폰 또는 국내 일반전화)
+export const isOrderablePhone = (value: string) =>
+  isMobileOrderPhone(value) || isLandlineOrderPhone(value);

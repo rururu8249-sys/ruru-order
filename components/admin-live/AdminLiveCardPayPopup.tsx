@@ -61,6 +61,14 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
     { key: "phone", label: "주문자 번호", value: phone, hint: "결제하는 분 · - 없이" },
   ];
 
+  // [2026-08-30] 집·사무실 전화(02 등)로도 주문할 수 있게 열었다.
+  //   카드결제 링크는 문자로 가므로 휴대폰이 아니면 발송이 안 된다.
+  //   → 관리자가 링크를 만들기 전에 눈으로 알 수 있게 경고를 띄운다.
+  //   ⚠️ 주문·금액·입금·정산은 건드리지 않는다. 화면 경고만.
+  const phoneIsMobile = /^01[016789][0-9]{7,8}$/.test(phone);
+  const recipientPhoneDigits = String((order as { recipientPhone?: string | null }).recipientPhone || "").replace(/[^0-9]/g, "");
+  const recipientIsMobile = /^01[016789][0-9]{7,8}$/.test(recipientPhoneDigits);
+
   const copyValue = async (key: string, value: string) => {
     try {
       await navigator.clipboard.writeText(value);
@@ -227,6 +235,16 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
           <div className="mb-2 text-[12px] font-bold text-ink-soft">금액·전화번호는 페이스터 입력칸이 따로라 아래에서 복사하세요 (숫자키 1~3)</div>
 
           <div className="space-y-2">
+            {!phoneIsMobile && phone ? (
+              <div className="mb-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] font-bold leading-relaxed text-amber-800">
+                ⚠️ 주문자 번호가 휴대폰이 아닙니다 ({phone}) — 결제링크 문자가 가지 않습니다.
+                {recipientIsMobile ? (
+                  <> 배송지 연락처 <b>{recipientPhoneDigits}</b> 로 보내거나, 카카오톡으로 링크를 직접 보내주세요.</>
+                ) : (
+                  <> 카카오톡으로 링크를 직접 보내거나, 손님께 휴대폰 번호를 여쭤보세요.</>
+                )}
+              </div>
+            ) : null}
             {fields.map((f, fieldIndex) => (
               <div
                 key={f.key}
