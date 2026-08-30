@@ -44,6 +44,10 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
   //         금액·전화번호는 페이스터에서 입력칸이 따로라 합칠 수 없어 보조 복사로 남긴다.
   const amount = cardAmount(order);
   const summary = orderSummary(order);
+  // [2026-08-31 사장님 요청] 팝업 가운데 빈 공간에 "이 주문 내용" 확인 카드 — 표시 전용, 데이터 무변경
+  const orderItems = Array.isArray(order.items) ? order.items : [];
+  const baseAmount = Number(order.totalAmount || 0); // 상품금액 + 배송비
+  const cardExtra = Number(order.cardExtraAmount || 0) || Math.max(0, amount - baseAmount);
   const phone = phoneDigits(order);
   const nickname = String(order.nickname || "").trim();
 
@@ -165,9 +169,9 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
       }}
       style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}
     >
-      {/* [2026-08-31 사장님 지시] 세로는 화면의 96%까지(페이스터 스크롤 최소화), 왼쪽은 페이스터풍 네이비·블루로
+      {/* [2026-08-31 사장님 지시] 세로는 화면 거의 끝까지(위아래 8px만), 왼쪽은 페이스터풍 네이비·블루로
           위 쏠림 없이 세로 공간을 나눠 쓴다(헤더 → 복사 카드들 → (여백) → 하단 액션). */}
-      <div style={{ display: "flex", flexDirection: "row", width: "980px", maxWidth: "96vw", height: "min(1500px, 96vh)", borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}>
+      <div style={{ display: "flex", flexDirection: "row", width: "980px", maxWidth: "96vw", height: "min(1500px, calc(100dvh - 16px))", borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}>
         <div style={{ width: "50%", height: "100%", background: "#F4F6FB", display: "flex", flexDirection: "column", overflowY: "auto" }}>
         <div className="flex items-center justify-between px-5 py-4" style={{ background: "#101C3D" }}>
           <span className="text-[16px] font-black text-white">💳 카드결제 — {order.nickname}</span>
@@ -235,8 +239,35 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
             ))}
           </div>
 
-          {/* 아래 여백 — 액션 버튼을 하단에 정렬해 위 쏠림을 없앤다 */}
-          <div className="min-h-4 flex-1" />
+          {/* [2026-08-31 사장님 요청] 가운데 빈 공간 활용 — 결제 전에 주문·금액을 눈으로 검산 (표시 전용) */}
+          <div className="mt-4 flex min-h-0 flex-1 flex-col rounded-2xl bg-white px-4 py-3.5 shadow-sm" style={{ border: "1px solid #DDE4F2" }}>
+            <div className="mb-2 shrink-0 text-[11.5px] font-black" style={{ color: "#5A6B92" }}>🧾 이 주문 내용 — 결제 전에 확인하세요</div>
+            <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
+              {orderItems.map((item, itemIndex) => {
+                const opt = [String(item.color || "").trim(), String(item.size || "").trim()]
+                  .filter((v) => v && v !== "없음")
+                  .join("/");
+                return (
+                  <div key={itemIndex} className="flex items-center justify-between gap-2 text-[12.5px] font-bold" style={{ color: "#101C3D" }}>
+                    <span className="min-w-0 flex-1 truncate">
+                      {item.productName}
+                      {opt ? ` (${opt})` : ""}
+                      {Number(item.qty) > 1 ? ` ×${item.qty}` : ""}
+                    </span>
+                    <span className="shrink-0" style={{ color: "#5A6B92" }}>{Number(item.amount || 0).toLocaleString()}원</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-2.5 shrink-0 space-y-1 border-t pt-2.5 text-[12px] font-bold" style={{ borderColor: "#EAF0FE", color: "#5A6B92" }}>
+              <div className="flex justify-between"><span>상품금액 + 배송비</span><span>{baseAmount.toLocaleString()}원</span></div>
+              <div className="flex justify-between"><span>카드 추가금</span><span style={{ color: "#7C3AED" }}>+{cardExtra.toLocaleString()}원</span></div>
+              <div className="flex justify-between text-[14px] font-black" style={{ color: "#2B6BEB" }}><span>카드 결제금액</span><span>{amount.toLocaleString()}원</span></div>
+            </div>
+          </div>
+
+          {/* 하단 액션과의 간격 — 확인 카드가 남는 세로를 흡수한다 */}
+          <div className="min-h-3 shrink-0" />
 
           <button
             type="button"
