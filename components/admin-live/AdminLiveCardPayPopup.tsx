@@ -38,8 +38,6 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
   const [copiedKey, setCopiedKey] = useState("");
   const [saving, setSaving] = useState(false);
   // [2026-08-29] 카톡으로 결제링크 보낸 뒤, 유튜브 채팅에 자동 안내
-  const [chatNoticeSending, setChatNoticeSending] = useState(false);
-  const [chatNoticeSent, setChatNoticeSent] = useState(false);
   // [2026-08-29 사장님 요청] 페이스터는 남의 사이트라 자동 입력이 안 된다(브라우저 동일출처 정책).
   //   예전: 상품명·금액·닉네임·전화번호를 1→2→3→4 순서로 네 번 복사해야 했다.
   //   지금: 닉네임과 상품명을 하나로 합쳐서 "한 번만" 복사한다. 닉네임이 앞에 온다(매칭 기준).
@@ -112,53 +110,9 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order]);
 
-  // [2026-08-29 사장님 요청] 카톡 발송했다고 유튜브 채팅에 자동 안내.
-  //   ⚠️ 주문상태·금액·입금·배송은 전혀 건드리지 않는다. 채팅 글만 올린다.
-  //   ⚠️ 문구·닉네임은 서버가 DB에서 확인해서 만든다(화면 값 그대로 안 보냄).
-  const handleChatNotice = async () => {
-    const items = Array.isArray(order.items) ? order.items : [];
-    const rowIds = items.map((i) => Number(i.id)).filter((id) => Number.isFinite(id));
-
-    if (rowIds.length === 0) {
-      showAdminToast("주문 번호가 없어 채팅 안내를 보낼 수 없습니다.", "warning");
-      return;
-    }
-
-    const ok = await showAdminConfirm(
-      [
-        "유튜브 채팅에 이렇게 올릴까요?",
-        "",
-        `💳 ${order.nickname}님 카카오톡으로 카드결제 링크 보내드렸어요! 📩 확인 부탁드려요 🙏`,
-        "",
-        "※ 금액·전화번호는 공개 채팅이라 넣지 않습니다.",
-      ].join("\n"),
-    );
-
-    if (!ok) return;
-
-    setChatNoticeSending(true);
-    try {
-      const res = await fetch("/api/admin-live/card-pay-notice", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-        body: JSON.stringify({ orderRowIds: rowIds }),
-      });
-      const payload = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
-
-      if (!res.ok || !payload?.ok) {
-        showAdminToast("채팅 안내 실패\n\n" + (payload?.error || "잠시 후 다시 시도해 주세요."), "error");
-        return;
-      }
-
-      setChatNoticeSent(true);
-      showAdminToast("유튜브 채팅에 안내를 올렸습니다.", "success");
-    } catch (e) {
-      showAdminToast("채팅 안내 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
-    } finally {
-      setChatNoticeSending(false);
-    }
-  };
+  // [2026-08-31 사장님 지시] 유튜브 채팅 자동 게시는 쿼터를 먹는다(봇 글 하루 상한 공유)
+  //   → 안내문구를 복사만 해주고, 유튜브 채팅에는 사장님이 직접 붙여넣는다. (금액·전화번호는 공개 채팅이라 안 넣음)
+  const chatNoticeText = `💳 ${order.nickname}님 카카오톡으로 카드결제 링크 보내드렸어요! 📩 확인 부탁드려요 🙏`;
 
   // 결제완료처리: LiveOrderDetailDrawer.handleCardPaymentStatusChange와 동일 패턴(주문상태만 변경, 금액/배송/송장 로직 무변경)
   const handleComplete = async () => {
@@ -211,42 +165,41 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
       }}
       style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}
     >
-      {/* [2026-08-31 사장님 지시] 600px는 페이스터 화면이 절반만 보여 스크롤해야 했다 → 화면 높이의 92%까지 키움(고객정보 칸도 같이) */}
-      <div style={{ display: "flex", flexDirection: "row", width: "960px", maxWidth: "95vw", height: "min(1200px, 92vh)", borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
-        <div style={{ width: "50%", height: "100%", background: "var(--color-surface)", overflowY: "auto" }}>
-        <div className="flex items-center justify-between border-b border-rose-line px-5 py-3">
-          <span className="text-[15px] font-black text-ink">💳 카드결제 — {order.nickname}</span>
-          <button type="button" onClick={onClose} className="text-lg leading-none text-ink-mute hover:text-ink">
+      {/* [2026-08-31 사장님 지시] 세로는 화면의 96%까지(페이스터 스크롤 최소화), 왼쪽은 페이스터풍 네이비·블루로
+          위 쏠림 없이 세로 공간을 나눠 쓴다(헤더 → 복사 카드들 → (여백) → 하단 액션). */}
+      <div style={{ display: "flex", flexDirection: "row", width: "980px", maxWidth: "96vw", height: "min(1500px, 96vh)", borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}>
+        <div style={{ width: "50%", height: "100%", background: "#F4F6FB", display: "flex", flexDirection: "column", overflowY: "auto" }}>
+        <div className="flex items-center justify-between px-5 py-4" style={{ background: "#101C3D" }}>
+          <span className="text-[16px] font-black text-white">💳 카드결제 — {order.nickname}</span>
+          <button type="button" onClick={onClose} className="text-xl leading-none text-white/60 hover:text-white">
             ✕
           </button>
         </div>
 
-        <div className="px-5 py-4">
+        <div className="flex min-h-0 flex-1 flex-col px-5 py-5">
           {/* [2026-08-29 사장님 요청] 닉네임 먼저 + 상품명 을 하나로 합쳐서 한 번만 복사한다.
               이 값을 오른쪽 페이스터 「상품명」 칸에 그대로 붙여넣으면 된다. */}
           <button
             type="button"
             onClick={() => void copyValue("paste", pasteValue)}
             disabled={!pasteValue}
-            className={[
-              "mb-3 w-full rounded-xl px-4 py-3 text-left shadow-sm transition disabled:opacity-40",
-              copiedKey === "paste" ? "bg-emerald-600 text-white" : "bg-rose-deep text-white hover:opacity-90",
-            ].join(" ")}
+            className="mb-4 w-full rounded-2xl px-4 py-4 text-left shadow-md transition disabled:opacity-40"
+            style={{ background: copiedKey === "paste" ? "#059669" : "#2B6BEB", color: "#fff" }}
           >
-            <span className="block text-[10px] font-black opacity-80">페이스터 「상품명」 칸에 붙여넣기</span>
-            <span className="block text-[15px] font-black">
+            <span className="block text-[11px] font-black opacity-85">페이스터 「상품명」 칸에 붙여넣기</span>
+            <span className="mt-0.5 block text-[16px] font-black">
               {copiedKey === "paste" ? "✔ 복사됐습니다 · ⌘V 로 붙여넣기" : "⧉ 닉네임 + 상품명 복사하기"}
             </span>
-            <span className="block truncate text-[12px] font-bold opacity-90">
+            <span className="mt-0.5 block truncate text-[12px] font-bold opacity-90">
               {pasteValue || "값 없음"}
             </span>
           </button>
 
-          <div className="mb-2 text-[12px] font-bold text-ink-soft">금액·전화번호는 페이스터 입력칸이 따로라 아래에서 복사하세요 (숫자키 1~4)</div>
+          <div className="mb-2 text-[12px] font-bold" style={{ color: "#5A6B92" }}>금액·전화번호는 페이스터 입력칸이 따로라 아래에서 복사하세요 (숫자키 1~4)</div>
 
-          <div className="space-y-2">
+          <div className="space-y-3">
             {!phoneIsMobile && phone ? (
-              <div className="mb-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] font-bold leading-relaxed text-amber-800">
+              <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-[12px] font-bold leading-relaxed text-amber-800">
                 ⚠️ 주문자 번호가 휴대폰이 아닙니다 ({phone}) — 결제링크 문자가 가지 않습니다.
                 {recipientIsMobile ? (
                   <> 배송지 연락처 <b>{recipientPhoneDigits}</b> 로 보내거나, 카카오톡으로 링크를 직접 보내주세요.</>
@@ -258,27 +211,23 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
             {fields.map((f, fieldIndex) => (
               <div
                 key={f.key}
-                className={[
-                  "flex items-center gap-2 rounded-xl border px-3 py-2",
-                  f.highlight ? "border-rose-line bg-rose-soft/50" : "border-line",
-                ].join(" ")}
+                className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3.5 shadow-sm"
+                style={{ border: f.highlight ? "1.5px solid #2B6BEB" : "1px solid #DDE4F2" }}
               >
-                <span className="w-[16px] shrink-0 text-[11px] font-black text-ink-mute">{fieldIndex + 1}</span>
-                <div className="w-[64px] shrink-0">
-                  <div className={["text-[11px] font-black", f.highlight ? "text-rose-deep" : "text-ink-mute"].join(" ")}>{f.label}</div>
-                  {f.hint ? <div className="text-[9px] font-bold text-ink-mute">{f.hint}</div> : null}
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-black text-white" style={{ background: f.highlight ? "#2B6BEB" : "#8B99BC" }}>{fieldIndex + 1}</span>
+                <div className="w-[70px] shrink-0">
+                  <div className="text-[11.5px] font-black" style={{ color: f.highlight ? "#2B6BEB" : "#5A6B92" }}>{f.label}</div>
+                  {f.hint ? <div className="text-[9px] font-bold" style={{ color: "#8B99BC" }}>{f.hint}</div> : null}
                 </div>
-                <div className={["min-w-0 flex-1 truncate text-[14px] font-black", f.highlight ? "text-rose-deep" : "text-ink"].join(" ")}>
-                  {f.value || <span className="text-ink-mute">없음</span>}
+                <div className="min-w-0 flex-1 truncate text-[15px] font-black" style={{ color: "#101C3D" }}>
+                  {f.value || <span style={{ color: "#8B99BC" }}>없음</span>}
                 </div>
                 <button
                   type="button"
                   onClick={() => void copyFieldValue(fieldIndex)}
                   disabled={!f.value}
-                  className={[
-                    "h-8 shrink-0 rounded-lg px-2.5 text-[11px] font-black transition disabled:opacity-40",
-                    copiedKey === f.key ? "bg-emerald-600 text-white" : "border border-info-tx bg-info-bg text-info-tx hover:bg-info-bg",
-                  ].join(" ")}
+                  className="h-9 shrink-0 rounded-lg px-3 text-[12px] font-black transition disabled:opacity-40"
+                  style={copiedKey === f.key ? { background: "#059669", color: "#fff" } : { background: "#EAF0FE", color: "#2B6BEB", border: "1px solid #BFD2F8" }}
                 >
                   {copiedKey === f.key ? "복사됨" : "⧉ 복사"}
                 </button>
@@ -286,31 +235,29 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
             ))}
           </div>
 
+          {/* 아래 여백 — 액션 버튼을 하단에 정렬해 위 쏠림을 없앤다 */}
+          <div className="min-h-4 flex-1" />
+
           <button
             type="button"
-            disabled={chatNoticeSending}
-            onClick={handleChatNotice}
-            title="카카오톡으로 결제링크를 보낸 뒤 누르세요. 유튜브 채팅에 안내글이 자동으로 올라갑니다."
-            className={[
-              "mt-3 w-full rounded-xl px-4 py-2.5 text-sm font-black shadow-sm transition disabled:opacity-50",
-              chatNoticeSent
-                ? "border border-emerald-600 bg-emerald-50 text-emerald-700"
-                : "bg-rose-deep text-white hover:opacity-90",
-            ].join(" ")}
+            onClick={() => void copyValue("chatNotice", chatNoticeText)}
+            title="카카오톡으로 결제링크를 보낸 뒤 누르세요. 안내문구가 복사되고, 유튜브 채팅에 붙여넣기만 하면 됩니다. (자동 게시 안 함 — 쿼터 무소모)"
+            className="w-full rounded-2xl px-4 py-3.5 text-sm font-black shadow-md transition"
+            style={copiedKey === "chatNotice" ? { background: "#059669", color: "#fff" } : { background: "#101C3D", color: "#fff" }}
           >
-            {chatNoticeSending ? "채팅 올리는 중…" : chatNoticeSent ? "✔ 채팅 안내 완료 · 다시 보내기" : "📢 카톡 발송완료 → 채팅 안내"}
+            {copiedKey === "chatNotice" ? "✔ 복사됨 · 유튜브 채팅에 붙여넣기" : "📢 카톡 발송완료 안내문구 복사"}
           </button>
 
           <button
             type="button"
             disabled={saving}
             onClick={handleComplete}
-            className="mt-2 w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:bg-surface-3"
+            className="mt-2.5 w-full rounded-2xl bg-emerald-600 px-4 py-3.5 text-sm font-black text-white shadow-md transition hover:bg-emerald-700 disabled:bg-surface-3"
           >
             {saving ? "처리 중…" : "✔ 카드결제완료 처리"}
           </button>
 
-          <div className="mt-3 rounded-xl bg-info-bg px-3 py-2 text-[10px] font-bold leading-4 text-info-tx">
+          <div className="mt-4 rounded-xl px-3.5 py-2.5 text-[10.5px] font-bold leading-4" style={{ background: "#EAF0FE", color: "#3D5A8F" }}>
             상품명 칸은 「닉네임 상품명」 순서로 넣어야 나중에 어느 주문인지 매칭됩니다(이름 X). 전화번호는 <b>주문자(결제하는 분)</b> 번호예요 — 택배 받는 분 번호가 아닙니다. 페이스터는 남의 서버라 자동 채우기가 안 돼요.
           </div>
         </div>
