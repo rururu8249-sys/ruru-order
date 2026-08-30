@@ -134,6 +134,27 @@ export default function AdminLiveSidebarPresence() {
   if (!data || data.available === false) return null;
 
   const total = data.total ?? 0;
+  // [2026-08-31 사장님 요청] 접속자 줄 클릭 → 그 손님 장바구니(담긴 상품) 바로 보기
+  //   이미 서버에 있는 담김 데이터(/api/admin-live/cart-holds)를 닉네임으로 연결만 한다. 표시 전용.
+  const [cartFor, setCartFor] = useState("");
+  const [cartHolds, setCartHolds] = useState<Array<{ nickname: string; productName: string; detailName: string; qty: number; unitPrice: number | null }> | null>(null);
+  const [cartLoading, setCartLoading] = useState(false);
+  const cartFetchedAt = useRef(0);
+  const toggleVisitorCart = async (visitorId: string, nickname: string) => {
+    if (cartFor === visitorId) { setCartFor(""); return; }
+    setCartFor(visitorId);
+    if (!String(nickname || "").trim()) return;
+    if (!cartHolds || Date.now() - cartFetchedAt.current > 30_000) {
+      setCartLoading(true);
+      try {
+        const r = await fetch("/api/admin-live/cart-holds?scope=all", { cache: "no-store" });
+        const j = await r.json().catch(() => null);
+        if (j?.ok && Array.isArray(j.holds)) { setCartHolds(j.holds); cartFetchedAt.current = Date.now(); }
+      } catch { /* 보조 표시 — 실패해도 접속자 목록은 정상 */ }
+      finally { setCartLoading(false); }
+    }
+  };
+
   const listed = data.listed ?? (data.visitors?.length ?? 0);
   const by = data.byType ?? { orderForm: 0, orderLookup: 0, admin: 0, others: 0 };
   const visitors = data.visitors ?? [];
@@ -428,11 +449,43 @@ export default function AdminLiveSidebarPresence() {
           <>
             <ul className="mt-2 max-h-[240px] space-y-1 overflow-y-auto">
               {visitors.map((visitor) => (
-                <li key={visitor.id} className="flex items-center gap-2 rounded-xl bg-surface-2 px-2 py-1.5">
-                  <span className="min-w-0 flex-1 truncate text-[11.5px] font-black text-ink">{displayNickname(visitor.nickname)}</span>
-                  <span className="shrink-0 text-[9.5px] font-black text-ink-mute">{visitor.pageLabel}</span>
-                  <span className="shrink-0 text-[9px] font-bold text-ink-mute tabular-nums">{agoText(visitor.lastSeenAt)}</span>
-                </li>
+                <Fragment key={visitor.id}>
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => void toggleVisitorCart(visitor.id, visitor.nickname)}
+                      title="누르면 이 손님이 장바구니에 담아둔 상품을 보여줍니다"
+                      className={["flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left", cartFor === visitor.id ? "bg-rose-soft" : "bg-surface-2 hover:bg-surface-3"].join(" ")}
+                    >
+                      <span className="min-w-0 flex-1 truncate text-[11.5px] font-black text-ink">{displayNickname(visitor.nickname)}</span>
+                      <span className="shrink-0 text-[9.5px] font-black text-ink-mute">{visitor.pageLabel}</span>
+                      <span className="shrink-0 text-[9px] font-bold text-ink-mute tabular-nums">{agoText(visitor.lastSeenAt)}</span>
+                    </button>
+                  </li>
+                  {cartFor === visitor.id ? (
+                    <li className="rounded-xl border border-rose-line bg-white px-2.5 py-2 text-[10.5px] font-bold leading-5 text-ink-soft">
+                      {!String(visitor.nickname || "").trim() ? (
+                        "비회원은 장바구니를 연결할 수 없어요."
+                      ) : cartLoading ? (
+                        "🛒 장바구니 확인 중…"
+                      ) : (() => {
+                        const nick = String(visitor.nickname).trim();
+                        const mine = (cartHolds || []).filter((h) => String(h.nickname || "").trim() === nick);
+                        if (mine.length === 0) return "🛒 지금 장바구니에 담긴 상품이 없어요.";
+                        const known = mine.reduce((sum, h) => sum + (h.unitPrice ? h.unitPrice * (Number(h.qty) || 0) : 0), 0);
+                        const hasUnknown = mine.some((h) => h.unitPrice === null || h.unitPrice === undefined);
+                        return (
+                          <>
+                            {mine.map((h, i) => (
+                              <div key={i} className="truncate">· {(h.detailName || h.productName || "상품").trim()} <b className="text-ink">{Number(h.qty) || 0}개</b></div>
+                            ))}
+                            <div className="mt-0.5 text-rose-deep">담긴 금액 {known.toLocaleString("ko-KR")}원{hasUnknown ? " +미기록" : ""}</div>
+                          </>
+                        );
+                      })()}
+                    </li>
+                  ) : null}
+                </Fragment>
               ))}
             </ul>
             {more > 0 ? (
