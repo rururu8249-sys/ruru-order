@@ -80,6 +80,21 @@ function readFlag(value: unknown): boolean {
   return ["true", "1", "y", "yes"].includes(String(value ?? "").trim().toLowerCase());
 }
 
+// [2026-08-31 사장님 제보] 같은 세부상품이 「…가디건 / 없음」과 「…가디건」 두 칩으로 나왔다
+//   — 재고표(stock_variants)와 옵션 목록 칸이 표기가 달라 합쳐지며 중복. 재고 차감 키는 재고표가 정답이므로
+//   재고표가 있으면 재고표 값만 쓴다(색상 고르면 사이즈도 그 색상 조합만).
+function stockVariantPairs(p: ProductRow): Array<{ color: string; size: string }> {
+  const note = parseNote(p);
+  const variants = note["stock_variants"];
+  if (!Array.isArray(variants)) return [];
+  return variants
+    .map((v) => {
+      const obj = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+      return { color: String(obj["color"] ?? "").trim(), size: String(obj["size"] ?? "").trim() };
+    })
+    .filter((pair) => pair.color || pair.size);
+}
+
 // 색상/사이즈 후보값 — stock_variants + colors/color_options/... (고객페이지 getProductOptionSuggestions와 동일 소스)
 function optionSuggestions(p: ProductRow, field: OptionField): string[] {
   const note = parseNote(p);
@@ -155,7 +170,13 @@ function stockManaged(note: Record<string, unknown>) {
 
 function mainImage(p: ProductRow) {
   const direct = pickString(p, ["image_url", "cover_image_url", "main_image_url", "thumbnail_url"], "");
-  return direct ? resolveProductImageUrl(direct) : "";
+  if (direct) return resolveProductImageUrl(direct);
+  // [2026-08-31 사장님 지적] 브랜드 묶음은 대표사진이 없어 빈칸이었다 → 세부상품 첫 사진으로 대체
+  try {
+    const firstDetail = detailProducts(p as never, { includeHidden: true }).find((d) => d.image);
+    if (firstDetail?.image) return firstDetail.image;
+  } catch { /* 사진 없으면 빈칸 유지 */ }
+  return "";
 }
 
 type Props = {
@@ -233,10 +254,36 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
   };
 
   const selected = useMemo(() => products.find((p) => productId(p) === selectedId) || null, [products, selectedId]);
-  const colorMode = useMemo<OptionMode>(() => (selected ? optionMode(selected, "color") : "none"), [selected]);
-  const sizeMode = useMemo<OptionMode>(() => (selected ? optionMode(selected, "size") : "none"), [selected]);
-  const colorOptions = useMemo(() => (selected ? selectableOptions(selected, "color") : []), [selected]);
-  const sizeOptions = useMemo(() => (selected ? selectableOptions(selected, "size") : []), [selected]);
+  const variantPairs = useMemo(() => (selected ? stockVariantPairs(selected) : []), [selected]);
+  const colorOptions = useMemo(() => {
+    if (!selected) return [];
+    // 재고표가 있으면 재고표의 색상 값만 (중복 칩 제거 + 재고 키 일치 보장)
+    const fromVariants = Array.from(new Set(variantPairs.map((v) => normEmpty(v.color)).filter(Boolean)));
+    if (fromVariants.length > 0) return fromVariants.slice(0, 400);
+    return selectableOptions(selected, "color");
+  }, [selected, variantPairs]);
+  const sizeOptions = useMemo(() => {
+    if (!selected) return [];
+    if (variantPairs.length > 0) {
+      // 색상을 골랐으면 그 색상 조합의 사이즈만 — 다른 세부상품 사이즈가 섞여 나오지 않게
+      const pool = color.trim() ? variantPairs.filter((v) => v.color === color.trim()) : variantPairs;
+      const fromVariants = Array.from(new Set(pool.map((v) => normEmpty(v.size)).filter(Boolean)));
+      if (fromVariants.length > 0) return fromVariants.slice(0, 400);
+      if (pool.length > 0) return []; // 조합은 있는데 사이즈가 전부 없음 → 사이즈 입력 불필요
+    }
+    return selectableOptions(selected, "size");
+  }, [selected, variantPairs, color]);
+  // 재고표가 있으면 모드도 재고표 기준 — 옵션 목록과 항상 일치
+  const colorMode = useMemo<OptionMode>(() => {
+    if (!selected) return "none";
+    if (variantPairs.length > 0) return colorOptions.length > 0 ? "select" : "none";
+    return optionMode(selected, "color");
+  }, [selected, variantPairs, colorOptions]);
+  const sizeMode = useMemo<OptionMode>(() => {
+    if (!selected) return "none";
+    if (variantPairs.length > 0) return sizeOptions.length > 0 ? "select" : "none";
+    return optionMode(selected, "size");
+  }, [selected, variantPairs, sizeOptions]);
   const note = useMemo(() => (selected ? parseNote(selected) : {}), [selected]);
   const managed = useMemo(() => stockManaged(note), [note]);
 
@@ -392,7 +439,15 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
             ) : (
               visibleProducts.map((p) => {
                 const id = productId(p);
-                const img = mainImage(p);
+                let img = mainImage(p);
+                // 검색이 세부상품과 일치하면 그 세부상품 사진을 우선 표시
+                const matchedName = matchedDetailName(p);
+                if (matchedName) {
+                  try {
+                    const hit = detailProducts(p as never, { includeHidden: true }).find((d) => d.detailName === matchedName);
+                    if (hit?.image) img = hit.image;
+                  } catch { /* 대표사진 유지 */ }
+                }
                 const active = id === selectedId;
                 return (
                   <button
