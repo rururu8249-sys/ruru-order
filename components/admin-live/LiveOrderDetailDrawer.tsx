@@ -540,8 +540,14 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           try {
             const details = detailProducts(prow as never, { includeHidden: true });
             const itemName = String(it.productName || "").trim();
+            // [2026-08-31] 관리자 「등록상품 추가」로 넣은 3단 상품은 상품명=묶음 이름이고
+            //   세부상품명이 색상 칸("세부상품 / 색상")에 있다 → 색상 칸 앞부분으로도 매칭 (사진 표시 전용)
+            const colorDetail = String((it as { color?: string }).color || "").split(" / ")[0].trim();
             const hit = details
-              .filter((d) => d.detailName && (itemName === d.detailName || itemName.startsWith(d.detailName)))
+              .filter((d) => d.detailName && (
+                itemName === d.detailName || itemName.startsWith(d.detailName) ||
+                (colorDetail !== "" && (colorDetail === d.detailName || colorDetail.startsWith(d.detailName)))
+              ))
               .sort((a, b) => b.detailName.length - a.detailName.length)[0];
             if (hit?.image) url = hit.image;
           } catch { /* 세부상품 해석 실패 → 대표사진 폴백 */ }
