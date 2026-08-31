@@ -1694,18 +1694,41 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   <div style={{ margin: "0 0 8px", padding: "8px 10px", borderRadius: "10px", border: "1px solid var(--color-rose-line)", background: "var(--color-rose-soft)" }}>
                     <div style={{ fontSize: "10.5px", fontWeight: 900, color: "var(--color-rose-deep)", marginBottom: "6px" }}>📌 자주 고정한 상품 — 누르면 바로 「▶ 방송」(고정+채팅+문구복사)</div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                      {pinQuickList.map((entry) => (
-                        <button
-                          key={`${entry.productId}|${entry.detailName}`}
-                          type="button"
-                          disabled={bcPinBusy}
-                          onClick={() => void pinFromHistory(entry)}
-                          title={`지금까지 ${entry.count}번 고정 — 클릭 한 번이면 고정+채팅 지정+문구 복사까지 끝`}
-                          style={{ maxWidth: "230px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11.5px", fontWeight: 800, color: "var(--color-ink)", background: "var(--color-surface)", border: "1px solid var(--color-rose-line)", borderRadius: "999px", padding: "5px 10px", cursor: bcPinBusy ? "wait" : "pointer" }}
-                        >
-                          {entry.label} <span style={{ color: "var(--color-rose-deep)", fontWeight: 900 }}>×{entry.count}</span>
-                        </button>
-                      ))}
+                      {pinQuickList.map((entry) => {
+                        // [2026-08-31 사장님 지적] 글자만으론 무슨 상품인지 모른다 → 썸네일 + 클릭 확대
+                        const historyRow = bcProducts.find((r) => productId(r) === entry.productId);
+                        let historyImg = "";
+                        if (historyRow) {
+                          if (entry.detailName) {
+                            try { historyImg = detailProducts(historyRow, { includeHidden: true }).find((d) => d.detailName === entry.detailName)?.image || ""; } catch { /* 대표사진 폴백 */ }
+                          }
+                          if (!historyImg) historyImg = mainImage(historyRow);
+                        }
+                        return (
+                          <button
+                            key={`${entry.productId}|${entry.detailName}`}
+                            type="button"
+                            disabled={bcPinBusy}
+                            onClick={() => void pinFromHistory(entry)}
+                            title={`지금까지 ${entry.count}번 고정 — 클릭 한 번이면 고정+채팅 지정+문구 복사까지 끝 (사진을 누르면 크게 보기)`}
+                            style={{ display: "flex", alignItems: "center", gap: "7px", maxWidth: "250px", fontSize: "11.5px", fontWeight: 800, color: "var(--color-ink)", background: "var(--color-surface)", border: "1px solid var(--color-rose-line)", borderRadius: "999px", padding: "4px 10px 4px 4px", cursor: bcPinBusy ? "wait" : "pointer" }}
+                          >
+                            <span
+                              onClick={(e) => { if (historyImg) { e.stopPropagation(); setLightbox(historyImg); } }}
+                              title={historyImg ? "사진 크게 보기" : undefined}
+                              style={{ width: "30px", height: "30px", flexShrink: 0, borderRadius: "50%", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: historyImg ? "zoom-in" : "inherit" }}
+                            >
+                              {historyImg ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={historyImg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                              ) : "🖼"}
+                            </span>
+                            <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {entry.label} <span style={{ color: "var(--color-rose-deep)", fontWeight: 900 }}>×{entry.count}</span>
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 ) : null}
