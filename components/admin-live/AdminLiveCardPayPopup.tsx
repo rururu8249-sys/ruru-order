@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import type { LiveOrder } from "./types";
+import { detailProducts } from "@/lib/productDetailModel";
 
 const PAYSTER_URL = "https://user.service.payster.co.kr/#/payment/smspayment";
 
@@ -48,6 +49,49 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
   const orderItems = Array.isArray(order.items) ? order.items : [];
   const baseAmount = Number(order.totalAmount || 0); // 상품금액 + 배송비
   const cardExtra = Number(order.cardExtraAmount || 0) || Math.max(0, amount - baseAmount);
+  // [2026-08-31 사장님 요청] 확인 카드에 상품 사진 — 주문상세 서랍과 같은 방식(세부상품 사진 → 대표사진 폴백). 표시 전용.
+  const [itemImages, setItemImages] = useState<Record<string, string>>({});
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
+  useEffect(() => {
+    let stopped = false;
+    const ids = Array.from(new Set(orderItems.map((it) => String(it.productId || "").trim()).filter(Boolean)));
+    if (ids.length === 0) { setItemImages({}); return; }
+    (async () => {
+      try {
+        const { data } = await supabase.from("products").select("*").in("id", ids);
+        if (stopped || !Array.isArray(data)) return;
+        const byId = new Map<string, Record<string, unknown>>();
+        for (const p of data as Record<string, unknown>[]) byId.set(String((p as { id?: unknown }).id ?? ""), p);
+        const next: Record<string, string> = {};
+        for (const it of orderItems) {
+          const pid = String(it.productId || "").trim();
+          if (!pid) continue;
+          const prow = byId.get(pid);
+          if (!prow) continue;
+          let url = "";
+          try {
+            const details = detailProducts(prow as never, { includeHidden: true });
+            const itemName = String(it.productName || "").trim();
+            const hit = details
+              .filter((d) => d.detailName && (itemName === d.detailName || itemName.startsWith(d.detailName)))
+              .sort((a, b) => b.detailName.length - a.detailName.length)[0];
+            if (hit?.image) url = hit.image;
+          } catch { /* 세부상품 해석 실패 → 대표사진 폴백 */ }
+          if (!url) {
+            const pr = prow as Record<string, unknown>;
+            const arr = (v: unknown) => (Array.isArray(v) && v.length > 0 ? String(v[0] ?? "") : "");
+            url = String(pr.image_url || pr.cover_image_url || pr.main_image_url || pr.thumbnail_url || "").trim()
+              || arr(pr.detail_image_urls) || arr(pr.image_urls) || arr(pr.images);
+            url = String(url || "").trim();
+          }
+          if (url) next[String(it.id)] = url;
+        }
+        setItemImages(next);
+      } catch { /* 사진은 보조 표시 — 실패해도 팝업은 정상 */ }
+    })();
+    return () => { stopped = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order.id]);
   const phone = phoneDigits(order);
   const nickname = String(order.nickname || "").trim();
 
@@ -232,6 +276,12 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
                   .join("/");
                 return (
                   <div key={itemIndex} className="flex items-center justify-between gap-2 text-[12.5px] font-bold" style={{ color: "#101C3D" }}>
+                    {itemImages[String(item.id)] ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={itemImages[String(item.id)]} alt="" onClick={() => setImagePreviewUrl(itemImages[String(item.id)])} className="h-9 w-9 shrink-0 cursor-zoom-in rounded-lg object-cover" style={{ border: "1px solid #DDE4F2" }} />
+                    ) : (
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[15px]" style={{ background: "#F4F6FB" }}>🛍</span>
+                    )}
                     <span className="min-w-0 flex-1 truncate">
                       {item.productName}
                       {opt ? ` (${opt})` : ""}
@@ -280,6 +330,12 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
           <iframe src={PAYSTER_URL} title="페이스터 결제" style={{ width: "100%", height: "100%", border: 0 }} />
         </div>
       </div>
+      {imagePreviewUrl ? (
+        <div onClick={() => setImagePreviewUrl("")} style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={imagePreviewUrl} alt="상품 사진 크게 보기" style={{ maxHeight: "85vh", maxWidth: "90vw", borderRadius: "16px", objectFit: "contain" }} />
+        </div>
+      ) : null}
     </div>
   );
 }

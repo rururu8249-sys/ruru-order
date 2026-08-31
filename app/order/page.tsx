@@ -7476,7 +7476,24 @@ export default function OrderPage() {
                     <button type="button" onClick={closeRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#7A1E47", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>상품 선택 완료 · 총 {registeredOptionBrandCartCount}개</button>
                   ) : (
                     <>
-                    <button type="button" onClick={closeRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#F1ECEE", fontSize: "16px", fontWeight: 800, color: "#666", cursor: "pointer" }}>닫기</button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // [2026-08-31 사장님 요청] 세부상품 사이즈 화면에서 닫기 누르면 메인으로 튕겼다
+                        //   → 이전 화면(그 브랜드 세부상품 목록)으로 돌아간다. 목록 화면에서만 시트 전체를 닫는다.
+                        //   (장바구니 수정으로 바로 들어온 경우는 원래대로 닫기 = 시트 닫힘)
+                        if (registeredOptionAxes3 && registeredOptionDetail.trim() && registeredOptionEditIndex === null) {
+                          setRegisteredOptionDetail("");
+                          setRegisteredOptionColor("");
+                          setRegisteredOptionSize("");
+                          setRegisteredOptionCustomerDetail("");
+                          setRegisteredOptionQty(1);
+                          return;
+                        }
+                        closeRegisteredOptionSelectSheet();
+                      }}
+                      style={{ height: "52px", borderRadius: "16px", border: "none", background: "#F1ECEE", fontSize: "16px", fontWeight: 800, color: "#666", cursor: "pointer" }}
+                    >{registeredOptionAxes3 && registeredOptionDetail.trim() && registeredOptionEditIndex === null ? "◀ 목록으로" : "닫기"}</button>
                     {allOptionsSoldOut ? (
                     <button type="button" disabled style={{ height: "52px", borderRadius: "16px", border: "none", background: "#ccc", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "not-allowed" }}>품절</button>
                     ) : (
