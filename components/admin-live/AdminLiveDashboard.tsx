@@ -961,9 +961,23 @@ export default function AdminLiveDashboard() {
       if (debounce) clearTimeout(debounce);
       debounce = setTimeout(flushChanges, 600);
     };
-    const playNewOrderTone = () => {
+    // [2026-08-31 사장님 제보] 상품 2개짜리 주문서 = DB에 2행 INSERT → 띵동이 2번 났다
+    //   → 같은 주문서(order_group_id)면 한 번만. 그룹값이 없으면 3초 안 연속 울림 방지로 대체.
+    const seenToneGroups = new Set<string>();
+    let lastToneAt = 0;
+    const playNewOrderTone = (payload?: any) => {
       try {
         if (window.localStorage.getItem("ruru_admin_sound_on") === "false") return;
+        const groupId = String(payload?.new?.order_group_id || "");
+        const now = Date.now();
+        if (groupId) {
+          if (seenToneGroups.has(groupId)) return; // 같은 주문서의 다른 상품 행 — 소리 생략
+          seenToneGroups.add(groupId);
+          if (seenToneGroups.size > 500) seenToneGroups.clear(); // 메모리 상한
+        } else if (now - lastToneAt < 3000) {
+          return;
+        }
+        lastToneAt = now;
         // [2026-08-31 사장님 요청] 「띵동~ 주문~」 파일 재생(증폭) — 실패 시 음성 "주문!" 폴백
         playOrderAlert();
       } catch {
@@ -973,7 +987,7 @@ export default function AdminLiveDashboard() {
     const channel = supabase
       .channel("ruru-admin-live-orders-realtime")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, (payload: any) => {
-        playNewOrderTone();
+        playNewOrderTone(payload);
         scheduleReload(payload);
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, (payload: any) => scheduleReload(payload))
