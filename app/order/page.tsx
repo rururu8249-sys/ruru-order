@@ -7493,7 +7493,7 @@ export default function OrderPage() {
                         closeRegisteredOptionSelectSheet();
                       }}
                       style={{ height: "52px", borderRadius: "16px", border: "none", background: "#F1ECEE", fontSize: "16px", fontWeight: 800, color: "#666", cursor: "pointer" }}
-                    >{registeredOptionAxes3 && registeredOptionDetail.trim() && registeredOptionEditIndex === null ? "◀ 목록으로" : "닫기"}</button>
+                    >닫기</button>
                     {allOptionsSoldOut ? (
                     <button type="button" disabled style={{ height: "52px", borderRadius: "16px", border: "none", background: "#ccc", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "not-allowed" }}>품절</button>
                     ) : (
