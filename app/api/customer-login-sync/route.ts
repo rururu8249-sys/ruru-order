@@ -301,9 +301,12 @@ export async function POST(request: NextRequest) {
         recordChange("detail_address", existing.detail_address, detailAddress);
       }
 
-      // [유튜브 닉네임] 관문/재방문 시 즉시 반영 — 비어 있으면 채우고, 달라졌으면 갱신 + 변경이력 기록
-      //   (닉네임 중복 검사는 고객 관문에서 이미 통과한 값만 들어옴. 주문/입금/포인트 로직 무관 — customers 표시/검색 필드)
-      if (youtubeNickname && cleanText(existing.youtube_nickname) !== youtubeNickname) {
+      // [유튜브 닉네임 · 2026-08-31 사장님 사고 제보] "달라지면 갱신"이 사고를 냈다:
+      //   관리자가 회원 닉네임을 고쳐도(스누피→루_스누피) 손님 폰에 남은 옛 닉네임이
+      //   로그인 때 서버를 도로 덮어썼다. → **비어 있을 때만 채운다.** 서버 값이 정답이며,
+      //   아래 응답의 server_youtube_nickname 으로 손님 폰 저장값을 서버 값에 맞춘다.
+      //   (손님 본인의 닉네임 변경은 내정보 저장 API가 처리 — 이 API는 백필 전용)
+      if (youtubeNickname && !cleanText(existing.youtube_nickname)) {
         updateData.youtube_nickname = youtubeNickname;
         recordChange("youtube_nickname", existing.youtube_nickname, youtubeNickname);
       }
@@ -428,6 +431,8 @@ export async function POST(request: NextRequest) {
         customer_id: existing.id,
         updated_fields: Object.keys(updateData),
         needs_nickname_confirm: needsNicknameConfirm,
+        // 서버가 기억하는 정답 닉네임 — 손님 폰이 이 값으로 자기 저장값을 맞춘다
+        server_youtube_nickname: cleanText(updateData.youtube_nickname as string | undefined) || cleanText(existing.youtube_nickname),
       });
     }
 

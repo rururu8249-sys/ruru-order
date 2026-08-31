@@ -3010,7 +3010,7 @@ export default function OrderPage() {
       if (!cleanNick || !isOrderablePhone(phone)) return;
       const dedupeKey = `ruru_nick_synced_${phone}_${cleanNick}`;
       if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(dedupeKey)) return;
-      await fetch("/api/customer-login-sync", {
+      const res = await fetch("/api/customer-login-sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3022,6 +3022,16 @@ export default function OrderPage() {
         }),
       });
       if (typeof sessionStorage !== "undefined") sessionStorage.setItem(dedupeKey, "1");
+      // [2026-08-31 사장님 사고 제보] 관리자가 바꾼 닉네임이 손님 폰 옛 값에 도로 덮이던 사고
+      //   → 서버가 알려준 정답 닉네임으로 폰 저장값·화면을 맞춘다 (서버가 이긴다)
+      try {
+        const json = await res.json().catch(() => null);
+        const serverNick = String(json?.server_youtube_nickname || "").trim();
+        if (serverNick && serverNick !== cleanNick) {
+          setYoutubeNickname(serverNick);
+          if (typeof localStorage !== "undefined") localStorage.setItem("ruru_youtube_nickname", serverNick);
+        }
+      } catch { /* 교정 실패해도 주문 흐름엔 영향 없음 */ }
     } catch {
       // 조용히 무시 — 다음 방문/제출 때 다시 채워짐
     }

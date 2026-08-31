@@ -92,6 +92,9 @@ export default function KakaoCallbackPage() {
             // 깃발이 없는 계정이 같은 브라우저로 로그인하면 이전 깃발을 지운다(남의 깃발 상속 방지)
             if (syncData?.needs_nickname_confirm) localStorage.setItem("ruru_nickname_reconfirm", "1");
             else localStorage.removeItem("ruru_nickname_reconfirm");
+            // [2026-08-31] 서버가 기억하는 닉네임이 정답 — 관리자가 바꾼 이름을 폰에도 반영
+            const serverNick = String(syncData?.server_youtube_nickname || "").trim();
+            if (serverNick) localStorage.setItem("ruru_youtube_nickname", serverNick);
           } catch { /* 무시 */ }
         }
       } catch (syncError) {
