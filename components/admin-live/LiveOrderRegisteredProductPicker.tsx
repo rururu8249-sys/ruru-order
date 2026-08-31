@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import { resolveProductImageUrl } from "./quick-product/productImageUrl";
+import { detailProducts } from "@/lib/productDetailModel";
 import type { LiveOrderRegisteredAddInput } from "./useLiveOrderItemAdd";
 
 type ProductRow = Record<string, unknown>;
@@ -115,7 +116,8 @@ function optionSuggestions(p: ProductRow, field: OptionField): string[] {
     values.push(...splitOptionValue(p["size"]));
   }
 
-  return Array.from(new Set(values.map((v) => v.trim()).filter(Boolean))).slice(0, 40);
+  // [2026-08-31 사장님 제보] 세부상품 61개짜리 묶음에서 40개 상한에 걸려 BB-69가 아예 안 보였다 → 400으로
+  return Array.from(new Set(values.map((v) => v.trim()).filter(Boolean))).slice(0, 400);
 }
 
 // 고를 수 있는 실제 옵션(없음 제거)
@@ -171,6 +173,9 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
   const [size, setSize] = useState("");
   const [qty, setQty] = useState("1");
   const [unitPrice, setUnitPrice] = useState("");
+  // [2026-08-31 사장님 제보] 옵션 칩이 수십 개면 못 찾는다 → 칩 거르기 입력칸
+  const [colorFilter, setColorFilter] = useState("");
+  const [sizeFilter, setSizeFilter] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -191,13 +196,41 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
     };
   }, []);
 
+  // [2026-08-31 사장님 제보] BB(버버리)-69는 "버버리" 묶음 안 세부상품이라 이름 검색에 안 걸렸다
+  //   → 묶음 상품의 세부상품 이름으로도 검색되게 한다. (표시·검색 전용 — 추가 RPC 무변경)
+  const detailNamesById = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const p of products) {
+      try {
+        const names = detailProducts(p as never, { includeHidden: true })
+          .map((d) => String(d.detailName || "").trim())
+          .filter(Boolean);
+        if (names.length > 0) map.set(productId(p), names);
+      } catch { /* 세부상품 해석 실패 → 이름 검색만 */ }
+    }
+    return map;
+  }, [products]);
+
   const visibleProducts = useMemo(() => {
     const q = search.trim().toLowerCase();
     return products
       .filter((p) => productStatus(p) !== "deleted")
-      .filter((p) => (q ? productName(p).toLowerCase().includes(q) : true))
+      .filter((p) => {
+        if (!q) return true;
+        if (productName(p).toLowerCase().includes(q)) return true;
+        const details = detailNamesById.get(productId(p));
+        return details ? details.some((n) => n.toLowerCase().includes(q)) : false;
+      })
       .slice(0, 40);
-  }, [products, search]);
+  }, [products, search, detailNamesById]);
+
+  // 목록 줄에 "검색과 일치한 세부상품" 안내 — 왜 이 묶음이 나왔는지 바로 보이게
+  const matchedDetailName = (p: ProductRow): string => {
+    const q = search.trim().toLowerCase();
+    if (!q || productName(p).toLowerCase().includes(q)) return "";
+    const details = detailNamesById.get(productId(p));
+    return details?.find((n) => n.toLowerCase().includes(q)) || "";
+  };
 
   const selected = useMemo(() => products.find((p) => productId(p) === selectedId) || null, [products, selectedId]);
   const colorMode = useMemo<OptionMode>(() => (selected ? optionMode(selected, "color") : "none"), [selected]);
@@ -213,6 +246,9 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
     setSize("");
     setQty("1");
     setUnitPrice(String(productPrice(p) || ""));
+    // 세부상품 이름 검색으로 들어온 경우 → 칩 필터를 그 검색어로 미리 채워 바로 보이게
+    setColorFilter(matchedDetailName(p) ? search.trim() : "");
+    setSizeFilter("");
   };
 
   // [조합형 옵션 · 2026-07-22] 세부상품(종류) 상품은 옵션 선택 시 단가 기본값 = 기본가 + 추가금.
@@ -264,15 +300,34 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
     mode: OptionMode,
     options: string[],
     value: string,
-    setValue: (v: string) => void
+    setValue: (v: string) => void,
+    filter?: string,
+    setFilter?: (v: string) => void
   ) => {
     if (mode === "none") return null;
+    const filterText = String(filter ?? "").trim().toLowerCase();
+    const shown = mode === "select" && filterText
+      ? options.filter((opt) => opt.toLowerCase().includes(filterText) || opt === value)
+      : options;
     return (
       <div className="space-y-1">
-        <div className="text-[12px] font-black text-ink-soft">{label}</div>
+        <div className="text-[12px] font-black text-ink-soft">
+          {label}
+          {mode === "select" && options.length > 12 ? (
+            <span className="ml-1 font-bold text-ink-mute">— {options.length}개 중 {shown.length}개 표시</span>
+          ) : null}
+        </div>
+        {mode === "select" && options.length > 12 && setFilter ? (
+          <input
+            value={filter ?? ""}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder={`${label} 이름으로 거르기 (예: 69)`}
+            className="w-full rounded-lg border border-line px-3 py-2 text-[13px] outline-none focus:border-rose-deep"
+          />
+        ) : null}
         {mode === "select" ? (
-          <div className="flex flex-wrap gap-1.5">
-            {options.map((opt) => {
+          <div className="flex max-h-[180px] flex-wrap gap-1.5 overflow-y-auto">
+            {shown.map((opt) => {
               const active = opt === value;
               return (
                 <button
@@ -358,6 +413,9 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
                       <span className="block truncate text-[14px] font-black text-ink">{productName(p)}</span>
                       <span className="block text-[12px] font-bold text-ink-soft">
                         {productPrice(p).toLocaleString("ko-KR")}원
+                        {matchedDetailName(p) ? (
+                          <span className="ml-1 text-rose-deep">· 일치 세부상품: {matchedDetailName(p)}</span>
+                        ) : null}
                       </span>
                     </span>
                   </button>
@@ -371,8 +429,8 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
             <div className="space-y-3 rounded-xl border border-rose-line bg-rose-soft/30 p-3">
               <div className="text-[14px] font-black text-ink">{productName(selected)}</div>
 
-              {renderOptionField("색상", colorMode, colorOptions, color, setColor)}
-              {renderOptionField("사이즈", sizeMode, sizeOptions, size, setSize)}
+              {renderOptionField("색상", colorMode, colorOptions, color, setColor, colorFilter, setColorFilter)}
+              {renderOptionField("사이즈", sizeMode, sizeOptions, size, setSize, sizeFilter, setSizeFilter)}
 
               {colorMode === "none" && sizeMode === "none" ? (
                 <div className="text-[12px] font-bold text-ink-soft">
