@@ -5,7 +5,7 @@ import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 import { cartHoldPresentation } from "@/lib/cartHoldDetail";
 import { supabase } from "@/lib/supabase";
-import { detailProducts } from "@/lib/productDetailModel";
+import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { formatKoreanPhone } from "@/lib/order/phone";
 
 type Props = { onClose: () => void };
@@ -74,22 +74,11 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
           if (next[key]) continue;
           const prow = byId.get(pid);
           if (!prow) continue;
-          let url = "";
+          // [2026-08-31] 사진 매칭은 공용 규칙(lib/orderItemPhoto) 하나만 쓴다 —
+          //   세부상품 이름이 수정돼도 코드·괄호 규칙으로 찾고, 못 찾으면 엉뚱한 사진 대신 표시 안 함.
           const dn = String(h.detailName || "").trim();
-          try {
-            if (dn) {
-              const d = detailProducts(prow as never, { includeHidden: true }).find((x) => x.detailName === dn);
-              if (d?.image) url = d.image;
-            }
-          } catch { /* 세부상품 해석 실패 → 대표사진 폴백 */ }
-          if (!url) {
-            const row = prow as Record<string, unknown>;
-            const arr0 = (v: unknown) => (Array.isArray(v) && v.length > 0 ? String(v[0] ?? "") : "");
-            url = String(row.image_url || row.cover_image_url || row.main_image_url || row.thumbnail_url || "").trim()
-              || arr0(row.detail_image_urls) || arr0(row.image_urls) || arr0(row.images);
-            url = String(url || "").trim();
-          }
-          if (url) next[key] = url;
+          const r = resolveOrderItemPhoto(prow as Record<string, unknown>, { productName: dn, color: "" });
+          if (r.url) next[key] = r.url;
         }
         setHoldImages(next);
       } catch { /* 사진은 보조 표시 */ }

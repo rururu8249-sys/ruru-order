@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import type { LiveOrder } from "./types";
-import { detailProducts } from "@/lib/productDetailModel";
+import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 
 const PAYSTER_URL = "https://user.service.payster.co.kr/#/payment/smspayment";
 
@@ -69,29 +69,13 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
           if (!pid) continue;
           const prow = byId.get(pid);
           if (!prow) continue;
-          let url = "";
-          try {
-            const details = detailProducts(prow as never, { includeHidden: true });
-            const itemName = String(it.productName || "").trim();
-            // [2026-08-31] 관리자 「등록상품 추가」로 넣은 3단 상품은 상품명=묶음 이름이고
-            //   세부상품명이 색상 칸("세부상품 / 색상")에 있다 → 색상 칸 앞부분으로도 매칭 (사진 표시 전용)
-            const colorDetail = String((it as { color?: string }).color || "").split(" / ")[0].trim();
-            const hit = details
-              .filter((d) => d.detailName && (
-                itemName === d.detailName || itemName.startsWith(d.detailName) ||
-                (colorDetail !== "" && (colorDetail === d.detailName || colorDetail.startsWith(d.detailName)))
-              ))
-              .sort((a, b) => b.detailName.length - a.detailName.length)[0];
-            if (hit?.image) url = hit.image;
-          } catch { /* 세부상품 해석 실패 → 대표사진 폴백 */ }
-          if (!url) {
-            const pr = prow as Record<string, unknown>;
-            const arr = (v: unknown) => (Array.isArray(v) && v.length > 0 ? String(v[0] ?? "") : "");
-            url = String(pr.image_url || pr.cover_image_url || pr.main_image_url || pr.thumbnail_url || "").trim()
-              || arr(pr.detail_image_urls) || arr(pr.image_urls) || arr(pr.images);
-            url = String(url || "").trim();
-          }
-          if (url) next[String(it.id)] = url;
+          // [2026-08-31] 사진 매칭은 공용 규칙(lib/orderItemPhoto) 하나만 쓴다 —
+          //   이름 수정·코드·괄호 차이까지 흡수, 못 찾으면 엉뚱한 사진 대신 표시 안 함.
+          const r = resolveOrderItemPhoto(prow as Record<string, unknown>, {
+            productName: it.productName,
+            color: (it as { color?: string }).color,
+          });
+          if (r.url) next[String(it.id)] = r.url;
         }
         setItemImages(next);
       } catch { /* 사진은 보조 표시 — 실패해도 팝업은 정상 */ }
