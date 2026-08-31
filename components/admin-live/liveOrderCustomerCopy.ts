@@ -167,3 +167,12 @@ export function buildPaymentRequestNote(order: LiveOrder): { title: string; mess
     message: `${nick}님, 주문서 잘 받았어요! 아직 입금 확인 전이에요.\n\n💳 입금계좌: 새마을금고 9002186993725 (유혜원)\n입금하실 금액: ${money(payableTotal)}\n\n※ 이미 입금하셨다면 확인까지 보통 10분, 늦어도 30분 걸려요. 조금만 기다려주세요 🙂`,
   };
 }
+
+// [2026-08-31 사장님 요청 · 돈 계산기] 주문 금액이 바뀌어 입금이 부족할 때 보내는 추가입금 쪽지.
+//   계좌는 위 buildPaymentRequestNote와 동일 값 — 계좌 변경 시 함께 수정.
+export function buildExtraDepositRequestNote(nick: string, shortage: number): { title: string; message: string } {
+  return {
+    title: "💳 추가 입금 안내",
+    message: `${nick}님, 주문 내용이 바뀌어서 금액이 조금 달라졌어요.\n\n더 입금하실 금액: ${money(shortage)}\n💳 입금계좌: 새마을금고 9002186993725 (유혜원)\n\n입금해주시면 바로 확인해드릴게요 🙂`,
+  };
+}

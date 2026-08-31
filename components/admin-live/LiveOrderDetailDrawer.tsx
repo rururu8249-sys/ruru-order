@@ -12,7 +12,7 @@ import { useLiveOrderItemAdd, createInitialLiveOrderItemAddForm, type LiveOrderI
 import { useLiveOrderItemDelete } from "./useLiveOrderItemDelete";
 import LiveOrderRegisteredProductPicker from "./LiveOrderRegisteredProductPicker";
 import LiveOrderDangerActionGuide from "./LiveOrderDangerActionGuide";
-import { buildCustomerOrderCopyText, buildPaymentRequestNote } from "./liveOrderCustomerCopy";
+import { buildCustomerOrderCopyText, buildExtraDepositRequestNote, buildPaymentRequestNote } from "./liveOrderCustomerCopy";
 import { detailProducts } from "@/lib/productDetailModel";
 
 type Props = {
@@ -566,6 +566,93 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     return () => { stopped = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.id, items.length]);
+
+  // ── [2026-08-31 사장님 요청] 💰 돈 계산기(포스기) ──
+  //   입금확인된 무통장 주문: 연결된 입금액 합 vs 화면의 최종 결제금액을 자동 비교해
+  //   「딱 맞아요 / 더 냈어요(→포인트 돌려주기 버튼) / 부족해요(→추가입금 쪽지 버튼)」로 알려준다.
+  //   조회는 읽기 전용 API, 포인트 지급은 기존 customer-points API(중복차단 sourceKey) 재사용.
+  const [balanceInfo, setBalanceInfo] = useState<{ depositSum: number; depositCount: number; lastRefund: { amount: number; createdAt: string; sourceKey: string } | null } | null>(null);
+  const [balanceWorking, setBalanceWorking] = useState(false);
+  const balanceGroupId = String((orderForView as { groupId?: string }).groupId || "");
+  const balanceEligible =
+    ["manual_paid", "auto_paid", "paid"].includes(String(orderForView.paymentStatus || "")) &&
+    !isCardPaymentDisplay &&
+    balanceGroupId !== "";
+  // 화면 맨 아래 「최종/총 결제금액」과 똑같은 값(줄 1470과 동일 식) — 사장님이 보는 숫자로 비교
+  const balanceOrderTotal = pointUsedAmount > 0 ? finalPaymentAmount : cardPaymentExpectedTotal;
+  const balanceRefundKey = `depositdiff:${balanceGroupId}:${balanceInfo?.depositSum ?? 0}:${balanceOrderTotal}`;
+  const loadBalanceInfo = async () => {
+    if (!balanceEligible) { setBalanceInfo(null); return; }
+    try {
+      const res = await fetch(`/api/admin-live/order-balance?groupId=${encodeURIComponent(balanceGroupId)}`, { cache: "no-store" });
+      const json = await res.json().catch(() => null);
+      if (json?.ok) {
+        setBalanceInfo({
+          depositSum: Number(json.depositSum || 0),
+          depositCount: Number(json.depositCount || 0),
+          lastRefund: json.lastRefund || null,
+        });
+      } else {
+        setBalanceInfo(null);
+      }
+    } catch { setBalanceInfo(null); /* 보조 표시 — 실패해도 상세는 정상 */ }
+  };
+  useEffect(() => {
+    void loadBalanceInfo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order.id, orderForView.paymentStatus, balanceOrderTotal]);
+
+  const handleRefundDiffAsPoints = async (diff: number) => {
+    const phone = String(orderForView.phone || "").replace(/[^0-9]/g, "");
+    if (!phone) { showAdminToast("전화번호가 없는 주문이라 포인트를 줄 수 없어요.", "error"); return; }
+    const nick = String(orderForView.nickname || orderForView.name || "고객").trim();
+    const ok = await showAdminConfirm(
+      `${nick}님이 ${diff.toLocaleString()}원을 더 냈어요.\n\n이 돈을 포인트 ${diff.toLocaleString()}P로 돌려줄까요?\n(포인트는 다음 주문 때 돈처럼 쓸 수 있어요)`,
+      { title: "💰 차액 포인트로 돌려주기", confirmText: "돌려주기" },
+    );
+    if (!ok || balanceWorking) return;
+    setBalanceWorking(true);
+    try {
+      const res = await fetch("/api/admin-live/customer-points", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({
+          phone,
+          action: "grant",
+          amount: diff,
+          reason: `주문 금액변경 차액 환급 (${orderForView.orderNo || balanceGroupId})`,
+          source_key: balanceRefundKey,
+          youtube_nickname: orderForView.nickname || "",
+          customer_name: orderForView.name || "",
+        }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        showAdminToast("포인트 돌려주기 실패\n\n" + (json?.message || `요청 실패(${res.status})`), "error");
+        return;
+      }
+      showAdminToast(json.duplicate ? "이미 돌려준 건이라 다시 주지 않았어요." : `${nick}님께 ${diff.toLocaleString()}P를 돌려줬어요. 끝!`, "success");
+      await loadBalanceInfo();
+    } finally { setBalanceWorking(false); }
+  };
+
+  const handleRequestShortageDeposit = async (shortage: number) => {
+    const phone = String(orderForView.phone || "").replace(/[^0-9]/g, "");
+    if (!phone) { showAdminToast("전화번호가 없는 주문이라 쪽지를 보낼 수 없어요.", "error"); return; }
+    const nick = String(orderForView.nickname || orderForView.name || "고객").trim();
+    const note = buildExtraDepositRequestNote(nick, shortage);
+    if (!(await showAdminConfirm(`${nick}님께 아래 쪽지를 보낼까요?\n\n${note.message}`, { title: "추가입금 요청 쪽지", confirmText: "보내기" }))) return;
+    if (balanceWorking) return;
+    setBalanceWorking(true);
+    try {
+      const res = await fetch("/api/admin-live/customer-note", { method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store", body: JSON.stringify({ phone, title: note.title, message: note.message }) });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) { showAdminToast("쪽지 보내기 실패\n\n" + (json?.message || `요청 실패(${res.status})`), "error"); return; }
+      showAdminToast(json.duplicate || Number(json.sent) === 0 ? "조금 전에 이미 같은 쪽지를 보냈어요." : `${nick}님께 추가입금 요청 쪽지를 보냈어요.`, "success");
+    } finally { setBalanceWorking(false); }
+  };
+
   const customerDeliveryMemoText = getCustomerDeliveryMemo(orderForView);
 
   const { savingAction, cancelOrder, restoreOrder } = useLiveOrderCancelRestore({
@@ -1304,6 +1391,49 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             입금확인 주문입니다. 입금확인을 잘못 처리한 경우에는 [입금확인 취소]를 사용하세요. 주문 자체를 없애야 하는 경우에만 [주문서 자체 취소]를 사용하세요.
           </div>
         ) : null}
+
+        {/* [2026-08-31 사장님 요청] 💰 돈 계산기 — 입금액 vs 주문금액 자동 비교, 버튼 한 번 처리 */}
+        {balanceEligible && balanceInfo && balanceInfo.depositCount > 0 ? (() => {
+          const diff = balanceInfo.depositSum - balanceOrderTotal;
+          const refundDone = !!balanceInfo.lastRefund && balanceInfo.lastRefund.sourceKey === balanceRefundKey;
+          if (diff === 0) {
+            return (
+              <div className="mt-2 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-[12px] font-black leading-5 text-emerald-800">
+                ✅ 받은 돈 {money(balanceInfo.depositSum)} = 주문 금액 {money(balanceOrderTotal)} — 딱 맞아요. 하실 일 없어요!
+              </div>
+            );
+          }
+          if (diff > 0) {
+            return (
+              <div className="mt-2 space-y-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 leading-5">
+                <div className="text-[13px] font-black text-amber-900">💰 손님이 {money(diff)} 더 냈어요.</div>
+                <div className="text-[11px] font-bold text-amber-700">받은 돈 {money(balanceInfo.depositSum)} − 주문 금액 {money(balanceOrderTotal)} = {money(diff)}</div>
+                {refundDone && balanceInfo.lastRefund ? (
+                  <div className="rounded-lg bg-emerald-100 px-2.5 py-1.5 text-[12px] font-black text-emerald-800">✅ 이미 {money(balanceInfo.lastRefund.amount)}를 포인트로 돌려줬어요. 끝!</div>
+                ) : (
+                  <>
+                    <button type="button" disabled={balanceWorking} onClick={() => void handleRefundDiffAsPoints(diff)} className="w-full rounded-lg bg-amber-500 px-3 py-2 text-[13px] font-black text-white hover:bg-amber-600 disabled:opacity-50">
+                      {balanceWorking ? "처리 중…" : `👉 ${money(diff)} 포인트로 돌려주기 (버튼 한 번이면 끝)`}
+                    </button>
+                    {balanceInfo.lastRefund ? (
+                      <div className="text-[10.5px] font-bold text-amber-700">참고: 전에 이 주문으로 {money(balanceInfo.lastRefund.amount)}를 돌려준 기록이 있어요. 그 뒤 금액이 또 바뀐 경우에만 다시 누르세요.</div>
+                    ) : null}
+                    <div className="text-[10.5px] font-bold text-amber-700">계좌로 직접 환불하실 거면 이 버튼은 누르지 마세요.</div>
+                  </>
+                )}
+              </div>
+            );
+          }
+          return (
+            <div className="mt-2 space-y-2 rounded-xl border border-rose-300 bg-rose-50 px-3 py-2.5 leading-5">
+              <div className="text-[13px] font-black text-rose-900">⚠️ 받은 돈이 {money(-diff)} 부족해요.</div>
+              <div className="text-[11px] font-bold text-rose-700">주문 금액 {money(balanceOrderTotal)} − 받은 돈 {money(balanceInfo.depositSum)} = {money(-diff)}</div>
+              <button type="button" disabled={balanceWorking} onClick={() => void handleRequestShortageDeposit(-diff)} className="w-full rounded-lg bg-rose-500 px-3 py-2 text-[13px] font-black text-white hover:bg-rose-600 disabled:opacity-50">
+                {balanceWorking ? "처리 중…" : `🔔 ${money(-diff)} 더 입금해달라고 쪽지 보내기`}
+              </button>
+            </div>
+          );
+        })() : null}
 
         {paymentCancelError ? (
           <div className="mt-2 rounded-xl border border-danger-tx bg-danger-bg px-3 py-2 text-[11px] font-black leading-4 text-danger-tx">
