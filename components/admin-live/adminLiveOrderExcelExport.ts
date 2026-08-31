@@ -466,16 +466,40 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
     });
   });
 
+  // [2026-08-31 사장님 요청] 맨 아래 합계·설명 — 옷값 합계와 "실제 받은 돈"을 같이 적어
+  //   화면 매출 바와 왜 다른지 사장님이 계산할 필요 없게 한다 (표시 전용, 재계산 없음).
+  const goodsSum = itemRows.reduce((sum, row) => sum + (Number(row[4]) || 0), 0);
+  const receivedSum = exportOrders.reduce(
+    (sum, order) => sum + (PICKING_PAID_STATUSES.includes(clean(order.paymentStatus)) ? Number(order.totalAmount || 0) : 0),
+    0,
+  );
+  const summaryRows: WorkbookRow[] = [
+    [],
+    ["옷값 합계(상품금액)", "", "", "", goodsSum],
+    ["실제 받은 돈(결제완료 · 카드수수료 포함·포인트 차감)", "", "", "", receivedSum],
+    ["※ 두 금액은 다른 게 정상 — 옷값에 카드수수료가 더해지고 포인트가 빠진 금액이 실제 받은 돈(화면 매출 바 기준)이에요."],
+  ];
+
   const rows: WorkbookRow[] = [
     ...addSheetMetaRows("물건챙기기 리스트", meta, itemRows.length),
     headers,
     ...itemRows,
+    ...summaryRows,
   ];
 
   const workbook = createWorkbook();
   const sheet = workbook.addWorksheet("물건챙기기");
   addRows(sheet, rows);
   styleFilterSheet(sheet, 6, rows.length, headers.length);
+
+  // 합계 줄 스타일 — 굵게 + 쉼표
+  const summaryStartRow = 6 + 1 + itemRows.length + 1; // 메타(5)+헤더(1)+데이터+빈 줄 다음
+  [0, 1].forEach((offset) => {
+    const row = sheet.getRow(summaryStartRow + offset);
+    row.getCell(1).font = { bold: true };
+    row.getCell(5).font = { bold: true };
+    row.getCell(5).numFmt = "#,##0";
+  });
 
   // 데이터 줄 스타일 — 헤더(6행) 다음부터. styleFilterSheet 이후에 덮어써야 유지된다.
   const firstDataRow = 7;
