@@ -24,6 +24,7 @@ export function useLiveOrderItemDelete(onAfter?: () => void | Promise<void>) {
         `'${label}' 상품을 이 주문에서 삭제할까요?`,
         "",
         "등록상품이면 재고가 자동 복구됩니다.",
+        "이 상품에 포인트가 쓰였으면 남는 상품으로 자동으로 옮겨집니다.",
         "주문 총 결제금액이 그만큼 줄어듭니다.",
         "이미 입금확인된 주문이면 필요 시 '입금확인 취소'로 다시 매칭하세요.",
       ].join("\n")
@@ -43,7 +44,11 @@ export function useLiveOrderItemDelete(onAfter?: () => void | Promise<void>) {
         return false;
       }
 
-      showAdminToast(res.restored ? "상품을 삭제하고 재고를 복구했습니다." : "상품을 삭제했습니다.", "success");
+      const movedPoint = Number(res.point_moved || 0);
+      const parts = ["상품을 삭제했습니다."];
+      if (res.restored) parts.push("재고 복구 완료.");
+      if (movedPoint > 0) parts.push(`포인트 ${movedPoint.toLocaleString()}원은 남은 상품으로 옮겼습니다.`);
+      showAdminToast(parts.join(" "), "success");
       await onAfter?.();
       return true;
     } finally {

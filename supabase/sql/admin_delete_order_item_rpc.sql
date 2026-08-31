@@ -4,7 +4,10 @@
 --   - 직접입력(product_id 없음) 또는 재고 미차감: 그냥 행 삭제.
 -- 안전 가드:
 --   - 그룹에 상품이 1개뿐이면 개별 삭제 금지(주문 전체 취소를 쓰도록) → 빈 주문 방지.
---   - 포인트 사용된 항목은 개별 삭제 금지(포인트 복구 정합 위해 주문취소 사용).
+--   - [2026-08-31 개선] 포인트 사용 행 삭제 허용: 포인트를 같은 그룹의 남는 행으로 옮긴 뒤 삭제.
+--     · 그룹 포인트 합계 불변 → 최종결제금액 공식(final=총액−포인트)·자동입금매칭·주문취소 포인트환급 모두 정합 유지
+--     · 옮겨 받을 행의 여유금액(행 총액−이미 쓴 포인트)이 부족하면만 차단(기존 안내 유지)
+--     · 이미 포인트 환급된 행이면 옮길 것이 없으므로 그대로 삭제
 -- FK 확인됨: order_items(CASCADE)/order_money_edit_logs(CASCADE)/order_status_change_logs(SET NULL) → 하드 DELETE 안전.
 --   inventory_ledger 는 orders FK 없음 → 복구 기록은 감사용으로 유지됨.
 -- 입금내역/정산 로직 무변경. DELETE는 orders UPDATE 트리거(포인트 적립/회수)와 무관.
@@ -31,6 +34,12 @@ declare
   v_before integer;
   v_after integer;
   v_restore_ledger uuid;
+  v_pts integer := 0;
+  v_sib_id bigint;
+  v_sib_total integer;
+  v_sib_points integer;
+  v_sib_headroom integer;
+  v_point_moved integer := 0;
 begin
   if p_order_id is null or p_order_id <= 0 then
     raise exception '삭제할 주문 ID가 없습니다.';
@@ -47,9 +56,45 @@ begin
     end if;
   end if;
 
-  -- 가드2: 포인트 사용 항목은 개별 삭제 금지
-  if coalesce(v_order.point_used_amount, 0) > 0 then
-    raise exception '포인트가 사용된 상품은 개별 삭제할 수 없습니다. 주문취소를 사용하세요.';
+  -- [2026-08-31 개선] 포인트 사용 행: 포인트를 남는 행으로 이관 후 삭제 (그룹 포인트 합계 불변)
+  v_pts := coalesce(v_order.point_used_amount, 0);
+  if v_pts > 0
+     and (coalesce(v_order.point_refunded_amount, 0) > 0
+          or v_order.point_refund_ledger_id is not null
+          or v_order.point_refunded_at is not null) then
+    v_pts := 0; -- 이미 환급된 포인트 → 옮길 것 없음, 그대로 삭제 진행
+  end if;
+  if v_pts > 0 then
+    if coalesce(v_order.order_group_id, '') = '' then
+      raise exception '포인트가 사용된 상품은 개별 삭제할 수 없습니다. 주문취소를 사용하세요.';
+    end if;
+    -- 옮겨 받을 행: 여유금액(행 총액 − 이미 쓴 포인트)이 가장 큰 남는 행
+    select o.id,
+           coalesce(o.adjusted_total_price, o.total_price, 0),
+           coalesce(o.point_used_amount, 0)
+      into v_sib_id, v_sib_total, v_sib_points
+      from public.orders o
+      where o.order_group_id = v_order.order_group_id and o.id <> v_order.id
+      order by greatest(0, coalesce(o.adjusted_total_price, o.total_price, 0) - coalesce(o.point_used_amount, 0)) desc, o.id asc
+      limit 1
+      for update;
+    if v_sib_id is null then
+      raise exception '포인트가 사용된 상품은 개별 삭제할 수 없습니다. 주문취소를 사용하세요.';
+    end if;
+    v_sib_headroom := greatest(0, coalesce(v_sib_total, 0) - coalesce(v_sib_points, 0));
+    if v_sib_headroom < v_pts then
+      raise exception '사용 포인트 %원을 옮겨 받을 다른 상품의 금액이 부족합니다. 주문취소를 사용하세요.', v_pts;
+    end if;
+    -- 이관: 포인트 사용액 합산 + final 재계산(정합 공식: final = 행총액 − 포인트). 잔액 스탬프는 비어있을 때만 복사.
+    update public.orders o
+      set point_used_amount = coalesce(o.point_used_amount, 0) + v_pts,
+          final_amount = greatest(0, coalesce(o.adjusted_total_price, o.total_price, 0) - (coalesce(o.point_used_amount, 0) + v_pts)),
+          point_original_amount = coalesce(o.point_original_amount, coalesce(o.adjusted_total_price, o.total_price, 0)),
+          point_balance_before = coalesce(o.point_balance_before, v_order.point_balance_before),
+          point_balance_after = coalesce(o.point_balance_after, v_order.point_balance_after),
+          point_used_at = coalesce(o.point_used_at, v_order.point_used_at)
+      where o.id = v_sib_id;
+    v_point_moved := v_pts;
   end if;
 
   v_status := coalesce(v_order.inventory_deduction_status, '');
@@ -122,7 +167,9 @@ begin
     'restored', v_restore_ledger is not null,
     'restore_ledger_id', v_restore_ledger,
     'product_id', v_order.product_id,
-    'qty', v_qty
+    'qty', v_qty,
+    'point_moved', v_point_moved,
+    'point_moved_to', v_sib_id
   );
 end;
 $function$;
