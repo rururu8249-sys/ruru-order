@@ -60,7 +60,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
   // [2026-08-31 사장님 지시] 복사 순서: 1 결제금액 → 2 상품명 → 3 주문자 번호 (숫자키도 이 순서)
   const fields: { key: string; label: string; value: string; hint?: string; highlight?: boolean }[] = [
     { key: "amount", label: "결제금액", value: String(amount), hint: "카드 7% 포함" },
-    { key: "paste", label: "상품명 칸", value: pasteValue, hint: "닉네임 + 상품명", highlight: true },
+    { key: "paste", label: "상품명 칸", value: pasteValue, hint: "닉네임 + 상품명" },
     { key: "phone", label: "주문자 번호", value: phone, hint: "결제하는 분 · - 없이" },
   ];
 
@@ -181,25 +181,8 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col px-5 py-5">
-          {/* [2026-08-29 사장님 요청] 닉네임 먼저 + 상품명 을 하나로 합쳐서 한 번만 복사한다.
-              이 값을 오른쪽 페이스터 「상품명」 칸에 그대로 붙여넣으면 된다. */}
-          <button
-            type="button"
-            onClick={() => void copyValue("paste", pasteValue)}
-            disabled={!pasteValue}
-            className="mb-4 w-full rounded-2xl px-4 py-4 text-left shadow-md transition disabled:opacity-40"
-            style={{ background: copiedKey === "paste" ? "#059669" : "#2B6BEB", color: "#fff" }}
-          >
-            <span className="block text-[11px] font-black opacity-85">페이스터 「상품명」 칸에 붙여넣기</span>
-            <span className="mt-0.5 block text-[16px] font-black">
-              {copiedKey === "paste" ? "✔ 복사됐습니다 · ⌘V 로 붙여넣기" : "⧉ 닉네임 + 상품명 복사하기"}
-            </span>
-            <span className="mt-0.5 block truncate text-[12px] font-bold opacity-90">
-              {pasteValue || "값 없음"}
-            </span>
-          </button>
-
-          <div className="mb-2 text-[12px] font-bold" style={{ color: "#5A6B92" }}>금액·전화번호는 페이스터 입력칸이 따로라 아래에서 복사하세요 (숫자키 1~4)</div>
+          {/* [2026-08-31 사장님 확인] 맨 위 큰 복사 버튼은 2번 칸과 같은 값이라 삭제 — 1·2·3 카드로 통일 */}
+          <div className="mb-2 text-[12px] font-bold" style={{ color: "#5A6B92" }}>페이스터 입력칸 순서대로 1 → 2 → 3 복사해서 붙여넣으세요 (숫자키 1~4)</div>
 
           <div className="space-y-3">
             {!phoneIsMobile && phone ? (
