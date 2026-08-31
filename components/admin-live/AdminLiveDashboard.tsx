@@ -583,19 +583,31 @@ export default function AdminLiveDashboard() {
   //   → 항상 떠 있는 대시보드에서 감지: 주문 목록 갱신 시 "새로 자동입금확인된" 주문이 보이면 1회 알림.
   const knownAutoPaidRef = useRef<Set<string> | null>(null);
   useEffect(() => {
-    const ids = orders.filter((o) => o.paymentStatus === "auto_paid").map((o) => String(o.id));
+    const autoPaidRows = orders
+      .filter((o) => o.paymentStatus === "auto_paid")
+      .map((o) => ({ id: String(o.id), paidAtFull: String(o.paidAtFull || "") }));
     if (knownAutoPaidRef.current === null) {
-      knownAutoPaidRef.current = new Set(ids); // 첫 로드 — 기존 건은 조용히 기억만
+      knownAutoPaidRef.current = new Set(autoPaidRows.map((r) => r.id)); // 첫 로드 — 기존 건은 조용히 기억만
       return;
     }
     const known = knownAutoPaidRef.current;
-    const fresh = ids.filter((id) => !known.has(id));
-    ids.forEach((id) => known.add(id));
-    if (fresh.length === 0) return;
+    const freshRows = autoPaidRows.filter((r) => !known.has(r.id));
+    autoPaidRows.forEach((r) => known.add(r.id));
+    if (freshRows.length === 0) return;
+    // [2026-08-31 사장님 제보] 자동입금확인 안 됐는데 소리 남 — 기간·필터를 바꾸면
+    //   예전부터 확인돼 있던 옛 주문이 "처음 보이는 것"으로 잡혀 울렸다.
+    //   → 실제 확인시각(deposit_confirmed_at)이 최근 5분 이내인 건만 소리. 옛 건은 조용히 기억만.
+    const FIVE_MIN = 5 * 60 * 1000;
+    const now = Date.now();
+    const recentFresh = freshRows.filter((r) => {
+      const t = new Date(r.paidAtFull).getTime();
+      return Number.isFinite(t) && now - t < FIVE_MIN;
+    });
+    if (recentFresh.length === 0) return;
     try {
       if (window.localStorage.getItem("ruru_admin_sound_on") === "false") return;
     } catch { /* 무시 */ }
-    playDepositAlert(fresh[0]); // 띵동(크게) + 음성 "입금!" — 탭 2개여도 같은 건은 한 번만
+    playDepositAlert(recentFresh[0].id); // 띵동(크게) + 음성 "입금!" — 탭 2개여도 같은 건은 한 번만
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders]);
   // [표시 전용] 금액 단독 추천(amount_only_suggestions). 읽기 전용 dry_run으로만 채우며 확정/쓰기 없음.
