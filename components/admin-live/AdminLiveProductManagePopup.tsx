@@ -12,7 +12,7 @@ import { brandWordmarkThumbnail } from "@/lib/brandWordmarkThumbnail";
 import { adminDetailSearch, buildDetailChatLine, detailProducts, type DetailProduct } from "@/lib/productDetailModel";
 import { buildChatAnnounceText } from "@/lib/chatAnnounce";
 import { savedWidgetAutoMatches, savedWidgetPinMatches, widgetPinTargetBroadcastId } from "@/lib/widgetPinState";
-import { readPinHistory, recordPinHistory } from "@/lib/pinHistory";
+import { readPinHistory, recordPinHistory, removePinHistory } from "@/lib/pinHistory";
 
 type ProductRow = Record<string, unknown>;
 
@@ -252,6 +252,16 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   // [2026-08-31 사장님 요청] 📌 자주 고정 — 고정 기록(localStorage) 상위 목록. 표시 전용.
   const [pinHistoryVersion, setPinHistoryVersion] = useState(0);
   const pinQuickList = useMemo(() => readPinHistory(8), [pinHistoryVersion]);
+  // [2026-08-31 사장님 지적] 칩이 여러 줄이 되면 아래 상품 목록을 가린다 → 한 줄 고정 + 접기(기억)
+  const [pinListOpen, setPinListOpen] = useState(() => {
+    try { return window.localStorage.getItem("ruru_pin_list_open") !== "false"; } catch { return true; }
+  });
+  const togglePinList = () => {
+    setPinListOpen((prev) => {
+      try { window.localStorage.setItem("ruru_pin_list_open", String(!prev)); } catch { /* 무시 */ }
+      return !prev;
+    });
+  };
   const [bcWidgetPin, setBcWidgetPin] = useState<{ mode: "auto" | "pin"; productId: string; detailName: string }>({ mode: "auto", productId: "", detailName: "" });
   const [bcExpanded, setBcExpanded] = useState<Set<string>>(new Set());
   // 새 방송 만들기 모달
@@ -1691,9 +1701,13 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               <div style={{ padding: "8px 12px 0" }}>
                 {/* [2026-08-31 사장님 요청] 📌 자주 고정 — 고정했다 풀었다 반복하는 상품 원클릭 재고정 */}
                 {pinQuickList.length > 0 && !bcCopyMode ? (
-                  <div style={{ margin: "0 0 8px", padding: "8px 10px", borderRadius: "10px", border: "1px solid var(--color-rose-line)", background: "var(--color-rose-soft)" }}>
-                    <div style={{ fontSize: "10.5px", fontWeight: 900, color: "var(--color-rose-deep)", marginBottom: "6px" }}>📌 자주 고정한 상품 — 누르면 바로 「▶ 방송」(고정+채팅+문구복사)</div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  <div style={{ margin: "0 0 8px", padding: "6px 10px 8px", borderRadius: "10px", border: "1px solid var(--color-rose-line)", background: "var(--color-rose-soft)" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: pinListOpen ? "6px" : 0 }}>
+                      <span style={{ fontSize: "10.5px", fontWeight: 900, color: "var(--color-rose-deep)" }}>📌 자주 고정한 상품 — 누르면 바로 「▶ 방송」 · 사진 클릭=확대 · ✕=목록에서 삭제</span>
+                      <button type="button" onClick={togglePinList} style={{ flexShrink: 0, fontSize: "10.5px", fontWeight: 900, color: "var(--color-rose-deep)", background: "var(--color-surface)", border: "1px solid var(--color-rose-line)", borderRadius: "6px", padding: "2px 8px", cursor: "pointer" }}>{pinListOpen ? "▲ 접기" : "▼ 펴기"}</button>
+                    </div>
+                    {pinListOpen ? (
+                    <div style={{ display: "flex", flexWrap: "nowrap", overflowX: "auto", gap: "6px", paddingBottom: "2px" }}>
                       {pinQuickList.map((entry) => {
                         // [2026-08-31 사장님 지적] 글자만으론 무슨 상품인지 모른다 → 썸네일 + 클릭 확대
                         const historyRow = bcProducts.find((r) => productId(r) === entry.productId);
@@ -1711,7 +1725,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             disabled={bcPinBusy}
                             onClick={() => void pinFromHistory(entry)}
                             title={`지금까지 ${entry.count}번 고정 — 클릭 한 번이면 고정+채팅 지정+문구 복사까지 끝 (사진을 누르면 크게 보기)`}
-                            style={{ display: "flex", alignItems: "center", gap: "7px", maxWidth: "250px", fontSize: "11.5px", fontWeight: 800, color: "var(--color-ink)", background: "var(--color-surface)", border: "1px solid var(--color-rose-line)", borderRadius: "999px", padding: "4px 10px 4px 4px", cursor: bcPinBusy ? "wait" : "pointer" }}
+                            style={{ display: "flex", alignItems: "center", gap: "7px", flexShrink: 0, maxWidth: "250px", fontSize: "11.5px", fontWeight: 800, color: "var(--color-ink)", background: "var(--color-surface)", border: "1px solid var(--color-rose-line)", borderRadius: "999px", padding: "4px 8px 4px 4px", cursor: bcPinBusy ? "wait" : "pointer" }}
                           >
                             <span
                               onClick={(e) => { if (historyImg) { e.stopPropagation(); setLightbox(historyImg); } }}
@@ -1726,10 +1740,16 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                               {entry.label} <span style={{ color: "var(--color-rose-deep)", fontWeight: 900 }}>×{entry.count}</span>
                             </span>
+                            <span
+                              onClick={(e) => { e.stopPropagation(); removePinHistory(entry.productId, entry.detailName); setPinHistoryVersion((v) => v + 1); }}
+                              title="이 상품을 자주 고정 목록에서 삭제"
+                              style={{ flexShrink: 0, width: "16px", height: "16px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: 900, color: "var(--color-ink-mute)", background: "var(--color-surface-2)", cursor: "pointer" }}
+                            >✕</span>
                           </button>
                         );
                       })}
                     </div>
+                    ) : null}
                   </div>
                 ) : null}
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 10px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid #e5dfe1", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />

@@ -53,6 +53,17 @@ export function recordPinHistory(input: { productId: string; detailName?: string
   }
 }
 
+// [2026-08-31 사장님 요청] 목록에서 하나 지우기
+export function removePinHistory(productId: string, detailName: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const pid = String(productId || "").trim();
+    const dname = String(detailName || "").trim();
+    const list = readRaw().filter((e) => !(e.productId === pid && e.detailName === dname));
+    window.localStorage.setItem(PIN_HISTORY_KEY, JSON.stringify(list));
+  } catch { /* 무시 */ }
+}
+
 // 자주 고정한 순(횟수 → 최근) 상위 limit개
 export function readPinHistory(limit = 8): PinHistoryEntry[] {
   return readRaw()
