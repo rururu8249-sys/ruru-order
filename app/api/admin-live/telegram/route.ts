@@ -56,6 +56,14 @@ export async function POST(request: NextRequest) {
       const r = await sendTelegram(text, { forceEvenIfDisabled: !auto });
       return NextResponse.json({ ok: r.ok, skipped: r.skipped, reason: r.reason, preview: text });
     }
+    if (action === "send-range-report") {
+      // [2026-08-31 사장님 지적] 매출 바의 📤 버튼이 화면 필터와 무관하게 오늘/방송 기준으로 갔다
+      //   → 화면(현재 조회범위)에서 만든 보고 텍스트를 그대로 보낸다. 수동 버튼이라 토글 무관 전송.
+      const text = String((body as any)?.text || "").trim().slice(0, 3500);
+      if (!text) return NextResponse.json({ ok: false, reason: "보낼 내용이 없습니다." });
+      const r = await sendTelegram(text, { forceEvenIfDisabled: true });
+      return NextResponse.json({ ok: r.ok, skipped: r.skipped, reason: r.reason });
+    }
     if (action === "test") {
       const msg = String((body as any)?.message || "").trim() || "🔔 루루동이 텔레그램 알림 테스트입니다. 잘 도착했어요!";
       const r = await sendTelegram(msg, { forceEvenIfDisabled: true });
