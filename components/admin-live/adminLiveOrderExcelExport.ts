@@ -466,7 +466,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
     });
   });
 
-  // [2026-08-31 사장님 요청] 맨 아래 합계·설명 — 옷값 합계와 "실제 받은 돈"을 같이 적어
+  // [2026-08-31 사장님 요청] 맨 아래 합계·설명 — 상품값 합계와 "실제 받은 돈"을 같이 적어
   //   화면 매출 바와 왜 다른지 사장님이 계산할 필요 없게 한다 (표시 전용, 재계산 없음).
   const goodsSum = itemRows.reduce((sum, row) => sum + (Number(row[4]) || 0), 0);
   const receivedSum = exportOrders.reduce(
@@ -475,9 +475,9 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   );
   const summaryRows: WorkbookRow[] = [
     [],
-    ["옷값 합계(상품금액)", "", "", "", goodsSum],
+    ["상품값 합계(상품금액)", "", "", "", goodsSum],
     ["실제 받은 돈(결제완료 · 카드수수료 포함·포인트 차감)", "", "", "", receivedSum],
-    ["※ 두 금액은 다른 게 정상 — 옷값에 카드수수료가 더해지고 포인트가 빠진 금액이 실제 받은 돈(화면 매출 바 기준)이에요."],
+    ["※ 두 금액은 다른 게 정상 — 상품값에 카드수수료가 더해지고 포인트가 빠진 금액이 실제 받은 돈(화면 매출 바 기준)이에요."],
   ];
 
   const rows: WorkbookRow[] = [

@@ -275,8 +275,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
     return { pickedQty: p, totalQty: t };
   }, [scopedPanels, pickedIds]);
 
-  // [2026-08-31 사장님 요청] 돈 표시등 — 옷값 합계와 "실제 받은 돈"을 나란히 보여준다 (표시 전용).
-  //   옷값 = 상품금액 합(엑셀의 상품금액 칸과 동일). 실제 받은 돈 = 결제완료 주문의 총금액 합
+  // [2026-08-31 사장님 요청] 돈 표시등 — 상품값 합계와 "실제 받은 돈"을 나란히 보여준다 (표시 전용).
+  //   상품값 = 상품금액 합(엑셀의 상품금액 칸과 동일). 실제 받은 돈 = 결제완료 주문의 총금액 합
   //   (카드수수료 포함·포인트 차감 — 매출 바와 동일 기준). 두 숫자가 다른 게 정상이다.
   const moneySummary = useMemo(() => {
     const target = paidOnly ? orders.filter((o) => PAID_STATUSES.includes(clean(o.paymentStatus))) : orders;
@@ -305,8 +305,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
             챙김 <span className="text-ok-tx">{pickedQty}개</span> <span className="text-ink-mute">/</span> 전체 {totalQty}개
             {totalQty > 0 && pickedQty < totalQty ? <span className="ml-1 text-[11px] font-black text-rose-deep">· {totalQty - pickedQty}개 남음</span> : null}
             {totalQty > 0 && pickedQty >= totalQty ? <span className="ml-1 text-[11px] font-black text-ok-tx">· 다 챙김 🎉</span> : null}
-            <div className="mt-0.5 text-[11px] font-bold text-ink-soft" title="옷값 = 상품금액만 합친 것. 실제 받은 돈 = 카드수수료를 더하고 포인트를 뺀, 손님이 실제로 낸 돈(매출 바와 같은 기준). 두 숫자가 다른 게 정상이에요.">
-              📦 옷값 {moneySummary.goods.toLocaleString()}원 · 💳 실제 받은 돈 {moneySummary.received.toLocaleString()}원
+            <div className="mt-0.5 text-[11px] font-bold text-ink-soft" title="상품값 = 상품금액만 합친 것. 실제 받은 돈 = 카드수수료를 더하고 포인트를 뺀, 손님이 실제로 낸 돈(매출 바와 같은 기준). 두 숫자가 다른 게 정상이에요.">
+              📦 상품값 {moneySummary.goods.toLocaleString()}원 · 💳 실제 받은 돈 {moneySummary.received.toLocaleString()}원
             </div>
           </div>
           <div className="flex items-center gap-1.5">
