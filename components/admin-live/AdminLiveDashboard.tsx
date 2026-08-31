@@ -595,7 +595,7 @@ export default function AdminLiveDashboard() {
     try {
       if (window.localStorage.getItem("ruru_admin_sound_on") === "false") return;
     } catch { /* 무시 */ }
-    playDepositAlert(); // 띵동(크게) + 음성 "입금!"
+    playDepositAlert(fresh[0]); // 띵동(크게) + 음성 "입금!" — 탭 2개여도 같은 건은 한 번만
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders]);
   // [표시 전용] 금액 단독 추천(amount_only_suggestions). 읽기 전용 dry_run으로만 채우며 확정/쓰기 없음.
@@ -978,8 +978,8 @@ export default function AdminLiveDashboard() {
           return;
         }
         lastToneAt = now;
-        // [2026-08-31 사장님 요청] 「띵동~ 주문~」 파일 재생(증폭) — 실패 시 음성 "주문!" 폴백
-        playOrderAlert();
+        // [2026-08-31 사장님 요청] 「띵동~ 주문~」 파일 재생(증폭) — 탭 2개여도 같은 주문은 한 번만
+        playOrderAlert(groupId || String(payload?.new?.id || ""));
       } catch {
         /* 소리 실패 시 무시 */
       }

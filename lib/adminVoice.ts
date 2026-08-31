@@ -121,13 +121,31 @@ async function playAdminAlertFile(src: string, fallbackText: string): Promise<bo
   return false;
 }
 
-// 새 주문 알림 — 「띵동~ 주문~」 파일 (실패 시 음성 "주문!")
-export function playOrderAlert() {
+// [2026-08-31 사장님 제보] 같은 알림이 "동시에 두 번" — 관리자 페이지가 탭/창 2개면
+//   각 탭이 따로 울린다 → localStorage 로 탭끼리 공유하는 1회 가드(같은 건은 3초 안에 한 탭만).
+function crossTabOnce(key: string, windowMs = 3000): boolean {
+  if (!key) return true; // 키 없으면(수동 테스트 버튼) 가드 없이 항상 재생
+  try {
+    const storageKey = "ruru_alert_once_" + key;
+    const now = Date.now();
+    const prev = Number(window.localStorage.getItem(storageKey) || 0);
+    if (Number.isFinite(prev) && now - prev < windowMs) return false;
+    window.localStorage.setItem(storageKey, String(now));
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+// 새 주문 알림 — 「띵동~ 주문~」 파일 (실패 시 음성 "주문!"). dedupeKey = 주문 그룹 등 식별자
+export function playOrderAlert(dedupeKey?: string) {
+  if (!crossTabOnce(dedupeKey ? `order_${dedupeKey}` : "")) return;
   void playAdminAlertFile(ORDER_ALERT_SRC, "주문!");
 }
 
 // 입금확인 알림 — 「띵동」 차임(크게) + 음성 "입금!" (차임 실패 시 음성만)
-export function playDepositAlert() {
+export function playDepositAlert(dedupeKey?: string) {
+  if (!crossTabOnce(dedupeKey ? `deposit_${dedupeKey}` : "")) return;
   void playAdminAlertFile(DEPOSIT_DING_SRC, "입금!").then((played) => {
     if (played) window.setTimeout(() => speakAdmin("입금!"), 950);
   });
