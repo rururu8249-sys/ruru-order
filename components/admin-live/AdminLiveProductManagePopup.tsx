@@ -12,6 +12,7 @@ import { brandWordmarkThumbnail } from "@/lib/brandWordmarkThumbnail";
 import { adminDetailSearch, buildDetailChatLine, detailProducts, type DetailProduct } from "@/lib/productDetailModel";
 import { buildChatAnnounceText } from "@/lib/chatAnnounce";
 import { savedWidgetAutoMatches, savedWidgetPinMatches, widgetPinTargetBroadcastId } from "@/lib/widgetPinState";
+import { readPinHistory, recordPinHistory } from "@/lib/pinHistory";
 
 type ProductRow = Record<string, unknown>;
 
@@ -248,6 +249,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [bcLoading, setBcLoading] = useState(false);
   const [bcBusy, setBcBusy] = useState(false);
   const [bcPinBusy, setBcPinBusy] = useState(false);
+  // [2026-08-31 사장님 요청] 📌 자주 고정 — 고정 기록(localStorage) 상위 목록. 표시 전용.
+  const [pinHistoryVersion, setPinHistoryVersion] = useState(0);
+  const pinQuickList = useMemo(() => readPinHistory(8), [pinHistoryVersion]);
   const [bcWidgetPin, setBcWidgetPin] = useState<{ mode: "auto" | "pin"; productId: string; detailName: string }>({ mode: "auto", productId: "", detailName: "" });
   const [bcExpanded, setBcExpanded] = useState<Set<string>>(new Set());
   // 새 방송 만들기 모달
@@ -1176,6 +1180,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       if (error) throw error;
       if (!savedWidgetPinMatches(data as Record<string, unknown> | null, { productId: pid, detailName })) throw new Error("DB에 고정값이 저장되지 않았습니다. 다시 눌러주세요.");
       setBcWidgetPin({ mode: "pin", productId: pid, detailName });
+      // [2026-08-31] 고정 기록 — 「📌 자주 고정」 원클릭 목록용 (실패해도 고정은 정상)
+      recordPinHistory({ productId: pid, detailName, label: detail?.detailName || productName(p) });
+      setPinHistoryVersion((v) => v + 1);
       window.dispatchEvent(new Event("ruru-live-product-updated"));
       showAdminToast(`${detail?.detailName || productName(p)} 위젯 고정 완료`, "success");
     } catch (e) {
@@ -1185,6 +1192,26 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       setBcPinBusy(false);
     }
   };
+  // [2026-08-31 사장님 요청] 📌 자주 고정 칩 클릭 = ▶ 방송 원클릭(고정+채팅 현재상품+문구 복사)
+  const pinFromHistory = async (entry: { productId: string; detailName: string; label: string }) => {
+    const row = bcProducts.find((r) => productId(r) === entry.productId);
+    if (!row) {
+      showAdminToast(`「${entry.label}」은(는) 이 방송 진열에 없어요.\n「+ 상품 담기」로 먼저 담아주세요.`, "warning");
+      return;
+    }
+    let detail: DetailProduct | undefined;
+    if (entry.detailName) {
+      try {
+        detail = detailProducts(row, { includeHidden: true }).find((d) => d.detailName === entry.detailName);
+      } catch { /* 세부상품 해석 실패 → 아래 안내 */ }
+      if (!detail) {
+        showAdminToast(`「${entry.detailName}」 세부상품을 찾지 못했어요. 상품을 열어 직접 골라주세요.`, "warning");
+        return;
+      }
+    }
+    await broadcastOneClick(row, detail);
+  };
+
   const copyTextToClipboard = async (text:string) => { if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(text);return;} const ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta); };
   // [2026-08-29] 채팅 안내 문구에서 "현재상품" 글씨를 뺐다 (사장님 지시).
   //   ✅ 현재상품 ✅ BB(버버리)-67 …  →  ✅ BB(버버리)-67 …
@@ -1662,6 +1689,26 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 ) : null}
               </div>
               <div style={{ padding: "8px 12px 0" }}>
+                {/* [2026-08-31 사장님 요청] 📌 자주 고정 — 고정했다 풀었다 반복하는 상품 원클릭 재고정 */}
+                {pinQuickList.length > 0 && !bcCopyMode ? (
+                  <div style={{ margin: "0 0 8px", padding: "8px 10px", borderRadius: "10px", border: "1px solid var(--color-rose-line)", background: "var(--color-rose-soft)" }}>
+                    <div style={{ fontSize: "10.5px", fontWeight: 900, color: "var(--color-rose-deep)", marginBottom: "6px" }}>📌 자주 고정한 상품 — 누르면 바로 「▶ 방송」(고정+채팅+문구복사)</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                      {pinQuickList.map((entry) => (
+                        <button
+                          key={`${entry.productId}|${entry.detailName}`}
+                          type="button"
+                          disabled={bcPinBusy}
+                          onClick={() => void pinFromHistory(entry)}
+                          title={`지금까지 ${entry.count}번 고정 — 클릭 한 번이면 고정+채팅 지정+문구 복사까지 끝`}
+                          style={{ maxWidth: "230px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11.5px", fontWeight: 800, color: "var(--color-ink)", background: "var(--color-surface)", border: "1px solid var(--color-rose-line)", borderRadius: "999px", padding: "5px 10px", cursor: bcPinBusy ? "wait" : "pointer" }}
+                        >
+                          {entry.label} <span style={{ color: "var(--color-rose-deep)", fontWeight: 900 }}>×{entry.count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 10px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid #e5dfe1", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
                 {bcSelId && bcProducts.length > 0 && !bcDragEnabled && !bcCopyMode ? (
                   <div style={{ margin: "0 0 8px", padding: "6px 9px", borderRadius: "7px", background: "var(--color-warn-bg)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 700, lineHeight: 1.4 }}>
