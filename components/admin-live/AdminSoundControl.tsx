@@ -4,7 +4,7 @@
 //   - localStorage: ruru_admin_sound_on(on/off), ruru_admin_voice_volume(0~1).
 //   - 실제 알림은 speakAdmin이 이 값을 읽어 재생. 돈/주문 로직과 무관(소리 설정 전용).
 import { useEffect, useState } from "react";
-import { speakAdmin, ADMIN_SOUND_ON_KEY, ADMIN_VOICE_VOLUME_KEY } from "@/lib/adminVoice";
+import { playOrderAlert, playDepositAlert, ADMIN_SOUND_ON_KEY, ADMIN_VOICE_VOLUME_KEY } from "@/lib/adminVoice";
 
 export default function AdminSoundControl() {
   const [soundOn, setSoundOn] = useState(true);
@@ -80,14 +80,14 @@ export default function AdminSoundControl() {
       <div style={{ display: "flex", gap: 6, marginTop: 9 }}>
         <button
           type="button"
-          onClick={() => speakAdmin("주문!")}
+          onClick={() => playOrderAlert()}
           style={{ flex: 1, padding: "7px 4px", borderRadius: 9, border: "1.5px solid #7A1E47", background: "var(--color-surface)", color: "var(--color-rose-deep)", fontWeight: 800, fontSize: 11, cursor: "pointer" }}
         >
           🛒 주문!
         </button>
         <button
           type="button"
-          onClick={() => speakAdmin("입금!")}
+          onClick={() => playDepositAlert()}
           style={{ flex: 1, padding: "7px 4px", borderRadius: 9, border: "1.5px solid #0F6E56", background: "var(--color-surface)", color: "var(--color-ok-tx)", fontWeight: 800, fontSize: 11, cursor: "pointer" }}
         >
           💰 입금!

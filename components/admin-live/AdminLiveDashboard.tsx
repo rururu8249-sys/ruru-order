@@ -17,7 +17,7 @@ const clearLiveOrderAutoRefreshInterval = (intervalId: number | null) => {
 
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
-import { speakAdmin, primeAdminVoice } from "@/lib/adminVoice";
+import { primeAdminVoice, playOrderAlert, playDepositAlert } from "@/lib/adminVoice";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import ManualPaymentMatchDrawer from "@/components/admin-v2/payment/ManualPaymentMatchDrawer";
@@ -578,6 +578,26 @@ export default function AdminLiveDashboard() {
   const [integrityRecentOnly, setIntegrityRecentOnly] = useState(true);
   const [auditExpanded, setAuditExpanded] = useState<Record<string, boolean>>({});
   const [orders, setOrders] = useState<LiveOrder[]>([]);
+  // [2026-08-31 사장님 제보] 자동입금확인 소리가 아예 안 났다 — 소리 내던 LiveOpsStatusBox가
+  //   화면 개편 때 빠지면서 기능째 사라져 있었음(실측: 어디에도 마운트 안 됨).
+  //   → 항상 떠 있는 대시보드에서 감지: 주문 목록 갱신 시 "새로 자동입금확인된" 주문이 보이면 1회 알림.
+  const knownAutoPaidRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const ids = orders.filter((o) => o.paymentStatus === "auto_paid").map((o) => String(o.id));
+    if (knownAutoPaidRef.current === null) {
+      knownAutoPaidRef.current = new Set(ids); // 첫 로드 — 기존 건은 조용히 기억만
+      return;
+    }
+    const known = knownAutoPaidRef.current;
+    const fresh = ids.filter((id) => !known.has(id));
+    ids.forEach((id) => known.add(id));
+    if (fresh.length === 0) return;
+    try {
+      if (window.localStorage.getItem("ruru_admin_sound_on") === "false") return;
+    } catch { /* 무시 */ }
+    playDepositAlert(); // 띵동(크게) + 음성 "입금!"
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders]);
   // [표시 전용] 금액 단독 추천(amount_only_suggestions). 읽기 전용 dry_run으로만 채우며 확정/쓰기 없음.
   const [paymentSuggestions, setPaymentSuggestions] = useState<any[]>([]);
   const [broadcasts, setBroadcasts] = useState<AdminLiveBroadcast[]>([]);
@@ -944,8 +964,8 @@ export default function AdminLiveDashboard() {
     const playNewOrderTone = () => {
       try {
         if (window.localStorage.getItem("ruru_admin_sound_on") === "false") return;
-        // 띵동 비프 대신 한국어 음성 "주문!" (미지원 브라우저는 비프 폴백)
-        speakAdmin("주문!");
+        // [2026-08-31 사장님 요청] 「띵동~ 주문~」 파일 재생(증폭) — 실패 시 음성 "주문!" 폴백
+        playOrderAlert();
       } catch {
         /* 소리 실패 시 무시 */
       }

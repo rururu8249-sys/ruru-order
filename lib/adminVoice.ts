@@ -56,9 +56,97 @@ function beepFallback() {
   }
 }
 
+// ── [2026-08-31 사장님 요청] 알림 소리 파일 재생 ──
+//   TTS는 볼륨 1.0이 상한이라 OS에 따라 작게 들렸다 → mp3 파일을 WebAudio로 재생하고
+//   증폭(최대 1.7배)까지 건다. 파일 실패 시 TTS → 비프 순서로 폴백. 돈 로직 무관(소리 전용).
+export const ORDER_ALERT_SRC = "/sounds/order-alert.mp3";   // 띵동~ 주문~ (배민 구간 제거 편집본)
+export const DEPOSIT_DING_SRC = "/sounds/deposit-ding.mp3"; // 띵동 차임 — 뒤에 음성 "입금!"을 붙인다
+
+let sharedAudioCtx: AudioContext | null = null;
+const alertBufferCache = new Map<string, AudioBuffer>();
+
+function ensureAudioCtx(): AudioContext | null {
+  if (typeof window === "undefined") return null;
+  try {
+    if (!sharedAudioCtx) {
+      const AC =
+        window.AudioContext ||
+        (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AC) return null;
+      sharedAudioCtx = new AC();
+    }
+    return sharedAudioCtx;
+  } catch {
+    return null;
+  }
+}
+
+async function loadAlertBuffer(src: string, ctx: AudioContext): Promise<AudioBuffer | null> {
+  const cached = alertBufferCache.get(src);
+  if (cached) return cached;
+  try {
+    const res = await fetch(src, { cache: "force-cache" });
+    if (!res.ok) return null;
+    const raw = await res.arrayBuffer();
+    const buf = await ctx.decodeAudioData(raw);
+    alertBufferCache.set(src, buf);
+    return buf;
+  } catch {
+    return null;
+  }
+}
+
+// 파일 알림 재생 — 성공 true. 실패 시 fallbackText 를 TTS(→비프)로.
+async function playAdminAlertFile(src: string, fallbackText: string): Promise<boolean> {
+  try {
+    const ctx = ensureAudioCtx();
+    if (ctx) {
+      if (ctx.state === "suspended") await ctx.resume().catch(() => {});
+      const buf = await loadAlertBuffer(src, ctx);
+      if (buf) {
+        const source = ctx.createBufferSource();
+        const gain = ctx.createGain();
+        source.buffer = buf;
+        source.connect(gain);
+        gain.connect(ctx.destination);
+        gain.gain.value = Math.min(2, Math.max(0, getVolume() * 1.7)); // 파일 증폭 — TTS보다 확실히 크게
+        source.start();
+        return true;
+      }
+    }
+  } catch {
+    /* 폴백 */
+  }
+  speakAdmin(fallbackText);
+  return false;
+}
+
+// 새 주문 알림 — 「띵동~ 주문~」 파일 (실패 시 음성 "주문!")
+export function playOrderAlert() {
+  void playAdminAlertFile(ORDER_ALERT_SRC, "주문!");
+}
+
+// 입금확인 알림 — 「띵동」 차임(크게) + 음성 "입금!" (차임 실패 시 음성만)
+export function playDepositAlert() {
+  void playAdminAlertFile(DEPOSIT_DING_SRC, "입금!").then((played) => {
+    if (played) window.setTimeout(() => speakAdmin("입금!"), 950);
+  });
+}
+
 // 브라우저 음성 잠금 해제용 — 사용자 제스처(클릭/키) 안에서 1회 무음 재생.
 //   - 이걸 호출해두면 이후 자동 알림(주문!/입금!) 음성이 정책에 막히지 않는다.
+//   - [2026-08-31] 오디오 컨텍스트 깨우기 + 알림 파일 미리 받아두기까지 같이 한다.
 export function primeAdminVoice() {
+  try {
+    const ctx = ensureAudioCtx();
+    if (ctx) {
+      if (ctx.state === "suspended") void ctx.resume().catch(() => {});
+      void loadAlertBuffer(ORDER_ALERT_SRC, ctx);
+      void loadAlertBuffer(DEPOSIT_DING_SRC, ctx);
+    }
+  } catch {
+    /* 무시 */
+  }
   if (typeof window === "undefined") return;
   try {
     const synth = window.speechSynthesis;
