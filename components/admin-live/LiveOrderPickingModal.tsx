@@ -8,6 +8,7 @@
 //   - 상단 "챙김 N개 / 전체 M개"는 수량 합계. picked_at 한 칸만 update(돈/주문 로직 무관).
 
 import { useEffect, useMemo, useState } from "react";
+import { formatOrderOptionText } from "@/lib/orderOptionText";
 import { supabase } from "@/lib/supabase";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
@@ -87,7 +88,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
         rawItems.length === 0
           ? [{ id: String(o.id), text: clean(o.orderSummary) || "상품", qty: 1, amount: Number(o.productAmount || 0) }]
           : rawItems.map((it) => {
-              const opt = [clean(it.color), clean(it.size)].filter(Boolean).join("/");
+              const opt = formatOrderOptionText(it.color, it.size); // [2026-08-31] 없음 숨김·「사이즈 6」 표기
               return { id: String(it.id), text: (clean(it.productName) || "상품") + (opt ? ` (${opt})` : ""), qty: Number(it.qty || 1), amount: Number(it.amount || 0) };
             });
       const totalQty = items.reduce((s, it) => s + (Number.isFinite(it.qty) ? it.qty : 1), 0);

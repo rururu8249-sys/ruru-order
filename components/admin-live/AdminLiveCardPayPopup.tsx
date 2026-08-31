@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatOrderOptionText } from "@/lib/orderOptionText";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
@@ -277,9 +278,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
             <div className="mb-2 shrink-0 text-[11.5px] font-black" style={{ color: "#5A6B92" }}>🧾 이 주문 내용 — 결제 전에 확인하세요</div>
             <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
               {orderItems.map((item, itemIndex) => {
-                const opt = [String(item.color || "").trim(), String(item.size || "").trim()]
-                  .filter((v) => v && v !== "없음")
-                  .join("/");
+                const opt = formatOrderOptionText(item.color, item.size);
                 return (
                   <div key={itemIndex} className="flex items-center justify-between gap-2 text-[12.5px] font-bold" style={{ color: "#101C3D" }}>
                     {itemImages[String(item.id)] ? (

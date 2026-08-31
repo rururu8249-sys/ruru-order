@@ -3,6 +3,7 @@
 //   같은 텍스트를 쓰도록 한 곳으로 분리했다. 읽기 전용 — 어떤 데이터도 변경하지 않는다.
 //   금액 계산은 서랍 화면 표시값과 동일한 기준(상품금액/배송비/카드추가금/포인트).
 import type { LiveOrder } from "./types";
+import { formatOrderOptionText } from "@/lib/orderOptionText";
 import { formatKoreanPhone } from "@/lib/order/phone";
 
 function money(value: unknown) {
@@ -102,9 +103,7 @@ export function buildCustomerOrderCopyText(orderForView: LiveOrder, rawOrder?: L
   lines.push("");
   lines.push("[주문상품]");
   for (const item of items) {
-    const opt = [String(item.color || "").trim(), String(item.size || "").trim()]
-      .filter((value) => value && value !== "없음")
-      .join("/");
+    const opt = formatOrderOptionText(item.color, item.size); // [2026-08-31] 없음 숨김·「사이즈 6」 표기
     lines.push(`- ${item.productName}${opt ? ` (${opt})` : ""} ${Number(item.qty) || 1}개 · ${money(Number(item.amount) || 0)}`);
   }
   lines.push("");

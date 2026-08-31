@@ -1,4 +1,5 @@
 import { showAdminToast } from "@/lib/adminToast";
+import { formatOrderOptionText, stripNoneOptionParts } from "@/lib/orderOptionText";
 import ExcelJS from "exceljs";
 import type { LiveOrder, LiveOrderItem } from "./types";
 
@@ -74,8 +75,8 @@ function paymentLabel(order: LiveOrder) {
 }
 
 function itemOption(item: LiveOrderItem) {
-  const value = clean(item.optionText);
-  return value === "옵션 없음" ? "" : value;
+  // [2026-08-31 사장님 지시] 송장에도 "없음" 그대로 안 나가게 — 없음 숨기고 「사이즈 6」 표기
+  return formatOrderOptionText(item.color, item.size) || stripNoneOptionParts(item.optionText);
 }
 
 function itemName(item: LiveOrderItem) {

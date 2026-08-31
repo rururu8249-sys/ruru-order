@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatOrderOptionText, stripNoneOptionParts } from "@/lib/orderOptionText";
 import type { LiveOrderItem } from "./types";
 import {
   createInitialLiveOrderItemEditForm,
@@ -39,12 +40,8 @@ function getItemName(item: LiveOrderItem) {
 }
 
 function getOptionText(item: LiveOrderItem) {
-  const color = clean(item.color);
-  const size = clean(item.size);
-
-  if (color || size) return [color, size].filter(Boolean).join(" / ");
-
-  return clean(item.optionText) || "옵션 없음";
+  // [2026-08-31 사장님 지시] "없음 / 6" 금지 → 없음 숨기고 「사이즈 6」으로. 없으면 아예 표시 안 함.
+  return formatOrderOptionText(item.color, item.size) || stripNoneOptionParts(item.optionText);
 }
 
 
@@ -338,9 +335,11 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
         ) : null}
         <div className="min-w-0 flex-1">
           <div className="break-words text-sm font-black leading-5 text-ink">{getItemName(item)}</div>
-          <div className="mt-1 whitespace-pre-line break-words text-xs font-bold leading-5 text-ink-soft">
-            {getOptionText(item)}
-          </div>
+          {getOptionText(item) ? (
+            <div className="mt-1 whitespace-pre-line break-words text-xs font-bold leading-5 text-ink-soft">
+              {getOptionText(item)}
+            </div>
+          ) : null}
           {countText ? (
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               <span className="inline-flex rounded-full bg-warn-bg px-2 py-1 text-[11px] font-black text-warn-tx">
