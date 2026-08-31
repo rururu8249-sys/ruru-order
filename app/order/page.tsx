@@ -7082,27 +7082,7 @@ export default function OrderPage() {
 
                   {registeredOptionComboInfo ? (
                     <div style={{ marginBottom: "16px" }}>
-                      {registeredOptionAxes3 && registeredOptionDetail.trim() ? (
-                        /* [2026-08-29] 예전에는 여기서 사진·상품명·가격을 한 번 더 보여줬는데,
-                           바로 위 헤더에 이미 똑같은 내용이 있어 손님 화면에 두 번 나왔다.
-                           → 중복 카드를 없애고 "1단계(종류)로 되돌아가는 줄" 하나만 남긴다.
-                           닫기 = 보던 상품목록으로 / 이 버튼 = 종류만 다시 고르기. */
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", borderRadius: "14px", border: "1px solid #EFE3E8", background: "#FFF9FB", padding: "9px 11px" }}>
-                          <span style={{ minWidth: 0, fontSize: "12px", fontWeight: 800, color: "#8B7D83", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {registeredOptionAxes3.detailLabel} · <b style={{ color: "#7A1E47" }}>{registeredOptionDetail}</b>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setRegisteredOptionDetail("");
-                              setRegisteredOptionColor("");
-                              setRegisteredOptionSize("");
-                            }}
-                            style={{ flexShrink: 0, minHeight: "32px", borderRadius: "9px", border: "1px solid #D9C5CC", background: "#fff", padding: "0 10px", color: "#7A1E47", fontSize: "11px", fontWeight: 900, cursor: "pointer" }}
-                          >◀ 다시 고르기</button>
-                        </div>
-                      ) : null}
-
+                      {/* [2026-08-31 사장님 지시] 「◀ 다시 고르기」 줄 삭제 — 하단 「닫기」가 목록 복귀 역할, 중복이라 화면만 차지 */}
                       <div style={{ display: registeredOptionAxes3 && registeredOptionDetail.trim() ? "none" : "block" }}>
                       {/* [2026-08-12] 제목에 살 수 있는 개수를 먼저 보여준다 — 143가지 중 뭘 살 수 있는지 바로 알게 */}
                       {(() => {
