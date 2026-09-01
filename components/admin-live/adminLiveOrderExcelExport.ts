@@ -517,5 +517,19 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
     }
   });
 
-  await writeWorkbook(workbook, `pick_${safeFileDate()}.xlsx`);
+  // [2026-09-01 사장님 지시] 파일명 = 방송이름+날짜+루루
+  //   방송 필터: "0827(목) 해외원정방송 1부" → 해외원정방송1부0827루루.xlsx
+  //   쇼핑몰 모드(방송 외 주문): "0901(화) 공구·상시주문" → 방송외주문0901루루.xlsx
+  //   방송 전체보기: 날짜 없음 → 전체주문{오늘MMDD}루루.xlsx
+  const broadcastPart = String(meta.filterLabel || "").split(" · ")[0].replace(/^방송:\s*/, "").trim();
+  const dateMatch = broadcastPart.match(/^(\d{4})\([월화수목금토일]\)\s*/);
+  const now = new Date();
+  const todayMmdd = `${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  const fileDate = dateMatch ? dateMatch[1] : todayMmdd;
+  let fileBase = broadcastPart.replace(/^(\d{4})\([월화수목금토일]\)\s*/, "").trim();
+  if (fileBase.includes("공구·상시주문")) fileBase = "방송외주문";
+  if (!fileBase || fileBase === "전체보기") fileBase = "전체주문";
+  fileBase = fileBase.replace(/[\\/:*?"<>|]/g, "").replace(/\s+/g, "");
+
+  await writeWorkbook(workbook, `${fileBase}${fileDate}루루.xlsx`);
 }
