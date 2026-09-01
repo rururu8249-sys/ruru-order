@@ -431,8 +431,9 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
     if (!src) return "";
     const d = new Date(src);
     if (isNaN(d.getTime())) return "";
-    // 시간까지 포함 — 같은 날 여러 방송·주문 구분용 (예: 08.27 01:44)
-    return `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    // 요일·시간까지 포함 — 같은 날 여러 방송·주문 구분용 (예: 08.27(목) 01:44)
+    const wd = ["일", "월", "화", "수", "목", "금", "토"][d.getDay()];
+    return `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}(${wd}) ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   };
 
   const itemRows: WorkbookRow[] = [];
