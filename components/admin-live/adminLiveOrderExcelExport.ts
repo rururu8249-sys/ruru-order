@@ -409,9 +409,8 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
     return;
   }
 
-  // [2026-07-16 사장님 지침] 물건챙기기 엑셀에 "챙김" 컬럼 추가 — 팝업에서 체크한 건 "챙김", 안 한 건 "안챙김".
-  //   챙김 판정은 팝업과 동일한 picked id 집합(orders.picked_at 기반). pickedIds 없으면(옛 호출) 컬럼 생략.
-  //   상품금액은 주문에 저장된 값(item.amount, 상품행 없으면 order.productAmount) 표시 전용 — 재계산 안 함.
+  // 상품금액은 주문에 저장된 값(item.amount, 상품행 없으면 order.productAmount) 표시 전용 — 재계산 안 함.
+  //   (2026-07-16의 「챙김」 칸은 2026-09-01 사장님 지시로 삭제 — 팝업 체크로 충분)
   // [2026-08-31 사장님 지시]
   //   ① 상품금액에 쉼표(199,000) — 엑셀 표시형식만, 값은 숫자 그대로.
   //   ② 「미결제 포함」으로 뽑을 때 미입금 줄은 진한 핑크 배경 + 「결제」 칸에 '미입금' 표기.
@@ -423,11 +422,9 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   //   → 항상 넣는다. 전부 완료면 전부 '완료'로 보일 뿐이다.
   const hasUnpaid = true;
 
-  const withPick = pickedIds instanceof Set;
-  const headers: WorkbookRow = ["닉네임", "상품명", "옵션", "수량", "상품금액"];
-  if (withPick) headers.push("챙김");
-  headers.push("결제");
-  const pickLabel = (id: string) => (pickedIds?.has(id) ? "챙김" : "안챙김");
+  // [2026-09-01 사장님 지시] 「챙김/안챙김」 칸 삭제(팝업 체크로 충분), 맨 끝에 빈 「비고」 칸 추가.
+  void pickedIds; // 호출부 서명 유지용 — 챙김 칸이 빠져 더는 안 쓴다
+  const headers: WorkbookRow = ["닉네임", "상품명", "옵션", "수량", "상품금액", "결제", "비고"];
 
   const itemRows: WorkbookRow[] = [];
   const unpaidRowFlags: boolean[] = []; // itemRows 와 같은 순서 — 스타일용
@@ -444,8 +441,8 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
         1,
         Number(order.productAmount || 0),
       ];
-      if (withPick) row.push(pickLabel(String(order.id)));
       if (hasUnpaid) row.push(unpaid ? "미입금" : "완료");
+      row.push(""); // 비고 — 사장님이 손으로 적는 빈칸
       itemRows.push(row);
       unpaidRowFlags.push(unpaid);
       return;
@@ -459,8 +456,8 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
         itemQty(item),
         Number(item.amount || 0),
       ];
-      if (withPick) row.push(pickLabel(String(item.id)));
       if (hasUnpaid) row.push(unpaid ? "미입금" : "완료");
+      row.push(""); // 비고 — 사장님이 손으로 적는 빈칸
       itemRows.push(row);
       unpaidRowFlags.push(unpaid);
     });
@@ -473,36 +470,41 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
     (sum, order) => sum + (PICKING_PAID_STATUSES.includes(clean(order.paymentStatus)) ? Number(order.totalAmount || 0) : 0),
     0,
   );
+  // [2026-09-01 사장님 지시]
+  //   ① 맨 위 안내 글씨(제목·필터조건·생성일시·대상건수) 삭제
+  //   ② 합계·설명은 맨 아래가 아니라 **헤더 위(1~3행)** — 필터·정렬은 헤더 아래 데이터만
+  //      움직이므로 합계가 절대 섞이지 않는다. 틀고정으로 스크롤해도 항상 보인다.
   const summaryRows: WorkbookRow[] = [
-    [],
-    ["상품값 합계(상품금액)", "", "", "", goodsSum],
-    ["실제 받은 돈(결제완료 · 카드수수료 포함·포인트 차감)", "", "", "", receivedSum],
+    ["📦 상품값 합계(상품금액)", "", "", "", goodsSum],
+    ["💳 실제 받은 돈(결제완료 · 카드수수료 포함·포인트 차감)", "", "", "", receivedSum],
     ["※ 두 금액은 다른 게 정상 — 상품값에 카드수수료가 더해지고 포인트가 빠진 금액이 실제 받은 돈(화면 매출 바 기준)이에요."],
+    [],
   ];
+  const headerRowNumber = summaryRows.length + 1; // 5행
+  void addSheetMetaRows; // 다른 엑셀(택배송장 확인용)에서 계속 사용 — 물건챙기기만 안 씀
 
   const rows: WorkbookRow[] = [
-    ...addSheetMetaRows("물건챙기기 리스트", meta, itemRows.length),
+    ...summaryRows,
     headers,
     ...itemRows,
-    ...summaryRows,
   ];
 
   const workbook = createWorkbook();
   const sheet = workbook.addWorksheet("물건챙기기");
   addRows(sheet, rows);
-  styleFilterSheet(sheet, 6, rows.length, headers.length);
+  // 필터 범위 = 헤더~마지막 데이터 줄까지만 (위 합계 3줄은 범위 밖 = 고정)
+  styleFilterSheet(sheet, headerRowNumber, headerRowNumber + itemRows.length, headers.length);
 
-  // 합계 줄 스타일 — 굵게 + 쉼표
-  const summaryStartRow = 6 + 1 + itemRows.length + 1; // 메타(5)+헤더(1)+데이터+빈 줄 다음
-  [0, 1].forEach((offset) => {
-    const row = sheet.getRow(summaryStartRow + offset);
+  // 합계 줄 스타일 — 굵게 + 쉼표 (styleFilterSheet 이후에 덮어써야 유지된다)
+  [1, 2].forEach((rowNumber) => {
+    const row = sheet.getRow(rowNumber);
     row.getCell(1).font = { bold: true };
     row.getCell(5).font = { bold: true };
     row.getCell(5).numFmt = "#,##0";
   });
 
-  // 데이터 줄 스타일 — 헤더(6행) 다음부터. styleFilterSheet 이후에 덮어써야 유지된다.
-  const firstDataRow = 7;
+  // 데이터 줄 스타일 — 헤더 다음부터.
+  const firstDataRow = headerRowNumber + 1;
   itemRows.forEach((_, index) => {
     const row = sheet.getRow(firstDataRow + index);
     row.getCell(5).numFmt = "#,##0"; // 상품금액 쉼표
