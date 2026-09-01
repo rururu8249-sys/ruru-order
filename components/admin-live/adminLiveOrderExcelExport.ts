@@ -539,7 +539,8 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   const todayMmdd = `${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
   const fileDate = dateMatch ? dateMatch[1] : todayMmdd;
   let fileBase = broadcastPart.replace(/^(\d{4})\([월화수목금토일]\)\s*/, "").trim();
-  if (fileBase.includes("공구·상시주문")) fileBase = "방송외주문";
+  // 가운뎃점이 ·(U+00B7)·ㆍ(U+318D) 등 어떤 문자여도 잡히게 「상시주문」으로 판정
+  if (fileBase.includes("상시주문")) fileBase = "방송외주문";
   if (!fileBase || fileBase === "전체보기") fileBase = "전체주문";
   fileBase = fileBase.replace(/[\\/:*?"<>|]/g, "").replace(/\s+/g, "");
 
