@@ -424,7 +424,16 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
 
   // [2026-09-01 사장님 지시] 「챙김/안챙김」 칸 삭제(팝업 체크로 충분), 맨 끝에 빈 「비고」 칸 추가.
   void pickedIds; // 호출부 서명 유지용 — 챙김 칸이 빠져 더는 안 쓴다
-  const headers: WorkbookRow = ["닉네임", "상품명", "옵션", "수량", "상품금액", "결제", "비고"];
+  // [2026-09-01 사장님 지시] 첫 칸에 「날짜」(주문일 MM.DD) — 헤더 아래 데이터 줄부터 채움
+  const headers: WorkbookRow = ["날짜", "닉네임", "상품명", "옵션", "수량", "상품금액", "결제", "비고"];
+  const orderDateLabel = (order: LiveOrder) => {
+    const src = order.createdAt || order.submittedAt;
+    if (!src) return "";
+    const d = new Date(src);
+    if (isNaN(d.getTime())) return "";
+    // 시간까지 포함 — 같은 날 여러 방송·주문 구분용 (예: 08.27 01:44)
+    return `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  };
 
   const itemRows: WorkbookRow[] = [];
   const unpaidRowFlags: boolean[] = []; // itemRows 와 같은 순서 — 스타일용
@@ -435,6 +444,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
 
     if (!items.length) {
       const row: WorkbookRow = [
+        orderDateLabel(order),
         labelName(order),
         clean(order.orderSummary) || "상품명없음",
         "",
@@ -450,6 +460,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
 
     items.forEach((item) => {
       const row: WorkbookRow = [
+        orderDateLabel(order),
         labelName(order),
         itemName(item),
         itemOption(item),
@@ -465,7 +476,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
 
   // [2026-08-31 사장님 요청] 맨 아래 합계·설명 — 상품값 합계와 "실제 받은 돈"을 같이 적어
   //   화면 매출 바와 왜 다른지 사장님이 계산할 필요 없게 한다 (표시 전용, 재계산 없음).
-  const goodsSum = itemRows.reduce((sum, row) => sum + (Number(row[4]) || 0), 0);
+  const goodsSum = itemRows.reduce((sum, row) => sum + (Number(row[5]) || 0), 0); // 6번째 칸 = 상품금액
   const receivedSum = exportOrders.reduce(
     (sum, order) => sum + (PICKING_PAID_STATUSES.includes(clean(order.paymentStatus)) ? Number(order.totalAmount || 0) : 0),
     0,
@@ -475,8 +486,8 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   //   ② 합계·설명은 맨 아래가 아니라 **헤더 위(1~3행)** — 필터·정렬은 헤더 아래 데이터만
   //      움직이므로 합계가 절대 섞이지 않는다. 틀고정으로 스크롤해도 항상 보인다.
   const summaryRows: WorkbookRow[] = [
-    ["📦 상품값 합계(상품금액)", "", "", "", goodsSum],
-    ["💳 실제 받은 돈(결제완료 · 카드수수료 포함·포인트 차감)", "", "", "", receivedSum],
+    ["📦 상품값 합계(상품금액)", "", "", "", "", goodsSum],
+    ["💳 실제 받은 돈(결제완료 · 카드수수료 포함·포인트 차감)", "", "", "", "", receivedSum],
     ["※ 두 금액은 다른 게 정상 — 상품값에 카드수수료가 더해지고 포인트가 빠진 금액이 실제 받은 돈(화면 매출 바 기준)이에요."],
     [],
   ];
@@ -499,15 +510,15 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   [1, 2].forEach((rowNumber) => {
     const row = sheet.getRow(rowNumber);
     row.getCell(1).font = { bold: true };
-    row.getCell(5).font = { bold: true };
-    row.getCell(5).numFmt = "#,##0";
+    row.getCell(6).font = { bold: true };
+    row.getCell(6).numFmt = "#,##0";
   });
 
   // 데이터 줄 스타일 — 헤더 다음부터.
   const firstDataRow = headerRowNumber + 1;
   itemRows.forEach((_, index) => {
     const row = sheet.getRow(firstDataRow + index);
-    row.getCell(5).numFmt = "#,##0"; // 상품금액 쉼표
+    row.getCell(6).numFmt = "#,##0"; // 상품금액 쉼표
     if (unpaidRowFlags[index]) {
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
         if (colNumber > headers.length) return;
