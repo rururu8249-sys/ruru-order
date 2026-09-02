@@ -6283,10 +6283,16 @@ export default function OrderPage() {
                                 <span style={{ color: "white", fontSize: "11px", fontWeight: 800, letterSpacing: "0.1em" }}>SOLD OUT</span>
                               </div>
                             ) : null}
+                            {/* [2026-09-02 사장님 지시] 방송 중 고정(위젯) 상품은 썸네일 사진 위에 「라이브 소개중」 뱃지 */}
+                            {isBroadcastOn && pinned ? (
+                              <div style={{ position: "absolute", top: "6px", left: "6px", zIndex: 2, display: "flex", alignItems: "center", gap: "4px", background: "#E8340A", color: "#fff", fontSize: "10px", fontWeight: 900, borderRadius: "999px", padding: "3px 8px", boxShadow: "0 2px 6px rgba(0,0,0,0.3)" }}>
+                                <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#fff", animation: "shimmer 1.2s ease-in-out infinite" }} />
+                                라이브 소개중
+                              </div>
+                            ) : null}
                           </div>
                           <div style={listView === "grid" ? { minWidth: 0, flex: 1, display: "flex", flexDirection: "column" } : { minWidth: 0, flex: 1 }}>
                             <div style={{ display: "flex", gap: "4px", marginBottom: "4px", flexWrap: "wrap" }}>
-                              {isBroadcastOn && pinned ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#E8340A", borderRadius: "5px", padding: "2px 6px" }}>🔴 라이브</span> : null}
                               {!isBroadcastOn && pinned ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#7A1E47", borderRadius: "5px", padding: "2px 6px" }}>📌 추천</span> : null}
                               {badges.includes("new") ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#0F6E56", background: "#E7F3EE", borderRadius: "5px", padding: "2px 6px" }}>NEW</span> : null}
                               {badges.includes("hot") ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>HOT</span> : null}
