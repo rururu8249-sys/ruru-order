@@ -48,7 +48,7 @@ import {
   buildOrderLookupOrFilter,
   orderLookupPhoneValues,
 } from "@/lib/customerOrderLookup";
-import { brandWordmarkThumbnail, normalizeBrandKorean, productNameThumbnail } from "@/lib/brandWordmarkThumbnail";
+import { brandWordmarkThumbnail, normalizeBrandKorean, productNameThumbnail, productAutoThumbUrl } from "@/lib/brandWordmarkThumbnail";
 import {
   CUSTOMER_SESSION_VERSION_KEY,
   YOUTUBE_NICKNAME_CONFIRM_VERSION_KEY,
@@ -6278,8 +6278,15 @@ export default function OrderPage() {
                                 style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                               />
                             ) : img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (
-                              /* [2026-09-03 사장님 확정] 사진 없는 상품 = 카테고리 일러스트 + 상품코드 자동 썸네일 (표시 전용) */
-                              <img src={productNameThumbnail(String(product.product_name || "상품"), (() => { try { const n = parseProductSuggestionNote((product as any).product_note); return String((n as any)?.category ?? (product as any).category ?? (product as any).product_category ?? ""); } catch { return ""; } })())} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                              /* [2026-09-03 사장님 확정] 사진 없는 상품 = 사장님 생성 일러스트 자동 썸네일, 미인식만 글자 카드 (표시 전용) */
+                              (() => {
+                                const nm = String(product.product_name || "상품");
+                                let ct = "";
+                                try { const n = parseProductSuggestionNote((product as any).product_note); ct = String((n as any)?.category ?? (product as any).category ?? (product as any).product_category ?? ""); } catch { ct = ""; }
+                                const autoUrl = productAutoThumbUrl(nm, ct);
+                                // eslint-disable-next-line @next/next/no-img-element
+                                return <img src={autoUrl || productNameThumbnail(nm, ct)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />;
+                              })()
                             )}
                             {sold ? (
                               <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", borderRadius: "inherit", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
