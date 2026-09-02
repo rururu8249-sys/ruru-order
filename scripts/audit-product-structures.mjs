@@ -82,6 +82,6 @@ for (const p of products) {
 }
 console.log(`그림 매칭 분포: ${Object.entries(artCount).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}:${v}`).join("  ")}`);
 const uniq = [...new Set(unknown)];
-console.log(`미인식(그림 없이 글자만) ${uniq.length}건 — 최대 40건 표시:`);
-for (const n of uniq.slice(0, 40)) console.log("  · " + n);
+console.log(`미인식(그림 없이 글자만) ${uniq.length}건 — 전체 표시:`);
+for (const n of uniq) console.log("  · " + n);
 if (uniq.length > 40) console.log(`  … 외 ${uniq.length - 40}건`);
