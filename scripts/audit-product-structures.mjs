@@ -72,7 +72,10 @@ for (const p of products) {
   const name = String(p.product_name ?? p.name ?? "").trim();
   const key = productThumbArtKey(name, cat);
   artCount[key] = (artCount[key] || 0) + 1;
-  if (!key) unknown.push(name);
+  let isBrand = false;
+  try { isBrand = isBrandGroup(p); } catch { /* 무시 */ }
+  if (!key && isBrand) { /* 브랜드 묶음 표지는 브랜드 워드마크 카드로 표시됨 — 미인식 아님 */ }
+  else if (!key) unknown.push(cat ? `${name} [분류:${cat}]` : name);
   let details = [];
   try { details = detailProducts(p, { includeHidden: true }); } catch { /* 무시 */ }
   for (const d of details) {
@@ -84,4 +87,4 @@ console.log(`그림 매칭 분포: ${Object.entries(artCount).sort((a, b) => b[1
 const uniq = [...new Set(unknown)];
 console.log(`미인식(그림 없이 글자만) ${uniq.length}건 — 전체 표시:`);
 for (const n of uniq) console.log("  · " + n);
-if (uniq.length > 40) console.log(`  … 외 ${uniq.length - 40}건`);
+
