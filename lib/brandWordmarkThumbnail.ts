@@ -125,50 +125,69 @@ export function brandWordmarkThumbnail(brandEn: string, brandKo: string) {
 }
 
 
-// ── [2026-09-03 사장님 확정] 사진 없는 상품용 자동 썸네일 (v2 — 컬러 이모지 일러스트) ──
-//   1차 손그림 SVG는 "뭔지 모르겠다" 피드백 → 기기 내장 컬러 이모지를 SVG 텍스트로 렌더링하는
-//   표준 기법(CSS-Tricks emoji favicon)으로 교체. 색 있고 누구나 아는 그림 + 단어별 세분화.
-//   표시 전용 — 저장 안 함. 사진을 올리면 자연히 교체된다.
+// ── [2026-09-03 사장님 확정] 사진 없는 상품용 자동 썸네일 (v3 — 정식 무료 일러스트) ──
+//   v1 손그림("뭔지 모르겠다")·v2 이모지("이모지 말고 제대로") 폐기.
+//   Microsoft Fluent 플랫 일러스트(MIT 라이선스, lib/productThumbnailArt.ts에 내장)를 합성한다.
+//   규칙: ① 상품 종류 단어 먼저(트렌치코트→코트, 청바지→청바지, 립→립스틱 …)
+//        ② 없으면 브랜드 사전(롱샴→가방, 뉴발란스·미즈노·아식스→운동화, 이솝→향수 …)
+//        ③ 그래도 모르면 쇼핑백. 표시 전용 — 사진을 올리면 자연히 교체.
 
-// 카테고리·상품명 단어 → 이모지 (구체적인 단어 먼저, 넓은 단어는 뒤에)
-function productEmoji(category: string, nameHint: string): string {
+import { PRODUCT_THUMB_ART } from "./productThumbnailArt";
+
+type ThumbArt = { main: string; sub?: string };
+const THUMB_RULES: Array<[RegExp, ThumbArt]> = [
+  // 특수 — 랜덤박스 = 박스 + 물음표 (사장님 확정)
+  [/랜덤|럭키박스|복불복/, { main: "package", sub: "red-question-mark" }],
+  // 의류 — 종류별 (반팔·긴팔·티·맨투맨·후드는 티셔츠 그림 + 카드의 상품명 글자로 구분)
+  [/트렌치|코트|자켓|재킷|패딩|점퍼|아우터|조끼|베스트|바람막이/, { main: "coat" }],
+  [/가디건|니트|스웨터/, { main: "yarn" }],
+  [/청바지|데님|팬츠|바지|슬랙스|반바지|레깅스|트레이닝/, { main: "jeans" }],
+  [/원피스|스커트|드레스|투피스/, { main: "dress" }],
+  [/블라우스|여성복/, { main: "womans-clothes" }],
+  [/티셔츠|반팔|긴팔|맨투맨|후드|셔츠|카라티|폴로|상의|의류|옷/, { main: "t-shirt" }],
+  // 신발 — 종류별
+  [/운동화|스니커|러닝화?|조깅/, { main: "running-shoe" }],
+  [/힐|펌프스/, { main: "high-heeled-shoe" }],
+  [/부츠|워커|어그/, { main: "womans-boot" }],
+  [/샌들|슬리퍼|쪼리|뮬/, { main: "thong-sandal" }],
+  [/로퍼|플랫|단화|구두|신발|슈즈/, { main: "ballet-shoes" }],
+  // 잡화 — 종류별
+  [/지갑|카드지갑|명함/, { main: "credit-card" }],
+  [/백팩|배낭/, { main: "backpack" }],
+  [/가방|토트|숄더|크로스|클러치|파우치|백\b/, { main: "handbag" }],
+  [/모자|캡\b|비니|버킷|볼캡/, { main: "billed-cap" }],
+  [/스카프|머플러|숄\b/, { main: "scarf" }],
+  [/장갑/, { main: "gloves" }],
+  [/양말|스타킹/, { main: "socks" }],
+  [/시계|워치/, { main: "watch" }],
+  [/목걸이|반지|귀걸이|팔찌|주얼리|악세|액세/, { main: "ring" }],
+  [/선글라스|안경/, { main: "sunglasses" }],
+  [/벨트|넥타이/, { main: "necktie" }],
+  // 뷰티·생활 — 향수는 병 + 벚꽃 합성(향수 전용 무료 일러스트가 없음)
+  [/립스틱|립밤|립오일|틴트|립\b|립 /, { main: "lipstick" }],
+  [/향수|퍼퓸|오드|바디미스트|edp|edt/, { main: "lotion-bottle", sub: "cherry-blossom" }],
+  [/화장품|크림|스킨|로션|세럼|앰플|쿠션|팩트|섀도|마스카라|클렌징|선크림|코스메/, { main: "lotion-bottle" }],
+  [/캔들|디퓨저|방향제/, { main: "candle" }],
+  [/쿠키|과자|간식|초콜릿|음식|식품/, { main: "cookie" }],
+  [/차\b|티백|녹차|홍차/, { main: "teacup-without-handle" }],
+  // 브랜드 사전 — 종류 단어가 없을 때만 (예: "롱샴 르플리아쥬" → 가방)
+  [/롱샴|롱샹/, { main: "handbag" }],
+  [/뉴발란스|뉴발|미즈노|브룩스|아식스|나이키|아디다스|크록스|컨버스|반스|호카|살로몬|푸마|리복/, { main: "running-shoe" }],
+  [/이솝|딥디크|조말론|바이레도|딥티크|산타마리아/, { main: "lotion-bottle", sub: "cherry-blossom" }],
+];
+
+function productThumbArt(category: string, nameHint: string): ThumbArt {
   const c = `${String(category || "")} ${String(nameHint || "")}`.toLowerCase();
-  const rules: Array<[RegExp, string]> = [
-    // 의류 — 종류별로 다른 그림
-    [/트렌치|코트|자켓|재킷|패딩|점퍼|아우터|가디건|조끼|베스트/, "🧥"],
-    [/청바지|데님|팬츠|바지|슬랙스|반바지|레깅스/, "👖"],
-    [/원피스|스커트|드레스/, "👗"],
-    [/티셔츠|반팔|긴팔|맨투맨|후드|셔츠|블라우스|니트|상의|의류|옷/, "👕"],
-    // 신발 — 종류별
-    [/운동화|스니커|러닝/, "👟"],
-    [/힐|펌프스/, "👠"],
-    [/부츠|워커/, "👢"],
-    [/샌들|슬리퍼|쪼리/, "🩴"],
-    [/로퍼|플랫|단화|구두|신발|슈즈/, "🥿"],
-    // 잡화 — 종류별
-    [/지갑|카드지갑/, "👛"],
-    [/백팩|배낭/, "🎒"],
-    [/가방|토트|숄더|크로스|클러치|파우치|백/, "👜"],
-    [/모자|캡|비니|버킷/, "🧢"],
-    [/스카프|머플러|숄/, "🧣"],
-    [/장갑/, "🧤"],
-    [/양말|스타킹/, "🧦"],
-    [/시계|워치/, "⌚"],
-    [/목걸이|반지|귀걸이|팔찌|주얼리|악세|액세/, "💍"],
-    [/선글라스|안경/, "🕶"],
-    [/벨트|넥타이/, "👔"],
-    // 뷰티
-    [/립스틱|립밤|립오일|틴트|립/, "💄"],
-    [/향수|퍼퓸|오드|edp|edt/, "🌸"],
-    [/화장품|크림|스킨|로션|세럼|앰플|쿠션|팩트|섀도|마스카라|클렌징|코스메/, "🧴"],
-    [/캔들|디퓨저/, "🕯"],
-    [/음식|식품|간식|과자|차\b|커피/, "🍪"],
-  ];
-  for (const [re, emoji] of rules) if (re.test(c)) return emoji;
-  return "🛍"; // 기본 — 쇼핑백
+  for (const [re, art] of THUMB_RULES) if (re.test(c)) return art;
+  return { main: "shopping-bags" };
 }
 
-// 상품명(+카테고리) → 자동 썸네일 SVG 데이터 URI. 이모지 크게 + "MIU-201" 코드 + 이름.
+// (전수조사·테스트용) 이 상품이 어떤 그림으로 매칭되는지 키를 돌려준다. "shopping-bags" = 미인식 기본값.
+export function productThumbArtKey(productName: string, category?: string): string {
+  return productThumbArt(String(category || ""), String(productName || "")).main;
+}
+
+// 상품명(+카테고리) → 자동 썸네일 SVG 데이터 URI. 일러스트 크게 + "MIU-201" 코드 + 이름.
 export function productNameThumbnail(productName: string, category?: string) {
   const raw = String(productName || "상품").trim() || "상품";
   const codeMatch = raw.match(/([A-Za-z]+)(?:\([^)]*\))?-(\d+[A-Za-z]*)/);
@@ -179,12 +198,15 @@ export function productNameThumbnail(productName: string, category?: string) {
   const restShort = rest.length > 16 ? `${rest.slice(0, 15)}…` : rest;
   const bigFit = fittedText(big, 520, 78, 40);
   const restFit = fittedText(restShort || " ", 560, 48, 28);
-  const emoji = productEmoji(String(category || ""), raw);
+  const art = productThumbArt(String(category || ""), raw);
+  const mainBody = PRODUCT_THUMB_ART[art.main] || PRODUCT_THUMB_ART["shopping-bags"] || "";
+  const subBody = art.sub ? PRODUCT_THUMB_ART[art.sub] || "" : "";
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
     <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffdfb"/><stop offset="1" stop-color="#f4e9ed"/></linearGradient></defs>
     <rect width="800" height="800" rx="72" fill="url(#bg)"/>
     <rect x="42" y="42" width="716" height="716" rx="48" fill="none" stroke="#7a1e47" stroke-width="5"/>
-    <text x="400" y="268" text-anchor="middle" dominant-baseline="middle" font-size="250" font-family="Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,sans-serif">${emoji}</text>
+    <g transform="translate(216, 84) scale(11.5)">${mainBody}</g>
+    ${subBody ? `<g transform="translate(490, 66) scale(5.2)">${subBody}</g>` : ""}
     <text x="400" y="530" text-anchor="middle" dominant-baseline="middle" fill="#7a1e47" font-family="Georgia,Times New Roman,serif" font-size="${bigFit.fontSize}" font-weight="700" letter-spacing="2"${bigFit.fit}>${escapeXml(big)}</text>
     ${restShort ? `<line x1="240" y1="586" x2="560" y2="586" stroke="#7a1e47" stroke-width="4"/>
     <text x="400" y="648" text-anchor="middle" dominant-baseline="middle" fill="#2f2026" font-family="Arial,Noto Sans KR,sans-serif" font-size="${restFit.fontSize}" font-weight="800"${restFit.fit}>${escapeXml(restShort)}</text>` : ""}
