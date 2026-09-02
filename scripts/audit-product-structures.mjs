@@ -72,16 +72,16 @@ for (const p of products) {
   const name = String(p.product_name ?? p.name ?? "").trim();
   const key = productThumbArtKey(name, cat);
   artCount[key] = (artCount[key] || 0) + 1;
-  if (key === "shopping-bags") unknown.push(name);
+  if (!key) unknown.push(name);
   let details = [];
   try { details = detailProducts(p, { includeHidden: true }); } catch { /* 무시 */ }
   for (const d of details) {
     const dk = productThumbArtKey(d.detailName, cat);
-    if (dk === "shopping-bags") unknown.push(`(세부) ${d.detailName}`);
+    if (!dk) unknown.push(`(세부) ${d.detailName}`);
   }
 }
 console.log(`그림 매칭 분포: ${Object.entries(artCount).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}:${v}`).join("  ")}`);
 const uniq = [...new Set(unknown)];
-console.log(`미인식(기본 쇼핑백) ${uniq.length}건 — 최대 40건 표시:`);
+console.log(`미인식(그림 없이 글자만) ${uniq.length}건 — 최대 40건 표시:`);
 for (const n of uniq.slice(0, 40)) console.log("  · " + n);
 if (uniq.length > 40) console.log(`  … 외 ${uniq.length - 40}건`);

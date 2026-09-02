@@ -137,54 +137,81 @@ import { PRODUCT_THUMB_ART } from "./productThumbnailArt";
 type ThumbArt = { main: string; sub?: string };
 const THUMB_RULES: Array<[RegExp, ThumbArt]> = [
   // 특수 — 랜덤박스 = 박스 + 물음표 (사장님 확정)
-  [/랜덤|럭키박스|복불복/, { main: "package", sub: "red-question-mark" }],
-  // 의류 — 종류별 (반팔·긴팔·티·맨투맨·후드는 티셔츠 그림 + 카드의 상품명 글자로 구분)
-  [/트렌치|코트|자켓|재킷|패딩|점퍼|아우터|조끼|베스트|바람막이/, { main: "coat" }],
-  [/가디건|니트|스웨터/, { main: "yarn" }],
-  [/청바지|데님|팬츠|바지|슬랙스|반바지|레깅스|트레이닝/, { main: "jeans" }],
-  [/원피스|스커트|드레스|투피스/, { main: "dress" }],
-  [/블라우스|여성복/, { main: "womans-clothes" }],
-  [/티셔츠|반팔|긴팔|맨투맨|후드|셔츠|카라티|폴로|상의|의류|옷/, { main: "t-shirt" }],
-  // 신발 — 종류별
-  [/운동화|스니커|러닝화?|조깅/, { main: "running-shoe" }],
-  [/힐|펌프스/, { main: "high-heeled-shoe" }],
-  [/부츠|워커|어그/, { main: "womans-boot" }],
-  [/샌들|슬리퍼|쪼리|뮬/, { main: "thong-sandal" }],
-  [/로퍼|플랫|단화|구두|신발|슈즈/, { main: "ballet-shoes" }],
-  // 잡화 — 종류별
-  [/지갑|카드지갑|명함/, { main: "credit-card" }],
+  [/랜덤|럭키박스|복불복/, { main: "box", sub: "help" }],
+  // 의류 — 종류별 전부 다른 그림
+  [/패딩|잠바|점퍼|다운(?![가-힣])/, { main: "clothes-windbreaker" }],
+  [/트렌치|코트/, { main: "women-coat" }],
+  [/바람막이|윈드브레이커|아노락/, { main: "clothes-windbreaker" }],
+  [/자켓|재킷|블레이저|무스탕|가죽자켓/, { main: "clothes-suit" }],
+  [/가디건/, { main: "clothes-cardigan" }],
+  [/니트|스웨터|터틀넥|목폴라|폴라티/, { main: "clothes-turtleneck" }],
+  [/후드|맨투맨|스웨트/, { main: "clothes-hoodie" }],
+  [/조끼|베스트/, { main: "vest" }],
+  [/티셔츠|반팔|카라티|폴로|티(?![가-힣])/, { main: "t-shirt" }],
+  [/셔츠|블라우스|남방/, { main: "clothes-suit" }],
+  [/긴팔|롱슬리브/, { main: "clothes-crew-neck" }],
+  [/트레이닝|조거|스웨트팬츠/, { main: "clothes-pants-sweat" }],
+  [/반바지|쇼츠/, { main: "clothes-pants-short" }],
+  [/와이드팬츠|부츠컷|나팔/, { main: "trousers-bell-bottoms" }],
+  [/청바지|데님|팬츠|바지|슬랙스|레깅스/, { main: "clothes-pants" }],
+  [/원피스|드레스|투피스/, { main: "full-dress-longuette" }],
+  [/스커트|치마/, { main: "short-skirt" }],
+  [/상의|의류|여성복|옷(?![가-힣])/, { main: "clothes-crew-neck" }],
+  // 신발
+  [/힐(?![가-힣])|하이힐|펌프스/, { main: "high-heeled-shoes" }],
+  [/부츠|워커|어그|앵클/, { main: "boots" }],
+  [/샌들|슬리퍼|쪼리|뮬|로퍼|플랫|단화/, { main: "slippers" }],
+  [/운동화|스니커|러닝화|조깅화|구두|신발|슈즈/, { main: "spikedshoes" }],
+  // 식음료 먼저 — "티백"이 가방(백)으로 오인되지 않게
+  [/차(?![가-힣])|티백|녹차|홍차|커피/, { main: "tea-drink" }],
+  // 가방 — 여성 가방 기본은 둥근 손잡이 토트
   [/백팩|배낭/, { main: "backpack" }],
-  [/가방|토트|숄더|크로스|클러치|파우치|백\b/, { main: "handbag" }],
-  [/모자|캡\b|비니|버킷|볼캡/, { main: "billed-cap" }],
-  [/스카프|머플러|숄\b/, { main: "scarf" }],
-  [/장갑/, { main: "gloves" }],
+  [/크로스백|미니백/, { main: "the-single-shoulder-bag" }],
+  [/클러치|파우치/, { main: "handbag" }],
+  [/가방|토트|숄더|백(?![가-힣])|버킷백/, { main: "shoulder-bag" }],
+  // 잡화
+  [/지갑|카드지갑/, { main: "wallet" }],
+  [/벨트/, { main: "belt" }],
+  [/넥타이/, { main: "necktie" }],
+  [/선글라스|안경/, { main: "glasses" }],
   [/양말|스타킹/, { main: "socks" }],
+  [/장갑/, { main: "clothes-gloves" }],
+  [/비니|털모자/, { main: "woolen-hat" }],
+  [/버킷햇|밀짚|벙거지/, { main: "straw-hat" }],
+  [/모자|볼캡|캡(?![가-힣])/, { main: "baseball-cap" }],
   [/시계|워치/, { main: "watch" }],
-  [/목걸이|반지|귀걸이|팔찌|주얼리|악세|액세/, { main: "ring" }],
-  [/선글라스|안경/, { main: "sunglasses" }],
-  [/벨트|넥타이/, { main: "necktie" }],
-  // 뷰티·생활 — 향수는 병 + 벚꽃 합성(향수 전용 무료 일러스트가 없음)
-  [/립스틱|립밤|립오일|틴트|립\b|립 /, { main: "lipstick" }],
-  [/향수|퍼퓸|오드|바디미스트|edp|edt/, { main: "lotion-bottle", sub: "cherry-blossom" }],
-  [/화장품|크림|스킨|로션|세럼|앰플|쿠션|팩트|섀도|마스카라|클렌징|선크림|코스메/, { main: "lotion-bottle" }],
-  [/캔들|디퓨저|방향제/, { main: "candle" }],
-  [/쿠키|과자|간식|초콜릿|음식|식품/, { main: "cookie" }],
-  [/차\b|티백|녹차|홍차/, { main: "teacup-without-handle" }],
-  // 브랜드 사전 — 종류 단어가 없을 때만 (예: "롱샴 르플리아쥬" → 가방)
-  [/롱샴|롱샹/, { main: "handbag" }],
-  [/뉴발란스|뉴발|미즈노|브룩스|아식스|나이키|아디다스|크록스|컨버스|반스|호카|살로몬|푸마|리복/, { main: "running-shoe" }],
-  [/이솝|딥디크|조말론|바이레도|딥티크|산타마리아/, { main: "lotion-bottle", sub: "cherry-blossom" }],
+  [/목걸이|네크리스/, { main: "diamond-necklace" }],
+  [/반지|링(?![가-힣])/, { main: "diamond-ring" }],
+  [/귀걸이|팔찌|주얼리|악세|액세/, { main: "jewelry" }],
+  [/우산|양산/, { main: "umbrella" }],
+  [/머플러|스카프|숄(?![가-힣])/, { main: "towel" }],
+  [/거울/, { main: "mirror" }],
+  // 뷰티·생활
+  [/립스틱|립밤|립오일|틴트|립(?![가-힣])|립 /, { main: "lipstick" }],
+  [/향수|퍼퓸|오드|바디미스트|edp|edt/, { main: "perfume" }],
+  [/핸드크림/, { main: "hand-cream" }],
+  [/마스크팩|팩(?![가-힣])/, { main: "facial-mask" }],
+  [/브러시|메이크업/, { main: "cosmetic-brush" }],
+  [/화장품|크림|스킨|로션|세럼|앰플|쿠션|팩트|섀도|마스카라|클렌징|선크림|코스메/, { main: "lotion" }],
+  [/캔들|디퓨저|방향제/, { main: "spa-candle" }],
+  [/선물|기프트/, { main: "gift" }],
+  [/아이스크림|젤라또/, { main: "icecream" }],
+  [/쿠키|과자|간식|초콜릿|음식|식품/, { main: "snacks" }],
+  // 브랜드 사전 — 종류 단어가 없을 때만
+  [/롱샴|롱샹/, { main: "shoulder-bag" }],
+  [/뉴발란스|뉴발|미즈노|브룩스|아식스|나이키|아디다스|크록스|컨버스|반스|호카|살로몬|푸마|리복/, { main: "spikedshoes" }],
+  [/이솝|딥디크|딥티크|조말론|바이레도|산타마리아|마르지엘라/, { main: "perfume" }],
 ];
 
 function productThumbArt(category: string, nameHint: string): ThumbArt {
   const c = `${String(category || "")} ${String(nameHint || "")}`.toLowerCase();
   for (const [re, art] of THUMB_RULES) if (re.test(c)) return art;
-  return { main: "shopping-bags" };
+  return { main: "" }; // 미인식 — 엉뚱한 그림 대신 글자만 크게
 }
 
 // (전수조사·테스트용) 이 상품이 어떤 그림으로 매칭되는지 키를 돌려준다. "shopping-bags" = 미인식 기본값.
 export function productThumbArtKey(productName: string, category?: string): string {
-  return productThumbArt(String(category || ""), String(productName || "")).main;
+  return productThumbArt(String(category || ""), String(productName || "")).main; // "" = 미인식(글자만)
 }
 
 // 상품명(+카테고리) → 자동 썸네일 SVG 데이터 URI. 일러스트 크게 + "MIU-201" 코드 + 이름.
@@ -199,17 +226,21 @@ export function productNameThumbnail(productName: string, category?: string) {
   const bigFit = fittedText(big, 520, 78, 40);
   const restFit = fittedText(restShort || " ", 560, 48, 28);
   const art = productThumbArt(String(category || ""), raw);
-  const mainBody = PRODUCT_THUMB_ART[art.main] || PRODUCT_THUMB_ART["shopping-bags"] || "";
+  const mainBody = art.main ? PRODUCT_THUMB_ART[art.main] || "" : "";
   const subBody = art.sub ? PRODUCT_THUMB_ART[art.sub] || "" : "";
+  const bigBig = fittedText(big, 560, 110, 48); // 미인식(그림 없음)일 때 글자를 더 크게
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
     <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffdfb"/><stop offset="1" stop-color="#f4e9ed"/></linearGradient></defs>
     <rect width="800" height="800" rx="72" fill="url(#bg)"/>
     <rect x="42" y="42" width="716" height="716" rx="48" fill="none" stroke="#7a1e47" stroke-width="5"/>
-    <g transform="translate(216, 84) scale(11.5)">${mainBody}</g>
-    ${subBody ? `<g transform="translate(490, 66) scale(5.2)">${subBody}</g>` : ""}
+    ${mainBody ? `<g transform="translate(208, 76) scale(8)">${mainBody}</g>
+    ${subBody ? `<g transform="translate(504, 60) scale(3.6)">${subBody}</g>` : ""}
     <text x="400" y="530" text-anchor="middle" dominant-baseline="middle" fill="#7a1e47" font-family="Georgia,Times New Roman,serif" font-size="${bigFit.fontSize}" font-weight="700" letter-spacing="2"${bigFit.fit}>${escapeXml(big)}</text>
     ${restShort ? `<line x1="240" y1="586" x2="560" y2="586" stroke="#7a1e47" stroke-width="4"/>
-    <text x="400" y="648" text-anchor="middle" dominant-baseline="middle" fill="#2f2026" font-family="Arial,Noto Sans KR,sans-serif" font-size="${restFit.fontSize}" font-weight="800"${restFit.fit}>${escapeXml(restShort)}</text>` : ""}
+    <text x="400" y="648" text-anchor="middle" dominant-baseline="middle" fill="#2f2026" font-family="Arial,Noto Sans KR,sans-serif" font-size="${restFit.fontSize}" font-weight="800"${restFit.fit}>${escapeXml(restShort)}</text>` : ""}`
+    : `<text x="400" y="330" text-anchor="middle" dominant-baseline="middle" fill="#7a1e47" font-family="Georgia,Times New Roman,serif" font-size="${bigBig.fontSize}" font-weight="700" letter-spacing="2"${bigBig.fit}>${escapeXml(big)}</text>
+    ${restShort ? `<line x1="220" y1="430" x2="580" y2="430" stroke="#7a1e47" stroke-width="4"/>
+    <text x="400" y="520" text-anchor="middle" dominant-baseline="middle" fill="#2f2026" font-family="Arial,Noto Sans KR,sans-serif" font-size="${restFit.fontSize}" font-weight="800"${restFit.fit}>${escapeXml(restShort)}</text>` : ""}`}
   </svg>`;
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
