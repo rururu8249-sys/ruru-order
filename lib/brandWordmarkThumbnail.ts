@@ -125,51 +125,50 @@ export function brandWordmarkThumbnail(brandEn: string, brandKo: string) {
 }
 
 
-// ── [2026-09-03 사장님 요청] 사진 없는 상품용 자동 썸네일 ──
-//   인터넷 사진 수집은 저작권 위험(실사례)으로 채택 안 함. 대신 카테고리에 맞는
-//   일러스트 + 상품코드 글자를 자동 생성한다 (사장님 확정: "신발이면 신발 일러스트 느낌").
+// ── [2026-09-03 사장님 확정] 사진 없는 상품용 자동 썸네일 (v2 — 컬러 이모지 일러스트) ──
+//   1차 손그림 SVG는 "뭔지 모르겠다" 피드백 → 기기 내장 컬러 이모지를 SVG 텍스트로 렌더링하는
+//   표준 기법(CSS-Tricks emoji favicon)으로 교체. 색 있고 누구나 아는 그림 + 단어별 세분화.
 //   표시 전용 — 저장 안 함. 사진을 올리면 자연히 교체된다.
 
-// 카테고리별 선화 일러스트 (240×240 좌표계, 딥로즈 선)
-// 카테고리 단어가 없거나 못 알아들으면 상품명 단어로도 추측한다 (지갑→잡화, 가디건→의류 …)
-function categoryIllustration(category: string, nameHint?: string): string {
+// 카테고리·상품명 단어 → 이모지 (구체적인 단어 먼저, 넓은 단어는 뒤에)
+function productEmoji(category: string, nameHint: string): string {
   const c = `${String(category || "")} ${String(nameHint || "")}`.toLowerCase();
-  const S = 'fill="none" stroke="#7a1e47" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"';
-  if (/신발|슈즈|운동화|스니커|구두|로퍼|부츠|샌들|슬리퍼|힐|shoe/.test(c)) {
-    return `<path ${S} d="M35 158 C35 146 47 137 62 134 L95 128 C115 124 124 103 144 97 C168 90 199 116 202 147 L203 160 C203 169 196 176 187 176 L50 176 C41 176 35 168 35 158 Z"/>
-      <path ${S} d="M100 127 L112 140 M118 121 L130 134 M136 113 L148 126"/>
-      <path ${S} d="M35 160 L203 160"/>`;
-  }
-  if (/화장품|립스틱|립밤|립오일|틴트|메이크업|쿠션|팩트|섀도|마스카라|스킨|로션|크림|세럼|앰플|코스메/.test(c)) {
-    return `<rect ${S} x="92" y="122" width="56" height="80" rx="10"/>
-      <rect ${S} x="101" y="100" width="38" height="22" rx="5"/>
-      <path ${S} d="M108 100 L108 66 C108 56 132 56 132 66 L132 100"/>`;
-  }
-  if (/향수|퍼퓸|오드|바디미스트|perfume|edp|edt/.test(c)) {
-    return `<rect ${S} x="80" y="98" width="80" height="102" rx="16"/>
-      <rect ${S} x="104" y="76" width="32" height="22" rx="4"/>
-      <rect ${S} x="98" y="46" width="44" height="30" rx="8"/>
-      <path ${S} d="M96 132 C110 120 130 120 144 132"/>`;
-  }
-  if (/캔들|디퓨저|차량/.test(c)) {
-    return `<rect ${S} x="82" y="108" width="76" height="92" rx="12"/>
-      <path ${S} d="M120 108 L120 92"/>
-      <path ${S} d="M120 46 C132 62 134 74 120 84 C106 74 108 62 120 46 Z"/>`;
-  }
-  if (/잡화|가방|백팩|토트|숄더|크로스|클러치|파우치|지갑|벨트|스카프|머플러|장갑|양말|모자|캡|시계|주얼리|목걸이|반지|귀걸이|악세|액세/.test(c)) {
-    return `<path ${S} d="M62 112 L178 112 L169 194 C168 200 163 204 157 204 L83 204 C77 204 72 200 71 194 Z"/>
-      <path ${S} d="M88 112 C88 72 152 72 152 112"/>
-      <circle ${S} cx="120" cy="150" r="10"/>`;
-  }
-  if (/의류|옷|상의|하의|아우터|니트|가디건|코트|자켓|재킷|패딩|셔츠|블라우스|맨투맨|후드|티셔츠|청바지|데님|팬츠|스커트|원피스|트렌치|점퍼|조끼|베스트/.test(c)) {
-    return `<path ${S} d="M62 66 L96 46 C106 62 134 62 144 46 L178 66 L164 100 L146 90 L146 198 L94 198 L94 90 L76 100 Z"/>`;
-  }
-  // 기본: 가격표(태그)
-  return `<path ${S} d="M76 132 L140 68 C145 63 152 61 158 62 L186 67 C193 69 197 75 196 82 L192 110 C191 116 188 121 184 125 L120 189 C113 196 103 196 96 189 L76 169 C69 162 69 152 76 145 Z"/>
-    <circle ${S} cx="164" cy="90" r="9"/>`;
+  const rules: Array<[RegExp, string]> = [
+    // 의류 — 종류별로 다른 그림
+    [/트렌치|코트|자켓|재킷|패딩|점퍼|아우터|가디건|조끼|베스트/, "🧥"],
+    [/청바지|데님|팬츠|바지|슬랙스|반바지|레깅스/, "👖"],
+    [/원피스|스커트|드레스/, "👗"],
+    [/티셔츠|반팔|긴팔|맨투맨|후드|셔츠|블라우스|니트|상의|의류|옷/, "👕"],
+    // 신발 — 종류별
+    [/운동화|스니커|러닝/, "👟"],
+    [/힐|펌프스/, "👠"],
+    [/부츠|워커/, "👢"],
+    [/샌들|슬리퍼|쪼리/, "🩴"],
+    [/로퍼|플랫|단화|구두|신발|슈즈/, "🥿"],
+    // 잡화 — 종류별
+    [/지갑|카드지갑/, "👛"],
+    [/백팩|배낭/, "🎒"],
+    [/가방|토트|숄더|크로스|클러치|파우치|백/, "👜"],
+    [/모자|캡|비니|버킷/, "🧢"],
+    [/스카프|머플러|숄/, "🧣"],
+    [/장갑/, "🧤"],
+    [/양말|스타킹/, "🧦"],
+    [/시계|워치/, "⌚"],
+    [/목걸이|반지|귀걸이|팔찌|주얼리|악세|액세/, "💍"],
+    [/선글라스|안경/, "🕶"],
+    [/벨트|넥타이/, "👔"],
+    // 뷰티
+    [/립스틱|립밤|립오일|틴트|립/, "💄"],
+    [/향수|퍼퓸|오드|edp|edt/, "🌸"],
+    [/화장품|크림|스킨|로션|세럼|앰플|쿠션|팩트|섀도|마스카라|클렌징|코스메/, "🧴"],
+    [/캔들|디퓨저/, "🕯"],
+    [/음식|식품|간식|과자|차\b|커피/, "🍪"],
+  ];
+  for (const [re, emoji] of rules) if (re.test(c)) return emoji;
+  return "🛍"; // 기본 — 쇼핑백
 }
 
-// 상품명(+카테고리) → 자동 썸네일 SVG 데이터 URI. "MIU-201" 코드는 크게, 나머지 이름은 아래 줄.
+// 상품명(+카테고리) → 자동 썸네일 SVG 데이터 URI. 이모지 크게 + "MIU-201" 코드 + 이름.
 export function productNameThumbnail(productName: string, category?: string) {
   const raw = String(productName || "상품").trim() || "상품";
   const codeMatch = raw.match(/([A-Za-z]+)(?:\([^)]*\))?-(\d+[A-Za-z]*)/);
@@ -180,12 +179,12 @@ export function productNameThumbnail(productName: string, category?: string) {
   const restShort = rest.length > 16 ? `${rest.slice(0, 15)}…` : rest;
   const bigFit = fittedText(big, 520, 78, 40);
   const restFit = fittedText(restShort || " ", 560, 48, 28);
+  const emoji = productEmoji(String(category || ""), raw);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
     <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffdfb"/><stop offset="1" stop-color="#f4e9ed"/></linearGradient></defs>
     <rect width="800" height="800" rx="72" fill="url(#bg)"/>
     <rect x="42" y="42" width="716" height="716" rx="48" fill="none" stroke="#7a1e47" stroke-width="5"/>
-    <rect x="100" y="96" width="600" height="356" rx="40" fill="#fff" stroke="#ead9df" stroke-width="2"/>
-    <g transform="translate(180, 114) scale(1.83)">${categoryIllustration(String(category || ""), raw)}</g>
+    <text x="400" y="268" text-anchor="middle" dominant-baseline="middle" font-size="250" font-family="Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,sans-serif">${emoji}</text>
     <text x="400" y="530" text-anchor="middle" dominant-baseline="middle" fill="#7a1e47" font-family="Georgia,Times New Roman,serif" font-size="${bigFit.fontSize}" font-weight="700" letter-spacing="2"${bigFit.fit}>${escapeXml(big)}</text>
     ${restShort ? `<line x1="240" y1="586" x2="560" y2="586" stroke="#7a1e47" stroke-width="4"/>
     <text x="400" y="648" text-anchor="middle" dominant-baseline="middle" fill="#2f2026" font-family="Arial,Noto Sans KR,sans-serif" font-size="${restFit.fontSize}" font-weight="800"${restFit.fit}>${escapeXml(restShort)}</text>` : ""}
