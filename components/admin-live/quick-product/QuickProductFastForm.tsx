@@ -62,7 +62,7 @@ type ImagePickerProps = {
   value: string[];
   maxFiles: number;
   uploadKind: "cover" | "detail";
-  mode: "cover" | "detail";
+  mode: "cover" | "detail" | "strip";
   onChange: (nextValue: string[]) => void;
   triggerRef?: { current: (() => void) | null };
 };
@@ -594,6 +594,46 @@ function ImagePicker({
     );
   }
 
+  // [2026-09-03 재설계 1단계] 한 줄 사진(최대 10장) — 첫 장이 대표, 다른 장의 ☆을 누르면 대표로.
+  //   저장 형식은 그대로: 폼 쪽에서 첫 장 → image_url, 나머지 → detail_image_urls 로 분리한다.
+  if (mode === "strip") {
+    return (
+      <div className="min-w-0">
+        <div className="mb-1 flex items-center justify-between">
+          <span className="text-[11px] font-black text-ink">{label || "사진"}</span>
+          <span className="text-[10px] font-black text-ink-mute">{value.length}/{maxFiles}</span>
+        </div>
+        <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileChange} />
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "7px" }}>
+          {value.map((image, index) => (
+            <div key={`${image}-${index}`} style={{ position: "relative", width: "74px", height: "74px", flexShrink: 0 }}>
+              <img src={resolveProductImageUrl(image)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "8px", border: index === 0 ? "2px solid #7B2D43" : "1px solid #E8E2DD", boxSizing: "border-box" }} />
+              {index === 0 ? (
+                <span style={{ position: "absolute", top: "4px", left: "4px", background: "#7B2D43", color: "#fff", fontSize: "9px", fontWeight: 900, borderRadius: "9999px", padding: "1.5px 6px", pointerEvents: "none" }}>★ 대표</span>
+              ) : (
+                <button type="button" title="이 사진을 대표로" onClick={() => onChange([value[index], ...value.filter((_, i) => i !== index)])} style={{ position: "absolute", top: "3px", left: "3px", background: "rgba(255,255,255,0.92)", color: "#7B2D43", fontSize: "11px", fontWeight: 900, borderRadius: "9999px", padding: "1px 6px", border: "1px solid #E7C9D4", cursor: "pointer" }}>☆</button>
+              )}
+              <button type="button" onClick={() => removeImage(index)} style={{ position: "absolute", top: "3px", right: "3px", width: "16px", height: "16px", background: "rgba(0,0,0,0.55)", color: "#fff", borderRadius: "50%", fontSize: "10px", display: "flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", padding: 0 }}>×</button>
+            </div>
+          ))}
+          {value.length < maxFiles ? (
+            <button type="button" onClick={() => inputRef.current?.click()} onDragOver={(event) => event.preventDefault()} onDrop={handleDrop} style={{ width: "74px", height: "74px", borderRadius: "8px", border: "2px dashed #E7C9D4", background: "#FDF9FA", color: "#7B2D43", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", fontSize: "10px", fontWeight: 800, cursor: "pointer", flexShrink: 0 }}>
+              <span style={{ fontSize: "20px", lineHeight: 1 }}>＋</span>
+              <span>{uploading ? "업로드 중" : "추가"}</span>
+            </button>
+          ) : null}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "6px", flexWrap: "wrap" }}>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "12px", fontWeight: 700, color: "#7B2D43", background: "#F9EEF3", border: "1px solid #E7C9D4", borderRadius: "8px", padding: "6px 10px", cursor: "pointer" }}>
+            📷 촬영하기
+            <input type="file" accept="image/*" capture="environment" hidden onChange={handleFileChange} />
+          </label>
+          <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>첫 장이 대표 사진 · 다른 사진의 ☆을 누르면 대표가 바뀝니다</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-w-0">
       {label ? (
@@ -911,7 +951,7 @@ export default function QuickProductFastForm({
     setIsVisible(pickBoolean(initialProduct, ["is_visible", "visible", "status"], true));
     setIsPinned(pickBoolean(initialProduct, ["is_pinned", "pinned"], false));
     setCoverImages(pickImageArray(initialProduct, ["image_url", "cover_image_url", "main_image_url"]).slice(0, 1));
-    setDetailImages(pickImageArray(initialProduct, ["detail_image_urls", "detail_images", "images"]).slice(0, 5));
+    setDetailImages(pickImageArray(initialProduct, ["detail_image_urls", "detail_images", "images"]).slice(0, 9)); // [2026-09-03 재설계 1단계] 한 줄 10장(대표1+상세9)
     setColorText(pickArray(initialProduct, ["color_options", "colors"]).map(normalizeBrandKorean).join(", "));
     setSizeText(pickArray(initialProduct, ["size_options", "sizes"]).map(normalizeBrandKorean).join(", "));
     setDescription(normalizeTextareaText(pickString(initialProduct, ["product_description", "description", "detail_description"], "")));
@@ -1903,7 +1943,7 @@ export default function QuickProductFastForm({
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 18px" }}>
 
           {/* .top-row : 사진(120) + 필드 */}
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "120px 1fr", gap: "14px", marginBottom: "14px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: (isMobile || !brandGroupActive) ? "1fr" : "120px 1fr", gap: "14px", marginBottom: "14px" }}>
             {/* [2026-08-29] 모바일에선 1열로 떨어지는데 폭이 120px 로 고정돼 있어 화면이 어색했다 */}
             <div style={{ width: isMobile ? "100%" : "120px" }}>
               {brandGroupActive ? (
@@ -1934,7 +1974,17 @@ export default function QuickProductFastForm({
                   </div>
                 )
               ) : (
-                <ImagePicker label="" value={coverImages} maxFiles={1} uploadKind="cover" mode="cover" onChange={(next) => { setFormTouched(true); setCoverImages(next); }} triggerRef={coverUploadRef} />
+                // [2026-09-03 재설계 1단계] 대표(1)+상세(5) 분리 → 한 줄 최대 10장, 첫 장이 대표(★로 변경)
+                //   저장은 기존 그대로: 첫 장 → image_url(coverImages), 나머지 → detail_image_urls(detailImages)
+                <ImagePicker
+                  label="사진 (최대 10장 — 첫 장이 대표)"
+                  value={[...coverImages, ...detailImages]}
+                  maxFiles={10}
+                  uploadKind="cover"
+                  mode="strip"
+                  onChange={(next) => { setFormTouched(true); setCoverImages(next.slice(0, 1)); setDetailImages(next.slice(1, 10)); }}
+                  triggerRef={coverUploadRef}
+                />
               )}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -2820,11 +2870,8 @@ export default function QuickProductFastForm({
           <div style={{ height: "1px", background: "#E8E2DD", margin: "12px 0" }} />
 
           {/* 일반 상품 공통 상세사진 / 브랜드 대표상품은 위의 세부상품별 사진 목록으로 확인 */}
-          {!brandGroupActive ? (
-            <div style={{ marginBottom: "14px" }}>
-              <ImagePicker label="상세사진 (최대 5장)" value={detailImages} maxFiles={5} uploadKind="detail" mode="detail" onChange={(next) => { setFormTouched(true); setDetailImages(next); }} />
-            </div>
-          ) : (
+          {/* [2026-09-03 재설계 1단계] 단품 상세사진 섹션 제거 — 위 한 줄 10장으로 통합 */}
+          {!brandGroupActive ? null : (
             <div style={{ marginBottom: "14px", padding: "9px 11px", borderRadius: "8px", border: "1px solid #CFE4DB", background: "#EEF6F3", color: "#0F6E56", fontSize: "11.5px", lineHeight: 1.55 }}>
               세부상품별 사진 <b>{details.length}개 상품 · 총 {brandGroupDetailPhotoCount}장</b>이 등록되어 있습니다.<br />
               위의 세부상품 목록에서 썸네일과 사진 수를 확인할 수 있어요.
