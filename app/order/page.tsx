@@ -6278,8 +6278,8 @@ export default function OrderPage() {
                                 style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                               />
                             ) : img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (
-                              /* [2026-09-03 사장님 요청] 사진 없는 상품 = 회색 네모 대신 상품명 글자 썸네일 자동 (표시 전용) */
-                              <img src={productNameThumbnail(String(product.product_name || "상품"))} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                              /* [2026-09-03 사장님 확정] 사진 없는 상품 = 카테고리 일러스트 + 상품코드 자동 썸네일 (표시 전용) */
+                              <img src={productNameThumbnail(String(product.product_name || "상품"), (() => { try { const n = parseProductSuggestionNote((product as any).product_note); return String((n as any)?.category ?? (product as any).category ?? (product as any).product_category ?? ""); } catch { return ""; } })())} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                             )}
                             {sold ? (
                               <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", borderRadius: "inherit", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
