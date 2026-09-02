@@ -123,3 +123,30 @@ export function brandWordmarkThumbnail(brandEn: string, brandKo: string) {
   </svg>`;
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
+
+
+// ── [2026-09-03 사장님 요청] 사진 없는 단품 상품용 글자 썸네일 ──
+//   인터넷 사진 긁어오기는 저작권 위험이 커서(실제 손해배상 사례 다수),
+//   대신 상품명으로 깔끔한 카드형 썸네일을 자동 생성한다. 표시 전용 — 저장 안 함.
+//   "MIU-201" 같은 코드가 있으면 코드를 크게, 나머지 이름을 아래 줄에.
+export function productNameThumbnail(productName: string) {
+  const raw = String(productName || "상품").trim() || "상품";
+  const codeMatch = raw.match(/([A-Za-z]+)(?:\([^)]*\))?-(\d+[A-Za-z]*)/);
+  const big = codeMatch ? `${codeMatch[1].toUpperCase()}-${codeMatch[2].toUpperCase()}` : raw.split(/\s+/)[0].slice(0, 10);
+  const rest = codeMatch
+    ? raw.replace(codeMatch[0], "").replace(/\s+/g, " ").trim()
+    : raw.split(/\s+/).slice(1).join(" ").trim();
+  const restShort = rest.length > 16 ? `${rest.slice(0, 15)}…` : rest;
+  const bigFit = fittedText(big, 560, 120, 44);
+  const restFit = fittedText(restShort || " ", 560, 54, 30);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
+    <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffdfb"/><stop offset="1" stop-color="#f4e9ed"/></linearGradient></defs>
+    <rect width="800" height="800" rx="72" fill="url(#bg)"/>
+    <rect x="42" y="42" width="716" height="716" rx="48" fill="none" stroke="#7a1e47" stroke-width="5"/>
+    <rect x="90" y="230" width="620" height="270" rx="40" fill="#fff" stroke="#ead9df" stroke-width="2"/>
+    <text x="400" y="365" text-anchor="middle" dominant-baseline="middle" fill="#7a1e47" font-family="Georgia,Times New Roman,serif" font-size="${bigFit.fontSize}" font-weight="700" letter-spacing="2"${bigFit.fit}>${escapeXml(big)}</text>
+    ${restShort ? `<line x1="230" y1="560" x2="570" y2="560" stroke="#7a1e47" stroke-width="4"/>
+    <text x="400" y="630" text-anchor="middle" dominant-baseline="middle" fill="#2f2026" font-family="Arial,Noto Sans KR,sans-serif" font-size="${restFit.fontSize}" font-weight="800"${restFit.fit}>${escapeXml(restShort)}</text>` : ""}
+  </svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}

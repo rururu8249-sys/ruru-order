@@ -48,7 +48,7 @@ import {
   buildOrderLookupOrFilter,
   orderLookupPhoneValues,
 } from "@/lib/customerOrderLookup";
-import { brandWordmarkThumbnail, normalizeBrandKorean } from "@/lib/brandWordmarkThumbnail";
+import { brandWordmarkThumbnail, normalizeBrandKorean, productNameThumbnail } from "@/lib/brandWordmarkThumbnail";
 import {
   CUSTOMER_SESSION_VERSION_KEY,
   YOUTUBE_NICKNAME_CONFIRM_VERSION_KEY,
@@ -6277,7 +6277,10 @@ export default function OrderPage() {
                                 alt={`${brandGroup.brandKo} 브랜드 로고`}
                                 style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                               />
-                            ) : img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
+                            ) : img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (
+                              /* [2026-09-03 사장님 요청] 사진 없는 상품 = 회색 네모 대신 상품명 글자 썸네일 자동 (표시 전용) */
+                              <img src={productNameThumbnail(String(product.product_name || "상품"))} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            )}
                             {sold ? (
                               <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", borderRadius: "inherit", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
                                 <span style={{ color: "white", fontSize: "11px", fontWeight: 800, letterSpacing: "0.1em" }}>SOLD OUT</span>
