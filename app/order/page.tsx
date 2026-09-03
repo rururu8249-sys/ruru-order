@@ -724,6 +724,14 @@ function registeredProductNoneOptionEnabled(product: BroadcastProduct): boolean 
 // [2026-09-03 사장님 요청] 손님 직접입력 칸의 제목을 사장님이 정한다 (예: "상품숫자").
 //   스마트스토어 '직접입력형 옵션'(판매자가 옵션명 지정, 구매자가 텍스트 입력)과 같은 방식.
 //   저장 경로는 기존 색상(color) 그대로라 주문서·엑셀·물건챙기기 전부 무변경 — 제목 표시만 바뀐다.
+// [2026-09-03] 한국어 조사 자동 선택 — "상품번호를" / "색상을" 처럼 받침에 맞춰 붙인다(표시 전용).
+function koEulReul(word: string): string {
+  const trimmed = String(word || "").trim();
+  const code = trimmed.charCodeAt(trimmed.length - 1);
+  if (code >= 0xac00 && code <= 0xd7a3) return (code - 0xac00) % 28 > 0 ? "을" : "를";
+  return "을(를)";
+}
+
 function getCustomInputLabel(product: BroadcastProduct | null | undefined): string {
   try {
     const note = (parseProductSuggestionNote(product?.product_note) || {}) as Record<string, unknown>;
@@ -4231,7 +4239,7 @@ export default function OrderPage() {
         readComboInfoOrderProduct(product)
           ? "종류를 선택해 주세요."
           : colorMode === "input"
-            ? `${getCustomInputLabel(product) || "색상"}을(를) 입력해 주세요.`
+            ? (() => { const lb = getCustomInputLabel(product) || "색상"; return `${lb}${koEulReul(lb)} 입력해 주세요.`; })()
             : "색상을 선택해 주세요."
       );
       return;
@@ -4699,7 +4707,8 @@ export default function OrderPage() {
       }
 
       if (getRegisteredOptionMode(matchedProduct, "color") === "input" && !normalizeEmptyProductOptionValue(item.color)) {
-        showCustomerNotice("색상을 입력해 주세요.");
+        const missingLabel = getCustomInputLabel(matchedProduct);
+        showCustomerNotice(missingLabel ? `${missingLabel}${koEulReul(missingLabel)} 입력해 주세요.` : "색상을 입력해 주세요.");
         return false;
       }
 
@@ -7356,7 +7365,7 @@ export default function OrderPage() {
                       </div>
                       <input value={registeredOptionColor} onChange={(e) => setRegisteredOptionColor(e.target.value)} placeholder={inputLabel === "색상" ? "색상을 적어주세요 (예: 베이지)" : `${inputLabel} 입력칸이에요 — 방송에서 안내한 대로 적어주세요`} style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: !registeredOptionColor.trim() ? "2px dashed #E2B64D" : "1.5px solid #E8E2DD", background: !registeredOptionColor.trim() ? "#FFFDF5" : "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
                       {/* [2026-08-28 P0-4] 문구가 사라질 때 아래 버튼이 위로 밀려 오클릭이 나던 문제 → 자리를 항상 잡아둔다 */}
-                      <div data-order-option-missing={!registeredOptionColor.trim() ? "true" : undefined} style={{ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" }}>{!registeredOptionColor.trim() ? `${inputLabel}을(를) 입력해 주세요` : ""}</div>
+                      <div data-order-option-missing={!registeredOptionColor.trim() ? "true" : undefined} style={{ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" }}>{!registeredOptionColor.trim() ? `${inputLabel}${koEulReul(inputLabel)} 입력해 주세요` : ""}</div>
                     </div>
                     );
                   })() : null}
@@ -7582,7 +7591,9 @@ export default function OrderPage() {
                         : registeredOptionAxes3 && !registeredOptionDetail.trim()
                           ? "세부상품을 먼저 선택"
                           : !registeredOptionColorSelected
-                            ? (registeredOptionColorMode === "input" ? "색상을 입력해 주세요" : "색상을 선택해 주세요")
+                            ? (registeredOptionColorMode === "input"
+                                ? (() => { const lb = getCustomInputLabel(registeredOptionSelectProduct); return lb ? `${lb}${koEulReul(lb)} 입력해 주세요` : "색상을 입력해 주세요"; })()
+                                : "색상을 선택해 주세요")
                             : !registeredOptionSizeSelected
                               ? (registeredOptionSizeMode === "input" ? "사이즈를 입력해 주세요" : "사이즈를 선택해 주세요")
                               : "옵션을 선택해 주세요"}</button>
