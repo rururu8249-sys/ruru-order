@@ -1254,17 +1254,17 @@ export default function QuickProductFastForm({
     });
   };
 
-  const applyBrandDetailEditor = () => {
-    if (!brandDetailEditDraft) return;
+  const applyBrandDetailEditor = (): boolean => {
+    if (!brandDetailEditDraft) return false;
     const oldName = brandDetailEditDraft.originalName;
     const nextName = brandDetailEditDraft.name.trim();
     if (!nextName) {
       showAdminToast("세부상품명을 입력해주세요.", "error");
-      return;
+      return false;
     }
     if (nextName !== oldName && details.includes(nextName)) {
       showAdminToast("같은 세부상품명이 이미 있어요.", "error");
-      return;
+      return false;
     }
     const isNewDetail = !oldName;
     // [2026-09-03 사장님 확정] 본문·표와 같은 방식: 색상/사이즈를 쉼표로 적으면 조합은 자동 생성.
@@ -1318,6 +1318,7 @@ export default function QuickProductFastForm({
     setVariantRows([...remainingRows, ...editedRows]);
     setBrandDetailEditDraft(null);
     setFormTouched(true);
+    return true;
   };
 
   // [2026-08-11] 세부상품 사진 업로드 — 기존 상품사진과 동일한 압축·업로드 API 재사용
@@ -1806,14 +1807,18 @@ export default function QuickProductFastForm({
         ...(optionAxesPayload ? { option_axes: optionAxesPayload, combo_detail_values: exposedDetails } : {}),
       });
 
+      // [2026-09-03 사장님 지시] 새 상품 + 뱃지 미선택 → ⚡특가/💖루루픽 중 랜덤 1개 자동 (한 번만 뽑아 공유)
+      //   🔒 바로구매·해외배송 자동 절대 금지 · 수정 저장엔 자동 없음(뺀 뱃지 부활 방지)
+      const resolvedBadgeTypes = (!isEditMode && badgeTypes.length === 0) ? [Math.random() < 0.5 ? "special" : "pick"] : badgeTypes;
+
       const payload: Record<string, unknown> = {
         product_name: name,
         price,
         stock: totalStock,
         status: isVisible ? "판매중" : "숨김",
         product_type: resolvedProductType,
-        badge_types: badgeTypes,
-        badge_type: badgeTypes[0] ?? null,
+        badge_types: resolvedBadgeTypes,
+        badge_type: resolvedBadgeTypes[0] ?? null,
         shipping_type: shippingType,
         combine_shipping: shippingType === "vendor" ? "N" : "Y",
         sort_order: 0,
@@ -3133,12 +3138,22 @@ export default function QuickProductFastForm({
                   취소
                 </button>
 
+                {!brandDetailEditDraft.originalName ? (
+                  <button
+                    type="button"
+                    title="이 세부상품을 추가하고, 빈 창을 바로 다시 연다 — A-1, A-2, A-3 연속 입력"
+                    onClick={() => { if (applyBrandDetailEditor()) openBrandDetailEditorForNew(); }}
+                    style={{ padding: "8px 14px", border: "1.5px solid #0F6E56", borderRadius: "8px", background: "#fff", color: "#0F6E56", fontWeight: 900, cursor: "pointer" }}
+                  >
+                    추가하고 다음 ▸
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={applyBrandDetailEditor}
                   style={{ padding: "8px 15px", border: "none", borderRadius: "8px", background: "#0F6E56", color: "#fff", fontWeight: 900, cursor: "pointer" }}
                 >
-                  {brandDetailEditDraft.originalName ? "변경내용 적용" : "세부상품 추가"}
+                  {brandDetailEditDraft.originalName ? "변경내용 적용" : "추가하고 닫기"}
                 </button>
               </div>
             </div>
