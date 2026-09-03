@@ -1969,9 +1969,26 @@ export default function OrderPage() {
     void Promise.resolve(loadBroadcast()).catch(() => {}).finally(() => setBroadcastLoaded(true));
     clearLegacyCustomerSessionIfNeeded();
     loadSavedCustomerInfo();
-    // localStorage엔 배송지 목록이 없으므로, 저장된 번호가 있으면 DB에서 shipping_addresses를 채운다.
+    // [2026-09-04 사장님 지시 · 서버가 이긴다] 회원의 정체성은 카카오 계정(8/31 확정)인데,
+    //   여기 "처음 열릴 때 채우기"만 폰에 저장된 (옛)번호로 DB를 찾고 있었다.
+    //   실사고(초-이/최유진): DB엔 본인 번호·기본배송지가 정확히 있는데, 폰의 옛 번호로 조회가 빗나가
+    //   폰에 남은 옛 지인 선물 배송지가 주문서에 그대로 들어갔다.
+    //   → 카카오 계정으로 정답 줄을 먼저 찾아 화면·폰 저장값을 서버 값으로 맞춘다(applyCustomerFromRow가 덮어씀).
+    //     카카오 계정이 없거나 조회 실패면 기존 번호 조회 그대로(동작 무변경). 읽기 전용 — DB엔 아무것도 안 쓴다.
     const savedPhone = (typeof window !== "undefined" && window.localStorage.getItem("ruru_customer_phone")) || "";
-    if (savedPhone.trim()) {
+    const savedKakaoId = (() => {
+      try { return String(window.localStorage.getItem("ruru_kakao_id") || "").trim(); } catch { return ""; }
+    })();
+    if (savedKakaoId) {
+      void (async () => {
+        try {
+          const applied = await loadExistingCustomerByKakaoId(savedKakaoId);
+          if (!applied && savedPhone.trim()) await loadExistingCustomerByKakaoPhone(savedPhone);
+        } catch {
+          if (savedPhone.trim()) void loadExistingCustomerByKakaoPhone(savedPhone);
+        }
+      })();
+    } else if (savedPhone.trim()) {
       void loadExistingCustomerByKakaoPhone(savedPhone);
     }
   }, []);
@@ -2454,6 +2471,26 @@ export default function OrderPage() {
     // Phase1-2(중복 row 병합 + 전화번호 숫자키 통일)로 단일 row가 확정 조회됨 →
     // 빈배열 시 700ms 재조회 땜질 불필요(제거). 진실원천은 DB 단일 row 유지.
     return applyCustomerFromRow(customer, cleanPhone);
+  };
+
+  // [2026-09-04 서버가 이긴다] 카카오 계정으로 회원 정답 줄을 읽어 화면+폰 저장값을 맞춘다.
+  //   saveCustomer(4429)와 같은 기준: kakao_id 일치 · created_at 최신 1줄. 읽기 전용.
+  const loadExistingCustomerByKakaoId = async (kakaoId: string) => {
+    const kid = String(kakaoId || "").trim();
+    if (!kid) return false;
+    const { data, error } = await supabase
+      .from("customers")
+      .select("*")
+      .eq("kakao_id", kid)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (error) {
+      console.error("카카오ID 고객정보 조회 오류:", error.message);
+      return false;
+    }
+    const customer = data?.[0];
+    if (!customer) return false;
+    return applyCustomerFromRow(customer, normalizePhone(customer?.customer_phone || ""));
   };
 
 
