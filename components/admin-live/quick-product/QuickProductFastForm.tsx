@@ -793,7 +793,6 @@ export default function QuickProductFastForm({
   const [nameError, setNameError] = useState(false);
   // [2026-08-11] 방송 중 속도 — 거의 안 건드리는 카테고리·뱃지가 옵션/재고를 화면 밖으로 밀어내던 문제.
   //   기본 접힘 → 사진·이름·가격 다음에 바로 옵션·재고가 오게 한다. (값은 전부 기본값이 있어 안 펴도 등록 가능)
-  const [extraOpen, setExtraOpen] = useState(false);
   const coverUploadRef = useRef<(() => void) | null>(null);
 
   // 팝업 드래그(헤더 잡고 이동)
@@ -2765,29 +2764,6 @@ export default function QuickProductFastForm({
           {/* 구분선 */}
           <div style={{ height: "1px", background: "#E8E2DD", margin: "12px 0" }} />
           {/* [2026-09-03 재설계 순서 확정] ⚙ 고급 설정은 시안대로 맨 아래(등록 버튼 위) — 방송 중 쓰는 옵션·재고가 먼저 보이게 */}
-          {!extraOpen ? (
-            <div style={{ marginBottom: "12px" }}>
-              <button
-                type="button"
-                onClick={() => setExtraOpen(true)}
-                style={{ width: "100%", padding: "9px", border: "1px dashed #D9C5CC", background: "var(--color-surface)", color: "#7B2D43", fontSize: "12px", fontWeight: 800, borderRadius: "8px", cursor: "pointer" }}
-              >
-                ⚙ 고급 설정 — 카테고리 · 뱃지 · 상세설명 {(() => { const parts = [category.trim(), category.trim() && !customerCategoryVisible ? "고객 버튼 숨김" : "", badgeTypes.length ? `뱃지 ${badgeTypes.length}` : "", customerDetailInputEnabled && !customerDetailInputUnavailable ? "직접입력 ON" : "", description.trim() ? "상세설명 ✓" : ""].filter(Boolean); return parts.length ? `(${parts.join(" · ")})` : "(선택)"; })()}
-              </button>
-            </div>
-          ) : null}
-
-          {extraOpen ? (
-          <>
-          <div style={{ marginBottom: "8px", textAlign: "right" }}>
-            <button
-              type="button"
-              onClick={() => setExtraOpen(false)}
-              style={{ padding: "5px 12px", border: "1px solid #D9C5CC", background: "var(--color-surface)", color: "#7B2D43", fontSize: "11px", fontWeight: 800, borderRadius: "7px", cursor: "pointer" }}
-            >
-              − 접기
-            </button>
-          </div>
           {/* 카테고리 */}
           <div style={{ marginBottom: "14px" }}>
             <div style={sectionLabel}>카테고리</div>
@@ -2930,8 +2906,6 @@ export default function QuickProductFastForm({
             />
           </div>
 
-          </>
-          ) : null}
           </>) : null}
 
         </div>
