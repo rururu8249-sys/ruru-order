@@ -5347,6 +5347,23 @@ export default function OrderPage() {
       showCustomerNotice("제출 버튼 바로 위 체크칸을 한 번 눌러 주세요.", "warning");
       return;
     }
+    // [2026-09-04 사장님 승인 · 선물 배송지 가드] 지난번 선물 주소가 남아 내 주문이 남의 집으로 가는 사고 방지.
+    //   받는 분 이름이 주문자와 다르면 제출 전 딱 한 번 확인 — 표시 전용, 어떤 데이터도 안 바꾼다.
+    //   확인창이 어떤 이유로든 실패하면 기존 흐름 그대로 제출(fail-open) — 주문을 막는 일은 없다.
+    try {
+      const giftRecipient = recipientName.trim();
+      const ordererName = customerName.trim();
+      if (giftRecipient && ordererName && giftRecipient.replace(/\s+/g, "") !== ordererName.replace(/\s+/g, "")) {
+        const giftAddress = [address.trim(), detailAddress.trim()].filter(Boolean).join(" ");
+        const proceed = window.confirm(
+          `받는 분이 주문자와 달라요.\n\n받는 분: ${giftRecipient}${recipientPhone.trim() ? ` (${formatPhone(recipientPhone)})` : ""}\n주소: ${giftAddress}\n\n선물 등 이분께 보내는 주문이 맞으면 [확인],\n내가 받을 주문이면 [취소]를 눌러 배송지를 바꿔주세요.`,
+        );
+        if (!proceed) {
+          openCustomerInfoEditBottomSheet("shipping_list");
+          return;
+        }
+      }
+    } catch { /* 확인창 실패 → 기존 흐름 그대로 */ }
     void submitOrder();
   };
 
