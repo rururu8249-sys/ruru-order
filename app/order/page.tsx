@@ -6263,6 +6263,9 @@ export default function OrderPage() {
                       // [2026-09-03 재설계 5단계] ✨NEW 자동 — 등록 7일 이내면 뱃지를 안 골라도 자동 표시(표시 전용)
                       const createdMsForNew = Date.parse(String((product as any).created_at || ""));
                       const autoNew = Number.isFinite(createdMsForNew) && Date.now() - createdMsForNew < 7 * 24 * 60 * 60 * 1000;
+                      // [2026-09-03 재설계 5단계-2] 🔥HOT 자동 — 지금 다른 손님들이 담아둔 수량(실시간 홀드)이 3개 이상이면
+                      //   "주문 몰림"으로 보고 자동 표시. 표시 전용 — 저장·재고·주문 로직과 무관.
+                      const autoHot = Number(reservedByProduct[String(product.id ?? "")] || 0) >= 3;
                       return (
                         <div
                           key={String(product.id)}
@@ -6321,7 +6324,7 @@ export default function OrderPage() {
                             <div style={{ display: "flex", gap: "4px", marginBottom: "4px", flexWrap: "wrap" }}>
                               {!isBroadcastOn && pinned ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#7A1E47", borderRadius: "5px", padding: "2px 6px" }}>📌 추천</span> : null}
                               {badges.includes("new") || autoNew ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#0F6E56", background: "#E7F3EE", borderRadius: "5px", padding: "2px 6px" }}>NEW</span> : null}
-                              {badges.includes("hot") ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>HOT</span> : null}
+                              {badges.includes("hot") || autoHot ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>HOT</span> : null}
                               {badges.includes("special") ? <span style={{ fontSize: "10px", fontWeight: 900, color: "#9A6212", background: "#FFF4D6", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>⚡특가</span> : null}
                               {badges.includes("limit") ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#854F0B", background: "#FBF1E0", borderRadius: "5px", padding: "2px 6px" }}>마감임박</span> : null}
                               {!sold ? (() => {
