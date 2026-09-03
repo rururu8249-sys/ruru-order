@@ -48,6 +48,8 @@ type BrandDetailEditDraft = {
   hidden: boolean;
   photos: string[];
   variants: Array<{ color: string; size: string }>;
+  colorsText: string;   // [2026-09-03] 본문 옵션과 같은 쉼표 입력 — 조합은 적용 시 자동 생성
+  sizesText: string;
 };
 
 // [2026-08-11 사장님 지침] 라벨 드롭다운(맛/용량/브랜드) 제거 — 실제로 쓸 일이 없고 방송 중 고를 게 하나 더 늘 뿐.
@@ -1221,6 +1223,8 @@ export default function QuickProductFastForm({
       hidden: detailHidden.includes(name),
       photos: [...(brandGroupDetailPhotoSets[name] || (detailPhotos[name] ? [detailPhotos[name]] : []))],
       variants,
+      colorsText: (config.colors || []).filter((v) => v !== "없음").join(", "),
+      sizesText: (config.sizes || []).filter((v) => v !== "없음").join(", "),
     });
   };
 
@@ -1241,6 +1245,8 @@ export default function QuickProductFastForm({
       hidden: false,
       photos: [],
       variants,
+      colorsText: (sample?.colors || []).filter((v) => v !== "없음").join(", "),
+      sizesText: (sample?.sizes || []).filter((v) => v !== "없음").join(", "),
     });
   };
 
@@ -1257,21 +1263,13 @@ export default function QuickProductFastForm({
       return;
     }
     const isNewDetail = !oldName;
-    // [2026-09-03] 같은 조합·의미 없는 없음/없음 중복은 에러 대신 조용히 정리 — 사장님이 [＋ 줄 추가]를
-    //   여러 번 눌러도 사고 없이 동작 (저장 형태는 동일: 존재하는 조합만 한 줄씩)
-    let nextVariants = brandDetailEditDraft.variants.map((variant) => ({
-      color: String(variant.color || "").trim() || "없음",
-      size: String(variant.size || "").trim() || "없음",
-    }));
-    const seenCombo = new Set<string>();
-    nextVariants = nextVariants.filter((variant) => {
-      const key = `${variant.color}|${variant.size}`;
-      if (seenCombo.has(key)) return false;
-      seenCombo.add(key);
-      return true;
-    });
-    if (nextVariants.length > 1) nextVariants = nextVariants.filter((v) => !(v.color === "없음" && v.size === "없음"));
-    if (nextVariants.length === 0) nextVariants = [{ color: "없음", size: "없음" }];
+    // [2026-09-03 사장님 확정] 본문·표와 같은 방식: 색상/사이즈를 쉼표로 적으면 조합은 자동 생성.
+    //   (표 인라인 수정(setDetailAxisValues)과 동일 규칙 — 기존 수량은 아래에서 조합 키로 살린다)
+    const colorsList = unique(splitOptions(brandDetailEditDraft.colorsText)).filter((v) => v && v !== "없음");
+    const sizesList = unique(splitOptions(brandDetailEditDraft.sizesText)).filter((v) => v && v !== "없음");
+    const nextVariants = (colorsList.length ? colorsList : ["없음"]).flatMap((c) =>
+      (sizesList.length ? sizesList : ["없음"]).map((sz) => ({ color: c, size: sz })),
+    );
 
     const moveKey = <T,>(source: Record<string, T>, value: T | undefined) => {
       const next = { ...source };
@@ -1988,16 +1986,6 @@ export default function QuickProductFastForm({
                 </div>
               </div>
 
-              {/* [2026-09-03 사장님 요청] 손님 입력칸의 제목을 사장님이 정한다 (예: 상품숫자).
-                  색상에 실제 옵션값이 없을 때(비움 또는 "없음") 항상 노출 —
-                  제목을 적으면 색상·사이즈를 "없음"으로 꺼놔도 손님에게 이 제목의 입력칸이 나간다. */}
-              {!brandGroupActive && splitOptions(colorText).every((x) => x === "없음") ? (
-                <div style={{ ...optRow, background: "#FFFDF5", border: "1px dashed #E2B64D", borderRadius: "8px", padding: "7px 9px" }}>
-                  <span style={{ ...optLabel, color: "#9A6212" }}>✏️ 칸 제목</span>
-                  <input style={optInput} type="text" placeholder="예: 상품숫자 — 적으면 손님에게 이 제목의 입력칸이 나갑니다" value={customInputLabel} onChange={(e) => { setFormTouched(true); setCustomInputLabel(e.target.value); }} />
-                  <span style={{ fontSize: "11px", fontWeight: 700, color: "#9A6212", whiteSpace: "nowrap" }}>{customInputLabel.trim() ? "🚫 안 써요여도 이 칸은 나가요" : "비우면 「색상」"}</span>
-                </div>
-              ) : null}
 
               {/* 슬롯 3 — 사이즈 */}
               <div style={brandGroupActive ? { ...optRow, display: "none" } : optRow}>
@@ -2032,6 +2020,17 @@ export default function QuickProductFastForm({
                   예전: 카드 클릭 → 창 뜸 → 고침 → [변경내용 적용] → 창 닫음 → 또 [저장]  (상품 20개면 20번)
                   지금: 표에서 칸을 누르면 그 자리에서 고쳐진다. 창은 색상·사이즈를 세밀하게 손볼 때만 연다.
                   저장되는 형태는 창에서 고칠 때와 완전히 동일하다. */}
+              {/* [2026-09-03 사장님 요청] 손님 입력칸의 제목을 사장님이 정한다 (예: 상품숫자).
+                  색상에 실제 옵션값이 없을 때(비움 또는 "없음") 항상 노출 —
+                  제목을 적으면 색상·사이즈를 "없음"으로 꺼놔도 손님에게 이 제목의 입력칸이 나간다. */}
+              {!brandGroupActive && splitOptions(colorText).every((x) => x === "없음") ? (
+                <div style={{ ...optRow, background: "#FFFDF5", border: "1px dashed #E2B64D", borderRadius: "8px", padding: "7px 9px" }}>
+                  <span style={{ ...optLabel, color: "#9A6212" }}>✏️ 칸 제목</span>
+                  <input style={optInput} type="text" placeholder="예: 상품숫자 — 적으면 손님에게 이 제목의 입력칸이 나갑니다" value={customInputLabel} onChange={(e) => { setFormTouched(true); setCustomInputLabel(e.target.value); }} />
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: "#9A6212", whiteSpace: "nowrap" }}>{customInputLabel.trim() ? "🚫 안 써요여도 이 칸은 나가요" : "비우면 「색상」"}</span>
+                </div>
+              ) : null}
+
               {/* [2026-09-03 화면 통합] 세부상품 진입로 — 넣는 순간 자동으로 묶음 상품이 된다 (갈래 선택 없음) */}
               <input
                 ref={bulkRowPhotoInputRef}
@@ -2996,7 +2995,7 @@ export default function QuickProductFastForm({
                 <label style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>상품명
                   <input value={brandDetailEditDraft.name} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, name: event.target.value } : prev)} style={{ ...fieldInput, marginTop: "4px" }} />
                 </label>
-                <label style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>상품구분 <span style={{ fontWeight: 700 }}>(선택 — 상의/하의 필터용)</span>
+                <label style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>상품구분 <span style={{ fontWeight: 700 }}>(선택)</span>
                   <input value={brandDetailEditDraft.category} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, category: event.target.value } : prev)} placeholder="상의, 하의, 세트…" style={{ ...fieldInput, marginTop: "4px" }} />
                 </label>
               </div>
@@ -3042,19 +3041,18 @@ export default function QuickProductFastForm({
               </div>
 
               <div style={{ marginTop: "14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-ink)" }}>색상·사이즈 <span style={{ fontWeight: 700, color: "var(--color-ink-mute)" }}>— 이 상품에 있을 때만 · 없으면 그냥 두세요</span></span>
-                <button type="button" onClick={() => setBrandDetailEditDraft((prev) => prev ? { ...prev, variants: [...prev.variants, { color: "없음", size: "없음" }] } : prev)} style={{ border: "1px solid #D9C5CC", borderRadius: "7px", background: "#fff", color: "#7B2D43", padding: "5px 9px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>＋ 줄 추가</button>
+                <span style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-ink)" }}>색상·사이즈 <span style={{ fontWeight: 700, color: "var(--color-ink-mute)" }}>— 이 상품에 있을 때만 · 없으면 비워두세요</span></span>
               </div>
-              <div style={{ marginTop: "7px", display: "grid", gap: "6px", maxHeight: "280px", overflowY: "auto" }}>
-                {brandDetailEditDraft.variants.map((variant, index) => (
-                  <div key={`edit-variant-${index}`} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 34px", gap: "6px", alignItems: "center" }}>
-                    <input aria-label={`색상 ${index + 1}`} value={variant.color} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, variants: prev.variants.map((item, itemIndex) => itemIndex === index ? { ...item, color: event.target.value } : item) } : prev)} placeholder="예: 블랙 (없으면 없음)" style={fieldInput} />
-                    <input aria-label={`사이즈 ${index + 1}`} value={variant.size} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, variants: prev.variants.map((item, itemIndex) => itemIndex === index ? { ...item, size: event.target.value } : item) } : prev)} placeholder="예: 230 (없으면 없음)" style={fieldInput} />
-                    <button type="button" disabled={brandDetailEditDraft.variants.length <= 1} onClick={() => setBrandDetailEditDraft((prev) => prev ? { ...prev, variants: prev.variants.filter((_, itemIndex) => itemIndex !== index) } : prev)} style={{ height: "34px", border: "none", borderRadius: "7px", background: "#FBEAE7", color: "#C0392B", cursor: brandDetailEditDraft.variants.length <= 1 ? "default" : "pointer", opacity: brandDetailEditDraft.variants.length <= 1 ? 0.4 : 1 }}>×</button>
-                  </div>
-                ))}
+              {/* [2026-09-03 사장님 확정] 본문 옵션과 같은 형식 — 쉼표로 여러 개, 조합·재고 줄은 자동 */}
+              <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ width: "44px", fontSize: "12px", fontWeight: 900, color: "var(--color-ink-mute)", flexShrink: 0 }}>색상</span>
+                <input value={brandDetailEditDraft.colorsText} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, colorsText: event.target.value } : prev)} placeholder="화이트, 블랙, 베이지 (쉼표로 여러 개)" style={fieldInput} />
               </div>
-              <div style={{ marginTop: "7px", fontSize: "10.5px", color: "var(--color-ink-mute)" }}>색상·사이즈가 있으면 실제 있는 조합만 한 줄씩 (블랙·230, 블랙·240…) · 없으면 이대로 두면 됩니다</div>
+              <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ width: "44px", fontSize: "12px", fontWeight: 900, color: "var(--color-ink-mute)", flexShrink: 0 }}>사이즈</span>
+                <input value={brandDetailEditDraft.sizesText} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, sizesText: event.target.value } : prev)} placeholder="220, 230, 240 (쉼표로 여러 개)" style={fieldInput} />
+              </div>
+              <div style={{ marginTop: "7px", fontSize: "10.5px", color: "var(--color-ink-mute)" }}>조합과 재고 줄은 자동으로 만들어져요 (기존 수량 유지) · 둘 다 비우면 옵션 없는 상품</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", padding: "11px 16px", borderTop: "1px solid #E8E2DD", background: "#F7F5F3", flexWrap: "wrap" }}>
               {/* 새로 만드는 중일 때는 지울 게 없으므로 삭제 버튼을 숨긴다 */}
