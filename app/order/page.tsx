@@ -740,6 +740,9 @@ function getRegisteredOptionMode(product: BroadcastProduct, field: "color" | "si
   //   단 [2026-08-10 3단]은 세부상품이 별도 축이라 color/size 는 아래 일반 로직으로 정상 판정한다.
   if (readComboInfoOrderProduct(product) && !readOrderAxes3(product)) return field === "color" ? "select" : "none";
   if (getSelectableRegisteredOptions(product, field).length > 0) return "select";
+  // [2026-09-03 사장님 요청] 사장님이 칸 제목을 정해둔 상품(예: 상품숫자)은
+  //   색상·사이즈를 "없음"으로 꺼놨어도 그 제목의 직접입력 칸을 반드시 띄운다.
+  if (field === "color" && getCustomInputLabel(product)) return "input";
   // field별 독립 판단: color는 color_option_enabled, size는 size_option_enabled
   const record = product as unknown as Record<string, unknown>;
   const note = (parseProductSuggestionNote(product.product_note) || {}) as Record<string, unknown>;
