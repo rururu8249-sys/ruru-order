@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { assertValidCustomerPointPhone } from "@/lib/customerPoints";
 import { registeredProductPriceMode, registeredProductSubmittedPriceValid } from "@/lib/registeredProductPricePolicy";
 import { buildYoutubeOrderAnnouncementMessages } from "@/lib/orderYoutubeAnnouncement";
+import { buildCartHoldSnapshotItem } from "@/lib/cartHoldDetail";
 import { koreanPhoneVariants } from "@/lib/order/phone";
 import {
   canonicalCustomerDetailProductName,
@@ -683,6 +684,32 @@ export async function POST(request: NextRequest) {
       if (kakaoError) {
         console.warn("kakao_id 저장 실패(주문은 정상 저장됨):", kakaoError.message);
       }
+    }
+
+    // [2026-09-04 사장님 승인 · 유령 담기 홀드 정리] 제출 성공 시, 같은 전화번호가 "다른 브라우저(다른 세션키)"로
+    //   잡아둔 방금 주문한 그 상품·옵션의 담기 홀드도 함께 해제한다.
+    //   실사고(HHpark/박민주): 카카오 인앱↔기본 브라우저로 세션키가 갈라져, 제출해도 옛 세션의 담김이
+    //   유령으로 남아 「N개 남음」·담기 선착순 표시에 끼었다. RPC의 세션키 해제는 그대로, 여기는 추가 정리만.
+    //   표시용 선점 테이블(cart_reservations)만 삭제 — 주문 RPC·재고 차감·돈 로직 무접촉. 실패해도 주문 성공 유지.
+    //   비교 값은 담을 때와 같은 정규화(buildCartHoldSnapshotItem: 없음→"", trim)라서 형식이 정확히 일치한다.
+    try {
+      const holdPhone = String(phone || "").replace(/[^0-9]/g, "");
+      if (holdPhone.length >= 9) {
+        for (const row of orderRows) {
+          const snap = buildCartHoldSnapshotItem(row as Record<string, unknown>);
+          if (!snap.productId) continue; // 직접입력 상품(product_id 없음)은 홀드도 없다
+          const { error: holdError } = await supabase
+            .from("cart_reservations")
+            .delete()
+            .in("customer_phone", koreanPhoneVariants(holdPhone))
+            .eq("product_id", snap.productId)
+            .eq("color", snap.color)
+            .eq("size", snap.size);
+          if (holdError) console.warn("유령 담기 홀드 정리 실패(주문은 정상):", holdError.message);
+        }
+      }
+    } catch (holdCleanupError) {
+      console.warn("유령 담기 홀드 정리 실패(주문은 정상):", (holdCleanupError as Error)?.message);
     }
 
     // 유튜브 라이브 채팅 자동 게시(자동알림 ON일 때만). 주문 저장 완료 후 응답과 별개로 실행 →
