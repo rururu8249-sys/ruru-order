@@ -1653,6 +1653,10 @@ export default function QuickProductFastForm({
         : "group_buy";
 
     if (!name) {
+      if (brandGroupNew && !isEditMode) {
+        showAdminToast("브랜드 이름(한글)을 입력해 주세요.\n(묶음 이름이 곧 손님 목록 제목이 됩니다)", "error");
+        return;
+      }
       setNameError(true);
       return;
     }
@@ -2046,7 +2050,8 @@ export default function QuickProductFastForm({
               )}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              <div>
+              <div style={brandGroupNew && !isEditMode ? { display: "none" } : undefined}>
+                {/* [2026-09-03] 묶음 신규는 브랜드 이름 = 상품명 자동 — 같은 이름 두 번 안 치게 칸 자체를 숨긴다 */}
                 <label style={fieldLabel}>상품명 <span style={{ color: "var(--color-rose-deep)", marginLeft: "2px" }}>*</span></label>
                 <input
                   style={{ ...fieldInput, borderColor: nameError ? "#C0392B" : "#E8E2DD" }}
@@ -2190,13 +2195,6 @@ export default function QuickProductFastForm({
                 <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>{brandGroupActive ? "색상·사이즈·가격은 세부상품마다 따로" : "값 넣으면 고르기 · 비우면 손님 직접입력"}</span>
               </div>
 
-              {brandGroupActive ? (
-                <div style={{ padding: "9px 10px", marginBottom: "8px", borderRadius: "8px", background: "#EEF6F3", border: "1px solid #CFE4DB", fontSize: "11.5px", lineHeight: 1.55, color: "#0F6E56" }}>
-                  <b>브랜드 대표상품 · 세부상품 {details.length}개</b><br />
-                  색상과 사이즈는 상품마다 다르게 저장되어 있어요. 아래 목록에는 각 상품에 실제 등록된 옵션만 표시됩니다.
-                </div>
-              ) : null}
-
               {/* 슬롯 1 — 세부상품(라벨 변경 가능). A-1 / A-2 / A-3 처럼 한 상품 안의 여러 상품 */}
               <div style={brandGroupActive ? { ...optRow, display: "none" } : optRow}>
                 <span style={optLabel}>세부상품</span>
@@ -2318,11 +2316,17 @@ export default function QuickProductFastForm({
 
                   {details.length === 0 ? (
                     <div style={{ padding: "20px 14px", textAlign: "center", border: "2px dashed #D9C5CC", borderRadius: "11px", background: "var(--color-surface)" }}>
-                      <div style={{ fontSize: "13px", fontWeight: 900, color: "#7B2D43" }}>세부상품 만드는 법 (딱 3단계)</div>
-                      <div style={{ marginTop: "6px", fontSize: "11.5px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.8, textAlign: "left", display: "inline-block" }}>
-                        ① 위 분홍 칸에 <b>사진을 몽땅 끌어다 놓으면</b> 사진 수만큼 상품 줄이 생깁니다 (파일 이름 = 상품명)<br />
-                        ② 줄에서 <b>판매가</b>만 채우세요 — 색상·사이즈가 있으면 그 줄을 눌러서 넣습니다<br />
-                        ③ 아래 <b>[등록]</b>을 누르면 끝 · 사진 없이 만들려면 [＋ 세부상품 추가]
+                      <div style={{ fontSize: "13px", fontWeight: 900, color: "#7B2D43" }}>세부상품 넣기 — 둘 중 편한 방법으로</div>
+                      <div style={{ marginTop: "9px", display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "center" }}>
+                        <button
+                          type="button"
+                          onClick={(event) => { event.stopPropagation(); openBrandDetailEditorForNew(); }}
+                          style={{ border: "none", borderRadius: "10px", background: "#7B2D43", color: "#fff", padding: "11px 18px", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}
+                        >＋ 이름으로 추가 (사진 없이)</button>
+                        <div style={{ alignSelf: "center", fontSize: "11.5px", fontWeight: 800, color: "var(--color-ink-mute)" }}>또는 위 분홍 칸에 사진 몽땅 끌어놓기</div>
+                      </div>
+                      <div style={{ marginTop: "8px", fontSize: "11px", fontWeight: 700, color: "#0F6E56" }}>
+                        사진 없이 이름만 넣어도 손님에게는 <b>상품명에 맞는 자동 그림</b>이 나갑니다 (화장품→화장품 그림)
                       </div>
                     </div>
                   ) : (
@@ -2430,7 +2434,13 @@ export default function QuickProductFastForm({
                                             <span style={{ position: "absolute", right: "2px", bottom: "2px", background: "rgba(0,0,0,0.72)", color: "#fff", fontSize: "8px", fontWeight: 900, borderRadius: "5px", padding: "1px 4px" }}>{photos.length}</span>
                                           ) : null}
                                         </>
-                                      ) : "＋"}
+                                      ) : (
+                                        /* [2026-09-03 사장님 요청] 사진 없어도 상품명 자동 그림 — 손님 화면과 동일. 클릭하면 사진 올리기 */
+                                        <>
+                                          <img src={productAutoThumbUrl(name, "") || productNameThumbnail(name)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                          <span style={{ position: "absolute", right: "2px", bottom: "2px", background: "rgba(123,45,67,0.85)", color: "#fff", fontSize: "8px", fontWeight: 900, borderRadius: "5px", padding: "1px 4px" }}>자동</span>
+                                        </>
+                                      )}
                                     </div>
                                   </td>
 
@@ -2542,8 +2552,7 @@ export default function QuickProductFastForm({
                   )}
 
                   <div style={{ marginTop: "7px", fontSize: "10.5px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.6 }}>
-                    사진칸: <b>끌어놓기</b> · <b>클릭</b>하면 여러 장 고르기 · <b>우클릭</b>하면 대표사진 빼기<br />
-                    <b>Ctrl+V</b>: 줄 위에 마우스를 올린 채 붙여넣으면 그 줄에, 그냥 붙여넣으면 새 줄이 생깁니다 · <b>⋯</b> 는 색상·사이즈 조합을 자세히 손볼 때
+                    사진칸: 끌어놓기·클릭·붙여넣기(Ctrl+V) 다 됩니다 · 우클릭=사진 빼기 · <b>⋯</b>=색상·사이즈 자세히
                   </div>
                 </div>
               ) : null}

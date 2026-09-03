@@ -7274,7 +7274,9 @@ export default function OrderPage() {
                           const cfg = registeredOptionBrandGroup?.detailOptions[name];
                           const knownColor = (cfg?.colors || []).map(v=>normalizeEmptyProductOptionValue(v)).find(Boolean) || "";
                           const priceView = detailPricePresentation(registeredOptionPrice, plus);
-                          return { selected, remain, soldOut, plus, priceView, gallery, cover: gallery[0] || "", knownColor, code: detailCode(name) };
+                          // [2026-09-03 사장님 요청] 세부상품도 사진 없으면 이름 인식 자동 그림 → 글자 카드 (표시 전용)
+                          const autoCover = gallery[0] ? "" : (productAutoThumbUrl(name, "") || productNameThumbnail(name));
+                          return { selected, remain, soldOut, plus, priceView, gallery: gallery.length ? gallery : [autoCover], cover: gallery[0] || autoCover, knownColor, code: detailCode(name) };
                         };
                         return (
                           <div style={{ display: "grid", gap: "9px" }}>
