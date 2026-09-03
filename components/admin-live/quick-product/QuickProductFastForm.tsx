@@ -1942,6 +1942,57 @@ export default function QuickProductFastForm({
         {/* .modal-body */}
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 18px" }}>
 
+          {/* [2026-09-03 재설계 2단계] 갈래 선택 — 맨 위에서 「단품 / 세부상품 묶음」 중 하나 (시안 ①②)
+              저장 값은 기존 brandGroupNew 그대로(카드가 스위치를 대신할 뿐, 저장 로직 무수정).
+              브랜드 묶음 상품 수정 중에는 갈래 변경 금지(끄면 손님 화면이 깨짐) — 안내만 표시. */}
+          {!isBrandGroupEdit ? (
+            <div style={{ marginBottom: "14px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "10px" }}>
+                <button type="button" onClick={() => { if (brandGroupNew) { setFormTouched(true); setBrandGroupNew(false); } }} style={{ textAlign: "left", border: !brandGroupNew ? "2.5px solid #7B2D43" : "1.5px solid #E8E2DD", background: !brandGroupNew ? "#F9EEF3" : "var(--color-surface)", borderRadius: "12px", padding: "12px 14px", cursor: "pointer" }}>
+                  <div style={{ fontSize: "14px", fontWeight: 900, color: !brandGroupNew ? "#7B2D43" : "var(--color-ink-mute)" }}>🧦 단품 상품</div>
+                  <div style={{ marginTop: "3px", fontSize: "11px", fontWeight: 700, color: !brandGroupNew ? "#5B4A50" : "var(--color-ink-mute)", lineHeight: 1.5 }}>상품 하나. 사진 넣고 이름·가격만.<br />옵션(색상·사이즈)은 필요할 때만.</div>
+                </button>
+                <button type="button" onClick={() => { if (!brandGroupNew) { setFormTouched(true); setBrandGroupNew(true); } }} style={{ textAlign: "left", border: brandGroupNew ? "2.5px solid #7B2D43" : "1.5px solid #E8E2DD", background: brandGroupNew ? "#F9EEF3" : "var(--color-surface)", borderRadius: "12px", padding: "12px 14px", cursor: "pointer" }}>
+                  <div style={{ fontSize: "14px", fontWeight: 900, color: brandGroupNew ? "#7B2D43" : "var(--color-ink-mute)" }}>🧥 세부상품 묶음</div>
+                  <div style={{ marginTop: "3px", fontSize: "11px", fontWeight: 700, color: brandGroupNew ? "#5B4A50" : "var(--color-ink-mute)", lineHeight: 1.5 }}>버버리·미우미우처럼 한 상품 안에<br />여러 개 (각자 사진·가격·색상·사이즈)</div>
+                </button>
+              </div>
+              {brandGroupNew ? (
+                <div style={{ marginTop: "10px", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "8px" }}>
+                  <div>
+                    <label style={fieldLabel}>브랜드 이름 (한글)</label>
+                    <input
+                      style={fieldInput}
+                      type="text"
+                      placeholder="예: 버버리"
+                      value={brandKoText}
+                      onChange={(e) => { setFormTouched(true); setBrandKoText(e.target.value); }}
+                    />
+                  </div>
+                  <div>
+                    <label style={fieldLabel}>브랜드 이름 (영문) <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(썸네일용·선택)</span></label>
+                    <input
+                      style={fieldInput}
+                      type="text"
+                      placeholder="예: BURBERRY"
+                      value={brandEnText}
+                      onChange={(e) => { setFormTouched(true); setBrandEnText(e.target.value); }}
+                    />
+                  </div>
+                  <div style={{ gridColumn: isMobile ? "auto" : "1 / -1", fontSize: "11px", fontWeight: 800, color: details.length === 0 ? "#C0392B" : "#0F6E56", lineHeight: 1.5 }}>
+                    {details.length === 0
+                      ? "· 아래 [세부상품 관리]의 [＋ 세부상품 추가]로 상품을 1개 이상 만들어야 저장됩니다."
+                      : `· 세부상품 ${details.length}개 등록됨. 대표사진은 브랜드 썸네일이 자동으로 들어갑니다.`}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div style={{ marginBottom: "14px", padding: "9px 12px", borderRadius: "10px", border: "1px solid #E7C9D4", background: "#FFF9FB", fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>
+              🧥 세부상품 묶음 상품 수정 중 — 갈래는 바꿀 수 없어요 (세부상품·사진은 아래에서 그대로 고칩니다)
+            </div>
+          )}
+
           {/* .top-row : 사진(120) + 필드 */}
           <div style={{ display: "grid", gridTemplateColumns: (isMobile || !brandGroupActive) ? "1fr" : "120px 1fr", gap: "14px", marginBottom: "14px" }}>
             {/* [2026-08-29] 모바일에선 1열로 떨어지는데 폭이 120px 로 고정돼 있어 화면이 어색했다 */}
@@ -2029,58 +2080,6 @@ export default function QuickProductFastForm({
               </div>
             </div>
           </div>
-
-          {/* [2026-08-29 사장님 요청] 브랜드 묶음 상품 만들기
-              예전에는 엑셀 대량등록으로만 만들 수 있었다(폼은 수정 전용).
-              → 여기서 켜면 세부상품마다 사진·가격·색상·사이즈를 따로 넣는 브랜드 상품이 된다.
-              이미 브랜드 상품을 수정 중일 때는 이 스위치를 보여주지 않는다(끄면 손님 화면이 깨지므로). */}
-          {!isBrandGroupEdit ? (
-            <div style={{ marginBottom: "14px", border: `1px solid ${brandGroupNew ? "#7B2D43" : "#E8E2DD"}`, borderRadius: "10px", background: brandGroupNew ? "#FFF9FB" : "var(--color-surface)", padding: "10px 12px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: "13px", fontWeight: 900, color: "var(--color-ink)" }}>브랜드 묶음 상품</div>
-                  <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "2px", lineHeight: 1.5 }}>
-                    한 브랜드 아래에 <b>여러 상품</b>을 넣고, 상품마다 <b>사진·가격·색상·사이즈를 따로</b> 정합니다.
-                    <br />손님은 <b>브랜드 → 상품 → 색상 → 사이즈</b> 순으로 고릅니다. (버버리·몽클레어처럼)
-                  </div>
-                </div>
-                <div
-                  onClick={() => { setFormTouched(true); setBrandGroupNew((v) => !v); }}
-                  style={tgStyle(brandGroupNew)}
-                ><span style={tgKnob(brandGroupNew)} /></div>
-              </div>
-
-              {brandGroupNew ? (
-                <div style={{ marginTop: "10px", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "8px" }}>
-                  <div>
-                    <label style={fieldLabel}>브랜드 이름 (한글)</label>
-                    <input
-                      style={fieldInput}
-                      type="text"
-                      placeholder="예: 버버리"
-                      value={brandKoText}
-                      onChange={(e) => { setFormTouched(true); setBrandKoText(e.target.value); }}
-                    />
-                  </div>
-                  <div>
-                    <label style={fieldLabel}>브랜드 이름 (영문) <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(썸네일용·선택)</span></label>
-                    <input
-                      style={fieldInput}
-                      type="text"
-                      placeholder="예: BURBERRY"
-                      value={brandEnText}
-                      onChange={(e) => { setFormTouched(true); setBrandEnText(e.target.value); }}
-                    />
-                  </div>
-                  <div style={{ gridColumn: isMobile ? "auto" : "1 / -1", fontSize: "11px", fontWeight: 800, color: details.length === 0 ? "#C0392B" : "#0F6E56", lineHeight: 1.5 }}>
-                    {details.length === 0
-                      ? "· 아래 [세부상품 관리]의 [＋ 세부상품 추가]로 상품을 1개 이상 만들어야 저장됩니다."
-                      : `· 세부상품 ${details.length}개 등록됨. 대표사진은 브랜드 썸네일이 자동으로 들어갑니다.`}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
 
           {/* [2026-08-29 사장님 요청] 손님 화면 미리보기
               예전에는 등록을 마치고 주문서를 직접 열어봐야 어떻게 보이는지 알 수 있었다.
