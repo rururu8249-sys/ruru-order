@@ -2169,183 +2169,6 @@ export default function QuickProductFastForm({
             })() : null}
           </div>
 
-          {/* [2026-08-11] 카테고리·뱃지는 기본 접힘 — 방송 중엔 옵션·재고가 먼저 보이게 */}
-          {!extraOpen ? (
-            <div style={{ marginBottom: "12px" }}>
-              <button
-                type="button"
-                onClick={() => setExtraOpen(true)}
-                style={{ width: "100%", padding: "9px", border: "1px dashed #D9C5CC", background: "var(--color-surface)", color: "#7B2D43", fontSize: "12px", fontWeight: 800, borderRadius: "8px", cursor: "pointer" }}
-              >
-                ⚙ 고급 설정 — 카테고리 · 뱃지 · 구매제한 · 상세설명 {(() => { const parts = [category.trim(), category.trim() && !customerCategoryVisible ? "고객 버튼 숨김" : "", badgeTypes.length ? `뱃지 ${badgeTypes.length}` : "", purchaseLimitEnabled ? `1인 ${purchaseLimitText}개` : "", customerDetailInputEnabled && !customerDetailInputUnavailable ? "직접입력 ON" : "", description.trim() ? "상세설명 ✓" : ""].filter(Boolean); return parts.length ? `(${parts.join(" · ")})` : "(선택)"; })()}
-              </button>
-            </div>
-          ) : null}
-
-          {extraOpen ? (
-          <>
-          <div style={{ marginBottom: "8px", textAlign: "right" }}>
-            <button
-              type="button"
-              onClick={() => setExtraOpen(false)}
-              style={{ padding: "5px 12px", border: "1px solid #D9C5CC", background: "var(--color-surface)", color: "#7B2D43", fontSize: "11px", fontWeight: 800, borderRadius: "7px", cursor: "pointer" }}
-            >
-              − 접기
-            </button>
-          </div>
-          {/* 카테고리 */}
-          <div style={{ marginBottom: "14px" }}>
-            <div style={sectionLabel}>카테고리</div>
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-              {categoryChips.map((c) => {
-                const on = category === c;
-                const isCustom = !PRESET_CATEGORIES.includes(c);
-                return (
-                  <div
-                    key={c}
-                    onClick={() => setCategory((cur) => (cur === c ? "" : c))}
-                    style={{ padding: "6px 13px", borderRadius: "20px", border: "1px solid " + (on ? "#D9C5CC" : "#E8E2DD"), fontSize: "12px", cursor: "pointer", color: on ? "#7B2D43" : "#888780", background: on ? "#F5E6EB" : "#fff", fontWeight: on ? 500 : 400, display: "flex", alignItems: "center", gap: "4px" }}
-                  >
-                    {c}
-                    {isCustom ? (
-                      <span onClick={(e) => { e.stopPropagation(); removeCustomCategory(c); }} style={{ fontSize: "14px", color: "var(--color-rose-deep)", lineHeight: 1, marginLeft: "2px" }}>×</span>
-                    ) : null}
-                  </div>
-                );
-              })}
-              {!addingCategory ? (
-                <div onClick={() => setAddingCategory(true)} style={{ padding: "6px 13px", borderRadius: "20px", border: "1px dashed #E8E2DD", fontSize: "12px", cursor: "pointer", color: "var(--color-ink-mute)", background: "var(--color-surface)" }}>+ 추가</div>
-              ) : null}
-            </div>
-            {addingCategory ? (
-              <div style={{ display: "flex", gap: "6px", marginTop: "6px", alignItems: "center" }}>
-                <input
-                  autoFocus
-                  placeholder="카테고리명"
-                  value={newCategoryText}
-                  onChange={(e) => setNewCategoryText(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); confirmAddCategory(); } }}
-                  style={{ flex: 1, fontSize: "13px", padding: "7px 10px", border: "1px solid #7B2D43", borderRadius: "7px", outline: "none" }}
-                />
-                <button type="button" onClick={confirmAddCategory} style={{ padding: "7px 12px", borderRadius: "7px", background: "#7B2D43", color: "#fff", border: "none", fontSize: "12px", cursor: "pointer" }}>확인</button>
-                <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryText(""); }} style={{ padding: "7px 10px", borderRadius: "7px", border: "1px solid #E8E2DD", background: "var(--color-surface)", fontSize: "12px", cursor: "pointer", color: "var(--color-ink-mute)" }}>취소</button>
-              </div>
-            ) : null}
-            <label
-              style={{
-                marginTop: "10px",
-                padding: "10px 12px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "12px",
-                border: "1px solid #E8E2DD",
-                borderRadius: "9px",
-                background: "#FFFCFD",
-                cursor: "pointer",
-              }}
-            >
-              <span style={{ minWidth: 0 }}>
-                <span style={{ display: "block", fontSize: "12px", fontWeight: 800, color: "#49363D" }}>고객 카테고리 버튼에 표시</span>
-                <span style={{ display: "block", marginTop: "2px", fontSize: "11px", lineHeight: 1.45, color: "var(--color-ink-mute)" }}>
-                  꺼도 상품은 ‘전체’ 목록에서 정상적으로 보여요.
-                </span>
-              </span>
-              <input
-                type="checkbox"
-                checked={customerCategoryVisible}
-                onChange={(event) => setCustomerCategoryVisible(event.target.checked)}
-                aria-label="고객 카테고리 버튼에 표시"
-                style={{ width: "20px", height: "20px", flexShrink: 0, accentColor: "#7A1E47", cursor: "pointer" }}
-              />
-            </label>
-          </div>
-
-          {/* 상품 뱃지 */}
-          <div style={{ marginBottom: "14px" }}>
-            <div style={sectionLabel}>상품 뱃지</div>
-            <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginBottom: "6px", lineHeight: 1.6 }}>
-              손님 상품 목록에 표시되는 뱃지 · <b style={{ color: "#0F6E56" }}>✨NEW는 등록 후 7일 동안 자동으로 붙고, 재고가 적으면 「N개 남음」이 자동 표시</b>돼요 — 뱃지는 강조하고 싶을 때만 누르세요.
-              <br />🛒 바로구매 · ✈️ 해외배송은 구매·배송 방식과 직결이라 <b>자동으로 절대 안 붙습니다(사장님 수동 전용)</b>.
-            </div>
-            <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}`}</style>
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-              {/* [2026-07-10] 해외배송 배지 추가 (표시 전용 — 배송비/배송 로직과 무관) */}
-              {([["none", "없음"], ["new", "✨ NEW"], ["hot", "🔥 HOT"], ["special", "⚡ 특가"], ["limit", "⏰ 마감임박"], ["pick", "💖 루루픽"], ["direct", "🛒 바로구매"], ["overseas", "✈️ 해외배송"]] as const).map(([v, l]) => {
-                const on = v === "none" ? badgeTypes.length === 0 : badgeTypes.includes(v);
-                return (
-                  <div
-                    key={v}
-                    onClick={() =>
-                      v === "none"
-                        ? setBadgeTypes([])
-                        : setBadgeTypes((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]))
-                    }
-                    style={{ padding: "6px 12px", borderRadius: "8px", border: "1px solid " + (on ? "#7A1E47" : "#E5E1DC"), fontSize: "12px", fontWeight: 600, cursor: "pointer", color: on ? "#fff" : "#6B6460", background: on ? "#7A1E47" : "#fff", animation: v === "hot" ? "shimmer 1.5s ease-in-out infinite" : undefined }}
-                  >
-                    {l}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          {/* [2026-09-03 재설계 6단계] 방송 중 안 만지는 것들을 ⚙ 고급 설정 안으로 — 기능은 전부 그대로 */}
-          <div style={{ marginBottom: "14px" }}>
-            <div style={{ ...toggleRow, opacity: customerDetailInputUnavailable ? 0.55 : 1 }}>
-              <div style={{ minWidth: 0, paddingRight: "10px" }}>
-                <div style={{ fontSize: "13px", color: "var(--color-ink)", fontWeight: 800 }}>세부상품명 고객 직접입력</div>
-                <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "1px", lineHeight: 1.45 }}>
-                  {customerDetailInputUnavailable
-                    ? "등록된 세부상품 선택형에는 사용할 수 없음"
-                    : customerDetailInputEnabled
-                      ? "손님이 주문할 때 세부상품명을 직접 입력 · 주문서/송장/물건챙기기에 함께 표시"
-                      : "(끄면 세부상품명 직접입력 칸 없음)"}
-                </div>
-              </div>
-              <div
-                onClick={() => {
-                  if (customerDetailInputUnavailable) {
-                    showAdminToast("이미 등록된 세부상품을 고르는 상품에는 고객 직접입력을 함께 사용할 수 없어요.", "warning");
-                    return;
-                  }
-                  setCustomerDetailInputEnabled((v) => !v);
-                }}
-                style={tgStyle(!customerDetailInputUnavailable && customerDetailInputEnabled)}
-              ><span style={tgKnob(!customerDetailInputUnavailable && customerDetailInputEnabled)} /></div>
-            </div>
-
-            {/* 개인당 구매제한 (카톡 계정=전화번호 기준, 끌 때까지 계속 적용) */}
-            <div style={toggleRow}>
-              <div>
-                <div style={{ fontSize: "13px", color: "var(--color-ink)" }}>개인당 구매제한</div>
-                <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "1px" }}>{purchaseLimitEnabled ? "한 사람(카톡 계정)이 이 상품을 정해진 개수까지만" : "(끄면 제한 없음)"}</div>
-              </div>
-              <div onClick={() => setPurchaseLimitEnabled((v) => !v)} style={tgStyle(purchaseLimitEnabled)}><span style={tgKnob(purchaseLimitEnabled)} /></div>
-            </div>
-
-            {purchaseLimitEnabled ? (
-              <div style={{ background: "#F7F5F3", borderRadius: "8px", padding: "10px", marginTop: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "12px", color: "var(--color-ink)", flex: 1 }}>1인당 최대</span>
-                <input style={{ fontSize: "12px", padding: "5px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "80px" }} type="number" min={1} inputMode="numeric" value={purchaseLimitText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setPurchaseLimitText(e.target.value)} />
-                <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
-              </div>
-            ) : null}
-          </div>
-
-          {/* 상세설명 */}
-          <div style={{ marginBottom: "14px" }}>
-            <div style={sectionLabel}>상세설명</div>
-            <textarea
-              style={{ width: "100%", fontSize: "13px", padding: "10px 12px", border: "1px solid #E8E2DD", borderRadius: "8px", minHeight: "90px", resize: "vertical", background: "var(--color-surface)", fontFamily: "inherit", outline: "none" }}
-              placeholder="상품 상세 설명 (선택)"
-              value={description}
-              onChange={(e) => { setFormTouched(true); setDescription(e.target.value); }}
-            />
-          </div>
-
-          </>
-          ) : null}
-
           {/* ── 옵션 박스 [2026-08-10 통합] 탭 제거 · 슬롯 3개(세부상품/색상/사이즈) 중 쓰는 것만 축이 된다 ── */}
           <div style={{ marginBottom: "14px" }}>
             <div style={{ border: "1px solid #E8E2DD", borderRadius: "8px", padding: "12px", background: "#F7F5F3" }}>
@@ -2903,6 +2726,183 @@ export default function QuickProductFastForm({
 
           {/* 구분선 */}
           <div style={{ height: "1px", background: "#E8E2DD", margin: "12px 0" }} />
+          {/* [2026-09-03 재설계 순서 확정] ⚙ 고급 설정은 시안대로 맨 아래(등록 버튼 위) — 방송 중 쓰는 옵션·재고가 먼저 보이게 */}
+          {!extraOpen ? (
+            <div style={{ marginBottom: "12px" }}>
+              <button
+                type="button"
+                onClick={() => setExtraOpen(true)}
+                style={{ width: "100%", padding: "9px", border: "1px dashed #D9C5CC", background: "var(--color-surface)", color: "#7B2D43", fontSize: "12px", fontWeight: 800, borderRadius: "8px", cursor: "pointer" }}
+              >
+                ⚙ 고급 설정 — 카테고리 · 뱃지 · 구매제한 · 상세설명 {(() => { const parts = [category.trim(), category.trim() && !customerCategoryVisible ? "고객 버튼 숨김" : "", badgeTypes.length ? `뱃지 ${badgeTypes.length}` : "", purchaseLimitEnabled ? `1인 ${purchaseLimitText}개` : "", customerDetailInputEnabled && !customerDetailInputUnavailable ? "직접입력 ON" : "", description.trim() ? "상세설명 ✓" : ""].filter(Boolean); return parts.length ? `(${parts.join(" · ")})` : "(선택)"; })()}
+              </button>
+            </div>
+          ) : null}
+
+          {extraOpen ? (
+          <>
+          <div style={{ marginBottom: "8px", textAlign: "right" }}>
+            <button
+              type="button"
+              onClick={() => setExtraOpen(false)}
+              style={{ padding: "5px 12px", border: "1px solid #D9C5CC", background: "var(--color-surface)", color: "#7B2D43", fontSize: "11px", fontWeight: 800, borderRadius: "7px", cursor: "pointer" }}
+            >
+              − 접기
+            </button>
+          </div>
+          {/* 카테고리 */}
+          <div style={{ marginBottom: "14px" }}>
+            <div style={sectionLabel}>카테고리</div>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+              {categoryChips.map((c) => {
+                const on = category === c;
+                const isCustom = !PRESET_CATEGORIES.includes(c);
+                return (
+                  <div
+                    key={c}
+                    onClick={() => setCategory((cur) => (cur === c ? "" : c))}
+                    style={{ padding: "6px 13px", borderRadius: "20px", border: "1px solid " + (on ? "#D9C5CC" : "#E8E2DD"), fontSize: "12px", cursor: "pointer", color: on ? "#7B2D43" : "#888780", background: on ? "#F5E6EB" : "#fff", fontWeight: on ? 500 : 400, display: "flex", alignItems: "center", gap: "4px" }}
+                  >
+                    {c}
+                    {isCustom ? (
+                      <span onClick={(e) => { e.stopPropagation(); removeCustomCategory(c); }} style={{ fontSize: "14px", color: "var(--color-rose-deep)", lineHeight: 1, marginLeft: "2px" }}>×</span>
+                    ) : null}
+                  </div>
+                );
+              })}
+              {!addingCategory ? (
+                <div onClick={() => setAddingCategory(true)} style={{ padding: "6px 13px", borderRadius: "20px", border: "1px dashed #E8E2DD", fontSize: "12px", cursor: "pointer", color: "var(--color-ink-mute)", background: "var(--color-surface)" }}>+ 추가</div>
+              ) : null}
+            </div>
+            {addingCategory ? (
+              <div style={{ display: "flex", gap: "6px", marginTop: "6px", alignItems: "center" }}>
+                <input
+                  autoFocus
+                  placeholder="카테고리명"
+                  value={newCategoryText}
+                  onChange={(e) => setNewCategoryText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); confirmAddCategory(); } }}
+                  style={{ flex: 1, fontSize: "13px", padding: "7px 10px", border: "1px solid #7B2D43", borderRadius: "7px", outline: "none" }}
+                />
+                <button type="button" onClick={confirmAddCategory} style={{ padding: "7px 12px", borderRadius: "7px", background: "#7B2D43", color: "#fff", border: "none", fontSize: "12px", cursor: "pointer" }}>확인</button>
+                <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryText(""); }} style={{ padding: "7px 10px", borderRadius: "7px", border: "1px solid #E8E2DD", background: "var(--color-surface)", fontSize: "12px", cursor: "pointer", color: "var(--color-ink-mute)" }}>취소</button>
+              </div>
+            ) : null}
+            <label
+              style={{
+                marginTop: "10px",
+                padding: "10px 12px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "12px",
+                border: "1px solid #E8E2DD",
+                borderRadius: "9px",
+                background: "#FFFCFD",
+                cursor: "pointer",
+              }}
+            >
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: "block", fontSize: "12px", fontWeight: 800, color: "#49363D" }}>고객 카테고리 버튼에 표시</span>
+                <span style={{ display: "block", marginTop: "2px", fontSize: "11px", lineHeight: 1.45, color: "var(--color-ink-mute)" }}>
+                  꺼도 상품은 ‘전체’ 목록에서 정상적으로 보여요.
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                checked={customerCategoryVisible}
+                onChange={(event) => setCustomerCategoryVisible(event.target.checked)}
+                aria-label="고객 카테고리 버튼에 표시"
+                style={{ width: "20px", height: "20px", flexShrink: 0, accentColor: "#7A1E47", cursor: "pointer" }}
+              />
+            </label>
+          </div>
+
+          {/* 상품 뱃지 */}
+          <div style={{ marginBottom: "14px" }}>
+            <div style={sectionLabel}>상품 뱃지</div>
+            <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginBottom: "6px", lineHeight: 1.6 }}>
+              손님 상품 목록에 표시되는 뱃지 · <b style={{ color: "#0F6E56" }}>✨NEW는 등록 후 7일 동안 자동으로 붙고, 재고가 적으면 「N개 남음」이 자동 표시</b>돼요 — 뱃지는 강조하고 싶을 때만 누르세요.
+              <br />🛒 바로구매 · ✈️ 해외배송은 구매·배송 방식과 직결이라 <b>자동으로 절대 안 붙습니다(사장님 수동 전용)</b>.
+            </div>
+            <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}`}</style>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+              {/* [2026-07-10] 해외배송 배지 추가 (표시 전용 — 배송비/배송 로직과 무관) */}
+              {([["none", "없음"], ["new", "✨ NEW"], ["hot", "🔥 HOT"], ["special", "⚡ 특가"], ["limit", "⏰ 마감임박"], ["pick", "💖 루루픽"], ["direct", "🛒 바로구매"], ["overseas", "✈️ 해외배송"]] as const).map(([v, l]) => {
+                const on = v === "none" ? badgeTypes.length === 0 : badgeTypes.includes(v);
+                return (
+                  <div
+                    key={v}
+                    onClick={() =>
+                      v === "none"
+                        ? setBadgeTypes([])
+                        : setBadgeTypes((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]))
+                    }
+                    style={{ padding: "6px 12px", borderRadius: "8px", border: "1px solid " + (on ? "#7A1E47" : "#E5E1DC"), fontSize: "12px", fontWeight: 600, cursor: "pointer", color: on ? "#fff" : "#6B6460", background: on ? "#7A1E47" : "#fff", animation: v === "hot" ? "shimmer 1.5s ease-in-out infinite" : undefined }}
+                  >
+                    {l}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          {/* [2026-09-03 재설계 6단계] 방송 중 안 만지는 것들을 ⚙ 고급 설정 안으로 — 기능은 전부 그대로 */}
+          <div style={{ marginBottom: "14px" }}>
+            <div style={{ ...toggleRow, opacity: customerDetailInputUnavailable ? 0.55 : 1 }}>
+              <div style={{ minWidth: 0, paddingRight: "10px" }}>
+                <div style={{ fontSize: "13px", color: "var(--color-ink)", fontWeight: 800 }}>세부상품명 고객 직접입력</div>
+                <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "1px", lineHeight: 1.45 }}>
+                  {customerDetailInputUnavailable
+                    ? "등록된 세부상품 선택형에는 사용할 수 없음"
+                    : customerDetailInputEnabled
+                      ? "손님이 주문할 때 세부상품명을 직접 입력 · 주문서/송장/물건챙기기에 함께 표시"
+                      : "(끄면 세부상품명 직접입력 칸 없음)"}
+                </div>
+              </div>
+              <div
+                onClick={() => {
+                  if (customerDetailInputUnavailable) {
+                    showAdminToast("이미 등록된 세부상품을 고르는 상품에는 고객 직접입력을 함께 사용할 수 없어요.", "warning");
+                    return;
+                  }
+                  setCustomerDetailInputEnabled((v) => !v);
+                }}
+                style={tgStyle(!customerDetailInputUnavailable && customerDetailInputEnabled)}
+              ><span style={tgKnob(!customerDetailInputUnavailable && customerDetailInputEnabled)} /></div>
+            </div>
+
+            {/* 개인당 구매제한 (카톡 계정=전화번호 기준, 끌 때까지 계속 적용) */}
+            <div style={toggleRow}>
+              <div>
+                <div style={{ fontSize: "13px", color: "var(--color-ink)" }}>개인당 구매제한</div>
+                <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "1px" }}>{purchaseLimitEnabled ? "한 사람(카톡 계정)이 이 상품을 정해진 개수까지만" : "(끄면 제한 없음)"}</div>
+              </div>
+              <div onClick={() => setPurchaseLimitEnabled((v) => !v)} style={tgStyle(purchaseLimitEnabled)}><span style={tgKnob(purchaseLimitEnabled)} /></div>
+            </div>
+
+            {purchaseLimitEnabled ? (
+              <div style={{ background: "#F7F5F3", borderRadius: "8px", padding: "10px", marginTop: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "12px", color: "var(--color-ink)", flex: 1 }}>1인당 최대</span>
+                <input style={{ fontSize: "12px", padding: "5px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "80px" }} type="number" min={1} inputMode="numeric" value={purchaseLimitText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setPurchaseLimitText(e.target.value)} />
+                <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
+              </div>
+            ) : null}
+          </div>
+
+          {/* 상세설명 */}
+          <div style={{ marginBottom: "14px" }}>
+            <div style={sectionLabel}>상세설명</div>
+            <textarea
+              style={{ width: "100%", fontSize: "13px", padding: "10px 12px", border: "1px solid #E8E2DD", borderRadius: "8px", minHeight: "90px", resize: "vertical", background: "var(--color-surface)", fontFamily: "inherit", outline: "none" }}
+              placeholder="상품 상세 설명 (선택)"
+              value={description}
+              onChange={(e) => { setFormTouched(true); setDescription(e.target.value); }}
+            />
+          </div>
+
+          </>
+          ) : null}
+
 
           {/* 일반 상품 공통 상세사진 / 브랜드 대표상품은 위의 세부상품별 사진 목록으로 확인 */}
           {/* [2026-09-03 재설계 1단계] 단품 상세사진 섹션 제거 — 위 한 줄 10장으로 통합 */}
