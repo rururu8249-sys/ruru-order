@@ -21,6 +21,8 @@ type Props = {
   // [2026-08-31 사장님 요청] 등록상품 사진 — 있으면 작게 보여주고, 누르면 크게(부모가 띄움)
   imageUrl?: string | null;
   onImageClick?: (url: string) => void;
+  // [2026-09-03 사장님 요청] 칸 제목 상품(예: 상품번호)이면 색상 칸 라벨을 그 제목으로 — 표시 전용
+  colorLabel?: string;
 };
 
 function money(value: unknown) {
@@ -160,7 +162,7 @@ function updateForm<K extends keyof LiveOrderItemEditForm>(
   };
 }
 
-export default function LiveOrderItemEditCard({ item, index, disabled = false, onAfterSave, canDelete = false, deleting = false, onDelete, imageUrl = null, onImageClick }: Props) {
+export default function LiveOrderItemEditCard({ item, index, disabled = false, onAfterSave, canDelete = false, deleting = false, onDelete, imageUrl = null, onImageClick, colorLabel = "" }: Props) {
   const [editing, setEditing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [form, setForm] = useState(() => createInitialLiveOrderItemEditForm(item));
@@ -173,6 +175,13 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
   const countText = editCountText(item);
   const hasChangeHistory = Array.isArray(item.changeHistory) && item.changeHistory.length > 0;
   const inventoryLocked = isInventoryLockedItem(item);
+  // [2026-09-03] 칸 제목이 있으면 편집칸 라벨·접힌 줄 앞에 그 제목 표시(저장 필드는 color 그대로)
+  const colorFieldLabel = clean(colorLabel) || "색상";
+  const optionTextView = (() => {
+    const base = getOptionText(item);
+    if (!base) return "";
+    return clean(colorLabel) && formatOrderOptionText(item.color, "") ? `${clean(colorLabel)} ${base}` : base;
+  })();
 
   const cancelEdit = () => {
     setForm(createInitialLiveOrderItemEditForm(item));
@@ -220,12 +229,12 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
 
           <div className="grid grid-cols-1 gap-2">
             <label className="grid min-w-0 gap-1">
-              <span className="text-[11px] font-black text-ink-soft">색상</span>
+              <span className="text-[11px] font-black text-ink-soft">{colorFieldLabel}</span>
               <input
                 value={form.color}
                 onChange={(event) => setForm((prev) => updateForm(prev, "color", event.target.value))}
                 className="h-10 w-full min-w-0 rounded-xl border border-line bg-surface px-3 text-sm font-bold outline-none focus:border-blue-400"
-                placeholder="색상"
+                placeholder={colorFieldLabel}
               />
             </label>
 
@@ -335,9 +344,9 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
         ) : null}
         <div className="min-w-0 flex-1">
           <div className="break-words text-sm font-black leading-5 text-ink">{getItemName(item)}</div>
-          {getOptionText(item) ? (
+          {optionTextView ? (
             <div className="mt-1 whitespace-pre-line break-words text-xs font-bold leading-5 text-ink-soft">
-              {getOptionText(item)}
+              {optionTextView}
             </div>
           ) : null}
           {countText ? (

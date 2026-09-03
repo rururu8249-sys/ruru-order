@@ -519,11 +519,13 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   // [2026-08-31 사장님 요청] 등록상품으로 주문된 항목은 작은 사진 표시, 누르면 크게 — 표시 전용(데이터 무변경)
   //   세부상품(3단) 주문이면 그 세부상품 사진을, 아니면 상품 대표사진을 쓴다. 실패해도 상세는 정상 표시.
   const [itemImages, setItemImages] = useState<Record<string, string>>({});
+  // [2026-09-03 사장님 요청] 칸 제목 상품(예: 상품번호)은 주문 상세 편집칸 라벨도 그 제목으로 — 표시 전용(저장 필드는 color 그대로)
+  const [itemColorLabels, setItemColorLabels] = useState<Record<string, string>>({});
   const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   useEffect(() => {
     let stopped = false;
     const ids = Array.from(new Set(items.map((it) => String(it.productId || "").trim()).filter(Boolean)));
-    if (ids.length === 0) { setItemImages({}); return; }
+    if (ids.length === 0) { setItemImages({}); setItemColorLabels({}); return; }
     (async () => {
       try {
         const { data } = await supabase.from("products").select("*").in("id", ids);
@@ -531,11 +533,19 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         const byId = new Map<string, Record<string, unknown>>();
         for (const p of data as Record<string, unknown>[]) byId.set(String((p as { id?: unknown }).id ?? ""), p);
         const next: Record<string, string> = {};
+        const nextLabels: Record<string, string> = {};
         for (const it of items) {
           const pid = String(it.productId || "").trim();
           if (!pid) continue;
           const prow = byId.get(pid);
           if (!prow) continue;
+          // [2026-09-03] 칸 제목(custom_input_label) — note 파싱 실패해도 라벨만 생략(상세는 정상)
+          try {
+            const noteRaw = (prow as { product_note?: unknown }).product_note;
+            const noteObj = typeof noteRaw === "string" ? JSON.parse(noteRaw) : noteRaw;
+            const lb = String((noteObj as { custom_input_label?: unknown } | null)?.custom_input_label || "").trim();
+            if (lb) nextLabels[String(it.id)] = lb;
+          } catch { /* 표시 보조 */ }
           // [2026-08-31] 사진 매칭은 공용 규칙(lib/orderItemPhoto) 하나만 쓴다 —
           //   이름 수정·코드·괄호 차이까지 흡수, 못 찾으면 엉뚱한 사진 대신 표시 안 함.
           const r = resolveOrderItemPhoto(prow as Record<string, unknown>, {
@@ -545,6 +555,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           if (r.url) next[String(it.id)] = r.url;
         }
         setItemImages(next);
+        setItemColorLabels(nextLabels);
       } catch { /* 사진은 보조 표시 — 실패해도 상세는 정상 */ }
     })();
     return () => { stopped = true; };
@@ -1474,6 +1485,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                   deleting={deletingId === String(item.id)}
                   onDelete={() => handleDeleteItem(item)}
                   imageUrl={itemImages[String(item.id)] || null}
+                  colorLabel={itemColorLabels[String(item.id)] || ""}
                   onImageClick={(url) => setImagePreviewUrl(url)}
                 />
               ))
