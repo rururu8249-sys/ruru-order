@@ -839,6 +839,9 @@ export default function QuickProductFastForm({
   //   (스마트스토어 방식: 미리 고르지 않고, 옵션을 넣으면 옵션상품) 저장 로직은 기존 그대로.
   //   옛 조합형(세부상품 텍스트 축) 상품을 수정할 때만 예외적으로 묶음 아님.
   const [legacyComboLoaded, setLegacyComboLoaded] = useState(false);
+  // [2026-09-03 최종 구조] 기본 화면 = 사진·이름·가격·배송·세부상품·등록. 나머지는 「자세히」 뒤로.
+  //   세부상품이 있거나 수정 모드면 자동으로 펼쳐져 숨는 것 없음. 표시 전용 — 값·저장 무변경.
+  const [detailPanelOpen, setDetailPanelOpen] = useState(false);
   const [brandKoText, setBrandKoText] = useState("");
   const [brandEnText, setBrandEnText] = useState("");
   // brandGroupNew/brandGroupActive 는 details 정의 이후(아래)에서 파생 계산
@@ -1056,6 +1059,7 @@ export default function QuickProductFastForm({
 
   const brandGroupNew = !isBrandGroupEdit && !legacyComboLoaded && details.length > 0;
   const brandGroupActive = isBrandGroupEdit || brandGroupNew;
+  const effectiveDetailOpen = detailPanelOpen || isEditMode || details.length > 0 || legacyComboLoaded;
   const brandWordmarkImage = brandGroupActive
     ? brandWordmarkThumbnail(effectiveBrandEn, effectiveBrandKo)
     : "";
@@ -2031,32 +2035,6 @@ export default function QuickProductFastForm({
                 </div>
               ) : null}
 
-              {/* [2026-09-03 화면 통합] 세부상품 진입로 — 넣는 순간 자동으로 묶음 상품이 된다 (갈래 선택 없음) */}
-              <input
-                ref={bulkRowPhotoInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(event) => { const files = Array.from(event.target.files || []); event.target.value = ""; void addRowsFromPhotoFiles(files); }}
-                style={{ display: "none" }}
-              />
-              {!brandGroupActive && !legacyComboLoaded && details.length === 0 ? (
-                <div
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => { event.preventDefault(); void addRowsFromPhotoFiles(Array.from(event.dataTransfer?.files || [])); }}
-                  style={{ marginTop: "6px", border: "1.5px dashed #D9C5CC", borderRadius: "10px", background: "#FDF9FA", padding: "10px", textAlign: "center" }}
-                >
-                  <button
-                    type="button"
-                    onClick={openBrandDetailEditorForNew}
-                    style={{ border: "none", borderRadius: "9px", background: "#7B2D43", color: "#fff", padding: "10px 16px", fontSize: "12.5px", fontWeight: 900, cursor: "pointer" }}
-                  >＋ 세부상품 추가 — 한 상품 안에 여러 상품 (A-1, A-2처럼 각자 사진·가격)</button>
-                  <div
-                    onClick={() => bulkRowPhotoInputRef.current?.click()}
-                    style={{ marginTop: "6px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", cursor: "pointer" }}
-                  >📸 또는 여기에 사진 몽땅 끌어놓기·클릭 — 장수만큼 세부상품 생성 (파일명=이름)</div>
-                </div>
-              ) : null}
 
               {brandGroupActive ? (
                 <div style={{ marginTop: "10px", borderTop: "1px solid #E8E2DD", paddingTop: "12px" }}>
@@ -2613,12 +2591,6 @@ export default function QuickProductFastForm({
                   <input style={{ ...fieldInput, paddingRight: "30px", opacity: freeProductEnabled ? 0.45 : 1 }} type="text" inputMode="numeric" placeholder="59,000" value={freeProductEnabled ? "0" : priceText} disabled={freeProductEnabled} onChange={(e) => { setFormTouched(true); setPriceText(formatNumberWithComma(e.target.value)); }} />
                   <span style={{ position: "absolute", right: "11px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", color: "var(--color-ink-mute)", pointerEvents: "none" }}>원</span>
                 </div>
-                {/* [무료나눔 · 2026-07-22] 0원 상품 — "가격 비움(손님 직접입력)"과 구분되는 별도 플래그.
-                    켜면 가격 0 고정 + note.free_product=true → 고객 주문서에서 이 상품만 0원 제출 허용 */}
-                <label style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "6px", fontSize: "12px", fontWeight: 700, color: freeProductEnabled ? "#0F6E56" : "var(--color-ink-mute)", cursor: "pointer" }}>
-                  <input type="checkbox" checked={freeProductEnabled} onChange={(e) => setFreeProductEnabled(e.target.checked)} style={{ accentColor: "#0F6E56" }} />
-                  🎁 무료나눔 상품 (0원 — 손님에게 선물)
-                </label>
                 {/* [2026-08-29] 세부상품 판매가는 "대표가 + 추가금"이라 대표가를 바꾸면 같이 움직인다.
                     모르고 바꾸면 여러 상품 값이 한꺼번에 틀어지므로 미리 알려준다. */}
                 {details.length > 0 && !freeProductEnabled ? (
@@ -2638,6 +2610,49 @@ export default function QuickProductFastForm({
             </div>
           </div>
 
+
+              {/* [2026-09-03 화면 통합] 세부상품 진입로 — 넣는 순간 자동으로 묶음 상품이 된다 (갈래 선택 없음) */}
+          <input
+            ref={bulkRowPhotoInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={(event) => { const files = Array.from(event.target.files || []); event.target.value = ""; void addRowsFromPhotoFiles(files); }}
+            style={{ display: "none" }}
+          />
+          {!brandGroupActive && !legacyComboLoaded && details.length === 0 ? (
+            <div
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => { event.preventDefault(); void addRowsFromPhotoFiles(Array.from(event.dataTransfer?.files || [])); }}
+              style={{ marginTop: "6px", border: "1.5px dashed #D9C5CC", borderRadius: "10px", background: "#FDF9FA", padding: "10px", textAlign: "center" }}
+            >
+              <button
+            type="button"
+            onClick={openBrandDetailEditorForNew}
+            style={{ border: "none", borderRadius: "9px", background: "#7B2D43", color: "#fff", padding: "10px 16px", fontSize: "12.5px", fontWeight: 900, cursor: "pointer" }}
+              >＋ 세부상품 추가 — 한 상품 안에 여러 상품 (A-1, A-2처럼 각자 사진·가격)</button>
+              <div
+            onClick={() => bulkRowPhotoInputRef.current?.click()}
+            style={{ marginTop: "6px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", cursor: "pointer" }}
+              >📸 또는 여기에 사진 몽땅 끌어놓기·클릭 — 장수만큼 세부상품 생성 (파일명=이름)</div>
+            </div>
+          ) : null}
+
+          {/* [2026-09-03 최종 구조] 자세히 — 미리보기·옵션·재고·구매제한·노출·고급을 한 줄 뒤로 */}
+          {!effectiveDetailOpen ? (
+            <button
+              type="button"
+              onClick={() => setDetailPanelOpen(true)}
+              style={{ width: "100%", marginBottom: "14px", padding: "11px 13px", border: "1px dashed #D9C5CC", borderRadius: "10px", background: "var(--color-surface)", color: "#7B2D43", fontSize: "12px", fontWeight: 800, cursor: "pointer", textAlign: "left" }}
+            >
+              ▾ 자세히 — 미리보기 · 옵션(색상·사이즈) · 재고 · 구매제한 · 노출 · 카테고리 · 뱃지
+              <span style={{ display: "block", marginTop: "3px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>
+                안 열면 지금 설정대로: {(() => { const parts = [colors.length === 0 ? (customInputLabel.trim() ? `「${customInputLabel.trim()}」 손님이 적음` : "색상 손님이 적음") : colors.every((c) => c === "없음") ? "색상 안 씀" : `색상 ${colors.filter((c) => c !== "없음").length}개`, sizes.length === 0 ? "사이즈 손님이 적음" : sizes.every((c) => c === "없음") ? "사이즈 안 씀" : `사이즈 ${sizes.filter((c) => c !== "없음").length}개`, stockManagementEnabled ? "재고 관리함" : "재고 안 셈", isVisible ? "손님에게 보임" : "숨김"]; return parts.join(" · "); })()}
+              </span>
+            </button>
+          ) : null}
+
+          {effectiveDetailOpen ? (<>
           {/* [2026-08-29 사장님 요청] 손님 화면 미리보기
               예전에는 등록을 마치고 주문서를 직접 열어봐야 어떻게 보이는지 알 수 있었다.
               → 지금 입력 중인 값 그대로, 손님 상품목록에 나올 카드를 그 자리에서 보여준다.
@@ -2891,6 +2906,14 @@ export default function QuickProductFastForm({
 
           </div>
 
+          {/* [2026-09-03] 무료나눔 — 가끔 쓰는 기능이라 ⚙고급으로 (켜면 가격 0 고정, 기능 동일) */}
+          <div style={{ marginBottom: "14px" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", fontWeight: 800, color: freeProductEnabled ? "#0F6E56" : "var(--color-ink)", cursor: "pointer" }}>
+              <input type="checkbox" checked={freeProductEnabled} onChange={(e) => setFreeProductEnabled(e.target.checked)} style={{ accentColor: "#0F6E56" }} />
+              🎁 무료나눔 상품 (0원 — 손님에게 선물)
+            </label>
+          </div>
+
           {/* 상세설명 */}
           <div style={{ marginBottom: "14px" }}>
             <div style={sectionLabel}>상세설명</div>
@@ -2904,13 +2927,13 @@ export default function QuickProductFastForm({
 
           </>
           ) : null}
-
+          </>) : null}
 
         </div>
 
         {/* footer */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", borderTop: "1px solid #E8E2DD", background: "#F7F5F3", flexShrink: 0 }}>
-          <div style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}><span style={{ color: "var(--color-warn-tx)" }}>⚡ 빠른등록:</span> 사진·이름만 넣고 바로</div>
+          <div style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}><span style={{ color: "var(--color-warn-tx)" }}>⚡ 빠른등록:</span> 사진·이름·가격만 넣고 바로 — 나머지는 [자세히]에서 필요할 때만</div>
           <div style={{ display: "flex", gap: "8px" }}>
             <button type="button" onClick={() => { void requestClose(); }} disabled={saving} style={{ padding: "10px 18px", borderRadius: "8px", border: "1px solid #E8E2DD", background: "var(--color-surface)", fontSize: "13px", cursor: saving ? "default" : "pointer", color: "var(--color-ink)", opacity: saving ? 0.5 : 1 }}>취소</button>
             <button type="button" onClick={() => void saveProduct()} disabled={saving} style={{ padding: "10px 22px", borderRadius: "8px", background: saving ? "#ccc" : isEditMode ? "#0F6E56" : "#7B2D43", color: "#fff", border: "none", fontSize: "13px", fontWeight: 500, cursor: saving ? "not-allowed" : "pointer" }}>{saving ? "저장 중..." : isEditMode ? "저장" : "등록"}</button>
