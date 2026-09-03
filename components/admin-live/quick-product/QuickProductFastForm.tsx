@@ -14,7 +14,7 @@ import {
   setDetailAxis as setDetailAxisState,
   type BrandDetailState,
 } from "@/lib/brandDetailTableOps";
-import { brandWordmarkThumbnail, normalizeBrandKorean } from "@/lib/brandWordmarkThumbnail";
+import { brandWordmarkThumbnail, normalizeBrandKorean, productAutoThumbUrl, productNameThumbnail } from "@/lib/brandWordmarkThumbnail";
 import { detailCode } from "@/lib/productDetailModel";
 
 type ProductRow = Record<string, unknown>;
@@ -2112,9 +2112,11 @@ export default function QuickProductFastForm({
                     : "가격 직접입력";
 
               const uploadedCover = resolveProductImageUrl(coverImages[0] || "");
+              // [2026-09-03] 미리보기도 실제 손님 화면과 동일한 폴백: 사진 → (브랜드 워드마크) → 자동 그림 → 글자 카드
+              const autoThumb = productAutoThumbUrl(productName.trim(), category.trim()) || productNameThumbnail(productName.trim() || "상품", category.trim());
               const cover = brandGroupActive
                 ? (uploadedCover || brandWordmarkImage)
-                : resolveProductImageUrl(coverImages[0] || detailImages[0] || Object.values(detailPhotos)[0] || "");
+                : (resolveProductImageUrl(coverImages[0] || detailImages[0] || Object.values(detailPhotos)[0] || "") || autoThumb);
 
               const badgeChip = (bg: string, color: string, text: string) => (
                 <span key={text} style={{ fontSize: "9px", fontWeight: 800, color, background: bg, borderRadius: "4px", padding: "2px 5px" }}>{text}</span>
@@ -2124,9 +2126,7 @@ export default function QuickProductFastForm({
                 <div style={{ padding: "0 11px 11px" }}>
                   <div style={{ border: "1px solid #EFE6DE", borderRadius: "12px", background: "#fff", padding: "11px", display: "flex", gap: "10px", alignItems: "center" }}>
                     <div style={{ width: "68px", height: "68px", flexShrink: 0, borderRadius: "9px", overflow: "hidden", background: "#F0EBE8", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      {cover
-                        ? <img src={cover} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        : <span style={{ fontSize: "9px", fontWeight: 800, color: "#B0A5A9" }}>사진 없음</span>}
+                      <img src={cover} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     </div>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ display: "flex", gap: "3px", flexWrap: "wrap", marginBottom: "3px" }}>
@@ -2160,7 +2160,7 @@ export default function QuickProductFastForm({
                   {/* 손님이 못 보는 상태를 미리 알려준다 */}
                   <div style={{ marginTop: "7px", display: "flex", flexDirection: "column", gap: "3px" }}>
                     {!productName.trim() ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#C0392B" }}>· 상품명이 없으면 저장되지 않습니다</span> : null}
-                    {!brandGroupActive && !cover ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#8A5A00" }}>· 사진이 없어 손님 목록에 회색 네모로 보입니다</span> : null}
+                    {!brandGroupActive && !uploadedCover && !detailImages[0] ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#0F6E56" }}>· 사진이 없으면 상품명에 맞는 자동 그림이 나갑니다 (위 미리보기 그대로 · 사진 올리면 교체)</span> : null}
                     {!isVisible ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#8A5A00" }}>· 고객 노출이 꺼져 있어 손님 화면에 아예 안 보입니다</span> : null}
                     {details.length > 0 && detailHidden.length === details.length ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#C0392B" }}>· 세부상품이 전부 숨김이라 손님이 고를 수 있는 게 없습니다</span> : null}
                   </div>

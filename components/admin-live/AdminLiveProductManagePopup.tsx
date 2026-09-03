@@ -8,7 +8,7 @@ import { resolveProductImageUrl } from "./quick-product/productImageUrl";
 import { showAdminToast } from "@/lib/adminToast";
 import { createDraftBroadcast } from "./liveBroadcastController";
 import ExcelBulkImportPopup from "./ExcelBulkImportPopup";
-import { brandWordmarkThumbnail } from "@/lib/brandWordmarkThumbnail";
+import { brandWordmarkThumbnail, productAutoThumbUrl, productNameThumbnail } from "@/lib/brandWordmarkThumbnail";
 import { adminDetailSearch, buildDetailChatLine, detailProducts, type DetailProduct } from "@/lib/productDetailModel";
 import { buildChatAnnounceText } from "@/lib/chatAnnounce";
 import { savedWidgetAutoMatches, savedWidgetPinMatches, widgetPinTargetBroadcastId } from "@/lib/widgetPinState";
@@ -154,7 +154,9 @@ function mainImage(p: ProductRow) {
   if (direct) return resolveProductImageUrl(direct);
   const images = pickArray(p, ["images", "image_urls", "detail_image_urls"]);
   if (images[0]) return resolveProductImageUrl(images[0]);
-  return "";
+  // [2026-09-03] 사진 없는 상품 = 손님 화면과 동일하게 상품명 자동 그림 → 글자 카드 (표시 전용, 회색 네모 제거)
+  const cat = String((parseProductNote(p) as Record<string, unknown>).category || "");
+  return productAutoThumbUrl(productName(p), cat) || productNameThumbnail(productName(p), cat);
 }
 
 function shippingLabel(p: ProductRow) {
