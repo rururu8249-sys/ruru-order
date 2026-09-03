@@ -1059,7 +1059,10 @@ export default function QuickProductFastForm({
     [details, brandGroupDetailCategories],
   );
   // 사용 중인 축 개수(1~3). 0이면 옵션 없는 단일 상품.
-  const usedAxisCount = (details.length ? 1 : 0) + (colors.length ? 1 : 0) + (sizes.length ? 1 : 0);
+  // [2026-09-03 정합] "없음"은 실제 축이 아니다 — 없음만 있으면 그 축은 안 쓰는 것
+  const realColors = colors.filter((c) => c !== "없음");
+  const realSizes = sizes.filter((c) => c !== "없음");
+  const usedAxisCount = (details.length ? 1 : 0) + (realColors.length ? 1 : 0) + (realSizes.length ? 1 : 0);
 
   const noneOptionAutofillEnabled = colorText.trim() === "없음" && sizeText.trim() === "없음";
 
@@ -1964,7 +1967,13 @@ export default function QuickProductFastForm({
                       type="text"
                       placeholder="예: 버버리"
                       value={brandKoText}
-                      onChange={(e) => { setFormTouched(true); setBrandKoText(e.target.value); }}
+                      onChange={(e) => {
+                        setFormTouched(true);
+                        const v = e.target.value;
+                        // [2026-09-03] 묶음에서 브랜드 이름과 상품명을 두 번 치지 않게 — 상품명을 따로 안 만졌으면 따라간다
+                        if (!isEditMode && (!productName.trim() || productName === brandKoText)) setProductName(v);
+                        setBrandKoText(v);
+                      }}
                     />
                   </div>
                   <div>
@@ -2049,7 +2058,7 @@ export default function QuickProductFastForm({
                 {nameError ? <div style={{ marginTop: "4px", fontSize: "11px", color: "var(--color-danger-tx)" }}>상품명은 필수입니다</div> : null}
               </div>
               <div>
-                <label style={fieldLabel}>가격 <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(비우면 손님 직접입력)</span></label>
+                <label style={fieldLabel}>{brandGroupActive ? <>대표가 <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(세부상품 판매가의 기준 — 판매가 = 대표가 + 추가금)</span></> : <>가격 <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(비우면 손님 직접입력)</span></>}</label>
                 <div style={{ position: "relative" }}>
                   <input style={{ ...fieldInput, paddingRight: "30px", opacity: freeProductEnabled ? 0.45 : 1 }} type="text" inputMode="numeric" placeholder="59,000" value={freeProductEnabled ? "0" : priceText} disabled={freeProductEnabled} onChange={(e) => { setFormTouched(true); setPriceText(formatNumberWithComma(e.target.value)); }} />
                   <span style={{ position: "absolute", right: "11px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", color: "var(--color-ink-mute)", pointerEvents: "none" }}>원</span>
@@ -2174,9 +2183,11 @@ export default function QuickProductFastForm({
             <div style={{ border: "1px solid #E8E2DD", borderRadius: "8px", padding: "12px", background: "#F7F5F3" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
                 <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>
-                  옵션 <span style={{ color: "#7B2D43", fontWeight: 800 }}>{usedAxisCount > 0 ? `${usedAxisCount}단` : "없음"}</span>
+                  {brandGroupActive
+                    ? <>세부상품 <span style={{ color: "#7B2D43", fontWeight: 800 }}>{details.length}개</span></>
+                    : <>옵션 <span style={{ color: "#7B2D43", fontWeight: 800 }}>{usedAxisCount > 0 ? `${usedAxisCount}단` : "없음"}</span></>}
                 </span>
-                <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>값 넣으면 고르기 · 비우면 손님 직접입력</span>
+                <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>{brandGroupActive ? "색상·사이즈·가격은 세부상품마다 따로" : "값 넣으면 고르기 · 비우면 손님 직접입력"}</span>
               </div>
 
               {brandGroupActive ? (
@@ -2307,9 +2318,11 @@ export default function QuickProductFastForm({
 
                   {details.length === 0 ? (
                     <div style={{ padding: "20px 14px", textAlign: "center", border: "2px dashed #D9C5CC", borderRadius: "11px", background: "var(--color-surface)" }}>
-                      <div style={{ fontSize: "13px", fontWeight: 900, color: "#7B2D43" }}>아직 상품이 없습니다</div>
-                      <div style={{ marginTop: "5px", fontSize: "11.5px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.6 }}>
-                        위에 사진을 놓거나, 아래 [＋ 한 줄 추가]를 누르세요.
+                      <div style={{ fontSize: "13px", fontWeight: 900, color: "#7B2D43" }}>세부상품 만드는 법 (딱 3단계)</div>
+                      <div style={{ marginTop: "6px", fontSize: "11.5px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.8, textAlign: "left", display: "inline-block" }}>
+                        ① 위 분홍 칸에 <b>사진을 몽땅 끌어다 놓으면</b> 사진 수만큼 상품 줄이 생깁니다 (파일 이름 = 상품명)<br />
+                        ② 줄에서 <b>판매가</b>만 채우세요 — 색상·사이즈가 있으면 그 줄을 눌러서 넣습니다<br />
+                        ③ 아래 <b>[등록]</b>을 누르면 끝 · 사진 없이 만들려면 [＋ 세부상품 추가]
                       </div>
                     </div>
                   ) : (
@@ -2506,7 +2519,7 @@ export default function QuickProductFastForm({
                           type="button"
                           onClick={() => { addDetailRow(); }}
                           style={{ border: "none", borderRadius: "8px", background: "#7B2D43", color: "#fff", padding: "8px 13px", fontSize: "11.5px", fontWeight: 900, cursor: "pointer" }}
-                        >＋ 한 줄 추가</button>
+                        >＋ 세부상품 추가</button>
                         <button
                           type="button"
                           onClick={() => {
@@ -2536,7 +2549,18 @@ export default function QuickProductFastForm({
               ) : null}
 
               {usedAxisCount === 0 && !brandGroupActive ? (
-                <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", padding: "2px 2px 0" }}>옵션 없는 단일 상품으로 등록됩니다. 손님은 수량만 고릅니다.</div>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#9A6212", padding: "2px 2px 0", lineHeight: 1.6 }}>
+                  {(() => {
+                    // 실제 손님 화면 그대로: 비움=손님이 적어요(필수), 없음=안 씀. 칸 제목은 없음이어도 뜬다.
+                    const label = customInputLabel.trim();
+                    const colorAsks = colors.length === 0 || label !== "";
+                    const sizeAsks = sizes.length === 0;
+                    const asks = [colorAsks ? `「${label || "색상"}」` : "", sizeAsks ? "「사이즈」" : ""].filter(Boolean).join("과 ");
+                    return asks
+                      ? <>손님 화면에 {asks} 입력칸이 뜨고, <b>적어야 담을 수 있어요.</b> (입력을 안 받으려면 🚫 안 써요)</>
+                      : <>옵션 없이 등록됩니다 — 손님은 <b>수량만</b> 고릅니다.</>;
+                  })()}
+                </div>
               ) : null}
 
               {/* ── 재고관리 (옵션 박스 안으로 이동 — 재고 표 바로 위) ── */}
@@ -2696,11 +2720,11 @@ export default function QuickProductFastForm({
               {/* 저장 형태 안내 — 사장님이 "지금과 같은지" 바로 확인할 수 있게 */}
               {usedAxisCount > 0 ? (
                 <div style={{ background: "#F5E6EB", border: "1px solid #D9C5CC", color: "#7B2D43", fontSize: "11px", borderRadius: "8px", padding: "8px 10px", marginTop: "9px", lineHeight: 1.7 }}>
-                  {details.length > 0 && colors.length > 0
+                  {details.length > 0 && realColors.length > 0
                     ? <>3단 — 손님은 <b>세부상품 → 색상 → 사이즈</b> 순으로 고릅니다. 재고는 <b>&quot;세부상품 / 색상&quot; + 사이즈</b>로 관리돼요.</>
                     : details.length > 0
                       ? <>손님은 <b>세부상품</b>만 고릅니다. (예전 &quot;세부상품 조합형&quot;과 <b>완전히 같은 방식</b>)</>
-                      : <>손님은 <b>{[colors.length ? "색상" : "", sizes.length ? "사이즈" : ""].filter(Boolean).join(" → ")}</b>을(를) 고릅니다. (예전 &quot;색상·사이즈&quot;와 <b>완전히 같은 방식</b>)</>}
+                      : <>손님은 <b>{[realColors.length ? "색상" : "", realSizes.length ? "사이즈" : ""].filter(Boolean).join(" → ")}</b>을(를) 고릅니다. (예전 &quot;색상·사이즈&quot;와 <b>완전히 같은 방식</b>)</>}
                   {details.length > 0 ? (
                     <>
                       <br />추가금은 <b>세부상품</b>별로 넣습니다 · 👁 를 누르면 그 세부상품만 손님에게 숨겨져요.
