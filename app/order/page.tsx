@@ -7307,8 +7307,12 @@ export default function OrderPage() {
 
                   {registeredOptionDetailSelected && registeredOptionColorMode === "input" ? (
                     <div style={{ marginBottom: "16px" }}>
-                      <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>색상</div>
-                      <input value={registeredOptionColor} onChange={(e) => setRegisteredOptionColor(e.target.value)} placeholder="색상을 입력해 주세요" style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: `1.5px solid ${!registeredOptionColor.trim() ? "#E8B5B0" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
+                      {/* [2026-09-03 재설계 4단계 · 표시 전용] 직접입력 칸 — 주황 점선+배지+예시로 "내가 적어야 함"을 바로 인식 */}
+                      <div style={{ marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span style={{ fontSize: "14px", fontWeight: 800, color: "#333" }}>색상</span>
+                        <span style={{ background: "#9A6212", color: "#fff", fontSize: "10px", fontWeight: 900, borderRadius: "9999px", padding: "2px 8px" }}>🖊 직접 입력</span>
+                      </div>
+                      <input value={registeredOptionColor} onChange={(e) => setRegisteredOptionColor(e.target.value)} placeholder="색상을 적어주세요 (예: 베이지)" style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: !registeredOptionColor.trim() ? "2px dashed #E2B64D" : "1.5px solid #E8E2DD", background: !registeredOptionColor.trim() ? "#FFFDF5" : "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
                       {/* [2026-08-28 P0-4] 문구가 사라질 때 아래 버튼이 위로 밀려 오클릭이 나던 문제 → 자리를 항상 잡아둔다 */}
                       <div data-order-option-missing={!registeredOptionColor.trim() ? "true" : undefined} style={{ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" }}>{!registeredOptionColor.trim() ? "색상을 입력해 주세요" : ""}</div>
                     </div>
@@ -7362,8 +7366,12 @@ export default function OrderPage() {
 
                   {registeredOptionDetailSelected && registeredOptionSizeMode === "input" ? (
                     <div style={{ marginBottom: "16px" }}>
-                      <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>사이즈</div>
-                      <input value={registeredOptionSize} onChange={(e) => setRegisteredOptionSize(e.target.value)} placeholder="사이즈를 입력해 주세요" style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: `1.5px solid ${!registeredOptionSize.trim() ? "#E8B5B0" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
+                      {/* [2026-09-03 재설계 4단계 · 표시 전용] 직접입력 칸 — 주황 점선+배지+예시 */}
+                      <div style={{ marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span style={{ fontSize: "14px", fontWeight: 800, color: "#333" }}>사이즈</span>
+                        <span style={{ background: "#9A6212", color: "#fff", fontSize: "10px", fontWeight: 900, borderRadius: "9999px", padding: "2px 8px" }}>🖊 직접 입력</span>
+                      </div>
+                      <input value={registeredOptionSize} onChange={(e) => setRegisteredOptionSize(e.target.value)} placeholder="사이즈를 적어주세요 (예: 66, 프리)" style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: !registeredOptionSize.trim() ? "2px dashed #E2B64D" : "1.5px solid #E8E2DD", background: !registeredOptionSize.trim() ? "#FFFDF5" : "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
                       {/* [2026-08-28 P0-4] 문구가 사라질 때 아래 버튼이 위로 밀려 오클릭이 나던 문제 → 자리를 항상 잡아둔다 */}
                       <div data-order-option-missing={!registeredOptionSize.trim() ? "true" : undefined} style={{ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" }}>{!registeredOptionSize.trim() ? "사이즈를 입력해 주세요" : ""}</div>
                     </div>
@@ -7434,8 +7442,13 @@ export default function OrderPage() {
 
                 {registeredOptionDetailSelected && registeredOptionNeedsManualPrice ? (
                   <div style={{ flexShrink: 0, borderTop: "1px solid #F0EAE0", background: "#FFF8FA", padding: "12px 18px" }}>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: 900, color: "#7A1E47", marginBottom: "6px" }}>상품 금액</label>
-                    <input inputMode="numeric" value={registeredOptionManualPrice > 0 ? registeredOptionManualPrice.toLocaleString("ko-KR") : ""} onChange={(e) => setRegisteredOptionManualPrice(Math.max(0, Number(e.target.value.replace(/[^0-9]/g, "")) || 0))} placeholder="금액을 입력해 주세요" style={{ width: "100%", height: "46px", boxSizing: "border-box", borderRadius: "12px", border: `1.5px solid ${registeredOptionManualPrice > 0 ? "#B08794" : "#E8B5B0"}`, padding: "0 13px", fontSize: "16px", fontWeight: 900, color: "#222", background: "#fff", outline: "none" }} />
+                    {/* [2026-09-03 재설계 4단계 · 표시 전용] 가격 직접입력 — 주황 점선+배지+예시 (0원 금지 등 검증 무수정) */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+                      <span style={{ fontSize: "12px", fontWeight: 900, color: "#7A1E47" }}>상품 금액</span>
+                      <span style={{ background: "#9A6212", color: "#fff", fontSize: "10px", fontWeight: 900, borderRadius: "9999px", padding: "2px 8px" }}>🖊 직접 입력</span>
+                      <span style={{ fontSize: "11px", fontWeight: 800, color: "#9A6212" }}>방송에서 들은 금액을 적어주세요</span>
+                    </div>
+                    <input inputMode="numeric" value={registeredOptionManualPrice > 0 ? registeredOptionManualPrice.toLocaleString("ko-KR") : ""} onChange={(e) => setRegisteredOptionManualPrice(Math.max(0, Number(e.target.value.replace(/[^0-9]/g, "")) || 0))} placeholder="예: 59,000" style={{ width: "100%", height: "46px", boxSizing: "border-box", borderRadius: "12px", border: registeredOptionManualPrice > 0 ? "1.5px solid #B08794" : "2px dashed #E2B64D", padding: "0 13px", fontSize: "16px", fontWeight: 900, color: "#222", background: registeredOptionManualPrice > 0 ? "#fff" : "#FFFDF5", outline: "none" }} />
                     {registeredOptionManualPrice < 1 ? <div style={{ marginTop: "5px", fontSize: "11px", fontWeight: 800, color: "#C0392B" }}>이 상품은 고객이 금액을 직접 입력하는 상품입니다.</div> : null}
                   </div>
                 ) : null}
