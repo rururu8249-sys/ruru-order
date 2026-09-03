@@ -719,6 +719,8 @@ export default function QuickProductFastForm({
   //   재고를 입력하고도 무제한으로 저장되는 사고가 있었다(8/10 오버셀과 같은 경로).
   const [stockManagementEnabled, setStockManagementEnabled] = useState(true);
   const [shippingType, setShippingType] = useState("normal");
+  // [2026-09-03 사장님 요청] 손님 직접입력 칸의 제목(예: 상품숫자) — 비우면 기존대로 "색상". note.custom_input_label 로 저장.
+  const [customInputLabel, setCustomInputLabel] = useState("");
   const [isVisible, setIsVisible] = useState(true);
   const [isPinned, setIsPinned] = useState(false);
   const [registeredOrderEnabled, setRegisteredOrderEnabled] = useState(true);
@@ -927,6 +929,7 @@ export default function QuickProductFastForm({
     setNameSuggestionEnabled(productNote?.name_suggestion_enabled !== false);
     setCustomerDetailInputEnabled(productNote?.customer_detail_input_enabled === true);
     setSuggestionKeywordsText(Array.isArray(productNote?.suggestion_keywords) ? productNote.suggestion_keywords.join(", ") : "");
+    setCustomInputLabel(String((productNote as { custom_input_label?: unknown } | null)?.custom_input_label || "").trim());
     setBrandGroupDetailPhotoSets(normalizedPhotoSets);
     setBrandGroupDetailCategories(normalizedDetailCategories);
     setBrandGroupDetailOptions(normalizedDetailOptions);
@@ -1773,6 +1776,7 @@ export default function QuickProductFastForm({
         category: category.trim(),
         customer_category_visible: customerCategoryVisible,
         free_product: freeProductEnabled,
+        ...(customInputLabel.trim() ? { custom_input_label: customInputLabel.trim() } : {}),
         ...(detailActive
           ? {
               combo_mode: true,
@@ -2342,6 +2346,15 @@ export default function QuickProductFastForm({
                 </div>
                 {optionStateHint(colorText) ? <span style={{ fontSize: "11.5px", fontWeight: 700, color: optionStateHint(colorText)!.color, whiteSpace: "nowrap" }}>{optionStateHint(colorText)!.text}</span> : null}
               </div>
+
+              {/* [2026-09-03 사장님 요청] 색상을 비우면(=손님 직접입력) 그 칸의 제목을 사장님이 정할 수 있다 (예: 상품숫자) */}
+              {!brandGroupActive && !colorText.trim() && !splitOptions(colorText).includes("없음") ? (
+                <div style={{ ...optRow, background: "#FFFDF5", border: "1px dashed #E2B64D", borderRadius: "8px", padding: "7px 9px" }}>
+                  <span style={{ ...optLabel, color: "#9A6212" }}>✏️ 칸 제목</span>
+                  <input style={optInput} type="text" placeholder="비우면 「색상」 — 예: 상품숫자" value={customInputLabel} onChange={(e) => { setFormTouched(true); setCustomInputLabel(e.target.value); }} />
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: "#9A6212", whiteSpace: "nowrap" }}>손님 직접입력 칸의 제목</span>
+                </div>
+              ) : null}
 
               {/* 슬롯 3 — 사이즈 */}
               <div style={brandGroupActive ? { ...optRow, display: "none" } : optRow}>

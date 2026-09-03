@@ -721,6 +721,16 @@ function registeredProductNoneOptionEnabled(product: BroadcastProduct): boolean 
   return rawHasExplicitNone("color") || rawHasExplicitNone("size");
 }
 
+// [2026-09-03 사장님 요청] 손님 직접입력 칸의 제목을 사장님이 정한다 (예: "상품숫자").
+//   스마트스토어 '직접입력형 옵션'(판매자가 옵션명 지정, 구매자가 텍스트 입력)과 같은 방식.
+//   저장 경로는 기존 색상(color) 그대로라 주문서·엑셀·물건챙기기 전부 무변경 — 제목 표시만 바뀐다.
+function getCustomInputLabel(product: BroadcastProduct | null | undefined): string {
+  try {
+    const note = (parseProductSuggestionNote(product?.product_note) || {}) as Record<string, unknown>;
+    return String((note as { custom_input_label?: unknown }).custom_input_label || "").trim();
+  } catch { return ""; }
+}
+
 // 등록상품의 색상/사이즈 필드가 어떤 모드인지 field별 독립 판별한다.
 // - "select": 실제 옵션값(블랙/화이트, 230~290 등)이 있어 고객이 골라야 함.
 // - "none":   해당 field가 토글 ON(size/color_option_enabled=true) 또는 "없음" 명시 → 자동 "없음", 입력 불필요.
@@ -4203,7 +4213,7 @@ export default function OrderPage() {
         readComboInfoOrderProduct(product)
           ? "종류를 선택해 주세요."
           : colorMode === "input"
-            ? "색상을 입력해 주세요."
+            ? `${getCustomInputLabel(product) || "색상"}을(를) 입력해 주세요.`
             : "색상을 선택해 주세요."
       );
       return;
@@ -7309,18 +7319,22 @@ export default function OrderPage() {
 
                   {/* [UI] 옵션 없는 상품의 "없음" 죽은 칸 제거 — 안내 문구가 이미 있음 */}
 
-                  {registeredOptionDetailSelected && registeredOptionColorMode === "input" ? (
+                  {registeredOptionDetailSelected && registeredOptionColorMode === "input" ? (() => {
+                    // [2026-09-03 사장님 요청] 칸 제목은 사장님이 정한 라벨(예: 상품숫자), 없으면 기존대로 "색상"
+                    const inputLabel = getCustomInputLabel(registeredOptionSelectProduct) || "색상";
+                    return (
                     <div style={{ marginBottom: "16px" }}>
                       {/* [2026-09-03 재설계 4단계 · 표시 전용] 직접입력 칸 — 주황 점선+배지+예시로 "내가 적어야 함"을 바로 인식 */}
                       <div style={{ marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
-                        <span style={{ fontSize: "14px", fontWeight: 800, color: "#333" }}>색상</span>
+                        <span style={{ fontSize: "14px", fontWeight: 800, color: "#333" }}>{inputLabel}</span>
                         <span style={{ background: "#9A6212", color: "#fff", fontSize: "10px", fontWeight: 900, borderRadius: "9999px", padding: "2px 8px" }}>🖊 직접 입력</span>
                       </div>
-                      <input value={registeredOptionColor} onChange={(e) => setRegisteredOptionColor(e.target.value)} placeholder="색상을 적어주세요 (예: 베이지)" style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: !registeredOptionColor.trim() ? "2px dashed #E2B64D" : "1.5px solid #E8E2DD", background: !registeredOptionColor.trim() ? "#FFFDF5" : "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
+                      <input value={registeredOptionColor} onChange={(e) => setRegisteredOptionColor(e.target.value)} placeholder={inputLabel === "색상" ? "색상을 적어주세요 (예: 베이지)" : `${inputLabel} 입력칸이에요 — 방송에서 안내한 대로 적어주세요`} style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: !registeredOptionColor.trim() ? "2px dashed #E2B64D" : "1.5px solid #E8E2DD", background: !registeredOptionColor.trim() ? "#FFFDF5" : "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
                       {/* [2026-08-28 P0-4] 문구가 사라질 때 아래 버튼이 위로 밀려 오클릭이 나던 문제 → 자리를 항상 잡아둔다 */}
-                      <div data-order-option-missing={!registeredOptionColor.trim() ? "true" : undefined} style={{ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" }}>{!registeredOptionColor.trim() ? "색상을 입력해 주세요" : ""}</div>
+                      <div data-order-option-missing={!registeredOptionColor.trim() ? "true" : undefined} style={{ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" }}>{!registeredOptionColor.trim() ? `${inputLabel}을(를) 입력해 주세요` : ""}</div>
                     </div>
-                  ) : null}
+                    );
+                  })() : null}
 
                   {registeredOptionDetailSelected && registeredOptionSizeChoices.length > 0 ? (
                     <div style={{ marginBottom: "16px", opacity: registeredOptionAxes3 && !registeredOptionDetail.trim() ? 0.45 : 1, pointerEvents: registeredOptionAxes3 && !registeredOptionDetail.trim() ? "none" : "auto" }}>
