@@ -1256,15 +1256,21 @@ export default function QuickProductFastForm({
       return;
     }
     const isNewDetail = !oldName;
-    const nextVariants = brandDetailEditDraft.variants.map((variant) => ({
+    // [2026-09-03] 같은 조합·의미 없는 없음/없음 중복은 에러 대신 조용히 정리 — 사장님이 [＋ 줄 추가]를
+    //   여러 번 눌러도 사고 없이 동작 (저장 형태는 동일: 존재하는 조합만 한 줄씩)
+    let nextVariants = brandDetailEditDraft.variants.map((variant) => ({
       color: String(variant.color || "").trim() || "없음",
       size: String(variant.size || "").trim() || "없음",
     }));
-    const duplicateKey = nextVariants.map((variant) => `${variant.color}|${variant.size}`);
-    if (new Set(duplicateKey).size !== duplicateKey.length) {
-      showAdminToast("같은 색상·사이즈 조합이 두 번 들어가 있어요.", "error");
-      return;
-    }
+    const seenCombo = new Set<string>();
+    nextVariants = nextVariants.filter((variant) => {
+      const key = `${variant.color}|${variant.size}`;
+      if (seenCombo.has(key)) return false;
+      seenCombo.add(key);
+      return true;
+    });
+    if (nextVariants.length > 1) nextVariants = nextVariants.filter((v) => !(v.color === "없음" && v.size === "없음"));
+    if (nextVariants.length === 0) nextVariants = [{ color: "없음", size: "없음" }];
 
     const moveKey = <T,>(source: Record<string, T>, value: T | undefined) => {
       const next = { ...source };
@@ -2289,7 +2295,7 @@ export default function QuickProductFastForm({
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center", padding: "9px 10px", borderTop: "1px solid #EFE7EA", background: "#F7F2F4" }}>
                         <button
                           type="button"
-                          onClick={() => { addDetailRow(); }}
+                          onClick={openBrandDetailEditorForNew}
                           style={{ border: "none", borderRadius: "8px", background: "#7B2D43", color: "#fff", padding: "8px 13px", fontSize: "11.5px", fontWeight: 900, cursor: "pointer" }}
                         >＋ 세부상품 추가</button>
                         <button
@@ -2991,7 +2997,7 @@ export default function QuickProductFastForm({
                 <label style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>상품명
                   <input value={brandDetailEditDraft.name} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, name: event.target.value } : prev)} style={{ ...fieldInput, marginTop: "4px" }} />
                 </label>
-                <label style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>상품구분
+                <label style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>상품구분 <span style={{ fontWeight: 700 }}>(선택 — 상의/하의 필터용)</span>
                   <input value={brandDetailEditDraft.category} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, category: event.target.value } : prev)} placeholder="상의, 하의, 세트…" style={{ ...fieldInput, marginTop: "4px" }} />
                 </label>
               </div>
@@ -3037,19 +3043,19 @@ export default function QuickProductFastForm({
               </div>
 
               <div style={{ marginTop: "14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-ink)" }}>색상·사이즈 <span style={{ fontWeight: 700, color: "var(--color-ink-mute)" }}>— 없으면 그대로 「없음」</span></span>
-                <button type="button" onClick={() => setBrandDetailEditDraft((prev) => prev ? { ...prev, variants: [...prev.variants, { color: "없음", size: "없음" }] } : prev)} style={{ border: "1px solid #D9C5CC", borderRadius: "7px", background: "#fff", color: "#7B2D43", padding: "5px 9px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>+ 조합 추가</button>
+                <span style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-ink)" }}>색상·사이즈 <span style={{ fontWeight: 700, color: "var(--color-ink-mute)" }}>— 이 상품에 있을 때만 · 없으면 그냥 두세요</span></span>
+                <button type="button" onClick={() => setBrandDetailEditDraft((prev) => prev ? { ...prev, variants: [...prev.variants, { color: "없음", size: "없음" }] } : prev)} style={{ border: "1px solid #D9C5CC", borderRadius: "7px", background: "#fff", color: "#7B2D43", padding: "5px 9px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>＋ 줄 추가</button>
               </div>
               <div style={{ marginTop: "7px", display: "grid", gap: "6px", maxHeight: "280px", overflowY: "auto" }}>
                 {brandDetailEditDraft.variants.map((variant, index) => (
                   <div key={`edit-variant-${index}`} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 34px", gap: "6px", alignItems: "center" }}>
-                    <input aria-label={`색상 ${index + 1}`} value={variant.color} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, variants: prev.variants.map((item, itemIndex) => itemIndex === index ? { ...item, color: event.target.value } : item) } : prev)} placeholder="색상 없음이면 없음" style={fieldInput} />
-                    <input aria-label={`사이즈 ${index + 1}`} value={variant.size} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, variants: prev.variants.map((item, itemIndex) => itemIndex === index ? { ...item, size: event.target.value } : item) } : prev)} placeholder="사이즈 없음이면 없음" style={fieldInput} />
+                    <input aria-label={`색상 ${index + 1}`} value={variant.color} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, variants: prev.variants.map((item, itemIndex) => itemIndex === index ? { ...item, color: event.target.value } : item) } : prev)} placeholder="예: 블랙 (없으면 없음)" style={fieldInput} />
+                    <input aria-label={`사이즈 ${index + 1}`} value={variant.size} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, variants: prev.variants.map((item, itemIndex) => itemIndex === index ? { ...item, size: event.target.value } : item) } : prev)} placeholder="예: 230 (없으면 없음)" style={fieldInput} />
                     <button type="button" disabled={brandDetailEditDraft.variants.length <= 1} onClick={() => setBrandDetailEditDraft((prev) => prev ? { ...prev, variants: prev.variants.filter((_, itemIndex) => itemIndex !== index) } : prev)} style={{ height: "34px", border: "none", borderRadius: "7px", background: "#FBEAE7", color: "#C0392B", cursor: brandDetailEditDraft.variants.length <= 1 ? "default" : "pointer", opacity: brandDetailEditDraft.variants.length <= 1 ? 0.4 : 1 }}>×</button>
                   </div>
                 ))}
               </div>
-              <div style={{ marginTop: "7px", fontSize: "10.5px", color: "var(--color-ink-mute)" }}>색상이나 사이즈가 없는 상품은 `없음`으로 두세요. 존재하는 조합만 한 줄씩 등록됩니다.</div>
+              <div style={{ marginTop: "7px", fontSize: "10.5px", color: "var(--color-ink-mute)" }}>색상·사이즈가 있으면 실제 있는 조합만 한 줄씩 (블랙·230, 블랙·240…) · 없으면 이대로 두면 됩니다</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", padding: "11px 16px", borderTop: "1px solid #E8E2DD", background: "#F7F5F3", flexWrap: "wrap" }}>
               {/* 새로 만드는 중일 때는 지울 게 없으므로 삭제 버튼을 숨긴다 */}
