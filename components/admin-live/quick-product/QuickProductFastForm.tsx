@@ -832,19 +832,19 @@ export default function QuickProductFastForm({
   const [bulkNamesText, setBulkNamesText] = useState("");
   const [rowDropTarget, setRowDropTarget] = useState("");
   const bulkRowPhotoInputRef = useRef<HTMLInputElement | null>(null);
-  const [brandGroupNew, setBrandGroupNew] = useState(false);
+  // [2026-09-03 화면 통합] 단품/묶음 갈래 선택 제거 — 세부상품을 추가하면 자동으로 묶음이 된다.
+  //   (스마트스토어 방식: 미리 고르지 않고, 옵션을 넣으면 옵션상품) 저장 로직은 기존 그대로.
+  //   옛 조합형(세부상품 텍스트 축) 상품을 수정할 때만 예외적으로 묶음 아님.
+  const [legacyComboLoaded, setLegacyComboLoaded] = useState(false);
   const [brandKoText, setBrandKoText] = useState("");
   const [brandEnText, setBrandEnText] = useState("");
-  const brandGroupActive = isBrandGroupEdit || brandGroupNew;
+  // brandGroupNew/brandGroupActive 는 details 정의 이후(아래)에서 파생 계산
   const effectiveBrandKo = isBrandGroupEdit
     ? String(initialProductNote?.brand_group?.brand_ko || productName || "브랜드")
     : (brandKoText.trim() || productName.trim() || "브랜드");
   const effectiveBrandEn = isBrandGroupEdit
     ? String(initialProductNote?.brand_group?.brand_en || "")
     : brandEnText.trim();
-  const brandWordmarkImage = brandGroupActive
-    ? brandWordmarkThumbnail(effectiveBrandEn, effectiveBrandKo)
-    : "";
   // [2026-08-16 사장님 요청] 재고를 3가지로 나눠 보여준다 — 실재고 / 담김(주문서 제출 전 선점) / 지금 판매가능
   //   담김은 cart_reservations(표시용 선점)에서 읽는다. 읽기 전용 — 재고·주문·돈 로직 무접촉.
   const [heldByVariant, setHeldByVariant] = useState<Record<string, number>>({});
@@ -937,7 +937,7 @@ export default function QuickProductFastForm({
     setBrandDetailSearch("");
     setBrandDetailCategoryFilter("전체");
     setFormTouched(false);
-    setBrandGroupNew(false);
+    setLegacyComboLoaded(false);
     setBrandKoText("");
     setBrandEnText("");
 
@@ -1026,6 +1026,7 @@ export default function QuickProductFastForm({
       setDetailText("");
       setDetailLabel(DETAIL_LABEL_FIXED);
     }
+    setLegacyComboLoaded(restoredDetails.length > 0 && !isBrandGroupEdit);
 
     const nextPlus: Record<string, string> = {};
     for (const name of restoredDetails) {
@@ -1050,6 +1051,11 @@ export default function QuickProductFastForm({
 
   const details = useMemo(() => unique(splitOptions(detailText)), [detailText]);
 
+  const brandGroupNew = !isBrandGroupEdit && !legacyComboLoaded && details.length > 0;
+  const brandGroupActive = isBrandGroupEdit || brandGroupNew;
+  const brandWordmarkImage = brandGroupActive
+    ? brandWordmarkThumbnail(effectiveBrandEn, effectiveBrandKo)
+    : "";
   const colors = useMemo(() => unique(splitOptions(colorText)), [colorText]);
   const sizes = useMemo(() => unique(splitOptions(sizeText)), [sizeText]);
   const customerDetailInputUnavailable = details.length > 0 || brandGroupActive;
@@ -1626,7 +1632,7 @@ export default function QuickProductFastForm({
     setBrandDetailSearch("");
     setBrandDetailCategoryFilter("전체");
     setFormTouched(false);
-    setBrandGroupNew(false);
+    setLegacyComboLoaded(false);
     setBrandKoText("");
     setBrandEnText("");
     setBulkStockText("10");
@@ -1653,10 +1659,6 @@ export default function QuickProductFastForm({
         : "group_buy";
 
     if (!name) {
-      if (brandGroupNew && !isEditMode) {
-        showAdminToast("브랜드 이름(한글)을 입력해 주세요.\n(묶음 이름이 곧 손님 목록 제목이 됩니다)", "error");
-        return;
-      }
       setNameError(true);
       return;
     }
@@ -1940,11 +1942,11 @@ export default function QuickProductFastForm({
                     ? <>세부상품 <span style={{ color: "#7B2D43", fontWeight: 800 }}>{details.length}개</span></>
                     : <>옵션 <span style={{ color: "#7B2D43", fontWeight: 800 }}>{usedAxisCount > 0 ? `${usedAxisCount}단` : "없음"}</span></>}
                 </span>
-                <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>{brandGroupActive ? "색상·사이즈·가격은 세부상품마다 따로" : "값 넣으면 고르기 · 비우면 손님 직접입력"}</span>
+                <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>{brandGroupActive ? "색상·사이즈·가격은 세부상품마다 따로" : "값을 쓰면 손님이 골라요 · 방식은 옆 칩으로"}</span>
               </div>
 
-              {/* 슬롯 1 — 세부상품(라벨 변경 가능). A-1 / A-2 / A-3 처럼 한 상품 안의 여러 상품 */}
-              <div style={brandGroupActive ? { ...optRow, display: "none" } : optRow}>
+              {/* 슬롯 1 — 옛 조합형(세부상품 텍스트 축) — 그런 상품을 수정할 때만 보인다. 새 상품은 아래 [＋ 세부상품 추가]로 */}
+              <div style={brandGroupActive || !legacyComboLoaded ? { ...optRow, display: "none" } : optRow}>
                 <span style={optLabel}>세부상품</span>
                 <input style={optInput} type="text" placeholder="A-1, A-2, A-3 (쉼표로 구분)" value={detailText} onChange={(e) => { setFormTouched(true); setDetailText(e.target.value); }} />
                 {!detailText.trim() ? <span style={{ fontSize: "11.5px", fontWeight: 700, color: "var(--color-ink-mute)", whiteSpace: "nowrap" }}>🚫 사용 안 함</span> : null}
@@ -2023,6 +2025,33 @@ export default function QuickProductFastForm({
                   예전: 카드 클릭 → 창 뜸 → 고침 → [변경내용 적용] → 창 닫음 → 또 [저장]  (상품 20개면 20번)
                   지금: 표에서 칸을 누르면 그 자리에서 고쳐진다. 창은 색상·사이즈를 세밀하게 손볼 때만 연다.
                   저장되는 형태는 창에서 고칠 때와 완전히 동일하다. */}
+              {/* [2026-09-03 화면 통합] 세부상품 진입로 — 넣는 순간 자동으로 묶음 상품이 된다 (갈래 선택 없음) */}
+              <input
+                ref={bulkRowPhotoInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(event) => { const files = Array.from(event.target.files || []); event.target.value = ""; void addRowsFromPhotoFiles(files); }}
+                style={{ display: "none" }}
+              />
+              {!brandGroupActive && !legacyComboLoaded && details.length === 0 ? (
+                <div
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => { event.preventDefault(); void addRowsFromPhotoFiles(Array.from(event.dataTransfer?.files || [])); }}
+                  style={{ marginTop: "6px", border: "1.5px dashed #D9C5CC", borderRadius: "10px", background: "#FDF9FA", padding: "10px", textAlign: "center" }}
+                >
+                  <button
+                    type="button"
+                    onClick={openBrandDetailEditorForNew}
+                    style={{ border: "none", borderRadius: "9px", background: "#7B2D43", color: "#fff", padding: "10px 16px", fontSize: "12.5px", fontWeight: 900, cursor: "pointer" }}
+                  >＋ 세부상품 추가 — 한 상품 안에 여러 상품 (A-1, A-2처럼 각자 사진·가격)</button>
+                  <div
+                    onClick={() => bulkRowPhotoInputRef.current?.click()}
+                    style={{ marginTop: "6px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", cursor: "pointer" }}
+                  >📸 또는 여기에 사진 몽땅 끌어놓기·클릭 — 장수만큼 세부상품 생성 (파일명=이름)</div>
+                </div>
+              ) : null}
+
               {brandGroupActive ? (
                 <div style={{ marginTop: "10px", borderTop: "1px solid #E8E2DD", paddingTop: "12px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "9px" }}>
@@ -2050,14 +2079,6 @@ export default function QuickProductFastForm({
                       {bulkRowBusy ? "사진 올리는 중…" : "📸 사진 몽땅 끌어놓기 — 장수만큼 줄 생성 · 파일명=상품명"}
                     </div>
                   </div>
-                  <input
-                    ref={bulkRowPhotoInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={(event) => { const files = Array.from(event.target.files || []); event.target.value = ""; void addRowsFromPhotoFiles(files); }}
-                    style={{ display: "none" }}
-                  />
 
                   {details.length === 0 ? (
                     <div style={{ padding: "16px 14px", textAlign: "center", border: "2px dashed #7B2D43", borderRadius: "11px", background: "#FDF9FA", marginBottom: "9px" }}>
@@ -2486,6 +2507,24 @@ export default function QuickProductFastForm({
                 </div>
               ) : null}
               </>)}
+
+              {/* [2026-09-03] 개인당 구매제한 — ⚙고급에 넣었더니 사장님이 못 찾음 → 재고 바로 아래 원위치 */}
+              {/* 개인당 구매제한 (카톡 계정=전화번호 기준, 끌 때까지 계속 적용) */}
+              <div style={toggleRow}>
+                <div>
+                  <div style={{ fontSize: "13px", color: "var(--color-ink)" }}>개인당 구매제한</div>
+                  <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "1px" }}>{purchaseLimitEnabled ? "한 사람(카톡 계정)이 이 상품을 정해진 개수까지만" : "(끄면 제한 없음)"}</div>
+                </div>
+                <div onClick={() => setPurchaseLimitEnabled((v) => !v)} style={tgStyle(purchaseLimitEnabled)}><span style={tgKnob(purchaseLimitEnabled)} /></div>
+              </div>
+
+              {purchaseLimitEnabled ? (
+                <div style={{ background: "#F7F5F3", borderRadius: "8px", padding: "10px", marginTop: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "12px", color: "var(--color-ink)", flex: 1 }}>1인당 최대</span>
+                  <input style={{ fontSize: "12px", padding: "5px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "80px" }} type="number" min={1} inputMode="numeric" value={purchaseLimitText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setPurchaseLimitText(e.target.value)} />
+                  <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
+                </div>
+              ) : null}
             </div>
           </div>
   );
@@ -2506,63 +2545,6 @@ export default function QuickProductFastForm({
 
         {/* .modal-body */}
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 18px" }}>
-
-          {/* [2026-09-03 재설계 2단계] 갈래 선택 — 맨 위에서 「단품 / 세부상품 묶음」 중 하나 (시안 ①②)
-              저장 값은 기존 brandGroupNew 그대로(카드가 스위치를 대신할 뿐, 저장 로직 무수정).
-              브랜드 묶음 상품 수정 중에는 갈래 변경 금지(끄면 손님 화면이 깨짐) — 안내만 표시. */}
-          {!isBrandGroupEdit ? (
-            <div style={{ marginBottom: "14px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "10px" }}>
-                <button type="button" onClick={() => { if (brandGroupNew) { setFormTouched(true); setBrandGroupNew(false); } }} style={{ textAlign: "left", border: !brandGroupNew ? "2.5px solid #7B2D43" : "1.5px solid #E8E2DD", background: !brandGroupNew ? "#F9EEF3" : "var(--color-surface)", borderRadius: "12px", padding: "12px 14px", cursor: "pointer" }}>
-                  <div style={{ fontSize: "14px", fontWeight: 900, color: !brandGroupNew ? "#7B2D43" : "var(--color-ink-mute)" }}>🧦 단품 상품</div>
-                  <div style={{ marginTop: "3px", fontSize: "11px", fontWeight: 700, color: !brandGroupNew ? "#5B4A50" : "var(--color-ink-mute)", lineHeight: 1.5 }}>상품 하나. 사진 넣고 이름·가격만.<br />옵션(색상·사이즈)은 필요할 때만.</div>
-                </button>
-                <button type="button" onClick={() => { if (!brandGroupNew) { setFormTouched(true); setBrandGroupNew(true); } }} style={{ textAlign: "left", border: brandGroupNew ? "2.5px solid #7B2D43" : "1.5px solid #E8E2DD", background: brandGroupNew ? "#F9EEF3" : "var(--color-surface)", borderRadius: "12px", padding: "12px 14px", cursor: "pointer" }}>
-                  <div style={{ fontSize: "14px", fontWeight: 900, color: brandGroupNew ? "#7B2D43" : "var(--color-ink-mute)" }}>🧥 세부상품 묶음</div>
-                  <div style={{ marginTop: "3px", fontSize: "11px", fontWeight: 700, color: brandGroupNew ? "#5B4A50" : "var(--color-ink-mute)", lineHeight: 1.5 }}>버버리·미우미우처럼 한 상품 안에<br />여러 개 (각자 사진·가격·색상·사이즈)</div>
-                </button>
-              </div>
-              {brandGroupNew ? (
-                <div style={{ marginTop: "10px", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "8px" }}>
-                  <div>
-                    <label style={fieldLabel}>브랜드 이름 (한글)</label>
-                    <input
-                      style={fieldInput}
-                      type="text"
-                      placeholder="예: 버버리"
-                      value={brandKoText}
-                      onChange={(e) => {
-                        setFormTouched(true);
-                        const v = e.target.value;
-                        // [2026-09-03] 묶음에서 브랜드 이름과 상품명을 두 번 치지 않게 — 상품명을 따로 안 만졌으면 따라간다
-                        if (!isEditMode && (!productName.trim() || productName === brandKoText)) setProductName(v);
-                        setBrandKoText(v);
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label style={fieldLabel}>브랜드 이름 (영문) <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(썸네일용·선택)</span></label>
-                    <input
-                      style={fieldInput}
-                      type="text"
-                      placeholder="예: BURBERRY"
-                      value={brandEnText}
-                      onChange={(e) => { setFormTouched(true); setBrandEnText(e.target.value); }}
-                    />
-                  </div>
-                  <div style={{ gridColumn: isMobile ? "auto" : "1 / -1", fontSize: "11px", fontWeight: 800, color: details.length === 0 ? "#C0392B" : "#0F6E56", lineHeight: 1.5 }}>
-                    {details.length === 0
-                      ? "· 바로 아래 [＋ 세부상품 추가]로 상품을 1개 이상 넣으면 저장됩니다."
-                      : `· 세부상품 ${details.length}개 등록됨. 대표사진은 브랜드 썸네일이 자동으로 들어갑니다.`}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <div style={{ marginBottom: "14px", padding: "9px 12px", borderRadius: "10px", border: "1px solid #E7C9D4", background: "#FFF9FB", fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>
-              🧥 세부상품 묶음 상품 수정 중 — 갈래는 바꿀 수 없어요 (세부상품·사진은 아래에서 그대로 고칩니다)
-            </div>
-          )}
 
           {brandGroupActive ? optionStockSection : null}
 
@@ -2612,8 +2594,7 @@ export default function QuickProductFastForm({
               )}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              <div style={brandGroupNew && !isEditMode ? { display: "none" } : undefined}>
-                {/* [2026-09-03] 묶음 신규는 브랜드 이름 = 상품명 자동 — 같은 이름 두 번 안 치게 칸 자체를 숨긴다 */}
+              <div>
                 <label style={fieldLabel}>상품명 <span style={{ color: "var(--color-rose-deep)", marginLeft: "2px" }}>*</span></label>
                 <input
                   style={{ ...fieldInput, borderColor: nameError ? "#C0392B" : "#E8E2DD" }}
@@ -2735,7 +2716,7 @@ export default function QuickProductFastForm({
 
                   {/* 손님이 못 보는 상태를 미리 알려준다 */}
                   <div style={{ marginTop: "7px", display: "flex", flexDirection: "column", gap: "3px" }}>
-                    {!productName.trim() ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#C0392B" }}>{brandGroupActive ? "· 브랜드 이름을 입력해 주세요" : "· 상품명이 없으면 저장되지 않습니다"}</span> : null}
+                    {!productName.trim() ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#C0392B" }}>· 상품명이 없으면 저장되지 않습니다</span> : null}
                     {!brandGroupActive && !uploadedCover && !detailImages[0] ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#0F6E56" }}>· 사진이 없으면 상품명에 맞는 자동 그림이 나갑니다 (위 미리보기 그대로 · 사진 올리면 교체)</span> : null}
                     {!isVisible ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#8A5A00" }}>· 고객 노출이 꺼져 있어 손님 화면에 아예 안 보입니다</span> : null}
                     {details.length > 0 && detailHidden.length === details.length ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#C0392B" }}>· 세부상품이 전부 숨김이라 손님이 고를 수 있는 게 없습니다</span> : null}
@@ -2769,7 +2750,7 @@ export default function QuickProductFastForm({
                 onClick={() => setExtraOpen(true)}
                 style={{ width: "100%", padding: "9px", border: "1px dashed #D9C5CC", background: "var(--color-surface)", color: "#7B2D43", fontSize: "12px", fontWeight: 800, borderRadius: "8px", cursor: "pointer" }}
               >
-                ⚙ 고급 설정 — 카테고리 · 뱃지 · 구매제한 · 상세설명 {(() => { const parts = [category.trim(), category.trim() && !customerCategoryVisible ? "고객 버튼 숨김" : "", badgeTypes.length ? `뱃지 ${badgeTypes.length}` : "", purchaseLimitEnabled ? `1인 ${purchaseLimitText}개` : "", customerDetailInputEnabled && !customerDetailInputUnavailable ? "직접입력 ON" : "", description.trim() ? "상세설명 ✓" : ""].filter(Boolean); return parts.length ? `(${parts.join(" · ")})` : "(선택)"; })()}
+                ⚙ 고급 설정 — 카테고리 · 뱃지 · 상세설명 {(() => { const parts = [category.trim(), category.trim() && !customerCategoryVisible ? "고객 버튼 숨김" : "", badgeTypes.length ? `뱃지 ${badgeTypes.length}` : "", customerDetailInputEnabled && !customerDetailInputUnavailable ? "직접입력 ON" : "", description.trim() ? "상세설명 ✓" : ""].filter(Boolean); return parts.length ? `(${parts.join(" · ")})` : "(선택)"; })()}
               </button>
             </div>
           ) : null}
@@ -2906,22 +2887,6 @@ export default function QuickProductFastForm({
               ><span style={tgKnob(!customerDetailInputUnavailable && customerDetailInputEnabled)} /></div>
             </div>
 
-            {/* 개인당 구매제한 (카톡 계정=전화번호 기준, 끌 때까지 계속 적용) */}
-            <div style={toggleRow}>
-              <div>
-                <div style={{ fontSize: "13px", color: "var(--color-ink)" }}>개인당 구매제한</div>
-                <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "1px" }}>{purchaseLimitEnabled ? "한 사람(카톡 계정)이 이 상품을 정해진 개수까지만" : "(끄면 제한 없음)"}</div>
-              </div>
-              <div onClick={() => setPurchaseLimitEnabled((v) => !v)} style={tgStyle(purchaseLimitEnabled)}><span style={tgKnob(purchaseLimitEnabled)} /></div>
-            </div>
-
-            {purchaseLimitEnabled ? (
-              <div style={{ background: "#F7F5F3", borderRadius: "8px", padding: "10px", marginTop: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "12px", color: "var(--color-ink)", flex: 1 }}>1인당 최대</span>
-                <input style={{ fontSize: "12px", padding: "5px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "80px" }} type="number" min={1} inputMode="numeric" value={purchaseLimitText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setPurchaseLimitText(e.target.value)} />
-                <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
-              </div>
-            ) : null}
           </div>
 
           {/* 상세설명 */}
