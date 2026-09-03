@@ -177,6 +177,12 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
   const inventoryLocked = isInventoryLockedItem(item);
   // [2026-09-03] 칸 제목이 있으면 편집칸 라벨·접힌 줄 앞에 그 제목 표시(저장 필드는 color 그대로)
   const colorFieldLabel = clean(colorLabel) || "색상";
+  // [2026-09-03 사장님 요청] 옵션 안 쓰는 상품은 빈 색상/사이즈 칸을 굳이 띄우지 않는다 —
+  //   주문에 실값이 없으면 칸을 접고 「＋ 추가」 버튼만. 표시 전용(저장 필드·로직 무변경).
+  const itemHasRealColor = formatOrderOptionText(item.color, "") !== "";
+  const itemHasRealSize = formatOrderOptionText("없음", item.size) !== "";
+  const [showColorField, setShowColorField] = useState(false);
+  const [showSizeField, setShowSizeField] = useState(false);
   const optionTextView = (() => {
     const base = getOptionText(item);
     if (!base) return "";
@@ -228,6 +234,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
           </label>
 
           <div className="grid grid-cols-1 gap-2">
+            {itemHasRealColor || showColorField ? (
             <label className="grid min-w-0 gap-1">
               <span className="text-[11px] font-black text-ink-soft">{colorFieldLabel}</span>
               <input
@@ -237,7 +244,13 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
                 placeholder={colorFieldLabel}
               />
             </label>
+            ) : (
+            <button type="button" onClick={() => setShowColorField(true)} className="w-fit rounded-lg border border-dashed border-line bg-surface px-2 py-1 text-left text-[11px] font-bold text-ink-mute hover:bg-surface-2">
+              ＋ {colorFieldLabel} 추가 — 이 주문엔 {colorFieldLabel} 없음
+            </button>
+            )}
 
+            {itemHasRealSize || showSizeField ? (
             <label className="grid min-w-0 gap-1">
               <span className="text-[11px] font-black text-ink-soft">사이즈</span>
               <input
@@ -247,6 +260,11 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
                 placeholder="사이즈"
               />
             </label>
+            ) : (
+            <button type="button" onClick={() => setShowSizeField(true)} className="w-fit rounded-lg border border-dashed border-line bg-surface px-2 py-1 text-left text-[11px] font-bold text-ink-mute hover:bg-surface-2">
+              ＋ 사이즈 추가 — 이 주문엔 사이즈 없음
+            </button>
+            )}
           </div>
 
           <div className="grid grid-cols-1 gap-2">
