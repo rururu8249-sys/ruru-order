@@ -724,6 +724,12 @@ export default function QuickProductFastForm({
   const [shippingType, setShippingType] = useState("normal");
   // [2026-09-03 사장님 요청] 손님 직접입력 칸의 제목(예: 상품숫자) — 비우면 기존대로 "색상". note.custom_input_label 로 저장.
   const [customInputLabel, setCustomInputLabel] = useState("");
+  // [2026-09-03 사장님 요청] 색상별 사진(선택) — 색상 옵션마다 작은 사진 1장.
+  //   note.color_photos 새 키로만 저장(ADD only) — 기존 저장 형식·다른 키는 무변경.
+  const [colorPhotos, setColorPhotos] = useState<Record<string, string>>({});
+  const [colorPhotoUploading, setColorPhotoUploading] = useState("");
+  const colorPhotoInputRef = useRef<HTMLInputElement | null>(null);
+  const colorPhotoTargetRef = useRef("");
   const [isVisible, setIsVisible] = useState(true);
   const [isPinned, setIsPinned] = useState(false);
   const [registeredOrderEnabled, setRegisteredOrderEnabled] = useState(true);
@@ -935,6 +941,18 @@ export default function QuickProductFastForm({
     setCustomerDetailInputEnabled(productNote?.customer_detail_input_enabled === true);
     setSuggestionKeywordsText(Array.isArray(productNote?.suggestion_keywords) ? productNote.suggestion_keywords.join(", ") : "");
     setCustomInputLabel(String((productNote as { custom_input_label?: unknown } | null)?.custom_input_label || "").trim());
+    {
+      // [2026-09-03] 색상별 사진 로드 — 값이 있는 것만(없으면 빈 맵 → 기존 상품 무변화)
+      const rawColorPhotos = (productNote as { color_photos?: unknown } | null)?.color_photos;
+      const nextColorPhotos: Record<string, string> = {};
+      if (rawColorPhotos && typeof rawColorPhotos === "object" && !Array.isArray(rawColorPhotos)) {
+        for (const key of Object.keys(rawColorPhotos as Record<string, unknown>)) {
+          const url = String((rawColorPhotos as Record<string, unknown>)[key] ?? "").trim();
+          if (url) nextColorPhotos[String(key).trim()] = url;
+        }
+      }
+      setColorPhotos(nextColorPhotos);
+    }
     setBrandGroupDetailPhotoSets(normalizedPhotoSets);
     setBrandGroupDetailCategories(normalizedDetailCategories);
     setBrandGroupDetailOptions(normalizedDetailOptions);
@@ -1789,6 +1807,13 @@ export default function QuickProductFastForm({
         customer_category_visible: customerCategoryVisible,
         free_product: freeProductEnabled,
         ...(customInputLabel.trim() ? { custom_input_label: customInputLabel.trim() } : {}),
+        // [2026-09-03] 색상별 사진 — 실제로 사진 넣은 색상만, 지금 색상 목록에 남아 있는 것만 저장(없으면 키 생략)
+        ...(() => {
+          const keptColorPhotos = Object.fromEntries(
+            colors.filter((c) => c !== "없음" && colorPhotos[c]).map((c) => [c, colorPhotos[c]]),
+          );
+          return Object.keys(keptColorPhotos).length > 0 ? { color_photos: keptColorPhotos } : {};
+        })(),
         ...(detailActive
           ? {
               combo_mode: true,
@@ -1955,7 +1980,7 @@ export default function QuickProductFastForm({
                     ? <>세부상품 <span style={{ color: "#7B2D43", fontWeight: 800 }}>{details.length}개</span></>
                     : <>옵션 <span style={{ color: "#7B2D43", fontWeight: 800 }}>{usedAxisCount > 0 ? `${usedAxisCount}단` : "없음"}</span></>}
                 </span>
-                <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>{brandGroupActive ? "색상·사이즈·가격은 세부상품마다 따로" : "값을 쓰면 손님이 골라요 · 방식은 옆 칩으로"}</span>
+                <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>{brandGroupActive ? "색상·사이즈·가격은 세부상품마다 따로" : "값을 쓰면 손님이 골라요"}</span>
               </div>
 
               {/* 슬롯 1 — 옛 조합형(세부상품 텍스트 축) — 그런 상품을 수정할 때만 보인다. 새 상품은 아래 [＋ 세부상품 추가]로 */}
@@ -1994,6 +2019,47 @@ export default function QuickProductFastForm({
                 </div>
               </div>
 
+
+              {/* [2026-09-03 사장님 요청] 색상별 사진(선택) — 색상마다 작은 사진 1장. 손님 색상 버튼 앞에 떠서 클릭하면 확대 */}
+              {!brandGroupActive && colors.filter((c) => c !== "없음").length > 0 ? (
+                <div style={{ display: "flex", alignItems: "flex-start", gap: "8px", flexWrap: "wrap", margin: "0 0 10px", padding: "7px 9px", background: "#FBFAF8", border: "1px dashed #E0D8D0", borderRadius: "8px" }}>
+                  <input ref={colorPhotoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={async (event) => {
+                    const file = (event.target.files || [])[0];
+                    event.target.value = "";
+                    const target = colorPhotoTargetRef.current;
+                    colorPhotoTargetRef.current = "";
+                    if (!file || !target) return;
+                    setColorPhotoUploading(target);
+                    try {
+                      const urls = await uploadImageFiles([file], "cover");
+                      if (urls[0]) { setFormTouched(true); setColorPhotos((prev) => ({ ...prev, [target]: urls[0] })); }
+                    } catch (error) {
+                      showAdminToast("색상 사진 업로드 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
+                    } finally {
+                      setColorPhotoUploading("");
+                    }
+                  }} />
+                  <span style={{ fontSize: "11px", fontWeight: 800, color: "#8A7F76", lineHeight: "38px", flexShrink: 0 }}>색상별 사진 <span style={{ fontWeight: 700 }}>(선택)</span></span>
+                  {colors.filter((c) => c !== "없음").map((c) => (
+                    <div key={`cp-${c}`} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", width: "46px" }}>
+                      <div style={{ position: "relative", width: "38px", height: "38px" }}>
+                        <button type="button" title={colorPhotos[c] ? `${c} 사진 바꾸기` : `${c} 사진 넣기`} onClick={() => { colorPhotoTargetRef.current = c; colorPhotoInputRef.current?.click(); }} disabled={colorPhotoUploading !== ""} style={{ width: "38px", height: "38px", padding: 0, borderRadius: "8px", border: colorPhotos[c] ? "1px solid #E0D8D0" : "1.5px dashed #CFC5BC", background: "#fff", cursor: "pointer", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {colorPhotoUploading === c
+                            ? <span style={{ fontSize: "11px", fontWeight: 900, color: "#9A6212" }}>…</span>
+                            : colorPhotos[c]
+                              ? <img src={resolveProductImageUrl(colorPhotos[c])} alt={c} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                              : <span style={{ fontSize: "15px", fontWeight: 800, color: "#B7AA9F" }}>＋</span>}
+                        </button>
+                        {colorPhotos[c] && colorPhotoUploading !== c ? (
+                          <button type="button" title="사진 빼기" onClick={() => { setFormTouched(true); setColorPhotos((prev) => { const next = { ...prev }; delete next[c]; return next; }); }} style={{ position: "absolute", top: "-6px", right: "-6px", width: "16px", height: "16px", padding: 0, borderRadius: "999px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "10px", fontWeight: 900, lineHeight: "16px", cursor: "pointer" }}>×</button>
+                        ) : null}
+                      </div>
+                      <span style={{ fontSize: "9.5px", fontWeight: 700, color: "var(--color-ink-mute)", maxWidth: "46px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c}</span>
+                    </div>
+                  ))}
+                  <span style={{ fontSize: "10.5px", color: "var(--color-ink-mute)", lineHeight: "38px" }}>누르면 사진이 올라가고, 손님 색상 버튼에 떠요</span>
+                </div>
+              ) : null}
 
               {/* 슬롯 3 — 사이즈 */}
               <div style={brandGroupActive ? { ...optRow, display: "none" } : optRow}>
@@ -2034,7 +2100,7 @@ export default function QuickProductFastForm({
               {!brandGroupActive && splitOptions(colorText).every((x) => x === "없음") ? (
                 <div style={{ ...optRow, background: "#FFFDF5", border: "1px dashed #E2B64D", borderRadius: "8px", padding: "7px 9px" }}>
                   <span style={{ ...optLabel, color: "#9A6212" }}>✏️ 칸 제목</span>
-                  <input style={optInput} type="text" placeholder="예: 상품숫자 — 적으면 손님에게 이 제목의 입력칸이 나갑니다" value={customInputLabel} onChange={(e) => { setFormTouched(true); setCustomInputLabel(e.target.value); }} />
+                  <input style={optInput} type="text" placeholder="예: 상품숫자 (손님 입력칸 제목)" value={customInputLabel} onChange={(e) => { setFormTouched(true); setCustomInputLabel(e.target.value); }} />
                   <span style={{ fontSize: "11px", fontWeight: 700, color: "#9A6212", whiteSpace: "nowrap" }}>{customInputLabel.trim() ? "🚫 안 써요여도 이 칸은 나가요" : "비우면 「색상」"}</span>
                 </div>
               ) : null}
@@ -2314,7 +2380,7 @@ export default function QuickProductFastForm({
                     const sizeAsks = sizes.length === 0;
                     const asks = [colorAsks ? `「${label || "색상"}」` : "", sizeAsks ? "「사이즈」" : ""].filter(Boolean).join("과 ");
                     return asks
-                      ? <>손님 화면에 {asks} 입력칸이 뜨고, <b>적어야 담을 수 있어요.</b> (입력을 안 받으려면 🚫 안 써요)</>
+                      ? <>{asks} — <b>손님이 적어야 담을 수 있어요.</b></>
                       : <>옵션 없이 등록됩니다 — 손님은 <b>수량만</b> 고릅니다.</>;
                   })()}
                 </div>
@@ -2634,11 +2700,11 @@ export default function QuickProductFastForm({
             type="button"
             onClick={openBrandDetailEditorForNew}
             style={{ border: "none", borderRadius: "9px", background: "#7B2D43", color: "#fff", padding: "10px 16px", fontSize: "12.5px", fontWeight: 900, cursor: "pointer" }}
-              >＋ 세부상품 추가 — 한 상품 안에 여러 상품 (A-1, A-2처럼 각자 사진·가격)</button>
+              >＋ 세부상품 추가 (A-1, A-2처럼 여러 개)</button>
               <div
             onClick={() => bulkRowPhotoInputRef.current?.click()}
             style={{ marginTop: "6px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", cursor: "pointer" }}
-              >📸 또는 여기에 사진 몽땅 끌어놓기·클릭 — 장수만큼 세부상품 생성 (파일명=이름)</div>
+              >📸 사진 몽땅 끌어놓으면 장수만큼 자동 생성 (파일명=이름)</div>
             </div>
           ) : null}
 

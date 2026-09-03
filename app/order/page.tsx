@@ -1060,6 +1060,21 @@ function readComboPhotosOrderProduct(product: unknown): Record<string, string> {
   return out;
 }
 
+// [2026-09-03 사장님 요청] 색상별 사진 { 색상: URL } — note.color_photos.
+//   없으면 빈 객체 → 기존 상품은 아무 변화 없음(표시 전용, 주문·재고 로직 무관).
+function readColorPhotosOrderProduct(product: unknown): Record<string, string> {
+  const note = readOrderNoteObject(product);
+  const raw = (note as any)?.color_photos;
+  const out: Record<string, string> = {};
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    for (const key of Object.keys(raw)) {
+      const url = String((raw as any)[key] ?? "").trim();
+      if (url) out[String(key).trim()] = url;
+    }
+  }
+  return out;
+}
+
 type BrandGroupDetailOption = {
   colors: string[];
   sizes: string[];
@@ -5677,6 +5692,8 @@ export default function OrderPage() {
     : registeredOptionSelectProduct
       ? getSelectableRegisteredOptions(registeredOptionSelectProduct, "size")
       : [];
+  // [2026-09-03] 색상별 사진 — 색상 버튼 앞 작은 썸네일(클릭=확대). 없으면 빈 맵이라 기존 그대로.
+  const registeredOptionColorPhotos = registeredOptionSelectProduct ? readColorPhotosOrderProduct(registeredOptionSelectProduct) : {};
   const registeredOptionColorMode = registeredOptionSelectedDetailConfig && registeredOptionColorChoices.length === 0
     ? "none"
     : registeredOptionSelectProduct
@@ -7305,7 +7322,7 @@ export default function OrderPage() {
                             const selected = registeredOptionColor === option;
                             const soldOut = isSoldOutColorSize(option, registeredOptionSize);
                             return (
-                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionColor((prev) => prev === option ? "" : option); setRegisteredOptionSize(""); }} style={{ height: "44px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
+                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionColor((prev) => prev === option ? "" : option); setRegisteredOptionSize(""); }} style={{ height: "44px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", padding: "0 8px" }}>{registeredOptionColorPhotos[option] ? <span onClick={(e) => { e.stopPropagation(); openLightbox(registeredOptionColorPhotos[option], [registeredOptionColorPhotos[option]], option); }} style={{ flexShrink: 0, width: "32px", height: "32px", cursor: "zoom-in" }}><img src={registeredOptionColorPhotos[option]} alt={option} loading="lazy" decoding="async" style={{ width: "32px", height: "32px", objectFit: "cover", borderRadius: "8px", display: "block" }} /></span> : null}<span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{soldOut ? option + " (품절)" : option}</span></button>
                             );
                           })}
                         </div>
@@ -7315,7 +7332,7 @@ export default function OrderPage() {
                             const selected = registeredOptionColor === option;
                             const soldOut = isSoldOutColorSize(option, registeredOptionSize);
                             return (
-                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionColor((prev) => prev === option ? "" : option); setRegisteredOptionSize(""); }} style={{ height: "34px", borderRadius: "999px", padding: "0 14px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "13px", fontWeight: 700, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? option + " (품절)" : option}</button>
+                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionColor((prev) => prev === option ? "" : option); setRegisteredOptionSize(""); }} style={{ height: "34px", borderRadius: "999px", padding: registeredOptionColorPhotos[option] ? "0 14px 0 5px" : "0 14px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "13px", fontWeight: 700, cursor: "pointer", opacity: soldOut ? 0.4 : 1, display: "inline-flex", alignItems: "center", gap: "6px" }}>{registeredOptionColorPhotos[option] ? <span onClick={(e) => { e.stopPropagation(); openLightbox(registeredOptionColorPhotos[option], [registeredOptionColorPhotos[option]], option); }} style={{ flexShrink: 0, width: "26px", height: "26px", cursor: "zoom-in" }}><img src={registeredOptionColorPhotos[option]} alt={option} loading="lazy" decoding="async" style={{ width: "26px", height: "26px", objectFit: "cover", borderRadius: "999px", display: "block" }} /></span> : null}{soldOut ? option + " (품절)" : option}</button>
                             );
                           })}
                         </div>
