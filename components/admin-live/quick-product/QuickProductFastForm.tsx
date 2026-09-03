@@ -1930,260 +1930,8 @@ export default function QuickProductFastForm({
   const tgStyle = (on: boolean): CSSProperties => ({ width: "40px", height: "22px", borderRadius: "11px", background: on ? "#0F6E56" : "#E8E2DD", position: "relative", cursor: "pointer", flexShrink: 0 });
   const tgKnob = (on: boolean): CSSProperties => ({ position: "absolute", width: "18px", height: "18px", background: "var(--color-surface)", borderRadius: "50%", top: "2px", ...(on ? { right: "2px" } : { left: "2px" }) });
 
-  return (
-    <div
-      className="ruru-product-sian"
-      style={{ position: "fixed", inset: 0, zIndex: 90, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", padding: "16px" }}
-    >
-      {/* .modal */}
-      <div style={{ width: "560px", maxWidth: "100%", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "12px", boxShadow: "0 0 0 2px #7B2D43, 0 8px 40px rgba(0,0,0,0.35)", overflow: "hidden", transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}>
-
-        {/* .modal-hd */}
-        <div onMouseDown={onHeaderMouseDown} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: "1px solid #E8E2DD", background: "#F7F5F3", cursor: "grab", userSelect: "none" }}>
-          <h2 style={{ fontSize: "15px", fontWeight: 500, color: "var(--color-ink)", margin: 0 }}>{isEditMode ? "✎ 상품 수정" : "+ 새 상품 등록"}</h2>
-          <span onClick={() => { void requestClose(); }} style={{ fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>×</span>
-        </div>
-
-        {/* .modal-body */}
-        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 18px" }}>
-
-          {/* [2026-09-03 재설계 2단계] 갈래 선택 — 맨 위에서 「단품 / 세부상품 묶음」 중 하나 (시안 ①②)
-              저장 값은 기존 brandGroupNew 그대로(카드가 스위치를 대신할 뿐, 저장 로직 무수정).
-              브랜드 묶음 상품 수정 중에는 갈래 변경 금지(끄면 손님 화면이 깨짐) — 안내만 표시. */}
-          {!isBrandGroupEdit ? (
-            <div style={{ marginBottom: "14px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "10px" }}>
-                <button type="button" onClick={() => { if (brandGroupNew) { setFormTouched(true); setBrandGroupNew(false); } }} style={{ textAlign: "left", border: !brandGroupNew ? "2.5px solid #7B2D43" : "1.5px solid #E8E2DD", background: !brandGroupNew ? "#F9EEF3" : "var(--color-surface)", borderRadius: "12px", padding: "12px 14px", cursor: "pointer" }}>
-                  <div style={{ fontSize: "14px", fontWeight: 900, color: !brandGroupNew ? "#7B2D43" : "var(--color-ink-mute)" }}>🧦 단품 상품</div>
-                  <div style={{ marginTop: "3px", fontSize: "11px", fontWeight: 700, color: !brandGroupNew ? "#5B4A50" : "var(--color-ink-mute)", lineHeight: 1.5 }}>상품 하나. 사진 넣고 이름·가격만.<br />옵션(색상·사이즈)은 필요할 때만.</div>
-                </button>
-                <button type="button" onClick={() => { if (!brandGroupNew) { setFormTouched(true); setBrandGroupNew(true); } }} style={{ textAlign: "left", border: brandGroupNew ? "2.5px solid #7B2D43" : "1.5px solid #E8E2DD", background: brandGroupNew ? "#F9EEF3" : "var(--color-surface)", borderRadius: "12px", padding: "12px 14px", cursor: "pointer" }}>
-                  <div style={{ fontSize: "14px", fontWeight: 900, color: brandGroupNew ? "#7B2D43" : "var(--color-ink-mute)" }}>🧥 세부상품 묶음</div>
-                  <div style={{ marginTop: "3px", fontSize: "11px", fontWeight: 700, color: brandGroupNew ? "#5B4A50" : "var(--color-ink-mute)", lineHeight: 1.5 }}>버버리·미우미우처럼 한 상품 안에<br />여러 개 (각자 사진·가격·색상·사이즈)</div>
-                </button>
-              </div>
-              {brandGroupNew ? (
-                <div style={{ marginTop: "10px", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "8px" }}>
-                  <div>
-                    <label style={fieldLabel}>브랜드 이름 (한글)</label>
-                    <input
-                      style={fieldInput}
-                      type="text"
-                      placeholder="예: 버버리"
-                      value={brandKoText}
-                      onChange={(e) => {
-                        setFormTouched(true);
-                        const v = e.target.value;
-                        // [2026-09-03] 묶음에서 브랜드 이름과 상품명을 두 번 치지 않게 — 상품명을 따로 안 만졌으면 따라간다
-                        if (!isEditMode && (!productName.trim() || productName === brandKoText)) setProductName(v);
-                        setBrandKoText(v);
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label style={fieldLabel}>브랜드 이름 (영문) <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(썸네일용·선택)</span></label>
-                    <input
-                      style={fieldInput}
-                      type="text"
-                      placeholder="예: BURBERRY"
-                      value={brandEnText}
-                      onChange={(e) => { setFormTouched(true); setBrandEnText(e.target.value); }}
-                    />
-                  </div>
-                  <div style={{ gridColumn: isMobile ? "auto" : "1 / -1", fontSize: "11px", fontWeight: 800, color: details.length === 0 ? "#C0392B" : "#0F6E56", lineHeight: 1.5 }}>
-                    {details.length === 0
-                      ? "· 아래 [세부상품 관리]의 [＋ 세부상품 추가]로 상품을 1개 이상 만들어야 저장됩니다."
-                      : `· 세부상품 ${details.length}개 등록됨. 대표사진은 브랜드 썸네일이 자동으로 들어갑니다.`}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <div style={{ marginBottom: "14px", padding: "9px 12px", borderRadius: "10px", border: "1px solid #E7C9D4", background: "#FFF9FB", fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>
-              🧥 세부상품 묶음 상품 수정 중 — 갈래는 바꿀 수 없어요 (세부상품·사진은 아래에서 그대로 고칩니다)
-            </div>
-          )}
-
-          {/* .top-row : 사진(120) + 필드 */}
-          <div style={{ display: "grid", gridTemplateColumns: (isMobile || !brandGroupActive) ? "1fr" : "120px 1fr", gap: "14px", marginBottom: "14px" }}>
-            {/* [2026-08-29] 모바일에선 1열로 떨어지는데 폭이 120px 로 고정돼 있어 화면이 어색했다 */}
-            <div style={{ width: isMobile ? "100%" : "120px" }}>
-              {brandGroupActive ? (
-                // [2026-08-29] 예전에는 브랜드 상품이면 글자 썸네일로 고정돼 사진을 올릴 수가 없었다.
-                //   → 사진을 올리면 그 사진을, 안 올리면 지금처럼 글자 썸네일을 쓴다.
-                coverImages.length > 0 ? (
-                  <div>
-                    <ImagePicker label="" value={coverImages} maxFiles={1} uploadKind="cover" mode="cover" onChange={(next) => { setFormTouched(true); setCoverImages(next); }} triggerRef={coverUploadRef} />
-                    <div style={{ marginTop: "5px", textAlign: "center", fontSize: "10px", lineHeight: 1.3, fontWeight: 800, color: "#0F6E56" }}>
-                      올린 사진이 대표로 쓰입니다<br />
-                      <span style={{ color: "var(--color-ink-mute)", fontWeight: 700 }}>지우면 글자 썸네일로 돌아감</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <img
-                      src={brandWordmarkImage}
-                      alt={`${effectiveBrandKo} 대표 썸네일`}
-                      style={{ width: isMobile ? "100%" : "120px", maxWidth: "220px", height: "120px", display: "block", objectFit: "cover", borderRadius: "10px", border: "1px solid #E1D5D9", background: "#FFFDFB" }}
-                    />
-                    <div style={{ marginTop: "6px" }}>
-                      <ImagePicker label="" value={coverImages} maxFiles={1} uploadKind="cover" mode="cover" onChange={(next) => { setFormTouched(true); setCoverImages(next); }} triggerRef={coverUploadRef} />
-                    </div>
-                    <div style={{ marginTop: "5px", textAlign: "center", fontSize: "10px", lineHeight: 1.3, fontWeight: 800, color: "#7B2D43" }}>
-                      브랜드 글자 썸네일 자동 적용<br />
-                      <span style={{ color: "var(--color-ink-mute)", fontWeight: 700 }}>사진을 올리면 그걸 씁니다</span>
-                    </div>
-                  </div>
-                )
-              ) : (
-                // [2026-09-03 재설계 1단계] 대표(1)+상세(5) 분리 → 한 줄 최대 10장, 첫 장이 대표(★로 변경)
-                //   저장은 기존 그대로: 첫 장 → image_url(coverImages), 나머지 → detail_image_urls(detailImages)
-                <ImagePicker
-                  label="사진 (최대 10장 — 첫 장이 대표)"
-                  value={[...coverImages, ...detailImages]}
-                  maxFiles={10}
-                  uploadKind="cover"
-                  mode="strip"
-                  onChange={(next) => { setFormTouched(true); setCoverImages(next.slice(0, 1)); setDetailImages(next.slice(1, 10)); }}
-                  triggerRef={coverUploadRef}
-                />
-              )}
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              <div style={brandGroupNew && !isEditMode ? { display: "none" } : undefined}>
-                {/* [2026-09-03] 묶음 신규는 브랜드 이름 = 상품명 자동 — 같은 이름 두 번 안 치게 칸 자체를 숨긴다 */}
-                <label style={fieldLabel}>상품명 <span style={{ color: "var(--color-rose-deep)", marginLeft: "2px" }}>*</span></label>
-                <input
-                  style={{ ...fieldInput, borderColor: nameError ? "#C0392B" : "#E8E2DD" }}
-                  type="text"
-                  placeholder="예: 스웨이드 로퍼"
-                  value={productName}
-                  onChange={(e) => { setFormTouched(true); setProductName(e.target.value); if (nameError) setNameError(false); }}
-                />
-                {nameError ? <div style={{ marginTop: "4px", fontSize: "11px", color: "var(--color-danger-tx)" }}>상품명은 필수입니다</div> : null}
-              </div>
-              <div>
-                <label style={fieldLabel}>{brandGroupActive ? <>대표가 <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(세부상품 판매가의 기준 — 판매가 = 대표가 + 추가금)</span></> : <>가격 <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(비우면 손님 직접입력)</span></>}</label>
-                <div style={{ position: "relative" }}>
-                  <input style={{ ...fieldInput, paddingRight: "30px", opacity: freeProductEnabled ? 0.45 : 1 }} type="text" inputMode="numeric" placeholder="59,000" value={freeProductEnabled ? "0" : priceText} disabled={freeProductEnabled} onChange={(e) => { setFormTouched(true); setPriceText(formatNumberWithComma(e.target.value)); }} />
-                  <span style={{ position: "absolute", right: "11px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", color: "var(--color-ink-mute)", pointerEvents: "none" }}>원</span>
-                </div>
-                {/* [무료나눔 · 2026-07-22] 0원 상품 — "가격 비움(손님 직접입력)"과 구분되는 별도 플래그.
-                    켜면 가격 0 고정 + note.free_product=true → 고객 주문서에서 이 상품만 0원 제출 허용 */}
-                <label style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "6px", fontSize: "12px", fontWeight: 700, color: freeProductEnabled ? "#0F6E56" : "var(--color-ink-mute)", cursor: "pointer" }}>
-                  <input type="checkbox" checked={freeProductEnabled} onChange={(e) => setFreeProductEnabled(e.target.checked)} style={{ accentColor: "#0F6E56" }} />
-                  🎁 무료나눔 상품 (0원 — 손님에게 선물)
-                </label>
-                {/* [2026-08-29] 세부상품 판매가는 "대표가 + 추가금"이라 대표가를 바꾸면 같이 움직인다.
-                    모르고 바꾸면 여러 상품 값이 한꺼번에 틀어지므로 미리 알려준다. */}
-                {details.length > 0 && !freeProductEnabled ? (
-                  <div style={{ marginTop: "5px", fontSize: "10.5px", fontWeight: 800, color: "#8A5A00", lineHeight: 1.45 }}>
-                    ⚠ 이 값을 바꾸면 세부상품 {details.length}개의 판매가가 <b>같이 움직입니다</b> (판매가 = 이 값 + 추가금)
-                  </div>
-                ) : null}
-              </div>
-              <div>
-                <label style={fieldLabel}>배송</label>
-                <select style={fieldInput} value={shippingType} onChange={(e) => setShippingType(e.target.value)}>
-                  <option value="normal">일반배송 (기본)</option>
-                  <option value="vendor">업체배송 1</option>
-                  <option value="vendor2">업체배송 2</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* [2026-08-29 사장님 요청] 손님 화면 미리보기
-              예전에는 등록을 마치고 주문서를 직접 열어봐야 어떻게 보이는지 알 수 있었다.
-              → 지금 입력 중인 값 그대로, 손님 상품목록에 나올 카드를 그 자리에서 보여준다.
-              ⚠️ 표시 전용이다. 저장되는 값과 계산식은 건드리지 않는다. */}
-          <div style={{ marginBottom: "14px", border: "1px solid #D9C5CC", borderRadius: "10px", background: "#FFF9FB", overflow: "hidden" }}>
-            <button
-              type="button"
-              onClick={() => setPreviewOpen((v) => !v)}
-              style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "8px 11px", border: "none", background: "transparent", cursor: "pointer" }}
-            >
-              <span style={{ fontSize: "12px", fontWeight: 900, color: "#7B2D43" }}>👀 손님 화면 미리보기</span>
-              <span style={{ fontSize: "10px", fontWeight: 800, color: "var(--color-ink-mute)" }}>{previewOpen ? "접기 ▲" : "펴기 ▼"}</span>
-            </button>
-
-            {previewOpen ? (() => {
-              // 손님 목록 카드와 같은 기준으로 값 만들기
-              const basePrice = freeProductEnabled ? 0 : moneyNumber(priceText);
-              const plusList = details.map((n) => Math.max(0, Number(detailPlus[n]) || 0));
-              const minPlus = plusList.length > 0 ? Math.min(...plusList) : 0;
-              const maxPlus = plusList.length > 0 ? Math.max(...plusList) : 0;
-              const lowest = basePrice + minPlus;
-
-              const priceText2 = brandGroupActive
-                ? `최저가 ${lowest.toLocaleString("ko-KR")}원 부터 ~`
-                : freeProductEnabled
-                  ? "0원 · 🎁 무료나눔"
-                  : basePrice > 0
-                    ? maxPlus > 0
-                      ? `${lowest.toLocaleString("ko-KR")}원 ~`
-                      : `${basePrice.toLocaleString("ko-KR")}원`
-                    : "가격 직접입력";
-
-              const uploadedCover = resolveProductImageUrl(coverImages[0] || "");
-              // [2026-09-03] 미리보기도 실제 손님 화면과 동일한 폴백: 사진 → (브랜드 워드마크) → 자동 그림 → 글자 카드
-              const autoThumb = productAutoThumbUrl(productName.trim(), category.trim()) || productNameThumbnail(productName.trim() || "상품", category.trim());
-              const cover = brandGroupActive
-                ? (uploadedCover || brandWordmarkImage)
-                : (resolveProductImageUrl(coverImages[0] || detailImages[0] || Object.values(detailPhotos)[0] || "") || autoThumb);
-
-              const badgeChip = (bg: string, color: string, text: string) => (
-                <span key={text} style={{ fontSize: "9px", fontWeight: 800, color, background: bg, borderRadius: "4px", padding: "2px 5px" }}>{text}</span>
-              );
-
-              return (
-                <div style={{ padding: "0 11px 11px" }}>
-                  <div style={{ border: "1px solid #EFE6DE", borderRadius: "12px", background: "#fff", padding: "11px", display: "flex", gap: "10px", alignItems: "center" }}>
-                    <div style={{ width: "68px", height: "68px", flexShrink: 0, borderRadius: "9px", overflow: "hidden", background: "#F0EBE8", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <img src={cover} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    </div>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ display: "flex", gap: "3px", flexWrap: "wrap", marginBottom: "3px" }}>
-                        {badgeTypes.includes("new") ? badgeChip("#E7F3EE", "#0F6E56", "NEW") : null}
-                        {badgeTypes.includes("hot") ? badgeChip("#FBEAE7", "#C0392B", "HOT") : null}
-                        {badgeTypes.includes("special") ? badgeChip("#FFF4D6", "#9A6212", "⚡특가") : null}
-                        {badgeTypes.includes("limit") ? badgeChip("#FBF1E0", "#854F0B", "마감임박") : null}
-                        {badgeTypes.includes("pick") ? badgeChip("#FDEEF3", "#C2447A", "💖 루루픽") : null}
-                        {badgeTypes.includes("direct") ? badgeChip("#E8F0FE", "#1D4ED8", "🛒 바로구매") : null}
-                        {badgeTypes.includes("overseas") ? badgeChip("#EEF6F3", "#0F6E56", "✈️ 해외배송") : null}
-                        {freeProductEnabled ? badgeChip("#E7F3EE", "#0F6E56", "🎁 무료나눔") : null}
-                        {shippingType !== "normal" ? badgeChip("#EEF2FA", "#3B5BA5", "🚚 업체배송") : null}
-                      </div>
-                      <div style={{ fontSize: "13px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {productName.trim() || "상품명을 입력하세요"}
-                      </div>
-                      {details.length > 1 ? (
-                        <div style={{ fontSize: "10.5px", color: "#8A8A8A", marginTop: "2px" }}>
-                          {brandGroupActive
-                            ? `세부상품 ${details.length - detailHidden.length}가지 · 상품별 금액이 달라요`
-                            : `종류 ${details.length}가지 · 눌러서 선택`}
-                        </div>
-                      ) : null}
-                      <div style={{ marginTop: "4px", fontSize: "15px", fontWeight: 800, color: "#7A1E47" }}>{priceText2}</div>
-                    </div>
-                    <div style={{ flexShrink: 0, height: "30px", padding: "0 13px", borderRadius: "7px", background: "#7A1E47", color: "#fff", fontSize: "11px", fontWeight: 800, display: "flex", alignItems: "center" }}>
-                      {details.length > 1 || colors.length > 0 || sizes.length > 0 ? "상품 선택" : "장바구니 담기"}
-                    </div>
-                  </div>
-
-                  {/* 손님이 못 보는 상태를 미리 알려준다 */}
-                  <div style={{ marginTop: "7px", display: "flex", flexDirection: "column", gap: "3px" }}>
-                    {!productName.trim() ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#C0392B" }}>· 상품명이 없으면 저장되지 않습니다</span> : null}
-                    {!brandGroupActive && !uploadedCover && !detailImages[0] ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#0F6E56" }}>· 사진이 없으면 상품명에 맞는 자동 그림이 나갑니다 (위 미리보기 그대로 · 사진 올리면 교체)</span> : null}
-                    {!isVisible ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#8A5A00" }}>· 고객 노출이 꺼져 있어 손님 화면에 아예 안 보입니다</span> : null}
-                    {details.length > 0 && detailHidden.length === details.length ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#C0392B" }}>· 세부상품이 전부 숨김이라 손님이 고를 수 있는 게 없습니다</span> : null}
-                  </div>
-                </div>
-              );
-            })() : null}
-          </div>
-
-          {/* ── 옵션 박스 [2026-08-10 통합] 탭 제거 · 슬롯 3개(세부상품/색상/사이즈) 중 쓰는 것만 축이 된다 ── */}
+  // [2026-09-03 재설계] 옵션·세부상품·재고 섹션 — 단품에선 원래 자리, 묶음에선 브랜드 이름 바로 아래(주인공)로.
+  const optionStockSection = (
           <div style={{ marginBottom: "14px" }}>
             <div style={{ border: "1px solid #E8E2DD", borderRadius: "8px", padding: "12px", background: "#F7F5F3" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
@@ -2298,11 +2046,8 @@ export default function QuickProductFastForm({
                       background: rowDropTarget === "__bulk__" ? "#EAF6F1" : "#FBF7F9",
                     }}
                   >
-                    <div style={{ fontSize: "12.5px", fontWeight: 900, color: "#7B2D43" }}>
-                      {bulkRowBusy ? "사진 올리는 중…" : "📸 사진을 여기에 몽땅 끌어다 놓으세요"}
-                    </div>
-                    <div style={{ marginTop: "4px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.6 }}>
-                      놓은 장수만큼 줄이 자동으로 생기고, <b>파일 이름이 상품명</b>으로 들어갑니다 (BB-39.jpg → BB-39)
+                    <div style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>
+                      {bulkRowBusy ? "사진 올리는 중…" : "📸 사진 몽땅 끌어놓기 — 장수만큼 줄 생성 · 파일명=상품명"}
                     </div>
                   </div>
                   <input
@@ -2315,18 +2060,14 @@ export default function QuickProductFastForm({
                   />
 
                   {details.length === 0 ? (
-                    <div style={{ padding: "20px 14px", textAlign: "center", border: "2px dashed #D9C5CC", borderRadius: "11px", background: "var(--color-surface)" }}>
-                      <div style={{ fontSize: "13px", fontWeight: 900, color: "#7B2D43" }}>세부상품 넣기 — 둘 중 편한 방법으로</div>
-                      <div style={{ marginTop: "9px", display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "center" }}>
-                        <button
-                          type="button"
-                          onClick={(event) => { event.stopPropagation(); openBrandDetailEditorForNew(); }}
-                          style={{ border: "none", borderRadius: "10px", background: "#7B2D43", color: "#fff", padding: "11px 18px", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}
-                        >＋ 이름으로 추가 (사진 없이)</button>
-                        <div style={{ alignSelf: "center", fontSize: "11.5px", fontWeight: 800, color: "var(--color-ink-mute)" }}>또는 위 분홍 칸에 사진 몽땅 끌어놓기</div>
-                      </div>
-                      <div style={{ marginTop: "8px", fontSize: "11px", fontWeight: 700, color: "#0F6E56" }}>
-                        사진 없이 이름만 넣어도 손님에게는 <b>상품명에 맞는 자동 그림</b>이 나갑니다 (화장품→화장품 그림)
+                    <div style={{ padding: "16px 14px", textAlign: "center", border: "2px dashed #7B2D43", borderRadius: "11px", background: "#FDF9FA", marginBottom: "9px" }}>
+                      <button
+                        type="button"
+                        onClick={(event) => { event.stopPropagation(); openBrandDetailEditorForNew(); }}
+                        style={{ border: "none", borderRadius: "10px", background: "#7B2D43", color: "#fff", padding: "12px 22px", fontSize: "14px", fontWeight: 900, cursor: "pointer" }}
+                      >＋ 세부상품 추가 — 이름·가격만</button>
+                      <div style={{ marginTop: "7px", fontSize: "11px", fontWeight: 700, color: "#0F6E56" }}>
+                        사진 없어도 됩니다 — 손님에게는 <b>상품명 자동 그림</b>이 나가요 (화장품→화장품 그림)
                       </div>
                     </div>
                   ) : (
@@ -2572,7 +2313,9 @@ export default function QuickProductFastForm({
                 </div>
               ) : null}
 
-              {/* ── 재고관리 (옵션 박스 안으로 이동 — 재고 표 바로 위) ── */}
+              {/* ── 재고관리 (옵션 박스 안으로 이동 — 재고 표 바로 위) ──
+                  [2026-09-03] 묶음인데 세부상품이 아직 없으면 "총 재고 0개"는 소음 — 세부상품 생기면 나타남 (표시만) */}
+              {brandGroupActive && details.length === 0 ? null : (<>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #E8E2DD", marginTop: "10px", paddingTop: "10px" }}>
                 <div>
                   <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--color-ink)" }}>재고관리</div>
@@ -2742,8 +2485,267 @@ export default function QuickProductFastForm({
                   ) : null}
                 </div>
               ) : null}
+              </>)}
             </div>
           </div>
+  );
+
+  return (
+    <div
+      className="ruru-product-sian"
+      style={{ position: "fixed", inset: 0, zIndex: 90, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", padding: "16px" }}
+    >
+      {/* .modal */}
+      <div style={{ width: "560px", maxWidth: "100%", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "12px", boxShadow: "0 0 0 2px #7B2D43, 0 8px 40px rgba(0,0,0,0.35)", overflow: "hidden", transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}>
+
+        {/* .modal-hd */}
+        <div onMouseDown={onHeaderMouseDown} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: "1px solid #E8E2DD", background: "#F7F5F3", cursor: "grab", userSelect: "none" }}>
+          <h2 style={{ fontSize: "15px", fontWeight: 500, color: "var(--color-ink)", margin: 0 }}>{isEditMode ? "✎ 상품 수정" : "+ 새 상품 등록"}</h2>
+          <span onClick={() => { void requestClose(); }} style={{ fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>×</span>
+        </div>
+
+        {/* .modal-body */}
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 18px" }}>
+
+          {/* [2026-09-03 재설계 2단계] 갈래 선택 — 맨 위에서 「단품 / 세부상품 묶음」 중 하나 (시안 ①②)
+              저장 값은 기존 brandGroupNew 그대로(카드가 스위치를 대신할 뿐, 저장 로직 무수정).
+              브랜드 묶음 상품 수정 중에는 갈래 변경 금지(끄면 손님 화면이 깨짐) — 안내만 표시. */}
+          {!isBrandGroupEdit ? (
+            <div style={{ marginBottom: "14px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "10px" }}>
+                <button type="button" onClick={() => { if (brandGroupNew) { setFormTouched(true); setBrandGroupNew(false); } }} style={{ textAlign: "left", border: !brandGroupNew ? "2.5px solid #7B2D43" : "1.5px solid #E8E2DD", background: !brandGroupNew ? "#F9EEF3" : "var(--color-surface)", borderRadius: "12px", padding: "12px 14px", cursor: "pointer" }}>
+                  <div style={{ fontSize: "14px", fontWeight: 900, color: !brandGroupNew ? "#7B2D43" : "var(--color-ink-mute)" }}>🧦 단품 상품</div>
+                  <div style={{ marginTop: "3px", fontSize: "11px", fontWeight: 700, color: !brandGroupNew ? "#5B4A50" : "var(--color-ink-mute)", lineHeight: 1.5 }}>상품 하나. 사진 넣고 이름·가격만.<br />옵션(색상·사이즈)은 필요할 때만.</div>
+                </button>
+                <button type="button" onClick={() => { if (!brandGroupNew) { setFormTouched(true); setBrandGroupNew(true); } }} style={{ textAlign: "left", border: brandGroupNew ? "2.5px solid #7B2D43" : "1.5px solid #E8E2DD", background: brandGroupNew ? "#F9EEF3" : "var(--color-surface)", borderRadius: "12px", padding: "12px 14px", cursor: "pointer" }}>
+                  <div style={{ fontSize: "14px", fontWeight: 900, color: brandGroupNew ? "#7B2D43" : "var(--color-ink-mute)" }}>🧥 세부상품 묶음</div>
+                  <div style={{ marginTop: "3px", fontSize: "11px", fontWeight: 700, color: brandGroupNew ? "#5B4A50" : "var(--color-ink-mute)", lineHeight: 1.5 }}>버버리·미우미우처럼 한 상품 안에<br />여러 개 (각자 사진·가격·색상·사이즈)</div>
+                </button>
+              </div>
+              {brandGroupNew ? (
+                <div style={{ marginTop: "10px", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "8px" }}>
+                  <div>
+                    <label style={fieldLabel}>브랜드 이름 (한글)</label>
+                    <input
+                      style={fieldInput}
+                      type="text"
+                      placeholder="예: 버버리"
+                      value={brandKoText}
+                      onChange={(e) => {
+                        setFormTouched(true);
+                        const v = e.target.value;
+                        // [2026-09-03] 묶음에서 브랜드 이름과 상품명을 두 번 치지 않게 — 상품명을 따로 안 만졌으면 따라간다
+                        if (!isEditMode && (!productName.trim() || productName === brandKoText)) setProductName(v);
+                        setBrandKoText(v);
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={fieldLabel}>브랜드 이름 (영문) <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(썸네일용·선택)</span></label>
+                    <input
+                      style={fieldInput}
+                      type="text"
+                      placeholder="예: BURBERRY"
+                      value={brandEnText}
+                      onChange={(e) => { setFormTouched(true); setBrandEnText(e.target.value); }}
+                    />
+                  </div>
+                  <div style={{ gridColumn: isMobile ? "auto" : "1 / -1", fontSize: "11px", fontWeight: 800, color: details.length === 0 ? "#C0392B" : "#0F6E56", lineHeight: 1.5 }}>
+                    {details.length === 0
+                      ? "· 바로 아래 [＋ 세부상품 추가]로 상품을 1개 이상 넣으면 저장됩니다."
+                      : `· 세부상품 ${details.length}개 등록됨. 대표사진은 브랜드 썸네일이 자동으로 들어갑니다.`}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div style={{ marginBottom: "14px", padding: "9px 12px", borderRadius: "10px", border: "1px solid #E7C9D4", background: "#FFF9FB", fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>
+              🧥 세부상품 묶음 상품 수정 중 — 갈래는 바꿀 수 없어요 (세부상품·사진은 아래에서 그대로 고칩니다)
+            </div>
+          )}
+
+          {brandGroupActive ? optionStockSection : null}
+
+          {/* .top-row : 사진(120) + 필드 */}
+          <div style={{ display: "grid", gridTemplateColumns: (isMobile || !brandGroupActive) ? "1fr" : "120px 1fr", gap: "14px", marginBottom: "14px" }}>
+            {/* [2026-08-29] 모바일에선 1열로 떨어지는데 폭이 120px 로 고정돼 있어 화면이 어색했다 */}
+            <div style={{ width: isMobile ? "100%" : "120px" }}>
+              {brandGroupActive ? (
+                // [2026-08-29] 예전에는 브랜드 상품이면 글자 썸네일로 고정돼 사진을 올릴 수가 없었다.
+                //   → 사진을 올리면 그 사진을, 안 올리면 지금처럼 글자 썸네일을 쓴다.
+                coverImages.length > 0 ? (
+                  <div>
+                    <ImagePicker label="" value={coverImages} maxFiles={1} uploadKind="cover" mode="cover" onChange={(next) => { setFormTouched(true); setCoverImages(next); }} triggerRef={coverUploadRef} />
+                    <div style={{ marginTop: "5px", textAlign: "center", fontSize: "10px", lineHeight: 1.3, fontWeight: 800, color: "#0F6E56" }}>
+                      올린 사진이 대표로 쓰입니다<br />
+                      <span style={{ color: "var(--color-ink-mute)", fontWeight: 700 }}>지우면 글자 썸네일로 돌아감</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <img
+                      src={brandWordmarkImage}
+                      alt={`${effectiveBrandKo} 대표 썸네일`}
+                      style={{ width: isMobile ? "100%" : "120px", maxWidth: "220px", height: "120px", display: "block", objectFit: "cover", borderRadius: "10px", border: "1px solid #E1D5D9", background: "#FFFDFB" }}
+                    />
+                    <div style={{ marginTop: "6px" }}>
+                      <ImagePicker label="" value={coverImages} maxFiles={1} uploadKind="cover" mode="cover" onChange={(next) => { setFormTouched(true); setCoverImages(next); }} triggerRef={coverUploadRef} />
+                    </div>
+                    <div style={{ marginTop: "5px", textAlign: "center", fontSize: "10px", lineHeight: 1.3, fontWeight: 800, color: "#7B2D43" }}>
+                      브랜드 글자 썸네일 자동 적용<br />
+                      <span style={{ color: "var(--color-ink-mute)", fontWeight: 700 }}>사진을 올리면 그걸 씁니다</span>
+                    </div>
+                  </div>
+                )
+              ) : (
+                // [2026-09-03 재설계 1단계] 대표(1)+상세(5) 분리 → 한 줄 최대 10장, 첫 장이 대표(★로 변경)
+                //   저장은 기존 그대로: 첫 장 → image_url(coverImages), 나머지 → detail_image_urls(detailImages)
+                <ImagePicker
+                  label="사진 (최대 10장 — 첫 장이 대표)"
+                  value={[...coverImages, ...detailImages]}
+                  maxFiles={10}
+                  uploadKind="cover"
+                  mode="strip"
+                  onChange={(next) => { setFormTouched(true); setCoverImages(next.slice(0, 1)); setDetailImages(next.slice(1, 10)); }}
+                  triggerRef={coverUploadRef}
+                />
+              )}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div style={brandGroupNew && !isEditMode ? { display: "none" } : undefined}>
+                {/* [2026-09-03] 묶음 신규는 브랜드 이름 = 상품명 자동 — 같은 이름 두 번 안 치게 칸 자체를 숨긴다 */}
+                <label style={fieldLabel}>상품명 <span style={{ color: "var(--color-rose-deep)", marginLeft: "2px" }}>*</span></label>
+                <input
+                  style={{ ...fieldInput, borderColor: nameError ? "#C0392B" : "#E8E2DD" }}
+                  type="text"
+                  placeholder="예: 스웨이드 로퍼"
+                  value={productName}
+                  onChange={(e) => { setFormTouched(true); setProductName(e.target.value); if (nameError) setNameError(false); }}
+                />
+                {nameError ? <div style={{ marginTop: "4px", fontSize: "11px", color: "var(--color-danger-tx)" }}>상품명은 필수입니다</div> : null}
+              </div>
+              <div>
+                <label style={fieldLabel}>{brandGroupActive ? <>대표가 <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(세부상품 판매가의 기준 — 판매가 = 대표가 + 추가금)</span></> : <>가격 <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(비우면 손님 직접입력)</span></>}</label>
+                <div style={{ position: "relative" }}>
+                  <input style={{ ...fieldInput, paddingRight: "30px", opacity: freeProductEnabled ? 0.45 : 1 }} type="text" inputMode="numeric" placeholder="59,000" value={freeProductEnabled ? "0" : priceText} disabled={freeProductEnabled} onChange={(e) => { setFormTouched(true); setPriceText(formatNumberWithComma(e.target.value)); }} />
+                  <span style={{ position: "absolute", right: "11px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", color: "var(--color-ink-mute)", pointerEvents: "none" }}>원</span>
+                </div>
+                {/* [무료나눔 · 2026-07-22] 0원 상품 — "가격 비움(손님 직접입력)"과 구분되는 별도 플래그.
+                    켜면 가격 0 고정 + note.free_product=true → 고객 주문서에서 이 상품만 0원 제출 허용 */}
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "6px", fontSize: "12px", fontWeight: 700, color: freeProductEnabled ? "#0F6E56" : "var(--color-ink-mute)", cursor: "pointer" }}>
+                  <input type="checkbox" checked={freeProductEnabled} onChange={(e) => setFreeProductEnabled(e.target.checked)} style={{ accentColor: "#0F6E56" }} />
+                  🎁 무료나눔 상품 (0원 — 손님에게 선물)
+                </label>
+                {/* [2026-08-29] 세부상품 판매가는 "대표가 + 추가금"이라 대표가를 바꾸면 같이 움직인다.
+                    모르고 바꾸면 여러 상품 값이 한꺼번에 틀어지므로 미리 알려준다. */}
+                {details.length > 0 && !freeProductEnabled ? (
+                  <div style={{ marginTop: "5px", fontSize: "10.5px", fontWeight: 800, color: "#8A5A00", lineHeight: 1.45 }}>
+                    ⚠ 이 값을 바꾸면 세부상품 {details.length}개의 판매가가 <b>같이 움직입니다</b> (판매가 = 이 값 + 추가금)
+                  </div>
+                ) : null}
+              </div>
+              <div>
+                <label style={fieldLabel}>배송</label>
+                <select style={fieldInput} value={shippingType} onChange={(e) => setShippingType(e.target.value)}>
+                  <option value="normal">일반배송 (기본)</option>
+                  <option value="vendor">업체배송 1</option>
+                  <option value="vendor2">업체배송 2</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* [2026-08-29 사장님 요청] 손님 화면 미리보기
+              예전에는 등록을 마치고 주문서를 직접 열어봐야 어떻게 보이는지 알 수 있었다.
+              → 지금 입력 중인 값 그대로, 손님 상품목록에 나올 카드를 그 자리에서 보여준다.
+              ⚠️ 표시 전용이다. 저장되는 값과 계산식은 건드리지 않는다. */}
+          <div style={{ marginBottom: "14px", border: "1px solid #D9C5CC", borderRadius: "10px", background: "#FFF9FB", overflow: "hidden" }}>
+            <button
+              type="button"
+              onClick={() => setPreviewOpen((v) => !v)}
+              style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "8px 11px", border: "none", background: "transparent", cursor: "pointer" }}
+            >
+              <span style={{ fontSize: "12px", fontWeight: 900, color: "#7B2D43" }}>👀 손님 화면 미리보기</span>
+              <span style={{ fontSize: "10px", fontWeight: 800, color: "var(--color-ink-mute)" }}>{previewOpen ? "접기 ▲" : "펴기 ▼"}</span>
+            </button>
+
+            {previewOpen ? (() => {
+              // 손님 목록 카드와 같은 기준으로 값 만들기
+              const basePrice = freeProductEnabled ? 0 : moneyNumber(priceText);
+              const plusList = details.map((n) => Math.max(0, Number(detailPlus[n]) || 0));
+              const minPlus = plusList.length > 0 ? Math.min(...plusList) : 0;
+              const maxPlus = plusList.length > 0 ? Math.max(...plusList) : 0;
+              const lowest = basePrice + minPlus;
+
+              const priceText2 = brandGroupActive
+                ? `최저가 ${lowest.toLocaleString("ko-KR")}원 부터 ~`
+                : freeProductEnabled
+                  ? "0원 · 🎁 무료나눔"
+                  : basePrice > 0
+                    ? maxPlus > 0
+                      ? `${lowest.toLocaleString("ko-KR")}원 ~`
+                      : `${basePrice.toLocaleString("ko-KR")}원`
+                    : "가격 직접입력";
+
+              const uploadedCover = resolveProductImageUrl(coverImages[0] || "");
+              // [2026-09-03] 미리보기도 실제 손님 화면과 동일한 폴백: 사진 → (브랜드 워드마크) → 자동 그림 → 글자 카드
+              const autoThumb = productAutoThumbUrl(productName.trim(), category.trim()) || productNameThumbnail(productName.trim() || "상품", category.trim());
+              const cover = brandGroupActive
+                ? (uploadedCover || brandWordmarkImage)
+                : (resolveProductImageUrl(coverImages[0] || detailImages[0] || Object.values(detailPhotos)[0] || "") || autoThumb);
+
+              const badgeChip = (bg: string, color: string, text: string) => (
+                <span key={text} style={{ fontSize: "9px", fontWeight: 800, color, background: bg, borderRadius: "4px", padding: "2px 5px" }}>{text}</span>
+              );
+
+              return (
+                <div style={{ padding: "0 11px 11px" }}>
+                  <div style={{ border: "1px solid #EFE6DE", borderRadius: "12px", background: "#fff", padding: "11px", display: "flex", gap: "10px", alignItems: "center" }}>
+                    <div style={{ width: "68px", height: "68px", flexShrink: 0, borderRadius: "9px", overflow: "hidden", background: "#F0EBE8", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <img src={cover} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ display: "flex", gap: "3px", flexWrap: "wrap", marginBottom: "3px" }}>
+                        {badgeTypes.includes("new") ? badgeChip("#E7F3EE", "#0F6E56", "NEW") : null}
+                        {badgeTypes.includes("hot") ? badgeChip("#FBEAE7", "#C0392B", "HOT") : null}
+                        {badgeTypes.includes("special") ? badgeChip("#FFF4D6", "#9A6212", "⚡특가") : null}
+                        {badgeTypes.includes("limit") ? badgeChip("#FBF1E0", "#854F0B", "마감임박") : null}
+                        {badgeTypes.includes("pick") ? badgeChip("#FDEEF3", "#C2447A", "💖 루루픽") : null}
+                        {badgeTypes.includes("direct") ? badgeChip("#E8F0FE", "#1D4ED8", "🛒 바로구매") : null}
+                        {badgeTypes.includes("overseas") ? badgeChip("#EEF6F3", "#0F6E56", "✈️ 해외배송") : null}
+                        {freeProductEnabled ? badgeChip("#E7F3EE", "#0F6E56", "🎁 무료나눔") : null}
+                        {shippingType !== "normal" ? badgeChip("#EEF2FA", "#3B5BA5", "🚚 업체배송") : null}
+                      </div>
+                      <div style={{ fontSize: "13px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {productName.trim() || "상품명을 입력하세요"}
+                      </div>
+                      {details.length > 1 ? (
+                        <div style={{ fontSize: "10.5px", color: "#8A8A8A", marginTop: "2px" }}>
+                          {brandGroupActive
+                            ? `세부상품 ${details.length - detailHidden.length}가지 · 상품별 금액이 달라요`
+                            : `종류 ${details.length}가지 · 눌러서 선택`}
+                        </div>
+                      ) : null}
+                      <div style={{ marginTop: "4px", fontSize: "15px", fontWeight: 800, color: "#7A1E47" }}>{priceText2}</div>
+                    </div>
+                    <div style={{ flexShrink: 0, height: "30px", padding: "0 13px", borderRadius: "7px", background: "#7A1E47", color: "#fff", fontSize: "11px", fontWeight: 800, display: "flex", alignItems: "center" }}>
+                      {details.length > 1 || colors.length > 0 || sizes.length > 0 ? "상품 선택" : "장바구니 담기"}
+                    </div>
+                  </div>
+
+                  {/* 손님이 못 보는 상태를 미리 알려준다 */}
+                  <div style={{ marginTop: "7px", display: "flex", flexDirection: "column", gap: "3px" }}>
+                    {!productName.trim() ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#C0392B" }}>{brandGroupActive ? "· 브랜드 이름을 입력해 주세요" : "· 상품명이 없으면 저장되지 않습니다"}</span> : null}
+                    {!brandGroupActive && !uploadedCover && !detailImages[0] ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#0F6E56" }}>· 사진이 없으면 상품명에 맞는 자동 그림이 나갑니다 (위 미리보기 그대로 · 사진 올리면 교체)</span> : null}
+                    {!isVisible ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#8A5A00" }}>· 고객 노출이 꺼져 있어 손님 화면에 아예 안 보입니다</span> : null}
+                    {details.length > 0 && detailHidden.length === details.length ? <span style={{ fontSize: "10.5px", fontWeight: 800, color: "#C0392B" }}>· 세부상품이 전부 숨김이라 손님이 고를 수 있는 게 없습니다</span> : null}
+                  </div>
+                </div>
+              );
+            })() : null}
+          </div>
+
+          {!brandGroupActive ? optionStockSection : null}
 
           {/* 고객노출 / 구매제한 */}
           <div style={{ marginBottom: "14px" }}>
@@ -2937,15 +2939,6 @@ export default function QuickProductFastForm({
           ) : null}
 
 
-          {/* 일반 상품 공통 상세사진 / 브랜드 대표상품은 위의 세부상품별 사진 목록으로 확인 */}
-          {/* [2026-09-03 재설계 1단계] 단품 상세사진 섹션 제거 — 위 한 줄 10장으로 통합 */}
-          {!brandGroupActive ? null : (
-            <div style={{ marginBottom: "14px", padding: "9px 11px", borderRadius: "8px", border: "1px solid #CFE4DB", background: "#EEF6F3", color: "#0F6E56", fontSize: "11.5px", lineHeight: 1.55 }}>
-              세부상품별 사진 <b>{details.length}개 상품 · 총 {brandGroupDetailPhotoCount}장</b>이 등록되어 있습니다.<br />
-              위의 세부상품 목록에서 썸네일과 사진 수를 확인할 수 있어요.
-            </div>
-          )}
-
         </div>
 
         {/* footer */}
@@ -3073,7 +3066,7 @@ export default function QuickProductFastForm({
                       <div style={{ padding: "20px 11px 0", fontSize: "11.5px", fontWeight: 900, color: tooLow ? "#C0392B" : "#7B2D43", lineHeight: 1.5 }}>
                         {tooLow
                           ? <>대표가({base.toLocaleString("ko-KR")}원)보다<br />낮게는 못 넣습니다</>
-                          : <>대표가 {base.toLocaleString("ko-KR")}원<br />+ 추가금 {plusNow.toLocaleString("ko-KR")}원</>}
+                          : <>💡 <b>팔 금액을 그대로</b> 적으세요<br />추가금({plusNow.toLocaleString("ko-KR")}원)은 자동 계산</>}
                       </div>
                     </>
                   );
@@ -3081,7 +3074,7 @@ export default function QuickProductFastForm({
               </div>
 
               <div style={{ marginTop: "14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-ink)" }}>실제 색상·사이즈 조합</span>
+                <span style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-ink)" }}>색상·사이즈 <span style={{ fontWeight: 700, color: "var(--color-ink-mute)" }}>— 없으면 그대로 「없음」</span></span>
                 <button type="button" onClick={() => setBrandDetailEditDraft((prev) => prev ? { ...prev, variants: [...prev.variants, { color: "없음", size: "없음" }] } : prev)} style={{ border: "1px solid #D9C5CC", borderRadius: "7px", background: "#fff", color: "#7B2D43", padding: "5px 9px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>+ 조합 추가</button>
               </div>
               <div style={{ marginTop: "7px", display: "grid", gap: "6px", maxHeight: "280px", overflowY: "auto" }}>
