@@ -717,7 +717,8 @@ export default function QuickProductFastForm({
   const [priceText, setPriceText] = useState("");
   // [2026-08-10 0단계] 기본 ON — 방송 상품은 거의 전부 재고관리가 필요한데 기본이 꺼져 있어
   //   재고를 입력하고도 무제한으로 저장되는 사고가 있었다(8/10 오버셀과 같은 경로).
-  const [stockManagementEnabled, setStockManagementEnabled] = useState(true);
+  // [2026-09-03 사장님 지시] 새 상품 기본값 OFF — 기존 상품은 로드 시 저장된 값을 그대로 복원(보호)
+  const [stockManagementEnabled, setStockManagementEnabled] = useState(false);
   const [shippingType, setShippingType] = useState("normal");
   // [2026-09-03 사장님 요청] 손님 직접입력 칸의 제목(예: 상품숫자) — 비우면 기존대로 "색상". note.custom_input_label 로 저장.
   const [customInputLabel, setCustomInputLabel] = useState("");
@@ -1624,7 +1625,7 @@ export default function QuickProductFastForm({
     setVariantRows([]);
     setDescription("");
     setFreeProductEnabled(false);
-    setStockManagementEnabled(true);
+    setStockManagementEnabled(false); // [2026-09-03 사장님 지시] 새 상품 폼 초기화도 기본 OFF
     setCustomerDetailInputEnabled(false);
     setDetailText("");
     setDetailLabel(DETAIL_LABEL_FIXED);
@@ -2126,17 +2127,17 @@ export default function QuickProductFastForm({
                         </div>
                       ) : null}
                       <div style={{ overflowX: "auto" }}>
-                        <table style={{ borderCollapse: "collapse", width: "100%", minWidth: "560px" }}>
+                        {/* [2026-09-03 사장님 요청] 옆 스크롤 제거 — 색상·사이즈는 상품명 아래 둘째 줄(두줄 구조) */}
+                        <table style={{ borderCollapse: "collapse", width: "100%" }}>
                           <thead>
                             <tr style={{ background: "#F7F2F4" }}>
-                              {["사진", "상품명", "판매가", "색상", "사이즈", "노출"].map((h, i) => (
+                              {["사진", "상품명 · 색상·사이즈", "판매가", "노출·수정"].map((h, i) => (
                                 <th
                                   key={`h-${i}`}
                                   style={{
-                                    textAlign: i === 2 ? "right" : i === 5 ? "center" : "left", fontSize: "10px", fontWeight: 900,
+                                    textAlign: i === 2 ? "right" : i === 3 ? "center" : "left", fontSize: "10px", fontWeight: 900,
                                     color: "var(--color-ink-mute)", letterSpacing: "0.04em", padding: "8px 8px", whiteSpace: "nowrap",
-                                    width: i === 0 ? "56px" : i === 2 ? "104px" : i === 3 ? "104px" : i === 4 ? "116px" : i === 5 ? "74px" : undefined,
-                                    ...(i === 5 ? { position: "sticky" as const, right: 0, zIndex: 2, background: "#F7F2F4", boxShadow: "-7px 0 7px -7px rgba(0,0,0,0.22)" } : {}),
+                                    width: i === 0 ? "56px" : i === 2 ? "104px" : i === 3 ? "96px" : undefined,
                                   }}
                                 >{h}</th>
                               ))}
@@ -2231,9 +2232,29 @@ export default function QuickProductFastForm({
                                       }}
                                       onKeyDown={(event) => { if (event.key === "Enter") (event.target as HTMLInputElement).blur(); }}
                                     />
+                                    <div style={{ display: "flex", gap: "6px", alignItems: "center", marginTop: "2px" }}>
+                                      <span style={{ fontSize: "9px", fontWeight: 900, color: "var(--color-ink-mute)", flexShrink: 0 }}>색상</span>
+                                      <input
+                                        style={{ ...cellStyle, height: "26px", fontSize: "11px", fontWeight: 700, flex: 1, minWidth: 0 }}
+                                        placeholder="없음"
+                                        defaultValue={(cfg.colors || []).join(", ")}
+                                        key={`c-${name}-${(cfg.colors || []).join(",")}`}
+                                        onBlur={(event) => setDetailAxisValues(name, "colors", event.target.value)}
+                                        onKeyDown={(event) => { if (event.key === "Enter") (event.target as HTMLInputElement).blur(); }}
+                                      />
+                                      <span style={{ fontSize: "9px", fontWeight: 900, color: "var(--color-ink-mute)", flexShrink: 0 }}>사이즈</span>
+                                      <input
+                                        style={{ ...cellStyle, height: "26px", fontSize: "11px", fontWeight: 700, flex: 1, minWidth: 0 }}
+                                        placeholder="없음"
+                                        defaultValue={(cfg.sizes || []).join(", ")}
+                                        key={`s-${name}-${(cfg.sizes || []).join(",")}`}
+                                        onBlur={(event) => setDetailAxisValues(name, "sizes", event.target.value)}
+                                        onKeyDown={(event) => { if (event.key === "Enter") (event.target as HTMLInputElement).blur(); }}
+                                      />
+                                    </div>
                                   </td>
 
-                                  <td style={{ padding: "6px 8px" }}>
+                                  <td style={{ padding: "6px 8px", verticalAlign: "top" }}>
                                     <input
                                       style={{ ...cellStyle, textAlign: "right", fontWeight: 800, borderColor: tooLow ? "#C0392B" : "transparent" }}
                                       inputMode="numeric"
@@ -2249,29 +2270,7 @@ export default function QuickProductFastForm({
                                     </div>
                                   </td>
 
-                                  <td style={{ padding: "6px 8px" }}>
-                                    <input
-                                      style={cellStyle}
-                                      placeholder="블랙"
-                                      defaultValue={(cfg.colors || []).join(", ")}
-                                      key={`c-${name}-${(cfg.colors || []).join(",")}`}
-                                      onBlur={(event) => setDetailAxisValues(name, "colors", event.target.value)}
-                                      onKeyDown={(event) => { if (event.key === "Enter") (event.target as HTMLInputElement).blur(); }}
-                                    />
-                                  </td>
-
-                                  <td style={{ padding: "6px 8px" }}>
-                                    <input
-                                      style={cellStyle}
-                                      placeholder="S,M,L"
-                                      defaultValue={(cfg.sizes || []).join(", ")}
-                                      key={`s-${name}-${(cfg.sizes || []).join(",")}`}
-                                      onBlur={(event) => setDetailAxisValues(name, "sizes", event.target.value)}
-                                      onKeyDown={(event) => { if (event.key === "Enter") (event.target as HTMLInputElement).blur(); }}
-                                    />
-                                  </td>
-
-                                  <td style={{ padding: "6px 8px", whiteSpace: "nowrap", textAlign: "center", position: "sticky", right: 0, zIndex: 1, background: photoHoverTarget === name ? "#FBF7F9" : "var(--color-surface)", boxShadow: "-7px 0 7px -7px rgba(0,0,0,0.22)" }}>
+                                  <td style={{ padding: "6px 8px", whiteSpace: "nowrap", textAlign: "center", verticalAlign: "top" }}>
                                     <button
                                       type="button"
                                       title={off ? "숨김 — 누르면 손님에게 보임" : "보이는 중 — 누르면 숨김"}
@@ -2280,10 +2279,10 @@ export default function QuickProductFastForm({
                                     >{off ? "🚫" : "👁"}</button>
                                     <button
                                       type="button"
-                                      title="색상·사이즈 조합을 자세히 손보기"
+                                      title="사진·이름·가격·색상·사이즈를 창에서 자세히 수정"
                                       onClick={() => openBrandDetailEditor(name)}
-                                      style={{ marginLeft: "4px", width: "28px", height: "28px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", border: "1px solid #E1D5D9", background: "var(--color-surface)", color: "var(--color-ink-mute)" }}
-                                    >⋯</button>
+                                      style={{ marginLeft: "4px", height: "28px", padding: "0 9px", borderRadius: "8px", cursor: "pointer", fontSize: "11px", fontWeight: 800, border: "1px solid #E1D5D9", background: "var(--color-surface)", color: "var(--color-ink-mute)" }}
+                                    >수정</button>
                                   </td>
                                 </tr>
                               );
@@ -2320,7 +2319,7 @@ export default function QuickProductFastForm({
                   )}
 
                   <div style={{ marginTop: "7px", fontSize: "10.5px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.6 }}>
-                    사진칸: 끌어놓기·클릭·붙여넣기(Ctrl+V) 다 됩니다 · 우클릭=사진 빼기 · <b>⋯</b>=색상·사이즈 자세히
+                    사진칸: 끌어놓기·클릭·붙여넣기(Ctrl+V) 다 됩니다 · 우클릭=사진 빼기 · [수정]=창에서 자세히
                   </div>
                 </div>
               ) : null}
