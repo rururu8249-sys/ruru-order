@@ -2546,8 +2546,6 @@ export default function QuickProductFastForm({
         {/* .modal-body */}
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 18px" }}>
 
-          {brandGroupActive ? optionStockSection : null}
-
           {/* .top-row : 사진(120) + 필드 */}
           <div style={{ display: "grid", gridTemplateColumns: (isMobile || !brandGroupActive) ? "1fr" : "120px 1fr", gap: "14px", marginBottom: "14px" }}>
             {/* [2026-08-29] 모바일에선 1열로 떨어지는데 폭이 120px 로 고정돼 있어 화면이 어색했다 */}
@@ -2726,7 +2724,7 @@ export default function QuickProductFastForm({
             })() : null}
           </div>
 
-          {!brandGroupActive ? optionStockSection : null}
+          {optionStockSection}
 
           {/* 고객노출 / 구매제한 */}
           <div style={{ marginBottom: "14px" }}>
