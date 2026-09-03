@@ -1153,17 +1153,11 @@ export default function QuickProductFastForm({
   // [2026-08-11 사장님 지침] 프리셋 드롭다운을 맥 기본 메뉴 느낌으로 — 어두운 라운드 패널 + 왼쪽 ✓
   // [2026-08-11] 색상/사이즈 칸 상태 안내 — 비우면 "손님 직접입력"(필수), "없음"이면 옵션 자체를 안 씀.
   //   page.tsx getRegisteredOptionMode(610~637행) 기준: 값 있으면 select / "없음"이면 none / 비면 input.
-  const optionStateHint = (text: string) => {
-    const v = text.trim();
-    if (!v) return { text: "✏️ 손님 직접입력", color: "var(--color-info-tx)" };
-    // [2026-08-29] 예전에는 저장 버튼을 눌러야 "/ 를 쓸 수 없다"는 걸 알았다 → 치는 즉시 알려준다.
-    //   세부상품 + 색상을 같이 쓰면 재고를 "세부상품 / 색상" 으로 관리해서 충돌한다.
-    if (v.includes("/")) return { text: "⚠ / 는 쓸 수 없어요", color: "var(--color-danger-tx)" };
-    if (splitOptions(v).length > 0 && splitOptions(v).every((x) => x === "없음")) {
-      return { text: "🚫 사용 안 함", color: "var(--color-ink-mute)" };
-    }
-    return null;
-  };
+  // [2026-09-03 사장님 요청] "비우면 직접입력 · 없음이면 안 씀"이 눈에 안 보여 헷갈린다 →
+  //   스마트스토어처럼 방식(손님이 적어요/안 써요)을 누르는 칩으로 보여준다. 저장값은 기존 그대로("" / "없음").
+  const optionModeChip = (on: boolean, label: string, onClick: () => void) => (
+    <button type="button" onClick={onClick} style={{ padding: "5px 9px", borderRadius: "999px", fontSize: "10.5px", fontWeight: 900, whiteSpace: "nowrap", cursor: "pointer", border: on ? "1.5px solid #7B2D43" : "1px solid #E8E2DD", background: on ? "#F5E6EB" : "#fff", color: on ? "#7B2D43" : "var(--color-ink-mute)", flexShrink: 0 }}>{label}</button>
+  );
 
   const presetBtn = (count: number): CSSProperties => ({
     padding: "6px 11px", borderRadius: "7px", fontSize: "11px", fontWeight: 800,
@@ -2183,7 +2177,7 @@ export default function QuickProductFastForm({
                 onClick={() => setExtraOpen(true)}
                 style={{ width: "100%", padding: "9px", border: "1px dashed #D9C5CC", background: "var(--color-surface)", color: "#7B2D43", fontSize: "12px", fontWeight: 800, borderRadius: "8px", cursor: "pointer" }}
               >
-                ＋ 카테고리 · 상품 뱃지 {category.trim() || badgeTypes.length > 0 ? `(${[category.trim(), category.trim() && !customerCategoryVisible ? "고객 버튼 숨김" : "", badgeTypes.length ? `뱃지 ${badgeTypes.length}` : ""].filter(Boolean).join(" · ")})` : "(선택)"}
+                ⚙ 고급 설정 — 카테고리 · 뱃지 · 구매제한 · 상세설명 {(() => { const parts = [category.trim(), category.trim() && !customerCategoryVisible ? "고객 버튼 숨김" : "", badgeTypes.length ? `뱃지 ${badgeTypes.length}` : "", purchaseLimitEnabled ? `1인 ${purchaseLimitText}개` : "", customerDetailInputEnabled && !customerDetailInputUnavailable ? "직접입력 ON" : "", description.trim() ? "상세설명 ✓" : ""].filter(Boolean); return parts.length ? `(${parts.join(" · ")})` : "(선택)"; })()}
               </button>
             </div>
           ) : null}
@@ -2295,6 +2289,60 @@ export default function QuickProductFastForm({
               })}
             </div>
           </div>
+          {/* [2026-09-03 재설계 6단계] 방송 중 안 만지는 것들을 ⚙ 고급 설정 안으로 — 기능은 전부 그대로 */}
+          <div style={{ marginBottom: "14px" }}>
+            <div style={{ ...toggleRow, opacity: customerDetailInputUnavailable ? 0.55 : 1 }}>
+              <div style={{ minWidth: 0, paddingRight: "10px" }}>
+                <div style={{ fontSize: "13px", color: "var(--color-ink)", fontWeight: 800 }}>세부상품명 고객 직접입력</div>
+                <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "1px", lineHeight: 1.45 }}>
+                  {customerDetailInputUnavailable
+                    ? "등록된 세부상품 선택형에는 사용할 수 없음"
+                    : customerDetailInputEnabled
+                      ? "손님이 주문할 때 세부상품명을 직접 입력 · 주문서/송장/물건챙기기에 함께 표시"
+                      : "(끄면 세부상품명 직접입력 칸 없음)"}
+                </div>
+              </div>
+              <div
+                onClick={() => {
+                  if (customerDetailInputUnavailable) {
+                    showAdminToast("이미 등록된 세부상품을 고르는 상품에는 고객 직접입력을 함께 사용할 수 없어요.", "warning");
+                    return;
+                  }
+                  setCustomerDetailInputEnabled((v) => !v);
+                }}
+                style={tgStyle(!customerDetailInputUnavailable && customerDetailInputEnabled)}
+              ><span style={tgKnob(!customerDetailInputUnavailable && customerDetailInputEnabled)} /></div>
+            </div>
+
+            {/* 개인당 구매제한 (카톡 계정=전화번호 기준, 끌 때까지 계속 적용) */}
+            <div style={toggleRow}>
+              <div>
+                <div style={{ fontSize: "13px", color: "var(--color-ink)" }}>개인당 구매제한</div>
+                <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "1px" }}>{purchaseLimitEnabled ? "한 사람(카톡 계정)이 이 상품을 정해진 개수까지만" : "(끄면 제한 없음)"}</div>
+              </div>
+              <div onClick={() => setPurchaseLimitEnabled((v) => !v)} style={tgStyle(purchaseLimitEnabled)}><span style={tgKnob(purchaseLimitEnabled)} /></div>
+            </div>
+
+            {purchaseLimitEnabled ? (
+              <div style={{ background: "#F7F5F3", borderRadius: "8px", padding: "10px", marginTop: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "12px", color: "var(--color-ink)", flex: 1 }}>1인당 최대</span>
+                <input style={{ fontSize: "12px", padding: "5px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "80px" }} type="number" min={1} inputMode="numeric" value={purchaseLimitText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setPurchaseLimitText(e.target.value)} />
+                <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
+              </div>
+            ) : null}
+          </div>
+
+          {/* 상세설명 */}
+          <div style={{ marginBottom: "14px" }}>
+            <div style={sectionLabel}>상세설명</div>
+            <textarea
+              style={{ width: "100%", fontSize: "13px", padding: "10px 12px", border: "1px solid #E8E2DD", borderRadius: "8px", minHeight: "90px", resize: "vertical", background: "var(--color-surface)", fontFamily: "inherit", outline: "none" }}
+              placeholder="상품 상세 설명 (선택)"
+              value={description}
+              onChange={(e) => { setFormTouched(true); setDescription(e.target.value); }}
+            />
+          </div>
+
           </>
           ) : null}
 
@@ -2344,15 +2392,21 @@ export default function QuickProductFastForm({
                     </div>
                   ) : null}
                 </div>
-                {optionStateHint(colorText) ? <span style={{ fontSize: "11.5px", fontWeight: 700, color: optionStateHint(colorText)!.color, whiteSpace: "nowrap" }}>{optionStateHint(colorText)!.text}</span> : null}
+                {colorText.includes("/") ? <span style={{ fontSize: "11.5px", fontWeight: 700, color: "var(--color-danger-tx)", whiteSpace: "nowrap" }}>⚠ / 는 쓸 수 없어요</span> : null}
+                <div style={{ display: "flex", gap: "4px", alignItems: "center", flexShrink: 0 }}>
+                  {optionModeChip(colorText.trim() === "", "✏️ 손님이 적어요", () => { setFormTouched(true); setColorText(""); })}
+                  {optionModeChip(splitOptions(colorText).length > 0 && splitOptions(colorText).every((x) => x === "없음"), "🚫 안 써요", () => { setFormTouched(true); setColorText("없음"); })}
+                </div>
               </div>
 
-              {/* [2026-09-03 사장님 요청] 색상을 비우면(=손님 직접입력) 그 칸의 제목을 사장님이 정할 수 있다 (예: 상품숫자) */}
-              {!brandGroupActive && !colorText.trim() && !splitOptions(colorText).includes("없음") ? (
+              {/* [2026-09-03 사장님 요청] 손님 입력칸의 제목을 사장님이 정한다 (예: 상품숫자).
+                  색상에 실제 옵션값이 없을 때(비움 또는 "없음") 항상 노출 —
+                  제목을 적으면 색상·사이즈를 "없음"으로 꺼놔도 손님에게 이 제목의 입력칸이 나간다. */}
+              {!brandGroupActive && splitOptions(colorText).every((x) => x === "없음") ? (
                 <div style={{ ...optRow, background: "#FFFDF5", border: "1px dashed #E2B64D", borderRadius: "8px", padding: "7px 9px" }}>
                   <span style={{ ...optLabel, color: "#9A6212" }}>✏️ 칸 제목</span>
-                  <input style={optInput} type="text" placeholder="비우면 「색상」 — 예: 상품숫자" value={customInputLabel} onChange={(e) => { setFormTouched(true); setCustomInputLabel(e.target.value); }} />
-                  <span style={{ fontSize: "11px", fontWeight: 700, color: "#9A6212", whiteSpace: "nowrap" }}>손님 직접입력 칸의 제목</span>
+                  <input style={optInput} type="text" placeholder="예: 상품숫자 — 적으면 손님에게 이 제목의 입력칸이 나갑니다" value={customInputLabel} onChange={(e) => { setFormTouched(true); setCustomInputLabel(e.target.value); }} />
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: "#9A6212", whiteSpace: "nowrap" }}>{customInputLabel.trim() ? "🚫 안 써요여도 이 칸은 나가요" : "비우면 「색상」"}</span>
                 </div>
               ) : null}
 
@@ -2378,7 +2432,11 @@ export default function QuickProductFastForm({
                     </div>
                   ) : null}
                 </div>
-                {optionStateHint(sizeText) ? <span style={{ fontSize: "11.5px", fontWeight: 700, color: optionStateHint(sizeText)!.color, whiteSpace: "nowrap" }}>{optionStateHint(sizeText)!.text}</span> : null}
+                {sizeText.includes("/") ? <span style={{ fontSize: "11.5px", fontWeight: 700, color: "var(--color-danger-tx)", whiteSpace: "nowrap" }}>⚠ / 는 쓸 수 없어요</span> : null}
+                <div style={{ display: "flex", gap: "4px", alignItems: "center", flexShrink: 0 }}>
+                  {optionModeChip(sizeText.trim() === "", "✏️ 손님이 적어요", () => { setFormTouched(true); setSizeText(""); })}
+                  {optionModeChip(splitOptions(sizeText).length > 0 && splitOptions(sizeText).every((x) => x === "없음"), "🚫 안 써요", () => { setFormTouched(true); setSizeText("없음"); })}
+                </div>
               </div>
 
               {/* ── [2026-08-29 재설계] 이 브랜드의 상품 — 표에서 바로 고친다 ──
@@ -2841,45 +2899,6 @@ export default function QuickProductFastForm({
               <div onClick={() => setIsVisible((v) => !v)} style={tgStyle(isVisible)}><span style={tgKnob(isVisible)} /></div>
             </div>
 
-            <div style={{ ...toggleRow, opacity: customerDetailInputUnavailable ? 0.55 : 1 }}>
-              <div style={{ minWidth: 0, paddingRight: "10px" }}>
-                <div style={{ fontSize: "13px", color: "var(--color-ink)", fontWeight: 800 }}>세부상품명 고객 직접입력</div>
-                <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "1px", lineHeight: 1.45 }}>
-                  {customerDetailInputUnavailable
-                    ? "등록된 세부상품 선택형에는 사용할 수 없음"
-                    : customerDetailInputEnabled
-                      ? "손님이 주문할 때 세부상품명을 직접 입력 · 주문서/송장/물건챙기기에 함께 표시"
-                      : "(끄면 세부상품명 직접입력 칸 없음)"}
-                </div>
-              </div>
-              <div
-                onClick={() => {
-                  if (customerDetailInputUnavailable) {
-                    showAdminToast("이미 등록된 세부상품을 고르는 상품에는 고객 직접입력을 함께 사용할 수 없어요.", "warning");
-                    return;
-                  }
-                  setCustomerDetailInputEnabled((v) => !v);
-                }}
-                style={tgStyle(!customerDetailInputUnavailable && customerDetailInputEnabled)}
-              ><span style={tgKnob(!customerDetailInputUnavailable && customerDetailInputEnabled)} /></div>
-            </div>
-
-            {/* 개인당 구매제한 (카톡 계정=전화번호 기준, 끌 때까지 계속 적용) */}
-            <div style={toggleRow}>
-              <div>
-                <div style={{ fontSize: "13px", color: "var(--color-ink)" }}>개인당 구매제한</div>
-                <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "1px" }}>{purchaseLimitEnabled ? "한 사람(카톡 계정)이 이 상품을 정해진 개수까지만" : "(끄면 제한 없음)"}</div>
-              </div>
-              <div onClick={() => setPurchaseLimitEnabled((v) => !v)} style={tgStyle(purchaseLimitEnabled)}><span style={tgKnob(purchaseLimitEnabled)} /></div>
-            </div>
-
-            {purchaseLimitEnabled ? (
-              <div style={{ background: "#F7F5F3", borderRadius: "8px", padding: "10px", marginTop: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "12px", color: "var(--color-ink)", flex: 1 }}>1인당 최대</span>
-                <input style={{ fontSize: "12px", padding: "5px 8px", border: "1px solid #E8E2DD", borderRadius: "6px", textAlign: "right", width: "80px" }} type="number" min={1} inputMode="numeric" value={purchaseLimitText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setPurchaseLimitText(e.target.value)} />
-                <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
-              </div>
-            ) : null}
           </div>
 
           {/* 구분선 */}
@@ -2893,17 +2912,6 @@ export default function QuickProductFastForm({
               위의 세부상품 목록에서 썸네일과 사진 수를 확인할 수 있어요.
             </div>
           )}
-
-          {/* 상세설명 */}
-          <div style={{ marginBottom: "14px" }}>
-            <div style={sectionLabel}>상세설명</div>
-            <textarea
-              style={{ width: "100%", fontSize: "13px", padding: "10px 12px", border: "1px solid #E8E2DD", borderRadius: "8px", minHeight: "90px", resize: "vertical", background: "var(--color-surface)", fontFamily: "inherit", outline: "none" }}
-              placeholder="상품 상세 설명 (선택)"
-              value={description}
-              onChange={(e) => { setFormTouched(true); setDescription(e.target.value); }}
-            />
-          </div>
 
         </div>
 
