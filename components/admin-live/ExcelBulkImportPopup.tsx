@@ -917,7 +917,7 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
             {/* 일괄 설정 */}
             <div style={{ padding: "9px 18px", borderBottom: "1px solid #EDE4E8", display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center", fontSize: "12px", fontWeight: 700, color: "#5C4B52" }}>
               <span style={{ color: "#7B2D43", fontWeight: 900 }}>전체 적용</span>
-              {([["new", "✨NEW"], ["hot", "🔥HOT"], ["limit", "⏰한정"], ["pick", "⭐MD픽"], ["direct", "🛒바로구매"], ["overseas", "✈️해외배송"]] as const).map(([v, l]) => {
+              {([["new", "✨NEW"], ["hot", "🔥HOT"], ["special", "⚡특가"], ["limit", "⏰마감임박"], ["pick", "💖루루픽"], ["direct", "🛒바로구매"], ["overseas", "✈️해외배송"]] as const).map(([v, l]) => {
                 const on = bulkBadges.includes(v);
                 return (
                   <button key={v} type="button" onClick={() => setBulkBadges((p) => on ? p.filter((x) => x !== v) : [...p, v])}
@@ -1135,7 +1135,7 @@ function colLetter(i: number) {
 }
 
 const BADGE_LABEL: Record<string, string> = {
-  new: "✨NEW", hot: "🔥HOT", limit: "⏰한정", pick: "⭐MD픽", direct: "🛒바로구매", overseas: "✈️해외배송",
+  new: "✨NEW", hot: "🔥HOT", special: "⚡특가", limit: "⏰마감임박", pick: "💖루루픽", direct: "🛒바로구매", overseas: "✈️해외배송",
 };
 
 const selStyle: React.CSSProperties = {

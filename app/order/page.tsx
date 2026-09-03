@@ -6247,6 +6247,9 @@ export default function OrderPage() {
                           : badgeType && badgeType !== "none"
                             ? [badgeType]
                             : [];
+                      // [2026-09-03 재설계 5단계] ✨NEW 자동 — 등록 7일 이내면 뱃지를 안 골라도 자동 표시(표시 전용)
+                      const createdMsForNew = Date.parse(String((product as any).created_at || ""));
+                      const autoNew = Number.isFinite(createdMsForNew) && Date.now() - createdMsForNew < 7 * 24 * 60 * 60 * 1000;
                       return (
                         <div
                           key={String(product.id)}
@@ -6304,9 +6307,10 @@ export default function OrderPage() {
                           <div style={listView === "grid" ? { minWidth: 0, flex: 1, display: "flex", flexDirection: "column" } : { minWidth: 0, flex: 1 }}>
                             <div style={{ display: "flex", gap: "4px", marginBottom: "4px", flexWrap: "wrap" }}>
                               {!isBroadcastOn && pinned ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#7A1E47", borderRadius: "5px", padding: "2px 6px" }}>📌 추천</span> : null}
-                              {badges.includes("new") ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#0F6E56", background: "#E7F3EE", borderRadius: "5px", padding: "2px 6px" }}>NEW</span> : null}
+                              {badges.includes("new") || autoNew ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#0F6E56", background: "#E7F3EE", borderRadius: "5px", padding: "2px 6px" }}>NEW</span> : null}
                               {badges.includes("hot") ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>HOT</span> : null}
-                              {badges.includes("limit") ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#854F0B", background: "#FBF1E0", borderRadius: "5px", padding: "2px 6px" }}>한정</span> : null}
+                              {badges.includes("special") ? <span style={{ fontSize: "10px", fontWeight: 900, color: "#9A6212", background: "#FFF4D6", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>⚡특가</span> : null}
+                              {badges.includes("limit") ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#854F0B", background: "#FBF1E0", borderRadius: "5px", padding: "2px 6px" }}>마감임박</span> : null}
                               {!sold ? (() => {
                                 // 옵션 상품: 임박 옵션만 옵션별 표시(합산 금지) / 단일 상품: N개 남음 — 다른 고객 홀드 반영
                                 const pidForLow = String(product.id ?? "");
@@ -6319,7 +6323,7 @@ export default function OrderPage() {
                                 const remain = lowStockRemainOrderProduct(product, Number(reservedByProduct[pidForLow] || 0));
                                 return remain !== null ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px" }}>🔥 {remain}개 남음</span> : null;
                               })() : null}
-                              {badges.includes("pick") ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#FFF8E7", color: "#B8860B" }}>⭐ MD픽</span> : null}
+                              {badges.includes("pick") ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#FDEEF3", color: "#C2447A" }}>💖 루루픽</span> : null}
                               {badges.includes("direct") ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#E8F0FE", color: "#1D4ED8" }}>🛒 바로구매</span> : null}
                               {/* [2026-07-10] 해외배송 배지 — 표시 전용(배송비 계산과 무관) */}
                               {badges.includes("overseas") ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#EEF6F3", color: "#0F6E56" }}>✈️ 해외배송</span> : null}

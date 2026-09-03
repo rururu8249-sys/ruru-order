@@ -2134,8 +2134,9 @@ export default function QuickProductFastForm({
                       <div style={{ display: "flex", gap: "3px", flexWrap: "wrap", marginBottom: "3px" }}>
                         {badgeTypes.includes("new") ? badgeChip("#E7F3EE", "#0F6E56", "NEW") : null}
                         {badgeTypes.includes("hot") ? badgeChip("#FBEAE7", "#C0392B", "HOT") : null}
-                        {badgeTypes.includes("limit") ? badgeChip("#FBF1E0", "#854F0B", "한정") : null}
-                        {badgeTypes.includes("pick") ? badgeChip("#FFF8E7", "#B8860B", "⭐ MD픽") : null}
+                        {badgeTypes.includes("special") ? badgeChip("#FFF4D6", "#9A6212", "⚡특가") : null}
+                        {badgeTypes.includes("limit") ? badgeChip("#FBF1E0", "#854F0B", "마감임박") : null}
+                        {badgeTypes.includes("pick") ? badgeChip("#FDEEF3", "#C2447A", "💖 루루픽") : null}
                         {badgeTypes.includes("direct") ? badgeChip("#E8F0FE", "#1D4ED8", "🛒 바로구매") : null}
                         {badgeTypes.includes("overseas") ? badgeChip("#EEF6F3", "#0F6E56", "✈️ 해외배송") : null}
                         {freeProductEnabled ? badgeChip("#E7F3EE", "#0F6E56", "🎁 무료나눔") : null}
@@ -2265,11 +2266,14 @@ export default function QuickProductFastForm({
           {/* 상품 뱃지 */}
           <div style={{ marginBottom: "14px" }}>
             <div style={sectionLabel}>상품 뱃지</div>
-            <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginBottom: "6px" }}>손님 상품 목록에 표시되는 뱃지</div>
+            <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginBottom: "6px", lineHeight: 1.6 }}>
+              손님 상품 목록에 표시되는 뱃지 · <b style={{ color: "#0F6E56" }}>✨NEW는 등록 후 7일 동안 자동으로 붙고, 재고가 적으면 「N개 남음」이 자동 표시</b>돼요 — 뱃지는 강조하고 싶을 때만 누르세요.
+              <br />🛒 바로구매 · ✈️ 해외배송은 구매·배송 방식과 직결이라 <b>자동으로 절대 안 붙습니다(사장님 수동 전용)</b>.
+            </div>
             <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}`}</style>
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
               {/* [2026-07-10] 해외배송 배지 추가 (표시 전용 — 배송비/배송 로직과 무관) */}
-              {([["none", "없음"], ["new", "✨ NEW"], ["hot", "🔥 HOT"], ["limit", "⏰ 한정"], ["pick", "⭐ MD픽"], ["direct", "🛒 바로구매"], ["overseas", "✈️ 해외배송"]] as const).map(([v, l]) => {
+              {([["none", "없음"], ["new", "✨ NEW"], ["hot", "🔥 HOT"], ["special", "⚡ 특가"], ["limit", "⏰ 마감임박"], ["pick", "💖 루루픽"], ["direct", "🛒 바로구매"], ["overseas", "✈️ 해외배송"]] as const).map(([v, l]) => {
                 const on = v === "none" ? badgeTypes.length === 0 : badgeTypes.includes(v);
                 return (
                   <div
