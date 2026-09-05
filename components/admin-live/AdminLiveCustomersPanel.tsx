@@ -13,6 +13,7 @@ const BULK_POINT_REASON_PRESETS = ["방송 이벤트 당첨", "단골 감사", "
 import { supabase } from "@/lib/supabase";
 import { buildCustomerIdentityResolver, type CustomerIdentityRef } from "@/lib/customerIdentity";
 import { showAdminToast } from "@/lib/adminToast";
+import AdminLiveLoyaltyReport from "./AdminLiveLoyaltyReport";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import type { LiveOrder } from "./types";
 import AdminLiveCustomerIssueRail from "./AdminLiveCustomerIssueRail";
@@ -990,7 +991,7 @@ function CustomerDetailDrawer({
 //   ⚠️ 문구만이다. 누르는 순간 나가지 않는다 — 입력창에 채워질 뿐이고 [보내기]를 눌러야 발송된다.
 
 export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = "members" }: Props) {
-  const [custTab, setCustTab] = useState<"members" | "issues">(initialTab);
+  const [custTab, setCustTab] = useState<"members" | "issues" | "loyalty">(initialTab);
   const [phoneBlockOpen, setPhoneBlockOpen] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -1605,7 +1606,14 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
       <div className="flex gap-2 border-b border-rose-line">
         <button type="button" onClick={() => setCustTab("members")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "members" ? "bg-rose-deep text-white" : "text-ink-soft hover:text-rose-deep"}`}>회원 목록</button>
         <button type="button" onClick={() => setCustTab("issues")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "issues" ? "bg-rose-deep text-white" : "text-ink-soft hover:text-rose-deep"}`}>고객 이슈</button>
+        <button type="button" onClick={() => setCustTab("loyalty")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "loyalty" ? "bg-rose-deep text-white" : "text-ink-soft hover:text-rose-deep"}`}>📊 단골 리포트</button>
       </div>
+
+      {custTab === "loyalty" ? (
+        <div className="rounded-[28px] border border-line bg-surface p-4 shadow-sm">
+          <AdminLiveLoyaltyReport />
+        </div>
+      ) : null}
 
       <div className={custTab === "members" ? "" : "hidden"}>
         <div className="rounded-[28px] border border-line bg-surface p-4 shadow-sm">

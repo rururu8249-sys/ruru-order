@@ -25,6 +25,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ok: false, message: "관리자 로그인이 필요합니다." }, { status: 401 });
     }
     const supabase = getSupabaseAdminClient();
+    // 세그먼트 기준일 — 실측 구매주기(중앙값 8일·90% 45일)에 맞춰 기본 45일, 30~180 사이만 허용
+    const lapsedDaysParam = Number(request.nextUrl.searchParams.get("days") || 45);
+    const lapsedDaysCut = Number.isFinite(lapsedDaysParam) ? Math.min(180, Math.max(14, Math.round(lapsedDaysParam))) : 45;
 
     // 상태 컬럼 자동 감지 — 테이블 실물 기준(추정 금지)
     const { data: probe, error: probeError } = await supabase.from("orders").select("*").limit(1);
@@ -54,6 +57,7 @@ export async function GET(request: NextRequest) {
     // 고객별 구매일(같은 날 합침)
     const buyDays = new Map<string, Set<string>>();
     const nickOf = new Map<string, string>();
+    const phoneOf = new Map<string, string>();
     let canceledRows = 0;
     for (const o of rows) {
       if (isCanceled(o)) { canceledRows++; continue; }
@@ -65,6 +69,8 @@ export async function GET(request: NextRequest) {
       buyDays.get(cust)!.add(new Date(t).toISOString().slice(0, 10));
       const nick = String(o.youtube_nickname || "").trim();
       if (nick) nickOf.set(cust, nick);
+      const ph = digits(o.customer_phone);
+      if (ph) phoneOf.set(cust, ph);
     }
 
     const counts = { one: 0, two: 0, threeToFive: 0, sixPlus: 0 };
@@ -75,6 +81,9 @@ export async function GET(request: NextRequest) {
     const monthly = new Map<string, { nw: number; rp: number }>();
     const now = Date.now();
     const top: Array<{ nick: string; n: number; last: string }> = [];
+    // 카드 4장 세그먼트: 🌱새손님(1회·90일 미만) / 💖단골(2회+·기준일 미만) / 🚨떠나려는 단골(2회+·기준일↑) / 💤떠난 손님(1회·90일↑)
+    const segments = { fresh: 0, loyal: 0, atRisk: 0, gone: 0 };
+    const atRiskList: Array<{ phone: string; nick: string; buys: number; lastBuy: string; daysSince: number }> = [];
     for (const [cust, set] of buyDays) {
       const dates = Array.from(set).sort();
       const n = dates.length;
@@ -90,7 +99,32 @@ export async function GET(request: NextRequest) {
         monthly.get(m)![i === 0 ? "nw" : "rp"]++;
       });
       top.push({ nick: nickOf.get(cust) || `${cust.slice(0, 4)}…`, n, last: dates[n - 1] });
+      if (n === 1) { if (since >= 90) segments.gone++; else segments.fresh++; }
+      else if (since >= lapsedDaysCut) {
+        segments.atRisk++;
+        const phoneDigits = phoneOf.get(cust) || (/^[0-9]{9,}$/.test(cust) ? cust : "");
+        if (phoneDigits) {
+          atRiskList.push({ phone: phoneDigits, nick: nickOf.get(cust) || phoneDigits.slice(-4), buys: n, lastBuy: dates[n - 1], daysSince: since });
+        }
+      } else segments.loyal++;
     }
+    atRiskList.sort((a, b) => b.buys - a.buys || a.daysSince - b.daysSince);
+
+    // [재지급 잠금] 최근 30일 안에 "복귀" 사유 포인트를 이미 받은 번호 — 명단에 표시해 이중 지급을 막는다(읽기 전용)
+    const recentComebackPhones: string[] = [];
+    try {
+      const sinceIso = new Date(now - 30 * 86400000).toISOString();
+      const { data: recent } = await supabase
+        .from("customer_point_ledger")
+        .select("customer_phone, created_at, reason")
+        .gte("created_at", sinceIso)
+        .ilike("reason", "%복귀%")
+        .limit(2000);
+      for (const r of (recent || []) as Array<Record<string, unknown>>) {
+        const ph = digits(r.customer_phone);
+        if (ph) recentComebackPhones.push(ph);
+      }
+    } catch { /* 잠금 표시는 보조 — 실패해도 통계는 정상 */ }
     gaps.sort((a, b) => a - b);
     const q = (p: number) => (gaps.length ? gaps[Math.min(gaps.length - 1, Math.floor(gaps.length * p))] : 0);
     top.sort((a, b) => b.n - a.n);
@@ -108,6 +142,10 @@ export async function GET(request: NextRequest) {
       counts,
       gapDays: { samples: gaps.length, p25: q(0.25), median: q(0.5), p75: q(0.75), p90: q(0.9) },
       lapsed,
+      lapsedDaysCut,
+      segments,
+      atRiskList: atRiskList.slice(0, 500),
+      recentComebackPhones: Array.from(new Set(recentComebackPhones)),
       monthly: Array.from(monthly.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([m, v]) => ({ month: m, new: v.nw, repeat: v.rp })),
       topCustomers: top.slice(0, 15),
     });
