@@ -177,6 +177,12 @@ export async function GET(request: Request) {
 
     kakao_phone: kakaoPhone,
     kakao_phone_needs_agreement: Boolean(kakaoAccount?.phone_number_needs_agreement),
+    // [2026-09-05 사장님 요청 · 카카오 원본 보존] 카카오가 내려준 "원본" 이름/번호를 그대로 동봉 →
+    //   customer-login-sync 가 customers.kakao_account_* / kakao_shipping_* 에 보관(관리자 회원상세 "카카오 원본" 표시).
+    //   손님이 우리 화면에서 이름/번호를 이상하게 바꿔도 진짜를 확인할 수 있다. 응답 값 추가만 — 로그인 흐름 무변경.
+    kakao_account_name: accountName,
+    kakao_shipping_name: receiverName,
+    kakao_shipping_phone: shippingPhone,
 
     customer_name: dbName || receiverName || accountName || "",
     customer_phone: dbPhone || shippingPhone || kakaoPhone || "",

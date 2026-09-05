@@ -18,6 +18,11 @@ type LoginSyncBody = {
   kakao_id?: unknown;
   kakao_nickname?: unknown;
   kakao_profile_image?: unknown;
+  // [2026-09-05 카카오 원본 보존] 카카오가 내려준 원본 이름/번호 (관리자 회원상세 표시용)
+  kakao_account_name?: unknown;
+  kakao_account_phone?: unknown;
+  kakao_shipping_name?: unknown;
+  kakao_shipping_phone?: unknown;
   customer_name?: unknown;
   customer_phone?: unknown;
   customer_zipcode?: unknown;
@@ -151,6 +156,22 @@ export async function POST(request: NextRequest) {
   const youtubeNickname = cleanText(body.youtube_nickname).slice(0, 80);
   const nowIso = new Date().toISOString();
 
+  // [2026-09-05 사장님 요청 · 카카오 원본 보존] 손님이 우리 화면에서 이름/번호를 바꿔도 "카카오가 준 진짜"를 따로 보관.
+  //   customers 에 ADD COLUMN 한 kakao_account_name/kakao_account_phone/kakao_shipping_name/kakao_shipping_phone/kakao_raw_synced_at.
+  //   ⚠️ 칸이 아직 없어도(SQL 실행 전) 로그인은 절대 막지 않는다 — 본 저장과 별도 UPDATE, 실패는 경고만.
+  //   값이 온 칸만 갱신(빈값으로 덮지 않음). 주문/입금/정산/포인트 무관.
+  const kakaoRaw: Record<string, string> = {};
+  {
+    const an = cleanText(body.kakao_account_name).slice(0, 80);
+    const ap = phoneDigits(cleanText(body.kakao_account_phone)).slice(0, 15);
+    const sn = cleanText(body.kakao_shipping_name).slice(0, 80);
+    const sp = phoneDigits(cleanText(body.kakao_shipping_phone)).slice(0, 15);
+    if (an) kakaoRaw.kakao_account_name = an;
+    if (ap) kakaoRaw.kakao_account_phone = ap;
+    if (sn) kakaoRaw.kakao_shipping_name = sn;
+    if (sp) kakaoRaw.kakao_shipping_phone = sp;
+  }
+
   if (customerPhoneDigits.length < 9) {
     return NextResponse.json(
       {
@@ -164,6 +185,19 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createAdminSupabase();
     const phoneVariants = makePhoneVariants(customerPhone);
+
+    const stampKakaoRaw = async (customerId: unknown) => {
+      if (!kakaoId || customerId === null || customerId === undefined || Object.keys(kakaoRaw).length === 0) return;
+      try {
+        const { error: rawError } = await supabase
+          .from("customers")
+          .update({ ...kakaoRaw, kakao_raw_synced_at: nowIso })
+          .eq("id", customerId);
+        if (rawError) console.warn("카카오 원본 보관 실패(로그인은 정상):", rawError.message);
+      } catch (e) {
+        console.warn("카카오 원본 보관 예외(로그인은 정상):", e instanceof Error ? e.message : String(e));
+      }
+    };
 
     const CUSTOMER_SELECT_COLUMNS =
       "id, youtube_nickname, customer_name, customer_phone, zipcode, address, detail_address, customer_memo, is_blocked, last_order_at, created_at, kakao_id, kakao_nickname, kakao_profile_image, customer_history, live_alert_optin";
@@ -410,6 +444,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      await stampKakaoRaw(existing.id);
+
       // [2026-08-31 사장님 지시] 남남 닉네임 재확인 — nickname_reconfirm 깃발이 켜진 회원은
       //   로그인 후 유튜브 닉네임을 직접 다시 입력하게 한다(자동 통과 금지).
       //   ⚠️ 칸이 아직 없어도(SQL 실행 전) 로그인은 절대 막지 않는다 — 조회 실패 시 false.
@@ -469,6 +505,8 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    await stampKakaoRaw(insertedRows?.[0]?.id ?? null);
 
     return NextResponse.json({
       ok: true,

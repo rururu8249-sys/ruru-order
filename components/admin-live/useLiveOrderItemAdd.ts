@@ -48,6 +48,7 @@ export type LiveOrderRegisteredAddInput = {
 // 첫 행에서 그대로 복사할 "그룹 공유" 컬럼(주문자/받는사람/주소/방송/결제수단/상태/제외플래그 등)
 const SHARED_KEYS = [
   "created_at", // 원 주문 시각 복사 → 추가해도 주문일이 '오늘'로 튀지 않고 같은 그룹/날짜 유지
+  "kakao_id", // [2026-09-05] 회원 정체성 = 카카오ID. 추가 행에도 그룹의 kakao_id 를 복사(빈값 행 방지 — 윤땡땡 9/4 #4236 사례)
   "order_group_id",
   "order_lookup_code",
   "broadcast_id",
@@ -295,6 +296,16 @@ export function useLiveOrderItemAdd(onAfter?: (result: LiveOrderItemAddResult) =
 
       const newId = Number(res.new_order_id);
       const productTotal = Number(res.product_total) || unitPrice * qty;
+
+      // [2026-09-05] RPC 는 kakao_id 를 복사하지 않는다(RPC 무변경 원칙) → 추가 행에 그룹의 kakao_id 를 따로 스탬프.
+      //   submit API 의 "제출 직후 order_group_id 로 보강"과 같은 패턴. 돈/재고 무관, 실패해도 추가는 성공 유지.
+      try {
+        if (Number.isFinite(newId) && newId > 0) {
+          const { data: refRow } = await supabase.from("orders").select("kakao_id").eq("id", firstRowId).single();
+          const refKakao = String((refRow as any)?.kakao_id || "").trim();
+          if (refKakao) await supabase.from("orders").update({ kakao_id: refKakao }).eq("id", newId);
+        }
+      } catch { /* 표시용 정체성 스탬프 — 실패해도 주문 추가는 유지 */ }
 
       const result: LiveOrderItemAddResult = {
         rowId: newId,

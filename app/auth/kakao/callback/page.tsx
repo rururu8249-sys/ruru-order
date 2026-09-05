@@ -74,6 +74,11 @@ export default function KakaoCallbackPage() {
             kakao_id: data.kakao_id,
             kakao_nickname: data.kakao_nickname,
             kakao_profile_image: data.kakao_profile_image,
+            // [2026-09-05 카카오 원본 보존] 서버가 그대로 보관(관리자 회원상세 "카카오 원본")
+            kakao_account_name: data.kakao_account_name,
+            kakao_account_phone: data.kakao_phone,
+            kakao_shipping_name: data.kakao_shipping_name,
+            kakao_shipping_phone: data.kakao_shipping_phone,
             customer_name: data.customer_name,
             customer_phone: data.customer_phone,
             customer_zipcode: data.customer_zipcode,

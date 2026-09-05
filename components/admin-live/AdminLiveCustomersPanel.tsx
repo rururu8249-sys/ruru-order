@@ -442,6 +442,35 @@ function CustomerDetailDrawer({
   const [avatarZoom, setAvatarZoom] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
+  // [2026-09-05 사장님 요청 · 카카오 원본] 로그인 때 카카오가 준 진짜 이름/번호(customers.kakao_account_* / kakao_shipping_*).
+  //   손님이 우리 화면에서 바꿔도 여기서 원본 확인. 별도 조회 — 칸이 아직 없으면(SQL 전) 조용히 숨김.
+  const [kakaoRaw, setKakaoRaw] = useState<{ accountName: string; accountPhone: string; shippingName: string; shippingPhone: string; syncedAt: string } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    setKakaoRaw(null);
+    const id = profile?.id;
+    if (id === null || id === undefined || id === "") return;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("customers")
+          .select("kakao_account_name, kakao_account_phone, kakao_shipping_name, kakao_shipping_phone, kakao_raw_synced_at")
+          .eq("id", id)
+          .limit(1);
+        if (!alive || error) return;
+        const r = (data?.[0] || {}) as Record<string, unknown>;
+        const next = {
+          accountName: clean(r.kakao_account_name),
+          accountPhone: clean(r.kakao_account_phone),
+          shippingName: clean(r.kakao_shipping_name),
+          shippingPhone: clean(r.kakao_shipping_phone),
+          syncedAt: clean(r.kakao_raw_synced_at),
+        };
+        if (next.accountName || next.accountPhone || next.shippingName || next.shippingPhone) setKakaoRaw(next);
+      } catch { /* 칸 없음/조회 실패 → 표시 안 함 */ }
+    })();
+    return () => { alive = false; };
+  }, [profile?.id]);
   const [fNick, setFNick] = useState("");
   const [fName, setFName] = useState("");
   const [fZip, setFZip] = useState("");
@@ -712,6 +741,21 @@ function CustomerDetailDrawer({
                 📍 {customer.address || "주소 정보 없음"}<br />
                 🕒 {customer.orderCount > 0 ? formatOrderDateTime(customer.latestOrderAt) : "주문 전 회원"}
                 {profile?.kakao_nickname ? <><br />💬 카카오: {profile.kakao_nickname}</> : null}
+                {kakaoRaw ? (
+                  <>
+                    <br />
+                    <span title={kakaoRaw.syncedAt ? `카카오 로그인 때 받은 원본 · ${formatOrderDateTime(kakaoRaw.syncedAt)}` : "카카오 로그인 때 받은 원본"} style={{ color: "var(--color-rose-deep)", fontWeight: 800 }}>
+                      🪪 카카오 원본: {[kakaoRaw.accountName, kakaoRaw.accountPhone ? formatPhone(kakaoRaw.accountPhone) : ""].filter(Boolean).join(" · ") || "-"}
+                      {kakaoRaw.shippingName || kakaoRaw.shippingPhone ? ` / 배송지 ${[kakaoRaw.shippingName, kakaoRaw.shippingPhone ? formatPhone(kakaoRaw.shippingPhone) : ""].filter(Boolean).join(" · ")}` : ""}
+                    </span>
+                    {kakaoRaw.accountName && customer.name && kakaoRaw.accountName !== clean(customer.name) ? (
+                      <span style={{ marginLeft: "6px", fontSize: "10px", fontWeight: 800, color: "var(--color-warn-tx)", background: "var(--color-warn-bg)", borderRadius: "6px", padding: "1px 6px" }}>이름 다름</span>
+                    ) : null}
+                    {kakaoRaw.accountPhone && digitsOnly(customer.phone) && kakaoRaw.accountPhone !== digitsOnly(customer.phone) ? (
+                      <span style={{ marginLeft: "4px", fontSize: "10px", fontWeight: 800, color: "var(--color-warn-tx)", background: "var(--color-warn-bg)", borderRadius: "6px", padding: "1px 6px" }}>번호 다름</span>
+                    ) : null}
+                  </>
+                ) : null}
                 {profile?.first_login_at ? <><br />📅 최초 로그인: {formatOrderDateTime(profile.first_login_at)}</> : null}
                 {profile?.last_login_at ? <><br />🕒 최근 로그인: {formatOrderDateTime(profile.last_login_at)}</> : null}
               </div>

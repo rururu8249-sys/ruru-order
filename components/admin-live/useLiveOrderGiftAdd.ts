@@ -43,6 +43,7 @@ const onlyDigits = (v: unknown) => String(v ?? "").replace(/[^0-9]/g, "");
 // addDirectItem 과 동일한 그룹 공유 컬럼(주문일 포함 → 주문일이 '오늘'로 튀지 않음)
 const SHARED_KEYS = [
   "created_at",
+  "kakao_id", // [2026-09-05] 회원 정체성 = 카카오ID. 선물 행에도 그룹의 kakao_id 복사
   "order_group_id",
   "order_lookup_code",
   "broadcast_id",
