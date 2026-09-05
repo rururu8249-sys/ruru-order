@@ -54,6 +54,7 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
   const [amountText, setAmountText] = useState(String(DEFAULT_POINT));
   const [noteText, setNoteText] = useState("");
   const [sending, setSending] = useState(false);
+  const [sendProgress, setSendProgress] = useState<{ done: number; total: number } | null>(null);
   const [topMode, setTopMode] = useState<"count" | "spend">("count");
   const { grant } = useBulkPointGrant();
 
@@ -104,10 +105,20 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
     const totalWon = amountNum * targets.length;
     if (!window.confirm(`${SEG_META[seg].emoji} ${SEG_META[seg].label} ${targets.length}명에게 ${amountNum.toLocaleString()}P씩, 총 ${totalWon.toLocaleString()}P를 지급하고 쪽지를 보냅니다.\n\n(최근 30일 안에 이미 받은 분은 자동 제외)\n\n진행할까요?`)) return;
     setSending(true);
+    setSendProgress({ done: 0, total: targets.length });
+    // [2026-09-06] 같은 날 같은 대상엔 서버가 다시 지급하지 않도록 건별 고유키. 응답이 유실돼 재시도해도 이중지급 방지.
+    const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     try {
       const result = await grant(
         targets.map((t) => ({ phone: t.phone, label: t.nick })),
-        { amount: amountNum, reason: COMEBACK_REASON, adminMemo: `단골 리포트 일괄(${SEG_META[seg].label}·기준 ${days}일)`, customerVisible: true },
+        {
+          amount: amountNum,
+          reason: COMEBACK_REASON,
+          adminMemo: `단골 리포트 일괄(${SEG_META[seg].label}·기준 ${days}일)`,
+          customerVisible: true,
+          sourceKey: (t) => `comeback-${ymd}-${String(t.phone).replace(/[^0-9]/g, "")}`,
+          onProgress: (done, total) => setSendProgress({ done, total }),
+        },
       );
       const message = (noteText.trim() || defaultNote).slice(0, 500);
       let noteOk = false;
@@ -129,8 +140,13 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
       );
       setSendOpen(false);
       void load(days);
+    } catch (e) {
+      // grant/쪽지 도중 예외가 나도 화면이 멈추지 않게 — 완료 안내를 반드시 띄운다.
+      showAdminToast("보내기 처리 중 문제가 있었어요. 명단의 🔒 '이미 보냄' 표시로 실제 지급 여부를 확인해 주세요.\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+      void load(days);
     } finally {
       setSending(false);
+      setSendProgress(null);
     }
   };
 
@@ -268,7 +284,7 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
             <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder={defaultNote} rows={3} className="mb-4 w-full rounded-xl border border-line bg-surface px-3 py-2 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
             <div className="grid grid-cols-2 gap-2">
               <button type="button" disabled={sending} onClick={() => setSendOpen(false)} className="h-11 rounded-xl border border-line bg-surface text-[14px] font-black text-ink-soft">취소</button>
-              <button type="button" disabled={sending} onClick={() => void doSend()} className="h-11 rounded-xl bg-rose-deep text-[14px] font-black text-white disabled:opacity-50">{sending ? "보내는 중…" : "보내기"}</button>
+              <button type="button" disabled={sending} onClick={() => void doSend()} className="h-11 rounded-xl bg-rose-deep text-[14px] font-black text-white disabled:opacity-50">{sending ? (sendProgress ? `보내는 중… ${sendProgress.done}/${sendProgress.total}` : "보내는 중…") : "보내기"}</button>
             </div>
           </div>
         </div>
