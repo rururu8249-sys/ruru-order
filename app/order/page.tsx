@@ -1993,6 +1993,26 @@ export default function OrderPage() {
     }
   }, []);
 
+  // [2026-09-05 사장님 확정 · 카카오 필수, 예외 없음] 회원의 정체성 = 카카오ID. 카톡 간편로그인이 유일한 입구다.
+  //   이 브라우저에 카카오ID가 없으면(전화번호만 남은 옛 브라우저·/order 직접 접속) 시작 화면(/)으로 보내
+  //   카톡 로그인을 거치게 한다. 8/31 강제 재로그인과 같은 방식 — 주문·포인트·입금엔 아무 영향 없음.
+  //   임시주문서는 localStorage에 그대로 남는다. 설정 토글 없음(카카오가 죽으면 시작 화면 로그인도 안 되므로 무의미).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let kid = "";
+    try { kid = String(window.localStorage.getItem("ruru_kakao_id") || "").trim(); } catch { kid = ""; }
+    if (kid) return;
+    // 방송 채팅 딥링크(/order?p=상품ID)로 온 새 손님은 카톡 로그인 뒤 그 상품이 열리도록 p 를 잠시 보관(아래 딥링크 effect가 읽고 지움)
+    try {
+      const pendingP = new URLSearchParams(window.location.search).get("p") || "";
+      if (pendingP.trim()) window.localStorage.setItem("ruru_pending_deeplink_p", pendingP.trim());
+    } catch { /* 무시 */ }
+    showCustomerNotice("카카오톡 로그인 후 주문할 수 있어요. 시작 화면으로 이동합니다.");
+    const timer = window.setTimeout(() => window.location.replace("/"), 1500);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -4395,6 +4415,13 @@ export default function OrderPage() {
     if (quickGroupBuyProducts.length === 0) return;
     let pid = "";
     try { pid = new URLSearchParams(window.location.search).get("p") || ""; } catch { deepLinkHandledRef.current = true; return; }
+    // [2026-09-05 카카오 필수] 로그인 전에 보관해 둔 딥링크 상품ID가 있으면 이어서 연다(1회, 즉시 삭제)
+    if (!pid.trim()) {
+      try {
+        pid = window.localStorage.getItem("ruru_pending_deeplink_p") || "";
+        if (pid) window.localStorage.removeItem("ruru_pending_deeplink_p");
+      } catch { pid = ""; }
+    }
     if (!pid.trim()) { deepLinkHandledRef.current = true; return; }
     deepLinkHandledRef.current = true;
     const target = quickGroupBuyProducts.find((pr: any) => String(pr?.id ?? "") === pid.trim());
@@ -4660,6 +4687,17 @@ export default function OrderPage() {
     if (cleanPhone.length < 9) {
       showCustomerNotice("전화번호를 정확히 입력해 주세요.");
       return false;
+    }
+
+    // [2026-09-05 카카오 필수] 제출 직전 마지막 관문 — 마운트 후 로그아웃 등으로 카카오ID가 사라진 경우 대비.
+    {
+      let kid = "";
+      try { kid = String(window.localStorage.getItem("ruru_kakao_id") || "").trim(); } catch { kid = ""; }
+      if (!kid) {
+        showCustomerNotice("카카오톡 로그인 후 주문할 수 있어요. 시작 화면으로 이동합니다.");
+        window.setTimeout(() => window.location.replace("/"), 1500);
+        return false;
+      }
     }
 
     // [2026-07-06] 01X 만 허용했었다 → [2026-08-30] 집·사무실 전화도 허용(isOrderablePhone).
