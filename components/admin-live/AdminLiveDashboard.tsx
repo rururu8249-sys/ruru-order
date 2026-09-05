@@ -289,7 +289,6 @@ const MENU_KEYS_FOR_URL: AdminLiveMenuKey[] = [
   "products",
   "chatorder",
   "event",
-  "point",
   "orders",
   "payments",
   "customers",

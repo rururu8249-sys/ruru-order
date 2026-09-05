@@ -7,7 +7,6 @@ export type AdminLiveMenuKey =
   | "customers"
   | "notice"
   | "event"
-  | "point"
   | "settlement"
   | "settings";
 
@@ -59,8 +58,8 @@ export const ADMIN_LIVE_MENUS: AdminLiveMenuItem[] = [
     icon: "◔",
     desc: "방송·날짜별 통계",
     sidebarNotice: "정산통계 화면은 돈 로직을 건드리지 않고 조회·통계 중심으로 설계합니다.",
-    readyTitle: "정산통계 화면 연결 준비중",
-    readyDescription: "방송별·날짜별 결제완료 매출, 입금대기, 카드결제 통계를 조회 전용으로 구성합니다.",
+    readyTitle: "정산통계",
+    readyDescription: "방송별·날짜별 결제완료 매출, 입금대기, 카드결제 통계를 조회 전용으로 봅니다.",
     checkpoints: ["방송별 매출", "날짜별 통계", "결제상태", "카드결제", "상품 랭킹"],
   },
   {
@@ -69,8 +68,8 @@ export const ADMIN_LIVE_MENUS: AdminLiveMenuItem[] = [
     icon: "👤",
     desc: "고객·특이사항",
     sidebarNotice: "고객관리 화면은 고객 검색·차단·특이사항·이슈 관리를 분리해서 연결할 예정입니다.",
-    readyTitle: "고객관리 화면 연결 준비중",
-    readyDescription: "고객정보, 차단회원, 특이사항, 고객이슈를 한 화면에서 확인하도록 설계합니다.",
+    readyTitle: "고객·이슈",
+    readyDescription: "고객정보, 차단회원, 특이사항, 고객이슈, 단골 리포트를 한 화면에서 관리합니다.",
     checkpoints: ["고객 검색", "차단회원", "고객 특이사항", "고객이슈", "최근 주문"],
   },
   {
@@ -100,8 +99,8 @@ export const ADMIN_LIVE_MENUS: AdminLiveMenuItem[] = [
     icon: "⚙",
     desc: "운영 설정",
     sidebarNotice: "설정 화면은 방송·주문·입금 관련 설정을 돈 로직과 분리해서 연결할 예정입니다.",
-    readyTitle: "설정 화면 연결 준비중",
-    readyDescription: "방송 운영, 주문서 작성 가능 시간, 알림, 입금 안내 설정을 분리 관리합니다.",
+    readyTitle: "설정",
+    readyDescription: "결제·배송, 합배송, 포인트, 주문서 표시, 알림, 관리자 보안을 분리 관리합니다.",
     checkpoints: ["방송 설정", "주문서 설정", "알림 설정", "입금 안내", "관리자 설정"],
   },
 ];

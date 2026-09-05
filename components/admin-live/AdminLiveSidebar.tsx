@@ -112,22 +112,7 @@ export default function AdminLiveSidebar({
             );
           })}
 
-          {/* 유튜브 SEO·썸네일 생성기 — 독립 툴 페이지 링크 (메뉴 state 미사용, 새 탭) */}
-          <a
-            href="/admin-live/youtube-seo"
-            target="_blank"
-            rel="noreferrer"
-            className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-ink-soft transition hover:bg-surface-2 hover:text-ink"
-          >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-surface text-base shadow-sm ring-1 ring-line">
-              🎬
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[15px] font-black">유튜브 SEO</span>
-              <span className="block truncate text-[10px] font-bold opacity-60">제목·썸네일 생성기</span>
-            </span>
-            <span className="ml-auto shrink-0 text-[10px] font-black opacity-40">↗</span>
-          </a>
+          {/* [2026-09-06] 유튜브 SEO 링크 사이드바에서 제거(사장님). 도구 페이지 /admin-live/youtube-seo 는 그대로 접근 가능. */}
         </nav>
 
         {/* [2026-08-29 사장님 요청] 실시간 접속자 — 사이드바에서 바로 보이게 */}
