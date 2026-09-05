@@ -30,8 +30,14 @@ export default function KakaoStartPage() {
     const savedPhone = window.localStorage.getItem("ruru_customer_phone") || "";
     const savedAddress = window.localStorage.getItem("ruru_customer_address") || "";
     const savedDetailAddress = window.localStorage.getItem("ruru_customer_detail_address") || "";
+    // [2026-09-05 카카오 필수] 주문서(/order)는 카카오ID 없으면 여기로 돌려보낸다 → 여기서 카카오ID 없이 /order 로
+    //   자동 통과시키면 두 화면이 서로 튕기는 무한 반복이 된다. 카카오ID가 있을 때만 자동 통과(없으면 카톡 로그인 버튼).
+    const savedKakaoId = (() => {
+      try { return String(window.localStorage.getItem("ruru_kakao_id") || "").trim(); } catch { return ""; }
+    })();
 
     if (
+      savedKakaoId &&
       kakaoSessionReady &&
       youtubeNicknameConfirmed &&
       savedYoutubeNickname.trim() &&
