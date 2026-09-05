@@ -56,7 +56,17 @@ export async function GET(request: NextRequest) {
       if (rows.length > 200000) break; // 안전 상한
     }
 
-    const isCanceled = (o: Row) => statusCols.some((c) => /cancel|취소/i.test(String(o[c] ?? "")));
+    // [2026-09-05 근본수정 · 실제 입금 주문만] 회원 상세와 동일하게 "입금된 주문"만 통계에 센다.
+    //   입금 안 된 장난/테스트 주문(예: 865만원 미입금건)·취소·환불이 재구매율·금액을 오염시키던 문제.
+    //   판정 기준은 검증된 lib/admin-v2 PAID_STATUS_VALUES + AdminLiveCustomersPanel.isPaid 와 동일.
+    const payCols = statusCols.filter((c) => /order_manage_status|admin_order_status_v2|shipping_status/.test(c));
+    const usedCols = payCols.length ? payCols : statusCols;
+    const rowStatusText = (o: Row) => usedCols.map((c) => String(o[c] ?? "")).filter(Boolean).join(" ");
+    const PAID_RE = /입금확인|자동입금확인|수동입금확인|카드결제완료|결제완료|출고대기|출고완료|킵|픽업/;
+    const VOID_RE = /cancel|취소|환불|refund|테스트/i;
+    // 실제 구매(입금완료) 주문 = 입금/출고 표시가 있고, 취소·환불·테스트가 아닌 것
+    const isRealPurchase = (o: Row) => { const t = rowStatusText(o); return PAID_RE.test(t) && !VOID_RE.test(t); };
+    const isCanceled = (o: Row) => !isRealPurchase(o); // 아래 로직 호환 — 입금 안 됐거나 취소/환불이면 제외
 
     // [2026-09-05 진단 전용 · 읽기 전용] ?inspect=<닉/전화 일부> → 그 사람 실제 주문 줄을 그대로 보여준다.
     //   865만원 같은 이상치가 왜 나오는지 데이터로 확인하기 위한 것. 아무 데이터도 바꾸지 않는다.
