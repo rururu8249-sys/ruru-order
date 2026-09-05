@@ -92,8 +92,8 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
 
   const thisMonth = stats?.monthly?.[stats.monthly.length - 1];
   const amountNum = Math.floor(Number(amountText.replace(/[^0-9]/g, "") || 0));
-  // [윈백 카피 표준] 보고 싶다는 진심 + 혜택을 숫자로 + 할 일 하나(다음 방송)
-  const defaultNote = `보고 싶었어요! 요즘 통 안 보이셔서 서운했잖아요 🥺 감사한 마음으로 ${amountNum.toLocaleString()}P 넣어드렸어요 — 다음 방송에서 현금처럼 바로 쓰세요. 편하게 놀러만 오셔도 좋아요 💕`;
+  // [윈백 카피 표준] 솔직·담백하게 — 감사 인사 + 혜택을 숫자로 + 할 일 하나(다음 방송). 과한 이모지·오글 문구 지양.
+  const defaultNote = `한동안 방송에서 못 뵀네요. 늘 찾아주셔서 감사한 마음에 ${amountNum.toLocaleString()}P 넣어드렸어요. 다음 방송 때 현금처럼 바로 쓰실 수 있어요.`;
 
   const doSend = async () => {
     if (!stats) return;
@@ -116,7 +116,7 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
           method: "POST",
           headers: { "Content-Type": "application/json" },
           cache: "no-store",
-          body: JSON.stringify({ targets: targets.map((t) => ({ phone: t.phone })), title: "💝 보고 싶었어요!", message }),
+          body: JSON.stringify({ targets: targets.map((t) => ({ phone: t.phone })), title: "포인트를 넣어드렸어요", message }),
         });
         const json = await res.json().catch(() => null);
         noteOk = Boolean(res.ok && json?.ok);
