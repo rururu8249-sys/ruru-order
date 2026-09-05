@@ -11,7 +11,9 @@ import { showAdminToast } from "@/lib/adminToast";
 import { useBulkPointGrant } from "./useBulkPointGrant";
 
 type SegKey = "fresh" | "loyal" | "atRisk" | "gone";
-type SegRow = { phone: string; nick: string; buys: number; lastBuy: string; daysSince: number; spend: number };
+type SegRow = { phone: string; kakao?: string; nick: string; buys: number; lastBuy: string; daysSince: number; spend: number };
+// [2026-09-05] 명단·TOP10 닉네임 클릭 → 회원 상세. 정체성 = 카카오ID 우선, 전화 폴백(부모가 찾는다).
+export type LoyaltyCustomerRef = { kakao: string; phone: string; nick: string };
 type Stats = {
   ok: boolean;
   totalCustomers: number;
@@ -22,8 +24,8 @@ type Stats = {
   recentComebackPhones: string[];
   broadcastCount30d: number;
   monthly: Array<{ month: string; new: number; repeat: number }>;
-  topCustomers: Array<{ nick: string; n: number; last: string; spend: number }>;
-  topSpenders: Array<{ nick: string; n: number; last: string; spend: number }>;
+  topCustomers: Array<{ nick: string; n: number; last: string; spend: number; kakao?: string; phone?: string }>;
+  topSpenders: Array<{ nick: string; n: number; last: string; spend: number; kakao?: string; phone?: string }>;
 };
 
 const DAY_CHOICES = [30, 45, 60, 90];
@@ -42,7 +44,7 @@ const money = (n: number) => {
   return `${Number(n || 0).toLocaleString()}원`;
 };
 
-export default function AdminLiveLoyaltyReport() {
+export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCustomer?: (ref: LoyaltyCustomerRef) => void }) {
   const [days, setDays] = useState(45);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(false);
@@ -208,7 +210,14 @@ export default function AdminLiveLoyaltyReport() {
                   disabled={locked}
                   onChange={() => setChecked((prev) => { const next = new Set(prev); if (next.has(c.phone)) next.delete(c.phone); else next.add(c.phone); return next; })}
                 />
-                <span className="min-w-0 flex-1 truncate text-[13px] font-black text-ink">{c.nick}</span>
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenCustomer?.({ kakao: c.kakao || "", phone: c.phone, nick: c.nick }); }}
+                  className="min-w-0 flex-1 truncate text-left text-[13px] font-black text-ink underline decoration-dotted underline-offset-2 hover:text-rose-deep"
+                  title="회원 상세 열기"
+                >
+                  {c.nick}
+                </button>
                 <span className="text-[12px] font-bold text-ink-soft">{c.buys}회</span>
                 <span className="w-[64px] text-right text-[12px] font-bold text-ink-soft">{money(c.spend)}</span>
                 <span className="w-[86px] text-right text-[12px] font-bold text-rose-deep">{c.daysSince}일째 조용</span>
@@ -232,7 +241,14 @@ export default function AdminLiveLoyaltyReport() {
           {((topMode === "count" ? stats?.topCustomers : stats?.topSpenders) || []).slice(0, 10).map((t, i) => (
             <div key={`${topMode}-${t.nick}-${t.n}`} className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-1.5">
               <span className="w-6 text-[12px] font-black text-ink-mute">{i + 1}</span>
-              <span className="min-w-0 flex-1 truncate text-[13px] font-black text-ink">{t.nick}</span>
+              <button
+                type="button"
+                onClick={() => onOpenCustomer?.({ kakao: t.kakao || "", phone: t.phone || "", nick: t.nick })}
+                className="min-w-0 flex-1 truncate text-left text-[13px] font-black text-ink underline decoration-dotted underline-offset-2 hover:text-rose-deep"
+                title="회원 상세 열기"
+              >
+                {t.nick}
+              </button>
               <span className={`text-[12px] ${topMode === "count" ? "font-black text-rose-deep" : "font-bold text-ink-soft"}`}>{t.n}회</span>
               <span className={`w-[80px] text-right text-[13px] ${topMode === "spend" ? "font-black text-rose-deep" : "font-bold text-ink-soft"}`}>{money(t.spend)}</span>
             </div>

@@ -13,13 +13,14 @@ const BULK_POINT_REASON_PRESETS = ["방송 이벤트 당첨", "단골 감사", "
 import { supabase } from "@/lib/supabase";
 import { buildCustomerIdentityResolver, type CustomerIdentityRef } from "@/lib/customerIdentity";
 import { showAdminToast } from "@/lib/adminToast";
-import AdminLiveLoyaltyReport from "./AdminLiveLoyaltyReport";
+import AdminLiveLoyaltyReport, { type LoyaltyCustomerRef } from "./AdminLiveLoyaltyReport";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import type { LiveOrder } from "./types";
 import AdminLiveCustomerIssueRail from "./AdminLiveCustomerIssueRail";
 import AdminLivePhoneBlockPanel from "./AdminLivePhoneBlockPanel";
 import AdminLiveCustomerBlockReasonModal from "./AdminLiveCustomerBlockReasonModal";
 import AdminLiveCustomerPointPanel from "./AdminLiveCustomerPointPanel";
+import CustomerFullOrderHistory from "./CustomerFullOrderHistory";
 import { CUSTOMER_TERMS } from "./adminLiveCustomerTerms";
 import { formatKoreanPhone } from "@/lib/order/phone";
 
@@ -50,6 +51,8 @@ type CustomerSummary = {
   blocked: boolean;
   blockReason: string;
   orders: LooseLiveOrder[];
+  // [2026-09-05] 회원의 정체성 = 카카오ID. 주문/프로필에서 처음 만난 kakao_id. 없으면 "카카오 미연동"(전화번호만 남은 옛 회원).
+  kakaoId: string;
 };
 
 type CustomerProfile = {
@@ -92,7 +95,7 @@ const customerHistoryFieldLabel = (field: unknown) => {
 };
 
 type SortMode = "latest" | "amount" | "orders" | "nickname" | "joinedDesc" | "joinedAsc" | "lastLogin" | "oldLogin";
-type StatusFilter = "all" | "normal" | "blocked" | "attention";
+type StatusFilter = "all" | "normal" | "blocked" | "attention" | "nokakao";
 
 type BlockOverride = {
   blocked: boolean;
@@ -121,7 +124,6 @@ type BlockedCustomerListItem =
     };
 
 const CUSTOMER_PAGE_SIZE = 20;
-const DETAIL_ORDER_PAGE_SIZE = 6;
 
 function money(value: unknown) {
   return `${Number(value || 0).toLocaleString("ko-KR")}원`;
@@ -647,17 +649,6 @@ function CustomerDetailDrawer({
     }
   };
 
-  const totalPages = Math.max(1, Math.ceil(customer.orders.length / DETAIL_ORDER_PAGE_SIZE));
-  const safePage = Math.min(Math.max(1, page), totalPages);
-  const visibleOrders = customer.orders.slice((safePage - 1) * DETAIL_ORDER_PAGE_SIZE, safePage * DETAIL_ORDER_PAGE_SIZE);
-
-  const statusBadge = (text: string) => {
-    const t = String(text || "");
-    if (/입금확인|결제완료/.test(t)) return { background: "var(--color-ok-bg)", color: "var(--color-ok-tx)" };
-    if (/배송|출고/.test(t)) return { background: "var(--color-info-bg)", color: "var(--color-info-tx)" };
-    if (/대기|미입금|필요/.test(t)) return { background: "var(--color-warn-bg)", color: "var(--color-warn-tx)" };
-    return { background: "var(--color-surface-3)", color: "var(--color-ink-soft)" };
-  };
   const avatarChar = (customer.nickname || customer.name || "?").trim().charAt(0) || "?";
 
   return (
@@ -903,32 +894,8 @@ function CustomerDetailDrawer({
             </div>
           </div>
 
-          {/* 주문 이력 */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-            <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>주문 이력</span>
-            <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>{safePage} / {totalPages}</span>
-          </div>
-          {visibleOrders.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "18px 0", fontSize: "12px", color: "var(--color-ink-mute)" }}>주문 내역이 없습니다.</div>
-          ) : (
-            visibleOrders.map((order, index) => {
-              const badge = statusBadge(orderStatusText(order));
-              return (
-                <div key={`${order.id || index}-${orderCreatedLabel(order)}`} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 0", borderBottom: "1px solid var(--color-surface-2)" }}>
-                  <span style={{ width: "92px", flexShrink: 0, fontSize: "11px", color: "var(--color-ink-mute)" }}>{orderCreatedLabel(order)}</span>
-                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "12px", color: "var(--color-ink-soft)" }} title={orderSummary(order)}>{orderSummary(order)}</span>
-                  <b style={{ fontSize: "12px", color: "var(--color-ink)" }}>{money(orderAmount(order))}</b>
-                  <span style={{ flexShrink: 0, fontSize: "10px", fontWeight: 800, borderRadius: "6px", padding: "3px 7px", ...badge }}>{orderStatusText(order) || "-"}</span>
-                </div>
-              );
-            })
-          )}
-          {totalPages > 1 ? (
-            <div style={{ display: "flex", justifyContent: "center", gap: "8px", marginTop: "12px" }}>
-              <button type="button" onClick={() => setPage(Math.max(1, safePage - 1))} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", padding: "5px 12px", fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", cursor: "pointer" }}>이전</button>
-              <button type="button" onClick={() => setPage(Math.min(totalPages, safePage + 1))} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", padding: "5px 12px", fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", cursor: "pointer" }}>다음</button>
-            </div>
-          ) : null}
+          {/* 주문 이력 — [2026-09-05] 전 기간 DB 직접 조회(카카오ID 우선, 전화 폴백) + 정렬/필터/주문서 펼치기 */}
+          <CustomerFullOrderHistory kakaoId={clean(profile?.kakao_id) || clean(customer.kakaoId)} phone={customer.phone} />
 
           {/* 포인트 (기존 패널 유지 — 보유포인트 표시 + 🪙 지급) */}
           <div style={{ marginTop: "14px" }}>
@@ -1158,11 +1125,13 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
           blocked: orderBlocked,
           blockReason: orderBlockReason,
           orders: [order],
+          kakaoId: orderKakaoId(order),
         });
 
         return;
       }
 
+      if (!current.kakaoId) current.kakaoId = orderKakaoId(order);
       current.orderCount += 1;
       current.totalAmount += amount;
       current.paidCount += isPaid(order) ? 1 : 0;
@@ -1222,6 +1191,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
         current.joinedAt = clean(profile.created_at) || current.joinedAt;
         current.lastLoginAt = clean(profile.last_login_at) || current.lastLoginAt;
+        if (!current.kakaoId) current.kakaoId = clean(profile.kakao_id);
 
         return;
       }
@@ -1243,6 +1213,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
         blocked: profileBlocked,
         blockReason: profileBlockReason,
         orders: [],
+        kakaoId: clean(profile.kakao_id),
       });
     });
 
@@ -1271,6 +1242,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
         if (statusFilter === "normal") return !customer.blocked;
         if (statusFilter === "blocked") return customer.blocked;
         if (statusFilter === "attention") return customer.manualNeededCount > 0 || customer.unpaidCount > 0;
+        if (statusFilter === "nokakao") return !customer.kakaoId;
 
         return true;
       })
@@ -1439,12 +1411,29 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
   const openDetail = (customer: CustomerSummary) => {
     setSelectedCustomer(customer);
     setDetailPage(1);
-    // customers 프로필을 전화번호(숫자) 기준으로 매칭
+    // [2026-09-05 정체성 통일] 프로필 매칭은 카카오ID 우선. 전화번호는 카카오ID가 없을 때만(옛 회원) 폴백.
+    const kakaoKey = clean(customer.kakaoId);
     const phoneKey = digitsOnly(customer.phone);
-    const profile = phoneKey
-      ? customerProfiles.find((p) => digitsOnly(p.customer_phone) === phoneKey) || null
-      : null;
+    const byKakao = kakaoKey ? customerProfiles.find((p) => clean(p.kakao_id) === kakaoKey) || null : null;
+    const profile = byKakao
+      || (phoneKey ? customerProfiles.find((p) => digitsOnly(p.customer_phone) === phoneKey && (!kakaoKey || !clean(p.kakao_id))) || null : null);
     setSelectedProfile(profile);
+  };
+
+  // [2026-09-05] 단골 리포트 명단/TOP10 닉네임 클릭 → 회원 상세. 카카오ID 우선, 전화 폴백, 마지막에 닉네임.
+  const openDetailFromLoyalty = (ref: LoyaltyCustomerRef) => {
+    const kakaoKey = clean(ref.kakao);
+    const phoneKey = digitsOnly(ref.phone);
+    const nickKey = clean(ref.nick).toLowerCase();
+    const found =
+      (kakaoKey ? customers.find((c) => clean(c.kakaoId) === kakaoKey) : undefined) ||
+      (phoneKey ? customers.find((c) => digitsOnly(c.phone) === phoneKey) : undefined) ||
+      (nickKey ? customers.find((c) => clean(c.nickname).toLowerCase() === nickKey) : undefined);
+    if (!found) {
+      showAdminToast("회원 목록에서 못 찾았습니다. (주문 없는 회원이거나 표시 범위 밖)", "info");
+      return;
+    }
+    openDetail(found);
   };
 
   const applyBlockResult = (result: { phone: string; blocked: boolean; reason: string }) => {
@@ -1617,7 +1606,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
       {custTab === "loyalty" ? (
         <div className="rounded-[28px] border border-line bg-surface p-4 shadow-sm">
-          <AdminLiveLoyaltyReport />
+          <AdminLiveLoyaltyReport onOpenCustomer={openDetailFromLoyalty} />
         </div>
       ) : null}
 
@@ -1636,6 +1625,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
               <option value="normal">정상</option>
               <option value="blocked">차단</option>
               <option value="attention">관리필요</option>
+              <option value="nokakao">카카오 미연동</option>
             </select>
 
             <select
@@ -1750,6 +1740,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                         <div className="flex items-center gap-1.5">
                           <span className="truncate text-[13px] font-black text-ink">{customer.nickname || "—"}</span>
                           {customer.name ? <span className="shrink-0 text-xs text-ink-mute">· {customer.name}</span> : null}
+                          {!customer.kakaoId ? <span className="shrink-0 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-black text-warn-tx" title="카카오 로그인 기록이 없는 옛 회원(전화번호만). 다시 카톡 로그인하면 자동 연결됩니다.">카카오 미연동</span> : null}
                         </div>
                         <div className="mt-0.5 truncate text-[11px] text-ink-mute">
                           누적 {customer.orderCount}건 · {money(customer.totalAmount)}
@@ -2054,6 +2045,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                               blocked: true,
                               blockReason: block.reason,
                               orders: [],
+                              kakaoId: "",
                             })
                           }
                           disabled={blockSaving}

@@ -110,6 +110,7 @@ export async function GET(request: NextRequest) {
     const buyDays = new Map<string, Set<string>>();
     const nickOf = new Map<string, string>();
     const phoneOf = new Map<string, string>();
+    const kakaoOf = new Map<string, string>(); // [2026-09-05] 명단 클릭→회원상세 연결용(카카오ID 우선)
     const spendOf = new Map<string, number>();
     const rowAmount = (o: Row) => {
       const v = Number(o.total_amount ?? o.final_amount ?? o.adjusted_total_price ?? o.total_price ?? 0);
@@ -122,6 +123,8 @@ export async function GET(request: NextRequest) {
       const phRaw = digits(o.customer_phone);
       const cust = kakRaw || (phRaw ? phoneToKakao.get(phRaw) || phRaw : "");
       if (!cust) continue;
+      const kakForCust = kakRaw || (phRaw ? phoneToKakao.get(phRaw) || "" : "");
+      if (kakForCust) kakaoOf.set(cust, kakForCust);
       const t = new Date(String(o.created_at)).getTime();
       if (!Number.isFinite(t)) continue;
       if (!buyDays.has(cust)) buyDays.set(cust, new Set());
@@ -144,10 +147,10 @@ export async function GET(request: NextRequest) {
     };
     const monthly = new Map<string, { nw: number; rp: number }>();
     const now = Date.now();
-    const top: Array<{ nick: string; n: number; last: string; spend: number }> = [];
+    const top: Array<{ nick: string; n: number; last: string; spend: number; kakao: string; phone: string }> = [];
     // 카드 4장 세그먼트: 🌱새손님(1회·90일 미만) / 💖단골(2회+·기준일 미만) / 🚨떠나려는 단골(2회+·기준일↑) / 💤떠난 손님(1회·90일↑)
     const segments = { fresh: 0, loyal: 0, atRisk: 0, gone: 0 };
-    type SegRow = { phone: string; nick: string; buys: number; lastBuy: string; daysSince: number; spend: number };
+    type SegRow = { phone: string; kakao: string; nick: string; buys: number; lastBuy: string; daysSince: number; spend: number };
     const lists: Record<"fresh" | "loyal" | "atRisk" | "gone", SegRow[]> = { fresh: [], loyal: [], atRisk: [], gone: [] };
     for (const [cust, set] of buyDays) {
       const dates = Array.from(set).sort();
@@ -163,13 +166,13 @@ export async function GET(request: NextRequest) {
         if (!monthly.has(m)) monthly.set(m, { nw: 0, rp: 0 });
         monthly.get(m)![i === 0 ? "nw" : "rp"]++;
       });
-      top.push({ nick: nickOf.get(cust) || `${cust.slice(0, 4)}…`, n, last: dates[n - 1], spend: spendOf.get(cust) || 0 });
+      top.push({ nick: nickOf.get(cust) || `${cust.slice(0, 4)}…`, n, last: dates[n - 1], spend: spendOf.get(cust) || 0, kakao: kakaoOf.get(cust) || "", phone: phoneOf.get(cust) || "" });
       const seg: "fresh" | "loyal" | "atRisk" | "gone" =
         n === 1 ? (since >= 90 ? "gone" : "fresh") : since >= lapsedDaysCut ? "atRisk" : "loyal";
       segments[seg]++;
       const phoneDigits = phoneOf.get(cust) || (/^[0-9]{9,}$/.test(cust) ? cust : "");
       if (phoneDigits) {
-        lists[seg].push({ phone: phoneDigits, nick: nickOf.get(cust) || phoneDigits.slice(-4), buys: n, lastBuy: dates[n - 1], daysSince: since, spend: spendOf.get(cust) || 0 });
+        lists[seg].push({ phone: phoneDigits, kakao: kakaoOf.get(cust) || "", nick: nickOf.get(cust) || phoneDigits.slice(-4), buys: n, lastBuy: dates[n - 1], daysSince: since, spend: spendOf.get(cust) || 0 });
       }
     }
     lists.atRisk.sort((a, b) => b.buys - a.buys || a.daysSince - b.daysSince);
