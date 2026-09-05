@@ -18,7 +18,7 @@ function getSupabaseAdminClient() {
 
 const digits = (v: unknown) => String(v ?? "").replace(/[^0-9]/g, "");
 // [2026-09-05 사장님 지시] 관리자 계정은 통계·명단에서 제외 (닉네임 기준, 공백 무시)
-const ADMIN_NICKNAMES = new Set(["동실장", "루루동이"].map((n) => n.replace(/\s+/g, "")));
+const ADMIN_NICKNAMES = new Set(["동실장", "루루동이", "루루실장"].map((n) => n.replace(/\s+/g, "")));
 const isAdminNick = (nick: unknown) => ADMIN_NICKNAMES.has(String(nick ?? "").replace(/\s+/g, ""));
 
 export async function GET(request: NextRequest) {
