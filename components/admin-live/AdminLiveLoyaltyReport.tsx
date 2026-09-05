@@ -197,11 +197,11 @@ export default function AdminLiveLoyaltyReport() {
           <div className="py-8 text-center text-[13px] font-bold text-ink-mute">이 칸에는 지금 아무도 없어요 👍</div>
         ) : null}
         <div className="max-h-[320px] space-y-1 overflow-y-auto">
-          {rows.map((c) => {
+          {rows.map((c, i) => {
             const locked = lockSet.has(c.phone);
             const on = checked.has(c.phone);
             return (
-              <label key={c.phone} className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${locked ? "border-line bg-surface-2 opacity-60" : on ? "border-rose-line bg-rose-soft/30" : "border-line bg-surface"}`}>
+              <label key={`${seg}-${c.phone}-${i}`} className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${locked ? "border-line bg-surface-2 opacity-60" : on ? "border-rose-line bg-rose-soft/30" : "border-line bg-surface"}`}>
                 <input
                   type="checkbox"
                   checked={on}

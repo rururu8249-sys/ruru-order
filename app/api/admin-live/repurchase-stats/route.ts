@@ -58,7 +58,39 @@ export async function GET(request: NextRequest) {
 
     const isCanceled = (o: Row) => statusCols.some((c) => /cancel|취소/i.test(String(o[c] ?? "")));
 
+    // [2026-09-05 진단 전용 · 읽기 전용] ?inspect=<닉/전화 일부> → 그 사람 실제 주문 줄을 그대로 보여준다.
+    //   865만원 같은 이상치가 왜 나오는지 데이터로 확인하기 위한 것. 아무 데이터도 바꾸지 않는다.
+    const inspect = String(request.nextUrl.searchParams.get("inspect") || "").trim();
+    if (inspect) {
+      const q = inspect.toLowerCase();
+      const hit = rows.filter((o) => {
+        const nk = String(o.youtube_nickname || "").toLowerCase();
+        const ph = digits(o.customer_phone);
+        return nk.includes(q) || ph.includes(inspect.replace(/[^0-9]/g, ""));
+      }).slice(0, 200).map((o) => ({
+        group: String(o.order_group_id || o.id),
+        day: String(o.created_at || "").slice(0, 10),
+        nick: o.youtube_nickname, phone: o.customer_phone, kakao: o.kakao_id || "",
+        status: statusCols.map((c) => o[c]).filter(Boolean).join("|"),
+        amounts: { total_amount: o.total_amount, final_amount: o.final_amount, adjusted_total_price: o.adjusted_total_price, total_price: o.total_price },
+      }));
+      const byGroup = new Map<string, number>();
+      for (const h of hit) byGroup.set(h.group, (byGroup.get(h.group) || 0) + 1);
+      return NextResponse.json({ ok: true, inspect, rowCount: hit.length, groupCount: byGroup.size, rows: hit });
+    }
+
     // 고객별 구매일(같은 날 합침)
+    // [2026-09-05 근본수정 · 정체성 병합] 같은 사람이 「카카오 주문」과 「카카오 연결 전 전화 주문」으로
+    //   고객 두 줄로 갈라져 명단에 두 번 나오고(sc·선가네 중복), 2회 구매자가 1회짜리 둘로 쪼개져
+    //   재구매율까지 틀어졌다. 8/31 확정 원칙(정체성=카카오 계정)대로, 전화번호가 카카오 계정과
+    //   한 번이라도 같이 등장했으면 그 전화의 모든 주문을 그 카카오 고객으로 합친다.
+    const phoneToKakao = new Map<string, string>();
+    for (const o of rows) {
+      if (isCanceled(o)) continue;
+      const k = String(o.kakao_id || "").trim();
+      const p = digits(o.customer_phone);
+      if (k && p && !phoneToKakao.has(p)) phoneToKakao.set(p, k);
+    }
     const buyDays = new Map<string, Set<string>>();
     const nickOf = new Map<string, string>();
     const phoneOf = new Map<string, string>();
@@ -70,7 +102,9 @@ export async function GET(request: NextRequest) {
     let canceledRows = 0;
     for (const o of rows) {
       if (isCanceled(o)) { canceledRows++; continue; }
-      const cust = String(o.kakao_id || "").trim() || digits(o.customer_phone);
+      const kakRaw = String(o.kakao_id || "").trim();
+      const phRaw = digits(o.customer_phone);
+      const cust = kakRaw || (phRaw ? phoneToKakao.get(phRaw) || phRaw : "");
       if (!cust) continue;
       const t = new Date(String(o.created_at)).getTime();
       if (!Number.isFinite(t)) continue;
@@ -126,6 +160,15 @@ export async function GET(request: NextRequest) {
     lists.loyal.sort((a, b) => b.spend - a.spend);
     lists.fresh.sort((a, b) => a.daysSince - b.daysSince);
     lists.gone.sort((a, b) => b.spend - a.spend);
+    // 같은 전화번호가 두 줄 나오는 일이 절대 없게 — 명단·지급 안전핀
+    const dedupeByPhone = (arr: SegRow[]) => {
+      const seen = new Set<string>();
+      return arr.filter((r) => { if (seen.has(r.phone)) return false; seen.add(r.phone); return true; });
+    };
+    lists.fresh = dedupeByPhone(lists.fresh);
+    lists.loyal = dedupeByPhone(lists.loyal);
+    lists.atRisk = dedupeByPhone(lists.atRisk);
+    lists.gone = dedupeByPhone(lists.gone);
 
     // 방송주기 — 최근 30일 방송 횟수(방송 기록 실측, 읽기 전용)
     let broadcastCount30d = 0;
