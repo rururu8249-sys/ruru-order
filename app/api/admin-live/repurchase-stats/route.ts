@@ -17,6 +17,9 @@ function getSupabaseAdminClient() {
 }
 
 const digits = (v: unknown) => String(v ?? "").replace(/[^0-9]/g, "");
+// [2026-09-05 사장님 지시] 관리자 계정은 통계·명단에서 제외 (닉네임 기준, 공백 무시)
+const ADMIN_NICKNAMES = new Set(["동실장", "루루동이"].map((n) => n.replace(/\s+/g, "")));
+const isAdminNick = (nick: unknown) => ADMIN_NICKNAMES.has(String(nick ?? "").replace(/\s+/g, ""));
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,7 +37,8 @@ export async function GET(request: NextRequest) {
     if (probeError) throw new Error(probeError.message);
     const allCols = Object.keys((probe || [])[0] || {});
     const statusCols = allCols.filter((c) => /status/i.test(c));
-    const want = ["id", "created_at", "customer_phone", "kakao_id", "youtube_nickname", "order_group_id"];
+    const want = ["id", "created_at", "customer_phone", "kakao_id", "youtube_nickname", "order_group_id",
+      "total_amount", "final_amount", "adjusted_total_price", "total_price"];
     const selectCols = Array.from(new Set([...want.filter((c) => allCols.includes(c)), ...statusCols])).join(",");
 
     type Row = Record<string, unknown>;
@@ -58,6 +62,11 @@ export async function GET(request: NextRequest) {
     const buyDays = new Map<string, Set<string>>();
     const nickOf = new Map<string, string>();
     const phoneOf = new Map<string, string>();
+    const spendOf = new Map<string, number>();
+    const rowAmount = (o: Row) => {
+      const v = Number(o.total_amount ?? o.final_amount ?? o.adjusted_total_price ?? o.total_price ?? 0);
+      return Number.isFinite(v) && v > 0 ? v : 0;
+    };
     let canceledRows = 0;
     for (const o of rows) {
       if (isCanceled(o)) { canceledRows++; continue; }
@@ -71,6 +80,11 @@ export async function GET(request: NextRequest) {
       if (nick) nickOf.set(cust, nick);
       const ph = digits(o.customer_phone);
       if (ph) phoneOf.set(cust, ph);
+      spendOf.set(cust, (spendOf.get(cust) || 0) + rowAmount(o));
+    }
+    // 관리자 계정 제거 — 모든 통계·명단에서 빠진다
+    for (const [cust] of Array.from(buyDays)) {
+      if (isAdminNick(nickOf.get(cust))) { buyDays.delete(cust); spendOf.delete(cust); }
     }
 
     const counts = { one: 0, two: 0, threeToFive: 0, sixPlus: 0 };
@@ -80,10 +94,11 @@ export async function GET(request: NextRequest) {
     };
     const monthly = new Map<string, { nw: number; rp: number }>();
     const now = Date.now();
-    const top: Array<{ nick: string; n: number; last: string }> = [];
+    const top: Array<{ nick: string; n: number; last: string; spend: number }> = [];
     // 카드 4장 세그먼트: 🌱새손님(1회·90일 미만) / 💖단골(2회+·기준일 미만) / 🚨떠나려는 단골(2회+·기준일↑) / 💤떠난 손님(1회·90일↑)
     const segments = { fresh: 0, loyal: 0, atRisk: 0, gone: 0 };
-    const atRiskList: Array<{ phone: string; nick: string; buys: number; lastBuy: string; daysSince: number }> = [];
+    type SegRow = { phone: string; nick: string; buys: number; lastBuy: string; daysSince: number; spend: number };
+    const lists: Record<"fresh" | "loyal" | "atRisk" | "gone", SegRow[]> = { fresh: [], loyal: [], atRisk: [], gone: [] };
     for (const [cust, set] of buyDays) {
       const dates = Array.from(set).sort();
       const n = dates.length;
@@ -98,17 +113,31 @@ export async function GET(request: NextRequest) {
         if (!monthly.has(m)) monthly.set(m, { nw: 0, rp: 0 });
         monthly.get(m)![i === 0 ? "nw" : "rp"]++;
       });
-      top.push({ nick: nickOf.get(cust) || `${cust.slice(0, 4)}…`, n, last: dates[n - 1] });
-      if (n === 1) { if (since >= 90) segments.gone++; else segments.fresh++; }
-      else if (since >= lapsedDaysCut) {
-        segments.atRisk++;
-        const phoneDigits = phoneOf.get(cust) || (/^[0-9]{9,}$/.test(cust) ? cust : "");
-        if (phoneDigits) {
-          atRiskList.push({ phone: phoneDigits, nick: nickOf.get(cust) || phoneDigits.slice(-4), buys: n, lastBuy: dates[n - 1], daysSince: since });
-        }
-      } else segments.loyal++;
+      top.push({ nick: nickOf.get(cust) || `${cust.slice(0, 4)}…`, n, last: dates[n - 1], spend: spendOf.get(cust) || 0 });
+      const seg: "fresh" | "loyal" | "atRisk" | "gone" =
+        n === 1 ? (since >= 90 ? "gone" : "fresh") : since >= lapsedDaysCut ? "atRisk" : "loyal";
+      segments[seg]++;
+      const phoneDigits = phoneOf.get(cust) || (/^[0-9]{9,}$/.test(cust) ? cust : "");
+      if (phoneDigits) {
+        lists[seg].push({ phone: phoneDigits, nick: nickOf.get(cust) || phoneDigits.slice(-4), buys: n, lastBuy: dates[n - 1], daysSince: since, spend: spendOf.get(cust) || 0 });
+      }
     }
-    atRiskList.sort((a, b) => b.buys - a.buys || a.daysSince - b.daysSince);
+    lists.atRisk.sort((a, b) => b.buys - a.buys || a.daysSince - b.daysSince);
+    lists.loyal.sort((a, b) => b.spend - a.spend);
+    lists.fresh.sort((a, b) => a.daysSince - b.daysSince);
+    lists.gone.sort((a, b) => b.spend - a.spend);
+
+    // 방송주기 — 최근 30일 방송 횟수(방송 기록 실측, 읽기 전용)
+    let broadcastCount30d = 0;
+    try {
+      const sinceIso30 = new Date(now - 30 * 86400000).toISOString();
+      const { data: bc } = await supabase
+        .from("broadcasts")
+        .select("id, started_at, is_deleted")
+        .gte("started_at", sinceIso30)
+        .limit(1000);
+      broadcastCount30d = (bc || []).filter((b: Record<string, unknown>) => !b.is_deleted).length;
+    } catch { /* 보조 표시 — 실패해도 통계 정상 */ }
 
     // [재지급 잠금] 최근 30일 안에 "복귀" 사유 포인트를 이미 받은 번호 — 명단에 표시해 이중 지급을 막는다(읽기 전용)
     const recentComebackPhones: string[] = [];
@@ -144,7 +173,14 @@ export async function GET(request: NextRequest) {
       lapsed,
       lapsedDaysCut,
       segments,
-      atRiskList: atRiskList.slice(0, 500),
+      broadcastCount30d,
+      lists: {
+        fresh: lists.fresh.slice(0, 500),
+        loyal: lists.loyal.slice(0, 500),
+        atRisk: lists.atRisk.slice(0, 500),
+        gone: lists.gone.slice(0, 500),
+      },
+      atRiskList: lists.atRisk.slice(0, 500),
       recentComebackPhones: Array.from(new Set(recentComebackPhones)),
       monthly: Array.from(monthly.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([m, v]) => ({ month: m, new: v.nw, repeat: v.rp })),
       topCustomers: top.slice(0, 15),
