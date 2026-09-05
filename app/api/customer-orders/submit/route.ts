@@ -404,6 +404,7 @@ async function assertShippingFeeNotSkipped(
   orderRows: AnyRow[],
   phone: string,
   catalog: Map<string, AnyRow>,
+  kakaoId = "",
 ): Promise<void> {
   // 배송비를 물릴 대상이 있는지 — 손님 화면 getChargeableShippingItems(1420행)와 동일 기준
   const chargeable = orderRows.filter(
@@ -460,10 +461,21 @@ async function assertShippingFeeNotSkipped(
   const digits = phone.replace(/[^0-9]/g, "").slice(0, 11);
   const phoneValues = Array.from(new Set([phone, ...koreanPhoneVariants(digits)].filter(Boolean)));
 
-  const { data, error } = await supabase
+  // [2026-09-05 정체성 통일 · 사장님 확정] 회원의 정체성 = 카카오ID. 전화번호는 폴백일 뿐이다.
+  //   카카오 로그인 손님: kakao_id 가 같은 주문만 "내 주문". 전화번호는 kakao_id 가 안 찍힌 옛 주문을 찾을 때만 쓴다
+  //   (아래 JS 필터에서 "다른 카카오 계정이 찍힌 주문"은 전화가 같아도 제외 → 번호 공유·장난가입과 안 섞임).
+  //   카카오 없는 옛 손님: 기존 전화 조회 그대로. 손님 화면 checkAlreadyPaidShippingGroups 와 같은 기준.
+  const safeKakaoIdForShipping = String(kakaoId || "").replace(/[^0-9A-Za-z_-]/g, "");
+  let priorShippingQuery = supabase
     .from("orders")
-    .select("id, order_manage_status, zipcode, address, detail_address")
-    .in("customer_phone", phoneValues)
+    .select("id, order_manage_status, zipcode, address, detail_address, broadcast_id, created_at, customer_phone, kakao_id");
+  priorShippingQuery = safeKakaoIdForShipping
+    ? priorShippingQuery.or(
+        `kakao_id.eq.${safeKakaoIdForShipping},customer_phone.in.(${phoneValues.join(",")})`,
+      )
+    : priorShippingQuery.in("customer_phone", phoneValues);
+
+  const { data, error } = await priorShippingQuery
     .order("created_at", { ascending: false })
     .limit(300);
 
@@ -472,16 +484,32 @@ async function assertShippingFeeNotSkipped(
     return; // 조회 실패 → 허용(주문을 막지 않는다)
   }
 
-  const hasSameAddressOrder = (data || []).some((row: AnyRow) => {
+  const sameAddressOrders = (data || []).filter((row: AnyRow) => {
     if (isCanceledForSubmitShipping(row?.order_manage_status)) return false;
+    // 카카오 손님이면: 내 kakao_id 주문 또는 kakao_id 없는(옛) 주문만. 다른 카카오 계정 주문은 전화가 같아도 제외.
+    if (safeKakaoIdForShipping) {
+      const rowKakao = String(row?.kakao_id || "").trim();
+      if (rowKakao && rowKakao !== safeKakaoIdForShipping) return false;
+    }
     const sig = submitAddressSignature(row?.zipcode, row?.address, row?.detail_address);
     return Boolean(sig) && sig === signature;
   });
+  const hasSameAddressOrder = sameAddressOrders.length > 0;
 
   // 이전 주문이 하나라도 있으면 합배송으로 한 그룹분이 빠졌을 수 있다 → 무조건 통과(재구매 손님 보호).
   //   합배송 판정(관리자 시간설정 > 방송 단위 > 업체배송 그룹)은 손님 화면이 그대로 담당하고
   //   여기서는 재현하지 않는다. 재현하다 틀리면 정상 주문이 막히는 더 큰 사고가 난다.
-  if (hasSameAddressOrder) return;
+  // [2026-09-05 추적 로그 · 읽기 전용] 배송비 0원/부족 주문을 "통과"시킬 때 근거를 Vercel 로그에 남긴다.
+  //   윤땡땡 9/4 단독주문 0원 사고(RURU-MTMZ1RA8)는 남은 데이터로 원인 확정이 안 됐다 → 다음 발생 시 증거 확보용.
+  if (hasSameAddressOrder) {
+    const basis = sameAddressOrders.slice(0, 5).map((row: AnyRow) =>
+      `#${row?.id}(${String(row?.created_at || "").slice(0, 10)}|bc=${String(row?.broadcast_id || "").slice(0, 8)}|kk=${row?.kakao_id ? "Y" : "N"})`,
+    );
+    console.warn(
+      `배송비 검증 통과(합배송 추정): phone=${digits.slice(-4)} kakao=${safeKakaoIdForShipping ? "Y" : "N"} 낸배송비=${paidShipping} 필요=${expectedShipping} 기본배송비설정=${baseShippingFee} 주문방송=${String(firstOrderValue(orderRows, "broadcast_id") || "").slice(0, 8)} 근거주문=${basis.join(",")}`,
+    );
+    return;
+  }
 
   // 여기까지 = 같은 주소 이전 주문이 아예 없다 = 합배송이 성립할 수 없다
   //   → 배송그룹 수만큼 전액을 냈어야 한다. 그런데 안 냈다.
@@ -634,7 +662,7 @@ export async function POST(request: NextRequest) {
     //   카톡 계정(kakao_id) 기준 누적 → 전화번호 바꿔도 제한 우회 불가
     await assertDirectInputAllowed(supabase, orderRows);
     const productCatalog = await assertRegisteredProductPrices(supabase, orderRows);
-    await assertShippingFeeNotSkipped(supabase, orderRows, phone, productCatalog);
+    await assertShippingFeeNotSkipped(supabase, orderRows, phone, productCatalog, text(body.kakao_id));
     await assertPurchaseLimit(supabase, orderRows, phone, text(body.kakao_id));
 
     const normalizedSubmit = await normalizeOrderRowsForSubmitSettings(supabase, orderRows);

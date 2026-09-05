@@ -2827,10 +2827,22 @@ export default function OrderPage() {
       activeBroadcastIdForCombine.length > 0 &&
       String(broadcast?.status || "").trim().toUpperCase() === "ON";
 
+    // [2026-09-05 정체성 통일 · 사장님 확정] 회원의 정체성 = 카카오ID. 전화번호는 폴백일 뿐이다.
+    //   카카오 로그인 손님: kakao_id 가 같은 주문만 "내 주문"으로 합배송. 전화번호는 kakao_id 가 안 찍힌
+    //   옛 주문을 찾을 때만 쓴다(아래 필터에서 다른 카카오 계정이 찍힌 주문은 전화가 같아도 제외).
+    //   카카오 없는 옛 손님: 기존 전화 조회 그대로. 주소 동일·같은 방송/시간창·취소 제외 조건은 그대로.
+    //   서버 assertShippingFeeNotSkipped(submit/route.ts)와 같은 기준.
+    const kakaoIdForCombine = (() => {
+      try { return String(window.localStorage.getItem("ruru_kakao_id") || "").trim().replace(/[^0-9A-Za-z_-]/g, ""); } catch { return ""; }
+    })();
+
     let combineQuery = supabase
       .from("orders")
-      .select("id, product_id, customer_phone, shipping_fee, adjusted_shipping_fee, order_manage_status, created_at, zipcode, address, detail_address, broadcast_id")
-      .in("customer_phone", phoneValues);
+      .select("id, product_id, customer_phone, kakao_id, shipping_fee, adjusted_shipping_fee, order_manage_status, created_at, zipcode, address, detail_address, broadcast_id");
+
+    combineQuery = kakaoIdForCombine
+      ? combineQuery.or(`kakao_id.eq.${kakaoIdForCombine},customer_phone.in.(${phoneValues.join(",")})`)
+      : combineQuery.in("customer_phone", phoneValues);
 
     combineQuery = combineByBroadcastId
       ? combineQuery.eq("broadcast_id", activeBroadcastIdForCombine)
@@ -2845,9 +2857,15 @@ export default function OrderPage() {
       return { ...EMPTY_PAID_SHIPPING_GROUPS };
     }
 
-    const activeCombineShippingOrders = (data || []).filter(
-      (order: any) => !isCanceledOrderForCombineShipping(order),
-    );
+    const activeCombineShippingOrders = (data || []).filter((order: any) => {
+      if (isCanceledOrderForCombineShipping(order)) return false;
+      // 카카오 손님이면: 내 kakao_id 주문 또는 kakao_id 없는(옛) 주문만. 다른 카카오 계정 주문은 제외.
+      if (kakaoIdForCombine) {
+        const rowKakao = String(order?.kakao_id || "").trim();
+        if (rowKakao && rowKakao !== kakaoIdForCombine) return false;
+      }
+      return true;
+    });
 
     // [2026-07-17 사장님 정책 확정] 합배송 기준 주문 = "배송비를 낸 주문"이 아니라
     //   "합배송 범위(시간창/같은방송) 안의 같은 주소 유효 주문 전부"(배송비 0원짜리 포함).
