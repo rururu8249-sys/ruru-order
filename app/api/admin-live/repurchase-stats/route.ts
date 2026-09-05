@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     const want = ["id", "created_at", "customer_phone", "kakao_id", "youtube_nickname", "order_group_id",
       "total_amount", "final_amount", "adjusted_total_price", "total_price",
       "shipping_fee", "adjusted_shipping_fee", "product_price", "adjusted_product_price", "qty", "product_name", "item_change_history",
-      "zipcode", "address", "detail_address", "broadcast_id", "order_manage_status"];
+      "zipcode", "address", "detail_address", "broadcast_id", "order_manage_status", "is_deleted"];
     const selectCols = Array.from(new Set([...want.filter((c) => allCols.includes(c)), ...statusCols])).join(",");
 
     type Row = Record<string, unknown>;
@@ -73,15 +73,26 @@ export async function GET(request: NextRequest) {
     // [2026-09-05 진단 전용 · 읽기 전용] ?inspect=<닉/전화 일부> → 그 사람 실제 주문 줄을 그대로 보여준다.
     //   865만원 같은 이상치가 왜 나오는지 데이터로 확인하기 위한 것. 아무 데이터도 바꾸지 않는다.
     const inspect = String(request.nextUrl.searchParams.get("inspect") || "").trim();
-    if (inspect) {
+    // [2026-09-06 진단 전용 · 읽기 전용] ?addr=<주소 일부> → 전화/닉 무관하게 그 주소로 들어온 주문 줄 전부.
+    //   (윤땡땡 9/4 0원: 문향로11 주소로 다른 번호/닉의 주문이 있었는지 확인용). 아무 데이터도 바꾸지 않는다.
+    const inspectAddr = String(request.nextUrl.searchParams.get("addr") || "").replace(/\s+/g, "").toLowerCase();
+    if (inspect || inspectAddr) {
       const q = inspect.toLowerCase();
+      const inspectDigits = inspect.replace(/[^0-9]/g, "");
       const hit = rows.filter((o) => {
+        if (inspectAddr) {
+          const a = `${o.address || ""}${o.detail_address || ""}`.replace(/\s+/g, "").toLowerCase();
+          return a.includes(inspectAddr);
+        }
         const nk = String(o.youtube_nickname || "").toLowerCase();
         const ph = digits(o.customer_phone);
-        return nk.includes(q) || ph.includes(inspect.replace(/[^0-9]/g, ""));
+        // [2026-09-06] 한글만 넣으면 빈 digit 로 전체매칭되던 버그 수정: 숫자가 있을 때만 전화 비교
+        return (q && nk.includes(q)) || (inspectDigits.length >= 4 && ph.includes(inspectDigits));
       }).slice(0, 200).map((o) => ({
+        id: o.id,
         group: String(o.order_group_id || o.id),
-        day: String(o.created_at || "").slice(0, 10),
+        day: String(o.created_at || "").slice(0, 16),
+        deleted: o.is_deleted === true,
         nick: o.youtube_nickname, phone: o.customer_phone, kakao: o.kakao_id || "",
         status: statusCols.map((c) => o[c]).filter(Boolean).join("|"),
         product: o.product_name, qty: o.qty,
