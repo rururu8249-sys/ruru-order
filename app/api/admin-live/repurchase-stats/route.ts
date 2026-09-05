@@ -38,7 +38,8 @@ export async function GET(request: NextRequest) {
     const allCols = Object.keys((probe || [])[0] || {});
     const statusCols = allCols.filter((c) => /status/i.test(c));
     const want = ["id", "created_at", "customer_phone", "kakao_id", "youtube_nickname", "order_group_id",
-      "total_amount", "final_amount", "adjusted_total_price", "total_price"];
+      "total_amount", "final_amount", "adjusted_total_price", "total_price",
+      "shipping_fee", "adjusted_shipping_fee", "product_price", "adjusted_product_price", "qty", "product_name", "item_change_history"];
     const selectCols = Array.from(new Set([...want.filter((c) => allCols.includes(c)), ...statusCols])).join(",");
 
     type Row = Record<string, unknown>;
@@ -82,7 +83,10 @@ export async function GET(request: NextRequest) {
         day: String(o.created_at || "").slice(0, 10),
         nick: o.youtube_nickname, phone: o.customer_phone, kakao: o.kakao_id || "",
         status: statusCols.map((c) => o[c]).filter(Boolean).join("|"),
-        amounts: { total_amount: o.total_amount, final_amount: o.final_amount, adjusted_total_price: o.adjusted_total_price, total_price: o.total_price },
+        product: o.product_name, qty: o.qty,
+        amounts: { total_amount: o.total_amount, final_amount: o.final_amount, adjusted_total_price: o.adjusted_total_price, total_price: o.total_price,
+          product_price: o.product_price, adjusted_product_price: o.adjusted_product_price, shipping_fee: o.shipping_fee, adjusted_shipping_fee: o.adjusted_shipping_fee },
+        changeHistory: o.item_change_history,
       }));
       const byGroup = new Map<string, number>();
       for (const h of hit) byGroup.set(h.group, (byGroup.get(h.group) || 0) + 1);
