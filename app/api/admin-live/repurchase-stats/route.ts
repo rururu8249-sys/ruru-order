@@ -76,10 +76,14 @@ export async function GET(request: NextRequest) {
     // [2026-09-06 진단 전용 · 읽기 전용] ?addr=<주소 일부> → 전화/닉 무관하게 그 주소로 들어온 주문 줄 전부.
     //   (윤땡땡 9/4 0원: 문향로11 주소로 다른 번호/닉의 주문이 있었는지 확인용). 아무 데이터도 바꾸지 않는다.
     const inspectAddr = String(request.nextUrl.searchParams.get("addr") || "").replace(/\s+/g, "").toLowerCase();
-    if (inspect || inspectAddr) {
+    const inspectGroup = String(request.nextUrl.searchParams.get("group") || "").trim().toLowerCase();
+    if (inspect || inspectAddr || inspectGroup) {
       const q = inspect.toLowerCase();
       const inspectDigits = inspect.replace(/[^0-9]/g, "");
       const hit = rows.filter((o) => {
+        if (inspectGroup) {
+          return String(o.order_group_id || "").toLowerCase().startsWith(inspectGroup);
+        }
         if (inspectAddr) {
           const a = `${o.address || ""}${o.detail_address || ""}`.replace(/\s+/g, "").toLowerCase();
           return a.includes(inspectAddr);
