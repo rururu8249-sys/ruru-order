@@ -2858,7 +2858,7 @@ export default function OrderPage() {
 
     let combineQuery = supabase
       .from("orders")
-      .select("id, product_id, customer_phone, kakao_id, shipping_fee, adjusted_shipping_fee, order_manage_status, created_at, zipcode, address, detail_address, broadcast_id");
+      .select("id, product_id, customer_phone, kakao_id, shipping_fee, adjusted_shipping_fee, order_manage_status, created_at, zipcode, address, detail_address, broadcast_id, is_deleted");
 
     combineQuery = kakaoIdForCombine
       ? combineQuery.or(`kakao_id.eq.${kakaoIdForCombine},customer_phone.in.(${phoneValues.join(",")})`)
@@ -2879,6 +2879,9 @@ export default function OrderPage() {
 
     const activeCombineShippingOrders = (data || []).filter((order: any) => {
       if (isCanceledOrderForCombineShipping(order)) return false;
+      // [2026-09-06 사장님 승인] 관리자가 삭제한 주문(is_deleted=true)은 합배송 근거에서 제외.
+      //   (null/false 는 그대로 유효 — JS 비교라 is_deleted 가 null 인 옛 행이 빠지는 일 없음)
+      if (order?.is_deleted === true) return false;
       // 카카오 손님이면: 내 kakao_id 주문 또는 kakao_id 없는(옛) 주문만. 다른 카카오 계정 주문은 제외.
       if (kakaoIdForCombine) {
         const rowKakao = String(order?.kakao_id || "").trim();

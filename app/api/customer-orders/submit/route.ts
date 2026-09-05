@@ -468,7 +468,7 @@ async function assertShippingFeeNotSkipped(
   const safeKakaoIdForShipping = String(kakaoId || "").replace(/[^0-9A-Za-z_-]/g, "");
   let priorShippingQuery = supabase
     .from("orders")
-    .select("id, order_manage_status, zipcode, address, detail_address, broadcast_id, created_at, customer_phone, kakao_id");
+    .select("id, order_manage_status, zipcode, address, detail_address, broadcast_id, created_at, customer_phone, kakao_id, is_deleted");
   priorShippingQuery = safeKakaoIdForShipping
     ? priorShippingQuery.or(
         `kakao_id.eq.${safeKakaoIdForShipping},customer_phone.in.(${phoneValues.join(",")})`,
@@ -486,6 +486,8 @@ async function assertShippingFeeNotSkipped(
 
   const sameAddressOrders = (data || []).filter((row: AnyRow) => {
     if (isCanceledForSubmitShipping(row?.order_manage_status)) return false;
+    // [2026-09-06 사장님 승인] 삭제된 주문(is_deleted=true)은 합배송 근거 아님 — 손님 화면과 같은 기준(JS 비교, null 은 유효)
+    if (row?.is_deleted === true) return false;
     // 카카오 손님이면: 내 kakao_id 주문 또는 kakao_id 없는(옛) 주문만. 다른 카카오 계정 주문은 전화가 같아도 제외.
     if (safeKakaoIdForShipping) {
       const rowKakao = String(row?.kakao_id || "").trim();
