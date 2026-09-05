@@ -91,7 +91,7 @@ const customerHistoryFieldLabel = (field: unknown) => {
   return CUSTOMER_HISTORY_FIELD_LABEL[key] || key || "변경";
 };
 
-type SortMode = "latest" | "amount" | "orders" | "nickname" | "joinedDesc" | "joinedAsc" | "lastLogin";
+type SortMode = "latest" | "amount" | "orders" | "nickname" | "joinedDesc" | "joinedAsc" | "lastLogin" | "oldLogin";
 type StatusFilter = "all" | "normal" | "blocked" | "attention";
 
 type BlockOverride = {
@@ -1294,6 +1294,12 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
           if (!b.lastLoginAt) return -1;
           return b.lastLoginAt.localeCompare(a.lastLoginAt);
         }
+        if (sortMode === "oldLogin") {
+          // [2026-09-05 사장님 요청] 과거접속순 — 오래 안 들어온 손님부터 (접속 기록 없는 손님이 맨 위)
+          if (!a.lastLoginAt) return -1;
+          if (!b.lastLoginAt) return 1;
+          return a.lastLoginAt.localeCompare(b.lastLoginAt);
+        }
         return b.latestOrderAt.localeCompare(a.latestOrderAt);
       });
   }, [customers, keyword, sortMode, statusFilter, buyersOnly]);
@@ -1642,6 +1648,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
             >
               <option value="latest">최근주문순</option>
               <option value="lastLogin">최근접속순</option>
+              <option value="oldLogin">과거접속순 (오래 안 온 순)</option>
               <option value="joinedDesc">최근가입순</option>
               <option value="joinedAsc">과거가입순</option>
               <option value="amount">누적구매금액순</option>

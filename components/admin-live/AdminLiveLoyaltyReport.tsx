@@ -23,10 +23,11 @@ type Stats = {
   broadcastCount30d: number;
   monthly: Array<{ month: string; new: number; repeat: number }>;
   topCustomers: Array<{ nick: string; n: number; last: string; spend: number }>;
+  topSpenders: Array<{ nick: string; n: number; last: string; spend: number }>;
 };
 
 const DAY_CHOICES = [30, 45, 60, 90];
-const DEFAULT_POINT = 3000;
+const DEFAULT_POINT = 2000; // [사장님 결정 09-05] 기본 2,000P — 보낼 때 금액칸에서 자유 수정
 const COMEBACK_REASON = "복귀 감사 포인트"; // ⚠️ 재지급 잠금이 "복귀" 문구로 식별 — 바꾸면 잠금도 같이 볼 것
 
 const SEG_META: Record<SegKey, { emoji: string; label: string; desc: (days: number) => string; hot?: boolean; defaultChecked: boolean }> = {
@@ -51,6 +52,7 @@ export default function AdminLiveLoyaltyReport() {
   const [amountText, setAmountText] = useState(String(DEFAULT_POINT));
   const [noteText, setNoteText] = useState("");
   const [sending, setSending] = useState(false);
+  const [topMode, setTopMode] = useState<"count" | "spend">("count");
   const { grant } = useBulkPointGrant();
 
   const lockSet = useMemo(() => new Set(stats?.recentComebackPhones || []), [stats]);
@@ -217,16 +219,22 @@ export default function AdminLiveLoyaltyReport() {
         </div>
       </div>
 
-      {/* TOP 10 — 횟수 + 누적 금액 */}
+      {/* TOP 10 — 횟수순/금액순 전환 */}
       <div className="rounded-2xl border border-line bg-surface p-4">
-        <div className="mb-2 text-[13px] font-black text-ink">👑 우리 가게 최고 단골 TOP 10</div>
+        <div className="mb-2 flex items-center gap-2">
+          <span className="text-[13px] font-black text-ink">👑 우리 가게 최고 단골 TOP 10</span>
+          <div className="ml-auto flex gap-1">
+            <button type="button" onClick={() => setTopMode("count")} className={`rounded-lg px-2.5 py-1 text-[12px] font-black ${topMode === "count" ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}>횟수순</button>
+            <button type="button" onClick={() => setTopMode("spend")} className={`rounded-lg px-2.5 py-1 text-[12px] font-black ${topMode === "spend" ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}>금액순</button>
+          </div>
+        </div>
         <div className="space-y-1">
-          {(stats?.topCustomers || []).slice(0, 10).map((t, i) => (
-            <div key={`${t.nick}-${t.n}`} className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-1.5">
+          {((topMode === "count" ? stats?.topCustomers : stats?.topSpenders) || []).slice(0, 10).map((t, i) => (
+            <div key={`${topMode}-${t.nick}-${t.n}`} className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-1.5">
               <span className="w-6 text-[12px] font-black text-ink-mute">{i + 1}</span>
               <span className="min-w-0 flex-1 truncate text-[13px] font-black text-ink">{t.nick}</span>
-              <span className="text-[12px] font-bold text-ink-soft">{t.n}회</span>
-              <span className="w-[72px] text-right text-[13px] font-black text-rose-deep">{money(t.spend)}</span>
+              <span className={`text-[12px] ${topMode === "count" ? "font-black text-rose-deep" : "font-bold text-ink-soft"}`}>{t.n}회</span>
+              <span className={`w-[80px] text-right text-[13px] ${topMode === "spend" ? "font-black text-rose-deep" : "font-bold text-ink-soft"}`}>{money(t.spend)}</span>
             </div>
           ))}
         </div>
@@ -239,7 +247,7 @@ export default function AdminLiveLoyaltyReport() {
             <div className="mb-3 text-[15px] font-black text-ink">💝 {SEG_META[seg].label} {checked.size}명에게 보내기</div>
             <label className="mb-1 block text-[12px] font-black text-ink-soft">1인당 포인트</label>
             <input value={amountText} inputMode="numeric" onChange={(e) => setAmountText(e.target.value.replace(/[^0-9]/g, ""))} className="mb-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-[15px] font-black text-ink outline-none focus:border-rose-deep" />
-            <div className="mb-3 text-[11px] font-bold text-ink-mute">총 {(amountNum * checked.size).toLocaleString()}P · 업계 통상 1,000~3,000P(우리 권장 3,000P = 객단가의 5%)</div>
+            <div className="mb-3 text-[11px] font-bold text-ink-mute">총 {(amountNum * checked.size).toLocaleString()}P · 업계 통상 1,000~3,000P — 기본 2,000P, 금액은 자유롭게 바꾸세요</div>
             <label className="mb-1 block text-[12px] font-black text-ink-soft">쪽지 내용 (비우면 아래 기본 문구)</label>
             <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder={defaultNote} rows={3} className="mb-4 w-full rounded-xl border border-line bg-surface px-3 py-2 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
             <div className="grid grid-cols-2 gap-2">

@@ -184,6 +184,7 @@ export async function GET(request: NextRequest) {
       recentComebackPhones: Array.from(new Set(recentComebackPhones)),
       monthly: Array.from(monthly.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([m, v]) => ({ month: m, new: v.nw, repeat: v.rp })),
       topCustomers: top.slice(0, 15),
+      topSpenders: [...top].sort((a, b) => b.spend - a.spend).slice(0, 15),
     });
   } catch (error) {
     return NextResponse.json(
