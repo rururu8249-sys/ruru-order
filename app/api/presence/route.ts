@@ -27,7 +27,9 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-    const result = await writePresence(body);
+    const clientIp = (request.headers.get("x-forwarded-for") || "").split(",")[0].trim()
+      || (request.headers.get("x-real-ip") || "").trim();
+    const result = await writePresence(body, clientIp);
 
     if (!result.ok) {
       return NextResponse.json({ ok: false, message: result.message }, { status: result.status });

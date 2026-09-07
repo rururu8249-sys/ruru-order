@@ -33,7 +33,7 @@ type Payload = {
   visitors?: Visitor[];
 };
 
-type VisitPerson = { name: string; visits: number; lastAt: string; live: boolean };
+type VisitPerson = { name: string; visits: number; lastAt: string; live: boolean; ip?: string };
 
 type VisitStats = {
   ok?: boolean;
@@ -205,11 +205,18 @@ export default function AdminLiveSidebarPresence() {
                   </tr>
                 </thead>
                 <tbody>
-                  {people.map((p, i) => (
+                  {(() => {
+                    // [2026-09-07] 같은 IP 가 이 목록에 2명 이상이면 표시(장난 다계정·같은 사람 여러 닉 파악 보조)
+                    const ipCount = new Map<string, number>();
+                    for (const pp of people) { const v = String(pp.ip || "").trim(); if (v) ipCount.set(v, (ipCount.get(v) || 0) + 1); }
+                    return people.map((p, i) => {
+                    const ip = String(p.ip || "").trim();
+                    const ipDup = ip ? (ipCount.get(ip) || 0) > 1 : false;
+                    return (
                     <tr
                       key={`${p.name}-${i}`}
                       style={{ background: i % 2 === 1 ? "var(--color-surface-2)" : "transparent" }}
-                      title={`${p.name} · ${p.visits}번 방문 · 마지막 ${seoulStamp(p.lastAt)}`}
+                      title={`${p.name} · ${p.visits}번 방문 · 마지막 ${seoulStamp(p.lastAt)}${ip ? ` · IP ${ip}` : ""}`}
                     >
                       <td style={{ padding: "6px 8px", textAlign: "center", fontSize: "10.5px", fontWeight: 700, color: "var(--color-ink-mute)", fontVariantNumeric: "tabular-nums" }}>
                         {i + 1}
@@ -224,6 +231,11 @@ export default function AdminLiveSidebarPresence() {
                           }}
                         />
                         {p.name}
+                        {ip ? (
+                          <span style={{ display: "block", marginLeft: "12px", fontSize: "9.5px", fontWeight: 700, color: ipDup ? "var(--color-warn-tx)" : "var(--color-ink-mute)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {ipDup ? "⚠ 같은 IP · " : ""}{ip}
+                          </span>
+                        ) : null}
                       </td>
                       <td style={{ padding: "6px 8px", textAlign: "right", fontSize: "11.5px", fontWeight: 800, color: p.visits > 1 ? "var(--color-ink)" : "var(--color-ink-mute)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
                         {p.visits}
@@ -232,7 +244,9 @@ export default function AdminLiveSidebarPresence() {
                         {seoulStamp(p.lastAt)}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  });
+                  })()}
                 </tbody>
               </table>
             </div>

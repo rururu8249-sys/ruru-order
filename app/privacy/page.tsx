@@ -167,7 +167,7 @@ export default function PrivacyPage() {
               </tr>
               <tr>
                 <td style={S.td}>자동 생성</td>
-                <td style={S.td}>접속 일시, 서비스 이용 기록</td>
+                <td style={S.td}>접속 일시, 접속 IP주소, 서비스 이용 기록</td>
               </tr>
             </tbody>
           </table>

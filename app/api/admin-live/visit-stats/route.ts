@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabase
       .from("visitor_visits")
-      .select("visitor_key, nickname, page_type, broadcast_id, shop_mode, started_at, last_seen_at")
+      .select("visitor_key, nickname, page_type, broadcast_id, shop_mode, started_at, last_seen_at, ip")
       .gte("started_at", since)
       .order("started_at", { ascending: false })
       .limit(ROW_LIMIT);
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 방문자 한 명(visitor_key)당 한 줄. 이름은 있으면 쓰고, 없으면 "비회원".
-    type Person = { name: string; visits: number; lastAt: string; live: boolean };
+    type Person = { name: string; visits: number; lastAt: string; live: boolean; ip: string };
     type DayBucket = { visitors: Set<string>; visits: number; live: number; shop: number; people: Map<string, Person> };
     type BcBucket = { visitors: Set<string>; visits: number; firstAt: string; people: Map<string, Person> };
 
@@ -78,10 +78,10 @@ export async function GET(request: NextRequest) {
     const bcMap = new Map<string, BcBucket>();
     const allVisitors = new Set<string>();
 
-    const addPerson = (people: Map<string, Person>, key: string, name: string, lastAt: string, live: boolean) => {
+    const addPerson = (people: Map<string, Person>, key: string, name: string, lastAt: string, live: boolean, ip: string) => {
       const before = people.get(key);
       if (!before) {
-        people.set(key, { name, visits: 1, lastAt, live });
+        people.set(key, { name, visits: 1, lastAt, live, ip });
         return;
       }
       before.visits += 1;
@@ -89,6 +89,8 @@ export async function GET(request: NextRequest) {
       if (live) before.live = true;
       // 나중에 닉네임을 적은 방문이 있으면 그걸 쓴다 (처음엔 비회원이었다가 로그인하는 경우)
       if (name !== "비회원" && before.name === "비회원") before.name = name;
+      // IP 는 가장 최근 값 유지(rows 최신순 → 먼저 담긴 게 최신). 비어 있으면 채운다.
+      if (!before.ip && ip) before.ip = ip;
     };
 
     for (const row of rows) {
@@ -101,13 +103,14 @@ export async function GET(request: NextRequest) {
       const name = String(row.nickname ?? "").trim() || nameByVisitor.get(key) || "비회원";
       const lastAt = String(row.last_seen_at ?? "") || startedAt;
       const isLive = String(row.shop_mode ?? "") === "live";
+      const ip = String(row.ip ?? "").trim();
 
       const day = dailyMap.get(date)
         || { visitors: new Set<string>(), visits: 0, live: 0, shop: 0, people: new Map<string, Person>() };
       day.visitors.add(key);
       day.visits += 1;
       if (isLive) day.live += 1; else day.shop += 1;
-      addPerson(day.people, key, name, lastAt, isLive);
+      addPerson(day.people, key, name, lastAt, isLive, ip);
       dailyMap.set(date, day);
 
       const bid = row.broadcast_id != null ? String(row.broadcast_id) : "";
@@ -117,7 +120,7 @@ export async function GET(request: NextRequest) {
         bc.visitors.add(key);
         bc.visits += 1;
         if (startedAt < bc.firstAt) bc.firstAt = startedAt;
-        addPerson(bc.people, key, name, lastAt, isLive);
+        addPerson(bc.people, key, name, lastAt, isLive, ip);
         bcMap.set(bid, bc);
       }
     }
@@ -127,7 +130,7 @@ export async function GET(request: NextRequest) {
       Array.from(people.values())
         .sort((a, b) => (a.lastAt < b.lastAt ? 1 : -1))
         .slice(0, NAMES_PER_ROW)
-        .map((p) => ({ name: p.name, visits: p.visits, lastAt: p.lastAt, live: p.live }));
+        .map((p) => ({ name: p.name, visits: p.visits, lastAt: p.lastAt, live: p.live, ip: p.ip }));
 
     // 방송 제목 붙이기 (없어도 집계는 그대로 나온다)
     const bcIds = Array.from(bcMap.keys()).slice(0, 60);

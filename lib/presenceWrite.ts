@@ -77,9 +77,14 @@ async function currentBroadcastId(supabase: Supa): Promise<string | null> {
   return broadcastCache.id;
 }
 
+// [2026-09-07] "칸 없음"(ip 컬럼 SQL 실행 전) 이면 ip 만 빼고 다시 쓴다 — 접속 기록이 끊기지 않게.
+function isMissingColumnError(message: unknown): boolean {
+  return /column .* does not exist|could not find the .* column|PGRST204|42703/i.test(String(message ?? ""));
+}
+
 async function recordVisit(
   supabase: Supa,
-  params: { visitorKey: string; nickname: string; pageType: string; path: string; nowIso: string },
+  params: { visitorKey: string; nickname: string; pageType: string; path: string; nowIso: string; ip: string },
 ) {
   try {
     const broadcastId = await currentBroadcastId(supabase);
@@ -100,7 +105,7 @@ async function recordVisit(
     const gap = Date.now() - lastMs;
 
     if (!last || !lastMs || gap > VISIT_SESSION_GAP_MS) {
-      await supabase.from("visitor_visits").insert({
+      const insertRow: Record<string, unknown> = {
         visitor_key: params.visitorKey,
         nickname: params.nickname || null,
         page_type: params.pageType,
@@ -109,7 +114,11 @@ async function recordVisit(
         shop_mode: broadcastId ? "live" : "shop",
         started_at: params.nowIso,
         last_seen_at: params.nowIso,
-      });
+      };
+      const { error: insErr } = await supabase.from("visitor_visits").insert({ ...insertRow, ip: params.ip || null });
+      if (insErr && isMissingColumnError(insErr.message)) {
+        await supabase.from("visitor_visits").insert(insertRow); // ip 칸 없음 → 빼고 저장
+      }
       return;
     }
 
@@ -129,14 +138,18 @@ async function recordVisit(
     const pageMoved = params.pageType && String(last.page_type ?? "") !== params.pageType;
 
     if (gap > VISIT_TOUCH_MS || nicknameArrived || pageMoved) {
-      await supabase
+      const updateRow: Record<string, unknown> = {
+        last_seen_at: params.nowIso,
+        ...(params.nickname ? { nickname: params.nickname } : {}),
+        ...(pageMoved ? { page_type: params.pageType, path: params.path || null } : {}),
+      };
+      const { error: updErr } = await supabase
         .from("visitor_visits")
-        .update({
-          last_seen_at: params.nowIso,
-          ...(params.nickname ? { nickname: params.nickname } : {}),
-          ...(pageMoved ? { page_type: params.pageType, path: params.path || null } : {}),
-        })
+        .update({ ...updateRow, ...(params.ip ? { ip: params.ip } : {}) })
         .eq("id", last.id);
+      if (updErr && isMissingColumnError(updErr.message)) {
+        await supabase.from("visitor_visits").update(updateRow).eq("id", last.id); // ip 칸 없음 → 빼고
+      }
     }
   } catch {
     // 기록 실패는 접속 표시를 막지 않는다.
@@ -144,10 +157,14 @@ async function recordVisit(
 }
 
 /** 접속 신호 1건 저장. 성공/실패만 돌려준다. */
-export async function writePresence(body: Record<string, unknown>): Promise<
+export async function writePresence(
+  body: Record<string, unknown>,
+  ip = "",
+): Promise<
   { ok: true; lastSeenAt: string } | { ok: false; status: number; message: string }
 > {
   const input = normalizePresenceInput(body);
+  const cleanIp = String(ip || "").trim().slice(0, 60);
   if (!input.visitorKey) return { ok: false, status: 400, message: "visitorKey가 없습니다." };
   if (!input.valid) return { ok: false, status: 400, message: "visitorKey 형식이 올바르지 않습니다." };
 
@@ -183,6 +200,7 @@ export async function writePresence(body: Record<string, unknown>): Promise<
     pageType: input.pageType,
     path: input.path,
     nowIso,
+    ip: cleanIp,
   });
 
   return { ok: true, lastSeenAt: nowIso };
