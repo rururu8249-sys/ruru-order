@@ -1,17 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import DepositDetailModal from "@/components/admin-v2/payment/ledger/DepositDetailModal";
-import DepositLedgerFilters from "@/components/admin-v2/payment/ledger/DepositLedgerFilters";
-import DepositLedgerSummary from "@/components/admin-v2/payment/ledger/DepositLedgerSummary";
-import DepositLedgerTable from "@/components/admin-v2/payment/ledger/DepositLedgerTable";
+import DepositDetailModal from "./DepositDetailModal";
+import DepositLedgerFilters from "./DepositLedgerFilters";
+import DepositLedgerSummary from "./DepositLedgerSummary";
+import DepositLedgerTable from "./DepositLedgerTable";
 import type {
   DepositSummary,
   LedgerStatus,
   RawDepositRow,
   SortDirection,
   SortKey,
-} from "@/components/admin-v2/payment/ledger/depositLedgerTypes";
+} from "./depositLedgerTypes";
 import {
   daysAgoInputValue,
   getDepositAmount,
@@ -21,7 +21,7 @@ import {
   matchesKeyword,
   sortDeposits,
   todayInputValue,
-} from "@/components/admin-v2/payment/ledger/depositLedgerUtils";
+} from "./depositLedgerUtils";
 
 type Props = Record<string, unknown>;
 

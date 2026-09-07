@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-import PaymentMatchPanel from "@/components/admin-v2/payment/PaymentMatchPanel";
+import PaymentMatchPanel from "./payment-ledger/PaymentMatchPanel";
 import type { DepositRow, OrderGroup } from "@/lib/admin-v2/types";
 
 // [2026-08-06 부하개선] 이 패널의 자동 동기화 주기.
@@ -25,7 +25,6 @@ type Props = {
   orderGroups: OrderGroup[];
   onRefresh?: () => Promise<void> | void;
   onBankdaSync?: () => Promise<BankdaSyncResult | void> | void;
-  onOpenManualMatch: (orderGroup: OrderGroup) => void;
 };
 
 export default function AdminLivePaymentPanel({
@@ -33,7 +32,6 @@ export default function AdminLivePaymentPanel({
   orderGroups,
   onRefresh,
   onBankdaSync,
-  onOpenManualMatch,
 }: Props) {
   const syncBankdaAndRefresh = async () => {
     if (onBankdaSync) {
@@ -103,7 +101,6 @@ export default function AdminLivePaymentPanel({
     <PaymentMatchPanel
       deposits={deposits}
       orderGroups={orderGroups}
-      onOpenManualMatch={onOpenManualMatch}
       onSyncBankdaDeposits={syncBankdaAndRefresh}
       variant="admin-live"
     />

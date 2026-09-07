@@ -17,13 +17,8 @@ export default function AdminLoginPage() {
     if (typeof window === "undefined") return "/admin-live?panel=broadcast";
 
     const next = new URLSearchParams(window.location.search).get("next") || "";
-    const allowed =
-      next === "/admin" ||
-      next.startsWith("/admin/") ||
-      next === "/admin-live" ||
-      next.startsWith("/admin-live") ||
-      next === "/admin-v2" ||
-      next.startsWith("/admin-v2");
+    // [2026-09-07] 1·2세대 관리자 삭제 — 로그인 후 목적지는 /admin-live 계열만 허용
+    const allowed = next === "/admin-live" || next.startsWith("/admin-live?") || next.startsWith("/admin-live/");
 
     return allowed ? next : "/admin-live?panel=broadcast";
   };

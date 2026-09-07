@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
-import AdminSettlementPanel from "@/components/admin-v2/settlement/AdminSettlementPanel";
+import AdminSettlementPanel from "./settlement/AdminSettlementPanel";
 
 type LooseRow = Record<string, any>;
 

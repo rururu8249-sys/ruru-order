@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 
-const ADMIN_PAGE_PREFIXES = ["/admin", "/admin-live", "/admin-v2"];
+const ADMIN_PAGE_PREFIXES = ["/admin-live"]; // [2026-09-07] 1·2세대 관리자(/admin, /admin-v2) 페이지 삭제. API /api/admin-v2 는 그대로 보호.
 const ADMIN_API_PREFIXES = ["/api/admin-live", "/api/admin-v2", "/api/bankda"];
 
 const INTERNAL_CRON_API_PATHS = [
@@ -91,12 +91,8 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/admin",
-    "/admin/:path*",
     "/admin-live",
     "/admin-live/:path*",
-    "/admin-v2",
-    "/admin-v2/:path*",
     "/api/admin-live/:path*",
     "/api/admin-v2/:path*",
     "/api/bankda/:path*",

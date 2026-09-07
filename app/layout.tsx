@@ -1,7 +1,7 @@
 import PresenceHeartbeat from "@/components/PresenceHeartbeat";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import AdminConfirmHost from "@/components/admin/AdminConfirmHost";
+import AdminConfirmHost from "@/components/admin-live/AdminConfirmHost";
 import DeployChunkReloadGuard from "@/components/DeployChunkReloadGuard";
 import CustomerAccessBlockGuard from "@/components/customer/CustomerAccessBlockGuard";
 import CustomerSiteAlertPopup from "@/components/customer/CustomerSiteAlertPopup";

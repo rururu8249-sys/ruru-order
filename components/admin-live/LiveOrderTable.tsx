@@ -7,7 +7,7 @@ import LiveOrderPickingModal from "./LiveOrderPickingModal";
 import LiveCartHoldsModal from "./LiveCartHoldsModal";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
-import LiveOrderCancelViewFilter, { type LiveOrderCancelViewFilterValue } from "./LiveOrderCancelViewFilter";
+type LiveOrderCancelViewFilterValue = "all" | "active" | "canceled"; // 취소보기 필터 UI는 제거됨(항상 "all"). 표시 로직 무변경.
 import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
 import { openPaysterRightHalf } from "./AdminLiveCardPayPopup";
 import BroadcastCalendarPicker, { type BroadcastCalendarItem } from "./BroadcastCalendarPicker";
