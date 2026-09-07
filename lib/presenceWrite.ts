@@ -52,6 +52,18 @@ const VISIT_SESSION_GAP_MS = 30 * 60 * 1000;
 const VISIT_TOUCH_MS = 5 * 60 * 1000;
 const BROADCAST_CACHE_MS = 60 * 1000;
 
+// [2026-09-07 사장님 확정 · 개인정보처리방침과 일치] 접속기록(IP 포함) 보존 90일.
+//   말과 행동이 맞아야 하므로 90일 지난 visitor_visits 를 자동 파기한다.
+//   부하 보호: 매 신호마다 지우지 않고 낮은 확률로만 시도(이미 지운 뒤엔 대상 0건이라 저렴). 실패는 조용히 무시.
+const VISIT_RETENTION_DAYS = 90;
+async function purgeOldVisits(supabase: Supa) {
+  if (Math.random() >= 0.02) return; // ~2% 확률로만 정리
+  try {
+    const cutoff = new Date(Date.now() - VISIT_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    await supabase.from("visitor_visits").delete().lt("started_at", cutoff);
+  } catch { /* 정리 실패는 접속 저장에 영향 없음 */ }
+}
+
 // ⚠️ broadcasts.id 는 UUID 다 (supabase/sql/broadcast_end_reports.sql: broadcast_id uuid references broadcasts(id)).
 //    [2026-08-29 사고] 처음에 Number(id) 로 숫자 변환해서 UUID 가 NaN → null 이 됐다.
 //    그래서 방송 중인데도 방송 번호가 안 붙고 "방송별 기록 없음 / 방송중 0" 으로만 나왔다.
@@ -202,6 +214,9 @@ export async function writePresence(
     nowIso,
     ip: cleanIp,
   });
+
+  // 보존기간(90일) 지난 접속기록 자동 파기 — 처리방침과 일치. 낮은 확률로만 실행.
+  await purgeOldVisits(supabase);
 
   return { ok: true, lastSeenAt: nowIso };
 }

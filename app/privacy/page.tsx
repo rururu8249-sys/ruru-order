@@ -224,6 +224,11 @@ export default function PrivacyPage() {
                 <td style={S.td}>6개월</td>
                 <td style={S.td}>전자상거래법</td>
               </tr>
+              <tr>
+                <td style={S.td}>접속 기록(접속 IP주소 포함)</td>
+                <td style={S.td}>90일</td>
+                <td style={S.td}>부정 이용 방지·보안(내부 방침)</td>
+              </tr>
             </tbody>
           </table>
         </section>
