@@ -100,7 +100,7 @@ export default function SettlementManualEntryPanel({
 
   const saveEntry = async () => {
     if (!tableReady) {
-      showAdminToast("정산 추가 입력 테이블이 아직 없습니다. Supabase SQL Editor에서 settlement_manual_entries.sql을 먼저 실행해주세요.", "error");
+      showAdminToast("정산 추가 입력 저장 준비가 안 되어 있습니다. 개발자에게 알려주세요. (settlement_manual_entries 표 없음)", "error");
       return;
     }
 
@@ -295,9 +295,8 @@ export default function SettlementManualEntryPanel({
 
       {!tableReady ? (
         <div className="rounded-2xl border border-line bg-warn-bg px-4 py-3 text-sm font-bold leading-6 text-warn-tx">
-          정산 추가 입력 테이블이 아직 없습니다. 먼저 Supabase SQL Editor에서
-          <span className="mx-1 font-black">supabase/sql/settlement_manual_entries.sql</span>
-          내용을 실행해야 저장이 가능합니다.
+          정산 추가 입력을 저장할 준비가 아직 안 되어 있습니다. 개발자에게 알려주세요.
+          <span className="ml-1 text-xs font-bold text-ink-mute">(settlement_manual_entries 표 없음 — docs/인수인계_관리자설정.md)</span>
         </div>
       ) : null}
       <div className="grid gap-3 rounded-[22px] border border-line bg-surface-2 p-3">

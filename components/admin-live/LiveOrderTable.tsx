@@ -10,6 +10,7 @@ import { showAdminToast } from "@/lib/adminToast";
 type LiveOrderCancelViewFilterValue = "all" | "active" | "canceled"; // 취소보기 필터 UI는 제거됨(항상 "all"). 표시 로직 무변경.
 import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
 import { openPaysterRightHalf } from "./AdminLiveCardPayPopup";
+import { paymentStatusDetail, shippingStatusLabel } from "@/lib/orderLabels";
 import BroadcastCalendarPicker, { type BroadcastCalendarItem } from "./BroadcastCalendarPicker";
 import { useLiveOrderShipped } from "./useLiveOrderShipped";
 import { buildCustomerOrderCopyText, buildPaymentRequestNote } from "./liveOrderCustomerCopy";
@@ -221,16 +222,16 @@ function statusBadge(order: LiveOrder, actions?: { onMatch?: () => void; onCardP
     return <span style={{ ...base, ...red }}>카드미결제</span>;
   }
   if (order.paymentStatus === "unpaid") {
-    return <span style={{ ...base, ...red }}>입금대기</span>;
+    return <span style={{ ...base, ...red }}>미입금</span>;
   }
   if (order.paymentStatus === "card_paid") {
     return <span style={{ ...base, ...blue }}>카드결제완료</span>;
   }
   if (order.paymentStatus === "auto_paid") {
-    return <span style={{ ...base, ...green }}>자동입금확인</span>;
+    return <span style={{ ...base, ...green }} title={paymentStatusDetail("auto_paid")}>입금확인</span>;
   }
   if (order.paymentStatus === "manual_paid") {
-    return <span style={{ ...base, ...green }}>수동입금확인</span>;
+    return <span style={{ ...base, ...green }} title={paymentStatusDetail("manual_paid")}>입금확인</span>;
   }
   return <span style={{ ...base, ...green }}>입금확인</span>;
 }
@@ -787,13 +788,13 @@ export default function LiveOrderTable({
     const statusLabelMap: Record<LiveOrderStatusFilter, string> = {
       all: "상태: 전체보기",
       paid: "결제완료",
-      unpaid: "입금대기",
+      unpaid: "미결제",
       manual_match_needed: "매칭필요",
       bank_paid: "입금확인",
       card_unpaid: "카드미결제",
       card_paid: "카드결제완료",
       canceled: "주문서취소",
-      shipped: "출고완료",
+      shipped: "택배출고",
     };
 
     return [
@@ -887,11 +888,11 @@ export default function LiveOrderTable({
         {[
           ["전체", counts.total, "all", "rose"],
           ["결제완료", counts.paid, "paid", "green"],
-          ["입금대기", counts.unpaid, "unpaid", "red"],
+          ["미결제", counts.unpaid, "unpaid", "red"],
           // [2026-08-31 사장님 지시] 매칭필요·입금확인 배지 삭제 — 입금대기가 매칭필요를 포함하고(보조텍스트로 표시),
           //   입금확인은 결제완료의 하위 단계라 배지가 겹쳤다. 상태 드롭다운에서는 여전히 고를 수 있다.
           ["주문서취소", counts.canceled, "canceled", "muted"],
-          ["출고완료", counts.shipped, "shipped", "blue"],
+          ["택배출고", counts.shipped, "shipped", "blue"],
         ].map(([label, count, status, tone]) => {
           const active = filters.status === status;
           const toneStyle: Record<string, { bg: string; text: string; inactiveBg: string; inactiveText: string }> = {
@@ -950,18 +951,18 @@ export default function LiveOrderTable({
                 onClick={handleMarkShipped}
                 disabled={shippedSaving !== ""}
                 className="rounded-xl border border-info-tx bg-info-bg px-3 py-2 text-xs font-black text-[var(--color-info-tx)] hover:bg-info-bg disabled:cursor-not-allowed disabled:opacity-40"
-                title="선택한 결제완료 주문을 출고완료로 변경합니다 (출고시간 기록, 고객 주문조회 반영)"
+                title="선택한 결제완료 주문을 택배출고로 바꿉니다 (출고시간 기록, 손님 주문조회에 배송출발로 표시)"
               >
-                {shippedSaving === "ship" ? "처리중..." : "📦 출고완료 처리"}
+                {shippedSaving === "ship" ? "처리중..." : "📦 택배출고 처리"}
               </button>
               <button
                 type="button"
                 onClick={handleUnmarkShipped}
                 disabled={shippedSaving !== ""}
                 className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
-                title="잘못 누른 출고완료를 해제합니다 (출고대기로 되돌림)"
+                title="잘못 누른 택배출고를 해제합니다 (출고대기로 되돌림)"
               >
-                {shippedSaving === "unship" ? "해제중..." : "↩ 출고완료 해제"}
+                {shippedSaving === "unship" ? "해제중..." : "↩ 택배출고 해제"}
               </button>
             </>
           )}
@@ -1102,13 +1103,13 @@ export default function LiveOrderTable({
         >
           <option value="all">상태: 전체보기</option>
           <option value="paid">결제완료</option>
-          <option value="unpaid">입금대기</option>
+          <option value="unpaid">미결제 (미입금·매칭필요·카드미결제)</option>
           <option value="manual_match_needed">매칭필요</option>
           <option value="bank_paid">입금확인</option>
           <option value="card_unpaid">카드미결제</option>
           <option value="card_paid">카드결제완료</option>
           <option value="canceled">주문서취소</option>
-          <option value="shipped">출고완료</option>
+          <option value="shipped">택배출고</option>
         </select>
 
         <div className="flex w-full flex-nowrap items-center gap-2 sm:w-auto sm:flex-1">
@@ -1207,7 +1208,7 @@ export default function LiveOrderTable({
                               📋 주문서 복사
                             </button>
                             {(order as any).shippingStatus ? (
-                              <span className={`inline-flex items-center justify-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10px] font-black leading-none ${String((order as any).shippingStatus) === "출고완료" ? "bg-info-bg text-[var(--color-info-tx)]" : "bg-surface-2 text-ink-soft"}`}>{(order as any).shippingStatus}</span>
+                              <span className={`inline-flex items-center justify-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10px] font-black leading-none ${String((order as any).shippingStatus) === "출고완료" ? "bg-info-bg text-[var(--color-info-tx)]" : "bg-surface-2 text-ink-soft"}`}>{shippingStatusLabel((order as any).shippingStatus)}</span>
                             ) : null}
                             {["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
                               <button type="button" title="결제요청 쪽지 보내기" aria-label="결제요청 쪽지 보내기" disabled={payRequestSending === order.id} onClick={() => void sendPaymentRequest(order)} style={{ border: "none", background: "none", padding: "0 2px", fontSize: "14px", lineHeight: 1, cursor: "pointer", opacity: payRequestSending === order.id ? 0.35 : 0.75 }}>🔔</button>
@@ -1327,7 +1328,7 @@ export default function LiveOrderTable({
                                 : "bg-surface-2 text-ink-soft"
                             }`}
                           >
-                            {(order as any).shippingStatus}
+                            {shippingStatusLabel((order as any).shippingStatus)}
                           </span>
                         ) : (
                           <span className="text-ink-mute">-</span>
@@ -1346,7 +1347,7 @@ export default function LiveOrderTable({
           총 {orders.length}건 / 전체 {allOrderCount}건
         </div>
         <div className="mx-auto flex items-center gap-5 text-sm font-black">
-          <button type="button" onClick={() => setPage(Math.max(1, safePage - 1))} className="text-ink-mute">‹</button>
+          <button type="button" onClick={() => setPage(Math.max(1, safePage - 1))} disabled={safePage <= 1} className="text-ink-mute disabled:opacity-30" aria-label="이전 페이지">‹</button>
           {(() => {
             let start = Math.max(1, safePage - 2);
             const end = Math.min(totalPages, start + 4);
@@ -1368,7 +1369,7 @@ export default function LiveOrderTable({
               </button>
             );
           })}
-          <button type="button" onClick={() => setPage(Math.min(totalPages, safePage + 1))} className="text-ink-mute">›</button>
+          <button type="button" onClick={() => setPage(Math.min(totalPages, safePage + 1))} disabled={safePage >= totalPages} className="text-ink-mute disabled:opacity-30" aria-label="다음 페이지">›</button>
         </div>
       </div>
     </section>

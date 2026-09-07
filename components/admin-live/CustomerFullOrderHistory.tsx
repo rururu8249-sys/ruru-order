@@ -43,11 +43,11 @@ const money = (v: number) => `${Math.round(v).toLocaleString("ko-KR")}원`;
 function classify(text: string): { kind: Kind; label: string } {
   const t = text.toLowerCase();
   if (/주문서취소|주문취소|취소|환불|cancel|refund/.test(t)) return { kind: "canceled", label: "주문서취소" };
-  if (/manual_match_needed|입금확인 필요|입금매칭 필요|수동확인/.test(t)) return { kind: "unpaid", label: "입금매칭 필요" };
-  if (/card_unpaid|카드 미결제|카드미결제/.test(t)) return { kind: "unpaid", label: "카드 미결제" };
+  if (/manual_match_needed|입금확인 필요|입금매칭 필요|수동확인/.test(t)) return { kind: "unpaid", label: "매칭필요" };
+  if (/card_unpaid|카드 미결제|카드미결제/.test(t)) return { kind: "unpaid", label: "카드미결제" };
   if (/카드결제완료|card_paid/.test(t)) return { kind: "paid", label: "카드결제완료" };
-  if (/자동입금확인|auto_paid/.test(t)) return { kind: "paid", label: "자동입금확인" };
-  if (/수동입금확인|manual_paid/.test(t)) return { kind: "paid", label: "수동입금확인" };
+  if (/자동입금확인|auto_paid/.test(t)) return { kind: "paid", label: "입금확인" };
+  if (/수동입금확인|manual_paid/.test(t)) return { kind: "paid", label: "입금확인" };
   if (/입금확인|결제완료|출고|paid/.test(t)) return { kind: "paid", label: "입금확인" };
   return { kind: "unpaid", label: "미입금" };
 }

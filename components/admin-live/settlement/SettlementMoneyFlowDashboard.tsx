@@ -381,7 +381,7 @@ export default function SettlementMoneyFlowDashboard({
                 className="h-9 rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none"
               >
                 {(["전체", "무통장입금", "카드결제", "기타"] as PaymentFilter[]).map((value) => (
-                  <option key={value} value={value}>{value}</option>
+                  <option key={value} value={value}>{({ 전체: "결제수단: 전체", 무통장입금: "무통장", 카드결제: "카드", 기타: "기타(미지정)" } as Record<string, string>)[value] ?? value}</option>
                 ))}
               </select>
             </label>
@@ -447,16 +447,16 @@ export default function SettlementMoneyFlowDashboard({
         <div className="rounded-[28px] border border-line bg-surface p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-xl font-black tracking-[-0.05em] text-ink">지금 처리할 일</h3>
-              <p className="mt-1 text-xs font-bold text-ink-mute">방송 끝나고 바로 확인</p>
+              <h3 className="text-xl font-black tracking-[-0.05em] text-ink">확인할 금액</h3>
+              <p className="mt-1 text-xs font-bold text-ink-mute">방송 끝나고 한 번 훑어보는 숫자 (누르는 카드 아님)</p>
             </div>
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <ActionCard label="아직 못 받은 금액 확인" value={won(stats.unpaidAmount)} tone="orange" />
-            <ActionCard label="결제완료 매출 확인" value={countText(stats.paidCount)} tone="blue" />
-            <ActionCard label="창고/기타 지출 입력" value={countText(stats.manualExpenseCount)} tone="slate" />
-            <ActionCard label="추가 정산 수익 확인" value={won(stats.manualIncomeAmount)} tone="blue" />
+            <ActionCard label="아직 못 받은 금액" value={won(stats.unpaidAmount)} tone="orange" />
+            <ActionCard label="결제완료 주문 수" value={countText(stats.paidCount)} tone="blue" />
+            <ActionCard label="창고/기타 지출 (입력한 건수)" value={countText(stats.manualExpenseCount)} tone="slate" />
+            <ActionCard label="추가 정산 수익" value={won(stats.manualIncomeAmount)} tone="blue" />
           </div>
         </div>
       </section>

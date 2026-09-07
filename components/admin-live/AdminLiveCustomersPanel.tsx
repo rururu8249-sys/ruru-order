@@ -1644,8 +1644,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
       <div className="flex gap-2 border-b border-rose-line">
         <button type="button" onClick={() => setCustTab("members")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "members" ? "bg-rose-deep text-white" : "text-ink-soft hover:text-rose-deep"}`}>회원 목록</button>
-        <button type="button" onClick={() => setCustTab("issues")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "issues" ? "bg-rose-deep text-white" : "text-ink-soft hover:text-rose-deep"}`}>고객 이슈</button>
-        <button type="button" onClick={() => setCustTab("loyalty")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "loyalty" ? "bg-rose-deep text-white" : "text-ink-soft hover:text-rose-deep"}`}>📊 단골 리포트</button>
+        <button type="button" onClick={() => setCustTab("issues")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "issues" ? "bg-rose-deep text-white" : "text-ink-soft hover:text-rose-deep"}`}>고객이슈</button>
+        <button type="button" onClick={() => setCustTab("loyalty")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "loyalty" ? "bg-rose-deep text-white" : "text-ink-soft hover:text-rose-deep"}`}>단골 리포트</button>
       </div>
 
       {custTab === "loyalty" ? (

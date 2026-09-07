@@ -2,6 +2,7 @@
 
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
+import { paymentStatusLabel } from "@/lib/orderLabels";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { LiveOrder, LiveOrderItem } from "./types";
@@ -92,14 +93,8 @@ function formatFullDateTime(value: string | null | undefined, fallback?: string 
 }
 
 function getPaymentStatusLabel(order: LiveOrder) {
-  if (order.paymentStatus === "canceled") return "주문서취소";
-  if (order.paymentStatus === "manual_match_needed") return "매칭필요";
-  if (order.paymentStatus === "manual_paid") return "수동입금확인";
-  if (order.paymentStatus === "auto_paid") return "자동입금확인";
-  if (order.paymentStatus === "card_paid") return "카드결제완료";
-  if (order.paymentStatus === "card_unpaid") return "카드미결제";
-  if (order.paymentStatus === "unpaid") return "입금대기";
-  return "입금확인";
+  // [2026-09-07] 표시 문구는 lib/orderLabels 사전 하나로 통일(자동/수동 구분은 툴팁으로)
+  return paymentStatusLabel(order.paymentStatus);
 }
 
 function getPaymentStatusClass(order: LiveOrder) {

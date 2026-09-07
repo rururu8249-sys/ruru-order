@@ -1,4 +1,5 @@
 import type { LedgerStatus } from "./depositLedgerTypes";
+import { depositLedgerStatusLabel } from "@/lib/orderLabels";
 
 type Props = {
   keyword: string;
@@ -93,7 +94,7 @@ export default function DepositLedgerFilters({
                 onClick={() => onStatusFilterChange(value)}
                 className={`rounded-full border px-4 py-2 text-xs font-black transition ${chipClass(active, value)}`}
               >
-                {value}
+                {depositLedgerStatusLabel(value)}
               </button>
             );
           })}

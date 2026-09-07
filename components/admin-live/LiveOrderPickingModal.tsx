@@ -327,7 +327,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
               <button
                 type="button"
                 onClick={() => setShowBuyers((v) => !v)}
-                title="상품 줄 아래 주문자 칩(입금대기 ⏳ 포함) 표시를 켜고 끕니다 — 물건 집을 땐 끄면 깔끔해요"
+                title="상품 줄 아래 주문자 칩(미결제 ⏳ 포함) 표시를 켜고 끕니다 — 물건 집을 땐 끄면 깔끔해요"
                 className={`rounded-lg px-2.5 py-1 text-[11px] font-black ${showBuyers ? "bg-rose-deep text-white" : "border border-rose-line bg-rose-soft text-rose-deep"}`}
               >
                 {showBuyers ? "👤 주문자 ✓" : "👤 주문자"}
@@ -389,7 +389,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                             {row.buyers.map((b, i) => (
                               <span
                                 key={`${b.nickname}-${b.paid}-${i}`}
-                                title={b.paid ? "결제완료" : "입금대기"}
+                                title={b.paid ? "결제완료" : "미결제"}
                                 className={`rounded-md px-1.5 py-0.5 text-[11px] font-bold ${b.paid ? "bg-ok-bg text-ok-tx" : "bg-warn-bg text-warn-tx"}`}
                               >
                                 {b.nickname}{b.qty > 1 ? `×${b.qty}` : ""}{b.paid ? "" : "⏳"}

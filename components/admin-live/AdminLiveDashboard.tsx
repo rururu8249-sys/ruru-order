@@ -265,14 +265,14 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
 
   const statusLabelMap: Record<LiveOrderFilters["status"], string> = {
     all: "상태 전체보기",
-    unpaid: "입금대기",
+    unpaid: "미결제",
     paid: "결제완료",
     manual_match_needed: "매칭필요",
     bank_paid: "입금확인",
     card_paid: "카드결제완료",
     card_unpaid: "카드미결제",
     canceled: "주문서취소",
-    shipped: "출고완료",
+    shipped: "택배출고",
   };
   parts.push(statusLabelMap[filters.status]);
 
@@ -458,7 +458,7 @@ function buildLiveBroadcastEndSummary({
     buyerCount: currentPhones.length,
     existingMemberCount,
     newMemberCount,
-    visitorText: "방문 로그 설정 후 표시",
+    visitorText: "접속 기록 확인 중",
     memberBasisText: "현재 불러온 주문 이력 기준",
   };
 }
@@ -1334,6 +1334,25 @@ export default function AdminLiveDashboard() {
     try {
       await endAdminLiveBroadcast(activeBroadcast.id);
 
+      // [2026-09-07] 방문자 수 — 접속 기록(visitor_visits)에서 이 방송 방문자만 읽어 표시(읽기 전용, 실패해도 종료엔 영향 없음)
+      try {
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), 6000);
+        const res = await fetch("/api/admin-live/visit-stats", { cache: "no-store", signal: controller.signal });
+        window.clearTimeout(timer);
+        const json = await res.json().catch(() => null);
+        const row = Array.isArray(json?.broadcasts)
+          ? json.broadcasts.find((b: any) => String(b?.broadcastId ?? "") === String(activeBroadcast.id))
+          : null;
+        summary.visitorText = row
+          ? `${Number(row.visitors) || 0}명 (방문 ${Number(row.visits) || 0}회)`
+          : json?.available === false
+            ? "접속 기록 없음"
+            : "이 방송 접속 기록 없음";
+      } catch {
+        summary.visitorText = "접속 기록 확인 실패";
+      }
+
       try {
         await saveLiveBroadcastEndReport({
           broadcast: activeBroadcast,
@@ -1573,8 +1592,8 @@ export default function AdminLiveDashboard() {
                 <div className="mt-2 flex items-center gap-1.5 border-b border-rose-line">
                   {[
                     { key: "live", label: "실시간 주문", onClick: () => setActiveMenu("broadcast") },
-                    { key: "payments", label: "입금 내역", onClick: () => setActiveMenu("payments") },
-                    { key: "match", label: "입금 매칭", onClick: () => setMatchPanelOpen((v) => !v) },
+                    { key: "payments", label: "입금내역", onClick: () => setActiveMenu("payments") },
+                    { key: "match", label: "입금매칭", onClick: () => setMatchPanelOpen((v) => !v) },
                   ].map((tab) => {
                     const active =
                       (tab.key === "live" && activeMenu !== "orders" && activeMenu !== "payments") ||
@@ -1784,7 +1803,7 @@ export default function AdminLiveDashboard() {
                   <button type="button" onClick={() => setActiveMenu("broadcast")} className="text-lg leading-none text-ink-mute hover:text-ink">✕</button>
                 </div>
                 <div className="min-h-0 flex-1">
-                  <AdminLiveSettingsPanel />
+                  <AdminLiveSettingsPanel onOpenNotice={() => { setActiveMenu("notice"); replacePanelInUrl("notice"); }} />
                 </div>
               </div>
             </div>

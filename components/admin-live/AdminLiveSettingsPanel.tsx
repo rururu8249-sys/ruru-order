@@ -168,7 +168,12 @@ const SETTINGS_TABS: { key: SettingsTab; label: string; icon: string; desc: stri
 // 하단 공통 저장바(운영값)를 쓰는 탭 — 유튜브/보안은 자체 저장
 const GLOBAL_SAVE_TABS: SettingsTab[] = ["payment", "point", "order"];
 
-export default function AdminLiveSettingsPanel() {
+type AdminLiveSettingsPanelProps = {
+  /** [2026-09-07] 「공지·쪽지 열기」 바로가기 — 대시보드가 메뉴를 바꿔 준다 */
+  onOpenNotice?: () => void;
+};
+
+export default function AdminLiveSettingsPanel({ onOpenNotice }: AdminLiveSettingsPanelProps = {}) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>("payment");
@@ -515,12 +520,19 @@ export default function AdminLiveSettingsPanel() {
               </div>
 
               {/* [2026-08-30] 공지 문구·접속 팝업 공지는 사이드바 「📢 공지·쪽지」 메뉴로 옮겼다. */}
-              <div className="rounded-[20px] border border-line bg-warn-bg p-4">
-                <div className="text-sm font-black text-warn-tx">📢 공지는 「공지·쪽지」 메뉴로 옮겼습니다</div>
-                <div className="mt-1 text-xs font-bold leading-5 text-warn-tx">
-                  「주문서 공지 문구」와 「접속 팝업 공지」는 왼쪽 사이드바의 <b>📢 공지·쪽지</b> 에서 관리합니다.
-                  미리보기가 있어 손님 화면을 바로 확인할 수 있습니다.
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-line bg-surface-2 p-4">
+                <div className="text-xs font-bold leading-5 text-ink-soft">
+                  「주문서 공지 문구」와 「접속 팝업 공지」는 <b className="text-ink">공지·쪽지</b> 메뉴에 있습니다. 손님 화면 미리보기도 거기서 볼 수 있어요.
                 </div>
+                {onOpenNotice ? (
+                  <button
+                    type="button"
+                    onClick={onOpenNotice}
+                    className="shrink-0 rounded-xl border border-rose-line bg-rose-soft px-3 py-2 text-xs font-black text-rose-deep transition hover:opacity-90"
+                  >
+                    공지·쪽지 열기 ›
+                  </button>
+                ) : null}
               </div>
 
               <div className="mt-3 flex items-start justify-between gap-3 rounded-[20px] border border-line bg-surface-2 p-4">

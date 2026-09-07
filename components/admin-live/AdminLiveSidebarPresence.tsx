@@ -296,11 +296,10 @@ export default function AdminLiveSidebarPresence() {
               <div style={{ padding: "44px 18px", textAlign: "center", fontSize: "12.5px", fontWeight: 700, color: "var(--color-ink-mute)" }}>불러오는 중…</div>
             ) : stats?.available === false ? (
               <div style={{ padding: "36px 22px", textAlign: "center", fontSize: "12.5px", fontWeight: 700, color: "var(--color-ink-soft)", lineHeight: 1.9 }}>
-                아직 접속 기록을 쌓는 표가 없습니다.
+                아직 접속 기록을 저장할 준비가 안 되어 있습니다.
                 <br />
                 <span style={{ color: "var(--color-ink-mute)" }}>
-                  Supabase에서 <b>supabase/visitor_visits_history.sql</b> 을 한 번 실행하면
-                  <br />그때부터 날짜별·방송별로 쌓입니다.
+                  개발자에게 알려주세요. (visitor_visits 표 없음 — docs/인수인계_관리자설정.md)
                 </span>
               </div>
             ) : !stats?.ok ? (

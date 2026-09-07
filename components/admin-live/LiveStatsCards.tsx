@@ -83,7 +83,7 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
     {
       label: "미입금",
       amount: money(bankUnpaid.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)),
-      sub: `입금대기 ${bankUnpaid.length}건`,
+      sub: `미입금 ${bankUnpaid.length}건`,
       icon: "⏱",
       color: "bg-danger-bg text-danger-tx",
     },
@@ -146,12 +146,12 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
       <span className="text-ink-soft" title="결제완료 주문의 순수 상품금액만 합친 것 — 카드수수료·배송비·포인트 반영 전">📦 상품값 <span className="text-ink text-[13px]">{money(goodsPaid)}</span></span>
       <span className="text-ink-soft" title="손님이 실제로 낸 돈 — 상품값 + 카드수수료 + 배송비 − 포인트 (결제완료 건만, 미입금·취소·정산제외 미포함)">💳 실제 받은 돈<span className="ml-1 text-[10px] font-bold text-ink-mute">(결제완료만 · 현재 조회범위)</span> <span className="text-ink text-[13px]">{money(paidAmount)}</span></span>
       <span className="text-line">|</span>
-      <span className="text-ink-soft">무통장입금 <span className="text-ok-tx">{money(bankPaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
-      <span className="text-ink-soft">카드결제 <span className="text-ok-tx">{money(cardPaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
+      <span className="text-ink-soft" title="무통장 주문 중 입금확인된 금액">무통장 입금확인 <span className="text-ok-tx">{money(bankPaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
+      <span className="text-ink-soft" title="카드 주문 중 결제완료된 금액">카드결제완료 <span className="text-ok-tx">{money(cardPaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
       <span className="text-line">|</span>
-      <span className="text-ink-soft">무통장미입금 <span className="text-warn-tx">{money(bankUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
+      <span className="text-ink-soft" title="무통장 주문 중 미입금·매칭필요 금액">미입금 <span className="text-warn-tx">{money(bankUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
       <span className="text-ink-soft">카드미결제 <span className="text-warn-tx">{money(cardUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
-      <span className="text-ink-soft">전체미입금 <span className="text-danger-tx">{money(bankUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0)+cardUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
+      <span className="text-ink-soft" title="미입금 + 카드미결제 — 아직 못 받은 돈 전체">미결제 합계 <span className="text-danger-tx">{money(bankUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0)+cardUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
       <button
         type="button"
         disabled={tgSending}

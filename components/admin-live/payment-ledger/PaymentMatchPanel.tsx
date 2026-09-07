@@ -189,27 +189,10 @@ export default function PaymentMatchPanel(_props: Props) {
     <div className="mx-auto grid w-full max-w-[1440px] gap-5">
       <section className="flex flex-col gap-4 rounded-[34px] border border-line bg-gradient-to-br from-surface via-surface to-surface-2 p-6 shadow-[0_22px_60px_rgba(15,23,42,0.07)] lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex items-center rounded-full border border-line bg-info-bg px-3 py-1 text-xs font-black tracking-[0.18em] text-info-tx">
-              MG
-            </div>
-            <div className="text-xs font-black tracking-[0.18em] text-ink-soft">
-              SAEMAEUL GEUMGO
-            </div>
-            <div className="text-sm font-black text-ink-mute">×</div>
-            <div className="inline-flex items-center rounded-full border border-line bg-warn-bg px-3 py-1 text-xs font-black tracking-[0.18em] text-warn-tx">
-              BANKDA
-            </div>
-          </div>
-
-          <div className="mt-2 text-[11px] font-black tracking-[0.22em] text-ink-mute">
-            새마을금고 입금 자동연동
-          </div>
-
-          <h1 className="mt-3 text-3xl font-black tracking-tight text-ink">입금내역</h1>
+          <h1 className="text-2xl font-black tracking-tight text-ink">입금내역</h1>
 
           <p className="mt-2 text-sm font-bold text-ink-soft">
-            뱅크다로 자동 수집된 새마을금고 입금 기록입니다. 연결/처리 정보는 상세 버튼에서만 표시합니다.
+            새마을금고 계좌에 들어온 입금을 뱅크다가 자동으로 모아 온 기록입니다. 주문과 연결된 내용은 「보기」에서 확인합니다.
           </p>
         </div>
 

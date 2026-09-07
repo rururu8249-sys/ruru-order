@@ -29,9 +29,9 @@ export default function DepositLedgerSummary({ summary }: Props) {
       icon: "↧",
     },
     {
-      label: "마지막 동기화",
+      label: "마지막 조회",
       value: summary.lastSyncedLabel || "-",
-      sub: "뱅크다/화면 조회 기준",
+      sub: "이 화면이 기록을 불러온 시각",
       icon: "↻",
     },
   ];

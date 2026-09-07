@@ -800,9 +800,9 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
       <div className="mt-4 grid grid-cols-3 gap-1.5 rounded-2xl bg-surface-2 p-1">
         {[
-          ["open", `미해결 전체 ${openCount}건`],
-          ["all", `전체 ${tasks.length}건`],
-          ["resolved", `해결 전체 ${resolvedCount}건`],
+          ["open", `미해결 ${openCount}`],
+          ["all", `전체 ${tasks.length}`],
+          ["resolved", `해결 ${resolvedCount}`],
         ].map(([key, label]) => (
           <button
             key={key}

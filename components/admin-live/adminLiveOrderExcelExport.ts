@@ -2,6 +2,7 @@ import { showAdminToast } from "@/lib/adminToast";
 import { formatOrderOptionText, stripNoneOptionParts } from "@/lib/orderOptionText";
 import ExcelJS from "exceljs";
 import type { LiveOrder, LiveOrderItem } from "./types";
+import { paymentStatusLabel } from "@/lib/orderLabels";
 
 type ExportMeta = {
   filterLabel: string;
@@ -64,14 +65,8 @@ function fullDateTime() {
 }
 
 function paymentLabel(order: LiveOrder) {
-  if (order.paymentStatus === "canceled") return "주문서취소";
-  if (order.paymentStatus === "manual_match_needed") return "매칭필요";
-  if (order.paymentStatus === "manual_paid") return "수동입금확인";
-  if (order.paymentStatus === "auto_paid") return "자동입금확인";
-  if (order.paymentStatus === "card_paid") return "카드결제완료";
-  if (order.paymentStatus === "card_unpaid") return "카드미결제";
-  if (order.paymentStatus === "unpaid") return "입금대기";
-  return "입금확인";
+  // [2026-09-07] 관리자확인용 시트의 결제상태 글자 — lib/orderLabels 사전과 동일(로젠 업로드 시트에는 이 열이 없음)
+  return paymentStatusLabel(order.paymentStatus);
 }
 
 function itemOption(item: LiveOrderItem) {

@@ -96,7 +96,7 @@ export default function AdminLiveSidebar({
                         title={`입금자명·금액이 주문과 자동으로 안 맞아 수동 확인이 필요한 주문 ${exceptionBadges.needMatch}건 — 클릭하면 해당 주문만 보여요`}
                         onClick={(e) => { e.stopPropagation(); onExceptionBadgeClick?.("match"); }}
                         className="cursor-pointer whitespace-nowrap rounded-full bg-danger-bg px-2 py-0.5 text-[10px] font-black text-danger-tx hover:ring-2 hover:ring-danger-tx/30"
-                      >매칭 {exceptionBadges.needMatch} ›</span>
+                      >매칭필요 {exceptionBadges.needMatch} ›</span>
                     ) : null}
                     {exceptionBadges.cardUnpaid > 0 ? (
                       <span
@@ -104,7 +104,7 @@ export default function AdminLiveSidebar({
                         title={`카드결제 선택 후 아직 결제완료 처리 전인 주문 ${exceptionBadges.cardUnpaid}건 — 클릭하면 해당 주문만 보여요`}
                         onClick={(e) => { e.stopPropagation(); onExceptionBadgeClick?.("card"); }}
                         className="cursor-pointer whitespace-nowrap rounded-full bg-danger-bg px-2 py-0.5 text-[10px] font-black text-danger-tx hover:ring-2 hover:ring-danger-tx/30"
-                      >카드 {exceptionBadges.cardUnpaid} ›</span>
+                      >카드미결제 {exceptionBadges.cardUnpaid} ›</span>
                     ) : null}
                   </span>
                 ) : null}
@@ -128,7 +128,6 @@ export default function AdminLiveSidebar({
                 <div className="text-[10px] font-black tracking-[0.18em] text-ink-mute">QUICK</div>
                 <div className="text-sm font-black text-ink">빠른보기</div>
               </div>
-              <div className="rounded-full bg-rose-soft px-2 py-1 text-[10px] font-black text-rose-deep">방송중</div>
             </div>
 
             <div className="mt-1.5 grid grid-cols-2 gap-1.5">

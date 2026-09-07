@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { LedgerStatus, RawDepositRow, SortDirection, SortKey } from "./depositLedgerTypes";
+import { depositLedgerStatusLabel } from "@/lib/orderLabels";
 import {
   formatDepositDateTime,
   formatDepositMoney,
@@ -62,7 +63,7 @@ function SortButton({
 function StatusBadge({ status }: { status: LedgerStatus }) {
   return (
     <span className={`inline-flex min-w-[74px] justify-center rounded-full border px-3 py-1 text-xs font-black ${statusClass(status)}`}>
-      {status}
+      {depositLedgerStatusLabel(status)}
     </span>
   );
 }
@@ -136,7 +137,7 @@ export default function DepositLedgerTable({
     <section className="overflow-hidden rounded-[32px] border border-line bg-surface shadow-[0_18px_45px_rgba(15,23,42,0.06)]">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft px-5 py-4">
         <div>
-          <div className="text-lg font-black text-ink">은행 입금내역</div>
+          <div className="text-lg font-black text-ink">입금내역</div>
           <div className="mt-1 text-xs font-bold text-ink-mute">실제 입금 1건은 목록에서 반드시 1줄로만 표시됩니다.</div>
         </div>
         <div className="rounded-full bg-surface-3 px-3 py-1 text-xs font-black text-ink-soft">

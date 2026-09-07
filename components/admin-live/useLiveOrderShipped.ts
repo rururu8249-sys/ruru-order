@@ -58,23 +58,23 @@ export function useLiveOrderShipped({ onAfterStatusChange }: UseLiveOrderShipped
     const skipped = orders.length - target.length;
 
     if (target.length === 0) {
-      showAdminToast("출고완료로 바꿀 결제완료 주문이 없습니다.\n(미결제·취소 주문은 제외됩니다)", "warning");
+      showAdminToast("택배출고로 바꿀 결제완료 주문이 없습니다.\n(미결제·취소 주문은 제외됩니다)", "warning");
       return false;
     }
 
     const rowIds = collectRowIds(target);
     if (rowIds.length === 0) {
-      showAdminToast("출고완료 처리할 주문 ID가 없습니다.", "warning");
+      showAdminToast("택배출고 처리할 주문이 없습니다.", "warning");
       return false;
     }
 
     const confirmMessage = [
-      `선택한 결제완료 주문 ${target.length}건을 출고완료로 변경할까요?`,
+      `선택한 결제완료 주문 ${target.length}건을 택배출고로 바꿀까요?`,
       skipped > 0 ? `(미결제·취소 ${skipped}건은 자동 제외됩니다)` : "",
       "",
       "주문금액/상품/배송비/입금내역/포인트는 변경하지 않습니다.",
-      "주문상태만 출고완료로 바꾸고 출고시간을 기록합니다.",
-      "입금 배지는 그대로 유지되고, 고객 주문조회에 '출고완료'로 표시됩니다.",
+      "주문상태만 택배출고로 바꾸고 출고시간을 기록합니다.",
+      "입금 배지는 그대로 유지되고, 손님 주문조회에는 '배송출발'로 표시됩니다.",
     ]
       .filter(Boolean)
       .join("\n");
@@ -149,12 +149,12 @@ export function useLiveOrderShipped({ onAfterStatusChange }: UseLiveOrderShipped
         .is("shipped_at", null);
 
       if (timeError) {
-        showAdminToast("출고완료로 변경됐지만 출고시간 기록은 실패했습니다.\n\n" + timeError.message, "warning");
+        showAdminToast("택배출고로 바뀌었지만 출고시간 기록은 실패했습니다.\n\n" + timeError.message, "warning");
         await onAfterStatusChange?.();
         return true;
       }
 
-      showAdminToast(`출고완료 ${target.length}건 처리됐습니다.`, "success");
+      showAdminToast(`택배출고 ${target.length}건 처리됐습니다.`, "success");
       await onAfterStatusChange?.();
       return true;
     } finally {
@@ -173,11 +173,11 @@ export function useLiveOrderShipped({ onAfterStatusChange }: UseLiveOrderShipped
     }
 
     const confirmMessage = [
-      "선택한 주문 중 '출고완료' 상태인 건을 해제할까요?",
+      "선택한 주문 중 '택배출고' 상태인 건을 해제할까요?",
       "",
-      "출고완료 처리 직전 상태(입금확인 등)로 되돌리고 출고시간을 지웁니다.",
+      "택배출고 처리 직전 상태(입금확인 등)로 되돌리고 출고시간을 지웁니다.",
       "(직전 상태 기록이 없으면 '출고대기'로 되돌립니다)",
-      "출고완료가 아닌 주문은 변경하지 않습니다.",
+      "택배출고가 아닌 주문은 변경하지 않습니다.",
       "금액/입금/포인트/정산은 변경하지 않습니다.",
     ].join("\n");
 
@@ -205,7 +205,7 @@ export function useLiveOrderShipped({ onAfterStatusChange }: UseLiveOrderShipped
       });
 
       if (restoreGroups.size === 0) {
-        showAdminToast("선택한 주문 중 출고완료 상태가 없습니다.", "warning");
+        showAdminToast("선택한 주문 중 택배출고 상태가 없습니다.", "warning");
         return false;
       }
 
@@ -223,12 +223,12 @@ export function useLiveOrderShipped({ onAfterStatusChange }: UseLiveOrderShipped
           .eq("admin_order_status_v2", SHIPPED_STATUS); // 현재 출고완료 행만 가드
 
         if (error) {
-          showAdminToast("출고완료 해제 실패\n\n" + error.message, "error");
+          showAdminToast("택배출고 해제 실패\n\n" + error.message, "error");
           return false;
         }
       }
 
-      showAdminToast("출고완료를 해제했습니다. (직전 상태로 복원)", "success");
+      showAdminToast("택배출고를 해제했습니다. (직전 상태로 복원)", "success");
       await onAfterStatusChange?.();
       return true;
     } finally {

@@ -130,24 +130,16 @@ export default function LiveBroadcastEndSummaryModal({ summary, onClose, onOpenS
         </div>
 
         <div className="mt-3 grid gap-3 md:grid-cols-5">
-          <StatCard label="무통장 결제완료" value={money(summary.bankPaidAmount)} sub={count(summary.bankPaidCount)} tone="green" />
-          <StatCard label="카드 결제완료" value={money(summary.cardPaidAmount)} sub={count(summary.cardPaidCount)} tone="blue" />
+          <StatCard label="입금확인(무통장)" value={money(summary.bankPaidAmount)} sub={count(summary.bankPaidCount)} tone="green" />
+          <StatCard label="카드결제완료" value={money(summary.cardPaidAmount)} sub={count(summary.cardPaidCount)} tone="blue" />
           <StatCard label="취소/환불" value={count(summary.canceledCount)} sub="결제완료 매출 제외" />
           <StatCard label="기존회원" value={count(summary.existingMemberCount, "명")} sub={summary.memberBasisText} tone="green" />
           <StatCard label="신규회원" value={count(summary.newMemberCount, "명")} sub={summary.memberBasisText} tone="blue" />
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <div className="rounded-3xl border border-amber-100 bg-warn-bg px-4 py-3 text-xs font-bold leading-5 text-amber-800">
-            사이트 방문자 수: {summary.visitorText}
-            <br />
-            방문자 수는 방문 로그 테이블이 연결된 뒤 정확한 숫자로 표시하는 것이 안전합니다.
-          </div>
-          <div className="rounded-3xl border border-line bg-surface-2 px-4 py-3 text-xs font-bold leading-5 text-ink-soft">
-            방송 리포트 저장은 다음 단계에서 DB 구조를 확인한 뒤 연결합니다.
-            <br />
-            지금 팝업은 주문·결제 현황을 빠르게 확인하는 읽기 전용 요약입니다.
-          </div>
+        <div className="mt-4 rounded-3xl border border-line bg-surface-2 px-4 py-3 text-xs font-bold leading-5 text-ink-soft">
+          이번 방송 사이트 방문자: <span className="text-ink">{summary.visitorText}</span>
+          <span className="ml-2 text-ink-mute">· 자세한 명단은 왼쪽 「접속 기록 보기」</span>
         </div>
 
         <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-line-soft pt-4">

@@ -128,7 +128,7 @@ export default function AdminLoginPage() {
           </div>
 
           <div className="mt-6 rounded-2xl bg-amber-50 px-4 py-3 text-xs font-bold leading-5 text-amber-800">
-            로그인 정보는 외부에 표시하지 않습니다. 접속이 안 되면 관리자 설정을 확인해주세요.
+            아이디·비밀번호는 서버 설정에서 관리합니다. 로그인이 안 되면 대소문자와 자동완성된 값을 확인해주세요.
           </div>
         </form>
       </section>

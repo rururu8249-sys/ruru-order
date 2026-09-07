@@ -253,7 +253,7 @@ export default function LiveFloatingMatchPanel({
       {/* 헤더 */}
       <div style={{ padding: "12px 14px 0", flexShrink: 0, borderBottom: "1px solid var(--color-surface-2)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-          <span style={{ fontSize: 13, fontWeight: 800 }}>입금 내역</span>
+          <span style={{ fontSize: 13, fontWeight: 800 }}>입금매칭</span>
           <span style={{ background: "var(--color-rose-deep)", color: "#fff", borderRadius: 20, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>
             미매칭 {unmatchedCount}건
           </span>
@@ -361,7 +361,7 @@ export default function LiveFloatingMatchPanel({
       <div style={{ flex: 1, overflowY: "auto" }}>
         {grouped.length === 0 && (
           <div style={{ padding: 24, textAlign: "center", color: "var(--color-ink-mute)", fontSize: 12 }}>
-            {showAll ? "입금 내역 없음" : "미매칭 입금 없음"}
+            {showAll ? "입금 없음" : "미매칭 입금 없음"}
           </div>
         )}
         {grouped.map(([dateLabel, deps]) => (

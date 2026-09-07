@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { LedgerStatus, RawDepositRow } from "./depositLedgerTypes";
+import { depositLedgerStatusLabel } from "@/lib/orderLabels";
 import DepositLinkedOrderInfo from "./DepositLinkedOrderInfo";
 import {
   formatDepositDateTime,
@@ -36,7 +37,7 @@ function DetailLine({
 function StatusBadge({ status }: { status: LedgerStatus }) {
   return (
     <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${statusClass(status)}`}>
-      {status}
+      {depositLedgerStatusLabel(status)}
     </span>
   );
 }
@@ -44,7 +45,7 @@ function StatusBadge({ status }: { status: LedgerStatus }) {
 function guideText(status: LedgerStatus) {
   if (status === "확인완료") {
     return {
-      title: "확인완료 입금입니다.",
+      title: "주문과 매칭이 끝난 입금입니다.",
       body: "메인 목록은 은행 입금 1건 기준으로만 표시하고, 주문 연결·처리방식은 상세정보에서만 확인합니다.",
       className: "border-line bg-ok-bg text-ok-tx",
     };
@@ -52,14 +53,14 @@ function guideText(status: LedgerStatus) {
 
   if (status === "주의") {
     return {
-      title: "확인 필요 입금입니다.",
+      title: "확인이 필요한 입금입니다.",
       body: "입금자명, 금액, 입금시간 또는 상태값을 다시 확인하세요.",
       className: "border-line bg-warn-bg text-warn-tx",
     };
   }
 
   return {
-    title: "아직 확인되지 않은 입금입니다.",
+    title: "아직 주문과 매칭되지 않은 입금입니다.",
     body: "실제 은행 입금내역은 존재하지만 주문 연결 또는 처리 상태 확인이 필요할 수 있습니다.",
     className: "border-line bg-surface-2 text-ink",
   };
