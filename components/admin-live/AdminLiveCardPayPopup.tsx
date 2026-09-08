@@ -316,8 +316,39 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
           </div>
         </div>
         </div>
-        <div style={{ width: "50%", height: "100%", background: "var(--color-surface)", borderLeft: "1px solid var(--color-line)" }}>
-          <iframe src={paysterUrl} title="페이스터 결제" style={{ width: "100%", height: "100%", border: 0 }} />
+        {/* [2026-09-08] 예전엔 iframe 한 줄뿐이라, 페이스터가 «흰 화면»으로 뜨면 사장님은 이유를 알 수 없었다.
+              iframe 삽입 차단(결제 사이트는 보안상 흔히 막는다) · iframe 안 로그인 풀림 · 주소 오입력 —
+              원인이 무엇이든 결과가 똑같이 「흰 화면」이었고, 방송 중이면 카드결제를 아예 못 한다.
+            → 위에 항상 보이는 바를 두고 「새 창으로 열기」를 준다. iframe이 막혀도 결제는 진행된다.
+              (cross-origin iframe 은 안을 읽을 수 없어 «비었는지» 코드로 판정할 수 없다 → 항상 노출이 정답) */}
+        <div style={{ width: "50%", height: "100%", background: "var(--color-surface)", borderLeft: "1px solid var(--color-line)", display: "flex", flexDirection: "column", minHeight: 0 }}>
+          <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "8px 12px", borderBottom: "1px solid var(--color-line)", background: "var(--color-surface-2)" }}>
+            <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink-soft)" }}>페이스터 결제창</span>
+            <span style={{ fontSize: "12px", fontWeight: 650, color: "var(--color-ink-mute)" }}>안 보이면 →</span>
+            <button
+              type="button"
+              onClick={() => window.open(paysterUrl, "ruruPayster", "popup=yes,width=480,height=760")}
+              className="ru-btn ru-btn-sm ru-btn-primary"
+            >
+              새 창으로 열기
+            </button>
+            {!/smspayment/i.test(paysterUrl) ? (
+              <span
+                title="설정 › 상점 정보 › 「페이스터 문자결제 페이지 주소」에 문자결제 주소를 넣어주세요"
+                style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-warn-tx)", background: "var(--color-warn-bg)", borderRadius: "4px", padding: "2px 8px" }}
+              >
+                ⚠ 문자결제 주소가 아닙니다
+              </span>
+            ) : null}
+          </div>
+          <iframe
+            src={paysterUrl}
+            title="페이스터 결제"
+            style={{ width: "100%", flex: "1 1 0%", minHeight: 0, border: 0 }}
+          />
+          <div style={{ flexShrink: 0, padding: "6px 12px", borderTop: "1px solid var(--color-line)", background: "var(--color-surface-2)", fontSize: "11px", fontWeight: 650, color: "var(--color-ink-mute)", lineHeight: 1.5 }}>
+            여기가 비어 보이면 페이스터가 창 안에 넣는 걸 막은 겁니다. 위 「새 창으로 열기」를 쓰세요 — 왼쪽 복사 버튼은 그대로 됩니다.
+          </div>
         </div>
       </div>
       {imagePreviewUrl ? (

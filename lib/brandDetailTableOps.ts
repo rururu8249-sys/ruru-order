@@ -1,3 +1,4 @@
+import { splitOptionText } from "./optionSplit";
 // lib/brandDetailTableOps.ts
 // [2026-08-29] 브랜드 상품 "표에서 바로 고치기"의 계산 부분만 따로 뺀 것.
 //
@@ -39,13 +40,10 @@ export type BrandDetailState = {
 
 const clean = (v: unknown) => String(v ?? "").trim();
 
+// [2026-09-08 사장님 지침] 쉼표(와 줄바꿈)만 옵션 구분. | / · 는 «옵션 이름의 일부».
+//   규칙은 lib/optionSplit.ts 한 곳에서만 정한다.
 export function splitCsv(raw: unknown): string[] {
-  return [...new Set(
-    String(raw ?? "")
-      .split(/[,|\n]+/g)
-      .map((v) => v.trim())
-      .filter(Boolean),
-  )];
+  return [...new Set(splitOptionText(String(raw ?? "")))];
 }
 
 function variantKey(color: string, size: string) {

@@ -1,3 +1,4 @@
+import { splitOptionText } from "./optionSplit";
 export type ProductLike = Record<string, unknown>;
 export type DetailProduct = {
   parentId: string; parentName: string; detailName: string; code: string; hidden: boolean;
@@ -6,7 +7,7 @@ export type DetailProduct = {
 };
 const EMPTY = new Set(["", "없음", "없슴", "무", "-", "none", "n/a", "na"]);
 export function cleanOptionValues(raw: unknown): string[] {
-  const values = Array.isArray(raw) ? raw : typeof raw === "string" ? (() => { const t=raw.trim(); if(!t)return []; if(t.startsWith("[")&&t.endsWith("]")){try{const p=JSON.parse(t); return Array.isArray(p)?p:[t];}catch{return t.split(/[,|]+/g);}} return t.split(/[,|]+/g);})() : [];
+  const values = Array.isArray(raw) ? raw : typeof raw === "string" ? (() => { const t=raw.trim(); if(!t)return []; if(t.startsWith("[")&&t.endsWith("]")){try{const p=JSON.parse(t); return Array.isArray(p)?p:[t];}catch{return splitOptionText(t);}} return splitOptionText(t);})() : [];   // [2026-09-08] 쉼표(줄바꿈)만 구분 — lib/optionSplit.ts
   return [...new Set(values.map(v=>String(v??"").trim()).filter(v=>!EMPTY.has(v.toLowerCase())))];
 }
 export function parseProductNote(row: ProductLike|null|undefined): Record<string, unknown> { if(!row)return {}; const raw=row.product_note; if(raw&&typeof raw==="object"&&!Array.isArray(raw))return raw as Record<string,unknown>; if(typeof raw==="string"&&raw.trim()){try{const p=JSON.parse(raw); return p&&typeof p==="object"&&!Array.isArray(p)?p:{};}catch{return {};}} return {}; }

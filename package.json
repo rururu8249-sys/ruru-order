@@ -11,7 +11,7 @@
     "prebuild": "npm run guard:bankda && npm run guard:bankda-cron",
     "guard:bankda-cron": "node scripts/guard-bankda-cron.js",
     "guard:ui": "node scripts/guard-admin-ui.js",
-    "guard": "node scripts/guard-bankda-cron.js && node scripts/guard-bankda-admin-live.js && node scripts/guard-admin-ui.js"
+    "guard": "node scripts/guard-bankda-cron.js && node scripts/guard-bankda-admin-live.js && node scripts/guard-admin-ui.js && node scripts/guard-option-split.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",

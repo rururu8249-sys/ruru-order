@@ -15,6 +15,7 @@ import { showAdminToast } from "@/lib/adminToast";
 import { resolveProductImageUrl } from "./quick-product/productImageUrl";
 import { detailProducts } from "@/lib/productDetailModel";
 import type { LiveOrderRegisteredAddInput } from "./useLiveOrderItemAdd";
+import { toOptionList } from "@/lib/optionSplit";
 
 type ProductRow = Record<string, unknown>;
 type OptionField = "color" | "size";
@@ -55,15 +56,11 @@ function parseNote(p: ProductRow): Record<string, unknown> {
   return {};
 }
 
-// 값 분해(배열/구분자 문자열 → 문자열 배열) — 고객페이지 splitProductOptionValue와 동일 규칙
+// 값 분해 — 손님 주문서 splitProductOptionValue 와 «같은 규칙»이어야 한다.
+//   [2026-09-08] 쉼표(와 줄바꿈)만 구분. / | · 는 옵션 이름의 일부(「XS/S」는 한 묶음 사이즈).
+//   규칙은 lib/optionSplit.ts 한 곳에서만 정한다.
 function splitOptionValue(value: unknown): string[] {
-  if (Array.isArray(value)) return value.flatMap((i) => splitOptionValue(i));
-  if (typeof value !== "string") return [];
-  return value
-    // [2026-08-11] 마침표(.) 구분자 제거 — US5.5 같은 사이즈가 쪼개지지 않게 (고객 페이지와 동일 기준)
-    .split(/[,/|·\n]+/g)
-    .map((i) => i.trim())
-    .filter(Boolean);
+  return toOptionList(value);
 }
 
 // "없음" 계열 → 빈 값 (고객페이지 normalizeEmptyProductOptionValue와 동일)

@@ -49,6 +49,7 @@ import {
   orderLookupPhoneValues,
 } from "@/lib/customerOrderLookup";
 import { brandWordmarkThumbnail, normalizeBrandKorean, productNameThumbnail, productAutoThumbUrl } from "@/lib/brandWordmarkThumbnail";
+import { toOptionList } from "@/lib/optionSplit";
 import {
   CUSTOMER_SESSION_VERSION_KEY,
   YOUTUBE_NICKNAME_CONFIRM_VERSION_KEY,
@@ -616,21 +617,12 @@ const blockCustomerCopyEvents = () => {
 };
 
 function splitProductOptionValue(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.flatMap((item): string[] => splitProductOptionValue(item));
-  }
-
-  if (typeof value !== "string") {
-    return [];
-  }
-
-  return value
-    // [2026-08-11 버그수정] 마침표(.)를 구분자에서 뺀다.
-    //   신발 US 표기(225(US5.5), US6.5 …)가 "225(US5" / "5)" 로 쪼개져 옵션이 엉망이 되던 원인.
-    //   쉼표(,) · 슬래시(/) · 가운뎃점(·) · 줄바꿈만 구분자로 인정한다.
-    .split(/[,\/|·\n]+/g)
-    .map((item) => item.trim())
-    .filter(Boolean);
+  // [2026-09-08 사장님 지침] 쉼표(와 줄바꿈)만 옵션 구분. / | · 는 «옵션 이름의 일부».
+  //   예전엔 ① 배열 원소를 flatMap 으로 «또» 쪼개고 ② / | · 까지 구분자로 봤다.
+  //   → 관리자가 사이즈를 「XS/S」(한 묶음)로 저장해도 이 화면에서 「XS」「S」로 갈라졌다.
+  //     이번 「/ 가 인식이 안 된다」의 직접 원인. 규칙은 lib/optionSplit.ts 한 곳에서만 정한다.
+  //   ※ 마침표(.)를 뺀 2026-08-11 수정(신발 US5.5 표기가 쪼개지던 것)은 그대로 유지된다.
+  return toOptionList(value);
 }
 
 function uniqueOptionValues(values: string[]): string[] {

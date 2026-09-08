@@ -16,6 +16,7 @@ import {
 } from "@/lib/brandDetailTableOps";
 import { brandWordmarkThumbnail, normalizeBrandKorean, productAutoThumbUrl, productNameThumbnail } from "@/lib/brandWordmarkThumbnail";
 import { detailCode } from "@/lib/productDetailModel";
+import { splitOptionText } from "@/lib/optionSplit";
 
 type ProductRow = Record<string, unknown>;
 
@@ -95,11 +96,10 @@ function normalizeTextareaText(value: string) {
     .replace(/\\t/g, "\t");
 }
 
+// [2026-09-08] 쉼표(와 줄바꿈)만 구분. 「XS/S」는 한 묶음 사이즈의 «이름»이다.
+//   규칙은 lib/optionSplit.ts 한 곳에서만 정한다(예전엔 8곳에 따로 적혀 서로 달라질 수 있었다).
 function splitOptions(value: string) {
-  return String(value || "")
-    .split(/[,/|]+/g)
-    .map((item) => item.trim())
-    .filter(Boolean);
+  return splitOptionText(value);
 }
 
 function unique(values: string[]) {
@@ -182,10 +182,7 @@ function pickArray(row: ProductRow | null | undefined, keys: string[]) {
     }
 
     if (typeof value === "string" && value.trim()) {
-      return value
-        .split(/[,/|]+/g)
-        .map((item) => item.trim())
-        .filter(Boolean);
+      return splitOptionText(value);
     }
   }
 
@@ -2012,7 +2009,7 @@ export default function QuickProductFastForm({
                     </div>
                   ) : null}
                 </div>
-                {colorText.includes("/") ? <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-danger-tx)", whiteSpace: "nowrap" }}>⚠ / 는 쓸 수 없어요</span> : null}
+                {colorText.includes("/") ? <span title="쉼표(,)만 옵션을 나눕니다. / 는 이름의 일부로 저장됩니다." style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-info-tx)", whiteSpace: "nowrap" }}>ⓘ / 는 한 이름으로 묶여요</span> : null}
                 <div style={{ display: "flex", gap: "4px", alignItems: "center", flexShrink: 0 }}>
                   {optionModeChip(colorText.trim() === "", "✏️ 손님이 적어요", () => { setFormTouched(true); setColorText(""); })}
                   {optionModeChip(splitOptions(colorText).length > 0 && splitOptions(colorText).every((x) => x === "없음"), "🚫 안 써요", () => { setFormTouched(true); setColorText("없음"); })}
@@ -2064,7 +2061,7 @@ export default function QuickProductFastForm({
               {/* 슬롯 3 — 사이즈 */}
               <div style={brandGroupActive ? { ...optRow, display: "none" } : optRow}>
                 <span style={optLabel}>사이즈</span>
-                <input style={optInput} type="text" placeholder="220, 230, 240" value={sizeText} onChange={(e) => setSizeText(e.target.value)} />
+                <input style={optInput} type="text" placeholder="쉼표로 구분 — 예: XS/S, M/L, XL/XXL" value={sizeText} onChange={(e) => setSizeText(e.target.value)} />
                 <div ref={sizePresetRef} style={{ position: "relative", display: "inline-block" }}>
                   <button type="button" onClick={() => setSizePresetOpen((v) => !v)} style={presetBtn(sizes.length)}>
                     프리셋{sizes.length > 0 ? ` ${sizes.length}` : ""} ▾
@@ -2083,7 +2080,7 @@ export default function QuickProductFastForm({
                     </div>
                   ) : null}
                 </div>
-                {sizeText.includes("/") ? <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-danger-tx)", whiteSpace: "nowrap" }}>⚠ / 는 쓸 수 없어요</span> : null}
+                {sizeText.includes("/") ? <span title="쉼표(,)만 옵션을 나눕니다. XS/S 는 한 묶음 사이즈로 저장됩니다." style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-info-tx)", whiteSpace: "nowrap" }}>ⓘ / 는 한 사이즈로 묶여요</span> : null}
                 <div style={{ display: "flex", gap: "4px", alignItems: "center", flexShrink: 0 }}>
                   {optionModeChip(sizeText.trim() === "", "✏️ 손님이 적어요", () => { setFormTouched(true); setSizeText(""); })}
                   {optionModeChip(splitOptions(sizeText).length > 0 && splitOptions(sizeText).every((x) => x === "없음"), "🚫 안 써요", () => { setFormTouched(true); setSizeText("없음"); })}

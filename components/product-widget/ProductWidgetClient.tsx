@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase";
 import { resolveProductImageUrl } from "@/components/admin-live/quick-product/productImageUrl";
 import { getActiveBroadcast, loadAdminLiveBroadcasts } from "@/components/admin-live/liveBroadcastController";
 import { expandForWidget } from "@/lib/productDetailModel";
+import { splitOptionText } from "@/lib/optionSplit";
 
 type AnyProduct = Record<string, any>;
 
@@ -40,7 +41,7 @@ function joinOptionValues(raw: unknown): string {
     } catch {
       /* 일반 문자열 */
     }
-    return raw.split(/[,/|]+/g).map((s) => s.trim()).filter(Boolean).join(" · ");
+    return splitOptionText(raw).join(" · ");   // [2026-09-08] 쉼표만 구분 — lib/optionSplit.ts
   }
   return "";
 }

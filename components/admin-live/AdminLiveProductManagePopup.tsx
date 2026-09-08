@@ -14,6 +14,7 @@ import { adminDetailSearch, buildDetailChatLine, detailProducts, type DetailProd
 import { buildChatAnnounceText } from "@/lib/chatAnnounce";
 import { savedWidgetAutoMatches, savedWidgetPinMatches, widgetPinTargetBroadcastId } from "@/lib/widgetPinState";
 import { readPinHistory, recordPinHistory, removePinHistory } from "@/lib/pinHistory";
+import { splitOptionText } from "@/lib/optionSplit";
 
 type ProductRow = Record<string, unknown>;
 
@@ -88,7 +89,7 @@ function pickArray(row: ProductRow, keys: string[]) {
           return [trimmed];
         }
       }
-      return trimmed.split(/[,/|]+/g).map((i) => i.trim()).filter(Boolean);
+      return splitOptionText(trimmed);   // [2026-09-08] 쉼표만 구분 — lib/optionSplit.ts
     }
   }
   return [];
