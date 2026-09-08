@@ -119,8 +119,28 @@ export function usePipWindow() {
   // 서버 렌더와 화면이 어긋나지 않게, 지원 여부는 «브라우저에서» 확인한다
   useEffect(() => {
     setSupported(isPipSupported());
-    // 주문표 클릭 순간에 미리 열어둔 창이 있으면 그대로 이어받는다
     let stopped = false;
+    // 이미 떠 있는 복사창이 있으면 그대로 이어받는다.
+    //   [2026-09-08 실측] 브라우저는 «클릭 한 번에 창 하나»만 열어준다
+    //   (팝업을 먼저 열면 requestWindow 가 NotAllowedError: requires user activation).
+    //   그래서 복사창은 팝업이 닫혀도 «계속 살려두고» 다음 주문에서 이어받는다.
+    const alive = getPipWindow();
+    if (alive) {
+      openedRef.current = alive;
+      setPipWindow(alive);
+      alive.addEventListener(
+        "pagehide",
+        () => {
+          openedRef.current = null;
+          setPipWindow(null);
+        },
+        { once: true },
+      );
+      return () => {
+        stopped = true;
+      };
+    }
+    // 주문표 클릭 순간에 미리 열어둔 창이 있으면 그대로 이어받는다
     void takePreopenedPip().then((w) => {
       if (stopped || !w) return;
       openedRef.current = w;
@@ -173,16 +193,21 @@ export function usePipWindow() {
     setPipWindow(null);
   }, []);
 
-  // 팝업이 닫히면(=이 훅을 쓰는 화면이 사라지면) 작은 창도 같이 닫는다.
-  //   안 그러면 «주인 없는 창»이 화면에 남아 사장님이 손으로 닫아야 한다.
+  // 팝업이 닫혀도 복사창은 «닫지 않는다».
+  //   [2026-09-08] 브라우저가 클릭 한 번에 창 하나만 열어주기 때문에, 매번 닫았다 열면
+  //   그 한 번의 «열 권한»을 복사창이 써버려 페이스터가 안 열린다(사장님이 겪은 증상).
+  //   대신 «엉뚱한 주문의 금액»이 남아 있으면 위험하므로 안내 문구로 비운다.
   useEffect(() => {
     return () => {
-      try {
-        openedRef.current?.close();
-      } catch {
-        /* 무시 */
-      }
+      const w = openedRef.current;
       openedRef.current = null;
+      if (!w || w.closed) return;
+      try {
+        w.document.body.innerHTML =
+          '<div style="display:flex;height:100vh;align-items:center;justify-content:center;padding:24px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;font-weight:700;color:#8B99BC;line-height:1.7">카드결제할 주문을 선택하면<br>여기에 복사창이 나옵니다.<br><span style="font-size:11px">이 창은 닫지 마세요 — 닫으면 다음에 페이스터가 같이 안 열립니다.</span></div>';
+      } catch {
+        /* 이미 닫혔으면 무시 */
+      }
     };
   }, []);
 

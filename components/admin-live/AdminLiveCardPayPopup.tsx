@@ -108,8 +108,20 @@ function rectBesidePip(pipWin: Window) {
 /** 페이스터 창을 «정해진 자리»에 연다.
  *  ⚠ 위치는 «창을 처음 만들 때»만 정해진다. 이미 열려 있는 창은 위치를 못 바꾼다
  *    (남의 사이트라 moveTo 가 안 먹는다 — 실측 확인). 그래서 첫 생성 위치가 중요하다. */
+let paysterWin: Window | null = null;
+
+/** 페이스터 창이 «지금 살아 있나». 살아 있으면 클릭 권한 없이도 다시 부를 수 있다(실측). */
+function paysterAlive() {
+  try {
+    return !!paysterWin && !paysterWin.closed;
+  } catch {
+    return false;
+  }
+}
+
 function openPaysterAt(url: string, r: { left: number; top: number; width: number; height: number }) {
   const win = window.open(url, PAYSTER_WINDOW_NAME, `popup=yes,left=${r.left},top=${r.top},width=${r.width},height=${r.height}`);
+  if (win) paysterWin = win;
   try {
     win?.focus(); // 뒤로 숨어 있던 창이면 앞으로 부른다
   } catch {
@@ -140,23 +152,26 @@ function pipSize() {
  *  ⚠ 순서 주의 — await 없이 둘 다 «동기적으로» 부른다. */
 export function openPaysterRightHalf() {
   const url = getShopInfoNow().paysterUrl;
-  if (!(isPipPreferred() && isPipSupported())) {
-    openPayster(url); // 복사창을 안 쓰면 예전 방식 그대로
+  const pip = getPipWindow();
+  const wantPip = isPipPreferred() && isPipSupported();
+
+  // ⚠ [2026-09-08 실측] 브라우저는 «클릭 한 번에 창 하나»만 열어준다.
+  //   팝업을 먼저 열면 requestWindow 가 «NotAllowedError: requires user activation» 로 막히고,
+  //   복사창을 먼저 열면 페이스터 팝업이 차단된다. (사장님: 「왜 동시에 같이 안열려?」)
+  //   대신 «이미 열려 있는 이름창»은 클릭 권한 없이도 다시 부를 수 있다(실측 확인).
+  //   그래서 두 창을 하루 종일 켜두고, 한 번의 클릭 권한은 «없는 창 하나»에만 쓴다.
+  if (paysterAlive()) {
+    // 페이스터는 살아 있다 → 권한 없이 이동·포커스. 남는 권한으로 복사창을 연다.
+    openPaysterAt(url, pip ? rectBesidePip(pip) : paysterSlotRect());
+    if (wantPip && !pip) {
+      const size = pipSize();
+      void preopenPipWindow(size.width, size.height);
+    }
     return;
   }
-  const already = getPipWindow();
-  if (already) {
-    // 복사창이 이미 떠 있으면 그 옆으로 바로 연다
-    openPaysterAt(url, rectBesidePip(already));
-    return;
-  }
-  // 복사창을 «먼저» 열고, 자리를 읽어서 그 옆에 페이스터를 만든다.
-  //   크롬의 «사용자 조작» 유효시간(수 초) 안에 끝나므로 팝업차단에 안 걸린다.
-  //   혹시 창이 안 열리면 예전 자리로라도 띄운다 — 결제를 못 하는 상황은 만들지 않는다.
-  const size = pipSize();
-  void preopenPipWindow(size.width, size.height).then((pipWin) => {
-    openPaysterAt(url, pipWin ? rectBesidePip(pipWin) : paysterSlotRect());
-  });
+  // 페이스터가 없다 → 결제가 우선이므로 클릭 권한을 페이스터에 쓴다.
+  //   복사창은 팝업의 「📌」 버튼(자기 클릭 권한)으로 열고, 이후로는 계속 살아 있다.
+  openPaysterAt(url, pip ? rectBesidePip(pip) : paysterSlotRect());
 }
 
 type Props = {
@@ -394,7 +409,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
                 className="ru-btn ru-btn-sm"
                 title="복사창을 항상 맨 위에 뜨는 창으로 빼냅니다(기본 켜짐). 페이스터 창이 뒤로 안 밀리고, 페이스터가 복사창 바로 옆에 붙어서 열립니다."
               >
-                {pip.pipWindow ? "📌 고정 해제" : "📌 복사창 항상 위에"}
+                {pip.pipWindow ? "📌 고정 해제" : "📌 복사창 항상 위에 (한 번만)"}
               </button>
             ) : null}
           </div>
@@ -495,12 +510,13 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
             {/* [2026-09-08 실측] 페이스터는 로그인을 «창 하나에만 사는 저장소»에 넣는다.
                   창을 닫으면 그 저장소가 같이 사라져 다시 로그인해야 한다. 페이스터 쪽 방식이라 못 바꾼다. */}
             <br />
-            <b>페이스터 창은 닫지 마세요</b> — 닫으면 페이스터가 로그인을 잊어버려 다시 로그인해야 합니다(페이스터 쪽 방식이라 우리가 못 바꿔요). 그냥 켜두면 하루 종일 그 창 하나로 씁니다.
-            {/* [2026-09-08 실측] 복사창(항상 위) 위치는 크롬이 정한다. 우리가 옮길 수 없다.
-                  대신 크롬이 «사장님이 끌어다 놓은 자리»를 기억하므로, 한 번만 옮겨두면 된다.
-                  페이스터는 복사창 위치를 읽어서 그 옆에 만든다. */}
+            {/* [2026-09-08 실측] ① 페이스터는 로그인을 «창 하나»에만 저장 → 닫으면 다시 로그인.
+                  ② 브라우저는 «클릭 한 번에 창 하나»만 열어준다 → 두 창을 켜둬야 같이 따라온다.
+                  ③ 복사창 위치는 크롬이 정한다(우리가 못 옮김). 대신 끌어다 놓은 자리를 기억한다. */}
             <br />
-            <b>복사창을 원하는 자리로 한 번 끌어다 놓으세요</b> — 크롬이 그 자리를 기억하고, 페이스터가 항상 그 바로 옆에 붙어서 열립니다.
+            <b>두 창(페이스터·복사창)은 닫지 말고 켜두세요.</b> 닫으면 ① 페이스터 로그인이 풀리고 ② 다음 카드결제 때 둘이 같이 안 열립니다. 브라우저가 «클릭 한 번에 창 하나»만 열어주기 때문이에요. 켜두면 카드결제만 눌러도 둘 다 따라옵니다.
+            <br />
+            <b>두 창을 원하는 자리에 한 번씩 끌어다 놓으세요</b> — 그 자리를 기억해서 계속 그대로 뜹니다.
           </div>
         </div>
     </div>
