@@ -545,7 +545,18 @@ export default function AdminLiveDashboard() {
   const [activeMenu, setActiveMenu] = useState<AdminLiveMenuKey>(() => readMenuFromUrl());
   const [customersInitialTab, setCustomersInitialTab] = useState<"members" | "issues">("members");
   // [2026-09-08 5단계] 오른쪽 방송 레일 열림 — null 이면 "방송 중이면 열림, 아니면 접힘"(자동), 손잡이를 누르면 고정
-  const [railOpenChoice, setRailOpenChoice] = useState<boolean | null>(null);
+  // [2026-09-08 사장님 지적] 「새로고침할 때마다 방송화면·채팅창이 자꾸 저절로 뜬다」
+  //   원인: 열림 여부를 기억하지 않고 «방송 중이면 무조건 열림»으로 짰다(railOpenChoice ?? 방송중).
+  //   수정: 사장님이 접으면 접힌 채로, 펼치면 펼친 채로 «기억»한다. 기본값은 접힘.
+  const RAIL_KEY = "ruru_admin_rail_open";
+  const [railOpenChoice, setRailOpenChoice] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try { return window.localStorage.getItem(RAIL_KEY) === "1"; } catch { return false; }
+  });
+  const setRailOpen = (next: boolean) => {
+    setRailOpenChoice(next);
+    try { window.localStorage.setItem(RAIL_KEY, next ? "1" : "0"); } catch { /* 무시 */ }
+  };
   // 라이트/다크 테마 토글 — 관리자 루트에만 .dark 부여(다른 페이지 영향 0). localStorage 기억.
   const [theme, setTheme] = useState<"light" | "dark">("light");
   useEffect(() => {
@@ -1429,7 +1440,7 @@ export default function AdminLiveDashboard() {
   // [2026-09-08 5단계] 큰 메뉴·작은 탭·레일 열림(자동: 방송 중이면 열림)
   const activeTopMenu = getAdminLiveTopMenu(topMenuOf(activeMenu));
   const activeSubTabs = ADMIN_LIVE_SUB_TABS[activeTopMenu.key];
-  const railOpen = railOpenChoice ?? Boolean(activeBroadcast);
+  const railOpen = railOpenChoice;   // 방송 중이라고 «저절로» 열지 않는다 — 사장님이 고른 상태를 그대로
 
   return (
     <div className={`h-screen overflow-hidden bg-canvas text-ink ${theme === "dark" ? "dark" : ""}`} data-ruru-controltower-shell="layout-b-pages-rail-v4">
@@ -1720,7 +1731,7 @@ export default function AdminLiveDashboard() {
             {/* 오른쪽 접이식 방송·채팅 레일 (어느 화면에서든) */}
             <AdminLiveBroadcastRail
               open={railOpen}
-              onToggle={() => setRailOpenChoice(!railOpen)}
+              onToggle={() => setRailOpen(!railOpen)}
               broadcastOn={Boolean(activeBroadcast)}
               videoRatio={videoRatio}
               youtubeUrl={activeBroadcast?.youtube_live_url || ""}
