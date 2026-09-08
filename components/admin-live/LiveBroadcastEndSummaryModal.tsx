@@ -1,5 +1,20 @@
 "use client";
 
+import MissionPayoutButton from "./MissionPayoutButton";
+
+// [2026-09-08 4단계-B] 방송 종료 시점의 미션 결과(읽기 전용 스냅샷). 지급은 MissionPayoutButton → 기존 미션 API
+export type LiveBroadcastEndMission = {
+  title: string;
+  goalType: "count" | "amount";
+  goal: number;
+  current: number;
+  pct: number;
+  reward: number;
+  achieved: boolean;
+  /** 방송 종료와 함께 미션도 종료(mission_active=false) 처리됐는지 */
+  ended: boolean;
+};
+
 export type LiveBroadcastEndSummary = {
   title: string;
   broadcastDateText: string;
@@ -22,6 +37,8 @@ export type LiveBroadcastEndSummary = {
   newMemberCount: number;
   visitorText: string;
   memberBasisText: string;
+  /** 이번 방송에 미션이 켜져 있었으면 그 결과. 없으면 undefined */
+  mission?: LiveBroadcastEndMission;
 };
 
 type Props = {
@@ -118,7 +135,15 @@ export default function LiveBroadcastEndSummaryModal({ summary, onClose, onOpenS
             <div className="rounded-2xl bg-surface-2 px-3 py-2">
               {hasCanceled ? `취소/환불 ${count(summary.canceledCount)} 참고` : "취소/환불 없음"}
             </div>
-            <div className="rounded-2xl bg-surface-2 px-3 py-2">방문자 수는 로그 연결 후 표시</div>
+            <div className="rounded-2xl bg-surface-2 px-3 py-2">
+              {summary.mission
+                ? summary.mission.achieved
+                  ? summary.mission.reward > 0
+                    ? "🎯 미션 달성 — 아래에서 구매자 전원 지급"
+                    : "🎯 미션 달성 — 선물 명단은 이벤트 › 미션 탭"
+                  : `🎯 미션 미달성 (${summary.mission.pct}%) — 지급 없음`
+                : "미션 없음"}
+            </div>
           </div>
         </div>
 
@@ -136,6 +161,35 @@ export default function LiveBroadcastEndSummaryModal({ summary, onClose, onOpenS
           <StatCard label="기존회원" value={count(summary.existingMemberCount, "명")} sub={summary.memberBasisText} tone="green" />
           <StatCard label="신규회원" value={count(summary.newMemberCount, "명")} sub={summary.memberBasisText} tone="blue" />
         </div>
+
+        {summary.mission ? (
+          <div className={`mt-4 rounded-3xl border px-4 py-4 ${summary.mission.achieved ? "border-ok-tx/40 bg-ok-bg" : "border-line bg-surface-2"}`}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-black text-ink-mute">🎯 미션 게이지</div>
+                <div className="mt-1 text-base font-black text-ink">
+                  {summary.mission.title || "오늘의 미션"} ·{" "}
+                  <span className={summary.mission.achieved ? "text-ok-tx" : "text-rose-deep"}>{summary.mission.achieved ? "달성!" : "미달성"}</span>
+                </div>
+                <div className="mt-1 text-xs font-bold text-ink-soft">
+                  {Number(summary.mission.current).toLocaleString("ko-KR")}
+                  {summary.mission.goalType === "amount" ? "원" : "개"} / 목표 {Number(summary.mission.goal).toLocaleString("ko-KR")}
+                  {summary.mission.goalType === "amount" ? "원" : "개"} ({summary.mission.pct}%)
+                  {!summary.mission.ended ? " · ⚠ 미션 종료 처리가 안 됐어요 — 이벤트 › 미션 탭에서 종료해 주세요" : ""}
+                </div>
+              </div>
+              {summary.mission.achieved ? (
+                summary.mission.reward > 0 ? (
+                  <MissionPayoutButton reward={summary.mission.reward} />
+                ) : (
+                  <div className="text-xs font-bold text-ink-soft">포인트 보상 없음 · 선물 줄 명단은 이벤트 › 미션 탭</div>
+                )
+              ) : (
+                <div className="text-xs font-bold text-ink-mute">목표에 못 미쳐 지급하지 않습니다</div>
+              )}
+            </div>
+          </div>
+        ) : null}
 
         <div className="mt-4 rounded-3xl border border-line bg-surface-2 px-4 py-3 text-xs font-bold leading-5 text-ink-soft">
           이번 방송 사이트 방문자: <span className="text-ink">{summary.visitorText}</span>

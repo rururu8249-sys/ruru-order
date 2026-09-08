@@ -33,7 +33,10 @@ import LiveStatsPanel from "./LiveStatsPanel";
 import BroadcastReportPopup from "./BroadcastReportPopup";
 import SystemAuditCard from "./SystemAuditCard";
 import LiveIssueRailPanel from "./LiveIssueRailPanel";
-import LiveBroadcastEndSummaryModal, { type LiveBroadcastEndSummary } from "./LiveBroadcastEndSummaryModal";
+import LiveBroadcastEndSummaryModal, { type LiveBroadcastEndMission, type LiveBroadcastEndSummary } from "./LiveBroadcastEndSummaryModal";
+// [2026-09-08 4단계-B] 방송 시작 확인창(미션 설정 포함) + 콘솔 미션 게이지
+import LiveBroadcastStartModal, { type BroadcastStartConfirmInput } from "./LiveBroadcastStartModal";
+import LiveMissionGauge from "./LiveMissionGauge";
 import LiveOrderTable, { type LiveOrderFilters } from "./LiveOrderTable";
 import LiveOrderDetailDrawer from "./LiveOrderDetailDrawer";
 import LiveFloatingMatchPanel from "./LiveFloatingMatchPanel";
@@ -641,6 +644,8 @@ export default function AdminLiveDashboard() {
     typeof window !== "undefined" && !!window.sessionStorage.getItem(LIVE_ORDERS_FILTERS_KEY)
   );
   const [broadcastEndSummary, setBroadcastEndSummary] = useState<LiveBroadcastEndSummary | null>(null);
+  // [2026-09-08] 방송 시작 확인창 — 헤더의 제목·URL 을 받아 두었다가 확인 시 시작한다
+  const [broadcastStartDraft, setBroadcastStartDraft] = useState<{ title: string; youtubeUrl?: string } | null>(null);
 
   const [quickCustomerProfiles, setQuickCustomerProfiles] = useState<any[]>([]);
 
@@ -1242,17 +1247,27 @@ export default function AdminLiveDashboard() {
     await loadDepositsFromServer();
   };
 
+  // [2026-09-08 4단계-B] 방송시작 = 확인창(LiveBroadcastStartModal)에서 미션까지 정하고 시작.
+  //   ① 방송 ON(기존 로직 그대로) → ② 미션: 켜기면 "끄기 → 켜기" 두 번 저장해 시작시각·앵커를 이번 방송으로 새로 잡는다
+  //   (지난 방송 미션이 켜진 채 남아 있으면 ON→ON 이라 시작시각이 안 바뀌어 옛 주문까지 세는 문제 방지).
+  //   미션 저장 실패는 방송 시작을 막지 않는다(토스트로 안내).
   const startBroadcast = async (input: { title: string; youtubeUrl?: string }) => {
-    const ok = await showAdminConfirm(
-      [
-        "방송을 시작할까요?",
-        "",
-        "기존 ON 방송이 있으면 종료 처리되고, 새 방송이 ON으로 생성됩니다.",
-        "주문 필터는 방송 시작시간 기준으로 묶입니다.",
-      ].join("\n")
-    );
+    setBroadcastStartDraft(input);
+  };
 
-    if (!ok) return;
+  const saveMissionSettings = async (body: Record<string, unknown>) => {
+    const res = await fetch("/api/admin-live/mission", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const j = (await res.json().catch(() => null)) as { ok?: boolean; message?: string } | null;
+    if (!res.ok || !j?.ok) throw new Error(j?.message || `HTTP ${res.status}`);
+  };
+
+  const confirmStartBroadcast = async (confirmInput: BroadcastStartConfirmInput) => {
+    const input = broadcastStartDraft;
+    if (!input) return;
 
     setSavingBroadcast(true);
 
@@ -1272,6 +1287,28 @@ export default function AdminLiveDashboard() {
       } else {
         await startAdminLiveBroadcast(input);
       }
+      setBroadcastStartDraft(null);
+
+      // 미션 — 방송이 ON 이 된 다음에 저장해야 앵커가 이번 방송으로 잡힌다
+      const mission = confirmInput.mission;
+      try {
+        if (mission) {
+          const base = { goalType: mission.goalType, goalValue: mission.goalValue, rewardAmount: mission.rewardAmount, title: mission.title };
+          await saveMissionSettings({ ...base, active: false });
+          await saveMissionSettings({ ...base, active: true });
+          showAdminToast(`미션 게이지 켜짐 · 목표 ${mission.goalValue.toLocaleString("ko-KR")}${mission.goalType === "amount" ? "원" : "개"}`, "success");
+        } else {
+          // 이번 방송은 미션 없음 — 지난 방송 미션이 켜진 채 남아 있으면 끈다(위젯·게이지가 엉뚱하게 뜨지 않게)
+          const res = await fetch("/api/admin-live/mission", { cache: "no-store" });
+          const j = (await res.json().catch(() => null)) as { ok?: boolean; active?: boolean; goalType?: string; goal?: number; reward?: number; title?: string } | null;
+          if (j?.ok && j.active) {
+            await saveMissionSettings({ active: false, goalType: j.goalType, goalValue: j.goal, rewardAmount: j.reward, title: j.title });
+          }
+        }
+      } catch (error) {
+        showAdminToast("방송은 시작됐지만 미션 설정 저장에 실패했어요. 이벤트 › 미션 탭에서 직접 켜 주세요.\n\n" + (error instanceof Error ? error.message : String(error)), "warning");
+      }
+
       await loadBroadcasts();
       await loadOrders();
       setFilters((prev) => ({ ...prev, broadcast: "current" }));
@@ -1332,7 +1369,42 @@ export default function AdminLiveDashboard() {
     setSavingBroadcast(true);
 
     try {
+      // [2026-09-08 4단계-B] 미션 결과는 방송이 아직 ON 일 때 읽어야 한다(진행률은 ON 방송 기준으로만 계산됨)
+      let missionSnap: { goalType: "count" | "amount"; goal: number; reward: number; title: string; current: number; pct: number } | null = null;
+      try {
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), 6000);
+        const res = await fetch("/api/admin-live/mission", { cache: "no-store", signal: controller.signal });
+        window.clearTimeout(timer);
+        const j = (await res.json().catch(() => null)) as { ok?: boolean; active?: boolean; goalType?: string; goal?: number; reward?: number; title?: string; current?: number; pct?: number } | null;
+        if (j?.ok && j.active && Number(j.goal || 0) > 0) {
+          missionSnap = {
+            goalType: j.goalType === "amount" ? "amount" : "count",
+            goal: Number(j.goal || 0),
+            reward: Number(j.reward || 0),
+            title: String(j.title || ""),
+            current: Number(j.current || 0),
+            pct: Number(j.pct || 0),
+          };
+        }
+      } catch {
+        /* 미션 조회 실패 — 요약에 미션 없음으로 표시 */
+      }
+
       await endAdminLiveBroadcast(activeBroadcast.id);
+
+      // 미션도 함께 종료(mission_active=false → 위젯 숨김, 구간 끝 고정). 실패해도 방송 종료엔 영향 없음
+      if (missionSnap) {
+        let ended = false;
+        try {
+          await saveMissionSettings({ active: false, goalType: missionSnap.goalType, goalValue: missionSnap.goal, rewardAmount: missionSnap.reward, title: missionSnap.title });
+          ended = true;
+        } catch {
+          ended = false;
+        }
+        const mission: LiveBroadcastEndMission = { ...missionSnap, achieved: missionSnap.pct >= 100, ended };
+        summary.mission = mission;
+      }
 
       // [2026-09-07] 방문자 수 — 접속 기록(visitor_visits)에서 이 방송 방문자만 읽어 표시(읽기 전용, 실패해도 종료엔 영향 없음)
       try {
@@ -1588,6 +1660,15 @@ export default function AdminLiveDashboard() {
 
                 <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
 
+                {/* [2026-09-08] 미션 게이지 — 방송 중 + 미션 켜짐일 때만 보임(읽기 전용) */}
+                <LiveMissionGauge
+                  broadcastOn={Boolean(activeBroadcast)}
+                  onOpenMission={() => {
+                    setActiveMenu("event");
+                    replacePanelInUrl("event");
+                  }}
+                />
+
                 {/* 주문 영역 서브탭: 각 탭은 기존 팝업/드로어 트리거에 연결 */}
                 <div className="mt-2 flex items-center gap-1.5 border-b border-rose-line">
                   {[
@@ -1817,6 +1898,14 @@ export default function AdminLiveDashboard() {
 
           {/* [2026-07-24] 방송 판매 리포트 — 라이브 현황 "더보기" (읽기 전용) */}
           <BroadcastReportPopup open={reportOpen} onClose={() => setReportOpen(false)} initialBroadcastId={activeBroadcast?.id || null} />
+
+          <LiveBroadcastStartModal
+            open={Boolean(broadcastStartDraft)}
+            broadcastTitle={broadcastStartDraft?.title || broadcastTitle}
+            saving={savingBroadcast}
+            onCancel={() => setBroadcastStartDraft(null)}
+            onConfirm={confirmStartBroadcast}
+          />
 
           {broadcastEndSummary ? (
             <LiveBroadcastEndSummaryModal

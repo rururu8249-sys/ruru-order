@@ -1,8 +1,9 @@
 "use client";
 
-// 미션 게이지(공동목표) 관리자 패널 — 1단계: 목표/보상 설정 + 진행률 조회 + OBS 위젯주소.
+// 미션 게이지(공동목표) 관리자 패널 — 목표/보상 설정 + 진행률 + 구매자 전원 지급 + 선물 명단 + 지급 기록 + OBS 위젯주소.
 //   - 설정은 /api/admin-live/mission(POST), 진행률은 GET. settings 키만 다룸.
-//   - "구매자 전원 지급"(돈)은 2단계라 여기엔 없음(읽기/설정 전용).
+//   - [2026-09-08 4단계-B] 평소 흐름은 방송 시작 확인창(미션 켜기) → 콘솔 게이지 → 방송 종료 요약(지급 버튼).
+//     이 화면은 방송 중 켜기·수정, 선물 명단, 기록, 위젯 주소용으로 남긴다.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useBulkPointGrant } from "./useBulkPointGrant";
 import { showAdminConfirm } from "@/lib/adminConfirm";
@@ -290,7 +291,8 @@ export default function AdminLiveMissionPanel() {
     <div style={{ maxWidth: 720, margin: "0 auto", padding: "4px 2px" }}>
       <div style={{ fontSize: 18, fontWeight: 800, color: "var(--color-rose-deep)", marginBottom: 4 }}>◆ 미션 게이지 (공동목표)</div>
       <div style={{ fontSize: 13, color: "var(--color-ink-soft)", marginBottom: 16 }}>
-        방송 중 목표(누적 판매/매출)를 정하면 OBS 위젯에 진행 막대가 뜹니다. “구매자 전원 지급”은 다음 단계에서 추가돼요.
+        방송 시작 확인창에서 미션을 켜면 여기 안 와도 됩니다 — 콘솔에 게이지가 뜨고, 방송 종료 요약창에 달성 여부와 지급 버튼이 나와요.
+        이 화면은 <b>방송 중에 켜기·고치기</b>, <b>선물 줄 명단</b>, <b>지급 기록</b>, <b>위젯 주소</b>용입니다.
       </div>
 
       {/* 진행률 — 미션 켜진(진행 중) 동안만 표시. 종료되면 막대 숨기고 아래 "지급 내역"만 남김.
