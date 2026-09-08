@@ -1435,10 +1435,10 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             );
           }
           return (
-            <div className="mt-2 space-y-2 rounded-xl border border-rose-300 bg-rose-50 px-3 py-2.5 leading-5">
-              <div className="text-[13px] font-black text-rose-900">⚠️ 받은 돈이 {money(-diff)} 부족해요.</div>
-              <div className="text-[11px] font-bold text-rose-700">주문 금액 {money(balanceOrderTotal)} − 받은 돈 {money(balanceInfo.depositSum)} = {money(-diff)}</div>
-              <button type="button" disabled={balanceWorking} onClick={() => void handleRequestShortageDeposit(-diff)} className="w-full rounded-lg bg-rose-500 px-3 py-2 text-[13px] font-black text-white hover:bg-rose-600 disabled:opacity-50">
+            <div className="mt-2 space-y-2 rounded-xl border border-danger-tx/35 bg-danger-bg px-3 py-2.5 leading-5">
+              <div className="text-[13px] font-black text-danger-tx">⚠️ 받은 돈이 {money(-diff)} 부족해요.</div>
+              <div className="text-[11px] font-bold text-danger-tx">주문 금액 {money(balanceOrderTotal)} − 받은 돈 {money(balanceInfo.depositSum)} = {money(-diff)}</div>
+              <button type="button" disabled={balanceWorking} onClick={() => void handleRequestShortageDeposit(-diff)} className="w-full rounded-lg bg-[var(--color-danger-tx)] px-3 py-2 text-[13px] font-black text-white hover:bg-[var(--color-danger-tx)] disabled:opacity-50">
                 {balanceWorking ? "처리 중…" : `🔔 ${money(-diff)} 더 입금해달라고 쪽지 보내기`}
               </button>
             </div>

@@ -348,12 +348,15 @@ function IssueCard({
   onEdit,
   onResolve,
   onHide,
+  busy = false,
 }: {
   task: AdminIssueTask;
   index: number;
   onEdit: (task: AdminIssueTask) => void;
   onResolve: (task: AdminIssueTask) => void | Promise<void>;
   onHide: (task: AdminIssueTask) => void | Promise<void>;
+  /** [2026-09-08] 처리 중 재클릭 방지 — 없으면 중복 요청이 나간다 */
+  busy?: boolean;
 }) {
   const done = isResolved(task);
   const rows = issueRows(task);
@@ -412,18 +415,20 @@ function IssueCard({
             <button
               type="button"
               onClick={() => onHide(task)}
-              className="rounded-xl border border-danger-tx bg-danger-bg px-3 py-2 text-[11px] font-black text-danger-tx hover:opacity-90"
+              disabled={busy}
+              className="rounded-xl border border-danger-tx bg-danger-bg px-3 py-2 text-[11px] font-black text-danger-tx hover:opacity-90 disabled:opacity-45"
               title="DB 완전삭제가 아니라 해결목록 숨김 처리"
             >
-              목록삭제
+              {busy ? "처리중…" : "목록삭제"}
             </button>
           ) : (
             <button
               type="button"
               onClick={() => onResolve(task)}
-              className="rounded-xl border border-line bg-ok-bg px-3 py-2 text-[11px] font-black text-ok-tx hover:opacity-90"
+              disabled={busy}
+              className="rounded-xl border border-line bg-ok-bg px-3 py-2 text-[11px] font-black text-ok-tx hover:opacity-90 disabled:opacity-45"
             >
-              해결완료
+              {busy ? "처리중…" : "해결완료"}
             </button>
           )}
         </div>
@@ -838,6 +843,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               onEdit={openEdit}
               onResolve={resolveIssueTask}
               onHide={hideResolvedIssueTask}
+              busy={saving}
             />
           ))
         )}

@@ -14,6 +14,8 @@ export default function TelegramNotifyCard() {
   const [chatIdSet, setChatIdSet] = useState(false);
   const [recipientCount, setRecipientCount] = useState(0);
   const [saving, setSaving] = useState(false);
+  // 서버에 «저장된» 토글 값 (화면 값과 달라지면 「아직 저장 안 됨」 표시)
+  const [savedToggles, setSavedToggles] = useState<{ enabled: boolean; reportOnEnd: boolean } | null>(null);
   const [testing, setTesting] = useState(false);
 
   const loadStatus = async () => {
@@ -26,6 +28,8 @@ export default function TelegramNotifyCard() {
         setChatIdSet(!!j.chatIdSet);
         setRecipientCount(Number(j.recipientCount || 0));
         setReportOnEnd(j.reportOnEnd !== false);
+        // 저장된 값 기억 — 체크박스를 바꿨는데 저장 안 한 상태를 화면에 알려주기 위해
+        setSavedToggles({ enabled: j.enabled !== false, reportOnEnd: j.reportOnEnd !== false });
       }
     } catch {
       /* ignore */
@@ -34,6 +38,8 @@ export default function TelegramNotifyCard() {
   useEffect(() => {
     loadStatus();
   }, []);
+
+  const toggleDirty = savedToggles !== null && (enabled !== savedToggles.enabled || reportOnEnd !== savedToggles.reportOnEnd);
 
   const save = async () => {
     setSaving(true);
@@ -194,7 +200,21 @@ export default function TelegramNotifyCard() {
           <input type="checkbox" checked={reportOnEnd} onChange={(e) => setReportOnEnd(e.target.checked)} className="h-4 w-4 accent-rose-deep" />
           방송 종료하면 결산 자동 발송
         </label>
-        <span className="text-[11px] font-bold text-ink-mute">(바꾼 뒤 위 「저장」)</span>
+        {toggleDirty ? (
+          <span className="flex items-center gap-2 rounded-lg border border-warn-tx/35 bg-warn-bg px-2.5 py-1.5">
+            <span className="text-[12px] font-black text-warn-tx">아직 저장 안 됨</span>
+            <button
+              type="button"
+              onClick={() => void save()}
+              disabled={saving}
+              className="ru-btn ru-btn-sm ru-btn-primary"
+            >
+              {saving ? "저장 중…" : "지금 저장"}
+            </button>
+          </span>
+        ) : (
+          <span className="text-[11px] font-bold text-ink-mute">바꾸면 여기에 「지금 저장」 버튼이 나옵니다.</span>
+        )}
       </div>
 
       <div className="flex items-center gap-2">

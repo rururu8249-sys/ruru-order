@@ -56,6 +56,7 @@ export default function SettlementManualEntryDetailModal({
   onClose,
   onEdit,
   onDelete,
+  deleting = false,
 }: {
   entry: SettlementManualEntry;
   logs: SettlementManualEntryLog[];
@@ -63,6 +64,8 @@ export default function SettlementManualEntryDetailModal({
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  /** [2026-09-08] 저장 중 재클릭 방지 — 없으면 삭제 이력이 중복 기록된다 */
+  deleting?: boolean;
 }) {
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[var(--color-ink-soft)]/40 px-4 backdrop-blur-[2px]">
@@ -164,9 +167,10 @@ export default function SettlementManualEntryDetailModal({
           <button
             type="button"
             onClick={onDelete}
-            className="rounded-2xl border border-rose-200 bg-surface px-5 py-3 text-sm font-black text-rose-600 shadow-sm hover:bg-rose-50"
+            disabled={deleting}
+            className="ru-btn ru-btn-danger ru-btn-lg"
           >
-            삭제
+            {deleting ? "삭제 처리중…" : "삭제"}
           </button>
           <button
             type="button"

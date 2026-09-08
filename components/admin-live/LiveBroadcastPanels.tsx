@@ -76,7 +76,7 @@ const ISSUE_TYPES = [
   { label: "반품", taskType: "return", className: "bg-[var(--color-cardpay)]/12 text-[var(--color-cardpay)] border-[var(--color-cardpay)]/30" },
   { label: "환불", taskType: "refund", className: "bg-danger-bg text-danger-tx border-line" },
   { label: "구매", taskType: "product", className: "bg-ok-bg text-ok-tx border-ok-tx/35" },
-  { label: "진상", taskType: "complaint", className: "bg-rose-100 text-rose-700 border-rose-200" },
+  { label: "진상", taskType: "complaint", className: "bg-danger-bg text-danger-tx border-danger-tx/35" },
   { label: "기타", taskType: "general", className: "bg-surface-2 text-ink border-line" },
 ];
 

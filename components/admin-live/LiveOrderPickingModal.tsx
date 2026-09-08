@@ -189,6 +189,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
       await writePicked(ids, makePicked);
     } catch (e: any) {
       showAdminToast("일괄 체크 실패\n\n" + (e?.message || e), "error");
+      await resyncPickedFromServer(ids);   // 화면을 DB 실제값으로 되돌린다
     }
   };
 
@@ -207,6 +208,36 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
     })();
     return () => { alive = false; };
   }, [panels]);
+
+  // [2026-09-08 전수감사] 일괄 체크가 저장에 실패해도 화면은 「챙김」으로 남아 있었다.
+  //   → 화면은 챙겼다는데 DB(orders.picked_at)는 안 챙겨진 상태 = «누락 배송» 위험.
+  //   단순히 되돌리면 안 된다: writePicked 는 500개씩 나눠 쓰므로 «앞부분만 저장»된
+  //   부분 성공이 가능하다. 그래서 실패하면 해당 주문들의 picked_at 을 «DB에서 다시 읽어»
+  //   화면을 DB와 정확히 맞춘다. (원래 주석 「롤백 위해 재조회」가 의도했던 것)
+  //   ※ 읽기 전용 조회다. 주문·금액·입금엔 손대지 않는다.
+  const resyncPickedFromServer = async (ids: string[]) => {
+    const nums = ids.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0);
+    if (nums.length === 0) return;
+    try {
+      const truth = new Map<string, boolean>();
+      for (let i = 0; i < nums.length; i += 500) {
+        const { data, error } = await supabase
+          .from("orders")
+          .select("id, picked_at")
+          .in("id", nums.slice(i, i + 500));
+        if (error) throw error;
+        (data || []).forEach((r: any) => truth.set(String(r.id), Boolean(r.picked_at)));
+      }
+      setPickedIds((prev) => {
+        const n = new Set(prev);
+        truth.forEach((isPicked, id) => (isPicked ? n.add(id) : n.delete(id)));
+        return n;
+      });
+    } catch {
+      // 재조회까지 실패하면 화면을 건드리지 않는다(잘못된 상태로 덮어쓰는 게 더 위험).
+      showAdminToast("지금 화면의 챙김 표시가 실제와 다를 수 있어요.\n\n창을 닫았다 다시 열어 확인해주세요.", "error");
+    }
+  };
 
   const writePicked = async (ids: string[], makePicked: boolean) => {
     const nums = ids.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0);
@@ -237,8 +268,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
     try {
       await writePicked(ids, makePicked);
     } catch (e: any) {
-      // 롤백 위해 재조회
       showAdminToast("패널 일괄 체크 실패\n\n" + (e?.message || e), "error");
+      await resyncPickedFromServer(ids);   // 주석만 있고 없던 재조회 — 실제로 실행한다
     }
   };
 
@@ -252,6 +283,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
       showAdminToast("챙김 표시를 초기화했습니다.", "success");
     } catch (e: any) {
       showAdminToast("초기화 실패\n\n" + (e?.message || e), "error");
+      // 여기도 500개씩 나눠 쓰므로 «일부만 해제»될 수 있다 → DB 실제값으로 화면을 맞춘다
+      await resyncPickedFromServer(scopedPanels.flatMap((p) => p.items.map((it) => it.id)));
     } finally {
       setResetting(false);
     }

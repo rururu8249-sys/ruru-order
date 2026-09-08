@@ -55,8 +55,23 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
       return;
     }
 
-    // [2026-09-08] 차단해제만 확인창(차단은 사유 입력이 확인 역할)
-    if (!blocked) {
+    // [2026-09-08 전수감사 수정] 예전엔 «차단해제만» 확인창이었다(차단은 사유 입력이 확인 역할이라고 봤다).
+    //   그런데 차단은 번호를 «직접 타이핑»해서 넣는다 → 한 자리만 틀려도 엉뚱한 손님이 즉시
+    //   주문서를 못 쓰게 되고, 그 손님은 아무 안내도 못 받는다. 사유 입력은 오타를 못 막는다.
+    //   → 차단도 «번호를 다시 보여주는» 확인창을 거친다.
+    if (blocked) {
+      const ok = await showAdminConfirm(
+        [
+          `${formatPhone(phoneDigits)} 번호를 차단할까요?`,
+          "",
+          "· 이 번호로는 주문서를 쓸 수 없게 됩니다.",
+          "· 손님에게는 따로 안내가 가지 않습니다.",
+          "· 번호가 맞는지 한 번만 더 봐주세요.",
+        ].join("\n"),
+        { title: "전화번호 차단", confirmText: "차단", cancelText: "취소", tone: "danger" },
+      );
+      if (!ok) return;
+    } else {
       const ok = await showAdminConfirm(
         `${formatPhone(phoneDigits)} 번호의 차단을 해제합니다.\n해제 즉시 이 번호로 주문서 작성이 다시 가능해집니다.`,
         { title: "차단 해제", confirmText: "차단 해제", cancelText: "취소", tone: "warning" },

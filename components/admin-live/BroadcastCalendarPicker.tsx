@@ -112,7 +112,7 @@ export default function BroadcastCalendarPicker({ items, value, onPick, allLabel
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-11 w-full items-center justify-between rounded-xl border border-line bg-surface px-3 text-[12px] font-black text-ink outline-none transition hover:border-rose-300 active:scale-[0.98] duration-75"
+        className="flex h-11 w-full items-center justify-between rounded-xl border border-line bg-surface px-3 text-[12px] font-black text-ink outline-none transition hover:border-danger-tx/35 active:scale-[0.98] duration-75"
       >
         <span className="flex items-center gap-1 truncate">
           <span style={{ color: ROSE }}>📅</span>

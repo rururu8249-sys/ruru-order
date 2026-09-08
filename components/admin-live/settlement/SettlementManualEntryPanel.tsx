@@ -533,7 +533,8 @@ export default function SettlementManualEntryPanel({
                         <button
                           type="button"
                           onClick={() => deactivateEntry(entry)}
-                          className="rounded-lg border border-danger-tx/40 px-2.5 py-1.5 text-xs font-black text-danger-tx transition hover:bg-danger-bg"
+                          disabled={saving}
+                          className="ru-btn ru-btn-sm ru-btn-danger"
                         >
                           삭제
                         </button>
@@ -618,6 +619,7 @@ export default function SettlementManualEntryPanel({
             closeDetail();
           }}
           onDelete={() => deactivateEntry(detailEntry)}
+          deleting={saving}
         />
       ) : null}
     </div>

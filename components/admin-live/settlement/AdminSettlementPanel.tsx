@@ -313,7 +313,9 @@ export default function AdminSettlementPanel({
       ["조회기간", reportPeriod],
       ["조회 기준", effectivePeriod.label],
       ["생성일시", formatKoreanDateTime()],
-      ["결제수단 조건", paymentFilter],
+      // [2026-09-08 전수감사] 확정 용어(무통장 / 카드)로 내보낸다.
+      //   화면 select 는 이미 바꿔 보여주는데 CSV만 내부 원시값(무통장입금/카드결제)이 나가고 있었다.
+      ["결제수단 조건", ({ 전체: "전체", 무통장입금: "무통장", 카드결제: "카드", 기타: "기타(미지정)" } as Record<string, string>)[paymentFilter] ?? paymentFilter],
       ["방송리스트 조건", selectedBroadcastLabel],
       ["작성 기준", "/admin-live 정산통계 기준"],
       ["주의", "세무 제출 전 실제 입금내역·카드정산·창고정산 자료와 최종 대조하세요."],

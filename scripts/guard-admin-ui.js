@@ -45,7 +45,10 @@ const allowed = (file, text) =>
   ALLOW.some((a) => file.endsWith(a.file) && text.includes(a.match));
 
 // ── 규칙 1. 원색 팔레트 금지 (다크모드에서 배경에 묻히거나 형광처럼 튄다) ──
-const PALETTE = /\b(?:bg|text|border|ring|from|to|via)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink)-\d{2,3}\b/;
+// rose 도 포함한다 — Tailwind 원색은 rose-50/200/600 처럼 «숫자»가 붙고,
+// 우리 브랜드 토큰은 rose-deep/rose-soft/rose-line 이라 서로 겹치지 않는다.
+// (처음엔 겹칠까 봐 rose 를 통째로 뺐는데, 그 바람에 정산 상세 모달의 rose-200/600 을 못 잡았다)
+const PALETTE = /\b(?:bg|text|border|ring|from|to|via)-(?:slate|gray|zinc|neutral|stone|red|rose|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink)-\d{2,3}\b/;
 
 // ── 규칙 2. 화면급 고정 높이 금지 (부모가 준 높이를 채워야 한다) ──
 //    «화면»만 본다. 아래는 정상이므로 제외한다:

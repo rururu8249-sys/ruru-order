@@ -321,7 +321,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
               <div className="mt-1.5 flex flex-col gap-1">
                 {unsubmitted.map((u) => (
                   <div key={u.name} className="text-[12px] font-bold text-warn-tx">
-                    <b>{u.name}</b>님 — {u.items.join(" · ")} {u.claimed ? <span className="text-ok-tx">(담아감 · 제출만 남음)</span> : <span className="text-rose-600">(아직 안 담아감)</span>}
+                    <b>{u.name}</b>님 — {u.items.join(" · ")} {u.claimed ? <span className="text-ok-tx">(담아감 · 제출만 남음)</span> : <span className="text-danger-tx">(아직 안 담아감)</span>}
                   </div>
                 ))}
               </div>
@@ -380,7 +380,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
           <div className="mb-2 flex items-center gap-2 text-[11px] font-black text-ink-soft">
             <span>🎯 「지금 이거」</span>
             {current ? (
-              <span className="rounded-lg bg-rose-100 px-2 py-0.5 text-rose-800">{current.productName || current.productId}</span>
+              <span className="rounded-lg bg-danger-bg px-2 py-0.5 text-danger-tx">{current.productName || current.productId}</span>
             ) : (
               <span className="text-ink-mute">해제됨 — 상품을 말하지 않은 「저요」는 접수되지 않습니다</span>
             )}
@@ -400,7 +400,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
               return (
                 <button
                   key={p.id} type="button" onClick={() => void pickCurrent(p)} disabled={busy === "current"}
-                  className={`rounded-lg border px-2.5 py-1 text-[11px] font-black disabled:opacity-50 ${on ? "border-rose-400 bg-rose-100 text-rose-800" : "border-line bg-surface text-ink-soft hover:bg-surface-2"}`}
+                  className={`rounded-lg border px-2.5 py-1 text-[11px] font-black disabled:opacity-50 ${on ? "border-danger-tx bg-danger-bg text-danger-tx" : "border-line bg-surface text-ink-soft hover:bg-surface-2"}`}
                   title={p.variants && p.variants.length > 0 ? `세부상품 ${p.variants.length}종` : undefined}
                 >
                   {p.name}{p.variants && p.variants.length > 0 ? ` (${p.variants.length}종)` : ""}

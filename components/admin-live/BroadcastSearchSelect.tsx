@@ -56,7 +56,7 @@ export default function BroadcastSearchSelect({ options, value, onChange, todayA
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-11 w-full items-center justify-between rounded-xl border border-line bg-surface px-3 text-[12px] font-black text-ink outline-none transition hover:border-rose-300 active:scale-[0.98] active:bg-surface-2 duration-75"
+        className="flex h-11 w-full items-center justify-between rounded-xl border border-line bg-surface px-3 text-[12px] font-black text-ink outline-none transition hover:border-danger-tx/35 active:scale-[0.98] active:bg-surface-2 duration-75"
       >
         <span className="truncate">{currentLabel}</span>
         <span style={{ marginLeft: 6, color: "var(--color-ink-mute)", fontSize: 10, flexShrink: 0 }}>{open ? "▲" : "▼"}</span>
