@@ -9,6 +9,8 @@ import {
   calculateRouletteSpinDurationMs,
   normalizeEventRouletteMode,
   normalizeTicketRule,
+  autoTicketThresholds,
+  calculateAutoTicketCount,
   pickRouletteWinner,
   type EventRouletteMode,
   type RouletteTicketRule,
@@ -183,6 +185,8 @@ function sanitizeParticipantForAdmin(participant: EventRouletteParticipant) {
     // [2026-09-08] 응모권 근거(결제완료 금액) + 장수. weight 는 예전 클라이언트 호환(= tickets)
     paid_amount_sum: Number(participant.paidAmountSum || 0),
     tickets: participant.weight,
+    // [2026-09-09] 자동 응모권 근거 — 과거 구매일 수(단골). 화면에 「단골 N회」로 보여준다
+    visit_count: Number(participant.visitCount || 0),
     order_ids: participant.orderIds,
     weight: participant.weight,
   };
@@ -299,6 +303,9 @@ async function fetchOrderRowsForBroadcast(supabase: SupabaseAdminClient, broadca
         "admin_order_status_v2",
         "order_manage_status",
         "is_test_order",
+        // [2026-09-09] 자동 응모권 «단골» 판정용 — 사람 구분은 카카오ID 우선, 없으면 전화(8/31 확정 원칙)
+        "kakao_id",
+        "customer_phone",
       ].join(", ")
     )
     .gte("created_at", start)
@@ -331,6 +338,9 @@ async function fetchOrderRowsForDate(supabase: SupabaseAdminClient, sourceDate: 
         "admin_order_status_v2",
         "order_manage_status",
         "is_test_order",
+        // [2026-09-09] 자동 응모권 «단골» 판정용 — 사람 구분은 카카오ID 우선, 없으면 전화(8/31 확정 원칙)
+        "kakao_id",
+        "customer_phone",
       ].join(", ")
     )
     .gte("created_at", range.start)
@@ -365,6 +375,9 @@ async function fetchOrderRowsByGroupIds(supabase: SupabaseAdminClient, groupIds:
     "admin_order_status_v2",
     "order_manage_status",
     "is_test_order",
+    // [2026-09-09] 자동 응모권 «단골» 판정용 — 사람 구분은 카카오ID 우선, 없으면 전화(8/31 확정 원칙)
+    "kakao_id",
+    "customer_phone",
   ].join(", ");
 
   // ⚠️ 클라 어댑터는 주문을 order_group_id || order_lookup_code || id 로 묶는다(getGroupId).
@@ -404,6 +417,87 @@ function isPaidOrderRowForRoulette(row: EventRouletteOrderLike): boolean {
   return ROULETTE_PAID_STATUSES.has(a) || ROULETTE_PAID_STATUSES.has(b);
 }
 
+// ═══ [2026-09-09] 자동 응모권 — 「자주 오는 손님」을 알아내는 부분 ═══
+//   기준은 단골리포트(repurchase-stats)와 «같다»: 사람 = 카카오ID 우선·없으면 전화,
+//   구매 횟수 = 서로 다른 «구매일» 수(같은 날 여러 건은 1회), 입금된 주문만.
+//   ⚠ 읽기 전용이다. 아무것도 쓰지 않는다.
+type PersonKeyRow = { youtube_nickname?: unknown; kakao_id?: unknown; customer_phone?: unknown };
+const onlyDigits = (v: unknown) => String(v ?? "").replace(/[^0-9]/g, "");
+
+async function fetchVisitCountByNickname(
+  supabase: SupabaseAdminClient,
+  todayRows: EventRouletteOrderLike[]
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+
+  // 오늘 명단에 등장한 사람들의 «키»를 모은다 (닉네임 ↔ 카카오ID/전화)
+  const kakaoByNick = new Map<string, Set<string>>();
+  const phoneByNick = new Map<string, Set<string>>();
+  const kakaoIds = new Set<string>();
+  const phones = new Set<string>();
+  for (const raw of todayRows) {
+    const row = raw as PersonKeyRow;
+    const nick = cleanText(row.youtube_nickname);
+    if (!nick) continue;
+    const kakao = cleanText(row.kakao_id);
+    const phone = onlyDigits(row.customer_phone);
+    if (kakao) {
+      if (!kakaoByNick.has(nick)) kakaoByNick.set(nick, new Set());
+      kakaoByNick.get(nick)!.add(kakao);
+      kakaoIds.add(kakao);
+    }
+    if (phone) {
+      if (!phoneByNick.has(nick)) phoneByNick.set(nick, new Set());
+      phoneByNick.get(nick)!.add(phone);
+      phones.add(phone);
+    }
+  }
+  if (kakaoIds.size === 0 && phones.size === 0) return result;
+
+  const cols = "created_at, kakao_id, customer_phone, admin_order_status_v2, order_manage_status, is_test_order";
+  const runQuery = async (column: "kakao_id" | "customer_phone", values: string[]): Promise<unknown[]> => {
+    const { data } = await supabase.from("orders").select(cols).in(column, values).limit(5000);
+    return (Array.isArray(data) ? data : []) as unknown[];
+  };
+  const jobs: Promise<unknown[]>[] = [];
+  if (kakaoIds.size > 0) jobs.push(runQuery("kakao_id", Array.from(kakaoIds)));
+  if (phones.size > 0) jobs.push(runQuery("customer_phone", Array.from(phones)));
+  const settled = await Promise.all(jobs);
+
+  // 사람(카카오ID 또는 전화)별 «구매일» 모음
+  const daysByKakao = new Map<string, Set<string>>();
+  const daysByPhone = new Map<string, Set<string>>();
+  for (const part of settled) {
+    for (const raw of part) {
+      const row = raw as EventRouletteOrderLike & PersonKeyRow;
+      if (!isPaidOrderRowForRoulette(row)) continue; // 입금된 주문만 (미입금·취소는 안 센다)
+      const created = String((row as { created_at?: unknown }).created_at || "");
+      const day = created.slice(0, 10);
+      if (!day) continue;
+      const kakao = cleanText(row.kakao_id);
+      const phone = onlyDigits(row.customer_phone);
+      if (kakao) {
+        if (!daysByKakao.has(kakao)) daysByKakao.set(kakao, new Set());
+        daysByKakao.get(kakao)!.add(day);
+      }
+      if (phone) {
+        if (!daysByPhone.has(phone)) daysByPhone.set(phone, new Set());
+        daysByPhone.get(phone)!.add(day);
+      }
+    }
+  }
+
+  // 닉네임 한 명 = 그 사람의 카카오ID/전화가 가진 구매일을 «합집합»으로 센다
+  const nicknames = new Set<string>([...kakaoByNick.keys(), ...phoneByNick.keys()]);
+  for (const nick of nicknames) {
+    const days = new Set<string>();
+    for (const k of kakaoByNick.get(nick) || []) for (const d of daysByKakao.get(k) || []) days.add(d);
+    for (const ph of phoneByNick.get(nick) || []) for (const d of daysByPhone.get(ph) || []) days.add(d);
+    result.set(nick, Math.max(1, days.size));
+  }
+  return result;
+}
+
 async function buildParticipantsForRequest(
   supabase: SupabaseAdminClient,
   mode: EventRouletteMode,
@@ -431,7 +525,23 @@ async function buildParticipantsForRequest(
   const targetRows = paidOnly ? rows.filter(isPaidOrderRowForRoulette) : rows;
 
   // 응모권은 결제완료 주문 금액으로만 센다(미입금 주문은 참가는 되지만 장수를 늘리지 않음)
-  return buildRouletteParticipants(targetRows, mode, { ticketRule, isPaid: isPaidOrderRowForRoulette });
+  const participants = buildRouletteParticipants(targetRows, mode, { ticketRule, isPaid: isPaidOrderRowForRoulette });
+
+  // [2026-09-09] 자동 응모권 — 사장님이 숫자를 안 정한다. 그날 명단 안에서 상대 비교 + 단골 여부로 계산.
+  //   ⚠ 규칙이 꺼져 있거나 수동 모드면 여기 안 들어온다(예전 계산 그대로).
+  if (!ticketRule.enabled || !ticketRule.auto) return participants;
+
+  const visitByNickname = await fetchVisitCountByNickname(supabase, targetRows);
+  const thresholds = autoTicketThresholds(participants.map((p) => Number(p.paidAmountSum || 0)));
+  for (const participant of participants) {
+    const visitCount = visitByNickname.get(participant.nickname) || 1;
+    participant.visitCount = visitCount;
+    participant.weight = calculateAutoTicketCount(
+      { paidAmountSum: Number(participant.paidAmountSum || 0), visitCount },
+      thresholds,
+    );
+  }
+  return participants;
 }
 
 function normalizeWinnerNicknameForDedupe(value: unknown) {
@@ -698,6 +808,7 @@ async function handleParticipants(request: NextRequest) {
       useWeight: request.nextUrl.searchParams.get("useWeight"),
       ticketUnit: request.nextUrl.searchParams.get("ticketUnit"),
       ticketMax: request.nextUrl.searchParams.get("ticketMax"),
+      ticketAuto: request.nextUrl.searchParams.get("ticketAuto"),
     }),
   });
 }
@@ -714,7 +825,7 @@ async function handleParticipantsPost(body: Record<string, unknown>) {
     paidOnly: body.paidOnly === true || body.paidOnly === "true",
     excludeDailyDup: body.excludeDailyDup !== false && body.excludeDailyDup !== "false",
     orderGroupIds,
-    ticketRule: normalizeTicketRule({ useWeight: body.useWeight, ticketUnit: body.ticketUnit, ticketMax: body.ticketMax }),
+    ticketRule: normalizeTicketRule({ useWeight: body.useWeight, ticketUnit: body.ticketUnit, ticketMax: body.ticketMax, ticketAuto: body.ticketAuto }),
   });
 }
 
@@ -789,7 +900,7 @@ async function createEvent(body: Record<string, unknown>) {
       : rawEventKind === "race" ? "race" : "roulette";
   const requestedCreateParticipants = normalizeManualParticipantsForEvent(body.participants);
   // 화면이 명단(응모권 장수 포함)을 보내면 그대로, 아니면 서버가 같은 규칙으로 다시 만든다
-  const ticketRule = normalizeTicketRule({ useWeight: body.useWeight, ticketUnit: body.ticketUnit, ticketMax: body.ticketMax });
+  const ticketRule = normalizeTicketRule({ useWeight: body.useWeight, ticketUnit: body.ticketUnit, ticketMax: body.ticketMax, ticketAuto: body.ticketAuto });
   const rawParticipants = requestedCreateParticipants.length > 0
     ? requestedCreateParticipants
     : await buildParticipantsForRequest(supabase, mode, sourceDate, broadcastId, false, null, ticketRule);

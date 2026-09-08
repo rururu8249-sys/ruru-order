@@ -37,6 +37,8 @@ export type EventRouletteParticipant = {
   orderIds: string[];
   /** 응모권 장수(= 추첨 가중치). 규칙 꺼짐이면 전원 1 */
   weight: number;
+  /** [2026-09-09 자동 응모권] 과거 «서로 다른 구매일» 수 = 단골 판정. 단골리포트와 같은 기준. 모르면 1 */
+  visitCount?: number;
 };
 
 // [2026-09-08] 응모권 규칙 — "1장 + 결제완료 금액 unit원마다 1장, 최대 max장". 꺼져 있으면 전원 1장.
@@ -47,9 +49,12 @@ export type RouletteTicketRule = {
   unit: number;
   /** 1명이 가질 수 있는 최대 장수 */
   max: number;
+  /** [2026-09-09 사장님 지시] 「수동으로 숫자 작성하는거 없애라. 자동으로 손님들 분석해서」
+   *  true 면 unit·max 를 «안 쓴다». 그날 명단 안에서 상대 비교로 장수를 정한다. */
+  auto: boolean;
 };
 
-export const DEFAULT_TICKET_RULE: RouletteTicketRule = { enabled: false, unit: 50000, max: 5 };
+export const DEFAULT_TICKET_RULE: RouletteTicketRule = { enabled: false, unit: 50000, max: 5, auto: false };
 export const TICKET_UNIT_MIN = 10000;
 export const TICKET_UNIT_MAX = 1000000;
 export const TICKET_MAX_MIN = 1;
@@ -60,6 +65,7 @@ export function normalizeTicketRule(input: {
   useWeight?: unknown;
   ticketUnit?: unknown;
   ticketMax?: unknown;
+  ticketAuto?: unknown;
 } | null | undefined): RouletteTicketRule {
   const src = input || {};
   const enabled = src.useWeight === true || src.useWeight === "true";
@@ -71,10 +77,69 @@ export function normalizeTicketRule(input: {
   const max = Number.isFinite(maxRaw) && maxRaw > 0
     ? Math.min(TICKET_MAX_MAX, Math.max(TICKET_MAX_MIN, Math.floor(maxRaw)))
     : DEFAULT_TICKET_RULE.max;
-  return { enabled, unit, max };
+  const auto = (src as { ticketAuto?: unknown }).ticketAuto === true || (src as { ticketAuto?: unknown }).ticketAuto === "true";
+  return { enabled, unit, max, auto };
 }
 
-/** 응모권 장수 = 1 + floor(결제완료 금액 / 단위), 최대 max. 규칙 꺼짐이면 1 */
+// ═══ [2026-09-09] 자동 응모권 — 사장님이 숫자를 «하나도» 안 정한다 ═══
+//
+//   사장님 지시: 「수동을 작성 하는거 없애라. 자동으로 손님들 분석해서 당첨 잘되게 설정」
+//   계획 문서(2026-09-09 순차작업계획 2순위): 「자주 구매하러 오는가? + 오늘 많이 샀는가? 심플하게」
+//
+//   그래서 두 가지만 본다. 기준 금액은 «그날 명단 안에서» 상대적으로 정한다(고정 숫자 없음).
+//     ① 오늘 많이 샀는가  — 그날 결제완료 금액의 중앙값 / 상위권(3사분위) 기준
+//     ② 자주 오는가       — 과거 «서로 다른 구매일» 수 (단골리포트와 같은 기준)
+//
+//   ⚠ 확률 = 돈이다. 그래서 상한을 두고(최대 5장), 아무도 0장이 되지 않게 «기본 1장»은 항상 준다.
+
+/** 자동 모드에서 한 사람이 가질 수 있는 최대 응모권 */
+export const AUTO_TICKET_MAX = 5;
+
+export type AutoTicketThresholds = {
+  /** 그날 결제완료 금액의 중앙값(0원인 사람은 빼고 계산) */
+  median: number;
+  /** 그날 결제완료 금액의 상위권 기준(3사분위) */
+  top: number;
+  /** 기준을 뽑을 수 있었나(결제완료한 사람이 아무도 없으면 false → 금액 가산 없음) */
+  ready: boolean;
+};
+
+/** 그날 명단의 «결제완료 금액»들로 기준선을 뽑는다. 고정 숫자를 쓰지 않기 위한 핵심. */
+export function autoTicketThresholds(paidAmounts: number[]): AutoTicketThresholds {
+  const values = (Array.isArray(paidAmounts) ? paidAmounts : [])
+    .map((v) => safeNumber(v))
+    .filter((v) => v > 0)
+    .sort((a, b) => a - b);
+
+  if (values.length === 0) return { median: 0, top: 0, ready: false };
+
+  const at = (ratio: number) => values[Math.min(values.length - 1, Math.max(0, Math.floor(ratio * (values.length - 1))))];
+  return { median: at(0.5), top: at(0.75), ready: true };
+}
+
+/** 자동 응모권 장수. 기본 1장 + 오늘 금액(최대 +2) + 단골(최대 +2), 상한 5장. */
+export function calculateAutoTicketCount(
+  input: { paidAmountSum: number; visitCount: number },
+  thresholds: AutoTicketThresholds
+): number {
+  let tickets = 1;
+
+  const paid = safeNumber(input.paidAmountSum);
+  if (thresholds.ready && paid > 0) {
+    if (paid >= thresholds.median) tickets += 1; // 오늘 평균만큼 산 손님
+    if (paid >= thresholds.top) tickets += 1;    // 오늘 특히 많이 산 손님
+  }
+
+  const visits = Math.max(1, Math.floor(safeNumber(input.visitCount) || 1));
+  if (visits >= 2) tickets += 1; // 다시 와 준 손님
+  if (visits >= 5) tickets += 1; // 자주 오는 단골
+
+  return Math.min(AUTO_TICKET_MAX, tickets);
+}
+
+/** 응모권 장수 = 1 + floor(결제완료 금액 / 단위), 최대 max. 규칙 꺼짐이면 1
+ *  ⚠ 자동 모드(rule.auto)에서는 이 함수를 안 쓴다 — 위 calculateAutoTicketCount 가 대신한다.
+ *    (예전 수동 규칙을 지우지 않고 남겨둔 이유: 자동이 이상하면 즉시 되돌리기 위해) */
 export function calculateTicketCount(paidAmountSum: number, rule: RouletteTicketRule): number {
   if (!rule.enabled) return 1;
   const amount = safeNumber(paidAmountSum);
