@@ -9,12 +9,13 @@
 //   · 저장은 /api/admin-live/shop-info (관리자 세션 + 서비스롤 키)로만 한다.
 //     브라우저 anon 키로 직접 쓰지 않는다 — 계좌가 밖에서 바뀌면 안 되니까.
 
-export type ShopContactType = "channel" | "openchat" | "kakao_id";
+// [2026-09-08 사장님] 오픈채팅은 안 씀 → 채널 / 카카오톡 ID 두 가지만
+export type ShopContactType = "channel" | "kakao_id";
 
 export type ShopInfo = {
   /** 손님이 문의하는 방법 */
   contactType: ShopContactType;
-  /** channel/openchat = 주소(URL), kakao_id = 카카오톡 ID */
+  /** channel = 채널 주소(URL), kakao_id = 카카오톡 ID */
   contactValue: string;
   /** 관리자 사이드바 「카톡」 버튼이 여는 주소(선택). 비우면 contactValue 를 연다 */
   adminChatUrl: string;
@@ -51,14 +52,12 @@ export const SHOP_INFO_DEFAULTS: ShopInfo = {
 
 export const CONTACT_TYPE_LABEL: Record<ShopContactType, string> = {
   channel: "카카오톡 채널",
-  openchat: "카카오톡 오픈채팅",
   kakao_id: "카카오톡 ID (친구 추가)",
 };
 
 /** 사이드바 버튼처럼 짧게 부를 때 */
 export const CONTACT_TYPE_SHORT: Record<ShopContactType, string> = {
   channel: "카톡채널",
-  openchat: "오픈채팅",
   kakao_id: "카톡 ID",
 };
 
@@ -77,7 +76,7 @@ export function isKakaoId(value: string) {
 
 function isValidContact(type: string, value: string): type is ShopContactType {
   if (type === "kakao_id") return isKakaoId(value);
-  if (type === "channel" || type === "openchat") return isHttpUrl(value);
+  if (type === "channel") return isHttpUrl(value);
   return false;
 }
 
@@ -154,7 +153,7 @@ export function validateShopInfo(input: Partial<Record<keyof ShopInfo, unknown>>
   const bankAccount = clean(src.bankAccount).replace(/\s+/g, "");
   const bankHolder = clean(src.bankHolder);
 
-  if (contactTypeRaw !== "channel" && contactTypeRaw !== "openchat" && contactTypeRaw !== "kakao_id") {
+  if (contactTypeRaw !== "channel" && contactTypeRaw !== "kakao_id") {
     return { ok: false, message: "문의 방식을 골라 주세요." };
   }
   const contactType = contactTypeRaw as ShopContactType;
@@ -194,8 +193,6 @@ export function contactHref(info: ShopInfo): string | null {
 /** 버튼 글자. short = "카톡채널 문의", long = "카톡채널로 문의하기" */
 export function contactLabel(info: ShopInfo, form: "short" | "long" = "short"): string {
   switch (info.contactType) {
-    case "openchat":
-      return form === "long" ? "오픈채팅으로 문의하기" : "오픈채팅 문의";
     case "kakao_id":
       return form === "long" ? `카카오톡 ID「${info.contactValue}」로 문의하기` : `카톡 ID「${info.contactValue}」문의`;
     default:
@@ -206,8 +203,6 @@ export function contactLabel(info: ShopInfo, form: "short" | "long" = "short"): 
 /** 버튼 아래 설명 한 줄 */
 export function contactDesc(info: ShopInfo): string {
   switch (info.contactType) {
-    case "openchat":
-      return "입금·배송·주문 문의는 오픈채팅으로 남겨 주세요.";
     case "kakao_id":
       return `카카오톡에서 ID「${info.contactValue}」를 친구 추가하고 문의해 주세요.`;
     default:
@@ -218,8 +213,6 @@ export function contactDesc(info: ShopInfo): string {
 /** 차단 안내 등에서 "문의는 ○○로 부탁드립니다." */
 export function contactGuideSentence(info: ShopInfo): string {
   switch (info.contactType) {
-    case "openchat":
-      return "문의는 오픈채팅으로 부탁드립니다.";
     case "kakao_id":
       return `문의는 카카오톡 ID「${info.contactValue}」(친구 추가)로 부탁드립니다.`;
     default:

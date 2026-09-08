@@ -22,16 +22,12 @@ import { refreshShopInfo } from "@/lib/useShopInfo";
 import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 
-const CONTACT_TYPES: ShopContactType[] = ["channel", "openchat", "kakao_id"];
+const CONTACT_TYPES: ShopContactType[] = ["channel", "kakao_id"];
 
 const CONTACT_HINT: Record<ShopContactType, { placeholder: string; help: string }> = {
   channel: {
     placeholder: "https://pf.kakao.com/_xxxxx",
     help: "카카오톡 채널 관리자센터 › 채널 정보 › 「채널 URL」을 그대로 붙여 넣으세요.",
-  },
-  openchat: {
-    placeholder: "https://open.kakao.com/o/xxxxxxx",
-    help: "오픈채팅방 › 우측 상단 메뉴 › 「링크 복사」로 나온 주소를 붙여 넣으세요.",
   },
   kakao_id: {
     placeholder: "예: ruru_live",
@@ -194,7 +190,7 @@ export default function ShopInfoSettingsTab() {
         <div className={cardClass}>
           {sectionTitle("손님 문의 받는 방법", "손님 주문서·주문조회·홈 화면의 「문의하기」 버튼이 여기서 고른 방식으로 바뀝니다.")}
           <div className="grid gap-3">
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {CONTACT_TYPES.map((type) => {
                 const active = type === contactType;
                 return (

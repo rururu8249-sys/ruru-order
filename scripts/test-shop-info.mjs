@@ -56,10 +56,10 @@ function equal(actual, expected, message) {
   equal(contactDesc(id).includes("ruru_live"), true, "ID 설명에 ID 포함");
   equal(id.adminChatUrl, "", "방식 바꿨고 콘솔 주소 없으면 비움");
   equal(adminChatTarget(id).kind, "id", "관리자 버튼은 ID 복사");
+  // [2026-09-08 사장님] 오픈채팅은 안 씀 — 예전에 저장된 값이 있어도 기본(채널)으로 떨어진다
   const open = parseShopInfo([{ key: "shop_contact_type", value: "openchat" }, { key: "shop_contact_value", value: "https://open.kakao.com/o/abc" }]);
-  equal(contactHref(open), "https://open.kakao.com/o/abc", "오픈채팅 링크");
-  equal(contactLabel(open), "오픈채팅 문의", "오픈채팅 짧은 글자");
-  equal(adminChatTarget(open).url, "https://open.kakao.com/o/abc", "관리자 버튼도 오픈채팅");
+  equal(open.contactType, "channel", "오픈채팅 저장값은 무시 → 채널 기본값");
+  equal(validateShopInfo({ ...SHOP_INFO_DEFAULTS, contactType: "openchat", contactValue: "https://open.kakao.com/o/abc" }).ok, false, "오픈채팅 저장 거부");
   const ch = parseShopInfo([
     { key: "shop_contact_type", value: "channel" },
     { key: "shop_contact_value", value: "https://pf.kakao.com/_abc" },
