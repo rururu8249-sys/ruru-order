@@ -143,19 +143,20 @@ function paysterAlive() {
   }
 }
 
-function openPaysterAt(url: string, r: { left: number; top: number; width: number; height: number }) {
-  // ★ [2026-09-09] «주소 없이» 먼저 연다.
-  //   · 같은 이름의 창이 이미 있으면 → 그 창이 «이동 없이» 그대로 돌아온다(2026-09-08 실측 ③).
-  //     교차출처라 location 을 «읽을 수» 없다 → 그걸로 «기존 페이스터 창»임을 구분한다.
-  //   · 창이 없으면 → about:blank 새 창. 우리 오리진이라 창 두께를 잴 수 있다(이동하면 못 읽는다).
-  //   ⚠ 이름(PAYSTER_WINDOW_NAME)은 그대로 — 빼면 창이 매번 새로 생겨 로그인이 풀린다.
+/** 페이스터 창을 «주소 없이» 잡아서 곧바로 앞으로 부른다.
+ *  · 주소를 안 주므로 이동이 없고, 클릭 «열 권한»도 안 닳는다 (2026-09-08 실측 ③)
+ *  · 창이 없으면 이 자리·크기로 새로 생긴다. about:blank(우리 오리진)라 창 두께를 잴 수 있다
+ *    → 그 값으로 다음 창부터 복사창과 «보이는 상자»가 정확히 같아진다
+ *  · ★ focus() 를 «여기서» 부르는 게 핵심 — 사용자 클릭 권한이 아직 살아 있는 순간이라야 창이 올라온다
+ *  ⚠ 이름(PAYSTER_WINDOW_NAME)은 그대로. 빼면 창이 매번 새로 생겨 로그인이 풀린다. */
+function grabPaysterWindow(r: { left: number; top: number; width: number; height: number }) {
   let win: Window | null = null;
   try {
     win = window.open("", PAYSTER_WINDOW_NAME, `popup=yes,left=${r.left},top=${r.top},width=${r.width},height=${r.height}`);
   } catch {
     win = null;
   }
-  if (!win) return; // 팝업 차단 — 복사창의 「페이스터 창 다시 열기 ↗」로 복구된다
+  if (!win) return null; // 팝업 차단 — 복사창의 「페이스터 창 다시 열기 ↗」로 복구된다
   paysterWin = win;
 
   let isNewWindow = false;
@@ -167,14 +168,25 @@ function openPaysterAt(url: string, r: { left: number; top: number; width: numbe
   if (isNewWindow) measurePopupChrome(win, { top: r.top });
 
   try {
-    win.location.href = url; // 새 창이면 페이스터 로드, 기존 창이면 결제 폼으로 되돌린다
-  } catch {
-    /* 이동 실패해도 아래 focus 로 창은 앞으로 부른다 */
-  }
-  try {
-    win.focus(); // 뒤로 숨어 있던 창이면 앞으로 부른다 (⚠ «최소화»된 창은 웹이 못 되살린다)
+    win.focus(); // 뒤로 숨어 있던 창을 앞으로 (⚠ «최소화»된 창은 웹이 되살릴 방법이 없다)
   } catch {
     /* 포커스는 보조 동작 — 실패해도 창은 떠 있다 */
+  }
+  return win;
+}
+
+function openPaysterAt(url: string, r: { left: number; top: number; width: number; height: number }) {
+  const win = grabPaysterWindow(r);
+  if (!win) return;
+  try {
+    win.location.href = url; // 새 창이면 페이스터 로드, 기존 창이면 결제 폼으로 되돌린다
+  } catch {
+    /* 이동 실패해도 창은 이미 앞에 있다 */
+  }
+  try {
+    win.focus();
+  } catch {
+    /* 보조 동작 */
   }
 }
 
@@ -202,22 +214,30 @@ function pipSize() {
 export function openPaysterRightHalf() {
   const url = getShopInfoNow().paysterUrl;
   const pip = getPipWindow();
+  const rect = pip ? rectBesidePip(pip) : paysterSlotRect();
 
-  // ⚠ [2026-09-08 실측] 브라우저는 «클릭 한 번에 창 하나»만 열어준다.
-  //   팝업을 먼저 열면 requestWindow 가 «NotAllowedError: requires user activation» 로 막힌다.
-  //   대신 «이미 열려 있는 이름창»은 클릭 권한 없이도 다시 부를 수 있다(실측 확인).
-  // ★ 순서가 핵심: 복사창을 «먼저» 열어 클릭 권한을 쓰고, 페이스터는 그 뒤에 부른다.
-  //
-  // [2026-09-09 사장님 지시] 「애초에 고정식으로만 한개 뜨게」
-  //   → 페이스터가 살아 있든 아니든 «항상» 복사창을 먼저 연다. 화면에는 복사창 하나뿐이다.
-  //   페이스터가 «없을 때»는 새 창이라 팝업차단에 걸릴 수 있는데(미실측 구간),
-  //   그때는 복사창 안 「페이스터 창 다시 열기 ↗」 버튼으로 바로 복구된다(그 버튼은 자기 클릭 권한을 쓴다).
-  //   결제가 통째로 막히는 일은 없다.
+  // ★ [2026-09-09 사장님] 「카드결제 클릭해도 페이스터창 뒤에 가있는거 앞으로 다시 안나옴」
+  //   원인: 복사창 열기(requestWindow)가 클릭 «권한»을 먼저 써버려서, 그 뒤의 focus() 가
+  //   사용자 조작 없이 실행돼 창이 안 올라왔다.
+  //   [2026-09-08 실측 ③] «주소 없이» 참조 + focus() 는 열 권한을 «안 닳게» 한다.
+  //   → 순서를 ① 페이스터를 잡아 앞으로 → ② 복사창에 권한 사용 → ③ 결제 폼으로 이동 으로 바꾼다.
+  //   ⚠ ③(이동)을 ② 뒤에 두는 것이 중요하다. 주소를 먼저 주면 권한이 닳아 복사창이 막힌다(실측 ②).
+  const win = grabPaysterWindow(rect); // ① 권한 안 씀 + focus
+
   if (isPipSupported() && !pip) {
+    // ② 클릭 권한은 «없는 창»(복사창)에 쓴다. 화면에는 복사창 하나만 뜬다.
     const size = pipSize();
     void preopenPipWindow(size.width, size.height);
   }
-  openPaysterAt(url, pip ? rectBesidePip(pip) : paysterSlotRect());
+
+  if (win) {
+    // ③ 결제 폼으로 (기존 창이면 이동, 방금 만든 창이면 첫 로드)
+    try {
+      win.location.href = url;
+    } catch {
+      /* 이동 실패해도 창은 이미 앞에 있다 */
+    }
+  }
 }
 
 type Props = {
@@ -420,7 +440,11 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
   //     · 📌 켜면  → 항상 맨 위에 뜨는 창 안에
   //   둘 중 «한 곳»에만 그린다. 그래서 두 화면의 생김새가 갈라질 수 없다.
   const copyPanel = (
-    <div style={{ width: "100%", height: "100%", background: "#F4F6FB", display: "flex", flexDirection: "column", overflowY: "auto" }}>
+    // [2026-09-09 사장님 지적] 「글씨 다 깨지는거 안보임?」
+    //   원인: 바깥에 overflowY:auto 를 두고 안쪽 카드에 flex-1 을 줬더니, 창이 짧을 때
+    //   스크롤이 안 생기고 «카드 안이 잘려» 합계 줄과 아래 버튼이 겹쳐 보였다.
+    //   → 본문만 스크롤하고, 결제 버튼 두 개는 아래에 «고정»한다. 이제 어떤 창 높이에서도 안 잘린다.
+    <div style={{ width: "100%", height: "100%", background: "#F4F6FB", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div className="flex items-center justify-between px-5 py-4" style={{ background: "#101C3D" }}>
           <span className="text-[16px] font-black text-white">💳 카드결제 — {order.nickname}</span>
           <button type="button" onClick={onClose} className="text-xl leading-none text-white/60 hover:text-white">
@@ -428,10 +452,10 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
           </button>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col px-5 py-5">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-3 pt-5">
           {/* [2026-08-31 사장님 확인] 맨 위 큰 복사 버튼은 2번 칸과 같은 값이라 삭제 — 1·2·3 카드로 통일 */}
           <div className="mb-2 flex flex-wrap items-center gap-2 text-[12px] font-bold" style={{ color: "#5A6B92" }}>
-            <span>오른쪽 페이스터 창에 1 → 2 → 3 순서대로 복사해서 붙여넣으세요 (숫자키 1~4)</span>
+            <span>오른쪽 페이스터 창에 1 → 2 → 3 순서대로 붙여넣으세요 (숫자키 1~4) · 페이스터 창은 <b>최소화하지 마세요</b></span>
             {/* [2026-09-08] 페이스터 창을 실수로 닫았을 때 다시 여는 길. 화면 오른쪽 절반에 뜬다. */}
             <button type="button" onClick={() => openPayster(paysterUrl)} className="ru-btn ru-btn-sm" title="페이스터 창을 화면 오른쪽 절반에 다시 엽니다">
               페이스터 창 다시 열기 ↗
@@ -493,9 +517,9 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
           </div>
 
           {/* [2026-08-31 사장님 요청] 가운데 빈 공간 활용 — 결제 전에 주문·금액을 눈으로 검산 (표시 전용) */}
-          <div className="mt-4 flex min-h-0 flex-1 flex-col rounded-2xl bg-white px-4 py-3.5 shadow-sm" style={{ border: "1px solid #DDE4F2" }}>
+          <div className="mt-4 flex flex-col rounded-2xl bg-white px-4 py-3.5 shadow-sm" style={{ border: "1px solid #DDE4F2" }}>
             <div className="mb-2 shrink-0 text-[12px] font-black" style={{ color: "#5A6B92" }}>🧾 이 주문 내용 — 결제 전에 확인하세요</div>
-            <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
+            <div className="space-y-1.5">
               {/* [2026-09-09 사장님 지적] 복사창에서 이 칸이 «비어» 있었다. 원인은 order.items 가 빈 주문.
                     빈 칸으로 두면 화면이 고장 난 것처럼 보이고, 결제 전 검산도 못 한다.
                     → 왜 비었는지 화면에 말해 준다. ⚠ 표시 전용 — 금액·돈 처리와 무관(아래 합계는 그대로). */}
@@ -531,9 +555,10 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
             </div>
           </div>
 
-          {/* 하단 액션과의 간격 — 확인 카드가 남는 세로를 흡수한다 */}
-          <div className="min-h-3 shrink-0" />
+        </div>
 
+        {/* [2026-09-09] 결제 버튼은 «항상 보이게» 아래 고정. 위 본문만 스크롤한다. */}
+        <div className="shrink-0 px-5 pb-5 pt-3" style={{ background: "#F4F6FB", borderTop: "1px solid #E3E9F5" }}>
           <button
             type="button"
             onClick={() => void copyValue("chatNotice", chatNoticeText)}
@@ -553,19 +578,6 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
             {saving ? "처리 중…" : "✔ 카드결제완료 처리"}
           </button>
 
-          <div className="mt-4 rounded-xl px-3.5 py-2.5 text-[11px] font-bold leading-4" style={{ background: "#EAF0FE", color: "#3D5A8F" }}>
-            상품명 칸은 「닉네임 상품명」 순서로 넣어야 나중에 어느 주문인지 매칭됩니다(이름 X). 전화번호는 <b>주문자(결제하는 분)</b> 번호예요 — 택배 받는 분 번호가 아닙니다. 페이스터는 남의 서버라 자동 채우기가 안 돼요.
-            {/* [2026-09-08 실측] 페이스터는 로그인을 «창 하나에만 사는 저장소»에 넣는다.
-                  창을 닫으면 그 저장소가 같이 사라져 다시 로그인해야 한다. 페이스터 쪽 방식이라 못 바꾼다. */}
-            <br />
-            {/* [2026-09-08 실측] ① 페이스터는 로그인을 «창 하나»에만 저장 → 닫으면 다시 로그인.
-                  ② 브라우저는 «클릭 한 번에 창 하나»만 열어준다 → 두 창을 켜둬야 같이 따라온다.
-                  ③ 복사창 위치는 크롬이 정한다(우리가 못 옮김). 대신 끌어다 놓은 자리를 기억한다. */}
-            <br />
-            <b>페이스터 창은 닫지도, 최소화하지도 마세요.</b> 닫으면(빨간 ✕) 페이스터가 로그인을 잊어버립니다. <b>최소화(노란 −)하면 웹에서 다시 못 꺼냅니다</b> — 창을 되살리는 기능이 브라우저에 아예 없어서(w3c/window-management#3) 직접 눌러 꺼내셔야 합니다. 다른 업무 보실 땐 <b>그냥 뒤로 보내두세요.</b> 카드결제를 누르면 다시 앞으로 나옵니다. 주문이 몇 건이든 <b>이 창 하나로</b> 계속 결제합니다.
-            <br />
-            <b>복사창은 카드결제할 때만 뜹니다.</b> 이 창을 닫으면 <b>이 주문 카드결제가 끝납니다</b>(뒤에 아무것도 안 남습니다). 자리를 한 번 끌어다 놓으면 크롬이 그 자리를 기억합니다.
-          </div>
         </div>
     </div>
   );
