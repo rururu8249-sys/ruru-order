@@ -292,8 +292,10 @@ export default function SettlementMoneyFlowDashboard({
           </div>
         </div>
 
+        {/* [2026-09-08 사장님 지적] 필터가 11개라 뭘 눌러야 할지 모르겠던 화면.
+            → 평소 쓰는 «기간 + 방송» 만 위에 두고, 나머지(날짜 직접입력·연·월·결제수단)는 「자세한 조건」 안으로. 계산 기준·로직 무변경. */}
         <div className="grid gap-2.5 px-5 py-3.5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-end gap-2">
             <div className="flex flex-wrap gap-2">
               <CompactFilterButton label="오늘" onClick={() => onQuickRange("today")} />
               <CompactFilterButton label="이번 주" onClick={() => onQuickRange("week")} />
@@ -302,59 +304,8 @@ export default function SettlementMoneyFlowDashboard({
               <CompactFilterButton label="올해" onClick={() => onQuickRange("year")} />
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <label className="flex h-9 items-center gap-2 rounded-full border border-line bg-surface px-3 text-xs font-black text-ink-soft">
-                <span className="text-ink-mute">연도</span>
-                <select
-                  value={selectedSettlementYear}
-                  onChange={(event) => onYearFilter(event.target.value)}
-                  className="bg-transparent font-black outline-none"
-                >
-                  {availableSettlementYears.map((year) => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="flex h-9 items-center gap-2 rounded-full border border-line bg-surface px-3 text-xs font-black text-ink-soft">
-                <span className="text-ink-mute">월</span>
-                <select
-                  value={selectedSettlementMonth}
-                  onChange={(event) => onMonthFilter(event.target.value)}
-                  className="bg-transparent font-black outline-none"
-                >
-                  <option value="all">전체</option>
-                  {Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, "0")).map((month) => (
-                    <option key={month} value={month}>{Number(month)}월</option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          </div>
-
-          <div className="grid gap-2 xl:grid-cols-[0.8fr_0.8fr_1.25fr_0.95fr_1fr_auto]">
-            <label className="grid gap-1 text-[11px] font-black text-ink-mute">
-              시작일
-              <input
-                type="date"
-                value={startDate}
-                onChange={(event) => onStartDateChange(event.target.value)}
-                className="h-9 rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none"
-              />
-            </label>
-
-            <label className="grid gap-1 text-[11px] font-black text-ink-mute">
-              종료일
-              <input
-                type="date"
-                value={endDate}
-                onChange={(event) => onEndDateChange(event.target.value)}
-                className="h-9 rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none"
-              />
-            </label>
-
-            <label className="grid gap-1 text-[11px] font-black text-ink-mute">
-              방송리스트
+            <label className="grid min-w-[220px] flex-1 gap-1 text-[11px] font-black text-ink-mute">
+              방송
               <select
                 value={selectedBroadcastValue}
                 onChange={(event) => {
@@ -373,36 +324,83 @@ export default function SettlementMoneyFlowDashboard({
               </select>
             </label>
 
-            <label className="grid gap-1 text-[11px] font-black text-ink-mute">
-              결제수단
-              <select
-                value={paymentFilter}
-                onChange={(event) => onPaymentFilterChange(event.target.value as PaymentFilter)}
-                className="h-9 rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none"
-              >
-                {(["전체", "무통장입금", "카드결제", "기타"] as PaymentFilter[]).map((value) => (
-                  <option key={value} value={value}>{({ 전체: "결제수단: 전체", 무통장입금: "무통장", 카드결제: "카드", 기타: "기타(미지정)" } as Record<string, string>)[value] ?? value}</option>
-                ))}
-              </select>
-            </label>
-
-            <div className="grid gap-1 text-[11px] font-black text-ink-mute">
-              조회 기준
-              <div className="flex h-9 items-center rounded-xl border border-line bg-info-bg px-3 text-sm font-black text-info-tx">
-                {effectivePeriodLabel}
-              </div>
+            <div className="flex h-9 items-center rounded-xl border border-line bg-info-bg px-3 text-sm font-black text-info-tx">
+              {effectivePeriodLabel}
             </div>
 
-            <div className="flex items-end">
-              <button
-                type="button"
-                onClick={onResetFilters}
-                className="h-9 rounded-xl border border-line bg-surface px-4 text-sm font-black text-ink-soft shadow-sm transition hover:bg-surface-2"
-              >
-                초기화
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={onResetFilters}
+              className="h-9 rounded-xl border border-line bg-surface px-4 text-sm font-black text-ink-soft shadow-sm transition hover:bg-surface-2"
+            >
+              초기화
+            </button>
           </div>
+
+          <details className="rounded-xl border border-line bg-surface-2 px-3 py-2">
+            <summary className="cursor-pointer list-none text-xs font-black text-ink-soft">자세한 조건 (날짜 직접 입력 · 결제수단) ▾</summary>
+            <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+              <label className="grid gap-1 text-[11px] font-black text-ink-mute">
+                시작일
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(event) => onStartDateChange(event.target.value)}
+                  className="h-9 rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none"
+                />
+              </label>
+
+              <label className="grid gap-1 text-[11px] font-black text-ink-mute">
+                종료일
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(event) => onEndDateChange(event.target.value)}
+                  className="h-9 rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none"
+                />
+              </label>
+
+              <label className="grid gap-1 text-[11px] font-black text-ink-mute">
+                연도
+                <select
+                  value={selectedSettlementYear}
+                  onChange={(event) => onYearFilter(event.target.value)}
+                  className="h-9 rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none"
+                >
+                  {availableSettlementYears.map((year) => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-1 text-[11px] font-black text-ink-mute">
+                월
+                <select
+                  value={selectedSettlementMonth}
+                  onChange={(event) => onMonthFilter(event.target.value)}
+                  className="h-9 rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none"
+                >
+                  <option value="all">전체</option>
+                  {Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, "0")).map((month) => (
+                    <option key={month} value={month}>{Number(month)}월</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-1 text-[11px] font-black text-ink-mute">
+                결제수단
+                <select
+                  value={paymentFilter}
+                  onChange={(event) => onPaymentFilterChange(event.target.value as PaymentFilter)}
+                  className="h-9 rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none"
+                >
+                  {(["전체", "무통장입금", "카드결제", "기타"] as PaymentFilter[]).map((value) => (
+                    <option key={value} value={value}>{({ 전체: "전체", 무통장입금: "무통장", 카드결제: "카드", 기타: "기타(미지정)" } as Record<string, string>)[value] ?? value}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </details>
         </div>
       </section>
 
@@ -410,7 +408,7 @@ export default function SettlementMoneyFlowDashboard({
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-[25px] font-black tracking-[-0.06em] text-ink">돈 흐름 5단계</h3>
-            <p className="mt-1 text-xs font-bold text-ink-mute">초보자는 이 순서만 보면 됩니다.</p>
+            <p className="mt-1 text-xs font-bold text-ink-mute">주문 → 받은 돈 → 빠지는 돈 → 남는 돈 순서입니다.</p>
           </div>
           <div className="rounded-full bg-info-bg px-3.5 py-1.5 text-xs font-black text-info-tx">
             주문 → 받은 돈 → 빠지는 돈 → 남는 돈
