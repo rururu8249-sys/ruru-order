@@ -6249,6 +6249,19 @@ export default function OrderPage() {
                 </section>
               );
             }
+            // [2026-09-09 사장님 지적] 「새로고침 하면 노출 안 시킨 상품이 보였다가 사라져」
+            //   원인(실측): loadBroadcast() 가 카탈로그를 «먼저» 채우고(:2537) 방송 정보를 «나중에» 읽는다(:2555).
+            //   그 사이 broadcast=null 이라 quickGroupBuyProducts 가 «쇼핑몰 모드»로 오인해 카탈로그를 그렸다.
+            //   → 방송 정보를 다 읽기 전에는 목록을 안 그린다. ⚠ 표시 전용 — 주문·돈 로직 무관.
+            if (!broadcastLoaded) {
+              return (
+                <section style={{ margin: "12px auto 0", width: "100%", maxWidth: "560px" }}>
+                  <div style={{ padding: "44px 26px", textAlign: "center", color: "#7A1E47", fontSize: "14px", fontWeight: 700, border: "1px solid #D9C5CC", borderRadius: "16px", background: "#fff" }}>
+                    상품을 불러오는 중…
+                  </div>
+                </section>
+              );
+            }
             const q = productSearchText.trim();
             // 카테고리 탭: 현재 상품 중 '고객 카테고리 버튼에 표시'가 켜진 항목만 노출.
             // 상품 등록 순서와 무관하게 가나다순으로 정돈한다.

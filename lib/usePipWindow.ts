@@ -51,36 +51,17 @@ function copyStyles(target: Window) {
   doc.body.style.margin = "0";
 }
 
-// ── 「켜두면 계속 켜짐」 ───────────────────────────────────────────────
-//   [2026-09-08 사장님] 「복사 버튼 누르니까 페이스터창 사라짐」 — 📌 를 안 눌러서다.
-//   매번 누르시라는 건 말이 안 된다. 한 번 켜면 그 선택을 기억하고, 다음부터는
-//   카드결제를 누르는 «그 순간»에 자동으로 같이 연다(브라우저는 클릭 순간에만 창을 열어준다).
-const PIP_PREF_KEY = "ruru_cardpay_pip_on";
-
-/** 기본은 «켜짐». 사장님이 직접 끈 적이 있을 때만 꺼진다.
- *  [2026-09-08 사장님] 「애초에 복사창 항상위에 상태로 설계하면 돼잖아? 왜 일을 두번하게 만들어?」 */
-export function isPipPreferred() {
-  if (typeof window === "undefined") return false;
-  try {
-    return window.localStorage.getItem(PIP_PREF_KEY) !== "0";
-  } catch {
-    return true;
-  }
-}
+// ── 「복사창은 항상 고정식 하나」 ─────────────────────────────────────
+//   [2026-09-09 사장님 확정] 「그냥 애초에 고정식으로만 한개 뜨게 못만들어?」
+//   → 켜기/끄기 토글(📌)과 그 기억값(localStorage "ruru_cardpay_pip_on")을 «삭제»했다.
+//     이제 복사창은 항상 이 창으로만 뜬다. 페이지 안 모달은 이 창을 «못 열었을 때»의 비상구뿐이다.
+//     (예전 토글을 «꺼짐»으로 저장해 두셨던 경우에도 이제 무조건 켜진 것처럼 동작한다)
 
 /** 지금 열려 있는 복사창(없으면 null). 페이스터를 «그 옆»에 붙이려고 위치를 읽을 때 쓴다. */
 export function getPipWindow(): Window | null {
   const api = pipApi();
   const w = api?.window || null;
   return w && !w.closed ? w : null;
-}
-
-export function setPipPreferred(on: boolean) {
-  try {
-    window.localStorage.setItem(PIP_PREF_KEY, on ? "1" : "0");
-  } catch {
-    /* 저장 실패해도 이번 판은 정상 동작 */
-  }
 }
 
 /** 클릭 «안에서» 미리 열어두는 창. 팝업(모달)이 뜬 뒤에는 창을 못 열기 때문에
@@ -102,6 +83,12 @@ export function preopenPipWindow(width: number, height: number): Promise<Window 
   return pendingPip;
 }
 
+/** 주문표 클릭에서 «미리 열기»가 걸려 있나. 걸려 있으면 화면은 그 창을 기다린다
+ *  (기다리는 동안 페이지 모달을 그리면 복사창이 두 번 바뀌어 보인다 — 2026-09-09 사장님 지적). */
+export function hasPendingPipWindow() {
+  return pendingPip !== null;
+}
+
 async function takePreopenedPip(): Promise<Window | null> {
   const p = pendingPip;
   pendingPip = null;
@@ -112,8 +99,12 @@ async function takePreopenedPip(): Promise<Window | null> {
 }
 
 export function usePipWindow() {
-  const [pipWindow, setPipWindow] = useState<Window | null>(null);
+  // [2026-09-09] «첫 렌더»부터 실제 상태로 시작한다. 예전엔 항상 null 로 시작해
+  //   한 프레임 동안 페이지 모달이 그려졌다가 복사창으로 바뀌었다(사장님: 「뒤에 뭐가 숨어있어」).
+  const [pipWindow, setPipWindow] = useState<Window | null>(() => getPipWindow());
   const [supported, setSupported] = useState(false);
+  /** 복사창을 «여는 중». true 인 동안 화면은 아무것도 그리지 않는다. */
+  const [pending, setPending] = useState(() => !getPipWindow() && hasPendingPipWindow());
   const openedRef = useRef<Window | null>(null);
 
   // 서버 렌더와 화면이 어긋나지 않게, 지원 여부는 «브라우저에서» 확인한다
@@ -124,27 +115,10 @@ export function usePipWindow() {
     //   [2026-09-08 실측] 브라우저는 «클릭 한 번에 창 하나»만 열어준다
     //   (팝업을 먼저 열면 requestWindow 가 NotAllowedError: requires user activation).
     //   그래서 복사창은 팝업이 닫혀도 «계속 살려두고» 다음 주문에서 이어받는다.
-    const alive = getPipWindow();
-    if (alive) {
-      openedRef.current = alive;
-      setPipWindow(alive);
-      alive.addEventListener(
-        "pagehide",
-        () => {
-          openedRef.current = null;
-          setPipWindow(null);
-        },
-        { once: true },
-      );
-      return () => {
-        stopped = true;
-      };
-    }
-    // 주문표 클릭 순간에 미리 열어둔 창이 있으면 그대로 이어받는다
-    void takePreopenedPip().then((w) => {
-      if (stopped || !w) return;
+    const attach = (w: Window) => {
       openedRef.current = w;
       setPipWindow(w);
+      setPending(false);
       w.addEventListener(
         "pagehide",
         () => {
@@ -153,6 +127,29 @@ export function usePipWindow() {
         },
         { once: true },
       );
+    };
+    const alive = getPipWindow();
+    if (alive) {
+      attach(alive);
+      return () => {
+        stopped = true;
+      };
+    }
+    // 주문표 클릭 순간에 미리 열어둔 창이 있으면 그대로 이어받는다
+    if (!hasPendingPipWindow()) {
+      setPending(false);
+      return () => {
+        stopped = true;
+      };
+    }
+    setPending(true);
+    void takePreopenedPip().then((w) => {
+      if (stopped) return;
+      if (!w) {
+        setPending(false); // 못 열었다 → 비상구(페이지 모달)로 내려간다
+        return;
+      }
+      attach(w);
     });
     return () => {
       stopped = true;
@@ -168,6 +165,7 @@ export function usePipWindow() {
       copyStyles(w);
       openedRef.current = w;
       setPipWindow(w);
+      setPending(false);
       // 사장님이 창의 ✕ 를 눌러 닫았을 때 화면 상태를 되돌린다
       w.addEventListener(
         "pagehide",
@@ -212,7 +210,7 @@ export function usePipWindow() {
     };
   }, []);
 
-  return { pipWindow, supported, open, close };
+  return { pipWindow, supported, pending, open, close };
 }
 
 /** 클립보드 복사 — 작은 창 안에서도 되도록 예비수단을 갖춘다.

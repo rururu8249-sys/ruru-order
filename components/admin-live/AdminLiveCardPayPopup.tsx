@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatOrderOptionText } from "@/lib/orderOptionText";
 import { supabase } from "@/lib/supabase";
@@ -11,7 +11,7 @@ import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 // [2026-09-08] 페이스터 주소는 설정 › 상점 정보에서 온다(하드코딩 제거)
 import { getShopInfoNow, useShopInfo } from "@/lib/useShopInfo";
 // [2026-09-08] 복사 카드를 «항상 맨 위에 뜨는 작은 창»으로 빼내기 (사유·실측근거는 그 파일 상단)
-import { usePipWindow, copyTextIn, isPipPreferred, setPipPreferred, preopenPipWindow, isPipSupported, getPipWindow } from "@/lib/usePipWindow";
+import { usePipWindow, copyTextIn, preopenPipWindow, isPipSupported, getPipWindow } from "@/lib/usePipWindow";
 
 // ═══ 페이스터를 «어떻게» 열 것인가 — 2026-09-08 확정. 다시 뒤집지 말 것 ═══
 //
@@ -137,8 +137,8 @@ export function openPayster(url: string) {
   openPaysterAt(url, pipWin ? rectBesidePip(pipWin) : paysterSlotRect());
 }
 
-/** 「📌 복사창 항상 위에」 창 크기 — 원래 복사창과 «같은 폭», 세로는 화면 끝까지.
- *  작게 만들지 않는다(사장님 지시). 버튼과 자동열기가 같은 값을 쓰도록 여기 하나로 둔다. */
+/** 복사창(고정식) 크기 — 예전 모달 복사창과 «같은 폭», 세로는 화면 끝까지.
+ *  작게 만들지 않는다(사장님 지시). 자동열기와 비상 버튼이 같은 값을 쓰도록 여기 하나로 둔다. */
 function pipSize() {
   const availH = (typeof window !== "undefined" && window.screen?.availHeight) || 900;
   return { width: BOX_W / 2, height: Math.min(BOX_H_MAX, availH - 40) };
@@ -153,26 +153,21 @@ function pipSize() {
 export function openPaysterRightHalf() {
   const url = getShopInfoNow().paysterUrl;
   const pip = getPipWindow();
-  const wantPip = isPipPreferred() && isPipSupported();
 
   // ⚠ [2026-09-08 실측] 브라우저는 «클릭 한 번에 창 하나»만 열어준다.
-  //   팝업을 먼저 열면 requestWindow 가 «NotAllowedError: requires user activation» 로 막히고,
-  //   복사창을 먼저 열면 페이스터 팝업이 차단된다. (사장님: 「왜 동시에 같이 안열려?」)
+  //   팝업을 먼저 열면 requestWindow 가 «NotAllowedError: requires user activation» 로 막힌다.
   //   대신 «이미 열려 있는 이름창»은 클릭 권한 없이도 다시 부를 수 있다(실측 확인).
-  //   그래서 두 창을 하루 종일 켜두고, 한 번의 클릭 권한은 «없는 창 하나»에만 쓴다.
-  if (paysterAlive()) {
-    // ★ 순서가 핵심 (실측): 복사창을 «먼저» 열어 클릭 권한을 쓰고,
-    //   페이스터는 «이미 열린 이름창»이라 권한 없이도 그 주소로 이동한다.
-    //   반대로 하면(페이스터 먼저) 복사창이 NotAllowedError 로 막힌다.
-    if (wantPip && !pip) {
-      const size = pipSize();
-      void preopenPipWindow(size.width, size.height);
-    }
-    openPaysterAt(url, pip ? rectBesidePip(pip) : paysterSlotRect());
-    return;
+  // ★ 순서가 핵심: 복사창을 «먼저» 열어 클릭 권한을 쓰고, 페이스터는 그 뒤에 부른다.
+  //
+  // [2026-09-09 사장님 지시] 「애초에 고정식으로만 한개 뜨게」
+  //   → 페이스터가 살아 있든 아니든 «항상» 복사창을 먼저 연다. 화면에는 복사창 하나뿐이다.
+  //   페이스터가 «없을 때»는 새 창이라 팝업차단에 걸릴 수 있는데(미실측 구간),
+  //   그때는 복사창 안 「페이스터 창 다시 열기 ↗」 버튼으로 바로 복구된다(그 버튼은 자기 클릭 권한을 쓴다).
+  //   결제가 통째로 막히는 일은 없다.
+  if (isPipSupported() && !pip) {
+    const size = pipSize();
+    void preopenPipWindow(size.width, size.height);
   }
-  // 페이스터가 없다 → 결제가 우선이므로 클릭 권한을 페이스터에 쓴다.
-  //   복사창은 팝업의 「📌」 버튼(자기 클릭 권한)으로 열고, 이후로는 계속 살아 있다.
   openPaysterAt(url, pip ? rectBesidePip(pip) : paysterSlotRect());
 }
 
@@ -392,26 +387,20 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
             <button type="button" onClick={() => openPayster(paysterUrl)} className="ru-btn ru-btn-sm" title="페이스터 창을 화면 오른쪽 절반에 다시 엽니다">
               페이스터 창 다시 열기 ↗
             </button>
-            {/* [2026-09-08 사장님] 「왔다 갔다할때마다 창이 뒤로 밀리고 하니까 복잡한데」
-                  → 복사 카드만 «항상 맨 위에 뜨는 창»으로 빼낸다. 관리자 창을 안 눌러도 되니
-                    페이스터 창이 뒤로 밀리지 않는다. 지원 안 하는 브라우저에서는 버튼을 숨긴다. */}
-            {pip.supported ? (
+            {/* [2026-09-09 사장님 지시] 켜기/끄기 토글(📌) 삭제 — 복사창은 «항상 고정식 하나»가 기준.
+                  이 버튼은 그 창을 «못 열었을 때»(팝업차단 등)만 보이는 비상 복구 버튼이다.
+                  누르면 자기 클릭 권한으로 복사창을 열고, 이 페이지 모달은 사라진다. */}
+            {pip.supported && !pip.pipWindow ? (
               <button
                 type="button"
                 onClick={() => {
-                  if (pip.pipWindow) {
-                    pip.close();
-                    setPipPreferred(false); // 껐으면 다음부터 자동으로 안 뜬다
-                    return;
-                  }
-                  setPipPreferred(true); // 켰으면 다음 카드결제부터 «자동»으로 같이 뜬다
                   const s = pipSize();
                   void pip.open(s.width, s.height);
                 }}
                 className="ru-btn ru-btn-sm"
-                title="복사창을 항상 맨 위에 뜨는 창으로 빼냅니다(기본 켜짐). 페이스터 창이 뒤로 안 밀리고, 페이스터가 복사창 바로 옆에 붙어서 열립니다."
+                title="복사창을 «항상 맨 위에 뜨는 독립 창»으로 띄웁니다. 페이스터 창이 뒤로 밀리지 않습니다."
               >
-                {pip.pipWindow ? "📌 고정 해제" : "📌 복사창 항상 위에 (한 번만)"}
+                📌 복사창 띄우기 ↗
               </button>
             ) : null}
           </div>
@@ -516,13 +505,29 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
                   ② 브라우저는 «클릭 한 번에 창 하나»만 열어준다 → 두 창을 켜둬야 같이 따라온다.
                   ③ 복사창 위치는 크롬이 정한다(우리가 못 옮김). 대신 끌어다 놓은 자리를 기억한다. */}
             <br />
-            <b>페이스터 창은 닫지 말고 「최소화」해 두세요.</b> 닫으면(빨간 ✕) 페이스터가 로그인을 잊어버립니다. 다른 업무 보실 땐 최소화하거나 뒤로 보내두면 되고, 카드결제를 누르면 다시 앞으로 나옵니다. 주문이 몇 건이든 <b>이 창 하나로</b> 계속 결제합니다.
+            <b>페이스터 창은 닫지도, 최소화하지도 마세요.</b> 닫으면(빨간 ✕) 페이스터가 로그인을 잊어버립니다. <b>최소화(노란 −)하면 웹에서 다시 못 꺼냅니다</b> — 창을 되살리는 기능이 브라우저에 아예 없어서(w3c/window-management#3) 직접 눌러 꺼내셔야 합니다. 다른 업무 보실 땐 <b>그냥 뒤로 보내두세요.</b> 카드결제를 누르면 다시 앞으로 나옵니다. 주문이 몇 건이든 <b>이 창 하나로</b> 계속 결제합니다.
             <br />
-            <b>복사창은 카드결제할 때만 떴다가</b> 이 팝업을 닫으면 같이 사라집니다. 자리를 한 번 끌어다 놓으면 그 자리를 기억합니다.
+            <b>복사창은 카드결제할 때만 뜹니다.</b> 이 창을 닫으면 <b>이 주문 카드결제가 끝납니다</b>(뒤에 아무것도 안 남습니다). 자리를 한 번 끌어다 놓으면 크롬이 그 자리를 기억합니다.
           </div>
         </div>
     </div>
   );
+
+  // [2026-09-09 사장님 지적] 「복사창 X 누르면 왜 또 뒤에 뭐가 숨어있어?」
+  //   원인: 복사창이 닫히면 pip.pipWindow 가 null 이 되어 아래 «페이지 모달»이 그대로 드러났다.
+  //   → 복사창 ✕ = 이 주문 카드결제 «종료». 뒤에 아무것도 남기지 않는다.
+  //   ⚠ 돈 처리(handleComplete)와는 무관하다. 화면을 닫을 뿐이다.
+  const hadPipRef = useRef(false);
+  useEffect(() => {
+    if (pip.pipWindow) {
+      hadPipRef.current = true;
+      return;
+    }
+    if (hadPipRef.current) {
+      hadPipRef.current = false;
+      onClose();
+    }
+  }, [pip.pipWindow, onClose]);
 
   const imagePreview = imagePreviewUrl ? (
     <div onClick={() => setImagePreviewUrl("")} style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out" }}>
@@ -531,7 +536,11 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
     </div>
   ) : null;
 
-  // 📌 켜짐 — 같은 복사창을 그 창으로 «옮겨» 그린다. 팝업은 안 그린다(두 벌이 되지 않게).
+  // [2026-09-09] 복사창을 «여는 중»에는 아무것도 그리지 않는다.
+  //   예전엔 이 사이에 페이지 모달이 한 번 그려졌다가 복사창으로 바뀌어, 두 벌처럼 보였다.
+  if (pip.pending) return null;
+
+  // 복사창이 열려 있으면 «그 창에만» 그린다. 페이지 모달은 안 그린다(두 벌이 되지 않게).
   if (pip.pipWindow) {
     return createPortal(
       <div style={{ width: "100%", height: "100dvh", display: "flex", flexDirection: "column", overflow: "hidden", background: "#F4F6FB" }}>
