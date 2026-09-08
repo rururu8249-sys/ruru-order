@@ -33,9 +33,21 @@ import { usePipWindow, copyTextIn } from "@/lib/usePipWindow";
 //   · 모달 박스 크기는 예전과 «똑같은 px» 이다 — 가로 980(왼쪽 490 + 오른쪽 490),
 //     세로 min(1500, 화면높이−16). 50vw·100dvh 처럼 화면따라 늘었다 줄었다 하지 않는다.
 //   · 왼쪽 490 = 복사창(모달) / 오른쪽 490 = 그 자리에 페이스터 «창»이 정확히 겹쳐 뜬다.
-//   · 창 이름은 주지 않는다. 이름을 주면 window.opener 가 남아 흰 화면이 된다.
-//     (그래서 누를 때마다 새 창이 뜬다. «뜨는 것»이 «창 재사용»보다 우선이다.)
+//   · 창에 «고정 이름»을 준다 → 누를 때마다 같은 창을 다시 쓴다.
 //   · 반드시 클릭 제스처 «안에서» 불러야 팝업차단에 안 걸린다.
+//
+// ※ [2026-09-08 정정] 한때 「이름을 주면 window.opener 가 남아 흰 화면이 된다」고 적어두고
+//   이름 없이(noopener) 열었다. 그 진단은 «틀렸다». 실제로 이름을 주고 noopener 없이 열어
+//   화면을 확인한 결과, 페이스터가 정상 동작했다(#/payment/smspayment/success 까지 진행됨).
+//   그 잘못된 기록 때문에 카드결제를 누를 때마다 «새 창»이 떴고,
+//   페이스터 로그인이 창마다 따로라 사장님이 매번 다시 로그인해야 했다.
+//     사장님: 「매번 창을 꺼버리면 계속 로그인해야 하는데 로그인 유지 할 수 있는 방법 없어?」
+//   → 고정 이름으로 «한 창»만 쓴다. 같은 창이면 로그인이 유지된다.
+//
+// ※ opener 를 끊지 않는 것의 위험 (검토 후 수용):
+//   교차출처라 페이스터가 우리 화면을 «읽지»는 못한다. 할 수 있는 건 opener.location 변경
+//   (관리자 탭이 다른 주소로 넘어감) 정도다. 페이스터는 사장님이 실제 결제에 쓰는 도구이고,
+//   방송 중 창이 쌓이거나 로그인이 풀리는 쪽이 훨씬 큰 사고라 이쪽을 택한다.
 
 // 박스 치수 — «한 곳»에서만 정한다. 화면(JSX)과 창 위치 계산이 어긋나면 안 되기 때문.
 const BOX_W = 980;          // 가로 px (왼쪽 복사창 490 + 오른쪽 페이스터 490)
@@ -54,11 +66,16 @@ function paysterSlotRect() {
   const boxH = Math.min(BOX_H_MAX, vh - BOX_V_GAP);
   const width = Math.round(boxW / 2);
   const height = Math.round(boxH);
-  // 브라우저 «내용 영역»이 모니터의 어디서 시작하나 (주소창·탭줄 높이 = outerHeight − innerHeight)
-  const originX = window.screenX + Math.max(0, Math.round((window.outerWidth - vw) / 2));
-  const originY = window.screenY + Math.max(0, window.outerHeight - vh);
   const availW = window.screen?.availWidth || vw;
   const availH = window.screen?.availHeight || vh;
+  // 브라우저 «내용 영역»이 모니터의 어디서 시작하나.
+  //   보통 outerHeight − innerHeight 가 주소창·탭줄 높이다. 그런데
+  //   [2026-09-08 실측] 사장님 크롬은 outerWidth·outerHeight·screenX·screenY 를 «전부 0»으로 준다.
+  //   그대로 쓰면 주소창 높이(약 121px)가 통째로 빠져 페이스터 창이 위로 붕 뜬다(실제로 그랬다).
+  //   → 0 이면 창이 최대화된 상태로 보고 availHeight − innerHeight 로 대신 구한다.
+  const chromeH = window.outerHeight > 0 ? Math.max(0, window.outerHeight - vh) : Math.max(0, availH - vh);
+  const originX = window.screenX + (window.outerWidth > vw ? Math.round((window.outerWidth - vw) / 2) : 0);
+  const originY = window.screenY + chromeH;
   const left = Math.round(originX + (vw - boxW) / 2 + boxW / 2);
   const top = Math.round(originY + (vh - boxH) / 2);
   // 모니터 밖으로 나가면 잘리므로 안쪽으로 붙인다
@@ -70,12 +87,21 @@ function paysterSlotRect() {
   };
 }
 
+/** 페이스터 창 이름 — «고정». 이 이름 덕분에 누를 때마다 같은 창을 다시 쓴다.
+ *  이름을 빼거나 "_blank" 로 바꾸면 창이 매번 새로 생기고 로그인이 풀린다. 바꾸지 말 것. */
+const PAYSTER_WINDOW_NAME = "ruru_payster";
+
 export function openPayster(url: string) {
   if (typeof window === "undefined") return;
-  //   ⚠ 창 이름을 주면 window.opener 가 남아 페이스터가 안 뜬다 → 이름 없이(noopener) 연다.
   //   ⚠ 반드시 «클릭 제스처 안에서» 불러야 팝업차단에 안 걸린다.
+  //   ⚠ 같은 이름의 창이 이미 있으면 «그 창»이 이 주소로 이동한다(새 창 안 생김 → 로그인 유지).
   const r = paysterSlotRect();
-  window.open(url, "_blank", `noopener,noreferrer,popup=yes,left=${r.left},top=${r.top},width=${r.width},height=${r.height}`);
+  const win = window.open(url, PAYSTER_WINDOW_NAME, `popup=yes,left=${r.left},top=${r.top},width=${r.width},height=${r.height}`);
+  try {
+    win?.focus(); // 뒤로 숨어 있던 창이면 앞으로 부른다
+  } catch {
+    /* 포커스는 보조 동작 — 실패해도 창은 떠 있다 */
+  }
 }
 
 /** 카드결제 버튼에서 호출 — 페이스터를 «화면 오른쪽 절반»에 띄운다.
