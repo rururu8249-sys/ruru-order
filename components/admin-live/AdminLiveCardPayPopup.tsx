@@ -7,8 +7,8 @@ import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import type { LiveOrder } from "./types";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
-
-const PAYSTER_URL = "https://user.service.payster.co.kr/#/payment/smspayment";
+// [2026-09-08] 페이스터 주소는 설정 › 상점 정보에서 온다(하드코딩 제거)
+import { useShopInfo } from "@/lib/useShopInfo";
 
 // 페이스터는 카드결제 팝업 내부 iframe으로 표시합니다. 별도 창(window.open)은 더 이상 사용하지 않습니다.
 // LiveOrderTable 등 기존 호출부 호환을 위해 함수 시그니처만 유지(no-op).
@@ -37,6 +37,7 @@ function phoneDigits(order: LiveOrder) {
 }
 
 export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusChange }: Props) {
+  const { paysterUrl } = useShopInfo();
   const [copiedKey, setCopiedKey] = useState("");
   const [saving, setSaving] = useState(false);
   // [2026-08-29] 카톡으로 결제링크 보낸 뒤, 유튜브 채팅에 자동 안내
@@ -316,7 +317,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
         </div>
         </div>
         <div style={{ width: "50%", height: "100%", background: "var(--color-surface)", borderLeft: "1px solid var(--color-line)" }}>
-          <iframe src={PAYSTER_URL} title="페이스터 결제" style={{ width: "100%", height: "100%", border: 0 }} />
+          <iframe src={paysterUrl} title="페이스터 결제" style={{ width: "100%", height: "100%", border: 0 }} />
         </div>
       </div>
       {imagePreviewUrl ? (

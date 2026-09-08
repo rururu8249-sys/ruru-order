@@ -1,6 +1,11 @@
+"use client";
+
 // components/myorder/MyOrderLookupForm.tsx
 // 목적: 주문조회 이름/전화번호 입력 UI
 // 주의: UI 전용. 조회 로직 없음.
+
+// [2026-09-08] 문의 버튼은 설정 › 상점 정보의 문의 방식을 따른다
+import ShopContactLink from "@/components/customer/ShopContactLink";
 
 type MyOrderLookupFormProps = {
   customerName: string;
@@ -63,15 +68,14 @@ export default function MyOrderLookupForm({
         </button>
       </div>
 
-      <a
-        href="https://pf.kakao.com/_RMxaqX"
-        target="_blank"
-        rel="noreferrer"
-        className="mt-4 flex items-center justify-center gap-2 rounded-2xl bg-slate-50 p-3 text-[14px] font-black text-[#151923] ring-1 ring-slate-100 active:scale-[0.98]"
-      >
-        <span>💬</span>
-        카톡채널 문의
-      </a>
+      <ShopContactLink className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-50 p-3 text-[14px] font-black text-[#151923] ring-1 ring-slate-100 active:scale-[0.98]">
+        {({ label }) => (
+          <>
+            <span>💬</span>
+            {label}
+          </>
+        )}
+      </ShopContactLink>
     </section>
   );
 }

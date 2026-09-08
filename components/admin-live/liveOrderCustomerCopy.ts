@@ -5,6 +5,9 @@
 import type { LiveOrder } from "./types";
 import { formatOrderOptionText } from "@/lib/orderOptionText";
 import { formatKoreanPhone } from "@/lib/order/phone";
+// [2026-09-08] 입금계좌 문구는 설정 › 상점 정보에서 온다(하드코딩 제거). 아직 못 읽었으면 예전 값.
+import { bankLine } from "@/lib/shopInfo";
+import { getShopInfoSnapshot } from "@/lib/useShopInfo";
 
 function money(value: unknown) {
   return `${Number(value || 0).toLocaleString()}원`;
@@ -127,8 +130,8 @@ export function buildCustomerOrderCopyText(orderForView: LiveOrder, rawOrder?: L
       lines.push("✅ 입금확인 완료된 주문이에요. 감사합니다!");
     } else if (ps === "unpaid" || ps === "manual_match_needed") {
       lines.push("");
-      // 계좌는 주문서 페이지(app/order/page.tsx BANK_*)와 동일 값 — 계좌 변경 시 함께 수정
-      lines.push("💳 입금계좌: 새마을금고 9002186993725 (유혜원)");
+      // 계좌는 설정 › 상점 정보 값(손님 주문서와 같은 곳에서 읽음)
+      lines.push(`💳 입금계좌: ${bankLine(getShopInfoSnapshot())}`);
       lines.push(`입금하실 금액: ${money(payableTotal)}`);
       lines.push("※ 입금 확인은 보통 10분, 늦어도 30분 안에 완료돼요. 이미 입금하셨다면 조금만 기다려주세요 🙂");
     } else if (ps === "card_unpaid") {
@@ -164,16 +167,16 @@ export function buildPaymentRequestNote(order: LiveOrder): { title: string; mess
   // 무통장 (unpaid / manual_match_needed)
   return {
     title: "💳 입금 안내",
-    // 계좌는 app/order/page.tsx BANK_* 와 동일 값 — 계좌 변경 시 함께 수정
-    message: `${nick}님, 주문서 잘 받았어요! 아직 입금 확인 전이에요.\n\n💳 입금계좌: 새마을금고 9002186993725 (유혜원)\n입금하실 금액: ${money(payableTotal)}\n\n※ 이미 입금하셨다면 확인까지 보통 10분, 늦어도 30분 걸려요. 조금만 기다려주세요 🙂`,
+    // 계좌는 설정 › 상점 정보 값
+    message: `${nick}님, 주문서 잘 받았어요! 아직 입금 확인 전이에요.\n\n💳 입금계좌: ${bankLine(getShopInfoSnapshot())}\n입금하실 금액: ${money(payableTotal)}\n\n※ 이미 입금하셨다면 확인까지 보통 10분, 늦어도 30분 걸려요. 조금만 기다려주세요 🙂`,
   };
 }
 
 // [2026-08-31 사장님 요청 · 돈 계산기] 주문 금액이 바뀌어 입금이 부족할 때 보내는 추가입금 쪽지.
-//   계좌는 위 buildPaymentRequestNote와 동일 값 — 계좌 변경 시 함께 수정.
+//   계좌는 설정 › 상점 정보 값.
 export function buildExtraDepositRequestNote(nick: string, shortage: number): { title: string; message: string } {
   return {
     title: "💳 추가 입금 안내",
-    message: `${nick}님, 주문 내용이 바뀌어서 금액이 조금 달라졌어요.\n\n더 입금하실 금액: ${money(shortage)}\n💳 입금계좌: 새마을금고 9002186993725 (유혜원)\n\n입금해주시면 바로 확인해드릴게요 🙂`,
+    message: `${nick}님, 주문 내용이 바뀌어서 금액이 조금 달라졌어요.\n\n더 입금하실 금액: ${money(shortage)}\n💳 입금계좌: ${bankLine(getShopInfoSnapshot())}\n\n입금해주시면 바로 확인해드릴게요 🙂`,
   };
 }

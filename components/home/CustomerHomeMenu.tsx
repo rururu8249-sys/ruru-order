@@ -1,3 +1,5 @@
+"use client";
+
 // components/home/CustomerHomeMenu.tsx
 // 목적: 고객 HOME 하단 메뉴
 // 주의:
@@ -5,6 +7,9 @@
 // - 공구상품은 상단바가 아니라 이 HOME 메뉴 영역에 배치한다.
 
 import Link from "next/link";
+// [2026-09-08] 문의 카드는 설정 › 상점 정보의 문의 방식(채널/오픈채팅/카카오톡 ID)을 따른다
+import ShopContactLink from "@/components/customer/ShopContactLink";
+import { contactDesc } from "@/lib/shopInfo";
 
 type MenuItem = {
   href: string;
@@ -47,27 +52,26 @@ const menuItems: MenuItem[] = [
 export default function CustomerHomeMenu() {
   return (
     <>
-      <a
-        href="https://pf.kakao.com/_RMxaqX"
-        target="_blank"
-        rel="noreferrer"
-        className="mt-5 flex items-center gap-3 rounded-[26px] bg-[#ffe04b] px-4 py-4 shadow-[0_12px_26px_rgba(30,64,175,0.08)] ring-1 ring-yellow-200 active:scale-[0.99] min-[390px]:gap-4 min-[390px]:rounded-[28px] min-[390px]:px-5 min-[390px]:py-5"
-      >
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-white/70 text-[23px] font-black tracking-[-0.08em] text-[#3b2517]">
-          TALK
-        </div>
+      <ShopContactLink className="mt-5 flex w-full items-center gap-3 rounded-[26px] bg-[#ffe04b] px-4 py-4 text-left shadow-[0_12px_26px_rgba(30,64,175,0.08)] ring-1 ring-yellow-200 active:scale-[0.99] min-[390px]:gap-4 min-[390px]:rounded-[28px] min-[390px]:px-5 min-[390px]:py-5">
+        {({ info, label }) => (
+          <>
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-white/70 text-[23px] font-black tracking-[-0.08em] text-[#3b2517]">
+              TALK
+            </div>
 
-        <div className="min-w-0 flex-1">
-          <p className="break-keep text-[23px] font-black leading-tight tracking-[-0.06em] text-[#241b17] min-[390px]:text-[26px]">
-            카톡채널 문의
-          </p>
-          <p className="mt-1 break-keep text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-[#5f4a17]">
-            입금·배송·주문 문의는 카톡채널로 남겨 주세요.
-          </p>
-        </div>
+            <div className="min-w-0 flex-1">
+              <p className="break-keep text-[23px] font-black leading-tight tracking-[-0.06em] text-[#241b17] min-[390px]:text-[26px]">
+                {label}
+              </p>
+              <p className="mt-1 break-keep text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-[#5f4a17]">
+                {contactDesc(info)}
+              </p>
+            </div>
 
-        <div className="text-3xl font-black text-[#7d6415]">›</div>
-      </a>
+            <div className="text-3xl font-black text-[#7d6415]">›</div>
+          </>
+        )}
+      </ShopContactLink>
 
       <section className="mt-5 grid grid-cols-2 gap-3 min-[390px]:gap-4">
         {menuItems.map((item) => {

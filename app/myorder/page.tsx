@@ -29,11 +29,11 @@ import MyOrderLookupForm from "@/components/myorder/MyOrderLookupForm";
 import MyOrderResultCard from "@/components/myorder/MyOrderResultCard";
 import MyOrderEmptyState from "@/components/myorder/MyOrderEmptyState";
 import MyOrderPagination from "@/components/myorder/MyOrderPagination";
+// [2026-09-08] 표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
+import { useShopInfo } from "@/lib/useShopInfo";
 
 const FOOTER_TEXT = "© since 2024 루루동이 | All Rights Reserved.";
-const BANK_NAME = "새마을금고";
-const BANK_ACCOUNT = "9002186993725";
-const BANK_HOLDER = "유혜원";
+// [2026-09-08] BANK_NAME/BANK_ACCOUNT/BANK_HOLDER 는 MyOrderPage 안에서 useShopInfo() 로 받는다.
 
 const MY_ORDER_FILTERS = ["전체", "입금대기", "입금확인", "출고완료"] as const;
 type MyOrderFilter = (typeof MY_ORDER_FILTERS)[number];
@@ -149,6 +149,11 @@ const blockCustomerCopyEvents = () => {
 };
 
 export default function MyOrderPage() {
+  // [2026-09-08] 손님에게 보여주는 입금계좌 — 설정 › 상점 정보. 표시·복사 전용(입금 판정과 무관).
+  const shopInfo = useShopInfo();
+  const BANK_NAME = shopInfo.bankName;
+  const BANK_ACCOUNT = shopInfo.bankAccount;
+  const BANK_HOLDER = shopInfo.bankHolder;
   const [customerName, setCustomerName] = useState("");
 
   const [customerNotice, setCustomerNotice] = useState<{

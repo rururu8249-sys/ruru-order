@@ -6,6 +6,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
+import ShopContactLink from "@/components/customer/ShopContactLink";
+import { contactGuideSentence } from "@/lib/shopInfo";
+import { useShopInfo } from "@/lib/useShopInfo";
 
 type BlockState = {
   checking: boolean;
@@ -22,7 +25,7 @@ const INITIAL_STATE: BlockState = {
 };
 
 const CUSTOMER_ROUTES = new Set(["/", "/home", "/order", "/myorder", "/group-buy", "/notice"]);
-const KAKAO_CHANNEL_URL = process.env.NEXT_PUBLIC_KAKAO_CHANNEL_URL || "https://pf.kakao.com/_RMxaqX";
+// [2026-09-08] 문의 방식은 설정 › 상점 정보를 따른다(NEXT_PUBLIC_KAKAO_CHANNEL_URL 은 lib/shopInfo 기본값으로 이동)
 
 function digitsOnly(value: unknown) {
   return String(value || "").replace(/[^0-9]/g, "");
@@ -72,6 +75,7 @@ function shouldGuardPath(pathname: string | null) {
 }
 
 export default function CustomerAccessBlockGuard() {
+  const shopInfo = useShopInfo();
   const pathname = usePathname();
   const shouldGuard = useMemo(() => shouldGuardPath(pathname), [pathname]);
   const [state, setState] = useState<BlockState>(INITIAL_STATE);
@@ -186,19 +190,15 @@ export default function CustomerAccessBlockGuard() {
                 <p className="mt-3 text-[14px] font-black leading-6 text-red-700">
                   운영 확인 후 안내드리겠습니다.
                   <br />
-                  문의는 카톡채널로 부탁드립니다.
+                  {contactGuideSentence(shopInfo)}
                 </p>
               </div>
             </div>
 
-            <a
-              href={KAKAO_CHANNEL_URL}
-              target="_blank"
-              rel="noreferrer"
+            <ShopContactLink
+              labelForm="long"
               className="mt-5 flex h-12 w-full items-center justify-center rounded-2xl bg-slate-950 text-[15px] font-black text-white shadow-lg"
-            >
-              카톡채널 문의하기
-            </a>
+            />
           </div>
 
           <button

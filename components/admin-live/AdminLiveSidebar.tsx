@@ -2,6 +2,10 @@ import { ADMIN_LIVE_MENUS, type AdminLiveMenuKey } from "./adminLiveMenu";
 import AdminSoundControl from "./AdminSoundControl";
 import AdminLiveLogoutButton from "./AdminLiveLogoutButton";
 import AdminLiveSidebarPresence from "./AdminLiveSidebarPresence";
+// [2026-09-08] 카톡·카드결제 버튼 주소는 설정 › 상점 정보에서 온다(하드코딩 제거)
+import { CONTACT_TYPE_SHORT, adminChatTarget } from "@/lib/shopInfo";
+import { useShopInfo } from "@/lib/useShopInfo";
+import { showAdminToast } from "@/lib/adminToast";
 
 type Props = {
   activeMenu: AdminLiveMenuKey;
@@ -26,6 +30,8 @@ export default function AdminLiveSidebar({
   exceptionBadges,
   onExceptionBadgeClick,
 }: Props) {
+  const shopInfo = useShopInfo();
+  const chatTarget = adminChatTarget(shopInfo);
   return (
     <>
       {/* 모바일: 드로어 열렸을 때 뒤 어둡게(클릭하면 닫힘). 데스크탑(md+)에선 숨김 */}
@@ -134,6 +140,12 @@ export default function AdminLiveSidebar({
               <button
                 type="button"
                 onClick={() => {
+                  // 카카오톡 ID 방식이면 열 주소가 없다 → ID 복사
+                  if (chatTarget.kind === "id") {
+                    navigator.clipboard?.writeText(chatTarget.id).catch(() => {});
+                    showAdminToast(`카카오톡 ID「${chatTarget.id}」를 복사했어요. 카카오톡에서 친구 목록을 확인하세요.`, "success");
+                    return;
+                  }
                   const aw = window.screen.availWidth || 1600;
                   const ah = window.screen.availHeight || 1000;
                   const W = Math.min(1700, Math.round(aw * 0.92));
@@ -141,7 +153,7 @@ export default function AdminLiveSidebar({
                   const left = Math.max(0, Math.round((aw - W) / 2));
                   const top = Math.max(0, Math.round((ah - H) / 2));
                   const w = window.open(
-                    "https://business.kakao.com/_RMxaqX/chats?t_src=business_partnercenter&t_ch=lnb&t_obj=%EB%82%B4%EC%B1%84%ED%8C%85_%ED%81%B4%EB%A6%AD",
+                    chatTarget.url,
                     "ruruKakaoConsult",
                     `popup=yes,width=${W},height=${H},left=${left},top=${top}`
                   );
@@ -150,11 +162,11 @@ export default function AdminLiveSidebar({
                 className="flex h-10 items-center justify-center gap-1 rounded-xl border border-rose-line bg-rose-soft text-xs font-black text-rose-deep transition hover:opacity-90 active:scale-[0.98]"
               >
                 <span>💬</span>
-                카톡채널
+                {CONTACT_TYPE_SHORT[shopInfo.contactType]}
               </button>
               <button
                 type="button"
-                onClick={() => window.open("https://user.service.payster.co.kr/#/payment/smspayment", "ruruPayster", "popup=yes,width=480,height=720")}
+                onClick={() => window.open(shopInfo.paysterUrl, "ruruPayster", "popup=yes,width=480,height=720")}
                 className="flex h-10 items-center justify-center gap-1 rounded-xl border border-line bg-surface-2 text-xs font-black text-ink-soft transition hover:bg-surface-3 active:scale-[0.98]"
               >
                 <span>💳</span>

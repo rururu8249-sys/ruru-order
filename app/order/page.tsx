@@ -86,6 +86,9 @@ import CustomerMissingDetailAddressPanel from "@/components/customer/CustomerMis
 import GroupBuyQuickSelect, { type GroupBuyQuickSelectProduct } from "@/components/order/GroupBuyQuickSelect";
 import { noticeBarLine } from "@/lib/noticeBar";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
+// [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
+import ShopContactLink from "@/components/customer/ShopContactLink";
+import { useShopInfo } from "@/lib/useShopInfo";
 import { detailCode, detailPricePresentation, detailProducts } from "@/lib/productDetailModel";
 import CustomerSizeChartSheet from "@/components/customer/CustomerSizeChartSheet";
 import { resolveSizeChart } from "@/lib/sizeChart";
@@ -210,9 +213,7 @@ const resolveShippingGroupFromValue = (value: unknown): "normal" | "vendor" => {
   return "normal";
 };
 
-const BANK_NAME = "새마을금고";
-const BANK_ACCOUNT = "9002186993725";
-const BANK_HOLDER = "유혜원";
+// [2026-09-08] BANK_NAME/BANK_ACCOUNT/BANK_HOLDER 는 OrderPage 안에서 useShopInfo() 로 받는다(설정 › 상점 정보).
 
 const ORDER_LOOKUP_FILTERS = ["전체", "결제대기", "결제완료", "출고완료", "주문취소"] as const;
 const ORDER_LOOKUP_PER_PAGE = 2;
@@ -1326,6 +1327,11 @@ function normalizeOrderProductRow(product: any): BroadcastProduct {
 
 
 export default function OrderPage() {
+  // [2026-09-08] 손님에게 보여주는 입금계좌 — 설정 › 상점 정보. 표시·복사 전용(입금 판정과 무관).
+  const shopInfo = useShopInfo();
+  const BANK_NAME = shopInfo.bankName;
+  const BANK_ACCOUNT = shopInfo.bankAccount;
+  const BANK_HOLDER = shopInfo.bankHolder;
   const [isEditMode, setIsEditMode] = useState(false);
   const [broadcast, setBroadcast] = useState<any | null>(null);
   // [2026-08-21] 방송정보 조회가 끝났는지. false(로딩중)를 "방송 꺼짐"으로 오판해
@@ -8084,21 +8090,24 @@ export default function OrderPage() {
               </div>
               {/* [2026-07-10 사장님 지침] 카톡채널 = 1:1 문의 주 채널 → 가로 한 줄 단독 배치.
                   나머지(유튜브·밴드·인스타)는 아래 한 줄 3칸. 링크 주소는 전부 기존 그대로. */}
-              <a
-                href="https://pf.kakao.com/_RMxaqX"
-                target="_blank"
-                rel="noreferrer"
-                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", padding: "15px 12px", borderRadius: "12px", background: "#FEE500", textDecoration: "none", marginBottom: "8px" }}
+              {/* [2026-09-08] 문의 방식(채널/오픈채팅/카카오톡 ID)은 설정 › 상점 정보에서 정한다. 겉모습은 그대로. */}
+              <ShopContactLink
+                labelForm="long"
+                style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "center", gap: "8px", padding: "15px 12px", borderRadius: "12px", border: "none", background: "#FEE500", textDecoration: "none", marginBottom: "8px" }}
               >
-                {/* 카카오톡 말풍선 아이콘(노란 배경 + 갈색 말풍선 = 카카오 공식 조합) */}
-                <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden focusable="false">
-                  <path
-                    fill="#3C1E1E"
-                    d="M12 3C6.9 3 2.8 6.3 2.8 10.3c0 2.6 1.7 4.9 4.3 6.2-.2.7-.7 2.5-.8 2.9 0 0 0 .2.1.2h.2c.3-.1 2.7-1.8 3.4-2.3.6.1 1.3.2 2 .2 5.1 0 9.2-3.3 9.2-7.2S17.1 3 12 3z"
-                  />
-                </svg>
-                <span style={{ fontSize: "15px", color: "#3C1E1E", fontWeight: 800 }}>카톡채널로 문의하기</span>
-              </a>
+                {({ label }) => (
+                  <>
+                    {/* 카카오톡 말풍선 아이콘(노란 배경 + 갈색 말풍선 = 카카오 공식 조합) */}
+                    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden focusable="false">
+                      <path
+                        fill="#3C1E1E"
+                        d="M12 3C6.9 3 2.8 6.3 2.8 10.3c0 2.6 1.7 4.9 4.3 6.2-.2.7-.7 2.5-.8 2.9 0 0 0 .2.1.2h.2c.3-.1 2.7-1.8 3.4-2.3.6.1 1.3.2 2 .2 5.1 0 9.2-3.3 9.2-7.2S17.1 3 12 3z"
+                      />
+                    </svg>
+                    <span style={{ fontSize: "15px", color: "#3C1E1E", fontWeight: 800 }}>{label}</span>
+                  </>
+                )}
+              </ShopContactLink>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
                 <a href="https://youtube.com/channel/UCBbrUWUnHvq5Ldpxgy5GdMw?si=2wsmT_wEinvKzzEF" target="_blank" rel="noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", padding: "12px 4px", borderRadius: "10px", background: "#F5F3F0", textDecoration: "none" }}><span style={{ fontSize: "18px" }}>▶️</span><span style={{ fontSize: "11px", color: "#6B6460", fontWeight: 600 }}>유튜브</span></a>
                 <a href="https://band.us/@ruru8249" target="_blank" rel="noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", padding: "12px 4px", borderRadius: "10px", background: "#F5F3F0", textDecoration: "none" }}><span style={{ fontSize: "18px" }}>🎵</span><span style={{ fontSize: "11px", color: "#6B6460", fontWeight: 600 }}>밴드</span></a>

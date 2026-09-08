@@ -4,9 +4,13 @@
 // 목적: 차단 고객 주문서 작성 제한 안내
 // 주의: UI 전용. 주문 저장, 금액, 배송비, 입금, 정산 로직 없음.
 
-const KAKAO_CHANNEL_URL = "https://pf.kakao.com/_RMxaqX";
+// [2026-09-08] 문의 방식은 설정 › 상점 정보를 따른다(하드코딩 제거)
+import ShopContactLink from "@/components/customer/ShopContactLink";
+import { contactGuideSentence } from "@/lib/shopInfo";
+import { useShopInfo } from "@/lib/useShopInfo";
 
 export default function CustomerBlockedNotice() {
+  const shopInfo = useShopInfo();
   return (
     <section className="rounded-[26px] border border-red-100 bg-red-50 p-5 shadow-sm">
       <div className="flex items-start gap-3">
@@ -24,17 +28,13 @@ export default function CustomerBlockedNotice() {
           </h2>
 
           <p className="mt-2 break-keep text-[14px] font-bold leading-relaxed text-red-700">
-            문의는 카톡채널로 부탁드립니다. 운영 확인 후 안내드리겠습니다.
+            {contactGuideSentence(shopInfo)} 운영 확인 후 안내드리겠습니다.
           </p>
 
-          <a
-            href={KAKAO_CHANNEL_URL}
-            target="_blank"
-            rel="noreferrer"
+          <ShopContactLink
+            labelForm="long"
             className="mt-4 inline-flex h-11 items-center justify-center rounded-2xl bg-slate-950 px-5 text-sm font-black text-white active:scale-[0.98]"
-          >
-            카톡채널 문의하기
-          </a>
+          />
         </div>
       </div>
     </section>

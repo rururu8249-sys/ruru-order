@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import AdminAuthSettingsPanel from "./AdminAuthSettingsPanel";
 import CombineShippingSettingsTab from "./CombineShippingSettingsTab";
+import ShopInfoSettingsTab from "./ShopInfoSettingsTab";
 import { HOWTO_DEFAULT, parseHowtoSteps } from "@/lib/howto";
 
 type SettingKey =
@@ -154,8 +155,10 @@ function decimalInput(value: string) {
 }
 
 // 설정 카테고리(좌측 네비) — 업계 표준: 카테고리별로 나눠 스크롤 최소화
-type SettingsTab = "payment" | "combine" | "point" | "order" | "youtube" | "telegram" | "trend" | "security";
+type SettingsTab = "shop" | "payment" | "combine" | "point" | "order" | "youtube" | "telegram" | "trend" | "security";
 const SETTINGS_TABS: { key: SettingsTab; label: string; icon: string; desc: string }[] = [
+  // [2026-09-08] 상점 정보 — 문의 방식·페이스터·표시용 계좌. 자체 저장(API). 맨 위 + 기본 탭.
+  { key: "shop", label: "상점 정보", icon: "🏪", desc: "문의 방식·계좌·페이스터" },
   { key: "payment", label: "결제·배송", icon: "💳", desc: "카드 수수료·배송비" },
   { key: "combine", label: "합배송", icon: "🚚", desc: "시간범위 수동설정" },
   { key: "point", label: "포인트 적립", icon: "🪙", desc: "자동적립·적립률" },
@@ -176,7 +179,7 @@ type AdminLiveSettingsPanelProps = {
 export default function AdminLiveSettingsPanel({ onOpenNotice }: AdminLiveSettingsPanelProps = {}) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<SettingsTab>("payment");
+  const [activeTab, setActiveTab] = useState<SettingsTab>("shop");
 
   const [customerCardRate, setCustomerCardRate] = useState(String(DEFAULTS.customer_card_extra_rate));
   const [actualCardRate, setActualCardRate] = useState(String(DEFAULTS.actual_card_fee_rate));
@@ -328,6 +331,9 @@ export default function AdminLiveSettingsPanel({ onOpenNotice }: AdminLiveSettin
       {/* 우측 내용 */}
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex-1 space-y-4 overflow-y-auto p-5">
+          {/* ── 상점 정보 (자체 저장: /api/admin-live/shop-info) ── */}
+          {activeTab === "shop" && <ShopInfoSettingsTab />}
+
           {/* ── 결제·배송 ── */}
           {activeTab === "payment" && (
             <>
