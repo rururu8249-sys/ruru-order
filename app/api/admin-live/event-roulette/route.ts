@@ -651,15 +651,24 @@ async function runParticipants(opts: {
 }) {
   const supabase = getSupabaseAdmin();
   const { mode, sourceDate, broadcastId, paidOnly, excludeDailyDup, orderGroupIds, ticketRule } = opts;
-  const rawParticipants = await buildParticipantsForRequest(supabase, mode, sourceDate, broadcastId, paidOnly, orderGroupIds, ticketRule);
-  const deduped = excludeDailyDup
-    ? await applyNoDuplicateWinnerRule(supabase, rawParticipants, {
-        mode,
-        isTest: mode === "test",
-        sourceDate,
-        broadcastId,
-      })
-    : { participants: rawParticipants, excludedWinnerCount: 0 };
+  // [2026-09-09] 명단 조회가 매번 0.5초 걸리던 이유 — DB 조회 3개를 «줄줄이» 기다렸다.
+  //   ① 주문 조회 → ② 기존 이벤트 조회 → ③ 기존 당첨자 조회
+  //   그런데 ②③(중복당첨 제외 명단)은 ①의 결과를 «전혀 안 쓴다»(입력이 mode·isTest·sourceDate·broadcastId 뿐).
+  //   → ①과 ②③을 «동시에» 시작한다. 기다리는 시간만 줄고 결과는 완전히 동일하다.
+  //   ⚠ 추첨·가중치·응모권 계산과 제외 규칙은 손대지 않았다. 순서(참가자 배열 순서)도 filter 라 그대로다.
+  const [rawParticipants, priorWinnerNicknames] = await Promise.all([
+    buildParticipantsForRequest(supabase, mode, sourceDate, broadcastId, paidOnly, orderGroupIds, ticketRule),
+    excludeDailyDup
+      ? fetchPriorWinnerNicknameSet(supabase, {
+          mode,
+          isTest: mode === "test",
+          sourceDate,
+          broadcastId,
+        })
+      : Promise.resolve(new Set<string>()),
+  ]);
+  const filtered = filterParticipantsExcludingWinnerNicknames(rawParticipants, priorWinnerNicknames);
+  const deduped = { participants: filtered, excludedWinnerCount: rawParticipants.length - filtered.length };
   const participants = deduped.participants;
 
   return json({

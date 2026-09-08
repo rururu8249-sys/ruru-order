@@ -275,8 +275,14 @@ export default function AdminLiveEventRoulettePanel({
   // [2026-09-08] 구매 응모권 규칙 — 켜면 "1장 + 결제완료 금액 unit원마다 1장, 최대 max장". 서버에 그대로 보내고 서버가 계산.
   //   (예전 useWeight 토글은 어디에도 안 보내져서 장식이었고, 서버는 항상 1~1.8배 가중치를 걸고 있었음)
   const [ticketEnabled, setTicketEnabled] = useState(false);
-  const [ticketUnitMan, setTicketUnitMan] = useState("5"); // 만원 단위
-  const [ticketMax, setTicketMax] = useState("5");
+  // [2026-09-09] 숫자를 «치는 동안» 매번 서버에 물어보던 것(0.5초마다 명단 재조회) 제거.
+  //   화면에 보이는 값(ticket*)과 «실제 적용된 값»(applied*)을 나눈다.
+  //   칸 밖을 클릭하거나 Enter 를 누를 때만 applied 로 넘어가고, 그때 한 번만 다시 불러온다.
+  //   ⚠ 서버로 나가는 규칙은 «항상» applied 값이다 → 화면 숫자와 추첨 확률이 어긋나지 않는다.
+  const [ticketUnitMan, setTicketUnitMan] = useState("5"); // 만원 단위 (입력 중)
+  const [ticketMax, setTicketMax] = useState("5");         // (입력 중)
+  const [appliedUnitMan, setAppliedUnitMan] = useState("5"); // 실제 적용값
+  const [appliedMax, setAppliedMax] = useState("5");         // 실제 적용값
   // 사장님이 직접 바꾼 뒤에만 저장·재조회한다(처음 불러온 값 반영 중엔 아무것도 안 함 — 저장값 덮어쓰기 방지)
   const ticketTouchedRef = useRef(false);
   useEffect(() => {
@@ -287,17 +293,29 @@ export default function AdminLiveEventRoulettePanel({
         if (!raw) return;
         const j = JSON.parse(raw) as { enabled?: boolean; unitMan?: string; max?: string };
         if (typeof j.enabled === "boolean") setTicketEnabled(j.enabled);
-        if (typeof j.unitMan === "string" && /^[0-9]{1,3}$/.test(j.unitMan)) setTicketUnitMan(j.unitMan);
-        if (typeof j.max === "string" && /^[0-9]{1,2}$/.test(j.max)) setTicketMax(j.max);
+        if (typeof j.unitMan === "string" && /^[0-9]{1,3}$/.test(j.unitMan)) { setTicketUnitMan(j.unitMan); setAppliedUnitMan(j.unitMan); }
+        if (typeof j.max === "string" && /^[0-9]{1,2}$/.test(j.max)) { setTicketMax(j.max); setAppliedMax(j.max); }
       } catch { /* 저장된 규칙 없음 */ }
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
   const ticketRuleBody = useMemo(() => ({
     useWeight: ticketEnabled,
-    ticketUnit: Math.max(1, Number(ticketUnitMan) || 5) * 10000,
-    ticketMax: Math.max(1, Number(ticketMax) || 5),
-  }), [ticketEnabled, ticketUnitMan, ticketMax]);
+    ticketUnit: Math.max(1, Number(appliedUnitMan) || 5) * 10000,
+    ticketMax: Math.max(1, Number(appliedMax) || 5),
+  }), [ticketEnabled, appliedUnitMan, appliedMax]);
+  /** 입력 중인 숫자를 «적용»한다 — 칸 밖을 클릭하거나 Enter. 여기서만 명단을 다시 불러온다. */
+  const applyTicketNumbers = () => {
+    const unit = Number(ticketUnitMan) >= 1 ? ticketUnitMan : "5";
+    const max = Number(ticketMax) >= 1 ? ticketMax : "5";
+    if (unit !== ticketUnitMan) setTicketUnitMan(unit);
+    if (max !== ticketMax) setTicketMax(max);
+    if (unit === appliedUnitMan && max === appliedMax) return; // 안 바뀌었으면 서버에 안 물어본다
+    ticketTouchedRef.current = true;
+    setAppliedUnitMan(unit);
+    setAppliedMax(max);
+  };
+  const ticketNumbersDirty = ticketUnitMan !== appliedUnitMan || ticketMax !== appliedMax;
   const ticketRuleKey = JSON.stringify(ticketRuleBody);
   const [listPeriod, setListPeriod] = useState<"today" | "week" | "month" | "date">("today");
   const [listDate, setListDate] = useState("");
@@ -978,14 +996,12 @@ export default function AdminLiveEventRoulettePanel({
   // [2026-09-08] 응모권 규칙이 바뀌면 명단(장수)을 다시 불러오고 규칙을 기억해 둔다(수동 입력은 전원 1장이라 제외)
   useEffect(() => {
     if (!ticketTouchedRef.current) return;
-    try { window.localStorage.setItem("ruru_event_ticket_rule", JSON.stringify({ enabled: ticketEnabled, unitMan: ticketUnitMan, max: ticketMax })); } catch { /* 무시 */ }
+    try { window.localStorage.setItem("ruru_event_ticket_rule", JSON.stringify({ enabled: ticketEnabled, unitMan: appliedUnitMan, max: appliedMax })); } catch { /* 무시 */ }
     if (!open) return;
     if (participantSource !== "auto" && participantSource !== "paid") return;
-    // 숫자 칸을 치는 동안 매 글자마다 조회하지 않게 0.5초 뒤 한 번
-    const timer = window.setTimeout(() => {
-      void loadParticipants(mode, sourceDate, broadcastId, participantSource === "paid");
-    }, 500);
-    return () => window.clearTimeout(timer);
+    // [2026-09-09] 예전엔 «글자를 칠 때마다» 0.5초 뒤 조회가 나갔다. 이제 규칙이 «적용»될 때만 바뀌므로
+    //   기다릴 이유가 없다 — 바로 한 번 불러온다. (켜기/끄기 토글도 같은 경로)
+    void loadParticipants(mode, sourceDate, broadcastId, participantSource === "paid");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketRuleKey]);
 
@@ -1083,9 +1099,23 @@ export default function AdminLiveEventRoulettePanel({
   };
 
 
+  // [2026-09-09] 명단을 불러올 때마다 «대기 이벤트»를 DB에 새로 만들던 것 → 같은 명단이면 건너뛴다.
+  //   (예전: 명단 1회 로드 = participants + create_event + events + winners = 서버 왕복 4회,
+  //    게다가 테스트 이벤트 행이 계속 쌓였다)
+  const previewSignatureRef = useRef("");
   const ensureRoulettePreviewEvent = async (nextParticipants: RouletteParticipant[]) => {
     if (eventTab !== "roulette") return;
     if (nextParticipants.length === 0) return;
+
+    // 명단(닉네임+응모권 장수)과 방송·제목·규칙이 그대로면 위젯에 띄울 내용도 그대로다 → 서버에 안 간다.
+    const signature = JSON.stringify([
+      nextParticipants.map((p) => `${p.nickname}:${Math.max(1, Math.floor(Number(p.tickets ?? p.weight ?? 1)) || 1)}`),
+      broadcastId,
+      title,
+      excludeDailyDup,
+      ticketRuleKey,
+    ]);
+    if (previewSignatureRef.current === signature) return;
 
     try {
       const createPayload = await requestJson<EventPayload>("/api/admin-live/event-roulette", {
@@ -1109,10 +1139,13 @@ export default function AdminLiveEventRoulettePanel({
         throw new Error(createPayload.message || "룰렛 미리보기 이벤트 생성 실패");
       }
 
+      previewSignatureRef.current = signature;
       setCurrentEvent(createPayload.event);
       setParticipants(createPayload.event.participants || nextParticipants);
-      await loadEventsAndWinners();
+      // [2026-09-09] 여기서 기록(이벤트목록·당첨자)까지 다시 불러오느라 왕복이 2회 더 나갔다.
+      //   이건 «테스트 대기 이벤트»라 목록에 즉시 보일 필요가 없다 → 아래 「새로고침」 버튼에 맡긴다.
     } catch (error) {
+      previewSignatureRef.current = ""; // 실패했으면 다음에 다시 시도한다
       showAdminToast(
         "룰렛 미리보기 생성 실패\\n\\n" + (error instanceof Error ? error.message : String(error)),
         "error"
@@ -1560,11 +1593,21 @@ export default function AdminLiveEventRoulettePanel({
                     {ticketEnabled ? (
                       <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap", fontSize: "11px" }}>
                         <span>기본 1장 + 결제완료</span>
-                        <input className="ipt" style={{ width: "44px", textAlign: "center", padding: "4px" }} inputMode="numeric" value={ticketUnitMan} onChange={(e) => { ticketTouchedRef.current = true; setTicketUnitMan(e.target.value.replace(/[^0-9]/g, "").slice(0, 3) || ""); }} onBlur={() => { if (!(Number(ticketUnitMan) >= 1)) setTicketUnitMan("5"); }} />
+                        <input className="ipt" style={{ width: "44px", textAlign: "center", padding: "4px" }} inputMode="numeric" value={ticketUnitMan}
+                          onChange={(e) => setTicketUnitMan(e.target.value.replace(/[^0-9]/g, "").slice(0, 3) || "")}
+                          onBlur={applyTicketNumbers}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }} />
                         <span>만원마다 1장 · 최대</span>
-                        <input className="ipt" style={{ width: "40px", textAlign: "center", padding: "4px" }} inputMode="numeric" value={ticketMax} onChange={(e) => { ticketTouchedRef.current = true; setTicketMax(e.target.value.replace(/[^0-9]/g, "").slice(0, 2) || ""); }} onBlur={() => { if (!(Number(ticketMax) >= 1)) setTicketMax("5"); }} />
+                        <input className="ipt" style={{ width: "40px", textAlign: "center", padding: "4px" }} inputMode="numeric" value={ticketMax}
+                          onChange={(e) => setTicketMax(e.target.value.replace(/[^0-9]/g, "").slice(0, 2) || "")}
+                          onBlur={applyTicketNumbers}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }} />
                         <span>장</span>
-                        <span style={{ width: "100%", color: "var(--mut2)" }}>예) 5만원마다 1장이면 — 결제 0~4만원 <b>1장</b> · 5만원 <b>2장</b> · 10만원 <b>3장</b> … 최대 {ticketMax || 5}장.<br />확률 = 내 장수 ÷ 전체 장수. <b>미입금 주문은 장수가 안 늘어요</b>(참가는 됨). 수동 입력 명단은 전원 1장.</span>
+                        <span style={{ width: "100%", color: "var(--mut2)" }}>예) 5만원마다 1장이면 — 결제 0~4만원 <b>1장</b> · 5만원 <b>2장</b> · 10만원 <b>3장</b> … 최대 {appliedMax || 5}장.<br />확률 = 내 장수 ÷ 전체 장수. <b>미입금 주문은 장수가 안 늘어요</b>(참가는 됨). 수동 입력 명단은 전원 1장.</span>
+                        {/* [2026-09-09] 숫자를 치는 동안엔 명단을 다시 안 불러온다(버벅임 제거). 적용 시점을 화면에 알려준다. */}
+                        <span style={{ width: "100%", color: ticketNumbersDirty ? "var(--amber)" : "var(--mut2)", fontWeight: ticketNumbersDirty ? 700 : 400 }}>
+                          {ticketNumbersDirty ? "↩︎ Enter 를 누르거나 칸 밖을 클릭하면 적용됩니다 (지금은 예전 숫자로 계산 중)" : "숫자를 고치면 Enter 또는 칸 밖 클릭으로 적용됩니다."}
+                        </span>
                       </div>
                     ) : (
                       <div style={{ marginTop: "4px", fontSize: "11px", color: "var(--mut2)" }}>지금은 <b>꺼짐</b> — 61명이든 1명이든 <b>전원 똑같은 확률</b>입니다. 켜면 결제한 금액만큼 응모권이 늘어나요.</div>
