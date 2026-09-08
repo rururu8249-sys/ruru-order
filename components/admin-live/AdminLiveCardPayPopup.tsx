@@ -10,8 +10,34 @@ import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 // [2026-09-08] 페이스터 주소는 설정 › 상점 정보에서 온다(하드코딩 제거)
 import { useShopInfo } from "@/lib/useShopInfo";
 
-// 페이스터는 카드결제 팝업 내부 iframe으로 표시합니다. 별도 창(window.open)은 더 이상 사용하지 않습니다.
-// LiveOrderTable 등 기존 호출부 호환을 위해 함수 시그니처만 유지(no-op).
+// ═══ 페이스터를 «어떻게» 열 것인가 — 2026-09-08 확정. 다시 뒤집지 말 것 ═══
+//
+// 이 파일은 iframe ↔ 별도 창 사이를 네 번 오갔다(e0757de → 08f7eeb → 5b95833 →
+// 0301f98 → 1fc8464). 원인을 밝히지 않고 «안 되니까 반대로» 바꾸기만 반복한 흔적이다.
+//
+// 2026-09-08 실측:
+//   · iframe 은 차단당한 게 아니다 — onload 정상 발생, X-Frame-Options 거부 메시지 없음.
+//     그런데도 «안이 비어 있다».
+//   · window.open 으로 연 별도 창도 «흰 화면».
+//   · 같은 주소를 «일반 탭»에 그냥 열면 정상 동작(로그인 상태로 뜬다).
+//
+// 이 셋을 한 번에 설명하는 원인은 하나뿐이다:
+//   페이스터가 「누가 나를 열었는가」를 보고 거부한다.
+//     iframe      → window.parent !== window
+//     window.open → window.opener !== null      ← 이름 있는 창도 opener 가 남는다
+//     일반 탭      → 둘 다 없음 → 정상            ✅
+//   결제 사이트의 흔한 클릭재킹 방어다. 우리가 뚫을 수 없고, 뚫으려 해서도 안 된다.
+//
+// 결론: opener 를 «끊고» 연다. rel="noopener" / window.open(..., "noopener") 를 쓰면
+//   열린 창의 window.opener 가 null 이라 «일반 탭»과 똑같아진다.
+//   ⚠ 창 이름("ruruPayster")을 주면 opener 가 남으므로 이름을 주면 안 된다.
+export function openPayster(url: string) {
+  // noopener → 열린 창에서 window.opener === null (일반 탭과 동일한 상태)
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+// LiveOrderTable 등 기존 호출부 호환을 위해 시그니처만 유지(no-op).
+//   카드결제 팝업이 열릴 때 자동으로 창을 띄우지는 않는다 — 사장님이 버튼으로 연다.
 export function openPaysterRightHalf() {
   /* no-op */
 }
@@ -316,39 +342,36 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
           </div>
         </div>
         </div>
-        {/* [2026-09-08] 예전엔 iframe 한 줄뿐이라, 페이스터가 «흰 화면»으로 뜨면 사장님은 이유를 알 수 없었다.
-              iframe 삽입 차단(결제 사이트는 보안상 흔히 막는다) · iframe 안 로그인 풀림 · 주소 오입력 —
-              원인이 무엇이든 결과가 똑같이 「흰 화면」이었고, 방송 중이면 카드결제를 아예 못 한다.
-            → 위에 항상 보이는 바를 두고 「새 창으로 열기」를 준다. iframe이 막혀도 결제는 진행된다.
-              (cross-origin iframe 은 안을 읽을 수 없어 «비었는지» 코드로 판정할 수 없다 → 항상 노출이 정답) */}
-        <div style={{ width: "50%", height: "100%", background: "var(--color-surface)", borderLeft: "1px solid var(--color-line)", display: "flex", flexDirection: "column", minHeight: 0 }}>
-          <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "8px 12px", borderBottom: "1px solid var(--color-line)", background: "var(--color-surface-2)" }}>
-            <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink-soft)" }}>페이스터 결제창</span>
-            <span style={{ fontSize: "12px", fontWeight: 650, color: "var(--color-ink-mute)" }}>안 보이면 →</span>
-            <button
-              type="button"
-              onClick={() => window.open(paysterUrl, "ruruPayster", "popup=yes,width=480,height=760")}
-              className="ru-btn ru-btn-sm ru-btn-primary"
-            >
-              새 창으로 열기
-            </button>
-            {!/smspayment/i.test(paysterUrl) ? (
-              <span
-                title="설정 › 상점 정보 › 「페이스터 문자결제 페이지 주소」에 문자결제 주소를 넣어주세요"
-                style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-warn-tx)", background: "var(--color-warn-bg)", borderRadius: "4px", padding: "2px 8px" }}
-              >
-                ⚠ 문자결제 주소가 아닙니다
-              </span>
-            ) : null}
+        {/* [2026-09-08] 예전엔 여기가 iframe 이었는데 «항상 흰 화면»이었다(위 상단 주석의 실측 참고).
+              빈 화면을 절반이나 차지하느니, 여는 방법을 크게 안내한다. 복사 버튼은 왼쪽에 그대로 있다. */}
+        <div style={{ width: "50%", height: "100%", background: "var(--color-surface)", borderLeft: "1px solid var(--color-line)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "16px", padding: "32px", textAlign: "center" }}>
+          <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-ink)" }}>페이스터 결제창</div>
+          <div style={{ fontSize: "13px", fontWeight: 650, color: "var(--color-ink-soft)", lineHeight: 1.7, maxWidth: "320px" }}>
+            페이스터는 <b>다른 창 안에 넣으면 열리지 않습니다</b>(결제 사이트 보안).<br />
+            아래 버튼으로 여시고, 왼쪽 <b>1 → 2 → 3</b> 을 복사해 붙여 넣으세요.
           </div>
-          <iframe
-            src={paysterUrl}
-            title="페이스터 결제"
-            style={{ width: "100%", flex: "1 1 0%", minHeight: 0, border: 0 }}
-          />
-          <div style={{ flexShrink: 0, padding: "6px 12px", borderTop: "1px solid var(--color-line)", background: "var(--color-surface-2)", fontSize: "11px", fontWeight: 650, color: "var(--color-ink-mute)", lineHeight: 1.5 }}>
-            여기가 비어 보이면 페이스터가 창 안에 넣는 걸 막은 겁니다. 위 「새 창으로 열기」를 쓰세요 — 왼쪽 복사 버튼은 그대로 됩니다.
+
+          <a
+            href={paysterUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ru-btn ru-btn-primary ru-btn-lg"
+            style={{ textDecoration: "none", minWidth: "220px" }}
+          >
+            페이스터 결제창 열기 ↗
+          </a>
+
+          <div style={{ fontSize: "12px", fontWeight: 650, color: "var(--color-ink-mute)", lineHeight: 1.7, maxWidth: "320px" }}>
+            한 번 열어두면 이 창을 닫아도 그대로 남습니다.<br />
+            결제가 끝나면 왼쪽 <b>「✔ 카드결제완료 처리」</b> 를 눌러 주세요.
           </div>
+
+          {!/smspayment/i.test(paysterUrl) ? (
+            <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-warn-tx)", background: "var(--color-warn-bg)", borderRadius: "8px", padding: "8px 12px", maxWidth: "320px", lineHeight: 1.6 }}>
+              ⚠ 지금 주소는 문자결제 페이지가 아닙니다.<br />
+              설정 › 상점 정보에서 <b>/#/payment/smspayment</b> 로 두는 게 기본값입니다.
+            </div>
+          ) : null}
         </div>
       </div>
       {imagePreviewUrl ? (

@@ -5,6 +5,8 @@
 //   · 실시간 접속 위젯은 그대로(방송 중 바로 보는 숫자).
 import { ADMIN_LIVE_TOP_MENUS, topMenuOf, type AdminLiveMenuKey } from "./adminLiveMenu";
 import AdminLiveLogoutButton from "./AdminLiveLogoutButton";
+// [2026-09-08] 페이스터는 opener 가 남은 창에서 안 열린다 → 공용 여는 함수 사용(AdminLiveCardPayPopup 상단 주석 참고)
+import { openPayster } from "./AdminLiveCardPayPopup";
 import AdminLiveMenuIcon from "./AdminLiveMenuIcon";
 import { CONTACT_TYPE_SHORT, adminChatTarget } from "@/lib/shopInfo";
 import { useShopInfo } from "@/lib/useShopInfo";
@@ -181,7 +183,7 @@ export default function AdminLiveSidebar({
             </button>
             <button
               type="button"
-              onClick={() => window.open(shopInfo.paysterUrl, "ruruPayster", "popup=yes,width=480,height=720")}
+              onClick={() => openPayster(shopInfo.paysterUrl)}
               title="페이스터 문자결제 페이지를 새 창으로 엽니다"
               className="flex h-10 items-center justify-center gap-1 rounded-xl border border-line bg-surface-2 text-[11px] font-black text-ink-soft transition hover:bg-surface-3 active:scale-[0.98]"
             >
