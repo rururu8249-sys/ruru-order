@@ -39,6 +39,8 @@ const BOX_W = 980;          // 가로 px (왼쪽 복사창 490 + 오른쪽 페�
 const BOX_W_RATIO = 0.96;   // 좁은 화면에서만 96vw 로 줄어든다 (예전과 동일)
 const BOX_H_MAX = 1500;     // 세로 상한 px (예전과 동일)
 const BOX_V_GAP = 16;       // 위아래 8px씩 (예전과 동일)
+// 모달이 차지하는 «왼쪽 절반» 폭. 490px 은 여백이 아니라 «자리 좌표»라서 4px 격자와 무관하다.
+const HALF_CSS = `min(${BOX_W / 2}px, ${(BOX_W_RATIO * 100) / 2}vw)`;
 
 /** 모달 «오른쪽 절반»(예전 iframe 자리)이 «모니터 좌표»로 어디인지.
  *  창을 그 자리에 정확히 겹쳐 띄우기 위한 값이다. */
@@ -271,13 +273,16 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
     >
       {/* [2026-08-31 사장님 지시] 세로는 화면 거의 끝까지(위아래 8px만), 왼쪽은 페이스터풍 네이비·블루로
           위 쏠림 없이 세로 공간을 나눠 쓴다(헤더 → 복사 카드들 → (여백) → 하단 액션). */}
-      {/* [2026-09-08 사장님] 「프레임 안에 딱딱 왼쪽 오른쪽 붙어 나와야지」 — 원래 모양.
-            페이스터는 프레임 안에서 안 그려진다(실측). 그래서 박스는 «예전 px 그대로» 두고
-            (가로 980 = 왼쪽 490 + 오른쪽 490, 세로 min(1500, 100dvh−16)),
-            오른쪽 490 자리에 페이스터 «창»이 정확히 겹쳐 뜨게 한다. 크기를 임의로 늘리거나 줄이지 않는다.
+      {/* [2026-09-08 사장님] 「옆에 안뜨는데 저 안뜨는 부분은 삭제 하던지」 — 오른쪽 빈칸을 없앴다.
+            페이스터는 프레임 안에서 안 그려진다(실측). 창으로만 뜨는데, 그 창이 뒤로 숨으면
+            오른쪽 칸이 «빈 흰 판»으로 남아 고장 난 것처럼 보였다. 그래서 칸 자체를 삭제한다.
+            모달 크기·자리는 그대로다 — 예전 박스(가로 980)의 «왼쪽 490 자리»를 그대로 차지한다.
+              width       = 490 (예전 왼쪽 칸과 같은 px)
+              marginRight = 490 → 가운데 정렬했을 때 왼쪽 절반 자리에 딱 앉는다
+              (좁은 화면에서는 예전 maxWidth:96vw 와 같은 비율로 48vw 까지 줄어든다)
             ⚠ pointerEvents 는 건드리지 않는다 — 예전에 그것 때문에 X 버튼이 안 눌렸다. */}
-      <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "row", width: `${BOX_W}px`, maxWidth: "96vw", height: `min(${BOX_H_MAX}px, calc(100dvh - ${BOX_V_GAP}px))`, borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}>
-        <div style={{ width: "50%", height: "100%", background: "#F4F6FB", display: "flex", flexDirection: "column", overflowY: "auto" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "row", width: HALF_CSS, marginRight: HALF_CSS, height: `min(${BOX_H_MAX}px, calc(100dvh - ${BOX_V_GAP}px))`, borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}>
+        <div style={{ width: "100%", height: "100%", background: "#F4F6FB", display: "flex", flexDirection: "column", overflowY: "auto" }}>
         <div className="flex items-center justify-between px-5 py-4" style={{ background: "#101C3D" }}>
           <span className="text-[16px] font-black text-white">💳 카드결제 — {order.nickname}</span>
           <button type="button" onClick={onClose} className="text-xl leading-none text-white/60 hover:text-white">
@@ -390,16 +395,6 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
             상품명 칸은 「닉네임 상품명」 순서로 넣어야 나중에 어느 주문인지 매칭됩니다(이름 X). 전화번호는 <b>주문자(결제하는 분)</b> 번호예요 — 택배 받는 분 번호가 아닙니다. 페이스터는 남의 서버라 자동 채우기가 안 돼요.
           </div>
         </div>
-        </div>
-        {/* 오른쪽 절반 — 예전 iframe 자리. 페이스터 «창»이 정확히 이 자리에 겹쳐 뜬다.
-              창이 뒤로 숨었을 때 다시 부르는 자리이기도 하다. (프레임 안에는 안 그려짐 — 실측) */}
-        <div style={{ width: "50%", height: "100%", background: "var(--color-surface)", borderLeft: "1px solid var(--color-line)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px", padding: "24px", textAlign: "center" }}>
-          <div className="ru-t-sub">💳 페이스터 결제창</div>
-          <div className="ru-t-hint" style={{ lineHeight: 1.7 }}>
-            이 자리에 페이스터 창이 겹쳐서 열립니다.
-            <br />
-            창이 안 보이면 왼쪽 위 「페이스터 창 다시 열기 ↗」를 누르세요.
-          </div>
         </div>
       </div>
       {imagePreviewUrl ? (
