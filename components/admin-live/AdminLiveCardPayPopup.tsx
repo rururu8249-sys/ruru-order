@@ -15,22 +15,23 @@ import { getShopInfoNow, useShopInfo } from "@/lib/useShopInfo";
 // 이 파일은 iframe ↔ 별도 창 사이를 네 번 오갔다(e0757de → 08f7eeb → 5b95833 →
 // 0301f98 → 1fc8464). 원인을 밝히지 않고 «안 되니까 반대로» 바꾸기만 반복한 흔적이다.
 //
-// 2026-09-08 실측:
-//   · iframe 은 차단당한 게 아니다 — onload 정상 발생, X-Frame-Options 거부 메시지 없음.
-//     그런데도 «안이 비어 있다».
-//   · window.open 으로 연 별도 창도 «흰 화면».
-//   · 같은 주소를 «일반 탭»에 그냥 열면 정상 동작(로그인 상태로 뜬다).
+// 2026-09-08 실측으로 확인한 것 (추측 아님):
+//   · iframe 안 → 흰 화면. 아무리 해도 안 그려진다.
+//   · 별도 창(opener 끊고) → 페이스터 화면이 «정상»으로 뜬다.
+//   · 일반 탭 → 정상.
+//   ⇒ 결론은 하나: 페이스터는 «프레임 안»에서는 안 뜨고, «독립된 창»이면 뜬다.
+//     (X-Frame-Options 거부 메시지는 없었다. 페이스터 앱 자체가 프레임 안에서
+//      안 그려지는 것으로 보인다. 어느 쪽이든 우리가 뚫을 수 없다.)
 //
-// 이 셋을 한 번에 설명하는 원인은 하나뿐이다:
-//   페이스터가 「누가 나를 열었는가」를 보고 거부한다.
-//     iframe      → window.parent !== window
-//     window.open → window.opener !== null      ← 이름 있는 창도 opener 가 남는다
-//     일반 탭      → 둘 다 없음 → 정상            ✅
-//   결제 사이트의 흔한 클릭재킹 방어다. 우리가 뚫을 수 없고, 뚫으려 해서도 안 된다.
+//   ※ 한때 「크롬의 다른 사이트 쿠키 차단 때문」이라고 적었는데 틀렸다.
+//     사장님 크롬은 사이트 데이터 저장이 이미 «허용»이었다. 그 설명은 폐기한다.
 //
-// 결론: opener 를 «끊고» 연다. rel="noopener" / window.open(..., "noopener") 를 쓰면
-//   열린 창의 window.opener 가 null 이라 «일반 탭»과 똑같아진다.
-//   ⚠ 창 이름("ruruPayster")을 주면 opener 가 남으므로 이름을 주면 안 된다.
+// 그래서 이렇게 한다 — 예전에 쓰던 «왼쪽 복사창 / 오른쪽 페이스터» 를 창으로 재현:
+//   · 복사창  = 화면 왼쪽 절반 (모달)
+//   · 페이스터 = 화면 오른쪽 절반 (별도 창)
+//   · 창 이름은 주지 않는다. 이름을 주면 window.opener 가 남아 흰 화면이 된다.
+//     (그래서 누를 때마다 새 창이 뜬다. «뜨는 것»이 «창 재사용»보다 우선이다.)
+//   · 반드시 클릭 제스처 «안에서» 불러야 팝업차단에 안 걸린다.
 export function openPayster(url: string) {
   if (typeof window === "undefined") return;
   // 화면 «오른쪽 절반»에 창으로 띄운다 — 왼쪽 절반이 복사창이라 그대로 복사→붙여넣기가 된다.
@@ -71,8 +72,6 @@ function phoneDigits(order: LiveOrder) {
 
 export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusChange }: Props) {
   const { paysterUrl } = useShopInfo();
-  // [2026-09-08] 「여기 붙여서 보려면?」 안내 펼침 (크롬 쿠키 허용 방법)
-  const [cookieHelpOpen, setCookieHelpOpen] = useState(false);
   const [copiedKey, setCopiedKey] = useState("");
   const [saving, setSaving] = useState(false);
   // [2026-08-29] 카톡으로 결제링크 보낸 뒤, 유튜브 채팅에 자동 안내
@@ -238,12 +237,14 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}
+      // [2026-09-08] 페이스터 창이 «화면 오른쪽 절반»에 뜨므로 복사창은 «왼쪽 절반»에 붙인다.
+      //   가운데 정렬이면 페이스터 창에 가려 복사 버튼이 안 보인다.
+      style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "flex-start" }}
     >
       {/* [2026-08-31 사장님 지시] 세로는 화면 거의 끝까지(위아래 8px만), 왼쪽은 페이스터풍 네이비·블루로
           위 쏠림 없이 세로 공간을 나눠 쓴다(헤더 → 복사 카드들 → (여백) → 하단 액션). */}
-      <div style={{ display: "flex", flexDirection: "row", width: "980px", maxWidth: "96vw", height: "min(1500px, calc(100dvh - 16px))", borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}>
-        <div style={{ width: "50%", height: "100%", background: "#F4F6FB", display: "flex", flexDirection: "column", overflowY: "auto" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "column", width: "50vw", minWidth: "440px", height: "100dvh", overflow: "hidden", boxShadow: "8px 0 40px rgba(0,0,0,0.35)" }}>
+        <div style={{ width: "100%", height: "100%", background: "#F4F6FB", display: "flex", flexDirection: "column", overflowY: "auto" }}>
         <div className="flex items-center justify-between px-5 py-4" style={{ background: "#101C3D" }}>
           <span className="text-[16px] font-black text-white">💳 카드결제 — {order.nickname}</span>
           <button type="button" onClick={onClose} className="text-xl leading-none text-white/60 hover:text-white">
@@ -356,58 +357,6 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
             상품명 칸은 「닉네임 상품명」 순서로 넣어야 나중에 어느 주문인지 매칭됩니다(이름 X). 전화번호는 <b>주문자(결제하는 분)</b> 번호예요 — 택배 받는 분 번호가 아닙니다. 페이스터는 남의 서버라 자동 채우기가 안 돼요.
           </div>
         </div>
-        </div>
-        {/* [2026-09-08 사장님] 「원래 옆에 붙어서 나왔잖아」 — 맞다. 여기 iframe 이 원래 자리다.
-              한동안 흰 화면이 된 건 페이스터가 «남의 창 안»이라 막아서가 아니다(실측: X-Frame 거부 없음).
-              크롬이 «다른 사이트 쿠키»를 막으면서 iframe 안에서 페이스터 로그인이 안 붙어
-              로그인 페이지로 튕기고, 그 로그인 페이지가 프레임 안에서 안 그려지는 것이다.
-              → 크롬 설정에서 payster.co.kr 쿠키를 허용하면 예전처럼 «붙어서» 나온다.
-                아래 띠에 그 방법과, 그래도 안 될 때 쓸 「새 창」을 같이 둔다. */}
-        <div style={{ width: "50%", height: "100%", background: "var(--color-surface)", borderLeft: "1px solid var(--color-line)", display: "flex", flexDirection: "column", minHeight: 0 }}>
-          <iframe
-            src={paysterUrl}
-            title="페이스터 결제"
-            style={{ width: "100%", flex: "1 1 0%", minHeight: 0, border: 0 }}
-          />
-          <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "8px 12px", borderTop: "1px solid var(--color-line)", background: "var(--color-surface-2)" }}>
-            <span style={{ fontSize: "12px", fontWeight: 650, color: "var(--color-ink-mute)" }}>위가 비어 있으면 →</span>
-            <button type="button" onClick={() => openPayster(paysterUrl)} className="ru-btn ru-btn-sm ru-btn-primary">
-              새 창으로 열기 ↗
-            </button>
-            <button
-              type="button"
-              onClick={() => setCookieHelpOpen((v) => !v)}
-              className="ru-btn ru-btn-sm"
-              title="크롬이 다른 사이트 쿠키를 막으면 여기 붙어서 안 나옵니다"
-            >
-              여기 붙여서 보려면?
-            </button>
-            {!/smspayment/i.test(paysterUrl) ? (
-              <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-warn-tx)", background: "var(--color-warn-bg)", borderRadius: "4px", padding: "2px 8px" }}>
-                ⚠ 문자결제 주소가 아닙니다
-              </span>
-            ) : null}
-          </div>
-          {cookieHelpOpen ? (
-            <div style={{ flexShrink: 0, padding: "12px", borderTop: "1px solid var(--color-line)", background: "var(--color-surface)", fontSize: "12px", fontWeight: 650, color: "var(--color-ink-soft)", lineHeight: 1.8 }}>
-              크롬 주소창에 아래를 붙여넣고 → <b>사이트 추가</b> → <b>[*.]payster.co.kr</b> 을 <b>허용</b>으로.
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
-                <code style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "4px", padding: "6px 8px", fontSize: "12px", userSelect: "all" }}>
-                  chrome://settings/content/siteData
-                </code>
-                <button
-                  type="button"
-                  onClick={() => { void navigator.clipboard?.writeText("chrome://settings/content/siteData"); showAdminToast("주소를 복사했어요. 크롬 주소창에 붙여넣으세요.", "success"); }}
-                  className="ru-btn ru-btn-sm"
-                >
-                  복사
-                </button>
-              </div>
-              <div style={{ marginTop: "8px", color: "var(--color-ink-mute)" }}>
-                허용한 뒤 이 창을 닫았다 다시 열면 여기 <b>붙어서</b> 나옵니다.
-              </div>
-            </div>
-          ) : null}
         </div>
       </div>
       {imagePreviewUrl ? (
