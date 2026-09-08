@@ -362,7 +362,10 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
           </a>
 
           <div style={{ fontSize: "12px", fontWeight: 650, color: "var(--color-ink-mute)", lineHeight: 1.7, maxWidth: "320px" }}>
-            한 번 열어두면 이 창을 닫아도 그대로 남습니다.<br />
+            {/* [2026-09-08] 새 탭은 페이스터 로그인 화면으로 뜬다 — 처음 한 번은 로그인이 필요하다.
+                  로그인해 둔 탭은 이 창을 닫아도 남으므로, 방송 시작 전에 한 번 열어두면 편하다. */}
+            처음 열면 <b>페이스터 로그인 화면</b>이 나옵니다. 한 번 로그인해 두세요.<br />
+            열어둔 탭은 이 창을 닫아도 남습니다 — <b>방송 전에 미리 열어두면</b> 편합니다.<br />
             결제가 끝나면 왼쪽 <b>「✔ 카드결제완료 처리」</b> 를 눌러 주세요.
           </div>
 
