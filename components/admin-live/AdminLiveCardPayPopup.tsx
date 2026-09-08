@@ -191,7 +191,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
   //   작은 창(항상 위)에서 눌렀는데 관리자 창의 클립보드를 쓰면 «포커스 없음»으로 거부된다.
   //   sourceWindow 를 안 주면 예전과 똑같이 관리자 창에서 복사한다.
   const copyValue = async (key: string, value: string, sourceWindow?: Window | null) => {
-    const ok = await copyTextIn(sourceWindow || window, value);
+    const ok = await copyTextIn(sourceWindow || pip.pipWindow || window, value);
     if (!ok) {
       showAdminToast("복사 실패 — 길게 눌러 직접 복사해주세요.", "warning");
       return;
@@ -219,10 +219,12 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
       event.preventDefault();
       void copyFieldValue(index);
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // 📌 켜져 있으면 키 입력이 «그 창»으로 가므로 양쪽 다 듣는다
+    const targets: Window[] = pip.pipWindow ? [window, pip.pipWindow] : [window];
+    targets.forEach((t) => t.addEventListener("keydown", onKey));
+    return () => targets.forEach((t) => t.removeEventListener("keydown", onKey));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [order]);
+  }, [order, pip.pipWindow]);
 
   // [2026-08-31 사장님 지시] 유튜브 채팅 자동 게시는 쿼터를 먹는다(봇 글 하루 상한 공유)
   //   → 안내문구를 복사만 해주고, 유튜브 채팅에는 사장님이 직접 붙여넣는다. (금액·전화번호는 공개 채팅이라 안 넣음)
@@ -272,25 +274,18 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
     }
   };
 
-  return (
-    <div
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}
-    >
-      {/* [2026-08-31 사장님 지시] 세로는 화면 거의 끝까지(위아래 8px만), 왼쪽은 페이스터풍 네이비·블루로
-          위 쏠림 없이 세로 공간을 나눠 쓴다(헤더 → 복사 카드들 → (여백) → 하단 액션). */}
-      {/* [2026-09-08 사장님] 「옆에 안뜨는데 저 안뜨는 부분은 삭제 하던지」 — 오른쪽 빈칸을 없앴다.
-            페이스터는 프레임 안에서 안 그려진다(실측). 창으로만 뜨는데, 그 창이 뒤로 숨으면
-            오른쪽 칸이 «빈 흰 판»으로 남아 고장 난 것처럼 보였다. 그래서 칸 자체를 삭제한다.
-            모달 크기·자리는 그대로다 — 예전 박스(가로 980)의 «왼쪽 490 자리»를 그대로 차지한다.
-              width       = 490 (예전 왼쪽 칸과 같은 px)
-              marginRight = 490 → 가운데 정렬했을 때 왼쪽 절반 자리에 딱 앉는다
-              (좁은 화면에서는 예전 maxWidth:96vw 와 같은 비율로 48vw 까지 줄어든다)
-            ⚠ pointerEvents 는 건드리지 않는다 — 예전에 그것 때문에 X 버튼이 안 눌렸다. */}
-      <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "row", width: HALF_CSS, marginRight: HALF_CSS, height: `min(${BOX_H_MAX}px, calc(100dvh - ${BOX_V_GAP}px))`, borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}>
-        <div style={{ width: "100%", height: "100%", background: "#F4F6FB", display: "flex", flexDirection: "column", overflowY: "auto" }}>
+  // ── 복사창은 «한 벌»만 만든다 ────────────────────────────────────────
+  //   [2026-09-08 사장님] 「그냥 원래 왼쪽 복사창을 띄어놓는 느낌으로 만들면 안되는건지?
+  //     굳이 왜 따로 작은창을 띄어놓게 설계함?」 — 맞는 지적이라 고쳤다.
+  //
+  //   창을 따로 띄우는 것 자체는 피할 수 없다 — 브라우저에서 «항상 맨 위»가 되는 건
+  //   별도 창뿐이고, 페이지 안의 패널은 아무리 해도 페이스터 창 위로 못 올라간다.
+  //   하지만 «화면»을 새로 그릴 이유는 없었다. 아래 복사창 하나를 만들어서
+  //     · 평소     → 팝업(모달) 안에
+  //     · 📌 켜면  → 항상 맨 위에 뜨는 창 안에
+  //   둘 중 «한 곳»에만 그린다. 그래서 두 화면의 생김새가 갈라질 수 없다.
+  const copyPanel = (
+    <div style={{ width: "100%", height: "100%", background: "#F4F6FB", display: "flex", flexDirection: "column", overflowY: "auto" }}>
         <div className="flex items-center justify-between px-5 py-4" style={{ background: "#101C3D" }}>
           <span className="text-[16px] font-black text-white">💳 카드결제 — {order.nickname}</span>
           <button type="button" onClick={onClose} className="text-xl leading-none text-white/60 hover:text-white">
@@ -314,7 +309,8 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
                 type="button"
                 onClick={() => {
                   if (pip.pipWindow) pip.close();
-                  else void pip.open(430, 470);
+                  // 작게 만들지 않는다 — 원래 복사창과 «같은 폭», 세로는 화면 끝까지
+                  else void pip.open(BOX_W / 2, Math.min(BOX_H_MAX, (window.screen?.availHeight || window.innerHeight) - 40));
                 }}
                 className="ru-btn ru-btn-sm"
                 title="복사 카드를 항상 맨 위에 뜨는 작은 창으로 빼냅니다. 페이스터 창이 뒤로 안 밀립니다."
@@ -419,67 +415,48 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
             상품명 칸은 「닉네임 상품명」 순서로 넣어야 나중에 어느 주문인지 매칭됩니다(이름 X). 전화번호는 <b>주문자(결제하는 분)</b> 번호예요 — 택배 받는 분 번호가 아닙니다. 페이스터는 남의 서버라 자동 채우기가 안 돼요.
           </div>
         </div>
-        </div>
+    </div>
+  );
+
+  const imagePreview = imagePreviewUrl ? (
+    <div onClick={() => setImagePreviewUrl("")} style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out" }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={imagePreviewUrl} alt="상품 사진 크게 보기" style={{ maxHeight: "85vh", maxWidth: "90vw", borderRadius: "16px", objectFit: "contain" }} />
+    </div>
+  ) : null;
+
+  // 📌 켜짐 — 같은 복사창을 그 창으로 «옮겨» 그린다. 팝업은 안 그린다(두 벌이 되지 않게).
+  if (pip.pipWindow) {
+    return createPortal(
+      <div style={{ width: "100%", height: "100dvh", display: "flex", flexDirection: "column", overflow: "hidden", background: "#F4F6FB" }}>
+        {copyPanel}
+        {imagePreview}
+      </div>,
+      pip.pipWindow.document.body,
+    );
+  }
+
+  return (
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}
+    >
+      {/* [2026-08-31 사장님 지시] 세로는 화면 거의 끝까지(위아래 8px만), 왼쪽은 페이스터풍 네이비·블루로
+          위 쏠림 없이 세로 공간을 나눠 쓴다(헤더 → 복사 카드들 → (여백) → 하단 액션). */}
+      {/* [2026-09-08 사장님] 「옆에 안뜨는데 저 안뜨는 부분은 삭제 하던지」 — 오른쪽 빈칸을 없앴다.
+            페이스터는 프레임 안에서 안 그려진다(실측). 창으로만 뜨는데, 그 창이 뒤로 숨으면
+            오른쪽 칸이 «빈 흰 판»으로 남아 고장 난 것처럼 보였다. 그래서 칸 자체를 삭제한다.
+            모달 크기·자리는 그대로다 — 예전 박스(가로 980)의 «왼쪽 490 자리»를 그대로 차지한다.
+              width       = 490 (예전 왼쪽 칸과 같은 px)
+              marginRight = 490 → 가운데 정렬했을 때 왼쪽 절반 자리에 딱 앉는다
+              (좁은 화면에서는 예전 maxWidth:96vw 와 같은 비율로 48vw 까지 줄어든다)
+            ⚠ pointerEvents 는 건드리지 않는다 — 예전에 그것 때문에 X 버튼이 안 눌렸다. */}
+      <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "row", width: HALF_CSS, marginRight: HALF_CSS, height: `min(${BOX_H_MAX}px, calc(100dvh - ${BOX_V_GAP}px))`, borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}>
+        {copyPanel}
       </div>
-      {/* ── 「항상 맨 위에 뜨는 작은 창」 안 화면 ──────────────────────────
-            ⚠ 데이터도 함수도 전부 위와 «같은 것»을 쓴다. 돈 처리(handleComplete)는
-              복제하지 않고 그대로 호출한다 — 로직이 갈라지면 안 되기 때문. */}
-      {pip.pipWindow
-        ? createPortal(
-            <div className="flex h-full flex-col gap-2 p-3" style={{ background: "#F4F6FB" }}>
-              <div className="flex shrink-0 items-center justify-between">
-                <span className="text-[13px] font-black" style={{ color: "#101C3D" }}>💳 {order.nickname}</span>
-                <span className="text-[11px] font-bold" style={{ color: "#8B99BC" }}>📌 항상 맨 위</span>
-              </div>
-              {fields.map((f, fieldIndex) => (
-                <button
-                  key={f.key}
-                  type="button"
-                  disabled={!f.value}
-                  onClick={() => void copyFieldValue(fieldIndex, pip.pipWindow)}
-                  className="flex w-full shrink-0 items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-left disabled:opacity-40"
-                  style={{ border: copiedKey === f.key ? "1.5px solid #059669" : "1px solid #DDE4F2" }}
-                >
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-white" style={{ background: copiedKey === f.key ? "#059669" : "#8B99BC" }}>
-                    {fieldIndex + 1}
-                  </span>
-                  <span className="w-[62px] shrink-0 text-[11px] font-black" style={{ color: "#5A6B92" }}>{f.label}</span>
-                  <span className="min-w-0 flex-1 truncate text-[13px] font-black" style={{ color: "#101C3D" }}>{f.value || "-"}</span>
-                  <span className="shrink-0 text-[11px] font-black" style={{ color: copiedKey === f.key ? "#059669" : "#2B6BEB" }}>
-                    {copiedKey === f.key ? "복사됨" : "⧉ 복사"}
-                  </span>
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => void copyValue("chatNotice", chatNoticeText, pip.pipWindow)}
-                className="w-full shrink-0 rounded-xl px-3 py-2.5 text-[12px] font-black"
-                style={copiedKey === "chatNotice" ? { background: "#059669", color: "#fff" } : { background: "#101C3D", color: "#fff" }}
-              >
-                {copiedKey === "chatNotice" ? "✔ 복사됨 · 유튜브 채팅에 붙여넣기" : "📢 카톡 발송완료 안내문구 복사"}
-              </button>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={handleComplete}
-                className="w-full shrink-0 rounded-xl px-3 py-2.5 text-[12px] font-black text-white disabled:opacity-40"
-                style={{ background: "#059669" }}
-              >
-                {saving ? "처리 중…" : "✔ 카드결제완료 처리"}
-              </button>
-              <div className="mt-auto shrink-0 text-[11px] font-bold leading-4" style={{ color: "#8B99BC" }}>
-                이 창은 페이스터 위에 계속 떠 있습니다. 닫으면 원래 팝업으로 돌아갑니다.
-              </div>
-            </div>,
-            pip.pipWindow.document.body,
-          )
-        : null}
-      {imagePreviewUrl ? (
-        <div onClick={() => setImagePreviewUrl("")} style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out" }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={imagePreviewUrl} alt="상품 사진 크게 보기" style={{ maxHeight: "85vh", maxWidth: "90vw", borderRadius: "16px", objectFit: "contain" }} />
-        </div>
-      ) : null}
+      {imagePreview}
     </div>
   );
 }
