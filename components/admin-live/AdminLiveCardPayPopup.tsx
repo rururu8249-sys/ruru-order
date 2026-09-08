@@ -11,7 +11,7 @@ import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 // [2026-09-08] 페이스터 주소는 설정 › 상점 정보에서 온다(하드코딩 제거)
 import { getShopInfoNow, useShopInfo } from "@/lib/useShopInfo";
 // [2026-09-08] 복사 카드를 «항상 맨 위에 뜨는 작은 창»으로 빼내기 (사유·실측근거는 그 파일 상단)
-import { usePipWindow, copyTextIn } from "@/lib/usePipWindow";
+import { usePipWindow, copyTextIn, isPipPreferred, setPipPreferred, preopenPipWindow, isPipSupported, getPipWindow } from "@/lib/usePipWindow";
 
 // ═══ 페이스터를 «어떻게» 열 것인가 — 2026-09-08 확정. 다시 뒤집지 말 것 ═══
 //
@@ -91,11 +91,24 @@ function paysterSlotRect() {
  *  이름을 빼거나 "_blank" 로 바꾸면 창이 매번 새로 생기고 로그인이 풀린다. 바꾸지 말 것. */
 const PAYSTER_WINDOW_NAME = "ruru_payster";
 
-export function openPayster(url: string) {
-  if (typeof window === "undefined") return;
-  //   ⚠ 반드시 «클릭 제스처 안에서» 불러야 팝업차단에 안 걸린다.
-  //   ⚠ 같은 이름의 창이 이미 있으면 «그 창»이 이 주소로 이동한다(새 창 안 생김 → 로그인 유지).
-  const r = paysterSlotRect();
+/** 복사창(항상 위) «바로 옆» 자리. 예전처럼 짝꿍처럼 찰싹 붙인다.
+ *  [2026-09-08 실측] 복사창은 screenX/screenY/outerWidth/outerHeight 를 «정확히» 알려준다.
+ *    (예: 1206 / 259 / 490 / 834 — 운영체제가 보고한 창 위치와 일치)
+ *  오른쪽에 자리가 있으면 오른쪽(예전 배치), 없으면 왼쪽에 붙인다. */
+function rectBesidePip(pipWin: Window) {
+  const width = Math.round(BOX_W / 2);
+  const availW = window.screen?.availWidth || window.innerWidth;
+  const px = pipWin.screenX;
+  const pw = pipWin.outerWidth || width;
+  const right = px + pw;
+  const left = right + width <= availW ? right : Math.max(0, px - width);
+  return { left, top: pipWin.screenY, width, height: pipWin.outerHeight || Math.round(BOX_H_MAX) };
+}
+
+/** 페이스터 창을 «정해진 자리»에 연다.
+ *  ⚠ 위치는 «창을 처음 만들 때»만 정해진다. 이미 열려 있는 창은 위치를 못 바꾼다
+ *    (남의 사이트라 moveTo 가 안 먹는다 — 실측 확인). 그래서 첫 생성 위치가 중요하다. */
+function openPaysterAt(url: string, r: { left: number; top: number; width: number; height: number }) {
   const win = window.open(url, PAYSTER_WINDOW_NAME, `popup=yes,left=${r.left},top=${r.top},width=${r.width},height=${r.height}`);
   try {
     win?.focus(); // 뒤로 숨어 있던 창이면 앞으로 부른다
@@ -104,11 +117,46 @@ export function openPayster(url: string) {
   }
 }
 
-/** 카드결제 버튼에서 호출 — 페이스터를 «화면 오른쪽 절반»에 띄운다.
- *  프레임 안에는 안 나오므로(실측) 창으로 띄우되, 모달이 왼쪽 절반이라 겹치지 않는다.
- *  ⚠ 주문표(LiveOrderTable)의 클릭 «안에서» 불려야 팝업차단에 안 걸린다. */
+export function openPayster(url: string) {
+  if (typeof window === "undefined") return;
+  //   ⚠ 반드시 «클릭 제스처 안에서» 불러야 팝업차단에 안 걸린다.
+  //   ⚠ 같은 이름의 창이 이미 있으면 «그 창»이 이 주소로 이동한다(새 창 안 생김 → 로그인 유지).
+  const pipWin = getPipWindow();
+  openPaysterAt(url, pipWin ? rectBesidePip(pipWin) : paysterSlotRect());
+}
+
+/** 「📌 복사창 항상 위에」 창 크기 — 원래 복사창과 «같은 폭», 세로는 화면 끝까지.
+ *  작게 만들지 않는다(사장님 지시). 버튼과 자동열기가 같은 값을 쓰도록 여기 하나로 둔다. */
+function pipSize() {
+  const availH = (typeof window !== "undefined" && window.screen?.availHeight) || 900;
+  return { width: BOX_W / 2, height: Math.min(BOX_H_MAX, availH - 40) };
+}
+
+/** 카드결제 버튼에서 호출 — 페이스터 창을 띄운다.
+ *  [2026-09-08] 📌 를 한 번 켜두면 여기서 복사창(항상 위)도 «같이» 연다.
+ *    브라우저는 «클릭 순간»에만 창을 열어주므로, 팝업이 뜬 뒤에는 자동으로 못 연다.
+ *    그래서 주문표 클릭 안인 이 자리에서 미리 열어두고, 팝업이 그 창을 이어받는다.
+ *  ⚠ 주문표(LiveOrderTable)의 클릭 «안에서» 불려야 팝업차단에 안 걸린다.
+ *  ⚠ 순서 주의 — await 없이 둘 다 «동기적으로» 부른다. */
 export function openPaysterRightHalf() {
-  openPayster(getShopInfoNow().paysterUrl);
+  const url = getShopInfoNow().paysterUrl;
+  if (!(isPipPreferred() && isPipSupported())) {
+    openPayster(url); // 복사창을 안 쓰면 예전 방식 그대로
+    return;
+  }
+  const already = getPipWindow();
+  if (already) {
+    // 복사창이 이미 떠 있으면 그 옆으로 바로 연다
+    openPaysterAt(url, rectBesidePip(already));
+    return;
+  }
+  // 복사창을 «먼저» 열고, 자리를 읽어서 그 옆에 페이스터를 만든다.
+  //   크롬의 «사용자 조작» 유효시간(수 초) 안에 끝나므로 팝업차단에 안 걸린다.
+  //   혹시 창이 안 열리면 예전 자리로라도 띄운다 — 결제를 못 하는 상황은 만들지 않는다.
+  const size = pipSize();
+  void preopenPipWindow(size.width, size.height).then((pipWin) => {
+    openPaysterAt(url, pipWin ? rectBesidePip(pipWin) : paysterSlotRect());
+  });
 }
 
 type Props = {
@@ -334,12 +382,17 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
               <button
                 type="button"
                 onClick={() => {
-                  if (pip.pipWindow) pip.close();
-                  // 작게 만들지 않는다 — 원래 복사창과 «같은 폭», 세로는 화면 끝까지
-                  else void pip.open(BOX_W / 2, Math.min(BOX_H_MAX, (window.screen?.availHeight || window.innerHeight) - 40));
+                  if (pip.pipWindow) {
+                    pip.close();
+                    setPipPreferred(false); // 껐으면 다음부터 자동으로 안 뜬다
+                    return;
+                  }
+                  setPipPreferred(true); // 켰으면 다음 카드결제부터 «자동»으로 같이 뜬다
+                  const s = pipSize();
+                  void pip.open(s.width, s.height);
                 }}
                 className="ru-btn ru-btn-sm"
-                title="복사 카드를 항상 맨 위에 뜨는 작은 창으로 빼냅니다. 페이스터 창이 뒤로 안 밀립니다."
+                title="복사창을 항상 맨 위에 뜨는 창으로 빼냅니다(기본 켜짐). 페이스터 창이 뒤로 안 밀리고, 페이스터가 복사창 바로 옆에 붙어서 열립니다."
               >
                 {pip.pipWindow ? "📌 고정 해제" : "📌 복사창 항상 위에"}
               </button>
@@ -439,6 +492,15 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
 
           <div className="mt-4 rounded-xl px-3.5 py-2.5 text-[11px] font-bold leading-4" style={{ background: "#EAF0FE", color: "#3D5A8F" }}>
             상품명 칸은 「닉네임 상품명」 순서로 넣어야 나중에 어느 주문인지 매칭됩니다(이름 X). 전화번호는 <b>주문자(결제하는 분)</b> 번호예요 — 택배 받는 분 번호가 아닙니다. 페이스터는 남의 서버라 자동 채우기가 안 돼요.
+            {/* [2026-09-08 실측] 페이스터는 로그인을 «창 하나에만 사는 저장소»에 넣는다.
+                  창을 닫으면 그 저장소가 같이 사라져 다시 로그인해야 한다. 페이스터 쪽 방식이라 못 바꾼다. */}
+            <br />
+            <b>페이스터 창은 닫지 마세요</b> — 닫으면 페이스터가 로그인을 잊어버려 다시 로그인해야 합니다(페이스터 쪽 방식이라 우리가 못 바꿔요). 그냥 켜두면 하루 종일 그 창 하나로 씁니다.
+            {/* [2026-09-08 실측] 복사창(항상 위) 위치는 크롬이 정한다. 우리가 옮길 수 없다.
+                  대신 크롬이 «사장님이 끌어다 놓은 자리»를 기억하므로, 한 번만 옮겨두면 된다.
+                  페이스터는 복사창 위치를 읽어서 그 옆에 만든다. */}
+            <br />
+            <b>복사창을 원하는 자리로 한 번 끌어다 놓으세요</b> — 크롬이 그 자리를 기억하고, 페이스터가 항상 그 바로 옆에 붙어서 열립니다.
           </div>
         </div>
     </div>

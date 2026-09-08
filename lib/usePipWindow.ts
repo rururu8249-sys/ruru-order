@@ -51,6 +51,66 @@ function copyStyles(target: Window) {
   doc.body.style.margin = "0";
 }
 
+// ── 「켜두면 계속 켜짐」 ───────────────────────────────────────────────
+//   [2026-09-08 사장님] 「복사 버튼 누르니까 페이스터창 사라짐」 — 📌 를 안 눌러서다.
+//   매번 누르시라는 건 말이 안 된다. 한 번 켜면 그 선택을 기억하고, 다음부터는
+//   카드결제를 누르는 «그 순간»에 자동으로 같이 연다(브라우저는 클릭 순간에만 창을 열어준다).
+const PIP_PREF_KEY = "ruru_cardpay_pip_on";
+
+/** 기본은 «켜짐». 사장님이 직접 끈 적이 있을 때만 꺼진다.
+ *  [2026-09-08 사장님] 「애초에 복사창 항상위에 상태로 설계하면 돼잖아? 왜 일을 두번하게 만들어?」 */
+export function isPipPreferred() {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(PIP_PREF_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+/** 지금 열려 있는 복사창(없으면 null). 페이스터를 «그 옆»에 붙이려고 위치를 읽을 때 쓴다. */
+export function getPipWindow(): Window | null {
+  const api = pipApi();
+  const w = api?.window || null;
+  return w && !w.closed ? w : null;
+}
+
+export function setPipPreferred(on: boolean) {
+  try {
+    window.localStorage.setItem(PIP_PREF_KEY, on ? "1" : "0");
+  } catch {
+    /* 저장 실패해도 이번 판은 정상 동작 */
+  }
+}
+
+/** 클릭 «안에서» 미리 열어두는 창. 팝업(모달)이 뜬 뒤에는 창을 못 열기 때문에
+ *  주문표 클릭 순간에 열어두고, 팝업이 마운트될 때 받아 쓴다. */
+let pendingPip: Promise<Window | null> | null = null;
+
+/** ⚠ 반드시 클릭 핸들러 «안에서» 부를 것. 돌려주는 약속(Promise)은 기다려도 된다 —
+ *  크롬의 «사용자 조작» 유효시간(수 초) 안이면 그 뒤에 창을 하나 더 열 수 있다. */
+export function preopenPipWindow(width: number, height: number): Promise<Window | null> {
+  const api = pipApi();
+  if (!api) return Promise.resolve(null);
+  pendingPip = api
+    .requestWindow({ width: Math.round(width), height: Math.round(height) })
+    .then((w) => {
+      copyStyles(w);
+      return w;
+    })
+    .catch(() => null);
+  return pendingPip;
+}
+
+async function takePreopenedPip(): Promise<Window | null> {
+  const p = pendingPip;
+  pendingPip = null;
+  if (!p) return null;
+  const w = await p;
+  if (!w || w.closed) return null;
+  return w;
+}
+
 export function usePipWindow() {
   const [pipWindow, setPipWindow] = useState<Window | null>(null);
   const [supported, setSupported] = useState(false);
@@ -59,6 +119,24 @@ export function usePipWindow() {
   // 서버 렌더와 화면이 어긋나지 않게, 지원 여부는 «브라우저에서» 확인한다
   useEffect(() => {
     setSupported(isPipSupported());
+    // 주문표 클릭 순간에 미리 열어둔 창이 있으면 그대로 이어받는다
+    let stopped = false;
+    void takePreopenedPip().then((w) => {
+      if (stopped || !w) return;
+      openedRef.current = w;
+      setPipWindow(w);
+      w.addEventListener(
+        "pagehide",
+        () => {
+          openedRef.current = null;
+          setPipWindow(null);
+        },
+        { once: true },
+      );
+    });
+    return () => {
+      stopped = true;
+    };
   }, []);
 
   /** ⚠ 반드시 «클릭 안에서» 불러야 한다 — 브라우저가 사용자 조작 없이는 창을 안 열어준다. */
