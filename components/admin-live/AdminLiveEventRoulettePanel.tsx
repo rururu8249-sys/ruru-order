@@ -28,6 +28,9 @@ type RouletteParticipant = {
   order_count?: number;
   qty_sum?: number;
   amount_sum?: number;
+  /** [2026-09-08] 결제완료 금액(응모권 근거) · 응모권 장수(= weight) */
+  paid_amount_sum?: number;
+  tickets?: number;
   order_ids?: string[];
   weight?: number;
 };
@@ -164,18 +167,6 @@ function dateTimeFull(value: unknown) {
   return `${yy}.${mm}.${dd}(${wd}) ${hh}:${mi}`;
 }
 
-function modeLabel(mode: RouletteMode) {
-  if (mode === "live") return "실제 운영";
-  if (mode === "test") return "테스트";
-  return "미리보기";
-}
-
-function modeBadgeClass(mode: RouletteMode) {
-  if (mode === "live") return "bg-ok-bg text-ok-tx ring-emerald-100";
-  if (mode === "test") return "bg-warn-bg text-warn-tx ring-amber-100";
-  return "bg-surface-3 text-ink-soft ring-line";
-}
-
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...init,
@@ -251,7 +242,8 @@ export default function AdminLiveEventRoulettePanel({
     if (controlledOpen !== undefined) onRequestClose?.();
     else setInternalOpen(false);
   };
-  const [mode, setMode] = useState<RouletteMode>("test");
+  // [2026-09-08] 테스트/운영 토글 삭제 → 기본 운영. 테스트는 「테스트로 해보기」 버튼이 한 판만 test 로 돌린다.
+  const [mode, setMode] = useState<RouletteMode>("live");
   const [sourceDate] = useState(todayText);
   const [broadcasts, setBroadcasts] = useState<RouletteBroadcast[]>([]);
   const [broadcastId, setBroadcastId] = useState("");
@@ -263,7 +255,8 @@ export default function AdminLiveEventRoulettePanel({
   const [winners, setWinners] = useState<RouletteWinner[]>([]);
   const [loading, setLoading] = useState(false);
   const [spinning, setSpinning] = useState(false);
-  const [eventTab, setEventTab] = useState<"roulette" | "claw" | "mission" | "survival" | "race">("claw");
+  // [2026-09-08] 기본 탭 서바이벌(실사용 최다). 탭 순서: 서바이벌·달리기·룰렛·인형뽑기·미션
+  const [eventTab, setEventTab] = useState<"roulette" | "claw" | "mission" | "survival" | "race">("survival");
   const [participantSource, setParticipantSource] = useState<"auto" | "paid" | "manual">("auto");
   const [manualParticipantText, setManualParticipantText] = useState("");
   const [fixedWinnerNickname, setFixedWinnerNickname] = useState("");
@@ -276,7 +269,33 @@ export default function AdminLiveEventRoulettePanel({
   const [fixedSurvivorNicknames, setFixedSurvivorNicknames] = useState<string[]>([]); // 미리 지정한 고정 당첨자(다중, 최대 K)
   // 시안 신규 UI 상태 (추첨 로직 무변경 — 표시/선택용)
   const [excludeDailyDup, setExcludeDailyDup] = useState(true);
-  const [useWeight, setUseWeight] = useState(false);
+  // [2026-09-08] 구매 응모권 규칙 — 켜면 "1장 + 결제완료 금액 unit원마다 1장, 최대 max장". 서버에 그대로 보내고 서버가 계산.
+  //   (예전 useWeight 토글은 어디에도 안 보내져서 장식이었고, 서버는 항상 1~1.8배 가중치를 걸고 있었음)
+  const [ticketEnabled, setTicketEnabled] = useState(false);
+  const [ticketUnitMan, setTicketUnitMan] = useState("5"); // 만원 단위
+  const [ticketMax, setTicketMax] = useState("5");
+  // 사장님이 직접 바꾼 뒤에만 저장·재조회한다(처음 불러온 값 반영 중엔 아무것도 안 함 — 저장값 덮어쓰기 방지)
+  const ticketTouchedRef = useRef(false);
+  useEffect(() => {
+    // 마운트 직후 한 번, 저장해 둔 규칙을 읽어 온다(서버 렌더와 어긋나지 않게 다음 틱에서 반영)
+    const timer = window.setTimeout(() => {
+      try {
+        const raw = window.localStorage.getItem("ruru_event_ticket_rule");
+        if (!raw) return;
+        const j = JSON.parse(raw) as { enabled?: boolean; unitMan?: string; max?: string };
+        if (typeof j.enabled === "boolean") setTicketEnabled(j.enabled);
+        if (typeof j.unitMan === "string" && /^[0-9]{1,3}$/.test(j.unitMan)) setTicketUnitMan(j.unitMan);
+        if (typeof j.max === "string" && /^[0-9]{1,2}$/.test(j.max)) setTicketMax(j.max);
+      } catch { /* 저장된 규칙 없음 */ }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const ticketRuleBody = useMemo(() => ({
+    useWeight: ticketEnabled,
+    ticketUnit: Math.max(1, Number(ticketUnitMan) || 5) * 10000,
+    ticketMax: Math.max(1, Number(ticketMax) || 5),
+  }), [ticketEnabled, ticketUnitMan, ticketMax]);
+  const ticketRuleKey = JSON.stringify(ticketRuleBody);
   const [listPeriod, setListPeriod] = useState<"today" | "week" | "month" | "date">("today");
   const [listDate, setListDate] = useState("");
 
@@ -309,6 +328,8 @@ export default function AdminLiveEventRoulettePanel({
   }, [manualParticipantText]);
 
   const finalParticipants = participantSource === "manual" ? manualParticipants : participants;
+  // [2026-09-08] 전체 응모권 장수 — 칩의 확률 표시용
+  const totalTickets = finalParticipants.reduce((sum, p) => sum + Math.max(1, Math.floor(Number(p.tickets ?? p.weight ?? 1)) || 1), 0);
   const selectedWinnerNickname =
     fixedWinnerNickname.trim() ||
     finalParticipants[0]?.nickname ||
@@ -372,7 +393,11 @@ export default function AdminLiveEventRoulettePanel({
   const rafRef = useRef<number | null>(null);
   const animatedKeyRef = useRef("");
   const namesRef = useRef<string[]>([]);
-  namesRef.current = finalParticipants.map((p) => p.nickname);
+  // [2026-09-08] 응모권 장수만큼 같은 이름 칸 반복 → 휠 칸 수 = 실제 확률 (방송 위젯도 같은 규칙)
+  namesRef.current = finalParticipants.flatMap((p) => {
+    const t = Math.max(1, Math.min(20, Math.floor(Number(p.tickets ?? p.weight ?? 1)) || 1));
+    return Array.from({ length: t }, () => p.nickname);
+  });
   const wheelKey = namesRef.current.join("|");
   const [centerWinner, setCenterWinner] = useState("");
 
@@ -446,7 +471,8 @@ export default function AdminLiveEventRoulettePanel({
     const gType = giftType;
     const gAmount = Number(giftPointAmount || 0);
     const gReason = (winnerNote || title || "이벤트 당첨").trim();
-    const isLive = mode === "live";
+    // [2026-09-08] 이 판이 운영인지 — 화면 상태가 아니라 서버가 만든 이벤트 행의 mode 로 판단(테스트 한 판 중 상태 꼬임 방지)
+    const isLive = (currentEvent?.mode || mode) === "live";
     const gEventId = currentEvent?.id || ""; // 중복지급 가드 키
 
     setCenterWinner("");
@@ -743,11 +769,6 @@ export default function AdminLiveEventRoulettePanel({
     setCurrentEvent(null);
   };
 
-  const changeMode = (nextMode: RouletteMode) => {
-    setMode(nextMode);
-    void loadParticipants(nextMode, sourceDate, broadcastId);
-  };
-
   const changeBroadcast = (nextBroadcastId: string) => {
     setBroadcastId(nextBroadcastId);
     void loadParticipants(mode, sourceDate, nextBroadcastId);
@@ -805,11 +826,7 @@ export default function AdminLiveEventRoulettePanel({
     setManualParticipantText(`${current}\n새참가자`);
   };
 
-  const previewClawAnimation = () => {
-    showAdminToast("인형뽑기 미리보기는 다음 단계에서 방송용 위젯에 연결합니다.", "info");
-  };
-
-  const startClawEvent = async () => {
+  const startClawEvent = async (runMode: RouletteMode = mode) => {
     if (finalParticipants.length === 0) {
       showAdminToast("참가자 명단이 없습니다. 자동 명단을 불러오거나 수동 참가자를 입력해주세요.", "warning");
       return;
@@ -823,7 +840,7 @@ export default function AdminLiveEventRoulettePanel({
         method: "POST",
         body: JSON.stringify({
           action: "create_event",
-          mode,
+          mode: runMode,
           sourceDate,
           broadcastId,
           title,
@@ -831,6 +848,7 @@ export default function AdminLiveEventRoulettePanel({
           participants: finalParticipants,
           eventKind: "claw",
           excludeDailyDup,
+          ...ticketRuleBody,
         }),
       });
 
@@ -912,6 +930,7 @@ export default function AdminLiveEventRoulettePanel({
           paidOnly: paidOnly || undefined,
           excludeDailyDup,
           orderGroupIds: paidOnly ? undefined : (filteredIdsRef.current ?? undefined),
+          ...ticketRuleBody,
         }),
       });
 
@@ -929,6 +948,20 @@ export default function AdminLiveEventRoulettePanel({
       setLoading(false);
     }
   };
+
+  // [2026-09-08] 응모권 규칙이 바뀌면 명단(장수)을 다시 불러오고 규칙을 기억해 둔다(수동 입력은 전원 1장이라 제외)
+  useEffect(() => {
+    if (!ticketTouchedRef.current) return;
+    try { window.localStorage.setItem("ruru_event_ticket_rule", JSON.stringify({ enabled: ticketEnabled, unitMan: ticketUnitMan, max: ticketMax })); } catch { /* 무시 */ }
+    if (!open) return;
+    if (participantSource !== "auto" && participantSource !== "paid") return;
+    // 숫자 칸을 치는 동안 매 글자마다 조회하지 않게 0.5초 뒤 한 번
+    const timer = window.setTimeout(() => {
+      void loadParticipants(mode, sourceDate, broadcastId, participantSource === "paid");
+    }, 500);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticketRuleKey]);
 
   // 주문서 화면 필터(보이는 주문)가 바뀌면 자동/입금완료 참가자를 다시 불러온다(수동 입력 모드는 제외).
   const filterFirstRunRef = useRef(false);
@@ -977,44 +1010,6 @@ export default function AdminLiveEventRoulettePanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const createEvent = async () => {
-    setLoading(true);
-
-    try {
-      const payload = await requestJson<EventPayload>("/api/admin-live/event-roulette", {
-        method: "POST",
-        body: JSON.stringify({
-          action: "create_event",
-          mode,
-          sourceDate,
-          broadcastId,
-          title,
-          participantSource,
-          participants: finalParticipants,
-          eventKind: "roulette",
-          excludeDailyDup,
-        }),
-      });
-
-      if (!payload.ok || !payload.event) {
-        throw new Error(payload.message || "룰렛 이벤트 생성 실패");
-      }
-
-      setCurrentEvent(payload.event);
-      setParticipants(payload.event.participants || participants);
-      await loadEventsAndWinners();
-
-      if (payload.saved === false) {
-        showAdminToast("미리보기 룰렛을 불러왔습니다. 실제 기록에는 저장되지 않습니다.", "success");
-      } else {
-        showAdminToast(`${modeLabel(mode)} 룰렛 이벤트를 만들었습니다.`, "success");
-      }
-    } catch (error) {
-      showAdminToast("룰렛 이벤트 생성 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const spinEvent = async () => {
     if (!currentEvent?.id) {
@@ -1072,12 +1067,15 @@ export default function AdminLiveEventRoulettePanel({
         body: JSON.stringify({
           action: "create_event",
           title,
-          mode,
+          // [2026-09-08] 명단을 불러올 때 방송 위젯에 휠을 미리 띄우려고 만드는 "대기" 이벤트 — 항상 테스트 기록으로.
+          //   (기본 모드가 운영으로 바뀌면서 운영 대기 행이 쌓이는 걸 막음. 실제 추첨은 돌리기 때 새 이벤트를 만든다)
+          mode: "test",
           sourceDate,
           broadcastId,
           participants: nextParticipants,
           eventKind: "roulette",
           excludeDailyDup,
+          ...ticketRuleBody,
         }),
       });
 
@@ -1100,7 +1098,7 @@ export default function AdminLiveEventRoulettePanel({
   //   ① create_event(eventKind:"survival")로 이벤트 생성 → ② resolve_survival_event로 서버가 생존자 K명 확정
   //   (고정 당첨자 우선 → 나머지 가중치 랜덤). 방송 위젯은 그 결과를 폴링해 연출을 재생한다.
   //   포인트 지급은 여기서 하지 않는다(Phase 4에서 기존 grant 흐름 연결).
-  const startSurvivalEvent = async () => {
+  const startSurvivalEvent = async (runMode: RouletteMode = mode) => {
     if (finalParticipants.length === 0) {
       showAdminToast("참가자 명단이 없습니다. 자동 명단을 불러오거나 수동 참가자를 입력해주세요.", "warning");
       return;
@@ -1121,7 +1119,7 @@ export default function AdminLiveEventRoulettePanel({
 
     // 실제 돈이 나가므로 총 지급액을 먼저 확인시킨다(운영모드 + 포인트 선물일 때만).
     const gAmountPre = Number(String(giftPointAmount || "").replace(/[^0-9]/g, "")) || 0;
-    if (mode === "live" && giftType === "point" && gAmountPre > 0) {
+    if (runMode === "live" && giftType === "point" && gAmountPre > 0) {
       const totalPre = gAmountPre * survivorCount;
       const okStart = await showAdminConfirm(
         `${kindLabel}을 시작합니다.\n\n${winnerWord} ${survivorCount}명 × ${gAmountPre.toLocaleString("ko-KR")}P` +
@@ -1139,7 +1137,7 @@ export default function AdminLiveEventRoulettePanel({
         method: "POST",
         body: JSON.stringify({
           action: "create_event",
-          mode,
+          mode: runMode,
           sourceDate,
           broadcastId,
           title,
@@ -1147,6 +1145,7 @@ export default function AdminLiveEventRoulettePanel({
           participants: finalParticipants,
           eventKind: isRace ? "race" : "survival",
           excludeDailyDup,
+          ...ticketRuleBody,
         }),
       });
 
@@ -1183,7 +1182,7 @@ export default function AdminLiveEventRoulettePanel({
       // 포인트 자동지급 — 룰렛과 동일한 게이트: 운영(live) 모드 + 선물=포인트 + 금액>0 일 때만.
       //   생존자는 서버가 이미 확정했으므로 연출 종료를 기다리지 않고 바로 지급한다(연출이 끊겨도 지급 누락 없음).
       const gAmount = Number(String(giftPointAmount || "").replace(/[^0-9]/g, "")) || 0;
-      if (giftType === "point" && gAmount > 0 && mode === "live") {
+      if (giftType === "point" && gAmount > 0 && runMode === "live") {
         await grantPointToSurvivors(resolvePayload.winners || [], gAmount, winnerNote || (isRace ? "달리기 당첨" : "서바이벌 생존"));
       } else {
         if (giftType === "point" && gAmount > 0) {
@@ -1198,7 +1197,7 @@ export default function AdminLiveEventRoulettePanel({
     }
   };
 
-  const startRouletteOneClick = async () => {
+  const startRouletteOneClick = async (runMode: RouletteMode = mode) => {
     if (finalParticipants.length === 0) {
       showAdminToast("먼저 주문서 명단을 불러오거나 수동 참가자를 입력해주세요.", "warning");
       return;
@@ -1217,13 +1216,14 @@ export default function AdminLiveEventRoulettePanel({
         body: JSON.stringify({
           action: "create_event",
           title,
-          mode,
+          mode: runMode,
           sourceDate,
           broadcastId,
           participantSource,
           participants: finalParticipants,
           manualParticipantText,
           eventKind: "roulette",
+          ...ticketRuleBody,
         }),
       });
 
@@ -1391,14 +1391,30 @@ export default function AdminLiveEventRoulettePanel({
 
   // 돌리기 가드: 운영모드 + 선물=포인트인데 금액이 0/빈칸이면 자동지급이 안 되므로 먼저 경고(막기).
   //   → "당첨 내용(포인트)" 안 채우고 돌려서 당첨자가 포인트 못 받는 사고 방지. (지급/grant 로직은 무변경)
-  const startSpin = async () => {
+  // [2026-09-08] testRun=true 면 이 한 판만 테스트(포인트 안 나감, 테스트 기록으로 저장). 평소는 운영.
+  const startSpin = async (testRun = false) => {
+    const runMode: RouletteMode = testRun ? "test" : "live";
+    setMode(runMode);
     const amt = Number(String(giftPointAmount || "").replace(/[^0-9]/g, "")) || 0;
-    if (mode === "live" && giftType === "point" && amt <= 0) {
+    if (runMode === "live" && giftType === "point" && amt <= 0) {
       const okZero = await showAdminConfirm("당첨자에게 줄 포인트 금액이 비어 있어요 (0P).\n이대로 돌리면 포인트 자동지급이 안 됩니다.\n\n‘당첨 내용(포인트)’에 금액을 먼저 입력하세요.\n\n그래도 그냥 돌릴까요?", { title: "포인트 금액 없음", confirmText: "그냥 돌리기", cancelText: "취소", tone: "warning" });
-      if (!okZero) return;
+      if (!okZero) { setMode("live"); return; }
     }
-    // [2026-07-26] 달리기(race)는 서바이벌과 동일 실행 함수 사용(startSurvivalEvent가 탭 감지).
-    (eventTab === "roulette" ? startRouletteOneClick : (eventTab === "survival" || eventTab === "race") ? startSurvivalEvent : startClawEvent)();
+    // 룰렛·인형뽑기: 운영 + 포인트 > 0 이면 서바이벌과 같은 시작 확인창(당첨자 1명에게 실제 지급)
+    if (runMode === "live" && giftType === "point" && amt > 0 && (eventTab === "roulette" || eventTab === "claw")) {
+      const okStart = await showAdminConfirm(
+        `${eventTab === "roulette" ? "🎡 룰렛" : "🪆 인형뽑기"}을 시작합니다.\n\n당첨자 1명에게 ${amt.toLocaleString("ko-KR")}P 가 실제로 지급됩니다.\n\n진행할까요?`,
+        { title: "이벤트 시작", confirmText: "시작", cancelText: "취소", tone: "warning" },
+      );
+      if (!okStart) return;
+    }
+    try {
+      // [2026-07-26] 달리기(race)는 서바이벌과 동일 실행 함수 사용(startSurvivalEvent가 탭 감지).
+      await (eventTab === "roulette" ? startRouletteOneClick(runMode) : (eventTab === "survival" || eventTab === "race") ? startSurvivalEvent(runMode) : startClawEvent(runMode));
+    } finally {
+      // 다음 판은 다시 운영
+      setMode("live");
+    }
   };
   // [2026-07-26] K명 당첨 방식(서바이벌·달리기 공용) 판정 — UI 게이팅에 사용.
   const isKWinnerTab = eventTab === "survival" || eventTab === "race";
@@ -1427,19 +1443,18 @@ export default function AdminLiveEventRoulettePanel({
               <div style={{ display: "flex", alignItems: "center", marginBottom: "13px" }}>
                 <span style={{ fontSize: "14px", fontWeight: 600 }}>◆ 이벤트</span>
                 <span style={{ marginLeft: "auto", display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap" }}>
-                  <span className="badge" style={{ padding: "4px 16px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "roulette" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "roulette" ? "#fff" : "var(--mut)" }}
-                    onClick={() => { setEventTab("roulette"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>룰렛</span>
-                  <span className="badge" style={{ padding: "4px 16px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "claw" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "claw" ? "#fff" : "var(--mut)" }}
-                    onClick={() => { setEventTab("claw"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>인형뽑기</span>
-                  <span className="badge" style={{ padding: "4px 14px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "mission" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "mission" ? "#fff" : "var(--mut)" }}
-                    onClick={() => { setEventTab("mission"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>🎯 미션 게이지</span>
+                  {/* [2026-09-08] 탭 순서 = 실제 쓰는 순서(서바이벌·달리기 최다). 테스트/운영 토글은 삭제 — 「테스트로 해보기」 버튼으로 */}
                   <span className="badge" style={{ padding: "4px 14px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "survival" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "survival" ? "#fff" : "var(--mut)" }}
                     onClick={() => { setEventTab("survival"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>⛈️ 서바이벌</span>
                   <span className="badge" style={{ padding: "4px 14px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "race" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "race" ? "#fff" : "var(--mut)" }}
                     onClick={() => { setEventTab("race"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>🏁 달리기</span>
+                  <span className="badge" style={{ padding: "4px 16px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "roulette" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "roulette" ? "#fff" : "var(--mut)" }}
+                    onClick={() => { setEventTab("roulette"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>🎡 룰렛</span>
+                  <span className="badge" style={{ padding: "4px 16px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "claw" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "claw" ? "#fff" : "var(--mut)" }}
+                    onClick={() => { setEventTab("claw"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>🪆 인형뽑기</span>
+                  <span className="badge" style={{ padding: "4px 14px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "mission" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "mission" ? "#fff" : "var(--mut)" }}
+                    onClick={() => { setEventTab("mission"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>🎯 미션</span>
                   <span style={{ width: "1px", height: "18px", background: "var(--bd)", margin: "0 3px" }} />
-                  <span className="badge" style={{ padding: "4px 10px", cursor: "pointer", border: "1px solid var(--bd)", background: mode === "test" ? "var(--amber-bg)" : "var(--color-surface)", color: mode === "test" ? "var(--amber)" : "var(--mut)" }} onClick={() => changeMode("test")}>테스트</span>
-                  <span className="badge" style={{ padding: "4px 10px", cursor: "pointer", border: "1px solid var(--bd)", background: mode === "live" ? "var(--green-bg)" : "var(--color-surface)", color: mode === "live" ? "var(--green)" : "var(--mut)" }} onClick={() => changeMode("live")}>운영</span>
                   <button className="btn" style={{ height: "auto", padding: "5px 10px" }} onClick={() => { resetEvent(); setCenterWinner(""); }}>↺ 초기화</button>
                   <button className="btn" style={{ height: "auto", padding: "5px 10px" }} onClick={closePanel}>✕</button>
                 </span>
@@ -1472,7 +1487,14 @@ export default function AdminLiveEventRoulettePanel({
                       <span style={{ fontSize: "12px", color: "var(--rose)", fontWeight: 600 }}>인형뽑기 · {finalParticipants.length}명</span>
                     </div>
                   )}
-                  <button className="btn rose" style={{ height: "auto", padding: "9px 30px" }} onClick={startSpin} disabled={spinning || finalParticipants.length === 0}>{spinning ? "진행중..." : "▶ 돌리기"}</button>
+                  <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
+                    <button className="btn rose" style={{ height: "auto", padding: "9px 30px" }} onClick={() => void startSpin(false)} disabled={spinning || finalParticipants.length === 0}>
+                      {spinning ? "진행중..." : giftType === "point" && Number(giftPointAmount || 0) > 0 ? `▶ 시작 · ${isKWinnerTab ? `${survivorCount}명에게 ` : "당첨자에게 "}${Number(giftPointAmount).toLocaleString("ko-KR")}P 지급` : "▶ 시작"}
+                    </button>
+                    <button className="btn" style={{ height: "auto", padding: "9px 12px" }} onClick={() => void startSpin(true)} disabled={spinning || finalParticipants.length === 0} title="포인트가 나가지 않고 테스트 기록으로만 남습니다">
+                      테스트로 해보기 · 포인트 안 나감
+                    </button>
+                  </div>
 
                   {/* 당첨자 발표 카드 — 룰렛 위(상단)에만 덮어서 아래 ▶돌리기 버튼은 가리지 않음. 클릭도 통과(pointerEvents none) */}
                   {centerWinner && currentEvent?.winner_nickname === centerWinner ? (
@@ -1503,9 +1525,24 @@ export default function AdminLiveEventRoulettePanel({
                     <span style={{ fontSize: "11px" }}>당일 중복당첨 금지</span>
                     <span className={`tog ${excludeDailyDup ? "on" : "off"}`}><i /></span>
                   </div>
-                  <div style={{ background: "var(--color-surface-2)", borderRadius: "7px", padding: "8px 11px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => setUseWeight((v) => !v)}>
-                    <span style={{ fontSize: "11px" }}>많이 산 사람 확률 ↑ <span style={{ color: "var(--mut2)" }}>(금액40%+당일60%)</span></span>
-                    <span className={`tog ${useWeight ? "on" : "off"}`}><i /></span>
+                  {/* [2026-09-08] 구매 응모권 — 실제로 서버에 전달되어 추첨 확률이 된다 */}
+                  <div style={{ background: "var(--color-surface-2)", borderRadius: "7px", padding: "8px 11px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => { ticketTouchedRef.current = true; setTicketEnabled((v) => !v); }}>
+                      <span style={{ fontSize: "11px" }}>구매 응모권 적용 <span style={{ color: "var(--mut2)" }}>(많이 산 사람 확률 ↑)</span></span>
+                      <span className={`tog ${ticketEnabled ? "on" : "off"}`}><i /></span>
+                    </div>
+                    {ticketEnabled ? (
+                      <div style={{ marginTop: "7px", display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap", fontSize: "11px" }}>
+                        <span>기본 1장 + 결제완료</span>
+                        <input className="ipt" style={{ width: "44px", textAlign: "center", padding: "3px" }} inputMode="numeric" value={ticketUnitMan} onChange={(e) => { ticketTouchedRef.current = true; setTicketUnitMan(e.target.value.replace(/[^0-9]/g, "").slice(0, 3) || ""); }} onBlur={() => { if (!(Number(ticketUnitMan) >= 1)) setTicketUnitMan("5"); }} />
+                        <span>만원마다 1장 · 최대</span>
+                        <input className="ipt" style={{ width: "40px", textAlign: "center", padding: "3px" }} inputMode="numeric" value={ticketMax} onChange={(e) => { ticketTouchedRef.current = true; setTicketMax(e.target.value.replace(/[^0-9]/g, "").slice(0, 2) || ""); }} onBlur={() => { if (!(Number(ticketMax) >= 1)) setTicketMax("5"); }} />
+                        <span>장</span>
+                        <span style={{ width: "100%", color: "var(--mut2)" }}>확률 = 내 장수 ÷ 전체 장수. 미입금 주문은 참가만 되고 장수는 안 늘어요. 수동 입력 명단은 전원 1장.</span>
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: "5px", fontSize: "11px", color: "var(--mut2)" }}>꺼짐 = 전원 같은 확률(1장씩)</div>
+                    )}
                   </div>
                   {isKWinnerTab ? (
                     <div style={{ background: "var(--rose-bg)", border: "1px solid var(--rose-bd)", borderRadius: "7px", padding: "8px 11px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
@@ -1531,6 +1568,8 @@ export default function AdminLiveEventRoulettePanel({
                   ) : (
                     finalParticipants.map((p, i) => {
                       const on = isKWinnerTab ? fixedSurvivorNicknames.includes(p.nickname) : fixedWinnerNickname === p.nickname;
+                      const myTickets = Math.max(1, Math.floor(Number(p.tickets ?? p.weight ?? 1)) || 1);
+                      const ticketTail = ticketEnabled && totalTickets > 0 ? ` ×${myTickets}장 · ${Math.round((myTickets / totalTickets) * 1000) / 10}%` : "";
                       const toggleFixed = () => {
                         if (isKWinnerTab) {
                           setFixedSurvivorNicknames((prev) =>
@@ -1545,7 +1584,7 @@ export default function AdminLiveEventRoulettePanel({
                         }
                       };
                       return (
-                        <span key={`fix-${p.nickname}-${i}`} className={`nick ${on ? "win" : ""}`} onClick={toggleFixed}>{on ? "👑 " : ""}{p.nickname}</span>
+                        <span key={`fix-${p.nickname}-${i}`} className={`nick ${on ? "win" : ""}`} onClick={toggleFixed} title={ticketEnabled ? `결제완료 ${Number(p.paid_amount_sum || 0).toLocaleString("ko-KR")}원` : undefined}>{on ? "👑 " : ""}{p.nickname}{ticketTail ? <span style={{ color: "var(--mut2)", fontSize: "10px" }}>{ticketTail}</span> : null}</span>
                       );
                     })
                   )}
@@ -1575,6 +1614,17 @@ export default function AdminLiveEventRoulettePanel({
                 <button className="btn rose" style={{ height: "auto", padding: "5px 12px" }} onClick={() => void copyText(widgetUrl)} disabled={!widgetUrl}>복사</button>
               </div>
 
+              {/* [2026-09-08] 방송 위젯을 그대로 작게 — 시청자가 보는 화면(룰렛·인형뽑기). 읽기 전용 iframe */}
+              {(eventTab === "roulette" || eventTab === "claw") && widgetUrl ? (
+                <div style={{ marginBottom: "11px", borderRadius: "10px", overflow: "hidden", border: "1px solid var(--bd)", background: "#111" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 10px", fontSize: "11px", color: "#ddd" }}>
+                    <span>방송 화면 미리보기 (시청자가 보는 그대로)</span>
+                    <a href={widgetUrl} target="_blank" rel="noreferrer" style={{ color: "#ffd166" }}>새 창으로 열기 ↗</a>
+                  </div>
+                  <iframe src={widgetUrl} title="방송 위젯 미리보기" style={{ width: "100%", height: "280px", border: 0, display: "block", background: "#111" }} />
+                </div>
+              ) : null}
+
               {/* [2026-08-12] 효과음 사운드보드 — 서바이벌/달리기 탭에서만. 재생 전용(추첨·지급 무관) */}
               {isKWinnerTab && <AdminLiveEventSoundboard kind={eventTab === "race" ? "race" : "survival"} />}
 
@@ -1600,7 +1650,7 @@ export default function AdminLiveEventRoulettePanel({
                     <div key={`winner-${w.id}`} className="row">
                       <span className="note" style={{ width: "120px", flexShrink: 0 }}>{dateTimeFull(w.winner_at)}</span>
                       <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.is_test ? "테스트" : "운영"} · {(() => { const ev = events.find((e) => e.id === w.event_id); const token = ev?.overlay_token || ""; return token.startsWith("roulette") ? "🎡룰렛" : token.startsWith("claw") ? "🪆인형뽑기" : token.startsWith("survival") ? "⛈️서바이벌" : token.startsWith("race") ? "🏁달리기" : "이벤트"; })()} · 당첨 <b>{w.nickname}</b> · {w.winner_note || "이벤트 당첨"}</span>
-                      <span className={`badge ${w.is_reward_done ? "b-ok" : "b-card"}`} style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => markRewardDone(w, !w.is_reward_done)}>{w.is_reward_done ? "지급완료" : "지급대기"}</span>
+                      <button type="button" className={`badge ${w.is_reward_done ? "b-ok" : "b-card"}`} style={{ cursor: "pointer", flexShrink: 0, border: "1px solid transparent" }} onClick={() => markRewardDone(w, !w.is_reward_done)} title={w.is_reward_done ? "누르면 지급대기로 되돌립니다(확인창)" : "누르면 지급완료로 표시합니다"}>{w.is_reward_done ? "✓ 지급완료" : "지급대기 → 완료로"}</button>
                       <span className="note" style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => void deleteWinnerRecord(w)}>삭제</span>
                     </div>
                   ))

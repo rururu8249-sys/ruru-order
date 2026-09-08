@@ -58,6 +58,8 @@ function sanitizeParticipants(input: EventRouletteParticipant[] | null) {
 
   return input.map((item) => ({
     nickname: cleanText(item.nickname) || "참여자",
+    // [2026-09-08] 응모권 장수 — 위젯이 장수만큼 칸을 반복해서 그린다(화면 = 확률)
+    tickets: Math.max(1, Math.floor(Number(item.weight || 1))),
   }));
 }
 

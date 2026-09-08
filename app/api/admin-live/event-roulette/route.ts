@@ -8,8 +8,10 @@ import {
   buildRoulettePreviewParticipants,
   calculateRouletteSpinDurationMs,
   normalizeEventRouletteMode,
+  normalizeTicketRule,
   pickRouletteWinner,
   type EventRouletteMode,
+  type RouletteTicketRule,
   type EventRouletteOrderLike,
   type EventRouletteParticipant,
 } from "@/lib/eventRoulette";
@@ -178,6 +180,9 @@ function sanitizeParticipantForAdmin(participant: EventRouletteParticipant) {
     order_count: participant.orderCount,
     qty_sum: participant.qtySum,
     amount_sum: participant.amountSum,
+    // [2026-09-08] 응모권 근거(결제완료 금액) + 장수. weight 는 예전 클라이언트 호환(= tickets)
+    paid_amount_sum: Number(participant.paidAmountSum || 0),
+    tickets: participant.weight,
     order_ids: participant.orderIds,
     weight: participant.weight,
   };
@@ -186,6 +191,8 @@ function sanitizeParticipantForAdmin(participant: EventRouletteParticipant) {
 function sanitizeParticipantForOverlay(participant: EventRouletteParticipant) {
   return {
     nickname: participant.nickname,
+    // [2026-09-08] 방송 위젯이 응모권 장수만큼 칸을 반복해 그린다(화면 = 확률). 옛 위젯은 이 필드를 무시
+    tickets: Math.max(1, Math.floor(Number(participant.weight || 1))),
   };
 }
 
@@ -403,7 +410,9 @@ async function buildParticipantsForRequest(
   sourceDate: string,
   broadcastId = "",
   paidOnly = false,
-  orderGroupIds: string[] | null = null
+  orderGroupIds: string[] | null = null,
+  // [2026-09-08] 응모권 규칙 — 화면 토글·단위·최대를 그대로 받아 서버가 장수를 계산한다(예전엔 토글이 서버에 안 갔음)
+  ticketRule: RouletteTicketRule = normalizeTicketRule(null)
 ) {
   if (mode === "preview") {
     return buildRoulettePreviewParticipants();
@@ -421,7 +430,8 @@ async function buildParticipantsForRequest(
   // 입금완료한 사람만: admin_order_status_v2/order_manage_status가 결제완료 상태인 주문만 남긴다.
   const targetRows = paidOnly ? rows.filter(isPaidOrderRowForRoulette) : rows;
 
-  return buildRouletteParticipants(targetRows, mode);
+  // 응모권은 결제완료 주문 금액으로만 센다(미입금 주문은 참가는 되지만 장수를 늘리지 않음)
+  return buildRouletteParticipants(targetRows, mode, { ticketRule, isPaid: isPaidOrderRowForRoulette });
 }
 
 function normalizeWinnerNicknameForDedupe(value: unknown) {
@@ -573,7 +583,8 @@ function normalizeManualParticipantsForEvent(value: unknown) {
     const orderCount = safeNumber(row.orderCount ?? row.order_count, orderIds.length);
     const qtySum = safeNumber(row.qtySum ?? row.qty_sum, 0);
     const amountSum = safeNumber(row.amountSum ?? row.amount_sum, 0);
-    const weightValue = Number(row.weight ?? 1);
+    const paidAmountSum = safeNumber(row.paidAmountSum ?? row.paid_amount_sum, 0);
+    const weightValue = Number(row.weight ?? row.tickets ?? 1);
     const weight = Number.isFinite(weightValue) && weightValue > 0 ? weightValue : 1;
 
     result.push({
@@ -581,6 +592,7 @@ function normalizeManualParticipantsForEvent(value: unknown) {
       orderCount,
       qtySum,
       amountSum,
+      paidAmountSum,
       orderIds,
       weight,
     });
@@ -635,10 +647,11 @@ async function runParticipants(opts: {
   paidOnly: boolean;
   excludeDailyDup: boolean;
   orderGroupIds: string[] | null;
+  ticketRule: RouletteTicketRule;
 }) {
   const supabase = getSupabaseAdmin();
-  const { mode, sourceDate, broadcastId, paidOnly, excludeDailyDup, orderGroupIds } = opts;
-  const rawParticipants = await buildParticipantsForRequest(supabase, mode, sourceDate, broadcastId, paidOnly, orderGroupIds);
+  const { mode, sourceDate, broadcastId, paidOnly, excludeDailyDup, orderGroupIds, ticketRule } = opts;
+  const rawParticipants = await buildParticipantsForRequest(supabase, mode, sourceDate, broadcastId, paidOnly, orderGroupIds, ticketRule);
   const deduped = excludeDailyDup
     ? await applyNoDuplicateWinnerRule(supabase, rawParticipants, {
         mode,
@@ -656,6 +669,7 @@ async function runParticipants(opts: {
     broadcast_id: broadcastId || null,
     participant_count: participants.length,
     excluded_winner_count: deduped.excludedWinnerCount,
+    ticket_rule: ticketRule,
     participants: participants.map(sanitizeParticipantForAdmin),
   });
 }
@@ -671,6 +685,11 @@ async function handleParticipants(request: NextRequest) {
     paidOnly: request.nextUrl.searchParams.get("paidOnly") === "true",
     excludeDailyDup: request.nextUrl.searchParams.get("excludeDailyDup") !== "false",
     orderGroupIds: null,
+    ticketRule: normalizeTicketRule({
+      useWeight: request.nextUrl.searchParams.get("useWeight"),
+      ticketUnit: request.nextUrl.searchParams.get("ticketUnit"),
+      ticketMax: request.nextUrl.searchParams.get("ticketMax"),
+    }),
   });
 }
 
@@ -686,6 +705,7 @@ async function handleParticipantsPost(body: Record<string, unknown>) {
     paidOnly: body.paidOnly === true || body.paidOnly === "true",
     excludeDailyDup: body.excludeDailyDup !== false && body.excludeDailyDup !== "false",
     orderGroupIds,
+    ticketRule: normalizeTicketRule({ useWeight: body.useWeight, ticketUnit: body.ticketUnit, ticketMax: body.ticketMax }),
   });
 }
 
@@ -759,9 +779,11 @@ async function createEvent(body: Record<string, unknown>) {
     rawEventKind === "claw" ? "claw" : rawEventKind === "survival" ? "survival"
       : rawEventKind === "race" ? "race" : "roulette";
   const requestedCreateParticipants = normalizeManualParticipantsForEvent(body.participants);
+  // 화면이 명단(응모권 장수 포함)을 보내면 그대로, 아니면 서버가 같은 규칙으로 다시 만든다
+  const ticketRule = normalizeTicketRule({ useWeight: body.useWeight, ticketUnit: body.ticketUnit, ticketMax: body.ticketMax });
   const rawParticipants = requestedCreateParticipants.length > 0
     ? requestedCreateParticipants
-    : await buildParticipantsForRequest(supabase, mode, sourceDate, broadcastId);
+    : await buildParticipantsForRequest(supabase, mode, sourceDate, broadcastId, false, null, ticketRule);
   const excludeDailyDup = body.excludeDailyDup !== false; // 기본 true(중복당첨 금지). false면 중복체크 건너뜀
   const deduped = excludeDailyDup
     ? await applyNoDuplicateWinnerRule(supabase, rawParticipants, {

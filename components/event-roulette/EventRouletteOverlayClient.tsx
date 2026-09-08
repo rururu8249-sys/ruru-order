@@ -79,19 +79,30 @@ function normalizeParticipants(event: RouletteEvent | null) {
       ? event?.participant_snapshot
       : [];
 
-  return source
-    .map((item) => {
-      if (typeof item === "string") return cleanText(item);
+  // [2026-09-08] 응모권 장수(tickets)만큼 같은 이름 칸을 반복 — 화면 칸 수 = 실제 확률.
+  //   tickets 가 없는(옛 기록) 참가자는 1칸. 전체 90칸까지만.
+  const slots: string[] = [];
+  for (const item of source) {
+    let name = "";
+    let tickets = 1;
+    if (typeof item === "string") {
+      name = cleanText(item);
+    } else if (item && typeof item === "object") {
+      const record = item as Record<string, unknown>;
+      name = cleanText(record.nickname || record.name || record.youtube_nickname);
+      const t = Math.floor(Number(record.tickets ?? record.weight ?? 1));
+      tickets = Number.isFinite(t) && t >= 1 ? Math.min(t, 20) : 1;
+    }
+    if (!name) continue;
+    for (let i = 0; i < tickets && slots.length < 90; i += 1) slots.push(name);
+    if (slots.length >= 90) break;
+  }
+  return slots;
+}
 
-      if (item && typeof item === "object") {
-        const record = item as Record<string, unknown>;
-        return cleanText(record.nickname || record.name || record.youtube_nickname);
-      }
-
-      return "";
-    })
-    .filter(Boolean)
-    .slice(0, 90);
+/** 칸 수가 아니라 사람 수 — "N명 참여중" 표시용 */
+function countUniqueNames(names: string[]) {
+  return new Set(names.map((n) => cleanText(n).toLowerCase())).size;
 }
 
 function winnerIndexOf(names: string[], winner: string) {
@@ -570,7 +581,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
           <div className="fixed-center-cap" aria-hidden="true">
             <div>루루동이</div>
             <div>이벤트</div>
-            <div className="participant-count">{participants.length}명 참여중</div>
+            <div className="participant-count">{countUniqueNames(participants)}명 참여중</div>
           </div>
         </div>
 
