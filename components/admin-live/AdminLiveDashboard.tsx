@@ -280,6 +280,10 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
   return parts.join(" · ");
 }
 
+// [2026-09-08 사장님 지적] 모든 메뉴 화면의 «세로 크기»는 이 한 줄로만 정한다(제각각 금지).
+//   화면 높이 - (본문 상하 여백 + 제목·탭 줄). 여기만 바꾸면 전 메뉴가 같이 바뀐다.
+const SCREEN_SHELL_HEIGHT = "h-[calc(100vh-104px)] min-h-[520px]";
+
 // [2026-09-08] ?panel= 은 adminLiveMenu 의 화면 키 전부 허용(옛 주소 그대로 열림)
 function isMenuKeyForUrl(value: string | null): value is AdminLiveMenuKey {
   return isAdminLiveMenuKey(value);
@@ -539,6 +543,8 @@ export default function AdminLiveDashboard() {
   const [customersInitialTab, setCustomersInitialTab] = useState<"members" | "issues">("members");
   // [2026-09-08 5단계] 오른쪽 방송 레일 열림 — null 이면 "방송 중이면 열림, 아니면 접힘"(자동), 손잡이를 누르면 고정
   const [railOpenChoice, setRailOpenChoice] = useState<boolean | null>(null);
+  // [2026-09-08 사장님 요청] 펼치면 시원하게(화면 절반 이상). 「보통」으로 줄일 수 있다.
+  const [railWide, setRailWide] = useState(true);
   // 라이트/다크 테마 토글 — 관리자 루트에만 .dark 부여(다른 페이지 영향 0). localStorage 기억.
   const [theme, setTheme] = useState<"light" | "dark">("light");
   useEffect(() => {
@@ -1466,7 +1472,9 @@ export default function AdminLiveDashboard() {
           </button>
 
           {/* [2026-09-08 5단계 · 레이아웃 B] 왼쪽 = 큰 메뉴 화면(통째로 전환) / 오른쪽 = 접이식 방송·채팅 레일 */}
-          <div className={railOpen ? "grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]" : "grid grid-cols-1 gap-4"}>
+          {/* [2026-09-08 사장님 지적] 메뉴마다 크기가 제각각이면 안 된다.
+              → 모든 화면이 이 «하나의 틀» 안에 들어간다. 가로=화면 전체, 세로=화면 높이-헤더. 예외 없음. */}
+          <div className="w-full">
             <div className="min-w-0">
               {/* 화면 제목 + 작은 탭 */}
               <div className="mb-3 flex flex-wrap items-end justify-between gap-2 border-b border-rose-line">
@@ -1523,9 +1531,12 @@ export default function AdminLiveDashboard() {
                 </div>
               ) : null}
 
+              {/* ▼▼ 모든 메뉴 공통 틀 — 여기 안쪽만 화면마다 다르다 ▼▼ */}
+              <div className={`w-full overflow-hidden rounded-2xl border border-line bg-surface ${SCREEN_SHELL_HEIGHT}`}>
+
               {/* ── 방송 › 방송 콘솔 ── */}
               {activeMenu === "broadcast" ? (
-                <div className="space-y-3">
+                <div className="h-full space-y-3 overflow-y-auto p-4">
                   <LiveHeader
                     activeBroadcast={activeBroadcast}
                     savingBroadcast={savingBroadcast}
@@ -1549,15 +1560,10 @@ export default function AdminLiveDashboard() {
                     onOpenMission={() => { setActiveMenu("event"); replacePanelInUrl("event"); }}
                   />
                   <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
-                  <div className="grid gap-3 lg:grid-cols-2">
-                    <div className="space-y-3">
-                      <LiveStatsPanel orders={orders} activeBroadcastId={activeBroadcast?.id || null} onOpenReport={() => { setActiveMenu("reports"); replacePanelInUrl("reports"); }} />
-                      {/* [2026-07-25 사장님] 상시 시스템 점검 카드 — 이상 없어도 초록 표시 */}
-                      <SystemAuditCard onOpenDetail={() => void runIntegrityCheck()} />
-                    </div>
-                    <div className="min-h-0">
-                      <LiveIssueRailPanel onOpenAll={() => { setCustomersInitialTab("issues"); setActiveMenu("customers"); replacePanelInUrl("customers"); }} />
-                    </div>
+                  {/* [2026-09-08 사장님 지적] 시스템 점검은 「설정 › 시스템 점검」, 고객이슈는 「고객」으로 옮겼다.
+                      방송/쇼핑몰 상관없는 공통 항목이라 방송 메뉴에 있을 자리가 아니다. */}
+                  <div className="w-full">
+                    <LiveStatsPanel orders={orders} activeBroadcastId={activeBroadcast?.id || null} onOpenReport={() => { setActiveMenu("reports"); replacePanelInUrl("reports"); }} />
                   </div>
                 </div>
               ) : null}
@@ -1566,7 +1572,7 @@ export default function AdminLiveDashboard() {
               {activeMenu === "chatorder" ? <ChatOrderQueuePopup embedded onClose={() => {}} /> : null}
 
               {/* ── 방송 › 이벤트 (항상 마운트 → 명단·상태 유지. 탭이 아닐 땐 숨김) ── */}
-              <div hidden={activeMenu !== "event"}>
+              <div hidden={activeMenu !== "event"} className="h-full">
                 <AdminLiveEventRoulettePanel
                   embedded
                   renderTrigger={false}
@@ -1584,7 +1590,7 @@ export default function AdminLiveDashboard() {
 
               {/* ── 주문·입금 › 실시간 주문 ── */}
               {activeMenu === "orders" ? (
-                <div className="space-y-3">
+                <div className="h-full space-y-3 overflow-y-auto p-4">
                   <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
                   <LiveMissionGauge
                     broadcastOn={Boolean(activeBroadcast)}
@@ -1620,7 +1626,7 @@ export default function AdminLiveDashboard() {
 
               {/* ── 주문·입금 › 입금내역 ── */}
               {activeMenu === "payments" ? (
-                <div className="rounded-2xl border border-line bg-surface p-5">
+                <div className="h-full overflow-y-auto p-5">
                   <AdminLivePaymentPanel
                     deposits={deposits}
                     orderGroups={orderGroups}
@@ -1632,7 +1638,7 @@ export default function AdminLiveDashboard() {
 
               {/* ── 주문·입금 › 정산 ── */}
               {activeMenu === "settlement" ? (
-                <div className="rounded-2xl border border-line bg-surface p-5">
+                <div className="h-full overflow-y-auto p-5">
                   <AdminLiveSettlementPanel orders={orders} />
                 </div>
               ) : null}
@@ -1652,42 +1658,63 @@ export default function AdminLiveDashboard() {
 
               {/* ── 고객 › 회원·이슈·단골 ── */}
               {activeMenu === "customers" ? (
-                <AdminLiveCustomersPanel embedded orders={orders} initialTab={customersInitialTab} onClose={() => setCustomersInitialTab("members")} />
+                <div className="flex h-full flex-col gap-3 p-4">
+                  {/* [2026-09-08] 방송 콘솔에 있던 「고객이슈」 요약 — 사람에 관한 건 고객 메뉴로 */}
+                  <div className="shrink-0">
+                    <LiveIssueRailPanel onOpenAll={() => setCustomersInitialTab("issues")} />
+                  </div>
+                  <div className="min-h-0 flex-1">
+                    <AdminLiveCustomersPanel embedded orders={orders} initialTab={customersInitialTab} onClose={() => setCustomersInitialTab("members")} />
+                  </div>
+                </div>
               ) : null}
 
               {/* ── 고객 › 쪽지·공지 ── */}
               {activeMenu === "notice" ? (
-                <div className="flex h-[calc(100vh-120px)] min-h-[520px] flex-col overflow-hidden rounded-2xl border border-line bg-surface">
+                <div className="h-full w-full">
                   <AdminLiveNoticePanel />
+                </div>
+              ) : null}
+
+              {/* ── 설정 › 시스템 점검 (공통) ── */}
+              {activeMenu === "audit" ? (
+                <div className="h-full space-y-3 overflow-y-auto p-4">
+                  {/* [2026-07-25 사장님] 상시 시스템 점검 카드 — 이상 없어도 초록 표시 */}
+                  <SystemAuditCard onOpenDetail={() => void runIntegrityCheck()} />
+                  <div className="rounded-2xl border border-line bg-surface-2 px-4 py-3 text-xs font-bold leading-5 text-ink-soft">
+                    주문·입금 데이터가 서로 어긋나는 곳이 있는지 훑어봅니다. 방송 중이든 아니든 언제나 같은 기준으로 봅니다.
+                    「자세히 보기」를 누르면 어떤 주문인지 목록으로 나옵니다.
+                  </div>
                 </div>
               ) : null}
 
               {/* ── 고객 › 접속 기록 (읽기 전용) ── */}
               {activeMenu === "visits" ? (
-                <div className="overflow-hidden rounded-2xl border border-line bg-surface">
-                  <VisitStatsView embedded style={{ height: "calc(100vh - 140px)", minHeight: "520px" }} />
-                </div>
+                <VisitStatsView embedded style={{ height: "100%" }} />
               ) : null}
 
               {/* ── 설정 ── */}
               {activeMenu === "settings" ? (
-                <div className="flex h-[calc(100vh-120px)] min-h-[520px] flex-col overflow-hidden rounded-2xl border border-line bg-surface">
+                <div className="h-full w-full">
                   <AdminLiveSettingsPanel onOpenNotice={() => { setActiveMenu("notice"); replacePanelInUrl("notice"); }} />
                 </div>
               ) : null}
+
+              </div>
+              {/* ▲▲ 공통 틀 끝 ▲▲ */}
             </div>
 
             {/* 오른쪽 접이식 방송·채팅 레일 (어느 화면에서든) */}
             <AdminLiveBroadcastRail
               open={railOpen}
               onToggle={() => setRailOpenChoice(!railOpen)}
+              wide={railWide}
+              onToggleWide={() => setRailWide((v) => !v)}
               broadcastOn={Boolean(activeBroadcast)}
-              savingBroadcast={savingBroadcast}
               videoRatio={videoRatio}
               youtubeUrl={activeBroadcast?.youtube_live_url || ""}
               activeBroadcastId={activeBroadcast?.id || null}
-              onStartBroadcast={() => void startBroadcast({ title: broadcastTitle, youtubeUrl: broadcastYoutubeUrl })}
-              onEndBroadcast={() => void endBroadcast()}
+              onOpenBroadcastConsole={() => { setActiveMenu("broadcast"); replacePanelInUrl("broadcast"); }}
             />
           </div>
 

@@ -296,12 +296,12 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
   return (
     <div
       onClick={embedded ? undefined : onClose}
-      style={embedded ? undefined : { position: "fixed", inset: 0, zIndex: 130, background: "rgba(30,20,20,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}
+      style={embedded ? { width: "100%", height: "100%" } : { position: "fixed", inset: 0, zIndex: 130, background: "rgba(30,20,20,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={embedded
-          ? { width: "100%", maxWidth: "1100px", height: "calc(100vh - 120px)", minHeight: "520px", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "16px", border: "1px solid var(--color-line)", overflow: "hidden" }
+          ? { width: "100%", height: "100%", display: "flex", flexDirection: "column", background: "var(--color-surface)", overflow: "hidden" }
           : { width: "min(780px, 96vw)", maxHeight: "92vh", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "16px", border: "1px solid var(--color-line)", boxShadow: "0 18px 50px rgba(0,0,0,0.22)", overflow: "hidden" }}
       >
         {/* 헤더 */}

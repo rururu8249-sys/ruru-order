@@ -1438,8 +1438,8 @@ export default function AdminLiveEventRoulettePanel({
       ) : null}
 
       {open ? (
-        <div style={embedded ? undefined : { position: "fixed", inset: 0, zIndex: 130, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(2,6,23,0.55)", padding: "12px" }}>
-          <div className="ruru-event-sian" style={embedded ? { width: "100%", maxWidth: "900px", height: "calc(100vh - 120px)", minHeight: "520px", overflowY: "auto", overflowX: "auto", borderRadius: "16px", border: "1px solid var(--color-line)" } : { width: "680px", maxWidth: "100%", flexShrink: 0, height: "88vh", overflowY: "auto", overflowX: "auto" }}>
+        <div style={embedded ? { width: "100%", height: "100%" } : { position: "fixed", inset: 0, zIndex: 130, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(2,6,23,0.55)", padding: "12px" }}>
+          <div className="ruru-event-sian" style={embedded ? { width: "100%", height: "100%", overflowY: "auto", overflowX: "auto" } : { width: "680px", maxWidth: "100%", flexShrink: 0, height: "88vh", overflowY: "auto", overflowX: "auto" }}>
             <div className="body" style={{ minHeight: "100%", boxSizing: "border-box" }}>
 
               {/* 헤더 */}

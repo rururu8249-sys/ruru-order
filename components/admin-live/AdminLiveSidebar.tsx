@@ -53,7 +53,7 @@ export default function AdminLiveSidebar({
 
       <aside
         className={[
-          "fixed inset-y-0 left-0 z-40 flex w-[220px] shrink-0 flex-col overflow-y-auto border-r border-line bg-surface px-4 py-6 transition-transform duration-200",
+          "fixed inset-y-0 left-0 z-40 flex w-[244px] shrink-0 flex-col overflow-y-auto border-r border-line bg-surface px-4 py-5 transition-transform duration-200",
           "md:static md:z-auto md:translate-x-0",
           navOpen ? "translate-x-0" : "-translate-x-full",
         ].join(" ")}
@@ -95,27 +95,31 @@ export default function AdminLiveSidebar({
                 }}
                 aria-current={active ? "page" : undefined}
                 className={[
-                  "flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition",
+                  // [2026-09-08 수정] 배지를 라벨 옆에 두면 좁은 사이드바에서 「주문·입금」 글자가 세로로 눌린다.
+                  //   → 위: 아이콘+이름 한 줄 / 아래: 배지 한 줄. 이름은 절대 줄바꿈하지 않는다.
+                  "flex w-full flex-col gap-1.5 rounded-2xl px-3 py-3 text-left transition",
                   active
                     ? "bg-rose-soft text-rose-deep shadow-sm ring-1 ring-rose-line"
                     : "text-ink-soft hover:bg-surface-2 hover:text-ink",
                 ].join(" ")}
               >
-                <span
-                  className={[
-                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-sm ring-1",
-                    active ? "bg-rose-deep text-white ring-rose-deep" : "bg-surface text-ink-soft ring-line",
-                  ].join(" ")}
-                  aria-hidden
-                >
-                  <AdminLiveMenuIcon menu={menu.key} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[15px] font-black">{menu.label}</span>
-                  <span className="block truncate text-[10px] font-bold opacity-60">{menu.desc}</span>
+                <span className="flex w-full items-center gap-3">
+                  <span
+                    className={[
+                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-sm ring-1",
+                      active ? "bg-rose-deep text-white ring-rose-deep" : "bg-surface text-ink-soft ring-line",
+                    ].join(" ")}
+                    aria-hidden
+                  >
+                    <AdminLiveMenuIcon menu={menu.key} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block whitespace-nowrap text-[15px] font-black">{menu.label}</span>
+                    <span className="block truncate text-[10px] font-bold opacity-60">{menu.desc}</span>
+                  </span>
                 </span>
                 {showBadges ? (
-                  <span className="flex shrink-0 flex-col items-end gap-0.5">
+                  <span className="flex flex-wrap items-center gap-1 pl-12">
                     {exceptionBadges.needMatch > 0 ? (
                       <span
                         role="button"

@@ -16,7 +16,8 @@ export type AdminLiveMenuKey =
   | "customers" // 회원·이슈·단골
   | "notice" // 쪽지·공지
   | "visits" // 접속 기록(날짜별·방송별)
-  | "settings"; // 설정
+  | "settings" // 설정
+  | "audit"; // 시스템 점검(공통 — 방송/쇼핑몰 상관없음)
 
 export type AdminLiveTopMenuKey = "broadcast" | "orders" | "products" | "customers" | "settings";
 
@@ -34,7 +35,7 @@ export const ADMIN_LIVE_TOP_MENUS: AdminLiveTopMenuItem[] = [
   { key: "orders", label: "주문·입금", desc: "실시간 주문 · 입금내역 · 정산", defaultKey: "orders" },
   { key: "products", label: "상품", desc: "방송 상품 · 쇼핑몰 · 등록", defaultKey: "products" },
   { key: "customers", label: "고객", desc: "회원 · 이슈 · 쪽지·공지 · 접속 기록", defaultKey: "customers" },
-  { key: "settings", label: "설정", desc: "상점 · 결제 · 알림", defaultKey: "settings" },
+  { key: "settings", label: "설정", desc: "상점 · 결제 · 알림 · 점검", defaultKey: "settings" },
 ];
 
 export type AdminLiveSubTab = { key: AdminLiveMenuKey; label: string };
@@ -58,7 +59,10 @@ export const ADMIN_LIVE_SUB_TABS: Record<AdminLiveTopMenuKey, AdminLiveSubTab[]>
     { key: "notice", label: "쪽지·공지" },
     { key: "visits", label: "접속 기록" },
   ],
-  settings: [{ key: "settings", label: "설정" }],
+  settings: [
+    { key: "settings", label: "설정" },
+    { key: "audit", label: "시스템 점검" },
+  ],
 };
 
 const TOP_MENU_OF: Record<AdminLiveMenuKey, AdminLiveTopMenuKey> = {
@@ -74,6 +78,7 @@ const TOP_MENU_OF: Record<AdminLiveMenuKey, AdminLiveTopMenuKey> = {
   notice: "customers",
   visits: "customers",
   settings: "settings",
+  audit: "settings",
 };
 
 export function topMenuOf(key: AdminLiveMenuKey): AdminLiveTopMenuKey {

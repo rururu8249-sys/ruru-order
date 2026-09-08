@@ -23,7 +23,17 @@ import {
   todayInputValue,
 } from "./depositLedgerUtils";
 
-type Props = Record<string, unknown>;
+// [2026-09-08 사장님 지적 · 속도] 이 화면은 부모(관리자 화면)가 이미 불러다 놓은 입금 목록을 통째로 무시하고
+//   열 때마다 90일치를 처음부터 다시 받아서 그동안 "불러오는 중"만 떠 있었다.
+//   → ① 부모가 준 목록(deposits)을 그대로 «먼저» 보여주고 ② 최신화는 뒤에서 조용히 돌린다
+//      ③ 서버 조회도 화면에 보이는 기간(기본 7일)만 받는다(전체 90일 → 필요할 때만).
+//   집계·판정·매칭 로직은 그대로. 「보기」·상세·매칭 동작 무변경.
+type Props = {
+  deposits?: readonly unknown[];
+  orderGroups?: readonly unknown[];
+  onSyncBankdaDeposits?: () => Promise<void> | void;
+  variant?: string;
+};
 
 function lastSyncedLabel(date: Date | null) {
   if (!date) return "-";
@@ -48,9 +58,15 @@ function todayStart() {
   return now.getTime();
 }
 
-export default function PaymentMatchPanel(_props: Props) {
-  const [deposits, setDeposits] = useState<RawDepositRow[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function PaymentMatchPanel({ deposits: depositsFromParent }: Props) {
+  // 부모가 준 목록으로 바로 그린다(빈 배열이면 서버 응답을 기다린다)
+  const parentRows = useMemo(
+    () => (Array.isArray(depositsFromParent) ? (depositsFromParent as RawDepositRow[]) : []),
+    [depositsFromParent],
+  );
+  const [deposits, setDeposits] = useState<RawDepositRow[]>(parentRows);
+  const [loading, setLoading] = useState(parentRows.length === 0);
+  const [refreshing, setRefreshing] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState("");
   const [keyword, setKeyword] = useState("");
@@ -65,12 +81,18 @@ export default function PaymentMatchPanel(_props: Props) {
   const [selectedDeposit, setSelectedDeposit] = useState<RawDepositRow | null>(null);
   const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(null);
 
-  const loadDeposits = async () => {
-    setLoading(true);
+  // background=true 면 화면을 가리지 않고 뒤에서 최신화만 한다
+  const loadDeposits = async (options: { background?: boolean; days?: number | "all" } = {}) => {
+    const background = options.background === true;
+    if (background) setRefreshing(true);
+    else setLoading(true);
     setMessage("");
 
     try {
-      const response = await fetch("/api/admin-v2/deposits", {
+      // 화면에 보이는 기간만 받는다(기본 7일 + 여유 1일). 「전체 기간」이 필요하면 days:"all".
+      const days = options.days ?? Math.max(1, Math.ceil((Date.now() - new Date(appliedFromDate).getTime()) / 86400000) + 1);
+      const query = days === "all" ? "?days=all" : `?days=${days}`;
+      const response = await fetch(`/api/admin-v2/deposits${query}`, {
         method: "GET",
         cache: "no-store",
       });
@@ -87,9 +109,11 @@ export default function PaymentMatchPanel(_props: Props) {
     } catch (error) {
       const text = error instanceof Error ? error.message : "입금내역 조회 실패";
       setMessage(text);
-      setDeposits([]);
+      // 뒤에서 돌던 최신화가 실패해도 이미 보고 있던 목록은 지우지 않는다
+      if (!background) setDeposits([]);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -118,8 +142,18 @@ export default function PaymentMatchPanel(_props: Props) {
     }
   };
 
+  // 부모 목록이 갱신되면(뱅크다 자동조회 등) 화면도 같이 갱신
   useEffect(() => {
-    void loadDeposits();
+    if (parentRows.length > 0) {
+      setDeposits(parentRows);
+      setLoading(false);
+    }
+  }, [parentRows]);
+
+  // 첫 진입: 부모 목록이 있으면 «뒤에서» 최신화(화면 안 가림), 없으면 평소처럼 불러온다
+  useEffect(() => {
+    void loadDeposits({ background: parentRows.length > 0 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -168,6 +202,9 @@ export default function PaymentMatchPanel(_props: Props) {
   const applyDateFilter = () => {
     setAppliedFromDate(fromDate);
     setAppliedToDate(toDate);
+    // 고른 기간이 지금 받아 둔 것보다 과거면 그 기간만큼 서버에서 더 받아온다(화면은 안 가림)
+    const days = Math.max(1, Math.ceil((Date.now() - new Date(fromDate).getTime()) / 86400000) + 1);
+    void loadDeposits({ background: true, days });
   };
 
   const resetFilters = () => {
@@ -186,7 +223,7 @@ export default function PaymentMatchPanel(_props: Props) {
   };
 
   return (
-    <div className="mx-auto grid w-full max-w-[1440px] gap-5">
+    <div className="grid w-full gap-5">
       <section className="flex flex-col gap-4 rounded-[34px] border border-line bg-gradient-to-br from-surface via-surface to-surface-2 p-6 shadow-[0_22px_60px_rgba(15,23,42,0.07)] lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-ink">입금내역</h1>
@@ -200,9 +237,9 @@ export default function PaymentMatchPanel(_props: Props) {
           type="button"
           onClick={refreshBankdaDeposits}
           disabled={syncing || loading}
-          className="h-13 rounded-2xl bg-rose-deep px-6 py-4 text-sm font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.24)] transition hover:bg-rose-deep disabled:cursor-not-allowed disabled:bg-surface-3"
+          className="h-13 shrink-0 rounded-2xl bg-rose-deep px-6 py-4 text-sm font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.24)] transition hover:bg-rose-deep disabled:cursor-not-allowed disabled:bg-surface-3"
         >
-          {syncing ? "새로고침 중..." : "입금내역 새로고침"}
+          {syncing ? "새로고침 중..." : refreshing ? "최신 확인 중..." : "입금내역 새로고침"}
         </button>
       </section>
 
@@ -230,7 +267,7 @@ export default function PaymentMatchPanel(_props: Props) {
       {loading ? (
         <section className="rounded-[32px] border border-line bg-surface p-12 text-center shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
           <div className="text-lg font-black text-ink">입금내역을 불러오는 중입니다.</div>
-          <div className="mt-2 text-sm font-bold text-ink-mute">전체 입금 기록을 불러오고 있어 건수가 많으면 시간이 걸릴 수 있어요. 잠시만요.</div>
+          <div className="mt-2 text-sm font-bold text-ink-mute">잠시만요.</div>
         </section>
       ) : (
         <DepositLedgerTable

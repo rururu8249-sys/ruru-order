@@ -270,8 +270,8 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
   }, [rows]);
 
   return (
-    <div className={embedded ? "" : "fixed inset-0 z-[130] flex items-center justify-center bg-black/40 p-4"} onClick={embedded ? undefined : onClose}>
-      <div className={embedded ? "flex h-[calc(100vh-120px)] min-h-[520px] w-full flex-col overflow-hidden rounded-3xl border border-line bg-surface" : "flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl bg-surface shadow-2xl"} onClick={(e) => e.stopPropagation()}>
+    <div className={embedded ? "h-full w-full" : "fixed inset-0 z-[130] flex items-center justify-center bg-black/40 p-4"} onClick={embedded ? undefined : onClose}>
+      <div className={embedded ? "flex h-full w-full flex-col overflow-hidden bg-surface" : "flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl bg-surface shadow-2xl"} onClick={(e) => e.stopPropagation()}>
 
         {/* 헤더 */}
         <div className="flex items-center justify-between border-b border-line px-5 py-4">

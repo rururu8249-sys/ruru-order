@@ -18,25 +18,27 @@ type VideoRatio = "vertical" | "wide" | "auto";
 type Props = {
   open: boolean;
   onToggle: () => void;
+  /** 넓게 펼침(화면 절반 이상) / 보통 */
+  wide: boolean;
+  onToggleWide: () => void;
   broadcastOn: boolean;
-  savingBroadcast: boolean;
   videoRatio: VideoRatio;
   youtubeUrl: string;
   activeBroadcastId: string | null;
-  onStartBroadcast: () => void;
-  onEndBroadcast: () => void;
+  /** 방송 시작/종료가 있는 방송 콘솔로 보내기 */
+  onOpenBroadcastConsole: () => void;
 };
 
 export default function AdminLiveBroadcastRail({
   open,
   onToggle,
+  wide,
+  onToggleWide,
   broadcastOn,
-  savingBroadcast,
   videoRatio,
   youtubeUrl,
   activeBroadcastId,
-  onStartBroadcast,
-  onEndBroadcast,
+  onOpenBroadcastConsole,
 }: Props) {
   const shopInfo = useShopInfo();
   const chatTarget = adminChatTarget(shopInfo);
@@ -67,7 +69,7 @@ export default function AdminLiveBroadcastRail({
         aria-label={open ? "방송·채팅 접기" : "방송·채팅 펼치기"}
         title={open ? "방송·채팅 접기" : "방송·채팅 펼치기"}
         className={[
-          "fixed right-0 top-1/2 z-[45] -translate-y-1/2 rounded-l-2xl border border-r-0 px-1.5 py-4 text-[11px] font-black shadow-lg transition",
+          "fixed right-0 top-1/2 z-[45] -translate-y-1/2 rounded-l-2xl border border-r-0 px-2 py-5 text-[12px] font-black shadow-lg transition",
           broadcastOn ? "border-danger-tx/40 bg-danger-bg text-danger-tx" : "border-line bg-surface text-ink-soft hover:bg-surface-2",
         ].join(" ")}
         style={{ writingMode: "vertical-rl" }}
@@ -75,11 +77,24 @@ export default function AdminLiveBroadcastRail({
         {open ? "▶ 접기" : `◀ 방송·채팅${broadcastOn ? " · LIVE" : ""}`}
       </button>
 
-      {/* 레일 본체 — 접히면 display:none (마운트 유지) */}
+      {/* [2026-09-08 사장님 요청] 옆에 붙는 좁은 칸이 아니라 «화면 2/3 사이드 팝업»으로 시원하게.
+          접혀 있어도 마운트는 유지(유튜브 iframe 재로드 방지) — 화면 밖으로 밀어 둔다. */}
+      <div
+        onClick={onToggle}
+        aria-hidden={!open}
+        className={[
+          "fixed inset-0 z-[44] bg-slate-950/35 transition-opacity duration-200",
+          open ? "opacity-100" : "pointer-events-none opacity-0",
+        ].join(" ")}
+      />
       <aside
-        hidden={!open}
-        className="min-w-0 space-y-3 xl:sticky xl:top-3 xl:self-start"
         aria-label="방송 · 채팅"
+        aria-hidden={!open}
+        className={[
+          "fixed inset-y-0 right-0 z-[46] flex flex-col gap-3 overflow-y-auto border-l border-line bg-canvas p-3 shadow-2xl transition-transform duration-300",
+          wide ? "w-[66vw] min-w-[560px]" : "w-[420px] min-w-[360px]",
+          open ? "translate-x-0" : "translate-x-full",
+        ].join(" ")}
       >
         <div className="rounded-2xl border border-line bg-surface p-2.5 shadow-sm">
           <div className="mb-2 flex items-center justify-between px-1">
@@ -87,26 +102,28 @@ export default function AdminLiveBroadcastRail({
               <span className={`inline-block h-2 w-2 rounded-full ${broadcastOn ? "bg-danger-tx" : "bg-line"}`} />
               {broadcastOn ? "방송 중" : "방송 대기"}
             </div>
-            <button type="button" onClick={onToggle} className="rounded-lg px-2 py-0.5 text-[11px] font-black text-ink-mute hover:bg-surface-2 hover:text-ink">
-              접기 ▶
-            </button>
+            <span className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={onToggleWide}
+                title={wide ? "보통 크기로" : "화면 절반 이상으로 크게"}
+                className="rounded-lg border border-line px-2 py-0.5 text-[11px] font-black text-ink-soft hover:bg-surface-2"
+              >
+                {wide ? "작게 ◀" : "크게 ▶"}
+              </button>
+              <button type="button" onClick={onToggle} className="rounded-lg px-2 py-0.5 text-[11px] font-black text-ink-mute hover:bg-surface-2 hover:text-ink">
+                접기 ▶
+              </button>
+            </span>
           </div>
           <div className="grid grid-cols-2 gap-1.5">
+            {/* 방송시작·종료 버튼은 「방송 › 방송 콘솔」 한 곳에만 둔다(중복 제거) */}
             <button
               type="button"
-              disabled={savingBroadcast || broadcastOn}
-              onClick={onStartBroadcast}
-              className="h-9 rounded-xl bg-emerald-600 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:bg-line disabled:text-ink-mute"
+              onClick={onOpenBroadcastConsole}
+              className="col-span-2 flex h-9 items-center justify-center gap-1 rounded-xl border border-line bg-surface-2 text-xs font-black text-ink-soft transition hover:bg-surface-3"
             >
-              ▶ 방송시작
-            </button>
-            <button
-              type="button"
-              disabled={savingBroadcast || !broadcastOn}
-              onClick={onEndBroadcast}
-              className="h-9 rounded-xl bg-red-600 text-xs font-black text-white shadow-sm transition hover:bg-red-700 disabled:bg-line disabled:text-ink-mute"
-            >
-              ■ 방송종료
+              {broadcastOn ? "■ 방송 종료하러 가기" : "▶ 방송 시작하러 가기"}
             </button>
             <button
               type="button"
@@ -128,7 +145,9 @@ export default function AdminLiveBroadcastRail({
           </div>
         </div>
 
-        <LiveBroadcastPanels variant="column" hideProducts videoRatio={videoRatio} youtubeUrl={youtubeUrl} activeBroadcastId={activeBroadcastId} />
+        <div className="min-h-0 flex-1">
+          <LiveBroadcastPanels variant="column" hideProducts videoRatio={videoRatio} youtubeUrl={youtubeUrl} activeBroadcastId={activeBroadcastId} />
+        </div>
       </aside>
     </>
   );

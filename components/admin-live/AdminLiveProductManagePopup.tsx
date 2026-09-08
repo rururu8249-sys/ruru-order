@@ -1480,11 +1480,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const popupTree = (
     <div
       className={(typeof document !== "undefined" && document.querySelector(".dark") ? "dark " : "") + "ruru-product-sian"}
-      style={embedded ? undefined : { position: "fixed", inset: 0, zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", padding: "16px" }}
+      style={embedded ? { width: "100%", height: "100%" } : { position: "fixed", inset: 0, zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", padding: "16px" }}
       onClick={embedded ? undefined : (e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div style={embedded
-        ? { width: "100%", maxWidth: "1200px", height: "calc(100vh - 120px)", minHeight: "560px", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "14px", border: "1px solid var(--color-line)", overflow: "hidden" }
+        ? { width: "100%", height: "100%", display: "flex", flexDirection: "column", background: "var(--color-surface)", overflow: "hidden" }
         : { width: "960px", maxWidth: "100%", flexShrink: 0, height: "680px", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "14px", overflow: "hidden" }}>
         {/* 헤더 */}
         <div style={{ display: "flex", alignItems: "center", padding: "14px 18px", borderBottom: "1px solid var(--color-line)" }}>

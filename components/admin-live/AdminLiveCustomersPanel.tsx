@@ -1622,8 +1622,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
   };
 
   return (
-    <div className={embedded ? "" : "fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 p-4"} onClick={embedded ? undefined : (e) => { if (e.target === e.currentTarget) onClose?.(); }}>
-      <div className={embedded ? "flex h-[calc(100vh-120px)] min-h-[520px] w-full max-w-[1100px] flex-col overflow-hidden rounded-2xl border border-line bg-surface" : "flex h-[88vh] w-full max-w-[640px] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl"}>
+    <div className={embedded ? "h-full w-full" : "fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 p-4"} onClick={embedded ? undefined : (e) => { if (e.target === e.currentTarget) onClose?.(); }}>
+      <div className={embedded ? "flex h-full w-full flex-col overflow-hidden bg-surface" : "flex h-[88vh] w-full max-w-[640px] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl"}>
         {embedded ? null : (
           <div className="flex items-center justify-between border-b border-rose-line px-5 py-3 shrink-0">
             <span className="text-[15px] font-black text-ink">👥 고객·이슈</span>
