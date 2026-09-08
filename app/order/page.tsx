@@ -7542,22 +7542,25 @@ export default function OrderPage() {
 
                   {registeredOptionDetailSelected && (registeredOptionAllImages.length > 0 || registeredOptionDescription) ? (
                     <div style={{ marginTop: "16px", borderTop: "1px solid #F0EAE0", paddingTop: "14px" }}>
+                      {/* [2026-09-09 사장님 지적] 「위에 사진들이 나열돼 있는데 밑에 또 크게 띄울 필요가 있나?
+                            중복 개념 아닌가? 결국 상세 설명은 사진들 끝에 있어서 글이 보이지도 않음」
+                          맞는 지적이라 고쳤다. 예전엔 위 썸네일 줄과 «똑같은 사진 배열»을 여기서 전부
+                          다시 크게 깔고, 설명 글을 그 «뒤»에 뒀다 → 사진 10장을 다 내려야 글이 나왔다.
+                          바꾼 것: ① 설명 글을 맨 위로(바로 읽힌다) ② 사진 중복 나열 삭제
+                                   ③ 사진은 위 썸네일 줄에 이미 다 있으므로 「모두 보기」 한 줄로 크게 본다
+                          (무신사·29CM·쿠팡 모두 갤러리는 위, 상세 영역은 설명 글이 먼저다) */}
                       <div style={{ marginBottom: "10px", fontSize: "14px", fontWeight: 800, color: "#333" }}>상품 상세</div>
-                      {registeredOptionAllImages.length > 0 ? (
-                        <div style={{ display: "grid", gap: "8px" }}>
-                          {registeredOptionAllImages.map((img, i) => (
-                            <div key={i} style={{ overflow: "hidden", border: "1px solid #E9DDD8", borderRadius: "12px", background: "#fff" }}>
-                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", padding: "10px 12px", background: "#FBF5F7" }}>
-                                <span style={{ minWidth: 0, fontSize: "13px", fontWeight: 900, lineHeight: 1.35, color: "#4A2634", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{registeredOptionPhotoTitle}</span>
-                                {registeredOptionAllImages.length > 1 ? <span style={{ flexShrink: 0, borderRadius: "999px", background: "#7A1E47", padding: "3px 8px", color: "#fff", fontSize: "10px", fontWeight: 900 }}>사진 {i + 1} / {registeredOptionAllImages.length}</span> : null}
-                              </div>
-                              <img src={img} alt={`${registeredOptionPhotoTitle} ${i + 1}번째 상세 사진`} onClick={() => openLightbox(img, registeredOptionAllImages, registeredOptionPhotoTitle)} style={{ display: "block", width: "100%", objectFit: "cover", cursor: "zoom-in", background: "#F0EBE8" }} />
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
                       {registeredOptionDescription ? (
-                        <div style={{ marginTop: "10px", fontSize: "13px", color: "#555", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{registeredOptionDescription}</div>
+                        <div style={{ fontSize: "13px", color: "#555", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{registeredOptionDescription}</div>
+                      ) : null}
+                      {registeredOptionAllImages.length > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => openLightbox(registeredOptionAllImages[0], registeredOptionAllImages, registeredOptionPhotoTitle)}
+                          style={{ marginTop: registeredOptionDescription ? "12px" : "0", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", width: "100%", height: "48px", borderRadius: "14px", border: "1.5px solid #E8DCE3", background: "#FBF5F7", color: "#7A1E47", fontSize: "14px", fontWeight: 900, cursor: "pointer" }}
+                        >
+                          🔍 사진 {registeredOptionAllImages.length}장 크게 보기
+                        </button>
                       ) : null}
                     </div>
                   ) : null}
