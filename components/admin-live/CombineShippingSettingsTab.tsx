@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import {
   COMBINE_SHIPPING_SETTING_KEYS,
   parseCombineShippingSettings,
@@ -106,8 +107,9 @@ export default function CombineShippingSettingsTab() {
       // 범위가 7일 초과면 확인 — 그 기간 같은 번호 주문 전부 배송비 0원
       const rangeDays = (endMs - startMs) / (1000 * 60 * 60 * 24);
       if (rangeDays > 7) {
-        const ok = window.confirm(
-          `합배송 범위가 약 ${Math.round(rangeDays)}일입니다. 그 기간 같은 번호 주문이 전부 배송비 0원 됩니다. 계속?`,
+        const ok = await showAdminConfirm(
+          `합배송 범위가 약 ${Math.round(rangeDays)}일입니다. 그 기간 같은 번호 주문이 전부 배송비 0원 됩니다. 계속할까요?`,
+          { title: "합배송 범위 확인", confirmText: "저장", cancelText: "취소", tone: "warning" },
         );
         if (!ok) return;
       }

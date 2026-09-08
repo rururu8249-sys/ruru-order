@@ -8,7 +8,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { showAdminToast } from "@/lib/adminToast";
-import { useBulkPointGrant } from "./useBulkPointGrant";
+import { BULK_POINT_MAX_MESSAGE, BULK_POINT_MAX_PER_PERSON, useBulkPointGrant } from "./useBulkPointGrant";
+import { showAdminConfirm } from "@/lib/adminConfirm";
 
 type SegKey = "fresh" | "loyal" | "atRisk" | "gone";
 type SegRow = { phone: string; kakao?: string; nick: string; buys: number; lastBuy: string; daysSince: number; spend: number };
@@ -99,11 +100,15 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
   const doSend = async () => {
     if (!stats) return;
     if (!amountNum || amountNum <= 0) { showAdminToast("포인트 금액을 적어주세요.", "error"); return; }
-    if (amountNum > 50000) { showAdminToast("1인당 5만P를 넘는 금액은 일괄로 보낼 수 없어요. 개별 지급을 사용해 주세요.", "error"); return; }
+    if (amountNum > BULK_POINT_MAX_PER_PERSON) { showAdminToast(BULK_POINT_MAX_MESSAGE, "error"); return; }
     const targets = rows.filter((c) => checked.has(c.phone) && !lockSet.has(c.phone));
     if (targets.length === 0) { showAdminToast("보낼 대상이 없습니다.", "error"); return; }
     const totalWon = amountNum * targets.length;
-    if (!window.confirm(`${SEG_META[seg].emoji} ${SEG_META[seg].label} ${targets.length}명에게 ${amountNum.toLocaleString()}P씩, 총 ${totalWon.toLocaleString()}P를 지급하고 쪽지를 보냅니다.\n\n(최근 30일 안에 이미 받은 분은 자동 제외)\n\n진행할까요?`)) return;
+    const ok = await showAdminConfirm(
+      `${SEG_META[seg].emoji} ${SEG_META[seg].label} ${targets.length}명에게 ${amountNum.toLocaleString()}P씩, 총 ${totalWon.toLocaleString()}P를 지급하고 쪽지를 보냅니다.\n\n(최근 30일 안에 이미 받은 분은 자동 제외)\n\n진행할까요?`,
+      { title: "포인트 + 쪽지 보내기", confirmText: "보내기", cancelText: "취소", tone: "warning" },
+    );
+    if (!ok) return;
     setSending(true);
     setSendProgress({ done: 0, total: targets.length });
     // [2026-09-06] 같은 날 같은 대상엔 서버가 다시 지급하지 않도록 건별 고유키. 응답이 유실돼 재시도해도 이중지급 방지.

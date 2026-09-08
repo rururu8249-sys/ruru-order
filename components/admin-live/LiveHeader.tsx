@@ -5,6 +5,7 @@ import type { AdminLiveBroadcast } from "./liveBroadcastController";
 import { formatBroadcastTime } from "./liveBroadcastController";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import { buildChatAnnounceText } from "@/lib/chatAnnounce";
 import { buildDetailChatLine, detailProducts } from "@/lib/productDetailModel";
 
@@ -146,9 +147,11 @@ export default function LiveHeader({
     const count = Number(alertPreview?.targetCount || 0);
     if (count === 0) return;
     if (alertMode === "all") {
-      if (!window.confirm(`⚠️ 신청 안 한 회원까지 ${count}명에게 발송합니다.\n동의 미확인자 발송은 카카오 채널 제재 위험이 있습니다.\n정말 보낼까요?`)) return;
+      const okAll = await showAdminConfirm(`신청 안 한 회원까지 ${count}명에게 발송합니다.\n동의 미확인자 발송은 카카오 채널 제재 위험이 있습니다.\n정말 보낼까요?`, { title: "전체 발송", confirmText: "전체 발송", cancelText: "취소", tone: "danger" });
+      if (!okAll) return;
     } else {
-      if (!window.confirm(`${count}명에게 방송알림을 발송합니다. 계속할까요?`)) return;
+      const okSend = await showAdminConfirm(`${count}명에게 방송알림을 발송합니다. 계속할까요?`, { title: "방송알림 발송", confirmText: "발송", cancelText: "취소", tone: "info" });
+      if (!okSend) return;
     }
     setAlertSending(true);
     setAlertResult("");

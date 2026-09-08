@@ -6,6 +6,8 @@
 
 import { useState } from "react";
 import { formatKoreanPhone } from "@/lib/order/phone";
+import { showAdminToast } from "@/lib/adminToast";
+import { showAdminConfirm } from "@/lib/adminConfirm";
 
 type BlockResult = {
   phone: string;
@@ -35,14 +37,12 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
   const [phone, setPhone] = useState("");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
   const submit = async (blocked: boolean) => {
     const phoneDigits = digitsOnly(phone);
     const finalReason = blocked ? reason.trim() : "";
 
-    setMessage("");
     setErrorMessage("");
 
     if (phoneDigits.length < 9 || phoneDigits.length > 11) {
@@ -53,6 +53,15 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
     if (blocked && !finalReason) {
       setErrorMessage("차단사유를 입력해주세요.");
       return;
+    }
+
+    // [2026-09-08] 차단해제만 확인창(차단은 사유 입력이 확인 역할)
+    if (!blocked) {
+      const ok = await showAdminConfirm(
+        `${formatPhone(phoneDigits)} 번호의 차단을 해제합니다.\n해제 즉시 이 번호로 주문서 작성이 다시 가능해집니다.`,
+        { title: "차단 해제", confirmText: "차단 해제", cancelText: "취소", tone: "warning" },
+      );
+      if (!ok) return;
     }
 
     setSaving(true);
@@ -84,17 +93,18 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
         directBlockSaved: Boolean(payload.directBlockSaved),
       });
 
-      setMessage(
+      showAdminToast(
         `${formatPhone(phoneDigits)} · ${blocked ? "차단" : "차단해제"} 완료 · ${
           Number(payload.matchedCount || 0) > 0
             ? `${Number(payload.matchedCount || 0).toLocaleString("ko-KR")}명 반영`
             : "전화번호 전용 차단 저장"
-        }`
+        }`,
+        "success",
       );
 
       if (!blocked) setReason("");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "전화번호 차단 처리 실패");
+      showAdminToast(error instanceof Error ? error.message : "전화번호 차단 처리 실패", "error");
     } finally {
       setSaving(false);
     }
@@ -110,12 +120,6 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
             주문 이력이 없는 번호도 전화번호 전용 차단으로 저장합니다.
           </p>
         </div>
-
-        {message ? (
-          <div className="rounded-xl bg-surface px-3 py-2 text-[12px] font-black text-danger-tx ring-1 ring-red-100">
-            {message}
-          </div>
-        ) : null}
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">

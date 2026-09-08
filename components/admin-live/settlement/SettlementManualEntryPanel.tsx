@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import type { SettlementBroadcastOption, SettlementManualEntry, SettlementManualEntryType } from "./settlementTypes";
 import SettlementManualEntryDetailModal, { type SettlementManualEntryLog } from "./SettlementManualEntryDetailModal";
 import { formatMoneyInput, manualEntryBroadcastKey, manualEntryDateKey, manualEntryLabel, toNumber, won } from "./settlementUtils";
@@ -173,7 +174,7 @@ export default function SettlementManualEntryPanel({
   const deactivateEntry = async (entry: SettlementManualEntry) => {
     if (!entry.id) return;
 
-    const ok = window.confirm("이 추가 정산 내역을 목록에서 삭제 처리할까요?\n완전삭제가 아니라 비활성 처리됩니다.");
+    const ok = await showAdminConfirm("이 추가 정산 내역을 목록에서 삭제 처리할까요?\n완전삭제가 아니라 비활성 처리됩니다.", { title: "추가 정산 내역 삭제", confirmText: "삭제", cancelText: "취소", tone: "danger" });
     if (!ok) return;
 
     setSaving(true);

@@ -7,6 +7,10 @@
 
 import { useState } from "react";
 
+// [2026-09-08] 일괄지급 1인당 상한 — 단골리포트에만 있던 5만P 규칙을 회원목록 일괄지급에도 똑같이 적용
+export const BULK_POINT_MAX_PER_PERSON = 50000;
+export const BULK_POINT_MAX_MESSAGE = "1인당 5만P를 넘는 금액은 일괄로 보낼 수 없어요. 개별 지급을 사용해 주세요.";
+
 export type BulkGrantTarget = { phone: string; label: string };
 
 export type BulkGrantResult = {

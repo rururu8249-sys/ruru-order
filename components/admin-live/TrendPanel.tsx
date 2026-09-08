@@ -3,6 +3,7 @@
 // 📈 오늘의 트렌드 추천 패널 — AI가 뽑은 셀럽/인스타 트렌드 + 블루오션템을 어드민에서 보고, 텔레그램으로도 발송.
 //   내용은 settings(trend_recommendation)에 저장. 비밀 아님(공개 패션 정보).
 import { useEffect, useState } from "react";
+import { showAdminToast } from "@/lib/adminToast";
 
 export default function TrendPanel() {
   const [text, setText] = useState("");
@@ -10,7 +11,6 @@ export default function TrendPanel() {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState("");
 
   const load = async () => {
     try {
@@ -30,7 +30,6 @@ export default function TrendPanel() {
 
   const save = async () => {
     setSaving(true);
-    setMsg("");
     try {
       const r = await fetch("/api/admin-live/trend", {
         method: "POST",
@@ -41,20 +40,19 @@ export default function TrendPanel() {
       if (j.ok) {
         setText(draft);
         setEditing(false);
-        setMsg("저장됐어요.");
+        showAdminToast("트렌드 추천을 저장했습니다.", "success");
         load();
       } else {
-        setMsg("저장 실패: " + (j.error || ""));
+        showAdminToast("저장 실패\n\n" + (j.error || ""), "error");
       }
     } catch (e: any) {
-      setMsg("저장 실패: " + (e?.message || e));
+      showAdminToast("저장 실패\n\n" + (e?.message || e), "error");
     } finally {
       setSaving(false);
     }
   };
 
   const sendTg = async () => {
-    setMsg("");
     try {
       const r = await fetch("/api/admin-live/trend", {
         method: "POST",
@@ -62,9 +60,10 @@ export default function TrendPanel() {
         body: JSON.stringify({ action: "send-telegram" }),
       });
       const j = await r.json();
-      setMsg(j.ok ? "✅ 텔레그램으로 보냈어요!" : "❌ " + (j.reason || j.error || "실패"));
+      if (j.ok) showAdminToast("텔레그램으로 보냈어요!", "success");
+      else showAdminToast("텔레그램 발송 실패\n\n" + (j.reason || j.error || "실패"), "error");
     } catch (e: any) {
-      setMsg("실패: " + (e?.message || e));
+      showAdminToast("실패\n\n" + (e?.message || e), "error");
     }
   };
 
@@ -101,7 +100,6 @@ export default function TrendPanel() {
           {text || '아직 트렌드 추천이 없어요. [수정]을 눌러 내용을 붙여넣거나, AI한테 "오늘 트렌드 뽑아줘" 하세요.'}
         </div>
       )}
-      {msg ? <div className="text-xs font-bold text-ink-soft">{msg}</div> : null}
     </div>
   );
 }

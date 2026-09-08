@@ -146,6 +146,9 @@ function CustomerPointActionModal({
   const isGrant = form.mode === "grant";
   const title = isGrant ? "포인트 지급" : "포인트 회수";
   const actionLabel = isGrant ? "지급" : "회수";
+  // [2026-09-08] 확인창 대신 실행 버튼에 금액을 그대로 보여준다("2,000P 지급") — 잘못 친 금액을 누르기 전에 보게
+  const amountNum = Number(String(form.amount || "").replace(/[^0-9]/g, "")) || 0;
+  const submitLabel = amountNum > 0 ? `${amountNum.toLocaleString("ko-KR")}P ${actionLabel}` : title;
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-4 py-6">
@@ -223,13 +226,13 @@ function CustomerPointActionModal({
           <button
             type="button"
             onClick={onSubmit}
-            disabled={saving}
+            disabled={saving || amountNum <= 0}
             className={[
               "rounded-2xl px-5 py-2 text-sm font-black text-white shadow-sm disabled:opacity-50",
               isGrant ? "bg-rose-deep hover:bg-rose-deep" : "bg-slate-900 hover:bg-slate-700",
             ].join(" ")}
           >
-            {saving ? "처리중..." : title}
+            {saving ? "처리중..." : submitLabel}
           </button>
         </div>
       </div>

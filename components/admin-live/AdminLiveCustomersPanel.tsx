@@ -6,7 +6,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { NOTE_PRESETS } from "@/lib/customerNotePresets";
-import { useBulkPointGrant, type BulkGrantResult } from "./useBulkPointGrant";
+import { BULK_POINT_MAX_MESSAGE, BULK_POINT_MAX_PER_PERSON, useBulkPointGrant, type BulkGrantResult } from "./useBulkPointGrant";
 
 // 일괄지급 사유 프리셋(고객에게 보이는 문구). "직접입력" 선택 시 직접 작성.
 const BULK_POINT_REASON_PRESETS = ["방송 이벤트 당첨", "단골 감사", "리뷰 감사", "오지급 보정", "직접입력"];
@@ -1015,7 +1015,6 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
   const [blockModalTarget, setBlockModalTarget] = useState<BlockModalTarget | null>(null);
   const [blockSaving, setBlockSaving] = useState(false);
   const [blockErrorMessage, setBlockErrorMessage] = useState("");
-  const [blockStatusMessage, setBlockStatusMessage] = useState("");
   const [showBlockedCustomers, setShowBlockedCustomers] = useState(false);
   const [blockedCustomerKeywordDraft, setBlockedCustomerKeywordDraft] = useState("");
   const [blockedCustomerKeyword, setBlockedCustomerKeyword] = useState("");
@@ -1363,8 +1362,16 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
   const submitBulkGrant = async () => {
     const amount = Number(String(bulkAmount).replace(/[^\d]/g, "")) || 0;
     if (amount <= 0) return;
+    // [2026-09-08] 단골리포트와 같은 1인당 상한
+    if (amount > BULK_POINT_MAX_PER_PERSON) {
+      showAdminToast(BULK_POINT_MAX_MESSAGE, "error");
+      return;
+    }
     const reason = bulkReasonPreset === "직접입력" ? bulkReasonCustom.trim() : bulkReasonPreset;
-    if (!reason) return;
+    if (!reason) {
+      showAdminToast("지급 사유를 골라 주세요.", "error");
+      return;
+    }
     const byPhone = new Map(customers.map((c) => [digitsOnly(c.phone), c]));
     const targets = Array.from(selectedPhones)
       .map((p) => {
@@ -1373,6 +1380,12 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
       })
       .filter((t): t is { phone: string; label: string } => Boolean(t));
     if (targets.length === 0) return;
+    // [2026-09-08] N명에게 동시에 나가는 돈 — 되돌리려면 N번 회수해야 하므로 확인창
+    const ok = await showAdminConfirm(
+      `${targets.length}명에게 ${amount.toLocaleString("ko-KR")}P씩, 총 ${(amount * targets.length).toLocaleString("ko-KR")}P를 지급합니다.\n사유: ${reason}\n\n되돌리려면 한 명씩 회수해야 합니다. 진행할까요?`,
+      { title: "포인트 일괄지급", confirmText: `${targets.length}명에게 지급`, cancelText: "취소", tone: "warning" },
+    );
+    if (!ok) return;
     const result = await bulkGrant(targets, {
       amount,
       reason,
@@ -1526,7 +1539,6 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
     const phoneKey = digitsOnly(customer.phone);
 
     setBlockErrorMessage("");
-    setBlockStatusMessage("");
 
     if (!phoneKey) {
       setBlockErrorMessage("전화번호가 없어 차단 처리할 수 없습니다.");
@@ -1565,10 +1577,14 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
         reason: blocked ? reason.trim() : "",
       });
 
-      setBlockStatusMessage(`${customer.nickname} 고객을 ${blocked ? "차단" : "차단해제"}했습니다.`);
+      // [2026-09-08] 결과는 토스트로(예전 상태 문구는 화면 어디에도 안 그려지고 있었음)
+      showAdminToast(`${customer.nickname} 고객을 ${blocked ? "차단" : "차단해제"}했습니다.`, "success");
       return true;
     } catch (error) {
-      setBlockErrorMessage(error instanceof Error ? error.message : "차단 처리 실패");
+      const message = error instanceof Error ? error.message : "차단 처리 실패";
+      setBlockErrorMessage(message);
+      // 차단해제는 사유 모달이 없어서 인라인 에러가 보일 자리가 없다 → 토스트
+      if (!blocked) showAdminToast("차단해제 실패\n\n" + message, "error");
       return false;
     } finally {
       setBlockSaving(false);
@@ -1577,9 +1593,14 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
   const handleCustomerBlockButton = async (customer: CustomerSummary) => {
     setBlockErrorMessage("");
-    setBlockStatusMessage("");
 
     if (customer.blocked) {
+      // [2026-09-08] 차단해제 확인창 — 목록 행에서 「차단」과 나란히 있어 오클릭 쉬움. 해제되면 바로 주문 가능.
+      const ok = await showAdminConfirm(
+        `${customer.nickname || customer.name || customer.phone} 고객의 차단을 해제합니다.\n해제 즉시 주문서 작성이 다시 가능해집니다.`,
+        { title: "차단 해제", confirmText: "차단 해제", cancelText: "취소", tone: "warning" },
+      );
+      if (!ok) return;
       await requestCustomerBlock(customer, false, "");
       return;
     }

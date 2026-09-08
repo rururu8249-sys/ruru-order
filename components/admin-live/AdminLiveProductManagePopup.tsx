@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import { resolveProductImageUrl } from "./quick-product/productImageUrl";
 import { showAdminToast } from "@/lib/adminToast";
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import { createDraftBroadcast } from "./liveBroadcastController";
 import ExcelBulkImportPopup from "./ExcelBulkImportPopup";
 import { brandWordmarkThumbnail, productAutoThumbUrl, productNameThumbnail } from "@/lib/brandWordmarkThumbnail";
@@ -507,7 +508,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       showAdminToast("켜진 방송은 숨길 수 없습니다. 먼저 방송을 종료해주세요.", "warning");
       return;
     }
-    if (!window.confirm(`'${b.title}' 방송을 목록에서 숨길까요?\n\n데이터는 보존되며 복구 가능합니다.`)) return;
+    const okHide = await showAdminConfirm(`'${b.title}' 방송을 목록에서 숨길까요?\n\n데이터는 보존되며 복구 가능합니다.`, { title: "방송 숨기기", confirmText: "숨기기", cancelText: "취소", tone: "warning" });
+    if (!okHide) return;
     setBcBusy(true);
     try {
       const { error } = await adminCatalogWrite({ table: "broadcasts", op: "update", values: { is_deleted: true }, filters: [{ type: "eq", col: "id", val: b.id }] });
@@ -1402,7 +1404,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const deleteProduct = async (p: ProductRow) => {
     const id = productId(p);
     if (!id) return;
-    if (!window.confirm(`"${productName(p)}" 상품을 삭제할까요?\n\n숨김 처리됩니다 (복구 가능)`)) return;
+    const okDel = await showAdminConfirm(`"${productName(p)}" 상품을 삭제할까요?\n\n숨김 처리됩니다 (복구 가능)`, { title: "상품 삭제", confirmText: "삭제", cancelText: "취소", tone: "danger" });
+    if (!okDel) return;
     // 소프트 삭제 마커 = status:"deleted".
     //   관리자 목록(status==="deleted" 제외)·고객 목록(app/order: status!=="deleted") 양쪽 모두 이 마커로 숨김.
     //   과거엔 is_visible도 함께 update했는데, is_visible 컬럼이 없으면 update 전체가 실패(=숨김 실패 [object Object]).

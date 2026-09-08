@@ -415,8 +415,6 @@ type Props = {
   broadcastCalendar?: BroadcastCalendarItem[];
   shopOrderCalendar?: BroadcastCalendarItem[];
   broadcastStartedAt?: string | null;
-  deposits?: readonly any[];
-  onMatched?: () => void | Promise<void>;
   onSelectForMatch?: (order: LiveOrder) => void;
 };
 
@@ -438,8 +436,6 @@ export default function LiveOrderTable({
   broadcastCalendar = [],
   shopOrderCalendar = [],
   broadcastStartedAt,
-  deposits,
-  onMatched,
   onSelectForMatch,
 }: Props) {
   // 현재 페이지를 새로고침(F5) 사이에 보존(보기 상태 전용). 1페이지면 저장 삭제 → 초기화 시 자연 정리.
@@ -457,37 +453,16 @@ export default function LiveOrderTable({
   const [sortMode, setSortMode] = useState<SortMode>("latest");
   const [pageSize, setPageSize] = useState(10);
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
-  const [selectedDepositIds, setSelectedDepositIds] = useState<string[]>([]);
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     const c = () => setIsMobile(typeof window !== "undefined" && window.innerWidth <= 640);
     c(); window.addEventListener("resize", c);
     return () => window.removeEventListener("resize", c);
   }, []);
-  const [matchSaving, setMatchSaving] = useState(false);
-  const [matchSearch, setMatchSearch] = useState("");
-  const [dropHoverOrderId, setDropHoverOrderId] = useState("");
-
-  // 플로팅 패널에서 드래그한 입금을 주문 행에 드롭 → 기존 confirmWithDeposit 재사용
-  const handleDepositDropOnOrder = (order: LiveOrder, depositId: string) => {
-    setDropHoverOrderId("");
-    const dep = (deposits || []).find((d) => String(d.id) === String(depositId));
-    if (dep) void confirmWithDeposit(order, [dep], [String(dep.id)]);
-  };
-  const isMatchableOrder = (order: LiveOrder) =>
-    ["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus);
-
-  // 주문의 매칭 키(그룹/행ID/금액) 도출
-  const deriveOrderMatchKeys = (order: LiveOrder) => {
-    const o = order as any;
-    const orderIds = (o.orderIds || o.order_ids || (Array.isArray(order.items) ? order.items.map((i: any) => Number(i.id)) : []))
-      .map((v: any) => Number(v))
-      .filter((v: number) => Number.isFinite(v) && v > 0);
-    const orderGroupId = o.groupId || o.orderGroupId || o.order_group_id || order.id || "";
-    const expectedAmount = Number(order.totalAmount || 0) || Number(order.finalAmount || 0) || 0;
-    return { orderIds, orderGroupId, expectedAmount };
-  };
-
+  // [2026-09-08] 이 표 안에 있던 입금매칭 코드(드래그 드롭 핸들러·confirmWithDeposit·confirmWithoutDeposit·deriveOrderMatchKeys)는
+  //   전부 제거. 드래그 시작(입금 목록 draggable)이 2026-06-14 4c6a8f6에서 사라진 뒤 어디서도 호출되지 않던 죽은 코드였고,
+  //   아무 글자를 끌어다 놓아도 입금 id와 맞으면 확인창 없이 매칭되는 구멍이었다.
+  //   입금 연결은 「입금매칭」 패널(LiveFloatingMatchPanel, 금액 일치일 때만 활성)로만 한다. API 무변경.
   // [2026-08-31 사장님 요청] 닉네임 밑 「모아 복사」를 없애고 — 그 주문서 한 건을
   //   주문 상세의 「고객용 복사」와 같은 형식(주소·입금상태·계좌 안내 포함)으로 바로 복사한다.
   //   표시·클립보드 전용 — 주문/입금/정산 데이터는 일절 변경하지 않는다.
@@ -520,55 +495,6 @@ export default function LiveOrderTable({
     }
   };
 
-  // 선택 입금으로 입금확인 (기존 /api/admin-v2/manual-payment-match 재사용)
-  const confirmWithDeposit = async (order: LiveOrder, deposits: LiveMatchDeposit[], selectedIds: string[]) => {
-    if (matchSaving) return;
-    const depositIds = deposits.map(d => Number(d.id)).filter(n => Number.isFinite(n));
-    if (depositIds.length === 0) return;
-    const { orderIds, orderGroupId } = deriveOrderMatchKeys(order);
-    setMatchSaving(true);
-    try {
-      const res = await fetch("/api/admin-v2/manual-payment-match", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderGroupId, orderIds, depositIds, clientSelectedTotalAmount: deposits.reduce((s,d) => s + Number(d.amount||0), 0) }),
-      });
-      const r = await res.json().catch(() => null);
-      if (!res.ok || !r?.ok) {
-        showAdminToast("입금확인 실패\n\n" + (r?.message || ""), "error");
-        return;
-      }
-      showAdminToast("입금확인 처리됐습니다.", "success");
-      setSelectedDepositIds([]);
-      await onMatched?.();
-    } finally {
-      setMatchSaving(false);
-    }
-  };
-
-  // 금액 무시하고 수동확인 (기존 /api/admin-v2/manual-payment-confirm-without-deposit 재사용)
-  const confirmWithoutDeposit = async (order: LiveOrder) => {
-    if (matchSaving) return;
-    const { orderIds, orderGroupId, expectedAmount } = deriveOrderMatchKeys(order);
-    setMatchSaving(true);
-    try {
-      const res = await fetch("/api/admin-v2/manual-payment-confirm-without-deposit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderGroupId, orderIds, expectedAmount }),
-      });
-      const r = await res.json().catch(() => null);
-      if (!res.ok || !r?.ok) {
-        showAdminToast("수동확인 실패\n\n" + (r?.message || ""), "error");
-        return;
-      }
-      showAdminToast("수동 입금확인 처리됐습니다.", "success");
-      setSelectedDepositIds([]);
-      await onMatched?.();
-    } finally {
-      setMatchSaving(false);
-    }
-  };
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState<"" | "rozen" | "picking">("");
   const [exportConfirm, setExportConfirm] = useState<"" | "rozen" | "picking">("");
@@ -1222,10 +1148,7 @@ export default function LiveOrderTable({
                   return (
                     <Fragment key={order.id}>
                     <div
-                      onDragOver={isMatchableOrder(order) ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (dropHoverOrderId !== order.id) setDropHoverOrderId(order.id); } : undefined}
-                      onDragLeave={isMatchableOrder(order) ? () => setDropHoverOrderId((cur) => (cur === order.id ? "" : cur)) : undefined}
-                      onDrop={isMatchableOrder(order) ? (e) => { e.preventDefault(); handleDepositDropOnOrder(order, e.dataTransfer.getData("text/plain")); } : undefined}
-                      className={`grid min-w-[1000px] grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 items-start text-[14px] transition ${dropHoverOrderId === order.id ? "bg-ok-bg ring-2 ring-inset ring-ok-tx" : selected ? "bg-rose-soft/70" : "hover:bg-surface-2"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}
+                      className={`grid min-w-[1000px] grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 items-start text-[14px] transition ${selected ? "bg-rose-soft/70" : "hover:bg-surface-2"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}
                     >
                       {/* 0. 선택 체크박스 */}
                       <div className="flex items-center justify-center py-3" onClick={(e) => e.stopPropagation()}>

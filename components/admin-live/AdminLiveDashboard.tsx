@@ -1647,8 +1647,6 @@ export default function AdminLiveDashboard() {
                     onRefresh={loadOrders}
                     onOpenManualMatch={openManualMatchForOrder}
                     onOpenCardPay={setCardPayOrder}
-                    deposits={deposits}
-                    onMatched={refreshAfterManualMatch}
                     onSelectForMatch={(order) => { setOrderDetailOpen(false); setSelectedOrderForMatch(order); setMatchPanelOpen(true); }}
                   />
                 </div>

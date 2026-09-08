@@ -1,6 +1,7 @@
 "use client";
 
 import { showAdminToast } from "@/lib/adminToast";
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
 import AdminLiveMissionPanel from "./AdminLiveMissionPanel";
@@ -1122,10 +1123,12 @@ export default function AdminLiveEventRoulettePanel({
     const gAmountPre = Number(String(giftPointAmount || "").replace(/[^0-9]/g, "")) || 0;
     if (mode === "live" && giftType === "point" && gAmountPre > 0) {
       const totalPre = gAmountPre * survivorCount;
-      if (!window.confirm(
+      const okStart = await showAdminConfirm(
         `${kindLabel}을 시작합니다.\n\n${winnerWord} ${survivorCount}명 × ${gAmountPre.toLocaleString("ko-KR")}P` +
-        `\n= 총 ${totalPre.toLocaleString("ko-KR")}P 가 실제로 지급됩니다.\n\n진행할까요?`
-      )) return;
+        `\n= 총 ${totalPre.toLocaleString("ko-KR")}P 가 실제로 지급됩니다.\n\n진행할까요?`,
+        { title: "이벤트 시작", confirmText: "시작", cancelText: "취소", tone: "warning" },
+      );
+      if (!okStart) return;
     }
 
     setCurrentEvent(null); // 이전 결과 표시 제거 후 새 판
@@ -1261,6 +1264,14 @@ export default function AdminLiveEventRoulettePanel({
 
 
   const markRewardDone = async (winner: RouletteWinner, isRewardDone: boolean) => {
+    // [2026-09-08] 지급대기→지급완료는 즉시, 지급완료→지급대기(되돌리기)만 확인창 — 되돌리기는 드물고 실수 가능성 높음
+    if (!isRewardDone) {
+      const ok = await showAdminConfirm(
+        `${winner.nickname || "당첨자"}의 「지급완료」 체크를 해제해 다시 「지급대기」로 되돌립니다.\n포인트가 회수되는 건 아니고, 표시만 바뀝니다.`,
+        { title: "지급완료 되돌리기", confirmText: "되돌리기", cancelText: "취소", tone: "warning" },
+      );
+      if (!ok) return;
+    }
     try {
       const payload = await requestJson<{ ok: boolean; message?: string }>("/api/admin-live/event-roulette", {
         method: "POST",
@@ -1302,7 +1313,8 @@ export default function AdminLiveEventRoulettePanel({
       ? `운영 룰렛 이벤트를 삭제합니다.\n\n이벤트: ${event.title || sourceLabel}\n당첨자: ${event.winner_nickname || "-"}\n\n이 룰렛 이벤트와 연결 당첨자 기록이 당첨자 관리에서 모두 삭제됩니다.\n이미 지급/고객 안내한 내용은 별도로 확인해야 합니다.\n\n정말 삭제할까요?`
       : `테스트 룰렛 이벤트를 삭제할까요?\n\n${event.title || sourceLabel}`;
 
-    if (!window.confirm(confirmMessage)) return;
+    const okDelete = await showAdminConfirm(confirmMessage, { title: "이벤트 삭제", confirmText: "삭제", cancelText: "취소", tone: "danger" });
+    if (!okDelete) return;
 
     try {
       const payload = await requestJson<{ ok: boolean; message?: string }>("/api/admin-live/event-roulette", {
@@ -1350,7 +1362,8 @@ export default function AdminLiveEventRoulettePanel({
 
 
   const deleteAllTestRecords = async () => {
-    if (!window.confirm("테스트 룰렛 이벤트와 테스트 당첨 기록을 모두 삭제할까요?\n\n운영 기록은 삭제하지 않습니다.")) return;
+    const okClean = await showAdminConfirm("테스트 룰렛 이벤트와 테스트 당첨 기록을 모두 삭제할까요?\n\n운영 기록은 삭제하지 않습니다.", { title: "테스트 기록 정리", confirmText: "삭제", cancelText: "취소", tone: "danger" });
+    if (!okClean) return;
 
     try {
       const payload = await requestJson<{ ok: boolean; message?: string }>("/api/admin-live/event-roulette", {
@@ -1378,10 +1391,11 @@ export default function AdminLiveEventRoulettePanel({
 
   // 돌리기 가드: 운영모드 + 선물=포인트인데 금액이 0/빈칸이면 자동지급이 안 되므로 먼저 경고(막기).
   //   → "당첨 내용(포인트)" 안 채우고 돌려서 당첨자가 포인트 못 받는 사고 방지. (지급/grant 로직은 무변경)
-  const startSpin = () => {
+  const startSpin = async () => {
     const amt = Number(String(giftPointAmount || "").replace(/[^0-9]/g, "")) || 0;
     if (mode === "live" && giftType === "point" && amt <= 0) {
-      if (!window.confirm("⚠️ 당첨자에게 줄 포인트 금액이 비어 있어요 (0P).\n이대로 돌리면 포인트 자동지급이 안 됩니다.\n\n‘당첨 내용(포인트)’에 금액을 먼저 입력하세요.\n\n그래도 그냥 돌릴까요?")) return;
+      const okZero = await showAdminConfirm("당첨자에게 줄 포인트 금액이 비어 있어요 (0P).\n이대로 돌리면 포인트 자동지급이 안 됩니다.\n\n‘당첨 내용(포인트)’에 금액을 먼저 입력하세요.\n\n그래도 그냥 돌릴까요?", { title: "포인트 금액 없음", confirmText: "그냥 돌리기", cancelText: "취소", tone: "warning" });
+      if (!okZero) return;
     }
     // [2026-07-26] 달리기(race)는 서바이벌과 동일 실행 함수 사용(startSurvivalEvent가 탭 감지).
     (eventTab === "roulette" ? startRouletteOneClick : (eventTab === "survival" || eventTab === "race") ? startSurvivalEvent : startClawEvent)();

@@ -5,6 +5,7 @@
 //   - "구매자 전원 지급"(돈)은 2단계라 여기엔 없음(읽기/설정 전용).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useBulkPointGrant } from "./useBulkPointGrant";
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import { useLiveOrderGiftAdd } from "./useLiveOrderGiftAdd";
 import { MISSION_PAYOUT_MEMO } from "@/lib/mission";
 
@@ -177,11 +178,12 @@ export default function AdminLiveMissionPanel() {
       setGiftMsg("선물 이름을 입력하세요.");
       return;
     }
-    const ok = window.confirm(
+    const ok = await showAdminConfirm(
       `아래 ${payout.count}명의 가장 최근 주문서에\n"🎁 ${name}" 을(를) 0원으로 추가할까요?\n\n` +
         `· 주문 총금액·입금매칭·재고는 바뀌지 않습니다\n` +
         `· 송장·물건챙기기 목록에 선물이 함께 나옵니다\n` +
-        (giftAllowDup ? `· ⚠️ 중복 허용 — 같은 주문서에 이미 있어도 또 추가됩니다` : `· 같은 주문서에 이미 있으면 건너뜁니다`)
+        (giftAllowDup ? `· ⚠️ 중복 허용 — 같은 주문서에 이미 있어도 또 추가됩니다` : `· 같은 주문서에 이미 있으면 건너뜁니다`),
+      { title: "선물 넣기", confirmText: "추가", cancelText: "취소", tone: "warning" },
     );
     if (!ok) return;
     setGiftMsg("");
@@ -237,7 +239,8 @@ export default function AdminLiveMissionPanel() {
   // 이벤트 종료: 미션 끄기(active=false 저장 → 위젯 숨김) + 지급 버튼 열림 + 선물 줄 명단 자동 표시
   const endEvent = async () => {
     if (ending) return;
-    if (!window.confirm("이벤트를 종료할까요?\n\n· 방송 위젯이 꺼집니다(숨김)\n· 선물 줘야 할 명단이 바로 표시됩니다\n· '구매자 전원 지급' 버튼이 열립니다\n(지급은 방송이 켜져 있는 동안 해주세요)")) return;
+    const okEnd = await showAdminConfirm("이벤트를 종료할까요?\n\n· 방송 위젯이 꺼집니다(숨김)\n· 선물 줘야 할 명단이 바로 표시됩니다\n· '구매자 전원 지급' 버튼이 열립니다\n(지급은 방송이 켜져 있는 동안 해주세요)", { title: "미션 종료", confirmText: "종료", cancelText: "취소", tone: "warning" });
+    if (!okEnd) return;
     setEnding(true);
     setMsg("");
     try {

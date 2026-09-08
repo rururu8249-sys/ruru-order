@@ -3,6 +3,7 @@
 // 텔레그램 알림 설정 카드 — 봇 토큰/chat id 붙여넣고 저장 + 테스트 발송.
 //   비밀값은 서버전용 테이블에 보관(/api/admin-live/telegram). Vercel 환경변수 불필요.
 import { useEffect, useState } from "react";
+import { showAdminToast } from "@/lib/adminToast";
 
 export default function TelegramNotifyCard() {
   const [botToken, setBotToken] = useState("");
@@ -14,7 +15,6 @@ export default function TelegramNotifyCard() {
   const [recipientCount, setRecipientCount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [msg, setMsg] = useState("");
 
   const loadStatus = async () => {
     try {
@@ -37,7 +37,6 @@ export default function TelegramNotifyCard() {
 
   const save = async () => {
     setSaving(true);
-    setMsg("");
     try {
       const body: Record<string, unknown> = { action: "save", enabled, reportOnEnd };
       if (botToken.trim()) body.botToken = botToken.trim();
@@ -48,14 +47,15 @@ export default function TelegramNotifyCard() {
         body: JSON.stringify(body),
       });
       const j = await r.json();
-      setMsg(j.ok ? "저장됐어요." : `저장 실패: ${j.error || ""}`);
+      if (j.ok) showAdminToast("텔레그램 설정을 저장했습니다.", "success");
+      else showAdminToast("저장 실패\n\n" + (j.error || ""), "error");
       if (j.ok) {
         setBotToken("");
         setChatId("");
         loadStatus();
       }
     } catch (e: any) {
-      setMsg("저장 실패: " + (e?.message || e));
+      showAdminToast("저장 실패\n\n" + (e?.message || e), "error");
     } finally {
       setSaving(false);
     }
@@ -64,7 +64,6 @@ export default function TelegramNotifyCard() {
   const [detecting, setDetecting] = useState(false);
   const detectChat = async () => {
     setDetecting(true);
-    setMsg("");
     try {
       const r = await fetch("/api/admin-live/telegram", {
         method: "POST",
@@ -73,13 +72,13 @@ export default function TelegramNotifyCard() {
       });
       const j = await r.json();
       if (j.ok) {
-        setMsg(`✅ 연결됐어요${j.name ? ` — ${j.name}` : ""} (번호 ${j.chatId}). 이제 🔔 테스트 보내기를 눌러보세요.`);
+        showAdminToast(`연결됐어요${j.name ? ` — ${j.name}` : ""} (번호 ${j.chatId}). 이제 🔔 테스트 보내기를 눌러보세요.`, "success");
         loadStatus();
       } else {
-        setMsg(`❌ 아직 못 찾았어요 — ② 봇에게 말을 한 번 보냈는지 확인한 뒤 다시 눌러주세요. (${j.reason || j.error || "응답 없음"})`);
+        showAdminToast(`아직 못 찾았어요 — ② 봇에게 말을 한 번 보냈는지 확인한 뒤 다시 눌러주세요.\n\n(${j.reason || j.error || "응답 없음"})`, "error");
       }
     } catch (e: any) {
-      setMsg("실패: " + (e?.message || e));
+      showAdminToast("실패\n\n" + (e?.message || e), "error");
     } finally {
       setDetecting(false);
     }
@@ -88,7 +87,6 @@ export default function TelegramNotifyCard() {
   const [reporting, setReporting] = useState(false);
   const sendReport = async () => {
     setReporting(true);
-    setMsg("");
     try {
       const r = await fetch("/api/admin-live/telegram", {
         method: "POST",
@@ -96,9 +94,10 @@ export default function TelegramNotifyCard() {
         body: JSON.stringify({ action: "send-report" }),
       });
       const j = await r.json();
-      setMsg(j.ok ? "✅ 오늘 결산을 폰으로 보냈어요!" : `❌ 실패: ${j.reason || j.error || "설정을 확인하세요"}`);
+      if (j.ok) showAdminToast("오늘 결산을 폰으로 보냈어요!", "success");
+      else showAdminToast("결산 발송 실패\n\n" + (j.reason || j.error || "설정을 확인하세요"), "error");
     } catch (e: any) {
-      setMsg("실패: " + (e?.message || e));
+      showAdminToast("실패\n\n" + (e?.message || e), "error");
     } finally {
       setReporting(false);
     }
@@ -106,7 +105,6 @@ export default function TelegramNotifyCard() {
 
   const sendTest = async () => {
     setTesting(true);
-    setMsg("");
     try {
       const r = await fetch("/api/admin-live/telegram", {
         method: "POST",
@@ -114,9 +112,10 @@ export default function TelegramNotifyCard() {
         body: JSON.stringify({ action: "test" }),
       });
       const j = await r.json();
-      setMsg(j.ok ? "✅ 테스트 알림을 보냈어요. 폰(텔레그램)에서 확인하세요!" : `❌ 실패: ${j.reason || j.error || "설정을 확인하세요"}`);
+      if (j.ok) showAdminToast("테스트 알림을 보냈어요. 폰(텔레그램)에서 확인하세요!", "success");
+      else showAdminToast("테스트 발송 실패\n\n" + (j.reason || j.error || "설정을 확인하세요"), "error");
     } catch (e: any) {
-      setMsg("실패: " + (e?.message || e));
+      showAdminToast("실패\n\n" + (e?.message || e), "error");
     } finally {
       setTesting(false);
     }
@@ -204,7 +203,6 @@ export default function TelegramNotifyCard() {
         </button>
         <span className="text-[11px] font-bold text-ink-mute">오늘 매출·미입금·큰손을 폰으로 한 통</span>
       </div>
-      {msg ? <div className="rounded-xl border border-line bg-surface-2 px-3 py-2 text-xs font-bold text-ink-soft">{msg}</div> : null}
     </div>
   );
 }
