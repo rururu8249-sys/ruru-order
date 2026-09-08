@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { formatOrderOptionText } from "@/lib/orderOptionText";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
@@ -9,6 +10,8 @@ import type { LiveOrder } from "./types";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 // [2026-09-08] 페이스터 주소는 설정 › 상점 정보에서 온다(하드코딩 제거)
 import { getShopInfoNow, useShopInfo } from "@/lib/useShopInfo";
+// [2026-09-08] 복사 카드를 «항상 맨 위에 뜨는 작은 창»으로 빼내기 (사유·실측근거는 그 파일 상단)
+import { usePipWindow, copyTextIn } from "@/lib/usePipWindow";
 
 // ═══ 페이스터를 «어떻게» 열 것인가 — 2026-09-08 확정. 다시 뒤집지 말 것 ═══
 //
@@ -104,6 +107,8 @@ function phoneDigits(order: LiveOrder) {
 
 export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusChange }: Props) {
   const { paysterUrl } = useShopInfo();
+  // 「항상 맨 위에 뜨는 작은 창」 — 페이스터 창이 뒤로 밀리지 않게 복사 카드만 빼낸다
+  const pip = usePipWindow();
   const [copiedKey, setCopiedKey] = useState("");
   const [saving, setSaving] = useState(false);
   // [2026-08-29] 카톡으로 결제링크 보낸 뒤, 유튜브 채팅에 자동 안내
@@ -182,21 +187,24 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
   const recipientPhoneDigits = String((order as { recipientPhone?: string | null }).recipientPhone || "").replace(/[^0-9]/g, "");
   const recipientIsMobile = /^01[016789][0-9]{7,8}$/.test(recipientPhoneDigits);
 
-  const copyValue = async (key: string, value: string) => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopiedKey(key);
-      window.setTimeout(() => setCopiedKey((k) => (k === key ? "" : k)), 1500);
-    } catch {
+  // [2026-09-08] 복사는 «클릭이 일어난 창»에서 해야 한다.
+  //   작은 창(항상 위)에서 눌렀는데 관리자 창의 클립보드를 쓰면 «포커스 없음»으로 거부된다.
+  //   sourceWindow 를 안 주면 예전과 똑같이 관리자 창에서 복사한다.
+  const copyValue = async (key: string, value: string, sourceWindow?: Window | null) => {
+    const ok = await copyTextIn(sourceWindow || window, value);
+    if (!ok) {
       showAdminToast("복사 실패 — 길게 눌러 직접 복사해주세요.", "warning");
+      return;
     }
+    setCopiedKey(key);
+    window.setTimeout(() => setCopiedKey((k) => (k === key ? "" : k)), 1500);
   };
 
   // 칸 하나를 바로 복사한다(순서·단계 없음).
-  const copyFieldValue = async (index: number) => {
+  const copyFieldValue = async (index: number, sourceWindow?: Window | null) => {
     const field = fields[index];
     if (!field || !field.value) return;
-    await copyValue(field.key, field.value);
+    await copyValue(field.key, field.value, sourceWindow);
   };
 
   // 숫자키 1~4 로도 복사 (마우스 안 옮기고 붙여넣기만 반복할 수 있게)
@@ -298,6 +306,22 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
             <button type="button" onClick={() => openPayster(paysterUrl)} className="ru-btn ru-btn-sm" title="페이스터 창을 화면 오른쪽 절반에 다시 엽니다">
               페이스터 창 다시 열기 ↗
             </button>
+            {/* [2026-09-08 사장님] 「왔다 갔다할때마다 창이 뒤로 밀리고 하니까 복잡한데」
+                  → 복사 카드만 «항상 맨 위에 뜨는 창»으로 빼낸다. 관리자 창을 안 눌러도 되니
+                    페이스터 창이 뒤로 밀리지 않는다. 지원 안 하는 브라우저에서는 버튼을 숨긴다. */}
+            {pip.supported ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (pip.pipWindow) pip.close();
+                  else void pip.open(430, 470);
+                }}
+                className="ru-btn ru-btn-sm"
+                title="복사 카드를 항상 맨 위에 뜨는 작은 창으로 빼냅니다. 페이스터 창이 뒤로 안 밀립니다."
+              >
+                {pip.pipWindow ? "📌 고정 해제" : "📌 복사창 항상 위에"}
+              </button>
+            ) : null}
           </div>
 
           <div className="space-y-3">
@@ -397,6 +421,59 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
         </div>
         </div>
       </div>
+      {/* ── 「항상 맨 위에 뜨는 작은 창」 안 화면 ──────────────────────────
+            ⚠ 데이터도 함수도 전부 위와 «같은 것»을 쓴다. 돈 처리(handleComplete)는
+              복제하지 않고 그대로 호출한다 — 로직이 갈라지면 안 되기 때문. */}
+      {pip.pipWindow
+        ? createPortal(
+            <div className="flex h-full flex-col gap-2 p-3" style={{ background: "#F4F6FB" }}>
+              <div className="flex shrink-0 items-center justify-between">
+                <span className="text-[13px] font-black" style={{ color: "#101C3D" }}>💳 {order.nickname}</span>
+                <span className="text-[11px] font-bold" style={{ color: "#8B99BC" }}>📌 항상 맨 위</span>
+              </div>
+              {fields.map((f, fieldIndex) => (
+                <button
+                  key={f.key}
+                  type="button"
+                  disabled={!f.value}
+                  onClick={() => void copyFieldValue(fieldIndex, pip.pipWindow)}
+                  className="flex w-full shrink-0 items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-left disabled:opacity-40"
+                  style={{ border: copiedKey === f.key ? "1.5px solid #059669" : "1px solid #DDE4F2" }}
+                >
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-white" style={{ background: copiedKey === f.key ? "#059669" : "#8B99BC" }}>
+                    {fieldIndex + 1}
+                  </span>
+                  <span className="w-[62px] shrink-0 text-[11px] font-black" style={{ color: "#5A6B92" }}>{f.label}</span>
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-black" style={{ color: "#101C3D" }}>{f.value || "-"}</span>
+                  <span className="shrink-0 text-[11px] font-black" style={{ color: copiedKey === f.key ? "#059669" : "#2B6BEB" }}>
+                    {copiedKey === f.key ? "복사됨" : "⧉ 복사"}
+                  </span>
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => void copyValue("chatNotice", chatNoticeText, pip.pipWindow)}
+                className="w-full shrink-0 rounded-xl px-3 py-2.5 text-[12px] font-black"
+                style={copiedKey === "chatNotice" ? { background: "#059669", color: "#fff" } : { background: "#101C3D", color: "#fff" }}
+              >
+                {copiedKey === "chatNotice" ? "✔ 복사됨 · 유튜브 채팅에 붙여넣기" : "📢 카톡 발송완료 안내문구 복사"}
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={handleComplete}
+                className="w-full shrink-0 rounded-xl px-3 py-2.5 text-[12px] font-black text-white disabled:opacity-40"
+                style={{ background: "#059669" }}
+              >
+                {saving ? "처리 중…" : "✔ 카드결제완료 처리"}
+              </button>
+              <div className="mt-auto shrink-0 text-[11px] font-bold leading-4" style={{ color: "#8B99BC" }}>
+                이 창은 페이스터 위에 계속 떠 있습니다. 닫으면 원래 팝업으로 돌아갑니다.
+              </div>
+            </div>,
+            pip.pipWindow.document.body,
+          )
+        : null}
       {imagePreviewUrl ? (
         <div onClick={() => setImagePreviewUrl("")} style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
