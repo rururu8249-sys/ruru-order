@@ -156,7 +156,7 @@ function renderOrderSummary(order: LiveOrder) {
 //   → 배지 자체를 누르면 입금매칭/카드결제가 열린다(핸들러가 넘어온 경우). 다른 상태 배지는 표시 전용 그대로.
 function statusBadge(order: LiveOrder, actions?: { onMatch?: () => void; onCardPay?: () => void }) {
   // 시안 ① 팔레트(딥로즈 테마): 입금확인=green / 매칭필요=amber / 대기·미결제=red / 취소=muted / 카드완료=blue
-  const base = { borderRadius: "8px", padding: "3px 9px", fontSize: "11px", fontWeight: 800, display: "inline-block" } as const;
+  const base = { borderRadius: "8px", padding: "4px 8px", fontSize: "11px", fontWeight: 800, display: "inline-block" } as const;
   const green = { background: "var(--color-ok-bg)", color: "var(--color-ok-tx)" };
   const amber = { background: "var(--color-warn-bg)", color: "var(--color-warn-tx)" };
   const red = { background: "var(--color-danger-bg)", color: "var(--color-danger-tx)" };
@@ -724,20 +724,20 @@ export default function LiveOrderTable({
     ) : null}
     {exportConfirm !== "" ? (
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setExportConfirm("")}>
-        <div style={{ background: "var(--color-surface)", borderRadius: "16px", padding: "26px 30px", minWidth: "340px", boxShadow: "0 8px 40px rgba(0,0,0,0.18)" }} onClick={(e) => e.stopPropagation()}>
-          <div style={{ fontSize: "16px", fontWeight: 900, color: "var(--color-ink)", marginBottom: "14px" }}>
+        <div style={{ background: "var(--color-surface)", borderRadius: "16px", padding: "24px 32px", minWidth: "340px", boxShadow: "0 8px 40px rgba(0,0,0,0.18)" }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ fontSize: "16px", fontWeight: 900, color: "var(--color-ink)", marginBottom: "12px" }}>
             {exportConfirm === "rozen" ? "🚚 송장 출력" : "🛍 물건챙기기"}
           </div>
           <div style={{ fontSize: "13px", color: "var(--color-ink-soft)", marginBottom: "20px", lineHeight: 1.8 }}>
             <div>현재 필터 기준: <b>{exportableOrders.length.toLocaleString("ko-KR")}건</b></div>
-            <div style={{ fontSize: "15px" }}>✅ 돈 받은 것(결제완료): <b style={{ color: "var(--color-ok-tx)", fontSize: "16px" }}>{paidOnlyExportOrders.length.toLocaleString("ko-KR")}건</b></div>
+            <div style={{ fontSize: "14px" }}>✅ 돈 받은 것(결제완료): <b style={{ color: "var(--color-ok-tx)", fontSize: "16px" }}>{paidOnlyExportOrders.length.toLocaleString("ko-KR")}건</b></div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             {/* 기본 추천: 결제완료만 — 크게/녹색/맨 위 */}
             <button type="button"
               disabled={paidOnlyExportOrders.length === 0}
               onClick={() => { const kind = exportConfirm as "rozen" | "picking"; setExportConfirm(""); void runExport(kind, paidOnlyExportOrders, "결제완료"); }}
-              style={{ padding: "13px 16px", borderRadius: "10px", border: "none", background: "var(--color-ok-tx)", color: "#fff", fontWeight: 800, cursor: paidOnlyExportOrders.length === 0 ? "default" : "pointer", fontSize: "15px", opacity: paidOnlyExportOrders.length === 0 ? 0.4 : 1, textAlign: "left" }}>
+              style={{ padding: "12px 16px", borderRadius: "8px", border: "none", background: "var(--color-ok-tx)", color: "#fff", fontWeight: 800, cursor: paidOnlyExportOrders.length === 0 ? "default" : "pointer", fontSize: "14px", opacity: paidOnlyExportOrders.length === 0 ? 0.4 : 1, textAlign: "left" }}>
               ✅ 돈 받은 것만 출력 ({paidOnlyExportOrders.length.toLocaleString("ko-KR")}건)
               <div style={{ fontSize: "11px", fontWeight: 600, opacity: 0.85, marginTop: "2px" }}>입금확인·카드결제 완료분만</div>
             </button>
@@ -745,7 +745,7 @@ export default function LiveOrderTable({
             {selectedExportOrders.length > 0 ? (
               <button type="button"
                 onClick={() => { const kind = exportConfirm as "rozen" | "picking"; setExportConfirm(""); void runExport(kind, selectedExportOrders, `선택 ${selectedExportOrders.length}건`); }}
-                style={{ padding: "10px 16px", borderRadius: "10px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: "14px", textAlign: "left" }}>
+                style={{ padding: "8px 16px", borderRadius: "8px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: "14px", textAlign: "left" }}>
                 ✓ 선택한 {selectedExportOrders.length.toLocaleString("ko-KR")}건 출력
               </button>
             ) : null}
@@ -753,13 +753,13 @@ export default function LiveOrderTable({
             {/* 미결제 포함 전체 — 작게/경고색/아래 */}
             <button type="button"
               onClick={() => { const kind = exportConfirm as "rozen" | "picking"; setExportConfirm(""); void runExport(kind, exportableOrders, currentFilterLabel); }}
-              style={{ padding: "9px 14px", borderRadius: "9px", border: "1px solid var(--color-warn-tx)", background: "var(--color-warn-bg)", color: "var(--color-warn-tx)", fontWeight: 700, cursor: "pointer", fontSize: "12px", textAlign: "left" }}>
+              style={{ padding: "8px 12px", borderRadius: "8px", border: "1px solid var(--color-warn-tx)", background: "var(--color-warn-bg)", color: "var(--color-warn-tx)", fontWeight: 700, cursor: "pointer", fontSize: "12px", textAlign: "left" }}>
               ⚠️ 미결제 포함 전체 ({exportableOrders.length.toLocaleString("ko-KR")}건)
-              <div style={{ fontSize: "10px", fontWeight: 600, opacity: 0.9, marginTop: "2px" }}>돈 안 들어온 주문도 포함됩니다</div>
+              <div style={{ fontSize: "11px", fontWeight: 600, opacity: 0.9, marginTop: "2px" }}>돈 안 들어온 주문도 포함됩니다</div>
             </button>
 
             <button type="button" onClick={() => setExportConfirm("")}
-              style={{ padding: "8px 14px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
+              style={{ padding: "8px 12px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
               취소
             </button>
           </div>
@@ -826,7 +826,7 @@ export default function LiveOrderTable({
               }}
             >
               {label} <span style={{ opacity: 0.85 }}>{count}</span>
-              {sub ? <span style={{ marginLeft: "5px", fontSize: "10px", fontWeight: 700, opacity: 0.6 }}>{sub}</span> : null}
+              {sub ? <span style={{ marginLeft: "4px", fontSize: "11px", fontWeight: 700, opacity: 0.6 }}>{sub}</span> : null}
             </button>
           );
         })}
@@ -1065,12 +1065,12 @@ export default function LiveOrderTable({
                   if (isMobile) {
                     return (
                       <div key={order.id} onClick={() => onSelectOrder(order)}
-                        style={{ background: "var(--color-surface)", border: "1px solid #eadfe3", borderLeft: order.paymentStatus === "manual_match_needed" ? "3px solid var(--color-rose-deep)" : "1px solid #eadfe3", borderRadius: "12px", padding: "11px 12px", marginBottom: "9px", cursor: "pointer" }}>
+                        style={{ background: "var(--color-surface)", border: "1px solid #eadfe3", borderLeft: order.paymentStatus === "manual_match_needed" ? "3px solid var(--color-rose-deep)" : "1px solid #eadfe3", borderRadius: "12px", padding: "12px 12px", marginBottom: "8px", cursor: "pointer" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
                           <input type="checkbox" checked={selectedOrderIds.has(String(order.id))} onChange={() => toggleSelectOrder(String(order.id))} onClick={(e) => e.stopPropagation()} style={{ width: "16px", height: "16px", accentColor: "var(--color-rose-deep)" }} />
                           <span style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{order.nickname}</span>
                           <span style={{ fontSize: "11px", color: "#888" }}>{order.name || ""}</span>
-                          <span style={{ marginLeft: "auto", fontSize: "10px", color: "#aaa" }}>
+                          <span style={{ marginLeft: "auto", fontSize: "11px", color: "#aaa" }}>
                             {(() => {
                               const src = order.createdAt || order.submittedAt;
                               if (!src) return "-";
@@ -1088,15 +1088,15 @@ export default function LiveOrderTable({
                             })()}
                           </span>
                         </div>
-                        <div style={{ fontSize: "12px", color: "#444", marginBottom: "7px", lineHeight: 1.4 }}>{renderOrderSummary(order)} · {getTotalQty(order)}개</div>
+                        <div style={{ fontSize: "12px", color: "#444", marginBottom: "8px", lineHeight: 1.4 }}>{renderOrderSummary(order)} · {getTotalQty(order)}개</div>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", flexWrap: "wrap" }}>
-                          <div style={{ display: "flex", gap: "5px", alignItems: "center", flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
+                          <div style={{ display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
                             {statusBadge(order, {
                               onMatch: onSelectForMatch ? () => onSelectForMatch(order) : undefined,
                               onCardPay: onOpenCardPay ? () => { openPaysterRightHalf(); onOpenCardPay(order); } : undefined,
                             })}
                             <button type="button" onClick={() => void copyOrderForCustomer(order)}
-                              style={{ fontSize: "10px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "6px", padding: "2px 7px", cursor: "pointer" }}>
+                              style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "2px 8px", cursor: "pointer" }}>
                               📋 주문서 복사
                             </button>
                             {(order as any).shippingStatus ? (
@@ -1106,7 +1106,7 @@ export default function LiveOrderTable({
                               <button type="button" title="결제요청 쪽지 보내기" aria-label="결제요청 쪽지 보내기" disabled={payRequestSending === order.id} onClick={() => void sendPaymentRequest(order)} style={{ border: "none", background: "none", padding: "0 2px", fontSize: "14px", lineHeight: 1, cursor: "pointer", opacity: payRequestSending === order.id ? 0.35 : 0.75 }}>🔔</button>
                             ) : null}
                           </div>
-                          <span style={{ fontSize: "15px", fontWeight: 800, color: "var(--color-danger-tx)" }}>{money(displayPayableAmount(order))}</span>
+                          <span style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-danger-tx)" }}>{money(displayPayableAmount(order))}</span>
                         </div>
                       </div>
                     );

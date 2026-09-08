@@ -1475,7 +1475,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
   if (typeof document === "undefined") return null;
 
-  const chipBase: React.CSSProperties = { padding: "5px 12px", borderRadius: "16px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid var(--color-rose-line)" };
+  const chipBase: React.CSSProperties = { padding: "4px 12px", borderRadius: "16px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid var(--color-rose-line)" };
 
   const popupTree = (
     <div
@@ -1485,12 +1485,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     >
       <div style={embedded
         ? { width: "100%", height: "100%", display: "flex", flexDirection: "column", background: "var(--color-surface)", overflow: "hidden" }
-        : { width: "960px", maxWidth: "100%", flexShrink: 0, height: "680px", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "14px", overflow: "hidden" }}>
+        : { width: "960px", maxWidth: "100%", flexShrink: 0, height: "680px", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "12px", overflow: "hidden" }}>
         {/* 헤더 */}
-        <div style={{ display: "flex", alignItems: "center", padding: "14px 18px", borderBottom: "1px solid var(--color-line)" }}>
+        <div style={{ display: "flex", alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--color-line)" }}>
           <span style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-rose-deep)" }}>📦 상품 관리</span>
           <button type="button" onClick={() => setExcelImportOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "13px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-surface)", border: "1.5px solid var(--color-rose-deep)", borderRadius: "8px", padding: "6px 12px", cursor: "pointer", marginLeft: "auto" }}>📄 엑셀 대량등록</button>
-          <button type="button" onClick={openCreate} style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "13px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "8px", padding: "7px 13px", cursor: "pointer", marginLeft: "8px" }}>+ 상품 등록</button>
+          <button type="button" onClick={openCreate} style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "13px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "8px", padding: "8px 12px", cursor: "pointer", marginLeft: "8px" }}>+ 상품 등록</button>
           {embedded ? null : <button type="button" onClick={onClose} style={{ marginLeft: "8px", border: "none", background: "none", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>✕</button>}
         </div>
 
@@ -1507,13 +1507,13 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         ) : null}
 
         {/* 탭 2개 */}
-        <div style={{ display: "flex", gap: "2px", padding: "0 18px", borderBottom: "1px solid var(--color-line)" }}>
+        <div style={{ display: "flex", gap: "2px", padding: "0 16px", borderBottom: "1px solid var(--color-line)" }}>
           {([["broadcast", "방송 상품"], ["shop", "쇼핑몰 진열"], ["products", "전체 상품"], ["history", "판매 기록"]] as const).map(([k, l]) => (
             <button
               key={k}
               type="button"
               onClick={() => setTab(k)}
-              style={{ padding: "11px 16px", fontSize: "13px", fontWeight: 800, background: "none", border: "none", borderBottom: "2px solid " + (tab === k ? "var(--color-rose-deep)" : "transparent"), color: tab === k ? "var(--color-rose-deep)" : "var(--color-ink-soft)", cursor: "pointer" }}
+              style={{ padding: "12px 16px", fontSize: "13px", fontWeight: 800, background: "none", border: "none", borderBottom: "2px solid " + (tab === k ? "var(--color-rose-deep)" : "transparent"), color: tab === k ? "var(--color-rose-deep)" : "var(--color-ink-soft)", cursor: "pointer" }}
             >
               {l}
             </button>
@@ -1521,7 +1521,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         </div>
 
         {tab === "history" ? (
-          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "14px 18px 16px" }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "12px 16px 16px" }}>
             {/* 요약카드 3개 */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "12px" }}>
               {([
@@ -1529,7 +1529,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 ["총 매출", money(histSummary.sales)],
                 ["총 주문", `${histSummary.count.toLocaleString("ko-KR")}건`],
               ] as const).map(([label, value]) => (
-                <div key={label} style={{ border: "1px solid var(--color-line)", borderRadius: "10px", padding: "12px 10px", textAlign: "center", background: "var(--color-surface-2)" }}>
+                <div key={label} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", padding: "12px 8px", textAlign: "center", background: "var(--color-surface-2)" }}>
                   <div style={{ fontSize: "11px", color: "var(--color-ink-soft)", marginBottom: "4px" }}>{label}</div>
                   <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{value}</div>
                 </div>
@@ -1537,28 +1537,28 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             </div>
 
             {/* 필터: 모드 + 년/월 */}
-            <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
-              <select value={histMode} onChange={(e) => setHistMode(e.target.value as "all" | "broadcast" | "shop")} style={{ height: "34px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 10px", fontSize: "13px", background: "var(--color-surface)", cursor: "pointer", color: "var(--color-ink)" }}>
+            <div style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
+              <select value={histMode} onChange={(e) => setHistMode(e.target.value as "all" | "broadcast" | "shop")} style={{ height: "34px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 8px", fontSize: "13px", background: "var(--color-surface)", cursor: "pointer", color: "var(--color-ink)" }}>
                 <option value="all">전체</option>
                 <option value="broadcast">방송모드</option>
                 <option value="shop">쇼핑몰모드</option>
               </select>
-              <select value={histYear} onChange={(e) => setHistYear(e.target.value)} style={{ height: "34px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 10px", fontSize: "13px", background: "var(--color-surface)", cursor: "pointer", color: "var(--color-ink)" }}>
+              <select value={histYear} onChange={(e) => setHistYear(e.target.value)} style={{ height: "34px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 8px", fontSize: "13px", background: "var(--color-surface)", cursor: "pointer", color: "var(--color-ink)" }}>
                 <option value="전체">전체 연도</option>
                 {histYearOptions.map((y) => <option key={y} value={y}>{y}년</option>)}
               </select>
-              <select value={histMonth} onChange={(e) => setHistMonth(e.target.value)} style={{ height: "34px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 10px", fontSize: "13px", background: "var(--color-surface)", cursor: "pointer", color: "var(--color-ink)" }}>
+              <select value={histMonth} onChange={(e) => setHistMonth(e.target.value)} style={{ height: "34px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 8px", fontSize: "13px", background: "var(--color-surface)", cursor: "pointer", color: "var(--color-ink)" }}>
                 <option value="전체">전체 월</option>
                 {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((m) => <option key={m} value={m}>{m}월</option>)}
               </select>
-              <input value={histSearch} onChange={(e) => setHistSearch(e.target.value)} placeholder="🔍 방송명 검색" style={{ flex: 1, minWidth: "120px", height: "34px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 10px", fontSize: "13px", outline: "none", color: "var(--color-ink)" }} />
+              <input value={histSearch} onChange={(e) => setHistSearch(e.target.value)} placeholder="🔍 방송명 검색" style={{ flex: 1, minWidth: "120px", height: "34px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 8px", fontSize: "13px", outline: "none", color: "var(--color-ink)" }} />
             </div>
 
             {/* 방송/쇼핑몰 목록 */}
             {histLoading ? (
               <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>불러오는 중…</div>
             ) : histFiltered.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "34px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>아직 기록이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "3px" }}>상품을 방송에 담거나 진열하면 여기에 남습니다.</div></div>
+              <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>아직 기록이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "4px" }}>상품을 방송에 담거나 진열하면 여기에 남습니다.</div></div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {histFiltered.map((b) => {
@@ -1570,10 +1570,10 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   const detail = histDetail.get(b.id);
                   const detailSubtotal = (detail || []).reduce((acc, r) => ({ sales: acc.sales + r.sales, qty: acc.qty + r.qty }), { sales: 0, qty: 0 });
                   return (
-                    <div key={b.id} style={{ border: "1px solid " + (expanded ? "var(--color-rose-line)" : "var(--color-line)"), borderRadius: "10px", overflow: "hidden", background: "var(--color-surface)" }}>
+                    <div key={b.id} style={{ border: "1px solid " + (expanded ? "var(--color-rose-line)" : "var(--color-line)"), borderRadius: "8px", overflow: "hidden", background: "var(--color-surface)" }}>
                       {/* 헤더 행 */}
-                      <div onClick={() => void loadBroadcastDetail(b.id)} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "11px 13px", cursor: "pointer", background: expanded ? "var(--color-rose-soft)" : "var(--color-surface)" }}>
-                        <span style={{ flexShrink: 0, fontSize: "10px", fontWeight: 800, padding: "3px 8px", borderRadius: "6px", background: isShop ? "var(--color-ok-bg)" : "var(--color-warn-bg)", color: isShop ? "var(--color-ok-tx)" : "var(--color-warn-tx)" }}>{isShop ? "🛍 쇼핑몰" : "📺 방송"}</span>
+                      <div onClick={() => void loadBroadcastDetail(b.id)} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 12px", cursor: "pointer", background: expanded ? "var(--color-rose-soft)" : "var(--color-surface)" }}>
+                        <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, padding: "4px 8px", borderRadius: "8px", background: isShop ? "var(--color-ok-bg)" : "var(--color-warn-bg)", color: isShop ? "var(--color-ok-tx)" : "var(--color-warn-tx)" }}>{isShop ? "🛍 쇼핑몰" : "📺 방송"}</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</div>
                           <div style={{ fontSize: "11px", color: "var(--color-ink-soft)", marginTop: "2px" }}>{dateLabel}</div>
@@ -1587,7 +1587,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
                       {/* 펼침: 상품별 상세 */}
                       {expanded ? (
-                        <div style={{ borderTop: "1px solid var(--color-line)", padding: "10px 13px", background: "var(--color-surface-2)" }}>
+                        <div style={{ borderTop: "1px solid var(--color-line)", padding: "8px 12px", background: "var(--color-surface-2)" }}>
                           {histDetailLoading === b.id && !detail ? (
                             <div style={{ textAlign: "center", padding: "16px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>불러오는 중…</div>
                           ) : !detail || detail.length === 0 ? (
@@ -1595,7 +1595,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           ) : (
                             <>
                               {/* 펼침 헤더: 빈칸 / 상품명·옵션 / 수량 / 단가 / 매출 */}
-                              <div style={{ display: "grid", gridTemplateColumns: "32px 1fr 44px 72px 84px", gap: "8px", alignItems: "center", padding: "0 0 6px", fontSize: "10px", fontWeight: 700, color: "var(--color-ink-soft)", borderBottom: "1px solid var(--color-line)" }}>
+                              <div style={{ display: "grid", gridTemplateColumns: "32px 1fr 44px 72px 84px", gap: "8px", alignItems: "center", padding: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", borderBottom: "1px solid var(--color-line)" }}>
                                 <span />
                                 <span>상품명·옵션</span>
                                 <span style={{ textAlign: "right" }}>수량</span>
@@ -1603,10 +1603,10 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                                 <span style={{ textAlign: "right" }}>매출</span>
                               </div>
                               {detail.map((r) => (
-                                <div key={r.key} style={{ display: "grid", gridTemplateColumns: "32px 1fr 44px 72px 84px", gap: "8px", alignItems: "center", padding: "7px 0", borderBottom: "1px solid var(--color-line)" }}>
+                                <div key={r.key} style={{ display: "grid", gridTemplateColumns: "32px 1fr 44px 72px 84px", gap: "8px", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--color-line)" }}>
                                   <span
                                     onClick={(e) => { e.stopPropagation(); if (r.thumb) setImagePreviewUrl(r.thumb); }}
-                                    style={{ width: "32px", height: "32px", flexShrink: 0, borderRadius: "6px", overflow: "hidden", background: "var(--color-surface)", border: "1px solid var(--color-line)", display: "flex", alignItems: "center", justifyContent: "center", cursor: r.thumb ? "zoom-in" : "default" }}
+                                    style={{ width: "32px", height: "32px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface)", border: "1px solid var(--color-line)", display: "flex", alignItems: "center", justifyContent: "center", cursor: r.thumb ? "zoom-in" : "default" }}
                                   >
                                     {r.thumb ? <img src={r.thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "14px" }}>🖼</span>}
                                   </span>
@@ -1635,28 +1635,28 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             )}
           </div>
         ) : tab === "broadcast" ? (
-          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: isNarrow ? "column" : "row", gap: "12px", padding: "14px 18px 16px" }}>
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: isNarrow ? "column" : "row", gap: "12px", padding: "12px 16px 16px" }}>
             {/* 좌측: 방송 목록 */}
-            <div style={{ width: isNarrow ? "100%" : "260px", flexShrink: 0, ...(isNarrow && bcListOpen ? { maxHeight: "210px" } : {}), display: "flex", flexDirection: "column", border: "1px solid var(--color-line)", borderRadius: "10px", overflow: "hidden" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 12px", borderBottom: "1px solid var(--color-line)" }}>
+            <div style={{ width: isNarrow ? "100%" : "260px", flexShrink: 0, ...(isNarrow && bcListOpen ? { maxHeight: "210px" } : {}), display: "flex", flexDirection: "column", border: "1px solid var(--color-line)", borderRadius: "8px", overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 12px", borderBottom: "1px solid var(--color-line)" }}>
                 <span
                   onClick={isNarrow ? () => setBcListOpen((v) => !v) : undefined}
-                  style={{ display: "flex", alignItems: "center", gap: "5px", minWidth: 0, fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)", cursor: isNarrow ? "pointer" : "default" }}
+                  style={{ display: "flex", alignItems: "center", gap: "4px", minWidth: 0, fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)", cursor: isNarrow ? "pointer" : "default" }}
                 >
                   📺 방송 목록
-                  {isNarrow ? <span style={{ fontSize: "10px" }}>{bcListOpen ? "▲" : "▼"}</span> : null}
+                  {isNarrow ? <span style={{ fontSize: "11px" }}>{bcListOpen ? "▲" : "▼"}</span> : null}
                   {isNarrow && !bcListOpen ? (
                     <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>· {bcList.find((b) => b.id === bcSelId)?.title ?? "방송 선택"}</span>
                   ) : null}
                 </span>
-                <button type="button" disabled={bcBusy} onClick={() => { setNewBcTitle(""); setNewBcCopyIds(null); setNewBcOpen(true); }} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "7px", padding: "4px 9px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>+ 새 방송</button>
+                <button type="button" disabled={bcBusy} onClick={() => { setNewBcTitle(""); setNewBcCopyIds(null); setNewBcOpen(true); }} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "4px 8px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>+ 새 방송</button>
               </div>
               {(!isNarrow || bcListOpen) && (
               <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
                 {bcLoading ? (
-                  <div style={{ textAlign: "center", padding: "30px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>불러오는 중…</div>
+                  <div style={{ textAlign: "center", padding: "32px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>불러오는 중…</div>
                 ) : bcList.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "34px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>방송이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "3px" }}>방송 콘솔에서 ▶ 방송시작을 누르면 여기에 나옵니다.</div></div>
+                  <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>방송이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "4px" }}>방송 콘솔에서 ▶ 방송시작을 누르면 여기에 나옵니다.</div></div>
                 ) : (
                   bcList.map((b) => {
                     const on = b.id === bcSelId;
@@ -1664,9 +1664,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     const d = new Date(b.started_at);
                     const dateLabel = Number.isNaN(d.getTime()) ? "-" : `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
                     return (
-                      <button type="button" key={b.id} onClick={() => { setBcSelId(b.id); if (isNarrow) setBcListOpen(false); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", borderBottom: "1px solid var(--color-line)", background: on ? "var(--color-rose-soft)" : "var(--color-surface)", cursor: "pointer", border: "none" }}>
+                      <button type="button" key={b.id} onClick={() => { setBcSelId(b.id); if (isNarrow) setBcListOpen(false); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", borderBottom: "1px solid var(--color-line)", background: on ? "var(--color-rose-soft)" : "var(--color-surface)", cursor: "pointer", border: "none" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          {isOn ? <span style={{ flexShrink: 0, fontSize: "9px", fontWeight: 800, padding: "1px 6px", borderRadius: "5px", background: "var(--color-ok-bg)", color: "var(--color-ok-tx)" }}>ON</span> : null}
+                          {isOn ? <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, padding: "1px 6px", borderRadius: "4px", background: "var(--color-ok-bg)", color: "var(--color-ok-tx)" }}>ON</span> : null}
                           <span style={{ flex: 1, minWidth: 0, fontSize: "12px", fontWeight: 800, color: on ? "var(--color-rose-deep)" : "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</span>
                           {/* 켜진 방송(isOn)은 숨기기 불가 — 가드: span 자체를 렌더하지 않음 */}
                           {!isOn ? (
@@ -1674,13 +1674,13 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                               role="button"
                               title="목록에서 숨기기"
                               onClick={(e) => { e.stopPropagation(); void handleHideBroadcast(b); }}
-                              style={{ flexShrink: 0, fontSize: "10px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", borderRadius: "5px", padding: "1px 6px", cursor: bcBusy ? "default" : "pointer", opacity: bcBusy ? 0.5 : 1 }}
+                              style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", borderRadius: "4px", padding: "1px 6px", cursor: bcBusy ? "default" : "pointer", opacity: bcBusy ? 0.5 : 1 }}
                             >
                               숨기기
                             </span>
                           ) : null}
                         </div>
-                        <div style={{ fontSize: "10px", color: "var(--color-ink-soft)", marginTop: "2px" }}>{dateLabel}</div>
+                        <div style={{ fontSize: "11px", color: "var(--color-ink-soft)", marginTop: "2px" }}>{dateLabel}</div>
                       </button>
                     );
                   })
@@ -1689,31 +1689,31 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             )}
             </div>
             {/* 우측: 선택 방송의 진열 상품 (sort_order순, 읽기 전용) */}
-            <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", border: "1px solid var(--color-line)", borderRadius: "10px", overflow: "hidden" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 12px", borderBottom: "1px solid var(--color-line)" }}>
+            <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", border: "1px solid var(--color-line)", borderRadius: "8px", overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 12px", borderBottom: "1px solid var(--color-line)" }}>
                 <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)" }}>진열 상품 {bcProducts.length}개</span>
-                <button type="button" disabled={!bcSelId || bcBusy} onClick={openBcPicker} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "7px", padding: "5px 11px", cursor: !bcSelId || bcBusy ? "not-allowed" : "pointer", opacity: !bcSelId || bcBusy ? 0.5 : 1 }}>+ 상품 담기</button>
+                <button type="button" disabled={!bcSelId || bcBusy} onClick={openBcPicker} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "8px", padding: "4px 12px", cursor: !bcSelId || bcBusy ? "not-allowed" : "pointer", opacity: !bcSelId || bcBusy ? 0.5 : 1 }}>+ 상품 담기</button>
                 {bcSelId && bcProducts.length > 0 ? (
                   <select
                     value={bcSort}
                     onChange={(e) => setBcSort(e.target.value as ProductSortKey)}
                     title="화면에 보이는 순서만 바꿉니다. 저장된 진열 순서는 그대로예요."
-                    style={{ height: "26px", borderRadius: "7px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 800, padding: "0 6px", cursor: "pointer" }}
+                    style={{ height: "26px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 800, padding: "0 6px", cursor: "pointer" }}
                   >
                     {PRODUCT_SORT_OPTIONS.map((o) => (<option key={o.key} value={o.key}>{o.label}</option>))}
                   </select>
                 ) : null}
                 {bcSelId && bcProducts.length > 0 ? (
-                  <button type="button" disabled={bcBusy} onClick={() => { setBcCopyMode((v) => !v); setBcCopySel(new Set()); }} style={{ fontSize: "11px", fontWeight: 800, color: bcCopyMode ? "var(--color-ink-soft)" : "var(--color-rose-deep)", background: bcCopyMode ? "var(--color-surface)" : "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "7px", padding: "5px 11px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>{bcCopyMode ? "✕ 선택 취소" : "☑ 선택 복사"}</button>
+                  <button type="button" disabled={bcBusy} onClick={() => { setBcCopyMode((v) => !v); setBcCopySel(new Set()); }} style={{ fontSize: "11px", fontWeight: 800, color: bcCopyMode ? "var(--color-ink-soft)" : "var(--color-rose-deep)", background: bcCopyMode ? "var(--color-surface)" : "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "4px 12px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>{bcCopyMode ? "✕ 선택 취소" : "☑ 선택 복사"}</button>
                 ) : null}
               </div>
               <div style={{ padding: "8px 12px 0" }}>
                 {/* [2026-08-31 사장님 요청] 📌 자주 고정 — 고정했다 풀었다 반복하는 상품 원클릭 재고정 */}
                 {pinQuickList.length > 0 && !bcCopyMode ? (
-                  <div style={{ margin: "0 0 8px", padding: "6px 10px 8px", borderRadius: "10px", border: "1px solid var(--color-rose-line)", background: "var(--color-rose-soft)" }}>
+                  <div style={{ margin: "0 0 8px", padding: "6px 8px 8px", borderRadius: "8px", border: "1px solid var(--color-rose-line)", background: "var(--color-rose-soft)" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: pinListOpen ? "6px" : 0 }}>
-                      <span style={{ fontSize: "10.5px", fontWeight: 900, color: "var(--color-rose-deep)" }}>📌 자주 고정한 상품 — 누르면 바로 「▶ 방송」 · 사진 클릭=확대 · ✕=목록에서 삭제</span>
-                      <button type="button" onClick={togglePinList} style={{ flexShrink: 0, fontSize: "10.5px", fontWeight: 900, color: "var(--color-rose-deep)", background: "var(--color-surface)", border: "1px solid var(--color-rose-line)", borderRadius: "6px", padding: "2px 8px", cursor: "pointer" }}>{pinListOpen ? "▲ 접기" : "▼ 펴기"}</button>
+                      <span style={{ fontSize: "11px", fontWeight: 900, color: "var(--color-rose-deep)" }}>📌 자주 고정한 상품 — 누르면 바로 「▶ 방송」 · 사진 클릭=확대 · ✕=목록에서 삭제</span>
+                      <button type="button" onClick={togglePinList} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 900, color: "var(--color-rose-deep)", background: "var(--color-surface)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "2px 8px", cursor: "pointer" }}>{pinListOpen ? "▲ 접기" : "▼ 펴기"}</button>
                     </div>
                     {pinListOpen ? (
                     <div style={{ display: "flex", flexWrap: "nowrap", overflowX: "auto", gap: "6px", paddingBottom: "2px" }}>
@@ -1734,7 +1734,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             disabled={bcPinBusy}
                             onClick={() => void pinFromHistory(entry)}
                             title={`지금까지 ${entry.count}번 고정 — 클릭 한 번이면 고정+채팅 지정+문구 복사까지 끝 (사진을 누르면 크게 보기)`}
-                            style={{ display: "flex", alignItems: "center", gap: "7px", flexShrink: 0, maxWidth: "250px", fontSize: "11.5px", fontWeight: 800, color: "var(--color-ink)", background: "var(--color-surface)", border: "1px solid var(--color-rose-line)", borderRadius: "999px", padding: "4px 8px 4px 4px", cursor: bcPinBusy ? "wait" : "pointer" }}
+                            style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, maxWidth: "250px", fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", background: "var(--color-surface)", border: "1px solid var(--color-rose-line)", borderRadius: "999px", padding: "4px 8px 4px 4px", cursor: bcPinBusy ? "wait" : "pointer" }}
                           >
                             <span
                               onClick={(e) => { if (historyImg) { e.stopPropagation(); setLightbox(historyImg); } }}
@@ -1752,7 +1752,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             <span
                               onClick={(e) => { e.stopPropagation(); removePinHistory(entry.productId, entry.detailName); setPinHistoryVersion((v) => v + 1); }}
                               title="이 상품을 자주 고정 목록에서 삭제"
-                              style={{ flexShrink: 0, width: "16px", height: "16px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: 900, color: "var(--color-ink-mute)", background: "var(--color-surface-2)", cursor: "pointer" }}
+                              style={{ flexShrink: 0, width: "16px", height: "16px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 900, color: "var(--color-ink-mute)", background: "var(--color-surface-2)", cursor: "pointer" }}
                             >✕</span>
                           </button>
                         );
@@ -1761,16 +1761,16 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     ) : null}
                   </div>
                 ) : null}
-                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 10px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid var(--color-line)", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 8px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid var(--color-line)", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
                 {bcSelId && bcProducts.length > 0 && !bcDragEnabled && !bcCopyMode ? (
-                  <div style={{ margin: "0 0 8px", padding: "6px 9px", borderRadius: "7px", background: "var(--color-warn-bg)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 700, lineHeight: 1.4 }}>
+                  <div style={{ margin: "0 0 8px", padding: "6px 8px", borderRadius: "8px", background: "var(--color-warn-bg)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 700, lineHeight: 1.4 }}>
                     {search.trim() ? "🔍 검색 중에는 순서를 바꿀 수 없어요. 검색어를 지워주세요." : "↕ 순서를 바꾸려면 정렬을 「진열 순서 (드래그)」로 두세요. (지금은 보기만 바뀐 상태 — 저장된 순서는 그대로)"}
                   </div>
                 ) : null}
               </div>
               {bcCopyMode ? (
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "0 12px 8px" }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", cursor: "pointer", userSelect: "none" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", cursor: "pointer", userSelect: "none" }}>
                     <input
                       type="checkbox"
                       checked={bcProducts.length > 0 && bcCopySel.size === bcProducts.length}
@@ -1779,7 +1779,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     />
                     전체선택
                   </label>
-                  <button type="button" disabled={bcCopySel.size === 0 || bcBusy} onClick={openNewBcWithCopy} style={{ marginLeft: "auto", fontSize: "12px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "7px", padding: "6px 12px", cursor: bcCopySel.size === 0 || bcBusy ? "not-allowed" : "pointer", opacity: bcCopySel.size === 0 || bcBusy ? 0.5 : 1 }}>선택 {bcCopySel.size}개 → 새 방송으로 복사</button>
+                  <button type="button" disabled={bcCopySel.size === 0 || bcBusy} onClick={openNewBcWithCopy} style={{ marginLeft: "auto", fontSize: "12px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "8px", padding: "6px 12px", cursor: bcCopySel.size === 0 || bcBusy ? "not-allowed" : "pointer", opacity: bcCopySel.size === 0 || bcBusy ? 0.5 : 1 }}>선택 {bcCopySel.size}개 → 새 방송으로 복사</button>
                 </div>
               ) : null}
               {/* [2026-08-29 사장님 지시] 고정 중일 때 글씨로만 알려주니, 해제하려면 검색어를 다시 쳐서
@@ -1788,7 +1788,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               {(() => {
                 if (bcWidgetPin.mode !== "pin") {
                   return (
-                    <div style={{ margin: "0 12px 8px", padding: "7px 10px", borderRadius: "8px", background: "var(--color-surface-2)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 900 }}>
+                    <div style={{ margin: "0 12px 8px", padding: "8px 8px", borderRadius: "8px", background: "var(--color-surface-2)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 900 }}>
                       ↻ 자동 순환 중
                     </div>
                   );
@@ -1806,29 +1806,29 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   ? [pinnedDetail.colors.length ? `색상 ${pinnedDetail.colors.join(",")}` : "", pinnedDetail.sizes.length ? `사이즈 ${pinnedDetail.sizes.join(",")}` : ""].filter(Boolean).join(" · ")
                   : "";
                 return (
-                  <div style={{ margin: "0 12px 8px", border: "2px solid var(--color-rose-deep)", borderRadius: "10px", background: "var(--color-rose-soft)", overflow: "hidden" }}>
-                    <div style={{ padding: "5px 10px", fontSize: "10.5px", fontWeight: 900, color: "var(--color-rose-deep)", borderBottom: "1px solid var(--color-rose-line)" }}>
+                  <div style={{ margin: "0 12px 8px", border: "2px solid var(--color-rose-deep)", borderRadius: "8px", background: "var(--color-rose-soft)", overflow: "hidden" }}>
+                    <div style={{ padding: "4px 8px", fontSize: "11px", fontWeight: 900, color: "var(--color-rose-deep)", borderBottom: "1px solid var(--color-rose-line)" }}>
                       📌 위젯 고정 중 — 손님 화면에 이 상품만 보입니다
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "9px", padding: "8px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px" }}>
                       <span
                         onClick={() => { if (pinnedImg) setLightbox(pinnedImg); }}
                         style={{ width: "46px", height: "46px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface)", display: "flex", alignItems: "center", justifyContent: "center", cursor: pinnedImg ? "zoom-in" : "default" }}
                       >
-                        {pinnedImg ? <img src={pinnedImg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "17px" }}>🖼</span>}
+                        {pinnedImg ? <img src={pinnedImg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "16px" }}>🖼</span>}
                       </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: "13px", fontWeight: 900, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pinnedTitle}</div>
-                        {pinnedPrice ? <div style={{ fontSize: "11.5px", fontWeight: 900, color: "var(--color-rose-deep)", marginTop: "2px" }}>{pinnedPrice}</div> : null}
-                        {pinnedOption ? <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-ink-soft)", marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pinnedOption}</div> : null}
-                        {!pinnedRow ? <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-ink-soft)", marginTop: "1px" }}>이 방송 진열 목록에 없는 상품입니다</div> : null}
+                        {pinnedPrice ? <div style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-rose-deep)", marginTop: "2px" }}>{pinnedPrice}</div> : null}
+                        {pinnedOption ? <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pinnedOption}</div> : null}
+                        {!pinnedRow ? <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", marginTop: "1px" }}>이 방송 진열 목록에 없는 상품입니다</div> : null}
                       </div>
                       {pinnedRow ? (
                         <button
                           type="button"
                           onClick={() => void setChatCurrentAndCopy(pinnedRow, pinnedDetail)}
                           title="이 상품 안내글을 복사합니다"
-                          style={{ flexShrink: 0, fontSize: "11px", fontWeight: 900, color: "var(--color-ink-soft)", background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }}
+                          style={{ flexShrink: 0, fontSize: "11px", fontWeight: 900, color: "var(--color-ink-soft)", background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}
                         >📢 채팅</button>
                       ) : null}
                       <button
@@ -1836,7 +1836,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         disabled={bcPinBusy}
                         onClick={() => void clearBroadcastPin()}
                         title="고정을 풀고 다시 자동 순환합니다"
-                        style={{ flexShrink: 0, fontSize: "11px", fontWeight: 900, color: "#fff", background: "var(--color-rose-deep)", border: "1px solid var(--color-rose-deep)", borderRadius: "6px", padding: "6px 10px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcPinBusy ? 0.6 : 1 }}
+                        style={{ flexShrink: 0, fontSize: "11px", fontWeight: 900, color: "#fff", background: "var(--color-rose-deep)", border: "1px solid var(--color-rose-deep)", borderRadius: "8px", padding: "6px 8px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcPinBusy ? 0.6 : 1 }}
                       >{bcPinBusy ? "해제중…" : "📌 해제"}</button>
                     </div>
                   </div>
@@ -1848,14 +1848,14 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 onDrop={stopBcAutoScroll}
                 onDragEnd={stopBcAutoScroll}
                 onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) stopBcAutoScroll(); }}
-                style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "10px 12px" }}
+                style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "8px 12px" }}
               >
                 {!bcSelId ? (
-                  <div style={{ textAlign: "center", padding: "30px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>방송을 선택하세요.</div>
+                  <div style={{ textAlign: "center", padding: "32px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>방송을 선택하세요.</div>
                 ) : bcProducts.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "34px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>진열된 상품이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "3px" }}>아래 목록에서 상품을 골라 「진열」을 누르면 손님 화면에 올라갑니다.</div></div>
+                  <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>진열된 상품이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "4px" }}>아래 목록에서 상품을 골라 「진열」을 누르면 손님 화면에 올라갑니다.</div></div>
                 ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                     {bcProductsView.filter(nameMatch).map((p, i) => {
                       const img = mainImage(p);
                       const pid = productId(p);
@@ -1876,18 +1876,18 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           onDragOver={(e) => { e.preventDefault(); if (bcDragOver !== i) setBcDragOver(i); }}
                           onDrop={(e) => { e.preventDefault(); if (bcDragPid) reorderBcByPid(bcDragPid, pid); setBcDragPid(null); setBcDragOver(null); }}
                           onDragEnd={() => { setBcDragPid(null); setBcDragOver(null); }}
-                          style={{ border: bcCopyMode && bcCopySel.has(pid) ? "1px solid var(--color-rose-deep)" : "1px solid var(--color-line)", borderRadius: "10px", background: bcCopyMode && bcCopySel.has(pid) ? "var(--color-rose-soft)" : bcDragPid !== null && bcDragOver === i && bcDragPid !== pid ? "var(--color-warn-bg)" : "var(--color-surface)", opacity: bcDragPid === pid ? 0.4 : 1, overflow: "hidden", cursor: bcCopyMode ? "pointer" : !bcDragEnabled ? "default" : "grab" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px" }}>
+                          style={{ border: bcCopyMode && bcCopySel.has(pid) ? "1px solid var(--color-rose-deep)" : "1px solid var(--color-line)", borderRadius: "8px", background: bcCopyMode && bcCopySel.has(pid) ? "var(--color-rose-soft)" : bcDragPid !== null && bcDragOver === i && bcDragPid !== pid ? "var(--color-warn-bg)" : "var(--color-surface)", opacity: bcDragPid === pid ? 0.4 : 1, overflow: "hidden", cursor: bcCopyMode ? "pointer" : !bcDragEnabled ? "default" : "grab" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px" }}>
                             {bcCopyMode ? <input type="checkbox" checked={bcCopySel.has(pid)} onChange={() => toggleBcCopyPick(pid)} onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, width: "16px", height: "16px", accentColor: "var(--color-rose-deep)", cursor: "pointer" }} /> : <span style={{ flexShrink: 0, fontSize: "14px", color: bcDragEnabled ? "var(--color-ink-mute)" : "var(--color-line)", userSelect: "none" }}>⠿</span>}
                             <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", width: "20px", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
                             <span onClick={(e) => { e.stopPropagation(); if (img) setLightbox(img); }} style={{ width: "48px", height: "48px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: img ? "zoom-in" : "default" }}>{img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "18px" }}>🖼</span>}</span>
                             <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div><div style={{ fontSize: "11px", fontWeight: 800, color: isBrandFolder ? "var(--color-ink-soft)" : "var(--color-rose-deep)", marginTop: "2px" }}>{isBrandFolder ? `브랜드 그룹 · 세부상품 ${allDetails.length}개` : productPriceLabel(p)}</div></div>
-                            {isBrandFolder && !bcCopyMode ? <button type="button" onClick={(e) => { e.stopPropagation(); setBcExpanded((prev) => { const next = new Set(prev); if (next.has(pid)) next.delete(pid); else next.add(pid); return next; }); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }}>{expanded ? "접기" : "세부상품"}</button> : null}
-                            {!isBrandFolder && !bcCopyMode ? <><button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void broadcastOneClick(p); }} title="고정 + 채팅 현재상품 + 문구 복사를 한 번에 — 유튜브 채팅엔 붙여넣기만 하면 돼요" style={{ flexShrink: 0, fontSize: "11px", fontWeight: 900, borderRadius: "6px", padding: "6px 10px", cursor: bcPinBusy ? "wait" : "pointer", color: "#fff", background: "var(--color-ok-tx)", border: "1px solid var(--color-ok-tx)" }}>▶ 방송</button><button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void pinBroadcastProduct(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, borderRadius: "6px", padding: "6px 10px", cursor: bcPinBusy ? "wait" : "pointer", color: parentPinned ? "#fff" : "var(--color-ink-soft)", background: parentPinned ? "var(--color-rose-deep)" : "var(--color-surface-2)", border: `1px solid ${parentPinned ? "var(--color-rose-deep)" : "var(--color-line)"}` }}>{parentPinned ? "📌 고정중" : "📌 고정"}</button><button type="button" onClick={(e) => { e.stopPropagation(); void setChatCurrentAndCopy(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }}>📢 채팅</button></> : null}
-                            <button type="button" onClick={(e) => { e.stopPropagation(); editProduct(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }}>수정</button>
-                            <button type="button" disabled={bcBusy} onClick={(e) => { e.stopPropagation(); void removeBcProduct(pid); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", border: "none", borderRadius: "6px", padding: "6px 10px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcBusy ? 0.6 : 1 }}>빼기</button>
+                            {isBrandFolder && !bcCopyMode ? <button type="button" onClick={(e) => { e.stopPropagation(); setBcExpanded((prev) => { const next = new Set(prev); if (next.has(pid)) next.delete(pid); else next.add(pid); return next; }); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}>{expanded ? "접기" : "세부상품"}</button> : null}
+                            {!isBrandFolder && !bcCopyMode ? <><button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void broadcastOneClick(p); }} title="고정 + 채팅 현재상품 + 문구 복사를 한 번에 — 유튜브 채팅엔 붙여넣기만 하면 돼요" style={{ flexShrink: 0, fontSize: "11px", fontWeight: 900, borderRadius: "8px", padding: "6px 8px", cursor: bcPinBusy ? "wait" : "pointer", color: "#fff", background: "var(--color-ok-tx)", border: "1px solid var(--color-ok-tx)" }}>▶ 방송</button><button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void pinBroadcastProduct(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, borderRadius: "8px", padding: "6px 8px", cursor: bcPinBusy ? "wait" : "pointer", color: parentPinned ? "#fff" : "var(--color-ink-soft)", background: parentPinned ? "var(--color-rose-deep)" : "var(--color-surface-2)", border: `1px solid ${parentPinned ? "var(--color-rose-deep)" : "var(--color-line)"}` }}>{parentPinned ? "📌 고정중" : "📌 고정"}</button><button type="button" onClick={(e) => { e.stopPropagation(); void setChatCurrentAndCopy(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}>📢 채팅</button></> : null}
+                            <button type="button" onClick={(e) => { e.stopPropagation(); editProduct(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}>수정</button>
+                            <button type="button" disabled={bcBusy} onClick={(e) => { e.stopPropagation(); void removeBcProduct(pid); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", border: "none", borderRadius: "8px", padding: "6px 8px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcBusy ? 0.6 : 1 }}>빼기</button>
                           </div>
-                          {isBrandFolder && expanded ? <div style={{ borderTop: "1px solid var(--color-line)", padding: "8px", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", gap: "6px" }}>{detailRows.filter((detail) => bcCopyMode || !isBroadcastPinned(pid, detail.detailName)).map((detail) => { const pinned=isBroadcastPinned(pid,detail.detailName); const optionText=[detail.colors.length?`색상 ${detail.colors.join(",")}`:"",detail.sizes.length?`사이즈 ${detail.sizes.join(",")}`:""].filter(Boolean).join(" · ")||"옵션 없음"; return <div key={broadcastPinKey(pid,detail.detailName)} style={{ display:"grid",gridTemplateColumns:"44px minmax(0,1fr) auto auto auto",gap:"8px",alignItems:"center",border:pinned?"2px solid var(--color-rose-deep)":"1px solid var(--color-line)",borderRadius:"8px",padding:"7px",background:pinned?"var(--color-rose-soft)":"var(--color-surface)" }}><button type="button" onClick={()=>detail.image&&setLightbox(detail.image)} style={{width:42,height:42,border:0,borderRadius:7,overflow:"hidden",padding:0,background:"var(--color-surface-2)"}}>{detail.image?<img src={detail.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🖼"}</button><div style={{minWidth:0}}><div style={{fontSize:"12px",fontWeight:900,color:"var(--color-ink)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{detail.detailName}</div><div style={{fontSize:"11px",fontWeight:800,color:"var(--color-rose-deep)",marginTop:2}}>{detail.price.toLocaleString("ko-KR")}원</div><div style={{fontSize:"10px",fontWeight:700,color:"var(--color-ink-soft)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{optionText}{detail.stockManaged&&detail.stock!==null?` · 재고 ${detail.stock}`:""}</div></div><button type="button" disabled={bcPinBusy} onClick={()=>void broadcastOneClick(p,detail)} title="고정 + 채팅 현재상품 + 문구 복사를 한 번에 — 유튜브 채팅엔 붙여넣기만 하면 돼요" style={{fontSize:"11px",fontWeight:900,borderRadius:6,padding:"6px 9px",color:"#fff",background:"var(--color-ok-tx)",border:"1px solid var(--color-ok-tx)"}}>▶ 방송</button><button type="button" disabled={bcPinBusy} onClick={()=>void pinBroadcastProduct(p,detail)} style={{fontSize:"11px",fontWeight:900,borderRadius:6,padding:"6px 9px",color:pinned?"#fff":"var(--color-ink-soft)",background:pinned?"var(--color-rose-deep)":"var(--color-surface-2)",border:`1px solid ${pinned?"var(--color-rose-deep)":"var(--color-line)"}`}}>{pinned?"📌 고정중":"📌 고정"}</button><button type="button" onClick={()=>void setChatCurrentAndCopy(p,detail)} style={{fontSize:"11px",fontWeight:900,color:"var(--color-ink-soft)",background:"var(--color-surface-2)",border:"1px solid var(--color-line)",borderRadius:6,padding:"6px 9px"}}>📢 채팅</button></div>})}{detailRows.length>0&&detailRows.filter((detail)=>bcCopyMode||!isBroadcastPinned(pid,detail.detailName)).length===0?<div style={{padding:"10px",textAlign:"center",fontSize:"11px",fontWeight:700,color:"var(--color-ink-mute)"}}>📌 고정 중인 상품이라 맨 위 카드에 있습니다.</div>:null}</div> : null}
+                          {isBrandFolder && expanded ? <div style={{ borderTop: "1px solid var(--color-line)", padding: "8px", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", gap: "6px" }}>{detailRows.filter((detail) => bcCopyMode || !isBroadcastPinned(pid, detail.detailName)).map((detail) => { const pinned=isBroadcastPinned(pid,detail.detailName); const optionText=[detail.colors.length?`색상 ${detail.colors.join(",")}`:"",detail.sizes.length?`사이즈 ${detail.sizes.join(",")}`:""].filter(Boolean).join(" · ")||"옵션 없음"; return <div key={broadcastPinKey(pid,detail.detailName)} style={{ display:"grid",gridTemplateColumns:"44px minmax(0,1fr) auto auto auto",gap:"8px",alignItems:"center",border:pinned?"2px solid var(--color-rose-deep)":"1px solid var(--color-line)",borderRadius:"8px",padding:"8px",background:pinned?"var(--color-rose-soft)":"var(--color-surface)" }}><button type="button" onClick={()=>detail.image&&setLightbox(detail.image)} style={{width:42,height:42,border:0,borderRadius:7,overflow:"hidden",padding:0,background:"var(--color-surface-2)"}}>{detail.image?<img src={detail.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🖼"}</button><div style={{minWidth:0}}><div style={{fontSize:"12px",fontWeight:900,color:"var(--color-ink)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{detail.detailName}</div><div style={{fontSize:"11px",fontWeight:800,color:"var(--color-rose-deep)",marginTop:2}}>{detail.price.toLocaleString("ko-KR")}원</div><div style={{fontSize:"11px",fontWeight:700,color:"var(--color-ink-soft)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{optionText}{detail.stockManaged&&detail.stock!==null?` · 재고 ${detail.stock}`:""}</div></div><button type="button" disabled={bcPinBusy} onClick={()=>void broadcastOneClick(p,detail)} title="고정 + 채팅 현재상품 + 문구 복사를 한 번에 — 유튜브 채팅엔 붙여넣기만 하면 돼요" style={{fontSize:"11px",fontWeight:900,borderRadius:6,padding:"6px 8px",color:"#fff",background:"var(--color-ok-tx)",border:"1px solid var(--color-ok-tx)"}}>▶ 방송</button><button type="button" disabled={bcPinBusy} onClick={()=>void pinBroadcastProduct(p,detail)} style={{fontSize:"11px",fontWeight:900,borderRadius:6,padding:"6px 8px",color:pinned?"#fff":"var(--color-ink-soft)",background:pinned?"var(--color-rose-deep)":"var(--color-surface-2)",border:`1px solid ${pinned?"var(--color-rose-deep)":"var(--color-line)"}`}}>{pinned?"📌 고정중":"📌 고정"}</button><button type="button" onClick={()=>void setChatCurrentAndCopy(p,detail)} style={{fontSize:"11px",fontWeight:900,color:"var(--color-ink-soft)",background:"var(--color-surface-2)",border:"1px solid var(--color-line)",borderRadius:6,padding:"6px 8px"}}>📢 채팅</button></div>})}{detailRows.length>0&&detailRows.filter((detail)=>bcCopyMode||!isBroadcastPinned(pid,detail.detailName)).length===0?<div style={{padding:"8px",textAlign:"center",fontSize:"11px",fontWeight:700,color:"var(--color-ink-mute)"}}>📌 고정 중인 상품이라 맨 위 카드에 있습니다.</div>:null}</div> : null}
                         </div>
                       );
                     })}
@@ -1897,22 +1897,22 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             </div>
           </div>
         ) : tab === "shop" ? (
-          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "14px 18px 16px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "12px 16px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px", flexWrap: "wrap" }}>
               <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)" }}>🛍 쇼핑몰 진열 {shopRows.length}개</span>
               {shopRows.length > 0 ? (
                 <select
                   value={shopSort}
                   onChange={(e) => setShopSort(e.target.value as ProductSortKey)}
                   title="화면에 보이는 순서만 바꿉니다. 저장된 진열 순서는 그대로예요."
-                  style={{ marginLeft: "auto", height: "26px", borderRadius: "7px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 800, padding: "0 6px", cursor: "pointer" }}
+                  style={{ marginLeft: "auto", height: "26px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 800, padding: "0 6px", cursor: "pointer" }}
                 >
                   {PRODUCT_SORT_OPTIONS.map((o) => (<option key={o.key} value={o.key}>{o.label}</option>))}
                 </select>
               ) : null}
-              <button type="button" disabled={shopBusy} onClick={openShopPicker} style={{ marginLeft: shopRows.length > 0 ? undefined : "auto", fontSize: "11px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "7px", padding: "5px 11px", cursor: shopBusy ? "wait" : "pointer", opacity: shopBusy ? 0.5 : 1 }}>+ 쇼핑몰에 상품 추가</button>
+              <button type="button" disabled={shopBusy} onClick={openShopPicker} style={{ marginLeft: shopRows.length > 0 ? undefined : "auto", fontSize: "11px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "8px", padding: "4px 12px", cursor: shopBusy ? "wait" : "pointer", opacity: shopBusy ? 0.5 : 1 }}>+ 쇼핑몰에 상품 추가</button>
             </div>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 10px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid var(--color-line)", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 8px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid var(--color-line)", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
             <div
               ref={shopScrollRef}
               onDragOver={handleShopDragAutoScroll}
@@ -1922,9 +1922,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               style={{ flex: 1, minHeight: 0, overflowY: "auto" }}
             >
               {shopRows.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "34px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>진열된 상품이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "3px" }}>손님 화면에 보일 상품을 골라 「진열」을 눌러주세요.</div></div>
+                <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>진열된 상품이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "4px" }}>손님 화면에 보일 상품을 골라 「진열」을 눌러주세요.</div></div>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   {shopRowsView.filter(nameMatch).map((p, i) => {
                     const img = mainImage(p);
                     const pid = productId(p);
@@ -1936,7 +1936,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         onDragOver={(e) => { e.preventDefault(); if (shopDragOver !== i) setShopDragOver(i); }}
                         onDrop={(e) => { e.preventDefault(); if (shopDragPid) reorderShopByPid(shopDragPid, pid); setShopDragPid(null); setShopDragOver(null); }}
                         onDragEnd={() => { setShopDragPid(null); setShopDragOver(null); }}
-                        style={{ display: "flex", alignItems: "center", gap: "10px", border: "1px solid var(--color-line)", borderRadius: "10px", padding: "9px", background: shopDragPid !== null && shopDragOver === i && shopDragPid !== pid ? "var(--color-warn-bg)" : "var(--color-surface)", opacity: shopDragPid === pid ? 0.4 : 1, boxShadow: shopDragPid !== null && shopDragOver === i && shopDragPid !== pid ? "inset 0 2px 0 var(--color-rose-deep)" : undefined, cursor: !shopDragEnabled ? "default" : "grab" }}
+                        style={{ display: "flex", alignItems: "center", gap: "8px", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "8px", background: shopDragPid !== null && shopDragOver === i && shopDragPid !== pid ? "var(--color-warn-bg)" : "var(--color-surface)", opacity: shopDragPid === pid ? 0.4 : 1, boxShadow: shopDragPid !== null && shopDragOver === i && shopDragPid !== pid ? "inset 0 2px 0 var(--color-rose-deep)" : undefined, cursor: !shopDragEnabled ? "default" : "grab" }}
                       >
                         {/* 드래그 핸들 */}
                         <span style={{ flexShrink: 0, fontSize: "14px", color: "var(--color-ink-mute)", userSelect: "none" }} title="드래그로 순서 변경">⠿</span>
@@ -1951,10 +1951,10 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
                           <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)", marginTop: "2px" }}>{productPriceLabel(p)}</div>
-                          {productCategory(p) ? <span style={{ display: "inline-block", marginTop: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: "var(--color-surface-3)", color: "var(--color-ink-soft)" }}>{productCategory(p)}</span> : null}
+                          {productCategory(p) ? <span style={{ display: "inline-block", marginTop: "4px", fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "8px", background: "var(--color-surface-3)", color: "var(--color-ink-soft)" }}>{productCategory(p)}</span> : null}
                         </div>
-                        <button type="button" onClick={() => editProduct(p)} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }}>수정</button>
-                        <button type="button" disabled={shopBusy} onClick={() => void removeFromShop(pid)} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", border: "none", borderRadius: "6px", padding: "6px 10px", cursor: shopBusy ? "wait" : "pointer", opacity: shopBusy ? 0.6 : 1 }}>빼기</button>
+                        <button type="button" onClick={() => editProduct(p)} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}>수정</button>
+                        <button type="button" disabled={shopBusy} onClick={() => void removeFromShop(pid)} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", border: "none", borderRadius: "8px", padding: "6px 8px", cursor: shopBusy ? "wait" : "pointer", opacity: shopBusy ? 0.6 : 1 }}>빼기</button>
                       </div>
                     );
                   })}
@@ -1965,12 +1965,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         ) : (
           <>
             {/* 검색 */}
-            <div style={{ padding: "0 18px 8px" }}>
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid var(--color-line)", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none", color: "var(--color-ink)" }} />
+            <div style={{ padding: "0 16px 8px" }}>
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none", color: "var(--color-ink)" }} />
             </div>
 
             {/* 카테고리 칩 */}
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", padding: "0 18px 10px" }}>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", padding: "0 16px 8px" }}>
               {categories.map((c) => (
                 <button
                   key={c}
@@ -2001,11 +2001,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             </div>
 
             {/* 상품 목록 (무한스크롤) */}
-            <div style={{ flex: 1, minHeight: "400px", overflowY: "auto", padding: "0 18px 16px" }}>
+            <div style={{ flex: 1, minHeight: "400px", overflowY: "auto", padding: "0 16px 16px" }}>
               {loading ? (
                 <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>불러오는 중…</div>
               ) : visible.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "34px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>등록된 상품이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "3px" }}>오른쪽 위 「+ 상품 등록」 또는 「📄 엑셀 대량등록」으로 추가하세요.</div></div>
+                <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>등록된 상품이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "4px" }}>오른쪽 위 「+ 상품 등록」 또는 「📄 엑셀 대량등록」으로 추가하세요.</div></div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   {visible.map((p) => {
@@ -2023,12 +2023,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     const matchedDetails = normalizedQuery && !parentNameMatched ? adminDetailSearch(p, search) : [];
                     return (
                       <div key={id || productName(p)} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      <div style={{ display: "flex", gap: "12px", alignItems: "center", border: "1px solid var(--color-line)", borderRadius: "12px", padding: "10px" }}>
+                      <div style={{ display: "flex", gap: "12px", alignItems: "center", border: "1px solid var(--color-line)", borderRadius: "12px", padding: "8px" }}>
                         {/* 사진 88px 클릭 확대 */}
                         <button
                           type="button"
                           onClick={() => img && setLightbox(img)}
-                          style={{ width: "88px", height: "88px", flexShrink: 0, borderRadius: "10px", overflow: "hidden", background: "var(--color-surface-2)", border: "none", padding: 0, cursor: img ? "zoom-in" : "default", display: "flex", alignItems: "center", justifyContent: "center" }}
+                          style={{ width: "88px", height: "88px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface-2)", border: "none", padding: 0, cursor: img ? "zoom-in" : "default", display: "flex", alignItems: "center", justifyContent: "center" }}
                         >
                           {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "26px" }}>🖼</span>}
                         </button>
@@ -2036,19 +2036,19 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         {/* 정보 */}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
-                          <div style={{ marginTop: "3px", fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{productPriceLabel(p)}</div>
+                          <div style={{ marginTop: "4px", fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{productPriceLabel(p)}</div>
                           {createdAtLabel ? (
-                            <div style={{ marginTop: "3px", fontSize: "10.5px", fontWeight: 700, color: "var(--color-ink-mute)", fontVariantNumeric: "tabular-nums" }}>
+                            <div style={{ marginTop: "4px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", fontVariantNumeric: "tabular-nums" }}>
                               등록일시 {createdAtLabel}
                             </div>
                           ) : null}
-                          <div style={{ marginTop: "5px", display: "flex", gap: "4px", flexWrap: "wrap" }}>
-                            <span style={{ fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: "var(--color-info-bg)", color: "var(--color-info-tx)" }}>{shippingLabel(p)}</span>
-                            {productCategory(p) ? <span style={{ fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: "var(--color-surface-3)", color: "var(--color-ink-soft)" }}>{productCategory(p)}</span> : null}
+                          <div style={{ marginTop: "4px", display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                            <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "8px", background: "var(--color-info-bg)", color: "var(--color-info-tx)" }}>{shippingLabel(p)}</span>
+                            {productCategory(p) ? <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "8px", background: "var(--color-surface-3)", color: "var(--color-ink-soft)" }}>{productCategory(p)}</span> : null}
                             {(() => {
                               const s = lowStockOf(p);
                               if (s === null || s > 3) return null;
-                              return <span style={{ fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: "var(--color-danger-bg)", color: "var(--color-danger-tx)" }}>{s <= 0 ? "⛔ 품절" : `🔥 재고 ${s}`}</span>;
+                              return <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "8px", background: "var(--color-danger-bg)", color: "var(--color-danger-tx)" }}>{s <= 0 ? "⛔ 품절" : `🔥 재고 ${s}`}</span>;
                             })()}
                           </div>
                           {/* 재고 표시 + 인라인 수정 (총재고 상품만 · 옵션 상품은 수정 폼 유도) */}
@@ -2057,22 +2057,22 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             if (!m.managed || m.stock === null) return null;
                             if (m.hasVariants) {
                               return (
-                                <div style={{ marginTop: "5px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>
+                                <div style={{ marginTop: "4px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>
                                   재고 {m.stock.toLocaleString("ko-KR")}개
-                                  <button type="button" onClick={() => editProduct(p)} title="옵션별 재고는 수정 폼에서 변경" style={{ marginLeft: "5px", fontSize: "10px", fontWeight: 800, color: "var(--color-info-tx)", background: "var(--color-info-bg)", border: "none", borderRadius: "5px", padding: "2px 7px", cursor: "pointer" }}>옵션별 수정</button>
+                                  <button type="button" onClick={() => editProduct(p)} title="옵션별 재고는 수정 폼에서 변경" style={{ marginLeft: "4px", fontSize: "11px", fontWeight: 800, color: "var(--color-info-tx)", background: "var(--color-info-bg)", border: "none", borderRadius: "4px", padding: "2px 8px", cursor: "pointer" }}>옵션별 수정</button>
                                 </div>
                               );
                             }
                             if (inlineStockId !== id) {
                               return (
-                                <div style={{ marginTop: "5px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>
+                                <div style={{ marginTop: "4px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>
                                   재고 {m.stock.toLocaleString("ko-KR")}개
-                                  <button type="button" onClick={() => { setInlineStockId(id); setInlineStockText(String(m.stock)); }} style={{ marginLeft: "5px", fontSize: "10px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "5px", padding: "2px 7px", cursor: "pointer" }}>✎ 수정</button>
+                                  <button type="button" onClick={() => { setInlineStockId(id); setInlineStockText(String(m.stock)); }} style={{ marginLeft: "4px", fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "4px", padding: "2px 8px", cursor: "pointer" }}>✎ 수정</button>
                                 </div>
                               );
                             }
                             return (
-                              <div style={{ marginTop: "5px", display: "flex", alignItems: "center", gap: "5px" }}>
+                              <div style={{ marginTop: "4px", display: "flex", alignItems: "center", gap: "4px" }}>
                                 <input
                                   value={inlineStockText}
                                   onChange={(e) => setInlineStockText(e.target.value.replace(/[^0-9]/g, ""))}
@@ -2080,11 +2080,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                                   autoFocus
                                   onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }}
                                   onKeyDown={(e) => { if (e.key === "Enter") void saveInlineStock(p); if (e.key === "Escape") setInlineStockId(""); }}
-                                  style={{ width: "64px", height: "26px", borderRadius: "6px", border: "1px solid var(--color-rose-line)", padding: "0 8px", fontSize: "12px", fontWeight: 800, textAlign: "right", color: "var(--color-ink)", background: "var(--color-surface)" }}
+                                  style={{ width: "64px", height: "26px", borderRadius: "8px", border: "1px solid var(--color-rose-line)", padding: "0 8px", fontSize: "12px", fontWeight: 800, textAlign: "right", color: "var(--color-ink)", background: "var(--color-surface)" }}
                                 />
                                 <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
-                                <button type="button" disabled={inlineStockSaving} onClick={() => void saveInlineStock(p)} style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "5px", padding: "4px 9px", cursor: inlineStockSaving ? "wait" : "pointer", opacity: inlineStockSaving ? 0.6 : 1 }}>{inlineStockSaving ? "저장중…" : "저장"}</button>
-                                <button type="button" onClick={() => setInlineStockId("")} style={{ fontSize: "10px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "5px", padding: "4px 9px", cursor: "pointer" }}>취소</button>
+                                <button type="button" disabled={inlineStockSaving} onClick={() => void saveInlineStock(p)} style={{ fontSize: "11px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "4px", padding: "4px 8px", cursor: inlineStockSaving ? "wait" : "pointer", opacity: inlineStockSaving ? 0.6 : 1 }}>{inlineStockSaving ? "저장중…" : "저장"}</button>
+                                <button type="button" onClick={() => setInlineStockId("")} style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "4px", padding: "4px 8px", cursor: "pointer" }}>취소</button>
                               </div>
                             );
                           })()}
@@ -2093,14 +2093,14 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             type="button"
                             disabled={busy}
                             onClick={() => onWidgetClick(p)}
-                            style={{ marginTop: "8px", height: "28px", borderRadius: "7px", padding: "0 12px", fontSize: "11px", fontWeight: 800, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.5 : 1, ...widgetStyle }}
+                            style={{ marginTop: "8px", height: "28px", borderRadius: "8px", padding: "0 12px", fontSize: "11px", fontWeight: 800, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.5 : 1, ...widgetStyle }}
                           >
                             {busy ? "처리중…" : widgetText}
                           </button>
                         </div>
 
                         {/* 수정 / 삭제 — 오른쪽 끝 나란히 */}
-                        <div style={{ display: "flex", flexDirection: "row", gap: "5px", flexShrink: 0, alignSelf: "flex-start" }}>
+                        <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexShrink: 0, alignSelf: "flex-start" }}>
                           <button
                             type="button"
                             title="고객 주문 딥링크 복사 — 방송 채팅 고정메시지에 붙이면 고객이 링크 탭 → 이 상품이 바로 열림"
@@ -2111,30 +2111,30 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                                 () => showAdminToast("복사 실패 — 직접 복사해주세요\n" + link, "warning"),
                               );
                             }}
-                            style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ok-tx)", background: "var(--color-ok-bg)", border: "none", borderRadius: "6px", padding: "6px 11px", cursor: "pointer" }}
+                            style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ok-tx)", background: "var(--color-ok-bg)", border: "none", borderRadius: "8px", padding: "6px 12px", cursor: "pointer" }}
                           >🔗 링크</button>
-                          <button type="button" onClick={() => editProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-info-tx)", background: "var(--color-info-bg)", border: "none", borderRadius: "6px", padding: "6px 11px", cursor: "pointer" }}>수정</button>
-                          <button type="button" onClick={() => duplicateProduct(p)} title="이 상품 내용으로 새 상품 등록 폼 열기" style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "6px", padding: "6px 11px", cursor: "pointer" }}>복제</button>
-                          <button type="button" onClick={() => void deleteProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", border: "none", borderRadius: "6px", padding: "6px 11px", cursor: "pointer" }}>삭제</button>
+                          <button type="button" onClick={() => editProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-info-tx)", background: "var(--color-info-bg)", border: "none", borderRadius: "8px", padding: "6px 12px", cursor: "pointer" }}>수정</button>
+                          <button type="button" onClick={() => duplicateProduct(p)} title="이 상품 내용으로 새 상품 등록 폼 열기" style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "6px 12px", cursor: "pointer" }}>복제</button>
+                          <button type="button" onClick={() => void deleteProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", border: "none", borderRadius: "8px", padding: "6px 12px", cursor: "pointer" }}>삭제</button>
                         </div>
                       </div>
                       {matchedDetails.length > 0 ? (
-                        <div style={{ marginLeft: "100px", border: "1px solid var(--color-rose-line)", borderRadius: "10px", overflow: "hidden", background: "var(--color-surface)" }}>
-                          <div style={{ padding: "6px 9px", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", fontSize: "10.5px", fontWeight: 900 }}>🔎 세부상품 검색결과 {matchedDetails.length}개</div>
+                        <div style={{ marginLeft: "96px", border: "1px solid var(--color-rose-line)", borderRadius: "8px", overflow: "hidden", background: "var(--color-surface)" }}>
+                          <div style={{ padding: "6px 8px", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", fontSize: "11px", fontWeight: 900 }}>🔎 세부상품 검색결과 {matchedDetails.length}개</div>
                           {matchedDetails.map((detail) => (
-                            <div key={detail.detailName} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "7px 9px", borderTop: "1px solid var(--color-line)" }}>
+                            <div key={detail.detailName} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 8px", borderTop: "1px solid var(--color-line)" }}>
                               <button type="button" onClick={() => detail.image && setLightbox(detail.image)} style={{ width: "54px", height: "54px", flexShrink: 0, border: "none", borderRadius: "8px", overflow: "hidden", padding: 0, background: "var(--color-surface-2)", cursor: detail.image ? "zoom-in" : "default" }}>
                                 {detail.image ? <img src={detail.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "18px" }}>🖼</span>}
                               </button>
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: "5px", flexWrap: "wrap" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}>
                                   <span style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-ink)" }}>{detail.detailName}</span>
-                                  {detail.hidden ? <span style={{ padding: "1px 5px", borderRadius: "5px", background: "var(--color-danger-bg)", color: "var(--color-danger-tx)", fontSize: "9px", fontWeight: 900 }}>숨김</span> : null}
+                                  {detail.hidden ? <span style={{ padding: "1px 4px", borderRadius: "4px", background: "var(--color-danger-bg)", color: "var(--color-danger-tx)", fontSize: "11px", fontWeight: 900 }}>숨김</span> : null}
                                 </div>
                                 <div style={{ marginTop: "2px", fontSize: "12px", fontWeight: 900, color: "var(--color-rose-deep)" }}>{money(detail.price)}</div>
-                                {(detail.colors.length > 0 || detail.sizes.length > 0) ? <div style={{ marginTop: "2px", fontSize: "10px", fontWeight: 700, color: "var(--color-ink-soft)" }}>{detail.colors.length > 0 ? `색상: ${detail.colors.join(", ")}` : ""}{detail.colors.length > 0 && detail.sizes.length > 0 ? " · " : ""}{detail.sizes.length > 0 ? `사이즈: ${detail.sizes.join(", ")}` : ""}</div> : null}
+                                {(detail.colors.length > 0 || detail.sizes.length > 0) ? <div style={{ marginTop: "2px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>{detail.colors.length > 0 ? `색상: ${detail.colors.join(", ")}` : ""}{detail.colors.length > 0 && detail.sizes.length > 0 ? " · " : ""}{detail.sizes.length > 0 ? `사이즈: ${detail.sizes.join(", ")}` : ""}</div> : null}
                               </div>
-                              <button type="button" onClick={() => editProduct(p)} style={{ flexShrink: 0, fontSize: "10px", fontWeight: 800, color: "var(--color-info-tx)", background: "var(--color-info-bg)", border: "none", borderRadius: "6px", padding: "5px 8px", cursor: "pointer" }}>세부관리</button>
+                              <button type="button" onClick={() => editProduct(p)} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-info-tx)", background: "var(--color-info-bg)", border: "none", borderRadius: "8px", padding: "4px 8px", cursor: "pointer" }}>세부관리</button>
                             </div>
                           ))}
                         </div>
@@ -2146,7 +2146,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   {visibleCount < filtered.length ? (
                     <div ref={sentinelRef} style={{ height: "1px" }} />
                   ) : (
-                    <div style={{ textAlign: "center", padding: "10px 0", fontSize: "11px", color: "var(--color-ink-mute)" }}>총 {filtered.length}개</div>
+                    <div style={{ textAlign: "center", padding: "8px 0", fontSize: "11px", color: "var(--color-ink-mute)" }}>총 {filtered.length}개</div>
                   )}
                 </div>
               )}
@@ -2161,19 +2161,19 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
           onClick={(e) => { if (e.target === e.currentTarget) setWidgetSettingsOpen(false); }}
           style={{ position: "fixed", inset: 0, zIndex: 55, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(2,6,23,0.5)", padding: "16px" }}
         >
-          <div style={{ width: "520px", maxWidth: "100%", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "14px", overflow: "hidden" }}>
+          <div style={{ width: "520px", maxWidth: "100%", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "12px", overflow: "hidden" }}>
             {/* 헤더 */}
-            <div style={{ display: "flex", alignItems: "center", padding: "14px 18px", borderBottom: "1px solid var(--color-line)" }}>
-              <span style={{ fontSize: "15px", fontWeight: 800, color: "var(--color-rose-deep)" }}>📺 위젯 설정</span>
+            <div style={{ display: "flex", alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--color-line)" }}>
+              <span style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>📺 위젯 설정</span>
               <button type="button" onClick={() => setWidgetSettingsOpen(false)} style={{ marginLeft: "auto", border: "none", background: "none", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>✕</button>
             </div>
 
-            <div style={{ padding: "0 18px 8px", fontSize: "11px", color: "var(--color-ink-mute)", fontWeight: 700 }}>
+            <div style={{ padding: "0 16px 8px", fontSize: "11px", color: "var(--color-ink-mute)", fontWeight: 700 }}>
               선택 상품을 방송 순환목록에 담습니다. 정확한 위젯 고정은 방송상품의 세부상품 행에서 합니다.
             </div>
 
             {/* 전체선택 (고정모드는 단일 선택이라 비활성) */}
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 18px", borderTop: "1px solid var(--color-surface-2)", borderBottom: "1px solid var(--color-surface-2)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 16px", borderTop: "1px solid var(--color-surface-2)", borderBottom: "1px solid var(--color-surface-2)" }}>
               <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: 800, color: "var(--color-ink-soft)", cursor: "pointer" }}>
                 <input type="checkbox" checked={wsAllChecked} onChange={wsToggleAll} />
                 전체선택
@@ -2182,19 +2182,19 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             </div>
 
             {/* 상품 목록(개별선택) */}
-            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "8px 18px" }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "8px 16px" }}>
               {products.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "34px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>조건에 맞는 상품이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "3px" }}>위 검색어·필터를 지우면 전체가 보입니다.</div></div>
+                <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>조건에 맞는 상품이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "4px" }}>위 검색어·필터를 지우면 전체가 보입니다.</div></div>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                   {products.map((p) => {
                     const id = productId(p);
                     const img = mainImage(p);
                     const checked = wsSelected.has(id);
                     return (
-                      <label key={id || productName(p)} style={{ display: "flex", gap: "9px", alignItems: "center", border: "1px solid " + (checked ? "var(--color-rose-line)" : "var(--color-line)"), background: checked ? "var(--color-rose-soft)" : "var(--color-surface)", borderRadius: "9px", padding: "7px 10px", cursor: "pointer" }}>
+                      <label key={id || productName(p)} style={{ display: "flex", gap: "8px", alignItems: "center", border: "1px solid " + (checked ? "var(--color-rose-line)" : "var(--color-line)"), background: checked ? "var(--color-rose-soft)" : "var(--color-surface)", borderRadius: "8px", padding: "8px 8px", cursor: "pointer" }}>
                         <input type="checkbox" checked={checked} onChange={() => wsToggle(id)} />
-                        <span style={{ width: "34px", height: "34px", flexShrink: 0, borderRadius: "7px", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <span style={{ width: "34px", height: "34px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                           {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "16px" }}>🖼</span>}
                         </span>
                         <span style={{ flex: 1, minWidth: 0 }}>
@@ -2209,12 +2209,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             </div>
 
             {/* 푸터 */}
-            <div style={{ display: "flex", gap: "6px", padding: "12px 18px", borderTop: "1px solid var(--color-line)" }}>
-              <button type="button" onClick={() => setWidgetSettingsOpen(false)} style={{ height: "38px", padding: "0 16px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)" }}>취소</button>
-              <button type="button" onClick={copyWidgetUrl} style={{ height: "38px", padding: "0 14px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (copied ? "var(--color-ok-tx)" : "var(--color-line)"), background: copied ? "var(--color-ok-bg)" : "var(--color-surface)", color: copied ? "var(--color-ok-tx)" : "var(--color-ink-soft)", whiteSpace: "nowrap" }}>
+            <div style={{ display: "flex", gap: "6px", padding: "12px 16px", borderTop: "1px solid var(--color-line)" }}>
+              <button type="button" onClick={() => setWidgetSettingsOpen(false)} style={{ height: "38px", padding: "0 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)" }}>취소</button>
+              <button type="button" onClick={copyWidgetUrl} style={{ height: "38px", padding: "0 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (copied ? "var(--color-ok-tx)" : "var(--color-line)"), background: copied ? "var(--color-ok-bg)" : "var(--color-surface)", color: copied ? "var(--color-ok-tx)" : "var(--color-ink-soft)", whiteSpace: "nowrap" }}>
                 {copied ? "복사됐어요!" : "🔗 위젯 주소 복사"}
               </button>
-              <button type="button" disabled={wsSaving || wsSelected.size === 0} onClick={wsConfirm} style={{ flex: 1, height: "38px", borderRadius: "9px", fontSize: "12px", fontWeight: 800, cursor: wsSaving || wsSelected.size === 0 ? "default" : "pointer", border: "none", background: wsSaving || wsSelected.size === 0 ? "var(--color-rose-line)" : "var(--color-rose-deep)", color: "#fff" }}>
+              <button type="button" disabled={wsSaving || wsSelected.size === 0} onClick={wsConfirm} style={{ flex: 1, height: "38px", borderRadius: "8px", fontSize: "12px", fontWeight: 800, cursor: wsSaving || wsSelected.size === 0 ? "default" : "pointer", border: "none", background: wsSaving || wsSelected.size === 0 ? "var(--color-rose-line)" : "var(--color-rose-deep)", color: "#fff" }}>
                 {wsSaving ? "처리중…" : `선택 ${wsSelected.size}개 순환 담기`}
               </button>
             </div>
@@ -2248,16 +2248,16 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
           onClick={(e) => { if (e.target === e.currentTarget) setBcPickerOpen(false); }}
           style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(2,6,23,0.5)", padding: "16px" }}
         >
-          <div style={{ width: "520px", maxWidth: "100%", height: "600px", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "14px", overflow: "hidden" }}>
+          <div style={{ width: "520px", maxWidth: "100%", height: "600px", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "12px", overflow: "hidden" }}>
             {/* 헤더 */}
-            <div style={{ display: "flex", alignItems: "center", padding: "14px 18px", borderBottom: "1px solid var(--color-line)" }}>
-              <span style={{ fontSize: "15px", fontWeight: 800, color: "var(--color-rose-deep)" }}>방송에 상품 담기</span>
+            <div style={{ display: "flex", alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--color-line)" }}>
+              <span style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>방송에 상품 담기</span>
               <button type="button" onClick={() => setBcPickerOpen(false)} style={{ marginLeft: "auto", border: "none", background: "none", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>✕</button>
             </div>
             {/* 불러올 범위: 빠른 칩(전체/오늘·어제 등록) + 등록일·지난 방송 상세 선택 + 검색
                 [2026-08-21] 대량등록한 상품을 날짜로 모아 방송에 한 번에 담는 흐름.
                 필터는 화면 표시만 거른다 — 담기 저장 경로(broadcast_products insert)는 기존 그대로. */}
-            <div style={{ padding: "12px 18px 8px", display: "flex", flexDirection: "column", gap: "8px" }}>
+            <div style={{ padding: "12px 16px 8px", display: "flex", flexDirection: "column", gap: "8px" }}>
               <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                 {([
                   ["all", "📦 전체", -1],
@@ -2280,7 +2280,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 <select
                   value={bcPickerDate && bcPickerDate !== todayStr && bcPickerDate !== yesterdayStr ? bcPickerDate : ""}
                   onChange={(e) => { const v = e.target.value; if (!v) return; setBcPickerFromBcId(""); setBcPickerFromIds(null); setBcPickerDate(v); }}
-                  style={{ height: "34px", borderRadius: "999px", border: "1.5px solid " + (bcPickerDate && bcPickerDate !== todayStr && bcPickerDate !== yesterdayStr ? "var(--color-rose-deep)" : "var(--color-rose-line)"), padding: "0 10px", fontSize: "12px", fontWeight: 800, outline: "none", color: "var(--color-rose-deep)", background: "var(--color-surface)", maxWidth: "170px" }}
+                  style={{ height: "34px", borderRadius: "999px", border: "1.5px solid " + (bcPickerDate && bcPickerDate !== todayStr && bcPickerDate !== yesterdayStr ? "var(--color-rose-deep)" : "var(--color-rose-line)"), padding: "0 8px", fontSize: "12px", fontWeight: 800, outline: "none", color: "var(--color-rose-deep)", background: "var(--color-surface)", maxWidth: "170px" }}
                 >
                   <option value="">📅 다른 등록일…</option>
                   {bcPickerDateGroups.map(([d, n]) => <option key={d} value={d}>🗓 {d} 등록 · {n}개</option>)}
@@ -2289,7 +2289,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               <select
                 value={bcPickerFromBcId}
                 onChange={(e) => { setBcPickerDate(""); void changeBcPickerFrom(e.target.value); }}
-                style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid var(--color-line)", padding: "0 10px", fontSize: "13px", fontWeight: 700, outline: "none", color: "var(--color-ink)", background: "var(--color-surface)" }}
+                style={{ width: "100%", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 8px", fontSize: "13px", fontWeight: 700, outline: "none", color: "var(--color-ink)", background: "var(--color-surface)" }}
               >
                 <option value="">📺 지난 방송에서 불러오기…</option>
                 {bcList.filter((b) => b.id !== bcSelId).map((b) => {
@@ -2298,10 +2298,10 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   return <option key={b.id} value={b.id}>📺 {b.title}{dateLabel} 방송에서 불러오기</option>;
                 })}
               </select>
-              <input value={bcPickerSearch} onChange={(e) => setBcPickerSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid var(--color-line)", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none", color: "var(--color-ink)" }} />
+              <input value={bcPickerSearch} onChange={(e) => setBcPickerSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none", color: "var(--color-ink)" }} />
             </div>
             {/* 목록 */}
-            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 18px 8px" }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 16px 8px" }}>
               {(() => {
                 const q = bcPickerSearch.trim().toLowerCase();
                 const pickList = products.filter((p) => {
@@ -2320,12 +2320,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 return (
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                     {bcPickerDate ? (
-                      <div style={{ fontSize: "11.5px", fontWeight: 800, color: "var(--color-ink-soft)" }}>
+                      <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink-soft)" }}>
                         🗓 {bcPickerDate} 등록 상품 {pickList.length}개{alreadyCount > 0 ? ` · 이미 담김 ${alreadyCount}개` : ""}
                       </div>
                     ) : null}
                     {(bcPickerFromBcId || bcPickerDate) && selectableIds.length > 0 ? (
-                      <button type="button" onClick={() => setBcPickerSel((prev) => new Set([...prev, ...selectableIds]))} style={{ alignSelf: "flex-start", fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "7px", padding: "5px 10px", cursor: "pointer" }}>☑ 표시된 {selectableIds.length}개 모두 선택 (담긴 것 제외)</button>
+                      <button type="button" onClick={() => setBcPickerSel((prev) => new Set([...prev, ...selectableIds]))} style={{ alignSelf: "flex-start", fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "4px 8px", cursor: "pointer" }}>☑ 표시된 {selectableIds.length}개 모두 선택 (담긴 것 제외)</button>
                     ) : null}
                     {pickList.map((p, i) => {
                       const pid = productId(p);
@@ -2333,9 +2333,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       const checked = bcPickerSel.has(pid);
                       const img = mainImage(p);
                       return (
-                        <label key={pid || i} style={{ display: "flex", gap: "9px", alignItems: "center", border: "1px solid " + (checked ? "var(--color-rose-line)" : "var(--color-line)"), background: already ? "var(--color-surface-2)" : checked ? "var(--color-rose-soft)" : "var(--color-surface)", borderRadius: "9px", padding: "7px 10px", cursor: already ? "not-allowed" : "pointer", opacity: already ? 0.55 : 1 }}>
+                        <label key={pid || i} style={{ display: "flex", gap: "8px", alignItems: "center", border: "1px solid " + (checked ? "var(--color-rose-line)" : "var(--color-line)"), background: already ? "var(--color-surface-2)" : checked ? "var(--color-rose-soft)" : "var(--color-surface)", borderRadius: "8px", padding: "8px 8px", cursor: already ? "not-allowed" : "pointer", opacity: already ? 0.55 : 1 }}>
                           <input type="checkbox" disabled={already} checked={already || checked} onChange={() => !already && toggleBcPick(pid)} style={{ width: "16px", height: "16px", flexShrink: 0, accentColor: "var(--color-rose-deep)" }} />
-                          <span style={{ width: "40px", height: "40px", flexShrink: 0, borderRadius: "7px", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <span style={{ width: "40px", height: "40px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                             {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "16px" }}>🖼</span>}
                           </span>
                           <span style={{ flex: 1, minWidth: 0 }}>
@@ -2350,9 +2350,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               })()}
             </div>
             {/* 푸터 */}
-            <div style={{ display: "flex", gap: "8px", padding: "12px 18px", borderTop: "1px solid var(--color-line)" }}>
-              <button type="button" onClick={() => setBcPickerOpen(false)} style={{ flex: 1, height: "40px", borderRadius: "9px", fontSize: "13px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface)", border: "1px solid var(--color-line)", cursor: "pointer" }}>취소</button>
-              <button type="button" disabled={bcPickerSel.size === 0 || bcBusy} onClick={() => void confirmBcPick()} style={{ flex: 1, height: "40px", borderRadius: "9px", fontSize: "13px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", cursor: bcPickerSel.size === 0 || bcBusy ? "not-allowed" : "pointer", opacity: bcPickerSel.size === 0 || bcBusy ? 0.5 : 1 }}>{bcBusy ? "담는 중…" : `선택 ${bcPickerSel.size}개 담기`}</button>
+            <div style={{ display: "flex", gap: "8px", padding: "12px 16px", borderTop: "1px solid var(--color-line)" }}>
+              <button type="button" onClick={() => setBcPickerOpen(false)} style={{ flex: 1, height: "40px", borderRadius: "8px", fontSize: "13px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface)", border: "1px solid var(--color-line)", cursor: "pointer" }}>취소</button>
+              <button type="button" disabled={bcPickerSel.size === 0 || bcBusy} onClick={() => void confirmBcPick()} style={{ flex: 1, height: "40px", borderRadius: "8px", fontSize: "13px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", cursor: bcPickerSel.size === 0 || bcBusy ? "not-allowed" : "pointer", opacity: bcPickerSel.size === 0 || bcBusy ? 0.5 : 1 }}>{bcBusy ? "담는 중…" : `선택 ${bcPickerSel.size}개 담기`}</button>
             </div>
           </div>
         </div>
@@ -2364,18 +2364,18 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
           onClick={(e) => { if (e.target === e.currentTarget) setShopPickerOpen(false); }}
           style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(2,6,23,0.5)", padding: "16px" }}
         >
-          <div style={{ width: "520px", maxWidth: "100%", height: "600px", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "14px", overflow: "hidden" }}>
+          <div style={{ width: "520px", maxWidth: "100%", height: "600px", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "12px", overflow: "hidden" }}>
             {/* 헤더 */}
-            <div style={{ display: "flex", alignItems: "center", padding: "14px 18px", borderBottom: "1px solid var(--color-line)" }}>
-              <span style={{ fontSize: "15px", fontWeight: 800, color: "var(--color-rose-deep)" }}>쇼핑몰에 상품 진열</span>
+            <div style={{ display: "flex", alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--color-line)" }}>
+              <span style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>쇼핑몰에 상품 진열</span>
               <button type="button" onClick={() => setShopPickerOpen(false)} style={{ marginLeft: "auto", border: "none", background: "none", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>✕</button>
             </div>
             {/* 검색 */}
-            <div style={{ padding: "12px 18px 8px" }}>
-              <input value={shopPickerSearch} onChange={(e) => setShopPickerSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid var(--color-line)", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none", color: "var(--color-ink)" }} />
+            <div style={{ padding: "12px 16px 8px" }}>
+              <input value={shopPickerSearch} onChange={(e) => setShopPickerSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none", color: "var(--color-ink)" }} />
             </div>
             {/* 목록 */}
-            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 18px 8px" }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 16px 8px" }}>
               {(() => {
                 const q = shopPickerSearch.trim().toLowerCase();
                 const pickList = products.filter((p) => {
@@ -2385,7 +2385,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   return true;
                 });
                 if (pickList.length === 0) {
-                  return <div style={{ textAlign: "center", padding: "34px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>상품이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "3px" }}>「+ 상품 등록」으로 먼저 상품을 만들어 주세요.</div></div>;
+                  return <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>상품이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "4px" }}>「+ 상품 등록」으로 먼저 상품을 만들어 주세요.</div></div>;
                 }
                 return (
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -2395,9 +2395,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       const checked = shopPickerSel.has(pid);
                       const img = mainImage(p);
                       return (
-                        <label key={pid || i} style={{ display: "flex", gap: "9px", alignItems: "center", border: "1px solid " + (checked ? "var(--color-rose-line)" : "var(--color-line)"), background: already ? "var(--color-surface-2)" : checked ? "var(--color-rose-soft)" : "var(--color-surface)", borderRadius: "9px", padding: "7px 10px", cursor: already ? "not-allowed" : "pointer", opacity: already ? 0.55 : 1 }}>
+                        <label key={pid || i} style={{ display: "flex", gap: "8px", alignItems: "center", border: "1px solid " + (checked ? "var(--color-rose-line)" : "var(--color-line)"), background: already ? "var(--color-surface-2)" : checked ? "var(--color-rose-soft)" : "var(--color-surface)", borderRadius: "8px", padding: "8px 8px", cursor: already ? "not-allowed" : "pointer", opacity: already ? 0.55 : 1 }}>
                           <input type="checkbox" disabled={already} checked={already || checked} onChange={() => !already && toggleShopPick(pid)} style={{ width: "16px", height: "16px", flexShrink: 0, accentColor: "var(--color-rose-deep)" }} />
-                          <span style={{ width: "40px", height: "40px", flexShrink: 0, borderRadius: "7px", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <span style={{ width: "40px", height: "40px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                             {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "16px" }}>🖼</span>}
                           </span>
                           <span style={{ flex: 1, minWidth: 0 }}>
@@ -2412,9 +2412,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               })()}
             </div>
             {/* 푸터 */}
-            <div style={{ display: "flex", gap: "8px", padding: "12px 18px", borderTop: "1px solid var(--color-line)" }}>
-              <button type="button" onClick={() => setShopPickerOpen(false)} style={{ flex: 1, height: "40px", borderRadius: "9px", fontSize: "13px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface)", border: "1px solid var(--color-line)", cursor: "pointer" }}>취소</button>
-              <button type="button" disabled={shopPickerSel.size === 0 || shopBusy} onClick={() => void confirmShopPick()} style={{ flex: 1, height: "40px", borderRadius: "9px", fontSize: "13px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", cursor: shopPickerSel.size === 0 || shopBusy ? "not-allowed" : "pointer", opacity: shopPickerSel.size === 0 || shopBusy ? 0.5 : 1 }}>{shopBusy ? "진열 중…" : `선택 ${shopPickerSel.size}개 진열`}</button>
+            <div style={{ display: "flex", gap: "8px", padding: "12px 16px", borderTop: "1px solid var(--color-line)" }}>
+              <button type="button" onClick={() => setShopPickerOpen(false)} style={{ flex: 1, height: "40px", borderRadius: "8px", fontSize: "13px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface)", border: "1px solid var(--color-line)", cursor: "pointer" }}>취소</button>
+              <button type="button" disabled={shopPickerSel.size === 0 || shopBusy} onClick={() => void confirmShopPick()} style={{ flex: 1, height: "40px", borderRadius: "8px", fontSize: "13px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", cursor: shopPickerSel.size === 0 || shopBusy ? "not-allowed" : "pointer", opacity: shopPickerSel.size === 0 || shopBusy ? 0.5 : 1 }}>{shopBusy ? "진열 중…" : `선택 ${shopPickerSel.size}개 진열`}</button>
             </div>
           </div>
         </div>
@@ -2426,12 +2426,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
           onClick={(e) => { if (e.target === e.currentTarget) setNewBcOpen(false); }}
           style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(2,6,23,0.5)", padding: "16px" }}
         >
-          <div style={{ width: "380px", maxWidth: "100%", background: "var(--color-surface)", borderRadius: "14px", overflow: "hidden" }}>
-            <div style={{ display: "flex", alignItems: "center", padding: "14px 18px", borderBottom: "1px solid var(--color-line)" }}>
-              <span style={{ fontSize: "15px", fontWeight: 800, color: "var(--color-rose-deep)" }}>새 방송 만들기</span>
+          <div style={{ width: "380px", maxWidth: "100%", background: "var(--color-surface)", borderRadius: "12px", overflow: "hidden" }}>
+            <div style={{ display: "flex", alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--color-line)" }}>
+              <span style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>새 방송 만들기</span>
               <button type="button" onClick={() => setNewBcOpen(false)} style={{ marginLeft: "auto", border: "none", background: "none", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>✕</button>
             </div>
-            <div style={{ padding: "16px 18px" }}>
+            <div style={{ padding: "16px 16px" }}>
               <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", marginBottom: "6px" }}>방송 제목</label>
               <input
                 autoFocus
@@ -2442,15 +2442,15 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   if (e.key === "Escape") setNewBcOpen(false);
                 }}
                 placeholder="예: 0617 저녁 라이브"
-                style={{ width: "100%", height: "40px", borderRadius: "9px", border: "1px solid var(--color-line)", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none", color: "var(--color-ink)" }}
+                style={{ width: "100%", height: "40px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none", color: "var(--color-ink)" }}
               />
               {newBcCopyIds && newBcCopyIds.length > 0 ? (
-                <div style={{ marginTop: "8px", fontSize: "11px", fontWeight: 700, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "7px", padding: "7px 10px" }}>☑ 선택한 상품 {newBcCopyIds.length}개가 새 방송에 그대로 담깁니다.</div>
+                <div style={{ marginTop: "8px", fontSize: "11px", fontWeight: 700, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "8px 8px" }}>☑ 선택한 상품 {newBcCopyIds.length}개가 새 방송에 그대로 담깁니다.</div>
               ) : null}
             </div>
-            <div style={{ display: "flex", gap: "8px", padding: "0 18px 16px" }}>
-              <button type="button" onClick={() => setNewBcOpen(false)} style={{ flex: 1, height: "40px", borderRadius: "9px", fontSize: "13px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface)", border: "1px solid var(--color-line)", cursor: "pointer" }}>취소</button>
-              <button type="button" disabled={!newBcTitle.trim() || bcBusy} onClick={() => void submitNewBroadcast()} style={{ flex: 1, height: "40px", borderRadius: "9px", fontSize: "13px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", cursor: !newBcTitle.trim() || bcBusy ? "not-allowed" : "pointer", opacity: !newBcTitle.trim() || bcBusy ? 0.5 : 1 }}>{bcBusy ? "만드는 중…" : "만들기"}</button>
+            <div style={{ display: "flex", gap: "8px", padding: "0 16px 16px" }}>
+              <button type="button" onClick={() => setNewBcOpen(false)} style={{ flex: 1, height: "40px", borderRadius: "8px", fontSize: "13px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface)", border: "1px solid var(--color-line)", cursor: "pointer" }}>취소</button>
+              <button type="button" disabled={!newBcTitle.trim() || bcBusy} onClick={() => void submitNewBroadcast()} style={{ flex: 1, height: "40px", borderRadius: "8px", fontSize: "13px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", cursor: !newBcTitle.trim() || bcBusy ? "not-allowed" : "pointer", opacity: !newBcTitle.trim() || bcBusy ? 0.5 : 1 }}>{bcBusy ? "만드는 중…" : "만들기"}</button>
             </div>
           </div>
         </div>

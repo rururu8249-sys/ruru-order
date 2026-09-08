@@ -59,7 +59,7 @@ export default function BroadcastSearchSelect({ options, value, onChange, todayA
         className="flex h-11 w-full items-center justify-between rounded-xl border border-line bg-surface px-3 text-[12px] font-black text-ink outline-none transition hover:border-danger-tx/35 active:scale-[0.98] active:bg-surface-2 duration-75"
       >
         <span className="truncate">{currentLabel}</span>
-        <span style={{ marginLeft: 6, color: "var(--color-ink-mute)", fontSize: 10, flexShrink: 0 }}>{open ? "▲" : "▼"}</span>
+        <span style={{ marginLeft: 6, color: "var(--color-ink-mute)", fontSize: 11, flexShrink: 0 }}>{open ? "▲" : "▼"}</span>
       </button>
 
       {/* 드롭다운 */}
@@ -73,7 +73,7 @@ export default function BroadcastSearchSelect({ options, value, onChange, todayA
           }}
         >
           {/* 검색창 */}
-          <div style={{ padding: "10px 10px 6px" }}>
+          <div style={{ padding: "8px 8px 6px" }}>
             <input
               ref={inputRef}
               type="text"
@@ -82,7 +82,7 @@ export default function BroadcastSearchSelect({ options, value, onChange, todayA
               placeholder="🔍 방송명 검색"
               style={{
                 width: "100%", border: "1px solid #e5e5e5", borderRadius: 8,
-                padding: "7px 10px", fontSize: 12, outline: "none",
+                padding: "8px 8px", fontSize: 12, outline: "none",
                 background: "var(--color-surface)",
               }}
               onFocus={(e) => { e.target.style.borderColor = "var(--color-rose-deep)"; e.target.style.background = "#fff"; }}
@@ -96,7 +96,7 @@ export default function BroadcastSearchSelect({ options, value, onChange, todayA
             {!query && (
               <button type="button" onClick={() => select("all")}
                 style={{
-                  width: "100%", textAlign: "left", padding: "9px 14px",
+                  width: "100%", textAlign: "left", padding: "8px 12px",
                   fontSize: 12, fontWeight: value === "all" ? 800 : 600,
                   color: value === "all" ? "var(--color-rose-deep)" : "#333",
                   background: value === "all" ? "#fdf0f3" : "transparent",
@@ -111,14 +111,14 @@ export default function BroadcastSearchSelect({ options, value, onChange, todayA
 
             {/* 방송 목록 */}
             {filtered.length === 0 ? (
-              <div style={{ padding: "12px 14px", fontSize: 12, color: "var(--color-ink-mute)", textAlign: "center" }}>
+              <div style={{ padding: "12px 12px", fontSize: 12, color: "var(--color-ink-mute)", textAlign: "center" }}>
                 검색 결과 없음
               </div>
             ) : (
               filtered.map((o) => (
                 <button type="button" key={o.value} onClick={() => select(o.value)}
                   style={{
-                    width: "100%", textAlign: "left", padding: "9px 14px",
+                    width: "100%", textAlign: "left", padding: "8px 12px",
                     fontSize: 12, fontWeight: value === o.value ? 800 : 500,
                     color: value === o.value ? "var(--color-rose-deep)" : "#333",
                     background: value === o.value ? "#fdf0f3" : "transparent",
@@ -136,7 +136,7 @@ export default function BroadcastSearchSelect({ options, value, onChange, todayA
             {!query && !hideShopOption && (
               <button type="button" onClick={() => select("none")}
                 style={{
-                  width: "100%", textAlign: "left", padding: "9px 14px",
+                  width: "100%", textAlign: "left", padding: "8px 12px",
                   fontSize: 12, fontWeight: value === "none" ? 800 : 600,
                   color: value === "none" ? "var(--color-rose-deep)" : "#555",
                   background: value === "none" ? "#fdf0f3" : "#fafafa",

@@ -279,8 +279,8 @@ export default function AdminLiveMissionPanel() {
 
   const inputStyle: React.CSSProperties = {
     width: "100%",
-    padding: "9px 12px",
-    borderRadius: 10,
+    padding: "8px 12px",
+    borderRadius: 8,
     border: "1.5px solid var(--color-rose-line)",
     fontSize: 14,
     outline: "none",
@@ -298,20 +298,20 @@ export default function AdminLiveMissionPanel() {
       {/* 진행률 — 미션 켜진(진행 중) 동안만 표시. 종료되면 막대 숨기고 아래 "지급 내역"만 남김.
           새 이벤트를 켜면 카운트가 0부터 다시 시작(이벤트 시작 시각 기준). */}
       {prog && prog.active ? (
-        <div style={{ background: "var(--color-rose-soft)", borderRadius: 14, padding: "14px 16px", marginBottom: 16 }}>
+        <div style={{ background: "var(--color-rose-soft)", borderRadius: 12, padding: "12px 16px", marginBottom: 16 }}>
           <div style={{ fontSize: 13, color: "var(--color-rose-deep)", fontWeight: 700 }}>
             현재 진행{prog.broadcastTitle ? ` · ${prog.broadcastTitle}` : " · (방송 OFF)"}
           </div>
           <div style={{ fontSize: 20, fontWeight: 800, color: "var(--color-rose-deep)", marginTop: 3 }}>
             {won(current)}
-            {unit} <span style={{ color: "var(--color-ink-mute)", fontSize: 15 }}>/ 목표 {won(goal)}{unit} ({pct}%)</span>
+            {unit} <span style={{ color: "var(--color-ink-mute)", fontSize: 14 }}>/ 목표 {won(goal)}{unit} ({pct}%)</span>
           </div>
-          <div style={{ marginTop: 8, height: 14, background: "var(--color-surface)", borderRadius: 7, overflow: "hidden", border: "1px solid var(--color-rose-line)" }}>
-            <div style={{ width: `${pct}%`, height: "100%", background: pct >= 100 ? "var(--color-ok-tx)" : "var(--color-rose-deep)", borderRadius: 7, transition: "width .5s" }} />
+          <div style={{ marginTop: 8, height: 14, background: "var(--color-surface)", borderRadius: 8, overflow: "hidden", border: "1px solid var(--color-rose-line)" }}>
+            <div style={{ width: `${pct}%`, height: "100%", background: pct >= 100 ? "var(--color-ok-tx)" : "var(--color-rose-deep)", borderRadius: 8, transition: "width .5s" }} />
           </div>
         </div>
       ) : (
-        <div style={{ background: "var(--color-rose-soft)", borderRadius: 14, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "var(--color-rose-deep)", fontWeight: 700 }}>
+        <div style={{ background: "var(--color-rose-soft)", borderRadius: 12, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "var(--color-rose-deep)", fontWeight: 700 }}>
           미션 꺼짐 — 진행 막대는 미션을 켜면 0부터 표시돼요.
         </div>
       )}
@@ -320,7 +320,7 @@ export default function AdminLiveMissionPanel() {
       <div style={{ display: "grid", gap: 14 }}>
         <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
           <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} style={{ width: 20, height: 20 }} />
-          <span style={{ fontSize: 15, fontWeight: 700, color: active ? "var(--color-ok-tx)" : "var(--color-ink-mute)" }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: active ? "var(--color-ok-tx)" : "var(--color-ink-mute)" }}>
             {active ? "미션 켜짐 (위젯 표시)" : "미션 꺼짐 (위젯 숨김)"}
           </span>
         </label>
@@ -335,8 +335,8 @@ export default function AdminLiveMissionPanel() {
                 onClick={() => setGoalType(g)}
                 style={{
                   flex: 1,
-                  padding: "10px",
-                  borderRadius: 10,
+                  padding: "8px",
+                  borderRadius: 8,
                   border: goalType === g ? "2px solid var(--color-rose-deep)" : "1.5px solid var(--color-rose-line)",
                   background: goalType === g ? "var(--color-rose-deep)" : "var(--color-surface)",
                   color: goalType === g ? "#fff" : "var(--color-rose-deep)",
@@ -372,7 +372,7 @@ export default function AdminLiveMissionPanel() {
           type="button"
           onClick={save}
           disabled={saving}
-          style={{ padding: "12px", borderRadius: 12, border: dirty ? "2px solid var(--color-danger-tx)" : "none", background: "var(--color-rose-deep)", color: "#fff", fontWeight: 800, fontSize: 15, cursor: "pointer", opacity: saving ? 0.6 : 1 }}
+          style={{ padding: "12px", borderRadius: 12, border: dirty ? "2px solid var(--color-danger-tx)" : "none", background: "var(--color-rose-deep)", color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer", opacity: saving ? 0.6 : 1 }}
         >
           {saving ? "저장 중…" : dirty ? "변경사항 저장하기" : "저장"}
         </button>
@@ -389,7 +389,7 @@ export default function AdminLiveMissionPanel() {
             type="button"
             onClick={endEvent}
             disabled={ending}
-            style={{ width: "100%", padding: "11px", borderRadius: 12, border: "2px solid var(--color-danger-tx)", background: "var(--color-surface)", color: "var(--color-danger-tx)", fontWeight: 800, fontSize: 14, cursor: "pointer", marginBottom: 8, opacity: ending ? 0.6 : 1 }}
+            style={{ width: "100%", padding: "12px", borderRadius: 12, border: "2px solid var(--color-danger-tx)", background: "var(--color-surface)", color: "var(--color-danger-tx)", fontWeight: 800, fontSize: 14, cursor: "pointer", marginBottom: 8, opacity: ending ? 0.6 : 1 }}
           >
             {ending ? "종료 중…" : "🛑 이벤트 종료 (위젯 끄고 지급 열기)"}
           </button>
@@ -407,7 +407,7 @@ export default function AdminLiveMissionPanel() {
             background: payoutUnlocked ? "var(--color-surface)" : "var(--color-surface-2)",
             color: payoutUnlocked ? "var(--color-ok-tx)" : "var(--color-ink-mute)",
             fontWeight: 800,
-            fontSize: 15,
+            fontSize: 14,
             cursor: payoutUnlocked ? "pointer" : "not-allowed",
             opacity: paying ? 0.6 : 1,
           }}
@@ -439,7 +439,7 @@ export default function AdminLiveMissionPanel() {
             <span
               key={key}
               className="badge"
-              style={{ cursor: "pointer", padding: "4px 10px", border: "1px solid var(--bd)", background: histPeriod === key ? "var(--rose)" : "var(--color-surface)", color: histPeriod === key ? "#fff" : "var(--mut)" }}
+              style={{ cursor: "pointer", padding: "4px 8px", border: "1px solid var(--bd)", background: histPeriod === key ? "var(--rose)" : "var(--color-surface)", color: histPeriod === key ? "#fff" : "var(--mut)" }}
               onClick={() => setHistPeriod(key)}
             >
               {label}
@@ -490,7 +490,7 @@ export default function AdminLiveMissionPanel() {
           <button
             type="button"
             onClick={() => { void navigator.clipboard?.writeText(widgetUrl); setMsg("위젯주소 복사됨"); }}
-            style={{ padding: "9px 16px", borderRadius: 10, border: "none", background: "var(--color-rose-deep)", color: "#fff", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
+            style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "var(--color-rose-deep)", color: "#fff", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
           >
             복사
           </button>
@@ -533,17 +533,17 @@ export default function AdminLiveMissionPanel() {
                   )}
                 </div>
                 {payout.reward <= 0 ? (
-                  <div style={{ marginTop: 8, padding: "9px 11px", borderRadius: 9, background: "var(--color-surface-2)", border: "1px solid var(--color-rose-line)", fontSize: 12.5, color: "var(--color-ink-soft)", lineHeight: 1.6, flexShrink: 0 }}>
+                  <div style={{ marginTop: 8, padding: "8px 12px", borderRadius: 8, background: "var(--color-surface-2)", border: "1px solid var(--color-rose-line)", fontSize: 13, color: "var(--color-ink-soft)", lineHeight: 1.6, flexShrink: 0 }}>
                     <b style={{ color: "var(--color-rose-deep)" }}>포인트가 설정되지 않았어요.</b> 사은품·무료배송 등 <b>포인트가 아닌 선물</b>이면 이 명단을 보고 직접 챙겨주세요.
                     <br />포인트로 주시려면 창을 닫고 <b>구매자 1인당 포인트</b>를 입력·저장한 뒤 다시 종료/지급하세요.
                   </div>
                 ) : null}
-                <div style={{ marginTop: 10, flex: 1, minHeight: 0, overflowY: "auto", border: "1px solid var(--color-surface-3)", borderRadius: 10 }}>
+                <div style={{ marginTop: 10, flex: 1, minHeight: 0, overflowY: "auto", border: "1px solid var(--color-surface-3)", borderRadius: 8 }}>
                   {payout.buyers.length === 0 ? (
                     <div style={{ padding: "16px", textAlign: "center", color: "var(--color-ink-mute)", fontSize: 13 }}>지급 대상(결제완료 구매자)이 없어요. 입금이 확인된 주문이 생기면 여기에 명단이 나옵니다.</div>
                   ) : (
                     payout.buyers.map((b, i) => (
-                      <div key={`${b.phone}-${i}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderBottom: "1px solid var(--color-surface-2)", fontSize: 13 }}>
+                      <div key={`${b.phone}-${i}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderBottom: "1px solid var(--color-surface-2)", fontSize: 13 }}>
                         <span style={{ color: "var(--color-ink-mute)", width: 22, flexShrink: 0 }}>{i + 1}</span>
                         <span style={{ flex: 1, minWidth: 0, fontWeight: 700, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.nickname}</span>
                         <span style={{ color: "var(--color-ok-tx)", fontWeight: 700, flexShrink: 0 }}>{won(b.amount)}원</span>
@@ -552,7 +552,7 @@ export default function AdminLiveMissionPanel() {
                     ))
                   )}
                 </div>
-                <div style={{ marginTop: 10, fontSize: 15, fontWeight: 800, color: "var(--color-rose-deep)", flexShrink: 0 }}>
+                <div style={{ marginTop: 10, fontSize: 14, fontWeight: 800, color: "var(--color-rose-deep)", flexShrink: 0 }}>
                   총 {payout.count}명
                   {payout.reward > 0 ? (
                     <> · 총 지급 <span style={{ color: "var(--color-ok-tx)" }}>{won(payout.total)}P</span></>
@@ -561,7 +561,7 @@ export default function AdminLiveMissionPanel() {
 
                 {/* [2026-07-10 사장님 지침] 포인트가 아닌 선물(사은품 등)을 주문서에 0원 행으로 얹기.
                     → 송장·물건챙기기에 함께 나와 선물을 빠뜨리지 않음. 총금액/재고/입금매칭 불변. */}
-                <div style={{ marginTop: 12, padding: "11px 12px", borderRadius: 10, border: "1.5px solid var(--color-rose-line)", background: "var(--color-surface-2)", flexShrink: 0 }}>
+                <div style={{ marginTop: 12, padding: "12px 12px", borderRadius: 8, border: "1.5px solid var(--color-rose-line)", background: "var(--color-surface-2)", flexShrink: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 800, color: "var(--color-rose-deep)" }}>🎁 선물을 주문서에 넣기 (포인트 아님)</div>
                   <div style={{ marginTop: 4, fontSize: 12, color: "var(--color-ink-mute)", lineHeight: 1.5 }}>
                     위 {payout.count}명의 <b>가장 최근 주문서</b>에 0원으로 추가됩니다. 총금액·재고·입금매칭은 그대로예요.
@@ -571,13 +571,13 @@ export default function AdminLiveMissionPanel() {
                       value={giftName}
                       onChange={(e) => setGiftName(e.target.value)}
                       placeholder="선물 이름 (예: 수면양말)"
-                      style={{ flex: 1, minWidth: 0, padding: "9px 10px", borderRadius: 8, border: "1.5px solid var(--color-rose-line)", background: "var(--color-surface)", color: "var(--color-ink)", fontSize: 13 }}
+                      style={{ flex: 1, minWidth: 0, padding: "8px 8px", borderRadius: 8, border: "1.5px solid var(--color-rose-line)", background: "var(--color-surface)", color: "var(--color-ink)", fontSize: 13 }}
                     />
                     <button
                       type="button"
                       onClick={doAddGift}
                       disabled={giftRunning || !giftName.trim()}
-                      style={{ flexShrink: 0, padding: "9px 14px", borderRadius: 8, border: "none", background: "var(--color-rose-deep)", color: "#fff", fontWeight: 800, fontSize: 13, cursor: giftRunning || !giftName.trim() ? "not-allowed" : "pointer", opacity: giftRunning || !giftName.trim() ? 0.5 : 1 }}
+                      style={{ flexShrink: 0, padding: "8px 12px", borderRadius: 8, border: "none", background: "var(--color-rose-deep)", color: "#fff", fontWeight: 800, fontSize: 13, cursor: giftRunning || !giftName.trim() ? "not-allowed" : "pointer", opacity: giftRunning || !giftName.trim() ? 0.5 : 1 }}
                     >
                       {giftRunning ? "넣는 중…" : "주문서에 넣기"}
                     </button>
@@ -586,12 +586,12 @@ export default function AdminLiveMissionPanel() {
                     <input type="checkbox" checked={giftAllowDup} onChange={(e) => setGiftAllowDup(e.target.checked)} />
                     중복 허용 — 같은 주문서에 같은 선물이 있어도 또 추가 (꺼짐 = 건너뜀)
                   </label>
-                  {giftMsg ? <div style={{ marginTop: 7, fontSize: 12.5, fontWeight: 700, color: "var(--color-ok-tx)" }}>{giftMsg}</div> : null}
+                  {giftMsg ? <div style={{ marginTop: 7, fontSize: 13, fontWeight: 700, color: "var(--color-ok-tx)" }}>{giftMsg}</div> : null}
                 </div>
               </>
             )}
             <div style={{ display: "flex", gap: 8, marginTop: 16, flexShrink: 0 }}>
-              <button type="button" onClick={() => setPayout(null)} style={{ flex: 1, padding: "11px", borderRadius: 10, border: "1.5px solid var(--color-rose-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontWeight: 700, cursor: "pointer" }}>{payout.reward > 0 ? "취소" : "닫기"}</button>
+              <button type="button" onClick={() => setPayout(null)} style={{ flex: 1, padding: "12px", borderRadius: 8, border: "1.5px solid var(--color-rose-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontWeight: 700, cursor: "pointer" }}>{payout.reward > 0 ? "취소" : "닫기"}</button>
               {/* 사은품 등 직접 챙길 때 쓰라고 명단 복사 (읽기 전용) */}
               {payout.count > 0 ? (
                 <button
@@ -603,13 +603,13 @@ export default function AdminLiveMissionPanel() {
                       () => setPayMsg("복사 실패 — 직접 선택해 복사하세요.")
                     );
                   }}
-                  style={{ flex: 1, padding: "11px", borderRadius: 10, border: "1.5px solid var(--color-rose-line)", background: "var(--color-surface)", color: "var(--color-rose-deep)", fontWeight: 800, cursor: "pointer" }}
+                  style={{ flex: 1, padding: "12px", borderRadius: 8, border: "1.5px solid var(--color-rose-line)", background: "var(--color-surface)", color: "var(--color-rose-deep)", fontWeight: 800, cursor: "pointer" }}
                 >
                   📋 명단 복사
                 </button>
               ) : null}
               {payout.count > 0 && payout.reward > 0 ? (
-                <button type="button" onClick={doPayout} disabled={paying || executing} style={{ flex: 1, padding: "11px", borderRadius: 10, border: "none", background: "var(--color-ok-tx)", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: paying || executing ? 0.6 : 1 }}>{paying || executing ? "지급 중…" : `${won(payout.total)}P 지급 실행`}</button>
+                <button type="button" onClick={doPayout} disabled={paying || executing} style={{ flex: 1, padding: "12px", borderRadius: 8, border: "none", background: "var(--color-ok-tx)", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: paying || executing ? 0.6 : 1 }}>{paying || executing ? "지급 중…" : `${won(payout.total)}P 지급 실행`}</button>
               ) : null}
             </div>
           </div>
@@ -625,16 +625,16 @@ export default function AdminLiveMissionPanel() {
               {result.failed.length ? <> · 실패 <b style={{ color: "var(--color-danger-tx)" }}>{result.failed.length}명</b></> : null}
               {" "}· 총 지급 <b style={{ color: "var(--color-ok-tx)" }}>{won(result.successList.length * result.reward)}P</b>
             </div>
-            <div style={{ marginTop: 10, flex: 1, minHeight: 0, overflowY: "auto", border: "1px solid var(--color-surface-3)", borderRadius: 10 }}>
+            <div style={{ marginTop: 10, flex: 1, minHeight: 0, overflowY: "auto", border: "1px solid var(--color-surface-3)", borderRadius: 8 }}>
               {result.successList.map((b, i) => (
-                <div key={`s-${i}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderBottom: "1px solid var(--color-surface-2)", fontSize: 13 }}>
+                <div key={`s-${i}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderBottom: "1px solid var(--color-surface-2)", fontSize: 13 }}>
                   <span style={{ color: "var(--color-ok-tx)", flexShrink: 0, width: 16 }}>✓</span>
                   <span style={{ flex: 1, minWidth: 0, fontWeight: 700, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.nickname}</span>
                   <span style={{ color: "var(--color-ok-tx)", fontWeight: 800, flexShrink: 0 }}>+{won(result.reward)}P</span>
                 </div>
               ))}
               {result.failed.map((f, i) => (
-                <div key={`f-${i}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderBottom: "1px solid var(--color-surface-2)", fontSize: 13, background: "var(--color-danger-bg)" }}>
+                <div key={`f-${i}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderBottom: "1px solid var(--color-surface-2)", fontSize: 13, background: "var(--color-danger-bg)" }}>
                   <span style={{ color: "var(--color-danger-tx)", flexShrink: 0, width: 16 }}>✕</span>
                   <span style={{ flex: 1, minWidth: 0, fontWeight: 700, color: "var(--color-danger-tx)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.label}</span>
                   <span style={{ color: "var(--color-ink-mute)", flexShrink: 0, fontSize: 11, maxWidth: 170, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.reason}</span>
@@ -642,7 +642,7 @@ export default function AdminLiveMissionPanel() {
               ))}
             </div>
             {result.failed.length ? <div style={{ marginTop: 8, fontSize: 12, color: "var(--color-danger-tx)", flexShrink: 0 }}>실패자는 고객·이슈 메뉴에서 수동 지급해 주세요.</div> : null}
-            <button type="button" onClick={() => setResult(null)} style={{ marginTop: 14, padding: "11px", borderRadius: 10, border: "none", background: "var(--color-rose-deep)", color: "#fff", fontWeight: 800, cursor: "pointer", flexShrink: 0 }}>닫기</button>
+            <button type="button" onClick={() => setResult(null)} style={{ marginTop: 14, padding: "12px", borderRadius: 8, border: "none", background: "var(--color-rose-deep)", color: "#fff", fontWeight: 800, cursor: "pointer", flexShrink: 0 }}>닫기</button>
           </div>
         </div>
       ) : null}

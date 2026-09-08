@@ -84,13 +84,13 @@ export function useVisitStats(): VisitStatsState {
 function nameList(people: VisitPerson[] | undefined, capped: boolean | undefined, colSpan: number) {
   return (
     <tr>
-      <td colSpan={colSpan} style={{ padding: "0 6px 14px" }}>
+      <td colSpan={colSpan} style={{ padding: "0 6px 12px" }}>
         {!people || people.length === 0 ? (
-          <div style={{ padding: "12px", borderRadius: "10px", background: "var(--color-surface-2)", fontSize: "11.5px", fontWeight: 700, color: "var(--color-ink-mute)", textAlign: "center" }}>
+          <div style={{ padding: "12px", borderRadius: "8px", background: "var(--color-surface-2)", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-mute)", textAlign: "center" }}>
             이름이 남은 방문자가 없습니다.
           </div>
         ) : (
-          <div style={{ border: "1px solid var(--color-line)", borderRadius: "10px", overflow: "hidden", background: "var(--color-surface)" }}>
+          <div style={{ border: "1px solid var(--color-line)", borderRadius: "8px", overflow: "hidden", background: "var(--color-surface)" }}>
             <div style={{ maxHeight: "300px", overflowY: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
                 <colgroup>
@@ -112,8 +112,8 @@ function nameList(people: VisitPerson[] | undefined, capped: boolean | undefined
                         style={{
                           position: "sticky", top: 0, zIndex: 1,
                           background: "var(--color-surface-2)",
-                          textAlign: h.align, padding: "7px 8px",
-                          fontSize: "10.5px", fontWeight: 900, whiteSpace: "nowrap",
+                          textAlign: h.align, padding: "8px 8px",
+                          fontSize: "11px", fontWeight: 900, whiteSpace: "nowrap",
                           color: "var(--color-ink-mute)",
                           borderBottom: "1px solid var(--color-line)",
                         }}
@@ -135,7 +135,7 @@ function nameList(people: VisitPerson[] | undefined, capped: boolean | undefined
                       style={{ background: i % 2 === 1 ? "var(--color-surface-2)" : "transparent" }}
                       title={`${p.name} · ${p.visits}번 방문 · 마지막 ${seoulStamp(p.lastAt)}${ip ? ` · IP ${ip}` : ""}`}
                     >
-                      <td style={{ padding: "6px 8px", textAlign: "center", fontSize: "10.5px", fontWeight: 700, color: "var(--color-ink-mute)", fontVariantNumeric: "tabular-nums" }}>
+                      <td style={{ padding: "6px 8px", textAlign: "center", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", fontVariantNumeric: "tabular-nums" }}>
                         {i + 1}
                       </td>
                       <td style={{ padding: "6px 8px", fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -149,15 +149,15 @@ function nameList(people: VisitPerson[] | undefined, capped: boolean | undefined
                         />
                         {p.name}
                         {ip ? (
-                          <span style={{ display: "block", marginLeft: "12px", fontSize: "9.5px", fontWeight: 700, color: ipDup ? "var(--color-warn-tx)" : "var(--color-ink-mute)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          <span style={{ display: "block", marginLeft: "12px", fontSize: "11px", fontWeight: 700, color: ipDup ? "var(--color-warn-tx)" : "var(--color-ink-mute)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                             {ipDup ? "⚠ 같은 IP · " : ""}{ip}
                           </span>
                         ) : null}
                       </td>
-                      <td style={{ padding: "6px 8px", textAlign: "right", fontSize: "11.5px", fontWeight: 800, color: p.visits > 1 ? "var(--color-ink)" : "var(--color-ink-mute)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+                      <td style={{ padding: "6px 8px", textAlign: "right", fontSize: "12px", fontWeight: 800, color: p.visits > 1 ? "var(--color-ink)" : "var(--color-ink-mute)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
                         {p.visits}
                       </td>
-                      <td style={{ padding: "6px 8px", textAlign: "right", fontSize: "11.5px", fontWeight: 700, color: "var(--color-ink-soft)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+                      <td style={{ padding: "6px 8px", textAlign: "right", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-soft)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
                         {seoulStamp(p.lastAt)}
                       </td>
                     </tr>
@@ -167,7 +167,7 @@ function nameList(people: VisitPerson[] | undefined, capped: boolean | undefined
                 </tbody>
               </table>
             </div>
-            <div style={{ padding: "7px 9px", borderTop: "1px solid var(--color-line)", background: "var(--color-surface-2)", fontSize: "10px", fontWeight: 700, color: "var(--color-ink-mute)" }}>
+            <div style={{ padding: "8px 8px", borderTop: "1px solid var(--color-line)", background: "var(--color-surface-2)", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>
               총 {people.length.toLocaleString("ko-KR")}명 · 최근 접속 순 · 빨간 점 = 방송 중 접속
               {capped ? " · 최근 120명까지만" : ""}
             </div>
@@ -202,9 +202,9 @@ export default function VisitStatsView({ embedded = false, state, style }: Visit
   const { stats, loading, tab, setTab, openRows, toggleRow } = s;
 
   const body = loading ? (
-    <div style={{ padding: "44px 18px", textAlign: "center", fontSize: "12.5px", fontWeight: 700, color: "var(--color-ink-mute)" }}>불러오는 중…</div>
+    <div style={{ padding: "48px 16px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "var(--color-ink-mute)" }}>불러오는 중…</div>
   ) : stats?.available === false ? (
-    <div style={{ padding: "36px 22px", textAlign: "center", fontSize: "12.5px", fontWeight: 700, color: "var(--color-ink-soft)", lineHeight: 1.9 }}>
+    <div style={{ padding: "32px 24px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "var(--color-ink-soft)", lineHeight: 1.9 }}>
       아직 접속 기록을 저장할 준비가 안 되어 있습니다.
       <br />
       <span style={{ color: "var(--color-ink-mute)" }}>
@@ -212,10 +212,10 @@ export default function VisitStatsView({ embedded = false, state, style }: Visit
       </span>
     </div>
   ) : !stats?.ok ? (
-    <div style={{ padding: "40px 18px", textAlign: "center", fontSize: "12.5px", fontWeight: 700, color: "var(--color-ink-mute)" }}>기록을 불러오지 못했습니다.</div>
+    <div style={{ padding: "40px 16px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "var(--color-ink-mute)" }}>기록을 불러오지 못했습니다.</div>
   ) : (
     <>
-      <div style={{ display: "flex", gap: "6px", padding: "10px 16px", borderBottom: "1px solid var(--color-line)" }}>
+      <div style={{ display: "flex", gap: "6px", padding: "8px 16px", borderBottom: "1px solid var(--color-line)" }}>
         {([["date", "날짜별"], ["broadcast", "방송별"]] as const).map(([key, label]) => (
           <button
             key={key}
@@ -223,7 +223,7 @@ export default function VisitStatsView({ embedded = false, state, style }: Visit
             onClick={() => setTab(key)}
             style={{
               border: tab === key ? "none" : "1px solid var(--color-line)",
-              borderRadius: "999px", padding: "6px 14px", cursor: "pointer",
+              borderRadius: "999px", padding: "6px 12px", cursor: "pointer",
               fontSize: "12px", fontWeight: 900, whiteSpace: "nowrap",
               background: tab === key ? "var(--color-rose-deep)" : "var(--color-surface)",
               color: tab === key ? "#fff" : "var(--color-ink-soft)",
@@ -234,20 +234,20 @@ export default function VisitStatsView({ embedded = false, state, style }: Visit
 
       {/* [2026-08-30 사장님 지적] "방문자 99명인데 방송중 144명이 무슨 말이냐"
           → 방문자는 '사람 수', 방송중/쇼핑몰은 '방문 횟수'로 단위가 달랐다. 그 차이를 명시한다. */}
-      <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--color-line)", background: "var(--color-surface-2)", fontSize: "10.5px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.6 }}>
+      <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--color-line)", background: "var(--color-surface-2)", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.6 }}>
         <b>방문자 = 사람 수</b> · <b>방문 = 들어온 횟수</b> (같은 사람이 30분 넘게 끊겼다 다시 오면 1회 더)
       </div>
 
       <div style={{ minHeight: 0, flex: 1, overflowY: "auto", padding: "12px 16px 16px" }}>
         {tab === "date" ? (
           (stats.daily || []).length === 0 ? (
-            <div style={{ padding: "34px 10px", textAlign: "center", fontSize: "12.5px", fontWeight: 700, color: "var(--color-ink-mute)" }}>아직 쌓인 기록이 없습니다. 손님이 주문서에 들어오면 여기에 쌓입니다.</div>
+            <div style={{ padding: "32px 8px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "var(--color-ink-mute)" }}>아직 쌓인 기록이 없습니다. 손님이 주문서에 들어오면 여기에 쌓입니다.</div>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
                   {["날짜", "방문자", "방송중 방문", "쇼핑몰 방문"].map((h, i) => (
-                    <th key={h} style={{ textAlign: i === 0 ? "left" : "right", fontSize: "10.5px", fontWeight: 900, color: "var(--color-ink-mute)", padding: "0 6px 8px", whiteSpace: "nowrap" }}>{h}</th>
+                    <th key={h} style={{ textAlign: i === 0 ? "left" : "right", fontSize: "11px", fontWeight: 900, color: "var(--color-ink-mute)", padding: "0 6px 8px", whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -259,13 +259,13 @@ export default function VisitStatsView({ embedded = false, state, style }: Visit
                     style={{ borderTop: "1px solid var(--color-line)", cursor: "pointer" }}
                     title="누르면 그날 누가 왔었는지 펼쳐집니다"
                   >
-                    <td style={{ padding: "9px 6px", fontSize: "12.5px", fontWeight: 800, color: "var(--color-ink)", whiteSpace: "nowrap" }}>
-                      <span style={{ marginRight: "5px", fontSize: "10px", color: "var(--color-ink-mute)" }}>{openRows[`d:${d.date}`] ? "▾" : "▸"}</span>
+                    <td style={{ padding: "8px 6px", fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", whiteSpace: "nowrap" }}>
+                      <span style={{ marginRight: "4px", fontSize: "11px", color: "var(--color-ink-mute)" }}>{openRows[`d:${d.date}`] ? "▾" : "▸"}</span>
                       {d.date}
                     </td>
-                    <td style={{ padding: "9px 6px", textAlign: "right", fontSize: "13.5px", fontWeight: 900, color: "var(--color-rose-deep)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{d.visitors.toLocaleString("ko-KR")}<span style={{ fontSize: "10px", fontWeight: 800, opacity: 0.75 }}>명</span></td>
-                    <td style={{ padding: "9px 6px", textAlign: "right", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-soft)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{d.live.toLocaleString("ko-KR")}<span style={{ fontSize: "10px", fontWeight: 800, opacity: 0.7 }}>회</span></td>
-                    <td style={{ padding: "9px 6px", textAlign: "right", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-soft)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{d.shop.toLocaleString("ko-KR")}<span style={{ fontSize: "10px", fontWeight: 800, opacity: 0.7 }}>회</span></td>
+                    <td style={{ padding: "8px 6px", textAlign: "right", fontSize: "14px", fontWeight: 900, color: "var(--color-rose-deep)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{d.visitors.toLocaleString("ko-KR")}<span style={{ fontSize: "11px", fontWeight: 800, opacity: 0.75 }}>명</span></td>
+                    <td style={{ padding: "8px 6px", textAlign: "right", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-soft)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{d.live.toLocaleString("ko-KR")}<span style={{ fontSize: "11px", fontWeight: 800, opacity: 0.7 }}>회</span></td>
+                    <td style={{ padding: "8px 6px", textAlign: "right", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-soft)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{d.shop.toLocaleString("ko-KR")}<span style={{ fontSize: "11px", fontWeight: 800, opacity: 0.7 }}>회</span></td>
                   </tr>
                   {openRows[`d:${d.date}`] ? nameList(d.names, d.namesCapped, 4) : null}
                   </Fragment>
@@ -274,16 +274,16 @@ export default function VisitStatsView({ embedded = false, state, style }: Visit
             </table>
           )
         ) : (stats.broadcasts || []).length === 0 ? (
-          <div style={{ padding: "34px 10px", textAlign: "center", fontSize: "12.5px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.8 }}>
+          <div style={{ padding: "32px 8px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.8 }}>
             아직 방송별 기록이 없습니다.
-            <br /><span style={{ fontSize: "11.5px" }}>방송을 켜둔 동안 들어온 손님부터 쌓입니다.</span>
+            <br /><span style={{ fontSize: "12px" }}>방송을 켜둔 동안 들어온 손님부터 쌓입니다.</span>
           </div>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
                 {["방송", "방문자"].map((h, i) => (
-                  <th key={h} style={{ textAlign: i === 0 ? "left" : "right", fontSize: "10.5px", fontWeight: 900, color: "var(--color-ink-mute)", padding: "0 6px 8px", whiteSpace: "nowrap" }}>{h}</th>
+                  <th key={h} style={{ textAlign: i === 0 ? "left" : "right", fontSize: "11px", fontWeight: 900, color: "var(--color-ink-mute)", padding: "0 6px 8px", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -295,14 +295,14 @@ export default function VisitStatsView({ embedded = false, state, style }: Visit
                   style={{ borderTop: "1px solid var(--color-line)", cursor: "pointer" }}
                   title="누르면 그 방송에 누가 왔었는지 펼쳐집니다"
                 >
-                  <td style={{ padding: "9px 6px" }}>
-                    <div style={{ fontSize: "12.5px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "320px" }}>
-                      <span style={{ marginRight: "5px", fontSize: "10px", color: "var(--color-ink-mute)" }}>{openRows[`b:${b.broadcastId}`] ? "▾" : "▸"}</span>
+                  <td style={{ padding: "8px 6px" }}>
+                    <div style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "320px" }}>
+                      <span style={{ marginRight: "4px", fontSize: "11px", color: "var(--color-ink-mute)" }}>{openRows[`b:${b.broadcastId}`] ? "▾" : "▸"}</span>
                       {b.title}
                     </div>
-                    <div style={{ marginTop: "2px", fontSize: "10.5px", fontWeight: 700, color: "var(--color-ink-mute)" }}>{String(b.startedAt).slice(0, 16).replace("T", " ")}</div>
+                    <div style={{ marginTop: "2px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>{String(b.startedAt).slice(0, 16).replace("T", " ")}</div>
                   </td>
-                  <td style={{ padding: "9px 6px", textAlign: "right", fontSize: "13.5px", fontWeight: 900, color: "var(--color-rose-deep)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{b.visitors.toLocaleString("ko-KR")}명<div style={{ marginTop: "2px", fontSize: "10px", fontWeight: 700, color: "var(--color-ink-mute)" }}>방문 {b.visits.toLocaleString("ko-KR")}회</div></td>
+                  <td style={{ padding: "8px 6px", textAlign: "right", fontSize: "14px", fontWeight: 900, color: "var(--color-rose-deep)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{b.visitors.toLocaleString("ko-KR")}명<div style={{ marginTop: "2px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>방문 {b.visits.toLocaleString("ko-KR")}회</div></td>
                 </tr>
                 {openRows[`b:${b.broadcastId}`] ? nameList(b.names, b.namesCapped, 2) : null}
                 </Fragment>
@@ -320,7 +320,7 @@ export default function VisitStatsView({ embedded = false, state, style }: Visit
 
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: 0, ...style }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "14px 16px", borderBottom: "1px solid var(--color-line)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", borderBottom: "1px solid var(--color-line)" }}>
         <span style={{ fontSize: "14px", fontWeight: 900, color: "var(--color-ink)", whiteSpace: "nowrap" }}>📊 접속 기록</span>
         <span style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)", whiteSpace: "nowrap" }}>
           {visitStatsSummaryText(stats)}
@@ -331,7 +331,7 @@ export default function VisitStatsView({ embedded = false, state, style }: Visit
           disabled={loading}
           title="지금 다시 불러오기"
           aria-label="새로고침"
-          style={{ border: "1px solid var(--color-line)", borderRadius: "8px", background: "transparent", cursor: loading ? "default" : "pointer", padding: "3px 8px", fontSize: "11px", fontWeight: 900, lineHeight: 1.4, color: "var(--color-ink-mute)" }}
+          style={{ border: "1px solid var(--color-line)", borderRadius: "8px", background: "transparent", cursor: loading ? "default" : "pointer", padding: "4px 8px", fontSize: "11px", fontWeight: 900, lineHeight: 1.4, color: "var(--color-ink-mute)" }}
         >↻</button>
       </div>
       {body}

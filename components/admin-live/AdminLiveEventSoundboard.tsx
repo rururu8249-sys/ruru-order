@@ -67,14 +67,14 @@ export default function AdminLiveEventSoundboard({ kind }: { kind: "survival" | 
   const list = SOUNDS[kind];
 
   return (
-    <div style={{ border: "1px solid var(--bd)", borderRadius: "10px", padding: "10px 12px", marginBottom: "11px", background: "var(--color-surface)" }}>
+    <div style={{ border: "1px solid var(--bd)", borderRadius: "8px", padding: "8px 12px", marginBottom: "12px", background: "var(--color-surface)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px", flexWrap: "wrap" }}>
         <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--rose)" }}>🔊 효과음 재생 (실제 녹음)</span>
         <span className="note" style={{ fontSize: "11px" }}>이 컴퓨터 스피커로 재생 — 방송 송출은 OBS 데스크탑 오디오 캡처</span>
-        <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "5px" }}>
+        <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "4px" }}>
           <span className="note" style={{ fontSize: "11px" }}>볼륨 {volume}%</span>
           <input type="range" min={0} max={100} value={volume} onChange={(e) => setVolume(Number(e.target.value))} style={{ width: "90px" }} />
-          <button className="btn" style={{ height: "auto", padding: "4px 10px", fontSize: "12px" }} onClick={stopAll} disabled={!playingKey}>⏹ 정지</button>
+          <button className="btn" style={{ height: "auto", padding: "4px 8px", fontSize: "12px" }} onClick={stopAll} disabled={!playingKey}>⏹ 정지</button>
         </span>
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>

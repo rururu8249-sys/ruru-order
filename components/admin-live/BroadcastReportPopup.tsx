@@ -305,7 +305,7 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
           : { width: "min(780px, 96vw)", maxHeight: "92vh", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "16px", border: "1px solid var(--color-line)", boxShadow: "0 18px 50px rgba(0,0,0,0.22)", overflow: "hidden" }}
       >
         {/* 헤더 */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "14px 18px", borderBottom: "1px solid var(--color-line)", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", borderBottom: "1px solid var(--color-line)", flexShrink: 0 }}>
           <span style={{ fontSize: "16px", fontWeight: 900, color: "var(--color-ink)" }}>📊 방송 판매 리포트</span>
           <select
             value={selectedId}
@@ -314,7 +314,7 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
               setBuyerExpand("");
               setCatExpand("");
             }}
-            style={{ flex: 1, minWidth: 0, height: "36px", borderRadius: "9px", border: "1px solid var(--color-line)", padding: "0 10px", fontSize: "13px", fontWeight: 700, background: "var(--color-surface)", color: "var(--color-ink)", cursor: "pointer" }}
+            style={{ flex: 1, minWidth: 0, height: "36px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 8px", fontSize: "13px", fontWeight: 700, background: "var(--color-surface)", color: "var(--color-ink)", cursor: "pointer" }}
           >
             {broadcasts.map((b) => {
               const d = new Date(b.started_at);
@@ -327,34 +327,34 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
               );
             })}
           </select>
-          <button type="button" onClick={copyReport} style={{ flexShrink: 0, height: "34px", padding: "0 12px", borderRadius: "9px", border: "1px solid var(--color-rose-line)", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}>
+          <button type="button" onClick={copyReport} style={{ flexShrink: 0, height: "34px", padding: "0 12px", borderRadius: "8px", border: "1px solid var(--color-rose-line)", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}>
             📋 복사
           </button>
           {embedded ? null : (
-            <button type="button" onClick={onClose} aria-label="닫기" style={{ flexShrink: 0, width: "34px", height: "34px", borderRadius: "9px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}>
+            <button type="button" onClick={onClose} aria-label="닫기" style={{ flexShrink: 0, width: "34px", height: "34px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}>
               ✕
             </button>
           )}
         </div>
 
         {/* 본문 스크롤 */}
-        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "14px 18px 18px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", flexWrap: "wrap" }}>
-            <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ok-tx)", background: "var(--color-ok-bg)", borderRadius: "999px", padding: "3px 10px" }}>결제완료 기준 · 취소 제외</span>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "12px 16px 16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ok-tx)", background: "var(--color-ok-bg)", borderRadius: "999px", padding: "4px 8px" }}>결제완료 기준 · 취소 제외</span>
             {dateLabel ? <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>{dateLabel} 방송</span> : null}
             {report.unpaidCount > 0 ? <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>미결제 대기 {report.unpaidCount}건은 집계 제외</span> : null}
           </div>
 
           {loading ? (
-            <div style={{ textAlign: "center", padding: "60px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>불러오는 중…</div>
+            <div style={{ textAlign: "center", padding: "64px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>불러오는 중…</div>
           ) : (
             <>
               {/* KPI 카드 */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "8px", marginBottom: "14px" }}>
-                <div style={{ gridColumn: "1 / -1", borderRadius: "12px", padding: "14px 16px", background: "linear-gradient(135deg, var(--color-rose-soft), var(--color-surface-2))", border: "1px solid var(--color-rose-line)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "8px", marginBottom: "12px" }}>
+                <div style={{ gridColumn: "1 / -1", borderRadius: "12px", padding: "12px 16px", background: "linear-gradient(135deg, var(--color-rose-soft), var(--color-surface-2))", border: "1px solid var(--color-rose-line)" }}>
                   <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)" }}>총 매출 (결제완료)</div>
-                  <div style={{ fontSize: "26px", fontWeight: 900, color: "var(--color-rose-deep)", lineHeight: 1.2 }}>{won(report.sales)}</div>
-                  <div style={{ marginTop: "3px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>
+                  <div style={{ fontSize: "24px", fontWeight: 900, color: "var(--color-rose-deep)", lineHeight: 1.2 }}>{won(report.sales)}</div>
+                  <div style={{ marginTop: "4px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>
                     상품금액 {won(report.productSales)} · 무통장 {report.bankCount} · 카드 {report.cardCount}
                   </div>
                 </div>
@@ -366,9 +366,9 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
                     ["객단가", won(report.avg)],
                   ] as const
                 ).map(([label, value]) => (
-                  <div key={label} style={{ borderRadius: "12px", padding: "12px 10px", textAlign: "center", background: "var(--color-surface-2)", border: "1px solid var(--color-line)" }}>
-                    <div style={{ fontSize: "10px", fontWeight: 800, color: "var(--color-ink-mute)", marginBottom: "3px" }}>{label}</div>
-                    <div style={{ fontSize: "17px", fontWeight: 900, color: "var(--color-ink)" }}>{value}</div>
+                  <div key={label} style={{ borderRadius: "12px", padding: "12px 8px", textAlign: "center", background: "var(--color-surface-2)", border: "1px solid var(--color-line)" }}>
+                    <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)", marginBottom: "4px" }}>{label}</div>
+                    <div style={{ fontSize: "16px", fontWeight: 900, color: "var(--color-ink)" }}>{value}</div>
                   </div>
                 ))}
               </div>
@@ -376,8 +376,8 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
               {/* 📦 카테고리별 판매 — "향수 총 몇 개" 한눈에 */}
               {report.categories.length > 0 ? (
                 <>
-                  <div style={{ fontSize: "13px", fontWeight: 900, color: "var(--color-ink)", marginBottom: "7px" }}>
-                    📦 카테고리별 판매 <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-ink-mute)" }}>· 카드를 누르면 상품별 세부</span>
+                  <div style={{ fontSize: "13px", fontWeight: 900, color: "var(--color-ink)", marginBottom: "8px" }}>
+                    📦 카테고리별 판매 <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>· 카드를 누르면 상품별 세부</span>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(118px, 1fr))", gap: "6px", marginBottom: catExpand ? "6px" : "14px" }}>
                     {report.categories.map((c, i) => {
@@ -386,16 +386,16 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
                         <div
                           key={c.name}
                           onClick={() => setCatExpand(on ? "" : c.name)}
-                          style={{ borderRadius: "11px", padding: "9px 10px", cursor: "pointer", background: on || i === 0 ? "var(--color-rose-soft)" : "var(--color-surface-2)", border: "1px solid " + (on ? "var(--color-rose-deep)" : i === 0 ? "var(--color-rose-line)" : "var(--color-line)") }}
+                          style={{ borderRadius: "12px", padding: "8px 8px", cursor: "pointer", background: on || i === 0 ? "var(--color-rose-soft)" : "var(--color-surface-2)", border: "1px solid " + (on ? "var(--color-rose-deep)" : i === 0 ? "var(--color-rose-line)" : "var(--color-line)") }}
                         >
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px" }}>
                             <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
-                            <span style={{ flexShrink: 0, fontSize: "9px", color: "var(--color-ink-mute)" }}>{on ? "▴" : "▾"}</span>
+                            <span style={{ flexShrink: 0, fontSize: "11px", color: "var(--color-ink-mute)" }}>{on ? "▴" : "▾"}</span>
                           </div>
                           <div style={{ marginTop: "2px", fontSize: "16px", fontWeight: 900, color: on || i === 0 ? "var(--color-rose-deep)" : "var(--color-ink)" }}>
                             {c.qty.toLocaleString("ko-KR")}<span style={{ fontSize: "11px", fontWeight: 800 }}>개</span>
                           </div>
-                          <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-ink-soft)" }}>{won(c.sales)}</div>
+                          <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>{won(c.sales)}</div>
                         </div>
                       );
                     })}
@@ -405,16 +405,16 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
                         const cat = report.categories.find((c) => c.name === catExpand);
                         if (!cat) return null;
                         return (
-                          <div style={{ border: "1px solid var(--color-rose-line)", borderRadius: "11px", padding: "8px 12px", marginBottom: "14px", background: "var(--color-surface)" }}>
+                          <div style={{ border: "1px solid var(--color-rose-line)", borderRadius: "12px", padding: "8px 12px", marginBottom: "12px", background: "var(--color-surface)" }}>
                             <div style={{ fontSize: "11px", fontWeight: 900, color: "var(--color-rose-deep)", marginBottom: "4px" }}>
                               {cat.name} 상품별 · {cat.qty.toLocaleString("ko-KR")}개 · {won(cat.sales)}
                             </div>
                             {cat.products.map((p, j) => (
-                              <div key={p.name} style={{ display: "flex", alignItems: "baseline", gap: "8px", padding: "5px 0", borderBottom: j < cat.products.length - 1 ? "1px dashed var(--color-line)" : "none" }}>
-                                <span style={{ width: "20px", flexShrink: 0, textAlign: "center", fontSize: "10px", fontWeight: 900, color: j < 3 ? "var(--color-rose-deep)" : "var(--color-ink-mute)" }}>{j + 1}</span>
+                              <div key={p.name} style={{ display: "flex", alignItems: "baseline", gap: "8px", padding: "4px 0", borderBottom: j < cat.products.length - 1 ? "1px dashed var(--color-line)" : "none" }}>
+                                <span style={{ width: "20px", flexShrink: 0, textAlign: "center", fontSize: "11px", fontWeight: 900, color: j < 3 ? "var(--color-rose-deep)" : "var(--color-ink-mute)" }}>{j + 1}</span>
                                 <span style={{ flex: 1, minWidth: 0, fontSize: "12px", fontWeight: 700, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
                                 <span style={{ flexShrink: 0, fontSize: "12px", fontWeight: 900, color: "var(--color-rose-deep)" }}>{p.qty.toLocaleString("ko-KR")}개</span>
-                                <span style={{ flexShrink: 0, fontSize: "10px", fontWeight: 700, color: "var(--color-ink-soft)" }}>{won(p.sales)}</span>
+                                <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>{won(p.sales)}</span>
                               </div>
                             ))}
                           </div>
@@ -425,7 +425,7 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
               ) : null}
 
               {/* 🏆 베스트 품목 */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "7px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
                 <span style={{ fontSize: "13px", fontWeight: 900, color: "var(--color-ink)" }}>🏆 베스트 품목 TOP {best.length}</span>
                 <div style={{ display: "flex", gap: "4px" }}>
                   {(
@@ -434,34 +434,34 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
                       ["sales", "매출순"],
                     ] as const
                   ).map(([k, l]) => (
-                    <button key={k} type="button" onClick={() => setBestSort(k)} style={{ height: "26px", padding: "0 10px", borderRadius: "999px", border: "1px solid " + (bestSort === k ? "var(--color-rose-line)" : "var(--color-line)"), background: bestSort === k ? "var(--color-rose-soft)" : "var(--color-surface)", color: bestSort === k ? "var(--color-rose-deep)" : "var(--color-ink-soft)", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>
+                    <button key={k} type="button" onClick={() => setBestSort(k)} style={{ height: "26px", padding: "0 8px", borderRadius: "999px", border: "1px solid " + (bestSort === k ? "var(--color-rose-line)" : "var(--color-line)"), background: bestSort === k ? "var(--color-rose-soft)" : "var(--color-surface)", color: bestSort === k ? "var(--color-rose-deep)" : "var(--color-ink-soft)", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>
                       {l}
                     </button>
                   ))}
                 </div>
               </div>
-              <div style={{ border: "1px solid var(--color-line)", borderRadius: "12px", padding: "6px 12px", marginBottom: "14px", background: "var(--color-surface)" }}>
+              <div style={{ border: "1px solid var(--color-line)", borderRadius: "12px", padding: "6px 12px", marginBottom: "12px", background: "var(--color-surface)" }}>
                 {best.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "18px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>결제완료 주문이 없습니다. 입금이 확인되면 여기에 집계됩니다.</div>
+                  <div style={{ textAlign: "center", padding: "16px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>결제완료 주문이 없습니다. 입금이 확인되면 여기에 집계됩니다.</div>
                 ) : (
                   best.map((b, i) => {
                     const value = bestSort === "qty" ? b.qty : b.sales;
                     const ratio = Math.max(0.04, value / bestMax);
                     return (
-                      <div key={`${b.name}|${b.option}`} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "7px 0", borderBottom: i < best.length - 1 ? "1px solid var(--color-line)" : "none" }}>
+                      <div key={`${b.name}|${b.option}`} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 0", borderBottom: i < best.length - 1 ? "1px solid var(--color-line)" : "none" }}>
                         <span style={{ width: "26px", flexShrink: 0, textAlign: "center", fontSize: i < 3 ? "15px" : "12px", fontWeight: 900, color: "var(--color-ink-mute)" }}>{medal(i)}</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "baseline", gap: "6px", minWidth: 0 }}>
                             <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.name}</span>
                             {b.option ? <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.option}</span> : null}
                           </div>
-                          <div style={{ marginTop: "3px", height: "6px", borderRadius: "999px", background: "var(--color-surface-2)", overflow: "hidden" }}>
+                          <div style={{ marginTop: "4px", height: "6px", borderRadius: "999px", background: "var(--color-surface-2)", overflow: "hidden" }}>
                             <div style={{ width: `${Math.round(ratio * 100)}%`, height: "100%", borderRadius: "999px", background: i === 0 ? "var(--color-rose-deep)" : "var(--color-rose-line)" }} />
                           </div>
                         </div>
                         <div style={{ flexShrink: 0, textAlign: "right" }}>
                           <div style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-rose-deep)" }}>{b.qty.toLocaleString("ko-KR")}개</div>
-                          <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-ink-soft)" }}>{won(b.sales)}</div>
+                          <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>{won(b.sales)}</div>
                         </div>
                       </div>
                     );
@@ -470,37 +470,37 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
               </div>
 
               {/* 👤 구매자별 */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "7px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "8px" }}>
                 <span style={{ fontSize: "13px", fontWeight: 900, color: "var(--color-ink)" }}>👤 구매자별 구매 내역 ({report.buyers.length}명)</span>
-                <input value={buyerSearch} onChange={(e) => setBuyerSearch(e.target.value)} placeholder="🔍 닉네임·이름" style={{ width: "150px", height: "30px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 9px", fontSize: "12px", outline: "none", color: "var(--color-ink)" }} />
+                <input value={buyerSearch} onChange={(e) => setBuyerSearch(e.target.value)} placeholder="🔍 닉네임·이름" style={{ width: "150px", height: "30px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 8px", fontSize: "12px", outline: "none", color: "var(--color-ink)" }} />
               </div>
               <div style={{ border: "1px solid var(--color-line)", borderRadius: "12px", overflow: "hidden", background: "var(--color-surface)" }}>
                 {buyersFiltered.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "18px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>{buyerSearch ? "검색 결과가 없습니다." : "결제완료 구매자가 없습니다. 입금이 확인되면 여기에 나옵니다."}</div>
+                  <div style={{ textAlign: "center", padding: "16px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>{buyerSearch ? "검색 결과가 없습니다." : "결제완료 구매자가 없습니다. 입금이 확인되면 여기에 나옵니다."}</div>
                 ) : (
                   buyersFiltered.map((b, i) => {
                     const expanded = buyerExpand === b.key;
                     return (
                       <div key={b.key} style={{ borderBottom: i < buyersFiltered.length - 1 ? "1px solid var(--color-line)" : "none" }}>
-                        <div onClick={() => setBuyerExpand(expanded ? "" : b.key)} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "9px 12px", cursor: "pointer", background: expanded ? "var(--color-rose-soft)" : "transparent" }}>
+                        <div onClick={() => setBuyerExpand(expanded ? "" : b.key)} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px", cursor: "pointer", background: expanded ? "var(--color-rose-soft)" : "transparent" }}>
                           <span style={{ width: "24px", flexShrink: 0, textAlign: "center", fontSize: "11px", fontWeight: 900, color: i < 3 ? "var(--color-rose-deep)" : "var(--color-ink-mute)" }}>{i + 1}</span>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                               {b.nickname}
                               {b.name && b.name !== "-" && b.name !== b.nickname ? <span style={{ fontWeight: 700, color: "var(--color-ink-soft)" }}> ({b.name})</span> : null}
                             </div>
-                            <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-ink-soft)", marginTop: "1px" }}>
+                            <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", marginTop: "1px" }}>
                               주문 {b.orderCount}건 · {b.items.reduce((s, it) => s + it.qty, 0)}개
                             </div>
                           </div>
                           <div style={{ flexShrink: 0, textAlign: "right" }}>
                             <div style={{ fontSize: "13px", fontWeight: 900, color: "var(--color-rose-deep)" }}>{won(b.paySum)}</div>
-                            <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--color-ink-soft)" }}>상품 {won(b.productSum)}</div>
+                            <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>상품 {won(b.productSum)}</div>
                           </div>
                           <span style={{ flexShrink: 0, color: "var(--color-ink-soft)", fontSize: "11px" }}>{expanded ? "▴" : "▾"}</span>
                         </div>
                         {expanded ? (
-                          <div style={{ padding: "4px 12px 10px 44px", background: "var(--color-surface-2)" }}>
+                          <div style={{ padding: "4px 12px 8px 48px", background: "var(--color-surface-2)" }}>
                             {b.items.map((it, j) => (
                               <div key={j} style={{ display: "flex", alignItems: "baseline", gap: "8px", padding: "4px 0", borderBottom: j < b.items.length - 1 ? "1px dashed var(--color-line)" : "none" }}>
                                 <span style={{ flex: 1, minWidth: 0, fontSize: "11px", fontWeight: 700, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.label}</span>

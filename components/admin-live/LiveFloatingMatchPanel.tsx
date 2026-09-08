@@ -251,7 +251,7 @@ export default function LiveFloatingMatchPanel({
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--color-surface)" }}>
 
       {/* 헤더 */}
-      <div style={{ padding: "12px 14px 0", flexShrink: 0, borderBottom: "1px solid var(--color-surface-2)" }}>
+      <div style={{ padding: "12px 12px 0", flexShrink: 0, borderBottom: "1px solid var(--color-surface-2)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
           <span style={{ fontSize: 13, fontWeight: 800 }}>입금매칭</span>
           <span style={{ background: "var(--color-rose-deep)", color: "#fff", borderRadius: 20, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>
@@ -265,7 +265,7 @@ export default function LiveFloatingMatchPanel({
           {PERIOD_TABS.map(t => (
             <button key={t.key} onClick={() => { setPeriod(t.key); setCalOpen(false); }}
               style={{
-                padding: "5px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                padding: "4px 8px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer",
                 border: `1px solid ${period === t.key && !calOpen ? "var(--color-rose-deep)" : "var(--color-line)"}`,
                 background: period === t.key && !calOpen ? "var(--color-rose-deep)" : "var(--color-surface)",
                 color: period === t.key && !calOpen ? "#fff" : "var(--color-ink-soft)",
@@ -274,7 +274,7 @@ export default function LiveFloatingMatchPanel({
           <div style={{ position: "relative" }}>
             <button onClick={() => setCalOpen(v => !v)}
               style={{
-                padding: "5px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                padding: "4px 8px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer",
                 border: `1px solid var(--color-rose-deep)`,
                 background: calOpen ? "var(--color-rose-deep)" : "var(--color-surface)",
                 color: calOpen ? "#fff" : "var(--color-rose-deep)",
@@ -282,19 +282,19 @@ export default function LiveFloatingMatchPanel({
             {calOpen && (
               <div style={{
                 position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 300,
-                background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: 10,
+                background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: 8,
                 boxShadow: "0 8px 24px rgba(0,0,0,0.13)", padding: 12, width: 240,
               }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-ink-soft)", marginBottom: 6 }}>기간 선택</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <input type="date" value={calFrom} onChange={e => setCalFrom(e.target.value)}
-                    style={{ flex: 1, border: "1px solid var(--color-line)", borderRadius: 6, padding: "5px 6px", fontSize: 12, outline: "none" }} />
+                    style={{ flex: 1, border: "1px solid var(--color-line)", borderRadius: 8, padding: "4px 6px", fontSize: 12, outline: "none" }} />
                   <span style={{ color: "var(--color-ink-mute)", fontSize: 12 }}>~</span>
                   <input type="date" value={calTo} onChange={e => setCalTo(e.target.value)}
-                    style={{ flex: 1, border: "1px solid var(--color-line)", borderRadius: 6, padding: "5px 6px", fontSize: 12, outline: "none" }} />
+                    style={{ flex: 1, border: "1px solid var(--color-line)", borderRadius: 8, padding: "4px 6px", fontSize: 12, outline: "none" }} />
                 </div>
                 <button onClick={() => { setPeriod("custom"); setCalOpen(false); }}
-                  style={{ marginTop: 8, width: "100%", background: "var(--color-rose-deep)", color: "#fff", border: "none", borderRadius: 7, padding: "7px 0", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                  style={{ marginTop: 8, width: "100%", background: "var(--color-rose-deep)", color: "#fff", border: "none", borderRadius: 8, padding: "8px 0", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                   적용
                 </button>
               </div>
@@ -306,7 +306,7 @@ export default function LiveFloatingMatchPanel({
         <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center" }}>
           <button onClick={() => setShowAll(v => !v)}
             style={{
-              padding: "5px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer",
+              padding: "4px 8px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer",
               border: `1px solid ${showAll ? "var(--color-line)" : "var(--color-rose-deep)"}`,
               background: showAll ? "var(--color-surface-2)" : "var(--color-rose-soft)",
               color: showAll ? "var(--color-ink-soft)" : "var(--color-rose-deep)",
@@ -314,13 +314,13 @@ export default function LiveFloatingMatchPanel({
             }}>{showAll ? "전체보기" : "미매칭만"}</button>
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="🔍 입금자명 · 금액"
-            style={{ flex: 1, border: "1px solid var(--color-line)", borderRadius: 8, padding: "6px 10px", fontSize: 12, outline: "none", background: "var(--color-surface-2)" }} />
+            style={{ flex: 1, border: "1px solid var(--color-line)", borderRadius: 8, padding: "6px 8px", fontSize: 12, outline: "none", background: "var(--color-surface-2)" }} />
         </div>
       </div>
 
       {/* 매칭 모드 안내 */}
       {matchMode && selectedOrderForMatch && (
-        <div style={{ padding: "8px 14px", background: "var(--color-rose-soft)", borderBottom: "1px solid var(--color-rose-soft)", fontSize: 11, color: "var(--color-rose-deep)", fontWeight: 700, flexShrink: 0 }}>
+        <div style={{ padding: "8px 12px", background: "var(--color-rose-soft)", borderBottom: "1px solid var(--color-rose-soft)", fontSize: 11, color: "var(--color-rose-deep)", fontWeight: 700, flexShrink: 0 }}>
           🔗 <strong>{selectedOrderForMatch.nickname ?? selectedOrderForMatch.name}</strong>
           {" · "}{won(expectedAmount)} 주문에 연결할 입금 선택
           <button onClick={() => { onClearSelectedOrder?.(); setSelectedDepIds(new Set()); }}
@@ -330,7 +330,7 @@ export default function LiveFloatingMatchPanel({
 
       {/* 매칭 모드 확정 버튼 (상단 고정 — 스크롤해도 항상 보임) */}
       {matchMode && (
-        <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--color-surface-2)", display: "flex", flexDirection: "column", gap: 6, flexShrink: 0, background: "var(--color-surface)" }}>
+        <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--color-surface-2)", display: "flex", flexDirection: "column", gap: 6, flexShrink: 0, background: "var(--color-surface)" }}>
           {selDeps.length > 0 && (
             <div style={{ fontSize: 11, fontWeight: 700, color: selTotal === expectedAmount ? "var(--color-ok-tx)" : "var(--color-danger-tx)", textAlign: "center", marginBottom: 2 }}>
               선택 합계 {won(selTotal)} {selTotal === expectedAmount ? "✓ 일치" : `✗ 불일치 (주문 ${won(expectedAmount)})`}
@@ -340,7 +340,7 @@ export default function LiveFloatingMatchPanel({
             <button onClick={handleConfirmWithDeposit} disabled={!canConfirm || matchSaving}
               style={{
                 flex: 1, background: canConfirm ? "var(--color-ok-tx)" : "var(--color-ink-mute)", color: "#fff", border: "none",
-                borderRadius: 10, padding: "11px 6px", fontSize: 12, fontWeight: 800,
+                borderRadius: 8, padding: "12px 6px", fontSize: 12, fontWeight: 800,
                 cursor: canConfirm ? "pointer" : "not-allowed",
               }}>
               {matchSaving ? "처리중…" : "선택 후 입금확인"}
@@ -348,7 +348,7 @@ export default function LiveFloatingMatchPanel({
             <button onClick={handleConfirmWithoutDeposit} disabled={matchSaving}
               style={{
                 flex: 1, background: "var(--color-rose-deep)", color: "#fff", border: "none",
-                borderRadius: 10, padding: "11px 6px", fontSize: 12, fontWeight: 800,
+                borderRadius: 8, padding: "12px 6px", fontSize: 12, fontWeight: 800,
                 cursor: matchSaving ? "not-allowed" : "pointer",
               }}>
               금액 무시하고 수동확인
@@ -366,7 +366,7 @@ export default function LiveFloatingMatchPanel({
         )}
         {grouped.map(([dateLabel, deps]) => (
           <div key={dateLabel}>
-            <div style={{ padding: "7px 14px", fontSize: 11, fontWeight: 800, color: "var(--color-ink-mute)", background: "var(--color-surface-2)", borderBottom: "1px solid var(--color-surface-2)", position: "sticky", top: 0, zIndex: 1 }}>
+            <div style={{ padding: "8px 12px", fontSize: 11, fontWeight: 800, color: "var(--color-ink-mute)", background: "var(--color-surface-2)", borderBottom: "1px solid var(--color-surface-2)", position: "sticky", top: 0, zIndex: 1 }}>
               {dateLabel}
             </div>
             {deps.map((dep: any) => {
@@ -382,7 +382,7 @@ export default function LiveFloatingMatchPanel({
                   onClick={() => { if (matchMode && !isMatched) toggleDep(depId); }}
                   style={{
                     display: "flex", alignItems: "center", gap: 10,
-                    padding: "10px 14px", borderBottom: "1px solid var(--color-surface-2)",
+                    padding: "8px 12px", borderBottom: "1px solid var(--color-surface-2)",
                     cursor: matchMode && !isMatched ? "pointer" : "default",
                     background: checked ? "var(--color-rose-soft)" : rec && !isMatched ? "var(--color-ok-bg)" : "transparent",
                     opacity: isMatched ? 0.45 : 1,
@@ -403,17 +403,17 @@ export default function LiveFloatingMatchPanel({
                     <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-ink)" }}>{dep.depositor_name ?? "—"}</span>
                       {isMatched && (
-                        <span style={{ fontSize: 10, fontWeight: 700, color: "var(--color-ok-tx)", background: "var(--color-ok-bg)", borderRadius: 4, padding: "1px 5px" }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-ok-tx)", background: "var(--color-ok-bg)", borderRadius: 4, padding: "1px 4px" }}>
                           ✅ 매칭완료
                         </span>
                       )}
                       {!isMatched && rec && (
-                        <span style={{ fontSize: 10, fontWeight: 800, color: "#fff", background: "var(--color-ok-tx)", borderRadius: 4, padding: "1px 5px" }}>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: "#fff", background: "var(--color-ok-tx)", borderRadius: 4, padding: "1px 4px" }}>
                           ✅ 추천
                         </span>
                       )}
                       {!isMatched && rec && matchMode && (
-                        <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", background: "var(--color-rose-deep)", borderRadius: 4, padding: "1px 5px" }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: "var(--color-rose-deep)", borderRadius: 4, padding: "1px 4px" }}>
                           금액일치
                         </span>
                       )}
@@ -427,12 +427,12 @@ export default function LiveFloatingMatchPanel({
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 800 }}>{won(Number(dep.amount ?? 0))}</div>
                     {matchMode && !isMatched && diff !== 0 && (
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-danger-tx)" }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-danger-tx)" }}>
                         {diff > 0 ? "+" : ""}{Number(diff).toLocaleString("ko-KR")}
                       </div>
                     )}
                     {matchMode && !isMatched && diff === 0 && (
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-ok-tx)" }}>±0</div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-ok-tx)" }}>±0</div>
                     )}
                     {/* 브라우징 모드: 즉시 매칭 버튼 */}
                     {!matchMode && !isMatched && bestOrder && (
@@ -440,7 +440,7 @@ export default function LiveFloatingMatchPanel({
                         disabled={matchSaving}
                         style={{
                           marginTop: 4, background: "var(--color-ok-tx)", color: "#fff", border: "none",
-                          borderRadius: 6, padding: "3px 8px", fontSize: 11, fontWeight: 700,
+                          borderRadius: 8, padding: "4px 8px", fontSize: 11, fontWeight: 700,
                           cursor: "pointer",
                         }}>매칭</button>
                     )}
@@ -448,7 +448,7 @@ export default function LiveFloatingMatchPanel({
                       <button onClick={e => { e.stopPropagation(); onSearchFilter(dep.depositor_name ?? ""); }}
                         style={{
                           marginTop: 4, background: "var(--color-surface-2)", color: "var(--color-ink-soft)", border: "1px solid var(--color-line)",
-                          borderRadius: 6, padding: "3px 8px", fontSize: 11, fontWeight: 700,
+                          borderRadius: 8, padding: "4px 8px", fontSize: 11, fontWeight: 700,
                           cursor: "pointer",
                         }}>확인필요</button>
                     )}

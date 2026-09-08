@@ -1466,23 +1466,23 @@ export default function AdminLiveEventRoulettePanel({
             <div className="body" style={{ minHeight: "100%", boxSizing: "border-box" }}>
 
               {/* 헤더 */}
-              <div style={{ display: "flex", alignItems: "center", marginBottom: "13px" }}>
+              <div style={{ display: "flex", alignItems: "center", marginBottom: "12px" }}>
                 <span style={{ fontSize: "14px", fontWeight: 600 }}>◆ 이벤트</span>
                 <span style={{ marginLeft: "auto", display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap" }}>
                   {/* [2026-09-08] 탭 순서 = 실제 쓰는 순서(서바이벌·달리기 최다). 테스트/운영 토글은 삭제 — 「테스트로 해보기」 버튼으로 */}
-                  <span className="badge" style={{ padding: "4px 14px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "survival" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "survival" ? "#fff" : "var(--mut)" }}
+                  <span className="badge" style={{ padding: "4px 12px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "survival" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "survival" ? "#fff" : "var(--mut)" }}
                     onClick={() => { setEventTab("survival"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>⛈️ 서바이벌</span>
-                  <span className="badge" style={{ padding: "4px 14px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "race" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "race" ? "#fff" : "var(--mut)" }}
+                  <span className="badge" style={{ padding: "4px 12px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "race" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "race" ? "#fff" : "var(--mut)" }}
                     onClick={() => { setEventTab("race"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>🏁 달리기</span>
                   <span className="badge" style={{ padding: "4px 16px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "roulette" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "roulette" ? "#fff" : "var(--mut)" }}
                     onClick={() => { setEventTab("roulette"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>🎡 룰렛</span>
                   <span className="badge" style={{ padding: "4px 16px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "claw" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "claw" ? "#fff" : "var(--mut)" }}
                     onClick={() => { setEventTab("claw"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>🪆 인형뽑기</span>
-                  <span className="badge" style={{ padding: "4px 14px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "mission" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "mission" ? "#fff" : "var(--mut)" }}
+                  <span className="badge" style={{ padding: "4px 12px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "mission" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "mission" ? "#fff" : "var(--mut)" }}
                     onClick={() => { setEventTab("mission"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>🎯 미션</span>
-                  <span style={{ width: "1px", height: "18px", background: "var(--bd)", margin: "0 3px" }} />
-                  <button className="btn" style={{ height: "auto", padding: "5px 10px" }} onClick={() => { resetEvent(); setCenterWinner(""); }}>↺ 초기화</button>
-                  {embedded ? null : <button className="btn" style={{ height: "auto", padding: "5px 10px" }} onClick={closePanel}>✕</button>}
+                  <span style={{ width: "1px", height: "18px", background: "var(--bd)", margin: "0 4px" }} />
+                  <button className="btn" style={{ height: "auto", padding: "4px 8px" }} onClick={() => { resetEvent(); setCenterWinner(""); }}>↺ 초기화</button>
+                  {embedded ? null : <button className="btn" style={{ height: "auto", padding: "4px 8px" }} onClick={closePanel}>✕</button>}
                 </span>
               </div>
 
@@ -1491,8 +1491,8 @@ export default function AdminLiveEventRoulettePanel({
               ) : (
               <>
               {/* 룰렛 + 참가자 */}
-              <div style={{ display: "flex", gap: "14px", alignItems: "stretch", marginBottom: "13px" }}>
-                <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "10px", minHeight: "190px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", position: "relative" }}>
+              <div style={{ display: "flex", gap: "12px", alignItems: "stretch", marginBottom: "12px" }}>
+                <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "8px", minHeight: "190px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", position: "relative" }}>
                   {eventTab === "roulette" ? (
                     <div className="wheel">
                       <span className="pt" style={{ top: "6px", fontSize: "24px" }}>▼</span>
@@ -1502,7 +1502,7 @@ export default function AdminLiveEventRoulettePanel({
                       </div>
                     </div>
                   ) : isKWinnerTab ? (
-                    <div style={{ width: "150px", height: "150px", borderRadius: "16px", background: "var(--color-surface)", border: "1px solid var(--bd)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "5px" }}>
+                    <div style={{ width: "150px", height: "150px", borderRadius: "16px", background: "var(--color-surface)", border: "1px solid var(--bd)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px" }}>
                       <span style={{ fontSize: "44px", lineHeight: 1 }}>{eventTab === "race" ? "🏁" : "⛈️"}</span>
                       <span style={{ fontSize: "12px", color: "var(--rose)", fontWeight: 600 }}>{eventTab === "race" ? "달리기" : "서바이벌"} · {finalParticipants.length}명</span>
                       <span style={{ fontSize: "11px", color: "var(--mut2)" }}>{eventTab === "race" ? "당첨" : "생존"} {survivorCount}명</span>
@@ -1514,70 +1514,70 @@ export default function AdminLiveEventRoulettePanel({
                     </div>
                   )}
                   <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
-                    <button className="btn rose" style={{ height: "auto", padding: "9px 30px" }} onClick={() => void startSpin(false)} disabled={spinning || finalParticipants.length === 0}>
+                    <button className="btn rose" style={{ height: "auto", padding: "8px 32px" }} onClick={() => void startSpin(false)} disabled={spinning || finalParticipants.length === 0}>
                       {spinning ? "진행중..." : giftType === "point" && Number(giftPointAmount || 0) > 0 ? `▶ 시작 · ${isKWinnerTab ? `${survivorCount}명에게 ` : "당첨자에게 "}${Number(giftPointAmount).toLocaleString("ko-KR")}P 지급` : "▶ 시작"}
                     </button>
-                    <button className="btn" style={{ height: "auto", padding: "9px 12px" }} onClick={() => void startSpin(true)} disabled={spinning || finalParticipants.length === 0} title="포인트가 나가지 않고 테스트 기록으로만 남습니다">
+                    <button className="btn" style={{ height: "auto", padding: "8px 12px" }} onClick={() => void startSpin(true)} disabled={spinning || finalParticipants.length === 0} title="포인트가 나가지 않고 테스트 기록으로만 남습니다">
                       테스트로 해보기 · 포인트 안 나감
                     </button>
                   </div>
 
                   {/* 당첨자 발표 카드 — 룰렛 위(상단)에만 덮어서 아래 ▶돌리기 버튼은 가리지 않음. 클릭도 통과(pointerEvents none) */}
                   {centerWinner && currentEvent?.winner_nickname === centerWinner ? (
-                    <div style={{ position: "absolute", left: "50%", top: "8px", transform: "translateX(-50%)", width: "min(90%,300px)", borderRadius: "24px", background: "var(--color-surface)", boxShadow: "0 24px 70px rgba(15,23,42,0.24)", padding: "18px", textAlign: "center", zIndex: 30, pointerEvents: "none" }}>
+                    <div style={{ position: "absolute", left: "50%", top: "8px", transform: "translateX(-50%)", width: "min(90%,300px)", borderRadius: "20px", background: "var(--color-surface)", boxShadow: "0 24px 70px rgba(15,23,42,0.24)", padding: "16px", textAlign: "center", zIndex: 30, pointerEvents: "none" }}>
                       <div style={{ color: "var(--color-cardpay)", fontSize: "18px", fontWeight: 950, letterSpacing: "-0.05em" }}>당첨</div>
                       <div style={{ marginTop: "6px", color: "var(--color-ink)", fontSize: "40px", fontWeight: 950, lineHeight: 1.05, letterSpacing: "-0.08em", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{centerWinner}</div>
-                      <div style={{ marginTop: "10px", color: "var(--color-ink-soft)", fontSize: "16px", fontWeight: 900, letterSpacing: "-0.05em" }}>{currentEvent?.winner_note || "이벤트 당첨"}</div>
+                      <div style={{ marginTop: "8px", color: "var(--color-ink-soft)", fontSize: "16px", fontWeight: 900, letterSpacing: "-0.05em" }}>{currentEvent?.winner_note || "이벤트 당첨"}</div>
                     </div>
                   ) : null}
                 </div>
 
-                <div style={{ flex: 0.95, display: "flex", flexDirection: "column", gap: "9px" }}>
+                <div style={{ flex: 0.95, display: "flex", flexDirection: "column", gap: "8px" }}>
                   <div className="note">참가자 불러오기</div>
-                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "7px", borderColor: participantSource === "auto" ? "var(--rose)" : "var(--bd)", color: participantSource === "auto" ? "var(--rose)" : "var(--ink)" }} onClick={() => changeParticipantSource("auto")} disabled={!canLoadParticipants}>👥 주문서 제출자 전체 <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "auto" ? (loading ? "불러오는 중…" : `${autoParticipantCount}명`) : ""}</span></button>
-                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "7px", borderColor: participantSource === "paid" ? "var(--green)" : "var(--bd)", color: participantSource === "paid" ? "var(--green)" : "var(--ink)" }} onClick={() => changeParticipantSource("paid")} disabled={!canLoadParticipants}>💵 결제완료한 사람만 <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "paid" ? (loading ? "불러오는 중…" : `${autoParticipantCount}명`) : ""}</span></button>
-                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "7px", borderColor: participantSource === "manual" ? "var(--rose)" : "var(--bd)", color: participantSource === "manual" ? "var(--rose)" : "var(--ink)" }} onClick={() => changeParticipantSource("manual")}>✎ 수동 입력 (쉼표로 자동분리) <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "manual" ? `${manualParticipantCount}명` : ""}</span></button>
+                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "8px", borderColor: participantSource === "auto" ? "var(--rose)" : "var(--bd)", color: participantSource === "auto" ? "var(--rose)" : "var(--ink)" }} onClick={() => changeParticipantSource("auto")} disabled={!canLoadParticipants}>👥 주문서 제출자 전체 <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "auto" ? (loading ? "불러오는 중…" : `${autoParticipantCount}명`) : ""}</span></button>
+                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "8px", borderColor: participantSource === "paid" ? "var(--green)" : "var(--bd)", color: participantSource === "paid" ? "var(--green)" : "var(--ink)" }} onClick={() => changeParticipantSource("paid")} disabled={!canLoadParticipants}>💵 결제완료한 사람만 <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "paid" ? (loading ? "불러오는 중…" : `${autoParticipantCount}명`) : ""}</span></button>
+                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "8px", borderColor: participantSource === "manual" ? "var(--rose)" : "var(--bd)", color: participantSource === "manual" ? "var(--rose)" : "var(--ink)" }} onClick={() => changeParticipantSource("manual")}>✎ 수동 입력 (쉼표로 자동분리) <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "manual" ? `${manualParticipantCount}명` : ""}</span></button>
                   {participantSource === "manual" ? (
                     <textarea value={manualParticipantText} onChange={(e) => setManualParticipantText(e.target.value)} onPaste={handleManualPaste}
                       placeholder={"닉네임/쉼표 구분. 채팅 붙여넣으면 @닉네임만 자동 추출."}
-                      style={{ width: "100%", height: "70px", resize: "none", fontSize: "11px", border: "1px solid var(--bd)", borderRadius: "7px", padding: "8px", background: "var(--color-surface)" }} />
+                      style={{ width: "100%", height: "70px", resize: "none", fontSize: "11px", border: "1px solid var(--bd)", borderRadius: "8px", padding: "8px", background: "var(--color-surface)" }} />
                   ) : null}
                   {!canLoadParticipants && participantSource !== "manual" ? (
                     <div className="note" style={{ color: "var(--amber)" }}>⚠ 불러올 주문 없음 — 방송 시작 또는 주문서에 주문이 보이면 명단을 불러올 수 있어요.</div>
                   ) : participantSource !== "manual" ? (
                     <div className="note" style={{ color: "var(--mut2)" }}>※ 주문서 제출자 전체=화면 필터(기간·방송·상태) 기준. 결제완료한 사람만=이 방송의 입금확인·카드결제완료 전부.</div>
                   ) : null}
-                  <div style={{ background: "var(--color-surface-2)", borderRadius: "7px", padding: "8px 11px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => setExcludeDailyDup((v) => !v)}>
+                  <div style={{ background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => setExcludeDailyDup((v) => !v)}>
                     <span style={{ fontSize: "11px" }}>당일 중복당첨 금지</span>
                     <span className={`tog ${excludeDailyDup ? "on" : "off"}`}><i /></span>
                   </div>
                   {/* [2026-09-08] 구매 응모권 — 실제로 서버에 전달되어 추첨 확률이 된다 */}
-                  <div style={{ background: "var(--color-surface-2)", borderRadius: "7px", padding: "8px 11px" }}>
+                  <div style={{ background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px 12px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => { ticketTouchedRef.current = true; setTicketEnabled((v) => !v); }}>
                       <span style={{ fontSize: "11px", fontWeight: 600 }}>많이 산 손님 당첨확률 올리기</span>
                       <span className={`tog ${ticketEnabled ? "on" : "off"}`}><i /></span>
                     </div>
                     {ticketEnabled ? (
-                      <div style={{ marginTop: "7px", display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap", fontSize: "11px" }}>
+                      <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap", fontSize: "11px" }}>
                         <span>기본 1장 + 결제완료</span>
-                        <input className="ipt" style={{ width: "44px", textAlign: "center", padding: "3px" }} inputMode="numeric" value={ticketUnitMan} onChange={(e) => { ticketTouchedRef.current = true; setTicketUnitMan(e.target.value.replace(/[^0-9]/g, "").slice(0, 3) || ""); }} onBlur={() => { if (!(Number(ticketUnitMan) >= 1)) setTicketUnitMan("5"); }} />
+                        <input className="ipt" style={{ width: "44px", textAlign: "center", padding: "4px" }} inputMode="numeric" value={ticketUnitMan} onChange={(e) => { ticketTouchedRef.current = true; setTicketUnitMan(e.target.value.replace(/[^0-9]/g, "").slice(0, 3) || ""); }} onBlur={() => { if (!(Number(ticketUnitMan) >= 1)) setTicketUnitMan("5"); }} />
                         <span>만원마다 1장 · 최대</span>
-                        <input className="ipt" style={{ width: "40px", textAlign: "center", padding: "3px" }} inputMode="numeric" value={ticketMax} onChange={(e) => { ticketTouchedRef.current = true; setTicketMax(e.target.value.replace(/[^0-9]/g, "").slice(0, 2) || ""); }} onBlur={() => { if (!(Number(ticketMax) >= 1)) setTicketMax("5"); }} />
+                        <input className="ipt" style={{ width: "40px", textAlign: "center", padding: "4px" }} inputMode="numeric" value={ticketMax} onChange={(e) => { ticketTouchedRef.current = true; setTicketMax(e.target.value.replace(/[^0-9]/g, "").slice(0, 2) || ""); }} onBlur={() => { if (!(Number(ticketMax) >= 1)) setTicketMax("5"); }} />
                         <span>장</span>
                         <span style={{ width: "100%", color: "var(--mut2)" }}>예) 5만원마다 1장이면 — 결제 0~4만원 <b>1장</b> · 5만원 <b>2장</b> · 10만원 <b>3장</b> … 최대 {ticketMax || 5}장.<br />확률 = 내 장수 ÷ 전체 장수. <b>미입금 주문은 장수가 안 늘어요</b>(참가는 됨). 수동 입력 명단은 전원 1장.</span>
                       </div>
                     ) : (
-                      <div style={{ marginTop: "5px", fontSize: "11px", color: "var(--mut2)" }}>지금은 <b>꺼짐</b> — 61명이든 1명이든 <b>전원 똑같은 확률</b>입니다. 켜면 결제한 금액만큼 응모권이 늘어나요.</div>
+                      <div style={{ marginTop: "4px", fontSize: "11px", color: "var(--mut2)" }}>지금은 <b>꺼짐</b> — 61명이든 1명이든 <b>전원 똑같은 확률</b>입니다. 켜면 결제한 금액만큼 응모권이 늘어나요.</div>
                     )}
                   </div>
                   {isKWinnerTab ? (
-                    <div style={{ background: "var(--rose-bg)", border: "1px solid var(--rose-bd)", borderRadius: "7px", padding: "8px 11px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+                    <div style={{ background: "var(--rose-bg)", border: "1px solid var(--rose-bd)", borderRadius: "8px", padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
                       <span style={{ fontSize: "11px", color: "var(--rose)", fontWeight: 600 }}>{eventTab === "race" ? "당첨자(등수) 수" : "생존자(당첨자) 수"}</span>
                       <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                        <button className="btn" style={{ height: "auto", padding: "2px 9px" }} onClick={() => setSurvivorCount((v) => Math.max(1, v - 1))}>−</button>
+                        <button className="btn" style={{ height: "auto", padding: "2px 8px" }} onClick={() => setSurvivorCount((v) => Math.max(1, v - 1))}>−</button>
                         <input className="ipt" style={{ width: "48px", textAlign: "center", padding: "4px" }} inputMode="numeric" value={survivorCount}
                           onChange={(e) => { const d = Number(e.target.value.replace(/[^0-9]/g, "")) || 1; setSurvivorCount(Math.min(Math.max(1, d), Math.max(1, finalParticipants.length - 1))); }} />
-                        <button className="btn" style={{ height: "auto", padding: "2px 9px" }} onClick={() => setSurvivorCount((v) => Math.min(v + 1, Math.max(1, finalParticipants.length - 1)))}>+</button>
+                        <button className="btn" style={{ height: "auto", padding: "2px 8px" }} onClick={() => setSurvivorCount((v) => Math.min(v + 1, Math.max(1, finalParticipants.length - 1)))}>+</button>
                         <span style={{ fontSize: "11px", color: "var(--mut2)" }}>명</span>
                       </span>
                     </div>
@@ -1586,26 +1586,26 @@ export default function AdminLiveEventRoulettePanel({
               </div>
 
               {/* 당첨 고정 */}
-              <div style={{ border: "1px solid var(--rose-bd)", background: "var(--rose-bg)", borderRadius: "8px", padding: "9px 11px", marginBottom: "11px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "7px", flexWrap: "wrap", marginBottom: "7px" }}>
+              <div style={{ border: "1px solid var(--rose-bd)", background: "var(--rose-bg)", borderRadius: "8px", padding: "8px 12px", marginBottom: "12px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
                   <span style={{ fontSize: "11px", color: "var(--rose)", fontWeight: 600 }}>🎯 당첨 고정 (닉네임 클릭){isKWinnerTab ? ` · 최대 ${survivorCount}명` : ""}</span>
-                  <span style={{ fontSize: "10.5px", color: "var(--mut2)" }}>ㄱㄴㄷ 순 · 안 고르면 전원 추첨</span>
+                  <span style={{ fontSize: "11px", color: "var(--mut2)" }}>ㄱㄴㄷ 순 · 안 고르면 전원 추첨</span>
                   {/* [2026-09-08] 61명 중에서 눈으로 찾기 어렵다 → 검색칸. 찾는 즉시 걸러진다. */}
                   <input
                     className="ipt"
-                    style={{ marginLeft: "auto", width: "150px", height: "26px", padding: "0 9px", fontSize: "11px" }}
+                    style={{ marginLeft: "auto", width: "150px", height: "26px", padding: "0 8px", fontSize: "11px" }}
                     placeholder="🔍 닉네임 찾기"
                     value={nickFilter}
                     onChange={(e) => setNickFilter(e.target.value)}
                   />
                   {nickFilter ? (
-                    <button className="btn" style={{ height: "26px", padding: "0 9px", fontSize: "11px" }} onClick={() => setNickFilter("")}>지우기</button>
+                    <button className="btn" style={{ height: "26px", padding: "0 8px", fontSize: "11px" }} onClick={() => setNickFilter("")}>지우기</button>
                   ) : null}
-                  <span style={{ fontSize: "10.5px", color: "var(--mut2)", minWidth: "62px", textAlign: "right" }}>
+                  <span style={{ fontSize: "11px", color: "var(--mut2)", minWidth: "62px", textAlign: "right" }}>
                     {nickFilter ? `${pickList.length}/${finalParticipants.length}명` : `${finalParticipants.length}명`}
                   </span>
                 </div>
-                <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", maxHeight: "150px", overflowY: "auto" }}>
+                <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", maxHeight: "150px", overflowY: "auto" }}>
                   {finalParticipants.length === 0 ? (
                     <span className="note">참가자를 먼저 불러오세요.</span>
                   ) : pickList.length === 0 ? (
@@ -1629,18 +1629,18 @@ export default function AdminLiveEventRoulettePanel({
                         }
                       };
                       return (
-                        <span key={`fix-${p.nickname}-${i}`} className={`nick ${on ? "win" : ""}`} onClick={toggleFixed} title={ticketEnabled ? `결제완료 ${Number(p.paid_amount_sum || 0).toLocaleString("ko-KR")}원` : undefined}>{on ? "👑 " : ""}{p.nickname}{ticketTail ? <span style={{ color: "var(--mut2)", fontSize: "10px" }}>{ticketTail}</span> : null}</span>
+                        <span key={`fix-${p.nickname}-${i}`} className={`nick ${on ? "win" : ""}`} onClick={toggleFixed} title={ticketEnabled ? `결제완료 ${Number(p.paid_amount_sum || 0).toLocaleString("ko-KR")}원` : undefined}>{on ? "👑 " : ""}{p.nickname}{ticketTail ? <span style={{ color: "var(--mut2)", fontSize: "11px" }}>{ticketTail}</span> : null}</span>
                       );
                     })
                   )}
                 </div>
-                <div className="note" style={{ marginTop: "7px" }}>{isKWinnerTab
+                <div className="note" style={{ marginTop: "8px" }}>{isKWinnerTab
                     ? (fixedSurvivorNicknames.length > 0 ? `👑 고정 ${fixedSurvivorNicknames.length}/${survivorCount}명 — ${fixedSurvivorNicknames.join(", ")}` : "👑 아무도 고정 안 함 (전원 추첨)")
                     : (fixedWinnerNickname ? `👑 고정: ${fixedWinnerNickname}` : "👑 아무도 고정 안 함 (전원 추첨)")}</div>
               </div>
 
               {/* 제목 + 당첨 내용(선물) */}
-              <div style={{ display: "flex", gap: "6px", marginBottom: "11px" }}>
+              <div style={{ display: "flex", gap: "6px", marginBottom: "12px" }}>
                 <input className="ipt" style={{ flex: 1 }} placeholder="이벤트 제목" value={title} maxLength={30} onChange={(e) => setTitle(e.target.value)} />
                 <select className="ipt" style={{ flex: "0 0 84px" }} value={giftType} onChange={(e) => { const next = e.target.value as "point" | "custom"; setGiftType(next); if (next === "point") setWinnerNote(`포인트 ${Number(giftPointAmount || 0).toLocaleString("ko-KR")}P`); }}>
                   <option value="point">포인트</option>
@@ -1655,16 +1655,16 @@ export default function AdminLiveEventRoulettePanel({
               </div>
 
               {/* 위젯주소 */}
-              <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "11px" }}>
+              <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "12px" }}>
                 <span className="note" style={{ flexShrink: 0 }}>방송 위젯주소</span>
                 <span className="note" style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{widgetUrl || "준비중"}</span>
-                <button className="btn rose" style={{ height: "auto", padding: "5px 12px" }} onClick={() => void copyText(widgetUrl)} disabled={!widgetUrl}>복사</button>
+                <button className="btn rose" style={{ height: "auto", padding: "4px 12px" }} onClick={() => void copyText(widgetUrl)} disabled={!widgetUrl}>복사</button>
               </div>
 
               {/* [2026-09-08] 방송 위젯을 그대로 작게 — 시청자가 보는 화면(룰렛·인형뽑기). 읽기 전용 iframe */}
               {(eventTab === "roulette" || eventTab === "claw") && widgetUrl ? (
-                <div style={{ marginBottom: "11px", borderRadius: "10px", overflow: "hidden", border: "1px solid var(--bd)", background: "#111" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 10px", fontSize: "11px", color: "#ddd" }}>
+                <div style={{ marginBottom: "12px", borderRadius: "8px", overflow: "hidden", border: "1px solid var(--bd)", background: "#111" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 8px", fontSize: "11px", color: "#ddd" }}>
                     <span>방송 화면 미리보기 (시청자가 보는 그대로)</span>
                     <a href={widgetUrl} target="_blank" rel="noreferrer" style={{ color: "#ffd166" }}>새 창으로 열기 ↗</a>
                   </div>
@@ -1676,16 +1676,16 @@ export default function AdminLiveEventRoulettePanel({
               {isKWinnerTab && <AdminLiveEventSoundboard kind={eventTab === "race" ? "race" : "survival"} />}
 
               {/* 이벤트 목록 */}
-              <div style={{ borderTop: "1px solid var(--bd)", paddingTop: "11px" }}>
+              <div style={{ borderTop: "1px solid var(--bd)", paddingTop: "12px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
                   <span className="seclabel" style={{ margin: 0 }}>이벤트 목록 <span className="note">지난 기록</span></span>
                   {periodChips.map((chip) => (
-                    <span key={chip.key} className="badge" style={{ cursor: "pointer", padding: "4px 10px", border: "1px solid var(--bd)", background: listPeriod === chip.key ? "var(--rose)" : "var(--color-surface)", color: listPeriod === chip.key ? "#fff" : "var(--mut)" }} onClick={() => setListPeriod(chip.key)}>{chip.label}</span>
+                    <span key={chip.key} className="badge" style={{ cursor: "pointer", padding: "4px 8px", border: "1px solid var(--bd)", background: listPeriod === chip.key ? "var(--rose)" : "var(--color-surface)", color: listPeriod === chip.key ? "#fff" : "var(--mut)" }} onClick={() => setListPeriod(chip.key)}>{chip.label}</span>
                   ))}
                   {listPeriod === "date" ? (
                     <input type="date" className="ipt" style={{ height: "26px" }} value={listDate} onChange={(e) => setListDate(e.target.value)} />
                   ) : null}
-                  <span style={{ marginLeft: "auto", display: "flex", gap: "5px" }}>
+                  <span style={{ marginLeft: "auto", display: "flex", gap: "4px" }}>
                     <button className="btn" style={{ height: "26px", padding: "0 8px" }} onClick={() => void loadEventsAndWinners()}>새로고침</button>
                     <button className="btn" style={{ height: "26px", padding: "0 8px" }} onClick={() => void deleteAllTestRecords()}>테스트정리</button>
                   </span>

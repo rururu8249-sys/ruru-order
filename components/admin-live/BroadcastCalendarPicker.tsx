@@ -118,7 +118,7 @@ export default function BroadcastCalendarPicker({ items, value, onPick, allLabel
           <span style={{ color: ROSE }}>📅</span>
           <span className="truncate">{currentLabel}</span>
         </span>
-        <span style={{ marginLeft: 6, color: "var(--color-ink-mute)", fontSize: 10, flexShrink: 0 }}>{open ? "▲" : "▼"}</span>
+        <span style={{ marginLeft: 6, color: "var(--color-ink-mute)", fontSize: 11, flexShrink: 0 }}>{open ? "▲" : "▼"}</span>
       </button>
 
       {open && (
@@ -141,7 +141,7 @@ export default function BroadcastCalendarPicker({ items, value, onPick, allLabel
 
           <button type="button" onClick={() => pick("all")}
             style={{
-              width: "100%", marginBottom: 10, padding: "7px 0", borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: "pointer",
+              width: "100%", marginBottom: 10, padding: "8px 0", borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: "pointer",
               border: value === "all" ? `1px solid ${ROSE}` : `1px solid ${ROSE_LINE}`,
               background: value === "all" ? ROSE : "#fff",
               color: value === "all" ? "#fff" : ROSE,
@@ -180,7 +180,7 @@ export default function BroadcastCalendarPicker({ items, value, onPick, allLabel
                     <span style={{ position: "absolute", bottom: 4, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, borderRadius: "50%", background: ROSE }} />
                   )}
                   {has && (list.length > 1 || Number(list[0]?.count || 0) > 0) && (
-                    <span style={{ position: "absolute", top: 2, right: 3, fontSize: 8.5, fontWeight: 900, color: selectedHere ? "#fff" : ROSE }}>{list.length > 1 ? list.length : `${Number(list[0]?.count || 0)}건`}</span>
+                    <span style={{ position: "absolute", top: 2, right: 3, fontSize: 11, fontWeight: 900, color: selectedHere ? "#fff" : ROSE }}>{list.length > 1 ? list.length : `${Number(list[0]?.count || 0)}건`}</span>
                   )}
                 </button>
               );
@@ -193,7 +193,7 @@ export default function BroadcastCalendarPicker({ items, value, onPick, allLabel
               <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-ink-mute)", marginBottom: 6 }}>이 날 방송 선택</div>
               {dayPickList.map((it) => (
                 <button key={it.id} type="button" onClick={() => pick(it.id)}
-                  style={{ width: "100%", textAlign: "left", padding: "8px 10px", marginBottom: 4, borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", border: `1px solid ${ROSE_LINE}`, background: it.id === value ? ROSE : "#fff", color: it.id === value ? "#fff" : ROSE }}>
+                  style={{ width: "100%", textAlign: "left", padding: "8px 8px", marginBottom: 4, borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", border: `1px solid ${ROSE_LINE}`, background: it.id === value ? ROSE : "#fff", color: it.id === value ? "#fff" : ROSE }}>
                   {it.label}
                 </button>
               ))}

@@ -40,6 +40,9 @@ const ALLOW = [
   { file: "AdminLiveNoticePanel.tsx", match: "bg-slate-900/70" },
   // OBS 방송 위젯 미리보기 — 실제 송출 화면(어두운 배경)을 그대로 보여줘야 한다
   { file: "AdminLiveEventRoulettePanel.tsx", match: "방송 위젯 미리보기" },
+  // 이벤트 종류 큰 그림(🏁 ⛈️) — 글자가 아니라 아이콘이라 글씨 스케일과 무관.
+  //   삼항식 안에 있어 자동 이모지 판정에 안 걸린다.
+  { file: "AdminLiveEventRoulettePanel.tsx", match: '{eventTab === "race" ? "🏁"' },
 ];
 const allowed = (file, text) =>
   ALLOW.some((a) => file.endsWith(a.file) && text.includes(a.match));
@@ -77,6 +80,37 @@ const DEAD_HOVER = /hover:bg-([\w[\]()#,.%/-]+)/;
 //    (예전엔 제가 임의로 14·16을 «금지»했었다. Polaris는 본문 14, 소제목 16을 쓴다)
 const FONT_OK = new Set([11, 12, 13, 14, 16, 18, 20, 22, 24, 30, 32, 36, 40]);
 const FONT_PX = /text-\[(\d+(?:\.\d+)?)px\]/g;
+
+// ── 규칙 9. 인라인 style 의 px 도 Polaris 격자만 ──
+//    className 뿐 아니라 style={{...}} 안의 값도 흩어져 있었다(모서리 8종·글씨 20종·여백 22종).
+//    space 1·2·4·6·8·12·16·20·24·32·40·48 / radius 4·8·12·16·20·(50·999=원·알약)
+//    font 11·12·13·14·16·18·20·22·24·30·32·36·40  ※ 이모지 크기는 글자가 아니므로 제외
+// space-1600(64)·2000(80)·2400(96) 까지가 Polaris 스케일 — 큰 들여쓰기에도 쓰인다
+const GRID_SPACE  = new Set([0,1,2,4,6,8,12,16,20,24,32,40,48,64,80,96,112,128]);
+const GRID_RADIUS = new Set([0,4,8,12,16,20,50,999,9999]);
+const GRID_FONT   = new Set([11,12,13,14,16,18,20,22,24,30,32,36,40]);
+const INLINE_SPACE = /\b(?:padding|margin|gap|rowGap|columnGap|padding(?:Top|Bottom|Left|Right)|margin(?:Top|Bottom|Left|Right))\s*:\s*"([^"]*)"/g;
+const INLINE_RADIUS = /\bborderRadius\s*:\s*"([^"]*)"/g;
+const INLINE_FONT = /\bfontSize\s*:\s*"([^"]*)"/g;
+// 이모지 그림 크기는 «글자»가 아니므로 검사 제외 (📷 ✅ ⚠️ 같은 아이콘)
+//   u 플래그 안에서 { } 는 이스케이프해야 해서 정규식 대신 코드로 판정한다.
+const EMOJI_RE = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{2190}-\u{21FF}]/u;
+function isEmojiSize(raw) {
+  // fontSize 뒤에 나오는 첫 «> 내용 <» 가 이모지뿐이면 그림 크기로 본다
+  const i = raw.indexOf("fontSize");
+  if (i < 0) return false;
+  const m = raw.slice(i).match(/>([^<>]{1,6})</);
+  if (!m) return false;
+  const t = m[1].trim();
+  return t.length > 0 && EMOJI_RE.test(t) && !/[0-9A-Za-z가-힣]/.test(t);
+}
+function offGrid(raw, re, grid) {
+  const bad = [];
+  for (const m of raw.matchAll(re))
+    for (const n of m[1].matchAll(/(\d+(?:\.\d+)?)px/g))
+      if (!grid.has(Number(n[1]))) bad.push(n[0]);
+  return bad;
+}
 
 // ── 규칙 8. 빈 화면은 «다음에 뭘 하면 되는지»까지 말해야 한다 ──
 //    「상품이 없습니다.」로 끝나면 처음 쓰는 사람이 거기서 막힌다.
@@ -140,6 +174,14 @@ for (const file of files) {
       const px = Number(m[1]);
       if (!FONT_OK.has(px)) add(file, line, "글씨 크기 5단계 밖 (11/12/13/15/20)", `text-[${m[1]}px]`);
     }
+
+    for (const v of offGrid(raw, INLINE_RADIUS, GRID_RADIUS))
+      add(file, line, "인라인 모서리가 격자 밖 (4·8·12·16·20)", `borderRadius ${v}`);
+    for (const v of offGrid(raw, INLINE_SPACE, GRID_SPACE))
+      add(file, line, "인라인 여백이 격자 밖 (4px 격자)", `여백 ${v}`);
+    if (!isEmojiSize(raw))
+      for (const v of offGrid(raw, INLINE_FONT, GRID_FONT))
+        add(file, line, "인라인 글씨가 스케일 밖 (11·12·13·14·16·18·20·24)", `fontSize ${v}`);
 
     const mr = raw.match(RADIUS_BAD);
     if (mr) add(file, line, "모서리 3종 밖 (카드 2xl · 버튼 xl · 칩 full)", mr[0] + "  ⟵ " + raw);

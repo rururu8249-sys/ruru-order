@@ -190,7 +190,7 @@ export default function CustomerFullOrderHistory({ kakaoId, phone }: { kakaoId: 
       type="button"
       key={value}
       onClick={() => { setFilter(value); setPage(1); }}
-      style={{ border: "1px solid", borderColor: filter === value ? "var(--color-rose-deep)" : "var(--color-line)", background: filter === value ? "var(--color-rose-deep)" : "var(--color-surface)", color: filter === value ? "#fff" : "var(--color-ink-soft)", borderRadius: "999px", padding: "3px 9px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}
+      style={{ border: "1px solid", borderColor: filter === value ? "var(--color-rose-deep)" : "var(--color-line)", background: filter === value ? "var(--color-rose-deep)" : "var(--color-surface)", color: filter === value ? "#fff" : "var(--color-ink-soft)", borderRadius: "999px", padding: "4px 8px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}
     >
       {label} {n}
     </button>
@@ -212,7 +212,7 @@ export default function CustomerFullOrderHistory({ kakaoId, phone }: { kakaoId: 
           <option value="amount">금액순</option>
         </select>
       </div>
-      <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", marginBottom: "8px" }}>
+      <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginBottom: "8px" }}>
         {chip("all", "전체", counts.all)}
         {chip("paid", "입금확인", counts.paid)}
         {chip("unpaid", "미입금", counts.unpaid)}
@@ -220,11 +220,11 @@ export default function CustomerFullOrderHistory({ kakaoId, phone }: { kakaoId: 
       </div>
 
       {rows === null ? (
-        <div style={{ textAlign: "center", padding: "18px 0", fontSize: "12px", color: "var(--color-ink-mute)" }}>주문 이력 불러오는 중…</div>
+        <div style={{ textAlign: "center", padding: "16px 0", fontSize: "12px", color: "var(--color-ink-mute)" }}>주문 이력 불러오는 중…</div>
       ) : error ? (
-        <div style={{ textAlign: "center", padding: "18px 0", fontSize: "12px", color: "var(--color-danger-tx)" }}>주문 이력 조회 실패: {error}</div>
+        <div style={{ textAlign: "center", padding: "16px 0", fontSize: "12px", color: "var(--color-danger-tx)" }}>주문 이력 조회 실패: {error}</div>
       ) : visible.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "18px 0", fontSize: "12px", color: "var(--color-ink-mute)" }}>주문 내역이 없습니다. 위 필터를 「전체」로 바꿔보세요.</div>
+        <div style={{ textAlign: "center", padding: "16px 0", fontSize: "12px", color: "var(--color-ink-mute)" }}>주문 내역이 없습니다. 위 필터를 「전체」로 바꿔보세요.</div>
       ) : (
         visible.map((g) => {
           const open = openKey === g.key;
@@ -238,14 +238,14 @@ export default function CustomerFullOrderHistory({ kakaoId, phone }: { kakaoId: 
                 <span style={{ width: "86px", flexShrink: 0, fontSize: "11px", color: "var(--color-ink-mute)" }}>{fmtDate(g.createdAt)}</span>
                 <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "12px", color: "var(--color-ink-soft)" }} title={g.summary}>
                   {g.summary}
-                  {!g.kakaoLinked ? <span style={{ marginLeft: "5px", fontSize: "10px", fontWeight: 800, color: "var(--color-warn-tx)" }}>전화만</span> : null}
+                  {!g.kakaoLinked ? <span style={{ marginLeft: "4px", fontSize: "11px", fontWeight: 800, color: "var(--color-warn-tx)" }}>전화만</span> : null}
                 </span>
                 <b style={{ fontSize: "12px", color: "var(--color-ink)", flexShrink: 0 }}>{money(g.amount)}</b>
-                <span style={{ flexShrink: 0, fontSize: "10px", fontWeight: 800, borderRadius: "6px", padding: "3px 7px", ...badgeStyle(g.kind) }}>{g.statusLabel}</span>
+                <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, borderRadius: "8px", padding: "4px 8px", ...badgeStyle(g.kind) }}>{g.statusLabel}</span>
                 <span style={{ flexShrink: 0, fontSize: "11px", color: "var(--color-ink-mute)" }}>{open ? "▲" : "▼"}</span>
               </button>
               {open ? (
-                <div style={{ margin: "0 0 10px 0", padding: "8px 10px", borderRadius: "10px", background: "var(--color-surface-2)", fontSize: "11px", color: "var(--color-ink-soft)", lineHeight: 1.6 }}>
+                <div style={{ margin: "0 0 8px 0", padding: "8px 8px", borderRadius: "8px", background: "var(--color-surface-2)", fontSize: "11px", color: "var(--color-ink-soft)", lineHeight: 1.6 }}>
                   {g.rows.map((r) => (
                     <div key={r.id} style={{ display: "flex", justifyContent: "space-between", gap: "8px" }}>
                       <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{rowItemLabel(r)}</span>
@@ -268,9 +268,9 @@ export default function CustomerFullOrderHistory({ kakaoId, phone }: { kakaoId: 
 
       {totalPages > 1 ? (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "8px", marginTop: "12px" }}>
-          <button type="button" onClick={() => setPage(Math.max(1, safePage - 1))} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", padding: "5px 12px", fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", cursor: "pointer" }}>이전</button>
+          <button type="button" onClick={() => setPage(Math.max(1, safePage - 1))} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", padding: "4px 12px", fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", cursor: "pointer" }}>이전</button>
           <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>{safePage} / {totalPages}</span>
-          <button type="button" onClick={() => setPage(Math.min(totalPages, safePage + 1))} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", padding: "5px 12px", fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", cursor: "pointer" }}>다음</button>
+          <button type="button" onClick={() => setPage(Math.min(totalPages, safePage + 1))} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", padding: "4px 12px", fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", cursor: "pointer" }}>다음</button>
         </div>
       ) : null}
     </div>

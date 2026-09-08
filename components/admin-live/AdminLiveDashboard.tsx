@@ -1806,7 +1806,7 @@ export default function AdminLiveDashboard() {
           onClick={() => setIntegrityOpen(false)}
         >
           <div
-            style={{ background: "var(--color-surface)", borderRadius: "16px", width: "100%", maxWidth: "560px", maxHeight: "80vh", overflowY: "auto", padding: "20px 22px", boxShadow: "0 18px 50px rgba(0,0,0,0.25)" }}
+            style={{ background: "var(--color-surface)", borderRadius: "16px", width: "100%", maxWidth: "560px", maxHeight: "80vh", overflowY: "auto", padding: "20px 24px", boxShadow: "0 18px 50px rgba(0,0,0,0.25)" }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
@@ -1814,7 +1814,7 @@ export default function AdminLiveDashboard() {
               <button
                 type="button"
                 onClick={() => setIntegrityOpen(false)}
-                style={{ width: "30px", height: "30px", borderRadius: "50%", border: "none", background: "#F1ECEE", color: "var(--color-ink-soft)", fontSize: "15px", cursor: "pointer" }}
+                style={{ width: "30px", height: "30px", borderRadius: "50%", border: "none", background: "#F1ECEE", color: "var(--color-ink-soft)", fontSize: "14px", cursor: "pointer" }}
               >
                 ✕
               </button>
@@ -1829,11 +1829,11 @@ export default function AdminLiveDashboard() {
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
+                  <div style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
                     <button type="button" onClick={() => setIntegrityRecentOnly(true)}
-                      style={{ fontSize: "12px", fontWeight: 700, padding: "5px 12px", borderRadius: "8px", border: "1px solid #E5C7CE", cursor: "pointer", background: integrityRecentOnly ? "#7A1E47" : "#fff", color: integrityRecentOnly ? "#fff" : "#7A1E47" }}>최근 7일만</button>
+                      style={{ fontSize: "12px", fontWeight: 700, padding: "4px 12px", borderRadius: "8px", border: "1px solid #E5C7CE", cursor: "pointer", background: integrityRecentOnly ? "#7A1E47" : "#fff", color: integrityRecentOnly ? "#fff" : "#7A1E47" }}>최근 7일만</button>
                     <button type="button" onClick={() => setIntegrityRecentOnly(false)}
-                      style={{ fontSize: "12px", fontWeight: 700, padding: "5px 12px", borderRadius: "8px", border: "1px solid #E5C7CE", cursor: "pointer", background: !integrityRecentOnly ? "#7A1E47" : "#fff", color: !integrityRecentOnly ? "#fff" : "#7A1E47" }}>전체 보기</button>
+                      style={{ fontSize: "12px", fontWeight: 700, padding: "4px 12px", borderRadius: "8px", border: "1px solid #E5C7CE", cursor: "pointer", background: !integrityRecentOnly ? "#7A1E47" : "#fff", color: !integrityRecentOnly ? "#fff" : "#7A1E47" }}>전체 보기</button>
                   </div>
                   {[
                     // [2026-08-11] 재고 안전장치 생존 감시 — 제출RPC 거부로직·경비원·담기선점이 하나라도 죽으면 표시 (0건=안전)
@@ -1886,7 +1886,7 @@ export default function AdminLiveDashboard() {
                       return `${base} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
                     };
                     return (
-                      <div key={card.kind} style={{ border: `1px solid ${isOk ? "#D1E7DD" : "#F5C2C7"}`, borderRadius: "12px", padding: "12px 14px" }}>
+                      <div key={card.kind} style={{ border: `1px solid ${isOk ? "#D1E7DD" : "#F5C2C7"}`, borderRadius: "12px", padding: "12px 12px" }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                           <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-ink)" }}>{card.title}</div>
                           <div style={{ fontSize: "14px", fontWeight: 800, color }}>{isOk ? "정상" : `${shownCount}건`}</div>
@@ -1920,13 +1920,13 @@ export default function AdminLiveDashboard() {
                                     {expandable ? <span style={{ color: "#B91C1C", fontWeight: 800, width: "10px" }}>{open ? "▾" : "▸"}</span> : <span>·</span>}
                                     <span style={{ fontWeight: expandable ? 700 : 400, color: expandable ? "var(--color-ink)" : lineColor }}>{summaryText}</span>
                                     {suspicious ? (
-                                      <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#B91C1C", borderRadius: "6px", padding: "1px 6px" }}>⚠️ 오매칭 의심</span>
+                                      <span style={{ fontSize: "11px", fontWeight: 800, color: "#fff", background: "#B91C1C", borderRadius: "8px", padding: "1px 6px" }}>⚠️ 오매칭 의심</span>
                                     ) : card.kind === "check2" ? (
-                                      <span style={{ fontSize: "10px", fontWeight: 800, color: "#92400E", background: "#FEF3C7", borderRadius: "6px", padding: "1px 6px" }}>고객 중복입금?</span>
+                                      <span style={{ fontSize: "11px", fontWeight: 800, color: "#92400E", background: "#FEF3C7", borderRadius: "8px", padding: "1px 6px" }}>고객 중복입금?</span>
                                     ) : null}
                                   </div>
                                   {expandable && open ? (
-                                    <div style={{ marginTop: "6px", marginLeft: "16px", marginBottom: "4px", padding: "8px 10px", background: suspicious ? "#FEF2F2" : "#FAF6F7", border: `1px solid ${suspicious ? "#F5C2C7" : "#E5C7CE"}`, borderRadius: "8px", color: "#444", fontSize: "12px", lineHeight: 1.7 }}>
+                                    <div style={{ marginTop: "6px", marginLeft: "16px", marginBottom: "4px", padding: "8px 8px", background: suspicious ? "#FEF2F2" : "#FAF6F7", border: `1px solid ${suspicious ? "#F5C2C7" : "#E5C7CE"}`, borderRadius: "8px", color: "#444", fontSize: "12px", lineHeight: 1.7 }}>
                                       {card.kind === "check2" ? (
                                         <>
                                           <div style={{ fontWeight: 700, color: "var(--color-ink)" }}>연결 주문: {item.nickname || "-"}{item.customer_name ? ` (${item.customer_name})` : ""}{item.order_lookup_code ? ` · ${item.order_lookup_code}` : ""} · 주문일 {fmtFull(item.order_created_at)}</div>

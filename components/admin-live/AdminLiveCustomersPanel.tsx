@@ -650,15 +650,15 @@ function CustomerDetailDrawer({
         style={{ width: "100%", maxWidth: "540px", maxHeight: "90vh", overflowY: "auto", borderRadius: "20px", border: "1px solid var(--color-rose-line)", background: "var(--color-surface)", boxShadow: "0 24px 70px rgba(15,23,42,0.28)" }}
       >
         {/* 헤더 */}
-        <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid var(--color-line)", padding: "14px 18px" }}>
-          <span style={{ fontSize: "15px", fontWeight: 800, color: "var(--color-ink)" }}>👤 회원 상세</span>
-          <button type="button" onClick={editOpen ? () => setEditOpen(false) : openEdit} style={{ marginLeft: "auto", marginRight: "8px", height: "30px", padding: "0 12px", borderRadius: "9px", border: "1px solid var(--color-rose-line)", background: editOpen ? "var(--color-surface-2)" : "var(--color-rose-deep)", color: editOpen ? "var(--color-ink-soft)" : "#fff", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}>{editOpen ? "취소" : "✎ 정보 수정"}</button>
+        <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid var(--color-line)", padding: "12px 16px" }}>
+          <span style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-ink)" }}>👤 회원 상세</span>
+          <button type="button" onClick={editOpen ? () => setEditOpen(false) : openEdit} style={{ marginLeft: "auto", marginRight: "8px", height: "30px", padding: "0 12px", borderRadius: "8px", border: "1px solid var(--color-rose-line)", background: editOpen ? "var(--color-surface-2)" : "var(--color-rose-deep)", color: editOpen ? "var(--color-ink-soft)" : "#fff", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}>{editOpen ? "취소" : "✎ 정보 수정"}</button>
           <button type="button" onClick={onClose} style={{ width: "27px", height: "27px", border: "none", background: "none", color: "var(--color-ink-mute)", fontSize: "18px", cursor: "pointer" }}>✕</button>
         </div>
 
-        <div style={{ padding: "16px 18px 18px" }}>
+        <div style={{ padding: "16px 16px 16px" }}>
           {/* 프로필 */}
-          <div style={{ display: "flex", gap: "13px", marginBottom: "14px" }}>
+          <div style={{ display: "flex", gap: "12px", marginBottom: "12px" }}>
             {clean(profile?.kakao_profile_image) ? (
               <img
                 src={clean(profile?.kakao_profile_image)}
@@ -670,11 +670,11 @@ function CustomerDetailDrawer({
               <span style={{ width: "54px", height: "54px", flexShrink: 0, borderRadius: "50%", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", fontWeight: 800 }}>{avatarChar}</span>
             )}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: "15px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "3px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+              <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                 {customer.nickname}
                 <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-ink-mute)" }}>· {customer.name || "-"}</span>
                 {customer.blocked ? (
-                  <span style={{ fontSize: "10px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", borderRadius: "6px", padding: "2px 7px" }}>차단</span>
+                  <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", borderRadius: "8px", padding: "2px 8px" }}>차단</span>
                 ) : null}
                 {profile?.live_alert_optin ? (
                   <span
@@ -696,10 +696,10 @@ function CustomerDetailDrawer({
                       {kakaoRaw.shippingName || kakaoRaw.shippingPhone ? ` / 배송지 ${[kakaoRaw.shippingName, kakaoRaw.shippingPhone ? formatPhone(kakaoRaw.shippingPhone) : ""].filter(Boolean).join(" · ")}` : ""}
                     </span>
                     {kakaoRaw.accountName && customer.name && kakaoRaw.accountName !== clean(customer.name) ? (
-                      <span style={{ marginLeft: "6px", fontSize: "10px", fontWeight: 800, color: "var(--color-warn-tx)", background: "var(--color-warn-bg)", borderRadius: "6px", padding: "1px 6px" }}>이름 다름</span>
+                      <span style={{ marginLeft: "6px", fontSize: "11px", fontWeight: 800, color: "var(--color-warn-tx)", background: "var(--color-warn-bg)", borderRadius: "8px", padding: "1px 6px" }}>이름 다름</span>
                     ) : null}
                     {kakaoRaw.accountPhone && digitsOnly(customer.phone) && kakaoRaw.accountPhone !== digitsOnly(customer.phone) ? (
-                      <span style={{ marginLeft: "4px", fontSize: "10px", fontWeight: 800, color: "var(--color-warn-tx)", background: "var(--color-warn-bg)", borderRadius: "6px", padding: "1px 6px" }}>번호 다름</span>
+                      <span style={{ marginLeft: "4px", fontSize: "11px", fontWeight: 800, color: "var(--color-warn-tx)", background: "var(--color-warn-bg)", borderRadius: "8px", padding: "1px 6px" }}>번호 다름</span>
                     ) : null}
                   </>
                 ) : null}
@@ -711,55 +711,55 @@ function CustomerDetailDrawer({
 
           {/* 정보 수정 폼 (닉네임/이름/주소 교정 + [📞 번호 변경] 전용 블록) */}
           {editOpen ? (
-            <div style={{ marginBottom: "14px", border: "1px solid var(--color-rose-line)", borderRadius: "12px", background: "var(--color-surface-2)", padding: "12px 13px" }}>
-              <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "9px" }}>✎ 회원 정보 수정 <span style={{ fontWeight: 700, color: "var(--color-ink-mute)" }}>(기본배송지 기준)</span></div>
+            <div style={{ marginBottom: "12px", border: "1px solid var(--color-rose-line)", borderRadius: "12px", background: "var(--color-surface-2)", padding: "12px 12px" }}>
+              <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "8px" }}>✎ 회원 정보 수정 <span style={{ fontWeight: 700, color: "var(--color-ink-mute)" }}>(기본배송지 기준)</span></div>
               {([
                 { label: "닉네임(유튜브 핸들명)", val: fNick, set: setFNick, ph: "예: @rur8249" },
                 { label: "이름", val: fName, set: setFName, ph: "주문자 이름" },
               ] as const).map((f) => (
                 <label key={f.label} style={{ display: "block", marginBottom: "8px" }}>
-                  <span style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", marginBottom: "3px" }}>{f.label}</span>
+                  <span style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", marginBottom: "4px" }}>{f.label}</span>
                   <input value={f.val} onChange={(e) => f.set(e.target.value)} placeholder={f.ph}
-                    style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "0 11px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none" }} />
+                    style={{ width: "100%", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "0 12px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none" }} />
                 </label>
               ))}
 
               {/* 주소: 우편번호 검색으로 채움(읽기전용) + 상세주소 직접 입력 */}
               <div style={{ marginBottom: "8px" }}>
-                <span style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", marginBottom: "3px" }}>주소 (기본배송지)</span>
+                <span style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", marginBottom: "4px" }}>주소 (기본배송지)</span>
                 <div style={{ display: "flex", gap: "6px", marginBottom: "6px" }}>
                   <input value={fZip} readOnly placeholder="우편번호"
-                    style={{ width: "110px", height: "38px", borderRadius: "9px", border: "1px solid var(--color-line)", background: "var(--color-surface-2)", padding: "0 11px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none" }} />
+                    style={{ width: "110px", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface-2)", padding: "0 12px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none" }} />
                   <button type="button" onClick={searchEditAddress}
-                    style={{ flex: 1, height: "38px", borderRadius: "9px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}>🔍 주소 검색</button>
+                    style={{ flex: 1, height: "38px", borderRadius: "8px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}>🔍 주소 검색</button>
                 </div>
                 <input value={fAddr} readOnly placeholder="주소 검색을 눌러 선택하세요"
-                  style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid var(--color-line)", background: "var(--color-surface-2)", padding: "0 11px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none", marginBottom: "6px" }} />
+                  style={{ width: "100%", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface-2)", padding: "0 12px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none", marginBottom: "6px" }} />
                 <input value={fDetail} onChange={(e) => setFDetail(e.target.value)} placeholder="상세주소 (동/호수 등 직접 입력)"
-                  style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "0 11px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none" }} />
+                  style={{ width: "100%", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "0 12px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none" }} />
               </div>
 
               {/* [2026-08-30] 전화번호 변경 — 식별키라 전용 API 로만 처리한다.
                   손님이 번호를 잘못 넣은 경우가 실제로 반복돼서(루루짱929, 히무0) 화면에서 바로 고치게 한다. */}
-              <div style={{ margin: "10px 0", border: "1px solid var(--color-rose-line)", borderRadius: "10px", background: "var(--color-surface)", padding: "10px 11px" }}>
+              <div style={{ margin: "8px 0", border: "1px solid var(--color-rose-line)", borderRadius: "8px", background: "var(--color-surface)", padding: "8px 12px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)" }}>전화번호</span>
                   <span style={{ fontSize: "13px", fontWeight: 900, color: "var(--color-ink)" }}>{formatPhone(customer.phone) || "-"}</span>
                   <button
                     type="button"
                     onClick={() => { setPhoneEditOpen((v) => !v); setFNewPhone(""); }}
-                    style={{ marginLeft: "auto", height: "30px", padding: "0 11px", borderRadius: "8px", border: "1px solid var(--color-rose-line)", background: phoneEditOpen ? "var(--color-surface-2)" : "var(--color-rose-soft)", color: "var(--color-rose-deep)", fontSize: "11.5px", fontWeight: 900, cursor: "pointer" }}
+                    style={{ marginLeft: "auto", height: "30px", padding: "0 12px", borderRadius: "8px", border: "1px solid var(--color-rose-line)", background: phoneEditOpen ? "var(--color-surface-2)" : "var(--color-rose-soft)", color: "var(--color-rose-deep)", fontSize: "12px", fontWeight: 900, cursor: "pointer" }}
                   >{phoneEditOpen ? "취소" : "📞 번호 변경"}</button>
                 </div>
 
                 {phoneEditOpen ? (
-                  <div style={{ marginTop: "9px" }}>
+                  <div style={{ marginTop: "8px" }}>
                     <input
                       value={fNewPhone}
                       onChange={(e) => setFNewPhone(e.target.value)}
                       inputMode="numeric"
                       placeholder="새 전화번호 (숫자만, 예: 01083834389)"
-                      style={{ width: "100%", height: "38px", borderRadius: "9px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "0 11px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none", boxSizing: "border-box" }}
+                      style={{ width: "100%", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "0 12px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none", boxSizing: "border-box" }}
                     />
                     <label style={{ display: "flex", alignItems: "center", gap: "6px", margin: "8px 0", cursor: "pointer", userSelect: "none" }}>
                       <input
@@ -768,9 +768,9 @@ function CustomerDetailDrawer({
                         onChange={(e) => setFUnifyOrders(e.target.checked)}
                         style={{ width: "15px", height: "15px", accentColor: "var(--color-rose-deep)", cursor: "pointer" }}
                       />
-                      <span style={{ fontSize: "11.5px", fontWeight: 800, color: "var(--color-ink)" }}>지난 주문도 같이 바꾸기 <b style={{ color: "var(--color-rose-deep)" }}>(권장)</b></span>
+                      <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>지난 주문도 같이 바꾸기 <b style={{ color: "var(--color-rose-deep)" }}>(권장)</b></span>
                     </label>
-                    <div style={{ fontSize: "10.5px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.8, marginBottom: "8px" }}>
+                    <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.8, marginBottom: "8px" }}>
                       · 포인트도 새 번호로 따라옵니다<br />
                       · 다른 사람이 쓰는 번호면 안 바뀝니다<br />
                       · 지난 주문도 같이 바꿔야 택배비가 또 안 붙습니다
@@ -779,32 +779,32 @@ function CustomerDetailDrawer({
                       type="button"
                       onClick={savePhoneChange}
                       disabled={phoneSaving}
-                      style={{ width: "100%", height: "40px", borderRadius: "10px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "13.5px", fontWeight: 900, cursor: phoneSaving ? "not-allowed" : "pointer", opacity: phoneSaving ? 0.6 : 1 }}
+                      style={{ width: "100%", height: "40px", borderRadius: "8px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "14px", fontWeight: 900, cursor: phoneSaving ? "not-allowed" : "pointer", opacity: phoneSaving ? 0.6 : 1 }}
                     >{phoneSaving ? "변경 중…" : "📞 전화번호 변경하기"}</button>
                   </div>
                 ) : null}
               </div>
 
               {/* 쪽지 보내기 — 사이트 안 알림. 접속만 하면 카톡 인앱브라우저·아이폰 모두 보인다. */}
-              <div style={{ margin: "10px 0", border: "1px solid var(--color-line)", borderRadius: "10px", background: "var(--color-surface)", padding: "10px 11px" }}>
+              <div style={{ margin: "8px 0", border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", padding: "8px 12px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)" }}>📩 쪽지 보내기</span>
                   <button
                     type="button"
                     onClick={() => { setNoteOpen((v) => !v); setNoteText(""); }}
-                    style={{ marginLeft: "auto", height: "30px", padding: "0 11px", borderRadius: "8px", border: "1px solid var(--color-line)", background: noteOpen ? "var(--color-surface-2)" : "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "11.5px", fontWeight: 900, cursor: "pointer" }}
+                    style={{ marginLeft: "auto", height: "30px", padding: "0 12px", borderRadius: "8px", border: "1px solid var(--color-line)", background: noteOpen ? "var(--color-surface-2)" : "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "12px", fontWeight: 900, cursor: "pointer" }}
                   >{noteOpen ? "취소" : "쓰기"}</button>
                 </div>
                 {noteOpen ? (
-                  <div style={{ marginTop: "9px" }}>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginBottom: "7px" }}>
+                  <div style={{ marginTop: "8px" }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "8px" }}>
                       {NOTE_PRESETS.map((pre) => (
                         <button
                           key={pre.label}
                           type="button"
                           onClick={() => setNoteText(pre.text)}
                           title={pre.text}
-                          style={{ border: "1px solid var(--color-rose-line)", borderRadius: "999px", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", padding: "5px 10px", fontSize: "11px", fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap" }}
+                          style={{ border: "1px solid var(--color-rose-line)", borderRadius: "999px", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", padding: "4px 8px", fontSize: "11px", fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap" }}
                         >{pre.label}</button>
                       ))}
                     </div>
@@ -813,9 +813,9 @@ function CustomerDetailDrawer({
                       onChange={(e) => setNoteText(e.target.value)}
                       placeholder="예) 주문서 제출만 하시면 됩니다! 마감 임박이에요 🙏"
                       rows={3}
-                      style={{ width: "100%", borderRadius: "9px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "9px 11px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none", boxSizing: "border-box", resize: "none", lineHeight: 1.6 }}
+                      style={{ width: "100%", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "8px 12px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none", boxSizing: "border-box", resize: "none", lineHeight: 1.6 }}
                     />
-                    <div style={{ fontSize: "10.5px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.7, margin: "6px 0 8px" }}>
+                    <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.7, margin: "6px 0 8px" }}>
                       · 손님이 사이트에 들어오면 팝업으로 뜹니다<br />
                       · 이미 보고 있으면 15초 안에 뜹니다<br />
                       · 놓쳐도 손님 화면 🔔 쪽지함에 12시간 남습니다<br />
@@ -825,17 +825,17 @@ function CustomerDetailDrawer({
                       type="button"
                       onClick={sendCustomerNote}
                       disabled={noteSending || !clean(noteText)}
-                      style={{ width: "100%", height: "40px", borderRadius: "10px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "13.5px", fontWeight: 900, cursor: noteSending ? "not-allowed" : "pointer", opacity: noteSending || !clean(noteText) ? 0.5 : 1 }}
+                      style={{ width: "100%", height: "40px", borderRadius: "8px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "14px", fontWeight: 900, cursor: noteSending ? "not-allowed" : "pointer", opacity: noteSending || !clean(noteText) ? 0.5 : 1 }}
                     >{noteSending ? "보내는 중…" : "📩 쪽지 보내기"}</button>
                   </div>
                 ) : null}
               </div>
 
-              <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-warn-tx)", lineHeight: 1.6, margin: "4px 0 9px" }}>
+              <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-warn-tx)", lineHeight: 1.6, margin: "4px 0 8px" }}>
                 ※ 닉네임/이름은 이 회원의 주문서 표시에도 반영됩니다.<br />※ 주소는 회원의 <b>기본배송지</b>를 바꿉니다(손님 화면·다음 주문에 반영, 기존 주문 송장은 유지).<br />※ 미입금 주문은 입금 자동매칭 기준(입금자명)도 새 닉네임으로 바뀝니다.<br />※ 전화번호는 안전을 위해 수정하지 않습니다.
               </div>
               <button type="button" onClick={saveEdit} disabled={editSaving}
-                style={{ width: "100%", height: "42px", borderRadius: "10px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "14px", fontWeight: 800, cursor: editSaving ? "not-allowed" : "pointer", opacity: editSaving ? 0.6 : 1 }}>
+                style={{ width: "100%", height: "42px", borderRadius: "8px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "14px", fontWeight: 800, cursor: editSaving ? "not-allowed" : "pointer", opacity: editSaving ? 0.6 : 1 }}>
                 {editSaving ? "저장 중…" : "저장 (customers + 주문서 반영)"}
               </button>
             </div>
@@ -843,7 +843,7 @@ function CustomerDetailDrawer({
 
           {/* 등록 배송지 (고객이 등록한 customers.shipping_addresses 배열 — 읽기 전용) */}
           {Array.isArray(profile?.shipping_addresses) && profile.shipping_addresses.length > 0 ? (
-            <div style={{ marginBottom: "14px" }}>
+            <div style={{ marginBottom: "12px" }}>
               <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "8px" }}>📦 등록 배송지 ({profile.shipping_addresses.length}건)</div>
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {[...profile.shipping_addresses]
@@ -855,11 +855,11 @@ function CustomerDetailDrawer({
                       clean(addr?.detailAddress),
                     ].filter(Boolean).join(" ");
                     return (
-                      <div key={`${clean(addr?.name)}-${index}`} style={{ border: "1px solid var(--color-line)", borderRadius: "9px", padding: "8px 11px", background: addr?.isDefault ? "var(--color-surface-2)" : "#fff" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px" }}>
+                      <div key={`${clean(addr?.name)}-${index}`} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", padding: "8px 12px", background: addr?.isDefault ? "var(--color-surface-2)" : "#fff" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
                           <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>{clean(addr?.name) || "이름 없음"}</span>
                           {clean(addr?.phone) ? <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>{formatPhone(clean(addr?.phone))}</span> : null}
-                          {addr?.isDefault ? <span style={{ marginLeft: "auto", fontSize: "10px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", borderRadius: "6px", padding: "2px 7px" }}>기본</span> : null}
+                          {addr?.isDefault ? <span style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", borderRadius: "8px", padding: "2px 8px" }}>기본</span> : null}
                         </div>
                         <div style={{ fontSize: "11px", color: "var(--color-ink-soft)" }}>{fullAddr || "주소 없음"}</div>
                       </div>
@@ -870,18 +870,18 @@ function CustomerDetailDrawer({
           ) : null}
 
           {/* 3 스탯 */}
-          <div style={{ display: "flex", gap: "7px", marginBottom: "14px" }}>
-            <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "10px", padding: "10px", textAlign: "center" }}>
+          <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+            <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", textAlign: "center" }}>
               <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>누적 주문</div>
-              <div style={{ marginTop: "3px", fontSize: "16px", fontWeight: 800, color: "var(--color-ink)" }}>{customer.orderCount.toLocaleString("ko-KR")}건</div>
+              <div style={{ marginTop: "4px", fontSize: "16px", fontWeight: 800, color: "var(--color-ink)" }}>{customer.orderCount.toLocaleString("ko-KR")}건</div>
             </div>
-            <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "10px", padding: "10px", textAlign: "center" }}>
+            <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", textAlign: "center" }}>
               <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>누적 결제</div>
-              <div style={{ marginTop: "3px", fontSize: "16px", fontWeight: 800, color: "var(--color-ink)" }}>{money(customer.totalAmount)}</div>
+              <div style={{ marginTop: "4px", fontSize: "16px", fontWeight: 800, color: "var(--color-ink)" }}>{money(customer.totalAmount)}</div>
             </div>
-            <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "10px", padding: "10px", textAlign: "center" }}>
+            <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", textAlign: "center" }}>
               <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>미입금</div>
-              <div style={{ marginTop: "3px", fontSize: "16px", fontWeight: 800, color: customer.unpaidCount > 0 ? "var(--color-warn-tx)" : "var(--color-ink)" }}>{customer.unpaidCount.toLocaleString("ko-KR")}건</div>
+              <div style={{ marginTop: "4px", fontSize: "16px", fontWeight: 800, color: customer.unpaidCount > 0 ? "var(--color-warn-tx)" : "var(--color-ink)" }}>{customer.unpaidCount.toLocaleString("ko-KR")}건</div>
             </div>
           </div>
 
@@ -889,7 +889,7 @@ function CustomerDetailDrawer({
           <CustomerFullOrderHistory kakaoId={clean(profile?.kakao_id) || clean(customer.kakaoId)} phone={customer.phone} />
 
           {/* 포인트 (기존 패널 유지 — 보유포인트 표시 + 🪙 지급) */}
-          <div style={{ marginTop: "14px" }}>
+          <div style={{ marginTop: "12px" }}>
             <AdminLiveCustomerPointPanel customer={customer} />
           </div>
 
@@ -901,18 +901,18 @@ function CustomerDetailDrawer({
                 {[...profile.customer_history]
                   .sort((a, b) => String(b.changed_at).localeCompare(String(a.changed_at)))
                   .map((h, index) => (
-                    <div key={`${h.field}-${h.changed_at}-${index}`} style={{ border: "1px solid var(--color-line)", borderRadius: "9px", padding: "8px 11px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px" }}>
+                    <div key={`${h.field}-${h.changed_at}-${index}`} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", padding: "8px 12px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
                         <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)" }}>{customerHistoryFieldLabel(h.field)}</span>
-                        <span style={{ marginLeft: "auto", fontSize: "10px", color: "var(--color-ink-mute)" }}>{formatOrderDateTime(h.changed_at)}</span>
+                        <span style={{ marginLeft: "auto", fontSize: "11px", color: "var(--color-ink-mute)" }}>{formatOrderDateTime(h.changed_at)}</span>
                       </div>
                       <div style={{ fontSize: "11px", color: "var(--color-ink-soft)" }}>
                         <span style={{ color: "var(--color-ink-mute)" }}>{h.old_value || "(없음)"}</span>
-                        <span style={{ margin: "0 5px", color: "var(--color-ink-mute)", fontWeight: 800 }}>→</span>
+                        <span style={{ margin: "0 4px", color: "var(--color-ink-mute)", fontWeight: 800 }}>→</span>
                         <span style={{ color: "var(--color-ink)", fontWeight: 700 }}>{h.new_value || "(없음)"}</span>
                       </div>
                       {h.note ? (
-                        <div style={{ marginTop: "4px", fontSize: "10px", fontWeight: 700, color: "var(--color-danger-tx)" }}>{h.note}</div>
+                        <div style={{ marginTop: "4px", fontSize: "11px", fontWeight: 700, color: "var(--color-danger-tx)" }}>{h.note}</div>
                       ) : null}
                     </div>
                   ))}
@@ -933,7 +933,7 @@ function CustomerDetailDrawer({
             <button
               type="button"
               onClick={onClose}
-              style={{ marginLeft: "auto", borderRadius: "8px", border: "none", background: "var(--color-rose-deep)", padding: "8px 18px", fontSize: "12px", fontWeight: 800, color: "#fff", cursor: "pointer" }}
+              style={{ marginLeft: "auto", borderRadius: "8px", border: "none", background: "var(--color-rose-deep)", padding: "8px 16px", fontSize: "12px", fontWeight: 800, color: "#fff", cursor: "pointer" }}
             >
               닫기
             </button>
