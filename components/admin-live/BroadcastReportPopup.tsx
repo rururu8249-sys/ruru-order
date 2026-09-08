@@ -442,7 +442,7 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
               </div>
               <div style={{ border: "1px solid var(--color-line)", borderRadius: "12px", padding: "6px 12px", marginBottom: "14px", background: "var(--color-surface)" }}>
                 {best.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "18px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>결제완료 주문이 없습니다.</div>
+                  <div style={{ textAlign: "center", padding: "18px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>결제완료 주문이 없습니다. 입금이 확인되면 여기에 집계됩니다.</div>
                 ) : (
                   best.map((b, i) => {
                     const value = bestSort === "qty" ? b.qty : b.sales;
@@ -476,7 +476,7 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
               </div>
               <div style={{ border: "1px solid var(--color-line)", borderRadius: "12px", overflow: "hidden", background: "var(--color-surface)" }}>
                 {buyersFiltered.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "18px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>{buyerSearch ? "검색 결과가 없습니다." : "결제완료 구매자가 없습니다."}</div>
+                  <div style={{ textAlign: "center", padding: "18px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>{buyerSearch ? "검색 결과가 없습니다." : "결제완료 구매자가 없습니다. 입금이 확인되면 여기에 나옵니다."}</div>
                 ) : (
                   buyersFiltered.map((b, i) => {
                     const expanded = buyerExpand === b.key;

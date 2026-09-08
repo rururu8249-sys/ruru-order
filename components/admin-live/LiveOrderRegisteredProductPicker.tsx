@@ -435,7 +435,7 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
             {loading ? (
               <div className="py-4 text-center text-[13px] font-bold text-ink-mute">불러오는 중...</div>
             ) : visibleProducts.length === 0 ? (
-              <div className="py-4 text-center text-[13px] font-bold text-ink-mute">상품이 없습니다.</div>
+              <div className="py-4 text-center text-[13px] font-bold text-ink-mute">상품이 없습니다. 검색어를 지우거나 상품 관리에서 먼저 등록해 주세요.</div>
             ) : (
               visibleProducts.map((p) => {
                 const id = productId(p);

@@ -464,7 +464,7 @@ export default function AdminLiveMissionPanel() {
             return k >= weekAgo && k <= today; // 이번주 = 최근 7일
           });
           if (filtered.length === 0) {
-            return <div className="note" style={{ textAlign: "center", padding: "20px 0" }}>해당 기간 지급 기록이 없습니다.</div>;
+            return <div className="note" style={{ textAlign: "center", padding: "20px 0" }}>해당 기간 지급 기록이 없습니다. 위 기간 버튼을 바꿔보세요.</div>;
           }
           const total = filtered.reduce((s, x) => s + x.amount, 0);
           return (
@@ -540,7 +540,7 @@ export default function AdminLiveMissionPanel() {
                 ) : null}
                 <div style={{ marginTop: 10, flex: 1, minHeight: 0, overflowY: "auto", border: "1px solid var(--color-surface-3)", borderRadius: 10 }}>
                   {payout.buyers.length === 0 ? (
-                    <div style={{ padding: "16px", textAlign: "center", color: "var(--color-ink-mute)", fontSize: 13 }}>지급 대상(결제완료 구매자)이 없어요.</div>
+                    <div style={{ padding: "16px", textAlign: "center", color: "var(--color-ink-mute)", fontSize: 13 }}>지급 대상(결제완료 구매자)이 없어요. 입금이 확인된 주문이 생기면 여기에 명단이 나옵니다.</div>
                   ) : (
                     payout.buyers.map((b, i) => (
                       <div key={`${b.phone}-${i}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderBottom: "1px solid var(--color-surface-2)", fontSize: 13 }}>

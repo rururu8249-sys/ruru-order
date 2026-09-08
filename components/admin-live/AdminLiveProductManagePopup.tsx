@@ -1558,7 +1558,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             {histLoading ? (
               <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>불러오는 중…</div>
             ) : histFiltered.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>기록이 없습니다.</div>
+              <div style={{ textAlign: "center", padding: "34px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>아직 기록이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "3px" }}>상품을 방송에 담거나 진열하면 여기에 남습니다.</div></div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {histFiltered.map((b) => {
@@ -1591,7 +1591,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           {histDetailLoading === b.id && !detail ? (
                             <div style={{ textAlign: "center", padding: "16px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>불러오는 중…</div>
                           ) : !detail || detail.length === 0 ? (
-                            <div style={{ textAlign: "center", padding: "16px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>주문이 없습니다.</div>
+                            <div style={{ textAlign: "center", padding: "16px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>주문이 없습니다. 방송 중 손님이 주문하면 여기에 바로 나옵니다.</div>
                           ) : (
                             <>
                               {/* 펼침 헤더: 빈칸 / 상품명·옵션 / 수량 / 단가 / 매출 */}
@@ -1656,7 +1656,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 {bcLoading ? (
                   <div style={{ textAlign: "center", padding: "30px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>불러오는 중…</div>
                 ) : bcList.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "30px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>방송이 없습니다.</div>
+                  <div style={{ textAlign: "center", padding: "34px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>방송이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "3px" }}>방송 콘솔에서 ▶ 방송시작을 누르면 여기에 나옵니다.</div></div>
                 ) : (
                   bcList.map((b) => {
                     const on = b.id === bcSelId;
@@ -1853,7 +1853,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 {!bcSelId ? (
                   <div style={{ textAlign: "center", padding: "30px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>방송을 선택하세요.</div>
                 ) : bcProducts.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "30px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>진열된 상품이 없습니다.</div>
+                  <div style={{ textAlign: "center", padding: "34px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>진열된 상품이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "3px" }}>아래 목록에서 상품을 골라 「진열」을 누르면 손님 화면에 올라갑니다.</div></div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
                     {bcProductsView.filter(nameMatch).map((p, i) => {
@@ -1922,7 +1922,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               style={{ flex: 1, minHeight: 0, overflowY: "auto" }}
             >
               {shopRows.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>진열된 상품이 없습니다.</div>
+                <div style={{ textAlign: "center", padding: "34px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>진열된 상품이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "3px" }}>손님 화면에 보일 상품을 골라 「진열」을 눌러주세요.</div></div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
                   {shopRowsView.filter(nameMatch).map((p, i) => {
@@ -2005,7 +2005,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               {loading ? (
                 <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>불러오는 중…</div>
               ) : visible.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>상품이 없습니다.</div>
+                <div style={{ textAlign: "center", padding: "34px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>등록된 상품이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "3px" }}>오른쪽 위 「+ 상품 등록」 또는 「📄 엑셀 대량등록」으로 추가하세요.</div></div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   {visible.map((p) => {
@@ -2184,7 +2184,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             {/* 상품 목록(개별선택) */}
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "8px 18px" }}>
               {products.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "30px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>상품이 없습니다.</div>
+                <div style={{ textAlign: "center", padding: "34px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>조건에 맞는 상품이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "3px" }}>위 검색어·필터를 지우면 전체가 보입니다.</div></div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
                   {products.map((p) => {
@@ -2313,7 +2313,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   return true;
                 });
                 if (pickList.length === 0) {
-                  return <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>{bcPickerDate ? `${bcPickerDate}에 등록한 상품이 없습니다.` : bcPickerFromBcId ? "그 방송에 담았던 상품이 없습니다." : "상품이 없습니다."}</div>;
+                  return <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>{bcPickerDate ? `${bcPickerDate}에 등록한 상품이 없습니다.` : bcPickerFromBcId ? "그 방송에 담았던 상품이 없습니다." : "상품이 없습니다. 「+ 상품 등록」으로 먼저 만들어 주세요."}</div>;
                 }
                 const selectableIds = pickList.map((p) => productId(p)).filter((pid) => pid && !bcAddedIds.has(pid));
                 const alreadyCount = pickList.length - selectableIds.length;
@@ -2385,7 +2385,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   return true;
                 });
                 if (pickList.length === 0) {
-                  return <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>상품이 없습니다.</div>;
+                  return <div style={{ textAlign: "center", padding: "34px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>상품이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "3px" }}>「+ 상품 등록」으로 먼저 상품을 만들어 주세요.</div></div>;
                 }
                 return (
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>

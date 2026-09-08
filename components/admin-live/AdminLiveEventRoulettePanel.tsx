@@ -1691,7 +1691,7 @@ export default function AdminLiveEventRoulettePanel({
                   </span>
                 </div>
                 {filteredWinners.length === 0 ? (
-                  <div className="note" style={{ textAlign: "center", padding: "20px 0" }}>해당 기간 당첨 기록이 없습니다.</div>
+                  <div className="note" style={{ textAlign: "center", padding: "20px 0" }}>해당 기간 당첨 기록이 없습니다. 위 기간 버튼을 「이번달」로 바꿔보세요.</div>
                 ) : (
                   filteredWinners.map((w) => (
                     <div key={`winner-${w.id}`} className="row">

@@ -241,7 +241,7 @@ export default function VisitStatsView({ embedded = false, state, style }: Visit
       <div style={{ minHeight: 0, flex: 1, overflowY: "auto", padding: "12px 16px 16px" }}>
         {tab === "date" ? (
           (stats.daily || []).length === 0 ? (
-            <div style={{ padding: "34px 10px", textAlign: "center", fontSize: "12.5px", fontWeight: 700, color: "var(--color-ink-mute)" }}>아직 쌓인 기록이 없습니다.</div>
+            <div style={{ padding: "34px 10px", textAlign: "center", fontSize: "12.5px", fontWeight: 700, color: "var(--color-ink-mute)" }}>아직 쌓인 기록이 없습니다. 손님이 주문서에 들어오면 여기에 쌓입니다.</div>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>

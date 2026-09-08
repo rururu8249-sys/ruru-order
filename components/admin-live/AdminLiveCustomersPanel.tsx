@@ -1723,7 +1723,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
             <div className="mt-3 flex flex-col gap-1.5">
               {visibleCustomers.length === 0 ? (
-                <div className="py-10 text-center text-sm text-ink-mute">표시할 고객이 없습니다.</div>
+                <div className="ru-empty"><div className="ru-empty-title">이 조건에 맞는 고객이 없습니다.</div><div className="ru-empty-hint">검색어를 지우거나 「구매한 손님만」 필터를 꺼보세요.</div></div>
               ) : (
                 visibleCustomers.map((customer) => {
                   const initial = (customer.nickname || customer.name || "?").trim().charAt(0);

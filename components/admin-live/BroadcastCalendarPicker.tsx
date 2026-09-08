@@ -201,7 +201,7 @@ export default function BroadcastCalendarPicker({ items, value, onPick, allLabel
           )}
 
           {byDate.size === 0 && (
-            <div style={{ marginTop: 8, fontSize: 12, color: "var(--color-ink-mute)", textAlign: "center" }}>등록된 방송이 없습니다</div>
+            <div style={{ marginTop: 8, fontSize: 12, color: "var(--color-ink-mute)", textAlign: "center" }}>등록된 방송이 없습니다. 방송 콘솔에서 ▶ 방송시작을 누르면 만들어집니다.</div>
           )}
         </div>
       )}

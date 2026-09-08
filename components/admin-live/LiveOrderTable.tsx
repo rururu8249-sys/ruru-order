@@ -1058,7 +1058,7 @@ export default function LiveOrderTable({
               {loading ? (
                 <div className="px-3 py-10 text-center text-sm font-black text-ink-mute">실제 주문 데이터를 불러오는 중입니다.</div>
               ) : visibleOrders.length === 0 ? (
-                <div className="px-3 py-10 text-center text-sm font-black text-ink-mute">표시할 주문이 없습니다.</div>
+                <div className="ru-empty"><div className="ru-empty-title">이 조건에 맞는 주문이 없습니다.</div><div className="ru-empty-hint">위 기간·방송·상태 필터를 「전체」로 바꾸면 다른 주문도 보입니다.</div></div>
               ) : (
                 visibleOrders.map((order) => {
                   const selected = order.id === selectedOrderId;

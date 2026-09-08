@@ -618,7 +618,7 @@ export default function AdminLiveNoticePanel() {
           {/* 목록 */}
           <div className="space-y-2">
             {notices.length === 0 ? (
-              <div className={`${card} py-14 text-center text-sm font-bold text-ink-mute`}>등록된 공지가 없습니다.</div>
+              <div className={`${card} py-14 text-center text-sm font-bold text-ink-mute`}>등록된 공지가 없습니다. 위에서 제목·내용을 넣고 「공지 등록」을 눌러주세요.</div>
             ) : (
               notices.map((n, i) => (
                 <div key={n.id} className={`rounded-xl border p-4 ${n.is_visible ? "border-line bg-surface" : "border-line bg-surface-2 opacity-60"}`}>
@@ -770,7 +770,7 @@ export default function AdminLiveNoticePanel() {
 
           {sent.length === 0 ? (
             <div className={`${card} py-14 text-center text-sm font-bold text-ink-mute`}>
-              {sentLoading ? "불러오는 중…" : "보낸 쪽지가 없습니다."}
+              {sentLoading ? "불러오는 중…" : "보낸 쪽지가 없습니다. 위에서 손님을 찾아 쪽지를 보내면 여기에 쌓입니다."}
             </div>
           ) : (
             <div className="space-y-2">

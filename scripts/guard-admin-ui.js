@@ -75,6 +75,30 @@ const DEAD_HOVER = /hover:bg-([\w[\]()#,.%/-]+)/;
 const FONT_OK = new Set([11, 12, 13, 14, 16, 18, 20, 22, 24, 30, 32, 36, 40]);
 const FONT_PX = /text-\[(\d+(?:\.\d+)?)px\]/g;
 
+// ── 규칙 8. 빈 화면은 «다음에 뭘 하면 되는지»까지 말해야 한다 ──
+//    「상품이 없습니다.」로 끝나면 처음 쓰는 사람이 거기서 막힌다.
+//    단어 목록으로 판정하면 「바꾸」가 「바꿔보세요」를 못 잡는 식으로 새므로,
+//    «없다는 말 뒤에 안내 문장이 실제로 붙어 있는지» 길이로 본다.
+const EMPTY_STATE = /(?:text-center|textAlign:\s*"center")/;
+const EMPTY_WORD = /없습니다|없어요/;
+// 「다 끝났다」는 좋은 소식(🎉·👍)은 다음 할 일이 없으므로 제외
+const EMPTY_GOOD = /🎉|👍|✅|다 챙|모두 |없어요!/;
+// 그 줄에 «화면에 보이는 글자»를 전부 모아, 「없다」는 말 뒤에 안내가 10글자 이상 있는지 본다.
+//   (안내를 형제 <div>에 따로 쓴 경우도 잡아야 하므로 줄 전체의 텍스트를 합친다)
+function emptyStateHasHint(raw) {
+  const parts = [];
+  for (const m of raw.matchAll(/>([^<>{}]+)</g)) parts.push(m[1]);          // JSX 텍스트 노드
+  for (const m of raw.matchAll(/"([^"]{2,})"/g)) {                            // 문자열 리터럴
+    const t = m[1];
+    if (!/[:;{}]|^[a-z-]+$|px|rem|var\(|#[0-9a-f]{3}/i.test(t)) parts.push(t); // CSS 값 제외
+  }
+  const text = parts.join(" ");
+  const i = Math.max(text.lastIndexOf("없습니다"), text.lastIndexOf("없어요"));
+  if (i < 0) return true;
+  const after = text.slice(i).replace(/없습니다|없어요/g, "").replace(/[.\s·]/g, "");
+  return after.length >= 10;
+}
+
 // ── 규칙 7. 모서리 — Polaris border-radius 스케일만 (4·8·12·16·20·full) ──
 //    rounded-md(6)·3xl(24) 는 스케일에 없다. Tailwind sm=2 md=6 lg=8 xl=12 2xl=16 3xl=24
 const RADIUS_BAD = /\brounded-(?:md|3xl)\b/;
@@ -116,6 +140,10 @@ for (const file of files) {
 
     const mr = raw.match(RADIUS_BAD);
     if (mr) add(file, line, "모서리 3종 밖 (카드 2xl · 버튼 xl · 칩 full)", mr[0] + "  ⟵ " + raw);
+
+    if (EMPTY_STATE.test(raw) && EMPTY_WORD.test(raw) && !EMPTY_GOOD.test(raw) && !emptyStateHasHint(raw)) {
+      add(file, line, "빈 화면에 «다음에 할 일» 안내 없음", raw);
+    }
   });
 }
 

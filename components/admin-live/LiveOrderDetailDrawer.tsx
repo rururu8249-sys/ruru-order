@@ -1487,7 +1487,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           </div>
           <div className="space-y-2">
             {items.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-line p-4 text-center text-xs font-bold text-ink-mute">주문 품목이 없습니다.</div>
+              <div className="rounded-2xl border border-dashed border-line"><div className="ru-empty"><div className="ru-empty-title">주문 품목이 없습니다.</div><div className="ru-empty-hint">위 「+ 등록상품 추가」 또는 「+ 직접입력 추가」로 넣어주세요.</div></div></div>
             ) : (
               items.map((item, index) => (
                 <LiveOrderItemEditCard

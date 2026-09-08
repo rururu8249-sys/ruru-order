@@ -224,7 +224,7 @@ export default function CustomerFullOrderHistory({ kakaoId, phone }: { kakaoId: 
       ) : error ? (
         <div style={{ textAlign: "center", padding: "18px 0", fontSize: "12px", color: "var(--color-danger-tx)" }}>주문 이력 조회 실패: {error}</div>
       ) : visible.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "18px 0", fontSize: "12px", color: "var(--color-ink-mute)" }}>주문 내역이 없습니다.</div>
+        <div style={{ textAlign: "center", padding: "18px 0", fontSize: "12px", color: "var(--color-ink-mute)" }}>주문 내역이 없습니다. 위 필터를 「전체」로 바꿔보세요.</div>
       ) : (
         visible.map((g) => {
           const open = openKey === g.key;

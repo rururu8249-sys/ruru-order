@@ -498,7 +498,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
             </thead>
             <tbody>
               {view.length === 0 ? (
-                <tr><td colSpan={9} className="px-3 py-10 text-center text-[12px] font-black text-ink-mute">읽어온 채팅이 없습니다.</td></tr>
+                <tr><td colSpan={9}><div className="ru-empty"><div className="ru-empty-title">읽어온 채팅이 없습니다.</div><div className="ru-empty-hint">위 「채팅주문 켜기」를 누르면 유튜브 채팅에서 주문을 읽어옵니다.</div></div></td></tr>
               ) : view.map((r) => {
                 const st = STATUS_META[String(r.parse_status || "raw")] || STATUS_META.raw;
                 return (
