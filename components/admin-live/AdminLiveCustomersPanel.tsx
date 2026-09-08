@@ -679,7 +679,7 @@ function CustomerDetailDrawer({
                 {profile?.live_alert_optin ? (
                   <span
                     title={profile.live_alert_optin_at ? `신청일 ${new Date(profile.live_alert_optin_at).toLocaleDateString("ko-KR")}` : "방송알림 신청"}
-                    style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: 9999, fontSize: 12, fontWeight: 600, background: "#F9EEF3", color: "#7A1E47", marginLeft: 6 }}
+                    style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: 9999, fontSize: 12, fontWeight: 600, background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", marginLeft: 6 }}
                   >🔔 방송알림</span>
                 ) : null}
               </div>
@@ -881,7 +881,7 @@ function CustomerDetailDrawer({
             </div>
             <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "10px", padding: "10px", textAlign: "center" }}>
               <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>미입금</div>
-              <div style={{ marginTop: "3px", fontSize: "16px", fontWeight: 800, color: customer.unpaidCount > 0 ? "var(--color-warn-tx)" : "#222" }}>{customer.unpaidCount.toLocaleString("ko-KR")}건</div>
+              <div style={{ marginTop: "3px", fontSize: "16px", fontWeight: 800, color: customer.unpaidCount > 0 ? "var(--color-warn-tx)" : "var(--color-ink)" }}>{customer.unpaidCount.toLocaleString("ko-KR")}건</div>
             </div>
           </div>
 
@@ -926,7 +926,7 @@ function CustomerDetailDrawer({
               type="button"
               onClick={() => onBlockAction(customer)}
               disabled={blockSaving}
-              style={{ border: "1px solid", borderColor: customer.blocked ? "var(--color-rose-line)" : "var(--color-rose-line)", borderRadius: "8px", background: customer.blocked ? "#fff" : "var(--color-danger-bg)", padding: "8px 12px", fontSize: "11px", fontWeight: 800, color: customer.blocked ? "#555" : "var(--color-danger-tx)", cursor: blockSaving ? "wait" : "pointer", opacity: blockSaving ? 0.5 : 1 }}
+              style={{ border: "1px solid", borderColor: customer.blocked ? "var(--color-rose-line)" : "var(--color-rose-line)", borderRadius: "8px", background: customer.blocked ? "#fff" : "var(--color-danger-bg)", padding: "8px 12px", fontSize: "11px", fontWeight: 800, color: customer.blocked ? "var(--color-ink-soft)" : "var(--color-danger-tx)", cursor: blockSaving ? "wait" : "pointer", opacity: blockSaving ? 0.5 : 1 }}
             >
               {customer.blocked ? `✅ ${CUSTOMER_TERMS.unblock}` : `🚫 ${CUSTOMER_TERMS.block}`}
             </button>
@@ -1570,7 +1570,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
       <div className={embedded ? "flex h-full w-full flex-col overflow-hidden bg-surface" : "flex h-[88vh] w-full max-w-[640px] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl"}>
         {embedded ? null : (
           <div className="flex items-center justify-between border-b border-rose-line px-5 py-3 shrink-0">
-            <span className="text-[15px] font-black text-ink">👥 고객·이슈</span>
+            <span className="text-[14px] font-black text-ink">👥 고객·이슈</span>
             <button type="button" onClick={() => onClose?.()} className="text-ink-mute hover:text-ink text-lg leading-none">✕</button>
           </div>
         )}
@@ -1754,7 +1754,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                         <div className="flex items-center gap-1.5">
                           <span className="truncate text-[13px] font-black text-ink">{customer.nickname || "—"}</span>
                           {customer.name ? <span className="shrink-0 text-xs text-ink-mute">· {customer.name}</span> : null}
-                          {!customer.kakaoId ? <span className="shrink-0 rounded-md bg-warn-bg px-1.5 py-0.5 text-[11px] font-black text-warn-tx" title="카카오 로그인 기록이 없는 옛 회원(전화번호만). 다시 카톡 로그인하면 자동 연결됩니다.">카카오 미연동</span> : null}
+                          {!customer.kakaoId ? <span className="shrink-0 rounded-lg bg-warn-bg px-1.5 py-0.5 text-[11px] font-black text-warn-tx" title="카카오 로그인 기록이 없는 옛 회원(전화번호만). 다시 카톡 로그인하면 자동 연결됩니다.">카카오 미연동</span> : null}
                         </div>
                         <div className="mt-0.5 truncate text-[11px] text-ink-mute">
                           누적 {customer.orderCount}건 · {money(customer.totalAmount)}
@@ -1762,7 +1762,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                         </div>
                       </button>
                       {customer.blocked ? (
-                        <span className="shrink-0 rounded-md bg-danger-bg px-2 py-0.5 text-[11px] font-black text-danger-tx">차단</span>
+                        <span className="shrink-0 rounded-lg bg-danger-bg px-2 py-0.5 text-[11px] font-black text-danger-tx">차단</span>
                       ) : null}
                       <button
                         type="button"
@@ -1940,7 +1940,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                     }
                   }}
                   placeholder="닉네임 / 이름 / 전화번호 / 주소 / 차단사유 검색"
-                  className="h-11 rounded-xl border border-line bg-surface px-3 text-sm font-black text-ink outline-none focus:border-danger-tx/35 focus:ring-4 focus:ring-red-50"
+                  className="h-11 rounded-xl border border-line bg-surface px-3 text-sm font-black text-ink outline-none focus:border-danger-tx/35 focus:ring-4 focus:ring-[var(--color-danger-tx)]/25"
                 />
 
                 <button

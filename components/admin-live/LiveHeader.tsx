@@ -358,7 +358,7 @@ export default function LiveHeader({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
-              <div className="text-[15px] font-black text-ink">📣 방송알림 발송</div>
+              <div className="text-[14px] font-black text-ink">📣 방송알림 발송</div>
               <button
                 type="button"
                 onClick={() => !alertSending && setAlertOpen(false)}

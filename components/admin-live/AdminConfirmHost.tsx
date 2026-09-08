@@ -59,7 +59,7 @@ export default function AdminConfirmHost() {
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[var(--color-ink-soft)]/35 px-4">
-      <div className="w-full max-w-md rounded-3xl border border-line bg-white p-5 shadow-2xl">
+      <div className="w-full max-w-md rounded-2xl border border-line bg-white p-5 shadow-2xl">
         <div className={`mb-4 rounded-2xl border px-4 py-3 ${toneClass}`}>
           <div className="text-sm font-black">{title}</div>
           <div className="mt-1 text-xs font-bold opacity-80">

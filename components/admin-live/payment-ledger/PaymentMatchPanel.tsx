@@ -237,7 +237,7 @@ export default function PaymentMatchPanel({ deposits: depositsFromParent }: Prop
           type="button"
           onClick={refreshBankdaDeposits}
           disabled={syncing || loading}
-          className="h-13 shrink-0 rounded-2xl bg-rose-deep px-6 py-4 text-sm font-black text-white shadow-2xl transition hover:bg-rose-deep disabled:cursor-not-allowed disabled:bg-surface-3"
+          className="h-13 shrink-0 rounded-2xl bg-rose-deep px-6 py-4 text-sm font-black text-white shadow-2xl transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-surface-3"
         >
           {syncing ? "새로고침 중..." : refreshing ? "최신 확인 중..." : "입금내역 새로고침"}
         </button>

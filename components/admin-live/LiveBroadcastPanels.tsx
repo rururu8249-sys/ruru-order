@@ -73,7 +73,7 @@ type AdminIssueTask = {
 
 const ISSUE_TYPES = [
   { label: "교환", taskType: "exchange", className: "bg-rose-soft text-rose-deep border-rose-line" },
-  { label: "반품", taskType: "return", className: "bg-[var(--color-cardpay)]/12 text-[var(--color-cardpay)] border-violet-200" },
+  { label: "반품", taskType: "return", className: "bg-[var(--color-cardpay)]/12 text-[var(--color-cardpay)] border-[var(--color-cardpay)]/30" },
   { label: "환불", taskType: "refund", className: "bg-danger-bg text-danger-tx border-line" },
   { label: "구매", taskType: "product", className: "bg-ok-bg text-ok-tx border-ok-tx/35" },
   { label: "진상", taskType: "complaint", className: "bg-rose-100 text-rose-700 border-rose-200" },
@@ -84,9 +84,13 @@ function clean(value: unknown) {
   return String(value ?? "").trim();
 }
 
+// [2026-09-08 사장님 지적] 「페이지별 화면 비율이 이상하다」
+//   aspect-video(16:9)와 h-[430px]를 «같이» 걸어 둘이 서로 높이를 정하려 했다.
+//   → 창이 좁으면 세로로 늘어나고 넓으면 눌려서 방송화면 비율이 깨졌다.
+//   비율을 쓰기로 했으면 높이는 비율이 정한다. 고정 px·h-full 은 뺀다.
 function videoSizeClass(videoRatio: VideoRatio) {
-  if (videoRatio === "wide") return "aspect-video h-[430px] w-full max-w-[760px]";
-  if (videoRatio === "auto") return "aspect-[4/5] h-full max-w-full";
+  if (videoRatio === "wide") return "aspect-video w-full max-w-[760px]";
+  if (videoRatio === "auto") return "aspect-[4/5] w-full max-w-full";
   return "aspect-[9/16] w-full";
 }
 
@@ -315,7 +319,7 @@ function CustomerIssueSummaryRow({
         {metas.map((meta) => (
           <span
             key={meta.taskType}
-            className={`rounded-md border px-2 py-0.5 text-[11px] font-black ${meta.className}`}
+            className={`rounded-lg border px-2 py-0.5 text-[11px] font-black ${meta.className}`}
           >
             {meta.label}
           </span>
@@ -840,24 +844,24 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
   };
 
   return (
-    <section className={isCol ? `flex w-full flex-col gap-3${hideProducts ? "" : " xl:h-full"}` : "mb-4 flex w-full items-stretch gap-3"}>
-      <div className={`min-w-0 rounded-2xl border border-line bg-surface p-3.5 shadow-sm flex flex-col ${isCol ? "h-[480px] w-full xl:h-[44vh] xl:min-h-[260px] xl:shrink-0" : "h-[420px]"}`} style={isCol ? undefined : { flex: "1 1 0%" }}>
+    <section className={isCol ? `flex min-h-0 w-full flex-1 flex-col gap-3${hideProducts ? "" : " xl:h-full"}` : "mb-4 flex w-full items-stretch gap-3"}>
+      <div className={`min-w-0 rounded-2xl border border-line bg-surface p-3.5 shadow-sm flex flex-col ${isCol ? "min-h-[240px] w-full flex-[4_1_0%]" : "h-[420px]"}`} style={isCol ? undefined : { flex: "1 1 0%" }}>
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-black text-ink">
             방송화면
             <span
               className={[
-                "rounded-md px-2 py-0.5 text-[11px] font-black",
+                "rounded-lg px-2 py-0.5 text-[11px] font-black",
                 videoEmbedUrl ? "bg-[var(--color-ok-tx)] text-white" : "bg-warn-bg text-warn-tx",
               ].join(" ")}
             >
               {videoEmbedUrl ? "영상 연결" : "URL 대기"}
             </span>
             {liveStats?.concurrentViewers != null ? (
-              <span className="rounded-md bg-rose-soft px-2 py-0.5 text-[11px] font-black text-rose-deep" title="동시 시청자 수">👁 {liveStats.concurrentViewers.toLocaleString("ko-KR")}</span>
+              <span className="rounded-lg bg-rose-soft px-2 py-0.5 text-[11px] font-black text-rose-deep" title="동시 시청자 수">👁 {liveStats.concurrentViewers.toLocaleString("ko-KR")}</span>
             ) : null}
             {liveStats?.likeCount != null ? (
-              <span className="rounded-md bg-surface-2 px-2 py-0.5 text-[11px] font-black text-ink-soft" title="좋아요 수">👍 {liveStats.likeCount.toLocaleString("ko-KR")}</span>
+              <span className="rounded-lg bg-surface-2 px-2 py-0.5 text-[11px] font-black text-ink-soft" title="좋아요 수">👍 {liveStats.likeCount.toLocaleString("ko-KR")}</span>
             ) : null}
           </div>
           <div className="flex items-center gap-1.5">
@@ -867,7 +871,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
                   type="button"
                   onClick={toggleVideoMute}
                   title={videoMuted ? "소리 켜기" : "음소거"}
-                  className="rounded-md bg-surface-2 px-1.5 py-0.5 text-[13px] leading-none hover:bg-surface-3"
+                  className="rounded-lg bg-surface-2 px-1.5 py-0.5 text-[13px] leading-none hover:bg-surface-3"
                 >
                   {videoMuted ? "🔇" : "🔊"}
                 </button>
@@ -896,7 +900,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
               allowFullScreen
             />
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-amber-100 via-stone-100 to-slate-100">
+            <div className="absolute inset-0 flex items-center justify-center bg-surface-2">
               <div className="w-[78%] rounded-2xl bg-surface/70 p-6 text-center shadow-sm backdrop-blur">
                 <div className="text-5xl">👟</div>
                 <div className="mt-4 text-lg font-black text-ink">루루동이LIVE</div>
@@ -907,7 +911,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
         </div>
       </div>
 
-      <div className={`min-w-0 rounded-2xl border border-line bg-surface p-3.5 shadow-sm flex flex-col ${isCol ? "h-[560px] w-full xl:h-[calc(100vh-44vh-1.75rem)] xl:min-h-[260px] xl:shrink-0" : "h-[420px]"}`} style={isCol ? undefined : { flex: "3 1 0%" }}>
+      <div className={`min-w-0 rounded-2xl border border-line bg-surface p-3.5 shadow-sm flex flex-col ${isCol ? "min-h-[240px] w-full flex-[6_1_0%]" : "h-[420px]"}`} style={isCol ? undefined : { flex: "3 1 0%" }}>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-black text-ink">라이브 채팅</h2>
           <span className="text-xs font-bold text-ink-soft">{chatEmbedUrl ? "채팅 연결" : "URL 대기"}</span>
@@ -993,7 +997,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
                       key={String(p?.id ?? i)}
                       onClick={() => goToLiveIdx(i)}
                       title={p?.product_name || p?.name || ""}
-                      className={["relative h-12 w-12 shrink-0 overflow-hidden rounded-md border bg-surface-2 transition", i === safeIdx ? "border-rose-deep ring-1 ring-rose-deep" : "border-line hover:border-rose-line"].join(" ")}
+                      className={["relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border bg-surface-2 transition", i === safeIdx ? "border-rose-deep ring-1 ring-rose-deep" : "border-line hover:border-rose-line"].join(" ")}
                     >
                       {nowProdImageOf(p) ? (
                         <img src={nowProdImageOf(p)} alt="" className="h-full w-full object-cover" />
@@ -1010,7 +1014,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
           )}
         </div>
       ) : (
-      <div className="min-w-0 rounded-2xl border border-line bg-surface p-3.5 shadow-sm flex flex-col h-[420px]" style={{ flex: "1.2 1 0%" }}>
+      <div className="min-w-0 rounded-2xl border border-line bg-surface p-3.5 shadow-sm flex flex-col min-h-[240px]" style={{ flex: "1.2 1 0%" }}>
         {/* 헤더: 제목 + 자동순환 토글 */}
         <div className="mb-2 flex items-center gap-2 text-sm font-black text-ink">
           지금 방송 상품
@@ -1066,7 +1070,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
             <div className="mt-2 truncate text-[14px] font-black text-ink">
               {liveProduct.product_name || liveProduct.name || liveProduct.title || "상품명 없음"}
             </div>
-            <div className="text-[15px] font-black text-rose-deep">
+            <div className="text-[14px] font-black text-rose-deep">
               {Number(liveProduct.price ?? liveProduct.sale_price ?? liveProduct.selling_price ?? 0).toLocaleString("ko-KR")}원
             </div>
 

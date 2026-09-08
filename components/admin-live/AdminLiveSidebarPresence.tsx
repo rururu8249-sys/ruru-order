@@ -180,7 +180,7 @@ export default function AdminLiveSidebarPresence({ onOpenVisitStats }: Props = {
                     className={["flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left", cartFor === visitor.id ? "bg-rose-soft" : "bg-surface-2 hover:bg-surface-3"].join(" ")}
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[11.5px] font-black text-ink">{displayNickname(visitor.nickname)}</span>
+                      <span className="block truncate text-[12px] font-black text-ink">{displayNickname(visitor.nickname)}</span>
                       {String(visitor.viewingProduct || "").trim() ? (
                         <span className="block truncate text-[11px] font-bold text-rose-deep">👀 {String(visitor.viewingProduct).trim()}</span>
                       ) : null}
@@ -215,9 +215,9 @@ export default function AdminLiveSidebarPresence({ onOpenVisitStats }: Props = {
                   <span className="text-[14px] font-black text-ink">🛒 {displayNickname(nick)} 장바구니</span>
                   <button type="button" onClick={() => setCartFor("")} className="text-lg leading-none text-ink-mute hover:text-ink">✕</button>
                 </div>
-                <div className="max-h-[50vh] overflow-y-auto px-4 py-3 text-[12.5px] font-bold leading-6 text-ink-soft">
+                <div className="max-h-[50vh] overflow-y-auto px-4 py-3 text-[13px] font-bold leading-6 text-ink-soft">
                   {String(visitor?.viewingProduct || "").trim() ? (
-                    <div className="mb-2 rounded-lg bg-rose-soft px-2.5 py-1.5 text-[11.5px] font-black text-rose-deep">👀 최근 담은 상품 · {String(visitor?.viewingProduct).trim()}</div>
+                    <div className="mb-2 rounded-lg bg-rose-soft px-2.5 py-1.5 text-[12px] font-black text-rose-deep">👀 최근 담은 상품 · {String(visitor?.viewingProduct).trim()}</div>
                   ) : null}
                   {!nick ? (
                     "비회원(닉네임 없음)은 장바구니를 연결할 수 없어요."

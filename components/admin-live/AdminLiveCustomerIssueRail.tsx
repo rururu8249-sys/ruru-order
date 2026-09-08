@@ -393,7 +393,7 @@ function IssueCard({
             </span>
           </div>
 
-          <div className="mt-2 truncate text-[15px] font-black text-ink" title={getNickname(task)}>
+          <div className="mt-2 truncate text-[14px] font-black text-ink" title={getNickname(task)}>
             {getNickname(task)}
           </div>
           <div className="mt-0.5 text-[11px] font-black text-ink-mute">{dateLabel(task.created_at)}</div>
@@ -412,7 +412,7 @@ function IssueCard({
             <button
               type="button"
               onClick={() => onHide(task)}
-              className="rounded-xl border border-danger-tx bg-danger-bg px-3 py-2 text-[11px] font-black text-danger-tx hover:bg-danger-bg"
+              className="rounded-xl border border-danger-tx bg-danger-bg px-3 py-2 text-[11px] font-black text-danger-tx hover:opacity-90"
               title="DB 완전삭제가 아니라 해결목록 숨김 처리"
             >
               목록삭제
@@ -421,7 +421,7 @@ function IssueCard({
             <button
               type="button"
               onClick={() => onResolve(task)}
-              className="rounded-xl border border-line bg-ok-bg px-3 py-2 text-[11px] font-black text-ok-tx hover:bg-ok-bg"
+              className="rounded-xl border border-line bg-ok-bg px-3 py-2 text-[11px] font-black text-ok-tx hover:opacity-90"
             >
               해결완료
             </button>
@@ -784,7 +784,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           <button
             type="button"
             onClick={() => setShowMemoAdd(true)}
-            className="h-9 rounded-xl bg-rose-deep px-3 text-[12px] font-black text-white hover:bg-rose-deep"
+            className="h-9 rounded-xl bg-rose-deep px-3 text-[12px] font-black text-white hover:opacity-90"
           >
             + 메모
           </button>
@@ -1027,7 +1027,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
                 type="button"
                 onClick={saveIssueMemo}
                 disabled={saving}
-                className="h-11 rounded-xl bg-rose-deep text-sm font-black text-white hover:bg-rose-deep disabled:opacity-50"
+                className="h-11 rounded-xl bg-rose-deep text-sm font-black text-white hover:opacity-90 disabled:opacity-50"
               >
                 저장
               </button>
@@ -1097,7 +1097,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
                 type="button"
                 onClick={saveEditedIssueMemo}
                 disabled={saving}
-                className="h-11 rounded-xl bg-rose-deep text-sm font-black text-white hover:bg-rose-deep disabled:opacity-50"
+                className="h-11 rounded-xl bg-rose-deep text-sm font-black text-white hover:opacity-90 disabled:opacity-50"
               >
                 수정 저장
               </button>

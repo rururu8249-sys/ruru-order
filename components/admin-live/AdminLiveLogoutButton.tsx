@@ -18,7 +18,7 @@ export default function AdminLiveLogoutButton() {
     <button
       type="button"
       onClick={handleAdminLogout}
-      className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-100 bg-rose-soft px-4 py-3 text-[13px] font-black text-rose-deep transition hover:bg-rose-soft"
+      className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-100 bg-rose-soft px-4 py-3 text-[13px] font-black text-rose-deep transition hover:opacity-90"
     >
       <span>↩</span>
       <span>관리자 로그아웃</span>

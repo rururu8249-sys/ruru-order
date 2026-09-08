@@ -60,7 +60,7 @@ export default function AdminLiveBroadcastRail({
         aria-label="방송 · 채팅"
         aria-hidden={!open}
         className={[
-          "fixed inset-y-0 right-0 z-[46] flex flex-col gap-3 overflow-y-auto border-l border-line bg-canvas p-3 shadow-2xl transition-transform duration-300",
+          "fixed inset-y-0 right-0 z-[46] flex min-h-0 flex-col gap-3 overflow-hidden border-l border-line bg-canvas p-3 shadow-2xl transition-transform duration-300",
           "w-[420px] min-w-[320px] max-w-[92vw]",
           open ? "translate-x-0" : "translate-x-full",
         ].join(" ")}

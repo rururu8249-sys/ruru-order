@@ -841,7 +841,7 @@ export default function LiveOrderTable({
                 type="button"
                 onClick={handleMarkShipped}
                 disabled={shippedSaving !== ""}
-                className="rounded-xl border border-info-tx bg-info-bg px-3 py-2 text-xs font-black text-[var(--color-info-tx)] hover:bg-info-bg disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-xl border border-info-tx bg-info-bg px-3 py-2 text-xs font-black text-[var(--color-info-tx)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                 title="선택한 결제완료 주문을 택배출고로 바꿉니다 (출고시간 기록, 손님 주문조회에 배송출발로 표시)"
               >
                 {shippedSaving === "ship" ? "처리중..." : "📦 택배출고 처리"}
@@ -912,7 +912,7 @@ export default function LiveOrderTable({
             type="button"
             onClick={refreshOrders}
             disabled={!onRefresh || refreshing}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-line text-ink-soft hover:bg-surface-2 active:bg-surface-2 active:scale-[0.94] transition-all duration-75 disabled:opacity-40"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-line text-ink-soft hover:opacity-90 active:bg-surface-2 active:scale-[0.94] transition-all duration-75 disabled:opacity-40"
             title="주문 새로고침"
           >
             {refreshing ? "…" : "↻"}
@@ -1100,7 +1100,7 @@ export default function LiveOrderTable({
                               📋 주문서 복사
                             </button>
                             {(order as any).shippingStatus ? (
-                              <span className={`inline-flex items-center justify-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px] font-black leading-none ${String((order as any).shippingStatus) === "출고완료" ? "bg-info-bg text-[var(--color-info-tx)]" : "bg-surface-2 text-ink-soft"}`}>{shippingStatusLabel((order as any).shippingStatus)}</span>
+                              <span className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg px-1.5 py-0.5 text-[11px] font-black leading-none ${String((order as any).shippingStatus) === "출고완료" ? "bg-info-bg text-[var(--color-info-tx)]" : "bg-surface-2 text-ink-soft"}`}>{shippingStatusLabel((order as any).shippingStatus)}</span>
                             ) : null}
                             {["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
                               <button type="button" title="결제요청 쪽지 보내기" aria-label="결제요청 쪽지 보내기" disabled={payRequestSending === order.id} onClick={() => void sendPaymentRequest(order)} style={{ border: "none", background: "none", padding: "0 2px", fontSize: "14px", lineHeight: 1, cursor: "pointer", opacity: payRequestSending === order.id ? 0.35 : 0.75 }}>🔔</button>
@@ -1149,7 +1149,7 @@ export default function LiveOrderTable({
                           type="button"
                           onClick={(e) => { e.stopPropagation(); void copyOrderForCustomer(order); }}
                           title="이 주문서 한 건을 상세 안 열고 고객용 형식(주소·입금상태·계좌 안내 포함)으로 복사"
-                          className="mt-0.5 rounded-md border border-rose-line bg-rose-soft px-1.5 py-0.5 text-[11px] font-black text-rose-deep"
+                          className="mt-0.5 rounded-lg border border-rose-line bg-rose-soft px-1.5 py-0.5 text-[11px] font-black text-rose-deep"
                         >
                           📋 주문서 복사
                         </button>
@@ -1191,7 +1191,7 @@ export default function LiveOrderTable({
                           const extra = Number((order as any).cardExtraAmount || 0)
                             || Math.max(0, Number((order as any).cardPaymentTotalAmount || 0) - Number(order.productAmount || 0) - Number(order.shippingFee || 0));
                           if (extra <= 0) return null;
-                          return <div className="text-[11px] font-black text-purple-700">+{money(extra)}</div>;
+                          return <div className="text-[11px] font-black text-[var(--color-cardpay)]">+{money(extra)}</div>;
                         })()}
                       </div>
                       {/* 8. 입금 */}
@@ -1211,7 +1211,7 @@ export default function LiveOrderTable({
                       <div className="px-1 py-3 text-center">
                         {(order as any).shippingStatus ? (
                           <span
-                            className={`inline-flex items-center justify-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px] font-black leading-none ${
+                            className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg px-1.5 py-0.5 text-[11px] font-black leading-none ${
                               String((order as any).shippingStatus) === "출고완료"
                                 ? "bg-info-bg text-[var(--color-info-tx)]"
                                 : "bg-surface-2 text-ink-soft"

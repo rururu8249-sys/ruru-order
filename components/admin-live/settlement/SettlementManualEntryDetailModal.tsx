@@ -171,7 +171,7 @@ export default function SettlementManualEntryDetailModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-2xl bg-rose-deep px-6 py-3 text-sm font-black text-white shadow-sm hover:bg-rose-deep"
+            className="rounded-2xl bg-rose-deep px-6 py-3 text-sm font-black text-white shadow-sm hover:opacity-90"
           >
             확인
           </button>

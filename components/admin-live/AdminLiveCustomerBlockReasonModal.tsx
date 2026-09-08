@@ -90,7 +90,7 @@ export default function AdminLiveCustomerBlockReasonModal({
             value={reason}
             onChange={(event) => setReason(event.target.value)}
             placeholder="예: 환불 악용, 반복 미입금, 악성 문의 등"
-            className="mt-2 min-h-[120px] w-full resize-none rounded-2xl border border-line bg-surface p-3 text-sm font-bold text-ink outline-none focus:border-danger-tx/35 focus:ring-4 focus:ring-red-100"
+            className="mt-2 min-h-[120px] w-full resize-none rounded-2xl border border-line bg-surface p-3 text-sm font-bold text-ink outline-none focus:border-danger-tx/35 focus:ring-4 focus:ring-[var(--color-danger-tx)]/25"
           />
         </label>
 

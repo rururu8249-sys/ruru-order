@@ -109,96 +109,124 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* === 시안(루루동이 관리자 시안모음) CSS 변수 — 이벤트 등 시안 1:1 이식용 === */
+/* === 「시안」 클래스 — 2026-09-08 기준 통합 ==============================
+   여기는 원래 «두 번째 디자인 시스템»이었다.
+     · 자체 변수(--rose/--bd/--ink/--mut/--green)를 따로 두고
+     · 배경을 #fff·#eee·#ccc·#999로 «라이트 전용»으로 박아
+     · 모서리 3/4/6/7/8/10/11px, 글씨 9/10/11/12/15px를 따로 썼다.
+   그래서 이벤트·미션·상품 화면만 «다른 앱»처럼 보였고 다크모드에서 깨졌다.
+   (.dark 아래에 오버라이드를 덕지덕지 붙여 겨우 막고 있었다)
+
+   수정: 값을 없애고 «관리자 공통 토큰(--color-*)에 연결»만 한다.
+     → 다크모드 오버라이드 불필요(토큰이 알아서 바뀜)
+     → 모서리·글씨·높이가 공통 기준(.ru-*)과 같아짐
+   ※ 클래스 이름(.btn/.ipt/.nick/.tog…)은 그대로 둔다 —
+      5개 화면의 JSX를 건드리지 않고 «생김새만» 통일하기 위해서다.
+   ======================================================================== */
 :root {
-  --rose: #7B2D43;
-  --rose-bg: #F5E6EB;
-  --rose-bg2: #FAF6F2;
-  --rose-bd: #D9C5CC;
-  --red: #C0392B;
-  --green: #0F6E56;
-  --green-bg: #E1F5EE;
-  --blue: #185FA5;
-  --blue-bg: #E6F1FB;
-  --amber: #854F0B;
-  --amber-bg: #FAEEDA;
-  --ink: #222;
-  --mut: #666;
-  --mut2: #999;
-  --bd: #E8E2DD;
+  --rose: var(--color-rose-deep);
+  --rose-bg: var(--color-rose-soft);
+  --rose-bg2: var(--color-surface-2);
+  --rose-bd: var(--color-rose-line);
+  --red: var(--color-danger-tx);
+  --green: var(--color-ok-tx);
+  --green-bg: var(--color-ok-bg);
+  --blue: var(--color-info-tx);
+  --blue-bg: var(--color-info-bg);
+  --amber: var(--color-warn-tx);
+  --amber-bg: var(--color-warn-bg);
+  --ink: var(--color-ink);
+  --mut: var(--color-ink-soft);
+  --mut2: var(--color-ink-mute);
+  --bd: var(--color-line);
 }
 
-/* 시안 클래스 — .ruru-event-sian 하위로 스코프(전역 .btn/.row/.note 충돌 방지) */
-.ruru-event-sian .body { background: #fff; border: 1px solid var(--bd); border-radius: 10px; padding: 13px; }
-.ruru-event-sian .btn { font-size: 11px; height: 32px; padding: 0 11px; border: 1px solid var(--bd); background: #fff; border-radius: 7px; cursor: pointer; color: var(--ink); }
-.ruru-event-sian .btn.rose { background: var(--rose); color: #fff; border-color: var(--rose); }
+/* 공통 기준과 같은 값으로: 버튼·입력칸 높이 32px(=.ru-btn-sm) · 모서리 10px · 글씨 11px */
+.ruru-event-sian .body { background: var(--color-surface); border: 1px solid var(--bd); border-radius: 16px; padding: 13px; }
+.ruru-event-sian .btn,
+.ruru-product-sian .btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  font-size: 11px; font-weight: 800; height: 32px; padding: 0 11px;
+  border: 1px solid var(--bd); background: var(--color-surface); border-radius: 10px;
+  cursor: pointer; color: var(--ink); white-space: nowrap;
+  transition: background-color .15s, opacity .15s;
+}
+.ruru-event-sian .btn:hover:not(:disabled),
+.ruru-product-sian .btn:hover:not(:disabled) { background: var(--color-surface-2); }
+.ruru-event-sian .btn.rose, .ruru-product-sian .btn.rose { background: var(--rose); color: #fff; border-color: var(--rose); }
+.ruru-event-sian .btn.rose:hover:not(:disabled), .ruru-product-sian .btn.rose:hover:not(:disabled) { background: var(--rose); opacity: .88; }
 .ruru-event-sian .btn.green { background: var(--green); color: #fff; border-color: var(--green); }
-.ruru-event-sian .btn:disabled { opacity: .45; cursor: not-allowed; }
-.ruru-event-sian .ipt { font-size: 11px; height: 32px; border: 1px solid var(--bd); border-radius: 7px; padding: 0 9px; background: #fff; }
-.ruru-event-sian .row { display: flex; gap: 9px; align-items: center; border: 1px solid var(--bd); border-radius: 7px; padding: 8px 11px; margin-bottom: 5px; font-size: 11px; }
+.ruru-event-sian .btn.green:hover:not(:disabled) { background: var(--green); opacity: .88; }
+.ruru-event-sian .btn:disabled, .ruru-product-sian .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.ruru-event-sian .ipt, .ruru-product-sian .ipt {
+  font-size: 11px; font-weight: 700; height: 32px;
+  border: 1px solid var(--bd); border-radius: 10px; padding: 0 10px;
+  background: var(--color-surface); color: var(--ink); outline: none;
+  transition: border-color .15s;
+}
+.ruru-event-sian .ipt:focus, .ruru-product-sian .ipt:focus { border-color: var(--color-rose-deep); }
+.ruru-event-sian .ipt::placeholder, .ruru-product-sian .ipt::placeholder { color: var(--mut2); }
+
+.ruru-event-sian .row { display: flex; gap: 9px; align-items: center; border: 1px solid var(--bd); border-radius: 10px; padding: 8px 11px; margin-bottom: 5px; font-size: 11px; background: var(--color-surface); color: var(--ink); }
 .ruru-event-sian .row b { font-size: 12px; }
-.ruru-event-sian .badge { font-size: 9px; padding: 2px 7px; border-radius: 4px; }
-.ruru-event-sian .b-ok { background: var(--green-bg); color: var(--green); }
+/* 배지 — 공통 .ru-badge 와 같은 모양(알약형·11px) */
+.ruru-event-sian .badge, .ruru-product-sian .badge { display: inline-flex; align-items: center; font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 999px; }
+.ruru-event-sian .b-ok, .ruru-product-sian .badge.b-ok { background: var(--green-bg); color: var(--green); }
 .ruru-event-sian .b-card { background: var(--amber-bg); color: var(--amber); }
-.ruru-event-sian .seclabel { font-size: 12px; font-weight: 600; margin: 0 0 7px; }
-.ruru-event-sian .note { font-size: 10px; color: var(--mut2); }
-.ruru-event-sian .nick { font-size: 10px; background: var(--rose-bg); color: var(--rose); padding: 3px 10px; border-radius: 11px; cursor: pointer; }
+.ruru-event-sian .seclabel { font-size: 12px; font-weight: 800; color: var(--ink); margin: 0 0 7px; }
+/* 예전 9~10px은 작아서 안 읽힌다 → 공통 최소 11px */
+.ruru-event-sian .note, .ruru-product-sian .note { font-size: 11px; font-weight: 700; color: var(--mut2); }
+
+.ruru-event-sian .nick { font-size: 11px; font-weight: 700; background: var(--rose-bg); color: var(--rose); padding: 3px 10px; border-radius: 999px; cursor: pointer; transition: opacity .15s; }
+.ruru-event-sian .nick:hover { opacity: .85; }
 .ruru-event-sian .nick.win { background: var(--rose); color: #fff; }
-.ruru-event-sian .nick.out { background: #eee; color: #999; text-decoration: line-through; }
-.ruru-event-sian .tog { width: 28px; height: 16px; border-radius: 8px; position: relative; display: inline-block; }
-.ruru-event-sian .tog.on { background: var(--red); }
-.ruru-event-sian .tog.on i { right: 2px; }
-.ruru-event-sian .tog.off { background: #ccc; }
-.ruru-event-sian .tog.off i { left: 2px; }
-.ruru-event-sian .tog i { position: absolute; top: 2px; width: 12px; height: 12px; background: #fff; border-radius: 50%; }
+.ruru-event-sian .nick.out { background: var(--color-surface-2); color: var(--color-ink-mute); text-decoration: line-through; }
+
+.ruru-event-sian .tog, .ruru-product-sian .tog { width: 28px; height: 16px; border-radius: 999px; position: relative; display: inline-block; flex-shrink: 0; transition: background-color .15s; }
+.ruru-event-sian .tog.on, .ruru-product-sian .tog.on { background: var(--color-ok-tx); }
+.ruru-event-sian .tog.on i, .ruru-product-sian .tog.on i { right: 2px; }
+.ruru-event-sian .tog.off, .ruru-product-sian .tog.off { background: var(--color-surface-3); }
+.ruru-event-sian .tog.off i, .ruru-product-sian .tog.off i { left: 2px; }
+.ruru-event-sian .tog i, .ruru-product-sian .tog i { position: absolute; top: 2px; width: 12px; height: 12px; background: #fff; border-radius: 50%; }
+
 .ruru-event-sian .wheel { width: 130px; height: 130px; border-radius: 50%; border: 7px solid var(--rose); position: relative; }
 .ruru-event-sian .wheel .pt { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); color: var(--red); font-size: 18px; z-index: 10; pointer-events: none; }
 
-/* 시안 상품(② 상품관리 / ③ 새 상품 등록) 클래스 — .ruru-product-sian 스코프 */
-.ruru-product-sian .btn { font-size: 11px; height: 32px; padding: 0 11px; border: 1px solid var(--bd); background: #fff; border-radius: 7px; cursor: pointer; color: var(--ink); }
-.ruru-product-sian .btn.rose { background: var(--rose); color: #fff; border-color: var(--rose); }
-.ruru-product-sian .btn:disabled { opacity: .45; cursor: not-allowed; }
-.ruru-product-sian .ipt { font-size: 11px; height: 32px; border: 1px solid var(--bd); border-radius: 7px; padding: 0 9px; background: #fff; }
-.ruru-product-sian .badge { font-size: 9px; padding: 2px 7px; border-radius: 4px; }
-.ruru-product-sian .note { font-size: 10px; color: var(--mut2); }
-.ruru-product-sian .tag { font-size: 9px; padding: 2px 5px; border-radius: 4px; border: 1px solid var(--bd); color: var(--mut); background: #fff; }
-.ruru-product-sian label.fl { font-size: 11px; color: var(--mut); display: block; margin-bottom: 3px; }
+.ruru-product-sian .tag { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--bd); color: var(--mut); background: var(--color-surface); }
+.ruru-product-sian label.fl { font-size: 11px; font-weight: 800; color: var(--mut); display: block; margin-bottom: 3px; }
 .ruru-product-sian .mh { display: flex; align-items: center; margin-bottom: 13px; }
-.ruru-product-sian .mh .mt { font-size: 15px; font-weight: 600; }
-.ruru-product-sian .mh .x { margin-left: auto; width: 27px; height: 27px; border: none; background: none; color: var(--mut2); font-size: 18px; cursor: pointer; }
+.ruru-product-sian .mh .mt { font-size: 15px; font-weight: 800; color: var(--ink); }
+.ruru-product-sian .mh .x { margin-left: auto; width: 27px; height: 27px; border: none; background: none; color: var(--mut2); font-size: 18px; cursor: pointer; border-radius: 8px; }
+.ruru-product-sian .mh .x:hover { background: var(--color-surface-2); }
 .ruru-product-sian .subtabs { display: flex; gap: 4px; border-bottom: 1px solid var(--bd); padding-bottom: 9px; margin-bottom: 11px; align-items: center; }
-.ruru-product-sian .subtabs .st { font-size: 11px; padding: 5px 11px; color: var(--mut); border-radius: 6px; cursor: pointer; }
+.ruru-product-sian .subtabs .st { font-size: 12px; font-weight: 800; padding: 6px 12px; color: var(--mut); border-radius: 10px; cursor: pointer; }
+.ruru-product-sian .subtabs .st:hover { background: var(--color-surface-2); }
 .ruru-product-sian .subtabs .st.on { background: var(--rose); color: #fff; }
 .ruru-product-sian .filters { display: flex; gap: 7px; margin-bottom: 10px; align-items: center; flex-wrap: wrap; }
 .ruru-product-sian .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; overflow-x: hidden; }
-.ruru-product-sian .pgrid { border: 1px solid var(--bd); border-radius: 8px; padding: 9px; display: flex; gap: 9px; align-items: center; cursor: pointer; min-width: 0; }
+.ruru-product-sian .pgrid { border: 1px solid var(--bd); border-radius: 12px; padding: 9px; display: flex; gap: 9px; align-items: center; cursor: pointer; min-width: 0; background: var(--color-surface); transition: background-color .15s; }
+.ruru-product-sian .pgrid:hover { background: var(--color-surface-2); }
 .ruru-product-sian .pgrid.sel { border: 1.5px solid var(--rose); background: var(--rose-bg2); }
-.ruru-product-sian .ph2 { width: 18px; height: 18px; background: #eee; border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; color: #aaa; flex-shrink: 0; overflow: hidden; }
+.ruru-product-sian .ph2 { width: 18px; height: 18px; background: var(--color-surface-3); border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; color: var(--mut2); flex-shrink: 0; overflow: hidden; }
 .ruru-product-sian .mfoot { display: flex; align-items: center; margin-top: 15px; padding-top: 12px; border-top: 1px solid var(--bd); }
 .ruru-product-sian .mfoot .r { margin-left: auto; display: flex; gap: 8px; }
-.ruru-product-sian .badge.b-ok { background: var(--green-bg); color: var(--green); }
-.ruru-product-sian .tog { width: 28px; height: 16px; border-radius: 8px; position: relative; display: inline-block; }
-.ruru-product-sian .tog.on { background: var(--red); }
-.ruru-product-sian .tog.on i { right: 2px; }
-.ruru-product-sian .tog.off { background: #ccc; }
-.ruru-product-sian .tog.off i { left: 2px; }
-.ruru-product-sian .tog i { position: absolute; top: 2px; width: 12px; height: 12px; background: #fff; border-radius: 50%; }
 
-/* === 이벤트/상품 시안 팝업 다크 오버라이드 (.dark 안에서만) === */
-.dark .ruru-event-sian, .dark .ruru-product-sian {
-  --bd: #3a3833; --ink: #edece8; --mut: #b2afa7; --mut2: #8a867d;
-  --rose-bg: #352a28; --rose-bg2: #2f2b28; --green-bg: #173026; --blue-bg: #16293a; --amber-bg: #352c18;
-}
-.dark .ruru-event-sian .body,
-.dark .ruru-event-sian .btn:not(.rose):not(.green),
-.dark .ruru-event-sian .ipt,
-.dark .ruru-product-sian .btn:not(.rose):not(.green),
-.dark .ruru-product-sian .ipt,
-.dark .ruru-product-sian .tag { background: var(--color-surface); color: var(--ink); }
-.dark .ruru-event-sian .nick { background: var(--color-surface-3); color: var(--color-ink); }
-.dark .ruru-event-sian .nick.win { background: var(--color-rose-deep); color: #1a1a18; }
-.dark .ruru-event-sian .nick.out { background: var(--color-surface-2); color: var(--color-ink-mute); }
-.dark .ruru-event-sian .tog.off { background: var(--color-surface-3); }
+/* [2026-09-08 전수감사] 상품 관리·상품 등록·엑셀 대량등록 화면은 버튼이 전부 인라인 style이라
+   hover 상태가 «한 곳도» 정의돼 있지 않았다(grep 결과 각각 0건·0건·1건(죽은 변수)).
+   → 방송 중 급하게 누를 때 「눌렸는지」 알 수 없어 여러 번 누르게 된다(중복 등록 위험).
+   JSX를 건드리지 않고 스코프 전체의 버튼에 «눌리는 느낌»을 준다. 색·크기는 그대로. */
+.ruru-product-sian button:not(:disabled):hover,
+.ruru-event-sian button:not(:disabled):hover { filter: brightness(0.94); }
+.ruru-product-sian button:not(:disabled):active,
+.ruru-event-sian button:not(:disabled):active { transform: scale(0.985); }
+.ruru-product-sian button, .ruru-event-sian button { transition: filter .15s, transform .06s; }
+.ruru-product-sian button:disabled, .ruru-event-sian button:disabled { cursor: not-allowed; }
+/* 표·목록 줄에 마우스를 올렸을 때도 어느 줄인지 보이게 */
+.ruru-product-sian [role="button"]:hover { filter: brightness(0.97); }
+
+/* 다크 오버라이드는 «없앴다» — 위 변수가 전부 --color-* 를 가리키므로 자동으로 따라간다.
+   (예전엔 .dark .ruru-*-sian 블록 9줄로 라이트 전용 값을 일일이 덮어쓰고 있었다) */
 
 /* ============================================================================
    [2026-08-29 P1-7] 터치 기기에서 입력 요소 글씨 최소 16px 보장
@@ -242,33 +270,49 @@ body {
      섞여 있었다. 화면마다 «자기만의 디자인»을 직접 써서, 어느 한 화면이
      못생긴 게 아니라 «기준이 없어서» 20개 화면이 다른 앱처럼 보였다.
 
-   규칙 (예외 없음):
-     · 색   → 아래 토큰만. 원색 hex 금지 (다크모드가 깨진다)
-     · 글씨 → 5단계만: 20 / 15 / 13 / 12 / 11 px
-     · 모서리 → 카드 16px(2xl) · 버튼/입력칸 12px(xl) · 칩 999px(full)
-     · 버튼 높이 → 32(sm) / 40(기본) / 44(lg) 세 가지만
+   기준의 출처 (2026-09-08 교체):
+     처음엔 제가 임의로 정한 숫자였는데, 실제 커머스 관리자 디자인 시스템인
+     **Shopify Polaris**(@shopify/polaris-tokens)의 공개 토큰 값을 받아 그대로 맞췄다.
+     → 검증된 규격이라 「왜 이 숫자냐」에 답할 수 있고, 남에게 팔 때도 근거가 된다.
+
+     · 글씨 (font-size-275~600)  11 · 12 · 13 · 14 · 16 · 20 · 24 px
+         ※ 예전 제 기준은 14·16을 «금지»했었다. Polaris는 본문 14, 소제목 16을 쓴다.
+     · 여백 (space-*)             4px 격자 — 4 · 6 · 8 · 12 · 16 · 20 · 24 · 32 px
+         카드 안쪽 16 · 카드 사이 16 · 버튼 사이 8 · 표 칸 6 (space-card-padding 등)
+     · 모서리 (border-radius-*)   4 · 8 · 12 · 16 · 20 · full
+         카드 12(300) · 버튼/입력칸 8(200) · 배지 4(100) · 칩 full
+     · 높이 (height-*)            28 · 32 · 36 · 40 · 48 px
+         ※ 예전 제 기준의 44px 은 Polaris에 없는 값이었다 → 48로 교체.
+
+   추가로 지키는 것 (Polaris 규격이 정하지 않는 부분):
+     · 색   → var(--color-*) 토큰만. 원색 hex 금지 (다크모드가 깨진다)
      · 채운 로즈색 주버튼(.ru-btn-primary)은 «한 화면에 1개»
      · 모든 화면은 부모가 준 높이를 채운다 (자체 고정 px 높이 금지)
+     · hover 색은 기본 배경과 «달라야» 한다 (같으면 눌러도 반응 없어 보인다)
+
+   이 기준은 scripts/guard-admin-ui.js 가 자동 검사한다. 말로 보증하지 않는다.
 
    쓰는 법: className="ru-btn ru-btn-primary" 처럼 조합.
    ═══════════════════════════════════════════════════════════════════════ */
 
 @layer components {
   /* ── 글씨 5단계 ─────────────────────────────────────────────── */
-  .ru-t-title { font-size: 20px; font-weight: 900; letter-spacing: -0.03em; color: var(--color-ink); }
-  .ru-t-sub   { font-size: 15px; font-weight: 800; color: var(--color-ink); }
-  .ru-t-body  { font-size: 13px; font-weight: 700; color: var(--color-ink); }
-  .ru-t-label { font-size: 12px; font-weight: 800; color: var(--color-ink-soft); }
-  .ru-t-hint  { font-size: 11px; font-weight: 700; color: var(--color-ink-mute); }
-  .ru-t-money { font-size: 32px; font-weight: 900; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+  /* Polaris font-size-500 / 400 / 350 / 325 / 300 / 275 */
+  .ru-t-title { font-size: 20px; font-weight: 900; letter-spacing: -0.0125em; color: var(--color-ink); }
+  .ru-t-sub   { font-size: 16px; font-weight: 800; color: var(--color-ink); }
+  .ru-t-body  { font-size: 14px; font-weight: 650; color: var(--color-ink); }
+  .ru-t-label { font-size: 13px; font-weight: 700; color: var(--color-ink-soft); }
+  .ru-t-hint  { font-size: 12px; font-weight: 650; color: var(--color-ink-mute); }
+  .ru-t-micro { font-size: 11px; font-weight: 650; color: var(--color-ink-mute); }
+  .ru-t-money { font-size: 32px; font-weight: 900; letter-spacing: -0.03375em; font-variant-numeric: tabular-nums; }
 
   /* ── 버튼 — 기본은 테두리. 채운 건 primary 하나뿐 ───────────── */
   .ru-btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-    height: 40px; padding: 0 16px;
-    border-radius: 12px; border: 1px solid var(--color-line);
+    height: 36px; padding: 0 12px;              /* Polaris height-900 · space-300 */
+    border-radius: 8px; border: 1px solid var(--color-line);   /* border-radius-200 */
     background: var(--color-surface); color: var(--color-ink);
-    font-size: 12px; font-weight: 800; white-space: nowrap; cursor: pointer;
+    font-size: 13px; font-weight: 700; white-space: nowrap; cursor: pointer;
     transition: background-color .15s, opacity .15s, transform .06s;
   }
   .ru-btn:hover:not(:disabled) { background: var(--color-surface-2); }
@@ -276,8 +320,8 @@ body {
   .ru-btn:disabled { opacity: .45; cursor: not-allowed; }
   .ru-btn:focus-visible { outline: 2px solid var(--color-rose-deep); outline-offset: 2px; }
 
-  .ru-btn-sm { height: 32px; padding: 0 11px; font-size: 11px; border-radius: 10px; }
-  .ru-btn-lg { height: 44px; padding: 0 22px; font-size: 13px; }
+  .ru-btn-sm { height: 28px; padding: 0 8px;  font-size: 12px; }   /* height-700 · space-200 */
+  .ru-btn-lg { height: 48px; padding: 0 20px; font-size: 14px; }   /* height-1200 · space-500 */
 
   .ru-btn-primary { background: var(--color-rose-deep); border-color: var(--color-rose-deep); color: #fff; }
   .ru-btn-primary:hover:not(:disabled) { background: var(--color-rose-deep); opacity: .88; }
@@ -293,28 +337,29 @@ body {
   .ru-btn-on:hover:not(:disabled) { background: var(--color-rose-soft); opacity: .85; }
 
   /* ── 카드 / 패널 ────────────────────────────────────────────── */
-  .ru-card { border-radius: 16px; border: 1px solid var(--color-line); background: var(--color-surface); }
-  .ru-card-2 { border-radius: 16px; border: 1px solid var(--color-line); background: var(--color-surface-2); }
-  .ru-card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--color-line); }
-  .ru-card-body { padding: 16px 20px; }
+  /* border-radius-300(12) · space-card-padding(16) · space-card-gap(16) */
+  .ru-card { border-radius: 12px; border: 1px solid var(--color-line); background: var(--color-surface); }
+  .ru-card-2 { border-radius: 12px; border: 1px solid var(--color-line); background: var(--color-surface-2); }
+  .ru-card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--color-line); }
+  .ru-card-body { padding: 16px; }
 
   /* ── 입력칸 ────────────────────────────────────────────────── */
   .ru-input, .ru-select {
-    height: 40px; padding: 0 12px;
-    border-radius: 12px; border: 1px solid var(--color-line);
+    height: 36px; padding: 0 12px;
+    border-radius: 8px; border: 1px solid var(--color-line);
     background: var(--color-surface); color: var(--color-ink);
-    font-size: 13px; font-weight: 700; outline: none;
+    font-size: 14px; font-weight: 650; outline: none;
     transition: border-color .15s;
   }
   .ru-input:focus, .ru-select:focus { border-color: var(--color-rose-deep); }
   .ru-input::placeholder { color: var(--color-ink-mute); font-weight: 600; }
-  .ru-input-sm { height: 32px; padding: 0 10px; font-size: 12px; border-radius: 10px; }
-  .ru-textarea { padding: 10px 12px; border-radius: 12px; border: 1px solid var(--color-line); background: var(--color-surface); color: var(--color-ink); font-size: 13px; font-weight: 700; outline: none; }
+  .ru-input-sm { height: 28px; padding: 0 8px; font-size: 13px; }
+  .ru-textarea { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--color-line); background: var(--color-surface); color: var(--color-ink); font-size: 13px; font-weight: 700; outline: none; }
   .ru-textarea:focus { border-color: var(--color-rose-deep); }
   .ru-input-num { text-align: right; font-variant-numeric: tabular-nums; }
 
   /* ── 배지 / 칩 ─────────────────────────────────────────────── */
-  .ru-badge { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+  .ru-badge { display: inline-flex; align-items: center; gap: 4px; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: 700; white-space: nowrap; }
   .ru-badge-ok     { background: var(--color-ok-bg);     color: var(--color-ok-tx); }
   .ru-badge-warn   { background: var(--color-warn-bg);   color: var(--color-warn-tx); }
   .ru-badge-danger { background: var(--color-danger-bg); color: var(--color-danger-tx); }
@@ -322,7 +367,7 @@ body {
   .ru-badge-mute   { background: var(--color-surface-2); color: var(--color-ink-soft); }
   .ru-badge-rose   { background: var(--color-rose-soft); color: var(--color-rose-deep); }
 
-  .ru-chip { display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--color-line); background: var(--color-surface); color: var(--color-ink-soft); font-size: 12px; font-weight: 800; cursor: pointer; transition: background-color .15s; }
+  .ru-chip { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 12px; border-radius: 9999px; border: 1px solid var(--color-line); background: var(--color-surface); color: var(--color-ink-soft); font-size: 13px; font-weight: 700; cursor: pointer; transition: background-color .15s; }
   .ru-chip:hover { background: var(--color-surface-2); }
   .ru-chip-on { border-color: var(--color-rose-deep); background: var(--color-rose-soft); color: var(--color-rose-deep); }
 
@@ -331,17 +376,17 @@ body {
   .ru-table thead th {
     position: sticky; top: 0; z-index: 10;
     background: var(--color-surface-2); color: var(--color-ink-soft);
-    font-size: 11px; font-weight: 800; text-align: left;
-    padding: 9px 12px; border-bottom: 1px solid var(--color-line);
+    font-size: 12px; font-weight: 700; text-align: left;
+    padding: 6px 12px; border-bottom: 1px solid var(--color-line);   /* space-table-cell-padding */
   }
-  .ru-table tbody td { padding: 10px 12px; border-bottom: 1px solid var(--color-line-soft); font-size: 13px; font-weight: 700; color: var(--color-ink); }
+  .ru-table tbody td { padding: 8px 12px; border-bottom: 1px solid var(--color-line-soft); font-size: 14px; font-weight: 650; color: var(--color-ink); }
   .ru-table tbody tr:hover td { background: var(--color-surface-2); }
   .ru-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 
   /* ── 빈 상태 — 「없다」로 끝내지 말고 다음에 뭘 하면 되는지 ── */
   .ru-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 180px; padding: 24px; text-align: center; }
-  .ru-empty-title { font-size: 13px; font-weight: 800; color: var(--color-ink-soft); }
-  .ru-empty-hint { font-size: 11px; font-weight: 700; color: var(--color-ink-mute); }
+  .ru-empty-title { font-size: 14px; font-weight: 700; color: var(--color-ink-soft); }
+  .ru-empty-hint { font-size: 12px; font-weight: 650; color: var(--color-ink-mute); }
 
   /* ── 화면 틀 — 부모가 준 높이를 채운다(고정 px 금지) ────────── */
   .ru-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; }

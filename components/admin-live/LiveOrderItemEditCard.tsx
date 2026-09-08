@@ -337,7 +337,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
             type="button"
             onClick={submit}
             disabled={saving || inventoryLocked}
-            className="h-10 rounded-xl bg-rose-deep text-xs font-black text-white hover:bg-rose-deep disabled:bg-surface-3"
+            className="h-10 rounded-xl bg-rose-deep text-xs font-black text-white hover:opacity-90 disabled:bg-surface-3"
           >
             {inventoryLocked ? "수정잠금" : saving ? "저장중..." : "저장"}
           </button>
@@ -403,7 +403,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
                 type="button"
                 onClick={onDelete}
                 disabled={deleting}
-                className="rounded-xl border border-danger-tx bg-danger-bg px-2.5 py-1.5 text-[11px] font-black text-[var(--color-danger-tx)] hover:bg-danger-bg disabled:opacity-50"
+                className="rounded-xl border border-danger-tx bg-danger-bg px-2.5 py-1.5 text-[11px] font-black text-[var(--color-danger-tx)] hover:opacity-90 disabled:opacity-50"
               >
                 {deleting ? "삭제중..." : "🗑 삭제"}
               </button>

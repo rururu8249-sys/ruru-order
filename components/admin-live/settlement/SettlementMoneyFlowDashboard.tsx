@@ -146,7 +146,7 @@ function CalcRow({
       </span>
 
       <span className="min-w-0 flex-1">
-        <span className={emphasis === "total" ? "text-[15px] font-black text-ink" : "text-sm font-black text-ink"}>{label}</span>
+        <span className={emphasis === "total" ? "text-[14px] font-black text-ink" : "text-sm font-black text-ink"}>{label}</span>
         {hint ? <span className="ml-2 text-xs font-bold text-ink-mute">{hint}</span> : null}
       </span>
 
@@ -155,7 +155,7 @@ function CalcRow({
       <span
         className={[
           "shrink-0 text-right tabular-nums",
-          emphasis === "total" ? "text-[26px] font-black tracking-[-0.04em]" : "text-[15px] font-black",
+          emphasis === "total" ? "text-[24px] font-black tracking-[-0.04em]" : "text-[14px] font-black",
           amountTx,
         ].join(" ")}
         style={{ minWidth: emphasis === "total" ? 200 : 150 }}
@@ -387,7 +387,7 @@ export default function SettlementMoneyFlowDashboard({
         <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line bg-surface-2 px-5 py-4">
           <div className="min-w-0">
             <div className="text-sm font-black text-ink-soft">지금 남는 돈</div>
-            <div className="mt-0.5 text-[38px] font-black leading-none tracking-[-0.05em] text-ok-tx">
+            <div className="mt-0.5 text-[36px] font-black leading-none tracking-[-0.05em] text-ok-tx">
               {won(stats.netAmount)}
             </div>
             <div className="mt-2 text-xs font-bold text-ink-mute">

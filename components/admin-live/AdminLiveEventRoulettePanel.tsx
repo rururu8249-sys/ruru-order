@@ -227,7 +227,7 @@ async function copyText(value: string) {
 
 export default function AdminLiveEventRoulettePanel({
   buttonLabel = "🎁 이벤트",
-  buttonClassName = "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-xl bg-violet-600 px-3 text-xs font-black text-white shadow-sm transition hover:bg-violet-700",
+  buttonClassName = "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-xl bg-[var(--color-cardpay)] px-3 text-xs font-black text-white shadow-sm transition hover:bg-[var(--color-cardpay)]",
   renderTrigger = true,
   controlledOpen,
   onRequestClose,

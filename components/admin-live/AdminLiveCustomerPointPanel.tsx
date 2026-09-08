@@ -204,12 +204,12 @@ function CustomerPointActionModal({
           </label>
 
           {errorMessage ? (
-            <div className="rounded-2xl bg-danger-bg px-4 py-3 text-sm font-black text-danger-tx ring-1 ring-red-100">
+            <div className="rounded-2xl bg-danger-bg px-4 py-3 text-sm font-black text-danger-tx ring-1 ring-[var(--color-danger-tx)]/25">
               {errorMessage}
             </div>
           ) : null}
 
-          <div className="rounded-2xl bg-warn-bg px-4 py-3 text-xs font-bold leading-relaxed text-warn-tx ring-1 ring-amber-100">
+          <div className="rounded-2xl bg-warn-bg px-4 py-3 text-xs font-bold leading-relaxed text-warn-tx ring-1 ring-[var(--color-warn-tx)]/25">
             관리자 지급/회수 포인트는 정산에 바로 반영되지 않습니다. 고객이 주문서에서 실제 사용하는 단계는 나중에 별도 작업합니다.
           </div>
         </div>
@@ -420,7 +420,7 @@ export default function AdminLiveCustomerPointPanel({ customer }: { customer: Po
             type="button"
             onClick={() => openModal("grant")}
             disabled={pointState.loading || pointState.saving || !phoneKey}
-            className="rounded-2xl bg-rose-deep px-4 py-3 text-sm font-black text-white hover:bg-rose-deep disabled:opacity-50"
+            className="rounded-2xl bg-rose-deep px-4 py-3 text-sm font-black text-white hover:opacity-90 disabled:opacity-50"
           >
             포인트 지급
           </button>
@@ -436,13 +436,13 @@ export default function AdminLiveCustomerPointPanel({ customer }: { customer: Po
       </div>
 
       {pointState.statusMessage ? (
-        <div className="mt-3 rounded-2xl bg-ok-bg px-4 py-3 text-sm font-black text-ok-tx ring-1 ring-emerald-100">
+        <div className="mt-3 rounded-2xl bg-ok-bg px-4 py-3 text-sm font-black text-ok-tx ring-1 ring-[var(--color-ok-tx)]/25">
           {pointState.statusMessage}
         </div>
       ) : null}
 
       {pointState.errorMessage ? (
-        <div className="mt-3 rounded-2xl bg-danger-bg px-4 py-3 text-sm font-black text-danger-tx ring-1 ring-red-100">
+        <div className="mt-3 rounded-2xl bg-danger-bg px-4 py-3 text-sm font-black text-danger-tx ring-1 ring-[var(--color-danger-tx)]/25">
           {pointState.errorMessage}
         </div>
       ) : null}

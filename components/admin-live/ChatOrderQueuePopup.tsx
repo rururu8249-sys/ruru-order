@@ -271,18 +271,18 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
 
   return (
     <div className={embedded ? "h-full w-full" : "fixed inset-0 z-[130] flex items-center justify-center bg-black/40 p-4"} onClick={embedded ? undefined : onClose}>
-      <div className={embedded ? "flex h-full w-full flex-col overflow-hidden bg-surface" : "flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl bg-surface shadow-2xl"} onClick={(e) => e.stopPropagation()}>
+      <div className={embedded ? "flex h-full w-full flex-col overflow-hidden bg-surface" : "flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl"} onClick={(e) => e.stopPropagation()}>
 
         {/* 헤더 */}
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
-          <div className="text-[15px] font-black text-ink">
+          <div className="text-[14px] font-black text-ink">
             💬 채팅 주문 대기열 <span className="text-ink-mute">(검증 단계 — 담기지 않습니다)</span>
           </div>
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => void loadQueue()} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft hover:bg-surface-2">
               새로고침
             </button>
-            {embedded ? null : <button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-[15px] font-black text-ink-mute hover:text-ink">✕</button>}
+            {embedded ? null : <button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-[14px] font-black text-ink-mute hover:text-ink">✕</button>}
           </div>
         </div>
 
@@ -299,7 +299,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
               🤖 봇 안내 {botEnabled ? "켜짐" : "꺼짐"}
             </button>
             <button type="button" onClick={() => void toggleCustomerUi()} disabled={busy === "cui"}
-              className={`rounded-xl px-4 py-2 text-[13px] font-black text-white disabled:opacity-50 ${customerUi ? "bg-fuchsia-600" : "bg-[var(--color-ink-soft)]"}`}
+              className={`rounded-xl px-4 py-2 text-[13px] font-black text-white disabled:opacity-50 ${customerUi ? "bg-[var(--color-cardpay)]" : "bg-[var(--color-ink-soft)]"}`}
               title="채팅으로 주문한 손님이 사이트에 오면 채팅 주문을 주문서에 자동으로 담아둡니다. 손님이 확인·수정 후 직접 제출합니다.">
               🛒 채팅 자동담기 {customerUi ? "켜짐" : "꺼짐"}
             </button>
@@ -317,7 +317,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
 
           {unsubmitted.length > 0 ? (
             <div className="mt-2 rounded-xl border border-warn-tx/35 bg-warn-bg p-3">
-              <div className="text-[12.5px] font-black text-warn-tx">📢 호명 리스트 — 채팅주문 후 아직 제출 안 한 손님 {unsubmitted.length}명</div>
+              <div className="text-[13px] font-black text-warn-tx">📢 호명 리스트 — 채팅주문 후 아직 제출 안 한 손님 {unsubmitted.length}명</div>
               <div className="mt-1.5 flex flex-col gap-1">
                 {unsubmitted.map((u) => (
                   <div key={u.name} className="text-[12px] font-bold text-warn-tx">
@@ -333,7 +333,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
             <div className="mt-2 rounded-xl border border-line bg-surface p-3">
               {/* [수동 연결] 유튜브 이름 ≠ 사이트 닉네임 (예: Borahae_Ju = 보라해쥬) — 1회 연결하면 평생 자동 */}
               <div className="mb-2 rounded-lg border border-info-tx/35 bg-info-bg p-2">
-                <div className="text-[11.5px] font-black text-info-tx">🔗 회원 수동 연결 — 유튜브 이름과 사이트 닉네임이 다른 손님 (1회만 하면 평생 자동)</div>
+                <div className="text-[12px] font-black text-info-tx">🔗 회원 수동 연결 — 유튜브 이름과 사이트 닉네임이 다른 손님 (1회만 하면 평생 자동)</div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   <input value={linkChatName} onChange={(e) => setLinkChatName(e.target.value)} placeholder="채팅 이름 (예: Borahae_Ju)"
                     className="w-44 rounded-lg border border-line bg-white px-2 py-1.5 text-[12px] font-bold" />
@@ -464,7 +464,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
                         <tr key={i} className="border-b border-line last:border-0">
                           <td className="px-3 py-1.5 text-ink">{r.text}</td>
                           <td className="whitespace-nowrap px-3 py-1.5">
-                            <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-black ${st.cls}`}>{st.label}</span>
+                            <span className={`rounded-lg px-1.5 py-0.5 text-[11px] font-black ${st.cls}`}>{st.label}</span>
                           </td>
                           <td className="px-3 py-1.5 font-bold text-ink">{r.product || "-"}</td>
                           <td className="px-3 py-1.5 text-ink">{r.variant || "-"}</td>
@@ -507,7 +507,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
                     <td className="whitespace-nowrap px-3 py-2 font-black text-ink">{r.display_name || ""}</td>
                     <td className="px-3 py-2 text-ink">{r.raw_message || ""}</td>
                     <td className="whitespace-nowrap px-3 py-2">
-                      <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-black ${st.cls}`}>{st.label}</span>
+                      <span className={`rounded-lg px-1.5 py-0.5 text-[11px] font-black ${st.cls}`}>{st.label}</span>
                     </td>
                     <td className="px-3 py-2 font-bold text-ink">{r.parsed_product_name || ""}</td>
                     <td className="px-3 py-2 text-ink">{r.parsed_variant || ""}</td>

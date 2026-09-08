@@ -239,10 +239,10 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
               >
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-black text-white" style={{ background: f.highlight ? "#2B6BEB" : "#8B99BC" }}>{fieldIndex + 1}</span>
                 <div className="w-[70px] shrink-0">
-                  <div className="text-[11.5px] font-black" style={{ color: f.highlight ? "#2B6BEB" : "#5A6B92" }}>{f.label}</div>
+                  <div className="text-[12px] font-black" style={{ color: f.highlight ? "#2B6BEB" : "#5A6B92" }}>{f.label}</div>
                   {f.hint ? <div className="text-[11px] font-bold" style={{ color: "#8B99BC" }}>{f.hint}</div> : null}
                 </div>
-                <div className="min-w-0 flex-1 truncate text-[15px] font-black" style={{ color: "#101C3D" }}>
+                <div className="min-w-0 flex-1 truncate text-[14px] font-black" style={{ color: "#101C3D" }}>
                   {f.value || <span style={{ color: "#8B99BC" }}>없음</span>}
                 </div>
                 <button
@@ -260,17 +260,17 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
 
           {/* [2026-08-31 사장님 요청] 가운데 빈 공간 활용 — 결제 전에 주문·금액을 눈으로 검산 (표시 전용) */}
           <div className="mt-4 flex min-h-0 flex-1 flex-col rounded-2xl bg-white px-4 py-3.5 shadow-sm" style={{ border: "1px solid #DDE4F2" }}>
-            <div className="mb-2 shrink-0 text-[11.5px] font-black" style={{ color: "#5A6B92" }}>🧾 이 주문 내용 — 결제 전에 확인하세요</div>
+            <div className="mb-2 shrink-0 text-[12px] font-black" style={{ color: "#5A6B92" }}>🧾 이 주문 내용 — 결제 전에 확인하세요</div>
             <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
               {orderItems.map((item, itemIndex) => {
                 const opt = formatOrderOptionText(item.color, item.size);
                 return (
-                  <div key={itemIndex} className="flex items-center justify-between gap-2 text-[12.5px] font-bold" style={{ color: "#101C3D" }}>
+                  <div key={itemIndex} className="flex items-center justify-between gap-2 text-[13px] font-bold" style={{ color: "#101C3D" }}>
                     {itemImages[String(item.id)] ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={itemImages[String(item.id)]} alt="" onClick={() => setImagePreviewUrl(itemImages[String(item.id)])} className="h-9 w-9 shrink-0 cursor-zoom-in rounded-lg object-cover" style={{ border: "1px solid #DDE4F2" }} />
                     ) : (
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[15px]" style={{ background: "#F4F6FB" }}>🛍</span>
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[14px]" style={{ background: "#F4F6FB" }}>🛍</span>
                     )}
                     <span className="min-w-0 flex-1 truncate">
                       {item.productName}

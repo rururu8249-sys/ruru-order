@@ -1492,7 +1492,7 @@ export default function AdminLiveDashboard() {
                             onClick={() => { setActiveMenu(tab.key); replacePanelInUrl(tab.key); }}
                             className={[
                               "-mb-px rounded-t-lg border-b-2 px-3.5 py-2 text-[13px] font-black transition",
-                              active ? "border-rose-deep bg-rose-soft/60 text-rose-deep" : "border-transparent text-ink-soft hover:bg-rose-soft hover:text-rose-deep",
+                              active ? "border-rose-deep bg-rose-soft/60 text-rose-deep" : "border-transparent text-ink-soft hover:opacity-90 hover:text-rose-deep",
                             ].join(" ")}
                           >
                             {tab.label}
@@ -1509,7 +1509,7 @@ export default function AdminLiveDashboard() {
                       onClick={() => setMatchPanelOpen((v) => !v)}
                       className={[
                         "rounded-lg border px-2.5 py-1.5 text-xs font-black transition",
-                        matchPanelOpen ? "border-rose-deep bg-rose-soft text-rose-deep" : "border-rose-line text-rose-deep hover:bg-rose-soft",
+                        matchPanelOpen ? "border-rose-deep bg-rose-soft text-rose-deep" : "border-rose-line text-rose-deep hover:opacity-90",
                       ].join(" ")}
                     >
                       {matchPanelOpen ? "입금매칭 닫기" : "입금매칭 열기"}

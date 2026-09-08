@@ -281,9 +281,9 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
       {sendOpen ? (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4" onClick={() => !sending && setSendOpen(false)}>
           <div className="w-full max-w-md rounded-2xl bg-surface p-5" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 text-[15px] font-black text-ink">💝 {SEG_META[seg].label} {checked.size}명에게 보내기</div>
+            <div className="mb-3 text-[14px] font-black text-ink">💝 {SEG_META[seg].label} {checked.size}명에게 보내기</div>
             <label className="mb-1 block text-[12px] font-black text-ink-soft">1인당 포인트</label>
-            <input value={amountText ? Number(amountText).toLocaleString("ko-KR") : ""} inputMode="numeric" onChange={(e) => setAmountText(e.target.value.replace(/[^0-9]/g, ""))} className="mb-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-[15px] font-black text-ink outline-none focus:border-rose-deep" />
+            <input value={amountText ? Number(amountText).toLocaleString("ko-KR") : ""} inputMode="numeric" onChange={(e) => setAmountText(e.target.value.replace(/[^0-9]/g, ""))} className="mb-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-[14px] font-black text-ink outline-none focus:border-rose-deep" />
             <div className="mb-3 text-[11px] font-bold text-ink-mute">총 {(amountNum * checked.size).toLocaleString()}P · 업계 통상 1,000~3,000P — 기본 2,000P, 금액은 자유롭게 바꾸세요</div>
             <label className="mb-1 block text-[12px] font-black text-ink-soft">쪽지 내용 (비우면 아래 기본 문구)</label>
             <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder={defaultNote} rows={3} className="mb-4 w-full rounded-xl border border-line bg-surface px-3 py-2 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />

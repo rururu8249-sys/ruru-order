@@ -128,14 +128,14 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
           onChange={(event) => setPhone(event.target.value)}
           placeholder="01012345678"
           inputMode="numeric"
-          className="h-11 w-full min-w-0 rounded-xl border border-danger-tx bg-surface px-3 text-[13px] font-black text-ink outline-none focus:border-danger-tx/35 focus:ring-4 focus:ring-red-100 sm:w-44"
+          className="h-11 w-full min-w-0 rounded-xl border border-danger-tx bg-surface px-3 text-[13px] font-black text-ink outline-none focus:border-danger-tx/35 focus:ring-4 focus:ring-[var(--color-danger-tx)]/25 sm:w-44"
         />
 
         <input
           value={reason}
           onChange={(event) => setReason(event.target.value)}
           placeholder="차단사유 입력"
-          className="h-11 min-w-[150px] flex-1 rounded-xl border border-danger-tx bg-surface px-3 text-[13px] font-bold text-ink outline-none focus:border-danger-tx/35 focus:ring-4 focus:ring-red-100"
+          className="h-11 min-w-[150px] flex-1 rounded-xl border border-danger-tx bg-surface px-3 text-[13px] font-bold text-ink outline-none focus:border-danger-tx/35 focus:ring-4 focus:ring-[var(--color-danger-tx)]/25"
         />
 
         <button
@@ -158,7 +158,7 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
       </div>
 
       {errorMessage ? (
-        <div className="mt-3 rounded-2xl bg-surface px-3 py-2 text-[12px] font-black text-danger-tx ring-1 ring-red-100">
+        <div className="mt-3 rounded-2xl bg-surface px-3 py-2 text-[12px] font-black text-danger-tx ring-1 ring-[var(--color-danger-tx)]/25">
           {errorMessage}
         </div>
       ) : null}

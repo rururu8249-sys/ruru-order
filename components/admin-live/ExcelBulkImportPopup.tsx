@@ -14,6 +14,7 @@ import { createPortal } from "react-dom";
 import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import { mergeBrandGroupProduct } from "@/lib/brandGroupMerge";
 import {
   autoGuessConfig, buildDraftCores, auditDraftCores, norm, totalStock,
@@ -436,6 +437,21 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
       showAdminToast("확인 필요 표시가 있는 상품은 등록할 수 없어요.\n\n문제없는 것만 선택하거나 엑셀을 수정해주세요.", "error");
       return;
     }
+    // [2026-09-08 전수감사] 상품 표에 «대량 INSERT» 하는 마지막 단계인데 확인창이 없었다.
+    //   방송 전에 급히 엑셀을 올리다 잘못된 가격·수량이 그대로 들어갈 수 있다. (파싱·등록 로직은 무변경)
+    const priceSum = targets.reduce((sum, d) => sum + Number((d as any).price || 0), 0);
+    const okToCommit = await showAdminConfirm(
+      [
+        `상품 ${targets.length.toLocaleString("ko-KR")}개를 등록할까요?`,
+        "",
+        `· 가격 합계 ${priceSum.toLocaleString("ko-KR")}원 (미리보기 기준)`,
+        "· 등록하면 손님 화면 상품 목록에 바로 올라갑니다.",
+        "· 잘못 올라간 상품은 상품 관리에서 하나씩 지워야 합니다.",
+      ].join("\n"),
+      { title: "엑셀 대량등록", confirmText: `${targets.length}개 등록` },
+    );
+    if (!okToCommit) return;
+
     setBusy("중복 확인 중…");
     setProgress({ done: 0, total: targets.length, ok: 0, fail: 0 });
     try {
@@ -792,7 +808,9 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
   };
 
   const body = (
-    <div style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    // [2026-09-08] 이 화면은 버튼이 전부 인라인 style이라 hover가 «한 곳도» 없었다.
+    //   .ruru-product-sian 스코프를 걸면 globals.css 규칙으로 눌리는 느낌이 생긴다(색·크기 무변경).
+    <div className="ruru-product-sian" style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{ width: "1000px", maxWidth: "100%", height: "700px", maxHeight: "calc(100vh - 32px)", background: "var(--color-surface)", borderRadius: "14px", overflow: "hidden", display: "flex", flexDirection: "column" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "13px 18px", borderBottom: "1px solid #EDE4E8" }}>
           <span style={{ fontSize: "16px", fontWeight: 900, color: "var(--color-rose-deep)" }}>📄 엑셀 대량등록</span>

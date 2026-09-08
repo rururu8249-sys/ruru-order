@@ -403,7 +403,7 @@ export default function AdminLiveNoticePanel() {
                   className={input}
                 />
                 <div className="mt-2 rounded-lg px-2.5 py-1.5" style={{ background: popupColor }}>
-                  <span className="text-[11.5px] font-bold text-white">📢 {noticeBarLine(barLine || popupTitle, popupText)}</span>
+                  <span className="text-[12px] font-bold text-white">📢 {noticeBarLine(barLine || popupTitle, popupText)}</span>
                 </div>
                 <span className={help}>
                   손님 화면 맨 위에 <b>이 한 줄</b>만 보입니다. 비우면 제목이나 본문 첫 줄이 자동으로 들어가는데,
@@ -631,7 +631,7 @@ export default function AdminLiveNoticePanel() {
                         {!n.is_visible ? <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-mute">숨김</span> : null}
                         <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-mute">{n.category || "공지"}</span>
                       </div>
-                      <p className="mt-1.5 whitespace-pre-line text-[12.5px] font-bold leading-6 text-ink-soft">{n.content}</p>
+                      <p className="mt-1.5 whitespace-pre-line text-[13px] font-bold leading-6 text-ink-soft">{n.content}</p>
                     </div>
                   </div>
 
@@ -746,7 +746,7 @@ export default function AdminLiveNoticePanel() {
             </label>
 
             <button type="button" onClick={() => void sendNotes()} disabled={sending || picked.length === 0 || !noteText.trim()}
-              className="mt-4 h-12 w-full rounded-2xl bg-rose-deep text-[15px] font-black text-white transition disabled:opacity-40">
+              className="mt-4 h-12 w-full rounded-2xl bg-rose-deep text-[14px] font-black text-white transition disabled:opacity-40">
               {sending ? "보내는 중…" : picked.length > 0 ? `📩 ${picked.length}명에게 보내기` : "받을 손님을 먼저 고르세요"}
             </button>
             <div className="mt-2 rounded-xl border border-line bg-warn-bg px-3 py-2 text-[11px] font-bold leading-5 text-warn-tx">
@@ -788,7 +788,7 @@ export default function AdminLiveNoticePanel() {
                       {!revoked && expired ? <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-mute">기간 지남</span> : null}
                       {n.dismissed_at ? <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-mute">손님이 닫음</span> : null}
                     </div>
-                    <p className="mt-1.5 whitespace-pre-line text-[12.5px] font-bold leading-6 text-ink-soft">{n.message}</p>
+                    <p className="mt-1.5 whitespace-pre-line text-[13px] font-bold leading-6 text-ink-soft">{n.message}</p>
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-bold text-ink-mute">
                       <span>보낸 날짜 {noteTimeText(n.created_at)}</span>
                       {n.seen_at ? <span>읽은 날짜 {noteTimeText(n.seen_at)}</span> : null}

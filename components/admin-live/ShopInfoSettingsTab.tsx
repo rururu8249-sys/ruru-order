@@ -199,7 +199,7 @@ export default function ShopInfoSettingsTab() {
                     type="button"
                     onClick={() => onChangeType(type)}
                     className={`rounded-2xl border px-3 py-3 text-left text-sm font-black transition ${
-                      active ? "border-rose-deep bg-rose-soft text-rose-deep" : "border-line bg-surface-2 text-ink-soft hover:bg-surface"
+                      active ? "border-rose-deep bg-rose-soft text-rose-deep" : "border-line bg-surface-2 text-ink-soft hover:opacity-90"
                     }`}
                   >
                     {CONTACT_TYPE_LABEL[type]}
@@ -294,7 +294,7 @@ export default function ShopInfoSettingsTab() {
           type="button"
           onClick={save}
           disabled={saving || loading}
-          className="rounded-2xl bg-rose-deep px-6 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-rose-deep disabled:cursor-wait disabled:opacity-50"
+          className="rounded-2xl bg-rose-deep px-6 py-2.5 text-sm font-black text-white shadow-sm transition hover:opacity-90 disabled:cursor-wait disabled:opacity-50"
         >
           {saving ? "저장중..." : "상점 정보 저장"}
         </button>

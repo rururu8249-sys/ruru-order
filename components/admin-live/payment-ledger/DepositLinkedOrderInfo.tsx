@@ -153,7 +153,7 @@ export default function DepositLinkedOrderInfo({ row }: { row: RawDepositRow }) 
 
   if (orders.length === 0) {
     return (
-      <section className="rounded-3xl border border-line bg-surface-2 px-4 py-3">
+      <section className="rounded-2xl border border-line bg-surface-2 px-4 py-3">
         <div className="text-sm font-black text-ink">연결 주문 정보</div>
         <div className="mt-1 text-xs font-bold leading-5 text-ink-soft">
           연결된 주문 상세가 현재 입금내역에 포함되어 있지 않습니다.
@@ -163,7 +163,7 @@ export default function DepositLinkedOrderInfo({ row }: { row: RawDepositRow }) 
   }
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-line bg-info-bg">
+    <section className="overflow-hidden rounded-2xl border border-line bg-info-bg">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
         <div>
           <div className="text-sm font-black text-ink">연결 주문 정보</div>

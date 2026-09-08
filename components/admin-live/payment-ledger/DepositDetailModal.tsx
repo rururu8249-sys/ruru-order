@@ -136,7 +136,7 @@ export default function DepositDetailModal({ row, onClose }: Props) {
             <button
               type="button"
               onClick={onClose}
-              className="rounded-2xl bg-rose-deep px-7 py-3 text-sm font-black text-white shadow-sm transition hover:bg-rose-deep"
+              className="rounded-2xl bg-rose-deep px-7 py-3 text-sm font-black text-white shadow-sm transition hover:opacity-90"
             >
               확인
             </button>

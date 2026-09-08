@@ -410,7 +410,7 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
       >
         {/* 헤더 */}
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
-          <div className="text-[15px] font-black text-rose-deep">등록상품 추가 (재고 차감)</div>
+          <div className="text-[14px] font-black text-rose-deep">등록상품 추가 (재고 차감)</div>
           <button
             type="button"
             onClick={onClose}
@@ -460,9 +460,9 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
                   >
                     {img ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={img} alt="" className="h-11 w-11 flex-none rounded-md object-cover" />
+                      <img src={img} alt="" className="h-11 w-11 flex-none rounded-lg object-cover" />
                     ) : (
-                      <span className="h-11 w-11 flex-none rounded-md bg-surface-2" />
+                      <span className="h-11 w-11 flex-none rounded-lg bg-surface-2" />
                     )}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[14px] font-black text-ink">{productName(p)}</span>

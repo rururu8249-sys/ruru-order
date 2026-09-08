@@ -71,7 +71,7 @@ export default function LiveStatsPanel({ orders, activeBroadcastId, onOpenReport
           {/* 매출 크게 */}
           <div className="mb-2 rounded-xl bg-rose-soft/40 px-3 py-2">
             <div className="text-[11px] font-black text-ink-mute">결제완료 매출</div>
-            <div className="text-[19px] font-black text-rose-deep">{won(stats.paidSales)}</div>
+            <div className="text-[20px] font-black text-rose-deep">{won(stats.paidSales)}</div>
           </div>
 
           {/* 지표 그리드 */}

@@ -136,7 +136,7 @@ export default function AdminLiveSidebar({
                     <AdminLiveMenuIcon menu={menu.key} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block whitespace-nowrap text-[15px] font-black">{menu.label}</span>
+                    <span className="block whitespace-nowrap text-[14px] font-black">{menu.label}</span>
                     <span className="block truncate text-[11px] font-bold opacity-60">{menu.desc}</span>
                   </span>
                 </span>

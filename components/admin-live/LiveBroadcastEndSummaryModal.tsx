@@ -74,7 +74,7 @@ function StatCard({
         : tone === "orange"
           ? "border-line bg-warn-bg text-warn-tx"
           : tone === "violet"
-            ? "border-violet-100 bg-[var(--color-cardpay)]/12 text-[var(--color-cardpay)]"
+            ? "border-[var(--color-cardpay)]/30 bg-[var(--color-cardpay)]/12 text-[var(--color-cardpay)]"
             : "border-line bg-surface text-ink";
 
   return (
@@ -101,7 +101,7 @@ export default function LiveBroadcastEndSummaryModal({ summary, onClose, onOpenS
           </p>
         </div>
 
-        <div className="mt-4 rounded-3xl border border-line bg-surface-2 p-4">
+        <div className="mt-4 rounded-2xl border border-line bg-surface-2 p-4">
           <div className="grid gap-3 text-sm font-bold text-ink md:grid-cols-5">
             <div className="md:col-span-2">
               <div className="text-[11px] font-black text-ink-mute">방송명</div>
@@ -124,7 +124,7 @@ export default function LiveBroadcastEndSummaryModal({ summary, onClose, onOpenS
           </div>
         </div>
 
-        <div className="mt-4 rounded-3xl border border-line bg-warn-bg px-4 py-3">
+        <div className="mt-4 rounded-2xl border border-line bg-warn-bg px-4 py-3">
           <div className="text-sm font-black text-warn-tx">지금 확인할 일</div>
           <div className="mt-2 grid gap-2 text-xs font-bold text-warn-tx md:grid-cols-3">
             <div className="rounded-2xl bg-surface-2 px-3 py-2">
@@ -163,7 +163,7 @@ export default function LiveBroadcastEndSummaryModal({ summary, onClose, onOpenS
         </div>
 
         {summary.mission ? (
-          <div className={`mt-4 rounded-3xl border px-4 py-4 ${summary.mission.achieved ? "border-ok-tx/40 bg-ok-bg" : "border-line bg-surface-2"}`}>
+          <div className={`mt-4 rounded-2xl border px-4 py-4 ${summary.mission.achieved ? "border-ok-tx/40 bg-ok-bg" : "border-line bg-surface-2"}`}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-[11px] font-black text-ink-mute">🎯 미션 게이지</div>
@@ -191,7 +191,7 @@ export default function LiveBroadcastEndSummaryModal({ summary, onClose, onOpenS
           </div>
         ) : null}
 
-        <div className="mt-4 rounded-3xl border border-line bg-surface-2 px-4 py-3 text-xs font-bold leading-5 text-ink-soft">
+        <div className="mt-4 rounded-2xl border border-line bg-surface-2 px-4 py-3 text-xs font-bold leading-5 text-ink-soft">
           이번 방송 사이트 방문자: <span className="text-ink">{summary.visitorText}</span>
           <span className="ml-2 text-ink-mute">· 자세한 명단은 왼쪽 「접속 기록 보기」</span>
         </div>
@@ -207,7 +207,7 @@ export default function LiveBroadcastEndSummaryModal({ summary, onClose, onOpenS
           <button
             type="button"
             onClick={onOpenSettlement}
-            className="rounded-2xl bg-rose-deep px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-rose-deep"
+            className="rounded-2xl bg-rose-deep px-4 py-3 text-sm font-black text-white shadow-sm transition hover:opacity-90"
           >
             정산통계에서 보기
           </button>

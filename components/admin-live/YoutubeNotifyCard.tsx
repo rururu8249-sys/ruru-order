@@ -125,7 +125,7 @@ export default function YoutubeNotifyCard() {
         <button
           type="button"
           onClick={connect}
-          className="shrink-0 rounded-full bg-rose-deep px-4 py-2 text-xs font-black text-white transition hover:bg-rose-deep"
+          className="shrink-0 rounded-full bg-rose-deep px-4 py-2 text-xs font-black text-white transition hover:opacity-90"
         >
           {connected ? "다시 연결" : "유튜브 연결"}
         </button>
@@ -174,7 +174,7 @@ export default function YoutubeNotifyCard() {
             type="button"
             onClick={saveSettings}
             disabled={savingSettings}
-            className="rounded-2xl bg-rose-deep px-5 py-3 text-sm font-black text-white transition hover:bg-rose-deep disabled:opacity-50"
+            className="rounded-2xl bg-rose-deep px-5 py-3 text-sm font-black text-white transition hover:opacity-90 disabled:opacity-50"
           >
             {savingSettings ? "저장중" : "설정 저장"}
           </button>

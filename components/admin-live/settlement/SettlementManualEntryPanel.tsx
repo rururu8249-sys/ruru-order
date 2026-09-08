@@ -19,7 +19,7 @@ function entryTypeLabel(value: SettlementManualEntryType) {
 }
 
 function entryTypeTone(value: SettlementManualEntryType) {
-  return value === "income" ? "text-info-tx bg-info-bg border-line" : "text-[var(--color-cardpay)] bg-[var(--color-cardpay)]/12 border-violet-100";
+  return value === "income" ? "text-info-tx bg-info-bg border-line" : "text-[var(--color-cardpay)] bg-[var(--color-cardpay)]/12 border-[var(--color-cardpay)]/30";
 }
 
 function getVisiblePages(currentPage: number, pageCount: number) {

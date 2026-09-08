@@ -721,6 +721,26 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const handlePaymentConfirmCancel = async () => {
     if (!canCancelPaymentConfirm || paymentCancelAction) return;
 
+    // [2026-09-08 전수감사] ★ 이 화면의 다른 돈 액션은 전부 확인창을 거치는데 «이것만» 예외였다.
+    //   방송 중 실수로 누르면 입금확인이 풀리고 화면까지 새로고침되어, 되돌리려면 입금을 다시 수동 매칭해야 한다.
+    //   → 다른 돈 액션과 같은 확인창을 붙인다. (서버 API·입금 로직은 무변경)
+    const view = orderForView as any;
+    const who = String(view?.nickname || view?.customerName || "이 주문");
+    const amountText = Number(view?.totalAmount || 0) > 0
+      ? `${Number(view.totalAmount).toLocaleString("ko-KR")}원 `
+      : "";
+    const ok = await showAdminConfirm(
+      [
+        `${who}님의 ${amountText}입금확인을 취소할까요?`,
+        "",
+        "· 이 주문이 「미입금」으로 되돌아갑니다.",
+        "· 정산의 「실제로 받은 돈」에서 이 금액이 빠집니다.",
+        "· 되돌리려면 입금내역에서 다시 매칭해야 합니다.",
+      ].join("\n"),
+      { title: "입금확인 취소", confirmText: "입금확인 취소", tone: "danger" },
+    );
+    if (!ok) return;
+
     setPaymentCancelAction(true);
     setPaymentCancelError("");
 
@@ -1135,7 +1155,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     <aside className="flex h-full min-h-0 w-full flex-col bg-surface">
       {/* 목업 B panel-header */}
       <header className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-3">
-        <span className="text-[15px] font-black text-ink">주문 상세</span>
+        <span className="text-[14px] font-black text-ink">주문 상세</span>
         {/* [고객용 복사 · 2026-07-22 사장님 지시] 닉네임/이름/주소/연락처/주문내역/금액을 카톡에 바로 붙여넣을 텍스트로 복사 — 읽기 전용 */}
         <button
           type="button"
@@ -1223,7 +1243,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               <div className="grid gap-1 text-[11px] font-black text-ink-mute">우편번호 · 주소
                 <div className="flex gap-2">
                   <input value={editZipcode} onChange={(e) => setEditZipcode(e.target.value)} placeholder="우편번호" className="h-9 w-[96px] rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
-                  <button type="button" onClick={openAddressSearch} className="h-9 shrink-0 rounded-lg bg-rose-deep px-3 text-[12px] font-black text-white hover:bg-rose-deep">주소검색</button>
+                  <button type="button" onClick={openAddressSearch} className="h-9 shrink-0 rounded-lg bg-rose-deep px-3 text-[12px] font-black text-white hover:opacity-90">주소검색</button>
                 </div>
                 <input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} placeholder="기본주소" className="mt-1 h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
                 <input value={editDetailAddress} onChange={(e) => setEditDetailAddress(e.target.value)} placeholder="상세주소" className="mt-1 h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
@@ -1266,21 +1286,21 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 <button
                   type="button"
                   onClick={() => startEditReturn("refund")}
-                  className="rounded-md border border-rose-line bg-rose-soft px-2.5 py-1 text-[11px] font-black text-rose-deep transition hover:bg-rose-line/40"
+                  className="rounded-lg border border-rose-line bg-rose-soft px-2.5 py-1 text-[11px] font-black text-rose-deep transition hover:bg-rose-line/40"
                 >
                   ↩ 반품(환불)
                 </button>
                 <button
                   type="button"
                   onClick={() => startEditReturn("exchange")}
-                  className="rounded-md border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft transition hover:bg-surface-2"
+                  className="rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft transition hover:bg-surface-2"
                 >
                   ⇄ 반품(교환)
                 </button>
                 <button
                   type="button"
                   onClick={() => startEditReturn("etc")}
-                  className="rounded-md border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft transition hover:bg-surface-2"
+                  className="rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft transition hover:bg-surface-2"
                   title="오배송·부분보상 등 환불/교환이 아닌 건 — 기록과 고객이슈 등록만 하고 포인트는 건드리지 않아요"
                 >
                   📝 기타
@@ -1291,7 +1311,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           {!returnEditing ? (
             (order as any).returnStatus ? (
               <div className="rounded-lg border border-warn-tx/40 bg-warn-bg p-3 text-[12px] font-bold leading-6 text-warn-tx">
-                <span className="mr-2 rounded-md bg-surface px-2 py-0.5 text-[11px] font-black">{String((order as any).returnStatus)}</span>
+                <span className="mr-2 rounded-lg bg-surface px-2 py-0.5 text-[11px] font-black">{String((order as any).returnStatus)}</span>
                 {Number((order as any).returnAmount || 0) > 0 ? <span className="mr-2">환불 예정/완료 {money(Number((order as any).returnAmount || 0))}</span> : null}
                 <div className="mt-1 whitespace-pre-wrap text-ink-soft">{String((order as any).returnReason || "사유 없음")}</div>
                 <div className="mt-1 text-[11px] text-ink-mute">※ 기록용입니다 — 정산·입금·재고 숫자는 바뀌지 않아요.</div>
@@ -1323,7 +1343,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 ))}
               </div>
 
-              <div className="mt-2 space-y-1 rounded-md border border-line bg-surface p-2">
+              <div className="mt-2 space-y-1 rounded-lg border border-line bg-surface p-2">
                 <div className="text-[11px] font-black text-ink-mute">대상 상품 선택 ({returnSelectedIds.length}/{items.length})</div>
                 {items.map((item) => {
                   const id = String(item.id);
@@ -1332,7 +1352,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                     .filter((v) => v && v !== "없음")
                     .join("/");
                   return (
-                    <label key={id} className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 hover:bg-surface-2">
+                    <label key={id} className="flex cursor-pointer items-center gap-2 rounded-lg px-1 py-1 hover:bg-surface-2">
                       <input type="checkbox" checked={checked} onChange={() => toggleReturnItem(id)} className="h-4 w-4 shrink-0 accent-rose-deep" />
                       <span className="min-w-0 flex-1 truncate text-[12px] font-bold text-ink">
                         {item.productName}
@@ -1349,15 +1369,15 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 value={returnReasonDraft}
                 onChange={(e) => setReturnReasonDraft(e.target.value)}
                 placeholder="세부사항 (선택 — 예: 사이즈 안 맞음, 7/6 회수 예약)"
-                className="mt-2 h-14 w-full rounded-md border border-line bg-surface p-2 text-[12px] font-bold text-ink"
+                className="mt-2 h-14 w-full rounded-lg border border-line bg-surface p-2 text-[12px] font-bold text-ink"
               />
               <div className="mt-2 flex flex-wrap gap-2">
-                <button type="button" disabled={returnSaving} onClick={() => void handleSaveReturn()} className="rounded-md bg-rose-deep px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-50">
+                <button type="button" disabled={returnSaving} onClick={() => void handleSaveReturn()} className="rounded-lg bg-rose-deep px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-50">
                   {returnSaving ? "접수중…" : returnModeDraft === "refund" ? "환불 접수 (포인트 회수 포함)" : returnModeDraft === "exchange" ? "교환 접수" : "기타 접수 (기록만)"}
                 </button>
-                <button type="button" onClick={() => setReturnEditing(false)} className="rounded-md border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ink-soft">취소</button>
+                <button type="button" onClick={() => setReturnEditing(false)} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ink-soft">취소</button>
                 {(order as any).returnStatus ? (
-                  <button type="button" disabled={returnSaving} onClick={() => void handleClearReturn()} className="ml-auto rounded-md border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ink-mute hover:text-danger-tx">
+                  <button type="button" disabled={returnSaving} onClick={() => void handleClearReturn()} className="ml-auto rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ink-mute hover:text-danger-tx">
                     기록 지우기
                   </button>
                 ) : null}
@@ -1447,7 +1467,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                       setShowPicker(false);
                       setShowAddForm((v) => !v);
                     }}
-                    className="rounded-lg border border-rose-line bg-rose-soft px-2 py-1 text-[11px] font-black text-rose-deep hover:bg-rose-soft"
+                    className="rounded-lg border border-rose-line bg-rose-soft px-2 py-1 text-[11px] font-black text-rose-deep hover:opacity-90"
                   >
                     {showAddForm ? "닫기" : "+ 직접입력 추가"}
                   </button>
@@ -1457,7 +1477,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                       setShowAddForm(false);
                       setShowPicker((v) => !v);
                     }}
-                    className="rounded-lg border border-rose-line bg-rose-soft px-2 py-1 text-[11px] font-black text-rose-deep hover:bg-rose-soft"
+                    className="rounded-lg border border-rose-line bg-rose-soft px-2 py-1 text-[11px] font-black text-rose-deep hover:opacity-90"
                   >
                     {showPicker ? "닫기" : "+ 등록상품 추가"}
                   </button>
@@ -1558,7 +1578,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 <button
                   type="button"
                   onClick={() => { setShipEditText(String(shippingFee)); setShipEditOpen((v) => !v); }}
-                  className="rounded-md border border-line bg-surface px-1.5 py-0.5 text-[11px] font-black text-ink-soft hover:border-rose-deep hover:text-rose-deep"
+                  className="rounded-lg border border-line bg-surface px-1.5 py-0.5 text-[11px] font-black text-ink-soft hover:border-rose-deep hover:text-rose-deep"
                 >
                   ✎ 수정
                 </button>
@@ -1572,12 +1592,12 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 value={shipEditText === "" ? "" : Number(String(shipEditText).replace(/[^0-9]/g, "") || 0).toLocaleString("ko-KR")}
                 inputMode="numeric"
                 onChange={(event) => setShipEditText(event.target.value.replace(/[^0-9]/g, ""))}
-                className="w-24 rounded-md border border-line px-2 py-1 text-right text-[12px] font-black outline-none focus:border-rose-deep"
+                className="w-24 rounded-lg border border-line px-2 py-1 text-right text-[12px] font-black outline-none focus:border-rose-deep"
                 placeholder="0"
               />
               <span className="text-[11px] text-ink-soft">원 (0원 가능)</span>
-              <button type="button" disabled={savingShipping} onClick={() => void handleSaveShippingFee()} className="ml-auto rounded-md bg-rose-deep px-2.5 py-1 text-[11px] font-black text-white disabled:opacity-50">{savingShipping ? "저장중…" : "저장"}</button>
-              <button type="button" disabled={savingShipping} onClick={() => setShipEditOpen(false)} className="rounded-md border border-line bg-surface px-2 py-1 text-[11px] font-bold text-ink-soft">취소</button>
+              <button type="button" disabled={savingShipping} onClick={() => void handleSaveShippingFee()} className="ml-auto rounded-lg bg-rose-deep px-2.5 py-1 text-[11px] font-black text-white disabled:opacity-50">{savingShipping ? "저장중…" : "저장"}</button>
+              <button type="button" disabled={savingShipping} onClick={() => setShipEditOpen(false)} className="rounded-lg border border-line bg-surface px-2 py-1 text-[11px] font-bold text-ink-soft">취소</button>
             </div>
           ) : null}
           {isCardPaymentDisplay && cardPaymentExtraAmount > 0 ? (
@@ -1610,7 +1630,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               type="button"
               onClick={handlePaymentConfirmCancel}
               disabled={paymentCancelAction}
-              className="h-10 w-full rounded-xl border border-line bg-surface text-[13px] font-black text-ink shadow-sm hover:bg-surface-2 active:scale-[0.99] disabled:bg-surface-2 disabled:text-ink-mute"
+              className="h-10 w-full rounded-xl border border-line bg-surface text-[13px] font-black text-ink shadow-sm hover:opacity-90 active:scale-[0.99] disabled:bg-surface-2 disabled:text-ink-mute"
             >
               {paymentCancelAction ? "처리중..." : "입금확인 취소"}
             </button>
@@ -1631,14 +1651,14 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 
               {isCardPaid ? (
                 <>
-                  <div className="rounded-xl border border-purple-100 bg-purple-50 px-3 py-2 text-[11px] font-bold leading-4 text-purple-700">
+                  <div className="rounded-xl border border-[var(--color-cardpay)]/30 bg-[var(--color-cardpay)]/12 px-3 py-2 text-[11px] font-bold leading-4 text-[var(--color-cardpay)]">
                     카드결제완료 주문입니다. 결제완료 처리를 잘못한 경우에는 [카드미결제로 되돌리기]를 사용하세요. 주문 자체를 없애야 하는 경우에만 [주문서 자체 취소]를 사용하세요.
                   </div>
                   <button
                     type="button"
                     onClick={() => handleCardPaymentStatusChange("주문확인전", "card-unpaid")}
                     disabled={Boolean(cardStatusAction)}
-                    className="h-10 w-full rounded-xl border border-rose-line bg-rose-soft text-[13px] font-black text-rose-deep shadow-sm hover:bg-rose-soft active:scale-[0.99] disabled:bg-surface-2 disabled:text-ink-mute"
+                    className="h-10 w-full rounded-xl border border-rose-line bg-rose-soft text-[13px] font-black text-rose-deep shadow-sm hover:opacity-90 active:scale-[0.99] disabled:bg-surface-2 disabled:text-ink-mute"
                   >
                     {cardStatusAction === "card-unpaid" ? "처리중..." : "카드미결제로 되돌리기"}
                   </button>
@@ -1662,7 +1682,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             <button
               type="button"
               onClick={() => onOpenManualMatch(order)}
-              className="h-10 w-full rounded-xl border border-rose-line bg-rose-soft text-[13px] font-black text-rose-deep shadow-sm hover:bg-rose-soft active:scale-[0.99]"
+              className="h-10 w-full rounded-xl border border-rose-line bg-rose-soft text-[13px] font-black text-rose-deep shadow-sm hover:opacity-90 active:scale-[0.99]"
             >
               입금 매칭에서 찾기
             </button>
@@ -1674,7 +1694,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 type="button"
                 onClick={restoreOrder}
                 disabled={Boolean(savingAction)}
-                className="h-10 w-full rounded-xl bg-rose-deep text-[13px] font-black text-white shadow-sm hover:bg-rose-deep active:scale-[0.99] disabled:bg-surface-3"
+                className="h-10 w-full rounded-xl bg-rose-deep text-[13px] font-black text-white shadow-sm hover:opacity-90 active:scale-[0.99] disabled:bg-surface-3"
               >
                 {savingAction === "restore" ? "처리중..." : "주문서복구"}
               </button>
@@ -1702,7 +1722,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 type="button"
                 onClick={cancelOrder}
                 disabled={Boolean(savingAction)}
-                className="h-10 w-full rounded-xl border border-danger-tx bg-danger-bg text-[13px] font-black text-danger-tx shadow-sm hover:bg-danger-bg active:scale-[0.99] disabled:bg-surface-2 disabled:text-ink-mute"
+                className="h-10 w-full rounded-xl border border-danger-tx bg-danger-bg text-[13px] font-black text-danger-tx shadow-sm hover:opacity-90 active:scale-[0.99] disabled:bg-surface-2 disabled:text-ink-mute"
               >
                 {savingAction === "cancel" ? "처리중..." : "주문서 자체 취소"}
               </button>

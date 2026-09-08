@@ -1761,7 +1761,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     ) : null}
                   </div>
                 ) : null}
-                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 10px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid #e5dfe1", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 10px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid var(--color-line)", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
                 {bcSelId && bcProducts.length > 0 && !bcDragEnabled && !bcCopyMode ? (
                   <div style={{ margin: "0 0 8px", padding: "6px 9px", borderRadius: "7px", background: "var(--color-warn-bg)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 700, lineHeight: 1.4 }}>
                     {search.trim() ? "🔍 검색 중에는 순서를 바꿀 수 없어요. 검색어를 지워주세요." : "↕ 순서를 바꾸려면 정렬을 「진열 순서 (드래그)」로 두세요. (지금은 보기만 바뀐 상태 — 저장된 순서는 그대로)"}
@@ -1912,7 +1912,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               ) : null}
               <button type="button" disabled={shopBusy} onClick={openShopPicker} style={{ marginLeft: shopRows.length > 0 ? undefined : "auto", fontSize: "11px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "7px", padding: "5px 11px", cursor: shopBusy ? "wait" : "pointer", opacity: shopBusy ? 0.5 : 1 }}>+ 쇼핑몰에 상품 추가</button>
             </div>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 10px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid #e5dfe1", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 10px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid var(--color-line)", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
             <div
               ref={shopScrollRef}
               onDragOver={handleShopDragAutoScroll}
