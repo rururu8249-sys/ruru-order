@@ -39,6 +39,8 @@ type Props = {
   onYearFilter: (year: string) => void;
   onMonthFilter: (month: string) => void;
   onToggleSettlementDetail: () => void;
+  /** [2026-09-08] 「아직 안 들어온 돈 › 주문 보기」 — 주문·입금 화면의 미입금 주문으로 이동 */
+  onGoToUnpaidOrders?: () => void;
 };
 
 function numberValue(value: unknown) {
@@ -94,71 +96,84 @@ function CompactFilterButton({
   );
 }
 
-function MoneyFlowCard({
-  step,
-  title,
-  value,
-  note,
-  tone,
-}: {
-  step: string;
-  title: string;
-  value: string;
-  note: string;
-  tone: "blue" | "orange" | "dark" | "green";
-}) {
-  // 다크: 큰 카드는 중립 면(surface-2)으로, 색 구분은 숫자·배지에만 — 큰 면적 채도칠은 탁해짐
-  const toneClass = "border-line bg-surface-2";
+// [2026-09-08 전면 재설계 · 정산 «돈 계산서»]
+//   사장님 지적: 「처음 쓰는 사람도 이해하기 쉽고 직관적이어야 한다」
+//   타 플랫폼(Shopify Finances summary, 스마트스토어 정산내역) 공통 규칙 3가지를 그대로 따른다.
+//     ① 답(최종 금액)을 맨 위에 크게 하나. ② 그 아래에 «어떻게 그 숫자가 나왔는지» 위→아래 계산서.
+//     ③ 손댈 게 있는 줄만 버튼을 준다.
+//   예전 화면의 실제 결함:
+//     · 「돈 흐름 5단계」가 가로 카드 5개 → 덧셈·뺄셈으로 안 보였다.
+//     · 그 5단계에 «추가 정산 수익»이 빠져 있어 ②−④ ≠ ⑤. 계산이 재현되지 않았다(가장 큰 문제).
+//     · 「한 줄 요약」·「확인할 금액」이 위 카드의 숫자를 두 번·세 번 반복했다.
+//     · 제목 글씨가 29/25/22/20px로 다 달라 뭐가 중요한지 알 수 없었다.
+//   ※ 계산식·집계 로직은 손대지 않았다. 화면 표현만 바꾼다.
+//      실수익 = 결제완료 매출 + 추가 정산 수익 − 카드 수수료 − 창고/기타 지출 (AdminSettlementPanel CSV와 동일)
 
-  const stepClass =
-    tone === "green"
-      ? "bg-emerald-600 text-white"
-      : tone === "orange"
-        ? "bg-orange-500 text-white"
-        : tone === "dark"
-          ? "bg-surface-3 text-white"
-          : "bg-rose-deep text-white";
-
-  const valueClass =
-    tone === "green"
-      ? "text-ok-tx"
-      : tone === "orange"
-        ? "text-warn-tx"
-        : tone === "blue"
-          ? "text-rose-deep"
-          : "text-ink";
-
-  return (
-    <div className={`rounded-xl border px-4 py-3.5 shadow-sm ${toneClass}`}>
-      <div className="flex items-center justify-between gap-3">
-        <span className={`flex h-8 min-w-8 items-center justify-center rounded-full px-3 text-xs font-black ${stepClass}`}>
-          {step}
-        </span>
-        <span className="truncate text-xs font-black text-ink-mute">{note}</span>
-      </div>
-      <div className="mt-3 text-sm font-black text-ink-soft">{title}</div>
-      <div className={`mt-1 truncate text-[25px] font-black tracking-[-0.06em] ${valueClass}`}>{value}</div>
-    </div>
-  );
-}
-
-function ActionCard({
+function CalcRow({
+  sign,
   label,
-  value,
-  tone,
+  hint,
+  count,
+  amount,
+  emphasis,
+  action,
 }: {
+  sign: "" | "+" | "−";
   label: string;
-  value: string;
-  tone: "blue" | "orange" | "slate";
+  hint?: string;
+  count?: string;
+  amount: number;
+  emphasis?: "subtotal" | "total";
+  action?: { label: string; onClick: () => void };
 }) {
-  // 중립 카드 + 값 글자에만 색
-  const valTx =
-    tone === "orange" ? "text-warn-tx" : tone === "blue" ? "text-info-tx" : "text-ink";
+  const zero = numberValue(amount) === 0;
+  const amountTx =
+    emphasis === "total"
+      ? "text-ok-tx"
+      : sign === "−"
+        ? zero ? "text-ink-mute" : "text-warn-tx"
+        : zero ? "text-ink-mute" : "text-ink";
 
   return (
-    <div className="rounded-xl border border-line bg-surface-2 px-4 py-3">
-      <div className="text-xs font-black text-ink-soft">{label}</div>
-      <div className={`mt-1 text-xl font-black tracking-[-0.05em] ${valTx}`}>{value}</div>
+    <div
+      className={[
+        "flex flex-wrap items-center gap-x-3 gap-y-1 px-4",
+        emphasis === "total" ? "border-t-2 border-ink/15 bg-ok-bg/40 py-4" : emphasis === "subtotal" ? "border-t border-line bg-surface-2 py-3" : "py-2.5",
+      ].join(" ")}
+    >
+      <span className={`w-4 shrink-0 text-center text-base font-black ${sign === "−" ? "text-warn-tx" : sign === "+" ? "text-ink-soft" : "text-ink-mute"}`}>
+        {emphasis ? "=" : sign}
+      </span>
+
+      <span className="min-w-0 flex-1">
+        <span className={emphasis === "total" ? "text-[15px] font-black text-ink" : "text-sm font-black text-ink"}>{label}</span>
+        {hint ? <span className="ml-2 text-xs font-bold text-ink-mute">{hint}</span> : null}
+      </span>
+
+      {count ? <span className="shrink-0 text-xs font-bold tabular-nums text-ink-mute">{count}</span> : null}
+
+      <span
+        className={[
+          "shrink-0 text-right tabular-nums",
+          emphasis === "total" ? "text-[26px] font-black tracking-[-0.04em]" : "text-[15px] font-black",
+          amountTx,
+        ].join(" ")}
+        style={{ minWidth: emphasis === "total" ? 200 : 150 }}
+      >
+        {sign === "−" && !zero ? "−" : ""}{won(Math.abs(numberValue(amount)))}
+      </span>
+
+      <span className="w-[86px] shrink-0 text-right">
+        {action ? (
+          <button
+            type="button"
+            onClick={action.onClick}
+            className="rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft transition hover:bg-surface-2"
+          >
+            {action.label} ›
+          </button>
+        ) : null}
+      </span>
     </div>
   );
 }
@@ -192,6 +207,7 @@ export default function SettlementMoneyFlowDashboard({
   onYearFilter,
   onMonthFilter,
   onToggleSettlementDetail,
+  onGoToUnpaidOrders,
 }: Props) {
   void trend;
   void effectivePeriodLabel;
@@ -223,53 +239,15 @@ export default function SettlementMoneyFlowDashboard({
     [safeBroadcastPage, broadcastPageCount],
   );
 
-  const moneyFlowCards = [
-    {
-      step: "1",
-      title: "주문서 총금액",
-      value: won(stats.totalOrderAmount),
-      note: countText(stats.orderCount),
-      tone: "blue" as const,
-    },
-    {
-      step: "2",
-      title: "결제완료 매출",
-      value: won(stats.paidAmount),
-      note: countText(stats.paidCount),
-      tone: "blue" as const,
-    },
-    {
-      step: "3",
-      title: "아직 못 받은 금액",
-      value: won(stats.unpaidAmount),
-      note: "아직 안 받은 돈은 제외",
-      tone: "orange" as const,
-    },
-    {
-      step: "4",
-      title: "빠지는 돈",
-      value: outflowText(stats.totalExpense),
-      note: `카드 수수료 ${actualCardFeeRate}% + 창고/기타 지출`,
-      tone: "dark" as const,
-    },
-    {
-      step: "5",
-      title: "현재 실수익",
-      value: won(stats.netAmount),
-      note: "실제로 남는 돈",
-      tone: "green" as const,
-    },
-  ];
-
   return (
     <div className="grid gap-3">
       <section className="overflow-hidden rounded-2xl border border-rose-line bg-surface shadow-sm">
         <div className="border-b border-rose-line bg-gradient-to-r from-rose-soft via-surface to-surface px-5 py-3.5">
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h2 className="text-[29px] font-black tracking-[-0.06em] text-ink">정산통계</h2>
-              <p className="mt-1 text-sm font-bold text-ink-soft">
-                방송 정산에서 꼭 봐야 할 금액만 먼저 정리했습니다.
+            <div className="min-w-0">
+              <h2 className="text-xl font-black tracking-[-0.03em] text-ink">얼마 남았는지 보기</h2>
+              <p className="mt-0.5 text-xs font-bold text-ink-mute">
+                아래 계산서는 여기서 고른 기간·방송만 계산합니다.
               </p>
             </div>
 
@@ -277,16 +255,16 @@ export default function SettlementMoneyFlowDashboard({
               <button
                 type="button"
                 onClick={onOpenManualPanel}
-                className="h-9 rounded-full bg-rose-deep px-4 text-sm font-black text-white shadow-sm transition hover:bg-rose-deep"
+                className="h-9 rounded-xl bg-rose-deep px-4 text-sm font-black text-white shadow-sm transition hover:opacity-90 active:scale-[0.99]"
               >
                 + 정산 추가 입력
               </button>
               <button
                 type="button"
                 onClick={onExportSummaryCsv}
-                className="h-9 rounded-full border border-line bg-surface px-4 text-sm font-black text-ink shadow-sm transition hover:bg-surface-2"
+                className="h-9 rounded-xl border border-line bg-surface px-4 text-sm font-black text-ink-soft shadow-sm transition hover:bg-surface-2"
               >
-                정산 CSV 내보내기
+                엑셀(CSV) 받기
               </button>
             </div>
           </div>
@@ -404,65 +382,101 @@ export default function SettlementMoneyFlowDashboard({
         </div>
       </section>
 
-      <section className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="text-[25px] font-black tracking-[-0.06em] text-ink">돈 흐름 5단계</h3>
-            <p className="mt-1 text-xs font-bold text-ink-mute">주문 → 받은 돈 → 빠지는 돈 → 남는 돈 순서입니다.</p>
-          </div>
-          <div className="rounded-full bg-info-bg px-3.5 py-1.5 text-xs font-black text-info-tx">
-            주문 → 받은 돈 → 빠지는 돈 → 남는 돈
-          </div>
-        </div>
-
-        <div className="grid gap-3 xl:grid-cols-5">
-          {moneyFlowCards.map((card) => (
-            <MoneyFlowCard key={card.title} {...card} />
-          ))}
-        </div>
-      </section>
-
-      <section className="grid gap-3 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="rounded-2xl border border-line bg-surface p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="text-[22px] font-black tracking-[-0.04em] text-ink">한 줄 요약</h3>
-              <p className="mt-1 text-sm font-black text-info-tx">이번 기간 돈 흐름을 문장으로 정리했습니다.</p>
+      {/* ══ 답 먼저: 지금 남는 돈 ══ */}
+      <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
+        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line bg-surface-2 px-5 py-4">
+          <div className="min-w-0">
+            <div className="text-sm font-black text-ink-soft">지금 남는 돈</div>
+            <div className="mt-0.5 text-[38px] font-black leading-none tracking-[-0.05em] text-ok-tx">
+              {won(stats.netAmount)}
             </div>
-            <div className="rounded-full bg-surface px-4 py-2 text-sm font-black text-info-tx shadow-sm">
-              돈 흐름은 위 5단계 카드 기준
+            <div className="mt-2 text-xs font-bold text-ink-mute">
+              받은 돈 {won(stats.paidAmount)}
+              {numberValue(stats.manualIncomeAmount) > 0 ? ` + 추가수익 ${won(stats.manualIncomeAmount)}` : ""}
+              {" − 빠지는 돈 "}{won(stats.totalExpense)}
             </div>
           </div>
 
-          <div className="mt-4 grid gap-2.5 text-[15px] font-bold leading-7 text-ink">
-            <p>① 주문서 총금액은 <span className="font-black text-ink">{won(stats.totalOrderAmount)}</span>입니다.</p>
-            <p>② 결제완료 매출은 <span className="font-black text-info-tx">{won(stats.paidAmount)}</span>입니다.</p>
-            <p>③ 아직 못 받은 금액은 <span className="font-black text-warn-tx">{won(stats.unpaidAmount)}</span>입니다.</p>
-            <p>④ 마지막 초록색 카드가 실제로 남는 돈입니다.</p>
-          </div>
+          {numberValue(stats.unpaidAmount) > 0 ? (
+            <div className="rounded-xl border border-warn-tx/35 bg-warn-bg px-4 py-2.5">
+              <div className="text-xs font-black text-warn-tx">아직 안 들어온 돈</div>
+              <div className="mt-0.5 text-xl font-black tabular-nums text-warn-tx">{won(stats.unpaidAmount)}</div>
+              <div className="mt-0.5 text-[11px] font-bold text-warn-tx/80">이 돈은 위 금액에 안 들어있습니다</div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-ok-tx/30 bg-ok-bg px-4 py-2.5 text-xs font-black text-ok-tx">
+              ✓ 이 기간 미수금 없음
+            </div>
+          )}
         </div>
 
-        <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="text-xl font-black tracking-[-0.05em] text-ink">확인할 금액</h3>
-              <p className="mt-1 text-xs font-bold text-ink-mute">방송 끝나고 한 번 훑어보는 숫자 (누르는 카드 아님)</p>
-            </div>
-          </div>
+        {/* ══ 어떻게 이 숫자가 나왔는지 — 위에서 아래로 읽는 계산서 ══ */}
+        <div className="border-b border-line px-5 py-2.5">
+          <div className="text-sm font-black text-ink">어떻게 계산됐나요?</div>
+          <div className="mt-0.5 text-xs font-bold text-ink-mute">위에서 아래로 한 줄씩 더하고 빼면 맨 아래 숫자가 나옵니다.</div>
+        </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <ActionCard label="아직 못 받은 금액" value={won(stats.unpaidAmount)} tone="orange" />
-            <ActionCard label="결제완료 주문 수" value={countText(stats.paidCount)} tone="blue" />
-            <ActionCard label="창고/기타 지출 (입력한 건수)" value={countText(stats.manualExpenseCount)} tone="slate" />
-            <ActionCard label="추가 정산 수익" value={won(stats.manualIncomeAmount)} tone="blue" />
+        {/* ⚠ 이 4줄은 settlementUtils.ts:385 의 식과 «글자 그대로» 같아야 한다.
+              netAmount = paidAmount + manualIncomeAmount − (actualCardFee + warehouseOtherExpense)
+            «주문서 총금액(totalOrderAmount)»은 :362 에서 이미 추가 정산 수익을 더한 값이라
+            여기 계산줄에 넣으면 추가수익이 두 번 계산된다 → 계산줄에서 뺐다. 참고 숫자는 아래 회색 줄로만. */}
+        <div className="divide-y divide-line-soft">
+          <CalcRow
+            sign=""
+            label="실제로 받은 돈"
+            hint="결제완료된 주문만"
+            count={countText(stats.paidCount)}
+            amount={stats.paidAmount}
+          />
+          <CalcRow
+            sign="+"
+            label="추가 정산 수익"
+            hint="주문서 밖 입금"
+            count={countText(stats.manualIncomeCount)}
+            amount={stats.manualIncomeAmount}
+            action={{ label: "입력", onClick: onOpenManualPanel }}
+          />
+          <CalcRow
+            sign="−"
+            label="카드 수수료"
+            hint={`카드 결제분의 ${actualCardFeeRate}%`}
+            amount={stats.actualCardFee}
+          />
+          <CalcRow
+            sign="−"
+            label="창고·기타 지출"
+            hint="택배비·알바비 등 직접 입력"
+            count={countText(stats.manualExpenseCount)}
+            amount={stats.warehouseOtherExpense}
+            action={{ label: "입력", onClick: onOpenManualPanel }}
+          />
+          <CalcRow sign="" label="지금 남는 돈" amount={stats.netAmount} emphasis="total" />
+        </div>
+
+        <div className="grid gap-1 border-t border-line bg-surface-2 px-5 py-3 text-[11px] font-bold leading-5 text-ink-mute">
+          <div className="flex flex-wrap items-center gap-x-2">
+            <span>참고 · 주문서 총금액(추가 수익 포함)</span>
+            <span className="font-black tabular-nums text-ink-soft">{won(stats.totalOrderAmount)}</span>
+            <span>· 주문 {countText(stats.orderCount)}</span>
+            {numberValue(stats.unpaidAmount) > 0 && onGoToUnpaidOrders ? (
+              <button
+                type="button"
+                onClick={onGoToUnpaidOrders}
+                className="rounded-lg border border-warn-tx/35 bg-warn-bg px-2 py-0.5 text-[11px] font-black text-warn-tx transition hover:opacity-90"
+              >
+                안 들어온 돈 {won(stats.unpaidAmount)} 주문 보기 ›
+              </button>
+            ) : null}
           </div>
+          <div>· 「아직 안 들어온 돈」은 위 계산에 들어있지 않습니다. 입금되면 「실제로 받은 돈」으로 올라갑니다.</div>
+          <div>· 카드 수수료는 카드 결제완료 금액에만 붙습니다(무통장 입금은 수수료 없음).</div>
         </div>
       </section>
 
       <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-2xl font-black tracking-[-0.05em] text-ink">방송별 정산</h3>
+            <h3 className="text-xl font-black tracking-[-0.03em] text-ink">방송별로 보기</h3>
             <p className="mt-1 text-xs font-bold text-ink-mute">
               방송 날짜별로 얼마 팔고, 아직 못 받은 돈과 현재 남은 돈만 봅니다.
             </p>

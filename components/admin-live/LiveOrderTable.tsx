@@ -1099,7 +1099,7 @@ export default function LiveOrderTable({
                   if (isMobile) {
                     return (
                       <div key={order.id} onClick={() => onSelectOrder(order)}
-                        style={{ background: "#fff", border: "1px solid #eadfe3", borderLeft: order.paymentStatus === "manual_match_needed" ? "3px solid var(--color-rose-deep)" : "1px solid #eadfe3", borderRadius: "12px", padding: "11px 12px", marginBottom: "9px", cursor: "pointer" }}>
+                        style={{ background: "var(--color-surface)", border: "1px solid #eadfe3", borderLeft: order.paymentStatus === "manual_match_needed" ? "3px solid var(--color-rose-deep)" : "1px solid #eadfe3", borderRadius: "12px", padding: "11px 12px", marginBottom: "9px", cursor: "pointer" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
                           <input type="checkbox" checked={selectedOrderIds.has(String(order.id))} onChange={() => toggleSelectOrder(String(order.id))} onClick={(e) => e.stopPropagation()} style={{ width: "16px", height: "16px", accentColor: "var(--color-rose-deep)" }} />
                           <span style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{order.nickname}</span>
@@ -1140,7 +1140,7 @@ export default function LiveOrderTable({
                               <button type="button" title="결제요청 쪽지 보내기" aria-label="결제요청 쪽지 보내기" disabled={payRequestSending === order.id} onClick={() => void sendPaymentRequest(order)} style={{ border: "none", background: "none", padding: "0 2px", fontSize: "14px", lineHeight: 1, cursor: "pointer", opacity: payRequestSending === order.id ? 0.35 : 0.75 }}>🔔</button>
                             ) : null}
                           </div>
-                          <span style={{ fontSize: "15px", fontWeight: 800, color: "#C0392B" }}>{money(displayPayableAmount(order))}</span>
+                          <span style={{ fontSize: "15px", fontWeight: 800, color: "var(--color-danger-tx)" }}>{money(displayPayableAmount(order))}</span>
                         </div>
                       </div>
                     );

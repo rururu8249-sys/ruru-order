@@ -7,6 +7,7 @@ import TrendPanel from "./TrendPanel";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import AdminAuthSettingsPanel from "./AdminAuthSettingsPanel";
+import AdminSoundControl from "./AdminSoundControl";
 import CombineShippingSettingsTab from "./CombineShippingSettingsTab";
 import ShopInfoSettingsTab from "./ShopInfoSettingsTab";
 import { HOWTO_DEFAULT, parseHowtoSteps } from "@/lib/howto";
@@ -155,7 +156,7 @@ function decimalInput(value: string) {
 }
 
 // 설정 카테고리(좌측 네비) — 업계 표준: 카테고리별로 나눠 스크롤 최소화
-type SettingsTab = "shop" | "payment" | "combine" | "point" | "order" | "youtube" | "telegram" | "trend" | "security";
+type SettingsTab = "shop" | "payment" | "combine" | "point" | "order" | "sound" | "youtube" | "telegram" | "trend" | "security";
 const SETTINGS_TABS: { key: SettingsTab; label: string; icon: string; desc: string }[] = [
   // [2026-09-08] 상점 정보 — 문의 방식·페이스터·표시용 계좌. 자체 저장(API). 맨 위 + 기본 탭.
   { key: "shop", label: "상점 정보", icon: "🏪", desc: "문의 방식·계좌·페이스터" },
@@ -163,6 +164,8 @@ const SETTINGS_TABS: { key: SettingsTab; label: string; icon: string; desc: stri
   { key: "combine", label: "합배송", icon: "🚚", desc: "시간범위 수동설정" },
   { key: "point", label: "포인트 적립", icon: "🪙", desc: "자동적립·적립률" },
   { key: "order", label: "주문서 표시", icon: "📝", desc: "선점시간·직접입력" },
+  // [2026-09-08 사장님 요청] 알림음은 사이드바가 아니라 설정에 둔다.
+  { key: "sound", label: "알림음", icon: "🔔", desc: "주문·입금 소리·볼륨" },
   { key: "youtube", label: "유튜브 알림", icon: "📺", desc: "라이브 채팅 자동알림" },
   { key: "telegram", label: "텔레그램 알림", icon: "📨", desc: "폰 푸시 알림" },
   { key: "trend", label: "트렌드 추천", icon: "📈", desc: "셀럽·인스타 트렌드" },
@@ -560,6 +563,14 @@ export default function AdminLiveSettingsPanel({ onOpenNotice }: AdminLiveSettin
 
           {/* ── 유튜브 알림 (자체 저장) ── */}
           {activeTab === "combine" && <CombineShippingSettingsTab />}
+
+          {/* ── 알림음 (이 브라우저에만 저장: localStorage) ── */}
+          {activeTab === "sound" && (
+            <div className={cardClass}>
+              {sectionTitle("알림음", "새 주문·입금이 들어오면 소리로 알려줍니다. 이 컴퓨터(브라우저)에만 저장되고, 다른 기기엔 따로 설정해야 합니다.")}
+              <AdminSoundControl />
+            </div>
+          )}
 
           {activeTab === "youtube" && <YoutubeNotifyCard />}
 

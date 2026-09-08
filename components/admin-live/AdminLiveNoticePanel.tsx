@@ -72,6 +72,7 @@ export default function AdminLiveNoticePanel() {
   //   띠에 나갈 한 줄은 따로 적는다. 비우면 예전처럼 제목/본문 첫 줄로 자동.
   const [barLine, setBarLine] = useState("");
   const [popupFont, setPopupFont] = useState("normal");
+  // ⚠ 이 값은 settings(popup_notice_color)로 저장돼 손님 화면에 그대로 쓰인다 → 관리자 CSS 변수 금지, 실제 색값만.
   const [popupColor, setPopupColor] = useState("#7B2D43");
   const [popupBandUrl, setPopupBandUrl] = useState(DEFAULT_BAND_URL);
   const [noticeText, setNoticeText] = useState("");

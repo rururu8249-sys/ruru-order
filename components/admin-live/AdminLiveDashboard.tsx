@@ -282,7 +282,10 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
 
 // [2026-09-08 사장님 지적] 모든 메뉴 화면의 «세로 크기»는 이 한 줄로만 정한다(제각각 금지).
 //   화면 높이 - (본문 상하 여백 + 제목·탭 줄). 여기만 바꾸면 전 메뉴가 같이 바뀐다.
-const SCREEN_SHELL_HEIGHT = "h-[calc(100vh-104px)] min-h-[520px]";
+// [2026-09-08 사장님 지적] 「모든 페이지가 왼쪽 사이드메뉴바 px랑 하나도 안 맞는다」
+//   원인: 화면 카드 높이를 100vh-104px 라는 «어림 숫자»로 잡아 제목줄/여백 실제 높이와 어긋났다.
+//   수정: 숫자를 없애고 남는 세로를 그대로 채운다(flex-1). 창 크기·확대율·제목줄이 바뀌어도 사이드바 바닥과 항상 같은 선.
+const SCREEN_SHELL_HEIGHT = "min-h-0 flex-1";
 
 // [2026-09-08] ?panel= 은 adminLiveMenu 의 화면 키 전부 허용(옛 주소 그대로 열림)
 function isMenuKeyForUrl(value: string | null): value is AdminLiveMenuKey {
@@ -1429,8 +1432,8 @@ export default function AdminLiveDashboard() {
   const railOpen = railOpenChoice ?? Boolean(activeBroadcast);
 
   return (
-    <div className={`min-h-screen bg-canvas text-ink ${theme === "dark" ? "dark" : ""}`} data-ruru-controltower-shell="layout-b-pages-rail-v3">
-      <div className="flex min-h-screen">
+    <div className={`h-screen overflow-hidden bg-canvas text-ink ${theme === "dark" ? "dark" : ""}`} data-ruru-controltower-shell="layout-b-pages-rail-v4">
+      <div className="flex h-full min-h-0">
         <AdminLiveSidebar
           activeMenu={activeMenu}
           theme={theme}
@@ -1459,12 +1462,12 @@ export default function AdminLiveDashboard() {
           onOpenVisitStats={() => { setActiveMenu("visits"); replacePanelInUrl("visits"); }}
         />
 
-        <main className="min-w-0 flex-1 overflow-x-hidden px-3 py-3 md:px-5 md:py-4">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-3 py-3 md:px-5 md:py-4">
           {/* 모바일 전용: 사이드바(메뉴) 여는 햄버거. 데스크탑(md+)에선 사이드바가 항상 보여 숨김 */}
           <button
             type="button"
             onClick={() => setNavOpen(true)}
-            className="mb-3 inline-flex items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 text-sm font-black text-ink shadow-sm md:hidden"
+            className="mb-3 inline-flex shrink-0 items-center gap-2 self-start rounded-xl border border-line bg-surface px-3 py-2 text-sm font-black text-ink shadow-sm md:hidden"
           >
             ☰ 메뉴
           </button>
@@ -1472,10 +1475,10 @@ export default function AdminLiveDashboard() {
           {/* [2026-09-08 5단계 · 레이아웃 B] 왼쪽 = 큰 메뉴 화면(통째로 전환) / 오른쪽 = 접이식 방송·채팅 레일 */}
           {/* [2026-09-08 사장님 지적] 메뉴마다 크기가 제각각이면 안 된다.
               → 모든 화면이 이 «하나의 틀» 안에 들어간다. 가로=화면 전체, 세로=화면 높이-헤더. 예외 없음. */}
-          <div className="w-full">
-            <div className="min-w-0">
+          <div className="flex min-h-0 w-full flex-1 flex-col">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               {/* 화면 제목 + 작은 탭 */}
-              <div className="mb-3 flex flex-wrap items-end justify-between gap-2 border-b border-rose-line">
+              <div className="mb-3 flex shrink-0 flex-wrap items-end justify-between gap-2 border-b border-rose-line">
                 <div className="flex items-end gap-3">
                   <h1 className="pb-2 text-lg font-black tracking-tight text-ink">{activeTopMenu.label}</h1>
                   {activeSubTabs.length > 1 ? (
@@ -1524,7 +1527,7 @@ export default function AdminLiveDashboard() {
               </div>
 
               {loadError && (activeMenu === "orders" || activeMenu === "broadcast") ? (
-                <div className="mb-3 rounded-2xl border border-danger-tx/40 bg-danger-bg px-4 py-3 text-sm font-black text-danger-tx">
+                <div className="mb-3 shrink-0 rounded-2xl border border-danger-tx/40 bg-danger-bg px-4 py-3 text-sm font-black text-danger-tx">
                   주문 데이터 불러오기 실패: {loadError}
                 </div>
               ) : null}
@@ -1637,7 +1640,15 @@ export default function AdminLiveDashboard() {
               {/* ── 주문·입금 › 정산 ── */}
               {activeMenu === "settlement" ? (
                 <div className="h-full overflow-y-auto p-5">
-                  <AdminLiveSettlementPanel orders={orders} />
+                  <AdminLiveSettlementPanel
+                    orders={orders}
+                    onGoToUnpaidOrders={() => {
+                      // 미수금 줄 → 주문·입금 화면에서 «미입금 주문만» 바로 보기 (읽기 전용 이동, 돈 로직 무관)
+                      setActiveMenu("orders");
+                      replacePanelInUrl("orders");
+                      setFilters((prev) => ({ ...prev, broadcast: "all", scope: "all", date: "all", status: "unpaid" }));
+                    }}
+                  />
                 </div>
               ) : null}
 

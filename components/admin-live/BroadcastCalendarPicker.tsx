@@ -15,7 +15,7 @@ interface Props {
   allLabel?: string;
 }
 
-const ROSE = "#7B2D43";
+const ROSE = "var(--color-rose-deep)";
 const ROSE_LINE = "#E3D3D9";
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -152,7 +152,7 @@ export default function BroadcastCalendarPicker({ items, value, onPick, allLabel
           {/* 요일 */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 2, marginBottom: 4 }}>
             {WEEKDAYS.map((w, i) => (
-              <div key={w} style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: i === 0 ? "#C0392B" : i === 6 ? "#185FA5" : "#999" }}>{w}</div>
+              <div key={w} style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: i === 0 ? "var(--color-danger-tx)" : i === 6 ? "#185FA5" : "#999" }}>{w}</div>
             ))}
           </div>
 

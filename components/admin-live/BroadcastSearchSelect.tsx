@@ -85,7 +85,7 @@ export default function BroadcastSearchSelect({ options, value, onChange, todayA
                 padding: "7px 10px", fontSize: 12, outline: "none",
                 background: "var(--color-surface)",
               }}
-              onFocus={(e) => { e.target.style.borderColor = "#7B2D43"; e.target.style.background = "#fff"; }}
+              onFocus={(e) => { e.target.style.borderColor = "var(--color-rose-deep)"; e.target.style.background = "#fff"; }}
               onBlur={(e) => { e.target.style.borderColor = "#e5e5e5"; e.target.style.background = "#fafafa"; }}
             />
           </div>
@@ -98,7 +98,7 @@ export default function BroadcastSearchSelect({ options, value, onChange, todayA
                 style={{
                   width: "100%", textAlign: "left", padding: "9px 14px",
                   fontSize: 12, fontWeight: value === "all" ? 800 : 600,
-                  color: value === "all" ? "#7B2D43" : "#333",
+                  color: value === "all" ? "var(--color-rose-deep)" : "#333",
                   background: value === "all" ? "#fdf0f3" : "transparent",
                   border: "none", cursor: "pointer", display: "block",
                 }}
@@ -120,7 +120,7 @@ export default function BroadcastSearchSelect({ options, value, onChange, todayA
                   style={{
                     width: "100%", textAlign: "left", padding: "9px 14px",
                     fontSize: 12, fontWeight: value === o.value ? 800 : 500,
-                    color: value === o.value ? "#7B2D43" : "#333",
+                    color: value === o.value ? "var(--color-rose-deep)" : "#333",
                     background: value === o.value ? "#fdf0f3" : "transparent",
                     border: "none", cursor: "pointer", display: "block",
                   }}
@@ -138,7 +138,7 @@ export default function BroadcastSearchSelect({ options, value, onChange, todayA
                 style={{
                   width: "100%", textAlign: "left", padding: "9px 14px",
                   fontSize: 12, fontWeight: value === "none" ? 800 : 600,
-                  color: value === "none" ? "#7B2D43" : "#555",
+                  color: value === "none" ? "var(--color-rose-deep)" : "#555",
                   background: value === "none" ? "#fdf0f3" : "#fafafa",
                   border: "none", borderTop: "1px solid #f0f0f0", cursor: "pointer", display: "block",
                 }}

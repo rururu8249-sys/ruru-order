@@ -9,6 +9,8 @@ type LooseRow = Record<string, any>;
 
 type Props = {
   orders: LooseRow[];
+  /** [2026-09-08] 계산서의 「아직 안 들어온 돈 › 주문 보기」 — 대시보드가 주문 화면으로 보내준다 */
+  onGoToUnpaidOrders?: () => void;
 };
 
 type SettingSummary = {
@@ -164,7 +166,7 @@ function readSettingNumber(rows: LooseRow[], key: string, fallback: number) {
   return value > 0 || String(row?.value ?? "").trim() === "0" ? value : fallback;
 }
 
-export default function AdminLiveSettlementPanel({ orders }: Props) {
+export default function AdminLiveSettlementPanel({ orders, onGoToUnpaidOrders }: Props) {
   const [deposits, setDeposits] = useState<LooseRow[]>([]);
   const [broadcasts, setBroadcasts] = useState<LooseRow[]>([]);
   const [settings, setSettings] = useState<LooseRow[]>([]);
@@ -244,6 +246,7 @@ export default function AdminLiveSettlementPanel({ orders }: Props) {
       </details>
 
       <AdminSettlementPanel
+        onGoToUnpaidOrders={onGoToUnpaidOrders}
         orders={settlementOrders}
         deposits={deposits}
         broadcasts={broadcasts}

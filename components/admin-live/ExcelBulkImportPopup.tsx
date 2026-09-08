@@ -793,9 +793,9 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
 
   const body = (
     <div style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ width: "1000px", maxWidth: "100%", height: "700px", maxHeight: "calc(100vh - 32px)", background: "#fff", borderRadius: "14px", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <div style={{ width: "1000px", maxWidth: "100%", height: "700px", maxHeight: "calc(100vh - 32px)", background: "var(--color-surface)", borderRadius: "14px", overflow: "hidden", display: "flex", flexDirection: "column" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "13px 18px", borderBottom: "1px solid #EDE4E8" }}>
-          <span style={{ fontSize: "16px", fontWeight: 900, color: "#7B2D43" }}>📄 엑셀 대량등록</span>
+          <span style={{ fontSize: "16px", fontWeight: 900, color: "var(--color-rose-deep)" }}>📄 엑셀 대량등록</span>
           <span style={{ fontSize: "11.5px", fontWeight: 700, color: "#A08A92" }}>[등록] 누르기 전엔 저장되지 않습니다</span>
           <button type="button" onClick={onClose} style={{ marginLeft: "auto", border: "none", background: "none", fontSize: "20px", color: "#999", cursor: "pointer" }}>✕</button>
         </div>
@@ -808,7 +808,7 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
                 <div style={{ fontSize: "13px", fontWeight: 900, color: "#3A2F34", margin: "7px 0 3px" }}>① 정규양식 받기 <span style={{ fontWeight: 700, color: "#A08A92" }}>(선택)</span></div>
                 <div style={{ fontSize: "11.5px", fontWeight: 600, color: "#8A7680", lineHeight: 1.6 }}>우리 양식에 채우면<br />100% 그대로 인식돼요</div>
                 <a href="/excel-templates/ruru_form_v1.xlsx" download="루루동이_정규양식_v1.xlsx"
-                  style={{ display: "inline-flex", alignItems: "center", height: "34px", padding: "0 14px", marginTop: "9px", borderRadius: "10px", border: "1.5px solid #E0C9D2", background: "#fff", color: "#7B2D43", fontSize: "12px", fontWeight: 900, textDecoration: "none" }}>
+                  style={{ display: "inline-flex", alignItems: "center", height: "34px", padding: "0 14px", marginTop: "9px", borderRadius: "10px", border: "1.5px solid #E0C9D2", background: "var(--color-surface)", color: "var(--color-rose-deep)", fontSize: "12px", fontWeight: 900, textDecoration: "none" }}>
                   📥 양식 내려받기
                 </a>
               </div>
@@ -817,7 +817,7 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
                 <div style={{ fontSize: "13px", fontWeight: 900, color: "#3A2F34", margin: "7px 0 3px" }}>② 파일 올리기</div>
                 <div style={{ fontSize: "11.5px", fontWeight: 600, color: "#8A7680", lineHeight: 1.6 }}>거래처 엑셀도 그대로 OK<br />형식이 달라도 읽어드려요</div>
                 <button type="button" onClick={() => fileRef.current?.click()} disabled={Boolean(busy)}
-                  style={{ height: "34px", padding: "0 16px", marginTop: "9px", border: "none", borderRadius: "10px", background: "#7B2D43", color: "#fff", fontSize: "12px", fontWeight: 900, cursor: "pointer" }}>
+                  style={{ height: "34px", padding: "0 16px", marginTop: "9px", border: "none", borderRadius: "10px", background: "var(--color-rose-deep)", color: "#fff", fontSize: "12px", fontWeight: 900, cursor: "pointer" }}>
                   {busy || "파일 선택"}
                 </button>
               </div>
@@ -890,23 +890,23 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
               ) : null}
               <span>수량</span>
               <ColSelect value={cfg.colQty} options={colOptions} onChange={(v) => applyCfg({ colQty: v })} allowNone />
-              <button type="button" onClick={() => setShowSizePick((v) => !v)} style={{ ...selStyle, cursor: "pointer", fontWeight: 800, color: cfg.sizeCols.length ? "#7B2D43" : "#A08A92" }}>
+              <button type="button" onClick={() => setShowSizePick((v) => !v)} style={{ ...selStyle, cursor: "pointer", fontWeight: 800, color: cfg.sizeCols.length ? "var(--color-rose-deep)" : "#A08A92" }}>
                 사이즈 칸 {cfg.sizeCols.length}개 {showSizePick ? "▲" : "▼"}
               </button>
-              <button type="button" onClick={autoAgain} style={{ ...selStyle, cursor: "pointer", background: "#fff", fontWeight: 800, color: "#7B2D43" }}>자동인식 다시</button>
-              <button type="button" onClick={reRead} style={{ ...selStyle, cursor: "pointer", background: "#fff", fontWeight: 800, color: "#7B2D43" }}>다시 읽기</button>
+              <button type="button" onClick={autoAgain} style={{ ...selStyle, cursor: "pointer", background: "var(--color-surface)", fontWeight: 800, color: "var(--color-rose-deep)" }}>자동인식 다시</button>
+              <button type="button" onClick={reRead} style={{ ...selStyle, cursor: "pointer", background: "var(--color-surface)", fontWeight: 800, color: "var(--color-rose-deep)" }}>다시 읽기</button>
             </div>
             ) : null}
 
             {!official && showSizePick ? (
               <div style={{ padding: "8px 18px", borderBottom: "1px solid #EDE4E8", background: "#FFFBFC", display: "flex", flexWrap: "wrap", gap: "5px", alignItems: "center" }}>
-                <span style={{ fontSize: "11.5px", fontWeight: 800, color: "#7B2D43", marginRight: "4px" }}>사이즈별 수량이 들어있는 칸을 골라주세요</span>
+                <span style={{ fontSize: "11.5px", fontWeight: 800, color: "var(--color-rose-deep)", marginRight: "4px" }}>사이즈별 수량이 들어있는 칸을 골라주세요</span>
                 {colOptions.map((o) => {
                   const on = cfg.sizeCols.includes(o.i);
                   return (
                     <button key={o.i} type="button"
                       onClick={() => applyCfg({ sizeCols: on ? cfg.sizeCols.filter((x) => x !== o.i) : [...cfg.sizeCols, o.i].sort((a, b) => a - b) })}
-                      style={{ padding: "4px 9px", borderRadius: "999px", border: `1.5px solid ${on ? "#7B2D43" : "#E8D5DD"}`, background: on ? "#7B2D43" : "#fff", color: on ? "#fff" : "#7B2D43", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>
+                      style={{ padding: "4px 9px", borderRadius: "999px", border: `1.5px solid ${on ? "var(--color-rose-deep)" : "#E8D5DD"}`, background: on ? "var(--color-rose-deep)" : "#fff", color: on ? "#fff" : "var(--color-rose-deep)", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>
                       {o.label}
                     </button>
                   );
@@ -916,12 +916,12 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
 
             {/* 일괄 설정 */}
             <div style={{ padding: "9px 18px", borderBottom: "1px solid #EDE4E8", display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center", fontSize: "12px", fontWeight: 700, color: "#5C4B52" }}>
-              <span style={{ color: "#7B2D43", fontWeight: 900 }}>전체 적용</span>
+              <span style={{ color: "var(--color-rose-deep)", fontWeight: 900 }}>전체 적용</span>
               {([["new", "✨NEW"], ["hot", "🔥HOT"], ["special", "⚡특가"], ["limit", "⏰마감임박"], ["pick", "💖루루픽"], ["direct", "🛒바로구매"], ["overseas", "✈️해외배송"]] as const).map(([v, l]) => {
                 const on = bulkBadges.includes(v);
                 return (
                   <button key={v} type="button" onClick={() => setBulkBadges((p) => on ? p.filter((x) => x !== v) : [...p, v])}
-                    style={{ padding: "5px 10px", borderRadius: "999px", border: `1.5px solid ${on ? "#7B2D43" : "#E8D5DD"}`, background: on ? "#7B2D43" : "#fff", color: on ? "#fff" : "#7B2D43", fontSize: "11.5px", fontWeight: 800, cursor: "pointer" }}>{l}</button>
+                    style={{ padding: "5px 10px", borderRadius: "999px", border: `1.5px solid ${on ? "var(--color-rose-deep)" : "#E8D5DD"}`, background: on ? "var(--color-rose-deep)" : "#fff", color: on ? "#fff" : "var(--color-rose-deep)", fontSize: "11.5px", fontWeight: 800, cursor: "pointer" }}>{l}</button>
                 );
               })}
               <select value={bulkShipping} onChange={(e) => setBulkShipping(e.target.value as "normal" | "vendor")} style={selStyle}>
@@ -963,8 +963,8 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
                 </div>
               ) : null}
               <div style={{ fontSize: "12px", fontWeight: 800, color: "#5C4B52", marginBottom: "8px" }}>
-                미리보기 {drafts.length}개 · 등록 대상 <b style={{ color: "#7B2D43" }}>{useCount}</b>개
-                {drafts.some((d) => d.warns.length > 0) ? <span style={{ marginLeft: "8px", color: "#C0392B" }}>⚠ 확인 필요 {drafts.filter((d) => d.warns.length > 0).length}개</span> : null}
+                미리보기 {drafts.length}개 · 등록 대상 <b style={{ color: "var(--color-rose-deep)" }}>{useCount}</b>개
+                {drafts.some((d) => d.warns.length > 0) ? <span style={{ marginLeft: "8px", color: "var(--color-danger-tx)" }}>⚠ 확인 필요 {drafts.filter((d) => d.warns.length > 0).length}개</span> : null}
                 {/* [2026-08-29] 색상이 비어 있으면 나중에 「같은 디자인 묶기」에서 옵션1·옵션2로만 보인다 → 등록 전에 알려준다 */}
                 {drafts.filter((d) => d.use && d.colors.length === 0).length > 0 ? (
                   <span style={{ marginLeft: "8px", color: "#8A5A00" }}>🎨 색상 없음 {drafts.filter((d) => d.use && d.colors.length === 0).length}개</span>
@@ -972,7 +972,7 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
               </div>
               {drafts.length === 0 ? (
                 <div style={{ padding: "40px 0", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "#A08A92", lineHeight: 1.8 }}>
-                  읽어낸 상품이 없어요.<br />위에서 <b style={{ color: "#7B2D43" }}>제목줄 · 구조 · 상품명 칸</b>을 바꿔보세요.
+                  읽어낸 상품이 없어요.<br />위에서 <b style={{ color: "var(--color-rose-deep)" }}>제목줄 · 구조 · 상품명 칸</b>을 바꿔보세요.
                 </div>
               ) : null}
               {drafts.map((d, i) => (
@@ -986,7 +986,7 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
                       <input value={d.name} onChange={(e) => setDrafts((p) => p.map((x, k) => k === i ? { ...x, name: e.target.value } : x))}
                         style={{ flex: 1, minWidth: 0, height: "30px", borderRadius: "7px", border: "1px solid #E8D5DD", padding: "0 8px", fontSize: "12.5px", fontWeight: 800, color: "#3A2F34" }} />
                       <input type="number" value={d.price} onChange={(e) => setDrafts((p) => p.map((x, k) => k === i ? { ...x, price: Number(e.target.value) || 0 } : x))}
-                        style={{ width: "96px", height: "30px", borderRadius: "7px", border: "1px solid #E8D5DD", padding: "0 8px", fontSize: "12.5px", fontWeight: 800, textAlign: "right", color: "#7B2D43" }} />
+                        style={{ width: "96px", height: "30px", borderRadius: "7px", border: "1px solid #E8D5DD", padding: "0 8px", fontSize: "12.5px", fontWeight: 800, textAlign: "right", color: "var(--color-rose-deep)" }} />
                       <span style={{ fontSize: "11px", color: "#A08A92" }}>원</span>
                     </div>
                     <div style={{ marginTop: "4px", fontSize: "11.5px", fontWeight: 700, color: "#68575E" }}>
@@ -996,7 +996,7 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
                       {d.code ? <span style={{ color: "#B0A5A0" }}> · {d.code}</span> : null}
                     </div>
                     {d.badges || d.category || d.shipping || d.place ? (
-                      <div style={{ marginTop: "3px", fontSize: "10.5px", fontWeight: 800, color: "#7B2D43" }}>
+                      <div style={{ marginTop: "3px", fontSize: "10.5px", fontWeight: 800, color: "var(--color-rose-deep)" }}>
                         {(d.badges || []).map((b) => BADGE_LABEL[b] || b).join(" ")}
                         {d.category ? ` · ${d.category}` : ""}
                         {d.shipping ? ` · ${d.shipping === "vendor" ? "업체발송" : "일반배송"}` : ""}
@@ -1004,7 +1004,7 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
                         <span style={{ color: "#B0A5A0", fontWeight: 700 }}> (엑셀에 쓴 값 — 전체 적용보다 우선)</span>
                       </div>
                     ) : null}
-                    {d.warns.length ? <div style={{ marginTop: "3px", fontSize: "11px", fontWeight: 800, color: "#C0392B" }}>⚠ {d.warns.join(" · ")}</div> : null}
+                    {d.warns.length ? <div style={{ marginTop: "3px", fontSize: "11px", fontWeight: 800, color: "var(--color-danger-tx)" }}>⚠ {d.warns.join(" · ")}</div> : null}
                   </div>
                 </div>
               ))}
@@ -1020,7 +1020,7 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
                 {busy ? `${progress.done}/${progress.total} 등록 중…` : ""}
               </span>
               <button type="button" onClick={() => void commit()} disabled={Boolean(busy) || useCount === 0}
-                style={{ height: "44px", padding: "0 22px", border: "none", borderRadius: "12px", background: useCount ? "#7B2D43" : "#CFC5C9", color: "#fff", fontSize: "14.5px", fontWeight: 900, cursor: useCount ? "pointer" : "default" }}>
+                style={{ height: "44px", padding: "0 22px", border: "none", borderRadius: "12px", background: useCount ? "var(--color-rose-deep)" : "#CFC5C9", color: "#fff", fontSize: "14.5px", fontWeight: 900, cursor: useCount ? "pointer" : "default" }}>
                 {busy ? "등록 중…" : `${useCount}개 등록하기`}
               </button>
             </div>
@@ -1030,9 +1030,9 @@ export default function ExcelBulkImportPopup({ onClose, onDone, targetBroadcastI
         {step === "done" ? (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px" }}>
             <div style={{ fontSize: "40px" }}>{progress.fail ? "⚠️" : "✅"}</div>
-            <div style={{ fontSize: "17px", fontWeight: 900, color: "#7B2D43" }}>등록 완료</div>
+            <div style={{ fontSize: "17px", fontWeight: 900, color: "var(--color-rose-deep)" }}>등록 완료</div>
             <div style={{ fontSize: "13.5px", fontWeight: 700, color: "#5C4B52" }}>성공 {progress.ok}개 · 실패 {progress.fail}개</div>
-            <button type="button" onClick={onClose} style={{ marginTop: "8px", height: "44px", padding: "0 26px", border: "none", borderRadius: "12px", background: "#7B2D43", color: "#fff", fontSize: "14.5px", fontWeight: 900, cursor: "pointer" }}>닫기</button>
+            <button type="button" onClick={onClose} style={{ marginTop: "8px", height: "44px", padding: "0 26px", border: "none", borderRadius: "12px", background: "var(--color-rose-deep)", color: "#fff", fontSize: "14.5px", fontWeight: 900, cursor: "pointer" }}>닫기</button>
           </div>
         ) : null}
       </div>
@@ -1139,6 +1139,6 @@ const BADGE_LABEL: Record<string, string> = {
 };
 
 const selStyle: React.CSSProperties = {
-  height: "30px", borderRadius: "7px", border: "1px solid #E8D5DD", background: "#fff",
+  height: "30px", borderRadius: "7px", border: "1px solid #E8D5DD", background: "var(--color-surface)",
   padding: "0 8px", fontSize: "11.5px", fontWeight: 700, color: "#5C4B52",
 };

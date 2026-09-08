@@ -332,6 +332,18 @@ export default function AdminLiveEventRoulettePanel({
 
   const finalParticipants = participantSource === "manual" ? manualParticipants : participants;
   // [2026-09-08] 전체 응모권 장수 — 칩의 확률 표시용
+  // [2026-09-08 사장님 지적] 「명단이 ㄱㄴㄷ 순도 아니고 닉네임 확인도 어렵다」
+  //   ⚠ finalParticipants 는 추첨 API 본문(participants)으로 그대로 나간다 → 순서를 바꾸면 안 된다.
+  //   그래서 «화면에서 고를 때만» 쓰는 복사본을 따로 만든다(정렬·검색). 추첨 결과·확률과 무관.
+  const [nickFilter, setNickFilter] = useState("");
+  const pickList = useMemo(() => {
+    const sorted = [...finalParticipants].sort((a, b) =>
+      String(a.nickname ?? "").localeCompare(String(b.nickname ?? ""), "ko", { numeric: true }),
+    );
+    const q = nickFilter.trim().toLowerCase();
+    return q ? sorted.filter((p) => String(p.nickname ?? "").toLowerCase().includes(q)) : sorted;
+  }, [finalParticipants, nickFilter]);
+
   const totalTickets = finalParticipants.reduce((sum, p) => sum + Math.max(1, Math.floor(Number(p.tickets ?? p.weight ?? 1)) || 1), 0);
   const selectedWinnerNickname =
     fixedWinnerNickname.trim() ||
@@ -342,6 +354,9 @@ export default function AdminLiveEventRoulettePanel({
   const recentEvents = events.slice(0, 3);
   const recentWinners = winners.slice(0, 100);
   const autoParticipantCount = participants.length;
+  // 「주문서 제출자 전체 / 결제완료한 사람만」 각각의 마지막 결과를 기억 → 다시 누르면 즉시 보여주고 뒤에서 갱신.
+  //   추첨에 쓰이는 값은 서버 응답 그대로다(캐시는 화면 표시용 첫 그림일 뿐, 갱신되면 덮어씀).
+  const participantCacheRef = useRef<{ auto: RouletteParticipant[] | null; paid: RouletteParticipant[] | null }>({ auto: null, paid: null });
   const manualParticipantCount = manualParticipants.length;
 
   // 명단(소스 전환·재로드 포함)이 바뀌어 고정 당첨자가 현재 명단에 없으면 자동 해제(유령 고정값 방지).
@@ -785,6 +800,12 @@ export default function AdminLiveEventRoulettePanel({
   const changeParticipantSource = (source: "auto" | "paid" | "manual") => {
     setParticipantSource(source);
 
+    // 이미 한 번 불러온 기준이면 캐시를 먼저 그려 «즉시» 반응하게 한다(그 다음 아래에서 최신값 재조회).
+    if (source === "auto" || source === "paid") {
+      const cached = participantCacheRef.current[source];
+      if (cached) setParticipants(cached);
+    }
+
     if (source === "auto" || source === "paid") {
       if (!canLoadParticipants) {
         showAdminToast("불러올 주문이 없습니다.\n\n방송을 시작했거나 주문서에 주문이 보이는 상태여야 참가자를 불러올 수 있어요.", "warning");
@@ -941,7 +962,9 @@ export default function AdminLiveEventRoulettePanel({
         throw new Error(payload.message || "참여자 조회 실패");
       }
 
-      setParticipants(payload.participants || []);
+      const nextRows = payload.participants || [];
+      participantCacheRef.current[paidOnly ? "paid" : "auto"] = nextRows;
+      setParticipants(nextRows);
       // 목록·인원수는 즉시 표시하고 로딩 해제(버벅임 방지). 미리보기 이벤트 생성(추가 서버 왕복)은
       //   화면을 막지 않게 백그라운드로 — 룰렛 휠은 잠시 뒤 채워짐. 추첨/지급 로직은 무변경.
       setLoading(false);
@@ -1511,8 +1534,8 @@ export default function AdminLiveEventRoulettePanel({
 
                 <div style={{ flex: 0.95, display: "flex", flexDirection: "column", gap: "9px" }}>
                   <div className="note">참가자 불러오기</div>
-                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "7px", borderColor: participantSource === "auto" ? "var(--rose)" : "var(--bd)", color: participantSource === "auto" ? "var(--rose)" : "var(--ink)" }} onClick={() => changeParticipantSource("auto")} disabled={!canLoadParticipants}>👥 주문서 제출자 전체 <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "auto" ? `${autoParticipantCount}명` : ""}</span></button>
-                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "7px", borderColor: participantSource === "paid" ? "var(--green)" : "var(--bd)", color: participantSource === "paid" ? "var(--green)" : "var(--ink)" }} onClick={() => changeParticipantSource("paid")} disabled={!canLoadParticipants}>💵 결제완료한 사람만 <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "paid" ? `${autoParticipantCount}명` : ""}</span></button>
+                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "7px", borderColor: participantSource === "auto" ? "var(--rose)" : "var(--bd)", color: participantSource === "auto" ? "var(--rose)" : "var(--ink)" }} onClick={() => changeParticipantSource("auto")} disabled={!canLoadParticipants}>👥 주문서 제출자 전체 <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "auto" ? (loading ? "불러오는 중…" : `${autoParticipantCount}명`) : ""}</span></button>
+                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "7px", borderColor: participantSource === "paid" ? "var(--green)" : "var(--bd)", color: participantSource === "paid" ? "var(--green)" : "var(--ink)" }} onClick={() => changeParticipantSource("paid")} disabled={!canLoadParticipants}>💵 결제완료한 사람만 <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "paid" ? (loading ? "불러오는 중…" : `${autoParticipantCount}명`) : ""}</span></button>
                   <button className="btn" style={{ textAlign: "left", height: "auto", padding: "7px", borderColor: participantSource === "manual" ? "var(--rose)" : "var(--bd)", color: participantSource === "manual" ? "var(--rose)" : "var(--ink)" }} onClick={() => changeParticipantSource("manual")}>✎ 수동 입력 (쉼표로 자동분리) <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "manual" ? `${manualParticipantCount}명` : ""}</span></button>
                   {participantSource === "manual" ? (
                     <textarea value={manualParticipantText} onChange={(e) => setManualParticipantText(e.target.value)} onPaste={handleManualPaste}
@@ -1531,7 +1554,7 @@ export default function AdminLiveEventRoulettePanel({
                   {/* [2026-09-08] 구매 응모권 — 실제로 서버에 전달되어 추첨 확률이 된다 */}
                   <div style={{ background: "var(--color-surface-2)", borderRadius: "7px", padding: "8px 11px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => { ticketTouchedRef.current = true; setTicketEnabled((v) => !v); }}>
-                      <span style={{ fontSize: "11px" }}>구매 응모권 적용 <span style={{ color: "var(--mut2)" }}>(많이 산 사람 확률 ↑)</span></span>
+                      <span style={{ fontSize: "11px", fontWeight: 600 }}>많이 산 손님 당첨확률 올리기</span>
                       <span className={`tog ${ticketEnabled ? "on" : "off"}`}><i /></span>
                     </div>
                     {ticketEnabled ? (
@@ -1541,10 +1564,10 @@ export default function AdminLiveEventRoulettePanel({
                         <span>만원마다 1장 · 최대</span>
                         <input className="ipt" style={{ width: "40px", textAlign: "center", padding: "3px" }} inputMode="numeric" value={ticketMax} onChange={(e) => { ticketTouchedRef.current = true; setTicketMax(e.target.value.replace(/[^0-9]/g, "").slice(0, 2) || ""); }} onBlur={() => { if (!(Number(ticketMax) >= 1)) setTicketMax("5"); }} />
                         <span>장</span>
-                        <span style={{ width: "100%", color: "var(--mut2)" }}>확률 = 내 장수 ÷ 전체 장수. 미입금 주문은 참가만 되고 장수는 안 늘어요. 수동 입력 명단은 전원 1장.</span>
+                        <span style={{ width: "100%", color: "var(--mut2)" }}>예) 5만원마다 1장이면 — 결제 0~4만원 <b>1장</b> · 5만원 <b>2장</b> · 10만원 <b>3장</b> … 최대 {ticketMax || 5}장.<br />확률 = 내 장수 ÷ 전체 장수. <b>미입금 주문은 장수가 안 늘어요</b>(참가는 됨). 수동 입력 명단은 전원 1장.</span>
                       </div>
                     ) : (
-                      <div style={{ marginTop: "5px", fontSize: "11px", color: "var(--mut2)" }}>꺼짐 = 전원 같은 확률(1장씩)</div>
+                      <div style={{ marginTop: "5px", fontSize: "11px", color: "var(--mut2)" }}>지금은 <b>꺼짐</b> — 61명이든 1명이든 <b>전원 똑같은 확률</b>입니다. 켜면 결제한 금액만큼 응모권이 늘어나요.</div>
                     )}
                   </div>
                   {isKWinnerTab ? (
@@ -1564,12 +1587,31 @@ export default function AdminLiveEventRoulettePanel({
 
               {/* 당첨 고정 */}
               <div style={{ border: "1px solid var(--rose-bd)", background: "var(--rose-bg)", borderRadius: "8px", padding: "9px 11px", marginBottom: "11px" }}>
-                <div style={{ fontSize: "11px", color: "var(--rose)", fontWeight: 600, marginBottom: "7px" }}>🎯 당첨 고정 (명단에서 닉네임 클릭){isKWinnerTab ? ` · 최대 ${survivorCount}명` : ""}</div>
-                <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", maxHeight: "92px", overflowY: "auto" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "7px", flexWrap: "wrap", marginBottom: "7px" }}>
+                  <span style={{ fontSize: "11px", color: "var(--rose)", fontWeight: 600 }}>🎯 당첨 고정 (닉네임 클릭){isKWinnerTab ? ` · 최대 ${survivorCount}명` : ""}</span>
+                  <span style={{ fontSize: "10.5px", color: "var(--mut2)" }}>ㄱㄴㄷ 순 · 안 고르면 전원 추첨</span>
+                  {/* [2026-09-08] 61명 중에서 눈으로 찾기 어렵다 → 검색칸. 찾는 즉시 걸러진다. */}
+                  <input
+                    className="ipt"
+                    style={{ marginLeft: "auto", width: "150px", height: "26px", padding: "0 9px", fontSize: "11px" }}
+                    placeholder="🔍 닉네임 찾기"
+                    value={nickFilter}
+                    onChange={(e) => setNickFilter(e.target.value)}
+                  />
+                  {nickFilter ? (
+                    <button className="btn" style={{ height: "26px", padding: "0 9px", fontSize: "11px" }} onClick={() => setNickFilter("")}>지우기</button>
+                  ) : null}
+                  <span style={{ fontSize: "10.5px", color: "var(--mut2)", minWidth: "62px", textAlign: "right" }}>
+                    {nickFilter ? `${pickList.length}/${finalParticipants.length}명` : `${finalParticipants.length}명`}
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", maxHeight: "150px", overflowY: "auto" }}>
                   {finalParticipants.length === 0 ? (
                     <span className="note">참가자를 먼저 불러오세요.</span>
+                  ) : pickList.length === 0 ? (
+                    <span className="note">「{nickFilter}」와 맞는 닉네임이 없어요.</span>
                   ) : (
-                    finalParticipants.map((p, i) => {
+                    pickList.map((p, i) => {
                       const on = isKWinnerTab ? fixedSurvivorNicknames.includes(p.nickname) : fixedWinnerNickname === p.nickname;
                       const myTickets = Math.max(1, Math.floor(Number(p.tickets ?? p.weight ?? 1)) || 1);
                       const ticketTail = ticketEnabled && totalTickets > 0 ? ` ×${myTickets}장 · ${Math.round((myTickets / totalTickets) * 1000) / 10}%` : "";
@@ -1592,7 +1634,9 @@ export default function AdminLiveEventRoulettePanel({
                     })
                   )}
                 </div>
-                <div className="note" style={{ marginTop: "7px" }}>👑 = 당첨 고정 선택됨</div>
+                <div className="note" style={{ marginTop: "7px" }}>{isKWinnerTab
+                    ? (fixedSurvivorNicknames.length > 0 ? `👑 고정 ${fixedSurvivorNicknames.length}/${survivorCount}명 — ${fixedSurvivorNicknames.join(", ")}` : "👑 아무도 고정 안 함 (전원 추첨)")
+                    : (fixedWinnerNickname ? `👑 고정: ${fixedWinnerNickname}` : "👑 아무도 고정 안 함 (전원 추첨)")}</div>
               </div>
 
               {/* 제목 + 당첨 내용(선물) */}

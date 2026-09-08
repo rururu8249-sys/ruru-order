@@ -24,6 +24,8 @@ type Props = {
   deposits?: AnyRow[];
   broadcasts?: AnyRow[];
   settingsSummary?: SettlementSettingsSummary;
+  /** [2026-09-08] 계산서의 「아직 안 들어온 돈 › 주문 보기」 */
+  onGoToUnpaidOrders?: () => void;
 };
 
 function csvCell(value: unknown) {
@@ -86,6 +88,7 @@ export default function AdminSettlementPanel({
   deposits,
   broadcasts,
   settingsSummary,
+  onGoToUnpaidOrders,
 }: Props) {
   const actualCardFeeRate = String(settingsSummary?.actualCardRate ?? 7);
 
@@ -495,6 +498,7 @@ export default function AdminSettlementPanel({
   return (
     <section className="grid gap-5">
       <SettlementMoneyFlowDashboard
+        onGoToUnpaidOrders={onGoToUnpaidOrders}
         stats={stats}
         actualCardFeeRate={actualCardFeeRate}
         startDate={startDate}
@@ -525,25 +529,40 @@ export default function AdminSettlementPanel({
         onToggleSettlementDetail={() => setSettlementDetailOpen((current) => !current)}
       />
 
+      {/* [2026-09-08 사장님 지적] 「추가 정산 클릭했을 때 디자인도 이상하고 세로px도 이상하다」
+            · 뒤 배경을 눌러도 안 닫혔다 → 닫기 버튼 하나뿐
+            · 회색 슬래브가 그냥 «툭» 나타났다 → 다른 드로어(주문상세·입금매칭)는 슬라이드인인데 여기만 달랐다
+            · 카드 안에 카드 안에 카드(3겹) → 가로 여백만 먹고 세로는 남아돌았다
+          수정: 관리자 공통 드로어 규격(오른쪽 슬라이드인 · 뒤 클릭 닫기 · Esc)으로 통일하고,
+                안쪽은 «입력칸 고정 + 표만 스크롤» 2단으로 바꿔 남는 세로를 표가 채우게 한다. */}
       {manualPanelOpen ? (
-        <div className="fixed inset-0 z-[90] bg-slate-950/35 backdrop-blur-[2px]">
-          <div className="absolute right-0 top-0 flex h-full w-full max-w-[820px] flex-col overflow-hidden bg-surface-2 shadow-2xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-5 py-3">
-              <div>
-                <div className="text-xs font-black text-info-tx">주문서와 별도 정산 입력</div>
-                <div className="mt-1 text-xl font-black text-ink">정산 추가 입력</div>
+        <>
+          <button
+            type="button"
+            aria-label="정산 추가 입력 닫기"
+            onClick={() => setManualPanelOpen(false)}
+            className="fixed inset-0 z-[90] bg-black/40"
+          />
+          <div
+            className="fixed inset-y-0 right-0 z-[91] flex w-full max-w-[860px] flex-col overflow-hidden border-l border-line bg-surface shadow-2xl"
+            style={{ animation: "ruruSidePanelIn 0.22s ease" }}
+          >
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-5 py-3.5">
+              <div className="min-w-0">
+                <div className="text-xl font-black text-ink">정산 추가 입력</div>
+                <div className="mt-0.5 text-xs font-bold text-ink-mute">주문서에 없는 수익·지출만 여기서 넣습니다. 주문 데이터는 바뀌지 않습니다.</div>
               </div>
 
               <button
                 type="button"
                 onClick={() => setManualPanelOpen(false)}
-                className="rounded-xl border border-line bg-surface px-4 py-2 text-sm font-black text-ink shadow-sm transition hover:bg-surface-2"
+                className="shrink-0 rounded-xl border border-line bg-surface px-4 py-2 text-sm font-black text-ink shadow-sm transition hover:bg-surface-2"
               >
                 닫기
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            <div className="flex min-h-0 flex-1 flex-col">
               <SettlementManualEntryPanel
                 entries={manualEntriesInScope}
                 broadcastOptions={broadcastOptions}
@@ -553,7 +572,7 @@ export default function AdminSettlementPanel({
               />
             </div>
           </div>
-        </div>
+        </>
       ) : null}
     </section>
   );

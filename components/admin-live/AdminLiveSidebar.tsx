@@ -1,12 +1,11 @@
 // components/admin-live/AdminLiveSidebar.tsx
 // [2026-09-08 5단계 · 레이아웃 B] 큰 메뉴 5개(방송 / 주문·입금 / 상품 / 고객 / 설정). 누르면 화면이 통째로 바뀐다.
 //   · 예외 배지(매칭필요·카드미결제)는 「주문·입금」에 붙는다.
-//   · 예전 「빠른보기」(카톡·카드결제·알림음)는 오른쪽 방송 레일로 옮겼다(AdminLiveBroadcastRail).
+//   · 카톡 문의·카드결제는 어느 화면에서든 쓰므로 여기 고정. 알림음은 설정 › 알림음 탭으로 옮겼다(2026-09-08 사장님 요청).
 //   · 실시간 접속 위젯은 그대로(방송 중 바로 보는 숫자).
 import { ADMIN_LIVE_TOP_MENUS, topMenuOf, type AdminLiveMenuKey } from "./adminLiveMenu";
 import AdminLiveLogoutButton from "./AdminLiveLogoutButton";
 import AdminLiveMenuIcon from "./AdminLiveMenuIcon";
-import AdminSoundControl from "./AdminSoundControl";
 import { CONTACT_TYPE_SHORT, adminChatTarget } from "@/lib/shopInfo";
 import { useShopInfo } from "@/lib/useShopInfo";
 import { showAdminToast } from "@/lib/adminToast";
@@ -169,26 +168,25 @@ export default function AdminLiveSidebar({
         {/* [2026-08-29 사장님 요청] 실시간 접속자 — 사이드바에서 바로 보이게 */}
         <AdminLiveSidebarPresence onOpenVisitStats={() => { onOpenVisitStats?.(); onCloseNav?.(); }} />
 
-        {/* [2026-09-08] 늘 쓰는 것 — 카톡 문의 · 카드결제 · 알림음 */}
-        <section className="mt-3 rounded-2xl border border-line bg-surface p-2.5 shadow-sm">
+        {/* [2026-09-08] 늘 쓰는 것 — 카톡 문의 · 카드결제 (알림음은 설정 › 알림음) */}
+        <section className="mt-3 shrink-0">
           <div className="grid grid-cols-2 gap-1.5">
             <button
               type="button"
               onClick={openKakao}
-              className="flex h-9 items-center justify-center gap-1 rounded-xl border border-rose-line bg-rose-soft text-[11px] font-black text-rose-deep transition hover:opacity-90 active:scale-[0.98]"
+              title="손님이 남긴 카톡 문의에 답하는 관리자 채팅창을 엽니다 (설정 › 상점 정보에서 주소 변경)"
+              className="flex h-10 items-center justify-center gap-1 rounded-xl border border-rose-line bg-rose-soft text-[11px] font-black text-rose-deep transition hover:opacity-90 active:scale-[0.98]"
             >
               💬 {CONTACT_TYPE_SHORT[shopInfo.contactType]}
             </button>
             <button
               type="button"
               onClick={() => window.open(shopInfo.paysterUrl, "ruruPayster", "popup=yes,width=480,height=720")}
-              className="flex h-9 items-center justify-center gap-1 rounded-xl border border-line bg-surface-2 text-[11px] font-black text-ink-soft transition hover:bg-surface-3 active:scale-[0.98]"
+              title="페이스터 문자결제 페이지를 새 창으로 엽니다"
+              className="flex h-10 items-center justify-center gap-1 rounded-xl border border-line bg-surface-2 text-[11px] font-black text-ink-soft transition hover:bg-surface-3 active:scale-[0.98]"
             >
               💳 카드결제
             </button>
-          </div>
-          <div className="mt-2">
-            <AdminSoundControl />
           </div>
         </section>
 

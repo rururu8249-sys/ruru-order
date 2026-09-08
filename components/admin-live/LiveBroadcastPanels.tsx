@@ -913,13 +913,13 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
           <span className="text-xs font-bold text-ink-soft">{chatEmbedUrl ? "채팅 연결" : "URL 대기"}</span>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-hidden rounded-2xl border border-line bg-surface-2" style={chatEmbedUrl ? { background: "#ffffff" } : undefined}>
+        <div className="flex-1 min-h-0 overflow-hidden rounded-2xl border border-line bg-surface-2" style={chatEmbedUrl ? { background: "var(--color-surface)" } : undefined}>
           {chatEmbedUrl ? (
             <iframe
               title="YouTube live chat"
               src={chatEmbedUrl}
               className="h-full w-full"
-              style={{ background: "#ffffff", colorScheme: "light" }}
+              style={{ background: "var(--color-surface)", colorScheme: "light" }}
             />
           ) : (
             <div className="flex h-full items-center justify-center p-6 text-center">
@@ -1021,7 +1021,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
               "ml-auto rounded-lg px-2.5 py-1 text-[11px] font-black transition",
               cycleOn ? "text-white" : "bg-surface-2 text-ink-soft hover:bg-surface-3",
             ].join(" ")}
-            style={cycleOn ? { background: "#7B2D43" } : undefined}
+            style={cycleOn ? { background: "var(--color-rose-deep)" } : undefined}
           >
             {cycleOn ? "⏸ 자동순환 ON" : "▶ 자동순환"}
           </button>
@@ -1104,7 +1104,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
             type="button"
             onClick={() => window.dispatchEvent(new Event("ruru-open-quick-product-panel"))}
             className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-black text-white"
-            style={{ background: "#7B2D43" }}
+            style={{ background: "var(--color-rose-deep)" }}
           >
             + 즉석
           </button>

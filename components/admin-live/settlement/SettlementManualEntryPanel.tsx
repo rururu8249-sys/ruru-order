@@ -276,167 +276,170 @@ export default function SettlementManualEntryPanel({
   const totalExpense = entries.filter((entry) => entry.entry_type === "expense").reduce((sum, entry) => sum + toNumber(entry.amount), 0);
 
   return (
-    <div className="grid gap-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-bold leading-6 text-ink-soft">
-            주문서에 없는 추가 정산 수익과 창고/기타 지출만 빠르게 입력합니다.
-          </p>
-        </div>
-
-        <div className="flex gap-2">
-          <div className="rounded-full bg-info-bg px-3 py-2 text-xs font-black text-info-tx">
-            추가 정산 수익 {won(totalIncome)}
-          </div>
-          <div className="rounded-full bg-violet-50 px-3 py-2 text-xs font-black text-violet-700">
-            창고/기타 지출 -{won(totalExpense)}
-          </div>
-        </div>
+    // [2026-09-08] 드로어 안 세로 2단: 위=입력칸(고정) / 아래=최근 내역(남는 세로 전부, 표만 스크롤).
+    //   예전엔 카드 3겹을 한 스크롤에 넣어 빈 표 아래에 세로가 남아돌고 가로 스크롤바까지 생겼다.
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* ── 합계 띠 ── */}
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-surface-2 px-5 py-2.5">
+        <span className="rounded-full bg-ok-bg px-3 py-1.5 text-xs font-black text-ok-tx">
+          추가 수익 +{won(totalIncome)}
+        </span>
+        <span className="rounded-full bg-warn-bg px-3 py-1.5 text-xs font-black text-warn-tx">
+          창고·기타 지출 −{won(totalExpense)}
+        </span>
+        <span className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-black text-ink">
+          합계 {totalIncome - totalExpense < 0 ? "−" : "+"}{won(Math.abs(totalIncome - totalExpense))}
+        </span>
+        <span className="ml-auto text-[11px] font-bold text-ink-mute">위 정산 화면의 기간·방송 조건 기준</span>
       </div>
 
-      {!tableReady ? (
-        <div className="rounded-2xl border border-line bg-warn-bg px-4 py-3 text-sm font-bold leading-6 text-warn-tx">
-          정산 추가 입력을 저장할 준비가 아직 안 되어 있습니다. 개발자에게 알려주세요.
-          <span className="ml-1 text-xs font-bold text-ink-mute">(settlement_manual_entries 표 없음 — docs/인수인계_관리자설정.md)</span>
-        </div>
-      ) : null}
-      <div className="grid gap-3 rounded-xl border border-line bg-surface-2 p-3">
-        <div className="grid gap-3 lg:grid-cols-[0.85fr_1fr_1fr]">
-          <label className="grid gap-1">
-            <span className="text-xs font-black text-ink-soft">구분</span>
-            <select
-              value={entryType}
-              onChange={(event) => {
-                const nextType = event.target.value as SettlementManualEntryType;
-                setEntryType(nextType);
-                setTitle(nextType === "income" ? "방송외입금" : "창고정산");
-              }}
-              className="h-10 rounded-xl border border-line bg-surface px-3 text-sm font-black outline-none focus:border-blue-400"
-            >
-              <option value="expense">창고/기타 지출</option>
-              <option value="income">추가 정산 수익</option>
-            </select>
-          </label>
-
-          <label className="grid gap-1">
-            <span className="text-xs font-black text-ink-soft">날짜</span>
-            <input
-              type="date"
-              value={entryDate}
-              onChange={(event) => setEntryDate(event.target.value)}
-              className="h-10 rounded-xl border border-line bg-surface px-3 text-sm font-black outline-none focus:border-blue-400"
-            />
-          </label>
-
-          <label className="grid gap-1">
-            <span className="text-xs font-black text-ink-soft">금액</span>
-            <div className="relative">
-              <input
-              value={amount}
-              onChange={(event) => setAmount(formatMoneyInput(event.target.value))}
-              placeholder="0"
-              className="h-10 w-full rounded-xl border border-line bg-surface px-3 pr-10 text-sm font-black outline-none focus:border-blue-400"
-              />
-              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-black text-ink-mute">원</span>
-            </div>
-          </label>
-        </div>
-
-        <div className="grid gap-2">
-          <span className="text-xs font-black text-ink-soft">빠른 제목</span>
-          <div className="flex flex-wrap gap-2">
-            {(entryType === "income" ? ["방송외입금", "기타수익"] : ["창고정산", "택배비", "알바비", "사입비", "기타지출"]).map((quickTitle) => (
-              <button
-                key={quickTitle}
-                type="button"
-                onClick={() => setTitle(quickTitle)}
-                className={
-                  title === quickTitle
-                    ? "rounded-full bg-rose-deep px-3 py-1.5 text-xs font-black text-white shadow-sm"
-                    : "rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-black text-ink-soft hover:bg-surface-2"
-                }
-              >
-                {quickTitle}
-              </button>
-            ))}
+      {/* ── 위: 입력칸 (고정) ── */}
+      <div className="shrink-0 border-b border-line px-5 py-4">
+        {!tableReady ? (
+          <div className="mb-3 rounded-xl border border-warn-tx/30 bg-warn-bg px-4 py-3 text-sm font-bold leading-6 text-warn-tx">
+            정산 추가 입력을 저장할 준비가 아직 안 되어 있습니다. 개발자에게 알려주세요.
+            <span className="ml-1 text-xs font-bold opacity-75">(settlement_manual_entries 표 없음 — docs/인수인계_관리자설정.md)</span>
           </div>
-        </div>
+        ) : null}
 
-        <div className="grid gap-3 lg:grid-cols-[0.9fr_1.1fr]">
-          <label className="grid gap-1">
-            <span className="text-xs font-black text-ink-soft">제목</span>
-            <input
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="창고정산, 택배비, 방송외입금, 기타수익"
-              className="h-10 rounded-xl border border-line bg-surface px-3 text-sm font-black outline-none focus:border-blue-400"
-            />
-          </label>
+        <div className="grid gap-3">
+          <div className="grid gap-3 sm:grid-cols-[0.8fr_1fr_1fr]">
+            <label className="grid gap-1">
+              <span className="text-xs font-black text-ink-soft">구분</span>
+              <select
+                value={entryType}
+                onChange={(event) => {
+                  const nextType = event.target.value as SettlementManualEntryType;
+                  setEntryType(nextType);
+                  setTitle(nextType === "income" ? "방송외입금" : "창고정산");
+                }}
+                className="h-10 rounded-xl border border-line bg-surface px-3 text-sm font-black text-ink outline-none focus:border-rose-deep"
+              >
+                <option value="expense">창고/기타 지출</option>
+                <option value="income">추가 정산 수익</option>
+              </select>
+            </label>
 
-          <label className="grid gap-1">
-            <span className="text-xs font-black text-ink-soft">연결 방송</span>
-            <select
-              value={broadcastKey}
-              onChange={(event) => setBroadcastKey(event.target.value)}
-              className="h-10 rounded-xl border border-line bg-surface px-3 text-sm font-black outline-none focus:border-blue-400"
-            >
-              <option value="">날짜 기준 자동 연결</option>
-              {broadcastOptions.slice(0, 120).map((option) => (
-                <option key={option.key} value={option.key}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+            <label className="grid gap-1">
+              <span className="text-xs font-black text-ink-soft">날짜</span>
+              <input
+                type="date"
+                value={entryDate}
+                onChange={(event) => setEntryDate(event.target.value)}
+                className="h-10 rounded-xl border border-line bg-surface px-3 text-sm font-black text-ink outline-none focus:border-rose-deep"
+              />
+            </label>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={saveEntry}
-            disabled={saving || !tableReady}
-            className="h-10 min-w-[150px] rounded-xl bg-rose-deep px-5 text-sm font-black text-white shadow-sm transition hover:bg-rose-deep disabled:cursor-wait disabled:opacity-45"
-          >
-            {saving ? "반영중" : editingId ? "수정 저장" : "정산에 반영하기"}
-          </button>
+            <label className="grid gap-1">
+              <span className="text-xs font-black text-ink-soft">금액</span>
+              <div className="relative">
+                <input
+                  value={amount}
+                  onChange={(event) => setAmount(formatMoneyInput(event.target.value))}
+                  placeholder="0"
+                  inputMode="numeric"
+                  className="h-10 w-full rounded-xl border border-line bg-surface px-3 pr-9 text-right text-sm font-black tabular-nums text-ink outline-none focus:border-rose-deep"
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-black text-ink-mute">원</span>
+              </div>
+            </label>
+          </div>
 
-          {editingId ? (
+          <div className="grid gap-3 sm:grid-cols-[1fr_1fr]">
+            <label className="grid gap-1">
+              <span className="text-xs font-black text-ink-soft">제목</span>
+              <input
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="창고정산, 택배비, 방송외입금, 기타수익"
+                className="h-10 rounded-xl border border-line bg-surface px-3 text-sm font-black text-ink outline-none focus:border-rose-deep"
+              />
+              <span className="mt-0.5 flex flex-wrap gap-1.5">
+                {(entryType === "income" ? ["방송외입금", "기타수익"] : ["창고정산", "택배비", "알바비", "사입비", "기타지출"]).map((quickTitle) => (
+                  <button
+                    key={quickTitle}
+                    type="button"
+                    onClick={() => setTitle(quickTitle)}
+                    className={
+                      title === quickTitle
+                        ? "rounded-full bg-rose-deep px-2.5 py-1 text-[11px] font-black text-white"
+                        : "rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft transition hover:bg-surface-2"
+                    }
+                  >
+                    {quickTitle}
+                  </button>
+                ))}
+              </span>
+            </label>
+
+            <div className="grid content-start gap-3">
+              <label className="grid gap-1">
+                <span className="text-xs font-black text-ink-soft">연결 방송</span>
+                <select
+                  value={broadcastKey}
+                  onChange={(event) => setBroadcastKey(event.target.value)}
+                  className="h-10 rounded-xl border border-line bg-surface px-3 text-sm font-black text-ink outline-none focus:border-rose-deep"
+                >
+                  <option value="">날짜 기준 자동 연결</option>
+                  {broadcastOptions.slice(0, 120).map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-1">
+                <span className="text-xs font-black text-ink-soft">메모 <span className="font-bold text-ink-mute">(선택)</span></span>
+                <input
+                  value={memo}
+                  onChange={(event) => setMemo(event.target.value)}
+                  placeholder="무슨 수익/지출인지 한 줄로"
+                  className="h-10 rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-deep"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={resetForm}
-              className="h-10 rounded-xl border border-line bg-surface px-4 text-sm font-black text-ink-soft shadow-sm"
+              onClick={saveEntry}
+              disabled={saving || !tableReady}
+              className="h-11 min-w-[170px] rounded-xl bg-rose-deep px-5 text-sm font-black text-white shadow-sm transition hover:opacity-90 active:scale-[0.99] disabled:cursor-wait disabled:opacity-45"
             >
-              수정 취소
+              {saving ? "반영중..." : editingId ? "수정 저장" : "정산에 반영하기"}
             </button>
-          ) : null}
 
-          <div className="text-xs font-bold text-ink-mute">
-            주문서와 별도로 정산에만 반영됩니다.
+            {editingId ? (
+              <button
+                type="button"
+                onClick={resetForm}
+                className="h-11 rounded-xl border border-line bg-surface px-4 text-sm font-black text-ink-soft transition hover:bg-surface-2"
+              >
+                수정 취소
+              </button>
+            ) : null}
+
+            <span className="text-xs font-bold text-ink-mute">주문서는 그대로 두고 정산 숫자에만 더해집니다.</span>
           </div>
         </div>
       </div>
 
-      <label className="grid gap-1">
-        <span className="text-xs font-black text-ink-soft">메모</span>
-        <textarea
-          value={memo}
-          onChange={(event) => setMemo(event.target.value)}
-          placeholder="무슨 추가 정산 수익/창고·기타 지출인지 메모를 적어주세요."
-          className="min-h-[62px] rounded-xl border border-line px-4 py-2.5 text-sm font-bold outline-none focus:border-blue-400"
-        />
-      </label>
-
-      <div className="overflow-hidden rounded-xl border border-line">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-soft bg-surface-2 px-4 py-3">
-          <div className="text-sm font-black text-ink">최근 추가 정산 내역</div>
-          <div className="flex items-center gap-2">
+      {/* ── 아래: 최근 내역 (남는 세로 전부) ── */}
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 bg-surface-2 px-5 py-2.5">
+          <div className="text-sm font-black text-ink">
+            최근 추가 정산 내역 <span className="text-ink-mute">{entries.length.toLocaleString()}건</span>
+          </div>
+          {entries.length > 0 ? (
             <select
               value={pageSize}
               onChange={(event) => {
                 setPageSize(Number(event.target.value));
                 setPage(1);
               }}
-              className="h-8 rounded-xl border border-line bg-surface px-2 text-xs font-black"
+              className="h-8 rounded-xl border border-line bg-surface px-2 text-xs font-black text-ink"
             >
               {PAGE_SIZE_OPTIONS.map((size) => (
                 <option key={size} value={size}>
@@ -444,151 +447,146 @@ export default function SettlementManualEntryPanel({
                 </option>
               ))}
             </select>
-            <div className="rounded-full bg-surface px-3 py-2 text-xs font-black text-ink-soft">
-              총 {entries.length.toLocaleString()}개
-            </div>
-          </div>
+          ) : null}
         </div>
 
-        <div className="overflow-auto">
-          <table className="min-w-[760px] w-full border-separate border-spacing-0">
-            <thead>
-              <tr className="bg-surface text-xs font-black text-ink-soft">
-                <th className="px-3 py-2.5 text-left">날짜/방송</th>
-                <th className="px-3 py-2.5 text-left">구분</th>
-                <th className="px-3 py-2.5 text-left">제목</th>
-                <th className="px-3 py-2.5 text-right">금액</th>
-                <th className="px-3 py-2.5 text-left">메모</th>
-                <th className="px-3 py-2.5 text-right">관리</th>
-              </tr>
-            </thead>
+        <div className="min-h-0 flex-1 overflow-auto">
+          {loading ? (
+            <div className="flex h-full min-h-[160px] items-center justify-center text-sm font-bold text-ink-mute">불러오는 중...</div>
+          ) : visibleEntries.length === 0 ? (
+            // [수정] 빈 상태를 표 안에 넣으면 min-w 때문에 «빈 화면에도 가로 스크롤바»가 생겼다 → 표 밖으로 뺀다.
+            <div className="flex h-full min-h-[180px] flex-col items-center justify-center gap-1 px-6 text-center">
+              <div className="text-sm font-black text-ink-soft">아직 추가한 정산 내역이 없습니다.</div>
+              <div className="text-xs font-bold text-ink-mute">위에서 구분·날짜·금액을 넣고 「정산에 반영하기」를 누르면 여기에 쌓입니다.</div>
+            </div>
+          ) : (
+            <table className="w-full min-w-[720px] border-separate border-spacing-0">
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-surface text-xs font-black text-ink-soft">
+                  <th className="border-b border-line px-3 py-2.5 text-left">날짜/방송</th>
+                  <th className="border-b border-line px-3 py-2.5 text-left">구분</th>
+                  <th className="border-b border-line px-3 py-2.5 text-left">제목</th>
+                  <th className="border-b border-line px-3 py-2.5 text-right">금액</th>
+                  <th className="border-b border-line px-3 py-2.5 text-left">메모</th>
+                  <th className="border-b border-line px-3 py-2.5 text-right">관리</th>
+                </tr>
+              </thead>
 
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-sm font-bold text-ink-mute">
-                    불러오는 중...
-                  </td>
-                </tr>
-              ) : visibleEntries.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-sm font-bold text-ink-mute">
-                    아직 추가한 정산 내역이 없습니다.
-                  </td>
-                </tr>
-              ) : (
-                visibleEntries.map((entry) => (
-                  <tr key={entry.id} className="hover:bg-info-bg">
-                    <td className="border-t border-line-soft px-3 py-2.5">
+              <tbody>
+                {visibleEntries.map((entry) => (
+                  <tr key={entry.id} className="transition hover:bg-surface-2">
+                    <td className="border-b border-line-soft px-3 py-2.5">
                       <div className="text-sm font-black text-ink">{manualEntryDateKey(entry) || "-"}</div>
-                      <div className="mt-1 max-w-[260px] truncate text-xs font-bold text-ink-mute">
+                      <div className="mt-0.5 max-w-[220px] truncate text-xs font-bold text-ink-mute">
                         {entry.broadcast_label || manualEntryLabel(entry)}
                       </div>
                     </td>
-                    <td className="border-t border-line-soft px-3 py-2.5">
-                      <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${entryTypeTone(entry.entry_type)}`}>
+                    <td className="border-b border-line-soft px-3 py-2.5">
+                      <span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-black ${entryTypeTone(entry.entry_type)}`}>
                         {entryTypeLabel(entry.entry_type)}
                       </span>
                     </td>
-                    <td className="border-t border-line-soft px-3 py-2.5 text-sm font-black text-ink">{entry.title}</td>
-                    <td className="border-t border-line-soft px-3 py-2.5 text-right text-sm font-black tabular-nums text-ink">
-                      {entry.entry_type === "expense" ? "-" : ""}
+                    <td className="border-b border-line-soft px-3 py-2.5 text-sm font-black text-ink">{entry.title}</td>
+                    <td className={`border-b border-line-soft px-3 py-2.5 text-right text-sm font-black tabular-nums ${entry.entry_type === "expense" ? "text-warn-tx" : "text-ok-tx"}`}>
+                      {entry.entry_type === "expense" ? "−" : "+"}
                       {won(entry.amount)}
                     </td>
-                    <td className="border-t border-line-soft px-3 py-2.5">
-                      <div className="max-w-[260px] truncate text-xs font-bold text-ink-soft">{entry.memo || "-"}</div>
+                    <td className="border-b border-line-soft px-3 py-2.5">
+                      <div className="max-w-[220px] truncate text-xs font-bold text-ink-soft">{entry.memo || "-"}</div>
                     </td>
-                    <td className="border-t border-line-soft px-3 py-2.5 text-right">
-                      <div className="flex justify-end gap-2">
+                    <td className="border-b border-line-soft px-3 py-2.5 text-right">
+                      <div className="flex justify-end gap-1.5">
                         <button
                           type="button"
                           onClick={() => openDetail(entry)}
-                          className="rounded-xl border border-line px-3 py-2 text-xs font-black text-info-tx hover:bg-info-bg"
+                          className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-black text-ink-soft transition hover:bg-surface-2"
                         >
                           상세
                         </button>
                         <button
                           type="button"
                           onClick={() => startEdit(entry)}
-                          className="rounded-xl border border-line px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2"
+                          className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-black text-ink-soft transition hover:bg-surface-2"
                         >
                           수정
                         </button>
                         <button
                           type="button"
                           onClick={() => deactivateEntry(entry)}
-                          className="rounded-xl border border-rose-200 px-3 py-2 text-xs font-black text-rose-600 hover:bg-rose-50"
+                          className="rounded-lg border border-danger-tx/40 px-2.5 py-1.5 text-xs font-black text-danger-tx transition hover:bg-danger-bg"
                         >
                           삭제
                         </button>
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line-soft px-4 py-3">
-          <div className="text-xs font-bold text-ink-mute">
-            {entries.length === 0
-              ? "0개"
-              : `${(startIndex + 1).toLocaleString()}-${Math.min(startIndex + pageSize, entries.length).toLocaleString()} / ${entries.length.toLocaleString()}개`}
-          </div>
+        {/* 페이지 버튼 — 2페이지 이상일 때만 (빈 목록에 페이지 줄이 뜨던 것 제거) */}
+        {pageCount > 1 ? (
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-line px-5 py-2.5">
+            <div className="text-xs font-bold text-ink-mute">
+              {`${(startIndex + 1).toLocaleString()}-${Math.min(startIndex + pageSize, entries.length).toLocaleString()} / ${entries.length.toLocaleString()}개`}
+            </div>
 
-          <div className="flex flex-wrap gap-1">
-            <button
-              type="button"
-              onClick={() => setPage(1)}
-              disabled={safePage === 1}
-              className="h-8 rounded-xl border border-line px-3 text-xs font-black disabled:opacity-40"
-            >
-              처음
-            </button>
-            <button
-              type="button"
-              onClick={() => setPage(Math.max(1, safePage - 1))}
-              disabled={safePage === 1}
-              className="h-8 rounded-xl border border-line px-3 text-xs font-black disabled:opacity-40"
-            >
-              이전
-            </button>
-
-            {visiblePages.map((pageNumber) => (
+            <div className="flex flex-wrap gap-1">
               <button
-                key={pageNumber}
                 type="button"
-                onClick={() => setPage(pageNumber)}
-                className={
-                  pageNumber === safePage
-                    ? "h-9 min-w-9 rounded-xl bg-rose-deep px-3 text-xs font-black text-white"
-                    : "h-9 min-w-9 rounded-xl border border-line px-3 text-xs font-black text-ink-soft"
-                }
+                onClick={() => setPage(1)}
+                disabled={safePage === 1}
+                className="h-9 rounded-lg border border-line px-3 text-xs font-black text-ink-soft transition hover:bg-surface-2 disabled:opacity-40 disabled:hover:bg-transparent"
               >
-                {pageNumber}
+                처음
               </button>
-            ))}
+              <button
+                type="button"
+                onClick={() => setPage(Math.max(1, safePage - 1))}
+                disabled={safePage === 1}
+                className="h-9 rounded-lg border border-line px-3 text-xs font-black text-ink-soft transition hover:bg-surface-2 disabled:opacity-40 disabled:hover:bg-transparent"
+              >
+                이전
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setPage(Math.min(pageCount, safePage + 1))}
-              disabled={safePage === pageCount}
-              className="h-8 rounded-xl border border-line px-3 text-xs font-black disabled:opacity-40"
-            >
-              다음
-            </button>
-            <button
-              type="button"
-              onClick={() => setPage(pageCount)}
-              disabled={safePage === pageCount}
-              className="h-8 rounded-xl border border-line px-3 text-xs font-black disabled:opacity-40"
-            >
-              마지막
-            </button>
+              {visiblePages.map((pageNumber) => (
+                <button
+                  key={pageNumber}
+                  type="button"
+                  onClick={() => setPage(pageNumber)}
+                  className={
+                    pageNumber === safePage
+                      ? "h-9 min-w-9 rounded-lg bg-rose-deep px-3 text-xs font-black text-white"
+                      : "h-9 min-w-9 rounded-lg border border-line px-3 text-xs font-black text-ink-soft transition hover:bg-surface-2"
+                  }
+                >
+                  {pageNumber}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => setPage(Math.min(pageCount, safePage + 1))}
+                disabled={safePage === pageCount}
+                className="h-9 rounded-lg border border-line px-3 text-xs font-black text-ink-soft transition hover:bg-surface-2 disabled:opacity-40 disabled:hover:bg-transparent"
+              >
+                다음
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage(pageCount)}
+                disabled={safePage === pageCount}
+                className="h-9 rounded-lg border border-line px-3 text-xs font-black text-ink-soft transition hover:bg-surface-2 disabled:opacity-40 disabled:hover:bg-transparent"
+              >
+                마지막
+              </button>
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
+
       {detailEntry ? (
         <SettlementManualEntryDetailModal
           entry={detailEntry}
