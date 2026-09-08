@@ -87,7 +87,7 @@ function CompactFilterButton({
     <button
       type="button"
       onClick={onClick}
-      className="h-8 rounded-full border border-rose-line bg-surface px-3 text-xs font-black text-rose-deep shadow-[0_6px_16px_rgba(123,45,67,0.06)] transition hover:bg-rose-soft"
+      className="h-8 rounded-full border border-rose-line bg-surface px-3 text-xs font-black text-rose-deep shadow-sm transition hover:bg-rose-soft"
     >
       {label}
     </button>
@@ -129,7 +129,7 @@ function MoneyFlowCard({
           : "text-ink";
 
   return (
-    <div className={`rounded-[22px] border px-4 py-3.5 shadow-[0_10px_24px_rgba(15,23,42,0.04)] ${toneClass}`}>
+    <div className={`rounded-xl border px-4 py-3.5 shadow-sm ${toneClass}`}>
       <div className="flex items-center justify-between gap-3">
         <span className={`flex h-8 min-w-8 items-center justify-center rounded-full px-3 text-xs font-black ${stepClass}`}>
           {step}
@@ -156,7 +156,7 @@ function ActionCard({
     tone === "orange" ? "text-warn-tx" : tone === "blue" ? "text-info-tx" : "text-ink";
 
   return (
-    <div className="rounded-[18px] border border-line bg-surface-2 px-4 py-3">
+    <div className="rounded-xl border border-line bg-surface-2 px-4 py-3">
       <div className="text-xs font-black text-ink-soft">{label}</div>
       <div className={`mt-1 text-xl font-black tracking-[-0.05em] ${valTx}`}>{value}</div>
     </div>
@@ -263,7 +263,7 @@ export default function SettlementMoneyFlowDashboard({
 
   return (
     <div className="grid gap-3">
-      <section className="overflow-hidden rounded-[30px] border border-rose-line bg-surface shadow-[0_14px_36px_rgba(123,45,67,0.07)]">
+      <section className="overflow-hidden rounded-2xl border border-rose-line bg-surface shadow-sm">
         <div className="border-b border-rose-line bg-gradient-to-r from-rose-soft via-surface to-surface px-5 py-3.5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -404,7 +404,7 @@ export default function SettlementMoneyFlowDashboard({
         </div>
       </section>
 
-      <section className="rounded-[30px] border border-line bg-surface p-4 shadow-[0_14px_34px_rgba(37,99,235,0.07)]">
+      <section className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-[25px] font-black tracking-[-0.06em] text-ink">돈 흐름 5단계</h3>
@@ -423,7 +423,7 @@ export default function SettlementMoneyFlowDashboard({
       </section>
 
       <section className="grid gap-3 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="rounded-[28px] border border-line bg-surface p-5">
+        <div className="rounded-2xl border border-line bg-surface p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="text-[22px] font-black tracking-[-0.04em] text-ink">한 줄 요약</h3>
@@ -442,7 +442,7 @@ export default function SettlementMoneyFlowDashboard({
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-line bg-surface p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+        <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="text-xl font-black tracking-[-0.05em] text-ink">확인할 금액</h3>
@@ -459,7 +459,7 @@ export default function SettlementMoneyFlowDashboard({
         </div>
       </section>
 
-      <section className="rounded-[30px] border border-line bg-surface p-5 shadow-[0_12px_34px_rgba(15,23,42,0.04)]">
+      <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-2xl font-black tracking-[-0.05em] text-ink">방송별 정산</h3>
@@ -487,7 +487,7 @@ export default function SettlementMoneyFlowDashboard({
           </div>
         </div>
 
-        <div className="overflow-auto rounded-[22px] border border-line-soft bg-surface">
+        <div className="overflow-auto rounded-xl border border-line-soft bg-surface">
           <table className="min-w-[920px] w-full border-separate border-spacing-0">
             <thead>
               <tr className="bg-surface-3 text-xs font-black text-ink-soft">

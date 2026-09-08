@@ -66,7 +66,7 @@ export default function SettlementManualEntryDetailModal({
 }) {
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/40 px-4 backdrop-blur-[2px]">
-      <div className="flex max-h-[calc(100dvh-32px)] w-full max-w-[720px] flex-col overflow-hidden rounded-[30px] bg-surface shadow-[0_30px_100px_rgba(15,23,42,0.35)]">
+      <div className="flex max-h-[calc(100dvh-32px)] w-full max-w-[720px] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
         <div className="flex items-center justify-between gap-3 border-b border-line-soft px-6 py-5">
           <div>
             <div className="text-xs font-black tracking-[0.22em] text-violet-600">SETTLEMENT ENTRY DETAIL</div>

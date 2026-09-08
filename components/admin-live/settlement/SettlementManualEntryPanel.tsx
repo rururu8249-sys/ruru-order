@@ -276,7 +276,7 @@ export default function SettlementManualEntryPanel({
   const totalExpense = entries.filter((entry) => entry.entry_type === "expense").reduce((sum, entry) => sum + toNumber(entry.amount), 0);
 
   return (
-    <div className="grid gap-3 rounded-[26px] border border-line bg-surface p-4 shadow-[0_12px_30px_rgba(15,23,42,0.045)]">
+    <div className="grid gap-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-bold leading-6 text-ink-soft">
@@ -300,7 +300,7 @@ export default function SettlementManualEntryPanel({
           <span className="ml-1 text-xs font-bold text-ink-mute">(settlement_manual_entries 표 없음 — docs/인수인계_관리자설정.md)</span>
         </div>
       ) : null}
-      <div className="grid gap-3 rounded-[22px] border border-line bg-surface-2 p-3">
+      <div className="grid gap-3 rounded-xl border border-line bg-surface-2 p-3">
         <div className="grid gap-3 lg:grid-cols-[0.85fr_1fr_1fr]">
           <label className="grid gap-1">
             <span className="text-xs font-black text-ink-soft">구분</span>
@@ -426,7 +426,7 @@ export default function SettlementManualEntryPanel({
         />
       </label>
 
-      <div className="overflow-hidden rounded-[20px] border border-line">
+      <div className="overflow-hidden rounded-xl border border-line">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-soft bg-surface-2 px-4 py-3">
           <div className="text-sm font-black text-ink">최근 추가 정산 내역</div>
           <div className="flex items-center gap-2">

@@ -41,7 +41,7 @@ export default function DepositLedgerSummary({ summary }: Props) {
       {cards.map((card) => (
         <article
           key={card.label}
-          className="rounded-[26px] border border-line bg-surface p-5 shadow-[0_18px_45px_rgba(15,23,42,0.06)]"
+          className="rounded-2xl border border-line bg-surface p-5 shadow-sm"
         >
           <div className="flex items-start justify-between gap-3">
             <div>

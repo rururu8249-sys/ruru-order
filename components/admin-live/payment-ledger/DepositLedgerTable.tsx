@@ -134,7 +134,7 @@ export default function DepositLedgerTable({
   const endCount = Math.min(normalizedPage * pageSize, rows.length);
 
   return (
-    <section className="overflow-hidden rounded-[32px] border border-line bg-surface shadow-[0_18px_45px_rgba(15,23,42,0.06)]">
+    <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft px-5 py-4">
         <div>
           <div className="text-lg font-black text-ink">입금내역</div>
@@ -146,13 +146,13 @@ export default function DepositLedgerTable({
       </div>
 
       <div className="overflow-auto px-4 pb-3">
-        <table className="mx-auto min-w-[760px] max-w-[860px] w-full border-separate border-spacing-0">
+        <table className="w-full min-w-[760px] border-separate border-spacing-0">
           <colgroup>
-            <col className="w-[235px]" />
-            <col className="w-[170px]" />
-            <col className="w-[150px]" />
-            <col className="w-[110px]" />
-            <col className="w-[84px]" />
+            <col className="w-[26%]" />
+            <col className="w-[24%]" />
+            <col className="w-[20%]" />
+            <col className="w-[16%]" />
+            <col className="w-[14%]" />
           </colgroup>
           <thead>
             <tr className="bg-surface-2">

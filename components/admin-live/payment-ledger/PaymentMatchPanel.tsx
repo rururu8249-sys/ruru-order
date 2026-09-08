@@ -224,7 +224,7 @@ export default function PaymentMatchPanel({ deposits: depositsFromParent }: Prop
 
   return (
     <div className="grid w-full gap-5">
-      <section className="flex flex-col gap-4 rounded-[34px] border border-line bg-gradient-to-br from-surface via-surface to-surface-2 p-6 shadow-[0_22px_60px_rgba(15,23,42,0.07)] lg:flex-row lg:items-center lg:justify-between">
+      <section className="flex flex-col gap-4 rounded-2xl border border-line bg-gradient-to-br from-surface via-surface to-surface-2 p-6 shadow-sm lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-ink">입금내역</h1>
 
@@ -237,7 +237,7 @@ export default function PaymentMatchPanel({ deposits: depositsFromParent }: Prop
           type="button"
           onClick={refreshBankdaDeposits}
           disabled={syncing || loading}
-          className="h-13 shrink-0 rounded-2xl bg-rose-deep px-6 py-4 text-sm font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.24)] transition hover:bg-rose-deep disabled:cursor-not-allowed disabled:bg-surface-3"
+          className="h-13 shrink-0 rounded-2xl bg-rose-deep px-6 py-4 text-sm font-black text-white shadow-2xl transition hover:bg-rose-deep disabled:cursor-not-allowed disabled:bg-surface-3"
         >
           {syncing ? "새로고침 중..." : refreshing ? "최신 확인 중..." : "입금내역 새로고침"}
         </button>
@@ -259,13 +259,13 @@ export default function PaymentMatchPanel({ deposits: depositsFromParent }: Prop
       />
 
       {message ? (
-        <div className="rounded-[24px] border border-line bg-info-bg px-5 py-4 text-sm font-black text-info-tx">
+        <div className="rounded-2xl border border-line bg-info-bg px-5 py-4 text-sm font-black text-info-tx">
           {message}
         </div>
       ) : null}
 
       {loading ? (
-        <section className="rounded-[32px] border border-line bg-surface p-12 text-center shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+        <section className="rounded-2xl border border-line bg-surface p-12 text-center shadow-sm">
           <div className="text-lg font-black text-ink">입금내역을 불러오는 중입니다.</div>
           <div className="mt-2 text-sm font-bold text-ink-mute">잠시만요.</div>
         </section>

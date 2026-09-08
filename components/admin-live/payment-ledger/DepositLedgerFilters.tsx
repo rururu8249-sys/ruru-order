@@ -37,7 +37,7 @@ export default function DepositLedgerFilters({
   onStatusFilterChange,
 }: Props) {
   return (
-    <section className="rounded-[30px] border border-line bg-surface p-4 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+    <section className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
       <div className="grid gap-3 xl:grid-cols-[1fr_180px_20px_180px_auto_auto] xl:items-center">
         <label className="relative block">
           <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-ink-mute">⌕</span>

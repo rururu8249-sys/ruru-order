@@ -527,7 +527,7 @@ export default function AdminSettlementPanel({
 
       {manualPanelOpen ? (
         <div className="fixed inset-0 z-[90] bg-slate-950/35 backdrop-blur-[2px]">
-          <div className="absolute right-0 top-0 flex h-full w-full max-w-[820px] flex-col overflow-hidden bg-surface-2 shadow-[0_30px_120px_rgba(15,23,42,0.45)]">
+          <div className="absolute right-0 top-0 flex h-full w-full max-w-[820px] flex-col overflow-hidden bg-surface-2 shadow-2xl">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-5 py-3">
               <div>
                 <div className="text-xs font-black text-info-tx">주문서와 별도 정산 입력</div>
