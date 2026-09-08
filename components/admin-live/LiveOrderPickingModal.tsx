@@ -315,7 +315,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
               <button type="button" onClick={() => setViewMode("order")} className={`px-2.5 py-1 text-[11px] font-black ${viewMode === "order" ? "bg-rose-deep text-white" : "bg-surface text-rose-deep"}`}>주문별</button>
               <button type="button" onClick={() => setViewMode("batch")} className={`px-2.5 py-1 text-[11px] font-black ${viewMode === "batch" ? "bg-rose-deep text-white" : "bg-surface text-rose-deep"}`}>상품별</button>
             </span>
-            <button type="button" onClick={() => setPaidOnly((v) => !v)} className={`rounded-lg px-2.5 py-1 text-[11px] font-black ${paidOnly ? "bg-emerald-600 text-white" : "border border-amber-300 bg-warn-bg text-warn-tx"}`}>{paidOnly ? "결제완료만 ✓" : "미결제 포함"}</button>
+            <button type="button" onClick={() => setPaidOnly((v) => !v)} className={`rounded-lg px-2.5 py-1 text-[11px] font-black ${paidOnly ? "bg-[var(--color-ok-tx)] text-white" : "border border-warn-tx/35 bg-warn-bg text-warn-tx"}`}>{paidOnly ? "결제완료만 ✓" : "미결제 포함"}</button>
             <button type="button" onClick={() => setUnpickedOnly((v) => !v)} className={`rounded-lg px-2.5 py-1 text-[11px] font-black ${unpickedOnly ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}>{unpickedOnly ? "안 챙긴 것만 ✓" : "안 챙긴 것만"}</button>
             {viewMode === "order" ? (
               <>
@@ -334,14 +334,14 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
               </button>
             ) : null}
             <button type="button" onClick={resetAll} disabled={resetting} className="rounded-lg border border-danger-tx bg-danger-bg px-2.5 py-1 text-[11px] font-black text-[var(--color-danger-tx)] hover:bg-danger-bg disabled:opacity-50">{resetting ? "초기화중" : "전체 초기화"}</button>
-            <button type="button" onClick={runExcel} disabled={exporting} className="rounded-lg bg-slate-950 px-2.5 py-1 text-[11px] font-black text-white hover:bg-rose-deep disabled:opacity-50">{exporting ? "내보내는중" : "엑셀"}</button>
+            <button type="button" onClick={runExcel} disabled={exporting} className="rounded-lg bg-[var(--color-ink-soft)] px-2.5 py-1 text-[11px] font-black text-white hover:bg-rose-deep disabled:opacity-50">{exporting ? "내보내는중" : "엑셀"}</button>
           </div>
         </div>
 
         {/* 진행 바 */}
         <div className="shrink-0 px-4 pt-2">
           <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2">
-            <div className="h-full rounded-full bg-emerald-500 transition-all duration-300" style={{ width: `${totalQty > 0 ? Math.round((pickedQty / totalQty) * 100) : 0}%` }} />
+            <div className="h-full rounded-full bg-[var(--color-ok-tx)] transition-all duration-300" style={{ width: `${totalQty > 0 ? Math.round((pickedQty / totalQty) * 100) : 0}%` }} />
           </div>
         </div>
 
@@ -368,9 +368,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                     const done = row.ids.every((id) => pickedIds.has(id));
                     const some = !done && row.ids.some((id) => pickedIds.has(id));
                     return (
-                      <button key={row.text} type="button" onClick={() => toggleIds(row.ids)} className={`w-full rounded-xl border-2 px-3 py-2.5 text-left ${done ? "border-emerald-300 bg-ok-bg" : "border-line bg-surface hover:bg-surface-2"}`}>
+                      <button key={row.text} type="button" onClick={() => toggleIds(row.ids)} className={`w-full rounded-xl border-2 px-3 py-2.5 text-left ${done ? "border-ok-tx/35 bg-ok-bg" : "border-line bg-surface hover:bg-surface-2"}`}>
                         <span className="flex w-full items-center gap-3">
-                          <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 text-[12px] font-black ${done ? "border-emerald-500 bg-emerald-500 text-white" : some ? "border-emerald-400 bg-emerald-100 text-emerald-600" : "border-line text-transparent"}`}>{some ? "–" : "✓"}</span>
+                          <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 text-[12px] font-black ${done ? "border-ok-tx/35 bg-[var(--color-ok-tx)] text-white" : some ? "border-ok-tx/35 bg-ok-bg text-ok-tx" : "border-line text-transparent"}`}>{some ? "–" : "✓"}</span>
                           <span className={`min-w-0 flex-1 truncate text-[14px] font-black ${done ? "text-ink-mute line-through" : "text-ink"}`}>{row.text}</span>
                           <span className="shrink-0 whitespace-nowrap text-right">
                             <span className={`text-[16px] font-black ${done ? "text-ink-mute" : "text-rose-deep"}`}>×{row.totalQty}</span>
@@ -411,22 +411,22 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                 const pickedInPanel = panel.items.filter((it) => pickedIds.has(it.id)).length;
                 const complete = panel.items.length > 0 && pickedInPanel === panel.items.length;
                 return (
-                  <div key={panel.key} className={`overflow-hidden rounded-2xl border-2 ${complete ? "border-emerald-300 bg-ok-bg/60" : "border-line bg-surface"}`}>
+                  <div key={panel.key} className={`overflow-hidden rounded-2xl border-2 ${complete ? "border-ok-tx/35 bg-ok-bg/60" : "border-line bg-surface"}`}>
                     {/* 패널 헤더 = 주문서(닉네임) : 아바타(이니셜) + 이름 + 배지 + 진행. 체크박스 없음(상품과 구분). 클릭=그 주문 전체 챙김/해제 */}
                     <button type="button" onClick={() => togglePanel(panel)} className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left ${complete ? "bg-ok-bg" : "bg-rose-soft"}`}>
-                      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-black text-white ${complete ? "bg-emerald-500" : "bg-rose-deep"}`}>{complete ? "✓" : (panel.nickname.charAt(0) || "?")}</span>
+                      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-black text-white ${complete ? "bg-[var(--color-ok-tx)]" : "bg-rose-deep"}`}>{complete ? "✓" : (panel.nickname.charAt(0) || "?")}</span>
                       <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
                         <span className="shrink truncate text-[15px] font-black text-ink">{panel.nickname}</span>
                         {panel.name && panel.name !== panel.nickname ? <span className="shrink-0 text-[12px] font-bold text-ink-soft">· {panel.name}</span> : null}
                         {whenText(panel.when) ? <span className="shrink-0 text-[11px] font-semibold text-ink-mute">{whenText(panel.when)}</span> : null}
                       </span>
                       {panel.phone && (phoneCount.get(panel.phone) || 0) > 1 ? (
-                        <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-black text-violet-700" title="같은 고객의 다른 주문도 있어요 — 한 박스로 같이 포장하세요(합배송)">📦 같은고객 {phoneCount.get(panel.phone)}건</span>
+                        <span className="shrink-0 rounded-full bg-[var(--color-cardpay)]/12 px-2 py-0.5 text-[11px] font-black text-[var(--color-cardpay)]" title="같은 고객의 다른 주문도 있어요 — 한 박스로 같이 포장하세요(합배송)">📦 같은고객 {phoneCount.get(panel.phone)}건</span>
                       ) : null}
                       {panel.paid ? (
-                        <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-black text-ok-tx">결제완료</span>
+                        <span className="shrink-0 rounded-full bg-ok-bg px-2 py-0.5 text-[11px] font-black text-ok-tx">결제완료</span>
                       ) : (
-                        <span className="shrink-0 rounded-full bg-red-500 px-2.5 py-0.5 text-[11px] font-black text-white">미결제</span>
+                        <span className="shrink-0 rounded-full bg-[var(--color-danger-tx)] px-2.5 py-0.5 text-[11px] font-black text-white">미결제</span>
                       )}
                       <span className={`shrink-0 text-[12px] font-black ${complete ? "text-ok-tx" : "text-rose-deep"}`}>{complete ? "✓ 완료" : `${pickedInPanel}/${panel.items.length}`}</span>
                     </button>
@@ -437,7 +437,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                         const picked = pickedIds.has(it.id);
                         return (
                           <button key={it.id} type="button" onClick={() => togglePick(it.id)} className={`flex w-full items-center gap-3 py-2.5 pl-6 pr-3 text-left ${picked ? "bg-ok-bg" : "bg-surface hover:bg-surface-2"}`}>
-                            <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 text-[11px] font-black ${picked ? "border-emerald-500 bg-emerald-500 text-white" : "border-line text-transparent"}`}>✓</span>
+                            <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 text-[11px] font-black ${picked ? "border-ok-tx/35 bg-[var(--color-ok-tx)] text-white" : "border-line text-transparent"}`}>✓</span>
                             <span className={`min-w-0 flex-1 truncate text-[13px] font-bold ${picked ? "text-ink-mute line-through" : "text-ink"}`}>{it.text}</span>
                             {/* [2026-07-13] 상품금액 표시 — 주문에 저장된 값 그대로(표시 전용) */}
                             {it.amount > 0 ? (

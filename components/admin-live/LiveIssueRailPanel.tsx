@@ -105,7 +105,7 @@ export default function LiveIssueRailPanel({ onOpenAll }: Props) {
           <ul className="space-y-1">
             {open.map((t, i) => (
               <li key={String(t.id ?? i)} className="flex items-center gap-2 rounded-lg bg-surface-2 px-2.5 py-1.5">
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-danger-tx)]" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[11px] font-black text-ink">{t.title || "제목 없음"}</div>
                   <div className="truncate text-[11px] font-bold text-ink-mute">

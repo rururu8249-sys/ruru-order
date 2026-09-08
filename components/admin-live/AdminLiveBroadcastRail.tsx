@@ -52,7 +52,7 @@ export default function AdminLiveBroadcastRail({
         onClick={onToggle}
         aria-hidden={!open}
         className={[
-          "fixed inset-0 z-[44] bg-slate-950/35 transition-opacity duration-200",
+          "fixed inset-0 z-[44] bg-[var(--color-ink-soft)]/35 transition-opacity duration-200",
           open ? "opacity-100" : "pointer-events-none opacity-0",
         ].join(" ")}
       />

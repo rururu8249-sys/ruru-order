@@ -121,8 +121,8 @@ export default function AdminLiveSidebarPresence({ onOpenVisitStats }: Props = {
     <section className="mt-4 rounded-2xl border border-line bg-surface p-3 shadow-sm">
       <div className="flex items-center gap-2">
         <span className="relative flex h-2.5 w-2.5 shrink-0">
-          <span className={total > 0 ? "absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-70" : ""} />
-          <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${total > 0 ? "bg-emerald-500" : "bg-slate-300"}`} />
+          <span className={total > 0 ? "absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--color-ok-tx)] opacity-70" : ""} />
+          <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${total > 0 ? "bg-[var(--color-ok-tx)]" : "bg-surface-3"}`} />
         </span>
         <button
           type="button"

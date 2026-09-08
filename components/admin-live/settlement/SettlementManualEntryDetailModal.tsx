@@ -65,11 +65,11 @@ export default function SettlementManualEntryDetailModal({
   onDelete: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/40 px-4 backdrop-blur-[2px]">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[var(--color-ink-soft)]/40 px-4 backdrop-blur-[2px]">
       <div className="flex max-h-[calc(100dvh-32px)] w-full max-w-[720px] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
         <div className="flex items-center justify-between gap-3 border-b border-line-soft px-6 py-5">
           <div>
-            <div className="text-xs font-black tracking-[0.22em] text-violet-600">SETTLEMENT ENTRY DETAIL</div>
+            <div className="text-xs font-black tracking-[0.22em] text-[var(--color-cardpay)]">SETTLEMENT ENTRY DETAIL</div>
             <h3 className="mt-1 text-2xl font-black tracking-[-0.04em] text-ink">추가 정산 내역 상세</h3>
           </div>
 

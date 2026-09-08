@@ -262,12 +262,6 @@ function formatOrderDateTime(value: unknown, fallbackTime = "") {
   return `${yyyy}.${mm}.${dd}(${day}) ${hh}:${mi}`;
 }
 
-function orderCreatedLabel(order: LooseLiveOrder) {
-  const rawDate = orderCreatedRawValue(order);
-  const fallbackTime = orderSubmittedTimeValue(order);
-
-  return formatOrderDateTime(rawDate, fallbackTime);
-}
 
 function orderCreatedSortValue(order: LooseLiveOrder) {
   return parseDateCandidate(orderCreatedRawValue(order)) || orderSubmittedTimeValue(order);
@@ -307,9 +301,6 @@ function formatAdminPaymentStatus(value: unknown) {
   return status;
 }
 
-function orderStatusText(order: LooseLiveOrder) {
-  return formatAdminPaymentStatus(orderRawStatusText(order));
-}
 
 function isPaid(order: LooseLiveOrder) {
   const status = orderRawStatusText(order);
@@ -374,54 +365,7 @@ function customerProfileKey(profile: CustomerProfile, resolve: (ref: CustomerIde
   return `profile:${clean(profile.id) || clean(profile.customer_name) || clean(profile.youtube_nickname) || "unknown"}`;
 }
 
-function statusBadge(customer: CustomerSummary) {
-  if (customer.blocked) {
-    return <span className="rounded-lg bg-danger-bg px-2 py-1 text-xs font-black text-danger-tx">{CUSTOMER_TERMS.blocked}</span>;
-  }
 
-  if (customer.manualNeededCount > 0 || customer.unpaidCount > 0) {
-    return <span className="rounded-lg bg-amber-100 px-2 py-1 text-xs font-black text-warn-tx">관리필요</span>;
-  }
-
-  return <span className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-ok-tx">{CUSTOMER_TERMS.normal}</span>;
-}
-
-function SummaryCard({
-  icon = "",
-  label,
-  value,
-  sub,
-  valueClassName = "",
-  labelClassName = "",
-  subClassName = "",
-}: {
-  icon?: string;
-  label: string;
-  value: string;
-  sub: string;
-  valueClassName?: string;
-  labelClassName?: string;
-  subClassName?: string;
-}) {
-  return (
-    <div className="min-h-[142px] rounded-xl border border-line bg-surface p-4 shadow-sm">
-      <div className={`flex items-center gap-2 text-[12px] font-black text-ink-soft ${labelClassName}`}>
-        {icon ? <span className="text-[15px]">{icon}</span> : null}
-        <span>{label}</span>
-      </div>
-
-      <div
-        className={`mt-2 break-keep text-[32px] font-black leading-[1.12] tracking-[-0.055em] text-ink ${valueClassName}`}
-      >
-        {value}
-      </div>
-
-      <div className={`mt-2 break-keep text-[12px] font-bold leading-relaxed text-ink-mute ${subClassName}`}>
-        {sub}
-      </div>
-    </div>
-  );
-}
 
 function CustomerDetailDrawer({
   customer,
@@ -1622,7 +1566,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
   };
 
   return (
-    <div className={embedded ? "h-full w-full" : "fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 p-4"} onClick={embedded ? undefined : (e) => { if (e.target === e.currentTarget) onClose?.(); }}>
+    <div className={embedded ? "h-full w-full" : "fixed inset-0 z-40 flex items-center justify-center bg-[var(--color-ink-soft)]/40 p-4"} onClick={embedded ? undefined : (e) => { if (e.target === e.currentTarget) onClose?.(); }}>
       <div className={embedded ? "flex h-full w-full flex-col overflow-hidden bg-surface" : "flex h-[88vh] w-full max-w-[640px] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl"}>
         {embedded ? null : (
           <div className="flex items-center justify-between border-b border-rose-line px-5 py-3 shrink-0">
@@ -1646,17 +1590,17 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
               }}
               className="hover:underline"
             >
-              차단 <span className="text-red-500">{blockedTotalCount.toLocaleString("ko-KR")}</span>
+              차단 <span className="text-danger-tx">{blockedTotalCount.toLocaleString("ko-KR")}</span>
             </button>
             <span className="text-ink-mute">·</span>
-            <span>관리필요 <span className="text-amber-600">{attentionCustomers.length.toLocaleString("ko-KR")}</span></span>
+            <span>관리필요 <span className="text-warn-tx">{attentionCustomers.length.toLocaleString("ko-KR")}</span></span>
           </div>
 
       <div className="rounded-xl border border-danger-tx bg-danger-bg/50">
         <button
           type="button"
           onClick={() => setPhoneBlockOpen((v) => !v)}
-          className="flex w-full items-center justify-between px-4 py-2.5 text-[12px] font-black text-red-500"
+          className="flex w-full items-center justify-between px-4 py-2.5 text-[12px] font-black text-danger-tx"
         >
           <span>⛔ 전화번호 직접 차단</span>
           <span className="text-base leading-none">{phoneBlockOpen ? "−" : "+"}</span>
@@ -1810,7 +1754,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                         <div className="flex items-center gap-1.5">
                           <span className="truncate text-[13px] font-black text-ink">{customer.nickname || "—"}</span>
                           {customer.name ? <span className="shrink-0 text-xs text-ink-mute">· {customer.name}</span> : null}
-                          {!customer.kakaoId ? <span className="shrink-0 rounded-md bg-amber-100 px-1.5 py-0.5 text-[11px] font-black text-warn-tx" title="카카오 로그인 기록이 없는 옛 회원(전화번호만). 다시 카톡 로그인하면 자동 연결됩니다.">카카오 미연동</span> : null}
+                          {!customer.kakaoId ? <span className="shrink-0 rounded-md bg-warn-bg px-1.5 py-0.5 text-[11px] font-black text-warn-tx" title="카카오 로그인 기록이 없는 옛 회원(전화번호만). 다시 카톡 로그인하면 자동 연결됩니다.">카카오 미연동</span> : null}
                         </div>
                         <div className="mt-0.5 truncate text-[11px] text-ink-mute">
                           누적 {customer.orderCount}건 · {money(customer.totalAmount)}
@@ -1818,12 +1762,12 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                         </div>
                       </button>
                       {customer.blocked ? (
-                        <span className="shrink-0 rounded-md bg-danger-bg px-2 py-0.5 text-[11px] font-black text-red-500">차단</span>
+                        <span className="shrink-0 rounded-md bg-danger-bg px-2 py-0.5 text-[11px] font-black text-danger-tx">차단</span>
                       ) : null}
                       <button
                         type="button"
                         onClick={() => handleCustomerBlockButton(customer)}
-                        className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-black transition-colors ${customer.blocked ? "border border-line text-ink-soft hover:bg-surface-2" : "text-red-500 hover:bg-danger-bg"}`}
+                        className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-black transition-colors ${customer.blocked ? "border border-line text-ink-soft hover:bg-surface-2" : "text-danger-tx hover:bg-danger-bg"}`}
                       >
                         {customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}
                       </button>
@@ -1874,7 +1818,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                       {selectedCustomersList.map((c) => (
                         <span key={c.key} className="inline-flex items-center gap-1 rounded-full bg-surface px-2 py-1 text-[11px] font-black text-ink ring-1 ring-line">
                           {c.nickname || c.name || formatPhone(c.phone)}
-                          <button type="button" onClick={() => toggleSelectPhone(c.phone)} className="leading-none text-ink-mute hover:text-red-500" title="선택 해제">✕</button>
+                          <button type="button" onClick={() => toggleSelectPhone(c.phone)} className="leading-none text-ink-mute hover:text-danger-tx" title="선택 해제">✕</button>
                         </span>
                       ))}
                     </div>
@@ -1957,11 +1901,11 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
       </div>
 
       {showBlockedCustomers && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-ink-soft)]/35 px-4">
           <div className="max-h-[84vh] w-full max-w-[720px] overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3 border-b border-line pb-4">
               <div>
-                <div className="text-[11px] font-black tracking-[0.18em] text-red-500">BLOCKED CUSTOMERS</div>
+                <div className="text-[11px] font-black tracking-[0.18em] text-danger-tx">BLOCKED CUSTOMERS</div>
                 <h2 className="mt-1 text-2xl font-black tracking-[-0.04em] text-ink">
                   차단 고객 목록 {blockedTotalCount.toLocaleString("ko-KR")}명
                 </h2>
@@ -1996,7 +1940,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                     }
                   }}
                   placeholder="닉네임 / 이름 / 전화번호 / 주소 / 차단사유 검색"
-                  className="h-11 rounded-xl border border-line bg-surface px-3 text-sm font-black text-ink outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50"
+                  className="h-11 rounded-xl border border-line bg-surface px-3 text-sm font-black text-ink outline-none focus:border-danger-tx/35 focus:ring-4 focus:ring-red-50"
                 />
 
                 <button
@@ -2005,7 +1949,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                     setBlockedCustomerKeyword(blockedCustomerKeywordDraft);
                     setBlockedCustomerPage(1);
                   }}
-                  className="h-11 rounded-xl bg-slate-900 px-3 text-sm font-black text-white hover:bg-slate-700"
+                  className="h-11 rounded-xl bg-rose-deep px-3 text-sm font-black text-white transition hover:opacity-90"
                 >
                   검색
                 </button>
@@ -2052,7 +1996,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                     이전
                   </button>
 
-                  <div className="h-9 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white">
+                  <div className="ru-badge ru-badge-rose h-9 px-3 py-2">
                     {safeBlockedCustomerPage} / {blockedCustomerTotalPages}
                   </div>
 
@@ -2119,7 +2063,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                             })
                           }
                           disabled={blockSaving}
-                          className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white hover:bg-slate-700 disabled:opacity-50"
+                          className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft transition hover:bg-surface-2 disabled:opacity-50"
                         >
                           차단해제
                         </button>
@@ -2162,7 +2106,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                           type="button"
                           onClick={() => handleCustomerBlockButton(customer)}
                           disabled={blockSaving}
-                          className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white hover:bg-slate-700 disabled:opacity-50"
+                          className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft transition hover:bg-surface-2 disabled:opacity-50"
                         >
                           차단해제
                         </button>

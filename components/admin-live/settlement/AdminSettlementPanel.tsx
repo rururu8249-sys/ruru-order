@@ -495,6 +495,24 @@ export default function AdminSettlementPanel({
     setEndDate(localDateKey(lastDay));
   };
 
+  // [2026-09-08 사장님 지적] 「방송 선택 후 창고·기타 지출 입력을 눌렀는데 날짜가 안 맞는다」
+  //   드로어가 오늘 날짜로 열려, 지난 방송 지출이 오늘로 저장될 뻔했다.
+  //   → 지금 고른 방송(1개)의 날짜·키를 그대로 넘긴다. 여러 개/전체면 기간 종료일만.
+  //   ※ 폼의 «기본값»만 채우는 것. 저장 로직·집계는 무변경이고 사장님이 바꿀 수 있다.
+  const manualPreset = (() => {
+    if (selectedBroadcastKeys.length === 1) {
+      const picked = broadcastOptions.find((option) => option.key === selectedBroadcastKeys[0]);
+      if (picked) {
+        return { broadcastKey: picked.key, date: picked.dateKey || endDate || "", label: `「${picked.label}」에 붙습니다` };
+      }
+    }
+    return {
+      broadcastKey: "",
+      date: endDate || "",
+      label: endDate ? `${endDate} 날짜로 · 방송은 날짜 기준 자동 연결` : "위 정산 화면의 기간·방송 조건 기준",
+    };
+  })();
+
   return (
     <section className="grid gap-5">
       <SettlementMoneyFlowDashboard
@@ -569,6 +587,9 @@ export default function AdminSettlementPanel({
                 loading={manualEntriesLoading}
                 tableReady={manualEntryTableReady}
                 onChanged={loadManualEntries}
+                presetBroadcastKey={manualPreset.broadcastKey}
+                presetDate={manualPreset.date}
+                presetLabel={manualPreset.label}
               />
             </div>
           </div>

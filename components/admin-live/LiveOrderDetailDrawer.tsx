@@ -1175,7 +1175,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4" onClick={() => setImagePreviewUrl("")}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={imagePreviewUrl} alt="상품 사진 크게 보기" className="max-h-[85vh] max-w-full rounded-2xl object-contain shadow-2xl" />
-          <button type="button" onClick={() => setImagePreviewUrl("")} className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1.5 text-sm font-black text-slate-700">✕ 닫기</button>
+          <button type="button" onClick={() => setImagePreviewUrl("")} className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1.5 text-sm font-black text-ink">✕ 닫기</button>
         </div>
       ) : null}
 
@@ -1231,7 +1231,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               <label className="grid gap-1 text-[11px] font-black text-ink-mute">배송메모
                 <input value={editMemo} onChange={(e) => setEditMemo(e.target.value)} placeholder="배송 요청사항" className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
               </label>
-              <button type="button" onClick={handleSaveCustomerFields} disabled={savingCustomer} className="mt-1 h-9 w-full rounded-lg bg-emerald-600 text-[13px] font-black text-white hover:bg-emerald-700 disabled:bg-surface-3">
+              <button type="button" onClick={handleSaveCustomerFields} disabled={savingCustomer} className="mt-1 h-9 w-full rounded-lg bg-[var(--color-ok-tx)] text-[13px] font-black text-white hover:bg-[var(--color-ok-tx)] disabled:bg-surface-3">
                 {savingCustomer ? "저장중..." : "✔ 고객/배송 정보 저장"}
               </button>
               <div className="rounded-lg bg-warn-bg px-2.5 py-1.5 text-[11px] font-bold leading-4 text-warn-tx">상품명·옵션·금액은 아래 상품 카드에서 수정합니다. 여기선 고객·주소·메모만 저장됩니다(배송비/합계 미변경).</div>
@@ -1314,7 +1314,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                     className={[
                       "rounded-lg px-3 py-1.5 text-[12px] font-black transition",
                       returnModeDraft === modeKey
-                        ? modeKey === "refund" ? "bg-rose-deep text-white" : "bg-slate-800 text-white"
+                        ? modeKey === "refund" ? "bg-rose-deep text-white" : "bg-[var(--color-ink-soft)] text-white"
                         : "border border-line bg-surface text-ink-mute hover:bg-surface-2",
                     ].join(" ")}
                   >
@@ -1388,27 +1388,27 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           const refundDone = !!balanceInfo.lastRefund && balanceInfo.lastRefund.sourceKey === balanceRefundKey;
           if (diff === 0) {
             return (
-              <div className="mt-2 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-[12px] font-black leading-5 text-emerald-800">
+              <div className="mt-2 rounded-xl border border-ok-tx/35 bg-ok-bg px-3 py-2 text-[12px] font-black leading-5 text-ok-tx">
                 ✅ 받은 돈 {money(balanceInfo.depositSum)} = 주문 금액 {money(balanceOrderTotal)} — 딱 맞아요. 하실 일 없어요!
               </div>
             );
           }
           if (diff > 0) {
             return (
-              <div className="mt-2 space-y-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 leading-5">
-                <div className="text-[13px] font-black text-amber-900">💰 손님이 {money(diff)} 더 냈어요.</div>
-                <div className="text-[11px] font-bold text-amber-700">받은 돈 {money(balanceInfo.depositSum)} − 주문 금액 {money(balanceOrderTotal)} = {money(diff)}</div>
+              <div className="mt-2 space-y-2 rounded-xl border border-warn-tx/35 bg-warn-bg px-3 py-2.5 leading-5">
+                <div className="text-[13px] font-black text-warn-tx">💰 손님이 {money(diff)} 더 냈어요.</div>
+                <div className="text-[11px] font-bold text-warn-tx">받은 돈 {money(balanceInfo.depositSum)} − 주문 금액 {money(balanceOrderTotal)} = {money(diff)}</div>
                 {refundDone && balanceInfo.lastRefund ? (
-                  <div className="rounded-lg bg-emerald-100 px-2.5 py-1.5 text-[12px] font-black text-emerald-800">✅ 이미 {money(balanceInfo.lastRefund.amount)}를 포인트로 돌려줬어요. 끝!</div>
+                  <div className="rounded-lg bg-ok-bg px-2.5 py-1.5 text-[12px] font-black text-ok-tx">✅ 이미 {money(balanceInfo.lastRefund.amount)}를 포인트로 돌려줬어요. 끝!</div>
                 ) : (
                   <>
-                    <button type="button" disabled={balanceWorking} onClick={() => void handleRefundDiffAsPoints(diff)} className="w-full rounded-lg bg-amber-500 px-3 py-2 text-[13px] font-black text-white hover:bg-amber-600 disabled:opacity-50">
+                    <button type="button" disabled={balanceWorking} onClick={() => void handleRefundDiffAsPoints(diff)} className="w-full rounded-lg bg-[var(--color-warn-tx)] px-3 py-2 text-[13px] font-black text-white hover:bg-[var(--color-warn-tx)] disabled:opacity-50">
                       {balanceWorking ? "처리 중…" : `👉 ${money(diff)} 포인트로 돌려주기 (버튼 한 번이면 끝)`}
                     </button>
                     {balanceInfo.lastRefund ? (
-                      <div className="text-[11px] font-bold text-amber-700">참고: 전에 이 주문으로 {money(balanceInfo.lastRefund.amount)}를 돌려준 기록이 있어요. 그 뒤 금액이 또 바뀐 경우에만 다시 누르세요.</div>
+                      <div className="text-[11px] font-bold text-warn-tx">참고: 전에 이 주문으로 {money(balanceInfo.lastRefund.amount)}를 돌려준 기록이 있어요. 그 뒤 금액이 또 바뀐 경우에만 다시 누르세요.</div>
                     ) : null}
-                    <div className="text-[11px] font-bold text-amber-700">계좌로 직접 환불하실 거면 이 버튼은 누르지 마세요.</div>
+                    <div className="text-[11px] font-bold text-warn-tx">계좌로 직접 환불하실 거면 이 버튼은 누르지 마세요.</div>
                   </>
                 )}
               </div>
@@ -1652,7 +1652,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               type="button"
               onClick={handleManualConfirm}
               disabled={manualConfirmAction}
-              className="h-10 w-full rounded-xl bg-emerald-600 text-[13px] font-black text-white shadow-sm hover:bg-emerald-700 active:scale-[0.99] disabled:bg-surface-3"
+              className="h-10 w-full rounded-xl bg-[var(--color-ok-tx)] text-[13px] font-black text-white shadow-sm hover:bg-[var(--color-ok-tx)] active:scale-[0.99] disabled:bg-surface-3"
             >
               {manualConfirmAction ? "처리중..." : "수동 입금확인"}
             </button>

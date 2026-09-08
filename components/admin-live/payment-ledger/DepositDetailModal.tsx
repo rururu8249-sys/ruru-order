@@ -75,7 +75,7 @@ export default function DepositDetailModal({ row, onClose }: Props) {
   const amount = getDepositAmount(row);
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/35 px-4 py-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--color-ink-soft)]/35 px-4 py-4 backdrop-blur-sm">
       <div className="flex max-h-[calc(100dvh-32px)] w-full max-w-[680px] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
         <div className="shrink-0 border-b border-line-soft px-6 py-4">
           <div>

@@ -233,3 +233,117 @@ body {
     font-size: max(16px, 1em) !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   관리자 디자인 기준 (Design System) — 2026-09-08 신설
+   ───────────────────────────────────────────────────────────────────────
+   왜 만들었나:
+     실측 결과 인라인 style 1,316곳 · 하드코딩 색 126종 · 글씨크기 16종이
+     섞여 있었다. 화면마다 «자기만의 디자인»을 직접 써서, 어느 한 화면이
+     못생긴 게 아니라 «기준이 없어서» 20개 화면이 다른 앱처럼 보였다.
+
+   규칙 (예외 없음):
+     · 색   → 아래 토큰만. 원색 hex 금지 (다크모드가 깨진다)
+     · 글씨 → 5단계만: 20 / 15 / 13 / 12 / 11 px
+     · 모서리 → 카드 16px(2xl) · 버튼/입력칸 12px(xl) · 칩 999px(full)
+     · 버튼 높이 → 32(sm) / 40(기본) / 44(lg) 세 가지만
+     · 채운 로즈색 주버튼(.ru-btn-primary)은 «한 화면에 1개»
+     · 모든 화면은 부모가 준 높이를 채운다 (자체 고정 px 높이 금지)
+
+   쓰는 법: className="ru-btn ru-btn-primary" 처럼 조합.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  /* ── 글씨 5단계 ─────────────────────────────────────────────── */
+  .ru-t-title { font-size: 20px; font-weight: 900; letter-spacing: -0.03em; color: var(--color-ink); }
+  .ru-t-sub   { font-size: 15px; font-weight: 800; color: var(--color-ink); }
+  .ru-t-body  { font-size: 13px; font-weight: 700; color: var(--color-ink); }
+  .ru-t-label { font-size: 12px; font-weight: 800; color: var(--color-ink-soft); }
+  .ru-t-hint  { font-size: 11px; font-weight: 700; color: var(--color-ink-mute); }
+  .ru-t-money { font-size: 32px; font-weight: 900; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+
+  /* ── 버튼 — 기본은 테두리. 채운 건 primary 하나뿐 ───────────── */
+  .ru-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 40px; padding: 0 16px;
+    border-radius: 12px; border: 1px solid var(--color-line);
+    background: var(--color-surface); color: var(--color-ink);
+    font-size: 12px; font-weight: 800; white-space: nowrap; cursor: pointer;
+    transition: background-color .15s, opacity .15s, transform .06s;
+  }
+  .ru-btn:hover:not(:disabled) { background: var(--color-surface-2); }
+  .ru-btn:active:not(:disabled) { transform: scale(.985); }
+  .ru-btn:disabled { opacity: .45; cursor: not-allowed; }
+  .ru-btn:focus-visible { outline: 2px solid var(--color-rose-deep); outline-offset: 2px; }
+
+  .ru-btn-sm { height: 32px; padding: 0 11px; font-size: 11px; border-radius: 10px; }
+  .ru-btn-lg { height: 44px; padding: 0 22px; font-size: 13px; }
+
+  .ru-btn-primary { background: var(--color-rose-deep); border-color: var(--color-rose-deep); color: #fff; }
+  .ru-btn-primary:hover:not(:disabled) { background: var(--color-rose-deep); opacity: .88; }
+
+  .ru-btn-danger { border-color: color-mix(in srgb, var(--color-danger-tx) 40%, transparent); color: var(--color-danger-tx); background: var(--color-surface); }
+  .ru-btn-danger:hover:not(:disabled) { background: var(--color-danger-bg); }
+
+  .ru-btn-ghost { border-color: transparent; background: transparent; color: var(--color-ink-soft); }
+  .ru-btn-ghost:hover:not(:disabled) { background: var(--color-surface-2); }
+
+  /* 켜짐 상태 — 켜져도 «주버튼»으로 안 보이게 옅은 로즈 */
+  .ru-btn-on { background: var(--color-rose-soft); border-color: var(--color-rose-line); color: var(--color-rose-deep); }
+  .ru-btn-on:hover:not(:disabled) { background: var(--color-rose-soft); opacity: .85; }
+
+  /* ── 카드 / 패널 ────────────────────────────────────────────── */
+  .ru-card { border-radius: 16px; border: 1px solid var(--color-line); background: var(--color-surface); }
+  .ru-card-2 { border-radius: 16px; border: 1px solid var(--color-line); background: var(--color-surface-2); }
+  .ru-card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--color-line); }
+  .ru-card-body { padding: 16px 20px; }
+
+  /* ── 입력칸 ────────────────────────────────────────────────── */
+  .ru-input, .ru-select {
+    height: 40px; padding: 0 12px;
+    border-radius: 12px; border: 1px solid var(--color-line);
+    background: var(--color-surface); color: var(--color-ink);
+    font-size: 13px; font-weight: 700; outline: none;
+    transition: border-color .15s;
+  }
+  .ru-input:focus, .ru-select:focus { border-color: var(--color-rose-deep); }
+  .ru-input::placeholder { color: var(--color-ink-mute); font-weight: 600; }
+  .ru-input-sm { height: 32px; padding: 0 10px; font-size: 12px; border-radius: 10px; }
+  .ru-textarea { padding: 10px 12px; border-radius: 12px; border: 1px solid var(--color-line); background: var(--color-surface); color: var(--color-ink); font-size: 13px; font-weight: 700; outline: none; }
+  .ru-textarea:focus { border-color: var(--color-rose-deep); }
+  .ru-input-num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* ── 배지 / 칩 ─────────────────────────────────────────────── */
+  .ru-badge { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+  .ru-badge-ok     { background: var(--color-ok-bg);     color: var(--color-ok-tx); }
+  .ru-badge-warn   { background: var(--color-warn-bg);   color: var(--color-warn-tx); }
+  .ru-badge-danger { background: var(--color-danger-bg); color: var(--color-danger-tx); }
+  .ru-badge-info   { background: var(--color-info-bg);   color: var(--color-info-tx); }
+  .ru-badge-mute   { background: var(--color-surface-2); color: var(--color-ink-soft); }
+  .ru-badge-rose   { background: var(--color-rose-soft); color: var(--color-rose-deep); }
+
+  .ru-chip { display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--color-line); background: var(--color-surface); color: var(--color-ink-soft); font-size: 12px; font-weight: 800; cursor: pointer; transition: background-color .15s; }
+  .ru-chip:hover { background: var(--color-surface-2); }
+  .ru-chip-on { border-color: var(--color-rose-deep); background: var(--color-rose-soft); color: var(--color-rose-deep); }
+
+  /* ── 표 — 하루 종일 보는 화면. 머리줄 고정, 구분선은 옅게 ───── */
+  .ru-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+  .ru-table thead th {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--color-surface-2); color: var(--color-ink-soft);
+    font-size: 11px; font-weight: 800; text-align: left;
+    padding: 9px 12px; border-bottom: 1px solid var(--color-line);
+  }
+  .ru-table tbody td { padding: 10px 12px; border-bottom: 1px solid var(--color-line-soft); font-size: 13px; font-weight: 700; color: var(--color-ink); }
+  .ru-table tbody tr:hover td { background: var(--color-surface-2); }
+  .ru-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* ── 빈 상태 — 「없다」로 끝내지 말고 다음에 뭘 하면 되는지 ── */
+  .ru-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 180px; padding: 24px; text-align: center; }
+  .ru-empty-title { font-size: 13px; font-weight: 800; color: var(--color-ink-soft); }
+  .ru-empty-hint { font-size: 11px; font-weight: 700; color: var(--color-ink-mute); }
+
+  /* ── 화면 틀 — 부모가 준 높이를 채운다(고정 px 금지) ────────── */
+  .ru-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+  .ru-screen-scroll { flex: 1 1 0%; min-height: 0; overflow: auto; }
+}

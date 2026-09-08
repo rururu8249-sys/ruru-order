@@ -1475,7 +1475,7 @@ export default function AdminLiveDashboard() {
           {/* [2026-09-08 5단계 · 레이아웃 B] 왼쪽 = 큰 메뉴 화면(통째로 전환) / 오른쪽 = 접이식 방송·채팅 레일 */}
           {/* [2026-09-08 사장님 지적] 메뉴마다 크기가 제각각이면 안 된다.
               → 모든 화면이 이 «하나의 틀» 안에 들어간다. 가로=화면 전체, 세로=화면 높이-헤더. 예외 없음. */}
-          <div className="flex min-h-0 w-full flex-1 flex-col">
+          <div className="mx-auto flex min-h-0 w-full max-w-[1720px] flex-1 flex-col">
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               {/* 화면 제목 + 작은 탭 */}
               <div className="mb-3 flex shrink-0 flex-wrap items-end justify-between gap-2 border-b border-rose-line">
@@ -1591,13 +1591,17 @@ export default function AdminLiveDashboard() {
 
               {/* ── 주문·입금 › 실시간 주문 ── */}
               {activeMenu === "orders" ? (
-                <div className="h-full space-y-3 overflow-y-auto p-4">
-                  <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
-                  <LiveMissionGauge
-                    broadcastOn={Boolean(activeBroadcast)}
-                    onOpenMission={() => { setActiveMenu("event"); replacePanelInUrl("event"); }}
-                  />
-                  <div className="min-w-0">
+                <div className="flex h-full min-h-0 flex-col gap-3 p-4">
+                  <div className="shrink-0">
+                    <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
+                  </div>
+                  <div className="shrink-0">
+                    <LiveMissionGauge
+                      broadcastOn={Boolean(activeBroadcast)}
+                      onOpenMission={() => { setActiveMenu("event"); replacePanelInUrl("event"); }}
+                    />
+                  </div>
+                  <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                     <LiveOrderTable
                       orders={filteredOrders}
                       allOrderCount={orders.length}

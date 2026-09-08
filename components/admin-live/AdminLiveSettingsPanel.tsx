@@ -590,7 +590,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice }: AdminLiveSettin
               type="button"
               onClick={saveSettings}
               disabled={saving || loading}
-              className="rounded-2xl bg-rose-deep px-6 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-rose-deep disabled:cursor-wait disabled:opacity-50"
+              className="ru-btn ru-btn-primary ru-btn-lg"
             >
               {saving ? "저장중..." : "설정 저장"}
             </button>

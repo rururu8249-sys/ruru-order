@@ -92,7 +92,7 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
       amount: money(cardPaid.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)),
       sub: `결제완료 ${cardPaid.length}건`,
       icon: "💳",
-      color: "bg-violet-50 text-violet-700",
+      color: "bg-[var(--color-cardpay)]/12 text-[var(--color-cardpay)]",
     },
     {
       label: "카드미결제",

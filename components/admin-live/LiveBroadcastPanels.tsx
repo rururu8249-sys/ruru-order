@@ -73,9 +73,9 @@ type AdminIssueTask = {
 
 const ISSUE_TYPES = [
   { label: "교환", taskType: "exchange", className: "bg-rose-soft text-rose-deep border-rose-line" },
-  { label: "반품", taskType: "return", className: "bg-violet-100 text-violet-700 border-violet-200" },
-  { label: "환불", taskType: "refund", className: "bg-red-100 text-danger-tx border-line" },
-  { label: "구매", taskType: "product", className: "bg-green-100 text-ok-tx border-green-200" },
+  { label: "반품", taskType: "return", className: "bg-[var(--color-cardpay)]/12 text-[var(--color-cardpay)] border-violet-200" },
+  { label: "환불", taskType: "refund", className: "bg-danger-bg text-danger-tx border-line" },
+  { label: "구매", taskType: "product", className: "bg-ok-bg text-ok-tx border-ok-tx/35" },
   { label: "진상", taskType: "complaint", className: "bg-rose-100 text-rose-700 border-rose-200" },
   { label: "기타", taskType: "general", className: "bg-surface-2 text-ink border-line" },
 ];
@@ -303,7 +303,7 @@ function CustomerIssueSummaryRow({
       className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 text-left hover:bg-rose-soft"
       title="고객관리에서 자세히 보기"
     >
-      <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-black text-warn-tx">
+      <span className="rounded-full bg-warn-bg px-2 py-0.5 text-[11px] font-black text-warn-tx">
         미해결
       </span>
 
@@ -848,7 +848,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
             <span
               className={[
                 "rounded-md px-2 py-0.5 text-[11px] font-black",
-                videoEmbedUrl ? "bg-emerald-600 text-white" : "bg-warn-bg text-warn-tx",
+                videoEmbedUrl ? "bg-[var(--color-ok-tx)] text-white" : "bg-warn-bg text-warn-tx",
               ].join(" ")}
             >
               {videoEmbedUrl ? "영상 연결" : "URL 대기"}
@@ -885,7 +885,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
           </div>
         </div>
 
-        <div className="relative flex-1 min-h-0 w-full overflow-hidden rounded-2xl border border-line bg-slate-950">
+        <div className="relative flex-1 min-h-0 w-full overflow-hidden rounded-2xl border border-line bg-[var(--color-ink-soft)]">
           {videoEmbedUrl ? (
             <iframe
               ref={videoIframeRef}

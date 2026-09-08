@@ -499,6 +499,7 @@ export default function AdminLiveNoticePanel() {
               <div className="text-sm font-black text-ink">👀 손님 화면 미리보기</div>
               <div className="mt-1 text-[11px] font-bold text-ink-mute">저장 전 모습입니다. 실제 반영은 저장 후.</div>
 
+              {/* ⚠ 이 어두운 배경은 «손님 폰의 팝업 뒷배경»을 흉내낸 것 → 관리자 테마와 무관. 토큰으로 바꾸지 말 것. */}
               <div className="mt-3 rounded-2xl bg-slate-900/70 p-4">
                 {popupEnabled && popupText.trim() ? (
                   <div className="overflow-hidden rounded-2xl bg-white shadow-lg">
@@ -510,9 +511,9 @@ export default function AdminLiveNoticePanel() {
                     <div className="px-4 py-4">
                       {previewBlocks.map((block, i) => (
                         <div key={i}>
-                          {i > 0 ? <div className="my-3 border-t border-slate-200" /> : null}
+                          {i > 0 ? <div className="my-3 border-t border-line" /> : null}
                           <p
-                            className="whitespace-pre-line text-center font-bold leading-relaxed text-slate-700"
+                            className="whitespace-pre-line text-center font-bold leading-relaxed text-ink"
                             style={{ fontSize: `${FONT_PX[popupFont] ?? 14}px` }}
                           >
                             {block.join("\n").trim()}
@@ -522,10 +523,10 @@ export default function AdminLiveNoticePanel() {
                     </div>
                     <div className="space-y-2 px-4 pb-4">
                       {popupBandUrl.trim() ? (
-                        <div className="rounded-xl bg-[#00C73C] py-2.5 text-center text-[13px] font-black text-white">🟢 밴드 바로가기</div>
+                        <div className="rounded-xl bg-ok-tx py-2.5 text-center text-[13px] font-black text-white">🟢 밴드 바로가기</div>
                       ) : null}
                       <div className="rounded-xl py-2.5 text-center text-[13px] font-black text-white" style={{ background: popupColor }}>확인</div>
-                      <div className="pt-1 text-center text-[11px] font-bold text-slate-400">24시간 동안 열지 않기</div>
+                      <div className="pt-1 text-center text-[11px] font-bold text-ink-mute">24시간 동안 열지 않기</div>
                     </div>
                   </div>
                 ) : (
@@ -584,14 +585,14 @@ export default function AdminLiveNoticePanel() {
               <button
                 type="button"
                 onClick={() => setForm({ ...form, is_pinned: !form.is_pinned })}
-                className={`rounded-xl px-3 py-2 text-xs font-black transition ${form.is_pinned ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}
+                className={`ru-btn ru-btn-sm ${form.is_pinned ? "ru-btn-on" : ""}`}
               >
                 {form.is_pinned ? "📌 상단 고정" : "고정 안 함"}
               </button>
               <button
                 type="button"
                 onClick={() => setForm({ ...form, is_visible: !form.is_visible })}
-                className={`rounded-xl px-3 py-2 text-xs font-black transition ${form.is_visible ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}
+                className={`ru-btn ru-btn-sm ${form.is_visible ? "ru-btn-on" : ""}`}
               >
                 {form.is_visible ? "👁 공개" : "🙈 숨김"}
               </button>
@@ -602,7 +603,7 @@ export default function AdminLiveNoticePanel() {
                 type="button"
                 onClick={saveNotice}
                 disabled={listBusy}
-                className="flex-1 rounded-xl bg-rose-deep px-4 py-2.5 text-sm font-black text-white transition disabled:opacity-50"
+                className="ru-btn ru-btn-primary ru-btn-lg flex-1"
               >
                 {form.id ? "수정 저장" : "공지 등록"}
               </button>
@@ -782,7 +783,7 @@ export default function AdminLiveNoticePanel() {
                       <span className="text-[13px] font-black text-ink">{n.customer_phone || String(n.target_session_key || "").replace(/^phone:/, "") || "대상 미상"}</span>
                       {n.seen_at
                         ? <span className="rounded-full bg-ok-bg px-2 py-0.5 text-[11px] font-black text-ok-tx">읽음</span>
-                        : <span className="rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-black text-white">안 읽음</span>}
+                        : <span className="rounded-full bg-[var(--color-danger-tx)] px-2 py-0.5 text-[11px] font-black text-white">안 읽음</span>}
                       {revoked ? <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-mute">회수됨</span> : null}
                       {!revoked && expired ? <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-mute">기간 지남</span> : null}
                       {n.dismissed_at ? <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-mute">손님이 닫음</span> : null}

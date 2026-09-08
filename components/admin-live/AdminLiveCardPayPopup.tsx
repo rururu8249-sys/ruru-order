@@ -222,7 +222,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
 
           <div className="space-y-3">
             {!phoneIsMobile && phone ? (
-              <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-[12px] font-bold leading-relaxed text-amber-800">
+              <div className="rounded-xl border border-warn-tx/35 bg-warn-bg px-3 py-2.5 text-[12px] font-bold leading-relaxed text-warn-tx">
                 ⚠️ 주문자 번호가 휴대폰이 아닙니다 ({phone}) — 결제링크 문자가 가지 않습니다.
                 {recipientIsMobile ? (
                   <> 배송지 연락처 <b>{recipientPhoneDigits}</b> 로 보내거나, 카카오톡으로 링크를 직접 보내주세요.</>
@@ -306,7 +306,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
             type="button"
             disabled={saving}
             onClick={handleComplete}
-            className="mt-2.5 w-full rounded-2xl bg-emerald-600 px-4 py-3.5 text-sm font-black text-white shadow-md transition hover:bg-emerald-700 disabled:bg-surface-3"
+            className="mt-2.5 w-full rounded-2xl bg-[var(--color-ok-tx)] px-4 py-3.5 text-sm font-black text-white shadow-md transition hover:bg-[var(--color-ok-tx)] disabled:bg-surface-3"
           >
             {saving ? "처리 중…" : "✔ 카드결제완료 처리"}
           </button>

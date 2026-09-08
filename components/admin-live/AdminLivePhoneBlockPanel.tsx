@@ -114,7 +114,7 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
     <section className="rounded-2xl border border-danger-tx bg-danger-bg p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[11px] font-black tracking-[0.16em] text-red-500">PHONE BLOCK</div>
+          <div className="text-[11px] font-black tracking-[0.16em] text-danger-tx">PHONE BLOCK</div>
           <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-ink">전화번호 직접 차단</h2>
           <p className="mt-1 text-[12px] font-bold text-danger-tx">
             주문 이력이 없는 번호도 전화번호 전용 차단으로 저장합니다.
@@ -128,21 +128,21 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
           onChange={(event) => setPhone(event.target.value)}
           placeholder="01012345678"
           inputMode="numeric"
-          className="h-11 w-full min-w-0 rounded-xl border border-danger-tx bg-surface px-3 text-[13px] font-black text-ink outline-none focus:border-red-400 focus:ring-4 focus:ring-red-100 sm:w-44"
+          className="h-11 w-full min-w-0 rounded-xl border border-danger-tx bg-surface px-3 text-[13px] font-black text-ink outline-none focus:border-danger-tx/35 focus:ring-4 focus:ring-red-100 sm:w-44"
         />
 
         <input
           value={reason}
           onChange={(event) => setReason(event.target.value)}
           placeholder="차단사유 입력"
-          className="h-11 min-w-[150px] flex-1 rounded-xl border border-danger-tx bg-surface px-3 text-[13px] font-bold text-ink outline-none focus:border-red-400 focus:ring-4 focus:ring-red-100"
+          className="h-11 min-w-[150px] flex-1 rounded-xl border border-danger-tx bg-surface px-3 text-[13px] font-bold text-ink outline-none focus:border-danger-tx/35 focus:ring-4 focus:ring-red-100"
         />
 
         <button
           type="button"
           disabled={saving}
           onClick={() => submit(true)}
-          className="h-11 shrink-0 rounded-xl bg-red-600 px-4 text-[13px] font-black text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-200"
+          className="h-11 shrink-0 rounded-xl bg-[var(--color-danger-tx)] px-4 text-[13px] font-black text-white hover:bg-[var(--color-danger-tx)] disabled:cursor-not-allowed disabled:bg-danger-bg"
         >
           차단
         </button>

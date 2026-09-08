@@ -88,39 +88,6 @@ function getTotalQty(order: LiveOrder) {
   return (order.items || []).reduce((sum, item) => sum + Number(item.qty || 0), 0);
 }
 
-function compactOrderSummary(order: LiveOrder) {
-  const items = order.items || [];
-
-  if (!items.length) return order.orderSummary || "-";
-
-  const itemTexts = items.map(buildItemText).filter(Boolean);
-
-  if (itemTexts.length <= 1) {
-    return itemTexts[0] || order.orderSummary || "-";
-  }
-
-  const maxChars = 70;
-  const visible: string[] = [];
-  let usedLength = 0;
-
-  itemTexts.forEach((itemText) => {
-    const nextLength = usedLength + itemText.length + (visible.length > 0 ? 3 : 0);
-
-    if (nextLength <= maxChars) {
-      visible.push(itemText);
-      usedLength = nextLength;
-    }
-  });
-
-  if (visible.length === 0) {
-    return `${itemTexts[0]} 외 ${itemTexts.length - 1}개`;
-  }
-
-  const hiddenCount = itemTexts.length - visible.length;
-  const joined = visible.join("  |  ");
-
-  return hiddenCount > 0 ? `${joined} 외 ${hiddenCount}개` : joined;
-}
 
 function getVisibleOrderSummaryParts(order: LiveOrder) {
   const items = order.items || [];
@@ -281,7 +248,7 @@ function inventoryStatusBadge(order: LiveOrder) {
   if (restoredItem) {
     return (
       <span
-        className="inline-flex shrink-0 items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-black text-sky-700"
+        className="inline-flex shrink-0 items-center rounded-full border border-info-tx/35 bg-info-bg px-2 py-1 text-[11px] font-black text-info-tx"
         title={restoredItem.inventoryRestoreMemo || restoredItem.inventoryRestoreStatus || "주문취소 재고복구 완료"}
       >
         재고복구완료
@@ -599,7 +566,6 @@ export default function LiveOrderTable({
   }, [sortedOrders, cancelViewFilter]);
 
   const cancelFilteredActiveCount = sortedOrders.filter((order) => order.paymentStatus !== "canceled").length;
-  const cancelFilteredCanceledCount = sortedOrders.length - cancelFilteredActiveCount;
 
   const totalPages = Math.max(1, Math.ceil(cancelViewFilteredOrders.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -609,7 +575,6 @@ export default function LiveOrderTable({
     () => cancelViewFilteredOrders.filter((order) => order.paymentStatus !== "canceled"),
     [cancelViewFilteredOrders]
   );
-  const canceledExportExcludedCount = cancelViewFilteredOrders.length - exportableOrders.length;
   const paidOnlyExportOrders = exportableOrders.filter((order) =>
     ["paid", "auto_paid", "manual_paid", "card_paid"].includes(order.paymentStatus ?? "")
   );
@@ -801,9 +766,9 @@ export default function LiveOrderTable({
         </div>
       </div>
     ) : null}
-    <section className="rounded-2xl border border-line bg-surface p-4 shadow-sm flex flex-col">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h2 className="mr-2 text-lg font-black text-ink">실시간 주문서</h2>
+    <section className="ru-screen rounded-2xl border border-line bg-surface p-4 shadow-sm">
+      <div className="mb-3 flex shrink-0 flex-wrap items-center gap-2">
+        <h2 className="ru-t-title mr-2">실시간 주문서</h2>
         {/* [안내 2026-07-06] 방송묶음 컷이 걸려 있을 때 뭘 보고 있는지 명시 — 지난 주문 찾다가 헤매는 것 방지 */}
         {broadcastStartedAt && filters.broadcast === "current" && filters.date === "all" ? (
           <span className="rounded-full bg-rose-soft px-2.5 py-1 text-[11px] font-black text-rose-deep" title="지난 주문을 보려면 기간이나 방송 필터를 바꿔주세요">
@@ -817,7 +782,7 @@ export default function LiveOrderTable({
           ["미결제", counts.unpaid, "unpaid", "red"],
           // [2026-08-31 사장님 지시] 매칭필요·입금확인 배지 삭제 — 입금대기가 매칭필요를 포함하고(보조텍스트로 표시),
           //   입금확인은 결제완료의 하위 단계라 배지가 겹쳤다. 상태 드롭다운에서는 여전히 고를 수 있다.
-          ["주문서취소", counts.canceled, "canceled", "muted"],
+          ["취소", counts.canceled, "canceled", "muted"],
           ["택배출고", counts.shipped, "shipped", "blue"],
         ].map(([label, count, status, tone]) => {
           const active = filters.status === status;
@@ -827,7 +792,7 @@ export default function LiveOrderTable({
             red:   { bg: "var(--color-danger-tx)", text: "#fff", inactiveBg: "var(--color-danger-bg)", inactiveText: "var(--color-danger-tx)" },
             amber: { bg: "var(--color-warn-tx)", text: "#fff", inactiveBg: "var(--color-warn-bg)", inactiveText: "var(--color-warn-tx)" },
             blue:  { bg: "var(--color-info-tx)", text: "#fff", inactiveBg: "var(--color-info-bg)", inactiveText: "var(--color-info-tx)" },
-            muted: { bg: "#777",    text: "#fff", inactiveBg: "var(--color-surface-3)", inactiveText: "#777" },
+            muted: { bg: "var(--color-ink-soft)", text: "#fff", inactiveBg: "var(--color-surface-3)", inactiveText: "var(--color-ink-soft)" },
           };
           const t = toneStyle[tone as string] ?? toneStyle.muted;
           // 보조텍스트(표시용) — 기존 counts 값 조합만 사용. 결제완료=무통장/카드 분해, 입금대기=매칭필요 포함.
@@ -1064,7 +1029,8 @@ export default function LiveOrderTable({
         </div>
       </div>
 
-      <div className="h-[1180px] overflow-auto rounded-xl border border-line">
+      {/* [2026-09-08] h-[1180px] 고정 → 부모가 준 높이를 채운다. 창 크기·모니터가 달라도 항상 맞음 */}
+      <div className="ru-screen-scroll rounded-xl border border-line">
             {/* 헤더 행 (모바일 카드형에선 숨김) */}
             {!isMobile && (
             /* [2026-08-29] 방송 중 아래로 스크롤하면 제목줄이 사라져 어느 칸이 금액인지 헷갈리던 문제.

@@ -82,7 +82,7 @@ export default function LiveStatsPanel({ orders, activeBroadcastId, onOpenReport
             </div>
             <div className="rounded-lg bg-surface-2 px-1 py-1.5">
               <div className="text-[11px] font-bold text-ink-mute">결제완료</div>
-              <div className="text-[13px] font-black text-emerald-600">{stats.paidCount}건</div>
+              <div className="text-[13px] font-black text-ok-tx">{stats.paidCount}건</div>
             </div>
             <div className="rounded-lg bg-surface-2 px-1 py-1.5">
               <div className="text-[11px] font-bold text-ink-mute">객단가</div>

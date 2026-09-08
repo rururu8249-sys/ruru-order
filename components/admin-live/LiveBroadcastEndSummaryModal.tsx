@@ -68,13 +68,13 @@ function StatCard({
 }) {
   const toneClass =
     tone === "blue"
-      ? "border-rose-line bg-rose-soft text-blue-900"
+      ? "border-rose-line bg-rose-soft text-info-tx"
       : tone === "green"
-        ? "border-line bg-ok-bg text-emerald-900"
+        ? "border-line bg-ok-bg text-ok-tx"
         : tone === "orange"
-          ? "border-line bg-warn-bg text-orange-900"
+          ? "border-line bg-warn-bg text-warn-tx"
           : tone === "violet"
-            ? "border-violet-100 bg-violet-50 text-violet-900"
+            ? "border-violet-100 bg-[var(--color-cardpay)]/12 text-[var(--color-cardpay)]"
             : "border-line bg-surface text-ink";
 
   return (
@@ -91,7 +91,7 @@ export default function LiveBroadcastEndSummaryModal({ summary, onClose, onOpenS
   const hasCanceled = summary.canceledCount > 0;
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-3 py-5">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--color-ink-soft)]/45 px-3 py-5">
       <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-white/80 bg-surface p-5 shadow-2xl">
         <div className="border-b border-line-soft pb-4">
           <div className="text-xs font-black tracking-[0.2em] text-rose-deep">BROADCAST SUMMARY</div>
@@ -125,7 +125,7 @@ export default function LiveBroadcastEndSummaryModal({ summary, onClose, onOpenS
         </div>
 
         <div className="mt-4 rounded-3xl border border-line bg-warn-bg px-4 py-3">
-          <div className="text-sm font-black text-orange-900">지금 확인할 일</div>
+          <div className="text-sm font-black text-warn-tx">지금 확인할 일</div>
           <div className="mt-2 grid gap-2 text-xs font-bold text-warn-tx md:grid-cols-3">
             <div className="rounded-2xl bg-surface-2 px-3 py-2">
               {hasUnpaid

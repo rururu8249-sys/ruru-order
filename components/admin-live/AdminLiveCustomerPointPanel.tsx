@@ -151,7 +151,7 @@ function CustomerPointActionModal({
   const submitLabel = amountNum > 0 ? `${amountNum.toLocaleString("ko-KR")}P ${actionLabel}` : title;
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-4 py-6">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--color-ink-soft)]/45 px-4 py-6">
       <div className="w-full max-w-[520px] overflow-hidden rounded-2xl bg-surface shadow-2xl ring-1 ring-line">
         <div className="border-b border-line bg-surface-2 px-5 py-4">
           <div className="text-lg font-black text-ink">{title}</div>
@@ -229,7 +229,8 @@ function CustomerPointActionModal({
             disabled={saving || amountNum <= 0}
             className={[
               "rounded-2xl px-5 py-2 text-sm font-black text-white shadow-sm disabled:opacity-50",
-              isGrant ? "bg-rose-deep hover:bg-rose-deep" : "bg-slate-900 hover:bg-slate-700",
+              // 지급=로즈(주버튼) / 차감=위험색. 돈이 빠지는 쪽을 색으로 분명히 구분.
+              isGrant ? "bg-rose-deep hover:opacity-90" : "bg-[var(--color-danger-tx)] hover:opacity-90",
             ].join(" ")}
           >
             {saving ? "처리중..." : submitLabel}
@@ -427,7 +428,7 @@ export default function AdminLiveCustomerPointPanel({ customer }: { customer: Po
             type="button"
             onClick={() => openModal("deduct")}
             disabled={pointState.loading || pointState.saving || !phoneKey}
-            className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white hover:bg-slate-700 disabled:opacity-50"
+            className="ru-btn ru-btn-primary ru-btn-lg"
           >
             포인트 회수
           </button>

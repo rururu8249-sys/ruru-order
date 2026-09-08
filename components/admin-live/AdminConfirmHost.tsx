@@ -38,17 +38,18 @@ export default function AdminConfirmHost() {
 
   const toneClass =
     tone === "danger"
-      ? "border-red-200 bg-red-50 text-red-700"
+      ? "border-danger-tx/35 bg-danger-bg text-danger-tx"
       : tone === "info"
-        ? "border-blue-200 bg-blue-50 text-blue-700"
-        : "border-amber-200 bg-amber-50 text-amber-700";
+        ? "border-info-tx/35 bg-info-bg text-info-tx"
+        : "border-warn-tx/35 bg-warn-bg text-warn-tx";
 
+  // [2026-09-08] 원색(red-600/blue-600/slate-900) → 토큰. 다크모드에서 형광처럼 튀던 것 해결.
   const buttonClass =
     tone === "danger"
-      ? "bg-red-600 hover:bg-red-700"
+      ? "bg-[var(--color-danger-tx)] hover:opacity-90"
       : tone === "info"
-        ? "bg-blue-600 hover:bg-blue-700"
-        : "bg-slate-900 hover:bg-slate-700";
+        ? "bg-[var(--color-info-tx)] hover:opacity-90"
+        : "bg-rose-deep hover:opacity-90";
 
   const close = (ok: boolean) => {
     const resolve = request.resolve;
@@ -57,8 +58,8 @@ export default function AdminConfirmHost() {
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/35 px-4">
-      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[var(--color-ink-soft)]/35 px-4">
+      <div className="w-full max-w-md rounded-3xl border border-line bg-white p-5 shadow-2xl">
         <div className={`mb-4 rounded-2xl border px-4 py-3 ${toneClass}`}>
           <div className="text-sm font-black">{title}</div>
           <div className="mt-1 text-xs font-bold opacity-80">
@@ -66,7 +67,7 @@ export default function AdminConfirmHost() {
           </div>
         </div>
 
-        <div className="max-h-[320px] overflow-y-auto rounded-2xl bg-slate-50 px-4 py-3 text-sm font-bold leading-6 text-slate-700">
+        <div className="max-h-[320px] overflow-y-auto rounded-2xl bg-surface-2 px-4 py-3 text-sm font-bold leading-6 text-ink">
           {messageLines.map((line, index) =>
             line ? (
               <p key={`${request.id}_${index}`}>{line}</p>
@@ -80,7 +81,7 @@ export default function AdminConfirmHost() {
           <button
             type="button"
             onClick={() => close(false)}
-            className="rounded-2xl border border-slate-200 bg-white py-3 text-sm font-black text-slate-500 hover:bg-slate-50"
+            className="rounded-2xl border border-line bg-white py-3 text-sm font-black text-ink-soft hover:bg-surface-2"
           >
             {cancelText}
           </button>

@@ -117,7 +117,7 @@ function inventoryItemStatusInfo(item: LiveOrderItem) {
     return {
       label: "재고복구완료",
       memo: item.inventoryRestoreMemo || "주문취소 재고복구 완료",
-      className: "border-sky-200 bg-sky-50 text-sky-700",
+      className: "border-info-tx/35 bg-info-bg text-info-tx",
     };
   }
 
@@ -228,7 +228,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
             <input
               value={form.productName}
               onChange={(event) => setForm((prev) => updateForm(prev, "productName", event.target.value))}
-              className="h-10 w-full min-w-0 rounded-xl border border-line bg-surface px-3 text-sm font-bold outline-none focus:border-blue-400"
+              className="h-10 w-full min-w-0 rounded-xl border border-line bg-surface px-3 text-sm font-bold outline-none focus:border-info-tx/35"
               placeholder="상품명"
             />
           </label>
@@ -240,7 +240,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
               <input
                 value={form.color}
                 onChange={(event) => setForm((prev) => updateForm(prev, "color", event.target.value))}
-                className="h-10 w-full min-w-0 rounded-xl border border-line bg-surface px-3 text-sm font-bold outline-none focus:border-blue-400"
+                className="h-10 w-full min-w-0 rounded-xl border border-line bg-surface px-3 text-sm font-bold outline-none focus:border-info-tx/35"
                 placeholder={colorFieldLabel}
               />
             </label>
@@ -256,7 +256,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
               <input
                 value={form.size}
                 onChange={(event) => setForm((prev) => updateForm(prev, "size", event.target.value))}
-                className="h-10 w-full min-w-0 rounded-xl border border-line bg-surface px-3 text-sm font-bold outline-none focus:border-blue-400"
+                className="h-10 w-full min-w-0 rounded-xl border border-line bg-surface px-3 text-sm font-bold outline-none focus:border-info-tx/35"
                 placeholder="사이즈"
               />
             </label>
@@ -274,7 +274,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
                 value={form.qty}
                 inputMode="numeric"
                 onChange={(event) => setForm((prev) => updateForm(prev, "qty", onlyNumber(event.target.value)))}
-                className="h-10 w-full min-w-0 rounded-xl border border-line bg-surface px-3 text-sm font-bold outline-none focus:border-blue-400"
+                className="h-10 w-full min-w-0 rounded-xl border border-line bg-surface px-3 text-sm font-bold outline-none focus:border-info-tx/35"
                 placeholder="1"
               />
             </label>
@@ -285,7 +285,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
                 value={Number(form.unitPrice || 0).toLocaleString("ko-KR")}
                 inputMode="numeric"
                 onChange={(event) => setForm((prev) => updateForm(prev, "unitPrice", onlyNumber(event.target.value)))}
-                className="h-10 w-full min-w-0 rounded-xl border border-line bg-surface px-3 text-sm font-bold outline-none focus:border-blue-400"
+                className="h-10 w-full min-w-0 rounded-xl border border-line bg-surface px-3 text-sm font-bold outline-none focus:border-info-tx/35"
                 placeholder="19000"
               />
             </label>
@@ -413,7 +413,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
               onClick={() => setEditing(true)}
               disabled={disabled || inventoryLocked}
               title={inventoryLocked ? "재고복구완료 주문은 상품수정할 수 없습니다." : undefined}
-              className="rounded-xl bg-slate-950 px-2.5 py-1.5 text-[11px] font-black text-white hover:bg-rose-deep disabled:bg-surface-3 disabled:text-ink-mute"
+              className="rounded-xl bg-[var(--color-ink-soft)] px-2.5 py-1.5 text-[11px] font-black text-white hover:bg-rose-deep disabled:bg-surface-3 disabled:text-ink-mute"
             >
               {inventoryLocked ? "수정잠금" : "수정"}
             </button>

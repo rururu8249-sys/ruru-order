@@ -199,7 +199,7 @@ export default function LiveHeader({
             statusLabel === "방송중" ? "bg-ok-bg text-ok-tx" : "bg-warn-bg text-warn-tx",
           ].join(" ")}
         >
-          <span className={["h-2 w-2 rounded-full", statusLabel === "방송중" ? "bg-emerald-500" : "bg-amber-500"].join(" ")} />
+          <span className={["h-2 w-2 rounded-full", statusLabel === "방송중" ? "bg-[var(--color-ok-tx)]" : "bg-[var(--color-warn-tx)]"].join(" ")} />
           {statusLabel}
         </div>
 
@@ -209,7 +209,7 @@ export default function LiveHeader({
             type="button"
             disabled={savingBroadcast || Boolean(activeBroadcast)}
             onClick={() => onStartBroadcast({ title, youtubeUrl })}
-            className="h-9 rounded-xl bg-emerald-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:bg-line disabled:text-ink-mute"
+            className="h-9 rounded-xl bg-[var(--color-ok-tx)] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[var(--color-ok-tx)] disabled:bg-line disabled:text-ink-mute"
           >
             ▶ 방송시작
           </button>
@@ -217,14 +217,14 @@ export default function LiveHeader({
             type="button"
             disabled={savingBroadcast || !activeBroadcast}
             onClick={onEndBroadcast}
-            className="h-9 rounded-xl bg-red-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-red-700 disabled:bg-line disabled:text-ink-mute"
+            className="h-9 rounded-xl bg-[var(--color-danger-tx)] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[var(--color-danger-tx)] disabled:bg-line disabled:text-ink-mute"
           >
             ■ 방송종료
           </button>
           {activeBroadcast && (
             <button
               type="button"
-              className="h-9 rounded-xl bg-indigo-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700 disabled:bg-line disabled:text-ink-mute"
+              className="h-9 rounded-xl bg-[var(--color-info-tx)] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[var(--color-info-tx)] disabled:bg-line disabled:text-ink-mute"
               onClick={openAlert}
             >
               📣 방송알림
@@ -235,7 +235,7 @@ export default function LiveHeader({
 
       {/* 압축 상태바: ● 방송명 · 상품 N개 · 시작시간 + 우측 [쇼핑몰 토글][URL 수정] */}
       <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-surface-2 px-3 py-2 text-xs font-black text-ink-soft">
-        <span className={["h-2 w-2 rounded-full", statusLabel === "방송중" ? "bg-emerald-500" : "bg-amber-500"].join(" ")} />
+        <span className={["h-2 w-2 rounded-full", statusLabel === "방송중" ? "bg-[var(--color-ok-tx)]" : "bg-[var(--color-warn-tx)]"].join(" ")} />
         <span className="text-ink">{title.trim() || activeBroadcast?.public_title || "방송명 미설정"}</span>
         <span className="text-ink-mute">·</span>
         <span>상품 {typeof productCount === "number" ? productCount : "—"}개</span>
@@ -251,7 +251,7 @@ export default function LiveHeader({
             onClick={() => void copyCurrentProductLine()}
             className={[
               "h-7 rounded-lg px-2.5 text-[11px] font-black transition disabled:cursor-not-allowed disabled:opacity-40",
-              currentCopied ? "bg-emerald-600 text-white" : "bg-rose-soft text-rose-deep",
+              currentCopied ? "bg-[var(--color-ok-tx)] text-white" : "bg-rose-soft text-rose-deep",
             ].join(" ")}
             title={activeBroadcast ? "지금 고정된 상품의 채팅 안내문구를 다시 복사합니다 — 유튜브 채팅에 붙여넣기만 하세요" : "방송 중에만 사용할 수 있습니다"}
           >
@@ -375,7 +375,7 @@ export default function LiveHeader({
                 onClick={() => changeAlertMode("optin")}
                 className={[
                   "h-10 rounded-xl text-sm font-black transition",
-                  alertMode === "optin" ? "bg-indigo-600 text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2",
+                  alertMode === "optin" ? "bg-[var(--color-info-tx)] text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2",
                 ].join(" ")}
               >
                 알림 신청자만
@@ -385,7 +385,7 @@ export default function LiveHeader({
                 onClick={() => changeAlertMode("all")}
                 className={[
                   "h-10 rounded-xl text-sm font-black transition",
-                  alertMode === "all" ? "bg-red-600 text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2",
+                  alertMode === "all" ? "bg-[var(--color-danger-tx)] text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2",
                 ].join(" ")}
               >
                 전체 회원 ⚠️
@@ -393,7 +393,7 @@ export default function LiveHeader({
             </div>
 
             {alertMode === "all" && (
-              <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-bold text-red-700">
+              <div className="mb-3 rounded-xl border border-danger-tx/35 bg-danger-bg px-3 py-2 text-[12px] font-bold text-danger-tx">
                 ⚠️ 신청 안 한 회원에게도 발송합니다. 동의 미확인자 발송은 카카오 알림톡 채널이 제재/차단될 수 있어요.
               </div>
             )}
@@ -408,7 +408,7 @@ export default function LiveHeader({
                   <span className="text-ink-mute">·</span>
                   <span>이미 받음 <b className="text-ink">{alertPreview.receivedCount}</b>명</span>
                   <span className="text-ink-mute">·</span>
-                  <span className="text-indigo-700">이번에 받을 <b>{alertPreview.targetCount}</b>명</span>
+                  <span className="text-info-tx">이번에 받을 <b>{alertPreview.targetCount}</b>명</span>
                 </div>
               ) : (
                 <div className="text-ink-mute">{alertResult || "대상 없음"}</div>
@@ -443,7 +443,7 @@ export default function LiveHeader({
               onClick={sendAlert}
               className={[
                 "h-11 w-full rounded-xl text-sm font-black text-white transition disabled:bg-line disabled:text-ink-mute",
-                alertMode === "all" ? "bg-red-600 hover:bg-red-700" : "bg-indigo-600 hover:bg-indigo-700",
+                alertMode === "all" ? "bg-[var(--color-danger-tx)] hover:bg-[var(--color-danger-tx)]" : "bg-[var(--color-info-tx)] hover:bg-[var(--color-info-tx)]",
               ].join(" ")}
             >
               {alertSending

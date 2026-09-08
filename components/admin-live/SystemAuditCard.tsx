@@ -71,20 +71,20 @@ export default function SystemAuditCard({ onOpenDetail }: { onOpenDetail?: () =>
       {loading && !result ? (
         <div className="py-2 text-center text-[11px] font-bold text-ink-mute">점검 중…</div>
       ) : failed ? (
-        <div className="rounded-xl bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-700">
+        <div className="rounded-xl bg-warn-bg px-3 py-2 text-[11px] font-bold text-warn-tx">
           ⚠️ 점검 실행 실패 — ↻ 눌러 다시 시도하세요.
         </div>
       ) : allOk ? (
-        <div className="rounded-xl bg-emerald-50 px-3 py-2">
-          <div className="text-[13px] font-black text-emerald-700">✅ 이상 없음</div>
-          <div className="mt-0.5 text-[11px] font-bold text-emerald-700/70">재고·금액·포인트·입금 {CHECK_LABELS.length}개 항목 통과 · 최근 7일 기준</div>
+        <div className="rounded-xl bg-ok-bg px-3 py-2">
+          <div className="text-[13px] font-black text-ok-tx">✅ 이상 없음</div>
+          <div className="mt-0.5 text-[11px] font-bold text-ok-tx/70">재고·금액·포인트·입금 {CHECK_LABELS.length}개 항목 통과 · 최근 7일 기준</div>
         </div>
       ) : result ? (
-        <div className="rounded-xl bg-red-50 px-3 py-2">
-          <div className="text-[13px] font-black text-red-700">🚨 발견 {bad.reduce((s, c) => s + c.count, 0)}건</div>
+        <div className="rounded-xl bg-danger-bg px-3 py-2">
+          <div className="text-[13px] font-black text-danger-tx">🚨 발견 {bad.reduce((s, c) => s + c.count, 0)}건</div>
           <ul className="mt-1 space-y-0.5">
             {bad.map((c) => (
-              <li key={c.key} className="text-[11px] font-bold text-red-700/90">
+              <li key={c.key} className="text-[11px] font-bold text-danger-tx/90">
                 · {c.label} <b>{c.count}건</b>
               </li>
             ))}
@@ -93,7 +93,7 @@ export default function SystemAuditCard({ onOpenDetail }: { onOpenDetail?: () =>
             <button
               type="button"
               onClick={onOpenDetail}
-              className="mt-1.5 w-full rounded-lg border border-red-200 bg-white py-1 text-[11px] font-black text-red-700"
+              className="mt-1.5 w-full rounded-lg border border-danger-tx/35 bg-white py-1 text-[11px] font-black text-danger-tx"
             >
               자세히 보기 →
             </button>

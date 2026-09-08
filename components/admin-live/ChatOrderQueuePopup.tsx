@@ -42,11 +42,11 @@ type ProductRow = { id: string; name: string; variants?: string[] };
 type CurrentProduct = { productId: string; productName: string; setAt: string } | null;
 
 const STATUS_META: Record<string, { label: string; cls: string }> = {
-  parsed: { label: "접수후보", cls: "bg-emerald-100 text-emerald-800" },
-  need_product: { label: "상품모름", cls: "bg-amber-100 text-amber-800" },
-  ambiguous: { label: "후보여럿", cls: "bg-orange-100 text-orange-800" },
-  not_order: { label: "주문아님", cls: "bg-slate-100 text-slate-500" },
-  raw: { label: "미파싱", cls: "bg-slate-100 text-slate-500" },
+  parsed: { label: "접수후보", cls: "bg-ok-bg text-ok-tx" },
+  need_product: { label: "상품모름", cls: "bg-warn-bg text-warn-tx" },
+  ambiguous: { label: "후보여럿", cls: "bg-warn-bg text-warn-tx" },
+  not_order: { label: "주문아님", cls: "bg-surface-2 text-ink-soft" },
+  raw: { label: "미파싱", cls: "bg-surface-2 text-ink-soft" },
 };
 
 const MATCHED_LABEL: Record<string, string> = {
@@ -290,21 +290,21 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
         <div className="border-b border-line bg-surface-2 px-5 py-3">
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={() => void toggleEnabled()} disabled={busy === "enable"}
-              className={`rounded-xl px-4 py-2 text-[13px] font-black text-white disabled:opacity-50 ${enabled ? "bg-emerald-600" : "bg-slate-400"}`}>
+              className={`rounded-xl px-4 py-2 text-[13px] font-black text-white disabled:opacity-50 ${enabled ? "bg-[var(--color-ok-tx)]" : "bg-[var(--color-ink-soft)]"}`}>
               {enabled ? "✅ 채팅주문 받는 중" : "▶ 채팅주문 켜기"}
             </button>
             <button type="button" onClick={() => void toggleBot()} disabled={busy === "bot"}
-              className={`rounded-xl px-4 py-2 text-[13px] font-black text-white disabled:opacity-50 ${botEnabled ? "bg-sky-600" : "bg-slate-400"}`}
+              className={`rounded-xl px-4 py-2 text-[13px] font-black text-white disabled:opacity-50 ${botEnabled ? "bg-[var(--color-info-tx)]" : "bg-[var(--color-ink-soft)]"}`}
               title="상품을 못 알아들은 주문 채팅에 봇이 '다시 적어달라'고 자동으로 안내합니다.">
               🤖 봇 안내 {botEnabled ? "켜짐" : "꺼짐"}
             </button>
             <button type="button" onClick={() => void toggleCustomerUi()} disabled={busy === "cui"}
-              className={`rounded-xl px-4 py-2 text-[13px] font-black text-white disabled:opacity-50 ${customerUi ? "bg-fuchsia-600" : "bg-slate-400"}`}
+              className={`rounded-xl px-4 py-2 text-[13px] font-black text-white disabled:opacity-50 ${customerUi ? "bg-fuchsia-600" : "bg-[var(--color-ink-soft)]"}`}
               title="채팅으로 주문한 손님이 사이트에 오면 채팅 주문을 주문서에 자동으로 담아둡니다. 손님이 확인·수정 후 직접 제출합니다.">
               🛒 채팅 자동담기 {customerUi ? "켜짐" : "꺼짐"}
             </button>
             <span className="ml-auto text-[12px] font-black text-ink-soft">
-              접수후보 <b className="text-emerald-700">{counts.parsed || 0}</b> · 확인필요 {(counts.need_product || 0) + (counts.ambiguous || 0)}
+              접수후보 <b className="text-ok-tx">{counts.parsed || 0}</b> · 확인필요 {(counts.need_product || 0) + (counts.ambiguous || 0)}
             </span>
             <button type="button" onClick={() => setAdvanced((v) => !v)}
               className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft hover:bg-surface-2">
@@ -316,32 +316,32 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
           </div>
 
           {unsubmitted.length > 0 ? (
-            <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
-              <div className="text-[12.5px] font-black text-amber-800">📢 호명 리스트 — 채팅주문 후 아직 제출 안 한 손님 {unsubmitted.length}명</div>
+            <div className="mt-2 rounded-xl border border-warn-tx/35 bg-warn-bg p-3">
+              <div className="text-[12.5px] font-black text-warn-tx">📢 호명 리스트 — 채팅주문 후 아직 제출 안 한 손님 {unsubmitted.length}명</div>
               <div className="mt-1.5 flex flex-col gap-1">
                 {unsubmitted.map((u) => (
-                  <div key={u.name} className="text-[12px] font-bold text-amber-900">
-                    <b>{u.name}</b>님 — {u.items.join(" · ")} {u.claimed ? <span className="text-emerald-700">(담아감 · 제출만 남음)</span> : <span className="text-rose-600">(아직 안 담아감)</span>}
+                  <div key={u.name} className="text-[12px] font-bold text-warn-tx">
+                    <b>{u.name}</b>님 — {u.items.join(" · ")} {u.claimed ? <span className="text-ok-tx">(담아감 · 제출만 남음)</span> : <span className="text-rose-600">(아직 안 담아감)</span>}
                   </div>
                 ))}
               </div>
-              <div className="mt-1 text-[11px] font-bold text-amber-700">방송에서 "○○님 주문서 제출해주세요~" 불러주시면 됩니다. 제출하면 자동으로 사라져요.</div>
+              <div className="mt-1 text-[11px] font-bold text-warn-tx">방송에서 "○○님 주문서 제출해주세요~" 불러주시면 됩니다. 제출하면 자동으로 사라져요.</div>
             </div>
           ) : null}
 
           {advanced ? (
             <div className="mt-2 rounded-xl border border-line bg-surface p-3">
               {/* [수동 연결] 유튜브 이름 ≠ 사이트 닉네임 (예: Borahae_Ju = 보라해쥬) — 1회 연결하면 평생 자동 */}
-              <div className="mb-2 rounded-lg border border-sky-200 bg-sky-50 p-2">
-                <div className="text-[11.5px] font-black text-sky-800">🔗 회원 수동 연결 — 유튜브 이름과 사이트 닉네임이 다른 손님 (1회만 하면 평생 자동)</div>
+              <div className="mb-2 rounded-lg border border-info-tx/35 bg-info-bg p-2">
+                <div className="text-[11.5px] font-black text-info-tx">🔗 회원 수동 연결 — 유튜브 이름과 사이트 닉네임이 다른 손님 (1회만 하면 평생 자동)</div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   <input value={linkChatName} onChange={(e) => setLinkChatName(e.target.value)} placeholder="채팅 이름 (예: Borahae_Ju)"
                     className="w-44 rounded-lg border border-line bg-white px-2 py-1.5 text-[12px] font-bold" />
-                  <span className="text-[12px] font-black text-sky-700">=</span>
+                  <span className="text-[12px] font-black text-info-tx">=</span>
                   <input value={linkSiteNick} onChange={(e) => setLinkSiteNick(e.target.value)} placeholder="사이트 닉네임 (예: 보라해쥬)"
                     className="w-44 rounded-lg border border-line bg-white px-2 py-1.5 text-[12px] font-bold" />
                   <button type="button" disabled={busy === "link" || !linkChatName.trim() || !linkSiteNick.trim()} onClick={() => void doLinkChat()}
-                    className="rounded-lg bg-sky-600 px-3 py-1.5 text-[12px] font-black text-white disabled:opacity-50">연결</button>
+                    className="rounded-lg bg-[var(--color-info-tx)] px-3 py-1.5 text-[12px] font-black text-white disabled:opacity-50">연결</button>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-[11px] font-black">
@@ -413,16 +413,16 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
         {/* 자동 자가진단 경고 — 문제 있을 때만 나타납니다 */}
         {selfCheck ? (
           <div className="border-b border-line px-5 py-2">
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-black">
+            <div className="rounded-lg border border-warn-tx/35 bg-warn-bg px-3 py-2 text-[11px] font-black">
               <div className="flex flex-wrap items-center gap-3">
-                <span className="text-amber-900">⚠️ 이름이 겹치는 상품이 있어요</span>
-                <span className="text-amber-800">겹침 문장 {selfCheck.wrong}건은 자동으로 「보류」 처리돼 잘못 담기지 않습니다</span>
-                <button type="button" onClick={() => setSelfCheck(null)} className="ml-auto rounded-lg border border-amber-200 bg-white px-2 py-0.5 text-amber-800">닫기</button>
+                <span className="text-warn-tx">⚠️ 이름이 겹치는 상품이 있어요</span>
+                <span className="text-warn-tx">겹침 문장 {selfCheck.wrong}건은 자동으로 「보류」 처리돼 잘못 담기지 않습니다</span>
+                <button type="button" onClick={() => setSelfCheck(null)} className="ml-auto rounded-lg border border-warn-tx/35 bg-white px-2 py-0.5 text-warn-tx">닫기</button>
               </div>
               <div className="mt-1.5 max-h-32 overflow-auto">
                 {selfCheck.bad.slice(0, 10).map((b, i) => (
-                  <div key={i} className="border-t border-amber-100 py-1 font-bold text-amber-800">
-                    "{b.text}" → <span className="text-red-600">{b.got}</span> <span className="opacity-70">(정답: {b.expected})</span>
+                  <div key={i} className="border-t border-warn-tx/35 py-1 font-bold text-warn-tx">
+                    "{b.text}" → <span className="text-danger-tx">{b.got}</span> <span className="opacity-70">(정답: {b.expected})</span>
                   </div>
                 ))}
               </div>
@@ -437,11 +437,11 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
               <span>🧪 문장 판정 테스트</span>
               <span className="text-ink-mute">한 줄에 하나씩 — 판정만 합니다(주문 안 됨)</span>
               <button type="button" onClick={() => void runSelfCheck()} disabled={busy === "selfcheck"}
-                className="ml-auto rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1 font-black text-emerald-800 disabled:opacity-50">
+                className="ml-auto rounded-lg border border-ok-tx/35 bg-ok-bg px-3 py-1 font-black text-ok-tx disabled:opacity-50">
                 {busy === "selfcheck" ? "진단중…" : "🩺 자가진단"}
               </button>
               <button type="button" onClick={() => void runPreview()} disabled={busy === "preview"}
-                className="rounded-lg bg-slate-700 px-3 py-1 font-black text-white disabled:opacity-50">
+                className="rounded-lg bg-[var(--color-ink-soft)] px-3 py-1 font-black text-white disabled:opacity-50">
                 {busy === "preview" ? "판정중…" : "판정해보기"}
               </button>
               {testRows.length > 0 ? (
@@ -526,7 +526,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
                       {r.parsed_matched_by ? <b className="text-ink-soft">{MATCHED_LABEL[r.parsed_matched_by] || r.parsed_matched_by}</b> : null}
                       {r.parsed_matched_by && r.parsed_reason ? " · " : ""}
                       {r.parsed_reason || ""}
-                      {r.parsed_candidates ? <div className="mt-0.5 text-amber-700">후보: {r.parsed_candidates}</div> : null}
+                      {r.parsed_candidates ? <div className="mt-0.5 text-warn-tx">후보: {r.parsed_candidates}</div> : null}
                     </td>
                   </tr>
                 );

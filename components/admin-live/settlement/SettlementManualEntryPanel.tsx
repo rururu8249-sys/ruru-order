@@ -19,7 +19,7 @@ function entryTypeLabel(value: SettlementManualEntryType) {
 }
 
 function entryTypeTone(value: SettlementManualEntryType) {
-  return value === "income" ? "text-info-tx bg-info-bg border-line" : "text-violet-700 bg-violet-50 border-violet-100";
+  return value === "income" ? "text-info-tx bg-info-bg border-line" : "text-[var(--color-cardpay)] bg-[var(--color-cardpay)]/12 border-violet-100";
 }
 
 function getVisiblePages(currentPage: number, pageCount: number) {
@@ -39,6 +39,12 @@ type Props = {
   loading: boolean;
   tableReady: boolean;
   onChanged: () => void;
+  /** [2026-09-08] 정산 화면에서 «지금 고른» 방송 키 — 열자마자 이 방송으로 채운다 */
+  presetBroadcastKey?: string;
+  /** [2026-09-08] 그 방송의 날짜(없으면 기간 종료일). 오늘로 잘못 저장되던 것 방지 */
+  presetDate?: string;
+  /** 위 정산 화면이 지금 보고 있는 조건 설명 (화면에 그대로 표시) */
+  presetLabel?: string;
 };
 
 export default function SettlementManualEntryPanel({
@@ -47,10 +53,14 @@ export default function SettlementManualEntryPanel({
   loading,
   tableReady,
   onChanged,
+  presetBroadcastKey = "",
+  presetDate = "",
+  presetLabel = "",
 }: Props) {
   const [entryType, setEntryType] = useState<SettlementManualEntryType>("expense");
-  const [entryDate, setEntryDate] = useState(todayKey());
-  const [broadcastKey, setBroadcastKey] = useState("");
+  // ⚠ 기본값이 «오늘»이면 지난 방송을 골라놓고 입력할 때 날짜가 어긋난다 → 고른 방송 날짜 우선.
+  const [entryDate, setEntryDate] = useState(presetDate || todayKey());
+  const [broadcastKey, setBroadcastKey] = useState(presetBroadcastKey);
   const [title, setTitle] = useState("창고정산");
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
@@ -80,8 +90,9 @@ export default function SettlementManualEntryPanel({
 
   const resetForm = () => {
     setEntryType("expense");
-    setEntryDate(todayKey());
-    setBroadcastKey("");
+    // 저장 후에도 «고른 방송» 기준을 유지 — 연속 입력할 때 매번 날짜를 다시 고치지 않게
+    setEntryDate(presetDate || todayKey());
+    setBroadcastKey(presetBroadcastKey);
     setTitle("창고정산");
     setAmount("");
     setMemo("");
@@ -290,11 +301,11 @@ export default function SettlementManualEntryPanel({
         <span className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-black text-ink">
           합계 {totalIncome - totalExpense < 0 ? "−" : "+"}{won(Math.abs(totalIncome - totalExpense))}
         </span>
-        <span className="ml-auto text-[11px] font-bold text-ink-mute">위 정산 화면의 기간·방송 조건 기준</span>
+        <span className="ml-auto text-[11px] font-bold text-ink-mute">{presetLabel || "위 정산 화면의 기간·방송 조건 기준"}</span>
       </div>
 
       {/* ── 위: 입력칸 (고정) ── */}
-      <div className="shrink-0 border-b border-line px-5 py-4">
+      <div className="w-full max-w-[900px] shrink-0 border-b border-line px-5 py-4">
         {!tableReady ? (
           <div className="mb-3 rounded-xl border border-warn-tx/30 bg-warn-bg px-4 py-3 text-sm font-bold leading-6 text-warn-tx">
             정산 추가 입력을 저장할 준비가 아직 안 되어 있습니다. 개발자에게 알려주세요.
@@ -303,7 +314,7 @@ export default function SettlementManualEntryPanel({
         ) : null}
 
         <div className="grid gap-3">
-          <div className="grid gap-3 sm:grid-cols-[0.8fr_1fr_1fr]">
+          <div className="grid gap-3 sm:grid-cols-[168px_190px_200px]">
             <label className="grid gap-1">
               <span className="text-xs font-black text-ink-soft">구분</span>
               <select
@@ -328,6 +339,15 @@ export default function SettlementManualEntryPanel({
                 onChange={(event) => setEntryDate(event.target.value)}
                 className="h-10 rounded-xl border border-line bg-surface px-3 text-sm font-black text-ink outline-none focus:border-rose-deep"
               />
+              {presetDate && entryDate !== presetDate ? (
+                <button
+                  type="button"
+                  onClick={() => setEntryDate(presetDate)}
+                  className="justify-self-start rounded-lg border border-warn-tx/35 bg-warn-bg px-2 py-0.5 text-[11px] font-black text-warn-tx"
+                >
+                  ↺ 고른 방송 날짜({presetDate})로
+                </button>
+              ) : null}
             </label>
 
             <label className="grid gap-1">
@@ -345,7 +365,7 @@ export default function SettlementManualEntryPanel({
             </label>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-[1fr_1fr]">
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,360px)_minmax(0,360px)]">
             <label className="grid gap-1">
               <span className="text-xs font-black text-ink-soft">제목</span>
               <input
