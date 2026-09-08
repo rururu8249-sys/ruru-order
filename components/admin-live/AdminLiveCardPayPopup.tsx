@@ -368,7 +368,12 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
           />
           {/* 프레임 안이 비어 보일 때만 쓰는 최후의 수단. 평소엔 신경 쓸 필요 없다. */}
           <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "8px", padding: "6px 12px", borderTop: "1px solid var(--color-line)", background: "var(--color-surface-2)" }}>
-            <span style={{ fontSize: "11px", fontWeight: 650, color: "var(--color-ink-mute)" }}>비어 있으면 주소창 오른쪽 👁 아이콘 → 「타사 쿠키 허용」</span>
+            <span style={{ fontSize: "11px", fontWeight: 650, color: "var(--color-ink-mute)" }}>
+              {/* [2026-09-08 실측] 크롬 설정 문제가 아니다 — 쿠키·저장소 접근 모두 정상이고
+                    차단 메시지도 없다. 페이스터 앱이 «프레임 안에서는 스스로 안 그리는» 것.
+                    크롬 설정을 만지라는 안내는 틀렸으므로 지운다. */}
+              페이스터는 이 안에 안 나옵니다 (페이스터 쪽 제한) →
+            </span>
             <button type="button" onClick={() => openPayster(paysterUrl)} className="ru-btn ru-btn-sm" style={{ marginLeft: "auto" }}>
               새 창 ↗
             </button>
