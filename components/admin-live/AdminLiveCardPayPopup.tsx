@@ -237,14 +237,14 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      // [2026-09-08] 페이스터 창이 «화면 오른쪽 절반»에 뜨므로 복사창은 «왼쪽 절반»에 붙인다.
-      //   가운데 정렬이면 페이스터 창에 가려 복사 버튼이 안 보인다.
-      style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "flex-start" }}
+      style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}
     >
       {/* [2026-08-31 사장님 지시] 세로는 화면 거의 끝까지(위아래 8px만), 왼쪽은 페이스터풍 네이비·블루로
           위 쏠림 없이 세로 공간을 나눠 쓴다(헤더 → 복사 카드들 → (여백) → 하단 액션). */}
-      <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "column", width: "50vw", minWidth: "440px", height: "100dvh", overflow: "hidden", boxShadow: "8px 0 40px rgba(0,0,0,0.35)" }}>
-        <div style={{ width: "100%", height: "100%", background: "#F4F6FB", display: "flex", flexDirection: "column", overflowY: "auto" }}>
+      {/* [2026-09-08 사장님] 「프레임 안에 딱딱 왼쪽 오른쪽 붙어 나와야지」 — 원래 모양.
+            창을 따로 띄우면 복사하려고 브라우저를 누르는 순간 페이스터 창이 뒤로 숨어서 못 쓴다. */}
+      <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "row", width: "980px", maxWidth: "96vw", height: "min(1500px, calc(100dvh - 16px))", borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}>
+        <div style={{ width: "50%", height: "100%", background: "#F4F6FB", display: "flex", flexDirection: "column", overflowY: "auto" }}>
         <div className="flex items-center justify-between px-5 py-4" style={{ background: "#101C3D" }}>
           <span className="text-[16px] font-black text-white">💳 카드결제 — {order.nickname}</span>
           <button type="button" onClick={onClose} className="text-xl leading-none text-white/60 hover:text-white">
@@ -357,6 +357,20 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
             상품명 칸은 「닉네임 상품명」 순서로 넣어야 나중에 어느 주문인지 매칭됩니다(이름 X). 전화번호는 <b>주문자(결제하는 분)</b> 번호예요 — 택배 받는 분 번호가 아닙니다. 페이스터는 남의 서버라 자동 채우기가 안 돼요.
           </div>
         </div>
+        </div>
+        <div style={{ width: "50%", height: "100%", background: "var(--color-surface)", borderLeft: "1px solid var(--color-line)", display: "flex", flexDirection: "column" }}>
+          <iframe
+            src={paysterUrl}
+            title="페이스터 결제"
+            style={{ width: "100%", flex: "1 1 0%", minHeight: 0, border: 0 }}
+          />
+          {/* 프레임 안이 비어 보일 때만 쓰는 최후의 수단. 평소엔 신경 쓸 필요 없다. */}
+          <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "8px", padding: "6px 12px", borderTop: "1px solid var(--color-line)", background: "var(--color-surface-2)" }}>
+            <span style={{ fontSize: "11px", fontWeight: 650, color: "var(--color-ink-mute)" }}>비어 있으면 주소창 오른쪽 👁 아이콘 → 「타사 쿠키 허용」</span>
+            <button type="button" onClick={() => openPayster(paysterUrl)} className="ru-btn ru-btn-sm" style={{ marginLeft: "auto" }}>
+              새 창 ↗
+            </button>
+          </div>
         </div>
       </div>
       {imagePreviewUrl ? (
