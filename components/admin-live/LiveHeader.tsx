@@ -299,7 +299,7 @@ export default function LiveHeader({
           <div>
             <div className="mb-1 flex items-center justify-between">
               <label className="text-[11px] font-black text-ink-soft">방송 제목</label>
-              <span className="text-[10px] font-bold text-ink-mute">
+              <span className="text-[11px] font-bold text-ink-mute">
                 {titleSavedAt ? `저장 ${titleSavedAt}` : activeBroadcast ? "방송중" : "저장 필요"}
               </span>
             </div>
@@ -323,7 +323,7 @@ export default function LiveHeader({
           <div>
             <div className="mb-1 flex items-center justify-between">
               <label className="text-[11px] font-black text-ink-soft">유튜브 라이브 URL</label>
-              <span className="text-[10px] font-bold text-ink-mute">
+              <span className="text-[11px] font-bold text-ink-mute">
                 {urlAppliedAt ? `적용 ${urlAppliedAt}` : "영상/채팅 연결"}
               </span>
             </div>

@@ -79,7 +79,7 @@ export default function LiveIssueRailPanel({ onOpenAll }: Props) {
         <div className="flex shrink-0 items-center gap-1.5">
           <span
             className={[
-              "rounded-full px-2 py-0.5 text-[10px] font-black",
+              "rounded-full px-2 py-0.5 text-[11px] font-black",
               open.length > 0 ? "bg-danger-bg text-danger-tx" : "bg-surface-2 text-ink-mute",
             ].join(" ")}
           >
@@ -89,7 +89,7 @@ export default function LiveIssueRailPanel({ onOpenAll }: Props) {
             type="button"
             onClick={() => void load()}
             title="새로고침"
-            className="rounded-lg border border-line bg-surface-2 px-2 py-0.5 text-[10px] font-black text-ink-soft transition hover:bg-surface-3"
+            className="rounded-lg border border-line bg-surface-2 px-2 py-0.5 text-[11px] font-black text-ink-soft transition hover:bg-surface-3"
           >
             ↻
           </button>
@@ -108,7 +108,7 @@ export default function LiveIssueRailPanel({ onOpenAll }: Props) {
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[11px] font-black text-ink">{t.title || "제목 없음"}</div>
-                  <div className="truncate text-[10px] font-bold text-ink-mute">
+                  <div className="truncate text-[11px] font-bold text-ink-mute">
                     {t.customer_nickname || ""}
                     {t.created_at ? ` · ${timeLabel(t.created_at)}` : ""}
                   </div>

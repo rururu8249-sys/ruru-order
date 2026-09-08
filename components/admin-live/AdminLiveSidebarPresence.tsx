@@ -130,7 +130,7 @@ export default function AdminLiveSidebarPresence({ onOpenVisitStats }: Props = {
           className="min-w-0 flex-1 text-left"
           title="지금 사이트에 들어와 있는 사람 (최근 2분 안에 신호가 온 접속)"
         >
-          <span className="block text-[10px] font-black tracking-[0.18em] text-ink-mute">LIVE</span>
+          <span className="block text-[11px] font-black tracking-[0.18em] text-ink-mute">LIVE</span>
           <span className="block text-sm font-black text-ink tabular-nums">지금 접속 {total.toLocaleString("ko-KR")}명</span>
         </button>
         <button
@@ -146,7 +146,7 @@ export default function AdminLiveSidebarPresence({ onOpenVisitStats }: Props = {
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-label={open ? "접기" : "펴기"}
-          className="shrink-0 text-[10px] font-black text-ink-mute"
+          className="shrink-0 text-[11px] font-black text-ink-mute"
         >{open ? "▲" : "▼"}</button>
       </div>
 
@@ -157,7 +157,7 @@ export default function AdminLiveSidebarPresence({ onOpenVisitStats }: Props = {
           { label: "기타", value: by.others },
         ].map((item) => (
           <div key={item.label} className="rounded-xl bg-surface-2 px-1.5 py-1.5 text-center">
-            <div className="text-[9px] font-black text-ink-mute">{item.label}</div>
+            <div className="text-[11px] font-black text-ink-mute">{item.label}</div>
             <div className="text-[13px] font-black tabular-nums text-ink">{item.value.toLocaleString("ko-KR")}</div>
           </div>
         ))}
@@ -182,17 +182,17 @@ export default function AdminLiveSidebarPresence({ onOpenVisitStats }: Props = {
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[11.5px] font-black text-ink">{displayNickname(visitor.nickname)}</span>
                       {String(visitor.viewingProduct || "").trim() ? (
-                        <span className="block truncate text-[9.5px] font-bold text-rose-deep">👀 {String(visitor.viewingProduct).trim()}</span>
+                        <span className="block truncate text-[11px] font-bold text-rose-deep">👀 {String(visitor.viewingProduct).trim()}</span>
                       ) : null}
                     </span>
-                    <span className="shrink-0 text-[9.5px] font-black text-ink-mute">{visitor.pageLabel}</span>
-                    <span className="shrink-0 text-[9px] font-bold text-ink-mute tabular-nums">{agoText(visitor.lastSeenAt)}</span>
+                    <span className="shrink-0 text-[11px] font-black text-ink-mute">{visitor.pageLabel}</span>
+                    <span className="shrink-0 text-[11px] font-bold text-ink-mute tabular-nums">{agoText(visitor.lastSeenAt)}</span>
                   </button>
                 </li>
               ))}
             </ul>
             {more > 0 ? (
-              <div className="mt-1.5 text-center text-[10.5px] font-bold text-ink-mute">
+              <div className="mt-1.5 text-center text-[11px] font-bold text-ink-mute">
                 이름은 최근 {listed}명까지만 보여요 · 외 {more.toLocaleString("ko-KR")}명 더 접속중
               </div>
             ) : null}
@@ -250,7 +250,7 @@ export default function AdminLiveSidebarPresence({ onOpenVisitStats }: Props = {
       <button
         type="button"
         onClick={() => onOpenVisitStats?.()}
-        className="mt-2 w-full rounded-xl bg-surface-2 px-2 py-1.5 text-[10.5px] font-black text-ink-soft hover:bg-surface-3"
+        className="mt-2 w-full rounded-xl bg-surface-2 px-2 py-1.5 text-[11px] font-black text-ink-soft hover:bg-surface-3"
       >
         📊 접속 기록 보기
       </button>

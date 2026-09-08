@@ -49,7 +49,7 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-[24px] border border-line bg-surface-2 p-4">
+    <div className="rounded-2xl border border-line bg-surface-2 p-4">
       <div className="text-sm font-black text-ink">{label}</div>
       {desc ? <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">{desc}</div> : null}
       <div className="mt-3">{children}</div>

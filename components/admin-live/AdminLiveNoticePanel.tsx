@@ -330,7 +330,7 @@ export default function AdminLiveNoticePanel() {
     }
   };
 
-  const card = "rounded-[20px] border border-line bg-surface-2 p-4";
+  const card = "rounded-xl border border-line bg-surface-2 p-4";
   const input = "mt-1 h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-deep";
   const label = "text-xs font-black text-ink-soft";
   const help = "mt-1 block text-[11px] font-bold leading-5 text-ink-mute";
@@ -359,7 +359,7 @@ export default function AdminLiveNoticePanel() {
             className={`rounded-xl px-4 py-2 text-left transition ${tab === t.key ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}
           >
             <span className="block text-[13px] font-black">{t.label}</span>
-            <span className={`block text-[10px] font-bold ${tab === t.key ? "text-white/70" : "text-ink-mute"}`}>{t.desc}</span>
+            <span className={`block text-[11px] font-bold ${tab === t.key ? "text-white/70" : "text-ink-mute"}`}>{t.desc}</span>
           </button>
         ))}
       </div>
@@ -494,7 +494,7 @@ export default function AdminLiveNoticePanel() {
 
           {/* ─────────── 오른쪽: 미리보기 ─────────── */}
           <div className="lg:sticky lg:top-0 lg:self-start">
-            <div className="rounded-[20px] border border-line bg-surface-2 p-4">
+            <div className="rounded-xl border border-line bg-surface-2 p-4">
               <div className="text-sm font-black text-ink">👀 손님 화면 미리보기</div>
               <div className="mt-1 text-[11px] font-bold text-ink-mute">저장 전 모습입니다. 실제 반영은 저장 후.</div>
 
@@ -619,15 +619,15 @@ export default function AdminLiveNoticePanel() {
               <div className={`${card} py-14 text-center text-sm font-bold text-ink-mute`}>등록된 공지가 없습니다.</div>
             ) : (
               notices.map((n, i) => (
-                <div key={n.id} className={`rounded-[18px] border p-4 ${n.is_visible ? "border-line bg-surface" : "border-line bg-surface-2 opacity-60"}`}>
+                <div key={n.id} className={`rounded-xl border p-4 ${n.is_visible ? "border-line bg-surface" : "border-line bg-surface-2 opacity-60"}`}>
                   <div className="flex items-start gap-2">
                     <span className="text-base">{n.is_pinned ? "📌" : "📢"}</span>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="text-[14px] font-black text-ink">{n.title}</span>
-                        {n.is_pinned ? <span className="rounded-full bg-rose-deep px-2 py-0.5 text-[10px] font-black text-white">고정</span> : null}
-                        {!n.is_visible ? <span className="rounded-full border border-line px-2 py-0.5 text-[10px] font-black text-ink-mute">숨김</span> : null}
-                        <span className="rounded-full border border-line px-2 py-0.5 text-[10px] font-black text-ink-mute">{n.category || "공지"}</span>
+                        {n.is_pinned ? <span className="rounded-full bg-rose-deep px-2 py-0.5 text-[11px] font-black text-white">고정</span> : null}
+                        {!n.is_visible ? <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-mute">숨김</span> : null}
+                        <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-mute">{n.category || "공지"}</span>
                       </div>
                       <p className="mt-1.5 whitespace-pre-line text-[12.5px] font-bold leading-6 text-ink-soft">{n.content}</p>
                     </div>
@@ -776,15 +776,15 @@ export default function AdminLiveNoticePanel() {
                 const revoked = Boolean(n.revoked_at) || (!n.is_active && !n.dismissed_at);
                 const expired = new Date(n.expires_at).getTime() < Date.now();
                 return (
-                  <div key={n.id} className={`rounded-[18px] border p-4 ${revoked ? "border-line bg-surface-2 opacity-60" : "border-line bg-surface"}`}>
+                  <div key={n.id} className={`rounded-xl border p-4 ${revoked ? "border-line bg-surface-2 opacity-60" : "border-line bg-surface"}`}>
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-[13px] font-black text-ink">{n.customer_phone || String(n.target_session_key || "").replace(/^phone:/, "") || "대상 미상"}</span>
                       {n.seen_at
-                        ? <span className="rounded-full bg-ok-bg px-2 py-0.5 text-[10px] font-black text-ok-tx">읽음</span>
-                        : <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white">안 읽음</span>}
-                      {revoked ? <span className="rounded-full border border-line px-2 py-0.5 text-[10px] font-black text-ink-mute">회수됨</span> : null}
-                      {!revoked && expired ? <span className="rounded-full border border-line px-2 py-0.5 text-[10px] font-black text-ink-mute">기간 지남</span> : null}
-                      {n.dismissed_at ? <span className="rounded-full border border-line px-2 py-0.5 text-[10px] font-black text-ink-mute">손님이 닫음</span> : null}
+                        ? <span className="rounded-full bg-ok-bg px-2 py-0.5 text-[11px] font-black text-ok-tx">읽음</span>
+                        : <span className="rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-black text-white">안 읽음</span>}
+                      {revoked ? <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-mute">회수됨</span> : null}
+                      {!revoked && expired ? <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-mute">기간 지남</span> : null}
+                      {n.dismissed_at ? <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-mute">손님이 닫음</span> : null}
                     </div>
                     <p className="mt-1.5 whitespace-pre-line text-[12.5px] font-bold leading-6 text-ink-soft">{n.message}</p>
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-bold text-ink-mute">

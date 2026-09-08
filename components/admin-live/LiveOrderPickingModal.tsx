@@ -421,10 +421,10 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                         {whenText(panel.when) ? <span className="shrink-0 text-[11px] font-semibold text-ink-mute">{whenText(panel.when)}</span> : null}
                       </span>
                       {panel.phone && (phoneCount.get(panel.phone) || 0) > 1 ? (
-                        <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black text-violet-700" title="같은 고객의 다른 주문도 있어요 — 한 박스로 같이 포장하세요(합배송)">📦 같은고객 {phoneCount.get(panel.phone)}건</span>
+                        <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-black text-violet-700" title="같은 고객의 다른 주문도 있어요 — 한 박스로 같이 포장하세요(합배송)">📦 같은고객 {phoneCount.get(panel.phone)}건</span>
                       ) : null}
                       {panel.paid ? (
-                        <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-ok-tx">결제완료</span>
+                        <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-black text-ok-tx">결제완료</span>
                       ) : (
                         <span className="shrink-0 rounded-full bg-red-500 px-2.5 py-0.5 text-[11px] font-black text-white">미결제</span>
                       )}

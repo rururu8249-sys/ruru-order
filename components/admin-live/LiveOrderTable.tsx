@@ -241,7 +241,7 @@ function returnBadge(order: LiveOrder) {
   const s = String(order.returnStatus || "").trim();
   if (!s) return null;
   return (
-    <span className="inline-flex shrink-0 items-center rounded-full border border-warn-tx bg-warn-bg px-2 py-0.5 text-[10px] font-black text-warn-tx" title={order.returnReason || undefined}>
+    <span className="inline-flex shrink-0 items-center rounded-full border border-warn-tx bg-warn-bg px-2 py-0.5 text-[11px] font-black text-warn-tx" title={order.returnReason || undefined}>
       ↩ {s}
     </span>
   );
@@ -1070,7 +1070,7 @@ export default function LiveOrderTable({
             /* [2026-08-29] 방송 중 아래로 스크롤하면 제목줄이 사라져 어느 칸이 금액인지 헷갈리던 문제.
                제목줄을 맨 위에 고정한다. 배경을 불투명으로 바꿔야 주문 행이 비쳐 보이지 않는다.
                표시 전용 — 주문·금액·입금 데이터와 무관. */
-            <div className="sticky top-0 z-20 grid min-w-[1000px] grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 border-b border-rose-line bg-rose-soft text-[12px] font-black text-ink-soft shadow-[0_2px_6px_rgba(39,28,33,0.07)]">
+            <div className="sticky top-0 z-20 grid min-w-[1000px] grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 border-b border-rose-line bg-rose-soft text-[12px] font-black text-ink-soft shadow-sm">
               <span className="flex items-center justify-center py-2.5">
                 <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} className="h-4 w-4 cursor-pointer accent-[var(--color-rose-deep)]" />
               </span>
@@ -1134,7 +1134,7 @@ export default function LiveOrderTable({
                               📋 주문서 복사
                             </button>
                             {(order as any).shippingStatus ? (
-                              <span className={`inline-flex items-center justify-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10px] font-black leading-none ${String((order as any).shippingStatus) === "출고완료" ? "bg-info-bg text-[var(--color-info-tx)]" : "bg-surface-2 text-ink-soft"}`}>{shippingStatusLabel((order as any).shippingStatus)}</span>
+                              <span className={`inline-flex items-center justify-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px] font-black leading-none ${String((order as any).shippingStatus) === "출고완료" ? "bg-info-bg text-[var(--color-info-tx)]" : "bg-surface-2 text-ink-soft"}`}>{shippingStatusLabel((order as any).shippingStatus)}</span>
                             ) : null}
                             {["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
                               <button type="button" title="결제요청 쪽지 보내기" aria-label="결제요청 쪽지 보내기" disabled={payRequestSending === order.id} onClick={() => void sendPaymentRequest(order)} style={{ border: "none", background: "none", padding: "0 2px", fontSize: "14px", lineHeight: 1, cursor: "pointer", opacity: payRequestSending === order.id ? 0.35 : 0.75 }}>🔔</button>
@@ -1161,7 +1161,7 @@ export default function LiveOrderTable({
                           if (!src) return <span>-</span>;
                           try {
                             const d = new Date(src);
-                            if (isNaN(d.getTime())) return <span className="text-[10px]">{src}</span>;
+                            if (isNaN(d.getTime())) return <span className="text-[11px]">{src}</span>;
                             const yy = d.getFullYear();
                             const mm = String(d.getMonth() + 1).padStart(2, "0");
                             const dd = String(d.getDate()).padStart(2, "0");
@@ -1169,7 +1169,7 @@ export default function LiveOrderTable({
                             const hh = String(d.getHours()).padStart(2, "0");
                             const mi = String(d.getMinutes()).padStart(2, "0");
                             return <><div>{yy}.{mm}.{dd}</div><div className="text-ink-mute">({wd}) {hh}:{mi}</div></>;
-                          } catch { return <span className="text-[10px]">{src}</span>; }
+                          } catch { return <span className="text-[11px]">{src}</span>; }
                         })()}
                       </div>
                       {/* 2. 닉네임 */}
@@ -1183,7 +1183,7 @@ export default function LiveOrderTable({
                           type="button"
                           onClick={(e) => { e.stopPropagation(); void copyOrderForCustomer(order); }}
                           title="이 주문서 한 건을 상세 안 열고 고객용 형식(주소·입금상태·계좌 안내 포함)으로 복사"
-                          className="mt-0.5 rounded-md border border-rose-line bg-rose-soft px-1.5 py-0.5 text-[10px] font-black text-rose-deep"
+                          className="mt-0.5 rounded-md border border-rose-line bg-rose-soft px-1.5 py-0.5 text-[11px] font-black text-rose-deep"
                         >
                           📋 주문서 복사
                         </button>
@@ -1209,7 +1209,7 @@ export default function LiveOrderTable({
                       <div className="px-3 py-3 text-center text-[13px] font-black text-ink">
                         <div>{money(order.productAmount)}</div>
                         {Number(order.pointUsedAmount || 0) > 0 ? (
-                          <div className="text-[10px] text-ok-tx">포인트 -{money(Number(order.pointUsedAmount || 0))}</div>
+                          <div className="text-[11px] text-ok-tx">포인트 -{money(Number(order.pointUsedAmount || 0))}</div>
                         ) : null}
                       </div>
                       {/* 6. 택배비 */}
@@ -1225,7 +1225,7 @@ export default function LiveOrderTable({
                           const extra = Number((order as any).cardExtraAmount || 0)
                             || Math.max(0, Number((order as any).cardPaymentTotalAmount || 0) - Number(order.productAmount || 0) - Number(order.shippingFee || 0));
                           if (extra <= 0) return null;
-                          return <div className="text-[10px] font-black text-purple-700">+{money(extra)}</div>;
+                          return <div className="text-[11px] font-black text-purple-700">+{money(extra)}</div>;
                         })()}
                       </div>
                       {/* 8. 입금 */}
@@ -1234,7 +1234,7 @@ export default function LiveOrderTable({
                           onMatch: onSelectForMatch ? () => onSelectForMatch(order) : undefined,
                           onCardPay: onOpenCardPay ? () => { openPaysterRightHalf(); onOpenCardPay(order); } : undefined,
                         })}</div>
-                        {order.paidAt && <div className="mt-0.5 text-[10px] text-ink-mute">{order.paidAt}</div>}
+                        {order.paidAt && <div className="mt-0.5 text-[11px] text-ink-mute">{order.paidAt}</div>}
                         {["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
                           <button type="button" title="결제요청 쪽지 보내기" aria-label="결제요청 쪽지 보내기" disabled={payRequestSending === order.id} onClick={(e) => { e.stopPropagation(); void sendPaymentRequest(order); }} className="mt-0.5 rounded-full px-1 text-[14px] leading-none opacity-70 transition hover:opacity-100 hover:drop-shadow disabled:opacity-35">
                             🔔
@@ -1245,7 +1245,7 @@ export default function LiveOrderTable({
                       <div className="px-1 py-3 text-center">
                         {(order as any).shippingStatus ? (
                           <span
-                            className={`inline-flex items-center justify-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10px] font-black leading-none ${
+                            className={`inline-flex items-center justify-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px] font-black leading-none ${
                               String((order as any).shippingStatus) === "출고완료"
                                 ? "bg-info-bg text-[var(--color-info-tx)]"
                                 : "bg-surface-2 text-ink-soft"

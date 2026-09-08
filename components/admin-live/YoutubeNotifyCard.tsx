@@ -103,7 +103,7 @@ export default function YoutubeNotifyCard() {
   };
 
   return (
-    <div className="rounded-[30px] border border-line bg-surface p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+    <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-black text-ink">유튜브 라이브 알림</h2>
@@ -115,7 +115,7 @@ export default function YoutubeNotifyCard() {
       </div>
 
       {/* 연결 */}
-      <div className="flex items-start justify-between gap-3 rounded-[24px] border border-line bg-surface-2 p-4">
+      <div className="flex items-start justify-between gap-3 rounded-2xl border border-line bg-surface-2 p-4">
         <div>
           <div className="text-sm font-black text-ink">봇 계정 연결</div>
           <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
@@ -132,7 +132,7 @@ export default function YoutubeNotifyCard() {
       </div>
 
       {/* 라이브 주소 — 메인 컨트롤타워에서 입력한 주소를 자동 사용 */}
-      <div className="mt-3 rounded-[24px] border border-line bg-surface-2 p-4">
+      <div className="mt-3 rounded-2xl border border-line bg-surface-2 p-4">
         <div className="text-sm font-black text-ink">현재 라이브 주소 (자동)</div>
         <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
           메인 화면(방송 컨트롤타워)에서 입력·저장한 유튜브 라이브 주소를 그대로 사용합니다. 여기서 따로 넣을 필요 없어요.
@@ -143,7 +143,7 @@ export default function YoutubeNotifyCard() {
       </div>
 
       {/* ON/OFF + 문구 */}
-      <div className="mt-3 rounded-[24px] border border-line bg-surface-2 p-4">
+      <div className="mt-3 rounded-2xl border border-line bg-surface-2 p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-sm font-black text-ink">자동 알림</div>

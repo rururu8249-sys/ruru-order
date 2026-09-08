@@ -6,6 +6,10 @@
 import { ADMIN_LIVE_TOP_MENUS, topMenuOf, type AdminLiveMenuKey } from "./adminLiveMenu";
 import AdminLiveLogoutButton from "./AdminLiveLogoutButton";
 import AdminLiveMenuIcon from "./AdminLiveMenuIcon";
+import AdminSoundControl from "./AdminSoundControl";
+import { CONTACT_TYPE_SHORT, adminChatTarget } from "@/lib/shopInfo";
+import { useShopInfo } from "@/lib/useShopInfo";
+import { showAdminToast } from "@/lib/adminToast";
 import AdminLiveSidebarPresence from "./AdminLiveSidebarPresence";
 
 type Props = {
@@ -38,6 +42,25 @@ export default function AdminLiveSidebar({
   onOpenVisitStats,
 }: Props) {
   const activeTop = topMenuOf(activeMenu);
+  const shopInfo = useShopInfo();
+  const chatTarget = adminChatTarget(shopInfo);
+
+  // [2026-09-08 사장님 지적] 카톡·카드결제·알림음은 어느 화면에 있든 쓰는 것 → 사이드바 고정
+  const openKakao = () => {
+    if (chatTarget.kind === "id") {
+      navigator.clipboard?.writeText(chatTarget.id).catch(() => {});
+      showAdminToast(`카카오톡 ID「${chatTarget.id}」를 복사했어요. 카카오톡에서 친구 목록을 확인하세요.`, "success");
+      return;
+    }
+    const aw = window.screen.availWidth || 1600;
+    const ah = window.screen.availHeight || 1000;
+    const W = Math.min(1700, Math.round(aw * 0.92));
+    const H = Math.min(1050, Math.round(ah * 0.92));
+    const left = Math.max(0, Math.round((aw - W) / 2));
+    const top = Math.max(0, Math.round((ah - H) / 2));
+    const w = window.open(chatTarget.url, "ruruKakaoConsult", `popup=yes,width=${W},height=${H},left=${left},top=${top}`);
+    if (w) { try { w.resizeTo(W, H); w.moveTo(left, top); w.focus(); } catch { /* 무시 */ } }
+  };
 
   return (
     <>
@@ -115,7 +138,7 @@ export default function AdminLiveSidebar({
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block whitespace-nowrap text-[15px] font-black">{menu.label}</span>
-                    <span className="block truncate text-[10px] font-bold opacity-60">{menu.desc}</span>
+                    <span className="block truncate text-[11px] font-bold opacity-60">{menu.desc}</span>
                   </span>
                 </span>
                 {showBadges ? (
@@ -125,7 +148,7 @@ export default function AdminLiveSidebar({
                         role="button"
                         title={`입금자명·금액이 주문과 자동으로 안 맞아 수동 확인이 필요한 주문 ${exceptionBadges.needMatch}건 — 클릭하면 해당 주문만 보여요`}
                         onClick={(e) => { e.stopPropagation(); onExceptionBadgeClick?.("match"); onCloseNav?.(); }}
-                        className="cursor-pointer whitespace-nowrap rounded-full bg-danger-bg px-2 py-0.5 text-[10px] font-black text-danger-tx hover:ring-2 hover:ring-danger-tx/30"
+                        className="cursor-pointer whitespace-nowrap rounded-full bg-danger-bg px-2 py-0.5 text-[11px] font-black text-danger-tx hover:ring-2 hover:ring-danger-tx/30"
                       >매칭필요 {exceptionBadges.needMatch} ›</span>
                     ) : null}
                     {exceptionBadges.cardUnpaid > 0 ? (
@@ -133,7 +156,7 @@ export default function AdminLiveSidebar({
                         role="button"
                         title={`카드결제 선택 후 아직 결제완료 처리 전인 주문 ${exceptionBadges.cardUnpaid}건 — 클릭하면 해당 주문만 보여요`}
                         onClick={(e) => { e.stopPropagation(); onExceptionBadgeClick?.("card"); onCloseNav?.(); }}
-                        className="cursor-pointer whitespace-nowrap rounded-full bg-danger-bg px-2 py-0.5 text-[10px] font-black text-danger-tx hover:ring-2 hover:ring-danger-tx/30"
+                        className="cursor-pointer whitespace-nowrap rounded-full bg-danger-bg px-2 py-0.5 text-[11px] font-black text-danger-tx hover:ring-2 hover:ring-danger-tx/30"
                       >카드미결제 {exceptionBadges.cardUnpaid} ›</span>
                     ) : null}
                   </span>
@@ -145,6 +168,29 @@ export default function AdminLiveSidebar({
 
         {/* [2026-08-29 사장님 요청] 실시간 접속자 — 사이드바에서 바로 보이게 */}
         <AdminLiveSidebarPresence onOpenVisitStats={() => { onOpenVisitStats?.(); onCloseNav?.(); }} />
+
+        {/* [2026-09-08] 늘 쓰는 것 — 카톡 문의 · 카드결제 · 알림음 */}
+        <section className="mt-3 rounded-2xl border border-line bg-surface p-2.5 shadow-sm">
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              onClick={openKakao}
+              className="flex h-9 items-center justify-center gap-1 rounded-xl border border-rose-line bg-rose-soft text-[11px] font-black text-rose-deep transition hover:opacity-90 active:scale-[0.98]"
+            >
+              💬 {CONTACT_TYPE_SHORT[shopInfo.contactType]}
+            </button>
+            <button
+              type="button"
+              onClick={() => window.open(shopInfo.paysterUrl, "ruruPayster", "popup=yes,width=480,height=720")}
+              className="flex h-9 items-center justify-center gap-1 rounded-xl border border-line bg-surface-2 text-[11px] font-black text-ink-soft transition hover:bg-surface-3 active:scale-[0.98]"
+            >
+              💳 카드결제
+            </button>
+          </div>
+          <div className="mt-2">
+            <AdminSoundControl />
+          </div>
+        </section>
 
         <div className="mt-auto space-y-2 pt-4">
           {/* 라이트/다크 토글 */}

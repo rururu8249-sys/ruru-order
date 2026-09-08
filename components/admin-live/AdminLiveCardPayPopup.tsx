@@ -240,7 +240,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-black text-white" style={{ background: f.highlight ? "#2B6BEB" : "#8B99BC" }}>{fieldIndex + 1}</span>
                 <div className="w-[70px] shrink-0">
                   <div className="text-[11.5px] font-black" style={{ color: f.highlight ? "#2B6BEB" : "#5A6B92" }}>{f.label}</div>
-                  {f.hint ? <div className="text-[9px] font-bold" style={{ color: "#8B99BC" }}>{f.hint}</div> : null}
+                  {f.hint ? <div className="text-[11px] font-bold" style={{ color: "#8B99BC" }}>{f.hint}</div> : null}
                 </div>
                 <div className="min-w-0 flex-1 truncate text-[15px] font-black" style={{ color: "#101C3D" }}>
                   {f.value || <span style={{ color: "#8B99BC" }}>없음</span>}
@@ -311,7 +311,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
             {saving ? "처리 중…" : "✔ 카드결제완료 처리"}
           </button>
 
-          <div className="mt-4 rounded-xl px-3.5 py-2.5 text-[10.5px] font-bold leading-4" style={{ background: "#EAF0FE", color: "#3D5A8F" }}>
+          <div className="mt-4 rounded-xl px-3.5 py-2.5 text-[11px] font-bold leading-4" style={{ background: "#EAF0FE", color: "#3D5A8F" }}>
             상품명 칸은 「닉네임 상품명」 순서로 넣어야 나중에 어느 주문인지 매칭됩니다(이름 X). 전화번호는 <b>주문자(결제하는 분)</b> 번호예요 — 택배 받는 분 번호가 아닙니다. 페이스터는 남의 서버라 자동 채우기가 안 돼요.
           </div>
         </div>

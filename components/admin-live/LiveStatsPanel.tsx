@@ -51,12 +51,12 @@ export default function LiveStatsPanel({ orders, activeBroadcastId, onOpenReport
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-black text-ink">📊 라이브 현황</span>
         <span className="flex items-center gap-1.5">
-          <span className="text-[10px] font-bold text-ink-mute">이번 방송 · 실시간</span>
+          <span className="text-[11px] font-bold text-ink-mute">이번 방송 · 실시간</span>
           {onOpenReport ? (
             <button
               type="button"
               onClick={onOpenReport}
-              className="rounded-full border border-rose-line bg-rose-soft px-2 py-0.5 text-[10px] font-black text-rose-deep"
+              className="rounded-full border border-rose-line bg-rose-soft px-2 py-0.5 text-[11px] font-black text-rose-deep"
             >
               더보기 →
             </button>
@@ -70,27 +70,27 @@ export default function LiveStatsPanel({ orders, activeBroadcastId, onOpenReport
         <>
           {/* 매출 크게 */}
           <div className="mb-2 rounded-xl bg-rose-soft/40 px-3 py-2">
-            <div className="text-[10px] font-black text-ink-mute">결제완료 매출</div>
+            <div className="text-[11px] font-black text-ink-mute">결제완료 매출</div>
             <div className="text-[19px] font-black text-rose-deep">{won(stats.paidSales)}</div>
           </div>
 
           {/* 지표 그리드 */}
           <div className="mb-2 grid grid-cols-3 gap-1.5 text-center">
             <div className="rounded-lg bg-surface-2 px-1 py-1.5">
-              <div className="text-[9px] font-bold text-ink-mute">주문</div>
+              <div className="text-[11px] font-bold text-ink-mute">주문</div>
               <div className="text-[13px] font-black text-ink">{stats.orderCount}건</div>
             </div>
             <div className="rounded-lg bg-surface-2 px-1 py-1.5">
-              <div className="text-[9px] font-bold text-ink-mute">결제완료</div>
+              <div className="text-[11px] font-bold text-ink-mute">결제완료</div>
               <div className="text-[13px] font-black text-emerald-600">{stats.paidCount}건</div>
             </div>
             <div className="rounded-lg bg-surface-2 px-1 py-1.5">
-              <div className="text-[9px] font-bold text-ink-mute">객단가</div>
+              <div className="text-[11px] font-bold text-ink-mute">객단가</div>
               <div className="text-[13px] font-black text-ink">{won(stats.avg)}</div>
             </div>
           </div>
 
-          <div className="mb-2 flex items-center justify-center gap-2 text-[10px] font-bold text-ink-soft">
+          <div className="mb-2 flex items-center justify-center gap-2 text-[11px] font-bold text-ink-soft">
             <span>무통장 <b className="text-ink">{stats.bankCount}</b></span>
             <span className="text-ink-mute">·</span>
             <span>카드 <b className="text-ink">{stats.cardCount}</b></span>
@@ -98,7 +98,7 @@ export default function LiveStatsPanel({ orders, activeBroadcastId, onOpenReport
 
           {/* TOP 상품 */}
           <div className="border-t border-line pt-2">
-            <div className="mb-1 text-[10px] font-black text-ink-mute">🔥 잘 나가는 상품 TOP</div>
+            <div className="mb-1 text-[11px] font-black text-ink-mute">🔥 잘 나가는 상품 TOP</div>
             {stats.top.length === 0 ? (
               <div className="py-1 text-[11px] font-bold text-ink-mute">아직 주문 없음</div>
             ) : (
@@ -107,7 +107,7 @@ export default function LiveStatsPanel({ orders, activeBroadcastId, onOpenReport
                   <li key={t.name} className="flex items-center gap-2 text-[11px] font-bold text-ink">
                     <span className={["w-4 shrink-0 text-center font-black", i === 0 ? "text-rose-deep" : "text-ink-mute"].join(" ")}>{i + 1}</span>
                     <span className="min-w-0 flex-1 truncate">{t.name}</span>
-                    <span className="shrink-0 rounded-full bg-rose-soft/50 px-1.5 py-0.5 text-[10px] font-black text-rose-deep">{t.qty}개</span>
+                    <span className="shrink-0 rounded-full bg-rose-soft/50 px-1.5 py-0.5 text-[11px] font-black text-rose-deep">{t.qty}개</span>
                   </li>
                 ))}
               </ul>

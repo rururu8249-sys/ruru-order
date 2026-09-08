@@ -1714,7 +1714,6 @@ export default function AdminLiveDashboard() {
               videoRatio={videoRatio}
               youtubeUrl={activeBroadcast?.youtube_live_url || ""}
               activeBroadcastId={activeBroadcast?.id || null}
-              onOpenBroadcastConsole={() => { setActiveMenu("broadcast"); replacePanelInUrl("broadcast"); }}
             />
           </div>
 

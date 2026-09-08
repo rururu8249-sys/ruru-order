@@ -8,10 +8,6 @@
 //   · 돈/포인트 로직 없음. 방송 시작/종료는 부모 핸들러(확인창 포함) 그대로.
 
 import LiveBroadcastPanels from "./LiveBroadcastPanels";
-import AdminSoundControl from "./AdminSoundControl";
-import { CONTACT_TYPE_SHORT, adminChatTarget } from "@/lib/shopInfo";
-import { useShopInfo } from "@/lib/useShopInfo";
-import { showAdminToast } from "@/lib/adminToast";
 
 type VideoRatio = "vertical" | "wide" | "auto";
 
@@ -25,8 +21,6 @@ type Props = {
   videoRatio: VideoRatio;
   youtubeUrl: string;
   activeBroadcastId: string | null;
-  /** 방송 시작/종료가 있는 방송 콘솔로 보내기 */
-  onOpenBroadcastConsole: () => void;
 };
 
 export default function AdminLiveBroadcastRail({
@@ -38,27 +32,7 @@ export default function AdminLiveBroadcastRail({
   videoRatio,
   youtubeUrl,
   activeBroadcastId,
-  onOpenBroadcastConsole,
 }: Props) {
-  const shopInfo = useShopInfo();
-  const chatTarget = adminChatTarget(shopInfo);
-
-  const openKakao = () => {
-    if (chatTarget.kind === "id") {
-      navigator.clipboard?.writeText(chatTarget.id).catch(() => {});
-      showAdminToast(`카카오톡 ID「${chatTarget.id}」를 복사했어요. 카카오톡에서 친구 목록을 확인하세요.`, "success");
-      return;
-    }
-    const aw = window.screen.availWidth || 1600;
-    const ah = window.screen.availHeight || 1000;
-    const W = Math.min(1700, Math.round(aw * 0.92));
-    const H = Math.min(1050, Math.round(ah * 0.92));
-    const left = Math.max(0, Math.round((aw - W) / 2));
-    const top = Math.max(0, Math.round((ah - H) / 2));
-    const w = window.open(chatTarget.url, "ruruKakaoConsult", `popup=yes,width=${W},height=${H},left=${left},top=${top}`);
-    if (w) { try { w.resizeTo(W, H); w.moveTo(left, top); w.focus(); } catch { /* 무시 */ } }
-  };
-
   return (
     <>
       {/* 손잡이 — 항상 화면 오른쪽 가장자리 */}
@@ -96,53 +70,26 @@ export default function AdminLiveBroadcastRail({
           open ? "translate-x-0" : "translate-x-full",
         ].join(" ")}
       >
-        <div className="rounded-2xl border border-line bg-surface p-2.5 shadow-sm">
-          <div className="mb-2 flex items-center justify-between px-1">
-            <div className="flex items-center gap-1.5 text-xs font-black text-ink">
-              <span className={`inline-block h-2 w-2 rounded-full ${broadcastOn ? "bg-danger-tx" : "bg-line"}`} />
-              {broadcastOn ? "방송 중" : "방송 대기"}
-            </div>
-            <span className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={onToggleWide}
-                title={wide ? "보통 크기로" : "화면 절반 이상으로 크게"}
-                className="rounded-lg border border-line px-2 py-0.5 text-[11px] font-black text-ink-soft hover:bg-surface-2"
-              >
-                {wide ? "작게 ◀" : "크게 ▶"}
-              </button>
-              <button type="button" onClick={onToggle} className="rounded-lg px-2 py-0.5 text-[11px] font-black text-ink-mute hover:bg-surface-2 hover:text-ink">
-                접기 ▶
-              </button>
-            </span>
+        {/* [2026-09-08 사장님 지적] 알림음·카톡채널·카드결제는 화면과 상관없이 늘 쓰는 것 → 사이드바로 옮겼다.
+            여기(레일)는 «방송화면 + 라이브채팅»만 본다. */}
+        <div className="mb-1 flex items-center justify-between px-1">
+          <div className="flex items-center gap-1.5 text-xs font-black text-ink">
+            <span className={`inline-block h-2 w-2 rounded-full ${broadcastOn ? "bg-danger-tx" : "bg-line"}`} />
+            {broadcastOn ? "방송 중" : "방송 대기"}
           </div>
-          <div className="grid grid-cols-2 gap-1.5">
-            {/* 방송시작·종료 버튼은 「방송 › 방송 콘솔」 한 곳에만 둔다(중복 제거) */}
+          <span className="flex items-center gap-1">
             <button
               type="button"
-              onClick={onOpenBroadcastConsole}
-              className="col-span-2 flex h-9 items-center justify-center gap-1 rounded-xl border border-line bg-surface-2 text-xs font-black text-ink-soft transition hover:bg-surface-3"
+              onClick={onToggleWide}
+              title={wide ? "보통 크기로" : "화면 절반 이상으로 크게"}
+              className="rounded-lg border border-line px-2 py-0.5 text-[11px] font-black text-ink-soft hover:bg-surface-2"
             >
-              {broadcastOn ? "■ 방송 종료하러 가기" : "▶ 방송 시작하러 가기"}
+              {wide ? "작게 ◀" : "크게 ▶"}
             </button>
-            <button
-              type="button"
-              onClick={openKakao}
-              className="flex h-9 items-center justify-center gap-1 rounded-xl border border-rose-line bg-rose-soft text-xs font-black text-rose-deep transition hover:opacity-90 active:scale-[0.98]"
-            >
-              💬 {CONTACT_TYPE_SHORT[shopInfo.contactType]}
+            <button type="button" onClick={onToggle} className="rounded-lg px-2 py-0.5 text-[11px] font-black text-ink-mute hover:bg-surface-2 hover:text-ink">
+              접기 ▶
             </button>
-            <button
-              type="button"
-              onClick={() => window.open(shopInfo.paysterUrl, "ruruPayster", "popup=yes,width=480,height=720")}
-              className="flex h-9 items-center justify-center gap-1 rounded-xl border border-line bg-surface-2 text-xs font-black text-ink-soft transition hover:bg-surface-3 active:scale-[0.98]"
-            >
-              💳 카드결제
-            </button>
-          </div>
-          <div className="mt-2">
-            <AdminSoundControl />
-          </div>
+          </span>
         </div>
 
         <div className="min-h-0 flex-1">

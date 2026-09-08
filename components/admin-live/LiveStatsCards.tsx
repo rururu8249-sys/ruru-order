@@ -144,7 +144,7 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
       {/* [UI 2026-07-06] 기준 명시 — 정산 팝업(이번달 자동조회)과 숫자가 달라 헷갈리던 것 방지 */}
       {/* [2026-08-31 사장님 요청] 유치원생 기준 — 상품값과 실제 받은 돈을 나란히 크게 */}
       <span className="text-ink-soft" title="결제완료 주문의 순수 상품금액만 합친 것 — 카드수수료·배송비·포인트 반영 전">📦 상품값 <span className="text-ink text-[13px]">{money(goodsPaid)}</span></span>
-      <span className="text-ink-soft" title="손님이 실제로 낸 돈 — 상품값 + 카드수수료 + 배송비 − 포인트 (결제완료 건만, 미입금·취소·정산제외 미포함)">💳 실제 받은 돈<span className="ml-1 text-[10px] font-bold text-ink-mute">(결제완료만 · 현재 조회범위)</span> <span className="text-ink text-[13px]">{money(paidAmount)}</span></span>
+      <span className="text-ink-soft" title="손님이 실제로 낸 돈 — 상품값 + 카드수수료 + 배송비 − 포인트 (결제완료 건만, 미입금·취소·정산제외 미포함)">💳 실제 받은 돈<span className="ml-1 text-[11px] font-bold text-ink-mute">(결제완료만 · 현재 조회범위)</span> <span className="text-ink text-[13px]">{money(paidAmount)}</span></span>
       <span className="text-line">|</span>
       <span className="text-ink-soft" title="무통장 주문 중 입금확인된 금액">무통장 입금확인 <span className="text-ok-tx">{money(bankPaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
       <span className="text-ink-soft" title="카드 주문 중 결제완료된 금액">카드결제완료 <span className="text-ok-tx">{money(cardPaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>

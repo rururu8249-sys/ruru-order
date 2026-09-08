@@ -897,7 +897,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-amber-100 via-stone-100 to-slate-100">
-              <div className="w-[78%] rounded-[2rem] bg-surface/70 p-6 text-center shadow-sm backdrop-blur">
+              <div className="w-[78%] rounded-2xl bg-surface/70 p-6 text-center shadow-sm backdrop-blur">
                 <div className="text-5xl">👟</div>
                 <div className="mt-4 text-lg font-black text-ink">루루동이LIVE</div>
                 <div className="mt-2 text-xs font-bold text-ink-soft">유튜브 라이브 URL을 적용하면 방송화면이 표시됩니다.</div>
@@ -1037,7 +1037,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
                 <div className="flex h-full items-center justify-center text-4xl">👟</div>
               )}
               {/* LIVE 배지 + 카운터 */}
-              <div className="absolute left-2 top-2 flex items-center gap-1.5 rounded-lg bg-black/55 px-2 py-0.5 text-[10px] font-black text-white">
+              <div className="absolute left-2 top-2 flex items-center gap-1.5 rounded-lg bg-black/55 px-2 py-0.5 text-[11px] font-black text-white">
                 <span>🔴 LIVE</span>
                 <span className="opacity-90">{safeIdx + 1}/{liveCount}</span>
               </div>

@@ -55,13 +55,13 @@ export default function SystemAuditCard({ onOpenDetail }: { onOpenDetail?: () =>
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-black text-ink">🛡️ 시스템 점검</span>
         <span className="flex items-center gap-1.5">
-          {time ? <span className="text-[10px] font-bold text-ink-mute">{time} 점검</span> : null}
+          {time ? <span className="text-[11px] font-bold text-ink-mute">{time} 점검</span> : null}
           <button
             type="button"
             onClick={() => void load()}
             disabled={loading}
             title="다시 점검"
-            className="rounded-full border border-line bg-surface px-1.5 py-0.5 text-[10px] font-black text-ink-soft disabled:opacity-50"
+            className="rounded-full border border-line bg-surface px-1.5 py-0.5 text-[11px] font-black text-ink-soft disabled:opacity-50"
           >
             ↻
           </button>
@@ -77,7 +77,7 @@ export default function SystemAuditCard({ onOpenDetail }: { onOpenDetail?: () =>
       ) : allOk ? (
         <div className="rounded-xl bg-emerald-50 px-3 py-2">
           <div className="text-[13px] font-black text-emerald-700">✅ 이상 없음</div>
-          <div className="mt-0.5 text-[10px] font-bold text-emerald-700/70">재고·금액·포인트·입금 {CHECK_LABELS.length}개 항목 통과 · 최근 7일 기준</div>
+          <div className="mt-0.5 text-[11px] font-bold text-emerald-700/70">재고·금액·포인트·입금 {CHECK_LABELS.length}개 항목 통과 · 최근 7일 기준</div>
         </div>
       ) : result ? (
         <div className="rounded-xl bg-red-50 px-3 py-2">

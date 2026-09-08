@@ -58,7 +58,7 @@ export default function AdminLiveCustomerBlockReasonModal({
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/35 px-4">
-      <section className="w-full max-w-[520px] rounded-[28px] border border-danger-tx bg-surface p-5 shadow-2xl">
+      <section className="w-full max-w-[520px] rounded-2xl border border-danger-tx bg-surface p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-[11px] font-black tracking-[0.18em] text-red-500">BLOCK REASON</div>

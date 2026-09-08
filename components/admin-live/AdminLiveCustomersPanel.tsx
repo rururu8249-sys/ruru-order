@@ -404,7 +404,7 @@ function SummaryCard({
   subClassName?: string;
 }) {
   return (
-    <div className="min-h-[142px] rounded-[22px] border border-line bg-surface p-4 shadow-sm">
+    <div className="min-h-[142px] rounded-xl border border-line bg-surface p-4 shadow-sm">
       <div className={`flex items-center gap-2 text-[12px] font-black text-ink-soft ${labelClassName}`}>
         {icon ? <span className="text-[15px]">{icon}</span> : null}
         <span>{label}</span>
@@ -1675,13 +1675,13 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
       </div>
 
       {custTab === "loyalty" ? (
-        <div className="rounded-[28px] border border-line bg-surface p-4 shadow-sm">
+        <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
           <AdminLiveLoyaltyReport onOpenCustomer={openDetailFromLoyalty} />
         </div>
       ) : null}
 
       <div className={custTab === "members" ? "" : "hidden"}>
-        <div className="rounded-[28px] border border-line bg-surface p-4 shadow-sm">
+        <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
           <div className="grid grid-cols-2 gap-2">
             <select
               value={statusFilter}
@@ -1810,7 +1810,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                         <div className="flex items-center gap-1.5">
                           <span className="truncate text-[13px] font-black text-ink">{customer.nickname || "—"}</span>
                           {customer.name ? <span className="shrink-0 text-xs text-ink-mute">· {customer.name}</span> : null}
-                          {!customer.kakaoId ? <span className="shrink-0 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-black text-warn-tx" title="카카오 로그인 기록이 없는 옛 회원(전화번호만). 다시 카톡 로그인하면 자동 연결됩니다.">카카오 미연동</span> : null}
+                          {!customer.kakaoId ? <span className="shrink-0 rounded-md bg-amber-100 px-1.5 py-0.5 text-[11px] font-black text-warn-tx" title="카카오 로그인 기록이 없는 옛 회원(전화번호만). 다시 카톡 로그인하면 자동 연결됩니다.">카카오 미연동</span> : null}
                         </div>
                         <div className="mt-0.5 truncate text-[11px] text-ink-mute">
                           누적 {customer.orderCount}건 · {money(customer.totalAmount)}
@@ -1958,7 +1958,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
       {showBlockedCustomers && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4">
-          <div className="max-h-[84vh] w-full max-w-[720px] overflow-y-auto rounded-[28px] border border-line bg-surface p-5 shadow-2xl">
+          <div className="max-h-[84vh] w-full max-w-[720px] overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3 border-b border-line pb-4">
               <div>
                 <div className="text-[11px] font-black tracking-[0.18em] text-red-500">BLOCKED CUSTOMERS</div>

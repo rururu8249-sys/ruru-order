@@ -5,7 +5,7 @@
 
 export default function AdminAuthSettingsPanel() {
   return (
-    <section className="rounded-[28px] border border-line bg-surface p-5 shadow-sm">
+    <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
       <h3 className="text-base font-black text-ink">관리자 로그인</h3>
       <p className="mt-2 text-sm font-bold leading-6 text-ink-soft">
         관리자 아이디와 비밀번호는 이 화면에서 바꾸지 않습니다. 서버 설정에서만 바뀝니다.

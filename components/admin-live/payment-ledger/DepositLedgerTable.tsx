@@ -26,7 +26,7 @@ const PAGE_SIZE_OPTIONS = [10, 20, 50];
 type PaginationItem = number | "ellipsis";
 
 function sortMark(active: boolean, direction: SortDirection) {
-  if (!active) return <span className="text-[10px] text-ink-mute">↕</span>;
+  if (!active) return <span className="text-[11px] text-ink-mute">↕</span>;
   return <span className="text-[11px] text-info-tx">{direction === "asc" ? "↑" : "↓"}</span>;
 }
 

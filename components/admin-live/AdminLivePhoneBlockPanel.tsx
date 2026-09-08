@@ -111,7 +111,7 @@ export default function AdminLivePhoneBlockPanel({ onSaved }: Props) {
   };
 
   return (
-    <section className="rounded-[24px] border border-danger-tx bg-danger-bg p-4">
+    <section className="rounded-2xl border border-danger-tx bg-danger-bg p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-[11px] font-black tracking-[0.16em] text-red-500">PHONE BLOCK</div>

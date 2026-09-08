@@ -126,7 +126,7 @@ function SettingInput({
   inputMode?: "numeric" | "decimal" | "text";
 }) {
   return (
-    <div className="rounded-[24px] border border-line bg-surface-2 p-4">
+    <div className="rounded-2xl border border-line bg-surface-2 p-4">
       <div className="text-sm font-black text-ink">{label}</div>
       <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">{desc}</div>
       <div className="mt-3 flex items-center gap-2">
@@ -435,7 +435,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice }: AdminLiveSettin
 
               {/* [2026-07-13 사장님 지침] 장바구니 선점 유지시간 — 담는 순간 다른 고객 화면 남은 수량에서
                   빠져 보이는 시간. 지나면 자동 해제(표시용 예약만 — 진짜 재고/주문/차감 로직 무관). */}
-              <div className="mb-3 rounded-[20px] border border-line bg-surface-2 p-4">
+              <div className="mb-3 rounded-xl border border-line bg-surface-2 p-4">
                 <div className="text-sm font-black text-ink">🛒 장바구니 선점 유지시간</div>
                 <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
                   고객이 장바구니에 담으면 이 시간 동안 다른 고객에게 남은 수량에서 빠져 보입니다. 시간이 지나면 자동
@@ -462,7 +462,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice }: AdminLiveSettin
               </div>
 
               {/* [2026-07-10] 주문 방법 팝업 — 접속하자마자 뜨는 안내. 켜고/끄기 + 내용 수정 */}
-              <div className="mb-3 rounded-[20px] border border-line bg-surface-2 p-4">
+              <div className="mb-3 rounded-xl border border-line bg-surface-2 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-sm font-black text-ink">📌 주문 방법 팝업</div>
@@ -526,7 +526,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice }: AdminLiveSettin
               </div>
 
               {/* [2026-08-30] 공지 문구·접속 팝업 공지는 사이드바 「📢 공지·쪽지」 메뉴로 옮겼다. */}
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-line bg-surface-2 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface-2 p-4">
                 <div className="text-xs font-bold leading-5 text-ink-soft">
                   「주문서 공지 문구」와 「접속 팝업 공지」는 <b className="text-ink">공지·쪽지</b> 메뉴에 있습니다. 손님 화면 미리보기도 거기서 볼 수 있어요.
                 </div>
@@ -541,7 +541,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice }: AdminLiveSettin
                 ) : null}
               </div>
 
-              <div className="mt-3 flex items-start justify-between gap-3 rounded-[20px] border border-line bg-surface-2 p-4">
+              <div className="mt-3 flex items-start justify-between gap-3 rounded-xl border border-line bg-surface-2 p-4">
                 <div>
                   <div className="text-sm font-black text-ink">직접 입력하기 버튼</div>
                   <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">상품 목록에서 못 찾은 상품을 손님이 직접 입력하는 버튼입니다. OFF 시 버튼이 숨겨집니다.</div>

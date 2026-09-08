@@ -444,7 +444,7 @@ function IssueCard({
             <IssueRow key={label} label={label} value={value} strong={label === "메모"} />
           ))
         )}
-        <div className="mt-1 text-right text-[10px] font-black text-ink-mute">{expanded ? "▲ 접기" : "▼ 전체 보기"}</div>
+        <div className="mt-1 text-right text-[11px] font-black text-ink-mute">{expanded ? "▲ 접기" : "▼ 전체 보기"}</div>
       </div>
     </article>
   );
@@ -879,7 +879,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
       {showMemoAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4">
-          <div className="max-h-[92vh] w-full max-w-[620px] overflow-y-auto rounded-[28px] border border-line bg-surface p-5 shadow-2xl">
+          <div className="max-h-[92vh] w-full max-w-[620px] overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-[11px] font-black tracking-[0.18em] text-rose-deep">ADD CUSTOMER ISSUE</div>
@@ -1038,7 +1038,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
       {editingIssueTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4">
-          <div className="w-full max-w-[560px] rounded-[28px] border border-line bg-surface p-5 shadow-2xl">
+          <div className="w-full max-w-[560px] rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-[11px] font-black tracking-[0.18em] text-rose-deep">EDIT CUSTOMER ISSUE</div>

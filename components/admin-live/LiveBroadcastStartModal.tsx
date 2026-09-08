@@ -106,7 +106,7 @@ export default function LiveBroadcastStartModal({ open, broadcastTitle, saving, 
 
   return (
     <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/45 px-3 py-5">
-      <div className="w-full max-w-lg rounded-[28px] border border-white/80 bg-surface p-5 shadow-[0_28px_90px_rgba(15,23,42,0.35)]">
+      <div className="w-full max-w-lg rounded-2xl border border-white/80 bg-surface p-5 shadow-2xl">
         <div className="text-xs font-black tracking-[0.2em] text-rose-deep">START BROADCAST</div>
         <h2 className="mt-1 text-2xl font-black tracking-[-0.04em] text-ink">방송을 시작할까요?</h2>
         <div className="mt-3 rounded-2xl border border-line bg-surface-2 px-4 py-3 text-sm font-bold text-ink">

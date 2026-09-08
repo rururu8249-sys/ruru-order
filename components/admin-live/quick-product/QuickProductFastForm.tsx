@@ -547,7 +547,7 @@ function ImagePicker({
         {label ? (
           <div className="mb-1 flex items-center justify-between">
             <span className="text-[11px] font-black text-ink">{label}</span>
-            <span className="text-[10px] font-black text-ink-mute">{value.length}/{maxFiles}</span>
+            <span className="text-[11px] font-black text-ink-mute">{value.length}/{maxFiles}</span>
           </div>
         ) : null}
 
@@ -603,7 +603,7 @@ function ImagePicker({
       <div className="min-w-0">
         <div className="mb-1 flex items-center justify-between">
           <span className="text-[11px] font-black text-ink">{label || "사진"}</span>
-          <span className="text-[10px] font-black text-ink-mute">{value.length}/{maxFiles}</span>
+          <span className="text-[11px] font-black text-ink-mute">{value.length}/{maxFiles}</span>
         </div>
         <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileChange} />
         <div style={{ display: "flex", flexWrap: "wrap", gap: "7px" }}>

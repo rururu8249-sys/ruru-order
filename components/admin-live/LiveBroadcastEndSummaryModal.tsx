@@ -92,7 +92,7 @@ export default function LiveBroadcastEndSummaryModal({ summary, onClose, onOpenS
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-3 py-5">
-      <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[32px] border border-white/80 bg-surface p-5 shadow-[0_28px_90px_rgba(15,23,42,0.35)]">
+      <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-white/80 bg-surface p-5 shadow-2xl">
         <div className="border-b border-line-soft pb-4">
           <div className="text-xs font-black tracking-[0.2em] text-rose-deep">BROADCAST SUMMARY</div>
           <h2 className="mt-2 text-3xl font-black tracking-[-0.05em] text-ink">방송 종료 요약</h2>

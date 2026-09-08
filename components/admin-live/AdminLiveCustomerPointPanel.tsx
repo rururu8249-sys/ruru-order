@@ -152,7 +152,7 @@ function CustomerPointActionModal({
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-4 py-6">
-      <div className="w-full max-w-[520px] overflow-hidden rounded-[28px] bg-surface shadow-2xl ring-1 ring-line">
+      <div className="w-full max-w-[520px] overflow-hidden rounded-2xl bg-surface shadow-2xl ring-1 ring-line">
         <div className="border-b border-line bg-surface-2 px-5 py-4">
           <div className="text-lg font-black text-ink">{title}</div>
           <div className="mt-1 text-xs font-bold text-ink-soft">
@@ -384,7 +384,7 @@ export default function AdminLiveCustomerPointPanel({ customer }: { customer: Po
   };
 
   return (
-    <section className="mt-5 rounded-[24px] border border-rose-line bg-rose-soft/60 p-4">
+    <section className="mt-5 rounded-2xl border border-rose-line bg-rose-soft/60 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-black text-ink">🪙 포인트</h3>
@@ -404,7 +404,7 @@ export default function AdminLiveCustomerPointPanel({ customer }: { customer: Po
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr]">
-        <div className="rounded-[22px] bg-surface p-4 ring-1 ring-rose-line">
+        <div className="rounded-xl bg-surface p-4 ring-1 ring-rose-line">
           <div className="text-xs font-black text-ink-soft">현재 포인트</div>
           <div className="mt-2 text-[30px] font-black tracking-[-0.06em] text-rose-deep">
             {pointState.loading ? "불러오는중..." : pointState.currentPointsText}
@@ -414,7 +414,7 @@ export default function AdminLiveCustomerPointPanel({ customer }: { customer: Po
           </div>
         </div>
 
-        <div className="grid content-start gap-2 rounded-[22px] bg-surface p-4 ring-1 ring-rose-line">
+        <div className="grid content-start gap-2 rounded-xl bg-surface p-4 ring-1 ring-rose-line">
           <button
             type="button"
             onClick={() => openModal("grant")}
