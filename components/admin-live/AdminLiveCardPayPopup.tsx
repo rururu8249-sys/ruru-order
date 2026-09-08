@@ -12,6 +12,8 @@ import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { getShopInfoNow, useShopInfo } from "@/lib/useShopInfo";
 // [2026-09-08] 복사 카드를 «항상 맨 위에 뜨는 작은 창»으로 빼내기 (사유·실측근거는 그 파일 상단)
 import { usePipWindow, copyTextIn, preopenPipWindow, isPipSupported, getPipWindow } from "@/lib/usePipWindow";
+// [2026-09-09] 두 창의 «보이는 상자»를 같게 맞추려면 창 두께를 재야 한다 (근거는 그 파일 상단)
+import { readPopupChrome, measurePopupChrome } from "@/lib/windowChrome";
 
 // ═══ 페이스터를 «어떻게» 열 것인가 — 2026-09-08 확정. 다시 뒤집지 말 것 ═══
 //
@@ -91,18 +93,40 @@ function paysterSlotRect() {
  *  이름을 빼거나 "_blank" 로 바꾸면 창이 매번 새로 생기고 로그인이 풀린다. 바꾸지 말 것. */
 const PAYSTER_WINDOW_NAME = "ruru_payster";
 
-/** 복사창(항상 위) «바로 옆» 자리. 예전처럼 짝꿍처럼 찰싹 붙인다.
+/** 복사창(항상 위) «바로 옆» 자리 — 두 창의 «보이는 상자»가 한치도 안 어긋나게.
  *  [2026-09-08 실측] 복사창은 screenX/screenY/outerWidth/outerHeight 를 «정확히» 알려준다.
  *    (예: 1206 / 259 / 490 / 834 — 운영체제가 보고한 창 위치와 일치)
- *  오른쪽에 자리가 있으면 오른쪽(예전 배치), 없으면 왼쪽에 붙인다. */
+ *  [2026-09-09 정정] 예전엔 복사창의 outer 값을 window.open 의 «내용영역» 인자로 그대로 넘겼다.
+ *    페이스터 창엔 탭줄·주소창이 더 붙으므로 세로가 그만큼 커지고 내용이 아래로 밀렸다(사장님: 「이질감」).
+ *    → 창 두께(readPopupChrome)를 빼서 준다. 두께는 페이스터 창을 «처음 만들 때» 재 둔다. */
 function rectBesidePip(pipWin: Window) {
-  const width = Math.round(BOX_W / 2);
   const availW = window.screen?.availWidth || window.innerWidth;
-  const px = pipWin.screenX;
-  const pw = pipWin.outerWidth || width;
-  const right = px + pw;
-  const left = right + width <= availW ? right : Math.max(0, px - width);
-  return { left, top: pipWin.screenY, width, height: pipWin.outerHeight || Math.round(BOX_H_MAX) };
+
+  // 복사창의 «보이는 상자»(outer) 좌표·크기. screenX/Y 는 viewport 기준이라 위 띠만큼 빼서 상자 좌상단을 구한다.
+  const pipInnerW = pipWin.innerWidth || Math.round(BOX_W / 2);
+  const pipInnerH = pipWin.innerHeight || Math.round(BOX_H_MAX);
+  const pipBoxW = pipWin.outerWidth || pipInnerW;
+  const pipBoxH = pipWin.outerHeight || pipInnerH;
+  const pipTopBar = Math.max(0, pipBoxH - pipInnerH);
+  const pipSideBar = Math.max(0, Math.round((pipBoxW - pipInnerW) / 2));
+  const boxLeft = pipWin.screenX - pipSideBar;
+  const boxTop = pipWin.screenY - pipTopBar;
+
+  // 오른쪽에 같은 크기 상자가 들어가면 오른쪽(예전 배치), 아니면 왼쪽에 붙인다.
+  const left = boxLeft + pipBoxW + pipBoxW <= availW ? boxLeft + pipBoxW : Math.max(0, boxLeft - pipBoxW);
+
+  const chrome = readPopupChrome();
+  if (!chrome) {
+    // 아직 페이스터 창 두께를 못 쟀다(첫 창). 예전 방식으로 열고, 여는 김에 재 둔다 → 다음 창부터 정확해진다.
+    return { left, top: boxTop, width: Math.round(BOX_W / 2), height: pipInnerH };
+  }
+  // ★ 요청값은 «내용 영역» 기준(MDN) → 두께를 빼서 주면 «창 전체»가 복사창과 똑같아진다.
+  return {
+    left,
+    top: boxTop,
+    width: Math.max(200, pipBoxW - chrome.wGap),
+    height: Math.max(200, pipBoxH - chrome.hGap),
+  };
 }
 
 /** 페이스터 창을 «정해진 자리»에 연다.
@@ -120,10 +144,35 @@ function paysterAlive() {
 }
 
 function openPaysterAt(url: string, r: { left: number; top: number; width: number; height: number }) {
-  const win = window.open(url, PAYSTER_WINDOW_NAME, `popup=yes,left=${r.left},top=${r.top},width=${r.width},height=${r.height}`);
-  if (win) paysterWin = win;
+  // ★ [2026-09-09] «주소 없이» 먼저 연다.
+  //   · 같은 이름의 창이 이미 있으면 → 그 창이 «이동 없이» 그대로 돌아온다(2026-09-08 실측 ③).
+  //     교차출처라 location 을 «읽을 수» 없다 → 그걸로 «기존 페이스터 창»임을 구분한다.
+  //   · 창이 없으면 → about:blank 새 창. 우리 오리진이라 창 두께를 잴 수 있다(이동하면 못 읽는다).
+  //   ⚠ 이름(PAYSTER_WINDOW_NAME)은 그대로 — 빼면 창이 매번 새로 생겨 로그인이 풀린다.
+  let win: Window | null = null;
   try {
-    win?.focus(); // 뒤로 숨어 있던 창이면 앞으로 부른다
+    win = window.open("", PAYSTER_WINDOW_NAME, `popup=yes,left=${r.left},top=${r.top},width=${r.width},height=${r.height}`);
+  } catch {
+    win = null;
+  }
+  if (!win) return; // 팝업 차단 — 복사창의 「페이스터 창 다시 열기 ↗」로 복구된다
+  paysterWin = win;
+
+  let isNewWindow = false;
+  try {
+    isNewWindow = win.location.href === "about:blank"; // 읽히면 새 창, SecurityError 면 기존 페이스터 창
+  } catch {
+    isNewWindow = false;
+  }
+  if (isNewWindow) measurePopupChrome(win, { top: r.top });
+
+  try {
+    win.location.href = url; // 새 창이면 페이스터 로드, 기존 창이면 결제 폼으로 되돌린다
+  } catch {
+    /* 이동 실패해도 아래 focus 로 창은 앞으로 부른다 */
+  }
+  try {
+    win.focus(); // 뒤로 숨어 있던 창이면 앞으로 부른다 (⚠ «최소화»된 창은 웹이 못 되살린다)
   } catch {
     /* 포커스는 보조 동작 — 실패해도 창은 떠 있다 */
   }
@@ -447,6 +496,14 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
           <div className="mt-4 flex min-h-0 flex-1 flex-col rounded-2xl bg-white px-4 py-3.5 shadow-sm" style={{ border: "1px solid #DDE4F2" }}>
             <div className="mb-2 shrink-0 text-[12px] font-black" style={{ color: "#5A6B92" }}>🧾 이 주문 내용 — 결제 전에 확인하세요</div>
             <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
+              {/* [2026-09-09 사장님 지적] 복사창에서 이 칸이 «비어» 있었다. 원인은 order.items 가 빈 주문.
+                    빈 칸으로 두면 화면이 고장 난 것처럼 보이고, 결제 전 검산도 못 한다.
+                    → 왜 비었는지 화면에 말해 준다. ⚠ 표시 전용 — 금액·돈 처리와 무관(아래 합계는 그대로). */}
+              {orderItems.length === 0 ? (
+                <div className="rounded-xl px-3 py-2.5 text-[12px] font-bold leading-relaxed" style={{ background: "#FFF7E6", color: "#8A5A00", border: "1px solid #F0DCB0" }}>
+                  ⚠️ 이 주문에 <b>상품 내역이 없습니다.</b> 아래 합계 금액만 확인하시고, 무슨 상품인지는 <b>주문상세</b>에서 봐주세요.
+                </div>
+              ) : null}
               {orderItems.map((item, itemIndex) => {
                 const opt = formatOrderOptionText(item.color, item.size);
                 return (
