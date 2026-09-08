@@ -1973,18 +1973,19 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                   {filteredBlockedTotalCount.toLocaleString("ko-KR")}명 / 전체 {blockedTotalCount.toLocaleString("ko-KR")}명
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
+                {/* [2026-09-08] 한 페이지에 다 들어가면 「몇 개 보기」·페이지 버튼은 눌러도 변화가 없다 → 감춘다 */}
+                <div className={`flex flex-wrap items-center gap-2 ${blockedCustomerTotalPages <= 1 ? "hidden" : ""}`}>
                   <select
                     value={blockedCustomerPageSize}
                     onChange={(event) => {
                       setBlockedCustomerPageSize(Number(event.target.value));
                       setBlockedCustomerPage(1);
                     }}
-                    className="h-9 rounded-xl border border-line bg-surface px-2 text-xs font-black text-ink-soft"
+                    className="ru-select ru-input-sm"
                   >
-                    <option value={10}>10개 보기</option>
-                    <option value={20}>20개 보기</option>
-                    <option value={50}>50개 보기</option>
+                    <option value={10}>10개씩</option>
+                    <option value={20}>20개씩</option>
+                    <option value={50}>50개씩</option>
                   </select>
 
                   <button

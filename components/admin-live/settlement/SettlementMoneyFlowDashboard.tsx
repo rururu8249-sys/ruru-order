@@ -483,21 +483,24 @@ export default function SettlementMoneyFlowDashboard({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-full bg-surface-3 px-4 py-2 text-sm font-black text-ink-soft">
-              총 {broadcastRows.length.toLocaleString("ko-KR")}개
+            <div className="ru-badge ru-badge-mute px-3 py-1.5">
+              총 {broadcastRows.length.toLocaleString("ko-KR")}개{broadcastPageCount <= 1 ? " · 전부 표시 중" : ""}
             </div>
-            <select
-              value={broadcastPageSize}
-              onChange={(event) => {
-                setBroadcastPageSize(Number(event.target.value));
-                setBroadcastCurrentPage(1);
-              }}
-              className="h-10 rounded-full border border-line bg-surface px-3 text-xs font-black text-ink-soft outline-none"
-            >
-              <option value={10}>10개 보기</option>
-              <option value={20}>20개 보기</option>
-              <option value={30}>30개 보기</option>
-            </select>
+            {/* 한 페이지에 다 들어가면 「몇 개 보기」는 눌러도 아무 변화가 없다 → 아예 감춘다 */}
+            {broadcastRows.length > 10 ? (
+              <select
+                value={broadcastPageSize}
+                onChange={(event) => {
+                  setBroadcastPageSize(Number(event.target.value));
+                  setBroadcastCurrentPage(1);
+                }}
+                className="ru-select ru-input-sm"
+              >
+                <option value={10}>10개씩</option>
+                <option value={20}>20개씩</option>
+                <option value={30}>30개씩</option>
+              </select>
+            ) : null}
           </div>
         </div>
 
@@ -539,11 +542,10 @@ export default function SettlementMoneyFlowDashboard({
           </table>
         </div>
 
+        {broadcastPageCount > 1 ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-3">
           <div className="text-xs font-bold text-ink-mute">
-            {broadcastRows.length === 0
-              ? "0개"
-              : `${(broadcastStartIndex + 1).toLocaleString("ko-KR")}-${Math.min(broadcastEndIndex, broadcastRows.length).toLocaleString("ko-KR")} / ${broadcastRows.length.toLocaleString("ko-KR")}개`}
+            {`${(broadcastStartIndex + 1).toLocaleString("ko-KR")}-${Math.min(broadcastEndIndex, broadcastRows.length).toLocaleString("ko-KR")} / ${broadcastRows.length.toLocaleString("ko-KR")}개`}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -587,6 +589,7 @@ export default function SettlementMoneyFlowDashboard({
             </button>
           </div>
         </div>
+        ) : null}
       </section>
     </div>
   );
