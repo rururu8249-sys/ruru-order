@@ -113,6 +113,8 @@ type AdminLiveEventRoulettePanelProps = {
   renderTrigger?: boolean;
   controlledOpen?: boolean;
   onRequestClose?: () => void;
+  /** [2026-09-08 5단계] 페이지 안에 그대로(방송 › 이벤트 탭). 팝업 껍데기·✕ 없음 */
+  embedded?: boolean;
   activeBroadcastId?: string | number | null;
   filteredOrderGroupIds?: string[]; // 주문서 화면 필터로 현재 보이는 주문 group_id 목록(룰렛 참가자 기준)
 };
@@ -229,6 +231,7 @@ export default function AdminLiveEventRoulettePanel({
   renderTrigger = true,
   controlledOpen,
   onRequestClose,
+  embedded = false,
   activeBroadcastId,
   filteredOrderGroupIds,
 }: AdminLiveEventRoulettePanelProps) {
@@ -1435,8 +1438,8 @@ export default function AdminLiveEventRoulettePanel({
       ) : null}
 
       {open ? (
-        <div style={{ position: "fixed", inset: 0, zIndex: 130, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(2,6,23,0.55)", padding: "12px" }}>
-          <div className="ruru-event-sian" style={{ width: "680px", maxWidth: "100%", flexShrink: 0, height: "88vh", overflowY: "auto", overflowX: "auto" }}>
+        <div style={embedded ? undefined : { position: "fixed", inset: 0, zIndex: 130, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(2,6,23,0.55)", padding: "12px" }}>
+          <div className="ruru-event-sian" style={embedded ? { width: "100%", maxWidth: "900px", height: "calc(100vh - 120px)", minHeight: "520px", overflowY: "auto", overflowX: "auto", borderRadius: "16px", border: "1px solid var(--color-line)" } : { width: "680px", maxWidth: "100%", flexShrink: 0, height: "88vh", overflowY: "auto", overflowX: "auto" }}>
             <div className="body" style={{ minHeight: "100%", boxSizing: "border-box" }}>
 
               {/* 헤더 */}
@@ -1456,7 +1459,7 @@ export default function AdminLiveEventRoulettePanel({
                     onClick={() => { setEventTab("mission"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>🎯 미션</span>
                   <span style={{ width: "1px", height: "18px", background: "var(--bd)", margin: "0 3px" }} />
                   <button className="btn" style={{ height: "auto", padding: "5px 10px" }} onClick={() => { resetEvent(); setCenterWinner(""); }}>↺ 초기화</button>
-                  <button className="btn" style={{ height: "auto", padding: "5px 10px" }} onClick={closePanel}>✕</button>
+                  {embedded ? null : <button className="btn" style={{ height: "auto", padding: "5px 10px" }} onClick={closePanel}>✕</button>}
                 </span>
               </div>
 

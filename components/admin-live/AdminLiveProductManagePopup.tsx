@@ -28,6 +28,8 @@ type Props = {
   // 닫힘/재오픈 사이 검색어 보존(수정 후 보던 검색 유지)
   initialSearch?: string;
   onSearchChange?: (search: string) => void;
+  /** [2026-09-08 5단계] 페이지 안에 그대로(상품 메뉴). 팝업 껍데기·✕ 없음, 포털 안 씀 */
+  embedded?: boolean;
 };
 
 const PAGE_STEP = 10;
@@ -223,7 +225,7 @@ function sortProductRows(rows: ProductRow[], key: ProductSortKey) {
   return copy.sort((a, b) => productCreatedAt(b) - productCreatedAt(a)); // recent
 }
 
-export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose, initialTab, onTabChange, initialSearch, onSearchChange }: Props) {
+export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose, initialTab, onTabChange, initialSearch, onSearchChange, embedded = false }: Props) {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [rotationIds, setRotationIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -1475,19 +1477,21 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
   const chipBase: React.CSSProperties = { padding: "5px 12px", borderRadius: "16px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid var(--color-rose-line)" };
 
-  return createPortal(
+  const popupTree = (
     <div
       className={(typeof document !== "undefined" && document.querySelector(".dark") ? "dark " : "") + "ruru-product-sian"}
-      style={{ position: "fixed", inset: 0, zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", padding: "16px" }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={embedded ? undefined : { position: "fixed", inset: 0, zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", padding: "16px" }}
+      onClick={embedded ? undefined : (e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{ width: "960px", maxWidth: "100%", flexShrink: 0, height: "680px", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "14px", overflow: "hidden" }}>
+      <div style={embedded
+        ? { width: "100%", maxWidth: "1200px", height: "calc(100vh - 120px)", minHeight: "560px", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "14px", border: "1px solid var(--color-line)", overflow: "hidden" }
+        : { width: "960px", maxWidth: "100%", flexShrink: 0, height: "680px", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "14px", overflow: "hidden" }}>
         {/* 헤더 */}
         <div style={{ display: "flex", alignItems: "center", padding: "14px 18px", borderBottom: "1px solid var(--color-line)" }}>
           <span style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-rose-deep)" }}>📦 상품 관리</span>
           <button type="button" onClick={() => setExcelImportOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "13px", fontWeight: 800, color: "#7B2D43", background: "#fff", border: "1.5px solid #7B2D43", borderRadius: "8px", padding: "6px 12px", cursor: "pointer", marginLeft: "auto" }}>📄 엑셀 대량등록</button>
           <button type="button" onClick={openCreate} style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "13px", fontWeight: 800, color: "#fff", background: "#7B2D43", border: "none", borderRadius: "8px", padding: "7px 13px", cursor: "pointer", marginLeft: "8px" }}>+ 상품 등록</button>
-          <button type="button" onClick={onClose} style={{ marginLeft: "8px", border: "none", background: "none", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>✕</button>
+          {embedded ? null : <button type="button" onClick={onClose} style={{ marginLeft: "8px", border: "none", background: "none", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>✕</button>}
         </div>
 
         {excelImportOpen ? (
@@ -2451,7 +2455,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
           </div>
         </div>
       ) : null}
-    </div>,
-    document.body,
+    </div>
   );
+  // 페이지 안에 넣을 때(레이아웃 B)는 포털 없이 그 자리에, 팝업일 때는 예전처럼 body 포털
+  return embedded ? popupTree : createPortal(popupTree, document.body);
 }

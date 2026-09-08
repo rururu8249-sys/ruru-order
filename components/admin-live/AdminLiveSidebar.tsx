@@ -1,11 +1,11 @@
-import { ADMIN_LIVE_MENUS, type AdminLiveMenuKey } from "./adminLiveMenu";
-import AdminSoundControl from "./AdminSoundControl";
+// components/admin-live/AdminLiveSidebar.tsx
+// [2026-09-08 5단계 · 레이아웃 B] 큰 메뉴 5개(방송 / 주문·입금 / 상품 / 고객 / 설정). 누르면 화면이 통째로 바뀐다.
+//   · 예외 배지(매칭필요·카드미결제)는 「주문·입금」에 붙는다.
+//   · 예전 「빠른보기」(카톡·카드결제·알림음)는 오른쪽 방송 레일로 옮겼다(AdminLiveBroadcastRail).
+//   · 실시간 접속 위젯은 그대로(방송 중 바로 보는 숫자).
+import { ADMIN_LIVE_TOP_MENUS, topMenuOf, type AdminLiveMenuKey } from "./adminLiveMenu";
 import AdminLiveLogoutButton from "./AdminLiveLogoutButton";
 import AdminLiveSidebarPresence from "./AdminLiveSidebarPresence";
-// [2026-09-08] 카톡·카드결제 버튼 주소는 설정 › 상점 정보에서 온다(하드코딩 제거)
-import { CONTACT_TYPE_SHORT, adminChatTarget } from "@/lib/shopInfo";
-import { useShopInfo } from "@/lib/useShopInfo";
-import { showAdminToast } from "@/lib/adminToast";
 
 type Props = {
   activeMenu: AdminLiveMenuKey;
@@ -18,6 +18,8 @@ type Props = {
   exceptionBadges?: { needMatch: number; cardUnpaid: number };
   /** 배지 클릭 시 해당 상태 필터로 바로 이동 (match=매칭필요, card=카드미결제) */
   onExceptionBadgeClick?: (kind: "match" | "card") => void;
+  /** 방송 중 표시(사이드바 상단 점) */
+  broadcastOn?: boolean;
 };
 
 export default function AdminLiveSidebar({
@@ -29,9 +31,10 @@ export default function AdminLiveSidebar({
   onCloseNav,
   exceptionBadges,
   onExceptionBadgeClick,
+  broadcastOn = false,
 }: Props) {
-  const shopInfo = useShopInfo();
-  const chatTarget = adminChatTarget(shopInfo);
+  const activeTop = topMenuOf(activeMenu);
+
   return (
     <>
       {/* 모바일: 드로어 열렸을 때 뒤 어둡게(클릭하면 닫힘). 데스크탑(md+)에선 숨김 */}
@@ -46,16 +49,19 @@ export default function AdminLiveSidebar({
 
       <aside
         className={[
-          "fixed inset-y-0 left-0 z-40 flex w-[220px] shrink-0 flex-col border-r border-line bg-surface px-4 py-6 transition-transform duration-200",
+          "fixed inset-y-0 left-0 z-40 flex w-[220px] shrink-0 flex-col overflow-y-auto border-r border-line bg-surface px-4 py-6 transition-transform duration-200",
           "md:static md:z-auto md:translate-x-0",
           navOpen ? "translate-x-0" : "-translate-x-full",
         ].join(" ")}
       >
-        <div className="mb-8 flex items-center gap-2">
+        <div className="mb-6 flex items-center gap-2 px-1">
           <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-deep text-white">▶</div>
           <div className="min-w-0">
             <div className="truncate text-lg font-black tracking-tight text-ink">루루동이LIVE</div>
-            <div className="text-[11px] font-bold text-ink-mute">운영 컨트롤타워</div>
+            <div className="flex items-center gap-1.5 text-[11px] font-bold text-ink-mute">
+              <span className={`inline-block h-2 w-2 rounded-full ${broadcastOn ? "bg-danger-tx" : "bg-line"}`} />
+              {broadcastOn ? "방송 중" : "방송 대기"}
+            </div>
           </div>
           {/* 모바일 닫기 버튼 */}
           <button
@@ -68,39 +74,47 @@ export default function AdminLiveSidebar({
           </button>
         </div>
 
-        <nav className="space-y-1.5">
-          {ADMIN_LIVE_MENUS.map((menu) => {
-            const active = menu.key === activeMenu;
+        <nav className="space-y-1">
+          {ADMIN_LIVE_TOP_MENUS.map((menu) => {
+            const active = menu.key === activeTop;
+            const showBadges = menu.key === "orders" && exceptionBadges && (exceptionBadges.needMatch > 0 || exceptionBadges.cardUnpaid > 0);
 
             return (
               <button
                 key={menu.key}
                 type="button"
                 onClick={() => {
-                  onMenuChange(menu.key);
+                  onMenuChange(menu.defaultKey);
                   onCloseNav?.();
                 }}
+                aria-current={active ? "page" : undefined}
                 className={[
-                  "flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition",
+                  "flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition",
                   active
                     ? "bg-rose-soft text-rose-deep shadow-sm ring-1 ring-rose-line"
                     : "text-ink-soft hover:bg-surface-2 hover:text-ink",
                 ].join(" ")}
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-surface text-base shadow-sm ring-1 ring-line">
+                <span
+                  className={[
+                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-base font-black shadow-sm ring-1",
+                    active ? "bg-rose-deep text-white ring-rose-deep" : "bg-surface text-ink-soft ring-line",
+                  ].join(" ")}
+                  aria-hidden
+                >
                   {menu.icon}
                 </span>
-                <span className="min-w-0">
+                <span className="min-w-0 flex-1">
                   <span className="block text-[15px] font-black">{menu.label}</span>
                   <span className="block truncate text-[10px] font-bold opacity-60">{menu.desc}</span>
                 </span>
-                {menu.key === "broadcast" && exceptionBadges && (exceptionBadges.needMatch > 0 || exceptionBadges.cardUnpaid > 0) ? (
-                  <span className="ml-auto flex shrink-0 flex-col items-end gap-0.5">
+                {showBadges ? (
+                  <span className="flex shrink-0 flex-col items-end gap-0.5">
                     {exceptionBadges.needMatch > 0 ? (
                       <span
                         role="button"
                         title={`입금자명·금액이 주문과 자동으로 안 맞아 수동 확인이 필요한 주문 ${exceptionBadges.needMatch}건 — 클릭하면 해당 주문만 보여요`}
-                        onClick={(e) => { e.stopPropagation(); onExceptionBadgeClick?.("match"); }}
+                        onClick={(e) => { e.stopPropagation(); onExceptionBadgeClick?.("match"); onCloseNav?.(); }}
                         className="cursor-pointer whitespace-nowrap rounded-full bg-danger-bg px-2 py-0.5 text-[10px] font-black text-danger-tx hover:ring-2 hover:ring-danger-tx/30"
                       >매칭필요 {exceptionBadges.needMatch} ›</span>
                     ) : null}
@@ -108,7 +122,7 @@ export default function AdminLiveSidebar({
                       <span
                         role="button"
                         title={`카드결제 선택 후 아직 결제완료 처리 전인 주문 ${exceptionBadges.cardUnpaid}건 — 클릭하면 해당 주문만 보여요`}
-                        onClick={(e) => { e.stopPropagation(); onExceptionBadgeClick?.("card"); }}
+                        onClick={(e) => { e.stopPropagation(); onExceptionBadgeClick?.("card"); onCloseNav?.(); }}
                         className="cursor-pointer whitespace-nowrap rounded-full bg-danger-bg px-2 py-0.5 text-[10px] font-black text-danger-tx hover:ring-2 hover:ring-danger-tx/30"
                       >카드미결제 {exceptionBadges.cardUnpaid} ›</span>
                     ) : null}
@@ -117,70 +131,10 @@ export default function AdminLiveSidebar({
               </button>
             );
           })}
-
-          {/* [2026-09-06] 유튜브 SEO 링크 제거(사장님) → [2026-09-07] 도구 페이지 자체도 삭제(커밋 b75f35d 에서 복구 가능). */}
         </nav>
 
         {/* [2026-08-29 사장님 요청] 실시간 접속자 — 사이드바에서 바로 보이게 */}
         <AdminLiveSidebarPresence />
-
-        {activeMenu === "broadcast" ? (
-          <section
-            className="mt-4 rounded-2xl border border-line bg-surface p-3 shadow-sm"
-            data-ruru-quick-modal-dock="sidebar-inline"
-          >
-            <div className="mb-2 flex items-center justify-between">
-              <div>
-                <div className="text-[10px] font-black tracking-[0.18em] text-ink-mute">QUICK</div>
-                <div className="text-sm font-black text-ink">빠른보기</div>
-              </div>
-            </div>
-
-            <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  // 카카오톡 ID 방식이면 열 주소가 없다 → ID 복사
-                  if (chatTarget.kind === "id") {
-                    navigator.clipboard?.writeText(chatTarget.id).catch(() => {});
-                    showAdminToast(`카카오톡 ID「${chatTarget.id}」를 복사했어요. 카카오톡에서 친구 목록을 확인하세요.`, "success");
-                    return;
-                  }
-                  const aw = window.screen.availWidth || 1600;
-                  const ah = window.screen.availHeight || 1000;
-                  const W = Math.min(1700, Math.round(aw * 0.92));
-                  const H = Math.min(1050, Math.round(ah * 0.92));
-                  const left = Math.max(0, Math.round((aw - W) / 2));
-                  const top = Math.max(0, Math.round((ah - H) / 2));
-                  const w = window.open(
-                    chatTarget.url,
-                    "ruruKakaoConsult",
-                    `popup=yes,width=${W},height=${H},left=${left},top=${top}`
-                  );
-                  if (w) { try { w.resizeTo(W, H); w.moveTo(left, top); w.focus(); } catch { /* 무시 */ } }
-                }}
-                className="flex h-10 items-center justify-center gap-1 rounded-xl border border-rose-line bg-rose-soft text-xs font-black text-rose-deep transition hover:opacity-90 active:scale-[0.98]"
-              >
-                <span>💬</span>
-                {CONTACT_TYPE_SHORT[shopInfo.contactType]}
-              </button>
-              <button
-                type="button"
-                onClick={() => window.open(shopInfo.paysterUrl, "ruruPayster", "popup=yes,width=480,height=720")}
-                className="flex h-10 items-center justify-center gap-1 rounded-xl border border-line bg-surface-2 text-xs font-black text-ink-soft transition hover:bg-surface-3 active:scale-[0.98]"
-              >
-                <span>💳</span>
-                카드결제
-              </button>
-            </div>
-
-            <div className="mt-2 rounded-xl bg-surface-2 px-2 py-2 text-[10px] font-bold leading-4 text-ink-soft">
-              방송 중 필요한 내용만 빠르게 확인
-            </div>
-
-            <AdminSoundControl />
-          </section>
-        ) : null}
 
         <div className="mt-auto space-y-2 pt-4">
           {/* 라이트/다크 토글 */}

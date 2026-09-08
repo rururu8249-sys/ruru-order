@@ -8,7 +8,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { showAdminToast } from "@/lib/adminToast";
 
-type Props = { onClose: () => void };
+// [2026-09-08 5단계] embedded=true 면 팝업 껍데기 없이 페이지 안에 그대로 그린다(레이아웃 B: 방송 › 채팅주문 탭)
+type Props = { onClose: () => void; embedded?: boolean };
 
 type QueueRow = {
   id: number;
@@ -64,7 +65,7 @@ const timeText = (iso: string | null) => {
   }).format(d);
 };
 
-export default function ChatOrderQueuePopup({ onClose }: Props) {
+export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props) {
   const [rows, setRows] = useState<QueueRow[]>([]);
   const [usage, setUsage] = useState<UsageRow[]>([]);
   const [enabled, setEnabled] = useState(false);
@@ -269,8 +270,8 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
   }, [rows]);
 
   return (
-    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className={embedded ? "" : "fixed inset-0 z-[130] flex items-center justify-center bg-black/40 p-4"} onClick={embedded ? undefined : onClose}>
+      <div className={embedded ? "flex h-[calc(100vh-120px)] min-h-[520px] w-full flex-col overflow-hidden rounded-3xl border border-line bg-surface" : "flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl bg-surface shadow-2xl"} onClick={(e) => e.stopPropagation()}>
 
         {/* 헤더 */}
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
@@ -281,7 +282,7 @@ export default function ChatOrderQueuePopup({ onClose }: Props) {
             <button type="button" onClick={() => void loadQueue()} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft hover:bg-surface-2">
               새로고침
             </button>
-            <button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-[15px] font-black text-ink-mute hover:text-ink">✕</button>
+            {embedded ? null : <button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-[15px] font-black text-ink-mute hover:text-ink">✕</button>}
           </div>
         </div>
 

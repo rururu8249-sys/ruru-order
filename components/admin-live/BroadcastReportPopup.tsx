@@ -22,9 +22,11 @@ type Props = {
   open: boolean;
   onClose: () => void;
   initialBroadcastId: string | null;
+  /** [2026-09-08 5단계] 페이지 안에 그대로(방송 › 기록·리포트 탭). 팝업 껍데기·✕ 없음 */
+  embedded?: boolean;
 };
 
-export default function BroadcastReportPopup({ open, onClose, initialBroadcastId }: Props) {
+export default function BroadcastReportPopup({ open, onClose, initialBroadcastId, embedded = false }: Props) {
   const [broadcasts, setBroadcasts] = useState<BroadcastEntry[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
   const [orders, setOrders] = useState<LiveOrder[]>([]);
@@ -293,12 +295,14 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
 
   return (
     <div
-      onClick={onClose}
-      style={{ position: "fixed", inset: 0, zIndex: 130, background: "rgba(30,20,20,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}
+      onClick={embedded ? undefined : onClose}
+      style={embedded ? undefined : { position: "fixed", inset: 0, zIndex: 130, background: "rgba(30,20,20,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ width: "min(780px, 96vw)", maxHeight: "92vh", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "16px", border: "1px solid var(--color-line)", boxShadow: "0 18px 50px rgba(0,0,0,0.22)", overflow: "hidden" }}
+        style={embedded
+          ? { width: "100%", maxWidth: "1100px", height: "calc(100vh - 120px)", minHeight: "520px", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "16px", border: "1px solid var(--color-line)", overflow: "hidden" }
+          : { width: "min(780px, 96vw)", maxHeight: "92vh", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "16px", border: "1px solid var(--color-line)", boxShadow: "0 18px 50px rgba(0,0,0,0.22)", overflow: "hidden" }}
       >
         {/* 헤더 */}
         <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "14px 18px", borderBottom: "1px solid var(--color-line)", flexShrink: 0 }}>
@@ -326,9 +330,11 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
           <button type="button" onClick={copyReport} style={{ flexShrink: 0, height: "34px", padding: "0 12px", borderRadius: "9px", border: "1px solid var(--color-rose-line)", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}>
             📋 복사
           </button>
-          <button type="button" onClick={onClose} aria-label="닫기" style={{ flexShrink: 0, width: "34px", height: "34px", borderRadius: "9px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}>
-            ✕
-          </button>
+          {embedded ? null : (
+            <button type="button" onClick={onClose} aria-label="닫기" style={{ flexShrink: 0, width: "34px", height: "34px", borderRadius: "9px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}>
+              ✕
+            </button>
+          )}
         </div>
 
         {/* 본문 스크롤 */}

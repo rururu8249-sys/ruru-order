@@ -27,7 +27,10 @@ import { formatKoreanPhone } from "@/lib/order/phone";
 type Props = {
   orders: LiveOrder[];
   onClose?: () => void;
-  initialTab?: "members" | "issues";
+  // [2026-09-08] loyalty(단골 리포트)도 바깥에서 바로 열 수 있게(예전엔 타입에 빠져 있었음)
+  initialTab?: "members" | "issues" | "loyalty";
+  /** [2026-09-08 5단계] 페이지 안에 그대로(고객 메뉴). 팝업 껍데기·✕ 없음 */
+  embedded?: boolean;
 };
 
 type LooseLiveOrder = LiveOrder & Record<string, any>;
@@ -1001,7 +1004,7 @@ function CustomerDetailDrawer({
 //   방송 중에 타이핑할 시간이 없다. 눌러서 넣고 필요하면 고쳐 쓴다.
 //   ⚠️ 문구만이다. 누르는 순간 나가지 않는다 — 입력창에 채워질 뿐이고 [보내기]를 눌러야 발송된다.
 
-export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = "members" }: Props) {
+export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = "members", embedded = false }: Props) {
   const [custTab, setCustTab] = useState<"members" | "issues" | "loyalty">(initialTab);
   const [phoneBlockOpen, setPhoneBlockOpen] = useState(false);
   const [keyword, setKeyword] = useState("");
@@ -1619,12 +1622,14 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}>
-      <div className="flex h-[88vh] w-full max-w-[640px] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
-        <div className="flex items-center justify-between border-b border-rose-line px-5 py-3 shrink-0">
-          <span className="text-[15px] font-black text-ink">👥 고객·이슈</span>
-          <button type="button" onClick={() => onClose?.()} className="text-ink-mute hover:text-ink text-lg leading-none">✕</button>
-        </div>
+    <div className={embedded ? "" : "fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 p-4"} onClick={embedded ? undefined : (e) => { if (e.target === e.currentTarget) onClose?.(); }}>
+      <div className={embedded ? "flex h-[calc(100vh-120px)] min-h-[520px] w-full max-w-[1100px] flex-col overflow-hidden rounded-2xl border border-line bg-surface" : "flex h-[88vh] w-full max-w-[640px] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl"}>
+        {embedded ? null : (
+          <div className="flex items-center justify-between border-b border-rose-line px-5 py-3 shrink-0">
+            <span className="text-[15px] font-black text-ink">👥 고객·이슈</span>
+            <button type="button" onClick={() => onClose?.()} className="text-ink-mute hover:text-ink text-lg leading-none">✕</button>
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-5 space-y-4">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-rose-soft/40 px-4 py-2.5 text-[12px] font-black text-ink-soft">
             <span>전체 <span className="text-ink">{customers.length.toLocaleString("ko-KR")}</span></span>
