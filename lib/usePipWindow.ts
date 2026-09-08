@@ -193,18 +193,19 @@ export function usePipWindow() {
     setPipWindow(null);
   }, []);
 
-  // 팝업이 닫혀도 복사창은 «닫지 않는다».
-  //   [2026-09-08] 브라우저가 클릭 한 번에 창 하나만 열어주기 때문에, 매번 닫았다 열면
-  //   그 한 번의 «열 권한»을 복사창이 써버려 페이스터가 안 열린다(사장님이 겪은 증상).
-  //   대신 «엉뚱한 주문의 금액»이 남아 있으면 위험하므로 안내 문구로 비운다.
+  // 팝업이 닫히면 복사창도 같이 닫는다.
+  //   [2026-09-08 사장님] 「그럼 다른 업무는 어떻게 봐?」 — 항상 맨 위에 뜨는 창을 하루 종일
+  //   띄워두면 다른 일에 방해가 된다. 카드결제할 때만 떴다가 같이 사라져야 한다.
+  //   그래도 페이스터가 같이 열리는 이유는 여는 «순서» 때문이다(실측):
+  //     ① 복사창(requestWindow) 먼저 — 클릭 권한을 여기 쓴다
+  //     ② 페이스터는 «이미 열려 있는 이름창»이라 권한 없이도 이동한다
+  //   그래서 페이스터 창만 살아 있으면 복사창은 매번 새로 열어도 된다.
   useEffect(() => {
     return () => {
       const w = openedRef.current;
       openedRef.current = null;
-      if (!w || w.closed) return;
       try {
-        w.document.body.innerHTML =
-          '<div style="display:flex;height:100vh;align-items:center;justify-content:center;padding:24px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;font-weight:700;color:#8B99BC;line-height:1.7">카드결제할 주문을 선택하면<br>여기에 복사창이 나옵니다.<br><span style="font-size:11px">이 창은 닫지 마세요 — 닫으면 다음에 페이스터가 같이 안 열립니다.</span></div>';
+        w?.close();
       } catch {
         /* 이미 닫혔으면 무시 */
       }

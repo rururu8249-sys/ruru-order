@@ -161,12 +161,14 @@ export function openPaysterRightHalf() {
   //   대신 «이미 열려 있는 이름창»은 클릭 권한 없이도 다시 부를 수 있다(실측 확인).
   //   그래서 두 창을 하루 종일 켜두고, 한 번의 클릭 권한은 «없는 창 하나»에만 쓴다.
   if (paysterAlive()) {
-    // 페이스터는 살아 있다 → 권한 없이 이동·포커스. 남는 권한으로 복사창을 연다.
-    openPaysterAt(url, pip ? rectBesidePip(pip) : paysterSlotRect());
+    // ★ 순서가 핵심 (실측): 복사창을 «먼저» 열어 클릭 권한을 쓰고,
+    //   페이스터는 «이미 열린 이름창»이라 권한 없이도 그 주소로 이동한다.
+    //   반대로 하면(페이스터 먼저) 복사창이 NotAllowedError 로 막힌다.
     if (wantPip && !pip) {
       const size = pipSize();
       void preopenPipWindow(size.width, size.height);
     }
+    openPaysterAt(url, pip ? rectBesidePip(pip) : paysterSlotRect());
     return;
   }
   // 페이스터가 없다 → 결제가 우선이므로 클릭 권한을 페이스터에 쓴다.
@@ -514,9 +516,9 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
                   ② 브라우저는 «클릭 한 번에 창 하나»만 열어준다 → 두 창을 켜둬야 같이 따라온다.
                   ③ 복사창 위치는 크롬이 정한다(우리가 못 옮김). 대신 끌어다 놓은 자리를 기억한다. */}
             <br />
-            <b>두 창(페이스터·복사창)은 닫지 말고 켜두세요.</b> 닫으면 ① 페이스터 로그인이 풀리고 ② 다음 카드결제 때 둘이 같이 안 열립니다. 브라우저가 «클릭 한 번에 창 하나»만 열어주기 때문이에요. 켜두면 카드결제만 눌러도 둘 다 따라옵니다.
+            <b>페이스터 창은 닫지 말고 「최소화」해 두세요.</b> 닫으면(빨간 ✕) 페이스터가 로그인을 잊어버립니다. 다른 업무 보실 땐 최소화하거나 뒤로 보내두면 되고, 카드결제를 누르면 다시 앞으로 나옵니다. 주문이 몇 건이든 <b>이 창 하나로</b> 계속 결제합니다.
             <br />
-            <b>두 창을 원하는 자리에 한 번씩 끌어다 놓으세요</b> — 그 자리를 기억해서 계속 그대로 뜹니다.
+            <b>복사창은 카드결제할 때만 떴다가</b> 이 팝업을 닫으면 같이 사라집니다. 자리를 한 번 끌어다 놓으면 그 자리를 기억합니다.
           </div>
         </div>
     </div>
