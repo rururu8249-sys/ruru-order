@@ -8,7 +8,7 @@ import { showAdminConfirm } from "@/lib/adminConfirm";
 import type { LiveOrder } from "./types";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 // [2026-09-08] 페이스터 주소는 설정 › 상점 정보에서 온다(하드코딩 제거)
-import { useShopInfo } from "@/lib/useShopInfo";
+import { getShopInfoNow, useShopInfo } from "@/lib/useShopInfo";
 
 // ═══ 페이스터를 «어떻게» 열 것인가 — 2026-09-08 확정. 다시 뒤집지 말 것 ═══
 //
@@ -26,30 +26,58 @@ import { useShopInfo } from "@/lib/useShopInfo";
 //   ※ 한때 「크롬의 다른 사이트 쿠키 차단 때문」이라고 적었는데 틀렸다.
 //     사장님 크롬은 사이트 데이터 저장이 이미 «허용»이었다. 그 설명은 폐기한다.
 //
-// 그래서 이렇게 한다 — 예전에 쓰던 «왼쪽 복사창 / 오른쪽 페이스터» 를 창으로 재현:
-//   · 복사창  = 화면 왼쪽 절반 (모달)
-//   · 페이스터 = 화면 오른쪽 절반 (별도 창)
+// 그래서 이렇게 한다 — 예전 «왼쪽 복사창 / 오른쪽 페이스터» 모양을 «창»으로 그대로 재현:
+//   · 모달 박스 크기는 예전과 «똑같은 px» 이다 — 가로 980(왼쪽 490 + 오른쪽 490),
+//     세로 min(1500, 화면높이−16). 50vw·100dvh 처럼 화면따라 늘었다 줄었다 하지 않는다.
+//   · 왼쪽 490 = 복사창(모달) / 오른쪽 490 = 그 자리에 페이스터 «창»이 정확히 겹쳐 뜬다.
 //   · 창 이름은 주지 않는다. 이름을 주면 window.opener 가 남아 흰 화면이 된다.
 //     (그래서 누를 때마다 새 창이 뜬다. «뜨는 것»이 «창 재사용»보다 우선이다.)
 //   · 반드시 클릭 제스처 «안에서» 불러야 팝업차단에 안 걸린다.
-export function openPayster(url: string) {
-  if (typeof window === "undefined") return;
-  // 화면 «오른쪽 절반»에 창으로 띄운다 — 왼쪽 절반이 복사창이라 그대로 복사→붙여넣기가 된다.
-  //   ⚠ 창 이름을 주면 window.opener 가 남아 페이스터가 안 뜬다 → 이름 없이(noopener) 연다.
-  //   ⚠ 반드시 «클릭 제스처 안에서» 불러야 팝업차단에 안 걸린다.
-  const sw = window.screen?.availWidth || window.innerWidth;
-  const sh = window.screen?.availHeight || window.innerHeight;
-  const left = Math.floor(sw / 2);
-  const width = sw - left;
-  window.open(url, "_blank", `noopener,noreferrer,popup=yes,left=${left},top=0,width=${width},height=${sh}`);
+
+// 박스 치수 — «한 곳»에서만 정한다. 화면(JSX)과 창 위치 계산이 어긋나면 안 되기 때문.
+const BOX_W = 980;          // 가로 px (왼쪽 복사창 490 + 오른쪽 페이스터 490)
+const BOX_W_RATIO = 0.96;   // 좁은 화면에서만 96vw 로 줄어든다 (예전과 동일)
+const BOX_H_MAX = 1500;     // 세로 상한 px (예전과 동일)
+const BOX_V_GAP = 16;       // 위아래 8px씩 (예전과 동일)
+
+/** 모달 «오른쪽 절반»(예전 iframe 자리)이 «모니터 좌표»로 어디인지.
+ *  창을 그 자리에 정확히 겹쳐 띄우기 위한 값이다. */
+function paysterSlotRect() {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const boxW = Math.min(BOX_W, vw * BOX_W_RATIO);
+  const boxH = Math.min(BOX_H_MAX, vh - BOX_V_GAP);
+  const width = Math.round(boxW / 2);
+  const height = Math.round(boxH);
+  // 브라우저 «내용 영역»이 모니터의 어디서 시작하나 (주소창·탭줄 높이 = outerHeight − innerHeight)
+  const originX = window.screenX + Math.max(0, Math.round((window.outerWidth - vw) / 2));
+  const originY = window.screenY + Math.max(0, window.outerHeight - vh);
+  const availW = window.screen?.availWidth || vw;
+  const availH = window.screen?.availHeight || vh;
+  const left = Math.round(originX + (vw - boxW) / 2 + boxW / 2);
+  const top = Math.round(originY + (vh - boxH) / 2);
+  // 모니터 밖으로 나가면 잘리므로 안쪽으로 붙인다
+  return {
+    left: Math.max(0, Math.min(left, availW - width)),
+    top: Math.max(0, Math.min(top, availH - height)),
+    width,
+    height,
+  };
 }
 
-/** [2026-09-08] 카드결제 팝업 «안»에 페이스터가 붙어 나오므로 별도 창은 자동으로 열지 않는다.
- *  예전에 이걸 자동 호출해서 «모달 + 별도 창»이 같이 떠 화면이 엉망이 됐다.
- *  별도 창은 프레임이 비어 보일 때 사장님이 「새 창 ↗」을 눌렀을 때만 연다.
- *  (LiveOrderTable 등 기존 호출부 호환을 위해 이름만 남긴다) */
+export function openPayster(url: string) {
+  if (typeof window === "undefined") return;
+  //   ⚠ 창 이름을 주면 window.opener 가 남아 페이스터가 안 뜬다 → 이름 없이(noopener) 연다.
+  //   ⚠ 반드시 «클릭 제스처 안에서» 불러야 팝업차단에 안 걸린다.
+  const r = paysterSlotRect();
+  window.open(url, "_blank", `noopener,noreferrer,popup=yes,left=${r.left},top=${r.top},width=${r.width},height=${r.height}`);
+}
+
+/** 카드결제 버튼에서 호출 — 페이스터를 «화면 오른쪽 절반»에 띄운다.
+ *  프레임 안에는 안 나오므로(실측) 창으로 띄우되, 모달이 왼쪽 절반이라 겹치지 않는다.
+ *  ⚠ 주문표(LiveOrderTable)의 클릭 «안에서» 불려야 팝업차단에 안 걸린다. */
 export function openPaysterRightHalf() {
-  /* no-op — 자동으로 창을 띄우지 않는다 */
+  openPayster(getShopInfoNow().paysterUrl);
 }
 
 type Props = {
@@ -244,8 +272,11 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
       {/* [2026-08-31 사장님 지시] 세로는 화면 거의 끝까지(위아래 8px만), 왼쪽은 페이스터풍 네이비·블루로
           위 쏠림 없이 세로 공간을 나눠 쓴다(헤더 → 복사 카드들 → (여백) → 하단 액션). */}
       {/* [2026-09-08 사장님] 「프레임 안에 딱딱 왼쪽 오른쪽 붙어 나와야지」 — 원래 모양.
-            창을 따로 띄우면 복사하려고 브라우저를 누르는 순간 페이스터 창이 뒤로 숨어서 못 쓴다. */}
-      <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "row", width: "980px", maxWidth: "96vw", height: "min(1500px, calc(100dvh - 16px))", borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}>
+            페이스터는 프레임 안에서 안 그려진다(실측). 그래서 박스는 «예전 px 그대로» 두고
+            (가로 980 = 왼쪽 490 + 오른쪽 490, 세로 min(1500, 100dvh−16)),
+            오른쪽 490 자리에 페이스터 «창»이 정확히 겹쳐 뜨게 한다. 크기를 임의로 늘리거나 줄이지 않는다.
+            ⚠ pointerEvents 는 건드리지 않는다 — 예전에 그것 때문에 X 버튼이 안 눌렸다. */}
+      <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "row", width: `${BOX_W}px`, maxWidth: "96vw", height: `min(${BOX_H_MAX}px, calc(100dvh - ${BOX_V_GAP}px))`, borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}>
         <div style={{ width: "50%", height: "100%", background: "#F4F6FB", display: "flex", flexDirection: "column", overflowY: "auto" }}>
         <div className="flex items-center justify-between px-5 py-4" style={{ background: "#101C3D" }}>
           <span className="text-[16px] font-black text-white">💳 카드결제 — {order.nickname}</span>
@@ -360,23 +391,14 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
           </div>
         </div>
         </div>
-        <div style={{ width: "50%", height: "100%", background: "var(--color-surface)", borderLeft: "1px solid var(--color-line)", display: "flex", flexDirection: "column" }}>
-          <iframe
-            src={paysterUrl}
-            title="페이스터 결제"
-            style={{ width: "100%", flex: "1 1 0%", minHeight: 0, border: 0 }}
-          />
-          {/* 프레임 안이 비어 보일 때만 쓰는 최후의 수단. 평소엔 신경 쓸 필요 없다. */}
-          <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "8px", padding: "6px 12px", borderTop: "1px solid var(--color-line)", background: "var(--color-surface-2)" }}>
-            <span style={{ fontSize: "11px", fontWeight: 650, color: "var(--color-ink-mute)" }}>
-              {/* [2026-09-08 실측] 크롬 설정 문제가 아니다 — 쿠키·저장소 접근 모두 정상이고
-                    차단 메시지도 없다. 페이스터 앱이 «프레임 안에서는 스스로 안 그리는» 것.
-                    크롬 설정을 만지라는 안내는 틀렸으므로 지운다. */}
-              페이스터는 이 안에 안 나옵니다 (페이스터 쪽 제한) →
-            </span>
-            <button type="button" onClick={() => openPayster(paysterUrl)} className="ru-btn ru-btn-sm" style={{ marginLeft: "auto" }}>
-              새 창 ↗
-            </button>
+        {/* 오른쪽 절반 — 예전 iframe 자리. 페이스터 «창»이 정확히 이 자리에 겹쳐 뜬다.
+              창이 뒤로 숨었을 때 다시 부르는 자리이기도 하다. (프레임 안에는 안 그려짐 — 실측) */}
+        <div style={{ width: "50%", height: "100%", background: "var(--color-surface)", borderLeft: "1px solid var(--color-line)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px", padding: "24px", textAlign: "center" }}>
+          <div className="ru-t-sub">💳 페이스터 결제창</div>
+          <div className="ru-t-hint" style={{ lineHeight: 1.7 }}>
+            이 자리에 페이스터 창이 겹쳐서 열립니다.
+            <br />
+            창이 안 보이면 왼쪽 위 「페이스터 창 다시 열기 ↗」를 누르세요.
           </div>
         </div>
       </div>
