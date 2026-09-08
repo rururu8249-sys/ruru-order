@@ -8,7 +8,7 @@ import { showAdminConfirm } from "@/lib/adminConfirm";
 import type { LiveOrder } from "./types";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 // [2026-09-08] 페이스터 주소는 설정 › 상점 정보에서 온다(하드코딩 제거)
-import { getShopInfoNow, useShopInfo } from "@/lib/useShopInfo";
+import { useShopInfo } from "@/lib/useShopInfo";
 
 // ═══ 페이스터를 «어떻게» 열 것인가 — 2026-09-08 확정. 다시 뒤집지 말 것 ═══
 //
@@ -44,10 +44,12 @@ export function openPayster(url: string) {
   window.open(url, "_blank", `noopener,noreferrer,popup=yes,left=${left},top=0,width=${width},height=${sh}`);
 }
 
-/** 카드결제 버튼에서 호출 — 페이스터를 화면 오른쪽 절반에 띄운다.
- *  주문표(LiveOrderTable)의 클릭 핸들러 «안에서» 불려야 팝업차단에 안 걸린다. */
+/** [2026-09-08] 카드결제 팝업 «안»에 페이스터가 붙어 나오므로 별도 창은 자동으로 열지 않는다.
+ *  예전에 이걸 자동 호출해서 «모달 + 별도 창»이 같이 떠 화면이 엉망이 됐다.
+ *  별도 창은 프레임이 비어 보일 때 사장님이 「새 창 ↗」을 눌렀을 때만 연다.
+ *  (LiveOrderTable 등 기존 호출부 호환을 위해 이름만 남긴다) */
 export function openPaysterRightHalf() {
-  openPayster(getShopInfoNow().paysterUrl);
+  /* no-op — 자동으로 창을 띄우지 않는다 */
 }
 
 type Props = {
