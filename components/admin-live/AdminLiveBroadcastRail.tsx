@@ -79,7 +79,10 @@ export default function AdminLiveBroadcastRail({
           </span>
         </div>
 
-        <div className="min-h-0 flex-1">
+        {/* [2026-09-09 사장님 지적] 「방송화면·채팅이 화면 안에 딱 보여야 하는데 왜 바뀌었냐」
+              원인: 이 칸이 «flex 가 아닌» div 라서 안쪽 section 의 flex-1 이 무시됐다.
+              → 두 카드가 내용 높이로만 줄어들고 아래가 통째로 비었다. flex 컨테이너로 고친다. */}
+        <div className="flex min-h-0 flex-1 flex-col">
           <LiveBroadcastPanels variant="column" hideProducts videoRatio={videoRatio} youtubeUrl={youtubeUrl} activeBroadcastId={activeBroadcastId} />
         </div>
       </aside>

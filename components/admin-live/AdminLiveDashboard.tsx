@@ -280,12 +280,14 @@ function buildCriteriaLabel(filters: LiveOrderFilters) {
   return parts.join(" · ");
 }
 
-// [2026-09-08 사장님 지적] 모든 메뉴 화면의 «세로 크기»는 이 한 줄로만 정한다(제각각 금지).
-//   화면 높이 - (본문 상하 여백 + 제목·탭 줄). 여기만 바꾸면 전 메뉴가 같이 바뀐다.
-// [2026-09-08 사장님 지적] 「모든 페이지가 왼쪽 사이드메뉴바 px랑 하나도 안 맞는다」
-//   원인: 화면 카드 높이를 100vh-104px 라는 «어림 숫자»로 잡아 제목줄/여백 실제 높이와 어긋났다.
-//   수정: 숫자를 없애고 남는 세로를 그대로 채운다(flex-1). 창 크기·확대율·제목줄이 바뀌어도 사이드바 바닥과 항상 같은 선.
-const SCREEN_SHELL_HEIGHT = "min-h-0 flex-1";
+// [2026-09-09 사장님 지적] 「작은 한정된 공간 안에서 스크롤을 움직이면서 봐야 한다는 자체가 숨막힌다」
+//   그래서 «화면 안 스크롤(중첩 스크롤)»을 전 메뉴에서 없앤다.
+//   · 예전: 바깥을 h-screen 으로 잠그고 각 화면에 자체 스크롤을 줬다 → 표가 몇 줄만 보임 + 스크롤바 2개
+//   · 지금: 페이지가 통째로 스크롤한다(스크롤바 1개). 표는 내용만큼 길어진다.
+//     사이드바와 오른쪽 방송레일은 원래 fixed 라 항상 화면 전체 높이 — 바닥 선은 그대로 맞는다.
+//   (Shopify 관리자·스마트스토어 판매관리도 목록 화면은 전부 이 방식이다)
+//   화면 틀은 이제 높이를 «정하지 않는다». 내용이 정한다.
+const SCREEN_SHELL_HEIGHT = "";
 
 // [2026-09-08] ?panel= 은 adminLiveMenu 의 화면 키 전부 허용(옛 주소 그대로 열림)
 function isMenuKeyForUrl(value: string | null): value is AdminLiveMenuKey {
@@ -1443,8 +1445,8 @@ export default function AdminLiveDashboard() {
   const railOpen = railOpenChoice;   // 방송 중이라고 «저절로» 열지 않는다 — 사장님이 고른 상태를 그대로
 
   return (
-    <div className={`h-screen overflow-hidden bg-canvas text-ink ${theme === "dark" ? "dark" : ""}`} data-ruru-controltower-shell="layout-b-pages-rail-v4">
-      <div className="flex h-full min-h-0">
+    <div className={`min-h-screen bg-canvas text-ink ${theme === "dark" ? "dark" : ""}`} data-ruru-controltower-shell="layout-b-pages-rail-v4">
+      <div className="flex min-h-screen">
         <AdminLiveSidebar
           activeMenu={activeMenu}
           theme={theme}
@@ -1473,7 +1475,7 @@ export default function AdminLiveDashboard() {
           onOpenVisitStats={() => { setActiveMenu("visits"); replacePanelInUrl("visits"); }}
         />
 
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-3 py-3 md:px-5 md:py-4">
+        <main className="flex min-w-0 flex-1 flex-col px-3 py-3 md:px-5 md:py-4">
           {/* 모바일 전용: 사이드바(메뉴) 여는 햄버거. 데스크탑(md+)에선 사이드바가 항상 보여 숨김 */}
           <button
             type="button"
@@ -1486,10 +1488,11 @@ export default function AdminLiveDashboard() {
           {/* [2026-09-08 5단계 · 레이아웃 B] 왼쪽 = 큰 메뉴 화면(통째로 전환) / 오른쪽 = 접이식 방송·채팅 레일 */}
           {/* [2026-09-08 사장님 지적] 메뉴마다 크기가 제각각이면 안 된다.
               → 모든 화면이 이 «하나의 틀» 안에 들어간다. 가로=화면 전체, 세로=화면 높이-헤더. 예외 없음. */}
-          <div className="mx-auto flex min-h-0 w-full max-w-[1720px] flex-1 flex-col">
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className="mx-auto flex w-full max-w-[1720px] flex-1 flex-col">
+            <div className="flex min-w-0 flex-1 flex-col">
               {/* 화면 제목 + 작은 탭 */}
-              <div className="mb-3 flex shrink-0 flex-wrap items-end justify-between gap-2 border-b border-rose-line">
+              {/* 페이지가 스크롤해도 화면 이름·탭은 위에 붙어 있다(내용이 뒤로 지나가도 가려지지 않게 배경 지정) */}
+              <div className="sticky top-0 z-30 -mx-3 -mt-3 mb-3 flex flex-wrap items-end justify-between gap-2 border-b border-rose-line bg-canvas px-3 pt-3 md:-mx-5 md:-mt-4 md:px-5 md:pt-4">
                 <div className="flex items-end gap-3">
                   <h1 className="pb-2 text-lg font-black tracking-tight text-ink">{activeTopMenu.label}</h1>
                   {activeSubTabs.length > 1 ? (
@@ -1544,11 +1547,11 @@ export default function AdminLiveDashboard() {
               ) : null}
 
               {/* ▼▼ 모든 메뉴 공통 틀 — 여기 안쪽만 화면마다 다르다 ▼▼ */}
-              <div className={`w-full overflow-hidden rounded-2xl border border-line bg-surface ${SCREEN_SHELL_HEIGHT}`}>
+              <div className={`w-full rounded-2xl border border-line bg-surface ${SCREEN_SHELL_HEIGHT}`}>
 
               {/* ── 방송 › 방송 콘솔 ── */}
               {activeMenu === "broadcast" ? (
-                <div className="h-full space-y-3 overflow-y-auto p-4">
+                <div className="space-y-3 p-4">
                   <LiveHeader
                     activeBroadcast={activeBroadcast}
                     savingBroadcast={savingBroadcast}
@@ -1602,7 +1605,7 @@ export default function AdminLiveDashboard() {
 
               {/* ── 주문·입금 › 실시간 주문 ── */}
               {activeMenu === "orders" ? (
-                <div className="flex h-full min-h-0 flex-col gap-3 p-4">
+                <div className="flex flex-col gap-3 p-4">
                   <div className="shrink-0">
                     <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
                   </div>
@@ -1612,7 +1615,7 @@ export default function AdminLiveDashboard() {
                       onOpenMission={() => { setActiveMenu("event"); replacePanelInUrl("event"); }}
                     />
                   </div>
-                  <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                  <div className="flex min-w-0 flex-col">
                     <LiveOrderTable
                       orders={filteredOrders}
                       allOrderCount={orders.length}
@@ -1642,7 +1645,7 @@ export default function AdminLiveDashboard() {
 
               {/* ── 주문·입금 › 입금내역 ── */}
               {activeMenu === "payments" ? (
-                <div className="h-full overflow-y-auto p-5">
+                <div className="p-5">
                   <AdminLivePaymentPanel
                     deposits={deposits}
                     orderGroups={orderGroups}
@@ -1654,7 +1657,7 @@ export default function AdminLiveDashboard() {
 
               {/* ── 주문·입금 › 정산 ── */}
               {activeMenu === "settlement" ? (
-                <div className="h-full overflow-y-auto p-5">
+                <div className="p-5">
                   <AdminLiveSettlementPanel
                     orders={orders}
                     onGoToUnpaidOrders={() => {
@@ -1682,12 +1685,12 @@ export default function AdminLiveDashboard() {
 
               {/* ── 고객 › 회원·이슈·단골 ── */}
               {activeMenu === "customers" ? (
-                <div className="flex h-full flex-col gap-3 p-4">
+                <div className="flex flex-col gap-3 p-4">
                   {/* [2026-09-08] 방송 콘솔에 있던 「고객이슈」 요약 — 사람에 관한 건 고객 메뉴로 */}
                   <div className="shrink-0">
                     <LiveIssueRailPanel onOpenAll={() => setCustomersInitialTab("issues")} />
                   </div>
-                  <div className="min-h-0 flex-1">
+                  <div className="min-w-0">
                     <AdminLiveCustomersPanel embedded orders={orders} initialTab={customersInitialTab} onClose={() => setCustomersInitialTab("members")} />
                   </div>
                 </div>
@@ -1695,14 +1698,14 @@ export default function AdminLiveDashboard() {
 
               {/* ── 고객 › 쪽지·공지 ── */}
               {activeMenu === "notice" ? (
-                <div className="h-full w-full">
+                <div className="w-full">
                   <AdminLiveNoticePanel />
                 </div>
               ) : null}
 
               {/* ── 설정 › 시스템 점검 (공통) ── */}
               {activeMenu === "audit" ? (
-                <div className="h-full space-y-3 overflow-y-auto p-4">
+                <div className="space-y-3 p-4">
                   {/* [2026-07-25 사장님] 상시 시스템 점검 카드 — 이상 없어도 초록 표시 */}
                   <SystemAuditCard onOpenDetail={() => void runIntegrityCheck()} />
                   <div className="rounded-2xl border border-line bg-surface-2 px-4 py-3 text-xs font-bold leading-5 text-ink-soft">
@@ -1719,7 +1722,7 @@ export default function AdminLiveDashboard() {
 
               {/* ── 설정 ── */}
               {activeMenu === "settings" ? (
-                <div className="h-full w-full">
+                <div className="w-full">
                   <AdminLiveSettingsPanel onOpenNotice={() => { setActiveMenu("notice"); replacePanelInUrl("notice"); }} />
                 </div>
               ) : null}

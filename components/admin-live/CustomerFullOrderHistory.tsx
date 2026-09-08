@@ -46,8 +46,9 @@ function classify(text: string): { kind: Kind; label: string } {
   if (/manual_match_needed|입금확인 필요|입금매칭 필요|수동확인/.test(t)) return { kind: "unpaid", label: "매칭필요" };
   if (/card_unpaid|카드 미결제|카드미결제/.test(t)) return { kind: "unpaid", label: "카드미결제" };
   if (/카드결제완료|card_paid/.test(t)) return { kind: "paid", label: "카드결제완료" };
-  if (/자동입금확인|auto_paid/.test(t)) return { kind: "paid", label: "입금확인" };
-  if (/수동입금확인|manual_paid/.test(t)) return { kind: "paid", label: "입금확인" };
+  // [2026-09-09 사장님 요청] 자동/수동 구분 복원 — kind(=결제완료 판정)는 그대로 "paid"
+  if (/자동입금확인|auto_paid/.test(t)) return { kind: "paid", label: "자동입금확인" };
+  if (/수동입금확인|manual_paid/.test(t)) return { kind: "paid", label: "수동입금확인" };
   if (/입금확인|결제완료|출고|paid/.test(t)) return { kind: "paid", label: "입금확인" };
   return { kind: "unpaid", label: "미입금" };
 }

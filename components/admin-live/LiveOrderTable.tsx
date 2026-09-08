@@ -194,11 +194,13 @@ function statusBadge(order: LiveOrder, actions?: { onMatch?: () => void; onCardP
   if (order.paymentStatus === "card_paid") {
     return <span style={{ ...base, ...blue }}>카드결제완료</span>;
   }
+  // [2026-09-09 사장님 요청] 자동/수동을 배지에서 다시 구분한다(예전 방식 복귀).
+  //   어느 쪽으로 확인된 건지 표에서 바로 보여야 사고를 잡는다. 돈 판정은 코드로 하므로 무관.
   if (order.paymentStatus === "auto_paid") {
-    return <span style={{ ...base, ...green }} title={paymentStatusDetail("auto_paid")}>입금확인</span>;
+    return <span style={{ ...base, ...green }} title={paymentStatusDetail("auto_paid")}>자동입금확인</span>;
   }
   if (order.paymentStatus === "manual_paid") {
-    return <span style={{ ...base, ...green }} title={paymentStatusDetail("manual_paid")}>입금확인</span>;
+    return <span style={{ ...base, ...green }} title={paymentStatusDetail("manual_paid")}>수동입금확인</span>;
   }
   return <span style={{ ...base, ...green }}>입금확인</span>;
 }

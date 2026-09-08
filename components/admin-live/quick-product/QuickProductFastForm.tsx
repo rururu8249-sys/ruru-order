@@ -2598,7 +2598,10 @@ export default function QuickProductFastForm({
           {/* .top-row : 사진(120) + 필드 */}
           <div style={{ display: "grid", gridTemplateColumns: (isMobile || !brandGroupActive) ? "1fr" : "120px 1fr", gap: "12px", marginBottom: "12px" }}>
             {/* [2026-08-29] 모바일에선 1열로 떨어지는데 폭이 120px 로 고정돼 있어 화면이 어색했다 */}
-            <div style={{ width: isMobile ? "100%" : "120px" }}>
+            {/* [2026-09-09 사장님 지적] 사진 10장이 «세로 한 줄»로 쌓이고 오른쪽이 통째로 비었다.
+                  원인: 바로 위 그리드는 브랜드상품이 아니면 «1열(1fr)» 인데, 이 칸 폭만 120px 로
+                  고정돼 있어 74px 사진이 한 줄에 하나씩만 들어갔다. 그리드 조건과 폭을 맞춘다. */}
+            <div style={{ width: isMobile || !brandGroupActive ? "100%" : "120px" }}>
               {brandGroupActive ? (
                 // [2026-08-29] 예전에는 브랜드 상품이면 글자 썸네일로 고정돼 사진을 올릴 수가 없었다.
                 //   → 사진을 올리면 그 사진을, 안 올리면 지금처럼 글자 썸네일을 쓴다.
