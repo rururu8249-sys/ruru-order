@@ -543,8 +543,6 @@ export default function AdminLiveDashboard() {
   const [customersInitialTab, setCustomersInitialTab] = useState<"members" | "issues">("members");
   // [2026-09-08 5단계] 오른쪽 방송 레일 열림 — null 이면 "방송 중이면 열림, 아니면 접힘"(자동), 손잡이를 누르면 고정
   const [railOpenChoice, setRailOpenChoice] = useState<boolean | null>(null);
-  // [2026-09-08 사장님 요청] 펼치면 시원하게(화면 절반 이상). 「보통」으로 줄일 수 있다.
-  const [railWide, setRailWide] = useState(true);
   // 라이트/다크 테마 토글 — 관리자 루트에만 .dark 부여(다른 페이지 영향 0). localStorage 기억.
   const [theme, setTheme] = useState<"light" | "dark">("light");
   useEffect(() => {
@@ -1708,8 +1706,6 @@ export default function AdminLiveDashboard() {
             <AdminLiveBroadcastRail
               open={railOpen}
               onToggle={() => setRailOpenChoice(!railOpen)}
-              wide={railWide}
-              onToggleWide={() => setRailWide((v) => !v)}
               broadcastOn={Boolean(activeBroadcast)}
               videoRatio={videoRatio}
               youtubeUrl={activeBroadcast?.youtube_live_url || ""}
