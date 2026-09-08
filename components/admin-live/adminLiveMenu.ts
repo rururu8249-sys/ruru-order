@@ -15,6 +15,7 @@ export type AdminLiveMenuKey =
   | "products" // 상품
   | "customers" // 회원·이슈·단골
   | "notice" // 쪽지·공지
+  | "visits" // 접속 기록(날짜별·방송별)
   | "settings"; // 설정
 
 export type AdminLiveTopMenuKey = "broadcast" | "orders" | "products" | "customers" | "settings";
@@ -23,18 +24,17 @@ export type AdminLiveTopMenuItem = {
   key: AdminLiveTopMenuKey;
   label: string;
   desc: string;
-  /** 사이드바 아이콘(글자). 5-C 에서 SVG 로 교체 예정 */
-  icon: string;
   /** 큰 메뉴를 누르면 열리는 첫 화면 */
   defaultKey: AdminLiveMenuKey;
 };
 
 export const ADMIN_LIVE_TOP_MENUS: AdminLiveTopMenuItem[] = [
-  { key: "broadcast", label: "방송", desc: "시작·종료 · 채팅주문 · 이벤트", icon: "▶", defaultKey: "broadcast" },
-  { key: "orders", label: "주문·입금", desc: "실시간 주문 · 입금내역 · 정산", icon: "₩", defaultKey: "orders" },
-  { key: "products", label: "상품", desc: "방송 상품 · 쇼핑몰 · 등록", icon: "▦", defaultKey: "products" },
-  { key: "customers", label: "고객", desc: "회원 · 이슈 · 쪽지·공지", icon: "☺", defaultKey: "customers" },
-  { key: "settings", label: "설정", desc: "상점 · 결제 · 알림", icon: "⚙", defaultKey: "settings" },
+  // 아이콘은 AdminLiveMenuIcon.tsx (SVG) — 기기마다 모양이 달라지는 이모지를 쓰지 않는다
+  { key: "broadcast", label: "방송", desc: "시작·종료 · 채팅주문 · 이벤트", defaultKey: "broadcast" },
+  { key: "orders", label: "주문·입금", desc: "실시간 주문 · 입금내역 · 정산", defaultKey: "orders" },
+  { key: "products", label: "상품", desc: "방송 상품 · 쇼핑몰 · 등록", defaultKey: "products" },
+  { key: "customers", label: "고객", desc: "회원 · 이슈 · 쪽지·공지 · 접속 기록", defaultKey: "customers" },
+  { key: "settings", label: "설정", desc: "상점 · 결제 · 알림", defaultKey: "settings" },
 ];
 
 export type AdminLiveSubTab = { key: AdminLiveMenuKey; label: string };
@@ -56,6 +56,7 @@ export const ADMIN_LIVE_SUB_TABS: Record<AdminLiveTopMenuKey, AdminLiveSubTab[]>
   customers: [
     { key: "customers", label: "회원·이슈·단골" },
     { key: "notice", label: "쪽지·공지" },
+    { key: "visits", label: "접속 기록" },
   ],
   settings: [{ key: "settings", label: "설정" }],
 };
@@ -71,6 +72,7 @@ const TOP_MENU_OF: Record<AdminLiveMenuKey, AdminLiveTopMenuKey> = {
   products: "products",
   customers: "customers",
   notice: "customers",
+  visits: "customers",
   settings: "settings",
 };
 

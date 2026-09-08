@@ -56,6 +56,7 @@ import type { DepositRow, OrderGroup, OrderRow } from "@/lib/admin-v2/types";
 import { ADMIN_LIVE_SUB_TABS, getAdminLiveTopMenu, isAdminLiveMenuKey, topMenuOf, type AdminLiveMenuKey } from "./adminLiveMenu";
 // [2026-09-08 5단계 · 레이아웃 B] 오른쪽 접이식 방송 레일
 import AdminLiveBroadcastRail from "./AdminLiveBroadcastRail";
+import VisitStatsView from "./VisitStatsView";
 import type { LiveOrder } from "./types";
 import {
   buildAdminLiveOrderGroups,
@@ -1451,6 +1452,7 @@ export default function AdminLiveDashboard() {
             replacePanelInUrl(nextMenu);
           }}
           broadcastOn={Boolean(activeBroadcast)}
+          onOpenVisitStats={() => { setActiveMenu("visits"); replacePanelInUrl("visits"); }}
         />
 
         <main className="min-w-0 flex-1 overflow-x-hidden px-3 py-3 md:px-5 md:py-4">
@@ -1657,6 +1659,13 @@ export default function AdminLiveDashboard() {
               {activeMenu === "notice" ? (
                 <div className="flex h-[calc(100vh-120px)] min-h-[520px] flex-col overflow-hidden rounded-2xl border border-line bg-surface">
                   <AdminLiveNoticePanel />
+                </div>
+              ) : null}
+
+              {/* ── 고객 › 접속 기록 (읽기 전용) ── */}
+              {activeMenu === "visits" ? (
+                <div className="overflow-hidden rounded-2xl border border-line bg-surface">
+                  <VisitStatsView embedded style={{ height: "calc(100vh - 140px)", minHeight: "520px" }} />
                 </div>
               ) : null}
 

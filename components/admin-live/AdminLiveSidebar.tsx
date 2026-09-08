@@ -5,6 +5,7 @@
 //   · 실시간 접속 위젯은 그대로(방송 중 바로 보는 숫자).
 import { ADMIN_LIVE_TOP_MENUS, topMenuOf, type AdminLiveMenuKey } from "./adminLiveMenu";
 import AdminLiveLogoutButton from "./AdminLiveLogoutButton";
+import AdminLiveMenuIcon from "./AdminLiveMenuIcon";
 import AdminLiveSidebarPresence from "./AdminLiveSidebarPresence";
 
 type Props = {
@@ -20,6 +21,8 @@ type Props = {
   onExceptionBadgeClick?: (kind: "match" | "card") => void;
   /** 방송 중 표시(사이드바 상단 점) */
   broadcastOn?: boolean;
+  /** 「접속 기록 보기」 → 고객 › 접속 기록 화면으로 (예전엔 사이드바 안 팝업이었다) */
+  onOpenVisitStats?: () => void;
 };
 
 export default function AdminLiveSidebar({
@@ -32,6 +35,7 @@ export default function AdminLiveSidebar({
   exceptionBadges,
   onExceptionBadgeClick,
   broadcastOn = false,
+  onOpenVisitStats,
 }: Props) {
   const activeTop = topMenuOf(activeMenu);
 
@@ -55,7 +59,9 @@ export default function AdminLiveSidebar({
         ].join(" ")}
       >
         <div className="mb-6 flex items-center gap-2 px-1">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-deep text-white">▶</div>
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-deep text-white">
+            <AdminLiveMenuIcon menu="broadcast" className="h-[17px] w-[17px]" />
+          </div>
           <div className="min-w-0">
             <div className="truncate text-lg font-black tracking-tight text-ink">루루동이LIVE</div>
             <div className="flex items-center gap-1.5 text-[11px] font-bold text-ink-mute">
@@ -97,12 +103,12 @@ export default function AdminLiveSidebar({
               >
                 <span
                   className={[
-                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-base font-black shadow-sm ring-1",
+                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-sm ring-1",
                     active ? "bg-rose-deep text-white ring-rose-deep" : "bg-surface text-ink-soft ring-line",
                   ].join(" ")}
                   aria-hidden
                 >
-                  {menu.icon}
+                  <AdminLiveMenuIcon menu={menu.key} />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[15px] font-black">{menu.label}</span>
@@ -134,7 +140,7 @@ export default function AdminLiveSidebar({
         </nav>
 
         {/* [2026-08-29 사장님 요청] 실시간 접속자 — 사이드바에서 바로 보이게 */}
-        <AdminLiveSidebarPresence />
+        <AdminLiveSidebarPresence onOpenVisitStats={() => { onOpenVisitStats?.(); onCloseNav?.(); }} />
 
         <div className="mt-auto space-y-2 pt-4">
           {/* 라이트/다크 토글 */}
