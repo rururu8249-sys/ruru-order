@@ -8,7 +8,7 @@ import { showAdminConfirm } from "@/lib/adminConfirm";
 import type { LiveOrder } from "./types";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 // [2026-09-08] 페이스터 주소는 설정 › 상점 정보에서 온다(하드코딩 제거)
-import { useShopInfo } from "@/lib/useShopInfo";
+import { getShopInfoNow, useShopInfo } from "@/lib/useShopInfo";
 
 // ═══ 페이스터를 «어떻게» 열 것인가 — 2026-09-08 확정. 다시 뒤집지 말 것 ═══
 //
@@ -32,14 +32,21 @@ import { useShopInfo } from "@/lib/useShopInfo";
 //   열린 창의 window.opener 가 null 이라 «일반 탭»과 똑같아진다.
 //   ⚠ 창 이름("ruruPayster")을 주면 opener 가 남으므로 이름을 주면 안 된다.
 export function openPayster(url: string) {
-  // noopener → 열린 창에서 window.opener === null (일반 탭과 동일한 상태)
-  window.open(url, "_blank", "noopener,noreferrer");
+  if (typeof window === "undefined") return;
+  // 화면 «오른쪽 절반»에 창으로 띄운다 — 왼쪽 절반이 복사창이라 그대로 복사→붙여넣기가 된다.
+  //   ⚠ 창 이름을 주면 window.opener 가 남아 페이스터가 안 뜬다 → 이름 없이(noopener) 연다.
+  //   ⚠ 반드시 «클릭 제스처 안에서» 불러야 팝업차단에 안 걸린다.
+  const sw = window.screen?.availWidth || window.innerWidth;
+  const sh = window.screen?.availHeight || window.innerHeight;
+  const left = Math.floor(sw / 2);
+  const width = sw - left;
+  window.open(url, "_blank", `noopener,noreferrer,popup=yes,left=${left},top=0,width=${width},height=${sh}`);
 }
 
-// LiveOrderTable 등 기존 호출부 호환을 위해 시그니처만 유지(no-op).
-//   카드결제 팝업이 열릴 때 자동으로 창을 띄우지는 않는다 — 사장님이 버튼으로 연다.
+/** 카드결제 버튼에서 호출 — 페이스터를 화면 오른쪽 절반에 띄운다.
+ *  주문표(LiveOrderTable)의 클릭 핸들러 «안에서» 불려야 팝업차단에 안 걸린다. */
 export function openPaysterRightHalf() {
-  /* no-op */
+  openPayster(getShopInfoNow().paysterUrl);
 }
 
 type Props = {
@@ -229,7 +236,10 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}
+      // [2026-09-08 사장님] 「원래는 옆에 바로 화면이 뜨니까 복사 붙여넣기가 쉬웠다」
+      //   → 복사창은 화면 «왼쪽 절반»에 붙이고, 페이스터 창이 «오른쪽 절반»에 뜬다.
+      //     가운데 정렬이면 페이스터 창에 가려서 복사 버튼이 안 보인다.
+      style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.25)", display: "flex", alignItems: "center", justifyContent: "flex-start", pointerEvents: "none" }}
     >
       {/* [2026-08-31 사장님 지시] 세로는 화면 거의 끝까지(위아래 8px만), 왼쪽은 페이스터풍 네이비·블루로
           위 쏠림 없이 세로 공간을 나눠 쓴다(헤더 → 복사 카드들 → (여백) → 하단 액션). */}
@@ -244,7 +254,13 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
 
         <div className="flex min-h-0 flex-1 flex-col px-5 py-5">
           {/* [2026-08-31 사장님 확인] 맨 위 큰 복사 버튼은 2번 칸과 같은 값이라 삭제 — 1·2·3 카드로 통일 */}
-          <div className="mb-2 text-[12px] font-bold" style={{ color: "#5A6B92" }}>페이스터 입력칸 순서대로 1 → 2 → 3 복사해서 붙여넣으세요 (숫자키 1~4)</div>
+          <div className="mb-2 flex flex-wrap items-center gap-2 text-[12px] font-bold" style={{ color: "#5A6B92" }}>
+            <span>오른쪽 페이스터 창에 1 → 2 → 3 순서대로 복사해서 붙여넣으세요 (숫자키 1~4)</span>
+            {/* [2026-09-08] 페이스터 창을 실수로 닫았을 때 다시 여는 길. 화면 오른쪽 절반에 뜬다. */}
+            <button type="button" onClick={() => openPayster(paysterUrl)} className="ru-btn ru-btn-sm" title="페이스터 창을 화면 오른쪽 절반에 다시 엽니다">
+              페이스터 창 다시 열기 ↗
+            </button>
+          </div>
 
           <div className="space-y-3">
             {!phoneIsMobile && phone ? (

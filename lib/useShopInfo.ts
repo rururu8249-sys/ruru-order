@@ -25,6 +25,12 @@ function notify(info: ShopInfo) {
   });
 }
 
+/** [2026-09-08] 훅 없이 «지금 캐시된» 값 (아직 안 읽었으면 기본값).
+ *  클릭 제스처 «안에서» 팝업을 열어야 브라우저 팝업차단에 안 걸려서, await 할 수 없다. */
+export function getShopInfoNow(): ShopInfo {
+  return cache || SHOP_INFO_DEFAULTS;
+}
+
 /** 상점 정보 읽기. force=true 면 캐시를 버리고 다시 읽는다(설정 저장 직후). */
 export async function loadShopInfo(force = false): Promise<ShopInfo> {
   if (!force) {
