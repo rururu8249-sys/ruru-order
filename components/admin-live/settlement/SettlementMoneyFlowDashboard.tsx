@@ -525,16 +525,20 @@ export default function SettlementMoneyFlowDashboard({
                 </tr>
               ) : (
                 visibleBroadcastRows.map((row) => (
+                  /* [2026-09-09 4순위 Polaris 대조] 숫자·금액 열은 «오른쪽 정렬 + 자릿수 고정(tabular-nums)».
+                     Polaris DataTable 공개 지침: Numerical = Right aligned.
+                     자릿수 폭이 다르면 위아래 금액의 만·천 자리가 어긋나 눈으로 비교가 안 된다.
+                     입금내역·정산 수기내역엔 이미 있었는데 «방송별 정산표»만 빠져 있었다. */
                   <tr key={row.key} className="hover:bg-surface-2">
                     <td className="border-b border-line-soft px-4 py-3.5">
                       <div className="max-w-[320px] truncate text-sm font-black text-ink">{row.label}</div>
                       <div className="mt-1 text-xs font-bold text-ink-mute">{row.dateKey}</div>
                     </td>
-                    <td className="border-b border-line-soft px-4 py-3.5 text-right text-sm font-black text-ink">{countText(row.count)}</td>
-                    <td className="border-b border-line-soft px-4 py-3.5 text-right text-sm font-black text-info-tx">{won(row.paidAmount)}</td>
-                    <td className="border-b border-line-soft px-4 py-3.5 text-right text-sm font-black text-warn-tx">{won(row.unpaidAmount)}</td>
-                    <td className="border-b border-line-soft px-4 py-3.5 text-right text-sm font-black text-ink">{outflowText(row.totalExpense)}</td>
-                    <td className="border-b border-line-soft px-4 py-3.5 text-right text-sm font-black text-ink">{won(row.netAmount)}</td>
+                    <td className="border-b border-line-soft px-4 py-3.5 text-right text-sm font-black tabular-nums text-ink">{countText(row.count)}</td>
+                    <td className="border-b border-line-soft px-4 py-3.5 text-right text-sm font-black tabular-nums text-info-tx">{won(row.paidAmount)}</td>
+                    <td className="border-b border-line-soft px-4 py-3.5 text-right text-sm font-black tabular-nums text-warn-tx">{won(row.unpaidAmount)}</td>
+                    <td className="border-b border-line-soft px-4 py-3.5 text-right text-sm font-black tabular-nums text-ink">{outflowText(row.totalExpense)}</td>
+                    <td className="border-b border-line-soft px-4 py-3.5 text-right text-sm font-black tabular-nums text-ink">{won(row.netAmount)}</td>
                   </tr>
                 ))
               )}

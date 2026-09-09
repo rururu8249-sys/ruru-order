@@ -140,6 +140,21 @@ function emptyStateHasHint(raw) {
 //    rounded-md(6)·3xl(24) 는 스케일에 없다. Tailwind sm=2 md=6 lg=8 xl=12 2xl=16 3xl=24
 const RADIUS_BAD = /\brounded-(?:md|3xl)\b/;
 
+// ── 규칙 10. 표 칸의 «금액·숫자» 열은 오른쪽 정렬 + 자릿수 고정 ──────────────────
+//   출처: Shopify Polaris DataTable 공개 지침
+//     · columnContentTypes: 'text' | 'numeric'
+//     · "Numerical = Right aligned" / "Textual data = Left aligned"
+//   왜 자릿수 고정(tabular-nums)까지 보나:
+//     기본 폰트는 숫자 폭이 제각각이라 1,250,000 과 980,000 의 «만·천 자리»가 세로로 어긋난다.
+//     금액을 위아래로 훑어 비교하는 화면(입금내역·정산)에서는 이게 곧 오독이다.
+//   실측(2026-09-09): 입금내역·정산 수기내역엔 이미 적용돼 있었고 «방송별 정산표»만 빠져 있었다.
+//   범위: 표 칸(<td) 안에서 «돈»을 그리는 줄만 본다.
+//     개수·순번은 가운데 정렬이 나은 자리도 있어 강제하지 않는다(오탐 방지).
+const MONEY_CELL = /<td\b/;
+const MONEY_RENDER = /\bwon\(|outflowText\(|원<\/|원"|toLocaleString\("ko-KR"\)\s*\+\s*"원/;
+const ALIGN_RIGHT = /text-right\b|textAlign:\s*"right"/;
+const TABULAR = /tabular-nums|fontVariantNumeric:\s*"tabular-nums"/;
+
 for (const file of files) {
   const lines = fs.readFileSync(file, "utf8").split("\n");
   lines.forEach((raw, idx) => {
@@ -188,6 +203,12 @@ for (const file of files) {
 
     if (EMPTY_STATE.test(raw) && EMPTY_WORD.test(raw) && !EMPTY_GOOD.test(raw) && !emptyStateHasHint(raw)) {
       add(file, line, "빈 화면에 «다음에 할 일» 안내 없음", raw);
+    }
+
+    // 규칙 10 — 표 칸의 금액
+    if (MONEY_CELL.test(raw) && MONEY_RENDER.test(raw) && !/colSpan/.test(raw)) {
+      if (!ALIGN_RIGHT.test(raw)) add(file, line, "표의 금액 칸은 오른쪽 정렬 (Polaris: Numerical = Right aligned)", raw);
+      else if (!TABULAR.test(raw)) add(file, line, "표의 금액 칸에 자릿수 고정 없음 (tabular-nums) — 만·천 자리가 어긋난다", raw);
     }
   });
 }
