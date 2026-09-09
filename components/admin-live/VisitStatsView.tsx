@@ -48,9 +48,13 @@ export function seoulStamp(iso: string) {
   return `${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())} ${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}`;
 }
 
-// 팝업 헤더 / 내장 헤더가 똑같이 쓰는 요약 문구 — "최근 30일 · 방문자 99명"
+// 팝업 헤더 / 내장 헤더가 똑같이 쓰는 요약 문구
+// [2026-09-09 사장님 지적] 「대충 봐도 500명 넘는 거 같은데 484명? 뭔소리야?」
+//   원인: 이 숫자는 30일 «전체»에서 같은 사람을 한 번만 센 값이고(visit-stats/route.ts:178 allVisitors.size),
+//   아래 날짜별 숫자는 «그 날» 기준이라 같은 사람이 여러 날 오면 날마다 세진다. 그래서 합계가 더 크다.
+//   → 숫자만 보고 오해하지 않게 문구에 「서로 다른 사람」을 박아 둔다.
 export function visitStatsSummaryText(stats: VisitStats | null) {
-  return `최근 ${stats?.days ?? 30}일 · 방문자 ${(stats?.totals?.visitors ?? 0).toLocaleString("ko-KR")}명`;
+  return `최근 ${stats?.days ?? 30}일 · 다녀간 사람 ${(stats?.totals?.visitors ?? 0).toLocaleString("ko-KR")}명`;
 }
 
 // 접속 기록 상태(데이터 + 탭 + 펼친 줄). 불러오기는 자동으로 하지 않는다 — 호출하는 쪽이 reload() 를 부른다.
@@ -124,16 +128,30 @@ function nameList(people: VisitPerson[] | undefined, capped: boolean | undefined
                 <tbody>
                   {(() => {
                     // [2026-09-07] 같은 IP 가 이 목록에 2명 이상이면 표시(장난 다계정·같은 사람 여러 닉 파악 보조)
-                    const ipCount = new Map<string, number>();
-                    for (const pp of people) { const v = String(pp.ip || "").trim(); if (v) ipCount.set(v, (ipCount.get(v) || 0) + 1); }
+                    // [2026-09-09 사장님 지적] 「같은 IP라는게 대체 뭐가 누구랑 같다는건데? 겁나 불친절하네」
+                    //   → 경고만 띄우고 «상대가 누군지»를 안 알려줬다. 같은 IP 를 쓰는 닉네임을 그대로 적어 준다.
+                    const ipNames = new Map<string, string[]>();
+                    for (const pp of people) {
+                      const v = String(pp.ip || "").trim();
+                      if (!v) continue;
+                      const arr = ipNames.get(v);
+                      if (arr) arr.push(pp.name); else ipNames.set(v, [pp.name]);
+                    }
                     return people.map((p, i) => {
                     const ip = String(p.ip || "").trim();
-                    const ipDup = ip ? (ipCount.get(ip) || 0) > 1 : false;
+                    const sameIpNames = ip ? (ipNames.get(ip) || []).filter((n) => n !== p.name) : [];
+                    const ipDup = sameIpNames.length > 0;
+                    // 「마이쮸-yumyum 님과 같음」 / 3명 이상이면 「… 외 2명과 같음」
+                    const sameIpText = !ipDup
+                      ? ""
+                      : sameIpNames.length === 1
+                        ? `${sameIpNames[0]} 님과 같은 인터넷 주소`
+                        : `${sameIpNames[0]} 님 외 ${sameIpNames.length - 1}명과 같은 인터넷 주소`;
                     return (
                     <tr
                       key={`${p.name}-${i}`}
                       style={{ background: i % 2 === 1 ? "var(--color-surface-2)" : "transparent" }}
-                      title={`${p.name} · ${p.visits}번 방문 · 마지막 ${seoulStamp(p.lastAt)}${ip ? ` · IP ${ip}` : ""}`}
+                      title={`${p.name} · ${p.visits}번 방문 · 마지막 ${seoulStamp(p.lastAt)}${ip ? ` · IP ${ip}` : ""}${ipDup ? ` · 같은 IP: ${sameIpNames.join(", ")}` : ""}`}
                     >
                       <td style={{ padding: "6px 8px", textAlign: "center", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", fontVariantNumeric: "tabular-nums" }}>
                         {i + 1}
@@ -149,8 +167,11 @@ function nameList(people: VisitPerson[] | undefined, capped: boolean | undefined
                         />
                         {p.name}
                         {ip ? (
-                          <span style={{ display: "block", marginLeft: "12px", fontSize: "11px", fontWeight: 700, color: ipDup ? "var(--color-warn-tx)" : "var(--color-ink-mute)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                            {ipDup ? "⚠ 같은 IP · " : ""}{ip}
+                          <span style={{ display: "block", marginLeft: "12px", fontSize: "11px", fontWeight: 700, color: ipDup ? "var(--color-warn-tx)" : "var(--color-ink-mute)", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {ip}
+                            {ipDup ? (
+                              <span style={{ display: "block" }} title={sameIpNames.join(", ")}>⚠ {sameIpText}</span>
+                            ) : null}
                           </span>
                         ) : null}
                       </td>
@@ -236,6 +257,12 @@ export default function VisitStatsView({ embedded = false, state, style }: Visit
           → 방문자는 '사람 수', 방송중/쇼핑몰은 '방문 횟수'로 단위가 달랐다. 그 차이를 명시한다. */}
       <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--color-line)", background: "var(--color-surface-2)", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.6 }}>
         <b>방문자 = 사람 수</b> · <b>방문 = 들어온 횟수</b> (같은 사람이 30분 넘게 끊겼다 다시 오면 1회 더)
+        <br />
+        {/* [2026-09-09] 위 「다녀간 사람 N명」과 아래 날짜별 합계가 다른 이유를 화면에서 바로 알 수 있게 */}
+        <span style={{ color: "var(--color-ink-mute)" }}>
+          ※ 아래 날짜별 <b>방문자</b>는 <b>그 날</b> 기준이라, 같은 사람이 3일 오면 <b>3번</b> 세집니다.
+          맨 위 <b>「다녀간 사람」</b>은 30일 전체에서 <b>한 사람을 한 번만</b> 셉니다 — 그래서 날짜별을 다 더한 것보다 <b>작습니다</b>.
+        </span>
       </div>
 
       <div style={{ minHeight: 0, flex: 1, overflowY: "auto", padding: "12px 16px 16px" }}>
