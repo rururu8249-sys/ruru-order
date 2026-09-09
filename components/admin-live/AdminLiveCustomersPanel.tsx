@@ -20,7 +20,7 @@ import AdminLiveCustomerIssueRail from "./AdminLiveCustomerIssueRail";
 import AdminLivePhoneBlockPanel from "./AdminLivePhoneBlockPanel";
 import AdminLiveCustomerBlockReasonModal from "./AdminLiveCustomerBlockReasonModal";
 import AdminLiveCustomerPointPanel from "./AdminLiveCustomerPointPanel";
-import CustomerFullOrderHistory from "./CustomerFullOrderHistory";
+import CustomerFullOrderHistory, { type CustomerFullOrderStats } from "./CustomerFullOrderHistory";
 import { CUSTOMER_TERMS } from "./adminLiveCustomerTerms";
 import { formatKoreanPhone } from "@/lib/order/phone";
 
@@ -388,6 +388,9 @@ function CustomerDetailDrawer({
 }) {
   const [avatarZoom, setAvatarZoom] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  // [2026-09-09] 위 3칸(누적 주문·누적 결제·미입금)에 쓸 «전 기간» 집계.
+  //   아래 CustomerFullOrderHistory 가 DB를 전 기간 조회한 결과를 그대로 받아 쓴다. null = 아직 불러오는 중.
+  const [fullStats, setFullStats] = useState<CustomerFullOrderStats | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   // [2026-09-05 사장님 요청 · 카카오 원본] 로그인 때 카카오가 준 진짜 이름/번호(customers.kakao_account_* / kakao_shipping_*).
   //   손님이 우리 화면에서 바꿔도 여기서 원본 확인. 별도 조회 — 칸이 아직 없으면(SQL 전) 조용히 숨김.
@@ -869,24 +872,32 @@ function CustomerDetailDrawer({
             </div>
           ) : null}
 
-          {/* 3 스탯 */}
+          {/* 3 스탯 — [2026-09-09] «전 기간 DB 조회» 값으로 표시.
+                예전엔 «주문서 화면에 로드된 주문»만 세서, 옛 주문뿐인 손님이 0건/0원으로 보였다
+                (사장님 지적: 용서린 — 아래 「주문 이력」은 5건인데 위는 0건).
+                아래 CustomerFullOrderHistory 가 이미 전 기간을 조회하므로 그 값을 그대로 쓴다.
+                아직 불러오는 중이면 «…» 을 보여준다(0 으로 오해하지 않게). */}
           <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
             <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", textAlign: "center" }}>
               <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>누적 주문</div>
-              <div style={{ marginTop: "4px", fontSize: "16px", fontWeight: 800, color: "var(--color-ink)" }}>{customer.orderCount.toLocaleString("ko-KR")}건</div>
+              <div style={{ marginTop: "4px", fontSize: "16px", fontWeight: 800, color: "var(--color-ink)" }}>{fullStats ? `${fullStats.all.toLocaleString("ko-KR")}건` : "…"}</div>
             </div>
             <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", textAlign: "center" }}>
               <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>누적 결제</div>
-              <div style={{ marginTop: "4px", fontSize: "16px", fontWeight: 800, color: "var(--color-ink)" }}>{money(customer.totalAmount)}</div>
+              <div style={{ marginTop: "4px", fontSize: "16px", fontWeight: 800, color: "var(--color-ink)" }}>{fullStats ? money(fullStats.paidAmount) : "…"}</div>
             </div>
             <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", textAlign: "center" }}>
               <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>미입금</div>
-              <div style={{ marginTop: "4px", fontSize: "16px", fontWeight: 800, color: customer.unpaidCount > 0 ? "var(--color-warn-tx)" : "var(--color-ink)" }}>{customer.unpaidCount.toLocaleString("ko-KR")}건</div>
+              <div style={{ marginTop: "4px", fontSize: "16px", fontWeight: 800, color: fullStats && fullStats.unpaid > 0 ? "var(--color-warn-tx)" : "var(--color-ink)" }}>{fullStats ? `${fullStats.unpaid.toLocaleString("ko-KR")}건` : "…"}</div>
             </div>
           </div>
 
           {/* 주문 이력 — [2026-09-05] 전 기간 DB 직접 조회(카카오ID 우선, 전화 폴백) + 정렬/필터/주문서 펼치기 */}
-          <CustomerFullOrderHistory kakaoId={clean(profile?.kakao_id) || clean(customer.kakaoId)} phone={customer.phone} />
+          <CustomerFullOrderHistory
+            kakaoId={clean(profile?.kakao_id) || clean(customer.kakaoId)}
+            phone={customer.phone}
+            onStats={setFullStats}
+          />
 
           {/* 포인트 (기존 패널 유지 — 보유포인트 표시 + 🪙 지급) */}
           <div style={{ marginTop: "12px" }}>

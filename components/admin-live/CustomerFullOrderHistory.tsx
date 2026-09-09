@@ -7,7 +7,7 @@
 //   전화번호는 kakao_id 가 안 찍힌 옛 주문을 찾을 때만 폴백. 다른 카카오 계정 주문은 전화가 같아도 제외.
 //   읽기 전용 — DB에 아무것도 쓰지 않는다. 주문/입금/정산/포인트 로직 무접촉.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { koreanPhoneVariants } from "@/lib/order/phone";
 
@@ -78,7 +78,9 @@ function badgeStyle(kind: Kind): React.CSSProperties {
   return { background: "var(--color-warn-bg)", color: "var(--color-warn-tx)" };
 }
 
-export default function CustomerFullOrderHistory({ kakaoId, phone }: { kakaoId: string; phone: string }) {
+export type CustomerFullOrderStats = { all: number; paid: number; unpaid: number; canceled: number; paidAmount: number };
+
+export default function CustomerFullOrderHistory({ kakaoId, phone, onStats }: { kakaoId: string; phone: string; onStats?: (stats: CustomerFullOrderStats | null) => void }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
@@ -181,6 +183,16 @@ export default function CustomerFullOrderHistory({ kakaoId, phone }: { kakaoId: 
     canceled: groups.filter((g) => g.kind === "canceled").length,
     paidAmount: groups.filter((g) => g.kind === "paid").reduce((s, g) => s + g.amount, 0),
   }), [groups]);
+
+  // [2026-09-09 사장님 지적] 회원 상세 위쪽 「누적 주문·누적 결제」가 0으로 보였다.
+  //   원인: 그 3칸은 «주문서 화면에 로드된 주문»만 세는데, 옛 주문(예: 5~7월)은 거기 없다.
+  //   → 여기서 «전 기간 DB 조회»로 이미 센 값을 부모에게 그대로 올려준다. 아래 「주문 이력」과 항상 같은 숫자가 된다.
+  const onStatsRef = useRef(onStats);
+  onStatsRef.current = onStats;
+  useEffect(() => {
+    if (rows === null) { onStatsRef.current?.(null); return; } // 아직 불러오는 중
+    onStatsRef.current?.(counts);
+  }, [rows, counts]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(Math.max(1, page), totalPages);
