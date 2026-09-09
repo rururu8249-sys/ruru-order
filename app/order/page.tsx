@@ -42,6 +42,7 @@ import { HOWTO_DEFAULT, parseHowtoSteps } from "@/lib/howto";
 import { supabase } from "@/lib/supabase";
 import { isRemoteAreaAddress } from "@/lib/order/shippingAddress";
 import { formatOrderPhone, normalizeOrderPhone, isOrderablePhone, isMobileOrderPhone, koreanPhoneVariants } from "@/lib/order/phone";
+import { isNicknameTakenByOthers } from "@/lib/nicknameConflict";
 import {
   CUSTOMER_ORDER_LOOKUP_LIMIT,
   customerOrderLookupSinceIso,
@@ -80,6 +81,7 @@ import CustomerOrderLookupBottomSheet, {
   type CustomerOrderLookupGroup,
 } from "@/components/customer/CustomerOrderLookupBottomSheet";
 import OrderKakaoNicknameNotice from "@/components/order/OrderKakaoNicknameNotice";
+import OrderNicknameConflictNotice from "@/components/order/OrderNicknameConflictNotice";
 import CustomerBlockedNotice from "@/components/customer/CustomerBlockedNotice";
 import CustomerToastNotice from "@/components/customer/CustomerToastNotice";
 import CustomerManualAddressPanel from "@/components/customer/CustomerManualAddressPanel";
@@ -1385,6 +1387,9 @@ export default function OrderPage() {
   const [loginPhone, setLoginPhone] = useState("");
   const [kakaoNickname, setKakaoNickname] = useState("");
   const [youtubeNicknameError, setYoutubeNicknameError] = useState("");
+  // [2026-09-09 용서린 사고] 닉네임이 겹쳤을 때 «막다른 안내» 대신 갈림길 화면으로 보낸다.
+  //   값이 들어 있으면 관문 자리에 OrderNicknameConflictNotice 가 뜬다. 돈/주문 로직 무관 — 화면 전환만.
+  const [nicknameConflict, setNicknameConflict] = useState<string>("");
   const [isKakaoLoginReturn, setIsKakaoLoginReturn] = useState(false);
   // [2026-08-21 사장님 지시] 카톡 복귀 직후 DB에서 닉네임을 복원하는 동안(비동기 수백ms)
   //   "닉네임 없음"으로 잠깐 판정돼 닉네임 관문이 깜빡이던 문제 → 복원이 끝날 때까지
@@ -3081,20 +3086,31 @@ export default function OrderPage() {
 
     if (!cleanNickname) return "";
 
+    // [2026-09-09] kakao_id 도 같이 본다 — «내 카톡이 이미 쓰던 이름»을 남의 이름으로 오해하지 않으려고.
+    //   (폰을 바꿔 localStorage 가 빈 손님은 관문에서 번호를 아직 모른다 → 카톡으로 본인 확인)
     const { data, error } = await supabase
       .from("customers")
-      .select("id, customer_phone, youtube_nickname")
+      .select("id, customer_phone, youtube_nickname, kakao_id")
       .eq("youtube_nickname", cleanNickname)
-      .limit(3);
+      .limit(5);
 
     if (error) {
       console.error("유튜브 닉네임 중복 확인 오류:", error.message);
       return "";
     }
 
-    const duplicated = (data || []).some((customer: any) => {
-      const existingPhone = normalizePhone(customer?.customer_phone || "");
-      return Boolean(existingPhone && cleanPhone && existingPhone !== cleanPhone);
+    const myKakaoId =
+      typeof localStorage !== "undefined" ? String(localStorage.getItem("ruru_kakao_id") || "").trim() : "";
+
+    // [2026-09-09 구멍 수정 · 용서린 사고] 판정 규칙은 lib/nicknameConflict.ts 한 곳으로 옮겼다.
+    //   예전 조건은 «내 번호를 알 때만» 남인지 따졌는데(cleanPhone), 닉네임 관문은 번호를 넣기 «전» 화면이라
+    //   새 카톡 손님은 cleanPhone 이 "" → 검사가 통째로 무력화돼 누구나 남의 닉네임을 가져갈 수 있었다.
+    //   (실측: customers 91=01071437473 / 2855=01086247473 둘 다 youtube_nickname '용서린')
+    //   시험: scripts/test-nickname-conflict.mjs (9개)
+    const duplicated = isNicknameTakenByOthers({
+      rows: (data || []) as any[],
+      myPhone: cleanPhone,
+      myKakaoId,
     });
 
     if (!duplicated) return "";
@@ -3149,21 +3165,10 @@ export default function OrderPage() {
     }
   };
 
-  const confirmKakaoYoutubeNickname = async () => {
-    const cleanNickname = youtubeNickname.trim();
-
-    if (!cleanNickname) {
-      setYoutubeNicknameError("유튜브 라이브 채팅에 보이는 닉네임을 입력해 주세요.");
-      return;
-    }
-
-    const duplicateMessage = await getDuplicateYoutubeNicknameMessage(cleanNickname, customerPhone);
-
-    if (duplicateMessage) {
-      setYoutubeNicknameError(duplicateMessage);
-      return;
-    }
-
+  // [2026-09-09] 관문 «통과» 부분만 따로 뺐다 — 계정 연결 화면에서 정해진 이름으로도 똑같이 통과시키려고.
+  //   내용은 예전과 한 글자도 다르지 않다(저장 → 동기화 → 정보 유무에 따라 다음 화면).
+  const passYoutubeNicknameGate = (cleanNickname: string) => {
+    setNicknameConflict("");
     setYoutubeNicknameError("");
     localStorage.setItem("ruru_youtube_nickname", cleanNickname);
     markYoutubeNicknameConfirmVersionCurrent();
@@ -3199,6 +3204,26 @@ export default function OrderPage() {
     }, 100);
   };
 
+  const confirmKakaoYoutubeNickname = async () => {
+    const cleanNickname = youtubeNickname.trim();
+
+    if (!cleanNickname) {
+      setYoutubeNicknameError("유튜브 라이브 채팅에 보이는 닉네임을 입력해 주세요.");
+      return;
+    }
+
+    const duplicateMessage = await getDuplicateYoutubeNicknameMessage(cleanNickname, customerPhone);
+
+    if (duplicateMessage) {
+      // [2026-09-09 용서린 사고] 예전엔 여기서 빨간 안내만 띄우고 끝이라 손님이 갇혔다.
+      //   → 갈림길 화면으로 보낸다. "예전에 주문하신 분인가요?" 한 줄만 물어본다.
+      setYoutubeNicknameError("");
+      setNicknameConflict(cleanNickname);
+      return;
+    }
+
+    passYoutubeNicknameGate(cleanNickname);
+  };
 
   const loadCustomerByNamePhone = async () => {
     const cleanName = String(loginName || "").trim();
@@ -5962,13 +5987,33 @@ export default function OrderPage() {
     return (
       <OrderPageShell>
         <section className="rounded-[32px] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
-          <OrderKakaoNicknameNotice
-            kakaoNickname={kakaoNickname}
-            youtubeNickname={youtubeNickname}
-            errorMessage={youtubeNicknameError}
-            onYoutubeNicknameChange={handleYoutubeNicknameChange}
-            onConfirm={confirmKakaoYoutubeNickname}
-          />
+          {/* [2026-09-09] 둘 다 position:fixed 전체화면이라 «겹쳐 뜨면» 뒤엣것이 가려진다.
+              → 겹칠 때는 계정 연결 화면만 그린다(둘 중 하나만). */}
+          {nicknameConflict ? (
+            <OrderNicknameConflictNotice
+              nickname={nicknameConflict}
+              myPhoneDigits={onlyNumber(customerPhone)}
+              kakaoId={typeof localStorage !== "undefined" ? localStorage.getItem("ruru_kakao_id") || "" : ""}
+              kakaoNickname={kakaoNickname}
+              onUseNickname={(picked) => {
+                setYoutubeNickname(picked);
+                passYoutubeNicknameGate(picked);
+              }}
+              onBack={() => {
+                setNicknameConflict("");
+                setYoutubeNickname("");
+                setYoutubeNicknameError("");
+              }}
+            />
+          ) : (
+            <OrderKakaoNicknameNotice
+              kakaoNickname={kakaoNickname}
+              youtubeNickname={youtubeNickname}
+              errorMessage={youtubeNicknameError}
+              onYoutubeNicknameChange={handleYoutubeNicknameChange}
+              onConfirm={confirmKakaoYoutubeNickname}
+            />
+          )}
         </section>
       </OrderPageShell>
     );
