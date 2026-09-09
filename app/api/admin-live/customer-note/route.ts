@@ -256,6 +256,9 @@ export async function PATCH(request: NextRequest) {
         .eq("kind", "admin_note")
         .is("seen_at", null)
         .is("revoked_at", null)
+        // [2026-09-09 보강] 손님이 «2초 안에 빨리 닫은» 쪽지는 seen_at 이 없고 dismissed_at 만 있다.
+        //   그것까지 되살리면 이미 확인한 손님에게 또 뜬다 → 닫은 쪽지는 제외.
+        .is("dismissed_at", null)
         .lt("expires_at", nowIso)
         .select("id");
       if (reviveAllError) return NextResponse.json({ ok: false, message: "다시 띄우기 실패: " + reviveAllError.message }, { status: 500 });
@@ -270,6 +273,7 @@ export async function PATCH(request: NextRequest) {
         .eq("kind", "admin_note")
         .is("seen_at", null)        // 안전핀: 이미 «읽은» 쪽지는 다시 띄우지 않는다
         .is("revoked_at", null)     // 안전핀: 회수한 쪽지는 되살리지 않는다
+        .is("dismissed_at", null)   // 안전핀: 손님이 «닫은» 쪽지도 되살리지 않는다
         .select("id")
         .maybeSingle();
       if (reviveError) return NextResponse.json({ ok: false, message: "다시 띄우기 실패: " + reviveError.message }, { status: 500 });
