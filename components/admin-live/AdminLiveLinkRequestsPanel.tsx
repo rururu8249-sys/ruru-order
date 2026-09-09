@@ -16,6 +16,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { showAdminToast } from "@/lib/adminToast";
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import { formatKoreanPhone } from "@/lib/order/phone";
 
 type LinkRequestRow = {
@@ -94,6 +95,7 @@ export default function AdminLiveLinkRequestsPanel() {
   const [rows, setRows] = useState<LinkRequestRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDone, setShowDone] = useState(false);
+  const [merging, setMerging] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -124,6 +126,77 @@ export default function AdminLiveLinkRequestsPanel() {
       showAdminToast(status === "done" ? "처리함으로 표시했습니다." : status === "rejected" ? "«아님»으로 표시했습니다." : "대기중으로 되돌렸습니다.", "success");
     } catch {
       showAdminToast("표시를 저장하지 못했습니다.", "error");
+    }
+  };
+
+  // [2026-09-09 2단계] [합치기] — 먼저 «미리보기»로 무슨 일이 일어날지 숫자로 보여주고, 승인해야 실행한다.
+  //   ⚠ 여기가 «돈»이다. 실제 이동은 전부 Postgres 함수 한 트랜잭션 안에서 일어난다(반쪽 병합 불가).
+  const mergeRow = async (row: LinkRequestRow) => {
+    setMerging(row.id);
+    try {
+      // ① 미리보기 (아무것도 안 바꾼다)
+      const res = await fetch("/api/admin-live/customer-link-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: row.id }),
+      });
+      const json = await res.json().catch(() => null);
+      const p = json?.result as Record<string, any> | undefined;
+
+      if (!json?.ok || !p?.ok) {
+        const why = String(p?.reason || json?.reason || "");
+        if (why === "new_side_has_money") {
+          showAdminToast(
+            `새 계정에도 주문 ${p?.new_orders ?? 0}건 · 포인트 ${(p?.new_points ?? 0).toLocaleString("ko-KR")}P 가 있어 자동 합치기를 멈췄습니다.\n\n양쪽 돈을 합치는 판단이 필요해요 — [병합 SQL 복사]로 직접 확인해 주세요.`,
+            "warning",
+          );
+          return;
+        }
+        if (why === "old_not_found") { showAdminToast("예전 계정을 못 찾았습니다. 번호가 이미 바뀌었을 수 있어요.", "error"); return; }
+        if (why === "not_pending") { showAdminToast("이미 처리된 요청입니다.", "warning"); void load(); return; }
+        showAdminToast("합치기 미리보기 실패" + (why ? `\n\n${why}` : ""), "error");
+        return;
+      }
+
+      // ② 사장님 승인 — 실제 숫자를 그대로 보여준다
+      const lines = [
+        `「${row.nickname}」님 계정을 합칩니다.`,
+        ``,
+        `남길 계정 : ${formatKoreanPhone(p.old_phone)} ${p.old_name || ""}`.trim(),
+        `  · 주문 ${Number(p.old_orders || 0).toLocaleString("ko-KR")}건`,
+        `  · 포인트 ${Number(p.old_points || 0).toLocaleString("ko-KR")}P`,
+        ``,
+        p.will_change_phone ? `번호를 ${formatKoreanPhone(p.old_phone)} → ${formatKoreanPhone(p.new_phone)} 로 바꿉니다.` : `번호는 그대로 둡니다.`,
+        p.will_delete_new_row ? `지금 쓰는 빈 계정 줄은 지웁니다(주문·포인트 0).` : `지울 계정 줄은 없습니다.`,
+        ``,
+        `포인트와 주문은 «없어지지 않고» 이 계정으로 따라갑니다.`,
+        `되돌릴 수 있게 백업을 먼저 남깁니다.`,
+      ].join("\n");
+
+      const ok = await showAdminConfirm(lines, { title: "계정 합치기", confirmText: "합치기", cancelText: "취소", tone: "warning" });
+      if (!ok) return;
+
+      // ③ 실행
+      const res2 = await fetch("/api/admin-live/customer-link-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: row.id, confirm: true }),
+      });
+      const json2 = await res2.json().catch(() => null);
+      const d = json2?.result as Record<string, any> | undefined;
+      if (!json2?.ok || !d?.ok) {
+        showAdminToast("합치기 실패 — 아무것도 바뀌지 않았습니다." + (d?.reason ? `\n\n${d.reason}` : ""), "error");
+        return;
+      }
+      showAdminToast(
+        `합쳤습니다. ${formatKoreanPhone(d.final_phone)} 한 줄로 · 주문 ${Number(d.kept_orders || 0).toLocaleString("ko-KR")}건 · 포인트 ${Number(d.kept_points || 0).toLocaleString("ko-KR")}P`,
+        "success",
+      );
+      void load();
+    } catch {
+      showAdminToast("합치기 중 문제가 생겼습니다. 목록을 새로고침해 확인해 주세요.", "error");
+    } finally {
+      setMerging("");
     }
   };
 
@@ -215,10 +288,20 @@ export default function AdminLiveLinkRequestsPanel() {
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2">
+                {row.status === "pending" ? (
+                  <button
+                    type="button"
+                    disabled={merging === row.id}
+                    onClick={() => void mergeRow(row)}
+                    className="rounded-lg bg-rose-deep px-3 py-2 text-[12px] font-black text-white disabled:opacity-50"
+                  >
+                    {merging === row.id ? "확인 중…" : "🔗 합치기"}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => void copySql(row)}
-                  className="rounded-lg bg-rose-deep px-3 py-2 text-[12px] font-black text-white"
+                  className="rounded-lg border border-line px-3 py-2 text-[12px] font-black text-ink-soft hover:text-rose-deep"
                 >
                   병합 SQL 복사
                 </button>
@@ -251,8 +334,9 @@ export default function AdminLiveLinkRequestsPanel() {
               </div>
 
               <p className="mt-2 text-[11px] font-bold leading-relaxed text-ink-mute">
-                «병합 SQL 복사» → Supabase SQL Editor 에 붙여넣고 <b>[0] 확인부터</b> 돌려 예상과 같은지 본 뒤 나머지를 돌리세요.
-                다음 단계에서 이 자리에 [합치기] 버튼 하나로 바뀝니다.
+                <b>[🔗 합치기]</b>를 누르면 먼저 «무엇이 어떻게 바뀌는지» 숫자로 보여주고, 사장님이 승인해야 실행됩니다.
+                실행은 한 번에(중간에 멈추지 않게) 처리되고 되돌릴 수 있게 백업이 남습니다.
+                새 계정에도 주문·포인트가 있으면 자동으로 멈추니, 그때만 «병합 SQL 복사»로 직접 확인하세요.
               </p>
             </div>
           ))}

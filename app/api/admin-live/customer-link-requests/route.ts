@@ -71,6 +71,40 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// [2026-09-09 2단계] 실제 «합치기» — 미리보기(dryRun) / 실행
+//   ⚠ 병합은 단계가 7개다. 여기서 7번 나눠 쏘면 중간에 실패했을 때 반쪽만 옮겨진 채 남는다 = 돈 사고.
+//     → Postgres 함수 ruru_merge_customer_link_request 안에서 «한 트랜잭션»으로 돈다(실패하면 통째로 되돌아감).
+//     이 파일은 그 함수를 부르기만 한다. 순서·안전핀은 전부 함수 안에 있다.
+//     함수는 실행 전 스스로 백업(customer_link_merge_backup)을 남긴다.
+export async function POST(request: NextRequest) {
+  const session = await verifyAdminSessionFromRequest(request);
+  if (!session) return NextResponse.json({ ok: false, reason: "unauthorized" }, { status: 401 });
+
+  let body: Record<string, unknown>;
+  try {
+    body = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ ok: false, reason: "bad_body" }, { status: 400 });
+  }
+
+  const id = text(body.id);
+  if (!id) return NextResponse.json({ ok: false, reason: "no_id" }, { status: 400 });
+  // 기본은 «미리보기». 실행은 confirm 을 명시적으로 보내야만 한다(오클릭으로 병합되지 않게).
+  const dryRun = body.confirm !== true;
+
+  try {
+    const db = admin();
+    const { data, error } = await db.rpc("ruru_merge_customer_link_request", {
+      p_request_id: id,
+      p_dry_run: dryRun,
+    });
+    if (error) throw new Error(error.message);
+    return NextResponse.json({ ok: true, result: data });
+  } catch (error: any) {
+    return NextResponse.json({ ok: false, reason: "server", message: String(error?.message || "") }, { status: 500 });
+  }
+}
+
 export async function PATCH(request: NextRequest) {
   const session = await verifyAdminSessionFromRequest(request);
   if (!session) return NextResponse.json({ ok: false, reason: "unauthorized" }, { status: 401 });
