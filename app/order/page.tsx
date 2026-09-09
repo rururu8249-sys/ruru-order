@@ -1624,6 +1624,11 @@ export default function OrderPage() {
   // [2026-08-14] 주문서 확인에서 「옵션 변경」 — null이면 새로 담기, 숫자면 그 줄을 교체
   const [registeredOptionEditIndex, setRegisteredOptionEditIndex] = useState<number | null>(null);
   const [registeredOptionColor, setRegisteredOptionColor] = useState("");
+  // [2026-09-09 3순위] 시트 «대표사진»을 손님이 바꿀 수 있게 한다.
+  //   예전: 썸네일을 눌러도 대표사진은 그대로였다(확대창만 떴다) → 「옆으로 넘기면 다른 사진인가?」를 알 수 없었다.
+  //   지금: 썸네일 탭 = 대표사진 교체 / 색상 탭 = 그 색 사진으로 교체 / 대표사진 탭 = 확대. 역할을 셋으로 분리.
+  //   ""(빈값)이면 기본 사진을 쓴다. 담기·가격·재고 로직 무관 — 보여주는 사진만 바뀐다.
+  const [registeredOptionHeroPhoto, setRegisteredOptionHeroPhoto] = useState("");
   const [registeredOptionSize, setRegisteredOptionSize] = useState("");
   const [registeredOptionCustomerDetail, setRegisteredOptionCustomerDetail] = useState("");
   const [registeredOptionQty, setRegisteredOptionQty] = useState(1);
@@ -4244,6 +4249,7 @@ export default function OrderPage() {
     setRegisteredOptionManualPrice(0);
     setRegisteredOptionComboSearch("");
     setRegisteredOptionDetailCategory("전체");
+    setRegisteredOptionHeroPhoto("");
   };
 
   const closeRegisteredOptionSelectSheet = () => {
@@ -4257,6 +4263,7 @@ export default function OrderPage() {
     setRegisteredOptionManualPrice(0);
     setRegisteredOptionComboSearch("");
     setRegisteredOptionDetailCategory("전체");
+    setRegisteredOptionHeroPhoto("");
   };
 
   // 동일 상품 + 동일 옵션(색상/사이즈)으로 이미 제출된 주문이 있는지 확인.
@@ -7225,8 +7232,14 @@ export default function OrderPage() {
                   <SheetGrabber onClose={closeRegisteredOptionSelectSheet} style={{ margin: "0 auto 6px" }} />
                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                     {(() => {
-                      const selectedPhoto = registeredOptionBrandDetailPhotos[0] || registeredOptionComboPhotos[registeredOptionDetail] || pickOrderProductImageUrl(registeredOptionSelectProduct);
-                      return <div onClick={() => { if (selectedPhoto) openLightbox(selectedPhoto, registeredOptionAllImages, registeredOptionPhotoTitle); }} style={{ position: "relative", width: "60px", height: "60px", flexShrink: 0, borderRadius: "12px", overflow: "hidden", background: "#F0EBE8", cursor: selectedPhoto ? "zoom-in" : "default" }}>
+                      // [2026-09-09 3순위 · 실측 기반] 대표사진 60 → 88px.
+                      //   무신사(375px 화면)·지그재그 실측: 대표사진은 «화면 폭 100%»(375x450 / 375x375).
+                      //   우리 시트는 «옵션 고르는 화면»이라 사진을 화면 폭으로 키우면 옵션이 화면 밖으로 밀린다
+                      //   (방송 중 빠른 담기가 1순위) → 썸네일 46px 과 «확실히 구분»되는 88px 로 키우고,
+                      //   대신 «지금 보는 사진 / 더 있음 / 확대»를 표시로 알린다.
+                      const defaultHeroPhoto = registeredOptionBrandDetailPhotos[0] || registeredOptionComboPhotos[registeredOptionDetail] || pickOrderProductImageUrl(registeredOptionSelectProduct);
+                      const selectedPhoto = registeredOptionHeroPhoto || defaultHeroPhoto;
+                      return <div onClick={() => { if (selectedPhoto) openLightbox(selectedPhoto, registeredOptionAllImages, registeredOptionPhotoTitle); }} style={{ position: "relative", width: "88px", height: "88px", flexShrink: 0, borderRadius: "14px", overflow: "hidden", background: "#F0EBE8", cursor: selectedPhoto ? "zoom-in" : "default" }}>
                       {selectedPhoto ? (
                         <img src={selectedPhoto} alt={registeredOptionDetail || registeredOptionSelectProduct.product_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       ) : registeredOptionBrandGroup ? (
@@ -7235,7 +7248,8 @@ export default function OrderPage() {
                           <span style={{ fontSize: "8px", fontWeight: 800, color: "#7A1E47" }}>{registeredOptionBrandGroup.brandKo}</span>
                         </div>
                       ) : null}
-                      {selectedPhoto && registeredOptionAllImages.length > 1 ? <span style={{ position: "absolute", right: "3px", bottom: "3px", borderRadius: "999px", background: "rgba(0,0,0,0.68)", padding: "2px 5px", color: "#fff", fontSize: "9px", fontWeight: 900 }}>사진 {registeredOptionAllImages.length}장</span> : null}
+                      {/* [2026-09-09] 「눌러도 되는지 몰랐다」 → 확대 신호를 사진 위에 붙인다 (모바일엔 마우스 커서가 없다) */}
+                      {selectedPhoto ? <span style={{ position: "absolute", right: "4px", bottom: "4px", borderRadius: "999px", background: "rgba(0,0,0,0.72)", padding: "3px 7px", color: "#fff", fontSize: "10px", fontWeight: 900, lineHeight: 1 }}>🔍 크게</span> : null}
                     </div>;
                     })()}
                     <div style={{ minWidth: 0, flex: 1 }}>
@@ -7257,13 +7271,29 @@ export default function OrderPage() {
                       </div>
                     </div>
                   </div>
-                  {registeredOptionAllImages.length > 1 ? (
-                    <div style={{ display: "flex", gap: "6px", marginTop: "10px", overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: "2px" }}>
-                      {registeredOptionAllImages.map((img, i) => (
-                        <img key={`thumb-${i}`} src={img} alt={`${i + 1}번째 상품 사진`} onClick={() => openLightbox(img, registeredOptionAllImages, registeredOptionPhotoTitle)} style={{ width: "46px", height: "46px", flexShrink: 0, borderRadius: "8px", objectFit: "cover", cursor: "zoom-in", border: "1px solid #EEE7E1", background: "#F0EBE8" }} />
-                      ))}
+                  {/* [2026-09-09 3순위] 예전엔 썸네일을 눌러도 «확대창»만 떠서 위 대표사진은 그대로였다.
+                      → 탭하면 위 대표사진이 «그 사진으로 바뀐다». 지금 보고 있는 것에는 테두리를 준다.
+                      (Baymard 공개 조사: 모바일에서도 점 인디케이터보다 «썸네일»이 낫다 — 오탭이 적다)
+                      확대는 위 대표사진(🔍 크게)이 맡는다 — 역할을 겹치지 않게 나눴다. */}
+                  {registeredOptionAllImages.length > 1 ? (() => {
+                    const heroNow = registeredOptionHeroPhoto || registeredOptionBrandDetailPhotos[0] || registeredOptionComboPhotos[registeredOptionDetail] || pickOrderProductImageUrl(registeredOptionSelectProduct);
+                    const heroIdx = registeredOptionAllImages.findIndex((img) => img === heroNow);
+                    return (
+                    <div style={{ marginTop: "10px" }}>
+                      <div style={{ marginBottom: "5px", fontSize: "11px", fontWeight: 800, color: "#8A7F84" }}>
+                        사진 {registeredOptionAllImages.length}장{heroIdx >= 0 ? ` · 지금 ${heroIdx + 1}번째` : ""} — 눌러서 바꿔 보세요
+                      </div>
+                      <div style={{ display: "flex", gap: "6px", overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: "2px" }}>
+                        {registeredOptionAllImages.map((img, i) => {
+                          const isHero = img === heroNow;
+                          return (
+                            <img key={`thumb-${i}`} src={img} alt={`${i + 1}번째 상품 사진`} onClick={() => setRegisteredOptionHeroPhoto(img)} style={{ width: "46px", height: "46px", flexShrink: 0, borderRadius: "8px", objectFit: "cover", cursor: "pointer", border: isHero ? "2.5px solid #7A1E47" : "1px solid #EEE7E1", background: "#F0EBE8", opacity: isHero ? 1 : 0.72 }} />
+                          );
+                        })}
+                      </div>
                     </div>
-                  ) : null}
+                    );
+                  })() : null}
                 </div>
 
                 <div data-registered-option-scroll="true" style={{ minHeight: 0, flex: 1, overflowY: "auto", padding: "16px" }}>
@@ -7458,6 +7488,7 @@ export default function OrderPage() {
                           if (registeredOptionAxes3) {
                             setRegisteredOptionDetail((prev) => (prev === name ? "" : name));
                             setRegisteredOptionColor(""); setRegisteredOptionSize("");
+                            setRegisteredOptionHeroPhoto(""); // 세부상품이 바뀌면 대표사진도 그 상품 기본사진으로
                             requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-registered-option-scroll="true"]')?.scrollTo({ top: 0, behavior: "smooth" }));
                           } else setRegisteredOptionColor((prev) => (prev === name ? "" : name));
                         };
@@ -7477,7 +7508,9 @@ export default function OrderPage() {
                           <div style={{ display: "grid", gap: "9px" }}>
                             {entries.map((entry) => {
                               const name=entry.name, m=metaOf(name);
-                              return <button key={name} type="button" onClick={()=>chooseDetail(name,m.soldOut)} disabled={m.soldOut} style={{display:"flex",alignItems:"center",gap:"8px",width:"100%",padding:"9px",border:"1px solid #F0EAE0",borderRadius:"12px",background:m.selected?"#7A1E47":"#FFFDFB",opacity:m.soldOut?.45:1}}>{m.cover?<span onClick={e=>{e.stopPropagation();openLightbox(m.cover,m.gallery,orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name??""),name));}} style={{position:"relative",width:48,height:48,flexShrink:0}}><img src={m.cover} alt="" loading="lazy" decoding="async" style={{width:48,height:48,objectFit:"cover",borderRadius:8}}/>{m.gallery.length>1?<span style={{position:"absolute",right:2,bottom:2,borderRadius:999,background:"rgba(0,0,0,.68)",padding:"1px 4px",color:"#fff",fontSize:"8px",fontWeight:900}}>사진 {m.gallery.length}장</span>:null}</span>:null}<span style={{flex:1,minWidth:0,textAlign:"left",fontSize:"13px",fontWeight:800,color:m.selected?"#fff":"#333",overflow:"hidden",textOverflow:"ellipsis"}}>{orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name??""),name)}</span><span style={{flexShrink:0,textAlign:"right",lineHeight:1.15}}><b style={{display:"block",fontSize:"12px",fontWeight:900,color:m.selected?"#F5D9E5":"#7A1E47"}}>{m.priceView.actualLabel}</b></span></button>;
+                              return <button key={name} type="button" onClick={()=>chooseDetail(name,m.soldOut)} disabled={m.soldOut} style={{display:"flex",alignItems:"center",gap:"8px",width:"100%",padding:"9px",border:"1px solid #F0EAE0",borderRadius:"12px",background:m.selected?"#7A1E47":"#FFFDFB",opacity:m.soldOut?.45:1}}>{/* [2026-09-09 3순위] 예전엔 사진을 누르면 «확대창»이 떠서 «고르려던» 손님이 헷갈렸다(색상칩도 같은 문제였다).
+                                  → 사진을 눌러도 그냥 «선택»된다. 확대는 위 대표사진(🔍 크게)이 맡는다. */}
+                              {m.cover?<span style={{position:"relative",width:48,height:48,flexShrink:0}}><img src={m.cover} alt="" loading="lazy" decoding="async" style={{width:48,height:48,objectFit:"cover",borderRadius:8}}/>{m.gallery.length>1?<span style={{position:"absolute",right:2,bottom:2,borderRadius:999,background:"rgba(0,0,0,.68)",padding:"1px 4px",color:"#fff",fontSize:"8px",fontWeight:900}}>사진 {m.gallery.length}장</span>:null}</span>:null}<span style={{flex:1,minWidth:0,textAlign:"left",fontSize:"13px",fontWeight:800,color:m.selected?"#fff":"#333",overflow:"hidden",textOverflow:"ellipsis"}}>{orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name??""),name)}</span><span style={{flexShrink:0,textAlign:"right",lineHeight:1.15}}><b style={{display:"block",fontSize:"12px",fontWeight:900,color:m.selected?"#F5D9E5":"#7A1E47"}}>{m.priceView.actualLabel}</b></span></button>;
                             })}
                           </div>
                         );
@@ -7490,6 +7523,10 @@ export default function OrderPage() {
                     <div style={{ marginBottom: "16px", opacity: registeredOptionAxes3 && !registeredOptionDetail.trim() ? 0.45 : 1, pointerEvents: registeredOptionAxes3 && !registeredOptionDetail.trim() ? "none" : "auto" }}>
                       <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>
                         색상
+                        {/* [2026-09-09] 색상 사진이 실제로 있을 때만 안내 — 없는 상품엔 헛말이 되지 않게 */}
+                        {registeredOptionColorChoices.some((c) => registeredOptionColorPhotos[c]) && !(registeredOptionAxes3 && !registeredOptionDetail.trim())
+                          ? <span style={{ marginLeft: "5px", fontSize: "11px", fontWeight: 800, color: "#8A7F84" }}>— 누르면 위 사진이 그 색으로 바뀌어요</span>
+                          : null}
                         {registeredOptionAxes3 && !registeredOptionDetail.trim()
                           ? <span style={{ marginLeft: "6px", fontSize: "12px", fontWeight: 700, color: "#7B736D" }}>— {registeredOptionAxes3.detailLabel}부터 선택</span>
                           : null}
@@ -7500,7 +7537,7 @@ export default function OrderPage() {
                             const selected = registeredOptionColor === option;
                             const soldOut = isSoldOutColorSize(option, registeredOptionSize);
                             return (
-                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionColor((prev) => prev === option ? "" : option); setRegisteredOptionSize(""); }} style={{ height: "44px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", padding: "0 8px" }}>{registeredOptionColorPhotos[option] ? <span onClick={(e) => { e.stopPropagation(); openLightbox(registeredOptionColorPhotos[option], [registeredOptionColorPhotos[option]], option); }} style={{ flexShrink: 0, width: "32px", height: "32px", cursor: "zoom-in" }}><img src={registeredOptionColorPhotos[option]} alt={option} loading="lazy" decoding="async" style={{ width: "32px", height: "32px", objectFit: "cover", borderRadius: "8px", display: "block" }} /></span> : null}<span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{soldOut ? option + " (품절)" : option}</span></button>
+                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; const next = selected ? "" : option; setRegisteredOptionColor(next); setRegisteredOptionSize(""); const nextPhoto = next ? (registeredOptionColorPhotos[next] || "") : ""; setRegisteredOptionHeroPhoto(nextPhoto); }} style={{ height: "48px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", padding: "0 8px" }}>{registeredOptionColorPhotos[option] ? <img src={registeredOptionColorPhotos[option]} alt={option} loading="lazy" decoding="async" style={{ flexShrink: 0, width: "36px", height: "36px", objectFit: "cover", borderRadius: "10px", display: "block" }} /> : null}<span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{soldOut ? option + " (품절)" : option}</span></button>
                             );
                           })}
                         </div>
@@ -7510,7 +7547,7 @@ export default function OrderPage() {
                             const selected = registeredOptionColor === option;
                             const soldOut = isSoldOutColorSize(option, registeredOptionSize);
                             return (
-                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionColor((prev) => prev === option ? "" : option); setRegisteredOptionSize(""); }} style={{ height: "34px", borderRadius: "999px", padding: registeredOptionColorPhotos[option] ? "0 14px 0 5px" : "0 14px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "13px", fontWeight: 700, cursor: "pointer", opacity: soldOut ? 0.4 : 1, display: "inline-flex", alignItems: "center", gap: "6px" }}>{registeredOptionColorPhotos[option] ? <span onClick={(e) => { e.stopPropagation(); openLightbox(registeredOptionColorPhotos[option], [registeredOptionColorPhotos[option]], option); }} style={{ flexShrink: 0, width: "26px", height: "26px", cursor: "zoom-in" }}><img src={registeredOptionColorPhotos[option]} alt={option} loading="lazy" decoding="async" style={{ width: "26px", height: "26px", objectFit: "cover", borderRadius: "999px", display: "block" }} /></span> : null}{soldOut ? option + " (품절)" : option}</button>
+                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; const next = selected ? "" : option; setRegisteredOptionColor(next); setRegisteredOptionSize(""); const nextPhoto = next ? (registeredOptionColorPhotos[next] || "") : ""; setRegisteredOptionHeroPhoto(nextPhoto); }} style={{ height: "44px", borderRadius: "999px", padding: registeredOptionColorPhotos[option] ? "0 14px 0 4px" : "0 16px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 700, cursor: "pointer", opacity: soldOut ? 0.4 : 1, display: "inline-flex", alignItems: "center", gap: "8px" }}>{registeredOptionColorPhotos[option] ? <img src={registeredOptionColorPhotos[option]} alt={option} loading="lazy" decoding="async" style={{ flexShrink: 0, width: "36px", height: "36px", objectFit: "cover", borderRadius: "999px", display: "block" }} /> : null}{soldOut ? option + " (품절)" : option}</button>
                             );
                           })}
                         </div>
