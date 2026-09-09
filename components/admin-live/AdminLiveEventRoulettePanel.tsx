@@ -792,11 +792,30 @@ export default function AdminLiveEventRoulettePanel({
   };
 
   // 초기화: 참가자 + 당첨고정 + 당첨자발표(현재 이벤트) 동시 리셋. 기록/목록은 건드리지 않음.
-  const resetEvent = () => {
+  // [2026-09-09 4순위 전수감사] 「↺ 초기화」에 확인창이 없었다.
+  //   이 버튼은 탭(🎯 미션 …)과 「✕ 닫기」 «사이»에 끼어 있고 크기도 작다(padding 4px 8px).
+  //   방송 중에 잘못 누르면 불러온 명단·직접 적은 참가자·고정 당첨자가 «한 번에» 사라진다.
+  //   (같은 종류의 오클릭 위험을 2026-09-08 감사에서 「지급완료 옆 삭제」로 한 번 고쳤다 — 여기가 남아 있었다)
+  //   → 지울 게 «있을 때만» 물어본다. 이미 비어 있으면 예전처럼 그냥 넘어간다(불필요한 확인창 금지).
+  const resetEvent = async () => {
+    const losing: string[] = [];
+    if (participants.length > 0) losing.push(`명단 ${participants.length}명`);
+    if (manualParticipantText.trim()) losing.push("직접 적은 참가자");
+    if (fixedWinnerNickname.trim()) losing.push(`고정 당첨자 「${fixedWinnerNickname.trim()}」`);
+
+    if (losing.length > 0) {
+      const ok = await showAdminConfirm(
+        `${losing.join(" · ")}\n\n이걸 전부 지우고 처음으로 되돌릴까요?\n(이미 지급한 포인트·당첨 기록은 그대로 남습니다)`,
+        { title: "이벤트 화면 초기화", confirmText: "초기화", cancelText: "그대로 두기", tone: "warning" },
+      );
+      if (!ok) return;
+    }
+
     setParticipants([]);
     setManualParticipantText("");
     setFixedWinnerNickname("");
     setCurrentEvent(null);
+    setCenterWinner(""); // 「취소」를 누르면 여기까지 안 오므로 화면이 그대로 남는다
   };
 
   const changeBroadcast = (nextBroadcastId: string) => {
@@ -1508,7 +1527,7 @@ export default function AdminLiveEventRoulettePanel({
                   <span className="badge" style={{ padding: "4px 12px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "mission" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "mission" ? "#fff" : "var(--mut)" }}
                     onClick={() => { setEventTab("mission"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>🎯 미션</span>
                   <span style={{ width: "1px", height: "18px", background: "var(--bd)", margin: "0 4px" }} />
-                  <button className="btn" style={{ height: "auto", padding: "4px 8px" }} onClick={() => { resetEvent(); setCenterWinner(""); }}>↺ 초기화</button>
+                  <button className="btn" style={{ height: "auto", padding: "4px 8px" }} onClick={() => { void resetEvent(); }}>↺ 초기화</button>
                   {embedded ? null : <button className="btn" style={{ height: "auto", padding: "4px 8px" }} onClick={closePanel}>✕</button>}
                 </span>
               </div>
