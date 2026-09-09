@@ -22,6 +22,26 @@ export const cleanNoteSessionKey = (v: unknown) => {
 export const cleanNoteText = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
 
 /** 보관 시간 — 1~72시간. 값이 이상하면 12시간. */
+// [2026-09-09 사장님 지적] 「포인트 넣어드렸어요」 쪽지가 12시간 뒤 사라져 손님이 영영 못 봤다.
+//   실측: AdminLiveLoyaltyReport 가 hours 를 안 보내 noteHours(undefined) → 12시간.
+//   포인트는 이미 «줬는데» 알림만 사라지니, 손님은 받은 줄도 모른다(2026-09-06 발송분 154명).
+//   → 돈이 오간 쪽지는 «손님이 볼 때까지» 남아야 한다. 만료 칸이 NOT NULL 이라 지울 수는 없으므로
+//     아주 먼 날짜를 넣어 사실상 무제한으로 만든다. (DB 구조 변경 없음 — 기존 데이터 보호)
+export const NOTE_UNLIMITED_YEARS = 10;
+
+/** 이 쪽지가 언제까지 손님 화면에 뜨는가. unlimited 면 10년 뒤(사실상 무제한). */
+export function noteExpiresAt(nowMs: number, hours: number, unlimited: boolean): string {
+  if (unlimited) return new Date(nowMs + NOTE_UNLIMITED_YEARS * 365 * 24 * 60 * 60 * 1000).toISOString();
+  return new Date(nowMs + hours * 60 * 60 * 1000).toISOString();
+}
+
+/** 무제한으로 보낸 쪽지인가 (만료가 1년 이상 남았으면 무제한으로 본다) */
+export function isUnlimitedNote(expiresAt: unknown): boolean {
+  const t = new Date(String(expiresAt ?? "")).getTime();
+  if (!Number.isFinite(t)) return false;
+  return t - Date.now() > 365 * 24 * 60 * 60 * 1000;
+}
+
 export function noteHours(v: unknown): number {
   const n = Math.floor(Number(v));
   if (!Number.isFinite(n) || n <= 0) return 12;

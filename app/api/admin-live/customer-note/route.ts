@@ -20,12 +20,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
+import { koreanPhoneVariants } from "@/lib/order/phone";
 import {
   buildNoteSourceKey,
   cleanNotePhone,
   cleanNoteSessionKey,
   cleanNoteText,
   noteHours,
+  noteExpiresAt,
   normalizeTargets,
   targetSessionKeyOf,
   type CleanTarget,
@@ -62,6 +64,9 @@ export async function POST(request: NextRequest) {
     const title = cleanNoteText(body.title, 60) || "📩 루루동이 알림";
     const message = cleanNoteText(body.message, 500);
     const hours = noteHours(body.hours);
+    // [2026-09-09] 돈이 오간 쪽지(포인트 지급 안내)는 «손님이 볼 때까지» 남긴다.
+    //   보내는 쪽에서 unlimited:true 를 준다. 안 주면 예전과 100% 동일(12~72시간).
+    const unlimited = body.unlimited === true;
 
     // 예전 방식(한 명)도 그대로 받는다 — 고객 카드의 쪽지 보내기가 이 모양으로 부른다.
     const targets: CleanTarget[] = Array.isArray(body.targets)
@@ -85,7 +90,7 @@ export async function POST(request: NextRequest) {
       title,
       message,
       is_active: true,
-      expires_at: new Date(nowMs + hours * 60 * 60 * 1000).toISOString(),
+      expires_at: noteExpiresAt(nowMs, hours, unlimited),
       sent_by: sentBy,
       // 같은 사람·같은 내용·같은 10분 구간이면 같은 값 → DB 유니크가 두 번째를 막는다.
       source_key: buildNoteSourceKey(t, message, nowMs),
@@ -176,7 +181,50 @@ export async function GET(request: NextRequest) {
 
     if (error) return NextResponse.json({ ok: false, message: "보낸 쪽지 조회 실패: " + error.message }, { status: 500 });
 
-    return NextResponse.json({ ok: true, notes: data || [] });
+    // [2026-09-09 사장님 지적] 「닉네임이랑 표시가 되어야지 폰번호만 나오면 어쩌자는 거지?」
+    //   쪽지 표에는 전화번호밖에 없다 → 회원 표에서 닉네임·이름을 «읽어서» 붙인다.
+    //   읽기 전용. 저장하지 않는다. 조회 실패해도 목록은 그대로 나온다.
+    const notes = (data || []) as Record<string, unknown>[];
+    try {
+      const phones = Array.from(
+        new Set(
+          notes
+            .map((n) => String(n.customer_phone ?? "").trim() || String(n.target_session_key ?? "").replace(/^phone:/, "").trim())
+            .filter(Boolean),
+        ),
+      ).slice(0, 400);
+
+      if (phones.length > 0) {
+        // 같은 번호가 숫자만/하이픈 두 가지로 저장돼 있을 수 있어 후보를 넓힌다
+        const variants = Array.from(new Set(phones.flatMap((v) => koreanPhoneVariants(v))));
+        const { data: people } = await sb
+          .from("customers")
+          .select("customer_phone, youtube_nickname, customer_name")
+          .in("customer_phone", variants);
+
+        const byDigits = new Map<string, { nick: string; name: string }>();
+        for (const row of (people || []) as Record<string, unknown>[]) {
+          const key = String(row.customer_phone ?? "").replace(/[^0-9]/g, "");
+          if (!key) continue;
+          const nick = String(row.youtube_nickname ?? "").trim();
+          const name = String(row.customer_name ?? "").trim();
+          const prev = byDigits.get(key);
+          // 닉네임이 있는 줄을 우선 — 반쪽짜리 줄이 이름을 덮지 않게
+          if (!prev || (!prev.nick && nick)) byDigits.set(key, { nick, name });
+        }
+
+        for (const n of notes) {
+          const key = (String(n.customer_phone ?? "").trim() || String(n.target_session_key ?? "").replace(/^phone:/, "")).replace(/[^0-9]/g, "");
+          const hit = key ? byDigits.get(key) : undefined;
+          n.youtube_nickname = hit?.nick || "";
+          n.customer_name = hit?.name || "";
+        }
+      }
+    } catch {
+      /* 이름 붙이기 실패는 쪽지 목록을 막지 않는다 */
+    }
+
+    return NextResponse.json({ ok: true, notes });
   } catch (e) {
     return NextResponse.json({ ok: false, message: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }
@@ -190,9 +238,44 @@ export async function PATCH(request: NextRequest) {
 
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const id = Math.floor(Number(body.id) || 0);
-    if (id <= 0) return NextResponse.json({ ok: false, message: "회수할 쪽지를 찾지 못했습니다." }, { status: 400 });
-
     const sb = admin();
+    if (id <= 0 && String(body.action || "") !== "revive_all") {
+      return NextResponse.json({ ok: false, message: "쪽지를 찾지 못했습니다." }, { status: 400 });
+    }
+
+    // [2026-09-09 사장님 지적] 이미 «기간이 지나» 손님 화면에서 사라진 쪽지를 다시 띄운다.
+    //   2026-09-06 복귀 포인트 쪽지 154건이 12시간 만에 사라졌다 — 포인트는 줬는데 손님은 모른다.
+    //   ⚠ 여기서 «돈»은 1원도 움직이지 않는다. 쪽지 만료일과 화면표시(is_active)만 되살린다.
+    // 한 번에 되살리기 — 「못 본 쪽지」가 154건씩 쌓이면 하나씩 누를 수 없다.
+    //   안전핀은 단건과 동일: admin_note · 안 읽음 · 회수 안 함 · 이미 만료된 것만.
+    if (String(body.action || "") === "revive_all") {
+      const nowIso = new Date().toISOString();
+      const { data: revivedRows, error: reviveAllError } = await sb
+        .from("customer_site_alerts")
+        .update({ is_active: true, expires_at: noteExpiresAt(Date.now(), 0, true) })
+        .eq("kind", "admin_note")
+        .is("seen_at", null)
+        .is("revoked_at", null)
+        .lt("expires_at", nowIso)
+        .select("id");
+      if (reviveAllError) return NextResponse.json({ ok: false, message: "다시 띄우기 실패: " + reviveAllError.message }, { status: 500 });
+      return NextResponse.json({ ok: true, revivedCount: (revivedRows || []).length });
+    }
+
+    if (String(body.action || "") === "revive") {
+      const { data: revived, error: reviveError } = await sb
+        .from("customer_site_alerts")
+        .update({ is_active: true, expires_at: noteExpiresAt(Date.now(), 0, true) })
+        .eq("id", id)
+        .eq("kind", "admin_note")
+        .is("seen_at", null)        // 안전핀: 이미 «읽은» 쪽지는 다시 띄우지 않는다
+        .is("revoked_at", null)     // 안전핀: 회수한 쪽지는 되살리지 않는다
+        .select("id")
+        .maybeSingle();
+      if (reviveError) return NextResponse.json({ ok: false, message: "다시 띄우기 실패: " + reviveError.message }, { status: 500 });
+      if (!revived) return NextResponse.json({ ok: false, message: "이미 읽었거나 회수한 쪽지는 다시 띄우지 않습니다." }, { status: 400 });
+      return NextResponse.json({ ok: true, revived: true });
+    }
     let { data, error } = await sb
       .from("customer_site_alerts")
       .update({ is_active: false, revoked_at: new Date().toISOString(), revoked_by: who(session) })

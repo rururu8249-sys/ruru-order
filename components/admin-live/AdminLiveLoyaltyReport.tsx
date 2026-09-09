@@ -132,7 +132,9 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
           method: "POST",
           headers: { "Content-Type": "application/json" },
           cache: "no-store",
-          body: JSON.stringify({ targets: targets.map((t) => ({ phone: t.phone })), title: "💌 포인트를 넣어드렸어요", message }),
+          // [2026-09-09 사장님 지적] unlimited:true — 포인트를 «줬다»는 알림은 12시간 만에 사라지면 안 된다.
+          //   손님이 다음에 언제 들어올지 모른다(45일 넘게 안 온 손님에게 보내는 쪽지다).
+          body: JSON.stringify({ targets: targets.map((t) => ({ phone: t.phone })), title: "💌 포인트를 넣어드렸어요", message, unlimited: true }),
         });
         const json = await res.json().catch(() => null);
         noteOk = Boolean(res.ok && json?.ok);

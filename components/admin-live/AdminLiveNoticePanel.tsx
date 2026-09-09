@@ -59,6 +59,8 @@ type SentNote = {
   id: number; title: string; message: string; customer_phone: string | null; target_session_key: string | null;
   created_at: string; expires_at: string; seen_at: string | null; dismissed_at: string | null;
   revoked_at?: string | null; sent_by: string | null; is_active: boolean;
+  // [2026-09-09] 서버가 회원표에서 읽어 붙여준다 (쪽지 표엔 전화번호밖에 없다)
+  youtube_nickname?: string | null; customer_name?: string | null;
 };
 
 export default function AdminLiveNoticePanel() {
@@ -311,6 +313,46 @@ export default function AdminLiveNoticePanel() {
   };
 
   useEffect(() => { if (tab === "sent") void loadSent(); }, [tab]);
+
+  // [2026-09-09 사장님 지적] 기간이 지나 «손님 화면에서 사라진» 쪽지를 다시 띄운다.
+  //   ⚠ 돈은 1원도 안 움직인다 — 포인트는 보낼 때 이미 지급됐고, 여기선 쪽지 표시만 되살린다.
+  const reviveNote = async (n: SentNote) => {
+    const who = n.youtube_nickname || n.customer_name || n.customer_phone || "이 손님";
+    if (!(await showAdminConfirm(`「${who}」님 화면에 이 쪽지를 다시 띄울까요?\n\n손님이 읽을 때까지 계속 뜹니다.\n포인트는 이미 지급됐고, 다시 주지 않습니다.`))) return;
+    try {
+      const res = await fetch("/api/admin-live/customer-note", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ id: n.id, action: "revive" }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j?.ok) throw new Error(j?.message || `요청 실패(${res.status})`);
+      showAdminToast("다시 띄웠습니다. 손님이 읽을 때까지 계속 뜹니다.", "success");
+      void loadSent();
+    } catch (e) {
+      showAdminToast("다시 띄우기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    }
+  };
+
+  // 못 본 쪽지 전부 다시 띄우기 — 154건을 하나씩 누를 수는 없다
+  const reviveAllMissed = async (count: number) => {
+    if (!(await showAdminConfirm(`손님이 «못 본» 쪽지 ${count}건을 전부 다시 띄울까요?\n\n각 손님이 읽을 때까지 계속 뜹니다.\n포인트는 이미 지급됐고, 다시 주지 않습니다.`))) return;
+    try {
+      const res = await fetch("/api/admin-live/customer-note", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ action: "revive_all" }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j?.ok) throw new Error(j?.message || `요청 실패(${res.status})`);
+      showAdminToast(`${Number(j.revivedCount || 0)}건을 다시 띄웠습니다.`, "success");
+      void loadSent();
+    } catch (e) {
+      showAdminToast("다시 띄우기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    }
+  };
 
   const revokeNote = async (n: SentNote) => {
     const seenWarn = n.seen_at ? "\n\n⚠️ 손님이 이미 읽은 쪽지입니다. 화면에서는 내려가지만 이미 봤습니다." : "";
@@ -768,6 +810,23 @@ export default function AdminLiveNoticePanel() {
             </button>
           </div>
 
+          {(() => {
+            const missedCount = sent.filter((n) => {
+              const rev = Boolean(n.revoked_at) || (!n.is_active && !n.dismissed_at);
+              return !rev && !n.seen_at && new Date(n.expires_at).getTime() < Date.now();
+            }).length;
+            if (missedCount === 0) return null;
+            return (
+              <div className="mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-danger-tx bg-danger-bg/50 px-4 py-3">
+                <span className="text-[13px] font-black text-danger-tx">손님이 못 본 쪽지 {missedCount}건</span>
+                <span className="text-[11px] font-bold text-ink-soft">표시 기간이 끝나 손님 화면에서 사라졌습니다. 포인트는 이미 지급돼 있어요.</span>
+                <button type="button" onClick={() => void reviveAllMissed(missedCount)}
+                  className="ml-auto rounded-lg bg-rose-deep px-3 py-1.5 text-[11px] font-black text-white">
+                  🔔 전부 다시 띄우기
+                </button>
+              </div>
+            );
+          })()}
           {sent.length === 0 ? (
             <div className={`${card} py-14 text-center text-sm font-bold text-ink-mute`}>
               {sentLoading ? "불러오는 중…" : "보낸 쪽지가 없습니다. 위에서 손님을 찾아 쪽지를 보내면 여기에 쌓입니다."}
@@ -777,15 +836,28 @@ export default function AdminLiveNoticePanel() {
               {sent.map((n) => {
                 const revoked = Boolean(n.revoked_at) || (!n.is_active && !n.dismissed_at);
                 const expired = new Date(n.expires_at).getTime() < Date.now();
+                // [2026-09-09] 만료가 1년 이상 남았으면 «손님이 볼 때까지» 보내는 쪽지다(포인트 안내 등)
+                const unlimited = new Date(n.expires_at).getTime() - Date.now() > 365 * 24 * 60 * 60 * 1000;
+                // 「안 읽음 + 기간 지남」 = 손님이 못 봤고 앞으로도 못 본다. 이게 제일 나쁜 상태다.
+                const missed = !revoked && expired && !n.seen_at;
+                const phoneText = n.customer_phone || String(n.target_session_key || "").replace(/^phone:/, "");
+                const whoText = (n.youtube_nickname || "").trim() || (n.customer_name || "").trim();
                 return (
                   <div key={n.id} className={`rounded-xl border p-4 ${revoked ? "border-line bg-surface-2 opacity-60" : "border-line bg-surface"}`}>
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-[13px] font-black text-ink">{n.customer_phone || String(n.target_session_key || "").replace(/^phone:/, "") || "대상 미상"}</span>
+                      {/* [2026-09-09 사장님 지적] 폰번호만 있으면 누군지 모른다 → 닉네임을 앞에 크게, 번호는 뒤에 작게 */}
+                      <span className="text-[13px] font-black text-ink">{whoText || phoneText || "대상 미상"}</span>
+                      {whoText && phoneText ? <span className="text-[11px] font-bold text-ink-mute">{phoneText}</span> : null}
                       {n.seen_at
                         ? <span className="rounded-full bg-ok-bg px-2 py-0.5 text-[11px] font-black text-ok-tx">읽음</span>
                         : <span className="rounded-full bg-[var(--color-danger-tx)] px-2 py-0.5 text-[11px] font-black text-white">안 읽음</span>}
                       {revoked ? <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-mute">회수됨</span> : null}
-                      {!revoked && expired ? <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-mute">기간 지남</span> : null}
+                      {/* [2026-09-09] 「기간 지남」이 무슨 뜻인지 사장님이 알 수 없었다 → 결과로 쓴다.
+                          · 안 읽었는데 기간이 끝났다 = 손님은 «영영 못 본다» → 빨간 경고 + 다시 띄우기
+                          · 읽고 나서 끝났다 = 정상 종료 → 회색 */}
+                      {missed ? <span className="rounded-full bg-danger-bg px-2 py-0.5 text-[11px] font-black text-danger-tx">손님이 못 봄 · 이제 안 뜸</span> : null}
+                      {!revoked && expired && n.seen_at ? <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-mute">표시 끝</span> : null}
+                      {!revoked && !expired && unlimited && !n.seen_at ? <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-soft">읽을 때까지 계속 뜸</span> : null}
                       {n.dismissed_at ? <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-mute">손님이 닫음</span> : null}
                     </div>
                     <p className="mt-1.5 whitespace-pre-line text-[13px] font-bold leading-6 text-ink-soft">{n.message}</p>
@@ -793,9 +865,15 @@ export default function AdminLiveNoticePanel() {
                       <span>보낸 날짜 {noteTimeText(n.created_at)}</span>
                       {n.seen_at ? <span>읽은 날짜 {noteTimeText(n.seen_at)}</span> : null}
                       {n.sent_by ? <span>보낸 사람 {n.sent_by}</span> : null}
+                      {missed ? (
+                        <button type="button" onClick={() => void reviveNote(n)}
+                          className="ml-auto rounded-lg bg-rose-deep px-2.5 py-1.5 text-[11px] font-black text-white">
+                          🔔 다시 띄우기
+                        </button>
+                      ) : null}
                       {!revoked ? (
                         <button type="button" onClick={() => void revokeNote(n)}
-                          className="ml-auto rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-danger-tx">
+                          className={`${missed ? "" : "ml-auto "}rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-danger-tx`}>
                           ↩︎ 회수
                         </button>
                       ) : null}

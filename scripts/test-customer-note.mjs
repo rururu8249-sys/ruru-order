@@ -6,7 +6,7 @@
 //   ② 여러 명 발송에서 같은 사람이 두 번 들어가는 것
 //   ③ 보낼 곳 없는 줄(번호도 세션키도 없음)이 섞여 들어가는 것
 import {
-  cleanNotePhone, cleanNoteSessionKey, cleanNoteText, noteHours,
+  cleanNotePhone, cleanNoteSessionKey, cleanNoteText, noteHours, noteExpiresAt, isUnlimitedNote,
   normalizeTargets, targetSessionKeyOf, buildNoteSourceKey, fingerprint,
 } from "../lib/customerNote.ts";
 import { NOTE_PRESETS, safeSearchTerm } from "../lib/customerNotePresets.ts";
@@ -29,6 +29,21 @@ eq(noteHours(0), 12, "0이면 기본 12시간");
 eq(noteHours(-5), 12, "음수면 기본 12시간");
 eq(noteHours(999), 72, "너무 길면 72시간으로 자름");
 eq(noteHours("이상한값"), 12, "숫자가 아니면 기본 12시간");
+
+// [2026-09-09 사장님 지적] 포인트 쪽지가 12시간 만에 사라져 손님이 못 봤다 → «무제한» 신설
+{
+  const now = Date.UTC(2026, 8, 9, 0, 0, 0);
+  const normal = new Date(noteExpiresAt(now, 12, false)).getTime();
+  eq(normal - now, 12 * 60 * 60 * 1000, "무제한이 아니면 예전 그대로 (보낸 시각 + 시간)");
+
+  const unlimited = new Date(noteExpiresAt(now, 12, true)).getTime();
+  eq(unlimited - now > 365 * 24 * 60 * 60 * 1000, true, "무제한이면 1년보다 훨씬 뒤");
+
+  eq(isUnlimitedNote(new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000).toISOString()), true, "10년 뒤 = 무제한으로 본다");
+  eq(isUnlimitedNote(new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString()), false, "12시간 뒤 = 무제한 아님");
+  eq(isUnlimitedNote(new Date(Date.now() - 1000).toISOString()), false, "이미 지난 것 = 무제한 아님");
+  eq(isUnlimitedNote("이상한값"), false, "날짜가 아니면 무제한 아님");
+}
 
 console.log("\n── 받는 사람 목록 ──");
 eq(normalizeTargets([{ phone: "01028495209" }, { phone: "010-2849-5209" }]).length, 1,
