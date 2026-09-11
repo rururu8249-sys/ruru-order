@@ -2,9 +2,13 @@
 
 // components/admin-live/AdminLiveLinkRequestsPanel.tsx
 // [2026-09-09] «계정 연결 요청» 목록 — 손님이 카톡을 바꿔 계정이 갈라졌을 때 (1단계)
+// [2026-09-11 사장님 결정] 손님한테 안 묻는다. 시스템이 «주소»로 알아내서 여기 올린다(자동 감지).
 //
-//   손님 쪽에서 «예전 번호»로 본인 확인을 마친 요청만 여기 쌓인다(번호가 틀리면 접수 자체가 안 됨).
-//   사장님은 한 줄을 보고 «같은 사람 맞다» 싶으면 합치면 된다.
+//   줄이 생기는 길 두 가지
+//     · 자동 감지(source='auto')  DB 트리거 ruru_detect_split_account — 상세주소까지 같은 «다른 카톡·다른 번호» 회원이
+//                                 생기면(카카오 배송지 동기화든 손님 직접 입력이든) 한 줄 올린다. 이름도 같으면 배지 추가.
+//     · 손님 요청(source='customer') 예전 화면(09-09)에서 접수된 것. 지금 손님 화면은 접수 단계가 없어 새로 생기진 않는다.
+//   사장님은 양쪽 주소·이름·마지막 주문을 보고 «같은 사람 맞다» 싶으면 [🔗 합치기] 한 번.
 //
 //   1단계에서 이 화면이 하는 일
 //     · 요청 보여주기 (예전 계정에 주문 몇 건 · 포인트 얼마가 들어 있는지 같이)
@@ -37,7 +41,23 @@ type LinkRequestRow = {
   created_at: string;
   old_order_count?: number;
   old_points?: number;
+  // [2026-09-11] 자동 감지
+  source?: string;                 // 'auto' | 'customer'
+  match_reasons?: string[];        // ['상세주소 같음', '이름 같음']
+  new_customer_id?: number | null;
+  old_address?: string;
+  old_detail_address?: string;
+  old_nickname?: string;
+  new_address?: string;
+  new_detail_address?: string;
+  new_customer_name?: string;
+  new_nickname?: string;
+  old_last_order_at?: string;
+  old_last_order_product?: string;
 };
+
+const isAuto = (row: LinkRequestRow) => String(row.source || "customer") === "auto";
+const joinAddress = (base?: string, detail?: string) => [String(base || "").trim(), String(detail || "").trim()].filter(Boolean).join(" ");
 
 const when = (value: unknown) => {
   const date = new Date(String(value || ""));
@@ -167,11 +187,12 @@ export default function AdminLiveLinkRequestsPanel() {
         `  · 포인트 ${Number(p.old_points || 0).toLocaleString("ko-KR")}P`,
         ``,
         p.will_change_phone ? `번호를 ${formatKoreanPhone(p.old_phone)} → ${formatKoreanPhone(p.new_phone)} 로 바꿉니다.` : `번호는 그대로 둡니다.`,
+        p.will_change_kakao ? `카톡 로그인을 «지금 쓰는 카톡»으로 바꿉니다(예전 카톡으로는 더 못 들어옴).` : null,
         p.will_delete_new_row ? `지금 쓰는 빈 계정 줄은 지웁니다(주문·포인트 0).` : `지울 계정 줄은 없습니다.`,
         ``,
         `포인트와 주문은 «없어지지 않고» 이 계정으로 따라갑니다.`,
         `되돌릴 수 있게 백업을 먼저 남깁니다.`,
-      ].join("\n");
+      ].filter((line): line is string => line !== null).join("\n");
 
       const ok = await showAdminConfirm(lines, { title: "계정 합치기", confirmText: "합치기", cancelText: "취소", tone: "warning" });
       if (!ok) return;
@@ -217,11 +238,11 @@ export default function AdminLiveLinkRequestsPanel() {
     <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-[14px] font-black text-ink">🔗 계정 연결 요청</div>
+          <div className="text-[14px] font-black text-ink">🔗 같은 사람 같아요 — 계정 잇기</div>
           <p className="mt-1 text-[12px] font-bold leading-relaxed text-ink-soft">
-            손님이 카톡을 바꿔 회원이 갈라졌을 때, 손님이 «예전 번호»로 본인 확인을 마친 요청만 여기 쌓입니다.
+            손님이 카톡을 바꾸면 우리 눈엔 «새 회원»이 됩니다. 새 회원의 <b>상세주소까지</b> 예전 회원과 같으면 여기 자동으로 올라옵니다.
             <br />
-            번호가 틀리면 접수 자체가 안 되니, 여기 뜬 줄은 «같은 사람일 가능성이 높은» 줄입니다.
+            양쪽을 보고 같은 사람이면 [🔗 합치기] 한 번 — 예전 주문·포인트가 지금 카톡으로 따라갑니다.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -253,8 +274,14 @@ export default function AdminLiveLinkRequestsPanel() {
           {visible.map((row) => (
             <div key={row.id} className="rounded-xl border border-line bg-surface-2 p-4">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-rose-deep px-2 py-0.5 text-[12px] font-black text-white">{row.nickname}</span>
-                <span className="text-[12px] font-bold text-ink-mute">{when(row.created_at)} 요청</span>
+                <span className="rounded-full bg-rose-deep px-2 py-0.5 text-[12px] font-black text-white">{row.nickname || row.new_nickname || row.old_nickname || "이름없음"}</span>
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-black ${isAuto(row) ? "bg-warn-bg text-warn-tx" : "border border-line text-ink-soft"}`}>
+                  {isAuto(row) ? "자동 감지" : "손님 요청"}
+                </span>
+                {(row.match_reasons || []).map((reason) => (
+                  <span key={reason} className="rounded-full bg-ok-bg px-2 py-0.5 text-[11px] font-black text-ok-tx">✅ {reason}</span>
+                ))}
+                <span className="text-[12px] font-bold text-ink-mute">{when(row.created_at)}</span>
                 {row.status !== "pending" ? (
                   <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-soft">
                     {row.status === "done" ? "처리함" : "아님"}
@@ -273,17 +300,29 @@ export default function AdminLiveLinkRequestsPanel() {
                     {" · "}
                     포인트 <span className="text-rose-deep">{(row.old_points ?? 0).toLocaleString("ko-KR")}P</span>
                   </div>
+                  {joinAddress(row.old_address, row.old_detail_address) ? (
+                    <div className="mt-1 break-keep text-[12px] font-bold text-ink-soft">📍 {joinAddress(row.old_address, row.old_detail_address)}</div>
+                  ) : null}
+                  {row.old_last_order_at ? (
+                    <div className="mt-1 text-[11px] font-bold text-ink-mute">
+                      마지막 주문 {when(row.old_last_order_at)}{row.old_last_order_product ? ` · ${row.old_last_order_product}` : ""}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="rounded-lg border border-line bg-surface p-3">
                   <div className="text-[11px] font-black text-ink-mute">지금 쓰는 계정 (새 카톡)</div>
                   <div className="mt-1 text-[13px] font-black text-ink">
                     {row.new_customer_phone ? formatKoreanPhone(row.new_customer_phone) : "번호 아직 없음"}
+                    {row.new_customer_name ? ` · ${row.new_customer_name}` : ""}
                   </div>
                   <div className="mt-1 text-[12px] font-bold text-ink-soft">
-                    카톡 {row.new_kakao_id || "-"}
+                    카톡 {row.new_kakao_nickname || row.new_kakao_id || "-"}
                     {row.temp_nickname ? <> · 지금 이름 <span className="text-rose-deep">{row.temp_nickname}</span></> : null}
                   </div>
+                  {joinAddress(row.new_address, row.new_detail_address) ? (
+                    <div className="mt-1 break-keep text-[12px] font-bold text-ink-soft">📍 {joinAddress(row.new_address, row.new_detail_address)}</div>
+                  ) : null}
                 </div>
               </div>
 
@@ -334,8 +373,8 @@ export default function AdminLiveLinkRequestsPanel() {
               </div>
 
               <p className="mt-2 text-[11px] font-bold leading-relaxed text-ink-mute">
-                <b>[🔗 합치기]</b>를 누르면 먼저 «무엇이 어떻게 바뀌는지» 숫자로 보여주고, 사장님이 승인해야 실행됩니다.
-                실행은 한 번에(중간에 멈추지 않게) 처리되고 되돌릴 수 있게 백업이 남습니다.
+                <b>[🔗 합치기]</b>를 누르면 먼저 «무엇이 어떻게 바뀌는지» 보여주고, 승인해야 실행됩니다(한 번에 처리 · 백업 남음).
+                같은 주소에 사는 가족처럼 «다른 사람»이면 <b>[같은 사람 아님]</b>을 누르세요 — 아무것도 바뀌지 않습니다.
                 새 계정에도 주문·포인트가 있으면 자동으로 멈추니, 그때만 «병합 SQL 복사»로 직접 확인하세요.
               </p>
             </div>

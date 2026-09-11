@@ -964,6 +964,16 @@ function CustomerDetailDrawer({
 export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = "members", embedded = false }: Props) {
   // [2026-09-09] «계정 연결 요청» 탭 추가 — 손님이 카톡을 바꿔 회원이 갈라졌을 때 들어오는 요청함
   const [custTab, setCustTab] = useState<"members" | "issues" | "loyalty" | "link">(initialTab);
+  // [2026-09-11] «계정 잇기» 대기 건수 배지 — 자동 감지가 올린 줄을 사장님이 놓치지 않게 (건수만 1번 조회)
+  const [linkPendingCount, setLinkPendingCount] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/admin-live/customer-link-requests?count=1", { cache: "no-store" })
+      .then((res) => res.json().catch(() => null))
+      .then((json) => { if (alive && json?.ok) setLinkPendingCount(Number(json.pendingCount || 0)); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [custTab]);
   const [phoneBlockOpen, setPhoneBlockOpen] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -1630,7 +1640,12 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
         <button type="button" onClick={() => setCustTab("members")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "members" ? "bg-rose-deep text-white" : "text-ink-soft hover:text-rose-deep"}`}>회원 목록</button>
         <button type="button" onClick={() => setCustTab("issues")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "issues" ? "bg-rose-deep text-white" : "text-ink-soft hover:text-rose-deep"}`}>고객이슈</button>
         <button type="button" onClick={() => setCustTab("loyalty")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "loyalty" ? "bg-rose-deep text-white" : "text-ink-soft hover:text-rose-deep"}`}>단골 리포트</button>
-        <button type="button" onClick={() => setCustTab("link")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "link" ? "bg-rose-deep text-white" : "text-ink-soft hover:text-rose-deep"}`}>계정 연결 요청</button>
+        <button type="button" onClick={() => setCustTab("link")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "link" ? "bg-rose-deep text-white" : "text-ink-soft hover:text-rose-deep"}`}>
+          계정 잇기
+          {linkPendingCount > 0 ? (
+            <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-black ${custTab === "link" ? "bg-white text-rose-deep" : "bg-warn-bg text-warn-tx"}`}>{linkPendingCount}</span>
+          ) : null}
+        </button>
       </div>
 
       {custTab === "link" ? <AdminLiveLinkRequestsPanel /> : null}

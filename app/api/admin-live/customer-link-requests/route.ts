@@ -5,6 +5,8 @@
 //   customer_link_requests 에 한 줄이 쌓인다. 사장님은 여기서 그 줄을 본다.
 //
 //   GET   대기중 + 최근 처리분 목록. 판단에 필요한 «예전 계정» 숫자(주문건수·포인트)를 곁들인다.
+//         [2026-09-11] 자동 감지 건(source='auto')을 위해 양쪽 주소·이름·마지막 주문도 곁들인다(읽기만).
+//           사장님이 «같은 사람 맞나»를 한눈에 보고 [합치기]/[아님]을 누르게 하려고.
 //   PATCH 한 줄의 상태만 바꾼다 (pending → done / rejected) + 메모
 //
 //   ⚠ 1단계는 돈을 «옮기지 않는다». 이 파일에는 포인트/주문/입금/정산/배송 «쓰기»가 한 줄도 없다.
@@ -35,6 +37,16 @@ export async function GET(request: NextRequest) {
   try {
     const db = admin();
 
+    // [2026-09-11] ?count=1 — 탭 배지용 «대기 건수»만 (목록·부가조회 없이 쿼리 1번)
+    if (request.nextUrl.searchParams.get("count") === "1") {
+      const { count, error: countError } = await db
+        .from("customer_link_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending");
+      if (countError) throw new Error(countError.message);
+      return NextResponse.json({ ok: true, pendingCount: Number(count || 0) });
+    }
+
     const { data: rows, error } = await db
       .from("customer_link_requests")
       .select("*")
@@ -44,20 +56,62 @@ export async function GET(request: NextRequest) {
 
     const list = rows || [];
 
+    // [2026-09-11] 양쪽 회원 줄(주소·이름·이름표) — 한 번에 모아서 읽는다(요청 100건이어도 쿼리 1번)
+    const customerIds = Array.from(
+      new Set(
+        list
+          .flatMap((row: any) => [row?.target_customer_id, row?.new_customer_id])
+          .map((v: unknown) => Number(v))
+          .filter((n: number) => Number.isFinite(n) && n > 0),
+      ),
+    );
+    const customerById = new Map<number, any>();
+    if (customerIds.length > 0) {
+      const { data: customerRows } = await db
+        .from("customers")
+        .select("id, customer_name, customer_phone, youtube_nickname, kakao_id, address, detail_address, created_at")
+        .in("id", customerIds);
+      for (const c of customerRows || []) customerById.set(Number((c as any).id), c);
+    }
+
     // 판단 자료 — «예전 계정»에 뭐가 들어 있는지 (읽기만)
     const enriched = await Promise.all(
       list.map(async (row: any) => {
+        const oldCustomer = customerById.get(Number(row?.target_customer_id)) || null;
+        const newCustomer = customerById.get(Number(row?.new_customer_id)) || null;
+        const extra = {
+          old_address: text(oldCustomer?.address),
+          old_detail_address: text(oldCustomer?.detail_address),
+          old_nickname: text(oldCustomer?.youtube_nickname),
+          new_address: text(newCustomer?.address),
+          new_detail_address: text(newCustomer?.detail_address),
+          new_customer_name: text(newCustomer?.customer_name),
+          new_nickname: text(newCustomer?.youtube_nickname),
+          old_last_order_at: "",
+          old_last_order_product: "",
+        };
+
         const oldPhone = text(row?.target_customer_phone);
-        if (!oldPhone) return { ...row, old_order_count: 0, old_points: 0 };
+        if (!oldPhone) return { ...row, ...extra, old_order_count: 0, old_points: 0 };
 
         const variants = koreanPhoneVariants(oldPhone);
-        const [orderRes, pointRes] = await Promise.all([
+        const [orderRes, pointRes, lastRes] = await Promise.all([
           db.from("orders").select("id", { count: "exact", head: true }).in("customer_phone", variants).neq("is_deleted", true),
           db.from("customer_point_balances").select("current_points").in("customer_phone", variants).limit(5),
+          db.from("orders").select("created_at, product_name").in("customer_phone", variants).neq("is_deleted", true)
+            .order("created_at", { ascending: false }).limit(1),
         ]);
 
         const points = (pointRes.data || []).reduce((sum: number, item: any) => sum + Number(item?.current_points || 0), 0);
-        return { ...row, old_order_count: Number(orderRes.count || 0), old_points: points };
+        const last = (lastRes.data || [])[0] as any;
+        return {
+          ...row,
+          ...extra,
+          old_last_order_at: text(last?.created_at),
+          old_last_order_product: text(last?.product_name),
+          old_order_count: Number(orderRes.count || 0),
+          old_points: points,
+        };
       }),
     );
 
