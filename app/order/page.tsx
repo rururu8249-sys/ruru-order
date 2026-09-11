@@ -3159,6 +3159,15 @@ export default function OrderPage() {
       //   → 서버가 알려준 정답 닉네임으로 폰 저장값·화면을 맞춘다 (서버가 이긴다)
       try {
         const json = await res.json().catch(() => null);
+        // [2026-09-11] 서버가 «남이 쓰는 이름»이라 저장을 거절했다 → 폰에 남은 값을 버리고 갈림길로 보낸다.
+        //   이걸 안 하면 손님 화면엔 그 이름이 남아 있는데 DB엔 없어서, 주문서에 «없는 이름»이 실린다
+        //   (= 입금자명 매칭이 깨진다).
+        if (json?.nickname_taken) {
+          try { localStorage.removeItem("ruru_youtube_nickname"); } catch { /* 무시 */ }
+          setYoutubeNickname("");
+          setNicknameConflict(cleanNick);
+          return;
+        }
         const serverNick = String(json?.server_youtube_nickname || "").trim();
         if (serverNick && serverNick !== cleanNick) {
           setYoutubeNickname(serverNick);

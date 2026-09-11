@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isOrderablePhone } from "@/lib/order/phone";
 import { createClient } from "@supabase/supabase-js";
 import { collectKnownPhoneDigits, selectBackfillPhoneDigits } from "@/lib/customerIdentity";
+import { isNicknameTakenByOthers } from "@/lib/nicknameConflict";
 
 // app/api/customer-login-sync/route.ts
 // 목적:
@@ -236,6 +237,29 @@ export async function POST(request: NextRequest) {
       existing = Array.isArray(byPhone) ? (byPhone[0] as CustomerRow | undefined) : undefined;
     }
 
+    // [2026-09-11] 이 닉네임이 «남의 것»인지 — 손님 화면(관문)과 똑같은 규칙으로 본다.
+    //   조회 실패해도 로그인은 막지 않는다(false 로 두고 예전처럼 진행).
+    let nicknameTaken = false;
+    if (youtubeNickname) {
+      try {
+        const { data: sameNickRows } = await supabase
+          .from("customers")
+          .select("id, customer_phone, kakao_id")
+          .eq("youtube_nickname", youtubeNickname)
+          .limit(20);
+        const others = (sameNickRows || []).filter(
+          (row) => !existing?.id || String((row as Record<string, unknown>).id) !== String(existing.id),
+        );
+        nicknameTaken = isNicknameTakenByOthers({
+          rows: others as Array<{ customer_phone?: unknown; kakao_id?: unknown }>,
+          myPhone: customerPhoneDigits,
+          myKakaoId: kakaoId,
+        });
+      } catch {
+        nicknameTaken = false; // 검사 실패가 로그인을 막지 않게
+      }
+    }
+
     // [2026-08-29] 번호가 바뀐 손님도 옛 주문이 보이게 — "알려진 모든 번호"로 kakao_id 소급 연결
     //   왜 고쳤나(실측): 이전에는 이번 로그인에 담겨온 번호 하나로만 옛 주문을 찾았다.
     //     번호를 바꾸거나 배송지 번호로 주문한 손님의 옛 주문은 kakao_id가 빈 채 남아
@@ -335,12 +359,17 @@ export async function POST(request: NextRequest) {
         recordChange("detail_address", existing.detail_address, detailAddress);
       }
 
+      // [2026-09-11 구멍 차단] 이 API 에는 «닉네임 중복 검사»가 아예 없었다.
+      //   손님 화면(관문)만 막혀 있어서, 화면을 안 거치는 이 경로로 남의 닉네임이 그대로 저장됐다.
+      //   실측 사고: customers 1771(김진의·지니키키) / 2871(09-11 08:55 신규·지니키키)
+      //   → 화면과 «똑같은 규칙»(lib/nicknameConflict.ts)으로 여기서도 확인한다.
+      //   ⚠ 로그인은 절대 실패시키지 않는다. 닉네임만 안 넣고, 응답에 알려 화면이 관문을 띄우게 한다.
       // [유튜브 닉네임 · 2026-08-31 사장님 사고 제보] "달라지면 갱신"이 사고를 냈다:
       //   관리자가 회원 닉네임을 고쳐도(스누피→루_스누피) 손님 폰에 남은 옛 닉네임이
       //   로그인 때 서버를 도로 덮어썼다. → **비어 있을 때만 채운다.** 서버 값이 정답이며,
       //   아래 응답의 server_youtube_nickname 으로 손님 폰 저장값을 서버 값에 맞춘다.
       //   (손님 본인의 닉네임 변경은 내정보 저장 API가 처리 — 이 API는 백필 전용)
-      if (youtubeNickname && !cleanText(existing.youtube_nickname)) {
+      if (youtubeNickname && !cleanText(existing.youtube_nickname) && !nicknameTaken) {
         updateData.youtube_nickname = youtubeNickname;
         recordChange("youtube_nickname", existing.youtube_nickname, youtubeNickname);
       }
@@ -469,11 +498,14 @@ export async function POST(request: NextRequest) {
         needs_nickname_confirm: needsNicknameConfirm,
         // 서버가 기억하는 정답 닉네임 — 손님 폰이 이 값으로 자기 저장값을 맞춘다
         server_youtube_nickname: cleanText(updateData.youtube_nickname as string | undefined) || cleanText(existing.youtube_nickname),
+        // [2026-09-11] 남이 쓰는 이름이라 저장하지 않았다 → 손님 화면이 관문/갈림길을 띄운다
+        nickname_taken: nicknameTaken,
       });
     }
 
     const insertData: Record<string, unknown> = {
-      youtube_nickname: youtubeNickname || "",
+      // [2026-09-11] 남이 쓰는 이름이면 «빈 값»으로 만든다 — 관문이 다시 떠서 갈림길로 안내한다
+      youtube_nickname: nicknameTaken ? "" : (youtubeNickname || ""),
       customer_name: customerName,
       customer_phone: customerPhoneDigits, // DB customer_phone 키는 숫자만(2026-06-16 정규화 + 주문 RPC 정합)
       zipcode,
