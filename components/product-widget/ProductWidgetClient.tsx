@@ -12,6 +12,7 @@ import { resolveProductImageUrl } from "@/components/admin-live/quick-product/pr
 import { getActiveBroadcast, loadAdminLiveBroadcasts } from "@/components/admin-live/liveBroadcastController";
 import { expandForWidget } from "@/lib/productDetailModel";
 import { splitOptionText } from "@/lib/optionSplit";
+import { compressSizeList } from "@/lib/sizeRange";
 
 type AnyProduct = Record<string, any>;
 
@@ -54,12 +55,10 @@ function sizesOf(p: AnyProduct | null): string {
 //   위젯에 `[없음]`으로 찍히던 문제. 고객 주문페이지와 동일하게 이런 값은 옵션으로 안 친다.
 // 배경(그라데이션) 없이도 밝은 상품 사진 위에서 글씨가 읽히도록 하는 검정 아웃라인.
 //   다방향 text-shadow로 테두리를 만들고, 마지막에 약한 그림자로 입체감만 살짝.
+//   [2026-09-11] 하단 글자는 반투명 띠 안으로 들어가 아웃라인이 필요 없어짐 → SOLD OUT 오버레이에만 남는다.
 const OUTLINE_TEXT =
   "-2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000," +
   "-2px 0 0 #000, 2px 0 0 #000, 0 -2px 0 #000, 0 2px 0 #000, 0 3px 8px rgba(0,0,0,0.55)";
-const OUTLINE_TEXT_SM =
-  "-1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000," +
-  "0 2px 6px rgba(0,0,0,0.5)";
 
 // 주문성공(초록) / 입금·카드완료(파랑) 알림 배너
 type ToastItem = { icon: string; title: string; name: string; detail: string; tone: "green" | "blue" };
@@ -96,7 +95,8 @@ function sizeTextOf(p: AnyProduct | null): string {
   if (!p) return "";
   const cleaned = cleanOptionText(sizesOf(p));
   if (!cleaned) return "";
-  return cleaned.split(" · ").map(sizeDisplayLabel).filter(Boolean).join(" · ");
+  // [2026-09-11 사장님 지침] 이어진 사이즈는 「S ~ XXL」 한 토막, 중간이 비면 따로따로 — lib/sizeRange.ts (표시 전용)
+  return compressSizeList(cleaned.split(" · ").map(sizeDisplayLabel).filter(Boolean)).join(" · ");
 }
 
 // [2026-07-23 사장님 지침] 조합형(combo_mode) 상품 전용 표시 정보.
@@ -228,6 +228,29 @@ export default function ProductWidgetClient() {
   // 주문/취소 실시간 이벤트가 오면 상품(재고)을 즉시 다시 읽기 위한 핸들
   const reloadProductsRef = useRef<null | (() => void)>(null);
 
+  // [2026-09-11 사장님 지적 «사진이 위젯 사이즈에 자동조절 안 되고 잘린다»]
+  //   ① 사진: object-fit cover → contain (아래 img). 어떤 비율이든 카드 안에 통째로 들어온다.
+  //   ② 카드: PRISM 브라우저 소스 창이 카드(200×267 + 여백 24)보다 작으면 창에 맞춰 통째로 축소.
+  //      글자·띠·사진 비율이 그대로 줄어든다(transform: scale). 창이 충분히 크면 1배(기존 그대로).
+  const [fitScale, setFitScale] = useState(1);
+  useEffect(() => {
+    const CARD_W = 200, CARD_H = Math.round(200 * 4 / 3), MARGIN = 24;
+    const calc = () => {
+      const s = Math.min(1, (window.innerWidth - MARGIN) / (CARD_W + MARGIN), (window.innerHeight - MARGIN) / (CARD_H + MARGIN));
+      setFitScale(Number.isFinite(s) && s > 0 ? s : 1);
+    };
+    calc();
+    window.addEventListener("resize", calc);
+    return () => window.removeEventListener("resize", calc);
+  }, []);
+
+  // [2026-09-11] ?preview=1 — 방송이 없어도 «사진 있는 최근 상품» 한 장을 띄워 위젯 모양을 미리 본다(읽기 전용).
+  //   PRISM 에 소스를 붙일 때 크기·위치를 맞추는 용도. 실제 방송 중엔 붙이지 않는다(방송 목록이 우선).
+  const [previewMode, setPreviewMode] = useState(false);
+  useEffect(() => {
+    try { setPreviewMode(new URLSearchParams(window.location.search).get("preview") === "1"); } catch { setPreviewMode(false); }
+  }, []);
+
   // 위젯 위치 — 운영자가 드래그해서 원하는 곳에 두면 기억(localStorage, 보기 상태 전용·돈 로직 무관).
   // 저장 전(null)에는 기본 좌하단(left:24/bottom:24) 유지.
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
@@ -323,7 +346,17 @@ export default function ProductWidgetClient() {
           const pinDetailName = String((active as AnyProduct | null)?.widget_pin_detail_name || "").trim();
           const pinnedInActive = pinMode === "pin" && pinProductId ? rot.find((item) => { const parentId=String(item?.__parent_product_id ?? item?.id ?? item?.product_id ?? ""); const detail=String(item?.__detail_name || "").trim(); return parentId===pinProductId && (!pinDetailName || detail===pinDetailName); }) || null : null;
           if (alive) setPinned(pinnedInActive);
-        } else if (alive) { setRotation([]); setPinned(null); }
+        } else if (alive) {
+          setRotation([]);
+          setPinned(null);
+          // 미리보기: 활성 방송이 없을 때만, 사진 있는 최근 상품 1개(품절 아닌 것)를 고정처럼 띄운다
+          if (previewMode) {
+            const sample = [...list]
+              .filter((x) => imageOf(x) && !isSoldOutWidgetProduct(x))
+              .sort((a, b) => String(b?.created_at || "").localeCompare(String(a?.created_at || "")))[0] || null;
+            setPinned(sample);
+          }
+        }
       } catch {
         /* 로드 실패해도 위젯은 빈 화면 유지 */
       }
@@ -341,7 +374,7 @@ export default function ProductWidgetClient() {
       reloadProductsRef.current = null;
       window.clearInterval(timer);
     };
-  }, []);
+  }, [previewMode]);
 
   // 순환 자동 전환 (고정상품 없을 때만)
   useEffect(() => {
@@ -502,6 +535,9 @@ export default function ProductWidgetClient() {
           bottom: pos ? undefined : "24px",
           width: `${CARD}px`,
           pointerEvents: "none",
+          // 창이 작으면 카드째 축소(비율 유지) — 왼쪽 아래(또는 드래그한 왼쪽 위)를 기준으로
+          transform: fitScale < 1 ? `scale(${fitScale})` : undefined,
+          transformOrigin: pos ? "top left" : "bottom left",
         }}
       >
 
@@ -523,7 +559,8 @@ export default function ProductWidgetClient() {
               animation: "ruruWidgetIn 0.5s ease",
             }}
           >
-            {/* 상품 이미지 — 카드 전체를 채움 */}
+            {/* 상품 이미지 — [2026-09-11] cover → contain: 사진이 잘리지 않고 통째로 들어온다.
+                남는 위아래/좌우는 카드 반투명 배경이 그대로 보인다(띠와 같은 톤이라 한 덩어리로 읽힘). */}
             {img ? (
               <img
                 src={imgSrc}
@@ -531,7 +568,7 @@ export default function ProductWidgetClient() {
                 onError={() => {
                   if (imgRetry < 6) window.setTimeout(() => setImgRetry((v) => v + 1), 1500);
                 }}
-                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", objectPosition: "center top" }}
               />
             ) : (
               <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "56px", opacity: 0.8 }}>👟</div>
@@ -578,40 +615,54 @@ export default function ProductWidgetClient() {
               </div>
             ) : null}
 
-            {/* 하단: 상품명 / 옵션(색상·사이즈) / 금액 — 배경·음영 없이 아웃라인 글씨만 */}
-            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 2, padding: "8px 9px 9px" }}>
+            {/* 하단 띠: 상품명 / 옵션(색상·사이즈) + 금액
+                [2026-09-11 사장님 지침] 글자가 사진을 다 덮던 것 → 사진 아래쪽 가장자리에 붙은 «반투명 띠» 하나에 담는다.
+                  · 띠는 카드와 같은 폭·같은 모서리(카드 overflow:hidden 안) → 사진과 한 덩어리
+                  · 반투명(62%) + 뒤 흐림이라 띠 뒤로 사진이 비친다. 높이는 글자 2줄(상품명 / 옵션·금액) ≈ 카드의 1/4
+                  · 아웃라인 글씨(text-shadow)는 띠가 생겨 필요 없어짐 → 제거(더 깔끔) */}
+            <div
+              style={{
+                position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 2,
+                padding: "7px 10px 8px",
+                background: "rgba(14, 12, 18, 0.62)",
+                backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
+                borderTop: "1px solid rgba(255,255,255,0.14)",
+              }}
+            >
+              {/* 1줄: 상품명(한 줄, 넘치면 …) — [2026-07-11] 크게 20px 였던 것을 띠 높이를 위해 18px */}
               <div
                 style={{
-                  // [2026-07-11 사장님 요청] 상품명 폰트 17 → 20px
-                  fontSize: "20px", fontWeight: 900, lineHeight: 1.15, color: "#fff",
-                  textShadow: OUTLINE_TEXT,
+                  fontSize: "18px", fontWeight: 900, lineHeight: 1.15, color: "#fff",
                   overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                 }}
               >
                 {nameOf(current)}
               </div>
 
+              {/* 2줄: 옵션(색상 | 사이즈) — 띠 폭 전체, 길면 최대 2줄 */}
               {optionText ? (
                 <div
                   style={{
-                    marginTop: "1px", fontSize: "13px", fontWeight: 900, lineHeight: 1.25, color: "#fff",
-                    textShadow: OUTLINE_TEXT_SM,
-                    wordBreak: "keep-all", // 사이즈가 "36(S)·38(M)·4…"로 잘리지 않게 줄바꿈 허용
+                    marginTop: "2px",
+                    fontSize: "12.5px", fontWeight: 800, lineHeight: 1.25, color: "rgba(255,255,255,0.92)",
+                    wordBreak: "keep-all", // "36(S) ~ 40(L)" 토막 중간에서 안 끊기게
+                    overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
                   }}
                 >
                   {optionText}
                 </div>
               ) : null}
 
-              <div style={{ marginTop: "2px", display: "flex", alignItems: "baseline", gap: "6px" }}>
-                <span style={{ fontSize: "23px", fontWeight: 900, lineHeight: 1, color: "#fff", textShadow: OUTLINE_TEXT }}>
+              {/* 3줄: 금액(오른쪽) + 남은 수량 */}
+              <div style={{ marginTop: "3px", display: "flex", alignItems: "baseline", justifyContent: "flex-end", gap: "6px" }}>
+                {stock ? (
+                  <span style={{ fontSize: "11px", fontWeight: 900, color: "#FFD9E0" }}>{stock}</span>
+                ) : null}
+                <span style={{ fontSize: "21px", fontWeight: 900, lineHeight: 1, color: "#fff" }}>
                   {priceOf(current).toLocaleString("ko-KR")}
                   {/* [2026-07-23] 조합형 + 추가금 옵션 존재 시 "원~" — 고객 주문페이지 카드와 동일 규칙. 평소 상품은 "원" 그대로. */}
-                  <span style={{ fontSize: "14px", fontWeight: 800 }}>{comboInfo && comboInfo.maxPlus > 0 ? "원~" : "원"}</span>
+                  <span style={{ fontSize: "13px", fontWeight: 800 }}>{comboInfo && comboInfo.maxPlus > 0 ? "원~" : "원"}</span>
                 </span>
-                {stock ? (
-                  <span style={{ fontSize: "11px", fontWeight: 900, color: "#fff", textShadow: OUTLINE_TEXT_SM }}>{stock}</span>
-                ) : null}
               </div>
             </div>
 
