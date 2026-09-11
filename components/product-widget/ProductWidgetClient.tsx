@@ -234,7 +234,7 @@ export default function ProductWidgetClient() {
   //      글자·띠·사진 비율이 그대로 줄어든다(transform: scale). 창이 충분히 크면 1배(기존 그대로).
   const [fitScale, setFitScale] = useState(1);
   useEffect(() => {
-    const CARD_W = 200, CARD_H = Math.round(200 * 4 / 3), MARGIN = 24;
+    const CARD_W = 200, CARD_H = Math.round(200 * 4 / 3) + 120, MARGIN = 24; // 사진칸(3:4 최대) + 띠(최대 약 120px)
     const calc = () => {
       const s = Math.min(1, (window.innerWidth - MARGIN) / (CARD_W + MARGIN), (window.innerHeight - MARGIN) / (CARD_H + MARGIN));
       setFitScale(Number.isFinite(s) && s > 0 ? s : 1);
@@ -505,9 +505,10 @@ export default function ProductWidgetClient() {
   // [2026-07-23] 조합형(combo_mode)만 "종류 N가지" 요약 — 세부상품명 수십 개가 카드에 쏟아지던 문제.
   //   평소 상품(comboInfo=null)은 기존과 동일: 색상 · 사이즈를 한 줄로. 둘 다 없으면 아예 안 그림.
   const comboInfo = comboInfoOf(current);
-  const optionText = comboInfo
-    ? (comboInfo.count > 0 ? `${comboInfo.label} ${comboInfo.count}가지` : "")
-    : [colors, sizeText].filter(Boolean).join("  |  ");
+  // [2026-09-11 사장님 지적 «색상, 사이즈 옵션도 맞나?»] 「색상들 | 사이즈들」 한 줄 뭉치 → 줄마다 작은 이름표(색상/사이즈/종류)를 붙여 따로 보여준다.
+  const optionRows: { label: string; value: string }[] = comboInfo
+    ? (comboInfo.count > 0 ? [{ label: comboInfo.label, value: `${comboInfo.count}가지` }] : [])
+    : [colors ? { label: "색상", value: colors } : null, sizeText ? { label: "사이즈", value: sizeText } : null].filter(Boolean) as { label: string; value: string }[];
   const soldOut = isSoldOutWidgetProduct(current);
   const stock = soldOut ? "" : stockLabel(current); // 품절이면 "남은 0" 대신 SOLD OUT 오버레이로 알림
 
@@ -549,7 +550,7 @@ export default function ProductWidgetClient() {
             style={{
               position: "relative",
               width: "100%",
-              aspectRatio: "3 / 4",
+              // [2026-09-11] 고정 비율(3:4) 제거 — 사진칸(사진 비율 그대로, 최대 3:4) + 아래 띠가 높이를 정한다
               cursor: "move",
               pointerEvents: "auto",
               borderRadius: "10px",
@@ -559,19 +560,22 @@ export default function ProductWidgetClient() {
               animation: "ruruWidgetIn 0.5s ease",
             }}
           >
-            {/* 상품 이미지 — [2026-09-11] cover → contain: 사진이 잘리지 않고 통째로 들어온다.
-                남는 위아래/좌우는 카드 반투명 배경이 그대로 보인다(띠와 같은 톤이라 한 덩어리로 읽힘). */}
+            {/* 사진칸 — [2026-09-11 사장님 지적 «사진이 잘린다·글자가 사진을 덮는다»]
+                · 사진은 자기 비율 그대로(가로형이면 납작하게, 세로형이면 길게), 세로는 최대 3:4(267px)까지. 그보다 길면 안 잘리고 통째로 줄어든다(contain).
+                · 글자 띠는 이 칸 «아래»에 붙는다 → 사진은 한 픽셀도 안 가려진다. */}
             {img ? (
-              <img
-                src={imgSrc}
-                alt=""
-                onError={() => {
-                  if (imgRetry < 6) window.setTimeout(() => setImgRetry((v) => v + 1), 1500);
-                }}
-                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", objectPosition: "center top" }}
-              />
+              <div style={{ position: "relative", width: "100%", lineHeight: 0, background: "rgba(0,0,0,0.18)" }}>
+                <img
+                  src={imgSrc}
+                  alt=""
+                  onError={() => {
+                    if (imgRetry < 6) window.setTimeout(() => setImgRetry((v) => v + 1), 1500);
+                  }}
+                  style={{ display: "block", width: "100%", height: "auto", maxHeight: `${Math.round(CARD * 4 / 3)}px`, objectFit: "contain", objectPosition: "center" }}
+                />
+              </div>
             ) : (
-              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "56px", opacity: 0.8 }}>👟</div>
+              <div style={{ width: "100%", aspectRatio: "3 / 4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "56px", opacity: 0.8 }}>👟</div>
             )}
 
             {/* [2026-07-09] 상품이 가려져서 하단 어두운 그라데이션 제거.
@@ -622,46 +626,62 @@ export default function ProductWidgetClient() {
                   · 아웃라인 글씨(text-shadow)는 띠가 생겨 필요 없어짐 → 제거(더 깔끔) */}
             <div
               style={{
-                position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 2,
-                padding: "7px 10px 8px",
-                background: "rgba(14, 12, 18, 0.62)",
-                backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
-                borderTop: "1px solid rgba(255,255,255,0.14)",
+                position: "relative", zIndex: 2,
+                padding: "8px 10px 9px",
+                background: "rgba(20, 17, 24, 0.74)",
+                backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+                borderTop: "1px solid rgba(255,255,255,0.12)",
               }}
             >
-              {/* 1줄: 상품명(한 줄, 넘치면 …) — [2026-07-11] 크게 20px 였던 것을 띠 높이를 위해 18px */}
+              {/* 1) 상품명 — [2026-09-11 사장님 «안 잘렸으면»] 16px 로 최대 3줄까지 다 보여준다(그보다 길 때만 …).
+                  띄어쓰기 없는 긴 이름도 밖으로 안 튀어나가게 overflowWrap */}
               <div
                 style={{
-                  fontSize: "18px", fontWeight: 900, lineHeight: 1.15, color: "#fff",
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  fontSize: "16px", fontWeight: 900, lineHeight: 1.2, color: "#fff", wordBreak: "keep-all", overflowWrap: "anywhere",
+                  overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as const,
                 }}
               >
                 {nameOf(current)}
               </div>
 
-              {/* 2줄: 옵션(색상 | 사이즈) — 띠 폭 전체, 길면 최대 2줄 */}
-              {optionText ? (
-                <div
+              {/* 2)·3) 옵션 — 줄마다 작은 이름표(색상 / 사이즈 / 종류). 값이 길면 줄바꿈(최대 2줄) */}
+              {optionRows.map((row) => (
+                <div key={row.label} style={{ marginTop: "4px", display: "flex", alignItems: "flex-start", gap: "6px" }}>
+                  <span
+                    style={{
+                      flexShrink: 0, marginTop: "1px",
+                      fontSize: "10px", fontWeight: 900, lineHeight: 1, letterSpacing: "0.02em",
+                      color: "rgba(255,255,255,0.72)", background: "rgba(255,255,255,0.13)",
+                      borderRadius: "5px", padding: "3px 5px",
+                    }}
+                  >
+                    {row.label}
+                  </span>
+                  <span
+                    style={{
+                      minWidth: 0, fontSize: "12.5px", fontWeight: 800, lineHeight: 1.3, color: "rgba(255,255,255,0.95)",
+                      wordBreak: "keep-all", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+                    }}
+                  >
+                    {row.value}
+                  </span>
+                </div>
+              ))}
+
+              {/* 4) 남은 수량(왼쪽 끝) ······ 금액(오른쪽 끝) — [사장님 «금액 앞에 붙어 있으면 안 됨»] 양끝으로 떨어뜨림 */}
+              <div style={{ marginTop: "6px", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "10px" }}>
+                <span
                   style={{
-                    marginTop: "2px",
-                    fontSize: "12.5px", fontWeight: 800, lineHeight: 1.25, color: "rgba(255,255,255,0.92)",
-                    wordBreak: "keep-all", // "36(S) ~ 40(L)" 토막 중간에서 안 끊기게
-                    overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+                    fontSize: "11px", fontWeight: 900, color: "#FFD9E0", visibility: stock ? "visible" : "hidden",
+                    background: "rgba(255,255,255,0.12)", borderRadius: "999px", padding: "3px 8px",
                   }}
                 >
-                  {optionText}
-                </div>
-              ) : null}
-
-              {/* 3줄: 금액(오른쪽) + 남은 수량 */}
-              <div style={{ marginTop: "3px", display: "flex", alignItems: "baseline", justifyContent: "flex-end", gap: "6px" }}>
-                {stock ? (
-                  <span style={{ fontSize: "11px", fontWeight: 900, color: "#FFD9E0" }}>{stock}</span>
-                ) : null}
-                <span style={{ fontSize: "21px", fontWeight: 900, lineHeight: 1, color: "#fff" }}>
+                  {stock || "·"}
+                </span>
+                <span style={{ fontSize: "22px", fontWeight: 900, lineHeight: 1, color: "#fff", whiteSpace: "nowrap" }}>
                   {priceOf(current).toLocaleString("ko-KR")}
                   {/* [2026-07-23] 조합형 + 추가금 옵션 존재 시 "원~" — 고객 주문페이지 카드와 동일 규칙. 평소 상품은 "원" 그대로. */}
-                  <span style={{ fontSize: "13px", fontWeight: 800 }}>{comboInfo && comboInfo.maxPlus > 0 ? "원~" : "원"}</span>
+                  <span style={{ fontSize: "13px", fontWeight: 800, marginLeft: "1px" }}>{comboInfo && comboInfo.maxPlus > 0 ? "원~" : "원"}</span>
                 </span>
               </div>
             </div>

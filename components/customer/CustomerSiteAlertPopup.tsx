@@ -80,7 +80,9 @@ export default function CustomerSiteAlertPopup() {
   const [moreLoading, setMoreLoading] = useState(false);
 
   useEffect(() => {
-    if (typeof window === "undefined" || window.location.pathname.startsWith("/admin")) return;
+    // [2026-09-11] /product-widget(방송 송출 오버레이)에서는 쪽지 팝업·🔔 버튼이 방송 화면에 찍히면 안 된다 → 관리자와 같이 제외.
+    //   (사장님 브라우저처럼 손님 로그인이 남은 창으로 위젯을 열었을 때 🔔이 떠 있던 것을 배포 확인 중 발견)
+    if (typeof window === "undefined" || window.location.pathname.startsWith("/admin") || window.location.pathname.startsWith("/product-widget")) return;
     let stopped = false;
     const load = async () => {
       const key = sessionKey();
