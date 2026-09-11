@@ -65,7 +65,10 @@ ok("⑦ 번호가 비어 있는 옛 줄은 «내 번호를 알 때»는 막지 �
   );
 });
 
-ok("⑧ 여러 줄 중 하나라도 남이면 막는다", () => {
+// [2026-09-11 정정] 이 시험은 원래 «하나라도 남이면 막는다»(true)로 적혀 있었다.
+//   실기기에서 그게 틀렸다는 게 드러났다 — 사장님 카톡이 「루루동이」의 주인인데도 막혔다.
+//   올바른 규칙: «이미 그 이름의 주인인 사람»은 계속 쓴다. 새로 가져가려는 사람만 막는다.
+ok("⑧ 내 줄이 섞여 있으면 «내 이름» — 통과 (실기기에서 뒤집힌 규칙)", () => {
   assert.equal(
     isNicknameTakenByOthers({
       rows: [
@@ -75,7 +78,7 @@ ok("⑧ 여러 줄 중 하나라도 남이면 막는다", () => {
       myPhone: "01011112222",
       myKakaoId: "me",
     }),
-    true,
+    false,
   );
 });
 
@@ -87,6 +90,66 @@ ok("⑨ 카톡ID가 같으면 번호가 달라도 내 줄 (번호 바꾼 손님)
       myKakaoId: "me",
     }),
     false,
+  );
+});
+
+// ── [2026-09-11 실기기 사고 재현] 「루루동이」 — 같은 이름 2줄, 그중 1줄이 내 카톡
+//    사장님이 카톡 로그인했는데 «본인인데» 막혔다. 줄을 하나하나 따로 보다가
+//    «내 줄»을 통과시켜 놓고 «다른 줄» 때문에 some() 이 true 가 됐다.
+ok("⑩ 사고 재현 — 내 카톡 줄 + 남의 줄이 같이 있으면 «내 이름»으로 통과해야 한다", () => {
+  assert.equal(
+    isNicknameTakenByOthers({
+      rows: [
+        { customer_phone: "01011112222", kakao_id: "" },      // 카톡 없는 옛 줄
+        { customer_phone: "01033334444", kakao_id: "MYKAKAO" }, // 내 줄
+      ],
+      myPhone: "",            // 새 브라우저라 번호를 아직 모름
+      myKakaoId: "MYKAKAO",
+    }),
+    false,
+    "내 카톡 줄이 하나라도 있으면 그 이름은 내 것이다 (순서가 바뀌어도 같아야 한다)",
+  );
+});
+
+ok("⑪ 줄 순서가 반대여도 같은 결과", () => {
+  assert.equal(
+    isNicknameTakenByOthers({
+      rows: [
+        { customer_phone: "01033334444", kakao_id: "MYKAKAO" },
+        { customer_phone: "01011112222", kakao_id: "" },
+      ],
+      myPhone: "",
+      myKakaoId: "MYKAKAO",
+    }),
+    false,
+  );
+});
+
+ok("⑫ 내 번호로 된 줄이 있으면, 남의 줄이 같이 있어도 통과", () => {
+  assert.equal(
+    isNicknameTakenByOthers({
+      rows: [
+        { customer_phone: "01011112222", kakao_id: "OTHER" },
+        { customer_phone: "01033334444", kakao_id: "" },
+      ],
+      myPhone: "01033334444",
+      myKakaoId: "",
+    }),
+    false,
+  );
+});
+
+ok("⑬ 내 줄이 하나도 없으면 예전처럼 막는다 (구멍이 다시 열리지 않게)", () => {
+  assert.equal(
+    isNicknameTakenByOthers({
+      rows: [
+        { customer_phone: "01011112222", kakao_id: "OTHER1" },
+        { customer_phone: "01055556666", kakao_id: "OTHER2" },
+      ],
+      myPhone: "",
+      myKakaoId: "MYKAKAO",
+    }),
+    true,
   );
 });
 

@@ -39,15 +39,27 @@ const clean = (value: unknown) => String(value ?? "").trim();
 export function isNicknameTakenByOthers({ rows, myPhone, myKakaoId }: NicknameConflictInput): boolean {
   const phone = normalizeOrderPhone(String(myPhone ?? ""));
   const kakaoId = clean(myKakaoId);
+  const list = rows || [];
 
-  return (rows || []).some((row) => {
-    const rowPhone = normalizeOrderPhone(String(row?.customer_phone ?? ""));
+  // ★ [2026-09-11 실기기에서 잡힘] «내가 이미 이 이름의 주인인가»를 «줄 전체»에서 먼저 본다.
+  //   왜 먼저 보나 — 예전엔 줄 하나하나를 따로 판정해서, 내 줄을 통과시켜 놓고도
+  //   같은 이름의 «다른 줄» 하나 때문에 some() 이 true 가 되어 결국 막혔다.
+  //   실측(2026-09-11, 사장님 카톡 로그인): 「루루동이」는 회원 줄이 2개(카톡 있는 줄 1 = 사장님).
+  //     → 사장님 본인인데 「이 이름을 쓰는 분이 이미 계세요」가 떴다.
+  //   내 카톡이나 내 번호로 된 줄이 하나라도 있으면 그 이름은 «내 이름»이다.
+  const mine = list.some((row) => {
     const rowKakaoId = clean(row?.kakao_id);
+    if (kakaoId && rowKakaoId && rowKakaoId === kakaoId) return true;
+    const rowPhone = normalizeOrderPhone(String(row?.customer_phone ?? ""));
+    return Boolean(phone && rowPhone && rowPhone === phone);
+  });
+  if (mine) return false;
 
-    // ① 내 카톡이 이미 쓰던 이름 → 내 이름
-    if (kakaoId && rowKakaoId && rowKakaoId === kakaoId) return false;
+  // 내 줄이 하나도 없을 때만 «남인지»를 따진다
+  return list.some((row) => {
+    const rowPhone = normalizeOrderPhone(String(row?.customer_phone ?? ""));
 
-    // ② 내 번호를 아직 모른다 → 남일 수 있다
+    // ② 내 번호를 아직 모른다 → 남일 수 있다 (계정 연결 화면으로 보낸다)
     if (!phone) return true;
 
     // ③ 번호가 다르면 남
