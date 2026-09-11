@@ -5818,6 +5818,21 @@ export default function OrderPage() {
   })();
   // [2026-08-10 3단] 이 상품이 3단인지 + 재고 조회에 쓸 실제 color 키("세부상품 / 색상")
   const registeredOptionAxes3 = registeredOptionSelectProduct ? readOrderAxes3(registeredOptionSelectProduct) : null;
+  // [2026-09-11 manysell 실측 흡수] 지금 고른 색상·사이즈로 «담을 수 있는 수량» — 재고연동 상품만(재고 − 다른 손님 홀드).
+  //   수량 칸 밑 「최대 N개」 표시와 [+] 상한에 같이 쓴다. 표시·입력 상한 전용 — 실제 차감은 제출 RPC 그대로.
+  //   (예전 [+] 상한은 홀드를 안 빼서 품절 표시와 어긋날 수 있었다 → 품절 판정(isSoldOutColorSize)과 같은 계산으로 맞춤)
+  const registeredOptionAvailableQty: number | null = (() => {
+    if (!registeredOptionSelectProduct || registeredOptionStockVariants.length === 0) return null;
+    const nm2 = (v: string) => { const t = String(v ?? "").trim(); return t === "없음" ? "" : t; };
+    const colorKey = registeredOptionAxes3 && !registeredOptionBrandGroup
+      ? [registeredOptionDetail, registeredOptionColor].map((v) => String(v ?? "").trim()).filter(Boolean).join(ORDER_AXIS_JOIN)
+      : registeredOptionColor;
+    const matched = registeredOptionStockVariants.find((v) => nm2(v.color) === nm2(colorKey) && nm2(v.size) === nm2(registeredOptionSize));
+    if (!matched) return null;
+    const pid = String(registeredOptionSelectProduct.id ?? "");
+    const reserved = pid ? Number(reservedByVariant[reservationVariantKey(pid, matched.color, matched.size)] || 0) : 0;
+    return Math.max(0, Number(matched.stock) - Math.max(0, reserved));
+  })();
   const joinAxisColor = (colorValue: string) =>
     registeredOptionAxes3 && !registeredOptionBrandGroup
       ? [registeredOptionDetail, colorValue].map((v) => String(v ?? "").trim()).filter(Boolean).join(ORDER_AXIS_JOIN)
@@ -6423,6 +6438,13 @@ export default function OrderPage() {
                   </select>
                   </div>
                 </div>
+                {/* [2026-09-11 manysell 실측 흡수] 배송비 규칙 한 줄 — 문구만. 계산은 기존 그대로
+                    (settings.default_shipping_fee · 제주/도서산간 · 같은 방송/기간 + 같은 주소 합배송 · 업체배송 별도) */}
+                <div style={{ marginTop: "6px", fontSize: "11.5px", fontWeight: 700, color: "#8A8A8A", wordBreak: "keep-all", lineHeight: 1.4 }}>
+                  {generalShippingFee > 0
+                    ? `🚚 배송비 ${won(generalShippingFee)} · 같은 방송·기간에 같은 주소로 더 주문하면 배송비는 한 번만${remoteAreaShippingFee > generalShippingFee ? ` · 제주/도서산간 ${won(remoteAreaShippingFee)}` : ""}${visibleItems.some((p) => productDeliveryLabel(p) === "업체배송") ? " · 업체배송 상품은 배송비 따로" : ""}`
+                    : "🚚 지금은 배송비 0원(무료배송)"}
+                </div>
                 {visibleItems.length === 0 ? (
                   <div style={{ marginTop: "14px", padding: "26px", textAlign: "center", color: "#999", fontSize: "14px", fontWeight: 700 }}>찾는 상품이 없어요. 아래 직접 입력으로 담아 주세요.</div>
                 ) : (
@@ -6549,20 +6571,32 @@ export default function OrderPage() {
                                 const remain = lowStockRemainOrderProduct(product, Number(reservedByProduct[pidForLow] || 0));
                                 return remain !== null ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px" }}>🔥 {remain}개 남음</span> : null;
                               })() : null}
-                              {badges.includes("pick") ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#FDEEF3", color: "#C2447A" }}>💖 루루픽</span> : null}
-                              {badges.includes("direct") ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#E8F0FE", color: "#1D4ED8" }}>🛒 바로구매</span> : null}
+                              {badges.includes("pick") ? <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#FDEEF3", color: "#C2447A" }}>💖 루루픽</span> : null}
+                              {badges.includes("direct") ? <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#E8F0FE", color: "#1D4ED8" }}>🛒 바로구매</span> : null}
                               {/* [2026-07-10] 해외배송 배지 — 표시 전용(배송비 계산과 무관) */}
-                              {badges.includes("overseas") ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#EEF6F3", color: "#0F6E56" }}>✈️ 해외배송</span> : null}
+                              {badges.includes("overseas") ? <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#EEF6F3", color: "#0F6E56" }}>✈️ 해외배송</span> : null}
                               {/* [무료나눔] 0원 선물 상품 배지 — 표시 전용 */}
-                              {isFreeOrderProduct(product) ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 800, padding: "2px 6px", background: "#E7F3EE", color: "#0F6E56" }}>🎁 무료나눔</span> : null}
+                              {isFreeOrderProduct(product) ? <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#E7F3EE", color: "#0F6E56" }}>🎁 무료나눔</span> : null}
                               {/* [2026-07-23 사장님 지시] 업체배송 상품 카드 배지 — 표시 전용(배송비 계산과 무관) */}
-                              {productDeliveryLabel(product) === "업체배송" ? <span style={{ borderRadius: "4px", fontSize: "9px", fontWeight: 700, padding: "2px 6px", background: "#EEF2FA", color: "#3B5BA5" }}>🚚 업체배송</span> : null}
+                              {productDeliveryLabel(product) === "업체배송" ? <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#EEF2FA", color: "#3B5BA5" }}>🚚 업체배송</span> : null}
                             </div>
+                            {/* [2026-09-11 manysell 실측 흡수] 상품명 13→15px(목록)·14px(격자) — 주 고객 중장년, 마켓오리진 16px 대비 우리가 작았다(표시 전용) */}
                             <div style={listView === "grid"
-                              ? { fontSize: "13px", fontWeight: 700, color: "#222", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "break-all" }
-                              : { fontSize: "13px", fontWeight: 700, color: "#222", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.product_name}</div>
+                              ? { fontSize: "14px", fontWeight: 800, color: "#222", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "break-all" }
+                              : { fontSize: "15px", fontWeight: 800, color: "#222", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.product_name}</div>
                             {/* 바로구매 부가설명 유지(사장님 지침: 배지만으론 신규 고객이 뜻을 모름) + 가격 위계 강화 15→17px */}
                             {badges.includes("direct") ? (<div style={{ fontSize: 11, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>방송 접수 없이 지금 바로 구매 가능</div>) : null}
+                            {/* [2026-09-11 manysell 실측 흡수] 옵션 있는 상품은 「색상 3 · 사이즈 4」 한 줄 — 시트 열기 전에 내 사이즈가 있는지 보이게.
+                                브랜드묶음·조합형은 자기 안내줄이 따로 있어 제외. 표시 전용(담기·재고·금액 무관) */}
+                            {!brandGroup && !sold ? (() => {
+                              const ci2 = readComboInfoOrderProduct(product);
+                              if (ci2 && ci2.names.length > 1) return null;
+                              const colorCount = getSelectableRegisteredOptions(product as BroadcastProduct, "color").length;
+                              const sizeCount = getSelectableRegisteredOptions(product as BroadcastProduct, "size").length;
+                              const parts = [colorCount > 1 ? `색상 ${colorCount}` : "", sizeCount > 1 ? `사이즈 ${sizeCount}` : ""].filter(Boolean);
+                              if (parts.length === 0) return null;
+                              return <div style={{ fontSize: 11.5, fontWeight: 700, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>{parts.join(" · ")}</div>;
+                            })() : null}
                             {/* [조합형 옵션] 세부상품 개수 안내 — 표시 전용 */}
                             {(() => {
                               const ci = readComboInfoOrderProduct(product);
@@ -6625,8 +6659,8 @@ export default function OrderPage() {
                                 disabled={sold}
                                 onClick={() => selectQuickGroupBuyProduct(product as BroadcastProduct)}
                                 style={listView === "grid"
-                                  ? { width: "100%", height: "34px", padding: "0 10px", borderRadius: "8px", border: "none", background: sold ? "#ccc" : "#7A1E47", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: sold ? "default" : "pointer" }
-                                  : { flexShrink: 0, height: "32px", padding: "0 16px", borderRadius: "8px", border: "none", background: sold ? "#ccc" : "#7A1E47", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: sold ? "default" : "pointer" }}
+                                  ? { width: "100%", height: "40px", padding: "0 10px", borderRadius: "10px", border: "none", background: sold ? "#ccc" : "#7A1E47", color: "#fff", fontSize: "14px", fontWeight: 800, cursor: sold ? "default" : "pointer" }
+                                  : { flexShrink: 0, height: "40px", padding: "0 18px", borderRadius: "10px", border: "none", background: sold ? "#ccc" : "#7A1E47", color: "#fff", fontSize: "14px", fontWeight: 800, cursor: sold ? "default" : "pointer" }}
                               >
                                 {sold ? "품절" : brandGroup ? "상품 선택" : "장바구니 담기"}
                               </button>
@@ -7725,17 +7759,20 @@ export default function OrderPage() {
                 <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "14px 18px" }}>
                   {registeredOptionDetailSelected ? (
                     <>
-                      <span style={{ fontSize: "14px", fontWeight: 800, color: "#333" }}>수량</span>
+                      <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                        <span style={{ fontSize: "14px", fontWeight: 800, color: "#333" }}>수량</span>
+                        {registeredOptionAvailableQty !== null ? (
+                          <span style={{ fontSize: "10.5px", fontWeight: 800, whiteSpace: "nowrap", color: registeredOptionAvailableQty <= 3 ? "#C0392B" : "#0F6E56" }}>
+                            {registeredOptionAvailableQty > 0 ? `최대 ${registeredOptionAvailableQty}개` : "지금 품절"}
+                          </span>
+                        ) : null}
+                      </div>
                       <div style={{ display: "grid", gridTemplateColumns: "40px 44px 40px", height: "44px", borderRadius: "12px", border: "1px solid #E8E2DD", overflow: "hidden" }}>
                         <button type="button" onClick={() => setRegisteredOptionQty((c) => Math.max(1, c - 1))} style={{ borderRight: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#555", cursor: "pointer" }}>−</button>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionQty}</div>
                         <button type="button" onClick={() => {
-                          const maxStock = (() => {
-                            if (!registeredOptionSelectProduct || registeredOptionStockVariants.length === 0) return 999;
-                            const nm2 = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
-                            const matched = registeredOptionStockVariants.find((v: any) => nm2(v.color) === nm2(registeredOptionColor) && nm2(v.size) === nm2(registeredOptionSize));
-                            return matched ? Number(matched.stock) : 999;
-                          })();
+                          // [2026-09-11] 상한 = 「최대 N개」와 같은 숫자(재고 − 홀드). 재고연동 아니면 예전처럼 999.
+                          const maxStock = registeredOptionAvailableQty === null ? 999 : Math.max(1, registeredOptionAvailableQty);
                           setRegisteredOptionQty((c) => Math.min(c + 1, maxStock));
                         }} style={{ borderLeft: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+</button>
                       </div>
