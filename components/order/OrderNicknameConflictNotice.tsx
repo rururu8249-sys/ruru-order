@@ -4,7 +4,8 @@
 // [2026-09-11 사장님 결정 · 전면 단순화] 닉네임이 겹치면 «아무것도 묻지 않는다».
 //
 //   예전(09-09): "예전에 주문하신 분인가요?" → 예전 번호 입력 → 접수… 4단계. 손님도 사장님도 헷갈렸다.
-//   지금(09-11): 화면 하나. 「A」는 이미 쓰는 분이 계셔서 「A2204」로 해드렸어요 → [확인] 끝.
+//   지금(09-11): 화면 하나. 「A」는 이미 쓰는 분이 계셔서 닉네임 뒤에 전화번호 끝 4자리를 붙였어요 「A2204」 → [확인] 끝.
+//   ⚠ 문구에 «이름»이라 쓰지 않는다(사장님 지적 09-11) — 손님이 실명으로 오해한다. «닉네임 + 번호 끝 4자리»라고 그대로 말한다.
 //
 //   «누구인지»는 손님한테 안 묻는다. 시스템이 주소로 알아낸다.
 //     · 주소·상세주소가 예전 회원과 같으면 DB 트리거(ruru_detect_split_account)가
@@ -171,7 +172,7 @@ export default function OrderNicknameConflictNotice({
   const [error, setError] = useState("");
   const [tryCount, setTryCount] = useState(0);
 
-  // 화면이 뜨는 순간 «빈 이름»을 서버에서 하나 받아온다 (1순위: 닉네임 + 내 번호 끝 4자리)
+  // 화면이 뜨는 순간 «빈 닉네임»을 서버에서 하나 받아온다 (1순위: 닉네임 + 내 번호 끝 4자리, 번호 모르면 닉네임 + 2, 3…)
   useEffect(() => {
     let alive = true;
     setLoading(true);
@@ -194,7 +195,7 @@ export default function OrderNicknameConflictNotice({
         if (!picked) throw new Error("no_suggestion");
         if (alive) setSuggestion(picked);
       } catch {
-        if (alive) setError("이름을 만들지 못했어요.\n잠시 후 다시 눌러주세요.");
+        if (alive) setError("닉네임을 만들지 못했어요.\n잠시 후 다시 눌러주세요.");
       } finally {
         if (alive) setLoading(false);
       }
@@ -206,18 +207,25 @@ export default function OrderNicknameConflictNotice({
 
   const canConfirm = !loading && !error && suggestion.length > 0;
 
+  // 붙인 게 «내 전화번호 끝 4자리»인지(1순위), 아니면 그냥 숫자인지(번호를 아직 모를 때 2, 3, …)
+  const last4 = myPhoneDigits.length >= 4 ? myPhoneDigits.slice(-4) : "";
+  const appended = suggestion.startsWith(nickname) ? suggestion.slice(nickname.length) : "";
+  const isPhoneTail = Boolean(last4) && appended === last4;
+
   return (
     <div style={wrapStyle}>
       <section style={cardStyle}>
         <div style={innerStyle}>
           <h2 style={titleStyle}>
-            「{nickname}」는 이미 쓰는 분이 계셔서 이 이름으로 해드렸어요
+            「{nickname}」는 이미 쓰는 분이 계셔서 닉네임 뒤에 {isPhoneTail ? "전화번호 끝 4자리를" : "숫자를"} 붙였어요
           </h2>
 
           <div style={nameChip}>{loading ? "…" : suggestion || "—"}</div>
 
           <p style={leadStyle}>
-            입금하실 때도 이 이름으로 보내주시면
+            {isPhoneTail ? `${nickname} + 내 번호 끝 ${last4}` : `${nickname} + ${appended || "숫자"}`}
+            <br />
+            입금하실 때도 이 닉네임으로 보내주시면
             <br />
             주문이 바로 확인돼요.
           </p>
@@ -235,7 +243,7 @@ export default function OrderNicknameConflictNotice({
           )}
 
           <button type="button" onClick={onBack} style={quietLink}>
-            다른 이름으로 할래요
+            다른 닉네임으로 할래요
           </button>
 
           <div style={infoBox}>
