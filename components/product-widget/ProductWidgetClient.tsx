@@ -59,6 +59,8 @@ function sizesOf(p: AnyProduct | null): string {
 const OUTLINE_TEXT =
   "-2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000," +
   "-2px 0 0 #000, 2px 0 0 #000, 0 -2px 0 #000, 0 2px 0 #000, 0 3px 8px rgba(0,0,0,0.55)";
+// [2026-09-12] 띠(50%) 안 글자용 옅은 그림자 — 테두리가 아니라 얇은 그늘. 밝은 배경에서만 티가 난다.
+const SOFT_TEXT = "0 1px 2px rgba(0,0,0,0.85), 0 0 6px rgba(0,0,0,0.45)";
 
 // 주문성공(초록) / 입금·카드완료(파랑) 알림 배너
 type ToastItem = { icon: string; title: string; name: string; detail: string; tone: "green" | "blue" };
@@ -628,9 +630,13 @@ export default function ProductWidgetClient() {
               style={{
                 position: "relative", zIndex: 2,
                 padding: "8px 10px 9px",
-                background: "rgba(20, 17, 24, 0.74)",
+                // [2026-09-12 사장님 결정] 띠 50% — 방송 화면이 더 비친다. 흰 글자가 밝은 배경(흰 옷·밝은 벽)에서도 읽히게
+                //   글자마다 옅은 그림자(SOFT_TEXT)를 얹는다(예전 2px 검정 테두리보다 훨씬 옅음).
+                //   계산: 검정 50% 위 흰 글자 = 밝은 배경에서 대비 약 3.6:1(기준 4.5:1 미달) → 그림자로 보완. 74%였을 땐 약 9:1.
+                background: "rgba(20, 17, 24, 0.5)",
                 backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
-                borderTop: "1px solid rgba(255,255,255,0.12)",
+                borderTop: "1px solid rgba(255,255,255,0.14)",
+                textShadow: SOFT_TEXT,
               }}
             >
               {/* 1) 상품명 — [2026-09-11 사장님 «안 잘렸으면»] 16px 로 최대 3줄까지 다 보여준다(그보다 길 때만 …).
