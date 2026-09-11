@@ -9,7 +9,7 @@ import { NOTE_PRESETS } from "@/lib/customerNotePresets";
 import { BULK_POINT_MAX_MESSAGE, BULK_POINT_MAX_PER_PERSON, useBulkPointGrant, type BulkGrantResult } from "./useBulkPointGrant";
 
 // 일괄지급 사유 프리셋(고객에게 보이는 문구). "직접입력" 선택 시 직접 작성.
-import AdminLiveLinkRequestsPanel from "@/components/admin-live/AdminLiveLinkRequestsPanel";
+import AdminLiveLinkRequestsPanel, { LINK_REQUESTS_CHANGED_EVENT } from "@/components/admin-live/AdminLiveLinkRequestsPanel";
 
 const BULK_POINT_REASON_PRESETS = ["방송 이벤트 당첨", "단골 감사", "리뷰 감사", "오지급 보정", "직접입력"];
 import { supabase } from "@/lib/supabase";
@@ -968,11 +968,16 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
   const [linkPendingCount, setLinkPendingCount] = useState(0);
   useEffect(() => {
     let alive = true;
-    fetch("/api/admin-live/customer-link-requests?count=1", { cache: "no-store" })
-      .then((res) => res.json().catch(() => null))
-      .then((json) => { if (alive && json?.ok) setLinkPendingCount(Number(json.pendingCount || 0)); })
-      .catch(() => {});
-    return () => { alive = false; };
+    const refresh = () => {
+      fetch("/api/admin-live/customer-link-requests?count=1", { cache: "no-store" })
+        .then((res) => res.json().catch(() => null))
+        .then((json) => { if (alive && json?.ok) setLinkPendingCount(Number(json.pendingCount || 0)); })
+        .catch(() => {});
+    };
+    refresh();
+    // 합침·아님·되돌림 직후에도 배지가 바로 바뀌게 (패널이 쏘는 이벤트)
+    window.addEventListener(LINK_REQUESTS_CHANGED_EVENT, refresh);
+    return () => { alive = false; window.removeEventListener(LINK_REQUESTS_CHANGED_EVENT, refresh); };
   }, [custTab]);
   const [phoneBlockOpen, setPhoneBlockOpen] = useState(false);
   const [keyword, setKeyword] = useState("");

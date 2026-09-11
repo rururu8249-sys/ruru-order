@@ -67,7 +67,6 @@ import {
   type CombineShippingSettings,
 } from "@/lib/admin-v2/combineShipping";
 import OrderPageShell from "@/components/order/OrderPageShell";
-import OrderCustomerTopNav from "@/components/order/OrderCustomerTopNav";
 import OrderPriceSummaryBox from "@/components/order/OrderPriceSummaryBox";
 import OrderCustomerInfoIntro from "@/components/order/OrderCustomerInfoIntro";
 import OrderCustomerInfoFormCard from "@/components/order/OrderCustomerInfoFormCard";
@@ -2995,7 +2994,7 @@ export default function OrderPage() {
       showCustomerNotice("로그아웃되었습니다. 오늘도 좋은 하루 보내세요 😊", "success");
 
     if (typeof window !== "undefined") {
-      window.location.replace("/home");
+      window.location.replace("/");   // [2026-09-11] /home 은 없어짐(시작 화면으로)
     }
 };
 

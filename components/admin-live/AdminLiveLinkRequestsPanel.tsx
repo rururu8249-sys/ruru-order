@@ -57,6 +57,9 @@ type LinkRequestRow = {
 };
 
 const isAuto = (row: LinkRequestRow) => String(row.source || "customer") === "auto";
+// [2026-09-11] 대기 건수가 바뀌면(합침·아님·되돌림) 회원 탭 배지가 바로 따라오게 — 부모(AdminLiveCustomersPanel)가 듣는다
+export const LINK_REQUESTS_CHANGED_EVENT = "ruru-link-requests-changed";
+const notifyChanged = () => { try { window.dispatchEvent(new Event(LINK_REQUESTS_CHANGED_EVENT)); } catch {} };
 const joinAddress = (base?: string, detail?: string) => [String(base || "").trim(), String(detail || "").trim()].filter(Boolean).join(" ");
 
 const when = (value: unknown) => {
@@ -143,6 +146,7 @@ export default function AdminLiveLinkRequestsPanel() {
       const json = await res.json().catch(() => null);
       if (!json?.ok) throw new Error("fail");
       setRows((prev) => prev.map((row) => (row.id === id ? { ...row, status } : row)));
+      notifyChanged();
       showAdminToast(status === "done" ? "처리함으로 표시했습니다." : status === "rejected" ? "«아님»으로 표시했습니다." : "대기중으로 되돌렸습니다.", "success");
     } catch {
       showAdminToast("표시를 저장하지 못했습니다.", "error");
@@ -213,6 +217,7 @@ export default function AdminLiveLinkRequestsPanel() {
         `합쳤습니다. ${formatKoreanPhone(d.final_phone)} 한 줄로 · 주문 ${Number(d.kept_orders || 0).toLocaleString("ko-KR")}건 · 포인트 ${Number(d.kept_points || 0).toLocaleString("ko-KR")}P`,
         "success",
       );
+      notifyChanged();
       void load();
     } catch {
       showAdminToast("합치기 중 문제가 생겼습니다. 목록을 새로고침해 확인해 주세요.", "error");
