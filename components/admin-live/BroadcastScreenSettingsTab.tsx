@@ -12,7 +12,7 @@
 //   권장 크기 근거(실제 위젯 코드) — [2026-09-13] «프리즘 네모 크기 = 위젯 크기» (두 위젯 공통, 비율 고정으로 확대/축소):
 //     · 상품 카드: 카드 고정 비율 200×387. 세로 방송(1080×1920)에서 화면 폭 26% = 280 → 280 × 542
 //       (사장님이 «잘 나온다»고 한 09-13 실방송 캡처 실측: 카드 폭 ≈ 화면 폭 26%)
-//     · 주문·입금 알림: OrderFeedWidgetClient BOX_W 660 × BOX_H 300 이 1배 (WIDGET_W 640 + 여백, 공지 + 상품 2줄 알림 2개 ≈ 270)
+//     · 주문·입금 알림: OrderFeedWidgetClient BOX_W 660 × BOX_H 320 이 1배 (공지 30px 2줄 90 + 상품 2줄 알림 105 × 2 + 간격 20)
 
 import { useEffect, useState } from "react";
 import { showAdminToast } from "@/lib/adminToast";
@@ -113,7 +113,7 @@ export default function BroadcastScreenSettingsTab({ onOpenEvent }: Props) {
         url={feedUrl}
         previewUrl={origin ? `${origin}/order-feed-widget?preview=1` : ""}
         w={660}
-        h={300}
+        h={320}
         where="세로 방송(1080×1920) 기준. 네모 아래쪽 끝을 채팅창 바로 위에 맞추면 공지가 거기 고정됩니다."
         extra={
           <div className="mt-3 rounded-xl border border-rose-line bg-rose-soft/40 px-3 py-2.5 text-[13px] font-bold leading-6 text-ink-soft">
