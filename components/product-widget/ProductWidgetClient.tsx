@@ -61,6 +61,9 @@ const OUTLINE_TEXT =
   "-2px 0 0 #000, 2px 0 0 #000, 0 -2px 0 #000, 0 2px 0 #000, 0 3px 8px rgba(0,0,0,0.55)";
 // [2026-09-12] 띠(50%) 안 글자용 옅은 그림자 — 테두리가 아니라 얇은 그늘. 밝은 배경에서만 티가 난다.
 const SOFT_TEXT = "0 1px 2px rgba(0,0,0,0.85), 0 0 6px rgba(0,0,0,0.45)";
+// [2026-09-13 사장님] 상품 카드 «고정» 높이(px). 폭 200 × 높이 387 = 사진칸(3:4 = 267) + 글자 띠(약 120) 기준.
+//   상품이 바뀌어도 카드 네모는 항상 이 크기. 글자가 많으면 띠가 위로 자라고 사진칸이 그만큼 줄어든다(사진은 잘리지 않고 통째로 축소).
+const CARD_FIXED_H_CONST = Math.round(200 * 4 / 3) + 120;
 
 // 주문성공(초록) / 입금·카드완료(파랑) 알림 배너
 type ToastItem = { icon: string; title: string; name: string; detail: string; tone: "green" | "blue" };
@@ -236,7 +239,7 @@ export default function ProductWidgetClient() {
   //      글자·띠·사진 비율이 그대로 줄어든다(transform: scale). 창이 충분히 크면 1배(기존 그대로).
   const [fitScale, setFitScale] = useState(1);
   useEffect(() => {
-    const CARD_W = 200, CARD_H = Math.round(200 * 4 / 3) + 120, MARGIN = 24; // 사진칸(3:4 최대) + 띠(최대 약 120px)
+    const CARD_W = 200, CARD_H = CARD_FIXED_H, MARGIN = 24; // 카드 «고정» 크기 (아래 CARD_FIXED_H)
     const calc = () => {
       const s = Math.min(1, (window.innerWidth - MARGIN) / (CARD_W + MARGIN), (window.innerHeight - MARGIN) / (CARD_H + MARGIN));
       setFitScale(Number.isFinite(s) && s > 0 ? s : 1);
@@ -533,6 +536,10 @@ export default function ProductWidgetClient() {
   //   예) 200 → 약 496px  /  240 → 약 590px
   //   [2026-07-09] 방송화면에서 세로가 어깨 아래까지 내려와 240 → 200으로 축소.
   const CARD = 200;
+  // [2026-09-13 사장님] 카드 크기 «고정». 예전(09-11)엔 사진 비율대로 칸 높이가 바뀌어 상품마다 위젯이 커졌다 작아졌다 했다.
+  //   → 카드 전체를 200×387 로 못 박고, 글자 띠가 아래를 차지한 «나머지»가 사진칸. 사진은 그 칸 안에 통째로 들어간다(contain, 잘림 없음).
+  //   세로 사진은 칸에 꽉 차고 가로 사진은 위아래에 카드색이 남는다 — 어느 상품이든 방송 화면에서 차지하는 네모는 같다.
+  const CARD_FIXED_H = CARD_FIXED_H_CONST;   // = 387
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "transparent", pointerEvents: "none", fontFamily: "Pretendard, Arial, sans-serif" }}>
@@ -561,7 +568,9 @@ export default function ProductWidgetClient() {
             style={{
               position: "relative",
               width: "100%",
-              // [2026-09-11] 고정 비율(3:4) 제거 — 사진칸(사진 비율 그대로, 최대 3:4) + 아래 띠가 높이를 정한다
+              // [2026-09-13] 카드 높이 «고정» — 위: 사진칸(나머지 전부) / 아래: 글자 띠(내용만큼). 상품이 바뀌어도 네모 크기는 그대로
+              height: `${CARD_FIXED_H}px`,
+              display: "flex", flexDirection: "column",
               cursor: "move",
               pointerEvents: "auto",
               borderRadius: "10px",
@@ -575,18 +584,18 @@ export default function ProductWidgetClient() {
                 · 사진은 자기 비율 그대로(가로형이면 납작하게, 세로형이면 길게), 세로는 최대 3:4(267px)까지. 그보다 길면 안 잘리고 통째로 줄어든다(contain).
                 · 글자 띠는 이 칸 «아래»에 붙는다 → 사진은 한 픽셀도 안 가려진다. */}
             {img ? (
-              <div style={{ position: "relative", width: "100%", lineHeight: 0, background: "rgba(0,0,0,0.18)" }}>
+              <div style={{ position: "relative", flex: "1 1 auto", minHeight: 0, width: "100%", background: "rgba(0,0,0,0.18)" }}>
                 <img
                   src={imgSrc}
                   alt=""
                   onError={() => {
                     if (imgRetry < 6) window.setTimeout(() => setImgRetry((v) => v + 1), 1500);
                   }}
-                  style={{ display: "block", width: "100%", height: "auto", maxHeight: `${Math.round(CARD * 4 / 3)}px`, objectFit: "contain", objectPosition: "center" }}
+                  style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", objectPosition: "center" }}
                 />
               </div>
             ) : (
-              <div style={{ width: "100%", aspectRatio: "3 / 4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "56px", opacity: 0.8 }}>👟</div>
+              <div style={{ flex: "1 1 auto", minHeight: 0, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "56px", opacity: 0.8 }}>👟</div>
             )}
 
             {/* [2026-07-09] 상품이 가려져서 하단 어두운 그라데이션 제거.
@@ -637,7 +646,7 @@ export default function ProductWidgetClient() {
                   · 아웃라인 글씨(text-shadow)는 띠가 생겨 필요 없어짐 → 제거(더 깔끔) */}
             <div
               style={{
-                position: "relative", zIndex: 2,
+                position: "relative", zIndex: 2, flex: "0 0 auto",
                 padding: "8px 10px 9px",
                 // [2026-09-12 사장님 결정] 띠 50% — 방송 화면이 더 비친다. 흰 글자가 밝은 배경(흰 옷·밝은 벽)에서도 읽히게
                 //   글자마다 옅은 그림자(SOFT_TEXT)를 얹는다(예전 2px 검정 테두리보다 훨씬 옅음).
