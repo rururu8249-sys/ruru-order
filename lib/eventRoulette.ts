@@ -25,6 +25,9 @@ export type EventRouletteOrderLike = {
   isTestOrder?: boolean | null;
   event_excluded?: boolean | null;
   eventExcluded?: boolean | null;
+  // [2026-09-13] «같은 닉네임 다른 손님» 감지용. 명단은 닉네임으로 묶이는데 사람은 번호로 갈린다.
+  customer_phone?: string | null;
+  customerPhone?: string | null;
 };
 
 export type EventRouletteParticipant = {
@@ -39,7 +42,15 @@ export type EventRouletteParticipant = {
   weight: number;
   /** [2026-09-09 자동 응모권] 과거 «서로 다른 구매일» 수 = 단골 판정. 단골리포트와 같은 기준. 모르면 1 */
   visitCount?: number;
+  /** [2026-09-13] 이 «한 칸»에 섞여 있는 서로 다른 전화번호 수. 2 이상이면 같은 닉네임 다른 손님이 합쳐진 것 */
+  personCount?: number;
 };
+
+/** [2026-09-13] 주문 한 줄의 «사람» 키 = 전화번호 숫자. (포인트 지급이 번호로 나가므로 번호 기준이 맞다) */
+export function getRoulettePersonPhone(order: EventRouletteOrderLike): string {
+  const digits = String(order.customer_phone ?? order.customerPhone ?? "").replace(/[^0-9]/g, "");
+  return digits.length >= 10 ? digits : "";
+}
 
 // [2026-09-08] 응모권 규칙 — "1장 + 결제완료 금액 unit원마다 1장, 최대 max장". 꺼져 있으면 전원 1장.
 //   예전 공식(1 + 금액/20만 최대 0.5 + 주문수 보너스 최대 0.3, 최대 1.8배)은 화면 토글과 무관하게 항상 걸려 있어서 제거.
@@ -258,6 +269,8 @@ export function buildRouletteParticipants(
   options: BuildParticipantsOptions = {}
 ): EventRouletteParticipant[] {
   const grouped = new Map<string, EventRouletteParticipant>();
+  // [2026-09-13] 닉네임 한 칸에 «서로 다른 번호»가 몇 개 섞였는지 — 명단에 ⚠️로 알려주기 위함(묶는 기준은 무변경)
+  const phonesByNickname = new Map<string, Set<string>>();
   const rule = options.ticketRule || DEFAULT_TICKET_RULE;
   const isPaid = options.isPaid;
 
@@ -291,6 +304,14 @@ export function buildRouletteParticipants(
     }
 
     current.weight = calculateTicketCount(current.paidAmountSum || 0, rule);
+
+    const personPhone = getRoulettePersonPhone(order);
+    if (personPhone) {
+      const seen = phonesByNickname.get(nickname) || new Set<string>();
+      seen.add(personPhone);
+      phonesByNickname.set(nickname, seen);
+      current.personCount = seen.size;
+    }
 
     grouped.set(nickname, current);
   }

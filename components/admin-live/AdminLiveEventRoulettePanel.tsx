@@ -35,8 +35,19 @@ const dashPhone = (p: string) =>
   : p.length === 10 ? `${p.slice(0, 3)}-${p.slice(3, 6)}-${p.slice(6)}`
   : p;
 
-const resolveWinnerPhoneStrict = async (nick: string): Promise<PhoneResolveResult> =>
-  resolveOwnerPhoneBySteps([
+const resolveWinnerPhoneStrict = async (nick: string, orderIds: string[] = []): Promise<PhoneResolveResult> => {
+  const ids = (orderIds || []).map((v) => String(v || "").trim()).filter(Boolean).slice(0, 200);
+  return resolveOwnerPhoneBySteps([
+    // ⓪ [2026-09-13 사장님 지적] 당첨자의 «바로 그 주문서» — 명단을 만든 그 주문 줄이다.
+    //    닉네임으로 DB 전체를 뒤지는 것보다 정확하다(5월에 다른 손님이 쓴 같은 닉네임에 안 걸린다).
+    //    여기서 번호가 갈리면 = 같은 닉네임 두 손님이 한 칸으로 합쳐진 것 → 멈추고 사장님께 알린다.
+    ...(ids.length > 0
+      ? [async () => {
+          const { data } = await supabase.from("orders").select("customer_phone").in("id", ids);
+          return (data || []) as PhoneRow[];
+        }]
+      : []),
+    // 아래는 주문서를 못 찾을 때(수동 명단 등)만 쓰는 예비 경로 — 기존 순서 그대로
     async () => {
       const { data } = await supabase
         .from("orders").select("customer_phone")
@@ -58,6 +69,7 @@ const resolveWinnerPhoneStrict = async (nick: string): Promise<PhoneResolveResul
       return (data || []) as PhoneRow[];
     },
   ]);
+};
 
 type RouletteBroadcast = {
   id: string;
@@ -77,6 +89,8 @@ type RouletteParticipant = {
   paid_amount_sum?: number;
   tickets?: number;
   order_ids?: string[];
+  /** [2026-09-13] 이 한 칸에 섞인 «서로 다른 번호» 수. 2 이상 = 같은 닉네임 다른 손님이 합쳐진 칸 */
+  person_count?: number;
   weight?: number;
 };
 
@@ -143,7 +157,7 @@ type SurvivalResolvePayload = {
   event?: RouletteEvent;
   winner_count?: number;
   survivors?: string[];
-  winners?: { nickname: string; winnerId: string }[];
+  winners?: { nickname: string; winnerId: string; orderIds?: string[] }[];
 };
 
 type EventsPayload = {
@@ -549,6 +563,8 @@ export default function AdminLiveEventRoulettePanel({
     // [2026-09-08] 이 판이 운영인지 — 화면 상태가 아니라 서버가 만든 이벤트 행의 mode 로 판단(테스트 한 판 중 상태 꼬임 방지)
     const isLive = (currentEvent?.mode || mode) === "live";
     const gEventId = currentEvent?.id || ""; // 중복지급 가드 키
+    // [2026-09-13] 당첨자의 «그 주문서» id — 포인트를 이 주문의 번호로 지급한다(닉네임 재조회 X)
+    const gOrderIds = Array.isArray(currentEvent?.winner_order_ids) ? currentEvent.winner_order_ids : [];
 
     setCenterWinner("");
     angleRef.current = 0;
@@ -566,7 +582,7 @@ export default function AdminLiveEventRoulettePanel({
         // 포인트 선물 + 금액 있으면 자동지급 (운영 모드만)
         if (gType === "point" && gAmount > 0) {
           if (isLive) {
-            void grantPointToWinner(winner, gAmount, gReason, gEventId);
+            void grantPointToWinner(winner, gAmount, gReason, gEventId, gOrderIds);
           } else {
             showAdminToast("테스트 모드라 포인트 자동지급은 건너뜁니다.", "info");
           }
@@ -588,7 +604,7 @@ export default function AdminLiveEventRoulettePanel({
 
   // 당첨자 닉네임 → orders 최신 주문 전화번호 매핑 → 기존 포인트 API로 자동지급
   // 중복지급 가드: ① 이번 세션 ref ② 영구 게이트 is_reward_done. 지급 성공 시 is_reward_done=true로 잠금.
-  const grantPointToWinner = async (nickname: string, amount: number, reason: string, eventId = "") => {
+  const grantPointToWinner = async (nickname: string, amount: number, reason: string, eventId = "", orderIds: string[] = []) => {
     const evId = String(eventId || "").trim();
 
     if (evId) {
@@ -609,12 +625,12 @@ export default function AdminLiveEventRoulettePanel({
       // 전화번호 조회: ① 주문(orders) 닉네임 → ② 고객(customers) 닉네임 → ③ 고객 카카오닉네임.
       //   카카오 간편로그인은 customers에 전화번호가 항상 저장되므로, orders에 없어도 여기서 찾는다.
       //   [2026-09-13] 번호가 갈리면(같은 닉네임 다른 손님) «아무나 고르지 않고» 멈춘다 — 위 주석 참고.
-      const found = await resolveWinnerPhoneStrict(nick);
+      const found = await resolveWinnerPhoneStrict(nick, orderIds);
       if (!found.ok) {
         if (evId) grantedEventIdsRef.current.delete(evId); // 지급 안 됐으니 잠금 해제
         showAdminToast(
           found.reason === "ambiguous"
-            ? `⚠️ 「${nick}」 자동지급을 멈췄습니다.\n같은 닉네임을 쓰는 손님이 ${found.phones.length}명이라 누구인지 확정할 수 없어요.\n후보: ${found.phones.map(dashPhone).join(" / ")}\n→ 회원상세에서 맞는 손님에게 직접 지급해주세요.`
+            ? `⚠️ 「${nick}」 자동지급을 멈췄습니다.\n같은 닉네임으로 주문한 손님이 ${found.phones.length}명이라 누구인지 확정할 수 없어요.\n후보: ${found.phones.map(dashPhone).join(" / ")}\n→ 회원상세에서 맞는 손님에게 직접 지급해주세요.`
             : `${nick}의 전화번호를 어디서도 찾지 못해 자동지급을 건너뜁니다.`,
           "warning",
         );
@@ -690,12 +706,12 @@ export default function AdminLiveEventRoulettePanel({
   const grantedWinnerIdsRef = useRef<Set<string>>(new Set()); // 세션 중복지급 가드(당첨자 행 단위)
 
   // 닉네임 → 전화번호 (grantPointToWinner와 «동일한» 판정 = 한 명으로 확정될 때만, 읽기 전용)
-  const findWinnerPhone = async (nick: string) => resolveWinnerPhoneStrict(nick);
+  const findWinnerPhone = async (nick: string, orderIds: string[] = []) => resolveWinnerPhoneStrict(nick, orderIds);
 
   // 생존자 K명에게 각각 amount 포인트 지급. 한 명 실패해도 나머지는 계속 진행.
   //   중복지급 방지 2중: ① 세션 ref(winnerId) ② DB의 is_reward_done(그 당첨자 행) 확인 후 지급, 성공 시 즉시 잠금.
   const grantPointToSurvivors = async (
-    survivorWinners: { nickname: string; winnerId: string }[],
+    survivorWinners: { nickname: string; winnerId: string; orderIds?: string[] }[],
     amount: number,
     reason: string
   ) => {
@@ -729,12 +745,12 @@ export default function AdminLiveEventRoulettePanel({
       grantedWinnerIdsRef.current.add(winnerId); // 선점 잠금(실패 시 아래에서 해제)
 
       try {
-        const found = await findWinnerPhone(nick);
+        const found = await findWinnerPhone(nick, w.orderIds || []);
         if (!found.ok) {
           grantedWinnerIdsRef.current.delete(winnerId); // 지급 안 됐으니 해제
           failed.push(
             found.reason === "ambiguous"
-              ? `${nick}(같은 닉네임 ${found.phones.length}명 — 누구인지 확정 불가, 수동지급 필요)`
+              ? `${nick}(같은 닉네임으로 주문한 손님 ${found.phones.length}명 — 확정 불가, 수동지급 필요)`
               : `${nick}(전화번호 없음)`,
           );
           continue;
@@ -1691,8 +1707,10 @@ export default function AdminLiveEventRoulettePanel({
                           setFixedWinnerNickname(on ? "" : p.nickname);
                         }
                       };
+                      // [2026-09-13] 같은 닉네임으로 «서로 다른 손님»이 주문하면 한 칸으로 합쳐진다. 표시만 해서 알려준다.
+                      const mixed = Number(p.person_count || 0) >= 2;
                       return (
-                        <span key={`fix-${p.nickname}-${i}`} className={`nick ${on ? "win" : ""}`} onClick={toggleFixed} title={ticketEnabled ? `결제완료 ${Number(p.paid_amount_sum || 0).toLocaleString("ko-KR")}원` : undefined}>{on ? "👑 " : ""}{p.nickname}{ticketTail ? <span style={{ color: "var(--mut2)", fontSize: "11px" }}>{ticketTail}</span> : null}</span>
+                        <span key={`fix-${p.nickname}-${i}`} className={`nick ${on ? "win" : ""}`} onClick={toggleFixed} title={mixed ? `⚠️ 이 이름으로 주문한 손님이 ${p.person_count}명입니다(번호가 다름). 당첨되면 자동지급이 멈추고 수동지급 안내가 뜹니다.` : (ticketEnabled ? `결제완료 ${Number(p.paid_amount_sum || 0).toLocaleString("ko-KR")}원` : undefined)}>{on ? "👑 " : ""}{p.nickname}{mixed ? <span style={{ color: "#f59e0b", fontSize: "11px", fontWeight: 700 }}> ⚠️{p.person_count}명</span> : null}{ticketTail ? <span style={{ color: "var(--mut2)", fontSize: "11px" }}>{ticketTail}</span> : null}</span>
                       );
                     })
                   )}

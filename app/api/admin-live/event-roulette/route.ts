@@ -188,6 +188,8 @@ function sanitizeParticipantForAdmin(participant: EventRouletteParticipant) {
     // [2026-09-09] 자동 응모권 근거 — 과거 구매일 수(단골). 화면에 「단골 N회」로 보여준다
     visit_count: Number(participant.visitCount || 0),
     order_ids: participant.orderIds,
+    // [2026-09-13] 이 한 칸에 섞인 서로 다른 번호 수. 2 이상이면 «같은 닉네임 다른 손님»이 합쳐진 칸
+    person_count: Number(participant.personCount || 0),
     weight: participant.weight,
   };
 }
@@ -705,6 +707,8 @@ function normalizeManualParticipantsForEvent(value: unknown) {
       paidAmountSum,
       orderIds,
       weight,
+      // [2026-09-13] 스냅샷을 다시 읽어도 «⚠️N명» 표시가 사라지지 않게 같이 보존
+      personCount: safeNumber(row.personCount ?? row.person_count, 0),
     });
   }
 
@@ -1290,7 +1294,11 @@ async function resolveSurvivalEvent(body: Record<string, unknown>) {
     const row = allRows.find(
       (r) => normalizeWinnerNicknameForDedupe(r.nickname) === normalizeWinnerNicknameForDedupe(nickname)
     );
-    return { nickname, winnerId: row ? String(row.id ?? "") : "" };
+    // [2026-09-13] 포인트를 «그 사람의 주문서»로 지급하려고 당첨자의 주문 id를 같이 내려준다(닉네임 재조회 안 하도록)
+    const picked = survivors.find(
+      (s) => normalizeWinnerNicknameForDedupe(s.nickname) === normalizeWinnerNicknameForDedupe(nickname)
+    );
+    return { nickname, winnerId: row ? String(row.id ?? "") : "", orderIds: picked?.orderIds || [] };
   });
 
   return json({

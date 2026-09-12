@@ -3,6 +3,7 @@
 // 실행: node --experimental-strip-types --loader ./scripts/_ts-resolve.mjs scripts/test-nickname-owner-phone.mjs
 import assert from "node:assert/strict";
 import { resolveUniqueOwnerPhone, resolveOwnerPhoneBySteps } from "../lib/nicknameOwnerPhone.ts";
+import { buildRouletteParticipants } from "../lib/eventRoulette.ts";
 
 let n = 0;
 const ok = (label, fn) => { fn(); n += 1; console.log("  ✓", label); };
@@ -78,6 +79,44 @@ await okAsync("⑪ 마지막 단계에서 갈려도 멈춘다", async () => {
   const r = await resolveOwnerPhoneBySteps([rows(), rows(), rows("01056505531", "01081912420")]);
   assert.equal(r.ok, false);
   assert.equal(r.reason, "ambiguous");
+});
+
+// ── 이벤트 명단: 같은 닉네임 다른 손님이 «한 칸»으로 합쳐지는 것 감지 ──────────
+// 명단을 닉네임으로 묶는 기준 자체는 무변경(추첨 결과에 영향 없음). 합쳐진 칸을 표시만 한다.
+console.log("\n[이벤트 명단 — 한 칸에 몇 명이 섞였나]");
+
+const order = (id, nick, phone, amount = 10000) => ({
+  id: String(id), youtube_nickname: nick, customer_phone: phone,
+  qty: 1, final_amount: amount, admin_order_status_v2: "결제완료",
+});
+
+ok("⑫ 한 사람이 두 번 주문하면 1명", () => {
+  const [p] = buildRouletteParticipants([order(1, "민연숙쨩", "01028495209"), order(2, "민연숙쨩", "010-2849-5209")]);
+  assert.equal(p.orderCount, 2);
+  assert.equal(p.personCount, 1);
+});
+
+ok("⑬ 실측 신디 — 김애경·나금혜가 한 칸으로 합쳐지면 2명으로 표시", () => {
+  const [p] = buildRouletteParticipants([order(1, "신디", "01031805071"), order(2, "신디", "01087648075")]);
+  assert.equal(p.nickname, "신디");
+  assert.equal(p.orderCount, 2);   // 묶는 기준은 그대로 (추첨 무변경)
+  assert.equal(p.personCount, 2);  // 다만 «2명»이라고 알려준다
+  assert.deepEqual(p.orderIds, ["1", "2"]);
+});
+
+ok("⑭ 번호 없는 주문은 사람 수에 안 센다", () => {
+  const [p] = buildRouletteParticipants([order(1, "곰", "01099992420"), order(2, "곰", "")]);
+  assert.equal(p.personCount, 1);
+});
+
+ok("⑮ 당첨자의 그 주문서가 한 사람이면 그 번호로 확정", () => {
+  const [p] = buildRouletteParticipants([order(1, "신디", "01031805071"), order(2, "신디", "01087648075")]);
+  // 당첨자의 주문 줄로 번호를 찾는다 → 갈리므로 «멈춘다»
+  const rows = [{ customer_phone: "01031805071" }, { customer_phone: "01087648075" }];
+  assert.equal(resolveUniqueOwnerPhone(rows).ok, false);
+  // 한 사람만 들어있는 주문서면 바로 확정
+  assert.deepEqual(resolveUniqueOwnerPhone([{ customer_phone: "01031805071" }]), { ok: true, phone: "01031805071" });
+  assert.equal(p.personCount, 2);
 });
 
 console.log(`\n✅ 닉네임 → 번호 확정 ${n}개 통과`);
