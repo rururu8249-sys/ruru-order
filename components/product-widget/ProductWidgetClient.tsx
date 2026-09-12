@@ -237,12 +237,16 @@ export default function ProductWidgetClient() {
   //   ① 사진: object-fit cover → contain (아래 img). 어떤 비율이든 카드 안에 통째로 들어온다.
   //   ② 카드: PRISM 브라우저 소스 창이 카드(200×267 + 여백 24)보다 작으면 창에 맞춰 통째로 축소.
   //      글자·띠·사진 비율이 그대로 줄어든다(transform: scale). 창이 충분히 크면 1배(기존 그대로).
+  // [2026-09-13 사장님 «크기 줄이면 진짜 줄고 키우면 엄청 커짐 — 고정으로 적당한 사이즈로»]
+  //   → 규칙을 하나로: «프리즘 네모 크기 = 카드 크기». 카드(200×387 비율)를 네모에 꽉 차게 키우거나 줄인다(비율 고정, 위아래 모두).
+  //   네모를 어떻게 잡든 카드는 항상 그 안에 같은 비율로 들어가고, 네모를 키운 만큼만 커진다(갑자기 튀지 않음).
+  //   세로 방송(1080×1920) 권장 네모 = 폭 280 × 높이 542 (화면 폭의 26% — 사장님이 «잘 나온다»고 한 실방송 캡처 실측).
   const [fitScale, setFitScale] = useState(1);
   useEffect(() => {
-    const CARD_W = 200, CARD_H = CARD_FIXED_H, MARGIN = 24; // 카드 «고정» 크기 (아래 CARD_FIXED_H)
+    const CARD_W = 200, CARD_H = CARD_FIXED_H;
     const calc = () => {
-      const s = Math.min(1, (window.innerWidth - MARGIN) / (CARD_W + MARGIN), (window.innerHeight - MARGIN) / (CARD_H + MARGIN));
-      setFitScale(Number.isFinite(s) && s > 0 ? s : 1);
+      const s = Math.min(window.innerWidth / CARD_W, window.innerHeight / CARD_H);
+      setFitScale(Number.isFinite(s) && s > 0 ? Math.min(4, s) : 1);
     };
     calc();
     window.addEventListener("resize", calc);
@@ -265,48 +269,8 @@ export default function ProductWidgetClient() {
     } catch { setPreviewMode(false); }
   }, []);
 
-  // 위젯 위치 — 운영자가 드래그해서 원하는 곳에 두면 기억(localStorage, 보기 상태 전용·돈 로직 무관).
-  // 저장 전(null)에는 기본 좌하단(left:24/bottom:24) 유지.
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-  const dragRef = useRef<{ dx: number; dy: number } | null>(null);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem("ruru_product_widget_pos");
-      if (raw) setPos(JSON.parse(raw));
-    } catch {
-      // ignore
-    }
-  }, []);
-  const startDragWidget = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    dragRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
-    const onMove = (ev: MouseEvent) => {
-      if (!dragRef.current) return;
-      setPos({
-        x: Math.max(0, ev.clientX - dragRef.current.dx),
-        y: Math.max(0, ev.clientY - dragRef.current.dy),
-      });
-    };
-    const onUp = () => {
-      dragRef.current = null;
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-      setPos((p) => {
-        if (p && typeof window !== "undefined") {
-          try {
-            window.localStorage.setItem("ruru_product_widget_pos", JSON.stringify(p));
-          } catch {
-            // ignore
-          }
-        }
-        return p;
-      });
-    };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-    e.preventDefault();
-  };
+  // [2026-09-13 사장님] 드래그 이동 삭제 — «프리즘 네모 = 카드» 라 위치는 프리즘에서 네모를 옮기면 된다.
+  //   (예전 localStorage 위치 'ruru_product_widget_pos' 는 더 이상 읽지 않는다. 남아 있어도 무해.)
 
   // 배경 투명 (OBS 크로마키)
   useEffect(() => {
@@ -545,37 +509,34 @@ export default function ProductWidgetClient() {
     <div style={{ position: "fixed", inset: 0, background: "transparent", pointerEvents: "none", fontFamily: "Pretendard, Arial, sans-serif" }}>
       {/* [2026-07-12 사장님 확정] 내장 배너 제거 — 위젯은 상품카드만. 주문방법 배너는
           PRISM에 PNG 이미지 소스로 직접 올려서 운영(두 겹 표시 방지). 기본 위치도 원래 좌하단 복원. */}
-      {/* 카드·오버레이·폭죽을 한 앵커에 묶어, 드래그로 옮기면 전부 같이 따라간다 */}
+      {/* 카드·오버레이·폭죽을 한 앵커에 묶는다. [2026-09-13] 왼쪽 아래 딱 붙여 네모에 꽉 차게(비율 고정) 확대/축소 */}
       <div
         style={{
           position: "absolute",
-          left: pos ? `${pos.x}px` : "24px",
-          top: pos ? `${pos.y}px` : undefined,
-          bottom: pos ? undefined : "24px",
+          left: 0,
+          bottom: 0,
           width: `${CARD}px`,
           pointerEvents: "none",
-          // 창이 작으면 카드째 축소(비율 유지) — 왼쪽 아래(또는 드래그한 왼쪽 위)를 기준으로
-          transform: fitScale < 1 ? `scale(${fitScale})` : undefined,
-          transformOrigin: pos ? "top left" : "bottom left",
+          transform: fitScale !== 1 ? `scale(${fitScale})` : undefined,
+          transformOrigin: "bottom left",
         }}
       >
 
         {current ? (
           <div
             key={String(current?.id ?? rotIndex)}
-            onMouseDown={startDragWidget}
-            title="드래그해서 위치 이동 (위치 자동 저장)"
             style={{
               position: "relative",
               width: "100%",
               // [2026-09-13] 카드 높이 «고정» — 위: 사진칸(나머지 전부) / 아래: 글자 띠(내용만큼). 상품이 바뀌어도 네모 크기는 그대로
               height: `${CARD_FIXED_H}px`,
               display: "flex", flexDirection: "column",
-              cursor: "move",
-              pointerEvents: "auto",
+              pointerEvents: "none",
               borderRadius: "10px",
               overflow: "hidden",
-              background: "rgba(24,24,28,0.55)",
+              // [2026-09-13 사장님 «반투명이 반투명스럽지 않다»] 카드 전체 배경(55%) 위에 띠(50%)가 겹쳐 실제론 약 78% 였다.
+              //   → 카드 배경 없앰. 반투명은 사진칸·띠에 «한 겹(50%)»만.
+              background: "transparent",
               color: "#fff",
               animation: "ruruWidgetIn 0.5s ease",
             }}
@@ -584,7 +545,7 @@ export default function ProductWidgetClient() {
                 · 사진은 자기 비율 그대로(가로형이면 납작하게, 세로형이면 길게), 세로는 최대 3:4(267px)까지. 그보다 길면 안 잘리고 통째로 줄어든다(contain).
                 · 글자 띠는 이 칸 «아래»에 붙는다 → 사진은 한 픽셀도 안 가려진다. */}
             {img ? (
-              <div style={{ position: "relative", flex: "1 1 auto", minHeight: 0, width: "100%", background: "rgba(0,0,0,0.18)" }}>
+              <div style={{ position: "relative", flex: "1 1 auto", minHeight: 0, width: "100%", background: "rgba(20, 17, 24, 0.5)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}>
                 <img
                   src={imgSrc}
                   alt=""
@@ -595,7 +556,7 @@ export default function ProductWidgetClient() {
                 />
               </div>
             ) : (
-              <div style={{ flex: "1 1 auto", minHeight: 0, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "56px", opacity: 0.8 }}>👟</div>
+              <div style={{ flex: "1 1 auto", minHeight: 0, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "56px", opacity: 0.8, background: "rgba(20, 17, 24, 0.5)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}>👟</div>
             )}
 
             {/* [2026-07-09] 상품이 가려져서 하단 어두운 그라데이션 제거.

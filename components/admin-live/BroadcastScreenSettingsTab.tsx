@@ -9,10 +9,10 @@
 //   저장 없음. DB·settings 무접촉. 방송마다 바뀌는 📌 공지는 «방송의 속성»이라 방송 콘솔에서(여기선 한 줄로만 안내).
 //   ⚠ 돈·주문·입금·정산 로직 없음. 읽기 전용 안내 화면.
 //
-//   권장 크기 근거(실제 위젯 코드):
-//     · 상품 카드: ProductWidgetClient CARD_W 200 · CARD_H 387(사진 3:4 최대 267 + 띠 120) · MARGIN 24 → 224 × 412
-//     · 주문·입금 알림: OrderFeedWidgetClient WIDGET_W 640 + 왼쪽 8 · 한 줄 ≈ 80px × 3 + 간격 → 660 × 280
-//     둘 다 창이 더 작으면 비율대로 축소(transform: scale)되어 잘리지 않는다.
+//   권장 크기 근거(실제 위젯 코드) — [2026-09-13] «프리즘 네모 크기 = 위젯 크기» (두 위젯 공통, 비율 고정으로 확대/축소):
+//     · 상품 카드: 카드 고정 비율 200×387. 세로 방송(1080×1920)에서 화면 폭 26% = 280 → 280 × 542
+//       (사장님이 «잘 나온다»고 한 09-13 실방송 캡처 실측: 카드 폭 ≈ 화면 폭 26%)
+//     · 주문·입금 알림: OrderFeedWidgetClient BOX_W 660 × BOX_H 280 이 1배 (WIDGET_W 640 + 여백, 3줄 ≈ 240)
 
 import { useEffect, useState } from "react";
 import { showAdminToast } from "@/lib/adminToast";
@@ -91,7 +91,7 @@ export default function BroadcastScreenSettingsTab({ onOpenEvent }: Props) {
         <p className="mt-1 text-[13px] font-bold leading-6 text-ink-soft">
           위젯은 <b className="text-ink">2개</b>이고 각각 주소가 하나씩 있습니다. 프리즘에서 <b className="text-ink">소스 추가 › 브라우저 소스</b>를 누르고
           주소를 붙여넣은 뒤, 폭·높이를 아래 숫자로 적으면 끝입니다. 배경은 저절로 투명하게 나오고, 위치는 프리즘 화면에서 끌어서 정합니다.
-          여기서 저장할 것은 없습니다.
+          <b className="text-ink">네모 크기가 곧 위젯 크기</b>입니다 — 네모를 키우면 그 비율로 커지고, 줄이면 작아집니다. 여기서 저장할 것은 없습니다.
         </p>
       </div>
 
@@ -101,9 +101,9 @@ export default function BroadcastScreenSettingsTab({ onOpenEvent }: Props) {
         what="지금 파는 상품의 사진·이름·색상/사이즈·남은 개수·가격이 카드로 뜹니다. 방송 중에만 보이고, 켜고 끄는 건 방송 컨트롤타워의 「📺 상품 카드 ON/OFF」 버튼입니다."
         url={productUrl}
         previewUrl={origin ? `${origin}/product-widget?preview=1` : ""}
-        w={224}
-        h={412}
-        where="보통 화면 오른쪽 위에 둡니다."
+        w={280}
+        h={542}
+        where="세로 방송(1080×1920) 기준 · 화면 폭의 약 1/4. 보통 오른쪽 위에 둡니다."
       />
 
       <WidgetCard
@@ -114,7 +114,7 @@ export default function BroadcastScreenSettingsTab({ onOpenEvent }: Props) {
         previewUrl={origin ? `${origin}/order-feed-widget?preview=1` : ""}
         w={660}
         h={280}
-        where="채팅창 바로 위에 두면 채팅처럼 보입니다."
+        where="세로 방송(1080×1920) 기준. 채팅창 바로 위에 두면 채팅처럼 보입니다."
         extra={
           <div className="mt-3 rounded-xl border border-rose-line bg-rose-soft/40 px-3 py-2.5 text-[13px] font-bold leading-6 text-ink-soft">
             📌 알림 맨 위에 <b className="text-ink">공지 한 줄</b>을 붙일 수 있습니다. 방송마다 내용이 달라서(예: 「오늘 9시 마감」)

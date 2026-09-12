@@ -41,7 +41,9 @@ type FeedItem = { id: string; kind: FeedKind; nick: string; detail: string; at: 
 
 const SHOW_MS = 10000;      // 한 줄이 떠 있는 시간 (사장님 09-12: 10초)
 const MAX_LINES = 3;        // 화면에 보이는 전체 줄 수 상한 — 📌 공지가 있으면 알림은 2줄 (사장님 09-12)
-const WIDGET_W = 640;       // 기본 폭(px) — PRISM 에서 크기를 줄여도 비율 유지
+const WIDGET_W = 640;       // 기본 폭(px)
+// [2026-09-13] «프리즘 네모 크기 = 위젯 크기» — 권장 네모 660×280 이 1배. 네모를 키우면 글자도 그 비율로 커지고, 줄이면 작아진다(비율 고정).
+const BOX_W = 660, BOX_H = 280;
 
 const KIND_META: Record<FeedKind, { icon: string; tag: string; verb: string; accent: string }> = {
   order:   { icon: "🛒", tag: "주문", verb: "주문 감사합니다",   accent: "#22c55e" },   // 초록 = 상품 위젯 주문성공과 같은 톤
@@ -99,11 +101,11 @@ export default function OrderFeedWidgetClient() {
     try { setPreviewMode(new URLSearchParams(window.location.search).get("preview") === "1"); } catch { setPreviewMode(false); }
   }, []);
 
-  // 브라우저 소스 창이 위젯 폭보다 좁으면 통째로 축소(비율 유지)
+  // 브라우저 소스 네모에 맞춰 통째로 확대/축소(비율 유지) — 권장 660×280 이면 1배
   useEffect(() => {
     const calc = () => {
-      const s = Math.min(1, (window.innerWidth - 16) / (WIDGET_W + 16));
-      setFitScale(Number.isFinite(s) && s > 0 ? s : 1);
+      const s = Math.min(window.innerWidth / BOX_W, window.innerHeight / BOX_H);
+      setFitScale(Number.isFinite(s) && s > 0 ? Math.min(3, s) : 1);
     };
     calc();
     window.addEventListener("resize", calc);
@@ -212,7 +214,7 @@ export default function OrderFeedWidgetClient() {
         style={{
           position: "absolute", left: "8px", bottom: "8px", width: `${WIDGET_W}px`,
           display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: "10px",
-          transform: fitScale < 1 ? `scale(${fitScale})` : undefined, transformOrigin: "bottom left",
+          transform: fitScale !== 1 ? `scale(${fitScale})` : undefined, transformOrigin: "bottom left",
         }}
       >
         {/* 📌 고정 공지 — 피드 맨 위, 방송 ON 동안 상시. 다른 줄과 구분되게 딥로즈 테두리 */}
