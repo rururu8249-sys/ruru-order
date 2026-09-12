@@ -24,6 +24,10 @@ function pickAutoSummary(autoResult: any) {
     success_count: Number(summary.success_count ?? 0),
     failed_count: Number(summary.failed_count ?? 0),
     blocked_count: Number(summary.blocked_count ?? 0),
+    // [2026-09-13] 포인트 전액사용 0원 주문의 입금확인 건수가 요약에서 빠져 있었다.
+    //   → 관리자 화면이 «매칭 0건»으로 알고 주문목록을 새로 안 읽어, 입금 소리가 다음 새로고침 때까지 밀렸다.
+    //   (자동매칭 판정·DB 쓰기는 그대로. 여기는 이미 끝난 결과를 «세어서 알려주는» 자리일 뿐이다.)
+    zero_payment_success_count: Number(summary.zero_payment_success_count ?? 0),
   };
 }
 

@@ -583,16 +583,25 @@ export default function AdminLiveDashboard() {
   const [integrityRecentOnly, setIntegrityRecentOnly] = useState(true);
   const [auditExpanded, setAuditExpanded] = useState<Record<string, boolean>>({});
   const [orders, setOrders] = useState<LiveOrder[]>([]);
+  // [2026-09-13] 첫 조회가 끝났는지 — 아래 «자동입금확인 소리» 감지가 이 값을 봐야 해서 여기로 올렸다(선언 위치만 이동).
+  const [loading, setLoading] = useState(true);
   // [2026-08-31 사장님 제보] 자동입금확인 소리가 아예 안 났다 — 소리 내던 LiveOpsStatusBox가
   //   화면 개편 때 빠지면서 기능째 사라져 있었음(실측: 어디에도 마운트 안 됨).
   //   → 항상 떠 있는 대시보드에서 감지: 주문 목록 갱신 시 "새로 자동입금확인된" 주문이 보이면 1회 알림.
   const knownAutoPaidRef = useRef<Set<string> | null>(null);
+  const watchStartedAtRef = useRef(0);
   useEffect(() => {
+    // [2026-09-13 사장님 제보] 02:28:36 에 확인된 입금이 02:33 에 울렸다 — 그때 화면을 새로 열었기 때문.
+    //   원인: 주문목록이 «빈 배열»인 채로 이 효과가 먼저 돌아 «첫 로드 기준»을 빈 목록으로 잡았다.
+    //         그 뒤 진짜 목록이 들어오면 최근 5분 안에 확인된 건이 전부 «새 건»으로 보여 울렸다.
+    //   수정: ① 첫 조회가 «끝난 뒤»에 기준을 잡고 ② 그 시각 이후에 확인된 건만 울린다(새로고침해도 지난 건은 조용).
+    if (loading) return;
     const autoPaidRows = orders
       .filter((o) => o.paymentStatus === "auto_paid")
       .map((o) => ({ id: String(o.id), paidAtFull: String(o.paidAtFull || "") }));
     if (knownAutoPaidRef.current === null) {
       knownAutoPaidRef.current = new Set(autoPaidRows.map((r) => r.id)); // 첫 로드 — 기존 건은 조용히 기억만
+      watchStartedAtRef.current = Date.now();
       return;
     }
     const known = knownAutoPaidRef.current;
@@ -604,9 +613,11 @@ export default function AdminLiveDashboard() {
     //   → 실제 확인시각(deposit_confirmed_at)이 최근 5분 이내인 건만 소리. 옛 건은 조용히 기억만.
     const FIVE_MIN = 5 * 60 * 1000;
     const now = Date.now();
+    // 화면을 보기 시작한 뒤(watchStartedAt)에 확인된 건만 — 새로고침·필터변경으로 «지난 건»이 다시 울리는 것 차단.
+    const sinceWatch = watchStartedAtRef.current - 5000; // 시계 오차 5초 여유
     const recentFresh = freshRows.filter((r) => {
       const t = new Date(r.paidAtFull).getTime();
-      return Number.isFinite(t) && now - t < FIVE_MIN;
+      return Number.isFinite(t) && now - t < FIVE_MIN && t >= sinceWatch;
     });
     if (recentFresh.length === 0) return;
     try {
@@ -614,7 +625,7 @@ export default function AdminLiveDashboard() {
     } catch { /* 무시 */ }
     playDepositAlert(recentFresh[0].id); // 띵동(크게) + 음성 "입금!" — 탭 2개여도 같은 건은 한 번만
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orders]);
+  }, [orders, loading]);
   // [표시 전용] 금액 단독 추천(amount_only_suggestions). 읽기 전용 dry_run으로만 채우며 확정/쓰기 없음.
   const [broadcasts, setBroadcasts] = useState<AdminLiveBroadcast[]>([]);
   const [broadcastProductCount, setBroadcastProductCount] = useState<number | null>(null);
@@ -632,7 +643,6 @@ export default function AdminLiveDashboard() {
   const [matchPanelOpen, setMatchPanelOpen] = useState(false);
   const [selectedOrderForMatch, setSelectedOrderForMatch] = useState<LiveOrder | null>(null);
   const [videoRatio, setVideoRatio] = useState<VideoRatio>("vertical");
-  const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   // 필터를 sessionStorage에 보존 → 브라우저 새로고침(F5)에도 보던 필터 유지(초기화 버튼 누르면 기본값=저장 삭제).
   // (운영/돈 데이터 아님, 화면 보기 상태. 기존 ruru_admin_sound_on 등 UI 상태 저장과 동일 관행)

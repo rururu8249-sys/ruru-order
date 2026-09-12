@@ -58,7 +58,12 @@ function claimBrowserLock() {
 }
 
 function getAutoMatchSuccessCount(result: any) {
-  return Number(result?.autoMatchSummary?.success_count || result?.autoMatch?.summary?.success_count || 0);
+  // [2026-09-13 사장님 제보] 02:28 주문이 02:28:36 에 자동입금확인됐는데 화면·소리는 02:33 에야 떴다.
+  //   원인: 이름+금액 매칭 건수(success_count)만 세고, «포인트 전액사용 0원 주문»의 입금확인 건수를 안 셌다.
+  //   → 둘을 합쳐서 «이번 조회에서 입금확인된 게 있나»로 판단한다(있으면 대시보드가 주문목록을 즉시 다시 읽음).
+  const matched = Number(result?.autoMatchSummary?.success_count ?? result?.autoMatch?.summary?.success_count ?? 0);
+  const zero = Number(result?.autoMatchSummary?.zero_payment_success_count ?? result?.autoMatch?.summary?.zero_payment_success_count ?? 0);
+  return (Number.isFinite(matched) ? matched : 0) + (Number.isFinite(zero) ? zero : 0);
 }
 
 export function useAutoBankdaPaymentSync(options: UseAutoBankdaPaymentSyncOptions = {}) {
