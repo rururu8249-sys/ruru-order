@@ -12,7 +12,7 @@
 //   권장 크기 근거(실제 위젯 코드) — [2026-09-13] «프리즘 네모 크기 = 위젯 크기» (두 위젯 공통, 비율 고정으로 확대/축소):
 //     · 상품 카드: 카드 고정 비율 200×387. 세로 방송(1080×1920)에서 화면 폭 26% = 280 → 280 × 542
 //       (사장님이 «잘 나온다»고 한 09-13 실방송 캡처 실측: 카드 폭 ≈ 화면 폭 26%)
-//     · 주문·입금 알림: OrderFeedWidgetClient BOX_W 660 × BOX_H 280 이 1배 (WIDGET_W 640 + 여백, 3줄 ≈ 240)
+//     · 주문·입금 알림: OrderFeedWidgetClient BOX_W 660 × BOX_H 300 이 1배 (WIDGET_W 640 + 여백, 공지 + 상품 2줄 알림 2개 ≈ 270)
 
 import { useEffect, useState } from "react";
 import { showAdminToast } from "@/lib/adminToast";
@@ -109,12 +109,12 @@ export default function BroadcastScreenSettingsTab({ onOpenEvent }: Props) {
       <WidgetCard
         icon="💬"
         title="주문·입금 알림"
-        what="손님이 주문하거나 입금(카드결제)하면 「OO님 주문 감사합니다」가 유튜브 채팅처럼 뜹니다. 3줄까지, 10초 뒤 사라집니다. 금액·옵션·개수는 안 나옵니다."
+        what="손님이 주문하거나 입금(카드결제)하면 「OO님 주문 감사합니다」가 뜹니다. 주문은 상품명·옵션·금액까지(상품 2개까지 한 줄씩, 3개부터는 「외 N종 · 합계」). 3줄까지, 10초 뒤 사라집니다. 📌 공지는 맨 아래에 고정되고 알림은 그 위로 쌓입니다."
         url={feedUrl}
         previewUrl={origin ? `${origin}/order-feed-widget?preview=1` : ""}
         w={660}
-        h={280}
-        where="세로 방송(1080×1920) 기준. 채팅창 바로 위에 두면 채팅처럼 보입니다."
+        h={300}
+        where="세로 방송(1080×1920) 기준. 네모 아래쪽 끝을 채팅창 바로 위에 맞추면 공지가 거기 고정됩니다."
         extra={
           <div className="mt-3 rounded-xl border border-rose-line bg-rose-soft/40 px-3 py-2.5 text-[13px] font-bold leading-6 text-ink-soft">
             📌 알림 맨 위에 <b className="text-ink">공지 한 줄</b>을 붙일 수 있습니다. 방송마다 내용이 달라서(예: 「오늘 9시 마감」)

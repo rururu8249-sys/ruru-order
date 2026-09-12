@@ -33,17 +33,18 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { getActiveBroadcast, loadAdminLiveBroadcasts } from "@/components/admin-live/liveBroadcastController";
-import { feedOrderDetail } from "@/lib/feedText";
+import { feedOrderLines, type FeedLine, type FeedOrderItem } from "@/lib/feedText";
+import { formatOrderOptionText } from "@/lib/orderOptionText";
 
 type AnyRow = Record<string, any>;
 type FeedKind = "order" | "deposit" | "card";
-type FeedItem = { id: string; kind: FeedKind; nick: string; detail: string; at: number };
+type FeedItem = { id: string; kind: FeedKind; nick: string; lines: FeedLine[]; at: number };   // lines: 상품 줄(왼쪽 상품명·옵션 / 오른쪽 금액), 최대 2줄
 
 const SHOW_MS = 10000;      // 한 줄이 떠 있는 시간 (사장님 09-12: 10초)
 const MAX_LINES = 3;        // 화면에 보이는 전체 줄 수 상한 — 📌 공지가 있으면 알림은 2줄 (사장님 09-12)
 const WIDGET_W = 640;       // 기본 폭(px)
 // [2026-09-13] «프리즘 네모 크기 = 위젯 크기» — 권장 네모 660×280 이 1배. 네모를 키우면 글자도 그 비율로 커지고, 줄이면 작아진다(비율 고정).
-const BOX_W = 660, BOX_H = 280;
+const BOX_W = 660, BOX_H = 300;   // 공지 + (상품 2줄 알림) 2개 = 약 270 → 300
 
 const KIND_META: Record<FeedKind, { icon: string; tag: string; verb: string; accent: string }> = {
   order:   { icon: "🛒", tag: "주문", verb: "주문 감사합니다",   accent: "#22c55e" },   // 초록 = 상품 위젯 주문성공과 같은 톤
@@ -69,9 +70,9 @@ const statusOf = (row: AnyRow) => String(row?.admin_order_status_v2 || row?.orde
 const groupOf = (row: AnyRow) => String(row?.order_group_id || row?.id || "");
 
 const PREVIEW_ROWS: FeedItem[] = [
-  { id: "p1", kind: "order",   nick: "지니키키", detail: "나이키 쭈리후드티_센터자수 외 2종", at: 0 },
-  { id: "p2", kind: "deposit", nick: "용서린",   detail: "", at: 0 },
-  { id: "p3", kind: "card",    nick: "루루짱929", detail: "", at: 0 },
+  { id: "p1", kind: "order",   nick: "지니키키", lines: [{ left: "나이키 쭈리후드티_센터자수 · 블랙/L", right: "59,000원" }, { left: "뉴발란스740 · 240", right: "129,000원" }], at: 0 },
+  { id: "p2", kind: "deposit", nick: "용서린",   lines: [], at: 0 },
+  { id: "p3", kind: "card",    nick: "루루짱929", lines: [], at: 0 },
 ];
 
 export default function OrderFeedWidgetClient() {
@@ -82,7 +83,7 @@ export default function OrderFeedWidgetClient() {
   const [pinText, setPinText] = useState("");
   const seenRef = useRef<Set<string>>(new Set());
   // 같은 주문(order_group_id)의 상품 여러 줄이 INSERT 로 따로 오므로 0.6초 모아서 한 줄로
-  const pendingOrdersRef = useRef<Map<string, { nick: string; products: string[]; timer: number | null }>>(new Map());
+  const pendingOrdersRef = useRef<Map<string, { nick: string; items: FeedOrderItem[]; timer: number | null }>>(new Map());
 
   // 배경 투명 (크로마키)
   useEffect(() => {
@@ -155,7 +156,7 @@ export default function OrderFeedWidgetClient() {
       const p = pendingOrdersRef.current.get(key);
       if (!p) return;
       pendingOrdersRef.current.delete(key);
-      pushItem({ id: `ins:${key}`, kind: "order", nick: p.nick, detail: feedOrderDetail(p.products), at: Date.now() });
+      pushItem({ id: `ins:${key}`, kind: "order", nick: p.nick, lines: feedOrderLines(p.items, formatOrderOptionText), at: Date.now() });
     };
 
     const channel = supabase
@@ -165,14 +166,16 @@ export default function OrderFeedWidgetClient() {
         if (row?.is_test_order === true || row?.is_deleted === true) return;
         const key = groupOf(row);
         const seenKey = `ins:${key}`;
+        // [2026-09-13 사장님] 옵션·수량·금액도 같이 — orders 는 상품 한 줄이 한 행(color · size · qty · product_price=단가)
+        const itemOf = (r: AnyRow): FeedOrderItem => ({ name: productOf(r), color: r?.color, size: r?.size, qty: r?.qty, price: r?.product_price });
         if (seenRef.current.has(seenKey)) {
           // 같은 주문의 다른 상품 줄 — 모으기만
           const p = pendingOrdersRef.current.get(key);
-          if (p) { p.products.push(productOf(row)); }
+          if (p) { p.items.push(itemOf(row)); }
           return;
         }
         seenRef.current.add(seenKey);
-        const entry = { nick: nickOf(row), products: [productOf(row)], timer: null as number | null };
+        const entry = { nick: nickOf(row), items: [itemOf(row)], timer: null as number | null };
         entry.timer = window.setTimeout(() => flushOrder(key), 600);
         pendingOrdersRef.current.set(key, entry);
       })
@@ -185,11 +188,11 @@ export default function OrderFeedWidgetClient() {
         const key = groupOf(row);
         if (/입금확인/.test(status) && !/입금확인/.test(oldStatus)) {
           const k = `dep:${key}`;
-          if (!seenRef.current.has(k)) { seenRef.current.add(k); pushItem({ id: k, kind: "deposit", nick: nickOf(row), detail: "", at: Date.now() }); }
+          if (!seenRef.current.has(k)) { seenRef.current.add(k); pushItem({ id: k, kind: "deposit", nick: nickOf(row), lines: [], at: Date.now() }); }
         }
         if (status === "카드결제완료" && oldStatus !== "카드결제완료") {
           const k = `card:${key}`;
-          if (!seenRef.current.has(k)) { seenRef.current.add(k); pushItem({ id: k, kind: "card", nick: nickOf(row), detail: "", at: Date.now() }); }
+          if (!seenRef.current.has(k)) { seenRef.current.add(k); pushItem({ id: k, kind: "card", nick: nickOf(row), lines: [], at: Date.now() }); }
         }
       })
       .subscribe();
@@ -209,7 +212,7 @@ export default function OrderFeedWidgetClient() {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "transparent", pointerEvents: "none", fontFamily: "Pretendard, 'Apple SD Gothic Neo', 'Noto Sans KR', Arial, sans-serif" }}>
-      {/* 왼쪽 아래 기준으로 쌓임 — PRISM 에서 소스 위치·크기는 사장님이 정한다 */}
+      {/* 왼쪽 아래 기준. 맨 아래 📌 공지(고정) ← 그 위로 알림(최신이 공지 바로 위, 오래된 게 위로) — PRISM 네모 위치·크기는 사장님이 정한다 */}
       <div
         style={{
           position: "absolute", left: "8px", bottom: "8px", width: `${WIDGET_W}px`,
@@ -217,26 +220,6 @@ export default function OrderFeedWidgetClient() {
           transform: fitScale !== 1 ? `scale(${fitScale})` : undefined, transformOrigin: "bottom left",
         }}
       >
-        {/* 📌 고정 공지 — 피드 맨 위, 방송 ON 동안 상시. 다른 줄과 구분되게 딥로즈 테두리 */}
-        {showPin ? (
-          <div
-            style={{
-              alignSelf: "flex-start", maxWidth: "100%", boxSizing: "border-box",
-              display: "flex", alignItems: "center", gap: "10px",
-              padding: "9px 18px 9px 14px", marginBottom: "4px",
-              borderRadius: "999px",
-              background: "rgba(123, 45, 67, 0.62)",
-              backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
-              boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
-              border: "1.5px solid rgba(255,217,224,0.55)",
-              color: "#fff", textShadow: "0 1px 2px rgba(0,0,0,0.8)",
-              fontSize: "24px", fontWeight: 900, lineHeight: 1.2, wordBreak: "keep-all",
-            }}
-          >
-            <span style={{ fontSize: "24px", textShadow: "none" }}>📌</span>
-            <span>{pinShown}</span>
-          </div>
-        ) : null}
         {visible.map((item) => {
           const meta = KIND_META[item.kind];
           const leaving = !previewMode && now - item.at > SHOW_MS;   // 10초 지남 → 커튼 닫히며 퇴장(0.5초)
@@ -244,7 +227,7 @@ export default function OrderFeedWidgetClient() {
             <div
               key={item.id}
               style={{
-                alignSelf: "flex-start", maxWidth: "100%", boxSizing: "border-box",   // 채팅처럼 글 길이만큼만 말풍선
+                alignSelf: "stretch", boxSizing: "border-box",                       // [09-13 사장님] 공지와 같은 폭(위젯 폭 전체) — 옵션·금액이 들어갈 자리
                 position: "relative", overflow: "hidden",                            // 빛 줄이 말풍선 밖으로 안 나가게
                 display: "flex", alignItems: "center", gap: "12px",
                 padding: "10px 16px 10px 18px",
@@ -287,11 +270,19 @@ export default function OrderFeedWidgetClient() {
                     {meta.icon} {meta.verb}
                   </span>
                 </span>
-                {item.detail ? (
-                  <span style={{ fontSize: "21px", fontWeight: 700, lineHeight: 1.2, color: "rgba(255,255,255,0.86)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {item.detail}
+                {/* 상품 줄(최대 2줄): 왼쪽 상품명·옵션·수량은 길면 …, 오른쪽 금액은 절대 안 잘림 */}
+                {item.lines.map((ln, i) => (
+                  <span key={i} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "14px", minWidth: 0 }}>
+                    <span style={{ minWidth: 0, fontSize: "20px", fontWeight: 700, lineHeight: 1.2, color: "rgba(255,255,255,0.88)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {ln.left}
+                    </span>
+                    {ln.right ? (
+                      <span style={{ flexShrink: 0, fontSize: "20px", fontWeight: 900, lineHeight: 1.2, color: "#fff", whiteSpace: "nowrap" }}>
+                        {ln.right}
+                      </span>
+                    ) : null}
                   </span>
-                ) : null}
+                ))}
               </span>
 
               {/* 작은 «주문/입금/카드» 표시 — 진짜 채팅과 구분 */}
@@ -307,6 +298,27 @@ export default function OrderFeedWidgetClient() {
             </div>
           );
         })}
+        {/* 📌 고정 공지 — [2026-09-13 사장님 «위치가 지맘대로 바뀌었다 돌아온다»] 알림이 오면 공지가 위로 밀렸다가 내려오던 것.
+            → 공지를 «맨 아래 고정». 알림은 공지 «위»로 쌓이고(최신이 공지 바로 위), 사라져도 공지는 그 자리. 방송 ON 동안 상시. */}
+        {showPin ? (
+          <div
+            style={{
+              alignSelf: "stretch", boxSizing: "border-box",                  // 알림 줄과 같은 폭(위젯 폭 전체)
+              display: "flex", alignItems: "center", gap: "10px",
+              padding: "9px 18px 9px 14px", marginTop: "4px",
+              borderRadius: "999px",
+              background: "rgba(123, 45, 67, 0.62)",
+              backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
+              boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
+              border: "1.5px solid rgba(255,217,224,0.55)",
+              color: "#fff", textShadow: "0 1px 2px rgba(0,0,0,0.8)",
+              fontSize: "24px", fontWeight: 900, lineHeight: 1.2, wordBreak: "keep-all",
+            }}
+          >
+            <span style={{ fontSize: "24px", textShadow: "none" }}>📌</span>
+            <span>{pinShown}</span>
+          </div>
+        ) : null}
       </div>
       <style>{`
         @keyframes ruruCurtain { from { clip-path: inset(0 100% 0 0 round 999px); transform: translateX(-10px); opacity: 0.7; } to { clip-path: inset(0 0 0 0 round 999px); transform: translateX(0); opacity: 1; } }
