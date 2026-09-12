@@ -239,6 +239,18 @@ export async function POST(request: NextRequest) {
 
     // [2026-09-11] 이 닉네임이 «남의 것»인지 — 손님 화면(관문)과 똑같은 규칙으로 본다.
     //   조회 실패해도 로그인은 막지 않는다(false 로 두고 예전처럼 진행).
+    //
+    // [2026-09-13 사장님 실기기 제보 · 실측으로 확인] 사장님 계정(「루루동이」 · 010-9999-2420)으로 로그인하니
+    //   「이미 있는 닉네임」이라며 숫자가 붙었다.
+    //   실측: customers 에 youtube_nickname='루루동이' 줄이 2개 —
+    //         id 1   = 010-1111-1111 · 카카오 없음 · 05-14 만든 테스트 줄
+    //         id 657 = 010-9999-2420 · 카카오 4774935609 · 사장님 본인
+    //   원인: 아래에서 «내 줄(existing.id)»을 먼저 빼고 남는 줄만 판정에 넘겼다.
+    //         → 내 줄이 빠지니 isNicknameTakenByOthers 안의 «내 이름인가» 검사가 쓸모없어지고,
+    //           남은 테스트 줄 하나 때문에 «남의 이름»으로 결론났다.
+    //   수정: 줄을 빼지 않고 «전부» 넘긴다. 내 카톡·내 번호로 된 줄이 하나라도 있으면
+    //         그 함수가 이미 «내 이름»으로 판정한다(2026-09-11 규칙). 내 줄이 이 이름을 쓰고 있으면 당연히 내 이름.
+    //   ⚠ 판정만 바뀐다 — 주문·입금·포인트·정산 값은 이 블록에서 하나도 안 건드린다.
     let nicknameTaken = false;
     if (youtubeNickname) {
       try {
@@ -247,14 +259,15 @@ export async function POST(request: NextRequest) {
           .select("id, customer_phone, kakao_id")
           .eq("youtube_nickname", youtubeNickname)
           .limit(20);
-        const others = (sameNickRows || []).filter(
-          (row) => !existing?.id || String((row as Record<string, unknown>).id) !== String(existing.id),
-        );
-        nicknameTaken = isNicknameTakenByOthers({
-          rows: others as Array<{ customer_phone?: unknown; kakao_id?: unknown }>,
-          myPhone: customerPhoneDigits,
-          myKakaoId: kakaoId,
-        });
+        // 내 회원 줄이 이미 이 닉네임이면 더 볼 것도 없이 «내 이름»
+        const alreadyMine = Boolean(existing?.id) && cleanText(existing?.youtube_nickname) === youtubeNickname;
+        nicknameTaken = alreadyMine
+          ? false
+          : isNicknameTakenByOthers({
+              rows: (sameNickRows || []) as Array<{ customer_phone?: unknown; kakao_id?: unknown }>,
+              myPhone: customerPhoneDigits,
+              myKakaoId: kakaoId,
+            });
       } catch {
         nicknameTaken = false; // 검사 실패가 로그인을 막지 않게
       }

@@ -153,4 +153,46 @@ ok("⑬ 내 줄이 하나도 없으면 예전처럼 막는다 (구멍이 다시 
   );
 });
 
+// [2026-09-13 사장님 실기기] 같은 닉네임 줄이 2개인데 그중 하나가 «내 줄»이면 내 이름이다.
+//   실측: 「루루동이」 id 1(010-1111-1111·카카오 없음, 05-14 테스트 줄) + id 657(010-9999-2420·카카오 4774935609, 사장님)
+//   ⚠ 로그인 서버가 «내 줄»을 빼고 넘기면 이 판정이 무너진다(그래서 안 뺀다) — customer-login-sync/route.ts 참고
+ok("⑭ [09-13 사장님] 내 줄이 섞여 있으면 — 번호로 내 이름", () => {
+  assert.equal(
+    isNicknameTakenByOthers({
+      rows: [
+        { customer_phone: "01011111111", kakao_id: null },
+        { customer_phone: "01099992420", kakao_id: "4774935609" },
+      ],
+      myPhone: "010-9999-2420",
+      myKakaoId: "",
+    }),
+    false,
+  );
+});
+
+ok("⑮ [09-13] 내 줄이 섞여 있으면 — 카카오로 내 이름 (번호 몰라도)", () => {
+  assert.equal(
+    isNicknameTakenByOthers({
+      rows: [
+        { customer_phone: "01011111111", kakao_id: null },
+        { customer_phone: "01099992420", kakao_id: "4774935609" },
+      ],
+      myPhone: "",
+      myKakaoId: "4774935609",
+    }),
+    false,
+  );
+});
+
+ok("⑯ [09-13] 내 줄을 빼고 넘기면 남의 이름으로 잘못 판정된다 — 그래서 로그인 서버는 줄을 빼지 않는다", () => {
+  assert.equal(
+    isNicknameTakenByOthers({
+      rows: [{ customer_phone: "01011111111", kakao_id: null }],   // 내 줄을 뺀 상태
+      myPhone: "010-9999-2420",
+      myKakaoId: "4774935609",
+    }),
+    true,
+  );
+});
+
 console.log(`\n✅ 닉네임 중복 판정 ${n}개 통과`);
