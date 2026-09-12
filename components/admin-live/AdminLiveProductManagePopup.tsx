@@ -7,7 +7,7 @@ import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import { resolveProductImageUrl } from "./quick-product/productImageUrl";
 import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
-import { createDraftBroadcast } from "./liveBroadcastController";
+import { createDraftBroadcast, setBroadcastFeedNotice } from "./liveBroadcastController";
 import ExcelBulkImportPopup from "./ExcelBulkImportPopup";
 import { brandWordmarkThumbnail, productAutoThumbUrl, productNameThumbnail } from "@/lib/brandWordmarkThumbnail";
 import { adminDetailSearch, buildDetailChatLine, detailProducts, type DetailProduct } from "@/lib/productDetailModel";
@@ -1254,7 +1254,19 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       const j = await res.json().catch(() => null);
       if (!res.ok || j?.ok === false) throw new Error(j?.error?.message || "현재상품 저장 실패");
       await copyTextToClipboard(text);
-      showAdminToast(`채팅 현재상품 지정 + 복사 완료\n\n${text}`, "success");
+      // [2026-09-13 사장님] 같은 문구를 방송 화면 «주문·입금 알림» 위젯에도 한 줄 띄운다(30초).
+      //   ⚠ 위 «현재상품 지정 + 복사»가 끝난 뒤에만, 실패해도 기존 동작에 영향 없게 따로 감싼다.
+      //   방송 중이 아니면 띄울 곳이 없으므로 조용히 건너뛴다.
+      let widgetShown = false;
+      if (activeBroadcastId) {
+        try {
+          await setBroadcastFeedNotice(String(activeBroadcastId), line);
+          widgetShown = true;
+        } catch {
+          /* 위젯 표시 실패는 채팅 복사와 무관 — 조용히 넘어간다 */
+        }
+      }
+      showAdminToast(`채팅 현재상품 지정 + 복사 완료${widgetShown ? " · 방송 화면에도 30초 표시" : ""}\n\n${text}`, "success");
     } catch (e) {
       showAdminToast("채팅 현재상품 지정/복사 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
     }

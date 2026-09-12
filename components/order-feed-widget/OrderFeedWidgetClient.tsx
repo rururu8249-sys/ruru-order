@@ -40,11 +40,12 @@ type AnyRow = Record<string, any>;
 type FeedKind = "order" | "deposit" | "card";
 type FeedItem = { id: string; kind: FeedKind; nick: string; lines: FeedLine[]; at: number };   // lines: 상품 줄(왼쪽 상품명·옵션 / 오른쪽 금액), 최대 2줄
 
-const SHOW_MS = 10000;      // 한 줄이 떠 있는 시간 (사장님 09-12: 10초)
-const MAX_LINES = 3;        // 화면에 보이는 전체 줄 수 상한 — 📌 공지가 있으면 알림은 2줄 (사장님 09-12)
-const WIDGET_W = 640;       // 기본 폭(px)
-// [2026-09-13] «프리즘 네모 크기 = 위젯 크기» — 권장 네모 660×280 이 1배. 네모를 키우면 글자도 그 비율로 커지고, 줄이면 작아진다(비율 고정).
-const BOX_W = 660, BOX_H = 320;   // 공지(30px 2줄 = 90) + (상품 2줄 알림 105) × 2 + 간격 20 = 320
+const SHOW_MS = 10000;      // 알림 한 줄이 떠 있는 시간 (사장님 09-12: 10초)
+const NOTICE_MS = 30000;    // 📢 상품 안내가 떠 있는 시간 — 사장님 09-13 「이건 노출 시간 좀 길게」 → 알림의 3배
+const MAX_LINES = 3;        // 화면에 보이는 전체 줄 수 상한 — 📌 공지·📢 안내 포함 (사장님 09-12)
+const WIDGET_W = 860;       // 기본 폭(px) — [09-13 사장님 「가로 좀 늘려줘 길이가 아쉽네」] 640 → 860 (한 줄에 34% 더 들어감)
+// [2026-09-13] «프리즘 네모 크기 = 위젯 크기» — 권장 네모 880×320 이 1배. 네모를 키우면 글자도 그 비율로 커지고, 줄이면 작아진다(비율 고정).
+const BOX_W = 880, BOX_H = 320;   // 폭 860 + 여백 20 / 높이 = 공지 2줄 + 안내 1줄 + 상품 2줄 알림
 // [2026-09-13 사장님 «반투명 제대로 + 가독성»] «유리»처럼: 배경은 옅게(공지 45% · 알림 42%)·흐림 없음 → 방송 화면이 그대로 비친다.
 //   읽히는 건 배경이 아니라 «글자 테두리»가 맡는다(검정 1.5px 8방향 + 아래 그림자). 공지 30px(유튜브 채팅과 비슷).
 //   실측: 인형 선반 배경 + 폰 크기(1080→390) + JPEG 45 압축 흉내에서도 읽힘. (직전 72%+blur 는 배경이 안 비쳐 «불투명»으로 보였음 — 폐기)
@@ -86,6 +87,7 @@ export default function OrderFeedWidgetClient() {
   const [previewMode, setPreviewMode] = useState(false);
   const [fitScale, setFitScale] = useState(1);
   const [pinText, setPinText] = useState("");
+  const [notice, setNotice] = useState<{ text: string; at: number }>({ text: "", at: 0 });
   const seenRef = useRef<Set<string>>(new Set());
   // 같은 주문(order_group_id)의 상품 여러 줄이 INSERT 로 따로 오므로 0.6초 모아서 한 줄로
   const pendingOrdersRef = useRef<Map<string, { nick: string; items: FeedOrderItem[]; timer: number | null }>>(new Map());
@@ -129,6 +131,11 @@ export default function OrderFeedWidgetClient() {
         const active = getActiveBroadcast(list);
         setLive(Boolean(active));
         setPinText(String(active?.feed_pin_text ?? "").trim());
+        // [2026-09-13] 📢 상품 안내 — 「📢 채팅」 버튼이 쓴 한 줄 + 띄운 시각. 30초 지나면 아래 계산에서 스스로 내려간다.
+        setNotice({
+          text: String(active?.feed_notice_text ?? "").trim(),
+          at: active?.feed_notice_at ? new Date(String(active.feed_notice_at)).getTime() : 0,
+        });
       } catch { /* 조회 실패 시 상태 유지 */ }
     };
     void check();
@@ -210,10 +217,14 @@ export default function OrderFeedWidgetClient() {
 
   const showPin = (live || previewMode) && (pinText || (previewMode && !pinText));
   const pinShown = pinText || "공지: 입금자명은 닉네임으로 보내주세요";
-  const rowCap = showPin ? MAX_LINES - 1 : MAX_LINES;   // 공지 포함 3줄
+  // 📢 상품 안내 — 누른 지 30초 안이면 📌 공지 바로 위에 한 줄. 미리보기에선 견본으로 항상.
+  const noticeAlive = Boolean(notice.text) && notice.at > 0 && now - notice.at < NOTICE_MS;
+  const showNotice = previewMode ? true : live && noticeAlive;
+  const noticeShown = previewMode && !notice.text ? "노다001신더 99,000원 사이즈 235~285" : notice.text;
+  const rowCap = MAX_LINES - (showPin ? 1 : 0) - (showNotice ? 1 : 0);   // 공지·안내 포함 3줄
   const source = previewMode && items.length === 0 ? PREVIEW_ROWS : (live || previewMode ? items : []);
   const visible = source.slice(-rowCap);
-  if (visible.length === 0 && !showPin) return null;
+  if (visible.length === 0 && !showPin && !showNotice) return null;
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "transparent", pointerEvents: "none", fontFamily: "Pretendard, 'Apple SD Gothic Neo', 'Noto Sans KR', Arial, sans-serif" }}>
@@ -302,6 +313,27 @@ export default function OrderFeedWidgetClient() {
             </div>
           );
         })}
+        {/* 📢 상품 안내 — [2026-09-13 사장님] 상품관리 「📢 채팅」 버튼을 누르면 그 문구가 여기 30초 뜬다(📌 공지 바로 위).
+            방송 화면에 «지금 이 상품» 을 알리는 줄이라 주문 알림(초록·파랑)과 구분되게 노랑 테두리. */}
+        {showNotice ? (
+          <div
+            style={{
+              alignSelf: "stretch", boxSizing: "border-box",
+              display: "flex", alignItems: "center", gap: "10px",
+              padding: "9px 18px 9px 14px", marginTop: "4px",
+              borderRadius: "999px",
+              background: "rgba(24, 20, 12, 0.45)",                                  // 흐림 없음 — 뒤가 그대로 비침
+              boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
+              border: "1.5px solid rgba(253, 224, 71, 0.7)",
+              color: "#fff", textShadow: TEXT_SHADOW,
+              fontSize: "28px", fontWeight: 900, lineHeight: 1.2, wordBreak: "keep-all",
+              animation: "ruruCurtain 0.65s cubic-bezier(0.16,1,0.3,1) both",
+            }}
+          >
+            <span style={{ flexShrink: 0, fontSize: "26px", textShadow: "none" }}>📢</span>
+            <span style={{ minWidth: 0 }}>{noticeShown}</span>
+          </div>
+        ) : null}
         {/* 📌 고정 공지 — [2026-09-13 사장님 «위치가 지맘대로 바뀌었다 돌아온다»] 알림이 오면 공지가 위로 밀렸다가 내려오던 것.
             → 공지를 «맨 아래 고정». 알림은 공지 «위»로 쌓이고(최신이 공지 바로 위), 사라져도 공지는 그 자리. 방송 ON 동안 상시. */}
         {showPin ? (

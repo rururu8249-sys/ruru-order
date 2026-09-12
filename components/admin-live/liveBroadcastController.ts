@@ -19,6 +19,9 @@ export type AdminLiveBroadcast = {
   widget_pin_detail_name?: string | null;
   // [2026-09-12] 방송별 📌 고정 공지 — 주문·입금 피드 위젯(/order-feed-widget) 맨 위 한 줄. NULL/빈값=없음
   feed_pin_text?: string | null;
+  // [2026-09-13] 방송별 📢 상품 안내 — 「📢 채팅」 버튼이 쓰는 한 줄 + 띄운 시각(위젯이 30초만 표시)
+  feed_notice_text?: string | null;
+  feed_notice_at?: string | null;
 };
 
 export type StartBroadcastInput = {
@@ -246,6 +249,29 @@ export async function setBroadcastFeedPin(broadcastId: string, text: string) {
     table: "broadcasts",
     op: "update",
     values: { feed_pin_text: value || null },
+    filters: [{ type: "eq", col: "id", val: broadcastId }],
+    select: "*",
+    single: true,
+  });
+
+  if (error) throw error;
+
+  return data as AdminLiveBroadcast;
+}
+
+// [2026-09-13 사장님] 📢 상품 안내 — 상품관리 「📢 채팅」 버튼을 누르면 위젯에도 한 줄 뜬다.
+//   broadcasts.feed_notice_text / feed_notice_at 두 컬럼만 갱신(서버 경로 catalog-write).
+//   ⚠ 채팅 현재상품 지정·클립보드 복사·주문접수 로직과 무관 — «표시용 한 줄»만 남긴다.
+export async function setBroadcastFeedNotice(broadcastId: string, text: string) {
+  if (!broadcastId) {
+    throw new Error("방송 ID가 없습니다.");
+  }
+
+  const value = String(text || "").replace(/\s+/g, " ").trim().slice(0, 120);
+  const { data, error } = await adminCatalogWrite({
+    table: "broadcasts",
+    op: "update",
+    values: { feed_notice_text: value || null, feed_notice_at: value ? new Date().toISOString() : null },
     filters: [{ type: "eq", col: "id", val: broadcastId }],
     select: "*",
     single: true,
