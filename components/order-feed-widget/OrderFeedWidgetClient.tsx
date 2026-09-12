@@ -37,8 +37,9 @@ import { feedOrderLines, type FeedLine, type FeedOrderItem } from "@/lib/feedTex
 import { formatOrderOptionText } from "@/lib/orderOptionText";
 
 type AnyRow = Record<string, any>;
-type FeedKind = "order" | "deposit" | "card";
-type FeedItem = { id: string; kind: FeedKind; nick: string; lines: FeedLine[]; at: number };   // lines: 상품 줄(왼쪽 상품명·옵션 / 오른쪽 금액), 최대 2줄
+type FeedKind = "order" | "deposit" | "card" | "notice";
+// notice = 📢 상품 안내(「📢 채팅」 버튼). 다른 줄과 «같은 줄 목록»에 들어가야 3줄 한도에서 같이 밀려난다(사장님 09-13).
+type FeedItem = { id: string; kind: FeedKind; nick: string; lines: FeedLine[]; at: number; text?: string };   // lines: 상품 줄(왼쪽 상품명·옵션 / 오른쪽 금액), 최대 2줄
 
 const SHOW_MS = 10000;      // 알림 한 줄이 떠 있는 시간 (사장님 09-12: 10초)
 const NOTICE_MS = 30000;    // 📢 상품 안내가 떠 있는 시간 — 사장님 09-13 「이건 노출 시간 좀 길게」 → 알림의 3배
@@ -52,7 +53,8 @@ const BOX_W = 880, BOX_H = 320;   // 폭 860 + 여백 20 / 높이 = 공지 2줄 
 const TEXT_SHADOW =
   "0 0 2px rgba(0,0,0,0.95), 0 0 2px rgba(0,0,0,0.95), 1.5px 1.5px 0 rgba(0,0,0,0.85), -1.5px -1.5px 0 rgba(0,0,0,0.85), 1.5px -1.5px 0 rgba(0,0,0,0.85), -1.5px 1.5px 0 rgba(0,0,0,0.85), 0 2px 6px rgba(0,0,0,0.6)";
 
-const KIND_META: Record<FeedKind, { icon: string; tag: string; verb: string; accent: string }> = {
+// 📢 안내(notice)는 이 표를 쓰지 않는다(닉네임·감사 문구가 없는 줄) → Exclude 로 빼둔다.
+const KIND_META: Record<Exclude<FeedKind, "notice">, { icon: string; tag: string; verb: string; accent: string }> = {
   order:   { icon: "🛒", tag: "주문", verb: "주문 감사합니다",   accent: "#22c55e" },   // 초록 = 상품 위젯 주문성공과 같은 톤
   deposit: { icon: "💰", tag: "입금", verb: "입금 감사합니다",   accent: "#60a5fa" },   // 파랑 = 입금/카드
   card:    { icon: "💳", tag: "카드", verb: "카드결제 감사합니다", accent: "#60a5fa" },
@@ -77,7 +79,7 @@ const groupOf = (row: AnyRow) => String(row?.order_group_id || row?.id || "");
 
 const PREVIEW_ROWS: FeedItem[] = [
   { id: "p1", kind: "order",   nick: "지니키키", lines: [{ left: "나이키 쭈리후드티_센터자수 · 블랙/L", right: "59,000원" }, { left: "뉴발란스740 · 240", right: "129,000원" }], at: 0 },
-  { id: "p2", kind: "deposit", nick: "용서린",   lines: [], at: 0 },
+  { id: "p2", kind: "notice",  nick: "", lines: [], at: 0, text: "노다001신더 99,000원 사이즈 235·240·260~275·285 남은 13" },
   { id: "p3", kind: "card",    nick: "루루짱929", lines: [], at: 0 },
 ];
 
@@ -87,7 +89,6 @@ export default function OrderFeedWidgetClient() {
   const [previewMode, setPreviewMode] = useState(false);
   const [fitScale, setFitScale] = useState(1);
   const [pinText, setPinText] = useState("");
-  const [notice, setNotice] = useState<{ text: string; at: number }>({ text: "", at: 0 });
   const seenRef = useRef<Set<string>>(new Set());
   // 같은 주문(order_group_id)의 상품 여러 줄이 INSERT 로 따로 오므로 0.6초 모아서 한 줄로
   const pendingOrdersRef = useRef<Map<string, { nick: string; items: FeedOrderItem[]; timer: number | null }>>(new Map());
@@ -131,11 +132,17 @@ export default function OrderFeedWidgetClient() {
         const active = getActiveBroadcast(list);
         setLive(Boolean(active));
         setPinText(String(active?.feed_pin_text ?? "").trim());
-        // [2026-09-13] 📢 상품 안내 — 「📢 채팅」 버튼이 쓴 한 줄 + 띄운 시각. 30초 지나면 아래 계산에서 스스로 내려간다.
-        setNotice({
-          text: String(active?.feed_notice_text ?? "").trim(),
-          at: active?.feed_notice_at ? new Date(String(active.feed_notice_at)).getTime() : 0,
-        });
+        // [2026-09-13] 📢 상품 안내 — 「📢 채팅」 버튼이 쓴 한 줄. 다른 알림과 «같은 줄 목록»에 넣는다.
+        //   → 30초가 안 지났어도 새 주문·입금이 와서 3줄이 넘으면 오래된 이 줄부터 밀려난다(사장님 09-13).
+        const noticeText = String(active?.feed_notice_text ?? "").trim();
+        const noticeAt = active?.feed_notice_at ? new Date(String(active.feed_notice_at)).getTime() : 0;
+        if (noticeText && noticeAt > 0 && Date.now() - noticeAt < NOTICE_MS) {
+          const key = `notice:${noticeAt}`;
+          if (!seenRef.current.has(key)) {
+            seenRef.current.add(key);
+            pushItem({ id: key, kind: "notice", nick: "", lines: [], at: noticeAt, text: noticeText });
+          }
+        }
       } catch { /* 조회 실패 시 상태 유지 */ }
     };
     void check();
@@ -147,6 +154,9 @@ export default function OrderFeedWidgetClient() {
     return () => { alive = false; window.clearInterval(timer); supabase.removeChannel(ch); };
   }, []);
 
+  // 줄마다 떠 있는 시간 — 📢 안내만 30초, 나머지는 10초
+  const lifeOf = (item: FeedItem) => (item.kind === "notice" ? NOTICE_MS : SHOW_MS);
+
   const pushItem = (item: FeedItem) => {
     setItems((prev) => [...prev.filter((x) => x.id !== item.id), item].slice(-MAX_LINES));   // 넉넉히 들고, 그릴 때 공지 여부로 자른다
   };
@@ -157,7 +167,7 @@ export default function OrderFeedWidgetClient() {
     const t = window.setInterval(() => {
       const n = Date.now();
       setNow(n);
-      setItems((prev) => (prev.some((x) => n - x.at > SHOW_MS + EXIT_MS) ? prev.filter((x) => n - x.at <= SHOW_MS + EXIT_MS) : prev));
+      setItems((prev) => (prev.some((x) => n - x.at > lifeOf(x) + EXIT_MS) ? prev.filter((x) => n - x.at <= lifeOf(x) + EXIT_MS) : prev));
     }, 100);
     return () => window.clearInterval(t);
   }, []);
@@ -217,14 +227,10 @@ export default function OrderFeedWidgetClient() {
 
   const showPin = (live || previewMode) && (pinText || (previewMode && !pinText));
   const pinShown = pinText || "공지: 입금자명은 닉네임으로 보내주세요";
-  // 📢 상품 안내 — 누른 지 30초 안이면 📌 공지 바로 위에 한 줄. 미리보기에선 견본으로 항상.
-  const noticeAlive = Boolean(notice.text) && notice.at > 0 && now - notice.at < NOTICE_MS;
-  const showNotice = previewMode ? true : live && noticeAlive;
-  const noticeShown = previewMode && !notice.text ? "노다001신더 99,000원 사이즈 235~285" : notice.text;
-  const rowCap = MAX_LINES - (showPin ? 1 : 0) - (showNotice ? 1 : 0);   // 공지·안내 포함 3줄
+  const rowCap = MAX_LINES - (showPin ? 1 : 0);   // 📌 공지 포함 3줄 (📢 안내는 알림과 같은 줄로 취급)
   const source = previewMode && items.length === 0 ? PREVIEW_ROWS : (live || previewMode ? items : []);
   const visible = source.slice(-rowCap);
-  if (visible.length === 0 && !showPin && !showNotice) return null;
+  if (visible.length === 0 && !showPin) return null;
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "transparent", pointerEvents: "none", fontFamily: "Pretendard, 'Apple SD Gothic Neo', 'Noto Sans KR', Arial, sans-serif" }}>
@@ -237,8 +243,34 @@ export default function OrderFeedWidgetClient() {
         }}
       >
         {visible.map((item) => {
-          const meta = KIND_META[item.kind];
-          const leaving = !previewMode && now - item.at > SHOW_MS;   // 10초 지남 → 커튼 닫히며 퇴장(0.5초)
+          const leaving = !previewMode && now - item.at > lifeOf(item);   // 수명 지남 → 커튼 닫히며 퇴장(0.5초)
+          // 📢 상품 안내 — [2026-09-13 사장님] 「📢 채팅」 버튼 문구. 30초짜리지만 3줄이 넘으면 새 주문·입금에 밀려난다.
+          //   방송 화면에 «지금 이 상품»을 알리는 줄이라 주문 알림(초록·파랑)과 구분되게 노랑 테두리.
+          if (item.kind === "notice") {
+            return (
+              <div
+                key={item.id}
+                style={{
+                  alignSelf: "stretch", boxSizing: "border-box",
+                  display: "flex", alignItems: "center", gap: "10px",
+                  padding: "9px 18px 9px 14px",
+                  borderRadius: "999px",
+                  background: "rgba(24, 20, 12, 0.45)",                                  // 흐림 없음 — 뒤가 그대로 비침
+                  boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
+                  border: "1.5px solid rgba(253, 224, 71, 0.7)",
+                  color: "#fff", textShadow: TEXT_SHADOW,
+                  fontSize: "28px", fontWeight: 900, lineHeight: 1.2, wordBreak: "keep-all",
+                  animation: leaving
+                    ? `ruruCurtainOut ${EXIT_MS}ms ease-in forwards`
+                    : "ruruCurtain 0.65s cubic-bezier(0.16,1,0.3,1) both",
+                }}
+              >
+                <span style={{ flexShrink: 0, fontSize: "26px", textShadow: "none" }}>📢</span>
+                <span style={{ minWidth: 0 }}>{item.text}</span>
+              </div>
+            );
+          }
+          const meta = KIND_META[item.kind as Exclude<FeedKind, "notice">];
           return (
             <div
               key={item.id}
@@ -313,27 +345,6 @@ export default function OrderFeedWidgetClient() {
             </div>
           );
         })}
-        {/* 📢 상품 안내 — [2026-09-13 사장님] 상품관리 「📢 채팅」 버튼을 누르면 그 문구가 여기 30초 뜬다(📌 공지 바로 위).
-            방송 화면에 «지금 이 상품» 을 알리는 줄이라 주문 알림(초록·파랑)과 구분되게 노랑 테두리. */}
-        {showNotice ? (
-          <div
-            style={{
-              alignSelf: "stretch", boxSizing: "border-box",
-              display: "flex", alignItems: "center", gap: "10px",
-              padding: "9px 18px 9px 14px", marginTop: "4px",
-              borderRadius: "999px",
-              background: "rgba(24, 20, 12, 0.45)",                                  // 흐림 없음 — 뒤가 그대로 비침
-              boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
-              border: "1.5px solid rgba(253, 224, 71, 0.7)",
-              color: "#fff", textShadow: TEXT_SHADOW,
-              fontSize: "28px", fontWeight: 900, lineHeight: 1.2, wordBreak: "keep-all",
-              animation: "ruruCurtain 0.65s cubic-bezier(0.16,1,0.3,1) both",
-            }}
-          >
-            <span style={{ flexShrink: 0, fontSize: "26px", textShadow: "none" }}>📢</span>
-            <span style={{ minWidth: 0 }}>{noticeShown}</span>
-          </div>
-        ) : null}
         {/* 📌 고정 공지 — [2026-09-13 사장님 «위치가 지맘대로 바뀌었다 돌아온다»] 알림이 오면 공지가 위로 밀렸다가 내려오던 것.
             → 공지를 «맨 아래 고정». 알림은 공지 «위»로 쌓이고(최신이 공지 바로 위), 사라져도 공지는 그 자리. 방송 ON 동안 상시. */}
         {showPin ? (
