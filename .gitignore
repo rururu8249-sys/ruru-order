@@ -56,3 +56,6 @@ _bulk_register/
 _to_delete/
 _cowork_tmp/
 .claude/
+
+# Cowork(Claude) 가 내려준 결과물 폴더 — 저장소에 안 올린다
+/Claude outputs/

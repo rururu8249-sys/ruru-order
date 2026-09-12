@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AdminLiveBroadcast } from "./liveBroadcastController";
 import { formatBroadcastTime } from "./liveBroadcastController";
 import { supabase } from "@/lib/supabase";
@@ -62,6 +62,40 @@ export default function LiveHeader({
   const [titleSavedAt, setTitleSavedAt] = useState("");
   const [urlAppliedAt, setUrlAppliedAt] = useState("");
   const [editOpen, setEditOpen] = useState(false);
+
+  // [2026-09-12] 📌 위젯 고정 공지 — «주문·입금 피드» 위젯(/order-feed-widget) 맨 위 한 줄. settings.order_feed_pin_text.
+  //   비우고 저장하면 위젯에서 사라진다. 위젯은 settings 실시간 구독이라 저장 즉시 반영. 표시 전용(돈·주문 무관).
+  const PIN_KEY = "order_feed_pin_text";
+  const [pinText, setPinText] = useState("");
+  const [pinSaving, setPinSaving] = useState(false);
+  const [pinSavedAt, setPinSavedAt] = useState("");
+  useEffect(() => {
+    if (!editOpen) return;
+    let alive = true;
+    (async () => {
+      try {
+        const { data } = await supabase.from("settings").select("value").eq("key", PIN_KEY).limit(1);
+        if (alive) setPinText(String((data as Array<{ value?: unknown }> | null)?.[0]?.value ?? ""));
+      } catch { /* 읽기 실패 시 빈 칸 */ }
+    })();
+    return () => { alive = false; };
+  }, [editOpen]);
+  const savePinText = async () => {
+    if (pinSaving) return;
+    setPinSaving(true);
+    try {
+      const value = pinText.trim().slice(0, 60);
+      const { error } = await supabase.from("settings").upsert({ key: PIN_KEY, value }, { onConflict: "key" });
+      if (error) throw error;
+      setPinText(value);
+      setPinSavedAt(new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }));
+      showAdminToast(value ? "위젯 고정 공지를 저장했습니다. 방송 화면에 바로 뜹니다." : "위젯 고정 공지를 지웠습니다.", "success");
+    } catch {
+      showAdminToast("위젯 고정 공지 저장에 실패했어요.", "error");
+    } finally {
+      setPinSaving(false);
+    }
+  };
 
   // [2026-08-31 사장님 요청] 지금 고정된 상품의 채팅 안내문구를 어디서든 재복사 —
   //   상품관리 📢 채팅 버튼과 같은 문구(lib/chatAnnounce 공용). 복사만 한다(채팅봇 현재상품·고정은 안 건드림).
@@ -341,6 +375,32 @@ export default function LiveHeader({
                 className="h-9 shrink-0 rounded-xl bg-rose-deep px-3 text-xs font-black text-white transition hover:opacity-90 disabled:bg-line disabled:text-ink-mute"
               >
                 적용
+              </button>
+            </div>
+          </div>
+
+          {/* [2026-09-12] 📌 위젯 고정 공지 — 주문·입금 피드 위젯 맨 위 한 줄(60자). 비우고 저장 = 숨김 */}
+          <div className="xl:col-span-2">
+            <div className="mb-1 flex items-center justify-between">
+              <label className="text-[11px] font-black text-ink-soft">📌 위젯 고정 공지 <span className="font-bold text-ink-mute">— 주문·입금 피드 위젯 맨 위 한 줄 · 비우면 안 뜸</span></label>
+              <span className="text-[11px] font-bold text-ink-mute">{pinSavedAt ? `저장 ${pinSavedAt}` : "방송 중 상시 표시"}</span>
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={pinText}
+                maxLength={60}
+                onChange={(event) => setPinText(event.target.value)}
+                onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void savePinText(); } }}
+                placeholder="예) 입금자명은 닉네임으로 보내주세요 🙏"
+                className="h-9 min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-line focus:ring-2 focus:ring-rose-soft"
+              />
+              <button
+                type="button"
+                disabled={pinSaving}
+                onClick={() => void savePinText()}
+                className="h-9 shrink-0 rounded-xl bg-rose-deep px-3 text-xs font-black text-white transition hover:opacity-90 disabled:bg-line disabled:text-ink-mute"
+              >
+                {pinSaving ? "저장 중…" : "저장"}
               </button>
             </div>
           </div>

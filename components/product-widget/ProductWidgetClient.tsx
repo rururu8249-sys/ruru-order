@@ -249,8 +249,15 @@ export default function ProductWidgetClient() {
   // [2026-09-11] ?preview=1 — 방송이 없어도 «사진 있는 최근 상품» 한 장을 띄워 위젯 모양을 미리 본다(읽기 전용).
   //   PRISM 에 소스를 붙일 때 크기·위치를 맞추는 용도. 실제 방송 중엔 붙이지 않는다(방송 목록이 우선).
   const [previewMode, setPreviewMode] = useState(false);
+  // [2026-09-12] ?toast=0 — 주문/입금/카드 배너를 이 위젯에선 끈다(«주문·입금 피드» 위젯 /order-feed-widget 과 겹쳐 보일 때).
+  //   재고 즉시 갱신은 그대로 돈다. 표시만 끈다.
+  const toastOffRef = useRef(false);
   useEffect(() => {
-    try { setPreviewMode(new URLSearchParams(window.location.search).get("preview") === "1"); } catch { setPreviewMode(false); }
+    try {
+      const q = new URLSearchParams(window.location.search);
+      setPreviewMode(q.get("preview") === "1");
+      toastOffRef.current = q.get("toast") === "0";
+    } catch { setPreviewMode(false); }
   }, []);
 
   // 위젯 위치 — 운영자가 드래그해서 원하는 곳에 두면 기억(localStorage, 보기 상태 전용·돈 로직 무관).
@@ -397,7 +404,7 @@ export default function ProductWidgetClient() {
     // 입금/카드 상태가 기록되는 실제 컬럼들
     const statusOf = (row: AnyProduct) => String(row?.admin_order_status_v2 || row?.order_manage_status || row?.deposit_status || "").trim();
     const groupKey = (row: AnyProduct) => String(row?.order_group_id || row?.id || "");
-    const push = (item: ToastItem) => setToastQueue((q) => [...q, item]);
+    const push = (item: ToastItem) => { if (toastOffRef.current) return; setToastQueue((q) => [...q, item]); };
 
     // [2026-07-09] 재고 즉시 반영 — 주문/취소가 들어오면 상품을 곧바로 다시 읽는다.
     //   한 주문에 상품이 여러 개면 INSERT가 여러 번 오므로 0.4초 디바운스로 한 번만 재조회.
