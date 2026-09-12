@@ -49,6 +49,15 @@ const KIND_META: Record<FeedKind, { icon: string; tag: string; verb: string; acc
   card:    { icon: "💳", tag: "카드", verb: "카드결제 감사합니다", accent: "#60a5fa" },
 };
 
+// [2026-09-13 사장님] 알림 줄 등장 = «커튼이 젖혀지듯» 왼쪽→오른쪽 열림 + 빛 한 줄이 따라감 + 「주문 감사합니다」 톡 튀며 등장 + 강조색 잔광.
+//   📌 공지 줄은 상시라 애니메이션 없음. 전부 GPU 속성(clip-path·transform·opacity·box-shadow)이라 PRISM 부담 없음.
+//   글로우 색: CEF 구버전을 생각해 color-mix 대신 rgba 문자열을 직접 만든다.
+function glowOf(hex: string, alpha: number) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  if (!m) return `rgba(255,255,255,${alpha})`;
+  return `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${alpha})`;
+}
+
 // 아바타 색 — 닉네임으로 정해지는 파스텔 (유튜브 기본 아바타처럼 사람마다 다른 색)
 const AVATAR_COLORS = ["#F472B6", "#FB923C", "#FACC15", "#4ADE80", "#38BDF8", "#A78BFA", "#F87171", "#2DD4BF"];
 function avatarColor(nick: string) {
@@ -237,6 +246,7 @@ export default function OrderFeedWidgetClient() {
               key={item.id}
               style={{
                 alignSelf: "flex-start", maxWidth: "100%", boxSizing: "border-box",   // 채팅처럼 글 길이만큼만 말풍선
+                position: "relative", overflow: "hidden",                            // 빛 줄이 말풍선 밖으로 안 나가게
                 display: "flex", alignItems: "center", gap: "12px",
                 padding: "10px 16px 10px 12px",
                 borderRadius: "999px",
@@ -244,11 +254,23 @@ export default function OrderFeedWidgetClient() {
                 backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
                 boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
                 borderLeft: `5px solid ${meta.accent}`,
-                animation: "ruruFeedIn 0.45s cubic-bezier(0.18,0.89,0.32,1.15)",
+                // 커튼 열림(0.65초) → 강조색 잔광(0.4초 뒤 시작, 1초)
+                animation: "ruruCurtain 0.65s cubic-bezier(0.16,1,0.3,1) both, ruruGlow 1s ease-out 0.4s",
+                ["--ruru-glow" as string]: glowOf(meta.accent, 0.6),
                 textShadow: "0 1px 2px rgba(0,0,0,0.8)",
                 color: "#fff",
-              }}
+              } as React.CSSProperties}
             >
+              {/* 빛 한 줄 — 커튼 가장자리를 따라 왼쪽→오른쪽으로 지나감 */}
+              <span
+                aria-hidden
+                style={{
+                  position: "absolute", top: 0, bottom: 0, left: 0, width: "38%", pointerEvents: "none",
+                  background: "linear-gradient(100deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.28) 40%, rgba(255,255,255,0.7) 50%, rgba(255,255,255,0.28) 60%, rgba(255,255,255,0) 100%)",
+                  transform: "translateX(-120%) skewX(-12deg)",
+                  animation: "ruruShine 0.8s cubic-bezier(0.16,1,0.3,1) 0.05s both",
+                }}
+              />
               {/* 아바타 — 닉네임 첫 글자, 사람마다 다른 색 (유튜브 기본 아바타 느낌) */}
               <span
                 style={{
@@ -266,7 +288,13 @@ export default function OrderFeedWidgetClient() {
                   <span style={{ fontSize: "30px", fontWeight: 900, lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {item.nick}<span style={{ fontSize: "22px", fontWeight: 800, opacity: 0.9 }}>님</span>
                   </span>
-                  <span style={{ flexShrink: 0, fontSize: "26px", fontWeight: 800, lineHeight: 1.1, color: meta.accent, whiteSpace: "nowrap" }}>
+                  <span
+                    style={{
+                      flexShrink: 0, display: "inline-block", fontSize: "26px", fontWeight: 800, lineHeight: 1.1, color: meta.accent, whiteSpace: "nowrap",
+                      transformOrigin: "left center",
+                      animation: "ruruVerbPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.35s both",
+                    }}
+                  >
                     {meta.icon} {meta.verb}
                   </span>
                 </span>
@@ -292,7 +320,10 @@ export default function OrderFeedWidgetClient() {
         })}
       </div>
       <style>{`
-        @keyframes ruruFeedIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes ruruCurtain { from { clip-path: inset(0 100% 0 0 round 999px); transform: translateX(-10px); opacity: 0.7; } to { clip-path: inset(0 0 0 0 round 999px); transform: translateX(0); opacity: 1; } }
+        @keyframes ruruShine   { from { transform: translateX(-120%) skewX(-12deg); } to { transform: translateX(330%) skewX(-12deg); } }
+        @keyframes ruruGlow    { 0% { box-shadow: 0 4px 14px rgba(0,0,0,0.25), 0 0 0 0 var(--ruru-glow); } 35% { box-shadow: 0 4px 14px rgba(0,0,0,0.25), 0 0 26px 3px var(--ruru-glow); } 100% { box-shadow: 0 4px 14px rgba(0,0,0,0.25), 0 0 0 0 rgba(0,0,0,0); } }
+        @keyframes ruruVerbPop { from { opacity: 0; transform: scale(1.5); } 60% { opacity: 1; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
       `}</style>
     </div>
   );
