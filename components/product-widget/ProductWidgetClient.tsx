@@ -59,8 +59,11 @@ function sizesOf(p: AnyProduct | null): string {
 const OUTLINE_TEXT =
   "-2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000," +
   "-2px 0 0 #000, 2px 0 0 #000, 0 -2px 0 #000, 0 2px 0 #000, 0 3px 8px rgba(0,0,0,0.55)";
-// [2026-09-12] 띠(50%) 안 글자용 옅은 그림자 — 테두리가 아니라 얇은 그늘. 밝은 배경에서만 티가 난다.
-const SOFT_TEXT = "0 1px 2px rgba(0,0,0,0.85), 0 0 6px rgba(0,0,0,0.45)";
+// [2026-09-13 사장님 «상품 위젯도 유리처럼 — 뒤가 비치면서 글자는 또렷»] 띠·사진 빈칸 42%, 흐림 없음.
+//   읽히는 건 배경이 아니라 «글자 테두리»(검정 1px 8방향 + 아래 그림자) — 알림 위젯(TEXT_SHADOW)과 같은 방식, 글자가 작아 1px.
+const SOFT_TEXT =
+  "0 0 2px rgba(0,0,0,0.95), 0 0 2px rgba(0,0,0,0.95), 1px 1px 0 rgba(0,0,0,0.85), -1px -1px 0 rgba(0,0,0,0.85), 1px -1px 0 rgba(0,0,0,0.85), -1px 1px 0 rgba(0,0,0,0.85), 0 1px 4px rgba(0,0,0,0.6)";
+const GLASS_BG = "rgba(20, 17, 24, 0.42)";   // 사진 빈칸 + 글자 띠 공통 (한 겹, 흐림 없음)
 // [2026-09-13 사장님] 상품 카드 «고정» 높이(px). 폭 200 × 높이 387 = 사진칸(3:4 = 267) + 글자 띠(약 120) 기준.
 //   상품이 바뀌어도 카드 네모는 항상 이 크기. 글자가 많으면 띠가 위로 자라고 사진칸이 그만큼 줄어든다(사진은 잘리지 않고 통째로 축소).
 const CARD_FIXED_H_CONST = Math.round(200 * 4 / 3) + 120;
@@ -545,7 +548,7 @@ export default function ProductWidgetClient() {
                 · 사진은 자기 비율 그대로(가로형이면 납작하게, 세로형이면 길게), 세로는 최대 3:4(267px)까지. 그보다 길면 안 잘리고 통째로 줄어든다(contain).
                 · 글자 띠는 이 칸 «아래»에 붙는다 → 사진은 한 픽셀도 안 가려진다. */}
             {img ? (
-              <div style={{ position: "relative", flex: "1 1 auto", minHeight: 0, width: "100%", background: "rgba(20, 17, 24, 0.5)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}>
+              <div style={{ position: "relative", flex: "1 1 auto", minHeight: 0, width: "100%", background: GLASS_BG }}>
                 <img
                   src={imgSrc}
                   alt=""
@@ -556,7 +559,7 @@ export default function ProductWidgetClient() {
                 />
               </div>
             ) : (
-              <div style={{ flex: "1 1 auto", minHeight: 0, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "56px", opacity: 0.8, background: "rgba(20, 17, 24, 0.5)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}>👟</div>
+              <div style={{ flex: "1 1 auto", minHeight: 0, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "56px", opacity: 0.8, background: GLASS_BG }}>👟</div>
             )}
 
             {/* [2026-07-09] 상품이 가려져서 하단 어두운 그라데이션 제거.
@@ -612,8 +615,7 @@ export default function ProductWidgetClient() {
                 // [2026-09-12 사장님 결정] 띠 50% — 방송 화면이 더 비친다. 흰 글자가 밝은 배경(흰 옷·밝은 벽)에서도 읽히게
                 //   글자마다 옅은 그림자(SOFT_TEXT)를 얹는다(예전 2px 검정 테두리보다 훨씬 옅음).
                 //   계산: 검정 50% 위 흰 글자 = 밝은 배경에서 대비 약 3.6:1(기준 4.5:1 미달) → 그림자로 보완. 74%였을 땐 약 9:1.
-                background: "rgba(20, 17, 24, 0.5)",
-                backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+                background: GLASS_BG,                                                 // [09-13] 42% · 흐림 없음 — 뒤가 그대로 비침
                 borderTop: "1px solid rgba(255,255,255,0.14)",
                 textShadow: SOFT_TEXT,
               }}
