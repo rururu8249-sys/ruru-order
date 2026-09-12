@@ -15,10 +15,10 @@
 //     → 이 위젯 기본 크기: 폭 640px(세로 1080 방송에서 59%, 가로 1920 방송에서 33%), 닉네임 30px(세로 방송 폭의 2.8%)
 //       = 앱 채팅보다 조금 작아서 «화면을 해치지 않으면서» 읽힌다. 배치는 사장님이 PRISM 에서 정한다.
 //
-//   무엇을 보여주나 (금액은 절대 안 띄움 — 다른 시청자가 보는 화면)
-//     🛒 주문   「닉네임」님 주문 완료 · 상품명 (한 주문에 여러 상품이면 「외 N개」)
-//     💰 입금   「닉네임」님 입금 확인
-//     💳 카드   「닉네임」님 카드결제 완료
+//   무엇을 보여주나 (옵션·수량·금액은 안 띄움 — 남들이 보는 화면. 사이즈=몸 정보, 금액=돈 정보. lib/feedText.ts)
+//     🛒 주문   「닉네임」님 주문 감사합니다 · 상품명(꼬리표·코드 뗀 20자) (여러 상품이면 「외 N종」)
+//     💰 입금   「닉네임」님 입금 감사합니다
+//     💳 카드   「닉네임」님 카드결제 감사합니다
 //     · 최근 3줄, 아래에서 위로 쌓임(채팅처럼 최신이 아래), 10초 뒤 조용히 사라짐. 아무것도 없으면 완전 투명.
 //       (사장님 09-12: 1~3줄·10초 — 방송 화면을 해치지 않는 선. 새 건이 오면 가장 오래된 줄이 먼저 빠진다)
 //     · 줄 앞 작은 「주문/입금/카드」 표시 — 진짜 채팅으로 착각하지 않게(«댓글 왜 안 보여요» 혼란 방지).
@@ -32,6 +32,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { getActiveBroadcast, loadAdminLiveBroadcasts } from "@/components/admin-live/liveBroadcastController";
+import { feedOrderDetail } from "@/lib/feedText";
 
 type AnyRow = Record<string, any>;
 type FeedKind = "order" | "deposit" | "card";
@@ -43,9 +44,9 @@ export const PIN_SETTING_KEY = "order_feed_pin_text";
 const WIDGET_W = 640;       // 기본 폭(px) — PRISM 에서 크기를 줄여도 비율 유지
 
 const KIND_META: Record<FeedKind, { icon: string; tag: string; verb: string; accent: string }> = {
-  order:   { icon: "🛒", tag: "주문", verb: "주문 완료",   accent: "#22c55e" },   // 초록 = 상품 위젯 주문성공과 같은 톤
-  deposit: { icon: "💰", tag: "입금", verb: "입금 확인",   accent: "#60a5fa" },   // 파랑 = 입금/카드
-  card:    { icon: "💳", tag: "카드", verb: "카드결제 완료", accent: "#60a5fa" },
+  order:   { icon: "🛒", tag: "주문", verb: "주문 감사합니다",   accent: "#22c55e" },   // 초록 = 상품 위젯 주문성공과 같은 톤
+  deposit: { icon: "💰", tag: "입금", verb: "입금 감사합니다",   accent: "#60a5fa" },   // 파랑 = 입금/카드
+  card:    { icon: "💳", tag: "카드", verb: "카드결제 감사합니다", accent: "#60a5fa" },
 };
 
 // 아바타 색 — 닉네임으로 정해지는 파스텔 (유튜브 기본 아바타처럼 사람마다 다른 색)
@@ -62,7 +63,7 @@ const statusOf = (row: AnyRow) => String(row?.admin_order_status_v2 || row?.orde
 const groupOf = (row: AnyRow) => String(row?.order_group_id || row?.id || "");
 
 const PREVIEW_ROWS: FeedItem[] = [
-  { id: "p1", kind: "order",   nick: "지니키키", detail: "나이키 쭈리후드티 센터자수 외 1개", at: 0 },
+  { id: "p1", kind: "order",   nick: "지니키키", detail: "나이키 쭈리후드티_센터자수 외 2종", at: 0 },
   { id: "p2", kind: "deposit", nick: "용서린",   detail: "", at: 0 },
   { id: "p3", kind: "card",    nick: "루루짱929", detail: "", at: 0 },
 ];
@@ -162,9 +163,7 @@ export default function OrderFeedWidgetClient() {
       const p = pendingOrdersRef.current.get(key);
       if (!p) return;
       pendingOrdersRef.current.delete(key);
-      const names = p.products.filter(Boolean);
-      const detail = names.length === 0 ? "" : names.length === 1 ? names[0] : `${names[0]} 외 ${names.length - 1}개`;
-      pushItem({ id: `ins:${key}`, kind: "order", nick: p.nick, detail, at: Date.now() });
+      pushItem({ id: `ins:${key}`, kind: "order", nick: p.nick, detail: feedOrderDetail(p.products), at: Date.now() });
     };
 
     const channel = supabase
