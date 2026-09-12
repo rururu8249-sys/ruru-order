@@ -45,9 +45,11 @@ const MAX_LINES = 3;        // 화면에 보이는 전체 줄 수 상한 — �
 const WIDGET_W = 640;       // 기본 폭(px)
 // [2026-09-13] «프리즘 네모 크기 = 위젯 크기» — 권장 네모 660×280 이 1배. 네모를 키우면 글자도 그 비율로 커지고, 줄이면 작아진다(비율 고정).
 const BOX_W = 660, BOX_H = 320;   // 공지(30px 2줄 = 90) + (상품 2줄 알림 105) × 2 + 간격 20 = 320
-// [2026-09-13 사장님 «공지 글씨 배경 반투명·가독성이 별로»] 원인 = 공지 글자(24px)가 화면에서 제일 작은 글자였고(유튜브 채팅 ≈ 34px),
-//   유튜브 압축이 작은 글자 + 흐린 반투명 배경을 뭉갠다. → 공지 30px(채팅과 비슷), 배경 62% → 72%(여전히 비침), 글자 그림자 2겹.
-const TEXT_SHADOW = "0 1px 2px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.55)";   // 압축·밝은 배경에서도 글자 테두리가 살아남게
+// [2026-09-13 사장님 «반투명 제대로 + 가독성»] «유리»처럼: 배경은 옅게(공지 45% · 알림 42%)·흐림 없음 → 방송 화면이 그대로 비친다.
+//   읽히는 건 배경이 아니라 «글자 테두리»가 맡는다(검정 1.5px 8방향 + 아래 그림자). 공지 30px(유튜브 채팅과 비슷).
+//   실측: 인형 선반 배경 + 폰 크기(1080→390) + JPEG 45 압축 흉내에서도 읽힘. (직전 72%+blur 는 배경이 안 비쳐 «불투명»으로 보였음 — 폐기)
+const TEXT_SHADOW =
+  "0 0 2px rgba(0,0,0,0.95), 0 0 2px rgba(0,0,0,0.95), 1.5px 1.5px 0 rgba(0,0,0,0.85), -1.5px -1.5px 0 rgba(0,0,0,0.85), 1.5px -1.5px 0 rgba(0,0,0,0.85), -1.5px 1.5px 0 rgba(0,0,0,0.85), 0 2px 6px rgba(0,0,0,0.6)";
 
 const KIND_META: Record<FeedKind, { icon: string; tag: string; verb: string; accent: string }> = {
   order:   { icon: "🛒", tag: "주문", verb: "주문 감사합니다",   accent: "#22c55e" },   // 초록 = 상품 위젯 주문성공과 같은 톤
@@ -235,8 +237,7 @@ export default function OrderFeedWidgetClient() {
                 display: "flex", alignItems: "center", gap: "12px",
                 padding: "10px 16px 10px 18px",
                 borderRadius: "999px",
-                background: "rgba(14, 12, 18, 0.56)",
-                backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
+                background: "rgba(14, 12, 18, 0.42)",                                 // 흐림 없음 — 뒤가 그대로 비침
                 boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
                 borderLeft: `5px solid ${meta.accent}`,
                 // 등장: 커튼 열림(0.65초) → 강조색 잔광(0.4초 뒤, 1초).  퇴장: 커튼 닫힘(0.5초). 둘 다 1회.
@@ -310,8 +311,7 @@ export default function OrderFeedWidgetClient() {
               display: "flex", alignItems: "center", gap: "10px",
               padding: "9px 18px 9px 14px", marginTop: "4px",
               borderRadius: "999px",
-              background: "rgba(123, 45, 67, 0.72)",
-              backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
+              background: "rgba(123, 45, 67, 0.45)",                                  // 흐림 없음 — 뒤가 그대로 비침
               boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
               border: "1.5px solid rgba(255,217,224,0.6)",
               color: "#fff", textShadow: TEXT_SHADOW,
