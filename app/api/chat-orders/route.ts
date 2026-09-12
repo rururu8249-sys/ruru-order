@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { SETTING_CHAT_READ_ENABLED, SETTING_TEST_LIVE_URL } from "@/lib/youtubeChatRead";
 import { SETTING_SELF_CHECK, SETTING_BOT_REPLY_ENABLED } from "@/lib/chatOrderPipeline";
+import { resolveUniqueOwnerPhone, type PhoneRow } from "@/lib/nicknameOwnerPhone";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -114,10 +115,15 @@ export async function POST(request: NextRequest) {
       const hit = ((rows || []) as Record<string, unknown>[]).find((r) => sq(r.display_name) === chatName && String(r.channel_id ?? "").trim());
       if (!hit) return NextResponse.json({ ok: false, error: { message: "최근 채팅에서 그 이름을 못 찾았어요. 채팅 원문의 닉네임 그대로 입력해주세요." } }, { status: 404 });
       const ch = String(hit.channel_id).trim();
-      const { data: cust } = await sb.from("customers")
-        .select("customer_phone").eq("youtube_nickname", siteNick).limit(1).maybeSingle();
-      if (!cust) return NextResponse.json({ ok: false, error: { message: `사이트 닉네임 '${siteNick}' 회원을 못 찾았어요.` } }, { status: 404 });
-      const phone = String((cust as Record<string, unknown>).customer_phone ?? "");
+      // [2026-09-13] 같은 사이트 닉네임을 쓰는 회원이 2명 이상이면 «아무나» 고르지 않는다.
+      //   (실측: 닉네임 중복 18쌍 36명 — 신디 = 김애경 / 나금혜 처럼 진짜 다른 손님)
+      //   잘못 고르면 그 채널ID가 «남의 계정»에 붙어 이후 채팅주문이 통째로 남에게 들어간다.
+      const { data: custRows } = await sb.from("customers")
+        .select("customer_phone").eq("youtube_nickname", siteNick).limit(20);
+      const owner = resolveUniqueOwnerPhone((custRows || []) as PhoneRow[]);
+      if (!owner.ok && owner.reason === "none") return NextResponse.json({ ok: false, error: { message: `사이트 닉네임 '${siteNick}' 회원을 못 찾았어요.` } }, { status: 404 });
+      if (!owner.ok) return NextResponse.json({ ok: false, error: { message: `사이트 닉네임 '${siteNick}' 을(를) 쓰는 회원이 ${owner.phones.length}명이라 누구인지 확정할 수 없어요. 회원상세에서 그 손님을 찾아 연결해주세요. (후보 ${owner.phones.join(" / ")})` } }, { status: 409 });
+      const phone = owner.phone;
       await sb.from("customers").update({ youtube_channel_id: null }).eq("youtube_channel_id", ch).neq("customer_phone", phone);
       await sb.from("customers").update({ youtube_channel_id: ch, youtube_handle: String(lc.chatName ?? "").trim().replace(/^@/, ""), handle_verified_at: new Date().toISOString() }).eq("customer_phone", phone);
       out.linked = { channel: ch, siteNick };

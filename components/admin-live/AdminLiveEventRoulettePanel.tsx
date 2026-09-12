@@ -3,6 +3,7 @@
 import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { supabase } from "@/lib/supabase";
+import { resolveOwnerPhoneBySteps, type PhoneResolveResult, type PhoneRow } from "@/lib/nicknameOwnerPhone";
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
 import AdminLiveMissionPanel from "./AdminLiveMissionPanel";
 import AdminLiveEventSoundboard from "./AdminLiveEventSoundboard"; // [2026-08-12] 효과음 재생 버튼(표시·재생 전용)
@@ -13,6 +14,50 @@ const FIXED_OVERLAY_TOKEN = "roulette_luludongi_live";
 const FIXED_CLAW_OVERLAY_TOKEN = "claw_luludongi_live";
 const FIXED_SURVIVAL_OVERLAY_TOKEN = "survival_luludongi_live";
 const FIXED_RACE_OVERLAY_TOKEN = "race_luludongi_live"; // [2026-07-26] 달리기 대회
+
+// ── [2026-09-13] 닉네임 → 전화번호: «한 명으로 확정될 때만» 돌려준다 ────────────
+// 왜 바꿨나 (실측, 2026-09-13 DB)
+//   · 회원표(customers)에 같은 youtube_nickname 을 쓰는 «서로 다른 손님»이 18쌍(36명) 있다.
+//     예) 신디 = 김애경(01031805071) / 나금혜(01087648075)  ·  sunny = 유동 / 김선혜
+//   · 주문표(orders)의 닉네임도 오타·대리입력 때문에 번호가 갈리는 경우가 15건 있다.
+//     예) kek81025 = 01083210812(2건) / 01083210512(1건, 한 자리 오타)
+//   예전 코드는 각 단계에서 .limit(1) 로 «첫 줄»을 그대로 썼다 → 「신디」가 당첨되면
+//   김애경·나금혜 중 아무나에게 포인트가 나갈 수 있었다. 돈이 엉뚱한 사람에게 가는 길이다.
+//
+// 새 규칙 (돈 관련이라 «안전한 쪽»으로만 바뀐다)
+//   · 조회 순서는 기존과 동일: ① 주문 닉네임 → ② 회원 닉네임 → ③ 회원 카카오닉네임.
+//   · 각 단계에서 서로 다른 번호가 2개 이상 나오면 «누구인지 모른다» → 그 자리에서 멈춘다.
+//     (다음 단계로 넘어가지 않는다. 넘어가면 또 다른 아무나를 고르게 된다.)
+//   · 결과적으로 이 변경은 «자동지급을 안 하게» 될 뿐, «다른 사람에게 지급»되는 일은 없다.
+//     멈추면 사장님이 회원상세에서 직접 지급하면 된다.
+const dashPhone = (p: string) =>
+  p.length === 11 ? `${p.slice(0, 3)}-${p.slice(3, 7)}-${p.slice(7)}`
+  : p.length === 10 ? `${p.slice(0, 3)}-${p.slice(3, 6)}-${p.slice(6)}`
+  : p;
+
+const resolveWinnerPhoneStrict = async (nick: string): Promise<PhoneResolveResult> =>
+  resolveOwnerPhoneBySteps([
+    async () => {
+      const { data } = await supabase
+        .from("orders").select("customer_phone")
+        .eq("youtube_nickname", nick)
+        .order("created_at", { ascending: false }).limit(200);
+      return (data || []) as PhoneRow[];
+    },
+    async () => {
+      const { data } = await supabase
+        .from("customers").select("customer_phone")
+        .eq("youtube_nickname", nick)
+        .order("last_order_at", { ascending: false }).limit(50);
+      return (data || []) as PhoneRow[];
+    },
+    async () => {
+      const { data } = await supabase
+        .from("customers").select("customer_phone")
+        .eq("kakao_nickname", nick).limit(50);
+      return (data || []) as PhoneRow[];
+    },
+  ]);
 
 type RouletteBroadcast = {
   id: string;
@@ -561,35 +606,21 @@ export default function AdminLiveEventRoulettePanel({
 
     try {
       const nick = String(nickname || "").trim();
-      const digitsOf = (v: unknown) => String(v || "").replace(/[^0-9]/g, "");
       // 전화번호 조회: ① 주문(orders) 닉네임 → ② 고객(customers) 닉네임 → ③ 고객 카카오닉네임.
       //   카카오 간편로그인은 customers에 전화번호가 항상 저장되므로, orders에 없어도 여기서 찾는다.
-      let phone = "";
-      {
-        const { data: oRow } = await supabase
-          .from("orders").select("customer_phone")
-          .eq("youtube_nickname", nick)
-          .order("created_at", { ascending: false }).limit(1).maybeSingle();
-        phone = digitsOf((oRow as { customer_phone?: unknown } | null)?.customer_phone);
-      }
-      if (!phone) {
-        const { data: cRows } = await supabase
-          .from("customers").select("customer_phone")
-          .eq("youtube_nickname", nick)
-          .order("last_order_at", { ascending: false }).limit(1);
-        phone = digitsOf((cRows as { customer_phone?: unknown }[] | null)?.[0]?.customer_phone);
-      }
-      if (!phone) {
-        const { data: kRows } = await supabase
-          .from("customers").select("customer_phone")
-          .eq("kakao_nickname", nick).limit(1);
-        phone = digitsOf((kRows as { customer_phone?: unknown }[] | null)?.[0]?.customer_phone);
-      }
-      if (!phone) {
+      //   [2026-09-13] 번호가 갈리면(같은 닉네임 다른 손님) «아무나 고르지 않고» 멈춘다 — 위 주석 참고.
+      const found = await resolveWinnerPhoneStrict(nick);
+      if (!found.ok) {
         if (evId) grantedEventIdsRef.current.delete(evId); // 지급 안 됐으니 잠금 해제
-        showAdminToast(`${nick}의 전화번호를 어디서도 찾지 못해 자동지급을 건너뜁니다.`, "warning");
+        showAdminToast(
+          found.reason === "ambiguous"
+            ? `⚠️ 「${nick}」 자동지급을 멈췄습니다.\n같은 닉네임을 쓰는 손님이 ${found.phones.length}명이라 누구인지 확정할 수 없어요.\n후보: ${found.phones.map(dashPhone).join(" / ")}\n→ 회원상세에서 맞는 손님에게 직접 지급해주세요.`
+            : `${nick}의 전화번호를 어디서도 찾지 못해 자동지급을 건너뜁니다.`,
+          "warning",
+        );
         return;
       }
+      const phone = found.phone;
       // [2026-08-30] 중복지급 근본 차단 — 이 이벤트의 당첨자 줄 하나당 평생 1회.
       //   winnerId 를 알면 그걸로, 아직 모르면 eventId 로 키를 만든다(둘 다 1이벤트 1당첨자 전제).
       const rouletteWinnerId = evId ? winnerIdByEventRef.current.get(evId) : "";
@@ -658,32 +689,8 @@ export default function AdminLiveEventRoulettePanel({
   //   ⚠ 기존 grantPointToWinner / 룰렛 / 인형뽑기 지급 로직은 무변경.
   const grantedWinnerIdsRef = useRef<Set<string>>(new Set()); // 세션 중복지급 가드(당첨자 행 단위)
 
-  // 닉네임 → 전화번호 (grantPointToWinner와 동일한 3단계 조회, 읽기 전용)
-  const findWinnerPhone = async (nick: string) => {
-    const digitsOf = (v: unknown) => String(v || "").replace(/[^0-9]/g, "");
-    let phone = "";
-    {
-      const { data: oRow } = await supabase
-        .from("orders").select("customer_phone")
-        .eq("youtube_nickname", nick)
-        .order("created_at", { ascending: false }).limit(1).maybeSingle();
-      phone = digitsOf((oRow as { customer_phone?: unknown } | null)?.customer_phone);
-    }
-    if (!phone) {
-      const { data: cRows } = await supabase
-        .from("customers").select("customer_phone")
-        .eq("youtube_nickname", nick)
-        .order("last_order_at", { ascending: false }).limit(1);
-      phone = digitsOf((cRows as { customer_phone?: unknown }[] | null)?.[0]?.customer_phone);
-    }
-    if (!phone) {
-      const { data: kRows } = await supabase
-        .from("customers").select("customer_phone")
-        .eq("kakao_nickname", nick).limit(1);
-      phone = digitsOf((kRows as { customer_phone?: unknown }[] | null)?.[0]?.customer_phone);
-    }
-    return phone;
-  };
+  // 닉네임 → 전화번호 (grantPointToWinner와 «동일한» 판정 = 한 명으로 확정될 때만, 읽기 전용)
+  const findWinnerPhone = async (nick: string) => resolveWinnerPhoneStrict(nick);
 
   // 생존자 K명에게 각각 amount 포인트 지급. 한 명 실패해도 나머지는 계속 진행.
   //   중복지급 방지 2중: ① 세션 ref(winnerId) ② DB의 is_reward_done(그 당첨자 행) 확인 후 지급, 성공 시 즉시 잠금.
@@ -722,12 +729,17 @@ export default function AdminLiveEventRoulettePanel({
       grantedWinnerIdsRef.current.add(winnerId); // 선점 잠금(실패 시 아래에서 해제)
 
       try {
-        const phone = await findWinnerPhone(nick);
-        if (!phone) {
+        const found = await findWinnerPhone(nick);
+        if (!found.ok) {
           grantedWinnerIdsRef.current.delete(winnerId); // 지급 안 됐으니 해제
-          failed.push(`${nick}(전화번호 없음)`);
+          failed.push(
+            found.reason === "ambiguous"
+              ? `${nick}(같은 닉네임 ${found.phones.length}명 — 누구인지 확정 불가, 수동지급 필요)`
+              : `${nick}(전화번호 없음)`,
+          );
           continue;
         }
+        const phone = found.phone;
 
         // [2026-08-30] 중복지급 근본 차단 — 당첨자 줄(winnerId) 하나당 평생 1회.
         //   화면 잠금(is_reward_done)이 실패해도 서버가 두 번째 지급을 거부한다.
