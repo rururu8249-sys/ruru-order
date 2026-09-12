@@ -10,6 +10,7 @@ import AdminAuthSettingsPanel from "./AdminAuthSettingsPanel";
 import AdminSoundControl from "./AdminSoundControl";
 import CombineShippingSettingsTab from "./CombineShippingSettingsTab";
 import ShopInfoSettingsTab from "./ShopInfoSettingsTab";
+import BroadcastScreenSettingsTab from "./BroadcastScreenSettingsTab";
 import { HOWTO_DEFAULT, parseHowtoSteps } from "@/lib/howto";
 
 type SettingKey =
@@ -156,7 +157,7 @@ function decimalInput(value: string) {
 }
 
 // 설정 카테고리(좌측 네비) — 업계 표준: 카테고리별로 나눠 스크롤 최소화
-type SettingsTab = "shop" | "payment" | "combine" | "point" | "order" | "sound" | "youtube" | "telegram" | "trend" | "security";
+type SettingsTab = "shop" | "payment" | "combine" | "point" | "order" | "screen" | "sound" | "youtube" | "telegram" | "trend" | "security";
 const SETTINGS_TABS: { key: SettingsTab; label: string; icon: string; desc: string }[] = [
   // [2026-09-08] 상점 정보 — 문의 방식·페이스터·표시용 계좌. 자체 저장(API). 맨 위 + 기본 탭.
   { key: "shop", label: "상점 정보", icon: "🏪", desc: "문의 방식·계좌·페이스터" },
@@ -164,6 +165,8 @@ const SETTINGS_TABS: { key: SettingsTab; label: string; icon: string; desc: stri
   { key: "combine", label: "합배송", icon: "🚚", desc: "시간범위 수동설정" },
   { key: "point", label: "포인트 적립", icon: "🪙", desc: "자동적립·적립률" },
   { key: "order", label: "주문서 표시", icon: "📝", desc: "선점시간·직접입력" },
+  // [2026-09-12] 방송 화면 — 프리즘 브라우저 소스 주소·크기·옵션. 저장 없음(안내판).
+  { key: "screen", label: "방송 화면", icon: "📺", desc: "위젯 주소·크기" },
   // [2026-09-08 사장님 요청] 알림음은 사이드바가 아니라 설정에 둔다.
   { key: "sound", label: "알림음", icon: "🔔", desc: "주문·입금 소리·볼륨" },
   { key: "youtube", label: "유튜브 알림", icon: "📺", desc: "라이브 채팅 자동알림" },
@@ -177,9 +180,11 @@ const GLOBAL_SAVE_TABS: SettingsTab[] = ["payment", "point", "order"];
 type AdminLiveSettingsPanelProps = {
   /** [2026-09-07] 「공지·쪽지 열기」 바로가기 — 대시보드가 메뉴를 바꿔 준다 */
   onOpenNotice?: () => void;
+  /** [2026-09-12] 「이벤트 열기」 바로가기 — 방송 화면 탭에서 이벤트 오버레이 주소를 찾아갈 때 */
+  onOpenEvent?: () => void;
 };
 
-export default function AdminLiveSettingsPanel({ onOpenNotice }: AdminLiveSettingsPanelProps = {}) {
+export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent }: AdminLiveSettingsPanelProps = {}) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>("shop");
@@ -563,6 +568,9 @@ export default function AdminLiveSettingsPanel({ onOpenNotice }: AdminLiveSettin
 
           {/* ── 유튜브 알림 (자체 저장) ── */}
           {activeTab === "combine" && <CombineShippingSettingsTab />}
+
+          {/* ── 방송 화면 (저장 없음: 프리즘 소스 주소·크기 안내) ── */}
+          {activeTab === "screen" && <BroadcastScreenSettingsTab onOpenEvent={onOpenEvent} />}
 
           {/* ── 알림음 (이 브라우저에만 저장: localStorage) ── */}
           {activeTab === "sound" && (

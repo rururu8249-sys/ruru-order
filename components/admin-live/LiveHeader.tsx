@@ -30,6 +30,8 @@ type Props = {
   // [2026-07-12] 위젯 상품카드 ON/OFF (방송 중에만 의미. 배너는 PRISM 소스라 무관)
   widgetCardOn?: boolean;
   onToggleWidgetCard?: () => void;
+  // [2026-09-12] 방송별 📌 고정 공지 저장 (broadcasts.feed_pin_text · 서버 경로). 방송 없으면 못 씀.
+  onSaveFeedPin?: (text: string) => Promise<void> | void;
 };
 
 function todayLabel() {
@@ -58,35 +60,34 @@ export default function LiveHeader({
   onToggleShopOpen,
   widgetCardOn = true,
   onToggleWidgetCard,
+  onSaveFeedPin,
 }: Props) {
   const [titleSavedAt, setTitleSavedAt] = useState("");
   const [urlAppliedAt, setUrlAppliedAt] = useState("");
   const [editOpen, setEditOpen] = useState(false);
 
-  // [2026-09-12] 📌 위젯 고정 공지 — «주문·입금 피드» 위젯(/order-feed-widget) 맨 위 한 줄. settings.order_feed_pin_text.
-  //   비우고 저장하면 위젯에서 사라진다. 위젯은 settings 실시간 구독이라 저장 즉시 반영. 표시 전용(돈·주문 무관).
-  const PIN_KEY = "order_feed_pin_text";
+  // [2026-09-12] 📌 위젯 고정 공지 — «주문·입금 피드» 위젯(/order-feed-widget) 맨 위 한 줄.
+  //   «이번 방송»의 속성이라 broadcasts.feed_pin_text 에 둔다(유튜브 고정 메시지처럼 방송마다 하나).
+  //   → 방송이 끝나면 같이 끝나고, 다음 방송은 빈칸에서 시작(지난 방송 공지가 새어나가지 않음).
+  //   저장은 부모(onSaveFeedPin → catalog-write 서버 경로). 위젯은 broadcasts 실시간이라 저장 즉시 반영. 표시 전용(돈·주문 무관).
+  const activeBroadcastId = activeBroadcast?.id ?? "";
+  const activePinText = String(activeBroadcast?.feed_pin_text ?? "");
   const [pinText, setPinText] = useState("");
   const [pinSaving, setPinSaving] = useState(false);
   const [pinSavedAt, setPinSavedAt] = useState("");
+  // 패널을 열 때 / 방송이 바뀔 때 — 입력칸을 현재 방송의 저장값으로 맞춘다
   useEffect(() => {
     if (!editOpen) return;
-    let alive = true;
-    (async () => {
-      try {
-        const { data } = await supabase.from("settings").select("value").eq("key", PIN_KEY).limit(1);
-        if (alive) setPinText(String((data as Array<{ value?: unknown }> | null)?.[0]?.value ?? ""));
-      } catch { /* 읽기 실패 시 빈 칸 */ }
-    })();
-    return () => { alive = false; };
-  }, [editOpen]);
+    setPinText(activePinText);
+    setPinSavedAt("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editOpen, activeBroadcastId]);
   const savePinText = async () => {
-    if (pinSaving) return;
+    if (pinSaving || !activeBroadcastId || !onSaveFeedPin) return;
     setPinSaving(true);
     try {
       const value = pinText.trim().slice(0, 60);
-      const { error } = await supabase.from("settings").upsert({ key: PIN_KEY, value }, { onConflict: "key" });
-      if (error) throw error;
+      await onSaveFeedPin(value);
       setPinText(value);
       setPinSavedAt(new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }));
       showAdminToast(value ? "위젯 고정 공지를 저장했습니다. 방송 화면에 바로 뜹니다." : "위젯 고정 공지를 지웠습니다.", "success");
@@ -302,7 +303,7 @@ export default function LiveHeader({
             ].join(" ")}
             title={activeBroadcast ? "방송 위젯의 상품카드를 켜고 끕니다 (위젯 반영 최대 20초)" : "방송 중에만 사용할 수 있습니다"}
           >
-            🖼 위젯 상품 {widgetCardOn ? "ON" : "OFF"}
+            📺 상품 카드 {widgetCardOn ? "ON" : "OFF"}
           </button>
           {/* 쇼핑몰 열기/닫기 — settings.shop_open 영속. 방송 ON 중엔 의미 없어 비활성. */}
           <button
@@ -379,24 +380,25 @@ export default function LiveHeader({
             </div>
           </div>
 
-          {/* [2026-09-12] 📌 위젯 고정 공지 — 주문·입금 피드 위젯 맨 위 한 줄(60자). 비우고 저장 = 숨김 */}
+          {/* [2026-09-12] 📌 위젯 고정 공지 — «이번 방송» 동안 주문·입금 알림 위젯 맨 위 한 줄(60자). 비우고 저장 = 숨김. 방송 없으면 비활성 */}
           <div className="xl:col-span-2">
             <div className="mb-1 flex items-center justify-between">
-              <label className="text-[11px] font-black text-ink-soft">📌 위젯 고정 공지 <span className="font-bold text-ink-mute">— 주문·입금 피드 위젯 맨 위 한 줄 · 비우면 안 뜸</span></label>
-              <span className="text-[11px] font-bold text-ink-mute">{pinSavedAt ? `저장 ${pinSavedAt}` : "방송 중 상시 표시"}</span>
+              <label className="text-[11px] font-black text-ink-soft">📌 위젯 고정 공지 <span className="font-bold text-ink-mute">— 이번 방송 동안 주문·입금 알림 위젯 맨 위 한 줄 · 비우면 안 뜸</span></label>
+              <span className="text-[11px] font-bold text-ink-mute">{pinSavedAt ? `저장 ${pinSavedAt}` : activeBroadcast ? "방송 끝나면 같이 사라짐" : "방송 중에만 쓸 수 있음"}</span>
             </div>
             <div className="flex gap-2">
               <input
                 value={pinText}
                 maxLength={60}
+                disabled={!activeBroadcast}
                 onChange={(event) => setPinText(event.target.value)}
                 onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void savePinText(); } }}
-                placeholder="예) 입금자명은 닉네임으로 보내주세요 🙏"
-                className="h-9 min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-line focus:ring-2 focus:ring-rose-soft"
+                placeholder={activeBroadcast ? "예) 입금자명은 닉네임으로 보내주세요 🙏" : "방송을 시작하면 쓸 수 있어요"}
+                className="h-9 min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-line focus:ring-2 focus:ring-rose-soft disabled:opacity-50"
               />
               <button
                 type="button"
-                disabled={pinSaving}
+                disabled={pinSaving || !activeBroadcast}
                 onClick={() => void savePinText()}
                 className="h-9 shrink-0 rounded-xl bg-rose-deep px-3 text-xs font-black text-white transition hover:opacity-90 disabled:bg-line disabled:text-ink-mute"
               >

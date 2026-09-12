@@ -22,7 +22,8 @@
 //     · 전체 최대 3줄(📌 공지 포함) — 공지가 있으면 알림 2줄, 없으면 3줄. 아래에서 위로 쌓임(최신이 아래), 10초 뒤 사라짐.
 //       (사장님 09-12: 「공지 포함해서 3줄, 4줄은 너무 많다」. 새 건이 오면 가장 오래된 줄이 먼저 빠진다)
 //     · 줄 앞 작은 「주문/입금/카드」 표시 — 진짜 채팅으로 착각하지 않게(«댓글 왜 안 보여요» 혼란 방지).
-//     · 📌 고정 공지 한 줄 (settings.order_feed_pin_text) — 관리자 방송 콘솔 「제목·URL 수정」에서 쓰고 비우면 사라짐.
+//     · 📌 고정 공지 한 줄 (broadcasts.feed_pin_text · «이번 방송»의 속성) — 관리자 방송 콘솔 「제목·URL 수정」에서 쓰고 비우면 사라짐.
+//       방송이 끝나면 같이 끝나고 다음 방송은 빈칸에서 시작(지난 방송 공지가 새어나가지 않음).
 //       방송 ON 동안 맨 위에 계속 떠 있다(«입금자명은 닉네임으로» 같은 상시 안내용).
 //
 //   ⚠ 읽기 전용. orders 를 실시간 구독(INSERT/UPDATE)해서 «표시»만 한다. 돈·입금·상태 판정 로직은 상품 위젯과 같은 문자열 기준.
@@ -40,7 +41,6 @@ type FeedItem = { id: string; kind: FeedKind; nick: string; detail: string; at: 
 
 const SHOW_MS = 10000;      // 한 줄이 떠 있는 시간 (사장님 09-12: 10초)
 const MAX_LINES = 3;        // 화면에 보이는 전체 줄 수 상한 — 📌 공지가 있으면 알림은 2줄 (사장님 09-12)
-export const PIN_SETTING_KEY = "order_feed_pin_text";
 const WIDGET_W = 640;       // 기본 폭(px) — PRISM 에서 크기를 줄여도 비율 유지
 
 const KIND_META: Record<FeedKind, { icon: string; tag: string; verb: string; accent: string }> = {
@@ -106,13 +106,17 @@ export default function OrderFeedWidgetClient() {
     return () => window.removeEventListener("resize", calc);
   }, []);
 
-  // 방송 ON/OFF — 20초 폴링 + broadcasts 실시간
+  // 방송 ON/OFF + 📌 고정 공지 — 활성 방송 행 하나에서 같이 읽는다 (20초 폴링 + broadcasts 실시간)
+  //   관리자가 📌 를 저장하면 broadcasts UPDATE → 즉시 다시 읽어 바로 반영. 방송 OFF 면 공지도 같이 사라짐.
   useEffect(() => {
     let alive = true;
     const check = async () => {
       try {
         const list = await loadAdminLiveBroadcasts();
-        if (alive) setLive(Boolean(getActiveBroadcast(list)));
+        if (!alive) return;
+        const active = getActiveBroadcast(list);
+        setLive(Boolean(active));
+        setPinText(String(active?.feed_pin_text ?? "").trim());
       } catch { /* 조회 실패 시 상태 유지 */ }
     };
     void check();
@@ -122,26 +126,6 @@ export default function OrderFeedWidgetClient() {
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "broadcasts" }, () => void check())
       .subscribe();
     return () => { alive = false; window.clearInterval(timer); supabase.removeChannel(ch); };
-  }, []);
-
-  // 📌 고정 공지 — settings 한 줄 읽기 + 실시간 반영(관리자가 저장하면 바로 바뀜)
-  useEffect(() => {
-    let alive = true;
-    const read = async () => {
-      try {
-        const { data } = await supabase.from("settings").select("value").eq("key", PIN_SETTING_KEY).limit(1);
-        if (alive) setPinText(String((data as AnyRow[] | null)?.[0]?.value ?? "").trim());
-      } catch { /* 실패 시 이전 값 유지 */ }
-    };
-    void read();
-    const ch = supabase
-      .channel("ruru-order-feed-pin")
-      .on("postgres_changes", { event: "*", schema: "public", table: "settings" }, (payload) => {
-        const row = ((payload as AnyRow).new || {}) as AnyRow;
-        if (String(row?.key || "") === PIN_SETTING_KEY) setPinText(String(row?.value ?? "").trim());
-      })
-      .subscribe();
-    return () => { alive = false; supabase.removeChannel(ch); };
   }, []);
 
   const pushItem = (item: FeedItem) => {

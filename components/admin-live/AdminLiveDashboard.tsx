@@ -47,6 +47,7 @@ import {
   isOrderInsideBroadcastTime,
   loadAdminLiveBroadcasts,
   setBroadcastWidgetCard,
+  setBroadcastFeedPin,
   setShopOpen,
   startAdminLiveBroadcast,
   updateAdminLiveBroadcast,
@@ -1052,6 +1053,14 @@ export default function AdminLiveDashboard() {
     }
   };
 
+  // [2026-09-12] 방송별 📌 고정 공지 저장 — broadcasts.feed_pin_text (서버 경로). 위젯은 broadcasts 실시간으로 바로 반영.
+  const handleSaveFeedPin = async (text: string) => {
+    if (!activeBroadcast?.id) throw new Error("방송 중에만 저장할 수 있습니다.");
+    const saved = await setBroadcastFeedPin(activeBroadcast.id, text);
+    const next = String(saved?.feed_pin_text ?? "");
+    setBroadcasts((prev) => prev.map((b) => (b.id === activeBroadcast.id ? { ...b, feed_pin_text: next } : b)));
+  };
+
   // 컨트롤타워 "상품 N개" — 활성 방송의 broadcast_products 연결 개수(읽기 전용 count)
   const loadBroadcastProductCount = async () => {
     if (!activeBroadcast?.id) {
@@ -1569,6 +1578,7 @@ export default function AdminLiveDashboard() {
                     onToggleShopOpen={handleToggleShopOpen}
                     widgetCardOn={widgetCardOn}
                     onToggleWidgetCard={handleToggleWidgetCard}
+                    onSaveFeedPin={handleSaveFeedPin}
                   />
                   <LiveMissionGauge
                     broadcastOn={Boolean(activeBroadcast)}
@@ -1723,7 +1733,10 @@ export default function AdminLiveDashboard() {
               {/* ── 설정 ── */}
               {activeMenu === "settings" ? (
                 <div className="w-full">
-                  <AdminLiveSettingsPanel onOpenNotice={() => { setActiveMenu("notice"); replacePanelInUrl("notice"); }} />
+                  <AdminLiveSettingsPanel
+                    onOpenNotice={() => { setActiveMenu("notice"); replacePanelInUrl("notice"); }}
+                    onOpenEvent={() => { setActiveMenu("event"); replacePanelInUrl("event"); }}
+                  />
                 </div>
               ) : null}
 

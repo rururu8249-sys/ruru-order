@@ -17,6 +17,8 @@ export type AdminLiveBroadcast = {
   widget_pin_mode?: "auto" | "pin" | string | null;
   widget_pin_product_id?: string | number | null;
   widget_pin_detail_name?: string | null;
+  // [2026-09-12] 방송별 📌 고정 공지 — 주문·입금 피드 위젯(/order-feed-widget) 맨 위 한 줄. NULL/빈값=없음
+  feed_pin_text?: string | null;
 };
 
 export type StartBroadcastInput = {
@@ -222,6 +224,28 @@ export async function setBroadcastWidgetCard(broadcastId: string, enabled: boole
     table: "broadcasts",
     op: "update",
     values: { widget_card_enabled: enabled },
+    filters: [{ type: "eq", col: "id", val: broadcastId }],
+    select: "*",
+    single: true,
+  });
+
+  if (error) throw error;
+
+  return data as AdminLiveBroadcast;
+}
+
+// [2026-09-12] 방송별 📌 고정 공지 — 주문·입금 피드 위젯 맨 위 한 줄(60자). 비우면 위젯에서 사라진다.
+//   broadcasts.feed_pin_text 한 컬럼만 갱신(서버 경로 catalog-write). 방송 상태·정산/주문/돈 로직 무접촉.
+export async function setBroadcastFeedPin(broadcastId: string, text: string) {
+  if (!broadcastId) {
+    throw new Error("방송 ID가 없습니다.");
+  }
+
+  const value = String(text || "").trim().slice(0, 60);
+  const { data, error } = await adminCatalogWrite({
+    table: "broadcasts",
+    op: "update",
+    values: { feed_pin_text: value || null },
     filters: [{ type: "eq", col: "id", val: broadcastId }],
     select: "*",
     single: true,
