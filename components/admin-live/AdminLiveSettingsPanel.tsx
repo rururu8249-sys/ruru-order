@@ -166,7 +166,7 @@ const SETTINGS_TABS: { key: SettingsTab; label: string; icon: string; desc: stri
   { key: "point", label: "포인트 적립", icon: "🪙", desc: "자동적립·적립률" },
   { key: "order", label: "주문서 표시", icon: "📝", desc: "선점시간·직접입력" },
   // [2026-09-12] 방송 화면 — 프리즘 브라우저 소스 주소·크기·옵션. 저장 없음(안내판).
-  { key: "screen", label: "방송 화면", icon: "📺", desc: "위젯 주소·크기" },
+  { key: "screen", label: "방송 화면", icon: "📺", desc: "프리즘 위젯 주소" },
   // [2026-09-08 사장님 요청] 알림음은 사이드바가 아니라 설정에 둔다.
   { key: "sound", label: "알림음", icon: "🔔", desc: "주문·입금 소리·볼륨" },
   { key: "youtube", label: "유튜브 알림", icon: "📺", desc: "라이브 채팅 자동알림" },

@@ -28,7 +28,7 @@
 //
 //   ⚠ 읽기 전용. orders 를 실시간 구독(INSERT/UPDATE)해서 «표시»만 한다. 돈·입금·상태 판정 로직은 상품 위젯과 같은 문자열 기준.
 //   ⚠ 방송 OFF(활성 방송 없음)면 아무것도 안 그린다.   ?preview=1 이면 견본 3줄을 띄워 크기·위치 맞추기용.
-//   ⚠ /product-widget 의 배너 알림과 겹쳐 보이면 상품 위젯 쪽을 ?toast=0 으로 끈다.
+//   ⚠ /product-widget 의 주문/입금 말풍선은 09-13 부터 기본 OFF(이 위젯이 그 역할). 예전처럼 켜려면 상품 위젯 주소에 ?toast=1.
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";

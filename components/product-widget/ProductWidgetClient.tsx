@@ -249,14 +249,16 @@ export default function ProductWidgetClient() {
   // [2026-09-11] ?preview=1 — 방송이 없어도 «사진 있는 최근 상품» 한 장을 띄워 위젯 모양을 미리 본다(읽기 전용).
   //   PRISM 에 소스를 붙일 때 크기·위치를 맞추는 용도. 실제 방송 중엔 붙이지 않는다(방송 목록이 우선).
   const [previewMode, setPreviewMode] = useState(false);
-  // [2026-09-12] ?toast=0 — 주문/입금/카드 배너를 이 위젯에선 끈다(«주문·입금 피드» 위젯 /order-feed-widget 과 겹쳐 보일 때).
+  // [2026-09-13 사장님] 주문/입금/카드 말풍선은 이 위젯에선 «기본 OFF». 그 소식은 «주문·입금 알림» 위젯(/order-feed-widget)이 보여준다.
+  //   두 위젯을 같이 띄우면 같은 알림이 두 번 뜨고, 사장님이 «?toast=0 을 붙여라»는 설명을 이해할 수 없다고 하셔서
+  //   주소 옵션을 없앴다. 예전처럼 여기서도 띄우고 싶으면 주소 뒤에 ?toast=1 (설정 화면엔 안 적음).
   //   재고 즉시 갱신은 그대로 돈다. 표시만 끈다.
-  const toastOffRef = useRef(false);
+  const toastOffRef = useRef(true);
   useEffect(() => {
     try {
       const q = new URLSearchParams(window.location.search);
       setPreviewMode(q.get("preview") === "1");
-      toastOffRef.current = q.get("toast") === "0";
+      toastOffRef.current = q.get("toast") !== "1";
     } catch { setPreviewMode(false); }
   }, []);
 
