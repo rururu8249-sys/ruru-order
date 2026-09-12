@@ -19,8 +19,8 @@
 //     🛒 주문   「닉네임」님 주문 감사합니다 · 상품명(꼬리표·코드 뗀 20자) (여러 상품이면 「외 N종」)
 //     💰 입금   「닉네임」님 입금 감사합니다
 //     💳 카드   「닉네임」님 카드결제 감사합니다
-//     · 최근 3줄, 아래에서 위로 쌓임(채팅처럼 최신이 아래), 10초 뒤 조용히 사라짐. 아무것도 없으면 완전 투명.
-//       (사장님 09-12: 1~3줄·10초 — 방송 화면을 해치지 않는 선. 새 건이 오면 가장 오래된 줄이 먼저 빠진다)
+//     · 전체 최대 3줄(📌 공지 포함) — 공지가 있으면 알림 2줄, 없으면 3줄. 아래에서 위로 쌓임(최신이 아래), 10초 뒤 사라짐.
+//       (사장님 09-12: 「공지 포함해서 3줄, 4줄은 너무 많다」. 새 건이 오면 가장 오래된 줄이 먼저 빠진다)
 //     · 줄 앞 작은 「주문/입금/카드」 표시 — 진짜 채팅으로 착각하지 않게(«댓글 왜 안 보여요» 혼란 방지).
 //     · 📌 고정 공지 한 줄 (settings.order_feed_pin_text) — 관리자 방송 콘솔 「제목·URL 수정」에서 쓰고 비우면 사라짐.
 //       방송 ON 동안 맨 위에 계속 떠 있다(«입금자명은 닉네임으로» 같은 상시 안내용).
@@ -39,7 +39,7 @@ type FeedKind = "order" | "deposit" | "card";
 type FeedItem = { id: string; kind: FeedKind; nick: string; detail: string; at: number };
 
 const SHOW_MS = 10000;      // 한 줄이 떠 있는 시간 (사장님 09-12: 10초)
-const MAX_ROWS = 3;         // 동시에 보이는 최대 줄 수 (사장님 09-12: 1~3줄)
+const MAX_LINES = 3;        // 화면에 보이는 전체 줄 수 상한 — 📌 공지가 있으면 알림은 2줄 (사장님 09-12)
 export const PIN_SETTING_KEY = "order_feed_pin_text";
 const WIDGET_W = 640;       // 기본 폭(px) — PRISM 에서 크기를 줄여도 비율 유지
 
@@ -145,7 +145,7 @@ export default function OrderFeedWidgetClient() {
   }, []);
 
   const pushItem = (item: FeedItem) => {
-    setItems((prev) => [...prev.filter((x) => x.id !== item.id), item].slice(-MAX_ROWS));
+    setItems((prev) => [...prev.filter((x) => x.id !== item.id), item].slice(-MAX_LINES));   // 넉넉히 들고, 그릴 때 공지 여부로 자른다
   };
 
   // 12초 지난 줄 정리(1초마다)
@@ -208,9 +208,11 @@ export default function OrderFeedWidgetClient() {
     };
   }, []);
 
-  const visible = previewMode && items.length === 0 ? PREVIEW_ROWS : (live || previewMode ? items : []);
   const showPin = (live || previewMode) && (pinText || (previewMode && !pinText));
   const pinShown = pinText || "공지: 입금자명은 닉네임으로 보내주세요";
+  const rowCap = showPin ? MAX_LINES - 1 : MAX_LINES;   // 공지 포함 3줄
+  const source = previewMode && items.length === 0 ? PREVIEW_ROWS : (live || previewMode ? items : []);
+  const visible = source.slice(-rowCap);
   if (visible.length === 0 && !showPin) return null;
 
   return (
