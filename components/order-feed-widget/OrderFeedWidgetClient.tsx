@@ -58,13 +58,8 @@ function glowOf(hex: string, alpha: number) {
   return `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${alpha})`;
 }
 
-// 아바타 색 — 닉네임으로 정해지는 파스텔 (유튜브 기본 아바타처럼 사람마다 다른 색)
-const AVATAR_COLORS = ["#F472B6", "#FB923C", "#FACC15", "#4ADE80", "#38BDF8", "#A78BFA", "#F87171", "#2DD4BF"];
-function avatarColor(nick: string) {
-  let h = 0;
-  for (const ch of nick) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return AVATAR_COLORS[h % AVATAR_COLORS.length];
-}
+// [2026-09-13 사장님] 닉네임 첫 글자 동그라미(아바타) 없앰 — 이름이 바로 첫 글자부터 보이게.
+const EXIT_MS = 500;        // 사라질 때 커튼이 닫히는 시간(왼쪽→오른쪽) — 등장과 대칭. 알림은 «1회성»: 등장 1번, 퇴장 1번, 반복 없음.
 
 const nickOf = (row: AnyRow) => String(row?.youtube_nickname || row?.nickname || row?.customer_name || "손님").trim();
 const productOf = (row: AnyRow) => String(row?.product_name || row?.name || "").trim();
@@ -141,12 +136,14 @@ export default function OrderFeedWidgetClient() {
     setItems((prev) => [...prev.filter((x) => x.id !== item.id), item].slice(-MAX_LINES));   // 넉넉히 들고, 그릴 때 공지 여부로 자른다
   };
 
-  // 12초 지난 줄 정리(1초마다)
+  // 10초 지난 줄은 0.5초 동안 커튼 닫히듯 사라진 뒤 제거 (0.1초마다 확인 — 줄이 최대 3개라 부담 없음)
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = window.setInterval(() => {
-      const now = Date.now();
-      setItems((prev) => (prev.some((x) => now - x.at > SHOW_MS) ? prev.filter((x) => now - x.at <= SHOW_MS) : prev));
-    }, 1000);
+      const n = Date.now();
+      setNow(n);
+      setItems((prev) => (prev.some((x) => n - x.at > SHOW_MS + EXIT_MS) ? prev.filter((x) => n - x.at <= SHOW_MS + EXIT_MS) : prev));
+    }, 100);
     return () => window.clearInterval(t);
   }, []);
 
@@ -240,7 +237,7 @@ export default function OrderFeedWidgetClient() {
         ) : null}
         {visible.map((item) => {
           const meta = KIND_META[item.kind];
-          const initial = Array.from(item.nick)[0] || "?";
+          const leaving = !previewMode && now - item.at > SHOW_MS;   // 10초 지남 → 커튼 닫히며 퇴장(0.5초)
           return (
             <div
               key={item.id}
@@ -248,14 +245,16 @@ export default function OrderFeedWidgetClient() {
                 alignSelf: "flex-start", maxWidth: "100%", boxSizing: "border-box",   // 채팅처럼 글 길이만큼만 말풍선
                 position: "relative", overflow: "hidden",                            // 빛 줄이 말풍선 밖으로 안 나가게
                 display: "flex", alignItems: "center", gap: "12px",
-                padding: "10px 16px 10px 12px",
+                padding: "10px 16px 10px 18px",
                 borderRadius: "999px",
                 background: "rgba(14, 12, 18, 0.56)",
                 backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
                 boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
                 borderLeft: `5px solid ${meta.accent}`,
-                // 커튼 열림(0.65초) → 강조색 잔광(0.4초 뒤 시작, 1초)
-                animation: "ruruCurtain 0.65s cubic-bezier(0.16,1,0.3,1) both, ruruGlow 1s ease-out 0.4s",
+                // 등장: 커튼 열림(0.65초) → 강조색 잔광(0.4초 뒤, 1초).  퇴장: 커튼 닫힘(0.5초). 둘 다 1회.
+                animation: leaving
+                  ? `ruruCurtainOut ${EXIT_MS}ms ease-in forwards`
+                  : "ruruCurtain 0.65s cubic-bezier(0.16,1,0.3,1) both, ruruGlow 1s ease-out 0.4s",
                 ["--ruru-glow" as string]: glowOf(meta.accent, 0.6),
                 textShadow: "0 1px 2px rgba(0,0,0,0.8)",
                 color: "#fff",
@@ -271,18 +270,6 @@ export default function OrderFeedWidgetClient() {
                   animation: "ruruShine 0.8s cubic-bezier(0.16,1,0.3,1) 0.05s both",
                 }}
               />
-              {/* 아바타 — 닉네임 첫 글자, 사람마다 다른 색 (유튜브 기본 아바타 느낌) */}
-              <span
-                style={{
-                  flexShrink: 0, width: "44px", height: "44px", borderRadius: "50%",
-                  background: avatarColor(item.nick), color: "#1b1620",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "22px", fontWeight: 900, textShadow: "none",
-                }}
-              >
-                {initial}
-              </span>
-
               <span style={{ minWidth: 0, flex: 1, display: "flex", flexDirection: "column", gap: "2px" }}>
                 <span style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
                   <span style={{ fontSize: "30px", fontWeight: 900, lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -321,6 +308,7 @@ export default function OrderFeedWidgetClient() {
       </div>
       <style>{`
         @keyframes ruruCurtain { from { clip-path: inset(0 100% 0 0 round 999px); transform: translateX(-10px); opacity: 0.7; } to { clip-path: inset(0 0 0 0 round 999px); transform: translateX(0); opacity: 1; } }
+        @keyframes ruruCurtainOut { from { clip-path: inset(0 0 0 0 round 999px); opacity: 1; } to { clip-path: inset(0 0 0 100% round 999px); opacity: 0; } }
         @keyframes ruruShine   { from { transform: translateX(-120%) skewX(-12deg); } to { transform: translateX(330%) skewX(-12deg); } }
         @keyframes ruruGlow    { 0% { box-shadow: 0 4px 14px rgba(0,0,0,0.25), 0 0 0 0 var(--ruru-glow); } 35% { box-shadow: 0 4px 14px rgba(0,0,0,0.25), 0 0 26px 3px var(--ruru-glow); } 100% { box-shadow: 0 4px 14px rgba(0,0,0,0.25), 0 0 0 0 rgba(0,0,0,0); } }
         @keyframes ruruVerbPop { from { opacity: 0; transform: scale(1.5); } 60% { opacity: 1; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
