@@ -46,7 +46,13 @@ const NOTICE_MS = 30000;    // 📢 상품 안내가 떠 있는 시간 — 사�
 const MAX_LINES = 3;        // 화면에 보이는 전체 줄 수 상한 — 📌 공지·📢 안내 포함 (사장님 09-12)
 const WIDGET_W = 860;       // 기본 폭(px) — [09-13 사장님 「가로 좀 늘려줘 길이가 아쉽네」] 640 → 860 (한 줄에 34% 더 들어감)
 // [2026-09-13] «프리즘 네모 크기 = 위젯 크기» — 권장 네모 880×320 이 1배. 네모를 키우면 글자도 그 비율로 커지고, 줄이면 작아진다(비율 고정).
-const BOX_W = 880, BOX_H = 320;   // 폭 860 + 여백 20 / 높이 = 공지 2줄 + 안내 1줄 + 상품 2줄 알림
+const BOX_W = 880, BOX_H = 300;   // 폭 860 + 여백 20 / 높이 = «실제로 쓰는 만큼»
+// [2026-09-16 사장님 «크기만 늘리면 뭐함 — 폰트도 키워야지»]
+//   이 BOX_H 가 글자 크기를 정한다. 네모 안에 880×BOX_H 를 꽉 채워 넣기 때문에,
+//   BOX_H 가 실제 내용보다 크면 그 차이만큼 «빈 공간»이 되고 글자는 그만큼 작게 들어간다.
+//   실측(브라우저 렌더): 알림 1줄 74px · 공지/안내 1줄 76px(2줄 116px) · 줄간격 8px
+//   → 흔한 최대(알림 2줄 + 공지 2줄) = 284px. 320 은 16%를 버리고 있었다 → 300 으로.
+//   ⚠ 공지·안내는 «최대 2줄»로 잘라 높이가 예측 가능하게 고정한다(아래 WebkitLineClamp).
 // [2026-09-13 사장님 «반투명 제대로 + 가독성»] «유리»처럼: 배경은 옅게(공지 45% · 알림 42%)·흐림 없음 → 방송 화면이 그대로 비친다.
 //   읽히는 건 배경이 아니라 «글자 테두리»가 맡는다(검정 1.5px 8방향 + 아래 그림자). 공지 30px(유튜브 채팅과 비슷).
 //   실측: 인형 선반 배경 + 폰 크기(1080→390) + JPEG 45 압축 흉내에서도 읽힘. (직전 72%+blur 는 배경이 안 비쳐 «불투명»으로 보였음 — 폐기)
@@ -54,11 +60,20 @@ const TEXT_SHADOW =
   "0 0 2px rgba(0,0,0,0.95), 0 0 2px rgba(0,0,0,0.95), 1.5px 1.5px 0 rgba(0,0,0,0.85), -1.5px -1.5px 0 rgba(0,0,0,0.85), 1.5px -1.5px 0 rgba(0,0,0,0.85), -1.5px 1.5px 0 rgba(0,0,0,0.85), 0 2px 6px rgba(0,0,0,0.6)";
 
 // 📢 안내(notice)는 이 표를 쓰지 않는다(닉네임·감사 문구가 없는 줄) → Exclude 로 빼둔다.
-const KIND_META: Record<Exclude<FeedKind, "notice">, { icon: string; tag: string; verb: string; accent: string }> = {
-  order:   { icon: "🛒", tag: "주문", verb: "주문 감사합니다",   accent: "#22c55e" },   // 초록 = 상품 위젯 주문성공과 같은 톤
-  deposit: { icon: "💰", tag: "입금", verb: "입금 감사합니다",   accent: "#60a5fa" },   // 파랑 = 입금/카드
-  card:    { icon: "💳", tag: "카드", verb: "카드결제 감사합니다", accent: "#60a5fa" },
+const KIND_META: Record<Exclude<FeedKind, "notice">, { icon: string; tag: string; verb: string; short: string; accent: string }> = {
+  order:   { icon: "🛒", tag: "주문", verb: "주문 감사합니다",   short: "주문",   accent: "#22c55e" },   // 초록 = 상품 위젯 주문성공과 같은 톤
+  deposit: { icon: "💰", tag: "입금", verb: "입금 감사합니다",   short: "입금",   accent: "#60a5fa" },   // 파랑 = 입금/카드
+  card:    { icon: "💳", tag: "카드", verb: "카드결제 감사합니다", short: "카드결제", accent: "#60a5fa" },
 };
+
+// [2026-09-16] 한 줄에 다 안 들어가는 «긴 줄»이면 인사말을 줄인다.
+//   「루루짱929님 🛒 주문 감사합니다 · 아미반팔 30,000원」  ← 대부분은 이 형태 그대로
+//   「내가사는세상-88님 🛒 주문 · 나이키 바람막이 외 2종 합계 84,000원」  ← 길면 «감사합니다»를 빼서 상품명을 살린다
+//   (인사말보다 «누가·뭘·얼마»가 먼저다. 오른쪽 꼬리표도 이때는 중복이라 숨긴다)
+const TIGHT_CHARS = 25;
+function isTightRow(nick: string, left: string, right: string) {
+  return nick.length + left.length + right.length > TIGHT_CHARS;
+}
 
 // [2026-09-13 사장님] 알림 줄 등장 = «커튼이 젖혀지듯» 왼쪽→오른쪽 열림 + 빛 한 줄이 따라감 + 「주문 감사합니다」 톡 튀며 등장 + 강조색 잔광.
 //   📌 공지 줄은 상시라 애니메이션 없음. 전부 GPU 속성(clip-path·transform·opacity·box-shadow)이라 PRISM 부담 없음.
@@ -254,24 +269,26 @@ export default function OrderFeedWidgetClient() {
                 style={{
                   maxWidth: "100%", boxSizing: "border-box",                            // [09-16] 폭 자동 — 글자만큼만
                   display: "flex", alignItems: "center", gap: "10px",
-                  padding: "14px 24px 14px 20px",                                        // [09-16 사장님 «좁고 답답하다»] 세로 두껍게
+                  padding: "17px 26px 17px 22px",                                        // [09-16] 여백은 «글자 크기의 절반» 정도만
                   borderRadius: "999px",
                   background: "rgba(24, 20, 12, 0.45)",                                  // 흐림 없음 — 뒤가 그대로 비침
                   boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
                   border: "1.5px solid rgba(253, 224, 71, 0.7)",
                   color: "#fff", textShadow: TEXT_SHADOW,
-                  fontSize: "28px", fontWeight: 900, lineHeight: 1.2, wordBreak: "keep-all",
+                  fontSize: "30px", fontWeight: 900, lineHeight: 1.3, wordBreak: "keep-all",
                   animation: leaving
                     ? `ruruCurtainOut ${EXIT_MS}ms ease-in forwards`
                     : "ruruCurtain 0.65s cubic-bezier(0.16,1,0.3,1) both",
                 }}
               >
-                <span style={{ flexShrink: 0, fontSize: "26px", textShadow: "none" }}>📢</span>
-                <span style={{ minWidth: 0 }}>{item.text}</span>
+                <span style={{ flexShrink: 0, fontSize: "28px", textShadow: "none" }}>📢</span>
+                <span style={{ minWidth: 0, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{item.text}</span>
               </div>
             );
           }
           const meta = KIND_META[item.kind as Exclude<FeedKind, "notice">];
+          const detail = item.lines[0];
+          const tight = isTightRow(item.nick, detail?.left || "", detail?.right || "");
           return (
             <div
               key={item.id}
@@ -279,7 +296,7 @@ export default function OrderFeedWidgetClient() {
                 maxWidth: "100%", boxSizing: "border-box",                           // [09-16 사장님] 폭은 «글자 길이만큼». 길면 위젯 폭에서 … 로 줄인다
                 position: "relative", overflow: "hidden",                            // 빛 줄이 말풍선 밖으로 안 나가게
                 display: "flex", alignItems: "center", gap: "12px",
-                padding: "15px 18px 15px 22px",                                      // [09-16 사장님 «좁고 답답하다»] 세로 두껍게
+                padding: "18px 20px 18px 24px",                                      // [09-16] 여백은 «글자 크기의 절반» 정도만 — 남는 높이는 글자에 쓴다
                 borderRadius: "999px",
                 background: "rgba(14, 12, 18, 0.42)",                                 // 흐림 없음 — 뒤가 그대로 비침
                 boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
@@ -306,34 +323,37 @@ export default function OrderFeedWidgetClient() {
               {/* [2026-09-16 사장님] 닉네임 · 감사문구 · 상품 · 금액을 «한 줄»로. 금액이 상품 바로 뒤에 붙어 읽힌다.
                   길면 «상품 이름»만 … 로 줄어들고 닉네임·금액은 끝까지 보인다. */}
               <span style={{ minWidth: 0, display: "flex", alignItems: "baseline", gap: "10px", lineHeight: 1.15 }}>
-                <span style={{ flexShrink: 0, fontSize: "30px", fontWeight: 900, whiteSpace: "nowrap" }}>
-                  {item.nick}<span style={{ fontSize: "22px", fontWeight: 800, opacity: 0.9 }}>님</span>
+                {/* 닉네임은 «손님이 자기 이름을 찾는 곳»이라 최우선으로 지킨다 — 자리가 모자라면 상품명이 먼저 줄어든다.
+    (아주 긴 닉네임만 절반 선에서 …, 그래야 금액이 안 잘린다) */}
+                <span style={{ flexShrink: 0, maxWidth: "52%", fontSize: "33px", fontWeight: 900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {item.nick}<span style={{ fontSize: "23px", fontWeight: 700, opacity: 0.85 }}>님</span>
                 </span>
                 <span
                   style={{
-                    flexShrink: 0, display: "inline-block", fontSize: "26px", fontWeight: 800, color: meta.accent, whiteSpace: "nowrap",
+                    flexShrink: 0, display: "inline-block", fontSize: "23px", fontWeight: 800, color: meta.accent, whiteSpace: "nowrap",
                     transformOrigin: "left center",
                     animation: "ruruVerbPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.35s both",
                   }}
                 >
-                  {meta.icon} {meta.verb}
+                  {meta.icon} {tight ? meta.short : meta.verb}
                 </span>
-                {item.lines[0] ? (
+                {detail ? (
                   <>
-                    <span style={{ flexShrink: 0, fontSize: "22px", opacity: 0.5 }}>·</span>
-                    <span style={{ minWidth: 0, fontSize: "23px", fontWeight: 700, color: "rgba(255,255,255,0.92)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {item.lines[0].left}
+                    <span style={{ flexShrink: 0, fontSize: "20px", opacity: 0.45 }}>·</span>
+                    <span style={{ flex: "1 1 auto", minWidth: 0, fontSize: "25px", fontWeight: 700, color: "rgba(255,255,255,0.93)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {detail.left}
                     </span>
-                    {item.lines[0].right ? (
-                      <span style={{ flexShrink: 0, fontSize: "25px", fontWeight: 900, color: "#fff", whiteSpace: "nowrap" }}>
-                        {item.lines[0].right}
+                    {detail.right ? (
+                      <span style={{ flexShrink: 0, fontSize: "29px", fontWeight: 900, color: "#fff", whiteSpace: "nowrap" }}>
+                        {detail.right}
                       </span>
                     ) : null}
                   </>
                 ) : null}
               </span>
 
-              {/* 작은 «주문/입금/카드» 표시 — 진짜 채팅과 구분 */}
+              {/* 작은 «주문/입금/카드» 표시 — 진짜 채팅과 구분. 긴 줄에선 인사말이 이미 「주문」이라 숨긴다 */}
+              {tight ? null : (
               <span
                 style={{
                   flexShrink: 0, marginLeft: "4px", fontSize: "15px", fontWeight: 900, letterSpacing: "0.04em",
@@ -343,6 +363,7 @@ export default function OrderFeedWidgetClient() {
               >
                 {meta.tag}
               </span>
+              )}
             </div>
           );
         })}
@@ -353,17 +374,17 @@ export default function OrderFeedWidgetClient() {
             style={{
               maxWidth: "100%", boxSizing: "border-box",                      // [09-16] 폭 자동 — 글자만큼만
               display: "flex", alignItems: "center", gap: "10px",
-              padding: "14px 24px 14px 20px", marginTop: "4px",               // [09-16 사장님 «좁고 답답하다»] 세로 두껍게
+              padding: "17px 26px 17px 22px", marginTop: "4px",               // [09-16] 여백은 «글자 크기의 절반» 정도만
               borderRadius: "999px",
               background: "rgba(123, 45, 67, 0.45)",                                  // 흐림 없음 — 뒤가 그대로 비침
               boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
               border: "1.5px solid rgba(255,217,224,0.6)",
               color: "#fff", textShadow: TEXT_SHADOW,
-              fontSize: "30px", fontWeight: 900, lineHeight: 1.2, wordBreak: "keep-all",
+              fontSize: "31px", fontWeight: 900, lineHeight: 1.3, wordBreak: "keep-all",
             }}
           >
-            <span style={{ fontSize: "28px", textShadow: "none" }}>📌</span>
-            <span>{pinShown}</span>
+            <span style={{ flexShrink: 0, fontSize: "28px", textShadow: "none" }}>📌</span>
+            <span style={{ minWidth: 0, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{pinShown}</span>
           </div>
         ) : null}
       </div>
