@@ -33,7 +33,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { getActiveBroadcast, loadAdminLiveBroadcasts } from "@/components/admin-live/liveBroadcastController";
-import { feedOrderLines, feedOrderParts, feedProductLabel, feedRowFitsOneLine, feedDetailLineCount, feedPinFitsOneLine, feedPinFontSize, FEED_ROW_SIZES, FEED_DETAIL_MAX_LINES, type FeedLine, type FeedOrderItem, type FeedProduct } from "@/lib/feedText";
+import { feedOrderLines, feedOrderParts, feedProductLabel, feedShownProducts, feedRowFitsOneLine, feedDetailLineCount, feedPinFitsOneLine, feedPinFontSize, FEED_ROW_SIZES, FEED_DETAIL_MAX_LINES, type FeedLine, type FeedOrderItem, type FeedProduct } from "@/lib/feedText";
 import { formatOrderOptionText } from "@/lib/orderOptionText";
 
 type AnyRow = Record<string, any>;
@@ -103,22 +103,19 @@ const PREVIEW_ROWS: FeedItem[] = [
   { id: "p3", kind: "card",    nick: "루루짱929", lines: [], at: 0 },
 ];
 
-// [2026-09-16 사장님 「상품과 상품 사이, 옵션이 구분이 잘 안 됨」]
-//   글자로만 「A · M, B · L」 하면 어디까지가 상품이고 어디가 옵션인지 안 보인다.
-//   → 상품명은 «흰색 굵게», 옵션은 «괄호 + 연한색 + 작게», 상품 사이는 «강조색 구분점»으로 그린다.
-function ProductList({ products, rest, accent }: { products: FeedProduct[]; rest: number; accent: string }) {
+// [2026-09-16 사장님 「수량이 몇 개냐고? 색상 있는 옵션이면 어떻게 표현할 거고?」]
+//   가로로 이어 붙이면 상품·옵션·수량이 섞여 안 읽힌다 → «상품 하나에 한 줄».
+//   한 줄 안에서도 역할이 다르면 모양을 다르게: 상품명 흰색 굵게 / 옵션 연한색 / 수량 흰색.
+//   옵션 문구는 2026-08-31 공용 규칙 그대로(「블랙 / 사이즈 L」) — 라벨을 떼면 6이 사이즈인지 수량인지 모른다.
+function ProductLine({ p, size, optSize }: { p: FeedProduct; size: number; optSize: number }) {
   return (
-    <>
-      {products.map((p, i) => (
-        <span key={i}>
-          {i > 0 ? <span style={{ color: accent, opacity: 0.95, padding: "0 6px", fontWeight: 900 }}>·</span> : null}
-          <span style={{ fontWeight: 800 }}>{p.name}</span>
-          {p.opt ? <span style={{ fontSize: `${FEED_ROW_SIZES.opt}px`, fontWeight: 700, color: "rgba(255,255,255,0.72)" }}>{` (${p.opt})`}</span> : null}
-          {p.qty > 1 ? <span style={{ fontSize: `${FEED_ROW_SIZES.opt}px`, fontWeight: 900, color: "rgba(255,255,255,0.88)" }}>{` ×${p.qty}`}</span> : null}
-        </span>
-      ))}
-      {rest > 0 ? <span style={{ fontSize: `${FEED_ROW_SIZES.opt}px`, fontWeight: 800, color: "rgba(255,255,255,0.8)" }}>{` 외 ${rest}종`}</span> : null}
-    </>
+    <span style={{ minWidth: 0, display: "flex", alignItems: "baseline", gap: "12px", whiteSpace: "nowrap", overflow: "hidden" }}>
+      <span style={{ flexShrink: 1, minWidth: 0, fontSize: `${size}px`, fontWeight: 800, color: "#fff", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+      {p.opt ? (
+        <span style={{ flexShrink: 1, minWidth: 0, fontSize: `${optSize}px`, fontWeight: 700, color: "rgba(255,255,255,0.72)", overflow: "hidden", textOverflow: "ellipsis" }}>{p.opt}</span>
+      ) : null}
+      <span style={{ flexShrink: 0, fontSize: `${optSize}px`, fontWeight: 800, color: "rgba(255,255,255,0.9)" }}>{p.qty}개</span>
+    </span>
   );
 }
 
@@ -198,7 +195,7 @@ export default function OrderFeedWidgetClient() {
   //   한 줄 10초 · 주문내역이 두 줄이면 12.5초 · 세 줄이면 15초. (상품이 많을수록 읽을 게 많다)
   const lifeOf = (item: FeedItem) => {
     if (item.kind === "notice") return NOTICE_MS;
-    const detailLines = feedDetailLineCount(item.lines[0]?.left || "");
+    const detailLines = feedDetailLineCount((item.products || []).length);
     return SHOW_MS + Math.max(0, detailLines - 1) * 2500;
   };
 
@@ -279,9 +276,10 @@ export default function OrderFeedWidgetClient() {
   const heightOf = (it: FeedItem) => {
     if (it.kind === "notice") return H_PAD_NOTICE + H_LINE_NOTICE * (feedPinFitsOneLine(it.text || "") ? 1 : 2);
     const m = KIND_META[it.kind as Exclude<FeedKind, "notice">];
-    const detail = it.lines[0]?.left || "";
-    if (feedRowFitsOneLine(it.nick, `${m.icon} ${m.verb}`, detail)) return H_ALERT_ONE;
-    return H_ALERT_ONE + H_DETAIL_LINE * feedDetailLineCount(detail);
+    const parts = it.products || [];
+    // 상품 «하나»이고 한 줄에 들어가면 한 줄. 아니면 상품마다 한 줄씩 아래로.
+    if (parts.length <= 1 && feedRowFitsOneLine(it.nick, `${m.icon} ${m.verb}`, parts[0] ? feedProductLabel(parts[0]) : "")) return H_ALERT_ONE;
+    return H_ALERT_ONE + H_DETAIL_LINE * feedDetailLineCount(parts.length);
   };
   // 📌 공지가 먼저 자리를 잡고, 남는 높이만큼 «최신 알림부터» 담는다.
   let budget = BUDGET_H - (showPin ? H_PAD_NOTICE + H_LINE_NOTICE * (feedPinFitsOneLine(pinShown) ? 1 : 2) + 4 : 0);
@@ -337,14 +335,11 @@ export default function OrderFeedWidgetClient() {
             );
           }
           const meta = KIND_META[item.kind as Exclude<FeedKind, "notice">];
-          const detailText = item.lines[0]?.left || "";
-          // 화면 문구에 실제로 들어간 상품 수(나머지는 「외 N종」) — 문구와 조각이 어긋나지 않게 맞춘다
           const allParts = item.products || [];
-          const shownCount = allParts.filter((pp) => detailText.includes(feedProductLabel(pp))).length;
-          const shownParts = shownCount > 0 ? allParts.slice(0, shownCount) : allParts;
-          const restCount = Math.max(0, allParts.length - shownParts.length);
-          // 글자 폭을 재서 «한 줄에 들어가면 한 줄». 들어가는지는 CSS 가 미리 못 알려주므로 lib 에서 계산한다.
-          const oneLine = feedRowFitsOneLine(item.nick, `${meta.icon} ${meta.verb}`, detailText);
+          const { shown: shownParts, rest: restCount } = feedShownProducts(allParts);
+          // 상품 «하나»일 때만 한 줄에 붙인다. 여러 개면 섞여서 안 읽히므로 상품마다 한 줄.
+          const oneLine = allParts.length <= 1
+            && feedRowFitsOneLine(item.nick, `${meta.icon} ${meta.verb}`, allParts[0] ? feedProductLabel(allParts[0]) : "");
           return (
             <div
               key={item.id}
@@ -395,22 +390,23 @@ export default function OrderFeedWidgetClient() {
                   >
                     {meta.icon} {meta.verb}
                   </span>
-                  {oneLine && detailText ? (
+                  {oneLine && allParts[0] ? (
                     <>
                       <span style={{ flexShrink: 0, fontSize: "24px", opacity: 0.45 }}>·</span>
-                      <span style={{ flexShrink: 1, minWidth: 0, fontSize: `${FEED_ROW_SIZES.detail}px`, color: "rgba(255,255,255,0.97)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {allParts.length > 0 ? <ProductList products={shownParts} rest={restCount} accent={meta.accent} /> : detailText}
+                      <span style={{ flexShrink: 1, minWidth: 0, overflow: "hidden" }}>
+                        <ProductLine p={allParts[0]} size={FEED_ROW_SIZES.detail} optSize={FEED_ROW_SIZES.opt} />
                       </span>
                     </>
                   ) : null}
                 </span>
-                {!oneLine && detailText ? (
-                  // 상품이 많으면 여기서 «최대 3줄»까지 펼친다(그만큼 화면에 뜨는 알림 개수가 줄어든다)
-                  <span style={{
-                    minWidth: 0, fontSize: `${FEED_ROW_SIZES.detail}px`, color: "rgba(255,255,255,0.97)", lineHeight: 1.22,
-                    display: "-webkit-box", WebkitLineClamp: FEED_DETAIL_MAX_LINES, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "keep-all",
-                  }}>
-                    {allParts.length > 0 ? <ProductList products={shownParts} rest={restCount} accent={meta.accent} /> : detailText}
+                {!oneLine && allParts.length > 0 ? (
+                  <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
+                    {shownParts.map((pp, i) => (
+                      <ProductLine key={i} p={pp} size={FEED_ROW_SIZES.detail} optSize={FEED_ROW_SIZES.opt} />
+                    ))}
+                    {restCount > 0 ? (
+                      <span style={{ fontSize: `${FEED_ROW_SIZES.opt}px`, fontWeight: 800, color: "rgba(255,255,255,0.8)" }}>{`외 ${restCount}종 더`}</span>
+                    ) : null}
                   </span>
                 ) : null}
               </span>

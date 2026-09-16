@@ -44,10 +44,10 @@ export type FeedLine = { left: string; right: string };
 
 const won = (n: number) => `${Math.round(n).toLocaleString("ko-KR")}원`;
 
-/** 옵션을 피드용으로 짧게: 「블랙 / 사이즈 L」 → 「블랙/L」, 「사이즈 240」 → 「240」 (한 줄에 이름·옵션·금액이 다 들어가야 해서) */
-function compactOption(opt: string): string {
-  return opt.replace(/사이즈\s*/g, "").split("/").map((p) => p.trim()).filter(Boolean).join("/");
-}
+// [2026-09-16] 예전엔 여기서 「사이즈 6」의 «사이즈» 라벨을 떼어 「베이지/6」으로 줄였다(폭 아끼려고).
+//   그게 화면에서 「6」이 사이즈인지 수량인지 모르게 만든 원인이었다.
+//   → 2026-08-31 사장님이 정한 공용 규칙(lib/orderOptionText: 「베이지 / 사이즈 6」)을 그대로 쓴다.
+
 
 // ── [2026-09-16] 「한 줄에 들어가면 한 줄」 판정 ───────────────────────────────
 // 방송 화면을 덜 가리려면 한 줄이 맞다. 그런데 CSS 는 «들어가는지»를 미리 못 알려준다.
@@ -125,15 +125,21 @@ export function feedOrderParts(items: FeedOrderItem[], optionText: (color: unkno
   return items
     .map((it) => ({
       name: cleanProductNameForFeed(it.name),
-      opt: compactOption(optionText(it.color, it.size).trim()),
+      opt: optionText(it.color, it.size).trim(),
       qty: Math.max(1, Math.floor(Number(it.qty) || 1)),
     }))
     .filter((r) => r.name);
 }
 
-/** 조각 하나의 표시 문구 — 「나이키 바람막이 (M) ×2」 (옵션은 괄호, 수량은 ×N) */
+/**
+ * 조각 하나의 표시 문구 — 「아미반팔  블랙 / 사이즈 L  2개」
+ * [2026-09-16 사장님 「수량이 몇 개냐고? 색상 있는 옵션이면 어떻게 표현할 거고?」]
+ *   · 옵션은 08-31 공용 규칙 그대로(「블랙 / 사이즈 L」) — 라벨을 떼면 6이 사이즈인지 수량인지 모른다.
+ *   · 수량은 «1개여도 항상» 쓴다. 안 쓰면 몇 개인지 알 수 없다.
+ *   · 가로로 이어 붙이면 무조건 헷갈린다 → 화면에서는 «상품마다 한 줄»로 세로로 그린다.
+ */
 export function feedProductLabel(p: FeedProduct): string {
-  return `${p.name}${p.opt ? ` (${p.opt})` : ""}${p.qty > 1 ? ` ×${p.qty}` : ""}`;
+  return `${p.name}${p.opt ? `  ${p.opt}` : ""}  ${p.qty}개`;
 }
 
 /** 주문내역이 쓸 수 있는 최대 줄 수(위젯과 같은 값). 이 안에서 «상품을 최대한 많이» 보여준다. */
@@ -148,31 +154,30 @@ export function feedOrderProducts(
   items: FeedOrderItem[],
   optionText: (color: unknown, size: unknown) => string,
   maxLines: number = FEED_DETAIL_MAX_LINES,
-  em: number = 37,
-  avail: number = FEED_ROW_AVAIL_W,
 ): string {
-  const parts = feedOrderParts(items, optionText).map(feedProductLabel);
+  const parts = feedOrderParts(items, optionText);
   if (parts.length === 0) return "";
-
-  const budget = avail * Math.max(1, maxLines);
-  let taken = 0;
-  for (let i = 1; i <= parts.length; i += 1) {
-    const rest = parts.length - i;
-    const text = parts.slice(0, i).join(" · ") + (rest > 0 ? ` 외 ${rest}종` : "");
-    if (estimateTextWidth(text, em) > budget) break;
-    taken = i;
-  }
-  if (taken === 0) taken = 1;
-  const rest = parts.length - taken;
-  return parts.slice(0, taken).join(" · ") + (rest > 0 ? ` 외 ${rest}종` : "");
+  const { shown, rest } = feedShownProducts(parts, maxLines);
+  return shown.map(feedProductLabel).join(" / ") + (rest > 0 ? ` / 외 ${rest}종` : "");
 }
 
-/** 주문내역이 몇 줄을 차지하나 (1층 인사말 줄은 뺀 숫자) */
-export function feedDetailLineCount(detail: string, em: number = 37, avail: number = FEED_ROW_AVAIL_W): number {
-  if (!detail) return 0;
-  return Math.min(FEED_DETAIL_MAX_LINES, Math.max(1, Math.ceil(estimateTextWidth(detail, em) / avail)));
+/**
+ * 화면에 실제로 그릴 상품들과, 넘쳐서 못 그린 개수.
+ * 「외 N종 더」도 «한 줄»을 먹으므로, 넘칠 때는 상품을 한 줄 덜 보여준다.
+ *   상품 3개 → 3줄 전부 상품 / 상품 4개 → 상품 2줄 + 「외 2종 더」 1줄 = 3줄
+ */
+export function feedShownProducts(parts: FeedProduct[], maxLines: number = FEED_DETAIL_MAX_LINES) {
+  const cap = Math.max(1, maxLines);
+  if (parts.length <= cap) return { shown: parts, rest: 0 };
+  const shown = parts.slice(0, Math.max(1, cap - 1));
+  return { shown, rest: parts.length - shown.length };
 }
 
+/** 주문내역이 몇 줄을 차지하나 — 상품 하나가 한 줄(최대 3줄) */
+export function feedDetailLineCount(productCount: number): number {
+  if (productCount <= 0) return 0;
+  return Math.min(FEED_DETAIL_MAX_LINES, productCount);
+}
 
 // ── [2026-09-16 사장님 «공지글 몇 자 넘으면 2줄?»] ────────────────────────────
 // 📌 공지 알약 실측: 글자 34px · 안쪽 가용 폭 770px(=860 − 좌우여백 48 − 📌아이콘 32 − 간격 10).
