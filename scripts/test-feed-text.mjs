@@ -1,6 +1,6 @@
 // 방송 피드 상품명 정리 — 꼬리표·코드 떼고 20자, 여러 개는 「외 N종」
 import assert from "node:assert/strict";
-import { cleanProductNameForFeed, feedOrderDetail, feedOrderLines } from "../lib/feedText.ts";
+import { cleanProductNameForFeed, feedOrderDetail, feedOrderLines, feedOrderProducts, feedRowFitsOneLine, estimateTextWidth } from "../lib/feedText.ts";
 import { formatOrderOptionText } from "../lib/orderOptionText.ts";
 
 assert.equal(cleanProductNameForFeed("[👽주말마지막] 나이키 쭈리후드티_센터자수 FB7789"), "나이키 쭈리후드티_센터자수");
@@ -12,20 +12,34 @@ assert.equal(cleanProductNameForFeed("FB7789"), "FB7789");                      
 assert.equal(feedOrderDetail(["[👽주말마지막] 나이키 쭈리후드티_센터자수 FB7789", "나이키 바람막이", "양말"]), "나이키 쭈리후드티_센터자수 외 2종");
 assert.equal(feedOrderDetail(["반집업 룰루레몬"]), "반집업 룰루레몬");
 assert.equal(feedOrderDetail([]), "");
-// [2026-09-16] 주문내역 줄 — 왼쪽(이름·옵션·수량) / 오른쪽(금액). 1~2개는 상품마다, 3개↑는 첫 상품 + 「외 N종 합계」
+// [2026-09-16 사장님 «바람잡이»] 주문내역 = 상품 이름 위주, 금액 없음
 const opt = formatOrderOptionText;
-assert.deepEqual(
-  feedOrderLines([{ name: "[👽주말마지막] 나이키 쭈리후드티_센터자수 FB7789", color: "블랙", size: "L", qty: 2, price: 59000 }], opt),
-  [{ left: "나이키 쭈리후드티_센터자수 · 블랙/L · 2개", right: "118,000원" }],
+assert.equal(
+  feedOrderProducts([{ name: "[👽주말마지막] 나이키 쭈리후드티_센터자수 FB7789", color: "블랙", size: "L", qty: 2, price: 59000 }], opt),
+  "나이키 쭈리후드티_센터자수 · 블랙/L · 2개",
 );
-assert.deepEqual(
-  feedOrderLines([{ name: "뉴발란스740", color: "없음", size: "240", qty: 1, price: 129000 }, { name: "아미반팔", color: "없음", size: "없음", qty: "1", price: "30000" }], opt),
-  [{ left: "뉴발란스740 · 240", right: "129,000원" }, { left: "아미반팔", right: "30,000원" }],
+assert.equal(
+  feedOrderProducts([{ name: "뉴발란스740", color: "없음", size: "240" }, { name: "아미반팔", color: "없음", size: "없음" }], opt),
+  "뉴발란스740 · 240, 아미반팔",
 );
-assert.deepEqual(
-  feedOrderLines([{ name: "A", price: 10000 }, { name: "B", price: 20000, qty: 2 }, { name: "C", price: 5000 }], opt),
-  [{ left: "A", right: "10,000원" }, { left: "외 2종", right: "합계 55,000원" }],
+// 4개 이상이면 앞 3개 + 「외 N종」
+assert.equal(
+  feedOrderProducts([{ name: "A" }, { name: "B" }, { name: "C" }, { name: "D" }, { name: "E" }], opt),
+  "A, B, C 외 2종",
 );
+assert.equal(feedOrderProducts([], opt), "");
+// feedOrderLines 는 그 문구를 한 줄로 감싼다(금액 칸 비움)
 assert.deepEqual(feedOrderLines([{ name: "가격없음", price: 0 }], opt), [{ left: "가격없음", right: "" }]);
 assert.deepEqual(feedOrderLines([], opt), []);
-console.log("✅ test-feed-text 14개 통과");
+
+// ── 「한 줄에 들어가면 한 줄」 판정 (방송화면을 덜 가리려고 한 줄 우선) ──────────
+// 짧은 주문 = 한 줄
+assert.equal(feedRowFitsOneLine("루루짱929", "🛒 주문 감사합니다", "아미반팔 · L"), true);
+// 닉네임·상품이 길면 2줄로 내린다
+assert.equal(feedRowFitsOneLine("내가사는세상-88", "🛒 주문 감사합니다", "나이키 바람막이 · M, 꽃티 · L"), false);
+// 주문내역이 없는 입금·카드 줄은 언제나 한 줄
+assert.equal(feedRowFitsOneLine("내가사는세상-88", "💰 입금 감사합니다", ""), true);
+// 폭 추정: 한글이 숫자보다 넓다
+assert.ok(estimateTextWidth("가나다", 40) > estimateTextWidth("123", 40));
+
+console.log("✅ test-feed-text 19개 통과");

@@ -33,7 +33,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { getActiveBroadcast, loadAdminLiveBroadcasts } from "@/components/admin-live/liveBroadcastController";
-import { feedOrderLines, type FeedLine, type FeedOrderItem } from "@/lib/feedText";
+import { feedOrderLines, feedRowFitsOneLine, FEED_ROW_SIZES, type FeedLine, type FeedOrderItem } from "@/lib/feedText";
 import { formatOrderOptionText } from "@/lib/orderOptionText";
 
 type AnyRow = Record<string, any>;
@@ -43,11 +43,13 @@ type FeedItem = { id: string; kind: FeedKind; nick: string; lines: FeedLine[]; a
 
 const SHOW_MS = 10000;      // 알림 한 줄이 떠 있는 시간 (사장님 09-12: 10초)
 const NOTICE_MS = 30000;    // 📢 상품 안내가 떠 있는 시간 — 사장님 09-13 「이건 노출 시간 좀 길게」 → 알림의 3배
-const MAX_TEXT_LINES = 6;   // [2026-09-16] 화면에 보이는 «글자 줄» 상한. 주문 한 건이 2~3줄을 쓰므로 칸 개수로는 못 센다.
-                            //   기준 높이 320 = 이 6줄이 꽉 차는 높이. 넘치면 오래된 알림부터 빠진다.
+const MAX_TEXT_LINES = 4;   // [2026-09-16] 화면에 보이는 «글자 줄» 상한 — 📌 공지 2줄 + 알림 2줄.
+                            //   실측 렌더: 이 4줄이 약 290px. 방송 화면 점유 약 13%(채팅이 덮는 아래쪽)라
+                            //   상품·얼굴을 가리지 않는다. 6줄로 하면 419px(19%)라 너무 가린다.
+                            //   넘치면 «오래된 알림»부터 안 그린다.
 const WIDGET_W = 860;       // 기본 폭(px) — [09-13 사장님 「가로 좀 늘려줘 길이가 아쉽네」] 640 → 860 (한 줄에 34% 더 들어감)
 // [2026-09-13] «프리즘 네모 크기 = 위젯 크기» — 권장 네모 880×320 이 1배. 네모를 키우면 글자도 그 비율로 커지고, 줄이면 작아진다(비율 고정).
-const BOX_W = 880, BOX_H = 320;   // 폭 860 + 여백 20 / 높이 = 6줄 꽉 채운 높이
+const BOX_W = 880, BOX_H = 300;   // 폭 860 + 여백 20 / 높이 = 4줄(공지2+알림2)이 꽉 차는 높이(실측 290)
 // [2026-09-16 사장님 «크기만 늘리면 뭐함 — 폰트도 키워야지»]
 //   이 BOX_H 가 글자 크기를 정한다. 네모 안에 880×BOX_H 를 꽉 채워 넣기 때문에,
 //   BOX_H 가 실제 내용보다 크면 그 차이만큼 «빈 공간»이 되고 글자는 그만큼 작게 들어간다.
@@ -240,7 +242,11 @@ export default function OrderFeedWidgetClient() {
   const source = previewMode && items.length === 0 ? PREVIEW_ROWS : (live || previewMode ? items : []);
   // [2026-09-16] «글자 줄» 예산으로 자른다. 주문 한 건 = 인사말 1줄 + 상품 최대 2줄, 📢 안내 = 2줄, 📌 공지 = 2줄.
   //   최신(맨 아래)부터 담고 예산이 차면 오래된 건 안 그린다 → 기준 높이를 넘지 않는다.
-  const textLinesOf = (it: FeedItem) => (it.kind === "notice" ? 2 : 1 + Math.min(it.lines.length, 2));
+  const textLinesOf = (it: FeedItem) => {
+    if (it.kind === "notice") return 2;
+    const m = KIND_META[it.kind as Exclude<FeedKind, "notice">];
+    return feedRowFitsOneLine(it.nick, `${m.icon} ${m.verb}`, it.lines[0]?.left || "") ? 1 : 2;
+  };
   let budget = MAX_TEXT_LINES - (showPin ? 2 : 0);
   const picked: FeedItem[] = [];
   for (let i = source.length - 1; i >= 0; i -= 1) {
@@ -292,6 +298,9 @@ export default function OrderFeedWidgetClient() {
             );
           }
           const meta = KIND_META[item.kind as Exclude<FeedKind, "notice">];
+          const detailText = item.lines[0]?.left || "";
+          // 글자 폭을 재서 «한 줄에 들어가면 한 줄». 들어가는지는 CSS 가 미리 못 알려주므로 lib 에서 계산한다.
+          const oneLine = feedRowFitsOneLine(item.nick, `${meta.icon} ${meta.verb}`, detailText);
           return (
             <div
               key={item.id}
@@ -323,37 +332,39 @@ export default function OrderFeedWidgetClient() {
                   animation: "ruruShine 0.8s cubic-bezier(0.16,1,0.3,1) 0.05s both",
                 }}
               />
-              {/* [2026-09-16 실측 재설계] 1층 «누가 + 인사말» / 2층부터 «주문내역(상품 · 금액)».
-                  가로가 이미 화면의 88%라 한 줄로는 글자를 못 키운다 → 줄을 나눠 글자를 키웠다.
-                  금액은 상품명 «바로 뒤»에 붙인다(예전처럼 오른쪽 끝으로 보내지 않는다). */}
-              <span style={{ minWidth: 0, flex: "1 1 auto", display: "flex", flexDirection: "column", gap: "3px" }}>
-                <span style={{ minWidth: 0, display: "flex", alignItems: "baseline", gap: "10px", lineHeight: 1.1 }}>
+              {/* [2026-09-16 사장님 «바람잡이»] 손님들이 «저런 걸 사는구나» 보게 하는 줄이다.
+                  → 금액은 빼고 «상품 이름»을 보여준다. 금액이 빠진 만큼 자리가 남아 대부분 한 줄로 끝난다(화면을 덜 가린다).
+                  들어가면 한 줄, 안 들어가면 2줄(1층 누가·인사말 / 2층 주문내역). 3줄은 만들지 않는다.
+                  글자 크기는 «유튜브 채팅과 같게» 맞췄다(실측: 채팅 글자 21px = 이 위젯 37px). */}
+              <span style={{ minWidth: 0, flex: "1 1 auto", display: "flex", flexDirection: "column", gap: "2px" }}>
+                <span style={{ minWidth: 0, display: "flex", alignItems: "baseline", gap: "11px", lineHeight: 1.12 }}>
                   {/* 닉네임 = 손님이 자기 이름을 찾는 곳. 안 자른다(아주 긴 것만 60% 선에서 …) */}
-                  <span style={{ flexShrink: 0, maxWidth: "60%", fontSize: "40px", fontWeight: 900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {item.nick}<span style={{ fontSize: "28px", fontWeight: 700, opacity: 0.85 }}>님</span>
+                  <span style={{ flexShrink: 0, maxWidth: "60%", fontSize: `${FEED_ROW_SIZES.nick}px`, fontWeight: 900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {item.nick}<span style={{ fontSize: `${FEED_ROW_SIZES.nim}px`, fontWeight: 700, opacity: 0.85 }}>님</span>
                   </span>
                   <span
                     style={{
-                      flexShrink: 1, minWidth: 0, fontSize: "30px", fontWeight: 800, color: meta.accent, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                      flexShrink: 0, fontSize: `${FEED_ROW_SIZES.verb}px`, fontWeight: 800, color: meta.accent, whiteSpace: "nowrap",
                       transformOrigin: "left center",
                       animation: "ruruVerbPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.35s both",
                     }}
                   >
                     {meta.icon} {meta.verb}
                   </span>
-                </span>
-                {item.lines.slice(0, 2).map((ln, i) => (
-                  <span key={i} style={{ minWidth: 0, display: "flex", alignItems: "baseline", gap: "12px", lineHeight: 1.15 }}>
-                    <span style={{ flexShrink: 1, minWidth: 0, fontSize: "30px", fontWeight: 700, color: "rgba(255,255,255,0.93)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {ln.left}
-                    </span>
-                    {ln.right ? (
-                      <span style={{ flexShrink: 0, fontSize: "34px", fontWeight: 900, color: "#fff", whiteSpace: "nowrap" }}>
-                        {ln.right}
+                  {oneLine && detailText ? (
+                    <>
+                      <span style={{ flexShrink: 0, fontSize: "24px", opacity: 0.45 }}>·</span>
+                      <span style={{ flexShrink: 1, minWidth: 0, fontSize: `${FEED_ROW_SIZES.detail}px`, fontWeight: 700, color: "rgba(255,255,255,0.95)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {detailText}
                       </span>
-                    ) : null}
+                    </>
+                  ) : null}
+                </span>
+                {!oneLine && detailText ? (
+                  <span style={{ minWidth: 0, fontSize: `${FEED_ROW_SIZES.detail}px`, fontWeight: 700, color: "rgba(255,255,255,0.95)", lineHeight: 1.18, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {detailText}
                   </span>
-                ))}
+                ) : null}
               </span>
 
             </div>

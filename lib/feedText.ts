@@ -50,33 +50,79 @@ function compactOption(opt: string): string {
 }
 
 /**
- * 주문 한 건 → 피드에 그릴 «한 줄». [2026-09-16 사장님]
- *   「세로가 답답하다 / 금액이 오른쪽 끝에 떨어져 있어 안 읽힌다 / 정보량은 적은데 가로만 길다」
- *   → 2층(닉네임 줄 + 상품 줄)을 없애고 닉네임 옆에 바로 붙는 «한 줄»로 만든다. 폭도 글자 길이에 맞춰 줄어든다.
+ * 주문 한 건 → 방송에 띄울 «주문내역 한 줄». [2026-09-16 사장님]
+ *   「손님들도 「와 저런 거 사는구나」 보게 하는 바람잡이 역할이다. 실제 주문내용이 보여야 한다.
+ *    금액은 굳이 안 나와도 될 것 같다. 근데 방송화면을 너무 가리면 안 된다」
+ *   → 금액을 빼면 그만큼 «상품 이름»이 들어간다. 그래서 대부분 한 줄로 끝난다(화면을 덜 가린다).
  *
- *   상품 1개 : 왼쪽 「나이키 쭈리후드티_센터자수 · 블랙/L · 2개」 오른쪽 「118,000원」
- *   상품 2개↑: 왼쪽 「나이키 바람막이 외 2종」              오른쪽 「합계 84,000원」
- *   금액 = 단가 × 수량. 단가가 없으면(0) 금액 칸 비움. 수량 1이면 «N개» 생략.
- *   오른쪽(금액)은 절대 안 잘리고, 왼쪽(이름·옵션)이 길면 … 로 줄인다.
- *   optionText: 색상·사이즈 → 옵션 문구(없음 숨김)는 부른 쪽이 넘긴다(lib/orderOptionText 의존 안 함 — 테스트 단순화).
+ *   상품 1개 : 「아미반팔 · L」
+ *   상품 2~3개: 「나이키 바람막이 · M, 꽃티 · L」   ← 쉼표로 이어 붙인다
+ *   상품 4개↑ : 「나이키 바람막이 · M, 꽃티 · L, 알로가방 외 2종」
+ *   수량이 2개 이상이면 이름 뒤에 「2개」. 금액은 넣지 않는다.
+ *   optionText: 색상·사이즈 → 옵션 문구(없음 숨김)는 부른 쪽이 넘긴다.
  */
 export function feedOrderLines(items: FeedOrderItem[], optionText: (color: unknown, size: unknown) => string): FeedLine[] {
-  const rows = items
+  const text = feedOrderProducts(items, optionText);
+  return text ? [{ left: text, right: "" }] : [];
+}
+
+const MAX_NAMES = 3;
+
+/** 주문 한 건의 상품들 → 방송에 띄울 한 줄 문구(금액 없음) */
+export function feedOrderProducts(items: FeedOrderItem[], optionText: (color: unknown, size: unknown) => string): string {
+  const parts = items
     .map((it) => {
       const name = cleanProductNameForFeed(it.name);
+      if (!name) return "";
       const qty = Math.max(1, Math.floor(Number(it.qty) || 1));
-      const price = Math.max(0, Number(it.price) || 0);
       const opt = compactOption(optionText(it.color, it.size).trim());
-      return { name, qty, amount: price * qty, opt };
+      return [name, opt, qty > 1 ? `${qty}개` : ""].filter(Boolean).join(" · ");
     })
-    .filter((r) => r.name);
-  if (rows.length === 0) return [];
-  const lineOf = (r: (typeof rows)[number]) => ({
-    left: [r.name, r.opt, r.qty > 1 ? `${r.qty}개` : ""].filter(Boolean).join(" · "),
-    right: r.amount > 0 ? won(r.amount) : "",
-  });
-  // 1~2개: 상품마다 한 줄.  3개↑: 첫 상품 한 줄 + 「외 N종 · 합계 …」 한 줄.
-  if (rows.length <= 2) return rows.map(lineOf);
-  const total = rows.reduce((s, r) => s + r.amount, 0);
-  return [lineOf(rows[0]), { left: `외 ${rows.length - 1}종`, right: total > 0 ? `합계 ${won(total)}` : "" }];
+    .filter(Boolean);
+  if (parts.length === 0) return "";
+  if (parts.length <= MAX_NAMES) return parts.join(", ");
+  return `${parts.slice(0, MAX_NAMES).join(", ")} 외 ${parts.length - MAX_NAMES}종`;
+}
+
+
+// ── [2026-09-16] 「한 줄에 들어가면 한 줄」 판정 ───────────────────────────────
+// 방송 화면을 덜 가리려면 한 줄이 맞다. 그런데 CSS 는 «들어가는지»를 미리 못 알려준다.
+//   → 글자 폭을 추정해서 미리 정한다. (추정 근거: 한글·이모지는 글자크기만큼, 숫자·영문은 약 0.55배)
+//   사장님 방송 캡쳐 실측 기준 — 위젯 알약 안쪽 가용 폭은 814px(=860 − 좌우 여백 46).
+export const FEED_ROW_AVAIL_W = 814;
+
+/** 문자열의 대략적인 폭(px). em = 글자 크기 */
+export function estimateTextWidth(text: string, em: number): number {
+  let w = 0;
+  for (const ch of String(text ?? "")) {
+    const c = ch.codePointAt(0) || 0;
+    if (ch === " ") w += em * 0.3;
+    else if (c > 0x1f000 || (c >= 0x2190 && c <= 0x2bff)) w += em * 1.15;          // 이모지·기호
+    else if ((c >= 0xac00 && c <= 0xd7a3) || (c >= 0x3130 && c <= 0x318f)) w += em; // 한글
+    else if (c < 0x0250) w += em * 0.55;                                           // 숫자·영문
+    else w += em * 0.9;
+  }
+  return w;
+}
+
+export type FeedRowSizes = { nick: number; nim: number; verb: number; detail: number };
+/** 기본 글자 크기(디자인 px). 위젯과 이 파일이 «같은 숫자»를 봐야 판정이 맞는다. */
+export const FEED_ROW_SIZES: FeedRowSizes = { nick: 40, nim: 28, verb: 30, detail: 37 };
+
+/**
+ * 이 줄이 «한 줄»에 들어가나? (닉네임 + 인사말 + 주문내역 + 금액 + 칸 사이 여백)
+ *   들어가면 한 줄, 안 들어가면 2줄(1층 = 누가·인사말 / 2층 = 주문내역).
+ *   주문내역이 없는 입금·카드 줄은 언제나 한 줄이다.
+ */
+export function feedRowFitsOneLine(
+  nick: string, verb: string, detail: string,
+  sizes: FeedRowSizes = FEED_ROW_SIZES, avail: number = FEED_ROW_AVAIL_W,
+): boolean {
+  if (!detail) return true;
+  const GAP = 11;
+  const w =
+    estimateTextWidth(nick, sizes.nick) + estimateTextWidth("님", sizes.nim) + GAP +
+    estimateTextWidth(verb, sizes.verb) + GAP +
+    estimateTextWidth(detail, sizes.detail);
+  return w <= avail;
 }
