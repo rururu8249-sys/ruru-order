@@ -42,7 +42,6 @@ export type FeedOrderItem = { name: unknown; color?: unknown; size?: unknown; qt
 /** 피드 한 줄 = 왼쪽(상품명 · 옵션 · N개) + 오른쪽(금액). 오른쪽은 잘리지 않게 따로 그린다. */
 export type FeedLine = { left: string; right: string };
 
-const MAX_LINES_PER_ORDER = 2;
 const won = (n: number) => `${Math.round(n).toLocaleString("ko-KR")}원`;
 
 /** 옵션을 피드용으로 짧게: 「블랙 / 사이즈 L」 → 「블랙/L」, 「사이즈 240」 → 「240」 (한 줄에 이름·옵션·금액이 다 들어가야 해서) */
@@ -51,11 +50,14 @@ function compactOption(opt: string): string {
 }
 
 /**
- * 주문 한 건(상품 여러 줄) → 피드에 그릴 줄들(최대 2줄).
- *   1~2개: 상품마다 한 줄  왼쪽 「나이키 쭈리후드티_센터자수 · 블랙/L」 ······ 오른쪽 「2개 · 118,000원」
- *   3개↑ : 첫 상품 한 줄 + 왼쪽 「외 2종」 ······ 오른쪽 「합계 187,000원」
- *   금액 = 단가 × 수량(줄 금액). 단가가 없으면(0) 금액 칸 비움. 수량 1이면 «N개» 생략.
- *   오른쪽(수량·금액)은 잘리지 않고, 왼쪽(이름·옵션)이 길면 …  — 실측: 폭 640·20px 글자면 왼쪽 약 21자.
+ * 주문 한 건 → 피드에 그릴 «한 줄». [2026-09-16 사장님]
+ *   「세로가 답답하다 / 금액이 오른쪽 끝에 떨어져 있어 안 읽힌다 / 정보량은 적은데 가로만 길다」
+ *   → 2층(닉네임 줄 + 상품 줄)을 없애고 닉네임 옆에 바로 붙는 «한 줄»로 만든다. 폭도 글자 길이에 맞춰 줄어든다.
+ *
+ *   상품 1개 : 왼쪽 「나이키 쭈리후드티_센터자수 · 블랙/L · 2개」 오른쪽 「118,000원」
+ *   상품 2개↑: 왼쪽 「나이키 바람막이 외 2종」              오른쪽 「합계 84,000원」
+ *   금액 = 단가 × 수량. 단가가 없으면(0) 금액 칸 비움. 수량 1이면 «N개» 생략.
+ *   오른쪽(금액)은 절대 안 잘리고, 왼쪽(이름·옵션)이 길면 … 로 줄인다.
  *   optionText: 색상·사이즈 → 옵션 문구(없음 숨김)는 부른 쪽이 넘긴다(lib/orderOptionText 의존 안 함 — 테스트 단순화).
  */
 export function feedOrderLines(items: FeedOrderItem[], optionText: (color: unknown, size: unknown) => string): FeedLine[] {
@@ -69,11 +71,14 @@ export function feedOrderLines(items: FeedOrderItem[], optionText: (color: unkno
     })
     .filter((r) => r.name);
   if (rows.length === 0) return [];
-  const lineOf = (r: (typeof rows)[number]): FeedLine => ({
-    left: [r.name, r.opt].filter(Boolean).join(" · "),
-    right: [r.qty > 1 ? `${r.qty}개` : "", r.amount > 0 ? won(r.amount) : ""].filter(Boolean).join(" · "),
-  });
-  if (rows.length <= MAX_LINES_PER_ORDER) return rows.map(lineOf);
+  const first = rows[0];
+  if (rows.length === 1) {
+    return [{
+      left: [first.name, first.opt, first.qty > 1 ? `${first.qty}개` : ""].filter(Boolean).join(" · "),
+      right: first.amount > 0 ? won(first.amount) : "",
+    }];
+  }
+  // 여러 상품이면 «첫 상품 외 N종 + 합계» 한 줄로. (옵션은 뺀다 — 한 줄에 다 들어가야 한다)
   const total = rows.reduce((s, r) => s + r.amount, 0);
-  return [lineOf(rows[0]), { left: `외 ${rows.length - 1}종`, right: total > 0 ? `합계 ${won(total)}` : "" }];
+  return [{ left: `${first.name} 외 ${rows.length - 1}종`, right: total > 0 ? `합계 ${won(total)}` : "" }];
 }

@@ -78,7 +78,7 @@ const statusOf = (row: AnyRow) => String(row?.admin_order_status_v2 || row?.orde
 const groupOf = (row: AnyRow) => String(row?.order_group_id || row?.id || "");
 
 const PREVIEW_ROWS: FeedItem[] = [
-  { id: "p1", kind: "order",   nick: "지니키키", lines: [{ left: "나이키 쭈리후드티_센터자수 · 블랙/L", right: "59,000원" }, { left: "뉴발란스740 · 240", right: "129,000원" }], at: 0 },
+  { id: "p1", kind: "order",   nick: "지니키키", lines: [{ left: "나이키 쭈리후드티_센터자수 외 1종", right: "합계 188,000원" }], at: 0 },
   { id: "p2", kind: "notice",  nick: "", lines: [], at: 0, text: "노다001신더 99,000원 사이즈 235·240·260~275·285 남은 13" },
   { id: "p3", kind: "card",    nick: "루루짱929", lines: [], at: 0 },
 ];
@@ -238,7 +238,8 @@ export default function OrderFeedWidgetClient() {
       <div
         style={{
           position: "absolute", left: "8px", bottom: "8px", width: `${WIDGET_W}px`,
-          display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: "10px",
+          // [2026-09-16 사장님 «정보량은 적은데 가로만 길다»] 줄마다 «글자 길이만큼»만 차지하고, 길면 위젯 폭에서 멈춘다.
+          display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "flex-start", gap: "8px",
           transform: fitScale !== 1 ? `scale(${fitScale})` : undefined, transformOrigin: "bottom left",
         }}
       >
@@ -251,9 +252,9 @@ export default function OrderFeedWidgetClient() {
               <div
                 key={item.id}
                 style={{
-                  alignSelf: "stretch", boxSizing: "border-box",
+                  maxWidth: "100%", boxSizing: "border-box",                            // [09-16] 폭 자동 — 글자만큼만
                   display: "flex", alignItems: "center", gap: "10px",
-                  padding: "9px 18px 9px 14px",
+                  padding: "14px 24px 14px 20px",                                        // [09-16 사장님 «좁고 답답하다»] 세로 두껍게
                   borderRadius: "999px",
                   background: "rgba(24, 20, 12, 0.45)",                                  // 흐림 없음 — 뒤가 그대로 비침
                   boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
@@ -275,10 +276,10 @@ export default function OrderFeedWidgetClient() {
             <div
               key={item.id}
               style={{
-                alignSelf: "stretch", boxSizing: "border-box",                       // [09-13 사장님] 공지와 같은 폭(위젯 폭 전체) — 옵션·금액이 들어갈 자리
+                maxWidth: "100%", boxSizing: "border-box",                           // [09-16 사장님] 폭은 «글자 길이만큼». 길면 위젯 폭에서 … 로 줄인다
                 position: "relative", overflow: "hidden",                            // 빛 줄이 말풍선 밖으로 안 나가게
                 display: "flex", alignItems: "center", gap: "12px",
-                padding: "10px 16px 10px 18px",
+                padding: "15px 18px 15px 22px",                                      // [09-16 사장님 «좁고 답답하다»] 세로 두껍게
                 borderRadius: "999px",
                 background: "rgba(14, 12, 18, 0.42)",                                 // 흐림 없음 — 뒤가 그대로 비침
                 boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
@@ -302,34 +303,34 @@ export default function OrderFeedWidgetClient() {
                   animation: "ruruShine 0.8s cubic-bezier(0.16,1,0.3,1) 0.05s both",
                 }}
               />
-              <span style={{ minWidth: 0, flex: 1, display: "flex", flexDirection: "column", gap: "2px" }}>
-                <span style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
-                  <span style={{ fontSize: "30px", fontWeight: 900, lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {item.nick}<span style={{ fontSize: "22px", fontWeight: 800, opacity: 0.9 }}>님</span>
-                  </span>
-                  <span
-                    style={{
-                      flexShrink: 0, display: "inline-block", fontSize: "26px", fontWeight: 800, lineHeight: 1.1, color: meta.accent, whiteSpace: "nowrap",
-                      transformOrigin: "left center",
-                      animation: "ruruVerbPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.35s both",
-                    }}
-                  >
-                    {meta.icon} {meta.verb}
-                  </span>
+              {/* [2026-09-16 사장님] 닉네임 · 감사문구 · 상품 · 금액을 «한 줄»로. 금액이 상품 바로 뒤에 붙어 읽힌다.
+                  길면 «상품 이름»만 … 로 줄어들고 닉네임·금액은 끝까지 보인다. */}
+              <span style={{ minWidth: 0, display: "flex", alignItems: "baseline", gap: "10px", lineHeight: 1.15 }}>
+                <span style={{ flexShrink: 0, fontSize: "30px", fontWeight: 900, whiteSpace: "nowrap" }}>
+                  {item.nick}<span style={{ fontSize: "22px", fontWeight: 800, opacity: 0.9 }}>님</span>
                 </span>
-                {/* 상품 줄(최대 2줄): 왼쪽 상품명·옵션·수량은 길면 …, 오른쪽 금액은 절대 안 잘림 */}
-                {item.lines.map((ln, i) => (
-                  <span key={i} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "14px", minWidth: 0 }}>
-                    <span style={{ minWidth: 0, fontSize: "20px", fontWeight: 700, lineHeight: 1.2, color: "rgba(255,255,255,0.88)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {ln.left}
+                <span
+                  style={{
+                    flexShrink: 0, display: "inline-block", fontSize: "26px", fontWeight: 800, color: meta.accent, whiteSpace: "nowrap",
+                    transformOrigin: "left center",
+                    animation: "ruruVerbPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.35s both",
+                  }}
+                >
+                  {meta.icon} {meta.verb}
+                </span>
+                {item.lines[0] ? (
+                  <>
+                    <span style={{ flexShrink: 0, fontSize: "22px", opacity: 0.5 }}>·</span>
+                    <span style={{ minWidth: 0, fontSize: "23px", fontWeight: 700, color: "rgba(255,255,255,0.92)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {item.lines[0].left}
                     </span>
-                    {ln.right ? (
-                      <span style={{ flexShrink: 0, fontSize: "20px", fontWeight: 900, lineHeight: 1.2, color: "#fff", whiteSpace: "nowrap" }}>
-                        {ln.right}
+                    {item.lines[0].right ? (
+                      <span style={{ flexShrink: 0, fontSize: "25px", fontWeight: 900, color: "#fff", whiteSpace: "nowrap" }}>
+                        {item.lines[0].right}
                       </span>
                     ) : null}
-                  </span>
-                ))}
+                  </>
+                ) : null}
               </span>
 
               {/* 작은 «주문/입금/카드» 표시 — 진짜 채팅과 구분 */}
@@ -350,9 +351,9 @@ export default function OrderFeedWidgetClient() {
         {showPin ? (
           <div
             style={{
-              alignSelf: "stretch", boxSizing: "border-box",                  // 알림 줄과 같은 폭(위젯 폭 전체)
+              maxWidth: "100%", boxSizing: "border-box",                      // [09-16] 폭 자동 — 글자만큼만
               display: "flex", alignItems: "center", gap: "10px",
-              padding: "9px 18px 9px 14px", marginTop: "4px",
+              padding: "14px 24px 14px 20px", marginTop: "4px",               // [09-16 사장님 «좁고 답답하다»] 세로 두껍게
               borderRadius: "999px",
               background: "rgba(123, 45, 67, 0.45)",                                  // 흐림 없음 — 뒤가 그대로 비침
               boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
