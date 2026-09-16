@@ -33,7 +33,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { getActiveBroadcast, loadAdminLiveBroadcasts } from "@/components/admin-live/liveBroadcastController";
-import { feedOrderLines, feedRowFitsOneLine, FEED_ROW_SIZES, type FeedLine, type FeedOrderItem } from "@/lib/feedText";
+import { feedOrderLines, feedRowFitsOneLine, feedDetailLineCount, feedPinFitsOneLine, FEED_ROW_SIZES, FEED_DETAIL_MAX_LINES, type FeedLine, type FeedOrderItem } from "@/lib/feedText";
 import { formatOrderOptionText } from "@/lib/orderOptionText";
 
 type AnyRow = Record<string, any>;
@@ -43,10 +43,17 @@ type FeedItem = { id: string; kind: FeedKind; nick: string; lines: FeedLine[]; a
 
 const SHOW_MS = 10000;      // 알림 한 줄이 떠 있는 시간 (사장님 09-12: 10초)
 const NOTICE_MS = 30000;    // 📢 상품 안내가 떠 있는 시간 — 사장님 09-13 「이건 노출 시간 좀 길게」 → 알림의 3배
-const MAX_TEXT_LINES = 4;   // [2026-09-16] 화면에 보이는 «글자 줄» 상한 — 📌 공지 2줄 + 알림 2줄.
-                            //   실측 렌더: 이 4줄이 약 290px. 방송 화면 점유 약 13%(채팅이 덮는 아래쪽)라
-                            //   상품·얼굴을 가리지 않는다. 6줄로 하면 419px(19%)라 너무 가린다.
-                            //   넘치면 «오래된 알림»부터 안 그린다.
+// [2026-09-16 사장님] 「상품이 많으면 자리를 더 쓰고, 대신 화면에 뜨는 개수를 줄여라. 주문내용은 다 보이게」
+//   → «줄 수»가 아니라 «높이»로 관리한다(줄마다 높이가 달라서 줄 수로 세면 틀린다).
+//   실측 렌더(디자인 px): 📌공지/📢안내 1줄 77 · 2줄 120 / 알림 한 줄 75 · 주문내역 한 줄 늘 때마다 +44
+//   예산 292px = 방송화면의 약 10%. 아래 조합이 전부 예산 안에 들어간다.
+//     공지1줄 + 상품 많은 주문 1건(4줄) = 77 + 207 + 8 = 292   ← 「공지 포함 2개만」
+//     공지2줄 + 주문 2건(각 1줄)        = 120 + 150 + 16 = 286
+//     공지1줄 + 주문 3건(각 1줄)        = 77 + 225 + 24 = 326 → 넘으므로 오래된 1건이 빠진다
+const BUDGET_H = 292;
+const H_PAD_NOTICE = 34, H_LINE_NOTICE = 43;   // 📌공지·📢안내
+const H_ALERT_ONE = 75, H_DETAIL_LINE = 44;    // 알림 한 줄 / 주문내역 한 줄 추가분
+const KEEP_ITEMS = 6;                          // 메모리에 들고 있는 알림 수(그릴 때 예산으로 자른다)
 const WIDGET_W = 860;       // 기본 폭(px) — [09-13 사장님 「가로 좀 늘려줘 길이가 아쉽네」] 640 → 860 (한 줄에 34% 더 들어감)
 // [2026-09-13] «프리즘 네모 크기 = 위젯 크기» — 권장 네모 880×320 이 1배. 네모를 키우면 글자도 그 비율로 커지고, 줄이면 작아진다(비율 고정).
 const BOX_W = 880, BOX_H = 300;   // 폭 860 + 여백 20 / 높이 = 4줄(공지2+알림2)이 꽉 차는 높이(실측 290)
@@ -170,7 +177,7 @@ export default function OrderFeedWidgetClient() {
   const lifeOf = (item: FeedItem) => (item.kind === "notice" ? NOTICE_MS : SHOW_MS);
 
   const pushItem = (item: FeedItem) => {
-    setItems((prev) => [...prev.filter((x) => x.id !== item.id), item].slice(-MAX_TEXT_LINES));   // 넉넉히 들고, 그릴 때 «줄 예산»으로 자른다
+    setItems((prev) => [...prev.filter((x) => x.id !== item.id), item].slice(-KEEP_ITEMS));   // 넉넉히 들고, 그릴 때 «높이 예산»으로 자른다
   };
 
   // 10초 지난 줄은 0.5초 동안 커튼 닫히듯 사라진 뒤 제거 (0.1초마다 확인 — 줄이 최대 3개라 부담 없음)
@@ -242,20 +249,25 @@ export default function OrderFeedWidgetClient() {
   const source = previewMode && items.length === 0 ? PREVIEW_ROWS : (live || previewMode ? items : []);
   // [2026-09-16] «글자 줄» 예산으로 자른다. 주문 한 건 = 인사말 1줄 + 상품 최대 2줄, 📢 안내 = 2줄, 📌 공지 = 2줄.
   //   최신(맨 아래)부터 담고 예산이 차면 오래된 건 안 그린다 → 기준 높이를 넘지 않는다.
-  const textLinesOf = (it: FeedItem) => {
-    if (it.kind === "notice") return 2;
+  // 이 줄이 화면에서 차지하는 «높이»(디자인 px)
+  const heightOf = (it: FeedItem) => {
+    if (it.kind === "notice") return H_PAD_NOTICE + H_LINE_NOTICE * (feedPinFitsOneLine(it.text || "") ? 1 : 2);
     const m = KIND_META[it.kind as Exclude<FeedKind, "notice">];
-    return feedRowFitsOneLine(it.nick, `${m.icon} ${m.verb}`, it.lines[0]?.left || "") ? 1 : 2;
+    const detail = it.lines[0]?.left || "";
+    if (feedRowFitsOneLine(it.nick, `${m.icon} ${m.verb}`, detail)) return H_ALERT_ONE;
+    return H_ALERT_ONE + H_DETAIL_LINE * feedDetailLineCount(detail);
   };
-  let budget = MAX_TEXT_LINES - (showPin ? 2 : 0);
+  // 📌 공지가 먼저 자리를 잡고, 남는 높이만큼 «최신 알림부터» 담는다.
+  let budget = BUDGET_H - (showPin ? H_PAD_NOTICE + H_LINE_NOTICE * (feedPinFitsOneLine(pinShown) ? 1 : 2) + 4 : 0);
   const picked: FeedItem[] = [];
   for (let i = source.length - 1; i >= 0; i -= 1) {
-    const cost = textLinesOf(source[i]);
+    const cost = heightOf(source[i]) + (picked.length > 0 || showPin ? 8 : 0);
     if (budget - cost < 0) break;
     budget -= cost;
     picked.unshift(source[i]);
   }
-  const visible = picked;
+  // 예산이 빠듯해 하나도 못 담는 경우엔 «최신 한 건»은 무조건 보여준다(알림이 통째로 안 뜨는 일 방지)
+  const visible = picked.length === 0 && source.length > 0 ? [source[source.length - 1]] : picked;
   if (visible.length === 0 && !showPin) return null;
 
   return (
@@ -361,7 +373,11 @@ export default function OrderFeedWidgetClient() {
                   ) : null}
                 </span>
                 {!oneLine && detailText ? (
-                  <span style={{ minWidth: 0, fontSize: `${FEED_ROW_SIZES.detail}px`, fontWeight: 700, color: "rgba(255,255,255,0.95)", lineHeight: 1.18, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  // 상품이 많으면 여기서 «최대 3줄»까지 펼친다(그만큼 화면에 뜨는 알림 개수가 줄어든다)
+                  <span style={{
+                    minWidth: 0, fontSize: `${FEED_ROW_SIZES.detail}px`, fontWeight: 700, color: "rgba(255,255,255,0.95)", lineHeight: 1.18,
+                    display: "-webkit-box", WebkitLineClamp: FEED_DETAIL_MAX_LINES, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "keep-all",
+                  }}>
                     {detailText}
                   </span>
                 ) : null}

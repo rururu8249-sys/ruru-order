@@ -49,42 +49,6 @@ function compactOption(opt: string): string {
   return opt.replace(/사이즈\s*/g, "").split("/").map((p) => p.trim()).filter(Boolean).join("/");
 }
 
-/**
- * 주문 한 건 → 방송에 띄울 «주문내역 한 줄». [2026-09-16 사장님]
- *   「손님들도 「와 저런 거 사는구나」 보게 하는 바람잡이 역할이다. 실제 주문내용이 보여야 한다.
- *    금액은 굳이 안 나와도 될 것 같다. 근데 방송화면을 너무 가리면 안 된다」
- *   → 금액을 빼면 그만큼 «상품 이름»이 들어간다. 그래서 대부분 한 줄로 끝난다(화면을 덜 가린다).
- *
- *   상품 1개 : 「아미반팔 · L」
- *   상품 2~3개: 「나이키 바람막이 · M, 꽃티 · L」   ← 쉼표로 이어 붙인다
- *   상품 4개↑ : 「나이키 바람막이 · M, 꽃티 · L, 알로가방 외 2종」
- *   수량이 2개 이상이면 이름 뒤에 「2개」. 금액은 넣지 않는다.
- *   optionText: 색상·사이즈 → 옵션 문구(없음 숨김)는 부른 쪽이 넘긴다.
- */
-export function feedOrderLines(items: FeedOrderItem[], optionText: (color: unknown, size: unknown) => string): FeedLine[] {
-  const text = feedOrderProducts(items, optionText);
-  return text ? [{ left: text, right: "" }] : [];
-}
-
-const MAX_NAMES = 3;
-
-/** 주문 한 건의 상품들 → 방송에 띄울 한 줄 문구(금액 없음) */
-export function feedOrderProducts(items: FeedOrderItem[], optionText: (color: unknown, size: unknown) => string): string {
-  const parts = items
-    .map((it) => {
-      const name = cleanProductNameForFeed(it.name);
-      if (!name) return "";
-      const qty = Math.max(1, Math.floor(Number(it.qty) || 1));
-      const opt = compactOption(optionText(it.color, it.size).trim());
-      return [name, opt, qty > 1 ? `${qty}개` : ""].filter(Boolean).join(" · ");
-    })
-    .filter(Boolean);
-  if (parts.length === 0) return "";
-  if (parts.length <= MAX_NAMES) return parts.join(", ");
-  return `${parts.slice(0, MAX_NAMES).join(", ")} 외 ${parts.length - MAX_NAMES}종`;
-}
-
-
 // ── [2026-09-16] 「한 줄에 들어가면 한 줄」 판정 ───────────────────────────────
 // 방송 화면을 덜 가리려면 한 줄이 맞다. 그런데 CSS 는 «들어가는지»를 미리 못 알려준다.
 //   → 글자 폭을 추정해서 미리 정한다. (추정 근거: 한글·이모지는 글자크기만큼, 숫자·영문은 약 0.55배)
@@ -125,4 +89,83 @@ export function feedRowFitsOneLine(
     estimateTextWidth(verb, sizes.verb) + GAP +
     estimateTextWidth(detail, sizes.detail);
   return w <= avail;
+}
+
+/**
+ * 주문 한 건 → 방송에 띄울 «주문내역 한 줄». [2026-09-16 사장님]
+ *   「손님들도 「와 저런 거 사는구나」 보게 하는 바람잡이 역할이다. 실제 주문내용이 보여야 한다.
+ *    금액은 굳이 안 나와도 될 것 같다. 근데 방송화면을 너무 가리면 안 된다」
+ *   → 금액을 빼면 그만큼 «상품 이름»이 들어간다. 그래서 대부분 한 줄로 끝난다(화면을 덜 가린다).
+ *
+ *   상품 1개 : 「아미반팔 · L」
+ *   상품 2~3개: 「나이키 바람막이 · M, 꽃티 · L」   ← 쉼표로 이어 붙인다
+ *   상품 4개↑ : 「나이키 바람막이 · M, 꽃티 · L, 알로가방 외 2종」
+ *   수량이 2개 이상이면 이름 뒤에 「2개」. 금액은 넣지 않는다.
+ *   optionText: 색상·사이즈 → 옵션 문구(없음 숨김)는 부른 쪽이 넘긴다.
+ */
+export function feedOrderLines(items: FeedOrderItem[], optionText: (color: unknown, size: unknown) => string): FeedLine[] {
+  const text = feedOrderProducts(items, optionText);
+  return text ? [{ left: text, right: "" }] : [];
+}
+
+/** 주문내역이 쓸 수 있는 최대 줄 수(위젯과 같은 값). 이 안에서 «상품을 최대한 많이» 보여준다. */
+export const FEED_DETAIL_MAX_LINES = 3;
+
+/**
+ * 주문 한 건의 상품들 → 방송에 띄울 문구(금액 없음).
+ * [2026-09-16 사장님] 「개수가 많으면 자리를 더 쓰고, 대신 화면에 뜨는 알림을 줄여라. 주문내용은 다 보이게」
+ *   → 개수로 자르지 않고 «줄 수»로 자른다. maxLines 줄에 들어가는 만큼 다 넣고, 남으면 「외 N종」.
+ */
+export function feedOrderProducts(
+  items: FeedOrderItem[],
+  optionText: (color: unknown, size: unknown) => string,
+  maxLines: number = FEED_DETAIL_MAX_LINES,
+  em: number = 37,
+  avail: number = FEED_ROW_AVAIL_W,
+): string {
+  const parts = items
+    .map((it) => {
+      const name = cleanProductNameForFeed(it.name);
+      if (!name) return "";
+      const qty = Math.max(1, Math.floor(Number(it.qty) || 1));
+      const opt = compactOption(optionText(it.color, it.size).trim());
+      return [name, opt, qty > 1 ? `${qty}개` : ""].filter(Boolean).join(" · ");
+    })
+    .filter(Boolean);
+  if (parts.length === 0) return "";
+
+  const budget = avail * Math.max(1, maxLines);
+  let taken = 0;
+  for (let i = 1; i <= parts.length; i += 1) {
+    const rest = parts.length - i;
+    const text = parts.slice(0, i).join(", ") + (rest > 0 ? ` 외 ${rest}종` : "");
+    if (estimateTextWidth(text, em) > budget) break;
+    taken = i;
+  }
+  if (taken === 0) taken = 1;                       // 하나도 못 넣는 경우는 없게(길면 …로 잘린다)
+  const rest = parts.length - taken;
+  return parts.slice(0, taken).join(", ") + (rest > 0 ? ` 외 ${rest}종` : "");
+}
+
+/** 주문내역이 몇 줄을 차지하나 (1층 인사말 줄은 뺀 숫자) */
+export function feedDetailLineCount(detail: string, em: number = 37, avail: number = FEED_ROW_AVAIL_W): number {
+  if (!detail) return 0;
+  return Math.min(FEED_DETAIL_MAX_LINES, Math.max(1, Math.ceil(estimateTextWidth(detail, em) / avail)));
+}
+
+
+// ── [2026-09-16 사장님 «공지글 몇 자 넘으면 2줄?»] ────────────────────────────
+// 📌 공지 알약 실측: 글자 34px · 안쪽 가용 폭 770px(=860 − 좌우여백 48 − 📌아이콘 32 − 간격 10).
+//   한글은 글자크기만큼 넓으므로 «한글 약 22자»가 한 줄. 이모지는 한글 1.15자로 친다.
+export const FEED_PIN_SIZE = 34;
+export const FEED_PIN_AVAIL_W = 770;
+
+/** 이 공지 문구가 한 줄에 들어가나? */
+export function feedPinFitsOneLine(text: string): boolean {
+  return estimateTextWidth(text, FEED_PIN_SIZE) <= FEED_PIN_AVAIL_W;
+}
+
+/** 한 줄을 100 으로 봤을 때 지금 몇 %인지 (관리자 입력칸 안내용) */
+export function feedPinFillPercent(text: string): number {
+  return Math.round((estimateTextWidth(text, FEED_PIN_SIZE) / FEED_PIN_AVAIL_W) * 100);
 }

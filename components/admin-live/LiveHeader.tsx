@@ -8,6 +8,7 @@ import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { buildChatAnnounceText } from "@/lib/chatAnnounce";
 import { buildDetailChatLine, detailProducts } from "@/lib/productDetailModel";
+import { feedPinFitsOneLine, feedPinFillPercent } from "@/lib/feedText";
 
 type VideoRatio = "vertical" | "wide" | "auto";
 
@@ -383,8 +384,16 @@ export default function LiveHeader({
           {/* [2026-09-12] 📌 위젯 고정 공지 — «이번 방송» 동안 주문·입금 알림 위젯 맨 위 한 줄(60자). 비우고 저장 = 숨김. 방송 없으면 비활성 */}
           <div className="xl:col-span-2">
             <div className="mb-1 flex items-center justify-between">
-              <label className="text-[11px] font-black text-ink-soft">📌 방송 화면 공지 <span className="font-bold text-ink-mute">— 방송 화면 알림(주문·입금) 맨 위에 한 줄로 뜸 · 비우면 안 뜸</span></label>
-              <span className="text-[11px] font-bold text-ink-mute">{pinSavedAt ? `저장 ${pinSavedAt}` : activeBroadcast ? "방송 끝나면 자동으로 지워짐" : "방송 시작 후 쓸 수 있음"}</span>
+              <label className="text-[11px] font-black text-ink-soft">📌 방송 화면 공지 <span className="font-bold text-ink-mute">— 주문·입금 알림 맨 아래에 뜸 · 비우면 안 뜸</span></label>
+              <div className="flex items-center gap-2">
+                {/* [2026-09-16 사장님 «몇 자 넘으면 2줄로 넘어가?»] 방송 화면 폭 실측(글자 34px · 가용 770px) 기준으로 지금 문구가 한 줄인지 바로 보여준다 */}
+                {pinText.trim() ? (
+                  feedPinFitsOneLine(pinText)
+                    ? <span className="text-[11px] font-black text-ok-tx">한 줄 ({feedPinFillPercent(pinText)}%)</span>
+                    : <span className="text-[11px] font-black text-warn-tx">2줄로 넘어감 ({feedPinFillPercent(pinText)}%) — 줄이면 한 줄</span>
+                ) : null}
+                <span className="text-[11px] font-bold text-ink-mute">{pinSavedAt ? `저장 ${pinSavedAt}` : activeBroadcast ? "방송 끝나면 자동으로 지워짐" : "방송 시작 후 쓸 수 있음"}</span>
+              </div>
             </div>
             <div className="flex gap-2">
               <input
@@ -393,7 +402,7 @@ export default function LiveHeader({
                 disabled={!activeBroadcast}
                 onChange={(event) => setPinText(event.target.value)}
                 onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void savePinText(); } }}
-                placeholder={activeBroadcast ? "예) 입금자명은 닉네임으로 보내주세요 🙏" : "방송을 시작한 뒤에 쓸 수 있어요 (방송마다 새로 씁니다)"}
+                placeholder={activeBroadcast ? "예) 입금자명은 닉네임으로 보내주세요 🙏 (한글 22자쯤이 한 줄)" : "방송을 시작한 뒤에 쓸 수 있어요 (방송마다 새로 씁니다)"}
                 className="h-9 min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-line focus:ring-2 focus:ring-rose-soft disabled:opacity-50"
               />
               <button
