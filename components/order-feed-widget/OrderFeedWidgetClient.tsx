@@ -173,8 +173,14 @@ export default function OrderFeedWidgetClient() {
     return () => { alive = false; window.clearInterval(timer); supabase.removeChannel(ch); };
   }, []);
 
-  // 줄마다 떠 있는 시간 — 📢 안내만 30초, 나머지는 10초
-  const lifeOf = (item: FeedItem) => (item.kind === "notice" ? NOTICE_MS : SHOW_MS);
+  // 줄마다 떠 있는 시간 — 📢 안내는 30초. 주문 알림은 «읽을 양»에 맞춰 유도리 있게.
+  //   [2026-09-16 사장님] 「내용이 길면 적용시간도 유도리 있게 바뀌어야 할 것 같은데」
+  //   한 줄 10초 · 주문내역이 두 줄이면 12.5초 · 세 줄이면 15초. (상품이 많을수록 읽을 게 많다)
+  const lifeOf = (item: FeedItem) => {
+    if (item.kind === "notice") return NOTICE_MS;
+    const detailLines = feedDetailLineCount(item.lines[0]?.left || "");
+    return SHOW_MS + Math.max(0, detailLines - 1) * 2500;
+  };
 
   const pushItem = (item: FeedItem) => {
     setItems((prev) => [...prev.filter((x) => x.id !== item.id), item].slice(-KEEP_ITEMS));   // 넉넉히 들고, 그릴 때 «높이 예산»으로 자른다
