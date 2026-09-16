@@ -12,7 +12,7 @@ assert.equal(cleanProductNameForFeed("FB7789"), "FB7789");                      
 assert.equal(feedOrderDetail(["[👽주말마지막] 나이키 쭈리후드티_센터자수 FB7789", "나이키 바람막이", "양말"]), "나이키 쭈리후드티_센터자수 외 2종");
 assert.equal(feedOrderDetail(["반집업 룰루레몬"]), "반집업 룰루레몬");
 assert.equal(feedOrderDetail([]), "");
-// [2026-09-16] 한 줄 요약 — 왼쪽(이름·옵션·수량) / 오른쪽(금액). 여러 상품이면 «외 N종 + 합계»
+// [2026-09-16] 주문내역 줄 — 왼쪽(이름·옵션·수량) / 오른쪽(금액). 1~2개는 상품마다, 3개↑는 첫 상품 + 「외 N종 합계」
 const opt = formatOrderOptionText;
 assert.deepEqual(
   feedOrderLines([{ name: "[👽주말마지막] 나이키 쭈리후드티_센터자수 FB7789", color: "블랙", size: "L", qty: 2, price: 59000 }], opt),
@@ -20,11 +20,11 @@ assert.deepEqual(
 );
 assert.deepEqual(
   feedOrderLines([{ name: "뉴발란스740", color: "없음", size: "240", qty: 1, price: 129000 }, { name: "아미반팔", color: "없음", size: "없음", qty: "1", price: "30000" }], opt),
-  [{ left: "뉴발란스740 외 1종", right: "합계 159,000원" }],
+  [{ left: "뉴발란스740 · 240", right: "129,000원" }, { left: "아미반팔", right: "30,000원" }],
 );
 assert.deepEqual(
   feedOrderLines([{ name: "A", price: 10000 }, { name: "B", price: 20000, qty: 2 }, { name: "C", price: 5000 }], opt),
-  [{ left: "A 외 2종", right: "합계 55,000원" }],
+  [{ left: "A", right: "10,000원" }, { left: "외 2종", right: "합계 55,000원" }],
 );
 assert.deepEqual(feedOrderLines([{ name: "가격없음", price: 0 }], opt), [{ left: "가격없음", right: "" }]);
 assert.deepEqual(feedOrderLines([], opt), []);

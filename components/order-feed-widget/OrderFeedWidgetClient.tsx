@@ -43,15 +43,18 @@ type FeedItem = { id: string; kind: FeedKind; nick: string; lines: FeedLine[]; a
 
 const SHOW_MS = 10000;      // 알림 한 줄이 떠 있는 시간 (사장님 09-12: 10초)
 const NOTICE_MS = 30000;    // 📢 상품 안내가 떠 있는 시간 — 사장님 09-13 「이건 노출 시간 좀 길게」 → 알림의 3배
-const MAX_LINES = 3;        // 화면에 보이는 전체 줄 수 상한 — 📌 공지·📢 안내 포함 (사장님 09-12)
+const MAX_TEXT_LINES = 6;   // [2026-09-16] 화면에 보이는 «글자 줄» 상한. 주문 한 건이 2~3줄을 쓰므로 칸 개수로는 못 센다.
+                            //   기준 높이 320 = 이 6줄이 꽉 차는 높이. 넘치면 오래된 알림부터 빠진다.
 const WIDGET_W = 860;       // 기본 폭(px) — [09-13 사장님 「가로 좀 늘려줘 길이가 아쉽네」] 640 → 860 (한 줄에 34% 더 들어감)
 // [2026-09-13] «프리즘 네모 크기 = 위젯 크기» — 권장 네모 880×320 이 1배. 네모를 키우면 글자도 그 비율로 커지고, 줄이면 작아진다(비율 고정).
-const BOX_W = 880, BOX_H = 300;   // 폭 860 + 여백 20 / 높이 = «실제로 쓰는 만큼»
+const BOX_W = 880, BOX_H = 320;   // 폭 860 + 여백 20 / 높이 = 6줄 꽉 채운 높이
 // [2026-09-16 사장님 «크기만 늘리면 뭐함 — 폰트도 키워야지»]
 //   이 BOX_H 가 글자 크기를 정한다. 네모 안에 880×BOX_H 를 꽉 채워 넣기 때문에,
 //   BOX_H 가 실제 내용보다 크면 그 차이만큼 «빈 공간»이 되고 글자는 그만큼 작게 들어간다.
-//   실측(브라우저 렌더): 알림 1줄 74px · 공지/안내 1줄 76px(2줄 116px) · 줄간격 8px
-//   → 흔한 최대(알림 2줄 + 공지 2줄) = 284px. 320 은 16%를 버리고 있었다 → 300 으로.
+//   [실측 · 사장님 방송 캡쳐 648×1440] 유튜브 채팅 글자 21px / 위젯 닉네임 17px / 위젯 상품줄은 측정도 안 될 만큼 작음.
+//   «채팅보다 작은 글씨»라 안 읽혔다. 위젯 알약은 가로 x39~615 = 화면 폭의 88% — 가로는 이미 꽉 찼다.
+//   → 한 줄에 욱여넣는 한 글자는 못 키운다. «2줄로 나눠» 한 줄당 글자 수를 줄이고 그만큼 글자를 키운다.
+//   비어 있던 세로(내용 171 / 기준 320 = 절반을 버리고 있었다)를 그 글자로 채우므로 화면 점유는 그대로다.
 //   ⚠ 공지·안내는 «최대 2줄»로 잘라 높이가 예측 가능하게 고정한다(아래 WebkitLineClamp).
 // [2026-09-13 사장님 «반투명 제대로 + 가독성»] «유리»처럼: 배경은 옅게(공지 45% · 알림 42%)·흐림 없음 → 방송 화면이 그대로 비친다.
 //   읽히는 건 배경이 아니라 «글자 테두리»가 맡는다(검정 1.5px 8방향 + 아래 그림자). 공지 30px(유튜브 채팅과 비슷).
@@ -66,14 +69,6 @@ const KIND_META: Record<Exclude<FeedKind, "notice">, { icon: string; tag: string
   card:    { icon: "💳", tag: "카드", verb: "카드결제 감사합니다", short: "카드결제", accent: "#60a5fa" },
 };
 
-// [2026-09-16] 한 줄에 다 안 들어가는 «긴 줄»이면 인사말을 줄인다.
-//   「루루짱929님 🛒 주문 감사합니다 · 아미반팔 30,000원」  ← 대부분은 이 형태 그대로
-//   「내가사는세상-88님 🛒 주문 · 나이키 바람막이 외 2종 합계 84,000원」  ← 길면 «감사합니다»를 빼서 상품명을 살린다
-//   (인사말보다 «누가·뭘·얼마»가 먼저다. 오른쪽 꼬리표도 이때는 중복이라 숨긴다)
-const TIGHT_CHARS = 25;
-function isTightRow(nick: string, left: string, right: string) {
-  return nick.length + left.length + right.length > TIGHT_CHARS;
-}
 
 // [2026-09-13 사장님] 알림 줄 등장 = «커튼이 젖혀지듯» 왼쪽→오른쪽 열림 + 빛 한 줄이 따라감 + 「주문 감사합니다」 톡 튀며 등장 + 강조색 잔광.
 //   📌 공지 줄은 상시라 애니메이션 없음. 전부 GPU 속성(clip-path·transform·opacity·box-shadow)이라 PRISM 부담 없음.
@@ -173,7 +168,7 @@ export default function OrderFeedWidgetClient() {
   const lifeOf = (item: FeedItem) => (item.kind === "notice" ? NOTICE_MS : SHOW_MS);
 
   const pushItem = (item: FeedItem) => {
-    setItems((prev) => [...prev.filter((x) => x.id !== item.id), item].slice(-MAX_LINES));   // 넉넉히 들고, 그릴 때 공지 여부로 자른다
+    setItems((prev) => [...prev.filter((x) => x.id !== item.id), item].slice(-MAX_TEXT_LINES));   // 넉넉히 들고, 그릴 때 «줄 예산»으로 자른다
   };
 
   // 10초 지난 줄은 0.5초 동안 커튼 닫히듯 사라진 뒤 제거 (0.1초마다 확인 — 줄이 최대 3개라 부담 없음)
@@ -242,9 +237,19 @@ export default function OrderFeedWidgetClient() {
 
   const showPin = (live || previewMode) && (pinText || (previewMode && !pinText));
   const pinShown = pinText || "공지: 입금자명은 닉네임으로 보내주세요";
-  const rowCap = MAX_LINES - (showPin ? 1 : 0);   // 📌 공지 포함 3줄 (📢 안내는 알림과 같은 줄로 취급)
   const source = previewMode && items.length === 0 ? PREVIEW_ROWS : (live || previewMode ? items : []);
-  const visible = source.slice(-rowCap);
+  // [2026-09-16] «글자 줄» 예산으로 자른다. 주문 한 건 = 인사말 1줄 + 상품 최대 2줄, 📢 안내 = 2줄, 📌 공지 = 2줄.
+  //   최신(맨 아래)부터 담고 예산이 차면 오래된 건 안 그린다 → 기준 높이를 넘지 않는다.
+  const textLinesOf = (it: FeedItem) => (it.kind === "notice" ? 2 : 1 + Math.min(it.lines.length, 2));
+  let budget = MAX_TEXT_LINES - (showPin ? 2 : 0);
+  const picked: FeedItem[] = [];
+  for (let i = source.length - 1; i >= 0; i -= 1) {
+    const cost = textLinesOf(source[i]);
+    if (budget - cost < 0) break;
+    budget -= cost;
+    picked.unshift(source[i]);
+  }
+  const visible = picked;
   if (visible.length === 0 && !showPin) return null;
 
   return (
@@ -275,7 +280,7 @@ export default function OrderFeedWidgetClient() {
                   boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
                   border: "1.5px solid rgba(253, 224, 71, 0.7)",
                   color: "#fff", textShadow: TEXT_SHADOW,
-                  fontSize: "30px", fontWeight: 900, lineHeight: 1.3, wordBreak: "keep-all",
+                  fontSize: "34px", fontWeight: 900, lineHeight: 1.25, wordBreak: "keep-all",
                   animation: leaving
                     ? `ruruCurtainOut ${EXIT_MS}ms ease-in forwards`
                     : "ruruCurtain 0.65s cubic-bezier(0.16,1,0.3,1) both",
@@ -287,8 +292,6 @@ export default function OrderFeedWidgetClient() {
             );
           }
           const meta = KIND_META[item.kind as Exclude<FeedKind, "notice">];
-          const detail = item.lines[0];
-          const tight = isTightRow(item.nick, detail?.left || "", detail?.right || "");
           return (
             <div
               key={item.id}
@@ -296,7 +299,7 @@ export default function OrderFeedWidgetClient() {
                 maxWidth: "100%", boxSizing: "border-box",                           // [09-16 사장님] 폭은 «글자 길이만큼». 길면 위젯 폭에서 … 로 줄인다
                 position: "relative", overflow: "hidden",                            // 빛 줄이 말풍선 밖으로 안 나가게
                 display: "flex", alignItems: "center", gap: "12px",
-                padding: "18px 20px 18px 24px",                                      // [09-16] 여백은 «글자 크기의 절반» 정도만 — 남는 높이는 글자에 쓴다
+                padding: "14px 22px 16px 24px",                                      // [09-16] 2층 구조라 여백은 최소로 — 남는 높이는 전부 «글자»에
                 borderRadius: "999px",
                 background: "rgba(14, 12, 18, 0.42)",                                 // 흐림 없음 — 뒤가 그대로 비침
                 boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
@@ -320,50 +323,39 @@ export default function OrderFeedWidgetClient() {
                   animation: "ruruShine 0.8s cubic-bezier(0.16,1,0.3,1) 0.05s both",
                 }}
               />
-              {/* [2026-09-16 사장님] 닉네임 · 감사문구 · 상품 · 금액을 «한 줄»로. 금액이 상품 바로 뒤에 붙어 읽힌다.
-                  길면 «상품 이름»만 … 로 줄어들고 닉네임·금액은 끝까지 보인다. */}
-              <span style={{ minWidth: 0, display: "flex", alignItems: "baseline", gap: "10px", lineHeight: 1.15 }}>
-                {/* 닉네임은 «손님이 자기 이름을 찾는 곳»이라 최우선으로 지킨다 — 자리가 모자라면 상품명이 먼저 줄어든다.
-    (아주 긴 닉네임만 절반 선에서 …, 그래야 금액이 안 잘린다) */}
-                <span style={{ flexShrink: 0, maxWidth: "52%", fontSize: "33px", fontWeight: 900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {item.nick}<span style={{ fontSize: "23px", fontWeight: 700, opacity: 0.85 }}>님</span>
+              {/* [2026-09-16 실측 재설계] 1층 «누가 + 인사말» / 2층부터 «주문내역(상품 · 금액)».
+                  가로가 이미 화면의 88%라 한 줄로는 글자를 못 키운다 → 줄을 나눠 글자를 키웠다.
+                  금액은 상품명 «바로 뒤»에 붙인다(예전처럼 오른쪽 끝으로 보내지 않는다). */}
+              <span style={{ minWidth: 0, flex: "1 1 auto", display: "flex", flexDirection: "column", gap: "3px" }}>
+                <span style={{ minWidth: 0, display: "flex", alignItems: "baseline", gap: "10px", lineHeight: 1.1 }}>
+                  {/* 닉네임 = 손님이 자기 이름을 찾는 곳. 안 자른다(아주 긴 것만 60% 선에서 …) */}
+                  <span style={{ flexShrink: 0, maxWidth: "60%", fontSize: "40px", fontWeight: 900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {item.nick}<span style={{ fontSize: "28px", fontWeight: 700, opacity: 0.85 }}>님</span>
+                  </span>
+                  <span
+                    style={{
+                      flexShrink: 1, minWidth: 0, fontSize: "30px", fontWeight: 800, color: meta.accent, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                      transformOrigin: "left center",
+                      animation: "ruruVerbPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.35s both",
+                    }}
+                  >
+                    {meta.icon} {meta.verb}
+                  </span>
                 </span>
-                <span
-                  style={{
-                    flexShrink: 0, display: "inline-block", fontSize: "23px", fontWeight: 800, color: meta.accent, whiteSpace: "nowrap",
-                    transformOrigin: "left center",
-                    animation: "ruruVerbPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.35s both",
-                  }}
-                >
-                  {meta.icon} {tight ? meta.short : meta.verb}
-                </span>
-                {detail ? (
-                  <>
-                    <span style={{ flexShrink: 0, fontSize: "20px", opacity: 0.45 }}>·</span>
-                    <span style={{ flex: "1 1 auto", minWidth: 0, fontSize: "25px", fontWeight: 700, color: "rgba(255,255,255,0.93)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {detail.left}
+                {item.lines.slice(0, 2).map((ln, i) => (
+                  <span key={i} style={{ minWidth: 0, display: "flex", alignItems: "baseline", gap: "12px", lineHeight: 1.15 }}>
+                    <span style={{ flexShrink: 1, minWidth: 0, fontSize: "30px", fontWeight: 700, color: "rgba(255,255,255,0.93)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {ln.left}
                     </span>
-                    {detail.right ? (
-                      <span style={{ flexShrink: 0, fontSize: "29px", fontWeight: 900, color: "#fff", whiteSpace: "nowrap" }}>
-                        {detail.right}
+                    {ln.right ? (
+                      <span style={{ flexShrink: 0, fontSize: "34px", fontWeight: 900, color: "#fff", whiteSpace: "nowrap" }}>
+                        {ln.right}
                       </span>
                     ) : null}
-                  </>
-                ) : null}
+                  </span>
+                ))}
               </span>
 
-              {/* 작은 «주문/입금/카드» 표시 — 진짜 채팅과 구분. 긴 줄에선 인사말이 이미 「주문」이라 숨긴다 */}
-              {tight ? null : (
-              <span
-                style={{
-                  flexShrink: 0, marginLeft: "4px", fontSize: "15px", fontWeight: 900, letterSpacing: "0.04em",
-                  color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.35)",
-                  borderRadius: "999px", padding: "3px 8px", textShadow: "none",
-                }}
-              >
-                {meta.tag}
-              </span>
-              )}
             </div>
           );
         })}
@@ -380,7 +372,7 @@ export default function OrderFeedWidgetClient() {
               boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
               border: "1.5px solid rgba(255,217,224,0.6)",
               color: "#fff", textShadow: TEXT_SHADOW,
-              fontSize: "31px", fontWeight: 900, lineHeight: 1.3, wordBreak: "keep-all",
+              fontSize: "34px", fontWeight: 900, lineHeight: 1.25, wordBreak: "keep-all",
             }}
           >
             <span style={{ flexShrink: 0, fontSize: "28px", textShadow: "none" }}>📌</span>

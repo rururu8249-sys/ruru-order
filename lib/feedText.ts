@@ -71,14 +71,12 @@ export function feedOrderLines(items: FeedOrderItem[], optionText: (color: unkno
     })
     .filter((r) => r.name);
   if (rows.length === 0) return [];
-  const first = rows[0];
-  if (rows.length === 1) {
-    return [{
-      left: [first.name, first.opt, first.qty > 1 ? `${first.qty}개` : ""].filter(Boolean).join(" · "),
-      right: first.amount > 0 ? won(first.amount) : "",
-    }];
-  }
-  // 여러 상품이면 «첫 상품 외 N종 + 합계» 한 줄로. (옵션은 뺀다 — 한 줄에 다 들어가야 한다)
+  const lineOf = (r: (typeof rows)[number]) => ({
+    left: [r.name, r.opt, r.qty > 1 ? `${r.qty}개` : ""].filter(Boolean).join(" · "),
+    right: r.amount > 0 ? won(r.amount) : "",
+  });
+  // 1~2개: 상품마다 한 줄.  3개↑: 첫 상품 한 줄 + 「외 N종 · 합계 …」 한 줄.
+  if (rows.length <= 2) return rows.map(lineOf);
   const total = rows.reduce((s, r) => s + r.amount, 0);
-  return [{ left: `${first.name} 외 ${rows.length - 1}종`, right: total > 0 ? `합계 ${won(total)}` : "" }];
+  return [lineOf(rows[0]), { left: `외 ${rows.length - 1}종`, right: total > 0 ? `합계 ${won(total)}` : "" }];
 }
