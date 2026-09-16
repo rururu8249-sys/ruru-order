@@ -55,23 +55,33 @@ function compactOption(opt: string): string {
 //   사장님 방송 캡쳐 실측 기준 — 위젯 알약 안쪽 가용 폭은 814px(=860 − 좌우 여백 46).
 export const FEED_ROW_AVAIL_W = 814;
 
-/** 문자열의 대략적인 폭(px). em = 글자 크기 */
+/**
+ * 문자열의 대략적인 폭(px). em = 글자 크기.
+ * [2026-09-16 실측 보정] 실제 브라우저(Pretendard, weight 900)에서 잰 값에 맞췄다.
+ *   한글 1.0em (가×22 @34px = 748px 실측 = 22×34 정확히 일치)
+ *   이모지 1.45em (👉💚🙏🛒 — 예전 1.15em 은 너무 작아 공지가 2줄로 넘어갔다)
+ *   공백 0.25em · 숫자/영문 0.55em
+ *   마지막에 2% 여유 — 폰트가 다르거나 글자 사이 간격이 더 벌어져도 안 넘치게.
+ */
 export function estimateTextWidth(text: string, em: number): number {
   let w = 0;
   for (const ch of String(text ?? "")) {
     const c = ch.codePointAt(0) || 0;
-    if (ch === " ") w += em * 0.3;
-    else if (c > 0x1f000 || (c >= 0x2190 && c <= 0x2bff)) w += em * 1.15;          // 이모지·기호
+    if (ch === " ") w += em * 0.25;
+    else if (c > 0x1f000 || (c >= 0x2190 && c <= 0x2bff)) w += em * 1.45;          // 이모지·기호
     else if ((c >= 0xac00 && c <= 0xd7a3) || (c >= 0x3130 && c <= 0x318f)) w += em; // 한글
     else if (c < 0x0250) w += em * 0.55;                                           // 숫자·영문
     else w += em * 0.9;
   }
-  return w;
+  return w * 1.02;
 }
 
-export type FeedRowSizes = { nick: number; nim: number; verb: number; detail: number };
+export type FeedRowSizes = { nick: number; nim: number; verb: number; detail: number; opt: number };
 /** 기본 글자 크기(디자인 px). 위젯과 이 파일이 «같은 숫자»를 봐야 판정이 맞는다. */
-export const FEED_ROW_SIZES: FeedRowSizes = { nick: 40, nim: 28, verb: 30, detail: 37 };
+// [2026-09-16 사장님] 「닉네임하고 내용 글씨 크기도 똑같아야지. 방송화면 캡쳐 기준 폰트 크기를 동일하게」
+//   실측: 유튜브 채팅 글자 = 이 위젯의 37px. 닉네임·인사말·주문내역 전부 37 로 맞춘다.
+//   「님」과 옵션만 한 단계 작게(부속이라 구분되어야 읽기 쉽다).
+export const FEED_ROW_SIZES: FeedRowSizes = { nick: 37, nim: 26, verb: 37, detail: 37, opt: 30 };
 
 /**
  * 이 줄이 «한 줄»에 들어가나? (닉네임 + 인사말 + 주문내역 + 금액 + 칸 사이 여백)
@@ -108,6 +118,24 @@ export function feedOrderLines(items: FeedOrderItem[], optionText: (color: unkno
   return text ? [{ left: text, right: "" }] : [];
 }
 
+export type FeedProduct = { name: string; opt: string; qty: number };
+
+/** 주문 한 건 → 상품 조각들. 화면에서 상품명·옵션·수량을 «다른 모양»으로 그리려고 구조로 돌려준다. */
+export function feedOrderParts(items: FeedOrderItem[], optionText: (color: unknown, size: unknown) => string): FeedProduct[] {
+  return items
+    .map((it) => ({
+      name: cleanProductNameForFeed(it.name),
+      opt: compactOption(optionText(it.color, it.size).trim()),
+      qty: Math.max(1, Math.floor(Number(it.qty) || 1)),
+    }))
+    .filter((r) => r.name);
+}
+
+/** 조각 하나의 표시 문구 — 「나이키 바람막이 (M) ×2」 (옵션은 괄호, 수량은 ×N) */
+export function feedProductLabel(p: FeedProduct): string {
+  return `${p.name}${p.opt ? ` (${p.opt})` : ""}${p.qty > 1 ? ` ×${p.qty}` : ""}`;
+}
+
 /** 주문내역이 쓸 수 있는 최대 줄 수(위젯과 같은 값). 이 안에서 «상품을 최대한 많이» 보여준다. */
 export const FEED_DETAIL_MAX_LINES = 3;
 
@@ -123,28 +151,20 @@ export function feedOrderProducts(
   em: number = 37,
   avail: number = FEED_ROW_AVAIL_W,
 ): string {
-  const parts = items
-    .map((it) => {
-      const name = cleanProductNameForFeed(it.name);
-      if (!name) return "";
-      const qty = Math.max(1, Math.floor(Number(it.qty) || 1));
-      const opt = compactOption(optionText(it.color, it.size).trim());
-      return [name, opt, qty > 1 ? `${qty}개` : ""].filter(Boolean).join(" · ");
-    })
-    .filter(Boolean);
+  const parts = feedOrderParts(items, optionText).map(feedProductLabel);
   if (parts.length === 0) return "";
 
   const budget = avail * Math.max(1, maxLines);
   let taken = 0;
   for (let i = 1; i <= parts.length; i += 1) {
     const rest = parts.length - i;
-    const text = parts.slice(0, i).join(", ") + (rest > 0 ? ` 외 ${rest}종` : "");
+    const text = parts.slice(0, i).join(" · ") + (rest > 0 ? ` 외 ${rest}종` : "");
     if (estimateTextWidth(text, em) > budget) break;
     taken = i;
   }
-  if (taken === 0) taken = 1;                       // 하나도 못 넣는 경우는 없게(길면 …로 잘린다)
+  if (taken === 0) taken = 1;
   const rest = parts.length - taken;
-  return parts.slice(0, taken).join(", ") + (rest > 0 ? ` 외 ${rest}종` : "");
+  return parts.slice(0, taken).join(" · ") + (rest > 0 ? ` 외 ${rest}종` : "");
 }
 
 /** 주문내역이 몇 줄을 차지하나 (1층 인사말 줄은 뺀 숫자) */
@@ -158,11 +178,26 @@ export function feedDetailLineCount(detail: string, em: number = 37, avail: numb
 // 📌 공지 알약 실측: 글자 34px · 안쪽 가용 폭 770px(=860 − 좌우여백 48 − 📌아이콘 32 − 간격 10).
 //   한글은 글자크기만큼 넓으므로 «한글 약 22자»가 한 줄. 이모지는 한글 1.15자로 친다.
 export const FEED_PIN_SIZE = 34;
-export const FEED_PIN_AVAIL_W = 770;
+export const FEED_PIN_AVAIL_W = 778;   // 860 − 좌우여백 36 − 📌아이콘 38 − 간격 8
 
-/** 이 공지 문구가 한 줄에 들어가나? */
+/** 공지 글자를 이보다 작게는 안 줄인다(너무 작으면 방송에서 안 읽힌다) */
+export const FEED_PIN_MIN_SIZE = 26;
+
+/**
+ * [2026-09-16 사장님] 「이 정도는 한 줄로 다 뜨게 설계해달라니까?」
+ *   → 문구가 길면 «글자 크기를 줄여서» 한 줄에 맞춘다. 최소 27px 까지.
+ *   그보다 더 길면 그때만 2줄(27px 유지).
+ */
+export function feedPinFontSize(text: string): number {
+  const w = estimateTextWidth(text, FEED_PIN_SIZE);
+  if (w <= FEED_PIN_AVAIL_W) return FEED_PIN_SIZE;
+  const fit = Math.floor((FEED_PIN_AVAIL_W / w) * FEED_PIN_SIZE);
+  return Math.max(FEED_PIN_MIN_SIZE, fit);
+}
+
+/** 이 공지 문구가 (글자 크기를 줄여서라도) 한 줄에 들어가나? */
 export function feedPinFitsOneLine(text: string): boolean {
-  return estimateTextWidth(text, FEED_PIN_SIZE) <= FEED_PIN_AVAIL_W;
+  return estimateTextWidth(text, feedPinFontSize(text)) <= FEED_PIN_AVAIL_W;
 }
 
 /** 한 줄을 100 으로 봤을 때 지금 몇 %인지 (관리자 입력칸 안내용) */

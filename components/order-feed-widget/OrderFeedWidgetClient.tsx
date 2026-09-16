@@ -33,13 +33,14 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { getActiveBroadcast, loadAdminLiveBroadcasts } from "@/components/admin-live/liveBroadcastController";
-import { feedOrderLines, feedRowFitsOneLine, feedDetailLineCount, feedPinFitsOneLine, FEED_ROW_SIZES, FEED_DETAIL_MAX_LINES, type FeedLine, type FeedOrderItem } from "@/lib/feedText";
+import { feedOrderLines, feedOrderParts, feedProductLabel, feedRowFitsOneLine, feedDetailLineCount, feedPinFitsOneLine, feedPinFontSize, FEED_ROW_SIZES, FEED_DETAIL_MAX_LINES, type FeedLine, type FeedOrderItem, type FeedProduct } from "@/lib/feedText";
 import { formatOrderOptionText } from "@/lib/orderOptionText";
 
 type AnyRow = Record<string, any>;
 type FeedKind = "order" | "deposit" | "card" | "notice";
 // notice = 📢 상품 안내(「📢 채팅」 버튼). 다른 줄과 «같은 줄 목록»에 들어가야 3줄 한도에서 같이 밀려난다(사장님 09-13).
-type FeedItem = { id: string; kind: FeedKind; nick: string; lines: FeedLine[]; at: number; text?: string };   // lines: 상품 줄(왼쪽 상품명·옵션 / 오른쪽 금액), 최대 2줄
+// lines[0].left = 주문내역 «표시 문구»(폭 계산용) · products = 그 조각들(상품명/옵션/수량을 «다른 모양»으로 그리려고)
+type FeedItem = { id: string; kind: FeedKind; nick: string; lines: FeedLine[]; products?: FeedProduct[]; at: number; text?: string };
 
 const SHOW_MS = 10000;      // 알림 한 줄이 떠 있는 시간 (사장님 09-12: 10초)
 const NOTICE_MS = 30000;    // 📢 상품 안내가 떠 있는 시간 — 사장님 09-13 「이건 노출 시간 좀 길게」 → 알림의 3배
@@ -101,6 +102,25 @@ const PREVIEW_ROWS: FeedItem[] = [
   { id: "p2", kind: "notice",  nick: "", lines: [], at: 0, text: "노다001신더 99,000원 사이즈 235·240·260~275·285 남은 13" },
   { id: "p3", kind: "card",    nick: "루루짱929", lines: [], at: 0 },
 ];
+
+// [2026-09-16 사장님 「상품과 상품 사이, 옵션이 구분이 잘 안 됨」]
+//   글자로만 「A · M, B · L」 하면 어디까지가 상품이고 어디가 옵션인지 안 보인다.
+//   → 상품명은 «흰색 굵게», 옵션은 «괄호 + 연한색 + 작게», 상품 사이는 «강조색 구분점»으로 그린다.
+function ProductList({ products, rest, accent }: { products: FeedProduct[]; rest: number; accent: string }) {
+  return (
+    <>
+      {products.map((p, i) => (
+        <span key={i}>
+          {i > 0 ? <span style={{ color: accent, opacity: 0.95, padding: "0 6px", fontWeight: 900 }}>·</span> : null}
+          <span style={{ fontWeight: 800 }}>{p.name}</span>
+          {p.opt ? <span style={{ fontSize: `${FEED_ROW_SIZES.opt}px`, fontWeight: 700, color: "rgba(255,255,255,0.72)" }}>{` (${p.opt})`}</span> : null}
+          {p.qty > 1 ? <span style={{ fontSize: `${FEED_ROW_SIZES.opt}px`, fontWeight: 900, color: "rgba(255,255,255,0.88)" }}>{` ×${p.qty}`}</span> : null}
+        </span>
+      ))}
+      {rest > 0 ? <span style={{ fontSize: `${FEED_ROW_SIZES.opt}px`, fontWeight: 800, color: "rgba(255,255,255,0.8)" }}>{` 외 ${rest}종`}</span> : null}
+    </>
+  );
+}
 
 export default function OrderFeedWidgetClient() {
   const [items, setItems] = useState<FeedItem[]>([]);
@@ -203,7 +223,7 @@ export default function OrderFeedWidgetClient() {
       const p = pendingOrdersRef.current.get(key);
       if (!p) return;
       pendingOrdersRef.current.delete(key);
-      pushItem({ id: `ins:${key}`, kind: "order", nick: p.nick, lines: feedOrderLines(p.items, formatOrderOptionText), at: Date.now() });
+      pushItem({ id: `ins:${key}`, kind: "order", nick: p.nick, lines: feedOrderLines(p.items, formatOrderOptionText), products: feedOrderParts(p.items, formatOrderOptionText), at: Date.now() });
     };
 
     const channel = supabase
@@ -298,25 +318,31 @@ export default function OrderFeedWidgetClient() {
                 style={{
                   maxWidth: "100%", boxSizing: "border-box",                            // [09-16] 폭 자동 — 글자만큼만
                   display: "flex", alignItems: "center", gap: "10px",
-                  padding: "17px 26px 17px 22px",                                        // [09-16] 여백은 «글자 크기의 절반» 정도만
+                  padding: "17px 20px 17px 16px",                                        // [09-16] 좌우 여백을 줄여 글자를 1px이라도 크게(공지는 길다)
                   borderRadius: "999px",
                   background: "rgba(24, 20, 12, 0.45)",                                  // 흐림 없음 — 뒤가 그대로 비침
                   boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
                   border: "1.5px solid rgba(253, 224, 71, 0.7)",
                   color: "#fff", textShadow: TEXT_SHADOW,
-                  fontSize: "34px", fontWeight: 900, lineHeight: 1.25, wordBreak: "keep-all",
+                  // [09-16] 길면 글자를 줄여서라도 한 줄에 맞춘다(최소 27px). 그보다 길면 그때만 2줄.
+                  fontSize: `${feedPinFontSize(item.text || "")}px`, fontWeight: 900, lineHeight: 1.25, wordBreak: "keep-all",
                   animation: leaving
                     ? `ruruCurtainOut ${EXIT_MS}ms ease-in forwards`
                     : "ruruCurtain 0.65s cubic-bezier(0.16,1,0.3,1) both",
                 }}
               >
-                <span style={{ flexShrink: 0, fontSize: "28px", textShadow: "none" }}>📢</span>
+                <span style={{ flexShrink: 0, fontSize: "26px", textShadow: "none" }}>📢</span>
                 <span style={{ minWidth: 0, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{item.text}</span>
               </div>
             );
           }
           const meta = KIND_META[item.kind as Exclude<FeedKind, "notice">];
           const detailText = item.lines[0]?.left || "";
+          // 화면 문구에 실제로 들어간 상품 수(나머지는 「외 N종」) — 문구와 조각이 어긋나지 않게 맞춘다
+          const allParts = item.products || [];
+          const shownCount = allParts.filter((pp) => detailText.includes(feedProductLabel(pp))).length;
+          const shownParts = shownCount > 0 ? allParts.slice(0, shownCount) : allParts;
+          const restCount = Math.max(0, allParts.length - shownParts.length);
           // 글자 폭을 재서 «한 줄에 들어가면 한 줄». 들어가는지는 CSS 가 미리 못 알려주므로 lib 에서 계산한다.
           const oneLine = feedRowFitsOneLine(item.nick, `${meta.icon} ${meta.verb}`, detailText);
           return (
@@ -372,8 +398,8 @@ export default function OrderFeedWidgetClient() {
                   {oneLine && detailText ? (
                     <>
                       <span style={{ flexShrink: 0, fontSize: "24px", opacity: 0.45 }}>·</span>
-                      <span style={{ flexShrink: 1, minWidth: 0, fontSize: `${FEED_ROW_SIZES.detail}px`, fontWeight: 700, color: "rgba(255,255,255,0.95)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {detailText}
+                      <span style={{ flexShrink: 1, minWidth: 0, fontSize: `${FEED_ROW_SIZES.detail}px`, color: "rgba(255,255,255,0.97)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {allParts.length > 0 ? <ProductList products={shownParts} rest={restCount} accent={meta.accent} /> : detailText}
                       </span>
                     </>
                   ) : null}
@@ -381,10 +407,10 @@ export default function OrderFeedWidgetClient() {
                 {!oneLine && detailText ? (
                   // 상품이 많으면 여기서 «최대 3줄»까지 펼친다(그만큼 화면에 뜨는 알림 개수가 줄어든다)
                   <span style={{
-                    minWidth: 0, fontSize: `${FEED_ROW_SIZES.detail}px`, fontWeight: 700, color: "rgba(255,255,255,0.95)", lineHeight: 1.18,
+                    minWidth: 0, fontSize: `${FEED_ROW_SIZES.detail}px`, color: "rgba(255,255,255,0.97)", lineHeight: 1.22,
                     display: "-webkit-box", WebkitLineClamp: FEED_DETAIL_MAX_LINES, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "keep-all",
                   }}>
-                    {detailText}
+                    {allParts.length > 0 ? <ProductList products={shownParts} rest={restCount} accent={meta.accent} /> : detailText}
                   </span>
                 ) : null}
               </span>
@@ -399,16 +425,17 @@ export default function OrderFeedWidgetClient() {
             style={{
               maxWidth: "100%", boxSizing: "border-box",                      // [09-16] 폭 자동 — 글자만큼만
               display: "flex", alignItems: "center", gap: "10px",
-              padding: "17px 26px 17px 22px", marginTop: "4px",               // [09-16] 여백은 «글자 크기의 절반» 정도만
+              padding: "17px 20px 17px 16px", marginTop: "4px",               // [09-16] 좌우 여백을 줄여 글자를 1px이라도 크게(공지는 길다)
               borderRadius: "999px",
               background: "rgba(123, 45, 67, 0.45)",                                  // 흐림 없음 — 뒤가 그대로 비침
               boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
               border: "1.5px solid rgba(255,217,224,0.6)",
               color: "#fff", textShadow: TEXT_SHADOW,
-              fontSize: "34px", fontWeight: 900, lineHeight: 1.25, wordBreak: "keep-all",
+              // [2026-09-16 사장님 「이 정도는 한 줄로 다 뜨게」] 길면 글자를 줄여 한 줄에 맞춘다(최소 27px)
+              fontSize: `${feedPinFontSize(pinShown)}px`, fontWeight: 900, lineHeight: 1.25, wordBreak: "keep-all",
             }}
           >
-            <span style={{ flexShrink: 0, fontSize: "28px", textShadow: "none" }}>📌</span>
+            <span style={{ flexShrink: 0, fontSize: "26px", textShadow: "none" }}>📌</span>
             <span style={{ minWidth: 0, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{pinShown}</span>
           </div>
         ) : null}

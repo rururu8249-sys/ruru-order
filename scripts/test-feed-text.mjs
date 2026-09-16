@@ -1,6 +1,6 @@
 // 방송 피드 상품명 정리 — 꼬리표·코드 떼고 20자, 여러 개는 「외 N종」
 import assert from "node:assert/strict";
-import { cleanProductNameForFeed, feedOrderDetail, feedOrderLines, feedOrderProducts, feedRowFitsOneLine, feedDetailLineCount, feedPinFitsOneLine, estimateTextWidth } from "../lib/feedText.ts";
+import { cleanProductNameForFeed, feedOrderDetail, feedOrderLines, feedOrderProducts, feedOrderParts, feedProductLabel, feedRowFitsOneLine, feedDetailLineCount, feedPinFitsOneLine, feedPinFontSize, estimateTextWidth } from "../lib/feedText.ts";
 import { formatOrderOptionText } from "../lib/orderOptionText.ts";
 
 assert.equal(cleanProductNameForFeed("[👽주말마지막] 나이키 쭈리후드티_센터자수 FB7789"), "나이키 쭈리후드티_센터자수");
@@ -16,14 +16,14 @@ assert.equal(feedOrderDetail([]), "");
 const opt = formatOrderOptionText;
 assert.equal(
   feedOrderProducts([{ name: "[👽주말마지막] 나이키 쭈리후드티_센터자수 FB7789", color: "블랙", size: "L", qty: 2, price: 59000 }], opt),
-  "나이키 쭈리후드티_센터자수 · 블랙/L · 2개",
+  "나이키 쭈리후드티_센터자수 (블랙/L) ×2",
 );
 assert.equal(
   feedOrderProducts([{ name: "뉴발란스740", color: "없음", size: "240" }, { name: "아미반팔", color: "없음", size: "없음" }], opt),
-  "뉴발란스740 · 240, 아미반팔",
+  "뉴발란스740 (240) · 아미반팔",
 );
 // [2026-09-16] 개수가 아니라 «줄 수»로 자른다 — 3줄에 들어가는 만큼 다 넣고 남으면 「외 N종」
-assert.equal(feedOrderProducts([{ name: "A" }, { name: "B" }, { name: "C" }, { name: "D" }, { name: "E" }], opt), "A, B, C, D, E");
+assert.equal(feedOrderProducts([{ name: "A" }, { name: "B" }, { name: "C" }, { name: "D" }, { name: "E" }], opt), "A · B · C · D · E");
 // 한 줄만 허용하면 그 안에 들어가는 만큼만 + 「외 N종」
 {
   const one = feedOrderProducts(
@@ -61,9 +61,27 @@ assert.ok(estimateTextWidth("가나다", 40) > estimateTextWidth("123", 40));
 // ── 📌 공지 한 줄 기준 (관리자 입력칸이 이 판정을 그대로 쓴다) ────────────────
 assert.equal(feedPinFitsOneLine("입금자명은 닉네임으로 보내주세요 🙏"), true);
 // 사장님이 쓰던 문구는 2줄로 넘어간다
-assert.equal(feedPinFitsOneLine("주문방법 💚 방송접수 후 👉 카톡채널 👉 주문서&입금메뉴"), false);
+// [2026-09-16] 길면 «글자를 줄여서» 한 줄에 맞춘다 → 사장님 문구도 한 줄(29px)
+assert.equal(feedPinFitsOneLine("주문방법 💚 방송접수 후 👉 카톡채널 👉 주문서&입금메뉴"), true);
+assert.equal(feedPinFontSize("주문방법 💚 방송접수 후 👉 카톡채널 👉 주문서&입금메뉴"), 28);
+assert.equal(feedPinFontSize("입금자명은 닉네임으로 보내주세요 🙏"), 34);   // 짧으면 안 줄인다
+assert.equal(feedPinFitsOneLine("가".repeat(30)), false);                  // 최소 27px 로도 안 되면 2줄
 // 한글 22자까지는 한 줄, 24자는 넘침
 assert.equal(feedPinFitsOneLine("가".repeat(22)), true);
-assert.equal(feedPinFitsOneLine("가".repeat(24)), false);
+// 폭 추정 실측 보정 — 실제 브라우저(Pretendard 900)에서 잰 값과 ±6% 안에서 맞아야 한다
+//   실측 @34px: 「가」×22 = 748px · 「주문방법 💚 … 입금메뉴」 = 898px · 「🛒 주문 감사합니다」 = 299px
+{
+  const near = (got, real) => Math.abs(got - real) / real <= 0.06;
+  assert.ok(near(estimateTextWidth("가".repeat(22), 34), 748), `한글 추정: ${estimateTextWidth("가".repeat(22), 34)}`);
+  assert.ok(near(estimateTextWidth("주문방법 💚 방송접수 후 👉 카톡채널 👉 주문서&입금메뉴", 34), 898), `이모지 섞인 추정: ${estimateTextWidth("주문방법 💚 방송접수 후 👉 카톡채널 👉 주문서&입금메뉴", 34)}`);
+  assert.ok(near(estimateTextWidth("🛒 주문 감사합니다", 34), 299), `인사말 추정: ${estimateTextWidth("🛒 주문 감사합니다", 34)}`);
+}
+assert.equal(feedPinFitsOneLine("가".repeat(24)), true);   // 줄여서 한 줄
 
-console.log("✅ test-feed-text 27개 통과");
+// 상품 조각 — 화면에서 상품/옵션을 다른 모양으로 그리기 위한 구조
+{
+  const parts = feedOrderParts([{ name: "나이키 바람막이 DX1234-100", color: "없음", size: "M", qty: 2 }], opt);
+  assert.deepEqual(parts, [{ name: "나이키 바람막이", opt: "M", qty: 2 }]);
+  assert.equal(feedProductLabel(parts[0]), "나이키 바람막이 (M) ×2");
+}
+console.log("✅ test-feed-text 36개 통과");

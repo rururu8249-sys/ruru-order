@@ -8,7 +8,7 @@ import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { buildChatAnnounceText } from "@/lib/chatAnnounce";
 import { buildDetailChatLine, detailProducts } from "@/lib/productDetailModel";
-import { feedPinFitsOneLine, feedPinFillPercent } from "@/lib/feedText";
+import { feedPinFitsOneLine, feedPinFontSize, FEED_PIN_SIZE } from "@/lib/feedText";
 
 type VideoRatio = "vertical" | "wide" | "auto";
 
@@ -388,9 +388,11 @@ export default function LiveHeader({
               <div className="flex items-center gap-2">
                 {/* [2026-09-16 사장님 «몇 자 넘으면 2줄로 넘어가?»] 방송 화면 폭 실측(글자 34px · 가용 770px) 기준으로 지금 문구가 한 줄인지 바로 보여준다 */}
                 {pinText.trim() ? (
-                  feedPinFitsOneLine(pinText)
-                    ? <span className="text-[11px] font-black text-ok-tx">한 줄 ({feedPinFillPercent(pinText)}%)</span>
-                    : <span className="text-[11px] font-black text-warn-tx">2줄로 넘어감 ({feedPinFillPercent(pinText)}%) — 줄이면 한 줄</span>
+                  !feedPinFitsOneLine(pinText)
+                    ? <span className="text-[11px] font-black text-warn-tx">2줄로 넘어감 — 좀 더 줄이면 한 줄</span>
+                    : feedPinFontSize(pinText) >= FEED_PIN_SIZE
+                      ? <span className="text-[11px] font-black text-ok-tx">한 줄 · 글자 제일 큼</span>
+                      : <span className="text-[11px] font-black text-ok-tx">한 줄 · 글자 {feedPinFontSize(pinText)}px <span className="font-bold text-ink-mute">(짧게 쓰면 {FEED_PIN_SIZE}px까지 커짐)</span></span>
                 ) : null}
                 <span className="text-[11px] font-bold text-ink-mute">{pinSavedAt ? `저장 ${pinSavedAt}` : activeBroadcast ? "방송 끝나면 자동으로 지워짐" : "방송 시작 후 쓸 수 있음"}</span>
               </div>
@@ -402,7 +404,7 @@ export default function LiveHeader({
                 disabled={!activeBroadcast}
                 onChange={(event) => setPinText(event.target.value)}
                 onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void savePinText(); } }}
-                placeholder={activeBroadcast ? "예) 입금자명은 닉네임으로 보내주세요 🙏 (한글 22자쯤이 한 줄)" : "방송을 시작한 뒤에 쓸 수 있어요 (방송마다 새로 씁니다)"}
+                placeholder={activeBroadcast ? "예) 입금자명은 닉네임으로 보내주세요 🙏 (길면 글자가 작아지며 한 줄로 맞춰짐)" : "방송을 시작한 뒤에 쓸 수 있어요 (방송마다 새로 씁니다)"}
                 className="h-9 min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-line focus:ring-2 focus:ring-rose-soft disabled:opacity-50"
               />
               <button
