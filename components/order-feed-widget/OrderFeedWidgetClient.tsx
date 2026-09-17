@@ -137,6 +137,57 @@ function ProductRun({ products, accent, page, pageCount }: { products: FeedProdu
   );
 }
 
+// [2026-09-17 사장님] 「주문 감사합니다 할 때 폭죽 터지는 느낌」 — 상품 위젯에 있던 폭죽을 그대로 옮겨왔다.
+//   주문 줄이 «등장할 때 1회»만 터진다. 입금·카드·안내엔 안 터진다(주문이 몰릴 때 정신없지 않게).
+//   알약이 overflow:hidden 이라 알약 «밖»(감싸는 칸)에서 터뜨린다. 전부 GPU 속성이라 PRISM 부담 없음.
+const CONFETTI_MS = 1700;
+const CONFETTI_PIECES = [
+  { tx: "104px", ty: "-38px", r: "-232deg", color: "#7B2D43", size: 11, round: true, dur: 1.49 },
+  { tx: "71px", ty: "-34px", r: "-348deg", color: "#FFD9E0", size: 10, round: false, dur: 1.45 },
+  { tx: "115px", ty: "-69px", r: "-101deg", color: "#F5C24B", size: 8, round: false, dur: 1.15 },
+  { tx: "98px", ty: "-74px", r: "-397deg", color: "#22c55e", size: 9, round: true, dur: 1.15 },
+  { tx: "92px", ty: "-84px", r: "-419deg", color: "#ffffff", size: 12, round: false, dur: 1.17 },
+  { tx: "66px", ty: "-73px", r: "-414deg", color: "#6FC3E8", size: 12, round: false, dur: 1.45 },
+  { tx: "45px", ty: "-61px", r: "-88deg", color: "#7B2D43", size: 8, round: true, dur: 1.43 },
+  { tx: "45px", ty: "-75px", r: "53deg", color: "#FFD9E0", size: 11, round: false, dur: 1.19 },
+  { tx: "36px", ty: "-77px", r: "91deg", color: "#F5C24B", size: 12, round: false, dur: 1.59 },
+  { tx: "31px", ty: "-88px", r: "-329deg", color: "#22c55e", size: 12, round: true, dur: 1.44 },
+  { tx: "23px", ty: "-91px", r: "222deg", color: "#ffffff", size: 8, round: false, dur: 1.43 },
+  { tx: "11px", ty: "-77px", r: "-418deg", color: "#6FC3E8", size: 12, round: false, dur: 1.22 },
+  { tx: "7px", ty: "-138px", r: "335deg", color: "#7B2D43", size: 10, round: true, dur: 1.38 },
+  { tx: "-6px", ty: "-128px", r: "200deg", color: "#FFD9E0", size: 10, round: false, dur: 1.25 },
+  { tx: "-14px", ty: "-92px", r: "-41deg", color: "#F5C24B", size: 8, round: false, dur: 1.44 },
+  { tx: "-33px", ty: "-133px", r: "473deg", color: "#22c55e", size: 10, round: true, dur: 1.54 },
+  { tx: "-36px", ty: "-100px", r: "-391deg", color: "#ffffff", size: 8, round: false, dur: 1.41 },
+  { tx: "-39px", ty: "-82px", r: "160deg", color: "#6FC3E8", size: 9, round: false, dur: 1.66 },
+  { tx: "-63px", ty: "-106px", r: "-460deg", color: "#7B2D43", size: 13, round: true, dur: 1.15 },
+  { tx: "-84px", ty: "-113px", r: "102deg", color: "#FFD9E0", size: 10, round: false, dur: 1.52 },
+  { tx: "-98px", ty: "-108px", r: "477deg", color: "#F5C24B", size: 12, round: false, dur: 1.58 },
+  { tx: "-58px", ty: "-53px", r: "-349deg", color: "#22c55e", size: 10, round: true, dur: 1.38 },
+  { tx: "-62px", ty: "-47px", r: "-416deg", color: "#ffffff", size: 13, round: false, dur: 1.52 },
+  { tx: "-122px", ty: "-74px", r: "372deg", color: "#6FC3E8", size: 10, round: false, dur: 1.53 },
+  { tx: "-103px", ty: "-49px", r: "-494deg", color: "#7B2D43", size: 11, round: true, dur: 1.31 },
+  { tx: "-139px", ty: "-51px", r: "-301deg", color: "#FFD9E0", size: 11, round: false, dur: 1.14 },
+];
+
+function Confetti() {
+  return (
+    <div aria-hidden style={{ position: "absolute", left: "48px", top: "52%", width: 0, height: 0, pointerEvents: "none", zIndex: 3 }}>
+      {CONFETTI_PIECES.map((p, i) => (
+        <span
+          key={i}
+          style={{
+            position: "absolute", width: `${p.size}px`, height: `${p.size}px`,
+            borderRadius: p.round ? "50%" : "2px", background: p.color,
+            ["--tx" as string]: p.tx, ["--ty" as string]: p.ty, ["--r" as string]: p.r,
+            animation: `ruruConfetti ${p.dur}s ease-out forwards`,
+          } as React.CSSProperties}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function OrderFeedWidgetClient() {
   const [items, setItems] = useState<FeedItem[]>([]);
   const itemsRef = useRef<FeedItem[]>([]);   // 수명 계산에서 «지금 떠 있는 다른 알림»을 보려고(붐빔 판정)
@@ -379,9 +430,12 @@ export default function OrderFeedWidgetClient() {
           const shownParts = pages[pageIdx] || [];
           const runText = shownParts.map(feedProductLabel).join("  |  ");
           const oneLine = pages.length <= 1 && feedRowFitsOneLine(item.nick, `${meta.icon} ${meta.verb}`, runText);
+          // 폭죽: 주문 줄이고, 막 등장했을 때(1.7초 안) 1회. 그 뒤엔 DOM 에서 빠진다.
+          const burst = item.kind === "order" && now - item.at < CONFETTI_MS;
           return (
+            <div key={item.id} style={{ position: "relative", maxWidth: "100%" }}>
+            {burst ? <Confetti /> : null}
             <div
-              key={item.id}
               style={{
                 maxWidth: "100%", boxSizing: "border-box",                           // [09-16 사장님] 폭은 «글자 길이만큼». 길면 위젯 폭에서 … 로 줄인다
                 position: "relative", overflow: "hidden",                            // 빛 줄이 말풍선 밖으로 안 나가게
@@ -449,6 +503,7 @@ export default function OrderFeedWidgetClient() {
               </span>
 
             </div>
+            </div>
           );
         })}
         {/* 📌 고정 공지 — [2026-09-13 사장님 «위치가 지맘대로 바뀌었다 돌아온다»] 알림이 오면 공지가 위로 밀렸다가 내려오던 것.
@@ -474,6 +529,7 @@ export default function OrderFeedWidgetClient() {
         ) : null}
       </div>
       <style>{`
+        @keyframes ruruConfetti { 0% { transform: translate(0, 0) rotate(0deg); opacity: 1; } 100% { transform: translate(var(--tx), var(--ty)) rotate(var(--r)); opacity: 0; } }
         @keyframes ruruCurtain { from { clip-path: inset(0 100% 0 0 round 999px); transform: translateX(-10px); opacity: 0.7; } to { clip-path: inset(0 0 0 0 round 999px); transform: translateX(0); opacity: 1; } }
         @keyframes ruruCurtainOut { from { clip-path: inset(0 0 0 0 round 999px); opacity: 1; } to { clip-path: inset(0 0 0 100% round 999px); opacity: 0; } }
         @keyframes ruruShine   { from { transform: translateX(-120%) skewX(-12deg); } to { transform: translateX(330%) skewX(-12deg); } }

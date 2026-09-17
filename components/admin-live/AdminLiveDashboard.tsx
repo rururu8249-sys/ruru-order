@@ -1807,6 +1807,7 @@ export default function AdminLiveDashboard() {
               order={cardPayOrder}
               onClose={() => setCardPayOrder(null)}
               onAfterStatusChange={loadOrders}
+              activeBroadcastId={activeBroadcast?.id ?? null}
             />
           )}
 

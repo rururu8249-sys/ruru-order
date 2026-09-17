@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import type { LiveOrder } from "./types";
+import { setBroadcastFeedNotice } from "./liveBroadcastController";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 // [2026-09-08] 페이스터 주소는 설정 › 상점 정보에서 온다(하드코딩 제거)
 import { getShopInfoNow, useShopInfo } from "@/lib/useShopInfo";
@@ -244,6 +245,8 @@ type Props = {
   order: LiveOrder;
   onClose: () => void;
   onAfterStatusChange?: () => void | Promise<void>;
+  /** [2026-09-17] 안내문구를 방송 화면 위젯에도 띄우려고 — 없으면(방송 OFF) 복사만 한다 */
+  activeBroadcastId?: string | number | null;
 };
 
 function orderSummary(order: LiveOrder) {
@@ -260,7 +263,7 @@ function phoneDigits(order: LiveOrder) {
   return String(order.phone || "").replace(/[^0-9]/g, "");
 }
 
-export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusChange }: Props) {
+export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusChange, activeBroadcastId }: Props) {
   const { paysterUrl } = useShopInfo();
   // 「항상 맨 위에 뜨는 작은 창」 — 페이스터 창이 뒤로 밀리지 않게 복사 카드만 빼낸다
   const pip = usePipWindow();
@@ -353,6 +356,17 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
     }
     setCopiedKey(key);
     window.setTimeout(() => setCopiedKey((k) => (k === key ? "" : k)), 1500);
+  };
+
+  // [2026-09-17] 안내문구 복사 + 방송 화면 위젯 표시(30초). 위젯은 방송 ON 일 때만, 실패해도 복사는 유지.
+  const copyAndAnnounceChatNotice = async (sourceWindow?: Window | null) => {
+    await copyValue("chatNotice", chatNoticeText, sourceWindow);
+    if (!activeBroadcastId) return;
+    try {
+      await setBroadcastFeedNotice(String(activeBroadcastId), chatNoticeText);
+    } catch {
+      showAdminToast("방송 화면 표시는 실패했어요(복사는 됐습니다).", "warning");
+    }
   };
 
   // 칸 하나를 바로 복사한다(순서·단계 없음).
@@ -559,14 +573,17 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
 
         {/* [2026-09-09] 결제 버튼은 «항상 보이게» 아래 고정. 위 본문만 스크롤한다. */}
         <div className="shrink-0 px-5 pb-5 pt-3" style={{ background: "#F4F6FB", borderTop: "1px solid #E3E9F5" }}>
+          {/* [2026-09-17 사장님] 이 버튼은 «카드결제 링크를 카톡으로 보냈다»는 안내다(발송완료 아님 — 이름 정정).
+              누르면 ① 채팅 붙여넣기용으로 복사 ② 방송 화면 알림 위젯에도 30초 표시(상품관리 「📢 채팅」과 같은 방식).
+              위젯 표시가 실패해도 복사는 그대로 된다(돈·주문 무관). */}
           <button
             type="button"
-            onClick={() => void copyValue("chatNotice", chatNoticeText)}
-            title="카카오톡으로 결제링크를 보낸 뒤 누르세요. 안내문구가 복사되고, 유튜브 채팅에 붙여넣기만 하면 됩니다. (자동 게시 안 함 — 쿼터 무소모)"
+            onClick={() => void copyAndAnnounceChatNotice()}
+            title="카카오톡으로 결제링크를 보낸 뒤 누르세요. 안내문구가 복사되고(유튜브 채팅에 붙여넣기), 방송 화면 위젯에도 30초 뜹니다."
             className="w-full rounded-2xl px-4 py-3.5 text-sm font-black shadow-md transition"
             style={copiedKey === "chatNotice" ? { background: "#059669", color: "#fff" } : { background: "#101C3D", color: "#fff" }}
           >
-            {copiedKey === "chatNotice" ? "✔ 복사됨 · 유튜브 채팅에 붙여넣기" : "📢 카톡 발송완료 안내문구 복사"}
+            {copiedKey === "chatNotice" ? "✔ 복사됨 · 방송 화면에도 표시됨" : "📢 「카톡으로 결제링크 보냈어요」 안내 복사 + 방송 표시"}
           </button>
 
           <button
