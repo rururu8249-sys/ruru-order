@@ -1,6 +1,6 @@
 // 방송 피드 상품명 정리 — 꼬리표·코드 떼고 20자, 여러 개는 「외 N종」
 import assert from "node:assert/strict";
-import { cleanProductNameForFeed, feedOrderDetail, feedOrderLines, feedOrderProducts, feedOrderParts, feedProductLabel, feedShownProducts, feedRowFitsOneLine, feedDetailLineCount, feedPinFitsOneLine, feedPinFontSize, estimateTextWidth } from "../lib/feedText.ts";
+import { cleanProductNameForFeed, feedOrderDetail, feedOrderLines, feedOrderProducts, feedOrderParts, feedProductLabel, feedShownProducts, feedProductPages, feedRowFitsOneLine, feedDetailLineCount, feedPinFitsOneLine, feedPinFontSize, estimateTextWidth } from "../lib/feedText.ts";
 import { formatOrderOptionText } from "../lib/orderOptionText.ts";
 
 assert.equal(cleanProductNameForFeed("[👽주말마지막] 나이키 쭈리후드티_센터자수 FB7789"), "나이키 쭈리후드티_센터자수");
@@ -16,32 +16,32 @@ assert.equal(feedOrderDetail([]), "");
 const opt = formatOrderOptionText;
 assert.equal(
   feedOrderProducts([{ name: "[👽주말마지막] 나이키 쭈리후드티_센터자수 FB7789", color: "블랙", size: "L", qty: 2, price: 59000 }], opt),
-  "나이키 쭈리후드티_센터자수  블랙 / 사이즈 L  2개",
+  "나이키 쭈리후드티_센터자수 블랙/L 2개",
 );
 assert.equal(
   feedOrderProducts([{ name: "뉴발란스740", color: "없음", size: "240" }, { name: "아미반팔", color: "없음", size: "없음" }], opt),
-  "뉴발란스740  사이즈 240  1개 / 아미반팔  1개",
+  "뉴발란스740 240 1개 / 아미반팔 1개",
 );
 // [2026-09-16] 개수가 아니라 «줄 수»로 자른다 — 3줄에 들어가는 만큼 다 넣고 남으면 「외 N종」
 // 상품 하나가 한 줄 → 3줄까지만 보여주고 나머지는 「외 N종」
-assert.equal(feedOrderProducts([{ name: "A" }, { name: "B" }, { name: "C" }, { name: "D" }, { name: "E" }], opt), "A  1개 / B  1개 / 외 3종");
+assert.equal(feedOrderProducts([{ name: "A" }, { name: "B" }, { name: "C" }, { name: "D" }, { name: "E" }], opt), "A 1개 / 외 4종");
 // 진짜 긴 주문도 3줄 안에서 최대한 보여준다
 {
   const many = Array.from({ length: 12 }, (_, i) => ({ name: `상품${i + 1}번 이름` }));
   const t = feedOrderProducts(many, opt);
-  assert.ok(t.includes("외 10종"), t);
+  assert.ok(t.includes("외 11종"), t);
   const { shown, rest } = feedShownProducts(feedOrderParts(many, opt));
-  assert.equal(shown.length, 2);   // 「외 N종 더」가 한 줄을 먹으므로 상품은 2줄
-  assert.equal(rest, 10);
-  assert.equal(feedDetailLineCount(12), 3);
+  assert.equal(shown.length, 1);
+  assert.equal(rest, 11);
+  assert.equal(feedDetailLineCount(12), 2);
 }
 // 주문내역 줄 수 = 상품 수(최대 3)
 assert.equal(feedDetailLineCount(1), 1);
-assert.equal(feedDetailLineCount(5), 3);
+assert.equal(feedDetailLineCount(5), 2);
 assert.equal(feedDetailLineCount(0), 0);
 assert.equal(feedOrderProducts([], opt), "");
 // feedOrderLines 는 그 문구를 한 줄로 감싼다(금액 칸 비움)
-assert.deepEqual(feedOrderLines([{ name: "가격없음", price: 0 }], opt), [{ left: "가격없음  1개", right: "" }]);
+assert.deepEqual(feedOrderLines([{ name: "가격없음", price: 0 }], opt), [{ left: "가격없음 1개", right: "" }]);
 assert.deepEqual(feedOrderLines([], opt), []);
 
 // ── 「한 줄에 들어가면 한 줄」 판정 (방송화면을 덜 가리려고 한 줄 우선) ──────────
@@ -83,7 +83,29 @@ assert.equal(feedPinFitsOneLine("가".repeat(24)), true);   // 줄여서 한 줄
 // 상품 조각 — 화면에서 상품/옵션을 다른 모양으로 그리기 위한 구조
 {
   const parts = feedOrderParts([{ name: "나이키 바람막이 DX1234-100", color: "없음", size: "M", qty: 2 }], opt);
-  assert.deepEqual(parts, [{ name: "나이키 바람막이", opt: "사이즈 M", qty: 2 }]);
-  assert.equal(feedProductLabel(parts[0]), "나이키 바람막이  사이즈 M  2개");
+  assert.deepEqual(parts, [{ name: "나이키 바람막이", opt: "M", qty: 2 }]);
+  assert.equal(feedProductLabel(parts[0]), "나이키 바람막이 M 2개");
 }
-console.log("✅ test-feed-text 41개 통과");
+// ── 상품이 많으면 «넘겨가며» 보여준다 (화면 높이는 그대로) ─────────────────────
+{
+  const one = feedOrderParts([{ name: "아미반팔", color: "블랙", size: "L" }], opt);
+  assert.equal(feedProductPages(one).length, 1, "상품 1개는 한 장");
+
+  const many = feedOrderParts(
+    Array.from({ length: 8 }, (_, i) => ({ name: `아주긴상품이름${i + 1}번입니다`, color: "베이지", size: "L", qty: 2 })),
+    opt,
+  );
+  const pages = feedProductPages(many);
+  assert.ok(pages.length >= 3, `여러 장으로 나뉜다: ${pages.length}`);
+  // 빠짐 없이 전부 들어가야 한다 — 「외 N종」으로 버리지 않는다
+  assert.equal(pages.flat().length, 8);
+  // 각 장은 «두 줄» 폭(작은 글씨 28px)을 안 넘는다(상품 하나가 혼자 넘치는 경우 제외)
+  for (const pg of pages) {
+    if (pg.length === 1) continue;
+    assert.ok(estimateTextWidth(pg.map(feedProductLabel).join("  |  "), 28) <= 814 * 2, "한 장이 두 줄을 넘었다");
+  }
+  // 짧은 상품이면 한 장에 여러 개 — 「1개 출력당 최대한 많이」
+  const short = feedOrderParts(Array.from({ length: 6 }, (_, i) => ({ name: `꽃티${i + 1}`, size: "L" })), opt);
+  assert.equal(feedProductPages(short).length, 1, "짧은 상품 6개는 한 장에 다 들어간다");
+}
+console.log("✅ test-feed-text 46개 통과");

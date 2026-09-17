@@ -44,9 +44,15 @@ export type FeedLine = { left: string; right: string };
 
 const won = (n: number) => `${Math.round(n).toLocaleString("ko-KR")}원`;
 
-// [2026-09-16] 예전엔 여기서 「사이즈 6」의 «사이즈» 라벨을 떼어 「베이지/6」으로 줄였다(폭 아끼려고).
-//   그게 화면에서 「6」이 사이즈인지 수량인지 모르게 만든 원인이었다.
-//   → 2026-08-31 사장님이 정한 공용 규칙(lib/orderOptionText: 「베이지 / 사이즈 6」)을 그대로 쓴다.
+/**
+ * 옵션을 방송 화면용으로 짧게: 「베이지 / 사이즈 6」 → 「베이지/6」
+ * [2026-09-17] 09-16에 이 축약을 없앴다가 되살린다. 그때 뺀 이유는 「6」이 수량과 헷갈려서였는데,
+ *   지금은 수량을 «항상 1개·2개»로 쓰므로 «개»가 붙은 쪽이 수량이다 → 라벨 없이도 안 헷갈린다.
+ *   라벨 3글자를 빼면 상품 하나가 약 110px 짧아져 한 줄에 더 들어간다(방송 화면을 덜 가린다).
+ */
+function compactOption(opt: string): string {
+  return opt.replace(/사이즈\s*/g, "").split("/").map((x) => x.trim()).filter(Boolean).join("/");
+}
 
 
 // ── [2026-09-16] 「한 줄에 들어가면 한 줄」 판정 ───────────────────────────────
@@ -80,8 +86,11 @@ export type FeedRowSizes = { nick: number; nim: number; verb: number; detail: nu
 /** 기본 글자 크기(디자인 px). 위젯과 이 파일이 «같은 숫자»를 봐야 판정이 맞는다. */
 // [2026-09-16 사장님] 「닉네임하고 내용 글씨 크기도 똑같아야지. 방송화면 캡쳐 기준 폰트 크기를 동일하게」
 //   실측: 유튜브 채팅 글자 = 이 위젯의 37px. 닉네임·인사말·주문내역 전부 37 로 맞춘다.
-//   「님」과 옵션만 한 단계 작게(부속이라 구분되어야 읽기 쉽다).
-export const FEED_ROW_SIZES: FeedRowSizes = { nick: 37, nim: 26, verb: 37, detail: 37, opt: 30 };
+//   [09-17] 「님」까지 포함해 «전부 37» 로 통일 — 한 글자도 다른 크기를 쓰지 않는다.
+//   상품명/옵션/수량 구분은 «크기»가 아니라 «색»으로 한다(흰색 / 연한색 / 흰색).
+// [2026-09-17 최종] 닉네임·「님」·인사말 = 채팅과 같은 37. 상품·옵션·수량 = 28 (작게, 대신 한 알림에 많이).
+//   사장님: 「닉네임·주문감사합니다는 제외하고, 상품명·옵션·수량은 글씨를 줄여서 1개 출력당 최대한 많이」
+export const FEED_ROW_SIZES: FeedRowSizes = { nick: 37, nim: 37, verb: 37, detail: 28, opt: 28 };
 
 /**
  * 이 줄이 «한 줄»에 들어가나? (닉네임 + 인사말 + 주문내역 + 금액 + 칸 사이 여백)
@@ -125,25 +134,25 @@ export function feedOrderParts(items: FeedOrderItem[], optionText: (color: unkno
   return items
     .map((it) => ({
       name: cleanProductNameForFeed(it.name),
-      opt: optionText(it.color, it.size).trim(),
+      opt: compactOption(optionText(it.color, it.size).trim()),
       qty: Math.max(1, Math.floor(Number(it.qty) || 1)),
     }))
     .filter((r) => r.name);
 }
 
 /**
- * 조각 하나의 표시 문구 — 「아미반팔  블랙 / 사이즈 L  2개」
+ * 조각 하나의 표시 문구 — 「아미반팔 블랙/L 2개」
  * [2026-09-16 사장님 「수량이 몇 개냐고? 색상 있는 옵션이면 어떻게 표현할 거고?」]
- *   · 옵션은 08-31 공용 규칙 그대로(「블랙 / 사이즈 L」) — 라벨을 떼면 6이 사이즈인지 수량인지 모른다.
+ *   · 옵션은 「블랙/L」로 짧게. 수량을 «항상 N개»로 쓰니 «개»가 붙은 쪽이 수량이라 안 헷갈린다.
  *   · 수량은 «1개여도 항상» 쓴다. 안 쓰면 몇 개인지 알 수 없다.
- *   · 가로로 이어 붙이면 무조건 헷갈린다 → 화면에서는 «상품마다 한 줄»로 세로로 그린다.
+ *   · 화면에서는 «옆으로 이어» 쓰고, 상품 사이는 강조색 막대(|)로 끊는다(줄 낭비를 안 하려고).
  */
 export function feedProductLabel(p: FeedProduct): string {
-  return `${p.name}${p.opt ? `  ${p.opt}` : ""}  ${p.qty}개`;
+  return `${p.name}${p.opt ? ` ${p.opt}` : ""} ${p.qty}개`;
 }
 
-/** 주문내역이 쓸 수 있는 최대 줄 수(위젯과 같은 값). 이 안에서 «상품을 최대한 많이» 보여준다. */
-export const FEED_DETAIL_MAX_LINES = 3;
+/** 주문내역이 쓸 수 있는 최대 줄 수. [09-17] 3 → 2 — 화면을 실제로 덜 가리는 유일한 방법은 «양»을 줄이는 것. */
+export const FEED_DETAIL_MAX_LINES = 2;
 
 /**
  * 주문 한 건의 상품들 → 방송에 띄울 문구(금액 없음).
@@ -208,4 +217,36 @@ export function feedPinFitsOneLine(text: string): boolean {
 /** 한 줄을 100 으로 봤을 때 지금 몇 %인지 (관리자 입력칸 안내용) */
 export function feedPinFillPercent(text: string): number {
   return Math.round((estimateTextWidth(text, FEED_PIN_SIZE) / FEED_PIN_AVAIL_W) * 100);
+}
+
+// ── [2026-09-17 사장님] 「너무 길고 복잡하면 출력하고 빠르게 또 이어서 보여주고?」 ──
+// 주문한 상품이 많을 때 세로로 늘리면 방송화면을 가리고, 잘라 버리면 주문내역이 안 보인다.
+//   → «한 줄에 들어가는 만큼»을 한 장으로 묶어 «넘겨가며» 보여준다. 화면 높이는 항상 그대로다.
+//   장이 하나면 안 넘어간다(대부분의 주문은 상품 1~2개라 한 장으로 끝난다).
+export const FEED_PAGE_MS = 3500;   // 한 장이 떠 있는 시간
+
+/** 상품들을 «한 줄에 들어가는 만큼»씩 나눈다. 각 장은 최소 1개는 담는다(이름이 아주 길어도). */
+/** 한 장이 쓰는 줄 수 — 상품 줄은 작은 글씨로 «두 줄»까지 (그래야 한 알림에 많이 들어간다) */
+export const FEED_DETAIL_LINES_PER_PAGE = 2;
+
+export function feedProductPages(
+  parts: FeedProduct[],
+  avail: number = FEED_ROW_AVAIL_W,
+  em: number = FEED_ROW_SIZES.detail,
+  lines: number = FEED_DETAIL_LINES_PER_PAGE,
+): FeedProduct[][] {
+  const pages: FeedProduct[][] = [];
+  let cur: FeedProduct[] = [];
+  // 두 줄로 접힐 때 줄 끝에 남는 자투리를 감안해 8% 여유
+  const budget = avail * Math.max(1, lines) * 0.92;
+  const widthOf = (list: FeedProduct[]) => estimateTextWidth(list.map(feedProductLabel).join("  |  "), em);
+  for (const p of parts) {
+    if (cur.length > 0 && widthOf([...cur, p]) > budget) {
+      pages.push(cur);
+      cur = [];
+    }
+    cur.push(p);
+  }
+  if (cur.length > 0) pages.push(cur);
+  return pages.length > 0 ? pages : [];
 }

@@ -33,7 +33,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { getActiveBroadcast, loadAdminLiveBroadcasts } from "@/components/admin-live/liveBroadcastController";
-import { feedOrderLines, feedOrderParts, feedProductLabel, feedShownProducts, feedRowFitsOneLine, feedDetailLineCount, feedPinFitsOneLine, feedPinFontSize, FEED_ROW_SIZES, FEED_DETAIL_MAX_LINES, type FeedLine, type FeedOrderItem, type FeedProduct } from "@/lib/feedText";
+import { feedOrderLines, feedOrderParts, feedProductLabel, feedProductPages, feedRowFitsOneLine, feedPinFitsOneLine, feedPinFontSize, estimateTextWidth, FEED_PAGE_MS, FEED_ROW_AVAIL_W, FEED_ROW_SIZES, FEED_DETAIL_LINES_PER_PAGE, type FeedLine, type FeedOrderItem, type FeedProduct } from "@/lib/feedText";
 import { formatOrderOptionText } from "@/lib/orderOptionText";
 
 type AnyRow = Record<string, any>;
@@ -73,10 +73,16 @@ const TEXT_SHADOW =
   "0 0 2px rgba(0,0,0,0.95), 0 0 2px rgba(0,0,0,0.95), 1.5px 1.5px 0 rgba(0,0,0,0.85), -1.5px -1.5px 0 rgba(0,0,0,0.85), 1.5px -1.5px 0 rgba(0,0,0,0.85), -1.5px 1.5px 0 rgba(0,0,0,0.85), 0 2px 6px rgba(0,0,0,0.6)";
 
 // 📢 안내(notice)는 이 표를 쓰지 않는다(닉네임·감사 문구가 없는 줄) → Exclude 로 빼둔다.
-const KIND_META: Record<Exclude<FeedKind, "notice">, { icon: string; tag: string; verb: string; short: string; accent: string }> = {
-  order:   { icon: "🛒", tag: "주문", verb: "주문 감사합니다",   short: "주문",   accent: "#22c55e" },   // 초록 = 상품 위젯 주문성공과 같은 톤
-  deposit: { icon: "💰", tag: "입금", verb: "입금 감사합니다",   short: "입금",   accent: "#60a5fa" },   // 파랑 = 입금/카드
-  card:    { icon: "💳", tag: "카드", verb: "카드결제 감사합니다", short: "카드결제", accent: "#60a5fa" },
+const KIND_META: Record<Exclude<FeedKind, "notice">, { icon: string; tag: string; verb: string; verbSolo: string; accent: string }> = {
+  // [2026-09-17] 인사말을 「주문 감사합니다」에서 「주문」으로 줄였다. 이유는 «자리 계산»이다.
+  //   한 줄에 쓸 수 있는 폭 814px 중 — 닉네임 약 200 · 상품(옵션·수량 포함) 약 330 은 «정보»라 못 줄인다.
+  //   「주문 감사합니다」는 그 글자 크기(채팅과 같은 37px)에서 331px, 한 줄의 41% 를 먹는다.
+  //   셋을 다 넣으면 861 > 814 라 «무조건» 두 줄이 된다. 정보가 아닌 인사말을 줄이는 게 맞다.
+  //   ⚠ 상품이 없는 입금·카드 줄은 자리가 남으므로 인사말을 그대로 둔다(verbSolo).
+  // [2026-09-17 최종] 인사말은 「주문 감사합니다」 그대로. 상품 줄을 작은 글씨로 내려 자리를 만들었다.
+  order:   { icon: "🛒", tag: "주문", verb: "주문 감사합니다",   verbSolo: "주문 감사합니다",   accent: "#22c55e" },   // 초록 = 상품 위젯 주문성공과 같은 톤
+  deposit: { icon: "💰", tag: "입금", verb: "입금 감사합니다",   verbSolo: "입금 감사합니다",   accent: "#60a5fa" },   // 파랑 = 입금/카드
+  card:    { icon: "💳", tag: "카드", verb: "카드결제 감사합니다", verbSolo: "카드결제 감사합니다", accent: "#60a5fa" },
 };
 
 
@@ -103,19 +109,28 @@ const PREVIEW_ROWS: FeedItem[] = [
   { id: "p3", kind: "card",    nick: "루루짱929", lines: [], at: 0 },
 ];
 
-// [2026-09-16 사장님 「수량이 몇 개냐고? 색상 있는 옵션이면 어떻게 표현할 거고?」]
-//   가로로 이어 붙이면 상품·옵션·수량이 섞여 안 읽힌다 → «상품 하나에 한 줄».
-//   한 줄 안에서도 역할이 다르면 모양을 다르게: 상품명 흰색 굵게 / 옵션 연한색 / 수량 흰색.
-//   옵션 문구는 2026-08-31 공용 규칙 그대로(「블랙 / 사이즈 L」) — 라벨을 떼면 6이 사이즈인지 수량인지 모른다.
-function ProductLine({ p, size, optSize }: { p: FeedProduct; size: number; optSize: number }) {
+// [2026-09-17 사장님] 「한 줄 한 줄 하지 말고 옆으로 길게, 단 구분 잘 되게. 글자는 전부 채팅과 같은 크기로」
+//   · 글자 크기는 상품명·옵션·수량 전부 같다(37). 구분은 «색»으로 한다 — 흰색 / 연한색 / 흰색.
+//   · 상품과 상품 사이는 «강조색 막대」로 끊는다. 쉼표·가운뎃점은 옵션 안에도 나와서 헷갈렸다.
+//   · 옵션은 「블랙/L」로 짧게. 수량이 항상 「N개」라 «개»가 붙은 쪽이 수량이라 안 헷갈린다.
+function ProductRun({ products, accent, page, pageCount }: { products: FeedProduct[]; accent: string; page: number; pageCount: number }) {
   return (
-    <span style={{ minWidth: 0, display: "flex", alignItems: "baseline", gap: "12px", whiteSpace: "nowrap", overflow: "hidden" }}>
-      <span style={{ flexShrink: 1, minWidth: 0, fontSize: `${size}px`, fontWeight: 800, color: "#fff", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
-      {p.opt ? (
-        <span style={{ flexShrink: 1, minWidth: 0, fontSize: `${optSize}px`, fontWeight: 700, color: "rgba(255,255,255,0.72)", overflow: "hidden", textOverflow: "ellipsis" }}>{p.opt}</span>
+    <>
+      {products.map((p, i) => (
+        // 상품 하나는 «통째로» 줄을 바꾼다 — 「알로가방 / 1개」처럼 이름과 수량이 갈라지지 않게
+        <span key={i} style={{ display: "inline", whiteSpace: "nowrap" }}>
+          {i > 0 ? (
+            <span style={{ color: accent, fontWeight: 900, padding: "0 10px", textShadow: "none", whiteSpace: "normal" }}>|</span>
+          ) : null}
+          <span style={{ fontWeight: 800, color: "#fff" }}>{p.name}</span>
+          {p.opt ? <span style={{ fontWeight: 800, color: "rgba(255,255,255,0.7)" }}>{` ${p.opt}`}</span> : null}
+          <span style={{ fontWeight: 800, color: "#fff" }}>{` ${p.qty}개`}</span>
+        </span>
+      ))}
+      {pageCount > 1 ? (
+        <span style={{ fontWeight: 800, color: "rgba(255,255,255,0.6)", paddingLeft: "12px" }}>{`(${page + 1}/${pageCount})`}</span>
       ) : null}
-      <span style={{ flexShrink: 0, fontSize: `${optSize}px`, fontWeight: 800, color: "rgba(255,255,255,0.9)" }}>{p.qty}개</span>
-    </span>
+    </>
   );
 }
 
@@ -191,12 +206,12 @@ export default function OrderFeedWidgetClient() {
   }, []);
 
   // 줄마다 떠 있는 시간 — 📢 안내는 30초. 주문 알림은 «읽을 양»에 맞춰 유도리 있게.
-  //   [2026-09-16 사장님] 「내용이 길면 적용시간도 유도리 있게 바뀌어야 할 것 같은데」
-  //   한 줄 10초 · 주문내역이 두 줄이면 12.5초 · 세 줄이면 15초. (상품이 많을수록 읽을 게 많다)
+  //   [2026-09-17] 상품이 많아 «장»이 여러 개면 그 장들을 다 볼 시간을 준다(장당 3.5초).
   const lifeOf = (item: FeedItem) => {
     if (item.kind === "notice") return NOTICE_MS;
-    const detailLines = feedDetailLineCount((item.products || []).length);
-    return SHOW_MS + Math.max(0, detailLines - 1) * 2500;
+    const pages = feedProductPages(item.products || []);
+    if (pages.length <= 1) return SHOW_MS;
+    return Math.max(SHOW_MS, pages.length * FEED_PAGE_MS + 1500);
   };
 
   const pushItem = (item: FeedItem) => {
@@ -276,10 +291,13 @@ export default function OrderFeedWidgetClient() {
   const heightOf = (it: FeedItem) => {
     if (it.kind === "notice") return H_PAD_NOTICE + H_LINE_NOTICE * (feedPinFitsOneLine(it.text || "") ? 1 : 2);
     const m = KIND_META[it.kind as Exclude<FeedKind, "notice">];
-    const parts = it.products || [];
-    // 상품 «하나»이고 한 줄에 들어가면 한 줄. 아니면 상품마다 한 줄씩 아래로.
-    if (parts.length <= 1 && feedRowFitsOneLine(it.nick, `${m.icon} ${m.verb}`, parts[0] ? feedProductLabel(parts[0]) : "")) return H_ALERT_ONE;
-    return H_ALERT_ONE + H_DETAIL_LINE * feedDetailLineCount(parts.length);
+    const pages = feedProductPages(it.products || []);
+    if (pages.length === 0) return H_ALERT_ONE;
+    const run = pages[0].map(feedProductLabel).join("  |  ");
+    if (pages.length === 1 && feedRowFitsOneLine(it.nick, `${m.icon} ${m.verb}`, run)) return H_ALERT_ONE;
+    // 상품 줄(28px)이 1줄이면 +35, 2줄이면 +70. 장이 여러 개면 «가장 큰 장» 기준(높이가 흔들리지 않게).
+    const maxLines = Math.max(...pages.map((pg) => Math.min(FEED_DETAIL_LINES_PER_PAGE, Math.ceil(estimateTextWidth(pg.map(feedProductLabel).join("  |  "), FEED_ROW_SIZES.detail) / FEED_ROW_AVAIL_W))));
+    return H_ALERT_ONE + 35 * Math.max(1, maxLines);
   };
   // 📌 공지가 먼저 자리를 잡고, 남는 높이만큼 «최신 알림부터» 담는다.
   let budget = BUDGET_H - (showPin ? H_PAD_NOTICE + H_LINE_NOTICE * (feedPinFitsOneLine(pinShown) ? 1 : 2) + 4 : 0);
@@ -336,10 +354,16 @@ export default function OrderFeedWidgetClient() {
           }
           const meta = KIND_META[item.kind as Exclude<FeedKind, "notice">];
           const allParts = item.products || [];
-          const { shown: shownParts, rest: restCount } = feedShownProducts(allParts);
-          // 상품 «하나»일 때만 한 줄에 붙인다. 여러 개면 섞여서 안 읽히므로 상품마다 한 줄.
-          const oneLine = allParts.length <= 1
-            && feedRowFitsOneLine(item.nick, `${meta.icon} ${meta.verb}`, allParts[0] ? feedProductLabel(allParts[0]) : "");
+          // [2026-09-17 사장님] 「너무 길고 복잡하면 출력하고 빠르게 또 이어서 보여주고?」
+          //   → 상품이 많으면 «한 줄에 들어가는 만큼»씩 장을 넘겨가며 전부 보여준다.
+          //     화면 높이는 항상 그대로(최대 2줄)고, 주문내역은 하나도 안 버린다.
+          const pages = feedProductPages(allParts);
+          const pageIdx = pages.length > 1
+            ? Math.min(pages.length - 1, Math.floor(Math.max(0, now - item.at) / FEED_PAGE_MS))
+            : 0;
+          const shownParts = pages[pageIdx] || [];
+          const runText = shownParts.map(feedProductLabel).join("  |  ");
+          const oneLine = pages.length <= 1 && feedRowFitsOneLine(item.nick, `${meta.icon} ${meta.verb}`, runText);
           return (
             <div
               key={item.id}
@@ -378,8 +402,8 @@ export default function OrderFeedWidgetClient() {
               <span style={{ minWidth: 0, flex: "1 1 auto", display: "flex", flexDirection: "column", gap: "2px" }}>
                 <span style={{ minWidth: 0, display: "flex", alignItems: "baseline", gap: "11px", lineHeight: 1.12 }}>
                   {/* 닉네임 = 손님이 자기 이름을 찾는 곳. 안 자른다(아주 긴 것만 60% 선에서 …) */}
-                  <span style={{ flexShrink: 0, maxWidth: "60%", fontSize: `${FEED_ROW_SIZES.nick}px`, fontWeight: 900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {item.nick}<span style={{ fontSize: `${FEED_ROW_SIZES.nim}px`, fontWeight: 700, opacity: 0.85 }}>님</span>
+                  <span style={{ flexShrink: 0, maxWidth: "60%", fontSize: `${FEED_ROW_SIZES.nick}px`, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {item.nick}<span style={{ fontSize: `${FEED_ROW_SIZES.nim}px`, fontWeight: 800 }}>님</span>
                   </span>
                   <span
                     style={{
@@ -388,25 +412,23 @@ export default function OrderFeedWidgetClient() {
                       animation: "ruruVerbPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.35s both",
                     }}
                   >
-                    {meta.icon} {meta.verb}
+                    {meta.icon} {allParts.length > 0 ? meta.verb : meta.verbSolo}
                   </span>
                   {oneLine && allParts[0] ? (
                     <>
                       <span style={{ flexShrink: 0, fontSize: "24px", opacity: 0.45 }}>·</span>
-                      <span style={{ flexShrink: 1, minWidth: 0, overflow: "hidden" }}>
-                        <ProductLine p={allParts[0]} size={FEED_ROW_SIZES.detail} optSize={FEED_ROW_SIZES.opt} />
+                      <span style={{ flexShrink: 1, minWidth: 0, fontSize: `${FEED_ROW_SIZES.detail}px`, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <ProductRun products={shownParts} accent={meta.accent} page={pageIdx} pageCount={pages.length} />
                       </span>
                     </>
                   ) : null}
                 </span>
                 {!oneLine && allParts.length > 0 ? (
-                  <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
-                    {shownParts.map((pp, i) => (
-                      <ProductLine key={i} p={pp} size={FEED_ROW_SIZES.detail} optSize={FEED_ROW_SIZES.opt} />
-                    ))}
-                    {restCount > 0 ? (
-                      <span style={{ fontSize: `${FEED_ROW_SIZES.opt}px`, fontWeight: 800, color: "rgba(255,255,255,0.8)" }}>{`외 ${restCount}종 더`}</span>
-                    ) : null}
+                  <span style={{
+                    minWidth: 0, fontSize: `${FEED_ROW_SIZES.detail}px`, lineHeight: 1.25, marginTop: "2px",
+                    display: "-webkit-box", WebkitLineClamp: FEED_DETAIL_LINES_PER_PAGE, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "keep-all",
+                  }}>
+                    <ProductRun products={shownParts} accent={meta.accent} page={pageIdx} pageCount={pages.length} />
                   </span>
                 ) : null}
               </span>
