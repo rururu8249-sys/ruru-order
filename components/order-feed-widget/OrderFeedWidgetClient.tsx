@@ -51,7 +51,10 @@ const NOTICE_MS = 30000;    // 📢 상품 안내가 떠 있는 시간 — 사�
 //     공지1줄 + 상품 많은 주문 1건(4줄) = 77 + 207 + 8 = 292   ← 「공지 포함 2개만」
 //     공지2줄 + 주문 2건(각 1줄)        = 120 + 150 + 16 = 286
 //     공지1줄 + 주문 3건(각 1줄)        = 77 + 225 + 24 = 326 → 넘으므로 오래된 1건이 빠진다
-const BUDGET_H = 292;
+// [2026-09-17 사장님] 「너무 화면을 잡아먹는다. 주문내역 많은 게 뜰 때는 공지 포함 2개만」
+//   글자 28 통일 후 실측: 공지 1줄 77 · 알림 한 줄 62 · 주문내역 한 줄마다 +35
+//   230 이면 — 공지 + 상품 많은 주문(3줄 = 132) = 221 → «2개만».  공지 + 짧은 주문 2건(62×2) = 221 → 3개.
+const BUDGET_H = 230;
 const H_PAD_NOTICE = 34, H_LINE_NOTICE = 43;   // 📌공지·📢안내
 const H_ALERT_ONE = 62, H_DETAIL_LINE = 35;    // 알림 한 줄(28px+여백) / 주문내역 한 줄 추가분 — [09-17] 글자 28 통일 후 실측
 const KEEP_ITEMS = 6;                          // 메모리에 들고 있는 알림 수(그릴 때 예산으로 자른다)
@@ -136,6 +139,8 @@ function ProductRun({ products, accent, page, pageCount }: { products: FeedProdu
 
 export default function OrderFeedWidgetClient() {
   const [items, setItems] = useState<FeedItem[]>([]);
+  const itemsRef = useRef<FeedItem[]>([]);   // 수명 계산에서 «지금 떠 있는 다른 알림»을 보려고(붐빔 판정)
+  itemsRef.current = items;
   const [live, setLive] = useState(false);          // 활성 방송 있음
   const [previewMode, setPreviewMode] = useState(false);
   const [fitScale, setFitScale] = useState(1);
@@ -207,7 +212,17 @@ export default function OrderFeedWidgetClient() {
 
   // 줄마다 떠 있는 시간 — 📢 안내는 30초. 주문 알림은 «읽을 양»에 맞춰 유도리 있게.
   //   [2026-09-17] 상품이 많아 «장»이 여러 개면 그 장들을 다 볼 시간을 준다(장당 3.5초).
-  const lifeOf = (item: FeedItem) => {
+  // [2026-09-17 사장님] 「화면을 너무 잡아먹을 땐 빠르게 없애야」 — 새 알림이 뒤에 붙으면
+  //   앞 알림은 «인식만 되게» 잠깐(4초) 더 보이고 사라진다. 혼자 떠 있을 땐 원래 시간대로.
+  const CROWD_GRACE_MS = 4000;
+  const crowdedLife = (item: FeedItem, base: number) => {
+    if (item.kind === "notice") return base;
+    const newer = itemsRef.current.find((x) => x.kind !== "notice" && x.id !== item.id && x.at > item.at);
+    if (!newer) return base;
+    return Math.min(base, newer.at - item.at + CROWD_GRACE_MS);
+  };
+  const lifeOf = (item: FeedItem) => crowdedLife(item, baseLifeOf(item));
+  const baseLifeOf = (item: FeedItem) => {
     if (item.kind === "notice") return NOTICE_MS;
     const pages = feedProductPages(item.products || []);
     if (pages.length <= 1) return SHOW_MS;
