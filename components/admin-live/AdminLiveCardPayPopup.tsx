@@ -269,6 +269,11 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
   const pip = usePipWindow();
   const [copiedKey, setCopiedKey] = useState("");
   const [saving, setSaving] = useState(false);
+  // [2026-09-19 사장님] 「복사창이 항상 위라 '결제완료 처리할까요?' 창이 앞으로 안 나와서 몰랐음」
+  //   → 복사창이 열려 있을 때는 확인창을 «복사창 안에» 그린다(본창의 AdminConfirmHost 는 복사창 뒤에 숨는다).
+  //   처리 실패 문구도 같은 이유로 복사창 안에 띄운다. 돈 처리(runComplete)는 그대로다.
+  const [pipConfirmOpen, setPipConfirmOpen] = useState(false);
+  const [pipCompleteError, setPipCompleteError] = useState("");
   // [2026-08-29] 카톡으로 결제링크 보낸 뒤, 유튜브 채팅에 자동 안내
   // [2026-08-29 사장님 요청] 페이스터는 남의 사이트라 자동 입력이 안 된다(브라우저 동일출처 정책).
   //   예전: 상품명·금액·닉네임·전화번호를 1→2→3→4 순서로 네 번 복사해야 했다.
@@ -400,12 +405,51 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
   const chatNoticeText = `💳 ${order.nickname}님 카카오톡으로 카드결제 링크 보내드렸어요! 📩 확인 부탁드려요 🙏`;
 
   // 결제완료처리: LiveOrderDetailDrawer.handleCardPaymentStatusChange와 동일 패턴(주문상태만 변경, 금액/배송/송장 로직 무변경)
-  const handleComplete = async () => {
+  const completeRowIds = () => {
     const items = Array.isArray(order.items) ? order.items : [];
-    const rowIds = items.map((i) => Number(i.id)).filter((id) => Number.isFinite(id));
+    return items.map((i) => Number(i.id)).filter((id) => Number.isFinite(id));
+  };
+
+  // 실제 상태 변경(확인창에서 «확인»을 누른 뒤에만 호출). 쿼리·값은 예전 그대로.
+  const runComplete = async (rowIds: number[]) => {
+    setSaving(true);
+    setPipCompleteError("");
+    try {
+      const { error } = await supabase
+        .from("orders")
+        .update({
+          admin_order_status_v2: "카드결제완료",
+          order_manage_status: "카드결제완료",
+        })
+        .in("id", rowIds);
+
+      if (error) {
+        showAdminToast("카드결제 상태 변경 실패\n\n" + error.message, "error");
+        setPipCompleteError("카드결제 상태 변경 실패: " + error.message);
+        return;
+      }
+
+      showAdminToast("카드결제완료 처리됐습니다.", "success");
+      await onAfterStatusChange?.();
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleComplete = async () => {
+    const rowIds = completeRowIds();
 
     if (rowIds.length === 0) {
       showAdminToast("상태 변경할 주문 ID가 없습니다.", "warning");
+      setPipCompleteError("상태 변경할 주문 ID가 없습니다.");
+      return;
+    }
+
+    // 복사창 안에서는 «복사창 안 확인창»으로 (본창 확인창은 복사창 뒤에 숨어 안 보인다)
+    if (pip.pipWindow) {
+      setPipCompleteError("");
+      setPipConfirmOpen(true);
       return;
     }
 
@@ -419,29 +463,46 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
     );
 
     if (!ok) return;
-
-    setSaving(true);
-    try {
-      const { error } = await supabase
-        .from("orders")
-        .update({
-          admin_order_status_v2: "카드결제완료",
-          order_manage_status: "카드결제완료",
-        })
-        .in("id", rowIds);
-
-      if (error) {
-        showAdminToast("카드결제 상태 변경 실패\n\n" + error.message, "error");
-        return;
-      }
-
-      showAdminToast("카드결제완료 처리됐습니다.", "success");
-      await onAfterStatusChange?.();
-      onClose();
-    } finally {
-      setSaving(false);
-    }
+    await runComplete(rowIds);
   };
+
+  // 복사창 안 확인창(복사창이 열려 있을 때만 그려진다)
+  const pipConfirm = pipConfirmOpen ? (
+    <div
+      onClick={() => { if (!saving) setPipConfirmOpen(false); }}
+      style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(16,28,61,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}
+    >
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "380px", borderRadius: "16px", background: "#fff", padding: "20px", boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}>
+        <div style={{ fontSize: "16px", fontWeight: 900, color: "#101C3D" }}>카드결제완료 처리할까요?</div>
+        <div style={{ marginTop: "8px", fontSize: "13px", fontWeight: 700, lineHeight: 1.5, color: "#3B4A6B" }}>
+          실제 카드결제가 확인된 경우에만 진행하세요.
+          <br />
+          주문상태만 카드결제완료로 변경합니다.
+        </div>
+        {pipCompleteError ? (
+          <div style={{ marginTop: "12px", fontSize: "12px", fontWeight: 800, color: "#B42318", whiteSpace: "pre-wrap" }}>{pipCompleteError}</div>
+        ) : null}
+        <div style={{ marginTop: "16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => setPipConfirmOpen(false)}
+            style={{ borderRadius: "12px", border: "1px solid #D7DEEE", background: "#fff", padding: "12px", fontSize: "14px", fontWeight: 900, color: "#3B4A6B" }}
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => void runComplete(completeRowIds())}
+            style={{ borderRadius: "12px", border: "none", background: "#059669", padding: "12px", fontSize: "14px", fontWeight: 900, color: "#fff", opacity: saving ? 0.6 : 1 }}
+          >
+            {saving ? "처리 중…" : "확인"}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   // ── 복사창은 «한 벌»만 만든다 ────────────────────────────────────────
   //   [2026-09-08 사장님] 「그냥 원래 왼쪽 복사창을 띄어놓는 느낌으로 만들면 안되는건지?
@@ -594,6 +655,9 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
           >
             {saving ? "처리 중…" : "✔ 카드결제완료 처리"}
           </button>
+          {pipCompleteError && !pipConfirmOpen ? (
+            <div style={{ marginTop: "8px", fontSize: "12px", fontWeight: 800, color: "#B42318", whiteSpace: "pre-wrap" }}>{pipCompleteError}</div>
+          ) : null}
 
         </div>
     </div>
@@ -631,6 +695,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
     return createPortal(
       <div style={{ width: "100%", height: "100dvh", display: "flex", flexDirection: "column", overflow: "hidden", background: "#F4F6FB" }}>
         {copyPanel}
+        {pipConfirm}
         {imagePreview}
       </div>,
       pip.pipWindow.document.body,
