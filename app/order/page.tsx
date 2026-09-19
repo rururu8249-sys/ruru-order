@@ -94,7 +94,7 @@ import ShopContactLink from "@/components/customer/ShopContactLink";
 import { useShopInfo } from "@/lib/useShopInfo";
 import { detailCode, detailPricePresentation, detailProducts } from "@/lib/productDetailModel";
 import CustomerSizeChartSheet from "@/components/customer/CustomerSizeChartSheet";
-import { resolveSizeChart } from "@/lib/sizeChart";
+import { resolveSizeChart, sizeColumnIndex } from "@/lib/sizeChart";
 import { registeredProductEditManualPrice, registeredProductPriceMode } from "@/lib/registeredProductPricePolicy";
 import { buildCartHoldSnapshotItem } from "@/lib/cartHoldDetail";
 import {
@@ -1375,6 +1375,8 @@ export default function OrderPage() {
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
   const [requestMemo, setRequestMemo] = useState("");
+  // [2026-09-20 사장님 「주문서 최종 화면 심플하게」] 요청사항 칸은 접어 두고 필요할 때만 편다.
+  const [requestMemoOpen, setRequestMemoOpen] = useState(false);
 
   const [pin, setPin] = useState("");
   const [autoSaveInfo, setAutoSaveInfo] = useState(true);
@@ -1629,6 +1631,9 @@ export default function OrderPage() {
   //   지금: 썸네일 탭 = 대표사진 교체 / 색상 탭 = 그 색 사진으로 교체 / 대표사진 탭 = 확대. 역할을 셋으로 분리.
   //   ""(빈값)이면 기본 사진을 쓴다. 담기·가격·재고 로직 무관 — 보여주는 사진만 바뀐다.
   const [registeredOptionHeroPhoto, setRegisteredOptionHeroPhoto] = useState("");
+  // [2026-09-20 사장님 「타사이트처럼 사진 크게」] 대표사진은 본문 맨 위에 가로 꽉(정사각). 아래로 스크롤하면
+  //   헤더에 64px 썸네일이 대신 나타난다(무신사·지그재그 방식). 열 때마다 false 로.
+  const [registeredOptionHeroCollapsed, setRegisteredOptionHeroCollapsed] = useState(false);
   const [registeredOptionSize, setRegisteredOptionSize] = useState("");
   const [registeredOptionCustomerDetail, setRegisteredOptionCustomerDetail] = useState("");
   const [registeredOptionQty, setRegisteredOptionQty] = useState(1);
@@ -4259,6 +4264,7 @@ export default function OrderPage() {
     setRegisteredOptionComboSearch("");
     setRegisteredOptionDetailCategory("전체");
     setRegisteredOptionHeroPhoto("");
+    setRegisteredOptionHeroCollapsed(false);
   };
 
   const closeRegisteredOptionSelectSheet = () => {
@@ -4273,6 +4279,7 @@ export default function OrderPage() {
     setRegisteredOptionComboSearch("");
     setRegisteredOptionDetailCategory("전체");
     setRegisteredOptionHeroPhoto("");
+    setRegisteredOptionHeroCollapsed(false);
   };
 
   // 동일 상품 + 동일 옵션(색상/사이즈)으로 이미 제출된 주문이 있는지 확인.
@@ -5834,6 +5841,20 @@ export default function OrderPage() {
     const reserved = pid ? Number(reservedByVariant[reservationVariantKey(pid, matched.color, matched.size)] || 0) : 0;
     return Math.max(0, Number(matched.stock) - Math.max(0, reserved));
   })();
+  // [2026-09-20] 드롭다운 항목 라벨(「L · 2개 남음」)용 — registeredOptionAvailableQty 와 같은 계산을 색상·사이즈로 받는다. 표시 전용.
+  const availableQtyColorSize = (color: string, size: string): number | null => {
+    if (!registeredOptionSelectProduct || registeredOptionStockVariants.length === 0) return null;
+    const nm2 = (v: string) => { const t = String(v ?? "").trim(); return t === "없음" ? "" : t; };
+    const colorKey = registeredOptionAxes3 && !registeredOptionBrandGroup
+      ? [registeredOptionDetail, color].map((v) => String(v ?? "").trim()).filter(Boolean).join(ORDER_AXIS_JOIN)
+      : color;
+    const matched = registeredOptionStockVariants.find((v) => nm2(v.color) === nm2(colorKey) && nm2(v.size) === nm2(size));
+    if (!matched) return null;
+    const pid = String(registeredOptionSelectProduct.id ?? "");
+    const reserved = pid ? Number(reservedByVariant[reservationVariantKey(pid, matched.color, matched.size)] || 0) : 0;
+    return Math.max(0, Number(matched.stock) - Math.max(0, reserved));
+  };
+  const optionQtyLabel = (qty: number | null) => qty === null ? "" : qty <= 0 ? " · 품절" : qty <= 3 ? ` · ${qty}개 남음` : ` · 재고 ${qty}개`;
   const joinAxisColor = (colorValue: string) =>
     registeredOptionAxes3 && !registeredOptionBrandGroup
       ? [registeredOptionDetail, colorValue].map((v) => String(v ?? "").trim()).filter(Boolean).join(ORDER_AXIS_JOIN)
@@ -6686,6 +6707,7 @@ export default function OrderPage() {
             onClose={() => { if (!submitting) setOrderSheetOpen(false); }}
             closeDisabled={submitting}
             title="주문서 확인"
+            subtitle={selectedItemEntries.length > 0 ? `담은 상품 ${selectedItemEntries.length}개` : undefined}
             bodyPadding="0"
             headerBelow={(
               <div style={{ padding: "9px 14px", borderBottom: "1px solid #F0EAE0", background: "#FBF5F7", overflowX: "auto" }}>
@@ -6765,16 +6787,17 @@ export default function OrderPage() {
             )}
           >
                 {/* 🚚 배송지 카드 */}
+                {/* [2026-09-20 사장님 「난독증도 이해하게 심플하게」] 배송지 = 받는 분·연락처 한 줄 + 주소 한 줄. 닉네임은 결제(입금자명) 줄로 옮김. */}
                 <div style={{ margin: "12px 16px 0", border: "1px solid #E5E1DC", borderRadius: "12px", padding: "12px 14px", background: "#FAF8F6" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                    <span style={{ fontSize: "13px", fontWeight: 800, color: "#1A1A1A" }}>🚚 배송지</span>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                    <span style={{ fontSize: "13px", fontWeight: 800, color: "#1A1A1A" }}>🚚 받는 곳</span>
                     <button type="button" onClick={() => { setFinalSubmitAcknowledged(false); openCustomerInfoEditBottomSheet("shipping_list"); }} style={{ border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", borderRadius: "8px", padding: "4px 12px", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>변경</button>
                   </div>
-                  <div style={{ fontSize: "12px", color: "#444", lineHeight: 1.8 }}>
-                    <div>닉네임: {youtubeNickname.trim() || "-"}</div>
-                    <div>받는 분: {(recipientName.trim() || customerName.trim()) || "-"}</div>
-                    <div>연락처: {formatPhone(recipientPhone.trim() || customerPhone) || "-"}</div>
-                    <div>주소: {address.trim() ? `${address.trim()}${detailAddress.trim() ? " " + detailAddress.trim() : ""}` : "주소 미입력"}</div>
+                  <div style={{ fontSize: "14px", fontWeight: 800, color: "#222", lineHeight: 1.5 }}>
+                    {(recipientName.trim() || customerName.trim()) || "-"} · {formatPhone(recipientPhone.trim() || customerPhone) || "-"}
+                  </div>
+                  <div style={{ marginTop: "2px", fontSize: "13px", fontWeight: 600, color: "#444", lineHeight: 1.5, wordBreak: "keep-all" }}>
+                    {address.trim() ? `${address.trim()}${detailAddress.trim() ? " " + detailAddress.trim() : ""}` : "주소 미입력"}
                   </div>
                 </div>
 
@@ -6786,6 +6809,8 @@ export default function OrderPage() {
                   const ordererPhone = normalizePhone(customerPhone);
                   const phoneOk = isOrderablePhone(ordererPhone);
                   const phoneIsMobile = isMobileOrderPhone(ordererPhone);
+                  // [2026-09-20 심플하게] 정상 휴대폰이면 이 카드는 안 보인다. 문제(못 내는 번호·집전화)일 때만 그 자리에 뜬다.
+                  if (phoneOk && phoneIsMobile) return null;
                   return (
                     <div style={{ margin: "8px 16px 0", border: `1px solid ${phoneOk ? "#E5E1DC" : "#E0344B"}`, borderRadius: "12px", padding: "12px 14px", background: phoneOk ? "#FAF8F6" : "#FFF4F5" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
@@ -6946,78 +6971,59 @@ export default function OrderPage() {
               </div>
             ) : null}
 
-            <section style={{ padding: "16px 18px", borderTop: "0.5px solid #E5E1DC" }}>
-              <div style={{ fontSize: "14px", fontWeight: 800, color: "#1A1A1A", marginBottom: "12px" }}>결제 방법을 선택해 주세요.</div>
+            {/* [2026-09-20 사장님 「심플하게」] 결제 = 버튼 2개(라벨만) + 고른 쪽 밑에 한 줄.
+                무통장: 「{닉네임} 이름으로 입금」 / 카드: 「제출하면 카톡으로 결제링크」 + 최소금액. 요청사항은 접어 둠. 계산·제출 로직 무변경. */}
+            <section style={{ padding: "14px 18px", borderTop: "0.5px solid #E5E1DC" }}>
+              <div style={{ fontSize: "14px", fontWeight: 800, color: "#1A1A1A", marginBottom: "8px" }}>결제</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                 {(["무통장입금", "카드결제"] as const).map((method) => (
                   <button
                     key={method}
                     type="button"
                     onClick={() => setPaymentMethod(method)}
-                    style={{ minHeight: "68px", borderRadius: "16px", padding: "12px", textAlign: "left", border: paymentMethod === method ? "2px solid #7A1E47" : "1px solid #E5E1DC", background: paymentMethod === method ? "#F9EEF3" : "#fff", cursor: "pointer" }}
+                    style={{ height: "48px", borderRadius: "12px", border: paymentMethod === method ? "2px solid #7A1E47" : "1px solid #E5E1DC", background: paymentMethod === method ? "#F9EEF3" : "#fff", cursor: "pointer", fontSize: "15px", fontWeight: 800, color: paymentMethod === method ? "#7A1E47" : "#444" }}
                   >
-                    <span style={{ display: "block", fontSize: "15px", fontWeight: 800, color: paymentMethod === method ? "#7A1E47" : "#444" }}>
-                      {method === "카드결제" ? `카드결제 (+${cardRateForCustomer}%)` : method}
-                    </span>
-                    <span style={{ marginTop: "4px", display: "block", fontSize: "11px", fontWeight: 800, lineHeight: 1.3, color: paymentMethod === method ? "#7A1E47" : "#999" }}>
-                      {method === "무통장입금" ? "입금자명·금액 확인" : "제출 후 카카오톡으로 결제링크 전송"}
-                    </span>
+                    {method === "카드결제" ? `카드결제 +${cardRateForCustomer}%` : method}
                   </button>
                 ))}
               </div>
+              <div style={{ marginTop: "8px", borderRadius: "10px", background: "#FAF8F6", border: "1px solid #E5E1DC", padding: "9px 12px", fontSize: "13px", fontWeight: 800, lineHeight: 1.6, color: "#4B3540", wordBreak: "keep-all" }}>
+                {paymentMethod === "카드결제" ? (
+                  <>제출하면 <b style={{ color: "#7A1E47" }}>카카오톡으로 결제링크</b>를 보내드려요. (택배비 포함 {cardPaymentMinAmount.toLocaleString()}원 이상)</>
+                ) : (
+                  <>입금자명 <b style={{ color: "#7A1E47" }}>「{youtubeNickname.trim() || customerName.trim() || "-"}」</b> 으로 입금해 주세요.</>
+                )}
+              </div>
 
-              {paymentMethod === "카드결제" && (
-                <div style={{ marginTop: "12px", borderRadius: "16px", border: "1px solid #E5E1DC", background: "#F9EEF3", padding: "12px", fontSize: "13px", fontWeight: 800, lineHeight: 1.6, color: "#7A1E47" }}>
-                  ⓘ 카드결제는 택배비 포함 {cardPaymentMinAmount.toLocaleString()}원 이상 구매 시 가능합니다.
-                  <br />
-                  주문서를 제출하면 카카오톡으로 결제링크를 보내드립니다.
-                  <br />
-                  링크에서 결제를 완료해 주세요.
-                </div>
+              {requestMemoOpen || requestMemo.trim() ? (
+                <label className="mt-3 block">
+                  <span className="mb-2 block text-[13px] font-black tracking-[-0.04em] text-slate-700">요청사항</span>
+                  <textarea
+                    value={requestMemo}
+                    onChange={(event) => setRequestMemo(event.target.value)}
+                    placeholder="예) 문 앞에 놓아 주세요 / 배송 전 연락 주세요"
+                    className="min-h-[72px] w-full resize-none rounded-[14px] border border-slate-200 bg-slate-50 p-3 text-[15px] font-bold leading-relaxed tracking-[-0.04em] outline-none focus:border-rose-deep"
+                  />
+                </label>
+              ) : (
+                <button type="button" onClick={() => setRequestMemoOpen(true)} style={{ marginTop: "10px", border: "none", background: "none", padding: 0, fontSize: "13px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>
+                  요청사항 적기 ⌄
+                </button>
               )}
-
-              <label className="mt-4 block">
-                <span className="mb-2 block text-[13px] font-black tracking-[-0.04em] text-slate-700">
-                  요청사항
-                </span>
-                <textarea
-                  value={requestMemo}
-                  onChange={(event) => setRequestMemo(event.target.value)}
-                  placeholder="예) 문 앞에 놓아 주세요 / 배송 전 연락 주세요"
-                  className="min-h-[88px] w-full resize-none rounded-[20px] border border-slate-200 bg-slate-50 p-4 text-[15px] font-bold leading-relaxed tracking-[-0.04em] outline-none focus:border-rose-deep"
-                />
-              </label>
             </section>
 
             <section
               data-ruru-price-section="redesigned"
               style={{ padding: "16px 18px", borderTop: "0.5px solid #E5E1DC" }}
             >
-              <div className="min-w-0">
-                <p className="text-[12px] font-black tracking-[-0.04em]" style={{ color: "#7A1E47" }}>
-                  최종 확인
-                </p>
-                <h2 className="mt-1 text-[18px] font-black tracking-[-0.06em] text-slate-950">
-                  결제금액 확인
-                </h2>
-                <p className="mt-1 break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-500">
-                  상품금액, 배송비, 포인트 사용 금액을 확인해 주세요.
-                </p>
-              </div>
-
+              {/* [2026-09-20 심플하게] 「최종 확인 / 결제금액 확인 / …확인해 주세요」 설명 3줄 삭제 — 금액표만. */}
               {shippingNoticeText && (
-                <div
-                  className={`mt-3 rounded-[20px] p-3 text-[13px] font-black leading-relaxed tracking-[-0.04em] ${
-                    shippingFee > 0
-                      ? "bg-amber-50 text-amber-800 ring-1 ring-amber-100"
-                      : "bg-green-50 text-green-700 ring-1 ring-green-100"
-                  }`}
-                >
+                <div className="mb-3 break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em]" style={{ color: shippingFee > 0 ? "#80522B" : "#0F6E56" }}>
                   {shippingFee > 0 ? "🚚" : "✅"} {shippingNoticeText}
                 </div>
               )}
 
-              <div data-ruru-price-summary-wrapper="flat" className="mt-4">
+              <div data-ruru-price-summary-wrapper="flat">
                 <OrderPriceSummaryBox
                   productAmount={productAmount}
                   shippingFee={shippingFee}
@@ -7059,12 +7065,7 @@ export default function OrderPage() {
                 </label>
               )}
 
-              <div style={{ marginTop: "14px", borderRadius: "16px", border: "1px solid #F2D2AE", background: "#FFF3E8", padding: "13px" }}>
-                <strong style={{ display: "block", fontSize: "13px", color: "#9A4B00" }}>⚠️ 제출하기 전에 배송지를 확인해 주세요</strong>
-                <p style={{ marginTop: "5px", fontSize: "11.5px", fontWeight: 700, lineHeight: 1.6, color: "#80522B", wordBreak: "keep-all" }}>
-                  제출 후 내정보에서 배송지를 바꿔도 <b>이미 제출한 이번 주문에는 반영되지 않습니다.</b> 배송지가 다르면 위 [변경]에서 수정한 뒤 제출해 주세요.
-                </p>
-              </div>
+              {/* [2026-09-20 심플하게] ⚠️ 배송지 확인 경고 상자 삭제 — 제출 버튼 위 체크칸(배송지·상품·옵션·수량 확인)이 같은 역할. */}
 
             </section>
           </CustomerBottomSheet>
@@ -7268,8 +7269,12 @@ export default function OrderPage() {
             onClose={closeRegisteredOptionSelectSheet}
             ariaLabel="옵션 선택"
             bodyDataAttr="data-registered-option-scroll"
-            bodyPadding="16px"
-            headerLeft={(() => {
+            bodyPadding="0 16px 16px"
+            onBodyScroll={(event) => {
+              const collapsed = event.currentTarget.scrollTop > 200;
+              if (collapsed !== registeredOptionHeroCollapsed) setRegisteredOptionHeroCollapsed(collapsed);
+            }}
+            headerLeft={registeredOptionHeroCollapsed ? (() => {
               return (
                 <>
                     {(() => {
@@ -7280,7 +7285,7 @@ export default function OrderPage() {
                       //   대신 «지금 보는 사진 / 더 있음 / 확대»를 표시로 알린다.
                       const defaultHeroPhoto = registeredOptionBrandDetailPhotos[0] || registeredOptionComboPhotos[registeredOptionDetail] || pickOrderProductImageUrl(registeredOptionSelectProduct);
                       const selectedPhoto = registeredOptionHeroPhoto || defaultHeroPhoto;
-                      return <div onClick={() => { if (selectedPhoto) openLightbox(selectedPhoto, registeredOptionAllImages, registeredOptionPhotoTitle); }} style={{ position: "relative", width: "88px", height: "88px", flexShrink: 0, borderRadius: "14px", overflow: "hidden", background: "#F0EBE8", cursor: selectedPhoto ? "zoom-in" : "default" }}>
+                      return <div onClick={() => { if (selectedPhoto) openLightbox(selectedPhoto, registeredOptionAllImages, registeredOptionPhotoTitle); }} style={{ position: "relative", width: "64px", height: "64px", flexShrink: 0, borderRadius: "14px", overflow: "hidden", background: "#F0EBE8", cursor: selectedPhoto ? "zoom-in" : "default" }}>
                       {selectedPhoto ? (
                         <img src={selectedPhoto} alt={registeredOptionDetail || registeredOptionSelectProduct.product_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       ) : registeredOptionBrandGroup ? (
@@ -7295,7 +7300,7 @@ export default function OrderPage() {
                     })()}
                 </>
               );
-            })()}
+            })() : undefined}
             title={registeredOptionDetail || registeredOptionSelectProduct.product_name}
             subtitle={(
               <>
@@ -7315,33 +7320,6 @@ export default function OrderPage() {
                 </span>
               </>
             )}
-            headerBelow={registeredOptionAllImages.length > 1 ? (
-              <div style={{ padding: "0 16px 12px", borderBottom: "1px solid #F0EAE0" }}>
-                  {/* [2026-09-09 3순위] 예전엔 썸네일을 눌러도 «확대창»만 떠서 위 대표사진은 그대로였다.
-                      → 탭하면 위 대표사진이 «그 사진으로 바뀐다». 지금 보고 있는 것에는 테두리를 준다.
-                      (Baymard 공개 조사: 모바일에서도 점 인디케이터보다 «썸네일»이 낫다 — 오탭이 적다)
-                      확대는 위 대표사진(🔍 크게)이 맡는다 — 역할을 겹치지 않게 나눴다. */}
-                  {registeredOptionAllImages.length > 1 ? (() => {
-                    const heroNow = registeredOptionHeroPhoto || registeredOptionBrandDetailPhotos[0] || registeredOptionComboPhotos[registeredOptionDetail] || pickOrderProductImageUrl(registeredOptionSelectProduct);
-                    const heroIdx = registeredOptionAllImages.findIndex((img) => img === heroNow);
-                    return (
-                    <div style={{ marginTop: "10px" }}>
-                      <div style={{ marginBottom: "5px", fontSize: "11px", fontWeight: 800, color: "#8A7F84" }}>
-                        사진 {registeredOptionAllImages.length}장{heroIdx >= 0 ? ` · 지금 ${heroIdx + 1}번째` : ""} — 눌러서 바꿔 보세요
-                      </div>
-                      <div style={{ display: "flex", gap: "6px", overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: "2px" }}>
-                        {registeredOptionAllImages.map((img, i) => {
-                          const isHero = img === heroNow;
-                          return (
-                            <img key={`thumb-${i}`} src={img} alt={`${i + 1}번째 상품 사진`} onClick={() => setRegisteredOptionHeroPhoto(img)} style={{ width: "46px", height: "46px", flexShrink: 0, borderRadius: "8px", objectFit: "cover", cursor: "pointer", border: isHero ? "2.5px solid #7A1E47" : "1px solid #EEE7E1", background: "#F0EBE8", opacity: isHero ? 1 : 0.72 }} />
-                          );
-                        })}
-                      </div>
-                    </div>
-                    );
-                  })() : null}
-              </div>
-            ) : undefined}
             footer={(
               <>
                 {registeredOptionBrandCartEntries.length > 0 ? (
@@ -7482,6 +7460,44 @@ export default function OrderPage() {
               </>
             )}
           >
+                {/* [2026-09-20 사장님 「타사이트처럼 사진 크게」] 대표사진 가로 꽉(정사각, 잘리지 않게 contain) + 🔍 크게. 스크롤하면 헤더 64px 썸네일로 접힘. */}
+                {(() => {
+                  const defaultHeroPhoto = registeredOptionBrandDetailPhotos[0] || registeredOptionComboPhotos[registeredOptionDetail] || pickOrderProductImageUrl(registeredOptionSelectProduct);
+                  const selectedPhoto = registeredOptionHeroPhoto || defaultHeroPhoto;
+                  if (!selectedPhoto) return null;
+                  return (
+                    <div style={{ margin: "12px 0 6px" }}>
+                      <div onClick={() => openLightbox(selectedPhoto, registeredOptionAllImages, registeredOptionPhotoTitle)} style={{ position: "relative", width: "100%", aspectRatio: "1 / 1", borderRadius: "14px", overflow: "hidden", background: "#F0EBE8", cursor: "zoom-in" }}>
+                        <img src={selectedPhoto} alt={registeredOptionDetail || registeredOptionSelectProduct.product_name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                        <span style={{ position: "absolute", right: "8px", bottom: "8px", borderRadius: "999px", background: "rgba(0,0,0,0.72)", padding: "4px 9px", color: "#fff", fontSize: "11px", fontWeight: 900, lineHeight: 1 }}>🔍 크게</span>
+                      </div>
+                  {/* [2026-09-09 3순위] 예전엔 썸네일을 눌러도 «확대창»만 떠서 위 대표사진은 그대로였다.
+                      → 탭하면 위 대표사진이 «그 사진으로 바뀐다». 지금 보고 있는 것에는 테두리를 준다.
+                      (Baymard 공개 조사: 모바일에서도 점 인디케이터보다 «썸네일»이 낫다 — 오탭이 적다)
+                      확대는 위 대표사진(🔍 크게)이 맡는다 — 역할을 겹치지 않게 나눴다. */}
+                  {registeredOptionAllImages.length > 1 ? (() => {
+                    const heroNow = registeredOptionHeroPhoto || registeredOptionBrandDetailPhotos[0] || registeredOptionComboPhotos[registeredOptionDetail] || pickOrderProductImageUrl(registeredOptionSelectProduct);
+                    const heroIdx = registeredOptionAllImages.findIndex((img) => img === heroNow);
+                    return (
+                    <div style={{ marginTop: "10px" }}>
+                      <div style={{ marginBottom: "5px", fontSize: "11px", fontWeight: 800, color: "#8A7F84" }}>
+                        사진 {registeredOptionAllImages.length}장{heroIdx >= 0 ? ` · 지금 ${heroIdx + 1}번째` : ""} — 눌러서 바꿔 보세요
+                      </div>
+                      <div style={{ display: "flex", gap: "6px", overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: "2px" }}>
+                        {registeredOptionAllImages.map((img, i) => {
+                          const isHero = img === heroNow;
+                          return (
+                            <img key={`thumb-${i}`} src={img} alt={`${i + 1}번째 상품 사진`} onClick={() => setRegisteredOptionHeroPhoto(img)} style={{ width: "46px", height: "46px", flexShrink: 0, borderRadius: "8px", objectFit: "cover", cursor: "pointer", border: isHero ? "2.5px solid #7A1E47" : "1px solid #EEE7E1", background: "#F0EBE8", opacity: isHero ? 1 : 0.72 }} />
+                          );
+                        })}
+                      </div>
+                    </div>
+                    );
+                  })() : null}
+
+                    </div>
+                  );
+                })()}
                 {/* [2026-09-20] 세부상품(3단) 화면에서 «목록으로» — 예전엔 푸터 「닫기」가 이 역할을 겸했다. */}
                 {registeredOptionAxes3 && registeredOptionDetail.trim() && registeredOptionEditIndex === null ? (
                   <button
@@ -7741,15 +7757,18 @@ export default function OrderPage() {
                           })}
                         </div>
                       ) : (
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                        /* [2026-09-20 사장님] 5개 이상이면 폰이 띄우는 큰 글씨 목록(드롭다운). 칩이 34px로 쪼그라들던 문제 해결. */
+                        <select
+                          value={registeredOptionColor}
+                          onChange={(e) => { const next = e.target.value; setRegisteredOptionColor(next); setRegisteredOptionSize(""); setRegisteredOptionHeroPhoto(next ? (registeredOptionColorPhotos[next] || "") : ""); }}
+                          style={{ width: "100%", height: "52px", borderRadius: "12px", border: `1.5px solid ${registeredOptionColor ? "#7A1E47" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 800, color: registeredOptionColor ? "#7A1E47" : "#444" }}
+                        >
+                          <option value="">색상을 골라주세요 ({registeredOptionColorChoices.length}가지)</option>
                           {registeredOptionColorChoices.map((option) => {
-                            const selected = registeredOptionColor === option;
                             const soldOut = isSoldOutColorSize(option, registeredOptionSize);
-                            return (
-                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; const next = selected ? "" : option; setRegisteredOptionColor(next); setRegisteredOptionSize(""); const nextPhoto = next ? (registeredOptionColorPhotos[next] || "") : ""; setRegisteredOptionHeroPhoto(nextPhoto); }} style={{ height: "44px", borderRadius: "999px", padding: registeredOptionColorPhotos[option] ? "0 14px 0 4px" : "0 16px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 700, cursor: "pointer", opacity: soldOut ? 0.4 : 1, display: "inline-flex", alignItems: "center", gap: "8px" }}>{registeredOptionColorPhotos[option] ? <img src={registeredOptionColorPhotos[option]} alt={option} loading="lazy" decoding="async" style={{ flexShrink: 0, width: "36px", height: "36px", objectFit: "cover", borderRadius: "999px", display: "block" }} /> : null}{soldOut ? option + " (품절)" : option}</button>
-                            );
+                            return <option key={`c-${option}`} value={option} disabled={soldOut}>{option}{soldOut ? " · 품절" : ""}</option>;
                           })}
-                        </div>
+                        </select>
                       )}
                       {/* [2026-08-28 P0-4] 문구가 사라질 때 아래 버튼이 위로 밀려 오클릭이 나던 문제 → 자리를 항상 잡아둔다 */}
                       <div data-order-option-missing={!registeredOptionColor.trim() ? "true" : undefined} style={{ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" }}>{!registeredOptionColor.trim() ? "색상을 선택해 주세요" : ""}</div>
@@ -7799,23 +7818,47 @@ export default function OrderPage() {
                             const selected = registeredOptionSize === option;
                             const soldOut = isSoldOutColorSize(registeredOptionColor, option);
                             return (
-                              <button key={`s-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionSize((prev) => prev === option ? "" : option); }} style={{ height: "44px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? sizeDisplayLabel(option) + " (품절)" : sizeDisplayLabel(option)}</button>
+                              <button key={`s-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionSize((prev) => prev === option ? "" : option); }} style={{ height: "48px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? sizeDisplayLabel(option) + " (품절)" : sizeDisplayLabel(option)}</button>
                             );
                           })}
                         </div>
                       ) : (
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                        /* [2026-09-20 사장님] 5개 이상이면 드롭다운 — 항목에 「L · 2개 남음」「2XL · 품절」(재고연동 상품만). */
+                        <select
+                          value={registeredOptionSize}
+                          onChange={(e) => setRegisteredOptionSize(e.target.value)}
+                          style={{ width: "100%", height: "52px", borderRadius: "12px", border: `1.5px solid ${registeredOptionSize ? "#7A1E47" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 800, color: registeredOptionSize ? "#7A1E47" : "#444" }}
+                        >
+                          <option value="">사이즈를 골라주세요 ({registeredOptionSizeChoices.length}가지)</option>
                           {registeredOptionSizeChoices.map((option) => {
-                            const selected = registeredOptionSize === option;
                             const soldOut = isSoldOutColorSize(registeredOptionColor, option);
-                            return (
-                              <button key={`s-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionSize((prev) => prev === option ? "" : option); }} style={{ height: "34px", borderRadius: "999px", padding: "0 14px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "13px", fontWeight: 700, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? sizeDisplayLabel(option) + " (품절)" : sizeDisplayLabel(option)}</button>
-                            );
+                            const qty = registeredOptionColor.trim() || registeredOptionColorChoices.length === 0 ? availableQtyColorSize(registeredOptionColor, option) : null;
+                            return <option key={`s-${option}`} value={option} disabled={soldOut}>{sizeDisplayLabel(option)}{soldOut ? " · 품절" : optionQtyLabel(qty)}</option>;
                           })}
-                        </div>
+                        </select>
                       )}
                       {/* [2026-08-28 P0-4] 문구가 사라질 때 아래 버튼이 위로 밀려 오클릭이 나던 문제 → 자리를 항상 잡아둔다 */}
                       <div data-order-option-missing={!registeredOptionSize.trim() ? "true" : undefined} style={{ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" }}>{!registeredOptionSize.trim() ? "사이즈를 선택해 주세요" : ""}</div>
+                      {/* [2026-09-20 사장님] 치수 칩 — 사이즈를 고르면 그 사이즈 열의 앞 3개 치수(가슴단면 57 …)를 바로 보여준다.
+                          원천은 사이즈 실측표(size_charts) 그대로, 전체 표는 「사이즈 실측 보기」. 표시 전용. */}
+                      {registeredOptionSizeChart && registeredOptionSize.trim() ? (() => {
+                        const col = sizeColumnIndex(registeredOptionSizeChart, registeredOptionSize);
+                        if (col < 0) return null;
+                        const chips = registeredOptionSizeChart.rows
+                          .map((row) => ({ label: row.label, value: String(row.values[col] ?? "").trim() }))
+                          .filter((c) => c.value)
+                          .slice(0, 3);
+                        if (chips.length === 0) return null;
+                        return (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "2px" }}>
+                            {chips.map((c) => (
+                              <span key={c.label} style={{ fontSize: "12px", fontWeight: 800, background: "#F5E6EB", color: "#7A1E47", borderRadius: "999px", padding: "6px 10px" }}>
+                                {c.label} {c.value}{registeredOptionSizeChart.unit}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      })() : null}
                     </div>
                   ) : null}
 

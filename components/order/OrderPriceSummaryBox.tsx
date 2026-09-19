@@ -85,13 +85,14 @@ export default function OrderPriceSummaryBox({
               <span>{safePointBalance.toLocaleString()}P</span>
             </div>
 
-            <div style={{ marginTop: "12px", display: "grid", gap: "10px" }}>
+            {/* [2026-09-20 사장님] 「포인트 얼마 있는지 보여주고 직접입력도, 전부쓰기도」 — 입력칸과 전부쓰기를 한 줄에. 숫자는 쉼표(commaNumberText). */}
+            <div style={{ marginTop: "10px", display: "grid", gridTemplateColumns: "1fr 96px", gap: "8px" }}>
               <div style={{ position: "relative", width: "100%" }}>
                 <input
                   value={pointUseInput}
                   onChange={(event) => onPointUseInputChange?.(event.target.value)}
                   inputMode="numeric"
-                  placeholder="직접입력"
+                  placeholder="쓸 포인트 직접입력"
                   style={{ height: "48px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", padding: "0 32px 0 14px", textAlign: "center", fontSize: "15px", fontWeight: 800, color: "#222", outline: "none" }}
                 />
                 <span style={{ position: "absolute", right: "14px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", fontWeight: 800, color: "#7B2D43", pointerEvents: "none" }}>원</span>
@@ -100,14 +101,14 @@ export default function OrderPriceSummaryBox({
               <button
                 type="button"
                 onClick={onUseAllPoints}
-                style={{ height: "48px", width: "100%", borderRadius: "14px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}
+                style={{ height: "48px", width: "100%", borderRadius: "14px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}
               >
-                전액사용
+                전부 쓰기
               </button>
             </div>
 
-            <div style={{ marginTop: "8px", fontSize: "12px", fontWeight: 700, color: "#888", lineHeight: 1.5 }}>
-              포인트는 1,000원 이상부터 사용 가능하며, 주문금액을 초과해 사용할 수 없습니다.
+            <div style={{ marginTop: "6px", fontSize: "11.5px", fontWeight: 700, color: "#888", lineHeight: 1.5 }}>
+              1,000P 이상부터 · 주문금액까지만
             </div>
           </div>
         ) : hasSmallPoint ? (
@@ -126,9 +127,10 @@ export default function OrderPriceSummaryBox({
         ) : null}
 
         {/* [UI] 최종 금액 합계 행 — 표시 전용(계산은 부모에서 끝난 finalAmount만 받음) */}
-        <div style={{ marginTop: "14px", borderTop: "1.5px solid #C9AEB8", paddingTop: "14px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "17px", fontWeight: 900, color: "#7B2D43" }}>
-          <span>{paymentMethod === "카드결제" ? "총 결제금액" : "총 입금금액"}</span>
-          <span>{won(typeof finalAmount === "number" ? Math.max(0, finalAmount) : Math.max(0, totalAmount - safePointUsedAmount))}</span>
+        {/* [2026-09-20 심플하게] 총액은 크게(24px) — 손님이 이 숫자 하나만 보면 되게. */}
+        <div style={{ marginTop: "14px", borderTop: "1.5px solid #C9AEB8", paddingTop: "12px", display: "flex", justifyContent: "space-between", alignItems: "baseline", color: "#7B2D43" }}>
+          <span style={{ fontSize: "15px", fontWeight: 900 }}>{paymentMethod === "카드결제" ? "총 결제금액" : "총 입금금액"}</span>
+          <span style={{ fontSize: "24px", fontWeight: 900, letterSpacing: "-0.02em" }}>{won(typeof finalAmount === "number" ? Math.max(0, finalAmount) : Math.max(0, totalAmount - safePointUsedAmount))}</span>
         </div>
 
         {pointEarnRate > 0 ? (
