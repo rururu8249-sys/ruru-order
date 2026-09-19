@@ -4,6 +4,8 @@
 //   - 켜짐/꺼짐(ruru_admin_sound_on)은 호출 측에서 확인한 뒤 부른다(테스트 재생은 무시).
 //   - 돈/주문/입금 로직과 무관(알림 소리 출력 전용).
 
+import { shouldPlayAlert, DEPOSIT_KIND_COOLDOWN_MS } from "@/lib/alertDedupe";
+
 export const ADMIN_SOUND_ON_KEY = "ruru_admin_sound_on";
 export const ADMIN_VOICE_VOLUME_KEY = "ruru_admin_voice_volume";
 
@@ -60,7 +62,12 @@ function beepFallback() {
 //   TTS는 볼륨 1.0이 상한이라 OS에 따라 작게 들렸다 → mp3 파일을 WebAudio로 재생하고
 //   증폭(최대 1.7배)까지 건다. 파일 실패 시 TTS → 비프 순서로 폴백. 돈 로직 무관(소리 전용).
 export const ORDER_ALERT_SRC = "/sounds/order-alert.mp3";   // 띵동~ 주문~ (배민 구간 제거 편집본)
-export const DEPOSIT_DING_SRC = "/sounds/deposit-ding.mp3"; // 띵동 차임 — 뒤에 음성 "입금!"을 붙인다
+// [2026-09-20 사장님 요청] 입금 알림음을 «철컥띵 캐셔»(금전등록기) 효과음으로 교체.
+//   원본을 그대로 쓰지 않고 기존 알림음과 «같은 크기»로 맞춰 넣었다(실측, 추정 아님):
+//   앞뒤 무음 제거(0.075~1.72s) → 크기 맞춤 → 최종 1.68초 / -13.1 LUFS / 최대 -4.3 dB.
+//   기존 order-alert.mp3(-12.1 LUFS / -4.3 dB)와 같은 최대치라 아래 1.7배 증폭에서도 찢어지지 않는다.
+//   옛 파일(deposit-ding.mp3)은 되돌릴 때를 위해 남겨 둔다.
+export const DEPOSIT_ALERT_SRC = "/sounds/deposit-cashier.mp3";
 
 let sharedAudioCtx: AudioContext | null = null;
 const alertBufferCache = new Map<string, AudioBuffer>();
@@ -123,32 +130,62 @@ async function playAdminAlertFile(src: string, fallbackText: string): Promise<bo
 
 // [2026-08-31 사장님 제보] 같은 알림이 "동시에 두 번" — 관리자 페이지가 탭/창 2개면
 //   각 탭이 따로 울린다 → localStorage 로 탭끼리 공유하는 1회 가드(같은 건은 3초 안에 한 탭만).
-function crossTabOnce(key: string, windowMs = 3000): boolean {
-  if (!key) return true; // 키 없으면(수동 테스트 버튼) 가드 없이 항상 재생
+// [2026-09-20] 판단 규칙은 lib/alertDedupe.ts 로 빼서 테스트(scripts/test-alert-dedupe.mjs)로 고정했다.
+function readLastAt(storageKey: string): number | null {
   try {
-    const storageKey = "ruru_alert_once_" + key;
-    const now = Date.now();
-    const prev = Number(window.localStorage.getItem(storageKey) || 0);
-    if (Number.isFinite(prev) && now - prev < windowMs) return false;
-    window.localStorage.setItem(storageKey, String(now));
-    return true;
+    const raw = window.localStorage.getItem(storageKey);
+    if (raw == null) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
   } catch {
-    return true;
+    return null;
   }
+}
+
+function markNow(storageKey: string, now: number) {
+  try {
+    window.localStorage.setItem(storageKey, String(now));
+  } catch {
+    /* 무시 */
+  }
+}
+
+/**
+ * 울려도 되는지 판단하고, 울릴 거면 기록을 남긴다.
+ *   dedupeKey 없음(수동 «들어보기» 버튼) → 언제나 재생.
+ *   kindCooldownMs > 0 → 같은 종류가 그 시간 안에 이미 울렸으면 건너뛴다(입금 전용).
+ */
+function alertOnce(kind: string, dedupeKey: string | undefined, kindCooldownMs: number): boolean {
+  if (!dedupeKey) return true;
+  if (typeof window === "undefined") return true;
+  const now = Date.now();
+  const keyStore = `ruru_alert_once_${kind}_${dedupeKey}`;
+  const kindStore = `ruru_alert_kind_${kind}`;
+  const ok = shouldPlayAlert({
+    now,
+    lastSameKeyAt: readLastAt(keyStore),
+    lastKindAt: kindCooldownMs > 0 ? readLastAt(kindStore) : null,
+    kindCooldownMs,
+  });
+  markNow(keyStore, now); // 막혔어도 그 id 는 «처리됨»으로 남긴다(나중에 다시 울리지 않게)
+  if (!ok) return false;
+  if (kindCooldownMs > 0) markNow(kindStore, now);
+  return true;
 }
 
 // 새 주문 알림 — 「띵동~ 주문~」 파일 (실패 시 음성 "주문!"). dedupeKey = 주문 그룹 등 식별자
 export function playOrderAlert(dedupeKey?: string) {
-  if (!crossTabOnce(dedupeKey ? `order_${dedupeKey}` : "")) return;
+  // 주문은 손님마다 따로 울려야 한다(2초 간격 주문도 각각) → 종류 가드 없음(0)
+  if (!alertOnce("order", dedupeKey, 0)) return;
   void playAdminAlertFile(ORDER_ALERT_SRC, "주문!");
 }
 
 // 입금확인 알림 — 「띵동」 차임(크게) + 음성 "입금!" (차임 실패 시 음성만)
 export function playDepositAlert(dedupeKey?: string) {
-  if (!crossTabOnce(dedupeKey ? `deposit_${dedupeKey}` : "")) return;
-  void playAdminAlertFile(DEPOSIT_DING_SRC, "입금!").then((played) => {
-    if (played) window.setTimeout(() => speakAdmin("입금!"), 950);
-  });
+  // [2026-09-20] ① 파일 뒤에 음성 「입금!」을 덧붙이던 것을 삭제 — 그게 «두 번 연속»의 정체였다.
+  //   ② 한 입금이 주문 여러 건을 확인시켜 폴링이 나눠 읽어도 4초 안엔 한 번만 울린다.
+  if (!alertOnce("deposit", dedupeKey, DEPOSIT_KIND_COOLDOWN_MS)) return;
+  void playAdminAlertFile(DEPOSIT_ALERT_SRC, "입금!"); // 파일이 안 되면 그때만 음성으로 폴백
 }
 
 // 브라우저 음성 잠금 해제용 — 사용자 제스처(클릭/키) 안에서 1회 무음 재생.
@@ -160,7 +197,7 @@ export function primeAdminVoice() {
     if (ctx) {
       if (ctx.state === "suspended") void ctx.resume().catch(() => {});
       void loadAlertBuffer(ORDER_ALERT_SRC, ctx);
-      void loadAlertBuffer(DEPOSIT_DING_SRC, ctx);
+      void loadAlertBuffer(DEPOSIT_ALERT_SRC, ctx);
     }
   } catch {
     /* 무시 */
