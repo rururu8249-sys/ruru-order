@@ -545,10 +545,21 @@ export default function ProductWidgetClient() {
             }}
           >
             {/* 사진칸 — [2026-09-11 사장님 지적 «사진이 잘린다·글자가 사진을 덮는다»]
-                · 사진은 자기 비율 그대로(가로형이면 납작하게, 세로형이면 길게), 세로는 최대 3:4(267px)까지. 그보다 길면 안 잘리고 통째로 줄어든다(contain).
+                · 사진은 자기 비율 그대로 안 잘리게(contain). 비율이 안 맞아 남는 자리는 «같은 사진을 흐리게 키운 것»으로 채운다 → 빈칸 없음(09-19).
                 · 글자 띠는 이 칸 «아래»에 붙는다 → 사진은 한 픽셀도 안 가려진다. */}
             {img ? (
-              <div style={{ position: "relative", flex: "1 1 auto", minHeight: 0, width: "100%", background: GLASS_BG }}>
+              <div style={{ position: "relative", flex: "1 1 auto", minHeight: 0, width: "100%", background: GLASS_BG, overflow: "hidden" }}>
+                {/* [2026-09-19 사장님 «위아래 빈 공간이 거슬린다»] 사진 비율이 틀과 안 맞을 때 생기던 반투명 빈칸을
+                    «같은 사진을 흐리게 키운 것»으로 채운다(쇼핑앱 상세 사진과 같은 방식). 틀은 고정, 사진은 안 잘리고, 빈칸은 없다. */}
+                <img
+                  src={imgSrc}
+                  alt=""
+                  aria-hidden
+                  style={{
+                    position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center",
+                    filter: "blur(14px) brightness(0.72) saturate(1.1)", transform: "scale(1.18)", pointerEvents: "none",
+                  }}
+                />
                 <img
                   src={imgSrc}
                   alt=""
