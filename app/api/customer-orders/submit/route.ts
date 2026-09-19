@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 
 import { assertValidCustomerPointPhone } from "@/lib/customerPoints";
 import { registeredProductPriceMode, registeredProductSubmittedPriceValid } from "@/lib/registeredProductPricePolicy";
+import { submitRowLineTotal, submitRowUnitPriceForCheck } from "@/lib/submitRowPrice";
 import { buildYoutubeOrderAnnouncementMessages } from "@/lib/orderYoutubeAnnouncement";
 import { buildCartHoldSnapshotItem } from "@/lib/cartHoldDetail";
 import { koreanPhoneVariants } from "@/lib/order/phone";
@@ -137,9 +138,9 @@ const normalizeOrderRowsForSubmitSettings = async (
 
     normalizedCount += 1;
 
-    const qty = Math.max(1, Math.round(submitNumberValue(row?.qty, 1)));
-    const unitProductPrice = submitNumberValue(row?.adjusted_product_price ?? row?.product_price, 0);
-    const productAmount = Math.max(0, unitProductPrice * qty);
+    // [2026-09-20 위험분석 A] adjusted_product_price 는 «줄 합계»(단가×수량)다 — 예전엔 여기에 수량을 한 번 더 곱해
+    //   수량 2개 줄이 2배로 부풀었다(배송비 0원 설정일 때만 도는 경로라 아직 사고는 없었음). 줄 합계를 그대로 쓴다.
+    const productAmount = submitRowLineTotal(row);
     const paymentMethod = String(row?.payment_method || "");
     const customerCardRate = submitNumberValue(row?.customer_card_extra_rate_applied, 0);
     const actualCardRate = submitNumberValue(row?.actual_card_fee_rate_applied, 0);
@@ -331,8 +332,9 @@ async function assertRegisteredProductPrices(
     const basePrice = Math.max(0, Math.floor(Number(product?.price) || 0));
     const surcharge = submitComboSurcharge(product?.product_note, text(t.row?.color));
     const expected = basePrice + surcharge;
-    const rawUnit = t.row?.adjusted_product_price ?? t.row?.product_price;
-    const unitPrice = Math.floor(Number(rawUnit) || 0);
+    // [2026-09-20 위험분석 B] 예전엔 adjusted_product_price(줄 합계)를 단가 하한과 비교해 수량이 많을수록 검증이 느슨했다.
+    //   → 줄 합계÷수량 과 보낸 단가 중 작은 쪽을 단가로 검증(정상 주문은 둘이 같다 → 막히는 정상 주문 없음).
+    const unitPrice = submitRowUnitPriceForCheck(t.row);
     const note = readSubmitNoteObject(product?.product_note);
     const priceMode = registeredProductPriceMode(expected, note?.free_product === true);
 
