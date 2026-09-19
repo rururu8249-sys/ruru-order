@@ -1,11 +1,14 @@
 import { showAdminToast } from "@/lib/adminToast";
 import { formatOrderOptionText, stripNoneOptionParts } from "@/lib/orderOptionText";
+import { compareOrderOptions } from "@/lib/orderOptionSort";
 import ExcelJS from "exceljs";
 import type { LiveOrder, LiveOrderItem } from "./types";
 import { paymentStatusLabel } from "@/lib/orderLabels";
 
 type ExportMeta = {
   filterLabel: string;
+  // [2026-09-20] 물건챙기기 엑셀 줄 순서 — 팝업 화면과 같게. product: 상품명→색상→사이즈→시간 / nickname: 닉네임→시간 / time: 시간
+  rowOrder?: "product" | "nickname" | "time";
 };
 
 type WorkbookRow = Array<string | number | null>;
@@ -431,10 +434,23 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
     return `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}(${wd}) ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   };
 
-  const itemRows: WorkbookRow[] = [];
-  const unpaidRowFlags: boolean[] = []; // itemRows 와 같은 순서 — 스타일용
+  // [2026-09-20 사장님 지시] 줄 순서를 팝업 화면과 맞춘다. 엑셀에서 「상품명」으로 정렬해도 같은 상품 안 옵션이
+  //   「베이지 55 · 베이지 66 · 베이지 55」로 흩어지지 않게, 상품별일 땐 여기서 상품→색상→사이즈→시간 순으로 미리 줄 세운다.
+  //   (엑셀 정렬은 같은 값끼리 원래 순서를 유지하므로, 파일 자체가 이 순서면 어떤 칸으로 정렬해도 옵션이 모여 있다)
+  const orderTime = (order: LiveOrder) => { const t = new Date(order.createdAt || order.submittedAt || "").getTime(); return Number.isFinite(t) ? t : 0; };
+  const nicknameRank = (s: string) => { const c = (s || "").trim().charAt(0); if (/[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(c)) return 0; if (/[a-zA-Z]/.test(c)) return 1; if (/[0-9]/.test(c)) return 2; return 3; };
+  const rowOrder = meta.rowOrder || "time";
+  const orderedOrders = [...exportOrders];
+  if (rowOrder === "nickname") {
+    orderedOrders.sort((a, b) => nicknameRank(labelName(a)) - nicknameRank(labelName(b)) || labelName(a).localeCompare(labelName(b), "ko") || orderTime(a) - orderTime(b));
+  } else if (rowOrder === "time") {
+    orderedOrders.sort((a, b) => orderTime(a) - orderTime(b));
+  }
 
-  exportOrders.forEach((order) => {
+  type RowWithKey = { row: WorkbookRow; unpaid: boolean; product: string; color: string; size: string; time: number };
+  const keyedRows: RowWithKey[] = [];
+
+  orderedOrders.forEach((order) => {
     const unpaid = isUnpaidOrder(order);
     const items = order.items || [];
 
@@ -449,8 +465,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
       ];
       if (hasUnpaid) row.push(unpaid ? "미입금" : "완료");
       row.push(""); // 비고 — 사장님이 손으로 적는 빈칸
-      itemRows.push(row);
-      unpaidRowFlags.push(unpaid);
+      keyedRows.push({ row, unpaid, product: clean(order.orderSummary) || "상품명없음", color: "", size: "", time: orderTime(order) });
       return;
     }
 
@@ -465,33 +480,22 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
       ];
       if (hasUnpaid) row.push(unpaid ? "미입금" : "완료");
       row.push(""); // 비고 — 사장님이 손으로 적는 빈칸
-      itemRows.push(row);
-      unpaidRowFlags.push(unpaid);
+      keyedRows.push({ row, unpaid, product: itemName(item), color: clean(item.color), size: clean(item.size), time: orderTime(order) });
     });
   });
 
-  // [2026-08-31 사장님 요청] 맨 아래 합계·설명 — 상품값 합계와 "실제 받은 돈"을 같이 적어
-  //   화면 매출 바와 왜 다른지 사장님이 계산할 필요 없게 한다 (표시 전용, 재계산 없음).
-  const goodsSum = itemRows.reduce((sum, row) => sum + (Number(row[5]) || 0), 0); // 6번째 칸 = 상품금액
-  const receivedSum = exportOrders.reduce(
-    (sum, order) => sum + (PICKING_PAID_STATUSES.includes(clean(order.paymentStatus)) ? Number(order.totalAmount || 0) : 0),
-    0,
-  );
-  // [2026-09-01 사장님 지시]
-  //   ① 맨 위 안내 글씨(제목·필터조건·생성일시·대상건수) 삭제
-  //   ② 합계·설명은 맨 아래가 아니라 **헤더 위(1~3행)** — 필터·정렬은 헤더 아래 데이터만
-  //      움직이므로 합계가 절대 섞이지 않는다. 틀고정으로 스크롤해도 항상 보인다.
-  const summaryRows: WorkbookRow[] = [
-    ["📦 상품값 합계(상품금액)", "", "", "", "", goodsSum],
-    ["💳 실제 받은 돈(결제완료 · 카드수수료 포함·포인트 차감)", "", "", "", "", receivedSum],
-    ["※ 두 금액은 다른 게 정상 — 상품값에 카드수수료가 더해지고 포인트가 빠진 금액이 실제 받은 돈(화면 매출 바 기준)이에요."],
-    [],
-  ];
-  const headerRowNumber = summaryRows.length + 1; // 5행
+  if (rowOrder === "product") {
+    keyedRows.sort((a, b) => a.product.localeCompare(b.product, "ko") || compareOrderOptions(a, b) || a.time - b.time);
+  }
+  const itemRows: WorkbookRow[] = keyedRows.map((k) => k.row);
+  const unpaidRowFlags: boolean[] = keyedRows.map((k) => k.unpaid); // itemRows 와 같은 순서 — 스타일용
+
+  // [2026-09-20 사장님 지시] 맨 위 합계 3줄(상품값 합계·실제 받은 돈·설명) 삭제 — 팝업 상단에 같은 숫자가 있고,
+  //   엑셀에선 1행부터 표가 시작되는 게 정렬·필터에 편하다. (08-31 에 넣었던 것을 되돌림)
+  const headerRowNumber = 1;
   void addSheetMetaRows; // 다른 엑셀(택배송장 확인용)에서 계속 사용 — 물건챙기기만 안 씀
 
   const rows: WorkbookRow[] = [
-    ...summaryRows,
     headers,
     ...itemRows,
   ];
@@ -501,14 +505,6 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   addRows(sheet, rows);
   // 필터 범위 = 헤더~마지막 데이터 줄까지만 (위 합계 3줄은 범위 밖 = 고정)
   styleFilterSheet(sheet, headerRowNumber, headerRowNumber + itemRows.length, headers.length);
-
-  // 합계 줄 스타일 — 굵게 + 쉼표 (styleFilterSheet 이후에 덮어써야 유지된다)
-  [1, 2].forEach((rowNumber) => {
-    const row = sheet.getRow(rowNumber);
-    row.getCell(1).font = { bold: true };
-    row.getCell(6).font = { bold: true };
-    row.getCell(6).numFmt = "#,##0";
-  });
 
   // 데이터 줄 스타일 — 헤더 다음부터.
   const firstDataRow = headerRowNumber + 1;

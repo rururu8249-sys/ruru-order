@@ -9,6 +9,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatOrderOptionText } from "@/lib/orderOptionText";
+import { compareOrderOptions } from "@/lib/orderOptionSort";
 import { supabase } from "@/lib/supabase";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
@@ -18,10 +19,12 @@ import { exportLiveOrdersForPicking } from "./adminLiveOrderExcelExport";
 type Props = { orders: LiveOrder[]; filterLabel: string; onClose: () => void };
 
 // [2026-07-13 사장님 지침] amount = 주문에 저장된 상품금액(표시 전용, 재계산 안 함)
-type PickItem = { id: string; text: string; qty: number; amount: number };
+type PickItem = { id: string; text: string; productName: string; optionText: string; color: string; size: string; qty: number; amount: number };
 type Panel = { key: string; nickname: string; name: string; phone: string; search: string; paid: boolean; when: string; items: PickItem[]; totalQty: number };
 type BatchBuyer = { nickname: string; qty: number; paid: boolean };
-type BatchRow = { text: string; ids: string[]; totalQty: number; pickedQty: number; paidQty: number; buyers: BatchBuyer[] };
+// [2026-09-20 사장님 요청] 상품별 = 상품(총 N개) → 그 밑에 옵션(색상/사이즈)별 N개. 옵션은 색상 가나다 → 사이즈 순.
+type BatchOption = { key: string; optionText: string; color: string; size: string; ids: string[]; totalQty: number; pickedQty: number; paidQty: number; buyers: BatchBuyer[] };
+type BatchProduct = { name: string; ids: string[]; totalQty: number; pickedQty: number; paidQty: number; options: BatchOption[] };
 
 const PAID_STATUSES = ["paid", "auto_paid", "manual_paid", "card_paid"];
 const clean = (v: unknown) => String(v ?? "").trim();
@@ -86,10 +89,11 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
       const rawItems = Array.isArray(o.items) ? (o.items as LiveOrderItem[]) : [];
       const items: PickItem[] =
         rawItems.length === 0
-          ? [{ id: String(o.id), text: clean(o.orderSummary) || "상품", qty: 1, amount: Number(o.productAmount || 0) }]
+          ? [{ id: String(o.id), text: clean(o.orderSummary) || "상품", productName: clean(o.orderSummary) || "상품", optionText: "", color: "", size: "", qty: 1, amount: Number(o.productAmount || 0) }]
           : rawItems.map((it) => {
               const opt = formatOrderOptionText(it.color, it.size); // [2026-08-31] 없음 숨김·「사이즈 6」 표기
-              return { id: String(it.id), text: (clean(it.productName) || "상품") + (opt ? ` (${opt})` : ""), qty: Number(it.qty || 1), amount: Number(it.amount || 0) };
+              const productName = clean(it.productName) || "상품";
+              return { id: String(it.id), text: productName + (opt ? ` (${opt})` : ""), productName, optionText: opt, color: clean(it.color), size: clean(it.size), qty: Number(it.qty || 1), amount: Number(it.amount || 0) };
             });
       const totalQty = items.reduce((s, it) => s + (Number.isFinite(it.qty) ? it.qty : 1), 0);
       const phone = clean(o.phone).replace(/[^0-9]/g, ""); // 같은 고객 판정용(숫자만)
@@ -142,41 +146,57 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
     return m;
   }, [scopedPanels]);
 
-  // 상품별 합계(배치 피킹) — 옵션까지 같은 상품을 전 주문에서 합산. 한 종류씩 한 번에 집기.
-  // [2026-08-23 사장님 요청 · 상품별 집계 통합] 별도 「상품별 주문」 팝업 없이 이 탭에서 해결:
-  //   상품(옵션) 줄마다 결제/대기 수량 + 주문자 칩(입금대기 ⏳)까지. 챙김 체크 동작은 기존 그대로.
-  //   검색은 상품명뿐 아니라 닉네임으로도 잡힌다.
-  const batchRows = useMemo<BatchRow[]>(() => {
-    const m = new Map<string, BatchRow>();
-    const buyersByText = new Map<string, Map<string, BatchBuyer>>();
+  // 상품별 합계(배치 피킹) — [2026-09-20 사장님 요청] 상품 한 장(총 N개) 안에 옵션(색상/사이즈)별 줄.
+  //   예전엔 「막스라 코트 (베이지 / 사이즈 55)」 줄이 상품마다 흩어져 있어 "이 상품 총 몇 개"가 안 보였다.
+  //   옵션 줄 순서 = 색상 가나다 → 사이즈(55<66<77, S<M<L). 주문자 칩(입금대기 ⏳)은 옵션 줄마다. 챙김 체크 동작은 기존 그대로.
+  const batchProducts = useMemo<BatchProduct[]>(() => {
+    const products = new Map<string, BatchProduct>();
+    const optionMaps = new Map<string, Map<string, BatchOption>>();
+    const buyerMaps = new Map<string, Map<string, BatchBuyer>>(); // key = product|option
     const q = search.trim().toLowerCase();
     for (const p of scopedPanels) {
       for (const it of p.items) {
         if (q && !it.text.toLowerCase().includes(q) && !p.search.includes(q)) continue;
-        const row = m.get(it.text) || { text: it.text, ids: [], totalQty: 0, pickedQty: 0, paidQty: 0, buyers: [] };
-        row.ids.push(it.id);
-        row.totalQty += it.qty;
-        if (p.paid) row.paidQty += it.qty;
-        if (pickedIds.has(it.id)) row.pickedQty += it.qty;
-        m.set(it.text, row);
+        const prod = products.get(it.productName) || { name: it.productName, ids: [], totalQty: 0, pickedQty: 0, paidQty: 0, options: [] };
+        prod.ids.push(it.id);
+        prod.totalQty += it.qty;
+        if (p.paid) prod.paidQty += it.qty;
+        if (pickedIds.has(it.id)) prod.pickedQty += it.qty;
+        products.set(it.productName, prod);
+
+        const opts = optionMaps.get(it.productName) || new Map<string, BatchOption>();
+        const optKey = it.optionText || "";
+        const opt = opts.get(optKey) || { key: optKey, optionText: it.optionText, color: it.color, size: it.size, ids: [], totalQty: 0, pickedQty: 0, paidQty: 0, buyers: [] };
+        opt.ids.push(it.id);
+        opt.totalQty += it.qty;
+        if (p.paid) opt.paidQty += it.qty;
+        if (pickedIds.has(it.id)) opt.pickedQty += it.qty;
+        opts.set(optKey, opt);
+        optionMaps.set(it.productName, opts);
+
         // 같은 닉네임이라도 결제/대기가 다르면 칩 분리(대기분이 묻히지 않게)
-        const buyers = buyersByText.get(it.text) || new Map<string, BatchBuyer>();
+        const bkey = `${it.productName}|${optKey}`;
+        const buyers = buyerMaps.get(bkey) || new Map<string, BatchBuyer>();
         const bKey = `${p.nickname}|${p.paid ? "1" : "0"}`;
         const chip = buyers.get(bKey) || { nickname: p.nickname, qty: 0, paid: p.paid };
         chip.qty += it.qty;
         buyers.set(bKey, chip);
-        buyersByText.set(it.text, buyers);
+        buyerMaps.set(bkey, buyers);
       }
     }
-    let rows = Array.from(m.values());
-    for (const row of rows) {
-      const buyers = buyersByText.get(row.text);
-      row.buyers = buyers
-        ? [...buyers.values()].sort((a, b) => b.qty - a.qty || a.nickname.localeCompare(b.nickname, "ko"))
-        : [];
+    let list = Array.from(products.values());
+    for (const prod of list) {
+      const opts = Array.from((optionMaps.get(prod.name) || new Map<string, BatchOption>()).values());
+      for (const opt of opts) {
+        const buyers = buyerMaps.get(`${prod.name}|${opt.key}`);
+        opt.buyers = buyers ? [...buyers.values()].sort((a, b) => b.qty - a.qty || a.nickname.localeCompare(b.nickname, "ko")) : [];
+      }
+      prod.options = unpickedOnly
+        ? opts.filter((o) => o.pickedQty < o.totalQty).sort(compareOrderOptions)
+        : opts.sort(compareOrderOptions);
     }
-    if (unpickedOnly) rows = rows.filter((r) => r.pickedQty < r.totalQty);
-    return rows.sort((a, b) => a.text.localeCompare(b.text, "ko"));
+    if (unpickedOnly) list = list.filter((prod) => prod.pickedQty < prod.totalQty && prod.options.length > 0);
+    return list.sort((a, b) => a.name.localeCompare(b.name, "ko"));
   }, [scopedPanels, pickedIds, search, unpickedOnly]);
 
   // 여러 항목 일괄 토글(전부 챙김이면 해제, 아니면 전부 챙김) — 상품별 뷰에서 한 줄 = 그 상품 전부.
@@ -295,7 +315,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
     try {
       const exportOrders = paidOnly ? orders.filter((o) => PAID_STATUSES.includes(clean(o.paymentStatus))) : orders;
       // [2026-07-16] 챙김 여부 컬럼용 — 화면과 동일한 체크 집합(pickedIds) 전달
-      await exportLiveOrdersForPicking(exportOrders, { filterLabel }, pickedIds);
+      // [2026-09-20 사장님 요청] 엑셀 줄 순서 = 지금 보는 화면 순서(상품별: 상품→색상→사이즈 / 주문별: ㄱㄴㄷ·시간)
+      await exportLiveOrdersForPicking(exportOrders, { filterLabel, rowOrder: viewMode === "batch" ? "product" : sortMode }, pickedIds);
     } finally {
       setExporting(false);
     }
@@ -391,46 +412,75 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
         {/* 목록 (이 영역만 스크롤 — 모달 높이는 88vh 고정) */}
         <div className="flex-1 overflow-y-auto bg-surface-2 px-3 py-3">
           {viewMode === "batch" ? (
-            batchRows.length === 0 ? (
+            batchProducts.length === 0 ? (
               <div className="py-10 text-center text-sm font-bold text-ink-mute">{unpickedOnly ? "안 챙긴 상품이 없어요! 🎉" : "챙길 상품이 없습니다."}</div>
             ) : (
               <>
-                <div className="mb-2 px-1 text-[11px] font-bold text-ink-mute">상품 한 종류씩 한 번에 모아 집으세요. 한 줄 누르면 그 상품 전부 챙김 처리돼요.</div>
-                <div className="space-y-1.5">
-                  {batchRows.map((row) => {
-                    const done = row.ids.every((id) => pickedIds.has(id));
-                    const some = !done && row.ids.some((id) => pickedIds.has(id));
+                <div className="mb-2 flex items-center justify-between px-1 text-[11px] font-bold text-ink-mute">
+                  <span>상품 {batchProducts.length}가지 · 상품 줄을 누르면 그 상품 전부, 옵션 줄을 누르면 그 옵션만 챙김.</span>
+                </div>
+                <div className="space-y-2">
+                  {batchProducts.map((prod) => {
+                    const done = prod.ids.every((id) => pickedIds.has(id));
+                    const some = !done && prod.ids.some((id) => pickedIds.has(id));
+                    // 옵션이 하나뿐이고 옵션 글자도 없으면(단일 상품) 상품 줄 하나로 끝 — 옵션 줄 안 만든다
+                    const single = prod.options.length === 1 && !prod.options[0].optionText;
+                    const singleBuyers = single ? prod.options[0].buyers : [];
                     return (
-                      <button key={row.text} type="button" onClick={() => toggleIds(row.ids)} className={`w-full rounded-xl border-2 px-3 py-2.5 text-left ${done ? "border-ok-tx/35 bg-ok-bg" : "border-line bg-surface hover:bg-surface-2"}`}>
-                        <span className="flex w-full items-center gap-3">
+                      <div key={prod.name} className={`overflow-hidden rounded-xl border-2 ${done ? "border-ok-tx/35 bg-ok-bg/60" : "border-line bg-surface"}`}>
+                        {/* 상품 줄 = 총 수량 · 챙김 진행. 클릭 = 그 상품(모든 옵션) 전부 챙김/해제 */}
+                        <button type="button" onClick={() => toggleIds(prod.ids)} className={`flex w-full items-center gap-3 px-3 py-2.5 text-left ${done ? "bg-ok-bg" : single ? "bg-surface hover:bg-surface-2" : "bg-rose-soft"}`}>
                           <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 text-[12px] font-black ${done ? "border-ok-tx/35 bg-[var(--color-ok-tx)] text-white" : some ? "border-ok-tx/35 bg-ok-bg text-ok-tx" : "border-line text-transparent"}`}>{some ? "–" : "✓"}</span>
-                          <span className={`min-w-0 flex-1 truncate text-[14px] font-black ${done ? "text-ink-mute line-through" : "text-ink"}`}>{row.text}</span>
+                          <span className={`min-w-0 flex-1 truncate text-[14px] font-black ${done ? "text-ink-mute line-through" : "text-ink"}`}>{prod.name}</span>
                           <span className="shrink-0 whitespace-nowrap text-right">
-                            <span className={`text-[16px] font-black ${done ? "text-ink-mute" : "text-rose-deep"}`}>×{row.totalQty}</span>
-                            {!paidOnly && row.totalQty !== row.paidQty ? (
-                              <span className="ml-1 text-[11px] font-black text-warn-tx">대기 {row.totalQty - row.paidQty}</span>
+                            <span className={`text-[16px] font-black ${done ? "text-ink-mute" : "text-rose-deep"}`}>총 {prod.totalQty}개</span>
+                            {!paidOnly && prod.totalQty !== prod.paidQty ? (
+                              <span className="ml-1 text-[11px] font-black text-warn-tx">대기 {prod.totalQty - prod.paidQty}</span>
                             ) : null}
-                            <span className="ml-1 text-[11px] font-bold text-ink-mute">({row.pickedQty}/{row.totalQty})</span>
+                            <span className={`ml-1.5 text-[11px] font-black ${done ? "text-ok-tx" : "text-ink-mute"}`}>{done ? "✓ 완료" : `챙김 ${prod.pickedQty}/${prod.totalQty}`}</span>
                           </span>
-                        </span>
-                        {showBuyers && row.buyers.length > 0 ? (
-                          <span
-                            className="mt-1.5 flex flex-wrap gap-1 pl-9"
-                            onClick={(e) => e.stopPropagation()}
-                            title="주문자 목록 — 눌러도 챙김이 바뀌지 않아요"
-                          >
-                            {row.buyers.map((b, i) => (
-                              <span
-                                key={`${b.nickname}-${b.paid}-${i}`}
-                                title={b.paid ? "결제완료" : "미결제"}
-                                className={`rounded-lg px-1.5 py-0.5 text-[11px] font-bold ${b.paid ? "bg-ok-bg text-ok-tx" : "bg-warn-bg text-warn-tx"}`}
-                              >
+                        </button>
+                        {single && showBuyers && singleBuyers.length > 0 ? (
+                          <div className="flex flex-wrap gap-1 px-3 pb-2.5 pl-12" title="주문자 목록 — 눌러도 챙김이 바뀌지 않아요">
+                            {singleBuyers.map((b, i) => (
+                              <span key={`${b.nickname}-${b.paid}-${i}`} title={b.paid ? "결제완료" : "미결제"} className={`rounded-lg px-1.5 py-0.5 text-[11px] font-bold ${b.paid ? "bg-ok-bg text-ok-tx" : "bg-warn-bg text-warn-tx"}`}>
                                 {b.nickname}{b.qty > 1 ? `×${b.qty}` : ""}{b.paid ? "" : "⏳"}
                               </span>
                             ))}
-                          </span>
+                          </div>
                         ) : null}
-                      </button>
+                        {/* 옵션 줄 — 색상 가나다 → 사이즈 순. 클릭 = 그 옵션만 챙김/해제 */}
+                        {!single ? (
+                          <div className="divide-y divide-line">
+                            {prod.options.map((opt) => {
+                              const oDone = opt.ids.every((id) => pickedIds.has(id));
+                              const oSome = !oDone && opt.ids.some((id) => pickedIds.has(id));
+                              return (
+                                <div key={opt.key || "(옵션없음)"} className={oDone ? "bg-ok-bg" : "bg-surface"}>
+                                  <button type="button" onClick={() => toggleIds(opt.ids)} className="flex w-full items-center gap-3 py-2 pl-6 pr-3 text-left hover:bg-surface-2">
+                                    <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-lg border-2 text-[11px] font-black ${oDone ? "border-ok-tx/35 bg-[var(--color-ok-tx)] text-white" : oSome ? "border-ok-tx/35 bg-ok-bg text-ok-tx" : "border-line text-transparent"}`}>{oSome ? "–" : "✓"}</span>
+                                    <span className={`min-w-0 flex-1 truncate text-[13px] font-bold ${oDone ? "text-ink-mute line-through" : "text-ink"}`}>{opt.optionText || "옵션 없음"}</span>
+                                    <span className="shrink-0 whitespace-nowrap text-right">
+                                      <span className={`text-[14px] font-black ${oDone ? "text-ink-mute" : "text-ink"}`}>{opt.totalQty}개</span>
+                                      {!paidOnly && opt.totalQty !== opt.paidQty ? <span className="ml-1 text-[11px] font-black text-warn-tx">대기 {opt.totalQty - opt.paidQty}</span> : null}
+                                      <span className="ml-1 text-[11px] font-bold text-ink-mute">({opt.pickedQty}/{opt.totalQty})</span>
+                                    </span>
+                                  </button>
+                                  {showBuyers && opt.buyers.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1 px-3 pb-2 pl-14" title="주문자 목록 — 눌러도 챙김이 바뀌지 않아요">
+                                      {opt.buyers.map((b, i) => (
+                                        <span key={`${b.nickname}-${b.paid}-${i}`} title={b.paid ? "결제완료" : "미결제"} className={`rounded-lg px-1.5 py-0.5 text-[11px] font-bold ${b.paid ? "bg-ok-bg text-ok-tx" : "bg-warn-bg text-warn-tx"}`}>
+                                          {b.nickname}{b.qty > 1 ? `×${b.qty}` : ""}{b.paid ? "" : "⏳"}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                      </div>
                     );
                   })}
                 </div>
@@ -449,9 +499,10 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                     <button type="button" onClick={() => togglePanel(panel)} className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left ${complete ? "bg-ok-bg" : "bg-rose-soft"}`}>
                       <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-black text-white ${complete ? "bg-[var(--color-ok-tx)]" : "bg-rose-deep"}`}>{complete ? "✓" : (panel.nickname.charAt(0) || "?")}</span>
                       <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
-                        <span className="shrink truncate text-[14px] font-black text-ink">{panel.nickname}</span>
+                        {/* [2026-09-20] 배지가 많으면 닉네임이 「네·」처럼 한 글자로 찌그러지던 문제 → 닉네임은 지키고 시각이 먼저 줄어든다 */}
+                        <span className="max-w-[45%] shrink-0 truncate text-[14px] font-black text-ink">{panel.nickname}</span>
                         {panel.name && panel.name !== panel.nickname ? <span className="shrink-0 text-[12px] font-bold text-ink-soft">· {panel.name}</span> : null}
-                        {whenText(panel.when) ? <span className="shrink-0 text-[11px] font-semibold text-ink-mute">{whenText(panel.when)}</span> : null}
+                        {whenText(panel.when) ? <span className="min-w-0 shrink truncate text-[11px] font-semibold text-ink-mute">{whenText(panel.when)}</span> : null}
                       </span>
                       {panel.phone && (phoneCount.get(panel.phone) || 0) > 1 ? (
                         <span className="shrink-0 rounded-full bg-[var(--color-cardpay)]/12 px-2 py-0.5 text-[11px] font-black text-[var(--color-cardpay)]" title="같은 고객의 다른 주문도 있어요 — 한 박스로 같이 포장하세요(합배송)">📦 같은고객 {phoneCount.get(panel.phone)}건</span>
@@ -461,7 +512,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                       ) : (
                         <span className="shrink-0 rounded-full bg-[var(--color-danger-tx)] px-2.5 py-0.5 text-[11px] font-black text-white">미결제</span>
                       )}
-                      <span className={`shrink-0 text-[12px] font-black ${complete ? "text-ok-tx" : "text-rose-deep"}`}>{complete ? "✓ 완료" : `${pickedInPanel}/${panel.items.length}`}</span>
+                      {/* [2026-09-20] 주문 총 수량 — 상품 줄이 여럿이거나 수량이 2개 이상일 때만(1개짜리는 군더더기) */}
+                      {panel.totalQty > 1 ? <span className="shrink-0 text-[12px] font-black text-ink-soft">총 {panel.totalQty}개</span> : null}
+                      <span className={`shrink-0 text-[12px] font-black ${complete ? "text-ok-tx" : "text-rose-deep"}`}>{complete ? "✓ 완료" : `챙김 ${pickedInPanel}/${panel.items.length}`}</span>
                     </button>
 
                     {/* 패널 안 상품들 : 들여쓰기 + 네모 체크박스(헤더와 구분) */}
@@ -489,7 +542,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
         </div>
 
         <div className="shrink-0 border-t border-line px-4 py-2 text-[11px] font-bold leading-5 text-ink-mute">
-          상품 줄을 누르면 챙김, 주문서(닉네임) 줄을 누르면 그 주문 전체 챙김/해제. 체크는 서버 저장(다른 기기·새로고침 유지)·주문 취소/수정 자동 반영.
+          {viewMode === "batch" ? "상품 줄 = 그 상품 전부, 옵션 줄 = 그 옵션만 챙김/해제." : "상품 줄을 누르면 챙김, 주문서(닉네임) 줄을 누르면 그 주문 전체 챙김/해제."} 체크는 서버 저장(다른 기기·새로고침 유지)·주문 취소/수정 자동 반영.
         </div>
       </div>
     </div>

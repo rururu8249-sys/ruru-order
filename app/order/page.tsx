@@ -5955,6 +5955,21 @@ export default function OrderPage() {
   const registeredOptionColorSelected = registeredOptionColorMode === "none" || Boolean(normalizeEmptyProductOptionValue(registeredOptionColor));
   const registeredOptionSizeSelected = registeredOptionSizeMode === "none" || Boolean(normalizeEmptyProductOptionValue(registeredOptionSize));
   const registeredOptionSelectionReady = registeredOptionCustomerDetailReady && registeredOptionDetailSelected && registeredOptionColorSelected && registeredOptionSizeSelected && (!registeredOptionNeedsManualPrice || registeredOptionManualPrice > 0);
+  // [2026-09-20 사장님] 색상(또는 사이즈)이 딱 하나뿐인 상품은 손님이 그 하나를 굳이 누를 필요 없게 — 시트를 열면 미리 골라둔다.
+  //   조합형·브랜드묶음·3단(세부상품 먼저 고르는 상품)은 제외(선택 흐름이 다르다). 품절이면 미리 고르지 않는다(품절 칩 그대로 보이게).
+  //   등록된 값 그대로를 고르는 것이라 재고 키(color,size)·담기·금액 계산은 기존 경로 그대로다.
+  useEffect(() => {
+    if (!registeredOptionSelectProduct || registeredOptionEditIndex !== null) return;
+    if (registeredOptionComboInfo || registeredOptionBrandGroup || registeredOptionAxes3) return;
+    const onlyColor = registeredOptionColorMode === "select" && registeredOptionColorChoices.length === 1 ? registeredOptionColorChoices[0] : "";
+    const onlySize = registeredOptionSizeMode === "select" && registeredOptionSizeChoices.length === 1 ? registeredOptionSizeChoices[0] : "";
+    if (onlyColor && !registeredOptionColor.trim() && !isSoldOutColorSize(onlyColor, onlySize)) {
+      setRegisteredOptionColor(onlyColor);
+      setRegisteredOptionHeroPhoto(registeredOptionColorPhotos[onlyColor] || "");
+    }
+    if (onlySize && !registeredOptionSize.trim() && !isSoldOutColorSize(onlyColor, onlySize)) setRegisteredOptionSize(onlySize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registeredOptionSelectProduct?.id]);
   useEffect(() => {
     if (registeredOptionEditIndex === null || registeredOptionPriceMode !== "direct") return;
     const editItem = items[registeredOptionEditIndex];

@@ -2018,7 +2018,14 @@ export default function QuickProductFastForm({
               {/* 슬롯 2 — 색상 */}
               <div style={brandGroupActive ? { ...optRow, display: "none" } : optRow}>
                 <span style={optLabel}>색상</span>
-                <input style={optInput} type="text" placeholder="화이트, 블랙, 베이지" value={colorText} onChange={(e) => setColorText(e.target.value)} />
+                {/* [2026-09-20 사장님] 「안 써요」일 땐 「없음」 글자 대신 «기본»으로 — 저장값은 기존 그대로("없음" = 재고 키라 못 바꿈). 누르면 색상 입력으로 */}
+                {splitOptions(colorText).length > 0 && splitOptions(colorText).every((x) => x === "없음") ? (
+                  <button type="button" onClick={() => { setFormTouched(true); setColorText(""); }} title="누르면 색상을 넣을 수 있어요" style={{ ...optInput, textAlign: "left", cursor: "pointer", background: "var(--color-surface-2)", color: "var(--color-ink)", fontWeight: 800 }}>
+                    기본 <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>— 색상 하나뿐 · 손님이 고를 게 없어요</span>
+                  </button>
+                ) : (
+                  <input style={optInput} type="text" placeholder="화이트, 블랙, 베이지" value={colorText} onChange={(e) => setColorText(e.target.value)} />
+                )}
                 <div ref={colorPresetRef} style={{ position: "relative", display: "inline-block" }}>
                   <button type="button" onClick={() => setColorPresetOpen((v) => !v)} style={presetBtn(colors.length)}>
                     프리셋{colors.length > 0 ? ` ${colors.length}` : ""} ▾
@@ -2089,7 +2096,13 @@ export default function QuickProductFastForm({
               {/* 슬롯 3 — 사이즈 */}
               <div style={brandGroupActive ? { ...optRow, display: "none" } : optRow}>
                 <span style={optLabel}>사이즈</span>
-                <input style={optInput} type="text" placeholder="쉼표로 구분 — 예: XS/S, M/L, XL/XXL" value={sizeText} onChange={(e) => setSizeText(e.target.value)} />
+                {splitOptions(sizeText).length > 0 && splitOptions(sizeText).every((x) => x === "없음") ? (
+                  <button type="button" onClick={() => { setFormTouched(true); setSizeText(""); }} title="누르면 사이즈를 넣을 수 있어요" style={{ ...optInput, textAlign: "left", cursor: "pointer", background: "var(--color-surface-2)", color: "var(--color-ink)", fontWeight: 800 }}>
+                    기본 <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>— 사이즈 하나뿐 · 손님이 고를 게 없어요</span>
+                  </button>
+                ) : (
+                  <input style={optInput} type="text" placeholder="쉼표로 구분 — 예: XS/S, M/L, XL/XXL" value={sizeText} onChange={(e) => setSizeText(e.target.value)} />
+                )}
                 <div ref={sizePresetRef} style={{ position: "relative", display: "inline-block" }}>
                   <button type="button" onClick={() => setSizePresetOpen((v) => !v)} style={presetBtn(sizes.length)}>
                     프리셋{sizes.length > 0 ? ` ${sizes.length}` : ""} ▾
