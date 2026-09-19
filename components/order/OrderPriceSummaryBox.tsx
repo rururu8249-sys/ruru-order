@@ -80,19 +80,20 @@ export default function OrderPriceSummaryBox({
           </div>
         ) : showPointUse ? (
           <div style={{ marginTop: "16px", borderTop: "1px solid #D9C5CC", paddingTop: "16px" }}>
+            {/* [2026-09-20 사장님] 「전부쓰기? 포인트? 알아듣게」 — 「내 포인트 N P」 + 「쓸 만큼 숫자 입력」 + 「포인트 전부 쓰기」 */}
             <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", fontSize: "15px", fontWeight: 800, color: "#7B2D43" }}>
-              <span>보유 포인트</span>
+              <span>내 포인트</span>
               <span>{safePointBalance.toLocaleString()}P</span>
             </div>
 
             {/* [2026-09-20 사장님] 「포인트 얼마 있는지 보여주고 직접입력도, 전부쓰기도」 — 입력칸과 전부쓰기를 한 줄에. 숫자는 쉼표(commaNumberText). */}
-            <div style={{ marginTop: "10px", display: "grid", gridTemplateColumns: "1fr 96px", gap: "8px" }}>
+            <div style={{ marginTop: "10px", display: "grid", gridTemplateColumns: "1fr 128px", gap: "8px" }}>
               <div style={{ position: "relative", width: "100%" }}>
                 <input
                   value={pointUseInput}
                   onChange={(event) => onPointUseInputChange?.(event.target.value)}
                   inputMode="numeric"
-                  placeholder="쓸 포인트 직접입력"
+                  placeholder="쓸 만큼 숫자 입력"
                   style={{ height: "48px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", padding: "0 32px 0 14px", textAlign: "center", fontSize: "15px", fontWeight: 800, color: "#222", outline: "none" }}
                 />
                 <span style={{ position: "absolute", right: "14px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", fontWeight: 800, color: "#7B2D43", pointerEvents: "none" }}>원</span>
@@ -103,12 +104,12 @@ export default function OrderPriceSummaryBox({
                 onClick={onUseAllPoints}
                 style={{ height: "48px", width: "100%", borderRadius: "14px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}
               >
-                전부 쓰기
+                포인트 전부 쓰기
               </button>
             </div>
 
             <div style={{ marginTop: "6px", fontSize: "11.5px", fontWeight: 700, color: "#888", lineHeight: 1.5 }}>
-              1,000P 이상부터 · 주문금액까지만
+              포인트는 1,000P부터 쓸 수 있고, 주문금액까지만 써져요.
             </div>
           </div>
         ) : hasSmallPoint ? (

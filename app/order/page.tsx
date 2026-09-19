@@ -6997,7 +6997,7 @@ export default function OrderPage() {
 
               {requestMemoOpen || requestMemo.trim() ? (
                 <label className="mt-3 block">
-                  <span className="mb-2 block text-[13px] font-black tracking-[-0.04em] text-slate-700">요청사항</span>
+                  <span className="mb-2 block text-[13px] font-black tracking-[-0.04em] text-slate-700">요청사항 <span style={{ fontWeight: 700, color: "#7B736D" }}>(선택)</span></span>
                   <textarea
                     value={requestMemo}
                     onChange={(event) => setRequestMemo(event.target.value)}
@@ -7007,7 +7007,7 @@ export default function OrderPage() {
                 </label>
               ) : (
                 <button type="button" onClick={() => setRequestMemoOpen(true)} style={{ marginTop: "10px", border: "none", background: "none", padding: 0, fontSize: "13px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>
-                  요청사항 적기 ⌄
+                  요청사항 적기 (선택) ⌄
                 </button>
               )}
             </section>
@@ -7877,7 +7877,8 @@ export default function OrderPage() {
                     </div>
                   ) : null}
 
-                  {registeredOptionDetailSelected && (registeredOptionAllImages.length > 0 || registeredOptionDescription) ? (
+                  {/* [2026-09-20 사장님] 「사진 N장 크게 보기 없애도 될 듯」 — 대표사진이 크게 뜨고 🔍 크게가 있으니 삭제. 설명 글이 있을 때만 「상품 상세」. */}
+                  {registeredOptionDetailSelected && registeredOptionDescription ? (
                     <div style={{ marginTop: "16px", borderTop: "1px solid #F0EAE0", paddingTop: "14px" }}>
                       {/* [2026-09-09 사장님 지적] 「위에 사진들이 나열돼 있는데 밑에 또 크게 띄울 필요가 있나?
                             중복 개념 아닌가? 결국 상세 설명은 사진들 끝에 있어서 글이 보이지도 않음」
@@ -7889,15 +7890,6 @@ export default function OrderPage() {
                       <div style={{ marginBottom: "10px", fontSize: "14px", fontWeight: 800, color: "#333" }}>상품 상세</div>
                       {registeredOptionDescription ? (
                         <div style={{ fontSize: "13px", color: "#555", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{registeredOptionDescription}</div>
-                      ) : null}
-                      {registeredOptionAllImages.length > 0 ? (
-                        <button
-                          type="button"
-                          onClick={() => openLightbox(registeredOptionAllImages[0], registeredOptionAllImages, registeredOptionPhotoTitle)}
-                          style={{ marginTop: registeredOptionDescription ? "12px" : "0", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", width: "100%", height: "48px", borderRadius: "14px", border: "1.5px solid #E8DCE3", background: "#FBF5F7", color: "#7A1E47", fontSize: "14px", fontWeight: 900, cursor: "pointer" }}
-                        >
-                          🔍 사진 {registeredOptionAllImages.length}장 크게 보기
-                        </button>
                       ) : null}
                     </div>
                   ) : null}
