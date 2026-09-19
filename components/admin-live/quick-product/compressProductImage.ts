@@ -1,3 +1,5 @@
+import { squarePlacement, SQUARE_TARGET_PX } from "@/lib/imageSquare";
+
 type ProductImageKind = "cover" | "detail";
 
 type CompressConfig = {
@@ -8,7 +10,8 @@ type CompressConfig = {
 
 const CONFIG_BY_KIND: Record<ProductImageKind, CompressConfig> = {
   cover: {
-    maxEdge: 900,
+    // [2026-09-20] 실무 표준(스마트스토어 등) 대표이미지 1000×1000 에 맞춘다
+    maxEdge: SQUARE_TARGET_PX,
     quality: 0.72,
     softMaxBytes: 300 * 1024,
   },
@@ -165,7 +168,8 @@ export async function compressProductImage(file: File, kind: ProductImageKind) {
 
   const config = CONFIG_BY_KIND[kind] || CONFIG_BY_KIND.detail;
 
-  if (file.type === "image/webp" && file.size <= config.softMaxBytes) {
+  // [2026-09-20] 대표사진은 «정사각형 보장»이 목적이라, 이미 webp 라도 그냥 통과시키지 않는다(비율을 알 수 없으므로).
+  if (kind !== "cover" && file.type === "image/webp" && file.size <= config.softMaxBytes) {
     return file;
   }
 
@@ -176,25 +180,43 @@ export async function compressProductImage(file: File, kind: ProductImageKind) {
 
     if (!width || !height) return file;
 
-    const scale = Math.min(1, config.maxEdge / Math.max(width, height));
-    const nextWidth = Math.max(1, Math.round(width * scale));
-    const nextHeight = Math.max(1, Math.round(height * scale));
-
     const canvas = document.createElement("canvas");
-    canvas.width = nextWidth;
-    canvas.height = nextHeight;
-
-    const context = canvas.getContext("2d");
-
+    const context = (() => {
+      const ctx = canvas.getContext("2d");
+      return ctx;
+    })();
     if (!context) return file;
 
-    context.drawImage(image, 0, 0, nextWidth, nextHeight);
+    if (kind === "cover") {
+      // [2026-09-20 사장님 요청] 대표사진은 **1:1 정사각형**으로 통일한다.
+      //   찌그러뜨리거나 잘라내지 않고, 사진 전체를 비율 그대로 넣고 남는 자리에 «흰 여백»을 넣는다.
+      //   → 방송 위젯·손님 상품목록의 사진칸이 상품마다 달라 보이던 문제가 근본적으로 사라진다.
+      //   계산 규칙은 lib/imageSquare.ts (테스트 scripts/test-image-square.mjs) 참고.
+      const place = squarePlacement(width, height, config.maxEdge);
+      if (!place) return file;
+      canvas.width = place.size;
+      canvas.height = place.size;
+      context.fillStyle = "#FFFFFF"; // 실무 표준 배경색
+      context.fillRect(0, 0, place.size, place.size);
+      context.drawImage(image, place.dx, place.dy, place.dw, place.dh);
+    } else {
+      // 상세사진은 세로로 긴 «상세컷»이 많다 → 정사각형으로 만들면 흰 여백만 잔뜩 생긴다. 비율 그대로 둔다.
+      const scale = Math.min(1, config.maxEdge / Math.max(width, height));
+      const nextWidth = Math.max(1, Math.round(width * scale));
+      const nextHeight = Math.max(1, Math.round(height * scale));
+      canvas.width = nextWidth;
+      canvas.height = nextHeight;
+      context.drawImage(image, 0, 0, nextWidth, nextHeight);
+    }
 
     const blob = await canvasToBlob(canvas, "image/webp", config.quality);
     const optimizedFile = new File([blob], makeWebpName(file.name), {
       type: "image/webp",
       lastModified: Date.now(),
     });
+
+    // 대표사진은 크기와 상관없이 «정사각형으로 바꾼 것»을 써야 한다(그게 목적).
+    if (kind === "cover") return optimizedFile;
 
     if (optimizedFile.size < file.size || file.size > config.softMaxBytes) {
       return optimizedFile;

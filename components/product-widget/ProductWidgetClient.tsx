@@ -550,8 +550,12 @@ export default function ProductWidgetClient() {
             {/* 사진칸 — [2026-09-11 사장님 지적 «사진이 잘린다·글자가 사진을 덮는다»]
                 · 사진은 자기 비율 그대로 안 잘리게(contain). 비율이 안 맞아 남는 자리는 «같은 사진을 흐리게 키운 것»으로 채운다 → 빈칸 없음(09-19).
                 · 글자 띠는 이 칸 «아래»에 붙는다 → 사진은 한 픽셀도 안 가려진다. */}
+            {/* [2026-09-20 사장님 요청] 사진칸을 «정사각형»으로 못 박는다.
+                예전엔 flex:1 이라 글자 띠 높이(상품명 줄 수)에 따라 사진칸이 세로로 늘었다 줄었다 했다.
+                → 카드 폭과 같은 200×200 고정. 2026-09-20 이후 등록한 대표사진은 이미 1:1 이라 여백 없이 꽉 찬다.
+                그 전에 올린 사진(비율 제각각)은 아래 «흐린 같은 사진»이 남는 자리를 메운다. */}
             {img ? (
-              <div style={{ position: "relative", flex: "1 1 auto", minHeight: 0, width: "100%", background: GLASS_BG, overflow: "hidden" }}>
+              <div style={{ position: "relative", flex: `0 0 ${CARD}px`, height: `${CARD}px`, width: "100%", background: GLASS_BG, overflow: "hidden" }}>
                 {/* [2026-09-19 사장님 «위아래 빈 공간이 거슬린다»] 사진 비율이 틀과 안 맞을 때 생기던 반투명 빈칸을
                     «같은 사진을 흐리게 키운 것»으로 채운다(쇼핑앱 상세 사진과 같은 방식). 틀은 고정, 사진은 안 잘리고, 빈칸은 없다. */}
                 <img
@@ -573,7 +577,7 @@ export default function ProductWidgetClient() {
                 />
               </div>
             ) : (
-              <div style={{ flex: "1 1 auto", minHeight: 0, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "56px", opacity: 0.8, background: GLASS_BG }}>👟</div>
+              <div style={{ flex: `0 0 ${CARD}px`, height: `${CARD}px`, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "56px", opacity: 0.8, background: GLASS_BG }}>👟</div>
             )}
 
             {/* [2026-07-09] 상품이 가려져서 하단 어두운 그라데이션 제거.
