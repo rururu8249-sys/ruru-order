@@ -94,6 +94,28 @@ type Props = {
 
 const TITLE_ID_PREFIX = "cs-sheet-title-";
 
+// [2026-09-20 사장님 「제출 후 입금계좌 안내 시트가 사라짐」] 원인: 주문서 시트가 닫히며 되돌린 history.back() 이
+//   «비동기»라, 같은 순간 열린 입금안내 시트가 먼저 한 칸을 쌓고 → 그 back 이 입금안내 칸을 빼 버려
+//   입금안내가 «손님이 뒤로가기를 눌렀다»고 오해하고 닫혔다.
+//   → 우리가 부른 back 은 세어 두고(pendingBacks), 그 popstate 는 «손님 뒤로가기»로 치지 않는다.
+//     그 pop 으로 칸을 잃은 시트는 칸을 다시 쌓는다. 또 이미 안 열린 시트의 칸이 맨 위에 남아 있으면
+//     새 시트는 push 대신 replace 로 그 칸을 재사용한다(빈 칸이 쌓여 뒤로가기를 두 번 눌러야 하는 일 방지).
+const mountedSheetKeys = new Set<string>();
+let pendingBacks = 0;
+let consumedPopEvent: PopStateEvent | null = null;
+let popGuardInstalled = false;
+function installPopGuard() {
+  if (popGuardInstalled || typeof window === "undefined") return;
+  popGuardInstalled = true;
+  // 시트들의 popstate 리스너보다 먼저 등록되어 먼저 실행된다(같은 target 은 등록 순서).
+  window.addEventListener("popstate", (event) => {
+    if (pendingBacks > 0) {
+      pendingBacks -= 1;
+      consumedPopEvent = event;
+    }
+  });
+}
+
 export default function CustomerBottomSheet({
   open,
   onClose,
@@ -134,7 +156,10 @@ export default function CustomerBottomSheet({
 
   const pushEntry = () => {
     try {
-      window.history.pushState({ ruruSheet: key }, "");
+      const top = window.history.state as { ruruSheet?: string } | null;
+      const staleTop = Boolean(top?.ruruSheet && top.ruruSheet !== key && !mountedSheetKeys.has(top.ruruSheet));
+      if (staleTop) window.history.replaceState({ ruruSheet: key }, "");
+      else window.history.pushState({ ruruSheet: key }, "");
       pushedRef.current = true;
       pushedHrefRef.current = window.location.href;
     } catch {
@@ -152,11 +177,18 @@ export default function CustomerBottomSheet({
 
   useEffect(() => {
     if (!open) return;
+    installPopGuard();
+    mountedSheetKeys.add(key);
     pushEntry();
 
     const onPop = (event: PopStateEvent) => {
-      // 우리 칸이 빠져나간 것 = 손님이 뒤로가기를 누른 것. 가드가 막으면 칸을 다시 쌓아 둔다.
       const stillOurs = Boolean((event.state as { ruruSheet?: string } | null)?.ruruSheet === key);
+      // 다른 시트가 닫히며 부른 back 이 우리 칸을 빼 간 경우 — 손님 뒤로가기가 아니다. 칸만 다시 쌓는다.
+      if (consumedPopEvent === event) {
+        if (!stillOurs) { pushedRef.current = false; pushEntry(); }
+        return;
+      }
+      // 우리 칸이 빠져나간 것 = 손님이 뒤로가기를 누른 것. 가드가 막으면 칸을 다시 쌓아 둔다.
       if (stillOurs) return;
       pushedRef.current = false;
       if (!requestClose()) pushEntry();
@@ -172,13 +204,17 @@ export default function CustomerBottomSheet({
     return () => {
       window.removeEventListener("popstate", onPop);
       window.removeEventListener("keydown", onKey);
+      mountedSheetKeys.delete(key);
       // ✕·배경·그래버·ESC 로 닫힌 경우: 우리가 쌓은 한 칸이 아직 맨 위에 있으면 그 칸만 되돌린다.
       //   다른 페이지로 이동한 뒤라면(href 가 다르거나 state 가 우리 것이 아니면) 손대지 않는다.
       if (pushedRef.current) {
         pushedRef.current = false;
         try {
           const st = window.history.state as { ruruSheet?: string } | null;
-          if (st?.ruruSheet === key && window.location.href === pushedHrefRef.current) window.history.back();
+          if (st?.ruruSheet === key && window.location.href === pushedHrefRef.current) {
+            pendingBacks += 1;
+            window.history.back();
+          }
         } catch {
           /* noop */
         }

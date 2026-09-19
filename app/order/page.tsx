@@ -1375,8 +1375,6 @@ export default function OrderPage() {
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
   const [requestMemo, setRequestMemo] = useState("");
-  // [2026-09-20 사장님 「주문서 최종 화면 심플하게」] 요청사항 칸은 접어 두고 필요할 때만 편다.
-  const [requestMemoOpen, setRequestMemoOpen] = useState(false);
 
   const [pin, setPin] = useState("");
   const [autoSaveInfo, setAutoSaveInfo] = useState(true);
@@ -5874,6 +5872,18 @@ export default function OrderPage() {
         return Number(v.stock) - Math.max(0, reserved) <= 0;
       });
   };
+  // [2026-09-20 사장님] 「55 고르고 카멜 누르면 사이즈가 풀린다」 — 색상을 바꿀 때 이미 고른 사이즈가 그 색상에도 있고
+  //   품절이 아니면 그대로 둔다. 없거나 품절이면 예전처럼 비운다. 표시·선택 상태만(재고 판정 함수는 그대로 사용).
+  const sizeKeepableForColor = (nextColor: string, size: string): boolean => {
+    const sz = String(size ?? "").trim();
+    if (!sz || !nextColor) return false;
+    if (registeredOptionSelectedDetailConfig) {
+      const has = registeredOptionSelectedDetailConfig.variants.some((variant) =>
+        normalizeEmptyProductOptionValue(variant.color) === normalizeEmptyProductOptionValue(nextColor) && normalizeEmptyProductOptionValue(variant.size) === sz);
+      if (!has) return false;
+    }
+    return !isSoldOutColorSize(nextColor, sz);
+  };
   const registeredOptionColorChoices = registeredOptionSelectedDetailConfig
     ? registeredOptionSelectedDetailConfig.colors
         .map((value) => normalizeEmptyProductOptionValue(value))
@@ -6895,33 +6905,40 @@ export default function OrderPage() {
                       </div>
 
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        {/* [2026-08-13] 주문서 확인에서도 상품명·옵션명이 잘리면 손님이 제출 전에
-                            뭘 담았는지 확인을 못 한다(옵션명 = 조합형 세부상품명이라 특히 김) → 2줄 줄바꿈 */}
-                        <div style={{ fontSize: "13px", fontWeight: 600, color: "#1A1A1A", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{item.product_name || "상품명 없음"}{item.chat_source === "Y" ? <span style={{ marginLeft: "5px", verticalAlign: "1px", display: "inline-block", padding: "1.5px 6px", borderRadius: "6px", background: "#F9EEF3", color: "#7A1E47", fontSize: "9.5px", fontWeight: 900 }}>채팅주문</span> : null}</div>
-                        <div style={{ fontSize: "11px", color: "#7B736D", marginTop: "2px", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{optionSummaryText} · 단가 {won(toNumber(item.product_price))}</div>
-                        {itemIsRegisteredProduct && !itemHasNoOptions ? (
-                          <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · 옵션 변경`, "바꿀게요", () => openSheetItemOptionEdit(index))}
-                            style={{ marginTop: "5px", padding: "4px 10px", borderRadius: "8px", border: "1px solid #E8D5DD", background: "#fff", color: "#7A1E47", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>
-                            ✎ 옵션 변경
-                          </button>
-                        ) : null}
-
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "6px", gap: "8px" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
-                            <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · ${toNumber(item.qty)}개 → ${Math.max(1, toNumber(item.qty) - 1)}개`, "바꿀게요", () => changeSheetItemQty(index, -1))} aria-label="수량 줄이기"
-                              style={{ width: "27px", height: "27px", borderRadius: "8px", border: "1px solid #E5E1DC", background: "#fff", color: "#7A1E47", fontSize: "16px", fontWeight: 800, cursor: "pointer", lineHeight: 1 }}>−</button>
-                            <span style={{ fontSize: "13px", fontWeight: 800, color: "#1A1A1A", minWidth: "30px", textAlign: "center" }}>{toNumber(item.qty)}개</span>
-                            <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · ${toNumber(item.qty)}개 → ${toNumber(item.qty) + 1}개`, "바꿀게요", () => changeSheetItemQty(index, 1))} aria-label="수량 늘리기"
-                              style={{ width: "27px", height: "27px", borderRadius: "8px", border: "1px solid #E5E1DC", background: "#fff", color: "#7A1E47", fontSize: "16px", fontWeight: 800, cursor: "pointer", lineHeight: 1 }}>＋</button>
+                        {/* [2026-09-20 사장님] 「옵션 변경이 단가 밑에 작게 있어 누르기 애매 → 삭제 앞에, 누르기 쉽게」
+                            타사(manysell) 담은 상품 줄 실측: 이름 굵게 / 「단가 × N개」 회색 / 스테퍼 36px / 줄 합계 굵게 / [삭제] 64×40.
+                            우리: 오른쪽 위 [옵션 변경][삭제] 같은 크기(40px), 아래 줄 스테퍼는 옵션 시트와 같은 모양(한 상자 −/N/+). */}
+                        <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            {/* [2026-08-13] 상품명·옵션명이 잘리면 제출 전에 확인을 못 한다 → 2줄 줄바꿈 */}
+                            <div style={{ fontSize: "14px", fontWeight: 800, color: "#1A1A1A", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{item.product_name || "상품명 없음"}{item.chat_source === "Y" ? <span style={{ marginLeft: "5px", verticalAlign: "1px", display: "inline-block", padding: "1px 6px", borderRadius: "999px", background: "#E8F0FE", color: "#1D4ED8", fontSize: "10px", fontWeight: 800 }}>채팅주문</span> : null}</div>
+                            <div style={{ fontSize: "12px", color: "#7B736D", marginTop: "2px", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{optionSummaryText} · {won(toNumber(item.product_price))} × {toNumber(item.qty)}개</div>
                           </div>
-                          <span style={{ flexShrink: 0, fontSize: "14px", fontWeight: 700, color: "#7A1E47" }}>{won(itemAmount)}</span>
+                          <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                            {itemIsRegisteredProduct && !itemHasNoOptions ? (
+                              <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · 옵션 변경`, "바꿀게요", () => openSheetItemOptionEdit(index))}
+                                style={{ height: "40px", padding: "0 12px", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
+                                옵션 변경
+                              </button>
+                            ) : null}
+                            <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · ${toNumber(item.qty)}개 삭제`, "삭제할게요", () => removeItem(index))} aria-label="상품 삭제"
+                              style={{ height: "40px", padding: "0 12px", borderRadius: "10px", border: "1px solid #F0DDD9", background: "#FDF6F4", color: "#C0554A", fontSize: "13px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
+                              삭제
+                            </button>
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px", gap: "8px" }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "40px 44px 40px", height: "40px", borderRadius: "10px", border: "1px solid #E8E2DD", overflow: "hidden" }}>
+                            <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · ${toNumber(item.qty)}개 → ${Math.max(1, toNumber(item.qty) - 1)}개`, "바꿀게요", () => changeSheetItemQty(index, -1))} aria-label="수량 줄이기"
+                              style={{ borderRight: "1px solid #F0EAE0", border: "none", background: "#fff", color: "#555", fontSize: "18px", fontWeight: 800, cursor: "pointer" }}>−</button>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: 800, color: "#222", borderLeft: "1px solid #F0EAE0", borderRight: "1px solid #F0EAE0" }}>{toNumber(item.qty)}</div>
+                            <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · ${toNumber(item.qty)}개 → ${toNumber(item.qty) + 1}개`, "바꿀게요", () => changeSheetItemQty(index, 1))} aria-label="수량 늘리기"
+                              style={{ border: "none", background: "#fff", color: "#7A1E47", fontSize: "18px", fontWeight: 800, cursor: "pointer" }}>+</button>
+                          </div>
+                          <span style={{ flexShrink: 0, fontSize: "15px", fontWeight: 900, color: "#7A1E47" }}>{won(itemAmount)}</span>
                         </div>
                       </div>
-                      <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · ${toNumber(item.qty)}개 삭제`, "삭제할게요", () => removeItem(index))} aria-label="상품 삭제"
-                        style={{ flexShrink: 0, width: "36px", padding: "3px 0", borderRadius: "10px", border: "1px solid #F0DDD9", background: "#FDF6F4", cursor: "pointer", alignSelf: "flex-start", display: "flex", flexDirection: "column", alignItems: "center", gap: "1px" }}>
-                        <span style={{ fontSize: "14px", lineHeight: 1 }}>🗑</span>
-                        <span style={{ fontSize: "9.5px", fontWeight: 800, color: "#C0554A", lineHeight: 1 }}>삭제</span>
-                      </button>
                     </article>
                   );
                 })}
@@ -6995,21 +7012,17 @@ export default function OrderPage() {
                 )}
               </div>
 
-              {requestMemoOpen || requestMemo.trim() ? (
-                <label className="mt-3 block">
-                  <span className="mb-2 block text-[13px] font-black tracking-[-0.04em] text-slate-700">요청사항 <span style={{ fontWeight: 700, color: "#7B736D" }}>(선택)</span></span>
-                  <textarea
-                    value={requestMemo}
-                    onChange={(event) => setRequestMemo(event.target.value)}
-                    placeholder="예) 문 앞에 놓아 주세요 / 배송 전 연락 주세요"
-                    className="min-h-[72px] w-full resize-none rounded-[14px] border border-slate-200 bg-slate-50 p-3 text-[15px] font-bold leading-relaxed tracking-[-0.04em] outline-none focus:border-rose-deep"
-                  />
-                </label>
-              ) : (
-                <button type="button" onClick={() => setRequestMemoOpen(true)} style={{ marginTop: "10px", border: "none", background: "none", padding: 0, fontSize: "13px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>
-                  요청사항 적기 (선택) ⌄
-                </button>
-              )}
+              {/* [2026-09-20 사장님] 「접혀 있으면 난독증 손님은 모른다」 → 항상 펼쳐 둔다(작게). */}
+              <label className="mt-3 block">
+                <span className="mb-2 block text-[13px] font-black tracking-[-0.04em] text-slate-700">요청사항 <span style={{ fontWeight: 700, color: "#7B736D" }}>(선택 · 안 적어도 돼요)</span></span>
+                <textarea
+                  value={requestMemo}
+                  onChange={(event) => setRequestMemo(event.target.value)}
+                  placeholder="예) 문 앞에 놓아 주세요 / 배송 전 연락 주세요"
+                  rows={2}
+                  className="w-full resize-none rounded-[14px] border border-slate-200 bg-slate-50 p-3 text-[15px] font-bold leading-relaxed tracking-[-0.04em] outline-none focus:border-rose-deep"
+                />
+              </label>
             </section>
 
             <section
@@ -7752,7 +7765,7 @@ export default function OrderPage() {
                             const selected = registeredOptionColor === option;
                             const soldOut = isSoldOutColorSize(option, registeredOptionSize);
                             return (
-                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; const next = selected ? "" : option; setRegisteredOptionColor(next); setRegisteredOptionSize(""); const nextPhoto = next ? (registeredOptionColorPhotos[next] || "") : ""; setRegisteredOptionHeroPhoto(nextPhoto); }} style={{ height: "48px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", padding: "0 8px" }}>{registeredOptionColorPhotos[option] ? <img src={registeredOptionColorPhotos[option]} alt={option} loading="lazy" decoding="async" style={{ flexShrink: 0, width: "36px", height: "36px", objectFit: "cover", borderRadius: "10px", display: "block" }} /> : null}<span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{soldOut ? option + " (품절)" : option}</span></button>
+                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; const next = selected ? "" : option; setRegisteredOptionColor(next); if (!sizeKeepableForColor(next, registeredOptionSize)) setRegisteredOptionSize(""); const nextPhoto = next ? (registeredOptionColorPhotos[next] || "") : ""; setRegisteredOptionHeroPhoto(nextPhoto); }} style={{ height: "48px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", padding: "0 8px" }}>{registeredOptionColorPhotos[option] ? <img src={registeredOptionColorPhotos[option]} alt={option} loading="lazy" decoding="async" style={{ flexShrink: 0, width: "36px", height: "36px", objectFit: "cover", borderRadius: "10px", display: "block" }} /> : null}<span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{soldOut ? option + " (품절)" : option}</span></button>
                             );
                           })}
                         </div>
@@ -7760,7 +7773,7 @@ export default function OrderPage() {
                         /* [2026-09-20 사장님] 5개 이상이면 폰이 띄우는 큰 글씨 목록(드롭다운). 칩이 34px로 쪼그라들던 문제 해결. */
                         <select
                           value={registeredOptionColor}
-                          onChange={(e) => { const next = e.target.value; setRegisteredOptionColor(next); setRegisteredOptionSize(""); setRegisteredOptionHeroPhoto(next ? (registeredOptionColorPhotos[next] || "") : ""); }}
+                          onChange={(e) => { const next = e.target.value; setRegisteredOptionColor(next); if (!sizeKeepableForColor(next, registeredOptionSize)) setRegisteredOptionSize(""); setRegisteredOptionHeroPhoto(next ? (registeredOptionColorPhotos[next] || "") : ""); }}
                           style={{ width: "100%", height: "52px", borderRadius: "12px", border: `1.5px solid ${registeredOptionColor ? "#7A1E47" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 800, color: registeredOptionColor ? "#7A1E47" : "#444" }}
                         >
                           <option value="">색상을 골라주세요 ({registeredOptionColorChoices.length}가지)</option>
