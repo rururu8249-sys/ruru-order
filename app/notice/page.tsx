@@ -21,7 +21,6 @@ import CustomerTopNav from "@/components/customer/CustomerTopNav";
 import NoticePageHero from "@/components/notice/NoticePageHero";
 import NoticeStateMessage from "@/components/notice/NoticeStateMessage";
 import NoticeCard from "@/components/notice/NoticeCard";
-import NoticePagination from "@/components/notice/NoticePagination";
 
 type Notice = {
   id: number;
@@ -76,7 +75,6 @@ export default function NoticePage() {
   }, []);
 
   const [notices, setNotices] = useState<Notice[]>([]);
-  const [noticePage, setNoticePage] = useState(1);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -96,7 +94,6 @@ export default function NoticePage() {
 
     if (!error) {
       setNotices(data || []);
-    setNoticePage(1);
     }
 
     setLoading(false);
@@ -105,16 +102,9 @@ export default function NoticePage() {
 
 
 
-  const NOTICES_PER_PAGE = 2;
-  const totalNoticePages = Math.max(1, Math.ceil(notices.length / NOTICES_PER_PAGE));
-  const safeNoticePage = Math.min(noticePage, totalNoticePages);
-  const visibleNotices = notices.slice(
-    (safeNoticePage - 1) * NOTICES_PER_PAGE,
-    safeNoticePage * NOTICES_PER_PAGE
-  );
 
   return (
-    <main className="min-h-screen select-none bg-[#f5f8ff] px-4 py-6 text-[#151923]" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
+    <main className="min-h-screen select-none bg-[#FDF5F1] px-4 py-6 text-[#151923]" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
       <section className="mx-auto w-full max-w-md">
         <CustomerTopNav />
         <NoticePageHero />
@@ -125,19 +115,13 @@ export default function NoticePage() {
           <NoticeStateMessage message="등록된 공지사항이 없습니다." />
         )}
 
-        <div className="space-y-4">
-          {visibleNotices.map((notice) => (
-            <NoticeCard key={notice.id} notice={notice} />
+        {/* [2026-09-20] 공지 7개를 «2개씩 4페이지»로 넘겨 보던 것 → 전부 한 화면에.
+            대신 제목 줄을 눌러 펼치는 접이식(중요공지는 처음부터 펼침). */}
+        <div className="space-y-2.5">
+          {notices.map((notice) => (
+            <NoticeCard key={notice.id} notice={notice} defaultOpen={Boolean(notice.is_pinned)} />
           ))}
         </div>
-
-        {notices.length > 0 && (
-          <NoticePagination
-            currentPage={safeNoticePage}
-            totalPages={totalNoticePages}
-            onPageChange={setNoticePage}
-          />
-        )}
 
 
         <footer className="py-8 text-center">
