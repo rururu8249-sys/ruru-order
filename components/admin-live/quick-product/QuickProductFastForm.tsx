@@ -257,7 +257,25 @@ type ParsedProductNote = Record<string, unknown> & {
       };
       // [무료나눔 · 2026-07-22] true면 0원 상품(선물). 가격 비움(손님 직접입력)과 구분되는 명시 플래그
       free_product?: boolean;
+      // [2026-09-20] 한눈에 정보 칩 — 손님 옵션 시트에 「면 100%」「국내배송」처럼 짧은 칩으로 표시(표시 전용, 최대 6개·10자)
+      spec_chips?: string[];
+      // [2026-08-29] 사이즈 실측표 — SQL로만 넣는 표시 전용 데이터. 폼은 만지지 않고 저장 시 그대로 보존만 한다.
+      size_charts?: Record<string, unknown>;
 };
+
+// [2026-09-20] 한눈에 정보 칩 정규화 — 쉼표/줄바꿈 구분, 중복 제거, 최대 6개, 한 칩 10자
+export const SPEC_CHIP_MAX_COUNT = 6;
+export const SPEC_CHIP_MAX_LENGTH = 10;
+export function normalizeSpecChips(text: string): string[] {
+  const out: string[] = [];
+  for (const raw of String(text ?? "").split(/[,\n]/)) {
+    const v = raw.trim().slice(0, SPEC_CHIP_MAX_LENGTH);
+    if (!v || out.includes(v)) continue;
+    out.push(v);
+    if (out.length >= SPEC_CHIP_MAX_COUNT) break;
+  }
+  return out;
+}
 
 function parseProductNote(row: ProductRow | null | undefined): ParsedProductNote | null {
   if (!row) return null;
@@ -736,6 +754,7 @@ export default function QuickProductFastForm({
   const [purchaseLimitEnabled, setPurchaseLimitEnabled] = useState(false);
   const [purchaseLimitText, setPurchaseLimitText] = useState("1");
   const [suggestionKeywordsText, setSuggestionKeywordsText] = useState("");
+  const [specChipsText, setSpecChipsText] = useState(""); // [2026-09-20] 한눈에 정보 칩 (쉼표 구분)
 
   const [coverImages, setCoverImages] = useState<string[]>([]);
   const [detailImages, setDetailImages] = useState<string[]>([]);
@@ -937,6 +956,7 @@ export default function QuickProductFastForm({
     setNameSuggestionEnabled(productNote?.name_suggestion_enabled !== false);
     setCustomerDetailInputEnabled(productNote?.customer_detail_input_enabled === true);
     setSuggestionKeywordsText(Array.isArray(productNote?.suggestion_keywords) ? productNote.suggestion_keywords.join(", ") : "");
+    setSpecChipsText(Array.isArray(productNote?.spec_chips) ? productNote.spec_chips.map((v) => String(v ?? "").trim()).filter(Boolean).join(", ") : "");
     setCustomInputLabel(String((productNote as { custom_input_label?: unknown } | null)?.custom_input_label || "").trim());
     {
       // [2026-09-03] 색상별 사진 로드 — 값이 있는 것만(없으면 빈 맵 → 기존 상품 무변화)
@@ -1641,6 +1661,7 @@ export default function QuickProductFastForm({
     setTotalStockText("0");
     setVariantRows([]);
     setDescription("");
+    setSpecChipsText("");
     setFreeProductEnabled(false);
     setStockManagementEnabled(false); // [2026-09-03 사장님 지시] 새 상품 폼 초기화도 기본 OFF
     setCustomerDetailInputEnabled(false);
@@ -1804,6 +1825,13 @@ export default function QuickProductFastForm({
         customer_category_visible: customerCategoryVisible,
         free_product: freeProductEnabled,
         ...(customInputLabel.trim() ? { custom_input_label: customInputLabel.trim() } : {}),
+        // [2026-09-20] 한눈에 정보 칩 — 비어 있으면 키 생략(기존 상품 note 구성 무변화)
+        ...(() => {
+          const chips = normalizeSpecChips(specChipsText);
+          return chips.length > 0 ? { spec_chips: chips } : {};
+        })(),
+        // [2026-09-20] 사이즈 실측표는 폼에 입력칸이 없어 재저장 때 지워지던 문제 → 있던 그대로 보존(표시 전용)
+        ...(initialProductNote?.size_charts && typeof initialProductNote.size_charts === "object" ? { size_charts: initialProductNote.size_charts } : {}),
         // [2026-09-03] 색상별 사진 — 실제로 사진 넣은 색상만, 지금 색상 목록에 남아 있는 것만 저장(없으면 키 생략)
         ...(() => {
           const keptColorPhotos = Object.fromEntries(
@@ -2959,6 +2987,30 @@ export default function QuickProductFastForm({
               <input type="checkbox" checked={freeProductEnabled} onChange={(e) => setFreeProductEnabled(e.target.checked)} style={{ accentColor: "var(--color-ok-tx)" }} />
               🎁 무료나눔 상품 (0원 — 손님에게 선물)
             </label>
+          </div>
+
+          {/* [2026-09-20] 한눈에 정보 칩 — 손님이 긴 설명을 안 읽어도 되게 짧은 칩으로 (표시 전용) */}
+          <div style={{ marginBottom: "12px" }}>
+            <div style={sectionLabel}>한눈에 정보 (선택)</div>
+            <input
+              value={specChipsText}
+              onChange={(e) => { setFormTouched(true); setSpecChipsText(e.target.value); }}
+              placeholder="쉼표로 구분 · 예: 면 100%, 국내배송, 세탁기 가능"
+              style={{ width: "100%", height: "36px", boxSizing: "border-box", fontSize: "13px", padding: "0 12px", border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", outline: "none" }}
+            />
+            {(() => {
+              const chips = normalizeSpecChips(specChipsText);
+              return (
+                <div style={{ marginTop: "6px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", minHeight: "20px" }}>
+                  {chips.map((c) => (
+                    <span key={c} style={{ fontSize: "12px", fontWeight: 800, background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", borderRadius: "20px", padding: "4px 8px" }}>{c}</span>
+                  ))}
+                  <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>
+                    {chips.length === 0 ? "손님 옵션 창 위쪽에 칩으로 보여요 · 최대 6개, 한 칩 10자" : `${chips.length}/6개 · 손님 옵션 창에 이렇게 보여요`}
+                  </span>
+                </div>
+              );
+            })()}
           </div>
 
           {/* 상세설명 */}

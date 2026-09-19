@@ -33,6 +33,7 @@ type CustomerPaymentGuideBottomSheetProps = {
   items?: CustomerPaymentGuideOrderItem[];
   productAmount?: number;
   shippingFee?: number;
+  cardExtra?: number;
   totalAmount?: number;
   pointUsedAmount?: number;
   finalAmount?: number;
@@ -85,6 +86,7 @@ export default function CustomerPaymentGuideBottomSheet({
   items = [],
   productAmount = 0,
   shippingFee = 0,
+  cardExtra = 0,
   totalAmount = 0,
   pointUsedAmount = 0,
   finalAmount,
@@ -120,6 +122,7 @@ export default function CustomerPaymentGuideBottomSheet({
   const totalQty = orderItems.reduce((sum, item) => sum + toNumber(item.qty), 0);
   const safeProductAmount = Math.max(0, Number(productAmount || 0));
   const safeShippingFee = Math.max(0, Number(shippingFee || 0));
+  const safeCardExtra = safePaymentMethod === "카드결제" ? Math.max(0, Number(cardExtra || 0)) : 0;
   const safeTotalAmount = Math.max(0, Number(totalAmount || safeProductAmount + safeShippingFee || 0));
   const safePointUsedAmount = Math.max(0, Number(pointUsedAmount || 0));
   const safeFinalAmount =
@@ -247,6 +250,9 @@ export default function CustomerPaymentGuideBottomSheet({
               <div style={{ marginTop: "10px" }}>
                 <div style={sumRow}><span>상품금액</span><span>{won(safeProductAmount)}</span></div>
                 <div style={sumRow}><span>배송비</span><span>{won(safeShippingFee)}</span></div>
+                {safeCardExtra > 0 && (
+                  <div style={sumRow}><span>카드 추가금</span><span>+{won(safeCardExtra)}</span></div>
+                )}
                 {safePointUsedAmount > 0 && (
                   <div style={{ ...sumRow, fontWeight: 800, color: "#0F6E56" }}><span>포인트 사용</span><span>-{won(safePointUsedAmount)}</span></div>
                 )}

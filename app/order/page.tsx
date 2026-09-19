@@ -5794,6 +5794,19 @@ export default function OrderPage() {
   const registeredOptionDescription = registeredOptionSelectProduct
     ? String(registeredOptionSelectProduct.product_description || registeredOptionSelectProduct.detail_description || registeredOptionSelectProduct.description || "").trim()
     : "";
+  // [2026-09-20 사장님] 한눈에 정보 칩 — 관리자 상품등록 「한눈에 정보」(product_note.spec_chips). 표시 전용, 없으면 아무것도 안 그린다.
+  const registeredOptionSpecChips: string[] = (() => {
+    if (!registeredOptionSelectProduct) return [];
+    const raw = readOrderNoteObject(registeredOptionSelectProduct)?.spec_chips;
+    if (!Array.isArray(raw)) return [];
+    const out: string[] = [];
+    for (const v of raw) {
+      const t = String(v ?? "").trim().slice(0, 10);
+      if (t && !out.includes(t)) out.push(t);
+      if (out.length >= 6) break;
+    }
+    return out;
+  })();
   // [상세UI] 상단 썸네일 스트립용: 대표(커버) + 상세사진 통합(중복 제거). Baymard: 숨은 썸네일은 노출로 신호.
   // [2026-08-11] 세부상품별 사진 — 고른 세부상품의 사진이 있으면 맨 앞(대표)으로 올린다.
   const registeredOptionComboPhotos = registeredOptionSelectProduct ? readComboPhotosOrderProduct(registeredOptionSelectProduct) : {};
@@ -7521,6 +7534,14 @@ export default function OrderPage() {
                     </div>
                   );
                 })()}
+                {/* [2026-09-20 사장님] 한눈에 정보 칩 — 긴 설명 대신 「면 100%」「국내배송」 같은 짧은 칩 (표시 전용) */}
+                {registeredOptionSpecChips.length > 0 ? (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}>
+                    {registeredOptionSpecChips.map((c) => (
+                      <span key={`spec-${c}`} style={{ fontSize: "12px", fontWeight: 800, background: "#F5E6EB", color: "#7A1E47", borderRadius: "999px", padding: "6px 10px" }}>{c}</span>
+                    ))}
+                  </div>
+                ) : null}
                 {/* [2026-09-20] 세부상품(3단) 화면에서 «목록으로» — 예전엔 푸터 「닫기」가 이 역할을 겸했다. */}
                 {registeredOptionAxes3 && registeredOptionDetail.trim() && registeredOptionEditIndex === null ? (
                   <button
@@ -7748,7 +7769,7 @@ export default function OrderPage() {
                               const name=entry.name, m=metaOf(name);
                               return <button key={name} type="button" onClick={()=>chooseDetail(name,m.soldOut)} disabled={m.soldOut} style={{display:"flex",alignItems:"center",gap:"8px",width:"100%",padding:"9px",border:"1px solid #F0EAE0",borderRadius:"12px",background:m.selected?"#7A1E47":"#FFFDFB",opacity:m.soldOut?.45:1}}>{/* [2026-09-09 3순위] 예전엔 사진을 누르면 «확대창»이 떠서 «고르려던» 손님이 헷갈렸다(색상칩도 같은 문제였다).
                                   → 사진을 눌러도 그냥 «선택»된다. 확대는 위 대표사진(🔍 크게)이 맡는다. */}
-                              {m.cover?<span style={{position:"relative",width:48,height:48,flexShrink:0}}><img src={m.cover} alt="" loading="lazy" decoding="async" style={{width:48,height:48,objectFit:"cover",borderRadius:8}}/>{m.gallery.length>1?<span style={{position:"absolute",right:2,bottom:2,borderRadius:999,background:"rgba(0,0,0,.68)",padding:"1px 4px",color:"#fff",fontSize:"8px",fontWeight:900}}>사진 {m.gallery.length}장</span>:null}</span>:null}<span style={{flex:1,minWidth:0,textAlign:"left",fontSize:"13px",fontWeight:800,color:m.selected?"#fff":"#333",overflow:"hidden",textOverflow:"ellipsis"}}>{orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name??""),name)}</span><span style={{flexShrink:0,textAlign:"right",lineHeight:1.15}}><b style={{display:"block",fontSize:"12px",fontWeight:900,color:m.selected?"#F5D9E5":"#7A1E47"}}>{m.priceView.actualLabel}</b></span></button>;
+                              {m.cover?<span style={{position:"relative",width:48,height:48,flexShrink:0}}><img src={m.cover} alt="" loading="lazy" decoding="async" style={{width:48,height:48,objectFit:"cover",borderRadius:8}}/>{m.gallery.length>1?<span style={{position:"absolute",right:2,bottom:2,borderRadius:999,background:"rgba(0,0,0,.68)",padding:"1px 4px",color:"#fff",fontSize:"8px",fontWeight:900}}>사진 {m.gallery.length}장</span>:null}</span>:null}<span style={{flex:1,minWidth:0,textAlign:"left",fontSize:"13px",fontWeight:800,color:m.selected?"#fff":"#333",overflow:"hidden",textOverflow:"ellipsis"}}>{orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name??""),name)}</span>{/* [2026-09-20 사장님] 종류마다 값이 다를 때만 금액 표시 — 전부 같은 값이면 제목 금액과 중복이라 숨긴다 */}{info.maxPlus>0?<span style={{flexShrink:0,textAlign:"right",lineHeight:1.15}}><b style={{display:"block",fontSize:"12px",fontWeight:900,color:m.selected?"#F5D9E5":"#7A1E47"}}>{m.priceView.actualLabel}</b></span>:null}</button>;
                             })}
                           </div>
                         );
@@ -8321,6 +8342,7 @@ export default function OrderPage() {
           items={done?.items || []}
           productAmount={done?.productAmount || 0}
           shippingFee={done?.shippingFee || 0}
+          cardExtra={done?.cardExtra || 0}
           totalAmount={done?.totalAmount || 0}
           pointUsedAmount={done?.pointUsedAmount || 0}
           finalAmount={done?.finalAmount}
