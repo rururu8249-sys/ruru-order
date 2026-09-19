@@ -966,7 +966,7 @@ function lowStockRemainOrderProduct(product: any, reservedQty = 0): number | nul
 }
 
 // 옵션 상품 전용: 재고 1~5개인 "임박 옵션"만 [{label, stock}]로 반환 (재고관리 중일 때만)
-function lowStockOptionsOrderProduct(product: any, reservedOf?: (color: unknown, size: unknown) => number): Array<{ label: string; stock: number }> {
+function lowStockOptionsOrderProduct(product: any, reservedOf?: (color: unknown, size: unknown) => number): Array<{ label: string; stock: number; color: string; size: string }> {
   const note = readOrderNoteObject(product);
   if (note?.stock_management_enabled !== true) return [];
   const variants = Array.isArray(note?.stock_variants) ? note.stock_variants : [];
@@ -978,6 +978,8 @@ function lowStockOptionsOrderProduct(product: any, reservedOf?: (color: unknown,
   return variants
     .map((v: any) => ({
       label: [norm(v.color), norm(v.size)].filter(Boolean).join("/") || "기본",
+      color: norm(v.color),
+      size: norm(v.size),
       // [재고 홀드] 다른 고객 예약 수량 차감 — 표시 전용
       stock: Number(v.stock ?? 0) - Math.max(0, Number(reservedOf ? reservedOf(v.color, v.size) : 0) || 0),
     }))
@@ -6612,7 +6614,15 @@ export default function OrderPage() {
                                 const lowOpts = lowStockOptionsOrderProduct(product, (c, s) => Number(reservedByVariant[reservationVariantKey(pidForLow, c, s)] || 0));
                                 if (lowOpts.length > 0) {
                                   // 가장 급한(재고 적은) 순으로 최대 2개만, "외 N" 같은 축약 표현은 헷갈려서 안 씀(사장님 지침)
-                                  const shown = [...lowOpts].sort((a, b) => a.stock - b.stock).slice(0, 2).map((o) => `${String(o.label).replace(/\s*\/\s*없음\s*/g, "").trim()} ${o.stock}개`).join(" · ");
+                                  // [2026-09-20 사장님] 「66 4개 남음」은 숫자가 붙어 무슨 뜻인지 모른다 → 「66 사이즈 4개 남음」. 조합형(세부상품명이 color 칸)은 이름 그대로.
+                                  const isComboLow = Boolean(readComboInfoOrderProduct(product));
+                                  const lowName = (o: { label: string; color: string; size: string }) => {
+                                    if (isComboLow) return String(o.label).replace(/\s*\/\s*없음\s*/g, "").trim();
+                                    if (o.size && o.color) return `${o.color} ${o.size} 사이즈`;
+                                    if (o.size) return `${o.size} 사이즈`;
+                                    return o.color || "기본";
+                                  };
+                                  const shown = [...lowOpts].sort((a, b) => a.stock - b.stock).slice(0, 2).map((o) => `${lowName(o)} ${o.stock}개`).join(" · ");
                                   return <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px" }}>🔥 {shown} 남음</span>;
                                 }
                                 const remain = lowStockRemainOrderProduct(product, Number(reservedByProduct[pidForLow] || 0));
@@ -6638,11 +6648,19 @@ export default function OrderPage() {
                             {!brandGroup && !sold ? (() => {
                               const ci2 = readComboInfoOrderProduct(product);
                               if (ci2 && ci2.names.length > 1) return null;
-                              const colorCount = getSelectableRegisteredOptions(product as BroadcastProduct, "color").length;
-                              const sizeCount = getSelectableRegisteredOptions(product as BroadcastProduct, "size").length;
-                              const parts = [colorCount > 1 ? `색상 ${colorCount}` : "", sizeCount > 1 ? `사이즈 ${sizeCount}` : ""].filter(Boolean);
+                              // [2026-09-20 사장님] 「사이즈 2 · 색상 3」은 뜻을 모른다 → 값이 적으면 값을 그대로(「색상 블랙·아이보리·브라운」 「사이즈 55·66」),
+                              //   많으면 「색상 5가지」. 표시 전용.
+                              const colorVals = getSelectableRegisteredOptions(product as BroadcastProduct, "color");
+                              const sizeVals = getSelectableRegisteredOptions(product as BroadcastProduct, "size");
+                              const lineOf = (label: string, vals: string[], max: number) =>
+                                vals.length <= 1 ? "" : vals.length <= max ? `${label} ${vals.join("·")}` : `${label} ${vals.length}가지`;
+                              const parts = [lineOf("색상", colorVals, 4), lineOf("사이즈", sizeVals, 5)].filter(Boolean);
                               if (parts.length === 0) return null;
-                              return <div style={{ fontSize: 11.5, fontWeight: 700, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>{parts.join(" · ")}</div>;
+                              return (
+                                <div style={{ marginTop: 2, display: "grid", gap: 1 }}>
+                                  {parts.map((t) => <div key={t} style={{ fontSize: 12, fontWeight: 700, color: "#7B736D", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t}</div>)}
+                                </div>
+                              );
                             })() : null}
                             {/* [조합형 옵션] 세부상품 개수 안내 — 표시 전용 */}
                             {(() => {
