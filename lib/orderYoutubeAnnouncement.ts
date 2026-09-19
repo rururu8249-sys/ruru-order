@@ -21,11 +21,17 @@ function qtyOf(row: AnyOrderRow): number {
   return Math.max(1, Math.floor(Number(row.qty ?? row.quantity ?? 1) || 1));
 }
 
+// [2026-09-19 사장님] 「채팅 올라간 금액이랑 주문서랑 왜 달라?」 — 곱창끈 6개 60,000원이 채팅엔 360,000원.
+//   adjusted_product_price 는 «줄 합계»(단가 × 수량)다 — 주문 제출(app/order/page.tsx: itemTotal),
+//   정산 요약(lib/liveSummary.ts rowProductAmount), 주문 상세, 무결성 검사 전부 그렇게 쓴다.
+//   여기서만 단가로 착각해 × 수량을 한 번 더 곱했다(수량 1이면 티가 안 나 여태 몰랐다).
+//   → 정산 요약과 같은 규칙: 줄 합계가 있으면 그대로, 없으면 product_price × 수량.
 function itemAmountOf(row: AnyOrderRow): number {
-  const adjustedUnit = Number(row.adjusted_product_price);
-  const unit = Number.isFinite(adjustedUnit) && adjustedUnit >= 0
-    ? Math.floor(adjustedUnit)
-    : Math.max(0, Math.floor(Number(row.product_price ?? 0) || 0));
+  const lineTotal = Number(row.adjusted_product_price);
+  if (row.adjusted_product_price !== null && row.adjusted_product_price !== undefined && Number.isFinite(lineTotal) && lineTotal >= 0) {
+    return Math.floor(lineTotal);
+  }
+  const unit = Math.max(0, Math.floor(Number(row.product_price ?? 0) || 0));
   return unit * qtyOf(row);
 }
 

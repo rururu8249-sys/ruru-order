@@ -3,7 +3,8 @@ import { savedWidgetPinMatches, savedWidgetAutoMatches, widgetPinTargetBroadcast
 import { registeredProductEditManualPrice } from '../lib/registeredProductPricePolicy.ts';
 function assert(cond, msg){ if(!cond) throw new Error(msg); }
 const rows = [
-  { product_name:'MC(몽클레어)-105M 남성용 아우터', color:'블랙', size:'1', qty:2, product_price:195000, adjusted_product_price:195000 },
+  // adjusted_product_price = 줄 합계(단가 × 수량). 주문 제출이 그렇게 저장한다.
+  { product_name:'MC(몽클레어)-105M 남성용 아우터', color:'블랙', size:'1', qty:2, product_price:195000, adjusted_product_price:390000 },
   { product_name:'DR(디올)-207 아우터', color:'없음', size:'38', qty:1, product_price:229000, adjusted_product_price:229000 },
   { product_name:'버버리', color:'BB(버버리)-401M 남성용 패딩 아우터 / 블랙', size:'M', qty:1, product_price:239000, adjusted_product_price:239000 },
 ];
@@ -40,6 +41,18 @@ const one = buildYoutubeOrderAnnouncementMessages({
 assert(one.length === 1, '한 건이면 메시지 하나');
 assert(one[0] === '🛒 몽상가8277님 주문 감사합니다! 💗 BB(버버리)-78 트렌치코트 · 사이즈 8 · 1개 · 255,000원',
   '한 건 문구가 정확해야 함\n실제: ' + one[0]);
+
+// [2026-09-19 실제 사고] 곱창끈 6개 · 단가 10,000 · 줄 합계 60,000 → 채팅에 360,000원이 나갔다(× 수량 중복).
+const gop = buildYoutubeOrderAnnouncementMessages({
+  nickname:'알더블.케이',
+  rows:[{ product_name:'곱창끈', color:'6개 아이 검정 아이 핑크 호피 퍼플', size:'', qty:6, product_price:10000, adjusted_product_price:60000 }],
+  maxChars:180,
+});
+assert(gop[0].includes('6개 · 60,000원'), '줄 합계는 그대로(60,000원)\n실제: ' + gop[0]);
+assert(!gop[0].includes('360,000'), '× 수량 중복 금지\n실제: ' + gop[0]);
+// 줄 합계 없이 단가만 있으면 단가 × 수량
+const unitOnly = buildYoutubeOrderAnnouncementMessages({ nickname:'a', rows:[{ product_name:'x', qty:3, product_price:10000 }], maxChars:180 });
+assert(unitOnly[0].includes('3개 · 30,000원'), '단가만 있으면 × 수량\n실제: ' + unitOnly[0]);
 
 assert(savedWidgetPinMatches({widget_pin_mode:'pin',widget_pin_product_id:682,widget_pin_detail_name:'MC(몽클레어)-105M 남성용 아우터'}, {productId:'682',detailName:'MC(몽클레어)-105M 남성용 아우터'}), '저장된 고정값 검증');
 assert(!savedWidgetPinMatches({widget_pin_mode:'pin',widget_pin_product_id:683,widget_pin_detail_name:'ZN-1M'}, {productId:'682',detailName:'MC-105M'}), '다른 고정값 거부');
