@@ -116,28 +116,15 @@ function installPopGuard() {
   });
 }
 
-export default function CustomerBottomSheet({
-  open,
-  onClose,
-  title,
-  subtitle,
-  headerRight,
-  headerBelow,
-  footer,
-  children,
-  zIndex = CS_SHEET_Z,
-  bodyPadding = "14px 16px",
-  bodyStyle,
-  bodyDataAttr,
-  ariaLabel,
-  closeGuard,
-  closeDisabled = false,
-  headerLeft,
-  bodyRef,
-  onBodyScroll,
-  size = "full",
-  bottomInset = 0,
-}: Props) {
+// [2026-09-20] 시트·가운데 확인창이 같이 쓰는 «닫기 5종 + history 한 칸» 훅.
+//   returns requestClose — ✕·배경·그래버·뒤로가기·ESC 가 전부 이걸 부른다.
+export function useCustomerOverlayClose(opts: {
+  open: boolean;
+  onClose: () => void;
+  closeGuard?: () => boolean;
+  closeDisabled?: boolean;
+}): { key: string; requestClose: () => boolean } {
+  const { open, onClose, closeGuard, closeDisabled = false } = opts;
   const key = `${TITLE_ID_PREFIX}${useId()}`;
 
   // 최신 콜백을 ref 로 — 이펙트 재등록 없이 popstate/ESC 에서 최신 함수를 부른다(렌더 중이 아니라 이펙트에서 갱신).
@@ -222,6 +209,33 @@ export default function CustomerBottomSheet({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, key]);
+
+  return { key, requestClose };
+}
+
+export default function CustomerBottomSheet({
+  open,
+  onClose,
+  title,
+  subtitle,
+  headerRight,
+  headerBelow,
+  footer,
+  children,
+  zIndex = CS_SHEET_Z,
+  bodyPadding = "14px 16px",
+  bodyStyle,
+  bodyDataAttr,
+  ariaLabel,
+  closeGuard,
+  closeDisabled = false,
+  headerLeft,
+  bodyRef,
+  onBodyScroll,
+  size = "full",
+  bottomInset = 0,
+}: Props) {
+  const { key, requestClose } = useCustomerOverlayClose({ open, onClose, closeGuard, closeDisabled });
 
   if (!open) return null;
 

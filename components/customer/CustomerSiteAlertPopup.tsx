@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 // [2026-09-20] 바텀시트 «한 벌» 틀(높이·헤더·✕·닫기 5종). 탭·목록·읽음 처리 로직은 그대로.
 import CustomerBottomSheet, { csPrimaryButtonStyle } from "@/components/customer/CustomerBottomSheet";
+import CustomerDialog from "@/components/customer/CustomerDialog";
 import { noteTimeText, noteAgoText } from "@/lib/noteTime";
 
 type SiteAlert = { id: number; kind: string; title: string; message: string; created_at: string; expires_at: string };
@@ -406,20 +407,21 @@ export default function CustomerSiteAlertPopup() {
 
       {/* 새 쪽지 팝업 — 접속하면 바로, 접속 중에 오면 15초 안에 뜬다.
           단, 접속 공지 팝업이 떠 있으면 기다린다(팝업 두 개가 연달아 뜨지 않게). */}
+      {/* [2026-09-20] 가운데 확인창 «한 벌»(CustomerDialog): 1:1 [확인했어요][주문 확인하기]. 예전엔 주 버튼 위·닫기 아래로 다른 창들과 상하가 반대였다.
+          ✕·배경·뒤로가기 = 「확인했어요」(dismiss(false), 읽음 처리 그대로). 전역이라 z 500 유지(시트·확인창 위). */}
       {alert && !noticePopupOpen ? (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/55 px-5" role="dialog" aria-modal="true" aria-label="쪽지 알림">
-          <div className="w-full max-w-[420px] overflow-hidden rounded-[26px] bg-white shadow-2xl">
-            <div className="px-6 pb-3 pt-6 text-center">
-              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-rose-50 text-3xl">{iconOf(alert.kind)}</div>
-              <h2 className="text-xl font-black tracking-tight text-slate-950">{stripLeadIcon(alert.title)}</h2>
-              <p className="mt-3 whitespace-pre-line text-sm font-bold leading-6 text-slate-600">{alert.message}</p>
-            </div>
-            <div className="grid gap-2 px-5 pb-5 pt-2">
-              <button type="button" onClick={() => void dismiss(true)} className="h-13 rounded-2xl bg-[#7B2D43] text-base font-black text-white shadow-sm">주문 확인하기</button>
-              <button type="button" onClick={() => void dismiss(false)} className="h-10 rounded-xl text-xs font-black text-slate-400">확인했어요</button>
-            </div>
-          </div>
-        </div>
+        <CustomerDialog
+          open
+          onClose={() => void dismiss(false)}
+          zIndex={500}
+          ariaLabel="쪽지 알림"
+          icon={iconOf(alert.kind)}
+          title={stripLeadIcon(alert.title)}
+          cancelLabel="확인했어요"
+          primary={{ label: "주문 확인하기", onClick: () => void dismiss(true) }}
+        >
+          <p className="whitespace-pre-line text-sm font-bold leading-6 text-slate-600">{alert.message}</p>
+        </CustomerDialog>
       ) : null}
     </>
   );

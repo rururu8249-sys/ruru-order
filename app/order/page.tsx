@@ -75,6 +75,7 @@ import CustomerPointGiftPopup from "@/components/customer/CustomerPointGiftPopup
 import CustomerInfoEditBottomSheet from "@/components/customer/CustomerInfoEditBottomSheet";
 // [2026-09-20 사장님] 바텀시트 «한 벌» 틀 — 손님 시트 전부 같은 높이·헤더·✕·닫기 5종
 import CustomerBottomSheet, { CS_SHEET_Z_STACKED, csPrimaryButtonStyle, csCancelButtonStyle } from "@/components/customer/CustomerBottomSheet";
+import CustomerDialog from "@/components/customer/CustomerDialog";
 import { KakaoPostcodeEmbed } from "react-daum-postcode";
 import CustomerOrderLookupBottomSheet, {
   type CustomerOrderLookupFilter,
@@ -1508,7 +1509,8 @@ export default function OrderPage() {
   // [UI] 담김 토스트 자동 소멸 (2.4초) — 모달 대신 비차단 토스트라 확인 클릭 불필요
   useEffect(() => {
     if (!cartAddedOpen) return;
-    const t = setTimeout(() => setCartAddedOpen(false), 2400);
+    // [2026-09-20] [담은 상품 보기] 버튼이 생겨 누를 시간을 준다(2.4 → 4초).
+    const t = setTimeout(() => setCartAddedOpen(false), 4000);
     return () => clearTimeout(t);
   }, [cartAddedOpen, cartAddedItem]);
   const [lightboxImage, setLightboxImage] = useState<string>("");
@@ -7223,57 +7225,58 @@ export default function OrderPage() {
           ) : null}
 
           {/* [UI] 담기 완료 — 차단형 모달 → 비차단 자동소멸 토스트 (방송 중 연속 담기 안 끊기게. 하단바가 담은 개수 표시 담당) */}
+          {/* [2026-09-20 사장님·manysell 실측] 토스트에 [담은 상품 보기] — 누르면 주문서 확인 시트. 예전엔 눌리지도 않고 자동소멸만. */}
           {cartAddedOpen && (
-            <div style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", bottom: "calc(92px + env(safe-area-inset-bottom))", zIndex: 140, maxWidth: "88%", background: "rgba(52,20,31,0.93)", color: "#fff", borderRadius: "14px", padding: "12px 18px", display: "flex", alignItems: "center", gap: "10px", boxShadow: "0 10px 30px rgba(0,0,0,0.3)", pointerEvents: "none" }}>
+            <div style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", bottom: "calc(92px + env(safe-area-inset-bottom))", zIndex: 140, width: "max-content", maxWidth: "92%", background: "rgba(52,20,31,0.94)", color: "#fff", borderRadius: "14px", padding: "10px 10px 10px 16px", display: "flex", alignItems: "center", gap: "10px", boxShadow: "0 10px 30px rgba(0,0,0,0.3)" }}>
               <span style={{ flexShrink: 0, width: "22px", height: "22px", borderRadius: "50%", background: "#0F6E56", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: 900 }}>✓</span>
               <span style={{ minWidth: 0, fontSize: "13px", fontWeight: 800, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {cartAddedItem ? `${String(cartAddedItem.product_name || "상품")} ${Number(cartAddedItem.qty) || 1}개 담았어요` : "주문서에 담았어요"}
               </span>
+              <button
+                type="button"
+                onClick={() => { setCartAddedOpen(false); setOrderSheetOpen(true); }}
+                style={{ flexShrink: 0, height: "36px", padding: "0 12px", borderRadius: "10px", border: "none", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap" }}
+              >담은 상품 보기</button>
             </div>
           )}
 
+          {/* [2026-09-20] 가운데 확인창 «한 벌»(CustomerDialog): ✕·배경·뒤로가기·ESC 동일, 1:1 [취소][동사]. 동작(a.run) 무변경. */}
           {chatGuardAction ? (
-            <div style={{ position: "fixed", inset: 0, zIndex: 155, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)", padding: "0 24px" }}>
-              <div style={{ width: "330px", maxWidth: "100%", background: "#fff", borderRadius: "22px", padding: "26px 22px", boxShadow: "0 18px 50px rgba(0,0,0,0.28)", textAlign: "center" }}>
-                <div style={{ fontSize: "34px", lineHeight: 1 }}>⚠️</div>
-                <div style={{ marginTop: "10px", fontSize: "19px", fontWeight: 900, color: "#7A1E47" }}>잠깐만요!</div>
-                <div style={{ marginTop: "12px", background: "#F9EEF3", borderRadius: "12px", padding: "10px 12px", fontSize: "13.5px", fontWeight: 800, color: "#7A1E47", wordBreak: "keep-all" }}>{chatGuardAction.label}</div>
-                <div style={{ marginTop: "12px", fontSize: "13.5px", fontWeight: 600, color: "#666", lineHeight: 1.7 }}>임의로 수정·취소하시면<br /><b style={{ color: "#3A2F34" }}>상품이 잘못 가거나 누락될 수 있어요.</b></div>
-                <div style={{ marginTop: "10px", fontSize: "13.5px", fontWeight: 600, color: "#666", lineHeight: 1.7 }}>방송 채팅으로 <b style={{ color: "#3A2F34" }}>루루언니에게 먼저 여쭤본 뒤</b><br />바꿔 주세요 🙏</div>
-                <div style={{ marginTop: "18px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                  <button type="button" onClick={() => setChatGuardAction(null)} style={{ height: "52px", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", fontSize: "15px", fontWeight: 800, color: "#666", cursor: "pointer" }}>닫기</button>
-                  <button type="button" onClick={() => { const a = chatGuardAction; setChatGuardAction(null); a.run(); }} style={{ height: "52px", borderRadius: "14px", border: "none", background: "#7A1E47", fontSize: "15px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>{chatGuardAction.verb}</button>
-                </div>
-              </div>
-            </div>
+            <CustomerDialog
+              open
+              onClose={() => setChatGuardAction(null)}
+              icon="⚠️"
+              title="잠깐만요!"
+              primary={{ label: chatGuardAction.verb, onClick: () => { const a = chatGuardAction; setChatGuardAction(null); a.run(); } }}
+            >
+              <div style={{ background: "#F9EEF3", borderRadius: "12px", padding: "10px 12px", fontSize: "13.5px", fontWeight: 800, color: "#7A1E47" }}>{chatGuardAction.label}</div>
+              <div style={{ marginTop: "10px" }}>임의로 수정·취소하시면 <b style={{ color: "#3A2F34" }}>상품이 잘못 가거나 누락될 수 있어요.</b></div>
+              <div style={{ marginTop: "6px" }}>방송 채팅으로 <b style={{ color: "#3A2F34" }}>루루언니에게 먼저 여쭤본 뒤</b> 바꿔 주세요 🙏</div>
+            </CustomerDialog>
           ) : null}
 
           {chatNameChanged ? (
-            <div style={{ position: "fixed", inset: 0, zIndex: 150, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", padding: "0 24px" }}>
-              <div style={{ width: "330px", maxWidth: "100%", background: "#fff", borderRadius: "20px", padding: "24px 22px", boxShadow: "0 18px 50px rgba(0,0,0,0.25)" }}>
-                <div style={{ fontSize: "18px", fontWeight: 800, color: "#7A1E47", textAlign: "center" }}>📺 유튜브 이름이 바뀌셨네요!</div>
-                <div style={{ marginTop: "10px", fontSize: "14px", fontWeight: 600, color: "#555", textAlign: "center", lineHeight: 1.65 }}>
-                  유튜브 이름이 <b style={{ color: "#7A1E47" }}>{chatNameChanged}</b>(으)로 확인됐어요.<br />사이트 닉네임도 똑같이 바꿀까요?<br /><span style={{ fontSize: "12.5px", color: "#999" }}>똑같아야 주문 확인과 입금 확인이 정확해요.</span>
-                </div>
-                <div style={{ marginTop: "20px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                  <button type="button" onClick={() => { setChatNameChanged(null); chatNameChangeDismissedRef.current = true; }} style={{ height: "50px", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", fontSize: "15px", fontWeight: 800, color: "#666", cursor: "pointer" }}>나중에</button>
-                  <button type="button" onClick={() => { void applyChatNameChange(); }} style={{ height: "50px", borderRadius: "14px", border: "none", background: "#7A1E47", fontSize: "15px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>똑같이 바꾸기</button>
-                </div>
-              </div>
-            </div>
+            <CustomerDialog
+              open
+              onClose={() => { setChatNameChanged(null); chatNameChangeDismissedRef.current = true; }}
+              title="📺 유튜브 이름이 바뀌셨네요!"
+              cancelLabel="나중에"
+              primary={{ label: "똑같이 바꾸기", onClick: () => { void applyChatNameChange(); } }}
+            >
+              유튜브 이름이 <b style={{ color: "#7A1E47" }}>{chatNameChanged}</b>(으)로 확인됐어요.<br />사이트 닉네임도 똑같이 바꿀까요?<br /><span style={{ fontSize: "12.5px", color: "#999" }}>똑같아야 주문 확인과 입금 확인이 정확해요.</span>
+            </CustomerDialog>
           ) : null}
 
           {duplicateWarningOpen && (
-            <div style={{ position: "fixed", inset: 0, zIndex: 150, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", padding: "0 24px" }} onClick={(e) => { if (e.target === e.currentTarget) { setDuplicateWarningOpen(false); setDuplicateWarningPendingAction(null); } }}>
-              <div style={{ width: "320px", maxWidth: "100%", background: "#fff", borderRadius: "20px", padding: "24px 22px", boxShadow: "0 18px 50px rgba(0,0,0,0.25)" }}>
-                <div style={{ fontSize: "18px", fontWeight: 800, color: "#C0392B", textAlign: "center" }}>🚨 잠깐! 이미 담은 상품이에요</div>
-                <div style={{ marginTop: "10px", fontSize: "14px", fontWeight: 600, color: "#555", textAlign: "center", lineHeight: 1.6 }}>중복 주문 아닌가요? 그래도 추가하시겠어요?</div>
-                <div style={{ marginTop: "20px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                  <button type="button" onClick={() => { setDuplicateWarningOpen(false); setDuplicateWarningPendingAction(null); }} style={{ height: "50px", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", fontSize: "15px", fontWeight: 800, color: "#666", cursor: "pointer" }}>취소</button>
-                  <button type="button" onClick={() => { const action = duplicateWarningPendingAction; setDuplicateWarningOpen(false); setDuplicateWarningPendingAction(null); action?.(); }} style={{ height: "50px", borderRadius: "14px", border: "none", background: "#7A1E47", fontSize: "15px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>그래도 담기</button>
-                </div>
-              </div>
-            </div>
+            <CustomerDialog
+              open
+              onClose={() => { setDuplicateWarningOpen(false); setDuplicateWarningPendingAction(null); }}
+              icon="🚨"
+              title="잠깐! 이미 담은 상품이에요"
+              primary={{ label: "그래도 담기", onClick: () => { const action = duplicateWarningPendingAction; setDuplicateWarningOpen(false); setDuplicateWarningPendingAction(null); action?.(); } }}
+            >
+              중복 주문 아닌가요? 그래도 추가하시겠어요?
+            </CustomerDialog>
           )}
 
           {registeredOptionSelectProduct && (

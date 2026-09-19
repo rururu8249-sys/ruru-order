@@ -6,6 +6,8 @@
 // 주문금액/입금/정산/배송/포인트 잔액/포인트 차감/포인트 사용 로직 없음.
 
 import { useEffect, useState } from "react";
+// [2026-09-20] 가운데 확인창 «한 벌» 틀 — ✕·배경·뒤로가기도 「확인했어요」와 같은 closeGift(확인 기록). 지급 로직 무관.
+import CustomerDialog from "./CustomerDialog";
 
 type PointGift = {
   id: string;
@@ -134,56 +136,33 @@ export default function CustomerPointGiftPopup() {
   const reasonText = String(giftState.gift.reason || "").trim();
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 80, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.45)", padding: "24px 16px" }}>
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-label="포인트 선물 알림"
-        style={{ width: "100%", maxWidth: "360px", overflow: "hidden", borderRadius: "26px", border: "1px solid #D9C5CC", background: "#fff", boxShadow: "0 24px 70px rgba(15,23,42,0.28)" }}
-      >
-        <div style={{ background: "#F5E6EB", padding: "24px 20px 20px", textAlign: "center" }}>
-          <div style={{ margin: "0 auto", display: "flex", height: "64px", width: "64px", alignItems: "center", justifyContent: "center", borderRadius: "50%", background: "#7B2D43", fontSize: "32px" }}>
-            🎁
-          </div>
-          <h2 style={{ marginTop: "16px", fontSize: "23px", fontWeight: 800, lineHeight: 1.2, letterSpacing: "-0.06em", color: "#7B2D43" }}>
-            포인트 선물이 도착했어요!
-          </h2>
-          <p style={{ marginTop: "8px", fontSize: "14px", fontWeight: 700, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#666" }}>
-            루루동이님이 보낸 선물 · 감사합니다 💝
-          </p>
+    <CustomerDialog
+      open
+      onClose={closeGift}
+      closeDisabled={giftState.closing}
+      title="🎁 포인트 선물이 도착했어요!"
+      ariaLabel="포인트 선물 알림"
+      hideCancel
+      primary={{ label: giftState.closing ? "확인 저장중" : "확인했어요", onClick: closeGift, disabled: giftState.closing }}
+    >
+      <p style={{ fontSize: "13px", fontWeight: 700, color: "#666" }}>루루동이님이 보낸 선물 · 감사합니다 💝</p>
+      <div style={{ marginTop: "10px", borderRadius: "16px", border: "1px solid #D9C5CC", background: "#F5E6EB", padding: "14px", textAlign: "center" }}>
+        <div style={{ fontSize: "13px", fontWeight: 800, color: "#7B2D43" }}>지급 포인트</div>
+        <div style={{ marginTop: "4px", fontSize: "28px", fontWeight: 800, lineHeight: 1.2, color: "#7B2D43" }}>{amountText}</div>
+      </div>
+      <div style={{ marginTop: "10px", borderRadius: "14px", background: "#FAF6F2", padding: "10px 16px", textAlign: "center" }}>
+        <div style={{ fontSize: "12px", fontWeight: 800, color: "#888" }}>현재 보유 포인트</div>
+        <div style={{ marginTop: "2px", fontSize: "18px", fontWeight: 800, color: "#222" }}>{balanceText}</div>
+      </div>
+      {reasonText ? (
+        <div style={{ marginTop: "10px", borderRadius: "14px", border: "1px solid #E8E2DD", background: "#fff", padding: "10px 16px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "#666" }}>
+          {reasonText}
         </div>
-
-        <div style={{ padding: "0 20px 20px" }}>
-          <div style={{ borderRadius: "18px", border: "1px solid #D9C5CC", background: "#F5E6EB", padding: "16px", textAlign: "center" }}>
-            <div style={{ fontSize: "13px", fontWeight: 800, letterSpacing: "-0.04em", color: "#7B2D43" }}>지급 포인트</div>
-            <div style={{ marginTop: "4px", fontSize: "28px", fontWeight: 800, lineHeight: 1.2, letterSpacing: "-0.07em", color: "#7B2D43" }}>{amountText}</div>
-          </div>
-
-          <div style={{ marginTop: "12px", borderRadius: "16px", background: "#FAF6F2", padding: "12px 16px", textAlign: "center" }}>
-            <div style={{ fontSize: "12px", fontWeight: 800, letterSpacing: "-0.04em", color: "#888" }}>현재 보유 포인트</div>
-            <div style={{ marginTop: "4px", fontSize: "18px", fontWeight: 800, letterSpacing: "-0.05em", color: "#222" }}>{balanceText}</div>
-          </div>
-
-          {reasonText ? (
-            <div style={{ marginTop: "12px", borderRadius: "14px", border: "1px solid #E8E2DD", background: "#fff", padding: "12px 16px", textAlign: "center", fontSize: "13px", fontWeight: 700, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#666" }}>
-              {reasonText}
-            </div>
-          ) : null}
-
-          <p style={{ marginTop: "12px", wordBreak: "keep-all", textAlign: "center", fontSize: "12px", fontWeight: 700, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#999" }}>
-            아직 주문 결제에 자동 차감되지는 않아요. 포인트 사용 기능은 별도 안내 후 적용됩니다.
-          </p>
-
-          <button
-            type="button"
-            onClick={closeGift}
-            disabled={giftState.closing}
-            style={{ marginTop: "16px", display: "flex", minHeight: "54px", width: "100%", alignItems: "center", justifyContent: "center", borderRadius: "16px", border: "none", background: "#7B2D43", padding: "0 16px", fontSize: "16px", fontWeight: 800, letterSpacing: "-0.04em", color: "#fff", cursor: giftState.closing ? "wait" : "pointer", opacity: giftState.closing ? 0.7 : 1 }}
-          >
-            {giftState.closing ? "확인 저장중" : "확인했어요"}
-          </button>
-        </div>
-      </section>
-    </div>
+      ) : null}
+      {/* [2026-09-20] 예전 문구 「아직 주문 결제에 자동 차감되지 않아요·별도 안내 후 적용」은 사실과 달라 정정 — 주문서에서 바로 쓸 수 있다. */}
+      <p style={{ marginTop: "10px", textAlign: "center", fontSize: "12px", fontWeight: 700, color: "#999" }}>
+        주문서 확인 화면의 「포인트 전부 쓰기」로 바로 쓸 수 있어요.
+      </p>
+    </CustomerDialog>
   );
 }
