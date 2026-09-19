@@ -10,9 +10,9 @@
 //   ⚠ 돈·주문·입금·정산 로직 없음. 읽기 전용 안내 화면.
 //
 //   권장 크기 근거(실제 위젯 코드) — [2026-09-13] «프리즘 네모 크기 = 위젯 크기» (두 위젯 공통, 비율 고정으로 확대/축소):
-//     · 상품 카드: 카드 고정 비율 200×387. 세로 방송(1080×1920)에서 화면 폭 26% = 280 → 280 × 542
+//     · 상품 카드: 카드 고정 비율 200×320 (09-19 사진칸 1:1, 예전 387). 세로 방송(1080×1920)에서 화면 폭 26% = 280 → 280 × 448
 //       (사장님이 «잘 나온다»고 한 09-13 실방송 캡처 실측: 카드 폭 ≈ 화면 폭 26%)
-//     · 주문·입금 알림: OrderFeedWidgetClient BOX_W 880 × BOX_H 320 이 1배 (09-13 폭 640 → 860 으로 넓힘)
+//     · 주문·입금 알림: OrderFeedWidgetClient BOX_W 880 × BOX_H 300 이 1배 (09-17 실측 정리)
 
 import { useEffect, useState } from "react";
 import { showAdminToast } from "@/lib/adminToast";
@@ -102,18 +102,18 @@ export default function BroadcastScreenSettingsTab({ onOpenEvent }: Props) {
         url={productUrl}
         previewUrl={origin ? `${origin}/product-widget?preview=1` : ""}
         w={280}
-        h={542}
-        where="세로 방송(1080×1920) 기준 · 화면 폭의 약 1/4. 보통 오른쪽 위에 둡니다."
+        h={448}
+        where="세로 방송(1080×1920) 기준 · 화면 폭의 약 1/4. 보통 오른쪽 위에 둡니다. 예전 542 높이 네모를 그대로 써도 됩니다(카드가 아래에 붙고 위는 방송이 비침)."
       />
 
       <WidgetCard
         icon="💬"
         title="주문·입금 알림"
-        what="손님이 주문하거나 입금(카드결제)하면 「OO님 주문 감사합니다」가 뜹니다. 주문은 상품명·옵션·금액까지(상품 2개까지 한 줄씩, 3개부터는 「외 N종 · 합계」). 3줄까지, 10초 뒤 사라집니다. 📌 공지는 맨 아래에 고정되고 알림은 그 위로 쌓입니다."
+        what="손님이 주문하거나 입금(카드결제)하면 「OO님 주문 감사합니다」가 뜹니다. 주문은 상품명·옵션·수량까지(금액은 안 나옵니다). 상품이 많으면 3.5초마다 넘겨가며 전부 보여주고, 주문 줄이 뜰 땐 폭죽이 한 번 터집니다. 10초 뒤 사라지고, 새 알림이 붙으면 앞 알림은 4초 뒤 빠집니다. 📌 공지는 맨 아래에 고정되고 알림은 그 위로 쌓입니다."
         url={feedUrl}
         previewUrl={origin ? `${origin}/order-feed-widget?preview=1` : ""}
         w={880}
-        h={320}
+        h={300}
         where="세로 방송(1080×1920) 기준. 네모 아래쪽 끝을 채팅창 바로 위에 맞추면 공지가 거기 고정됩니다."
         extra={
           <div className="mt-3 rounded-xl border border-rose-line bg-rose-soft/40 px-3 py-2.5 text-[13px] font-bold leading-6 text-ink-soft">
