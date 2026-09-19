@@ -151,168 +151,149 @@ export default function CustomerPaymentGuideBottomSheet({
       bodyPadding="4px 16px 16px"
       footer={<button type="button" onClick={onClose} style={csPrimaryButtonStyle(true)}>확인</button>}
     >
-      <style>{`
-  @keyframes point-right {
-    0%, 100% { transform: translateY(-50%) translateX(0); }
-    50% { transform: translateY(-50%) translateX(-8px); }
-  }
-`}</style>
+          {/* [2026-09-20 사장님 「제출 후 화면도 심플하고 난독증 손님이 봐도 보기 좋게」]
+              · 무통장: 상자 3개(입금자명·금액·계좌)+화살표+손가락 → «이렇게 입금해 주세요» 상자 1개, 줄 3개, 복사는 줄 옆 버튼.
+              · 포인트 전액: 초록 한 줄. · 배송지 ⚠️ 상자 → 회색 한 줄. · 「다음 방송」 상자 → 버튼 2개 한 줄.
+              계좌·금액·닉네임 값과 복사 동작(onCopy*)은 그대로. */}
           {isFullyPaidByPoints && (
-            <section style={{ marginTop: "16px", borderRadius: "18px", background: "#E1F5EE", border: "1px solid #C7EBDD", padding: "16px" }}>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
-                <div style={{ display: "flex", height: "44px", width: "44px", flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: "14px", background: "#fff", fontSize: "23px" }}>✅</div>
-                <div style={{ minWidth: 0 }}>
-                  <h3 style={{ fontSize: "18px", fontWeight: 800, letterSpacing: "-0.06em", color: "#0F6E56" }}>포인트로 결제완료</h3>
-                  <p style={{ marginTop: "4px", wordBreak: "keep-all", fontSize: "13px", fontWeight: 700, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#0F6E56" }}>추가 입금 없이 주문이 접수됐습니다.</p>
-                </div>
+            <section style={{ marginTop: "12px", borderRadius: "14px", background: "#E1F5EE", border: "1px solid #C7EBDD", padding: "14px 16px", display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "22px", lineHeight: 1 }}>✅</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: "16px", fontWeight: 900, color: "#0F6E56" }}>포인트로 결제 끝났어요</div>
+                <div style={{ marginTop: "2px", fontSize: "13px", fontWeight: 700, color: "#397A68" }}>더 낼 돈이 없습니다.</div>
               </div>
             </section>
           )}
 
           {showCardGuide && (
-            <section style={{ marginTop: "16px", borderRadius: "18px", background: "#F9EEF3", border: "1px solid #D9C5CC", padding: "16px" }}>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
-                <div style={{ display: "flex", height: "44px", width: "44px", flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: "14px", background: "#fff", fontSize: "23px" }}>💳</div>
-                <div style={{ minWidth: 0 }}>
-                  <h3 style={{ fontSize: "18px", fontWeight: 800, letterSpacing: "-0.06em", color: "#7A1E47" }}>카드결제 안내</h3>
-                  <p style={{ marginTop: "4px", wordBreak: "keep-all", fontSize: "13px", fontWeight: 700, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#7A1E47" }}>카카오톡으로 결제링크를 보내드립니다. 링크에서 결제를 완료해 주세요.</p>
-                </div>
+            <section style={{ marginTop: "12px", borderRadius: "14px", background: "#F9EEF3", border: "1px solid #D9C5CC", padding: "14px 16px", display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "22px", lineHeight: 1 }}>💳</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: "16px", fontWeight: 900, color: "#7A1E47" }}>카카오톡으로 결제링크를 보내드려요</div>
+                <div style={{ marginTop: "2px", fontSize: "13px", fontWeight: 700, color: "#7A1E47", wordBreak: "keep-all" }}>카톡이 오면 링크에서 {won(safeFinalAmount)} 결제해 주세요.</div>
               </div>
             </section>
           )}
 
           {showBankGuide && (
-            <>
-              <div style={{ position: "relative", marginTop: "16px", background: "#FFFBEB", borderRadius: "12px", padding: "16px", paddingRight: "28px" }}>
-                <div style={{ fontSize: "11px", color: "#6B6460", marginBottom: "6px" }}>입금자명 (닉네임)</div>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ minWidth: 0, fontSize: "26px", fontWeight: 800, color: "#1A1A1A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={safeNickname}>{safeNickname}</span>
-                  <span style={{ flexShrink: 0, fontSize: "22px", lineHeight: 1, animation: "point-right 1s ease-in-out infinite" }}>👈</span>
+            <section style={{ marginTop: "12px", borderRadius: "16px", background: "#FFFBEB", border: "1.5px solid #F0E0B0", padding: "14px 16px" }}>
+              <div style={{ fontSize: "15px", fontWeight: 900, color: "#1A1A1A" }}>이렇게 입금해 주세요</div>
+
+              <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "10px" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "12px", fontWeight: 700, color: "#7B736D" }}>① 입금자명 (닉네임)</div>
+                  <div style={{ fontSize: "22px", fontWeight: 900, color: "#1A1A1A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{safeNickname}</div>
                 </div>
-                <div style={{ fontSize: "11px", color: "#854F0B", marginTop: "6px" }}>⚠️ 반드시 이 닉네임으로 입금해 주세요</div>
-                <button type="button" onClick={onCopyNickname} style={{ ...(nicknameCopyDone ? doneButtonStyle : normalButtonStyle), marginTop: "12px", width: "100%" }}>
-                  {nicknameCopyDone ? "고객 닉네임 복사 완료" : "입금자명(닉네임) 복사"}
-                </button>              </div>
+                <button type="button" onClick={onCopyNickname} style={{ ...(nicknameCopyDone ? doneButtonStyle : normalButtonStyle), flexShrink: 0, minHeight: "40px", padding: "0 14px", fontSize: "13px" }}>
+                  {nicknameCopyDone ? "복사됨" : "복사"}
+                </button>
+              </div>
+              <div style={{ marginTop: "4px", fontSize: "12px", fontWeight: 800, color: "#854F0B" }}>⚠️ 꼭 이 이름으로 입금해야 확인돼요</div>
 
-              <div style={{ textAlign: "center", fontSize: "18px", color: "#7B736D", margin: "8px 0" }}>↓</div>
+              <div style={{ marginTop: "12px", borderTop: "1px solid #F0E0B0", paddingTop: "12px" }}>
+                <div style={{ fontSize: "12px", fontWeight: 700, color: "#7B736D" }}>② 입금금액</div>
+                <div style={{ fontSize: "26px", fontWeight: 900, color: "#7A1E47" }}>{won(safeFinalAmount)}</div>
+              </div>
 
-              <div style={{ position: "relative", background: "#F9EEF3", borderRadius: "12px", padding: "16px", paddingRight: "28px" }}>
-                <div style={{ fontSize: "11px", color: "#6B6460", marginBottom: "6px" }}>입금금액</div>
-                <div style={{ fontSize: "26px", fontWeight: 800, color: "#7A1E47" }}>{won(safeFinalAmount)}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "6px" }}>
-                  <span style={{ minWidth: 0, fontSize: "18px", fontWeight: 800, color: "#555", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{safeBankName} {safeBankAccount}</span>
-                  <span style={{ flexShrink: 0, fontSize: "22px", lineHeight: 1, animation: "point-right 1s ease-in-out infinite" }}>👈</span>
+              <div style={{ marginTop: "12px", borderTop: "1px solid #F0E0B0", paddingTop: "12px", display: "flex", alignItems: "center", gap: "10px" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "12px", fontWeight: 700, color: "#7B736D" }}>③ 계좌</div>
+                  <div style={{ fontSize: "17px", fontWeight: 900, color: "#1A1A1A", wordBreak: "break-all" }}>{safeBankName} {safeBankAccount}</div>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#555" }}>예금주 {safeBankHolder}</div>
                 </div>
-                <div style={{ fontSize: "15px", fontWeight: 700, color: "#555", marginTop: "3px" }}>예금주 {safeBankHolder}</div>
-                <button type="button" onClick={onCopyBankAccount} style={{ ...(bankCopyDone ? doneButtonStyle : normalButtonStyle), marginTop: "12px", width: "100%" }}>
-                  {bankCopyDone ? "계좌번호 복사 완료" : "계좌번호 복사"}
-                </button>              </div>
+                <button type="button" onClick={onCopyBankAccount} style={{ ...(bankCopyDone ? doneButtonStyle : normalButtonStyle), flexShrink: 0, minHeight: "40px", padding: "0 14px", fontSize: "13px" }}>
+                  {bankCopyDone ? "복사됨" : "복사"}
+                </button>
+              </div>
 
-              {isOrderComplete && (
-                <section style={{ marginTop: "12px", borderRadius: "16px", border: "1px solid #C7EBDD", background: "#F0FBF7", padding: "13px" }}>
-                  <strong style={{ display: "block", fontSize: "14px", fontWeight: 900, color: "#0F6E56" }}>입금 자동 확인은 보통 10~30분 걸려요</strong>
-                  <p style={{ marginTop: "4px", fontSize: "12px", fontWeight: 700, lineHeight: 1.55, color: "#397A68", wordBreak: "keep-all" }}>주문내역에서 입금 상태와 계좌번호를 언제든 다시 확인할 수 있어요.</p>
+              {isOrderComplete ? (
+                <div style={{ marginTop: "12px", borderTop: "1px solid #F0E0B0", paddingTop: "10px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", fontSize: "12.5px", fontWeight: 700, color: "#397A68" }}>
+                  <span>입금 확인은 보통 10~30분 걸려요</span>
                   {onOpenOrderLookup ? (
-                    <button type="button" onClick={onOpenOrderLookup} style={{ marginTop: "10px", minHeight: "42px", width: "100%", borderRadius: "12px", border: "1px solid #9FDAC7", background: "#fff", color: "#0F6E56", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}>주문내역에서 확인</button>
+                    <button type="button" onClick={onOpenOrderLookup} style={{ flexShrink: 0, border: "none", background: "none", padding: 0, fontSize: "12.5px", fontWeight: 900, color: "#0F6E56", textDecoration: "underline", cursor: "pointer" }}>주문내역 보기</button>
                   ) : null}
-                </section>
-              )}
-            </>
+                </div>
+              ) : null}
+            </section>
           )}
 
           {isOrderComplete && (
-            <section style={{ marginTop: "16px", borderRadius: "18px", background: "#fff", border: "1px solid #E8E2DD", padding: "16px" }}>
-              <div style={{ marginBottom: "12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
-                <h3 style={{ fontSize: "18px", fontWeight: 800, letterSpacing: "-0.06em", color: "#222" }}>주문 상품</h3>
-                <span style={{ borderRadius: "999px", background: "#F5E6EB", border: "1px solid #D9C5CC", padding: "4px 12px", fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>총 {totalQty || orderItems.length}개</span>
+            <section style={{ marginTop: "12px", borderRadius: "16px", background: "#fff", border: "1px solid #E8E2DD", padding: "14px 16px" }}>
+              <div style={{ marginBottom: "8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+                <h3 style={{ fontSize: "15px", fontWeight: 900, color: "#222" }}>주문 상품</h3>
+                <span style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>총 {totalQty}개</span>
               </div>
 
-              <div style={{ display: "grid", gap: "8px" }}>
+              <div style={{ display: "grid", gap: "6px" }}>
                 {orderItems.length > 0 ? (
                   orderItems.map((item, index) => {
                     const qty = toNumber(item.qty);
                     const amount = toNumber(item.product_price) * qty;
                     return (
-                      <div key={`${itemTitle(item)}-${index}`} style={{ borderRadius: "14px", background: "#FAF6F2", padding: "12px", border: "1px solid #E8E2DD" }}>
-                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
-                          <div style={{ minWidth: 0 }}>
-                            <p style={{ wordBreak: "keep-all", fontSize: "14px", fontWeight: 800, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#222" }}>{itemTitle(item)}</p>
-                            <p style={{ marginTop: "4px", fontSize: "12px", fontWeight: 700, color: "#888" }}>수량 {qty || 0}개</p>
-                          </div>
-                          <p style={{ flexShrink: 0, textAlign: "right", fontSize: "14px", fontWeight: 800, color: "#7B2D43" }}>{won(amount)}</p>
+                      <div key={`${itemTitle(item)}-${index}`} style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", padding: "8px 0", borderBottom: "0.5px solid #EEE7E1" }}>
+                        <div style={{ minWidth: 0 }}>
+                          <p style={{ wordBreak: "keep-all", fontSize: "14px", fontWeight: 800, lineHeight: 1.5, color: "#222" }}>{itemTitle(item)}</p>
+                          <p style={{ marginTop: "2px", fontSize: "12px", fontWeight: 700, color: "#888" }}>{qty || 0}개</p>
                         </div>
+                        <p style={{ flexShrink: 0, textAlign: "right", fontSize: "14px", fontWeight: 800, color: "#7B2D43" }}>{won(amount)}</p>
                       </div>
                     );
                   })
                 ) : (
-                  <div style={{ borderRadius: "14px", background: "#FAF6F2", padding: "16px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "#888", border: "1px solid #E8E2DD" }}>주문 상품 정보가 비어 있습니다.</div>
+                  <div style={{ padding: "12px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "#888" }}>주문 상품 정보가 없습니다.</div>
                 )}
               </div>
 
-              <div style={{ marginTop: "12px", borderRadius: "14px", background: "#F5E6EB", border: "1px solid #D9C5CC", padding: "12px" }}>
+              <div style={{ marginTop: "10px" }}>
                 <div style={sumRow}><span>상품금액</span><span>{won(safeProductAmount)}</span></div>
                 <div style={sumRow}><span>배송비</span><span>{won(safeShippingFee)}</span></div>
                 {safePointUsedAmount > 0 && (
                   <div style={{ ...sumRow, fontWeight: 800, color: "#0F6E56" }}><span>포인트 사용</span><span>-{won(safePointUsedAmount)}</span></div>
                 )}
-                <div style={{ marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid #D9C5CC", paddingTop: "12px", fontSize: "17px", fontWeight: 800, color: "#222" }}>
+                <div style={{ marginTop: "6px", display: "flex", alignItems: "baseline", justifyContent: "space-between", borderTop: "1px solid #E8E2DD", paddingTop: "8px", fontSize: "15px", fontWeight: 900, color: "#222" }}>
                   <span>{safePointUsedAmount > 0 ? "최종 결제금액" : "결제금액"}</span>
-                  <span style={{ color: "#7A1E47" }}>{won(safeFinalAmount)}</span>
+                  <span style={{ color: "#7A1E47", fontSize: "20px" }}>{won(safeFinalAmount)}</span>
                 </div>
               </div>
             </section>
           )}
 
           {isOrderComplete && (
-            <section style={{ marginTop: "16px", borderRadius: "18px", background: "#FFF9FB", border: "1.5px solid #D9C5CC", padding: "16px" }}>
-              <h3 style={{ fontSize: "16px", fontWeight: 900, color: "#2B2025" }}>🚚 이번 주문 배송지</h3>
-              <div style={{ marginTop: "9px", fontSize: "13px", fontWeight: 700, lineHeight: 1.7, color: "#574C51" }}>
-                <div>{safeRecipientName} · {safeRecipientPhone}</div>
-                <div style={{ fontSize: "14px", fontWeight: 900, color: "#211A1D", wordBreak: "keep-all" }}>{safeShippingAddress}</div>
-              </div>
-              <div style={{ marginTop: "10px", borderRadius: "12px", background: "#FFF3E8", border: "1px solid #F2D2AE", padding: "10px 11px", fontSize: "11.5px", fontWeight: 800, lineHeight: 1.55, color: "#8A4A10", wordBreak: "keep-all" }}>
-                ⚠️ 내정보에서 배송지를 바꿔도 이미 접수된 이 주문에는 반영되지 않습니다. 변경이 필요하면 카톡채널로 문의해 주세요.
-              </div>
+            <section style={{ marginTop: "12px", borderRadius: "16px", background: "#fff", border: "1px solid #E8E2DD", padding: "14px 16px" }}>
+              <h3 style={{ fontSize: "15px", fontWeight: 900, color: "#222" }}>🚚 받는 곳</h3>
+              <div style={{ marginTop: "6px", fontSize: "14px", fontWeight: 800, color: "#222" }}>{safeRecipientName} · {safeRecipientPhone}</div>
+              <div style={{ marginTop: "2px", fontSize: "13px", fontWeight: 600, color: "#444", wordBreak: "keep-all" }}>{safeShippingAddress}</div>
+              <div style={{ marginTop: "8px", fontSize: "12px", fontWeight: 700, color: "#8A7A7D" }}>배송지를 바꿔야 하면 카톡채널로 알려주세요. (내정보에서 바꿔도 이 주문엔 적용 안 돼요)</div>
             </section>
           )}
 
-          {/* [추가] 주문완료 = 참여도 최고점 — 다음 방송 알림 신청 + 앱 추가 유도 (업계 표준: 전환 직후 설치/알림 제안) */}
-          {isOrderComplete && (
-            <section style={{ marginTop: "16px", borderRadius: "18px", background: "#F9EEF3", border: "1px solid #E3CDD6", padding: "16px" }}>
-              <div style={{ fontSize: "15px", fontWeight: 800, letterSpacing: "-0.04em", color: "#7B2D43" }}>다음 방송, 놓치지 마세요</div>
-              {onLiveAlertRequest ? (
-                liveAlertOptin ? (
-                  <div style={{ marginTop: "10px", borderRadius: "12px", background: "#E1F5EE", border: "1px solid #C7EBDD", padding: "11px 14px", fontSize: "13px", fontWeight: 800, color: "#0F6E56" }}>
-                    🔔 방송알림 신청됨 — 방송 시작하면 카톡으로 알려드려요
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={liveAlertSaving}
-                    onClick={onLiveAlertRequest}
-                    style={{ marginTop: "10px", display: "flex", minHeight: "46px", width: "100%", alignItems: "center", justifyContent: "center", borderRadius: "12px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "14px", fontWeight: 800, cursor: liveAlertSaving ? "wait" : "pointer", opacity: liveAlertSaving ? 0.6 : 1 }}
-                  >
-                    {liveAlertSaving ? "신청 중..." : "🔔 방송 시작 알림 신청하기"}
-                  </button>
-                )
-              ) : null}
-              {!isStandaloneApp && (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleInstallClick}
-                    style={{ marginTop: "8px", display: "flex", minHeight: "46px", width: "100%", alignItems: "center", justifyContent: "center", borderRadius: "12px", border: "1px solid #D9C5CC", background: "#fff", color: "#7B2D43", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}
-                  >
-                    📲 홈 화면에 앱으로 추가하기
-                  </button>
-                  {installHint && (
-                    <div style={{ marginTop: "8px", fontSize: "12px", fontWeight: 700, lineHeight: 1.6, color: "#8a6b76" }}>
-                      아이폰: Safari 하단 <b>공유</b> 버튼 → <b>홈 화면에 추가</b>
-                      <br />
-                      안드로이드: 브라우저 메뉴(⋮) → <b>홈 화면에 추가</b>
+          {/* 주문완료 = 참여도 최고점 — 알림 신청·앱 추가는 한 줄 버튼 2개로만 */}
+          {isOrderComplete && (onLiveAlertRequest || !isStandaloneApp) && (
+            <section style={{ marginTop: "12px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: onLiveAlertRequest && !isStandaloneApp ? "1fr 1fr" : "1fr", gap: "8px" }}>
+                {onLiveAlertRequest ? (
+                  liveAlertOptin ? (
+                    <div style={{ minHeight: "44px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "12px", background: "#E1F5EE", border: "1px solid #C7EBDD", padding: "0 10px", fontSize: "12.5px", fontWeight: 800, color: "#0F6E56", textAlign: "center", wordBreak: "keep-all" }}>
+                      🔔 방송 알림 받는 중
                     </div>
-                  )}
-                </>
+                  ) : (
+                    <button type="button" disabled={liveAlertSaving} onClick={onLiveAlertRequest} style={{ minHeight: "44px", borderRadius: "12px", border: "1px solid #D9C5CC", background: "#fff", padding: "0 10px", fontSize: "12.5px", fontWeight: 800, color: "#7B2D43", cursor: "pointer" }}>
+                      {liveAlertSaving ? "신청 중..." : "🔔 방송 알림 받기"}
+                    </button>
+                  )
+                ) : null}
+                {!isStandaloneApp ? (
+                  <button type="button" onClick={handleInstallClick} style={{ minHeight: "44px", borderRadius: "12px", border: "1px solid #D9C5CC", background: "#fff", padding: "0 10px", fontSize: "12.5px", fontWeight: 800, color: "#7B2D43", cursor: "pointer" }}>
+                    📲 홈 화면에 추가
+                  </button>
+                ) : null}
+              </div>
+              {installHint && (
+                <div style={{ marginTop: "8px", fontSize: "12px", fontWeight: 700, lineHeight: 1.6, color: "#8a6b76" }}>
+                  아이폰: Safari 하단 <b>공유</b> 버튼 → <b>홈 화면에 추가</b>
+                  <br />
+                  안드로이드: 브라우저 메뉴(⋮) → <b>홈 화면에 추가</b>
+                </div>
               )}
             </section>
           )}

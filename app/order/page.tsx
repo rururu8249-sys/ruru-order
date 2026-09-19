@@ -7279,13 +7279,20 @@ export default function OrderPage() {
             </CustomerDialog>
           )}
 
-          {registeredOptionSelectProduct && (
+          {registeredOptionSelectProduct && (() => {
+            // [2026-09-20 사장님] 「사진 없는 상품은 위에 딱 붙어 답답하고 밑은 남아돈다」
+            //   사진이 하나도 없는 «단순» 상품(브랜드묶음·조합형 아님)은 반 높이 시트 + 위 여백. 사진 있으면 전체 높이 그대로.
+            const optionSheetHasPhoto = Boolean(registeredOptionBrandDetailPhotos[0] || registeredOptionComboPhotos[registeredOptionDetail] || pickOrderProductImageUrl(registeredOptionSelectProduct) || registeredOptionAllImages.length > 0);
+            const optionSheetSimple = !registeredOptionBrandGroup && !registeredOptionComboInfo && !registeredOptionAxes3;
+            const optionSheetHalf = !optionSheetHasPhoto && optionSheetSimple;
+            return (
           <CustomerBottomSheet
             open
+            size={optionSheetHalf ? "half" : "full"}
             onClose={closeRegisteredOptionSelectSheet}
             ariaLabel="옵션 선택"
             bodyDataAttr="data-registered-option-scroll"
-            bodyPadding="0 16px 16px"
+            bodyPadding={optionSheetHasPhoto ? "0 16px 16px" : "16px 16px 16px"}
             onBodyScroll={(event) => {
               const collapsed = event.currentTarget.scrollTop > 200;
               if (collapsed !== registeredOptionHeroCollapsed) setRegisteredOptionHeroCollapsed(collapsed);
@@ -7910,7 +7917,8 @@ export default function OrderPage() {
                     </div>
                   ) : null}
           </CustomerBottomSheet>
-          )}
+            );
+          })()}
 
           {directInputOpen && directInputItem && (
           <CustomerBottomSheet
