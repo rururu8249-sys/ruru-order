@@ -1147,10 +1147,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
   const broadcastPinKey = (productIdValue: string, detailName = "") => `${productIdValue}|${detailName}`;
   const isBroadcastPinned = (productIdValue: string, detailName = "") => bcWidgetPin.mode === "pin" && bcWidgetPin.productId === String(productIdValue) && bcWidgetPin.detailName === String(detailName || "").trim();
+  // [2026-09-19 사장님] 「종료했다고 해제가 안 되네?」 — 해제는 지난 방송에서도 되게(«자동»으로 되돌릴 뿐이라 손님 화면 무관).
+  //   새로 고정하는 건 여전히 진행 중 방송만(pinBroadcastProduct).
   const clearBroadcastPin = async () => {
-    const targetBroadcastId = widgetPinTargetBroadcastId(bcSelId, activeBroadcastId);
+    const targetBroadcastId = String(bcSelId ?? "").trim();
     if (!targetBroadcastId || bcPinBusy) {
-      if (!targetBroadcastId) showAdminToast("위젯 고정은 현재 진행 중인 방송에서만 변경할 수 있습니다.", "warning");
+      if (!targetBroadcastId) showAdminToast("방송을 먼저 선택하세요.", "warning");
       return;
     }
     setBcPinBusy(true);
@@ -1818,10 +1820,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 const pinnedOption = pinnedDetail
                   ? [pinnedDetail.colors.length ? `색상 ${pinnedDetail.colors.join(",")}` : "", pinnedDetail.sizes.length ? `사이즈 ${pinnedDetail.sizes.join(",")}` : ""].filter(Boolean).join(" · ")
                   : "";
+                // [2026-09-19] 지난 방송(OFF)에 남은 고정은 손님 화면과 무관 — 위젯은 ON 방송 고정값만 읽는다. 문구로 거짓말하지 않는다.
+                const pinIsLive = Boolean(widgetPinTargetBroadcastId(bcSelId, activeBroadcastId));
                 return (
                   <div style={{ margin: "0 12px 8px", border: "2px solid var(--color-rose-deep)", borderRadius: "8px", background: "var(--color-rose-soft)", overflow: "hidden" }}>
                     <div style={{ padding: "4px 8px", fontSize: "11px", fontWeight: 900, color: "var(--color-rose-deep)", borderBottom: "1px solid var(--color-rose-line)" }}>
-                      📌 위젯 고정 중 — 손님 화면에 이 상품만 보입니다
+                      {pinIsLive ? "📌 위젯 고정 중 — 손님 화면에 이 상품만 보입니다" : "📌 지난 방송에서 고정했던 기록 — 손님 화면과 무관 (해제로 정리)"}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px" }}>
                       <span
@@ -1843,6 +1847,16 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           title="이 상품 안내글을 복사합니다"
                           style={{ flexShrink: 0, fontSize: "11px", fontWeight: 900, color: "var(--color-ink-soft)", background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}
                         >📢 채팅</button>
+                      ) : null}
+                      {/* [2026-09-19 사장님] 「고정 상태에서는 왜 상품 수정이 안 돼?」 — 고정 상품 줄은 목록에서 빠지는데(08-29 중복 방지)
+                          이 카드엔 [수정]이 없어 닿을 수 없었다. 목록 줄과 같은 editProduct. */}
+                      {pinnedRow ? (
+                        <button
+                          type="button"
+                          onClick={() => editProduct(pinnedRow)}
+                          title="이 상품 정보를 수정합니다"
+                          style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-surface)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}
+                        >수정</button>
                       ) : null}
                       <button
                         type="button"

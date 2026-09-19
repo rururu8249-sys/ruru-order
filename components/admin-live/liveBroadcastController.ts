@@ -66,6 +66,11 @@ async function safeUpsertSetting(key: string, value: string) {
   }
 }
 
+// [2026-09-19 사장님] 「방송 종료했는데 고정이 안 풀리네?」 — 종료·교체 때 고정값을 안 지워
+//   지난 방송에 📌 고정이 그대로 남아 관리자 목록에서 «손님 화면에 이 상품만 보입니다»라고 거짓말을 했다.
+//   (손님 위젯은 ON 방송의 고정값만 읽어 실제 노출 사고는 없었다.) → 방송이 OFF 되는 모든 곳에서 고정도 «자동»으로.
+const WIDGET_PIN_CLEAR = { widget_pin_mode: "auto", widget_pin_product_id: null, widget_pin_detail_name: null } as const;
+
 export async function startAdminLiveBroadcast(input: StartBroadcastInput) {
   const title = input.title.trim();
   const youtubeUrl = String(input.youtubeUrl || "").trim();
@@ -79,7 +84,7 @@ export async function startAdminLiveBroadcast(input: StartBroadcastInput) {
   const { error: closeError } = await adminCatalogWrite({
     table: "broadcasts",
     op: "update",
-    values: { status: "OFF", ended_at: nowIso },
+    values: { status: "OFF", ended_at: nowIso, ...WIDGET_PIN_CLEAR },
     filters: [{ type: "eq", col: "status", val: "ON" }],
   });
 
@@ -126,7 +131,7 @@ export async function activateBroadcast(broadcastId: string) {
   const { error: closeError } = await adminCatalogWrite({
     table: "broadcasts",
     op: "update",
-    values: { status: "OFF", ended_at: nowIso },
+    values: { status: "OFF", ended_at: nowIso, ...WIDGET_PIN_CLEAR },
     filters: [{ type: "eq", col: "status", val: "ON" }],
   });
 
@@ -292,7 +297,7 @@ export async function endAdminLiveBroadcast(broadcastId: string) {
   const { data, error } = await adminCatalogWrite({
     table: "broadcasts",
     op: "update",
-    values: { status: "OFF", ended_at: nowIso, order_form_enabled: false },
+    values: { status: "OFF", ended_at: nowIso, order_form_enabled: false, ...WIDGET_PIN_CLEAR },
     filters: [{ type: "eq", col: "id", val: broadcastId }],
     select: "*",
     single: true,
