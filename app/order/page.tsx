@@ -8214,10 +8214,18 @@ export default function OrderPage() {
                   </>
                 )}
               </ShopContactLink>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
-                <a href="https://youtube.com/channel/UCBbrUWUnHvq5Ldpxgy5GdMw?si=2wsmT_wEinvKzzEF" target="_blank" rel="noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", padding: "12px 4px", borderRadius: "10px", background: "#F5F3F0", textDecoration: "none" }}><span style={{ fontSize: "18px" }}>▶️</span><span style={{ fontSize: "11px", color: "#6B6460", fontWeight: 600 }}>유튜브</span></a>
-                <a href="https://band.us/@ruru8249" target="_blank" rel="noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", padding: "12px 4px", borderRadius: "10px", background: "#F5F3F0", textDecoration: "none" }}><span style={{ fontSize: "18px" }}>🎵</span><span style={{ fontSize: "11px", color: "#6B6460", fontWeight: 600 }}>밴드</span></a>
-                <a href="https://www.instagram.com/ruru8249_?igsh=MXR3Z2xnYmI1cG0ybQ==" target="_blank" rel="noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", padding: "12px 4px", borderRadius: "10px", background: "#F5F3F0", textDecoration: "none" }}><span style={{ fontSize: "18px" }}>📷</span><span style={{ fontSize: "11px", color: "#6B6460", fontWeight: 600 }}>인스타</span></a>
+              {/* [2026-09-20 사장님] 「카톡채널처럼 한 줄씩」 — 유튜브·밴드·인스타도 카톡 버튼과 같은 높이·폭의 한 줄 버튼. 링크 주소는 그대로. */}
+              <div style={{ display: "grid", gap: "8px" }}>
+                {([
+                  { href: "https://youtube.com/channel/UCBbrUWUnHvq5Ldpxgy5GdMw?si=2wsmT_wEinvKzzEF", icon: "▶️", label: "유튜브 채널" },
+                  { href: "https://band.us/@ruru8249", icon: "🎵", label: "밴드 (택배 송장 확인)" },
+                  { href: "https://www.instagram.com/ruru8249_?igsh=MXR3Z2xnYmI1cG0ybQ==", icon: "📷", label: "인스타그램" },
+                ] as const).map((link) => (
+                  <a key={link.href} href={link.href} target="_blank" rel="noreferrer" style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "center", gap: "8px", padding: "15px 12px", borderRadius: "12px", background: "#F5F3F0", textDecoration: "none" }}>
+                    <span style={{ fontSize: "18px" }}>{link.icon}</span>
+                    <span style={{ fontSize: "15px", color: "#3F3438", fontWeight: 800 }}>{link.label}</span>
+                  </a>
+                ))}
               </div>
           </CustomerBottomSheet>
         ) : null}
