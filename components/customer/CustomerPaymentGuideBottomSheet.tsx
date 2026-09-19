@@ -4,7 +4,8 @@
 
 import { useState } from "react";
 import type { CSSProperties } from "react";
-import SheetGrabber from "@/components/customer/SheetGrabber";
+// [2026-09-20] 바텀시트 «한 벌» 틀(높이·헤더·✕·닫기 5종). 계좌·금액·안내 내용은 그대로.
+import CustomerBottomSheet, { csPrimaryButtonStyle } from "@/components/customer/CustomerBottomSheet";
 
 type CustomerPaymentGuideOrderItem = {
   product_name?: string;
@@ -135,14 +136,20 @@ export default function CustomerPaymentGuideBottomSheet({
   const doneButtonStyle: CSSProperties = { ...normalButtonStyle, border: "1px solid #7B2D43", background: "#7B2D43", color: "#fff" };
   const sumRow: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0", fontSize: "13px", fontWeight: 700, color: "#666" };
 
+  const sheetTitle = isOrderComplete ? "✅ 주문 접수됐어요" : "입금 안내";
+  const sheetSubtitle = isOrderComplete
+    ? (isFullyPaidByPoints ? "추가 결제 없이 접수됐어요" : showCardGuide ? "카카오톡으로 전송되는 결제링크에서 결제해 주세요" : "아래 계좌로 입금해 주세요")
+    : "현재 보이는 닉네임으로 입금해 주세요.";
+
   return (
-    <div
-      data-ruru-payment-guide-bottom-sheet="shell-v2"
-      style={{ position: "fixed", inset: 0, zIndex: 90, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(15,23,42,0.45)" }}
-      role="dialog"
-      aria-modal="true"
-      aria-label={isOrderComplete ? "주문 접수 완료 및 입금 안내" : "입금 안내"}
-      onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
+    <CustomerBottomSheet
+      open
+      onClose={onClose}
+      title={sheetTitle}
+      subtitle={sheetSubtitle}
+      ariaLabel={isOrderComplete ? "주문 접수 완료 및 입금 안내" : "입금 안내"}
+      bodyPadding="4px 16px 16px"
+      footer={<button type="button" onClick={onClose} style={csPrimaryButtonStyle(true)}>확인</button>}
     >
       <style>{`
   @keyframes point-right {
@@ -150,28 +157,6 @@ export default function CustomerPaymentGuideBottomSheet({
     50% { transform: translateY(-50%) translateX(-8px); }
   }
 `}</style>
-      <div data-sheet style={{ width: "100%", maxWidth: "560px", margin: "0 auto", overflow: "hidden", borderTopLeftRadius: "28px", borderTopRightRadius: "28px", background: "#fff", boxShadow: "0 -22px 70px rgba(15,23,42,0.22)" }}>
-        <SheetGrabber onClose={onClose} style={{ paddingTop: "8px", paddingBottom: 0 }} />
-
-        <div style={{ maxHeight: "86dvh", overflowY: "auto", padding: "20px 16px calc(16px + env(safe-area-inset-bottom))" }}>
-          {isOrderComplete ? (
-            <header>
-              <div style={{ fontSize: "13px", color: "#6B6460" }}>✅ 주문 접수됐어요</div>
-              <div style={{ fontSize: "12px", color: "#7B736D", marginTop: "3px" }}>
-                {isFullyPaidByPoints ? "추가 결제 없이 접수됐어요" : showCardGuide ? "카카오톡으로 전송되는 결제링크에서 결제해 주세요" : "아래 계좌로 입금해 주세요"}
-              </div>
-            </header>
-          ) : (
-            <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
-              <div style={{ minWidth: 0 }}>
-                <p style={{ fontSize: "12px", fontWeight: 800, letterSpacing: "-0.04em", color: "#7B2D43" }}>루루동이 LIVE</p>
-                <h2 style={{ marginTop: "4px", fontSize: "26px", fontWeight: 800, lineHeight: 1.2, letterSpacing: "-0.07em", color: "#222" }}>입금 안내</h2>
-                <p style={{ marginTop: "8px", wordBreak: "keep-all", fontSize: "14px", fontWeight: 700, lineHeight: 1.6, letterSpacing: "-0.04em", color: "#666" }}>현재 보이는 닉네임으로 입금해 주세요.</p>
-              </div>
-              <div style={{ display: "flex", height: "48px", width: "48px", flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: "16px", background: "#F5E6EB", border: "1px solid #D9C5CC", fontSize: "25px" }}>💙</div>
-            </header>
-          )}
-
           {isFullyPaidByPoints && (
             <section style={{ marginTop: "16px", borderRadius: "18px", background: "#E1F5EE", border: "1px solid #C7EBDD", padding: "16px" }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
@@ -332,15 +317,6 @@ export default function CustomerPaymentGuideBottomSheet({
             </section>
           )}
 
-          <button
-            type="button"
-            onClick={onClose}
-            style={{ marginTop: "16px", display: "flex", minHeight: "52px", width: "100%", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "none", background: "#7A1E47", padding: "0 16px", fontSize: "16px", fontWeight: 800, letterSpacing: "-0.05em", color: "#fff", cursor: "pointer" }}
-          >
-            닫기
-          </button>
-        </div>
-      </div>
-    </div>
+    </CustomerBottomSheet>
   );
 }

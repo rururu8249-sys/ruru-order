@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+// [2026-09-20] 바텀시트 «한 벌» 틀(높이·헤더·✕·닫기 5종). 탭·목록·읽음 처리 로직은 그대로.
+import CustomerBottomSheet, { csPrimaryButtonStyle } from "@/components/customer/CustomerBottomSheet";
 import { noteTimeText, noteAgoText } from "@/lib/noteTime";
 
 type SiteAlert = { id: number; kind: string; title: string; message: string; created_at: string; expires_at: string };
@@ -208,7 +210,7 @@ export default function CustomerSiteAlertPopup() {
           type="button"
           onClick={() => setBoxOpen(true)}
           aria-label={unread > 0 ? `안 읽은 쪽지 ${unread}개` : "쪽지함"}
-          className="fixed bottom-5 right-4 z-[480] flex h-12 w-12 items-center justify-center rounded-full bg-[#7B2D43] text-xl shadow-lg active:scale-95"
+          className="fixed bottom-5 right-4 z-[95] flex h-12 w-12 items-center justify-center rounded-full bg-[#7B2D43] text-xl shadow-lg active:scale-95"
         >
           🔔
           {unread > 0 ? (
@@ -221,16 +223,12 @@ export default function CustomerSiteAlertPopup() {
 
       {/* 쪽지함 목록 */}
       {boxOpen ? (
-        <div className="fixed inset-0 z-[490] flex items-end justify-center bg-black/50" onClick={(e) => { if (e.target === e.currentTarget) { setBoxOpen(false); setDetail(null); } }}>
-          {/* [2026-08-31 사장님 지적] 크기 고정 + 다른 하단 시트(주문조회·내정보)와 동일 규격(가로 560px·높이 84dvh)으로 통일 */}
-          <div className="flex h-[84dvh] w-full max-w-[560px] flex-col overflow-hidden rounded-t-[26px] bg-white">
-            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-              <h2 className="text-[17px] font-black text-slate-950">📬 공지 · 쪽지함</h2>
-              <button type="button" onClick={() => { setBoxOpen(false); setDetail(null); }} className="text-lg font-black text-slate-400">✕</button>
-            </div>
-            {/* [2026-08-30 사장님 지적] 내용이 전부 펼쳐져 있어서 「내 쪽지」가 아래 있는지 몰랐다.
-                → 게시판처럼 제목만 보이고, 누르면 펼쳐진다. 탭으로 공지/내 쪽지를 나눈다.
-                   안 읽은 쪽지는 처음부터 펼쳐 둔다(놓치면 안 되는 것). */}
+        <CustomerBottomSheet
+          open
+          onClose={() => { setBoxOpen(false); setDetail(null); }}
+          title="📬 공지 · 쪽지함"
+          bodyPadding="12px 16px"
+          headerBelow={(
             <div className="flex gap-1.5 border-b border-slate-100 px-4 py-2.5">
               {([
                 { key: "all", label: "전체", n: unread },
@@ -250,8 +248,18 @@ export default function CustomerSiteAlertPopup() {
                 </button>
               ))}
             </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          )}
+          footer={(
+            <button
+              type="button"
+              onClick={() => { setBoxOpen(false); if (window.location.pathname !== "/order") window.location.href = "/order"; }}
+              style={csPrimaryButtonStyle(true)}
+            >주문서로 가기</button>
+          )}
+        >
+              {/* [2026-08-30 사장님 지적] 내용이 전부 펼쳐져 있어서 「내 쪽지」가 아래 있는지 몰랐다.
+                  → 게시판처럼 제목만 보이고, 누르면 펼쳐진다. 탭으로 공지/내 쪽지를 나눈다.
+                     안 읽은 쪽지는 처음부터 펼쳐 둔다(놓치면 안 되는 것). */}
               {/* [2026-08-31 사장님 지시] 게시판형 — 목록엔 번호·제목·읽음만, 누르면 내용 화면으로 전환 */}
               {detail ? (() => {
                 const back = (
@@ -393,16 +401,7 @@ export default function CustomerSiteAlertPopup() {
                   ) : null}
                 </>
               )}
-            </div>
-            <div className="border-t border-slate-100 p-4">
-              <button
-                type="button"
-                onClick={() => { setBoxOpen(false); if (window.location.pathname !== "/order") window.location.href = "/order"; }}
-                className="h-12 w-full rounded-2xl bg-[#7B2D43] text-[15px] font-black text-white"
-              >주문서로 가기</button>
-            </div>
-          </div>
-        </div>
+        </CustomerBottomSheet>
       ) : null}
 
       {/* 새 쪽지 팝업 — 접속하면 바로, 접속 중에 오면 15초 안에 뜬다.

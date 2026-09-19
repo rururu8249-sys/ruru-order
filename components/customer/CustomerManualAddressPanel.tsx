@@ -25,7 +25,7 @@ export default function CustomerManualAddressPanel({ open, defaultValue = "", on
   const cleanValue = value.trim();
 
   return (
-    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/35 px-4">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/35 px-4">
       <section className="w-full max-w-[520px] rounded-[28px] border border-slate-200 bg-white p-5 shadow-2xl">
         <div>
           <div className="text-[11px] font-black tracking-[0.16em] text-coral-500">MANUAL ADDRESS</div>

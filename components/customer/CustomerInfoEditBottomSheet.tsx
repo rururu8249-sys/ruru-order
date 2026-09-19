@@ -7,7 +7,8 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { isOrderablePhone, isMobileOrderPhone } from "@/lib/order/phone";
-import SheetGrabber from "@/components/customer/SheetGrabber";
+// [2026-09-20] 바텀시트 «한 벌» 틀(높이·헤더·✕·닫기 5종). 세 화면(정보/배송지 목록/배송지 폼)이 한 틀 안에서 바뀐다.
+import CustomerBottomSheet, { csPrimaryButtonStyle } from "@/components/customer/CustomerBottomSheet";
 import { clearSavedCustomerInfo, clearCartOnLogout } from "@/lib/customer/customerSession";
 
 type ShippingAddress = {
@@ -179,59 +180,59 @@ export default function CustomerInfoEditBottomSheet({
     });
   };
 
-  const sheetStyle: CSSProperties = {
-    position: "fixed",
-    inset: 0,
-    zIndex: 90,
-    display: "flex",
-    alignItems: "flex-end",
-    justifyContent: "center",
-    background: "rgba(15,23,42,0.45)",
+  // [2026-09-20 사장님] 「바텀시트 전부 동일하게」 — 세 화면이 한 틀(CustomerBottomSheet)을 쓴다.
+  //   · 높이·헤더·✕·배경 탭·그래버·뒤로가기·ESC 전부 틀이 맡는다.
+  //   · 배송지 목록/폼 화면은 헤더 왼쪽 「‹」 로 한 단계 뒤로. ✕ 는 어느 화면에서든 시트 전체를 닫는다.
+  //   · 배송지 폼 작성 중에 ✕ 를 누르면 한 번 묻는다(입력이 날아가므로). 정보 화면은 예전 「취소」와 같이 바로 닫힌다.
+  //   · 푸터: 왼쪽 「취소」 삭제(✕가 대신). 주 버튼 「저장」 풀폭 1개.
+  const backButton = (onBack: () => void, label: string) => (
+    <button type="button" onClick={onBack} aria-label={label}
+      style={{ width: "40px", height: "40px", borderRadius: "50%", background: "#F1ECEE", border: "none", fontSize: "22px", color: "#444", cursor: "pointer", lineHeight: 1 }}>
+      ‹
+    </button>
+  );
+
+  const closeGuard = () => {
+    if (screen !== "shipping_form") return true;
+    const typed = Boolean(addrForm.address || addrForm.detailAddress || addrForm.zipcode);
+    if (!typed) return true;
+    return window.confirm("작성 중인 배송지가 저장되지 않아요. 닫을까요?");
   };
 
-  const panelStyle: CSSProperties = {
-    width: "100%",
-    maxWidth: "560px",
-    margin: "0 auto",
-    background: "#F7F4F1",
-    borderRadius: "20px 20px 0 0",
-    overflow: "hidden",
-    // [2026-08-31 사장님 지적] 화면(정보/배송지목록/배송지폼)마다 시트 크기가 달라 정신없음 → 높이 고정, 본문만 스크롤
-    height: "84dvh",
-    maxHeight: "92vh",
-    display: "flex",
-    flexDirection: "column",
-  };
+  const sheetTitle =
+    screen === "shipping_form" ? (editingAddrIndex !== null ? "배송지 수정" : "배송지 추가")
+    : screen === "shipping_list" ? "배송지 관리"
+    : "정보수정";
+  const sheetSubtitle =
+    screen === "info" ? "주문 전 닉네임, 연락처, 주소가 맞는지 확인해 주세요." : undefined;
+  const headerLeft =
+    screen === "shipping_form" ? backButton(() => setScreen("shipping_list"), "배송지 관리로")
+    : screen === "shipping_list" ? backButton(() => setScreen("info"), "정보수정으로")
+    : undefined;
+  const footer =
+    screen === "shipping_form" ? (
+      <button type="button" onClick={handleSaveAddrForm} style={csPrimaryButtonStyle(true)}>저장</button>
+    ) : screen === "shipping_list" ? undefined : (
+      <button type="button" onClick={onSave} disabled={saving} style={{ ...csPrimaryButtonStyle(!saving), cursor: saving ? "default" : "pointer" }}>
+        {saving ? "저장 중..." : "저장"}
+      </button>
+    );
 
-  const headerStyle: CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "16px 20px 12px",
-    borderBottom: "1px solid #F0EBE6",
-    background: "#fff",
-    flexShrink: 0,
-  };
-
-  // ── 배송지 추가/수정 폼 화면 ──
-  if (screen === "shipping_form") {
-    return (
-      <div style={sheetStyle} role="dialog" aria-modal="true">
-        <div style={panelStyle}>
-          {/* 헤더 */}
-          <div style={headerStyle}>
-            <button type="button" onClick={() => setScreen("shipping_list")}
-              style={{ background: "none", border: "none", fontSize: "22px", color: "#555", cursor: "pointer", padding: "0 4px", lineHeight: 1 }}>
-              ‹
-            </button>
-            <div style={{ fontSize: "17px", fontWeight: 800, color: "#7A1E47" }}>
-              {editingAddrIndex !== null ? "배송지 수정" : "배송지 추가"}
-            </div>
-            <div style={{ width: "32px" }} />
-          </div>
-
-          {/* 폼 */}
-          <div style={{ flex: 1, overflowY: "auto", padding: "20px 16px" }}>
+  return (
+    <CustomerBottomSheet
+      open
+      onClose={handleClose}
+      title={sheetTitle}
+      subtitle={sheetSubtitle}
+      headerLeft={headerLeft}
+      footer={footer}
+      closeGuard={closeGuard}
+      closeDisabled={saving}
+      bodyPadding={screen === "shipping_form" ? "20px 16px" : "16px"}
+      bodyStyle={{ background: "#F7F4F1" }}
+    >
+      {screen === "shipping_form" ? (
+        <>
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               <div>
                 <label style={labelStyle}>받는 분</label>
@@ -259,44 +260,9 @@ export default function CustomerInfoEditBottomSheet({
                   placeholder="상세 주소 (동/호수 등)" style={inputStyle} />
               </div>
             </div>
-          </div>
-
-          {/* 저장 버튼 */}
-          <div style={{ display: "grid", gridTemplateColumns: "0.78fr 1.22fr", gap: "8px", borderTop: "1px solid #E8E2DD", background: "#fff", padding: "12px 16px calc(14px + env(safe-area-inset-bottom))", flexShrink: 0 }}>
-            <button type="button" onClick={() => setScreen("shipping_list")}
-              style={{ display: "flex", minHeight: "50px", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", fontSize: "15px", fontWeight: 800, color: "#666", cursor: "pointer" }}>
-              취소
-            </button>
-            <button type="button" onClick={handleSaveAddrForm}
-              style={{ display: "flex", minHeight: "50px", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "none", background: "#7A1E47", color: "#fff", fontSize: "15px", fontWeight: 800, cursor: "pointer" }}>
-              저장
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── 배송지 관리 화면 ──
-  if (screen === "shipping_list") {
-    return (
-      <div style={sheetStyle} role="dialog" aria-modal="true">
-        <div style={panelStyle}>
-          {/* 헤더 */}
-          <div style={headerStyle}>
-            <button type="button" onClick={() => setScreen("info")}
-              style={{ background: "none", border: "none", fontSize: "22px", color: "#555", cursor: "pointer", padding: "0 4px", lineHeight: 1 }}>
-              ‹
-            </button>
-            <div style={{ fontSize: "17px", fontWeight: 800, color: "#7A1E47" }}>배송지 관리</div>
-            <button type="button" onClick={handleClose}
-              style={{ background: "none", border: "none", fontSize: "22px", color: "#888", cursor: "pointer", padding: "0 4px", lineHeight: 1 }}>
-              ×
-            </button>
-          </div>
-
-          {/* 목록 */}
-          <div style={{ flex: 1, overflowY: "auto", padding: "16px" }}>
+        </>
+      ) : screen === "shipping_list" ? (
+        <>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
               <div style={{ fontSize: "13px", fontWeight: 700, color: "#888" }}>등록한 배송지</div>
               <button type="button" onClick={openAddForm}
@@ -344,30 +310,9 @@ export default function CustomerInfoEditBottomSheet({
                 ))}
               </div>
             )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── 정보수정 시트 (기본 화면) ──
-  return (
-    <div style={sheetStyle} role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
-      <div data-sheet style={panelStyle}>
-        {/* 핸들 */}
-        <SheetGrabber onClose={handleClose} style={{ paddingTop: "8px", paddingBottom: 0, background: "#fff" }} />
-
-        {/* 헤더 */}
-        <div style={{ padding: "12px 20px 10px", borderBottom: "1px solid #F0EBE6", background: "#fff", flexShrink: 0 }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
-            <span style={{ fontSize: "20px", fontWeight: 800, color: "#7A1E47" }}>정보수정</span>
-            <span style={{ fontSize: "13px", color: "#7B736D", fontWeight: 600 }}>배송정보 확인</span>
-          </div>
-          <div style={{ fontSize: "12px", color: "#7B736D", marginTop: "4px" }}>주문 전 닉네임, 연락처, 주소가 맞는지 확인해 주세요.</div>
-        </div>
-
-        {/* 본문 */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "16px" }}>
+        </>
+      ) : (
+        <>
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
 
             {/* 유튜브 닉네임 */}
@@ -453,20 +398,8 @@ export default function CustomerInfoEditBottomSheet({
             </button>
 
           </div>
-        </div>
-
-        {/* footer */}
-        <footer style={{ display: "grid", flexShrink: 0, gridTemplateColumns: "0.78fr 1.22fr", gap: "8px", borderTop: "1px solid #E8E2DD", background: "#fff", padding: "12px 16px calc(14px + env(safe-area-inset-bottom))" }}>
-          <button type="button" onClick={handleClose} disabled={saving}
-            style={{ display: "flex", minHeight: "50px", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", fontSize: "15px", fontWeight: 800, color: "#666", cursor: saving ? "default" : "pointer", opacity: saving ? 0.45 : 1 }}>
-            취소
-          </button>
-          <button type="button" onClick={onSave} disabled={saving}
-            style={{ display: "flex", minHeight: "50px", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "none", background: saving ? "#cbd5e1" : "#7A1E47", fontSize: "15px", fontWeight: 800, color: "#fff", cursor: saving ? "default" : "pointer" }}>
-            {saving ? "저장 중..." : "저장"}
-          </button>
-        </footer>
-      </div>
-    </div>
+        </>
+      )}
+    </CustomerBottomSheet>
   );
 }

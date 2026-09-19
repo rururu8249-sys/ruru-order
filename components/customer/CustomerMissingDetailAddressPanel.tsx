@@ -14,7 +14,7 @@ export default function CustomerMissingDetailAddressPanel({ open, onClose, onCon
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[96] flex items-center justify-center bg-slate-950/40 px-4">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/40 px-4">
       <section className="w-full max-w-[540px] rounded-[28px] border border-amber-100 bg-white p-5 shadow-2xl">
         <div className="flex items-start gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-xl text-white">

@@ -73,7 +73,8 @@ import OrderCustomerInfoFormCard from "@/components/order/OrderCustomerInfoFormC
 import CustomerPaymentGuideBottomSheet from "@/components/customer/CustomerPaymentGuideBottomSheet";
 import CustomerPointGiftPopup from "@/components/customer/CustomerPointGiftPopup";
 import CustomerInfoEditBottomSheet from "@/components/customer/CustomerInfoEditBottomSheet";
-import SheetGrabber from "@/components/customer/SheetGrabber";
+// [2026-09-20 사장님] 바텀시트 «한 벌» 틀 — 손님 시트 전부 같은 높이·헤더·✕·닫기 5종
+import CustomerBottomSheet, { CS_SHEET_Z_STACKED, csPrimaryButtonStyle, csCancelButtonStyle } from "@/components/customer/CustomerBottomSheet";
 import { KakaoPostcodeEmbed } from "react-daum-postcode";
 import CustomerOrderLookupBottomSheet, {
   type CustomerOrderLookupFilter,
@@ -6680,21 +6681,89 @@ export default function OrderPage() {
           })()}
 
           {orderSheetOpen && (
-          <div style={{ position: "fixed", inset: 0, zIndex: 35, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={(e) => { if (e.target === e.currentTarget) setOrderSheetOpen(false); }}>
-            <div data-sheet style={{ background: "#fff", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: "430px", maxHeight: "92dvh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-              <SheetGrabber onClose={() => { if (!submitting) setOrderSheetOpen(false); }} style={{ margin: "4px auto -4px", paddingBottom: "8px" }} />
-              <div style={{ flexShrink: 0, padding: "12px 18px", borderBottom: "0.5px solid #E5E1DC", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
-                <div style={{ minWidth: 0 }}>
-                  <span style={{ fontSize: "17px", fontWeight: 800, color: "#1A1A1A" }}>주문서 확인</span>
-                </div>
-                <button type="button" onClick={() => setOrderSheetOpen(false)} aria-label="닫기" style={{ flexShrink: 0, width: "28px", height: "28px", borderRadius: "50%", background: "#F5F3F0", border: "none", color: "#888", fontSize: "15px", cursor: "pointer" }}>✕</button>
-              </div>
-              <div style={{ flexShrink: 0, padding: "9px 14px", borderBottom: "1px solid #F0EAE0", background: "#FBF5F7", overflowX: "auto" }}>
+          <CustomerBottomSheet
+            open
+            onClose={() => { if (!submitting) setOrderSheetOpen(false); }}
+            closeDisabled={submitting}
+            title="주문서 확인"
+            bodyPadding="0"
+            headerBelow={(
+              <div style={{ padding: "9px 14px", borderBottom: "1px solid #F0EAE0", background: "#FBF5F7", overflowX: "auto" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", minWidth: "360px", color: "#7A1E47", fontSize: "10.5px", fontWeight: 900, whiteSpace: "nowrap" }}>
                   <span>상품 담기 완료 ✓</span><span style={{ color: "#C9A8B5" }}>→</span><span>주문서 확인·제출 (현재)</span><span style={{ color: "#C9A8B5" }}>→</span><span>입금·결제</span>
                 </div>
               </div>
-              <div style={{ overflowY: "auto", flex: 1 }}>
+            )}
+            footer={(
+              <>
+                {operatorTestAccount ? (
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "10px",
+                      marginBottom: "10px",
+                      padding: "10px 12px",
+                      borderRadius: "12px",
+                      border: adminTestOrderMode ? "1.5px solid #C7B8D8" : "1.5px solid #E24A4A",
+                      background: adminTestOrderMode ? "#F6F2FA" : "#FFF2F2",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={adminTestOrderMode}
+                      onChange={(event) => setAdminTestOrderMode(event.target.checked)}
+                      style={{ marginTop: "2px", width: "18px", height: "18px", flexShrink: 0, accentColor: "#7A1E47" }}
+                    />
+                    <span style={{ fontSize: "12.5px", fontWeight: 800, lineHeight: 1.5, color: adminTestOrderMode ? "#5B3E72" : "#B3261E" }}>
+                      {adminTestOrderMode ? (
+                        <>
+                          🧪 테스트 주문으로 제출
+                          <br />
+                          <span style={{ fontWeight: 700, color: "#7A6A80" }}>정산·입금확인·송장·피킹에서 제외됩니다. 실제 주문이면 체크를 해제하세요.</span>
+                        </>
+                      ) : (
+                        <>
+                          ⚠️ 실제 주문으로 접수됩니다
+                          <br />
+                          <span style={{ fontWeight: 700 }}>정산·입금확인·송장에 그대로 포함됩니다.</span>
+                        </>
+                      )}
+                    </span>
+                  </label>
+                ) : null}
+                {/* [2026-08-29] 예전에는 이 체크칸이 스크롤 위쪽에 있어 손님이 못 보았고,
+                    그래서 "마지막 확인 한 칸이 남았어요" 라는 안내문을 따로 띄워야 했다.
+                    → 체크칸을 제출 버튼 바로 위(항상 보이는 자리)로 옮기고 안내문은 없앴다. */}
+                {!customerBlockStatus.blocked ? (
+                  <label data-final-confirm="true" style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px", borderRadius: "12px", border: finalSubmitAcknowledged ? "1.5px solid #7A1E47" : "1.5px solid #E0A96D", background: finalSubmitAcknowledged ? "#F9EEF3" : "#FFF7ED", padding: "11px 12px", cursor: "pointer" }}>
+                    <input type="checkbox" checked={finalSubmitAcknowledged} onChange={(event) => setFinalSubmitAcknowledged(event.target.checked)} style={{ width: "21px", height: "21px", flexShrink: 0, accentColor: "#7A1E47" }} />
+                    <span style={{ fontSize: "13px", fontWeight: 900, lineHeight: 1.45, color: "#4B3540", wordBreak: "keep-all" }}>배송지·상품·옵션·수량을 확인했습니다</span>
+                  </label>
+                ) : null}
+                <button
+                  type="button"
+                  aria-disabled={!finalSubmitAcknowledged}
+                  onClick={() => {
+                    // [2026-08-28 P0-1] 확인 체크가 안 되어 있으면 막기만 하지 말고 그 자리로 데려간다.
+                    if (submitting || customerBlockStatus.blocked) return;
+                    if (!finalSubmitAcknowledged) {
+                      const target = document.querySelector<HTMLElement>('[data-final-confirm="true"]');
+                      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      showCustomerNotice("제출 버튼 바로 위 체크칸을 한 번 눌러 주세요.", "warning");
+                      return;
+                    }
+                    handleSubmitOrderClick();
+                  }}
+                  disabled={submitting || customerBlockStatus.blocked}
+                  style={{ width: "100%", padding: "14px", background: submitting || customerBlockStatus.blocked || !finalSubmitAcknowledged ? "#cbd5e1" : "#7A1E47", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: submitting || customerBlockStatus.blocked ? "default" : "pointer" }}
+                >
+                  {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : `${won(finalPaymentAmount)} · 주문서 제출`}
+                </button>
+              </>
+            )}
+          >
                 {/* 🚚 배송지 카드 */}
                 <div style={{ margin: "12px 16px 0", border: "1px solid #E5E1DC", borderRadius: "12px", padding: "12px 14px", background: "#FAF8F6" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
@@ -6998,77 +7067,7 @@ export default function OrderPage() {
               </div>
 
             </section>
-              </div>
-
-              <div style={{ flexShrink: 0, padding: "12px 18px calc(12px + env(safe-area-inset-bottom))", borderTop: "0.5px solid #E5E1DC", background: "#fff" }}>
-                {operatorTestAccount ? (
-                  <label
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: "10px",
-                      marginBottom: "10px",
-                      padding: "10px 12px",
-                      borderRadius: "12px",
-                      border: adminTestOrderMode ? "1.5px solid #C7B8D8" : "1.5px solid #E24A4A",
-                      background: adminTestOrderMode ? "#F6F2FA" : "#FFF2F2",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={adminTestOrderMode}
-                      onChange={(event) => setAdminTestOrderMode(event.target.checked)}
-                      style={{ marginTop: "2px", width: "18px", height: "18px", flexShrink: 0, accentColor: "#7A1E47" }}
-                    />
-                    <span style={{ fontSize: "12.5px", fontWeight: 800, lineHeight: 1.5, color: adminTestOrderMode ? "#5B3E72" : "#B3261E" }}>
-                      {adminTestOrderMode ? (
-                        <>
-                          🧪 테스트 주문으로 제출
-                          <br />
-                          <span style={{ fontWeight: 700, color: "#7A6A80" }}>정산·입금확인·송장·피킹에서 제외됩니다. 실제 주문이면 체크를 해제하세요.</span>
-                        </>
-                      ) : (
-                        <>
-                          ⚠️ 실제 주문으로 접수됩니다
-                          <br />
-                          <span style={{ fontWeight: 700 }}>정산·입금확인·송장에 그대로 포함됩니다.</span>
-                        </>
-                      )}
-                    </span>
-                  </label>
-                ) : null}
-                {/* [2026-08-29] 예전에는 이 체크칸이 스크롤 위쪽에 있어 손님이 못 보았고,
-                    그래서 "마지막 확인 한 칸이 남았어요" 라는 안내문을 따로 띄워야 했다.
-                    → 체크칸을 제출 버튼 바로 위(항상 보이는 자리)로 옮기고 안내문은 없앴다. */}
-                {!customerBlockStatus.blocked ? (
-                  <label data-final-confirm="true" style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px", borderRadius: "12px", border: finalSubmitAcknowledged ? "1.5px solid #7A1E47" : "1.5px solid #E0A96D", background: finalSubmitAcknowledged ? "#F9EEF3" : "#FFF7ED", padding: "11px 12px", cursor: "pointer" }}>
-                    <input type="checkbox" checked={finalSubmitAcknowledged} onChange={(event) => setFinalSubmitAcknowledged(event.target.checked)} style={{ width: "21px", height: "21px", flexShrink: 0, accentColor: "#7A1E47" }} />
-                    <span style={{ fontSize: "13px", fontWeight: 900, lineHeight: 1.45, color: "#4B3540", wordBreak: "keep-all" }}>배송지·상품·옵션·수량을 확인했습니다</span>
-                  </label>
-                ) : null}
-                <button
-                  type="button"
-                  aria-disabled={!finalSubmitAcknowledged}
-                  onClick={() => {
-                    // [2026-08-28 P0-1] 확인 체크가 안 되어 있으면 막기만 하지 말고 그 자리로 데려간다.
-                    if (submitting || customerBlockStatus.blocked) return;
-                    if (!finalSubmitAcknowledged) {
-                      const target = document.querySelector<HTMLElement>('[data-final-confirm="true"]');
-                      target?.scrollIntoView({ behavior: "smooth", block: "center" });
-                      showCustomerNotice("제출 버튼 바로 위 체크칸을 한 번 눌러 주세요.", "warning");
-                      return;
-                    }
-                    handleSubmitOrderClick();
-                  }}
-                  disabled={submitting || customerBlockStatus.blocked}
-                  style={{ width: "100%", padding: "14px", background: submitting || customerBlockStatus.blocked || !finalSubmitAcknowledged ? "#cbd5e1" : "#7A1E47", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: submitting || customerBlockStatus.blocked ? "default" : "pointer" }}
-                >
-                  {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : `${won(finalPaymentAmount)} · 주문서 제출`}
-                </button>
-              </div>
-            </div>
-          </div>
+          </CustomerBottomSheet>
           )}
 
             <CustomerToastNotice
@@ -7094,17 +7093,27 @@ export default function OrderPage() {
                       ③ 이미 만들어져 있던 CustomerManualAddressPanel 을 여기서 연다
                       (직접 입력해도 주문은 정상 제출된다 — 검증은 주소 유무만 본다) */}
             {addressSearchOpen ? (
-              <div
-                onClick={(e) => { if (e.target === e.currentTarget) setAddressSearchOpen(false); }}
-                style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: "0 12px" }}
+              <CustomerBottomSheet
+                open
+                onClose={() => setAddressSearchOpen(false)}
+                zIndex={CS_SHEET_Z_STACKED}
+                title="주소 검색"
+                subtitle="도로명·지번·건물명으로 찾아요"
+                bodyPadding="0"
+                bodyStyle={{ overflow: "hidden", display: "flex", flexDirection: "column" }}
+                footer={(
+                  <button
+                    type="button"
+                    onClick={() => { setAddressSearchOpen(false); setManualAddressOpen(true); }}
+                    style={csCancelButtonStyle}
+                  >✏️ 검색이 안 되면 직접 입력</button>
+                )}
               >
-                <div style={{ width: "100%", maxWidth: "480px", height: "80vh", background: "#fff", borderRadius: "20px 20px 0 0", overflow: "hidden", position: "relative", display: "flex", flexDirection: "column" }}>
-                  <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
                     <KakaoPostcodeEmbed
                       onComplete={handleAddressSearchComplete}
                       onClose={(state) => { if (state === "FORCE_CLOSE") setAddressSearchOpen(false); }}
                       autoClose={false}
-                      style={{ width: "100%", height: "100%" }}
+                      style={{ width: "100%", height: "100%", flex: 1, minHeight: 0 }}
                       errorMessage={
                         <div style={{ padding: "28px 20px", textAlign: "center" }}>
                           <div style={{ fontSize: "34px" }}>😥</div>
@@ -7122,21 +7131,7 @@ export default function OrderPage() {
                         </div>
                       }
                     />
-                  </div>
-                  <div style={{ flexShrink: 0, display: "flex", gap: "8px", alignItems: "center", padding: "10px 12px", borderTop: "1px solid #eee", background: "#fafafa" }}>
-                    <button
-                      type="button"
-                      onClick={() => setAddressSearchOpen(false)}
-                      style={{ height: "42px", padding: "0 18px", background: "#f1f1f1", border: "none", borderRadius: "14px", fontSize: "14px", color: "#555", cursor: "pointer", fontWeight: 800 }}
-                    >✕ 닫기</button>
-                    <button
-                      type="button"
-                      onClick={() => { setAddressSearchOpen(false); setManualAddressOpen(true); }}
-                      style={{ flex: 1, height: "42px", background: "#fff", border: "1.5px solid #7B2D43", borderRadius: "14px", fontSize: "14px", color: "#7B2D43", cursor: "pointer", fontWeight: 900 }}
-                    >✏️ 검색이 안 되면 직접 입력</button>
-                  </div>
-                </div>
-              </div>
+              </CustomerBottomSheet>
             ) : null}
 
             <CustomerMissingDetailAddressPanel
@@ -7268,11 +7263,15 @@ export default function OrderPage() {
           )}
 
           {registeredOptionSelectProduct && (
-            <div style={{ position: "fixed", inset: 0, zIndex: 128, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(0,0,0,0.45)" }} onClick={(e) => { if (e.target === e.currentTarget) closeRegisteredOptionSelectSheet(); }}>
-              <div data-sheet style={{ width: "100%", maxWidth: "430px", height: "96dvh", maxHeight: "96dvh", display: "flex", flexDirection: "column", background: "#fff", borderTopLeftRadius: "26px", borderTopRightRadius: "26px", overflow: "hidden" }}>
-                <div style={{ flexShrink: 0, borderBottom: "1px solid #F0EAE0", padding: "12px 16px 16px" }}>
-                  <SheetGrabber onClose={closeRegisteredOptionSelectSheet} style={{ margin: "0 auto 6px" }} />
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <CustomerBottomSheet
+            open
+            onClose={closeRegisteredOptionSelectSheet}
+            ariaLabel="옵션 선택"
+            bodyDataAttr="data-registered-option-scroll"
+            bodyPadding="16px"
+            headerLeft={(() => {
+              return (
+                <>
                     {(() => {
                       // [2026-09-09 3순위 · 실측 기반] 대표사진 60 → 88px.
                       //   무신사(375px 화면)·지그재그 실측: 대표사진은 «화면 폭 100%»(375x450 / 375x375).
@@ -7294,11 +7293,14 @@ export default function OrderPage() {
                       {selectedPhoto ? <span style={{ position: "absolute", right: "4px", bottom: "4px", borderRadius: "999px", background: "rgba(0,0,0,0.72)", padding: "3px 7px", color: "#fff", fontSize: "10px", fontWeight: 900, lineHeight: 1 }}>🔍 크게</span> : null}
                     </div>;
                     })()}
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: "16px", fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{registeredOptionDetail || registeredOptionSelectProduct.product_name}</div>
-                      {registeredOptionBrandGroup && registeredOptionDetail ? <div style={{ marginTop: "2px", fontSize: "11px", fontWeight: 700, color: "#8A8A8A" }}>{registeredOptionBrandGroup.brandKo}</div> : null}
-                      <div style={{ marginTop: "3px", fontSize: "15px", fontWeight: 800, color: "#7A1E47" }}>
-                        {/* [조합형 옵션] 선택 전엔 "기본가~", 선택하면 그 세부상품 단가 표시 / [무료나눔] 0원 표기 */}
+                </>
+              );
+            })()}
+            title={registeredOptionDetail || registeredOptionSelectProduct.product_name}
+            subtitle={(
+              <>
+                {registeredOptionBrandGroup && registeredOptionDetail ? <span style={{ fontSize: "11px", fontWeight: 700, color: "#8A8A8A" }}>{registeredOptionBrandGroup.brandKo} · </span> : null}
+                <span style={{ fontSize: "15px", fontWeight: 800, color: "#7A1E47" }}>
                         {registeredOptionComboInfo
                           ? (registeredOptionBrandGroup ? registeredOptionDetail.trim() : registeredOptionColor.trim())
                             ? won(registeredOptionUnitPrice)
@@ -7310,9 +7312,11 @@ export default function OrderPage() {
                             : registeredOptionSelectProduct && isFreeOrderProduct(registeredOptionSelectProduct)
                               ? "0원 · 🎁 무료나눔"
                               : "가격 직접입력"}
-                      </div>
-                    </div>
-                  </div>
+                </span>
+              </>
+            )}
+            headerBelow={registeredOptionAllImages.length > 1 ? (
+              <div style={{ padding: "0 16px 12px", borderBottom: "1px solid #F0EAE0" }}>
                   {/* [2026-09-09 3순위] 예전엔 썸네일을 눌러도 «확대창»만 떠서 위 대표사진은 그대로였다.
                       → 탭하면 위 대표사진이 «그 사진으로 바뀐다». 지금 보고 있는 것에는 테두리를 준다.
                       (Baymard 공개 조사: 모바일에서도 점 인디케이터보다 «썸네일»이 낫다 — 오탭이 적다)
@@ -7336,9 +7340,162 @@ export default function OrderPage() {
                     </div>
                     );
                   })() : null}
+              </div>
+            ) : undefined}
+            footer={(
+              <>
+                {registeredOptionBrandCartEntries.length > 0 ? (
+                  <section style={{ flexShrink: 0, maxHeight: "138px", overflowY: "auto", borderTop: "1px solid #D8EADF", background: "#F3FBF7", padding: "9px 14px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "6px" }}>
+                      <strong style={{ fontSize: "12px", color: "#0F6E56" }}>✓ 이 브랜드에서 담은 상품</strong>
+                      <span style={{ borderRadius: "999px", background: "#0F6E56", padding: "2px 8px", color: "#fff", fontSize: "10px", fontWeight: 900 }}>총 {registeredOptionBrandCartCount}개</span>
+                    </div>
+                    <div style={{ display: "grid", gap: "5px" }}>
+                      {registeredOptionBrandCartEntries.map(({ item, itemIndex }, index) => {
+                        // [2026-08-28 P0-3] "색상 없음"을 손님에게 보여주지 않는다(표시 전용).
+                        const colorText = normalizeEmptyProductOptionValue(item.color);
+                        const sizeText = normalizeEmptyProductOptionValue(item.size);
+                        const qty = Math.max(1, Number(item.qty) || 1);
+                        const optionSummary = [
+                          colorText ? `색상 ${colorText}` : "",
+                          sizeText ? `사이즈 ${sizeText}` : "",
+                          `수량 ${qty}개`,
+                        ].filter(Boolean).join(" · ");
+                        return (
+                          <div key={`brand-cart-summary-${index}`} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto auto", alignItems: "center", gap: "8px", borderRadius: "9px", background: "#fff", padding: "7px 9px", border: "1px solid #DDEEE4" }}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 900, color: "#263A31" }}>{item.product_name}</div>
+                              <div style={{ marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "10px", fontWeight: 700, color: "#6B8074" }}>{optionSummary}</div>
+                            </div>
+                            <strong style={{ alignSelf: "center", fontSize: "11px", color: "#0F6E56" }}>{won(toNumber(item.product_price) * qty)}</strong>
+                            <button
+                              type="button"
+                              aria-label={`${item.product_name} 주문서에서 삭제`}
+                              onClick={() => guardChatItem(item, `${item.product_name} · ${qty}개 삭제`, "삭제할게요", () => {
+                                removeItem(itemIndex);
+                                showCustomerNotice(`${item.product_name}을(를) 주문서에서 삭제했어요.`, "info");
+                              })}
+                              style={{ minWidth: "42px", height: "28px", borderRadius: "8px", border: "1px solid #E3C6CD", background: "#FFF7F8", padding: "0 7px", color: "#A13A50", fontSize: "10px", fontWeight: 900, cursor: "pointer" }}
+                            >삭제</button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ) : null}
+
+                {registeredOptionDetailSelected && registeredOptionNeedsManualPrice ? (
+                  <div style={{ flexShrink: 0, borderTop: "1px solid #F0EAE0", background: "#FFF8FA", padding: "12px 18px" }}>
+                    {/* [2026-09-03 재설계 4단계 · 표시 전용] 가격 직접입력 — 주황 점선+배지+예시 (0원 금지 등 검증 무수정) */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+                      <span style={{ fontSize: "12px", fontWeight: 900, color: "#7A1E47" }}>상품 금액</span>
+                      <span style={{ background: "#9A6212", color: "#fff", fontSize: "10px", fontWeight: 900, borderRadius: "9999px", padding: "2px 8px" }}>🖊 직접 입력</span>
+                      <span style={{ fontSize: "11px", fontWeight: 800, color: "#9A6212" }}>방송에서 들은 금액을 적어주세요</span>
+                    </div>
+                    <input inputMode="numeric" value={registeredOptionManualPrice > 0 ? registeredOptionManualPrice.toLocaleString("ko-KR") : ""} onChange={(e) => setRegisteredOptionManualPrice(Math.max(0, Number(e.target.value.replace(/[^0-9]/g, "")) || 0))} placeholder="예: 59,000" style={{ width: "100%", height: "46px", boxSizing: "border-box", borderRadius: "12px", border: registeredOptionManualPrice > 0 ? "1.5px solid #B08794" : "2px dashed #E2B64D", padding: "0 13px", fontSize: "16px", fontWeight: 900, color: "#222", background: registeredOptionManualPrice > 0 ? "#fff" : "#FFFDF5", outline: "none" }} />
+                    {registeredOptionManualPrice < 1 ? <div style={{ marginTop: "5px", fontSize: "11px", fontWeight: 800, color: "#C0392B" }}>이 상품은 고객이 금액을 직접 입력하는 상품입니다.</div> : null}
+                  </div>
+                ) : null}
+
+                <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "14px 18px" }}>
+                  {registeredOptionDetailSelected ? (
+                    <>
+                      <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                        <span style={{ fontSize: "14px", fontWeight: 800, color: "#333" }}>수량</span>
+                        {registeredOptionAvailableQty !== null ? (
+                          <span style={{ fontSize: "10.5px", fontWeight: 800, whiteSpace: "nowrap", color: registeredOptionAvailableQty <= 3 ? "#C0392B" : "#0F6E56" }}>
+                            {registeredOptionAvailableQty > 0 ? `최대 ${registeredOptionAvailableQty}개` : "지금 품절"}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "40px 44px 40px", height: "44px", borderRadius: "12px", border: "1px solid #E8E2DD", overflow: "hidden" }}>
+                        <button type="button" onClick={() => setRegisteredOptionQty((c) => Math.max(1, c - 1))} style={{ borderRight: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#555", cursor: "pointer" }}>−</button>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionQty}</div>
+                        <button type="button" onClick={() => {
+                          // [2026-09-11] 상한 = 「최대 N개」와 같은 숫자(재고 − 홀드). 재고연동 아니면 예전처럼 999.
+                          const maxStock = registeredOptionAvailableQty === null ? 999 : Math.max(1, registeredOptionAvailableQty);
+                          setRegisteredOptionQty((c) => Math.min(c + 1, maxStock));
+                        }} style={{ borderLeft: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+</button>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: "11px", fontWeight: 700, color: "#999" }}>선택금액</div>
+                        <div style={{ fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionTotalPrice > 0 ? won(registeredOptionTotalPrice) : "가격 직접입력"}</div>
+                      </div>
+                    </>
+                  ) : registeredOptionBrandGroup && registeredOptionBrandCartCount > 0 ? (
+                    <div style={{ width: "100%" }}>
+                      <strong style={{ display: "block", fontSize: "13px", color: "#0F6E56" }}>이 브랜드에서 총 {registeredOptionBrandCartCount}개 담았어요</strong>
+                    </div>
+                  ) : (
+                    <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+                      <div>
+                        <strong style={{ display: "block", fontSize: "13px", color: "#4A3D42" }}>세부상품을 먼저 선택해 주세요</strong>
+                        <span style={{ display: "block", marginTop: "2px", fontSize: "10px", fontWeight: 700, color: "#9A8E93" }}>선택 후 수량과 금액이 표시됩니다</span>
+                      </div>
+                      <span style={{ flexShrink: 0, fontSize: "13px", fontWeight: 900, color: "#B2A9AD" }}>수량 — · 금액 —</span>
+                    </div>
+                  )}
                 </div>
 
-                <div data-registered-option-scroll="true" style={{ minHeight: 0, flex: 1, overflowY: "auto", padding: "16px" }}>
+                <div style={{ flexShrink: 0, display: "grid", gridTemplateColumns: "1fr", gap: "10px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "14px 18px calc(16px + env(safe-area-inset-bottom))" }}>
+                  {registeredOptionShowBrandDoneOnly ? (
+                    <button type="button" onClick={closeRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#7A1E47", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>상품 선택 완료 · 총 {registeredOptionBrandCartCount}개</button>
+                  ) : (
+                    <>
+                    {/* [2026-09-20] 왼쪽 「닫기」 삭제 — 닫기는 우상단 ✕(틀). 세부상품 화면에서 «목록으로»는 본문 맨 위 「‹ 종류 다시 고르기」. */}
+                    {allOptionsSoldOut ? (
+                    <button type="button" disabled style={{ height: "52px", borderRadius: "16px", border: "none", background: "#ccc", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "not-allowed" }}>품절</button>
+                    ) : (
+                    <button
+                      type="button"
+                      aria-disabled={!registeredOptionSelectionReady}
+                      onClick={() => {
+                        // [2026-08-28 P0-4] 비활성으로 막아두면 눌러도 아무 반응이 없어 손님이 이유를 모른 채 이탈했다.
+                        //   → 누르면 무엇이 빠졌는지 빨간색으로 알려주고 그 자리로 스크롤한다.
+                        if (!registeredOptionSelectionReady) {
+                          setRegisteredOptionAttempted(true);
+                          requestAnimationFrame(() => {
+                            document.querySelector<HTMLElement>('[data-order-option-missing="true"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
+                          });
+                          return;
+                        }
+                        confirmRegisteredOptionSelectSheet();
+                      }}
+                      style={{ height: "52px", borderRadius: "16px", border: "none", background: registeredOptionSelectionReady ? "#7A1E47" : "#CFC4C8", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "pointer" }}
+                    >{registeredOptionSelectionReady
+                      ? (registeredOptionBrandGroup ? "선택상품 담기" : "장바구니 담기")
+                      : registeredOptionCustomerDetailRequired && !normalizeCustomerDetailName(registeredOptionCustomerDetail)
+                        ? "세부상품명을 입력해 주세요"
+                        : registeredOptionAxes3 && !registeredOptionDetail.trim()
+                          ? "세부상품을 먼저 선택"
+                          : !registeredOptionColorSelected
+                            ? (registeredOptionColorMode === "input"
+                                ? (() => { const lb = getCustomInputLabel(registeredOptionSelectProduct); return lb ? `${lb}${koEulReul(lb)} 입력해 주세요` : "색상을 입력해 주세요"; })()
+                                : "색상을 선택해 주세요")
+                            : !registeredOptionSizeSelected
+                              ? (registeredOptionSizeMode === "input" ? "사이즈를 입력해 주세요" : "사이즈를 선택해 주세요")
+                              : "옵션을 선택해 주세요"}</button>
+                    )}
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          >
+                {/* [2026-09-20] 세부상품(3단) 화면에서 «목록으로» — 예전엔 푸터 「닫기」가 이 역할을 겸했다. */}
+                {registeredOptionAxes3 && registeredOptionDetail.trim() && registeredOptionEditIndex === null ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRegisteredOptionDetail("");
+                      setRegisteredOptionColor("");
+                      setRegisteredOptionSize("");
+                      setRegisteredOptionCustomerDetail("");
+                      setRegisteredOptionQty(1);
+                    }}
+                    style={{ marginBottom: "10px", border: "1px solid #D9C5CC", background: "#fff", borderRadius: "999px", padding: "7px 12px", fontSize: "12px", fontWeight: 900, color: "#7A1E47", cursor: "pointer" }}
+                  >‹ 종류 다시 고르기</button>
+                ) : null}
                   {registeredOptionColorMode === "none" && registeredOptionSizeMode === "none" && !(registeredOptionSelectProduct && (readOrderAxes3(registeredOptionSelectProduct) || readComboInfoOrderProduct(registeredOptionSelectProduct))) ? (
                     <div style={{ padding: "12px 16px 0", fontSize: "12px", color: "#7B736D" }}>
                       {/* [2026-08-29] 예전에는 색상·사이즈만 보고 "옵션이 없습니다. 수량만 선택"이라고 했는데,
@@ -7701,188 +7858,29 @@ export default function OrderPage() {
                       ) : null}
                     </div>
                   ) : null}
-                </div>
-
-                {registeredOptionBrandCartEntries.length > 0 ? (
-                  <section style={{ flexShrink: 0, maxHeight: "138px", overflowY: "auto", borderTop: "1px solid #D8EADF", background: "#F3FBF7", padding: "9px 14px" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "6px" }}>
-                      <strong style={{ fontSize: "12px", color: "#0F6E56" }}>✓ 이 브랜드에서 담은 상품</strong>
-                      <span style={{ borderRadius: "999px", background: "#0F6E56", padding: "2px 8px", color: "#fff", fontSize: "10px", fontWeight: 900 }}>총 {registeredOptionBrandCartCount}개</span>
-                    </div>
-                    <div style={{ display: "grid", gap: "5px" }}>
-                      {registeredOptionBrandCartEntries.map(({ item, itemIndex }, index) => {
-                        // [2026-08-28 P0-3] "색상 없음"을 손님에게 보여주지 않는다(표시 전용).
-                        const colorText = normalizeEmptyProductOptionValue(item.color);
-                        const sizeText = normalizeEmptyProductOptionValue(item.size);
-                        const qty = Math.max(1, Number(item.qty) || 1);
-                        const optionSummary = [
-                          colorText ? `색상 ${colorText}` : "",
-                          sizeText ? `사이즈 ${sizeText}` : "",
-                          `수량 ${qty}개`,
-                        ].filter(Boolean).join(" · ");
-                        return (
-                          <div key={`brand-cart-summary-${index}`} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto auto", alignItems: "center", gap: "8px", borderRadius: "9px", background: "#fff", padding: "7px 9px", border: "1px solid #DDEEE4" }}>
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 900, color: "#263A31" }}>{item.product_name}</div>
-                              <div style={{ marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "10px", fontWeight: 700, color: "#6B8074" }}>{optionSummary}</div>
-                            </div>
-                            <strong style={{ alignSelf: "center", fontSize: "11px", color: "#0F6E56" }}>{won(toNumber(item.product_price) * qty)}</strong>
-                            <button
-                              type="button"
-                              aria-label={`${item.product_name} 주문서에서 삭제`}
-                              onClick={() => guardChatItem(item, `${item.product_name} · ${qty}개 삭제`, "삭제할게요", () => {
-                                removeItem(itemIndex);
-                                showCustomerNotice(`${item.product_name}을(를) 주문서에서 삭제했어요.`, "info");
-                              })}
-                              style={{ minWidth: "42px", height: "28px", borderRadius: "8px", border: "1px solid #E3C6CD", background: "#FFF7F8", padding: "0 7px", color: "#A13A50", fontSize: "10px", fontWeight: 900, cursor: "pointer" }}
-                            >삭제</button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </section>
-                ) : null}
-
-                {registeredOptionDetailSelected && registeredOptionNeedsManualPrice ? (
-                  <div style={{ flexShrink: 0, borderTop: "1px solid #F0EAE0", background: "#FFF8FA", padding: "12px 18px" }}>
-                    {/* [2026-09-03 재설계 4단계 · 표시 전용] 가격 직접입력 — 주황 점선+배지+예시 (0원 금지 등 검증 무수정) */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
-                      <span style={{ fontSize: "12px", fontWeight: 900, color: "#7A1E47" }}>상품 금액</span>
-                      <span style={{ background: "#9A6212", color: "#fff", fontSize: "10px", fontWeight: 900, borderRadius: "9999px", padding: "2px 8px" }}>🖊 직접 입력</span>
-                      <span style={{ fontSize: "11px", fontWeight: 800, color: "#9A6212" }}>방송에서 들은 금액을 적어주세요</span>
-                    </div>
-                    <input inputMode="numeric" value={registeredOptionManualPrice > 0 ? registeredOptionManualPrice.toLocaleString("ko-KR") : ""} onChange={(e) => setRegisteredOptionManualPrice(Math.max(0, Number(e.target.value.replace(/[^0-9]/g, "")) || 0))} placeholder="예: 59,000" style={{ width: "100%", height: "46px", boxSizing: "border-box", borderRadius: "12px", border: registeredOptionManualPrice > 0 ? "1.5px solid #B08794" : "2px dashed #E2B64D", padding: "0 13px", fontSize: "16px", fontWeight: 900, color: "#222", background: registeredOptionManualPrice > 0 ? "#fff" : "#FFFDF5", outline: "none" }} />
-                    {registeredOptionManualPrice < 1 ? <div style={{ marginTop: "5px", fontSize: "11px", fontWeight: 800, color: "#C0392B" }}>이 상품은 고객이 금액을 직접 입력하는 상품입니다.</div> : null}
-                  </div>
-                ) : null}
-
-                <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "14px 18px" }}>
-                  {registeredOptionDetailSelected ? (
-                    <>
-                      <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                        <span style={{ fontSize: "14px", fontWeight: 800, color: "#333" }}>수량</span>
-                        {registeredOptionAvailableQty !== null ? (
-                          <span style={{ fontSize: "10.5px", fontWeight: 800, whiteSpace: "nowrap", color: registeredOptionAvailableQty <= 3 ? "#C0392B" : "#0F6E56" }}>
-                            {registeredOptionAvailableQty > 0 ? `최대 ${registeredOptionAvailableQty}개` : "지금 품절"}
-                          </span>
-                        ) : null}
-                      </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "40px 44px 40px", height: "44px", borderRadius: "12px", border: "1px solid #E8E2DD", overflow: "hidden" }}>
-                        <button type="button" onClick={() => setRegisteredOptionQty((c) => Math.max(1, c - 1))} style={{ borderRight: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#555", cursor: "pointer" }}>−</button>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionQty}</div>
-                        <button type="button" onClick={() => {
-                          // [2026-09-11] 상한 = 「최대 N개」와 같은 숫자(재고 − 홀드). 재고연동 아니면 예전처럼 999.
-                          const maxStock = registeredOptionAvailableQty === null ? 999 : Math.max(1, registeredOptionAvailableQty);
-                          setRegisteredOptionQty((c) => Math.min(c + 1, maxStock));
-                        }} style={{ borderLeft: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+</button>
-                      </div>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: "11px", fontWeight: 700, color: "#999" }}>선택금액</div>
-                        <div style={{ fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionTotalPrice > 0 ? won(registeredOptionTotalPrice) : "가격 직접입력"}</div>
-                      </div>
-                    </>
-                  ) : registeredOptionBrandGroup && registeredOptionBrandCartCount > 0 ? (
-                    <div style={{ width: "100%" }}>
-                      <strong style={{ display: "block", fontSize: "13px", color: "#0F6E56" }}>이 브랜드에서 총 {registeredOptionBrandCartCount}개 담았어요</strong>
-                    </div>
-                  ) : (
-                    <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
-                      <div>
-                        <strong style={{ display: "block", fontSize: "13px", color: "#4A3D42" }}>세부상품을 먼저 선택해 주세요</strong>
-                        <span style={{ display: "block", marginTop: "2px", fontSize: "10px", fontWeight: 700, color: "#9A8E93" }}>선택 후 수량과 금액이 표시됩니다</span>
-                      </div>
-                      <span style={{ flexShrink: 0, fontSize: "13px", fontWeight: 900, color: "#B2A9AD" }}>수량 — · 금액 —</span>
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ flexShrink: 0, display: "grid", gridTemplateColumns: registeredOptionShowBrandDoneOnly ? "1fr" : "0.85fr 1.15fr", gap: "10px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "14px 18px calc(16px + env(safe-area-inset-bottom))" }}>
-                  {registeredOptionShowBrandDoneOnly ? (
-                    <button type="button" onClick={closeRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#7A1E47", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>상품 선택 완료 · 총 {registeredOptionBrandCartCount}개</button>
-                  ) : (
-                    <>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        // [2026-08-31 사장님 요청] 세부상품 사이즈 화면에서 닫기 누르면 메인으로 튕겼다
-                        //   → 이전 화면(그 브랜드 세부상품 목록)으로 돌아간다. 목록 화면에서만 시트 전체를 닫는다.
-                        //   (장바구니 수정으로 바로 들어온 경우는 원래대로 닫기 = 시트 닫힘)
-                        if (registeredOptionAxes3 && registeredOptionDetail.trim() && registeredOptionEditIndex === null) {
-                          setRegisteredOptionDetail("");
-                          setRegisteredOptionColor("");
-                          setRegisteredOptionSize("");
-                          setRegisteredOptionCustomerDetail("");
-                          setRegisteredOptionQty(1);
-                          return;
-                        }
-                        closeRegisteredOptionSelectSheet();
-                      }}
-                      style={{ height: "52px", borderRadius: "16px", border: "none", background: "#F1ECEE", fontSize: "16px", fontWeight: 800, color: "#666", cursor: "pointer" }}
-                    >닫기</button>
-                    {allOptionsSoldOut ? (
-                    <button type="button" disabled style={{ height: "52px", borderRadius: "16px", border: "none", background: "#ccc", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "not-allowed" }}>품절</button>
-                    ) : (
-                    <button
-                      type="button"
-                      aria-disabled={!registeredOptionSelectionReady}
-                      onClick={() => {
-                        // [2026-08-28 P0-4] 비활성으로 막아두면 눌러도 아무 반응이 없어 손님이 이유를 모른 채 이탈했다.
-                        //   → 누르면 무엇이 빠졌는지 빨간색으로 알려주고 그 자리로 스크롤한다.
-                        if (!registeredOptionSelectionReady) {
-                          setRegisteredOptionAttempted(true);
-                          requestAnimationFrame(() => {
-                            document.querySelector<HTMLElement>('[data-order-option-missing="true"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
-                          });
-                          return;
-                        }
-                        confirmRegisteredOptionSelectSheet();
-                      }}
-                      style={{ height: "52px", borderRadius: "16px", border: "none", background: registeredOptionSelectionReady ? "#7A1E47" : "#CFC4C8", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "pointer" }}
-                    >{registeredOptionSelectionReady
-                      ? (registeredOptionBrandGroup ? "선택상품 담기" : "장바구니 담기")
-                      : registeredOptionCustomerDetailRequired && !normalizeCustomerDetailName(registeredOptionCustomerDetail)
-                        ? "세부상품명을 입력해 주세요"
-                        : registeredOptionAxes3 && !registeredOptionDetail.trim()
-                          ? "세부상품을 먼저 선택"
-                          : !registeredOptionColorSelected
-                            ? (registeredOptionColorMode === "input"
-                                ? (() => { const lb = getCustomInputLabel(registeredOptionSelectProduct); return lb ? `${lb}${koEulReul(lb)} 입력해 주세요` : "색상을 입력해 주세요"; })()
-                                : "색상을 선택해 주세요")
-                            : !registeredOptionSizeSelected
-                              ? (registeredOptionSizeMode === "input" ? "사이즈를 입력해 주세요" : "사이즈를 선택해 주세요")
-                              : "옵션을 선택해 주세요"}</button>
-                    )}
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
+          </CustomerBottomSheet>
           )}
 
           {directInputOpen && directInputItem && (
-            <div className="fixed inset-0 z-[130] bg-slate-950/55 backdrop-blur-[2px]">
-              <div
-                data-sheet
-                data-ruru-direct-input-shell="direct-input-shell-v2"
-                className={directInputProductSearchMode ? "absolute inset-x-0 bottom-0 mx-auto max-h-[95dvh] w-full max-w-[430px] overflow-hidden rounded-t-[30px] bg-white shadow-[0_-24px_80px_rgba(15,23,42,0.25)]" : "absolute inset-x-0 bottom-0 mx-auto max-h-[90dvh] w-full max-w-[430px] overflow-hidden rounded-t-[30px] bg-white shadow-[0_-24px_80px_rgba(15,23,42,0.25)]"}
-                style={{
-                  bottom: directInputProductSearchMode ? "0px" : directInputKeyboardInset > 0 ? `${directInputKeyboardInset}px` : "0px",
-                }}
-              >
-                <SheetGrabber onClose={closeDirectInputSheet} style={{ paddingTop: "8px", paddingBottom: 0 }} />
-
-                <div className="max-h-[calc(95dvh-18px)] overflow-x-hidden overflow-y-auto px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-4">
-                  <div data-ruru-direct-input-no-top-close="enabled" className="mb-3">
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <h2 className="text-[27px] font-black leading-none tracking-[-0.08em] text-slate-950">
-                        상품 직접 입력
-                      </h2>
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black tracking-[-0.04em] text-slate-500">
-                        추천에 없는 상품을 직접 입력
-                      </span>
-                    </div>
-                  </div>
-
+          <CustomerBottomSheet
+            open
+            onClose={closeDirectInputSheet}
+            title="상품 직접 입력"
+            subtitle="추천에 없는 상품을 직접 입력"
+            bottomInset={directInputProductSearchMode ? 0 : directInputKeyboardInset}
+            bodyPadding="16px"
+            bodyStyle={{ overflowX: "hidden" }}
+            closeGuard={() => {
+              // [2026-09-20] 입력 중이면 한 번 묻는다(✕·배경·뒤로가기 어느 쪽이든). 빈 칸이면 바로 닫힘.
+              const typed = Boolean(String(directInputItem.product_name || "").trim() || Number(directInputItem.product_price) > 0);
+              return !typed || window.confirm("입력 중인 내용이 지워져요. 닫을까요?");
+            }}
+            footer={(
+              <button type="button" onClick={confirmDirectInputSheet} style={csPrimaryButtonStyle(true)}>
+                장바구니 담기
+              </button>
+            )}
+          >
                   <div className="grid min-w-0 gap-3 overflow-x-hidden">
                     <div data-ruru-product-search-area className={directInputProductSearchMode ? "sticky top-0 z-20 grid gap-2 rounded-b-2xl bg-white pb-2" : "grid gap-2"}>
                       <label className="min-w-0 grid gap-2">
@@ -8044,26 +8042,8 @@ export default function OrderPage() {
                       방송에서 안내받은 상품명, 옵션, 금액을 입력해 주세요. 색상·사이즈를 직접 입력해 주세요.
                     </div>
 
-                    <div className="grid min-w-0 grid-cols-[0.8fr_1.2fr] gap-3 pt-2">
-                      <button
-                        type="button"
-                        onClick={closeDirectInputSheet}
-                        className="h-14 rounded-[22px] bg-slate-100 text-[17px] font-black tracking-[-0.05em] text-slate-700"
-                      >
-                        취소
-                      </button>
-                      <button
-                        type="button"
-                        onClick={confirmDirectInputSheet}
-                        className="h-14 rounded-[22px] bg-rose-deep text-[17px] font-black tracking-[-0.05em] text-white shadow-[0_12px_28px_rgba(216,90,48,0.28)]"
-                      >
-                        장바구니 담기
-                      </button>
-                    </div>
                   </div>
-                </div>
-              </div>
-            </div>
+          </CustomerBottomSheet>
           )}
 
           {/* [2026-08-12 리뉴얼 3단계] 하단 = 제출 바 + 탭 5개.
@@ -8145,14 +8125,13 @@ export default function OrderPage() {
       )}
 
         {howToOpen ? (
-          <div
-            style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
-            onClick={(e) => { if (e.target === e.currentTarget) setHowToOpen(false); }}
+          <CustomerBottomSheet
+            open
+            onClose={() => setHowToOpen(false)}
+            title="📌 주문 방법"
+            bodyPadding="4px 0 16px"
+            footer={<button type="button" onClick={() => setHowToOpen(false)} style={csPrimaryButtonStyle(true)}>확인</button>}
           >
-            <div data-sheet style={{ background: "#fff", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: "430px", paddingBottom: "24px", maxHeight: "92dvh", overflowY: "auto" }}>
-              <SheetGrabber onClose={() => setHowToOpen(false)} style={{ paddingTop: "8px", paddingBottom: "4px" }} />
-              <div style={{ fontSize: "18px", fontWeight: 800, color: "#1A1A1A", padding: "0 20px", marginBottom: "18px" }}>📌 주문 방법</div>
-
               {/* [2026-07-10] 3단계 내용은 관리자 설정(howto_steps)에서 수정. 설정이 없으면 기본 문구. */}
               <div style={{ padding: "0 20px" }}>
                 {howToSteps.map((step, i) => {
@@ -8172,57 +8151,49 @@ export default function OrderPage() {
                 })}
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "0 20px", marginTop: "16px" }}>
+              {/* [2026-09-20] 「확인」은 푸터(풀폭 1개)로. 「오늘 하루 열지 않기」는 본문 끝 글자 버튼. */}
+              <div style={{ padding: "16px 20px 0", textAlign: "center" }}>
                 <button
                   type="button"
                   onClick={() => { localStorage.setItem("ruru_howto_hide_until", String(Date.now() + 86400000)); setHowToOpen(false); }}
-                  style={{ border: "1px solid #E5E1DC", background: "#fff", borderRadius: "10px", padding: "11px", fontSize: "13px", color: "#7B736D", cursor: "pointer", width: "100%" }}
+                  style={{ border: "none", background: "none", fontSize: "13px", fontWeight: 700, color: "#7B736D", textDecoration: "underline", cursor: "pointer", padding: "8px" }}
                 >
                   오늘 하루 열지 않기
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setHowToOpen(false)}
-                  style={{ background: "#7A1E47", color: "#fff", border: "none", borderRadius: "12px", padding: "14px", fontSize: "15px", fontWeight: 700, cursor: "pointer", width: "100%" }}
-                >
-                  확인
-                </button>
               </div>
-            </div>
-          </div>
+          </CustomerBottomSheet>
         ) : null}
 
         {alertSheetOpen ? (
-          <div onClick={() => setAlertSheetOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 60, display: "flex", alignItems: "flex-end" }}>
-            <div data-sheet onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: "#fff", borderTopLeftRadius: "24px", borderTopRightRadius: "24px", padding: "8px 18px 26px" }}>
-              <SheetGrabber onClose={() => setAlertSheetOpen(false)} style={{ paddingTop: 0, paddingBottom: "4px" }} />
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px", marginBottom: "8px" }}>
-                <span style={{ fontSize: "17px", fontWeight: 800, color: "#7B2D43" }}>{liveAlertOptin ? "🔔 방송 시작 알림을 받고 있어요" : "🔔 방송 시작 알림을 받으시겠어요?"}</span>
-                <button type="button" onClick={() => setAlertSheetOpen(false)} aria-label="닫기" style={{ border: "none", background: "none", fontSize: "20px", color: "#999", cursor: "pointer", flexShrink: 0, lineHeight: 1 }}>✕</button>
-              </div>
+          <CustomerBottomSheet
+            open
+            size="half"
+            onClose={() => setAlertSheetOpen(false)}
+            title={liveAlertOptin ? "🔔 방송 시작 알림을 받고 있어요" : "🔔 방송 시작 알림을 받으시겠어요?"}
+            bodyPadding="14px 18px"
+            footer={liveAlertOptin ? (
+              <button type="button" disabled={liveAlertSaving} onClick={() => saveLiveAlertOptin(false)} style={{ ...csCancelButtonStyle, opacity: liveAlertSaving ? 0.6 : 1 }}>{liveAlertSaving ? "처리 중..." : "알림 끄기"}</button>
+            ) : (
+              <button type="button" disabled={liveAlertSaving} onClick={() => saveLiveAlertOptin(true)} style={csPrimaryButtonStyle(!liveAlertSaving)}>{liveAlertSaving ? "처리 중..." : "방송 알림 받기"}</button>
+            )}
+          >
               {/* [2026-07-29] 카톡 로그인 시 알림이 기본 ON이므로, 켜져 있는 손님에겐 "자동으로 켜졌고 여기서 끌 수 있다"고 알려준다(카카오 채널 정책 대비 고지). */}
-              <div style={{ fontSize: "13px", color: "#666", lineHeight: 1.6, marginBottom: "18px" }}>
+              <div style={{ fontSize: "14px", color: "#555", lineHeight: 1.7 }}>
                 {liveAlertOptin
                   ? "카카오톡 로그인을 하시면 방송 시작 알림이 자동으로 켜집니다. 라이브가 시작되면 카카오 알림톡으로 알려드려요. 원하지 않으시면 바로 아래 [알림 끄기] 버튼을 눌러 주세요."
                   : "신청하면 라이브 시작 때 카카오 알림톡으로 알려드려요. 신청 시 알림 수신에 동의하며, 언제든 끌 수 있어요."}
               </div>
-              {liveAlertOptin ? (
-                <button type="button" disabled={liveAlertSaving} onClick={() => saveLiveAlertOptin(false)} style={{ width: "100%", padding: "13px", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", fontSize: "15px", fontWeight: 700, cursor: "pointer" }}>알림 끄기</button>
-              ) : (
-                <button type="button" disabled={liveAlertSaving} onClick={() => saveLiveAlertOptin(true)} style={{ width: "100%", padding: "13px", borderRadius: "10px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "15px", fontWeight: 700, cursor: "pointer" }}>{liveAlertSaving ? "처리 중..." : "방송 알림 받기"}</button>
-              )}
-            </div>
-          </div>
+          </CustomerBottomSheet>
         ) : null}
 
         {inquirySheetOpen ? (
-          <div onClick={() => setInquirySheetOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 60, display: "flex", alignItems: "flex-end" }}>
-            <div data-sheet onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: "#fff", borderTopLeftRadius: "24px", borderTopRightRadius: "24px", padding: "8px 18px 18px" }}>
-              <SheetGrabber onClose={() => setInquirySheetOpen(false)} style={{ paddingTop: 0, paddingBottom: "4px" }} />
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                <span style={{ fontSize: "16px", fontWeight: 800, color: "#7B2D43" }}>문의하기</span>
-                <button type="button" onClick={() => setInquirySheetOpen(false)} aria-label="닫기" style={{ border: "none", background: "none", fontSize: "20px", color: "#999", cursor: "pointer" }}>✕</button>
-              </div>
+          <CustomerBottomSheet
+            open
+            size="half"
+            onClose={() => setInquirySheetOpen(false)}
+            title="문의하기"
+            bodyPadding="14px 18px"
+          >
               {/* [2026-07-10 사장님 지침] 카톡채널 = 1:1 문의 주 채널 → 가로 한 줄 단독 배치.
                   나머지(유튜브·밴드·인스타)는 아래 한 줄 3칸. 링크 주소는 전부 기존 그대로. */}
               {/* [2026-09-08] 문의 방식(채널/오픈채팅/카카오톡 ID)은 설정 › 상점 정보에서 정한다. 겉모습은 그대로. */}
@@ -8248,21 +8219,19 @@ export default function OrderPage() {
                 <a href="https://band.us/@ruru8249" target="_blank" rel="noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", padding: "12px 4px", borderRadius: "10px", background: "#F5F3F0", textDecoration: "none" }}><span style={{ fontSize: "18px" }}>🎵</span><span style={{ fontSize: "11px", color: "#6B6460", fontWeight: 600 }}>밴드</span></a>
                 <a href="https://www.instagram.com/ruru8249_?igsh=MXR3Z2xnYmI1cG0ybQ==" target="_blank" rel="noreferrer" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", padding: "12px 4px", borderRadius: "10px", background: "#F5F3F0", textDecoration: "none" }}><span style={{ fontSize: "18px" }}>📷</span><span style={{ fontSize: "11px", color: "#6B6460", fontWeight: 600 }}>인스타</span></a>
               </div>
-            </div>
-          </div>
+          </CustomerBottomSheet>
         ) : null}
 
         {noticeSheetOpen ? (
-          <div onClick={() => setNoticeSheetOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 60, display: "flex", alignItems: "flex-end" }}>
-            <div data-sheet onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: "#fff", borderTopLeftRadius: "24px", borderTopRightRadius: "24px", padding: "8px 18px 18px", maxHeight: "70vh", overflowY: "auto" }}>
-              <SheetGrabber onClose={() => setNoticeSheetOpen(false)} style={{ paddingTop: 0, paddingBottom: "4px" }} />
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-                <span style={{ fontSize: "16px", fontWeight: 800, color: "#7B2D43" }}>📢 공지사항</span>
-                <button type="button" onClick={() => setNoticeSheetOpen(false)} aria-label="닫기" style={{ border: "none", background: "none", fontSize: "20px", color: "#999", cursor: "pointer" }}>✕</button>
-              </div>
+          <CustomerBottomSheet
+            open
+            size="half"
+            onClose={() => setNoticeSheetOpen(false)}
+            title="📢 공지사항"
+            bodyPadding="14px 18px"
+          >
               <div style={{ background: "#F9EEF3", borderLeft: "3px solid #7A1E47", borderRadius: "8px", padding: "13px", fontSize: "14px", color: "#3a2f33", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{noticeText && noticeText.trim() ? noticeText : "등록된 공지가 없어요."}</div>
-            </div>
-          </div>
+          </CustomerBottomSheet>
         ) : null}
 
         <CustomerPaymentGuideBottomSheet

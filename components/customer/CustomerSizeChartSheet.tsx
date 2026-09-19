@@ -7,6 +7,8 @@
 
 import type { SizeChart } from "@/lib/sizeChart";
 import { sizeColumnIndex } from "@/lib/sizeChart";
+// [2026-09-20] 바텀시트 «한 벌» 틀 — 높이·헤더·✕·닫기 5종은 틀이 맡는다. 옵션 시트 위에 뜨므로 STACKED z.
+import CustomerBottomSheet, { CS_SHEET_Z_STACKED } from "./CustomerBottomSheet";
 
 type Props = {
   open: boolean;
@@ -21,30 +23,16 @@ export default function CustomerSizeChartSheet({ open, title, chart, selectedSiz
   const hot = sizeColumnIndex(chart, selectedSize);
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      aria-label="사이즈 실측 닫기"
-      onClick={onClose}
-      onKeyDown={(event) => { if (event.key === "Escape" || event.key === "Enter") onClose(); }}
-      style={{ position: "fixed", inset: 0, zIndex: 100050, background: "rgba(39,28,33,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+    <CustomerBottomSheet
+      open
+      onClose={onClose}
+      zIndex={CS_SHEET_Z_STACKED}
+      title="사이즈 실측"
+      subtitle={title}
+      headerRight={<span style={{ fontSize: "12px", fontWeight: 800, color: "#7A1E47" }}>단위 {chart.unit}</span>}
+      bodyPadding="10px 12px 16px"
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="사이즈 실측"
-        onClick={(event) => event.stopPropagation()}
-        style={{ width: "100%", maxWidth: "560px", maxHeight: "82vh", display: "flex", flexDirection: "column", background: "#fff", borderTopLeftRadius: "18px", borderTopRightRadius: "18px", overflow: "hidden", boxShadow: "0 -10px 40px rgba(0,0,0,0.22)" }}
-      >
-        <div style={{ padding: "14px 16px 10px", borderBottom: "1px solid #F0EAE0" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ fontSize: "15px", fontWeight: 900, color: "#3F3438" }}>사이즈 실측</span>
-            <span style={{ marginLeft: "auto", fontSize: "12px", fontWeight: 800, color: "#7A1E47" }}>단위 {chart.unit}</span>
-          </div>
-          <div style={{ marginTop: "3px", fontSize: "12px", fontWeight: 700, color: "#8B7D83", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
-        </div>
-
-        <div style={{ overflow: "auto", padding: "10px 12px 4px" }}>
+        <div>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
             <thead>
               <tr>
@@ -82,17 +70,6 @@ export default function CustomerSizeChartSheet({ open, title, chart, selectedSiz
             판매처가 손으로 잰 값이라 1~2{chart.unit} 오차가 있을 수 있습니다.
           </div>
         </div>
-
-        <div style={{ marginTop: "auto", padding: "10px 14px 14px", borderTop: "1px solid #F0EAE0" }}>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{ width: "100%", height: "46px", borderRadius: "14px", border: "none", background: "#7A1E47", color: "#fff", fontSize: "15px", fontWeight: 900, cursor: "pointer" }}
-          >
-            닫기
-          </button>
-        </div>
-      </div>
-    </div>
+    </CustomerBottomSheet>
   );
 }

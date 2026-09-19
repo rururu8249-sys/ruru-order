@@ -3,7 +3,8 @@
 // 주의: UI 전용. DB, API, 주문저장, 입금매칭, 정산, 배송 로직 없음. (시안 딥로즈 #7B2D43 인라인)
 
 import { useEffect, useRef, type CSSProperties } from "react";
-import SheetGrabber from "@/components/customer/SheetGrabber";
+// [2026-09-20] 바텀시트 «한 벌» 틀(높이·헤더·✕·닫기 5종). 조회·필터·무한스크롤 로직은 그대로.
+import CustomerBottomSheet, { csPrimaryButtonStyle } from "@/components/customer/CustomerBottomSheet";
 
 export type CustomerOrderLookupFilter = "전체" | "결제대기" | "결제완료" | "출고완료" | "주문취소";
 
@@ -99,25 +100,16 @@ export default function CustomerOrderLookupBottomSheet({
   if (!open) return null;
 
   return (
-    <div
-      data-ruru-order-lookup-bottom-sheet="shell-v3-group"
-      style={{ position: "fixed", inset: 0, zIndex: 90, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(15,23,42,0.45)" }}
-      role="dialog"
-      aria-modal="true"
-      aria-label="주문조회"
-      onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
-    >
-      <section data-sheet style={{ width: "100%", maxWidth: "560px", margin: "0 auto", overflow: "hidden", borderTopLeftRadius: "28px", borderTopRightRadius: "28px", background: "#fff", boxShadow: "0 -22px 70px rgba(15,23,42,0.22)" }}>
-        <SheetGrabber onClose={onClose} style={{ paddingTop: "8px", paddingBottom: 0 }} />
-
-        {/* [2026-08-31 사장님 지적] 탭·내용 양에 따라 시트가 커졌다 작아졌다 → 높이 고정, 목록만 안에서 스크롤 */}
-        <div style={{ display: "flex", height: "84dvh", flexDirection: "column" }}>
-          <header style={{ flexShrink: 0, padding: "16px 16px 8px" }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: "8px", whiteSpace: "nowrap" }}>
-              <h2 style={{ fontSize: "26px", fontWeight: 800, lineHeight: 1, letterSpacing: "-0.08em", color: "#7B2D43" }}>주문조회</h2>
-              <span style={{ fontSize: "12px", fontWeight: 800, color: "#999" }}>최근 6개월 주문내역</span>
-            </div>
-
+    <CustomerBottomSheet
+      open
+      onClose={onClose}
+      title="주문조회"
+      subtitle="최근 6개월 주문내역"
+      bodyRef={scrollRef}
+      onBodyScroll={handleScroll}
+      bodyPadding="8px 16px"
+      headerBelow={(
+        <div style={{ padding: "10px 16px 8px" }}>
             <div style={{ marginTop: "14px", display: "grid", gridTemplateColumns: `repeat(${filters.length}, 1fr)`, borderRadius: "14px", background: "#F5F1F2", padding: "4px", gap: "2px" }}>
               {filters.map((filter) => {
                 const selected = activeFilter === filter;
@@ -133,9 +125,27 @@ export default function CustomerOrderLookupBottomSheet({
                 );
               })}
             </div>
-          </header>
-
-          <div ref={scrollRef} onScroll={handleScroll} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "8px 16px" }}>
+        </div>
+      )}
+      footer={(
+        <div style={{ display: "grid", rowGap: "6px" }}>
+            <a
+              href={BAND_TRACKING_URL}
+              target="_blank"
+              rel="noreferrer"
+              style={{ display: "flex", minHeight: "46px", alignItems: "center", gap: "10px", borderRadius: "14px", border: "1px solid #C8E6C9", background: "#EAF6EA", padding: "6px 12px", textDecoration: "none" }}
+            >
+              <div style={{ display: "flex", height: "36px", width: "36px", flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: "50%", background: "#21c531", fontSize: "11px", fontWeight: 800, color: "#fff" }}>BAND</div>
+              <p style={{ minWidth: 0, flex: 1, wordBreak: "keep-all", fontSize: "14px", fontWeight: 800, lineHeight: 1.3, letterSpacing: "-0.05em", color: "#1B5E20" }}>밴드에서 택배송장번호 확인 가능</p>
+              <div style={{ flexShrink: 0, fontSize: "18px", fontWeight: 800, color: "#2E7D32" }}>›</div>
+            </a>
+            {/* [2026-09-20] 왼쪽 「닫기」 삭제 — 닫기는 우상단 ✕(틀). 주 버튼 1개 풀폭. */}
+            <button type="button" onClick={onOpenPaymentGuide} style={csPrimaryButtonStyle(true)}>
+              입금 계좌 보기
+            </button>
+        </div>
+      )}
+    >
             {groups.length > 0 ? (
               <div style={{ display: "grid", gap: "10px" }}>
                 {groups.map((group) => {
@@ -238,38 +248,6 @@ export default function CustomerOrderLookupBottomSheet({
                 </p>
               </div>
             )}
-          </div>
-
-          <footer style={{ display: "grid", flexShrink: 0, gridTemplateColumns: "0.78fr 1.22fr", columnGap: "8px", rowGap: "6px", borderTop: "1px solid #E8E2DD", background: "#fff", padding: "10px 16px calc(12px + env(safe-area-inset-bottom))" }}>
-            <a
-              href={BAND_TRACKING_URL}
-              target="_blank"
-              rel="noreferrer"
-              style={{ gridColumn: "span 2", display: "flex", minHeight: "46px", alignItems: "center", gap: "10px", borderRadius: "14px", border: "1px solid #C8E6C9", background: "#EAF6EA", padding: "6px 12px", textDecoration: "none" }}
-            >
-              <div style={{ display: "flex", height: "36px", width: "36px", flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: "50%", background: "#21c531", fontSize: "11px", fontWeight: 800, color: "#fff" }}>BAND</div>
-              <p style={{ minWidth: 0, flex: 1, wordBreak: "keep-all", fontSize: "14px", fontWeight: 800, lineHeight: 1.3, letterSpacing: "-0.05em", color: "#1B5E20" }}>밴드에서 택배송장번호 확인 가능</p>
-              <div style={{ flexShrink: 0, fontSize: "18px", fontWeight: 800, color: "#2E7D32" }}>›</div>
-            </a>
-
-            <button
-              type="button"
-              onClick={onClose}
-              style={{ display: "flex", minHeight: "48px", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", padding: "0 12px", fontSize: "15px", fontWeight: 800, letterSpacing: "-0.05em", color: "#666", cursor: "pointer" }}
-            >
-              닫기
-            </button>
-
-            <button
-              type="button"
-              onClick={onOpenPaymentGuide}
-              style={{ display: "flex", minHeight: "48px", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "none", background: "#7B2D43", padding: "0 12px", fontSize: "15px", fontWeight: 800, letterSpacing: "-0.05em", color: "#fff", cursor: "pointer" }}
-            >
-              입금 계좌 보기
-            </button>
-          </footer>
-        </div>
-      </section>
-    </div>
+    </CustomerBottomSheet>
   );
 }
