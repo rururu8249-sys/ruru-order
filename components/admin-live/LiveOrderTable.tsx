@@ -1042,14 +1042,15 @@ export default function LiveOrderTable({
               <span className="flex items-center justify-center py-2.5">
                 <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} className="h-4 w-4 cursor-pointer accent-[var(--color-rose-deep)]" />
               </span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-center">주문일</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-center">닉네임</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-center">이름</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-center">주문내용</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-center">수량</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-center">상품금액</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-center">택배비</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-center">총금액</span>
+              {/* [2026-09-20 Polaris 대조] 글 칸은 왼쪽(start) · 숫자 칸은 오른쪽(end) · 배지 칸만 가운데. 숫자는 tabular-nums 로 자릿수 정렬. 표시 전용 */}
+              <span className="whitespace-nowrap px-3 py-2.5 text-left">주문일</span>
+              <span className="whitespace-nowrap px-3 py-2.5 text-left">닉네임</span>
+              <span className="whitespace-nowrap px-3 py-2.5 text-left">이름</span>
+              <span className="whitespace-nowrap px-3 py-2.5 text-left">주문내용</span>
+              <span className="whitespace-nowrap px-3 py-2.5 text-right">수량</span>
+              <span className="whitespace-nowrap px-3 py-2.5 text-right">상품금액</span>
+              <span className="whitespace-nowrap px-3 py-2.5 text-right">택배비</span>
+              <span className="whitespace-nowrap px-3 py-2.5 text-right">총금액</span>
               <span className="whitespace-nowrap px-3 py-2.5 text-center">입금</span>
               <span className="whitespace-nowrap px-3 py-2.5 text-center">출고</span>
             </div>
@@ -1123,7 +1124,7 @@ export default function LiveOrderTable({
                         <input type="checkbox" checked={selectedOrderIds.has(String(order.id))} onChange={() => toggleSelectOrder(String(order.id))} className="h-4 w-4 cursor-pointer accent-[var(--color-rose-deep)]" />
                       </div>
                       {/* 1. 주문일 */}
-                      <div className="px-3 py-3 text-center text-[11px] leading-tight text-ink-soft">
+                      <div className="px-3 py-3 text-left text-[11px] leading-tight text-ink-soft tabular-nums">
                         {(() => {
                           const src = order.createdAt || order.submittedAt;
                           if (!src) return <span>-</span>;
@@ -1141,7 +1142,7 @@ export default function LiveOrderTable({
                         })()}
                       </div>
                       {/* 2. 닉네임 */}
-                      <div className="min-w-0 px-3 py-3 text-center">
+                      <div className="min-w-0 px-3 py-3 text-left">
                         <div className="mb-0.5">
                           <button type="button" onClick={() => onSelectOrder(order)} className="font-black text-rose-deep underline-offset-2 hover:underline text-[13px]">
                             {order.nickname}
@@ -1164,28 +1165,28 @@ export default function LiveOrderTable({
                         )}
                       </div>
                       {/* 3. 이름 */}
-                      <div className="min-w-0 truncate px-3 py-3 text-center text-[13px] text-ink-soft">{order.name || "-"}</div>
+                      <div className="min-w-0 truncate px-3 py-3 text-left text-[13px] text-ink-soft">{order.name || "-"}</div>
                       {/* 4. 주문내용 */}
-                      <div className="min-w-0 truncate px-3 py-3 text-center text-[13px] font-black text-ink-soft">{renderOrderSummary(order)}</div>
+                      <div className="min-w-0 truncate px-3 py-3 text-left text-[13px] font-black text-ink-soft">{renderOrderSummary(order)}</div>
                       {/* 4. 수량 */}
-                      <div className="px-3 py-3 text-center">
+                      <div className="px-3 py-3 text-right tabular-nums">
                         <span className="inline-flex min-w-[34px] items-center justify-center rounded-lg bg-surface-2 px-1 py-0.5 text-[13px] font-black text-ink">
                           {getTotalQty(order)}
                         </span>
                       </div>
                       {/* 5. 상품금액 */}
-                      <div className="px-3 py-3 text-center text-[13px] font-black text-ink">
+                      <div className="px-3 py-3 text-right text-[13px] font-black text-ink tabular-nums">
                         <div>{money(order.productAmount)}</div>
                         {Number(order.pointUsedAmount || 0) > 0 ? (
                           <div className="text-[11px] text-ok-tx">포인트 -{money(Number(order.pointUsedAmount || 0))}</div>
                         ) : null}
                       </div>
                       {/* 6. 택배비 */}
-                      <div className="px-3 py-3 text-center text-[13px] text-ink-mute">
+                      <div className="px-3 py-3 text-right text-[13px] text-ink-mute tabular-nums">
                         {Number(order.shippingFee || 0) > 0 ? money(order.shippingFee) : "0"}
                       </div>
                       {/* 7. 총금액 */}
-                      <div className="px-3 py-3 text-center text-[14px] font-black text-ink">
+                      <div className="px-3 py-3 text-right text-[14px] font-black text-ink tabular-nums">
                         {money(displayPayableAmount(order))}
                         {(() => {
                           // [2026-08-31 사장님 지적] 보라 줄이 위 총금액과 같은 값을 반복했음 → 카드라서 더 붙은 추가금(+)만 작게 표시
