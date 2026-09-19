@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import CustomerPointBadge from "@/components/customer/CustomerPointBadge";
 import CustomerPointGiftPopup from "@/components/customer/CustomerPointGiftPopup";
 import CustomerTestAccountBadge from "@/components/customer/CustomerTestAccountBadge";
+import CustomerNoteUnreadBadge, { useNoteUnread } from "@/components/customer/CustomerNoteUnreadBadge";
 import {
   clearSavedCustomerInfo,
   clearCartOnLogout,
@@ -55,6 +56,8 @@ export default function CustomerTopNav({
 }: CustomerTopNavProps) {
   const [customerInfo, setCustomerInfo] = useState<SavedCustomerInfo>(initialInfo);
   const [isReady, setIsReady] = useState(false);
+  // [2026-09-20] 오른쪽 아래 떠 있던 🔔 버튼을 없앤 대신, 하단 메뉴가 없는 화면(주문조회·공지 등)의 들어가는 길
+  const noteUnread = useNoteUnread();
 
   useEffect(() => {
     setCustomerInfo(readSavedCustomerInfo());
@@ -100,6 +103,18 @@ export default function CustomerTopNav({
 
         {isLoggedIn && (
           <div className="flex shrink-0 flex-col items-end justify-start gap-1 self-start text-right">
+            <button
+              type="button"
+              onClick={() => { try { window.dispatchEvent(new Event("ruru-open-notice-box")); } catch { /* 무시 */ } }}
+              aria-label={noteUnread > 0 ? `공지·쪽지함 (안 읽음 ${noteUnread}개)` : "공지·쪽지함"}
+              className="relative inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-black text-slate-700 transition active:scale-[0.98]"
+            >
+              <span className="relative text-[13px] leading-none">
+                📬
+                <CustomerNoteUnreadBadge count={noteUnread} offset={{ top: -8, right: -8 }} />
+              </span>
+              공지·쪽지
+            </button>
             <CustomerPointBadge />
             <CustomerPointGiftPopup />
             <CustomerTestAccountBadge />

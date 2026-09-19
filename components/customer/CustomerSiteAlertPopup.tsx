@@ -72,8 +72,6 @@ export default function CustomerSiteAlertPopup() {
   const [shopGuide, setShopGuide] = useState("");
   // [2026-08-30] 접속 공지 팝업이 떠 있으면 쪽지 팝업은 기다린다(팝업 두 개 겹침 방지).
   const [noticePopupOpen, setNoticePopupOpen] = useState(false);
-  // [2026-08-30] 하단 메뉴에 「공지·쪽지」가 있는 화면이면 🔔 버튼은 숨긴다(중복 + 화면 가림).
-  const [noticeMenuOn, setNoticeMenuOn] = useState(false);
   // [2026-08-31 사장님 지시] 게시판형 — 번호+제목 목록, 누르면 내용 화면(「목록으로」 버튼), 맨 오른쪽 읽음 표시
   const [boxTab, setBoxTab] = useState<BoxTab>("all");
   const [detail, setDetail] = useState<{ kind: "guide" | "notice" | "note"; id?: number } | null>(null);
@@ -123,24 +121,19 @@ export default function CustomerSiteAlertPopup() {
     const onOpenBox = () => { setBoxOpen(true); void load(); };
     // 접속 공지 팝업이 떠 있는지 — 떠 있으면 쪽지 팝업을 미룬다
     const onNoticePopup = (e: Event) => setNoticePopupOpen(Boolean((e as CustomEvent).detail));
-    // 하단 메뉴(공지·쪽지)가 떠 있는지 — 떠 있으면 🔔 버튼을 숨긴다
-    const onNoticeMenu = (e: Event) => setNoticeMenuOn(Boolean((e as CustomEvent).detail));
     try {
       const w = window as unknown as Record<string, unknown>;
       setNoticePopupOpen(Boolean(w.__ruruNoticePopupOpen));
-      setNoticeMenuOn(Boolean(w.__ruruNoticeMenuOn));
     } catch { /* 무시 */ }
     window.addEventListener("focus", onFocus);
     window.addEventListener("ruru-open-notice-box", onOpenBox);
     window.addEventListener("ruru-notice-popup", onNoticePopup as EventListener);
-    window.addEventListener("ruru-notice-menu", onNoticeMenu as EventListener);
     return () => {
       stopped = true;
       window.clearInterval(timer);
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("ruru-open-notice-box", onOpenBox);
       window.removeEventListener("ruru-notice-popup", onNoticePopup as EventListener);
-      window.removeEventListener("ruru-notice-menu", onNoticeMenu as EventListener);
     };
   }, []);
 
@@ -204,23 +197,9 @@ export default function CustomerSiteAlertPopup() {
 
   return (
     <>
-      {/* [2026-08-30] 쪽지함 버튼 — 팝업을 실수로 닫아도 여기서 다시 본다.
-          일반 쇼핑몰의 알림함과 같은 자리(오른쪽 아래 떠 있는 버튼). */}
-      {hasAny && !alert && !noticePopupOpen && !noticeMenuOn ? (
-        <button
-          type="button"
-          onClick={() => setBoxOpen(true)}
-          aria-label={unread > 0 ? `안 읽은 쪽지 ${unread}개` : "쪽지함"}
-          className="fixed bottom-5 right-4 z-[95] flex h-12 w-12 items-center justify-center rounded-full bg-[#7B2D43] text-xl shadow-lg active:scale-95"
-        >
-          🔔
-          {unread > 0 ? (
-            <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-black text-white">
-              {unread > 9 ? "9+" : unread}
-            </span>
-          ) : null}
-        </button>
-      ) : null}
+      {/* [2026-09-20 사장님 지시] 오른쪽 아래 떠 있던 🔔 버튼 삭제 — 화면을 가리고 거슬린다.
+          → 들어가는 길은 ①주문서 화면 하단 메뉴 「📬 공지·쪽지」 ②그 밖의 화면은 상단바 📬 버튼.
+          둘 다 안 읽은 개수를 빨간 배지로 보여준다(CustomerNoteUnreadBadge). 읽음 처리·서버 호출 로직 무변경. */}
 
       {/* 쪽지함 목록 */}
       {boxOpen ? (

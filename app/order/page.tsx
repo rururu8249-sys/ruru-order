@@ -71,6 +71,7 @@ import OrderPriceSummaryBox from "@/components/order/OrderPriceSummaryBox";
 import OrderCustomerInfoIntro from "@/components/order/OrderCustomerInfoIntro";
 import OrderCustomerInfoFormCard from "@/components/order/OrderCustomerInfoFormCard";
 import CustomerPaymentGuideBottomSheet from "@/components/customer/CustomerPaymentGuideBottomSheet";
+import CustomerNoteUnreadBadge from "@/components/customer/CustomerNoteUnreadBadge";
 import CustomerPointGiftPopup from "@/components/customer/CustomerPointGiftPopup";
 import CustomerInfoEditBottomSheet from "@/components/customer/CustomerInfoEditBottomSheet";
 // [2026-09-20 사장님] 바텀시트 «한 벌» 틀 — 손님 시트 전부 같은 높이·헤더·✕·닫기 5종
@@ -3408,21 +3409,7 @@ export default function OrderPage() {
     return () => { if (open) tell(false); };
   }, [popupOpen, hasSavedInfo]);
 
-  // [2026-08-30 사장님 지적] 오른쪽 아래 떠 있는 🔔 버튼이 상품/장바구니 바를 가린다.
-  //   게다가 하단 메뉴에 이미 「📬 공지·쪽지」가 안 읽은 개수까지 달고 있어서 같은 게 두 개다.
-  //   → 하단 메뉴가 보이는 화면에서는 🔔 버튼을 숨긴다. (하단 메뉴가 없는 화면에서만 🔔 이 나온다)
-  useEffect(() => {
-    const on = hasSavedInfo && broadcastLoaded && !orderSheetOpen;
-    const tell = (v: boolean) => {
-      try {
-        (window as unknown as Record<string, unknown>).__ruruNoticeMenuOn = v;
-        window.dispatchEvent(new CustomEvent("ruru-notice-menu", { detail: v }));
-      } catch { /* 무시 */ }
-    };
-    tell(on);
-    // 이 화면을 벗어나면 반드시 "하단 메뉴 없음"으로 되돌린다(깃발이 켜진 채 남지 않게)
-    return () => { if (on) tell(false); };
-  }, [hasSavedInfo, broadcastLoaded, orderSheetOpen]);
+  // [2026-09-20] 오른쪽 아래 🔔 버튼을 아예 없앴으므로 「하단 메뉴가 있는 화면인지」 알려주던 신호도 삭제했다.
 
   // 띠에 보여줄 한 줄 — 규칙은 lib/noticeBar.ts (테스트가 같은 함수를 쓴다)
   //   관리자에서 「띠 한 줄」을 직접 적어두면 그걸 쓰고, 비어 있으면 제목/본문 첫 줄을 쓴다.
@@ -8220,13 +8207,10 @@ export default function OrderPage() {
                   onClick={tab.onClick}
                   style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "3px", border: "none", background: "none", padding: 0, cursor: "pointer", fontSize: "10px", fontWeight: 800, color: "#B0A6A0" }}
                 >
+                  {/* [2026-09-20] 빨간 숫자 배지 — Material Design 3 Badge specs(16dp·모서리 8dp·error 색) 기준. 99 넘으면 99+ */}
                   <span style={{ position: "relative", fontSize: "19px", lineHeight: 1 }}>
                     {tab.icon}
-                    {Number((tab as { badge?: number }).badge) > 0 ? (
-                      <span style={{ position: "absolute", top: "-5px", right: "-9px", minWidth: "15px", height: "15px", padding: "0 4px", borderRadius: "999px", background: "#E23B3B", color: "#fff", fontSize: "9.5px", fontWeight: 900, lineHeight: "15px", textAlign: "center" }}>
-                        {Number((tab as { badge?: number }).badge) > 9 ? "9+" : Number((tab as { badge?: number }).badge)}
-                      </span>
-                    ) : null}
+                    <CustomerNoteUnreadBadge count={Number((tab as { badge?: number }).badge) || 0} />
                   </span>
                   {tab.label}
                 </button>
