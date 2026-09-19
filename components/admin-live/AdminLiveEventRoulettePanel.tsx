@@ -1541,7 +1541,8 @@ export default function AdminLiveEventRoulettePanel({
 
               {/* 헤더 */}
               <div style={{ display: "flex", alignItems: "center", marginBottom: "12px" }}>
-                <span style={{ fontSize: "14px", fontWeight: 600 }}>◆ 이벤트</span>
+                {/* [2026-09-20 폰 화면 깨짐] 「◆ 이\n벤트」로 잘렸다 → 줄바꿈 금지 */}
+                <span style={{ fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>◆ 이벤트</span>
                 <span style={{ marginLeft: "auto", display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap" }}>
                   {/* [2026-09-08] 탭 순서 = 실제 쓰는 순서(서바이벌·달리기 최다). 테스트/운영 토글은 삭제 — 「테스트로 해보기」 버튼으로 */}
                   <span className="badge" style={{ padding: "4px 12px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "survival" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "survival" ? "#fff" : "var(--mut)" }}

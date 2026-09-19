@@ -317,9 +317,11 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent }: Ad
   );
 
   return (
-    <div className="flex h-full min-h-0">
+    /* [2026-09-20 사장님 폰 화면 깨짐] 폰에서 왼쪽 메뉴(176px)가 자리를 다 먹어 오른쪽 내용이 «오/늘/의» 한 글자씩 세로로 쪼개졌다.
+       → 폰에서는 위아래로 쌓고(메뉴는 가로 스크롤 칩 줄), 넓은 화면(md+)에서만 예전처럼 좌우 2단. 표시 전용 */
+    <div className="flex h-full min-h-0 flex-col md:flex-row">
       {/* 좌측 카테고리 네비 (업계표준: 카테고리로 나눠 스크롤 최소화) */}
-      <nav className="w-44 shrink-0 space-y-1 overflow-y-auto border-r border-line bg-surface-2/60 p-3">
+      <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-surface-2/60 p-2 [scrollbar-width:none] md:w-44 md:flex-col md:space-y-1 md:overflow-x-visible md:overflow-y-auto md:border-b-0 md:border-r md:p-3 [&::-webkit-scrollbar]:hidden">
         {SETTINGS_TABS.map((t) => {
           const active = activeTab === t.key;
           return (
@@ -327,18 +329,18 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent }: Ad
               key={t.key}
               type="button"
               onClick={() => setActiveTab(t.key)}
-              className={`flex w-full flex-col rounded-xl px-3 py-2.5 text-left transition ${active ? "bg-rose-deep text-white" : "text-ink-soft hover:bg-surface"}`}
+              className={`flex shrink-0 flex-col rounded-xl px-3 py-2 text-left transition md:w-full md:py-2.5 ${active ? "bg-rose-deep text-white" : "text-ink-soft hover:bg-surface"}`}
             >
-              <span className="text-sm font-black">{t.icon} {t.label}</span>
-              <span className={`mt-0.5 text-[11px] font-bold ${active ? "text-white/70" : "text-ink-mute"}`}>{t.desc}</span>
+              <span className="whitespace-nowrap text-sm font-black">{t.icon} {t.label}</span>
+              <span className={`mt-0.5 hidden text-[11px] font-bold md:block ${active ? "text-white/70" : "text-ink-mute"}`}>{t.desc}</span>
             </button>
           );
         })}
       </nav>
 
       {/* 우측 내용 */}
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex-1 space-y-4 overflow-y-auto p-5">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="flex-1 space-y-4 overflow-y-auto p-3 md:p-5">
           {/* ── 상점 정보 (자체 저장: /api/admin-live/shop-info) ── */}
           {activeTab === "shop" && <ShopInfoSettingsTab />}
 

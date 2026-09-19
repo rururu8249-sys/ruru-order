@@ -1522,13 +1522,14 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         ) : null}
 
         {/* 탭 2개 */}
-        <div style={{ display: "flex", gap: "2px", padding: "0 16px", borderBottom: "1px solid var(--color-line)" }}>
+        {/* [2026-09-20 사장님 폰 화면 깨짐] 「방송 상\n품」처럼 탭 글자가 잘렸다 → 줄바꿈 금지 + 넘치면 가로 스크롤 */}
+        <div style={{ display: "flex", gap: "2px", padding: "0 16px", borderBottom: "1px solid var(--color-line)", overflowX: "auto", scrollbarWidth: "none" }}>
           {([["broadcast", "방송 상품"], ["shop", "쇼핑몰 진열"], ["products", "전체 상품"], ["history", "판매 기록"]] as const).map(([k, l]) => (
             <button
               key={k}
               type="button"
               onClick={() => setTab(k)}
-              style={{ padding: "12px 16px", fontSize: "13px", fontWeight: 800, background: "none", border: "none", borderBottom: "2px solid " + (tab === k ? "var(--color-rose-deep)" : "transparent"), color: tab === k ? "var(--color-rose-deep)" : "var(--color-ink-soft)", cursor: "pointer" }}
+              style={{ flexShrink: 0, whiteSpace: "nowrap", padding: "12px 16px", fontSize: "13px", fontWeight: 800, background: "none", border: "none", borderBottom: "2px solid " + (tab === k ? "var(--color-rose-deep)" : "transparent"), color: tab === k ? "var(--color-rose-deep)" : "var(--color-ink-soft)", cursor: "pointer" }}
             >
               {l}
             </button>

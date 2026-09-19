@@ -1512,10 +1512,12 @@ export default function AdminLiveDashboard() {
               {/* 화면 제목 + 작은 탭 */}
               {/* 페이지가 스크롤해도 화면 이름·탭은 위에 붙어 있다(내용이 뒤로 지나가도 가려지지 않게 배경 지정) */}
               <div className="sticky top-0 z-30 -mx-3 -mt-3 mb-3 flex flex-wrap items-end justify-between gap-2 border-b border-rose-line bg-canvas px-3 pt-3 md:-mx-5 md:-mt-4 md:px-5 md:pt-4">
-                <div className="flex items-end gap-3">
-                  <h1 className="pb-2 text-lg font-black tracking-tight text-ink">{activeTopMenu.label}</h1>
+                {/* [2026-09-20 사장님 폰 화면 깨짐] 폰에서 「실시간 주\n문」처럼 탭 글자가 중간에서 잘렸다.
+                    → 제목·탭은 절대 줄바꿈하지 않고(whitespace-nowrap), 탭 줄이 넘치면 옆으로 미는 스크롤로 바꾼다. 표시 전용 */}
+                <div className="flex min-w-0 items-end gap-3">
+                  <h1 className="shrink-0 whitespace-nowrap pb-2 text-lg font-black tracking-tight text-ink">{activeTopMenu.label}</h1>
                   {activeSubTabs.length > 1 ? (
-                    <div className="flex items-center gap-1">
+                    <div className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                       {activeSubTabs.map((tab) => {
                         const active = tab.key === activeMenu;
                         return (
@@ -1524,7 +1526,7 @@ export default function AdminLiveDashboard() {
                             type="button"
                             onClick={() => { setActiveMenu(tab.key); replacePanelInUrl(tab.key); }}
                             className={[
-                              "-mb-px rounded-t-lg border-b-2 px-3.5 py-2 text-[13px] font-black transition",
+                              "-mb-px shrink-0 whitespace-nowrap rounded-t-lg border-b-2 px-3.5 py-2 text-[13px] font-black transition",
                               active ? "border-rose-deep bg-rose-soft/60 text-rose-deep" : "border-transparent text-ink-soft hover:opacity-90 hover:text-rose-deep",
                             ].join(" ")}
                           >
