@@ -336,6 +336,8 @@ export function toAdminLiveOrder(group: OrderGroup): LiveOrder {
     paidAt: first.deposit_confirmed_at ? formatTime(first.deposit_confirmed_at) : null,
     paidAtFull: first.deposit_confirmed_at || null,
     nickname: first.youtube_nickname || first.customer_name || "-",
+    // [2026-09-20] 위 nickname 은 «표시용»(비면 이름으로 대체). 아래는 DB 원본 — 닉네임 편집·입금매칭 판단용.
+    youtubeNickname: String(first.youtube_nickname || ""),
     name: first.customer_name || "-",
     phone: first.customer_phone || first.phone || "-",
     recipientName: (first as any).recipient_name || null,

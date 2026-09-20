@@ -6604,7 +6604,13 @@ export default function OrderPage() {
                     쿠팡·무신사·11번가·G마켓 실물 대조 + Baymard 필수 정렬 4종.
                     표시 순서만 바뀐다. DB의 sort_order·is_pinned, 담기·재고·금액은 안 건드린다. */}
                 <div style={{ marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                  <span style={{ flexShrink: 0, fontSize: "12px", fontWeight: 700, color: "#8A8A8A" }}>총 {visibleItems.length}개</span>
+                  {/* [2026-09-20 사장님] «총 3개가 너무 왼쪽 구석에 가 있는 거 아니야?»
+                      왼쪽 배치 자체는 무신사·29CM·11번가와 같은 «표준»이라 자리는 그대로 둔다.
+                      구석처럼 보인 진짜 이유 2가지를 고친다.
+                        1) 12px·연회색 글씨가 옆의 36px 박스 둘에 비해 너무 작고 흐려 «떨어져 나간 글자»로 보였다
+                           → 같은 36px 높이로 세로 가운데 맞추고, 13px·굵게·진한 색으로 무게를 맞춘다.
+                        2) 가운데가 휑했다 → 오른쪽 묶음이 남는 폭을 먹도록 해서 빈 칸을 줄인다(아래 flex:1). */}
+                  <span style={{ display: "inline-flex", alignItems: "center", flexShrink: 0, height: "36px", paddingLeft: "2px", fontSize: "13px", fontWeight: 800, color: "#6E655E" }}>총 {visibleItems.length}개</span>
                   {/* [2026-09-20 사장님] «두 박스 크기도 미묘하게 차이나고, 너무 붙어 있는 느낌»
                       실측으로 확인 — 전부 맞는 지적이었다.
                         보기전환 36.0px / 모서리 9px  / 테두리 #D9C5CC
@@ -6612,7 +6618,7 @@ export default function OrderPage() {
                         둘 사이 간격 6px
                       → 높이 36px · 모서리 10px · 테두리 #D9C5CC · 글자 12.5px 로 «완전히» 통일.
                         간격은 10px (Material Design의 인접 터치 컨트롤 간격 8dp 이상 권장) */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+                  <div style={{ display: "flex", flex: "1 1 auto", justifyContent: "flex-end", alignItems: "center", gap: "10px", minWidth: 0 }}>
                     {/* [2026-08-12 리뉴얼 4단계] 보기 전환 — 표시 배치만 바뀜(담기·금액·재고 무관)
                         [2026-09-20] 사장님 «저 버튼이 뭔지 모르는 경우도 있을 것 같은데? 타플랫폼도 저래?»
                           → 직접 확인한 결과 쿠팡(PC·모바일)·무신사·11번가 어디에도 보기 전환 버튼이 없다.
@@ -6662,7 +6668,7 @@ export default function OrderPage() {
                       value={productSort}
                       onChange={(e) => { setProductSort(e.target.value as typeof productSort); setVisibleProductCount(10); }}
                       aria-label="상품 정렬"
-                      style={{ minWidth: 0, maxWidth: "150px", height: "36px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", fontSize: "12.5px", fontWeight: 800, padding: "0 6px", cursor: "pointer", outline: "none", fontFamily: "inherit" }}
+                      style={{ minWidth: 0, flex: "1 1 auto", maxWidth: "168px", height: "36px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", fontSize: "12.5px", fontWeight: 800, padding: "0 6px", cursor: "pointer", outline: "none", fontFamily: "inherit" }}
                     >
                       <option value="default">루루동이 추천순</option>
                       <option value="mix">골고루 보기</option>
@@ -6930,13 +6936,24 @@ export default function OrderPage() {
                               //   많으면 「색상 5가지」. 표시 전용.
                               const colorVals = getSelectableRegisteredOptions(product as BroadcastProduct, "color");
                               const sizeVals = getSelectableRegisteredOptions(product as BroadcastProduct, "size");
+                              // [2026-09-20 사장님] «제목이랑 뒤 내용 글씨 색이 똑같아서 구분이 안 됨»
+                              //   맞는 지적 — 「색상 카멜·베이지」가 한 덩어리 회색이라 어디까지가 제목인지 안 보였다.
+                              //   → 제목(색상/사이즈)은 «연한 회색 작은 글씨», 값은 «진하고 큰 글씨»로 갈라 놓는다.
+                              //      (쿠팡·무신사 상품 스펙 표기와 같은 방식: 라벨 약하게 / 값 강하게)
+                              //      값 사이 구분도 「카멜·베이지」→「카멜 · 베이지」로 띄워 읽기 쉽게. 표시 전용.
                               const lineOf = (label: string, vals: string[], max: number) =>
-                                vals.length <= 1 ? "" : vals.length <= max ? `${label} ${vals.join("·")}` : `${label} ${vals.length}가지`;
-                              const parts = [lineOf("색상", colorVals, 4), lineOf("사이즈", sizeVals, 5)].filter(Boolean);
+                                vals.length <= 1 ? null : { label, value: vals.length <= max ? vals.join(" · ") : `${vals.length}가지` };
+                              const parts = [lineOf("색상", colorVals, 4), lineOf("사이즈", sizeVals, 5)]
+                                .filter(Boolean) as Array<{ label: string; value: string }>;
                               if (parts.length === 0) return null;
                               return (
-                                <div style={{ marginTop: 2, display: "grid", gap: 1 }}>
-                                  {parts.map((t) => <div key={t} style={{ fontSize: 12, fontWeight: 700, color: "#6E655E", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t}</div>)}
+                                <div style={{ marginTop: 3, display: "grid", gap: 2 }}>
+                                  {parts.map((p) => (
+                                    <div key={p.label} style={{ display: "flex", alignItems: "baseline", gap: "5px", lineHeight: 1.3, minWidth: 0 }}>
+                                      <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 800, color: "#A79A92" }}>{p.label}</span>
+                                      <span style={{ minWidth: 0, fontSize: 12.5, fontWeight: 800, color: "#3B332D", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.value}</span>
+                                    </div>
+                                  ))}
                                 </div>
                               );
                             })() : null}

@@ -71,6 +71,9 @@ export type LiveOrder = {
   paidAt: string | null;
   paidAtFull: string | null;
   nickname: string;
+  // [2026-09-20] orders.youtube_nickname «원본». nickname 은 비었을 때 이름으로 대체되므로
+  //   «자동 입금확인 키»를 편집할 때는 반드시 이 원본을 봐야 한다(빈값과 이름을 구분).
+  youtubeNickname?: string;
   name: string;
   phone: string;
   recipientName?: string | null;

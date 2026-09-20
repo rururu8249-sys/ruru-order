@@ -121,6 +121,12 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
+  // [2026-09-20 사장님 요청] 주문상세에서 닉네임 수정.
+  //   ⚠️ youtube_nickname 은 «자동 입금확인 키»다(lib/admin-v2/autoPaymentMatch.ts 91·138행).
+  //      orders.youtube_nickname == deposits.depositor_name(은행 입금자명) + 금액 일치 → 자동 입금확인.
+  //      그래서 이 값을 고치는 건 «돈 로직에 닿는» 수정이다. 아래 저장 함수에 확인창·중복경고를 둔다.
+  const [editNickname, setEditNickname] = useState("");
+  const originalNicknameRef = useRef("");
   // [받는분 수정 · 2026-07-22 사장님 지시] 받는분(배송) 이름/연락처도 편집 폼에서 함께 수정 — recipient_* 는 배송/송장 전용 컬럼(입금·정산·포인트 무관)
   const [editRecipientName, setEditRecipientName] = useState("");
   const [editRecipientPhone, setEditRecipientPhone] = useState("");
@@ -824,6 +830,11 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const startEditCustomer = () => {
     const row = order as any;
     setEditName(clean(row.name) || clean(row.customerName) || clean(row.customer_name));
+    // ⚠️ orderForView.nickname 은 «표시용»이라 youtube_nickname 이 비면 이름(customer_name)이 들어온다.
+    //    그걸 그대로 프리필하면 «이름»이 자동 입금확인 키로 저장될 수 있다 → DB 원본만 본다.
+    const startNick = clean((orderForView as any).youtubeNickname);
+    originalNicknameRef.current = startNick;
+    setEditNickname(startNick);
     const startPhone = clean(orderForView.phone) || clean(row.phone) || clean(row.customer_phone);
     originalPhoneRef.current = startPhone.replace(/[^0-9]/g, "");
     setEditPhone(startPhone);
@@ -846,28 +857,100 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       return;
     }
     const phoneDigits = editPhone.replace(/[^0-9]/g, "");
+
+    // [2026-09-20 사장님 요청] 닉네임 수정 — «돈 로직에 닿는» 필드다. 바뀔 때만 확인창.
+    //   근거(추정 아님): lib/admin-v2/autoPaymentMatch.ts
+    //     22행 isUnpaidBankOrder  → 미입금·무통장 주문만 자동매칭 후보
+    //     138행 group.nickname === depositName && group.amount === depositAmount
+    //     141행 if (matchedGroups.length !== 1) continue;  → 후보가 2개면 «매칭 안 함»(오매칭 아님)
+    //   11행 normalizeText = 공백제거 + 소문자. 그래서 중복검사도 대소문자 무시로 본다.
+    //   같이 바뀌는 곳: 로젠 배송엑셀 주소 뒤 /닉네임(lib/admin-v2/rosenExportRules.ts), 이벤트 룰렛 매칭(lib/eventRoulette.ts).
+    //   ⚠️ customers(회원정보) 는 건드리지 않는다 — 이 주문 1건만 고치는 게 목적이다.
+    const beforeNick = originalNicknameRef.current.trim();
+    const nextNick = editNickname.trim();
+    const nickChanged = beforeNick !== nextNick;
+
+    if (nickChanged) {
+      const norm = (v: string) => v.trim().replace(/\s+/g, "").toLowerCase();
+      let dupWarn = "";
+
+      if (nextNick) {
+        // 중복검사: 같은 닉네임을 쓰는 «다른» 미입금·무통장 주문이 있으면 자동입금확인이 멈춘다(141행).
+        try {
+          const { data: dupRows } = await supabase
+            .from("orders")
+            .select("id, youtube_nickname, payment_method, admin_order_status_v2, order_manage_status, is_deleted")
+            .ilike("youtube_nickname", nextNick)
+            .neq("is_deleted", true)
+            .limit(50);
+
+          const PAID = ["입금확인", "출고대기", "출고완료", "킵", "픽업예정", "주문취소", "환불"];
+          const others = (dupRows || []).filter((r: any) => {
+            if (rowIds.includes(Number(r.id))) return false;
+            if (norm(String(r.youtube_nickname || "")) !== norm(nextNick)) return false;
+            const st = String(r.admin_order_status_v2 || r.order_manage_status || "미설정").trim();
+            if (PAID.includes(st)) return false;
+            const pm = String(r.payment_method || "무통장입금").trim();
+            if (pm && pm !== "무통장입금") return false;
+            return true;
+          });
+
+          if (others.length > 0) {
+            dupWarn =
+              `\n\n⚠️ 같은 닉네임의 «미입금 무통장 주문»이 ${others.length}건 더 있습니다.\n` +
+              "   금액까지 같으면 자동 입금확인이 «멈춥니다»(잘못 매칭되진 않고, 입금매칭에서 손으로 해야 합니다).";
+          }
+        } catch {
+          dupWarn = "\n\n(중복 닉네임 검사는 못 했습니다 — 저장은 됩니다)";
+        }
+      }
+
+      const emptyWarn = nextNick
+        ? ""
+        : "\n\n⚠️ 닉네임을 «비우면» 이 주문은 자동 입금확인 대상에서 빠집니다(입금매칭에서 손으로만 가능).";
+
+      const ok = await showAdminConfirm(
+        `닉네임을 바꿉니다.\n\n   「${beforeNick || "(없음)"}」 → 「${nextNick || "(비움)"}」\n\n` +
+          "⚠️ 닉네임은 «자동 입금확인 키»입니다.\n" +
+          "   은행 입금자명과 글자가 똑같아야 자동으로 입금확인됩니다.\n" +
+          "   · 로젠 배송엑셀의 주소 뒤 /닉네임 도 같이 바뀝니다.\n" +
+          "   · 이벤트 룰렛 당첨자 매칭도 이 닉네임을 씁니다.\n\n" +
+          "이 주문만 바뀝니다(회원정보·지난 주문은 그대로)." +
+          emptyWarn +
+          dupWarn,
+        { title: "닉네임 변경 — 입금확인에 영향", confirmText: "바꾸기" },
+      );
+      if (!ok) return;
+    }
+
     setSavingCustomer(true);
     try {
+      // ⚠️ youtube_nickname 은 «닉네임을 실제로 고쳤을 때만» 넣는다.
+      //    주소만 고친 저장에서도 매번 덮어쓰면, 화면표시용 닉네임이 자동입금확인 키를 조용히 바꿔버린다.
+      const customerPatch: Record<string, unknown> = {
+        customer_name: editName.trim(),
+        customer_phone: phoneDigits,
+        phone: phoneDigits,
+        zipcode: editZipcode.trim(),
+        address: editAddress.trim(),
+        detail_address: editDetailAddress.trim(),
+        request_memo: editMemo.trim(),
+        // [받는분 수정] 배송/송장 전용 컬럼 — 입금확인·정산·포인트 매칭은 customer_* 기준이라 무관
+        recipient_name: editRecipientName.trim(),
+        recipient_phone: editRecipientPhone.replace(/[^0-9]/g, ""),
+      };
+      if (nickChanged) customerPatch.youtube_nickname = nextNick;
+
       const { error } = await supabase
         .from("orders")
-        .update({
-          customer_name: editName.trim(),
-          customer_phone: phoneDigits,
-          phone: phoneDigits,
-          zipcode: editZipcode.trim(),
-          address: editAddress.trim(),
-          detail_address: editDetailAddress.trim(),
-          request_memo: editMemo.trim(),
-          // [받는분 수정] 배송/송장 전용 컬럼 — 입금확인·정산·포인트 매칭은 customer_* 기준이라 무관
-          recipient_name: editRecipientName.trim(),
-          recipient_phone: editRecipientPhone.replace(/[^0-9]/g, ""),
-        })
+        .update(customerPatch)
         .in("id", rowIds);
       if (error) {
         showAdminToast("고객정보 저장 실패\n\n" + error.message, "error");
         return;
       }
-      showAdminToast("고객/배송 정보가 저장됐습니다.", "success");
+      showAdminToast(nickChanged ? "저장됐습니다. 닉네임도 바뀌었습니다." : "고객/배송 정보가 저장됐습니다.", "success");
+      originalNicknameRef.current = nextNick;
       setEditingCustomer(false);
 
       // [2026-08-30] 번호를 고쳤으면 회원정보까지 그냥 같이 바꾼다.
@@ -1221,6 +1304,11 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 
           {editingCustomer ? (
             <div className="grid gap-2">
+              {/* [2026-09-20 사장님 요청] 닉네임 수정 — 자동 입금확인 키라서 제일 위 + 경고줄을 붙인다. */}
+              <label className="grid gap-1 text-[11px] font-black text-ink-mute">닉네임 (유튜브)
+                <input value={editNickname} onChange={(e) => setEditNickname(e.target.value)} placeholder="은행 입금자명과 똑같이" className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
+                <span className="text-[11px] font-bold leading-4 text-warn-tx">입금자명과 글자가 같아야 자동 입금확인됩니다</span>
+              </label>
               <div className="grid grid-cols-2 gap-2">
                 <label className="grid gap-1 text-[11px] font-black text-ink-mute">이름
                   <input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
@@ -1254,7 +1342,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               <button type="button" onClick={handleSaveCustomerFields} disabled={savingCustomer} className="mt-1 h-9 w-full rounded-lg bg-[var(--color-ok-tx)] text-[13px] font-black text-white hover:bg-[var(--color-ok-tx)] disabled:bg-surface-3">
                 {savingCustomer ? "저장중..." : "✔ 고객/배송 정보 저장"}
               </button>
-              <div className="rounded-lg bg-warn-bg px-2.5 py-1.5 text-[11px] font-bold leading-4 text-warn-tx">상품명·옵션·금액은 아래 상품 카드에서 수정합니다. 여기선 고객·주소·메모만 저장됩니다(배송비/합계 미변경).</div>
+              <div className="rounded-lg bg-warn-bg px-2.5 py-1.5 text-[11px] font-bold leading-4 text-warn-tx">상품명·옵션·금액은 아래 상품 카드에서 수정합니다. 여기선 닉네임·고객·주소·메모만 저장됩니다(배송비/합계 미변경).</div>
             </div>
           ) : (
             <div className="whitespace-pre-wrap break-keep rounded-lg border border-line bg-surface-2 px-3 py-2 text-[12px] font-bold leading-5 text-ink">
@@ -1265,7 +1353,12 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 
         {/* 고객정보 그리드 (목업 B: 닉네임/이름/연락처/결제방법) */}
         <div className="mb-3 grid grid-cols-2 gap-x-3 gap-y-2.5">
-          <Info label="닉네임" value={orderForView.nickname || "-"} strong />
+          {/* [2026-09-20] 닉네임 «원본»을 보여준다.
+              예전엔 표시용 nickname(비면 이름으로 대체)을 그대로 띄워서,
+              youtube_nickname 이 «실제로 비어 있는» 주문도 이름이 닉네임인 것처럼 보였다.
+              그 주문은 자동 입금확인 후보에서 빠지므로(autoPaymentMatch 119행 group.nickname 필요)
+              사장님이 그 사실을 화면에서 바로 알아야 한다 — 「매칭필요」의 흔한 원인. */}
+          <Info label="닉네임" value={clean((orderForView as any).youtubeNickname) || "(없음 · 자동 입금확인 안 됨)"} strong />
           <Info label="이름(주문자)" value={order.name || "-"} />
           <Info label="연락처(주문자)" value={orderForView.phone || "-"} />
           <Info label="결제방법" value={orderForView.paymentMethod || "-"} />
