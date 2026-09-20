@@ -33,6 +33,7 @@
   "exclude": [
     "node_modules",
     "_to_delete",
+    "_to_delete*",
     "_cowork_tmp",
     "_bulk_register",
     ".backup_*"

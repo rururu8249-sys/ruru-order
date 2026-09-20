@@ -91,7 +91,7 @@ import CustomerMissingDetailAddressPanel from "@/components/customer/CustomerMis
 import GroupBuyQuickSelect, { type GroupBuyQuickSelectProduct } from "@/components/order/GroupBuyQuickSelect";
 import { noticeBarLine } from "@/lib/noticeBar";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
-import { pickVisibleBadges, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_MIN_BUYERS, TOP_SELLER_RANK_PCT, POPULAR_RANK_PCT, LIVE_SALES_MIN_QTY, HOLDING_MIN_PEOPLE } from "@/lib/productBadgePriority";
+import { pickVisibleBadges, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_MIN_BUYERS, TOP_SELLER_RANK_PCT, POPULAR_RANK_PCT, HOLDING_MIN_PEOPLE } from "@/lib/productBadgePriority";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import ShopContactLink from "@/components/customer/ShopContactLink";
 import { useShopInfo } from "@/lib/useShopInfo";
@@ -122,6 +122,11 @@ type OrderItem = {
 };
 
 type BroadcastProduct = {
+  // [2026-09-20] 판매 집계(products 테이블 ADD COLUMN) — 통계 배지가 읽는다. 표시 전용.
+  sold_qty_total?: number | null;
+  sold_qty_30d?: number | null;
+  repeat_buyer_count?: number | null;
+  sales_rank_pct?: number | string | null;
   id: string | number;
   product_name: string;
   price: number;
@@ -1319,6 +1324,14 @@ function normalizeOrderProductRow(product: any): BroadcastProduct {
     sizes: product?.sizes ?? null,
     product_colors: product?.product_colors ?? null,
     product_sizes: product?.product_sizes ?? null,
+    // [2026-09-20 버그수정] 판매 집계 컬럼 4개.
+    //   이 함수는 필요한 필드만 «새 객체로» 옮겨 담는데 여기에 없으면 통째로 사라진다.
+    //   그래서 최다판매·인기(순위)·요즘잘나가요·재구매 배지가 하나도 안 뜨고 있었다.
+    //   (DB에도 값이 있고 화면 코드도 배포됐는데 중간에서 잘렸던 것)
+    sold_qty_total: Number(product?.sold_qty_total ?? 0),
+    sold_qty_30d: Number(product?.sold_qty_30d ?? 0),
+    repeat_buyer_count: Number(product?.repeat_buyer_count ?? 0),
+    sales_rank_pct: product?.sales_rank_pct ?? null,
     image_url: pickOrderProductImageUrl(product),
   } as BroadcastProduct;
 }
@@ -2651,6 +2664,11 @@ export default function OrderPage() {
         image_url: pickOrderProductImageUrl(product),
         main_image_url: product.main_image_url ?? null,
         thumbnail_url: product.thumbnail_url ?? null,
+        // [2026-09-20 버그수정] 방송 ON 경로도 판매 집계 컬럼을 보존해야 통계 배지가 뜬다(카탈로그와 동일).
+        sold_qty_total: Number(product.sold_qty_total ?? 0),
+        sold_qty_30d: Number(product.sold_qty_30d ?? 0),
+        repeat_buyer_count: Number(product.repeat_buyer_count ?? 0),
+        sales_rank_pct: product.sales_rank_pct ?? null,
         is_pinned: Boolean(product.is_pinned) || Boolean(product.pinned),
         pinned: Boolean(product.pinned) || Boolean(product.is_pinned),
         pinned_at: String(product.pinned_at ?? ""),
@@ -3707,12 +3725,6 @@ export default function OrderPage() {
   //    API가 죽어도 담기/제출/입금/정산 전부 정상 동작(오버셀은 제출 RPC가 원래 막고 있음).
   const [reservedByVariant, setReservedByVariant] = useState<Record<string, number>>({});
   const [reservedByProduct, setReservedByProduct] = useState<Record<string, number>>({});
-  // [2026-09-20 사장님] «해당 방송 중 판매량에 따라 실시간으로 배지가 바뀌었으면(쇼핑몰 모드 포함)»
-  //   방송 ON  : 지금 방송(broadcast_id)에서 주문된 수량
-  //   방송 OFF : 오늘(한국시간 00시~) 주문된 수량
-  //   ※ 방송 중엔 대부분 미입금이라 «주문 접수» 기준으로 센다. 그래서 문구도 「주문」이라고 쓴다.
-  //      누적 판매 배지(🏆/📈)는 입금확인 기준 그대로 — 두 숫자의 뜻이 섞이지 않는다.
-  const [liveSalesByProduct, setLiveSalesByProduct] = useState<Record<string, number>>({});
   // [2026-09-20] 「지금 N명이 담는 중」 — cart_reservations 선점에서 «나를 뺀» 다른 손님 수.
   //   지어낸 숫자가 아니라 실제로 지금 장바구니에 담아둔 사람 수다.
   const [holdersByProduct, setHoldersByProduct] = useState<Record<string, number>>({});
@@ -3735,33 +3747,10 @@ export default function OrderPage() {
     const norm = (s: unknown) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
     return `${pid}|${norm(color)}|${norm(size)}`;
   };
-  // [2026-09-20] 방송/오늘 기준 실시간 주문 수량. 실패해도 배지만 안 뜨고 화면은 정상.
-  //   서버가 20초 캐시(s-maxage)를 걸어둬서 손님이 많아도 DB 조회는 20초에 한 번꼴이다.
-  const fetchLiveSales = async () => {
-    try {
-      const bid = String(broadcast?.id ?? "").trim();
-      const qs = isBroadcastOn && bid ? `b=${encodeURIComponent(bid)}` : "today=1";
-      const res = await fetch(`/api/broadcast-sales?${qs}`);
-      if (!res.ok) return;
-      const data = await res.json().catch(() => null);
-      if (data?.ok && data.sales && typeof data.sales === "object") setLiveSalesByProduct(data.sales as Record<string, number>);
-    } catch { /* 실시간 수량 조회 실패해도 주문·재고·금액은 정상 */ }
-  };
-  const fetchLiveSalesRef = useRef(fetchLiveSales);
-  fetchLiveSalesRef.current = fetchLiveSales;
-  useEffect(() => {
-    if (!hasSavedInfo) return;
-    void fetchLiveSalesRef.current();
-    const t = setInterval(() => {
-      // 탭이 안 보이면 쉬게 한다(기존 담김 동기화와 같은 규칙)
-      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
-      void fetchLiveSalesRef.current();
-      // 방송 중 12초 / 방송 아니면 30초. 서버 캐시(10초·20초)와 짝을 맞춘다.
-    }, isBroadcastOn ? 12000 : 30000);
-    return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasSavedInfo, isBroadcastOn, broadcast?.id]);
-
+  // [2026-09-20] 「방송/오늘 주문 수량」 실시간 조회(fetchLiveSales)와 20초 폴링 — «삭제».
+  //   그 숫자를 쓰던 「오늘 N개 나갔어요」 줄이 영업 정보라 없어졌다(6586행 주석).
+  //   쓰는 곳이 없어진 폴링을 남겨두면 Nano 컴퓨트를 계속 때리기만 한다.
+  //   같은 이유로 app/api/broadcast-sales 라우트도 지웠다.
   const fetchCartReservations = async () => {
     try {
       const ids = quickGroupBuyProducts.map((p: any) => String(p?.id ?? "")).filter(Boolean);
@@ -6565,22 +6554,12 @@ export default function OrderPage() {
                 </div>
                 {/* [2026-09-11 manysell 실측 흡수] 배송비 규칙 한 줄 — 문구만. 계산은 기존 그대로
                     (settings.default_shipping_fee · 제주/도서산간 · 같은 방송/기간 + 같은 주소 합배송 · 업체배송 별도) */}
-                {/* [2026-09-20 사장님 지적 반영] 방송(또는 오늘) 전체 주문 수 한 줄.
-                    상품마다 숫자를 붙이면 한 상품만 주목받고 나머지가 소외된다 → 합계로 올린다.
-                    숫자는 /api/broadcast-sales 가 준 상품별 수량의 합. 추가 조회 없음.
-                    5개 미만이면 아예 안 띄운다(「오늘 2개」는 활기가 아니라 «안 팔린다»로 읽힌다). */}
-                {(() => {
-                  const totalLive = Object.values(liveSalesByProduct).reduce((a, b) => a + (Math.max(0, Math.floor(Number(b) || 0))), 0);
-                  if (totalLive < LIVE_SALES_MIN_QTY) return null;
-                  return (
-                    <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "7px", background: "#FFF1EC", border: "1px solid #F6D3C6", borderRadius: "10px", padding: "8px 11px" }}>
-                      <span style={{ flexShrink: 0, fontSize: "13px" }}>🔥</span>
-                      <span style={{ minWidth: 0, fontSize: "12.5px", fontWeight: 800, color: "#C0392B", lineHeight: 1.4 }}>
-                        {isBroadcastOn ? "지금 방송에서" : "오늘"} <b style={{ fontSize: "14px" }}>{totalLive}개</b> 나갔어요
-                      </span>
-                    </div>
-                  );
-                })()}
+                {/* [2026-09-20] 「오늘 N개 나갔어요」 전체 합계 줄 — 삭제했다.
+                    사장님 지적: «관리자만 알 수 있는 게 왜 고객 페이지에 떡하니 표시되는데?»
+                    맞는 지적이다. 상품별 판매량(무신사 「판매 2천개」)과 달리
+                    이건 «상점 전체의 하루 판매 개수» = 영업 정보다. 손님에게 보일 게 아니다.
+                    → 고객 화면에 우리 «매출 규모»를 드러내는 숫자는 두지 않는다.
+                       남은 숫자 배지는 「N개 남음」 하나뿐이고 그건 재고(상품 상태)지 매출이 아니다. */}
                 <div style={{ marginTop: "6px", fontSize: "11.5px", fontWeight: 700, color: "#8A8A8A", wordBreak: "keep-all", lineHeight: 1.4 }}>
                   {generalShippingFee > 0
                     ? `🚚 배송비 ${won(generalShippingFee)} · 같은 방송·기간에 같은 주소로 더 주문하면 배송비는 한 번만${remoteAreaShippingFee > generalShippingFee ? ` · 제주/도서산간 ${won(remoteAreaShippingFee)}` : ""}${visibleItems.some((p) => productDeliveryLabel(p) === "업체배송") ? " · 업체배송 상품은 배송비 따로" : ""}`
@@ -6759,13 +6738,13 @@ export default function OrderPage() {
                                      (입금확인/카드결제완료/출고 등 = 판매, 취소·환불·테스트·삭제 제외)
                                    · 컬럼이 아직 없으면 0 → 배지가 안 뜰 뿐, 오류 없음. */
                                 /* 최다판매 — 판매 순위 상위 3%. 절대 수치가 아니라 «순위»라 작은 숫자로 초라해지지 않는다. */
-                                { key: "topSeller", on: isTopSeller, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 900, padding: "2px 6px", background: "#FFF4D6", color: "#8A5A00" }}>최다판매</span> },
+                                { key: "topSeller", on: isTopSeller, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 900, padding: "2px 6px", background: "#FFF4D6", color: "#8A5A00" }}>베스트</span> },
                                 /* 요즘 잘나가요 — 최근 30일 판매. 숫자는 안 보여준다(한 달 치라 작게 보이면 역효과). */
-                                { key: "trending", on: soldRecent, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#E7F3EE", color: "#0F6E56" }}>요즘 잘나가요</span> },
+                                { key: "trending", on: soldRecent, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#E7F3EE", color: "#0F6E56" }}>급상승</span> },
                                 /* [2026-09-20] 🔁 재구매 — 같은 사람이 2번 이상 산 상품. 단골 장사에서 가장 강한 증거.
                                    판정은 재구매율 리포트와 같은 기준(kakao_id 우선 · order_group_id 1건=1회 · 2건 이상).
                                    products.repeat_buyer_count 집계 컬럼을 그대로 읽는다 — 추가 쿼리 0. */
-                                { key: "repeat", on: repeatBuyers >= REPEAT_BADGE_MIN_BUYERS, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#F0E9FB", color: "#5B3A9B" }}>재구매 많아요</span> },
+                                { key: "repeat", on: repeatBuyers >= REPEAT_BADGE_MIN_BUYERS, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#F0E9FB", color: "#5B3A9B" }}>재구매</span> },
                                 { key: "special", on: badges.includes("special"), node: <span style={{ fontSize: "10px", fontWeight: 900, color: "#9A6212", background: "#FFF4D6", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>특가</span> },
                                 { key: "limit", on: badges.includes("limit"), node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#854F0B", background: "#FBF1E0", borderRadius: "5px", padding: "2px 6px" }}>마감임박</span> },
                                 { key: "pick", on: badges.includes("pick"), node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#FDEEF3", color: "#C2447A" }}>💖 루루픽</span> },

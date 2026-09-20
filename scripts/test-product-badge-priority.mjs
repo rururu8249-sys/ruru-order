@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { pickVisibleBadges, MAX_PROMO_BADGES, REPEAT_BADGE_MIN_BUYERS, SOLD_RECENT_MIN_QTY, LIVE_SALES_MIN_QTY, HOLDING_MIN_PEOPLE, TOP_SELLER_RANK_PCT, POPULAR_RANK_PCT } from "../lib/productBadgePriority.ts";
+import { pickVisibleBadges, MAX_PROMO_BADGES, REPEAT_BADGE_MIN_BUYERS, SOLD_RECENT_MIN_QTY, HOLDING_MIN_PEOPLE, TOP_SELLER_RANK_PCT, POPULAR_RANK_PCT } from "../lib/productBadgePriority.ts";
 
 const has = (s, ...k) => k.every((x) => s.has(x));
 
@@ -116,7 +116,6 @@ const has = (s, ...k) => k.every((x) => s.has(x));
 assert.ok(HOLDING_MIN_PEOPLE >= 3, "2명은 «여러 명»이라 하기 어렵다");
 // 숫자를 화면에 안 쓰는 배지는 기준을 후하게 — 자랑거리 없는 상품을 줄인다
 assert.ok(POPULAR_RANK_PCT >= 0.2, "「인기」는 넓게 잡아야 소외가 줄어든다");
-assert.ok(LIVE_SALES_MIN_QTY >= 5, "「오늘 2개 주문」은 자랑이 아니라 역효과다");
 assert.ok(TOP_SELLER_RANK_PCT < POPULAR_RANK_PCT, "최다판매가 인기보다 좁아야 한다");
 assert.ok(SOLD_RECENT_MIN_QTY >= 5);
 assert.ok(REPEAT_BADGE_MIN_BUYERS >= 2);
