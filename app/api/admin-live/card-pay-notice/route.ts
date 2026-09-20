@@ -11,6 +11,7 @@
 //   · 같은 주문에 3분 안에 두 번 보내지 않는다(중복 도배 방지).
 
 import { NextRequest, NextResponse } from "next/server";
+import { buildCardPayNoticeText } from "@/lib/cardPayNoticeText";
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { postLiveChatMessage, readSetting, writeSetting } from "@/lib/youtube";
@@ -91,7 +92,8 @@ export async function POST(request: NextRequest) {
 
     // 문구 — 서버 고정. 금액·전화번호는 넣지 않는다(공개 채팅).
     const shortNick = nickname.slice(0, 20);
-    const message = `💳 ${shortNick}님 카카오톡으로 카드결제 링크 보내드렸어요! 📩 확인 부탁드려요 🙏`;
+    // [2026-09-20] 문구는 lib/cardPayNoticeText.ts 한 곳에서만 만든다 — 방송위젯 📢 한 줄과 «같은 글»이어야 한다.
+    const message = buildCardPayNoticeText(shortNick);
 
     const botChatId = await readSetting(sb, "chat_order_chat_id");
     const result = await postLiveChatMessage(message, { forceEvenIfDisabled: true, liveChatId: botChatId });

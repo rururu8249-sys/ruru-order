@@ -8,6 +8,7 @@ import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import type { LiveOrder } from "./types";
 import { setBroadcastFeedNotice } from "./liveBroadcastController";
+import { buildCardPayNoticeText } from "@/lib/cardPayNoticeText";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 // [2026-09-08] 페이스터 주소는 설정 › 상점 정보에서 온다(하드코딩 제거)
 import { getShopInfoNow, useShopInfo } from "@/lib/useShopInfo";
@@ -402,7 +403,8 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
 
   // [2026-08-31 사장님 지시] 유튜브 채팅 자동 게시는 쿼터를 먹는다(봇 글 하루 상한 공유)
   //   → 안내문구를 복사만 해주고, 유튜브 채팅에는 사장님이 직접 붙여넣는다. (금액·전화번호는 공개 채팅이라 안 넣음)
-  const chatNoticeText = `💳 ${order.nickname}님 카카오톡으로 카드결제 링크 보내드렸어요! 📩 확인 부탁드려요 🙏`;
+  // [2026-09-20 사장님] 「글씨가 너무 많아 두 줄로 보이고 오른쪽으로 너무 간다」 → 문구는 lib/cardPayNoticeText.ts 한 곳에서만 만든다.
+  const chatNoticeText = buildCardPayNoticeText(order.nickname);
 
   // 결제완료처리: LiveOrderDetailDrawer.handleCardPaymentStatusChange와 동일 패턴(주문상태만 변경, 금액/배송/송장 로직 무변경)
   const completeRowIds = () => {
