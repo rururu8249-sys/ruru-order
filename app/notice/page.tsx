@@ -116,10 +116,12 @@ export default function NoticePage() {
         )}
 
         {/* [2026-09-20] 공지 7개를 «2개씩 4페이지»로 넘겨 보던 것 → 전부 한 화면에.
-            대신 제목 줄을 눌러 펼치는 접이식(중요공지는 처음부터 펼침). */}
+            대신 제목 줄을 눌러 펼치는 접이식.
+            [2026-09-20 2차] «중요공지 전부 펼침»이면 고정공지가 3~4개일 때 다시 글벽이 된다.
+            맨 위 1개만 펼치고 나머지는 접어 둔다 — 제목 줄이 한눈에 들어오게. */}
         <div className="space-y-2.5">
-          {notices.map((notice) => (
-            <NoticeCard key={notice.id} notice={notice} defaultOpen={Boolean(notice.is_pinned)} />
+          {notices.map((notice, index) => (
+            <NoticeCard key={notice.id} notice={notice} defaultOpen={index === 0} />
           ))}
         </div>
 
@@ -128,7 +130,7 @@ export default function NoticePage() {
           <p className="text-[15px] font-medium tracking-[-0.04em] text-slate-500">
             오늘도 루루동이와 함께 행복한 쇼핑 되세요!♡
           </p>
-          <div className="mx-auto mt-5 h-px w-full bg-blue-100" />
+          <div className="mx-auto mt-5 h-px w-full bg-[#E9DFE4]" />
           <p className="mt-4 text-[12px] text-slate-400">
             copyright © since 2024 루루동이. All rights reserved.
           </p>
