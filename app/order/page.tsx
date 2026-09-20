@@ -1512,7 +1512,11 @@ export default function OrderPage() {
   const [howToSteps, setHowToSteps] = useState(HOWTO_DEFAULT.steps);
   const [howToWarn, setHowToWarn] = useState(HOWTO_DEFAULT.warn);
   // [2026-07-10] 상품 목록 정렬(표시 전용). 기본순 = 고정 상품 우선 + 방송 진열 순서(기존 동작)
-  const [productSort, setProductSort] = useState<"default" | "price_asc" | "price_desc" | "name">("default");
+  // [2026-09-20] 정렬 항목을 국내 플랫폼 실물에 맞춤 (직접 열어 확인)
+  //   쿠팡  : 쿠팡 랭킹순ⓘ / 낮은가격순 / 높은가격순 / 판매량순 / 최신순   ← 가로 «탭»
+  //   무신사 : 무신사 추천순ⓘ / 신상품(재입고)순 / 낮은 가격순 / 높은 가격순 / 할인율순 / 후기순 / 판매수량순 …
+  //   → 두 곳 공통: «추천(기본) · 낮은가격 · 높은가격 · 판매량 · 신상품». «이름순»은 둘 다 없다.
+  const [productSort, setProductSort] = useState<"default" | "sold" | "new" | "price_asc" | "price_desc">("default");
   // [2026-08-12 리뉴얼 4단계] 상품 보기 방식 — 기기에 기억(UI 취향값만 저장).
   // [2026-09-20 사장님 지시] 기본값을 ⊞격자(2열)로. «디폴트값 가로형 아님».
   //   한 번이라도 ☰/⊞를 누른 고객은 localStorage 값이 있어 그 선택이 그대로 유지된다(아래 useEffect).
@@ -6522,8 +6526,18 @@ export default function OrderPage() {
                     const pb = Number((b as any).price ?? (b as any).sale_price ?? (b as any).selling_price ?? 0) || 0;
                     if (productSort === "price_asc") return pa - pb;
                     if (productSort === "price_desc") return pb - pa;
-                    // name: 코드 안의 숫자를 숫자로 비교(CH-2가 CH-10보다 앞)
-                    return String(a.product_name || "").localeCompare(String(b.product_name || ""), "ko", { numeric: true });
+                    // [2026-09-20] 판매량순 — products.sold_qty_total(집계 컬럼)만 읽는다. 표시 순서만 바뀐다.
+                    //   숫자는 화면에 안 나온다. 쿠팡 「판매량순」·무신사 「판매수량순」과 같은 개념.
+                    if (productSort === "sold") {
+                      const sa = Number((a as any).sold_qty_total ?? 0) || 0;
+                      const sb = Number((b as any).sold_qty_total ?? 0) || 0;
+                      if (sa !== sb) return sb - sa;
+                      return pb - pa; // 판매량이 같으면 비싼 것 먼저(임의 순서 방지)
+                    }
+                    // 신상품순 — 등록일 최신 먼저. 쿠팡 「최신순」·무신사 「신상품순」.
+                    const ta = Date.parse(String((a as any).created_at || "")) || 0;
+                    const tb = Date.parse(String((b as any).created_at || "")) || 0;
+                    return tb - ta;
                   });
             // 방송/쇼핑몰 상품 목록은 전부 표시(무한스크롤이 일부 기기에서 10개에서 멈추던 문제 해결).
             //   상품 수(방송 담긴분/카탈로그 ≤ 80)라 한 번에 렌더해도 가벼움.
@@ -6568,21 +6582,40 @@ export default function OrderPage() {
                       <button type="button" aria-label="격자형 보기" title="격자형(2열)" onClick={() => changeListView("grid")}
                         style={{ width: "32px", height: "34px", border: "none", borderLeft: "1px solid #EADCE2", background: listView === "grid" ? "#7A1E47" : "#fff", color: listView === "grid" ? "#fff" : "#7A1E47", fontSize: "14px", fontWeight: 800, cursor: "pointer", lineHeight: 1 }}>⊞</button>
                     </div>
-                    <span style={{ fontSize: "12px", fontWeight: 700, color: "#8A8A8A", whiteSpace: "nowrap" }}>⇅ 정렬</span>
+                  </div>
+                </div>
+                {/* [2026-09-20] 정렬 — 드롭다운 유지 (가로 탭으로 바꿨다가 되돌림).
+                    사장님 «가로탭이 더 좋은 거야? 뇌피셜 추정 아니지? 무신사는 드롭다운인데»
+                    → 맞는 지적이라 되돌렸다. 근거를 찾아본 결과:
+                      · Baymard(이커머스 UX 연구기관) 문서 둘을 읽었지만
+                        «무엇을 넣을지»만 다루고 «드롭다운이냐 탭이냐»는 아예 다루지 않는다.
+                      · 폰 420px에서 정렬 칩 5개는 가로 스크롤이 되어
+                        «항목이 다 보인다»는 탭의 이점 자체가 사라진다.
+                      · 무신사도 드롭다운이다(직접 확인).
+                    Baymard가 확실히 권한 것은 «현재 적용된 정렬을 눈에 보이게 표시»인데,
+                    드롭다운은 선택값이 그대로 보이므로 이미 충족한다.
+
+                    바꾼 것은 «항목»뿐 — 이쪽은 근거가 분명하다.
+                      Baymard 필수 정렬 4종: 가격(양방향) · 평점 · 베스트셀러 · 최신순
+                        (전체 사이트의 64%, 모바일은 69%가 이 4종을 다 못 갖춤)
+                      우리는 리뷰가 없어 평점을 뺀 나머지를 채웠다 → 판매량순 · 신상품순 신설.
+                      «이름순(알파벳 정렬)»은 Baymard가 «오히려 탐색을 방해한다»고 명시해 삭제.
+                      쿠팡·무신사 실물에도 이름순은 없다.
+                    표시 순서만 바뀐다. DB의 sort_order·is_pinned, 담기·재고·금액은 안 건드린다. */}
+                <div style={{ marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }}>
+                  <span style={{ flexShrink: 0, fontSize: "12px", fontWeight: 700, color: "#8A8A8A", whiteSpace: "nowrap" }}>⇅ 정렬</span>
                   <select
                     value={productSort}
                     onChange={(e) => { setProductSort(e.target.value as typeof productSort); setVisibleProductCount(10); }}
-                    style={{ height: "34px", borderRadius: "10px", border: "1px solid #B08794", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 700, padding: "0 10px", cursor: "pointer", outline: "none" }}
+                    style={{ maxWidth: "150px", height: "34px", borderRadius: "10px", border: "1px solid #B08794", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 700, padding: "0 8px", cursor: "pointer", outline: "none", fontFamily: "inherit" }}
                   >
-                    <option value="default">기본순 (방송 순서)</option>
+                    <option value="default">추천순</option>
+                    <option value="sold">판매량순</option>
+                    <option value="new">신상품순</option>
                     <option value="price_asc">낮은 가격순</option>
                     <option value="price_desc">높은 가격순</option>
-                    <option value="name">이름순</option>
                   </select>
-                  </div>
                 </div>
-                {/* [2026-09-11 manysell 실측 흡수] 배송비 규칙 한 줄 — 문구만. 계산은 기존 그대로
-                    (settings.default_shipping_fee · 제주/도서산간 · 같은 방송/기간 + 같은 주소 합배송 · 업체배송 별도) */}
                 {/* [2026-09-20] 「오늘 N개 나갔어요」 전체 합계 줄 — 삭제했다.
                     사장님 지적: «관리자만 알 수 있는 게 왜 고객 페이지에 떡하니 표시되는데?»
                     맞는 지적이다. 상품별 판매량(무신사 「판매 2천개」)과 달리

@@ -51,11 +51,21 @@ const has = (s, ...k) => k.every((x) => s.has(x));
   assert.ok(v.has("unknown_new_badge"), "2개까지는 통과");
 }
 
-// 통계 배지(자동)는 사장님이 «직접 고른» 배지를 밀어내면 안 된다
+// 「베스트」는 상위 3%뿐이라 수동 배지보다 위 — 사장님 지적으로 올림
 {
   const v = pickVisibleBadges(["topSeller", "special", "limit", "new"]);
-  assert.ok(has(v, "special", "limit"), "사장님이 단 특가·마감임박이 자동 최다판매보다 위");
-  assert.ok(!v.has("topSeller"));
+  assert.ok(has(v, "topSeller", "special"), "베스트 → 특가 순");
+  assert.ok(!v.has("limit"));
+}
+// 룰루레몬 실제 사례: 마감임박 + 💖루루픽 + 베스트 → 베스트가 살아남아야 한다
+{
+  const v = pickVisibleBadges(["limit", "pick", "topSeller"]);
+  assert.ok(v.has("topSeller"), "누적 상위 3% 상품이 마감임박·루루픽에 밀리면 안 된다");
+}
+// 그 외 통계 배지(자동)는 여전히 사장님 수동 배지를 밀어내지 않는다
+{
+  const v = pickVisibleBadges(["trending", "repeat", "special", "limit"]);
+  assert.ok(has(v, "special", "limit"));
 }
 // 사장님이 아무 배지도 안 단 상품에서 통계 배지가 두 칸을 채운다
 {
@@ -63,10 +73,16 @@ const has = (s, ...k) => k.every((x) => s.has(x));
   assert.ok(has(v, "topSeller", "trending"));
   assert.ok(!v.has("new"));
 }
-// 「N개 남음」만은 자동이어도 1순위 (유일한 예외)
+// 「N개 남음」과 「베스트」가 1·2순위 (자동이지만 예외로 수동 배지보다 위)
 {
   const v = pickVisibleBadges(["low", "special", "topSeller"]);
-  assert.ok(has(v, "low", "special"));
+  assert.ok(has(v, "low", "topSeller"), "재고 긴급성 + 판매 1등이 최강 조합");
+  assert.ok(!v.has("special"));
+}
+// 그 둘이 없으면 사장님 수동 배지가 앞선다
+{
+  const v = pickVisibleBadges(["special", "limit", "trending", "repeat"]);
+  assert.ok(has(v, "special", "limit"));
 }
 
 // 사장님이 배지를 «하나도 안 단» 상품 — 통계 배지만으로도 두 칸이 채워져야 한다
