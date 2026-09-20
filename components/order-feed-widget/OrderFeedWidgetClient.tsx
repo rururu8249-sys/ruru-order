@@ -119,13 +119,15 @@ const groupOf = (row: AnyRow) => String(row?.order_group_id || row?.id || "");
 //   예전 미리보기는 products 가 없어 항상 한 줄짜리라, 상품 여러 개일 때의 줄바꿈·폭을
 //   실제 방송 없이는 확인할 수 없었다(사장님 캡쳐 재현이 안 됐던 이유).
 const PREVIEW_ROWS: FeedItem[] = [
+  { id: "p2", kind: "notice",  nick: "", lines: [], at: 0, text: "노다001신더 99,000원 사이즈 235·240·260~275·285 남은 13" },
+  { id: "p3", kind: "card",    nick: "루루짱929", lines: [], at: 0 },
+  // ⚠ «맨 뒤 = 최신». 높이 예산은 최신부터 담으므로(아래 371행대) 확인 대상인 주문 줄을 맨 뒤에 둔다.
+  //   예전엔 맨 앞에 있어서 예산에 밀려 미리보기에 아예 안 떴다 — 그래서 확인이 안 됐다.
   { id: "p1", kind: "order",   nick: "공기뼈", lines: [{ left: "폴로 스트라이프 니트 외 1종", right: "합계 78,000원" }],
     products: [
       { name: "폴로 스트라이프 니트", opt: "레드/S", qty: 1 },
       { name: "폴로 스트라이프 니트", opt: "아이보리/S", qty: 1 },
     ], at: 0 },
-  { id: "p2", kind: "notice",  nick: "", lines: [], at: 0, text: "노다001신더 99,000원 사이즈 235·240·260~275·285 남은 13" },
-  { id: "p3", kind: "card",    nick: "루루짱929", lines: [], at: 0 },
 ];
 
 // [2026-09-17 사장님] 「한 줄 한 줄 하지 말고 옆으로 길게, 단 구분 잘 되게. 글자는 전부 채팅과 같은 크기로」
