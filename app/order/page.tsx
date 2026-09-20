@@ -91,7 +91,7 @@ import CustomerMissingDetailAddressPanel from "@/components/customer/CustomerMis
 import GroupBuyQuickSelect, { type GroupBuyQuickSelectProduct } from "@/components/order/GroupBuyQuickSelect";
 import { noticeBarLine } from "@/lib/noticeBar";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
-import { pickVisibleBadges, SOLD_BADGE_MIN_QTY, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_MIN_BUYERS, HOT_AUTO_RANK_PCT, PICK_AUTO_RANK_PCT } from "@/lib/productBadgePriority";
+import { pickVisibleBadges, SOLD_BADGE_MIN_QTY, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_MIN_BUYERS, HOT_AUTO_RANK_PCT, PICK_AUTO_RANK_PCT, LIVE_SALES_MIN_QTY } from "@/lib/productBadgePriority";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import ShopContactLink from "@/components/customer/ShopContactLink";
 import { useShopInfo } from "@/lib/useShopInfo";
@@ -1333,6 +1333,11 @@ export default function OrderPage() {
   const BANK_HOLDER = shopInfo.bankHolder;
   const [isEditMode, setIsEditMode] = useState(false);
   const [broadcast, setBroadcast] = useState<any | null>(null);
+  // [2026-09-20] 원래 5811행에 있던 파생값을 여기로 올렸다(값·식 동일).
+  //   방송 중 실시간 판매 배지 조회(fetchLiveSales, 3700행대)가 이 값을 써야 하는데
+  //   선언이 한참 아래라 «used before its declaration» 타입 오류가 났다.
+  //   같은 식을 두 군데 복사하면 나중에 한쪽만 고쳐지는 사고가 나므로 선언을 올려 하나로 유지한다.
+  const isBroadcastOn = String(broadcast?.status || "").toUpperCase() === "ON";
   // [2026-08-21] 방송정보 조회가 끝났는지. false(로딩중)를 "방송 꺼짐"으로 오판해
   //   "지금은 방송 전이에요" 배너가 먼저 떴다가 라이브 배너로 바뀌던 깜빡임 방지. 표시 전용.
   const [broadcastLoaded, setBroadcastLoaded] = useState(false);
@@ -3702,6 +3707,12 @@ export default function OrderPage() {
   //    API가 죽어도 담기/제출/입금/정산 전부 정상 동작(오버셀은 제출 RPC가 원래 막고 있음).
   const [reservedByVariant, setReservedByVariant] = useState<Record<string, number>>({});
   const [reservedByProduct, setReservedByProduct] = useState<Record<string, number>>({});
+  // [2026-09-20 사장님] «해당 방송 중 판매량에 따라 실시간으로 배지가 바뀌었으면(쇼핑몰 모드 포함)»
+  //   방송 ON  : 지금 방송(broadcast_id)에서 주문된 수량
+  //   방송 OFF : 오늘(한국시간 00시~) 주문된 수량
+  //   ※ 방송 중엔 대부분 미입금이라 «주문 접수» 기준으로 센다. 그래서 문구도 「주문」이라고 쓴다.
+  //      누적 판매 배지(🏆/📈)는 입금확인 기준 그대로 — 두 숫자의 뜻이 섞이지 않는다.
+  const [liveSalesByProduct, setLiveSalesByProduct] = useState<Record<string, number>>({});
   const cartSessionKeyRef = useRef<string>("");
   const getCartSessionKey = () => {
     if (cartSessionKeyRef.current) return cartSessionKeyRef.current;
@@ -3721,6 +3732,32 @@ export default function OrderPage() {
     const norm = (s: unknown) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
     return `${pid}|${norm(color)}|${norm(size)}`;
   };
+  // [2026-09-20] 방송/오늘 기준 실시간 주문 수량. 실패해도 배지만 안 뜨고 화면은 정상.
+  //   서버가 20초 캐시(s-maxage)를 걸어둬서 손님이 많아도 DB 조회는 20초에 한 번꼴이다.
+  const fetchLiveSales = async () => {
+    try {
+      const bid = String(broadcast?.id ?? "").trim();
+      const qs = isBroadcastOn && bid ? `b=${encodeURIComponent(bid)}` : "today=1";
+      const res = await fetch(`/api/broadcast-sales?${qs}`);
+      if (!res.ok) return;
+      const data = await res.json().catch(() => null);
+      if (data?.ok && data.sales && typeof data.sales === "object") setLiveSalesByProduct(data.sales as Record<string, number>);
+    } catch { /* 실시간 수량 조회 실패해도 주문·재고·금액은 정상 */ }
+  };
+  const fetchLiveSalesRef = useRef(fetchLiveSales);
+  fetchLiveSalesRef.current = fetchLiveSales;
+  useEffect(() => {
+    if (!hasSavedInfo) return;
+    void fetchLiveSalesRef.current();
+    const t = setInterval(() => {
+      // 탭이 안 보이면 쉬게 한다(기존 담김 동기화와 같은 규칙)
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      void fetchLiveSalesRef.current();
+    }, 20000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasSavedInfo, isBroadcastOn, broadcast?.id]);
+
   const fetchCartReservations = async () => {
     try {
       const ids = quickGroupBuyProducts.map((p: any) => String(p?.id ?? "")).filter(Boolean);
@@ -5775,8 +5812,7 @@ export default function OrderPage() {
     !address.trim() ||
     !detailAddress.trim();
 
-  // P3. 방송 영상 — 방송 ON + 유튜브 URL 있을 때만
-  const isBroadcastOn = String(broadcast?.status || "").toUpperCase() === "ON";
+  // P3. 방송 영상 — 방송 ON + 유튜브 URL 있을 때만 (isBroadcastOn 은 위쪽 broadcast 선언부로 이동)
   const broadcastYoutubeUrl = String(broadcast?.youtube_live_url || broadcast?.youtube_url || "").trim();
 
   const directInputItem = items[directInputTargetIndex] || null;
@@ -6585,6 +6621,8 @@ export default function OrderPage() {
                       //   products.sales_rank_pct = 판매 1개 이상인 상품끼리의 백분위(0 = 1등). 없으면 순위 밖.
                       const salesRankPctRaw = (product as unknown as Record<string, unknown>)?.sales_rank_pct;
                       const salesRankPct = Number.isFinite(Number(salesRankPctRaw)) && salesRankPctRaw !== null ? Number(salesRankPctRaw) : null;
+                      const liveSalesQty = Math.max(0, Math.floor(Number(liveSalesByProduct[String(product.id ?? "")]) || 0));
+                      const liveSalesOn = liveSalesQty >= LIVE_SALES_MIN_QTY;
                       const autoHotByRank = salesRankPct !== null && salesRankPct <= HOT_AUTO_RANK_PCT;
                       const autoPickByRank = salesRankPct !== null && salesRankPct <= PICK_AUTO_RANK_PCT;
                       const autoHot = Number(reservedByProduct[String(product.id ?? "")] || 0) >= 3 || autoHotByRank;
@@ -6698,7 +6736,7 @@ export default function OrderPage() {
                                    · 집계 기준은 새로 만들지 않고 재구매율·회원상세와 «같은» 판정을 쓴다.
                                      (입금확인/카드결제완료/출고 등 = 판매, 취소·환불·테스트·삭제 제외)
                                    · 컬럼이 아직 없으면 0 → 배지가 안 뜰 뿐, 오류 없음. */
-                                { key: "sold", on: soldBadgeOn, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#FFF4D6", color: "#8A5A00" }}>{soldRecent ? `📈 최근 ${soldQty30d}개 판매` : `🏆 ${soldQtyTotal}개 판매`}</span> },
+                                { key: "sold", on: soldBadgeOn && !liveSalesOn, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#FFF4D6", color: "#8A5A00" }}>{soldRecent ? `📈 최근 ${soldQty30d}개 판매` : `🏆 ${soldQtyTotal}개 판매`}</span> },
                                 /* [2026-09-20] 🔁 재구매 — 같은 사람이 2번 이상 산 상품. 단골 장사에서 가장 강한 증거.
                                    판정은 재구매율 리포트와 같은 기준(kakao_id 우선 · order_group_id 1건=1회 · 2건 이상).
                                    products.repeat_buyer_count 집계 컬럼을 그대로 읽는다 — 추가 쿼리 0. */
@@ -6706,6 +6744,9 @@ export default function OrderPage() {
                                 { key: "special", on: badges.includes("special"), node: <span style={{ fontSize: "10px", fontWeight: 900, color: "#9A6212", background: "#FFF4D6", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>⚡특가</span> },
                                 { key: "limit", on: badges.includes("limit"), node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#854F0B", background: "#FBF1E0", borderRadius: "5px", padding: "2px 6px" }}>마감임박</span> },
                                 { key: "pick", on: badges.includes("pick") || autoPickByRank, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#FDEEF3", color: "#C2447A" }}>💖 루루픽</span> },
+                                /* [2026-09-20 사장님] 방송 중(또는 오늘) 실제로 나간 수량 — 20초마다 갱신되어 방송 내내 배지가 살아 움직인다.
+                                   «주문 접수» 기준이라 문구도 「주문」. 누적 판매(🏆/📈)와 뜻이 섞이지 않게 라벨을 구분한다. */
+                                { key: "liveSales", on: liveSalesOn, node: <span style={{ fontSize: "10px", fontWeight: 900, color: "#fff", background: "#E8340A", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>🛒 {isBroadcastOn ? "방송 중" : "오늘"} {liveSalesQty}개 주문</span> },
                                 { key: "recommend", on: !isBroadcastOn && pinned, node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#7A1E47", borderRadius: "5px", padding: "2px 6px" }}>📌 추천</span> },
                                 { key: "hot", on: badges.includes("hot") || autoHot, node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>HOT</span> },
                                 { key: "new", on: badges.includes("new") || autoNew, node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#0F6E56", background: "#E7F3EE", borderRadius: "5px", padding: "2px 6px" }}>NEW</span> },

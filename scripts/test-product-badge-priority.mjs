@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { pickVisibleBadges, MAX_PROMO_BADGES, SOLD_BADGE_MIN_QTY, REPEAT_BADGE_MIN_BUYERS, SOLD_RECENT_MIN_QTY } from "../lib/productBadgePriority.ts";
+import { pickVisibleBadges, MAX_PROMO_BADGES, SOLD_BADGE_MIN_QTY, REPEAT_BADGE_MIN_BUYERS, SOLD_RECENT_MIN_QTY, LIVE_SALES_MIN_QTY } from "../lib/productBadgePriority.ts";
 
 const has = (s, ...k) => k.every((x) => s.has(x));
 
@@ -82,6 +82,22 @@ const has = (s, ...k) => k.every((x) => s.has(x));
   assert.ok(!v.has("repeat"));
 }
 
+// 방송 중 실시간 판매 배지는 수동 배지보다 아래, 재구매·누적판매보다 위
+{
+  const v = pickVisibleBadges(["liveSales", "repeat", "sold"]);
+  assert.ok(has(v, "liveSales", "repeat"), "방송 중 실시간 수량이 누적보다 강한 신호");
+  assert.ok(!v.has("sold"));
+}
+{
+  const v = pickVisibleBadges(["liveSales", "special", "pick"]);
+  assert.ok(has(v, "special", "pick"), "자동 배지는 사장님 수동 배지를 밀어내지 않는다");
+}
+{
+  const v = pickVisibleBadges(["low", "liveSales", "sold"]);
+  assert.ok(has(v, "low", "liveSales"), "실재고 + 방송 중 수량이 최강 조합");
+}
+
+assert.ok(LIVE_SALES_MIN_QTY >= 3, "2개는 우연일 수 있다");
 assert.equal(MAX_PROMO_BADGES, 2);
 // 실제 데이터(상품 696개) 기준 5개이상=128개=18.4% → 업계 권장 15~25% 안
 assert.equal(SOLD_BADGE_MIN_QTY, 5);
