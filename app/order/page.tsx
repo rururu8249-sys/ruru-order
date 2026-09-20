@@ -1512,10 +1512,29 @@ export default function OrderPage() {
   const [howToSteps, setHowToSteps] = useState(HOWTO_DEFAULT.steps);
   const [howToWarn, setHowToWarn] = useState(HOWTO_DEFAULT.warn);
   // [2026-07-10] 상품 목록 정렬(표시 전용). 기본순 = 고정 상품 우선 + 방송 진열 순서(기존 동작)
-  // [2026-09-20] 정렬 항목을 국내 플랫폼 실물에 맞춤 (직접 열어 확인)
-  //   쿠팡  : 쿠팡 랭킹순ⓘ / 낮은가격순 / 높은가격순 / 판매량순 / 최신순   ← 가로 «탭»
-  //   무신사 : 무신사 추천순ⓘ / 신상품(재입고)순 / 낮은 가격순 / 높은 가격순 / 할인율순 / 후기순 / 판매수량순 …
-  //   → 두 곳 공통: «추천(기본) · 낮은가격 · 높은가격 · 판매량 · 신상품». «이름순»은 둘 다 없다.
+  // [2026-09-20] 정렬 항목·명칭을 국내 플랫폼 실물에 맞춤 (전부 직접 열어 확인, 추정 아님)
+  //
+  //   의미      | 쿠팡          | 무신사              | 11번가
+  //   ----------|---------------|---------------------|--------------------------
+  //   기본/추천 | 쿠팡 랭킹순ⓘ  | 무신사 추천순ⓘ      | 11번가 랭킹순 / 인기순
+  //   판매      | 판매량순      | 판매수량순/판매금액순 | 누적 판매순
+  //   최신      | 최신순        | 신상품(재입고)순     | 최신순
+  //   가격↑     | 낮은가격순    | 낮은 가격순          | 낮은 가격순
+  //   가격↓     | 높은가격순    | 높은 가격순          | 높은 가격순
+  //   리뷰      | —             | 후기순               | 많은 리뷰순
+  //   이름      | 없음          | 없음                 | 가나다순
+  //   (G마켓은 카드 배지로 「구매 2천+」처럼 판매량을 보여준다)
+  //
+  //   확정 근거
+  //     · 「낮은/높은 가격순」 3사 완전 일치 → 그대로
+  //     · 「최신순」 쿠팡·11번가 2:1 우세 → 「신상품순」 대신 이것
+  //     · 「판매량순」 쿠팡 표기. 11번가 「누적 판매순」이 더 정확하지만
+  //       주 고객이 중장년이라 «누적»보다 쉬운 쪽을 골랐다
+  //     · 기본값은 3사 모두 «브랜드명 + 랭킹순/추천순» → 「루루동이 추천순」.
+  //       Baymard가 «모호한 Sort By 라벨은 탐색을 방해한다»고 해 누가 추천하는지 밝힌다
+  //     · 「이름순(가나다순)」 삭제 — Baymard가 알파벳 정렬을 «방해»로 명시.
+  //       11번가엔 있지만 쿠팡·무신사엔 없고, 상품 코드 검색은 위 검색칸이 한다
+  //     · 평점순은 우리에 리뷰 기능이 없어 제외
   const [productSort, setProductSort] = useState<"default" | "sold" | "new" | "price_asc" | "price_desc">("default");
   // [2026-08-12 리뉴얼 4단계] 상품 보기 방식 — 기기에 기억(UI 취향값만 저장).
   // [2026-09-20 사장님 지시] 기본값을 ⊞격자(2열)로. «디폴트값 가로형 아님».
@@ -6609,9 +6628,9 @@ export default function OrderPage() {
                     onChange={(e) => { setProductSort(e.target.value as typeof productSort); setVisibleProductCount(10); }}
                     style={{ maxWidth: "150px", height: "34px", borderRadius: "10px", border: "1px solid #B08794", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 700, padding: "0 8px", cursor: "pointer", outline: "none", fontFamily: "inherit" }}
                   >
-                    <option value="default">추천순</option>
+                    <option value="default">루루동이 추천순</option>
                     <option value="sold">판매량순</option>
-                    <option value="new">신상품순</option>
+                    <option value="new">최신순</option>
                     <option value="price_asc">낮은 가격순</option>
                     <option value="price_desc">높은 가격순</option>
                   </select>
