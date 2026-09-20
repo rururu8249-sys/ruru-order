@@ -1,6 +1,6 @@
 // 방송 피드 상품명 정리 — 꼬리표·코드 떼고 20자, 여러 개는 「외 N종」
 import assert from "node:assert/strict";
-import { cleanProductNameForFeed, feedOrderDetail, feedOrderLines, feedOrderProducts, feedOrderParts, feedProductLabel, feedShownProducts, feedProductPages, feedRowFitsOneLine, feedDetailLineCount, feedPinFitsOneLine, feedPinFontSize, estimateTextWidth } from "../lib/feedText.ts";
+import { cleanProductNameForFeed, feedOrderDetail, feedOrderLines, feedOrderProducts, feedOrderParts, feedProductLabel, feedShownProducts, feedProductPages, feedRowFitsOneLine, feedDetailLineCount, feedPinFitsOneLine, feedPinFontSize, estimateTextWidth, FEED_DETAIL_LINES_PER_PAGE } from "../lib/feedText.ts";
 import { formatOrderOptionText } from "../lib/orderOptionText.ts";
 
 assert.equal(cleanProductNameForFeed("[👽주말마지막] 나이키 쭈리후드티_센터자수 FB7789"), "나이키 쭈리후드티_센터자수");
@@ -96,16 +96,41 @@ assert.equal(feedPinFitsOneLine("가".repeat(24)), true);   // 줄여서 한 줄
     opt,
   );
   const pages = feedProductPages(many);
-  assert.ok(pages.length >= 3, `여러 장으로 나뉜다: ${pages.length}`);
+  assert.ok(pages.length >= 2, `여러 장으로 나뉜다: ${pages.length}`);
   // 빠짐 없이 전부 들어가야 한다 — 「외 N종」으로 버리지 않는다
   assert.equal(pages.flat().length, 8);
-  // 각 장은 «두 줄» 폭(작은 글씨 28px)을 안 넘는다(상품 하나가 혼자 넘치는 경우 제외)
+  // [2026-09-20] 한 장이 «허용된 줄 수» 폭을 안 넘는다. 예전엔 2줄로 못박아 놨는데
+  //   사장님 「주문상품이 짤리는데 3줄로」 요청으로 한도가 3이 됐다 → 상수를 보게 바꾼다.
   for (const pg of pages) {
     if (pg.length === 1) continue;
-    assert.ok(estimateTextWidth(pg.map(feedProductLabel).join("  |  "), 28) <= 814 * 2, "한 장이 두 줄을 넘었다");
+    assert.ok(
+      estimateTextWidth(pg.map(feedProductLabel).join("  |  "), 28) <= 814 * FEED_DETAIL_LINES_PER_PAGE,
+      `한 장이 ${FEED_DETAIL_LINES_PER_PAGE}줄을 넘었다`,
+    );
   }
   // 짧은 상품이면 한 장에 여러 개 — 「1개 출력당 최대한 많이」
   const short = feedOrderParts(Array.from({ length: 6 }, (_, i) => ({ name: `꽃티${i + 1}`, size: "L" })), opt);
   assert.equal(feedProductPages(short).length, 1, "짧은 상품 6개는 한 장에 다 들어간다");
 }
-console.log("✅ test-feed-text 46개 통과");
+// [2026-09-20 사장님] 「주문상품이 짤리는데 줄바꿈해서 3줄로 안내를 하던지」
+//   배포 위젯 DOM에서 직접 잰 값:
+//     「나이키 쭈리 후드티2 색N/M 1개」 5개 · 줄한도 2 → scrollHeight 초과 = «잘림»  ← 사장님이 보신 화면
+//                                    · 줄한도 3 → 3줄(105px)에 전부 들어감 · 잘림 없음
+//   이 한도가 다시 2로 내려가면 같은 잘림이 재발한다. 여기서 막는다.
+{
+  assert.equal(FEED_DETAIL_LINES_PER_PAGE, 3, "상품 줄 한도는 3줄 (2로 내리면 상품 많은 주문이 잘린다)");
+
+  const opt = (c, s2) => formatOrderOptionText(c, s2);
+  const five = feedOrderParts(
+    Array.from({ length: 5 }, (_, i) => ({ name: "나이키 쭈리 후드티2", color: `색${i}`, size: "M", qty: 1 })),
+    opt,
+  );
+  const fivePages = feedProductPages(five);
+  assert.equal(fivePages.length, 1, `상품 5개는 한 장(3줄)에 다 들어가야 한다: ${fivePages.length}장`);
+  assert.equal(fivePages[0].length, 5, "다섯 개가 한 장에");
+  const w = estimateTextWidth(fivePages[0].map(feedProductLabel).join("  |  "), 28);
+  assert.ok(w <= 814 * 3, `5개가 3줄을 넘었다: ${Math.round(w)}px`);
+  assert.ok(w > 814 * 2, `5개는 2줄로는 부족해야 한다(이 검사의 전제): ${Math.round(w)}px`);
+}
+
+console.log("✅ test-feed-text 통과 (상품 줄 3줄 한도 포함)");

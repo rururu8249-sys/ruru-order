@@ -226,8 +226,19 @@ export function feedPinFillPercent(text: string): number {
 export const FEED_PAGE_MS = 3500;   // 한 장이 떠 있는 시간
 
 /** 상품들을 «한 줄에 들어가는 만큼»씩 나눈다. 각 장은 최소 1개는 담는다(이름이 아주 길어도). */
-/** 한 장이 쓰는 줄 수 — 상품 줄은 작은 글씨로 «두 줄»까지 (그래야 한 알림에 많이 들어간다) */
-export const FEED_DETAIL_LINES_PER_PAGE = 2;
+/** 한 장이 쓰는 줄 수 — 상품 줄이 쓸 수 있는 최대 줄 수.
+ *  [2026-09-20 사장님] 「주문상품이 짤리는데 줄바꿈해서 3줄로 안내를 하던지」 → 2 → 3.
+ *    실측(배포 위젯 DOM에서 직접 잼): 한 줄 가용폭 814px.
+ *      「나이키 쭈리 후드티2 차콜/M 1개」 3개 = 1334px → 2줄에 딱 맞음(높이 70px)
+ *      그보다 많거나 이름이 길면 2줄 한도에서 «잘려나갔다» — 그게 사장님이 보신 화면이다.
+ *    이 숫자 하나가 «세 가지»를 동시에 정한다. 바꿀 때 셋을 같이 봐야 한다.
+ *      1) 화면에 보여줄 최대 줄 수 (OrderFeedWidgetClient 의 WebkitLineClamp)
+ *      2) 한 장에 담는 상품 수 (아래 feedProductPages 의 예산 = 가용폭 × 줄수 × 0.92)
+ *      3) 알림 한 건의 높이 (OrderFeedWidgetClient 의 heightOf → BUDGET_H 예산)
+ *    ⚠ 3 으로 올리면서 BUDGET_H 를 230 → 255 로 같이 올렸다.
+ *       안 올리면 3줄짜리 주문이 «예산 초과»로 아예 안 뜬다(77+167+8 = 252 > 230).
+ */
+export const FEED_DETAIL_LINES_PER_PAGE = 3;
 
 export function feedProductPages(
   parts: FeedProduct[],
