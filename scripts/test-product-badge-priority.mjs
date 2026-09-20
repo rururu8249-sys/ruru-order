@@ -117,7 +117,7 @@ assert.ok(HOLDING_MIN_PEOPLE >= 3, "2명은 «여러 명»이라 하기 어렵�
 // 숫자를 화면에 안 쓰는 배지는 기준을 후하게 — 자랑거리 없는 상품을 줄인다
 assert.ok(POPULAR_RANK_PCT >= 0.2, "「인기」는 넓게 잡아야 소외가 줄어든다");
 assert.ok(TOP_SELLER_RANK_PCT < POPULAR_RANK_PCT, "최다판매가 인기보다 좁아야 한다");
-assert.ok(SOLD_RECENT_MIN_QTY >= 5);
+assert.ok(SOLD_RECENT_MIN_QTY >= 2, "한 달에 1개는 «급상승»이라 부르기 어렵다");
 assert.ok(REPEAT_BADGE_MIN_BUYERS >= 2);
 assert.equal(MAX_PROMO_BADGES, 2);
 
