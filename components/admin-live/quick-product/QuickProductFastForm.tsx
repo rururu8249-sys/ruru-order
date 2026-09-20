@@ -1863,9 +1863,18 @@ export default function QuickProductFastForm({
         ...(optionAxesPayload ? { option_axes: optionAxesPayload, combo_detail_values: exposedDetails } : {}),
       });
 
-      // [2026-09-03 사장님 지시] 새 상품 + 뱃지 미선택 → ⚡특가/💖루루픽 중 랜덤 1개 자동 (한 번만 뽑아 공유)
-      //   🔒 바로구매·해외배송 자동 절대 금지 · 수정 저장엔 자동 없음(뺀 뱃지 부활 방지)
-      const resolvedBadgeTypes = (!isEditMode && badgeTypes.length === 0) ? [Math.random() < 0.5 ? "special" : "pick"] : badgeTypes;
+      // [2026-09-03] 새 상품 + 뱃지 미선택 → ⚡특가/💖루루픽 중 «랜덤 1개» 자동으로 붙이던 것 — 삭제.
+      // [2026-09-20 사장님 승인] 뺀 이유 둘
+      //   ① 랜덤 「특가」는 실제로 할인한 게 아닌데 특가라고 붙는 것이라 «거짓 표시»다.
+      //      표시광고법 「거짓·과장」(사실과 다르게 표시) — 시정조치·과징금 +
+      //      2년 이하 징역 또는 1억 5천만원 이하 벌금. 다크패턴 규제도 2025-02-14 시행 중.
+      //      손님이 한 번 눈치채면 「N개 남음」(실재고) 같은 진짜 배지까지 안 믿게 된다.
+      //   ② 랜덤 「💖루루픽」은 «사장님이 직접 고른 상품»이라는 뜻을 희석한다.
+      //      판매 상위 3%는 이제 「베스트」가 맡으므로 역할도 겹친다.
+      //   그리고 이제 배지를 하나도 안 골라도 자동으로 붙는 게 8종이라 카드가 비지 않는다
+      //   (신상 30일 · 무료배송 · N개 남음 · 여러 명이 담는 중 · 베스트 · 인기 · 급상승 · 재구매).
+      //   → 사장님이 «고른 것»만 저장한다. 안 고르면 빈 배열 그대로.
+      const resolvedBadgeTypes = badgeTypes;
 
       const payload: Record<string, unknown> = {
         product_name: name,

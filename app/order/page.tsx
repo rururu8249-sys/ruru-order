@@ -91,6 +91,7 @@ import CustomerMissingDetailAddressPanel from "@/components/customer/CustomerMis
 import GroupBuyQuickSelect, { type GroupBuyQuickSelectProduct } from "@/components/order/GroupBuyQuickSelect";
 import { noticeBarLine } from "@/lib/noticeBar";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
+import { compareMixOrder, mixSeedForToday } from "@/lib/productMixOrder";
 import { pickVisibleBadges, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_MIN_BUYERS, TOP_SELLER_RANK_PCT, POPULAR_RANK_PCT, HOLDING_MIN_PEOPLE } from "@/lib/productBadgePriority";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import ShopContactLink from "@/components/customer/ShopContactLink";
@@ -1535,7 +1536,9 @@ export default function OrderPage() {
   //     · 「이름순(가나다순)」 삭제 — Baymard가 알파벳 정렬을 «방해»로 명시.
   //       11번가엔 있지만 쿠팡·무신사엔 없고, 상품 코드 검색은 위 검색칸이 한다
   //     · 평점순은 우리에 리뷰 기능이 없어 제외
-  const [productSort, setProductSort] = useState<"default" | "sold" | "new" | "price_asc" | "price_desc">("default");
+  //   · 「골고루 보기」(mix)는 우리만의 항목이다. 플랫폼 표준은 아니지만
+  //     «안 팔린 상품도 노출되게» 하려면 배지만으로는 한계가 있어 넣었다(lib/productMixOrder.ts).
+  const [productSort, setProductSort] = useState<"default" | "mix" | "sold" | "new" | "price_asc" | "price_desc">("default");
   // [2026-08-12 리뉴얼 4단계] 상품 보기 방식 — 기기에 기억(UI 취향값만 저장).
   // [2026-09-20 사장님 지시] 기본값을 ⊞격자(2열)로. «디폴트값 가로형 아님».
   //   한 번이라도 ☰/⊞를 누른 고객은 localStorage 값이 있어 그 선택이 그대로 유지된다(아래 useEffect).
@@ -6545,6 +6548,10 @@ export default function OrderPage() {
                     const pb = Number((b as any).price ?? (b as any).sale_price ?? (b as any).selling_price ?? 0) || 0;
                     if (productSort === "price_asc") return pa - pb;
                     if (productSort === "price_desc") return pb - pa;
+                    // [2026-09-20] 골고루 보기 — 한국시간 «날짜»를 씨앗으로 섞는다.
+                    //   하루 동안은 순서가 고정되고(손님이 아까 본 상품을 다시 찾을 수 있게)
+                    //   날이 바뀌면 다시 섞여 모든 상품이 언젠가는 위에 올 기회를 갖는다.
+                    if (productSort === "mix") return compareMixOrder(a.id, b.id, mixSeedForToday());
                     // [2026-09-20] 판매량순 — products.sold_qty_total(집계 컬럼)만 읽는다. 표시 순서만 바뀐다.
                     //   숫자는 화면에 안 나온다. 쿠팡 「판매량순」·무신사 「판매수량순」과 같은 개념.
                     if (productSort === "sold") {
@@ -6658,6 +6665,7 @@ export default function OrderPage() {
                       style={{ minWidth: 0, maxWidth: "150px", height: "36px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", fontSize: "12.5px", fontWeight: 800, padding: "0 6px", cursor: "pointer", outline: "none", fontFamily: "inherit" }}
                     >
                       <option value="default">루루동이 추천순</option>
+                      <option value="mix">골고루 보기</option>
                       <option value="sold">판매량순</option>
                       <option value="new">최신순</option>
                       <option value="price_asc">낮은 가격순</option>
