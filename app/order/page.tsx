@@ -6589,51 +6589,47 @@ export default function OrderPage() {
                     <span style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "26px", background: "linear-gradient(90deg,rgba(253,247,249,0),#FDF7F9)", pointerEvents: "none" }} />
                   </div>
                 ) : null}
-                {/* [2026-07-10] 정렬 드롭다운 — 표시 순서만 바꿈. 기본순이면 지금 방송 상품이 맨 위(고정) */}
-                <div style={{ marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                  <span style={{ fontSize: "12px", fontWeight: 700, color: "#8A8A8A" }}>총 {visibleItems.length}개</span>
-                  {/* 손님이 무슨 칸인지 알 수 있게 "정렬" 라벨을 붙임 */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    {/* [2026-08-12 리뉴얼 4단계] 보기 전환 — 표시 배치만 바뀜(담기·금액·재고 무관) */}
-                    <div style={{ display: "flex", flexShrink: 0, border: "1px solid #D9C5CC", borderRadius: "9px", overflow: "hidden", background: "#fff" }}>
-                      <button type="button" aria-label="목록형 보기" title="목록형" onClick={() => changeListView("list")}
-                        style={{ width: "32px", height: "34px", border: "none", background: listView === "list" ? "#7A1E47" : "#fff", color: listView === "list" ? "#fff" : "#7A1E47", fontSize: "14px", fontWeight: 800, cursor: "pointer", lineHeight: 1 }}>☰</button>
-                      <button type="button" aria-label="격자형 보기" title="격자형(2열)" onClick={() => changeListView("grid")}
-                        style={{ width: "32px", height: "34px", border: "none", borderLeft: "1px solid #EADCE2", background: listView === "grid" ? "#7A1E47" : "#fff", color: listView === "grid" ? "#fff" : "#7A1E47", fontSize: "14px", fontWeight: 800, cursor: "pointer", lineHeight: 1 }}>⊞</button>
-                    </div>
-                  </div>
-                </div>
-                {/* [2026-09-20] 정렬 — 드롭다운 유지 (가로 탭으로 바꿨다가 되돌림).
-                    사장님 «가로탭이 더 좋은 거야? 뇌피셜 추정 아니지? 무신사는 드롭다운인데»
-                    → 맞는 지적이라 되돌렸다. 근거를 찾아본 결과:
-                      · Baymard(이커머스 UX 연구기관) 문서 둘을 읽었지만
-                        «무엇을 넣을지»만 다루고 «드롭다운이냐 탭이냐»는 아예 다루지 않는다.
-                      · 폰 420px에서 정렬 칩 5개는 가로 스크롤이 되어
-                        «항목이 다 보인다»는 탭의 이점 자체가 사라진다.
-                      · 무신사도 드롭다운이다(직접 확인).
-                    Baymard가 확실히 권한 것은 «현재 적용된 정렬을 눈에 보이게 표시»인데,
-                    드롭다운은 선택값이 그대로 보이므로 이미 충족한다.
-
-                    바꾼 것은 «항목»뿐 — 이쪽은 근거가 분명하다.
-                      Baymard 필수 정렬 4종: 가격(양방향) · 평점 · 베스트셀러 · 최신순
-                        (전체 사이트의 64%, 모바일은 69%가 이 4종을 다 못 갖춤)
-                      우리는 리뷰가 없어 평점을 뺀 나머지를 채웠다 → 판매량순 · 신상품순 신설.
-                      «이름순(알파벳 정렬)»은 Baymard가 «오히려 탐색을 방해한다»고 명시해 삭제.
-                      쿠팡·무신사 실물에도 이름순은 없다.
+                {/* [2026-07-10] 상품 수 · 보기전환 · 정렬 — 한 줄.
+                    [2026-09-20] 사장님 «왜 저 공간 저따구로 이상해진 거야? 빈 공간 생기고»
+                      정렬을 가로 탭으로 바꿨다 되돌리면서 «별도 줄»로 남겨 두 줄이 됐고
+                      가운데가 텅 비어 보였다. 원래대로 한 줄로 합친다.
+                    정렬 항목·명칭 근거는 productSort 선언부 주석 참고 —
+                    쿠팡·무신사·11번가·G마켓 실물 대조 + Baymard 필수 정렬 4종.
                     표시 순서만 바뀐다. DB의 sort_order·is_pinned, 담기·재고·금액은 안 건드린다. */}
-                <div style={{ marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }}>
-                  <span style={{ flexShrink: 0, fontSize: "12px", fontWeight: 700, color: "#8A8A8A", whiteSpace: "nowrap" }}>⇅ 정렬</span>
-                  <select
-                    value={productSort}
-                    onChange={(e) => { setProductSort(e.target.value as typeof productSort); setVisibleProductCount(10); }}
-                    style={{ maxWidth: "150px", height: "34px", borderRadius: "10px", border: "1px solid #B08794", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 700, padding: "0 8px", cursor: "pointer", outline: "none", fontFamily: "inherit" }}
-                  >
-                    <option value="default">루루동이 추천순</option>
-                    <option value="sold">판매량순</option>
-                    <option value="new">최신순</option>
-                    <option value="price_asc">낮은 가격순</option>
-                    <option value="price_desc">높은 가격순</option>
-                  </select>
+                <div style={{ marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                  <span style={{ flexShrink: 0, fontSize: "12px", fontWeight: 700, color: "#8A8A8A" }}>총 {visibleItems.length}개</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
+                    {/* [2026-08-12 리뉴얼 4단계] 보기 전환 — 표시 배치만 바뀜(담기·금액·재고 무관)
+                        [2026-09-20] 사장님 «저 버튼이 뭔지 모르는 경우도 있을 것 같은데? 타플랫폼도 저래?»
+                          → 직접 확인한 결과 쿠팡(PC·모바일)·무신사·11번가 어디에도 보기 전환 버튼이 없다.
+                            Baymard도 이 기능은 연구가 없고, 열 수는 «화면 크기 보고 사이트가 알아서» 정하라고 한다.
+                            즉 아이콘만 덩그러니 두면 손님은 알 길이 없다(표준이 없어 학습된 적도 없으니).
+                          → 기능은 남긴다. 주 고객이 중장년이라 «사진 크게 보기»는 실제로 쓸모가 있다.
+                            대신 아이콘 옆에 «글자»를 붙여 뜻을 못 알아보는 일이 없게 한다.
+                            (Baymard도 모호한 라벨이 탐색을 방해한다고 본다) */}
+                    <div style={{ display: "flex", flexShrink: 0, border: "1px solid #D9C5CC", borderRadius: "9px", overflow: "hidden", background: "#fff" }}>
+                      <button type="button" aria-label="한 줄에 하나씩 크게 보기" onClick={() => changeListView("list")}
+                        style={{ display: "inline-flex", alignItems: "center", gap: "3px", height: "34px", padding: "0 8px", border: "none", background: listView === "list" ? "#7A1E47" : "#fff", color: listView === "list" ? "#fff" : "#7A1E47", fontSize: "12px", fontWeight: 800, cursor: "pointer", lineHeight: 1, whiteSpace: "nowrap", fontFamily: "inherit" }}>
+                        <span style={{ fontSize: "13px" }}>☰</span>크게
+                      </button>
+                      <button type="button" aria-label="한 줄에 두 개씩 보기" onClick={() => changeListView("grid")}
+                        style={{ display: "inline-flex", alignItems: "center", gap: "3px", height: "34px", padding: "0 8px", border: "none", borderLeft: "1px solid #EADCE2", background: listView === "grid" ? "#7A1E47" : "#fff", color: listView === "grid" ? "#fff" : "#7A1E47", fontSize: "12px", fontWeight: 800, cursor: "pointer", lineHeight: 1, whiteSpace: "nowrap", fontFamily: "inherit" }}>
+                        <span style={{ fontSize: "13px" }}>⊞</span>2개씩
+                      </button>
+                    </div>
+                    <select
+                      value={productSort}
+                      onChange={(e) => { setProductSort(e.target.value as typeof productSort); setVisibleProductCount(10); }}
+                      aria-label="상품 정렬"
+                      style={{ minWidth: 0, maxWidth: "148px", height: "34px", borderRadius: "10px", border: "1px solid #B08794", background: "#fff", color: "#7A1E47", fontSize: "12.5px", fontWeight: 700, padding: "0 6px", cursor: "pointer", outline: "none", fontFamily: "inherit" }}
+                    >
+                      <option value="default">루루동이 추천순</option>
+                      <option value="sold">판매량순</option>
+                      <option value="new">최신순</option>
+                      <option value="price_asc">낮은 가격순</option>
+                      <option value="price_desc">높은 가격순</option>
+                    </select>
+                  </div>
                 </div>
                 {/* [2026-09-20] 「오늘 N개 나갔어요」 전체 합계 줄 — 삭제했다.
                     사장님 지적: «관리자만 알 수 있는 게 왜 고객 페이지에 떡하니 표시되는데?»
@@ -6641,11 +6637,13 @@ export default function OrderPage() {
                     이건 «상점 전체의 하루 판매 개수» = 영업 정보다. 손님에게 보일 게 아니다.
                     → 고객 화면에 우리 «매출 규모»를 드러내는 숫자는 두지 않는다.
                        남은 숫자 배지는 「N개 남음」 하나뿐이고 그건 재고(상품 상태)지 매출이 아니다. */}
-                <div style={{ marginTop: "6px", fontSize: "11.5px", fontWeight: 700, color: "#8A8A8A", wordBreak: "keep-all", lineHeight: 1.4 }}>
-                  {generalShippingFee > 0
-                    ? `🚚 배송비 ${won(generalShippingFee)} · 같은 방송·기간에 같은 주소로 더 주문하면 배송비는 한 번만${remoteAreaShippingFee > generalShippingFee ? ` · 제주/도서산간 ${won(remoteAreaShippingFee)}` : ""}${visibleItems.some((p) => productDeliveryLabel(p) === "업체배송") ? " · 업체배송 상품은 배송비 따로" : ""}`
-                    : "🚚 지금은 배송비 0원(무료배송)"}
-                </div>
+                {/* [2026-09-20 사장님 지시] 「🚚 배송비 4,000원 · …」 안내 줄 — «삭제».
+                    · 배송비 자체는 주문서(확인·제출)에서 금액으로 계산되어 그대로 표시된다.
+                      목록의 «안내 문구»만 없앤 것이라 거래조건 고지가 빠지는 게 아니다.
+                    · 합배송 규칙(같은 방송·기간에 같은 주소면 배송비 한 번만)은
+                      공지사항 「📦 배송 · 송장 · 합배송 안내」가 대신한다.
+                    · 배송비 «계산» 로직(generalShippingFee·remoteAreaShippingFee·합배송)은
+                      하나도 안 건드렸다. 화면에서 문구만 뺐다. */}
                 {visibleItems.length === 0 ? (
                   <div style={{ marginTop: "14px", padding: "26px", textAlign: "center", color: "#999", fontSize: "14px", fontWeight: 700 }}>찾는 상품이 없어요. 아래 직접 입력으로 담아 주세요.</div>
                 ) : (
