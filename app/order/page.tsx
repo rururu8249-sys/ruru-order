@@ -1509,11 +1509,11 @@ export default function OrderPage() {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [cartAddedOpen, setCartAddedOpen] = useState(false);
   const [cartAddedItem, setCartAddedItem] = useState<any | null>(null);
-  // [UI] 담김 토스트 자동 소멸 (2.4초) — 모달 대신 비차단 토스트라 확인 클릭 불필요
+  // [UI] 담김 토스트 자동 소멸 — 모달 대신 비차단 토스트라 확인 클릭 불필요
   useEffect(() => {
     if (!cartAddedOpen) return;
-    // [2026-09-20] [담은 상품 보기] 버튼이 생겨 누를 시간을 준다(2.4 → 4초).
-    const t = setTimeout(() => setCartAddedOpen(false), 4000);
+    // [2026-09-20 사장님 지적] 토스트 안 [담은 상품 보기] 버튼을 없앴으므로 «누를 시간»이 필요 없다 → 2.4초로 원복.
+    const t = setTimeout(() => setCartAddedOpen(false), 2400);
     return () => clearTimeout(t);
   }, [cartAddedOpen, cartAddedItem]);
   const [lightboxImage, setLightboxImage] = useState<string>("");
@@ -7258,18 +7258,30 @@ export default function OrderPage() {
           ) : null}
 
           {/* [UI] 담기 완료 — 차단형 모달 → 비차단 자동소멸 토스트 (방송 중 연속 담기 안 끊기게. 하단바가 담은 개수 표시 담당) */}
-          {/* [2026-09-20 사장님·manysell 실측] 토스트에 [담은 상품 보기] — 누르면 주문서 확인 시트. 예전엔 눌리지도 않고 자동소멸만. */}
+          {/* [2026-09-20 사장님 지적] 「주문서 확인」 버튼이 바로 아래 있는데 [담은 상품 보기]가 또 떠서 헷갈리고,
+              토스트가 그 장바구니 바를 «덮고» 있었다.
+              근거: Material Design 3 Snackbar 지침(직접 확인) — ①「자주 쓰는 터치 영역이나 내비게이션 앞에 두지 말 것」
+              ②「아래쪽 다른 UI(도킹된 바 등)와 겹치면 위로 밀어 올릴 것」 ③ 동작 버튼은 있어도 하나, 필수가 아님.
+              → 중복 버튼을 «버리고», 장바구니 바 위로 올려 아무것도 가리지 않게 했다. 담은 개수·금액·이동은 아래 바가 담당. */}
           {cartAddedOpen && (
-            <div style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", bottom: "calc(92px + env(safe-area-inset-bottom))", zIndex: 140, width: "max-content", maxWidth: "92%", background: "rgba(52,20,31,0.94)", color: "#fff", borderRadius: "14px", padding: "10px 10px 10px 16px", display: "flex", alignItems: "center", gap: "10px", boxShadow: "0 10px 30px rgba(0,0,0,0.3)" }}>
-              <span style={{ flexShrink: 0, width: "22px", height: "22px", borderRadius: "50%", background: "#0F6E56", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: 900 }}>✓</span>
+            <div
+              role="status"
+              aria-live="polite"
+              style={{
+                position: "fixed", left: "50%", transform: "translateX(-50%)",
+                // 하단 탭(68) + 장바구니 바(약 56) + 여백 → 절대 겹치지 않는 높이
+                bottom: "calc(134px + env(safe-area-inset-bottom))",
+                zIndex: 140, width: "max-content", maxWidth: "92%",
+                background: "rgba(52,20,31,0.94)", color: "#fff",
+                borderRadius: "999px", padding: "10px 16px",
+                display: "flex", alignItems: "center", gap: "8px",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.28)", pointerEvents: "none",
+              }}
+            >
+              <span style={{ flexShrink: 0, width: "20px", height: "20px", borderRadius: "50%", background: "#0F6E56", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: 900 }}>✓</span>
               <span style={{ minWidth: 0, fontSize: "13px", fontWeight: 800, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {cartAddedItem ? `${String(cartAddedItem.product_name || "상품")} ${Number(cartAddedItem.qty) || 1}개 담았어요` : "주문서에 담았어요"}
               </span>
-              <button
-                type="button"
-                onClick={() => { setCartAddedOpen(false); setOrderSheetOpen(true); }}
-                style={{ flexShrink: 0, height: "36px", padding: "0 12px", borderRadius: "10px", border: "none", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap" }}
-              >담은 상품 보기</button>
             </div>
           )}
 
