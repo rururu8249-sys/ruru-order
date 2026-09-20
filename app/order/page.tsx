@@ -51,6 +51,7 @@ import {
 } from "@/lib/customerOrderLookup";
 import { brandWordmarkThumbnail, normalizeBrandKorean, productNameThumbnail, productAutoThumbUrl } from "@/lib/brandWordmarkThumbnail";
 import { toOptionList } from "@/lib/optionSplit";
+import { widgetPinnedProductId } from "@/lib/widgetPinState";
 import {
   CUSTOMER_SESSION_VERSION_KEY,
   YOUTUBE_NICKNAME_CONFIRM_VERSION_KEY,
@@ -923,10 +924,15 @@ function readOrderNoteObject(product: any): any {
   return note && typeof note === "object" ? note : null;
 }
 
-function isPinnedOrderProduct(product: any): boolean {
-  const value = product?.is_pinned ?? product?.pinned;
-  if (typeof value === "boolean") return value;
-  return ["true", "1", "y", "yes", "상단", "고정"].includes(String(value ?? "").trim().toLowerCase());
+// [2026-09-20 사장님] 「위젯 고정하면 고객 페이지에서도 제일 처음 보여야 하는 것 아니냐」
+//   예전엔 products.is_pinned 를 봤다. 그런데 관리자 📌 고정은 2026년 어느 시점부터
+//   broadcasts.widget_pin_* 에만 저장한다(AdminLiveProductManagePopup.tsx 1194·1291행).
+//   → is_pinned 는 아무도 안 쓰는 «죽은 값»이 됐고, 고객 화면의 정렬·「라이브 소개중」 배지가
+//     통째로 먹통이었다. 이제 «지금 방송에 고정된 상품 id»와 대조한다.
+function isPinnedOrderProduct(product: any, livePinnedProductId: string): boolean {
+  const pinId = String(livePinnedProductId || "").trim();
+  if (!pinId) return false;
+  return String(product?.id ?? "").trim() === pinId;
 }
 
 // [2026-07-09 사장님 지침] 사이즈는 항상 "36(S)" 형태로 보여준다.
@@ -1352,6 +1358,9 @@ export default function OrderPage() {
   //   선언이 한참 아래라 «used before its declaration» 타입 오류가 났다.
   //   같은 식을 두 군데 복사하면 나중에 한쪽만 고쳐지는 사고가 나므로 선언을 올려 하나로 유지한다.
   const isBroadcastOn = String(broadcast?.status || "").toUpperCase() === "ON";
+  // [2026-09-20] 지금 방송에서 📌 고정한 상품 id — 카드 배지·정렬이 같이 본다.
+  //   broadcasts 를 select("*") 로 이미 읽고 있어 질의가 늘지 않는다.
+  const livePinnedProductId = isBroadcastOn ? widgetPinnedProductId(broadcast as any) : "";
   // [2026-08-21] 방송정보 조회가 끝났는지. false(로딩중)를 "방송 꺼짐"으로 오판해
   //   "지금은 방송 전이에요" 배너가 먼저 떴다가 라이브 배너로 바뀌던 깜빡임 방지. 표시 전용.
   const [broadcastLoaded, setBroadcastLoaded] = useState(false);
@@ -2654,6 +2663,19 @@ export default function OrderPage() {
     const t = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       void loadBroadcastProducts(bid);
+      // [2026-09-20] 📌 고정은 broadcasts 한 줄(widget_pin_*)에 저장된다.
+      //   예전엔 broadcast_products 만 다시 읽어서, 방송 중에 고정을 바꿔도
+      //   이미 페이지를 열어둔 손님 화면에는 끝까지 반영되지 않았다.
+      //   기본키 1건 조회라 서버 부담이 거의 없다(Nano 컴퓨트 고려).
+      void (async () => {
+        const { data: fresh } = await supabase
+          .from("broadcasts")
+          .select("id,status,widget_pin_mode,widget_pin_product_id,widget_pin_detail_name")
+          .eq("id", bid)
+          .maybeSingle();
+        if (!fresh) return;
+        setBroadcast((prev: any) => (prev && String(prev.id) === String(fresh.id) ? { ...prev, ...fresh } : prev));
+      })();
     }, 45000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3692,13 +3714,9 @@ export default function OrderPage() {
 
     const mergedProducts = [...catalogForGrid, ...broadcastProducts];
 
-    const readPinnedQuickProductValue = (value: unknown) => {
-      if (typeof value === "boolean") return value;
-
-      const text = String(value ?? "").trim().toLowerCase();
-
-      return ["true", "1", "y", "yes", "상단", "고정"].includes(text);
-    };
+    // [2026-09-20] 「지금 방송에서 고정한 상품」 — broadcasts.widget_pin_* 가 정답지다.
+    //   예전 products.is_pinned 는 관리자가 더 이상 쓰지 않는 죽은 값이라 뺐다.
+    const livePinnedId = broadcastOn ? widgetPinnedProductId(broadcast as any) : "";
 
     const readQuickProductSortNumber = (value: unknown) => {
       const parsed = Number(value);
@@ -3725,17 +3743,11 @@ export default function OrderPage() {
         return String(b.created_at || b.updated_at || b.id).localeCompare(String(a.created_at || a.updated_at || a.id));
       }
 
-      const pinnedA = readPinnedQuickProductValue(a.is_pinned) || readPinnedQuickProductValue(a.pinned) ? 1 : 0;
-      const pinnedB = readPinnedQuickProductValue(b.is_pinned) || readPinnedQuickProductValue(b.pinned) ? 1 : 0;
+      // 방송 중 고정한 상품 1개만 맨 위로. (고정은 한 번에 하나뿐이라 동점 처리가 필요 없다)
+      const pinnedA = livePinnedId && String(a.id ?? "").trim() === livePinnedId ? 1 : 0;
+      const pinnedB = livePinnedId && String(b.id ?? "").trim() === livePinnedId ? 1 : 0;
 
       if (pinnedA !== pinnedB) return pinnedB - pinnedA;
-
-      if (pinnedA && pinnedB) {
-        const pinnedAtA = String(a.pinned_at || "");
-        const pinnedAtB = String(b.pinned_at || "");
-
-        if (pinnedAtA !== pinnedAtB) return pinnedAtB.localeCompare(pinnedAtA);
-      }
 
       const sortA = readQuickProductSortNumber(a.sort_order ?? a.display_order);
       const sortB = readQuickProductSortNumber(b.sort_order ?? b.display_order);
@@ -3744,7 +3756,7 @@ export default function OrderPage() {
 
       return String(b.created_at || b.updated_at || b.id).localeCompare(String(a.created_at || a.updated_at || a.id));
     });
-  }, [broadcastProducts, groupBuyQuickProductsFromCatalog, broadcast?.status]);
+  }, [broadcastProducts, groupBuyQuickProductsFromCatalog, broadcast?.status, broadcast?.widget_pin_mode, broadcast?.widget_pin_product_id]);
 
   // ============ [재고 홀드] 담는 즉시 서버에 예약(15분) — 다른 고객 화면·품절 판정에 즉시 차감 반영 ============
   // ⚠️ 진짜 재고 차감/복구는 기존 제출 RPC·취소 복구가 단일 소유(무변경). 이 예약은 표시용 선점 전용이라
@@ -6543,6 +6555,12 @@ export default function OrderPage() {
               productSort === "default"
                 ? filtered
                 : [...filtered].sort((a, b) => {
+                    // [2026-09-20 사장님] 「고정하면 고객 페이지에서도 제일 처음 보이게」
+                    //   손님이 판매량순·가격순을 직접 골랐어도, «지금 방송에서 소개 중인» 상품은 맨 위에 둔다.
+                    //   한 번에 한 개뿐이고 방송이 끝나거나 해제하면 바로 사라진다. 표시 순서만 바뀐다.
+                    const pinA = livePinnedProductId && String(a.id ?? "").trim() === livePinnedProductId ? 1 : 0;
+                    const pinB = livePinnedProductId && String(b.id ?? "").trim() === livePinnedProductId ? 1 : 0;
+                    if (pinA !== pinB) return pinB - pinA;
                     // 가격 필드는 카드 표시(912행 helper)와 동일 기준
                     const pa = Number((a as any).price ?? (a as any).sale_price ?? (a as any).selling_price ?? 0) || 0;
                     const pb = Number((b as any).price ?? (b as any).sale_price ?? (b as any).selling_price ?? 0) || 0;
@@ -6701,7 +6719,7 @@ export default function OrderPage() {
                     {visibleItems.map((product) => {
                       const img = pickOrderProductImageUrl(product);
                       const brandGroup = readBrandGroupOrderProduct(product);
-                      const pinned = isPinnedOrderProduct(product);
+                      const pinned = isPinnedOrderProduct(product, livePinnedProductId);
                       const sold = (() => {
                         if (isSoldOutOrderProduct(product)) return true;
                         // 주문서에 담긴 수량 + 다른 고객 홀드(예약) 합산 후 재고 초과 체크
