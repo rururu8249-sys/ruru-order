@@ -6598,7 +6598,14 @@ export default function OrderPage() {
                     표시 순서만 바뀐다. DB의 sort_order·is_pinned, 담기·재고·금액은 안 건드린다. */}
                 <div style={{ marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                   <span style={{ flexShrink: 0, fontSize: "12px", fontWeight: 700, color: "#8A8A8A" }}>총 {visibleItems.length}개</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
+                  {/* [2026-09-20 사장님] «두 박스 크기도 미묘하게 차이나고, 너무 붙어 있는 느낌»
+                      실측으로 확인 — 전부 맞는 지적이었다.
+                        보기전환 36.0px / 모서리 9px  / 테두리 #D9C5CC
+                        정렬     34.0px / 모서리 10px / 테두리 #B08794  ← 높이·모서리·색 전부 달랐다
+                        둘 사이 간격 6px
+                      → 높이 36px · 모서리 10px · 테두리 #D9C5CC · 글자 12.5px 로 «완전히» 통일.
+                        간격은 10px (Material Design의 인접 터치 컨트롤 간격 8dp 이상 권장) */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
                     {/* [2026-08-12 리뉴얼 4단계] 보기 전환 — 표시 배치만 바뀜(담기·금액·재고 무관)
                         [2026-09-20] 사장님 «저 버튼이 뭔지 모르는 경우도 있을 것 같은데? 타플랫폼도 저래?»
                           → 직접 확인한 결과 쿠팡(PC·모바일)·무신사·11번가 어디에도 보기 전환 버튼이 없다.
@@ -6634,13 +6641,13 @@ export default function OrderPage() {
                             NN/g 기준으로는 «항상 보이는 글자 라벨»이 곧 설명이다.
                             그 이상(툴팁·별도 안내문)은 필요 없고 화면만 복잡해진다.
                             출처: nngroup.com/articles/icon-usability */}
-                    <div style={{ display: "flex", flexShrink: 0, border: "1px solid #D9C5CC", borderRadius: "9px", overflow: "hidden", background: "#fff" }}>
+                    <div style={{ display: "flex", flexShrink: 0, height: "36px", boxSizing: "border-box", border: "1px solid #D9C5CC", borderRadius: "10px", overflow: "hidden", background: "#fff" }}>
                       <button type="button" aria-label="사진 작게 보기 — 한 줄에 상품 한 개" onClick={() => changeListView("list")}
-                        style={{ display: "inline-flex", alignItems: "center", gap: "3px", height: "34px", padding: "0 8px", border: "none", background: listView === "list" ? "#7A1E47" : "#fff", color: listView === "list" ? "#fff" : "#7A1E47", fontSize: "12px", fontWeight: 800, cursor: "pointer", lineHeight: 1, whiteSpace: "nowrap", fontFamily: "inherit" }}>
+                        style={{ display: "inline-flex", alignItems: "center", gap: "3px", height: "100%", padding: "0 9px", border: "none", background: listView === "list" ? "#7A1E47" : "#fff", color: listView === "list" ? "#fff" : "#7A1E47", fontSize: "12.5px", fontWeight: 800, cursor: "pointer", lineHeight: 1, whiteSpace: "nowrap", fontFamily: "inherit" }}>
                         <span style={{ fontSize: "13px" }}>☰</span>작게
                       </button>
                       <button type="button" aria-label="사진 크게 보기 — 한 줄에 상품 두 개" onClick={() => changeListView("grid")}
-                        style={{ display: "inline-flex", alignItems: "center", gap: "3px", height: "34px", padding: "0 8px", border: "none", borderLeft: "1px solid #EADCE2", background: listView === "grid" ? "#7A1E47" : "#fff", color: listView === "grid" ? "#fff" : "#7A1E47", fontSize: "12px", fontWeight: 800, cursor: "pointer", lineHeight: 1, whiteSpace: "nowrap", fontFamily: "inherit" }}>
+                        style={{ display: "inline-flex", alignItems: "center", gap: "3px", height: "100%", padding: "0 9px", border: "none", borderLeft: "1px solid #EADCE2", background: listView === "grid" ? "#7A1E47" : "#fff", color: listView === "grid" ? "#fff" : "#7A1E47", fontSize: "12.5px", fontWeight: 800, cursor: "pointer", lineHeight: 1, whiteSpace: "nowrap", fontFamily: "inherit" }}>
                         <span style={{ fontSize: "13px" }}>⊞</span>크게
                       </button>
                     </div>
@@ -6648,7 +6655,7 @@ export default function OrderPage() {
                       value={productSort}
                       onChange={(e) => { setProductSort(e.target.value as typeof productSort); setVisibleProductCount(10); }}
                       aria-label="상품 정렬"
-                      style={{ minWidth: 0, maxWidth: "148px", height: "34px", borderRadius: "10px", border: "1px solid #B08794", background: "#fff", color: "#7A1E47", fontSize: "12.5px", fontWeight: 700, padding: "0 6px", cursor: "pointer", outline: "none", fontFamily: "inherit" }}
+                      style={{ minWidth: 0, maxWidth: "150px", height: "36px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", fontSize: "12.5px", fontWeight: 800, padding: "0 6px", cursor: "pointer", outline: "none", fontFamily: "inherit" }}
                     >
                       <option value="default">루루동이 추천순</option>
                       <option value="sold">판매량순</option>
