@@ -22,6 +22,11 @@ alter table products add column if not exists repeat_buyer_count integer not nul
 -- 판매 순위 백분위(0=1등 ~ 1=꼴찌). 판매가 0인 상품은 null → 순위 배지 대상 아님.
 alter table products add column if not exists sales_rank_pct numeric;
 
+-- 1단계에서 만든 같은 이름 함수는 «돌려주는 칸 수»가 달라서 create or replace 가 안 된다.
+--   (ERROR 42P13: cannot change return type of existing function)
+--   함수만 지우는 것이라 데이터는 하나도 안 없어진다. 바로 아래에서 다시 만든다.
+drop function if exists refresh_product_sales_stats();
+
 create or replace function refresh_product_sales_stats()
 returns table (updated_products integer, sum_qty bigint, sum_repeat bigint, ranked integer)
 language plpgsql
