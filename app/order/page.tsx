@@ -6736,20 +6736,20 @@ export default function OrderPage() {
                                    · 집계 기준은 새로 만들지 않고 재구매율·회원상세와 «같은» 판정을 쓴다.
                                      (입금확인/카드결제완료/출고 등 = 판매, 취소·환불·테스트·삭제 제외)
                                    · 컬럼이 아직 없으면 0 → 배지가 안 뜰 뿐, 오류 없음. */
-                                { key: "sold", on: soldBadgeOn && !liveSalesOn, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#FFF4D6", color: "#8A5A00" }}>{soldRecent ? `📈 최근 ${soldQty30d}개 판매` : `🏆 ${soldQtyTotal}개 판매`}</span> },
+                                { key: "sold", on: soldBadgeOn && !liveSalesOn, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#FFF4D6", color: "#8A5A00" }}>{soldRecent ? `이달 판매 ${soldQty30d}개` : `판매 ${soldQtyTotal}개`}</span> },
                                 /* [2026-09-20] 🔁 재구매 — 같은 사람이 2번 이상 산 상품. 단골 장사에서 가장 강한 증거.
                                    판정은 재구매율 리포트와 같은 기준(kakao_id 우선 · order_group_id 1건=1회 · 2건 이상).
                                    products.repeat_buyer_count 집계 컬럼을 그대로 읽는다 — 추가 쿼리 0. */
-                                { key: "repeat", on: repeatBuyers >= REPEAT_BADGE_MIN_BUYERS, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#F0E9FB", color: "#5B3A9B" }}>🔁 {repeatBuyers}명 재구매</span> },
-                                { key: "special", on: badges.includes("special"), node: <span style={{ fontSize: "10px", fontWeight: 900, color: "#9A6212", background: "#FFF4D6", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>⚡특가</span> },
+                                { key: "repeat", on: repeatBuyers >= REPEAT_BADGE_MIN_BUYERS, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#F0E9FB", color: "#5B3A9B" }}>재구매 {repeatBuyers}명</span> },
+                                { key: "special", on: badges.includes("special"), node: <span style={{ fontSize: "10px", fontWeight: 900, color: "#9A6212", background: "#FFF4D6", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>특가</span> },
                                 { key: "limit", on: badges.includes("limit"), node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#854F0B", background: "#FBF1E0", borderRadius: "5px", padding: "2px 6px" }}>마감임박</span> },
                                 { key: "pick", on: badges.includes("pick") || autoPickByRank, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#FDEEF3", color: "#C2447A" }}>💖 루루픽</span> },
                                 /* [2026-09-20 사장님] 방송 중(또는 오늘) 실제로 나간 수량 — 20초마다 갱신되어 방송 내내 배지가 살아 움직인다.
                                    «주문 접수» 기준이라 문구도 「주문」. 누적 판매(🏆/📈)와 뜻이 섞이지 않게 라벨을 구분한다. */
-                                { key: "liveSales", on: liveSalesOn, node: <span style={{ fontSize: "10px", fontWeight: 900, color: "#fff", background: "#E8340A", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>🛒 {isBroadcastOn ? "방송 중" : "오늘"} {liveSalesQty}개 주문</span> },
+                                { key: "liveSales", on: liveSalesOn, node: <span style={{ fontSize: "10px", fontWeight: 900, color: "#fff", background: "#E8340A", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>{isBroadcastOn ? "방송 중" : "오늘"} {liveSalesQty}개 주문</span> },
                                 { key: "recommend", on: !isBroadcastOn && pinned, node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#7A1E47", borderRadius: "5px", padding: "2px 6px" }}>📌 추천</span> },
-                                { key: "hot", on: badges.includes("hot") || autoHot, node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>HOT</span> },
-                                { key: "new", on: badges.includes("new") || autoNew, node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#0F6E56", background: "#E7F3EE", borderRadius: "5px", padding: "2px 6px" }}>NEW</span> },
+                                { key: "hot", on: badges.includes("hot") || autoHot, node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>급상승</span> },
+                                { key: "new", on: badges.includes("new") || autoNew, node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#0F6E56", background: "#E7F3EE", borderRadius: "5px", padding: "2px 6px" }}>신상</span> },
                                 /* [무료나눔] 0원 선물 상품 배지 — 표시 전용 */
                                 { key: "free", on: isFreeOrderProduct(product), node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#E7F3EE", color: "#0F6E56" }}>🎁 무료나눔</span> },
                                 /* [2026-07-10] 해외배송 배지 — 표시 전용(배송비 계산과 무관) */

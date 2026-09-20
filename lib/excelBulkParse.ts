@@ -568,11 +568,16 @@ export function detectOfficialForm(rows: SheetCell[][]): number {
 }
 
 // 배지 글자 → 저장값 (엑셀엔 사람 말로 쓰게 하고 여기서 변환)
+// [2026-09-20] 화면에 «보이는 이름»을 엑셀에 그대로 적어도 인식되게 맞췄다.
+//   예전엔 「루루픽」「마감임박」「특가」를 적으면 «없는 배지»로 경고만 나고 그냥 버려졌다.
+//   (화면 이름은 국내 플랫폼 실사용 문구에 맞춰 개편 — 무신사 「급상승」, 쿠팡 「특가진행중」)
+//   옛 표기(md픽·한정·NEW…)도 그대로 두어 예전 엑셀 파일이 계속 동작한다.
 const OFFICIAL_BADGES: [string, string[]][] = [
-  ["new", ["new", "신상", "뉴", "✨"]],
-  ["hot", ["hot", "인기", "핫", "🔥"]],
-  ["limit", ["한정", "리밋", "⏰"]],
-  ["pick", ["md픽", "엠디픽", "md", "픽", "⭐"]],
+  ["new", ["new", "신상", "뉴", "새상품", "✨"]],
+  ["hot", ["hot", "급상승", "인기", "핫", "🔥"]],
+  ["special", ["특가", "세일", "할인", "⚡"]],
+  ["limit", ["마감임박", "마감", "한정", "리밋", "⏰"]],
+  ["pick", ["루루픽", "루루", "md픽", "엠디픽", "md", "픽", "⭐", "💖"]],
   ["direct", ["바로구매", "바로", "🛒"]],
   ["overseas", ["해외배송", "해외", "✈"]],
 ];
@@ -584,7 +589,7 @@ function parseOfficialBadges(cellText: string, warns: string[]): string[] {
     if (!token) continue;
     const hit = OFFICIAL_BADGES.find(([, keys]) => keys.some((k) => token.includes(k)));
     if (hit) { if (!out.includes(hit[0])) out.push(hit[0]); }
-    else warns.push(`배지 「${norm(raw)}」는 없는 배지예요 (NEW/HOT/한정/MD픽/바로구매/해외배송)`);
+    else warns.push(`배지 「${norm(raw)}」는 없는 배지예요 (신상/급상승/특가/마감임박/루루픽/바로구매/해외배송)`);
   }
   return out;
 }
