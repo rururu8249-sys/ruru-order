@@ -91,7 +91,7 @@ import CustomerMissingDetailAddressPanel from "@/components/customer/CustomerMis
 import GroupBuyQuickSelect, { type GroupBuyQuickSelectProduct } from "@/components/order/GroupBuyQuickSelect";
 import { noticeBarLine } from "@/lib/noticeBar";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
-import { pickVisibleBadges, SOLD_BADGE_MIN_QTY, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_MIN_BUYERS, HOT_AUTO_RANK_PCT, PICK_AUTO_RANK_PCT, LIVE_SALES_MIN_QTY, HOLDING_MIN_PEOPLE } from "@/lib/productBadgePriority";
+import { pickVisibleBadges, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_MIN_BUYERS, TOP_SELLER_RANK_PCT, POPULAR_RANK_PCT, LIVE_SALES_MIN_QTY, HOLDING_MIN_PEOPLE } from "@/lib/productBadgePriority";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import ShopContactLink from "@/components/customer/ShopContactLink";
 import { useShopInfo } from "@/lib/useShopInfo";
@@ -6565,6 +6565,22 @@ export default function OrderPage() {
                 </div>
                 {/* [2026-09-11 manysell 실측 흡수] 배송비 규칙 한 줄 — 문구만. 계산은 기존 그대로
                     (settings.default_shipping_fee · 제주/도서산간 · 같은 방송/기간 + 같은 주소 합배송 · 업체배송 별도) */}
+                {/* [2026-09-20 사장님 지적 반영] 방송(또는 오늘) 전체 주문 수 한 줄.
+                    상품마다 숫자를 붙이면 한 상품만 주목받고 나머지가 소외된다 → 합계로 올린다.
+                    숫자는 /api/broadcast-sales 가 준 상품별 수량의 합. 추가 조회 없음.
+                    5개 미만이면 아예 안 띄운다(「오늘 2개」는 활기가 아니라 «안 팔린다»로 읽힌다). */}
+                {(() => {
+                  const totalLive = Object.values(liveSalesByProduct).reduce((a, b) => a + (Math.max(0, Math.floor(Number(b) || 0))), 0);
+                  if (totalLive < LIVE_SALES_MIN_QTY) return null;
+                  return (
+                    <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "7px", background: "#FFF1EC", border: "1px solid #F6D3C6", borderRadius: "10px", padding: "8px 11px" }}>
+                      <span style={{ flexShrink: 0, fontSize: "13px" }}>🔥</span>
+                      <span style={{ minWidth: 0, fontSize: "12.5px", fontWeight: 800, color: "#C0392B", lineHeight: 1.4 }}>
+                        {isBroadcastOn ? "지금 방송에서" : "오늘"} <b style={{ fontSize: "14px" }}>{totalLive}개</b> 나갔어요
+                      </span>
+                    </div>
+                  );
+                })()}
                 <div style={{ marginTop: "6px", fontSize: "11.5px", fontWeight: 700, color: "#8A8A8A", wordBreak: "keep-all", lineHeight: 1.4 }}>
                   {generalShippingFee > 0
                     ? `🚚 배송비 ${won(generalShippingFee)} · 같은 방송·기간에 같은 주소로 더 주문하면 배송비는 한 번만${remoteAreaShippingFee > generalShippingFee ? ` · 제주/도서산간 ${won(remoteAreaShippingFee)}` : ""}${visibleItems.some((p) => productDeliveryLabel(p) === "업체배송") ? " · 업체배송 상품은 배송비 따로" : ""}`
@@ -6617,9 +6633,11 @@ export default function OrderPage() {
                           : badgeType && badgeType !== "none"
                             ? [badgeType]
                             : [];
-                      // [2026-09-03 재설계 5단계] ✨NEW 자동 — 등록 7일 이내면 뱃지를 안 골라도 자동 표시(표시 전용)
+                      // [2026-09-03 재설계 5단계] 「신상」 자동 — 배지를 안 골라도 자동 표시(표시 전용)
+                      // [2026-09-20 사장님] «모든 상품이 잘 팔리는 느낌 들게» → 7일 → 14일로 넓힌다.
+                      //   판매가 아직 없는 새 상품도 2주 동안은 자랑거리를 하나 갖게 된다.
                       const createdMsForNew = Date.parse(String((product as any).created_at || ""));
-                      const autoNew = Number.isFinite(createdMsForNew) && Date.now() - createdMsForNew < 7 * 24 * 60 * 60 * 1000;
+                      const autoNew = Number.isFinite(createdMsForNew) && Date.now() - createdMsForNew < 14 * 24 * 60 * 60 * 1000;
                       // [2026-09-03 재설계 5단계-2] 🔥HOT 자동 — 지금 다른 손님들이 담아둔 수량(실시간 홀드)이 3개 이상이면
                       //   "주문 몰림"으로 보고 자동 표시. 표시 전용 — 저장·재고·주문 로직과 무관.
                       // [2026-09-20 사장님] «제일 많이 팔린 상품은 알아서 HOT/루루픽» — 랜덤이 아니라 판매 순위(사실).
@@ -6627,20 +6645,18 @@ export default function OrderPage() {
                       const salesRankPctRaw = (product as unknown as Record<string, unknown>)?.sales_rank_pct;
                       const salesRankPct = Number.isFinite(Number(salesRankPctRaw)) && salesRankPctRaw !== null ? Number(salesRankPctRaw) : null;
                       const holdingPeople = Math.max(0, Math.floor(Number(holdersByProduct[String(product.id ?? "")]) || 0));
-                      const liveSalesQty = Math.max(0, Math.floor(Number(liveSalesByProduct[String(product.id ?? "")]) || 0));
-                      const liveSalesOn = liveSalesQty >= LIVE_SALES_MIN_QTY;
-                      const autoHotByRank = salesRankPct !== null && salesRankPct <= HOT_AUTO_RANK_PCT;
-                      const autoPickByRank = salesRankPct !== null && salesRankPct <= PICK_AUTO_RANK_PCT;
-                      const autoHot = Number(reservedByProduct[String(product.id ?? "")] || 0) >= 3 || autoHotByRank;
+                      // 판매 순위 등급 — 둘은 겹치지 않는다(상위 3%는 「최다판매」만).
+                      const isTopSeller = salesRankPct !== null && salesRankPct <= TOP_SELLER_RANK_PCT;
+                      const isPopular = salesRankPct !== null && !isTopSeller && salesRankPct <= POPULAR_RANK_PCT;
+                      // 「인기」 = 사장님이 직접 단 것 또는 판매 상위 10%.
+                      //   실시간 담김은 「여러 명이 담는 중」이 따로 맡으므로 여기선 안 쓴다.
+                      const autoHot = badges.includes("hot") || isPopular;
                       // [2026-09-20] 🏆 누적 판매 수량 — products 테이블의 집계 컬럼(sold_qty_total).
                       //   화면에서 orders를 세지 않는다. 컬럼이 없으면 0(배지 안 뜸).
                       const statCol = (k: string) => Math.max(0, Math.floor(Number((product as unknown as Record<string, unknown>)?.[k]) || 0));
-                      const soldQtyTotal = statCol("sold_qty_total");
                       const soldQty30d = statCol("sold_qty_30d");
                       const repeatBuyers = statCol("repeat_buyer_count");
-                      // 최근 30일 실적이 있으면 «최근» 수치가 더 강한 신호라 같은 배지 자리에 그걸 쓴다.
                       const soldRecent = soldQty30d >= SOLD_RECENT_MIN_QTY;
-                      const soldBadgeOn = soldRecent || soldQtyTotal >= SOLD_BADGE_MIN_QTY;
                       return (
                         <div
                           key={String(product.id)}
@@ -6742,23 +6758,31 @@ export default function OrderPage() {
                                    · 집계 기준은 새로 만들지 않고 재구매율·회원상세와 «같은» 판정을 쓴다.
                                      (입금확인/카드결제완료/출고 등 = 판매, 취소·환불·테스트·삭제 제외)
                                    · 컬럼이 아직 없으면 0 → 배지가 안 뜰 뿐, 오류 없음. */
-                                { key: "sold", on: soldBadgeOn && !liveSalesOn, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#FFF4D6", color: "#8A5A00" }}>{soldRecent ? `이달 판매 ${soldQty30d}개` : `판매 ${soldQtyTotal}개`}</span> },
+                                /* 최다판매 — 판매 순위 상위 3%. 절대 수치가 아니라 «순위»라 작은 숫자로 초라해지지 않는다. */
+                                { key: "topSeller", on: isTopSeller, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 900, padding: "2px 6px", background: "#FFF4D6", color: "#8A5A00" }}>최다판매</span> },
+                                /* 요즘 잘나가요 — 최근 30일 판매. 숫자는 안 보여준다(한 달 치라 작게 보이면 역효과). */
+                                { key: "trending", on: soldRecent, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#E7F3EE", color: "#0F6E56" }}>요즘 잘나가요</span> },
                                 /* [2026-09-20] 🔁 재구매 — 같은 사람이 2번 이상 산 상품. 단골 장사에서 가장 강한 증거.
                                    판정은 재구매율 리포트와 같은 기준(kakao_id 우선 · order_group_id 1건=1회 · 2건 이상).
                                    products.repeat_buyer_count 집계 컬럼을 그대로 읽는다 — 추가 쿼리 0. */
-                                { key: "repeat", on: repeatBuyers >= REPEAT_BADGE_MIN_BUYERS, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#F0E9FB", color: "#5B3A9B" }}>재구매 {repeatBuyers}명</span> },
+                                { key: "repeat", on: repeatBuyers >= REPEAT_BADGE_MIN_BUYERS, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#F0E9FB", color: "#5B3A9B" }}>재구매 많아요</span> },
                                 { key: "special", on: badges.includes("special"), node: <span style={{ fontSize: "10px", fontWeight: 900, color: "#9A6212", background: "#FFF4D6", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>특가</span> },
                                 { key: "limit", on: badges.includes("limit"), node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#854F0B", background: "#FBF1E0", borderRadius: "5px", padding: "2px 6px" }}>마감임박</span> },
-                                { key: "pick", on: badges.includes("pick") || autoPickByRank, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#FDEEF3", color: "#C2447A" }}>💖 루루픽</span> },
+                                { key: "pick", on: badges.includes("pick"), node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#FDEEF3", color: "#C2447A" }}>💖 루루픽</span> },
                                 /* [2026-09-20] 지금 다른 손님이 장바구니에 담아둔 사람 수(15분 선점 기준).
                                    방송 중 가장 즉각적인 신호 — 「지금 누가 가져가고 있다」.
                                    품절된 상품엔 의미가 없으므로 끈다. 지어낸 숫자가 아니라 실제 선점 데이터. */
-                                { key: "holding", on: !sold && holdingPeople >= HOLDING_MIN_PEOPLE, node: <span style={{ fontSize: "10px", fontWeight: 900, color: "#7A1E47", background: "#F7E4EC", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>지금 {holdingPeople}명이 담는 중</span> },
-                                /* [2026-09-20 사장님] 방송 중(또는 오늘) 실제로 나간 수량 — 20초마다 갱신되어 방송 내내 배지가 살아 움직인다.
-                                   «주문 접수» 기준이라 문구도 「주문」. 누적 판매(🏆/📈)와 뜻이 섞이지 않게 라벨을 구분한다. */
-                                { key: "liveSales", on: liveSalesOn, node: <span style={{ fontSize: "10px", fontWeight: 900, color: "#fff", background: "#E8340A", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>{isBroadcastOn ? "방송 중" : "오늘"} {liveSalesQty}개 주문</span> },
+                                { key: "holding", on: !sold && holdingPeople >= HOLDING_MIN_PEOPLE, node: <span style={{ fontSize: "10px", fontWeight: 900, color: "#7A1E47", background: "#F7E4EC", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>여러 명이 담는 중</span> },
+                                /* [2026-09-20] 「방송 중 N개 주문」은 «상품 카드에서 뺐다».
+                                   사장님 지적: «7개 주문만 계속 관심받고 다른 상품은 소외야?»
+                                   맞는 말이다. 상품마다 숫자를 붙이면 필연적으로 줄 세우기가 되고,
+                                   안 붙은 상품은 «안 팔리는 상품»으로 읽힌다.
+                                   → 같은 숫자를 «상품 목록 맨 위 한 줄»로 올렸다(6570행대).
+                                     합계라서 소외되는 상품이 없고, 방송의 활기는 그대로 전달된다.
+                                   상품 카드의 실시간 역동성은 「여러 명이 담는 중」이 맡는다 —
+                                   이건 실시간으로 이 상품 저 상품 옮겨다녀 한 상품에 고정되지 않는다. */
                                 { key: "recommend", on: !isBroadcastOn && pinned, node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#7A1E47", borderRadius: "5px", padding: "2px 6px" }}>📌 추천</span> },
-                                { key: "hot", on: badges.includes("hot") || autoHot, node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>급상승</span> },
+                                { key: "hot", on: badges.includes("hot") || autoHot, node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>인기</span> },
                                 { key: "new", on: badges.includes("new") || autoNew, node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#0F6E56", background: "#E7F3EE", borderRadius: "5px", padding: "2px 6px" }}>신상</span> },
                                 /* [무료나눔] 0원 선물 상품 배지 — 표시 전용 */
                                 { key: "free", on: isFreeOrderProduct(product), node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#E7F3EE", color: "#0F6E56" }}>🎁 무료나눔</span> },

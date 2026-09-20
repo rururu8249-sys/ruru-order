@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { pickVisibleBadges, MAX_PROMO_BADGES, SOLD_BADGE_MIN_QTY, REPEAT_BADGE_MIN_BUYERS, SOLD_RECENT_MIN_QTY, LIVE_SALES_MIN_QTY, HOLDING_MIN_PEOPLE } from "../lib/productBadgePriority.ts";
+import { pickVisibleBadges, MAX_PROMO_BADGES, REPEAT_BADGE_MIN_BUYERS, SOLD_RECENT_MIN_QTY, LIVE_SALES_MIN_QTY, HOLDING_MIN_PEOPLE, TOP_SELLER_RANK_PCT, POPULAR_RANK_PCT } from "../lib/productBadgePriority.ts";
 
 const has = (s, ...k) => k.every((x) => s.has(x));
 
@@ -11,11 +11,11 @@ const has = (s, ...k) => k.every((x) => s.has(x));
   assert.ok(!v.has("pick"), "루루픽은 3순위라 잘린다");
 }
 
-// 사장님 캡쳐 실제 사례 ②: 알로가방 — NEW + HOT + 💖루루픽
+// 사장님 캡쳐 실제 사례 ②: 알로가방 — 신상 + 인기 + 💖루루픽
 {
   const v = pickVisibleBadges(["new", "hot", "pick"]);
   assert.equal(v.size, 2);
-  assert.ok(has(v, "pick", "hot"), "사장님이 고른 루루픽이 자동 HOT/NEW보다 우선");
+  assert.ok(has(v, "pick", "hot"), "사장님이 고른 루루픽이 자동 인기/신상보다 우선");
   assert.ok(!v.has("new"));
 }
 
@@ -51,28 +51,28 @@ const has = (s, ...k) => k.every((x) => s.has(x));
   assert.ok(v.has("unknown_new_badge"), "2개까지는 통과");
 }
 
-// 🏆N개판매(자동)는 사장님이 «직접 고른» 배지를 밀어내면 안 된다
+// 통계 배지(자동)는 사장님이 «직접 고른» 배지를 밀어내면 안 된다
 {
-  const v = pickVisibleBadges(["sold", "special", "limit", "new"]);
-  assert.ok(has(v, "special", "limit"), "사장님이 단 ⚡특가·마감임박이 자동 🏆보다 위");
-  assert.ok(!v.has("sold"), "자동 배지는 수동 배지에 밀린다");
+  const v = pickVisibleBadges(["topSeller", "special", "limit", "new"]);
+  assert.ok(has(v, "special", "limit"), "사장님이 단 특가·마감임박이 자동 최다판매보다 위");
+  assert.ok(!v.has("topSeller"));
 }
-// 사장님이 아무 배지도 안 단 상품에서 🏆가 빛난다
+// 사장님이 아무 배지도 안 단 상품에서 통계 배지가 두 칸을 채운다
 {
-  const v = pickVisibleBadges(["sold", "hot", "new"]);
-  assert.ok(has(v, "sold", "hot"));
+  const v = pickVisibleBadges(["topSeller", "trending", "hot", "new"]);
+  assert.ok(has(v, "topSeller", "trending"));
   assert.ok(!v.has("new"));
 }
-// 🔥N개남음만은 자동이어도 1순위 (유일한 예외)
+// 「N개 남음」만은 자동이어도 1순위 (유일한 예외)
 {
-  const v = pickVisibleBadges(["low", "special", "sold"]);
+  const v = pickVisibleBadges(["low", "special", "topSeller"]);
   assert.ok(has(v, "low", "special"));
 }
 
 // 사장님이 배지를 «하나도 안 단» 상품 — 통계 배지만으로도 두 칸이 채워져야 한다
 {
-  const v = pickVisibleBadges(["repeat", "sold", "hot", "new"]);
-  assert.ok(has(v, "repeat", "sold"), "재구매 → 판매수 순으로 자동 배지가 채운다");
+  const v = pickVisibleBadges(["repeat", "trending", "hot", "new"]);
+  assert.ok(has(v, "repeat", "trending"), "재구매 → 요즘잘나가요 순으로 자동 배지가 채운다");
   assert.equal(v.size, 2);
 }
 // 재구매(자동)도 사장님 수동 배지는 밀어내지 못한다
@@ -97,21 +97,29 @@ const has = (s, ...k) => k.every((x) => s.has(x));
   assert.ok(has(v, "low", "liveSales"), "실재고 + 방송 중 수량이 최강 조합");
 }
 
-// 「지금 N명이 담는 중」 — 실시간 선점. 방송 중 주문 수량보다 즉각적이라 위
+// 「여러 명이 담는 중」 — 실시간 선점. 자동 배지 중 가장 즉각적이라 위
 {
-  const v = pickVisibleBadges(["holding", "liveSales", "sold"]);
-  assert.ok(has(v, "holding", "liveSales"));
-  assert.ok(!v.has("sold"));
+  const v = pickVisibleBadges(["holding", "topSeller", "trending"]);
+  assert.ok(has(v, "holding", "topSeller"));
+  assert.ok(!v.has("trending"));
 }
 {
   const v = pickVisibleBadges(["holding", "special", "limit"]);
   assert.ok(has(v, "special", "limit"), "자동 배지는 사장님 수동 배지를 밀어내지 않는다");
 }
-assert.ok(HOLDING_MIN_PEOPLE >= 2, "1명이면 «경쟁»이라 할 수 없다");
-assert.ok(LIVE_SALES_MIN_QTY >= 2);
+// 상위 3%는 「최다판매」, 3~10%는 「인기」 — 겹치지 않는다
+{
+  const v = pickVisibleBadges(["topSeller", "repeat", "hot", "new"]);
+  assert.ok(has(v, "topSeller", "repeat"));
+}
+// 기준선 — 낮은 숫자를 띄우면 오히려 «인기 없는 상품»으로 읽힌다(negative social proof)
+assert.ok(HOLDING_MIN_PEOPLE >= 3, "2명은 «여러 명»이라 하기 어렵다");
+// 숫자를 화면에 안 쓰는 배지는 기준을 후하게 — 자랑거리 없는 상품을 줄인다
+assert.ok(POPULAR_RANK_PCT >= 0.2, "「인기」는 넓게 잡아야 소외가 줄어든다");
+assert.ok(LIVE_SALES_MIN_QTY >= 5, "「오늘 2개 주문」은 자랑이 아니라 역효과다");
+assert.ok(TOP_SELLER_RANK_PCT < POPULAR_RANK_PCT, "최다판매가 인기보다 좁아야 한다");
+assert.ok(SOLD_RECENT_MIN_QTY >= 5);
+assert.ok(REPEAT_BADGE_MIN_BUYERS >= 2);
 assert.equal(MAX_PROMO_BADGES, 2);
-// 실제 데이터(상품 696개) 기준 5개이상=128개=18.4% → 업계 권장 15~25% 안
-assert.equal(SOLD_BADGE_MIN_QTY, 5);
-assert.equal(SOLD_RECENT_MIN_QTY, 5);
-assert.ok(REPEAT_BADGE_MIN_BUYERS >= 2, "1명이면 «재구매 많음»이라 할 수 없다");
+
 console.log("✅ test-product-badge-priority 통과");
