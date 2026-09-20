@@ -87,6 +87,8 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(
     { ok: true, scope: broadcastId ? "broadcast" : "today", sales },
-    { headers: { "Cache-Control": "public, s-maxage=20, stale-while-revalidate=40" } },
+    // 방송 중에는 10초(배지가 살아 움직이게), 방송이 아니면 20초.
+    //   손님이 몇 명이든 이 시간 동안은 CDN이 같은 응답을 돌려줘 DB는 한 번만 조회된다.
+    { headers: { "Cache-Control": `public, s-maxage=${broadcastId ? 10 : 20}, stale-while-revalidate=40` } },
   );
 }

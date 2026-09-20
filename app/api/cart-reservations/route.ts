@@ -60,6 +60,10 @@ export async function GET(request: NextRequest) {
 
     const byProduct: Record<string, number> = {};
     const byVariant: Record<string, number> = {};
+    // [2026-09-20] 「지금 N명이 담는 중」 배지용 — 상품별 «사람 수»(세션 수).
+    //   byProduct 는 수량 합계라 한 사람이 3개 담아도 3이 된다. 사람 수는 따로 세야 정확하다.
+    //   같은 조회 결과를 한 번 더 훑는 것뿐이라 DB 비용은 늘지 않는다.
+    const peopleSet: Record<string, Set<string>> = {};
     for (const row of data || []) {
       if (exclude && String((row as any).session_key) === exclude) continue;
       const pid = String((row as any).product_id);
@@ -68,8 +72,11 @@ export async function GET(request: NextRequest) {
       byProduct[pid] = (byProduct[pid] || 0) + qty;
       const vKey = `${pid}|${normOpt((row as any).color)}|${normOpt((row as any).size)}`;
       byVariant[vKey] = (byVariant[vKey] || 0) + qty;
+      (peopleSet[pid] ||= new Set()).add(String((row as any).session_key || ""));
     }
-    return NextResponse.json({ ok: true, byProduct, byVariant });
+    const byProductPeople: Record<string, number> = {};
+    for (const [pid, set] of Object.entries(peopleSet)) byProductPeople[pid] = set.size;
+    return NextResponse.json({ ok: true, byProduct, byVariant, byProductPeople });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 });
   }

@@ -91,7 +91,7 @@ import CustomerMissingDetailAddressPanel from "@/components/customer/CustomerMis
 import GroupBuyQuickSelect, { type GroupBuyQuickSelectProduct } from "@/components/order/GroupBuyQuickSelect";
 import { noticeBarLine } from "@/lib/noticeBar";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
-import { pickVisibleBadges, SOLD_BADGE_MIN_QTY, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_MIN_BUYERS, HOT_AUTO_RANK_PCT, PICK_AUTO_RANK_PCT, LIVE_SALES_MIN_QTY } from "@/lib/productBadgePriority";
+import { pickVisibleBadges, SOLD_BADGE_MIN_QTY, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_MIN_BUYERS, HOT_AUTO_RANK_PCT, PICK_AUTO_RANK_PCT, LIVE_SALES_MIN_QTY, HOLDING_MIN_PEOPLE } from "@/lib/productBadgePriority";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import ShopContactLink from "@/components/customer/ShopContactLink";
 import { useShopInfo } from "@/lib/useShopInfo";
@@ -3713,6 +3713,9 @@ export default function OrderPage() {
   //   ※ 방송 중엔 대부분 미입금이라 «주문 접수» 기준으로 센다. 그래서 문구도 「주문」이라고 쓴다.
   //      누적 판매 배지(🏆/📈)는 입금확인 기준 그대로 — 두 숫자의 뜻이 섞이지 않는다.
   const [liveSalesByProduct, setLiveSalesByProduct] = useState<Record<string, number>>({});
+  // [2026-09-20] 「지금 N명이 담는 중」 — cart_reservations 선점에서 «나를 뺀» 다른 손님 수.
+  //   지어낸 숫자가 아니라 실제로 지금 장바구니에 담아둔 사람 수다.
+  const [holdersByProduct, setHoldersByProduct] = useState<Record<string, number>>({});
   const cartSessionKeyRef = useRef<string>("");
   const getCartSessionKey = () => {
     if (cartSessionKeyRef.current) return cartSessionKeyRef.current;
@@ -3753,7 +3756,8 @@ export default function OrderPage() {
       // 탭이 안 보이면 쉬게 한다(기존 담김 동기화와 같은 규칙)
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       void fetchLiveSalesRef.current();
-    }, 20000);
+      // 방송 중 12초 / 방송 아니면 30초. 서버 캐시(10초·20초)와 짝을 맞춘다.
+    }, isBroadcastOn ? 12000 : 30000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasSavedInfo, isBroadcastOn, broadcast?.id]);
@@ -3768,6 +3772,7 @@ export default function OrderPage() {
       if (data?.ok) {
         setReservedByVariant(data.byVariant || {});
         setReservedByProduct(data.byProduct || {});
+        setHoldersByProduct(data.byProductPeople || {});
       }
     } catch { /* 예약 조회 실패해도 화면·주문 정상 */ }
   };
@@ -6621,6 +6626,7 @@ export default function OrderPage() {
                       //   products.sales_rank_pct = 판매 1개 이상인 상품끼리의 백분위(0 = 1등). 없으면 순위 밖.
                       const salesRankPctRaw = (product as unknown as Record<string, unknown>)?.sales_rank_pct;
                       const salesRankPct = Number.isFinite(Number(salesRankPctRaw)) && salesRankPctRaw !== null ? Number(salesRankPctRaw) : null;
+                      const holdingPeople = Math.max(0, Math.floor(Number(holdersByProduct[String(product.id ?? "")]) || 0));
                       const liveSalesQty = Math.max(0, Math.floor(Number(liveSalesByProduct[String(product.id ?? "")]) || 0));
                       const liveSalesOn = liveSalesQty >= LIVE_SALES_MIN_QTY;
                       const autoHotByRank = salesRankPct !== null && salesRankPct <= HOT_AUTO_RANK_PCT;
@@ -6744,6 +6750,10 @@ export default function OrderPage() {
                                 { key: "special", on: badges.includes("special"), node: <span style={{ fontSize: "10px", fontWeight: 900, color: "#9A6212", background: "#FFF4D6", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>특가</span> },
                                 { key: "limit", on: badges.includes("limit"), node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#854F0B", background: "#FBF1E0", borderRadius: "5px", padding: "2px 6px" }}>마감임박</span> },
                                 { key: "pick", on: badges.includes("pick") || autoPickByRank, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#FDEEF3", color: "#C2447A" }}>💖 루루픽</span> },
+                                /* [2026-09-20] 지금 다른 손님이 장바구니에 담아둔 사람 수(15분 선점 기준).
+                                   방송 중 가장 즉각적인 신호 — 「지금 누가 가져가고 있다」.
+                                   품절된 상품엔 의미가 없으므로 끈다. 지어낸 숫자가 아니라 실제 선점 데이터. */
+                                { key: "holding", on: !sold && holdingPeople >= HOLDING_MIN_PEOPLE, node: <span style={{ fontSize: "10px", fontWeight: 900, color: "#7A1E47", background: "#F7E4EC", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>지금 {holdingPeople}명이 담는 중</span> },
                                 /* [2026-09-20 사장님] 방송 중(또는 오늘) 실제로 나간 수량 — 20초마다 갱신되어 방송 내내 배지가 살아 움직인다.
                                    «주문 접수» 기준이라 문구도 「주문」. 누적 판매(🏆/📈)와 뜻이 섞이지 않게 라벨을 구분한다. */
                                 { key: "liveSales", on: liveSalesOn, node: <span style={{ fontSize: "10px", fontWeight: 900, color: "#fff", background: "#E8340A", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>{isBroadcastOn ? "방송 중" : "오늘"} {liveSalesQty}개 주문</span> },

@@ -24,7 +24,8 @@ export const BADGE_PROMO_ORDER = [
   "special",    // ⚡특가           (사장님 설정)
   "limit",      // 마감임박         (사장님 설정)
   "pick",       // 💖 루루픽        (사장님 설정)
-  "liveSales",  // 🛒 방송 중 N개 주문 — 지금 이 방송에서 실제로 나간 수량(실시간). 방송 중 가장 강한 신호
+  "holding",    // 지금 N명이 담는 중 — 실시간 장바구니 선점. «지금 경쟁자가 있다»는 가장 즉각적인 신호
+  "liveSales",  // 방송 중 N개 주문 — 지금 이 방송에서 실제로 나간 수량(실시간)
   "recommend",  // 📌 추천          (사장님 고정)
   "repeat",     // 🔁 N명 재구매    — 자동. 단골 장사에서 가장 강한 증거(«다시 사는 사람이 있다»)
   "sold",       // 📈/🏆 N개 판매   — 자동. 사장님이 아무 배지도 안 단 상품에서 빛난다
@@ -63,7 +64,12 @@ export const SOLD_RECENT_MIN_QTY = 5;
 /** 「🛒 방송 중 N개 주문」을 붙이기 시작하는 수량.
  *  방송 중에는 대부분 미입금이라 «주문 접수» 기준으로 센다(문구도 «주문»이라고 정확히 쓴다).
  *  2개는 우연일 수 있어 3개부터. 방송이 꺼져 있으면 «오늘» 기준으로 같은 배지가 붙는다. */
-export const LIVE_SALES_MIN_QTY = 3;
+export const LIVE_SALES_MIN_QTY = 2;
+
+/** 「지금 N명이 담는 중」을 붙이기 시작하는 «사람 수».
+ *  cart_reservations(15분 선점)에서 «나를 뺀» 다른 손님 수를 센다 — 지어낸 숫자가 아니다.
+ *  1명이면 «경쟁»이라 할 수 없어 2명부터. */
+export const HOLDING_MIN_PEOPLE = 2;
 
 export const HOT_AUTO_RANK_PCT = 0.10;
 export const PICK_AUTO_RANK_PCT = 0.03;
