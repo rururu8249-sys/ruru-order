@@ -33,7 +33,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { getActiveBroadcast, loadAdminLiveBroadcasts } from "@/components/admin-live/liveBroadcastController";
-import { feedOrderLines, feedOrderParts, feedProductLabel, feedProductPages, feedRowFitsOneLine, feedPinFitsOneLine, feedPinFontSize, estimateTextWidth, FEED_PAGE_MS, FEED_ROW_AVAIL_W, FEED_ROW_SIZES, FEED_DETAIL_LINES_PER_PAGE, type FeedLine, type FeedOrderItem, type FeedProduct } from "@/lib/feedText";
+import { feedOrderLines, feedOrderParts, feedProductLabel, feedProductPages, feedRowFitsOneLine, feedPinFitsOneLine, feedPinFontSize, feedPinLayout, estimateTextWidth, FEED_PAGE_MS, FEED_ROW_AVAIL_W, FEED_ROW_SIZES, FEED_DETAIL_LINES_PER_PAGE, type FeedLine, type FeedOrderItem, type FeedProduct } from "@/lib/feedText";
 import { formatOrderOptionText } from "@/lib/orderOptionText";
 
 type AnyRow = Record<string, any>;
@@ -416,14 +416,17 @@ export default function OrderFeedWidgetClient() {
                   border: "1.5px solid rgba(253, 224, 71, 0.7)",
                   color: "#fff", textShadow: TEXT_SHADOW,
                   // [09-16] 길면 글자를 줄여서라도 한 줄에 맞춘다(최소 27px). 그보다 길면 그때만 2줄.
-                  fontSize: `${feedPinFontSize(item.text || "")}px`, fontWeight: 900, lineHeight: 1.25, wordBreak: "keep-all",
+                  // [2026-09-20 사장님] 「긴 알림은 좌우 여백 살짝 띄우고 노는 공간 살려서, 폰트도 좀 키우고」
+                  //   → 글자 크기·줄 수·폭을 lib/feedText.ts 의 feedPinLayout 한 곳에서 정한다.
+                  fontSize: `${feedPinLayout(item.text || "").fontSize}px`, fontWeight: 900, lineHeight: 1.25, wordBreak: "keep-all",
                   animation: leaving
                     ? `ruruCurtainOut ${EXIT_MS}ms ease-in forwards`
                     : "ruruCurtain 0.65s cubic-bezier(0.16,1,0.3,1) both",
                 }}
               >
                 <span style={{ flexShrink: 0, fontSize: "26px", textShadow: "none" }}>📢</span>
-                <span style={{ minWidth: 0, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{item.text}</span>
+                {/* 2줄이 될 때는 «절반쯤»에서 줄을 바꿔 두 줄 길이를 맞춘다 → 알약이 화면 끝까지 안 늘어나고 좌우에 여백이 남는다 */}
+                <span style={{ minWidth: 0, maxWidth: `${feedPinLayout(item.text || "").maxWidth}px`, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{item.text}</span>
               </div>
             );
           }
@@ -529,11 +532,12 @@ export default function OrderFeedWidgetClient() {
               border: "1.5px solid rgba(255,217,224,0.6)",
               color: "#fff", textShadow: TEXT_SHADOW,
               // [2026-09-16 사장님 「이 정도는 한 줄로 다 뜨게」] 길면 글자를 줄여 한 줄에 맞춘다(최소 27px)
-              fontSize: `${feedPinFontSize(pinShown)}px`, fontWeight: 900, lineHeight: 1.25, wordBreak: "keep-all",
+              // [2026-09-20] 📢 안내와 같은 기준 — feedPinLayout 이 한 줄/2줄·글자·폭을 정한다
+              fontSize: `${feedPinLayout(pinShown).fontSize}px`, fontWeight: 900, lineHeight: 1.25, wordBreak: "keep-all",
             }}
           >
             <span style={{ flexShrink: 0, fontSize: "26px", textShadow: "none" }}>📌</span>
-            <span style={{ minWidth: 0, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{pinShown}</span>
+            <span style={{ minWidth: 0, maxWidth: `${feedPinLayout(pinShown).maxWidth}px`, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{pinShown}</span>
           </div>
         ) : null}
       </div>

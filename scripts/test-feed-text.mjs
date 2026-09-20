@@ -1,6 +1,6 @@
 // 방송 피드 상품명 정리 — 꼬리표·코드 떼고 20자, 여러 개는 「외 N종」
 import assert from "node:assert/strict";
-import { cleanProductNameForFeed, feedOrderDetail, feedOrderLines, feedOrderProducts, feedOrderParts, feedProductLabel, feedShownProducts, feedProductPages, feedRowFitsOneLine, feedDetailLineCount, feedPinFitsOneLine, feedPinFontSize, estimateTextWidth, FEED_DETAIL_LINES_PER_PAGE } from "../lib/feedText.ts";
+import { cleanProductNameForFeed, feedOrderDetail, feedOrderLines, feedOrderProducts, feedOrderParts, feedProductLabel, feedShownProducts, feedProductPages, feedRowFitsOneLine, feedDetailLineCount, feedPinFitsOneLine, feedPinFontSize, feedPinLayout, estimateTextWidth, FEED_DETAIL_LINES_PER_PAGE, FEED_PIN_SIZE, FEED_PIN_AVAIL_W, FEED_PIN_MIN_SIZE, FEED_PIN_ONELINE_MIN_SIZE } from "../lib/feedText.ts";
 import { formatOrderOptionText } from "../lib/orderOptionText.ts";
 
 assert.equal(cleanProductNameForFeed("[👽주말마지막] 나이키 쭈리후드티_센터자수 FB7789"), "나이키 쭈리후드티_센터자수");
@@ -61,13 +61,19 @@ assert.equal(feedPinFitsOneLine("입금자명은 닉네임으로 보내주세요
 assert.equal(feedPinFitsOneLine("주문방법 💚 방송접수 후 👉 카톡채널 👉 주문서&입금메뉴"), true);
 assert.equal(feedPinFontSize("주문방법 💚 방송접수 후 👉 카톡채널 👉 주문서&입금메뉴"), 28);
 assert.equal(feedPinFontSize("입금자명은 닉네임으로 보내주세요 🙏"), 34);   // 짧으면 안 줄인다
-// «무한대로 작아지지 않는다» — 26px 이 바닥이고, 그보다 길면 2줄로 간다
+// «무한대로 작아지지 않는다» — 28px 밑으로 내려가야 할 만큼 길면 2줄로 간다
+//   [2026-09-20] 예전엔 26px 까지 쪼그라들며 한 줄을 지켰다. 그게 «가늘고 긴 띠»가 돼
+//   사장님이 「좌우 여백 살려서 폰트도 키우라」고 하셨다 → 28px 이 한 줄의 마지노선.
 assert.equal(feedPinFontSize("가".repeat(22)), 34);   // 22자까지는 제일 큰 글자
 assert.equal(feedPinFontSize("가".repeat(26)), 29);   // 길어지는 만큼 조금씩 작아지고
-assert.equal(feedPinFontSize("가".repeat(29)), 26);   // 29자에서 바닥
-assert.equal(feedPinFitsOneLine("가".repeat(29)), true);
-assert.equal(feedPinFitsOneLine("가".repeat(30)), false);  // 30자부터는 2줄(더 안 작아진다)
-assert.equal(feedPinFontSize("가".repeat(40)), 26);        // 아무리 길어도 26px 아래로는 안 간다
+assert.equal(feedPinFitsOneLine("가".repeat(26)), true);
+assert.equal(feedPinFitsOneLine("가".repeat(29)), false);  // 29자부터는 2줄
+assert.equal(feedPinFontSize("가".repeat(29)), 34);        // 2줄로 가는 대신 글자는 원래 크기
+assert.equal(feedPinFitsOneLine("가".repeat(30)), false);  // 30자부터는 2줄
+// [2026-09-20] 2줄이 되면 «글자를 안 줄인다» — 2줄로도 모자랄 만큼 길 때만 줄인다
+assert.equal(feedPinFontSize("가".repeat(40)), 34);        // 40자도 2줄 · 원래 크기
+assert.ok(feedPinFontSize("가".repeat(60)) < 34, "2줄로도 모자라면 그때 줄인다");
+assert.ok(feedPinFontSize("가".repeat(60)) >= 26, "아무리 길어도 26px 아래로는 안 간다");
 // 한글 22자까지는 한 줄, 24자는 넘침
 assert.equal(feedPinFitsOneLine("가".repeat(22)), true);
 // 폭 추정 실측 보정 — 실제 브라우저(Pretendard 900)에서 잰 값과 ±6% 안에서 맞아야 한다
@@ -133,4 +139,50 @@ assert.equal(feedPinFitsOneLine("가".repeat(24)), true);   // 줄여서 한 줄
   assert.ok(w > 814 * 2, `5개는 2줄로는 부족해야 한다(이 검사의 전제): ${Math.round(w)}px`);
 }
 
-console.log("✅ test-feed-text 통과 (상품 줄 3줄 한도 포함)");
+// [2026-09-20 사장님] 「공지 포함 긴 알림은 좌우 여백 살짝 띄우고 노는 공간 살려서… 폰트도 좀 키우고」
+//   실제 브라우저(Pretendard)에서 잰 값:
+//     「🛍 폴로 울캐시 가디건 60,000원 · 블랙·그린·연보라·핫핑크 / S·M·L」
+//       예전: 26px 한 줄 · 알약 777px = 위젯 폭의 90%  (가늘고 긴 띠, 여백 없음)
+//       지금: 34px 2줄  · 알약 661px = 위젯 폭의 77%  (글자 31% 크고 좌우 여백 23%)
+//       폭 제한 없이 2줄만 하면 853px = 99% 라 오히려 더 꽉 찬다 → maxWidth 가 핵심이다.
+{
+  const 긴공지 = "🛍 폴로 울캐시 가디건 60,000원 · 블랙·그린·연보라·핫핑크 / S·M·L";
+  const L = feedPinLayout(긴공지);
+  assert.equal(L.lines, 2, "아주 긴 공지는 2줄로 간다(26px까지 줄이지 않는다)");
+  assert.equal(L.fontSize, FEED_PIN_SIZE, "2줄로 가는 대신 글자는 원래 크기를 지킨다");
+  assert.ok(L.maxWidth < FEED_PIN_AVAIL_W * 0.85, `좌우에 여백이 남아야 한다: ${L.maxWidth}px`);
+  // 그 글자칸으로 진짜 2줄에 들어가나 — 3줄이 되면 «잘린다»
+  assert.ok(
+    Math.ceil(estimateTextWidth(긴공지, L.fontSize) / L.maxWidth) <= 2,
+    "균형 폭이 너무 좁아 3줄이 됐다(잘림)",
+  );
+
+  // 2026-09-16 사장님 지침 「이 정도는 한 줄로」 — 조금만 줄이면 되는 글은 그대로 한 줄
+  for (const t of [
+    "방송 채팅창 접수 👉카톡채널 👉주문서 작성 메뉴클릭",
+    "💳 봄여름1234님 카톡 카드결제 링크 확인해주세요 🙏",
+  ]) {
+    const one = feedPinLayout(t);
+    assert.equal(one.lines, 1, `한 줄을 지켜야 한다: ${t}`);
+    assert.ok(one.fontSize >= FEED_PIN_ONELINE_MIN_SIZE, `한 줄인데 글자가 너무 작다(${one.fontSize}px): ${t}`);
+  }
+
+  // 짧은 글은 원래 크기 한 줄
+  const short = feedPinLayout("🛍 나이키 쭈리 후드티2 19,000원");
+  assert.equal(short.lines, 1);
+  assert.equal(short.fontSize, FEED_PIN_SIZE);
+
+  // 2줄로도 안 들어갈 만큼 긴 글만 글자를 줄인다 — 그래도 잘리면 안 된다
+  const veryLong = "🛍 폴로 울캐시 가디건 60,000원 · 블랙·그린·연보라·핫핑크·네이비·차콜 / XS·S·M·L·XL 재고 넉넉합니다 서둘러주세요";
+  const V = feedPinLayout(veryLong);
+  assert.equal(V.lines, 2);
+  assert.ok(V.fontSize >= FEED_PIN_MIN_SIZE, "바닥 글자 크기 밑으로 내려가면 안 된다");
+  assert.ok(Math.ceil(estimateTextWidth(veryLong, V.fontSize) / V.maxWidth) <= 2, "아주 긴 글이 3줄로 넘쳤다");
+
+  // 껍데기 함수들이 layout 과 어긋나지 않는지
+  assert.equal(feedPinFontSize(긴공지), L.fontSize);
+  assert.equal(feedPinFitsOneLine(긴공지), false);
+  assert.equal(feedPinFitsOneLine("🛍 나이키 쭈리 후드티2 19,000원"), true);
+}
+
+console.log("✅ test-feed-text 통과 (상품 3줄 한도 · 긴 공지 2줄 균형 포함)");

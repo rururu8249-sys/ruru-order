@@ -197,21 +197,80 @@ export const FEED_PIN_AVAIL_W = 778;   // 860 − 좌우여백 36 − 📌아이
 /** 공지 글자를 이보다 작게는 안 줄인다(너무 작으면 방송에서 안 읽힌다) */
 export const FEED_PIN_MIN_SIZE = 26;
 
+/** 한 줄을 지키려고 «여기보다 더» 글자를 줄여야 하면, 한 줄을 포기하고 2줄로 간다.
+ *  [2026-09-20 사장님] 「긴 알림은 좌우 여백 살짝 띄우고 노는 공간 살려서… 폰트도 좀 키우고」
+ *  28 인 이유: 2026-09-16 에 사장님이 «한 줄로 뜨게» 지정하신 문구들이 28~31px 로 한 줄이다.
+ *    그 문구들은 건드리지 않고, 바닥(26~27px)까지 쪼그라들던 «진짜 긴 글»만 2줄로 보낸다.
+ *      「주문방법 💚 방송접수 후 👉 카톡채널 👉 주문서&입금메뉴」 28px → 한 줄 유지
+ *      「🛍 폴로 울캐시 가디건 60,000원 · 블랙·그린…」          24px → 2줄로 전환 */
+export const FEED_PIN_ONELINE_MIN_SIZE = 28;
+
+export type FeedPinLayout = {
+  /** 글자 크기(px) */
+  fontSize: number;
+  /** 몇 줄로 그릴지 — 높이 예산(heightOf)도 이 값을 본다 */
+  lines: 1 | 2;
+  /** 글자 칸의 최대 폭(px). 2줄일 때 «절반쯤»으로 묶어 두 줄 길이를 맞추고 좌우 여백을 남긴다 */
+  maxWidth: number;
+};
+
 /**
+ * 공지/안내 한 덩어리의 «글자 크기 · 줄 수 · 폭»을 한 번에 정한다.
+ *
  * [2026-09-16 사장님] 「이 정도는 한 줄로 다 뜨게 설계해달라니까?」
- *   → 문구가 길면 «글자 크기를 줄여서» 한 줄에 맞춘다. 최소 27px 까지.
- *   그보다 더 길면 그때만 2줄(27px 유지).
+ *   → 길면 글자를 줄여서라도 한 줄. 이 지침은 그대로 살린다.
+ * [2026-09-20 사장님] 「공지 포함 긴 알림은 좌우 여백 살짝 띄우고 노는 공간을 살려서…
+ *                      폰트도 좀 키우거나… 글자 수에 따라 예쁘게 비율적으로」
+ *   실측으로 확인한 문제 — 아주 긴 공지는 «바닥인 26px»까지 줄어들고 폭을 100% 꽉 채워
+ *   가늘고 긴 띠가 됐다(좌우 여백 0).
+ *     「🛍 폴로 울캐시 가디건 60,000원 · 블랙·그린·연보라·핫핑크 / S·M·L」
+ *       34px 기준 자연폭 1084px → 26px 한 줄 · 폭의 100%          ← 사장님이 보신 화면
+ *       34px 유지하고 2줄      → 줄당 542px · 폭의 70% · 여백 30%  ← 글자 31% 크고 반듯함
+ *
+ * 그래서 «둘 다» 살리는 기준으로 나눈다.
+ *   · 조금만 줄이면 들어감(28px 이상) → 지금까지처럼 한 줄
+ *       📌 방송 채팅창 접수…   846px → 31px 한 줄 (그대로)
+ *       💳 카드결제 안내       853px → 31px 한 줄 (그대로)
+ *   · 많이 줄여야 함(28px 미만) → 한 줄 포기. 34px 유지하고 «균형 잡힌» 2줄
+ *       🛍 긴 상품 공지       1084px → 34px 2줄, 줄당 70%
+ *   · 2줄로도 34px이 안 되는 아주 긴 글만 그때 글자를 줄인다(최소 26px).
  */
-export function feedPinFontSize(text: string): number {
-  const w = estimateTextWidth(text, FEED_PIN_SIZE);
-  if (w <= FEED_PIN_AVAIL_W) return FEED_PIN_SIZE;
-  const fit = Math.floor((FEED_PIN_AVAIL_W / w) * FEED_PIN_SIZE);
-  return Math.max(FEED_PIN_MIN_SIZE, fit);
+export function feedPinLayout(text: string): FeedPinLayout {
+  const natural = estimateTextWidth(text, FEED_PIN_SIZE);
+
+  // 원래 크기로 한 줄에 들어간다 — 손댈 것 없음
+  if (natural <= FEED_PIN_AVAIL_W) {
+    return { fontSize: FEED_PIN_SIZE, lines: 1, maxWidth: FEED_PIN_AVAIL_W };
+  }
+
+  // 조금만 줄이면 한 줄 — 2026-09-16 지침대로 한 줄을 지킨다
+  const oneLineFit = Math.floor((FEED_PIN_AVAIL_W / natural) * FEED_PIN_SIZE);
+  if (oneLineFit >= FEED_PIN_ONELINE_MIN_SIZE) {
+    return { fontSize: oneLineFit, lines: 1, maxWidth: FEED_PIN_AVAIL_W };
+  }
+
+  // 2줄. 34px 유지가 원칙이고, 2줄로도 안 들어갈 만큼 길 때만 줄인다.
+  const fontSize =
+    natural <= FEED_PIN_AVAIL_W * 2
+      ? FEED_PIN_SIZE
+      : Math.max(FEED_PIN_MIN_SIZE, Math.floor(((FEED_PIN_AVAIL_W * 2) / natural) * FEED_PIN_SIZE));
+
+  // 두 줄 길이를 맞춘다 — 절반에 8% 여유(한국어 keep-all 로 줄 끝에 자투리가 남는 것 감안).
+  //   여유가 없으면 셋째 줄로 넘어가 «잘린다». 8% 는 아래 테스트가 지킨다.
+  const used = estimateTextWidth(text, fontSize);
+  const maxWidth = Math.min(FEED_PIN_AVAIL_W, Math.ceil((used / 2) * 1.08));
+
+  return { fontSize, lines: 2, maxWidth };
 }
 
-/** 이 공지 문구가 (글자 크기를 줄여서라도) 한 줄에 들어가나? */
+/** 공지 글자 크기(px) — feedPinLayout 의 얇은 껍데기 */
+export function feedPinFontSize(text: string): number {
+  return feedPinLayout(text).fontSize;
+}
+
+/** 이 공지 문구를 한 줄로 그리나? (높이 예산 계산이 이 값을 본다) */
 export function feedPinFitsOneLine(text: string): boolean {
-  return estimateTextWidth(text, feedPinFontSize(text)) <= FEED_PIN_AVAIL_W;
+  return feedPinLayout(text).lines === 1;
 }
 
 /** 한 줄을 100 으로 봤을 때 지금 몇 %인지 (관리자 입력칸 안내용) */

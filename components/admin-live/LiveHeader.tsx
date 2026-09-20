@@ -8,7 +8,7 @@ import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { buildChatAnnounceText } from "@/lib/chatAnnounce";
 import { buildDetailChatLine, detailProducts } from "@/lib/productDetailModel";
-import { feedPinFitsOneLine, feedPinFontSize, FEED_PIN_SIZE } from "@/lib/feedText";
+import { feedPinLayout, FEED_PIN_SIZE } from "@/lib/feedText";
 
 type VideoRatio = "vertical" | "wide" | "auto";
 
@@ -386,14 +386,17 @@ export default function LiveHeader({
             <div className="mb-1 flex items-center justify-between">
               <label className="text-[11px] font-black text-ink-soft">📌 방송 화면 공지 <span className="font-bold text-ink-mute">— 주문·입금 알림 맨 아래에 뜸 · 비우면 안 뜸</span></label>
               <div className="flex items-center gap-2">
-                {/* [2026-09-16 사장님 «몇 자 넘으면 2줄로 넘어가?»] 방송 화면 폭 실측(글자 34px · 가용 770px) 기준으로 지금 문구가 한 줄인지 바로 보여준다 */}
-                {pinText.trim() ? (
-                  !feedPinFitsOneLine(pinText)
-                    ? <span className="text-[11px] font-black text-warn-tx">2줄로 넘어감 — 좀 더 줄이면 한 줄</span>
-                    : feedPinFontSize(pinText) >= FEED_PIN_SIZE
-                      ? <span className="text-[11px] font-black text-ok-tx">한 줄 · 글자 제일 큼</span>
-                      : <span className="text-[11px] font-black text-ok-tx">한 줄 · 글자 {feedPinFontSize(pinText)}px <span className="font-bold text-ink-mute">(짧게 쓰면 {FEED_PIN_SIZE}px까지 커짐)</span></span>
-                ) : null}
+                {/* [2026-09-16 사장님 «몇 자 넘으면 2줄로 넘어가?»] 방송 화면 폭 실측 기준으로 지금 문구가 어떻게 뜰지 바로 보여준다.
+                    [2026-09-20] 2줄은 더 이상 «나쁜 상태»가 아니다 — 사장님 「좌우 여백 살려서 폰트도 키우라」 지침 이후
+                      길면 글자를 쪼그라뜨리는 대신 원래 크기로 2줄을 쓴다. 그래서 경고가 아니라 «있는 그대로» 알려준다. */}
+                {pinText.trim() ? (() => {
+                  const pin = feedPinLayout(pinText);
+                  const biggest = pin.fontSize >= FEED_PIN_SIZE;
+                  const label = `${pin.lines === 1 ? "한 줄" : "2줄"} · 글자 ${biggest ? "제일 큼" : `${pin.fontSize}px`}`;
+                  return biggest
+                    ? <span className="text-[11px] font-black text-ok-tx">{label}</span>
+                    : <span className="text-[11px] font-black text-warn-tx">{label} <span className="font-bold text-ink-mute">(짧게 쓰면 {FEED_PIN_SIZE}px까지 커짐)</span></span>;
+                })() : null}
                 <span className="text-[11px] font-bold text-ink-mute">{pinSavedAt ? `저장 ${pinSavedAt}` : activeBroadcast ? "방송 끝나면 자동으로 지워짐" : "방송 시작 후 쓸 수 있음"}</span>
               </div>
             </div>
