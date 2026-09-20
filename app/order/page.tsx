@@ -6612,17 +6612,36 @@ export default function OrderPage() {
                               grid = 사진 width:100% · 1:1  → 폰 420px에서 약 167×167px
                               list = 사진 width:84px        →           84×84px
                             「2개씩」 쪽 사진이 정확히 2배 크다. 「크게」를 작은 쪽에 붙여놨던 것.
-                          → 「크게/작게」라는 말 자체가 헷갈린다.
-                            한 줄에 하나라 커 보이지만 실제 사진은 작기 때문.
-                            오해가 없는 기준은 «개수» → 「1개씩」 / 「2개씩」으로 통일한다. */}
+                        [2026-09-20 3차] 사장님 «1개씩도 따지고 보면 가로로 2개씩 나오잖아?»
+                          실측(배포 화면에서 직접 잼):
+                            ☰ = 한 줄에 상품 1개 · 사진 84px · 상품당 세로 132px
+                            ⊞ = 한 줄에 상품 2개 · 사진 253px(PC 560px 기준, 폰 420px에선 약 167px)
+                          상품 «개수»는 1개/2개가 맞다. 사장님이 «가로로 2개»로 보신 건
+                          ☰에서 «사진과 글자»가 좌우로 나란히 놓이기 때문이다(6739행 flex).
+                          → 개수로 부르면 화면과 어긋나 보인다.
+                            둘의 «진짜» 차이는 사진 크기(84 vs 253, 약 3배)이므로 그걸로 부른다.
+                            「☰ 작게」 / 「⊞ 크게」 — 짧고, 대비가 명확하고, 실측과 정확히 일치한다.
+                            (1차 실수였던 «크게를 작은 쪽에 붙임»은 여기서 바로잡혔다)
+
+                        [2026-09-20 4차] 사장님 «저게 뭔 말인가 모르지 않아? 설명이 없어도 될려나?»
+                          NN/g(Nielsen Norman Group) 「Icon Usability」 결론 — 근거 확정:
+                            · «아이콘 옆에는 반드시 텍스트 라벨이 있어야 한다»
+                            · «hover(툴팁)에 의존하지 마라 — 상호작용 비용이 늘고
+                               터치 기기에서는 아예 작동하지 않는다» → title 속성은 해답이 아니다
+                            · 진짜 범용 아이콘은 홈 · 프린터 · 돋보기 정도뿐.
+                              햄버거(☰)조차 «표준화된 뜻이 없다»고 못박는다
+                          → ☰ ⊞ 를 손님이 모르는 건 «정상»이다. 그래서 글자를 붙였고,
+                            NN/g 기준으로는 «항상 보이는 글자 라벨»이 곧 설명이다.
+                            그 이상(툴팁·별도 안내문)은 필요 없고 화면만 복잡해진다.
+                            출처: nngroup.com/articles/icon-usability */}
                     <div style={{ display: "flex", flexShrink: 0, border: "1px solid #D9C5CC", borderRadius: "9px", overflow: "hidden", background: "#fff" }}>
-                      <button type="button" aria-label="한 줄에 한 개씩 보기(사진 작게)" onClick={() => changeListView("list")}
+                      <button type="button" aria-label="사진 작게 보기 — 한 줄에 상품 한 개" onClick={() => changeListView("list")}
                         style={{ display: "inline-flex", alignItems: "center", gap: "3px", height: "34px", padding: "0 8px", border: "none", background: listView === "list" ? "#7A1E47" : "#fff", color: listView === "list" ? "#fff" : "#7A1E47", fontSize: "12px", fontWeight: 800, cursor: "pointer", lineHeight: 1, whiteSpace: "nowrap", fontFamily: "inherit" }}>
-                        <span style={{ fontSize: "13px" }}>☰</span>1개씩
+                        <span style={{ fontSize: "13px" }}>☰</span>작게
                       </button>
-                      <button type="button" aria-label="한 줄에 두 개씩 보기(사진 크게)" onClick={() => changeListView("grid")}
+                      <button type="button" aria-label="사진 크게 보기 — 한 줄에 상품 두 개" onClick={() => changeListView("grid")}
                         style={{ display: "inline-flex", alignItems: "center", gap: "3px", height: "34px", padding: "0 8px", border: "none", borderLeft: "1px solid #EADCE2", background: listView === "grid" ? "#7A1E47" : "#fff", color: listView === "grid" ? "#fff" : "#7A1E47", fontSize: "12px", fontWeight: 800, cursor: "pointer", lineHeight: 1, whiteSpace: "nowrap", fontFamily: "inherit" }}>
-                        <span style={{ fontSize: "13px" }}>⊞</span>2개씩
+                        <span style={{ fontSize: "13px" }}>⊞</span>크게
                       </button>
                     </div>
                     <select
