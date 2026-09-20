@@ -16,15 +16,20 @@
 //   단 「🔥 N개 남음」은 자동이지만 구체적 수치 + 긴급성이라 전환 효과가 가장 커서 1순위.
 
 export const BADGE_PROMO_ORDER = [
-  "low",        // 🔥 N개 남음 (재고 자동)
-  "special",    // ⚡특가 (사장님 설정)
-  "limit",      // 마감임박 (사장님 설정)
-  "pick",       // 💖 루루픽 (사장님 설정)
-  "recommend",  // 📌 추천 (사장님 고정)
-  "sold",       // 🏆 N개 판매 (누적 판매 자동 — 도입 예정 자리)
-  "hot",        // HOT
-  "new",        // NEW
+  "low",        // 🔥 N개 남음      — 희소성. 자동이지만 «구체적 수치 + 긴급성»이라 전환 효과가 가장 크다
+  "sold",       // 🏆 N개 판매      — 사회적 증거. 희소성과 짝을 이루는 가장 강한 조합
+  "special",    // ⚡특가           (사장님 설정)
+  "limit",      // 마감임박         (사장님 설정)
+  "pick",       // 💖 루루픽        (사장님 설정)
+  "recommend",  // 📌 추천          (사장님 고정)
+  "hot",        // HOT             (수동 또는 실시간 담김 자동)
+  "new",        // NEW             (수동 또는 등록 7일 이내 자동)
 ] as const;
+
+/** 「🏆 N개 판매」를 붙이기 시작하는 누적 판매 수량.
+ *  너무 낮으면 전 상품에 붙어 배지가 무의미해지고(badge blindness),
+ *  너무 높으면 아무 데도 안 붙는다. 실제 판매 분포를 보고 조정한다. */
+export const SOLD_BADGE_MIN_QTY = 10;
 
 export const BADGE_INFO_KEYS = ["free", "overseas", "company", "direct"] as const;
 

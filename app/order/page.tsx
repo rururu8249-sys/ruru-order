@@ -91,7 +91,7 @@ import CustomerMissingDetailAddressPanel from "@/components/customer/CustomerMis
 import GroupBuyQuickSelect, { type GroupBuyQuickSelectProduct } from "@/components/order/GroupBuyQuickSelect";
 import { noticeBarLine } from "@/lib/noticeBar";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
-import { pickVisibleBadges } from "@/lib/productBadgePriority";
+import { pickVisibleBadges, SOLD_BADGE_MIN_QTY } from "@/lib/productBadgePriority";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import ShopContactLink from "@/components/customer/ShopContactLink";
 import { useShopInfo } from "@/lib/useShopInfo";
@@ -6582,6 +6582,9 @@ export default function OrderPage() {
                       // [2026-09-03 재설계 5단계-2] 🔥HOT 자동 — 지금 다른 손님들이 담아둔 수량(실시간 홀드)이 3개 이상이면
                       //   "주문 몰림"으로 보고 자동 표시. 표시 전용 — 저장·재고·주문 로직과 무관.
                       const autoHot = Number(reservedByProduct[String(product.id ?? "")] || 0) >= 3;
+                      // [2026-09-20] 🏆 누적 판매 수량 — products 테이블의 집계 컬럼(sold_qty_total).
+                      //   화면에서 orders를 세지 않는다. 컬럼이 없으면 0(배지 안 뜸).
+                      const soldQtyTotal = Math.max(0, Math.floor(Number((product as unknown as Record<string, unknown>)?.sold_qty_total) || 0));
                       return (
                         <div
                           key={String(product.id)}
@@ -6677,6 +6680,13 @@ export default function OrderPage() {
                               // 켜져 있는 배지 목록 — 그리는 순서도 이 배열 순서를 따른다
                               const all: Array<{ key: string; on: boolean; node: React.ReactNode }> = [
                                 { key: "low", on: Boolean(lowNode), node: lowNode },
+                                /* [2026-09-20] 🏆 누적 판매 — products.sold_qty_total(집계 컬럼)을 그대로 읽는다.
+                                   · 고객 페이지는 products를 select("*")로 이미 받고 있어 «추가 쿼리 0».
+                                     주문 테이블을 화면에서 집계하지 않는다(그게 예전 과부하의 원인이었다).
+                                   · 집계 기준은 새로 만들지 않고 재구매율·회원상세와 «같은» 판정을 쓴다.
+                                     (입금확인/카드결제완료/출고 등 = 판매, 취소·환불·테스트·삭제 제외)
+                                   · 컬럼이 아직 없으면 0 → 배지가 안 뜰 뿐, 오류 없음. */
+                                { key: "sold", on: soldQtyTotal >= SOLD_BADGE_MIN_QTY, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#FFF4D6", color: "#8A5A00" }}>🏆 {soldQtyTotal}개 판매</span> },
                                 { key: "special", on: badges.includes("special"), node: <span style={{ fontSize: "10px", fontWeight: 900, color: "#9A6212", background: "#FFF4D6", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>⚡특가</span> },
                                 { key: "limit", on: badges.includes("limit"), node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#854F0B", background: "#FBF1E0", borderRadius: "5px", padding: "2px 6px" }}>마감임박</span> },
                                 { key: "pick", on: badges.includes("pick"), node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#FDEEF3", color: "#C2447A" }}>💖 루루픽</span> },

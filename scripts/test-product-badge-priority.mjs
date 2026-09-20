@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { pickVisibleBadges, MAX_PROMO_BADGES } from "../lib/productBadgePriority.ts";
+import { pickVisibleBadges, MAX_PROMO_BADGES, SOLD_BADGE_MIN_QTY } from "../lib/productBadgePriority.ts";
 
 const has = (s, ...k) => k.every((x) => s.has(x));
 
@@ -51,5 +51,17 @@ const has = (s, ...k) => k.every((x) => s.has(x));
   assert.ok(v.has("unknown_new_badge"), "2개까지는 통과");
 }
 
+// 🏆N개판매는 희소성(🔥) 바로 다음 — 사회적 증거라 특가·마감보다 위
+{
+  const v = pickVisibleBadges(["sold", "special", "limit", "new"]);
+  assert.ok(has(v, "sold", "special"));
+  assert.ok(!v.has("limit") && !v.has("new"));
+}
+{
+  const v = pickVisibleBadges(["low", "sold", "pick"]);
+  assert.ok(has(v, "low", "sold"), "희소성 + 사회적증거가 최우선 조합");
+}
+
 assert.equal(MAX_PROMO_BADGES, 2);
+assert.ok(SOLD_BADGE_MIN_QTY >= 1);
 console.log("✅ test-product-badge-priority 통과");
