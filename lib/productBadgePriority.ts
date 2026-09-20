@@ -25,7 +25,8 @@ export const BADGE_PROMO_ORDER = [
   "limit",      // 마감임박         (사장님 설정)
   "pick",       // 💖 루루픽        (사장님 설정)
   "recommend",  // 📌 추천          (사장님 고정)
-  "sold",       // 🏆 N개 판매      — 사회적 증거(자동). 사장님이 아무 배지도 안 단 상품에서 빛난다
+  "repeat",     // 🔁 N명 재구매    — 자동. 단골 장사에서 가장 강한 증거(«다시 사는 사람이 있다»)
+  "sold",       // 📈/🏆 N개 판매   — 자동. 사장님이 아무 배지도 안 단 상품에서 빛난다
   "hot",        // HOT             (수동 또는 실시간 담김 자동)
   "new",        // NEW             (수동 또는 등록 7일 이내 자동)
 ] as const;
@@ -39,6 +40,15 @@ export const BADGE_PROMO_ORDER = [
  *     → 5개 = 18.4% 로 권장 범위 한가운데. 1개(51%)는 너무 흔하고 10개(11%)는 너무 드물다.
  *  바꾸려면 이 숫자 하나만 고치면 된다. */
 export const SOLD_BADGE_MIN_QTY = 5;
+
+/** 「🔁 N명 재구매」를 붙이기 시작하는 «재구매 고객 수».
+ *  재구매 판정은 재구매율 리포트와 같은 기준(kakao_id 우선·order_group_id 1건=1회·2건 이상).
+ *  2명이면 이미 «우연»이 아니다. 실제 분포를 보고 올릴 수 있다. */
+export const REPEAT_BADGE_MIN_BUYERS = 2;
+
+/** 누적 대신 «최근 30일» 수치를 보여줄 기준.
+ *  최근 실적이 있으면 그게 더 강한 신호라 같은 배지 자리에 최근 수치를 쓴다. */
+export const SOLD_RECENT_MIN_QTY = 5;
 
 export const BADGE_INFO_KEYS = ["free", "overseas", "company", "direct"] as const;
 

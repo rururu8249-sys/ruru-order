@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { pickVisibleBadges, MAX_PROMO_BADGES, SOLD_BADGE_MIN_QTY } from "../lib/productBadgePriority.ts";
+import { pickVisibleBadges, MAX_PROMO_BADGES, SOLD_BADGE_MIN_QTY, REPEAT_BADGE_MIN_BUYERS, SOLD_RECENT_MIN_QTY } from "../lib/productBadgePriority.ts";
 
 const has = (s, ...k) => k.every((x) => s.has(x));
 
@@ -69,7 +69,22 @@ const has = (s, ...k) => k.every((x) => s.has(x));
   assert.ok(has(v, "low", "special"));
 }
 
+// 사장님이 배지를 «하나도 안 단» 상품 — 통계 배지만으로도 두 칸이 채워져야 한다
+{
+  const v = pickVisibleBadges(["repeat", "sold", "hot", "new"]);
+  assert.ok(has(v, "repeat", "sold"), "재구매 → 판매수 순으로 자동 배지가 채운다");
+  assert.equal(v.size, 2);
+}
+// 재구매(자동)도 사장님 수동 배지는 밀어내지 못한다
+{
+  const v = pickVisibleBadges(["repeat", "special", "pick"]);
+  assert.ok(has(v, "special", "pick"));
+  assert.ok(!v.has("repeat"));
+}
+
 assert.equal(MAX_PROMO_BADGES, 2);
 // 실제 데이터(상품 696개) 기준 5개이상=128개=18.4% → 업계 권장 15~25% 안
 assert.equal(SOLD_BADGE_MIN_QTY, 5);
+assert.equal(SOLD_RECENT_MIN_QTY, 5);
+assert.ok(REPEAT_BADGE_MIN_BUYERS >= 2, "1명이면 «재구매 많음»이라 할 수 없다");
 console.log("✅ test-product-badge-priority 통과");

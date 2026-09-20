@@ -91,7 +91,7 @@ import CustomerMissingDetailAddressPanel from "@/components/customer/CustomerMis
 import GroupBuyQuickSelect, { type GroupBuyQuickSelectProduct } from "@/components/order/GroupBuyQuickSelect";
 import { noticeBarLine } from "@/lib/noticeBar";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
-import { pickVisibleBadges, SOLD_BADGE_MIN_QTY } from "@/lib/productBadgePriority";
+import { pickVisibleBadges, SOLD_BADGE_MIN_QTY, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_MIN_BUYERS } from "@/lib/productBadgePriority";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import ShopContactLink from "@/components/customer/ShopContactLink";
 import { useShopInfo } from "@/lib/useShopInfo";
@@ -6584,7 +6584,13 @@ export default function OrderPage() {
                       const autoHot = Number(reservedByProduct[String(product.id ?? "")] || 0) >= 3;
                       // [2026-09-20] 🏆 누적 판매 수량 — products 테이블의 집계 컬럼(sold_qty_total).
                       //   화면에서 orders를 세지 않는다. 컬럼이 없으면 0(배지 안 뜸).
-                      const soldQtyTotal = Math.max(0, Math.floor(Number((product as unknown as Record<string, unknown>)?.sold_qty_total) || 0));
+                      const statCol = (k: string) => Math.max(0, Math.floor(Number((product as unknown as Record<string, unknown>)?.[k]) || 0));
+                      const soldQtyTotal = statCol("sold_qty_total");
+                      const soldQty30d = statCol("sold_qty_30d");
+                      const repeatBuyers = statCol("repeat_buyer_count");
+                      // 최근 30일 실적이 있으면 «최근» 수치가 더 강한 신호라 같은 배지 자리에 그걸 쓴다.
+                      const soldRecent = soldQty30d >= SOLD_RECENT_MIN_QTY;
+                      const soldBadgeOn = soldRecent || soldQtyTotal >= SOLD_BADGE_MIN_QTY;
                       return (
                         <div
                           key={String(product.id)}
@@ -6686,7 +6692,11 @@ export default function OrderPage() {
                                    · 집계 기준은 새로 만들지 않고 재구매율·회원상세와 «같은» 판정을 쓴다.
                                      (입금확인/카드결제완료/출고 등 = 판매, 취소·환불·테스트·삭제 제외)
                                    · 컬럼이 아직 없으면 0 → 배지가 안 뜰 뿐, 오류 없음. */
-                                { key: "sold", on: soldQtyTotal >= SOLD_BADGE_MIN_QTY, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#FFF4D6", color: "#8A5A00" }}>🏆 {soldQtyTotal}개 판매</span> },
+                                { key: "sold", on: soldBadgeOn, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#FFF4D6", color: "#8A5A00" }}>{soldRecent ? `📈 최근 ${soldQty30d}개 판매` : `🏆 ${soldQtyTotal}개 판매`}</span> },
+                                /* [2026-09-20] 🔁 재구매 — 같은 사람이 2번 이상 산 상품. 단골 장사에서 가장 강한 증거.
+                                   판정은 재구매율 리포트와 같은 기준(kakao_id 우선 · order_group_id 1건=1회 · 2건 이상).
+                                   products.repeat_buyer_count 집계 컬럼을 그대로 읽는다 — 추가 쿼리 0. */
+                                { key: "repeat", on: repeatBuyers >= REPEAT_BADGE_MIN_BUYERS, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#F0E9FB", color: "#5B3A9B" }}>🔁 {repeatBuyers}명 재구매</span> },
                                 { key: "special", on: badges.includes("special"), node: <span style={{ fontSize: "10px", fontWeight: 900, color: "#9A6212", background: "#FFF4D6", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>⚡특가</span> },
                                 { key: "limit", on: badges.includes("limit"), node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#854F0B", background: "#FBF1E0", borderRadius: "5px", padding: "2px 6px" }}>마감임박</span> },
                                 { key: "pick", on: badges.includes("pick"), node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#FDEEF3", color: "#C2447A" }}>💖 루루픽</span> },
