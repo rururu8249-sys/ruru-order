@@ -277,7 +277,7 @@ export default function CustomerBottomSheet({
           {headerLeft ? <div style={{ flexShrink: 0 }}>{headerLeft}</div> : null}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div id={key} style={{ fontSize: "17px", fontWeight: 800, color: "#151923", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
-            {subtitle ? <div style={{ marginTop: "2px", fontSize: "12px", fontWeight: 700, color: "#7B736D", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</div> : null}
+            {subtitle ? <div style={{ marginTop: "2px", fontSize: "12px", fontWeight: 700, color: "#6E655E", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</div> : null}
           </div>
           {headerRight ? <div style={{ flexShrink: 0 }}>{headerRight}</div> : null}
           <button

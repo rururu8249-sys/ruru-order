@@ -272,7 +272,7 @@ export default function CustomerInfoEditBottomSheet({
             </div>
 
             {shippingAddresses.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "48px 0", color: "#7B736D", fontSize: "14px" }}>
+              <div style={{ textAlign: "center", padding: "48px 0", color: "#6E655E", fontSize: "14px" }}>
                 등록된 배송지가 없어요
               </div>
             ) : (
@@ -322,7 +322,7 @@ export default function CustomerInfoEditBottomSheet({
               {youtubeNicknameError ? (
                 <div style={{ marginTop: "6px", fontSize: "12px", color: "#e74c3c", fontWeight: 600 }}>{youtubeNicknameError}</div>
               ) : (
-                <div style={{ marginTop: "6px", fontSize: "12px", color: "#7B736D" }}>현재 보이는 닉네임과 다르면 주문 누락이 생길 수 있습니다.</div>
+                <div style={{ marginTop: "6px", fontSize: "12px", color: "#6E655E" }}>현재 보이는 닉네임과 다르면 주문 누락이 생길 수 있습니다.</div>
               )}
             </div>
 
@@ -340,7 +340,7 @@ export default function CustomerInfoEditBottomSheet({
               />
               {ordererPhoneOk ? (
                 ordererPhoneIsMobile ? (
-                  <div style={{ marginTop: "6px", fontSize: "12px", color: "#7B736D" }}>배송지 연락처와 달라도 괜찮습니다. 이 번호로 주문·입금 확인이 연결됩니다.</div>
+                  <div style={{ marginTop: "6px", fontSize: "12px", color: "#6E655E" }}>배송지 연락처와 달라도 괜찮습니다. 이 번호로 주문·입금 확인이 연결됩니다.</div>
                 ) : (
                   <div style={{ marginTop: "6px", fontSize: "11.5px", color: "#8A6A1E", background: "#FFF8E6", border: "1px solid #F0E0B0", borderRadius: "8px", padding: "8px 10px", lineHeight: 1.7 }}>
                     <b>집·사무실 전화번호로 주문하셔도 됩니다.</b><br />
@@ -374,7 +374,7 @@ export default function CustomerInfoEditBottomSheet({
                 </button>
               ) : (
                 <button type="button" onClick={() => setScreen("shipping_list")}
-                  style={{ width: "100%", padding: "14px", border: "1px dashed #E5E1DC", borderRadius: "12px", background: "#fff", fontSize: "13px", color: "#7B736D", cursor: "pointer" }}>
+                  style={{ width: "100%", padding: "14px", border: "1px dashed #E5E1DC", borderRadius: "12px", background: "#fff", fontSize: "13px", color: "#6E655E", cursor: "pointer" }}>
                   + 배송지 추가
                 </button>
               )}

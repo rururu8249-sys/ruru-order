@@ -104,7 +104,7 @@ export default function NoticePage() {
 
 
   return (
-    <main className="min-h-screen select-none bg-[#FDF5F1] px-4 py-6 text-[#151923]" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
+    <main className="min-h-screen select-none bg-[#F6F4F2] px-4 py-6 text-[#151923]" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
       <section className="mx-auto w-full max-w-md">
         <CustomerTopNav />
         <NoticePageHero />

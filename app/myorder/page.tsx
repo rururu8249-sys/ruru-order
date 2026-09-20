@@ -342,7 +342,7 @@ export default function MyOrderPage() {
 
   return (
     <main
-      className="min-h-screen select-none bg-[#fdf5f1] px-3 py-4 text-[#151923] sm:px-4 sm:py-6"
+      className="min-h-screen select-none bg-[#F6F4F2] px-3 py-4 text-[#151923] sm:px-4 sm:py-6"
       style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
     >
         <CustomerToastNotice

@@ -6370,7 +6370,7 @@ export default function OrderPage() {
                 <section style={{ margin: "12px auto 0", width: "100%", maxWidth: "560px" }}>
                   <div style={{ padding: "44px 26px", textAlign: "center", color: "#7A1E47", fontSize: "16px", fontWeight: 800, border: "1px solid #D9C5CC", borderRadius: "16px", background: "#fff", lineHeight: 1.8 }}>
                     🛍 쇼핑몰 준비 중입니다
-                    <div style={{ marginTop: "6px", fontSize: "13px", fontWeight: 600, color: "#7B736D" }}>잠시 후 다시 찾아 주세요.</div>
+                    <div style={{ marginTop: "6px", fontSize: "13px", fontWeight: 600, color: "#6E655E" }}>잠시 후 다시 찾아 주세요.</div>
                   </div>
                 </section>
               );
@@ -6660,7 +6660,7 @@ export default function OrderPage() {
                               if (parts.length === 0) return null;
                               return (
                                 <div style={{ marginTop: 2, display: "grid", gap: 1 }}>
-                                  {parts.map((t) => <div key={t} style={{ fontSize: 12, fontWeight: 700, color: "#7B736D", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t}</div>)}
+                                  {parts.map((t) => <div key={t} style={{ fontSize: 12, fontWeight: 700, color: "#6E655E", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t}</div>)}
                                 </div>
                               );
                             })() : null}
@@ -6904,7 +6904,7 @@ export default function OrderPage() {
             {selectedItemEntries.length === 0 ? (
               <div style={{ padding: "40px 18px", textAlign: "center" }}>
                 <p style={{ fontSize: "14px", fontWeight: 800, color: "#1A1A1A" }}>아직 담은 상품이 없습니다.</p>
-                <p style={{ marginTop: "6px", fontSize: "12px", fontWeight: 600, color: "#7B736D", lineHeight: 1.6 }}>상품목록에서 [담기]를 누르거나 [직접 입력]으로 담아 주세요.</p>
+                <p style={{ marginTop: "6px", fontSize: "12px", fontWeight: 600, color: "#6E655E", lineHeight: 1.6 }}>상품목록에서 [담기]를 누르거나 [직접 입력]으로 담아 주세요.</p>
               </div>
             ) : (
               <div>
@@ -6935,7 +6935,7 @@ export default function OrderPage() {
                         {imageUrl ? (
                           <img src={imageUrl} alt={item.product_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                         ) : (
-                          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", fontWeight: 800, color: "#7B736D", textAlign: "center", padding: "0 4px" }}>{itemSourceLabel}</div>
+                          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", fontWeight: 800, color: "#6E655E", textAlign: "center", padding: "0 4px" }}>{itemSourceLabel}</div>
                         )}
                       </div>
 
@@ -6947,7 +6947,7 @@ export default function OrderPage() {
                           <div style={{ flex: 1, minWidth: 0 }}>
                             {/* [2026-08-13] 상품명·옵션명이 잘리면 제출 전에 확인을 못 한다 → 2줄 줄바꿈 */}
                             <div style={{ fontSize: "14px", fontWeight: 800, color: "#1A1A1A", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{item.product_name || "상품명 없음"}{item.chat_source === "Y" ? <span style={{ marginLeft: "5px", verticalAlign: "1px", display: "inline-block", padding: "1px 6px", borderRadius: "999px", background: "#E8F0FE", color: "#1D4ED8", fontSize: "10px", fontWeight: 800 }}>채팅주문</span> : null}</div>
-                            <div style={{ fontSize: "12px", color: "#7B736D", marginTop: "2px", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{optionSummaryText} · {won(toNumber(item.product_price))} × {toNumber(item.qty)}개</div>
+                            <div style={{ fontSize: "12px", color: "#6E655E", marginTop: "2px", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{optionSummaryText} · {won(toNumber(item.product_price))} × {toNumber(item.qty)}개</div>
                           </div>
                           <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
                             {itemIsRegisteredProduct && !itemHasNoOptions ? (
@@ -7049,7 +7049,7 @@ export default function OrderPage() {
 
               {/* [2026-09-20 사장님] 「접혀 있으면 난독증 손님은 모른다」 → 항상 펼쳐 둔다(작게). */}
               <label className="mt-3 block">
-                <span className="mb-2 block text-[13px] font-black tracking-[-0.04em] text-slate-700">요청사항 <span style={{ fontWeight: 700, color: "#7B736D" }}>(선택 · 안 적어도 돼요)</span></span>
+                <span className="mb-2 block text-[13px] font-black tracking-[-0.04em] text-slate-700">요청사항 <span style={{ fontWeight: 700, color: "#6E655E" }}>(선택 · 안 적어도 돼요)</span></span>
                 <textarea
                   value={requestMemo}
                   onChange={(event) => setRequestMemo(event.target.value)}
@@ -7589,7 +7589,7 @@ export default function OrderPage() {
                   >‹ 종류 다시 고르기</button>
                 ) : null}
                   {registeredOptionColorMode === "none" && registeredOptionSizeMode === "none" && !(registeredOptionSelectProduct && (readOrderAxes3(registeredOptionSelectProduct) || readComboInfoOrderProduct(registeredOptionSelectProduct))) ? (
-                    <div style={{ padding: "12px 16px 0", fontSize: "12px", color: "#7B736D" }}>
+                    <div style={{ padding: "12px 16px 0", fontSize: "12px", color: "#6E655E" }}>
                       {/* [2026-08-29] 예전에는 색상·사이즈만 보고 "옵션이 없습니다. 수량만 선택"이라고 했는데,
                           세부상품명이나 금액을 손님이 직접 적어야 하는 상품에서도 같은 문구가 떠서 말이 안 맞았다.
                           → 이 상품에서 실제로 뭘 입력해야 하는지 그대로 알려준다. */}
@@ -7656,7 +7656,7 @@ export default function OrderPage() {
                         return (
                           <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>
                             {registeredOptionAxes3 ? `1단계 · ${registeredOptionAxes3.detailLabel}` : "종류"} 선택{" "}
-                            <span style={{ fontSize: "12px", fontWeight: 700, color: "#7B736D" }}>
+                            <span style={{ fontSize: "12px", fontWeight: 700, color: "#6E655E" }}>
                               {soldCount > 0 ? `(판매중 ${total - soldCount}가지 · 품절 ${soldCount}가지)` : `(${total}가지)`}
                             </span>
                           </div>
@@ -7762,7 +7762,7 @@ export default function OrderPage() {
                         if (list.length === 0) {
                           return (
                             <div style={{ padding: "18px 14px", textAlign: "center", border: "1px solid #F0EAE0", borderRadius: "12px" }}>
-                              <div style={{ fontSize: "13px", fontWeight: 700, color: "#7B736D" }}>검색 결과가 없어요</div>
+                              <div style={{ fontSize: "13px", fontWeight: 700, color: "#6E655E" }}>검색 결과가 없어요</div>
                               <button type="button" onClick={() => setRegisteredOptionComboSearch("")} style={{ marginTop: "10px", height: "36px", padding: "0 16px", borderRadius: "10px", border: "1.5px solid #E8E2DD", background: "#fff", fontSize: "13px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>전체 보기</button>
                             </div>
                           );
@@ -7819,7 +7819,7 @@ export default function OrderPage() {
                           ? <span style={{ marginLeft: "5px", fontSize: "11px", fontWeight: 800, color: "#8A7F84" }}>— 누르면 위 사진이 그 색으로 바뀌어요</span>
                           : null}
                         {registeredOptionAxes3 && !registeredOptionDetail.trim()
-                          ? <span style={{ marginLeft: "6px", fontSize: "12px", fontWeight: 700, color: "#7B736D" }}>— {registeredOptionAxes3.detailLabel}부터 선택</span>
+                          ? <span style={{ marginLeft: "6px", fontSize: "12px", fontWeight: 700, color: "#6E655E" }}>— {registeredOptionAxes3.detailLabel}부터 선택</span>
                           : null}
                       </div>
                       {registeredOptionColorChoices.length <= 4 ? (
@@ -7875,7 +7875,7 @@ export default function OrderPage() {
                       <div style={{ marginBottom: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
                         <span style={{ fontSize: "14px", fontWeight: 800, color: "#333" }}>사이즈</span>
                         {registeredOptionAxes3 && !registeredOptionDetail.trim()
-                          ? <span style={{ fontSize: "12px", fontWeight: 700, color: "#7B736D" }}>— {registeredOptionAxes3.detailLabel}부터 선택</span>
+                          ? <span style={{ fontSize: "12px", fontWeight: 700, color: "#6E655E" }}>— {registeredOptionAxes3.detailLabel}부터 선택</span>
                           : null}
                         {/* [2026-08-29] 치수가 등록된 상품에서만 나온다. 없으면 이 버튼 자체가 없다. */}
                         {registeredOptionSizeChart ? (
@@ -8174,7 +8174,7 @@ export default function OrderPage() {
               }, 0);
               if (isEmpty) {
                 return (
-                  // [2026-08-13 사장님 선택 B안] 빈 장바구니 바 — 흰색 반투명은 배경(크림 #FDF5F1) 위에서
+                  // [2026-08-13 사장님 선택 B안] 빈 장바구니 바 — 흰색 반투명은 배경(2026-09-20 중성 오프화이트 #F6F4F2로 변경) 위에서
                   //   판도 글씨도 묻혀 안 읽혔다. 판은 오히려 더 연하게(로즈 10%), 글씨는 더 진하게(로즈).
                   //   담겼을 때 뜨는 진한 로즈 불투명 바와 확실히 구분되도록 농도를 낮게 유지한다. 표시 전용.
                   // [셀프 연결 진입로] 방송 중엔 빈 바를 누를 수 있게 — 누르면 주문서가 열리며 채팅주문 찾기 입력칸이 바로 펼쳐짐
@@ -8265,7 +8265,7 @@ export default function OrderPage() {
                 <button
                   type="button"
                   onClick={() => { localStorage.setItem("ruru_howto_hide_until", String(Date.now() + 86400000)); setHowToOpen(false); }}
-                  style={{ border: "none", background: "none", fontSize: "13px", fontWeight: 700, color: "#7B736D", textDecoration: "underline", cursor: "pointer", padding: "8px" }}
+                  style={{ border: "none", background: "none", fontSize: "13px", fontWeight: 700, color: "#6E655E", textDecoration: "underline", cursor: "pointer", padding: "8px" }}
                 >
                   오늘 하루 열지 않기
                 </button>

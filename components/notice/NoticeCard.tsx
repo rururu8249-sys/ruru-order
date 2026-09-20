@@ -62,7 +62,7 @@ export default function NoticeCard({ notice, defaultOpen = false }: NoticeCardPr
             )}
             <span className="inline-flex rounded-full bg-[#F5E6EB] px-2.5 py-1 text-[11px] font-black text-[#7A1E47]">{category}</span>
             {dateText && (
-              <span className="inline-flex rounded-full bg-[#F1ECEE] px-2.5 py-1 text-[11px] font-black text-[#7B736D]">{dateText}</span>
+              <span className="inline-flex rounded-full bg-[#F1ECEE] px-2.5 py-1 text-[11px] font-black text-[#6E655E]">{dateText}</span>
             )}
           </span>
           <span className="block break-keep text-[16px] font-black leading-snug text-[#151923]">{title}</span>

@@ -184,7 +184,7 @@ export default function CustomerPaymentGuideBottomSheet({
 
               <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "10px" }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: "12px", fontWeight: 700, color: "#7B736D" }}>① 입금자명 (닉네임)</div>
+                  <div style={{ fontSize: "12px", fontWeight: 700, color: "#6E655E" }}>① 입금자명 (닉네임)</div>
                   <div style={{ fontSize: "22px", fontWeight: 900, color: "#1A1A1A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{safeNickname}</div>
                 </div>
                 <button type="button" onClick={onCopyNickname} style={{ ...(nicknameCopyDone ? doneButtonStyle : normalButtonStyle), flexShrink: 0, minHeight: "40px", padding: "0 14px", fontSize: "13px" }}>
@@ -194,13 +194,13 @@ export default function CustomerPaymentGuideBottomSheet({
               <div style={{ marginTop: "4px", fontSize: "12px", fontWeight: 800, color: "#854F0B" }}>⚠️ 꼭 이 이름으로 입금해야 확인돼요</div>
 
               <div style={{ marginTop: "12px", borderTop: "1px solid #F0E0B0", paddingTop: "12px" }}>
-                <div style={{ fontSize: "12px", fontWeight: 700, color: "#7B736D" }}>② 입금금액</div>
+                <div style={{ fontSize: "12px", fontWeight: 700, color: "#6E655E" }}>② 입금금액</div>
                 <div style={{ fontSize: "26px", fontWeight: 900, color: "#7A1E47" }}>{won(safeFinalAmount)}</div>
               </div>
 
               <div style={{ marginTop: "12px", borderTop: "1px solid #F0E0B0", paddingTop: "12px", display: "flex", alignItems: "center", gap: "10px" }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: "12px", fontWeight: 700, color: "#7B736D" }}>③ 계좌</div>
+                  <div style={{ fontSize: "12px", fontWeight: 700, color: "#6E655E" }}>③ 계좌</div>
                   <div style={{ fontSize: "17px", fontWeight: 900, color: "#1A1A1A", wordBreak: "break-all" }}>{safeBankName} {safeBankAccount}</div>
                   <div style={{ fontSize: "13px", fontWeight: 700, color: "#555" }}>예금주 {safeBankHolder}</div>
                 </div>
