@@ -91,6 +91,7 @@ import CustomerMissingDetailAddressPanel from "@/components/customer/CustomerMis
 import GroupBuyQuickSelect, { type GroupBuyQuickSelectProduct } from "@/components/order/GroupBuyQuickSelect";
 import { noticeBarLine } from "@/lib/noticeBar";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
+import { pickVisibleBadges } from "@/lib/productBadgePriority";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import ShopContactLink from "@/components/customer/ShopContactLink";
 import { useShopInfo } from "@/lib/useShopInfo";
@@ -6636,13 +6637,18 @@ export default function OrderPage() {
                             ) : null}
                           </div>
                           <div style={listView === "grid" ? { minWidth: 0, flex: 1, display: "flex", flexDirection: "column" } : { minWidth: 0, flex: 1 }}>
-                            <div style={{ display: "flex", gap: "4px", marginBottom: "4px", flexWrap: "wrap" }}>
-                              {!isBroadcastOn && pinned ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#7A1E47", borderRadius: "5px", padding: "2px 6px" }}>📌 추천</span> : null}
-                              {badges.includes("new") || autoNew ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#0F6E56", background: "#E7F3EE", borderRadius: "5px", padding: "2px 6px" }}>NEW</span> : null}
-                              {badges.includes("hot") || autoHot ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>HOT</span> : null}
-                              {badges.includes("special") ? <span style={{ fontSize: "10px", fontWeight: 900, color: "#9A6212", background: "#FFF4D6", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>⚡특가</span> : null}
-                              {badges.includes("limit") ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#854F0B", background: "#FBF1E0", borderRadius: "5px", padding: "2px 6px" }}>마감임박</span> : null}
-                              {!sold ? (() => {
+                            {/* [2026-09-20 전면 정리] 배지는 «쌓기»가 아니라 «고르기».
+                                실측: 폰 420px 격자에서 카드 폭 167px — 배지 4개면 배지 줄만 42px(2줄), 5~6개면 3줄.
+                                업계 기준도 같은 방향(상품당 1개 권장, 카탈로그의 15~25%만 — 배지를 덕지덕지 붙이면
+                                손님이 배지 자체를 안 본다). 우선순위는 lib/productBadgePriority.ts 한 곳에서만 정한다.
+                                · 정보 배지(해외배송·업체배송·무료나눔·방송중 바로구매)는 개수 제한 밖 — 감추면 안 되는 사실
+                                · 마케팅 배지는 상위 2개만. 사장님이 고른 배지 > 자동 배지
+                                · 「🔥 N개 남음」만 예외적으로 1순위(구체적 수치 + 긴급성)
+                                배지 «종류·문구·색»은 하나도 안 바꿨다. 몇 개를 보여줄지만 정한다. 표시 전용. */}
+                            {(() => {
+                              // 🔥 N개 남음 문구 — 켜졌는지 판단하려면 먼저 만들어야 한다
+                              const lowNode = (() => {
+                                if (sold) return null;
                                 // 옵션 상품: 임박 옵션만 옵션별 표시(합산 금지) / 단일 상품: N개 남음 — 다른 고객 홀드 반영
                                 const pidForLow = String(product.id ?? "");
                                 const lowOpts = lowStockOptionsOrderProduct(product, (c, s) => Number(reservedByVariant[reservationVariantKey(pidForLow, c, s)] || 0));
@@ -6666,16 +6672,36 @@ export default function OrderPage() {
                                 }
                                 const remain = lowStockRemainOrderProduct(product, Number(reservedByProduct[pidForLow] || 0));
                                 return remain !== null ? <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px" }}>🔥 {remain}개 남음</span> : null;
-                              })() : null}
-                              {badges.includes("pick") ? <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#FDEEF3", color: "#C2447A" }}>💖 루루픽</span> : null}
-                              {badges.includes("direct") ? <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#E8F0FE", color: "#1D4ED8" }}>🛒 바로구매</span> : null}
-                              {/* [2026-07-10] 해외배송 배지 — 표시 전용(배송비 계산과 무관) */}
-                              {badges.includes("overseas") ? <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#EEF6F3", color: "#0F6E56" }}>✈️ 해외배송</span> : null}
-                              {/* [무료나눔] 0원 선물 상품 배지 — 표시 전용 */}
-                              {isFreeOrderProduct(product) ? <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#E7F3EE", color: "#0F6E56" }}>🎁 무료나눔</span> : null}
-                              {/* [2026-07-23 사장님 지시] 업체배송 상품 카드 배지 — 표시 전용(배송비 계산과 무관) */}
-                              {productDeliveryLabel(product) === "업체배송" ? <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#EEF2FA", color: "#3B5BA5" }}>🚚 업체배송</span> : null}
-                            </div>
+                              })();
+
+                              // 켜져 있는 배지 목록 — 그리는 순서도 이 배열 순서를 따른다
+                              const all: Array<{ key: string; on: boolean; node: React.ReactNode }> = [
+                                { key: "low", on: Boolean(lowNode), node: lowNode },
+                                { key: "special", on: badges.includes("special"), node: <span style={{ fontSize: "10px", fontWeight: 900, color: "#9A6212", background: "#FFF4D6", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>⚡특가</span> },
+                                { key: "limit", on: badges.includes("limit"), node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#854F0B", background: "#FBF1E0", borderRadius: "5px", padding: "2px 6px" }}>마감임박</span> },
+                                { key: "pick", on: badges.includes("pick"), node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#FDEEF3", color: "#C2447A" }}>💖 루루픽</span> },
+                                { key: "recommend", on: !isBroadcastOn && pinned, node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#7A1E47", borderRadius: "5px", padding: "2px 6px" }}>📌 추천</span> },
+                                { key: "hot", on: badges.includes("hot") || autoHot, node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>HOT</span> },
+                                { key: "new", on: badges.includes("new") || autoNew, node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#0F6E56", background: "#E7F3EE", borderRadius: "5px", padding: "2px 6px" }}>NEW</span> },
+                                /* [무료나눔] 0원 선물 상품 배지 — 표시 전용 */
+                                { key: "free", on: isFreeOrderProduct(product), node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#E7F3EE", color: "#0F6E56" }}>🎁 무료나눔</span> },
+                                /* [2026-07-10] 해외배송 배지 — 표시 전용(배송비 계산과 무관) */
+                                { key: "overseas", on: badges.includes("overseas"), node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#EEF6F3", color: "#0F6E56" }}>✈️ 해외배송</span> },
+                                /* [2026-07-23 사장님 지시] 업체배송 상품 카드 배지 — 표시 전용(배송비 계산과 무관) */
+                                { key: "company", on: productDeliveryLabel(product) === "업체배송", node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#EEF2FA", color: "#3B5BA5" }}>🚚 업체배송</span> },
+                                /* 바로구매 — 방송 중에만 «구별되는 정보»(방송 접수 없이도 살 수 있다).
+                                   방송 OFF면 진열 상품이 전부 바로구매라 배지가 뜻을 잃는다 → 끈다. */
+                                { key: "direct", on: badges.includes("direct") && isBroadcastOn, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#E8F0FE", color: "#1D4ED8" }}>🛒 바로구매</span> },
+                              ];
+                              const visible = pickVisibleBadges(all.filter((b) => b.on).map((b) => b.key));
+                              const nodes = all.filter((b) => b.on && visible.has(b.key));
+                              if (nodes.length === 0) return null;
+                              return (
+                                <div style={{ display: "flex", gap: "4px", marginBottom: "4px", flexWrap: "wrap" }}>
+                                  {nodes.map((b) => <span key={b.key} style={{ display: "inline-flex" }}>{b.node}</span>)}
+                                </div>
+                              );
+                            })()}
                             {/* [2026-09-11 manysell 실측 흡수] 상품명 13→15px(목록)·14px(격자) — 주 고객 중장년, 마켓오리진 16px 대비 우리가 작았다(표시 전용) */}
                             <div style={listView === "grid"
                               ? { fontSize: "14px", fontWeight: 800, color: "#222", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "break-word" as const }
