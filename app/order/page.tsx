@@ -1494,8 +1494,10 @@ export default function OrderPage() {
   const [howToWarn, setHowToWarn] = useState(HOWTO_DEFAULT.warn);
   // [2026-07-10] 상품 목록 정렬(표시 전용). 기본순 = 고정 상품 우선 + 방송 진열 순서(기존 동작)
   const [productSort, setProductSort] = useState<"default" | "price_asc" | "price_desc" | "name">("default");
-  // [2026-08-12 리뉴얼 4단계] 상품 보기 방식 — 기본 ☰목록, ⊞격자는 선택. 기기에 기억(UI 취향값만 저장).
-  const [listView, setListView] = useState<"list" | "grid">("list");
+  // [2026-08-12 리뉴얼 4단계] 상품 보기 방식 — 기기에 기억(UI 취향값만 저장).
+  // [2026-09-20 사장님 지시] 기본값을 ⊞격자(2열)로. «디폴트값 가로형 아님».
+  //   한 번이라도 ☰/⊞를 누른 고객은 localStorage 값이 있어 그 선택이 그대로 유지된다(아래 useEffect).
+  const [listView, setListView] = useState<"list" | "grid">("grid");
   useEffect(() => {
     try { const v = localStorage.getItem("ruru_order_list_view"); if (v === "grid" || v === "list") setListView(v); } catch {}
   }, []);
@@ -6618,13 +6620,18 @@ export default function OrderPage() {
                                   // 가장 급한(재고 적은) 순으로 최대 2개만, "외 N" 같은 축약 표현은 헷갈려서 안 씀(사장님 지침)
                                   // [2026-09-20 사장님] 「66 4개 남음」은 숫자가 붙어 무슨 뜻인지 모른다 → 「66 사이즈 4개 남음」. 조합형(세부상품명이 color 칸)은 이름 그대로.
                                   const isComboLow = Boolean(readComboInfoOrderProduct(product));
+                                  // [2026-09-20 사장님 캡쳐] 옵션이 하나뿐인 상품에 「🔥 기본 5개 남음」으로 떴다.
+                                  //   «기본»은 옵션칸을 안 쓴다는 관리자 표시일 뿐, 고객에겐 뜻이 없다 → 이름 없이 「🔥 5개 남음」.
+                                  const EMPTY_OPT = new Set(["", "기본", "없음", "단일", "-"]);
                                   const lowName = (o: { label: string; color: string; size: string }) => {
                                     if (isComboLow) return String(o.label).replace(/\s*\/\s*없음\s*/g, "").trim();
-                                    if (o.size && o.color) return `${o.color} ${o.size} 사이즈`;
-                                    if (o.size) return `${o.size} 사이즈`;
-                                    return o.color || "기본";
+                                    const c = EMPTY_OPT.has(String(o.color || "").trim()) ? "" : String(o.color).trim();
+                                    const z = EMPTY_OPT.has(String(o.size || "").trim()) ? "" : String(o.size).trim();
+                                    if (z && c) return `${c} ${z} 사이즈`;
+                                    if (z) return `${z} 사이즈`;
+                                    return c;
                                   };
-                                  const shown = [...lowOpts].sort((a, b) => a.stock - b.stock).slice(0, 2).map((o) => `${lowName(o)} ${o.stock}개`).join(" · ");
+                                  const shown = [...lowOpts].sort((a, b) => a.stock - b.stock).slice(0, 2).map((o) => `${lowName(o)} ${o.stock}개`.trim()).join(" · ");
                                   return <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px" }}>🔥 {shown} 남음</span>;
                                 }
                                 const remain = lowStockRemainOrderProduct(product, Number(reservedByProduct[pidForLow] || 0));
@@ -6641,7 +6648,7 @@ export default function OrderPage() {
                             </div>
                             {/* [2026-09-11 manysell 실측 흡수] 상품명 13→15px(목록)·14px(격자) — 주 고객 중장년, 마켓오리진 16px 대비 우리가 작았다(표시 전용) */}
                             <div style={listView === "grid"
-                              ? { fontSize: "14px", fontWeight: 800, color: "#222", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "break-all" }
+                              ? { fontSize: "14px", fontWeight: 800, color: "#222", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "break-word" as const }
                               : { fontSize: "15px", fontWeight: 800, color: "#222", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.product_name}</div>
                             {/* 바로구매 부가설명 유지(사장님 지침: 배지만으론 신규 고객이 뜻을 모름) + 가격 위계 강화 15→17px */}
                             {badges.includes("direct") ? (<div style={{ fontSize: 11, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>방송 접수 없이 지금 바로 구매 가능</div>) : null}
