@@ -6699,9 +6699,8 @@ export default function OrderPage() {
                                 { key: "overseas", on: badges.includes("overseas"), node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#EEF6F3", color: "#0F6E56" }}>✈️ 해외배송</span> },
                                 /* [2026-07-23 사장님 지시] 업체배송 상품 카드 배지 — 표시 전용(배송비 계산과 무관) */
                                 { key: "company", on: productDeliveryLabel(product) === "업체배송", node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#EEF2FA", color: "#3B5BA5" }}>🚚 업체배송</span> },
-                                /* 바로구매 — 방송 중에만 «구별되는 정보»(방송 접수 없이도 살 수 있다).
-                                   방송 OFF면 진열 상품이 전부 바로구매라 배지가 뜻을 잃는다 → 끈다. */
-                                { key: "direct", on: badges.includes("direct") && isBroadcastOn, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#E8F0FE", color: "#1D4ED8" }}>🛒 바로구매</span> },
+                                /* 바로구매 — 사장님 지침대로 방송 켜짐/꺼짐과 무관하게 항상 표시(정보 배지, 개수 제한 밖) */
+                                { key: "direct", on: badges.includes("direct"), node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#E8F0FE", color: "#1D4ED8" }}>🛒 바로구매</span> },
                               ];
                               const visible = pickVisibleBadges(all.filter((b) => b.on).map((b) => b.key));
                               const nodes = all.filter((b) => b.on && visible.has(b.key));
@@ -6716,13 +6715,11 @@ export default function OrderPage() {
                             <div style={listView === "grid"
                               ? { fontSize: "14px", fontWeight: 800, color: "#222", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "break-word" as const }
                               : { fontSize: "15px", fontWeight: 800, color: "#222", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.product_name}</div>
-                            {/* 바로구매 부가설명 — 사장님 지침: 배지만으론 신규 고객이 뜻을 모름. 설명 자체는 유지한다.
-                                [2026-09-20] 다만 방송 OFF(쇼핑몰 모드)에선 같은 말이 화면에 세 번 나온다:
-                                  ① 위 띠 「아래 상품 N개는 지금 바로 주문 가능」 ② 🛒바로구매 배지 ③ 이 줄
-                                방송이 꺼져 있으면 모든 상품이 바로구매라 «구별되는 정보»가 아니다 → 이 줄만 접는다.
-                                방송 ON일 때는 「이 상품은 방송 접수 없이도 살 수 있다」는 진짜 구별 정보이므로 그대로 둔다.
-                                배지·담기·금액은 무변경(표시 전용). */}
-                            {badges.includes("direct") && isBroadcastOn ? (<div style={{ fontSize: 11, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>방송 접수 없이 지금 바로 구매 가능</div>) : null}
+                            {/* 바로구매 부가설명 — 사장님 지침: 배지만으론 신규 고객이 뜻을 모름.
+                                [2026-09-20] 중복(위 띠 + 배지 + 이 줄)을 이유로 방송 OFF에서 잠깐 접었다가 되돌림.
+                                  사장님이 직접 남긴 지침이 먼저다. 방송 켜짐/꺼짐과 무관하게 항상 표시한다.
+                                  중복 문제는 «배지 개수 제한»(lib/productBadgePriority.ts)으로 해결한다. */}
+                            {badges.includes("direct") ? (<div style={{ fontSize: 11, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>방송 접수 없이 지금 바로 구매 가능</div>) : null}
                             {/* [2026-09-11 manysell 실측 흡수] 옵션 있는 상품은 「색상 3 · 사이즈 4」 한 줄 — 시트 열기 전에 내 사이즈가 있는지 보이게.
                                 브랜드묶음·조합형은 자기 안내줄이 따로 있어 제외. 표시 전용(담기·재고·금액 무관) */}
                             {!brandGroup && !sold ? (() => {

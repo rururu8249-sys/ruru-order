@@ -51,17 +51,25 @@ const has = (s, ...k) => k.every((x) => s.has(x));
   assert.ok(v.has("unknown_new_badge"), "2개까지는 통과");
 }
 
-// 🏆N개판매는 희소성(🔥) 바로 다음 — 사회적 증거라 특가·마감보다 위
+// 🏆N개판매(자동)는 사장님이 «직접 고른» 배지를 밀어내면 안 된다
 {
   const v = pickVisibleBadges(["sold", "special", "limit", "new"]);
-  assert.ok(has(v, "sold", "special"));
-  assert.ok(!v.has("limit") && !v.has("new"));
+  assert.ok(has(v, "special", "limit"), "사장님이 단 ⚡특가·마감임박이 자동 🏆보다 위");
+  assert.ok(!v.has("sold"), "자동 배지는 수동 배지에 밀린다");
 }
+// 사장님이 아무 배지도 안 단 상품에서 🏆가 빛난다
 {
-  const v = pickVisibleBadges(["low", "sold", "pick"]);
-  assert.ok(has(v, "low", "sold"), "희소성 + 사회적증거가 최우선 조합");
+  const v = pickVisibleBadges(["sold", "hot", "new"]);
+  assert.ok(has(v, "sold", "hot"));
+  assert.ok(!v.has("new"));
+}
+// 🔥N개남음만은 자동이어도 1순위 (유일한 예외)
+{
+  const v = pickVisibleBadges(["low", "special", "sold"]);
+  assert.ok(has(v, "low", "special"));
 }
 
 assert.equal(MAX_PROMO_BADGES, 2);
-assert.ok(SOLD_BADGE_MIN_QTY >= 1);
+// 실제 데이터(상품 696개) 기준 5개이상=128개=18.4% → 업계 권장 15~25% 안
+assert.equal(SOLD_BADGE_MIN_QTY, 5);
 console.log("✅ test-product-badge-priority 통과");
