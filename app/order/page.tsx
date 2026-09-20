@@ -6604,15 +6604,23 @@ export default function OrderPage() {
                           → 직접 확인한 결과 쿠팡(PC·모바일)·무신사·11번가 어디에도 보기 전환 버튼이 없다.
                             Baymard도 이 기능은 연구가 없고, 열 수는 «화면 크기 보고 사이트가 알아서» 정하라고 한다.
                             즉 아이콘만 덩그러니 두면 손님은 알 길이 없다(표준이 없어 학습된 적도 없으니).
-                          → 기능은 남긴다. 주 고객이 중장년이라 «사진 크게 보기»는 실제로 쓸모가 있다.
+                          → 기능은 남긴다. 주 고객이 중장년이라 보기 방식 선택은 실제로 쓸모가 있다.
                             대신 아이콘 옆에 «글자»를 붙여 뜻을 못 알아보는 일이 없게 한다.
-                            (Baymard도 모호한 라벨이 탐색을 방해한다고 본다) */}
+                            (Baymard도 모호한 라벨이 탐색을 방해한다고 본다)
+                        [2026-09-20 2차] 사장님 «2개씩이 크게 보이는 거 아니야? 크게는 작게 보이고»
+                          → 맞다. 내가 라벨을 거꾸로 붙였다. 실제 코드(6740행대) 기준:
+                              grid = 사진 width:100% · 1:1  → 폰 420px에서 약 167×167px
+                              list = 사진 width:84px        →           84×84px
+                            「2개씩」 쪽 사진이 정확히 2배 크다. 「크게」를 작은 쪽에 붙여놨던 것.
+                          → 「크게/작게」라는 말 자체가 헷갈린다.
+                            한 줄에 하나라 커 보이지만 실제 사진은 작기 때문.
+                            오해가 없는 기준은 «개수» → 「1개씩」 / 「2개씩」으로 통일한다. */}
                     <div style={{ display: "flex", flexShrink: 0, border: "1px solid #D9C5CC", borderRadius: "9px", overflow: "hidden", background: "#fff" }}>
-                      <button type="button" aria-label="한 줄에 하나씩 크게 보기" onClick={() => changeListView("list")}
+                      <button type="button" aria-label="한 줄에 한 개씩 보기(사진 작게)" onClick={() => changeListView("list")}
                         style={{ display: "inline-flex", alignItems: "center", gap: "3px", height: "34px", padding: "0 8px", border: "none", background: listView === "list" ? "#7A1E47" : "#fff", color: listView === "list" ? "#fff" : "#7A1E47", fontSize: "12px", fontWeight: 800, cursor: "pointer", lineHeight: 1, whiteSpace: "nowrap", fontFamily: "inherit" }}>
-                        <span style={{ fontSize: "13px" }}>☰</span>크게
+                        <span style={{ fontSize: "13px" }}>☰</span>1개씩
                       </button>
-                      <button type="button" aria-label="한 줄에 두 개씩 보기" onClick={() => changeListView("grid")}
+                      <button type="button" aria-label="한 줄에 두 개씩 보기(사진 크게)" onClick={() => changeListView("grid")}
                         style={{ display: "inline-flex", alignItems: "center", gap: "3px", height: "34px", padding: "0 8px", border: "none", borderLeft: "1px solid #EADCE2", background: listView === "grid" ? "#7A1E47" : "#fff", color: listView === "grid" ? "#fff" : "#7A1E47", fontSize: "12px", fontWeight: 800, cursor: "pointer", lineHeight: 1, whiteSpace: "nowrap", fontFamily: "inherit" }}>
                         <span style={{ fontSize: "13px" }}>⊞</span>2개씩
                       </button>
