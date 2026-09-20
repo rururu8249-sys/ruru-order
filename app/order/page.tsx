@@ -6125,18 +6125,30 @@ export default function OrderPage() {
     }
   };
 
+  // [2026-09-20] 상단 띠(공지·밴드)가 하나라도 떠 있는지 — 앱설치 배너를 접는 판단에만 쓴다. 표시 전용.
+  const noticeStripOn = Boolean(hasSavedInfo && popupNoticeEnabled && popupNoticeText.trim() && !noticeBarHidden);
+  const bandStripOn = Boolean(hasSavedInfo && popupBandUrl);
+  const topStripOn = noticeStripOn || bandStripOn;
+
   return (
     <OrderPageShell>
       <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}.ruru-cat-scroll::-webkit-scrollbar{display:none}`}</style>
       {hasSavedInfo && <TopCustomerNav />}
-      <PWAInstallBanner />
+      {/* [2026-09-20 실측] 손님 첫 화면에서 상품이 보이기까지 상단 «껍데기»가 388px였다.
+          (헤더 59 + 앱설치 47 + 공지 41 + 밴드 40 + 방송카드 166 + 검색·정렬·배송비 ~130)
+          폰 한 화면이 700px 남짓인데 상품이 거의 안 보인다.
+          · 밴드 띠는 접지 않는다 — 2026-08-30 사장님 확정 기준(접었더니 밴드가 아예 안 보였음)
+          · 대신 앱설치 배너를 접는다. 7일 쿨다운이 있어 다음에 또 뜨고,
+            주문완료 화면에도 설치 유도(__ruruPwaPrompt)가 따로 있다.
+          · 서비스워커 등록·설치 프롬프트 수집은 계속 돌아간다(hidden prop). */}
+      <PWAInstallBanner hidden={topStripOn} />
 
       {/* [2026-08-30] 공지 띠 — 전체 공지는 팝업으로 화면을 덮지 않고 여기에 계속 둔다.
           · 손님은 닫을 필요가 없다 → 바로 상품을 본다
           · 스크롤을 올리면 공지는 언제나 그 자리에 있다
           · 「자세히」를 누르면 기존 팝업(전문)이 그대로 열린다
           띠는 최대 두 개까지만 — 앱설치 배너가 떠 있으면 밴드 띠는 접는다(상품이 안 보이면 주문이 준다). */}
-      {hasSavedInfo && popupNoticeEnabled && popupNoticeText.trim() && !noticeBarHidden ? (
+      {noticeStripOn ? (
         <div style={{ background: popupNoticeColor, color: "#fff" }}>
           <div style={{ margin: "0 auto", width: "100%", maxWidth: "560px", display: "flex", alignItems: "center", gap: "8px", padding: "7px 12px" }}>
             <span style={{ flexShrink: 0, fontSize: "14px" }}>📢</span>
@@ -6171,7 +6183,7 @@ export default function OrderPage() {
 
       {/* 밴드 가입 띠 — 사장님 실측: 노출하면 은근히 많이 가입한다.
           팝업(하루 한 번 몇 초)보다 여기가 접속해 있는 내내 보인다. 닫기는 막지 않는다. */}
-      {hasSavedInfo && popupBandUrl ? (
+      {bandStripOn ? (
         <div style={{ background: "#EAFBEF", borderBottom: "1px solid #CDEBD7" }}>
           {/* [2026-08-31 사장님 지적] 위 공지 띠처럼 칸 아무 데나 눌러도 밴드로 이동한다 */}
           <a
@@ -6296,23 +6308,41 @@ export default function OrderPage() {
       {hasSavedInfo && broadcastLoaded ? (
         <section style={{ margin: "8px auto 0", width: "100%", maxWidth: "560px", padding: "0 14px 12px" }}>
           {!isBroadcastOn ? (
-            <div style={{ position: "relative", overflow: "hidden", background: "linear-gradient(135deg,#7A1E47,#9A3560)", borderRadius: "18px", padding: "16px", color: "#fff" }}>
+            /* [2026-09-20] 방송 전 카드 — 166px였다. 하는 일이 ①상태 알림 ②방송알림 신청 두 개인데,
+                 이미 알림을 신청한 손님에게는 ②가 «알림 받는 중 ✓» 라는 40px짜리 표시로만 남아 자리만 먹었다.
+                 → 신청 전에는 지금처럼 제대로 권하고, 신청한 손님에게는 한 줄 띠로 접는다.
+                 「🛍 쇼핑몰 모드」 머리말은 우리 내부 용어라 손님은 뜻을 모른다 → 삭제.
+                 알림 신청 동작·시트(setAlertSheetOpen)·유튜브 열기는 그대로. */
+            liveAlertOptin ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "linear-gradient(135deg,#7A1E47,#9A3560)", borderRadius: "14px", padding: "10px 13px", color: "#fff" }}>
+                <span style={{ flexShrink: 0, fontSize: "15px" }}>🛍</span>
+                <div style={{ minWidth: 0, flex: 1, fontSize: "12.5px", fontWeight: 800, lineHeight: 1.45 }}>
+                  방송 전이에요 · 아래 상품 {quickGroupBuyProducts.length}개는 <b>지금 바로 주문</b> 가능
+                  {nextLiveText ? <div style={{ fontSize: "11.5px", fontWeight: 700, opacity: 0.88 }}>다음 라이브 · {nextLiveText}</div> : null}
+                </div>
+                <button type="button" onClick={() => setAlertSheetOpen(true)} style={{ flexShrink: 0, height: "30px", padding: "0 10px", border: "1px solid rgba(255,255,255,0.45)", borderRadius: "999px", background: "rgba(255,255,255,0.14)", color: "#fff", fontSize: "11px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>🔔 알림 받는 중 ✓</button>
+                {broadcastYoutubeUrl ? (
+                  <button type="button" aria-label="유튜브 채널 열기" onClick={() => openYoutubeApp(broadcastYoutubeUrl)} style={{ flexShrink: 0, width: "30px", height: "30px", border: "1px solid rgba(255,255,255,0.45)", borderRadius: "999px", background: "transparent", color: "#fff", fontSize: "11px", fontWeight: 900, cursor: "pointer" }}>▶</button>
+                ) : null}
+              </div>
+            ) : (
+            <div style={{ position: "relative", overflow: "hidden", background: "linear-gradient(135deg,#7A1E47,#9A3560)", borderRadius: "18px", padding: "14px", color: "#fff" }}>
               <span style={{ position: "absolute", right: "-6px", bottom: "-14px", fontSize: "74px", opacity: 0.18, pointerEvents: "none" }}>🛍️</span>
-              <div style={{ fontSize: "11px", fontWeight: 800, opacity: 0.85 }}>🛍 쇼핑몰 모드</div>
-              <div style={{ fontSize: "17px", fontWeight: 900, margin: "5px 0 4px" }}>지금은 방송 전이에요</div>
+              <div style={{ fontSize: "17px", fontWeight: 900, marginBottom: "4px" }}>지금은 방송 전이에요</div>
               <div style={{ fontSize: "12.5px", fontWeight: 700, opacity: 0.92, lineHeight: 1.5 }}>
                 {nextLiveText ? <>다음 라이브 · {nextLiveText}<br /></> : null}
                 아래 상품 {quickGroupBuyProducts.length}개는 <b>지금 바로 주문</b>하실 수 있어요 👇
               </div>
-              <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
+              <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
                 <button type="button" onClick={() => setAlertSheetOpen(true)} style={{ flex: 1.2, height: "40px", border: "none", borderRadius: "12px", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}>
-                  {liveAlertOptin ? "🔔 알림 받는 중 ✓" : "🔔 방송 알림 받기"}
+                  🔔 방송 알림 받기
                 </button>
                 {broadcastYoutubeUrl ? (
                   <button type="button" onClick={() => openYoutubeApp(broadcastYoutubeUrl)} style={{ flex: 0.8, height: "40px", border: "1.5px solid rgba(255,255,255,0.55)", borderRadius: "12px", background: "transparent", color: "#fff", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}>▶ 유튜브 채널</button>
                 ) : null}
               </div>
             </div>
+            )
           ) : (
             <div style={{ background: "#1D1418", borderRadius: "16px", padding: "13px 14px", color: "#fff" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>

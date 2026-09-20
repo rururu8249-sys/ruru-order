@@ -1,7 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 
-export default function PWAInstallBanner() {
+// [2026-09-20] hidden — 서비스워커 등록·beforeinstallprompt 수집은 그대로 하고 «화면 표시만» 끈다.
+//   손님 화면 맨 위에 띠가 세 개(앱설치+공지+밴드) 쌓여 상품이 첫 화면에서 밀려나던 문제.
+//   컴포넌트를 아예 안 그리면 설치 프롬프트(__ruruPwaPrompt)까지 사라져 주문완료 화면의 설치 유도가 죽는다.
+export default function PWAInstallBanner({ hidden = false }: { hidden?: boolean }) {
   const [show, setShow] = useState(false);
   const [deferred, setDeferred] = useState<any>(null);
   const [isIOS, setIsIOS] = useState(false);
@@ -49,7 +52,7 @@ export default function PWAInstallBanner() {
     };
   }, [show]);
 
-  if (!show) return null;
+  if (!show || hidden) return null;
   const onInstall = async () => { if (!deferred) return; deferred.prompt(); const r = await deferred.userChoice; if (r.outcome === "accepted") setShow(false); setDeferred(null); };
   const onClose = () => {
     setShow(false);
