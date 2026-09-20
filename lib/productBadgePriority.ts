@@ -98,7 +98,12 @@ export const HOLDING_MIN_PEOPLE = 3;
 export const TOP_SELLER_RANK_PCT = 0.03;
 export const POPULAR_RANK_PCT = 0.25;
 
-export const BADGE_INFO_KEYS = ["free", "overseas", "company", "direct"] as const;
+// 정보 배지 — 개수 제한 밖. «판매 실적과 무관한 축»이라 한 개도 안 팔린 상품에도 붙는다.
+//   사장님: «잘 안 팔리는 상품도, 한 개도 안 팔린 상품도 노출되고 관심을 갖게 해야 하니»
+//   조사: 판매 실적이 없는 상품에 쓰는 배지는 «속성 · 재고 · 배송 · 프로모션» 축이다.
+//     쿠팡 실물 「새 상품」「무료배송」「내일(월) 도착 보장」 / 무신사 「무배당발」
+//     (Optimizely 머천다이징 가이드도 같은 분류 — Product Attributes / Inventory / Promotions)
+export const BADGE_INFO_KEYS = ["free", "overseas", "company", "direct", "freeship"] as const;
 
 export type BadgeKey = string;
 

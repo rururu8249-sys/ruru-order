@@ -3725,6 +3725,8 @@ export default function OrderPage() {
   //    API가 죽어도 담기/제출/입금/정산 전부 정상 동작(오버셀은 제출 RPC가 원래 막고 있음).
   const [reservedByVariant, setReservedByVariant] = useState<Record<string, number>>({});
   const [reservedByProduct, setReservedByProduct] = useState<Record<string, number>>({});
+  // [2026-09-20] 오늘(이번 방송)에 팔린 상품 id — 「급상승」 배지 판단 전용. 수량은 안 받는다.
+  const [liveTrendingIds, setLiveTrendingIds] = useState<Set<string>>(new Set());
   // [2026-09-20] 「지금 N명이 담는 중」 — cart_reservations 선점에서 «나를 뺀» 다른 손님 수.
   //   지어낸 숫자가 아니라 실제로 지금 장바구니에 담아둔 사람 수다.
   const [holdersByProduct, setHoldersByProduct] = useState<Record<string, number>>({});
@@ -3747,10 +3749,37 @@ export default function OrderPage() {
     const norm = (s: unknown) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
     return `${pid}|${norm(color)}|${norm(size)}`;
   };
-  // [2026-09-20] 「방송/오늘 주문 수량」 실시간 조회(fetchLiveSales)와 20초 폴링 — «삭제».
-  //   그 숫자를 쓰던 「오늘 N개 나갔어요」 줄이 영업 정보라 없어졌다(6586행 주석).
-  //   쓰는 곳이 없어진 폴링을 남겨두면 Nano 컴퓨트를 계속 때리기만 한다.
-  //   같은 이유로 app/api/broadcast-sales 라우트도 지웠다.
+  // [2026-09-20] 「급상승」을 «오늘(이번 방송)» 기준으로도 붙이기 위한 조회.
+  //   사장님: «우리는 방송을 하루 하니까 하루 기준이 빡세면 안 되잖아? 토탈통계 + 하루기준 짬뽕해도 되고»
+  //   최근 30일 집계만 보면 «오늘 처음 올린 상품»은 영영 「급상승」이 안 붙는다.
+  //   ⚠️ 서버가 «수량»이 아니라 «대상 상품 id 목록»만 준다 —
+  //      손님 브라우저로 매출 규모를 알 수 있는 숫자가 아예 나가지 않는다.
+  //      (「오늘 N개 나갔어요」를 영업정보라고 지적받아 뺀 것과 같은 원칙)
+  const fetchLiveTrending = async () => {
+    try {
+      const bid = String(broadcast?.id ?? "").trim();
+      const qs = isBroadcastOn && bid ? `b=${encodeURIComponent(bid)}` : "today=1";
+      const res = await fetch(`/api/live-trending?${qs}`);
+      if (!res.ok) return;
+      const data = await res.json().catch(() => null);
+      if (data?.ok && Array.isArray(data.ids)) setLiveTrendingIds(new Set(data.ids.map((x: unknown) => String(x))));
+    } catch { /* 실패해도 「급상승」만 안 뜨고 주문·재고·금액은 정상 */ }
+  };
+  const fetchLiveTrendingRef = useRef(fetchLiveTrending);
+  fetchLiveTrendingRef.current = fetchLiveTrending;
+  useEffect(() => {
+    if (!hasSavedInfo) return;
+    void fetchLiveTrendingRef.current();
+    const t = setInterval(() => {
+      // 탭이 안 보이면 쉰다(기존 담김 동기화와 같은 규칙)
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      void fetchLiveTrendingRef.current();
+      // 방송 중 15초 / 방송 아니면 60초. 서버 캐시(10초·30초)와 짝을 맞춘다.
+    }, isBroadcastOn ? 15000 : 60000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasSavedInfo, isBroadcastOn, broadcast?.id]);
+
   const fetchCartReservations = async () => {
     try {
       const ids = quickGroupBuyProducts.map((p: any) => String(p?.id ?? "")).filter(Boolean);
@@ -6613,10 +6642,11 @@ export default function OrderPage() {
                             ? [badgeType]
                             : [];
                       // [2026-09-03 재설계 5단계] 「신상」 자동 — 배지를 안 골라도 자동 표시(표시 전용)
-                      // [2026-09-20 사장님] «모든 상품이 잘 팔리는 느낌 들게» → 7일 → 14일로 넓힌다.
-                      //   판매가 아직 없는 새 상품도 2주 동안은 자랑거리를 하나 갖게 된다.
+                      // [2026-09-20 사장님] «모든 상품이 잘 팔리는 느낌 들게» → 7일 → 14일 → 30일로 넓힌다.
+                      //   «한 개도 안 팔린 상품도 관심을 갖게» — 판매 실적이 없어도 한 달 동안은
+                      //   「신상」이라는 자랑거리를 갖는다. 등록일은 사실이라 거짓 표시가 아니다.
                       const createdMsForNew = Date.parse(String((product as any).created_at || ""));
-                      const autoNew = Number.isFinite(createdMsForNew) && Date.now() - createdMsForNew < 14 * 24 * 60 * 60 * 1000;
+                      const autoNew = Number.isFinite(createdMsForNew) && Date.now() - createdMsForNew < 30 * 24 * 60 * 60 * 1000;
                       // [2026-09-03 재설계 5단계-2] 🔥HOT 자동 — 지금 다른 손님들이 담아둔 수량(실시간 홀드)이 3개 이상이면
                       //   "주문 몰림"으로 보고 자동 표시. 표시 전용 — 저장·재고·주문 로직과 무관.
                       // [2026-09-20 사장님] «제일 많이 팔린 상품은 알아서 HOT/루루픽» — 랜덤이 아니라 판매 순위(사실).
@@ -6635,7 +6665,9 @@ export default function OrderPage() {
                       const statCol = (k: string) => Math.max(0, Math.floor(Number((product as unknown as Record<string, unknown>)?.[k]) || 0));
                       const soldQty30d = statCol("sold_qty_30d");
                       const repeatBuyers = statCol("repeat_buyer_count");
-                      const soldRecent = soldQty30d >= SOLD_RECENT_MIN_QTY;
+                      // 「급상승」 = 최근 30일 2개 이상 «또는» 오늘(이번 방송)에 팔렸음.
+                      //   방송이 하루 단위라 30일 집계만으론 오늘 올린 상품이 영영 못 받는다(사장님 지적).
+                      const soldRecent = soldQty30d >= SOLD_RECENT_MIN_QTY || liveTrendingIds.has(String(product.id ?? ""));
                       return (
                         <div
                           key={String(product.id)}
@@ -6765,6 +6797,13 @@ export default function OrderPage() {
                                 { key: "new", on: badges.includes("new") || autoNew, node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#0F6E56", background: "#E7F3EE", borderRadius: "5px", padding: "2px 6px" }}>신상</span> },
                                 /* [무료나눔] 0원 선물 상품 배지 — 표시 전용 */
                                 { key: "free", on: isFreeOrderProduct(product), node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#E7F3EE", color: "#0F6E56" }}>🎁 무료나눔</span> },
+                                /* [2026-09-20] 무료배송 — 판매 실적과 «무관한» 축이라 한 개도 안 팔린 상품에도 붙는다.
+                                   사장님: «잘 안 팔리는 상품도, 한 개도 안 팔린 상품도 노출되고 관심을 갖게 해야 하니»
+                                   조사 결과 쿠팡(「무료배송」)·무신사(「무배당발」)도 판매 실적이 없는 상품에
+                                   이 축(배송·재고·속성)의 배지를 붙인다.
+                                   판정: 설정 배송비가 0원일 때만. 업체배송 상품은 배송비가 따로라 제외.
+                                   ⚠️ 표시 전용 — 배송비 계산(generalShippingFee)은 읽기만 하고 안 건드린다. */
+                                { key: "freeship", on: generalShippingFee <= 0 && productDeliveryLabel(product) !== "업체배송", node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#EAF4FF", color: "#1D4ED8" }}>무료배송</span> },
                                 /* [2026-07-10] 해외배송 배지 — 표시 전용(배송비 계산과 무관) */
                                 { key: "overseas", on: badges.includes("overseas"), node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#EEF6F3", color: "#0F6E56" }}>✈️ 해외배송</span> },
                                 /* [2026-07-23 사장님 지시] 업체배송 상품 카드 배지 — 표시 전용(배송비 계산과 무관) */
