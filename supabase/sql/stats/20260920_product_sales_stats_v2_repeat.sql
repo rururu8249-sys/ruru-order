@@ -19,9 +19,11 @@
 -- ============================================================
 
 alter table products add column if not exists repeat_buyer_count integer not null default 0;
+-- 판매 순위 백분위(0=1등 ~ 1=꼴찌). 판매가 0인 상품은 null → 순위 배지 대상 아님.
+alter table products add column if not exists sales_rank_pct numeric;
 
 create or replace function refresh_product_sales_stats()
-returns table (updated_products integer, sum_qty bigint, sum_repeat bigint)
+returns table (updated_products integer, sum_qty bigint, sum_repeat bigint, ranked integer)
 language plpgsql
 set search_path = public
 as $$
@@ -29,6 +31,7 @@ declare
   v_updated integer;
   v_total   bigint;
   v_repeat  bigint;
+  v_ranked  integer;
 begin
   update products p
      set sold_qty_total     = coalesce(j.total,  0)::int,
@@ -105,10 +108,27 @@ begin
    where p.id = j.pid;
 
   get diagnostics v_updated = row_count;
+
+  -- 판매 순위 백분위 — «제일 많이 팔린 상품»을 자동으로 가려내기 위한 값.
+  --   판매가 1개 이상인 상품끼리만 줄을 세운다(0개짜리가 순위를 흐리지 않게).
+  --   0 = 가장 많이 팔린 상품, 1 = 그 중 가장 적게 팔린 상품.
+  update products p
+     set sales_rank_pct = r.pct
+    from (
+      select id,
+             percent_rank() over (order by sold_qty_total desc) as pct
+      from products
+      where sold_qty_total >= 1
+    ) r
+   where p.id = r.id;
+  get diagnostics v_ranked = row_count;
+
+  update products set sales_rank_pct = null where sold_qty_total < 1 and sales_rank_pct is not null;
+
   select coalesce(sum(sold_qty_total), 0), coalesce(sum(repeat_buyer_count), 0)
     into v_total, v_repeat
     from products;
-  return query select v_updated, v_total, v_repeat;
+  return query select v_updated, v_total, v_repeat, v_ranked;
 end;
 $$;
 
@@ -124,12 +144,23 @@ where repeat_buyer_count > 0
 order by repeat_buyer_count desc
 limit 15;
 
--- (라) 기준선별 상품 수 — 「🔁 N명 재구매」와 「📈 최근 30일」이 몇 개에 붙는지
+-- (라) 기준선별 상품 수 — 자동 배지가 각각 몇 개 상품에 붙는지
 select
-  count(*)                                          as "전체상품",
-  count(*) filter (where repeat_buyer_count >= 2)   as "재구매2명이상",
-  count(*) filter (where repeat_buyer_count >= 3)   as "재구매3명이상",
-  count(*) filter (where repeat_buyer_count >= 5)   as "재구매5명이상",
-  count(*) filter (where sold_qty_30d >= 5)         as "최근30일5개이상",
-  count(*) filter (where sold_qty_30d >= 10)        as "최근30일10개이상"
+  count(*)                                            as "전체상품",
+  count(*) filter (where repeat_buyer_count >= 2)     as "🔁재구매2명이상",
+  count(*) filter (where sold_qty_30d >= 5)           as "📈최근30일5개이상",
+  count(*) filter (where sales_rank_pct <= 0.10)      as "HOT자동_판매상위10%",
+  count(*) filter (where sales_rank_pct <= 0.03)      as "루루픽자동_판매상위3%"
 from products;
+
+-- (마) 「제일 많이 팔린 상품」 자동 배지가 실제로 어디에 붙는지 눈으로 확인
+select product_name,
+       sold_qty_total as "누적판매",
+       round(sales_rank_pct * 100, 1) as "상위%",
+       case when sales_rank_pct <= 0.03 then '💖루루픽 + HOT'
+            when sales_rank_pct <= 0.10 then 'HOT'
+            else '' end as "자동으로 붙는 배지"
+from products
+where sales_rank_pct <= 0.10
+order by sold_qty_total desc
+limit 40;

@@ -50,6 +50,18 @@ export const REPEAT_BADGE_MIN_BUYERS = 2;
  *  최근 실적이 있으면 그게 더 강한 신호라 같은 배지 자리에 최근 수치를 쓴다. */
 export const SOLD_RECENT_MIN_QTY = 5;
 
+/** 「제일 많이 팔린 상품」 자동 배지 기준 — products.sales_rank_pct (0 = 1등).
+ *
+ *  사장님 요청: «제일 많이 팔린 상품은 알아서 HOT? 루루픽? 추천? 뭐 알아서 붙이고»
+ *  → 랜덤이 아니라 «판매 순위»라는 사실이므로 자동으로 붙인다.
+ *
+ *  판매 1개 이상인 상품끼리만 줄을 세운다(2026-09-20 기준 358개).
+ *    상위 10% ≈ 36개  → HOT
+ *    상위 3%  ≈ 11개  → 💖 루루픽 («사장님 대표상품»이라는 뜻을 지키려면 아주 적어야 한다)
+ *  둘 다 «상품 속성»이 아니라 «성과»라 방송마다 자동으로 갈아탄다. */
+export const HOT_AUTO_RANK_PCT = 0.10;
+export const PICK_AUTO_RANK_PCT = 0.03;
+
 export const BADGE_INFO_KEYS = ["free", "overseas", "company", "direct"] as const;
 
 export type BadgeKey = string;

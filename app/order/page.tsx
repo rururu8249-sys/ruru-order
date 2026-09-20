@@ -91,7 +91,7 @@ import CustomerMissingDetailAddressPanel from "@/components/customer/CustomerMis
 import GroupBuyQuickSelect, { type GroupBuyQuickSelectProduct } from "@/components/order/GroupBuyQuickSelect";
 import { noticeBarLine } from "@/lib/noticeBar";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
-import { pickVisibleBadges, SOLD_BADGE_MIN_QTY, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_MIN_BUYERS } from "@/lib/productBadgePriority";
+import { pickVisibleBadges, SOLD_BADGE_MIN_QTY, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_MIN_BUYERS, HOT_AUTO_RANK_PCT, PICK_AUTO_RANK_PCT } from "@/lib/productBadgePriority";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import ShopContactLink from "@/components/customer/ShopContactLink";
 import { useShopInfo } from "@/lib/useShopInfo";
@@ -6581,7 +6581,13 @@ export default function OrderPage() {
                       const autoNew = Number.isFinite(createdMsForNew) && Date.now() - createdMsForNew < 7 * 24 * 60 * 60 * 1000;
                       // [2026-09-03 재설계 5단계-2] 🔥HOT 자동 — 지금 다른 손님들이 담아둔 수량(실시간 홀드)이 3개 이상이면
                       //   "주문 몰림"으로 보고 자동 표시. 표시 전용 — 저장·재고·주문 로직과 무관.
-                      const autoHot = Number(reservedByProduct[String(product.id ?? "")] || 0) >= 3;
+                      // [2026-09-20 사장님] «제일 많이 팔린 상품은 알아서 HOT/루루픽» — 랜덤이 아니라 판매 순위(사실).
+                      //   products.sales_rank_pct = 판매 1개 이상인 상품끼리의 백분위(0 = 1등). 없으면 순위 밖.
+                      const salesRankPctRaw = (product as unknown as Record<string, unknown>)?.sales_rank_pct;
+                      const salesRankPct = Number.isFinite(Number(salesRankPctRaw)) && salesRankPctRaw !== null ? Number(salesRankPctRaw) : null;
+                      const autoHotByRank = salesRankPct !== null && salesRankPct <= HOT_AUTO_RANK_PCT;
+                      const autoPickByRank = salesRankPct !== null && salesRankPct <= PICK_AUTO_RANK_PCT;
+                      const autoHot = Number(reservedByProduct[String(product.id ?? "")] || 0) >= 3 || autoHotByRank;
                       // [2026-09-20] 🏆 누적 판매 수량 — products 테이블의 집계 컬럼(sold_qty_total).
                       //   화면에서 orders를 세지 않는다. 컬럼이 없으면 0(배지 안 뜸).
                       const statCol = (k: string) => Math.max(0, Math.floor(Number((product as unknown as Record<string, unknown>)?.[k]) || 0));
@@ -6699,7 +6705,7 @@ export default function OrderPage() {
                                 { key: "repeat", on: repeatBuyers >= REPEAT_BADGE_MIN_BUYERS, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#F0E9FB", color: "#5B3A9B" }}>🔁 {repeatBuyers}명 재구매</span> },
                                 { key: "special", on: badges.includes("special"), node: <span style={{ fontSize: "10px", fontWeight: 900, color: "#9A6212", background: "#FFF4D6", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>⚡특가</span> },
                                 { key: "limit", on: badges.includes("limit"), node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#854F0B", background: "#FBF1E0", borderRadius: "5px", padding: "2px 6px" }}>마감임박</span> },
-                                { key: "pick", on: badges.includes("pick"), node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#FDEEF3", color: "#C2447A" }}>💖 루루픽</span> },
+                                { key: "pick", on: badges.includes("pick") || autoPickByRank, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#FDEEF3", color: "#C2447A" }}>💖 루루픽</span> },
                                 { key: "recommend", on: !isBroadcastOn && pinned, node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#7A1E47", borderRadius: "5px", padding: "2px 6px" }}>📌 추천</span> },
                                 { key: "hot", on: badges.includes("hot") || autoHot, node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>HOT</span> },
                                 { key: "new", on: badges.includes("new") || autoNew, node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#0F6E56", background: "#E7F3EE", borderRadius: "5px", padding: "2px 6px" }}>NEW</span> },
