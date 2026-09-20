@@ -786,7 +786,8 @@ export default function QuickProductFastForm({
   // [2026-08-29] 저장 안 하고 닫으면 입력이 통째로 날아가던 문제 — 값이 바뀌었으면 확인하고 닫는다.
   const [formTouched, setFormTouched] = useState(false);
   // [2026-08-29 사장님 요청] 등록하면서 손님 화면이 어떻게 보이는지 바로 확인
-  const [previewOpen, setPreviewOpen] = useState(true);
+  // [2026-09-20] 미리보기는 «확인용»이라 기본 접힘 — 펼쳐진 채로 시작해 화면을 크게 먹었다(실측).
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [photoHoverTarget, setPhotoHoverTarget] = useState("");  // 붙여넣기(Ctrl+V) 대상 카드
   const bulkDetailPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const bulkDetailPhotoTargetRef = useRef("");
@@ -1093,7 +1094,13 @@ export default function QuickProductFastForm({
 
   const brandGroupNew = !isBrandGroupEdit && !legacyComboLoaded && details.length > 0;
   const brandGroupActive = isBrandGroupEdit || brandGroupNew;
-  const effectiveDetailOpen = detailPanelOpen || isEditMode || details.length > 0 || legacyComboLoaded;
+  // [2026-09-20 사장님 «상품등록이 너무 복잡하다»] 실측: 새 등록 폼은 6칸으로 간결한데,
+  //   «상품 수정»에 들어가면 isEditMode 때문에 «자세히»가 강제로 펼쳐져 폼 높이 1,696px(약 1.9화면)에
+  //   입력칸 13 + 버튼 22개가 한꺼번에 쏟아졌다. 정작 수정은 «한 가지»만 고치는 일이 대부분이다.
+  //   근거: NN/g Progressive Disclosure — 「자주 쓰는 것만 앞에, 나머지는 한 단계 뒤로」 「단계는 2단을 넘기지 말 것」.
+  //   → 수정도 새 등록과 «같은 화면»에서 시작한다. 지금 설정은 접힌 줄에 요약으로 보여주므로 안 보고도 안다.
+  //   단, 세부상품(조합형·브랜드묶음) 상품은 그 편집이 본론이라 예전처럼 펼친다.
+  const effectiveDetailOpen = detailPanelOpen || details.length > 0 || legacyComboLoaded;
   const brandWordmarkImage = brandGroupActive
     ? brandWordmarkThumbnail(effectiveBrandEn, effectiveBrandKo)
     : "";
@@ -1974,6 +1981,16 @@ export default function QuickProductFastForm({
   const sectionLabel: CSSProperties = { fontSize: "12px", fontWeight: 500, color: "var(--color-ink-mute)", marginBottom: "6px" };
   const fieldLabel: CSSProperties = { display: "block", fontSize: "12px", color: "var(--color-ink-mute)", fontWeight: 500, marginBottom: "4px" };
   const fieldInput: CSSProperties = { width: "100%", fontSize: "13px", padding: "8px 12px", border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", color: "var(--color-ink)", outline: "none" };
+  // [2026-09-20] «자세히» 안이 10덩어리 한 줄로 쏟아져 어디가 어디인지 안 보였다.
+  //   접는 단계를 또 만들면 3단이 되어 더 헷갈리므로(NN/g: 2단계 초과 금지),
+  //   «제목 줄»로 눈으로만 묶는다. 칸·동작은 하나도 안 바뀐다.
+  const groupTitle = (no: string, text: string, hint: string) => (
+    <div style={{ display: "flex", alignItems: "baseline", gap: "6px", margin: "20px 0 8px", paddingBottom: "6px", borderBottom: "2px solid var(--color-rose-line)" }}>
+      <span style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-rose-deep)" }}>{no} {text}</span>
+      <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>{hint}</span>
+    </div>
+  );
+
   const optRow: CSSProperties = { display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" };
   const optLabel: CSSProperties = { fontSize: "13px", color: "var(--color-ink)", minWidth: "36px" };
   const optInput: CSSProperties = { flex: 1, fontSize: "13px", padding: "6px 8px", border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", outline: "none" };
@@ -2756,9 +2773,9 @@ export default function QuickProductFastForm({
               onClick={() => setDetailPanelOpen(true)}
               style={{ width: "100%", marginBottom: "12px", padding: "12px 12px", border: "1px dashed var(--color-rose-line)", borderRadius: "8px", background: "var(--color-surface)", color: "var(--color-rose-deep)", fontSize: "12px", fontWeight: 800, cursor: "pointer", textAlign: "left" }}
             >
-              ▾ 자세히 — 미리보기 · 옵션(색상·사이즈) · 재고 · 구매제한 · 노출 · 카테고리 · 뱃지
+              ▾ 자세히 열기 — 옵션(색상·사이즈) · 재고 · 노출 · 카테고리 · 뱃지 · 설명
               <span style={{ display: "block", marginTop: "4px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>
-                안 열면 지금 설정대로: {(() => { const parts = [colors.length === 0 ? (customInputLabel.trim() ? `「${customInputLabel.trim()}」 손님이 적음` : "색상 손님이 적음") : colors.every((c) => c === "없음") ? "색상 안 씀" : `색상 ${colors.filter((c) => c !== "없음").length}개`, sizes.length === 0 ? "사이즈 손님이 적음" : sizes.every((c) => c === "없음") ? "사이즈 안 씀" : `사이즈 ${sizes.filter((c) => c !== "없음").length}개`, stockManagementEnabled ? "재고 관리함" : "재고 안 셈", isVisible ? "손님에게 보임" : "숨김"]; return parts.join(" · "); })()}
+                지금 설정 · {(() => { const parts = [colors.length === 0 ? (customInputLabel.trim() ? `「${customInputLabel.trim()}」 손님이 적음` : "색상 손님이 적음") : colors.every((c) => c === "없음") ? "색상 안 씀" : `색상 ${colors.filter((c) => c !== "없음").length}개`, sizes.length === 0 ? "사이즈 손님이 적음" : sizes.every((c) => c === "없음") ? "사이즈 안 씀" : `사이즈 ${sizes.filter((c) => c !== "없음").length}개`, stockManagementEnabled ? "재고 관리함" : "재고 안 셈", isVisible ? "손님에게 보임" : "숨김"]; return parts.join(" · "); })()}
               </span>
             </button>
           ) : null}
@@ -2854,6 +2871,7 @@ export default function QuickProductFastForm({
             })() : null}
           </div>
 
+          {groupTitle("①", "옵션 · 재고 · 노출", "손님이 고르는 것 · 몇 개 파는지")}
           {optionStockSection}
 
           {/* 고객노출 / 구매제한 */}
@@ -2868,9 +2886,8 @@ export default function QuickProductFastForm({
 
           </div>
 
-          {/* 구분선 */}
-          <div style={{ height: "1px", background: "var(--color-line)", margin: "12px 0" }} />
           {/* [2026-09-03 재설계 순서 확정] ⚙ 고급 설정은 시안대로 맨 아래(등록 버튼 위) — 방송 중 쓰는 옵션·재고가 먼저 보이게 */}
+          {groupTitle("②", "분류 · 뱃지", "손님 목록에서 어떻게 보일지")}
           {/* 카테고리 */}
           <div style={{ marginBottom: "12px" }}>
             <div style={sectionLabel}>카테고리</div>
@@ -2967,6 +2984,7 @@ export default function QuickProductFastForm({
               })}
             </div>
           </div>
+          {groupTitle("③", "설명 · 가끔 쓰는 것", "안 건드려도 됩니다")}
           {/* [2026-09-03 재설계 6단계] 방송 중 안 만지는 것들을 ⚙ 고급 설정 안으로 — 기능은 전부 그대로 */}
           <div style={{ marginBottom: "12px" }}>
             <div style={{ ...toggleRow, opacity: customerDetailInputUnavailable ? 0.55 : 1 }}>
