@@ -6680,8 +6680,13 @@ export default function OrderPage() {
                             <div style={listView === "grid"
                               ? { fontSize: "14px", fontWeight: 800, color: "#222", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "break-word" as const }
                               : { fontSize: "15px", fontWeight: 800, color: "#222", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.product_name}</div>
-                            {/* 바로구매 부가설명 유지(사장님 지침: 배지만으론 신규 고객이 뜻을 모름) + 가격 위계 강화 15→17px */}
-                            {badges.includes("direct") ? (<div style={{ fontSize: 11, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>방송 접수 없이 지금 바로 구매 가능</div>) : null}
+                            {/* 바로구매 부가설명 — 사장님 지침: 배지만으론 신규 고객이 뜻을 모름. 설명 자체는 유지한다.
+                                [2026-09-20] 다만 방송 OFF(쇼핑몰 모드)에선 같은 말이 화면에 세 번 나온다:
+                                  ① 위 띠 「아래 상품 N개는 지금 바로 주문 가능」 ② 🛒바로구매 배지 ③ 이 줄
+                                방송이 꺼져 있으면 모든 상품이 바로구매라 «구별되는 정보»가 아니다 → 이 줄만 접는다.
+                                방송 ON일 때는 「이 상품은 방송 접수 없이도 살 수 있다」는 진짜 구별 정보이므로 그대로 둔다.
+                                배지·담기·금액은 무변경(표시 전용). */}
+                            {badges.includes("direct") && isBroadcastOn ? (<div style={{ fontSize: 11, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>방송 접수 없이 지금 바로 구매 가능</div>) : null}
                             {/* [2026-09-11 manysell 실측 흡수] 옵션 있는 상품은 「색상 3 · 사이즈 4」 한 줄 — 시트 열기 전에 내 사이즈가 있는지 보이게.
                                 브랜드묶음·조합형은 자기 안내줄이 따로 있어 제외. 표시 전용(담기·재고·금액 무관) */}
                             {!brandGroup && !sold ? (() => {
