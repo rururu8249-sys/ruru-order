@@ -2,12 +2,26 @@ import assert from "node:assert/strict";
 import { buildCardPayNoticeText } from "../lib/cardPayNoticeText.ts";
 import { feedPinFitsOneLine, feedPinFontSize, FEED_PIN_SIZE } from "../lib/feedText.ts";
 
-// 흔한 닉네임 길이에서는 «한 줄», 그것도 글자를 거의 안 줄이고 들어가야 한다
-for (const nick of ["임언냐", "봄여름1234", "코코노랑-0413", "열자짜리닉네임이야"]) {
+// 흔한 닉네임(9자 이하)은 «한 줄» + 글자도 방송에서 읽힐 만큼 남아야 한다
+for (const nick of ["이찌", "임언냐", "봄여름1234", "코코노랑-0413"]) {
   const t = buildCardPayNoticeText(nick);
   assert.ok(feedPinFitsOneLine(t), `한 줄에 안 들어감: ${t}`);
   // 26px = 더 못 줄이고 2줄로 떨어지는 바닥값(FEED_PIN_MIN_SIZE). 그보다 여유가 있어야 한다.
-  assert.ok(feedPinFontSize(t) >= 28, `글자가 너무 작아짐(${feedPinFontSize(t)}px): ${t}`);
+  assert.ok(feedPinFontSize(t) >= 29, `글자가 너무 작아짐(${feedPinFontSize(t)}px): ${t}`);
+}
+
+// 10자 닉네임까지는 글자를 바닥(26px)까지 줄여서라도 한 줄을 지킨다
+{
+  const t = buildCardPayNoticeText("열자짜리닉네임이야");
+  assert.ok(feedPinFitsOneLine(t), `10자 닉네임에서 2줄로 떨어짐: ${t}`);
+}
+
+// 뜻이 두 토막 다 들어 있어야 한다 — «카톡에 카드결제 링크가 있다» + «확인해달라»
+{
+  const t = buildCardPayNoticeText("봄여름1234");
+  for (const must of ["카톡", "카드결제", "확인"]) {
+    assert.ok(t.includes(must), `문구에서 「${must}」가 빠졌다: ${t}`);
+  }
 }
 
 // 예전 문구는 «짧은 닉네임에도» 2줄이었다 — 되돌아가지 않게 못 박아 둔다
