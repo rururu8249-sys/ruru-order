@@ -13,9 +13,7 @@ import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 // [2026-09-08] 페이스터 주소는 설정 › 상점 정보에서 온다(하드코딩 제거)
 import { getShopInfoNow, useShopInfo } from "@/lib/useShopInfo";
 // [2026-09-08] 복사 카드를 «항상 맨 위에 뜨는 작은 창»으로 빼내기 (사유·실측근거는 그 파일 상단)
-import { usePipWindow, copyTextIn, preopenPipWindow, isPipSupported, getPipWindow } from "@/lib/usePipWindow";
-// [2026-09-09] 두 창의 «보이는 상자»를 같게 맞추려면 창 두께를 재야 한다 (근거는 그 파일 상단)
-import { readPopupChrome, measurePopupChrome } from "@/lib/windowChrome";
+import { usePipWindow, copyTextIn } from "@/lib/usePipWindow";
 
 // ═══ 페이스터를 «어떻게» 열 것인가 — 2026-09-08 확정. 다시 뒤집지 말 것 ═══
 //
@@ -53,87 +51,44 @@ import { readPopupChrome, measurePopupChrome } from "@/lib/windowChrome";
 //   (관리자 탭이 다른 주소로 넘어감) 정도다. 페이스터는 사장님이 실제 결제에 쓰는 도구이고,
 //   방송 중 창이 쌓이거나 로그인이 풀리는 쪽이 훨씬 큰 사고라 이쪽을 택한다.
 
+// ═══ [2026-09-22] 다시 «한 화면» — 크롬 «분할 보기(Split View)» 기준 (팝업·PiP 폐기) ═══
+//
+//   사장님: 「자꾸 따로따로 창이 뜨고 또 복사창을 고정하게 눌러야 하고 너무 복잡… 한창에 화면 나눠서」
+//
+//   원인 확정(2026-09-22, 추정 아님): 페이스터 서버가 X-Frame-Options: SAMEORIGIN 과
+//   CSP frame-ancestors 'self' 를 붙이기 시작해 iframe 이 «깨진 페이지»가 됐다(6월엔 없던 헤더).
+//   우리가 무력화하지 않는다. 대신 크롬 145+(2026-02)의 «분할 보기»를 쓴다 —
+//   크롬이 탭 2개를 한 창에 좌우로 그리는 기능이라 프레임 차단과 무관하다.
+//
+//   그래서 이렇게 바꾼다:
+//   · 페이스터는 «팝업 창»이 아니라 «이름 붙은 탭»으로 연다(window.open 에 창 옵션을 안 준다).
+//     이름(PAYSTER_WINDOW_NAME)·opener 규칙은 그대로 → 같은 탭을 하루 종일 재사용, 로그인 유지.
+//   · 복사창은 PiP(항상 위 창) 없이 «관리자 탭 안 모달»로만 그린다 — 예전 6월 모양.
+//     페이스터가 팝업이 아니니 «위에 떠야 할» 이유가 없고, 그래서
+//     클릭 권한 순서(복사창→페이스터)·📌 비상 버튼·창 위치/두께 계산·«최소화하면 못 살림» 이 전부 사라진다.
+//   · 사장님이 하루 한 번 페이스터 탭을 창 오른쪽 가장자리로 «끌어다 놓으면» 분할된다.
+//     (웹페이지는 분할을 못 시킨다 — 확장프로그램 API 뿐. 그래서 이 1회만 남는다)
+//     분할 전엔 페이스터 탭이 이 화면을 가리므로, 가려졌던 걸 visibilitychange 로 읽어 안내 띠를 띄운다.
+//   ⚠ lib/usePipWindow.ts 는 남겨둔다(사장님 결정: 실기기 확인 뒤 다음 작업에서 정리). 여기선 안 연다.
+
 // 박스 치수 — «한 곳»에서만 정한다. 화면(JSX)과 창 위치 계산이 어긋나면 안 되기 때문.
 const BOX_W = 980;          // 가로 px (왼쪽 복사창 490 + 오른쪽 페이스터 490)
-const BOX_W_RATIO = 0.96;   // 좁은 화면에서만 96vw 로 줄어든다 (예전과 동일)
 const BOX_H_MAX = 1500;     // 세로 상한 px (예전과 동일)
 const BOX_V_GAP = 16;       // 위아래 8px씩 (예전과 동일)
-// 모달이 차지하는 «왼쪽 절반» 폭. 490px 은 여백이 아니라 «자리 좌표»라서 4px 격자와 무관하다.
-const HALF_CSS = `min(${BOX_W / 2}px, ${(BOX_W_RATIO * 100) / 2}vw)`;
-
-/** 모달 «오른쪽 절반»(예전 iframe 자리)이 «모니터 좌표»로 어디인지.
- *  창을 그 자리에 정확히 겹쳐 띄우기 위한 값이다. */
-function paysterSlotRect() {
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  const boxW = Math.min(BOX_W, vw * BOX_W_RATIO);
-  const boxH = Math.min(BOX_H_MAX, vh - BOX_V_GAP);
-  const width = Math.round(boxW / 2);
-  const height = Math.round(boxH);
-  const availW = window.screen?.availWidth || vw;
-  const availH = window.screen?.availHeight || vh;
-  // 브라우저 «내용 영역»이 모니터의 어디서 시작하나.
-  //   보통 outerHeight − innerHeight 가 주소창·탭줄 높이다. 그런데
-  //   [2026-09-08 실측] 사장님 크롬은 outerWidth·outerHeight·screenX·screenY 를 «전부 0»으로 준다.
-  //   그대로 쓰면 주소창 높이(약 121px)가 통째로 빠져 페이스터 창이 위로 붕 뜬다(실제로 그랬다).
-  //   → 0 이면 창이 최대화된 상태로 보고 availHeight − innerHeight 로 대신 구한다.
-  const chromeH = window.outerHeight > 0 ? Math.max(0, window.outerHeight - vh) : Math.max(0, availH - vh);
-  const originX = window.screenX + (window.outerWidth > vw ? Math.round((window.outerWidth - vw) / 2) : 0);
-  const originY = window.screenY + chromeH;
-  const left = Math.round(originX + (vw - boxW) / 2 + boxW / 2);
-  const top = Math.round(originY + (vh - boxH) / 2);
-  // 모니터 밖으로 나가면 잘리므로 안쪽으로 붙인다
-  return {
-    left: Math.max(0, Math.min(left, availW - width)),
-    top: Math.max(0, Math.min(top, availH - height)),
-    width,
-    height,
-  };
-}
+// [2026-09-22] 창 위치 계산용 BOX_W_RATIO·HALF_CSS 는 페이스터가 «탭»이 되면서 필요 없어져 삭제.
+//   모달 폭은 BOX_W/2 = 490px(예전 왼쪽 칸과 같은 px), 좁은 화면에서만 96vw.
 
 /** 페이스터 창 이름 — «고정». 이 이름 덕분에 누를 때마다 같은 창을 다시 쓴다.
  *  이름을 빼거나 "_blank" 로 바꾸면 창이 매번 새로 생기고 로그인이 풀린다. 바꾸지 말 것. */
 const PAYSTER_WINDOW_NAME = "ruru_payster";
 
-/** 복사창(항상 위) «바로 옆» 자리 — 두 창의 «보이는 상자»가 한치도 안 어긋나게.
- *  [2026-09-08 실측] 복사창은 screenX/screenY/outerWidth/outerHeight 를 «정확히» 알려준다.
- *    (예: 1206 / 259 / 490 / 834 — 운영체제가 보고한 창 위치와 일치)
- *  [2026-09-09 정정] 예전엔 복사창의 outer 값을 window.open 의 «내용영역» 인자로 그대로 넘겼다.
- *    페이스터 창엔 탭줄·주소창이 더 붙으므로 세로가 그만큼 커지고 내용이 아래로 밀렸다(사장님: 「이질감」).
- *    → 창 두께(readPopupChrome)를 빼서 준다. 두께는 페이스터 창을 «처음 만들 때» 재 둔다. */
-function rectBesidePip(pipWin: Window) {
-  const availW = window.screen?.availWidth || window.innerWidth;
-
-  // 복사창의 «보이는 상자»(outer) 좌표·크기. screenX/Y 는 viewport 기준이라 위 띠만큼 빼서 상자 좌상단을 구한다.
-  const pipInnerW = pipWin.innerWidth || Math.round(BOX_W / 2);
-  const pipInnerH = pipWin.innerHeight || Math.round(BOX_H_MAX);
-  const pipBoxW = pipWin.outerWidth || pipInnerW;
-  const pipBoxH = pipWin.outerHeight || pipInnerH;
-  const pipTopBar = Math.max(0, pipBoxH - pipInnerH);
-  const pipSideBar = Math.max(0, Math.round((pipBoxW - pipInnerW) / 2));
-  const boxLeft = pipWin.screenX - pipSideBar;
-  const boxTop = pipWin.screenY - pipTopBar;
-
-  // 오른쪽에 같은 크기 상자가 들어가면 오른쪽(예전 배치), 아니면 왼쪽에 붙인다.
-  const left = boxLeft + pipBoxW + pipBoxW <= availW ? boxLeft + pipBoxW : Math.max(0, boxLeft - pipBoxW);
-
-  const chrome = readPopupChrome();
-  if (!chrome) {
-    // 아직 페이스터 창 두께를 못 쟀다(첫 창). 예전 방식으로 열고, 여는 김에 재 둔다 → 다음 창부터 정확해진다.
-    return { left, top: boxTop, width: Math.round(BOX_W / 2), height: pipInnerH };
-  }
-  // ★ 요청값은 «내용 영역» 기준(MDN) → 두께를 빼서 주면 «창 전체»가 복사창과 똑같아진다.
-  return {
-    left,
-    top: boxTop,
-    width: Math.max(200, pipBoxW - chrome.wGap),
-    height: Math.max(200, pipBoxH - chrome.hGap),
-  };
+/** [2026-09-22] 페이스터 탭을 «마지막으로 연/이동시킨» 시각.
+ *  이 직후에 관리자 탭이 «가려지면»(visibilitychange → hidden) 아직 분할 보기를 안 한 것이다 → 안내 띠. */
+let lastPaysterOpenAt = 0;
+export function paysterLastOpenedAt() {
+  return lastPaysterOpenAt;
 }
 
-/** 페이스터 창을 «정해진 자리»에 연다.
- *  ⚠ 위치는 «창을 처음 만들 때»만 정해진다. 이미 열려 있는 창은 위치를 못 바꾼다
- *    (남의 사이트라 moveTo 가 안 먹는다 — 실측 확인). 그래서 첫 생성 위치가 중요하다. */
 let paysterWin: Window | null = null;
 
 /** 페이스터 창이 «지금 살아 있나». 살아 있으면 클릭 권한 없이도 다시 부를 수 있다(실측). */
@@ -145,43 +100,33 @@ function paysterAlive() {
   }
 }
 
-/** 페이스터 창을 «주소 없이» 잡아서 곧바로 앞으로 부른다.
- *  · 주소를 안 주므로 이동이 없고, 클릭 «열 권한»도 안 닳는다 (2026-09-08 실측 ③)
- *  · 창이 없으면 이 자리·크기로 새로 생긴다. about:blank(우리 오리진)라 창 두께를 잴 수 있다
- *    → 그 값으로 다음 창부터 복사창과 «보이는 상자»가 정확히 같아진다
- *  · ★ focus() 를 «여기서» 부르는 게 핵심 — 사용자 클릭 권한이 아직 살아 있는 순간이라야 창이 올라온다
- *  ⚠ 이름(PAYSTER_WINDOW_NAME)은 그대로. 빼면 창이 매번 새로 생겨 로그인이 풀린다. */
-function grabPaysterWindow(r: { left: number; top: number; width: number; height: number }) {
+/** 페이스터 «탭»을 잡는다 — 없으면 새 탭(관리자 탭 바로 옆), 있으면 그 탭 그대로.
+ *  [2026-09-22] 창 옵션(popup=yes,left,top,…)을 «주지 않는다» → 팝업 창이 아니라 «탭»이 된다.
+ *    탭이라야 크롬 «분할 보기»로 관리자 탭 옆에 붙일 수 있다. 창 옵션을 다시 넣지 말 것.
+ *  ⚠ 이름(PAYSTER_WINDOW_NAME)은 그대로. 빼면 탭이 매번 새로 생겨 로그인이 풀린다. */
+function grabPaysterWindow() {
   let win: Window | null = null;
   try {
-    win = window.open("", PAYSTER_WINDOW_NAME, `popup=yes,left=${r.left},top=${r.top},width=${r.width},height=${r.height}`);
+    win = window.open("", PAYSTER_WINDOW_NAME);
   } catch {
     win = null;
   }
-  if (!win) return null; // 팝업 차단 — 복사창의 「페이스터 창 다시 열기 ↗」로 복구된다
+  if (!win) return null; // 팝업 차단 — 복사창의 「페이스터 탭 다시 열기 ↗」로 복구된다
   paysterWin = win;
-
-  let isNewWindow = false;
+  lastPaysterOpenAt = Date.now();
   try {
-    isNewWindow = win.location.href === "about:blank"; // 읽히면 새 창, SecurityError 면 기존 페이스터 창
+    win.focus();
   } catch {
-    isNewWindow = false;
-  }
-  if (isNewWindow) measurePopupChrome(win, { top: r.top });
-
-  try {
-    win.focus(); // 뒤로 숨어 있던 창을 앞으로 (⚠ «최소화»된 창은 웹이 되살릴 방법이 없다)
-  } catch {
-    /* 포커스는 보조 동작 — 실패해도 창은 떠 있다 */
+    /* 포커스는 보조 동작 */
   }
   return win;
 }
 
-function openPaysterAt(url: string, r: { left: number; top: number; width: number; height: number }) {
-  const win = grabPaysterWindow(r);
+function openPaysterAt(url: string) {
+  const win = grabPaysterWindow();
   if (!win) return;
   try {
-    win.location.href = url; // 새 창이면 페이스터 로드, 기존 창이면 결제 폼으로 되돌린다
+    win.location.href = url; // 새 탭이면 페이스터 로드, 기존 탭이면 결제 폼으로 되돌린다
   } catch {
     /* 이동 실패해도 창은 이미 앞에 있다 */
   }
@@ -195,51 +140,15 @@ function openPaysterAt(url: string, r: { left: number; top: number; width: numbe
 export function openPayster(url: string) {
   if (typeof window === "undefined") return;
   //   ⚠ 반드시 «클릭 제스처 안에서» 불러야 팝업차단에 안 걸린다.
-  //   ⚠ 같은 이름의 창이 이미 있으면 «그 창»이 이 주소로 이동한다(새 창 안 생김 → 로그인 유지).
-  const pipWin = getPipWindow();
-  openPaysterAt(url, pipWin ? rectBesidePip(pipWin) : paysterSlotRect());
+  //   ⚠ 같은 이름의 탭이 이미 있으면 «그 탭»이 이 주소로 이동한다(새 탭 안 생김 → 로그인 유지).
+  openPaysterAt(url);
 }
 
-/** 복사창(고정식) 크기 — 예전 모달 복사창과 «같은 폭», 세로는 화면 끝까지.
- *  작게 만들지 않는다(사장님 지시). 자동열기와 비상 버튼이 같은 값을 쓰도록 여기 하나로 둔다. */
-function pipSize() {
-  const availH = (typeof window !== "undefined" && window.screen?.availHeight) || 900;
-  return { width: BOX_W / 2, height: Math.min(BOX_H_MAX, availH - 40) };
-}
-
-/** 카드결제 버튼에서 호출 — 페이스터 창을 띄운다.
- *  [2026-09-08] 📌 를 한 번 켜두면 여기서 복사창(항상 위)도 «같이» 연다.
- *    브라우저는 «클릭 순간»에만 창을 열어주므로, 팝업이 뜬 뒤에는 자동으로 못 연다.
- *    그래서 주문표 클릭 안인 이 자리에서 미리 열어두고, 팝업이 그 창을 이어받는다.
- *  ⚠ 주문표(LiveOrderTable)의 클릭 «안에서» 불려야 팝업차단에 안 걸린다.
- *  ⚠ 순서 주의 — await 없이 둘 다 «동기적으로» 부른다. */
+/** 카드결제 버튼에서 호출 — 페이스터 탭을 결제 폼으로 보낸다(없으면 새 탭).
+ *  [2026-09-22] 복사창(PiP)은 더 이상 안 연다. 복사 패널은 이 탭 안 모달로 뜬다(파일 상단 참고).
+ *  ⚠ 주문표(LiveOrderTable)의 클릭 «안에서» 불려야 팝업차단에 안 걸린다. */
 export function openPaysterRightHalf() {
-  const url = getShopInfoNow().paysterUrl;
-  const pip = getPipWindow();
-  const rect = pip ? rectBesidePip(pip) : paysterSlotRect();
-
-  // ★ [2026-09-09 사장님] 「카드결제 클릭해도 페이스터창 뒤에 가있는거 앞으로 다시 안나옴」
-  //   원인: 복사창 열기(requestWindow)가 클릭 «권한»을 먼저 써버려서, 그 뒤의 focus() 가
-  //   사용자 조작 없이 실행돼 창이 안 올라왔다.
-  //   [2026-09-08 실측 ③] «주소 없이» 참조 + focus() 는 열 권한을 «안 닳게» 한다.
-  //   → 순서를 ① 페이스터를 잡아 앞으로 → ② 복사창에 권한 사용 → ③ 결제 폼으로 이동 으로 바꾼다.
-  //   ⚠ ③(이동)을 ② 뒤에 두는 것이 중요하다. 주소를 먼저 주면 권한이 닳아 복사창이 막힌다(실측 ②).
-  const win = grabPaysterWindow(rect); // ① 권한 안 씀 + focus
-
-  if (isPipSupported() && !pip) {
-    // ② 클릭 권한은 «없는 창»(복사창)에 쓴다. 화면에는 복사창 하나만 뜬다.
-    const size = pipSize();
-    void preopenPipWindow(size.width, size.height);
-  }
-
-  if (win) {
-    // ③ 결제 폼으로 (기존 창이면 이동, 방금 만든 창이면 첫 로드)
-    try {
-      win.location.href = url;
-    } catch {
-      /* 이동 실패해도 창은 이미 앞에 있다 */
-    }
-  }
+  openPayster(getShopInfoNow().paysterUrl);
 }
 
 type Props = {
@@ -275,6 +184,17 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
   //   처리 실패 문구도 같은 이유로 복사창 안에 띄운다. 돈 처리(runComplete)는 그대로다.
   const [pipConfirmOpen, setPipConfirmOpen] = useState(false);
   const [pipCompleteError, setPipCompleteError] = useState("");
+  // [2026-09-22] 분할 보기 안내 — 페이스터 탭을 연 «직후»에 이 탭이 가려졌다면(=탭이 앞으로 튀어나옴)
+  //   아직 분할을 안 한 것이다. 돌아왔을 때 «끌어다 놓기» 안내 띠를 띄운다. 표시 전용.
+  const [splitHint, setSplitHint] = useState(false);
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState !== "hidden") return;
+      if (Date.now() - paysterLastOpenedAt() < 3000) setSplitHint(true);
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
   // [2026-08-29] 카톡으로 결제링크 보낸 뒤, 유튜브 채팅에 자동 안내
   // [2026-08-29 사장님 요청] 페이스터는 남의 사이트라 자동 입력이 안 된다(브라우저 동일출처 정책).
   //   예전: 상품명·금액·닉네임·전화번호를 1→2→3→4 순서로 네 번 복사해야 했다.
@@ -532,28 +452,24 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-3 pt-5">
           {/* [2026-08-31 사장님 확인] 맨 위 큰 복사 버튼은 2번 칸과 같은 값이라 삭제 — 1·2·3 카드로 통일 */}
           <div className="mb-2 flex flex-wrap items-center gap-2 text-[12px] font-bold" style={{ color: "#5A6B92" }}>
-            <span>오른쪽 페이스터 창에 1 → 2 → 3 순서대로 붙여넣으세요 (숫자키 1~4) · 페이스터 창은 <b>최소화하지 마세요</b></span>
-            {/* [2026-09-08] 페이스터 창을 실수로 닫았을 때 다시 여는 길. 화면 오른쪽 절반에 뜬다. */}
-            <button type="button" onClick={() => openPayster(paysterUrl)} className="ru-btn ru-btn-sm" title="페이스터 창을 화면 오른쪽 절반에 다시 엽니다">
-              페이스터 창 다시 열기 ↗
+            <span>오른쪽 페이스터에 1 → 2 → 3 순서대로 붙여넣으세요 (숫자키 1~4) · 페이스터 탭은 <b>닫지 마세요</b>(로그인 유지)</span>
+            {/* [2026-09-08] 페이스터 탭을 실수로 닫았을 때 다시 여는 길. [2026-09-22] 창이 아니라 탭. */}
+            <button type="button" onClick={() => openPayster(paysterUrl)} className="ru-btn ru-btn-sm" title="페이스터 탭을 다시 엽니다(닫았을 때)">
+              페이스터 탭 다시 열기 ↗
             </button>
-            {/* [2026-09-09 사장님 지시] 켜기/끄기 토글(📌) 삭제 — 복사창은 «항상 고정식 하나»가 기준.
-                  이 버튼은 그 창을 «못 열었을 때»(팝업차단 등)만 보이는 비상 복구 버튼이다.
-                  누르면 자기 클릭 권한으로 복사창을 열고, 이 페이지 모달은 사라진다. */}
-            {pip.supported && !pip.pipWindow ? (
-              <button
-                type="button"
-                onClick={() => {
-                  const s = pipSize();
-                  void pip.open(s.width, s.height);
-                }}
-                className="ru-btn ru-btn-sm"
-                title="복사창을 «항상 맨 위에 뜨는 독립 창»으로 띄웁니다. 페이스터 창이 뒤로 밀리지 않습니다."
-              >
-                📌 복사창 띄우기 ↗
-              </button>
-            ) : null}
+            {/* [2026-09-09 사장님 지시] 📌 토글 삭제 → [2026-09-22] 📌 비상 버튼도 삭제. 복사창(PiP) 자체를 안 쓴다(파일 상단). */}
           </div>
+          {/* [2026-09-22] 분할 보기 안내 — 페이스터 탭이 이 화면을 «가렸을 때»만 보인다(하루 1회 끌어다 놓기). */}
+          {splitHint ? (
+            <div className="mb-3 flex items-start gap-2 rounded-xl px-3 py-2.5 text-[12px] font-bold leading-relaxed" style={{ background: "#EAF0FE", color: "#1E4FB8", border: "1px solid #BFD2F8" }}>
+              <span className="min-w-0 flex-1">
+                🪟 페이스터 탭이 이 화면을 가렸어요. <b>페이스터 탭을 창 오른쪽 가장자리로 끌어다 놓으면</b>(한 번만) 왼쪽 복사창 · 오른쪽 페이스터가 한 화면에 나란히 보입니다. 가운데 선을 끌어 폭을 맞추세요.
+              </span>
+              <button type="button" onClick={() => setSplitHint(false)} className="shrink-0 text-[12px] font-black" style={{ color: "#1E4FB8" }} title="안내 닫기">
+                ✕
+              </button>
+            </div>
+          ) : null}
 
           <div className="space-y-3">
             {!phoneIsMobile && phone ? (
@@ -721,7 +637,8 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
               marginRight = 490 → 가운데 정렬했을 때 왼쪽 절반 자리에 딱 앉는다
               (좁은 화면에서는 예전 maxWidth:96vw 와 같은 비율로 48vw 까지 줄어든다)
             ⚠ pointerEvents 는 건드리지 않는다 — 예전에 그것 때문에 X 버튼이 안 눌렸다. */}
-      <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "row", width: HALF_CSS, marginRight: HALF_CSS, height: `min(${BOX_H_MAX}px, calc(100dvh - ${BOX_V_GAP}px))`, borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}>
+      {/* [2026-09-22] 오른쪽 페이스터가 «같은 창의 옆 탭»이 되었으므로 marginRight(빈 오른쪽 자리)를 없애고 판 가운데에 둔다. 폭은 그대로 490px. */}
+      <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "row", width: `min(${BOX_W / 2}px, 96vw)`, height: `min(${BOX_H_MAX}px, calc(100dvh - ${BOX_V_GAP}px))`, borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}>
         {copyPanel}
       </div>
       {imagePreview}
