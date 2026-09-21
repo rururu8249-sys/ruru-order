@@ -277,34 +277,9 @@ function extractBodyField(task: AdminIssueTask, prefix: string) {
   return line ? line.slice(prefix.length).trim() : "";
 }
 
-function issueRows(task: AdminIssueTask) {
-  const orderNo = extractBodyField(task, "주문번호:");
-  const product = extractBodyField(task, "대상상품:") || clean(task.related_product);
-  return [
-    ["닉네임", getNickname(task)],
-    ["이름", getName(task)],
-    ["전화번호", formatPhone(getPhone(task))],
-    ...(orderNo ? [["주문번호", orderNo]] : []),
-    ...(product ? [["대상상품", product]] : []),
-    ["메모", getIssueText(task)],
-  ];
-}
-
-function IssueRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className="grid grid-cols-[62px_1fr] gap-2 border-b border-line py-1.5 last:border-b-0">
-      <div className="text-[11px] font-black text-ink-mute">{label}</div>
-      <div
-        className={`min-w-0 break-words text-[12px] leading-5 ${
-          strong ? "font-black text-ink" : "font-bold text-ink"
-        }`}
-        title={value}
-      >
-        {value || "-"}
-      </div>
-    </div>
-  );
-}
+// [2026-09-21] issueRows / IssueRow 제거 — 카드가 «6줄 표»를 그리던 함수들이다.
+//   NN/g 「Accordions on Desktop」: 펼치는 데 드는 상호작용 비용이 쌓이고,
+//   접힌 줄은 «내용을 알려주는 제목»이어야 한다. 표를 접어두는 건 둘 다 어긴 구조였다.
 
 function IssueTypeChips({
   value,
@@ -358,55 +333,93 @@ function IssueCard({
   /** [2026-09-08] 처리 중 재클릭 방지 — 없으면 중복 요청이 나간다 */
   busy?: boolean;
 }) {
+  // [2026-09-21 사장님] 「고객이슈 레이아웃 별로 안 예쁘고 보는 방식도 헷갈리고 어려움」
+  //   예전 카드의 문제(실제 화면에서 확인):
+  //     · 접혀 있어도 이미 «6줄짜리 표»(닉네임/이름/전화번호/주문번호/대상상품/메모)였다 — 접힌 게 아니었다
+  //     · 「▼ 전체 보기」를 누르면 «똑같은 내용»이 원문 텍스트로 또 나왔다 → 눌러도 새 정보가 없다
+  //     · 「전화번호 −」처럼 «빈 값도 한 줄»을 차지해 카드가 길어졌고, 10건 보려면 한참 스크롤
+  //     · 정작 알아야 할 «누가 · 무엇을 · 왜»가 표 안에 묻혔다
+  //   → 기본은 «세 줄 요약», 펼치면 «요약에 없던 것만» 보여준다(같은 내용을 두 번 안 보여준다).
   const done = isResolved(task);
-  const rows = issueRows(task);
   const issueTypes = getIssueTypes(task);
-  // [2026-08-13 사장님 요청] 카드 클릭 시 등록 원문 전체 펼침 — 기존엔 요약 첫 줄만 보여 답답했음. 표시 전용.
   const [expanded, setExpanded] = useState(false);
-  const fullText = cleanMultiline(task.body) || getIssueText(task);
+
+  const nickname = getNickname(task);
+  const name = getName(task);
+  const phone = formatPhone(getPhone(task));
+  const orderNo = extractBodyField(task, "주문번호:");
+  const product = extractBodyField(task, "대상상품:") || clean(task.related_product);
+  const memo = getIssueText(task);
+  const fullText = cleanMultiline(task.body) || memo;
+
+  // 유형을 «색»으로 구분한다 — 환불/교환은 처리 방법이 완전히 다르므로 한눈에 갈라져야 한다.
+  const typeTone = (type: string) =>
+    type === "refund"
+      ? "bg-danger-bg text-danger-tx"
+      : type === "exchange"
+        ? "bg-warn-bg text-warn-tx"
+        : "bg-surface-2 text-ink-soft";
+
+  // 펼쳤을 때 «요약 줄에 없던 것»만 모은다. 빈 값은 아예 넣지 않는다.
+  const moreRows: Array<[string, string]> = [];
+  if (phone) moreRows.push(["전화번호", phone]);
+  if (memo && memo !== product) moreRows.push(["메모", memo]);
 
   return (
     <article
       key={taskKey(task, index)}
-      className="relative overflow-hidden rounded-xl border border-line bg-surface p-3 pl-4 shadow-sm"
+      className="relative overflow-hidden rounded-xl border border-line bg-surface shadow-sm"
     >
       <span className={`absolute left-0 top-0 h-full w-1 ${done ? "bg-[var(--color-ok-tx)]" : "bg-[var(--color-danger-tx)]"}`} />
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span
-              className={`rounded-full px-2 py-0.5 text-[11px] font-black ${
-                done ? "bg-surface-3 text-ink-soft" : "bg-danger-bg text-danger-tx"
-              }`}
-            >
-              {done ? CUSTOMER_TERMS.issueResolved : CUSTOMER_TERMS.issueOpen}
-            </span>
 
+      <div className="flex items-start gap-3 py-3 pl-4 pr-3">
+        {/* 왼쪽 — 누가 · 무엇을 (카드 아무 데나 눌러 펼친다) */}
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="min-w-0 flex-1 text-left"
+          title={expanded ? "접기" : "자세히 보기"}
+        >
+          <div className="flex flex-wrap items-center gap-1.5">
             {issueTypes.map((type) => (
-              <span
-                key={type}
-                className="rounded-full bg-surface px-2 py-0.5 text-[11px] font-black text-ink-soft ring-1 ring-line"
-              >
+              <span key={type} className={`rounded px-2 py-0.5 text-[11px] font-black ${typeTone(type)}`}>
                 {getIssueTypeLabel(type)}
               </span>
             ))}
-
-            <span className="rounded-full bg-surface px-2 py-0.5 text-[11px] font-black text-ink-soft ring-1 ring-line">
-              {getPriorityLabel(task.priority)}
-            </span>
+            {done ? (
+              <span className="rounded bg-surface-3 px-2 py-0.5 text-[11px] font-black text-ink-soft">
+                {CUSTOMER_TERMS.issueResolved}
+              </span>
+            ) : null}
+            {getPriorityLabel(task.priority) !== "보통" ? (
+              <span className="rounded bg-surface-2 px-2 py-0.5 text-[11px] font-black text-ink-soft">
+                {getPriorityLabel(task.priority)}
+              </span>
+            ) : null}
           </div>
 
-          <div className="mt-2 truncate text-[14px] font-black text-ink" title={getNickname(task)}>
-            {getNickname(task)}
+          <div className="mt-1.5 truncate text-[14px] font-black text-ink">
+            {nickname}
+            {name && name !== nickname ? <span className="ml-1.5 text-[12px] font-bold text-ink-mute">{name}</span> : null}
           </div>
-          <div className="mt-0.5 text-[11px] font-black text-ink-mute">{dateLabel(task.created_at)}</div>
-        </div>
 
-        <div className="flex shrink-0 flex-col gap-1.5">
+          <div className="mt-0.5 truncate text-[12px] font-bold text-ink-soft">
+            {product || memo || "내용 없음"}
+          </div>
+
+          <div className="mt-0.5 truncate text-[11px] font-bold text-ink-mute">
+            {dateLabel(task.created_at)}
+            {orderNo ? ` · ${orderNo}` : ""}
+            <span className="ml-1.5 text-ink-mute">{expanded ? "▲ 접기" : "▼ 자세히"}</span>
+          </div>
+        </button>
+
+        {/* 오른쪽 — 할 일은 하나. 「해결완료」가 주버튼이고 「수정」은 옆에 작게. */}
+        <div className="flex shrink-0 items-center gap-1.5">
           <button
             type="button"
             onClick={() => onEdit(task)}
-            className="rounded-xl border border-line bg-surface px-3 py-2 text-[11px] font-black text-ink-soft hover:bg-surface-2"
+            className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft transition hover:bg-surface-2"
           >
             수정
           </button>
@@ -416,7 +429,7 @@ function IssueCard({
               type="button"
               onClick={() => onHide(task)}
               disabled={busy}
-              className="rounded-xl border border-danger-tx bg-danger-bg px-3 py-2 text-[11px] font-black text-danger-tx hover:opacity-90 disabled:opacity-45"
+              className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-danger-tx transition hover:bg-danger-bg disabled:opacity-45"
               title="DB 완전삭제가 아니라 해결목록 숨김 처리"
             >
               {busy ? "처리중…" : "목록삭제"}
@@ -426,7 +439,7 @@ function IssueCard({
               type="button"
               onClick={() => onResolve(task)}
               disabled={busy}
-              className="rounded-xl border border-line bg-ok-bg px-3 py-2 text-[11px] font-black text-ok-tx hover:opacity-90 disabled:opacity-45"
+              className="rounded-lg bg-ok-tx px-3 py-1.5 text-[11px] font-black text-white transition hover:opacity-90 disabled:opacity-45"
             >
               {busy ? "처리중…" : "해결완료"}
             </button>
@@ -434,23 +447,26 @@ function IssueCard({
         </div>
       </div>
 
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => setExpanded((v) => !v)}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded((v) => !v); } }}
-        className="mt-3 cursor-pointer rounded-2xl bg-surface/70 px-3 py-2 ring-1 ring-line transition hover:ring-rose-line"
-        title={expanded ? "접기" : "클릭하면 전체 내용을 볼 수 있어요"}
-      >
-        {expanded ? (
-          <div className="whitespace-pre-wrap break-words py-1 text-[12px] font-bold leading-6 text-ink">{fullText}</div>
-        ) : (
-          rows.map(([label, value]) => (
-            <IssueRow key={label} label={label} value={value} strong={label === "메모"} />
-          ))
-        )}
-        <div className="mt-1 text-right text-[11px] font-black text-ink-mute">{expanded ? "▲ 접기" : "▼ 전체 보기"}</div>
-      </div>
+      {/* 펼침 — 요약에 «없던 것»만. 같은 내용을 두 번 보여주지 않는다. */}
+      {expanded ? (
+        <div className="border-t border-line bg-surface-2 px-4 py-3">
+          {moreRows.length > 0 ? (
+            <div className="grid gap-1.5">
+              {moreRows.map(([label, value]) => (
+                <div key={label} className="grid grid-cols-[58px_1fr] gap-2">
+                  <div className="text-[11px] font-black text-ink-mute">{label}</div>
+                  <div className="min-w-0 break-words text-[12px] font-bold leading-5 text-ink">{value}</div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          <details className="mt-2">
+            <summary className="cursor-pointer text-[11px] font-black text-ink-mute">등록 원문 보기</summary>
+            <div className="mt-1.5 whitespace-pre-wrap break-words text-[12px] font-bold leading-5 text-ink-soft">{fullText}</div>
+          </details>
+        </div>
+      ) : null}
     </article>
   );
 }
