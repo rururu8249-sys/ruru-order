@@ -172,7 +172,16 @@ function getName(task: AdminIssueTask) {
 }
 
 function getPhone(task: AdminIssueTask) {
-  return clean(task.customer_phone) || rawValue(task, ["phone", "customer_phone"]) || "-";
+  // [2026-09-21 버그] 화면엔 「전화번호 −」인데 등록 원문엔 번호가 멀쩡히 있었다.
+  //   반품 접수로 자동 등록된 이슈는 admin_tasks 에 전화번호 «컬럼»을 안 넣고
+  //   본문(body)에만 「전화번호: 010…」으로 적어둔다(order-return/route.ts 129행).
+  //   → 컬럼이 비면 본문에서 뽑는다. 사장님이 전화를 걸어야 하는 정보라 안 보이면 안 된다.
+  return (
+    clean(task.customer_phone) ||
+    rawValue(task, ["phone", "customer_phone"]) ||
+    extractBodyField(task, "전화번호:") ||
+    ""
+  );
 }
 
 function getIssueTypes(task: AdminIssueTask) {
@@ -330,29 +339,26 @@ function IssueCard({
   onEdit: (task: AdminIssueTask) => void;
   onResolve: (task: AdminIssueTask) => void | Promise<void>;
   onHide: (task: AdminIssueTask) => void | Promise<void>;
-  /** [2026-09-08] 처리 중 재클릭 방지 — 없으면 중복 요청이 나간다 */
   busy?: boolean;
 }) {
-  // [2026-09-21 사장님] 「고객이슈 레이아웃 별로 안 예쁘고 보는 방식도 헷갈리고 어려움」
-  //   예전 카드의 문제(실제 화면에서 확인):
-  //     · 접혀 있어도 이미 «6줄짜리 표»(닉네임/이름/전화번호/주문번호/대상상품/메모)였다 — 접힌 게 아니었다
-  //     · 「▼ 전체 보기」를 누르면 «똑같은 내용»이 원문 텍스트로 또 나왔다 → 눌러도 새 정보가 없다
-  //     · 「전화번호 −」처럼 «빈 값도 한 줄»을 차지해 카드가 길어졌고, 10건 보려면 한참 스크롤
-  //     · 정작 알아야 할 «누가 · 무엇을 · 왜»가 표 안에 묻혔다
-  //   → 기본은 «세 줄 요약», 펼치면 «요약에 없던 것만» 보여준다(같은 내용을 두 번 안 보여준다).
+  // [2026-09-21 사장님] 「2번씩이나 클릭해야 하고 너무 보기 불편함.
+  //   필요한 고객정보 닉네임·이름·전화번호·년월일·특이사항 보기 좋게 딱 안 돼?」
+  //   맞는 지적이다. 접기/펼치기를 «아예 없앤다».
+  //     NN/g 「Accordions on Desktop」 — 대부분의 내용을 다 봐야 하는 화면이면
+  //     접지 말고 한 번에 보여라. 펼치는 상호작용 비용이 쌓여 부담이 된다.
+  //   화면은 가로로 넓은데 세로로만 쌓고 있었다 → 관리자 화면답게 «표 한 줄»로 간다.
+  //   (쿠팡 윙·스마트스토어 반품관리도 목록은 표다)
   const done = isResolved(task);
   const issueTypes = getIssueTypes(task);
-  const [expanded, setExpanded] = useState(false);
-
   const nickname = getNickname(task);
   const name = getName(task);
   const phone = formatPhone(getPhone(task));
   const orderNo = extractBodyField(task, "주문번호:");
   const product = extractBodyField(task, "대상상품:") || clean(task.related_product);
   const memo = getIssueText(task);
-  const fullText = cleanMultiline(task.body) || memo;
+  const priority = getPriorityLabel(task.priority);
 
-  // 유형을 «색»으로 구분한다 — 환불/교환은 처리 방법이 완전히 다르므로 한눈에 갈라져야 한다.
+  // 유형은 «색»으로 가른다 — 환불과 교환은 처리 방법이 완전히 달라서 한눈에 갈라져야 한다.
   const typeTone = (type: string) =>
     type === "refund"
       ? "bg-danger-bg text-danger-tx"
@@ -360,114 +366,93 @@ function IssueCard({
         ? "bg-warn-bg text-warn-tx"
         : "bg-surface-2 text-ink-soft";
 
-  // 펼쳤을 때 «요약 줄에 없던 것»만 모은다. 빈 값은 아예 넣지 않는다.
-  const moreRows: Array<[string, string]> = [];
-  if (phone) moreRows.push(["전화번호", phone]);
-  if (memo && memo !== product) moreRows.push(["메모", memo]);
+  // 특이사항 = 대상상품 + 메모. 같은 말이면 한 번만.
+  const detail = [product, memo && memo !== product ? memo : ""].filter(Boolean).join(" · ");
 
   return (
-    <article
+    <div
       key={taskKey(task, index)}
-      className="relative overflow-hidden rounded-xl border border-line bg-surface shadow-sm"
+      className={`relative grid grid-cols-[76px_120px_88px_124px_112px_1fr_auto] items-center gap-x-3 gap-y-1 border-b border-line px-3 py-2.5 transition hover:bg-surface-2 ${done ? "opacity-60" : ""}`}
     >
       <span className={`absolute left-0 top-0 h-full w-1 ${done ? "bg-[var(--color-ok-tx)]" : "bg-[var(--color-danger-tx)]"}`} />
 
-      <div className="flex items-start gap-3 py-3 pl-4 pr-3">
-        {/* 왼쪽 — 누가 · 무엇을 (카드 아무 데나 눌러 펼친다) */}
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="min-w-0 flex-1 text-left"
-          title={expanded ? "접기" : "자세히 보기"}
-        >
-          <div className="flex flex-wrap items-center gap-1.5">
-            {issueTypes.map((type) => (
-              <span key={type} className={`rounded px-2 py-0.5 text-[11px] font-black ${typeTone(type)}`}>
-                {getIssueTypeLabel(type)}
-              </span>
-            ))}
-            {done ? (
-              <span className="rounded bg-surface-3 px-2 py-0.5 text-[11px] font-black text-ink-soft">
-                {CUSTOMER_TERMS.issueResolved}
-              </span>
-            ) : null}
-            {getPriorityLabel(task.priority) !== "보통" ? (
-              <span className="rounded bg-surface-2 px-2 py-0.5 text-[11px] font-black text-ink-soft">
-                {getPriorityLabel(task.priority)}
-              </span>
-            ) : null}
-          </div>
-
-          <div className="mt-1.5 truncate text-[14px] font-black text-ink">
-            {nickname}
-            {name && name !== nickname ? <span className="ml-1.5 text-[12px] font-bold text-ink-mute">{name}</span> : null}
-          </div>
-
-          <div className="mt-0.5 truncate text-[12px] font-bold text-ink-soft">
-            {product || memo || "내용 없음"}
-          </div>
-
-          <div className="mt-0.5 truncate text-[11px] font-bold text-ink-mute">
-            {dateLabel(task.created_at)}
-            {orderNo ? ` · ${orderNo}` : ""}
-            <span className="ml-1.5 text-ink-mute">{expanded ? "▲ 접기" : "▼ 자세히"}</span>
-          </div>
-        </button>
-
-        {/* 오른쪽 — 할 일은 하나. 「해결완료」가 주버튼이고 「수정」은 옆에 작게. */}
-        <div className="flex shrink-0 items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => onEdit(task)}
-            className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft transition hover:bg-surface-2"
-          >
-            수정
-          </button>
-
-          {done ? (
-            <button
-              type="button"
-              onClick={() => onHide(task)}
-              disabled={busy}
-              className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-danger-tx transition hover:bg-danger-bg disabled:opacity-45"
-              title="DB 완전삭제가 아니라 해결목록 숨김 처리"
-            >
-              {busy ? "처리중…" : "목록삭제"}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => onResolve(task)}
-              disabled={busy}
-              className="rounded-lg bg-ok-tx px-3 py-1.5 text-[11px] font-black text-white transition hover:opacity-90 disabled:opacity-45"
-            >
-              {busy ? "처리중…" : "해결완료"}
-            </button>
-          )}
-        </div>
+      {/* 유형 */}
+      <div className="flex flex-wrap gap-1">
+        {issueTypes.map((type) => (
+          <span key={type} className={`rounded px-1.5 py-0.5 text-[11px] font-black ${typeTone(type)}`}>
+            {getIssueTypeLabel(type)}
+          </span>
+        ))}
+        {priority !== "보통" ? (
+          <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[11px] font-black text-ink-soft">{priority}</span>
+        ) : null}
       </div>
 
-      {/* 펼침 — 요약에 «없던 것»만. 같은 내용을 두 번 보여주지 않는다. */}
-      {expanded ? (
-        <div className="border-t border-line bg-surface-2 px-4 py-3">
-          {moreRows.length > 0 ? (
-            <div className="grid gap-1.5">
-              {moreRows.map(([label, value]) => (
-                <div key={label} className="grid grid-cols-[58px_1fr] gap-2">
-                  <div className="text-[11px] font-black text-ink-mute">{label}</div>
-                  <div className="min-w-0 break-words text-[12px] font-bold leading-5 text-ink">{value}</div>
-                </div>
-              ))}
-            </div>
-          ) : null}
+      {/* 닉네임 */}
+      <div className="truncate text-[13px] font-black text-ink" title={nickname}>{nickname}</div>
 
-          <details className="mt-2">
-            <summary className="cursor-pointer text-[11px] font-black text-ink-mute">등록 원문 보기</summary>
-            <div className="mt-1.5 whitespace-pre-wrap break-words text-[12px] font-bold leading-5 text-ink-soft">{fullText}</div>
-          </details>
-        </div>
-      ) : null}
-    </article>
+      {/* 이름 */}
+      <div className="truncate text-[12px] font-bold text-ink-soft" title={name}>{name}</div>
+
+      {/* 전화번호 — 눌러서 바로 복사 */}
+      <div className="truncate text-[12px] font-bold text-ink-soft" title={phone}>
+        {phone ? (
+          <button
+            type="button"
+            onClick={() => { void navigator.clipboard?.writeText(phone).then(() => showAdminToast("전화번호를 복사했어요.", "success")).catch(() => {}); }}
+            className="truncate hover:text-rose-deep hover:underline"
+            title="눌러서 복사"
+          >
+            {phone}
+          </button>
+        ) : (
+          <span className="text-ink-mute">번호 없음</span>
+        )}
+      </div>
+
+      {/* 년월일 */}
+      <div className="text-[12px] font-bold text-ink-soft">{dateLabel(task.created_at)}</div>
+
+      {/* 특이사항 — 넓은 칸. 길면 두 줄까지, 전체는 마우스 올리면 보인다 */}
+      <div
+        className="line-clamp-2 break-words text-[12px] font-bold leading-5 text-ink"
+        title={[detail, orderNo ? `주문번호 ${orderNo}` : ""].filter(Boolean).join("\n")}
+      >
+        {detail || "내용 없음"}
+        {orderNo ? <span className="ml-1.5 text-[11px] font-bold text-ink-mute">{orderNo}</span> : null}
+      </div>
+
+      {/* 처리 */}
+      <div className="flex shrink-0 items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => onEdit(task)}
+          className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft transition hover:bg-surface-2"
+        >
+          수정
+        </button>
+        {done ? (
+          <button
+            type="button"
+            onClick={() => onHide(task)}
+            disabled={busy}
+            className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-danger-tx transition hover:bg-danger-bg disabled:opacity-45"
+            title="DB 완전삭제가 아니라 해결목록 숨김 처리"
+          >
+            {busy ? "처리중…" : "목록삭제"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onResolve(task)}
+            disabled={busy}
+            className="rounded-lg bg-ok-tx px-3 py-1.5 text-[11px] font-black text-white transition hover:opacity-90 disabled:opacity-45"
+          >
+            {busy ? "처리중…" : "해결완료"}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -492,7 +477,9 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   const [newIssueForm, setNewIssueForm] = useState<IssueForm>(() => emptyIssueForm());
   const [customerSearchDraft, setCustomerSearchDraft] = useState("");
   const [customerSearchKeyword, setCustomerSearchKeyword] = useState("");
-  const issuePageSize = 3;
+  // [2026-09-21] 3 → 20. 카드가 세로로 길던 시절엔 3개도 화면을 다 먹었지만
+  //   이제 한 줄짜리 표라 미해결 10건이 «한 페이지»에 다 들어간다(페이지 넘길 일이 없어진다).
+  const issuePageSize = 20;
   const [issuePage, setIssuePage] = useState(1);
   const [editingIssueTask, setEditingIssueTask] = useState<AdminIssueTask | null>(null);
   const [editingIssueMemo, setEditingIssueMemo] = useState("");
@@ -850,17 +837,29 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
         ))}
       </div>
 
-      <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+      {/* [2026-09-21] 표 머리글 — 어느 칸이 무엇인지 한 번만 적어두면 줄마다 「닉네임:」 같은 라벨이 필요 없다.
+          예전 카드가 길었던 이유의 절반이 줄마다 반복되던 라벨이었다. */}
+      <div className="mt-4 min-h-0 flex-1 overflow-y-auto overflow-x-auto rounded-xl border border-line">
         {loading ? (
-          <div className="rounded-2xl bg-surface-2 p-6 text-center text-sm font-black text-ink-mute">
+          <div className="bg-surface-2 p-6 text-center text-sm font-black text-ink-mute">
             고객이슈 불러오는 중...
           </div>
         ) : visibleTasks.length === 0 ? (
-          <div className="rounded-2xl bg-surface-2 p-6 text-center text-sm font-black text-ink-mute">
+          <div className="bg-surface-2 p-6 text-center text-sm font-black text-ink-mute">
             표시할 고객이슈가 없습니다.
           </div>
         ) : (
-          pageTasks.map((task, index) => (
+          <div className="min-w-[860px]">
+            <div className="sticky top-0 z-10 grid grid-cols-[76px_120px_88px_124px_112px_1fr_auto] items-center gap-x-3 border-b border-line bg-surface-2 px-3 py-2 text-[11px] font-black text-ink-mute">
+              <div>유형</div>
+              <div>닉네임</div>
+              <div>이름</div>
+              <div>전화번호</div>
+              <div>등록일</div>
+              <div>특이사항 · 주문번호</div>
+              <div className="text-right">처리</div>
+            </div>
+            {pageTasks.map((task, index) => (
             <IssueCard
               key={taskKey(task, index)}
               task={task}
@@ -870,7 +869,8 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               onHide={hideResolvedIssueTask}
               busy={saving}
             />
-          ))
+          ))}
+          </div>
         )}
       </div>
 
@@ -881,7 +881,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="h-9 rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft">
-            3개씩 보기
+            {issuePageSize}개씩 보기
           </div>
 
           <button
