@@ -4,7 +4,7 @@
 // 목적: 실시간 관리자 고객관리 화면
 // 주의: 1차는 조회/화면 구성 전용. 고객 차단 저장, 메모 저장, 주문/입금/배송/정산 로직 없음.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NOTE_PRESETS } from "@/lib/customerNotePresets";
 import { BULK_POINT_MAX_MESSAGE, BULK_POINT_MAX_PER_PERSON, useBulkPointGrant, type BulkGrantResult } from "./useBulkPointGrant";
 
@@ -31,6 +31,15 @@ type Props = {
   onClose?: () => void;
   // [2026-09-08] loyalty(단골 리포트)도 바깥에서 바로 열 수 있게(예전엔 타입에 빠져 있었음)
   initialTab?: "members" | "issues" | "loyalty";
+  /** [2026-09-21] «탭을 열어달라»는 요청 시각(Date.now()).
+   *   initialTab 만으로는 못 연다 — useState 는 «처음 한 번»만 초깃값을 읽기 때문에
+   *   이미 떠 있는 화면에서 prop 이 바뀌어도 탭이 안 바뀌었다(사장님: 「전체 보기 눌러도 반응 없음」).
+   *   값이 «매번 달라지는» 시각을 같이 보내 요청 때마다 확실히 전환한다.
+   *   (탭 이름만 비교하면 같은 탭을 두 번째로 요청할 때 또 안 먹는 함정이 생긴다) */
+  openTabAt?: number;
+  /** [2026-09-21] 「고객이슈」 탭 배지에 쓸 미해결 건수.
+   *   위쪽 알림 띠가 이미 admin_tasks 를 읽으므로 그 값을 받아 쓴다(조회를 두 번 하지 않는다). */
+  openIssueCount?: number;
   /** [2026-09-08 5단계] 페이지 안에 그대로(고객 메뉴). 팝업 껍데기·✕ 없음 */
   embedded?: boolean;
 };
@@ -961,9 +970,20 @@ function CustomerDetailDrawer({
 //   방송 중에 타이핑할 시간이 없다. 눌러서 넣고 필요하면 고쳐 쓴다.
 //   ⚠️ 문구만이다. 누르는 순간 나가지 않는다 — 입력창에 채워질 뿐이고 [보내기]를 눌러야 발송된다.
 
-export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = "members", embedded = false }: Props) {
+export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = "members", openTabAt = 0, openIssueCount = 0, embedded = false }: Props) {
   // [2026-09-09] «계정 연결 요청» 탭 추가 — 손님이 카톡을 바꿔 회원이 갈라졌을 때 들어오는 요청함
   const [custTab, setCustTab] = useState<"members" | "issues" | "loyalty" | "link">(initialTab);
+  // [2026-09-21] 바깥(고객이슈 알림 띠 등)에서 탭 열기 요청이 오면 실제로 전환하고 그 자리로 스크롤한다.
+  const tabBarRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!openTabAt) return;
+    setCustTab(initialTab);
+    // 탭이 그려진 뒤에 스크롤 — 안 그러면 옛 위치로 간다
+    const timer = window.setTimeout(() => {
+      tabBarRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+    return () => window.clearTimeout(timer);
+  }, [openTabAt, initialTab]);
   // [2026-09-11] «계정 잇기» 대기 건수 배지 — 자동 감지가 올린 줄을 사장님이 놓치지 않게 (건수만 1번 조회)
   const [linkPendingCount, setLinkPendingCount] = useState(0);
   useEffect(() => {
@@ -1604,54 +1624,79 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
           </div>
         )}
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-5 space-y-4">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-rose-soft/40 px-4 py-2.5 text-[12px] font-black text-ink-soft">
-            <span>전체 <span className="text-ink">{customers.length.toLocaleString("ko-KR")}</span></span>
-            <span className="text-ink-mute">·</span>
-            <span>정상 <span className="text-ok-tx">{normalCustomers.length.toLocaleString("ko-KR")}</span></span>
-            <span className="text-ink-mute">·</span>
-            <button
-              type="button"
-              onClick={() => {
-                setBlockedCustomerKeywordDraft("");
-                setBlockedCustomerKeyword("");
-                setBlockedCustomerPage(1);
-                setShowBlockedCustomers(true);
-              }}
-              className="hover:underline"
-            >
-              차단 <span className="text-danger-tx">{blockedTotalCount.toLocaleString("ko-KR")}</span>
-            </button>
-            <span className="text-ink-mute">·</span>
-            <span>관리필요 <span className="text-warn-tx">{attentionCustomers.length.toLocaleString("ko-KR")}</span></span>
+          {/* [2026-09-21 사장님] 「고객 메뉴 레이아웃이 너무 별로」 — 순서를 바로잡았다.
+              예전: 통계요약 → ⛔전화번호 차단 → 탭바 → 내용
+                회원 목록 보러 들어왔는데 «빨간 차단 상자»가 탭보다 먼저 눈에 들어왔다.
+              지금: 탭바 → (회원 목록 탭일 때만) 통계요약 + ⛔차단 → 목록
+                무엇을 보는 화면인지가 맨 위에서 먼저 정해진다. */}
+          {/* ── 1층: 탭 (무엇을 보는 화면인지 먼저) ── */}
+          <div ref={tabBarRef} className="flex flex-wrap gap-2 border-b border-rose-line">
+            {([
+              ["members", "회원 목록", 0],
+              ["issues", "고객이슈", openIssueCount],
+              ["loyalty", "단골 리포트", 0],
+              ["link", "계정 잇기", linkPendingCount],
+            ] as const).map(([key, label, badge]) => {
+              const on = custTab === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setCustTab(key)}
+                  className={`rounded-t-lg px-4 py-2 text-sm font-black transition ${on ? "bg-rose-deep text-white" : "text-ink-soft hover:bg-rose-soft hover:text-rose-deep"}`}
+                >
+                  {label}
+                  {badge > 0 ? (
+                    <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-black ${on ? "bg-white text-rose-deep" : "bg-warn-bg text-warn-tx"}`}>{badge}</span>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
 
-      <div className="rounded-xl border border-danger-tx bg-danger-bg/50">
-        <button
-          type="button"
-          onClick={() => setPhoneBlockOpen((v) => !v)}
-          className="flex w-full items-center justify-between px-4 py-2.5 text-[12px] font-black text-danger-tx"
-        >
-          <span>⛔ 전화번호 직접 차단</span>
-          <span className="text-base leading-none">{phoneBlockOpen ? "−" : "+"}</span>
-        </button>
-        {phoneBlockOpen ? (
-          <div className="px-2 pb-2">
-            <AdminLivePhoneBlockPanel onSaved={applyBlockResult} />
-          </div>
-        ) : null}
-      </div>
+          {/* ── 2층: 회원 목록 탭에서만 보이는 «회원 전체» 요약과 차단 도구 ──
+              다른 탭(고객이슈·단골·계정잇기)에서는 상관없는 정보라 감춘다. */}
+          {custTab === "members" ? (
+            <>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-rose-soft/40 px-4 py-2.5 text-[12px] font-black text-ink-soft">
+                <span>전체 <span className="text-ink">{customers.length.toLocaleString("ko-KR")}</span></span>
+                <span className="text-ink-mute">·</span>
+                <span>정상 <span className="text-ok-tx">{normalCustomers.length.toLocaleString("ko-KR")}</span></span>
+                <span className="text-ink-mute">·</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBlockedCustomerKeywordDraft("");
+                    setBlockedCustomerKeyword("");
+                    setBlockedCustomerPage(1);
+                    setShowBlockedCustomers(true);
+                  }}
+                  className="hover:underline"
+                >
+                  차단 <span className="text-danger-tx">{blockedTotalCount.toLocaleString("ko-KR")}</span>
+                </button>
+                <span className="text-ink-mute">·</span>
+                <span>관리필요 <span className="text-warn-tx">{attentionCustomers.length.toLocaleString("ko-KR")}</span></span>
+              </div>
 
-      <div className="flex gap-2 border-b border-rose-line">
-        <button type="button" onClick={() => setCustTab("members")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "members" ? "bg-rose-deep text-white" : "text-ink-soft hover:text-rose-deep"}`}>회원 목록</button>
-        <button type="button" onClick={() => setCustTab("issues")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "issues" ? "bg-rose-deep text-white" : "text-ink-soft hover:text-rose-deep"}`}>고객이슈</button>
-        <button type="button" onClick={() => setCustTab("loyalty")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "loyalty" ? "bg-rose-deep text-white" : "text-ink-soft hover:text-rose-deep"}`}>단골 리포트</button>
-        <button type="button" onClick={() => setCustTab("link")} className={`px-4 py-2 text-sm font-black rounded-t-lg ${custTab === "link" ? "bg-rose-deep text-white" : "text-ink-soft hover:text-rose-deep"}`}>
-          계정 잇기
-          {linkPendingCount > 0 ? (
-            <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-black ${custTab === "link" ? "bg-white text-rose-deep" : "bg-warn-bg text-warn-tx"}`}>{linkPendingCount}</span>
+              {/* 접힌 상태가 기본 — 평소엔 한 줄이라 목록을 안 가린다 */}
+              <div className="rounded-xl border border-line bg-surface">
+                <button
+                  type="button"
+                  onClick={() => setPhoneBlockOpen((v) => !v)}
+                  className="flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-[12px] font-black text-ink-soft transition hover:bg-surface-2"
+                >
+                  <span>⛔ 전화번호 직접 차단</span>
+                  <span className="text-base leading-none">{phoneBlockOpen ? "−" : "+"}</span>
+                </button>
+                {phoneBlockOpen ? (
+                  <div className="px-2 pb-2">
+                    <AdminLivePhoneBlockPanel onSaved={applyBlockResult} />
+                  </div>
+                ) : null}
+              </div>
+            </>
           ) : null}
-        </button>
-      </div>
 
       {custTab === "link" ? <AdminLiveLinkRequestsPanel /> : null}
 

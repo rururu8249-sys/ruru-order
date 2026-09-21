@@ -785,13 +785,22 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
   return (
     <aside className="flex flex-col">
-        <div className="mb-3 flex items-center justify-end gap-2">
+        {/* [2026-09-21 사장님] 「고객 이슈 내용 등록 등…」
+            예전엔 오른쪽 끝에 「+ 메모」 두 글자만 떠 있어, 이게 «새 고객이슈를 적는 곳»인지 알 수 없었다.
+            (누르면 열리는 창 제목은 「고객이슈 메모 추가」다 — 버튼 이름이 창 이름과 달랐다)
+            → 왼쪽에 이 화면이 뭘 하는 곳인지 한 줄, 버튼 이름도 창과 같게 맞춘다. */}
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <div className="min-w-0">
+            <div className="text-[13px] font-black text-ink">📮 고객이슈</div>
+            <div className="text-[12px] font-bold text-ink-mute">반품·교환·문의를 적어두고 처리되면 해결완료로 넘깁니다</div>
+          </div>
+
           <button
             type="button"
             onClick={() => setShowMemoAdd(true)}
-            className="h-9 rounded-xl bg-rose-deep px-3 text-[12px] font-black text-white hover:opacity-90"
+            className="ml-auto h-9 rounded-xl bg-rose-deep px-3 text-[12px] font-black text-white transition hover:opacity-90"
           >
-            + 메모
+            + 고객이슈 등록
           </button>
 
           <button

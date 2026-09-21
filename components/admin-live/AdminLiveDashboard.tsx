@@ -547,6 +547,11 @@ async function saveLiveBroadcastEndReport({
 export default function AdminLiveDashboard() {
   const [activeMenu, setActiveMenu] = useState<AdminLiveMenuKey>(() => readMenuFromUrl());
   const [customersInitialTab, setCustomersInitialTab] = useState<"members" | "issues">("members");
+  // [2026-09-21] 「바로 처리 →」 를 누른 «시각». 탭 이름만 넘기면 두 번째 클릭부터 안 먹는다
+  //   (같은 값이라 화면이 바뀐 걸 모른다). 시각은 누를 때마다 달라지므로 매번 확실히 열린다.
+  const [customersOpenTabAt, setCustomersOpenTabAt] = useState(0);
+  // 고객이슈 미해결 건수 — 위 알림 띠가 읽은 값을 탭 배지에도 그대로 쓴다(조회 1번).
+  const [openIssueCount, setOpenIssueCount] = useState(0);
   // [2026-09-08 5단계] 오른쪽 방송 레일 열림 — null 이면 "방송 중이면 열림, 아니면 접힘"(자동), 손잡이를 누르면 고정
   // [2026-09-08 사장님 지적] 「새로고침할 때마다 방송화면·채팅창이 자꾸 저절로 뜬다」
   //   원인: 열림 여부를 기억하지 않고 «방송 중이면 무조건 열림»으로 짰다(railOpenChoice ?? 방송중).
@@ -1707,13 +1712,27 @@ export default function AdminLiveDashboard() {
 
               {/* ── 고객 › 회원·이슈·단골 ── */}
               {activeMenu === "customers" ? (
-                <div className="flex flex-col gap-3 p-4">
-                  {/* [2026-09-08] 방송 콘솔에 있던 「고객이슈」 요약 — 사람에 관한 건 고객 메뉴로 */}
+                <div className="flex h-full flex-col gap-3 p-4">
+                  {/* [2026-09-08] 방송 콘솔에 있던 「고객이슈」 요약 — 사람에 관한 건 고객 메뉴로
+                      [2026-09-21 사장님] 「맨 위에 떠서 레이아웃이 이상함」 — 세로로 길던 레일을
+                        «한 줄 띠»로 바꿨다. 미해결 0건이면 띠 자체가 안 뜬다.
+                        자세한 내용은 아래 「고객이슈」 탭에서 본다(같은 내용을 두 번 안 보여준다). */}
                   <div className="shrink-0">
-                    <LiveIssueRailPanel onOpenAll={() => setCustomersInitialTab("issues")} />
+                    <LiveIssueRailPanel
+                      variant="banner"
+                      onCountChange={setOpenIssueCount}
+                      onOpenAll={() => { setCustomersInitialTab("issues"); setCustomersOpenTabAt(Date.now()); }}
+                    />
                   </div>
-                  <div className="min-w-0">
-                    <AdminLiveCustomersPanel embedded orders={orders} initialTab={customersInitialTab} onClose={() => setCustomersInitialTab("members")} />
+                  <div className="min-h-0 min-w-0 flex-1">
+                    <AdminLiveCustomersPanel
+                      embedded
+                      orders={orders}
+                      initialTab={customersInitialTab}
+                      openTabAt={customersOpenTabAt}
+                      openIssueCount={openIssueCount}
+                      onClose={() => setCustomersInitialTab("members")}
+                    />
                   </div>
                 </div>
               ) : null}
