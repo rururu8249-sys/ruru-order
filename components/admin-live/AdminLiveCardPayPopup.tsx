@@ -13,7 +13,10 @@ import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 // [2026-09-08] 페이스터 주소는 설정 › 상점 정보에서 온다(하드코딩 제거)
 import { getShopInfoNow, useShopInfo } from "@/lib/useShopInfo";
 // [2026-09-08] 복사 카드를 «항상 맨 위에 뜨는 작은 창»으로 빼내기 (사유·실측근거는 그 파일 상단)
-import { usePipWindow, copyTextIn } from "@/lib/usePipWindow";
+import { copyTextIn } from "@/lib/usePipWindow";
+// [2026-09-22 B안] 복사창 = 우리 사이트의 «이름 붙은 팝업 창» (사유·규칙은 그 파일 상단)
+import { useCopyWindow, grabCopyWindow, currentCardPaySlots } from "@/lib/useCopyWindow";
+import { popupFeatures, type WindowRect } from "@/lib/cardPayWindowSlots";
 
 // ═══ 페이스터를 «어떻게» 열 것인가 — 2026-09-08 확정. 다시 뒤집지 말 것 ═══
 //
@@ -51,43 +54,36 @@ import { usePipWindow, copyTextIn } from "@/lib/usePipWindow";
 //   (관리자 탭이 다른 주소로 넘어감) 정도다. 페이스터는 사장님이 실제 결제에 쓰는 도구이고,
 //   방송 중 창이 쌓이거나 로그인이 풀리는 쪽이 훨씬 큰 사고라 이쪽을 택한다.
 
-// ═══ [2026-09-22] 다시 «한 화면» — 크롬 «분할 보기(Split View)» 기준 (팝업·PiP 폐기) ═══
+// ═══ [2026-09-22 B안] «창 두 개가 나란히 자동으로» — 복사창(우리 팝업) + 페이스터(팝업) ═══
 //
 //   사장님: 「자꾸 따로따로 창이 뜨고 또 복사창을 고정하게 눌러야 하고 너무 복잡… 한창에 화면 나눠서」
+//     → A안(크롬 분할 보기 = 페이스터를 탭으로)을 먼저 배포했으나, 오른쪽 칸이 하루 종일 자리를 차지하고
+//       아침마다 크롬 메뉴를 눌러야 해서 「편한 거 같으면서 귀찮은」 → 사장님 결정으로 B안 교체.
 //
 //   원인 확정(2026-09-22, 추정 아님): 페이스터 서버가 X-Frame-Options: SAMEORIGIN 과
 //   CSP frame-ancestors 'self' 를 붙이기 시작해 iframe 이 «깨진 페이지»가 됐다(6월엔 없던 헤더).
-//   우리가 무력화하지 않는다. 대신 크롬 145+(2026-02)의 «분할 보기»를 쓴다 —
-//   크롬이 탭 2개를 한 창에 좌우로 그리는 기능이라 프레임 차단과 무관하다.
+//   우리가 무력화하지 않는다.
 //
-//   그래서 이렇게 바꾼다:
-//   · 페이스터는 «팝업 창»이 아니라 «이름 붙은 탭»으로 연다(window.open 에 창 옵션을 안 준다).
-//     이름(PAYSTER_WINDOW_NAME)·opener 규칙은 그대로 → 같은 탭을 하루 종일 재사용, 로그인 유지.
-//   · 복사창은 PiP(항상 위 창) 없이 «관리자 탭 안 모달»로만 그린다 — 예전 6월 모양.
-//     페이스터가 팝업이 아니니 «위에 떠야 할» 이유가 없고, 그래서
-//     클릭 권한 순서(복사창→페이스터)·📌 비상 버튼·창 위치/두께 계산·«최소화하면 못 살림» 이 전부 사라진다.
-//   · 사장님이 하루 한 번 페이스터 탭을 창 오른쪽 가장자리로 «끌어다 놓으면» 분할된다.
-//     (웹페이지는 분할을 못 시킨다 — 확장프로그램 API 뿐. 그래서 이 1회만 남는다)
-//     분할 전엔 페이스터 탭이 이 화면을 가리므로, 가려졌던 걸 visibilitychange 로 읽어 안내 띠를 띄운다.
-//   ⚠ lib/usePipWindow.ts 는 남겨둔다(사장님 결정: 실기기 확인 뒤 다음 작업에서 정리). 여기선 안 연다.
+//   B안 규칙:
+//   · 복사창 = 우리 사이트 «이름 붙은 팝업 창»(lib/useCopyWindow.ts, 490 폭). 페이스터 = «이름 붙은 팝업 창»(490 폭).
+//     두 창을 «겹치지 않게» 나란히 둔다(lib/cardPayWindowSlots.ts). 겹치지 않으니 복사창을 눌러도
+//     페이스터가 뒤로 안 밀린다 → 「항상 위(PiP)」·📌 고정이 필요 없다.
+//   · 결제 안 할 땐 두 창이 관리자 창 뒤로 들어간다(화면을 안 잡아먹음). 카드결제를 누르면 앞으로 나온다.
+//   · 브라우저 규칙 «클릭 한 번에 새 창 하나» 때문에 여는 순서가 있다 — openPaysterRightHalf() 참고.
+//   · 페이지 «모달»은 복사창을 «못 열었을 때»(그날 첫 결제: 클릭 권한을 페이스터에 씀)의 비상구.
+//     그때 모달의 「복사창 열기 ↗」가 자기 클릭 권한으로 복사창을 연다(하루 1회).
+//   ⚠ lib/usePipWindow.ts 는 copyTextIn 만 쓴다. PiP 는 안 연다.
 
 // 박스 치수 — «한 곳»에서만 정한다. 화면(JSX)과 창 위치 계산이 어긋나면 안 되기 때문.
 const BOX_W = 980;          // 가로 px (왼쪽 복사창 490 + 오른쪽 페이스터 490)
 const BOX_H_MAX = 1500;     // 세로 상한 px (예전과 동일)
 const BOX_V_GAP = 16;       // 위아래 8px씩 (예전과 동일)
-// [2026-09-22] 창 위치 계산용 BOX_W_RATIO·HALF_CSS 는 페이스터가 «탭»이 되면서 필요 없어져 삭제.
-//   모달 폭은 BOX_W/2 = 490px(예전 왼쪽 칸과 같은 px), 좁은 화면에서만 96vw.
+// [2026-09-22 B안] 두 «창»의 자리 계산은 lib/cardPayWindowSlots.ts 로 옮겼다(모니터 기준, 테스트 있음).
+//   여기 값은 «페이지 모달»(비상구) 크기에만 쓴다: 폭 BOX_W/2 = 490px, 좁은 화면에서만 48vw.
 
 /** 페이스터 창 이름 — «고정». 이 이름 덕분에 누를 때마다 같은 창을 다시 쓴다.
  *  이름을 빼거나 "_blank" 로 바꾸면 창이 매번 새로 생기고 로그인이 풀린다. 바꾸지 말 것. */
 const PAYSTER_WINDOW_NAME = "ruru_payster";
-
-/** [2026-09-22] 페이스터 탭을 «마지막으로 연/이동시킨» 시각.
- *  이 직후에 관리자 탭이 «가려지면»(visibilitychange → hidden) 아직 분할 보기를 안 한 것이다 → 안내 띠. */
-let lastPaysterOpenAt = 0;
-export function paysterLastOpenedAt() {
-  return lastPaysterOpenAt;
-}
 
 let paysterWin: Window | null = null;
 
@@ -100,33 +96,33 @@ function paysterAlive() {
   }
 }
 
-/** 페이스터 «탭»을 잡는다 — 없으면 새 탭(관리자 탭 바로 옆), 있으면 그 탭 그대로.
- *  [2026-09-22] 창 옵션(popup=yes,left,top,…)을 «주지 않는다» → 팝업 창이 아니라 «탭»이 된다.
- *    탭이라야 크롬 «분할 보기»로 관리자 탭 옆에 붙일 수 있다. 창 옵션을 다시 넣지 말 것.
- *  ⚠ 이름(PAYSTER_WINDOW_NAME)은 그대로. 빼면 탭이 매번 새로 생겨 로그인이 풀린다. */
-function grabPaysterWindow() {
+/** 페이스터 «창»을 잡는다 — 없으면 이 자리(복사창 바로 오른쪽)에 새로 만들고, 있으면 참조+focus.
+ *  · «주소 없이» 참조하면 이동이 없고, 이미 있는 창이면 클릭 «열 권한»도 안 닳는다(2026-09-08 실측 ③)
+ *  · 없으면 새 창이 생기며 권한을 쓴다. 이 클릭에서 권한을 이미 썼으면(복사창) 차단되어 null
+ *  · [2026-09-22 B안] 위치·크기는 lib/cardPayWindowSlots.ts 의 «오른쪽 자리». 창은 «만들 때»만 자리를 잡는다
+ *  ⚠ 이름(PAYSTER_WINDOW_NAME)은 그대로. 빼면 창이 매번 새로 생겨 로그인이 풀린다. */
+function grabPaysterWindow(r: WindowRect) {
   let win: Window | null = null;
   try {
-    win = window.open("", PAYSTER_WINDOW_NAME);
+    win = window.open("", PAYSTER_WINDOW_NAME, popupFeatures(r));
   } catch {
     win = null;
   }
-  if (!win) return null; // 팝업 차단 — 복사창의 「페이스터 탭 다시 열기 ↗」로 복구된다
+  if (!win) return null; // 팝업 차단 — 「페이스터 창 다시 열기 ↗」로 복구된다
   paysterWin = win;
-  lastPaysterOpenAt = Date.now();
   try {
-    win.focus();
+    win.focus(); // 뒤로 숨어 있던 창을 앞으로 (⚠ «최소화»된 창은 웹이 되살릴 방법이 없다)
   } catch {
     /* 포커스는 보조 동작 */
   }
   return win;
 }
 
-function openPaysterAt(url: string) {
-  const win = grabPaysterWindow();
+function openPaysterAt(url: string, r: WindowRect) {
+  const win = grabPaysterWindow(r);
   if (!win) return;
   try {
-    win.location.href = url; // 새 탭이면 페이스터 로드, 기존 탭이면 결제 폼으로 되돌린다
+    win.location.href = url; // 새 창이면 페이스터 로드, 기존 창이면 결제 폼으로 되돌린다
   } catch {
     /* 이동 실패해도 창은 이미 앞에 있다 */
   }
@@ -140,15 +136,37 @@ function openPaysterAt(url: string) {
 export function openPayster(url: string) {
   if (typeof window === "undefined") return;
   //   ⚠ 반드시 «클릭 제스처 안에서» 불러야 팝업차단에 안 걸린다.
-  //   ⚠ 같은 이름의 탭이 이미 있으면 «그 탭»이 이 주소로 이동한다(새 탭 안 생김 → 로그인 유지).
-  openPaysterAt(url);
+  //   ⚠ 같은 이름의 창이 이미 있으면 «그 창»이 이 주소로 이동한다(새 창 안 생김 → 로그인 유지).
+  openPaysterAt(url, currentCardPaySlots().payster);
 }
 
-/** 카드결제 버튼에서 호출 — 페이스터 탭을 결제 폼으로 보낸다(없으면 새 탭).
- *  [2026-09-22] 복사창(PiP)은 더 이상 안 연다. 복사 패널은 이 탭 안 모달로 뜬다(파일 상단 참고).
- *  ⚠ 주문표(LiveOrderTable)의 클릭 «안에서» 불려야 팝업차단에 안 걸린다. */
+/** 카드결제 버튼에서 호출 — 복사창(왼쪽)과 페이스터 창(오른쪽)을 «나란히» 띄운다.
+ *  ⚠ 주문표(LiveOrderTable)의 클릭 «안에서» 불려야 한다. await 없이 전부 «동기적으로» 부른다.
+ *
+ *  [2026-09-22 B안] 여는 순서 — 브라우저는 클릭 한 번에 «새 창 하나»만 허락한다:
+ *    ① 페이스터를 «주소 없이» 잡는다 — 있으면 참조+focus(권한 안 씀, 실측 ③), 없으면 새 창(권한 사용)
+ *    ② 복사창을 잡는다        — 있으면 참조+focus, 없으면 새 창(①에서 권한이 남았을 때만 열린다)
+ *    ③ 페이스터를 결제 폼으로 이동 — location.href (2026-09-09부터 쓰던 순서, 실기기로 검증됨)
+ *  결과:
+ *    · 하루 중 대부분(페이스터 살아 있음): ①무료 ②복사창 열림 ③이동 → 두 창이 나란히 앞으로. 클릭 1번
+ *    · 그날 첫 결제(페이스터 없음): ①페이스터 새 창(로그인) ②차단(null) → 페이지 모달이 뜨고
+ *      모달의 「복사창 열기 ↗」(자기 클릭 권한)로 복사창을 연다. 하루 1회.
+ *      (크롬에서 이 사이트 팝업을 «허용»해 두면 ②도 같이 열려 첫 결제도 클릭 1번)
+ *    · 페이지 새로고침 직후: ①은 «있는 창» 참조라 무료 → 위 첫 줄과 같다
+ *  ⚠ 순서를 바꾸지 말 것: ③을 ②보다 먼저 하면(주소를 먼저 주면) 권한이 닳아 복사창이 막힌다(실측 ②). */
 export function openPaysterRightHalf() {
-  openPayster(getShopInfoNow().paysterUrl);
+  const url = getShopInfoNow().paysterUrl;
+  const slots = currentCardPaySlots();
+
+  const win = grabPaysterWindow(slots.payster); // ①
+  grabCopyWindow(slots.copy); // ②
+  if (win) {
+    try {
+      win.location.href = url; // ③
+    } catch {
+      /* 이동 실패해도 창은 이미 앞에 있다 */
+    }
+  }
 }
 
 type Props = {
@@ -175,8 +193,8 @@ function phoneDigits(order: LiveOrder) {
 
 export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusChange, activeBroadcastId }: Props) {
   const { paysterUrl } = useShopInfo();
-  // 「항상 맨 위에 뜨는 작은 창」 — 페이스터 창이 뒤로 밀리지 않게 복사 카드만 빼낸다
-  const pip = usePipWindow();
+  // [2026-09-22 B안] 복사창(우리 팝업 창). win 이 있으면 «그 창에» 그리고, 없으면 페이지 모달(비상구)
+  const copy = useCopyWindow();
   const [copiedKey, setCopiedKey] = useState("");
   const [saving, setSaving] = useState(false);
   // [2026-09-19 사장님] 「복사창이 항상 위라 '결제완료 처리할까요?' 창이 앞으로 안 나와서 몰랐음」
@@ -184,17 +202,6 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
   //   처리 실패 문구도 같은 이유로 복사창 안에 띄운다. 돈 처리(runComplete)는 그대로다.
   const [pipConfirmOpen, setPipConfirmOpen] = useState(false);
   const [pipCompleteError, setPipCompleteError] = useState("");
-  // [2026-09-22] 분할 보기 안내 — 페이스터 탭을 연 «직후»에 이 탭이 가려졌다면(=탭이 앞으로 튀어나옴)
-  //   아직 분할을 안 한 것이다. 돌아왔을 때 «끌어다 놓기» 안내 띠를 띄운다. 표시 전용.
-  const [splitHint, setSplitHint] = useState(false);
-  useEffect(() => {
-    const onVis = () => {
-      if (document.visibilityState !== "hidden") return;
-      if (Date.now() - paysterLastOpenedAt() < 3000) setSplitHint(true);
-    };
-    document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
-  }, []);
   // [2026-08-29] 카톡으로 결제링크 보낸 뒤, 유튜브 채팅에 자동 안내
   // [2026-08-29 사장님 요청] 페이스터는 남의 사이트라 자동 입력이 안 된다(브라우저 동일출처 정책).
   //   예전: 상품명·금액·닉네임·전화번호를 1→2→3→4 순서로 네 번 복사해야 했다.
@@ -275,7 +282,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
   //   작은 창(항상 위)에서 눌렀는데 관리자 창의 클립보드를 쓰면 «포커스 없음»으로 거부된다.
   //   sourceWindow 를 안 주면 예전과 똑같이 관리자 창에서 복사한다.
   const copyValue = async (key: string, value: string, sourceWindow?: Window | null) => {
-    const ok = await copyTextIn(sourceWindow || pip.pipWindow || window, value);
+    const ok = await copyTextIn(sourceWindow || copy.win || window, value);
     if (!ok) {
       showAdminToast("복사 실패 — 길게 눌러 직접 복사해주세요.", "warning");
       return;
@@ -315,11 +322,11 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
       void copyFieldValue(index);
     };
     // 📌 켜져 있으면 키 입력이 «그 창»으로 가므로 양쪽 다 듣는다
-    const targets: Window[] = pip.pipWindow ? [window, pip.pipWindow] : [window];
+    const targets: Window[] = copy.win ? [window, copy.win] : [window];
     targets.forEach((t) => t.addEventListener("keydown", onKey));
     return () => targets.forEach((t) => t.removeEventListener("keydown", onKey));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [order, pip.pipWindow]);
+  }, [order, copy.win]);
 
   // [2026-08-31 사장님 지시] 유튜브 채팅 자동 게시는 쿼터를 먹는다(봇 글 하루 상한 공유)
   //   → 안내문구를 복사만 해주고, 유튜브 채팅에는 사장님이 직접 붙여넣는다. (금액·전화번호는 공개 채팅이라 안 넣음)
@@ -369,7 +376,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
     }
 
     // 복사창 안에서는 «복사창 안 확인창»으로 (본창 확인창은 복사창 뒤에 숨어 안 보인다)
-    if (pip.pipWindow) {
+    if (copy.win) {
       setPipCompleteError("");
       setPipConfirmOpen(true);
       return;
@@ -452,21 +459,28 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-3 pt-5">
           {/* [2026-08-31 사장님 확인] 맨 위 큰 복사 버튼은 2번 칸과 같은 값이라 삭제 — 1·2·3 카드로 통일 */}
           <div className="mb-2 flex flex-wrap items-center gap-2 text-[12px] font-bold" style={{ color: "#5A6B92" }}>
-            <span>오른쪽 페이스터에 1 → 2 → 3 순서대로 붙여넣으세요 (숫자키 1~4) · 페이스터 탭은 <b>닫지 마세요</b>(로그인 유지)</span>
-            {/* [2026-09-08] 페이스터 탭을 실수로 닫았을 때 다시 여는 길. [2026-09-22] 창이 아니라 탭. */}
-            <button type="button" onClick={() => openPayster(paysterUrl)} className="ru-btn ru-btn-sm" title="페이스터 탭을 다시 엽니다(닫았을 때)">
-              페이스터 탭 다시 열기 ↗
+            <span>오른쪽 페이스터 창에 1 → 2 → 3 순서대로 붙여넣으세요 (숫자키 1~4) · 페이스터 창은 <b>닫지도, 최소화하지도 마세요</b>(로그인 유지)</span>
+            {/* [2026-09-08] 페이스터 창을 실수로 닫았을 때 다시 여는 길. 복사창 바로 오른쪽 자리에 뜬다. */}
+            <button type="button" onClick={() => openPayster(paysterUrl)} className="ru-btn ru-btn-sm" title="페이스터 창을 복사창 오른쪽에 다시 엽니다(닫았을 때)">
+              페이스터 창 다시 열기 ↗
             </button>
-            {/* [2026-09-09 사장님 지시] 📌 토글 삭제 → [2026-09-22] 📌 비상 버튼도 삭제. 복사창(PiP) 자체를 안 쓴다(파일 상단). */}
           </div>
-          {/* [2026-09-22] 분할 보기 안내 — 페이스터 탭이 이 화면을 «가렸을 때»만 보인다(하루 1회 끌어다 놓기). */}
-          {splitHint ? (
-            <div className="mb-3 flex items-start gap-2 rounded-xl px-3 py-2.5 text-[12px] font-bold leading-relaxed" style={{ background: "#EAF0FE", color: "#1E4FB8", border: "1px solid #BFD2F8" }}>
-              <span className="min-w-0 flex-1">
-                🪟 페이스터가 이 화면을 가렸어요. 맨 위 탭 줄에서 <b>payster 탭을 마우스 오른쪽 클릭 → 「현재 탭이 포함된 새 분할 보기」</b>를 누르면(하루 한 번) 왼쪽 복사창 · 오른쪽 페이스터가 한 창에 나란히 보입니다. payster 탭은 닫지 마세요(닫으면 로그인·분할이 풀림).
-              </span>
-              <button type="button" onClick={() => setSplitHint(false)} className="shrink-0 text-[12px] font-black" style={{ color: "#1E4FB8" }} title="안내 닫기">
-                ✕
+          {/* [2026-09-22 B안] 페이지 모달(비상구)일 때만 — 그날 첫 결제는 클릭 권한을 페이스터에 써서 복사창이 못 열린다.
+                이 버튼이 자기 클릭 권한으로 복사창을 열고, 이 모달은 사라진다(하루 1회). */}
+          {!copy.win ? (
+            <div className="mb-3 flex items-center gap-2 rounded-xl px-3 py-2.5 text-[12px] font-bold leading-relaxed" style={{ background: "#EAF0FE", color: "#1E4FB8", border: "1px solid #BFD2F8" }}>
+              <span className="min-w-0 flex-1">페이스터 로그인이 끝났으면 눌러주세요. 복사창이 페이스터 <b>바로 왼쪽</b>에 뜹니다 (오늘 한 번만).</span>
+              <button
+                type="button"
+                onClick={() => {
+                  // ⚠ 순서: 페이스터 focus(권한 안 씀) → 복사창 열기(권한 사용). 반대로 하면 focus 가 안 먹는다(2026-09-09 실측)
+                  grabPaysterWindow(currentCardPaySlots().payster);
+                  void copy.open();
+                }}
+                className="shrink-0 rounded-lg px-3 py-2 text-[12px] font-black text-white"
+                style={{ background: "#2B6BEB" }}
+              >
+                복사창 열기 ↗
               </button>
             </div>
           ) : null}
@@ -582,12 +596,12 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
   );
 
   // [2026-09-09 사장님 지적] 「복사창 X 누르면 왜 또 뒤에 뭐가 숨어있어?」
-  //   원인: 복사창이 닫히면 pip.pipWindow 가 null 이 되어 아래 «페이지 모달»이 그대로 드러났다.
+  //   원인: 복사창이 닫히면 copy.win 이 null 이 되어 아래 «페이지 모달»이 그대로 드러났다.
   //   → 복사창 ✕ = 이 주문 카드결제 «종료». 뒤에 아무것도 남기지 않는다.
   //   ⚠ 돈 처리(handleComplete)와는 무관하다. 화면을 닫을 뿐이다.
   const hadPipRef = useRef(false);
   useEffect(() => {
-    if (pip.pipWindow) {
+    if (copy.win) {
       hadPipRef.current = true;
       return;
     }
@@ -595,7 +609,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
       hadPipRef.current = false;
       onClose();
     }
-  }, [pip.pipWindow, onClose]);
+  }, [copy.win, onClose]);
 
   const imagePreview = imagePreviewUrl ? (
     <div onClick={() => setImagePreviewUrl("")} style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out" }}>
@@ -604,19 +618,15 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
     </div>
   ) : null;
 
-  // [2026-09-09] 복사창을 «여는 중»에는 아무것도 그리지 않는다.
-  //   예전엔 이 사이에 페이지 모달이 한 번 그려졌다가 복사창으로 바뀌어, 두 벌처럼 보였다.
-  if (pip.pending) return null;
-
   // 복사창이 열려 있으면 «그 창에만» 그린다. 페이지 모달은 안 그린다(두 벌이 되지 않게).
-  if (pip.pipWindow) {
+  if (copy.win) {
     return createPortal(
       <div style={{ width: "100%", height: "100dvh", display: "flex", flexDirection: "column", overflow: "hidden", background: "#F4F6FB" }}>
         {copyPanel}
         {pipConfirm}
         {imagePreview}
       </div>,
-      pip.pipWindow.document.body,
+      copy.win.document.body,
     );
   }
 
@@ -637,8 +647,9 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
               marginRight = 490 → 가운데 정렬했을 때 왼쪽 절반 자리에 딱 앉는다
               (좁은 화면에서는 예전 maxWidth:96vw 와 같은 비율로 48vw 까지 줄어든다)
             ⚠ pointerEvents 는 건드리지 않는다 — 예전에 그것 때문에 X 버튼이 안 눌렸다. */}
-      {/* [2026-09-22] 오른쪽 페이스터가 «같은 창의 옆 탭»이 되었으므로 marginRight(빈 오른쪽 자리)를 없애고 판 가운데에 둔다. 폭은 그대로 490px. */}
-      <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "row", width: `min(${BOX_W / 2}px, 96vw)`, height: `min(${BOX_H_MAX}px, calc(100dvh - ${BOX_V_GAP}px))`, borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}>
+      {/* [2026-09-22 B안] 이 모달은 «그날 첫 결제»의 비상구다. 페이스터 팝업이 화면 가운데 980 상자의 «오른쪽 절반»에 떠 있으므로,
+            모달은 «왼쪽 절반» 자리(width 490 + marginRight 490)에 두어 페이스터를 가리지 않는다(2026-09-08 배치와 동일). */}
+      <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "row", width: `min(${BOX_W / 2}px, 48vw)`, marginRight: `min(${BOX_W / 2}px, 48vw)`, height: `min(${BOX_H_MAX}px, calc(100dvh - ${BOX_V_GAP}px))`, borderRadius: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}>
         {copyPanel}
       </div>
       {imagePreview}
