@@ -463,7 +463,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
           {splitHint ? (
             <div className="mb-3 flex items-start gap-2 rounded-xl px-3 py-2.5 text-[12px] font-bold leading-relaxed" style={{ background: "#EAF0FE", color: "#1E4FB8", border: "1px solid #BFD2F8" }}>
               <span className="min-w-0 flex-1">
-                🪟 페이스터 탭이 이 화면을 가렸어요. <b>페이스터 탭을 창 오른쪽 가장자리로 끌어다 놓으면</b>(한 번만) 왼쪽 복사창 · 오른쪽 페이스터가 한 화면에 나란히 보입니다. 가운데 선을 끌어 폭을 맞추세요.
+                🪟 페이스터가 이 화면을 가렸어요. 맨 위 탭 줄에서 <b>payster 탭을 마우스 오른쪽 클릭 → 「현재 탭이 포함된 새 분할 보기」</b>를 누르면(하루 한 번) 왼쪽 복사창 · 오른쪽 페이스터가 한 창에 나란히 보입니다. payster 탭은 닫지 마세요(닫으면 로그인·분할이 풀림).
               </span>
               <button type="button" onClick={() => setSplitHint(false)} className="shrink-0 text-[12px] font-black" style={{ color: "#1E4FB8" }} title="안내 닫기">
                 ✕
