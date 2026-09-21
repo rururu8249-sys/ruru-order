@@ -469,7 +469,11 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
                 이 버튼이 자기 클릭 권한으로 복사창을 열고, 이 모달은 사라진다(하루 1회). */}
           {!copy.win ? (
             <div className="mb-3 flex items-center gap-2 rounded-xl px-3 py-2.5 text-[12px] font-bold leading-relaxed" style={{ background: "#EAF0FE", color: "#1E4FB8", border: "1px solid #BFD2F8" }}>
-              <span className="min-w-0 flex-1">페이스터 로그인이 끝났으면 눌러주세요. 복사창이 페이스터 <b>바로 왼쪽</b>에 뜹니다 (오늘 한 번만).</span>
+              <span className="min-w-0 flex-1">
+                크롬이 <b>복사창을 막았습니다</b>(클릭 한 번에 새 창은 하나만). 오른쪽 버튼을 누르면 복사창이 페이스터 <b>바로 왼쪽</b>에 뜹니다.
+                <br />
+                <b>다시는 안 보게 하려면(한 번만):</b> 주소창 맨 오른쪽의 「팝업 차단됨」 아이콘 클릭 → 「항상 허용」. 그 뒤로는 첫 결제도 복사창이 자동으로 뜹니다.
+              </span>
               <button
                 type="button"
                 onClick={() => {
