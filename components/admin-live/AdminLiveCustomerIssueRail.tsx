@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
+import { splitIssueBody, mergeIssueBody } from "@/lib/issueBodyMeta";
 import { CUSTOMER_TERMS } from "./adminLiveCustomerTerms";
 import { formatKoreanPhone } from "@/lib/order/phone";
 
@@ -228,31 +229,15 @@ function getIssueText(task: AdminIssueTask) {
   return contentLine.replace(/^(내용|메모):\s*/, "").trim();
 }
 
+// [2026-09-21 데이터 손실 버그] 사장님: 「수정하면 전화번호가 삭제됨」
+//   원인: 수정창은 «메타줄을 걷어낸 메모»만 채우는데, 저장할 때 body 를 그 메모로
+//     통째로 덮어써서 본문의 전화번호·닉네임·이름이 영구히 지워졌다.
+//   자르고 합치는 규칙은 lib/issueBodyMeta.ts 한 곳에만 둔다(기준이 갈라지면 또 지워진다).
+//   scripts/test-issue-body-meta.mjs 가 이를 지킨다.
 function getFullMemo(task: AdminIssueTask) {
   const text = cleanMultiline(task.body);
-
   if (!text) return getIssueText(task);
-
-  const metaPrefixes = [
-    "자동날짜:",
-    "이슈유형:",
-    "닉네임:",
-    "이름:",
-    "전화번호:",
-    "고객ID:",
-    "수정날짜:",
-    "주문내용:",
-  ];
-
-  const memoLines = text
-    .split(/\n+/)
-    .map((line) => clean(line))
-    .filter(Boolean)
-    .filter((line) => !metaPrefixes.some((prefix) => line.startsWith(prefix)))
-    .map((line) => line.replace(/^(내용|메모):\s*/, "").trim())
-    .filter(Boolean);
-
-  return memoLines.join("\n").trim() || getIssueText(task);
+  return splitIssueBody(text).memo || getIssueText(task);
 }
 
 function pad2(value: number) {
@@ -744,6 +729,10 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
     const issueTypes = editingIssueTypes.length > 0 ? editingIssueTypes : ["general"];
 
+    // [2026-09-21] 메타줄(전화번호·닉네임·이름·자동날짜…)을 앞에 되살린다.
+    //   예전엔 memo 만 보내 본문을 덮어써서 전화번호가 영구히 지워졌다.
+    const nextBody = mergeIssueBody(splitIssueBody(cleanMultiline(task.body)).metaLines, memo);
+
     setSaving(true);
 
     try {
@@ -756,7 +745,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           id,
           action: "update",
           title: clean(task.title) || `[고객이슈] ${getNickname(task)}`,
-          body: memo,
+          body: nextBody,
           task_type: issueTypes[0] || "general",
           priority: editingIssuePriority || "normal",
           raw_payload: {
