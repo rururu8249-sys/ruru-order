@@ -6812,13 +6812,11 @@ export default function OrderPage() {
                             ? { padding: "12px", margin: "8px 0 12px", borderRadius: "14px", border: "1.5px solid #7A1E47", background: "#FDF3F7", boxShadow: "0 4px 16px rgba(122,30,71,0.10)" }
                             : { padding: "13px 0", borderBottom: "0.5px solid #E5E1DC" }}
                         >
-                          {/* [UI] 방송 ON + 고정상품 = "지금 소개 중" 강조 카드 — 채팅에서 말하는 상품과 사이트 첫 화면 동기화 */}
-                          {isBroadcastOn && pinned ? (
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px", fontSize: "12px", fontWeight: 900, color: "#7A1E47" }}>
-                              <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#E8340A", animation: "shimmer 1.2s ease-in-out infinite" }} />
-                              지금 방송에서 소개 중
-                            </div>
-                          ) : null}
+                          {/* [2026-09-22 사장님] 「라이브소개중 글씨 중복 아니야? 위에꺼를 삭제하는게 어떨지?」
+                                카드 위 「● 지금 방송에서 소개 중」 줄을 삭제했다 — 바로 아래 사진에 붙는
+                                「● 라이브 소개중」 빨간 배지와 «같은 말»이라 한 카드에 두 번 나왔다.
+                                남는 신호: 사진 위 빨간 배지 + 카드 자주색 테두리·분홍 배경 + 목록 맨 위 정렬.
+                                ⚠ 되살리지 말 것(중복). 문구를 바꾸고 싶으면 사진 배지 쪽(「라이브 소개중」)을 고친다. */}
                           <div style={listView === "grid"
                             ? { display: "flex", flexDirection: "column", gap: "8px", alignItems: "stretch", flex: 1, minWidth: 0 }
                             : { display: "flex", gap: "12px", alignItems: "center" }}>

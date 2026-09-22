@@ -212,11 +212,42 @@ export default function OrderFeedWidgetClient() {
   itemsRef.current = items;
   const [live, setLive] = useState(false);          // 활성 방송 있음
   const [previewMode, setPreviewMode] = useState(false);
+  // [2026-09-22 2차] 줄 정렬 — 공지보다 «긴» 줄만 가운데로.
+  //   ⚠ 글자 폭을 «추정»하지 않는다. 브라우저가 그린 실제 offsetWidth 를 잰다(줄마다 아이콘·여백이 달라 추정이 어긋난다).
+  //   측정 → 비교 → alignSelf 만 바뀐다. 폭은 내용이 정하므로 다시 재도 값이 안 바뀐다(무한 되풀이 없음).
+  const pinElRef = useRef<HTMLDivElement | null>(null);
+  const rowElsRef = useRef<Map<string, HTMLElement>>(new Map());
+  const [wideIds, setWideIds] = useState<string>("");   // 공지보다 긴 줄들의 id 를 "|" 로 이은 값
   const [fitScale, setFitScale] = useState(1);
   const [pinText, setPinText] = useState("");
   const seenRef = useRef<Set<string>>(new Set());
   // 같은 주문(order_group_id)의 상품 여러 줄이 INSERT 로 따로 오므로 0.6초 모아서 한 줄로
   const pendingOrdersRef = useRef<Map<string, { nick: string; items: FeedOrderItem[]; timer: number | null }>>(new Map());
+
+  // [2026-09-22 2차] 공지 폭과 각 줄 폭을 재서 «긴 줄»을 가려낸다.
+  //   deps 를 안 준다 = 렌더될 때마다 잰다(장 넘김·공지 변경으로 폭이 달라져도 따라간다).
+  //   값이 같으면 setState 를 안 하므로 다시 그리지 않는다.
+  useEffect(() => {
+    const pinW = pinElRef.current?.offsetWidth ?? 0;
+    const next: string[] = [];
+    if (pinW > 0) {
+      rowElsRef.current.forEach((el, id) => {
+        if (el.isConnected && el.offsetWidth > pinW) next.push(id);
+      });
+    }
+    const key = next.sort().join("|");
+    setWideIds((prev) => (prev === key ? prev : key));
+  });
+
+  /** 이 줄이 공지보다 길면 가운데, 아니면 왼쪽(기존 기준). */
+  const alignOf = (id: string): "center" | "flex-start" =>
+    wideIds.split("|").includes(id) ? "center" : "flex-start";
+
+  /** 줄을 재기 위해 DOM 을 붙잡아 둔다(사라지면 지운다). */
+  const keepRow = (id: string) => (el: HTMLElement | null) => {
+    if (el) rowElsRef.current.set(id, el);
+    else rowElsRef.current.delete(id);
+  };
 
   // 배경 투명 (크로마키)
   useEffect(() => {
@@ -403,13 +434,10 @@ export default function OrderFeedWidgetClient() {
         style={{
           position: "absolute", left: "8px", bottom: "8px", width: `${WIDGET_W}px`,
           // [2026-09-16 사장님 «정보량은 적은데 가로만 길다»] 줄마다 «글자 길이만큼»만 차지하고, 길면 위젯 폭에서 멈춘다.
-          // [2026-09-22 사장님] 「왼쪽을 고정으로 해서 오른쪽으로 길이가 늘어나는데, 그냥 화면 중앙에서
-          //   비율좋게 왼쪽 오른쪽으로 길어지게」 → alignItems 를 center 로.
-          //   예전(flex-start)은 왼쪽 끝이 붙박이라 글자가 길어지면 오른쪽으로만 자랐다.
-          //   이제 각 줄이 위젯 폭(WIDGET_W) 가운데를 기준으로 좌우로 같이 늘어난다.
-          //   ⚠ 📌 공지 줄·📢 안내 줄도 이 열의 자식이라 같이 가운데로 온다(줄들이 따로 놀면 더 이상하다).
-          //   ⚠ 줄마다 «글자 길이만큼»이라는 09-16 기준은 그대로다 — 바뀐 건 «어디를 기준으로 늘어나나» 뿐.
-          display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", gap: "8px",
+          // [2026-09-22 2차 사장님] 「공지보다 글이 짧으면 «기존처럼 왼쪽 기준», 길면 «중앙 기준»으로 좌우 균등」
+          //   → 열 자체는 왼쪽 기준(기본)으로 두고, «공지보다 긴 줄»에만 alignSelf: center 를 준다(rowAlign).
+          //   1차(전부 center)는 짧은 입금·카드 줄이 화면 가운데로 떠올라서 사장님이 되돌리라고 하셨다.
+          display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "flex-start", gap: "8px",
           transform: fitScale !== 1 ? `scale(${fitScale})` : undefined, transformOrigin: "bottom left",
         }}
       >
@@ -421,7 +449,9 @@ export default function OrderFeedWidgetClient() {
             return (
               <div
                 key={item.id}
+                ref={keepRow(item.id)}
                 style={{
+                  alignSelf: alignOf(item.id),                                          // [09-22] 공지보다 길면 가운데
                   maxWidth: `${WIDGET_W}px`, boxSizing: "border-box",                  // [09-16] 폭 자동 — 글자만큼만 (09-21: 퍼센트 → 픽셀)
                   display: "flex", alignItems: "center", gap: "10px",
                   padding: "17px 20px 17px 16px",                                        // [09-16] 좌우 여백을 줄여 글자를 1px이라도 크게(공지는 길다)
@@ -460,7 +490,7 @@ export default function OrderFeedWidgetClient() {
           // 폭죽: 주문 줄이고, 막 등장했을 때(1.7초 안) 1회. 그 뒤엔 DOM 에서 빠진다.
           const burst = item.kind === "order" && now - item.at < CONFETTI_MS;
           return (
-            <div key={item.id} style={{ position: "relative", maxWidth: `${WIDGET_W}px` }}>
+            <div key={item.id} ref={keepRow(item.id)} style={{ alignSelf: alignOf(item.id), position: "relative", maxWidth: `${WIDGET_W}px` }}>
             {burst ? <Confetti /> : null}
             <div
               style={{
@@ -543,7 +573,10 @@ export default function OrderFeedWidgetClient() {
             → 공지를 «맨 아래 고정». 알림은 공지 «위»로 쌓이고(최신이 공지 바로 위), 사라져도 공지는 그 자리. 방송 ON 동안 상시. */}
         {showPin ? (
           <div
+            ref={pinElRef}
             style={{
+              // [09-22] 공지는 «기준선»이라 항상 왼쪽. 다른 줄이 이 폭과 비교된다.
+              alignSelf: "flex-start",
               maxWidth: `${WIDGET_W}px`, boxSizing: "border-box",            // [09-16] 폭 자동 — 글자만큼만 (09-21: 퍼센트 → 픽셀)
               display: "flex", alignItems: "center", gap: "10px",
               padding: "17px 20px 17px 16px", marginTop: "4px",               // [09-16] 좌우 여백을 줄여 글자를 1px이라도 크게(공지는 길다)
