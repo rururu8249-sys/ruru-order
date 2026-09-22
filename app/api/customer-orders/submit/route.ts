@@ -7,6 +7,7 @@ import { submitRowLineTotal, submitRowUnitPriceForCheck } from "@/lib/submitRowP
 import { buildYoutubeOrderAnnouncementMessages } from "@/lib/orderYoutubeAnnouncement";
 import { buildCartHoldSnapshotItem } from "@/lib/cartHoldDetail";
 import { koreanPhoneVariants } from "@/lib/order/phone";
+import { shippingAddressKey } from "@/lib/shippingAddressKey";
 import {
   canonicalCustomerDetailProductName,
   customerDetailInputEnabled,
@@ -366,22 +367,8 @@ async function assertRegisteredProductPrices(
 //      (실제 합배송 창은 그날·방송 단위라 90일은 매우 넉넉한 상한이다.)
 //   ⚠️ 돈/재고/포인트 RPC는 일절 건드리지 않고, 주문 RPC 호출 전에 차단만 한다.
 
-// 주소 비교 규칙 — 손님 화면 normalizeShippingAddressPart(app/order/page.tsx 2254행)와 동일.
-function normalizeSubmitAddressPart(value: unknown, removeParentheses = false): string {
-  let next = String(value || "");
-  if (removeParentheses) next = next.replace(/\([^)]*\)/g, " ");
-  return next.replace(/\s+/g, " ").replace(/[-‐-‒–—―]/g, "-").trim();
-}
-
-function submitAddressSignature(zipcode: unknown, address: unknown, detail: unknown): string {
-  return [
-    normalizeSubmitAddressPart(zipcode),
-    normalizeSubmitAddressPart(address, true),
-    normalizeSubmitAddressPart(detail),
-  ]
-    .filter(Boolean)
-    .join("|");
-}
+// 주소 비교 규칙 — [2026-09-22] 손님 화면과 같은 함수(lib/shippingAddressKey.ts)를 쓴다.
+//   예전에는 같은 로직이 양쪽에 복사돼 있어 한쪽만 고치면 사고가 났다.
 
 // 취소/환불 판정 — 손님 화면 isCanceledOrderForCombineShipping(1426행)과 동일 정규식.
 function isCanceledForSubmitShipping(status: unknown): boolean {
@@ -442,8 +429,7 @@ async function assertShippingFeeNotSkipped(
   if (paidShipping >= expectedShipping) return;
 
   // 여기까지 왔다 = 배송비를 안 냈거나 모자람. 합배송이 성립할 수 있는지만 본다.
-  const signature = submitAddressSignature(
-    firstOrderValue(orderRows, "zipcode"),
+  const signature = shippingAddressKey(
     firstOrderValue(orderRows, "address"),
     firstOrderValue(orderRows, "detail_address"),
   );
@@ -495,7 +481,7 @@ async function assertShippingFeeNotSkipped(
       const rowKakao = String(row?.kakao_id || "").trim();
       if (rowKakao && rowKakao !== safeKakaoIdForShipping) return false;
     }
-    const sig = submitAddressSignature(row?.zipcode, row?.address, row?.detail_address);
+    const sig = shippingAddressKey(row?.address, row?.detail_address);
     return Boolean(sig) && sig === signature;
   });
   const hasSameAddressOrder = sameAddressOrders.length > 0;

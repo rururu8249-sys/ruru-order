@@ -41,6 +41,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { HOWTO_DEFAULT, parseHowtoSteps } from "@/lib/howto";
 import { supabase } from "@/lib/supabase";
 import { isRemoteAreaAddress } from "@/lib/order/shippingAddress";
+import { shippingAddressKey } from "@/lib/shippingAddressKey";
 import { formatOrderPhone, normalizeOrderPhone, isOrderablePhone, isMobileOrderPhone, koreanPhoneVariants } from "@/lib/order/phone";
 import { isNicknameTakenByOthers } from "@/lib/nicknameConflict";
 import {
@@ -2790,49 +2791,10 @@ export default function OrderPage() {
     return nextSettings;
   };
 
-  const normalizeShippingAddressPart = (
-    value: unknown,
-    options: { removeParentheses?: boolean } = {},
-  ) => {
-    let nextValue = String(value || "");
-
-    if (options.removeParentheses) {
-      nextValue = nextValue.replace(/\([^)]*\)/g, " ");
-    }
-
-    return nextValue
-      .replace(/\s+/g, " ")
-      .replace(/[-‐-‒–—―]/g, "-")
-      .trim();
-  };
-
-  const hashShippingAddressText = (value: string) => {
-    let hash = 0;
-
-    for (let index = 0; index < value.length; index += 1) {
-      hash = (hash * 31 + value.charCodeAt(index)) | 0;
-    }
-
-    return Math.abs(hash).toString(36);
-  };
-
-  const getShippingAddressSignature = (
-    zipcodeValue: unknown,
-    addressValue: unknown,
-    detailAddressValue: unknown,
-  ) => {
-    const normalized = [
-      normalizeShippingAddressPart(zipcodeValue),
-      normalizeShippingAddressPart(addressValue, { removeParentheses: true }),
-      normalizeShippingAddressPart(detailAddressValue),
-    ]
-      .filter(Boolean)
-      .join("|");
-
-    return normalized ? hashShippingAddressText(normalized) : "";
-  };
-
-  const currentShippingAddressSignature = getShippingAddressSignature(zipcode, address, detailAddress);
+  // [2026-09-22] 합배송 «같은 주소» 판정은 lib/shippingAddressKey.ts 하나로 합쳤다.
+  //   서버(app/api/customer-orders/submit/route.ts)와 반드시 같은 함수를 써야 한다.
+  //   한쪽만 다르면 손님은 0원을 보내는데 서버가 막아 주문 자체가 실패한다.
+  const currentShippingAddressSignature = shippingAddressKey(address, detailAddress);
 
   const resolveCurrentCombineShippingSettings = (sourceSettings: CombineShippingSettings): CombineShippingSettings => {
     // 관리자 수동 시간설정이 켜져있고 "지금 유효"하면 방송 ON이어도 시간범위를 우선한다.
@@ -3005,11 +2967,7 @@ export default function OrderPage() {
     //   다음 주문에 배송비가 붙던 것(스마일 사례, id 2612/2647→2675)을 제거.
     //   취소/환불 제외는 위 activeCombineShippingOrders 필터가 담당(정규식), 주소 동일 조건 유지.
     const paidShippingOrders = activeCombineShippingOrders.filter((order: any) => {
-      const orderAddressSignature = getShippingAddressSignature(
-        order.zipcode,
-        order.address,
-        order.detail_address,
-      );
+      const orderAddressSignature = shippingAddressKey(order.address, order.detail_address);
 
       return Boolean(orderAddressSignature && orderAddressSignature === addressSignature);
     });
