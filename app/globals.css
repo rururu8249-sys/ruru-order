@@ -392,3 +392,27 @@ body {
   .ru-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; }
   .ru-screen-scroll { flex: 1 1 0%; min-height: 0; overflow: auto; }
 }
+
+/* ═══ [2026-09-22 사장님] 상품 대표사진 좌우 넘기기 ═══
+   「큰사진 자체에서 양옆으로 (PC에서 볼때) 화살표 표시 나오게 / 모바일에서는 손가락으로 쓰윽」
+
+   · 마우스가 있는 기기(PC)에서만 화살표를 그린다. 손가락 기기에선 사진을 가리므로 숨기고 스와이프로 넘긴다.
+     (손님 대부분이 중장년이라, 마우스를 올려야 «나타나는» 방식은 쓰지 않는다 — 평소에도 보이게 두고
+      올렸을 때 진해지기만 한다)
+   · 위치·동작은 app/order/page.tsx 의 대표사진 블록(.ru-photo-stage)에 있다. */
+.ru-photo-nav { display: none; }
+
+@media (hover: hover) and (pointer: fine) {
+  .ru-photo-nav {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    display: flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px; padding: 0 0 3px;
+    border: none; border-radius: 9999px;
+    background: rgba(0, 0, 0, 0.48); color: #fff;
+    font-size: 24px; font-weight: 700; line-height: 1; cursor: pointer;
+    transition: background-color .15s;
+  }
+  .ru-photo-nav:hover { background: rgba(0, 0, 0, 0.78); }
+  .ru-photo-nav-prev { left: 8px; }
+  .ru-photo-nav-next { right: 8px; }
+}

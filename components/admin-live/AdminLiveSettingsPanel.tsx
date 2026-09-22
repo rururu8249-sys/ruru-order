@@ -6,6 +6,8 @@ import TelegramNotifyCard from "./TelegramNotifyCard";
 import TrendPanel from "./TrendPanel";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
+// [2026-09-22] 상품 주문 안내 문구 — 문구 원문·기본값은 한 곳(lib)에서만 정한다
+import { PRODUCT_NOTICE_PRESETS, PRODUCT_NOTICE_MAX_LEN, parseProductNoticeMode, resolveProductOrderNotice, type ProductNoticeMode } from "@/lib/productOrderNotice";
 import AdminAuthSettingsPanel from "./AdminAuthSettingsPanel";
 import AdminSoundControl from "./AdminSoundControl";
 import CombineShippingSettingsTab from "./CombineShippingSettingsTab";
@@ -24,7 +26,9 @@ type SettingKey =
   | "cart_hold_minutes"
   | "direct_input_enabled"
   | "howto_enabled"
-  | "howto_steps";
+  | "howto_steps"
+  | "product_notice_mode"
+  | "product_notice_custom";
 
 type SettingRow = {
   key: string;
@@ -43,6 +47,8 @@ const SETTING_KEYS: SettingKey[] = [
   "direct_input_enabled",
   "howto_enabled",
   "howto_steps",
+  "product_notice_mode",
+  "product_notice_custom",
 ];
 
 type NumericSettingKey = Exclude<
@@ -50,6 +56,8 @@ type NumericSettingKey = Exclude<
   | "direct_input_enabled"
   | "howto_enabled"
   | "howto_steps"
+  | "product_notice_mode"
+  | "product_notice_custom"
 >;
 
 const DEFAULTS: Record<NumericSettingKey, number> = {
@@ -206,6 +214,9 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent }: Ad
   const [howtoEnabled, setHowtoEnabled] = useState(true);
   const [howtoSteps, setHowtoSteps] = useState(HOWTO_DEFAULT.steps);
   const [howtoWarn, setHowtoWarn] = useState(HOWTO_DEFAULT.warn);
+  // [2026-09-22 사장님] 상품 주문 안내 문구 — 손님 상품창의 «수량·금액 줄 바로 위»에 한 줄로 뜬다
+  const [productNoticeMode, setProductNoticeMode] = useState<ProductNoticeMode>("off");
+  const [productNoticeCustom, setProductNoticeCustom] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -244,6 +255,8 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent }: Ad
           setHowtoSteps(cfg.steps);
           setHowtoWarn(cfg.warn);
         }
+        setProductNoticeMode(parseProductNoticeMode(rows.find((r) => r.key === "product_notice_mode")?.value));
+        setProductNoticeCustom(clean(rows.find((r) => r.key === "product_notice_custom")?.value || ""));
       } finally {
         if (alive) setLoading(false);
       }
@@ -282,6 +295,8 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent }: Ad
           { key: "direct_input_enabled", value: directInputEnabled ? "true" : "false" },
           { key: "howto_enabled", value: howtoEnabled ? "true" : "false" },
           { key: "howto_steps", value: JSON.stringify({ steps: howtoSteps, warn: howtoWarn }) },
+          { key: "product_notice_mode", value: productNoticeMode },
+          { key: "product_notice_custom", value: productNoticeCustom.trim().slice(0, PRODUCT_NOTICE_MAX_LEN) },
         ],
         { onConflict: "key" },
       );
@@ -533,6 +548,88 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent }: Ad
                     </div>
                   </div>
                 ) : null}
+              </div>
+
+              {/* ── [2026-09-22 사장님] 상품 주문 안내 문구 ──────────────────────────
+                    「주문서표시 메뉴에다가 밑에 문구 설정가능하게 / 문구는 너의 추천을 따를게」
+
+                    자리: 손님 상품창의 «수량·선택금액 줄 바로 위»(항상 보이는 아래 칸).
+                      옵션 밑이 아니라 여기에 둔 이유 — 옵션은 스크롤하면 지나가지만,
+                      «살 수 있는 조건»은 담기 버튼 옆에 있어야 누르기 «전에» 읽힌다(스마트스토어·쿠팡도 같은 자리).
+                    색: 빨강+* 은 이 화면에서 «품절·선택 안 함» 경고에 쓰고 있어서, 같은 빨강이면 손님이
+                      «오류»로 오해한다. 그래서 안내 톤(연한 살구 바탕 + 진한 갈색)으로 구분했다.
+                    ⚠ 표시 전용 — 주문을 «막지» 않는다. 재고·진열·주문 로직과 무관. */}
+              <div className="mb-3 rounded-xl border border-line bg-surface-2 p-4">
+                <div className="text-sm font-black text-ink">📣 상품 주문 안내 문구</div>
+                <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
+                  손님이 상품을 눌렀을 때 <b>수량·금액 줄 바로 위</b>에 한 줄로 보입니다. 모든 상품에 같이 적용됩니다.
+                  안내만 할 뿐 주문을 막지는 않습니다.
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {PRODUCT_NOTICE_PRESETS.map((preset) => {
+                    const on = productNoticeMode === preset.mode;
+                    return (
+                      <button
+                        key={preset.mode}
+                        type="button"
+                        onClick={() => setProductNoticeMode(preset.mode)}
+                        className={`flex w-full items-start gap-3 rounded-2xl border p-3 text-left transition ${
+                          on ? "border-rose-deep bg-rose-soft" : "border-line bg-surface"
+                        }`}
+                      >
+                        <span
+                          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+                            on ? "border-rose-deep" : "border-line"
+                          }`}
+                        >
+                          {on ? <span className="h-2.5 w-2.5 rounded-full bg-rose-deep" /> : null}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className={`block text-xs font-black ${on ? "text-rose-deep" : "text-ink-soft"}`}>{preset.label}</span>
+                          {preset.text ? (
+                            <span className="mt-1 block text-sm font-bold leading-6 text-ink">{preset.text}</span>
+                          ) : preset.mode === "custom" ? (
+                            <span className="mt-1 block text-xs font-bold text-ink-mute">직접 쓴 문구를 보여줍니다.</span>
+                          ) : (
+                            <span className="mt-1 block text-xs font-bold text-ink-mute">아무 문구도 안 보입니다.</span>
+                          )}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {productNoticeMode === "custom" ? (
+                  <div className="mt-3 rounded-2xl border border-line bg-surface p-3">
+                    <div className="text-xs font-black text-ink-soft">직접 입력 ({PRODUCT_NOTICE_MAX_LEN}자까지)</div>
+                    <textarea
+                      value={productNoticeCustom}
+                      onChange={(e) => setProductNoticeCustom(e.target.value.slice(0, PRODUCT_NOTICE_MAX_LEN))}
+                      rows={2}
+                      placeholder="예) 📺 방송 중에만 주문받는 상품이에요"
+                      className="mt-2 w-full resize-none rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm font-bold text-ink outline-none transition focus:border-rose-deep"
+                    />
+                    <div className="mt-1 text-[11px] font-bold text-ink-mute">{productNoticeCustom.trim().length} / {PRODUCT_NOTICE_MAX_LEN}자</div>
+                  </div>
+                ) : null}
+
+                {/* 손님 화면에 그대로 보일 모습 — 저장 전에 눈으로 확인 */}
+                {resolveProductOrderNotice(productNoticeMode, productNoticeCustom) ? (
+                  <div className="mt-3">
+                    <div className="mb-1 text-[11px] font-black text-ink-mute">손님 화면 미리보기</div>
+                    <div
+                      className="rounded-xl px-3 py-2.5 text-sm font-bold leading-6"
+                      style={{ background: "#FDF1E7", color: "#8A4B1A", border: "1px solid #F3D9C2" }}
+                    >
+                      {resolveProductOrderNotice(productNoticeMode, productNoticeCustom)}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="mt-2 text-[11px] font-bold text-ink-mute">
+                  ※ 아래 <b>저장</b>을 눌러야 손님 화면에 반영됩니다.
+                </div>
               </div>
 
               {/* [2026-08-30] 공지 문구·접속 팝업 공지는 사이드바 「📢 공지·쪽지」 메뉴로 옮겼다. */}
