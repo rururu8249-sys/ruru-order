@@ -25,6 +25,8 @@ import AdminLiveCustomerPointPanel from "./AdminLiveCustomerPointPanel";
 import CustomerFullOrderHistory, { type CustomerFullOrderStats } from "./CustomerFullOrderHistory";
 import { CUSTOMER_TERMS } from "./adminLiveCustomerTerms";
 import { formatKoreanPhone } from "@/lib/order/phone";
+import { parseBlockReason, blockReasonSummary } from "@/lib/customerBlockReason";
+import { requestAdminCustomerBlock } from "@/lib/adminCustomerBlock";
 
 type Props = {
   orders: LiveOrder[];
@@ -117,6 +119,93 @@ type BlockOverride = {
 };
 
 type BlockModalTarget = CustomerSummary;
+
+// ── 차단목록 카드 ── [2026-09-22 사장님 요청 「눌렀을때만 내용이 보이고」]
+//   예전엔 사유가 항상 펼쳐진 통짜 덩어리라 목록을 훑을 수가 없었다.
+//   접힌 줄에는 «누구인지»만 남기고(사장님 확정), 사유·품목·주소는 눌러야 펼쳐진다.
+//   여러 장을 동시에 펼칠 수 있다 — 한 장만 열리는 아코디언은 비교를 막는다(NN/g).
+//   차단 날짜는 접힌 줄 오른쪽에 작게. 처음 말씀하신 「몇월 몇일」을 목록에서 바로 보시라고 둔 것.
+function BlockedCardHead({
+  title, sub, blockedAt, parts, summary, open, onToggle,
+}: {
+  title: string; sub: string; blockedAt: string;
+  parts: ReturnType<typeof parseBlockReason>; summary: string;
+  open: boolean; onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      className={`flex w-full items-center gap-3 px-4 py-3 text-left ${open ? "bg-danger-bg/60" : "bg-danger-bg/30 hover:bg-danger-bg/50"}`}
+    >
+      <span className="min-w-0 flex-1">
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="min-w-0 truncate text-[14px] font-black text-ink">{title}</span>
+          {parts.label ? (
+            <span className="shrink-0 rounded-lg bg-[var(--color-danger-tx)] px-2 py-0.5 text-[11px] font-black text-white">{parts.label}</span>
+          ) : null}
+          {parts.items.length > 0 ? (
+            <span className="shrink-0 text-[11px] font-black text-danger-tx">품목 {parts.items.length}개</span>
+          ) : null}
+        </span>
+        <span className="mt-0.5 block truncate text-[12px] font-bold text-ink-soft">{sub}</span>
+        {!open && summary ? (
+          <span className="mt-0.5 block truncate text-[11px] font-bold text-ink-mute">{summary}</span>
+        ) : null}
+      </span>
+      <span className="shrink-0 whitespace-nowrap text-right">
+        <span className="block text-[11px] font-black text-ink-mute">
+          {blockedAt ? formatOrderDateTime(blockedAt) : "날짜 기록 없음"}
+        </span>
+        <span className="mt-0.5 block text-[12px] font-black text-ink-soft">{open ? "▴ 접기" : "▾ 펼치기"}</span>
+      </span>
+    </button>
+  );
+}
+
+function BlockedCardBody({
+  parts, address, children,
+}: {
+  parts: ReturnType<typeof parseBlockReason>; address: string; children: React.ReactNode;
+}) {
+  const empty = !parts.label && parts.items.length === 0 && !parts.memo;
+  return (
+    <div className="border-t border-line px-4 py-3">
+      {empty ? (
+        <div className="text-[12px] font-bold text-ink-mute">차단사유가 적혀 있지 않습니다.</div>
+      ) : (
+        <>
+          {parts.items.length > 0 ? (
+            <div>
+              <div className="text-[11px] font-black text-ink-soft">거파 품목</div>
+              <ul className="mt-1 space-y-1">
+                {parts.items.map((item, index) => (
+                  <li key={`${item}-${index}`} className="rounded-lg bg-surface-2 px-3 py-2 text-[12px] font-bold leading-5 text-ink">
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {parts.memo ? (
+            <div className={parts.items.length > 0 ? "mt-3" : ""}>
+              <div className="text-[11px] font-black text-ink-soft">메모</div>
+              <div className="mt-1 break-keep text-[12px] font-bold leading-5 text-danger-tx">{parts.memo}</div>
+            </div>
+          ) : null}
+        </>
+      )}
+
+      {address ? (
+        <div className="mt-3 break-keep text-[11px] font-bold leading-5 text-ink-mute">📍 {address}</div>
+      ) : null}
+
+      <div className="mt-3 flex flex-wrap gap-2">{children}</div>
+    </div>
+  );
+}
+
 
 type DirectPhoneBlock = {
   phone: string;
@@ -1008,6 +1097,10 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
   const [selectedProfile, setSelectedProfile] = useState<CustomerProfile | null>(null);
   const [detailPage, setDetailPage] = useState(1);
   const [blockOverrides, setBlockOverrides] = useState<Record<string, BlockOverride>>({});
+  // [2026-09-22] 차단목록 = 접힌 카드. 여러 개를 동시에 펼칠 수 있게 «펼친 것만» 기억한다(NN/g 아코디언 기준).
+  const [expandedBlocks, setExpandedBlocks] = useState<string[]>([]);
+  const toggleExpandedBlock = (key: string) =>
+    setExpandedBlocks((prev) => (prev.includes(key) ? prev.filter((x) => x !== key) : [...prev, key]));
   const [blockModalTarget, setBlockModalTarget] = useState<BlockModalTarget | null>(null);
   const [blockSaving, setBlockSaving] = useState(false);
   const [blockErrorMessage, setBlockErrorMessage] = useState("");
@@ -1393,6 +1486,14 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
   };
 
   const normalCustomers = customers.filter((customer) => !customer.blocked);
+  // [2026-09-22 사장님 요청 「몇월 몇일 차단했는지도」]
+  //   차단할 때마다 customer_phone_blocks 에 updated_at 과 함께 저장된다(customer-block/route.ts).
+  //   이미 불러와 들고 있던 값이라 DB 변경 없이 전화번호로 맞춰 쓰면 된다.
+  //   ⚠ 이 테이블이 생기기 전에 차단한 분은 행이 없어 날짜를 모른다 → 「날짜 기록 없음」으로 정직하게 표시.
+  const blockedAtByPhone = useMemo(
+    () => new Map(directPhoneBlocks.map((block) => [digitsOnly(block.phone), clean(block.updated_at) || clean(block.created_at)])),
+    [directPhoneBlocks],
+  );
   const blockedCustomers = customers.filter((customer) => customer.blocked);
   const customerPhoneKeys = new Set(customers.map((customer) => digitsOnly(customer.phone)).filter(Boolean));
   const standalonePhoneBlocks = directPhoneBlocks.filter((block) => {
@@ -1549,23 +1650,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
     setBlockSaving(true);
 
     try {
-      const response = await fetch("/api/admin-live/customer-block", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          phone: phoneKey,
-          blocked,
-          reason: blocked ? reason.trim() : "",
-        }),
-      });
-
-      const payload = await response.json().catch(() => null);
-
-      if (!response.ok || !payload?.ok) {
-        throw new Error(payload?.message || "차단 처리 실패");
-      }
+      // [2026-09-22] 저장은 lib/adminCustomerBlock.ts 한 곳 — 주문상세에서도 같은 함수를 쓴다.
+      await requestAdminCustomerBlock({ phone: phoneKey, blocked, reason });
 
       applyBlockResult({
         phone: phoneKey,
@@ -2106,97 +2192,100 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                 </div>
               ) : (
                 <>
-                  {visibleStandalonePhoneBlocks.map((block) => (
-                    <div
-                      key={`phone-block-${digitsOnly(block.phone)}`}
-                      className="rounded-2xl border border-danger-tx bg-danger-bg/60 p-4"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="text-base font-black text-ink">전화번호 전용 차단</div>
-                          <div className="mt-1 text-sm font-bold text-ink-soft">
-                            {formatPhone(block.phone)}
-                          </div>
-                          <div className="mt-2 rounded-xl bg-surface px-3 py-2 text-xs font-bold leading-5 text-danger-tx">
-                            {block.reason || "차단사유 없음"}
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleCustomerBlockButton({
-                              key: `phone-block-${digitsOnly(block.phone)}`,
-                              nickname: "전화번호 전용",
-                              name: "-",
-                              phone: block.phone,
-                              address: "",
-                              orderCount: 0,
-                              totalAmount: 0,
-                              paidCount: 0,
-                              unpaidCount: 0,
-                              manualNeededCount: 0,
-                              latestOrderAt: "",
-                              joinedAt: "",
-                              lastLoginAt: "",
-                              blocked: true,
-                              blockReason: block.reason,
-                              orders: [],
-                              kakaoId: "",
-                            })
-                          }
-                          disabled={blockSaving}
-                          className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft transition hover:bg-surface-2 disabled:opacity-50"
-                        >
-                          차단해제
-                        </button>
+                  {visibleStandalonePhoneBlocks.map((block) => {
+                    const cardKey = `phone-block-${digitsOnly(block.phone)}`;
+                    const open = expandedBlocks.includes(cardKey);
+                    const parts = parseBlockReason(block.reason);
+                    const blockedAt = clean(block.updated_at) || clean(block.created_at);
+                    return (
+                      <div key={cardKey} className="overflow-hidden rounded-2xl border border-danger-tx bg-surface">
+                        <BlockedCardHead
+                          title="전화번호 전용 차단"
+                          sub={formatPhone(block.phone)}
+                          blockedAt={blockedAt}
+                          parts={parts}
+                          summary={blockReasonSummary(block.reason)}
+                          open={open}
+                          onToggle={() => toggleExpandedBlock(cardKey)}
+                        />
+                        {open ? (
+                          <BlockedCardBody parts={parts} address="">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleCustomerBlockButton({
+                                  key: cardKey,
+                                  nickname: "전화번호 전용",
+                                  name: "-",
+                                  phone: block.phone,
+                                  address: "",
+                                  orderCount: 0,
+                                  totalAmount: 0,
+                                  paidCount: 0,
+                                  unpaidCount: 0,
+                                  manualNeededCount: 0,
+                                  latestOrderAt: "",
+                                  joinedAt: "",
+                                  lastLoginAt: "",
+                                  blocked: true,
+                                  blockReason: block.reason,
+                                  orders: [],
+                                  kakaoId: "",
+                                })
+                              }
+                              disabled={blockSaving}
+                              className="h-10 rounded-xl border border-line bg-surface px-3 text-[12px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50"
+                            >
+                              차단해제
+                            </button>
+                          </BlockedCardBody>
+                        ) : null}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
-                  {visibleBlockedCustomers.map((customer) => (
-                  <div
-                    key={`blocked-${customer.key}`}
-                    className="rounded-2xl border border-danger-tx bg-danger-bg/60 p-4"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="truncate text-base font-black text-ink">{customer.nickname}</div>
-                        <div className="mt-1 text-sm font-bold text-ink-soft">
-                          {customer.name} · {formatPhone(customer.phone)}
-                        </div>
-                        <div className="mt-2 break-keep text-xs font-bold leading-5 text-ink-soft">
-                          📍 {customer.address || "주소 정보 없음"}
-                        </div>
-                        <div className="mt-2 rounded-xl bg-surface px-3 py-2 text-xs font-bold leading-5 text-danger-tx">
-                          {customer.blockReason || "차단사유 없음"}
-                        </div>
+                  {visibleBlockedCustomers.map((customer) => {
+                    const cardKey = `blocked-${customer.key}`;
+                    const open = expandedBlocks.includes(cardKey);
+                    const parts = parseBlockReason(customer.blockReason);
+                    const blockedAt = blockedAtByPhone.get(digitsOnly(customer.phone)) || "";
+                    return (
+                      <div key={cardKey} className="overflow-hidden rounded-2xl border border-danger-tx bg-surface">
+                        <BlockedCardHead
+                          title={customer.nickname}
+                          sub={`${customer.name} · ${formatPhone(customer.phone)}`}
+                          blockedAt={blockedAt}
+                          parts={parts}
+                          summary={blockReasonSummary(customer.blockReason)}
+                          open={open}
+                          onToggle={() => toggleExpandedBlock(cardKey)}
+                        />
+                        {open ? (
+                          <BlockedCardBody parts={parts} address={customer.address}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedCustomer(customer);
+                                setDetailPage(1);
+                                setShowBlockedCustomers(false);
+                              }}
+                              className="h-10 rounded-xl border border-line bg-surface px-3 text-[12px] font-black text-ink hover:bg-surface-2"
+                            >
+                              회원 상세
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleCustomerBlockButton(customer)}
+                              disabled={blockSaving}
+                              className="h-10 rounded-xl border border-line bg-surface px-3 text-[12px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50"
+                            >
+                              차단해제
+                            </button>
+                          </BlockedCardBody>
+                        ) : null}
                       </div>
-
-                      <div className="flex shrink-0 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedCustomer(customer);
-                            setDetailPage(1);
-                            setShowBlockedCustomers(false);
-                          }}
-                          className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink hover:bg-surface-2"
-                        >
-                          상세
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleCustomerBlockButton(customer)}
-                          disabled={blockSaving}
-                          className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft transition hover:bg-surface-2 disabled:opacity-50"
-                        >
-                          차단해제
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  ))}
+                    );
+                  })}
                 </>
               )}
             </div>
@@ -2220,6 +2309,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
         nickname={blockModalTarget?.nickname || ""}
         name={blockModalTarget?.name || ""}
         phone={blockModalTarget?.phone || ""}
+        kakaoId={blockModalTarget?.kakaoId || ""}
         defaultReason={blockModalTarget?.blockReason || ""}
         saving={blockSaving}
         errorMessage={blockErrorMessage}

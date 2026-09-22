@@ -15,6 +15,8 @@ import LiveOrderRegisteredProductPicker from "./LiveOrderRegisteredProductPicker
 import LiveOrderDangerActionGuide from "./LiveOrderDangerActionGuide";
 import { buildCustomerOrderCopyText, buildExtraDepositRequestNote, buildPaymentRequestNote } from "./liveOrderCustomerCopy";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
+import AdminLiveCustomerBlockReasonModal from "./AdminLiveCustomerBlockReasonModal";
+import { requestAdminCustomerBlock } from "@/lib/adminCustomerBlock";
 
 type Props = {
   order: LiveOrder;
@@ -110,6 +112,11 @@ function getPaymentStatusClass(order: LiveOrder) {
 }
 
 export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClose, onAfterStatusChange }: Props) {
+  // [2026-09-22 사장님 요청] 거파는 «주문을 보다가» 일어난다 → 이 화면에서 바로 차단.
+  //   모달이 이 주문의 품목을 미리 체크해 띄운다. 저장은 회원목록과 같은 함수(lib/adminCustomerBlock.ts).
+  const [blockOpen, setBlockOpen] = useState(false);
+  const [blockSaving, setBlockSaving] = useState(false);
+  const [blockError, setBlockError] = useState("");
   const [cardStatusAction, setCardStatusAction] = useState<"" | "card-paid" | "card-unpaid">("");
   const [paymentCancelAction, setPaymentCancelAction] = useState(false);
   const [methodChanging, setMethodChanging] = useState(false);
@@ -1823,6 +1830,21 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           )}
         </div>
 
+        {/* [2026-09-22] 이 손님 차단 — 거파 처리 흐름(주문 취소 → 차단)을 한 화면에서 끝낸다 */}
+        <div className="mt-3 rounded-xl border border-line p-3">
+          <div className="text-[11px] font-black text-ink-mute">이 손님</div>
+          <button
+            type="button"
+            onClick={() => { setBlockError(""); setBlockOpen(true); }}
+            className="mt-2 h-10 w-full rounded-xl border border-danger-tx bg-surface text-[13px] font-black text-danger-tx hover:bg-danger-bg active:scale-[0.99]"
+          >
+            🚫 이 손님 차단 (거파 품목 고르기)
+          </button>
+          <div className="mt-1.5 text-[11px] font-bold leading-4 text-ink-mute">
+            차단하면 이 손님은 주문서를 새로 쓸 수 없습니다. 이미 들어온 주문·입금·정산은 그대로 남습니다.
+          </div>
+        </div>
+
         <section className="mt-3">
           <div className="mb-1 text-[11px] font-black text-ink-mute">배송메모 / 특이사항</div>
           <div className="min-h-[56px] rounded-lg bg-surface-2 p-3 text-[12px] font-bold leading-6 text-ink-soft">
@@ -1831,6 +1853,31 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         </section>
 
       </div>
+
+      <AdminLiveCustomerBlockReasonModal
+        open={blockOpen}
+        nickname={clean(orderForView.nickname)}
+        name={clean(orderForView.name)}
+        phone={clean(orderForView.phone)}
+        kakaoId={clean(orderForView.kakao_id)}
+        focusOrderKey={clean(orderForView.groupId)}
+        saving={blockSaving}
+        errorMessage={blockError}
+        onClose={() => { if (!blockSaving) { setBlockOpen(false); setBlockError(""); } }}
+        onSubmit={async (reason) => {
+          setBlockError("");
+          setBlockSaving(true);
+          try {
+            await requestAdminCustomerBlock({ phone: clean(orderForView.phone), blocked: true, reason });
+            setBlockOpen(false);
+            showAdminToast(`${clean(orderForView.nickname) || clean(orderForView.name) || "이 손님"}을 차단했습니다.`, "success");
+          } catch (error) {
+            setBlockError(error instanceof Error ? error.message : "차단 처리 실패");
+          } finally {
+            setBlockSaving(false);
+          }
+        }}
+      />
     </aside>
   );
 }

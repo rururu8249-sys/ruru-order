@@ -53,7 +53,7 @@ function classify(text: string): { kind: Kind; label: string } {
   return { kind: "unpaid", label: "미입금" };
 }
 
-function fmtDate(v: unknown) {
+export function fmtDate(v: unknown) {
   const d = new Date(String(v || ""));
   if (Number.isNaN(d.getTime())) return "-";
   const p = (n: number) => String(n).padStart(2, "0");
@@ -66,7 +66,7 @@ function rowAmount(r: Row) {
   return num(r.adjusted_total_price ?? r.total_price ?? 0);
 }
 
-function rowItemLabel(r: Row) {
+export function rowItemLabel(r: Row) {
   const opt = [clean(r.color), clean(r.size)].filter(Boolean).join("/");
   const qty = num(r.qty) || 1;
   return `${clean(r.product_name) || clean(r.memo) || "상품"}${opt ? ` (${opt})` : ""} ×${qty}`;
