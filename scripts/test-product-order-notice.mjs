@@ -31,3 +31,37 @@ assert.equal(PRODUCT_NOTICE_PRESETS.length, 4);
 assert.equal(new Set(PRODUCT_NOTICE_PRESETS.map((p) => p.mode)).size, 4);
 
 console.log("✅ product order notice OK");
+
+// ── [2026-09-22 2차] 상품별 개별 설정 ──────────────────────────────
+{
+  const { resolveProductNoticeFor, parseProductNoticeProductMode, PRODUCT_NOTICE_PRODUCT_OPTIONS } =
+    await import("../lib/productOrderNotice.ts");
+
+  // 예전 상품(키 없음)·빈값·모르는 값 → 「기본값 따름」
+  assert.equal(parseProductNoticeProductMode(undefined), "inherit");
+  assert.equal(parseProductNoticeProductMode(""), "inherit");
+  assert.equal(parseProductNoticeProductMode("아무거나"), "inherit");
+  assert.equal(parseProductNoticeProductMode("off"), "off");
+
+  // 기본값 따름 → 전체 설정을 그대로 쓴다
+  assert.equal(resolveProductNoticeFor({ globalMode: "instant" }), resolveProductOrderNotice("instant", ""));
+  assert.equal(resolveProductNoticeFor({ productMode: "inherit", globalMode: "off" }), "");
+  // 전체가 «표시 안 함»(기본)이면 아무것도 안 보인다 — 사장님 기준
+  assert.equal(resolveProductNoticeFor({}), "");
+
+  // 상품 설정이 전체보다 «먼저»
+  assert.equal(resolveProductNoticeFor({ productMode: "off", globalMode: "live_only" }), "", "상품만 끄기");
+  assert.ok(resolveProductNoticeFor({ productMode: "live_only", globalMode: "off" }).includes("접수"), "전체 꺼져도 이 상품만 켜기");
+  assert.equal(
+    resolveProductNoticeFor({ productMode: "custom", productCustom: " 이 상품은 예약만 받아요 ", globalMode: "instant" }),
+    "이 상품은 예약만 받아요",
+  );
+  // 상품 직접입력이 비었으면 빈 줄(아무것도 안 그림) — 전체로 내려가지 않는다(사장님이 «이 상품만» 고른 것이므로)
+  assert.equal(resolveProductNoticeFor({ productMode: "custom", productCustom: "", globalMode: "live_only" }), "");
+
+  // 선택지 5개, mode 중복 없음, 맨 위가 기본값
+  assert.equal(PRODUCT_NOTICE_PRODUCT_OPTIONS.length, 5);
+  assert.equal(PRODUCT_NOTICE_PRODUCT_OPTIONS[0].mode, "inherit");
+  assert.equal(new Set(PRODUCT_NOTICE_PRODUCT_OPTIONS.map((o) => o.mode)).size, 5);
+}
+console.log("✅ product order notice (상품별) OK");

@@ -47,3 +47,43 @@ export function resolveProductOrderNotice(mode: unknown, custom: unknown): strin
   if (m === "custom") return String(custom ?? "").trim().slice(0, PRODUCT_NOTICE_MAX_LEN);
   return PRODUCT_NOTICE_PRESETS.find((p) => p.mode === m)?.text || "";
 }
+
+// ═══ [2026-09-22 2차] 상품마다 «개별로» ═══
+//
+//   사장님: 「아니 특정상품에 개별로 할거라서 이거 상품등록(수정) 하는곳에 설계 해야 하나?」
+//   → 맞다. 상품 등록·수정에 칸을 두고, 설정 화면의 값은 «전체 기본값»이 된다.
+//     · 상품마다 기본은 «기본값 따름» → 상품 100개를 올려도 매번 고를 필요가 없다
+//     · 다른 상품만 골라서 바꾼다 (스마트스토어의 «상품별 안내» 와 같은 구조)
+//   저장 자리: products.product_note JSON 에 키 2개(order_notice_mode / order_notice_custom).
+//     재고·옵션 플래그들이 이미 쓰는 자리라 **DB 변경이 없다**(ADD COLUMN 조차 불필요).
+
+export type ProductNoticeProductMode = "inherit" | ProductNoticeMode;
+
+/** 상품 등록·수정 화면의 선택지. 맨 위가 기본값(= 전체 설정을 따른다). */
+export const PRODUCT_NOTICE_PRODUCT_OPTIONS: { mode: ProductNoticeProductMode; label: string }[] = [
+  { mode: "inherit", label: "기본값 따름 (설정 → 주문서 표시)" },
+  { mode: "off", label: "이 상품만 표시 안 함" },
+  { mode: "live_only", label: "라이브 접수 후 구매" },
+  { mode: "instant", label: "바로 구매 가능" },
+  { mode: "custom", label: "직접 입력" },
+];
+
+/** 상품에 저장된 값을 안전하게 모드로. 키가 없으면(예전 상품) «기본값 따름». */
+export function parseProductNoticeProductMode(raw: unknown): ProductNoticeProductMode {
+  const v = String(raw ?? "").trim();
+  if (v === "off" || v === "live_only" || v === "instant" || v === "custom") return v;
+  return "inherit"; // "" · "inherit" · 모르는 값 전부 여기로
+}
+
+/** 손님 화면 한 줄 — 상품 설정이 먼저, «기본값 따름»이면 전체 설정으로 내려간다.
+ *  ⚠ 표시 전용. 주문을 막지 않는다. */
+export function resolveProductNoticeFor(input: {
+  productMode?: unknown;
+  productCustom?: unknown;
+  globalMode?: unknown;
+  globalCustom?: unknown;
+}): string {
+  const pm = parseProductNoticeProductMode(input.productMode);
+  if (pm !== "inherit") return resolveProductOrderNotice(pm, input.productCustom);
+  return resolveProductOrderNotice(input.globalMode, input.globalCustom);
+}

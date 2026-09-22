@@ -560,10 +560,12 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent }: Ad
                       «오류»로 오해한다. 그래서 안내 톤(연한 살구 바탕 + 진한 갈색)으로 구분했다.
                     ⚠ 표시 전용 — 주문을 «막지» 않는다. 재고·진열·주문 로직과 무관. */}
               <div className="mb-3 rounded-xl border border-line bg-surface-2 p-4">
-                <div className="text-sm font-black text-ink">📣 상품 주문 안내 문구</div>
+                <div className="text-sm font-black text-ink">📣 상품 주문 안내 문구 — 전체 기본값</div>
                 <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
-                  손님이 상품을 눌렀을 때 <b>수량·금액 줄 바로 위</b>에 한 줄로 보입니다. 모든 상품에 같이 적용됩니다.
-                  안내만 할 뿐 주문을 막지는 않습니다.
+                  손님이 상품을 눌렀을 때 <b>수량·금액 줄 바로 위</b>에 한 줄로 보입니다. 안내만 할 뿐 주문을 막지는 않습니다.
+                  <br />
+                  ※ 여기 값은 <b>기본값</b>입니다. 상품마다 다르게 하려면 <b>상품 수정 → 자세히 → 「주문 안내 문구」</b>에서
+                  그 상품만 바꾸세요(기본은 「기본값 따름」).
                 </div>
 
                 <div className="mt-3 space-y-2">
@@ -628,7 +630,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent }: Ad
                 ) : null}
 
                 <div className="mt-2 text-[11px] font-bold text-ink-mute">
-                  ※ 아래 <b>저장</b>을 눌러야 손님 화면에 반영됩니다.
+                  ※ 아래 <b>저장</b>을 눌러야 손님 화면에 반영됩니다. 상품에서 따로 고른 문구가 있으면 <b>그 상품은 그쪽이 우선</b>입니다.
                 </div>
               </div>
 

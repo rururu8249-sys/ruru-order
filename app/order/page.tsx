@@ -53,7 +53,7 @@ import { brandWordmarkThumbnail, normalizeBrandKorean, productNameThumbnail, pro
 import { toOptionList } from "@/lib/optionSplit";
 import { widgetPinnedProductId } from "@/lib/widgetPinState";
 // [2026-09-22] 상품 주문 안내 문구 — 문구 원문은 lib 한 곳에서만 정한다(관리자 설정과 같은 파일)
-import { resolveProductOrderNotice } from "@/lib/productOrderNotice";
+import { resolveProductNoticeFor } from "@/lib/productOrderNotice";
 import {
   CUSTOMER_SESSION_VERSION_KEY,
   YOUTUBE_NICKNAME_CONFIRM_VERSION_KEY,
@@ -1669,8 +1669,10 @@ export default function OrderPage() {
   //   손님 화면엔 "직접 입력하기" 버튼이 떠버렸다(8/10 23:25 장애 때 실제로 발생 — 없는 상품 "반바지" 주문 접수).
   //   → 설정을 성공적으로 읽어 ON 으로 확인된 경우에만 켠다. 못 읽으면 숨김(안전한 실패).
   const [directInputEnabled, setDirectInputEnabled] = useState(false);
-  // [2026-09-22 사장님] 상품 주문 안내 문구 — 설정 → 주문서 표시에서 고른 한 줄. ""이면 안 보인다(표시 전용).
-  const [productOrderNotice, setProductOrderNotice] = useState("");
+  // [2026-09-22 사장님] 주문 안내 문구 — 설정 → 주문서 표시의 «전체 기본값».
+  //   [2차] 상품마다 개별 설정이 우선이고, 그 상품이 «기본값 따름»일 때만 이 값이 쓰인다.
+  //   ⚠ 표시 전용 — 주문을 막지 않는다.
+  const [productNoticeGlobal, setProductNoticeGlobal] = useState<{ mode: string; custom: string }>({ mode: "off", custom: "" });
   const [combineShippingSettings, setCombineShippingSettings] =
     useState<CombineShippingSettings>(DEFAULT_COMBINE_SHIPPING_SETTINGS);
   const [alreadyPaidShipping, setAlreadyPaidShipping] = useState(false);
@@ -2395,13 +2397,11 @@ export default function OrderPage() {
     setPointEarnRateForDisplay(pointAutoEarnEnabled ? pointEarnRate : 0);
 
     setNoticeText(String((data || []).find((i: any) => i.key === "notice_text")?.value || ""));
-    // [2026-09-22 사장님] 상품 주문 안내 문구(설정 → 주문서 표시). ""이면 아무것도 안 그린다. 표시 전용.
-    setProductOrderNotice(
-      resolveProductOrderNotice(
-        (data || []).find((i: any) => i.key === "product_notice_mode")?.value,
-        (data || []).find((i: any) => i.key === "product_notice_custom")?.value,
-      ),
-    );
+    // [2026-09-22 사장님] 주문 안내 문구의 «전체 기본값»(설정 → 주문서 표시). 상품별 설정이 없을 때만 쓰인다.
+    setProductNoticeGlobal({
+      mode: String((data || []).find((i: any) => i.key === "product_notice_mode")?.value || "off"),
+      custom: String((data || []).find((i: any) => i.key === "product_notice_custom")?.value || ""),
+    });
     setDirectInputEnabled(
       String((data || []).find((i: any) => i.key === "direct_input_enabled")?.value || "true").trim() !== "false",
     );
@@ -7779,11 +7779,22 @@ export default function OrderPage() {
                       색: 빨강+* 은 이 화면에서 «품절·선택 안 함» 경고에 쓰고 있어 같은 빨강이면 «오류»로 오해한다.
                         → 안내 톤(연한 살구 바탕 + 진한 갈색). 굵게만 주고 * 는 안 쓴다.
                       ⚠ 표시 전용 — 주문을 막지 않는다(막으려면 재고·진열 쪽이라 위험분석이 따로 필요). */}
-                {productOrderNotice ? (
-                  <div style={{ flexShrink: 0, borderTop: "1px solid #F0EAE0", background: "#FDF1E7", padding: "10px 18px", fontSize: "12.5px", fontWeight: 800, lineHeight: 1.5, color: "#8A4B1A", wordBreak: "keep-all" }}>
-                    {productOrderNotice}
-                  </div>
-                ) : null}
+                {(() => {
+                  // [2026-09-22 2차 사장님] 「특정상품에 개별로」 — 이 상품 설정이 먼저, «기본값 따름»이면 전체 설정.
+                  const note = (parseProductSuggestionNote(registeredOptionSelectProduct?.product_note) || {}) as Record<string, unknown>;
+                  const line = resolveProductNoticeFor({
+                    productMode: note.order_notice_mode,
+                    productCustom: note.order_notice_custom,
+                    globalMode: productNoticeGlobal.mode,
+                    globalCustom: productNoticeGlobal.custom,
+                  });
+                  if (!line) return null;
+                  return (
+                    <div style={{ flexShrink: 0, borderTop: "1px solid #F0EAE0", background: "#FDF1E7", padding: "10px 18px", fontSize: "12.5px", fontWeight: 800, lineHeight: 1.5, color: "#8A4B1A", wordBreak: "keep-all" }}>
+                      {line}
+                    </div>
+                  );
+                })()}
 
                 <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "14px 18px" }}>
                   {registeredOptionDetailSelected ? (

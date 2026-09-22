@@ -4,6 +4,14 @@ import { ChangeEvent, type CSSProperties, DragEvent, type MouseEvent as ReactMou
 import { supabase } from "@/lib/supabase";
 import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import { showAdminToast } from "@/lib/adminToast";
+// [2026-09-22] 상품별 주문 안내 문구 — 문구 원문·모드는 lib 한 곳에서만 정한다(설정 화면과 같은 파일)
+import {
+  PRODUCT_NOTICE_PRODUCT_OPTIONS,
+  PRODUCT_NOTICE_MAX_LEN,
+  PRODUCT_NOTICE_PRESETS,
+  parseProductNoticeProductMode,
+  type ProductNoticeProductMode,
+} from "@/lib/productOrderNotice";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { resolveProductImageUrl } from "./productImageUrl";
 import { compressProductImage, isHeicLikeImage } from "./compressProductImage";
@@ -236,6 +244,9 @@ type ParsedProductNote = Record<string, unknown> & {
       suggestion_keywords?: string[];
       purchase_limit_enabled?: boolean;
       purchase_limit_qty?: number;
+      // [2026-09-22] 이 상품만의 주문 안내 문구. 없으면 «기본값 따름»(설정 → 주문서 표시)
+      order_notice_mode?: string;
+      order_notice_custom?: string;
       // [조합형 옵션 · 2026-07-22] 세부상품(종류) 모드 — 세부상품명은 stock_variants의 color 자리에 저장(재고 RPC 무변경 재사용)
       combo_mode?: boolean;
       option_label?: string;
@@ -755,6 +766,10 @@ export default function QuickProductFastForm({
   const [purchaseLimitText, setPurchaseLimitText] = useState("1");
   const [suggestionKeywordsText, setSuggestionKeywordsText] = useState("");
   const [specChipsText, setSpecChipsText] = useState(""); // [2026-09-20] 한눈에 정보 칩 (쉼표 구분)
+  // [2026-09-22 사장님] 「특정상품에 개별로」 — 이 상품만의 주문 안내 문구.
+  //   기본은 «기본값 따름» → 상품을 100개 올려도 매번 고를 필요가 없다. 다른 상품만 골라서 바꾼다.
+  const [orderNoticeMode, setOrderNoticeMode] = useState<ProductNoticeProductMode>("inherit");
+  const [orderNoticeCustom, setOrderNoticeCustom] = useState("");
 
   const [coverImages, setCoverImages] = useState<string[]>([]);
   const [detailImages, setDetailImages] = useState<string[]>([]);
@@ -958,6 +973,9 @@ export default function QuickProductFastForm({
     setCustomerDetailInputEnabled(productNote?.customer_detail_input_enabled === true);
     setSuggestionKeywordsText(Array.isArray(productNote?.suggestion_keywords) ? productNote.suggestion_keywords.join(", ") : "");
     setSpecChipsText(Array.isArray(productNote?.spec_chips) ? productNote.spec_chips.map((v) => String(v ?? "").trim()).filter(Boolean).join(", ") : "");
+    // [2026-09-22] 이 상품만의 주문 안내 문구. 키가 없는 예전 상품은 «기본값 따름»으로 읽힌다.
+    setOrderNoticeMode(parseProductNoticeProductMode(productNote?.order_notice_mode));
+    setOrderNoticeCustom(String(productNote?.order_notice_custom || "").trim());
     setCustomInputLabel(String((productNote as { custom_input_label?: unknown } | null)?.custom_input_label || "").trim());
     {
       // [2026-09-03] 색상별 사진 로드 — 값이 있는 것만(없으면 빈 맵 → 기존 상품 무변화)
@@ -1669,6 +1687,9 @@ export default function QuickProductFastForm({
     setVariantRows([]);
     setDescription("");
     setSpecChipsText("");
+    // [2026-09-22] 새 상품은 «기본값 따름» — 등록할 때마다 고를 필요가 없다
+    setOrderNoticeMode("inherit");
+    setOrderNoticeCustom("");
     setFreeProductEnabled(false);
     setStockManagementEnabled(false); // [2026-09-03 사장님 지시] 새 상품 폼 초기화도 기본 OFF
     setCustomerDetailInputEnabled(false);
@@ -1818,6 +1839,13 @@ export default function QuickProductFastForm({
         stock_management_enabled: stockManagementEnabled,
         purchase_limit_enabled: purchaseLimitEnabled,
         purchase_limit_qty: purchaseLimitEnabled ? Math.max(1, Number(purchaseLimitText) || 1) : 0,
+        // [2026-09-22] 이 상품만의 주문 안내 문구. «기본값 따름»이면 키를 안 만든다(기존 note 구성 무변화)
+        ...(orderNoticeMode !== "inherit"
+          ? {
+              order_notice_mode: orderNoticeMode,
+              ...(orderNoticeMode === "custom" ? { order_notice_custom: orderNoticeCustom.trim().slice(0, PRODUCT_NOTICE_MAX_LEN) } : {}),
+            }
+          : {}),
         registered_order_enabled: registeredOrderEnabled,
         // 고객 세부상품명 직접입력은 일반 상품 전용.
         // 기존 세부상품 조합형/브랜드 대표상품은 product_name이 재고 식별자라 저장 단계에서도 강제로 OFF한다.
@@ -3048,6 +3076,52 @@ export default function QuickProductFastForm({
                   <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>
                     {chips.length === 0 ? "손님 옵션 창 위쪽에 칩으로 보여요 · 최대 6개, 한 칩 10자" : `${chips.length}/6개 · 손님 옵션 창에 이렇게 보여요`}
                   </span>
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* [2026-09-22 사장님] 「특정상품에 개별로」 — 이 상품만의 주문 안내 문구.
+                손님 상품창의 «수량·금액 줄 바로 위»에 한 줄로 뜬다.
+                기본은 «기본값 따름»(설정 → 주문서 표시) → 등록할 때마다 고를 필요가 없고,
+                다른 상품만 골라서 바꾼다. 저장 자리는 product_note JSON(키 2개) — DB 변경 없음.
+                ⚠ 표시 전용 — 주문을 «막지» 않는다. */}
+          <div style={{ marginBottom: "12px" }}>
+            <div style={sectionLabel}>주문 안내 문구 (선택)</div>
+            <select
+              value={orderNoticeMode}
+              onChange={(e) => { setFormTouched(true); setOrderNoticeMode(parseProductNoticeProductMode(e.target.value)); }}
+              style={{ width: "100%", height: "36px", boxSizing: "border-box", fontSize: "13px", padding: "0 12px", border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", color: "var(--color-ink)" }}
+            >
+              {PRODUCT_NOTICE_PRODUCT_OPTIONS.map((o) => (
+                <option key={o.mode} value={o.mode}>{o.label}</option>
+              ))}
+            </select>
+
+            {orderNoticeMode === "custom" ? (
+              <input
+                value={orderNoticeCustom}
+                onChange={(e) => { setFormTouched(true); setOrderNoticeCustom(e.target.value.slice(0, PRODUCT_NOTICE_MAX_LEN)); }}
+                placeholder={`이 상품에만 보일 문구 (${PRODUCT_NOTICE_MAX_LEN}자까지)`}
+                style={{ width: "100%", height: "36px", boxSizing: "border-box", marginTop: "6px", fontSize: "13px", padding: "0 12px", border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", color: "var(--color-ink)" }}
+              />
+            ) : null}
+
+            {/* 손님 화면에 그대로 보일 모습 — 저장 전에 눈으로 확인 */}
+            {(() => {
+              if (orderNoticeMode === "inherit") {
+                return <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--color-ink-mute)" }}>설정 → 주문서 표시에서 정한 «전체 기본 문구»를 따릅니다.</div>;
+              }
+              if (orderNoticeMode === "off") {
+                return <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--color-ink-mute)" }}>이 상품에는 안내 문구가 안 보입니다.</div>;
+              }
+              const preview = orderNoticeMode === "custom"
+                ? orderNoticeCustom.trim()
+                : (PRODUCT_NOTICE_PRESETS.find((x) => x.mode === orderNoticeMode)?.text || "");
+              if (!preview) return <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--color-ink-mute)" }}>문구를 적어주세요 — 비어 있으면 안 보입니다.</div>;
+              return (
+                <div style={{ marginTop: "6px", borderRadius: "8px", background: "#FDF1E7", border: "1px solid #F3D9C2", color: "#8A4B1A", padding: "8px 12px", fontSize: "13px", fontWeight: 800, lineHeight: 1.5, wordBreak: "keep-all" }}>
+                  {preview}
                 </div>
               );
             })()}
