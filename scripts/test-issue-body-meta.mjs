@@ -58,4 +58,31 @@ const BODY = [
   assert.equal(isIssueMetaLine("전화번호: 010"), true);
 }
 
-console.log("✅ test-issue-body-meta — 수정해도 전화번호·닉네임·이름이 보존됨");
+// [2026-09-23 사장님] 「고객 이슈 들어가면 내용이 다 안보임 수정 눌러야만 전체 내용 확인 가능」
+//   목록이 메모의 «첫 줄만» 읽고 있었다. 메모는 여러 줄이 통째로 살아 있어야 한다.
+{
+  const body = [
+    "자동날짜: 2026. 09. 18. 금요일",
+    "이슈유형: 환불",
+    "닉네임: 채은-u8d",
+    "이름: 윤채은",
+    "전화번호: 01037279388",
+    "주문번호: RURU-MU4ANCKT",
+    "대상상품: 꽃티 폴로(S)×1",
+    "",
+    "불량 교환 완료",
+    "반품택배 미도착",
+  ].join("\n");
+
+  const { memo } = splitIssueBody(body);
+  assert.equal(memo, "불량 교환 완료\n반품택배 미도착", "여러 줄 메모가 잘리면 안 된다");
+  assert.ok(memo.includes("반품택배 미도착"), "둘째 줄이 사라졌다 — 목록에서 안 보이던 그 버그");
+  // 줄 수까지 고정 — 나중에 누가 첫 줄만 쓰도록 되돌리면 여기서 걸린다
+  assert.equal(memo.split("\n").length, 2);
+
+  // 저장해도 여러 줄이 유지돼야 한다
+  const saved = mergeIssueBody(splitIssueBody(body).metaLines, memo);
+  assert.equal(splitIssueBody(saved).memo, memo, "다시 저장했더니 줄이 줄었다");
+}
+
+console.log("✅ test-issue-body-meta — 수정해도 전화번호·닉네임·이름이 보존됨 + 여러 줄 메모 유지");

@@ -340,7 +340,12 @@ function IssueCard({
   const phone = formatPhone(getPhone(task));
   const orderNo = extractBodyField(task, "주문번호:");
   const product = extractBodyField(task, "대상상품:") || clean(task.related_product);
-  const memo = getIssueText(task);
+  // [2026-09-23 사장님] 「고객 이슈 들어가면 내용이 다 안보임 수정 눌러야만 전체 내용 확인 가능」
+  //   원인은 칸 폭이나 줄 제한이 아니라 «읽는 함수»였다. getIssueText 는 본문을 줄로 쪼갠 뒤
+  //   첫 줄 하나만 돌려준다(212~230행). 그래서 「불량 교환 완료 / 반품택배 미도착」의 둘째 줄이
+  //   목록에선 아예 넘어오지 않았고, 수정창(getFullMemo)에서만 보였다.
+  //   → 목록도 수정창과 «같은 함수»를 쓴다. 기준이 갈라지면 또 이런다.
+  const memo = getFullMemo(task);
   const priority = getPriorityLabel(task.priority);
 
   // 유형은 «색»으로 가른다 — 환불과 교환은 처리 방법이 완전히 달라서 한눈에 갈라져야 한다.
@@ -357,7 +362,7 @@ function IssueCard({
   return (
     <div
       key={taskKey(task, index)}
-      className={`relative grid grid-cols-[76px_120px_88px_124px_112px_1fr_auto] items-center gap-x-3 gap-y-1 border-b border-line px-3 py-2.5 transition hover:bg-surface-2 ${done ? "opacity-60" : ""}`}
+      className={`relative grid grid-cols-[76px_120px_88px_124px_112px_1fr_auto] items-start gap-x-3 gap-y-1 border-b border-line px-3 py-2.5 transition hover:bg-surface-2 ${done ? "opacity-60" : ""}`}
     >
       <span className={`absolute left-0 top-0 h-full w-1 ${done ? "bg-[var(--color-ok-tx)]" : "bg-[var(--color-danger-tx)]"}`} />
 
@@ -398,9 +403,11 @@ function IssueCard({
       {/* 년월일 */}
       <div className="text-[12px] font-bold text-ink-soft">{dateLabel(task.created_at)}</div>
 
-      {/* 특이사항 — 넓은 칸. 길면 두 줄까지, 전체는 마우스 올리면 보인다 */}
+      {/* 특이사항 — 자르지 않고 «전부» 보여준다(사장님 확정).
+          접기/펼치기는 2026-09-21 에 「2번씩이나 클릭해야 한다」고 하셔서 없앤 기준을 유지한다.
+          whitespace-pre-line = 메모에 적힌 줄바꿈을 그대로 살린다(HTML 기본은 줄바꿈을 지운다). */}
       <div
-        className="line-clamp-2 break-words text-[12px] font-bold leading-5 text-ink"
+        className="whitespace-pre-line break-words text-[12px] font-bold leading-5 text-ink"
         title={[detail, orderNo ? `주문번호 ${orderNo}` : ""].filter(Boolean).join("\n")}
       >
         {detail || "내용 없음"}
