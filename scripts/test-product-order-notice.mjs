@@ -68,19 +68,26 @@ console.log("✅ product order notice (상품별) OK");
 
 // ── [2026-09-22 3차] 두 줄 고정 (· 기준) ───────────────────────────
 {
-  const { splitProductOrderNotice } = await import("../lib/productOrderNotice.ts");
+  const { splitProductOrderNotice, PRODUCT_NOTICE_ONE_LINE_MAX } = await import("../lib/productOrderNotice.ts");
 
-  // 기본 문구 — 「접수해 주세요」 / 「접수 확인된 분만…」 으로 항상 나뉜다
+  // [2026-09-22 4차] 기본 문구 2종은 «한 줄»이다(사장님: 「두줄 별로인거 같음」)
   const live = resolveProductOrderNotice("live_only", "");
   const a = splitProductOrderNotice(live);
-  assert.ok(a.head.startsWith("📺") && a.head.includes("접수해 주세요"), JSON.stringify(a));
-  assert.ok(a.sub.includes("접수 확인된 분만"), JSON.stringify(a));
-  assert.ok(!a.head.includes("·") && !a.sub.includes("·"), "가운데점은 남기지 않는다");
+  assert.ok(a.head.startsWith("📺") && a.head.includes("주문할 수 있어요"), JSON.stringify(a));
+  assert.equal(a.sub, "", "기본 문구는 두 줄로 나뉘지 않는다");
 
-  // · 없는 짧은 문구는 한 줄 그대로
   const b = splitProductOrderNotice(resolveProductOrderNotice("instant", ""));
   assert.ok(b.head.includes("바로 주문"), JSON.stringify(b));
   assert.equal(b.sub, "");
+
+  // ★ 좁은 폰에서 한 줄을 지키는 길이 상한 — 여기를 넘기면 다시 두 줄이 된다
+  for (const t of [live, resolveProductOrderNotice("instant", "")]) {
+    assert.ok([...t].length <= PRODUCT_NOTICE_ONE_LINE_MAX, `한 줄 상한 초과: ${t} (${[...t].length}자)`);
+  }
+  // 끝맺음을 맞춰 나란히 읽히게 — 둘 다 「주문할 수 있어요」로 끝난다
+  for (const t of [live, resolveProductOrderNotice("instant", "")]) {
+    assert.ok(t.endsWith("주문할 수 있어요"), t);
+  }
 
   // 빈값·점만 있는 값도 안전하게
   assert.deepEqual(splitProductOrderNotice(""), { head: "", sub: "" });

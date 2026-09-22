@@ -21,7 +21,10 @@ export const PRODUCT_NOTICE_PRESETS: { mode: ProductNoticeMode; label: string; t
   {
     mode: "live_only",
     label: "라이브 접수 후 구매",
-    text: "📺 라이브 방송에서 먼저 접수해 주세요 · 접수 확인된 분만 주문할 수 있어요",
+    // [2026-09-22 4차] 사장님: 「말을 좀 못줄이나? 두줄 별로인거 같음」
+    //   35자 → 20자. 아래 «바로 구매»와 끝맺음("~주문할 수 있어요")을 맞춰 나란히 읽힌다.
+    //   ⚠ 여기를 늘리면 좁은 폰에서 다시 두 줄이 된다. 한 줄 상한은 PRODUCT_NOTICE_ONE_LINE_MAX(테스트가 지킨다)
+    text: "📺 방송에서 접수한 분만 주문할 수 있어요",
   },
   {
     mode: "instant",
@@ -33,6 +36,10 @@ export const PRODUCT_NOTICE_PRESETS: { mode: ProductNoticeMode; label: string; t
 
 /** 직접 입력 글자수 상한 — 손님 화면에서 두 줄을 넘기지 않는 길이(실측 기준). */
 export const PRODUCT_NOTICE_MAX_LEN = 60;
+
+/** 기본 문구가 «한 줄»로 들어가는 상한 — 2026-09-22 사장님 폰 실측(좁은 폭에서 약 24자부터 넘어감).
+ *  ⚠ 기본 문구(PRODUCT_NOTICE_PRESETS)를 이보다 길게 쓰면 두 줄이 된다. 테스트가 막는다. */
+export const PRODUCT_NOTICE_ONE_LINE_MAX = 24;
 
 /** 저장값(문자열)을 안전하게 모드로 바꾼다. 모르는 값이면 «표시 안 함». */
 export function parseProductNoticeMode(raw: unknown): ProductNoticeMode {
