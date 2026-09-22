@@ -65,3 +65,33 @@ console.log("✅ product order notice OK");
   assert.equal(new Set(PRODUCT_NOTICE_PRODUCT_OPTIONS.map((o) => o.mode)).size, 5);
 }
 console.log("✅ product order notice (상품별) OK");
+
+// ── [2026-09-22 3차] 두 줄 고정 (· 기준) ───────────────────────────
+{
+  const { splitProductOrderNotice } = await import("../lib/productOrderNotice.ts");
+
+  // 기본 문구 — 「접수해 주세요」 / 「접수 확인된 분만…」 으로 항상 나뉜다
+  const live = resolveProductOrderNotice("live_only", "");
+  const a = splitProductOrderNotice(live);
+  assert.ok(a.head.startsWith("📺") && a.head.includes("접수해 주세요"), JSON.stringify(a));
+  assert.ok(a.sub.includes("접수 확인된 분만"), JSON.stringify(a));
+  assert.ok(!a.head.includes("·") && !a.sub.includes("·"), "가운데점은 남기지 않는다");
+
+  // · 없는 짧은 문구는 한 줄 그대로
+  const b = splitProductOrderNotice(resolveProductOrderNotice("instant", ""));
+  assert.ok(b.head.includes("바로 주문"), JSON.stringify(b));
+  assert.equal(b.sub, "");
+
+  // 빈값·점만 있는 값도 안전하게
+  assert.deepEqual(splitProductOrderNotice(""), { head: "", sub: "" });
+  assert.deepEqual(splitProductOrderNotice(undefined), { head: "", sub: "" });
+  assert.deepEqual(splitProductOrderNotice("· 바로 주문 가능"), { head: "바로 주문 가능", sub: "" });
+  assert.deepEqual(splitProductOrderNotice("바로 주문 가능 ·"), { head: "바로 주문 가능", sub: "" });
+
+  // 직접 입력도 · 로 나눌 수 있다
+  assert.deepEqual(splitProductOrderNotice("예약만 받아요 · 방송 때 말씀해 주세요"), {
+    head: "예약만 받아요",
+    sub: "방송 때 말씀해 주세요",
+  });
+}
+console.log("✅ product order notice (두 줄) OK");

@@ -7,7 +7,7 @@ import TrendPanel from "./TrendPanel";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 // [2026-09-22] 상품 주문 안내 문구 — 문구 원문·기본값은 한 곳(lib)에서만 정한다
-import { PRODUCT_NOTICE_PRESETS, PRODUCT_NOTICE_MAX_LEN, parseProductNoticeMode, resolveProductOrderNotice, type ProductNoticeMode } from "@/lib/productOrderNotice";
+import { PRODUCT_NOTICE_PRESETS, PRODUCT_NOTICE_MAX_LEN, parseProductNoticeMode, resolveProductOrderNotice, splitProductOrderNotice, type ProductNoticeMode } from "@/lib/productOrderNotice";
 import AdminAuthSettingsPanel from "./AdminAuthSettingsPanel";
 import AdminSoundControl from "./AdminSoundControl";
 import CombineShippingSettingsTab from "./CombineShippingSettingsTab";
@@ -620,12 +620,16 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent }: Ad
                 {resolveProductOrderNotice(productNoticeMode, productNoticeCustom) ? (
                   <div className="mt-3">
                     <div className="mb-1 text-[11px] font-black text-ink-mute">손님 화면 미리보기</div>
-                    <div
-                      className="rounded-xl px-3 py-2.5 text-sm font-bold leading-6"
-                      style={{ background: "#FDF1E7", color: "#8A4B1A", border: "1px solid #F3D9C2" }}
-                    >
-                      {resolveProductOrderNotice(productNoticeMode, productNoticeCustom)}
-                    </div>
+                    {/* [2026-09-22 3차] 손님 화면과 «같은 모양»으로 — 가운데점(·) 기준 두 줄 */}
+                    {(() => {
+                      const { head, sub } = splitProductOrderNotice(resolveProductOrderNotice(productNoticeMode, productNoticeCustom));
+                      return (
+                        <div className="rounded-xl px-3 py-2.5" style={{ background: "#FDF1E7", border: "1px solid #F3D9C2", wordBreak: "keep-all" }}>
+                          <div className="text-sm font-bold leading-6" style={{ color: "#8A4B1A" }}>{head}</div>
+                          {sub ? <div className="text-xs font-bold leading-5" style={{ color: "#A5713F" }}>{sub}</div> : null}
+                        </div>
+                      );
+                    })()}
                   </div>
                 ) : null}
 

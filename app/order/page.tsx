@@ -53,7 +53,7 @@ import { brandWordmarkThumbnail, normalizeBrandKorean, productNameThumbnail, pro
 import { toOptionList } from "@/lib/optionSplit";
 import { widgetPinnedProductId } from "@/lib/widgetPinState";
 // [2026-09-22] 상품 주문 안내 문구 — 문구 원문은 lib 한 곳에서만 정한다(관리자 설정과 같은 파일)
-import { resolveProductNoticeFor } from "@/lib/productOrderNotice";
+import { resolveProductNoticeFor, splitProductOrderNotice } from "@/lib/productOrderNotice";
 import {
   CUSTOMER_SESSION_VERSION_KEY,
   YOUTUBE_NICKNAME_CONFIRM_VERSION_KEY,
@@ -7789,9 +7789,14 @@ export default function OrderPage() {
                     globalCustom: productNoticeGlobal.custom,
                   });
                   if (!line) return null;
+                  // [2026-09-22 3차 사장님] 「문장이 짤려서 밑으로 내려가는게 싫은데」
+                  //   → 좁은 폰에서 아무 데서나 끊기지 않게, 가운데점(·)을 기준으로 «처음부터» 두 줄로 나눈다.
+                  //     윗줄 = 무엇을 하면 되는지(굵게) / 아랫줄 = 조건(작게). ·이 없으면 한 줄 그대로.
+                  const { head, sub } = splitProductOrderNotice(line);
                   return (
-                    <div style={{ flexShrink: 0, borderTop: "1px solid #F0EAE0", background: "#FDF1E7", padding: "10px 18px", fontSize: "12.5px", fontWeight: 800, lineHeight: 1.5, color: "#8A4B1A", wordBreak: "keep-all" }}>
-                      {line}
+                    <div style={{ flexShrink: 0, borderTop: "1px solid #F0EAE0", background: "#FDF1E7", padding: "10px 18px", wordBreak: "keep-all" }}>
+                      <div style={{ fontSize: "12.5px", fontWeight: 800, lineHeight: 1.45, color: "#8A4B1A" }}>{head}</div>
+                      {sub ? <div style={{ marginTop: "2px", fontSize: "11.5px", fontWeight: 700, lineHeight: 1.45, color: "#A5713F" }}>{sub}</div> : null}
                     </div>
                   );
                 })()}

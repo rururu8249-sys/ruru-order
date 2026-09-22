@@ -10,6 +10,7 @@ import {
   PRODUCT_NOTICE_MAX_LEN,
   PRODUCT_NOTICE_PRESETS,
   parseProductNoticeProductMode,
+  splitProductOrderNotice,
   type ProductNoticeProductMode,
 } from "@/lib/productOrderNotice";
 import { showAdminConfirm } from "@/lib/adminConfirm";
@@ -3119,9 +3120,12 @@ export default function QuickProductFastForm({
                 ? orderNoticeCustom.trim()
                 : (PRODUCT_NOTICE_PRESETS.find((x) => x.mode === orderNoticeMode)?.text || "");
               if (!preview) return <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--color-ink-mute)" }}>문구를 적어주세요 — 비어 있으면 안 보입니다.</div>;
+              // [2026-09-22 3차] 손님 화면과 «같은 모양» — 가운데점(·) 기준 두 줄
+              const { head, sub } = splitProductOrderNotice(preview);
               return (
-                <div style={{ marginTop: "6px", borderRadius: "8px", background: "#FDF1E7", border: "1px solid #F3D9C2", color: "#8A4B1A", padding: "8px 12px", fontSize: "13px", fontWeight: 800, lineHeight: 1.5, wordBreak: "keep-all" }}>
-                  {preview}
+                <div style={{ marginTop: "6px", borderRadius: "8px", background: "#FDF1E7", border: "1px solid #F3D9C2", padding: "8px 12px", wordBreak: "keep-all" }}>
+                  <div style={{ fontSize: "13px", fontWeight: 800, lineHeight: 1.45, color: "#8A4B1A" }}>{head}</div>
+                  {sub ? <div style={{ marginTop: "2px", fontSize: "12px", fontWeight: 700, lineHeight: 1.45, color: "#A5713F" }}>{sub}</div> : null}
                 </div>
               );
             })()}

@@ -48,6 +48,30 @@ export function resolveProductOrderNotice(mode: unknown, custom: unknown): strin
   return PRODUCT_NOTICE_PRESETS.find((p) => p.mode === m)?.text || "";
 }
 
+// ═══ [2026-09-22 3차] 두 줄을 «처음부터» 나눠 보여준다 ═══
+//
+//   사장님: 「문장이 짤려서 밑으로 내려가는게 싫은데 … 보기좋게 «접수 확인된 분만» 이 문장을
+//            처음부터 밑에 (줄로) 내리던지」
+//
+//   좁은 폰에서 글자가 흐르다 아무 데서나 끊기면 «잘린 것»처럼 보인다.
+//   문구는 그대로 두고(사장님: 「문장도 매끄럽고」), 가운데점 «·» 을 기준으로
+//     첫 줄 = 무엇을 하면 되는지(굵게) / 둘째 줄 = 조건(작게)
+//   으로 «항상» 나눈다. 폭이 넓든 좁든 모양이 같다.
+//   · 이 없으면(짧은 문구·직접입력) 한 줄 그대로. 사장님이 직접 입력할 때도 · 로 나눌 수 있다.
+
+/** 안내 문구를 «윗줄 / 아랫줄»로 나눈다. 가운데점(·)이 기준. 없으면 sub 는 빈 문자열. */
+export function splitProductOrderNotice(text: unknown): { head: string; sub: string } {
+  const full = String(text ?? "").trim();
+  if (!full) return { head: "", sub: "" };
+  const at = full.indexOf("·");
+  if (at < 0) return { head: full, sub: "" };
+  const head = full.slice(0, at).trim();
+  const sub = full.slice(at + 1).trim();
+  // 한쪽이 비면 나누지 않는다(«· 주문 가능» 처럼 점으로 시작/끝나는 경우)
+  if (!head || !sub) return { head: full.replace(/^·|·$/g, "").trim(), sub: "" };
+  return { head, sub };
+}
+
 // ═══ [2026-09-22 2차] 상품마다 «개별로» ═══
 //
 //   사장님: 「아니 특정상품에 개별로 할거라서 이거 상품등록(수정) 하는곳에 설계 해야 하나?」
