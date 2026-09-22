@@ -403,7 +403,13 @@ export default function OrderFeedWidgetClient() {
         style={{
           position: "absolute", left: "8px", bottom: "8px", width: `${WIDGET_W}px`,
           // [2026-09-16 사장님 «정보량은 적은데 가로만 길다»] 줄마다 «글자 길이만큼»만 차지하고, 길면 위젯 폭에서 멈춘다.
-          display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "flex-start", gap: "8px",
+          // [2026-09-22 사장님] 「왼쪽을 고정으로 해서 오른쪽으로 길이가 늘어나는데, 그냥 화면 중앙에서
+          //   비율좋게 왼쪽 오른쪽으로 길어지게」 → alignItems 를 center 로.
+          //   예전(flex-start)은 왼쪽 끝이 붙박이라 글자가 길어지면 오른쪽으로만 자랐다.
+          //   이제 각 줄이 위젯 폭(WIDGET_W) 가운데를 기준으로 좌우로 같이 늘어난다.
+          //   ⚠ 📌 공지 줄·📢 안내 줄도 이 열의 자식이라 같이 가운데로 온다(줄들이 따로 놀면 더 이상하다).
+          //   ⚠ 줄마다 «글자 길이만큼»이라는 09-16 기준은 그대로다 — 바뀐 건 «어디를 기준으로 늘어나나» 뿐.
+          display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", gap: "8px",
           transform: fitScale !== 1 ? `scale(${fitScale})` : undefined, transformOrigin: "bottom left",
         }}
       >
