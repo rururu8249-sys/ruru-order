@@ -31,6 +31,9 @@ type AdminIssueTask = {
   is_resolved?: boolean | null;
   raw_payload?: Record<string, unknown> | null;
   related_product?: string | null;
+  /** 어디서 만들어졌나 — "order_return_flow" 면 주문상세 반품/교환 등록으로 생긴 건 */
+  source?: string | null;
+  resolved_note?: string | null;
 };
 
 type CustomerIssueCustomerOption = {
@@ -44,7 +47,8 @@ type Props = {
   customerOptions?: CustomerIssueCustomerOption[];
 };
 
-type IssueTab = "open" | "all" | "resolved";
+// [2026-09-23] 「지운 건」 탭 추가 — hide 는 DB 삭제가 아니라 status='deleted' 라 되살릴 수 있다.
+type IssueTab = "open" | "all" | "resolved" | "deleted";
 
 type IssueForm = {
   nickname: string;
@@ -320,6 +324,8 @@ function IssueCard({
   onEdit,
   onResolve,
   onHide,
+  onDelete,
+  onRestore,
   busy = false,
   photos = [],
   onPhotoZoom,
@@ -329,6 +335,10 @@ function IssueCard({
   onEdit: (task: AdminIssueTask) => void;
   onResolve: (task: AdminIssueTask) => void | Promise<void>;
   onHide: (task: AdminIssueTask) => void | Promise<void>;
+  /** [2026-09-23] 잘못 등록된 건 지우기(반품 흐름이면 포인트까지 되돌림) */
+  onDelete?: (task: AdminIssueTask) => void | Promise<void>;
+  /** [2026-09-23] 「지운 건」 탭에서 되살리기 */
+  onRestore?: (task: AdminIssueTask) => void | Promise<void>;
   busy?: boolean;
   /** [2026-09-23] 상품 사진 — 상품을 골라 등록한 이슈에만 붙는다. 없으면 빈 배열. */
   photos?: string[];
@@ -342,6 +352,9 @@ function IssueCard({
   //   화면은 가로로 넓은데 세로로만 쌓고 있었다 → 관리자 화면답게 «표 한 줄»로 간다.
   //   (쿠팡 윙·스마트스토어 반품관리도 목록은 표다)
   const done = isResolved(task);
+  const deleted = clean(task.status).toLowerCase() === "deleted";
+  // 반품/교환 등록으로 만들어진 건인가 — 지울 때 포인트·반품기록까지 되돌려야 한다
+  const fromReturn = clean((task as { source?: unknown }).source) === "order_return_flow";
   const issueTypes = getIssueTypes(task);
   const nickname = getNickname(task);
   const name = getName(task);
@@ -449,32 +462,61 @@ function IssueCard({
 
       {/* 처리 */}
       <div className="flex shrink-0 items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => onEdit(task)}
-          className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft transition hover:bg-surface-2"
-        >
-          수정
-        </button>
-        {done ? (
+        {deleted ? (
+          // [2026-09-23] 「지운 건」 탭 — 되살리기만 할 수 있다
           <button
             type="button"
-            onClick={() => onHide(task)}
+            onClick={() => onRestore?.(task)}
             disabled={busy}
-            className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-danger-tx transition hover:bg-danger-bg disabled:opacity-45"
-            title="DB 완전삭제가 아니라 해결목록 숨김 처리"
+            className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ok-tx transition hover:bg-ok-bg disabled:opacity-45"
           >
-            {busy ? "처리중…" : "목록삭제"}
+            {busy ? "처리중…" : "↩ 되살리기"}
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={() => onResolve(task)}
-            disabled={busy}
-            className="rounded-lg bg-ok-tx px-3 py-1.5 text-[11px] font-black text-white transition hover:opacity-90 disabled:opacity-45"
-          >
-            {busy ? "처리중…" : "해결완료"}
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => onEdit(task)}
+              className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft transition hover:bg-surface-2"
+            >
+              수정
+            </button>
+            {done ? (
+              <button
+                type="button"
+                onClick={() => onHide(task)}
+                disabled={busy}
+                className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-danger-tx transition hover:bg-danger-bg disabled:opacity-45"
+                title="DB 완전삭제가 아니라 「지운 건」 탭으로 옮김"
+              >
+                {busy ? "처리중…" : "목록삭제"}
+              </button>
+            ) : (
+              <>
+                {/* [2026-09-23 사장님 요청] 잘못 등록된 건 지우기.
+                    반품/교환으로 등록된 건이면 회수한 포인트까지 자동으로 되돌린다. */}
+                <button
+                  type="button"
+                  onClick={() => onDelete?.(task)}
+                  disabled={busy}
+                  className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-danger-tx transition hover:bg-danger-bg disabled:opacity-45"
+                  title={fromReturn
+                    ? "잘못 등록한 건 — 반품기록을 지우고 회수한 포인트를 돌려드립니다"
+                    : "잘못 등록한 건 — 「지운 건」 탭으로 옮깁니다(되살릴 수 있어요)"}
+                >
+                  {busy ? "처리중…" : fromReturn ? "등록취소" : "지우기"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onResolve(task)}
+                  disabled={busy}
+                  className="rounded-lg bg-ok-tx px-3 py-1.5 text-[11px] font-black text-white transition hover:opacity-90 disabled:opacity-45"
+                >
+                  {busy ? "처리중…" : "해결완료"}
+                </button>
+              </>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -494,6 +536,13 @@ function emptyIssueForm(): IssueForm {
 
 export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Props) {
   const [activeTab, setActiveTab] = useState<IssueTab>("open");
+  // [2026-09-23] 지운 직후 5초 동안 뜨는 «되돌리기» 띠. 놓쳐도 「지운 건」 탭에서 되살릴 수 있다.
+  const [undoTarget, setUndoTarget] = useState<AdminIssueTask | null>(null);
+  useEffect(() => {
+    if (!undoTarget) return;
+    const timer = window.setTimeout(() => setUndoTarget(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [undoTarget]);
   const [tasks, setTasks] = useState<AdminIssueTask[]>([]);
   const [loading, setLoading] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -526,7 +575,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
             return haystack.includes("고객이슈") || haystack.includes("issue") || Boolean(task.customer_id);
           })
-          .filter((task) => clean(task.status).toLowerCase() !== "deleted");
+          ;   // [2026-09-23] 지운 건도 들고 온다 — 「지운 건」 탭에서 되살릴 수 있어야 한다
 
         if (alive) setTasks(rows);
       } catch {
@@ -553,15 +602,21 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     };
   }, []);
 
-  const openCount = useMemo(() => tasks.filter((task) => !isResolved(task)).length, [tasks]);
-  const resolvedCount = useMemo(() => tasks.filter(isResolved).length, [tasks]);
+  const isDeleted = (task: AdminIssueTask) => clean(task.status).toLowerCase() === "deleted";
+  // 「지운 건」은 미해결·전체·해결 어디에도 안 섞인다. 예전과 같은 화면을 유지한다.
+  const liveTasks = useMemo(() => tasks.filter((task) => !isDeleted(task)), [tasks]);
+  const deletedTasks = useMemo(() => tasks.filter(isDeleted), [tasks]);
+
+  const openCount = useMemo(() => liveTasks.filter((task) => !isResolved(task)).length, [liveTasks]);
+  const resolvedCount = useMemo(() => liveTasks.filter(isResolved).length, [liveTasks]);
 
   const visibleTasks = useMemo(() => {
-    if (activeTab === "open") return tasks.filter((task) => !isResolved(task));
-    if (activeTab === "resolved") return tasks.filter(isResolved);
+    if (activeTab === "open") return liveTasks.filter((task) => !isResolved(task));
+    if (activeTab === "resolved") return liveTasks.filter(isResolved);
+    if (activeTab === "deleted") return deletedTasks;
 
-    return tasks;
-  }, [activeTab, tasks]);
+    return liveTasks;
+  }, [activeTab, liveTasks, deletedTasks]);
 
   const issueTotalPages = Math.max(1, Math.ceil(visibleTasks.length / issuePageSize));
   const safeIssuePage = Math.min(Math.max(1, issuePage), issueTotalPages);
@@ -827,6 +882,116 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     showAdminToast("고객이슈를 해결완료 처리했습니다.");
   };
 
+  // ── [2026-09-23 사장님 요청] 잘못 등록된 고객이슈 지우기 / 되살리기 ──
+  //   ⚠ 주문상세 «반품/교환 등록»으로 생긴 건은 고객이슈만 있는 게 아니다.
+  //     주문의 반품기록 + (환불이면) 회수된 적립 포인트가 같이 남아 있다.
+  //     그래서 그 건은 «반품 등록 취소» API 를 부른다 — 포인트를 자동으로 돌려준다.
+  //     서버가 이중 지급을 막는다(source_key + DB 유니크 인덱스).
+  const isReturnFlowIssue = (task: AdminIssueTask) =>
+    clean((task as { source?: unknown }).source) === "order_return_flow";
+
+  const restoreIssueTask = async (task: AdminIssueTask, silent = false) => {
+    const id = clean(task.id);
+    if (!id) return false;
+
+    // ⚠ «반품 등록 취소»로 지운 건은 포인트가 이미 손님께 돌아갔고 반품기록도 지워졌다.
+    //   이슈만 되살리면 화면과 실제가 어긋나므로, 무엇이 안 돌아오는지 분명히 알리고 확인받는다.
+    if (clean(task.resolved_note).startsWith("반품/교환 등록 취소")) {
+      const ok = await showAdminConfirm(
+        "이 건은 «반품 등록 취소»로 지운 건입니다.\n\n" +
+          "되살려도 다음은 자동으로 돌아오지 않습니다:\n" +
+          "· 손님께 돌려드린 포인트\n" +
+          "· 주문의 반품/교환 기록\n\n" +
+          "고객이슈 줄만 다시 보이게 할까요?\n(반품을 다시 잡으시려면 주문상세에서 새로 등록해주세요)",
+        { title: "되살리기", confirmText: "이슈만 되살리기", cancelText: "취소", tone: "warning" },
+      );
+      if (!ok) return false;
+    }
+
+    const response = await fetch("/api/admin-v2/admin-tasks", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, action: "restore", resolved_note: "고객관리에서 되돌리기" }),
+    });
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok || !payload?.ok) {
+      showAdminToast("되돌리기 실패\n" + (payload?.message || "알 수 없는 오류"), "error");
+      return false;
+    }
+
+    setReloadKey((value) => value + 1);
+    window.dispatchEvent(new Event("ruru-admin-task-updated"));
+    if (!silent) {
+      showAdminToast("고객이슈를 되돌렸습니다. 「미해결」에서 다시 보입니다.", "success");
+    }
+    return true;
+  };
+
+  /** 미해결 줄에서 «잘못 등록된 건» 지우기 */
+  const deleteIssueTask = async (task: AdminIssueTask) => {
+    const id = clean(task.id);
+    if (!id) {
+      showAdminToast("지울 고객이슈 ID가 없습니다.");
+      return;
+    }
+
+    const who = getNickname(task) || getName(task) || "이 고객";
+    const fromReturn = isReturnFlowIssue(task);
+
+    const ok = await showAdminConfirm(
+      fromReturn
+        ? `${who} 님의 반품/교환 등록을 취소할까요?\n\n` +
+          `· 회수했던 적립 포인트를 자동으로 돌려드립니다\n` +
+          `· 주문의 반품/교환 기록도 지웁니다\n` +
+          `· 고객이슈는 「지운 건」 탭으로 옮겨집니다(되살릴 수 있어요)\n\n` +
+          `※ 회수 뒤에 손으로 포인트를 따로 주셨다면 중복 지급이 될 수 있어요.`
+        : `${who} 님의 고객이슈를 지울까요?\n\nDB 완전삭제가 아니라 「지운 건」 탭으로 옮겨집니다.`,
+      { title: fromReturn ? "반품 등록 취소" : "고객이슈 지우기", confirmText: "지우기", cancelText: "취소", tone: "warning" },
+    );
+    if (!ok) return;
+
+    setSaving(true);
+    try {
+      if (fromReturn) {
+        const response = await fetch("/api/admin-live/order-return/undo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ taskId: id }),
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+          showAdminToast("반품 등록 취소 실패\n\n" + (payload?.message || "알 수 없는 오류"), "error");
+          return;
+        }
+        setIssuePage(1);
+        setReloadKey((value) => value + 1);
+        window.dispatchEvent(new Event("ruru-admin-task-updated"));
+        showAdminToast(String(payload.message || "반품/교환 등록을 취소했습니다."), "success");
+        // ⚠ 포인트가 오간 건은 «되돌리기» 한 번으로 못 되살린다 → 「지운 건」 탭으로 안내만 한다
+        return;
+      }
+
+      const response = await fetch("/api/admin-v2/admin-tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action: "hide", resolved_note: "고객관리에서 잘못 등록 지우기" }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        showAdminToast("지우기 실패\n" + (payload?.message || "알 수 없는 오류"), "error");
+        return;
+      }
+
+      setIssuePage(1);
+      setReloadKey((value) => value + 1);
+      window.dispatchEvent(new Event("ruru-admin-task-updated"));
+      setUndoTarget(task);      // 5초 동안 «되돌리기» 띠를 띄운다
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const hideResolvedIssueTask = async (task: AdminIssueTask) => {
     const id = clean(task.id);
 
@@ -959,11 +1124,28 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           </button>
         </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-1.5 rounded-2xl bg-surface-2 p-1">
+      {/* [2026-09-23] 지운 직후 «되돌리기» 띠 — 5초. 놓쳐도 「지운 건」 탭에서 되살릴 수 있다. */}
+      {undoTarget ? (
+        <div className="mt-3 flex items-center gap-3 rounded-xl border border-ok-tx/35 bg-ok-bg px-3 py-2">
+          <span className="min-w-0 flex-1 truncate text-[12px] font-bold text-ok-tx">
+            {getNickname(undoTarget) || getName(undoTarget) || "고객이슈"} 건을 지웠습니다 · 「지운 건」 탭에 있어요
+          </span>
+          <button
+            type="button"
+            onClick={() => { const t = undoTarget; setUndoTarget(null); void restoreIssueTask(t); }}
+            className="h-9 shrink-0 rounded-lg bg-[var(--color-ok-tx)] px-3 text-[12px] font-black text-white hover:opacity-90"
+          >
+            ↩ 되돌리기
+          </button>
+        </div>
+      ) : null}
+
+      <div className="mt-4 grid grid-cols-4 gap-1.5 rounded-2xl bg-surface-2 p-1">
         {[
           ["open", `미해결 ${openCount}`],
-          ["all", `전체 ${tasks.length}`],
+          ["all", `전체 ${liveTasks.length}`],
           ["resolved", `해결 ${resolvedCount}`],
+          ["deleted", `지운 건 ${deletedTasks.length}`],
         ].map(([key, label]) => (
           <button
             key={key}
@@ -1013,6 +1195,8 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               onEdit={openEdit}
               onResolve={resolveIssueTask}
               onHide={hideResolvedIssueTask}
+              onDelete={deleteIssueTask}
+              onRestore={(t) => { void restoreIssueTask(t); }}
               busy={saving}
             />
           ))}

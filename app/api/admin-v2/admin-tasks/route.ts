@@ -177,7 +177,8 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    if (!["resolve", "hide", "update"].includes(action)) {
+    // [2026-09-23] restore = 지운 건을 다시 미해결로. hide 가 DB 삭제가 아니라 status 만 바꾸므로 되살릴 수 있다.
+    if (!["resolve", "hide", "update", "restore"].includes(action)) {
       return NextResponse.json(
         { ok: false, message: "지원하지 않는 처리 방식입니다." },
         { status: 400 }
@@ -187,7 +188,14 @@ export async function PATCH(request: NextRequest) {
     const nowIso = new Date().toISOString();
 
     const updatePayload =
-      action === "hide"
+      action === "restore"
+        ? {
+            status: "open",
+            resolved_at: null,
+            resolved_note: resolvedNote || "관리자 되돌리기",
+            updated_at: nowIso,
+          }
+        : action === "hide"
         ? {
             status: "deleted",
             updated_at: nowIso,
