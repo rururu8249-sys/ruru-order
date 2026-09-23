@@ -10,6 +10,9 @@ import { showAdminToast } from "@/lib/adminToast";
 import { splitIssueBody, mergeIssueBody } from "@/lib/issueBodyMeta";
 import { CUSTOMER_TERMS } from "./adminLiveCustomerTerms";
 import { formatKoreanPhone } from "@/lib/order/phone";
+import { supabase } from "@/lib/supabase";
+import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
+import { pickIssueProductRows } from "@/lib/issueProductLabel";
 
 type AdminIssueTask = {
   id?: string | number | null;
@@ -318,6 +321,8 @@ function IssueCard({
   onResolve,
   onHide,
   busy = false,
+  photos = [],
+  onPhotoZoom,
 }: {
   task: AdminIssueTask;
   index: number;
@@ -325,6 +330,9 @@ function IssueCard({
   onResolve: (task: AdminIssueTask) => void | Promise<void>;
   onHide: (task: AdminIssueTask) => void | Promise<void>;
   busy?: boolean;
+  /** [2026-09-23] 상품 사진 — 상품을 골라 등록한 이슈에만 붙는다. 없으면 빈 배열. */
+  photos?: string[];
+  onPhotoZoom?: (url: string) => void;
 }) {
   // [2026-09-21 사장님] 「2번씩이나 클릭해야 하고 너무 보기 불편함.
   //   필요한 고객정보 닉네임·이름·전화번호·년월일·특이사항 보기 좋게 딱 안 돼?」
@@ -406,12 +414,37 @@ function IssueCard({
       {/* 특이사항 — 자르지 않고 «전부» 보여준다(사장님 확정).
           접기/펼치기는 2026-09-21 에 「2번씩이나 클릭해야 한다」고 하셔서 없앤 기준을 유지한다.
           whitespace-pre-line = 메모에 적힌 줄바꿈을 그대로 살린다(HTML 기본은 줄바꿈을 지운다). */}
-      <div
-        className="whitespace-pre-line break-words text-[12px] font-bold leading-5 text-ink"
-        title={[detail, orderNo ? `주문번호 ${orderNo}` : ""].filter(Boolean).join("\n")}
-      >
-        {detail || "내용 없음"}
-        {orderNo ? <span className="ml-1.5 text-[11px] font-bold text-ink-mute">{orderNo}</span> : null}
+      <div className="flex min-w-0 items-start gap-2">
+        {/* [2026-09-23] 상품 사진 — 상품을 골라 등록한 이슈에만. 최대 3장, 누르면 크게. */}
+        {photos.length > 0 ? (
+          <div className="flex shrink-0 gap-1">
+            {photos.slice(0, 3).map((url, photoIndex) => (
+              <button
+                key={`${url}-${photoIndex}`}
+                type="button"
+                onClick={() => onPhotoZoom?.(url)}
+                title="눌러서 크게 보기"
+                className="relative h-11 w-11 overflow-hidden rounded-lg border border-line bg-surface-2"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt="상품 사진" className="h-full w-full object-cover" loading="lazy" />
+                {photoIndex === 2 && photos.length > 3 ? (
+                  <span className="absolute inset-0 flex items-center justify-center bg-[var(--color-ink)]/60 text-[11px] font-black text-white">
+                    +{photos.length - 2}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        <div
+          className="min-w-0 flex-1 whitespace-pre-line break-words text-[12px] font-bold leading-5 text-ink"
+          title={[detail, orderNo ? `주문번호 ${orderNo}` : ""].filter(Boolean).join("\n")}
+        >
+          {detail || "내용 없음"}
+          {orderNo ? <span className="ml-1.5 text-[11px] font-bold text-ink-mute">{orderNo}</span> : null}
+        </div>
       </div>
 
       {/* 처리 */}
@@ -533,6 +566,121 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   const issueTotalPages = Math.max(1, Math.ceil(visibleTasks.length / issuePageSize));
   const safeIssuePage = Math.min(Math.max(1, issuePage), issueTotalPages);
   const pageTasks = visibleTasks.slice((safeIssuePage - 1) * issuePageSize, safeIssuePage * issuePageSize);
+
+  // ── [2026-09-23 사장님 요청] 「상품선택해서 했을 경우에는 상품 사진이 있는경우 같이 표시」 ──
+  //   이슈에는 상품이 «글자»로만 남으므로 상품을 되찾아 사진을 붙인다. 화면에 보이는 페이지만.
+  //     ① 새 이슈: raw_payload.items 에 상품 id 가 있다 → products 조회 1번으로 끝
+  //     ② 옛 이슈: id 가 없다 → 주문번호로 orders 를 찾고, 「대상상품:」에 적힌 행만 고른다
+  //        (pickIssueProductRows — 한 주문서의 다른 상품까지 딸려오면 엉뚱한 사진이 붙는다)
+  //   ⚠ 읽기 전용. 사진 주소를 저장하지 않는다 — 상품 사진을 바꾸면 여기도 최신으로 따라온다.
+  //   ⚠ 실패해도 목록은 그대로 뜬다. 사진은 «보조»다.
+  const [issuePhotos, setIssuePhotos] = useState<Record<string, string[]>>({});
+  const photoLookupKey = pageTasks
+    .map((task, index) => `${taskKey(task, index)}:${extractBodyField(task, "주문번호:")}`)
+    .join("|");
+
+  useEffect(() => {
+    let stopped = false;
+    if (pageTasks.length === 0) { setIssuePhotos({}); return; }
+
+    (async () => {
+      try {
+        type Want = { key: string; rows: { productId: string; productName: string; color: string }[] };
+        const wants: Want[] = [];
+        const lookupCodes: string[] = [];
+        const needOrderLookup: { key: string; code: string; target: string }[] = [];
+
+        pageTasks.forEach((task, index) => {
+          const key = taskKey(task, index);
+          const raw = (task.raw_payload || {}) as { items?: unknown };
+          const items = Array.isArray(raw.items) ? (raw.items as Record<string, unknown>[]) : [];
+
+          if (items.length > 0) {
+            wants.push({
+              key,
+              rows: items.map((it) => ({
+                productId: clean(it.productId),
+                productName: clean(it.productName),
+                color: clean(it.color),
+              })),
+            });
+            return;
+          }
+
+          const code = extractBodyField(task, "주문번호:");
+          const target = extractBodyField(task, "대상상품:") || clean(task.related_product);
+          if (code && target) {
+            needOrderLookup.push({ key, code, target });
+            lookupCodes.push(code);
+          }
+        });
+
+        // ② 옛 이슈 보충 — 주문번호로 한 번에
+        if (lookupCodes.length > 0) {
+          const { data } = await supabase
+            .from("orders")
+            .select("id, order_lookup_code, product_id, product_name, color, size, qty, is_deleted")
+            .in("order_lookup_code", Array.from(new Set(lookupCodes)));
+          if (stopped) return;
+
+          const byCode = new Map<string, Record<string, unknown>[]>();
+          for (const row of (data || []) as Record<string, unknown>[]) {
+            if (row.is_deleted === true) continue;
+            const code = clean(row.order_lookup_code);
+            if (!code) continue;
+            byCode.set(code, [...(byCode.get(code) || []), row]);
+          }
+
+          for (const need of needOrderLookup) {
+            const picked = pickIssueProductRows(byCode.get(need.code) || [], need.target);
+            if (picked.length === 0) continue;
+            wants.push({
+              key: need.key,
+              rows: picked.map((row) => ({
+                productId: clean(row.product_id),
+                productName: clean(row.product_name),
+                color: clean(row.color),
+              })),
+            });
+          }
+        }
+
+        const productIds = Array.from(
+          new Set(wants.flatMap((want) => want.rows.map((row) => row.productId)).filter(Boolean)),
+        );
+        if (productIds.length === 0) { if (!stopped) setIssuePhotos({}); return; }
+
+        const { data: productRows } = await supabase.from("products").select("*").in("id", productIds);
+        if (stopped) return;
+
+        const byId = new Map<string, Record<string, unknown>>();
+        for (const row of (productRows || []) as Record<string, unknown>[]) {
+          byId.set(clean((row as { id?: unknown }).id), row);
+        }
+
+        const next: Record<string, string[]> = {};
+        for (const want of wants) {
+          const urls: string[] = [];
+          for (const row of want.rows) {
+            const productRow = byId.get(row.productId);
+            if (!productRow) continue;
+            // 사진 고르는 규칙은 주문상세와 같은 공용 함수 하나만 쓴다(엉뚱한 사진 금지)
+            const found = resolveOrderItemPhoto(productRow, { productName: row.productName, color: row.color });
+            if (found.url && !urls.includes(found.url)) urls.push(found.url);
+          }
+          if (urls.length > 0) next[want.key] = urls;
+        }
+        setIssuePhotos(next);
+      } catch {
+        if (!stopped) setIssuePhotos({});   // 사진은 보조 — 실패해도 목록은 정상
+      }
+    })();
+
+    return () => { stopped = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photoLookupKey]);
+
+  const [issuePhotoPreview, setIssuePhotoPreview] = useState("");
 
   const customerSearchResults = useMemo(() => {
     const keyword = cleanCompact(customerSearchKeyword || customerSearchDraft);
@@ -860,6 +1008,8 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               key={taskKey(task, index)}
               task={task}
               index={index}
+              photos={issuePhotos[taskKey(task, index)] || []}
+              onPhotoZoom={setIssuePhotoPreview}
               onEdit={openEdit}
               onResolve={resolveIssueTask}
               onHide={hideResolvedIssueTask}
@@ -1132,6 +1282,23 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           </div>
         </div>
       )}
+
+      {/* [2026-09-23] 상품 사진 크게 보기 — 주문상세와 같은 방식(배경 아무 데나 누르면 닫힘) */}
+      {issuePhotoPreview ? (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--color-ink)]/70 p-6"
+          onClick={() => setIssuePhotoPreview("")}
+          role="button"
+          tabIndex={-1}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={issuePhotoPreview}
+            alt="상품 사진 크게 보기"
+            className="max-h-full max-w-full rounded-2xl object-contain shadow-2xl"
+          />
+        </div>
+      ) : null}
     </aside>
   );
 }

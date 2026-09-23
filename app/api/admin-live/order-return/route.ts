@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
+import { issueProductSummary } from "@/lib/issueProductLabel";
 
 // [2026-08-13 사장님 요청] 반품(환불)/반품(교환) 접수 — 상품 선택식 기록 + 고객이슈 자동 등록 + (환불 시) 적립 포인트 회수.
 //
@@ -47,10 +48,6 @@ function rowProductAmount(row: OrderRow) {
   return Math.max(0, unit * qty);
 }
 
-function rowLabel(row: OrderRow) {
-  const opt = [text(row.color), text(row.size)].filter((v) => v && v !== "없음").join("/");
-  return `${text(row.product_name) || "상품"}${opt ? `(${opt})` : ""}×${Math.max(1, num(row.qty) || 1)}`;
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -102,7 +99,7 @@ export async function POST(request: NextRequest) {
     const phone = digitsOnly(first.customer_phone);
     const orderNo = text(first.order_lookup_code);
     const modeLabel = mode === "refund" ? "반품(환불)" : mode === "exchange" ? "반품(교환)" : "기타";
-    const productSummary = selected.map(rowLabel).join(", ");
+    const productSummary = issueProductSummary(selected as Record<string, unknown>[]);
 
     // ── 1) return_* 기록 (그룹 전체 행에 동일 기록 — 기존 [+기록] 저장과 같은 방식/컬럼)
     const reasonText = [`[${modeLabel}] 대상: ${productSummary}`, detail ? `세부: ${detail}` : ""]
@@ -145,7 +142,19 @@ export async function POST(request: NextRequest) {
       source: "order_return_flow",
       status: "open",
       priority: "normal",
-      raw_payload: {},
+      // [2026-09-23 사장님 요청] 고객이슈 목록에 상품 사진을 띄우려면 «어떤 상품인지»가 필요하다.
+      //   본문의 「대상상품:」은 글자뿐이라 상품을 특정할 수 없다 → 여기에 상품 id 를 남긴다.
+      //   raw_payload 는 이미 있는 jsonb 칸이라 DB 변경이 없다(지금까지 {} 로 비워 두고 있었다).
+      //   ⚠ 사진 주소를 «복사해 굳히지» 않는다 — 상품 사진을 바꾸면 이슈에도 최신 사진이 나와야 한다.
+      raw_payload: {
+        items: selected.map((r) => ({
+          productId: text(r.product_id),
+          productName: text(r.product_name),
+          color: text(r.color),
+          size: text(r.size),
+          qty: Math.max(1, num(r.qty) || 1),
+        })),
+      },
     });
     const issueRegistered = !taskErr;
 
