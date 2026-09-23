@@ -6,6 +6,7 @@ import {
   planReturnUndo,
   canClearReturnRecord,
   returnUndoSourceKey,
+  detectManualRefund,
   RETURN_RECLAIM_CREATED_BY,
   RETURN_UNDO_CREATED_BY,
 } from "@/lib/orderReturnUndo";
@@ -70,6 +71,9 @@ export async function POST(request: NextRequest) {
 
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const taskId = text(body.taskId);
+    // [2026-09-23] preview = 아무것도 바꾸지 않고 «무엇이 일어날지»만 알려준다.
+    //   확인창에 실제 금액을 띄우고, 이상한 낌새가 있을 때만 한 줄 경고하기 위함.
+    const preview = body.preview === true;
     if (!taskId) return jsonError("되돌릴 고객이슈 ID가 없습니다.");
 
     const sb = admin();
@@ -116,6 +120,8 @@ export async function POST(request: NextRequest) {
     // ── 3) 포인트 되돌림 — 회수했던 «그 금액 그대로» ──
     let refunded = 0;
     let pointNote = "";
+    let willRefund = 0;
+    let warning = "";
 
     if (!phone || phone.length < 9) {
       pointNote = "전화번호가 없어 포인트는 건드리지 않았습니다.";
@@ -128,6 +134,51 @@ export async function POST(request: NextRequest) {
 
       const plan = planReturnUndo(ledgerRows || []);
       pointNote = plan.note;
+      willRefund = plan.refundPoints;
+
+      // 「이미 손으로 돌려주셨나?」 — 사장님이 매번 판단하지 않게 여기서 찾는다.
+      //   회수 이후 이 손님의 포인트 이력만 본다(줄 수가 적다).
+      if (plan.refundPoints > 0) {
+        const reclaimedAt = (ledgerRows || [])
+          .filter((r: any) => text(r?.created_by) === RETURN_RECLAIM_CREATED_BY)
+          .map((r: any) => text(r?.created_at))
+          .sort()
+          .pop() || "";
+
+        if (reclaimedAt) {
+          const { data: afterRows } = await sb
+            .from("customer_point_ledger")
+            .select("amount, created_by, created_at, related_order_id")
+            .eq("customer_phone", phone)
+            .gt("created_at", reclaimedAt)
+            .order("created_at", { ascending: true })
+            .limit(50);
+
+          const manual = detectManualRefund({
+            ledgerRows: afterRows || [],
+            reclaimedAt,
+            reclaimedAmount: plan.refundPoints,
+            groupKey: groupId,
+          });
+          if (manual.found) {
+            const when = manual.at ? new Date(manual.at).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+            warning = `이 손님께 ${manual.amount.toLocaleString("ko-KR")}원을 이미 따로 지급하신 기록이 있어요${when ? ` (${when})` : ""}. 그때 돌려주신 거라면 취소하세요.`;
+          }
+        }
+      }
+
+      // preview 면 여기서 멈춘다 — 아무것도 바꾸지 않았다
+      if (preview) {
+        return NextResponse.json({
+          ok: true,
+          preview: true,
+          orderNo,
+          willRefund,
+          warning,
+          nickname,
+          customerName,
+        });
+      }
 
       if (plan.refundPoints > 0) {
         const { data: bal } = await sb
@@ -186,6 +237,10 @@ export async function POST(request: NextRequest) {
           pointNote = `회수했던 ${refunded.toLocaleString("ko-KR")}원을 돌려드렸습니다.`;
         }
       }
+    }
+
+    if (preview) {
+      return NextResponse.json({ ok: true, preview: true, orderNo, willRefund, warning, nickname, customerName });
     }
 
     // ── 4) 반품기록 정리 — «가장 최근 등록»일 때만 ──

@@ -501,7 +501,7 @@ function IssueCard({
                   disabled={busy}
                   className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-danger-tx transition hover:bg-danger-bg disabled:opacity-45"
                   title={fromReturn
-                    ? "잘못 등록한 건 — 반품기록을 지우고 회수한 포인트를 돌려드립니다"
+                    ? "잘못 처리한 건 — 원래대로 되돌립니다(포인트도 같이)"
                     : "잘못 등록한 건 — 「지운 건」 탭으로 옮깁니다(되살릴 수 있어요)"}
                 >
                   {busy ? "처리중…" : fromReturn ? "등록취소" : "지우기"}
@@ -939,17 +939,46 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     const who = getNickname(task) || getName(task) || "이 고객";
     const fromReturn = isReturnFlowIssue(task);
 
-    const ok = await showAdminConfirm(
-      fromReturn
-        ? `${who} 님의 반품/교환 등록을 취소할까요?\n\n` +
-          `· 회수했던 적립 포인트를 자동으로 돌려드립니다\n` +
-          `· 주문의 반품/교환 기록도 지웁니다\n` +
-          `· 고객이슈는 「지운 건」 탭으로 옮겨집니다(되살릴 수 있어요)\n\n` +
-          `※ 회수 뒤에 손으로 포인트를 따로 주셨다면 중복 지급이 될 수 있어요.`
-        : `${who} 님의 고객이슈를 지울까요?\n\nDB 완전삭제가 아니라 「지운 건」 탭으로 옮겨집니다.`,
-      { title: fromReturn ? "반품 등록 취소" : "고객이슈 지우기", confirmText: "지우기", cancelText: "취소", tone: "warning" },
-    );
-    if (!ok) return;
+    if (fromReturn) {
+      // [2026-09-23 사장님 「뭐가 이리 복잡해?」]
+      //   묻기 전에 서버에 «무엇이 일어날지»만 물어본다(preview — 아무것도 안 바뀐다).
+      //   그래서 확인창에 실제 금액을 띄우고, 이상한 낌새가 있을 때만 한 줄 덧붙인다.
+      //   사장님이 매번 「혹시 따로 주셨나」를 떠올리실 필요가 없다.
+      setSaving(true);
+      let plan: { willRefund?: number; warning?: string } | null = null;
+      try {
+        const res = await fetch("/api/admin-live/order-return/undo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ taskId: id, preview: true }),
+        });
+        const payload = await res.json().catch(() => null);
+        if (!res.ok || !payload?.ok) {
+          showAdminToast("되돌릴 수 없는 건이에요\n\n" + (payload?.message || "알 수 없는 오류"), "error");
+          return;
+        }
+        plan = payload;
+      } finally {
+        setSaving(false);
+      }
+
+      const refund = Number(plan?.willRefund || 0);
+      const warning = clean(plan?.warning);
+
+      const ok = await showAdminConfirm(
+        `${who} 님의 반품 처리를 취소하고 원래대로 되돌릴까요?` +
+          (refund > 0 ? `\n\n회수했던 포인트 ${refund.toLocaleString("ko-KR")}원을 손님께 돌려드립니다.` : "") +
+          (warning ? `\n\n⚠ ${warning}` : ""),
+        { title: "반품 처리 취소", confirmText: "되돌리기", cancelText: "그만두기", tone: "warning" },
+      );
+      if (!ok) return;
+    } else {
+      const ok = await showAdminConfirm(
+        `${who} 님의 고객이슈를 지울까요?\n\n「지운 건」 탭으로 옮겨져서 언제든 되살릴 수 있어요.`,
+        { title: "고객이슈 지우기", confirmText: "지우기", cancelText: "그만두기", tone: "warning" },
+      );
+      if (!ok) return;
+    }
 
     setSaving(true);
     try {

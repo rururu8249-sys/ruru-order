@@ -78,6 +78,46 @@ export function planReturnUndo(ledgerRows: LedgerRow[]): ReturnUndoPlan {
   };
 }
 
+/**
+ * 회수한 «뒤에» 사장님이 손으로 포인트를 따로 주신 흔적이 있는가?
+ *
+ * [2026-09-23 사장님] 「뭐가 이리 복잡해?」 — 맞는 지적이다.
+ *   예전엔 이 경우를 확인창에 «주의하세요»라고 써서 사장님이 매번 판단하시게 했다.
+ *   그건 시스템이 할 일이다. 여기서 찾아내고, 찾았을 때만 한 줄 알려드린다.
+ *
+ * 판정: 회수 시각 이후 · 양수 지급 · 자동 흐름이 아닌 것(손으로 준 것) ·
+ *       금액이 회수액과 같거나 같은 주문그룹에 달려 있는 것.
+ *   → 금액까지 같아야 «돌려주신 것»으로 본다. 방송 이벤트 포인트 같은 건 안 걸린다.
+ */
+export function detectManualRefund(input: {
+  ledgerRows: Array<{ amount?: unknown; created_by?: unknown; created_at?: unknown; related_order_id?: unknown }>;
+  reclaimedAt: string;
+  reclaimedAmount: number;
+  groupKey: string;
+}): { found: boolean; amount: number; at: string } {
+  const rows = Array.isArray(input.ledgerRows) ? input.ledgerRows : [];
+  const auto = new Set([RETURN_RECLAIM_CREATED_BY, RETURN_UNDO_CREATED_BY]);
+
+  for (const row of rows) {
+    const by = String(row?.created_by ?? "").trim();
+    if (auto.has(by)) continue;
+
+    const amount = num(row?.amount);
+    if (amount <= 0) continue;
+
+    const at = String(row?.created_at ?? "");
+    if (!at || !input.reclaimedAt || at <= input.reclaimedAt) continue;
+
+    const sameAmount = input.reclaimedAmount > 0 && amount === input.reclaimedAmount;
+    const sameOrder = Boolean(input.groupKey) && String(row?.related_order_id ?? "") === input.groupKey;
+    if (!sameAmount && !sameOrder) continue;
+
+    return { found: true, amount, at };
+  }
+
+  return { found: false, amount: 0, at: "" };
+}
+
 type IssueRow = {
   id?: unknown;
   created_at?: unknown;
