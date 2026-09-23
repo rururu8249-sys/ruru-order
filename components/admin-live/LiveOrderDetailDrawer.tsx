@@ -117,6 +117,12 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const [blockOpen, setBlockOpen] = useState(false);
   const [blockSaving, setBlockSaving] = useState(false);
   const [blockError, setBlockError] = useState("");
+  // [2026-09-23 사장님] 「차단을 했는데도 주문서 클릭시 또 차단 가능하게 나옴」
+  //   이 서랍은 차단 여부를 모르고 있었다. 읽기 전용 조회로 실제 상태를 가져온다.
+  //   null = 아직 확인 중(그동안 버튼을 잠근다 — 모르는 채로 누르게 두지 않는다).
+  const [blockedNow, setBlockedNow] = useState<boolean | null>(null);
+  const [blockedReason, setBlockedReason] = useState("");
+  const [blockCheckTick, setBlockCheckTick] = useState(0);
   const [cardStatusAction, setCardStatusAction] = useState<"" | "card-paid" | "card-unpaid">("");
   const [paymentCancelAction, setPaymentCancelAction] = useState(false);
   const [methodChanging, setMethodChanging] = useState(false);
@@ -523,6 +529,28 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const canChangePaymentMethod = !isCanceled && !canCancelPaymentConfirm && !isCardPaid;
   const nextPaymentMethod = isCardOrder ? "무통장입금" : "카드결제";
   const customerAddressText = getCustomerAddress(orderForView);
+
+  // [2026-09-23] 이 손님이 이미 차단돼 있는가 — 읽기 전용 조회(손님 화면이 쓰는 것과 같은 API).
+  //   차단/해제 직후에도 바로 맞게 보이도록 blockCheckTick 으로 다시 조회한다.
+  useEffect(() => {
+    let stopped = false;
+    const phone = clean(orderForView.phone).replace(/[^0-9]/g, "");
+    if (phone.length < 9) { setBlockedNow(false); setBlockedReason(""); return; }
+    setBlockedNow(null);
+    (async () => {
+      try {
+        const res = await fetch(`/api/customer-block-check?phone=${encodeURIComponent(phone)}`, { cache: "no-store" });
+        const json = await res.json().catch(() => null);
+        if (stopped) return;
+        setBlockedNow(Boolean(json?.blocked));
+        setBlockedReason(String(json?.reason || "").trim());
+      } catch {
+        if (!stopped) { setBlockedNow(false); setBlockedReason(""); }
+      }
+    })();
+    return () => { stopped = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderForView.phone, blockCheckTick]);
 
   // [2026-08-31 사장님 요청] 등록상품으로 주문된 항목은 작은 사진 표시, 누르면 크게 — 표시 전용(데이터 무변경)
   //   세부상품(3단) 주문이면 그 세부상품 사진을, 아니면 상품 대표사진을 쓴다. 실패해도 상세는 정상 표시.
@@ -1830,19 +1858,63 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           )}
         </div>
 
-        {/* [2026-09-22] 이 손님 차단 — 거파 처리 흐름(주문 취소 → 차단)을 한 화면에서 끝낸다 */}
+        {/* [2026-09-22] 이 손님 차단 — 거파 처리 흐름(주문 취소 → 차단)을 한 화면에서 끝낸다
+            [2026-09-23] 이미 차단된 손님이면 «차단 해제»만 보여준다(또 차단하라고 하지 않는다) */}
         <div className="mt-3 rounded-xl border border-line p-3">
           <div className="text-[11px] font-black text-ink-mute">이 손님</div>
-          <button
-            type="button"
-            onClick={() => { setBlockError(""); setBlockOpen(true); }}
-            className="mt-2 h-10 w-full rounded-xl border border-danger-tx bg-surface text-[13px] font-black text-danger-tx hover:bg-danger-bg active:scale-[0.99]"
-          >
-            🚫 이 손님 차단 (거파 품목 고르기)
-          </button>
-          <div className="mt-1.5 text-[11px] font-bold leading-4 text-ink-mute">
-            차단하면 이 손님은 주문서를 새로 쓸 수 없습니다. 이미 들어온 주문·입금·정산은 그대로 남습니다.
-          </div>
+
+          {blockedNow === null ? (
+            <div className="mt-2 flex h-10 w-full items-center justify-center rounded-xl bg-surface-2 text-[12px] font-bold text-ink-mute">
+              차단 여부 확인 중…
+            </div>
+          ) : blockedNow ? (
+            <>
+              <div className="mt-2 rounded-xl border border-danger-tx bg-danger-bg px-3 py-2">
+                <div className="text-[12px] font-black text-danger-tx">🚫 이미 차단된 손님입니다</div>
+                {blockedReason ? (
+                  <pre className="mt-1 whitespace-pre-wrap break-words text-[11px] font-bold leading-4 text-danger-tx">{blockedReason}</pre>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (blockSaving) return;
+                  const who = clean(orderForView.nickname) || clean(orderForView.name) || "이 손님";
+                  if (!(await showAdminConfirm(
+                    `${who}의 차단을 해제할까요?\n\n해제하면 바로 주문서를 다시 쓸 수 있습니다.`,
+                    { title: "차단 해제", confirmText: "차단 해제", cancelText: "그만두기", tone: "warning" },
+                  ))) return;
+                  setBlockSaving(true);
+                  try {
+                    await requestAdminCustomerBlock({ phone: clean(orderForView.phone), blocked: false, reason: "" });
+                    setBlockCheckTick((v) => v + 1);
+                    showAdminToast(`${who}의 차단을 해제했습니다.`, "success");
+                  } catch (error) {
+                    showAdminToast("차단 해제 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
+                  } finally {
+                    setBlockSaving(false);
+                  }
+                }}
+                disabled={blockSaving}
+                className="mt-2 h-10 w-full rounded-xl border border-line bg-surface text-[13px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50"
+              >
+                {blockSaving ? "처리중…" : "✅ 차단 해제"}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => { setBlockError(""); setBlockOpen(true); }}
+                className="mt-2 h-10 w-full rounded-xl border border-danger-tx bg-surface text-[13px] font-black text-danger-tx hover:bg-danger-bg active:scale-[0.99]"
+              >
+                🚫 이 손님 차단 (거파 품목 고르기)
+              </button>
+              <div className="mt-1.5 text-[11px] font-bold leading-4 text-ink-mute">
+                차단하면 이 손님은 주문서를 새로 쓸 수 없습니다. 이미 들어온 주문·입금·정산은 그대로 남습니다.
+              </div>
+            </>
+          )}
         </div>
 
         <section className="mt-3">
@@ -1861,6 +1933,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         phone={clean(orderForView.phone)}
         kakaoId={clean(orderForView.kakao_id)}
         focusOrderKey={clean(orderForView.groupId)}
+        focusOnly
         saving={blockSaving}
         errorMessage={blockError}
         onClose={() => { if (!blockSaving) { setBlockOpen(false); setBlockError(""); } }}
@@ -1870,6 +1943,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           try {
             await requestAdminCustomerBlock({ phone: clean(orderForView.phone), blocked: true, reason });
             setBlockOpen(false);
+            setBlockCheckTick((v) => v + 1);   // 차단 직후 버튼이 «차단 해제»로 바뀌게
             showAdminToast(`${clean(orderForView.nickname) || clean(orderForView.name) || "이 손님"}을 차단했습니다.`, "success");
           } catch (error) {
             setBlockError(error instanceof Error ? error.message : "차단 처리 실패");

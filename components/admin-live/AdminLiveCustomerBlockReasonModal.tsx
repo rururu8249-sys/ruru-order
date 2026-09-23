@@ -36,6 +36,12 @@ type Props = {
   kakaoId?: string;
   /** 주문상세에서 열었을 때 그 주문 — 맨 위로 올라오고 품목이 미리 체크된다. */
   focusOrderKey?: string;
+  /**
+   * [2026-09-23 사장님] 「해당 주문서를 클릭해서 보는데 다른 주문거도 포함되서
+   *   뭘 거파 했냐고 고르라고함... 귀찮게 해당 주문서에 관한 물건만 나오면 되는거 아닌가?」
+   *   맞는 말씀. 주문상세에서 열면 «그 주문서 품목만» 보여준다. 다른 주문은 아예 불러오지도 않는다.
+   */
+  focusOnly?: boolean;
   defaultReason?: string;
   saving?: boolean;
   errorMessage?: string;
@@ -77,6 +83,7 @@ export default function AdminLiveCustomerBlockReasonModal({
   phone,
   kakaoId = "",
   focusOrderKey = "",
+  focusOnly = false,
   defaultReason = "",
   saving = false,
   errorMessage = "",
@@ -112,13 +119,19 @@ export default function AdminLiveCustomerBlockReasonModal({
 
     (async () => {
       const phoneValues = koreanPhoneVariants(phoneDigits);
-      if (!safeKakao && phoneValues.length === 0) { setRows([]); return; }
+      const focusKey = clean(focusOrderKey);
+
+      // 주문상세에서 열었으면 «그 주문서»만. 다른 주문을 부르지 않는다(사장님 확정).
+      if (focusOnly && !focusKey) { setRows([]); return; }
+      if (!focusOnly && !safeKakao && phoneValues.length === 0) { setRows([]); return; }
 
       let query = supabase
         .from("orders")
         .select("id, order_group_id, order_lookup_code, created_at, kakao_id, product_name, color, size, qty, total_price, adjusted_total_price, final_amount, broadcast_name, memo, is_deleted");
 
-      if (safeKakao && phoneValues.length > 0) {
+      if (focusOnly) {
+        query = query.or(`order_group_id.eq.${focusKey},order_lookup_code.eq.${focusKey}`);
+      } else if (safeKakao && phoneValues.length > 0) {
         query = query.or(`kakao_id.eq.${safeKakao},customer_phone.in.(${phoneValues.join(",")})`);
       } else if (safeKakao) {
         query = query.eq("kakao_id", safeKakao);
@@ -133,6 +146,7 @@ export default function AdminLiveCustomerBlockReasonModal({
       setRows(
         (data || []).filter((row: Row) => {
           if (row?.is_deleted === true) return false;
+          if (focusOnly) return true;   // 그 주문서만 불러왔으므로 더 거를 게 없다
           if (safeKakao) {
             const rowKakao = clean(row?.kakao_id);
             if (rowKakao && rowKakao !== safeKakao) return false;
@@ -143,7 +157,7 @@ export default function AdminLiveCustomerBlockReasonModal({
     })().catch(() => { if (alive) setRows([]); });
 
     return () => { alive = false; };
-  }, [open, safeKakao, phoneDigits]);
+  }, [open, safeKakao, phoneDigits, focusOnly, focusOrderKey]);
 
   // 주문서 단위로 묶는다. 주문상세에서 온 주문은 맨 위로.
   const groups = useMemo<OrderGroup[]>(() => {
@@ -254,7 +268,9 @@ export default function AdminLiveCustomerBlockReasonModal({
                 <div className="text-[13px] font-black text-ink">② 무엇을 거파했나요?</div>
                 <div className="text-[11px] font-bold text-ink-mute">고른 것 {pickedLabels.length}개</div>
               </div>
-              <p className="mt-1 text-[11px] font-bold text-ink-mute">주문서 줄을 눌러 고르세요. 안 고르고 메모만 남겨도 됩니다.</p>
+              <p className="mt-1 text-[11px] font-bold text-ink-mute">
+                {focusOnly ? "이 주문서의 품목입니다. 거파한 것만 남기고 빼세요." : "주문서 줄을 눌러 고르세요."} 안 고르고 메모만 남겨도 됩니다.
+              </p>
 
               {rows === null ? (
                 <div className="mt-2 rounded-xl border border-line bg-surface-2 px-3 py-6 text-center text-[12px] font-bold text-ink-mute">주문을 불러오는 중…</div>
