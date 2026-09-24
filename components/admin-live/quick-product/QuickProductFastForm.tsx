@@ -17,6 +17,7 @@ import { showAdminConfirm } from "@/lib/adminConfirm";
 import { resolveProductImageUrl } from "./productImageUrl";
 import { compressProductImage, isHeicLikeImage } from "./compressProductImage";
 import ProductImageNoticeToggle from "./ProductImageNoticeToggle";
+import { noticeBatchLabel } from "./productImageNoticeClient";
 import {
   addDetailRow as addDetailRowState,
   removeDetailRow as removeDetailRowState,
@@ -539,6 +540,10 @@ function ImagePicker({
 
       const nextValue = unique([...value, ...uploaded]).slice(0, maxFiles);
       onChange(nextValue);
+      // [2026-09-24 2차] 이 묶음에 안내문구가 들어갔는지 바로 알려준다(합성이라 나중에 못 뺀다).
+      if (uploaded.length > 0) {
+        showAdminToast(`사진 ${uploaded.length}장 올렸어요${await noticeBatchLabel()}`, "success");
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "이미지 업로드 실패";
       showAdminToast("이미지 업로드 실패\n\n" + message, "error");
@@ -1466,12 +1471,14 @@ export default function QuickProductFastForm({
 
   // [2026-08-29] 세부상품 카드에 사진 여러 장 붙이기 (드래그·붙여넣기·파일선택 공통).
   //   첫 장이 대표사진이 되고, 이미 사진이 있으면 뒤에 이어붙인다.
-  const addDetailPhotos = async (name: string, fileList: File[]) => {
+  const addDetailPhotos = async (name: string, fileList: File[], options?: { quiet?: boolean }) => {
     const files = fileList.filter((file) => file && String(file.type || "").startsWith("image/"));
     if (!name || files.length === 0) return;
     if (detailPhotoUploading) return;
 
     setDetailPhotoUploading(name);
+    // 올리기 «직전»에 한 번 읽어 이 묶음 전체에 쓴다 — 중간에 체크를 눌러도 이 묶음 안내가 안 흔들린다.
+    const batchLabel = await noticeBatchLabel();
     try {
       const urls = await uploadImageFiles(files, "cover");
       if (urls.length === 0) return;
@@ -1481,7 +1488,11 @@ export default function QuickProductFastForm({
       });
       setDetailPhotos((prev) => (prev[name] ? prev : { ...prev, [name]: urls[0] }));
       setFormTouched(true);
-      showAdminToast(`${name} — 사진 ${urls.length}장 추가됐어요. 아직 저장 전이니 아래 [저장]을 눌러 주세요.`, "success");
+      // [2026-09-24 2차] 「사진 몽땅 끌어놓기」는 장수만큼 이 함수를 부른다 → 그때는 조용히 돌리고
+      //   끝나고 한 번만 알린다(예전에는 10장이면 알림이 10번 떴다).
+      if (!options?.quiet) {
+        showAdminToast(`${name} — 사진 ${urls.length}장 추가됐어요${batchLabel}.\n아직 저장 전이니 아래 [저장]을 눌러 주세요.`, "success");
+      }
     } catch (error) {
       showAdminToast("세부상품 사진 업로드 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
     } finally {
@@ -1607,13 +1618,14 @@ export default function QuickProductFastForm({
     const files = fileList.filter((f) => f && String(f.type || "").startsWith("image/"));
     if (files.length === 0) return;
     setBulkRowBusy(true);
+    const batchLabel = await noticeBatchLabel();
     try {
       for (const file of files) {
         const bare = String(file.name || "").replace(/\.[A-Za-z0-9]+$/, "").trim();
         const name = addDetailRow(bare || undefined);
-        await addDetailPhotos(name, [file]);
+        await addDetailPhotos(name, [file], { quiet: true });
       }
-      showAdminToast(`사진 ${files.length}장으로 상품 ${files.length}줄을 만들었어요.\n가격만 채우고 저장하세요.`, "success");
+      showAdminToast(`사진 ${files.length}장으로 상품 ${files.length}줄을 만들었어요${batchLabel}.\n가격만 채우고 저장하세요.`, "success");
     } finally {
       setBulkRowBusy(false);
     }

@@ -63,6 +63,17 @@ export async function shouldStampNotice(): Promise<ProductImageNotice | null> {
   return notice;
 }
 
+/**
+ * [2026-09-24 2차 사장님] 「여러 개 드래그 업로드 할 때도 선택적으로 넣을 수 있나?」
+ *   → 체크는 «올리는 그 순간»에 읽으므로 «묶음 단위»로 나뉜다(켜고 5장 → 끄고 5장).
+ *     한 번에 끌어놓은 묶음은 전부 같은 값이다. 그래서 올린 직후 «이 묶음에 들어갔는지»를 알려준다.
+ *   올리기 «직전»에 한 번 불러 그 값을 묶음 전체에 쓴다(중간에 눌러도 이 묶음은 안 흔들린다).
+ */
+export async function noticeBatchLabel(): Promise<string> {
+  const notice = await shouldStampNotice();
+  return notice ? " · 안내문구 넣었어요" : " · 문구 없이 올렸어요";
+}
+
 const FONT_STACK = `Pretendard, 'Apple SD Gothic Neo', 'Noto Sans KR', Arial, sans-serif`;
 
 function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
