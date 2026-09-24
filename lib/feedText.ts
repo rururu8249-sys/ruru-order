@@ -61,6 +61,26 @@ function compactOption(opt: string): string {
 //   사장님 방송 캡쳐 실측 기준 — 위젯 알약 안쪽 가용 폭은 814px(=860 − 좌우 여백 46).
 export const FEED_ROW_AVAIL_W = 814;
 
+// ── [2026-09-24 사장님] 「왼쪽 오른쪽 여백을 최대한으로 활용해서 길게 만들 수 있을까?」 ──
+// 예전엔 위젯 폭이 860 «고정»이라, 프리즘 네모를 가로로 늘려도 오른쪽이 그냥 빈 채로 남았다
+// (fitScale = min(가로비, 세로비) 라 세로가 기준이 되면 가로 여유분을 아무도 안 썼다).
+//   → 네모 폭을 디자인 px 로 환산해 «그만큼 줄을 길게» 쓴다. 글자 크기는 그대로다.
+//   ⚠ Math.max 로 기존 값을 바닥으로 깐다 = 어떤 경우에도 지금보다 짧아지지 않는다.
+/** 알림 줄에서 글자가 쓸 수 있는 폭 — 위젯 폭 − (강조바 5 + 왼쪽여백 12 + 오른쪽여백 22) */
+export const FEED_ROW_PAD_W = 39;
+/** 공지/안내 줄에서 글자가 쓸 수 있는 폭 — 위젯 폭 − (테두리 3 + 좌우여백 36 + 📌아이콘 38 + 간격 5) */
+export const FEED_PIN_PAD_W = 82;
+
+export function feedRowAvailW(widgetW: number): number {
+  const w = Math.floor(Number(widgetW) || 0) - FEED_ROW_PAD_W;
+  return Math.max(FEED_ROW_AVAIL_W, w);
+}
+
+export function feedPinAvailW(widgetW: number): number {
+  const w = Math.floor(Number(widgetW) || 0) - FEED_PIN_PAD_W;
+  return Math.max(FEED_PIN_AVAIL_W, w);
+}
+
 /**
  * 문자열의 대략적인 폭(px). em = 글자 크기.
  * [2026-09-16 실측 보정] 실제 브라우저(Pretendard, weight 900)에서 잰 값에 맞췄다.
@@ -235,42 +255,43 @@ export type FeedPinLayout = {
  *       🛍 긴 상품 공지       1084px → 34px 2줄, 줄당 70%
  *   · 2줄로도 34px이 안 되는 아주 긴 글만 그때 글자를 줄인다(최소 26px).
  */
-export function feedPinLayout(text: string): FeedPinLayout {
+export function feedPinLayout(text: string, avail: number = FEED_PIN_AVAIL_W): FeedPinLayout {
+  const A = Math.max(1, Math.floor(avail) || FEED_PIN_AVAIL_W);
   const natural = estimateTextWidth(text, FEED_PIN_SIZE);
 
   // 원래 크기로 한 줄에 들어간다 — 손댈 것 없음
-  if (natural <= FEED_PIN_AVAIL_W) {
-    return { fontSize: FEED_PIN_SIZE, lines: 1, maxWidth: FEED_PIN_AVAIL_W };
+  if (natural <= A) {
+    return { fontSize: FEED_PIN_SIZE, lines: 1, maxWidth: A };
   }
 
   // 조금만 줄이면 한 줄 — 2026-09-16 지침대로 한 줄을 지킨다
-  const oneLineFit = Math.floor((FEED_PIN_AVAIL_W / natural) * FEED_PIN_SIZE);
+  const oneLineFit = Math.floor((A / natural) * FEED_PIN_SIZE);
   if (oneLineFit >= FEED_PIN_ONELINE_MIN_SIZE) {
-    return { fontSize: oneLineFit, lines: 1, maxWidth: FEED_PIN_AVAIL_W };
+    return { fontSize: oneLineFit, lines: 1, maxWidth: A };
   }
 
   // 2줄. 34px 유지가 원칙이고, 2줄로도 안 들어갈 만큼 길 때만 줄인다.
   const fontSize =
-    natural <= FEED_PIN_AVAIL_W * 2
+    natural <= A * 2
       ? FEED_PIN_SIZE
-      : Math.max(FEED_PIN_MIN_SIZE, Math.floor(((FEED_PIN_AVAIL_W * 2) / natural) * FEED_PIN_SIZE));
+      : Math.max(FEED_PIN_MIN_SIZE, Math.floor(((A * 2) / natural) * FEED_PIN_SIZE));
 
   // 두 줄 길이를 맞춘다 — 절반에 8% 여유(한국어 keep-all 로 줄 끝에 자투리가 남는 것 감안).
   //   여유가 없으면 셋째 줄로 넘어가 «잘린다». 8% 는 아래 테스트가 지킨다.
   const used = estimateTextWidth(text, fontSize);
-  const maxWidth = Math.min(FEED_PIN_AVAIL_W, Math.ceil((used / 2) * 1.08));
+  const maxWidth = Math.min(A, Math.ceil((used / 2) * 1.08));
 
   return { fontSize, lines: 2, maxWidth };
 }
 
 /** 공지 글자 크기(px) — feedPinLayout 의 얇은 껍데기 */
-export function feedPinFontSize(text: string): number {
-  return feedPinLayout(text).fontSize;
+export function feedPinFontSize(text: string, avail: number = FEED_PIN_AVAIL_W): number {
+  return feedPinLayout(text, avail).fontSize;
 }
 
 /** 이 공지 문구를 한 줄로 그리나? (높이 예산 계산이 이 값을 본다) */
-export function feedPinFitsOneLine(text: string): boolean {
-  return feedPinLayout(text).lines === 1;
+export function feedPinFitsOneLine(text: string, avail: number = FEED_PIN_AVAIL_W): boolean {
+  return feedPinLayout(text, avail).lines === 1;
 }
 
 /** 한 줄을 100 으로 봤을 때 지금 몇 %인지 (관리자 입력칸 안내용) */

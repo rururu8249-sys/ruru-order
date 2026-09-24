@@ -33,7 +33,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { getActiveBroadcast, loadAdminLiveBroadcasts } from "@/components/admin-live/liveBroadcastController";
-import { feedOrderLines, feedOrderParts, feedProductLabel, feedProductPages, feedRowFitsOneLine, feedPinFitsOneLine, feedPinFontSize, feedPinLayout, estimateTextWidth, FEED_PAGE_MS, FEED_ROW_AVAIL_W, FEED_ROW_SIZES, FEED_DETAIL_LINES_PER_PAGE, type FeedLine, type FeedOrderItem, type FeedProduct } from "@/lib/feedText";
+import { feedOrderLines, feedOrderParts, feedProductLabel, feedProductPages, feedRowFitsOneLine, feedPinFitsOneLine, feedPinFontSize, feedPinLayout, feedRowAvailW, feedPinAvailW, estimateTextWidth, FEED_PAGE_MS, FEED_ROW_SIZES, FEED_DETAIL_LINES_PER_PAGE, type FeedLine, type FeedOrderItem, type FeedProduct } from "@/lib/feedText";
 import { formatOrderOptionText } from "@/lib/orderOptionText";
 
 type AnyRow = Record<string, any>;
@@ -74,7 +74,11 @@ const BUDGET_H = 270;
 const H_PAD_NOTICE = 34, H_LINE_NOTICE = 43;   // 📌공지·📢안내
 const H_ALERT_ONE = 62, H_DETAIL_LINE = 35;    // 알림 한 줄(28px+여백) / 주문내역 한 줄 추가분 — [09-17] 글자 28 통일 후 실측
 const KEEP_ITEMS = 6;                          // 메모리에 들고 있는 알림 수(그릴 때 예산으로 자른다)
-const WIDGET_W = 860;       // 기본 폭(px) — [09-13 사장님 「가로 좀 늘려줘 길이가 아쉽네」] 640 → 860 (한 줄에 34% 더 들어감)
+// [09-13 사장님 「가로 좀 늘려줘 길이가 아쉽네」] 640 → 860 (한 줄에 34% 더 들어감)
+// [2026-09-24 사장님 「왼쪽 오른쪽 여백을 최대한으로 활용해서 길게」] 이제 이 값은 «바닥(최소 폭)»이다.
+//   프리즘 네모가 880×300 보다 가로로 넓으면 그 남는 폭만큼 줄이 길어진다(아래 widgetW).
+//   글자 크기는 BOX_W/BOX_H 가 정하므로 그대로다 — 길어지기만 하고 작아지지 않는다.
+const WIDGET_W = 860;
 // [2026-09-13] «프리즘 네모 크기 = 위젯 크기» — 권장 네모 880×320 이 1배. 네모를 키우면 글자도 그 비율로 커지고, 줄이면 작아진다(비율 고정).
 const BOX_W = 880, BOX_H = 300;   // 폭 860 + 여백 20 / 높이 = 4줄(공지2+알림2)이 꽉 차는 높이(실측 290)
 // [2026-09-16 사장님 «크기만 늘리면 뭐함 — 폰트도 키워야지»]
@@ -225,10 +229,20 @@ export default function OrderFeedWidgetClient() {
   //   오른쪽으로는 80px 넘게 튀어나왔다 → 공지 기준으로 보면 좌우가 전혀 균등하지 않다.
   //   → 가운데 정렬을 없애고 «모든 줄을 공지 왼쪽 끝»에 맞춘다(폭 측정 자체가 필요 없어졌다).
   const [fitScale, setFitScale] = useState(1);
+  // [2026-09-24] 프리즘 네모의 «실제 가로»를 디자인 px 로 환산한 값(기본 = BOX_W 880).
+  const [boxW, setBoxW] = useState(BOX_W);
   const [pinText, setPinText] = useState("");
   const seenRef = useRef<Set<string>>(new Set());
   // 같은 주문(order_group_id)의 상품 여러 줄이 INSERT 로 따로 오므로 0.6초 모아서 한 줄로
   const pendingOrdersRef = useRef<Map<string, { nick: string; items: FeedOrderItem[]; timer: number | null }>>(new Map());
+
+  // [2026-09-24] 이번 렌더에서 쓸 «폭» 세 가지. 네모가 넓으면 같이 커지고, 좁아도 기존 값 아래로는 안 내려간다.
+  //   widgetW  = 줄 하나가 늘어날 수 있는 최대 폭(알약 maxWidth)
+  //   rowAvailW = 주문 알림의 글자 칸 폭   / pinAvailW = 📌공지·📢안내의 글자 칸 폭
+  //   ⚠ 이 세 값은 «한 줄/두 줄» 판정과 높이 예산(heightOf)까지 같이 정한다. 따로 놀면 줄이 잘린다.
+  const widgetW = Math.max(WIDGET_W, boxW - (BOX_W - WIDGET_W));
+  const rowAvailW = feedRowAvailW(widgetW);
+  const pinAvailW = feedPinAvailW(widgetW);
 
   // 배경 투명 (크로마키)
   useEffect(() => {
@@ -251,7 +265,13 @@ export default function OrderFeedWidgetClient() {
   useEffect(() => {
     const calc = () => {
       const s = Math.min(window.innerWidth / BOX_W, window.innerHeight / BOX_H);
-      setFitScale(Number.isFinite(s) && s > 0 ? Math.min(3, s) : 1);
+      const scale = Number.isFinite(s) && s > 0 ? Math.min(3, s) : 1;
+      setFitScale(scale);
+      // [2026-09-24] 글자 크기(scale)는 위와 똑같이 두고, «가로로 남는 폭»만 따로 계산한다.
+      //   세로가 기준이 되는 넓은 네모에서는 innerWidth/scale 이 BOX_W 보다 커진다 = 그만큼 줄을 길게 쓴다.
+      //   가로가 기준이면 정확히 BOX_W 가 나와 지금과 똑같다(변화 없음).
+      const w = window.innerWidth / scale;
+      setBoxW(Number.isFinite(w) && w > 0 ? Math.min(2400, Math.max(BOX_W, Math.floor(w))) : BOX_W);
     };
     calc();
     window.addEventListener("resize", calc);
@@ -306,7 +326,7 @@ export default function OrderFeedWidgetClient() {
   const lifeOf = (item: FeedItem) => crowdedLife(item, baseLifeOf(item));
   const baseLifeOf = (item: FeedItem) => {
     if (item.kind === "notice") return NOTICE_MS;
-    const pages = feedProductPages(item.products || []);
+    const pages = feedProductPages(item.products || [], rowAvailW);
     if (pages.length <= 1) return SHOW_MS;
     return Math.max(SHOW_MS, pages.length * FEED_PAGE_MS + 1500);
   };
@@ -386,18 +406,18 @@ export default function OrderFeedWidgetClient() {
   //   최신(맨 아래)부터 담고 예산이 차면 오래된 건 안 그린다 → 기준 높이를 넘지 않는다.
   // 이 줄이 화면에서 차지하는 «높이»(디자인 px)
   const heightOf = (it: FeedItem) => {
-    if (it.kind === "notice") return H_PAD_NOTICE + H_LINE_NOTICE * (feedPinFitsOneLine(it.text || "") ? 1 : 2);
+    if (it.kind === "notice") return H_PAD_NOTICE + H_LINE_NOTICE * (feedPinFitsOneLine(it.text || "", pinAvailW) ? 1 : 2);
     const m = KIND_META[it.kind as Exclude<FeedKind, "notice">];
-    const pages = feedProductPages(it.products || []);
+    const pages = feedProductPages(it.products || [], rowAvailW);
     if (pages.length === 0) return H_ALERT_ONE;
     const run = pages[0].map(feedProductLabel).join("  |  ");
-    if (pages.length === 1 && feedRowFitsOneLine(it.nick, `${m.icon} ${m.verb}`, run)) return H_ALERT_ONE;
+    if (pages.length === 1 && feedRowFitsOneLine(it.nick, `${m.icon} ${m.verb}`, run, FEED_ROW_SIZES, rowAvailW)) return H_ALERT_ONE;
     // 상품 줄(28px)이 1줄이면 +35, 2줄이면 +70. 장이 여러 개면 «가장 큰 장» 기준(높이가 흔들리지 않게).
-    const maxLines = Math.max(...pages.map((pg) => Math.min(FEED_DETAIL_LINES_PER_PAGE, Math.ceil(estimateTextWidth(pg.map(feedProductLabel).join("  |  "), FEED_ROW_SIZES.detail) / FEED_ROW_AVAIL_W))));
+    const maxLines = Math.max(...pages.map((pg) => Math.min(FEED_DETAIL_LINES_PER_PAGE, Math.ceil(estimateTextWidth(pg.map(feedProductLabel).join("  |  "), FEED_ROW_SIZES.detail) / rowAvailW))));
     return H_ALERT_ONE + 35 * Math.max(1, maxLines);
   };
   // 📌 공지가 먼저 자리를 잡고, 남는 높이만큼 «최신 알림부터» 담는다.
-  let budget = BUDGET_H - (showPin ? H_PAD_NOTICE + H_LINE_NOTICE * (feedPinFitsOneLine(pinShown) ? 1 : 2) + 4 : 0);
+  let budget = BUDGET_H - (showPin ? H_PAD_NOTICE + H_LINE_NOTICE * (feedPinFitsOneLine(pinShown, pinAvailW) ? 1 : 2) + 4 : 0);
   const picked: FeedItem[] = [];
   for (let i = source.length - 1; i >= 0; i -= 1) {
     const cost = heightOf(source[i]) + (picked.length > 0 || showPin ? 8 : 0);
@@ -414,7 +434,7 @@ export default function OrderFeedWidgetClient() {
       {/* 왼쪽 아래 기준. 맨 아래 📌 공지(고정) ← 그 위로 알림(최신이 공지 바로 위, 오래된 게 위로) — PRISM 네모 위치·크기는 사장님이 정한다 */}
       <div
         style={{
-          position: "absolute", left: "8px", bottom: "8px", width: `${WIDGET_W}px`,
+          position: "absolute", left: "8px", bottom: "8px", width: `${widgetW}px`,
           // [2026-09-16 사장님 «정보량은 적은데 가로만 길다»] 줄마다 «글자 길이만큼»만 차지하고, 길면 위젯 폭에서 멈춘다.
           // [정렬 기준 — 2026-09-24 확정] «모든 줄은 📌공지의 왼쪽 끝»에 맞춘다. 가운데 정렬은 쓰지 않는다.
           //   지난 이력: 1차(전부 center) → 짧은 입금·카드 줄이 화면 가운데로 떠서 되돌림.
@@ -435,7 +455,7 @@ export default function OrderFeedWidgetClient() {
                 key={item.id}
                 style={{
                   alignSelf: "flex-start",                                              // [09-24] 공지와 같은 왼쪽 기준선
-                  maxWidth: `${WIDGET_W}px`, boxSizing: "border-box",                  // [09-16] 폭 자동 — 글자만큼만 (09-21: 퍼센트 → 픽셀)
+                  maxWidth: `${widgetW}px`, boxSizing: "border-box",                  // [09-16] 폭 자동 — 글자만큼만 (09-21: 퍼센트 → 픽셀)
                   display: "flex", alignItems: "center", gap: "10px",
                   padding: "17px 20px 17px 16px",                                        // [09-16] 좌우 여백을 줄여 글자를 1px이라도 크게(공지는 길다)
                   borderRadius: "999px",
@@ -446,7 +466,7 @@ export default function OrderFeedWidgetClient() {
                   // [09-16] 길면 글자를 줄여서라도 한 줄에 맞춘다(최소 27px). 그보다 길면 그때만 2줄.
                   // [2026-09-20 사장님] 「긴 알림은 좌우 여백 살짝 띄우고 노는 공간 살려서, 폰트도 좀 키우고」
                   //   → 글자 크기·줄 수·폭을 lib/feedText.ts 의 feedPinLayout 한 곳에서 정한다.
-                  fontSize: `${feedPinLayout(item.text || "").fontSize}px`, fontWeight: 900, lineHeight: 1.25, wordBreak: "keep-all",
+                  fontSize: `${feedPinLayout(item.text || "", pinAvailW).fontSize}px`, fontWeight: 900, lineHeight: 1.25, wordBreak: "keep-all",
                   animation: leaving
                     ? `ruruCurtainOut ${EXIT_MS}ms ease-in forwards`
                     : "ruruCurtain 0.65s cubic-bezier(0.16,1,0.3,1) both",
@@ -454,7 +474,7 @@ export default function OrderFeedWidgetClient() {
               >
                 <span style={{ flexShrink: 0, fontSize: "26px", textShadow: "none" }}>📢</span>
                 {/* 2줄이 될 때는 «절반쯤»에서 줄을 바꿔 두 줄 길이를 맞춘다 → 알약이 화면 끝까지 안 늘어나고 좌우에 여백이 남는다 */}
-                <span style={{ minWidth: 0, maxWidth: `${feedPinLayout(item.text || "").maxWidth}px`, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{item.text}</span>
+                <span style={{ minWidth: 0, maxWidth: `${feedPinLayout(item.text || "", pinAvailW).maxWidth}px`, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{item.text}</span>
               </div>
             );
           }
@@ -463,17 +483,17 @@ export default function OrderFeedWidgetClient() {
           // [2026-09-17 사장님] 「너무 길고 복잡하면 출력하고 빠르게 또 이어서 보여주고?」
           //   → 상품이 많으면 «한 줄에 들어가는 만큼»씩 장을 넘겨가며 전부 보여준다.
           //     화면 높이는 항상 그대로(최대 2줄)고, 주문내역은 하나도 안 버린다.
-          const pages = feedProductPages(allParts);
+          const pages = feedProductPages(allParts, rowAvailW);
           const pageIdx = pages.length > 1
             ? Math.min(pages.length - 1, Math.floor(Math.max(0, now - item.at) / FEED_PAGE_MS))
             : 0;
           const shownParts = pages[pageIdx] || [];
           const runText = shownParts.map(feedProductLabel).join("  |  ");
-          const oneLine = pages.length <= 1 && feedRowFitsOneLine(item.nick, `${meta.icon} ${meta.verb}`, runText);
+          const oneLine = pages.length <= 1 && feedRowFitsOneLine(item.nick, `${meta.icon} ${meta.verb}`, runText, FEED_ROW_SIZES, rowAvailW);
           // 폭죽: 주문 줄이고, 막 등장했을 때(1.7초 안) 1회. 그 뒤엔 DOM 에서 빠진다.
           const burst = item.kind === "order" && now - item.at < CONFETTI_MS;
           return (
-            <div key={item.id} style={{ alignSelf: "flex-start", position: "relative", maxWidth: `${WIDGET_W}px` }}>
+            <div key={item.id} style={{ alignSelf: "flex-start", position: "relative", maxWidth: `${widgetW}px` }}>
             {burst ? <Confetti /> : null}
             <div
               style={{
@@ -481,7 +501,7 @@ export default function OrderFeedWidgetClient() {
                 //   폭 제한이 maxWidth:"100%" 였는데, 부모가 절대위치+transform 인 실제 화면에서는
                 //   그 퍼센트가 기대대로 안 걸렸다(내 테스트 페이지에서는 걸렸다 — 그래서 재현이 안 됐다).
                 //   → 퍼센트에 기대지 말고 «픽셀»로 못박는다. 값은 위젯 폭 그대로라 디자인 변화 없음.
-                maxWidth: `${WIDGET_W}px`, boxSizing: "border-box",                    // [09-16 사장님] 폭은 «글자 길이만큼». 길면 위젯 폭에서 멈춘다
+                maxWidth: `${widgetW}px`, boxSizing: "border-box",                    // [09-16 사장님] 폭은 «글자 길이만큼». 길면 위젯 폭에서 멈춘다
                 position: "relative", overflow: "hidden",                            // 빛 줄이 말풍선 밖으로 안 나가게
                 display: "flex", alignItems: "center", gap: "12px",
                 // [09-16] 2층 구조라 여백은 최소로 — 남는 높이는 전부 «글자»에
@@ -516,7 +536,7 @@ export default function OrderFeedWidgetClient() {
                   → 금액은 빼고 «상품 이름»을 보여준다. 금액이 빠진 만큼 자리가 남아 대부분 한 줄로 끝난다(화면을 덜 가린다).
                   들어가면 한 줄, 안 들어가면 2줄(1층 누가·인사말 / 2층 주문내역). 3줄은 만들지 않는다.
                   글자 크기는 «유튜브 채팅과 같게» 맞췄다(실측: 채팅 글자 21px = 이 위젯 37px). */}
-              <span style={{ minWidth: 0, maxWidth: `${FEED_ROW_AVAIL_W}px`, flex: "1 1 auto", display: "flex", flexDirection: "column", gap: "2px" }}>
+              <span style={{ minWidth: 0, maxWidth: `${rowAvailW}px`, flex: "1 1 auto", display: "flex", flexDirection: "column", gap: "2px" }}>
                 <span style={{ minWidth: 0, display: "flex", alignItems: "baseline", gap: "11px", lineHeight: 1.12 }}>
                   {/* 닉네임 = 손님이 자기 이름을 찾는 곳. 안 자른다(아주 긴 것만 60% 선에서 …) */}
                   <span style={{ flexShrink: 0, maxWidth: "60%", fontSize: `${FEED_ROW_SIZES.nick}px`, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -542,9 +562,9 @@ export default function OrderFeedWidgetClient() {
                 </span>
                 {!oneLine && allParts.length > 0 ? (
                   <span style={{
-                    // 폭을 픽셀로 못박아 «반드시» 여기서 줄이 바뀌게 한다(폭 계산 FEED_ROW_AVAIL_W 와 같은 값).
+                    // 폭을 픽셀로 못박아 «반드시» 여기서 줄이 바뀌게 한다(폭 계산 rowAvailW 와 같은 값).
                     // overflowWrap:anywhere 는 마지막 안전장치 — 상품 이름 하나가 한 줄보다 길어도 밖으로 안 넘친다.
-                    minWidth: 0, maxWidth: `${FEED_ROW_AVAIL_W}px`, fontSize: `${FEED_ROW_SIZES.detail}px`, lineHeight: 1.25, marginTop: "2px",
+                    minWidth: 0, maxWidth: `${rowAvailW}px`, fontSize: `${FEED_ROW_SIZES.detail}px`, lineHeight: 1.25, marginTop: "2px",
                     display: "-webkit-box", WebkitLineClamp: FEED_DETAIL_LINES_PER_PAGE, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "keep-all", overflowWrap: "anywhere",
                   }}>
                     <ProductRun products={shownParts} accent={meta.accent} page={pageIdx} pageCount={pages.length} />
@@ -563,7 +583,7 @@ export default function OrderFeedWidgetClient() {
             style={{
               // [09-22] 공지는 «기준선»이라 항상 왼쪽. [09-24] 이제 모든 줄이 이 기준선에 맞는다.
               alignSelf: "flex-start",
-              maxWidth: `${WIDGET_W}px`, boxSizing: "border-box",            // [09-16] 폭 자동 — 글자만큼만 (09-21: 퍼센트 → 픽셀)
+              maxWidth: `${widgetW}px`, boxSizing: "border-box",            // [09-16] 폭 자동 — 글자만큼만 (09-21: 퍼센트 → 픽셀)
               display: "flex", alignItems: "center", gap: "10px",
               padding: "17px 20px 17px 16px", marginTop: "4px",               // [09-16] 좌우 여백을 줄여 글자를 1px이라도 크게(공지는 길다)
               borderRadius: "999px",
@@ -573,11 +593,11 @@ export default function OrderFeedWidgetClient() {
               color: "#fff", textShadow: TEXT_SHADOW,
               // [2026-09-16 사장님 「이 정도는 한 줄로 다 뜨게」] 길면 글자를 줄여 한 줄에 맞춘다(최소 27px)
               // [2026-09-20] 📢 안내와 같은 기준 — feedPinLayout 이 한 줄/2줄·글자·폭을 정한다
-              fontSize: `${feedPinLayout(pinShown).fontSize}px`, fontWeight: 900, lineHeight: 1.25, wordBreak: "keep-all",
+              fontSize: `${feedPinLayout(pinShown, pinAvailW).fontSize}px`, fontWeight: 900, lineHeight: 1.25, wordBreak: "keep-all",
             }}
           >
             <span style={{ flexShrink: 0, fontSize: "26px", textShadow: "none" }}>📌</span>
-            <span style={{ minWidth: 0, maxWidth: `${feedPinLayout(pinShown).maxWidth}px`, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{pinShown}</span>
+            <span style={{ minWidth: 0, maxWidth: `${feedPinLayout(pinShown, pinAvailW).maxWidth}px`, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{pinShown}</span>
           </div>
         ) : null}
       </div>
