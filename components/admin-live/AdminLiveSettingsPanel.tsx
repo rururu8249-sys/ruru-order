@@ -12,6 +12,7 @@ import AdminAuthSettingsPanel from "./AdminAuthSettingsPanel";
 import AdminSoundControl from "./AdminSoundControl";
 import CombineShippingSettingsTab from "./CombineShippingSettingsTab";
 import ShopInfoSettingsTab from "./ShopInfoSettingsTab";
+import ProductImageNoticeSettingsTab from "./ProductImageNoticeSettingsTab";
 import BroadcastScreenSettingsTab from "./BroadcastScreenSettingsTab";
 import { HOWTO_DEFAULT, parseHowtoSteps } from "@/lib/howto";
 
@@ -165,7 +166,7 @@ function decimalInput(value: string) {
 }
 
 // 설정 카테고리(좌측 네비) — 업계 표준: 카테고리별로 나눠 스크롤 최소화
-type SettingsTab = "shop" | "payment" | "combine" | "point" | "order" | "screen" | "sound" | "youtube" | "telegram" | "trend" | "security";
+type SettingsTab = "shop" | "payment" | "combine" | "point" | "order" | "photo" | "screen" | "sound" | "youtube" | "telegram" | "trend" | "security";
 const SETTINGS_TABS: { key: SettingsTab; label: string; icon: string; desc: string }[] = [
   // [2026-09-08] 상점 정보 — 문의 방식·페이스터·표시용 계좌. 자체 저장(API). 맨 위 + 기본 탭.
   { key: "shop", label: "상점 정보", icon: "🏪", desc: "문의 방식·계좌·페이스터" },
@@ -173,6 +174,8 @@ const SETTINGS_TABS: { key: SettingsTab; label: string; icon: string; desc: stri
   { key: "combine", label: "합배송", icon: "🚚", desc: "시간범위 수동설정" },
   { key: "point", label: "포인트 적립", icon: "🪙", desc: "자동적립·적립률" },
   { key: "order", label: "주문서 표시", icon: "📝", desc: "선점시간·직접입력" },
+  // [2026-09-24] 상품사진 안내문구 — 사진에 구워 넣는 «연출컷» 고지. 자체 저장(API).
+  { key: "photo", label: "상품사진 문구", icon: "🖼", desc: "연출컷 안내문구 합성" },
   // [2026-09-12] 방송 화면 — 프리즘 브라우저 소스 주소·크기·옵션. 저장 없음(안내판).
   { key: "screen", label: "방송 화면", icon: "📺", desc: "프리즘 위젯 주소" },
   // [2026-09-08 사장님 요청] 알림음은 사이드바가 아니라 설정에 둔다.
@@ -358,6 +361,9 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent }: Ad
         <div className="flex-1 space-y-4 overflow-y-auto p-3 md:p-5">
           {/* ── 상점 정보 (자체 저장: /api/admin-live/shop-info) ── */}
           {activeTab === "shop" && <ShopInfoSettingsTab />}
+
+          {/* ── 상품사진 문구 (자체 저장: /api/admin-live/product-image-notice) ── */}
+          {activeTab === "photo" && <ProductImageNoticeSettingsTab />}
 
           {/* ── 결제·배송 ── */}
           {activeTab === "payment" && (

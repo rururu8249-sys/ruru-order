@@ -16,6 +16,7 @@ import {
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { resolveProductImageUrl } from "./productImageUrl";
 import { compressProductImage, isHeicLikeImage } from "./compressProductImage";
+import ProductImageNoticeToggle from "./ProductImageNoticeToggle";
 import {
   addDetailRow as addDetailRowState,
   removeDetailRow as removeDetailRowState,
@@ -2690,6 +2691,10 @@ export default function QuickProductFastForm({
 
         {/* .modal-body */}
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 16px" }}>
+
+          {/* [2026-09-24] 사진에 안내문구를 넣을지 — 이 화면에서 올리는 «모든» 사진에 적용된다.
+                기본값은 설정 › 상품사진 문구. 여러 장을 한 번에 골라도 전부 같은 값으로 들어간다. */}
+          <ProductImageNoticeToggle />
 
           {/* .top-row : 사진(120) + 필드 */}
           <div style={{ display: "grid", gridTemplateColumns: (isMobile || !brandGroupActive) ? "1fr" : "120px 1fr", gap: "12px", marginBottom: "12px" }}>

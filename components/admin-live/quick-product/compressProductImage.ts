@@ -1,4 +1,7 @@
 import { squarePlacement, SQUARE_TARGET_PX } from "@/lib/imageSquare";
+// [2026-09-24] 사진에 안내문구 띠를 «구워 넣는다». 설정이 꺼져 있으면 아무것도 안 한다.
+//   사진 업로드 경로 4곳이 전부 이 함수를 지나므로, 여기 한 곳만 거치면 여러 장을 한 번에 골라도 모두 적용된다.
+import { drawProductImageNotice, shouldStampNotice } from "./productImageNoticeClient";
 
 type ProductImageKind = "cover" | "detail";
 
@@ -168,8 +171,11 @@ export async function compressProductImage(file: File, kind: ProductImageKind) {
 
   const config = CONFIG_BY_KIND[kind] || CONFIG_BY_KIND.detail;
 
+  // [2026-09-24] 문구를 넣어야 하면 «그냥 통과»시킬 수 없다(다시 그려야 하므로). 꺼져 있으면 null.
+  const notice = await shouldStampNotice();
+
   // [2026-09-20] 대표사진은 «정사각형 보장»이 목적이라, 이미 webp 라도 그냥 통과시키지 않는다(비율을 알 수 없으므로).
-  if (kind !== "cover" && file.type === "image/webp" && file.size <= config.softMaxBytes) {
+  if (!notice && kind !== "cover" && file.type === "image/webp" && file.size <= config.softMaxBytes) {
     return file;
   }
 
@@ -199,6 +205,9 @@ export async function compressProductImage(file: File, kind: ProductImageKind) {
       context.fillStyle = "#FFFFFF"; // 실무 표준 배경색
       context.fillRect(0, 0, place.size, place.size);
       context.drawImage(image, place.dx, place.dy, place.dw, place.dh);
+      // [2026-09-24] 대표사진은 위아래에 «흰 여백»이 생긴다. 띠가 그 위에 뜨면 이상하므로
+      //   사진이 실제로 그려진 사각형 안에만 그린다.
+      if (notice) drawProductImageNotice(context, { x: place.dx, y: place.dy, width: place.dw, height: place.dh }, notice);
     } else {
       // 상세사진은 세로로 긴 «상세컷»이 많다 → 정사각형으로 만들면 흰 여백만 잔뜩 생긴다. 비율 그대로 둔다.
       const scale = Math.min(1, config.maxEdge / Math.max(width, height));
@@ -207,6 +216,7 @@ export async function compressProductImage(file: File, kind: ProductImageKind) {
       canvas.width = nextWidth;
       canvas.height = nextHeight;
       context.drawImage(image, 0, 0, nextWidth, nextHeight);
+      if (notice) drawProductImageNotice(context, { x: 0, y: 0, width: nextWidth, height: nextHeight }, notice);
     }
 
     const blob = await canvasToBlob(canvas, "image/webp", config.quality);
@@ -217,6 +227,9 @@ export async function compressProductImage(file: File, kind: ProductImageKind) {
 
     // 대표사진은 크기와 상관없이 «정사각형으로 바꾼 것»을 써야 한다(그게 목적).
     if (kind === "cover") return optimizedFile;
+
+    // [2026-09-24] 문구를 그렸으면 «그린 것»을 써야 한다. 원본으로 되돌리면 문구가 사라진다.
+    if (notice) return optimizedFile;
 
     if (optimizedFile.size < file.size || file.size > config.softMaxBytes) {
       return optimizedFile;
