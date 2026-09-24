@@ -63,7 +63,14 @@ const NOTICE_MS = 30000;    // 📢 상품 안내가 떠 있는 시간 — 사�
 //     공지 + 짧은 주문 2건        = 77 + 62×2 + 16 = 217 ≤ 255  → 3개 다 뜬다
 //     공지 + 짧은 주문 3건        = 77 + 62×3 + 24 = 287 > 255  → 오래된 1건이 빠진다(기존과 같은 동작)
 //   BOX_H(300) 안이라 글자 크기·위젯 박스는 안 바뀐다.
-const BUDGET_H = 255;
+// [2026-09-24 사장님] 「공지 포함 3개까지 뜨기로 했는데 왜 한 줄씩 보여줘?」 — 실측 결과 1px 모자랐다.
+//   📌공지(77+4=81) + «2줄» 알림(62+35=97, 간격8 → 105) + 한줄 알림(62+8=70) = 256 > 255
+//   → 딱 1px 넘어서 오래된 알림이 통째로 빠졌다(영상 20초→21초, 김맘조님 → YoungAYoungA님).
+//   255 → 270 으로 올린다. 최대 내용 270 + 아래여백 8 = 278 ≤ BOX_H(300) 이라
+//   OBS 네모 위로 안 잘리고, 글자 크기는 BOX_W/BOX_H 만 정하므로 그대로다.
+//     공지 + 2줄 알림 + 한줄 알림 = 81 + 105 + 70 = 256 ≤ 270  → 3개 다 뜬다
+//     공지 + 한줄 알림 3건        = 81 + 70×3   = 291 > 270  → 기존과 같이 오래된 1건이 빠진다
+const BUDGET_H = 270;
 const H_PAD_NOTICE = 34, H_LINE_NOTICE = 43;   // 📌공지·📢안내
 const H_ALERT_ONE = 62, H_DETAIL_LINE = 35;    // 알림 한 줄(28px+여백) / 주문내역 한 줄 추가분 — [09-17] 글자 28 통일 후 실측
 const KEEP_ITEMS = 6;                          // 메모리에 들고 있는 알림 수(그릴 때 예산으로 자른다)
@@ -212,42 +219,16 @@ export default function OrderFeedWidgetClient() {
   itemsRef.current = items;
   const [live, setLive] = useState(false);          // 활성 방송 있음
   const [previewMode, setPreviewMode] = useState(false);
-  // [2026-09-22 2차] 줄 정렬 — 공지보다 «긴» 줄만 가운데로.
-  //   ⚠ 글자 폭을 «추정»하지 않는다. 브라우저가 그린 실제 offsetWidth 를 잰다(줄마다 아이콘·여백이 달라 추정이 어긋난다).
-  //   측정 → 비교 → alignSelf 만 바뀐다. 폭은 내용이 정하므로 다시 재도 값이 안 바뀐다(무한 되풀이 없음).
-  const pinElRef = useRef<HTMLDivElement | null>(null);
-  const rowElsRef = useRef<Map<string, HTMLElement>>(new Map());
-  const [wideIds, setWideIds] = useState<string>("");   // 공지보다 긴 줄들의 id 를 "|" 로 이은 값
+  // [2026-09-24 사장님] 「공지 기준으로 좌우 공백 비율 좋게 하기로 했는데 왜 비율이 이상해?」
+  //   09-22 의 «공지보다 길면 가운데»는 공지가 아니라 «보이지 않는 860px 상자» 기준으로 가운데였다.
+  //   실측(사장님 영상): 공지 왼쪽 끝 418px / 주문알림 왼쪽 끝 456px = 38px 안으로 밀리고
+  //   오른쪽으로는 80px 넘게 튀어나왔다 → 공지 기준으로 보면 좌우가 전혀 균등하지 않다.
+  //   → 가운데 정렬을 없애고 «모든 줄을 공지 왼쪽 끝»에 맞춘다(폭 측정 자체가 필요 없어졌다).
   const [fitScale, setFitScale] = useState(1);
   const [pinText, setPinText] = useState("");
   const seenRef = useRef<Set<string>>(new Set());
   // 같은 주문(order_group_id)의 상품 여러 줄이 INSERT 로 따로 오므로 0.6초 모아서 한 줄로
   const pendingOrdersRef = useRef<Map<string, { nick: string; items: FeedOrderItem[]; timer: number | null }>>(new Map());
-
-  // [2026-09-22 2차] 공지 폭과 각 줄 폭을 재서 «긴 줄»을 가려낸다.
-  //   deps 를 안 준다 = 렌더될 때마다 잰다(장 넘김·공지 변경으로 폭이 달라져도 따라간다).
-  //   값이 같으면 setState 를 안 하므로 다시 그리지 않는다.
-  useEffect(() => {
-    const pinW = pinElRef.current?.offsetWidth ?? 0;
-    const next: string[] = [];
-    if (pinW > 0) {
-      rowElsRef.current.forEach((el, id) => {
-        if (el.isConnected && el.offsetWidth > pinW) next.push(id);
-      });
-    }
-    const key = next.sort().join("|");
-    setWideIds((prev) => (prev === key ? prev : key));
-  });
-
-  /** 이 줄이 공지보다 길면 가운데, 아니면 왼쪽(기존 기준). */
-  const alignOf = (id: string): "center" | "flex-start" =>
-    wideIds.split("|").includes(id) ? "center" : "flex-start";
-
-  /** 줄을 재기 위해 DOM 을 붙잡아 둔다(사라지면 지운다). */
-  const keepRow = (id: string) => (el: HTMLElement | null) => {
-    if (el) rowElsRef.current.set(id, el);
-    else rowElsRef.current.delete(id);
-  };
 
   // 배경 투명 (크로마키)
   useEffect(() => {
@@ -313,8 +294,9 @@ export default function OrderFeedWidgetClient() {
   // 줄마다 떠 있는 시간 — 📢 안내는 30초. 주문 알림은 «읽을 양»에 맞춰 유도리 있게.
   //   [2026-09-17] 상품이 많아 «장»이 여러 개면 그 장들을 다 볼 시간을 준다(장당 3.5초).
   // [2026-09-17 사장님] 「화면을 너무 잡아먹을 땐 빠르게 없애야」 — 새 알림이 뒤에 붙으면
-  //   앞 알림은 «인식만 되게» 잠깐(4초) 더 보이고 사라진다. 혼자 떠 있을 땐 원래 시간대로.
-  const CROWD_GRACE_MS = 4000;
+  //   앞 알림은 «인식만 되게» 잠깐 더 보이고 사라진다. 혼자 떠 있을 땐 원래 시간대로.
+  // [2026-09-24 사장님] 4초는 너무 짧아 두 줄이 겹쳐 보이는 시간이 거의 없었다 → 7초.
+  const CROWD_GRACE_MS = 7000;
   const crowdedLife = (item: FeedItem, base: number) => {
     if (item.kind === "notice") return base;
     const newer = itemsRef.current.find((x) => x.kind !== "notice" && x.id !== item.id && x.at > item.at);
@@ -434,9 +416,11 @@ export default function OrderFeedWidgetClient() {
         style={{
           position: "absolute", left: "8px", bottom: "8px", width: `${WIDGET_W}px`,
           // [2026-09-16 사장님 «정보량은 적은데 가로만 길다»] 줄마다 «글자 길이만큼»만 차지하고, 길면 위젯 폭에서 멈춘다.
-          // [2026-09-22 2차 사장님] 「공지보다 글이 짧으면 «기존처럼 왼쪽 기준», 길면 «중앙 기준»으로 좌우 균등」
-          //   → 열 자체는 왼쪽 기준(기본)으로 두고, «공지보다 긴 줄»에만 alignSelf: center 를 준다(rowAlign).
-          //   1차(전부 center)는 짧은 입금·카드 줄이 화면 가운데로 떠올라서 사장님이 되돌리라고 하셨다.
+          // [정렬 기준 — 2026-09-24 확정] «모든 줄은 📌공지의 왼쪽 끝»에 맞춘다. 가운데 정렬은 쓰지 않는다.
+          //   지난 이력: 1차(전부 center) → 짧은 입금·카드 줄이 화면 가운데로 떠서 되돌림.
+          //             2차(09-22, 공지보다 긴 줄만 center) → 그 center 가 공지가 아니라 «860px 상자» 기준이라
+          //             긴 줄이 왼쪽으로 38px 들어가고 오른쪽으로 80px 넘게 튀어나왔다(사장님 영상 실측).
+          //   → 3차(09-24): 가운데 정렬 폐기. 왼쪽 기준선 하나만 쓴다. 이후 작업은 이 기준을 따른다.
           display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "flex-start", gap: "8px",
           transform: fitScale !== 1 ? `scale(${fitScale})` : undefined, transformOrigin: "bottom left",
         }}
@@ -449,9 +433,8 @@ export default function OrderFeedWidgetClient() {
             return (
               <div
                 key={item.id}
-                ref={keepRow(item.id)}
                 style={{
-                  alignSelf: alignOf(item.id),                                          // [09-22] 공지보다 길면 가운데
+                  alignSelf: "flex-start",                                              // [09-24] 공지와 같은 왼쪽 기준선
                   maxWidth: `${WIDGET_W}px`, boxSizing: "border-box",                  // [09-16] 폭 자동 — 글자만큼만 (09-21: 퍼센트 → 픽셀)
                   display: "flex", alignItems: "center", gap: "10px",
                   padding: "17px 20px 17px 16px",                                        // [09-16] 좌우 여백을 줄여 글자를 1px이라도 크게(공지는 길다)
@@ -490,7 +473,7 @@ export default function OrderFeedWidgetClient() {
           // 폭죽: 주문 줄이고, 막 등장했을 때(1.7초 안) 1회. 그 뒤엔 DOM 에서 빠진다.
           const burst = item.kind === "order" && now - item.at < CONFETTI_MS;
           return (
-            <div key={item.id} ref={keepRow(item.id)} style={{ alignSelf: alignOf(item.id), position: "relative", maxWidth: `${WIDGET_W}px` }}>
+            <div key={item.id} style={{ alignSelf: "flex-start", position: "relative", maxWidth: `${WIDGET_W}px` }}>
             {burst ? <Confetti /> : null}
             <div
               style={{
@@ -501,7 +484,11 @@ export default function OrderFeedWidgetClient() {
                 maxWidth: `${WIDGET_W}px`, boxSizing: "border-box",                    // [09-16 사장님] 폭은 «글자 길이만큼». 길면 위젯 폭에서 멈춘다
                 position: "relative", overflow: "hidden",                            // 빛 줄이 말풍선 밖으로 안 나가게
                 display: "flex", alignItems: "center", gap: "12px",
-                padding: "14px 22px 16px 24px",                                      // [09-16] 2층 구조라 여백은 최소로 — 남는 높이는 전부 «글자»에
+                // [09-16] 2층 구조라 여백은 최소로 — 남는 높이는 전부 «글자»에
+                // [2026-09-24] 왼쪽 24 → 12. 강조바 5 + 12 = 17 로, 공지(테두리 1.5 + 여백 16 = 17.5)와
+                //   글자 시작점이 같아진다. 예전엔 29 vs 17.5 라 알림 글자만 11.5px 더 안쪽에서 시작했다.
+                //   덤으로 5px 넘침도 사라진다(예전: 글자칸 814 + 24 + 22 + 바 5 = 865 > 위젯 폭 860).
+                padding: "14px 22px 16px 12px",
                 borderRadius: "999px",
                 background: "rgba(14, 12, 18, 0.42)",                                 // 흐림 없음 — 뒤가 그대로 비침
                 boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
@@ -573,9 +560,8 @@ export default function OrderFeedWidgetClient() {
             → 공지를 «맨 아래 고정». 알림은 공지 «위»로 쌓이고(최신이 공지 바로 위), 사라져도 공지는 그 자리. 방송 ON 동안 상시. */}
         {showPin ? (
           <div
-            ref={pinElRef}
             style={{
-              // [09-22] 공지는 «기준선»이라 항상 왼쪽. 다른 줄이 이 폭과 비교된다.
+              // [09-22] 공지는 «기준선»이라 항상 왼쪽. [09-24] 이제 모든 줄이 이 기준선에 맞는다.
               alignSelf: "flex-start",
               maxWidth: `${WIDGET_W}px`, boxSizing: "border-box",            // [09-16] 폭 자동 — 글자만큼만 (09-21: 퍼센트 → 픽셀)
               display: "flex", alignItems: "center", gap: "10px",
