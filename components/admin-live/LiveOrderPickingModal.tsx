@@ -62,10 +62,14 @@ const whenText = (s: string) => {
 export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: Props) {
   const [pickedIds, setPickedIds] = useState<Set<string>>(new Set());
   const [sortMode, setSortMode] = useState<"nickname" | "time">("nickname");
-  // [2026-09-20 개편] 상품별 정렬(가나다 / 많은 순) · 다 챙긴 카드 접기(펼친 것만 기억)
+  // [2026-09-20 개편] 상품별 정렬(가나다 / 많은 순)
   const [batchSort, setBatchSort] = useState<"name" | "qty">("name");
-  const [expandedDone, setExpandedDone] = useState<Set<string>>(new Set());
-  const toggleExpandedDone = (key: string) => setExpandedDone((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
+  // [2026-09-24 사장님] 「체크완료시 화면 접히는기능 없애줘!! 귀찮아 죽겠네 확인이 안됨」
+  //   예전: 다 챙기면 «자동으로 접혔다»(펼친 것만 기억) → 방금 체크한 게 뭐였는지 확인이 안 됐다.
+  //   지금: 자동으로 안 접는다. 접은 것만 기억한다(▴ 를 직접 눌렀을 때만 접힘).
+  //   ⚠ 이 뒤집힘이 핵심이다. expandedDone(펼친 것) → collapsedDone(접은 것).
+  const [collapsedDone, setCollapsedDone] = useState<Set<string>>(new Set());
+  const toggleCollapsedDone = (key: string) => setCollapsedDone((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
   const [paidOnly, setPaidOnly] = useState(true);
   const [unpickedOnly, setUnpickedOnly] = useState(false);
   const [viewMode, setViewMode] = useState<"order" | "batch">("order");
@@ -491,7 +495,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                     const some = !done && prod.ids.some((id) => pickedIds.has(id));
                     const single = prod.options.length === 1 && !prod.options[0].optionText;
                     const singleBuyers = single ? prod.options[0].buyers : [];
-                    const collapsed = done && !expandedDone.has(`p:${prod.name}`);
+                    const collapsed = done && collapsedDone.has(`p:${prod.name}`);   // [09-24] 직접 접었을 때만
                     return (
                       <div key={prod.name} className={`rounded-xl border-2 ${done ? "border-ok-tx/35 bg-ok-bg/60" : "border-line bg-surface"}`}>
                         {/* 상품 줄(스크롤해도 위에 붙음) — 네모 칸만 눌러야 그 상품 전부 챙김/해제(실수 방지) */}
@@ -507,7 +511,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                             </span>
                           </div>
                           {done && !single ? (
-                            <button type="button" onClick={() => toggleExpandedDone(`p:${prod.name}`)} aria-label={collapsed ? "펼치기" : "접기"} className="mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[12px] font-black text-ok-tx hover:bg-white/60">{collapsed ? "▾" : "▴"}</button>
+                            <button type="button" onClick={() => toggleCollapsedDone(`p:${prod.name}`)} aria-label={collapsed ? "펼치기" : "접기"} className="mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[12px] font-black text-ok-tx hover:bg-white/60">{collapsed ? "▾" : "▴"}</button>
                           ) : null}
                         </div>
                         {single && showBuyers && singleBuyers.length > 1 && !collapsed ? <BuyerTiles buyers={singleBuyers} className="px-3 pb-3 pl-[52px]" /> : null}
@@ -547,12 +551,12 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
             <div className="py-14 text-center text-[14px] font-bold text-ink-mute">{unpickedOnly ? "안 챙긴 게 없어요! 다 챙겼습니다 🎉" : search ? "검색 결과가 없어요" : "챙길 주문이 없습니다."}</div>
           ) : (
             <>
-              <div className="mb-2 px-1 text-[11px] font-bold text-ink-mute">주문 {displayPanels.length}건 · ✅ 닉네임 옆 네모 칸 = 그 주문 전부 · 상품 줄은 줄 아무 데나 눌러도 돼요(1건씩) · 다 챙긴 주문은 접혀요</div>
+              <div className="mb-2 px-1 text-[11px] font-bold text-ink-mute">주문 {displayPanels.length}건 · ✅ 닉네임 옆 네모 칸 = 그 주문 전부 · 상품 줄은 줄 아무 데나 눌러도 돼요(1건씩) · 다 챙겨도 그대로 펼쳐 있어요(▴ 누르면 접힘)</div>
               <div className="space-y-2">
                 {displayPanels.map((panel) => {
                   const pickedInPanel = panel.items.filter((it) => pickedIds.has(it.id)).length;
                   const complete = panel.items.length > 0 && pickedInPanel === panel.items.length;
-                  const collapsed = complete && !expandedDone.has(`o:${panel.key}`);
+                  const collapsed = complete && collapsedDone.has(`o:${panel.key}`);   // [09-24] 직접 접었을 때만
                   const sameCustomer = panel.phone ? (phoneCount.get(panel.phone) || 0) : 0;
                   return (
                     <div key={panel.key} className={`rounded-xl border-2 ${complete ? "border-ok-tx/35 bg-ok-bg/60" : "border-line bg-surface"}`}>
@@ -576,7 +580,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                           <span className={`shrink-0 text-[12px] font-black ${complete ? "text-ok-tx" : "text-rose-deep"}`}>{complete ? "✓ 완료" : `${pickedInPanel}/${panel.items.length}`}</span>
                         </div>
                         {complete ? (
-                          <button type="button" onClick={() => toggleExpandedDone(`o:${panel.key}`)} aria-label={collapsed ? "펼치기" : "접기"} className="mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[12px] font-black text-ok-tx hover:bg-white/60">{collapsed ? "▾" : "▴"}</button>
+                          <button type="button" onClick={() => toggleCollapsedDone(`o:${panel.key}`)} aria-label={collapsed ? "펼치기" : "접기"} className="mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[12px] font-black text-ok-tx hover:bg-white/60">{collapsed ? "▾" : "▴"}</button>
                         ) : null}
                       </div>
                       {/* 상품 줄 */}
