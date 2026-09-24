@@ -318,14 +318,27 @@ function IssueTypeChips({
   );
 }
 
+// [2026-09-24] 줄 버튼 생김새는 여기서만 정한다 — 탭마다 제각각이던 것을 하나로.
+//   보조(수정·지우기·영구삭제): 흰 바탕 + 테두리, 글자색만 다르다.
+//   주(해결완료·되살리기·미해결로): 채움(또는 테두리형 1종). 높이 32px · 최소너비로 자리가 흔들리지 않는다.
+//   ⚠ 너비를 «고정»한다. min-width 로 두면 글자 수에 따라(지우기 3자 vs 영구삭제 4자)
+//     탭마다 처리 칸 너비가 187/189/198px 로 어긋난다 — 실제로 렌더해서 재 보고 고친 값이다.
+const SUB_BTN =
+  "flex h-8 w-[64px] shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-[11px] font-black transition disabled:opacity-45";
+const MAIN_BTN =
+  "flex h-8 w-[72px] shrink-0 items-center justify-center rounded-lg text-[11px] font-black transition hover:opacity-90 disabled:opacity-45";
+/** 버튼이 없는 칸 — 자리를 비워 두어 탭을 옮겨도 처리 칸이 안 흔들린다 */
+const SUB_BTN_SLOT = "h-8 w-[64px] shrink-0";
+
 function IssueCard({
   task,
   index,
   onEdit,
   onResolve,
-  onHide,
   onDelete,
   onRestore,
+  onUnresolve,
+  onPurge,
   busy = false,
   photos = [],
   onPhotoZoom,
@@ -334,11 +347,14 @@ function IssueCard({
   index: number;
   onEdit: (task: AdminIssueTask) => void;
   onResolve: (task: AdminIssueTask) => void | Promise<void>;
-  onHide: (task: AdminIssueTask) => void | Promise<void>;
   /** [2026-09-23] 잘못 등록된 건 지우기(반품 흐름이면 포인트까지 되돌림) */
   onDelete?: (task: AdminIssueTask) => void | Promise<void>;
   /** [2026-09-23] 「지운 건」 탭에서 되살리기 */
   onRestore?: (task: AdminIssueTask) => void | Promise<void>;
+  /** [2026-09-24] 해결완료를 실수로 누른 건 미해결로 되돌리기 */
+  onUnresolve?: (task: AdminIssueTask) => void | Promise<void>;
+  /** [2026-09-24] 「지운 건」 영구삭제 — 되돌릴 수 없다 */
+  onPurge?: (task: AdminIssueTask) => void | Promise<void>;
   busy?: boolean;
   /** [2026-09-23] 상품 사진 — 상품을 골라 등록한 이슈에만 붙는다. 없으면 빈 배열. */
   photos?: string[];
@@ -396,6 +412,11 @@ function IssueCard({
         ))}
         {priority !== "보통" ? (
           <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[11px] font-black text-ink-soft">{priority}</span>
+        ) : null}
+        {/* [2026-09-24] 주문상세 반품/교환에서 «자동으로» 만들어진 건.
+            이 줄의 「지우기」는 회수한 포인트까지 되돌리므로, 손으로 적은 메모와 구분이 돼야 한다. */}
+        {fromReturn ? (
+          <span className="rounded bg-rose-soft px-1.5 py-0.5 text-[11px] font-black text-rose-deep" title="주문상세 반품/교환에서 자동 등록 — 지우면 회수한 포인트도 돌아갑니다">자동</span>
         ) : null}
       </div>
 
@@ -460,61 +481,75 @@ function IssueCard({
         </div>
       </div>
 
-      {/* 처리 */}
+      {/* ── 처리 ── [2026-09-24 사장님] 「여러 항목 레이아웃 디자인 UX등 일괄성 있게」
+          예전엔 같은 «지우다»가 「등록취소」「지우기」「목록삭제」 세 이름이었고 탭마다 버튼 수도 달랐다.
+          이제 어느 탭이든 «보조 · 보조 · 주» 세 칸 고정. 세 번째 칸만 상태에 따라 바뀐다.
+            미해결  수정 · 지우기 · [해결완료]
+            해결    수정 · 지우기 · [미해결로]
+            지운 건   —  · 영구삭제 · [되살리기]
+          생김새도 하나로: 보조 = 흰 바탕 + 테두리(글자색만 다름), 주 = 채움. 높이 32px 통일. */}
       <div className="flex shrink-0 items-center gap-1.5">
         {deleted ? (
-          // [2026-09-23] 「지운 건」 탭 — 되살리기만 할 수 있다
-          <button
-            type="button"
-            onClick={() => onRestore?.(task)}
-            disabled={busy}
-            className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ok-tx transition hover:bg-ok-bg disabled:opacity-45"
-          >
-            {busy ? "처리중…" : "↩ 되살리기"}
-          </button>
+          <>
+            <span className={SUB_BTN_SLOT} />
+            <button
+              type="button"
+              onClick={() => onPurge?.(task)}
+              disabled={busy}
+              title="되돌릴 수 없습니다 — 기록이 완전히 사라집니다"
+              className={`${SUB_BTN} text-danger-tx hover:bg-danger-bg`}
+            >
+              {busy ? "처리중…" : "영구삭제"}
+            </button>
+            <button
+              type="button"
+              onClick={() => onRestore?.(task)}
+              disabled={busy}
+              className={`${MAIN_BTN} bg-[var(--color-ok-tx)] text-white`}
+            >
+              {busy ? "처리중…" : "되살리기"}
+            </button>
+          </>
         ) : (
           <>
             <button
               type="button"
               onClick={() => onEdit(task)}
-              className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft transition hover:bg-surface-2"
+              disabled={busy}
+              className={`${SUB_BTN} text-ink-soft hover:bg-surface-2`}
             >
               수정
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete?.(task)}
+              disabled={busy}
+              title={fromReturn
+                ? "잘못 처리한 건 — 원래대로 되돌립니다(회수한 포인트도 같이)"
+                : "잘못 등록한 건 — 「지운 건」 탭으로 옮깁니다(되살릴 수 있어요)"}
+              className={`${SUB_BTN} text-danger-tx hover:bg-danger-bg`}
+            >
+              {busy ? "처리중…" : "지우기"}
             </button>
             {done ? (
               <button
                 type="button"
-                onClick={() => onHide(task)}
+                onClick={() => onUnresolve?.(task)}
                 disabled={busy}
-                className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-danger-tx transition hover:bg-danger-bg disabled:opacity-45"
-                title="DB 완전삭제가 아니라 「지운 건」 탭으로 옮김"
+                title="실수로 해결완료를 누르셨으면 여기서 미해결로 돌립니다"
+                className={`${MAIN_BTN} border border-line bg-surface text-ink-soft hover:bg-surface-2`}
               >
-                {busy ? "처리중…" : "목록삭제"}
+                {busy ? "처리중…" : "미해결로"}
               </button>
             ) : (
-              <>
-                {/* [2026-09-23 사장님 요청] 잘못 등록된 건 지우기.
-                    반품/교환으로 등록된 건이면 회수한 포인트까지 자동으로 되돌린다. */}
-                <button
-                  type="button"
-                  onClick={() => onDelete?.(task)}
-                  disabled={busy}
-                  className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-danger-tx transition hover:bg-danger-bg disabled:opacity-45"
-                  title={fromReturn
-                    ? "잘못 처리한 건 — 원래대로 되돌립니다(포인트도 같이)"
-                    : "잘못 등록한 건 — 「지운 건」 탭으로 옮깁니다(되살릴 수 있어요)"}
-                >
-                  {busy ? "처리중…" : fromReturn ? "등록취소" : "지우기"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onResolve(task)}
-                  disabled={busy}
-                  className="rounded-lg bg-ok-tx px-3 py-1.5 text-[11px] font-black text-white transition hover:opacity-90 disabled:opacity-45"
-                >
-                  {busy ? "처리중…" : "해결완료"}
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={() => onResolve(task)}
+                disabled={busy}
+                className={`${MAIN_BTN} bg-[var(--color-ok-tx)] text-white`}
+              >
+                {busy ? "처리중…" : "해결완료"}
+              </button>
             )}
           </>
         )}
@@ -538,6 +573,15 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   const [activeTab, setActiveTab] = useState<IssueTab>("open");
   // [2026-09-23] 지운 직후 5초 동안 뜨는 «되돌리기» 띠. 놓쳐도 「지운 건」 탭에서 되살릴 수 있다.
   const [undoTarget, setUndoTarget] = useState<AdminIssueTask | null>(null);
+  // ── [2026-09-24 사장님 요청] 「고객이슈 뭐 필터 기능 그런거도 없고」 ──
+  //   찾아본 기준: 반품 관리 대시보드(AfterShip Returns)는 필터를 기간/상태/사유·유형/항목으로 나눈다.
+  //     그건 수천 건을 다루는 큰 쇼핑몰용이고, 우리는 전체 40건이라 그대로 가져오면 화면만 복잡해진다.
+  //   NN/g 「Data Tables」: 필터는 «눈에 띄고, 빠르고, 켜져 있으면 표시가 나야» 한다. 개수 기준은 없다.
+  //   → 우리 데이터에 실제로 있는 것만 둔다: «검색 한 칸» + «유형 칩».
+  //     기간·우선순위는 지금 건수에서 값을 못 한다(등록일 내림차순 정렬 + 40건이면 눈으로 충분).
+  //     필요해지면 칩 한 줄만 더 붙이면 되게 만들어 뒀다.
+  const [keyword, setKeyword] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");   // "" = 전체
   useEffect(() => {
     if (!undoTarget) return;
     const timer = window.setTimeout(() => setUndoTarget(null), 5000);
@@ -610,13 +654,41 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   const openCount = useMemo(() => liveTasks.filter((task) => !isResolved(task)).length, [liveTasks]);
   const resolvedCount = useMemo(() => liveTasks.filter(isResolved).length, [liveTasks]);
 
-  const visibleTasks = useMemo(() => {
+  const tabTasks = useMemo(() => {
     if (activeTab === "open") return liveTasks.filter((task) => !isResolved(task));
     if (activeTab === "resolved") return liveTasks.filter(isResolved);
     if (activeTab === "deleted") return deletedTasks;
 
     return liveTasks;
   }, [activeTab, liveTasks, deletedTasks]);
+
+  // 검색은 «화면에 보이는 글자»를 전부 본다 — 닉네임·이름·전화·상품·주문번호·메모.
+  //   띄어쓰기와 하이픈을 지우고 비교한다(010-1234 로도, 01012340 로도 찾힌다).
+  const searchKey = (value: unknown) => clean(value).replace(/[\s-]/g, "").toLowerCase();
+
+  const visibleTasks = useMemo(() => {
+    const word = searchKey(keyword);
+    return tabTasks.filter((task) => {
+      if (typeFilter && !getIssueTypes(task).includes(typeFilter)) return false;
+      if (!word) return true;
+      const haystack = searchKey(
+        [
+          getNickname(task),
+          getName(task),
+          getPhone(task),
+          extractBodyField(task, "주문번호:"),
+          extractBodyField(task, "대상상품:"),
+          clean(task.related_product),
+          getFullMemo(task),
+        ].join(" "),
+      );
+      return haystack.includes(word);
+    });
+  }, [tabTasks, keyword, typeFilter]);
+
+  const filterOn = Boolean(clean(keyword) || typeFilter);
+
+  useEffect(() => { setIssuePage(1); }, [keyword, typeFilter, activeTab]);
 
   const issueTotalPages = Math.max(1, Math.ceil(visibleTasks.length / issuePageSize));
   const safeIssuePage = Math.min(Math.max(1, issuePage), issueTotalPages);
@@ -890,6 +962,69 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   const isReturnFlowIssue = (task: AdminIssueTask) =>
     clean((task as { source?: unknown }).source) === "order_return_flow";
 
+  // [2026-09-24 사장님 요청] 「지운건은 뭐 삭제 기능도 없고」
+  //   ⚠ 되돌릴 수 없다. 서버는 status='deleted' 인 줄만 지운다(살아있는 이슈는 실수로도 안 지워진다).
+  const purgeIssueTask = async (task: AdminIssueTask) => {
+    const id = clean(task.id);
+    if (!id) return;
+
+    const who = getNickname(task) || getName(task) || "이 건";
+    const ok = await showAdminConfirm(
+      `${who} 건을 영구삭제할까요?\n\n이건 되돌릴 수 없습니다. 기록이 완전히 사라집니다.`,
+      { title: "영구삭제", confirmText: "영구삭제", cancelText: "그만두기", tone: "danger" },
+    );
+    if (!ok) return;
+
+    setSaving(true);
+    try {
+      const response = await fetch("/api/admin-v2/admin-tasks", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        showAdminToast("영구삭제 실패\n" + (payload?.message || "알 수 없는 오류"), "error");
+        return;
+      }
+      setReloadKey((value) => value + 1);
+      window.dispatchEvent(new Event("ruru-admin-task-updated"));
+      showAdminToast("영구삭제했습니다.", "success");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const purgeAllDeleted = async () => {
+    const count = deletedTasks.length;
+    if (count === 0) return;
+
+    const ok = await showAdminConfirm(
+      `「지운 건」 ${count}건을 모두 영구삭제할까요?\n\n이건 되돌릴 수 없습니다. 되살리고 싶은 게 있으면 먼저 되살려 두세요.`,
+      { title: "전체 비우기", confirmText: `${count}건 영구삭제`, cancelText: "그만두기", tone: "danger" },
+    );
+    if (!ok) return;
+
+    setSaving(true);
+    try {
+      const response = await fetch("/api/admin-v2/admin-tasks", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ purgeAll: true }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        showAdminToast("전체 비우기 실패\n" + (payload?.message || "알 수 없는 오류"), "error");
+        return;
+      }
+      setReloadKey((value) => value + 1);
+      window.dispatchEvent(new Event("ruru-admin-task-updated"));
+      showAdminToast(String(payload.message || "비웠습니다."), "success");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const restoreIssueTask = async (task: AdminIssueTask, silent = false) => {
     const id = clean(task.id);
     if (!id) return false;
@@ -1019,42 +1154,6 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     } finally {
       setSaving(false);
     }
-  };
-
-  const hideResolvedIssueTask = async (task: AdminIssueTask) => {
-    const id = clean(task.id);
-
-    if (!id) {
-      showAdminToast("목록삭제 처리할 고객이슈 ID가 없습니다.");
-      return;
-    }
-
-    const ok = await showAdminConfirm("해결완료 목록에서 이 고객이슈를 삭제할까요?\n\nDB 완전삭제가 아니라 목록 숨김 처리됩니다.");
-    if (!ok) return;
-
-    const response = await fetch("/api/admin-v2/admin-tasks", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        id,
-        action: "hide",
-        resolved_note: "고객관리에서 해결완료 목록 숨김삭제",
-      }),
-    });
-
-    const payload = await response.json().catch(() => null);
-
-    if (!response.ok || !payload?.ok) {
-      showAdminToast("목록삭제 처리 실패\n" + (payload?.message || "알 수 없는 오류"));
-      return;
-    }
-
-    setIssuePage(1);
-    setReloadKey((value) => value + 1);
-    window.dispatchEvent(new Event("ruru-admin-task-updated"));
-    showAdminToast("해결완료 목록에서 숨김 처리했습니다.");
   };
 
   const saveEditedIssueMemo = async () => {
@@ -1192,6 +1291,78 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
         ))}
       </div>
 
+      {/* ── 찾기 줄 — 검색 한 칸 + 유형 칩. 켜져 있으면 「초기화」가 나타난다(NN/g) ── */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[220px] flex-1">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-ink-mute">🔍</span>
+          <input
+            type="text"
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+            placeholder="닉네임 · 이름 · 전화 · 상품 · 주문번호 · 메모"
+            className="h-10 w-full rounded-xl border border-line bg-surface pl-9 pr-9 text-[13px] font-bold text-ink outline-none placeholder:font-semibold placeholder:text-ink-mute focus:border-rose-deep"
+          />
+          {keyword ? (
+            <button
+              type="button"
+              onClick={() => setKeyword("")}
+              aria-label="검색어 지우기"
+              className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-line text-[13px] font-black text-ink-soft"
+            >
+              ×
+            </button>
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1">
+          {[["", "전체"] as [string, string], ...ISSUE_TYPE_OPTIONS].map(([key, label]) => {
+            const on = typeFilter === key;
+            return (
+              <button
+                key={key || "all"}
+                type="button"
+                onClick={() => setTypeFilter(key)}
+                className={`h-10 rounded-xl px-3 text-[12px] font-black ${
+                  on ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        {filterOn ? (
+          <button
+            type="button"
+            onClick={() => { setKeyword(""); setTypeFilter(""); }}
+            className="h-10 rounded-xl border border-rose-deep bg-surface px-3 text-[12px] font-black text-rose-deep hover:bg-rose-soft"
+          >
+            ✕ 초기화
+          </button>
+        ) : null}
+
+        {/* [2026-09-24] 「지운 건」 탭에서만 — 쌓인 걸 한 번에 비운다 */}
+        {activeTab === "deleted" && deletedTasks.length > 0 ? (
+          <button
+            type="button"
+            onClick={purgeAllDeleted}
+            disabled={saving}
+            className="ml-auto h-10 rounded-xl border border-danger-tx bg-surface px-3 text-[12px] font-black text-danger-tx hover:bg-danger-bg disabled:opacity-50"
+          >
+            {saving ? "처리중…" : `🗑 전체 비우기 ${deletedTasks.length}건`}
+          </button>
+        ) : null}
+      </div>
+
+      {filterOn ? (
+        <div className="mt-2 text-[11px] font-bold text-ink-mute">
+          찾은 결과 {visibleTasks.length.toLocaleString("ko-KR")}건
+          {clean(keyword) ? ` · 검색 「${clean(keyword)}」` : ""}
+          {typeFilter ? ` · 유형 「${getIssueTypeLabel(typeFilter)}」` : ""}
+        </div>
+      ) : null}
+
       {/* [2026-09-21] 표 머리글 — 어느 칸이 무엇인지 한 번만 적어두면 줄마다 「닉네임:」 같은 라벨이 필요 없다.
           예전 카드가 길었던 이유의 절반이 줄마다 반복되던 라벨이었다. */}
       <div className="mt-4 min-h-0 flex-1 overflow-y-auto overflow-x-auto rounded-xl border border-line">
@@ -1223,9 +1394,10 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               onPhotoZoom={setIssuePhotoPreview}
               onEdit={openEdit}
               onResolve={resolveIssueTask}
-              onHide={hideResolvedIssueTask}
               onDelete={deleteIssueTask}
               onRestore={(t) => { void restoreIssueTask(t); }}
+              onUnresolve={(t) => { void restoreIssueTask(t, true).then((ok) => { if (ok) showAdminToast("미해결로 되돌렸습니다.", "success"); }); }}
+              onPurge={purgeIssueTask}
               busy={saving}
             />
           ))}

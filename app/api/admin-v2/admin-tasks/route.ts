@@ -161,6 +161,47 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// [2026-09-24 사장님 요청] 「지운건은 뭐 삭제 기능도 없고」
+//   지금까지 «지우기»는 status='deleted' 로 숨기기만 했다. 「지운 건」 탭에 쌓이기만 한다.
+//   여기서 «영구삭제»를 한다 — DB 에서 진짜 지운다. 되돌릴 수 없다.
+//   ⚠ 안전장치: status='deleted' 인 줄만 지운다. 미해결·해결 건은 실수로도 안 지워진다.
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = getSupabaseAdmin();
+    const body = await request.json().catch(() => null);
+
+    const id = cleanText(body?.id, 160);
+    const purgeAll = body?.purgeAll === true;
+
+    if (!id && !purgeAll) {
+      return NextResponse.json({ ok: false, message: "지울 고객 이슈를 정하지 못했습니다." }, { status: 400 });
+    }
+
+    // ⚠ 항상 status='deleted' 조건을 건다. 이 한 줄이 «살아있는 이슈»를 지키는 방어선이다.
+    let query = supabase.from("admin_tasks").delete().eq("status", "deleted");
+    if (!purgeAll) query = query.eq("id", id);
+
+    const { data, error } = await query.select("id");
+
+    if (error) {
+      return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    }
+
+    const removed = Array.isArray(data) ? data.length : 0;
+
+    return NextResponse.json({
+      ok: true,
+      removed,
+      message: removed > 0 ? `${removed}건을 영구삭제했습니다.` : "지울 건이 없습니다.",
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { ok: false, message: error instanceof Error ? error.message : String(error) },
+      { status: 500 },
+    );
+  }
+}
+
 export async function PATCH(request: NextRequest) {
   try {
     const supabase = getSupabaseAdmin();
