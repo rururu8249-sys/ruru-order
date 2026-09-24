@@ -66,10 +66,15 @@ export const FEED_ROW_AVAIL_W = 814;
 // (fitScale = min(가로비, 세로비) 라 세로가 기준이 되면 가로 여유분을 아무도 안 썼다).
 //   → 네모 폭을 디자인 px 로 환산해 «그만큼 줄을 길게» 쓴다. 글자 크기는 그대로다.
 //   ⚠ Math.max 로 기존 값을 바닥으로 깐다 = 어떤 경우에도 지금보다 짧아지지 않는다.
-/** 알림 줄에서 글자가 쓸 수 있는 폭 — 위젯 폭 − (강조바 5 + 왼쪽여백 12 + 오른쪽여백 22) */
-export const FEED_ROW_PAD_W = 39;
-/** 공지/안내 줄에서 글자가 쓸 수 있는 폭 — 위젯 폭 − (테두리 3 + 좌우여백 36 + 📌아이콘 38 + 간격 5) */
-export const FEED_PIN_PAD_W = 82;
+// [2026-09-24 2차 사장님] 「좌우 여백 꽉차게(최소의 여백만 남기고) 글씨 한줄에 최대한 많이」
+//   → 알약 안쪽 여백을 «최소»로 줄여 그만큼을 전부 글자에 준다.
+//     알림  : 강조바 5 + 왼쪽 10 + 오른쪽 14 = 29  (예전 39)
+//     공지  : 테두리 3 + 왼쪽 14 + 오른쪽 12 + 📌아이콘 38 + 간격 8 = 75  (예전 82)
+//   글자 시작점은 그대로 맞는다 — 알림 5+10=15 / 공지 1.5+14=15.5
+/** 알림 줄에서 글자가 쓸 수 있는 폭 — 위젯 폭 − (강조바 5 + 왼쪽여백 10 + 오른쪽여백 14) */
+export const FEED_ROW_PAD_W = 29;
+/** 공지/안내 줄에서 글자가 쓸 수 있는 폭 — 위젯 폭 − (테두리 3 + 왼쪽 14 + 오른쪽 12 + 📌아이콘 38 + 간격 8) */
+export const FEED_PIN_PAD_W = 75;
 
 export function feedRowAvailW(widgetW: number): number {
   const w = Math.floor(Number(widgetW) || 0) - FEED_ROW_PAD_W;
@@ -111,6 +116,41 @@ export type FeedRowSizes = { nick: number; nim: number; verb: number; detail: nu
 // [2026-09-17 최종] «전부 28» 로 통일 — 사장님: 「닉네임·주문감사합니다 너무 크다. 그냥 폰트 통일하게 가자」
 //   (실측 참고: 유튜브 채팅 글자 = 37. 28 은 그보다 약 25% 작다. 폰에서 보고 작으면 이 숫자 하나만 올리면 된다)
 export const FEED_ROW_SIZES: FeedRowSizes = { nick: 28, nim: 28, verb: 28, detail: 28, opt: 28 };
+
+/** [2026-09-24 2차] 주문 알림 한 줄을 지키려고 «여기보다 더» 글자를 줄여야 하면 2줄로 간다.
+ *  공지의 FEED_PIN_ONELINE_MIN_SIZE(28) 과 같은 역할. 알림은 2층 구조라 조금 더 내려갈 수 있다. */
+export const FEED_ROW_ONELINE_MIN_SIZE = 24;
+
+export type FeedRowLayout = {
+  /** 이 줄을 그릴 글자 크기(px) */
+  fontSize: number;
+  /** 한 줄로 그리나 */
+  oneLine: boolean;
+};
+
+/**
+ * [2026-09-24 2차 사장님] 「글씨 한줄에 최대한 많이 집어 넣게」
+ *   예전엔 28px 로 재서 «안 들어가면 바로 2줄»이었다. 45px 모자라도 2줄이 됐다(사장님 캡쳐).
+ *   → 공지와 같은 방식으로, 조금만 줄이면 한 줄인 경우 글자를 줄여서라도 한 줄을 지킨다.
+ *     24px 밑으로 내려가야 할 만큼 길 때만 2줄(그때는 원래 크기 28px 유지).
+ *   ⚠ 이 함수가 «한 줄/2줄»을 정한다 = 높이 예산(heightOf)도 같은 값을 봐야 한다.
+ */
+export function feedRowLayout(
+  nick: string, verb: string, detail: string,
+  avail: number = FEED_ROW_AVAIL_W, sizes: FeedRowSizes = FEED_ROW_SIZES,
+): FeedRowLayout {
+  const base = sizes.nick;
+  if (!detail) return { fontSize: base, oneLine: true };
+  const GAP = 11;
+  const w =
+    estimateTextWidth(nick, sizes.nick) + estimateTextWidth("님", sizes.nim) + GAP +
+    estimateTextWidth(verb, sizes.verb) + GAP +
+    estimateTextWidth(detail, sizes.detail);
+  if (w <= avail) return { fontSize: base, oneLine: true };
+  const fit = Math.floor((avail / w) * base);
+  if (fit >= FEED_ROW_ONELINE_MIN_SIZE) return { fontSize: fit, oneLine: true };
+  return { fontSize: base, oneLine: false };
+}
 
 /**
  * 이 줄이 «한 줄»에 들어가나? (닉네임 + 인사말 + 주문내역 + 금액 + 칸 사이 여백)
@@ -276,12 +316,11 @@ export function feedPinLayout(text: string, avail: number = FEED_PIN_AVAIL_W): F
       ? FEED_PIN_SIZE
       : Math.max(FEED_PIN_MIN_SIZE, Math.floor(((A * 2) / natural) * FEED_PIN_SIZE));
 
-  // 두 줄 길이를 맞춘다 — 절반에 8% 여유(한국어 keep-all 로 줄 끝에 자투리가 남는 것 감안).
-  //   여유가 없으면 셋째 줄로 넘어가 «잘린다». 8% 는 아래 테스트가 지킨다.
-  const used = estimateTextWidth(text, fontSize);
-  const maxWidth = Math.min(A, Math.ceil((used / 2) * 1.08));
-
-  return { fontSize, lines: 2, maxWidth };
+  // [2026-09-20] 예전엔 «절반씩» 쪼개 좌우에 여백을 남겼다(알약 폭 77%).
+  // [2026-09-24 2차 사장님] 「좌우 여백 꽉차게(최소의 여백만 남기고) 글씨 한줄에 최대한 많이」
+  //   → 절반 균형을 폐기한다. 첫 줄이 폭을 꽉 채우고, 남는 글자가 둘째 줄로 간다.
+  //     첫 줄에 들어가는 글자 수가 최대가 되고, 알약도 폭을 다 쓴다(예전 77% → 99%).
+  return { fontSize, lines: 2, maxWidth: A };
 }
 
 /** 공지 글자 크기(px) — feedPinLayout 의 얇은 껍데기 */
