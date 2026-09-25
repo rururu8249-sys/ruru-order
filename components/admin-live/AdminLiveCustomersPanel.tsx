@@ -1461,32 +1461,24 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
   // ── 일괄 포인트지급: 선택 헬퍼 ──
   const pageSelectablePhones = visibleCustomers.map((c) => digitsOnly(c.phone)).filter(Boolean);
 
-  // [2026-09-25] 현재 페이지 20명분 «추가정보»를 한 번에 묶어서 조회 — 포인트 잔액 1쿼리 + 미해결 이슈 1쿼리(회원별 개별 조회 금지).
-  //   표시 전용(SELECT만) — 돈/포인트 로직과 무관. 저장 형식이 숫자만/하이픈 섞여 있어 두 형식 모두로 조회한 뒤 숫자만 기준으로 매핑.
+  // [2026-09-25] 현재 페이지 20명분 «추가정보»(포인트 잔액 · 미해결 이슈 수)를 한 번에 묶어서 조회.
+  //   ⚠ customer_point_balances / admin_tasks 는 RLS 로 anon(브라우저 supabase)에겐 안 열린다 → 서버 라우트(service_role)로 조회.
+  //   표시 전용 — 돈/포인트 로직과 무관. 회원별 개별 쿼리 금지(Nano 부하). 실패해도 목록은 정상(배지만 생략).
   const pagePhoneKey = Array.from(new Set(pageSelectablePhones)).sort().join(",");
   useEffect(() => {
     let alive = true;
     const digits = pagePhoneKey ? pagePhoneKey.split(",") : [];
     if (digits.length === 0) { setPagePoints({}); setPageOpenIssues({}); return; }
-    const forQuery = Array.from(new Set(digits.flatMap((p) => [p, formatPhone(p)]).filter(Boolean)));
     (async () => {
-      const [balRes, taskRes] = await Promise.all([
-        supabase.from("customer_point_balances").select("customer_phone, current_points").in("customer_phone", forQuery),
-        supabase.from("admin_tasks").select("customer_phone, status").eq("status", "open").in("customer_phone", forQuery),
-      ]);
-      if (!alive) return;
-      const pts: Record<string, number> = {};
-      ((balRes.data as Array<{ customer_phone: unknown; current_points: unknown }>) || []).forEach((r) => {
-        const p = digitsOnly(r.customer_phone);
-        if (p) pts[p] = Number(r.current_points) || 0;
+      const res = await fetch("/api/admin-live/customer-list-extra", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phones: digits }),
       });
-      const iss: Record<string, number> = {};
-      ((taskRes.data as Array<{ customer_phone: unknown }>) || []).forEach((r) => {
-        const p = digitsOnly(r.customer_phone);
-        if (p) iss[p] = (iss[p] || 0) + 1;
-      });
-      setPagePoints(pts);
-      setPageOpenIssues(iss);
+      const payload = await res.json().catch(() => null);
+      if (!alive || !payload?.ok) return;
+      setPagePoints((payload.points as Record<string, number>) || {});
+      setPageOpenIssues((payload.openIssues as Record<string, number>) || {});
     })().catch(() => { /* 조회 실패는 조용히 무시 — 배지만 안 뜬다(목록은 정상) */ });
     return () => { alive = false; };
   }, [pagePhoneKey]);
@@ -1570,6 +1562,21 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
     () => new Map(directPhoneBlocks.map((block) => [digitsOnly(block.phone), clean(block.updated_at) || clean(block.created_at)])),
     [directPhoneBlocks],
   );
+  // [2026-09-25] 회원 한 줄에 쓰는 파생값 — 표(PC)·카드(모바일) 두 렌더가 같이 쓴다(중복 계산 방지).
+  const memberRowInfo = (customer: CustomerSummary) => {
+    const phoneDigits = digitsOnly(customer.phone);
+    const hasPhoto = isRealKakaoPhoto(customer.kakaoProfileImage);
+    const pts = phoneDigits ? pagePoints[phoneDigits] : undefined;
+    const openIssues = phoneDigits ? (pageOpenIssues[phoneDigits] || 0) : 0;
+    // [버그수정] 최근주문은 «주문이 있을 때만». latestOrderAt 은 0건 회원이면 가입일(created_at)로 폴백돼 있어 그대로 쓰면 안 됨.
+    const rel = customer.orderCount > 0 ? relativeTimeKo(customer.latestOrderAt) : "";
+    const blockedAt = customer.blocked && phoneDigits ? (blockedAtByPhone.get(phoneDigits) || "") : "";
+    const blockSummary = customer.blocked ? blockReasonSummary(customer.blockReason) : "";
+    const bp = customer.blocked ? parseBlockReason(customer.blockReason) : null;
+    const blockFull = bp ? [bp.label, bp.items.join(", "), bp.memo].filter(Boolean).join(" · ") : "";
+    const initial = (customer.nickname || customer.name || "?").trim().charAt(0);
+    return { phoneDigits, hasPhoto, pts, openIssues, rel, blockedAt, blockSummary, blockFull, initial };
+  };
   const blockedCustomers = customers.filter((customer) => customer.blocked);
   const customerPhoneKeys = new Set(customers.map((customer) => digitsOnly(customer.phone)).filter(Boolean));
   const standalonePhoneBlocks = directPhoneBlocks.filter((block) => {
@@ -1876,12 +1883,12 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
               value={keyword}
               onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
               placeholder="닉네임 / 이름 / 전화번호 검색"
-              className="h-11 min-w-[200px] flex-1 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink outline-none focus:border-info-tx focus:ring-4 focus:ring-info-bg"
+              className="h-11 min-w-[200px] flex-1 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink outline-none focus-visible:border-rose-deep focus-visible:ring-2 focus-visible:ring-rose-deep"
             />
             <select
               value={statusFilter}
               onChange={(event) => { setStatusFilter(event.target.value as StatusFilter); setPage(1); }}
-              className="h-11 shrink-0 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink"
+              className="h-11 shrink-0 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink outline-none focus-visible:ring-2 focus-visible:ring-rose-deep"
             >
               <option value="all">고객상태: 전체</option>
               <option value="normal">정상</option>
@@ -1892,7 +1899,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
             <select
               value={sortMode}
               onChange={(event) => { setSortMode(event.target.value as SortMode); setPage(1); }}
-              className="h-11 shrink-0 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink"
+              className="h-11 shrink-0 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink outline-none focus-visible:ring-2 focus-visible:ring-rose-deep"
             >
               <option value="latest">최근주문순</option>
               <option value="lastLogin">최근접속순</option>
@@ -1949,90 +1956,121 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
             </div>
           </div>
 
-            <div className="mt-3 flex flex-col gap-1.5">
-              {visibleCustomers.length === 0 ? (
-                <div className="ru-empty"><div className="ru-empty-title">이 조건에 맞는 고객이 없습니다.</div><div className="ru-empty-hint">검색어를 지우거나 「구매한 손님만」 필터를 꺼보세요.</div></div>
-              ) : (
-                visibleCustomers.map((customer) => {
-                  const initial = (customer.nickname || customer.name || "?").trim().charAt(0);
-                  const phoneDigits = digitsOnly(customer.phone);
-                  const hasPhoto = isRealKakaoPhoto(customer.kakaoProfileImage);
-                  const pts = phoneDigits ? pagePoints[phoneDigits] : undefined;
-                  const openIssues = phoneDigits ? (pageOpenIssues[phoneDigits] || 0) : 0;
-                  const rel = relativeTimeKo(customer.latestOrderAt);
-                  const blockedAt = customer.blocked && phoneDigits ? (blockedAtByPhone.get(phoneDigits) || "") : "";
-                  const blockSummary = customer.blocked ? blockReasonSummary(customer.blockReason) : "";
-                  const bp = customer.blocked ? parseBlockReason(customer.blockReason) : null;
-                  const blockFull = bp ? [bp.label, bp.items.join(", "), bp.memo].filter(Boolean).join(" · ") : "";
-                  return (
-                    <div
-                      key={customer.key}
-                      className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors ${customer.blocked ? "border-line border-l-4 border-l-danger-tx bg-danger-bg/40" : "border-line bg-surface hover:border-rose-line hover:bg-rose-soft/30"}`}
-                    >
-                      {phoneDigits ? (
-                        <input
-                          type="checkbox"
-                          checked={selectedPhones.has(phoneDigits)}
-                          onChange={() => toggleSelectPhone(customer.phone)}
-                          className="h-4 w-4 shrink-0 accent-rose-deep"
-                          title="일괄지급 선택"
-                        />
-                      ) : (
-                        <span className="w-4 shrink-0" />
-                      )}
-                      {hasPhoto ? (
-                        <button
-                          type="button"
-                          onClick={() => setPhotoZoom(customer.kakaoProfileImage)}
-                          className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-line"
-                          title="사진 크게 보기"
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={customer.kakaoProfileImage} alt="" className="h-full w-full object-cover" loading="lazy" />
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => openDetail(customer)}
-                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-black ${customer.blocked ? "bg-surface-3 text-ink-mute" : "bg-rose-soft text-rose-deep"}`}
-                        >
-                          {initial}
-                        </button>
-                      )}
-                      <button type="button" onClick={() => openDetail(customer)} className="min-w-0 flex-1 text-left">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="truncate text-[13px] font-black text-ink">{customer.nickname || "—"}</span>
-                          {customer.name ? <span className="shrink-0 text-xs text-ink-mute">· {customer.name}</span> : null}
-                          {!customer.kakaoId ? <span className="shrink-0 rounded-lg bg-warn-bg px-1.5 py-0.5 text-[11px] font-black text-warn-tx" title="카카오 로그인 기록이 없는 옛 회원(전화번호만). 다시 카톡 로그인하면 자동 연결됩니다.">카카오 미연동</span> : null}
-                          {openIssues > 0 ? <span className="shrink-0 rounded-lg bg-danger-bg px-1.5 py-0.5 text-[11px] font-black text-danger-tx" title="이 회원의 미해결 고객이슈">이슈 {openIssues}</span> : null}
-                          {customer.manualNeededCount > 0 ? <span className="shrink-0 rounded-lg bg-warn-bg px-1.5 py-0.5 text-[11px] font-black text-warn-tx" title="입금 자동매칭이 안 돼 수동 확인이 필요한 주문이 있어요">매칭필요</span> : null}
-                          {customer.liveAlertOptin === false ? <span className="shrink-0 rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] font-black text-ink-mute" title="방송 시작 알림을 받지 않는 회원">🔕 알림OFF</span> : null}
-                        </div>
-                        <div className="mt-0.5 truncate text-[11px] text-ink-mute">
-                          🕒 {rel || (customer.orderCount > 0 ? "최근 주문" : "주문 전 회원")}
-                          {" · "}누적 {customer.orderCount}건 · {money(customer.totalAmount)}
-                          {pts != null ? ` · 🪙 ${pts.toLocaleString("ko-KR")}P` : ""}
-                          {customer.phone ? ` · ${formatPhone(customer.phone)}` : ""}
-                        </div>
-                        {customer.blocked ? (
-                          <div className="mt-0.5 truncate text-[11px] font-bold text-danger-tx" title={blockFull || blockSummary || "차단됨"}>
-                            🚫 {blockSummary || "차단됨"}{blockedAt ? ` · ${formatOrderDateTime(blockedAt)}` : ""}
-                          </div>
-                        ) : null}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleCustomerBlockButton(customer)}
-                        className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-black transition-colors ${customer.blocked ? "border border-line text-ink-soft hover:bg-surface-2" : "text-danger-tx hover:bg-danger-bg"}`}
-                      >
-                        {customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}
-                      </button>
-                      <button type="button" onClick={() => openDetail(customer)} className="shrink-0 text-[11px] font-black text-rose-deep">상세 ›</button>
+            {/* [2026-09-25] PC(넓을 때)=고객이슈 탭과 같은 표 · 좁은 화면=카드(지금 모양 유지) */}
+            {visibleCustomers.length === 0 ? (
+              <div className="mt-3 ru-empty"><div className="ru-empty-title">이 조건에 맞는 고객이 없습니다.</div><div className="ru-empty-hint">검색어를 지우거나 「주문 있는 고객만」 필터를 꺼보세요.</div></div>
+            ) : (
+              <>
+                {/* ── PC: 표 (xl 이상) — 숫자 칸 오른쪽 정렬, 차단은 빨간 왼쪽 띠 + 상태 칸에 사유 요약 ── */}
+                <div className="mt-3 hidden overflow-x-auto rounded-xl border border-line xl:block">
+                  <div className="min-w-[900px]">
+                    <div className="sticky top-0 z-10 grid grid-cols-[36px_44px_minmax(150px,1fr)_92px_48px_108px_84px_150px_120px_auto] items-center gap-x-3 border-b border-line bg-surface-2 px-3 py-2 text-[11px] font-black text-ink-mute">
+                      <span />
+                      <span>사진</span>
+                      <span>닉네임 / 이름</span>
+                      <span>최근 주문</span>
+                      <span className="text-right">주문</span>
+                      <span className="text-right">누적 금액</span>
+                      <span className="text-right">포인트</span>
+                      <span>상태</span>
+                      <span>전화번호</span>
+                      <span className="text-right">처리</span>
                     </div>
-                  );
-                })
-              )}
-            </div>
+                    {visibleCustomers.map((customer) => {
+                      const d = memberRowInfo(customer);
+                      return (
+                        <div key={customer.key} className={`grid grid-cols-[36px_44px_minmax(150px,1fr)_92px_48px_108px_84px_150px_120px_auto] items-center gap-x-3 border-b border-line px-3 py-2.5 text-[12px] transition-colors ${customer.blocked ? "border-l-4 border-l-danger-tx bg-danger-bg/40" : "bg-surface hover:bg-rose-soft/30"}`}>
+                          {d.phoneDigits ? (
+                            <input type="checkbox" checked={selectedPhones.has(d.phoneDigits)} onChange={() => toggleSelectPhone(customer.phone)} className="h-4 w-4 accent-rose-deep" title="일괄지급 선택" />
+                          ) : <span />}
+                          {d.hasPhoto ? (
+                            <button type="button" onClick={() => setPhotoZoom(customer.kakaoProfileImage)} className="h-9 w-9 overflow-hidden rounded-full border border-line" title="사진 크게 보기">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={customer.kakaoProfileImage} alt="" className="h-full w-full object-cover" loading="lazy" />
+                            </button>
+                          ) : (
+                            <button type="button" onClick={() => openDetail(customer)} className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-black ${customer.blocked ? "bg-surface-3 text-ink-mute" : "bg-rose-soft text-rose-deep"}`}>{d.initial}</button>
+                          )}
+                          <button type="button" onClick={() => openDetail(customer)} className="min-w-0 text-left">
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate text-[13px] font-black text-ink">{customer.nickname || "—"}</span>
+                              {customer.name ? <span className="shrink-0 text-[11px] text-ink-mute">· {customer.name}</span> : null}
+                              {!customer.kakaoId ? <span className="shrink-0 rounded bg-warn-bg px-1 py-0.5 text-[11px] font-black text-warn-tx" title="카카오 로그인 기록이 없는 옛 회원(전화번호만)">미연동</span> : null}
+                            </div>
+                          </button>
+                          <span className="truncate text-[11px] text-ink-soft" title={customer.orderCount > 0 ? formatOrderDateTime(customer.latestOrderAt) : ""}>{d.rel || "-"}</span>
+                          <span className="text-right font-black text-ink">{customer.orderCount}</span>
+                          <span className="text-right font-black text-ink">{money(customer.totalAmount)}</span>
+                          <span className="text-right font-black text-rose-deep">{d.pts != null ? `${d.pts.toLocaleString("ko-KR")}P` : "-"}</span>
+                          <div className="flex min-w-0 flex-wrap items-center gap-1">
+                            {customer.blocked ? (
+                              <span className="truncate text-[11px] font-bold text-danger-tx" title={d.blockFull || d.blockSummary || "차단됨"}>🚫 {d.blockSummary || "차단됨"}{d.blockedAt ? ` · ${formatOrderDateTime(d.blockedAt)}` : ""}</span>
+                            ) : (
+                              <>
+                                {d.openIssues > 0 ? <span className="rounded bg-danger-bg px-1 py-0.5 text-[11px] font-black text-danger-tx" title="미해결 고객이슈">이슈 {d.openIssues}</span> : null}
+                                {customer.manualNeededCount > 0 ? <span className="rounded bg-warn-bg px-1 py-0.5 text-[11px] font-black text-warn-tx" title="입금 수동 확인 필요">매칭필요</span> : null}
+                                {customer.liveAlertOptin === false ? <span className="rounded bg-surface-2 px-1 py-0.5 text-[11px] font-black text-ink-mute" title="방송 알림 미신청">🔕</span> : null}
+                                {d.openIssues === 0 && customer.manualNeededCount === 0 && customer.liveAlertOptin !== false ? <span className="text-[11px] text-ink-mute">-</span> : null}
+                              </>
+                            )}
+                          </div>
+                          <span className="truncate text-[11px] text-ink-soft">{customer.phone ? formatPhone(customer.phone) : "-"}</span>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button type="button" onClick={() => handleCustomerBlockButton(customer)} className={`shrink-0 rounded-lg px-2 py-1 text-[11px] font-black transition-colors ${customer.blocked ? "border border-line text-ink-soft hover:bg-surface-2" : "text-danger-tx hover:bg-danger-bg"}`}>{customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}</button>
+                            <button type="button" onClick={() => openDetail(customer)} className="shrink-0 text-[11px] font-black text-rose-deep">상세 ›</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* ── 좁은 화면: 카드(지금 모양 유지) ── */}
+                <div className="mt-3 flex flex-col gap-1.5 xl:hidden">
+                  {visibleCustomers.map((customer) => {
+                    const d = memberRowInfo(customer);
+                    return (
+                      <div key={customer.key} className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors ${customer.blocked ? "border-line border-l-4 border-l-danger-tx bg-danger-bg/40" : "border-line bg-surface hover:border-rose-line hover:bg-rose-soft/30"}`}>
+                        {d.phoneDigits ? (
+                          <input type="checkbox" checked={selectedPhones.has(d.phoneDigits)} onChange={() => toggleSelectPhone(customer.phone)} className="h-4 w-4 shrink-0 accent-rose-deep" title="일괄지급 선택" />
+                        ) : <span className="w-4 shrink-0" />}
+                        {d.hasPhoto ? (
+                          <button type="button" onClick={() => setPhotoZoom(customer.kakaoProfileImage)} className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-line" title="사진 크게 보기">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={customer.kakaoProfileImage} alt="" className="h-full w-full object-cover" loading="lazy" />
+                          </button>
+                        ) : (
+                          <button type="button" onClick={() => openDetail(customer)} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-black ${customer.blocked ? "bg-surface-3 text-ink-mute" : "bg-rose-soft text-rose-deep"}`}>{d.initial}</button>
+                        )}
+                        <button type="button" onClick={() => openDetail(customer)} className="min-w-0 flex-1 text-left">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="truncate text-[13px] font-black text-ink">{customer.nickname || "—"}</span>
+                            {customer.name ? <span className="shrink-0 text-xs text-ink-mute">· {customer.name}</span> : null}
+                            {!customer.kakaoId ? <span className="shrink-0 rounded-lg bg-warn-bg px-1.5 py-0.5 text-[11px] font-black text-warn-tx" title="카카오 로그인 기록이 없는 옛 회원(전화번호만). 다시 카톡 로그인하면 자동 연결됩니다.">카카오 미연동</span> : null}
+                            {d.openIssues > 0 ? <span className="shrink-0 rounded-lg bg-danger-bg px-1.5 py-0.5 text-[11px] font-black text-danger-tx" title="이 회원의 미해결 고객이슈">이슈 {d.openIssues}</span> : null}
+                            {customer.manualNeededCount > 0 ? <span className="shrink-0 rounded-lg bg-warn-bg px-1.5 py-0.5 text-[11px] font-black text-warn-tx" title="입금 자동매칭이 안 돼 수동 확인이 필요한 주문이 있어요">매칭필요</span> : null}
+                            {customer.liveAlertOptin === false ? <span className="shrink-0 rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] font-black text-ink-mute" title="방송 시작 알림을 받지 않는 회원">🔕 알림OFF</span> : null}
+                          </div>
+                          <div className="mt-0.5 truncate text-[11px] text-ink-mute">
+                            🕒 {d.rel || "-"}
+                            {" · "}누적 {customer.orderCount}건 · {money(customer.totalAmount)}
+                            {d.pts != null ? ` · 🪙 ${d.pts.toLocaleString("ko-KR")}P` : ""}
+                            {customer.phone ? ` · ${formatPhone(customer.phone)}` : ""}
+                          </div>
+                          {customer.blocked ? (
+                            <div className="mt-0.5 truncate text-[11px] font-bold text-danger-tx" title={d.blockFull || d.blockSummary || "차단됨"}>
+                              🚫 {d.blockSummary || "차단됨"}{d.blockedAt ? ` · ${formatOrderDateTime(d.blockedAt)}` : ""}
+                            </div>
+                          ) : null}
+                        </button>
+                        <button type="button" onClick={() => handleCustomerBlockButton(customer)} className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-black transition-colors ${customer.blocked ? "border border-line text-ink-soft hover:bg-surface-2" : "text-danger-tx hover:bg-danger-bg"}`}>{customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}</button>
+                        <button type="button" onClick={() => openDetail(customer)} className="shrink-0 text-[11px] font-black text-rose-deep">상세 ›</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
 
           {/* [2026-09-25] 카카오 사진 크게 보기 — 640px 원본. 배경/✕ 클릭으로 닫힘. */}
           {photoZoom ? (
