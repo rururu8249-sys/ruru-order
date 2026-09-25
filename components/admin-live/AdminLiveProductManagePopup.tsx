@@ -1750,7 +1750,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     const d = new Date(b.started_at);
                     const dateLabel = Number.isNaN(d.getTime()) ? "-" : `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
                     return (
-                      <button type="button" key={b.id} onClick={() => { setBcSelId(b.id); if (isNarrow) setBcListOpen(false); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", borderBottom: "1px solid var(--color-line)", background: on ? "var(--color-rose-soft)" : "var(--color-surface)", cursor: "pointer", border: "none" }}>
+                      <button type="button" key={b.id} className="group" onClick={() => { setBcSelId(b.id); if (isNarrow) setBcListOpen(false); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", borderBottom: "1px solid var(--color-line)", background: on ? "var(--color-rose-soft)" : "var(--color-surface)", cursor: "pointer", border: "none" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                           {isOn ? <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, padding: "1px 6px", borderRadius: "4px", background: "var(--color-ok-bg)", color: "var(--color-ok-tx)" }}>ON</span> : null}
                           <span style={{ flex: 1, minWidth: 0, fontSize: "12px", fontWeight: 800, color: on ? "var(--color-rose-deep)" : "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</span>
@@ -1760,7 +1760,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                               role="button"
                               title="목록에서 숨기기"
                               onClick={(e) => { e.stopPropagation(); void handleHideBroadcast(b); }}
-                              style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", borderRadius: "4px", padding: "1px 6px", cursor: bcBusy ? "default" : "pointer", opacity: bcBusy ? 0.5 : 1 }}
+                              className={`shrink-0 rounded text-ink-mute transition hover:text-ink-soft hover:bg-surface-2 ${isNarrow ? "" : "opacity-0 group-hover:opacity-100"}`}
+                              style={{ fontSize: "11px", fontWeight: 800, borderRadius: "4px", padding: "1px 6px", cursor: bcBusy ? "default" : "pointer" }}
                             >
                               숨기기
                             </span>
