@@ -71,6 +71,9 @@ type CustomerSummary = {
   orders: LooseLiveOrder[];
   // [2026-09-05] 회원의 정체성 = 카카오ID. 주문/프로필에서 처음 만난 kakao_id. 없으면 "카카오 미연동"(전화번호만 남은 옛 회원).
   kakaoId: string;
+  // [2026-09-25] 표시 전용 — 카카오 프로필 사진(=profile_image_url, 640px) · 방송알림 신청여부(null=설정한 적 없음)
+  kakaoProfileImage: string;
+  liveAlertOptin: boolean | null;
 };
 
 type CustomerProfile = {
@@ -229,6 +232,34 @@ type BlockedCustomerListItem =
     };
 
 const CUSTOMER_PAGE_SIZE = 20;
+
+// [2026-09-25] 카카오 «실제» 프로필 사진인지 — 기본 프로필(사진 안 올린 사람)은 URL에 default_profile 이 들어간다 → 사진 없음 취급.
+function isRealKakaoPhoto(url: unknown): boolean {
+  const u = String(url ?? "").trim();
+  if (!u || !/^https?:\/\//i.test(u)) return false;
+  if (/default_profile|profile_nophoto|anonymous/i.test(u)) return false;
+  return true;
+}
+
+// [2026-09-25] 상대 시간(한국어) — "방금 전 / N분 전 / N시간 전 / N일 전 / N개월 전 / N년 전". 표시 전용.
+function relativeTimeKo(iso: unknown): string {
+  const s = String(iso ?? "").trim();
+  if (!s) return "";
+  const t = new Date(s).getTime();
+  if (Number.isNaN(t)) return "";
+  const diff = Date.now() - t;
+  if (diff < 0) return "방금 전";
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "방금 전";
+  if (min < 60) return `${min}분 전`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}시간 전`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day}일 전`;
+  const mon = Math.floor(day / 30);
+  if (mon < 12) return `${mon}개월 전`;
+  return `${Math.floor(mon / 12)}년 전`;
+}
 
 function money(value: unknown) {
   return `${Number(value || 0).toLocaleString("ko-KR")}원`;
@@ -1097,6 +1128,11 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("latest");
   const [page, setPage] = useState(1);
+  // [2026-09-25] 현재 페이지 20명만 «묶어서» 조회하는 추가정보(포인트 잔액 · 미해결 이슈 수). 회원별 개별 쿼리 금지 — Nano 부하 최소.
+  const [pagePoints, setPagePoints] = useState<Record<string, number>>({});
+  const [pageOpenIssues, setPageOpenIssues] = useState<Record<string, number>>({});
+  // [2026-09-25] 목록에서 카카오 사진 클릭 시 크게 보기(profile_image_url 640px). 표시 전용.
+  const [photoZoom, setPhotoZoom] = useState<string>("");
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerSummary | null>(null);
   const [selectedProfile, setSelectedProfile] = useState<CustomerProfile | null>(null);
   const [detailPage, setDetailPage] = useState(1);
@@ -1262,6 +1298,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
           blockReason: orderBlockReason,
           orders: [order],
           kakaoId: orderKakaoId(order),
+          kakaoProfileImage: "",
+          liveAlertOptin: null,
         });
 
         return;
@@ -1328,6 +1366,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
         current.joinedAt = clean(profile.created_at) || current.joinedAt;
         current.lastLoginAt = clean(profile.last_login_at) || current.lastLoginAt;
         if (!current.kakaoId) current.kakaoId = clean(profile.kakao_id);
+        current.kakaoProfileImage = clean(profile.kakao_profile_image) || current.kakaoProfileImage;
+        if (typeof profile.live_alert_optin === "boolean") current.liveAlertOptin = profile.live_alert_optin;
 
         return;
       }
@@ -1350,6 +1390,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
         blockReason: profileBlockReason,
         orders: [],
         kakaoId: clean(profile.kakao_id),
+        kakaoProfileImage: clean(profile.kakao_profile_image),
+        liveAlertOptin: typeof profile.live_alert_optin === "boolean" ? profile.live_alert_optin : null,
       });
     });
 
@@ -1418,6 +1460,36 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
   // ── 일괄 포인트지급: 선택 헬퍼 ──
   const pageSelectablePhones = visibleCustomers.map((c) => digitsOnly(c.phone)).filter(Boolean);
+
+  // [2026-09-25] 현재 페이지 20명분 «추가정보»를 한 번에 묶어서 조회 — 포인트 잔액 1쿼리 + 미해결 이슈 1쿼리(회원별 개별 조회 금지).
+  //   표시 전용(SELECT만) — 돈/포인트 로직과 무관. 저장 형식이 숫자만/하이픈 섞여 있어 두 형식 모두로 조회한 뒤 숫자만 기준으로 매핑.
+  const pagePhoneKey = Array.from(new Set(pageSelectablePhones)).sort().join(",");
+  useEffect(() => {
+    let alive = true;
+    const digits = pagePhoneKey ? pagePhoneKey.split(",") : [];
+    if (digits.length === 0) { setPagePoints({}); setPageOpenIssues({}); return; }
+    const forQuery = Array.from(new Set(digits.flatMap((p) => [p, formatPhone(p)]).filter(Boolean)));
+    (async () => {
+      const [balRes, taskRes] = await Promise.all([
+        supabase.from("customer_point_balances").select("customer_phone, current_points").in("customer_phone", forQuery),
+        supabase.from("admin_tasks").select("customer_phone, status").eq("status", "open").in("customer_phone", forQuery),
+      ]);
+      if (!alive) return;
+      const pts: Record<string, number> = {};
+      ((balRes.data as Array<{ customer_phone: unknown; current_points: unknown }>) || []).forEach((r) => {
+        const p = digitsOnly(r.customer_phone);
+        if (p) pts[p] = Number(r.current_points) || 0;
+      });
+      const iss: Record<string, number> = {};
+      ((taskRes.data as Array<{ customer_phone: unknown }>) || []).forEach((r) => {
+        const p = digitsOnly(r.customer_phone);
+        if (p) iss[p] = (iss[p] || 0) + 1;
+      });
+      setPagePoints(pts);
+      setPageOpenIssues(iss);
+    })().catch(() => { /* 조회 실패는 조용히 무시 — 배지만 안 뜬다(목록은 정상) */ });
+    return () => { alive = false; };
+  }, [pagePhoneKey]);
   const allPageSelected = pageSelectablePhones.length > 0 && pageSelectablePhones.every((p) => selectedPhones.has(p));
 
   const toggleSelectPhone = (phone: string) => {
@@ -1798,14 +1870,18 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
       <div className={custTab === "members" ? "" : "hidden"}>
         <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
-          <div className="grid grid-cols-2 gap-2">
+          {/* [2026-09-25] 필터 한 줄 — 검색(넓게) · 고객상태 · 정렬 · 주문있는고객만 · 초기화(바뀌었을 때만). 좁으면 자연스럽게 줄바꿈. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              value={keyword}
+              onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
+              placeholder="닉네임 / 이름 / 전화번호 검색"
+              className="h-11 min-w-[200px] flex-1 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink outline-none focus:border-info-tx focus:ring-4 focus:ring-info-bg"
+            />
             <select
               value={statusFilter}
-              onChange={(event) => {
-                setStatusFilter(event.target.value as StatusFilter);
-                setPage(1);
-              }}
-              className="h-11 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink"
+              onChange={(event) => { setStatusFilter(event.target.value as StatusFilter); setPage(1); }}
+              className="h-11 shrink-0 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink"
             >
               <option value="all">고객상태: 전체</option>
               <option value="normal">정상</option>
@@ -1813,14 +1889,10 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
               <option value="attention">관리필요</option>
               <option value="nokakao">카카오 미연동</option>
             </select>
-
             <select
               value={sortMode}
-              onChange={(event) => {
-                setSortMode(event.target.value as SortMode);
-                setPage(1);
-              }}
-              className="h-11 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink"
+              onChange={(event) => { setSortMode(event.target.value as SortMode); setPage(1); }}
+              className="h-11 shrink-0 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink"
             >
               <option value="latest">최근주문순</option>
               <option value="lastLogin">최근접속순</option>
@@ -1831,42 +1903,26 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
               <option value="orders">주문수순</option>
               <option value="nickname">닉네임순</option>
             </select>
-
             <button
               type="button"
-              onClick={() => {
-                setKeyword("");
-                setStatusFilter("all");
-                setSortMode("latest");
-                setPage(1);
-              }}
-              className="h-11 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink-soft hover:bg-surface-2"
+              onClick={() => { setBuyersOnly((v) => !v); setPage(1); }}
+              className={`h-11 shrink-0 rounded-xl px-3 text-[12px] font-black transition ${buyersOnly ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}
             >
-              초기화
+              {buyersOnly ? "주문 있는 고객만 ✓" : "주문 있는 고객만"}
             </button>
-
-            <input
-              value={keyword}
-              onChange={(event) => {
-                setKeyword(event.target.value);
-                setPage(1);
-              }}
-              placeholder="닉네임 / 이름 / 전화번호 검색"
-              className="h-11 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink outline-none focus:border-info-tx focus:ring-4 focus:ring-info-bg"
-            />
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-black text-ink">고객 목록</h2>
+            {(keyword.trim() || statusFilter !== "all" || sortMode !== "latest" || buyersOnly) ? (
               <button
                 type="button"
-                onClick={() => { setBuyersOnly((v) => !v); setPage(1); }}
-                className={`rounded-full px-3 py-1 text-[11px] font-black transition ${buyersOnly ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}
+                onClick={() => { setKeyword(""); setStatusFilter("all"); setSortMode("latest"); setBuyersOnly(false); setPage(1); }}
+                className="h-11 shrink-0 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink-soft hover:bg-surface-2"
               >
-                {buyersOnly ? "주문 있는 고객만 ✓" : "주문 있는 고객만"}
+                ✕ 초기화
               </button>
-            </div>
+            ) : null}
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-black text-ink">고객 목록</h2>
             <div className="text-xs font-black text-ink-mute">
               표시 {visibleCustomers.length.toLocaleString("ko-KR")}명 / 검색결과 {filteredCustomers.length.toLocaleString("ko-KR")}명
             </div>
@@ -1899,15 +1955,24 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
               ) : (
                 visibleCustomers.map((customer) => {
                   const initial = (customer.nickname || customer.name || "?").trim().charAt(0);
+                  const phoneDigits = digitsOnly(customer.phone);
+                  const hasPhoto = isRealKakaoPhoto(customer.kakaoProfileImage);
+                  const pts = phoneDigits ? pagePoints[phoneDigits] : undefined;
+                  const openIssues = phoneDigits ? (pageOpenIssues[phoneDigits] || 0) : 0;
+                  const rel = relativeTimeKo(customer.latestOrderAt);
+                  const blockedAt = customer.blocked && phoneDigits ? (blockedAtByPhone.get(phoneDigits) || "") : "";
+                  const blockSummary = customer.blocked ? blockReasonSummary(customer.blockReason) : "";
+                  const bp = customer.blocked ? parseBlockReason(customer.blockReason) : null;
+                  const blockFull = bp ? [bp.label, bp.items.join(", "), bp.memo].filter(Boolean).join(" · ") : "";
                   return (
                     <div
                       key={customer.key}
-                      className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors ${customer.blocked ? "border-line bg-surface-2 opacity-60" : "border-line bg-surface hover:border-rose-line hover:bg-rose-soft/30"}`}
+                      className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors ${customer.blocked ? "border-line border-l-4 border-l-danger-tx bg-danger-bg/40" : "border-line bg-surface hover:border-rose-line hover:bg-rose-soft/30"}`}
                     >
-                      {digitsOnly(customer.phone) ? (
+                      {phoneDigits ? (
                         <input
                           type="checkbox"
-                          checked={selectedPhones.has(digitsOnly(customer.phone))}
+                          checked={selectedPhones.has(phoneDigits)}
                           onChange={() => toggleSelectPhone(customer.phone)}
                           className="h-4 w-4 shrink-0 accent-rose-deep"
                           title="일괄지급 선택"
@@ -1915,27 +1980,46 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                       ) : (
                         <span className="w-4 shrink-0" />
                       )}
-                      <button
-                        type="button"
-                        onClick={() => openDetail(customer)}
-                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-black ${customer.blocked ? "bg-surface-3 text-ink-mute" : "bg-rose-soft text-rose-deep"}`}
-                      >
-                        {initial}
-                      </button>
+                      {hasPhoto ? (
+                        <button
+                          type="button"
+                          onClick={() => setPhotoZoom(customer.kakaoProfileImage)}
+                          className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-line"
+                          title="사진 크게 보기"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={customer.kakaoProfileImage} alt="" className="h-full w-full object-cover" loading="lazy" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => openDetail(customer)}
+                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-black ${customer.blocked ? "bg-surface-3 text-ink-mute" : "bg-rose-soft text-rose-deep"}`}
+                        >
+                          {initial}
+                        </button>
+                      )}
                       <button type="button" onClick={() => openDetail(customer)} className="min-w-0 flex-1 text-left">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <span className="truncate text-[13px] font-black text-ink">{customer.nickname || "—"}</span>
                           {customer.name ? <span className="shrink-0 text-xs text-ink-mute">· {customer.name}</span> : null}
                           {!customer.kakaoId ? <span className="shrink-0 rounded-lg bg-warn-bg px-1.5 py-0.5 text-[11px] font-black text-warn-tx" title="카카오 로그인 기록이 없는 옛 회원(전화번호만). 다시 카톡 로그인하면 자동 연결됩니다.">카카오 미연동</span> : null}
+                          {openIssues > 0 ? <span className="shrink-0 rounded-lg bg-danger-bg px-1.5 py-0.5 text-[11px] font-black text-danger-tx" title="이 회원의 미해결 고객이슈">이슈 {openIssues}</span> : null}
+                          {customer.manualNeededCount > 0 ? <span className="shrink-0 rounded-lg bg-warn-bg px-1.5 py-0.5 text-[11px] font-black text-warn-tx" title="입금 자동매칭이 안 돼 수동 확인이 필요한 주문이 있어요">매칭필요</span> : null}
+                          {customer.liveAlertOptin === false ? <span className="shrink-0 rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] font-black text-ink-mute" title="방송 시작 알림을 받지 않는 회원">🔕 알림OFF</span> : null}
                         </div>
                         <div className="mt-0.5 truncate text-[11px] text-ink-mute">
-                          누적 {customer.orderCount}건 · {money(customer.totalAmount)}
+                          🕒 {rel || (customer.orderCount > 0 ? "최근 주문" : "주문 전 회원")}
+                          {" · "}누적 {customer.orderCount}건 · {money(customer.totalAmount)}
+                          {pts != null ? ` · 🪙 ${pts.toLocaleString("ko-KR")}P` : ""}
                           {customer.phone ? ` · ${formatPhone(customer.phone)}` : ""}
                         </div>
+                        {customer.blocked ? (
+                          <div className="mt-0.5 truncate text-[11px] font-bold text-danger-tx" title={blockFull || blockSummary || "차단됨"}>
+                            🚫 {blockSummary || "차단됨"}{blockedAt ? ` · ${formatOrderDateTime(blockedAt)}` : ""}
+                          </div>
+                        ) : null}
                       </button>
-                      {customer.blocked ? (
-                        <span className="shrink-0 rounded-lg bg-danger-bg px-2 py-0.5 text-[11px] font-black text-danger-tx">차단</span>
-                      ) : null}
                       <button
                         type="button"
                         onClick={() => handleCustomerBlockButton(customer)}
@@ -1949,6 +2033,18 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                 })
               )}
             </div>
+
+          {/* [2026-09-25] 카카오 사진 크게 보기 — 640px 원본. 배경/✕ 클릭으로 닫힘. */}
+          {photoZoom ? (
+            <div
+              className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 p-6"
+              onClick={() => setPhotoZoom("")}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={photoZoom} alt="카카오 프로필 사진" className="max-h-[80vh] max-w-[80vw] rounded-2xl object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />
+              <button type="button" onClick={() => setPhotoZoom("")} className="absolute right-5 top-5 rounded-full bg-white/90 px-3 py-1 text-sm font-black text-ink shadow" aria-label="닫기">✕</button>
+            </div>
+          ) : null}
 
           <div className="mt-4 flex items-center justify-between">
             <div className="text-xs font-black text-ink-soft">
@@ -2235,6 +2331,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                                   blockReason: block.reason,
                                   orders: [],
                                   kakaoId: "",
+                                  kakaoProfileImage: "",
+                                  liveAlertOptin: null,
                                 })
                               }
                               disabled={blockSaving}

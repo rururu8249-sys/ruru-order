@@ -23,6 +23,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 (없음)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-09-25 **[고객] 회원 목록 화면 개편 — 필터 한 줄 · 카카오 사진 · 정보칸 · 상태배지 · 차단 표시**(AdminLiveCustomersPanel 1파일·읽기/표시 전용·돈/포인트 로직 무접촉): ①**필터 한 줄** — 2열 그리드 → `[검색(flex-1)·고객상태▾·정렬▾·주문있는고객만·초기화]` flex-wrap(좁으면 줄바꿈). 초기화는 기본값(검색""·상태 all·정렬 latest·주문있는고객만 off)과 다를 때만 표시. ②**카카오 프로필 사진** — `customers.kakao_profile_image`(=profile_image_url 640px) 있으면 동그라미 글자 대신 썸네일, 클릭 시 640px 확대 오버레이(`photoZoom`). **저장 컬럼은 이 하나뿐**(thumbnail_image_url·is_default_image 미저장·미캡처 확인) → 사장님 결정 「지금 데이터로만」: 기본사진은 URL 휴리스틱 `isRealKakaoPhoto`(default_profile 등 포함 시 사진없음 취급). ③**정보칸 추가** — 최근주문 상대시간(`relativeTimeKo`) · 누적 N건·금액 · 포인트 잔액 · 전화. ④**상태 배지(해당할 때만)** — 미해결이슈 N·매칭필요·🔕알림OFF(카카오미연동 기존 유지). 매칭필요=요약의 manualNeededCount(메모리 파생), 알림OFF=live_alert_optin===false(기존 조회에 포함). ⑤**차단** — 왼쪽 빨간 띠(border-l danger)+행 danger 배경, 닉네임 아래에 `🚫 사유요약(blockReasonSummary, 한 줄 truncate)·차단일`, 마우스 올리면 title로 전체 사유(parseBlockReason 조립). 차단 사유 저장=customer_phone_blocks.reason→customers.block_reason→최근 override, 차단일=blockedAtByPhone. ⑥**성능(Nano)** — 포인트 잔액·미해결이슈는 «현재 페이지 20명»만 묶어서 각 1쿼리(`customer_point_balances.in`·`admin_tasks.eq(status,open).in`), pagePhoneKey 바뀔 때만 실행, 실패해도 목록 정상(배지만 생략), 전화 저장형식 대비 숫자만+하이픈 둘 다로 조회. 검수 guard 5개·테스트 52/52·build(BANKDA 가드 2개)·tsc 0 통과.
 - 2026-09-25 **[관리자] 방송 목록 필터 — 선택된 방송·ON 방송은 항상 맨 위 고정**(AdminLiveProductManagePopup 1파일·표시 전용·돈/로직 무접촉): 기간 필터 기본이 최근 30일이라 오래된 방송을 선택 중이면 목록에서 사라지던 것 → `bcListView`에서 `bcSelId`(선택)·status ON 방송을 기간/검색 필터와 무관하게 bcList 순서 그대로 맨 위에 고정, 나머지는 필터 통과분만(중복 없음, Set 제외). deps에 bcSelId 추가. 검수 guard 5개·테스트 52/52·build·tsc 0 통과.
 - 2026-09-25 **[관리자] 방송 목록 각 줄 「숨기기」 빨간 글씨 → 회색 + hover 시에만 표시**(AdminLiveProductManagePopup 1파일·스타일만·돈/로직 무접촉): 상품관리 › 방송 상품 탭 왼쪽 방송 목록의 `숨기기`가 빨강(danger)이라 늘 눈에 띄던 것 → 회색(ink-mute)으로 낮추고 마우스 올렸을 때만 보이게. 행 버튼에 `group`, span에 `text-ink-mute hover:text-ink-soft opacity-0 group-hover:opacity-100`(터치=isNarrow에선 hover가 없어 항상 표시). handleHideBroadcast·ON 방송 가드는 그대로. 검수 guard 5개·테스트 52/52·build·tsc 0 통과.
 - 2026-09-25 **[고객이슈] 「고객이슈」 탭 안에서는 상단 미해결 알림 노란 띠 숨김**(AdminLiveCustomersPanel+AdminLiveDashboard 2파일·표시 로직·돈 무접촉): 고객·이슈 메뉴 상단 `📮 미해결 고객이슈 N건 · 바로 처리 →` 노란 띠(LiveIssueRailPanel variant="banner")가 아래 「고객이슈」 탭과 같은 내용을 두 번 보여주던 것 → 현재 탭이 issues면 띠 숨김. AdminLiveCustomersPanel에 `onTabChange` prop 신설(custTab 변경 시 보고), 대시보드가 `customersActiveTab` 추적해 `!== "issues"`일 때만 배너 렌더. LiveIssueRailPanel 자체는 무변경. 검수 guard 5개·테스트 52/52·build·tsc 0 통과.
@@ -171,7 +172,8 @@ git status
 - 출고 용어: 출고대기/택배출고
 - 결제수단: 무통장/카드
 - 화면명: 입금내역/입금매칭
-- 상품관리 › 방송 상품 탭 방송 목록 필터 = 기간 프리셋 `[최근 30일(기본)·최근 3개월·전체·기간 선택]` + 방송 이름 검색칸(월 드롭다운 아님). 기간 범위엔 BroadcastCalendarPicker(단일 방송 선택기) 재사용 금지 — date input 2칸 사용.
+- 상품관리 › 방송 상품 탭 방송 목록 필터 = 기간 프리셋 `[최근 30일(기본)·최근 3개월·전체·기간 선택]` + 방송 이름 검색칸(월 드롭다운 아님). 기간 범위엔 BroadcastCalendarPicker(단일 방송 선택기) 재사용 금지 — date input 2칸 사용. 선택된 방송·ON 방송은 필터와 무관하게 항상 맨 위.
+- 고객 › 회원 목록: 필터 한 줄 `[검색·고객상태·정렬·주문있는고객만·초기화(바뀌었을 때만)]`. 행 = 카카오 사진(있으면 썸네일·클릭 640px 확대, 기본사진 URL은 사진없음) · 최근주문 상대시간 · 누적건·금액 · 포인트 잔액 · 상태배지(이슈N·매칭필요·알림OFF·카카오미연동, 해당할 때만) · 차단회원은 왼쪽 빨간 띠+사유요약(hover 전체). 카카오 사진 저장 컬럼은 kakao_profile_image 하나뿐(썸네일·기본여부 미저장). 페이지 추가정보(포인트·이슈)는 현재 20명만 batch 조회 — 회원별 개별 쿼리 금지.
 - 시안 파일: /Users/ruru/Downloads/시안모음.html
 
 ## 스택
