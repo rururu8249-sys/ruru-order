@@ -255,6 +255,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [bcLoading, setBcLoading] = useState(false);
   const [bcBusy, setBcBusy] = useState(false);
   const [bcPinBusy, setBcPinBusy] = useState(false);
+  // [2026-09-25 사장님 요청] 방송 목록 날짜(월) 필터 — 표시 전용(읽기). "all" 또는 "YYYY-MM"
+  const [bcMonthFilter, setBcMonthFilter] = useState<string>("all");
   // [2026-08-31 사장님 요청] 📌 자주 고정 — 고정 기록(localStorage) 상위 목록. 표시 전용.
   const [pinHistoryVersion, setPinHistoryVersion] = useState(0);
   const pinQuickList = useMemo(() => readPinHistory(8), [pinHistoryVersion]);
@@ -552,6 +554,34 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     if (idx <= 0) return bcProducts;
     const copy = [...bcProducts]; const [top] = copy.splice(idx, 1); return [top, ...copy];
   }, [bcProducts, bcWidgetPin.mode, bcWidgetPin.productId, bcSort]);
+
+  // [2026-09-25] 방송 목록 날짜(월) 필터 — 표시 전용. bcList 원본은 그대로 두고 렌더만 거른다.
+  const bcMonthOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    bcList.forEach((b) => {
+      const d = new Date(b.started_at);
+      if (Number.isNaN(d.getTime())) return;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    return [...counts.entries()]
+      .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+      .map(([key, n]) => ({ key, label: `${key.replace("-", ".")} (${n})` }));
+  }, [bcList]);
+
+  const bcListView = useMemo(() => {
+    if (bcMonthFilter === "all") return bcList;
+    return bcList.filter((b) => {
+      const d = new Date(b.started_at);
+      if (Number.isNaN(d.getTime())) return false;
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` === bcMonthFilter;
+    });
+  }, [bcList, bcMonthFilter]);
+
+  // 방송 목록 새로고침 후 선택한 월이 사라졌으면 전체로 되돌림(빈 목록에 갇히지 않게)
+  useEffect(() => {
+    if (bcMonthFilter !== "all" && !bcMonthOptions.some((o) => o.key === bcMonthFilter)) setBcMonthFilter("all");
+  }, [bcMonthOptions, bcMonthFilter]);
 
   // [2026-08-13] 드래그 허용 조건 — 「진열 순서」 + 검색 안 함 + 복사모드 아님 + 저장 중 아님.
   //   (고정 여부는 더 이상 조건이 아니다 — ID 기준 순서변경이라 안 엉킴)
@@ -1667,14 +1697,29 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 </span>
                 <button type="button" disabled={bcBusy} onClick={() => { setNewBcTitle(""); setNewBcCopyIds(null); setNewBcOpen(true); }} style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "4px 8px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>+ 새 방송</button>
               </div>
+              {(!isNarrow || bcListOpen) && bcMonthOptions.length > 0 ? (
+                <div style={{ padding: "6px 12px", borderBottom: "1px solid var(--color-line)" }}>
+                  <select
+                    value={bcMonthFilter}
+                    onChange={(e) => setBcMonthFilter(e.target.value)}
+                    title="선택한 월의 방송만 목록에 보입니다. 진열 상품·저장에는 영향 없어요."
+                    style={{ width: "100%", height: "28px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 800, padding: "0 6px", cursor: "pointer" }}
+                  >
+                    <option value="all">전체 방송 ({bcList.length})</option>
+                    {bcMonthOptions.map((o) => (<option key={o.key} value={o.key}>{o.label}</option>))}
+                  </select>
+                </div>
+              ) : null}
               {(!isNarrow || bcListOpen) && (
               <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
                 {bcLoading ? (
                   <div style={{ textAlign: "center", padding: "32px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>불러오는 중…</div>
                 ) : bcList.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>방송이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "4px" }}>방송 콘솔에서 ▶ 방송시작을 누르면 여기에 나옵니다.</div></div>
+                ) : bcListView.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "24px 12px", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700, lineHeight: 1.6 }}>이 기간에 방송이 없습니다.<br /><span style={{ fontSize: "11px" }}>필터를 「전체 방송」으로 바꿔보세요.</span></div>
                 ) : (
-                  bcList.map((b) => {
+                  bcListView.map((b) => {
                     const on = b.id === bcSelId;
                     const isOn = String(b.status || "").toUpperCase() === "ON";
                     const d = new Date(b.started_at);
