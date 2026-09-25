@@ -752,6 +752,10 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   const allOnPageSelected = pageIds.length > 0 && selectedOnPage.length === pageIds.length;
   const someOnPageSelected = selectedOnPage.length > 0 && !allOnPageSelected;
   const selectedTasks = useMemo(() => tasks.filter((t) => selectedIds.has(clean(t.id))), [tasks, selectedIds]);
+  // [2026-09-25 사장님] 머리줄 전체선택으로 «현재 페이지»가 다 켜지면 → 작업 바에서 «필터 결과 전체»를 한 번에 선택.
+  const filteredIds = useMemo(() => visibleTasks.map((t) => clean(t.id)).filter(Boolean), [visibleTasks]);
+  const canSelectWholeTab = allOnPageSelected && selectedIds.size < filteredIds.length;
+  const selectWholeTab = () => setSelectedIds(new Set(filteredIds));
   const toggleSelect = (task: AdminIssueTask) => {
     const id = clean(task.id);
     if (!id) return;
@@ -1159,35 +1163,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     }
   };
 
-  const purgeAllDeleted = async () => {
-    const count = deletedTasks.length;
-    if (count === 0) return;
-
-    const ok = await showAdminConfirm(
-      `「삭제함」 ${count}건을 모두 영구삭제할까요?\n\n이건 되돌릴 수 없습니다. 되살리고 싶은 게 있으면 먼저 되살려 두세요.`,
-      { title: "전체 비우기", confirmText: `${count}건 영구삭제`, cancelText: "그만두기", tone: "danger" },
-    );
-    if (!ok) return;
-
-    setSaving(true);
-    try {
-      const response = await fetch("/api/admin-v2/admin-tasks", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ purgeAll: true }),
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok || !payload?.ok) {
-        showAdminToast("전체 비우기 실패\n" + (payload?.message || "알 수 없는 오류"), "error");
-        return;
-      }
-      setReloadKey((value) => value + 1);
-      window.dispatchEvent(new Event("ruru-admin-task-updated"));
-      showAdminToast(String(payload.message || "비웠습니다."), "success");
-    } finally {
-      setSaving(false);
-    }
-  };
+  // [2026-09-25 사장님] 「전체 비우기」 버튼 제거 — 삭제함 탭은 머리줄 전체선택 → 「이 탭 N건 전체 선택」 → 일괄 영구삭제(bulkPurge)로 대체.
 
   const restoreIssueTask = async (task: AdminIssueTask, silent = false) => {
     const id = clean(task.id);
@@ -1506,17 +1482,6 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           </button>
         ) : null}
 
-        {/* [2026-09-24] 「삭제함」 탭에서만 — 쌓인 걸 한 번에 비운다 */}
-        {activeTab === "deleted" && deletedTasks.length > 0 ? (
-          <button
-            type="button"
-            onClick={purgeAllDeleted}
-            disabled={saving}
-            className="ml-auto h-10 rounded-xl border border-danger-tx bg-surface px-3 text-[12px] font-black text-danger-tx hover:bg-danger-bg disabled:opacity-50"
-          >
-            {saving ? "처리중…" : `🗑 전체 비우기 ${deletedTasks.length}건`}
-          </button>
-        ) : null}
       </div>
 
       {filterOn ? (
@@ -1531,6 +1496,9 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       {selectedIds.size > 0 ? (
         <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-rose-line bg-rose-soft px-3 py-2">
           <span className="text-[12px] font-black text-rose-deep">{selectedIds.size}건 선택</span>
+          {canSelectWholeTab ? (
+            <button type="button" onClick={selectWholeTab} className="h-8 rounded-lg px-2 text-[11px] font-black text-rose-deep underline underline-offset-2 hover:bg-surface">이 탭 {visibleTasks.length.toLocaleString("ko-KR")}건 전체 선택</button>
+          ) : null}
           <button type="button" onClick={clearSelection} className="h-8 rounded-lg px-2 text-[11px] font-black text-ink-soft hover:bg-surface">선택 해제</button>
           <div className="ml-auto flex items-center gap-1.5">
             {activeTab === "deleted" ? (
