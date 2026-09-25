@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => null);
   const rawPhones: unknown[] = Array.isArray(body?.phones) ? body.phones : [];
-  const digits = Array.from(new Set(rawPhones.map(digitsOnly).filter((p) => p.length >= 8))).slice(0, 60);
+  const digits = Array.from(new Set(rawPhones.map(digitsOnly).filter((p) => p.length >= 8))).slice(0, 50);
 
   if (digits.length === 0) {
     return NextResponse.json({ ok: true, points: {}, openIssues: {} });

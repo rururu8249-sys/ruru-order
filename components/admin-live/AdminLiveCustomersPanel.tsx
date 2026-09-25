@@ -58,6 +58,8 @@ type CustomerSummary = {
   address: string;
   orderCount: number;
   totalAmount: number;
+  // [2026-09-25] 결제완료(isPaid) 주문 금액만 합산 — 목록 「누적 결제」에 상세와 같은 기준으로 표시(판정 로직 무변경, 합산 대상만 결제완료로).
+  paidAmount: number;
   paidCount: number;
   unpaidCount: number;
   manualNeededCount: number;
@@ -241,26 +243,6 @@ function isRealKakaoPhoto(url: unknown): boolean {
   return true;
 }
 
-// [2026-09-25] 상대 시간(한국어) — "방금 전 / N분 전 / N시간 전 / N일 전 / N개월 전 / N년 전". 표시 전용.
-function relativeTimeKo(iso: unknown): string {
-  const s = String(iso ?? "").trim();
-  if (!s) return "";
-  const t = new Date(s).getTime();
-  if (Number.isNaN(t)) return "";
-  const diff = Date.now() - t;
-  if (diff < 0) return "방금 전";
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return "방금 전";
-  if (min < 60) return `${min}분 전`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}시간 전`;
-  const day = Math.floor(hr / 24);
-  if (day < 30) return `${day}일 전`;
-  const mon = Math.floor(day / 30);
-  if (mon < 12) return `${mon}개월 전`;
-  return `${Math.floor(mon / 12)}년 전`;
-}
-
 function money(value: unknown) {
   return `${Number(value || 0).toLocaleString("ko-KR")}원`;
 }
@@ -398,6 +380,16 @@ function formatOrderDateTime(value: unknown, fallbackTime = "") {
 
 function orderCreatedSortValue(order: LooseLiveOrder) {
   return parseDateCandidate(orderCreatedRawValue(order)) || orderSubmittedTimeValue(order);
+}
+
+// [2026-09-25] 고객이슈 표 등록일과 같은 «두 줄» 날짜 — 1줄 2026.09.25(금) / 2줄 06:48. 값 없으면 {"-",""}.
+function dateTwoLine(value: unknown): { line1: string; line2: string } {
+  const s = formatOrderDateTime(value);
+  if (!s || s === "-") return { line1: "-", line2: "" };
+  const sp = s.indexOf(") ");
+  if (sp !== -1) return { line1: s.slice(0, sp + 1), line2: s.slice(sp + 2) };
+  const i = s.lastIndexOf(" ");
+  return i === -1 ? { line1: s, line2: "" } : { line1: s.slice(0, i), line2: s.slice(i + 1) };
 }
 
 function orderAmount(order: LooseLiveOrder) {
@@ -1288,6 +1280,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
           address: orderFullAddress(order),
           orderCount: 1,
           totalAmount: amount,
+          paidAmount: isPaid(order) ? amount : 0,
           paidCount: isPaid(order) ? 1 : 0,
           unpaidCount: isUnpaid(order) ? 1 : 0,
           manualNeededCount: isManualNeeded(order) ? 1 : 0,
@@ -1308,6 +1301,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
       if (!current.kakaoId) current.kakaoId = orderKakaoId(order);
       current.orderCount += 1;
       current.totalAmount += amount;
+      current.paidAmount += isPaid(order) ? amount : 0;
       current.paidCount += isPaid(order) ? 1 : 0;
       current.unpaidCount += isUnpaid(order) ? 1 : 0;
       current.manualNeededCount += isManualNeeded(order) ? 1 : 0;
@@ -1380,6 +1374,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
         address: profileAddress,
         orderCount: 0,
         totalAmount: 0,
+        paidAmount: 0,
         paidCount: 0,
         unpaidCount: 0,
         manualNeededCount: 0,
@@ -1425,7 +1420,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
         return true;
       })
       .sort((a, b) => {
-        if (sortMode === "amount") return b.totalAmount - a.totalAmount;
+        if (sortMode === "amount") return b.paidAmount - a.paidAmount;
         if (sortMode === "orders") return b.orderCount - a.orderCount;
         if (sortMode === "nickname") return a.nickname.localeCompare(b.nickname, "ko");
         // 가입일/최근접속: 값이 없는 회원(옛 데이터)은 항상 뒤로 보낸다.
@@ -1569,13 +1564,14 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
     const pts = phoneDigits ? pagePoints[phoneDigits] : undefined;
     const openIssues = phoneDigits ? (pageOpenIssues[phoneDigits] || 0) : 0;
     // [버그수정] 최근주문은 «주문이 있을 때만». latestOrderAt 은 0건 회원이면 가입일(created_at)로 폴백돼 있어 그대로 쓰면 안 됨.
-    const rel = customer.orderCount > 0 ? relativeTimeKo(customer.latestOrderAt) : "";
+    const orderTwo = customer.orderCount > 0 ? dateTwoLine(customer.latestOrderAt) : { line1: "-", line2: "" };
+    const loginTwo = dateTwoLine(customer.lastLoginAt);
     const blockedAt = customer.blocked && phoneDigits ? (blockedAtByPhone.get(phoneDigits) || "") : "";
     const blockSummary = customer.blocked ? blockReasonSummary(customer.blockReason) : "";
     const bp = customer.blocked ? parseBlockReason(customer.blockReason) : null;
     const blockFull = bp ? [bp.label, bp.items.join(", "), bp.memo].filter(Boolean).join(" · ") : "";
     const initial = (customer.nickname || customer.name || "?").trim().charAt(0);
-    return { phoneDigits, hasPhoto, pts, openIssues, rel, blockedAt, blockSummary, blockFull, initial };
+    return { phoneDigits, hasPhoto, pts, openIssues, orderTwo, loginTwo, blockedAt, blockSummary, blockFull, initial };
   };
   const blockedCustomers = customers.filter((customer) => customer.blocked);
   const customerPhoneKeys = new Set(customers.map((customer) => digitsOnly(customer.phone)).filter(Boolean));
@@ -1902,11 +1898,11 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
               className="h-11 shrink-0 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink outline-none focus-visible:ring-2 focus-visible:ring-rose-deep"
             >
               <option value="latest">최근주문순</option>
-              <option value="lastLogin">최근접속순</option>
+              <option value="lastLogin">최근 로그인순</option>
               <option value="oldLogin">과거접속순 (오래 안 온 순)</option>
               <option value="joinedDesc">최근가입순</option>
               <option value="joinedAsc">과거가입순</option>
-              <option value="amount">누적구매금액순</option>
+              <option value="amount">누적 결제순</option>
               <option value="orders">주문수순</option>
               <option value="nickname">닉네임순</option>
             </select>
@@ -1961,25 +1957,26 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
               <div className="mt-3 ru-empty"><div className="ru-empty-title">이 조건에 맞는 고객이 없습니다.</div><div className="ru-empty-hint">검색어를 지우거나 「주문 있는 고객만」 필터를 꺼보세요.</div></div>
             ) : (
               <>
-                {/* ── PC: 표 (xl 이상) — 숫자 칸 오른쪽 정렬, 차단은 빨간 왼쪽 띠 + 상태 칸에 사유 요약 ── */}
+                {/* ── PC: 표 (xl 이상) — 머리글·줄이 같은 grid 템플릿 · 숫자칸 고정폭 오른쪽정렬 · 차단은 inset 빨간띠(칸폭 영향 없음) ── */}
                 <div className="mt-3 hidden overflow-x-auto rounded-xl border border-line xl:block">
-                  <div className="min-w-[900px]">
-                    <div className="sticky top-0 z-10 grid grid-cols-[36px_44px_minmax(150px,1fr)_92px_48px_108px_84px_150px_120px_auto] items-center gap-x-3 border-b border-line bg-surface-2 px-3 py-2 text-[11px] font-black text-ink-mute">
+                  <div className="min-w-[1040px]">
+                    <div className="sticky top-0 z-10 grid grid-cols-[36px_44px_minmax(140px,200px)_120px_minmax(150px,1fr)_100px_100px_48px_96px_80px_auto] items-center gap-x-3 border-b border-line bg-surface-2 px-3 py-2 text-[11px] font-black text-ink-mute">
                       <span />
                       <span>사진</span>
                       <span>닉네임 / 이름</span>
-                      <span>최근 주문</span>
-                      <span className="text-right">주문</span>
-                      <span className="text-right">누적 금액</span>
-                      <span className="text-right">포인트</span>
-                      <span>상태</span>
                       <span>전화번호</span>
+                      <span>상태</span>
+                      <span>최근 주문</span>
+                      <span>최근 로그인</span>
+                      <span className="text-right">주문</span>
+                      <span className="text-right">누적 결제</span>
+                      <span className="text-right">포인트</span>
                       <span className="text-right">처리</span>
                     </div>
                     {visibleCustomers.map((customer) => {
                       const d = memberRowInfo(customer);
                       return (
-                        <div key={customer.key} className={`grid grid-cols-[36px_44px_minmax(150px,1fr)_92px_48px_108px_84px_150px_120px_auto] items-center gap-x-3 border-b border-line px-3 py-2.5 text-[12px] transition-colors ${customer.blocked ? "border-l-4 border-l-danger-tx bg-danger-bg/40" : "bg-surface hover:bg-rose-soft/30"}`}>
+                        <div key={customer.key} className={`grid grid-cols-[36px_44px_minmax(140px,200px)_120px_minmax(150px,1fr)_100px_100px_48px_96px_80px_auto] items-center gap-x-3 border-b border-line px-3 py-2.5 text-[12px] transition-colors ${customer.blocked ? "bg-danger-bg/40 shadow-[inset_4px_0_0_0_var(--color-danger-tx)]" : "bg-surface hover:bg-rose-soft/30"}`}>
                           {d.phoneDigits ? (
                             <input type="checkbox" checked={selectedPhones.has(d.phoneDigits)} onChange={() => toggleSelectPhone(customer.phone)} className="h-4 w-4 accent-rose-deep" title="일괄지급 선택" />
                           ) : <span />}
@@ -1991,30 +1988,45 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                           ) : (
                             <button type="button" onClick={() => openDetail(customer)} className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-black ${customer.blocked ? "bg-surface-3 text-ink-mute" : "bg-rose-soft text-rose-deep"}`}>{d.initial}</button>
                           )}
-                          <button type="button" onClick={() => openDetail(customer)} className="min-w-0 text-left">
+                          {/* 닉네임·이름 (포커스 로즈) */}
+                          <button type="button" onClick={() => openDetail(customer)} className="min-w-0 rounded text-left outline-none focus-visible:ring-2 focus-visible:ring-rose-deep">
                             <div className="flex items-center gap-1.5">
                               <span className="truncate text-[13px] font-black text-ink">{customer.nickname || "—"}</span>
                               {customer.name ? <span className="shrink-0 text-[11px] text-ink-mute">· {customer.name}</span> : null}
                               {!customer.kakaoId ? <span className="shrink-0 rounded bg-warn-bg px-1 py-0.5 text-[11px] font-black text-warn-tx" title="카카오 로그인 기록이 없는 옛 회원(전화번호만)">미연동</span> : null}
                             </div>
                           </button>
-                          <span className="truncate text-[11px] text-ink-soft" title={customer.orderCount > 0 ? formatOrderDateTime(customer.latestOrderAt) : ""}>{d.rel || "-"}</span>
-                          <span className="text-right font-black text-ink">{customer.orderCount}</span>
-                          <span className="text-right font-black text-ink">{money(customer.totalAmount)}</span>
-                          <span className="text-right font-black text-rose-deep">{d.pts != null ? `${d.pts.toLocaleString("ko-KR")}P` : "-"}</span>
+                          {/* 전화번호 */}
+                          <span className="truncate text-[11px] text-ink-soft">{customer.phone ? formatPhone(customer.phone) : "-"}</span>
+                          {/* 상태 (가장 넓게 · 여러 배지 줄바꿈 허용 · 차단은 사유 요약+hover 전체) */}
                           <div className="flex min-w-0 flex-wrap items-center gap-1">
                             {customer.blocked ? (
                               <span className="truncate text-[11px] font-bold text-danger-tx" title={d.blockFull || d.blockSummary || "차단됨"}>🚫 {d.blockSummary || "차단됨"}{d.blockedAt ? ` · ${formatOrderDateTime(d.blockedAt)}` : ""}</span>
-                            ) : (
+                            ) : (customer.unpaidCount > 0 || d.openIssues > 0 || customer.liveAlertOptin === false) ? (
                               <>
+                                {customer.unpaidCount > 0 ? <span className="rounded bg-warn-bg px-1 py-0.5 text-[11px] font-black text-warn-tx" title="상세와 같은 기준 — 아직 입금 전(자동매칭 실패 포함)">미입금 {customer.unpaidCount}건</span> : null}
                                 {d.openIssues > 0 ? <span className="rounded bg-danger-bg px-1 py-0.5 text-[11px] font-black text-danger-tx" title="미해결 고객이슈">이슈 {d.openIssues}</span> : null}
-                                {customer.manualNeededCount > 0 ? <span className="rounded bg-warn-bg px-1 py-0.5 text-[11px] font-black text-warn-tx" title="입금 수동 확인 필요">매칭필요</span> : null}
-                                {customer.liveAlertOptin === false ? <span className="rounded bg-surface-2 px-1 py-0.5 text-[11px] font-black text-ink-mute" title="방송 알림 미신청">🔕</span> : null}
-                                {d.openIssues === 0 && customer.manualNeededCount === 0 && customer.liveAlertOptin !== false ? <span className="text-[11px] text-ink-mute">-</span> : null}
+                                {customer.liveAlertOptin === false ? <span className="rounded bg-surface-2 px-1 py-0.5 text-[11px] font-black text-ink-mute" title="방송 알림 미신청">🔕 알림OFF</span> : null}
                               </>
-                            )}
+                            ) : <span className="text-[11px] text-ink-mute">-</span>}
                           </div>
-                          <span className="truncate text-[11px] text-ink-soft">{customer.phone ? formatPhone(customer.phone) : "-"}</span>
+                          {/* 최근 주문 (두 줄) */}
+                          <div className="text-[11px] leading-tight text-ink-soft">
+                            <div className="truncate">{d.orderTwo.line1}</div>
+                            {d.orderTwo.line2 ? <div className="truncate text-ink-mute">{d.orderTwo.line2}</div> : null}
+                          </div>
+                          {/* 최근 로그인 (두 줄) */}
+                          <div className="text-[11px] leading-tight text-ink-soft">
+                            <div className="truncate">{d.loginTwo.line1}</div>
+                            {d.loginTwo.line2 ? <div className="truncate text-ink-mute">{d.loginTwo.line2}</div> : null}
+                          </div>
+                          {/* 주문 */}
+                          <span className="text-right font-black text-ink">{customer.orderCount}</span>
+                          {/* 누적 결제(결제완료만) */}
+                          <span className="text-right font-black text-ink">{money(customer.paidAmount)}</span>
+                          {/* 포인트 */}
+                          <span className="text-right font-black text-rose-deep">{d.pts != null ? `${d.pts.toLocaleString("ko-KR")}P` : "-"}</span>
+                          {/* 처리 */}
                           <div className="flex items-center justify-end gap-1.5">
                             <button type="button" onClick={() => handleCustomerBlockButton(customer)} className={`shrink-0 rounded-lg px-2 py-1 text-[11px] font-black transition-colors ${customer.blocked ? "border border-line text-ink-soft hover:bg-surface-2" : "text-danger-tx hover:bg-danger-bg"}`}>{customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}</button>
                             <button type="button" onClick={() => openDetail(customer)} className="shrink-0 text-[11px] font-black text-rose-deep">상세 ›</button>
@@ -2030,7 +2042,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                   {visibleCustomers.map((customer) => {
                     const d = memberRowInfo(customer);
                     return (
-                      <div key={customer.key} className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors ${customer.blocked ? "border-line border-l-4 border-l-danger-tx bg-danger-bg/40" : "border-line bg-surface hover:border-rose-line hover:bg-rose-soft/30"}`}>
+                      <div key={customer.key} className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors ${customer.blocked ? "border-line bg-danger-bg/40 shadow-[inset_4px_0_0_0_var(--color-danger-tx)]" : "border-line bg-surface hover:border-rose-line hover:bg-rose-soft/30"}`}>
                         {d.phoneDigits ? (
                           <input type="checkbox" checked={selectedPhones.has(d.phoneDigits)} onChange={() => toggleSelectPhone(customer.phone)} className="h-4 w-4 shrink-0 accent-rose-deep" title="일괄지급 선택" />
                         ) : <span className="w-4 shrink-0" />}
@@ -2042,18 +2054,18 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                         ) : (
                           <button type="button" onClick={() => openDetail(customer)} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-black ${customer.blocked ? "bg-surface-3 text-ink-mute" : "bg-rose-soft text-rose-deep"}`}>{d.initial}</button>
                         )}
-                        <button type="button" onClick={() => openDetail(customer)} className="min-w-0 flex-1 text-left">
+                        <button type="button" onClick={() => openDetail(customer)} className="min-w-0 flex-1 rounded text-left outline-none focus-visible:ring-2 focus-visible:ring-rose-deep">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span className="truncate text-[13px] font-black text-ink">{customer.nickname || "—"}</span>
                             {customer.name ? <span className="shrink-0 text-xs text-ink-mute">· {customer.name}</span> : null}
                             {!customer.kakaoId ? <span className="shrink-0 rounded-lg bg-warn-bg px-1.5 py-0.5 text-[11px] font-black text-warn-tx" title="카카오 로그인 기록이 없는 옛 회원(전화번호만). 다시 카톡 로그인하면 자동 연결됩니다.">카카오 미연동</span> : null}
+                            {customer.unpaidCount > 0 ? <span className="shrink-0 rounded-lg bg-warn-bg px-1.5 py-0.5 text-[11px] font-black text-warn-tx" title="상세와 같은 기준 — 아직 입금 전(자동매칭 실패 포함)">미입금 {customer.unpaidCount}건</span> : null}
                             {d.openIssues > 0 ? <span className="shrink-0 rounded-lg bg-danger-bg px-1.5 py-0.5 text-[11px] font-black text-danger-tx" title="이 회원의 미해결 고객이슈">이슈 {d.openIssues}</span> : null}
-                            {customer.manualNeededCount > 0 ? <span className="shrink-0 rounded-lg bg-warn-bg px-1.5 py-0.5 text-[11px] font-black text-warn-tx" title="입금 자동매칭이 안 돼 수동 확인이 필요한 주문이 있어요">매칭필요</span> : null}
                             {customer.liveAlertOptin === false ? <span className="shrink-0 rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] font-black text-ink-mute" title="방송 시작 알림을 받지 않는 회원">🔕 알림OFF</span> : null}
                           </div>
                           <div className="mt-0.5 truncate text-[11px] text-ink-mute">
-                            🕒 {d.rel || "-"}
-                            {" · "}누적 {customer.orderCount}건 · {money(customer.totalAmount)}
+                            🕒 {d.orderTwo.line1}{d.orderTwo.line2 ? ` ${d.orderTwo.line2}` : ""}
+                            {" · "}누적 결제 {money(customer.paidAmount)} · 주문 {customer.orderCount}건
                             {d.pts != null ? ` · 🪙 ${d.pts.toLocaleString("ko-KR")}P` : ""}
                             {customer.phone ? ` · ${formatPhone(customer.phone)}` : ""}
                           </div>
@@ -2359,6 +2371,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                                   address: "",
                                   orderCount: 0,
                                   totalAmount: 0,
+                                  paidAmount: 0,
                                   paidCount: 0,
                                   unpaidCount: 0,
                                   manualNeededCount: 0,
