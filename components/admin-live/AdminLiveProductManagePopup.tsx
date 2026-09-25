@@ -559,6 +559,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   }, [bcProducts, bcWidgetPin.mode, bcWidgetPin.productId, bcSort]);
 
   // [2026-09-25] 방송 목록 기간 + 이름 검색 필터 — 표시 전용. bcList 원본은 그대로 두고 렌더만 거른다.
+  //   [사장님 요청] 지금 선택된 방송·방송 중(ON)인 방송은 기간/검색 필터와 상관없이 «항상 맨 위»에 고정.
   const bcListView = useMemo(() => {
     const q = bcSearch.trim().toLowerCase();
     // 기간 하한(from)·상한(to) 계산 (started_at 기준)
@@ -570,15 +571,20 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       if (bcCustomFrom) { const d = new Date(`${bcCustomFrom}T00:00:00`); if (!Number.isNaN(d.getTime())) fromTs = d.getTime(); }
       if (bcCustomTo) { const d = new Date(`${bcCustomTo}T23:59:59`); if (!Number.isNaN(d.getTime())) toTs = d.getTime(); }
     }
-    return bcList.filter((b) => {
+    const isAlwaysTop = (b: { id: string; status: string }) => b.id === bcSelId || String(b.status || "").toUpperCase() === "ON";
+    const passesFilter = (b: { started_at: string; title: string }) => {
       if (q && !b.title.toLowerCase().includes(q)) return false;
       if (bcDateFilter === "all") return true;
-      const d = new Date(b.started_at);
-      const t = d.getTime();
+      const t = new Date(b.started_at).getTime();
       if (Number.isNaN(t)) return false; // 날짜 없는 방송은 기간 필터에선 숨김(전체에서만 보임)
       return t >= fromTs && t <= toTs;
-    });
-  }, [bcList, bcDateFilter, bcCustomFrom, bcCustomTo, bcSearch]);
+    };
+    // 고정(선택·ON)은 bcList 순서(started_at 내림차순) 그대로 맨 위, 나머지는 필터 통과분만.
+    const top = bcList.filter(isAlwaysTop);
+    const topIds = new Set(top.map((b) => b.id));
+    const rest = bcList.filter((b) => !topIds.has(b.id) && passesFilter(b));
+    return [...top, ...rest];
+  }, [bcList, bcDateFilter, bcCustomFrom, bcCustomTo, bcSearch, bcSelId]);
 
   // [2026-08-13] 드래그 허용 조건 — 「진열 순서」 + 검색 안 함 + 복사모드 아님 + 저장 중 아님.
   //   (고정 여부는 더 이상 조건이 아니다 — ID 기준 순서변경이라 안 엉킴)
