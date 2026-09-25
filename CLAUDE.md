@@ -23,7 +23,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 (없음)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
-- 2026-09-25 **[관리자] 상품관리 › 방송 상품 탭 왼쪽 방송 목록에 날짜(월) 드롭다운 필터 신설**(AdminLiveProductManagePopup 1파일·표시 전용·읽기 전용(broadcasts SELECT만)·돈/주문/재고/방송write 무접촉): 방송이 쌓이면 목록이 길어지는 문제 → 헤더 아래 월 select 한 줄(`전체 방송 (N)` / `2026.09 (3)` …, started_at에서 월별 집계). `bcMonthFilter` state + `bcMonthOptions`·`bcListView` useMemo + 새로고침 후 사라진 월 자동 「전체」 리셋 effect. **렌더만 `bcListView` 기준으로 바꾸고 원본 `bcList`·나머지 참조 3곳(선택 방송 제목·모바일 접힘 라벨·선택복사 대상 드롭다운)은 그대로** → 선택·복사·저장 로직 영향 0. 필터로 0건이면 「이 기간에 방송이 없습니다」 안내. 검수 `npm run guard`(가드 5개)·테스트 52/52·`npm run build`(BANKDA 가드 2개+Compiled OK+TS OK+39페이지)·tsc 0 전부 통과.
+- 2026-09-25 **[관리자] 상품관리 › 방송 상품 탭 방송 목록 필터 = 기간 프리셋 + 이름 검색**(AdminLiveProductManagePopup 1파일·표시 전용·읽기 전용(broadcasts SELECT만)·돈/주문/재고/방송write 무접촉): 같은 날 넣었던 월 드롭다운(54f56ce)을 사장님 요청으로 교체 — 헤더 아래 ①방송 이름 검색칸 ②기간 프리셋 칩 `[최근 30일(기본)·최근 3개월·전체·기간 선택]` ③「기간 선택」 시 `<input type=date>` 시작~종료(started_at 기준). `bcDateFilter`·`bcCustomFrom/To`·`bcSearch` state + `bcListView` useMemo(기간 하한/상한 + 이름 부분일치). **BroadcastCalendarPicker는 단일 방송 선택기라 기간 범위엔 재사용 불가 → 안 건드림**(주문서 필터 그대로). **렌더만 `bcListView` 기준, 원본 `bcList`·나머지 참조 3곳(선택 방송 제목·모바일 접힘 라벨·선택복사 대상 드롭다운)은 그대로** → 선택·복사·저장 로직 영향 0. 기본이 최근 30일이라 오래된 방송은 「전체」/「기간 선택」으로. 인라인 값은 guard:ui 4px 격자·스케일 준수. 검수 guard 5개·테스트 52/52·build(BANKDA 가드 2개+Compiled OK+39페이지)·tsc 0 통과.
 - 2026-09-25 고객이슈 일괄처리 4건 완료(8b2a2e9) — opacity 흐림 제거/📦상품명·💬이슈 두줄/지우기→삭제·삭제함/체크박스 일괄(자동 반품건 일괄삭제 제외)
 - 📁 2026-08-31 이전 진행상황은 docs/진행상황_아카이브.md 로 이관(내용 그대로 보존).
 
@@ -166,6 +166,7 @@ git status
 - 출고 용어: 출고대기/택배출고
 - 결제수단: 무통장/카드
 - 화면명: 입금내역/입금매칭
+- 상품관리 › 방송 상품 탭 방송 목록 필터 = 기간 프리셋 `[최근 30일(기본)·최근 3개월·전체·기간 선택]` + 방송 이름 검색칸(월 드롭다운 아님). 기간 범위엔 BroadcastCalendarPicker(단일 방송 선택기) 재사용 금지 — date input 2칸 사용.
 - 시안 파일: /Users/ruru/Downloads/시안모음.html
 
 ## 스택
