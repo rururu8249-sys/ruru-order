@@ -399,7 +399,11 @@ function IssueCard({
   return (
     <div
       key={taskKey(task, index)}
-      className={`relative grid grid-cols-[76px_120px_88px_124px_112px_1fr_auto] items-start gap-x-3 gap-y-1 border-b border-line px-3 py-2.5 transition hover:bg-surface-2 ${done ? "opacity-60" : ""}`}
+      // [2026-09-25 사장님] 「왜 다 폰트를 희미하게 처리한거야?」
+      //   예전: 해결된 줄 전체에 opacity-60 → 글자까지 흐려져 WCAG 대비(4.5:1) 아래로 떨어졌다.
+      //   지금: 글자는 그대로 또렷하게. 상태는 «왼쪽 색 띠 + 연한 초록 배경»으로만 가른다.
+      //   (물건챙기기의 다 챙긴 카드와 같은 방식 — bg-ok-bg)
+      className={`relative grid grid-cols-[76px_120px_88px_124px_112px_1fr_auto] items-start gap-x-3 gap-y-1 border-b border-line px-3 py-2.5 transition hover:bg-surface-2 ${done ? "bg-ok-bg/40" : ""}`}
     >
       <span className={`absolute left-0 top-0 h-full w-1 ${done ? "bg-[var(--color-ok-tx)]" : "bg-[var(--color-danger-tx)]"}`} />
 
