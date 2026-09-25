@@ -393,8 +393,12 @@ function IssueCard({
         ? "bg-warn-bg text-warn-tx"
         : "bg-surface-2 text-ink-soft";
 
-  // 특이사항 = 대상상품 + 메모. 같은 말이면 한 번만.
-  const detail = [product, memo && memo !== product ? memo : ""].filter(Boolean).join(" · ");
+  // [2026-09-25 사장님] 「상품명과 이슈 내용이 한줄에 있어서 이슈 내용을 밑에칸으로 내려주고
+  //   이모지를 붙이던 폰트색상을 달리하던 구분좀 쉽게」
+  //   예전: `상품명 · 메모` 를 한 줄에 붙였다(join " · ") → 어디까지가 상품명인지 눈으로 갈라야 했다.
+  //   지금: 윗줄 📦 상품명(검정·굵게) / 아랫줄 💬 이슈 내용(장미색·굵게). 같은 말이면 한 번만.
+  const memoShown = memo && memo !== product ? memo : "";
+  const detail = [product, memoShown].filter(Boolean).join(" · ");   // title(툴팁)·검색용 한 줄
 
   return (
     <div
@@ -477,11 +481,26 @@ function IssueCard({
         ) : null}
 
         <div
-          className="min-w-0 flex-1 whitespace-pre-line break-words text-[12px] font-bold leading-5 text-ink"
+          className="min-w-0 flex-1 text-[12px] leading-5"
           title={[detail, orderNo ? `주문번호 ${orderNo}` : ""].filter(Boolean).join("\n")}
         >
-          {detail || "내용 없음"}
-          {orderNo ? <span className="ml-1.5 text-[11px] font-bold text-ink-mute">{orderNo}</span> : null}
+          {/* 윗줄 — 📦 상품명 (+ 주문번호) */}
+          {product ? (
+            <div className="flex min-w-0 items-baseline gap-1.5">
+              <span className="shrink-0" aria-hidden>📦</span>
+              <span className="min-w-0 break-words font-black text-ink">{product}</span>
+              {orderNo ? <span className="shrink-0 text-[11px] font-bold text-ink-mute">{orderNo}</span> : null}
+            </div>
+          ) : null}
+          {/* 아랫줄 — 💬 이슈 내용. 메모의 줄바꿈은 그대로(whitespace-pre-line) */}
+          {memoShown ? (
+            <div className="flex min-w-0 items-start gap-1.5">
+              <span className="shrink-0" aria-hidden>💬</span>
+              <span className="min-w-0 whitespace-pre-line break-words font-bold text-rose-deep">{memoShown}</span>
+            </div>
+          ) : null}
+          {!product && !memoShown ? <span className="font-bold text-ink-mute">내용 없음</span> : null}
+          {!product && orderNo ? <div className="text-[11px] font-bold text-ink-mute">{orderNo}</div> : null}
         </div>
       </div>
 
