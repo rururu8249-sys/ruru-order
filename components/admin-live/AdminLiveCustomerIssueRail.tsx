@@ -4,7 +4,7 @@
 // 목적: 고객관리 오른쪽 고객이슈 패널
 // 주의: 주문/입금/배송/정산 상태 변경 없음. 고객이슈 admin_tasks 조회/등록/수정만 처리.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 import { splitIssueBody, mergeIssueBody } from "@/lib/issueBodyMeta";
@@ -333,6 +333,8 @@ const SUB_BTN_SLOT = "h-8 w-[64px] shrink-0";
 function IssueCard({
   task,
   index,
+  selected = false,
+  onToggleSelect,
   onEdit,
   onResolve,
   onDelete,
@@ -345,6 +347,9 @@ function IssueCard({
 }: {
   task: AdminIssueTask;
   index: number;
+  /** [2026-09-25] 일괄 처리용 선택 상태 — 줄 맨 앞 체크박스 */
+  selected?: boolean;
+  onToggleSelect?: (task: AdminIssueTask) => void;
   onEdit: (task: AdminIssueTask) => void;
   onResolve: (task: AdminIssueTask) => void | Promise<void>;
   /** [2026-09-23] 잘못 등록된 건 지우기(반품 흐름이면 포인트까지 되돌림) */
@@ -407,9 +412,21 @@ function IssueCard({
       //   예전: 해결된 줄 전체에 opacity-60 → 글자까지 흐려져 WCAG 대비(4.5:1) 아래로 떨어졌다.
       //   지금: 글자는 그대로 또렷하게. 상태는 «왼쪽 색 띠 + 연한 초록 배경»으로만 가른다.
       //   (물건챙기기의 다 챙긴 카드와 같은 방식 — bg-ok-bg)
-      className={`relative grid grid-cols-[76px_120px_88px_124px_112px_1fr_auto] items-start gap-x-3 gap-y-1 border-b border-line px-3 py-2.5 transition hover:bg-surface-2 ${done ? "bg-ok-bg/40" : ""}`}
+      className={`relative grid grid-cols-[36px_76px_120px_88px_124px_112px_1fr_auto] items-start gap-x-3 gap-y-1 border-b border-line px-3 py-2.5 transition hover:bg-surface-2 ${selected ? "bg-rose-soft/50" : done ? "bg-ok-bg/40" : ""}`}
     >
       <span className={`absolute left-0 top-0 h-full w-1 ${done ? "bg-[var(--color-ok-tx)]" : "bg-[var(--color-danger-tx)]"}`} />
+
+      {/* [2026-09-25 사장님] 「맨앞에 체크 박스」 — NN/g 일괄 작업 원칙: 줄 맨 앞 체크박스 + 머리줄 전체선택.
+          32px 짜리 라벨로 감싸 손가락으로도 눌린다(체크박스 자체는 18px). */}
+      <label className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg hover:bg-surface-2" title="이 건 선택">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => onToggleSelect?.(task)}
+          aria-label={`${nickname || name || "이 건"} 선택`}
+          className="h-[18px] w-[18px] cursor-pointer accent-[var(--color-rose-deep)]"
+        />
+      </label>
 
       {/* 유형 */}
       <div className="flex flex-wrap gap-1">
@@ -625,6 +642,15 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   //   이제 한 줄짜리 표라 미해결 10건이 «한 페이지»에 다 들어간다(페이지 넘길 일이 없어진다).
   const issuePageSize = 20;
   const [issuePage, setIssuePage] = useState(1);
+  // ── [2026-09-25 사장님] 「체크박스 … 전체선택 … 해결완료 여러건 한번에 … 지우기도 한번에」 ──
+  //   찾아본 기준
+  //     NN/g 「Bulk Actions: 3 Design Guidelines」: ① 전체선택 제공 ② 선택했을 때만 나타나는 작업 바
+  //       ③ 끝나면 알림으로 결과 알리기.
+  //     Helios 「Table multi-select」: 체크박스는 줄 맨 앞, 전체선택은 머리줄(=현재 페이지),
+  //       작업 바는 표 바로 위에 「N건 선택」 + 버튼. 표가 바뀌면 선택을 리셋.
+  //   ⚠ 돈 보호: 「자동」(반품 흐름) 건의 삭제는 포인트 반환이 걸려 있어 일괄에서 뺀다. 한 건씩만.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  useEffect(() => { setSelectedIds(new Set()); }, [activeTab, reloadKey, keyword, typeFilter]);
   const [editingIssueTask, setEditingIssueTask] = useState<AdminIssueTask | null>(null);
   const [editingIssueMemo, setEditingIssueMemo] = useState("");
   const [editingIssueTypes, setEditingIssueTypes] = useState<string[]>(["general"]);
@@ -719,6 +745,118 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   const issueTotalPages = Math.max(1, Math.ceil(visibleTasks.length / issuePageSize));
   const safeIssuePage = Math.min(Math.max(1, issuePage), issueTotalPages);
   const pageTasks = visibleTasks.slice((safeIssuePage - 1) * issuePageSize, safeIssuePage * issuePageSize);
+
+  // ── 일괄 선택 파생값 ──
+  const pageIds = pageTasks.map((t) => clean(t.id)).filter(Boolean);
+  const selectedOnPage = pageIds.filter((id) => selectedIds.has(id));
+  const allOnPageSelected = pageIds.length > 0 && selectedOnPage.length === pageIds.length;
+  const someOnPageSelected = selectedOnPage.length > 0 && !allOnPageSelected;
+  const selectedTasks = useMemo(() => tasks.filter((t) => selectedIds.has(clean(t.id))), [tasks, selectedIds]);
+  const toggleSelect = (task: AdminIssueTask) => {
+    const id = clean(task.id);
+    if (!id) return;
+    setSelectedIds((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  };
+  /** 머리줄 체크박스 = «현재 페이지» 전체 (Helios 기준). 다 켜져 있으면 끈다. */
+  const toggleSelectAllOnPage = () => {
+    setSelectedIds((prev) => {
+      const n = new Set(prev);
+      if (allOnPageSelected) pageIds.forEach((id) => n.delete(id));
+      else pageIds.forEach((id) => n.add(id));
+      return n;
+    });
+  };
+  const clearSelection = () => setSelectedIds(new Set());
+  // 머리줄 체크박스의 «일부 선택(▪)» 표시는 DOM 속성이라 ref 로 넣는다
+  const selectAllRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => { if (selectAllRef.current) selectAllRef.current.indeterminate = someOnPageSelected; }, [someOnPageSelected]);
+
+  /** 한 건 처리 함수들 — 확인창·알림·새로고침 없이 «서버 호출만». 일괄 루프가 쓴다. */
+  const patchOne = async (id: string, body: Record<string, unknown>) => {
+    const res = await fetch("/api/admin-v2/admin-tasks", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...body }) });
+    const payload = await res.json().catch(() => null);
+    return Boolean(res.ok && payload?.ok);
+  };
+  const purgeOne = async (id: string) => {
+    const res = await fetch("/api/admin-v2/admin-tasks", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    const payload = await res.json().catch(() => null);
+    return Boolean(res.ok && payload?.ok);
+  };
+  /** 일괄 실행 — 한 건씩 차례로(서버 API 가 단건이라). 끝나면 성공/실패 건수를 한 번에 알린다(NN/g ③). */
+  const runBulk = async (items: AdminIssueTask[], label: string, doOne: (id: string) => Promise<boolean>) => {
+    if (items.length === 0) return;
+    setSaving(true);
+    let ok = 0; let fail = 0;
+    try {
+      for (const t of items) {
+        const id = clean(t.id);
+        if (!id) { fail += 1; continue; }
+        if (await doOne(id)) ok += 1; else fail += 1;
+      }
+    } finally {
+      setSaving(false);
+    }
+    setIssuePage(1);
+    setReloadKey((value) => value + 1);   // 표가 바뀌므로 선택도 같이 비워진다(위 useEffect)
+    window.dispatchEvent(new Event("ruru-admin-task-updated"));
+    showAdminToast(`${label} ${ok}건 완료${fail > 0 ? ` · ${fail}건 실패` : ""}`, fail > 0 ? "warning" : "success");
+  };
+
+  const bulkResolve = async () => {
+    const items = selectedTasks.filter((t) => !isDeleted(t) && !isResolved(t));
+    if (items.length === 0) { showAdminToast("해결완료로 바꿀 미해결 건이 선택되지 않았어요."); return; }
+    const ok = await showAdminConfirm(`선택한 ${items.length}건을 해결완료 처리할까요?`, { title: "일괄 해결완료", confirmText: `${items.length}건 해결완료`, cancelText: "그만두기", tone: "info" });
+    if (!ok) return;
+    await runBulk(items, "해결완료", (id) => patchOne(id, { action: "resolve", resolved_note: "고객관리에서 일괄 해결완료" }));
+  };
+  const bulkUnresolve = async () => {
+    const items = selectedTasks.filter((t) => !isDeleted(t) && isResolved(t));
+    if (items.length === 0) { showAdminToast("미해결로 되돌릴 해결 건이 선택되지 않았어요."); return; }
+    const ok = await showAdminConfirm(`선택한 ${items.length}건을 미해결로 되돌릴까요?`, { title: "일괄 미해결로", confirmText: `${items.length}건 미해결로`, cancelText: "그만두기", tone: "warning" });
+    if (!ok) return;
+    await runBulk(items, "미해결로", (id) => patchOne(id, { action: "restore", resolved_note: "고객관리에서 일괄 미해결로" }));
+  };
+  const bulkDelete = async () => {
+    const live = selectedTasks.filter((t) => !isDeleted(t));
+    // ⚠ 「자동」(반품 흐름) 건은 삭제 = 반품 등록 취소 + 포인트 반환. 돈이 움직이므로 일괄에서 뺀다.
+    const auto = live.filter(isReturnFlowIssue);
+    const items = live.filter((t) => !isReturnFlowIssue(t));
+    if (items.length === 0) {
+      showAdminToast(auto.length > 0
+        ? `선택한 ${auto.length}건은 모두 「자동」(반품 등록) 건이에요.\n포인트 반환이 걸려 있어 한 건씩만 삭제할 수 있어요.`
+        : "삭제할 건이 선택되지 않았어요.", "warning");
+      return;
+    }
+    const ok = await showAdminConfirm(
+      `선택한 ${items.length}건을 삭제할까요?\n\n「삭제함」 탭으로 옮겨져서 언제든 되살릴 수 있어요.` +
+        (auto.length > 0 ? `\n\n⚠ 「자동」 ${auto.length}건은 포인트 반환이 걸려 있어 이번 일괄에서 뺍니다. 한 건씩 삭제해주세요.` : ""),
+      { title: "일괄 삭제", confirmText: `${items.length}건 삭제`, cancelText: "그만두기", tone: "warning" },
+    );
+    if (!ok) return;
+    await runBulk(items, "삭제", (id) => patchOne(id, { action: "hide", resolved_note: "고객관리에서 일괄 삭제" }));
+  };
+  const bulkRestore = async () => {
+    const items = selectedTasks.filter(isDeleted);
+    if (items.length === 0) { showAdminToast("되살릴 건이 선택되지 않았어요."); return; }
+    const fromReturnCancel = items.filter((t) => clean(t.resolved_note).startsWith("반품/교환 등록 취소")).length;
+    const ok = await showAdminConfirm(
+      `선택한 ${items.length}건을 되살릴까요?\n「미해결」에서 다시 보입니다.` +
+        (fromReturnCancel > 0 ? `\n\n⚠ ${fromReturnCancel}건은 «반품 등록 취소»로 삭제된 건이라 손님께 돌려드린 포인트·반품기록은 돌아오지 않고 이슈 줄만 되살아납니다.` : ""),
+      { title: "일괄 되살리기", confirmText: `${items.length}건 되살리기`, cancelText: "그만두기", tone: "warning" },
+    );
+    if (!ok) return;
+    await runBulk(items, "되살리기", (id) => patchOne(id, { action: "restore", resolved_note: "고객관리에서 일괄 되돌리기" }));
+  };
+  const bulkPurge = async () => {
+    const items = selectedTasks.filter(isDeleted);
+    if (items.length === 0) { showAdminToast("영구삭제할 건이 선택되지 않았어요."); return; }
+    const ok = await showAdminConfirm(
+      `선택한 ${items.length}건을 영구삭제할까요?\n\n이건 되돌릴 수 없습니다. 기록이 완전히 사라집니다.`,
+      { title: "일괄 영구삭제", confirmText: `${items.length}건 영구삭제`, cancelText: "그만두기", tone: "danger" },
+    );
+    if (!ok) return;
+    await runBulk(items, "영구삭제", purgeOne);
+  };
 
   // ── [2026-09-23 사장님 요청] 「상품선택해서 했을 경우에는 상품 사진이 있는경우 같이 표시」 ──
   //   이슈에는 상품이 «글자»로만 남으므로 상품을 되찾아 사진을 붙인다. 화면에 보이는 페이지만.
@@ -1389,9 +1527,35 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
         </div>
       ) : null}
 
+      {/* [2026-09-25] 일괄 작업 바 — 선택했을 때만 나타난다(NN/g ②). 표 바로 위, 「N건 선택」 + 탭에 맞는 버튼(Helios). */}
+      {selectedIds.size > 0 ? (
+        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-rose-line bg-rose-soft px-3 py-2">
+          <span className="text-[12px] font-black text-rose-deep">{selectedIds.size}건 선택</span>
+          <button type="button" onClick={clearSelection} className="h-8 rounded-lg px-2 text-[11px] font-black text-ink-soft hover:bg-surface">선택 해제</button>
+          <div className="ml-auto flex items-center gap-1.5">
+            {activeTab === "deleted" ? (
+              <>
+                <button type="button" onClick={bulkPurge} disabled={saving} className={`${SUB_BTN} text-danger-tx hover:bg-danger-bg`}>{saving ? "처리중…" : "영구삭제"}</button>
+                <button type="button" onClick={bulkRestore} disabled={saving} className={`${MAIN_BTN} bg-[var(--color-ok-tx)] text-white`}>{saving ? "처리중…" : "되살리기"}</button>
+              </>
+            ) : activeTab === "resolved" ? (
+              <>
+                <button type="button" onClick={bulkDelete} disabled={saving} className={`${SUB_BTN} text-danger-tx hover:bg-danger-bg`}>{saving ? "처리중…" : "삭제"}</button>
+                <button type="button" onClick={bulkUnresolve} disabled={saving} className={`${MAIN_BTN} border border-line bg-surface text-ink-soft hover:bg-surface-2`}>{saving ? "처리중…" : "미해결로"}</button>
+              </>
+            ) : (
+              <>
+                <button type="button" onClick={bulkDelete} disabled={saving} className={`${SUB_BTN} text-danger-tx hover:bg-danger-bg`}>{saving ? "처리중…" : "삭제"}</button>
+                <button type="button" onClick={bulkResolve} disabled={saving} className={`${MAIN_BTN} bg-[var(--color-ok-tx)] text-white`}>{saving ? "처리중…" : "해결완료"}</button>
+              </>
+            )}
+          </div>
+        </div>
+      ) : null}
+
       {/* [2026-09-21] 표 머리글 — 어느 칸이 무엇인지 한 번만 적어두면 줄마다 「닉네임:」 같은 라벨이 필요 없다.
           예전 카드가 길었던 이유의 절반이 줄마다 반복되던 라벨이었다. */}
-      <div className="mt-4 min-h-0 flex-1 overflow-y-auto overflow-x-auto rounded-xl border border-line">
+      <div className={`${selectedIds.size > 0 ? "mt-2" : "mt-4"} min-h-0 flex-1 overflow-y-auto overflow-x-auto rounded-xl border border-line`}>
         {loading ? (
           <div className="bg-surface-2 p-6 text-center text-sm font-black text-ink-mute">
             고객이슈 불러오는 중...
@@ -1402,7 +1566,18 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           </div>
         ) : (
           <div className="min-w-[860px]">
-            <div className="sticky top-0 z-10 grid grid-cols-[76px_120px_88px_124px_112px_1fr_auto] items-center gap-x-3 border-b border-line bg-surface-2 px-3 py-2 text-[11px] font-black text-ink-mute">
+            <div className="sticky top-0 z-10 grid grid-cols-[36px_76px_120px_88px_124px_112px_1fr_auto] items-center gap-x-3 border-b border-line bg-surface-2 px-3 py-2 text-[11px] font-black text-ink-mute">
+              {/* 전체선택 = 이 페이지 전부. 일부만 켜져 있으면 ▪(indeterminate) */}
+              <label className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg hover:bg-surface" title={allOnPageSelected ? "이 페이지 전체 선택 해제" : "이 페이지 전체 선택"}>
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  checked={allOnPageSelected}
+                  onChange={toggleSelectAllOnPage}
+                  aria-label="이 페이지 전체 선택"
+                  className="h-[18px] w-[18px] cursor-pointer accent-[var(--color-rose-deep)]"
+                />
+              </label>
               <div>유형</div>
               <div>닉네임</div>
               <div>이름</div>
@@ -1416,6 +1591,8 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               key={taskKey(task, index)}
               task={task}
               index={index}
+              selected={selectedIds.has(clean(task.id))}
+              onToggleSelect={toggleSelect}
               photos={issuePhotos[taskKey(task, index)] || []}
               onPhotoZoom={setIssuePhotoPreview}
               onEdit={openEdit}
