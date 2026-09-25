@@ -507,9 +507,12 @@ function IssueCard({
       {/* ── 처리 ── [2026-09-24 사장님] 「여러 항목 레이아웃 디자인 UX등 일괄성 있게」
           예전엔 같은 «지우다»가 「등록취소」「지우기」「목록삭제」 세 이름이었고 탭마다 버튼 수도 달랐다.
           이제 어느 탭이든 «보조 · 보조 · 주» 세 칸 고정. 세 번째 칸만 상태에 따라 바뀐다.
-            미해결  수정 · 지우기 · [해결완료]
-            해결    수정 · 지우기 · [미해결로]
-            지운 건   —  · 영구삭제 · [되살리기]
+            미해결  수정 · 삭제 · [해결완료]
+            해결    수정 · 삭제 · [미해결로]
+            삭제함   —  · 영구삭제 · [되살리기]
+          [2026-09-25 사장님] 「지우기 말고 삭제로 변경요청」 — 「삭제 / 영구삭제」 는 한국 화면 표준 쌍이다
+          (윈도우 휴지통·구글 드라이브). Polaris 로 치면 삭제=Remove(목록에서 빼되 보관), 영구삭제=Delete.
+          탭 이름도 「지운 건」 → 「삭제함」 으로 맞췄다(버튼은 삭제인데 탭은 지운 건이면 또 어긋난다).
           생김새도 하나로: 보조 = 흰 바탕 + 테두리(글자색만 다름), 주 = 채움. 높이 32px 통일. */}
       <div className="flex shrink-0 items-center gap-1.5">
         {deleted ? (
@@ -549,10 +552,10 @@ function IssueCard({
               disabled={busy}
               title={fromReturn
                 ? "잘못 처리한 건 — 원래대로 되돌립니다(회수한 포인트도 같이)"
-                : "잘못 등록한 건 — 「지운 건」 탭으로 옮깁니다(되살릴 수 있어요)"}
+                : "잘못 등록한 건 — 「삭제함」 탭으로 옮깁니다(되살릴 수 있어요)"}
               className={`${SUB_BTN} text-danger-tx hover:bg-danger-bg`}
             >
-              {busy ? "처리중…" : "지우기"}
+              {busy ? "처리중…" : "삭제"}
             </button>
             {done ? (
               <button
@@ -1023,7 +1026,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     if (count === 0) return;
 
     const ok = await showAdminConfirm(
-      `「지운 건」 ${count}건을 모두 영구삭제할까요?\n\n이건 되돌릴 수 없습니다. 되살리고 싶은 게 있으면 먼저 되살려 두세요.`,
+      `「삭제함」 ${count}건을 모두 영구삭제할까요?\n\n이건 되돌릴 수 없습니다. 되살리고 싶은 게 있으면 먼저 되살려 두세요.`,
       { title: "전체 비우기", confirmText: `${count}건 영구삭제`, cancelText: "그만두기", tone: "danger" },
     );
     if (!ok) return;
@@ -1056,7 +1059,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     //   이슈만 되살리면 화면과 실제가 어긋나므로, 무엇이 안 돌아오는지 분명히 알리고 확인받는다.
     if (clean(task.resolved_note).startsWith("반품/교환 등록 취소")) {
       const ok = await showAdminConfirm(
-        "이 건은 «반품 등록 취소»로 지운 건입니다.\n\n" +
+        "이 건은 «반품 등록 취소»로 삭제한 건입니다.\n\n" +
           "되살려도 다음은 자동으로 돌아오지 않습니다:\n" +
           "· 손님께 돌려드린 포인트\n" +
           "· 주문의 반품/교환 기록\n\n" +
@@ -1090,7 +1093,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   const deleteIssueTask = async (task: AdminIssueTask) => {
     const id = clean(task.id);
     if (!id) {
-      showAdminToast("지울 고객이슈 ID가 없습니다.");
+      showAdminToast("삭제할 고객이슈 ID가 없습니다.");
       return;
     }
 
@@ -1132,8 +1135,8 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       if (!ok) return;
     } else {
       const ok = await showAdminConfirm(
-        `${who} 님의 고객이슈를 지울까요?\n\n「지운 건」 탭으로 옮겨져서 언제든 되살릴 수 있어요.`,
-        { title: "고객이슈 지우기", confirmText: "지우기", cancelText: "그만두기", tone: "warning" },
+        `${who} 님의 고객이슈를 삭제할까요?\n\n「삭제함」 탭으로 옮겨져서 언제든 되살릴 수 있어요.`,
+        { title: "고객이슈 삭제", confirmText: "삭제", cancelText: "그만두기", tone: "warning" },
       );
       if (!ok) return;
     }
@@ -1162,11 +1165,11 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       const response = await fetch("/api/admin-v2/admin-tasks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, action: "hide", resolved_note: "고객관리에서 잘못 등록 지우기" }),
+        body: JSON.stringify({ id, action: "hide", resolved_note: "고객관리에서 삭제" }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok || !payload?.ok) {
-        showAdminToast("지우기 실패\n" + (payload?.message || "알 수 없는 오류"), "error");
+        showAdminToast("삭제 실패\n" + (payload?.message || "알 수 없는 오류"), "error");
         return;
       }
 
@@ -1279,7 +1282,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       {undoTarget ? (
         <div className="mt-3 flex items-center gap-3 rounded-xl border border-ok-tx/35 bg-ok-bg px-3 py-2">
           <span className="min-w-0 flex-1 truncate text-[12px] font-bold text-ok-tx">
-            {getNickname(undoTarget) || getName(undoTarget) || "고객이슈"} 건을 지웠습니다 · 「지운 건」 탭에 있어요
+            {getNickname(undoTarget) || getName(undoTarget) || "고객이슈"} 건을 삭제했습니다 · 「삭제함」 탭에 있어요
           </span>
           <button
             type="button"
@@ -1296,7 +1299,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           ["open", `미해결 ${openCount}`],
           ["all", `전체 ${liveTasks.length}`],
           ["resolved", `해결 ${resolvedCount}`],
-          ["deleted", `지운 건 ${deletedTasks.length}`],
+          ["deleted", `삭제함 ${deletedTasks.length}`],
         ].map(([key, label]) => (
           <button
             key={key}
@@ -1365,7 +1368,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           </button>
         ) : null}
 
-        {/* [2026-09-24] 「지운 건」 탭에서만 — 쌓인 걸 한 번에 비운다 */}
+        {/* [2026-09-24] 「삭제함」 탭에서만 — 쌓인 걸 한 번에 비운다 */}
         {activeTab === "deleted" && deletedTasks.length > 0 ? (
           <button
             type="button"
