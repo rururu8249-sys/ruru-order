@@ -424,7 +424,7 @@ function IssueCard({
           checked={selected}
           onChange={() => onToggleSelect?.(task)}
           aria-label={`${nickname || name || "이 건"} 선택`}
-          className="h-[18px] w-[18px] cursor-pointer accent-[var(--color-rose-deep)]"
+          className="h-[18px] w-[18px] cursor-pointer accent-[var(--color-rose-deep)] outline-none focus-visible:ring-2 focus-visible:ring-rose-deep"
         />
       </label>
 
@@ -1422,7 +1422,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               setActiveTab(key as IssueTab);
               setIssuePage(1);
             }}
-            className={`h-9 rounded-xl text-[12px] font-black ${
+            className={`h-9 rounded-xl text-[12px] font-black outline-none focus-visible:ring-2 focus-visible:ring-rose-deep ${
               activeTab === key ? "bg-surface text-rose-deep shadow-sm" : "text-ink-soft"
             }`}
           >
@@ -1543,7 +1543,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
                   checked={allOnPageSelected}
                   onChange={toggleSelectAllOnPage}
                   aria-label="이 페이지 전체 선택"
-                  className="h-[18px] w-[18px] cursor-pointer accent-[var(--color-rose-deep)]"
+                  className="h-[18px] w-[18px] cursor-pointer accent-[var(--color-rose-deep)] outline-none focus-visible:ring-2 focus-visible:ring-rose-deep"
                 />
               </label>
               <div>유형</div>
