@@ -547,6 +547,8 @@ async function saveLiveBroadcastEndReport({
 export default function AdminLiveDashboard() {
   const [activeMenu, setActiveMenu] = useState<AdminLiveMenuKey>(() => readMenuFromUrl());
   const [customersInitialTab, setCustomersInitialTab] = useState<"members" | "issues">("members");
+  // [2026-09-25] 고객·이슈 패널의 «현재» 탭 — 「고객이슈」 탭이면 위쪽 미해결 알림 띠를 숨긴다(중복 표시 방지).
+  const [customersActiveTab, setCustomersActiveTab] = useState<"members" | "issues" | "loyalty" | "link">("members");
   // [2026-09-21] 「바로 처리 →」 를 누른 «시각». 탭 이름만 넘기면 두 번째 클릭부터 안 먹는다
   //   (같은 값이라 화면이 바뀐 걸 모른다). 시각은 누를 때마다 달라지므로 매번 확실히 열린다.
   const [customersOpenTabAt, setCustomersOpenTabAt] = useState(0);
@@ -1717,13 +1719,16 @@ export default function AdminLiveDashboard() {
                       [2026-09-21 사장님] 「맨 위에 떠서 레이아웃이 이상함」 — 세로로 길던 레일을
                         «한 줄 띠»로 바꿨다. 미해결 0건이면 띠 자체가 안 뜬다.
                         자세한 내용은 아래 「고객이슈」 탭에서 본다(같은 내용을 두 번 안 보여준다). */}
-                  <div className="shrink-0">
-                    <LiveIssueRailPanel
-                      variant="banner"
-                      onCountChange={setOpenIssueCount}
-                      onOpenAll={() => { setCustomersInitialTab("issues"); setCustomersOpenTabAt(Date.now()); }}
-                    />
-                  </div>
+                  {/* [2026-09-25] 「고객이슈」 탭 안에서는 아래 탭이 같은 내용을 보여주므로 위쪽 알림 띠를 숨긴다. */}
+                  {customersActiveTab !== "issues" ? (
+                    <div className="shrink-0">
+                      <LiveIssueRailPanel
+                        variant="banner"
+                        onCountChange={setOpenIssueCount}
+                        onOpenAll={() => { setCustomersInitialTab("issues"); setCustomersOpenTabAt(Date.now()); }}
+                      />
+                    </div>
+                  ) : null}
                   <div className="min-h-0 min-w-0 flex-1">
                     <AdminLiveCustomersPanel
                       embedded
@@ -1731,6 +1736,7 @@ export default function AdminLiveDashboard() {
                       initialTab={customersInitialTab}
                       openTabAt={customersOpenTabAt}
                       openIssueCount={openIssueCount}
+                      onTabChange={setCustomersActiveTab}
                       onClose={() => setCustomersInitialTab("members")}
                     />
                   </div>

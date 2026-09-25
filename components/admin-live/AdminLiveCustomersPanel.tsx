@@ -44,6 +44,8 @@ type Props = {
   openIssueCount?: number;
   /** [2026-09-08 5단계] 페이지 안에 그대로(고객 메뉴). 팝업 껍데기·✕ 없음 */
   embedded?: boolean;
+  /** [2026-09-25] 현재 탭을 바깥에 알린다 — 「고객이슈」 탭에선 위쪽 미해결 알림 띠를 숨기려고. */
+  onTabChange?: (tab: "members" | "issues" | "loyalty" | "link") => void;
 };
 
 type LooseLiveOrder = LiveOrder & Record<string, any>;
@@ -1059,7 +1061,7 @@ function CustomerDetailDrawer({
 //   방송 중에 타이핑할 시간이 없다. 눌러서 넣고 필요하면 고쳐 쓴다.
 //   ⚠️ 문구만이다. 누르는 순간 나가지 않는다 — 입력창에 채워질 뿐이고 [보내기]를 눌러야 발송된다.
 
-export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = "members", openTabAt = 0, openIssueCount = 0, embedded = false }: Props) {
+export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = "members", openTabAt = 0, openIssueCount = 0, embedded = false, onTabChange }: Props) {
   // [2026-09-09] «계정 연결 요청» 탭 추가 — 손님이 카톡을 바꿔 회원이 갈라졌을 때 들어오는 요청함
   const [custTab, setCustTab] = useState<"members" | "issues" | "loyalty" | "link">(initialTab);
   // [2026-09-21] 바깥(고객이슈 알림 띠 등)에서 탭 열기 요청이 오면 실제로 전환하고 그 자리로 스크롤한다.
@@ -1073,6 +1075,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
     }, 60);
     return () => window.clearTimeout(timer);
   }, [openTabAt, initialTab]);
+  // [2026-09-25] 현재 탭을 바깥에 알린다 — 「고객이슈」 탭이면 위쪽 미해결 알림 띠를 숨기려고.
+  useEffect(() => { onTabChange?.(custTab); }, [custTab, onTabChange]);
   // [2026-09-11] «계정 잇기» 대기 건수 배지 — 자동 감지가 올린 줄을 사장님이 놓치지 않게 (건수만 1번 조회)
   const [linkPendingCount, setLinkPendingCount] = useState(0);
   useEffect(() => {
