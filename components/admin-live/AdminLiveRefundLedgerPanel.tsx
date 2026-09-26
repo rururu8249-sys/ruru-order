@@ -355,8 +355,8 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
   const kind = kindOverride || item.kind || "반품";
   const isExchange = kind === "교환";
 
-  const [stage, setStage] = useState(item.stage || "접수");
-  const [stageTouched, setStageTouched] = useState(false);
+  // [5차] 상태 칩 폐지 — stage 는 저장값 유지(완료 버튼만 stage 를 명시적으로 바꾼다)
+  const [stage] = useState(item.stage || "접수");
   const [method, setMethod] = useState(item.method && item.method !== "없음" ? item.method : (isExchange ? "교환재발송" : "계좌이체"));
   const [exchangeOption, setExchangeOption] = useState(clean(item.exchange_option));
   const [reshipTracking, setReshipTracking] = useState(clean(item.reship_tracking));
@@ -523,7 +523,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
 
   // 완료 — 모달 안 확인 → 기록 저장 → 이슈 해결완료 연동(부수효과 없는 상태변경만).
   const complete = async (extra: Record<string, unknown>, confirmMsg: string) => {
-    const ok = await showAdminConfirm(confirmMsg, { title: isExchange ? "재발송 완료" : "환불 완료", confirmText: "완료", cancelText: "취소", tone: "info" });
+    const ok = await showAdminConfirm(confirmMsg, { title: isExchange ? "재발송 완료" : "환불 완료", confirmText: "네", cancelText: "취소", tone: "info" });
     if (!ok) return;
     const saved = await doPatch(extra);
     if (!saved) return;
@@ -554,9 +554,14 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
   const memoFirst = memoFull.split("\n")[0] || "";
   const nextActionSaved = clean(item.next_action);
   const INPUT = "h-11 rounded-lg border border-line bg-surface px-3 text-[16px] font-bold text-ink outline-none focus-visible:ring-2 focus-visible:ring-rose-deep";
-  // 상태 2칩 활성 판정
-  const stageIsArrived = stage === "도착·검수" || stage === "처리 필요";
-  const stageIsWaiting = stage === "접수" || stage === "회수 대기";
+  // [5차] 헤더 아래 회색 안내 — 돈이 여기서 안 나간다는 것을 명확히.
+  const headerNotice = isExchange
+    ? ""
+    : method === "포인트"
+      ? "포인트는 아직 자동 지급되지 않아요. 지급 후 [지급했어요]를 누르세요."
+      : method === "계좌이체"
+        ? "여기서 돈이 나가지 않아요. 은행 앱에서 보낸 뒤 [이체했어요]를 누르세요."
+        : "";
 
   return (
     <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onClick={onClose}>
@@ -564,7 +569,8 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
         {/* 1. 헤더 */}
         <div className="flex items-start justify-between gap-2 border-b border-line px-5 pt-4 pb-3">
           <div className="min-w-0">
-            <h3 className="text-lg font-black text-ink">{isExchange ? "교환 처리" : "환불 처리"}</h3>
+            <h3 className="text-lg font-black text-ink">{isExchange ? "교환하기" : "환불하기"}</h3>
+            {headerNotice ? <div className="mt-1 text-[13px] leading-5 text-ink-mute">{headerNotice}</div> : null}
             <div className="mt-1 text-[13px] leading-5 text-ink-soft">
               <div className="truncate font-black text-ink">{clean(item.nickname) || "—"}{clean(item.customer_name) ? ` · ${clean(item.customer_name)}` : ""}{orderCode ? ` · ${orderCode}` : ""}</div>
               {memoFirst ? <div className="truncate text-ink-mute">💬 {memoFirst}</div> : null}
@@ -750,16 +756,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
             </div>
           )}
 
-          {/* 7. 상태 2칩 */}
-          <div className="mb-3">
-            <div className="mb-1 text-[13px] font-black text-ink-mute">진행 상태</div>
-            <div className="flex gap-1.5">
-              <button type="button" onClick={() => { setStage("회수 대기"); setStageTouched(true); }} className={`rounded-lg px-3 py-1.5 text-[14px] font-black transition ${stageIsWaiting || (stageTouched && stage === "회수 대기") ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}>{isExchange ? "회수 대기" : "반품 대기"}</button>
-              <button type="button" onClick={() => { setStage("도착·검수"); setStageTouched(true); }} className={`rounded-lg px-3 py-1.5 text-[14px] font-black transition ${stageIsArrived ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}>{isExchange ? "도착·검수" : "반품 도착"}</button>
-            </div>
-          </div>
-
-          {/* 8. 메모 */}
+          {/* 8. 메모 (상태 칩은 5차에서 폐지 — stage 는 저장값 그대로 유지) */}
           {nextActionSaved ? <div className="mb-1 text-[13px] text-ink-mute">다음 할 일: {nextActionSaved}</div> : null}
           <input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="메모" className={`w-full ${INPUT}`} />
 
@@ -768,17 +765,17 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
           ) : null}
         </div>
 
-        {/* 9. 하단 고정 */}
+        {/* 9. 하단 고정 — 왼쪽 「저장만」 / 오른쪽 완료 → 해결완료 */}
         <div className="flex items-center gap-2 border-t border-line px-5 py-3">
-          <button type="button" disabled={saving} onClick={saveOnly} className="h-12 rounded-xl border border-line bg-surface px-4 text-[14px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50">저장 (이체 전)</button>
+          <button type="button" disabled={saving} onClick={saveOnly} className="h-12 rounded-xl border border-line bg-surface px-4 text-[14px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50">저장만</button>
           {isExchange ? (
-            <button type="button" disabled={saving} onClick={() => complete({ mark_done: true, stage: "완료" }, "재발송 완료로 기록하고 이슈를 해결완료로 넘길까요?")} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">재발송 완료</button>
+            <button type="button" disabled={saving} onClick={() => complete({ mark_done: true, stage: "완료" }, "재발송 완료로 기록하고 해결완료로 넘길까요?")} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">재발송했어요 → 해결완료</button>
           ) : method === "계좌이체" ? (
-            <button type="button" disabled={saving} onClick={() => complete({ mark_transferred: true, mark_done: true, stage: "완료" }, `${won(amountFinal)} 이체 완료로 기록하고 이슈를 해결완료로 넘길까요?`)} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">이체했어요 · 환불완료</button>
+            <button type="button" disabled={saving} onClick={() => complete({ mark_transferred: true, mark_done: true, stage: "완료" }, `${won(amountFinal)} 이체 완료로 기록하고 해결완료로 넘길까요?`)} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">이체했어요 → 해결완료</button>
           ) : method === "포인트" ? (
-            <button type="button" disabled={saving} onClick={() => complete({ mark_done: true, stage: "완료" }, "포인트 지급 완료로 기록하고 이슈를 해결완료로 넘길까요?")} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">포인트 지급했어요 · 완료</button>
+            <button type="button" disabled={saving} onClick={() => complete({ mark_done: true, stage: "완료" }, "포인트 지급 완료로 기록하고 해결완료로 넘길까요?")} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">지급했어요 → 해결완료</button>
           ) : (
-            <button type="button" disabled={saving} onClick={() => complete({ mark_done: true, stage: "거절·취소" }, "환불 없이 종료하고 이슈를 해결완료로 넘길까요?")} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">환불 없이 종료</button>
+            <button type="button" disabled={saving} onClick={() => complete({ mark_done: true, stage: "거절·취소" }, "환불 없이 해결완료로 넘길까요?")} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">환불 없이 해결완료</button>
           )}
         </div>
       </div>

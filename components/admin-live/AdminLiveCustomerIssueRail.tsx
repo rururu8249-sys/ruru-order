@@ -14,7 +14,8 @@ import { supabase } from "@/lib/supabase";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { pickIssueProductRows } from "@/lib/issueProductLabel";
 import { RefundProcessModal, type LedgerDetail } from "./AdminLiveRefundLedgerPanel";
-import { productSnapshotFromItems, stageDisplay } from "@/lib/refundLedger";
+import { productSnapshotFromItems, refundListButtonLabel, ledgerSummaryLine } from "@/lib/refundLedger";
+import { bankDisplayName } from "@/lib/parseBankAccount";
 import { ISSUE_FILTER_CHIPS, matchesIssueFilterChip, issueRawTypes } from "@/lib/issueFilter";
 
 type AdminIssueTask = {
@@ -390,7 +391,7 @@ function IssueCard({
   photos?: string[];
   onPhotoZoom?: (url: string) => void;
   /** [2026-09-26] 교환·환불 건의 장부 요약(있을 때만). 진행단계·최종환불액·방법. */
-  ledgerInfo?: { stage?: string; kind?: string; amount_final?: number; method?: string } | null;
+  ledgerInfo?: { stage?: string; kind?: string; amount_final?: number; method?: string; done_at?: string; bank?: string; account_holder?: string; exchange_option?: string } | null;
   /** [2026-09-26] 목록 「단가 × 수량」(매칭 성공 시). 교환/반품/환불 건에만. */
   amountText?: string;
   /** [2026-09-26] 「환불 처리」 — 처리 창 열기(교환/반품/환불 건에만). */
@@ -406,13 +407,11 @@ function IssueCard({
   const done = isResolved(task);
   const deleted = clean(task.status).toLowerCase() === "deleted";
   const isRefund = isRefundKindTask(task);
-  // [2026-09-26] 버튼 글자 — 반품/환불이 섞였으면 「환불 처리」, 교환만이면 「교환 처리」
+  // [2026-09-26 5차] 버튼 글자 — 교환만 「교환하기」, 반품/환불 「환불하기」(순수 함수, 기록·단계 무관)
   const _rawTypes = issueRawTypes(task);
-  const refundBtnLabel = _rawTypes.some((x) => x === "return" || x === "refund") ? "환불 처리" : (_rawTypes.includes("exchange") ? "교환 처리" : "환불 처리");
-  // 장부 요약: 값이 있을 때만(행 없거나 초기값이면 표시 안 함)
-  const ledgerLine = isRefund && ledgerInfo
-    ? [stageDisplay(ledgerInfo.stage, ledgerInfo.kind), (Number(ledgerInfo.amount_final) || 0) > 0 ? `${(Number(ledgerInfo.amount_final) || 0).toLocaleString("ko-KR")}원` : "", ledgerInfo.method && ledgerInfo.method !== "없음" ? ledgerInfo.method : ""].filter(Boolean).join(" · ")
-    : "";
+  const refundBtnLabel = refundListButtonLabel(_rawTypes);
+  // [2026-09-26 5차] 💳 요약 — 사람말로(순수 함수). 값 있을 때만. 은행은 전체이름, 계좌번호는 표시 안 함.
+  const ledgerLine = isRefund ? ledgerSummaryLine(ledgerInfo, bankDisplayName(clean(ledgerInfo?.bank))) : "";
   // 반품/교환 등록으로 만들어진 건인가 — 지울 때 포인트·반품기록까지 되돌려야 한다
   const fromReturn = clean((task as { source?: unknown }).source) === "order_return_flow";
   const issueTypes = getIssueTypes(task);
@@ -611,7 +610,7 @@ function IssueCard({
                 title="교환·환불 처리(단계·환불액·계좌) — 포인트는 움직이지 않고 기록만"
                 className={`${SUB_BTN} border-rose-line text-rose-deep hover:bg-rose-soft`}
               >
-                {clean(ledgerInfo?.stage) ? `${stageDisplay(ledgerInfo!.stage, ledgerInfo?.kind)} ›` : refundBtnLabel}
+                {refundBtnLabel}
               </button>
             ) : null}
             <button
@@ -818,7 +817,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
   // ── [2026-09-26] 교환·환불 장부(고객이슈 안에서 처리) ──
   //   현재 페이지의 교환/반품/환불 줄들의 refund_ledger 요약을 «한 번에» 묶어 조회(줄마다 개별 조회 금지).
-  const [ledgerByTask, setLedgerByTask] = useState<Record<string, { id: string; stage: string; kind: string; amount_final: number; method: string }>>({});
+  const [ledgerByTask, setLedgerByTask] = useState<Record<string, { id: string; stage: string; kind: string; amount_final: number; method: string; done_at: string; bank: string; account_holder: string; exchange_option: string }>>({});
   const [refundReloadTick, setRefundReloadTick] = useState(0);
   const [refundModalItem, setRefundModalItem] = useState<LedgerDetail | null>(null);
   const refundPageIdsKey = pageTasks.filter(isRefundKindTask).map((t) => clean(t.id)).filter(Boolean).sort().join(",");
@@ -830,10 +829,10 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       const res = await fetch(`/api/admin-live/refund-ledger?taskIds=${encodeURIComponent(ids.join(","))}`, { cache: "no-store" });
       const p = await res.json().catch(() => null);
       if (!alive || !p?.ok) return;
-      const map: Record<string, { id: string; stage: string; kind: string; amount_final: number; method: string }> = {};
+      const map: Record<string, { id: string; stage: string; kind: string; amount_final: number; method: string; done_at: string; bank: string; account_holder: string; exchange_option: string }> = {};
       for (const r of (p.items || []) as Array<Record<string, unknown>>) {
         const tid = clean(r.admin_task_id);
-        if (tid) map[tid] = { id: String(r.id), stage: String(r.stage ?? ""), kind: String(r.kind ?? ""), amount_final: Number(r.amount_final) || 0, method: String(r.method ?? "") };
+        if (tid) map[tid] = { id: String(r.id), stage: String(r.stage ?? ""), kind: String(r.kind ?? ""), amount_final: Number(r.amount_final) || 0, method: String(r.method ?? ""), done_at: String(r.done_at ?? ""), bank: String(r.bank ?? ""), account_holder: String(r.account_holder ?? ""), exchange_option: String(r.exchange_option ?? "") };
       }
       setLedgerByTask(map);
     })().catch(() => { /* 실패해도 목록은 정상, 요약만 생략 */ });

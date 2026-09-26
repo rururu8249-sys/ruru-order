@@ -25,6 +25,53 @@ export function stageDisplay(stage: unknown, kind?: unknown): string {
 // [2026-09-26] 반품 사유 칩 — reason 필드에 저장.
 export const REASON_CHIPS = ["단순변심", "사이즈", "불량", "오배송", "기타"] as const;
 
+// [2026-09-26 5차] 고객이슈 목록 버튼 글자 — 교환만 「교환하기」, 반품/환불 섞이면 「환불하기」(기록·단계 무관).
+export function refundListButtonLabel(rawTypes: unknown): string {
+  const arr = Array.isArray(rawTypes) ? rawTypes.map((x) => String(x ?? "").toLowerCase()) : [];
+  const isExchangeOnly = arr.includes("exchange") && !arr.some((x) => x === "return" || x === "refund");
+  return isExchangeOnly ? "교환하기" : "환불하기";
+}
+
+// 완료일 짧은 표기 "MM.DD(요일)" — 💳 요약 전용(표시만).
+function doneShortKo(v: unknown): string {
+  const raw = String(v ?? "").trim();
+  if (!raw) return "";
+  const d = new Date(raw.includes("T") ? raw : raw.replace(" ", "T"));
+  if (Number.isNaN(d.getTime())) return "";
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  const wd = ["일", "월", "화", "수", "목", "금", "토"][d.getDay()] || "";
+  return `${p2(d.getMonth() + 1)}.${p2(d.getDate())}(${wd})`;
+}
+
+export type LedgerSummaryInput = {
+  kind?: unknown; method?: unknown; amount_final?: unknown;
+  done_at?: unknown; bank?: unknown; account_holder?: unknown; exchange_option?: unknown;
+};
+// [2026-09-26 5차] 💳 요약 문구 — 사람말. 값 없으면 "".
+//   bankName 은 은행 전체이름 매핑 결과(호출부에서 bankDisplayName 적용). 계좌번호는 표시 안 함.
+export function ledgerSummaryLine(li: LedgerSummaryInput | null | undefined, bankName: string): string {
+  if (!li) return "";
+  const s = (v: unknown) => String(v ?? "").trim();
+  const amt = Math.round(Number(li.amount_final)) || 0;
+  const wonTxt = `${amt.toLocaleString("ko-KR")}원`;
+  const completed = !!s(li.done_at);
+  const isExchange = s(li.kind) === "교환" || s(li.kind) === "재발송";
+  const method = s(li.method);
+  if (completed) {
+    const dd = doneShortKo(li.done_at);
+    if (isExchange) return `재발송함${dd ? ` · ${dd}` : ""}`;
+    if (method === "없음") return "환불 없이 종료";
+    return `${wonTxt} 보냄${dd ? ` · ${dd}` : ""}`;
+  }
+  if (isExchange) return `교환 · 바꿀 옵션 ${s(li.exchange_option) || "-"}`;
+  if (method === "포인트" && amt > 0) return `포인트로 돌려줄 금액 ${wonTxt}`;
+  if (method === "계좌이체" && amt > 0) {
+    const acct = [s(bankName), s(li.account_holder)].filter(Boolean).join(" ");
+    return `보낼 돈 ${wonTxt}${acct ? ` · ${acct}` : ""}`;
+  }
+  return ""; // 아직 처리 전(값 없음) → 표시 안 함
+}
+
 export type RefundAdjustment = { label: string; amount: number };
 
 export function isValidStage(v: unknown): v is RefundStage {
