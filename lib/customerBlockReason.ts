@@ -90,41 +90,60 @@ export function buildBlockReason(input: {
   return lines.join("\n");
 }
 
+// [2026-09-26] 품목 불릿 계열(가운뎃점) — 저장은 「· 」(U+00B7)이지만 손입력 옛 기록엔
+//   • ∙ ‧ ・(전각) 등이 섞여 있고, 뒤 공백이 없거나 개행이 사라진 «한 줄» 저장도 있다.
+//   ⚠ 하이픈(-)·별표(*)는 상품 이름의 일부라 불릿으로 보지 않는다.
+const BLOCK_ITEM_BULLET = /[·•∙‧・]/;
+
 /** 저장된 문자열을 읽는다. 옛 자유 텍스트도 «메모만 있는 차단»으로 안전하게 읽힌다. */
 export function parseBlockReason(raw: unknown): BlockReasonParts {
-  const text = String(raw ?? "").replace(/\r\n/g, "\n").trim();
+  // 정규화: CRLF/CR·저장 중 살아남은 리터럴 \n → 개행 / 전각공백·NBSP → 일반공백
+  let text = String(raw ?? "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/\\r\\n|\\r|\\n/g, "\n")
+    .replace(/[ 　]/g, " ")
+    .trim();
 
   if (!text) return { type: null, label: "", items: [], memo: "" };
 
-  const lines = text.split("\n");
   let type: BlockReasonType | null = null;
   let label = "";
   const items: string[] = [];
   const memoLines: string[] = [];
 
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index].trim();
+  // 1) 맨 앞 [유형] — 같은 줄에 품목이 붙어 한 줄로 저장된 경우도 인식한다.
+  //    단, 메모가 우연히 [..] 로 시작하는 것과 구분: 아는 유형이거나, 대괄호 뒤가 끝/개행/불릿일 때만 유형으로 본다.
+  const labelMatch = text.match(/^\[([^\]]+)\]([\s\S]*)$/);
+  if (labelMatch) {
+    const candidate = labelMatch[1].trim();
+    const after = labelMatch[2].replace(/^[ \t]+/, "");
+    const known = BLOCK_REASON_TYPES.some((t) => t.label === candidate);
+    const followedOk = after === "" || after.startsWith("\n") || BLOCK_ITEM_BULLET.test(after.charAt(0));
+    if (known || followedOk) {
+      label = candidate;
+      type = BLOCK_REASON_TYPES.find((t) => t.label === candidate)?.type ?? "custom";
+      text = after.replace(/^\n+/, "");
+    }
+  }
+
+  // 2) 남은 내용을 줄 단위로 — 불릿으로 «시작»하는 줄은 품목(한 줄에 불릿이 여러 개면 여러 품목),
+  //    「메모:」로 시작하면 메모, 그 외는 메모. (가운뎃점이 문장 중간에 있는 옛 메모는 그대로 메모로 남는다)
+  for (const rawLine of text.split("\n")) {
+    const line = rawLine.trim();
     if (!line) continue;
 
-    // 첫 줄의 [대괄호]만 유형으로 본다 — 메모 안의 대괄호가 유형으로 둔갑하면 안 된다
-    if (index === 0) {
-      const matched = line.match(/^\[(.+)\]$/);
-      if (matched) {
-        label = matched[1].trim();
-        type = BLOCK_REASON_TYPES.find((t) => t.label === label)?.type ?? "custom";
-        continue;
-      }
-    }
-
-    if (line.startsWith(ITEM_PREFIX)) {
-      const item = line.slice(ITEM_PREFIX.length).trim();
-      if (item) items.push(item);
+    if (/^메모\s*[:：]/.test(line)) {
+      const memo = line.replace(/^메모\s*[:：]\s*/, "").trim();
+      if (memo) memoLines.push(memo);
       continue;
     }
 
-    if (line.startsWith(MEMO_PREFIX)) {
-      const memo = line.slice(MEMO_PREFIX.length).trim();
-      if (memo) memoLines.push(memo);
+    // 맨 앞 불릿만 떼고 나머지는 «한 품목»으로 둔다.
+    //   ⚠ 줄 안의 가운뎃점으로 쪼개지 않는다 — 「알로 뮬 2컬러 · 블랙/230」처럼 상품명에 가운뎃점이 들어간다
+    //     (scripts/guard-option-split.js 기준 · / | 는 이름의 일부).
+    if (BLOCK_ITEM_BULLET.test(line.charAt(0))) {
+      const item = line.replace(/^[·•∙‧・]+[ \t]*/, "").trim();
+      if (item) items.push(item);
       continue;
     }
 
