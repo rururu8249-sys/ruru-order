@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase
       .from("orders")
-      .select("id, order_lookup_code, product_id, product_name, color, size, qty, product_price, adjusted_product_price, shipping_fee, point_used_amount, created_at, is_deleted")
+      .select("id, order_lookup_code, product_id, product_name, color, size, qty, product_price, adjusted_product_price, shipping_fee, point_used_amount, created_at, payment_method, card_extra_amount, vat_amount, adjusted_total_price, total_price, final_amount, combine_shipping_memo, is_deleted")
       .in("order_lookup_code", codes);
     if (error) return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
 
@@ -51,13 +51,19 @@ export async function GET(request: NextRequest) {
       } catch { /* 사진 조회 실패는 무시 */ }
     }
 
-    const byCode: Record<string, { lines: Array<Record<string, unknown>>; shippingFee: number; pointUsed: number; orderDate: string }> = {};
+    type Entry = { lines: Array<Record<string, unknown>>; shippingFee: number; pointUsed: number; orderDate: string; paymentMethod: string; cardExtra: number; cardTotal: number; combined: boolean };
+    const byCode: Record<string, Entry> = {};
     for (const r of rows) {
       const code = clean(r.order_lookup_code);
       if (!code) continue;
-      const entry = byCode[code] || (byCode[code] = { lines: [], shippingFee: 0, pointUsed: 0, orderDate: "" });
+      const entry = byCode[code] || (byCode[code] = { lines: [], shippingFee: 0, pointUsed: 0, orderDate: "", paymentMethod: "", cardExtra: 0, cardTotal: 0, combined: false });
       const created = clean(r.created_at);
       if (created && (!entry.orderDate || created < entry.orderDate)) entry.orderDate = created; // 주문일 = 가장 이른 줄
+      // 결제방법·카드추가금·카드총액 — 주문상세와 같은 필드. 줄마다 저장되므로 합산(카드추가금=vat_amount).
+      if (!entry.paymentMethod) entry.paymentMethod = clean(r.payment_method);
+      entry.cardExtra += Math.max(0, Math.round(num(r.card_extra_amount ?? r.vat_amount)));
+      entry.cardTotal += Math.max(0, Math.round(num(r.adjusted_total_price ?? r.total_price ?? r.final_amount)));
+      if (clean(r.combine_shipping_memo)) entry.combined = true; // 합배송 흔적 → 배송비 공유 신호
       const qty = submitRowQty(r);
       const lineTotal = submitRowLineTotal(r);
       const unit = qty > 0 ? Math.floor(lineTotal / qty) : lineTotal;

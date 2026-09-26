@@ -1,5 +1,5 @@
 // [2026-09-26 5·6차] 고객이슈 환불/교환 용어·💳 요약 문구 테스트
-import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone } from "../lib/refundLedger.ts";
+import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase } from "../lib/refundLedger.ts";
 import { bankDisplayName } from "../lib/parseBankAccount.ts";
 
 let pass = 0;
@@ -49,6 +49,14 @@ const bn = (li) => bankDisplayName(String(li.bank ?? ""));
 { const li = { kind: "반품", method: "계좌이체", amount_final: 69000, stage: "완료", account_last4: "2708" };
   eq(ledgerSummaryLine(li, "국민은행"), "69,000원 보냄 · 국민은행 ****2708", "완료(stage=완료·날짜없음)"); }
 
+// ── [7차] 카드취소 💳 요약 ──
+{ const li = { kind: "반품", method: "카드취소", amount_final: 252850 };
+  eq(ledgerSummaryLine(li, ""), "카드 취소할 금액 252,850원", "미완료 카드취소"); }
+{ const li = { kind: "반품", method: "카드취소", amount_final: 252850, done_at: "2026-09-26T10:00:00" };
+  eq(ledgerSummaryLine(li, ""), "252,850원 카드 취소함 · 09.26(토)", "완료 카드취소"); }
+{ const li = { kind: "반품", method: "카드취소", amount_final: 0 };
+  eq(ledgerSummaryLine(li, ""), "", "카드취소 금액0 미완료→빈칸"); }
+
 // ── [6차] 옵션 「없음」 제거 ──
 eq(optionLabelNoNone("없음", "12"), "12", "없음/12→12");
 eq(optionLabelNoNone("없음", ""), "", "없음 단독→빈칸");
@@ -62,5 +70,19 @@ eq(ledgerSummaryLine(null, ""), "", "ledgerInfo 없음");
   eq(ledgerSummaryLine(li, ""), "", "처리 전(방법 없음·금액0·미완료)→빈칸"); }
 { const li = { kind: "반품", method: "계좌이체", amount_final: 0 };
   eq(ledgerSummaryLine(li, ""), "", "계좌이체지만 금액0·미완료→빈칸"); }
+
+// ── [7차] 전체 반품 판정 (배송비·카드추가금 자동 기준) ──
+eq(isFullReturnSel([{ qty: 1, selectedQty: 1 }]), true, "1개 중 1개→전체");
+eq(isFullReturnSel([{ qty: 1, selectedQty: 1 }, { qty: 1, selectedQty: 1 }]), true, "2개 중 2개→전체");
+eq(isFullReturnSel([{ qty: 1, selectedQty: 1 }, { qty: 1, selectedQty: 0 }]), false, "2개 중 1개→일부");
+eq(isFullReturnSel([{ qty: 3, selectedQty: 2 }]), false, "수량 3중 2→일부");
+eq(isFullReturnSel([{ qty: 2, selectedQty: 2 }]), true, "수량 2중 2→전체");
+eq(isFullReturnSel([]), false, "빈 목록→전체 아님");
+eq(isFullReturnSel([{ qty: 0, selectedQty: 0 }]), false, "수량0→전체 아님");
+// 전체 반품이면 배송비 포함, 일부면 상품만(컴포넌트가 isFullReturn 으로 includeShipping 을 정함)
+eq(computeRefundBase([{ lineTotal: 79000, qty: 1, unit: 79000, selectedQty: 1 }], true, 4000), 83000, "전체+배송비=83,000");
+eq(computeRefundBase([{ lineTotal: 79000, qty: 1, unit: 79000, selectedQty: 1 }], false, 4000), 79000, "배송비 미포함=79,000");
+// 카드: base + 카드추가금(컴포넌트가 더함) — 272,850
+eq(computeRefundBase([{ lineTotal: 255000, qty: 1, unit: 255000, selectedQty: 1 }], false, 0) + 17850, 272850, "상품255,000+카드추가금17,850=272,850");
 
 console.log(`✅ refund-issue-terms ${pass}건 통과`);

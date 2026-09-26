@@ -10,7 +10,7 @@ export type RefundStage = (typeof REFUND_STAGES)[number];
 export const REFUND_KINDS = ["교환", "반품", "재발송"] as const;
 export type RefundKind = (typeof REFUND_KINDS)[number];
 
-export const REFUND_METHODS = ["계좌이체", "포인트", "교환재발송", "없음"] as const;
+export const REFUND_METHODS = ["계좌이체", "포인트", "교환재발송", "카드취소", "없음"] as const;
 export type RefundMethod = (typeof REFUND_METHODS)[number];
 
 // [2026-09-26] 저장 단계값 → 목록·요약 표시(처리창 상태 2칩과 통일). 저장값은 안 건드림.
@@ -26,6 +26,13 @@ export function stageDisplay(stage: unknown, kind?: unknown): string {
 
 // [2026-09-26] 반품 사유 칩 — reason 필드에 저장.
 export const REASON_CHIPS = ["단순변심", "사이즈", "불량", "오배송", "기타"] as const;
+
+// [2026-09-26 7차] 전체 반품 판정 — 모든 줄이 «전체 수량»으로 선택됐는가(배송비·카드추가금 자동 체크 기준).
+export function isFullReturnSel(sels: Array<{ qty: unknown; selectedQty: unknown }>): boolean {
+  const arr = Array.isArray(sels) ? sels : [];
+  if (arr.length === 0) return false;
+  return arr.every((s) => (Math.round(Number(s.selectedQty)) || 0) === (Math.round(Number(s.qty)) || 0) && (Math.round(Number(s.qty)) || 0) > 0);
+}
 
 // [2026-09-26 6차] 옵션 표기에서 「없음」 제거 — "없음/12"→"12", "없음" 단독→"".
 export function optionLabelNoNone(color: unknown, size: unknown): string {
@@ -73,11 +80,13 @@ export function ledgerSummaryLine(li: LedgerSummaryInput | null | undefined, ban
     const dd = doneShortKo(li.done_at);
     if (isExchange) return `재발송함${dd ? ` · ${dd}` : ""}`;
     if (method === "없음") return "환불 없이 종료";
+    if (method === "카드취소") return `${wonTxt} 카드 취소함${dd ? ` · ${dd}` : ""}`;
     const last4 = s(li.account_last4);
     const acctSeg = last4 ? `${bn ? `${bn} ` : ""}****${last4}` : bn;
     return `${wonTxt} 보냄${dd ? ` · ${dd}` : ""}${acctSeg ? ` · ${acctSeg}` : ""}`;
   }
   if (isExchange) return `교환 · 바꿀 옵션 ${s(li.exchange_option) || "-"}`;
+  if (method === "카드취소" && amt > 0) return `카드 취소할 금액 ${wonTxt}`;
   if (method === "포인트" && amt > 0) return `포인트로 돌려줄 금액 ${wonTxt}`;
   if (method === "계좌이체" && amt > 0) {
     // [6차] 옛 예금주(입니다 등)는 노출 금지 → 「예금주 확인 필요」
