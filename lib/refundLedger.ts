@@ -11,6 +11,20 @@ export type RefundKind = (typeof REFUND_KINDS)[number];
 export const REFUND_METHODS = ["계좌이체", "포인트", "교환재발송", "없음"] as const;
 export type RefundMethod = (typeof REFUND_METHODS)[number];
 
+// [2026-09-26] 저장 단계값 → 목록·요약 표시(처리창 상태 2칩과 통일). 저장값은 안 건드림.
+export function stageDisplay(stage: unknown, kind?: unknown): string {
+  const s = String(stage ?? "").trim();
+  const k = String(kind ?? "").trim();
+  if (s === "접수" || s === "회수 대기") return "반품 대기";
+  if (s === "도착·검수" || s === "처리 필요") return "반품 도착";
+  if (s === "완료") return k === "교환" || k === "재발송" ? "재발송완료" : "환불완료";
+  if (s === "거절·취소") return "종료";
+  return s;
+}
+
+// [2026-09-26] 반품 사유 칩 — reason 필드에 저장.
+export const REASON_CHIPS = ["단순변심", "사이즈", "불량", "오배송", "기타"] as const;
+
 export type RefundAdjustment = { label: string; amount: number };
 
 export function isValidStage(v: unknown): v is RefundStage {

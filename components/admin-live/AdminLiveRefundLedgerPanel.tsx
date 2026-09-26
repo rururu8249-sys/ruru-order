@@ -6,13 +6,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { showAdminToast } from "@/lib/adminToast";
+import { showAdminConfirm } from "@/lib/adminConfirm";
 import { splitIssueBody } from "@/lib/issueBodyMeta";
-import { parseBankAccount, maskAccountForSummary } from "@/lib/parseBankAccount";
+import { parseBankAccount, bankDisplayName, isExcludedHolder } from "@/lib/parseBankAccount";
 import {
   REFUND_STAGES,
   REFUND_KINDS,
+  REASON_CHIPS,
   computeAmountFinal,
   computeRefundBase,
+  stageDisplay,
   formatComma,
   parseAmountInput,
   type RefundLineSel,
@@ -39,7 +42,9 @@ export type LedgerListRow = {
   adjustments?: RefundAdjustment[] | null;
   amount_final: number;
   method: string;
+  bank?: string | null;
   account_last4?: string | null;
+  account_holder?: string | null;
   transferred_at?: string | null;
   done_at?: string | null;
 };
@@ -75,6 +80,36 @@ function productText(snapshot: LedgerListRow["product_snapshot"]) {
   return snapshot
     .map((it) => `${clean(it.productName) || "상품"}${[clean(it.color), clean(it.size)].filter(Boolean).length ? ` (${[clean(it.color), clean(it.size)].filter(Boolean).join("/")})` : ""} ×${Math.max(1, Math.round(Number(it.qty)) || 1)}`)
     .join(", ");
+}
+
+// [2026-09-26] 주문일 표기 "YYYY.MM.DD(요일)" (formatDateTime 재사용)
+const dateWithDow = (v: unknown) => { const dt = formatDateTime(v); return typeof dt === "string" ? dt : dt.line1; };
+
+// 복사 한 줄: 주문일 · 상품(옵션)×수량 · 사유 · 환불액 · 은행전체이름 계좌번호 · 예금주
+function buildCopyLine(r: LedgerListRow, detail: LedgerDetail | null, orderDate: string) {
+  const dateStr = dateWithDow(orderDate || r.created_at);
+  const product = productText(r.product_snapshot);
+  const reason = reasonBody(r.reason).split("\n")[0] || "-";
+  const bank = bankDisplayName(clean(detail?.bank) || clean(r.bank));
+  const acct = clean(detail?.account_number);
+  const holder = clean(detail?.account_holder) || clean(r.account_holder) || clean(r.customer_name) || clean(r.nickname) || "-";
+  const acctPart = [bank, acct].filter(Boolean).join(" ") || "-";
+  return [dateStr, product, reason, won(r.amount_final), acctPart, holder].map((x) => x || "-").join(" · ");
+}
+
+// 주문일 묶음 조회(order-lines 재사용, 60개씩). 행마다 요청 금지.
+async function fetchOrderDates(codes: string[]): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  const uniq = Array.from(new Set(codes.map((c) => clean(c)).filter(Boolean)));
+  for (let i = 0; i < uniq.length; i += 60) {
+    const chunk = uniq.slice(i, i + 60);
+    try {
+      const res = await fetch(`/api/admin-live/order-lines?codes=${chunk.map(encodeURIComponent).join(",")}`, { cache: "no-store" });
+      const p = await res.json().catch(() => null);
+      if (p?.ok && p.byCode) for (const [code, e] of Object.entries(p.byCode as Record<string, { orderDate?: string }>)) out[code] = clean(e?.orderDate);
+    } catch { /* 무시 */ }
+  }
+  return out;
 }
 
 const KIND_COLOR: Record<string, string> = { 교환: "bg-info-bg text-info-tx", 반품: "bg-warn-bg text-warn-tx", 재발송: "bg-ok-bg text-ok-tx" };
@@ -166,34 +201,33 @@ export default function AdminLiveRefundLedgerPanel({ focusTaskId }: { focusTaskI
     setModalOpen(true);
   };
 
-  // 이체 목록 복사 — 선택 건의 «전체 계좌번호»를 이때만 서버에서 받아서 만든다.
+  // 이체 목록 복사 — 선택 건의 «전체 계좌번호»(copyIds 1회) + 주문일(order-lines 묶음)로 통일 형식.
   const copyTransferList = async () => {
     const targets = selectedRows.filter((r) => r.method === "계좌이체");
     if (targets.length === 0) { showAdminToast("계좌이체 방법인 선택 건이 없어요."); return; }
-    const lines: string[] = [];
-    for (const r of targets) {
-      const res = await fetch(`/api/admin-live/refund-ledger?id=${encodeURIComponent(r.id)}`, { cache: "no-store" });
+    const detailById: Record<string, LedgerDetail> = {};
+    try {
+      const res = await fetch(`/api/admin-live/refund-ledger?copyIds=${targets.map((r) => encodeURIComponent(r.id)).join(",")}`, { cache: "no-store" });
       const p = await res.json().catch(() => null);
-      const d = p?.ok ? (p.item as LedgerDetail) : null;
-      const bank = clean(d?.bank);
-      const acct = clean(d?.account_number);
-      const holder = clean(d?.account_holder) || clean(r.customer_name) || clean(r.nickname);
-      lines.push([bank, acct, holder, won(r.amount_final)].filter(Boolean).join(" "));
-    }
-    const text = lines.join("\n");
-    try { await navigator.clipboard.writeText(text); showAdminToast(`이체 목록 ${targets.length}건 복사했어요 (은행 계좌 예금주 금액)`, "success"); }
+      if (p?.ok) for (const d of (p.items as LedgerDetail[]) || []) detailById[clean(d.id)] = d;
+    } catch { /* 실패해도 뒷4자리 없는 대로 만든다 */ }
+    const orderDateByCode = await fetchOrderDates(targets.map((r) => clean(r.order_lookup_code)));
+    const text = targets
+      .map((r) => buildCopyLine(r, detailById[clean(r.id)] || null, orderDateByCode[clean(r.order_lookup_code)] || ""))
+      .join("\n");
+    try { await navigator.clipboard.writeText(text); showAdminToast(`이체 목록 ${targets.length}건 복사했어요`, "success"); }
     catch { showAdminToast("복사 실패 — 아래 내용을 직접 복사하세요:\n\n" + text, "warning"); }
   };
 
-  const downloadExcel = () => {
-    // 계좌는 뒷4자리만. CSV(BOM)로 저장 — 엑셀에서 열림.
-    const header = ["접수일", "고객", "전화(뒷4)", "구분", "단계", "상품", "사유", "최종환불액", "방법", "계좌뒷4", "이체일", "완료일"];
+  const downloadExcel = async () => {
+    // 계좌는 뒷4자리만(보안). 주문일은 order-lines 묶음. CSV(BOM)로 저장.
+    const orderDateByCode = await fetchOrderDates(rows.map((r) => clean(r.order_lookup_code)));
+    const header = ["주문일", "상품", "사유", "환불액", "은행", "계좌(뒤4)", "예금주", "닉네임", "단계"];
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const body = rows.map((r) => {
-      const dt = formatDateTime(r.created_at);
-      const created = typeof dt === "string" ? dt : `${dt.line1} ${dt.line2}`;
-      const phone4 = clean(r.customer_phone).slice(-4);
-      return [created, clean(r.nickname) || clean(r.customer_name), phone4, r.kind, r.stage, productText(r.product_snapshot), reasonBody(r.reason).replace(/\n/g, " "), r.amount_final, r.method, clean(r.account_last4), clean(r.transferred_at), clean(r.done_at)].map(esc).join(",");
+      const dateStr = dateWithDow(orderDateByCode[clean(r.order_lookup_code)] || r.created_at);
+      const holder = clean(r.account_holder) || clean(r.customer_name) || clean(r.nickname);
+      return [dateStr, productText(r.product_snapshot), reasonBody(r.reason).replace(/\n/g, " "), r.amount_final, bankDisplayName(clean(r.bank)), clean(r.account_last4), holder, clean(r.nickname), stageDisplay(r.stage, r.kind)].map(esc).join(",");
     });
     const csv = "﻿" + [header.map(esc).join(","), ...body].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -287,7 +321,7 @@ export default function AdminLiveRefundLedgerPanel({ focusTaskId }: { focusTaskI
                     <div className="truncate text-[11px] text-ink-soft" title={reasonBody(r.reason)}>{reasonBody(r.reason).split("\n")[0] || "-"}</div>
                   </div>
                   <div className="min-w-0">
-                    <span className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-black ${STAGE_COLOR[r.stage] || "bg-surface-2 text-ink-soft"}`}>{r.stage}</span>
+                    <span className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-black ${STAGE_COLOR[r.stage] || "bg-surface-2 text-ink-soft"}`}>{stageDisplay(r.stage, r.kind)}</span>
                     {r.next_action ? <div className="truncate text-[11px] text-ink-mute" title={clean(r.next_action)}>{clean(r.next_action)}</div> : null}
                   </div>
                   <div className="text-right">
@@ -314,7 +348,7 @@ export default function AdminLiveRefundLedgerPanel({ focusTaskId }: { focusTaskI
 }
 
 // ── 시안 ③ 처리 창 ──
-export function RefundProcessModal({ item, onClose, onSaved }: { item: LedgerDetail; onClose: () => void; onSaved: () => void }) {
+export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { item: LedgerDetail; onClose: () => void; onSaved: () => void; onCompleted?: (taskId: string) => Promise<boolean> }) {
   const orderCode = clean(item.order_lookup_code);
   // 교환→환불 전환(item 12). 저장 눌러야 반영.
   const [kindOverride, setKindOverride] = useState<string>("");
@@ -329,21 +363,34 @@ export function RefundProcessModal({ item, onClose, onSaved }: { item: LedgerDet
   const [memo, setMemo] = useState(clean(item.memo));
   const [saving, setSaving] = useState(false);
 
-  // 계좌
+  // 계좌 — 저장된 예금주가 제외 단어(입니다 등)면 열 때 확인 안내 + 편집 펼침(자동 수정 금지)
+  const holderExcluded = isExcludedHolder(clean(item.account_holder));
   const [bank, setBank] = useState(clean(item.bank));
   const [account, setAccount] = useState(clean(item.account_number));
   const [holder, setHolder] = useState(clean(item.account_holder) || clean(item.customer_name) || clean(item.nickname));
   const [paste, setPaste] = useState("");
-  const [acctEdit, setAcctEdit] = useState(!clean(item.bank) && !clean(item.account_number) ? false : false);
-  const [acctMissing, setAcctMissing] = useState<string[]>([]);
+  const [acctEdit, setAcctEdit] = useState(holderExcluded);
+  const [acctMissing, setAcctMissing] = useState<string[]>(holderExcluded ? ["holder"] : []);
 
-  // 차감(신규 1줄) + 기존 조정줄 보존
-  const [keptAdj, setKeptAdj] = useState<RefundAdjustment[]>(() => {
-    const a = Array.isArray(item.adjustments) ? item.adjustments : [];
-    return a.map((x) => ({ label: clean(x.label), amount: Math.round(Number(x.amount)) || 0 })).filter((x) => x.label || x.amount !== 0);
-  });
-  const [deductAmount, setDeductAmount] = useState(0);
-  const [deductLabel, setDeductLabel] = useState("");
+  // 반품 사유(reason 필드) — 칩 하나 선택. 저장된 값이 칩이면 그 칩, 짧은 텍스트면 기타, 메모 통째 같은 긴 값이면 비움.
+  const loadedReason = clean(item.reason);
+  const isLongReason = loadedReason.length > 20 || loadedReason.includes("\n");
+  const initReasonChip = (REASON_CHIPS as readonly string[]).includes(loadedReason)
+    ? loadedReason
+    : (loadedReason && !isLongReason ? "기타" : "");
+  const [reasonChip, setReasonChip] = useState(initReasonChip);
+  const [reasonEtc, setReasonEtc] = useState(initReasonChip === "기타" ? loadedReason : "");
+  const [reasonDirty, setReasonDirty] = useState(false);
+  const reasonVal = reasonChip === "기타" ? reasonEtc.trim() : reasonChip;
+
+  // 차감 — 신규는 금액칸 1개. 기존 조정줄이 1개(차감)면 그 줄을 금액칸으로 불러와 편집(별도 줄 없음). 2개↑면 목록+입력.
+  const initAdjs = (Array.isArray(item.adjustments) ? item.adjustments : [])
+    .map((x) => ({ label: clean(x.label), amount: Math.round(Number(x.amount)) || 0 }))
+    .filter((x) => x.label || x.amount !== 0);
+  const singleAdj = initAdjs.length === 1 && initAdjs[0].amount < 0 ? initAdjs[0] : null;
+  const [keptAdj, setKeptAdj] = useState<RefundAdjustment[]>(singleAdj ? [] : initAdjs);
+  const [deductAmount, setDeductAmount] = useState(singleAdj ? Math.abs(singleAdj.amount) : 0);
+  const [deductLabel] = useState(singleAdj ? clean(singleAdj.label) : ""); // 기존 저장 라벨 유지
 
   // 돌려받을 상품
   type OrderLineRow = { id: string; product_id: string; product_name: string; color: string; size: string; qty: number; unit: number; lineTotal: number; photo: string };
@@ -351,6 +398,7 @@ export function RefundProcessModal({ item, onClose, onSaved }: { item: LedgerDet
   const [linesLoaded, setLinesLoaded] = useState(false);
   const [shippingFee, setShippingFee] = useState(0);
   const [pointUsed, setPointUsed] = useState(0);
+  const [orderDate, setOrderDate] = useState("");
   const [sel, setSel] = useState<Record<string, number>>({});
   const [includeShipping, setIncludeShipping] = useState(false);
   const [manualBase, setManualBase] = useState(Math.round(Number(item.amount_base)) || 0);
@@ -371,6 +419,7 @@ export function RefundProcessModal({ item, onClose, onSaved }: { item: LedgerDet
         setLines(got);
         setShippingFee(Math.max(0, Math.round(Number(entry?.shippingFee)) || 0));
         setPointUsed(Math.max(0, Math.round(Number(entry?.pointUsed)) || 0));
+        setOrderDate(clean(entry?.orderDate));
         const targetQty: Record<string, number> = {};
         for (const s of (item.product_snapshot || [])) {
           const pid = clean((s as { productId?: unknown }).productId);
@@ -411,7 +460,8 @@ export function RefundProcessModal({ item, onClose, onSaved }: { item: LedgerDet
   const baseMismatch = !matchFailed && savedBase !== null && !matchAccepted && savedBase !== autoBase;
   const amountBase = matchFailed ? manualBase : (baseMismatch ? (savedBase as number) : autoBase);
 
-  const finalAdj: RefundAdjustment[] = [...keptAdj, ...(deductAmount > 0 ? [{ label: deductLabel || "차감", amount: -deductAmount }] : [])];
+  const deductFinalLabel = deductLabel || (reasonVal ? `${reasonVal} 차감` : "차감");
+  const finalAdj: RefundAdjustment[] = [...keptAdj, ...(deductAmount > 0 ? [{ label: deductFinalLabel, amount: -deductAmount }] : [])];
   const amountFinal = computeAmountFinal(amountBase, finalAdj);
   const deductTotal = finalAdj.filter((a) => a.amount < 0).reduce((s, a) => s - a.amount, 0);
   const formula = deductTotal > 0 ? `${formatComma(amountBase)} − ${formatComma(deductTotal)}` : "";
@@ -429,7 +479,11 @@ export function RefundProcessModal({ item, onClose, onSaved }: { item: LedgerDet
     if (r.missing.length > 0 && (r.bank || r.account || r.holder)) setAcctEdit(true); // 일부만 인식 → 펼쳐서 보정
   };
 
-  const patch = async (extra: Record<string, unknown>) => {
+  // reason 저장: 사용자가 사유를 건드렸을 때만 새 값으로. 안 건드리면 신규는 이슈 메모, 기존은 유지(미전송).
+  const reasonToSend = reasonDirty ? reasonVal : (item.id ? undefined : clean(item.reason));
+
+  // 창을 닫지 않고 저장만 — 성공 여부 반환.
+  const doPatch = async (extra: Record<string, unknown>): Promise<boolean> => {
     setSaving(true);
     try {
       const snapshot = matchFailed
@@ -443,10 +497,11 @@ export function RefundProcessModal({ item, onClose, onSaved }: { item: LedgerDet
         bank, account_number: account, account_holder: holder,
         exchange_option: exchangeOption, reship_tracking: reshipTracking, memo,
         product_snapshot: snapshot,
+        ...(reasonToSend !== undefined ? { reason: reasonToSend } : {}),
         ...(item.id ? {} : {
           nickname: clean(item.nickname), customer_name: clean(item.customer_name),
           customer_phone: clean(item.customer_phone), order_lookup_code: orderCode,
-          reason: clean(item.reason), next_action: clean(item.next_action),
+          next_action: clean(item.next_action),
         }),
         ...extra,
       };
@@ -456,16 +511,43 @@ export function RefundProcessModal({ item, onClose, onSaved }: { item: LedgerDet
         body: JSON.stringify(body),
       });
       const payload = await res.json().catch(() => null);
-      if (!payload?.ok) { showAdminToast("저장 실패\n" + (payload?.message || ""), "error"); return; }
-      showAdminToast("저장했습니다.", "success");
-      onSaved();
+      if (!payload?.ok) { showAdminToast("저장 실패\n" + (payload?.message || ""), "error"); return false; }
+      return true;
     } finally { setSaving(false); }
   };
 
+  // 저장만(이체 전) — 창 닫고 목록 새로고침.
+  const saveOnly = async () => {
+    if (await doPatch({})) { showAdminToast("저장했습니다.", "success"); onSaved(); }
+  };
+
+  // 완료 — 모달 안 확인 → 기록 저장 → 이슈 해결완료 연동(부수효과 없는 상태변경만).
+  const complete = async (extra: Record<string, unknown>, confirmMsg: string) => {
+    const ok = await showAdminConfirm(confirmMsg, { title: isExchange ? "재발송 완료" : "환불 완료", confirmText: "완료", cancelText: "취소", tone: "info" });
+    if (!ok) return;
+    const saved = await doPatch(extra);
+    if (!saved) return;
+    const taskId = clean(item.admin_task_id);
+    if (taskId && onCompleted) {
+      const resolved = await onCompleted(taskId).catch(() => false);
+      showAdminToast(resolved ? "환불 기록 저장 + 이슈 해결완료로 넘겼어요." : "환불 기록은 저장됐어요. 이슈 해결완료는 목록에서 눌러주세요.", resolved ? "success" : "warning");
+    } else {
+      showAdminToast("저장했습니다.", "success");
+    }
+    onSaved();
+  };
+
   const copyTransferInfo = async () => {
-    const text = [bank, account, holder, won(amountFinal)].filter(Boolean).join(" ");
-    try { await navigator.clipboard.writeText(text); showAdminToast("이체 정보 복사했어요", "success"); }
-    catch { showAdminToast("복사 실패:\n" + text, "warning"); }
+    // 통일 한 줄: 주문일 · 상품(옵션)×수량 · 사유 · 환불액 · 은행전체이름 계좌번호 · 예금주
+    const dateStr = dateWithDow(orderDate || item.created_at);
+    const product = matchFailed
+      ? productText(item.product_snapshot)
+      : productText(lines.filter((l) => (sel[l.id] || 0) > 0).map((l) => ({ productName: l.product_name, color: l.color, size: l.size, qty: sel[l.id] || 0 })));
+    const reason = reasonVal || reasonBody(item.reason).split("\n")[0] || "-";
+    const acctPart = [bankDisplayName(bank), account].filter(Boolean).join(" ") || "-";
+    const line = [dateStr, product || "-", reason, won(amountFinal), acctPart, holder || "-"].map((x) => x || "-").join(" · ");
+    try { await navigator.clipboard.writeText(line); showAdminToast("이체 정보 복사했어요", "success"); }
+    catch { showAdminToast("복사 실패:\n" + line, "warning"); }
   };
 
   const memoFull = clean(item.reason);
@@ -567,6 +649,21 @@ export function RefundProcessModal({ item, onClose, onSaved }: { item: LedgerDet
             ) : null}
           </div>
 
+          {/* 2-1. 사유 (reason 필드) */}
+          <div className="mb-3">
+            <div className="mb-1 text-[13px] font-black text-ink-mute">{isExchange ? "교환 사유" : "사유"}</div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {REASON_CHIPS.map((c) => (
+                <button key={c} type="button"
+                  onClick={() => { setReasonChip(reasonChip === c ? "" : c); setReasonDirty(true); }}
+                  className={`rounded-full px-3 py-1.5 text-[14px] font-black transition ${reasonChip === c ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}>{c}</button>
+              ))}
+              {reasonChip === "기타" ? (
+                <input value={reasonEtc} onChange={(e) => { setReasonEtc(e.target.value); setReasonDirty(true); }} placeholder="사유 입력" className={`w-40 ${INPUT}`} maxLength={40} />
+              ) : null}
+            </div>
+          </div>
+
           {!isExchange ? (
             <>
               {/* 3. 차감 */}
@@ -584,13 +681,8 @@ export function RefundProcessModal({ item, onClose, onSaved }: { item: LedgerDet
                   </div>
                 ) : null}
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <div className="flex gap-1">
-                    {["단순변심", "반품배송비"].map((c) => (
-                      <button key={c} type="button" onClick={() => setDeductLabel(deductLabel === c ? "" : c)} className={`rounded-full px-2.5 py-1 text-[14px] font-black ${deductLabel === c ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}>{c}</button>
-                    ))}
-                  </div>
-                  <input inputMode="numeric" value={formatComma(deductAmount)} onFocus={selectOnFocus} onChange={(e) => setDeductAmount(parseAmountInput(e.target.value))} placeholder="차감 금액" className={`w-28 text-right ${INPUT}`} />
-                  <span className="text-[13px] text-ink-mute">원 차감{deductLabel ? ` · ${deductLabel}` : ""}</span>
+                  <input inputMode="numeric" value={formatComma(deductAmount)} onFocus={selectOnFocus} onChange={(e) => setDeductAmount(parseAmountInput(e.target.value))} placeholder="차감 금액" className={`w-32 text-right ${INPUT}`} />
+                  <span className="text-[13px] text-ink-mute">원 차감{deductAmount > 0 ? ` · ${deductFinalLabel}` : ""}</span>
                 </div>
               </div>
 
@@ -607,24 +699,31 @@ export function RefundProcessModal({ item, onClose, onSaved }: { item: LedgerDet
               <div className="mb-3">
                 {method === "계좌이체" ? (
                   <div className="rounded-xl border border-line p-3">
-                    {!acctEdit ? (
+                    {holderExcluded ? (
+                      <div className="mb-2 rounded-lg border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">예금주가 &lsquo;{clean(item.account_holder)}&rsquo;로 저장돼 있어요. 확인해 주세요.</div>
+                    ) : null}
+                    {item.account_hidden ? (
+                      <div className="text-[14px] font-bold text-ink">{[bankDisplayName(bank), holder].filter(Boolean).join(" · ")}<div className="mt-1 text-[13px] font-bold text-ink-mute">완료 후 30일이 지나 계좌번호는 가려졌습니다(은행·예금주는 유지).</div></div>
+                    ) : !(acctEdit || !account) ? (
                       <div className="flex items-center gap-2">
-                        <span className="min-w-0 flex-1 truncate text-[14px] font-bold text-ink">{[bank, account ? maskAccountForSummary(account) : "", holder].filter(Boolean).join(" · ") || "계좌 정보를 붙여넣으세요"}</span>
+                        <span className="min-w-0 flex-1 truncate text-[14px] font-bold text-ink">{[bankDisplayName(bank), account, holder].filter(Boolean).join(" · ") || "계좌 정보를 붙여넣으세요"}</span>
                         <button type="button" onClick={() => setAcctEdit(true)} className="shrink-0 text-[14px] font-black text-ink-soft underline">수정</button>
                         <button type="button" onClick={copyTransferInfo} className="shrink-0 rounded-lg border border-rose-line bg-surface px-2 py-1 text-[14px] font-black text-rose-deep hover:bg-rose-soft">📋 복사</button>
                       </div>
                     ) : (
-                      <div className="flex flex-wrap gap-2">
-                        <select value={BANK_OPTIONS.includes(bank as typeof BANK_OPTIONS[number]) ? bank : (bank ? "기타" : "")} onChange={(e) => setBank(e.target.value === "기타" ? "" : e.target.value)} className={`w-28 ${INPUT} ${acctMissing.includes("bank") ? "ring-2 ring-warn-tx" : ""}`}>
-                          <option value="">은행</option>
-                          {BANK_OPTIONS.map((b) => <option key={b} value={b}>{b}</option>)}
-                        </select>
-                        <input value={account} onChange={(e) => setAccount(e.target.value.replace(/[^0-9]/g, ""))} onFocus={selectOnFocus} placeholder="계좌번호(숫자)" inputMode="numeric" className={`min-w-0 flex-1 ${INPUT} ${acctMissing.includes("account") ? "ring-2 ring-warn-tx" : ""}`} />
-                        <input value={holder} onChange={(e) => setHolder(e.target.value)} placeholder="예금주" className={`w-24 ${INPUT} ${acctMissing.includes("holder") ? "ring-2 ring-warn-tx" : ""}`} />
-                      </div>
+                      <>
+                        <input value={paste} onChange={(e) => applyPaste(e.target.value)} onPaste={(e) => applyPaste(e.clipboardData.getData("text"))} placeholder="계좌 정보 붙여넣기 (예: 국민은행 123456 01 234567 홍길동)" className={`w-full ${INPUT}`} />
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <select value={BANK_OPTIONS.includes(bank as typeof BANK_OPTIONS[number]) ? bank : (bank ? "기타" : "")} onChange={(e) => setBank(e.target.value === "기타" ? "" : e.target.value)} className={`w-32 ${INPUT} ${acctMissing.includes("bank") ? "ring-2 ring-warn-tx" : ""}`}>
+                            <option value="">은행</option>
+                            {BANK_OPTIONS.map((b) => <option key={b} value={b}>{bankDisplayName(b)}</option>)}
+                          </select>
+                          <input value={account} onChange={(e) => setAccount(e.target.value.replace(/[^0-9]/g, ""))} onFocus={selectOnFocus} placeholder="계좌번호(숫자)" inputMode="numeric" className={`min-w-0 flex-1 ${INPUT} ${acctMissing.includes("account") ? "ring-2 ring-warn-tx" : ""}`} />
+                          <input value={holder} onChange={(e) => setHolder(e.target.value)} placeholder="예금주" className={`w-24 ${INPUT} ${acctMissing.includes("holder") || holderExcluded ? "ring-2 ring-warn-tx" : ""}`} />
+                        </div>
+                        {account ? <button type="button" onClick={copyTransferInfo} className="mt-2 rounded-lg border border-rose-line bg-surface px-2 py-1 text-[14px] font-black text-rose-deep hover:bg-rose-soft">📋 복사</button> : null}
+                      </>
                     )}
-                    <input value={paste} onChange={(e) => applyPaste(e.target.value)} onPaste={(e) => applyPaste(e.clipboardData.getData("text"))} placeholder="계좌 정보 붙여넣기 (예: 국민은행 123456 01 234567 홍길동)" className={`mt-2 w-full ${INPUT}`} />
-                    {item.account_hidden ? <div className="mt-1 text-[13px] font-bold text-ink-mute">완료 후 30일이 지나 계좌번호는 가려졌습니다(은행·예금주는 유지).</div> : null}
                   </div>
                 ) : method === "포인트" ? (
                   <div className="rounded-xl border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">포인트 지급 버튼은 다음 작업에서 연결돼요. 지금은 기록만 저장돼요.</div>
@@ -671,15 +770,15 @@ export function RefundProcessModal({ item, onClose, onSaved }: { item: LedgerDet
 
         {/* 9. 하단 고정 */}
         <div className="flex items-center gap-2 border-t border-line px-5 py-3">
-          <button type="button" disabled={saving} onClick={() => patch({})} className="h-12 rounded-xl border border-line bg-surface px-4 text-[14px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50">저장</button>
+          <button type="button" disabled={saving} onClick={saveOnly} className="h-12 rounded-xl border border-line bg-surface px-4 text-[14px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50">저장 (이체 전)</button>
           {isExchange ? (
-            <button type="button" disabled={saving} onClick={() => patch({ mark_done: true, stage: "완료" })} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">재발송 완료</button>
+            <button type="button" disabled={saving} onClick={() => complete({ mark_done: true, stage: "완료" }, "재발송 완료로 기록하고 이슈를 해결완료로 넘길까요?")} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">재발송 완료</button>
           ) : method === "계좌이체" ? (
-            <button type="button" disabled={saving} onClick={() => patch({ mark_transferred: true, mark_done: true, stage: "완료" })} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">이체했어요 · 환불완료</button>
+            <button type="button" disabled={saving} onClick={() => complete({ mark_transferred: true, mark_done: true, stage: "완료" }, `${won(amountFinal)} 이체 완료로 기록하고 이슈를 해결완료로 넘길까요?`)} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">이체했어요 · 환불완료</button>
           ) : method === "포인트" ? (
-            <button type="button" disabled={saving} onClick={() => patch({ mark_done: true, stage: "완료" })} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">포인트 지급했어요 · 완료</button>
+            <button type="button" disabled={saving} onClick={() => complete({ mark_done: true, stage: "완료" }, "포인트 지급 완료로 기록하고 이슈를 해결완료로 넘길까요?")} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">포인트 지급했어요 · 완료</button>
           ) : (
-            <button type="button" disabled={saving} onClick={() => patch({ mark_done: true, stage: "거절·취소" })} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">환불 없이 종료</button>
+            <button type="button" disabled={saving} onClick={() => complete({ mark_done: true, stage: "거절·취소" }, "환불 없이 종료하고 이슈를 해결완료로 넘길까요?")} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">환불 없이 종료</button>
           )}
         </div>
       </div>

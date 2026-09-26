@@ -17,6 +17,8 @@ import {
   kindNeedsAmount,
   adjRowsToStored,
   storedToAdjRows,
+  stageDisplay,
+  REASON_CHIPS,
 } from "../lib/refundLedger.ts";
 
 let pass = 0;
@@ -127,5 +129,22 @@ eq(adjRowsToStored([{ label: "메모만", sign: "차감", amount: 0 }]).length, 
 ok(kindNeedsAmount("반품") === true, "반품은 금액 필요");
 ok(kindNeedsAmount("환불") === true, "환불(=반품 매핑)도 금액 필요");
 ok(kindNeedsAmount("교환") === false, "교환은 금액 대신 옵션/송장");
+
+// ── [4차 item 6] 상태 표기 통일(저장값→표시) ──
+eq(stageDisplay("접수"), "반품 대기", "접수→반품 대기");
+eq(stageDisplay("회수 대기"), "반품 대기", "회수 대기→반품 대기");
+eq(stageDisplay("도착·검수"), "반품 도착", "도착·검수→반품 도착");
+eq(stageDisplay("처리 필요"), "반품 도착", "처리 필요→반품 도착");
+eq(stageDisplay("완료", "반품"), "환불완료", "완료(반품)→환불완료");
+eq(stageDisplay("완료", "교환"), "재발송완료", "완료(교환)→재발송완료");
+eq(stageDisplay("완료", "재발송"), "재발송완료", "완료(재발송)→재발송완료");
+eq(stageDisplay("거절·취소"), "종료", "거절·취소→종료");
+eq(stageDisplay("알수없음"), "알수없음", "모르는 값 원문");
+eq(stageDisplay(""), "", "빈 값");
+
+// ── [4차 item 3] 반품 사유 칩 목록 ──
+ok(REASON_CHIPS.includes("단순변심") && REASON_CHIPS.includes("기타"), "REASON_CHIPS 단순변심·기타 포함");
+eq(REASON_CHIPS.length, 5, "REASON_CHIPS 5개");
+ok(REASON_CHIPS.includes("사이즈") && REASON_CHIPS.includes("불량") && REASON_CHIPS.includes("오배송"), "REASON_CHIPS 사이즈·불량·오배송");
 
 console.log(`✅ refund-ledger 순수 로직 ${pass}건 통과`);

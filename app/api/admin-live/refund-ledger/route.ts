@@ -106,6 +106,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ok: true, items: ((data as Row[]) || []).map(toListRow) });
     }
 
+    // ── 이체 목록 복사용: 선택 장부 id 묶음 → 전체 계좌번호(단 완료+30일 지나면 가림). 행마다 요청 금지 대응. ──
+    const copyIdsRaw = text(url.searchParams.get("copyIds"), 4000);
+    if (copyIdsRaw) {
+      const ids = Array.from(new Set(copyIdsRaw.split(",").map((s) => s.trim()).filter(Boolean))).slice(0, 200);
+      if (ids.length === 0) return NextResponse.json({ ok: true, items: [] });
+      const { data, error } = await supabase.from("refund_ledger").select("*").in("id", ids);
+      if (error) return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true, items: ((data as Row[]) || []).map((r) => toDetailRow(r, now)) });
+    }
+
     // ── 같은 주문번호(order_lookup_code)의 다른 환불 기록 — 중복 환불 경고용. 뒷4자리만. ──
     const orderCode = text(url.searchParams.get("orderCode"), 120);
     if (orderCode) {

@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase
       .from("orders")
-      .select("id, order_lookup_code, product_id, product_name, color, size, qty, product_price, adjusted_product_price, shipping_fee, point_used_amount, is_deleted")
+      .select("id, order_lookup_code, product_id, product_name, color, size, qty, product_price, adjusted_product_price, shipping_fee, point_used_amount, created_at, is_deleted")
       .in("order_lookup_code", codes);
     if (error) return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
 
@@ -49,11 +49,13 @@ export async function GET(request: NextRequest) {
       } catch { /* 사진 조회 실패는 무시 */ }
     }
 
-    const byCode: Record<string, { lines: Array<Record<string, unknown>>; shippingFee: number; pointUsed: number }> = {};
+    const byCode: Record<string, { lines: Array<Record<string, unknown>>; shippingFee: number; pointUsed: number; orderDate: string }> = {};
     for (const r of rows) {
       const code = clean(r.order_lookup_code);
       if (!code) continue;
-      const entry = byCode[code] || (byCode[code] = { lines: [], shippingFee: 0, pointUsed: 0 });
+      const entry = byCode[code] || (byCode[code] = { lines: [], shippingFee: 0, pointUsed: 0, orderDate: "" });
+      const created = clean(r.created_at);
+      if (created && (!entry.orderDate || created < entry.orderDate)) entry.orderDate = created; // 주문일 = 가장 이른 줄
       const qty = submitRowQty(r);
       const lineTotal = submitRowLineTotal(r);
       const unit = qty > 0 ? Math.floor(lineTotal / qty) : lineTotal;

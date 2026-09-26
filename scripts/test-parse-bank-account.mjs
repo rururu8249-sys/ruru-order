@@ -1,5 +1,5 @@
 // [2026-09-26] 계좌 붙여넣기 파서 테스트
-import { parseBankAccount, maskAccountForSummary } from "../lib/parseBankAccount.ts";
+import { parseBankAccount, maskAccountForSummary, bankDisplayName, isExcludedHolder } from "../lib/parseBankAccount.ts";
 
 let pass = 0;
 function eq(a, e, m) { if (a !== e) throw new Error(`${m}: expected=${JSON.stringify(e)} actual=${JSON.stringify(a)}`); pass++; }
@@ -33,5 +33,41 @@ function ok(c, m) { if (!c) throw new Error(m); pass++; }
 // 마스킹
 eq(maskAccountForSummary("46130204112708"), "461302-**-******", "마스킹");
 eq(maskAccountForSummary("12345"), "12345", "짧으면 그대로");
+
+// ── [4차 item 1] 예금주 제외 단어 ──
+{ const r = parseBankAccount("신한 91304888454 입니다"); eq(r.holder, "", "‘입니다’ 제외→빈칸"); ok(r.missing.includes("holder"), "holder missing(입니다)"); }
+{ const r = parseBankAccount("국민 46130204112708 홍채윤 입니다"); eq(r.holder, "홍채윤", "홍채윤(입니다 뒤섞임)"); }
+{ const r = parseBankAccount("농협 302-1234-5678-91 김영희님이요"); eq(r.holder, "김영희", "김영희(님이요 제거)"); }
+{ const r = parseBankAccount("카뱅 3333012345678로 보내주세요"); eq(r.holder, "", "보내주세요→빈칸"); }
+{ const r = parseBankAccount("국민 12345678901 이에요"); eq(r.holder, "", "이에요→빈칸"); }
+{ const r = parseBankAccount("신한 110123456789 예금주 박서준"); eq(r.holder, "박서준", "예금주 단어 제거 후 이름"); }
+{ const r = parseBankAccount("우리 1002123456789 본인 명의 이순자"); eq(r.holder, "이순자", "본인·명의 제거"); }
+{ const r = parseBankAccount("국민 12345678901 김하나 감사합니다"); eq(r.holder, "김하나", "감사합니다 제거"); }
+// isExcludedHolder
+ok(isExcludedHolder("입니다"), "isExcluded 입니다"); ok(isExcludedHolder("보내주세요"), "isExcluded 보내주세요");
+ok(!isExcludedHolder("홍채윤"), "isExcluded 홍채윤 false"); ok(!isExcludedHolder(""), "isExcluded 빈칸 false"); ok(!isExcludedHolder(null), "isExcluded null false");
+
+// ── [4차 item 2] 은행 전체 이름 표시(모든 별칭 + 모르는 값 원문) ──
+eq(bankDisplayName("국민"), "국민은행", "국민→국민은행");
+eq(bankDisplayName("신한"), "신한은행", "신한→신한은행");
+eq(bankDisplayName("우리"), "우리은행", "우리→우리은행");
+eq(bankDisplayName("하나"), "하나은행", "하나→하나은행");
+eq(bankDisplayName("농협"), "NH농협은행", "농협→NH농협은행");
+eq(bankDisplayName("기업"), "IBK기업은행", "기업→IBK기업은행");
+eq(bankDisplayName("SC제일"), "SC제일은행", "SC제일→SC제일은행");
+eq(bankDisplayName("카카오뱅크"), "카카오뱅크", "카카오뱅크 그대로");
+eq(bankDisplayName("토스뱅크"), "토스뱅크", "토스뱅크 그대로");
+eq(bankDisplayName("케이뱅크"), "케이뱅크", "케이뱅크 그대로");
+eq(bankDisplayName("새마을"), "새마을금고", "새마을→새마을금고");
+eq(bankDisplayName("우체국"), "우체국", "우체국");
+eq(bankDisplayName("신협"), "신협", "신협");
+eq(bankDisplayName("대구"), "iM뱅크(대구)", "대구→iM뱅크(대구)");
+eq(bankDisplayName("부산"), "부산은행", "부산→부산은행");
+eq(bankDisplayName("경남"), "경남은행", "경남→경남은행");
+eq(bankDisplayName("광주"), "광주은행", "광주→광주은행");
+eq(bankDisplayName("전북"), "전북은행", "전북→전북은행");
+eq(bankDisplayName("수협"), "수협은행", "수협→수협은행");
+eq(bankDisplayName("듣도못한은행"), "듣도못한은행", "모르는 값 원문 그대로");
+eq(bankDisplayName(""), "", "빈 값 빈칸");
 
 console.log(`✅ parse-bank-account ${pass}건 통과`);

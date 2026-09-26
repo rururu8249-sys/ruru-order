@@ -45,17 +45,34 @@ function findAccount(text: string): string {
   return valid.sort((a, b) => b.length - a.length)[0]; // 가장 긴 것
 }
 
-function findHolder(text: string, bankMatched: string, account: string): string {
+// [2026-09-26] 예금주 후보에서 뺄 말(어미·조사·잡단어). 긴 것 먼저 제거.
+const HOLDER_EXCLUDE_MULTI = [
+  "보내주세요", "부탁드려요", "감사합니다", "계좌번호", "예금주", "입금자", "송금인", "드려요", "주세요",
+  "입니다", "이에요", "이구요", "으로", "예요", "이요", "이고", "본인", "명의", "고객", "환불", "입금", "송금",
+  "부탁", "계좌", "번호", "은행", "뱅크",
+];
+// 완성형(그 자체가 이름이 아님) — 저장된 예금주 검증에도 쓴다.
+const HOLDER_EXCLUDE_WORDS = new Set([...HOLDER_EXCLUDE_MULTI, "님", "씨", "요", "로", "에"]);
+
+/** 저장된 예금주가 «제외 단어»(입니다 등)면 true — 처리창 열 때 확인 안내용. */
+export function isExcludedHolder(name: unknown): boolean {
+  const n = String(name ?? "").trim();
+  if (!n) return false;
+  return HOLDER_EXCLUDE_WORDS.has(n);
+}
+
+function findHolder(text: string, bankMatched: string): string {
   let t = text;
   if (bankMatched) t = t.split(bankMatched).join(" ");
   // 계좌번호가 들어간 숫자 덩어리 통째 제거
   t = t.replace(/[0-9][0-9\s-]{6,}[0-9]/g, " ");
-  t = t.replace(/은행|예금주|계좌|님/g, " ");
-  // 남은 한글 2~5자
-  const m = t.match(/[가-힣]{2,5}/g);
-  if (!m) return "";
-  // 계좌 숫자와 겹치지 않는 첫 한글 이름
-  return m[0];
+  // 다글자 제외 단어(입니다·보내주세요 등) 통째 제거
+  for (const w of HOLDER_EXCLUDE_MULTI) t = t.split(w).join(" ");
+  // 남은 한글 토큰에서 끝의 조사(님·씨·요·로·에) 제거 후 2~5자 이름만
+  const toks = (t.match(/[가-힣]{2,6}/g) || [])
+    .map((x) => x.replace(/(님|씨|요|로|에)+$/g, ""))
+    .filter((x) => x.length >= 2 && x.length <= 5 && !HOLDER_EXCLUDE_WORDS.has(x));
+  return toks[0] || "";
 }
 
 export function parseBankAccount(raw: unknown): ParsedBankAccount {
@@ -63,12 +80,27 @@ export function parseBankAccount(raw: unknown): ParsedBankAccount {
   if (!text) return { bank: "", account: "", holder: "", ok: false, missing: ["bank", "account", "holder"] };
   const { bank, matched } = findBank(text);
   const account = findAccount(text);
-  const holder = findHolder(text, matched, account);
+  const holder = findHolder(text, matched);
   const missing: string[] = [];
   if (!bank) missing.push("bank");
   if (!account) missing.push("account");
   if (!holder) missing.push("holder");
   return { bank, account, holder, ok: missing.length === 0, missing };
+}
+
+// [2026-09-26] 은행 저장값 → 전체 표시 이름(표시 전용, 저장값 불변). 모르는 값은 원문 그대로.
+const BANK_DISPLAY: Record<string, string> = {
+  국민: "국민은행", 신한: "신한은행", 우리: "우리은행", 하나: "하나은행",
+  농협: "NH농협은행", 기업: "IBK기업은행", SC제일: "SC제일은행",
+  카카오뱅크: "카카오뱅크", 토스뱅크: "토스뱅크", 케이뱅크: "케이뱅크",
+  새마을: "새마을금고", 우체국: "우체국", 신협: "신협",
+  대구: "iM뱅크(대구)", 부산: "부산은행", 경남: "경남은행", 광주: "광주은행",
+  전북: "전북은행", 수협: "수협은행",
+};
+export function bankDisplayName(value: unknown): string {
+  const k = String(value ?? "").trim();
+  if (!k) return "";
+  return BANK_DISPLAY[k] || k;
 }
 
 // 계좌번호 마스킹(요약 표시용) — 앞 6자리 + 가운데 마스킹 + 뒤 표기 제거. 뒷자리는 노출 최소화.
