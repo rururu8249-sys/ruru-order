@@ -746,6 +746,11 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
             {snapshotUnmatched ? (
               <div className="mt-2 rounded-lg border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">저장된 상품을 주문에서 못 찾았어요. 상품을 다시 선택해 주세요.</div>
             ) : null}
+            {!isExchange && linesLoaded && !linesError ? (
+              <div className="mt-1 text-[12px] text-ink-mute">
+                복원 근거: 기록 {item.id ? "있음" : "없음"} · 대표 {clean(item.admin_task_id).slice(0, 8) || "-"} · 저장 {(Array.isArray(item.product_snapshot) ? item.product_snapshot.length : 0)}개 · 매칭 {lines.filter((l) => (sel[l.id] || 0) > 0).length}개 · 방식 {(Array.isArray(item.product_snapshot) && item.product_snapshot.some((s) => clean((s as { productId?: unknown }).productId))) ? "id" : "이름"}
+              </div>
+            ) : null}
             {!isExchange && pointUsed > 0 ? (
               <div className="mt-2 rounded-lg border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">
                 이 주문은 포인트 {formatComma(pointUsed)}원 사용 — 환불액 확인 필요 (자동 차감하지 않아요)

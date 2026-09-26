@@ -53,15 +53,19 @@ export function ledgerHasPayoutInfo(r: Record<string, unknown> | null | undefine
 export function pickPrimaryLedger<T extends Record<string, unknown>>(rows: T[] | null | undefined): T | null {
   const list = Array.isArray(rows) ? rows.filter(Boolean) : [];
   if (list.length === 0) return null;
-  const ts = (r: Record<string, unknown>) => {
-    const t = Date.parse(String(r.updated_at ?? r.created_at ?? ""));
+  // [2026-09-27] 결정적 정렬 — ①계좌/카드 정보 있는 것 ②«생성»이 최근인 것(created_at, 저장해도 안 바뀜)
+  //   ③완전 동률이면 id 문자열 비교. updated_at 은 저장할 때마다 바뀌어 대표가 뒤바뀌던 원인이라 정렬키에서 뺀다.
+  const created = (r: Record<string, unknown>) => {
+    const t = Date.parse(String(r.created_at ?? ""));
     return Number.isNaN(t) ? 0 : t;
   };
   return [...list].sort((a, b) => {
     const aa = ledgerHasPayoutInfo(a) ? 1 : 0;
     const bb = ledgerHasPayoutInfo(b) ? 1 : 0;
-    if (aa !== bb) return bb - aa; // 계좌/카드 정보 있는 것 우선
-    return ts(b) - ts(a); // 그다음 최근 updated_at
+    if (aa !== bb) return bb - aa;
+    const ca = created(a), cb = created(b);
+    if (ca !== cb) return cb - ca; // 최근 생성 우선(생성 시각은 저장으로 안 변함 → 대표 고정)
+    return String(a.id ?? "").localeCompare(String(b.id ?? "")); // 완전 결정적
   })[0];
 }
 

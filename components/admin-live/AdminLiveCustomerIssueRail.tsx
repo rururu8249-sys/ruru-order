@@ -908,10 +908,12 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       if (lines.length === 0) continue;
       const primary = code ? primaryByOrder[code] : null;
       let matched: Array<Record<string, unknown>>;
+      let fromLedger = false;
       if (primary && Array.isArray(primary.product_snapshot) && primary.product_snapshot.length > 0) {
         const lite = lines.map((l) => ({ id: clean(l.id), product_id: clean(l.product_id), product_name: clean(l.product_name), color: clean(l.color), size: clean(l.size), qty: Number(l.qty) || 1 }));
         const restored = restoreSelectionFromSnapshot(lite, primary.product_snapshot);
         matched = lines.filter((l) => (restored[clean(l.id)] || 0) > 0);
+        fromLedger = true;
       } else {
         const rawItems = (t.raw_payload && typeof t.raw_payload === "object" ? (t.raw_payload as { items?: unknown }).items : null);
         const targetIds = Array.isArray(rawItems)
@@ -923,7 +925,8 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       }
       if (matched.length === 0) continue;
       const sum = matched.reduce((s, m) => s + (Number(m.lineTotal) || 0), 0);
-      map[clean(t.id)] = `${sum.toLocaleString("ko-KR")}원`;
+      const tag = fromLedger ? ` (기록 ${matched.length}개 합)` : " (대상상품 합)";
+      map[clean(t.id)] = `${sum.toLocaleString("ko-KR")}원${tag}`;
     }
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps

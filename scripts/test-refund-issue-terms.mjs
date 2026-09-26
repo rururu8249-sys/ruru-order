@@ -130,14 +130,20 @@ ok2(pickPrimaryLedger(null) === null, "null → null");
 { const a = { id: "A", account_number: "12345678", updated_at: "2026-09-19T07:03:00", amount_final: 69000 };
   const b = { id: "B", account_number: "", account_last4: "", updated_at: "2026-09-23T07:50:00", amount_final: 73000 };
   eq(pickPrimaryLedger([b, a]).id, "A", "계좌 있는 쪽(9/19) 우선"); }
-// 둘 다 계좌 있으면 최근 updated_at
-{ const a = { id: "A", account_number: "111", updated_at: "2026-09-19T00:00:00" };
-  const b = { id: "B", account_number: "222", updated_at: "2026-09-23T00:00:00" };
-  eq(pickPrimaryLedger([a, b]).id, "B", "둘 다 계좌 → 최근 updated_at"); }
-// 둘 다 계좌 없으면 최근
-{ const a = { id: "A", account_number: "", updated_at: "2026-09-19T00:00:00" };
-  const b = { id: "B", account_number: "", updated_at: "2026-09-23T00:00:00" };
-  eq(pickPrimaryLedger([a, b]).id, "B", "둘 다 무계좌 → 최근"); }
+// 둘 다 계좌 있으면 최근 «생성»(created_at) — updated_at 은 정렬에 안 씀(저장해도 대표 안 바뀜)
+{ const a = { id: "A", account_number: "111", created_at: "2026-09-19T00:00:00", updated_at: "2026-09-30T00:00:00" };
+  const b = { id: "B", account_number: "222", created_at: "2026-09-23T00:00:00", updated_at: "2026-09-20T00:00:00" };
+  eq(pickPrimaryLedger([a, b]).id, "B", "둘 다 계좌 → 최근 created_at(B, updated_at 무관)"); }
+// updated_at 이 바뀌어도 대표 고정(레이스 원인 제거) — created_at 고정이므로 결과 동일
+{ const a = { id: "A", account_number: "111", created_at: "2026-09-19T00:00:00", updated_at: "2026-09-19T00:00:00" };
+  const b = { id: "B", account_number: "222", created_at: "2026-09-23T00:00:00", updated_at: "2026-09-19T00:00:00" };
+  const first = pickPrimaryLedger([a, b]).id;
+  const afterSaveA = pickPrimaryLedger([{ ...a, updated_at: "2026-10-01T00:00:00" }, b]).id; // A 저장으로 updated_at 최신
+  eq(first, afterSaveA, "A 를 저장(updated_at 갱신)해도 대표 안 바뀜"); eq(first, "B", "대표는 계속 B"); }
+// created_at 동률이면 id 문자열로 결정(완전 결정적)
+{ const a = { id: "zzz", account_number: "1", created_at: "2026-09-19T00:00:00" };
+  const b = { id: "aaa", account_number: "2", created_at: "2026-09-19T00:00:00" };
+  eq(pickPrimaryLedger([a, b]).id, "aaa", "created_at 동률 → id 오름차순"); }
 // 카드취소는 계좌 없어도 payout 정보 있음으로 우선
 { const a = { id: "A", method: "카드취소", account_number: "", updated_at: "2026-09-19T00:00:00" };
   const b = { id: "B", method: "계좌이체", account_number: "", updated_at: "2026-09-23T00:00:00" };
