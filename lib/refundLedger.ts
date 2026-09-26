@@ -43,37 +43,12 @@ export function isCombinedShipmentPeer(mine: CombinePeerSelf, other: CombinePeer
   return Boolean((mine.broadcast && String(other.broadcast ?? "") === mine.broadcast) || (mine.day && String(other.day ?? "") === mine.day));
 }
 
-// [2026-09-26 정정] 배송비 = max(칼럼값, 총액 − 상품줄합계 − 카드추가금). shipping_fee 칼럼이 0이어도
-//   total_price 안에 배송비가 들어있는 주문(주문상세와 동일 규칙)의 배송비를 뽑아낸다.
-export function derivedShippingFee(o: {
-  orderBaseSum: unknown; productLineSum: unknown; cardExtra: unknown; shippingFeeColumn: unknown;
-}): number {
-  const total = Math.round(Number(o.orderBaseSum)) || 0;
-  const product = Math.round(Number(o.productLineSum)) || 0;
-  const cardExtra = Math.round(Number(o.cardExtra)) || 0;
-  const col = Math.max(0, Math.round(Number(o.shippingFeeColumn)) || 0);
-  return Math.max(col, Math.max(0, total - product - cardExtra));
-}
-
 // [2026-09-26 카드 단순화] 카드 「다시 받을 돈」 = 차감 + 남기는 상품값(부분반품). 전체반품이면 남기는 상품=0 → 차감 그대로.
 //   ⚠️ «총액 − amount_final» 역산이 아니다(옛 저장 base 값에 오염되던 버그 방지).
 export function cardRefundBackAmount(deductTotal: unknown, keptProductTotal: unknown): number {
   const d = Math.max(0, Math.round(Number(deductTotal)) || 0);
   const k = Math.max(0, Math.round(Number(keptProductTotal)) || 0);
   return d + k;
-}
-
-// [2026-09-26 복구후속] 저장 상품금액≠주문금액 경고를 띄울지 — 로딩 완료+성공+상품 있음+주문금액>0일 때만.
-//   로딩 중/실패/주문금액0 이면 false(0원으로 덮어쓰는 사고 방지).
-export function shouldWarnBaseMismatch(o: {
-  linesLoaded: boolean; linesError: boolean; lineCount: number; autoBase: number; savedBase: number | null; matchAccepted: boolean;
-}): boolean {
-  if (!o.linesLoaded || o.linesError) return false;
-  if ((Math.round(Number(o.lineCount)) || 0) <= 0) return false;
-  if ((Math.round(Number(o.autoBase)) || 0) <= 0) return false;
-  if (o.savedBase === null || o.savedBase === undefined) return false;
-  if (o.matchAccepted) return false;
-  return (Math.round(Number(o.savedBase)) || 0) !== (Math.round(Number(o.autoBase)) || 0);
 }
 
 // [2026-09-26 7차] 전체 반품 판정 — 모든 줄이 «전체 수량»으로 선택됐는가(배송비·카드추가금 자동 체크 기준).
@@ -110,7 +85,7 @@ function doneShortKo(v: unknown): string {
 export type LedgerSummaryInput = {
   kind?: unknown; method?: unknown; amount_final?: unknown; stage?: unknown;
   done_at?: unknown; bank?: unknown; account_holder?: unknown; exchange_option?: unknown;
-  account_number?: unknown; account_last4?: unknown; card_total?: unknown;
+  account_number?: unknown; account_last4?: unknown; card_total?: unknown; adjustments?: unknown;
 };
 // [2026-09-26 6차] 💳 요약 문구 — 사람말. 값 없으면 "".
 //   bankName = 은행 전체이름(호출부에서 bankDisplayName 적용).
@@ -125,9 +100,14 @@ export function ledgerSummaryLine(li: LedgerSummaryInput | null | undefined, ban
   const isExchange = s(li.kind) === "교환" || s(li.kind) === "재발송";
   const method = s(li.method);
   const bn = s(bankName);
-  // 카드 총결제액(없으면 amount_final 로 대체) + 다시 받을 돈(= 카드총액 − 실제 환불액, 0 이하 숨김)
+  // 카드 총결제액(없으면 amount_final 로 대체).
   const cardTotal = Math.max(0, Math.round(Number(li.card_total)) || 0) || amt;
-  const refundBack = Math.max(0, cardTotal - amt);
+  // [정정] 다시 받을 돈 = 저장된 «차감»(adjustments 음수 합의 절댓값). 총액−amount_final 역산 금지(옛 base 오염 방지).
+  const deductTotal = (Array.isArray(li.adjustments) ? li.adjustments : []).reduce((sc, a) => {
+    const amount = Math.round(Number((a as { amount?: unknown })?.amount)) || 0;
+    return amount < 0 ? sc - amount : sc;
+  }, 0);
+  const refundBack = cardRefundBackAmount(deductTotal, 0);
   if (completed) {
     const dd = doneShortKo(li.done_at);
     if (isExchange) return `재발송함${dd ? ` · ${dd}` : ""}`;

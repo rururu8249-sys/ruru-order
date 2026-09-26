@@ -18,7 +18,7 @@ const KNOWN_ORDERS_COLUMNS = new Set([
   "kakao_id", "address", "broadcast_id", "adjusted_total_price", "combine_shipping_memo", "final_amount",
   // 기존 order-lines 원본 쿼리(정상 동작)로 검증된 기본 컬럼
   "id", "order_lookup_code", "product_id", "product_name", "color", "size", "qty",
-  "product_price", "adjusted_product_price", "point_used_amount", "is_deleted",
+  "product_price", "adjusted_product_price", "point_used_amount", "is_deleted", "adjusted_shipping_fee",
   // submit priorShippingQuery(정상 동작)로 검증
   "detail_address", "zipcode", "order_manage_status",
 ]);

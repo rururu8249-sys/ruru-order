@@ -7,7 +7,7 @@
 //   카드추가금은 vat_amount 로만 읽는다(card_extra_amount 는 orders 에 없음 — 주문상세도 계산·vat_amount 사용).
 export const ORDER_LINES_SELECT_COLUMNS = [
   "id", "order_lookup_code", "product_id", "product_name", "color", "size", "qty",
-  "product_price", "adjusted_product_price", "shipping_fee", "point_used_amount", "created_at",
+  "product_price", "adjusted_product_price", "shipping_fee", "adjusted_shipping_fee", "point_used_amount", "created_at",
   "payment_method", "vat_amount", "adjusted_total_price", "total_price", "final_amount",
   "combine_shipping_memo", "address", "detail_address", "kakao_id", "customer_phone", "broadcast_id",
   "is_deleted",

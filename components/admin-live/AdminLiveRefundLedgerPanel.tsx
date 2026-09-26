@@ -15,7 +15,6 @@ import {
   REASON_CHIPS,
   optionLabelNoNone,
   isFullReturnSel,
-  shouldWarnBaseMismatch,
   cardRefundBackAmount,
   computeAmountFinal,
   computeRefundBase,
@@ -414,6 +413,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
   const [orderDate, setOrderDate] = useState("");
   const [orderPaymentMethod, setOrderPaymentMethod] = useState("");
   const [cardTotal, setCardTotal] = useState(0);
+  const [cardExtra, setCardExtra] = useState(0);
   const [combinedShipping, setCombinedShipping] = useState(false);
   const [combinedWith, setCombinedWith] = useState("");
   const [combinedShipFee, setCombinedShipFee] = useState(0);
@@ -423,7 +423,6 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
   const [shipFee, setShipFee] = useState(0); // 편집 가능한 배송비 금액
   const [shipFeeTouched, setShipFeeTouched] = useState(false);
   const [manualBase, setManualBase] = useState(Math.round(Number(item.amount_base)) || 0);
-  const [matchAccepted, setMatchAccepted] = useState(false);
 
   const [dupWarn, setDupWarn] = useState<Array<{ amount_final: number; stage: string; created_at: string }>>([]);
 
@@ -446,6 +445,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
         setOrderDate(clean(entry?.orderDate));
         setOrderPaymentMethod(clean(entry?.paymentMethod));
         setCardTotal(Math.max(0, Math.round(Number(entry?.cardTotal)) || 0));
+        setCardExtra(Math.max(0, Math.round(Number(entry?.cardExtra)) || 0));
         setCombinedShipping(Boolean(entry?.combined));
         setCombinedWith(clean(entry?.combinedWith));
         setCombinedShipFee(Math.max(0, Math.round(Number(entry?.combinedShipFee)) || 0));
@@ -513,18 +513,17 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
   }, [isFullReturn, effectiveShippingFee, combinedShipping, shippingTouched]);
   const selList: RefundLineSel[] = lines.map((l) => ({ lineTotal: l.lineTotal, qty: l.qty, unit: l.unit, selectedQty: sel[l.id] || 0 }));
   const autoBase = computeRefundBase(selList, includeShipping, shipFee);
-  const savedBase = item.id ? (Math.round(Number(item.amount_base)) || 0) : null;
 
   // [카드 단순화] 카드는 «무조건 전체 취소». amount_base = 카드 총결제액, 차감만 손님에게 따로 받는다.
   //   다시 받을 돈 = 남기는 상품값(부분반품) + 차감(역산 아님). 전체반품이면 남기는 상품=0 → 차감 그대로.
   const keptProductTotal = lines.reduce((s, l) => s + Math.max(0, l.qty - (sel[l.id] || 0)) * l.unit, 0);
   const cardTotalDisplay = cardTotal > 0 ? cardTotal : autoBase;
 
-  // [복구후속1] 카드 모드가 아닐 때만 저장금액≠주문금액 경고(카드는 base=카드총액이라 경고 무의미).
-  const baseMismatch = !isCardCancel && shouldWarnBaseMismatch({ linesLoaded, linesError, lineCount: lines.length, autoBase, savedBase, matchAccepted });
+  // [마무리3] 저장금액≠주문금액 경고 폐지 — 창을 열면 항상 «현재 체크된 상품 + 배송비» 기준으로 즉시 계산.
+  //   (무통장은 저장값이 곧 기록. DB 는 저장 버튼 누를 때만 바뀐다.)
   const amountBase = isCardCancel
-    ? cardTotalDisplay // 카드 = 전체 취소 → 총결제액 기준(옛 저장 base 무시)
-    : matchFailed ? manualBase : (baseMismatch ? (savedBase as number) : autoBase);
+    ? cardTotalDisplay // 카드 = 전체 취소 → 총결제액 기준
+    : matchFailed ? manualBase : autoBase;
 
   const deductFinalLabel = reasonVal ? `${reasonVal} 차감` : "차감"; // [6차] 현재 사유를 따라감(옛 라벨 유지 안 함)
   const finalAdj: RefundAdjustment[] = [...keptAdj, ...(deductAmount > 0 ? [{ label: deductFinalLabel, amount: -deductAmount }] : [])];
@@ -731,12 +730,6 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
                 ) : null}
               </div>
             )}
-            {baseMismatch ? (
-              <div className="mt-2 rounded-lg border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">
-                저장된 상품 금액 {formatComma(savedBase)}원이 주문 금액 {formatComma(autoBase)}원과 달라요.
-                <button type="button" onClick={() => setMatchAccepted(true)} className="ml-1 rounded border border-warn-tx/50 px-2 py-0.5 text-[13px] font-black text-warn-tx hover:bg-warn-bg">주문 금액으로 맞추기</button>
-              </div>
-            ) : null}
             {!isExchange && pointUsed > 0 ? (
               <div className="mt-2 rounded-lg border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">
                 이 주문은 포인트 {formatComma(pointUsed)}원 사용 — 환불액 확인 필요 (자동 차감하지 않아요)
@@ -795,8 +788,11 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
               {/* 5·6. 방법·계좌 */}
               <div className="mb-3">
                 {method === "카드취소" ? (
-                  /* [카드 단순화] 전체 취소 + 다시 받을 돈(=차감, 부분반품은 남기는 상품값+차감) 2줄만 */
+                  /* [카드 단순화] 부가세 안내 + 전체 취소 + 다시 받을 돈(=차감, 부분반품은 남기는 상품값+차감) */
                   <div className="rounded-xl border border-line p-3">
+                    {cardExtra > 0 && cardTotalDisplay > 0 ? (
+                      <div className="mb-2 text-[13px] text-ink-mute">상품 {formatComma(Math.max(0, cardTotalDisplay - cardExtra))}원 + 부가세({Math.round((cardExtra / Math.max(1, cardTotalDisplay - cardExtra)) * 100)}%) {formatComma(cardExtra)}원 = 카드 결제 {formatComma(cardTotalDisplay)}원</div>
+                    ) : null}
                     <div className="flex items-center justify-between">
                       <span className="text-[14px] font-black text-ink">카드 전체 취소</span>
                       <span className="text-[16px] font-black text-ink">{won(cardTotalDisplay)}</span>

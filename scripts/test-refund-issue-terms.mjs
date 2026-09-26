@@ -1,5 +1,5 @@
 // [2026-09-26 5·6차] 고객이슈 환불/교환 용어·💳 요약 문구 테스트
-import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, shouldWarnBaseMismatch, cardRefundBackAmount, derivedShippingFee } from "../lib/refundLedger.ts";
+import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, cardRefundBackAmount } from "../lib/refundLedger.ts";
 import { bankDisplayName } from "../lib/parseBankAccount.ts";
 
 let pass = 0;
@@ -49,19 +49,19 @@ const bn = (li) => bankDisplayName(String(li.bank ?? ""));
 { const li = { kind: "반품", method: "계좌이체", amount_final: 69000, stage: "완료", account_last4: "2708" };
   eq(ledgerSummaryLine(li, "국민은행"), "69,000원 보냄 · 국민은행 ****2708", "완료(stage=완료·날짜없음)"); }
 
-// ── [7차보완] 카드취소 💳 요약 — 전체 취소 + 다시 받을 돈 ──
-{ const li = { kind: "반품", method: "카드취소", amount_final: 252850, card_total: 272850 };
+// ── [마무리1] 카드취소 💳 요약 — 다시 받을 돈 = adjustments 음수 합(역산 아님) ──
+{ const li = { kind: "반품", method: "카드취소", amount_final: 252850, card_total: 272850, adjustments: [{ label: "차감", amount: -20000 }] };
   eq(ledgerSummaryLine(li, ""), "카드 전체 취소 272,850원 · 다시 받을 돈 20,000원", "미완료 카드취소(차감 20,000)"); }
-{ const li = { kind: "반품", method: "카드취소", amount_final: 272850, card_total: 272850 };
-  eq(ledgerSummaryLine(li, ""), "카드 전체 취소 272,850원", "미완료 카드취소(다시 받을 돈 0→생략)"); }
-{ const li = { kind: "반품", method: "카드취소", amount_final: 252850, card_total: 272850, done_at: "2026-09-26T10:00:00" };
+{ const li = { kind: "반품", method: "카드취소", amount_final: 272850, card_total: 272850, adjustments: [] };
+  eq(ledgerSummaryLine(li, ""), "카드 전체 취소 272,850원", "미완료 카드취소(차감 없음→생략)"); }
+{ const li = { kind: "반품", method: "카드취소", amount_final: 252850, card_total: 272850, adjustments: [{ label: "차감", amount: -20000 }], done_at: "2026-09-26T10:00:00" };
   eq(ledgerSummaryLine(li, ""), "카드 전체 취소함 · 20,000원 받음 · 09.26(토)", "완료 카드취소(20,000 받음)"); }
-{ const li = { kind: "반품", method: "카드취소", amount_final: 272850, card_total: 272850, done_at: "2026-09-26T10:00:00" };
+{ const li = { kind: "반품", method: "카드취소", amount_final: 272850, card_total: 272850, adjustments: [], done_at: "2026-09-26T10:00:00" };
   eq(ledgerSummaryLine(li, ""), "카드 전체 취소함 · 09.26(토)", "완료 카드취소(받을 돈 0)"); }
-{ const li = { kind: "반품", method: "카드취소", amount_final: 0, card_total: 0 };
+{ const li = { kind: "반품", method: "카드취소", amount_final: 0, card_total: 0, adjustments: [] };
   eq(ledgerSummaryLine(li, ""), "", "카드취소 금액0·총액0 미완료→빈칸"); }
-{ const li = { kind: "반품", method: "카드취소", amount_final: 252850 }; // card_total 없는 옛 기록 → amount_final 로 대체
-  eq(ledgerSummaryLine(li, ""), "카드 전체 취소 252,850원", "card_total 없으면 amount_final 로 대체"); }
+{ const li = { kind: "반품", method: "카드취소", amount_final: 252850, adjustments: [{ label: "차감", amount: -20000 }] }; // card_total 없는 옛 기록 → amount_final 로 대체
+  eq(ledgerSummaryLine(li, ""), "카드 전체 취소 252,850원 · 다시 받을 돈 20,000원", "card_total 없으면 amount_final 로 대체"); }
 
 // ── [6차] 옵션 「없음」 제거 ──
 eq(optionLabelNoNone("없음", "12"), "12", "없음/12→12");
@@ -105,33 +105,21 @@ eq(isCombinedShipmentPeer(me, P({ code: "", addr: "서울시강남구|101", kaka
 // [정정] 결제방법 다르면 합배송 아님 — MU464IS3(무통장) vs 같은 날 카드결제 주문
 eq(isCombinedShipmentPeer(me, { code: "B", addr: "서울시강남구|101", kakao: "KAK1", phone: "", broadcast: "BC1", day: "2026-09-16", paymentMethod: "카드결제" }), false, "결제방법 다르면 합배송 아님");
 
-// ── [복구후속1] 저장금액≠주문금액 경고 표시 판정 ──
-const base = { linesLoaded: true, linesError: false, lineCount: 1, autoBase: 83000, savedBase: 79000, matchAccepted: false };
-eq(shouldWarnBaseMismatch(base), true, "로딩완료+다름→경고");
-eq(shouldWarnBaseMismatch({ ...base, linesLoaded: false }), false, "로딩 중→경고 없음");
-eq(shouldWarnBaseMismatch({ ...base, linesError: true }), false, "조회 실패→경고 없음");
-eq(shouldWarnBaseMismatch({ ...base, autoBase: 0 }), false, "주문금액 0→경고 없음(덮어쓰기 방지)");
-eq(shouldWarnBaseMismatch({ ...base, lineCount: 0 }), false, "상품 줄 없음→경고 없음");
-eq(shouldWarnBaseMismatch({ ...base, savedBase: null }), false, "저장금액 없음(신규)→경고 없음");
-eq(shouldWarnBaseMismatch({ ...base, matchAccepted: true }), false, "이미 맞춤→경고 없음");
-eq(shouldWarnBaseMismatch({ ...base, autoBase: 79000 }), false, "금액 같음→경고 없음");
-
 // ── [카드 단순화] 다시 받을 돈 = 차감 + 남기는 상품(역산 아님) ──
 eq(cardRefundBackAmount(20000, 0), 20000, "전체반품 차감 20,000 → 다시 받을 돈 20,000");
 eq(cardRefundBackAmount(0, 0), 0, "차감 0 → 0(줄 숨김)");
 eq(cardRefundBackAmount(20000, 235000), 255000, "부분반품: 차감+남기는 상품");
 eq(cardRefundBackAmount(0, 100000), 100000, "부분반품 차감0 → 남기는 상품만");
-// 옛 저장 base(255,000) 로 amount_final 이 235,000 이어도 «역산 아님»이라 영향 없음 — 차감만 반영
-{ const deduct = 20000; eq(cardRefundBackAmount(deduct, 0), 20000, "옛 base 무관 — 차감 20,000 그대로"); }
 
-// ── [정정] 배송비 = 총액 − 상품 − 카드추가금 (shipping_fee 칼럼 0이어도) ──
-eq(derivedShippingFee({ orderBaseSum: 83000, productLineSum: 79000, cardExtra: 0, shippingFeeColumn: 0 }), 4000, "빛나리: 83,000−79,000=4,000(칼럼 0)");
-eq(derivedShippingFee({ orderBaseSum: 79000, productLineSum: 79000, cardExtra: 0, shippingFeeColumn: 0 }), 0, "배송비 없음→0");
-eq(derivedShippingFee({ orderBaseSum: 272850, productLineSum: 255000, cardExtra: 17850, shippingFeeColumn: 0 }), 0, "카드(총−상품−카드추가금)=0");
-eq(derivedShippingFee({ orderBaseSum: 87000, productLineSum: 79000, cardExtra: 0, shippingFeeColumn: 4000 }), 8000, "칼럼4000 vs 파생8000 → 큰 값");
-eq(derivedShippingFee({ orderBaseSum: 79000, productLineSum: 79000, cardExtra: 0, shippingFeeColumn: 4000 }), 4000, "칼럼만 4000");
-eq(derivedShippingFee({ orderBaseSum: 70000, productLineSum: 79000, cardExtra: 0, shippingFeeColumn: 0 }), 0, "음수 방지→0");
-// 배송비 포함 시 base: 79,000 + 4,000 = 83,000
+// ── [마무리1] 목록 💳 카드 = adjustments 음수 합 기반(역산 금지). 옛 base 여도 20,000 ──
+{ const li = { kind: "반품", method: "카드취소", amount_final: 235000, card_total: 272850, adjustments: [{ label: "단순변심 차감", amount: -20000 }] };
+  eq(ledgerSummaryLine(li, ""), "카드 전체 취소 272,850원 · 다시 받을 돈 20,000원", "미완료: adjustments 차감 20,000(옛 base·amount_final 무관)"); }
+{ const li = { kind: "반품", method: "카드취소", amount_final: 235000, card_total: 272850, adjustments: [{ label: "차감", amount: -20000 }], done_at: "2026-09-26T10:00:00" };
+  eq(ledgerSummaryLine(li, ""), "카드 전체 취소함 · 20,000원 받음 · 09.26(토)", "완료: 20,000 받음"); }
+{ const li = { kind: "반품", method: "카드취소", amount_final: 272850, card_total: 272850, adjustments: [] };
+  eq(ledgerSummaryLine(li, ""), "카드 전체 취소 272,850원", "차감 없음 → 다시 받을 돈 생략"); }
+
+// 배송비 = adjusted_shipping_fee ?? shipping_fee (주문상세 getGroupShippingFee 규칙). base 포함 확인.
 eq(computeRefundBase([{ lineTotal: 79000, qty: 1, unit: 79000, selectedQty: 1 }], true, 4000), 83000, "상품+배송비=83,000");
 
 console.log(`✅ refund-issue-terms ${pass}건 통과`);
