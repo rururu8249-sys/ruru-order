@@ -133,15 +133,14 @@ export function deriveInitialSelection(opts: {
     const anyChecked = Object.values(sel).some((v) => v > 0);
     return { sel, matchedNone: snap.length > 0 && !anyChecked };
   }
-  // 신규 — raw_payload 대상상품 자동 체크
-  const targetIds = new Set(snap.map((s) => String((s as { productId?: unknown }).productId ?? "").trim()).filter(Boolean));
-  const hasTarget = targetIds.size > 0;
-  const sel: Record<string, number> = {};
-  for (const l of lines) {
-    if (lines.length === 1) sel[String(l.id)] = Math.max(1, Math.round(Number(l.qty)) || 1);
-    else sel[String(l.id)] = hasTarget ? (targetIds.has(String(l.product_id ?? "").trim()) ? Math.max(1, Math.round(Number(l.qty)) || 1) : 0) : Math.max(1, Math.round(Number(l.qty)) || 1);
+  // 신규 — 대상 정보 없으면 전부 체크, 있으면 «엄격 매처»(productId+이름/옵션)로 자동 체크.
+  //   ⚠ products.id 는 브랜드 단위(677=프라다)라 product_id 만으로 자동 체크하면 같은 브랜드 다른 상품까지 켜진다.
+  if (snap.length === 0) {
+    const sel: Record<string, number> = {};
+    for (const l of lines) sel[String(l.id)] = Math.max(1, Math.round(Number(l.qty)) || 1);
+    return { sel, matchedNone: false };
   }
-  return { sel, matchedNone: false };
+  return { sel: restoreSelectionFromSnapshot(lines, snap), matchedNone: false };
 }
 
 // [2026-09-26 7차] 전체 반품 판정 — 모든 줄이 «전체 수량»으로 선택됐는가(배송비·카드추가금 자동 체크 기준).

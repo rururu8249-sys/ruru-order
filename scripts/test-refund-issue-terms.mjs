@@ -246,6 +246,16 @@ const LINES4 = [
 // (b) ledger 없음(신규) → raw_payload 대상(PD-202·206) 자동 체크
 { const r = deriveInitialSelection({ hasLedger: false, snapshot: [{ productId: "676" }, { productId: "677" }], lines: LINES4 });
   eq(r.sel.L202, 1, "(b) 신규 PD-202 자동체크"); eq(r.sel.L206, 1, "(b) 신규 PD-206 자동체크"); eq(r.sel.L3, 0, "(b) 대상 아님"); }
+// (b2) 신규인데 raw 대상이 PD-206 하나, 줄 PD-202·PD-206 이 같은 pid 677 → 이름 맞는 PD-206 만(브랜드 pid 과다 방지)
+{ const linesShare = [
+    { id: "L202", product_id: "677", product_name: "PD(프라다)-202 니트", color: "없음", size: "M", qty: 1 },
+    { id: "L206", product_id: "677", product_name: "PD(프라다)-206 아우터", color: "없음", size: "M", qty: 1 },
+  ];
+  const r = deriveInitialSelection({ hasLedger: false, snapshot: [{ productId: "677", productName: "PD(프라다)-206 아우터", color: "없음", size: "M", qty: 1 }], lines: linesShare });
+  eq(r.sel.L206, 1, "(b2) 신규·브랜드 pid 공유 → 이름 맞는 PD-206 만"); eq(r.sel.L202, 0, "(b2) PD-202 안 켜짐"); }
+// (b3) 신규·대상 정보 없음 → 전부 체크
+{ const r = deriveInitialSelection({ hasLedger: false, snapshot: [], lines: LINES4 });
+  eq(Object.values(r.sel).filter((v) => v > 0).length, 4, "(b3) 대상 없음 → 전부"); }
 // (c) ledger snapshot 이 줄과 불일치 → 0개 + matchedNone(raw 대체 금지)
 { const r = deriveInitialSelection({ hasLedger: true, snapshot: [{ productId: "999", productName: "없는상품" }], lines: LINES4 });
   eq(Object.values(r.sel).filter((v) => v > 0).length, 0, "(c) 하나도 체크 안 됨"); eq(r.matchedNone, true, "(c) matchedNone"); }
