@@ -235,6 +235,10 @@ type BlockedCustomerListItem =
 
 const CUSTOMER_PAGE_SIZE = 20;
 
+// [2026-09-26] 회원 목록 표(PC)의 «단 하나의» grid 템플릿 — 머리글·모든 줄이 이 상수를 그대로 써서 칸이 절대 어긋나지 않는다.
+//   [체크 44 · 사진 44 · 닉네임/이름 1fr · 연락처/로그인 176 · 상태 1.3fr · 누적주문 84 · 누적결제 116 · 마지막주문 136 · 포인트 88 · 처리 132]
+const MEMBER_GRID = "grid-cols-[44px_44px_minmax(150px,1fr)_176px_minmax(160px,1.3fr)_84px_116px_136px_88px_132px]";
+
 // [2026-09-25] 카카오 «실제» 프로필 사진인지 — 기본 프로필(사진 안 올린 사람)은 URL에 default_profile 이 들어간다 → 사진 없음 취급.
 function isRealKakaoPhoto(url: unknown): boolean {
   const u = String(url ?? "").trim();
@@ -1565,13 +1569,21 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
     const openIssues = phoneDigits ? (pageOpenIssues[phoneDigits] || 0) : 0;
     // [버그수정] 최근주문은 «주문이 있을 때만». latestOrderAt 은 0건 회원이면 가입일(created_at)로 폴백돼 있어 그대로 쓰면 안 됨.
     const orderTwo = customer.orderCount > 0 ? dateTwoLine(customer.latestOrderAt) : { line1: "-", line2: "" };
-    const loginTwo = dateTwoLine(customer.lastLoginAt);
+    // 연락처 아래 줄에 붙일 「로그인 MM.DD HH:mm」 (없으면 빈 문자열)
+    const loginShort = (() => {
+      const s = clean(customer.lastLoginAt);
+      if (!s) return "";
+      const dt = new Date(s.includes("T") ? s : s.replace(" ", "T"));
+      if (Number.isNaN(dt.getTime())) return "";
+      const p2 = (n: number) => String(n).padStart(2, "0");
+      return `${p2(dt.getMonth() + 1)}.${p2(dt.getDate())} ${p2(dt.getHours())}:${p2(dt.getMinutes())}`;
+    })();
     const blockedAt = customer.blocked && phoneDigits ? (blockedAtByPhone.get(phoneDigits) || "") : "";
     const blockSummary = customer.blocked ? blockReasonSummary(customer.blockReason) : "";
     const bp = customer.blocked ? parseBlockReason(customer.blockReason) : null;
     const blockFull = bp ? [bp.label, bp.items.join(", "), bp.memo].filter(Boolean).join(" · ") : "";
     const initial = (customer.nickname || customer.name || "?").trim().charAt(0);
-    return { phoneDigits, hasPhoto, pts, openIssues, orderTwo, loginTwo, blockedAt, blockSummary, blockFull, initial };
+    return { phoneDigits, hasPhoto, pts, openIssues, orderTwo, loginShort, blockedAt, blockSummary, blockFull, initial };
   };
   const blockedCustomers = customers.filter((customer) => customer.blocked);
   const customerPhoneKeys = new Set(customers.map((customer) => digitsOnly(customer.phone)).filter(Boolean));
@@ -1823,43 +1835,41 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
               다른 탭(고객이슈·단골·계정잇기)에서는 상관없는 정보라 감춘다. */}
           {custTab === "members" ? (
             <>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-rose-soft/40 px-4 py-2.5 text-[12px] font-black text-ink-soft">
-                <span>전체 <span className="text-ink">{customers.length.toLocaleString("ko-KR")}</span></span>
-                <span className="text-ink-mute">·</span>
-                <span>정상 <span className="text-ok-tx">{normalCustomers.length.toLocaleString("ko-KR")}</span></span>
-                <span className="text-ink-mute">·</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBlockedCustomerKeywordDraft("");
-                    setBlockedCustomerKeyword("");
-                    setBlockedCustomerPage(1);
-                    setShowBlockedCustomers(true);
-                  }}
-                  className="hover:underline"
-                >
-                  차단 <span className="text-danger-tx">{blockedTotalCount.toLocaleString("ko-KR")}</span>
-                </button>
-                <span className="text-ink-mute">·</span>
-                <span>관리필요 <span className="text-warn-tx">{attentionCustomers.length.toLocaleString("ko-KR")}</span></span>
-              </div>
-
-              {/* 접힌 상태가 기본 — 평소엔 한 줄이라 목록을 안 가린다 */}
-              <div className="rounded-xl border border-line bg-surface">
+              {/* [2026-09-26] 요약(전체·정상·차단·관리필요) 한 줄 + 오른쪽 「전화번호 차단」 버튼(접이식 줄 대체) */}
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-xl bg-rose-soft/40 px-4 py-2.5 text-[12px] font-black text-ink-soft">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span>전체 <span className="text-ink">{customers.length.toLocaleString("ko-KR")}</span></span>
+                  <span className="text-ink-mute">·</span>
+                  <span>정상 <span className="text-ok-tx">{normalCustomers.length.toLocaleString("ko-KR")}</span></span>
+                  <span className="text-ink-mute">·</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBlockedCustomerKeywordDraft("");
+                      setBlockedCustomerKeyword("");
+                      setBlockedCustomerPage(1);
+                      setShowBlockedCustomers(true);
+                    }}
+                    className="hover:underline"
+                  >
+                    차단 <span className="text-danger-tx">{blockedTotalCount.toLocaleString("ko-KR")}</span>
+                  </button>
+                  <span className="text-ink-mute">·</span>
+                  <span>관리필요 <span className="text-warn-tx">{attentionCustomers.length.toLocaleString("ko-KR")}</span></span>
+                </div>
                 <button
                   type="button"
                   onClick={() => setPhoneBlockOpen((v) => !v)}
-                  className="flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-[12px] font-black text-ink-soft transition hover:bg-surface-2"
+                  className={`shrink-0 rounded-lg px-3 py-1.5 text-[11px] font-black transition ${phoneBlockOpen ? "bg-rose-deep text-white" : "border border-danger-tx/40 bg-surface text-danger-tx hover:bg-danger-bg"}`}
                 >
-                  <span>⛔ 전화번호 직접 차단</span>
-                  <span className="text-base leading-none">{phoneBlockOpen ? "−" : "+"}</span>
+                  ⛔ 전화번호 차단
                 </button>
-                {phoneBlockOpen ? (
-                  <div className="px-2 pb-2">
-                    <AdminLivePhoneBlockPanel onSaved={applyBlockResult} />
-                  </div>
-                ) : null}
               </div>
+              {phoneBlockOpen ? (
+                <div className="rounded-xl border border-line bg-surface p-2">
+                  <AdminLivePhoneBlockPanel onSaved={applyBlockResult} />
+                </div>
+              ) : null}
             </>
           ) : null}
 
@@ -1931,52 +1941,48 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
             </div>
           </div>
 
-          {/* 선택 / 일괄 포인트지급 바 */}
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-surface-2 px-3 py-2">
-            <label className="flex items-center gap-2 text-[12px] font-black text-ink-soft">
-              <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAllPage} className="h-4 w-4 accent-rose-deep" />
-              이 페이지 전체선택
-            </label>
-            <div className="flex items-center gap-2">
-              {selectedPhones.size > 0 ? (
-                <button type="button" onClick={clearSelection} className="text-[11px] font-black text-ink-mute hover:text-ink">선택해제</button>
-              ) : null}
+          {/* [2026-09-26] 선택했을 때만 뜨는 작업 바(고객이슈 작업 바와 같은 모양). 전체선택은 표 머리글 체크박스로. */}
+          {selectedPhones.size > 0 ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-rose-line bg-rose-soft px-3 py-2">
+              <span className="text-[12px] font-black text-rose-deep">{selectedPhones.size}명 선택</span>
+              <button type="button" onClick={clearSelection} className="h-8 rounded-lg px-2 text-[11px] font-black text-ink-soft hover:bg-surface">선택 해제</button>
               <button
                 type="button"
-                disabled={selectedPhones.size === 0}
                 onClick={openBulk}
-                className="rounded-lg bg-rose-deep px-3 py-1.5 text-[12px] font-black text-white disabled:opacity-40"
+                className="ml-auto h-8 rounded-lg bg-rose-deep px-3 text-[12px] font-black text-white"
               >
-                🪙 선택 {selectedPhones.size}명 일괄 포인트지급
+                🪙 일괄 포인트 지급
               </button>
             </div>
-          </div>
+          ) : null}
 
             {/* [2026-09-25] PC(넓을 때)=고객이슈 탭과 같은 표 · 좁은 화면=카드(지금 모양 유지) */}
             {visibleCustomers.length === 0 ? (
               <div className="mt-3 ru-empty"><div className="ru-empty-title">이 조건에 맞는 고객이 없습니다.</div><div className="ru-empty-hint">검색어를 지우거나 「주문 있는 고객만」 필터를 꺼보세요.</div></div>
             ) : (
               <>
-                {/* ── PC: 표 (xl 이상) — 머리글·줄이 같은 grid 템플릿 · 숫자칸 고정폭 오른쪽정렬 · 차단은 inset 빨간띠(칸폭 영향 없음) ── */}
+                {/* ── PC: 표 (xl 이상) — 머리글·모든 줄이 MEMBER_GRID 하나를 공유(칸 어긋남 0) · 숫자칸 오른쪽정렬 · 차단은 absolute 빨간 막대(칸폭 영향 없음) ── */}
                 <div className="mt-3 hidden overflow-x-auto rounded-xl border border-line xl:block">
-                  <div className="min-w-[1040px]">
-                    <div className="sticky top-0 z-10 grid grid-cols-[36px_44px_minmax(140px,200px)_120px_minmax(150px,1fr)_100px_100px_48px_96px_80px_auto] items-center gap-x-3 border-b border-line bg-surface-2 px-3 py-2 text-[11px] font-black text-ink-mute">
-                      <span />
+                  <div className="min-w-[1180px]">
+                    <div className={`sticky top-0 z-10 grid ${MEMBER_GRID} items-center gap-x-3 border-b border-line bg-surface-2 px-3 py-2 text-[11px] font-black text-ink-mute`}>
+                      <label className="flex items-center justify-center" title={allPageSelected ? "이 페이지 전체 선택 해제" : "이 페이지 전체 선택"}>
+                        <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAllPage} className="h-4 w-4 accent-rose-deep outline-none focus-visible:ring-2 focus-visible:ring-rose-deep" aria-label="이 페이지 전체 선택" />
+                      </label>
                       <span>사진</span>
                       <span>닉네임 / 이름</span>
-                      <span>전화번호</span>
+                      <span>연락처 / 로그인</span>
                       <span>상태</span>
-                      <span>최근 주문</span>
-                      <span>최근 로그인</span>
-                      <span className="text-right">주문</span>
+                      <span className="text-right">누적 주문</span>
                       <span className="text-right">누적 결제</span>
+                      <span>마지막 주문</span>
                       <span className="text-right">포인트</span>
                       <span className="text-right">처리</span>
                     </div>
                     {visibleCustomers.map((customer) => {
                       const d = memberRowInfo(customer);
                       return (
-                        <div key={customer.key} className={`grid grid-cols-[36px_44px_minmax(140px,200px)_120px_minmax(150px,1fr)_100px_100px_48px_96px_80px_auto] items-center gap-x-3 border-b border-line px-3 py-2.5 text-[12px] transition-colors ${customer.blocked ? "bg-danger-bg/40 shadow-[inset_4px_0_0_0_var(--color-danger-tx)]" : "bg-surface hover:bg-rose-soft/30"}`}>
+                        <div key={customer.key} className={`relative grid ${MEMBER_GRID} items-center gap-x-3 border-b border-line px-3 py-2.5 text-[12px] transition-colors ${customer.blocked ? "bg-danger-bg/40" : "bg-surface hover:bg-rose-soft/30"}`}>
+                          {customer.blocked ? <span className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-[var(--color-danger-tx)]" aria-hidden /> : null}
                           {d.phoneDigits ? (
                             <input type="checkbox" checked={selectedPhones.has(d.phoneDigits)} onChange={() => toggleSelectPhone(customer.phone)} className="h-4 w-4 accent-rose-deep" title="일괄지급 선택" />
                           ) : <span />}
@@ -1988,20 +1994,23 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                           ) : (
                             <button type="button" onClick={() => openDetail(customer)} className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-black ${customer.blocked ? "bg-surface-3 text-ink-mute" : "bg-rose-soft text-rose-deep"}`}>{d.initial}</button>
                           )}
-                          {/* 닉네임·이름 (포커스 로즈) */}
+                          {/* 닉네임·이름 (두 줄 · 포커스 로즈) */}
                           <button type="button" onClick={() => openDetail(customer)} className="min-w-0 rounded text-left outline-none focus-visible:ring-2 focus-visible:ring-rose-deep">
                             <div className="flex items-center gap-1.5">
                               <span className="truncate text-[13px] font-black text-ink">{customer.nickname || "—"}</span>
-                              {customer.name ? <span className="shrink-0 text-[11px] text-ink-mute">· {customer.name}</span> : null}
                               {!customer.kakaoId ? <span className="shrink-0 rounded bg-warn-bg px-1 py-0.5 text-[11px] font-black text-warn-tx" title="카카오 로그인 기록이 없는 옛 회원(전화번호만)">미연동</span> : null}
                             </div>
+                            {customer.name ? <div className="truncate text-[11px] text-ink-mute">{customer.name}</div> : null}
                           </button>
-                          {/* 전화번호 */}
-                          <span className="truncate text-[11px] text-ink-soft">{customer.phone ? formatPhone(customer.phone) : "-"}</span>
+                          {/* 연락처 / 로그인 (두 줄) */}
+                          <div className="min-w-0 text-[11px] leading-tight">
+                            <div className="truncate text-ink-soft">{customer.phone ? formatPhone(customer.phone) : "-"}</div>
+                            <div className="truncate text-ink-mute">{d.loginShort ? `로그인 ${d.loginShort}` : "로그인 -"}</div>
+                          </div>
                           {/* 상태 (가장 넓게 · 여러 배지 줄바꿈 허용 · 차단은 사유 요약+hover 전체) */}
                           <div className="flex min-w-0 flex-wrap items-center gap-1">
                             {customer.blocked ? (
-                              <span className="truncate text-[11px] font-bold text-danger-tx" title={d.blockFull || d.blockSummary || "차단됨"}>🚫 {d.blockSummary || "차단됨"}{d.blockedAt ? ` · ${formatOrderDateTime(d.blockedAt)}` : ""}</span>
+                              <span className="truncate text-[11px] font-bold text-danger-tx" title={d.blockFull || d.blockSummary || "차단됨"}>🚫 차단{d.blockSummary ? ` · ${d.blockSummary}` : ""}{d.blockedAt ? ` · ${formatOrderDateTime(d.blockedAt)}` : ""}</span>
                             ) : (customer.unpaidCount > 0 || d.openIssues > 0 || customer.liveAlertOptin === false) ? (
                               <>
                                 {customer.unpaidCount > 0 ? <span className="rounded bg-warn-bg px-1 py-0.5 text-[11px] font-black text-warn-tx" title="상세와 같은 기준 — 아직 입금 전(자동매칭 실패 포함)">미입금 {customer.unpaidCount}건</span> : null}
@@ -2010,23 +2019,18 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                               </>
                             ) : <span className="text-[11px] text-ink-mute">-</span>}
                           </div>
-                          {/* 최근 주문 (두 줄) */}
+                          {/* 누적 주문 (오른쪽) */}
+                          <span className="text-right font-black text-ink">{customer.orderCount}건</span>
+                          {/* 누적 결제(결제완료만, 오른쪽) */}
+                          <span className="text-right font-black text-ink">{money(customer.paidAmount)}</span>
+                          {/* 마지막 주문 (두 줄 · 없으면 -) */}
                           <div className="text-[11px] leading-tight text-ink-soft">
                             <div className="truncate">{d.orderTwo.line1}</div>
                             {d.orderTwo.line2 ? <div className="truncate text-ink-mute">{d.orderTwo.line2}</div> : null}
                           </div>
-                          {/* 최근 로그인 (두 줄) */}
-                          <div className="text-[11px] leading-tight text-ink-soft">
-                            <div className="truncate">{d.loginTwo.line1}</div>
-                            {d.loginTwo.line2 ? <div className="truncate text-ink-mute">{d.loginTwo.line2}</div> : null}
-                          </div>
-                          {/* 주문 */}
-                          <span className="text-right font-black text-ink">{customer.orderCount}</span>
-                          {/* 누적 결제(결제완료만) */}
-                          <span className="text-right font-black text-ink">{money(customer.paidAmount)}</span>
-                          {/* 포인트 */}
+                          {/* 포인트 (오른쪽) */}
                           <span className="text-right font-black text-rose-deep">{d.pts != null ? `${d.pts.toLocaleString("ko-KR")}P` : "-"}</span>
-                          {/* 처리 */}
+                          {/* 처리 (오른쪽) */}
                           <div className="flex items-center justify-end gap-1.5">
                             <button type="button" onClick={() => handleCustomerBlockButton(customer)} className={`shrink-0 rounded-lg px-2 py-1 text-[11px] font-black transition-colors ${customer.blocked ? "border border-line text-ink-soft hover:bg-surface-2" : "text-danger-tx hover:bg-danger-bg"}`}>{customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}</button>
                             <button type="button" onClick={() => openDetail(customer)} className="shrink-0 text-[11px] font-black text-rose-deep">상세 ›</button>

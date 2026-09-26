@@ -59,6 +59,9 @@ type IssueForm = {
   memo: string;
 };
 
+// [2026-09-26] 고객이슈 표의 «단 하나의» grid 템플릿 — 머리글·모든 줄이 이 상수를 그대로 써서 칸이 어긋나지 않는다.
+const ISSUE_GRID = "grid-cols-[36px_76px_120px_88px_124px_112px_1fr_auto]";
+
 const ISSUE_TYPE_OPTIONS: Array<[string, string]> = [
   ["exchange", "교환"],
   ["return", "반품"],
@@ -412,7 +415,7 @@ function IssueCard({
       //   예전: 해결된 줄 전체에 opacity-60 → 글자까지 흐려져 WCAG 대비(4.5:1) 아래로 떨어졌다.
       //   지금: 글자는 그대로 또렷하게. 상태는 «왼쪽 색 띠 + 연한 초록 배경»으로만 가른다.
       //   (물건챙기기의 다 챙긴 카드와 같은 방식 — bg-ok-bg)
-      className={`relative grid grid-cols-[36px_76px_120px_88px_124px_112px_1fr_auto] items-start gap-x-3 gap-y-1 border-b border-line px-3 py-2.5 transition hover:bg-surface-2 ${selected ? "bg-rose-soft/50" : done ? "bg-ok-bg/40" : ""}`}
+      className={`relative grid ${ISSUE_GRID} items-start gap-x-3 gap-y-1 border-b border-line px-3 py-2.5 transition hover:bg-surface-2 ${selected ? "bg-rose-soft/50" : done ? "bg-ok-bg/40" : ""}`}
     >
       <span className={`absolute left-0 top-0 h-full w-1 ${done ? "bg-[var(--color-ok-tx)]" : "bg-[var(--color-danger-tx)]"}`} />
 
@@ -1534,7 +1537,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           </div>
         ) : (
           <div className="min-w-[860px]">
-            <div className="sticky top-0 z-10 grid grid-cols-[36px_76px_120px_88px_124px_112px_1fr_auto] items-center gap-x-3 border-b border-line bg-surface-2 px-3 py-2 text-[11px] font-black text-ink-mute">
+            <div className={`sticky top-0 z-10 grid ${ISSUE_GRID} items-center gap-x-3 border-b border-line bg-surface-2 px-3 py-2 text-[11px] font-black text-ink-mute`}>
               {/* 전체선택 = 이 페이지 전부. 일부만 켜져 있으면 ▪(indeterminate) */}
               <label className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg hover:bg-surface" title={allOnPageSelected ? "이 페이지 전체 선택 해제" : "이 페이지 전체 선택"}>
                 <input
