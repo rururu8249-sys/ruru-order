@@ -381,6 +381,28 @@ export function RefundProcessModal({ item, onClose, onSaved }: { item: LedgerDet
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderCode]);
 
+  // [2026-09-26] 같은 주문번호에 다른 환불 기록이 있으면 경고(저장은 막지 않음). 뒷4자리만·주문번호 1회 조회.
+  const [dupWarn, setDupWarn] = useState<Array<{ amount_final: number; stage: string; created_at: string }>>([]);
+  useEffect(() => {
+    if (!orderCode) { setDupWarn([]); return; }
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin-live/refund-ledger?orderCode=${encodeURIComponent(orderCode)}`, { cache: "no-store" });
+        const p = await res.json().catch(() => null);
+        if (!alive || !p?.ok) return;
+        const others = ((p.items || []) as Array<Record<string, unknown>>).filter((r) => {
+          if (item.id && clean(r.id) === clean(item.id)) return false;
+          if (!item.id && item.admin_task_id && clean(r.admin_task_id) === clean(item.admin_task_id)) return false;
+          return true;
+        });
+        setDupWarn(others.map((r) => ({ amount_final: Number(r.amount_final) || 0, stage: String(r.stage ?? ""), created_at: String(r.created_at ?? "") })));
+      } catch { /* 실패 무시 */ }
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderCode]);
+
   const selList: RefundLineSel[] = lines.map((l) => ({ lineTotal: l.lineTotal, qty: l.qty, unit: l.unit, selectedQty: sel[l.id] || 0 }));
   const autoBase = computeRefundBase(selList, includeShipping, shippingFee);
   const amountBase = manualMode ? manualBase : autoBase;
@@ -465,6 +487,11 @@ export function RefundProcessModal({ item, onClose, onSaved }: { item: LedgerDet
 
         {/* 본문 스크롤 */}
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
+          {dupWarn.length > 0 ? (
+            <div className="mb-3 rounded-lg border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">
+              같은 주문에 다른 환불 기록이 있어요: {dupWarn.map((d) => `${won(d.amount_final)} · ${d.stage}${(() => { const t = new Date(d.created_at); return Number.isNaN(t.getTime()) ? "" : ` (${t.getMonth() + 1}/${t.getDate()} 이슈)`; })()}`).join(", ")}
+            </div>
+          ) : null}
           {!isExchange ? (
             <div className="mb-3">
               <div className="mb-1 flex items-center justify-between">

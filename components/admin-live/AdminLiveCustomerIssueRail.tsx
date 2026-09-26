@@ -15,7 +15,7 @@ import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { pickIssueProductRows } from "@/lib/issueProductLabel";
 import { RefundProcessModal, type LedgerDetail } from "./AdminLiveRefundLedgerPanel";
 import { productSnapshotFromItems } from "@/lib/refundLedger";
-import { ISSUE_FILTER_CHIPS, matchesIssueFilterChip } from "@/lib/issueFilter";
+import { ISSUE_FILTER_CHIPS, matchesIssueFilterChip, issueRawTypes } from "@/lib/issueFilter";
 
 type AdminIssueTask = {
   id?: string | number | null;
@@ -406,6 +406,9 @@ function IssueCard({
   const done = isResolved(task);
   const deleted = clean(task.status).toLowerCase() === "deleted";
   const isRefund = isRefundKindTask(task);
+  // [2026-09-26] 버튼 글자 — 반품/환불이 섞였으면 「환불 처리」, 교환만이면 「교환 처리」
+  const _rawTypes = issueRawTypes(task);
+  const refundBtnLabel = _rawTypes.some((x) => x === "return" || x === "refund") ? "환불 처리" : (_rawTypes.includes("exchange") ? "교환 처리" : "환불 처리");
   // 장부 요약: 값이 있을 때만(행 없거나 초기값이면 표시 안 함)
   const ledgerLine = isRefund && ledgerInfo
     ? [ledgerInfo.stage, (Number(ledgerInfo.amount_final) || 0) > 0 ? `${(Number(ledgerInfo.amount_final) || 0).toLocaleString("ko-KR")}원` : "", ledgerInfo.method && ledgerInfo.method !== "없음" ? ledgerInfo.method : ""].filter(Boolean).join(" · ")
@@ -474,11 +477,7 @@ function IssueCard({
         {priority !== "보통" ? (
           <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[11px] font-black text-ink-soft">{priority}</span>
         ) : null}
-        {/* [2026-09-24] 주문상세 반품/교환에서 «자동으로» 만들어진 건.
-            이 줄의 「지우기」는 회수한 포인트까지 되돌리므로, 손으로 적은 메모와 구분이 돼야 한다. */}
-        {fromReturn ? (
-          <span className="rounded bg-rose-soft px-1.5 py-0.5 text-[11px] font-black text-rose-deep" title="주문상세 반품/교환에서 자동 등록 — 지우면 회수한 포인트도 돌아갑니다">자동</span>
-        ) : null}
+        {/* [2026-09-26] 「자동」 배지는 표시만 제거(source==="order_return_flow"). fromReturn 변수·삭제 포인트반환 로직은 그대로. */}
       </div>
 
       {/* 닉네임 */}
@@ -537,24 +536,29 @@ function IssueCard({
           className="min-w-0 flex-1 text-[12px] leading-5"
           title={[detail, orderNo ? `주문번호 ${orderNo}` : ""].filter(Boolean).join("\n")}
         >
-          {/* 윗줄 — 📦 상품명 (+ 주문번호) */}
+          {/* 윗줄 — 📦 상품명 (한 줄 그대로, ×N 포함) */}
           {product ? (
             <div className="flex min-w-0 items-baseline gap-1.5">
               <span className="shrink-0" aria-hidden>📦</span>
               <span className="min-w-0 break-words font-black text-ink">{product}</span>
-              {isRefund ? <span className="shrink-0 text-[13px] font-bold text-ink-soft">{amountText || "-"}</span> : null}
-              {orderNo ? <span className="shrink-0 text-[11px] font-bold text-ink-mute">{orderNo}</span> : null}
             </div>
           ) : null}
-          {/* 아랫줄 — 💬 이슈 내용. 메모의 줄바꿈은 그대로(whitespace-pre-line) */}
+          {/* [2026-09-26] 줄합계 · 주문번호 (상품명 아래 줄, 숫자는 진한 글씨·tabular) */}
+          {(amountText || orderNo) ? (
+            <div className="mt-0.5 text-[13px]">
+              {amountText ? <span className="font-black text-ink [font-variant-numeric:tabular-nums]">{amountText}</span> : null}
+              {amountText && orderNo ? <span className="text-ink-mute"> · </span> : null}
+              {orderNo ? <span className="font-bold text-ink-mute">{orderNo}</span> : null}
+            </div>
+          ) : null}
+          {/* 아랫줄 — 💬 이슈 내용(진한 회색). 메모의 줄바꿈은 그대로(whitespace-pre-line) */}
           {memoShown ? (
-            <div className="flex min-w-0 items-start gap-1.5">
+            <div className="mt-0.5 flex min-w-0 items-start gap-1.5">
               <span className="shrink-0" aria-hidden>💬</span>
-              <span className="min-w-0 whitespace-pre-line break-words font-bold text-rose-deep">{memoShown}</span>
+              <span className="min-w-0 whitespace-pre-line break-words font-bold text-ink-soft">{memoShown}</span>
             </div>
           ) : null}
-          {!product && !memoShown ? <span className="font-bold text-ink-mute">내용 없음</span> : null}
-          {!product && orderNo ? <div className="text-[11px] font-bold text-ink-mute">{orderNo}</div> : null}
+          {!product && !memoShown && !amountText && !orderNo ? <span className="font-bold text-ink-mute">내용 없음</span> : null}
           {/* [2026-09-26] 교환·환불 장부 요약 — 진행단계 · 최종환불액 · 방법 (값 있을 때만) */}
           {ledgerLine ? (
             <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[13px]">
@@ -607,7 +611,7 @@ function IssueCard({
                 title="교환·환불 처리(단계·환불액·계좌) — 포인트는 움직이지 않고 기록만"
                 className={`${SUB_BTN} border-rose-line text-rose-deep hover:bg-rose-soft`}
               >
-                환불 처리
+                {clean(ledgerInfo?.stage) ? `${ledgerInfo!.stage} ›` : refundBtnLabel}
               </button>
             ) : null}
             <button
@@ -836,12 +840,13 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     return () => { alive = false; };
   }, [refundPageIdsKey, refundReloadTick]);
 
-  // [2026-09-26] 목록 「단가 × 수량」 — 현재 페이지 교환·반품·환불 줄의 주문 상품을 «주문번호로 한 번에» 조회(행마다 쿼리 금지).
+  // [2026-09-26] 목록 줄합계 — 주문번호가 있는 «모든» 페이지 줄의 주문 상품을 «주문번호로 한 번에» 조회(행마다 쿼리 금지).
+  //   금액 = 매칭된 줄들의 줄합계(submitRowLineTotal 서버 계산) 합. 매칭 실패 시 생략(칸 비움).
   const [amountByTask, setAmountByTask] = useState<Record<string, string>>({});
-  const refundPageCodesKey = Array.from(new Set(pageTasks.filter(isRefundKindTask).map((t) => extractBodyField(t, "주문번호:")).filter(Boolean))).sort().join(",");
+  const pageOrderCodesKey = Array.from(new Set(pageTasks.map((t) => extractBodyField(t, "주문번호:")).filter(Boolean))).sort().join(",");
   useEffect(() => {
     let alive = true;
-    const codes = refundPageCodesKey ? refundPageCodesKey.split(",") : [];
+    const codes = pageOrderCodesKey ? pageOrderCodesKey.split(",") : [];
     if (codes.length === 0) { setAmountByTask({}); return; }
     (async () => {
       const res = await fetch(`/api/admin-live/order-lines?codes=${encodeURIComponent(codes.join(","))}`, { cache: "no-store" });
@@ -850,7 +855,6 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       const byCode = (p.byCode || {}) as Record<string, { lines?: Array<Record<string, unknown>> }>;
       const map: Record<string, string> = {};
       for (const t of pageTasks) {
-        if (!isRefundKindTask(t)) continue;
         const code = extractBodyField(t, "주문번호:");
         const lines = (code && byCode[code]?.lines) || [];
         if (lines.length === 0) continue;
@@ -861,20 +865,15 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
         const matched = targetIds.length > 0
           ? lines.filter((l) => targetIds.includes(clean(l.product_id)))
           : pickIssueProductRows(lines, extractBodyField(t, "대상상품:") || clean(t.related_product));
-        if (matched.length === 0) continue; // 매칭 실패 → "-"
-        if (matched.length === 1) {
-          const m = matched[0];
-          map[clean(t.id)] = `${Number(m.unit || 0).toLocaleString("ko-KR")}원 × ${Math.max(1, Number(m.qty) || 1)}`;
-        } else {
-          const sum = matched.reduce((s, m) => s + (Number(m.lineTotal) || 0), 0);
-          map[clean(t.id)] = `${sum.toLocaleString("ko-KR")}원`;
-        }
+        if (matched.length === 0) continue; // 매칭 실패 → 금액 칸 생략
+        const sum = matched.reduce((s, m) => s + (Number(m.lineTotal) || 0), 0);
+        map[clean(t.id)] = `${sum.toLocaleString("ko-KR")}원`;
       }
       setAmountByTask(map);
     })().catch(() => { /* 실패해도 목록 정상, 금액만 생략 */ });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refundPageCodesKey]);
+  }, [pageOrderCodesKey]);
 
   const openRefund = async (task: AdminIssueTask) => {
     const tid = clean(task.id);
@@ -1929,7 +1928,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
             </div>
 
             <div className="mt-4">
-              <div className="mb-2 text-xs font-black text-ink-soft">이슈유형 다중선택</div>
+              <div className="mb-2 text-xs font-black text-ink-soft">유형 (여러 개 선택 가능)</div>
               <IssueTypeChips
                 value={newIssueForm.taskTypes}
                 onChange={(nextValue) => updateNewIssueForm({ taskTypes: nextValue })}
@@ -1983,12 +1982,11 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           <div className="w-full max-w-[560px] rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[11px] font-black tracking-[0.18em] text-rose-deep">EDIT CUSTOMER ISSUE</div>
-                <h3 className="mt-1 text-lg font-black text-ink">고객이슈 메모 수정</h3>
+                <h3 className="text-lg font-black text-ink">고객이슈 수정</h3>
                 <p className="mt-1 text-xs font-bold text-ink-soft">
                   {getNickname(editingIssueTask)} / {getName(editingIssueTask)}
                 </p>
-                <p className="mt-1 text-[11px] font-bold text-rose-deep">
+                <p className="mt-1 text-[11px] font-bold text-ink-mute">
                   고객정보는 수정하지 않고 이슈유형·우선순위·메모만 수정합니다.
                 </p>
               </div>
@@ -2003,7 +2001,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
             </div>
 
             <div className="mt-4">
-              <div className="mb-2 text-xs font-black text-ink-soft">이슈유형 다중선택</div>
+              <div className="mb-2 text-xs font-black text-ink-soft">유형 (여러 개 선택 가능)</div>
               <IssueTypeChips value={editingIssueTypes} onChange={setEditingIssueTypes} />
             </div>
 

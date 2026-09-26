@@ -106,6 +106,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ok: true, items: ((data as Row[]) || []).map(toListRow) });
     }
 
+    // ── 같은 주문번호(order_lookup_code)의 다른 환불 기록 — 중복 환불 경고용. 뒷4자리만. ──
+    const orderCode = text(url.searchParams.get("orderCode"), 120);
+    if (orderCode) {
+      const { data, error } = await supabase.from("refund_ledger").select("*").eq("order_lookup_code", orderCode);
+      if (error) return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true, items: ((data as Row[]) || []).map(toListRow) });
+    }
+
     // ── 목록: 계좌 뒷4자리만 + 단계별 건수 ──
     const stage = text(url.searchParams.get("stage"), 20);
     const kind = text(url.searchParams.get("kind"), 20);
