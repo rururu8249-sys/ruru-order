@@ -16,6 +16,7 @@ import {
   optionLabelNoNone,
   isFullReturnSel,
   cardRefundBackAmount,
+  vatShareForSelection,
   computeAmountFinal,
   computeRefundBase,
   stageDisplay,
@@ -373,6 +374,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
   const [reshipTracking, setReshipTracking] = useState(clean(item.reship_tracking));
   const [memo, setMemo] = useState(clean(item.memo));
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   // 계좌 — [6차] 항상 3칸 표시(요약/펼침 토글 폐지). 옛 예금주가 제외단어(입니다 등)면
   //   손님 이름으로 «프리필»하고 노란 테두리+안내(저장 눌러야 DB 반영). 자동 저장 안 함.
@@ -422,6 +424,9 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
   const [shippingTouched, setShippingTouched] = useState(false);
   const [shipFee, setShipFee] = useState(0); // 편집 가능한 배송비 금액
   const [shipFeeTouched, setShipFeeTouched] = useState(false);
+  const [includeVatShare, setIncludeVatShare] = useState(true); // 카드 부분반품 부가세 몫 환불(기본 체크)
+  const [vatShare, setVatShare] = useState(0); // 편집 가능한 부가세 몫 금액
+  const [vatShareTouched, setVatShareTouched] = useState(false);
   const [manualBase, setManualBase] = useState(Math.round(Number(item.amount_base)) || 0);
 
 
@@ -448,22 +453,27 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
         setCombinedShipping(Boolean(entry?.combined));
         setCombinedWith(clean(entry?.combinedWith));
         setCombinedShipFee(Math.max(0, Math.round(Number(entry?.combinedShipFee)) || 0));
-        // 카드결제 주문 → 방법 기본 「카드취소」(사용자가 저장해둔 방법이 없을 때만).
-        if (clean(entry?.paymentMethod).includes("카드") && !isExchange && (!item.method || item.method === "없음")) {
-          setMethod("카드취소");
-        }
+        // [A 수정] 저장된 선택(product_snapshot)이 있으면 «그것만» 복원(자동 체크 금지).
+        //   저장건은 항상 id 가 있다 → snapshot 이 곧 저장된 선택. 신규(id 없음)일 때만 이슈 대상상품 자동 체크.
         const targetQty: Record<string, number> = {};
         for (const s of (item.product_snapshot || [])) {
           const pid = clean((s as { productId?: unknown }).productId);
           if (pid) targetQty[pid] = Math.max(1, Math.round(Number(s.qty)) || 1);
         }
+        const hasSaved = Boolean(item.id) && Object.keys(targetQty).length > 0; // 저장된 선택
         const hasTarget = Object.keys(targetQty).length > 0;
         const init: Record<string, number> = {};
         for (const l of got) {
-          if (got.length === 1) init[l.id] = l.qty; // 1개면 항상 포함
-          else init[l.id] = hasTarget ? (targetQty[l.product_id] ? Math.min(targetQty[l.product_id], l.qty) : 0) : l.qty;
+          if (hasSaved) init[l.id] = targetQty[l.product_id] ? Math.min(targetQty[l.product_id], l.qty) : 0; // 저장 선택만
+          else if (got.length === 1) init[l.id] = l.qty; // 신규·1개면 항상 포함
+          else init[l.id] = hasTarget ? (targetQty[l.product_id] ? Math.min(targetQty[l.product_id], l.qty) : 0) : l.qty; // 신규 자동 체크
         }
         setSel(init);
+        // 카드결제 주문 → 방법 기본: 전체 반품이면 「카드취소」, 부분 반품이면 「계좌이체」(저장 방법 없을 때만).
+        if (clean(entry?.paymentMethod).includes("카드") && !isExchange && (!item.method || item.method === "없음")) {
+          const initFull = got.length > 0 && got.every((l) => (init[l.id] || 0) === l.qty);
+          setMethod(initFull ? "카드취소" : "계좌이체");
+        }
         setLinesLoaded(true);
       } catch { if (alive) { setLinesError(true); setLinesLoaded(true); } }
     })();
@@ -498,15 +508,28 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFullReturn, effectiveShippingFee, combinedShipping, shippingTouched]);
   const selList: RefundLineSel[] = lines.map((l) => ({ lineTotal: l.lineTotal, qty: l.qty, unit: l.unit, selectedQty: sel[l.id] || 0 }));
-  const autoBase = computeRefundBase(selList, includeShipping, shipFee);
+  // [B] 카드 주문을 «계좌이체/포인트»로 환불하면 부가세 몫도 돌려준다 — 주문 부가세 × (선택 줄합계 / 전체 줄합계).
+  const totalLineSum = lines.reduce((s, l) => s + l.lineTotal, 0);
+  const selectedLineSum = lines.reduce((s, l) => s + (sel[l.id] === l.qty ? l.lineTotal : (sel[l.id] || 0) * l.unit), 0);
+  const vatShareBase = vatShareForSelection(cardExtra, selectedLineSum, totalLineSum);
+  const showVatShareRow = isCardOrder && !isCardCancel && !isExchange && cardExtra > 0;
+  const vatRatePct = totalLineSum > 0 ? Math.round((cardExtra / totalLineSum) * 100) : 0;
 
-  // [카드 단순화] 카드는 «무조건 전체 취소». amount_base = 카드 총결제액, 차감만 손님에게 따로 받는다.
-  //   다시 받을 돈 = 남기는 상품값(부분반품) + 차감(역산 아님). 전체반품이면 남기는 상품=0 → 차감 그대로.
+  // 부가세 몫 자동 금액 — 사용자가 손대기 전엔 선택 비율 따라감.
+  useEffect(() => {
+    if (vatShareTouched) return;
+    setVatShare(vatShareBase);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vatShareBase, vatShareTouched]);
+
+  const vatShareAdd = showVatShareRow && includeVatShare ? vatShare : 0;
+  const autoBase = computeRefundBase(selList, includeShipping, shipFee) + vatShareAdd;
+
+  // [카드 단순화] 카드 «전체 취소»는 총결제액 기준(차감만 따로 받음). 부분 반품은 계좌이체(선택 상품값+부가세 몫).
   const keptProductTotal = lines.reduce((s, l) => s + Math.max(0, l.qty - (sel[l.id] || 0)) * l.unit, 0);
-  const cardTotalDisplay = cardTotal > 0 ? cardTotal : autoBase;
+  const cardTotalDisplay = cardTotal > 0 ? cardTotal : (selectedLineSum + cardExtra);
 
-  // [마무리3] 저장금액≠주문금액 경고 폐지 — 창을 열면 항상 «현재 체크된 상품 + 배송비» 기준으로 즉시 계산.
-  //   (무통장은 저장값이 곧 기록. DB 는 저장 버튼 누를 때만 바뀐다.)
+  // [마무리3] 저장금액≠주문금액 경고 폐지 — 창을 열면 항상 «현재 체크된 상품 + 배송비/부가세 몫» 기준으로 즉시 계산.
   const amountBase = isCardCancel
     ? cardTotalDisplay // 카드 = 전체 취소 → 총결제액 기준
     : matchFailed ? manualBase : autoBase;
@@ -543,6 +566,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
   // 창을 닫지 않고 저장만 — 성공 여부 반환.
   const doPatch = async (extra: Record<string, unknown>): Promise<boolean> => {
     setSaving(true);
+    setSaveError("");
     try {
       const snapshot = matchFailed
         ? (item.product_snapshot ?? [])
@@ -569,14 +593,24 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
         body: JSON.stringify(body),
       });
       const payload = await res.json().catch(() => null);
-      if (!payload?.ok) { showAdminToast("저장 실패\n" + (payload?.message || ""), "error"); return false; }
+      if (!res.ok || !payload?.ok) {
+        const msg = clean(payload?.message) || `오류 (${res.status})`;
+        setSaveError(msg);
+        showAdminToast("저장 실패: " + msg, "error");
+        return false;
+      }
       return true;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "네트워크 오류";
+      setSaveError(msg);
+      showAdminToast("저장 실패: " + msg, "error");
+      return false;
     } finally { setSaving(false); }
   };
 
-  // 저장만(이체 전) — 창 닫고 목록 새로고침.
+  // 저장만(이체 전) — 성공 시 창 닫고 목록 💳 즉시 갱신. 실패 시 창 유지 + 빨간 안내(버튼 다시 활성).
   const saveOnly = async () => {
-    if (await doPatch({})) { showAdminToast("저장했습니다.", "success"); onSaved(); }
+    if (await doPatch({})) { showAdminToast("저장됐어요", "success"); onSaved(); }
   };
 
   // 완료 — 모달 안 확인 → 기록 저장 → 이슈 해결완료 연동(부수효과 없는 상태변경만).
@@ -678,21 +712,28 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
                 {lines.map((l) => {
                   const picked = sel[l.id] || 0;
                   const on = lines.length === 1 ? true : picked > 0;
+                  const lineShown = on ? (picked === l.qty ? l.lineTotal : l.unit * picked) : l.lineTotal; // 체크 안 돼도 줄금액 표시(회색)
                   return (
-                    <div key={l.id} className="flex items-center gap-2 border-b border-line px-2 py-2 last:border-b-0">
-                      {lines.length > 1 ? (
-                        <button type="button" onClick={() => setQty(l.id, on ? 0 : l.qty, l.qty)} aria-label="선택" className="flex h-11 w-11 shrink-0 items-center justify-center">
-                          <span className={`flex h-5 w-5 items-center justify-center rounded border text-[13px] ${on ? "border-rose-deep bg-rose-deep text-white" : "border-line bg-surface text-transparent"}`}>✓</span>
-                        </button>
-                      ) : null}
-                      {l.photo ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={l.photo} alt="" className="h-10 w-10 shrink-0 rounded-lg border border-line object-cover" loading="lazy" />
-                      ) : <span className="h-10 w-10 shrink-0 rounded-lg border border-line bg-surface-2" />}
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-[14px] font-bold text-ink">{l.product_name}</div>
-                        <div className="truncate text-[13px] text-ink-mute">{optLabel(l.color, l.size)}{optLabel(l.color, l.size) ? " · " : ""}{formatComma(l.unit)}원 × {l.qty}</div>
-                      </div>
+                    <div key={l.id} className="flex items-center gap-2 border-b border-line last:border-b-0">
+                      {/* [A3] 체크·사진·이름 전체가 «이 줄» 토글 버튼(44px+) — 다른 줄에 영향 없음 */}
+                      <button
+                        type="button"
+                        onClick={lines.length > 1 ? () => setQty(l.id, on ? 0 : l.qty, l.qty) : undefined}
+                        aria-label={lines.length > 1 ? "이 상품 선택" : undefined}
+                        className={`flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left outline-none ${lines.length > 1 ? "focus-visible:ring-2 focus-visible:ring-rose-deep" : "cursor-default"}`}
+                      >
+                        {lines.length > 1 ? (
+                          <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[13px] ${on ? "border-rose-deep bg-rose-deep text-white" : "border-line bg-surface text-transparent"}`}>✓</span>
+                        ) : null}
+                        {l.photo ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={l.photo} alt="" className="h-10 w-10 shrink-0 rounded-lg border border-line object-cover" loading="lazy" />
+                        ) : <span className="h-10 w-10 shrink-0 rounded-lg border border-line bg-surface-2" />}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[14px] font-bold text-ink">{l.product_name}</span>
+                          <span className="block truncate text-[13px] text-ink-mute">{optLabel(l.color, l.size)}{optLabel(l.color, l.size) ? " · " : ""}{formatComma(l.unit)}원 × {l.qty}</span>
+                        </span>
+                      </button>
                       {lines.length > 1 && l.qty > 1 && on ? (
                         <div className="flex shrink-0 items-center gap-1">
                           <button type="button" onClick={() => setQty(l.id, picked - 1, l.qty)} className="h-8 w-8 rounded-lg border border-line text-[14px] font-black text-ink-soft">−</button>
@@ -700,7 +741,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
                           <button type="button" onClick={() => setQty(l.id, picked + 1, l.qty)} className="h-8 w-8 rounded-lg border border-line text-[14px] font-black text-ink-soft">+</button>
                         </div>
                       ) : null}
-                      <div className="w-20 shrink-0 text-right text-[14px] font-black text-ink">{formatComma(on ? (picked === l.qty || lines.length === 1 ? l.lineTotal : l.unit * picked) : 0)}원</div>
+                      <div className={`w-20 shrink-0 pr-2 text-right text-[14px] font-black ${on ? "text-ink" : "text-ink-mute"}`}>{formatComma(lineShown)}원</div>
                     </div>
                   );
                 })}
@@ -716,6 +757,14 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
                       <span className="text-ink-mute">원</span>
                     </div>
                     {combinedShipping && !shipMovedToPeer ? <div className="mt-1 text-[13px] text-ink-mute">같이 배송된 주문{combinedWith ? `(${combinedWith})` : ""}이 있어서 배송비는 확인하세요.</div> : null}
+                  </div>
+                ) : null}
+                {showVatShareRow ? (
+                  <div className="flex items-center gap-2 px-2 py-2 text-[13px] font-bold text-ink-soft">
+                    <input type="checkbox" checked={includeVatShare} onChange={(e) => { setIncludeVatShare(e.target.checked); }} className="h-5 w-5 shrink-0 accent-rose-deep" />
+                    <span>부가세({vatRatePct}%)도 환불</span>
+                    <input inputMode="numeric" value={formatComma(vatShare)} onFocus={selectOnFocus} onChange={(e) => { setVatShare(parseAmountInput(e.target.value)); setVatShareTouched(true); }} className={`w-24 text-right ${INPUT}`} />
+                    <span className="text-ink-mute">원</span>
                   </div>
                 ) : null}
               </div>
@@ -872,8 +921,9 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
         </div>
 
         {/* 9. 하단 고정 — 왼쪽 「저장만」 / 오른쪽 완료 → 해결완료 */}
+        {saveError ? <div className="border-t border-danger-tx/40 bg-danger-bg px-5 py-2 text-[13px] font-bold text-danger-tx">저장 실패: {saveError}</div> : null}
         <div className="flex items-center gap-2 border-t border-line px-5 py-3">
-          <button type="button" disabled={saving} onClick={saveOnly} className="h-12 rounded-xl border border-line bg-surface px-4 text-[14px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50">저장만</button>
+          <button type="button" disabled={saving} onClick={saveOnly} className="h-12 rounded-xl border border-line bg-surface px-4 text-[14px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50">{saving ? "저장 중…" : "저장만"}</button>
           {isExchange ? (
             <button type="button" disabled={saving} onClick={() => complete({ mark_done: true, stage: "완료" }, "재발송 완료로 기록하고 해결완료로 넘길까요?")} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">재발송했어요 → 해결완료</button>
           ) : method === "카드취소" ? (

@@ -73,6 +73,16 @@ export function cardRefundBackAmount(deductTotal: unknown, keptProductTotal: unk
   return d + k;
 }
 
+// [2026-09-26] 카드 부분반품 계좌이체 시 돌려줄 «부가세 몫» = 주문 부가세 × (선택 줄합계 / 전체 줄합계), 반올림.
+//   7% 하드코딩 금지 — 실제 저장된 부가세(vat_amount 합)를 선택 비율로 나눈다.
+export function vatShareForSelection(orderVat: unknown, selectedLineSum: unknown, totalLineSum: unknown): number {
+  const vat = Math.max(0, Math.round(Number(orderVat)) || 0);
+  const sel = Math.max(0, Math.round(Number(selectedLineSum)) || 0);
+  const total = Math.round(Number(totalLineSum)) || 0;
+  if (vat <= 0 || total <= 0 || sel <= 0) return 0;
+  return Math.round(vat * (sel / total));
+}
+
 // [2026-09-26 7차] 전체 반품 판정 — 모든 줄이 «전체 수량»으로 선택됐는가(배송비·카드추가금 자동 체크 기준).
 export function isFullReturnSel(sels: Array<{ qty: unknown; selectedQty: unknown }>): boolean {
   const arr = Array.isArray(sels) ? sels : [];

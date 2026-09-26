@@ -1,5 +1,5 @@
 // [2026-09-26 5·6차] 고객이슈 환불/교환 용어·💳 요약 문구 테스트
-import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, cardRefundBackAmount, pickPrimaryLedger, ledgerHasPayoutInfo } from "../lib/refundLedger.ts";
+import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, cardRefundBackAmount, pickPrimaryLedger, ledgerHasPayoutInfo, vatShareForSelection } from "../lib/refundLedger.ts";
 import { bankDisplayName } from "../lib/parseBankAccount.ts";
 
 let pass = 0;
@@ -149,5 +149,17 @@ ok2(ledgerHasPayoutInfo(null) === false, "null → false");
 // 주문 1개·기록 1개 → 그 기록이 대표
 { const only = { id: "X", account_number: "", updated_at: "2026-09-19T00:00:00" };
   eq(pickPrimaryLedger([only]).id, "X", "기록 1개면 그것이 대표"); }
+
+// ── [B] 카드 부분반품 부가세 몫 = 주문 부가세 × (선택/전체), 반올림 ──
+// 김미성: 상품 219,000 + 259,000 + 329,000 = 807,000, 주문 부가세 7% = 56,490
+eq(vatShareForSelection(56490, 259000, 807000), 18130, "PD-206 1개 부가세 몫 18,130");
+eq(vatShareForSelection(56490, 478000, 807000), 33460, "2개(219+259=478,000) 부가세 몫 33,460");
+eq(vatShareForSelection(56490, 807000, 807000), 56490, "전체 선택 → 부가세 전액");
+eq(vatShareForSelection(0, 259000, 807000), 0, "부가세 없으면 0");
+eq(vatShareForSelection(56490, 0, 807000), 0, "선택 0 → 0");
+eq(vatShareForSelection(56490, 259000, 0), 0, "전체합 0 → 0");
+// 환불할 금액 = 선택 줄합계 + 부가세 몫 − 차감 (컴포넌트 조합) — 김미성 PD-206 277,130
+eq(computeRefundBase([{ lineTotal: 259000, qty: 1, unit: 259000, selectedQty: 1 }], false, 0) + vatShareForSelection(56490, 259000, 807000), 277130, "PD-206: 259,000+18,130=277,130");
+eq(computeRefundBase([{ lineTotal: 219000, qty: 1, unit: 219000, selectedQty: 1 }, { lineTotal: 259000, qty: 1, unit: 259000, selectedQty: 1 }], false, 0) + vatShareForSelection(56490, 478000, 807000), 511460, "2개: 478,000+33,460=511,460");
 
 console.log(`✅ refund-issue-terms ${pass}건 통과`);
