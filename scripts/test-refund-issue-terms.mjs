@@ -180,6 +180,27 @@ ok2(ledgerHasPayoutInfo(null) === false, "null → false");
   const snap = [{ productId: "", productName: "상품A", color: "없음", size: "230", qty: 2 }];
   eq(restoreSelectionFromSnapshot(lines, snap).L1, 2, "«없음» 옵션 정규화 매칭");
 }
+// [2026-09-27] 1:1 배정 — snapshot 1건은 이름/옵션 겹치는 여러 줄이 있어도 «한 줄»만 체크(김미성 PD-202 오체크 방지)
+{
+  // order-lines 가 product_name 을 폴백 「상품」으로 주고 옵션(M/없음)이 같은 4줄 + snapshot 1건
+  const lines = [
+    { id: "A", product_id: "", product_name: "상품", color: "없음", size: "M", qty: 1 },
+    { id: "B", product_id: "", product_name: "상품", color: "없음", size: "M", qty: 1 },
+    { id: "C", product_id: "", product_name: "상품", color: "없음", size: "M", qty: 1 },
+  ];
+  const r = restoreSelectionFromSnapshot(lines, [{ productId: "", productName: "상품", color: "없음", size: "M", qty: 1 }]);
+  eq(Object.values(r).filter((v) => v > 0).length, 1, "snapshot 1건 → 최대 1줄만(이름/옵션 겹쳐도)");
+}
+// snapshot 2건이면 서로 다른 두 줄 각각 1개씩(중복 claim 금지)
+{
+  const lines = [
+    { id: "A", product_id: "1", product_name: "가", color: "", size: "M", qty: 1 },
+    { id: "B", product_id: "2", product_name: "나", color: "", size: "M", qty: 1 },
+    { id: "C", product_id: "3", product_name: "다", color: "", size: "M", qty: 1 },
+  ];
+  const r = restoreSelectionFromSnapshot(lines, [{ productId: "1", qty: 1 }, { productId: "3", qty: 1 }]);
+  eq(r.A, 1, "snap1→A"); eq(r.B, 0, "B 미체크"); eq(r.C, 1, "snap2→C");
+}
 // 수량 상한(저장 3 > 줄 2 → 2)
 {
   const lines = [{ id: "L1", product_id: "9", product_name: "상품A", color: "", size: "", qty: 2 }];

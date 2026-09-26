@@ -87,17 +87,24 @@ export function restoreSelectionFromSnapshot(lines: OrderLineLite[], snapshot: S
     opt: optKey(s.color, s.size),
     qty: Math.max(1, Math.round(Number(s.qty)) || 1),
   }));
+  const lineList = (Array.isArray(lines) ? lines : []).map((l) => ({
+    id: String(l.id),
+    pid: String(l.product_id ?? "").trim(),
+    name: String(l.product_name ?? "").trim(),
+    opt: optKey(l.color, l.size),
+    qty: Math.max(1, Math.round(Number(l.qty)) || 1),
+  }));
   const out: Record<string, number> = {};
-  for (const l of Array.isArray(lines) ? lines : []) {
-    const lid = String(l.id);
-    const lpid = String(l.product_id ?? "").trim();
-    const lname = String(l.product_name ?? "").trim();
-    const lopt = optKey(l.color, l.size);
-    const m =
-      snaps.find((s) => s.pid && lpid && s.pid === lpid) ||
-      snaps.find((s) => s.name && s.name === lname && s.opt === lopt) ||
-      snaps.find((s) => s.name && s.name === lname);
-    out[lid] = m ? Math.min(m.qty, Math.max(1, Math.round(Number(l.qty)) || 1)) : 0;
+  for (const l of lineList) out[l.id] = 0;
+  // [2026-09-27] «1:1» 배정 — snapshot 1건이 이름/옵션 겹치는 여러 줄에 동시 적중하지 않게, 아직 안 쓴 줄 중 하나만 claim.
+  //   → 체크되는 줄 수 ≤ snapshot 항목 수(1건이면 최대 1줄). productId(강) → 이름+옵션 → 이름 순.
+  const used = new Set<string>();
+  for (const s of snaps) {
+    const pick =
+      lineList.find((l) => !used.has(l.id) && s.pid && l.pid && s.pid === l.pid) ||
+      lineList.find((l) => !used.has(l.id) && s.name && s.name === l.name && s.opt === l.opt) ||
+      lineList.find((l) => !used.has(l.id) && s.name && s.name === l.name);
+    if (pick) { used.add(pick.id); out[pick.id] = Math.min(s.qty, pick.qty); }
   }
   return out;
 }
