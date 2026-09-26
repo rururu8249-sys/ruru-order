@@ -405,6 +405,8 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
   type OrderLineRow = { id: string; product_id: string; product_name: string; color: string; size: string; qty: number; unit: number; lineTotal: number; photo: string };
   const [lines, setLines] = useState<OrderLineRow[]>([]);
   const [linesLoaded, setLinesLoaded] = useState(false);
+  const [linesError, setLinesError] = useState(false);
+  const [linesReloadTick, setLinesReloadTick] = useState(0);
   const [shippingFee, setShippingFee] = useState(0);
   const [pointUsed, setPointUsed] = useState(0);
   const [orderDate, setOrderDate] = useState("");
@@ -426,12 +428,15 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
   useEffect(() => {
     if (!orderCode) { setLinesLoaded(true); return; }
     let alive = true;
+    setLinesError(false);
     (async () => {
       try {
         const res = await fetch(`/api/admin-live/order-lines?codes=${encodeURIComponent(orderCode)}`, { cache: "no-store" });
         const p = await res.json().catch(() => null);
         if (!alive) return;
-        const entry = p?.ok ? p.byCode?.[orderCode] : null;
+        // 라우트가 실패하면 «조용히 직접입력»으로 떨어지지 않고 오류 표시(다시 시도) — 매칭 실패와 구분.
+        if (!p?.ok) { setLinesError(true); setLinesLoaded(true); return; }
+        const entry = p.byCode?.[orderCode] || null;
         const got: OrderLineRow[] = entry?.lines || [];
         setLines(got);
         setShippingFee(Math.max(0, Math.round(Number(entry?.shippingFee)) || 0));
@@ -459,7 +464,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
         }
         setSel(init);
         setLinesLoaded(true);
-      } catch { if (alive) setLinesLoaded(true); }
+      } catch { if (alive) { setLinesError(true); setLinesLoaded(true); } }
     })();
     // 같은 주문 다른 환불 기록 경고
     (async () => {
@@ -477,9 +482,9 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
     })();
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderCode]);
+  }, [orderCode, linesReloadTick]);
 
-  const matchFailed = linesLoaded && lines.length === 0;
+  const matchFailed = linesLoaded && !linesError && lines.length === 0;
   const isCardOrder = orderPaymentMethod.includes("카드");
   const isCardCancel = method === "카드취소";
   // [7차] 전체 반품 = 모든 줄이 «전체 수량»으로 선택됨(공용 isFullReturnSel). 일부면 배송비·카드추가금 줄 숨김.
@@ -647,6 +652,11 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
             <div className="mb-1 text-[13px] font-black text-ink-mute">{isExchange ? "교환 대상 상품" : "돌려받을 상품"}</div>
             {!linesLoaded ? (
               <div className="rounded-xl border border-line p-4 text-center text-[13px] font-bold text-ink-mute">주문 상품 불러오는 중…</div>
+            ) : linesError ? (
+              <div className="rounded-xl border border-danger-tx/40 bg-danger-bg p-4 text-center">
+                <div className="text-[14px] font-bold text-danger-tx">주문 정보를 불러오지 못했어요.</div>
+                <button type="button" onClick={() => { setLinesLoaded(false); setLinesReloadTick((v) => v + 1); }} className="mt-2 rounded-lg border border-danger-tx/50 px-3 py-1.5 text-[14px] font-black text-danger-tx hover:bg-danger-bg">다시 시도</button>
+              </div>
             ) : matchFailed ? (
               isExchange ? (
                 <div className="rounded-xl border border-line p-3 text-[14px] font-bold text-ink">{productText(item.product_snapshot)}</div>

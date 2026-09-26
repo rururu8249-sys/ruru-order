@@ -10,6 +10,7 @@ import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { shippingAddressKey } from "@/lib/shippingAddressKey";
 import { koreanPhoneVariants } from "@/lib/order/phone";
 import { isCombinedShipmentPeer } from "@/lib/refundLedger";
+import { orderLinesSelect, orderLinesCombineSelect } from "@/lib/orderLinesColumns";
 
 function getSupabaseAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
@@ -34,11 +35,14 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase
       .from("orders")
-      .select("id, order_lookup_code, product_id, product_name, color, size, qty, product_price, adjusted_product_price, shipping_fee, point_used_amount, created_at, payment_method, card_extra_amount, vat_amount, adjusted_total_price, total_price, final_amount, combine_shipping_memo, address, detail_address, kakao_id, customer_phone, broadcast_id, is_deleted")
+      .select(orderLinesSelect())
       .in("order_lookup_code", codes);
-    if (error) return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    if (error) {
+      console.error("[order-lines] orders select 실패:", error.message);
+      return NextResponse.json({ ok: false, message: `주문 줄 조회 실패: ${error.message}` }, { status: 500 });
+    }
 
-    const rows = ((data as Array<Record<string, unknown>>) || []).filter((r) => r.is_deleted !== true);
+    const rows = ((data as unknown as Array<Record<string, unknown>>) || []).filter((r) => r.is_deleted !== true);
 
     // 상품 사진 — 목록 행과 «같은» 규칙(resolveOrderItemPhoto)으로. image_url 만 보면
     //   색상별/세부상품 사진만 있는 상품(예: Lime RURU-MTFV6WC7)이 빈칸이 된다.
@@ -75,7 +79,7 @@ export async function GET(request: NextRequest) {
       if (created && (!entry.orderDate || created < entry.orderDate)) entry.orderDate = created; // 주문일 = 가장 이른 줄
       // 결제방법·카드추가금·카드총액 — 주문상세와 같은 필드. 줄마다 저장되므로 합산(카드추가금=vat_amount).
       if (!entry.paymentMethod) entry.paymentMethod = clean(r.payment_method);
-      entry.cardExtra += Math.max(0, Math.round(num(r.card_extra_amount ?? r.vat_amount)));
+      entry.cardExtra += Math.max(0, Math.round(num(r.vat_amount))); // 카드추가금 = vat_amount(orders 실재 컬럼)
       entry.cardTotal += Math.max(0, Math.round(num(r.adjusted_total_price ?? r.total_price ?? r.final_amount)));
       if (clean(r.combine_shipping_memo)) entry.combined = true; // 합배송 흔적 → 배송비 공유 신호
       const qty = submitRowQty(r);
@@ -110,12 +114,13 @@ export async function GET(request: NextRequest) {
       if (kakaos.size > 0) ors.push(`kakao_id.in.(${Array.from(kakaos).join(",")})`);
       if (phones.size > 0) ors.push(`customer_phone.in.(${Array.from(phones).join(",")})`);
       try {
-        const { data: od } = await supabase
+        const { data: od, error: odErr } = await supabase
           .from("orders")
-          .select("order_lookup_code, address, detail_address, kakao_id, customer_phone, broadcast_id, created_at, is_deleted")
+          .select(orderLinesCombineSelect())
           .or(ors.join(","))
           .limit(500);
-        const others = ((od as Array<Record<string, unknown>>) || []).filter((o) => o.is_deleted !== true);
+        if (odErr) throw new Error(odErr.message);
+        const others = ((od as unknown as Array<Record<string, unknown>>) || []).filter((o) => o.is_deleted !== true);
         for (const code of Object.keys(byCode)) {
           const m = meta[code];
           if (!m || !m.addr) continue;
@@ -125,7 +130,11 @@ export async function GET(request: NextRequest) {
           ));
           if (hit) { byCode[code].combined = true; byCode[code].combinedWith = clean(hit.order_lookup_code); }
         }
-      } catch { /* 합배송 조회 실패는 무시 — combine_shipping_memo 신호만으로도 동작 */ }
+      } catch (e) {
+        // 합배송 «판정»만 실패 → 상품 줄·금액·결제방법은 그대로 살리고, 배송비는 안전하게 「확인 필요」로.
+        console.error("[order-lines] 합배송 판정 실패(상품 줄은 정상 반환):", e instanceof Error ? e.message : e);
+        for (const code of Object.keys(byCode)) { byCode[code].combined = true; byCode[code].combinedWith = ""; }
+      }
     }
 
     return NextResponse.json({ ok: true, byCode });
