@@ -584,9 +584,9 @@ function IssueCard({
           {!product && !memoShown && !amountText && !orderNo ? <span className="font-bold text-ink-mute">내용 없음</span> : null}
           {/* [2026-09-26] 교환·환불 장부 요약 — 진행단계 · 최종환불액 · 방법 (값 있을 때만) */}
           {ledgerLine ? (
-            <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[13px]">
+            <div className="mt-0.5 flex min-w-0 items-start gap-1.5 text-[13px]">
               <span className="shrink-0" aria-hidden>💳</span>
-              <span className="min-w-0 truncate font-black text-info-tx">{ledgerLine}</span>
+              <span className="min-w-0 break-words font-black text-info-tx">{ledgerLine}</span>
             </div>
           ) : null}
         </div>
@@ -994,7 +994,10 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
             if (adjSib) item.adjustments = adjSib.adjustments;
           }
           setRefundModalItem(item);
-          setRefundModalMeta({ openedFromOther: clean(primary.admin_task_id) !== tid, repDate: clean(primary.created_at) });
+          // [C4] 헤더 날짜 = «대표 이슈» 등록일(admin_tasks.created_at). 장부 행 생성일 아님.
+          const repTaskId = clean(primary.admin_task_id);
+          const repTask = repTaskId === tid ? task : (visibleTasks.find((t) => clean(t.id) === repTaskId) || task);
+          setRefundModalMeta({ openedFromOther: repTaskId !== tid, repDate: clean(repTask.created_at) || clean(primary.created_at) });
           return;
         }
       } catch { /* fallthrough */ }

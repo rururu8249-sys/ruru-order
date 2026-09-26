@@ -1,5 +1,5 @@
 // [2026-09-26 5·6차] 고객이슈 환불/교환 용어·💳 요약 문구 테스트
-import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, cardRefundBackAmount, pickPrimaryLedger, ledgerHasPayoutInfo, restoreSelectionFromSnapshot, deriveInitialSelection, buildSnapshotFromSelection, listAmountLine, baseSummaryLine, dateShortKo, dateLongKo, returnStagePrefix } from "../lib/refundLedger.ts";
+import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, cardRefundBackAmount, pickPrimaryLedger, ledgerHasPayoutInfo, restoreSelectionFromSnapshot, deriveInitialSelection, buildSnapshotFromSelection, listAmountLine, baseSummaryLine, dateShortKo, dateLongKo, returnStagePrefix, reasonChipFromStored, buildKakaoCopy } from "../lib/refundLedger.ts";
 import { bankDisplayName } from "../lib/parseBankAccount.ts";
 
 let pass = 0;
@@ -327,7 +327,7 @@ const LINES4 = [
 
 // ── [목록 금액 4케이스] listAmountLine ──
 eq(listAmountLine({ productSum: 79000, shippingFee: 4000, allLineSum: 79000, cardTotal: 0, isCard: false, matchedCount: 1, lineCount: 1, orderCode: "RURU-1" }),
-  "상품 79,000 + 배송비 4,000 = 83,000원 · RURU-1", "단독 전부반품+배송비");
+  "상품 79,000 + 배송비 4,000 = 83,000원", "단독 전부반품+배송비 (C5 주문번호 중복 제거)");
 eq(listAmountLine({ productSum: 79000, shippingFee: 0, allLineSum: 79000, cardTotal: 0, isCard: false, matchedCount: 1, lineCount: 1 }),
   "79,000원 (무료배송)", "배송비 0");
 eq(listAmountLine({ productSum: 259000, shippingFee: 0, allLineSum: 1052980, cardTotal: 0, isCard: false, matchedCount: 1, lineCount: 4 }),
@@ -357,5 +357,56 @@ eq(dateLongKo(null), "", "null → 빈칸");
 eq(returnStagePrefix("2026-09-20", "2026-09-22"), "📦 도착 09.22(화)", "도착 있으면 도착");
 eq(returnStagePrefix("2026-09-20", ""), "📦 접수 09.20(일)", "접수만 있으면 접수");
 eq(returnStagePrefix("", ""), "", "둘 다 없으면 생략");
+
+// ── [사유 2칩] 저장값 → 칩 매핑 ──
+eq(reasonChipFromStored("손님 변심"), "손님 변심", "손님 변심 그대로");
+eq(reasonChipFromStored("단순변심"), "손님 변심", "단순변심 → 손님 변심");
+eq(reasonChipFromStored("사이즈"), "손님 변심", "사이즈 → 손님 변심");
+eq(reasonChipFromStored("상품 문제"), "상품 문제", "상품 문제 그대로");
+eq(reasonChipFromStored("불량"), "상품 문제", "불량 → 상품 문제");
+eq(reasonChipFromStored("오배송"), "상품 문제", "오배송 → 상품 문제");
+eq(reasonChipFromStored("기타"), "", "기타 → 미선택");
+eq(reasonChipFromStored("색이 달라서 바꿔주세요 ㅠㅠ"), "", "긴 메모 → 미선택");
+eq(reasonChipFromStored(""), "", "빈 값 → 미선택");
+
+// ── [카톡 복사] buildKakaoCopy 고정 문자열 ──
+const kakaoBase = {
+  nickname: "빛나리", name: "김나리", orderCode: "RURU-MU464IS3", orderDateLong: "2026.09.23 (화)",
+  products: [{ name: "울 니트", opt: "회베이지/240", qty: 1 }],
+  returnReceivedLong: "2026.09.22 (화)", returnRequestedLong: "2026.09.20 (일)",
+  reasonChip: "손님 변심", memo: "",
+  method: "계좌이체", productSum: 79000, shipIncluded: 4000, deductTotal: 10000, amountFinal: 73000,
+  cardTotal: 0, cardRefundBack: 0, bankName: "국민은행", account: "12345678", holder: "김나리",
+};
+eq(buildKakaoCopy(kakaoBase),
+  ["🧾 환불 안내 · 루루동이", "빛나리 (김나리) 님", "주문 RURU-MU464IS3 · 2026.09.23 (화)", "",
+   "📦 울 니트 회베이지/240", "📦 반품 도착 2026.09.22 (화)", "사유 손님 변심", "",
+   "상품 79,000 + 배송비 4,000 − 반품비 10,000", "💰 최종 환불금액 73,000원", "🏦 국민은행 12345678 김나리"].join("\n"),
+  "무통장 계좌이체 — 배송비+반품비 내역·은행줄, 도착일");
+// 이름 없음 → 닉네임만 / 도착 없고 접수만 / 사유 미선택+메모 / 배송비·차감 0 & 상품1 → 합계줄 생략
+eq(buildKakaoCopy({ ...kakaoBase, name: "", returnReceivedLong: "", reasonChip: "", memo: "색상 상이", shipIncluded: 0, deductTotal: 0, amountFinal: 79000 }),
+  ["🧾 환불 안내 · 루루동이", "빛나리 님", "주문 RURU-MU464IS3 · 2026.09.23 (화)", "",
+   "📦 울 니트 회베이지/240", "📦 반품 접수 2026.09.20 (일)", "사유 색상 상이", "",
+   "💰 최종 환불금액 79,000원", "🏦 국민은행 12345678 김나리"].join("\n"),
+  "닉네임만·접수만·메모만·상품1 합계줄 생략");
+// 여러 상품 + 도착·접수 둘 다 없음 → 합계줄 표시(상품>1)
+eq(buildKakaoCopy({ ...kakaoBase, products: [{ name: "니트", opt: "블랙/M", qty: 2 }, { name: "치마", opt: "", qty: 1 }], returnReceivedLong: "", returnRequestedLong: "", shipIncluded: 0, deductTotal: 0, amountFinal: 120000 }),
+  ["🧾 환불 안내 · 루루동이", "빛나리 (김나리) 님", "주문 RURU-MU464IS3 · 2026.09.23 (화)", "",
+   "📦 니트 블랙/M ×2", "📦 치마", "사유 손님 변심", "",
+   "상품 79,000", "💰 최종 환불금액 120,000원", "🏦 국민은행 12345678 김나리"].join("\n"),
+  "여러 상품(×2·옵션없음)·반품일 없음·합계줄");
+// 카드 전체취소 + 반품비 → 🏦 없음
+eq(buildKakaoCopy({ ...kakaoBase, method: "카드취소", cardTotal: 82000, cardRefundBack: 4000, returnReceivedLong: "" }),
+  ["🧾 환불 안내 · 루루동이", "빛나리 (김나리) 님", "주문 RURU-MU464IS3 · 2026.09.23 (화)", "",
+   "📦 울 니트 회베이지/240", "📦 반품 접수 2026.09.20 (일)", "사유 손님 변심", "",
+   "💳 카드 결제 82,000원 전체 취소", "💰 따로 입금해 주실 반품비 4,000원"].join("\n"),
+  "카드 전체취소+반품비·계좌줄 없음");
+// 포인트 환불
+eq(buildKakaoCopy({ ...kakaoBase, method: "포인트", shipIncluded: 0, deductTotal: 0, amountFinal: 79000, returnReceivedLong: "" }),
+  ["🧾 환불 안내 · 루루동이", "빛나리 (김나리) 님", "주문 RURU-MU464IS3 · 2026.09.23 (화)", "",
+   "📦 울 니트 회베이지/240", "📦 반품 접수 2026.09.20 (일)", "사유 손님 변심", "",
+   "💰 포인트 79,000원으로 돌려드려요"].join("\n"),
+  "포인트 환불 — 계좌줄 없음·상품1 합계줄 생략");
+ok2(buildKakaoCopy(kakaoBase).includes("\n"), "복사 텍스트에 줄바꿈 포함");
 
 console.log(`✅ refund-issue-terms ${pass}건 통과`);

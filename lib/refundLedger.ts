@@ -24,8 +24,72 @@ export function stageDisplay(stage: unknown, kind?: unknown): string {
   return s;
 }
 
-// [2026-09-26] 반품 사유 칩 — reason 필드에 저장.
-export const REASON_CHIPS = ["단순변심", "사이즈", "불량", "오배송", "기타"] as const;
+// [2026-09-27] 반품 사유 = 귀책 2칩. reason 필드에 "손님 변심" / "상품 문제" 저장(전자상거래법 18조 — 변심은 소비자 반품비 부담).
+export const REASON_CHIPS = ["단순변심", "사이즈", "불량", "오배송", "기타"] as const; // (옛 데이터 인식용)
+export const REASON_FAULT_CHIPS = [
+  { value: "손님 변심", sub: "단순변심·사이즈" },
+  { value: "상품 문제", sub: "불량·오배송" },
+] as const;
+// 저장된 reason → 2칩 매핑. 매칭 안 되면 ""(미선택) — 메모성 긴 값은 그대로 둠.
+export function reasonChipFromStored(reason: unknown): "손님 변심" | "상품 문제" | "" {
+  const r = String(reason ?? "").trim();
+  if (r === "손님 변심" || r === "단순변심" || r === "사이즈") return "손님 변심";
+  if (r === "상품 문제" || r === "불량" || r === "오배송") return "상품 문제";
+  return "";
+}
+
+// [2026-09-27] 처리창 「📋 복사」 = 카톡 붙여넣기용 여러 줄 텍스트(순수 함수·표시 전용).
+export type KakaoCopyInput = {
+  shopName?: string; nickname?: string; name?: string; orderCode?: string; orderDateLong?: string;
+  products: Array<{ name: string; opt?: string; qty?: number }>;
+  returnReceivedLong?: string; returnRequestedLong?: string;
+  reasonChip?: string; memo?: string;
+  method: string; // 계좌이체 | 카드취소 | 포인트 | 없음
+  productSum: number; shipIncluded: number; deductTotal: number; amountFinal: number;
+  cardTotal?: number; cardRefundBack?: number;
+  bankName?: string; account?: string; holder?: string;
+};
+export function buildKakaoCopy(o: KakaoCopyInput): string {
+  const won = (n: unknown) => `${Math.round(Number(n) || 0).toLocaleString("ko-KR")}원`;
+  const c = (n: unknown) => Math.round(Number(n) || 0).toLocaleString("ko-KR");
+  const t = (v: unknown) => String(v ?? "").trim();
+  const shop = t(o.shopName) || "루루동이";
+  const lines: string[] = [];
+  lines.push(`🧾 환불 안내 · ${shop}`);
+  lines.push(`${t(o.nickname) || "손님"}${t(o.name) ? ` (${t(o.name)})` : ""} 님`);
+  lines.push(`주문 ${t(o.orderCode) || "-"}${t(o.orderDateLong) ? ` · ${t(o.orderDateLong)}` : ""}`);
+  lines.push("");
+  for (const p of Array.isArray(o.products) ? o.products : []) {
+    const qty = Math.max(1, Math.round(Number(p.qty)) || 1);
+    lines.push(`📦 ${t(p.name)}${t(p.opt) ? ` ${t(p.opt)}` : ""}${qty >= 2 ? ` ×${qty}` : ""}`);
+  }
+  if (t(o.returnReceivedLong)) lines.push(`📦 반품 도착 ${t(o.returnReceivedLong)}`);
+  else if (t(o.returnRequestedLong)) lines.push(`📦 반품 접수 ${t(o.returnRequestedLong)}`);
+  const reasonBits = [t(o.reasonChip), t(o.memo)].filter(Boolean);
+  if (reasonBits.length) lines.push(`사유 ${reasonBits.join(" · ")}`);
+  lines.push("");
+  if (o.method === "카드취소") {
+    lines.push(`💳 카드 결제 ${won(o.cardTotal)} 전체 취소`);
+    if ((Math.round(Number(o.cardRefundBack)) || 0) > 0) lines.push(`💰 따로 입금해 주실 반품비 ${won(o.cardRefundBack)}`);
+  } else {
+    const showBreakdown = (Array.isArray(o.products) ? o.products.length : 0) > 1 || (Number(o.shipIncluded) || 0) > 0 || (Number(o.deductTotal) || 0) > 0;
+    if (showBreakdown) {
+      const parts = [`상품 ${c(o.productSum)}`];
+      if ((Number(o.shipIncluded) || 0) > 0) parts.push(`배송비 ${c(o.shipIncluded)}`);
+      let bd = parts.join(" + ");
+      if ((Number(o.deductTotal) || 0) > 0) bd += ` − 반품비 ${c(o.deductTotal)}`;
+      lines.push(bd);
+    }
+    if (o.method === "포인트") {
+      lines.push(`💰 포인트 ${won(o.amountFinal)}으로 돌려드려요`);
+    } else {
+      lines.push(`💰 최종 환불금액 ${won(o.amountFinal)}`);
+      const acct = [t(o.bankName), t(o.account), t(o.holder)].filter(Boolean).join(" ");
+      if (acct) lines.push(`🏦 ${acct}`);
+    }
+  }
+  return lines.join("\n");
+}
 
 // [2026-09-26 7차보완] 합배송 짝 판정(순수 비교) — 주소키는 호출부에서 shippingAddressKey 로 계산해 넘긴다.
 //   같은 손님(kakao_id 또는 전화) + 같은 주소키 + 같은 방송(또는 같은 날)이면 같이 배송된 주문으로 본다.
@@ -231,7 +295,8 @@ export function listAmountLine(o: {
   const ship = Math.max(0, Math.round(Number(o.shippingFee) || 0));
   const isFull = o.matchedCount === o.lineCount && o.lineCount > 0;
   const orderTotal = o.isCard ? (Math.round(Number(o.cardTotal) || 0) || Math.round(Number(o.allLineSum) || 0)) : (Math.round(Number(o.allLineSum) || 0) + ship);
-  if (isFull && ship > 0 && !o.isCard) return `상품 ${c(prod)} + 배송비 ${c(ship)} = ${w(prod + ship)}${o.orderCode ? ` · ${o.orderCode}` : ""}`;
+  // [C5 2026-09-27] 주문번호는 목록 줄에 이미 별도 표시 → 여기선 붙이지 않음(중복 제거).
+  if (isFull && ship > 0 && !o.isCard) return `상품 ${c(prod)} + 배송비 ${c(ship)} = ${w(prod + ship)}`;
   if (isFull && ship === 0 && !o.isCard) return `${w(prod)} (무료배송)`;
   return `상품 ${w(prod)} · 주문 ${o.lineCount}개 중 ${o.matchedCount}개 (총 결제 ${w(orderTotal)})`;
 }

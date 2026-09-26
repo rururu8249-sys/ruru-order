@@ -11,7 +11,9 @@ import { parseBankAccount, bankDisplayName, isExcludedHolder } from "@/lib/parse
 import {
   REFUND_STAGES,
   REFUND_KINDS,
-  REASON_CHIPS,
+  REASON_FAULT_CHIPS,
+  reasonChipFromStored,
+  buildKakaoCopy,
   optionLabelNoNone,
   isFullReturnSel,
   cardRefundBackAmount,
@@ -392,13 +394,11 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
   const [paste, setPaste] = useState("");
   const [acctMissing, setAcctMissing] = useState<string[]>([]);
 
-  // 반품 사유(reason 필드) — [6차] 저장값이 «칩»이면 그 칩만 선택. 메모 전문/긴 값·기타 텍스트는 프리필 안 함(미선택).
-  const loadedReason = clean(item.reason);
-  const initReasonChip = (REASON_CHIPS as readonly string[]).includes(loadedReason) ? loadedReason : "";
-  const [reasonChip, setReasonChip] = useState(initReasonChip);
-  const [reasonEtc, setReasonEtc] = useState("");
+  // 반품 사유(reason 필드) — [2026-09-27] 귀책 2칩(손님 변심 / 상품 문제). 옛 값(단순변심·사이즈→변심, 불량·오배송→문제)은 매핑, 그 외·긴 메모는 미선택.
+  const initReasonChip = reasonChipFromStored(item.reason);
+  const [reasonChip, setReasonChip] = useState<"손님 변심" | "상품 문제" | "">(initReasonChip);
   const [reasonDirty, setReasonDirty] = useState(false);
-  const reasonVal = reasonChip === "기타" ? reasonEtc.trim() : reasonChip;
+  const reasonVal = reasonChip;
 
   // 차감 — 신규는 금액칸 1개. 기존 조정줄이 1개(차감)면 그 줄을 금액칸으로 불러와 편집(별도 줄 없음). 2개↑면 목록+입력.
   //   [6차] 라벨은 «현재 사유»를 따라감(옛 저장 라벨 표시·유지 안 함).
@@ -520,6 +520,9 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
     : matchFailed ? manualBase : autoBase;
 
   const deductFinalLabel = isCardCancel ? (reasonVal ? `${reasonVal} 반품비` : "반품비") : (reasonVal ? `${reasonVal} 차감` : "차감");
+  // [사유 2칩] 손님 변심 → 「반품비」 라벨, 상품 문제 → 차감 행 숨김(0), 미선택 → 「차감」. 단 저장된 차감 값(입력값>0 또는 보존 조정줄)이 있으면 칩 무관하게 표시.
+  const deductRowLabel = reasonChip === "손님 변심" ? "반품비" : "차감";
+  const showDeductRow = reasonChip !== "상품 문제" || deductAmount > 0;
   const finalAdj: RefundAdjustment[] = [...keptAdj, ...(deductAmount > 0 ? [{ label: deductFinalLabel, amount: -deductAmount }] : [])];
   const amountFinal = computeAmountFinal(amountBase, finalAdj);
   const deductTotal = finalAdj.filter((a) => a.amount < 0).reduce((s, a) => s - a.amount, 0);
@@ -618,25 +621,32 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
     if (await doPatch({})) { showAdminToast("저장됐어요", "success"); onSaved(); }
   };
 
+  // [2026-09-27] 카톡 붙여넣기용 여러 줄 텍스트(text/plain·순수함수 buildKakaoCopy).
   const copyTransferInfo = async () => {
-    // 통일 한 줄: 주문일 · 상품(옵션)×수량 · 사유 · 환불액 · 은행전체이름 계좌번호 · 예금주
-    const dateStr = dateWithDow(orderDate || item.created_at);
-    const product = matchFailed
-      ? productText(item.product_snapshot)
-      : productText(lines.filter((l) => (sel[l.id] || 0) > 0).map((l) => ({ productName: l.product_name, color: l.color, size: l.size, qty: sel[l.id] || 0 })));
-    const reason = reasonVal || reasonBody(item.reason).split("\n")[0] || "-";
-    // 📦 반품 도착/접수(있을 때만) — 상품 줄 다음에.
-    const returnSeg = dateLongKo(returnReceivedOn) ? `📦 반품 도착 ${dateLongKo(returnReceivedOn)}` : (dateLongKo(returnRequestedOn) ? `📦 반품 접수 ${dateLongKo(returnRequestedOn)}` : "");
-    // 금액 뒤 괄호 내역(0 항목 생략): 73,000원(상품 79,000+배송비 4,000−차감 10,000)
-    let bd = `상품 ${formatComma(productSum)}`;
-    if (shipIncludedAmount > 0) bd += `+배송비 ${formatComma(shipIncludedAmount)}`;
-    if (deductTotal > 0) bd += `−차감 ${formatComma(deductTotal)}`;
-    const amountSeg = (shipIncludedAmount > 0 || deductTotal > 0) ? `${won(amountFinal)}(${bd})` : won(amountFinal);
-    const line = isCardCancel
-      ? [dateStr, product || "-", ...(returnSeg ? [returnSeg] : []), reason, `카드 전체취소 ${won(cardTotalDisplay)}`, ...(cardRefundBack > 0 ? [`반품비 ${won(cardRefundBack)}`] : [])].join(" · ")
-      : [dateStr, product || "-", ...(returnSeg ? [returnSeg] : []), reason, amountSeg, [bankDisplayName(bank), account].filter(Boolean).join(" ") || "-", holder || "-"].map((x) => x || "-").join(" · ");
-    try { await navigator.clipboard.writeText(line); showAdminToast("이체 정보 복사했어요", "success"); }
-    catch { showAdminToast("복사 실패:\n" + line, "warning"); }
+    const prodItems = matchFailed
+      ? (Array.isArray(item.product_snapshot) ? item.product_snapshot : []).map((s) => ({
+          name: clean((s as Record<string, unknown>).productName ?? (s as Record<string, unknown>).product_name),
+          opt: [clean((s as Record<string, unknown>).color), clean((s as Record<string, unknown>).size)].filter(Boolean).join("/"),
+          qty: Number((s as Record<string, unknown>).qty) || 1,
+        }))
+      : lines.filter((l) => (sel[l.id] || 0) > 0).map((l) => ({
+          name: l.product_name,
+          opt: [l.color, l.size].filter(Boolean).join("/"),
+          qty: sel[l.id] || 0,
+        }));
+    const text = buildKakaoCopy({
+      nickname: clean(item.nickname), name: clean(item.customer_name),
+      orderCode, orderDateLong: dateLongKo(orderDate || item.created_at),
+      products: prodItems,
+      returnReceivedLong: dateLongKo(returnReceivedOn), returnRequestedLong: dateLongKo(returnRequestedOn),
+      reasonChip: reasonVal, memo: clean(memo),
+      method,
+      productSum, shipIncluded: shipIncludedAmount, deductTotal, amountFinal,
+      cardTotal: cardTotalDisplay, cardRefundBack,
+      bankName: bankDisplayName(bank), account, holder,
+    });
+    try { await navigator.clipboard.writeText(text); showAdminToast("환불 안내 복사했어요 (카톡 붙여넣기)", "success"); }
+    catch { showAdminToast("복사 실패:\n" + text, "warning"); }
   };
 
   const memoFull = clean(item.reason);
@@ -723,7 +733,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                         ) : <span className="h-10 w-10 shrink-0 rounded-lg border border-line bg-surface-2" />}
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[14px] font-bold text-ink">{l.product_name}</span>
-                          <span className="block truncate text-[13px] text-ink-mute">{optLabel(l.color, l.size)}{optLabel(l.color, l.size) ? " · " : ""}{formatComma(l.unit)}원 × {l.qty}</span>
+                          <span className="block truncate text-[13px] text-ink-mute">{optLabel(l.color, l.size) || l.product_name}{l.qty >= 2 ? ` × ${l.qty}` : ""}</span>
                         </span>
                       </button>
                       {lines.length > 1 && l.qty > 1 && on ? (
@@ -775,14 +785,19 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
           <div className="mb-3">
             <div className="mb-1 text-[13px] font-black text-ink-mute">{isExchange ? "교환 사유" : "사유"}</div>
             <div className="flex flex-wrap items-center gap-1.5">
-              {REASON_CHIPS.map((c) => (
-                <button key={c} type="button"
-                  onClick={() => { setReasonChip(reasonChip === c ? "" : c); setReasonDirty(true); }}
-                  className={`rounded-full px-3 py-1.5 text-[14px] font-black transition ${reasonChip === c ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}>{c}</button>
+              {REASON_FAULT_CHIPS.map((c) => (
+                <button key={c.value} type="button"
+                  onClick={() => {
+                    const next = reasonChip === c.value ? "" : c.value;
+                    setReasonChip(next); setReasonDirty(true);
+                    // 상품 문제(사업자 귀책) → 반품비 차감 0으로(전자상거래법 18조). 손님 변심/미선택은 차감 유지.
+                    if (next === "상품 문제") setDeductAmount(0);
+                  }}
+                  className={`flex flex-col items-center rounded-2xl px-3 py-1.5 text-[14px] font-black leading-tight transition ${reasonChip === c.value ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}>
+                  <span>{c.value}</span>
+                  <span className={`text-[11px] font-bold ${reasonChip === c.value ? "text-white/80" : "text-ink-mute"}`}>{c.sub}</span>
+                </button>
               ))}
-              {reasonChip === "기타" ? (
-                <input value={reasonEtc} onChange={(e) => { setReasonEtc(e.target.value); setReasonDirty(true); }} placeholder="사유 입력" className={`w-40 ${INPUT}`} maxLength={40} />
-              ) : null}
             </div>
           </div>
 
@@ -825,15 +840,17 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                       <div className="mt-0.5 text-right text-[12px] text-ink-mute">{shippingStatusText}</div>
                     </div>
                   ) : null}
-                  {/* 차감 = 입력칸(오른쪽). 항상 표시 */}
-                  <div className="flex items-center justify-between py-1 text-[13px]">
-                    <span className="text-ink-soft">차감{reasonVal ? ` (${reasonVal})` : ""}</span>
-                    <span className="flex items-center gap-1">
-                      <span className="text-danger-tx">−</span>
-                      <input inputMode="numeric" value={formatComma(deductAmount)} onFocus={selectOnFocus} onChange={(e) => setDeductAmount(parseAmountInput(e.target.value))} className="h-8 w-24 rounded-lg border border-line px-2 text-right text-[14px] font-black text-danger-tx outline-none focus-visible:ring-2 focus-visible:ring-rose-deep" />
-                      <span className="text-ink-mute">원</span>
-                    </span>
-                  </div>
+                  {/* 차감/반품비 = 입력칸(오른쪽). 손님 변심 → 「반품비」, 미선택 → 「차감」. 상품 문제(저장 차감 없음)면 숨김·0. */}
+                  {showDeductRow ? (
+                    <div className="flex items-center justify-between py-1 text-[13px]">
+                      <span className="text-ink-soft">{deductRowLabel}</span>
+                      <span className="flex items-center gap-1">
+                        <span className="text-danger-tx">−</span>
+                        <input inputMode="numeric" value={formatComma(deductAmount)} onFocus={selectOnFocus} onChange={(e) => setDeductAmount(parseAmountInput(e.target.value))} className="h-8 w-24 rounded-lg border border-line px-2 text-right text-[14px] font-black text-danger-tx outline-none focus-visible:ring-2 focus-visible:ring-rose-deep" />
+                        <span className="text-ink-mute">원</span>
+                      </span>
+                    </div>
+                  ) : null}
                   <div className="mt-1 flex items-center justify-between border-t border-line pt-2 text-[16px] font-black"><span className="text-ink">환불할 금액</span><span className="text-rose-deep text-[18px]">{won(amountFinal)}</span></div>
                 </div>
               )}
