@@ -548,7 +548,7 @@ export default function AdminLiveDashboard() {
   const [activeMenu, setActiveMenu] = useState<AdminLiveMenuKey>(() => readMenuFromUrl());
   const [customersInitialTab, setCustomersInitialTab] = useState<"members" | "issues">("members");
   // [2026-09-25] 고객·이슈 패널의 «현재» 탭 — 「고객이슈」 탭이면 위쪽 미해결 알림 띠를 숨긴다(중복 표시 방지).
-  const [customersActiveTab, setCustomersActiveTab] = useState<"members" | "issues" | "loyalty" | "link">("members");
+  const [customersActiveTab, setCustomersActiveTab] = useState<"members" | "issues" | "loyalty" | "link" | "refund">("members");
   // [2026-09-21] 「바로 처리 →」 를 누른 «시각». 탭 이름만 넘기면 두 번째 클릭부터 안 먹는다
   //   (같은 값이라 화면이 바뀐 걸 모른다). 시각은 누를 때마다 달라지므로 매번 확실히 열린다.
   const [customersOpenTabAt, setCustomersOpenTabAt] = useState(0);

@@ -446,6 +446,17 @@ function IssueCard({
         {fromReturn ? (
           <span className="rounded bg-rose-soft px-1.5 py-0.5 text-[11px] font-black text-rose-deep" title="주문상세 반품/교환에서 자동 등록 — 지우면 회수한 포인트도 돌아갑니다">자동</span>
         ) : null}
+        {/* [2026-09-26] 교환·반품·환불 건은 «교환·환불 장부»에서 이어서 처리. 링크만 — 고객이슈 기존 동작은 그대로. */}
+        {(fromReturn || ["exchange", "return", "refund"].includes(clean(task.task_type).toLowerCase())) ? (
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent("ruru-open-refund-ledger", { detail: { adminTaskId: clean(task.id) } }))}
+            className="rounded border border-rose-line px-1.5 py-0.5 text-[11px] font-black text-rose-deep hover:bg-rose-soft"
+            title="교환·환불 장부에서 이 건을 열어 처리합니다"
+          >
+            장부에서 보기 ›
+          </button>
+        ) : null}
       </div>
 
       {/* 닉네임 */}

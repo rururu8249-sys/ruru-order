@@ -19,6 +19,7 @@ import AdminLiveLoyaltyReport, { type LoyaltyCustomerRef } from "./AdminLiveLoya
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import type { LiveOrder } from "./types";
 import AdminLiveCustomerIssueRail from "./AdminLiveCustomerIssueRail";
+import AdminLiveRefundLedgerPanel from "./AdminLiveRefundLedgerPanel";
 import AdminLivePhoneBlockPanel from "./AdminLivePhoneBlockPanel";
 import AdminLiveCustomerBlockReasonModal from "./AdminLiveCustomerBlockReasonModal";
 import AdminLiveCustomerPointPanel from "./AdminLiveCustomerPointPanel";
@@ -45,7 +46,7 @@ type Props = {
   /** [2026-09-08 5단계] 페이지 안에 그대로(고객 메뉴). 팝업 껍데기·✕ 없음 */
   embedded?: boolean;
   /** [2026-09-25] 현재 탭을 바깥에 알린다 — 「고객이슈」 탭에선 위쪽 미해결 알림 띠를 숨기려고. */
-  onTabChange?: (tab: "members" | "issues" | "loyalty" | "link") => void;
+  onTabChange?: (tab: "members" | "issues" | "loyalty" | "link" | "refund") => void;
 };
 
 type LooseLiveOrder = LiveOrder & Record<string, any>;
@@ -1090,7 +1091,18 @@ function CustomerDetailDrawer({
 
 export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = "members", openTabAt = 0, openIssueCount = 0, embedded = false, onTabChange }: Props) {
   // [2026-09-09] «계정 연결 요청» 탭 추가 — 손님이 카톡을 바꿔 회원이 갈라졌을 때 들어오는 요청함
-  const [custTab, setCustTab] = useState<"members" | "issues" | "loyalty" | "link">(initialTab);
+  const [custTab, setCustTab] = useState<"members" | "issues" | "loyalty" | "link" | "refund">(initialTab);
+  // [2026-09-26] 고객이슈 「장부에서 보기」로 넘어오면 교환·환불 탭 + 그 건 처리 창 열기
+  const [refundFocusTaskId, setRefundFocusTaskId] = useState("");
+  useEffect(() => {
+    const onOpenLedger = (e: Event) => {
+      const id = String((e as CustomEvent).detail?.adminTaskId ?? "").trim();
+      setRefundFocusTaskId(id);
+      setCustTab("refund");
+    };
+    window.addEventListener("ruru-open-refund-ledger", onOpenLedger as EventListener);
+    return () => window.removeEventListener("ruru-open-refund-ledger", onOpenLedger as EventListener);
+  }, []);
   // [2026-09-21] 바깥(고객이슈 알림 띠 등)에서 탭 열기 요청이 오면 실제로 전환하고 그 자리로 스크롤한다.
   const tabBarRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -1811,6 +1823,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
             {([
               ["members", "회원 목록", 0],
               ["issues", "고객이슈", openIssueCount],
+              ["refund", "교환·환불", 0],
               ["loyalty", "단골 리포트", 0],
               ["link", "계정 잇기", linkPendingCount],
             ] as const).map(([key, label, badge]) => {
@@ -1874,6 +1887,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
           ) : null}
 
       {custTab === "link" ? <AdminLiveLinkRequestsPanel /> : null}
+
+      {custTab === "refund" ? <AdminLiveRefundLedgerPanel focusTaskId={refundFocusTaskId} /> : null}
 
       {custTab === "loyalty" ? (
         <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
