@@ -158,6 +158,8 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   //   저장 시 서버(/api/admin-live/order-return)가 기록 + 고객이슈 자동등록 + (환불) 적립 포인트 회수까지 처리(회수 규칙 불변).
   const [issueRegisterOpen, setIssueRegisterOpen] = useState(false);
   const [issueEarnedPoints, setIssueEarnedPoints] = useState(0);
+  // [E2] 위험 작업(입금확인 취소·주문서 자체 취소·손님 차단)은 화면 맨 아래 접힌 한 줄로 — 실수 방지(2클릭 마찰).
+  const [dangerOpen, setDangerOpen] = useState(false);
 
   useEffect(() => {
     setLocalOrder(order);
@@ -1074,7 +1076,9 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         return;
       }
 
-      const lines = [`${res.modeLabel || "반품"} 접수 기록 완료`];
+      // [B3] 토스트는 화면 라벨(환불/교환/기타)로 — res.modeLabel(반품…) 대신.
+      const modeLabel = data.mode === "refund" ? "환불" : data.mode === "exchange" ? "교환" : "기타";
+      const lines = [`${modeLabel} 이슈 등록 완료`];
       if (res.issueRegistered) lines.push("🗂 고객이슈 자동 등록됨");
       if (Number(res.reclaimed) > 0) {
         const after = Number(res.balanceAfter);
@@ -1122,7 +1126,8 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const handleUndoReturn = async () => {
     if (returnSaving) return;
     const oo = order as Record<string, unknown>;
-    const orderCode = String(oo.orderNumber ?? oo.orderLookupCode ?? oo.order_lookup_code ?? "").trim();
+    // [A] LiveOrder 필드는 orderNo(어댑터 330행) — 옛 키(orderNumber/order_lookup_code)는 존재하지 않아 반품 취소가 항상 실패했음.
+    const orderCode = String((order as LiveOrder).orderNo || (order as Record<string, unknown>).order_lookup_code || "").trim();
     if (!orderCode) { showAdminToast("주문번호를 찾지 못해 반품을 취소할 수 없어요.", "error"); return; }
     setReturnSaving(true);
     try {
@@ -1435,41 +1440,47 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           <Info label="이름(주문자)" value={order.name || "-"} />
           <Info label="연락처(주문자)" value={orderForView.phone || "-"} />
           <Info label="결제방법" value={orderForView.paymentMethod || "-"} />
-          {((order as any).recipientName || (order as any).recipientPhone) ? (
-            <>
-              <Info label="받는 분(배송)" value={(order as any).recipientName || order.name || "-"} strong />
-              <Info label="받는분 연락처" value={(order as any).recipientPhone || orderForView.phone || "-"} />
-            </>
-          ) : null}
+          {/* [E4] 받는 분이 주문자와 같으면 두 칸 대신 한 칸으로. */}
+          {(() => {
+            const rName = clean((order as Record<string, unknown>).recipientName);
+            const rPhone = clean((order as Record<string, unknown>).recipientPhone);
+            if (!rName && !rPhone) return null;
+            const same = (!rName || rName === clean(order.name)) && (!rPhone || rPhone === clean(orderForView.phone));
+            if (same) return <Info label="받는 분" value="주문자와 동일" />;
+            return (
+              <>
+                <Info label="받는 분(배송)" value={rName || order.name || "-"} strong />
+                <Info label="받는분 연락처" value={rPhone || orderForView.phone || "-"} />
+              </>
+            );
+          })()}
         </div>
 
-        {/* 반품/교환 · 고객이슈 — 등록은 「환불·교환 등록」 버튼 하나로 고객이슈 등록 모달(IssueRegisterModal)을 연다. */}
+        {/* 고객이슈 — 등록은 「+ 고객이슈 등록」 버튼 하나로 고객이슈 등록 모달(IssueRegisterModal)을 연다. */}
         <section className="mt-3">
           <div className="mb-1 flex items-center gap-2">
-            <span className="text-[11px] font-black text-ink-mute">반품/교환</span>
+            <span className="text-[11px] font-black text-ink-mute">고객이슈</span>
             <button
               type="button"
               onClick={() => void openIssueRegister()}
               className="rounded-lg border border-rose-line bg-rose-soft px-2.5 py-1 text-[11px] font-black text-rose-deep transition hover:bg-rose-line/40"
             >
-              ↩ 환불·교환 등록
+              + 고객이슈 등록
             </button>
           </div>
           {(order as any).returnStatus ? (
             <div className="rounded-lg border border-warn-tx/40 bg-warn-bg p-3 text-[12px] font-bold leading-6 text-warn-tx">
-              <span className="mr-2 rounded-lg bg-surface px-2 py-0.5 text-[11px] font-black">{String((order as any).returnStatus)}</span>
+              {/* [B4] DB 값은 「반품(환불)/반품(교환)/기타」 — 화면에서만 「환불/교환/기타」로. 사유 앞머리 "[유형] " 제거. */}
+              <span className="mr-2 rounded-lg bg-surface px-2 py-0.5 text-[11px] font-black">{String((order as any).returnStatus).replace("반품(환불)", "환불").replace("반품(교환)", "교환")}</span>
               {Number((order as any).returnAmount || 0) > 0 ? <span className="mr-2">환불 예정/완료 {money(Number((order as any).returnAmount || 0))}</span> : null}
-              <div className="mt-1 whitespace-pre-wrap text-ink-soft">{String((order as any).returnReason || "사유 없음")}</div>
-              <div className="mt-1 flex items-center justify-between gap-2">
-                <span className="text-[11px] text-ink-mute">※ 기록용입니다 — 정산·입금·재고 숫자는 바뀌지 않아요.</span>
-                <span className="flex shrink-0 items-center gap-3">
-                  <button type="button" disabled={returnSaving} onClick={() => void handleClearReturn()} className="text-[11px] font-black text-ink-mute underline hover:text-danger-tx disabled:opacity-50">기록 지우기</button>
-                  <button type="button" disabled={returnSaving} onClick={handleUndoReturn} className="text-[11px] font-black text-ink-mute underline hover:text-rose-deep disabled:opacity-50">반품 취소</button>
-                </span>
+              <div className="mt-1 whitespace-pre-wrap text-ink-soft">{String((order as any).returnReason || "사유 없음").replace(/^\[[^\]]*\]\s*/, "")}</div>
+              <div className="mt-1 flex items-center justify-end gap-3">
+                <button type="button" disabled={returnSaving} onClick={() => void handleClearReturn()} title="기록만 지웁니다 — 정산·입금·재고 숫자는 바뀌지 않아요." className="text-[11px] font-black text-ink-mute underline hover:text-danger-tx disabled:opacity-50">기록 지우기</button>
+                <button type="button" disabled={returnSaving} onClick={handleUndoReturn} className="text-[11px] font-black text-ink-mute underline hover:text-rose-deep disabled:opacity-50">반품 취소</button>
               </div>
             </div>
           ) : (
-            <div className="rounded-lg bg-surface-2 p-3 text-[12px] font-bold text-ink-mute">기록 없음</div>
+            <div className="rounded-lg bg-surface-2 p-3 text-[12px] font-bold text-ink-mute">등록된 이슈 없음</div>
           )}
         </section>
 
@@ -1479,11 +1490,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           {orderForView.paidAt ? <span className="ml-2 font-bold opacity-70">{orderForView.paidAt}</span> : null}
         </div>
 
-        {["manual_paid", "auto_paid", "paid"].includes(orderForView.paymentStatus) ? (
-          <div className="mt-2 rounded-xl border border-line bg-surface-2 px-3 py-2 text-[11px] font-bold leading-4 text-ink-soft">
-            입금확인 주문입니다. 입금확인을 잘못 처리한 경우에는 [입금확인 취소]를 사용하세요. 주문 자체를 없애야 하는 경우에만 [주문서 자체 취소]를 사용하세요.
-          </div>
-        ) : null}
+        {/* [E1] 「입금확인 주문입니다…」 안내 문단 삭제 — 버튼 이름이 곧 설명. 상태 배지·돈 계산기 유지. */}
 
         {/* [2026-08-31 사장님 요청] 💰 돈 계산기 — 입금액 vs 주문금액 자동 비교, 버튼 한 번 처리 */}
         {balanceEligible && balanceInfo && balanceInfo.depositCount > 0 ? (() => {
@@ -1708,16 +1715,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             </button>
           ) : null}
 
-          {!isCanceled && canCancelPaymentConfirm ? (
-            <button
-              type="button"
-              onClick={handlePaymentConfirmCancel}
-              disabled={paymentCancelAction}
-              className="h-10 w-full rounded-xl border border-line bg-surface text-[13px] font-black text-ink shadow-sm hover:opacity-90 active:scale-[0.99] disabled:bg-surface-2 disabled:text-ink-mute"
-            >
-              {paymentCancelAction ? "처리중..." : "입금확인 취소"}
-            </button>
-          ) : null}
+          {/* [E2] 「입금확인 취소」는 화면 맨 아래 「⚠ 위험 작업」 접힘으로 이동. */}
 
           {showCardStatusActions ? (
             <>
@@ -1734,9 +1732,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 
               {isCardPaid ? (
                 <>
-                  <div className="rounded-xl border border-[var(--color-cardpay)]/30 bg-[var(--color-cardpay)]/12 px-3 py-2 text-[11px] font-bold leading-4 text-[var(--color-cardpay)]">
-                    카드결제완료 주문입니다. 결제완료 처리를 잘못한 경우에는 [카드미결제로 되돌리기]를 사용하세요. 주문 자체를 없애야 하는 경우에만 [주문서 자체 취소]를 사용하세요.
-                  </div>
+                  {/* [E1] 「카드결제완료 주문입니다…」 안내 문단 삭제 — 버튼 이름이 곧 설명. */}
                   <button
                     type="button"
                     onClick={() => handleCardPaymentStatusChange("주문확인전", "card-unpaid")}
@@ -1798,85 +1794,114 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 </>
               ) : null}
             </>
-          ) : (
-            <>
-              <LiveOrderDangerActionGuide />
-              <button
-                type="button"
-                onClick={cancelOrder}
-                disabled={Boolean(savingAction)}
-                className="h-10 w-full rounded-xl border border-danger-tx bg-danger-bg text-[13px] font-black text-danger-tx shadow-sm hover:opacity-90 active:scale-[0.99] disabled:bg-surface-2 disabled:text-ink-mute"
-              >
-                {savingAction === "cancel" ? "처리중..." : "주문서 자체 취소"}
-              </button>
-            </>
-          )}
+          ) : null /* [E2] 「주문서 자체 취소」는 화면 맨 아래 「⚠ 위험 작업」 접힘으로 이동. */}
         </div>
 
-        {/* [2026-09-22] 이 손님 차단 — 거파 처리 흐름(주문 취소 → 차단)을 한 화면에서 끝낸다
-            [2026-09-23] 이미 차단된 손님이면 «차단 해제»만 보여준다(또 차단하라고 하지 않는다) */}
-        <div className="mt-3 rounded-xl border border-line p-3">
-          <div className="text-[11px] font-black text-ink-mute">이 손님</div>
-
-          {blockedNow === null ? (
-            <div className="mt-2 flex h-10 w-full items-center justify-center rounded-xl bg-surface-2 text-[12px] font-bold text-ink-mute">
-              차단 여부 확인 중…
-            </div>
-          ) : blockedNow ? (
-            <>
-              <div className="mt-2 rounded-xl border border-danger-tx bg-danger-bg px-3 py-2">
-                <div className="text-[12px] font-black text-danger-tx">🚫 이미 차단된 손님입니다</div>
-                {blockedReason ? (
-                  <pre className="mt-1 whitespace-pre-wrap break-words text-[11px] font-bold leading-4 text-danger-tx">{blockedReason}</pre>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                onClick={async () => {
-                  if (blockSaving) return;
-                  const who = clean(orderForView.nickname) || clean(orderForView.name) || "이 손님";
-                  if (!(await showAdminConfirm(
-                    `${who}의 차단을 해제할까요?\n\n해제하면 바로 주문서를 다시 쓸 수 있습니다.`,
-                    { title: "차단 해제", confirmText: "차단 해제", cancelText: "그만두기", tone: "warning" },
-                  ))) return;
-                  setBlockSaving(true);
-                  try {
-                    await requestAdminCustomerBlock({ phone: clean(orderForView.phone), blocked: false, reason: "" });
-                    setBlockCheckTick((v) => v + 1);
-                    showAdminToast(`${who}의 차단을 해제했습니다.`, "success");
-                  } catch (error) {
-                    showAdminToast("차단 해제 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
-                  } finally {
-                    setBlockSaving(false);
-                  }
-                }}
-                disabled={blockSaving}
-                className="mt-2 h-10 w-full rounded-xl border border-line bg-surface text-[13px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50"
-              >
-                {blockSaving ? "처리중…" : "✅ 차단 해제"}
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => { setBlockError(""); setBlockOpen(true); }}
-                className="mt-2 h-10 w-full rounded-xl border border-danger-tx bg-surface text-[13px] font-black text-danger-tx hover:bg-danger-bg active:scale-[0.99]"
-              >
-                🚫 이 손님 차단 (거파 품목 고르기)
-              </button>
-              <div className="mt-1.5 text-[11px] font-bold leading-4 text-ink-mute">
-                차단하면 이 손님은 주문서를 새로 쓸 수 없습니다. 이미 들어온 주문·입금·정산은 그대로 남습니다.
-              </div>
-            </>
-          )}
-        </div>
+        {/* [E2] 「이 손님 차단」은 화면 맨 아래 「⚠ 위험 작업」 접힘으로 이동. */}
 
         <section className="mt-3">
           <div className="mb-1 text-[11px] font-black text-ink-mute">배송메모 / 특이사항</div>
-          <div className="min-h-[56px] rounded-lg bg-surface-2 p-3 text-[12px] font-bold leading-6 text-ink-soft">
-            {customerDeliveryMemoText || "입력 없음"}
-          </div>
+          {/* [E5] 비면 회색 한 줄 */}
+          {customerDeliveryMemoText ? (
+            <div className="min-h-[56px] rounded-lg bg-surface-2 p-3 text-[12px] font-bold leading-6 text-ink-soft">{customerDeliveryMemoText}</div>
+          ) : (
+            <div className="rounded-lg bg-surface-2 px-3 py-2 text-[12px] font-bold text-ink-mute">배송메모 없음</div>
+          )}
+        </section>
+
+        {/* [E2] ⚠ 위험 작업 — 기본 접힘. 누르면 입금확인 취소·주문서 자체 취소·이 손님 차단 표시(핸들러·조건·확인창 그대로). */}
+        <section className="mt-4">
+          <button type="button" onClick={() => setDangerOpen((v) => !v)} className="flex w-full items-center justify-between rounded-lg border border-line bg-surface px-3 py-2 text-[12px] font-black text-ink-mute hover:bg-surface-2">
+            <span>⚠ 위험 작업</span>
+            <span>{dangerOpen ? "▲" : "▼"}</span>
+          </button>
+          {dangerOpen ? (
+            <div className="mt-2 space-y-2 rounded-lg border border-danger-tx/30 bg-danger-bg/40 p-3">
+              <div className="text-[11px] font-bold leading-4 text-ink-mute">되돌리기 어려운 작업이에요 — 꼭 필요할 때만 사용하세요.</div>
+
+              {!isCanceled && canCancelPaymentConfirm ? (
+                <button
+                  type="button"
+                  onClick={handlePaymentConfirmCancel}
+                  disabled={paymentCancelAction}
+                  className="h-10 w-full rounded-xl border border-line bg-surface text-[13px] font-black text-ink shadow-sm hover:opacity-90 active:scale-[0.99] disabled:bg-surface-2 disabled:text-ink-mute"
+                >
+                  {paymentCancelAction ? "처리중..." : "입금확인 취소"}
+                </button>
+              ) : null}
+
+              {!isCanceled ? (
+                <>
+                  <LiveOrderDangerActionGuide />
+                  <button
+                    type="button"
+                    onClick={cancelOrder}
+                    disabled={Boolean(savingAction)}
+                    className="h-10 w-full rounded-xl border border-danger-tx bg-danger-bg text-[13px] font-black text-danger-tx shadow-sm hover:opacity-90 active:scale-[0.99] disabled:bg-surface-2 disabled:text-ink-mute"
+                  >
+                    {savingAction === "cancel" ? "처리중..." : "주문서 자체 취소"}
+                  </button>
+                </>
+              ) : null}
+
+              {/* 이 손님 차단(또는 해제) — 조건·핸들러·확인창 그대로 */}
+              <div className="rounded-xl border border-line bg-surface p-3">
+                <div className="text-[11px] font-black text-ink-mute">이 손님</div>
+                {blockedNow === null ? (
+                  <div className="mt-2 flex h-10 w-full items-center justify-center rounded-xl bg-surface-2 text-[12px] font-bold text-ink-mute">
+                    차단 여부 확인 중…
+                  </div>
+                ) : blockedNow ? (
+                  <>
+                    <div className="mt-2 rounded-xl border border-danger-tx bg-danger-bg px-3 py-2">
+                      <div className="text-[12px] font-black text-danger-tx">🚫 이미 차단된 손님입니다</div>
+                      {blockedReason ? (
+                        <pre className="mt-1 whitespace-pre-wrap break-words text-[11px] font-bold leading-4 text-danger-tx">{blockedReason}</pre>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (blockSaving) return;
+                        const who = clean(orderForView.nickname) || clean(orderForView.name) || "이 손님";
+                        if (!(await showAdminConfirm(
+                          `${who}의 차단을 해제할까요?\n\n해제하면 바로 주문서를 다시 쓸 수 있습니다.`,
+                          { title: "차단 해제", confirmText: "차단 해제", cancelText: "그만두기", tone: "warning" },
+                        ))) return;
+                        setBlockSaving(true);
+                        try {
+                          await requestAdminCustomerBlock({ phone: clean(orderForView.phone), blocked: false, reason: "" });
+                          setBlockCheckTick((v) => v + 1);
+                          showAdminToast(`${who}의 차단을 해제했습니다.`, "success");
+                        } catch (error) {
+                          showAdminToast("차단 해제 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
+                        } finally {
+                          setBlockSaving(false);
+                        }
+                      }}
+                      disabled={blockSaving}
+                      className="mt-2 h-10 w-full rounded-xl border border-line bg-surface text-[13px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50"
+                    >
+                      {blockSaving ? "처리중…" : "✅ 차단 해제"}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => { setBlockError(""); setBlockOpen(true); }}
+                      className="mt-2 h-10 w-full rounded-xl border border-danger-tx bg-surface text-[13px] font-black text-danger-tx hover:bg-danger-bg active:scale-[0.99]"
+                    >
+                      🚫 이 손님 차단 (거파 품목 고르기)
+                    </button>
+                    <div className="mt-1.5 text-[11px] font-bold leading-4 text-ink-mute">
+                      차단하면 이 손님은 주문서를 새로 쓸 수 없습니다. 이미 들어온 주문·입금·정산은 그대로 남습니다.
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          ) : null}
         </section>
 
       </div>
@@ -1914,7 +1939,8 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         saving={returnSaving}
         onSubmit={handleIssueRegisterSubmit}
         orderContext={{
-          orderCode: String((order as any).orderNumber ?? (order as any).orderLookupCode ?? (order as any).order_lookup_code ?? "").trim(),
+          // [A] LiveOrder 필드는 orderNo(어댑터 330행) — 옛 키는 존재하지 않아 항상 빈 값이었음.
+          orderCode: String((order as LiveOrder).orderNo || (order as Record<string, unknown>).order_lookup_code || "").trim(),
           nickname: clean((orderForView as any).youtubeNickname) || clean(orderForView.nickname),
           name: clean(orderForView.name),
           phone: clean(orderForView.phone),

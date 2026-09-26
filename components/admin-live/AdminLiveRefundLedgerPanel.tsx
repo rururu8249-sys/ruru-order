@@ -21,6 +21,7 @@ import {
   deriveInitialSelection,
   buildSnapshotFromSelection,
   baseSummaryLine,
+  cardBaseSummaryLine,
   dateShortKo,
   dateLongKo,
   computeAmountFinal,
@@ -478,7 +479,8 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
         setSel(derived.sel);
         setSnapshotUnmatched(derived.matchedNone);
         // 카드결제 주문 → 방법 기본 항상 「카드취소」(저장 방법 없을 때만). 카드는 전체 취소가 원칙.
-        if (clean(entry?.paymentMethod).includes("카드") && !isExchange && (!item.method || item.method === "없음")) {
+        //   [C4] 카드 감지 이전 저장 기록이 「계좌이체」(계좌번호 없음)로 열려 이체 사고 위험(김미성 MTD0B5AY) → 그 경우도 카드취소로.
+        if (clean(entry?.paymentMethod).includes("카드") && !isExchange && (!item.method || item.method === "없음" || (item.method === "계좌이체" && !clean(item.account_number)))) {
           setMethod("카드취소");
         }
         setLinesLoaded(true);
@@ -531,7 +533,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
   const deductFinalLabel = isCardCancel ? (reasonVal ? `${reasonVal} 반품비` : "반품비") : (reasonVal ? `${reasonVal} 차감` : "차감");
   // [사유 3칩] 단순변심 → 「반품비」 라벨, 기타 → 「차감」, 상품 문제 → 차감 행 숨김(0). 단 저장된 차감 값(입력>0)이 있으면 칩 무관하게 표시.
   const deductRowLabel = reasonChip === "단순변심" ? "반품비" : "차감";
-  const showDeductRow = reasonChip !== "상품 문제" || deductAmount > 0;
+  const showDeductRow = reasonChip !== "상품문제" || deductAmount > 0;
   const finalAdj: RefundAdjustment[] = [...keptAdj, ...(deductAmount > 0 ? [{ label: deductFinalLabel, amount: -deductAmount }] : [])];
   const amountFinal = computeAmountFinal(amountBase, finalAdj);
   const deductTotal = finalAdj.filter((a) => a.amount < 0).reduce((s, a) => s - a.amount, 0);
@@ -546,8 +548,10 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
   const isPartial = !matchFailed && lineCount > 0 && !isFullReturn;
   const orderTotalAll = totalLineSum + effectiveShippingFee; // 주문 총 결제금액(무통장)
   const cardProductAmount = Math.max(0, cardTotalDisplay - cardExtra); // 카드: 상품금액 = 카드총액 − 부가세
-  // [기준 줄] 항상 — 공용 baseSummaryLine 재사용.
-  const baseSummaryText = baseSummaryLine({ orderTotal: orderTotalAll, productAll: totalLineSum, shippingFee: effectiveShippingFee, isPartial, lineCount, selectedCount });
+  // [기준 줄] 카드 주문이면 카드총액 기준(cardBaseSummaryLine), 아니면 총 결제 기준(baseSummaryLine).
+  const baseSummaryText = isCardOrder
+    ? cardBaseSummaryLine({ cardTotal: cardTotalDisplay, productAll: totalLineSum, shippingFee: effectiveShippingFee, isPartial, lineCount, selectedCount })
+    : baseSummaryLine({ orderTotal: orderTotalAll, productAll: totalLineSum, shippingFee: effectiveShippingFee, isPartial, lineCount, selectedCount });
   const shippingStatusText = (() => {
     if (effectiveShippingFee === 0) return "무료배송";
     if (shippingTouched) return includeShipping ? "직접 포함" : "직접 제외";
@@ -668,8 +672,6 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
     catch { showAdminToast("복사 실패:\n" + text, "warning"); }
   };
 
-  const memoFull = clean(item.reason);
-  const memoFirst = memoFull.split("\n")[0] || "";
   const nextActionSaved = clean(item.next_action);
   const INPUT = "h-11 rounded-lg border border-line bg-surface px-3 text-[16px] font-bold text-ink outline-none focus-visible:ring-2 focus-visible:ring-rose-deep";
   // [묶기] 대표가 아닌 이슈에서 열었을 때 표기할 대표 이슈 날짜(M/D).
@@ -698,7 +700,6 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
             {headerNotice ? <div className="mt-1 text-[13px] leading-5 text-ink-mute">{headerNotice}</div> : null}
             <div className="mt-1 text-[13px] leading-5 text-ink-soft">
               <div className="truncate font-black text-ink">{clean(item.nickname) || "—"}{clean(item.customer_name) ? ` · ${clean(item.customer_name)}` : ""}{orderCode ? ` · ${orderCode}` : ""}</div>
-              {memoFirst ? <div className="truncate text-ink-mute">💬 {memoFirst}</div> : null}
             </div>
           </div>
           <button type="button" onClick={onClose} aria-label="닫기" className="shrink-0 rounded-full px-2 text-lg font-black text-ink-mute hover:bg-surface-2">✕</button>
@@ -717,7 +718,8 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                 </button>
               ))}
             </div>
-            <input value={issueMemo} onChange={(e) => setIssueMemo(e.target.value)} placeholder="메모 (선택)" className={`mt-2 w-full ${INPUT}`} />
+            {/* [C2] 기타는 사유가 없으니 메모를 유형 칩 아래에 둔다. 환불·교환은 사유 칩 아래(아래쪽)에 렌더. */}
+            {isEtc ? <input value={issueMemo} onChange={(e) => setIssueMemo(e.target.value)} placeholder="메모 (선택)" className={`mt-2 w-full ${INPUT}`} /> : null}
           </div>
 
           {/* 2. 상품 */}
@@ -827,14 +829,15 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                     const next = reasonChip === c.value ? "" : c.value;
                     setReasonChip(next); setReasonDirty(true);
                     // 상품 문제(사업자 귀책) → 반품비 차감 0으로(전자상거래법 18조). 단순변심/기타/미선택은 차감 유지.
-                    if (next === "상품 문제") setDeductAmount(0);
+                    if (next === "상품문제") setDeductAmount(0);
                   }}
-                  className={`flex flex-col items-center rounded-2xl px-3 py-1.5 text-[14px] font-black leading-tight transition ${reasonChip === c.value ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}>
-                  <span>{c.value}</span>
-                  {c.sub ? <span className={`text-[11px] font-bold ${reasonChip === c.value ? "text-white/80" : "text-ink-mute"}`}>{c.sub}</span> : null}
+                  className={`rounded-2xl px-3 py-1.5 text-[14px] font-black leading-tight transition ${reasonChip === c.value ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}>
+                  {c.value}
                 </button>
               ))}
             </div>
+            {/* [C2] 환불·교환 메모는 사유 칩 바로 아래(입력은 하나·issueMemo). */}
+            <input value={issueMemo} onChange={(e) => setIssueMemo(e.target.value)} placeholder="메모 (선택)" className={`mt-2 w-full ${INPUT}`} />
           </div>
 
           {!isExchange ? (

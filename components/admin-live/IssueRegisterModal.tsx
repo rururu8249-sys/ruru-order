@@ -92,11 +92,10 @@ export default function IssueRegisterModal({ open, onClose, onSubmit, saving = f
   const [nickname, setNickname] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [taskTypes, setTaskTypes] = useState<string[]>(["general"]);
   const [priority, setPriority] = useState("normal");
   const [memo, setMemo] = useState("");
-  // 주문상세 모드 전용
-  const [mode, setMode] = useState<"refund" | "exchange" | "etc">("refund");
+  // [B2] 유형 = 환불/교환/기타 단일 선택(두 경로 공통). 탭 저장 시 taskTypes 는 이 하나에서 파생(기타→general).
+  const [mode, setMode] = useState<"refund" | "exchange" | "etc">(isOrder ? "refund" : "etc");
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   // 탭 모드 검색
   const [searchDraft, setSearchDraft] = useState("");
@@ -108,10 +107,9 @@ export default function IssueRegisterModal({ open, onClose, onSubmit, saving = f
     setNickname(clean(orderContext?.nickname));
     setName(clean(orderContext?.name));
     setPhone(clean(orderContext?.phone));
-    setTaskTypes(["general"]);
     setPriority("normal");
     setMemo("");
-    setMode("refund");
+    setMode(isOrder ? "refund" : "etc");
     setSelectedRowIds((orderContext?.lines || []).map((l) => String(l.id)).filter(Boolean));
     setSearchDraft("");
     setSearchKeyword("");
@@ -130,6 +128,8 @@ export default function IssueRegisterModal({ open, onClose, onSubmit, saving = f
   const toggleRow = (id: string) => setSelectedRowIds((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
 
   const submit = () => {
+    // 탭 저장(admin-tasks)은 taskTypes[0] 을 task_type 으로 씀 → 기타=general, 나머지는 mode 그대로.
+    const taskTypes = [mode === "etc" ? "general" : mode];
     void onSubmit({ nickname: clean(nickname), name: clean(name), phone: clean(phone), taskTypes, priority, memo: cleanMultiline(memo), mode, selectedRowIds });
   };
 
@@ -138,8 +138,7 @@ export default function IssueRegisterModal({ open, onClose, onSubmit, saving = f
       <div className="max-h-[92vh] w-full max-w-[620px] overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-[11px] font-black tracking-[0.18em] text-rose-deep">{isOrder ? "REFUND / EXCHANGE" : "ADD CUSTOMER ISSUE"}</div>
-            <h3 className="mt-1 text-lg font-black text-ink">{isOrder ? "환불·교환 등록" : "고객이슈 등록"}</h3>
+            <h3 className="text-lg font-black text-ink">고객이슈 등록</h3>
           </div>
           <button type="button" onClick={onClose} className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2">닫기</button>
         </div>
@@ -239,8 +238,15 @@ export default function IssueRegisterModal({ open, onClose, onSubmit, saving = f
             </div>
 
             <div className="mt-4">
-              <div className="mb-2 text-xs font-black text-ink-soft">유형 (여러 개 선택 가능)</div>
-              <IssueTypeChips value={taskTypes} onChange={setTaskTypes} />
+              <div className="mb-2 text-xs font-black text-ink-soft">유형</div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {ORDER_ISSUE_TYPES.map(([key, label]) => (
+                  <button key={key} type="button" onClick={() => setMode(key as "refund" | "exchange" | "etc")}
+                    className={`rounded-xl px-3 py-1.5 text-[13px] font-black transition ${mode === key ? (key === "refund" ? "bg-rose-deep text-white" : "bg-[var(--color-ink-soft)] text-white") : "border border-line bg-surface text-ink-mute hover:bg-surface-2"}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="mt-3">
@@ -257,7 +263,7 @@ export default function IssueRegisterModal({ open, onClose, onSubmit, saving = f
         <div className="mt-4 grid grid-cols-2 gap-2">
           <button type="button" onClick={onClose} className="h-11 rounded-xl border border-line bg-surface text-sm font-black text-ink-soft hover:bg-surface-2">취소</button>
           <button type="button" onClick={submit} disabled={saving} className="h-11 rounded-xl bg-rose-deep text-sm font-black text-white hover:opacity-90 disabled:opacity-50">
-            {saving ? "접수중…" : isOrder ? (mode === "refund" ? "환불 등록" : mode === "exchange" ? "교환 등록" : "기타 등록") : "저장"}
+            {saving ? "접수중…" : "등록"}
           </button>
         </div>
       </div>

@@ -1,5 +1,5 @@
 // [2026-09-26 5·6차] 고객이슈 환불/교환 용어·💳 요약 문구 테스트
-import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, cardRefundBackAmount, pickPrimaryLedger, ledgerHasPayoutInfo, restoreSelectionFromSnapshot, deriveInitialSelection, buildSnapshotFromSelection, listAmountLine, listAmountParts, dateShortLabel, baseSummaryLine, dateShortKo, dateLongKo, returnStagePrefix, reasonChipFromStored, buildKakaoCopy } from "../lib/refundLedger.ts";
+import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, cardRefundBackAmount, pickPrimaryLedger, ledgerHasPayoutInfo, restoreSelectionFromSnapshot, deriveInitialSelection, buildSnapshotFromSelection, listAmountLine, listAmountParts, dateShortLabel, baseSummaryLine, cardBaseSummaryLine, dateShortKo, dateLongKo, returnStagePrefix, reasonChipFromStored, buildKakaoCopy } from "../lib/refundLedger.ts";
 import { bankDisplayName } from "../lib/parseBankAccount.ts";
 
 let pass = 0;
@@ -362,9 +362,10 @@ eq(returnStagePrefix("", ""), "", "둘 다 없으면 생략");
 eq(reasonChipFromStored("단순변심"), "단순변심", "단순변심 그대로");
 eq(reasonChipFromStored("손님 변심"), "단순변심", "손님 변심(옛값) → 단순변심");
 eq(reasonChipFromStored("사이즈"), "단순변심", "사이즈 → 단순변심");
-eq(reasonChipFromStored("상품 문제"), "상품 문제", "상품 문제 그대로");
-eq(reasonChipFromStored("불량"), "상품 문제", "불량 → 상품 문제");
-eq(reasonChipFromStored("오배송"), "상품 문제", "오배송 → 상품 문제");
+eq(reasonChipFromStored("상품문제"), "상품문제", "상품문제 그대로");
+eq(reasonChipFromStored("상품 문제"), "상품문제", "옛 상품 문제(띄어쓰기) → 상품문제");
+eq(reasonChipFromStored("불량"), "상품문제", "불량 → 상품문제");
+eq(reasonChipFromStored("오배송"), "상품문제", "오배송 → 상품문제");
 eq(reasonChipFromStored("기타"), "기타", "기타 그대로");
 eq(reasonChipFromStored("색이 달라서 바꿔주세요 ㅠㅠ"), "", "긴 메모 → 미선택");
 eq(reasonChipFromStored(""), "", "빈 값 → 미선택");
@@ -424,5 +425,11 @@ const nowFixed = new Date("2026-06-15T00:00:00");
 eq(dateShortLabel("2026-09-23", nowFixed), "9/23(수)", "올해 → M/D(요일)");
 eq(dateShortLabel("2025-12-31", nowFixed), "2025.12/31(수)", "작년 → YYYY.M/D(요일)");
 eq(dateShortLabel("", nowFixed), "", "빈값 → 빈칸");
+
+// ── [C5] cardBaseSummaryLine — 카드총액 기준(=없이 · 나열) ──
+eq(cardBaseSummaryLine({ cardTotal: 1052980, productAll: 986000, shippingFee: 0, isPartial: true, lineCount: 4, selectedCount: 1 }),
+  "카드 결제 1,052,980원 · 상품 986,000 · 무료배송 · 4개 중 1개 반품", "카드 부분반품·무료배송");
+eq(cardBaseSummaryLine({ cardTotal: 276850, productAll: 255000, shippingFee: 4000, isPartial: false, lineCount: 1, selectedCount: 1 }),
+  "카드 결제 276,850원 · 상품 255,000 + 배송비 4,000", "카드 전체·배송비");
 
 console.log(`✅ refund-issue-terms ${pass}건 통과`);

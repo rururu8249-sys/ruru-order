@@ -24,19 +24,19 @@ export function stageDisplay(stage: unknown, kind?: unknown): string {
   return s;
 }
 
-// [2026-09-27] 반품 사유 = 3칩. reason 필드에 "단순변심" / "상품 문제" / "기타" 저장(전자상거래법 18조 — 변심은 소비자 반품비 부담).
-export const REASON_CHIPS = ["단순변심", "사이즈", "불량", "오배송", "기타", "손님 변심", "상품 문제"] as const; // (옛 데이터 인식용)
+// [2026-09-27] 반품 사유 = 3칩. reason 필드에 "단순변심" / "상품문제" / "기타" 저장(전자상거래법 18조 — 변심은 소비자 반품비 부담).
+export const REASON_CHIPS = ["단순변심", "사이즈", "불량", "오배송", "기타", "손님 변심", "상품문제", "상품 문제"] as const; // (옛 데이터 인식용)
 export const REASON_FAULT_CHIPS = [
   { value: "단순변심", sub: "" },
-  { value: "상품 문제", sub: "불량·오배송" },
+  { value: "상품문제", sub: "" },
   { value: "기타", sub: "" },
 ] as const;
-export type ReasonChip = "단순변심" | "상품 문제" | "기타" | "";
-// 저장된 reason → 3칩 매핑. 매칭 안 되면 ""(미선택) — 메모성 긴 값은 그대로 둠.
+export type ReasonChip = "단순변심" | "상품문제" | "기타" | "";
+// 저장된 reason → 3칩 매핑. 매칭 안 되면 ""(미선택) — 메모성 긴 값은 그대로 둠. (옛 "상품 문제"/"불량"/"오배송" → "상품문제")
 export function reasonChipFromStored(reason: unknown): ReasonChip {
   const r = String(reason ?? "").trim();
   if (r === "단순변심" || r === "손님 변심" || r === "사이즈") return "단순변심";
-  if (r === "상품 문제" || r === "불량" || r === "오배송") return "상품 문제";
+  if (r === "상품문제" || r === "상품 문제" || r === "불량" || r === "오배송") return "상품문제";
   if (r === "기타") return "기타";
   return "";
 }
@@ -337,6 +337,20 @@ export function baseSummaryLine(o: {
   const c = (n: number) => Math.round(Number(n) || 0).toLocaleString("ko-KR");
   const ship = Math.max(0, Math.round(Number(o.shippingFee) || 0));
   let t = `주문 총 결제 ${w(o.orderTotal)} = 상품 ${c(o.productAll)}`;
+  t += ship > 0 ? ` + 배송비 ${c(ship)}` : " · 무료배송";
+  if (o.isPartial) t += ` · ${o.lineCount}개 중 ${o.selectedCount}개 반품`;
+  return t;
+}
+
+// [C5 2026-09-27] 카드 주문 기준 줄 — 「카드 결제 1,052,980원 · 상품 986,000 · 무료배송 · 4개 중 1개 반품」.
+//   카드총액은 부가세·포인트가 반영된 실제 결제액이라 «=» 로 상품+배송비와 같지 않다 → · 로 나열만.
+export function cardBaseSummaryLine(o: {
+  cardTotal: number; productAll: number; shippingFee: number; isPartial: boolean; lineCount: number; selectedCount: number;
+}): string {
+  const w = (n: number) => `${Math.round(Number(n) || 0).toLocaleString("ko-KR")}원`;
+  const c = (n: number) => Math.round(Number(n) || 0).toLocaleString("ko-KR");
+  const ship = Math.max(0, Math.round(Number(o.shippingFee) || 0));
+  let t = `카드 결제 ${w(o.cardTotal)} · 상품 ${c(o.productAll)}`;
   t += ship > 0 ? ` + 배송비 ${c(ship)}` : " · 무료배송";
   if (o.isPartial) t += ` · ${o.lineCount}개 중 ${o.selectedCount}개 반품`;
   return t;

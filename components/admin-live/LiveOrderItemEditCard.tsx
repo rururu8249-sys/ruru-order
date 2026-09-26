@@ -106,7 +106,8 @@ function editCountText(item: LiveOrderItem) {
 
   if (productCount <= 0 && amountCount <= 0) return "";
 
-  return `상품수정 ${productCount}회 · 금액수정 ${amountCount}회`;
+  // [E3] 0회 항목은 생략(둘 다 0이면 위에서 이미 배지 숨김).
+  return [productCount > 0 ? `상품수정 ${productCount}회` : "", amountCount > 0 ? `금액수정 ${amountCount}회` : ""].filter(Boolean).join(" · ");
 }
 
 function inventoryItemStatusInfo(item: LiveOrderItem) {
