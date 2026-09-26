@@ -15,6 +15,7 @@ import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { pickIssueProductRows } from "@/lib/issueProductLabel";
 import { RefundProcessModal, type LedgerDetail } from "./AdminLiveRefundLedgerPanel";
 import { productSnapshotFromItems } from "@/lib/refundLedger";
+import { ISSUE_FILTER_CHIPS, matchesIssueFilterChip } from "@/lib/issueFilter";
 
 type AdminIssueTask = {
   id?: string | number | null;
@@ -77,6 +78,15 @@ const ISSUE_TYPE_OPTIONS: Array<[string, string]> = [
   ["refund", "환불"],
   ["purchase", "구매"],
   ["bad_customer", "진상"],
+  ["general", "기타"],
+];
+
+// [2026-09-26] 등록·편집 셀렉터가 «보여주는» 유형 — 진상/구매 제외(교환·반품·환불·기타).
+//   ⚠️ 저장값·기존데이터 라벨 인식용 ISSUE_TYPE_OPTIONS 는 그대로 둔다(진상/구매 건도 정상 표시).
+const REGISTER_TYPE_OPTIONS: Array<[string, string]> = [
+  ["exchange", "교환"],
+  ["return", "반품"],
+  ["refund", "환불"],
   ["general", "기타"],
 ];
 
@@ -305,7 +315,7 @@ function IssueTypeChips({
 
   return (
     <div className="flex flex-wrap gap-2">
-      {ISSUE_TYPE_OPTIONS.map(([key, label]) => {
+      {REGISTER_TYPE_OPTIONS.map(([key, label]) => {
         const active = selected.includes(key);
 
         return (
@@ -357,6 +367,7 @@ function IssueCard({
   photos = [],
   onPhotoZoom,
   ledgerInfo = null,
+  amountText = "",
   onOpenRefund,
 }: {
   task: AdminIssueTask;
@@ -380,6 +391,8 @@ function IssueCard({
   onPhotoZoom?: (url: string) => void;
   /** [2026-09-26] 교환·환불 건의 장부 요약(있을 때만). 진행단계·최종환불액·방법. */
   ledgerInfo?: { stage?: string; amount_final?: number; method?: string } | null;
+  /** [2026-09-26] 목록 「단가 × 수량」(매칭 성공 시). 교환/반품/환불 건에만. */
+  amountText?: string;
   /** [2026-09-26] 「환불 처리」 — 처리 창 열기(교환/반품/환불 건에만). */
   onOpenRefund?: (task: AdminIssueTask) => void;
 }) {
@@ -529,6 +542,7 @@ function IssueCard({
             <div className="flex min-w-0 items-baseline gap-1.5">
               <span className="shrink-0" aria-hidden>📦</span>
               <span className="min-w-0 break-words font-black text-ink">{product}</span>
+              {isRefund ? <span className="shrink-0 text-[13px] font-bold text-ink-soft">{amountText || "-"}</span> : null}
               {orderNo ? <span className="shrink-0 text-[11px] font-bold text-ink-mute">{orderNo}</span> : null}
             </div>
           ) : null}
@@ -762,7 +776,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   const visibleTasks = useMemo(() => {
     const word = searchKey(keyword);
     return tabTasks.filter((task) => {
-      if (typeFilter && !getIssueTypes(task).includes(typeFilter)) return false;
+      if (typeFilter && !matchesIssueFilterChip(task, typeFilter)) return false;
       if (!word) return true;
       const haystack = searchKey(
         [
@@ -821,6 +835,46 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     })().catch(() => { /* 실패해도 목록은 정상, 요약만 생략 */ });
     return () => { alive = false; };
   }, [refundPageIdsKey, refundReloadTick]);
+
+  // [2026-09-26] 목록 「단가 × 수량」 — 현재 페이지 교환·반품·환불 줄의 주문 상품을 «주문번호로 한 번에» 조회(행마다 쿼리 금지).
+  const [amountByTask, setAmountByTask] = useState<Record<string, string>>({});
+  const refundPageCodesKey = Array.from(new Set(pageTasks.filter(isRefundKindTask).map((t) => extractBodyField(t, "주문번호:")).filter(Boolean))).sort().join(",");
+  useEffect(() => {
+    let alive = true;
+    const codes = refundPageCodesKey ? refundPageCodesKey.split(",") : [];
+    if (codes.length === 0) { setAmountByTask({}); return; }
+    (async () => {
+      const res = await fetch(`/api/admin-live/order-lines?codes=${encodeURIComponent(codes.join(","))}`, { cache: "no-store" });
+      const p = await res.json().catch(() => null);
+      if (!alive || !p?.ok) return;
+      const byCode = (p.byCode || {}) as Record<string, { lines?: Array<Record<string, unknown>> }>;
+      const map: Record<string, string> = {};
+      for (const t of pageTasks) {
+        if (!isRefundKindTask(t)) continue;
+        const code = extractBodyField(t, "주문번호:");
+        const lines = (code && byCode[code]?.lines) || [];
+        if (lines.length === 0) continue;
+        const rawItems = (t.raw_payload && typeof t.raw_payload === "object" ? (t.raw_payload as { items?: unknown }).items : null);
+        const targetIds = Array.isArray(rawItems)
+          ? rawItems.map((x) => clean((x as { productId?: unknown; product_id?: unknown })?.productId ?? (x as { product_id?: unknown })?.product_id)).filter(Boolean)
+          : [];
+        const matched = targetIds.length > 0
+          ? lines.filter((l) => targetIds.includes(clean(l.product_id)))
+          : pickIssueProductRows(lines, extractBodyField(t, "대상상품:") || clean(t.related_product));
+        if (matched.length === 0) continue; // 매칭 실패 → "-"
+        if (matched.length === 1) {
+          const m = matched[0];
+          map[clean(t.id)] = `${Number(m.unit || 0).toLocaleString("ko-KR")}원 × ${Math.max(1, Number(m.qty) || 1)}`;
+        } else {
+          const sum = matched.reduce((s, m) => s + (Number(m.lineTotal) || 0), 0);
+          map[clean(t.id)] = `${sum.toLocaleString("ko-KR")}원`;
+        }
+      }
+      setAmountByTask(map);
+    })().catch(() => { /* 실패해도 목록 정상, 금액만 생략 */ });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refundPageCodesKey]);
 
   const openRefund = async (task: AdminIssueTask) => {
     const tid = clean(task.id);
@@ -1596,7 +1650,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
         </div>
 
         <div className="flex flex-wrap items-center gap-1">
-          {[["", "전체"] as [string, string], ...ISSUE_TYPE_OPTIONS].map(([key, label]) => {
+          {ISSUE_FILTER_CHIPS.map(([key, label]) => {
             const on = typeFilter === key;
             return (
               <button
@@ -1715,6 +1769,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               onPurge={purgeIssueTask}
               busy={saving}
               ledgerInfo={ledgerByTask[clean(task.id)] || null}
+              amountText={amountByTask[clean(task.id)] || ""}
               onOpenRefund={openRefund}
             />
           ))}

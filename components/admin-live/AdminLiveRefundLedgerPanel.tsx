@@ -12,12 +12,14 @@ import {
   REFUND_KINDS,
   REFUND_METHODS,
   computeAmountFinal,
+  computeRefundBase,
   formatComma,
   parseAmountInput,
   kindNeedsAmount,
   adjRowsToStored,
   storedToAdjRows,
   type RefundAdjRow,
+  type RefundLineSel,
   type RefundAdjustment,
 } from "@/lib/refundLedger";
 
@@ -35,7 +37,7 @@ export type LedgerListRow = {
   customer_name?: string | null;
   kind: string;
   reason?: string | null;
-  product_snapshot?: Array<{ productName?: string; color?: string; size?: string; qty?: number }> | null;
+  product_snapshot?: Array<{ productId?: string; productName?: string; color?: string; size?: string; qty?: number }> | null;
   stage: string;
   next_action?: string | null;
   amount_base: number;
@@ -320,33 +322,89 @@ export default function AdminLiveRefundLedgerPanel({ focusTaskId }: { focusTaskI
 export function RefundProcessModal({ item, onClose, onSaved }: { item: LedgerDetail; onClose: () => void; onSaved: () => void }) {
   const kind = item.kind || "반품";
   const isExchange = kind === "교환";
-  const needsAmount = kindNeedsAmount(kind);
+  const orderCode = clean(item.order_lookup_code);
 
   const [stage, setStage] = useState(item.stage || "접수");
   const [nextAction, setNextAction] = useState(clean(item.next_action));
-  const [amountBase, setAmountBase] = useState(Math.round(Number(item.amount_base)) || 0);
   const [adjRows, setAdjRows] = useState<RefundAdjRow[]>(storedToAdjRows(item.adjustments));
-  const [method, setMethod] = useState(item.method || "없음");
+  const [method, setMethod] = useState(item.method && item.method !== "없음" ? item.method : (isExchange ? "교환재발송" : "계좌이체"));
   const [bank, setBank] = useState(clean(item.bank));
   const [account, setAccount] = useState(clean(item.account_number));
   const [holder, setHolder] = useState(clean(item.account_holder) || clean(item.customer_name) || clean(item.nickname));
   const [exchangeOption, setExchangeOption] = useState(clean(item.exchange_option));
   const [reshipTracking, setReshipTracking] = useState(clean(item.reship_tracking));
   const [memo, setMemo] = useState(clean(item.memo));
+  const [memoOpen, setMemoOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const stored = adjRowsToStored(adjRows);
-  const amountFinal = computeAmountFinal(amountBase, stored); // 표시용(저장은 서버가 재계산)
-  const formula = stored.length > 0
-    ? [formatComma(amountBase), ...stored.map((a) => `${a.amount < 0 ? "− " : "+ "}${formatComma(Math.abs(a.amount))}`)].join(" ")
-    : "";
+  // 돌려받을 상품
+  type OrderLineRow = { id: string; product_id: string; product_name: string; color: string; size: string; qty: number; unit: number; lineTotal: number; photo: string };
+  const [lines, setLines] = useState<OrderLineRow[]>([]);
+  const [linesLoaded, setLinesLoaded] = useState(false);
+  const [shippingFee, setShippingFee] = useState(0);
+  const [pointUsed, setPointUsed] = useState(0);
+  const [sel, setSel] = useState<Record<string, number>>({}); // lineId → 고른 수량
+  const [includeShipping, setIncludeShipping] = useState(false);
+  const [manualMode, setManualMode] = useState(Boolean(item.id)); // 기존 저장건은 저장된 금액 유지(직접입력)
+  const [manualBase, setManualBase] = useState(Math.round(Number(item.amount_base)) || 0);
 
-  // 손가락 입력 안전: 포커스 시 전체선택(0 뒤에 이어 붙는 버그 방지)
+  useEffect(() => {
+    if (!orderCode) { setLinesLoaded(true); setManualMode(true); return; }
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin-live/order-lines?codes=${encodeURIComponent(orderCode)}`, { cache: "no-store" });
+        const p = await res.json().catch(() => null);
+        if (!alive) return;
+        const entry = p?.ok ? p.byCode?.[orderCode] : null;
+        const got: OrderLineRow[] = entry?.lines || [];
+        setLines(got);
+        setShippingFee(Math.max(0, Math.round(Number(entry?.shippingFee)) || 0));
+        setPointUsed(Math.max(0, Math.round(Number(entry?.pointUsed)) || 0));
+        // 이슈 대상 상품 처음부터 체크
+        const targetQty: Record<string, number> = {};
+        for (const s of (item.product_snapshot || [])) {
+          const pid = clean((s as { productId?: unknown }).productId);
+          if (pid) targetQty[pid] = Math.max(1, Math.round(Number(s.qty)) || 1);
+        }
+        const hasTarget = Object.keys(targetQty).length > 0;
+        const init: Record<string, number> = {};
+        for (const l of got) {
+          init[l.id] = hasTarget ? (targetQty[l.product_id] ? Math.min(targetQty[l.product_id], l.qty) : 0) : l.qty;
+        }
+        setSel(init);
+        if (got.length === 0) setManualMode(true); // 매칭 실패 → 수동 입력
+        setLinesLoaded(true);
+      } catch { if (alive) { setLinesLoaded(true); setManualMode(true); } }
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderCode]);
+
+  const selList: RefundLineSel[] = lines.map((l) => ({ lineTotal: l.lineTotal, qty: l.qty, unit: l.unit, selectedQty: sel[l.id] || 0 }));
+  const autoBase = computeRefundBase(selList, includeShipping, shippingFee);
+  const amountBase = manualMode ? manualBase : autoBase;
+  const stored = adjRowsToStored(adjRows);
+  const amountFinal = computeAmountFinal(amountBase, stored); // 표시용(저장은 서버 재계산)
+  const itemsSum = computeRefundBase(selList, false, 0);
+  const deductSum = stored.filter((a) => a.amount < 0).reduce((s, a) => s - a.amount, 0);
+  const addSum = stored.filter((a) => a.amount > 0).reduce((s, a) => s + a.amount, 0);
+  const formula = [
+    `상품 ${formatComma(manualMode ? amountBase : itemsSum)}원`,
+    includeShipping && !manualMode ? `+ 배송비 ${formatComma(shippingFee)}원` : "",
+    deductSum ? `− 차감 ${formatComma(deductSum)}원` : "",
+    addSum ? `+ 추가 ${formatComma(addSum)}원` : "",
+  ].filter(Boolean).join(" ");
+
   const selectOnFocus = (e: React.FocusEvent<HTMLInputElement>) => e.currentTarget.select();
+  const setQty = (id: string, q: number, max: number) => setSel((prev) => ({ ...prev, [id]: Math.max(0, Math.min(q, max)) }));
 
   const patch = async (extra: Record<string, unknown>) => {
     setSaving(true);
     try {
+      const snapshot = manualMode
+        ? (item.product_snapshot ?? [])
+        : lines.filter((l) => (sel[l.id] || 0) > 0).map((l) => ({ productId: l.product_id, productName: l.product_name, color: l.color, size: l.size, qty: sel[l.id] || 0 }));
       const body: Record<string, unknown> = {
         id: item.id || undefined,
         admin_task_id: item.admin_task_id || undefined,
@@ -354,11 +412,10 @@ export function RefundProcessModal({ item, onClose, onSaved }: { item: LedgerDet
         amount_base: amountBase, adjustments: stored, method,
         bank, account_number: account, account_holder: holder,
         exchange_option: exchangeOption, reship_tracking: reshipTracking, memo,
-        // 새 행이면 상품·주문·고객·사유도 함께 저장(고객이슈에서 넘어온 값)
+        product_snapshot: snapshot,
         ...(item.id ? {} : {
-          product_snapshot: item.product_snapshot ?? [],
           nickname: clean(item.nickname), customer_name: clean(item.customer_name),
-          customer_phone: clean(item.customer_phone), order_lookup_code: clean(item.order_lookup_code),
+          customer_phone: clean(item.customer_phone), order_lookup_code: orderCode,
           reason: clean(item.reason),
         }),
         ...extra,
@@ -381,119 +438,211 @@ export function RefundProcessModal({ item, onClose, onSaved }: { item: LedgerDet
     catch { showAdminToast("복사 실패:\n" + text, "warning"); }
   };
 
-  const productLine = productText(item.product_snapshot);
+  const memoFull = clean(item.reason);
+  const memoFirst = memoFull.split("\n")[0] || "";
   const INPUT = "h-11 rounded-lg border border-line bg-surface px-3 text-[16px] font-bold text-ink outline-none focus-visible:ring-2 focus-visible:ring-rose-deep";
+  const methods = isExchange ? (["교환재발송", "계좌이체", "없음"] as const) : (["계좌이체", "포인트", "없음"] as const);
+  const methodLabel = (m: string) => (m === "없음" ? (isExchange ? "없음" : "환불 없음") : m);
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        {/* 머리글 — 「반품 처리」/「교환 처리」 + 고객·상품·주문번호 */}
-        <div className="mb-3 flex items-start justify-between gap-2">
+    <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onClick={onClose}>
+      <div className="flex max-h-[94vh] w-full max-w-[560px] flex-col overflow-hidden rounded-t-2xl border border-line bg-surface shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+        {/* 헤더 */}
+        <div className="flex items-start justify-between gap-2 border-b border-line px-5 pt-4 pb-3">
           <div className="min-w-0">
-            <h3 className="text-lg font-black text-ink">{isExchange ? "교환 처리" : "반품 처리"}</h3>
+            <h3 className="text-lg font-black text-ink">{isExchange ? "교환 처리" : "반품·환불 처리"}</h3>
             <div className="mt-1 text-[13px] leading-5 text-ink-soft">
-              <div className="truncate font-black text-ink">{clean(item.nickname) || "—"}{clean(item.customer_name) ? ` · ${clean(item.customer_name)}` : ""}</div>
-              {productLine !== "-" ? <div className="truncate">{productLine}</div> : null}
-              {clean(item.order_lookup_code) ? <div className="truncate text-ink-mute">{clean(item.order_lookup_code)}</div> : null}
+              <div className="truncate font-black text-ink">{clean(item.nickname) || "—"}{clean(item.customer_name) ? ` · ${clean(item.customer_name)}` : ""}{orderCode ? ` · ${orderCode}` : ""}</div>
+              {memoFirst ? (
+                <button type="button" onClick={() => setMemoOpen((v) => !v)} className="mt-0.5 block max-w-full text-left text-ink-mute">
+                  <span className={memoOpen ? "whitespace-pre-line" : "block truncate"}>💬 {memoOpen ? memoFull : memoFirst}</span>
+                </button>
+              ) : null}
             </div>
           </div>
           <button type="button" onClick={onClose} aria-label="닫기" className="shrink-0 rounded-full px-2 text-lg font-black text-ink-mute hover:bg-surface-2">✕</button>
         </div>
 
-        {/* 단계 */}
-        <div className="mb-3">
-          <div className="mb-1 text-[13px] font-black text-ink-mute">단계</div>
-          <div className="flex flex-wrap gap-1.5">
-            {REFUND_STAGES.map((s) => (
-              <button key={s} type="button" onClick={() => setStage(s)} className={`rounded-lg px-3 py-1.5 text-[14px] font-black transition ${stage === s ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}>{s}</button>
-            ))}
-          </div>
-          <input value={nextAction} onChange={(e) => setNextAction(e.target.value)} placeholder="다음 할 일(예: 회수 택배 예약)" className={`mt-2 w-full ${INPUT}`} />
-        </div>
-
-        {needsAmount ? (
-          /* ── 반품/환불: 금액 ── */
-          <div className="mb-3 rounded-xl border border-line p-3">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[13px] font-black text-ink-soft">상품 금액</span>
-              <input inputMode="numeric" value={formatComma(amountBase)} onFocus={selectOnFocus} onChange={(e) => setAmountBase(parseAmountInput(e.target.value))} className={`w-36 text-right ${INPUT}`} />
-            </div>
-            {adjRows.map((row, i) => (
-              <div key={i} className="mt-2 flex flex-wrap items-center gap-1.5">
-                <div className="flex overflow-hidden rounded-lg border border-line">
-                  {(["차감", "추가"] as const).map((sg) => (
-                    <button key={sg} type="button" onClick={() => setAdjRows((prev) => prev.map((x, j) => j === i ? { ...x, sign: sg } : x))} className={`px-2.5 py-2 text-[14px] font-black ${row.sign === sg ? (sg === "차감" ? "bg-danger-tx text-white" : "bg-ok-tx text-white") : "bg-surface text-ink-soft"}`}>{sg}</button>
-                  ))}
-                </div>
-                <input value={row.label} onChange={(e) => setAdjRows((prev) => prev.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} placeholder="항목" className={`min-w-0 flex-1 ${INPUT}`} />
-                <input inputMode="numeric" value={formatComma(row.amount)} onFocus={selectOnFocus} onChange={(e) => setAdjRows((prev) => prev.map((x, j) => j === i ? { ...x, amount: parseAmountInput(e.target.value) } : x))} className={`w-28 text-right ${INPUT}`} />
-                <button type="button" onClick={() => setAdjRows((prev) => prev.filter((_, j) => j !== i))} aria-label="줄 삭제" className="shrink-0 rounded-lg px-2 py-2 text-[14px] font-black text-danger-tx hover:bg-danger-bg">삭제</button>
+        {/* 본문 스크롤 */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
+          {!isExchange ? (
+            <div className="mb-3">
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-[13px] font-black text-ink-mute">돌려받을 상품</span>
+                {!manualMode ? (
+                  <button type="button" onClick={() => { setManualMode(true); setManualBase(amountBase); }} className="text-[13px] font-black text-rose-deep hover:underline">직접 수정</button>
+                ) : (
+                  <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[12px] font-black text-ink-mute">직접 입력</span>
+                )}
               </div>
-            ))}
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {ADJ_CHIPS.map((chip) => (
-                <button key={chip} type="button" onClick={() => setAdjRows((prev) => [...prev, { label: chip === "직접 입력" ? "" : chip, sign: "차감", amount: 0 }])} className="rounded-full border border-line bg-surface px-3 py-1.5 text-[14px] font-black text-ink-soft hover:bg-surface-2">+ {chip}</button>
+
+              {manualMode ? (
+                <div className="rounded-xl border border-line p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[13px] font-black text-ink-soft">상품 금액</span>
+                    <input inputMode="numeric" value={formatComma(manualBase)} onFocus={selectOnFocus} onChange={(e) => setManualBase(parseAmountInput(e.target.value))} className={`w-36 text-right ${INPUT}`} />
+                  </div>
+                  {lines.length > 0 ? <button type="button" onClick={() => setManualMode(false)} className="mt-2 text-[13px] font-black text-rose-deep hover:underline">← 상품 목록에서 고르기</button> : null}
+                </div>
+              ) : !linesLoaded ? (
+                <div className="rounded-xl border border-line p-4 text-center text-[13px] font-bold text-ink-mute">주문 상품 불러오는 중…</div>
+              ) : (
+                <div className="rounded-xl border border-line">
+                  {lines.map((l) => {
+                    const picked = sel[l.id] || 0;
+                    const on = picked > 0;
+                    return (
+                      <div key={l.id} className="flex items-center gap-2 border-b border-line px-2 py-2 last:border-b-0">
+                        <button type="button" onClick={() => setQty(l.id, on ? 0 : l.qty, l.qty)} aria-label="선택" className="flex h-11 w-11 shrink-0 items-center justify-center">
+                          <span className={`flex h-5 w-5 items-center justify-center rounded border text-[13px] ${on ? "border-rose-deep bg-rose-deep text-white" : "border-line bg-surface text-transparent"}`}>✓</span>
+                        </button>
+                        {l.photo ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={l.photo} alt="" className="h-10 w-10 shrink-0 rounded-lg border border-line object-cover" loading="lazy" />
+                        ) : <span className="h-10 w-10 shrink-0 rounded-lg border border-line bg-surface-2" />}
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-[14px] font-bold text-ink">{l.product_name}</div>
+                          <div className="truncate text-[13px] text-ink-mute">{[l.color, l.size].filter(Boolean).join("/")}{[l.color, l.size].filter(Boolean).length ? " · " : ""}{formatComma(l.unit)}원 × {l.qty}</div>
+                        </div>
+                        {l.qty > 1 && on ? (
+                          <div className="flex shrink-0 items-center gap-1">
+                            <button type="button" onClick={() => setQty(l.id, picked - 1, l.qty)} className="h-8 w-8 rounded-lg border border-line text-[14px] font-black text-ink-soft">−</button>
+                            <span className="w-6 text-center text-[14px] font-black text-ink">{picked}</span>
+                            <button type="button" onClick={() => setQty(l.id, picked + 1, l.qty)} className="h-8 w-8 rounded-lg border border-line text-[14px] font-black text-ink-soft">+</button>
+                          </div>
+                        ) : null}
+                        <div className="w-20 shrink-0 text-right text-[14px] font-black text-ink">{formatComma(on ? (picked === l.qty ? l.lineTotal : l.unit * picked) : 0)}원</div>
+                      </div>
+                    );
+                  })}
+                  <label className="flex items-center gap-2 px-2 py-2 text-[13px] font-bold text-ink-soft">
+                    <input type="checkbox" checked={includeShipping} onChange={(e) => setIncludeShipping(e.target.checked)} className="h-5 w-5 accent-rose-deep" />
+                    배송비도 환불 <span className="text-ink-mute">({formatComma(shippingFee)}원)</span>
+                  </label>
+                </div>
+              )}
+
+              {pointUsed > 0 ? (
+                <div className="mt-2 rounded-lg border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">
+                  이 주문은 포인트 {formatComma(pointUsed)}원 사용 — 환불액 확인 필요 (자동 차감하지 않아요)
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            /* 교환: 옵션/송장 */
+            <div className="mb-3 rounded-xl border border-line p-3">
+              <div className="text-[13px] font-black text-ink-soft">바꿀 옵션</div>
+              <input value={exchangeOption} onChange={(e) => setExchangeOption(e.target.value)} placeholder="예: XL → 2XL" className={`mt-1 w-full ${INPUT}`} />
+              <div className="mt-2 text-[13px] font-black text-ink-soft">재발송 송장번호</div>
+              <input inputMode="numeric" value={reshipTracking} onChange={(e) => setReshipTracking(e.target.value)} placeholder="재발송 택배 송장번호" className={`mt-1 w-full ${INPUT}`} />
+            </div>
+          )}
+
+          {/* 금액 조정 */}
+          {!isExchange ? (
+            <div className="mb-3">
+              <div className="mb-1 text-[13px] font-black text-ink-mute">금액 조정</div>
+              {adjRows.map((row, i) => (
+                <div key={i} className="mt-1 flex flex-wrap items-center gap-1.5">
+                  <span className={`shrink-0 rounded px-2 py-1 text-[13px] font-black ${row.sign === "차감" ? "bg-danger-bg text-danger-tx" : "bg-ok-bg text-ok-tx"}`}>{row.sign}</span>
+                  <input value={row.label} onChange={(e) => setAdjRows((prev) => prev.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} placeholder="항목" className={`min-w-0 flex-1 ${INPUT}`} />
+                  <input inputMode="numeric" value={formatComma(row.amount)} onFocus={selectOnFocus} onChange={(e) => setAdjRows((prev) => prev.map((x, j) => j === i ? { ...x, amount: parseAmountInput(e.target.value) } : x))} className={`w-24 text-right ${INPUT}`} />
+                  <button type="button" onClick={() => setAdjRows((prev) => prev.filter((_, j) => j !== i))} aria-label="줄 삭제" className="shrink-0 rounded-lg px-2 py-2 text-[14px] font-black text-danger-tx hover:bg-danger-bg">삭제</button>
+                </div>
+              ))}
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <button type="button" onClick={() => setAdjRows((prev) => [...prev, { label: "", sign: "차감", amount: 0 }])} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[14px] font-black text-danger-tx hover:bg-danger-bg">+ 차감 추가</button>
+                <button type="button" onClick={() => setAdjRows((prev) => [...prev, { label: "", sign: "추가", amount: 0 }])} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[14px] font-black text-ok-tx hover:bg-ok-bg">+ 추가 금액</button>
+                {["반품배송비", "왕복배송비", "부분환불", "기타"].map((chip) => (
+                  <button key={chip} type="button" onClick={() => setAdjRows((prev) => [...prev, { label: chip, sign: "차감", amount: 0 }])} className="rounded-full border border-line bg-surface px-3 py-1.5 text-[14px] font-black text-ink-soft hover:bg-surface-2">{chip}</button>
+                ))}
+              </div>
+
+              {/* 최종 환불액 */}
+              <div className="mt-3 rounded-xl border border-rose-line bg-rose-soft/50 p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[14px] font-black text-ink">환불할 금액</span>
+                  <span className="text-[22px] font-black text-rose-deep">{won(amountFinal)}</span>
+                </div>
+                {formula ? <div className="mt-0.5 text-right text-[13px] font-bold text-ink-mute">{formula} = {won(amountFinal)}</div> : null}
+              </div>
+            </div>
+          ) : null}
+
+          {/* 환불 방법 */}
+          <div className="mb-3">
+            <div className="mb-1 text-[13px] font-black text-ink-mute">{isExchange ? "처리 방법" : "환불 방법"}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {methods.map((m) => (
+                <button key={m} type="button" onClick={() => setMethod(m)} className={`rounded-lg px-3 py-1.5 text-[14px] font-black transition ${method === m ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}>{methodLabel(m)}</button>
               ))}
             </div>
-            <div className="mt-3 border-t border-line pt-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[14px] font-black text-ink">최종 환불액</span>
-                <span className="text-[18px] font-black text-rose-deep">{won(amountFinal)}</span>
-              </div>
-              {formula ? <div className="mt-0.5 text-right text-[12px] font-bold text-ink-mute">{formula}</div> : null}
-            </div>
           </div>
-        ) : (
-          /* ── 교환: 옵션/송장 ── */
-          <div className="mb-3 rounded-xl border border-line p-3">
-            <div className="text-[13px] font-black text-ink-soft">바꿀 옵션</div>
-            <input value={exchangeOption} onChange={(e) => setExchangeOption(e.target.value)} placeholder="예: XL → 2XL" className={`mt-1 w-full ${INPUT}`} />
-            <div className="mt-2 text-[13px] font-black text-ink-soft">재발송 송장번호</div>
-            <input inputMode="numeric" value={reshipTracking} onChange={(e) => setReshipTracking(e.target.value)} placeholder="재발송 택배 송장번호" className={`mt-1 w-full ${INPUT}`} />
-          </div>
-        )}
 
-        {/* 방법 */}
-        <div className="mb-3">
-          <div className="mb-1 text-[13px] font-black text-ink-mute">환불 방법</div>
-          <div className="flex flex-wrap gap-1.5">
-            {REFUND_METHODS.map((m) => (
-              <button key={m} type="button" onClick={() => setMethod(m)} className={`rounded-lg px-3 py-1.5 text-[14px] font-black transition ${method === m ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}>{m}</button>
-            ))}
+          {method === "계좌이체" ? (
+            <div className="mb-3 rounded-xl border border-line p-3">
+              <div className="flex flex-wrap gap-2">
+                <select value={BANK_OPTIONS.includes(bank as typeof BANK_OPTIONS[number]) ? bank : (bank ? "기타" : "")} onChange={(e) => setBank(e.target.value === "기타" ? "" : e.target.value)} className={`w-28 ${INPUT}`}>
+                  <option value="">은행</option>
+                  {BANK_OPTIONS.map((b) => <option key={b} value={b}>{b}</option>)}
+                </select>
+                <input value={account} onChange={(e) => setAccount(e.target.value.replace(/[^0-9]/g, ""))} onFocus={selectOnFocus} placeholder="계좌번호(숫자)" inputMode="numeric" className={`min-w-0 flex-1 ${INPUT}`} />
+                <input value={holder} onChange={(e) => setHolder(e.target.value)} placeholder="예금주" className={`w-24 ${INPUT}`} />
+              </div>
+              {item.account_hidden ? <div className="mt-1 text-[13px] font-bold text-ink-mute">완료 후 30일이 지나 계좌번호는 가려졌습니다(은행·예금주는 유지).</div> : null}
+              <button type="button" onClick={copyTransferInfo} className="mt-2 rounded-lg border border-rose-line bg-surface px-3 py-1.5 text-[14px] font-black text-rose-deep hover:bg-rose-soft">📋 이체 정보 복사</button>
+            </div>
+          ) : null}
+
+          {method === "포인트" ? (
+            <div className="mb-3 rounded-xl border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">
+              포인트 지급 버튼은 다음 작업에서 연결됩니다. 지금은 기록만 저장돼요.
+            </div>
+          ) : null}
+
+          {method === "교환재발송" ? (
+            <div className="mb-3 rounded-xl border border-line p-3">
+              <div className="text-[13px] font-black text-ink-soft">바꿀 옵션</div>
+              <input value={exchangeOption} onChange={(e) => setExchangeOption(e.target.value)} placeholder="예: XL → 2XL" className={`mt-1 w-full ${INPUT}`} />
+              <div className="mt-2 text-[13px] font-black text-ink-soft">재발송 송장번호</div>
+              <input inputMode="numeric" value={reshipTracking} onChange={(e) => setReshipTracking(e.target.value)} placeholder="재발송 택배 송장번호" className={`mt-1 w-full ${INPUT}`} />
+            </div>
+          ) : null}
+
+          {/* 물건 회수 (반품·환불만) */}
+          {!isExchange ? (
+            <div className="mb-3">
+              <div className="mb-1 text-[13px] font-black text-ink-mute">물건 회수</div>
+              <div className="flex gap-1.5">
+                <button type="button" onClick={() => setStage("회수 대기")} className={`rounded-lg px-3 py-1.5 text-[14px] font-black transition ${stage === "회수 대기" ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}>회수 필요</button>
+                <button type="button" onClick={() => setStage("처리 필요")} className={`rounded-lg px-3 py-1.5 text-[14px] font-black transition ${stage === "처리 필요" ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}>회수 없이 돈만</button>
+              </div>
+            </div>
+          ) : null}
+
+          {/* 진행 단계 */}
+          <div className="mb-3">
+            <div className="mb-1 text-[13px] font-black text-ink-mute">진행 단계</div>
+            <div className="flex flex-wrap gap-1">
+              {REFUND_STAGES.map((s) => (
+                <button key={s} type="button" onClick={() => setStage(s)} className={`rounded-full px-2.5 py-1 text-[13px] font-black transition ${stage === s ? "bg-rose-deep text-white" : "bg-surface-2 text-ink-mute hover:bg-surface-3"}`}>{s}</button>
+              ))}
+            </div>
+            <input value={nextAction} onChange={(e) => setNextAction(e.target.value)} placeholder="다음 할 일(예: 회수 택배 예약)" className={`mt-2 w-full ${INPUT}`} />
           </div>
+
+          <textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="메모" rows={2} className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] font-bold text-ink outline-none focus-visible:ring-2 focus-visible:ring-rose-deep" />
         </div>
 
-        {method === "계좌이체" ? (
-          <div className="mb-3 rounded-xl border border-line p-3">
-            <div className="flex flex-wrap gap-2">
-              <select value={bank} onChange={(e) => setBank(e.target.value)} className={`w-28 ${INPUT}`}>
-                <option value="">은행</option>
-                {BANK_OPTIONS.map((b) => <option key={b} value={b}>{b}</option>)}
-              </select>
-              <input value={account} onChange={(e) => setAccount(e.target.value.replace(/[^0-9]/g, ""))} onFocus={selectOnFocus} placeholder="계좌번호(숫자)" inputMode="numeric" className={`min-w-0 flex-1 ${INPUT}`} />
-              <input value={holder} onChange={(e) => setHolder(e.target.value)} placeholder="예금주" className={`w-24 ${INPUT}`} />
-            </div>
-            {item.account_hidden ? <div className="mt-1 text-[12px] font-bold text-ink-mute">완료 후 30일이 지나 계좌번호는 가려졌습니다(은행·예금주는 유지).</div> : null}
-            <button type="button" onClick={copyTransferInfo} className="mt-2 rounded-lg border border-rose-line bg-surface px-3 py-1.5 text-[14px] font-black text-rose-deep hover:bg-rose-soft">📋 이체 정보 복사</button>
-          </div>
-        ) : null}
-
-        {method === "포인트" ? (
-          <div className="mb-3 rounded-xl border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">
-            포인트는 이 창에서 지급되지 않아요. 회원 상세 › 포인트 지급으로 먼저 지급한 뒤 완료로 저장하세요.
-          </div>
-        ) : null}
-
-        <textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="메모" rows={2} className="mb-3 w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] font-bold text-ink outline-none focus-visible:ring-2 focus-visible:ring-rose-deep" />
-
-        <div className="flex flex-wrap items-center gap-2">
+        {/* 하단 고정 버튼 */}
+        <div className="flex items-center gap-2 border-t border-line px-5 py-3">
           <button type="button" disabled={saving} onClick={() => patch({})} className="h-12 rounded-xl border border-line bg-surface px-4 text-[14px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50">저장</button>
           {isExchange ? (
-            <button type="button" disabled={saving} onClick={() => patch({ mark_done: true, stage: "완료" })} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">재발송 완료로 저장</button>
+            <button type="button" disabled={saving} onClick={() => patch({ mark_done: true, stage: "완료" })} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">재발송 완료</button>
           ) : method === "계좌이체" ? (
-            <button type="button" disabled={saving} onClick={() => patch({ mark_transferred: true, mark_done: true, stage: "완료" })} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">이체했어요 · 환불완료로 저장</button>
+            <button type="button" disabled={saving} onClick={() => patch({ mark_transferred: true, mark_done: true, stage: "완료" })} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">이체했어요 · 환불완료</button>
           ) : (
-            <button type="button" disabled={saving} onClick={() => patch({ mark_done: true, stage: "완료" })} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">환불완료로 저장</button>
+            <button type="button" disabled={saving} onClick={() => patch({ mark_done: true, stage: "완료" })} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">환불완료</button>
           )}
         </div>
       </div>

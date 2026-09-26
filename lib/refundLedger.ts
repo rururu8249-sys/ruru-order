@@ -105,6 +105,29 @@ export function storedToAdjRows(adjs: unknown): RefundAdjRow[] {
   }));
 }
 
+// ── [2026-09-26] 「돌려받을 상품」 선택 → 환불 상품금액(amount_base) 계산 ──
+//   ⚠️ 돈을 만들지 않는다. 이미 계산된 줄 합계(submitRowLineTotal 기준)를 «고른 만큼» 더할 뿐.
+//   포인트 사용/할인은 «자동 차감하지 않는다»(안내만) — 여기 계산에 절대 넣지 않는다.
+export type RefundLineSel = { lineTotal: number; qty: number; unit: number; selectedQty: number };
+
+/** 한 줄의 환불 금액 — 전량이면 정확한 줄 합계(반올림 오차 방지), 일부면 단가×고른수량. */
+export function lineRefundAmount(sel: RefundLineSel): number {
+  const qty = Math.max(0, Math.round(Number(sel?.qty)) || 0);
+  const picked = Math.max(0, Math.min(Math.round(Number(sel?.selectedQty)) || 0, qty));
+  if (picked === 0) return 0;
+  const lineTotal = Math.max(0, Math.round(Number(sel?.lineTotal)) || 0);
+  if (picked === qty) return lineTotal;
+  const unit = Math.max(0, Math.floor(Number(sel?.unit)) || 0);
+  return Math.max(0, unit * picked);
+}
+
+/** 상품금액(amount_base) = 고른 줄들의 합 (+ 배송비 체크 시 배송비). 포인트/할인 미반영. */
+export function computeRefundBase(sels: RefundLineSel[], includeShipping: boolean, shippingFee: unknown): number {
+  const items = (Array.isArray(sels) ? sels : []).reduce((s, x) => s + lineRefundAmount(x), 0);
+  const ship = includeShipping ? Math.max(0, Math.round(Number(shippingFee)) || 0) : 0;
+  return items + ship;
+}
+
 /** done_at 이후 N일(기본 30) 지났으면 전체 계좌번호를 가려야 한다. */
 export function shouldHideAccountNumber(doneAt: unknown, now: number, days = 30): boolean {
   const s = String(doneAt ?? "").trim();
