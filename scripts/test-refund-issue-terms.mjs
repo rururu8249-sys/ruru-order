@@ -1,5 +1,5 @@
 // [2026-09-26 5·6차] 고객이슈 환불/교환 용어·💳 요약 문구 테스트
-import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, cardRefundBackAmount, pickPrimaryLedger, ledgerHasPayoutInfo, restoreSelectionFromSnapshot, deriveInitialSelection } from "../lib/refundLedger.ts";
+import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, cardRefundBackAmount, pickPrimaryLedger, ledgerHasPayoutInfo, restoreSelectionFromSnapshot, deriveInitialSelection, buildSnapshotFromSelection } from "../lib/refundLedger.ts";
 import { bankDisplayName } from "../lib/parseBankAccount.ts";
 
 let pass = 0;
@@ -271,6 +271,44 @@ const LINES4 = [
   const r2 = deriveInitialSelection({ hasLedger: true, snapshot: snap, lines: LINES4 }); // lines 먼저 (동일 입력)
   eq(JSON.stringify(r1.sel), JSON.stringify(r2.sel), "순서 무관 동일 결과");
   eq(r1.sel.L206, 1, "최종 PD-206 만"); eq(r1.sel.L202, 0, "PD-202 미체크");
+}
+
+// ── [lineId] 복원 ① lineId 정확 일치가 최우선(브랜드 pid·이름 흔들려도 그 줄만) ──
+{
+  const lines = [
+    { id: "row-A", product_id: "677", product_name: "PD(프라다)-202 니트", color: "없음", size: "M", qty: 1 },
+    { id: "row-B", product_id: "677", product_name: "PD(프라다)-206 아우터", color: "없음", size: "M", qty: 1 },
+  ];
+  // snapshot 에 lineId 만 있고 이름은 옛 값이어도 lineId 로 정확히
+  const snap = [{ lineId: "row-B", productId: "677", productName: "옛이름", color: "없음", size: "M", qty: 1 }];
+  const r = restoreSelectionFromSnapshot(lines, snap);
+  eq(r["row-B"], 1, "lineId 로 row-B 복원"); eq(r["row-A"], 0, "row-A 미체크");
+}
+// lineId 없으면 기존 우선순위(pid+이름/옵션)로 폴백
+{
+  const lines = [{ id: "X", product_id: "677", product_name: "PD-206", color: "없음", size: "M", qty: 1 }];
+  eq(restoreSelectionFromSnapshot(lines, [{ productId: "677", productName: "PD-206", color: "없음", size: "M", qty: 1 }]).X, 1, "lineId 없으면 pid+이름 폴백");
+}
+
+// ── [D] 저장 snapshot = 현재 체크된 줄에서 생성(lineId 포함) — 2개 체크 → 2개 / 1개 → 1개 ──
+{
+  const lines = [
+    { id: "a", product_id: "677", product_name: "PD-202", color: "없음", size: "M", qty: 2 },
+    { id: "b", product_id: "677", product_name: "PD-206", color: "없음", size: "M", qty: 1 },
+    { id: "c", product_id: "678", product_name: "CH", color: "", size: "S", qty: 1 },
+  ];
+  const snap2 = buildSnapshotFromSelection(lines, { a: 1, b: 1, c: 0 });
+  eq(snap2.length, 2, "2개 체크 → snapshot 2개");
+  eq(snap2.map((s) => s.lineId).join(","), "a,b", "lineId 담김");
+  const snap1 = buildSnapshotFromSelection(lines, { a: 0, b: 1, c: 0 });
+  eq(snap1.length, 1, "1개 체크 → snapshot 1개"); eq(snap1[0].lineId, "b", "b 하나"); eq(snap1[0].qty, 1, "qty 반영");
+  // 저장→복원 왕복: buildSnapshotFromSelection 결과로 다시 복원하면 같은 줄
+  const back = restoreSelectionFromSnapshot(lines, snap1);
+  eq(back.b, 1, "왕복 복원 b"); eq(back.a, 0, "왕복 a 미체크");
+  eq(buildSnapshotFromSelection(lines, {}).length, 0, "체크 0 → snapshot 0");
+  // 수량 편집(a 2개 중 1개만)도 반영
+  const snapQ = buildSnapshotFromSelection(lines, { a: 1 });
+  eq(snapQ[0].qty, 1, "부분 수량 저장");
 }
 
 console.log(`✅ refund-issue-terms ${pass}건 통과`);

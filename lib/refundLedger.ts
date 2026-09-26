@@ -80,12 +80,28 @@ export function cardRefundBackAmount(deductTotal: unknown, keptProductTotal: unk
 // [2026-09-27] 저장된 product_snapshot → 주문 줄별 «복원 수량». 매칭은 ①productId(둘 다 있을 때)
 //   ②상품명+옵션(색/사이즈, "없음"은 빈값). productId 문자/숫자·"없음" 때문에 매칭 실패해 자동 체크로
 //   떨어지던 버그(김미성 PD-206) 방지. 저장 기록이면 이 결과만 쓰고 절대 자동 체크하지 않는다.
-type SnapEntry = { productId?: unknown; productName?: unknown; color?: unknown; size?: unknown; qty?: unknown };
+type SnapEntry = { lineId?: unknown; productId?: unknown; productName?: unknown; color?: unknown; size?: unknown; qty?: unknown };
 type OrderLineLite = { id: string; product_id: string; product_name: string; color: string; size: string; qty: number };
+
+// [2026-09-27] 저장 snapshot 을 «현재 체크된 줄»에서 생성 — lineId(주문 행 id)까지 담아 다음 복원이 정확하게.
+export function buildSnapshotFromSelection(
+  lines: Array<{ id: unknown; product_id: unknown; product_name: unknown; color: unknown; size: unknown; qty: unknown }>,
+  sel: Record<string, number>,
+): Array<{ lineId: string; productId: string; productName: string; color: string; size: string; qty: number }> {
+  const out: Array<{ lineId: string; productId: string; productName: string; color: string; size: string; qty: number }> = [];
+  for (const l of Array.isArray(lines) ? lines : []) {
+    const id = String(l.id ?? "").trim();
+    const q = Math.max(0, Math.round(Number(sel?.[id])) || 0);
+    if (q <= 0) continue;
+    out.push({ lineId: id, productId: String(l.product_id ?? "").trim(), productName: String(l.product_name ?? "").trim(), color: String(l.color ?? "").trim(), size: String(l.size ?? "").trim(), qty: q });
+  }
+  return out;
+}
 export function restoreSelectionFromSnapshot(lines: OrderLineLite[], snapshot: SnapEntry[] | null | undefined): Record<string, number> {
   const norm = (v: unknown) => { const s = String(v ?? "").trim(); return s === "없음" ? "" : s; };
   const optKey = (c: unknown, s: unknown) => `${norm(c)}|${norm(s)}`;
   const snaps = (Array.isArray(snapshot) ? snapshot : []).map((s) => ({
+    lineId: String(s.lineId ?? "").trim(),
     pid: String(s.productId ?? "").trim(),
     name: String(s.productName ?? "").trim(),
     opt: optKey(s.color, s.size),
@@ -103,11 +119,12 @@ export function restoreSelectionFromSnapshot(lines: OrderLineLite[], snapshot: S
   // [2026-09-27] «1:1» 배정 — snapshot 항목당 아직 안 쓴 줄 하나만 claim(체크 ≤ snapshot 수).
   //   ⚠ productId 가 여러 줄에 중복될 수 있어(예: 사이즈 변형이 같은 product_id) «productId 만»으로 첫 줄을
   //     잡으면 엉뚱한 줄(PD-202)이 선택된다 → 이름/옵션이 함께 맞는 줄을 먼저 고른다.
-  //   우선순위: ①pid+이름+옵션 ②pid+이름 ③이름+옵션 ④이름 ⑤pid만(최후).
+  //   우선순위: ①lineId(주문 행 id) ②pid+이름+옵션 ③pid+이름 ④이름+옵션 ⑤이름 ⑥pid만(최후).
   const used = new Set<string>();
   const free = (l: { id: string }) => !used.has(l.id);
   for (const s of snaps) {
     const pick =
+      lineList.find((l) => free(l) && s.lineId && l.id === s.lineId) || // ① lineId(주문 행 id) 정확 일치 — 가장 강함
       lineList.find((l) => free(l) && s.pid && l.pid && s.pid === l.pid && s.name && s.name === l.name && s.opt === l.opt) ||
       lineList.find((l) => free(l) && s.pid && l.pid && s.pid === l.pid && s.name && s.name === l.name) ||
       lineList.find((l) => free(l) && s.name && s.name === l.name && s.opt === l.opt) ||

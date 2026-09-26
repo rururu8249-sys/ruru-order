@@ -17,6 +17,7 @@ import {
   isFullReturnSel,
   cardRefundBackAmount,
   deriveInitialSelection,
+  buildSnapshotFromSelection,
   computeAmountFinal,
   computeRefundBase,
   stageDisplay,
@@ -559,9 +560,10 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
     setSaving(true);
     setSaveError("");
     try {
+      // [D] 저장 snapshot = «현재 체크된 줄»에서 생성(lineId 포함). 매칭 실패(직접입력)일 때만 기존 값 유지.
       const snapshot = matchFailed
         ? (item.product_snapshot ?? [])
-        : lines.filter((l) => (sel[l.id] || 0) > 0).map((l) => ({ productId: l.product_id, productName: l.product_name, color: l.color, size: l.size, qty: sel[l.id] || 0 }));
+        : buildSnapshotFromSelection(lines, sel);
       const body: Record<string, unknown> = {
         id: item.id || undefined,
         admin_task_id: item.admin_task_id || undefined,
