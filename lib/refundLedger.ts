@@ -73,14 +73,33 @@ export function cardRefundBackAmount(deductTotal: unknown, keptProductTotal: unk
   return d + k;
 }
 
-// [2026-09-26] 카드 부분반품 계좌이체 시 돌려줄 «부가세 몫» = 주문 부가세 × (선택 줄합계 / 전체 줄합계), 반올림.
-//   7% 하드코딩 금지 — 실제 저장된 부가세(vat_amount 합)를 선택 비율로 나눈다.
-export function vatShareForSelection(orderVat: unknown, selectedLineSum: unknown, totalLineSum: unknown): number {
-  const vat = Math.max(0, Math.round(Number(orderVat)) || 0);
-  const sel = Math.max(0, Math.round(Number(selectedLineSum)) || 0);
-  const total = Math.round(Number(totalLineSum)) || 0;
-  if (vat <= 0 || total <= 0 || sel <= 0) return 0;
-  return Math.round(vat * (sel / total));
+// [2026-09-27] 저장된 product_snapshot → 주문 줄별 «복원 수량». 매칭은 ①productId(둘 다 있을 때)
+//   ②상품명+옵션(색/사이즈, "없음"은 빈값). productId 문자/숫자·"없음" 때문에 매칭 실패해 자동 체크로
+//   떨어지던 버그(김미성 PD-206) 방지. 저장 기록이면 이 결과만 쓰고 절대 자동 체크하지 않는다.
+type SnapEntry = { productId?: unknown; productName?: unknown; color?: unknown; size?: unknown; qty?: unknown };
+type OrderLineLite = { id: string; product_id: string; product_name: string; color: string; size: string; qty: number };
+export function restoreSelectionFromSnapshot(lines: OrderLineLite[], snapshot: SnapEntry[] | null | undefined): Record<string, number> {
+  const norm = (v: unknown) => { const s = String(v ?? "").trim(); return s === "없음" ? "" : s; };
+  const optKey = (c: unknown, s: unknown) => `${norm(c)}|${norm(s)}`;
+  const snaps = (Array.isArray(snapshot) ? snapshot : []).map((s) => ({
+    pid: String(s.productId ?? "").trim(),
+    name: String(s.productName ?? "").trim(),
+    opt: optKey(s.color, s.size),
+    qty: Math.max(1, Math.round(Number(s.qty)) || 1),
+  }));
+  const out: Record<string, number> = {};
+  for (const l of Array.isArray(lines) ? lines : []) {
+    const lid = String(l.id);
+    const lpid = String(l.product_id ?? "").trim();
+    const lname = String(l.product_name ?? "").trim();
+    const lopt = optKey(l.color, l.size);
+    const m =
+      snaps.find((s) => s.pid && lpid && s.pid === lpid) ||
+      snaps.find((s) => s.name && s.name === lname && s.opt === lopt) ||
+      snaps.find((s) => s.name && s.name === lname);
+    out[lid] = m ? Math.min(m.qty, Math.max(1, Math.round(Number(l.qty)) || 1)) : 0;
+  }
+  return out;
 }
 
 // [2026-09-26 7차] 전체 반품 판정 — 모든 줄이 «전체 수량»으로 선택됐는가(배송비·카드추가금 자동 체크 기준).
@@ -144,13 +163,13 @@ export function ledgerSummaryLine(li: LedgerSummaryInput | null | undefined, ban
     const dd = doneShortKo(li.done_at);
     if (isExchange) return `재발송함${dd ? ` · ${dd}` : ""}`;
     if (method === "없음") return "환불 없이 종료";
-    if (method === "카드취소") return `카드 전체 취소함${refundBack > 0 ? ` · ${refundBack.toLocaleString("ko-KR")}원 받음` : ""}${dd ? ` · ${dd}` : ""}`;
+    if (method === "카드취소") return `카드 전체 취소함${refundBack > 0 ? ` · 반품비 ${refundBack.toLocaleString("ko-KR")}원 받음` : ""}${dd ? ` · ${dd}` : ""}`;
     const last4 = s(li.account_last4);
     const acctSeg = last4 ? `${bn ? `${bn} ` : ""}****${last4}` : bn;
     return `${wonTxt} 보냄${dd ? ` · ${dd}` : ""}${acctSeg ? ` · ${acctSeg}` : ""}`;
   }
   if (isExchange) return `교환 · 바꿀 옵션 ${s(li.exchange_option) || "-"}`;
-  if (method === "카드취소" && cardTotal > 0) return `카드 전체 취소 ${cardTotal.toLocaleString("ko-KR")}원${refundBack > 0 ? ` · 다시 받을 돈 ${refundBack.toLocaleString("ko-KR")}원` : ""}`;
+  if (method === "카드취소" && cardTotal > 0) return `카드 전체 취소 ${cardTotal.toLocaleString("ko-KR")}원${refundBack > 0 ? ` · 반품비 ${refundBack.toLocaleString("ko-KR")}원` : ""}`;
   if (method === "포인트" && amt > 0) return `포인트로 돌려줄 금액 ${wonTxt}`;
   if (method === "계좌이체" && amt > 0) {
     // [6차] 옛 예금주(입니다 등)는 노출 금지 → 「예금주 확인 필요」

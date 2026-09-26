@@ -1,5 +1,5 @@
 // [2026-09-26 5·6차] 고객이슈 환불/교환 용어·💳 요약 문구 테스트
-import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, cardRefundBackAmount, pickPrimaryLedger, ledgerHasPayoutInfo, vatShareForSelection } from "../lib/refundLedger.ts";
+import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, cardRefundBackAmount, pickPrimaryLedger, ledgerHasPayoutInfo, restoreSelectionFromSnapshot } from "../lib/refundLedger.ts";
 import { bankDisplayName } from "../lib/parseBankAccount.ts";
 
 let pass = 0;
@@ -51,17 +51,17 @@ const bn = (li) => bankDisplayName(String(li.bank ?? ""));
 
 // ── [마무리1] 카드취소 💳 요약 — 다시 받을 돈 = adjustments 음수 합(역산 아님) ──
 { const li = { kind: "반품", method: "카드취소", amount_final: 252850, card_total: 272850, adjustments: [{ label: "차감", amount: -20000 }] };
-  eq(ledgerSummaryLine(li, ""), "카드 전체 취소 272,850원 · 다시 받을 돈 20,000원", "미완료 카드취소(차감 20,000)"); }
+  eq(ledgerSummaryLine(li, ""), "카드 전체 취소 272,850원 · 반품비 20,000원", "미완료 카드취소(차감 20,000)"); }
 { const li = { kind: "반품", method: "카드취소", amount_final: 272850, card_total: 272850, adjustments: [] };
   eq(ledgerSummaryLine(li, ""), "카드 전체 취소 272,850원", "미완료 카드취소(차감 없음→생략)"); }
 { const li = { kind: "반품", method: "카드취소", amount_final: 252850, card_total: 272850, adjustments: [{ label: "차감", amount: -20000 }], done_at: "2026-09-26T10:00:00" };
-  eq(ledgerSummaryLine(li, ""), "카드 전체 취소함 · 20,000원 받음 · 09.26(토)", "완료 카드취소(20,000 받음)"); }
+  eq(ledgerSummaryLine(li, ""), "카드 전체 취소함 · 반품비 20,000원 받음 · 09.26(토)", "완료 카드취소(반품비 20,000 받음)"); }
 { const li = { kind: "반품", method: "카드취소", amount_final: 272850, card_total: 272850, adjustments: [], done_at: "2026-09-26T10:00:00" };
   eq(ledgerSummaryLine(li, ""), "카드 전체 취소함 · 09.26(토)", "완료 카드취소(받을 돈 0)"); }
 { const li = { kind: "반품", method: "카드취소", amount_final: 0, card_total: 0, adjustments: [] };
   eq(ledgerSummaryLine(li, ""), "", "카드취소 금액0·총액0 미완료→빈칸"); }
 { const li = { kind: "반품", method: "카드취소", amount_final: 252850, adjustments: [{ label: "차감", amount: -20000 }] }; // card_total 없는 옛 기록 → amount_final 로 대체
-  eq(ledgerSummaryLine(li, ""), "카드 전체 취소 252,850원 · 다시 받을 돈 20,000원", "card_total 없으면 amount_final 로 대체"); }
+  eq(ledgerSummaryLine(li, ""), "카드 전체 취소 252,850원 · 반품비 20,000원", "card_total 없으면 amount_final 로 대체"); }
 
 // ── [6차] 옵션 「없음」 제거 ──
 eq(optionLabelNoNone("없음", "12"), "12", "없음/12→12");
@@ -113,9 +113,9 @@ eq(cardRefundBackAmount(0, 100000), 100000, "부분반품 차감0 → 남기는 
 
 // ── [마무리1] 목록 💳 카드 = adjustments 음수 합 기반(역산 금지). 옛 base 여도 20,000 ──
 { const li = { kind: "반품", method: "카드취소", amount_final: 235000, card_total: 272850, adjustments: [{ label: "단순변심 차감", amount: -20000 }] };
-  eq(ledgerSummaryLine(li, ""), "카드 전체 취소 272,850원 · 다시 받을 돈 20,000원", "미완료: adjustments 차감 20,000(옛 base·amount_final 무관)"); }
+  eq(ledgerSummaryLine(li, ""), "카드 전체 취소 272,850원 · 반품비 20,000원", "미완료: adjustments 차감 20,000(옛 base·amount_final 무관)"); }
 { const li = { kind: "반품", method: "카드취소", amount_final: 235000, card_total: 272850, adjustments: [{ label: "차감", amount: -20000 }], done_at: "2026-09-26T10:00:00" };
-  eq(ledgerSummaryLine(li, ""), "카드 전체 취소함 · 20,000원 받음 · 09.26(토)", "완료: 20,000 받음"); }
+  eq(ledgerSummaryLine(li, ""), "카드 전체 취소함 · 반품비 20,000원 받음 · 09.26(토)", "완료: 20,000 받음"); }
 { const li = { kind: "반품", method: "카드취소", amount_final: 272850, card_total: 272850, adjustments: [] };
   eq(ledgerSummaryLine(li, ""), "카드 전체 취소 272,850원", "차감 없음 → 다시 받을 돈 생략"); }
 
@@ -150,16 +150,41 @@ ok2(ledgerHasPayoutInfo(null) === false, "null → false");
 { const only = { id: "X", account_number: "", updated_at: "2026-09-19T00:00:00" };
   eq(pickPrimaryLedger([only]).id, "X", "기록 1개면 그것이 대표"); }
 
-// ── [B] 카드 부분반품 부가세 몫 = 주문 부가세 × (선택/전체), 반올림 ──
-// 김미성: 상품 219,000 + 259,000 + 329,000 = 807,000, 주문 부가세 7% = 56,490
-eq(vatShareForSelection(56490, 259000, 807000), 18130, "PD-206 1개 부가세 몫 18,130");
-eq(vatShareForSelection(56490, 478000, 807000), 33460, "2개(219+259=478,000) 부가세 몫 33,460");
-eq(vatShareForSelection(56490, 807000, 807000), 56490, "전체 선택 → 부가세 전액");
-eq(vatShareForSelection(0, 259000, 807000), 0, "부가세 없으면 0");
-eq(vatShareForSelection(56490, 0, 807000), 0, "선택 0 → 0");
-eq(vatShareForSelection(56490, 259000, 0), 0, "전체합 0 → 0");
-// 환불할 금액 = 선택 줄합계 + 부가세 몫 − 차감 (컴포넌트 조합) — 김미성 PD-206 277,130
-eq(computeRefundBase([{ lineTotal: 259000, qty: 1, unit: 259000, selectedQty: 1 }], false, 0) + vatShareForSelection(56490, 259000, 807000), 277130, "PD-206: 259,000+18,130=277,130");
-eq(computeRefundBase([{ lineTotal: 219000, qty: 1, unit: 219000, selectedQty: 1 }, { lineTotal: 259000, qty: 1, unit: 259000, selectedQty: 1 }], false, 0) + vatShareForSelection(56490, 478000, 807000), 511460, "2개: 478,000+33,460=511,460");
+// ── [A 재현] 저장된 선택 복원 — 김미성 PD-206 만 저장됐으면 재오픈 시 PD-206 만 체크(PD-202 자동체크 금지) ──
+{
+  // 주문 줄: PD-202, PD-206 (productId "676"·"677")
+  const lines = [
+    { id: "L202", product_id: "676", product_name: "PD(프라다)-202 니트", color: "없음", size: "M", qty: 1 },
+    { id: "L206", product_id: "677", product_name: "PD(프라다)-206 아우터", color: "없음", size: "M", qty: 1 },
+  ];
+  // 저장 snapshot = PD-206 하나만(productId "677")
+  const snap = [{ productId: "677", productName: "PD(프라다)-206 아우터", color: "없음", size: "M", qty: 1 }];
+  const r = restoreSelectionFromSnapshot(lines, snap);
+  eq(r.L206, 1, "PD-206 복원 체크");
+  eq(r.L202, 0, "PD-202 자동체크 안 됨");
+}
+// productId 비어도 상품명+옵션으로 매칭(타입/누락 방어)
+{
+  const lines = [
+    { id: "L1", product_id: "", product_name: "알로 뮬 2컬러", color: "회베이지", size: "240", qty: 1 },
+    { id: "L2", product_id: "", product_name: "다른 상품", color: "", size: "", qty: 1 },
+  ];
+  const snap = [{ productId: "", productName: "알로 뮬 2컬러", color: "회베이지", size: "240", qty: 1 }];
+  const r = restoreSelectionFromSnapshot(lines, snap);
+  eq(r.L1, 1, "productId 없어도 이름+옵션 매칭");
+  eq(r.L2, 0, "다른 줄 체크 안 됨");
+}
+// "없음" 옵션 정규화(snap color 없음 vs 줄 color 빈값도 매칭)
+{
+  const lines = [{ id: "L1", product_id: "9", product_name: "상품A", color: "", size: "230", qty: 2 }];
+  const snap = [{ productId: "", productName: "상품A", color: "없음", size: "230", qty: 2 }];
+  eq(restoreSelectionFromSnapshot(lines, snap).L1, 2, "«없음» 옵션 정규화 매칭");
+}
+// 수량 상한(저장 3 > 줄 2 → 2)
+{
+  const lines = [{ id: "L1", product_id: "9", product_name: "상품A", color: "", size: "", qty: 2 }];
+  const snap = [{ productId: "9", qty: 3 }];
+  eq(restoreSelectionFromSnapshot(lines, snap).L1, 2, "수량 줄 상한");
+}
 
 console.log(`✅ refund-issue-terms ${pass}건 통과`);
