@@ -197,6 +197,25 @@ ok2(ledgerHasPayoutInfo(null) === false, "null → false");
   const r = restoreSelectionFromSnapshot(lines, [{ productId: "", productName: "상품", color: "없음", size: "M", qty: 1 }]);
   eq(Object.values(r).filter((v) => v > 0).length, 1, "snapshot 1건 → 최대 1줄만(이름/옵션 겹쳐도)");
 }
+// [김미성 실측] PD-202·PD-206 이 같은 product_id "677" 을 공유해도 snapshot(PD-206)은 «이름 맞는» PD-206 만
+{
+  const lines = [
+    { id: "L202", product_id: "677", product_name: "PD(프라다)-202 니트", color: "없음", size: "M", qty: 1 },
+    { id: "L206", product_id: "677", product_name: "PD(프라다)-206 아우터", color: "없음", size: "M", qty: 1 },
+  ];
+  const snap = [{ productId: "677", productName: "PD(프라다)-206 아우터", color: "없음", size: "M", qty: 1 }];
+  const r = restoreSelectionFromSnapshot(lines, snap);
+  eq(r.L206, 1, "pid 공유해도 이름 맞는 PD-206 선택"); eq(r.L202, 0, "PD-202 는 이름 달라 선택 안 됨");
+  eq(Object.values(r).filter((v) => v > 0).length, 1, "체크 1개(478,000 과다매칭 아님)");
+}
+// 이름/옵션 다르면 productId 만으로도 «첫 줄 자동선택» 안 하고, 이름 완전 일치 줄만
+{
+  const lines = [
+    { id: "X", product_id: "677", product_name: "PD(프라다)-202 아우터", color: "없음", size: "M", qty: 1 },
+    { id: "Y", product_id: "677", product_name: "PD(프라다)-206 아우터", color: "없음", size: "M", qty: 1 },
+  ];
+  eq(restoreSelectionFromSnapshot(lines, [{ productId: "677", productName: "PD(프라다)-206 아우터", color: "없음", size: "M", qty: 1 }]).Y, 1, "202아우터 vs 206아우터 — 206만");
+}
 // snapshot 2건이면 서로 다른 두 줄 각각 1개씩(중복 claim 금지)
 {
   const lines = [

@@ -907,21 +907,26 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       const lines = (code && linesByOrder[code]) || [];
       if (lines.length === 0) continue;
       const primary = code ? primaryByOrder[code] : null;
+      const lite = lines.map((l) => ({ id: clean(l.id), product_id: clean(l.product_id), product_name: clean(l.product_name), color: clean(l.color), size: clean(l.size), qty: Number(l.qty) || 1 }));
       let matched: Array<Record<string, unknown>>;
       let fromLedger = false;
       if (primary && Array.isArray(primary.product_snapshot) && primary.product_snapshot.length > 0) {
-        const lite = lines.map((l) => ({ id: clean(l.id), product_id: clean(l.product_id), product_name: clean(l.product_name), color: clean(l.color), size: clean(l.size), qty: Number(l.qty) || 1 }));
+        // 대표 기록 있으면 그 snapshot 을 «엄격 매처»(productId+이름/옵션)로 — 창과 완전히 같은 결과.
         const restored = restoreSelectionFromSnapshot(lite, primary.product_snapshot);
         matched = lines.filter((l) => (restored[clean(l.id)] || 0) > 0);
         fromLedger = true;
       } else {
+        // 기록 없음 — raw_payload 대상상품을 «같은 엄격 매처»로(productId includes 필터는 product_id 중복 시 과다매칭).
         const rawItems = (t.raw_payload && typeof t.raw_payload === "object" ? (t.raw_payload as { items?: unknown }).items : null);
-        const targetIds = Array.isArray(rawItems)
-          ? rawItems.map((x) => clean((x as { productId?: unknown; product_id?: unknown })?.productId ?? (x as { product_id?: unknown })?.product_id)).filter(Boolean)
+        const rawSnap = Array.isArray(rawItems)
+          ? rawItems.map((x) => { const o = x as Record<string, unknown>; return { productId: clean(o.productId ?? o.product_id), productName: clean(o.productName ?? o.product_name), color: clean(o.color), size: clean(o.size), qty: Number(o.qty) || 1 }; })
           : [];
-        matched = targetIds.length > 0
-          ? lines.filter((l) => targetIds.includes(clean(l.product_id)))
-          : pickIssueProductRows(lines, extractBodyField(t, "대상상품:") || clean(t.related_product));
+        if (rawSnap.length > 0) {
+          const restored = restoreSelectionFromSnapshot(lite, rawSnap);
+          matched = lines.filter((l) => (restored[clean(l.id)] || 0) > 0);
+        } else {
+          matched = pickIssueProductRows(lines, extractBodyField(t, "대상상품:") || clean(t.related_product));
+        }
       }
       if (matched.length === 0) continue;
       const sum = matched.reduce((s, m) => s + (Number(m.lineTotal) || 0), 0);

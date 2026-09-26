@@ -100,14 +100,19 @@ export function restoreSelectionFromSnapshot(lines: OrderLineLite[], snapshot: S
   }));
   const out: Record<string, number> = {};
   for (const l of lineList) out[l.id] = 0;
-  // [2026-09-27] «1:1» 배정 — snapshot 1건이 이름/옵션 겹치는 여러 줄에 동시 적중하지 않게, 아직 안 쓴 줄 중 하나만 claim.
-  //   → 체크되는 줄 수 ≤ snapshot 항목 수(1건이면 최대 1줄). productId(강) → 이름+옵션 → 이름 순.
+  // [2026-09-27] «1:1» 배정 — snapshot 항목당 아직 안 쓴 줄 하나만 claim(체크 ≤ snapshot 수).
+  //   ⚠ productId 가 여러 줄에 중복될 수 있어(예: 사이즈 변형이 같은 product_id) «productId 만»으로 첫 줄을
+  //     잡으면 엉뚱한 줄(PD-202)이 선택된다 → 이름/옵션이 함께 맞는 줄을 먼저 고른다.
+  //   우선순위: ①pid+이름+옵션 ②pid+이름 ③이름+옵션 ④이름 ⑤pid만(최후).
   const used = new Set<string>();
+  const free = (l: { id: string }) => !used.has(l.id);
   for (const s of snaps) {
     const pick =
-      lineList.find((l) => !used.has(l.id) && s.pid && l.pid && s.pid === l.pid) ||
-      lineList.find((l) => !used.has(l.id) && s.name && s.name === l.name && s.opt === l.opt) ||
-      lineList.find((l) => !used.has(l.id) && s.name && s.name === l.name);
+      lineList.find((l) => free(l) && s.pid && l.pid && s.pid === l.pid && s.name && s.name === l.name && s.opt === l.opt) ||
+      lineList.find((l) => free(l) && s.pid && l.pid && s.pid === l.pid && s.name && s.name === l.name) ||
+      lineList.find((l) => free(l) && s.name && s.name === l.name && s.opt === l.opt) ||
+      lineList.find((l) => free(l) && s.name && s.name === l.name) ||
+      lineList.find((l) => free(l) && s.pid && l.pid && s.pid === l.pid);
     if (pick) { used.add(pick.id); out[pick.id] = Math.min(s.qty, pick.qty); }
   }
   return out;
