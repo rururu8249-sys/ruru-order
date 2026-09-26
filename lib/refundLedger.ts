@@ -119,17 +119,16 @@ export function restoreSelectionFromSnapshot(lines: OrderLineLite[], snapshot: S
   // [2026-09-27] «1:1» 배정 — snapshot 항목당 아직 안 쓴 줄 하나만 claim(체크 ≤ snapshot 수).
   //   ⚠ productId 가 여러 줄에 중복될 수 있어(예: 사이즈 변형이 같은 product_id) «productId 만»으로 첫 줄을
   //     잡으면 엉뚱한 줄(PD-202)이 선택된다 → 이름/옵션이 함께 맞는 줄을 먼저 고른다.
-  //   우선순위: ①lineId(주문 행 id) ②pid+이름+옵션 ③pid+이름 ④이름+옵션 ⑤이름 ⑥pid만(최후).
+  //   우선순위: ①lineId(주문 행 id) ②pid+이름+옵션 ③이름+옵션 ④이름(단, «옵션 없는 줄»만).
+  //   ⚠ pid 단독·pid+이름(옵션 무시) 매칭은 금지 — products.id 가 브랜드 단위라 과다매칭. 이름 단독도 옵션 있는 줄엔 옵션 일치 요구.
   const used = new Set<string>();
   const free = (l: { id: string }) => !used.has(l.id);
   for (const s of snaps) {
     const pick =
-      lineList.find((l) => free(l) && s.lineId && l.id === s.lineId) || // ① lineId(주문 행 id) 정확 일치 — 가장 강함
-      lineList.find((l) => free(l) && s.pid && l.pid && s.pid === l.pid && s.name && s.name === l.name && s.opt === l.opt) ||
-      lineList.find((l) => free(l) && s.pid && l.pid && s.pid === l.pid && s.name && s.name === l.name) ||
-      lineList.find((l) => free(l) && s.name && s.name === l.name && s.opt === l.opt) ||
-      lineList.find((l) => free(l) && s.name && s.name === l.name) ||
-      lineList.find((l) => free(l) && s.pid && l.pid && s.pid === l.pid);
+      lineList.find((l) => free(l) && s.lineId && l.id === s.lineId) || // ① lineId 정확 일치 — 가장 강함
+      lineList.find((l) => free(l) && s.pid && l.pid && s.pid === l.pid && s.name && s.name === l.name && s.opt === l.opt) || // ② pid+이름+옵션
+      lineList.find((l) => free(l) && s.name && s.name === l.name && s.opt === l.opt) || // ③ 이름+옵션 완전 일치
+      lineList.find((l) => free(l) && s.name && s.name === l.name && l.opt === ""); // ④ 이름 단독 — 옵션 없는 줄만
     if (pick) { used.add(pick.id); out[pick.id] = Math.min(s.qty, pick.qty); }
   }
   return out;

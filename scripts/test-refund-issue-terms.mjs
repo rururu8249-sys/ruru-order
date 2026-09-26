@@ -216,21 +216,26 @@ ok2(ledgerHasPayoutInfo(null) === false, "null → false");
   ];
   eq(restoreSelectionFromSnapshot(lines, [{ productId: "677", productName: "PD(프라다)-206 아우터", color: "없음", size: "M", qty: 1 }]).Y, 1, "202아우터 vs 206아우터 — 206만");
 }
-// snapshot 2건이면 서로 다른 두 줄 각각 1개씩(중복 claim 금지)
+// snapshot 2건이면 서로 다른 두 줄 각각 1개씩(중복 claim 금지) — 이름+옵션으로 매칭
 {
   const lines = [
     { id: "A", product_id: "1", product_name: "가", color: "", size: "M", qty: 1 },
     { id: "B", product_id: "2", product_name: "나", color: "", size: "M", qty: 1 },
     { id: "C", product_id: "3", product_name: "다", color: "", size: "M", qty: 1 },
   ];
-  const r = restoreSelectionFromSnapshot(lines, [{ productId: "1", qty: 1 }, { productId: "3", qty: 1 }]);
+  const r = restoreSelectionFromSnapshot(lines, [{ productId: "1", productName: "가", color: "", size: "M", qty: 1 }, { productId: "3", productName: "다", color: "", size: "M", qty: 1 }]);
   eq(r.A, 1, "snap1→A"); eq(r.B, 0, "B 미체크"); eq(r.C, 1, "snap2→C");
 }
-// 수량 상한(저장 3 > 줄 2 → 2)
+// 수량 상한(저장 3 > 줄 2 → 2) — 이름 있는 옵션없는 줄
 {
   const lines = [{ id: "L1", product_id: "9", product_name: "상품A", color: "", size: "", qty: 2 }];
-  const snap = [{ productId: "9", qty: 3 }];
+  const snap = [{ productId: "9", productName: "상품A", qty: 3 }];
   eq(restoreSelectionFromSnapshot(lines, snap).L1, 2, "수량 줄 상한");
+}
+// [규칙] pid 만 있고 이름 없는 snapshot → 브랜드 과다매칭 방지 위해 매칭 0
+{
+  const lines = [{ id: "L1", product_id: "9", product_name: "상품A", color: "", size: "M", qty: 1 }];
+  eq(restoreSelectionFromSnapshot(lines, [{ productId: "9" }]).L1, 0, "pid 단독 snapshot → 매칭 안 함");
 }
 
 // ── [A 근본] deriveInitialSelection — 한 번에 결정, ledger 있으면 snapshot 만 ──
@@ -243,8 +248,8 @@ const LINES4 = [
 // (a) ledger snapshot=PD-206, raw 는 무관 → PD-206 만
 { const r = deriveInitialSelection({ hasLedger: true, snapshot: [{ productId: "677", productName: "PD-206 아우터", color: "없음", size: "M", qty: 1 }], lines: LINES4 });
   eq(r.sel.L206, 1, "(a) ledger→PD-206 체크"); eq(r.sel.L202, 0, "(a) PD-202 미체크"); eq(r.matchedNone, false, "(a) 매칭됨"); }
-// (b) ledger 없음(신규) → raw_payload 대상(PD-202·206) 자동 체크
-{ const r = deriveInitialSelection({ hasLedger: false, snapshot: [{ productId: "676" }, { productId: "677" }], lines: LINES4 });
+// (b) ledger 없음(신규) → raw_payload 대상(PD-202·206) 자동 체크(이름+옵션으로)
+{ const r = deriveInitialSelection({ hasLedger: false, snapshot: [{ productId: "676", productName: "PD-202 니트", color: "없음", size: "M" }, { productId: "677", productName: "PD-206 아우터", color: "없음", size: "M" }], lines: LINES4 });
   eq(r.sel.L202, 1, "(b) 신규 PD-202 자동체크"); eq(r.sel.L206, 1, "(b) 신규 PD-206 자동체크"); eq(r.sel.L3, 0, "(b) 대상 아님"); }
 // (b2) 신규인데 raw 대상이 PD-206 하나, 줄 PD-202·PD-206 이 같은 pid 677 → 이름 맞는 PD-206 만(브랜드 pid 과다 방지)
 { const linesShare = [
@@ -256,13 +261,22 @@ const LINES4 = [
 // (b3) 신규·대상 정보 없음 → 전부 체크
 { const r = deriveInitialSelection({ hasLedger: false, snapshot: [], lines: LINES4 });
   eq(Object.values(r.sel).filter((v) => v > 0).length, 4, "(b3) 대상 없음 → 전부"); }
+// [요청] snapshot {pid 677, 이름 "PD(프라다)-999 아우터"} → 주문에 없는 이름 → 0개 + matchedNone(노란 안내)
+{ const linesShare = [
+    { id: "L202", product_id: "677", product_name: "PD(프라다)-202 니트", color: "없음", size: "M", qty: 1 },
+    { id: "L206", product_id: "677", product_name: "PD(프라다)-206 아우터", color: "없음", size: "M", qty: 1 },
+  ];
+  const r = restoreSelectionFromSnapshot(linesShare, [{ productId: "677", productName: "PD(프라다)-999 아우터", color: "없음", size: "M", qty: 1 }]);
+  eq(Object.values(r).filter((v) => v > 0).length, 0, "이름 999 는 주문에 없음 → 0개(브랜드 pid 로 202/206 안 잡힘)");
+  const d = deriveInitialSelection({ hasLedger: true, snapshot: [{ productId: "677", productName: "PD(프라다)-999 아우터", color: "없음", size: "M", qty: 1 }], lines: linesShare });
+  eq(Object.values(d.sel).filter((v) => v > 0).length, 0, "derive 0개"); eq(d.matchedNone, true, "matchedNone → 노란 안내"); }
 // (c) ledger snapshot 이 줄과 불일치 → 0개 + matchedNone(raw 대체 금지)
 { const r = deriveInitialSelection({ hasLedger: true, snapshot: [{ productId: "999", productName: "없는상품" }], lines: LINES4 });
   eq(Object.values(r.sel).filter((v) => v > 0).length, 0, "(c) 하나도 체크 안 됨"); eq(r.matchedNone, true, "(c) matchedNone"); }
-// (d) productId 숫자/문자 혼용 매칭 — snapshot "677"(문자) vs 줄 677(숫자)
+// (d) productId 숫자/문자 혼용 매칭 — snapshot "677"(문자) vs 줄 677(숫자), 이름+옵션 동반
 { const linesNum = [{ id: "L206", product_id: 677, product_name: "PD-206", color: "없음", size: "M", qty: 1 }];
-  const r = deriveInitialSelection({ hasLedger: true, snapshot: [{ productId: "677", qty: 1 }], lines: linesNum });
-  eq(r.sel.L206, 1, "(d) 문자 productId vs 숫자 매칭"); }
+  const r = deriveInitialSelection({ hasLedger: true, snapshot: [{ productId: "677", productName: "PD-206", color: "없음", size: "M", qty: 1 }], lines: linesNum });
+  eq(r.sel.L206, 1, "(d) 문자 productId vs 숫자 매칭(이름+옵션 동반)"); }
 
 // ── 순서 시나리오: lines/ledger 도착 순서와 무관하게 결과 동일(순수함수라 입력만 같으면 동일) ──
 {
