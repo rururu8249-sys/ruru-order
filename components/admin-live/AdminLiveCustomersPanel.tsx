@@ -504,6 +504,8 @@ function CustomerDetailDrawer({
   setPage,
   onClose,
   onBlockAction,
+  onEditBlockReason,
+  blockedAt,
   blockSaving,
   onSaved,
 }: {
@@ -513,6 +515,8 @@ function CustomerDetailDrawer({
   setPage: (value: number) => void;
   onClose: () => void;
   onBlockAction: (customer: CustomerSummary) => void | Promise<void>;
+  onEditBlockReason?: (customer: CustomerSummary) => void;
+  blockedAt?: string;
   blockSaving: boolean;
   onSaved?: (patch: Partial<CustomerProfile>) => void;
 }) {
@@ -841,6 +845,39 @@ function CustomerDetailDrawer({
               </div>
             </div>
           </div>
+
+          {/* [2026-09-26] 차단 회원일 때만 — 차단 정보 상자(기존 BlockedCardBody 재사용). 새 차단/해제 로직 없음. */}
+          {customer.blocked ? (() => {
+            const parts = parseBlockReason(customer.blockReason);
+            return (
+              <div className="mb-3 overflow-hidden rounded-xl border border-rose-line bg-danger-bg/40">
+                <div className="flex items-center justify-between gap-2 px-4 pt-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-lg bg-[var(--color-danger-tx)] px-2 py-0.5 text-[11px] font-black text-white">차단{parts.label ? ` · ${parts.label}` : ""}</span>
+                    {parts.items.length > 0 ? <span className="text-[11px] font-black text-danger-tx">품목 {parts.items.length}개</span> : null}
+                  </div>
+                  <span className="shrink-0 text-[11px] font-black text-ink-mute">{clean(blockedAt) ? formatOrderDateTime(blockedAt) : ""}</span>
+                </div>
+                <BlockedCardBody parts={parts} address="">
+                  <button
+                    type="button"
+                    onClick={() => onEditBlockReason?.(customer)}
+                    className="rounded-lg border border-rose-line bg-surface px-3 py-1.5 text-[11px] font-black text-rose-deep hover:bg-rose-soft"
+                  >
+                    사유 수정
+                  </button>
+                  <button
+                    type="button"
+                    disabled={blockSaving}
+                    onClick={() => onBlockAction(customer)}
+                    className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50"
+                  >
+                    {blockSaving ? "처리 중…" : CUSTOMER_TERMS.unblock}
+                  </button>
+                </BlockedCardBody>
+              </div>
+            );
+          })() : null}
 
           {/* 정보 수정 폼 (닉네임/이름/주소 교정 + [📞 번호 변경] 전용 블록) */}
           {editOpen ? (
@@ -1594,8 +1631,29 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
     const blockSummary = customer.blocked ? blockReasonSummary(customer.blockReason) : "";
     const bp = customer.blocked ? parseBlockReason(customer.blockReason) : null;
     const blockFull = bp ? [bp.label, bp.items.join(", "), bp.memo].filter(Boolean).join(" · ") : "";
+    // [2026-09-26] 차단 표시용 — 1줄 배지(유형)+차단일(MM.DD), 2줄 품목요약/메모, hover 전체
+    const blockedAtShort = (() => {
+      if (!blockedAt) return "";
+      const dt = new Date(blockedAt.includes("T") ? blockedAt : blockedAt.replace(" ", "T"));
+      if (Number.isNaN(dt.getTime())) return "";
+      const p2 = (n: number) => String(n).padStart(2, "0");
+      return `${p2(dt.getMonth() + 1)}.${p2(dt.getDate())}`;
+    })();
+    let blockLine2 = "";
+    if (bp) {
+      if (bp.items.length > 0) blockLine2 = bp.items[0] + (bp.items.length > 1 ? ` 외 ${bp.items.length - 1}개` : "");
+      else if (bp.memo) blockLine2 = bp.memo.split("\n")[0];
+    }
+    const blockTitle = bp
+      ? [
+          bp.label ? `유형: ${bp.label}` : "",
+          bp.items.length ? `품목: ${bp.items.join(", ")}` : "",
+          bp.memo ? `메모: ${bp.memo}` : "",
+          blockedAt ? `차단일시: ${formatOrderDateTime(blockedAt)}` : "",
+        ].filter(Boolean).join("\n")
+      : "";
     const initial = (customer.nickname || customer.name || "?").trim().charAt(0);
-    return { phoneDigits, hasPhoto, pts, openIssues, orderTwo, loginShort, blockedAt, blockSummary, blockFull, initial };
+    return { phoneDigits, hasPhoto, pts, openIssues, orderTwo, loginShort, blockedAt, blockedAtShort, blockSummary, blockFull, blockParts: bp, blockLine2, blockTitle, initial };
   };
   const blockedCustomers = customers.filter((customer) => customer.blocked);
   const customerPhoneKeys = new Set(customers.map((customer) => digitsOnly(customer.phone)).filter(Boolean));
@@ -2025,7 +2083,13 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                           {/* 상태 (가장 넓게 · 여러 배지 줄바꿈 허용 · 차단은 사유 요약+hover 전체) */}
                           <div className="flex min-w-0 flex-wrap items-center gap-1">
                             {customer.blocked ? (
-                              <span className="truncate text-[11px] font-bold text-danger-tx" title={d.blockFull || d.blockSummary || "차단됨"}>🚫 차단{d.blockSummary ? ` · ${d.blockSummary}` : ""}{d.blockedAt ? ` · ${formatOrderDateTime(d.blockedAt)}` : ""}</span>
+                              <div className="min-w-0" title={d.blockTitle || "차단됨"}>
+                                <div className="flex items-center gap-1">
+                                  <span className="shrink-0 rounded bg-[var(--color-danger-tx)] px-1.5 py-0.5 text-[13px] font-black text-white">차단{d.blockParts?.label ? ` · ${d.blockParts.label}` : ""}</span>
+                                  {d.blockedAtShort ? <span className="shrink-0 text-[11px] font-bold text-ink-mute">{d.blockedAtShort}</span> : null}
+                                </div>
+                                {d.blockLine2 ? <div className="mt-0.5 truncate text-[13px] text-ink-soft">{d.blockLine2}</div> : null}
+                              </div>
                             ) : (customer.unpaidCount > 0 || d.openIssues > 0 || customer.liveAlertOptin === false) ? (
                               <>
                                 {customer.unpaidCount > 0 ? <span className="rounded bg-warn-bg px-1 py-0.5 text-[11px] font-black text-warn-tx" title="상세와 같은 기준 — 아직 입금 전(자동매칭 실패 포함)">미입금 {customer.unpaidCount}건</span> : null}
@@ -2089,8 +2153,12 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                             {customer.phone ? ` · ${formatPhone(customer.phone)}` : ""}
                           </div>
                           {customer.blocked ? (
-                            <div className="mt-0.5 truncate text-[11px] font-bold text-danger-tx" title={d.blockFull || d.blockSummary || "차단됨"}>
-                              🚫 {d.blockSummary || "차단됨"}{d.blockedAt ? ` · ${formatOrderDateTime(d.blockedAt)}` : ""}
+                            <div className="mt-0.5 min-w-0" title={d.blockTitle || "차단됨"}>
+                              <div className="flex flex-wrap items-center gap-1">
+                                <span className="shrink-0 rounded bg-[var(--color-danger-tx)] px-1.5 py-0.5 text-[13px] font-black text-white">차단{d.blockParts?.label ? ` · ${d.blockParts.label}` : ""}</span>
+                                {d.blockedAtShort ? <span className="shrink-0 text-[11px] font-bold text-ink-mute">{d.blockedAtShort}</span> : null}
+                              </div>
+                              {d.blockLine2 ? <div className="mt-0.5 truncate text-[13px] text-ink-soft">{d.blockLine2}</div> : null}
                             </div>
                           ) : null}
                         </button>
@@ -2472,6 +2540,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
         setPage={setDetailPage}
         onClose={() => { setSelectedCustomer(null); setSelectedProfile(null); }}
         onBlockAction={handleCustomerBlockButton}
+        onEditBlockReason={(c) => setBlockModalTarget(c)}
+        blockedAt={selectedCustomer && selectedCustomer.blocked ? (blockedAtByPhone.get(digitsOnly(selectedCustomer.phone)) || "") : ""}
         blockSaving={blockSaving}
         onSaved={(patch) => { setReloadTick((t) => t + 1); setSelectedProfile((p) => (p ? { ...p, ...patch } : p)); }}
       />
