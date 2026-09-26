@@ -543,7 +543,7 @@ function IssueCard({
           {!product && orderNo ? <div className="text-[11px] font-bold text-ink-mute">{orderNo}</div> : null}
           {/* [2026-09-26] 교환·환불 장부 요약 — 진행단계 · 최종환불액 · 방법 (값 있을 때만) */}
           {ledgerLine ? (
-            <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+            <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[13px]">
               <span className="shrink-0" aria-hidden>💳</span>
               <span className="min-w-0 truncate font-black text-info-tx">{ledgerLine}</span>
             </div>

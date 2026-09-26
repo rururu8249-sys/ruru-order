@@ -60,6 +60,51 @@ export function computeAmountFinal(base: unknown, adjustments: unknown): number 
   return Math.max(0, safeBase + adjSum);
 }
 
+// ── [2026-09-26] 처리 창 입력 보조(표시·입력 전용, 저장은 서버가 amount_final 재계산) ──
+
+/** 숫자에 천단위 쉼표 — "69000" → "69,000" */
+export function formatComma(n: unknown): string {
+  const v = Math.round(Number(n));
+  return Number.isFinite(v) ? v.toLocaleString("ko-KR") : "0";
+}
+
+/** 쉼표·문자 섞인 입력에서 숫자만 → 양의 정수(부호는 버튼으로 받으므로 여기선 절대값). */
+export function parseAmountInput(s: unknown): number {
+  const d = String(s ?? "").replace(/[^0-9]/g, "");
+  return d ? Number(d) : 0;
+}
+
+/** 교환은 금액 대신 옵션/송장을 받는다 → 금액 영역이 필요 없다. */
+export function kindNeedsAmount(kind: unknown): boolean {
+  return String(kind ?? "").trim() !== "교환";
+}
+
+/** 처리 창 조정 줄(부호 버튼 + 양수 금액) */
+export type RefundAdjRow = { label: string; sign: "차감" | "추가"; amount: number };
+
+/** 화면 줄 → 저장형(차감은 음수). 기존 adjustments 형식 유지. 라벨·금액 둘 다 없으면 버림. */
+export function adjRowsToStored(rows: RefundAdjRow[]): RefundAdjustment[] {
+  if (!Array.isArray(rows)) return [];
+  const out: RefundAdjustment[] = [];
+  for (const r of rows) {
+    const label = String(r?.label ?? "").trim().slice(0, 120);
+    const abs = Math.abs(Math.round(Number(r?.amount)) || 0);
+    const amount = r?.sign === "차감" ? -abs : abs;
+    if (!label && amount === 0) continue;
+    out.push({ label, amount });
+  }
+  return out;
+}
+
+/** 저장형(음수/양수) → 화면 줄(부호 버튼 + 양수). 기존 값 편집용. */
+export function storedToAdjRows(adjs: unknown): RefundAdjRow[] {
+  return normalizeAdjustments(adjs).map((a) => ({
+    label: a.label,
+    sign: a.amount < 0 ? "차감" : "추가",
+    amount: Math.abs(a.amount),
+  }));
+}
+
 /** done_at 이후 N일(기본 30) 지났으면 전체 계좌번호를 가려야 한다. */
 export function shouldHideAccountNumber(doneAt: unknown, now: number, days = 30): boolean {
   const s = String(doneAt ?? "").trim();

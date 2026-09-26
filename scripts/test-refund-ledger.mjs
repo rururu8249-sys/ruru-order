@@ -12,6 +12,11 @@ import {
   isValidStage,
   isValidKind,
   isValidMethod,
+  formatComma,
+  parseAmountInput,
+  kindNeedsAmount,
+  adjRowsToStored,
+  storedToAdjRows,
 } from "../lib/refundLedger.ts";
 
 let pass = 0;
@@ -76,5 +81,51 @@ eq(d1.amount_base, 33000, "draft amount_base = 주문금액 인자");
 ok(isValidStage("완료") && !isValidStage("아무거나"), "stage 검증");
 ok(isValidKind("교환") && !isValidKind("환불"), "kind 검증(환불은 kind 아님 — 반품/교환/재발송)");
 ok(isValidMethod("계좌이체") && !isValidMethod("현금"), "method 검증");
+
+// ── [2026-09-26] 처리 창 입력 보조: 부호 변환·쉼표·교환 ──
+// 쉼표 표시/파싱
+eq(formatComma(69000), "69,000", "쉼표 표시");
+eq(formatComma(0), "0", "0 표시");
+eq(parseAmountInput("69,000"), 69000, "쉼표 파싱");
+eq(parseAmountInput("1,234원"), 1234, "원·쉼표 섞여도 숫자만");
+eq(parseAmountInput("abc"), 0, "숫자 없으면 0");
+eq(parseAmountInput(""), 0, "빈값 0");
+
+// 차감/추가 부호 변환 (화면 줄 → 저장형)
+{
+  const rows = [
+    { label: "반품 배송비", sign: "차감", amount: 4000 },
+    { label: "보상", sign: "추가", amount: 3000 },
+  ];
+  const stored = adjRowsToStored(rows);
+  eq(stored.length, 2, "부호변환: 2줄");
+  eq(stored[0].amount, -4000, "차감 → 음수");
+  eq(stored[1].amount, 3000, "추가 → 양수");
+}
+// 라벨·금액 둘 다 없으면 버림 / 라벨만 있어도 유지
+eq(adjRowsToStored([{ label: "", sign: "차감", amount: 0 }]).length, 0, "빈 줄 버림");
+eq(adjRowsToStored([{ label: "메모만", sign: "차감", amount: 0 }]).length, 1, "라벨만 있으면 유지");
+
+// 저장형 → 화면 줄 (편집용 왕복)
+{
+  const rows = storedToAdjRows([{ label: "왕복 배송비", amount: -6000 }, { label: "보상", amount: 2000 }]);
+  eq(rows[0].sign, "차감", "음수 → 차감");
+  eq(rows[0].amount, 6000, "음수 → 절대값");
+  eq(rows[1].sign, "추가", "양수 → 추가");
+}
+
+// 최종 환불액 = 상품금액 + 부호변환된 조정줄 합
+{
+  const rows = [
+    { label: "반품 배송비", sign: "차감", amount: 4000 },
+    { label: "단순변심 차감", sign: "차감", amount: 10000 },
+  ];
+  eq(computeAmountFinal(69000, adjRowsToStored(rows)), 55000, "69,000 − 4,000 − 10,000 = 55,000");
+}
+
+// 교환은 금액 영역 불필요
+ok(kindNeedsAmount("반품") === true, "반품은 금액 필요");
+ok(kindNeedsAmount("환불") === true, "환불(=반품 매핑)도 금액 필요");
+ok(kindNeedsAmount("교환") === false, "교환은 금액 대신 옵션/송장");
 
 console.log(`✅ refund-ledger 순수 로직 ${pass}건 통과`);
