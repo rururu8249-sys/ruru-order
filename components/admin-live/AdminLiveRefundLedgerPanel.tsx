@@ -515,7 +515,23 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
   const deductTotal = finalAdj.filter((a) => a.amount < 0).reduce((s, a) => s - a.amount, 0);
   // [카드] 받을 반품비 = 차감칸 입력값(음수 합). 0이면 줄 숨김.
   const cardRefundBack = cardRefundBackAmount(deductTotal, 0);
-  const formula = deductTotal > 0 ? `${formatComma(amountBase)} − ${formatComma(deductTotal)}` : "";
+
+  // [금액 박스 = 주문상세 합계 표] 상품금액/배송비/차감/환불할 금액을 줄로. 계산은 기존값 그대로 표시만.
+  const productSum = matchFailed ? manualBase : computeRefundBase(selList, false, 0); // 체크 상품 줄합계(배송비 제외)
+  const shipIncludedAmount = includeShipping ? shipFee : 0;
+  const selectedCount = lines.filter((l) => (sel[l.id] || 0) > 0).length;
+  const lineCount = lines.length;
+  const isPartial = !matchFailed && lineCount > 0 && !isFullReturn;
+  const orderTotalAll = totalLineSum + effectiveShippingFee; // 주문 총 결제금액(무통장)
+  const cardProductAmount = Math.max(0, cardTotalDisplay - cardExtra); // 카드: 상품금액 = 카드총액 − 부가세
+  const shippingStatusText = (() => {
+    if (effectiveShippingFee === 0) return "무료배송";
+    if (shippingTouched) return includeShipping ? "직접 포함" : "직접 제외";
+    if (combinedShipping && !includeShipping) return `같이 배송된 주문 ${combinedWith || ""} · 미포함`.replace("  ", " ").trim();
+    if (isFullReturn && includeShipping && !combinedShipping) return "주문 상품 전부 반품 · 포함";
+    if (isPartial && !includeShipping) return `남는 상품 ${Math.max(0, lineCount - selectedCount)}개 · 미포함`;
+    return includeShipping ? "포함" : "미포함";
+  })();
 
   const selectOnFocus = (e: React.FocusEvent<HTMLInputElement>) => e.currentTarget.select();
   const setQty = (id: string, q: number, max: number) => setSel((prev) => ({ ...prev, [id]: Math.max(0, Math.min(q, max)) }));
@@ -612,9 +628,14 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
       ? productText(item.product_snapshot)
       : productText(lines.filter((l) => (sel[l.id] || 0) > 0).map((l) => ({ productName: l.product_name, color: l.color, size: l.size, qty: sel[l.id] || 0 })));
     const reason = reasonVal || reasonBody(item.reason).split("\n")[0] || "-";
+    // 금액 뒤 괄호 내역(0 항목 생략): 73,000원(상품 79,000+배송비 4,000−차감 10,000)
+    let bd = `상품 ${formatComma(productSum)}`;
+    if (shipIncludedAmount > 0) bd += `+배송비 ${formatComma(shipIncludedAmount)}`;
+    if (deductTotal > 0) bd += `−차감 ${formatComma(deductTotal)}`;
+    const amountSeg = (shipIncludedAmount > 0 || deductTotal > 0) ? `${won(amountFinal)}(${bd})` : won(amountFinal);
     const line = isCardCancel
       ? [dateStr, product || "-", reason, `카드 전체취소 ${won(cardTotalDisplay)}`, ...(cardRefundBack > 0 ? [`반품비 ${won(cardRefundBack)}`] : [])].join(" · ")
-      : [dateStr, product || "-", reason, won(amountFinal), [bankDisplayName(bank), account].filter(Boolean).join(" ") || "-", holder || "-"].map((x) => x || "-").join(" · ");
+      : [dateStr, product || "-", reason, amountSeg, [bankDisplayName(bank), account].filter(Boolean).join(" ") || "-", holder || "-"].map((x) => x || "-").join(" · ");
     try { await navigator.clipboard.writeText(line); showAdminToast("이체 정보 복사했어요", "success"); }
     catch { showAdminToast("복사 실패:\n" + line, "warning"); }
   };
@@ -720,20 +741,6 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
                     </div>
                   );
                 })}
-                {showShippingRow ? (
-                  <div className="px-2 py-2">
-                    {shipMovedToPeer ? (
-                      <div className="mb-1 text-[13px] text-ink-mute">배송비 0원 — 같이 배송된 {combinedWith || "다른"} 주문에 {formatComma(combinedShipFee)}원 포함</div>
-                    ) : null}
-                    <div className="flex items-center gap-2 text-[13px] font-bold text-ink-soft">
-                      <input type="checkbox" checked={includeShipping} onChange={(e) => { setIncludeShipping(e.target.checked); setShippingTouched(true); }} className="h-5 w-5 shrink-0 accent-rose-deep" />
-                      <span>배송비도 환불</span>
-                      <input inputMode="numeric" value={formatComma(shipFee)} onFocus={selectOnFocus} onChange={(e) => { setShipFee(parseAmountInput(e.target.value)); setShipFeeTouched(true); }} className={`w-24 text-right ${INPUT}`} />
-                      <span className="text-ink-mute">원</span>
-                    </div>
-                    {combinedShipping && !shipMovedToPeer ? <div className="mt-1 text-[13px] text-ink-mute">같이 배송된 주문{combinedWith ? `(${combinedWith})` : ""}이 있어서 배송비는 확인하세요.</div> : null}
-                  </div>
-                ) : null}
               </div>
             )}
             {snapshotUnmatched ? (
@@ -783,37 +790,43 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
                 </div>
               </div>
 
-              {/* 4. 환불할 금액 — 카드 모드는 아래 카드 박스가 대신하므로 숨김 */}
-              {!isCardCancel ? (
-                <div className="mb-3 rounded-xl border border-rose-line bg-rose-soft/50 p-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[14px] font-black text-ink">환불할 금액</span>
-                    <span className="text-[22px] font-black text-rose-deep">{won(amountFinal)}</span>
-                  </div>
-                  {formula ? <div className="mt-0.5 text-right text-[13px] font-bold text-ink-mute">{formula} = {won(amountFinal)}</div> : null}
+              {/* 4. 금액 요약 표 — 주문상세 합계 표와 같은 모양(항목 왼쪽·금액 오른쪽, 합계 굵게) */}
+              {isCardCancel ? (
+                <div className="mb-3 border-t border-line pt-2">
+                  {isPartial ? <div className="pb-1 text-[13px] text-ink-mute">{lineCount}개 중 {selectedCount}개 반품 · 카드 전체 취소 후 손님과 정리</div> : null}
+                  <div className="flex items-center justify-between py-1 text-[13px]"><span className="text-ink-soft">상품금액</span><span className="font-black text-ink">{won(cardProductAmount)}</span></div>
+                  {cardExtra > 0 ? <div className="flex items-center justify-between py-1 text-[13px]"><span className="text-ink-soft">부가세({vatRatePct}%)</span><span className="font-black text-ink">{won(cardExtra)}</span></div> : null}
+                  <div className="flex items-center justify-between py-1 text-[13px]"><span className="text-ink-soft">카드 결제금액</span><span className="font-black text-ink">{won(cardTotalDisplay)}</span></div>
+                  <div className="mt-1 flex items-center justify-between border-t border-line pt-2 text-[16px] font-black"><span className="text-ink">카드 전체 취소</span><span className="text-ink">{won(cardTotalDisplay)}</span></div>
+                  {cardRefundBack > 0 ? <div className="flex items-center justify-between py-1 text-[14px] font-black"><span className="text-rose-deep">받을 반품비</span><span className="text-rose-deep">{won(cardRefundBack)}</span></div> : null}
                 </div>
-              ) : null}
+              ) : (
+                <div className="mb-3 border-t border-line pt-2">
+                  {isPartial ? <div className="pb-1 text-[13px] text-ink-mute">주문 총 결제금액 {won(orderTotalAll)} · {lineCount}개 중 {selectedCount}개 반품</div> : null}
+                  <div className="flex items-center justify-between py-1 text-[13px]"><span className="text-ink-soft">상품금액</span><span className="font-black text-ink">{won(productSum)}</span></div>
+                  {showShippingRow ? (
+                    <div className="py-1 text-[13px]">
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 text-ink-soft">
+                          <input type="checkbox" checked={includeShipping} onChange={(e) => { setIncludeShipping(e.target.checked); setShippingTouched(true); }} className="h-4 w-4 shrink-0 accent-rose-deep" />
+                          배송비
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <input inputMode="numeric" value={formatComma(shipFee)} onFocus={selectOnFocus} onChange={(e) => { setShipFee(parseAmountInput(e.target.value)); setShipFeeTouched(true); }} className="h-8 w-24 rounded-lg border border-line px-2 text-right text-[14px] font-black text-ink outline-none focus-visible:ring-2 focus-visible:ring-rose-deep" />
+                          <span className="text-ink-mute">원</span>
+                        </span>
+                      </div>
+                      <div className="mt-0.5 text-right text-[12px] text-ink-mute">{shippingStatusText}</div>
+                    </div>
+                  ) : null}
+                  {deductTotal > 0 ? <div className="flex items-center justify-between py-1 text-[13px]"><span className="text-ink-soft">차감{reasonVal ? ` (${reasonVal})` : ""}</span><span className="font-black text-danger-tx">−{won(deductTotal)}</span></div> : null}
+                  <div className="mt-1 flex items-center justify-between border-t border-line pt-2 text-[16px] font-black"><span className="text-ink">환불할 금액</span><span className="text-rose-deep text-[18px]">{won(amountFinal)}</span></div>
+                </div>
+              )}
 
               {/* 5·6. 방법·계좌 */}
               <div className="mb-3">
-                {method === "카드취소" ? (
-                  /* [카드 = 단순 전체 취소] 참고 부가세 안내 + 카드 전체 취소 + 받을 반품비(차감칸 입력값만) */
-                  <div className="rounded-xl border border-line p-3">
-                    {cardExtra > 0 && cardTotalDisplay > 0 ? (
-                      <div className="mb-2 text-[13px] text-ink-mute">상품 {formatComma(Math.max(0, cardTotalDisplay - cardExtra))}원 + 부가세({vatRatePct}%) {formatComma(cardExtra)}원 = 카드 결제 {formatComma(cardTotalDisplay)}원</div>
-                    ) : null}
-                    <div className="flex items-center justify-between">
-                      <span className="text-[14px] font-black text-ink">카드 전체 취소</span>
-                      <span className="text-[16px] font-black text-ink">{won(cardTotalDisplay)}</span>
-                    </div>
-                    {cardRefundBack > 0 ? (
-                      <div className="mt-1 flex items-center justify-between">
-                        <span className="text-[14px] font-black text-rose-deep">받을 반품비</span>
-                        <span className="text-[16px] font-black text-rose-deep">{won(cardRefundBack)}</span>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : method === "계좌이체" ? (
+                {method === "카드취소" ? null : method === "계좌이체" ? (
                   <div className="rounded-xl border border-line p-3">
                     {isCardOrder ? (
                       <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">
