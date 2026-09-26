@@ -41,6 +41,19 @@ export function isCombinedShipmentPeer(mine: CombinePeerSelf, other: CombinePeer
   return Boolean((mine.broadcast && String(other.broadcast ?? "") === mine.broadcast) || (mine.day && String(other.day ?? "") === mine.day));
 }
 
+// [2026-09-26 복구후속] 저장 상품금액≠주문금액 경고를 띄울지 — 로딩 완료+성공+상품 있음+주문금액>0일 때만.
+//   로딩 중/실패/주문금액0 이면 false(0원으로 덮어쓰는 사고 방지).
+export function shouldWarnBaseMismatch(o: {
+  linesLoaded: boolean; linesError: boolean; lineCount: number; autoBase: number; savedBase: number | null; matchAccepted: boolean;
+}): boolean {
+  if (!o.linesLoaded || o.linesError) return false;
+  if ((Math.round(Number(o.lineCount)) || 0) <= 0) return false;
+  if ((Math.round(Number(o.autoBase)) || 0) <= 0) return false;
+  if (o.savedBase === null || o.savedBase === undefined) return false;
+  if (o.matchAccepted) return false;
+  return (Math.round(Number(o.savedBase)) || 0) !== (Math.round(Number(o.autoBase)) || 0);
+}
+
 // [2026-09-26 7차] 전체 반품 판정 — 모든 줄이 «전체 수량»으로 선택됐는가(배송비·카드추가금 자동 체크 기준).
 export function isFullReturnSel(sels: Array<{ qty: unknown; selectedQty: unknown }>): boolean {
   const arr = Array.isArray(sels) ? sels : [];

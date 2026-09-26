@@ -1,5 +1,5 @@
 // [2026-09-26 5·6차] 고객이슈 환불/교환 용어·💳 요약 문구 테스트
-import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer } from "../lib/refundLedger.ts";
+import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, shouldWarnBaseMismatch } from "../lib/refundLedger.ts";
 import { bankDisplayName } from "../lib/parseBankAccount.ts";
 
 let pass = 0;
@@ -102,5 +102,16 @@ eq(isCombinedShipmentPeer(me, { code: "B", addr: "서울시강남구|101", kakao
 eq(isCombinedShipmentPeer(me, { code: "A", addr: "서울시강남구|101", kakao: "KAK1", phone: "", broadcast: "BC1", day: "2026-09-16" }), false, "자기 자신 제외");
 eq(isCombinedShipmentPeer({ ...me, addr: "" }, { code: "B", addr: "", kakao: "KAK1", phone: "", broadcast: "BC1", day: "2026-09-16" }), false, "주소 모르면 성립 안 함");
 eq(isCombinedShipmentPeer(me, { code: "", addr: "서울시강남구|101", kakao: "KAK1", phone: "", broadcast: "BC1", day: "2026-09-16" }), false, "상대 코드 없으면 아님");
+
+// ── [복구후속1] 저장금액≠주문금액 경고 표시 판정 ──
+const base = { linesLoaded: true, linesError: false, lineCount: 1, autoBase: 83000, savedBase: 79000, matchAccepted: false };
+eq(shouldWarnBaseMismatch(base), true, "로딩완료+다름→경고");
+eq(shouldWarnBaseMismatch({ ...base, linesLoaded: false }), false, "로딩 중→경고 없음");
+eq(shouldWarnBaseMismatch({ ...base, linesError: true }), false, "조회 실패→경고 없음");
+eq(shouldWarnBaseMismatch({ ...base, autoBase: 0 }), false, "주문금액 0→경고 없음(덮어쓰기 방지)");
+eq(shouldWarnBaseMismatch({ ...base, lineCount: 0 }), false, "상품 줄 없음→경고 없음");
+eq(shouldWarnBaseMismatch({ ...base, savedBase: null }), false, "저장금액 없음(신규)→경고 없음");
+eq(shouldWarnBaseMismatch({ ...base, matchAccepted: true }), false, "이미 맞춤→경고 없음");
+eq(shouldWarnBaseMismatch({ ...base, autoBase: 79000 }), false, "금액 같음→경고 없음");
 
 console.log(`✅ refund-issue-terms ${pass}건 통과`);

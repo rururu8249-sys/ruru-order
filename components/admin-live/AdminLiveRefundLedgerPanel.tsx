@@ -15,6 +15,7 @@ import {
   REASON_CHIPS,
   optionLabelNoNone,
   isFullReturnSel,
+  shouldWarnBaseMismatch,
   computeAmountFinal,
   computeRefundBase,
   stageDisplay,
@@ -487,8 +488,11 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
   const matchFailed = linesLoaded && !linesError && lines.length === 0;
   const isCardOrder = orderPaymentMethod.includes("카드");
   const isCardCancel = method === "카드취소";
-  // [7차] 전체 반품 = 모든 줄이 «전체 수량»으로 선택됨(공용 isFullReturnSel). 일부면 배송비·카드추가금 줄 숨김.
+  // [7차] 전체 반품 = 모든 줄이 «전체 수량»으로 선택됨(공용 isFullReturnSel).
   const isFullReturn = isFullReturnSel(lines.map((l) => ({ qty: l.qty, selectedQty: sel[l.id] || 0 })));
+  // [복구후속3] 배송비 줄은 배송비>0이면 항상 표시(전체반품·부분선택·저장건 복원 무관 — «체크 여부»만 자동/복원).
+  //   전에는 isFullReturn 에 줄 «표시»까지 묶여, 부분선택·복원 때 배송비 줄이 사라졌다.
+  const showShippingRow = !isExchange && shippingFee > 0;
 
   // [7차] 배송비 자동 — 전체 반품이고 배송비>0일 때 기본 체크(합배송 공유면 해제). 사용자가 손대면 그 선택 유지.
   useEffect(() => {
@@ -507,7 +511,8 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
   const cardExtraAdd = isCardCancel && includeCardExtra ? cardExtra : 0;
   const autoBase = computeRefundBase(selList, includeShipping, shippingFee) + cardExtraAdd;
   const savedBase = item.id ? (Math.round(Number(item.amount_base)) || 0) : null;
-  const baseMismatch = !matchFailed && savedBase !== null && !matchAccepted && savedBase !== autoBase;
+  // [복구후속1] 로딩 완료 + 성공 + 상품 줄 1개↑ + 주문금액>0 일 때만 불일치 경고(로딩 중/실패/0원엔 숨김 → 0원 덮어쓰기 방지)
+  const baseMismatch = shouldWarnBaseMismatch({ linesLoaded, linesError, lineCount: lines.length, autoBase, savedBase, matchAccepted });
   const amountBase = matchFailed ? manualBase : (baseMismatch ? (savedBase as number) : autoBase);
 
   const deductFinalLabel = reasonVal ? `${reasonVal} 차감` : "차감"; // [6차] 현재 사유를 따라감(옛 라벨 유지 안 함)
@@ -700,7 +705,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
                     </div>
                   );
                 })}
-                {!isExchange && isFullReturn && shippingFee > 0 ? (
+                {showShippingRow ? (
                   <div className="px-2 py-2">
                     <label className="flex items-center gap-2 text-[13px] font-bold text-ink-soft">
                       <input type="checkbox" checked={includeShipping} onChange={(e) => { setIncludeShipping(e.target.checked); setShippingTouched(true); }} className="h-5 w-5 accent-rose-deep" />
@@ -800,6 +805,12 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
                   </div>
                 ) : method === "계좌이체" ? (
                   <div className="rounded-xl border border-line p-3">
+                    {isCardOrder ? (
+                      <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">
+                        이 주문은 카드결제예요.
+                        <button type="button" onClick={() => setMethod("카드취소")} className="rounded border border-warn-tx/50 px-2 py-0.5 text-[13px] font-black text-warn-tx hover:bg-warn-bg">카드취소로 바꾸기</button>
+                      </div>
+                    ) : null}
                     {holderExcluded ? (
                       <div className="mb-2 rounded-lg border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">예금주가 &lsquo;{clean(item.account_holder)}&rsquo;로 잘못 저장돼 있었어요. 손님 이름으로 바꿔뒀어요. 맞으면 저장을 눌러주세요.</div>
                     ) : null}
