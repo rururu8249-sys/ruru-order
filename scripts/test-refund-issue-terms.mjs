@@ -1,5 +1,5 @@
 // [2026-09-26 5·6차] 고객이슈 환불/교환 용어·💳 요약 문구 테스트
-import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, cardRefundBackAmount, pickPrimaryLedger, ledgerHasPayoutInfo, restoreSelectionFromSnapshot, deriveInitialSelection, buildSnapshotFromSelection, listAmountLine, baseSummaryLine, dateShortKo, dateLongKo, returnStagePrefix, reasonChipFromStored, buildKakaoCopy } from "../lib/refundLedger.ts";
+import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, cardRefundBackAmount, pickPrimaryLedger, ledgerHasPayoutInfo, restoreSelectionFromSnapshot, deriveInitialSelection, buildSnapshotFromSelection, listAmountLine, listAmountParts, dateShortLabel, baseSummaryLine, dateShortKo, dateLongKo, returnStagePrefix, reasonChipFromStored, buildKakaoCopy } from "../lib/refundLedger.ts";
 import { bankDisplayName } from "../lib/parseBankAccount.ts";
 
 let pass = 0;
@@ -408,5 +408,21 @@ eq(buildKakaoCopy({ ...kakaoBase, method: "포인트", shipIncluded: 0, deductTo
    "💰 포인트 79,000원으로 돌려드려요"].join("\n"),
   "포인트 환불 — 계좌줄 없음·상품1 합계줄 생략");
 ok2(buildKakaoCopy(kakaoBase).includes("\n"), "복사 텍스트에 줄바꿈 포함");
+
+// ── [③] listAmountParts — head/sub 두 줄(값은 listAmountLine 과 동일 공식) ──
+{ const a = listAmountParts({ productSum: 79000, shippingFee: 4000, allLineSum: 79000, cardTotal: 0, isCard: false, matchedCount: 1, lineCount: 1 });
+  eq(a.head, "83,000원", "전부+배송비 head"); eq(a.sub, "상품 79,000 + 배송비 4,000", "전부+배송비 sub"); }
+{ const a = listAmountParts({ productSum: 79000, shippingFee: 0, allLineSum: 79000, cardTotal: 0, isCard: false, matchedCount: 1, lineCount: 1 });
+  eq(a.head, "79,000원", "무료배송 head"); eq(a.sub, "무료배송", "무료배송 sub"); }
+{ const a = listAmountParts({ productSum: 259000, shippingFee: 0, allLineSum: 1052980, cardTotal: 0, isCard: false, matchedCount: 1, lineCount: 4 });
+  eq(a.head, "259,000원", "부분 head"); eq(a.sub, "주문 4개 중 1개 · 총 결제 1,052,980원", "부분 sub"); }
+{ const a = listAmountParts({ productSum: 255000, shippingFee: 0, allLineSum: 255000, cardTotal: 272850, isCard: true, matchedCount: 1, lineCount: 4 });
+  eq(a.head, "255,000원", "카드 head"); eq(a.sub, "주문 4개 중 1개 · 총 결제 272,850원", "카드 sub(총결제=카드총액)"); }
+
+// ── [③] dateShortLabel — 올해 M/D(요일) · 다른 해 YYYY.M/D(요일) · 빈값 "" ──
+const nowFixed = new Date("2026-06-15T00:00:00");
+eq(dateShortLabel("2026-09-23", nowFixed), "9/23(수)", "올해 → M/D(요일)");
+eq(dateShortLabel("2025-12-31", nowFixed), "2025.12/31(수)", "작년 → YYYY.M/D(요일)");
+eq(dateShortLabel("", nowFixed), "", "빈값 → 빈칸");
 
 console.log(`✅ refund-issue-terms ${pass}건 통과`);

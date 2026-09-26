@@ -4,7 +4,7 @@
 // 목적: 고객관리 오른쪽 고객이슈 패널
 // 주의: 주문/입금/배송/정산 상태 변경 없음. 고객이슈 admin_tasks 조회/등록/수정만 처리.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 import { splitIssueBody, mergeIssueBody } from "@/lib/issueBodyMeta";
@@ -15,7 +15,7 @@ import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { pickIssueProductRows } from "@/lib/issueProductLabel";
 import { RefundProcessModal, type LedgerDetail } from "./AdminLiveRefundLedgerPanel";
 import IssueRegisterModal, { type IssueRegisterSubmit } from "./IssueRegisterModal";
-import { productSnapshotFromItems, ledgerSummaryLine, pickPrimaryLedger, restoreSelectionFromSnapshot, listAmountLine, returnStagePrefix } from "@/lib/refundLedger";
+import { productSnapshotFromItems, ledgerSummaryLine, pickPrimaryLedger, restoreSelectionFromSnapshot, listAmountParts, dateShortLabel, returnStagePrefix } from "@/lib/refundLedger";
 
 // [2026-09-26] refund_ledger 목록 요약 행(대표 선택·표시용). 같은 주문에 여러 개면 pickPrimaryLedger 로 1개.
 type LedgerRow = {
@@ -67,7 +67,7 @@ type IssueTab = "open" | "all" | "resolved" | "deleted";
 
 
 // [2026-09-26] 고객이슈 표의 «단 하나의» grid 템플릿 — 머리글·모든 줄이 이 상수를 그대로 써서 칸이 어긋나지 않는다.
-const ISSUE_GRID = "grid-cols-[36px_76px_120px_88px_124px_112px_1fr_auto]";
+const ISSUE_GRID = "grid-cols-[36px_60px_184px_1fr_124px_auto]";
 
 // [2026-09-26] 교환·환불 처리 대상인 이슈인가 — task_type(exchange/return/refund) 또는 유형 칩(교환/반품/환불).
 //   이 줄에만 「환불 처리」 버튼·장부 요약을 붙인다.
@@ -368,7 +368,7 @@ function IssueCard({
   ledgerInfo = null,
   isRepresentativeIssue = false,
   repIssueDate = "",
-  amountText = "",
+  amount = null,
 }: {
   task: AdminIssueTask;
   index: number;
@@ -394,8 +394,8 @@ function IssueCard({
   isRepresentativeIssue?: boolean;
   /** 대표 기록(대표 이슈) 등록일 — 다른 이슈 줄의 「M/D 이슈에서 처리 중」 표기용. */
   repIssueDate?: string;
-  /** [2026-09-26] 목록 「단가 × 수량」(매칭 성공 시). 교환/반품/환불 건에만. */
-  amountText?: string;
+  /** [③ 2026-09-27] 목록 금액 — head(합계)/sub(내역) 두 줄. 매칭 성공 시만, 없으면 null(「—」). */
+  amount?: { head: string; sub: string } | null;
 }) {
   // [2026-09-21 사장님] 「2번씩이나 클릭해야 하고 너무 보기 불편함.
   //   필요한 고객정보 닉네임·이름·전화번호·년월일·특이사항 보기 좋게 딱 안 돼?」
@@ -446,6 +446,13 @@ function IssueCard({
   //   지금: 윗줄 📦 상품명(검정·굵게) / 아랫줄 💬 이슈 내용(장미색·굵게). 같은 말이면 한 번만.
   const memoShown = memo && memo !== product ? memo : "";
   const detail = [product, memoShown].filter(Boolean).join(" · ");   // title(툴팁)·검색용 한 줄
+  // [③] 메모 line-clamp-2 넘침 판정 — 넘치면 「…더보기」(처리창 열기)로만. 아코디언 부활 금지.
+  const memoRef = useRef<HTMLDivElement>(null);
+  const [memoOverflow, setMemoOverflow] = useState(false);
+  useLayoutEffect(() => {
+    const el = memoRef.current;
+    setMemoOverflow(!!el && el.scrollHeight > el.clientHeight + 1);
+  }, [memoShown]);
 
   return (
     <div
@@ -455,7 +462,7 @@ function IssueCard({
       //   지금: 글자는 그대로 또렷하게. 상태는 «왼쪽 색 띠 + 연한 초록 배경»으로만 가른다.
       //   (물건챙기기의 다 챙긴 카드와 같은 방식 — bg-ok-bg)
       onClick={deleted ? undefined : () => onProcess(task)}
-      className={`relative grid ${ISSUE_GRID} items-start gap-x-3 gap-y-1 border-b border-line px-3 py-2.5 transition hover:bg-surface-2 ${deleted ? "" : "cursor-pointer"} ${selected ? "bg-rose-soft/50" : done ? "bg-ok-bg/40" : ""}`}
+      className={`relative grid ${ISSUE_GRID} items-start gap-x-3 gap-y-1 border-b border-line px-3 py-2 transition hover:bg-surface-2 ${deleted ? "" : "cursor-pointer"} ${selected ? "bg-rose-soft/50" : done ? "bg-ok-bg/40" : ""}`}
     >
       <span className={`absolute left-0 top-0 h-full w-1 ${done ? "bg-[var(--color-ok-tx)]" : "bg-[var(--color-danger-tx)]"}`} />
 
@@ -471,49 +478,58 @@ function IssueCard({
         />
       </label>
 
-      {/* 유형 */}
-      <div className="flex flex-wrap gap-1">
+      {/* [③] 유형 60px — 배지 세로로 쌓기, 우선순위(보통 제외)는 아래 작은 배지 */}
+      <div className="flex flex-col gap-1">
         {issueTypes.map((type) => (
-          <span key={type} className={`rounded px-1.5 py-0.5 text-[11px] font-black ${typeTone(type)}`}>
+          <span key={type} className={`w-fit rounded px-1.5 py-0.5 text-[11px] font-black ${typeTone(type)}`}>
             {getIssueTypeLabel(type)}
           </span>
         ))}
         {priority !== "보통" ? (
-          <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[11px] font-black text-ink-soft">{priority}</span>
+          <span className="w-fit rounded bg-surface-2 px-1.5 py-0.5 text-[11px] font-black text-ink-soft">{priority}</span>
         ) : null}
-        {/* [2026-09-26] 「자동」 배지는 표시만 제거(source==="order_return_flow"). fromReturn 변수·삭제 포인트반환 로직은 그대로. */}
       </div>
 
-      {/* 닉네임 */}
-      <div className="truncate text-[13px] font-black text-ink" title={nickname}>{nickname}</div>
-
-      {/* 이름 */}
-      <div className="truncate text-[12px] font-bold text-ink-soft" title={name}>{name}</div>
-
-      {/* 전화번호 — 눌러서 바로 복사 */}
-      <div className="truncate text-[12px] font-bold text-ink-soft" title={phone}>
-        {phone ? (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); void navigator.clipboard?.writeText(phone).then(() => showAdminToast("전화번호를 복사했어요.", "success")).catch(() => {}); }}
-            className="truncate hover:text-rose-deep hover:underline"
-            title="눌러서 복사"
-          >
-            {phone}
-          </button>
-        ) : (
-          <span className="text-ink-mute">번호 없음</span>
-        )}
+      {/* [③] 고객 184px — 닉네임 / 이름·전화 / 등록일·주문번호 세 줄 */}
+      <div className="min-w-0">
+        <div className="truncate text-[13px] font-black text-ink" title={nickname}>{nickname || "-"}</div>
+        <div className="truncate text-[12px] text-ink-soft">
+          <span title={name}>{name || "-"}</span>
+          <span className="text-ink-mute"> · </span>
+          {phone ? (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); void navigator.clipboard?.writeText(phone).then(() => showAdminToast("전화번호를 복사했어요.", "success")).catch(() => {}); }}
+              className="hover:text-rose-deep hover:underline"
+              title="눌러서 복사"
+            >
+              {phone}
+            </button>
+          ) : (
+            <span className="text-ink-mute">번호 없음</span>
+          )}
+        </div>
+        <div className="truncate text-[11px] text-ink-mute">
+          <span title={dateLabel(task.created_at)}>{dateShortLabel(task.created_at)}</span>
+          {orderNo ? (
+            <>
+              <span> · </span>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); void navigator.clipboard?.writeText(orderNo).then(() => showAdminToast("주문번호를 복사했어요.", "success")).catch(() => {}); }}
+                className="hover:text-rose-deep hover:underline"
+                title="눌러서 복사"
+              >
+                {orderNo}
+              </button>
+            </>
+          ) : null}
+        </div>
       </div>
 
-      {/* 년월일 */}
-      <div className="text-[12px] font-bold text-ink-soft">{dateLabel(task.created_at)}</div>
-
-      {/* 특이사항 — 자르지 않고 «전부» 보여준다(사장님 확정).
-          접기/펼치기는 2026-09-21 에 「2번씩이나 클릭해야 한다」고 하셔서 없앤 기준을 유지한다.
-          whitespace-pre-line = 메모에 적힌 줄바꿈을 그대로 살린다(HTML 기본은 줄바꿈을 지운다). */}
+      {/* [③] 내용 1fr — 📦 상품 1줄 / 💬 메모 2줄(넘치면 더보기) / 💳 상태 1줄. 셋 다 없으면 「내용 없음」 */}
       <div className="flex min-w-0 items-start gap-2">
-        {/* [2026-09-23] 상품 사진 — 상품을 골라 등록한 이슈에만. 최대 3장, 누르면 크게. */}
+        {/* 상품 사진 — 최대 3장, 누르면 크게(줄 클릭과 분리) */}
         {photos.length > 0 ? (
           <div className="flex shrink-0 gap-1">
             {photos.slice(0, 3).map((url, photoIndex) => (
@@ -536,41 +552,47 @@ function IssueCard({
           </div>
         ) : null}
 
-        <div
-          className="min-w-0 flex-1 text-[12px] leading-5"
-          title={[detail, orderNo ? `주문번호 ${orderNo}` : ""].filter(Boolean).join("\n")}
-        >
-          {/* 윗줄 — 📦 상품명 (한 줄 그대로, ×N 포함) */}
+        <div className="min-w-0 flex-1 text-[12px] leading-5" title={detail}>
+          {/* 📦 상품 1줄 */}
           {product ? (
             <div className="flex min-w-0 items-baseline gap-1.5">
               <span className="shrink-0" aria-hidden>📦</span>
-              <span className="min-w-0 break-words font-black text-ink">{product}</span>
+              <span className="min-w-0 truncate font-black text-ink" title={product}>{product}</span>
             </div>
           ) : null}
-          {/* [2026-09-26] 줄합계 · 주문번호 (상품명 아래 줄, 숫자는 진한 글씨·tabular) */}
-          {(amountText || orderNo) ? (
-            <div className="mt-0.5 text-[13px]">
-              {amountText ? <span className="font-black text-ink [font-variant-numeric:tabular-nums]">{amountText}</span> : null}
-              {amountText && orderNo ? <span className="text-ink-mute"> · </span> : null}
-              {orderNo ? <span className="font-bold text-ink-mute">{orderNo}</span> : null}
-            </div>
-          ) : null}
-          {/* 아랫줄 — 💬 이슈 내용(진한 회색). 메모의 줄바꿈은 그대로(whitespace-pre-line) */}
+          {/* 💬 메모 2줄 clamp + 넘치면 「…더보기」(처리창) */}
           {memoShown ? (
             <div className="mt-0.5 flex min-w-0 items-start gap-1.5">
               <span className="shrink-0" aria-hidden>💬</span>
-              <span className="min-w-0 whitespace-pre-line break-words font-bold text-ink-soft">{memoShown}</span>
+              <div className="min-w-0 flex-1">
+                <div ref={memoRef} className="line-clamp-2 whitespace-pre-line break-words font-bold text-ink-soft">{memoShown}</div>
+                {memoOverflow ? (
+                  <button type="button" onClick={(e) => { e.stopPropagation(); onProcess(task); }} className="mt-0.5 text-[11px] font-black text-rose-deep hover:underline">…더보기</button>
+                ) : null}
+              </div>
             </div>
           ) : null}
-          {!product && !memoShown && !amountText && !orderNo ? <span className="font-bold text-ink-mute">내용 없음</span> : null}
-          {/* [2026-09-26] 교환·환불 장부 요약 — 진행단계 · 최종환불액 · 방법 (값 있을 때만) */}
+          {/* 💳 상태 1줄 */}
           {ledgerLine ? (
             <div className="mt-0.5 flex min-w-0 items-start gap-1.5 text-[13px]">
               <span className="shrink-0" aria-hidden>💳</span>
-              <span className="min-w-0 break-words font-black text-info-tx">{ledgerLine}</span>
+              <span className="min-w-0 truncate font-black text-info-tx" title={ledgerLine}>{ledgerLine}</span>
             </div>
           ) : null}
+          {!product && !memoShown && !ledgerLine ? <span className="font-bold text-ink-mute">내용 없음</span> : null}
         </div>
+      </div>
+
+      {/* [③] 금액 124px — head(합계) 굵게 / sub(내역) 작게, 오른쪽 정렬·tabular. 없으면 「—」 */}
+      <div className="text-right [font-variant-numeric:tabular-nums]">
+        {amount ? (
+          <>
+            <div className="text-[14px] font-black text-ink">{amount.head}</div>
+            <div className="text-[11px] text-ink-mute">{amount.sub}</div>
+          </>
+        ) : (
+          <span className="text-[14px] font-black text-ink-mute">—</span>
+        )}
       </div>
 
       {/* ── 처리 ── [2026-09-24 사장님] 「여러 항목 레이아웃 디자인 UX등 일괄성 있게」
@@ -856,7 +878,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
   // [B5] 목록 줄 금액 — 대표 기록이 있으면 그 기록 snapshot 줄합계(같은 항목집합), 없으면 raw_payload 대상상품 합계.
   const amountByTask = useMemo(() => {
-    const map: Record<string, string> = {};
+    const map: Record<string, { head: string; sub: string }> = {};
     for (const t of pageTasks) {
       const code = extractBodyField(t, "주문번호:");
       const meta = code ? linesByOrder[code] : null;
@@ -883,7 +905,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
         }
       }
       if (matched.length === 0) continue;
-      map[clean(t.id)] = listAmountLine({
+      map[clean(t.id)] = listAmountParts({
         productSum: matched.reduce((s, m) => s + (Number(m.lineTotal) || 0), 0),
         shippingFee: meta?.shippingFee || 0,
         allLineSum: lines.reduce((s, l) => s + (Number(l.lineTotal) || 0), 0),
@@ -1680,7 +1702,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
             표시할 고객이슈가 없습니다.
           </div>
         ) : (
-          <div className="min-w-[860px]">
+          <div className="min-w-[820px]">
             <div className={`sticky top-0 z-10 grid ${ISSUE_GRID} items-center gap-x-3 border-b border-line bg-surface-2 px-3 py-2 text-[11px] font-black text-ink-mute`}>
               {/* 전체선택 = 이 페이지 전부. 일부만 켜져 있으면 ▪(indeterminate) */}
               <label className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg hover:bg-surface" title={allOnPageSelected ? "이 페이지 전체 선택 해제" : "이 페이지 전체 선택"}>
@@ -1694,12 +1716,10 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
                 />
               </label>
               <div>유형</div>
-              <div>닉네임</div>
-              <div>이름</div>
-              <div>전화번호</div>
-              <div>등록일</div>
-              <div>특이사항 · 주문번호</div>
-              <div className="text-right">처리</div>
+              <div>고객</div>
+              <div>내용</div>
+              <div className="text-right">금액</div>
+              <div />
             </div>
             {pageTasks.map((task, index) => (
             <IssueCard
@@ -1719,7 +1739,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               ledgerInfo={primaryByOrder[extractBodyField(task, "주문번호:")] || null}
               isRepresentativeIssue={(() => { const pr = primaryByOrder[extractBodyField(task, "주문번호:")]; return !!pr && clean(pr.admin_task_id) === clean(task.id); })()}
               repIssueDate={(primaryByOrder[extractBodyField(task, "주문번호:")]?.created_at) || ""}
-              amountText={amountByTask[clean(task.id)] || ""}
+              amount={amountByTask[clean(task.id)] || null}
             />
           ))}
           </div>

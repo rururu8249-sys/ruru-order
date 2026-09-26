@@ -304,6 +304,31 @@ export function listAmountLine(o: {
   return `상품 ${w(prod)} · 주문 ${o.lineCount}개 중 ${o.matchedCount}개 (총 결제 ${w(orderTotal)})`;
 }
 
+// [③ 2026-09-27] 목록 금액 = 위(head)/아래(sub) 두 줄로. 값 공식은 listAmountLine 과 글자 그대로 동일(새 공식 없음).
+export function listAmountParts(o: {
+  productSum: number; shippingFee: number; allLineSum: number; cardTotal: number;
+  isCard: boolean; matchedCount: number; lineCount: number; orderCode?: string;
+}): { head: string; sub: string } {
+  const w = (n: number) => `${Math.round(Number(n) || 0).toLocaleString("ko-KR")}원`;
+  const c = (n: number) => Math.round(Number(n) || 0).toLocaleString("ko-KR");
+  const prod = Math.round(Number(o.productSum) || 0);
+  const ship = Math.max(0, Math.round(Number(o.shippingFee) || 0));
+  const isFull = o.matchedCount === o.lineCount && o.lineCount > 0;
+  const orderTotal = o.isCard ? (Math.round(Number(o.cardTotal) || 0) || Math.round(Number(o.allLineSum) || 0)) : (Math.round(Number(o.allLineSum) || 0) + ship);
+  if (isFull && ship > 0 && !o.isCard) return { head: w(prod + ship), sub: `상품 ${c(prod)} + 배송비 ${c(ship)}` };
+  if (isFull && ship === 0 && !o.isCard) return { head: w(prod), sub: `무료배송` };
+  return { head: w(prod), sub: `주문 ${o.lineCount}개 중 ${o.matchedCount}개 · 총 결제 ${w(orderTotal)}` };
+}
+
+// [③ 2026-09-27] 목록 등록일 짧게 — 올해면 M/D(요일), 다른 해면 YYYY.M/D(요일). 유효하지 않으면 "".
+export function dateShortLabel(value: unknown, now: Date = new Date()): string {
+  const d = ymdToDate(value);
+  if (!d) return "";
+  const wd = ["일", "월", "화", "수", "목", "금", "토"][d.getDay()] || "";
+  const md = `${d.getMonth() + 1}/${d.getDate()}(${wd})`;
+  return d.getFullYear() === now.getFullYear() ? md : `${d.getFullYear()}.${md}`;
+}
+
 // [2026-09-27] 처리창 기준 줄(항상). 「주문 총 결제 83,000원 = 상품 79,000 + 배송비 4,000」 (0이면 무료배송, 일부면 반품 개수).
 export function baseSummaryLine(o: {
   orderTotal: number; productAll: number; shippingFee: number; isPartial: boolean; lineCount: number; selectedCount: number;
