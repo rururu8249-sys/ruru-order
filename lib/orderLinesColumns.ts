@@ -13,9 +13,9 @@ export const ORDER_LINES_SELECT_COLUMNS = [
   "is_deleted",
 ] as const;
 
-// 합배송 교차 조회(같은 손님 다른 주문): 주소키·손님·방송·날짜만.
+// 합배송 교차 조회(같은 손님 다른 주문): 주소키·손님·방송·날짜 + 배송비(0원 주문의 «낸 쪽» 배송비 표시용).
 export const ORDER_LINES_COMBINE_COLUMNS = [
-  "order_lookup_code", "address", "detail_address", "kakao_id", "customer_phone", "broadcast_id", "created_at", "is_deleted",
+  "order_lookup_code", "address", "detail_address", "kakao_id", "customer_phone", "broadcast_id", "created_at", "shipping_fee", "is_deleted",
 ] as const;
 
 export const orderLinesSelect = () => ORDER_LINES_SELECT_COLUMNS.join(", ");

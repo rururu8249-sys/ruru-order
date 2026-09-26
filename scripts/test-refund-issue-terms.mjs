@@ -1,5 +1,5 @@
 // [2026-09-26 5·6차] 고객이슈 환불/교환 용어·💳 요약 문구 테스트
-import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, shouldWarnBaseMismatch } from "../lib/refundLedger.ts";
+import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, shouldWarnBaseMismatch, cardRefundBackAmount } from "../lib/refundLedger.ts";
 import { bankDisplayName } from "../lib/parseBankAccount.ts";
 
 let pass = 0;
@@ -113,5 +113,13 @@ eq(shouldWarnBaseMismatch({ ...base, lineCount: 0 }), false, "상품 줄 없음�
 eq(shouldWarnBaseMismatch({ ...base, savedBase: null }), false, "저장금액 없음(신규)→경고 없음");
 eq(shouldWarnBaseMismatch({ ...base, matchAccepted: true }), false, "이미 맞춤→경고 없음");
 eq(shouldWarnBaseMismatch({ ...base, autoBase: 79000 }), false, "금액 같음→경고 없음");
+
+// ── [카드 단순화] 다시 받을 돈 = 차감 + 남기는 상품(역산 아님) ──
+eq(cardRefundBackAmount(20000, 0), 20000, "전체반품 차감 20,000 → 다시 받을 돈 20,000");
+eq(cardRefundBackAmount(0, 0), 0, "차감 0 → 0(줄 숨김)");
+eq(cardRefundBackAmount(20000, 235000), 255000, "부분반품: 차감+남기는 상품");
+eq(cardRefundBackAmount(0, 100000), 100000, "부분반품 차감0 → 남기는 상품만");
+// 옛 저장 base(255,000) 로 amount_final 이 235,000 이어도 «역산 아님»이라 영향 없음 — 차감만 반영
+{ const deduct = 20000; eq(cardRefundBackAmount(deduct, 0), 20000, "옛 base 무관 — 차감 20,000 그대로"); }
 
 console.log(`✅ refund-issue-terms ${pass}건 통과`);

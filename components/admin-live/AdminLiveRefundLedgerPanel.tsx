@@ -16,6 +16,7 @@ import {
   optionLabelNoNone,
   isFullReturnSel,
   shouldWarnBaseMismatch,
+  cardRefundBackAmount,
   computeAmountFinal,
   computeRefundBase,
   stageDisplay,
@@ -412,15 +413,13 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
   const [pointUsed, setPointUsed] = useState(0);
   const [orderDate, setOrderDate] = useState("");
   const [orderPaymentMethod, setOrderPaymentMethod] = useState("");
-  const [cardExtra, setCardExtra] = useState(0);
   const [cardTotal, setCardTotal] = useState(0);
   const [combinedShipping, setCombinedShipping] = useState(false);
   const [combinedWith, setCombinedWith] = useState("");
+  const [combinedShipFee, setCombinedShipFee] = useState(0);
   const [sel, setSel] = useState<Record<string, number>>({});
   const [includeShipping, setIncludeShipping] = useState(false);
   const [shippingTouched, setShippingTouched] = useState(false);
-  const [includeCardExtra, setIncludeCardExtra] = useState(false);
-  const [cardExtraTouched, setCardExtraTouched] = useState(false);
   const [manualBase, setManualBase] = useState(Math.round(Number(item.amount_base)) || 0);
   const [matchAccepted, setMatchAccepted] = useState(false);
 
@@ -444,10 +443,10 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
         setPointUsed(Math.max(0, Math.round(Number(entry?.pointUsed)) || 0));
         setOrderDate(clean(entry?.orderDate));
         setOrderPaymentMethod(clean(entry?.paymentMethod));
-        setCardExtra(Math.max(0, Math.round(Number(entry?.cardExtra)) || 0));
         setCardTotal(Math.max(0, Math.round(Number(entry?.cardTotal)) || 0));
         setCombinedShipping(Boolean(entry?.combined));
         setCombinedWith(clean(entry?.combinedWith));
+        setCombinedShipFee(Math.max(0, Math.round(Number(entry?.combinedShipFee)) || 0));
         // 카드결제 주문 → 방법 기본 「카드취소」(사용자가 저장해둔 방법이 없을 때만).
         if (clean(entry?.paymentMethod).includes("카드") && !isExchange && (!item.method || item.method === "없음")) {
           setMethod("카드취소");
@@ -490,9 +489,11 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
   const isCardCancel = method === "카드취소";
   // [7차] 전체 반품 = 모든 줄이 «전체 수량»으로 선택됨(공용 isFullReturnSel).
   const isFullReturn = isFullReturnSel(lines.map((l) => ({ qty: l.qty, selectedQty: sel[l.id] || 0 })));
-  // [복구후속3] 배송비 줄은 배송비>0이면 항상 표시(전체반품·부분선택·저장건 복원 무관 — «체크 여부»만 자동/복원).
-  //   전에는 isFullReturn 에 줄 «표시»까지 묶여, 부분선택·복원 때 배송비 줄이 사라졌다.
-  const showShippingRow = !isExchange && shippingFee > 0;
+  // 배송비 — 이 주문 배송비가 0이고 합배송이면 «낸 쪽» 주문 배송비(combinedShipFee)를 정보로 쓴다.
+  const shipMovedToPeer = shippingFee === 0 && combinedShipping && combinedShipFee > 0;
+  const effectiveShippingFee = shippingFee > 0 ? shippingFee : (shipMovedToPeer ? combinedShipFee : 0);
+  // [복구후속3] 배송비 줄은 배송비(또는 합배송 낸 쪽 배송비)>0이면 항상 표시(부분선택·복원 무관 — «체크 여부»만 자동/복원).
+  const showShippingRow = !isExchange && effectiveShippingFee > 0;
 
   // [7차] 배송비 자동 — 전체 반품이고 배송비>0일 때 기본 체크(합배송 공유면 해제). 사용자가 손대면 그 선택 유지.
   useEffect(() => {
@@ -500,28 +501,27 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
     setIncludeShipping(isFullReturn && shippingFee > 0 && !combinedShipping);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFullReturn, shippingFee, combinedShipping, shippingTouched]);
-  // [7차] 카드추가금 자동 — 카드 주문 전체 반품이면 기본 체크, 일부면 해제. 사용자가 손대면 유지.
-  useEffect(() => {
-    if (cardExtraTouched) return;
-    setIncludeCardExtra(isCardCancel && isFullReturn && cardExtra > 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCardCancel, isFullReturn, cardExtra, cardExtraTouched]);
-
   const selList: RefundLineSel[] = lines.map((l) => ({ lineTotal: l.lineTotal, qty: l.qty, unit: l.unit, selectedQty: sel[l.id] || 0 }));
-  const cardExtraAdd = isCardCancel && includeCardExtra ? cardExtra : 0;
-  const autoBase = computeRefundBase(selList, includeShipping, shippingFee) + cardExtraAdd;
+  const autoBase = computeRefundBase(selList, includeShipping, effectiveShippingFee);
   const savedBase = item.id ? (Math.round(Number(item.amount_base)) || 0) : null;
-  // [복구후속1] 로딩 완료 + 성공 + 상품 줄 1개↑ + 주문금액>0 일 때만 불일치 경고(로딩 중/실패/0원엔 숨김 → 0원 덮어쓰기 방지)
-  const baseMismatch = shouldWarnBaseMismatch({ linesLoaded, linesError, lineCount: lines.length, autoBase, savedBase, matchAccepted });
-  const amountBase = matchFailed ? manualBase : (baseMismatch ? (savedBase as number) : autoBase);
+
+  // [카드 단순화] 카드는 «무조건 전체 취소». amount_base = 카드 총결제액, 차감만 손님에게 따로 받는다.
+  //   다시 받을 돈 = 남기는 상품값(부분반품) + 차감(역산 아님). 전체반품이면 남기는 상품=0 → 차감 그대로.
+  const keptProductTotal = lines.reduce((s, l) => s + Math.max(0, l.qty - (sel[l.id] || 0)) * l.unit, 0);
+  const cardTotalDisplay = cardTotal > 0 ? cardTotal : autoBase;
+
+  // [복구후속1] 카드 모드가 아닐 때만 저장금액≠주문금액 경고(카드는 base=카드총액이라 경고 무의미).
+  const baseMismatch = !isCardCancel && shouldWarnBaseMismatch({ linesLoaded, linesError, lineCount: lines.length, autoBase, savedBase, matchAccepted });
+  const amountBase = isCardCancel
+    ? cardTotalDisplay // 카드 = 전체 취소 → 총결제액 기준(옛 저장 base 무시)
+    : matchFailed ? manualBase : (baseMismatch ? (savedBase as number) : autoBase);
 
   const deductFinalLabel = reasonVal ? `${reasonVal} 차감` : "차감"; // [6차] 현재 사유를 따라감(옛 라벨 유지 안 함)
   const finalAdj: RefundAdjustment[] = [...keptAdj, ...(deductAmount > 0 ? [{ label: deductFinalLabel, amount: -deductAmount }] : [])];
   const amountFinal = computeAmountFinal(amountBase, finalAdj);
-  // [7차보완] 카드 전체 취소액 = 카드 총결제액(항상 전체). 다시 받을 돈 = 총액 − 실제 환불액(0 이하 숨김).
-  const cardTotalDisplay = cardTotal > 0 ? cardTotal : amountFinal;
-  const cardRefundBack = Math.max(0, cardTotalDisplay - amountFinal);
   const deductTotal = finalAdj.filter((a) => a.amount < 0).reduce((s, a) => s - a.amount, 0);
+  // [카드] 다시 받을 돈 = 차감 + 남기는 상품값(부분반품). 0이면 줄 숨김. (총액−amount_final 역산 폐기)
+  const cardRefundBack = cardRefundBackAmount(deductTotal, keptProductTotal);
   const formula = deductTotal > 0 ? `${formatComma(amountBase)} − ${formatComma(deductTotal)}` : "";
 
   const selectOnFocus = (e: React.FocusEvent<HTMLInputElement>) => e.currentTarget.select();
@@ -707,18 +707,15 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
                 })}
                 {showShippingRow ? (
                   <div className="px-2 py-2">
+                    {shipMovedToPeer ? (
+                      <div className="mb-1 text-[13px] text-ink-mute">배송비 0원 — 같이 배송된 {combinedWith || "다른"} 주문에 {formatComma(combinedShipFee)}원 포함</div>
+                    ) : null}
                     <label className="flex items-center gap-2 text-[13px] font-bold text-ink-soft">
                       <input type="checkbox" checked={includeShipping} onChange={(e) => { setIncludeShipping(e.target.checked); setShippingTouched(true); }} className="h-5 w-5 accent-rose-deep" />
-                      배송비도 환불 <span className="text-ink-mute">({formatComma(shippingFee)}원)</span>
+                      배송비도 환불 <span className="text-ink-mute">({formatComma(effectiveShippingFee)}원)</span>
                     </label>
-                    {combinedShipping ? <div className="mt-1 text-[13px] text-ink-mute">같이 배송된 주문{combinedWith ? `(${combinedWith})` : ""}이 있어서 배송비는 확인하세요.</div> : null}
+                    {combinedShipping && !shipMovedToPeer ? <div className="mt-1 text-[13px] text-ink-mute">같이 배송된 주문{combinedWith ? `(${combinedWith})` : ""}이 있어서 배송비는 확인하세요.</div> : null}
                   </div>
-                ) : null}
-                {!isExchange && isCardCancel && cardExtra > 0 && isFullReturn ? (
-                  <label className="flex items-center gap-2 px-2 py-2 text-[13px] font-bold text-ink-soft">
-                    <input type="checkbox" checked={includeCardExtra} onChange={(e) => { setIncludeCardExtra(e.target.checked); setCardExtraTouched(true); }} className="h-5 w-5 accent-rose-deep" />
-                    카드추가금도 취소 <span className="text-ink-mute">({formatComma(cardExtra)}원)</span>
-                  </label>
                 ) : null}
               </div>
             )}
@@ -772,36 +769,35 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
                 </div>
               </div>
 
-              {/* 4. 환불할 금액 */}
-              <div className="mb-3 rounded-xl border border-rose-line bg-rose-soft/50 p-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[14px] font-black text-ink">환불할 금액</span>
-                  <span className="text-[22px] font-black text-rose-deep">{won(amountFinal)}</span>
+              {/* 4. 환불할 금액 — 카드 모드는 아래 카드 박스가 대신하므로 숨김 */}
+              {!isCardCancel ? (
+                <div className="mb-3 rounded-xl border border-rose-line bg-rose-soft/50 p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[14px] font-black text-ink">환불할 금액</span>
+                    <span className="text-[22px] font-black text-rose-deep">{won(amountFinal)}</span>
+                  </div>
+                  {formula ? <div className="mt-0.5 text-right text-[13px] font-bold text-ink-mute">{formula} = {won(amountFinal)}</div> : null}
                 </div>
-                {formula ? <div className="mt-0.5 text-right text-[13px] font-bold text-ink-mute">{formula} = {won(amountFinal)}</div> : null}
-              </div>
+              ) : null}
 
               {/* 5·6. 방법·계좌 */}
               <div className="mb-3">
                 {method === "카드취소" ? (
+                  /* [카드 단순화] 전체 취소 + 다시 받을 돈(=차감, 부분반품은 남기는 상품값+차감) 2줄만 */
                   <div className="rounded-xl border border-line p-3">
                     <div className="flex items-center justify-between">
                       <span className="text-[14px] font-black text-ink">카드 전체 취소</span>
-                      <span className="text-[14px] font-black text-ink">{won(cardTotalDisplay)}</span>
+                      <span className="text-[16px] font-black text-ink">{won(cardTotalDisplay)}</span>
                     </div>
                     {cardRefundBack > 0 ? (
                       <>
                         <div className="mt-1 flex items-center justify-between">
                           <span className="text-[14px] font-black text-rose-deep">다시 받을 돈</span>
-                          <span className="text-[14px] font-black text-rose-deep">{won(cardRefundBack)}</span>
+                          <span className="text-[16px] font-black text-rose-deep">{won(cardRefundBack)}</span>
                         </div>
-                        <div className="mt-0.5 text-[13px] text-ink-mute">{isFullReturn ? "차감 금액이에요. 손님에게 따로 받으세요." : "남기는 상품·배송비·차감이 들어 있어요. 카드로 다시 결제받을 때 카드추가금은 따로 확인하세요."}</div>
+                        <div className="mt-0.5 text-[13px] text-ink-mute">{isFullReturn ? "손님에게 따로 받으세요." : "남기는 상품값과 차감이 들어 있어요. 카드추가금은 따로 확인하세요."}</div>
                       </>
                     ) : null}
-                    <div className="mt-1 flex items-center justify-between">
-                      <span className="text-[13px] font-bold text-ink-mute">실제로 돌려주는 돈</span>
-                      <span className="text-[13px] font-bold text-ink-mute">{won(amountFinal)}</span>
-                    </div>
                   </div>
                 ) : method === "계좌이체" ? (
                   <div className="rounded-xl border border-line p-3">

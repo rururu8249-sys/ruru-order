@@ -41,6 +41,14 @@ export function isCombinedShipmentPeer(mine: CombinePeerSelf, other: CombinePeer
   return Boolean((mine.broadcast && String(other.broadcast ?? "") === mine.broadcast) || (mine.day && String(other.day ?? "") === mine.day));
 }
 
+// [2026-09-26 카드 단순화] 카드 「다시 받을 돈」 = 차감 + 남기는 상품값(부분반품). 전체반품이면 남기는 상품=0 → 차감 그대로.
+//   ⚠️ «총액 − amount_final» 역산이 아니다(옛 저장 base 값에 오염되던 버그 방지).
+export function cardRefundBackAmount(deductTotal: unknown, keptProductTotal: unknown): number {
+  const d = Math.max(0, Math.round(Number(deductTotal)) || 0);
+  const k = Math.max(0, Math.round(Number(keptProductTotal)) || 0);
+  return d + k;
+}
+
 // [2026-09-26 복구후속] 저장 상품금액≠주문금액 경고를 띄울지 — 로딩 완료+성공+상품 있음+주문금액>0일 때만.
 //   로딩 중/실패/주문금액0 이면 false(0원으로 덮어쓰는 사고 방지).
 export function shouldWarnBaseMismatch(o: {

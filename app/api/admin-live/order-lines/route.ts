@@ -58,14 +58,14 @@ export async function GET(request: NextRequest) {
       } catch { /* 사진 조회 실패는 무시 */ }
     }
 
-    type Entry = { lines: Array<Record<string, unknown>>; shippingFee: number; pointUsed: number; orderDate: string; paymentMethod: string; cardExtra: number; cardTotal: number; combined: boolean; combinedWith: string };
+    type Entry = { lines: Array<Record<string, unknown>>; shippingFee: number; pointUsed: number; orderDate: string; paymentMethod: string; cardExtra: number; cardTotal: number; combined: boolean; combinedWith: string; combinedShipFee: number };
     const byCode: Record<string, Entry> = {};
     // 합배송 판정용 코드별 메타(첫 줄 기준) — 같은 손님/주소/방송/날짜 비교에 쓴다.
     const meta: Record<string, { addr: string; kakao: string; phones: string[]; broadcast: string; day: string }> = {};
     for (const r of rows) {
       const code = clean(r.order_lookup_code);
       if (!code) continue;
-      const entry = byCode[code] || (byCode[code] = { lines: [], shippingFee: 0, pointUsed: 0, orderDate: "", paymentMethod: "", cardExtra: 0, cardTotal: 0, combined: false, combinedWith: "" });
+      const entry = byCode[code] || (byCode[code] = { lines: [], shippingFee: 0, pointUsed: 0, orderDate: "", paymentMethod: "", cardExtra: 0, cardTotal: 0, combined: false, combinedWith: "", combinedShipFee: 0 });
       if (!meta[code]) {
         meta[code] = {
           addr: shippingAddressKey(r.address, r.detail_address),
@@ -124,11 +124,16 @@ export async function GET(request: NextRequest) {
         for (const code of Object.keys(byCode)) {
           const m = meta[code];
           if (!m || !m.addr) continue;
-          const hit = others.find((o) => isCombinedShipmentPeer(
+          const peers = others.filter((o) => isCombinedShipmentPeer(
             { code, addr: m.addr, kakao: m.kakao, phones: m.phones, broadcast: m.broadcast, day: m.day },
             { code: clean(o.order_lookup_code), addr: shippingAddressKey(o.address, o.detail_address), kakao: clean(o.kakao_id), phone: clean(o.customer_phone), broadcast: clean(o.broadcast_id), day: clean(o.created_at).slice(0, 10) },
           ));
-          if (hit) { byCode[code].combined = true; byCode[code].combinedWith = clean(hit.order_lookup_code); }
+          if (peers.length > 0) {
+            byCode[code].combined = true;
+            byCode[code].combinedWith = clean(peers[0].order_lookup_code);
+            // 이 주문 배송비가 0이면(합배송으로 옮겨감) 「낸 쪽」 주문의 배송비를 정보로 넘긴다.
+            byCode[code].combinedShipFee = peers.reduce((mx, o) => Math.max(mx, Math.max(0, Math.round(num(o.shipping_fee)))), 0);
+          }
         }
       } catch (e) {
         // 합배송 «판정»만 실패 → 상품 줄·금액·결제방법은 그대로 살리고, 배송비는 안전하게 「확인 필요」로.
