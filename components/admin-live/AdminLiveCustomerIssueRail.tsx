@@ -871,12 +871,17 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     return () => { alive = false; };
   }, [refundOrderCodesKey, refundReloadTick]);
 
+  // [4] 삭제함(삭제된) 이슈의 admin_task_id 는 대표 선택에서 제외 — 지운 건의 기록이 목록/처리에 안 뜨게.
+  const deletedTaskIds = useMemo(() => new Set(tasks.filter(isDeleted).map((t) => clean(t.id)).filter(Boolean)), [tasks]);
   // 주문번호별 «대표» 기록(계좌 있는 것 우선·최근순). 목록·처리창·복사·완료가 모두 이걸 쓴다.
   const primaryByOrder = useMemo(() => {
     const out: Record<string, LedgerRow | null> = {};
-    for (const code of Object.keys(ledgerByOrder)) out[code] = pickPrimaryLedger(ledgerByOrder[code]);
+    for (const code of Object.keys(ledgerByOrder)) {
+      const rows = ledgerByOrder[code].filter((r) => !deletedTaskIds.has(clean(r.admin_task_id)));
+      out[code] = pickPrimaryLedger(rows);
+    }
     return out;
-  }, [ledgerByOrder]);
+  }, [ledgerByOrder, deletedTaskIds]);
 
   // [2026-09-26] 목록 줄합계 — 주문번호가 있는 «모든» 페이지 줄의 주문 상품을 «주문번호로 한 번에» 조회(행마다 쿼리 금지).
   //   금액 = 매칭된 줄들의 줄합계(submitRowLineTotal 서버 계산) 합. 매칭 실패 시 생략(칸 비움).
@@ -1129,19 +1134,11 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     await runBulk(items, "미해결로", (id) => patchOne(id, { action: "restore", resolved_note: "고객관리에서 일괄 미해결로" }));
   };
   const bulkDelete = async () => {
-    const live = selectedTasks.filter((t) => !isDeleted(t));
-    // ⚠ 「자동」(반품 흐름) 건은 삭제 = 반품 등록 취소 + 포인트 반환. 돈이 움직이므로 일괄에서 뺀다.
-    const auto = live.filter(isReturnFlowIssue);
-    const items = live.filter((t) => !isReturnFlowIssue(t));
-    if (items.length === 0) {
-      showAdminToast(auto.length > 0
-        ? `선택한 ${auto.length}건은 모두 「자동」(반품 등록) 건이에요.\n포인트 반환이 걸려 있어 한 건씩만 삭제할 수 있어요.`
-        : "삭제할 건이 선택되지 않았어요.", "warning");
-      return;
-    }
+    // [2026-09-27] 삭제 = 이슈 카드만 「삭제함」 이동(포인트·반품기록 무관). 반품 건 예외 없음.
+    const items = selectedTasks.filter((t) => !isDeleted(t));
+    if (items.length === 0) { showAdminToast("삭제할 건이 선택되지 않았어요.", "warning"); return; }
     const ok = await showAdminConfirm(
-      `선택한 ${items.length}건을 삭제할까요?\n\n「삭제함」 탭으로 옮겨져서 언제든 되살릴 수 있어요.` +
-        (auto.length > 0 ? `\n\n⚠ 「자동」 ${auto.length}건은 포인트 반환이 걸려 있어 이번 일괄에서 뺍니다. 한 건씩 삭제해주세요.` : ""),
+      `선택한 ${items.length}건을 삭제할까요?\n\n「삭제함」 탭으로 옮겨져서 언제든 되살릴 수 있어요.`,
       { title: "일괄 삭제", confirmText: `${items.length}건 삭제`, cancelText: "그만두기", tone: "warning" },
     );
     if (!ok) return;
@@ -1447,13 +1444,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     showAdminToast("고객이슈를 해결완료 처리했습니다.");
   };
 
-  // ── [2026-09-23 사장님 요청] 잘못 등록된 고객이슈 지우기 / 되살리기 ──
-  //   ⚠ 주문상세 «반품/교환 등록»으로 생긴 건은 고객이슈만 있는 게 아니다.
-  //     주문의 반품기록 + (환불이면) 회수된 적립 포인트가 같이 남아 있다.
-  //     그래서 그 건은 «반품 등록 취소» API 를 부른다 — 포인트를 자동으로 돌려준다.
-  //     서버가 이중 지급을 막는다(source_key + DB 유니크 인덱스).
-  const isReturnFlowIssue = (task: AdminIssueTask) =>
-    clean((task as { source?: unknown }).source) === "order_return_flow";
+  // [2026-09-27] 고객이슈 「삭제」는 이슈 카드만 「삭제함」으로. 포인트·반품기록은 주문상세 「반품 취소」에서만 되돌린다.
 
   // [2026-09-24 사장님 요청] 「지운건은 뭐 삭제 기능도 없고」
   //   ⚠ 되돌릴 수 없다. 서버는 status='deleted' 인 줄만 지운다(살아있는 이슈는 실수로도 안 지워진다).
@@ -1537,70 +1528,17 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     }
 
     const who = getNickname(task) || getName(task) || "이 고객";
-    const fromReturn = isReturnFlowIssue(task);
 
-    if (fromReturn) {
-      // [2026-09-23 사장님 「뭐가 이리 복잡해?」]
-      //   묻기 전에 서버에 «무엇이 일어날지»만 물어본다(preview — 아무것도 안 바뀐다).
-      //   그래서 확인창에 실제 금액을 띄우고, 이상한 낌새가 있을 때만 한 줄 덧붙인다.
-      //   사장님이 매번 「혹시 따로 주셨나」를 떠올리실 필요가 없다.
-      setSaving(true);
-      let plan: { willRefund?: number; warning?: string } | null = null;
-      try {
-        const res = await fetch("/api/admin-live/order-return/undo", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskId: id, preview: true }),
-        });
-        const payload = await res.json().catch(() => null);
-        if (!res.ok || !payload?.ok) {
-          showAdminToast("되돌릴 수 없는 건이에요\n\n" + (payload?.message || "알 수 없는 오류"), "error");
-          return;
-        }
-        plan = payload;
-      } finally {
-        setSaving(false);
-      }
-
-      const refund = Number(plan?.willRefund || 0);
-      const warning = clean(plan?.warning);
-
-      const ok = await showAdminConfirm(
-        `${who} 님의 반품 처리를 취소하고 원래대로 되돌릴까요?` +
-          (refund > 0 ? `\n\n회수했던 포인트 ${refund.toLocaleString("ko-KR")}원을 손님께 돌려드립니다.` : "") +
-          (warning ? `\n\n⚠ ${warning}` : ""),
-        { title: "반품 처리 취소", confirmText: "되돌리기", cancelText: "그만두기", tone: "warning" },
-      );
-      if (!ok) return;
-    } else {
-      const ok = await showAdminConfirm(
-        `${who} 님의 고객이슈를 삭제할까요?\n\n「삭제함」 탭으로 옮겨져서 언제든 되살릴 수 있어요.`,
-        { title: "고객이슈 삭제", confirmText: "삭제", cancelText: "그만두기", tone: "warning" },
-      );
-      if (!ok) return;
-    }
+    // [2026-09-27 사장님 확정] 「삭제」 = 이슈 카드만 「삭제함」으로 이동. 포인트·주문 반품 기록은 절대 안 건드린다.
+    //   반품을 없던 일로 되돌리기(포인트 반환)는 주문상세의 「반품 취소」에서만.
+    const ok = await showAdminConfirm(
+      `${who} 님의 고객이슈를 삭제할까요?\n\n「삭제함」 탭으로 옮겨져서 언제든 되살릴 수 있어요.`,
+      { title: "고객이슈 삭제", confirmText: "삭제", cancelText: "그만두기", tone: "warning" },
+    );
+    if (!ok) return;
 
     setSaving(true);
     try {
-      if (fromReturn) {
-        const response = await fetch("/api/admin-live/order-return/undo", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskId: id }),
-        });
-        const payload = await response.json().catch(() => null);
-        if (!response.ok || !payload?.ok) {
-          showAdminToast("반품 등록 취소 실패\n\n" + (payload?.message || "알 수 없는 오류"), "error");
-          return;
-        }
-        setIssuePage(1);
-        setReloadKey((value) => value + 1);
-        window.dispatchEvent(new Event("ruru-admin-task-updated"));
-        showAdminToast(String(payload.message || "반품/교환 등록을 취소했습니다."), "success");
-        // ⚠ 포인트가 오간 건은 «되돌리기» 한 번으로 못 되살린다 → 「지운 건」 탭으로 안내만 한다
-        return;
-      }
-
       const response = await fetch("/api/admin-v2/admin-tasks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

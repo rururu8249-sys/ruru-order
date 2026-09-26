@@ -1117,6 +1117,44 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     }
   };
 
+  // [2026-09-27 사장님 확정] 반품을 «없던 일로» 되돌리기(포인트 반환) — 여기서만. 기존 order-return/undo 그대로 호출.
+  //   고객이슈 「삭제」는 포인트를 절대 안 건드린다(카드만 지움). 되돌림은 이 「반품 취소」 링크에서만.
+  const handleUndoReturn = async () => {
+    if (returnSaving) return;
+    const oo = order as Record<string, unknown>;
+    const orderCode = String(oo.orderNumber ?? oo.orderLookupCode ?? oo.order_lookup_code ?? "").trim();
+    if (!orderCode) { showAdminToast("주문번호를 찾지 못해 반품을 취소할 수 없어요.", "error"); return; }
+    setReturnSaving(true);
+    try {
+      // 1) 이 주문의 활성 반품(order_return_flow) 이슈 찾기
+      const fr = await fetch(`/api/admin-live/order-return/find-task?orderCode=${encodeURIComponent(orderCode)}`, { cache: "no-store" });
+      const fp = await fr.json().catch(() => null);
+      const taskId = fp?.ok ? String(fp.taskId || "") : "";
+      if (!taskId) { showAdminToast("되돌릴 반품 고객이슈를 찾지 못했어요(이미 취소·해결됐을 수 있어요).", "warning"); return; }
+      // 2) preview 로 돌려줄 포인트 확인(아무것도 안 바뀜)
+      const pv = await fetch("/api/admin-live/order-return/undo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ taskId, preview: true }) });
+      const pvp = await pv.json().catch(() => null);
+      if (!pv.ok || !pvp?.ok) { showAdminToast("반품 취소 실패: " + (pvp?.message || `오류 ${pv.status}`), "error"); return; }
+      const refund = Number(pvp.willRefund || 0);
+      const ok = await showAdminConfirm(
+        `이 주문의 반품을 없던 일로 되돌릴까요?` + (refund > 0 ? `\n회수했던 포인트 ${refund.toLocaleString("ko-KR")}원이 손님께 돌아갑니다.` : `\n(돌려줄 포인트는 없어요.)`),
+        { title: "반품 취소", confirmText: "반품 취소", cancelText: "그만두기", tone: "warning" },
+      );
+      if (!ok) return;
+      // 3) 실제 되돌림(포인트 반환 + 반품기록 정리 + 이슈 삭제함 이동) — 기존 함수 그대로
+      const res = await fetch("/api/admin-live/order-return/undo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ taskId }) });
+      const rp = await res.json().catch(() => null);
+      if (!res.ok || !rp?.ok) { showAdminToast("반품 취소 실패: " + (rp?.message || `오류 ${res.status}`), "error"); return; }
+      showAdminToast(String(rp.message || "반품을 취소했습니다."), "success");
+      window.dispatchEvent(new Event("ruru-admin-task-updated"));
+      await onAfterStatusChange?.();
+    } catch (e) {
+      showAdminToast("반품 취소 실패: " + (e instanceof Error ? e.message : "네트워크 오류"), "error");
+    } finally {
+      setReturnSaving(false);
+    }
+  };
+
   // [고객용 복사 · 2026-07-22 사장님 지시] 배송정보+주문내역+금액을 고객에게 붙여넣기 좋은 텍스트로 클립보드 복사.
   //   읽기 전용(어떤 데이터도 변경 없음). 금액 표기는 이 서랍 화면의 계산값(상품금액/배송비/카드추가금/포인트) 그대로.
   // [2026-08-31 사장님 요청] 주문 상세 안 결제알림 — 결제수단·입금상태별 쪽지 발송 (기존 쪽지 API 재사용, 데이터 무접촉)
@@ -1442,7 +1480,10 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 <span className="mr-2 rounded-lg bg-surface px-2 py-0.5 text-[11px] font-black">{String((order as any).returnStatus)}</span>
                 {Number((order as any).returnAmount || 0) > 0 ? <span className="mr-2">환불 예정/완료 {money(Number((order as any).returnAmount || 0))}</span> : null}
                 <div className="mt-1 whitespace-pre-wrap text-ink-soft">{String((order as any).returnReason || "사유 없음")}</div>
-                <div className="mt-1 text-[11px] text-ink-mute">※ 기록용입니다 — 정산·입금·재고 숫자는 바뀌지 않아요.</div>
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <span className="text-[11px] text-ink-mute">※ 기록용입니다 — 정산·입금·재고 숫자는 바뀌지 않아요.</span>
+                  <button type="button" disabled={returnSaving} onClick={handleUndoReturn} className="shrink-0 text-[11px] font-black text-ink-mute underline hover:text-rose-deep disabled:opacity-50">반품 취소</button>
+                </div>
               </div>
             ) : (
               <div className="rounded-lg bg-surface-2 p-3 text-[12px] font-bold text-ink-mute">기록 없음</div>
