@@ -14,7 +14,7 @@ import { supabase } from "@/lib/supabase";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { pickIssueProductRows } from "@/lib/issueProductLabel";
 import { RefundProcessModal, type LedgerDetail } from "./AdminLiveRefundLedgerPanel";
-import { productSnapshotFromItems, refundListButtonLabel, ledgerSummaryLine, pickPrimaryLedger, restoreSelectionFromSnapshot } from "@/lib/refundLedger";
+import { productSnapshotFromItems, refundListButtonLabel, ledgerSummaryLine, pickPrimaryLedger, restoreSelectionFromSnapshot, listAmountLine } from "@/lib/refundLedger";
 
 // [2026-09-26] refund_ledger 목록 요약 행(대표 선택·표시용). 같은 주문에 여러 개면 pickPrimaryLedger 로 1개.
 type LedgerRow = {
@@ -841,7 +841,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   const [ledgerByOrder, setLedgerByOrder] = useState<Record<string, LedgerRow[]>>({});
   const [refundReloadTick, setRefundReloadTick] = useState(0);
   const [refundModalItem, setRefundModalItem] = useState<LedgerDetail | null>(null);
-  const [refundModalMeta, setRefundModalMeta] = useState<{ openedFromOther: boolean; repDate: string; linkedIssueCount: number }>({ openedFromOther: false, repDate: "", linkedIssueCount: 1 });
+  const [refundModalMeta, setRefundModalMeta] = useState<{ openedFromOther: boolean; repDate: string }>({ openedFromOther: false, repDate: "" });
   const refundOrderCodesKey = Array.from(new Set(pageTasks.filter(isRefundKindTask).map((t) => extractBodyField(t, "주문번호:")).filter(Boolean))).sort().join(",");
   useEffect(() => {
     let alive = true;
@@ -880,7 +880,8 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
   // [2026-09-26] 목록 줄합계 — 주문번호가 있는 «모든» 페이지 줄의 주문 상품을 «주문번호로 한 번에» 조회(행마다 쿼리 금지).
   //   금액 = 매칭된 줄들의 줄합계(submitRowLineTotal 서버 계산) 합. 매칭 실패 시 생략(칸 비움).
-  const [linesByOrder, setLinesByOrder] = useState<Record<string, Array<Record<string, unknown>>>>({});
+  type OrderMeta = { lines: Array<Record<string, unknown>>; shippingFee: number; cardTotal: number; paymentMethod: string };
+  const [linesByOrder, setLinesByOrder] = useState<Record<string, OrderMeta>>({});
   const pageOrderCodesKey = Array.from(new Set(pageTasks.map((t) => extractBodyField(t, "주문번호:")).filter(Boolean))).sort().join(",");
   useEffect(() => {
     let alive = true;
@@ -890,9 +891,9 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       const res = await fetch(`/api/admin-live/order-lines?codes=${encodeURIComponent(codes.join(","))}`, { cache: "no-store" });
       const p = await res.json().catch(() => null);
       if (!alive || !p?.ok) return;
-      const byCode = (p.byCode || {}) as Record<string, { lines?: Array<Record<string, unknown>> }>;
-      const out: Record<string, Array<Record<string, unknown>>> = {};
-      for (const [code, e] of Object.entries(byCode)) out[code] = Array.isArray(e?.lines) ? e.lines : [];
+      const byCode = (p.byCode || {}) as Record<string, { lines?: Array<Record<string, unknown>>; shippingFee?: number; cardTotal?: number; paymentMethod?: string }>;
+      const out: Record<string, OrderMeta> = {};
+      for (const [code, e] of Object.entries(byCode)) out[code] = { lines: Array.isArray(e?.lines) ? e.lines : [], shippingFee: Number(e?.shippingFee) || 0, cardTotal: Number(e?.cardTotal) || 0, paymentMethod: String(e?.paymentMethod ?? "") };
       setLinesByOrder(out);
     })().catch(() => { /* 실패해도 목록 정상, 금액만 생략 */ });
     return () => { alive = false; };
@@ -904,17 +905,16 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     const map: Record<string, string> = {};
     for (const t of pageTasks) {
       const code = extractBodyField(t, "주문번호:");
-      const lines = (code && linesByOrder[code]) || [];
+      const meta = code ? linesByOrder[code] : null;
+      const lines = meta?.lines || [];
       if (lines.length === 0) continue;
       const primary = code ? primaryByOrder[code] : null;
       const lite = lines.map((l) => ({ id: clean(l.id), product_id: clean(l.product_id), product_name: clean(l.product_name), color: clean(l.color), size: clean(l.size), qty: Number(l.qty) || 1 }));
       let matched: Array<Record<string, unknown>>;
-      let fromLedger = false;
       if (primary && Array.isArray(primary.product_snapshot) && primary.product_snapshot.length > 0) {
         // 대표 기록 있으면 그 snapshot 을 «엄격 매처»(productId+이름/옵션)로 — 창과 완전히 같은 결과.
         const restored = restoreSelectionFromSnapshot(lite, primary.product_snapshot);
         matched = lines.filter((l) => (restored[clean(l.id)] || 0) > 0);
-        fromLedger = true;
       } else {
         // 기록 없음 — raw_payload 대상상품을 «같은 엄격 매처»로(productId includes 필터는 product_id 중복 시 과다매칭).
         const rawItems = (t.raw_payload && typeof t.raw_payload === "object" ? (t.raw_payload as { items?: unknown }).items : null);
@@ -929,22 +929,24 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
         }
       }
       if (matched.length === 0) continue;
-      const sum = matched.reduce((s, m) => s + (Number(m.lineTotal) || 0), 0);
-      const tag = fromLedger ? ` (기록 ${matched.length}개 합)` : " (대상상품 합)";
-      map[clean(t.id)] = `${sum.toLocaleString("ko-KR")}원${tag}`;
+      map[clean(t.id)] = listAmountLine({
+        productSum: matched.reduce((s, m) => s + (Number(m.lineTotal) || 0), 0),
+        shippingFee: meta?.shippingFee || 0,
+        allLineSum: lines.reduce((s, l) => s + (Number(l.lineTotal) || 0), 0),
+        cardTotal: meta?.cardTotal || 0,
+        isCard: String(meta?.paymentMethod ?? "").includes("카드"),
+        matchedCount: matched.length,
+        lineCount: lines.length,
+        orderCode: code,
+      });
     }
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linesByOrder, primaryByOrder, pageOrderCodesKey]);
 
-  // 같은 주문의 «열린» 환불/교환 이슈 수(완료 시 함께 해결완료할 대상). 페이지 기준.
-  const openIssueCountForOrder = (orderCode: string) =>
-    !orderCode ? 1 : Math.max(1, pageTasks.filter((t) => isRefundKindTask(t) && !isResolved(t) && clean(t.status).toLowerCase() !== "deleted" && extractBodyField(t, "주문번호:") === orderCode).length);
-
   const openRefund = async (task: AdminIssueTask) => {
     const tid = clean(task.id);
     const orderCode = extractBodyField(task, "주문번호:");
-    const linkedIssueCount = openIssueCountForOrder(orderCode);
     // [레이스 방지] 클라 캐시(primaryByOrder)가 아직 안 찼을 수 있으니, 이 주문의 기록을 «항상 서버에서 신선하게» 조회.
     let primary = orderCode ? primaryByOrder[orderCode] : null;
     let siblings = orderCode ? (ledgerByOrder[orderCode] || []) : [];
@@ -983,7 +985,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
             if (adjSib) item.adjustments = adjSib.adjustments;
           }
           setRefundModalItem(item);
-          setRefundModalMeta({ openedFromOther: clean(primary.admin_task_id) !== tid, repDate: clean(primary.created_at), linkedIssueCount });
+          setRefundModalMeta({ openedFromOther: clean(primary.admin_task_id) !== tid, repDate: clean(primary.created_at) });
           return;
         }
       } catch { /* fallthrough */ }
@@ -1009,7 +1011,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       order_lookup_code: orderCode,
       reason: splitIssueBody(task.body).memo,
     });
-    setRefundModalMeta({ openedFromOther: false, repDate: "", linkedIssueCount });
+    setRefundModalMeta({ openedFromOther: false, repDate: "" });
   };
 
   // 주문번호 묶음 → 그 주문들의 «대표» 기록만(주문당 1줄). 이중 이체 방지.
@@ -1402,6 +1404,23 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
     const ok = await showAdminConfirm("이 고객이슈를 해결완료 처리할까요?");
     if (!ok) return;
+
+    // [환불 통합] 이 이슈 주문에 «미완료» 대표 환불 기록이 있으면 먼저 완료 처리(done_at 기록) → 성공해야 resolve.
+    //   같은 주문의 다른 이슈는 건드리지 않는다(그 줄은 「보냄」으로 표시). 기록 없으면 기존대로 resolve 만.
+    const orderCode = extractBodyField(task, "주문번호:");
+    const primary = orderCode ? primaryByOrder[orderCode] : null;
+    const primaryIncomplete = primary && !clean(primary.done_at) && String(primary.stage) !== "완료" && String(primary.stage) !== "거절·취소";
+    if (primary?.id && primaryIncomplete) {
+      try {
+        const lr = await fetch("/api/admin-live/refund-ledger", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: primary.id, mark_transferred: true, mark_done: true, stage: "완료" }),
+        });
+        const lp = await lr.json().catch(() => null);
+        if (!(lr.ok && lp?.ok)) { showAdminToast("환불 기록 완료 처리 실패: " + (lp?.message || `오류 ${lr.status}`)); return; }
+      } catch (e) { showAdminToast("환불 기록 완료 처리 실패: " + (e instanceof Error ? e.message : "네트워크 오류")); return; }
+    }
 
     const response = await fetch("/api/admin-v2/admin-tasks", {
       method: "PATCH",
@@ -1895,27 +1914,8 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           item={refundModalItem}
           openedFromOtherIssue={refundModalMeta.openedFromOther}
           repIssueDate={refundModalMeta.repDate}
-          linkedIssueCount={refundModalMeta.linkedIssueCount}
           onClose={() => setRefundModalItem(null)}
           onSaved={() => { setRefundModalItem(null); setRefundReloadTick((v) => v + 1); setReloadKey((v) => v + 1); window.dispatchEvent(new Event("ruru-admin-task-updated")); }}
-          onCompleted={async () => {
-            // 환불/교환 완료 → 같은 «주문»의 열린 이슈 전부 해결완료(상태값만 변경, 부수효과 없음 — 4차 확인).
-            const code = clean((refundModalItem as LedgerDetail).order_lookup_code);
-            const targets = code
-              ? pageTasks.filter((t) => isRefundKindTask(t) && !isResolved(t) && clean(t.status).toLowerCase() !== "deleted" && extractBodyField(t, "주문번호:") === code).map((t) => clean(t.id)).filter(Boolean)
-              : [clean((refundModalItem as LedgerDetail).admin_task_id)].filter(Boolean);
-            const ids = Array.from(new Set(targets));
-            if (ids.length === 0) return true;
-            let allOk = true;
-            for (const id of ids) {
-              try {
-                const res = await fetch("/api/admin-v2/admin-tasks", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, action: "resolve", resolved_note: "환불/교환 처리 완료(장부)" }) });
-                const p = await res.json().catch(() => null);
-                if (!(res.ok && p?.ok)) allOk = false;
-              } catch { allOk = false; }
-            }
-            return allOk;
-          }}
         />
       ) : null}
 

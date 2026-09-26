@@ -1,5 +1,5 @@
 // [2026-09-26 5·6차] 고객이슈 환불/교환 용어·💳 요약 문구 테스트
-import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, cardRefundBackAmount, pickPrimaryLedger, ledgerHasPayoutInfo, restoreSelectionFromSnapshot, deriveInitialSelection, buildSnapshotFromSelection } from "../lib/refundLedger.ts";
+import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, cardRefundBackAmount, pickPrimaryLedger, ledgerHasPayoutInfo, restoreSelectionFromSnapshot, deriveInitialSelection, buildSnapshotFromSelection, listAmountLine, baseSummaryLine } from "../lib/refundLedger.ts";
 import { bankDisplayName } from "../lib/parseBankAccount.ts";
 
 let pass = 0;
@@ -324,5 +324,29 @@ const LINES4 = [
   const snapQ = buildSnapshotFromSelection(lines, { a: 1 });
   eq(snapQ[0].qty, 1, "부분 수량 저장");
 }
+
+// ── [목록 금액 4케이스] listAmountLine ──
+eq(listAmountLine({ productSum: 79000, shippingFee: 4000, allLineSum: 79000, cardTotal: 0, isCard: false, matchedCount: 1, lineCount: 1, orderCode: "RURU-1" }),
+  "상품 79,000 + 배송비 4,000 = 83,000원 · RURU-1", "단독 전부반품+배송비");
+eq(listAmountLine({ productSum: 79000, shippingFee: 0, allLineSum: 79000, cardTotal: 0, isCard: false, matchedCount: 1, lineCount: 1 }),
+  "79,000원 (무료배송)", "배송비 0");
+eq(listAmountLine({ productSum: 259000, shippingFee: 0, allLineSum: 1052980, cardTotal: 0, isCard: false, matchedCount: 1, lineCount: 4 }),
+  "상품 259,000원 · 주문 4개 중 1개 (총 결제 1,052,980원)", "일부 반품(무통장)");
+eq(listAmountLine({ productSum: 255000, shippingFee: 0, allLineSum: 255000, cardTotal: 272850, isCard: true, matchedCount: 1, lineCount: 4 }),
+  "상품 255,000원 · 주문 4개 중 1개 (총 결제 272,850원)", "일부 반품(카드=카드총액)");
+
+// ── [기준 줄 3케이스] baseSummaryLine ──
+eq(baseSummaryLine({ orderTotal: 83000, productAll: 79000, shippingFee: 4000, isPartial: false, lineCount: 1, selectedCount: 1 }),
+  "주문 총 결제 83,000원 = 상품 79,000 + 배송비 4,000", "기준 줄 배송비");
+eq(baseSummaryLine({ orderTotal: 79000, productAll: 79000, shippingFee: 0, isPartial: false, lineCount: 1, selectedCount: 1 }),
+  "주문 총 결제 79,000원 = 상품 79,000 · 무료배송", "기준 줄 무료배송");
+eq(baseSummaryLine({ orderTotal: 1052980, productAll: 1048980, shippingFee: 4000, isPartial: true, lineCount: 4, selectedCount: 1 }),
+  "주문 총 결제 1,052,980원 = 상품 1,048,980 + 배송비 4,000 · 4개 중 1개 반품", "기준 줄 일부반품");
+
+// ── [💳 미완료 계좌이체] 차감 있으면 (base − 차감) 내역 ──
+{ const li = { kind: "반품", method: "계좌이체", amount_final: 73000, adjustments: [{ label: "단순변심 차감", amount: -10000 }], bank: "국민", account_number: "12345", account_holder: "홍길동" };
+  eq(ledgerSummaryLine(li, "국민은행"), "보낼 돈 73,000원 (83,000 − 차감 10,000) · 국민은행 12345 홍길동", "차감 내역 표시"); }
+{ const li = { kind: "반품", method: "계좌이체", amount_final: 79000, adjustments: [], bank: "국민", account_number: "12345", account_holder: "홍길동" };
+  eq(ledgerSummaryLine(li, "국민은행"), "보낼 돈 79,000원 · 국민은행 12345 홍길동", "차감 없으면 내역 없음"); }
 
 console.log(`✅ refund-issue-terms ${pass}건 통과`);

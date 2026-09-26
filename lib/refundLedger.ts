@@ -190,6 +190,35 @@ function doneShortKo(v: unknown): string {
   return `${p2(d.getMonth() + 1)}.${p2(d.getDate())}(${wd})`;
 }
 
+// [2026-09-27] 목록 줄 금액 문구(4케이스). 계산 불변 — 값만 조합.
+export function listAmountLine(o: {
+  productSum: number; shippingFee: number; allLineSum: number; cardTotal: number;
+  isCard: boolean; matchedCount: number; lineCount: number; orderCode?: string;
+}): string {
+  const w = (n: number) => `${Math.round(Number(n) || 0).toLocaleString("ko-KR")}원`;
+  const c = (n: number) => Math.round(Number(n) || 0).toLocaleString("ko-KR");
+  const prod = Math.round(Number(o.productSum) || 0);
+  const ship = Math.max(0, Math.round(Number(o.shippingFee) || 0));
+  const isFull = o.matchedCount === o.lineCount && o.lineCount > 0;
+  const orderTotal = o.isCard ? (Math.round(Number(o.cardTotal) || 0) || Math.round(Number(o.allLineSum) || 0)) : (Math.round(Number(o.allLineSum) || 0) + ship);
+  if (isFull && ship > 0 && !o.isCard) return `상품 ${c(prod)} + 배송비 ${c(ship)} = ${w(prod + ship)}${o.orderCode ? ` · ${o.orderCode}` : ""}`;
+  if (isFull && ship === 0 && !o.isCard) return `${w(prod)} (무료배송)`;
+  return `상품 ${w(prod)} · 주문 ${o.lineCount}개 중 ${o.matchedCount}개 (총 결제 ${w(orderTotal)})`;
+}
+
+// [2026-09-27] 처리창 기준 줄(항상). 「주문 총 결제 83,000원 = 상품 79,000 + 배송비 4,000」 (0이면 무료배송, 일부면 반품 개수).
+export function baseSummaryLine(o: {
+  orderTotal: number; productAll: number; shippingFee: number; isPartial: boolean; lineCount: number; selectedCount: number;
+}): string {
+  const w = (n: number) => `${Math.round(Number(n) || 0).toLocaleString("ko-KR")}원`;
+  const c = (n: number) => Math.round(Number(n) || 0).toLocaleString("ko-KR");
+  const ship = Math.max(0, Math.round(Number(o.shippingFee) || 0));
+  let t = `주문 총 결제 ${w(o.orderTotal)} = 상품 ${c(o.productAll)}`;
+  t += ship > 0 ? ` + 배송비 ${c(ship)}` : " · 무료배송";
+  if (o.isPartial) t += ` · ${o.lineCount}개 중 ${o.selectedCount}개 반품`;
+  return t;
+}
+
 export type LedgerSummaryInput = {
   kind?: unknown; method?: unknown; amount_final?: unknown; stage?: unknown;
   done_at?: unknown; bank?: unknown; account_holder?: unknown; exchange_option?: unknown;
@@ -232,7 +261,9 @@ export function ledgerSummaryLine(li: LedgerSummaryInput | null | undefined, ban
     // [6차] 옛 예금주(입니다 등)는 노출 금지 → 「예금주 확인 필요」
     const holderTxt = isExcludedHolder(li.account_holder) ? "예금주 확인 필요" : s(li.account_holder);
     const acct = [bn, s(li.account_number), holderTxt].filter(Boolean).join(" ");
-    return `보낼 돈 ${wonTxt}${acct ? ` · ${acct}` : ""}`;
+    // 차감이 있으면 (base − 차감) 내역 표시. base = amount_final + 차감(= amount_base).
+    const bd = deductTotal > 0 ? ` (${(amt + deductTotal).toLocaleString("ko-KR")} − 차감 ${deductTotal.toLocaleString("ko-KR")})` : "";
+    return `보낼 돈 ${wonTxt}${bd}${acct ? ` · ${acct}` : ""}`;
   }
   return ""; // 아직 처리 전(값 없음) → 표시 안 함
 }

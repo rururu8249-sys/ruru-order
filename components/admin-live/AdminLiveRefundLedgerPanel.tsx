@@ -6,7 +6,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { showAdminToast } from "@/lib/adminToast";
-import { showAdminConfirm } from "@/lib/adminConfirm";
 import { splitIssueBody } from "@/lib/issueBodyMeta";
 import { parseBankAccount, bankDisplayName, isExcludedHolder } from "@/lib/parseBankAccount";
 import {
@@ -18,6 +17,7 @@ import {
   cardRefundBackAmount,
   deriveInitialSelection,
   buildSnapshotFromSelection,
+  baseSummaryLine,
   computeAmountFinal,
   computeRefundBase,
   stageDisplay,
@@ -361,7 +361,7 @@ export default function AdminLiveRefundLedgerPanel({ focusTaskId }: { focusTaskI
 }
 
 // ── 시안 ③ 처리 창 ──
-export function RefundProcessModal({ item, onClose, onSaved, onCompleted, openedFromOtherIssue = false, repIssueDate = "", linkedIssueCount = 1 }: { item: LedgerDetail; onClose: () => void; onSaved: () => void; onCompleted?: (taskId: string) => Promise<boolean>; openedFromOtherIssue?: boolean; repIssueDate?: string; linkedIssueCount?: number }) {
+export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssue = false, repIssueDate = "" }: { item: LedgerDetail; onClose: () => void; onSaved: () => void; openedFromOtherIssue?: boolean; repIssueDate?: string }) {
   const orderCode = clean(item.order_lookup_code);
   // 교환→환불 전환(item 12). 저장 눌러야 반영.
   const [kindOverride, setKindOverride] = useState<string>("");
@@ -402,7 +402,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
     .map((x) => ({ label: clean(x.label), amount: Math.round(Number(x.amount)) || 0 }))
     .filter((x) => x.label || x.amount !== 0);
   const singleAdj = initAdjs.length === 1 && initAdjs[0].amount < 0 ? initAdjs[0] : null;
-  const [keptAdj, setKeptAdj] = useState<RefundAdjustment[]>(singleAdj ? [] : initAdjs);
+  const [keptAdj] = useState<RefundAdjustment[]>(singleAdj ? [] : initAdjs); // 기존 다중 조정줄 보존(차감액 합산). 신규는 차감 입력칸 하나.
   const [deductAmount, setDeductAmount] = useState(singleAdj ? Math.abs(singleAdj.amount) : 0);
 
   // 돌려받을 상품
@@ -525,6 +525,8 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
   const isPartial = !matchFailed && lineCount > 0 && !isFullReturn;
   const orderTotalAll = totalLineSum + effectiveShippingFee; // 주문 총 결제금액(무통장)
   const cardProductAmount = Math.max(0, cardTotalDisplay - cardExtra); // 카드: 상품금액 = 카드총액 − 부가세
+  // [기준 줄] 항상 — 공용 baseSummaryLine 재사용.
+  const baseSummaryText = baseSummaryLine({ orderTotal: orderTotalAll, productAll: totalLineSum, shippingFee: effectiveShippingFee, isPartial, lineCount, selectedCount });
   const shippingStatusText = (() => {
     if (effectiveShippingFee === 0) return "무료배송";
     if (shippingTouched) return includeShipping ? "직접 포함" : "직접 제외";
@@ -606,23 +608,6 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
     if (await doPatch({})) { showAdminToast("저장됐어요", "success"); onSaved(); }
   };
 
-  // 완료 — 모달 안 확인 → 기록 저장 → 이슈 해결완료 연동(부수효과 없는 상태변경만).
-  const complete = async (extra: Record<string, unknown>, confirmMsg: string) => {
-    const linkedNote = linkedIssueCount > 1 ? ` 같은 주문 이슈 ${linkedIssueCount}건이 함께 해결완료돼요.` : "";
-    const ok = await showAdminConfirm(confirmMsg + linkedNote, { title: isExchange ? "재발송 완료" : "환불 완료", confirmText: "네", cancelText: "취소", tone: "info" });
-    if (!ok) return;
-    const saved = await doPatch(extra);
-    if (!saved) return;
-    const taskId = clean(item.admin_task_id);
-    if (taskId && onCompleted) {
-      const resolved = await onCompleted(taskId).catch(() => false);
-      showAdminToast(resolved ? "환불 기록 저장 + 이슈 해결완료로 넘겼어요." : "환불 기록은 저장됐어요. 이슈 해결완료는 목록에서 눌러주세요.", resolved ? "success" : "warning");
-    } else {
-      showAdminToast("저장했습니다.", "success");
-    }
-    onSaved();
-  };
-
   const copyTransferInfo = async () => {
     // 통일 한 줄: 주문일 · 상품(옵션)×수량 · 사유 · 환불액 · 은행전체이름 계좌번호 · 예금주
     const dateStr = dateWithDow(orderDate || item.created_at);
@@ -654,15 +639,12 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
     return Number.isNaN(d.getTime()) ? "" : `${d.getMonth() + 1}/${d.getDate()}`;
   })();
   // [5차] 헤더 아래 회색 안내 — 돈이 여기서 안 나간다는 것을 명확히.
+  // [3] 헤더 안내 한 줄 — 완료는 목록 「해결완료」에서 처리하므로 «여기서 안 나간다»만 알린다.
   const headerNotice = isExchange
     ? ""
     : method === "카드취소"
-      ? "여기서 카드가 취소되지 않아요. 페이스터에서 전체 취소한 뒤 누르세요."
-      : method === "포인트"
-        ? "포인트는 아직 자동 지급되지 않아요. 지급 후 [지급했어요]를 누르세요."
-        : method === "계좌이체"
-          ? "여기서 돈이 나가지 않아요. 은행 앱에서 보낸 뒤 [이체했어요]를 누르세요."
-          : "";
+      ? "여기서 카드가 취소되지 않아요. 페이스터에서 전체 취소하세요."
+      : "여기서 돈이 나가지 않아요.";
 
   return (
     <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onClick={onClose}>
@@ -748,11 +730,6 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
             {snapshotUnmatched ? (
               <div className="mt-2 rounded-lg border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">저장된 상품을 주문에서 못 찾았어요. 상품을 다시 선택해 주세요.</div>
             ) : null}
-            {!isExchange && linesLoaded && !linesError ? (
-              <div className="mt-1 text-[12px] text-ink-mute">
-                복원 근거: 기록 {item.id ? "있음" : "없음"} · 대표 {clean(item.admin_task_id).slice(0, 8) || "-"} · 저장 {(Array.isArray(item.product_snapshot) ? item.product_snapshot.length : 0)}개 · 매칭 {lines.filter((l) => (sel[l.id] || 0) > 0).length}개 · 방식 {(Array.isArray(item.product_snapshot) && item.product_snapshot.some((s) => clean((s as { productId?: unknown }).productId))) ? "id" : "이름"}
-              </div>
-            ) : null}
             {!isExchange && pointUsed > 0 ? (
               <div className="mt-2 rounded-lg border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">
                 이 주문은 포인트 {formatComma(pointUsed)}원 사용 — 환불액 확인 필요 (자동 차감하지 않아요)
@@ -777,27 +754,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
 
           {!isExchange ? (
             <>
-              {/* 3. 차감 */}
-              <div className="mb-3">
-                <div className="mb-1 text-[13px] font-black text-ink-mute">차감</div>
-                {keptAdj.length > 0 ? (
-                  <div className="mb-1 space-y-1">
-                    {keptAdj.map((a, i) => (
-                      <div key={i} className="flex items-center gap-2 rounded-lg border border-line px-2 py-1 text-[13px]">
-                        <span className={`shrink-0 rounded px-1.5 py-0.5 font-black ${a.amount < 0 ? "bg-danger-bg text-danger-tx" : "bg-ok-bg text-ok-tx"}`}>{a.label || (a.amount < 0 ? "차감" : "추가")}</span>
-                        <span className="min-w-0 flex-1 text-right font-black text-ink">{a.amount < 0 ? "−" : "+"}{formatComma(Math.abs(a.amount))}원</span>
-                        <button type="button" onClick={() => setKeptAdj((prev) => prev.filter((_, j) => j !== i))} aria-label="삭제" className="shrink-0 rounded px-2 py-1 font-black text-danger-tx hover:bg-danger-bg">삭제</button>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <input inputMode="numeric" value={formatComma(deductAmount)} onFocus={selectOnFocus} onChange={(e) => setDeductAmount(parseAmountInput(e.target.value))} placeholder={isCardCancel ? "받을 반품비" : "차감 금액"} className={`w-32 text-right ${INPUT}`} />
-                  <span className="text-[13px] text-ink-mute">원 {isCardCancel ? "반품비" : "차감"}{reasonVal ? ` (${reasonVal})` : ""}</span>
-                </div>
-              </div>
-
-              {/* 4. 금액 요약 표 — 주문상세 합계 표와 같은 모양(항목 왼쪽·금액 오른쪽, 합계 굵게) */}
+              {/* 3. 금액 요약 표 — 차감/받을반품비 입력이 표 행 안에. 기준 줄(항상) + 상품/배송비/차감 → 환불할 금액 */}
               {isCardCancel ? (
                 <div className="mb-3 border-t border-line pt-2">
                   {isPartial ? <div className="pb-1 text-[13px] text-ink-mute">{lineCount}개 중 {selectedCount}개 반품 · 카드 전체 취소 후 손님과 정리</div> : null}
@@ -805,11 +762,19 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
                   {cardExtra > 0 ? <div className="flex items-center justify-between py-1 text-[13px]"><span className="text-ink-soft">부가세({vatRatePct}%)</span><span className="font-black text-ink">{won(cardExtra)}</span></div> : null}
                   <div className="flex items-center justify-between py-1 text-[13px]"><span className="text-ink-soft">카드 결제금액</span><span className="font-black text-ink">{won(cardTotalDisplay)}</span></div>
                   <div className="mt-1 flex items-center justify-between border-t border-line pt-2 text-[16px] font-black"><span className="text-ink">카드 전체 취소</span><span className="text-ink">{won(cardTotalDisplay)}</span></div>
-                  {cardRefundBack > 0 ? <div className="flex items-center justify-between py-1 text-[14px] font-black"><span className="text-rose-deep">받을 반품비</span><span className="text-rose-deep">{won(cardRefundBack)}</span></div> : null}
+                  {/* 받을 반품비 = 차감 입력칸(오른쪽) */}
+                  <div className="flex items-center justify-between py-1 text-[14px] font-black">
+                    <span className="text-rose-deep">받을 반품비{reasonVal ? ` (${reasonVal})` : ""}</span>
+                    <span className="flex items-center gap-1">
+                      <input inputMode="numeric" value={formatComma(deductAmount)} onFocus={selectOnFocus} onChange={(e) => setDeductAmount(parseAmountInput(e.target.value))} className="h-8 w-24 rounded-lg border border-line px-2 text-right text-[14px] font-black text-rose-deep outline-none focus-visible:ring-2 focus-visible:ring-rose-deep" />
+                      <span className="text-ink-mute">원</span>
+                    </span>
+                  </div>
                 </div>
               ) : (
                 <div className="mb-3 border-t border-line pt-2">
-                  {isPartial ? <div className="pb-1 text-[13px] text-ink-mute">주문 총 결제금액 {won(orderTotalAll)} · {lineCount}개 중 {selectedCount}개 반품</div> : null}
+                  {/* 기준 줄(항상) */}
+                  <div className="pb-1 text-[12px] text-ink-mute">{baseSummaryText}</div>
                   <div className="flex items-center justify-between py-1 text-[13px]"><span className="text-ink-soft">상품금액</span><span className="font-black text-ink">{won(productSum)}</span></div>
                   {showShippingRow ? (
                     <div className="py-1 text-[13px]">
@@ -826,7 +791,15 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
                       <div className="mt-0.5 text-right text-[12px] text-ink-mute">{shippingStatusText}</div>
                     </div>
                   ) : null}
-                  {deductTotal > 0 ? <div className="flex items-center justify-between py-1 text-[13px]"><span className="text-ink-soft">차감{reasonVal ? ` (${reasonVal})` : ""}</span><span className="font-black text-danger-tx">−{won(deductTotal)}</span></div> : null}
+                  {/* 차감 = 입력칸(오른쪽). 항상 표시 */}
+                  <div className="flex items-center justify-between py-1 text-[13px]">
+                    <span className="text-ink-soft">차감{reasonVal ? ` (${reasonVal})` : ""}</span>
+                    <span className="flex items-center gap-1">
+                      <span className="text-danger-tx">−</span>
+                      <input inputMode="numeric" value={formatComma(deductAmount)} onFocus={selectOnFocus} onChange={(e) => setDeductAmount(parseAmountInput(e.target.value))} className="h-8 w-24 rounded-lg border border-line px-2 text-right text-[14px] font-black text-danger-tx outline-none focus-visible:ring-2 focus-visible:ring-rose-deep" />
+                      <span className="text-ink-mute">원</span>
+                    </span>
+                  </div>
                   <div className="mt-1 flex items-center justify-between border-t border-line pt-2 text-[16px] font-black"><span className="text-ink">환불할 금액</span><span className="text-rose-deep text-[18px]">{won(amountFinal)}</span></div>
                 </div>
               )}
@@ -863,28 +836,17 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
                     )}
                   </div>
                 ) : method === "포인트" ? (
-                  <div className="rounded-xl border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">포인트 지급 버튼은 다음 작업에서 연결돼요. 지금은 기록만 저장돼요.</div>
+                  <div className="rounded-xl border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">포인트는 회원 상세 › 포인트 지급에서 지급하세요. 여기선 기록만 남습니다.</div>
                 ) : (
-                  <div className="rounded-xl border border-line px-3 py-2 text-[13px] font-bold text-ink-mute">환불 없이 종료합니다(금액 이동 없음).</div>
+                  <div className="rounded-xl border border-line px-3 py-2 text-[13px] font-bold text-ink-mute">환불 없이 기록만 남깁니다(금액 이동 없음).</div>
                 )}
-                <div className="mt-1 flex flex-wrap gap-3 text-[13px] font-bold text-ink-mute">
-                  {method === "카드취소" ? (
-                    <>
-                      <button type="button" onClick={() => setMethod("계좌이체")} className="underline">계좌이체로 환불</button>
-                      <button type="button" onClick={() => setMethod("포인트")} className="underline">포인트로 환불</button>
-                      <button type="button" onClick={() => setMethod("없음")} className="underline">환불 없이 종료</button>
-                    </>
-                  ) : method === "계좌이체" ? (
-                    <>
-                      {isCardOrder ? <button type="button" onClick={() => setMethod("카드취소")} className="underline">카드취소로 돌아가기</button> : null}
-                      <button type="button" onClick={() => setMethod("포인트")} className="underline">포인트로 환불</button>
-                      <button type="button" onClick={() => setMethod("없음")} className="underline">환불 없이 종료</button>
-                    </>
-                  ) : (
-                    isCardOrder
-                      ? <button type="button" onClick={() => setMethod("카드취소")} className="underline">카드취소로 돌아가기</button>
-                      : <button type="button" onClick={() => setMethod("계좌이체")} className="underline">계좌이체로 돌아가기</button>
-                  )}
+                {/* [7] 방법 선택 — 계좌이체 · 포인트 · 환불 없음 (카드 건은 카드취소 포함), 현재 것 강조 */}
+                <div className="mt-1 flex flex-wrap gap-3 text-[13px] font-bold">
+                  {(isCardOrder ? ["카드취소", "계좌이체", "포인트", "없음"] : ["계좌이체", "포인트", "없음"]).map((mth) => (
+                    <button key={mth} type="button" onClick={() => setMethod(mth)} className={`underline ${method === mth ? "text-rose-deep" : "text-ink-mute"}`}>
+                      {mth === "없음" ? "환불 없음" : mth}
+                    </button>
+                  ))}
                 </div>
               </div>
             </>
@@ -907,21 +869,10 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
           ) : null}
         </div>
 
-        {/* 9. 하단 고정 — 왼쪽 「저장만」 / 오른쪽 완료 → 해결완료 */}
+        {/* 9. 하단 고정 — 「저장」 하나. 완료(이체·취소·지급 등)는 목록 「해결완료」에서 처리. */}
         {saveError ? <div className="border-t border-danger-tx/40 bg-danger-bg px-5 py-2 text-[13px] font-bold text-danger-tx">저장 실패: {saveError}</div> : null}
         <div className="flex items-center gap-2 border-t border-line px-5 py-3">
-          <button type="button" disabled={saving || (!linesLoaded && !!orderCode) || linesError} onClick={saveOnly} className="h-12 rounded-xl border border-line bg-surface px-4 text-[14px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50">{saving ? "저장 중…" : "저장만"}</button>
-          {isExchange ? (
-            <button type="button" disabled={saving || (!linesLoaded && !!orderCode) || linesError} onClick={() => complete({ mark_done: true, stage: "완료" }, "재발송 완료로 기록하고 해결완료로 넘길까요?")} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">재발송했어요 → 해결완료</button>
-          ) : method === "카드취소" ? (
-            <button type="button" disabled={saving || (!linesLoaded && !!orderCode) || linesError} onClick={() => complete({ mark_done: true, stage: "완료" }, cardRefundBack > 0 ? `${won(cardTotalDisplay)} 카드 전체 취소, 반품비 ${won(cardRefundBack)} 받음으로 기록하고 해결완료로 넘길까요?` : `${won(cardTotalDisplay)} 카드 전체 취소로 기록하고 해결완료로 넘길까요?`)} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">{cardRefundBack > 0 ? `카드 전체 취소 + 반품비 ${won(cardRefundBack)} 받았어요 → 해결완료` : "카드 전체 취소했어요 → 해결완료"}</button>
-          ) : method === "계좌이체" ? (
-            <button type="button" disabled={saving || (!linesLoaded && !!orderCode) || linesError} onClick={() => complete({ mark_transferred: true, mark_done: true, stage: "완료" }, `${won(amountFinal)} 이체 완료로 기록하고 해결완료로 넘길까요?`)} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">이체했어요 → 해결완료</button>
-          ) : method === "포인트" ? (
-            <button type="button" disabled={saving || (!linesLoaded && !!orderCode) || linesError} onClick={() => complete({ mark_done: true, stage: "완료" }, "포인트 지급 완료로 기록하고 해결완료로 넘길까요?")} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">지급했어요 → 해결완료</button>
-          ) : (
-            <button type="button" disabled={saving || (!linesLoaded && !!orderCode) || linesError} onClick={() => complete({ mark_done: true, stage: "거절·취소" }, "환불 없이 해결완료로 넘길까요?")} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">환불 없이 해결완료</button>
-          )}
+          <button type="button" disabled={saving || (!linesLoaded && !!orderCode) || linesError} onClick={saveOnly} className="ml-auto h-12 rounded-xl bg-rose-deep px-6 text-[14px] font-black text-white disabled:opacity-50">{saving ? "저장 중…" : "저장"}</button>
         </div>
       </div>
     </div>
