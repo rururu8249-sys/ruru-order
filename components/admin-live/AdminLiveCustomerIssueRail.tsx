@@ -15,7 +15,7 @@ import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { pickIssueProductRows } from "@/lib/issueProductLabel";
 import { RefundProcessModal, type LedgerDetail } from "./AdminLiveRefundLedgerPanel";
 import IssueRegisterModal, { type IssueRegisterSubmit } from "./IssueRegisterModal";
-import { productSnapshotFromItems, refundListButtonLabel, ledgerSummaryLine, pickPrimaryLedger, restoreSelectionFromSnapshot, listAmountLine, returnStagePrefix } from "@/lib/refundLedger";
+import { productSnapshotFromItems, ledgerSummaryLine, pickPrimaryLedger, restoreSelectionFromSnapshot, listAmountLine, returnStagePrefix } from "@/lib/refundLedger";
 
 // [2026-09-26] refund_ledger 목록 요약 행(대표 선택·표시용). 같은 주문에 여러 개면 pickPrimaryLedger 로 1개.
 type LedgerRow = {
@@ -27,7 +27,7 @@ type LedgerRow = {
   return_requested_on: string; return_received_on: string;
 };
 import { bankDisplayName } from "@/lib/parseBankAccount";
-import { ISSUE_FILTER_CHIPS, matchesIssueFilterChip, issueRawTypes } from "@/lib/issueFilter";
+import { ISSUE_FILTER_CHIPS, matchesIssueFilterChip } from "@/lib/issueFilter";
 
 type AdminIssueTask = {
   id?: string | number | null;
@@ -357,9 +357,8 @@ function IssueCard({
   index,
   selected = false,
   onToggleSelect,
-  onEdit,
+  onProcess,
   onResolve,
-  onDelete,
   onRestore,
   onUnresolve,
   onPurge,
@@ -370,17 +369,15 @@ function IssueCard({
   isRepresentativeIssue = false,
   repIssueDate = "",
   amountText = "",
-  onOpenRefund,
 }: {
   task: AdminIssueTask;
   index: number;
   /** [2026-09-25] 일괄 처리용 선택 상태 — 줄 맨 앞 체크박스 */
   selected?: boolean;
   onToggleSelect?: (task: AdminIssueTask) => void;
-  onEdit: (task: AdminIssueTask) => void;
+  /** [2026-09-27 ②] 「처리」 = 줄의 주 액션(처리창 열기). 수정·환불하기·삭제가 모두 이 창 안으로. */
+  onProcess: (task: AdminIssueTask) => void;
   onResolve: (task: AdminIssueTask) => void | Promise<void>;
-  /** [2026-09-23] 잘못 등록된 건 지우기(반품 흐름이면 포인트까지 되돌림) */
-  onDelete?: (task: AdminIssueTask) => void | Promise<void>;
   /** [2026-09-23] 「지운 건」 탭에서 되살리기 */
   onRestore?: (task: AdminIssueTask) => void | Promise<void>;
   /** [2026-09-24] 해결완료를 실수로 누른 건 미해결로 되돌리기 */
@@ -399,8 +396,6 @@ function IssueCard({
   repIssueDate?: string;
   /** [2026-09-26] 목록 「단가 × 수량」(매칭 성공 시). 교환/반품/환불 건에만. */
   amountText?: string;
-  /** [2026-09-26] 「환불 처리」 — 처리 창 열기(교환/반품/환불 건에만). */
-  onOpenRefund?: (task: AdminIssueTask) => void;
 }) {
   // [2026-09-21 사장님] 「2번씩이나 클릭해야 하고 너무 보기 불편함.
   //   필요한 고객정보 닉네임·이름·전화번호·년월일·특이사항 보기 좋게 딱 안 돼?」
@@ -412,9 +407,6 @@ function IssueCard({
   const done = isResolved(task);
   const deleted = clean(task.status).toLowerCase() === "deleted";
   const isRefund = isRefundKindTask(task);
-  // [2026-09-26 5차] 버튼 글자 — 교환만 「교환하기」, 반품/환불 「환불하기」(순수 함수, 기록·단계 무관)
-  const _rawTypes = issueRawTypes(task);
-  const refundBtnLabel = refundListButtonLabel(_rawTypes);
   // [2026-09-26] 💳 요약 — 대표 이슈만 금액. 같은 주문의 다른 이슈는 「같은 주문 — M/D 이슈에서 처리 중」.
   const ledgerLine = (() => {
     if (!isRefund || !ledgerInfo) return "";
@@ -426,7 +418,6 @@ function IssueCard({
     return [rp, `같은 주문 — ${md ? `${md} ` : ""}이슈에서 처리 중`].filter(Boolean).join(" · ");
   })();
   // 반품/교환 등록으로 만들어진 건인가 — 지울 때 포인트·반품기록까지 되돌려야 한다
-  const fromReturn = clean((task as { source?: unknown }).source) === "order_return_flow";
   const issueTypes = getIssueTypes(task);
   const nickname = getNickname(task);
   const name = getName(task);
@@ -463,13 +454,14 @@ function IssueCard({
       //   예전: 해결된 줄 전체에 opacity-60 → 글자까지 흐려져 WCAG 대비(4.5:1) 아래로 떨어졌다.
       //   지금: 글자는 그대로 또렷하게. 상태는 «왼쪽 색 띠 + 연한 초록 배경»으로만 가른다.
       //   (물건챙기기의 다 챙긴 카드와 같은 방식 — bg-ok-bg)
-      className={`relative grid ${ISSUE_GRID} items-start gap-x-3 gap-y-1 border-b border-line px-3 py-2.5 transition hover:bg-surface-2 ${selected ? "bg-rose-soft/50" : done ? "bg-ok-bg/40" : ""}`}
+      onClick={deleted ? undefined : () => onProcess(task)}
+      className={`relative grid ${ISSUE_GRID} items-start gap-x-3 gap-y-1 border-b border-line px-3 py-2.5 transition hover:bg-surface-2 ${deleted ? "" : "cursor-pointer"} ${selected ? "bg-rose-soft/50" : done ? "bg-ok-bg/40" : ""}`}
     >
       <span className={`absolute left-0 top-0 h-full w-1 ${done ? "bg-[var(--color-ok-tx)]" : "bg-[var(--color-danger-tx)]"}`} />
 
       {/* [2026-09-25 사장님] 「맨앞에 체크 박스」 — NN/g 일괄 작업 원칙: 줄 맨 앞 체크박스 + 머리줄 전체선택.
           32px 짜리 라벨로 감싸 손가락으로도 눌린다(체크박스 자체는 18px). */}
-      <label className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg hover:bg-surface-2" title="이 건 선택">
+      <label className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg hover:bg-surface-2" title="이 건 선택" onClick={(e) => e.stopPropagation()}>
         <input
           type="checkbox"
           checked={selected}
@@ -503,7 +495,7 @@ function IssueCard({
         {phone ? (
           <button
             type="button"
-            onClick={() => { void navigator.clipboard?.writeText(phone).then(() => showAdminToast("전화번호를 복사했어요.", "success")).catch(() => {}); }}
+            onClick={(e) => { e.stopPropagation(); void navigator.clipboard?.writeText(phone).then(() => showAdminToast("전화번호를 복사했어요.", "success")).catch(() => {}); }}
             className="truncate hover:text-rose-deep hover:underline"
             title="눌러서 복사"
           >
@@ -528,7 +520,7 @@ function IssueCard({
               <button
                 key={`${url}-${photoIndex}`}
                 type="button"
-                onClick={() => onPhotoZoom?.(url)}
+                onClick={(e) => { e.stopPropagation(); onPhotoZoom?.(url); }}
                 title="눌러서 크게 보기"
                 className="relative h-11 w-11 overflow-hidden rounded-lg border border-line bg-surface-2"
               >
@@ -615,40 +607,20 @@ function IssueCard({
           </>
         ) : (
           <>
-            {isRefund ? (
-              <button
-                type="button"
-                onClick={() => onOpenRefund?.(task)}
-                disabled={busy}
-                title="교환·환불 처리(단계·환불액·계좌) — 포인트는 움직이지 않고 기록만"
-                className={`${SUB_BTN} border-rose-line text-rose-deep hover:bg-rose-soft`}
-              >
-                {refundBtnLabel}
-              </button>
-            ) : null}
+            {/* [② 2026-09-27] 행 버튼 = 「처리」(테두리) + 「해결완료/미해결로」 2개만. 수정·환불하기·삭제는 처리창 안으로. */}
             <button
               type="button"
-              onClick={() => onEdit(task)}
+              onClick={(e) => { e.stopPropagation(); onProcess(task); }}
               disabled={busy}
+              title="처리창 열기 — 유형·메모·상품·환불/교환 기록·삭제를 한 곳에서"
               className={`${SUB_BTN} text-ink-soft hover:bg-surface-2`}
             >
-              수정
-            </button>
-            <button
-              type="button"
-              onClick={() => onDelete?.(task)}
-              disabled={busy}
-              title={fromReturn
-                ? "잘못 처리한 건 — 원래대로 되돌립니다(회수한 포인트도 같이)"
-                : "잘못 등록한 건 — 「삭제함」 탭으로 옮깁니다(되살릴 수 있어요)"}
-              className={`${SUB_BTN} text-danger-tx hover:bg-danger-bg`}
-            >
-              {busy ? "처리중…" : "삭제"}
+              처리
             </button>
             {done ? (
               <button
                 type="button"
-                onClick={() => onUnresolve?.(task)}
+                onClick={(e) => { e.stopPropagation(); onUnresolve?.(task); }}
                 disabled={busy}
                 title="실수로 해결완료를 누르셨으면 여기서 미해결로 돌립니다"
                 className={`${MAIN_BTN} border border-line bg-surface text-ink-soft hover:bg-surface-2`}
@@ -658,7 +630,7 @@ function IssueCard({
             ) : (
               <button
                 type="button"
-                onClick={() => onResolve(task)}
+                onClick={(e) => { e.stopPropagation(); onResolve(task); }}
                 disabled={busy}
                 className={`${MAIN_BTN} bg-[var(--color-ok-tx)] text-white`}
               >
@@ -708,10 +680,8 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   //   ⚠ 돈 보호: 「자동」(반품 흐름) 건의 삭제는 포인트 반환이 걸려 있어 일괄에서 뺀다. 한 건씩만.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   useEffect(() => { setSelectedIds(new Set()); }, [activeTab, reloadKey, keyword, typeFilter]);
-  const [editingIssueTask, setEditingIssueTask] = useState<AdminIssueTask | null>(null);
-  const [editingIssueMemo, setEditingIssueMemo] = useState("");
-  const [editingIssueTypes, setEditingIssueTypes] = useState<string[]>(["general"]);
-  const [editingIssuePriority, setEditingIssuePriority] = useState("normal");
+  // [②] 「처리」 창에서 열린 이슈(유형·메모 저장·삭제·헤더용). 환불 기록 item 은 refundModalItem.
+  const [processTask, setProcessTask] = useState<AdminIssueTask | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -928,7 +898,9 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linesByOrder, primaryByOrder, pageOrderCodesKey]);
 
-  const openRefund = async (task: AdminIssueTask) => {
+  // [②] 「처리」 = 모든 줄의 주 액션. 환불 기록(있으면 대표)을 열거나 신규 item 합성 + 이슈 task 를 함께 담는다.
+  const openProcess = async (task: AdminIssueTask) => {
+    setProcessTask(task);
     const tid = clean(task.id);
     const orderCode = extractBodyField(task, "주문번호:");
     // [레이스 방지] 클라 캐시(primaryByOrder)가 아직 안 찼을 수 있으니, 이 주문의 기록을 «항상 서버에서 신선하게» 조회.
@@ -1267,20 +1239,6 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
   const closeAdd = () => setShowMemoAdd(false);
 
-  const openEdit = (task: AdminIssueTask) => {
-    setEditingIssueTask(task);
-    setEditingIssueMemo(getFullMemo(task));
-    setEditingIssueTypes(getIssueTypes(task));
-    setEditingIssuePriority(clean(task.priority) || "normal");
-  };
-
-  const closeEdit = () => {
-    setEditingIssueTask(null);
-    setEditingIssueMemo("");
-    setEditingIssueTypes(["general"]);
-    setEditingIssuePriority("normal");
-  };
-
   // 탭 「+ 고객이슈 등록」 제출 — IssueRegisterModal(orderContext 없음)에서 넘어온 폼으로 admin-tasks 생성(포인트 무접촉).
   const saveIssueMemo = async (data: IssueRegisterSubmit) => {
     const memo = cleanMultiline(data.memo);
@@ -1510,46 +1468,25 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     }
   };
 
-  const saveEditedIssueMemo = async () => {
-    const task = editingIssueTask;
-
-    if (!task) return;
-
+  // [②] 고객이슈(admin-tasks) 유형·메모 저장 — 「처리」 창의 「저장」이 호출. 성공 여부 반환(창은 안 닫음).
+  //   ⚠ 메타줄(전화번호·주문번호·대상상품·닉네임…) 보존 — body 통째 덮어쓰기 금지(mergeIssueBody).
+  const patchIssueFields = async (task: AdminIssueTask, issueTypeKey: string, memoRaw: string): Promise<boolean> => {
     const id = clean(task.id);
-
-    if (!id) {
-      showAdminToast("수정할 고객이슈 ID가 없습니다.");
-      return;
-    }
-
-    const memo = cleanMultiline(editingIssueMemo);
-
-    if (!memo) {
-      showAdminToast("수정할 메모 내용을 입력해주세요.");
-      return;
-    }
-
-    const issueTypes = editingIssueTypes.length > 0 ? editingIssueTypes : ["general"];
-
-    // [2026-09-21] 메타줄(전화번호·닉네임·이름·자동날짜…)을 앞에 되살린다.
-    //   예전엔 memo 만 보내 본문을 덮어써서 전화번호가 영구히 지워졌다.
+    if (!id) { showAdminToast("고객이슈 ID가 없습니다.", "error"); return false; }
+    const memo = cleanMultiline(memoRaw);
+    const issueTypes = [issueTypeKey || "general"];
     const nextBody = mergeIssueBody(splitIssueBody(cleanMultiline(task.body)).metaLines, memo);
-
-    setSaving(true);
-
     try {
       const response = await fetch("/api/admin-v2/admin-tasks", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id,
           action: "update",
           title: clean(task.title) || `[고객이슈] ${getNickname(task)}`,
           body: nextBody,
-          task_type: issueTypes[0] || "general",
-          priority: editingIssuePriority || "normal",
+          task_type: issueTypes[0],
+          priority: clean(task.priority) || "normal",
           raw_payload: {
             ...(task.raw_payload || {}),
             issue_types: issueTypes,
@@ -1558,22 +1495,15 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           },
         }),
       });
-
       const payload = await response.json().catch(() => null);
-
-      if (!response.ok || !payload?.ok) {
-        throw new Error(payload?.message || "고객이슈 메모 수정 실패");
-      }
-
-      closeEdit();
+      if (!response.ok || !payload?.ok) throw new Error(payload?.message || "고객이슈 저장 실패");
       setIssuePage(1);
       setReloadKey((value) => value + 1);
       window.dispatchEvent(new Event("ruru-admin-task-updated"));
-      showAdminToast("고객이슈 메모를 수정했습니다.");
+      return true;
     } catch (error) {
-      showAdminToast(error instanceof Error ? error.message : String(error));
-    } finally {
-      setSaving(false);
+      showAdminToast(error instanceof Error ? error.message : String(error), "error");
+      return false;
     }
   };
 
@@ -1780,9 +1710,8 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               onToggleSelect={toggleSelect}
               photos={issuePhotos[taskKey(task, index)] || []}
               onPhotoZoom={setIssuePhotoPreview}
-              onEdit={openEdit}
+              onProcess={openProcess}
               onResolve={resolveIssueTask}
-              onDelete={deleteIssueTask}
               onRestore={(t) => { void restoreIssueTask(t); }}
               onUnresolve={(t) => { void restoreIssueTask(t, true).then((ok) => { if (ok) showAdminToast("미해결로 되돌렸습니다.", "success"); }); }}
               onPurge={purgeIssueTask}
@@ -1791,7 +1720,6 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               isRepresentativeIssue={(() => { const pr = primaryByOrder[extractBodyField(task, "주문번호:")]; return !!pr && clean(pr.admin_task_id) === clean(task.id); })()}
               repIssueDate={(primaryByOrder[extractBodyField(task, "주문번호:")]?.created_at) || ""}
               amountText={amountByTask[clean(task.id)] || ""}
-              onOpenRefund={openRefund}
             />
           ))}
           </div>
@@ -1803,8 +1731,15 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           item={refundModalItem}
           openedFromOtherIssue={refundModalMeta.openedFromOther}
           repIssueDate={refundModalMeta.repDate}
-          onClose={() => setRefundModalItem(null)}
-          onSaved={() => { setRefundModalItem(null); setRefundReloadTick((v) => v + 1); setReloadKey((v) => v + 1); window.dispatchEvent(new Event("ruru-admin-task-updated")); }}
+          issueTypesInitial={processTask ? getIssueTypes(processTask) : []}
+          issueBodyMemo={processTask ? getFullMemo(processTask) : ""}
+          onSaveIssue={processTask ? async ({ issueType, memo }) => {
+            const key = issueType === "refund" ? "refund" : issueType === "exchange" ? "exchange" : "general";
+            return patchIssueFields(processTask, key, memo);
+          } : undefined}
+          onDelete={processTask ? () => { const t = processTask; setRefundModalItem(null); setProcessTask(null); void deleteIssueTask(t); } : undefined}
+          onClose={() => { setRefundModalItem(null); setProcessTask(null); }}
+          onSaved={() => { setRefundModalItem(null); setProcessTask(null); setRefundReloadTick((v) => v + 1); setReloadKey((v) => v + 1); window.dispatchEvent(new Event("ruru-admin-task-updated")); }}
         />
       ) : null}
 
@@ -1850,74 +1785,6 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
         onSubmit={saveIssueMemo}
       />
 
-      {editingIssueTask && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-ink-soft)]/35 px-4">
-          <div className="w-full max-w-[560px] rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-black text-ink">고객이슈 수정</h3>
-                <p className="mt-1 text-xs font-bold text-ink-soft">
-                  {getNickname(editingIssueTask)} / {getName(editingIssueTask)}
-                </p>
-                <p className="mt-1 text-[11px] font-bold text-ink-mute">
-                  고객정보는 수정하지 않고 이슈유형·우선순위·메모만 수정합니다.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={closeEdit}
-                className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2"
-              >
-                닫기
-              </button>
-            </div>
-
-            <div className="mt-4">
-              <div className="mb-2 text-xs font-black text-ink-soft">유형 (여러 개 선택 가능)</div>
-              <IssueTypeChips value={editingIssueTypes} onChange={setEditingIssueTypes} />
-            </div>
-
-            <div className="mt-3">
-              <select
-                value={editingIssuePriority}
-                onChange={(event) => setEditingIssuePriority(event.target.value)}
-                className="h-11 w-full rounded-xl border border-line px-3 text-sm font-black text-ink outline-none focus:border-info-tx/35 focus:ring-4 focus:ring-info-bg"
-              >
-                {PRIORITY_OPTIONS.map(([value, label]) => (
-                  <option key={value} value={value}>
-                    우선순위: {label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <textarea
-              value={editingIssueMemo}
-              onChange={(event) => setEditingIssueMemo(event.target.value)}
-              className="mt-3 min-h-[220px] w-full resize-none rounded-2xl border border-line p-3 text-sm font-bold leading-6 outline-none focus:border-info-tx/35 focus:ring-4 focus:ring-info-bg"
-            />
-
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={closeEdit}
-                className="h-11 rounded-xl border border-line bg-surface text-sm font-black text-ink-soft hover:bg-surface-2"
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={saveEditedIssueMemo}
-                disabled={saving}
-                className="h-11 rounded-xl bg-rose-deep text-sm font-black text-white hover:opacity-90 disabled:opacity-50"
-              >
-                수정 저장
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* [2026-09-23] 상품 사진 크게 보기 — 주문상세와 같은 방식(배경 아무 데나 누르면 닫힘) */}
       {issuePhotoPreview ? (

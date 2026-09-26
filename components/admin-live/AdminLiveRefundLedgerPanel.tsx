@@ -368,18 +368,27 @@ export default function AdminLiveRefundLedgerPanel({ focusTaskId }: { focusTaskI
 }
 
 // ── 시안 ③ 처리 창 ──
-export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssue = false, repIssueDate = "" }: { item: LedgerDetail; onClose: () => void; onSaved: () => void; openedFromOtherIssue?: boolean; repIssueDate?: string }) {
+export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssue = false, repIssueDate = "", issueTypesInitial = [], issueBodyMemo = "", onSaveIssue, onDelete }: { item: LedgerDetail; onClose: () => void; onSaved: () => void; openedFromOtherIssue?: boolean; repIssueDate?: string; issueTypesInitial?: string[]; issueBodyMemo?: string; onSaveIssue?: (d: { issueType: "refund" | "exchange" | "etc"; memo: string }) => Promise<boolean>; onDelete?: () => void }) {
   const orderCode = clean(item.order_lookup_code);
-  // 교환→환불 전환(item 12). 저장 눌러야 반영.
-  const [kindOverride, setKindOverride] = useState<string>("");
-  const kind = kindOverride || item.kind || "반품";
+  // [2026-09-27 ②] 유형 칩(환불/교환/기타) — 이 하나가 kind·하단 전환을 정한다. 기타는 하단 없음(admin-tasks 만 저장).
+  const initIssueType: "refund" | "exchange" | "etc" = (() => {
+    const t = (issueTypesInitial || []).map((x) => String(x).toLowerCase());
+    if (t.includes("exchange")) return "exchange";
+    if (t.includes("refund") || t.includes("return")) return "refund";
+    if (t.includes("general")) return "etc";
+    return item.kind === "교환" ? "exchange" : "refund";
+  })();
+  const [issueType, setIssueType] = useState<"refund" | "exchange" | "etc">(initIssueType);
+  const isEtc = issueType === "etc";
+  const kind = issueType === "exchange" ? "교환" : "반품";
   const isExchange = kind === "교환";
 
   // [5차] 상태 칩 폐지 — stage 는 저장값 유지(완료 버튼만 stage 를 명시적으로 바꾼다)
   const [stage] = useState(item.stage || "접수");
   const [method, setMethod] = useState(item.method && item.method !== "없음" ? item.method : (isExchange ? "교환재발송" : "계좌이체"));
   const [exchangeOption, setExchangeOption] = useState(clean(item.exchange_option));
-  const [memo, setMemo] = useState(clean(item.memo));
+  const [memo] = useState(clean(item.memo)); // refund_ledger.memo — 화면에서 편집 안 함(doPatch 로 값 유지). 표시 메모는 issueMemo(이슈 내용).
+  const [issueMemo, setIssueMemo] = useState(clean(issueBodyMemo)); // [②] 공통 상단 메모 = admin_tasks 이슈 내용
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
@@ -616,9 +625,19 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
     } finally { setSaving(false); }
   };
 
-  // 저장만(이체 전) — 성공 시 창 닫고 목록 💳 즉시 갱신. 실패 시 창 유지 + 빨간 안내(버튼 다시 활성).
+  // [②] 저장 하나 — 유형·메모(이슈)를 admin-tasks 에 먼저 저장 → (기타 아니면) refund-ledger PATCH. 순서대로, 부분 실패 안내.
   const saveOnly = async () => {
-    if (await doPatch({})) { showAdminToast("저장됐어요", "success"); onSaved(); }
+    // 1) 고객이슈(admin-tasks) 저장 — 기존 수정 경로(메타줄 보존). 호출은 rail 이 넘긴 onSaveIssue.
+    if (onSaveIssue) {
+      const okIssue = await onSaveIssue({ issueType, memo: issueMemo });
+      if (!okIssue) { setSaveError("고객이슈 저장에 실패했어요. 다시 시도해 주세요."); showAdminToast("고객이슈 저장 실패", "error"); return; }
+    }
+    // 2) 기타면 환불 기록은 만들지도 바꾸지도 않는다(💳 은 유형이 general 이라 목록에서 자동 숨김).
+    if (isEtc) { showAdminToast("저장됐어요", "success"); onSaved(); return; }
+    // 3) 환불/교환 기록(refund-ledger) 저장.
+    const okLedger = await doPatch({});
+    if (!okLedger) { showAdminToast("고객이슈는 저장됐지만 환불 기록 저장에 실패했어요. 환불 부분을 다시 저장해 주세요.", "warning"); return; }
+    showAdminToast("저장됐어요", "success"); onSaved();
   };
 
   // [2026-09-27] 카톡 붙여넣기용 여러 줄 텍스트(text/plain·순수함수 buildKakaoCopy).
@@ -639,7 +658,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
       orderCode, orderDateLong: dateLongKo(orderDate || item.created_at),
       products: prodItems,
       returnReceivedLong: dateLongKo(returnReceivedOn), returnRequestedLong: dateLongKo(returnRequestedOn),
-      reasonChip: reasonVal, memo: clean(memo),
+      reasonChip: reasonVal, memo: clean(issueMemo),
       method,
       productSum, shipIncluded: shipIncludedAmount, deductTotal, amountFinal,
       cardTotal: cardTotalDisplay, cardRefundBack,
@@ -674,7 +693,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
         {/* 1. 헤더 */}
         <div className="flex items-start justify-between gap-2 border-b border-line px-5 pt-4 pb-3">
           <div className="min-w-0">
-            <h3 className="text-lg font-black text-ink">{isExchange ? "교환하기" : "환불하기"}</h3>
+            <h3 className="text-lg font-black text-ink">{isEtc ? "고객이슈 처리" : isExchange ? "교환하기" : "환불하기"}</h3>
             {openedFromOtherIssue ? <div className="mt-1 text-[13px] leading-5 text-ink-mute">같은 주문의 {repIssueDateMD ? `${repIssueDateMD} ` : ""}이슈 기록을 열었어요.</div> : null}
             {headerNotice ? <div className="mt-1 text-[13px] leading-5 text-ink-mute">{headerNotice}</div> : null}
             <div className="mt-1 text-[13px] leading-5 text-ink-soft">
@@ -686,6 +705,20 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
+
+          {/* [②] 공통 상단 — 유형 칩(환불/교환/기타) + 메모(이슈 내용). 칩 바꾸면 하단이 즉시 전환된다. */}
+          <div className="mb-3">
+            <div className="mb-1 text-[13px] font-black text-ink-mute">유형</div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(["refund", "exchange", "etc"] as const).map((t) => (
+                <button key={t} type="button" onClick={() => { setIssueType(t); if (t === "exchange") setMethod("교환재발송"); else if (t === "refund" && (method === "교환재발송" || method === "없음")) setMethod("계좌이체"); }}
+                  className={`rounded-xl px-3 py-1.5 text-[14px] font-black transition ${issueType === t ? (t === "refund" ? "bg-rose-deep text-white" : "bg-[var(--color-ink-soft)] text-white") : "border border-line bg-surface text-ink-mute hover:bg-surface-2"}`}>
+                  {t === "refund" ? "환불" : t === "exchange" ? "교환" : "기타"}
+                </button>
+              ))}
+            </div>
+            <input value={issueMemo} onChange={(e) => setIssueMemo(e.target.value)} placeholder="메모 (선택)" className={`mt-2 w-full ${INPUT}`} />
+          </div>
 
           {/* 2. 상품 */}
           <div className="mb-3">
@@ -759,6 +792,9 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
             ) : null}
           </div>
 
+          {/* [②] 유형이 기타면 아래(반품 날짜·사유·금액표·계좌·교환옵션)는 숨김 — admin-tasks 만 저장. */}
+          {!isEtc ? (
+          <>
           {/* 2-0. 반품 접수/도착 날짜 — 칩 2개(표시·기록 전용, 기본값 없음) */}
           <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="text-[13px] font-black text-ink-mute">📦 반품</span>
@@ -799,8 +835,6 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                 </button>
               ))}
             </div>
-            {/* [A2] 메모 입력칸을 사유 칩 바로 아래로 이동(맨 아래 메모 삭제). */}
-            <input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="메모 (선택)" className={`mt-2 w-full ${INPUT}`} />
           </div>
 
           {!isExchange ? (
@@ -911,18 +945,23 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
             </div>
           )}
 
-          {/* 메모는 사유 칩 아래로 이동([A2]) — 하단 메모 칸 삭제. 다음 할 일은 저장값 있으면 회색으로만. */}
+          {/* 다음 할 일은 저장값 있으면 회색으로만. */}
           {nextActionSaved ? <div className="mb-1 text-[13px] text-ink-mute">다음 할 일: {nextActionSaved}</div> : null}
 
           {isExchange ? (
-            <button type="button" onClick={() => { setKindOverride("반품"); setMethod("계좌이체"); }} className="mt-3 text-[13px] font-bold text-ink-mute underline">재고 없으면 → 환불로 바꾸기</button>
+            <button type="button" onClick={() => { setIssueType("refund"); setMethod("계좌이체"); }} className="mt-3 text-[13px] font-bold text-ink-mute underline">재고 없으면 → 환불로 바꾸기</button>
           ) : null}
+          </>
+          ) : (
+            <div className="mb-3 rounded-lg bg-surface-2 p-3 text-[13px] font-bold text-ink-mute">기타 — 환불 기록 없이 이슈만 저장돼요.</div>
+          )}
         </div>
 
         {/* 9. 하단 고정 — 「저장」 하나. 완료(이체·취소·지급 등)는 목록 「해결완료」에서 처리. */}
         {saveError ? <div className="border-t border-danger-tx/40 bg-danger-bg px-5 py-2 text-[13px] font-bold text-danger-tx">저장 실패: {saveError}</div> : null}
         <div className="flex items-center gap-2 border-t border-line px-5 py-3">
-          <button type="button" disabled={saving || (!linesLoaded && !!orderCode) || linesError} onClick={saveOnly} className="ml-auto h-12 rounded-xl bg-rose-deep px-6 text-[14px] font-black text-white disabled:opacity-50">{saving ? "저장 중…" : "저장"}</button>
+          {onDelete ? <button type="button" disabled={saving} onClick={onDelete} className="text-[13px] font-bold text-ink-mute underline hover:text-danger-tx disabled:opacity-50">삭제</button> : null}
+          <button type="button" disabled={saving || (!isEtc && !linesLoaded && !!orderCode) || (!isEtc && linesError)} onClick={saveOnly} className="ml-auto h-12 rounded-xl bg-rose-deep px-6 text-[14px] font-black text-white disabled:opacity-50">{saving ? "저장 중…" : "저장"}</button>
         </div>
       </div>
     </div>
