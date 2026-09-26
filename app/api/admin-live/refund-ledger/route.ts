@@ -107,7 +107,8 @@ async function attachCardTotals(items: Array<Record<string, unknown>>, supabase:
       if (r.is_deleted === true) continue;
       const c = String(r.order_lookup_code ?? "").trim();
       if (!c) continue;
-      totalByCode[c] = (totalByCode[c] || 0) + Math.max(0, Math.round(num(r.adjusted_total_price ?? r.total_price ?? r.final_amount)));
+      // [B6] 주문상세·order-lines 와 같은 소스(orderBaseAmount: final_amount 우선)로 통일 — 목록 💳 = 창 총액.
+      totalByCode[c] = (totalByCode[c] || 0) + Math.max(0, Math.round(num(r.final_amount ?? r.adjusted_total_price ?? r.total_price)));
     }
     for (const it of items) {
       if (String(it.method ?? "") === "카드취소") it.card_total = totalByCode[String(it.order_lookup_code ?? "").trim()] || 0;

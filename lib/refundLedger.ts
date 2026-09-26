@@ -102,6 +102,32 @@ export function restoreSelectionFromSnapshot(lines: OrderLineLite[], snapshot: S
   return out;
 }
 
+// [2026-09-27] 초기 체크 상태를 «한 번에» 결정(레이스 방지). ledger(대표 기록)+주문 줄이 둘 다 도착한 뒤 딱 한 번 호출.
+//   hasLedger → 저장 snapshot 만으로 복원(자동 체크 금지). snapshot 이 줄과 하나도 안 맞으면 0개 + matchedNone=true(raw_payload 대체 금지).
+//   hasLedger 아님(신규) → snapshot(=raw_payload 대상)으로 자동 체크(productId 매칭, 대상 없으면 전체).
+export function deriveInitialSelection(opts: {
+  hasLedger: boolean;
+  snapshot: SnapEntry[] | null | undefined;
+  lines: OrderLineLite[];
+}): { sel: Record<string, number>; matchedNone: boolean } {
+  const lines = Array.isArray(opts.lines) ? opts.lines : [];
+  const snap = Array.isArray(opts.snapshot) ? opts.snapshot : [];
+  if (opts.hasLedger) {
+    const sel = restoreSelectionFromSnapshot(lines, snap);
+    const anyChecked = Object.values(sel).some((v) => v > 0);
+    return { sel, matchedNone: snap.length > 0 && !anyChecked };
+  }
+  // 신규 — raw_payload 대상상품 자동 체크
+  const targetIds = new Set(snap.map((s) => String((s as { productId?: unknown }).productId ?? "").trim()).filter(Boolean));
+  const hasTarget = targetIds.size > 0;
+  const sel: Record<string, number> = {};
+  for (const l of lines) {
+    if (lines.length === 1) sel[String(l.id)] = Math.max(1, Math.round(Number(l.qty)) || 1);
+    else sel[String(l.id)] = hasTarget ? (targetIds.has(String(l.product_id ?? "").trim()) ? Math.max(1, Math.round(Number(l.qty)) || 1) : 0) : Math.max(1, Math.round(Number(l.qty)) || 1);
+  }
+  return { sel, matchedNone: false };
+}
+
 // [2026-09-26 7차] 전체 반품 판정 — 모든 줄이 «전체 수량»으로 선택됐는가(배송비·카드추가금 자동 체크 기준).
 export function isFullReturnSel(sels: Array<{ qty: unknown; selectedQty: unknown }>): boolean {
   const arr = Array.isArray(sels) ? sels : [];

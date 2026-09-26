@@ -1,5 +1,5 @@
 // [2026-09-26 5·6차] 고객이슈 환불/교환 용어·💳 요약 문구 테스트
-import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, cardRefundBackAmount, pickPrimaryLedger, ledgerHasPayoutInfo, restoreSelectionFromSnapshot } from "../lib/refundLedger.ts";
+import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, cardRefundBackAmount, pickPrimaryLedger, ledgerHasPayoutInfo, restoreSelectionFromSnapshot, deriveInitialSelection } from "../lib/refundLedger.ts";
 import { bankDisplayName } from "../lib/parseBankAccount.ts";
 
 let pass = 0;
@@ -185,6 +185,36 @@ ok2(ledgerHasPayoutInfo(null) === false, "null → false");
   const lines = [{ id: "L1", product_id: "9", product_name: "상품A", color: "", size: "", qty: 2 }];
   const snap = [{ productId: "9", qty: 3 }];
   eq(restoreSelectionFromSnapshot(lines, snap).L1, 2, "수량 줄 상한");
+}
+
+// ── [A 근본] deriveInitialSelection — 한 번에 결정, ledger 있으면 snapshot 만 ──
+const LINES4 = [
+  { id: "L202", product_id: "676", product_name: "PD-202 니트", color: "없음", size: "M", qty: 1 },
+  { id: "L206", product_id: "677", product_name: "PD-206 아우터", color: "없음", size: "M", qty: 1 },
+  { id: "L3", product_id: "678", product_name: "C", color: "", size: "", qty: 1 },
+  { id: "L4", product_id: "679", product_name: "D", color: "", size: "", qty: 1 },
+];
+// (a) ledger snapshot=PD-206, raw 는 무관 → PD-206 만
+{ const r = deriveInitialSelection({ hasLedger: true, snapshot: [{ productId: "677", productName: "PD-206 아우터", color: "없음", size: "M", qty: 1 }], lines: LINES4 });
+  eq(r.sel.L206, 1, "(a) ledger→PD-206 체크"); eq(r.sel.L202, 0, "(a) PD-202 미체크"); eq(r.matchedNone, false, "(a) 매칭됨"); }
+// (b) ledger 없음(신규) → raw_payload 대상(PD-202·206) 자동 체크
+{ const r = deriveInitialSelection({ hasLedger: false, snapshot: [{ productId: "676" }, { productId: "677" }], lines: LINES4 });
+  eq(r.sel.L202, 1, "(b) 신규 PD-202 자동체크"); eq(r.sel.L206, 1, "(b) 신규 PD-206 자동체크"); eq(r.sel.L3, 0, "(b) 대상 아님"); }
+// (c) ledger snapshot 이 줄과 불일치 → 0개 + matchedNone(raw 대체 금지)
+{ const r = deriveInitialSelection({ hasLedger: true, snapshot: [{ productId: "999", productName: "없는상품" }], lines: LINES4 });
+  eq(Object.values(r.sel).filter((v) => v > 0).length, 0, "(c) 하나도 체크 안 됨"); eq(r.matchedNone, true, "(c) matchedNone"); }
+// (d) productId 숫자/문자 혼용 매칭 — snapshot "677"(문자) vs 줄 677(숫자)
+{ const linesNum = [{ id: "L206", product_id: 677, product_name: "PD-206", color: "없음", size: "M", qty: 1 }];
+  const r = deriveInitialSelection({ hasLedger: true, snapshot: [{ productId: "677", qty: 1 }], lines: linesNum });
+  eq(r.sel.L206, 1, "(d) 문자 productId vs 숫자 매칭"); }
+
+// ── 순서 시나리오: lines/ledger 도착 순서와 무관하게 결과 동일(순수함수라 입력만 같으면 동일) ──
+{
+  const snap = [{ productId: "677", productName: "PD-206 아우터", color: "없음", size: "M", qty: 1 }];
+  const r1 = deriveInitialSelection({ hasLedger: true, snapshot: snap, lines: LINES4 }); // ledger 먼저
+  const r2 = deriveInitialSelection({ hasLedger: true, snapshot: snap, lines: LINES4 }); // lines 먼저 (동일 입력)
+  eq(JSON.stringify(r1.sel), JSON.stringify(r2.sel), "순서 무관 동일 결과");
+  eq(r1.sel.L206, 1, "최종 PD-206 만"); eq(r1.sel.L202, 0, "PD-202 미체크");
 }
 
 console.log(`✅ refund-issue-terms ${pass}건 통과`);

@@ -14,7 +14,7 @@ import { supabase } from "@/lib/supabase";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { pickIssueProductRows } from "@/lib/issueProductLabel";
 import { RefundProcessModal, type LedgerDetail } from "./AdminLiveRefundLedgerPanel";
-import { productSnapshotFromItems, refundListButtonLabel, ledgerSummaryLine, pickPrimaryLedger } from "@/lib/refundLedger";
+import { productSnapshotFromItems, refundListButtonLabel, ledgerSummaryLine, pickPrimaryLedger, restoreSelectionFromSnapshot } from "@/lib/refundLedger";
 
 // [2026-09-26] refund_ledger 목록 요약 행(대표 선택·표시용). 같은 주문에 여러 개면 pickPrimaryLedger 로 1개.
 type LedgerRow = {
@@ -22,6 +22,7 @@ type LedgerRow = {
   stage: string; kind: string; amount_final: number; method: string; done_at: string;
   bank: string; account_holder: string; exchange_option: string; account_number: string; account_last4: string;
   card_total: number; adjustments: Array<{ label: string; amount: number }>;
+  product_snapshot: Array<{ productId?: string; productName?: string; color?: string; size?: string; qty?: number }>;
 };
 import { bankDisplayName } from "@/lib/parseBankAccount";
 import { ISSUE_FILTER_CHIPS, matchesIssueFilterChip, issueRawTypes } from "@/lib/issueFilter";
@@ -862,6 +863,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           account_holder: String(r.account_holder ?? ""), exchange_option: String(r.exchange_option ?? ""),
           account_number: String(r.account_number ?? ""), account_last4: String(r.account_last4 ?? ""),
           card_total: Number(r.card_total) || 0, adjustments: Array.isArray(r.adjustments) ? (r.adjustments as Array<{ label: string; amount: number }>) : [],
+          product_snapshot: Array.isArray(r.product_snapshot) ? (r.product_snapshot as LedgerRow["product_snapshot"]) : [],
         });
       }
       setLedgerByOrder(map);
@@ -878,38 +880,54 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
   // [2026-09-26] 목록 줄합계 — 주문번호가 있는 «모든» 페이지 줄의 주문 상품을 «주문번호로 한 번에» 조회(행마다 쿼리 금지).
   //   금액 = 매칭된 줄들의 줄합계(submitRowLineTotal 서버 계산) 합. 매칭 실패 시 생략(칸 비움).
-  const [amountByTask, setAmountByTask] = useState<Record<string, string>>({});
+  const [linesByOrder, setLinesByOrder] = useState<Record<string, Array<Record<string, unknown>>>>({});
   const pageOrderCodesKey = Array.from(new Set(pageTasks.map((t) => extractBodyField(t, "주문번호:")).filter(Boolean))).sort().join(",");
   useEffect(() => {
     let alive = true;
     const codes = pageOrderCodesKey ? pageOrderCodesKey.split(",") : [];
-    if (codes.length === 0) { setAmountByTask({}); return; }
+    if (codes.length === 0) { setLinesByOrder({}); return; }
     (async () => {
       const res = await fetch(`/api/admin-live/order-lines?codes=${encodeURIComponent(codes.join(","))}`, { cache: "no-store" });
       const p = await res.json().catch(() => null);
       if (!alive || !p?.ok) return;
       const byCode = (p.byCode || {}) as Record<string, { lines?: Array<Record<string, unknown>> }>;
-      const map: Record<string, string> = {};
-      for (const t of pageTasks) {
-        const code = extractBodyField(t, "주문번호:");
-        const lines = (code && byCode[code]?.lines) || [];
-        if (lines.length === 0) continue;
-        const rawItems = (t.raw_payload && typeof t.raw_payload === "object" ? (t.raw_payload as { items?: unknown }).items : null);
-        const targetIds = Array.isArray(rawItems)
-          ? rawItems.map((x) => clean((x as { productId?: unknown; product_id?: unknown })?.productId ?? (x as { product_id?: unknown })?.product_id)).filter(Boolean)
-          : [];
-        const matched = targetIds.length > 0
-          ? lines.filter((l) => targetIds.includes(clean(l.product_id)))
-          : pickIssueProductRows(lines, extractBodyField(t, "대상상품:") || clean(t.related_product));
-        if (matched.length === 0) continue; // 매칭 실패 → 금액 칸 생략
-        const sum = matched.reduce((s, m) => s + (Number(m.lineTotal) || 0), 0);
-        map[clean(t.id)] = `${sum.toLocaleString("ko-KR")}원`;
-      }
-      setAmountByTask(map);
+      const out: Record<string, Array<Record<string, unknown>>> = {};
+      for (const [code, e] of Object.entries(byCode)) out[code] = Array.isArray(e?.lines) ? e.lines : [];
+      setLinesByOrder(out);
     })().catch(() => { /* 실패해도 목록 정상, 금액만 생략 */ });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageOrderCodesKey]);
+
+  // [B5] 목록 줄 금액 — 대표 기록이 있으면 그 기록 snapshot 줄합계(같은 항목집합), 없으면 raw_payload 대상상품 합계.
+  const amountByTask = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const t of pageTasks) {
+      const code = extractBodyField(t, "주문번호:");
+      const lines = (code && linesByOrder[code]) || [];
+      if (lines.length === 0) continue;
+      const primary = code ? primaryByOrder[code] : null;
+      let matched: Array<Record<string, unknown>>;
+      if (primary && Array.isArray(primary.product_snapshot) && primary.product_snapshot.length > 0) {
+        const lite = lines.map((l) => ({ id: clean(l.id), product_id: clean(l.product_id), product_name: clean(l.product_name), color: clean(l.color), size: clean(l.size), qty: Number(l.qty) || 1 }));
+        const restored = restoreSelectionFromSnapshot(lite, primary.product_snapshot);
+        matched = lines.filter((l) => (restored[clean(l.id)] || 0) > 0);
+      } else {
+        const rawItems = (t.raw_payload && typeof t.raw_payload === "object" ? (t.raw_payload as { items?: unknown }).items : null);
+        const targetIds = Array.isArray(rawItems)
+          ? rawItems.map((x) => clean((x as { productId?: unknown; product_id?: unknown })?.productId ?? (x as { product_id?: unknown })?.product_id)).filter(Boolean)
+          : [];
+        matched = targetIds.length > 0
+          ? lines.filter((l) => targetIds.includes(clean(l.product_id)))
+          : pickIssueProductRows(lines, extractBodyField(t, "대상상품:") || clean(t.related_product));
+      }
+      if (matched.length === 0) continue;
+      const sum = matched.reduce((s, m) => s + (Number(m.lineTotal) || 0), 0);
+      map[clean(t.id)] = `${sum.toLocaleString("ko-KR")}원`;
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linesByOrder, primaryByOrder, pageOrderCodesKey]);
 
   // 같은 주문의 «열린» 환불/교환 이슈 수(완료 시 함께 해결완료할 대상). 페이지 기준.
   const openIssueCountForOrder = (orderCode: string) =>
@@ -918,9 +936,26 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   const openRefund = async (task: AdminIssueTask) => {
     const tid = clean(task.id);
     const orderCode = extractBodyField(task, "주문번호:");
-    const primary = orderCode ? primaryByOrder[orderCode] : null;
-    const siblings = orderCode ? (ledgerByOrder[orderCode] || []) : [];
     const linkedIssueCount = openIssueCountForOrder(orderCode);
+    // [레이스 방지] 클라 캐시(primaryByOrder)가 아직 안 찼을 수 있으니, 이 주문의 기록을 «항상 서버에서 신선하게» 조회.
+    let primary = orderCode ? primaryByOrder[orderCode] : null;
+    let siblings = orderCode ? (ledgerByOrder[orderCode] || []) : [];
+    if (orderCode) {
+      try {
+        const fr = await fetch(`/api/admin-live/refund-ledger?orderCodes=${encodeURIComponent(orderCode)}`, { cache: "no-store" });
+        const fp = await fr.json().catch(() => null);
+        if (fp?.ok && Array.isArray(fp.items)) {
+          siblings = fp.items as LedgerRow[];
+          primary = pickPrimaryLedger(fp.items as LedgerRow[]);
+        } else if (!primary) {
+          // 조회 실패 + 캐시도 없음 → '신규'로 오판하지 않고 중단.
+          showAdminToast("환불 기록을 불러오지 못했어요. 다시 시도해 주세요.", "error");
+          return;
+        }
+      } catch {
+        if (!primary) { showAdminToast("환불 기록을 불러오지 못했어요. 다시 시도해 주세요.", "error"); return; }
+      }
+    }
     // 같은 주문에 이미 기록이 있으면 «대표»를 열어 편집(새 기록 생성 금지, 이중 이체 방지).
     if (primary?.id) {
       try {

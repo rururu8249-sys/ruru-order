@@ -16,7 +16,7 @@ import {
   optionLabelNoNone,
   isFullReturnSel,
   cardRefundBackAmount,
-  restoreSelectionFromSnapshot,
+  deriveInitialSelection,
   computeAmountFinal,
   computeRefundBase,
   stageDisplay,
@@ -410,6 +410,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
   const [linesLoaded, setLinesLoaded] = useState(false);
   const [linesError, setLinesError] = useState(false);
   const [linesReloadTick, setLinesReloadTick] = useState(0);
+  const [snapshotUnmatched, setSnapshotUnmatched] = useState(false); // 저장 snapshot 이 주문 줄과 안 맞음
   const [shippingFee, setShippingFee] = useState(0);
   const [pointUsed, setPointUsed] = useState(0);
   const [orderDate, setOrderDate] = useState("");
@@ -431,6 +432,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
     if (!orderCode) { setLinesLoaded(true); return; }
     let alive = true;
     setLinesError(false);
+    setSnapshotUnmatched(false);
     (async () => {
       try {
         const res = await fetch(`/api/admin-live/order-lines?codes=${encodeURIComponent(orderCode)}`, { cache: "no-store" });
@@ -450,25 +452,12 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
         setCombinedShipping(Boolean(entry?.combined));
         setCombinedWith(clean(entry?.combinedWith));
         setCombinedShipFee(Math.max(0, Math.round(Number(entry?.combinedShipFee)) || 0));
-        // [A 수정] 저장 기록(item.id 있음 + snapshot 있음)이면 «저장된 선택만» 복원(자동 체크 절대 금지).
-        //   매칭은 productId 또는 상품명+옵션(robust). 신규(id 없음)일 때만 이슈 대상상품 자동 체크.
+        // [A 근본수정] 선택 상태는 «ledger(=item 프롭)+주문 줄이 둘 다 도착한 뒤» 한 번만 결정(레이스 방지).
+        //   item.id 있으면 저장 기록 → snapshot 만 복원(자동 체크 금지·불일치면 0개+안내). 없으면 신규 자동 체크.
         const savedSnap = Array.isArray(item.product_snapshot) ? item.product_snapshot : [];
-        const hasSaved = Boolean(item.id) && savedSnap.length > 0;
-        const init: Record<string, number> = {};
-        if (hasSaved) {
-          const restored = restoreSelectionFromSnapshot(got, savedSnap);
-          for (const l of got) init[l.id] = restored[l.id] || 0;
-        } else {
-          // 신규 — 이슈 대상상품 자동 체크(productId 매칭, 없으면 전체).
-          const targetQty: Record<string, number> = {};
-          for (const s of savedSnap) { const pid = clean((s as { productId?: unknown }).productId); if (pid) targetQty[pid] = Math.max(1, Math.round(Number(s.qty)) || 1); }
-          const hasTarget = Object.keys(targetQty).length > 0;
-          for (const l of got) {
-            if (got.length === 1) init[l.id] = l.qty;
-            else init[l.id] = hasTarget ? (targetQty[l.product_id] ? Math.min(targetQty[l.product_id], l.qty) : 0) : l.qty;
-          }
-        }
-        setSel(init);
+        const derived = deriveInitialSelection({ hasLedger: Boolean(item.id), snapshot: savedSnap, lines: got });
+        setSel(derived.sel);
+        setSnapshotUnmatched(derived.matchedNone);
         // 카드결제 주문 → 방법 기본 항상 「카드취소」(저장 방법 없을 때만). 카드는 전체 취소가 원칙.
         if (clean(entry?.paymentMethod).includes("카드") && !isExchange && (!item.method || item.method === "없음")) {
           setMethod("카드취소");
@@ -747,6 +736,9 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
                 ) : null}
               </div>
             )}
+            {snapshotUnmatched ? (
+              <div className="mt-2 rounded-lg border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">저장된 상품을 주문에서 못 찾았어요. 상품을 다시 선택해 주세요.</div>
+            ) : null}
             {!isExchange && pointUsed > 0 ? (
               <div className="mt-2 rounded-lg border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">
                 이 주문은 포인트 {formatComma(pointUsed)}원 사용 — 환불액 확인 필요 (자동 차감하지 않아요)
@@ -898,17 +890,17 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted, opened
         {/* 9. 하단 고정 — 왼쪽 「저장만」 / 오른쪽 완료 → 해결완료 */}
         {saveError ? <div className="border-t border-danger-tx/40 bg-danger-bg px-5 py-2 text-[13px] font-bold text-danger-tx">저장 실패: {saveError}</div> : null}
         <div className="flex items-center gap-2 border-t border-line px-5 py-3">
-          <button type="button" disabled={saving} onClick={saveOnly} className="h-12 rounded-xl border border-line bg-surface px-4 text-[14px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50">{saving ? "저장 중…" : "저장만"}</button>
+          <button type="button" disabled={saving || (!linesLoaded && !!orderCode) || linesError} onClick={saveOnly} className="h-12 rounded-xl border border-line bg-surface px-4 text-[14px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50">{saving ? "저장 중…" : "저장만"}</button>
           {isExchange ? (
-            <button type="button" disabled={saving} onClick={() => complete({ mark_done: true, stage: "완료" }, "재발송 완료로 기록하고 해결완료로 넘길까요?")} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">재발송했어요 → 해결완료</button>
+            <button type="button" disabled={saving || (!linesLoaded && !!orderCode) || linesError} onClick={() => complete({ mark_done: true, stage: "완료" }, "재발송 완료로 기록하고 해결완료로 넘길까요?")} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">재발송했어요 → 해결완료</button>
           ) : method === "카드취소" ? (
-            <button type="button" disabled={saving} onClick={() => complete({ mark_done: true, stage: "완료" }, cardRefundBack > 0 ? `${won(cardTotalDisplay)} 카드 전체 취소, 반품비 ${won(cardRefundBack)} 받음으로 기록하고 해결완료로 넘길까요?` : `${won(cardTotalDisplay)} 카드 전체 취소로 기록하고 해결완료로 넘길까요?`)} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">{cardRefundBack > 0 ? `카드 전체 취소 + 반품비 ${won(cardRefundBack)} 받았어요 → 해결완료` : "카드 전체 취소했어요 → 해결완료"}</button>
+            <button type="button" disabled={saving || (!linesLoaded && !!orderCode) || linesError} onClick={() => complete({ mark_done: true, stage: "완료" }, cardRefundBack > 0 ? `${won(cardTotalDisplay)} 카드 전체 취소, 반품비 ${won(cardRefundBack)} 받음으로 기록하고 해결완료로 넘길까요?` : `${won(cardTotalDisplay)} 카드 전체 취소로 기록하고 해결완료로 넘길까요?`)} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">{cardRefundBack > 0 ? `카드 전체 취소 + 반품비 ${won(cardRefundBack)} 받았어요 → 해결완료` : "카드 전체 취소했어요 → 해결완료"}</button>
           ) : method === "계좌이체" ? (
-            <button type="button" disabled={saving} onClick={() => complete({ mark_transferred: true, mark_done: true, stage: "완료" }, `${won(amountFinal)} 이체 완료로 기록하고 해결완료로 넘길까요?`)} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">이체했어요 → 해결완료</button>
+            <button type="button" disabled={saving || (!linesLoaded && !!orderCode) || linesError} onClick={() => complete({ mark_transferred: true, mark_done: true, stage: "완료" }, `${won(amountFinal)} 이체 완료로 기록하고 해결완료로 넘길까요?`)} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">이체했어요 → 해결완료</button>
           ) : method === "포인트" ? (
-            <button type="button" disabled={saving} onClick={() => complete({ mark_done: true, stage: "완료" }, "포인트 지급 완료로 기록하고 해결완료로 넘길까요?")} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">지급했어요 → 해결완료</button>
+            <button type="button" disabled={saving || (!linesLoaded && !!orderCode) || linesError} onClick={() => complete({ mark_done: true, stage: "완료" }, "포인트 지급 완료로 기록하고 해결완료로 넘길까요?")} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">지급했어요 → 해결완료</button>
           ) : (
-            <button type="button" disabled={saving} onClick={() => complete({ mark_done: true, stage: "거절·취소" }, "환불 없이 해결완료로 넘길까요?")} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">환불 없이 해결완료</button>
+            <button type="button" disabled={saving || (!linesLoaded && !!orderCode) || linesError} onClick={() => complete({ mark_done: true, stage: "거절·취소" }, "환불 없이 해결완료로 넘길까요?")} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">환불 없이 해결완료</button>
           )}
         </div>
       </div>
