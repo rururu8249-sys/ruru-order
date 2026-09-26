@@ -77,6 +77,9 @@ function buildWritePayload(body: Row) {
   if (body.reason !== undefined) payload.reason = text(body.reason);
   if (body.next_action !== undefined) payload.next_action = text(body.next_action, 500);
   if (body.exchange_option !== undefined) payload.exchange_option = text(body.exchange_option, 500);
+  // [2026-09-27] 반품 접수/도착 날짜(YYYY-MM-DD, 표시·기록 전용). 빈 문자열이면 null 로.
+  if (body.return_requested_on !== undefined) payload.return_requested_on = text(body.return_requested_on, 10) || null;
+  if (body.return_received_on !== undefined) payload.return_received_on = text(body.return_received_on, 10) || null;
   if (body.reship_tracking !== undefined) payload.reship_tracking = text(body.reship_tracking, 120);
   if (body.bank !== undefined) payload.bank = text(body.bank, 60);
   if (body.account_number !== undefined) payload.account_number = digitsOnly(body.account_number).slice(0, 30);

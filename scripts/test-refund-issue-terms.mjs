@@ -1,5 +1,5 @@
 // [2026-09-26 5·6차] 고객이슈 환불/교환 용어·💳 요약 문구 테스트
-import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, cardRefundBackAmount, pickPrimaryLedger, ledgerHasPayoutInfo, restoreSelectionFromSnapshot, deriveInitialSelection, buildSnapshotFromSelection, listAmountLine, baseSummaryLine } from "../lib/refundLedger.ts";
+import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, cardRefundBackAmount, pickPrimaryLedger, ledgerHasPayoutInfo, restoreSelectionFromSnapshot, deriveInitialSelection, buildSnapshotFromSelection, listAmountLine, baseSummaryLine, dateShortKo, dateLongKo, returnStagePrefix } from "../lib/refundLedger.ts";
 import { bankDisplayName } from "../lib/parseBankAccount.ts";
 
 let pass = 0;
@@ -348,5 +348,14 @@ eq(baseSummaryLine({ orderTotal: 1052980, productAll: 1048980, shippingFee: 4000
   eq(ledgerSummaryLine(li, "국민은행"), "보낼 돈 73,000원 (83,000 − 차감 10,000) · 국민은행 12345 홍길동", "차감 내역 표시"); }
 { const li = { kind: "반품", method: "계좌이체", amount_final: 79000, adjustments: [], bank: "국민", account_number: "12345", account_holder: "홍길동" };
   eq(ledgerSummaryLine(li, "국민은행"), "보낼 돈 79,000원 · 국민은행 12345 홍길동", "차감 없으면 내역 없음"); }
+
+// ── [반품 날짜] 포맷 + 목록 💳 앞머리 3케이스 ──
+eq(dateShortKo("2026-09-20"), "09.20(일)", "MM.DD(요일) 짧게");
+eq(dateLongKo("2026-09-22"), "2026.09.22 (화)", "YYYY.MM.DD (요일) 길게");
+eq(dateShortKo(""), "", "빈 값 → 빈칸");
+eq(dateLongKo(null), "", "null → 빈칸");
+eq(returnStagePrefix("2026-09-20", "2026-09-22"), "📦 도착 09.22(화)", "도착 있으면 도착");
+eq(returnStagePrefix("2026-09-20", ""), "📦 접수 09.20(일)", "접수만 있으면 접수");
+eq(returnStagePrefix("", ""), "", "둘 다 없으면 생략");
 
 console.log(`✅ refund-issue-terms ${pass}건 통과`);

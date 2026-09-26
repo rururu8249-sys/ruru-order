@@ -14,7 +14,7 @@ import { supabase } from "@/lib/supabase";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { pickIssueProductRows } from "@/lib/issueProductLabel";
 import { RefundProcessModal, type LedgerDetail } from "./AdminLiveRefundLedgerPanel";
-import { productSnapshotFromItems, refundListButtonLabel, ledgerSummaryLine, pickPrimaryLedger, restoreSelectionFromSnapshot, listAmountLine } from "@/lib/refundLedger";
+import { productSnapshotFromItems, refundListButtonLabel, ledgerSummaryLine, pickPrimaryLedger, restoreSelectionFromSnapshot, listAmountLine, returnStagePrefix } from "@/lib/refundLedger";
 
 // [2026-09-26] refund_ledger 목록 요약 행(대표 선택·표시용). 같은 주문에 여러 개면 pickPrimaryLedger 로 1개.
 type LedgerRow = {
@@ -23,6 +23,7 @@ type LedgerRow = {
   bank: string; account_holder: string; exchange_option: string; account_number: string; account_last4: string;
   card_total: number; adjustments: Array<{ label: string; amount: number }>;
   product_snapshot: Array<{ productId?: string; productName?: string; color?: string; size?: string; qty?: number }>;
+  return_requested_on: string; return_received_on: string;
 };
 import { bankDisplayName } from "@/lib/parseBankAccount";
 import { ISSUE_FILTER_CHIPS, matchesIssueFilterChip, issueRawTypes } from "@/lib/issueFilter";
@@ -402,7 +403,7 @@ function IssueCard({
   photos?: string[];
   onPhotoZoom?: (url: string) => void;
   /** [2026-09-26] 교환·환불 건의 장부 요약(있을 때만). 진행단계·최종환불액·방법. */
-  ledgerInfo?: { stage?: string; kind?: string; amount_final?: number; method?: string; done_at?: string; bank?: string; account_holder?: string; exchange_option?: string; account_number?: string; account_last4?: string; card_total?: number; adjustments?: Array<{ label: string; amount: number }> } | null;
+  ledgerInfo?: { stage?: string; kind?: string; amount_final?: number; method?: string; done_at?: string; bank?: string; account_holder?: string; exchange_option?: string; account_number?: string; account_last4?: string; card_total?: number; adjustments?: Array<{ label: string; amount: number }>; return_requested_on?: string; return_received_on?: string } | null;
   /** [2026-09-26] 이 이슈가 주문의 «대표» 환불 기록인가(대표만 금액 요약, 나머지는 「같은 주문 처리 중」). */
   isRepresentativeIssue?: boolean;
   /** 대표 기록(대표 이슈) 등록일 — 다른 이슈 줄의 「M/D 이슈에서 처리 중」 표기용. */
@@ -428,10 +429,12 @@ function IssueCard({
   // [2026-09-26] 💳 요약 — 대표 이슈만 금액. 같은 주문의 다른 이슈는 「같은 주문 — M/D 이슈에서 처리 중」.
   const ledgerLine = (() => {
     if (!isRefund || !ledgerInfo) return "";
-    if (isRepresentativeIssue) return ledgerSummaryLine(ledgerInfo, bankDisplayName(clean(ledgerInfo?.bank)));
+    // 📦 반품 접수/도착(있으면) 맨 앞에.
+    const rp = returnStagePrefix(ledgerInfo?.return_requested_on, ledgerInfo?.return_received_on);
+    if (isRepresentativeIssue) return [rp, ledgerSummaryLine(ledgerInfo, bankDisplayName(clean(ledgerInfo?.bank)))].filter(Boolean).join(" · ");
     const d = new Date(String(repIssueDate).includes("T") ? String(repIssueDate) : String(repIssueDate).replace(" ", "T"));
     const md = Number.isNaN(d.getTime()) ? "" : `${d.getMonth() + 1}/${d.getDate()}`;
-    return `같은 주문 — ${md ? `${md} ` : ""}이슈에서 처리 중`;
+    return [rp, `같은 주문 — ${md ? `${md} ` : ""}이슈에서 처리 중`].filter(Boolean).join(" · ");
   })();
   // 반품/교환 등록으로 만들어진 건인가 — 지울 때 포인트·반품기록까지 되돌려야 한다
   const fromReturn = clean((task as { source?: unknown }).source) === "order_return_flow";
@@ -864,6 +867,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           account_number: String(r.account_number ?? ""), account_last4: String(r.account_last4 ?? ""),
           card_total: Number(r.card_total) || 0, adjustments: Array.isArray(r.adjustments) ? (r.adjustments as Array<{ label: string; amount: number }>) : [],
           product_snapshot: Array.isArray(r.product_snapshot) ? (r.product_snapshot as LedgerRow["product_snapshot"]) : [],
+          return_requested_on: String(r.return_requested_on ?? ""), return_received_on: String(r.return_received_on ?? ""),
         });
       }
       setLedgerByOrder(map);
@@ -1047,7 +1051,8 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     const lines = targets.map((r) => {
       const d = detailById[clean(r.id)] || null;
       const holder = clean(d?.account_holder) || clean(r.account_holder) || clean(r.customer_name) || clean(r.nickname);
-      return [clean(d?.bank) || clean(r.bank), clean(d?.account_number), holder, `${(Number(r.amount_final) || 0).toLocaleString("ko-KR")}원`].filter(Boolean).join(" ");
+      const rp = returnStagePrefix(r.return_requested_on, r.return_received_on);
+      return [clean(d?.bank) || clean(r.bank), clean(d?.account_number), holder, `${(Number(r.amount_final) || 0).toLocaleString("ko-KR")}원`, rp].filter(Boolean).join(" ");
     });
     const textOut = lines.join("\n");
     try { await navigator.clipboard.writeText(textOut); showAdminToast(`이체 목록 ${targets.length}건 복사했어요 (은행 계좌 예금주 금액)`, "success"); }
@@ -1060,8 +1065,8 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     const rows = await fetchPrimariesForSelected();
     if (rows.length === 0) { showAdminToast("장부에 기록된 선택 건이 없어요(처리 전이면 먼저 「환불 처리」).", "warning"); return; }
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-    const header = ["접수일", "고객", "전화뒷4", "구분", "단계", "최종환불액", "방법", "계좌뒷4", "이체일", "완료일"];
-    const body = rows.map((r) => [clean(r.created_at), clean(r.nickname) || clean(r.customer_name), clean(r.customer_phone).slice(-4), clean(r.kind), clean(r.stage), Number(r.amount_final) || 0, clean(r.method), clean(r.account_last4), clean(r.transferred_at), clean(r.done_at)].map(esc).join(","));
+    const header = ["접수일", "고객", "전화뒷4", "구분", "단계", "최종환불액", "방법", "계좌뒷4", "반품접수일", "반품도착일", "이체일", "완료일"];
+    const body = rows.map((r) => [clean(r.created_at), clean(r.nickname) || clean(r.customer_name), clean(r.customer_phone).slice(-4), clean(r.kind), clean(r.stage), Number(r.amount_final) || 0, clean(r.method), clean(r.account_last4), clean(r.return_requested_on), clean(r.return_received_on), clean(r.transferred_at), clean(r.done_at)].map(esc).join(","));
     const csv = "﻿" + [header.map(esc).join(","), ...body].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);

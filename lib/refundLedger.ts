@@ -179,6 +179,36 @@ export function refundListButtonLabel(rawTypes: unknown): string {
   return isExchangeOnly ? "교환하기" : "환불하기";
 }
 
+// [2026-09-27] 날짜(YYYY-MM-DD) → "MM.DD(요일)" / "YYYY.MM.DD (요일)". 표시 전용.
+function ymdToDate(v: unknown): Date | null {
+  const raw = String(v ?? "").trim();
+  if (!raw) return null;
+  const d = new Date(raw.includes("T") ? raw : `${raw.slice(0, 10)}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+export function dateShortKo(v: unknown): string {
+  const d = ymdToDate(v);
+  if (!d) return "";
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  const wd = ["일", "월", "화", "수", "목", "금", "토"][d.getDay()] || "";
+  return `${p2(d.getMonth() + 1)}.${p2(d.getDate())}(${wd})`;
+}
+export function dateLongKo(v: unknown): string {
+  const d = ymdToDate(v);
+  if (!d) return "";
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  const wd = ["일", "월", "화", "수", "목", "금", "토"][d.getDay()] || "";
+  return `${d.getFullYear()}.${p2(d.getMonth() + 1)}.${p2(d.getDate())} (${wd})`;
+}
+// 목록 💳 앞머리: 도착 있으면 「📦 도착 MM.DD(요일)」, 접수만 있으면 「📦 접수 …」, 둘 다 없으면 "".
+export function returnStagePrefix(requestedOn: unknown, receivedOn: unknown): string {
+  const recv = dateShortKo(receivedOn);
+  if (recv) return `📦 도착 ${recv}`;
+  const req = dateShortKo(requestedOn);
+  if (req) return `📦 접수 ${req}`;
+  return "";
+}
+
 // 완료일 짧은 표기 "MM.DD(요일)" — 💳 요약 전용(표시만).
 function doneShortKo(v: unknown): string {
   const raw = String(v ?? "").trim();

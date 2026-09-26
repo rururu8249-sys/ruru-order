@@ -18,6 +18,8 @@ import {
   deriveInitialSelection,
   buildSnapshotFromSelection,
   baseSummaryLine,
+  dateShortKo,
+  dateLongKo,
   computeAmountFinal,
   computeRefundBase,
   stageDisplay,
@@ -51,6 +53,8 @@ export type LedgerListRow = {
   account_last4?: string | null;
   account_holder?: string | null;
   card_total?: number | null;
+  return_requested_on?: string | null;
+  return_received_on?: string | null;
   transferred_at?: string | null;
   done_at?: string | null;
 };
@@ -412,6 +416,11 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
   const [linesError, setLinesError] = useState(false);
   const [linesReloadTick, setLinesReloadTick] = useState(0);
   const [snapshotUnmatched, setSnapshotUnmatched] = useState(false); // 저장 snapshot 이 주문 줄과 안 맞음
+  // [반품 날짜] 접수/도착 — 표시·기록 전용(기본값 없음)
+  const [returnRequestedOn, setReturnRequestedOn] = useState(clean(item.return_requested_on));
+  const [returnReceivedOn, setReturnReceivedOn] = useState(clean(item.return_received_on));
+  const [editingReturnDate, setEditingReturnDate] = useState<"" | "req" | "recv">("");
+  const todayKST = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
   const [shippingFee, setShippingFee] = useState(0);
   const [pointUsed, setPointUsed] = useState(0);
   const [orderDate, setOrderDate] = useState("");
@@ -573,6 +582,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
         amount_base: amountBase, adjustments: finalAdj,
         bank, account_number: account, account_holder: holder,
         exchange_option: exchangeOption, reship_tracking: reshipTracking, memo,
+        return_requested_on: returnRequestedOn, return_received_on: returnReceivedOn,
         product_snapshot: snapshot,
         ...(reasonToSend !== undefined ? { reason: reasonToSend } : {}),
         ...(item.id ? {} : {
@@ -615,14 +625,16 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
       ? productText(item.product_snapshot)
       : productText(lines.filter((l) => (sel[l.id] || 0) > 0).map((l) => ({ productName: l.product_name, color: l.color, size: l.size, qty: sel[l.id] || 0 })));
     const reason = reasonVal || reasonBody(item.reason).split("\n")[0] || "-";
+    // 📦 반품 도착/접수(있을 때만) — 상품 줄 다음에.
+    const returnSeg = dateLongKo(returnReceivedOn) ? `📦 반품 도착 ${dateLongKo(returnReceivedOn)}` : (dateLongKo(returnRequestedOn) ? `📦 반품 접수 ${dateLongKo(returnRequestedOn)}` : "");
     // 금액 뒤 괄호 내역(0 항목 생략): 73,000원(상품 79,000+배송비 4,000−차감 10,000)
     let bd = `상품 ${formatComma(productSum)}`;
     if (shipIncludedAmount > 0) bd += `+배송비 ${formatComma(shipIncludedAmount)}`;
     if (deductTotal > 0) bd += `−차감 ${formatComma(deductTotal)}`;
     const amountSeg = (shipIncludedAmount > 0 || deductTotal > 0) ? `${won(amountFinal)}(${bd})` : won(amountFinal);
     const line = isCardCancel
-      ? [dateStr, product || "-", reason, `카드 전체취소 ${won(cardTotalDisplay)}`, ...(cardRefundBack > 0 ? [`반품비 ${won(cardRefundBack)}`] : [])].join(" · ")
-      : [dateStr, product || "-", reason, amountSeg, [bankDisplayName(bank), account].filter(Boolean).join(" ") || "-", holder || "-"].map((x) => x || "-").join(" · ");
+      ? [dateStr, product || "-", ...(returnSeg ? [returnSeg] : []), reason, `카드 전체취소 ${won(cardTotalDisplay)}`, ...(cardRefundBack > 0 ? [`반품비 ${won(cardRefundBack)}`] : [])].join(" · ")
+      : [dateStr, product || "-", ...(returnSeg ? [returnSeg] : []), reason, amountSeg, [bankDisplayName(bank), account].filter(Boolean).join(" ") || "-", holder || "-"].map((x) => x || "-").join(" · ");
     try { await navigator.clipboard.writeText(line); showAdminToast("이체 정보 복사했어요", "success"); }
     catch { showAdminToast("복사 실패:\n" + line, "warning"); }
   };
@@ -735,6 +747,28 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                 이 주문은 포인트 {formatComma(pointUsed)}원 사용 — 환불액 확인 필요 (자동 차감하지 않아요)
               </div>
             ) : null}
+          </div>
+
+          {/* 2-0. 반품 접수/도착 날짜 — 칩 2개(표시·기록 전용, 기본값 없음) */}
+          <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="text-[13px] font-black text-ink-mute">📦 반품</span>
+            {([["req", "접수", returnRequestedOn, setReturnRequestedOn], ["recv", "도착", returnReceivedOn, setReturnReceivedOn]] as const).map(([key, label, val, setVal]) => {
+              const on = !!clean(val);
+              return (
+                <span key={key} className="flex items-center gap-1.5">
+                  <button type="button"
+                    onClick={() => { if (on) { setVal(""); if (editingReturnDate === key) setEditingReturnDate(""); } else { setVal(todayKST()); } }}
+                    className={`rounded-full px-3 py-1 text-[14px] font-black transition ${on ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}>{label}</button>
+                  {on ? (
+                    editingReturnDate === key ? (
+                      <input type="date" value={clean(val).slice(0, 10)} autoFocus onBlur={() => setEditingReturnDate("")} onChange={(e) => setVal(e.target.value)} className="h-8 rounded-lg border border-line px-2 text-[14px] font-bold text-ink outline-none focus-visible:ring-2 focus-visible:ring-rose-deep" />
+                    ) : (
+                      <button type="button" onClick={() => setEditingReturnDate(key)} className="text-[13px] font-bold text-ink-soft underline">{dateShortKo(val)}</button>
+                    )
+                  ) : null}
+                </span>
+              );
+            })}
           </div>
 
           {/* 2-1. 사유 (reason 필드) */}
