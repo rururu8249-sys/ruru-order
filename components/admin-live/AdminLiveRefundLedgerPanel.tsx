@@ -13,6 +13,7 @@ import {
   REFUND_KINDS,
   REASON_FAULT_CHIPS,
   reasonChipFromStored,
+  type ReasonChip,
   buildKakaoCopy,
   optionLabelNoNone,
   isFullReturnSel,
@@ -378,7 +379,6 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
   const [stage] = useState(item.stage || "접수");
   const [method, setMethod] = useState(item.method && item.method !== "없음" ? item.method : (isExchange ? "교환재발송" : "계좌이체"));
   const [exchangeOption, setExchangeOption] = useState(clean(item.exchange_option));
-  const [reshipTracking, setReshipTracking] = useState(clean(item.reship_tracking));
   const [memo, setMemo] = useState(clean(item.memo));
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -394,9 +394,9 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
   const [paste, setPaste] = useState("");
   const [acctMissing, setAcctMissing] = useState<string[]>([]);
 
-  // 반품 사유(reason 필드) — [2026-09-27] 귀책 2칩(손님 변심 / 상품 문제). 옛 값(단순변심·사이즈→변심, 불량·오배송→문제)은 매핑, 그 외·긴 메모는 미선택.
+  // 반품 사유(reason 필드) — [2026-09-27] 3칩(단순변심 / 상품 문제 / 기타). 옛 값(손님 변심·사이즈→단순변심, 불량·오배송→상품 문제)은 매핑, 긴 메모는 미선택.
   const initReasonChip = reasonChipFromStored(item.reason);
-  const [reasonChip, setReasonChip] = useState<"손님 변심" | "상품 문제" | "">(initReasonChip);
+  const [reasonChip, setReasonChip] = useState<ReasonChip>(initReasonChip);
   const [reasonDirty, setReasonDirty] = useState(false);
   const reasonVal = reasonChip;
 
@@ -520,8 +520,8 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
     : matchFailed ? manualBase : autoBase;
 
   const deductFinalLabel = isCardCancel ? (reasonVal ? `${reasonVal} 반품비` : "반품비") : (reasonVal ? `${reasonVal} 차감` : "차감");
-  // [사유 2칩] 손님 변심 → 「반품비」 라벨, 상품 문제 → 차감 행 숨김(0), 미선택 → 「차감」. 단 저장된 차감 값(입력값>0 또는 보존 조정줄)이 있으면 칩 무관하게 표시.
-  const deductRowLabel = reasonChip === "손님 변심" ? "반품비" : "차감";
+  // [사유 3칩] 단순변심 → 「반품비」 라벨, 기타 → 「차감」, 상품 문제 → 차감 행 숨김(0). 단 저장된 차감 값(입력>0)이 있으면 칩 무관하게 표시.
+  const deductRowLabel = reasonChip === "단순변심" ? "반품비" : "차감";
   const showDeductRow = reasonChip !== "상품 문제" || deductAmount > 0;
   const finalAdj: RefundAdjustment[] = [...keptAdj, ...(deductAmount > 0 ? [{ label: deductFinalLabel, amount: -deductAmount }] : [])];
   const amountFinal = computeAmountFinal(amountBase, finalAdj);
@@ -584,7 +584,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
         stage, kind, method,
         amount_base: amountBase, adjustments: finalAdj,
         bank, account_number: account, account_holder: holder,
-        exchange_option: exchangeOption, reship_tracking: reshipTracking, memo,
+        exchange_option: exchangeOption, memo,
         return_requested_on: returnRequestedOn, return_received_on: returnReceivedOn,
         product_snapshot: snapshot,
         ...(reasonToSend !== undefined ? { reason: reasonToSend } : {}),
@@ -790,15 +790,17 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                   onClick={() => {
                     const next = reasonChip === c.value ? "" : c.value;
                     setReasonChip(next); setReasonDirty(true);
-                    // 상품 문제(사업자 귀책) → 반품비 차감 0으로(전자상거래법 18조). 손님 변심/미선택은 차감 유지.
+                    // 상품 문제(사업자 귀책) → 반품비 차감 0으로(전자상거래법 18조). 단순변심/기타/미선택은 차감 유지.
                     if (next === "상품 문제") setDeductAmount(0);
                   }}
                   className={`flex flex-col items-center rounded-2xl px-3 py-1.5 text-[14px] font-black leading-tight transition ${reasonChip === c.value ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}>
                   <span>{c.value}</span>
-                  <span className={`text-[11px] font-bold ${reasonChip === c.value ? "text-white/80" : "text-ink-mute"}`}>{c.sub}</span>
+                  {c.sub ? <span className={`text-[11px] font-bold ${reasonChip === c.value ? "text-white/80" : "text-ink-mute"}`}>{c.sub}</span> : null}
                 </button>
               ))}
             </div>
+            {/* [A2] 메모 입력칸을 사유 칩 바로 아래로 이동(맨 아래 메모 삭제). */}
+            <input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="메모 (선택)" className={`mt-2 w-full ${INPUT}`} />
           </div>
 
           {!isExchange ? (
@@ -902,18 +904,15 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
               </div>
             </>
           ) : (
-            /* 교환: 바꿀 옵션·송장(한 번만) */
+            /* 교환: 바꿀 옵션만(송장 칸은 [A3]에서 삭제 — reship_tracking 컬럼은 저장값 보존, 표시·입력 안 함). */
             <div className="mb-3 rounded-xl border border-line p-3">
               <div className="text-[13px] font-black text-ink-soft">바꿀 옵션</div>
               <input value={exchangeOption} onChange={(e) => setExchangeOption(e.target.value)} placeholder="예: XL → 2XL" className={`mt-1 w-full ${INPUT}`} />
-              <div className="mt-2 text-[13px] font-black text-ink-soft">재발송 송장번호</div>
-              <input inputMode="numeric" value={reshipTracking} onChange={(e) => setReshipTracking(e.target.value)} placeholder="재발송 택배 송장번호" className={`mt-1 w-full ${INPUT}`} />
             </div>
           )}
 
-          {/* 8. 메모 (상태 칩은 5차에서 폐지 — stage 는 저장값 그대로 유지) */}
+          {/* 메모는 사유 칩 아래로 이동([A2]) — 하단 메모 칸 삭제. 다음 할 일은 저장값 있으면 회색으로만. */}
           {nextActionSaved ? <div className="mb-1 text-[13px] text-ink-mute">다음 할 일: {nextActionSaved}</div> : null}
-          <input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="메모" className={`w-full ${INPUT}`} />
 
           {isExchange ? (
             <button type="button" onClick={() => { setKindOverride("반품"); setMethod("계좌이체"); }} className="mt-3 text-[13px] font-bold text-ink-mute underline">재고 없으면 → 환불로 바꾸기</button>

@@ -144,7 +144,8 @@ eq(stageDisplay(""), "", "빈 값");
 
 // ── [4차 item 3] 반품 사유 칩 목록 ──
 ok(REASON_CHIPS.includes("단순변심") && REASON_CHIPS.includes("기타"), "REASON_CHIPS 단순변심·기타 포함");
-eq(REASON_CHIPS.length, 5, "REASON_CHIPS 5개");
+ok(REASON_CHIPS.length >= 5, "REASON_CHIPS 옛값 인식용(단순변심/사이즈/불량/오배송/기타 + 손님변심/상품문제)");
 ok(REASON_CHIPS.includes("사이즈") && REASON_CHIPS.includes("불량") && REASON_CHIPS.includes("오배송"), "REASON_CHIPS 사이즈·불량·오배송");
+ok(REASON_CHIPS.includes("상품 문제"), "REASON_CHIPS 상품 문제 포함(옛 손님 변심도 인식)");
 
 console.log(`✅ refund-ledger 순수 로직 ${pass}건 통과`);

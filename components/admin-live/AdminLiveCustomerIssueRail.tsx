@@ -14,6 +14,7 @@ import { supabase } from "@/lib/supabase";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { pickIssueProductRows } from "@/lib/issueProductLabel";
 import { RefundProcessModal, type LedgerDetail } from "./AdminLiveRefundLedgerPanel";
+import IssueRegisterModal, { type IssueRegisterSubmit } from "./IssueRegisterModal";
 import { productSnapshotFromItems, refundListButtonLabel, ledgerSummaryLine, pickPrimaryLedger, restoreSelectionFromSnapshot, listAmountLine, returnStagePrefix } from "@/lib/refundLedger";
 
 // [2026-09-26] refund_ledger 목록 요약 행(대표 선택·표시용). 같은 주문에 여러 개면 pickPrimaryLedger 로 1개.
@@ -64,14 +65,6 @@ type Props = {
 // [2026-09-23] 「지운 건」 탭 추가 — hide 는 DB 삭제가 아니라 status='deleted' 라 되살릴 수 있다.
 type IssueTab = "open" | "all" | "resolved" | "deleted";
 
-type IssueForm = {
-  nickname: string;
-  name: string;
-  phone: string;
-  taskTypes: string[];
-  priority: string;
-  memo: string;
-};
 
 // [2026-09-26] 고객이슈 표의 «단 하나의» grid 템플릿 — 머리글·모든 줄이 이 상수를 그대로 써서 칸이 어긋나지 않는다.
 const ISSUE_GRID = "grid-cols-[36px_76px_120px_88px_124px_112px_1fr_auto]";
@@ -110,10 +103,6 @@ const PRIORITY_OPTIONS: Array<[string, string]> = [
 
 function clean(value: unknown) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
-}
-
-function cleanCompact(value: unknown) {
-  return clean(value).replace(/\s+/g, "").toLowerCase();
 }
 
 function digitsOnly(value: unknown) {
@@ -683,17 +672,6 @@ function IssueCard({
   );
 }
 
-function emptyIssueForm(): IssueForm {
-  return {
-    nickname: "",
-    name: "",
-    phone: "",
-    taskTypes: ["general"],
-    priority: "normal",
-    memo: "",
-  };
-}
-
 export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Props) {
   const [activeTab, setActiveTab] = useState<IssueTab>("open");
   // [2026-09-23] 지운 직후 5초 동안 뜨는 «되돌리기» 띠. 놓쳐도 「지운 건」 탭에서 되살릴 수 있다.
@@ -717,9 +695,6 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   const [reloadKey, setReloadKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [showMemoAdd, setShowMemoAdd] = useState(false);
-  const [newIssueForm, setNewIssueForm] = useState<IssueForm>(() => emptyIssueForm());
-  const [customerSearchDraft, setCustomerSearchDraft] = useState("");
-  const [customerSearchKeyword, setCustomerSearchKeyword] = useState("");
   // [2026-09-21] 3 → 20. 카드가 세로로 길던 시절엔 3개도 화면을 다 먹었지만
   //   이제 한 줄짜리 표라 미해결 10건이 «한 페이지»에 다 들어간다(페이지 넘길 일이 없어진다).
   const issuePageSize = 20;
@@ -1290,40 +1265,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
   const [issuePhotoPreview, setIssuePhotoPreview] = useState("");
 
-  const customerSearchResults = useMemo(() => {
-    const keyword = cleanCompact(customerSearchKeyword || customerSearchDraft);
-
-    if (!keyword) return [];
-
-    return customerOptions
-      .filter((customer) => {
-        const haystack = cleanCompact(`${customer.nickname} ${customer.name} ${customer.phone} ${formatPhone(customer.phone)}`);
-
-        return haystack.includes(keyword);
-      })
-      .slice(0, 8);
-  }, [customerOptions, customerSearchDraft, customerSearchKeyword]);
-
-  const updateNewIssueForm = (patch: Partial<IssueForm>) => {
-    setNewIssueForm((current) => ({ ...current, ...patch }));
-  };
-
-  const selectCustomer = (customer: CustomerIssueCustomerOption) => {
-    updateNewIssueForm({
-      nickname: customer.nickname,
-      name: customer.name,
-      phone: customer.phone,
-    });
-    setCustomerSearchDraft(`${customer.nickname} ${customer.name} ${formatPhone(customer.phone)}`);
-    setCustomerSearchKeyword("");
-  };
-
-  const closeAdd = () => {
-    setShowMemoAdd(false);
-    setNewIssueForm(emptyIssueForm());
-    setCustomerSearchDraft("");
-    setCustomerSearchKeyword("");
-  };
+  const closeAdd = () => setShowMemoAdd(false);
 
   const openEdit = (task: AdminIssueTask) => {
     setEditingIssueTask(task);
@@ -1339,8 +1281,9 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     setEditingIssuePriority("normal");
   };
 
-  const saveIssueMemo = async () => {
-    const memo = cleanMultiline(newIssueForm.memo);
+  // 탭 「+ 고객이슈 등록」 제출 — IssueRegisterModal(orderContext 없음)에서 넘어온 폼으로 admin-tasks 생성(포인트 무접촉).
+  const saveIssueMemo = async (data: IssueRegisterSubmit) => {
+    const memo = cleanMultiline(data.memo);
 
     if (!memo) {
       showAdminToast("고객이슈 메모 내용을 입력해주세요.");
@@ -1350,10 +1293,10 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     setSaving(true);
 
     try {
-      const nickname = clean(newIssueForm.nickname);
-      const name = clean(newIssueForm.name);
-      const phone = clean(newIssueForm.phone);
-      const issueTypes = newIssueForm.taskTypes.length > 0 ? newIssueForm.taskTypes : ["general"];
+      const nickname = clean(data.nickname);
+      const name = clean(data.name);
+      const phone = clean(data.phone);
+      const issueTypes = data.taskTypes.length > 0 ? data.taskTypes : ["general"];
       const titleName = nickname || name || phone || "수동메모";
 
       const response = await fetch("/api/admin-v2/admin-tasks", {
@@ -1367,7 +1310,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           body: memo,
           customer_name: name,
           customer_nickname: nickname,
-          priority: newIssueForm.priority || "normal",
+          priority: data.priority || "normal",
           source: "admin-live-customers",
           raw_payload: {
             nickname,
@@ -1899,164 +1842,13 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
         </div>
       </div>
 
-      {showMemoAdd && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-ink-soft)]/35 px-4">
-          <div className="max-h-[92vh] w-full max-w-[620px] overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-[11px] font-black tracking-[0.18em] text-rose-deep">ADD CUSTOMER ISSUE</div>
-                <h3 className="mt-1 text-lg font-black text-ink">고객이슈 메모 추가</h3>
-              </div>
-
-              <button
-                type="button"
-                onClick={closeAdd}
-                className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2"
-              >
-                닫기
-              </button>
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-line bg-surface-2 p-3">
-              <div className="text-xs font-black text-ink">🤖 ChatGPT로 고객이슈 정리</div>
-              <button
-                type="button"
-                onClick={() => window.open("https://chatgpt.com/", "_blank", "noopener")}
-                className="mt-2 h-9 rounded-lg bg-rose-deep px-3 text-xs font-black text-white"
-              >
-                🤖 ChatGPT 열기
-              </button>
-              <div className="mt-1.5 text-[11px] font-bold leading-4 text-ink-mute">
-                ChatGPT 창에 카톡 대화를 붙여넣고 "손님 말만 골라 닉네임/이름/유형/내용으로 정리해줘"라고 하세요. 나온 결과를 아래 메모칸에 붙여넣으면 됩니다.
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <div className="text-xs font-black text-ink-soft">고객 검색</div>
-              <div className="mt-2 grid gap-2 md:grid-cols-[1fr_96px]">
-                <input
-                  value={customerSearchDraft}
-                  onChange={(event) => {
-                    setCustomerSearchDraft(event.target.value);
-                    setCustomerSearchKeyword("");
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      setCustomerSearchKeyword(customerSearchDraft);
-                    }
-                  }}
-                  placeholder="닉네임 / 이름 / 전화번호 검색"
-                  className="h-11 rounded-xl border border-line px-3 text-sm font-bold outline-none focus:border-info-tx/35 focus:ring-4 focus:ring-info-bg"
-                />
-
-                <button
-                  type="button"
-                  onClick={() => setCustomerSearchKeyword(customerSearchDraft)}
-                  className="h-11 rounded-xl bg-rose-deep px-3 text-sm font-black text-white transition hover:opacity-90"
-                >
-                  검색
-                </button>
-              </div>
-
-              <div className="mt-2 rounded-2xl border border-dashed border-line bg-surface-2 p-2">
-                {!clean(customerSearchDraft) ? (
-                  <div className="px-3 py-4 text-center text-xs font-black text-ink-mute">
-                    닉네임·이름·전화번호를 검색하면 고객 추천이 표시됩니다.
-                  </div>
-                ) : customerSearchResults.length === 0 ? (
-                  <div className="px-3 py-4 text-center text-xs font-black text-ink-mute">
-                    검색 결과가 없습니다. 직접 입력도 가능합니다.
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    {customerSearchResults.map((customer) => (
-                      <button
-                        key={customer.key}
-                        type="button"
-                        onClick={() => selectCustomer(customer)}
-                        className="grid w-full grid-cols-[1fr_auto] gap-2 rounded-xl bg-surface px-3 py-2 text-left text-xs font-bold text-ink-soft hover:bg-rose-soft"
-                      >
-                        <span className="min-w-0 truncate">
-                          <b className="text-ink">{customer.nickname || "-"}</b> · {customer.name || "-"}
-                        </span>
-                        <span className="font-black text-rose-deep">{formatPhone(customer.phone)}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-2 md:grid-cols-3">
-              <input
-                value={newIssueForm.nickname}
-                onChange={(event) => updateNewIssueForm({ nickname: event.target.value })}
-                placeholder="닉네임"
-                className="h-11 rounded-xl border border-line px-3 text-sm font-bold outline-none focus:border-info-tx/35 focus:ring-4 focus:ring-info-bg"
-              />
-              <input
-                value={newIssueForm.name}
-                onChange={(event) => updateNewIssueForm({ name: event.target.value })}
-                placeholder="이름"
-                className="h-11 rounded-xl border border-line px-3 text-sm font-bold outline-none focus:border-info-tx/35 focus:ring-4 focus:ring-info-bg"
-              />
-              <input
-                value={newIssueForm.phone}
-                onChange={(event) => updateNewIssueForm({ phone: event.target.value })}
-                placeholder="전화번호"
-                className="h-11 rounded-xl border border-line px-3 text-sm font-bold outline-none focus:border-info-tx/35 focus:ring-4 focus:ring-info-bg"
-              />
-            </div>
-
-            <div className="mt-4">
-              <div className="mb-2 text-xs font-black text-ink-soft">유형 (여러 개 선택 가능)</div>
-              <IssueTypeChips
-                value={newIssueForm.taskTypes}
-                onChange={(nextValue) => updateNewIssueForm({ taskTypes: nextValue })}
-              />
-            </div>
-
-            <div className="mt-3">
-              <select
-                value={newIssueForm.priority}
-                onChange={(event) => updateNewIssueForm({ priority: event.target.value })}
-                className="h-11 w-full rounded-xl border border-line px-3 text-sm font-black text-ink outline-none focus:border-info-tx/35 focus:ring-4 focus:ring-info-bg"
-              >
-                {PRIORITY_OPTIONS.map(([value, label]) => (
-                  <option key={value} value={value}>
-                    우선순위: {label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <textarea
-              value={newIssueForm.memo}
-              onChange={(event) => updateNewIssueForm({ memo: event.target.value })}
-              placeholder="고객이슈 내용을 입력하세요."
-              className="mt-3 min-h-[180px] w-full resize-none rounded-2xl border border-line p-3 text-sm font-bold leading-6 outline-none focus:border-info-tx/35 focus:ring-4 focus:ring-info-bg"
-            />
-
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={closeAdd}
-                className="h-11 rounded-xl border border-line bg-surface text-sm font-black text-ink-soft hover:bg-surface-2"
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={saveIssueMemo}
-                disabled={saving}
-                className="h-11 rounded-xl bg-rose-deep text-sm font-black text-white hover:opacity-90 disabled:opacity-50"
-              >
-                저장
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <IssueRegisterModal
+        open={showMemoAdd}
+        onClose={closeAdd}
+        saving={saving}
+        customerOptions={customerOptions}
+        onSubmit={saveIssueMemo}
+      />
 
       {editingIssueTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-ink-soft)]/35 px-4">

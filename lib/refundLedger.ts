@@ -24,17 +24,20 @@ export function stageDisplay(stage: unknown, kind?: unknown): string {
   return s;
 }
 
-// [2026-09-27] 반품 사유 = 귀책 2칩. reason 필드에 "손님 변심" / "상품 문제" 저장(전자상거래법 18조 — 변심은 소비자 반품비 부담).
-export const REASON_CHIPS = ["단순변심", "사이즈", "불량", "오배송", "기타"] as const; // (옛 데이터 인식용)
+// [2026-09-27] 반품 사유 = 3칩. reason 필드에 "단순변심" / "상품 문제" / "기타" 저장(전자상거래법 18조 — 변심은 소비자 반품비 부담).
+export const REASON_CHIPS = ["단순변심", "사이즈", "불량", "오배송", "기타", "손님 변심", "상품 문제"] as const; // (옛 데이터 인식용)
 export const REASON_FAULT_CHIPS = [
-  { value: "손님 변심", sub: "단순변심·사이즈" },
+  { value: "단순변심", sub: "" },
   { value: "상품 문제", sub: "불량·오배송" },
+  { value: "기타", sub: "" },
 ] as const;
-// 저장된 reason → 2칩 매핑. 매칭 안 되면 ""(미선택) — 메모성 긴 값은 그대로 둠.
-export function reasonChipFromStored(reason: unknown): "손님 변심" | "상품 문제" | "" {
+export type ReasonChip = "단순변심" | "상품 문제" | "기타" | "";
+// 저장된 reason → 3칩 매핑. 매칭 안 되면 ""(미선택) — 메모성 긴 값은 그대로 둠.
+export function reasonChipFromStored(reason: unknown): ReasonChip {
   const r = String(reason ?? "").trim();
-  if (r === "손님 변심" || r === "단순변심" || r === "사이즈") return "손님 변심";
+  if (r === "단순변심" || r === "손님 변심" || r === "사이즈") return "단순변심";
   if (r === "상품 문제" || r === "불량" || r === "오배송") return "상품 문제";
+  if (r === "기타") return "기타";
   return "";
 }
 
