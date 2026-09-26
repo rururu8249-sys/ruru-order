@@ -13,17 +13,22 @@ insert into public.refund_ledger
   (admin_task_id, kind, stage, reason, product_snapshot, nickname, customer_name, amount_base, amount_final, method)
 select
   t.id::text                                                   as admin_task_id,
-  case
-    when lower(coalesce(t.task_type,'')) = 'exchange'  then '교환'
-    when lower(coalesce(t.task_type,'')) like '%재발송%' then '재발송'
-    else '반품'
-  end                                                          as kind,
+  case when lower(coalesce(t.task_type,'')) = 'exchange' then '교환' else '반품' end as kind,
   case
     when lower(coalesce(t.status,'')) = 'done'    then '완료'
     when lower(coalesce(t.status,'')) = 'deleted' then '거절·취소'
     else '접수'
   end                                                          as stage,
-  left(coalesce(t.body, t.title, ''), 2000)                    as reason,
+  -- reason 은 고객이슈 «메모 본문»만 (자동날짜/이슈유형/닉네임 등 머리말 제거 — lib/issueBodyMeta.splitIssueBody 와 같은 규칙)
+  left(coalesce((
+    select string_agg(m, E'\n') from (
+      select regexp_replace(btrim(l), '^(내용|메모)\s*:\s*', '') as m
+      from unnest(regexp_split_to_array(replace(coalesce(t.body, t.title, ''), E'\r\n', E'\n'), E'\n')) as l
+      where btrim(l) <> ''
+        and btrim(l) !~ '^(자동날짜|이슈유형|닉네임|이름|전화번호|고객ID|수정날짜|주문내용|주문번호|대상상품):'
+    ) s
+    where m <> ''
+  ), ''), 2000)                                                as reason,
   coalesce(t.raw_payload -> 'items', '[]'::jsonb)              as product_snapshot,
   t.customer_nickname                                          as nickname,
   t.customer_name                                              as customer_name,
@@ -32,6 +37,8 @@ select
   '없음'                                                        as method
 from public.admin_tasks t
 where coalesce(t.source, '') = 'order_return_flow'
+  -- [2026-09-26] general 은 제외 — 교환/반품만 장부로. (general 5건이 「반품」으로 잘못 들어갔던 것 방지)
+  and lower(coalesce(t.task_type, '')) in ('exchange', 'refund')
 on conflict (admin_task_id) do nothing;
 
 -- 이전 결과 확인

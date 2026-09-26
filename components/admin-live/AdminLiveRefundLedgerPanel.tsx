@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { showAdminToast } from "@/lib/adminToast";
+import { splitIssueBody } from "@/lib/issueBodyMeta";
 import {
   REFUND_STAGES,
   REFUND_KINDS,
@@ -48,6 +49,9 @@ type LedgerDetail = LedgerListRow & {
 
 const won = (n: unknown) => `${(Math.round(Number(n)) || 0).toLocaleString("ko-KR")}원`;
 const clean = (v: unknown) => String(v ?? "").trim();
+// [2026-09-26] 이전 초판이 reason 에 고객이슈 머리말(자동날짜/이슈유형/닉네임…)을 통째로 넣은 건 방어 —
+//   화면·엑셀엔 «메모 본문»만 보인다. (DB 값은 안 건드림. fix_reason SQL 실행 후엔 이미 본문만 남음)
+const reasonBody = (v: unknown) => { const memo = splitIssueBody(v).memo; return memo || clean(v); };
 
 function formatDateTime(value: unknown) {
   const raw = clean(value);
@@ -182,7 +186,7 @@ export default function AdminLiveRefundLedgerPanel({ focusTaskId }: { focusTaskI
       const dt = formatDateTime(r.created_at);
       const created = typeof dt === "string" ? dt : `${dt.line1} ${dt.line2}`;
       const phone4 = clean(r.customer_phone).slice(-4);
-      return [created, clean(r.nickname) || clean(r.customer_name), phone4, r.kind, r.stage, productText(r.product_snapshot), clean(r.reason).replace(/\n/g, " "), r.amount_final, r.method, clean(r.account_last4), clean(r.transferred_at), clean(r.done_at)].map(esc).join(",");
+      return [created, clean(r.nickname) || clean(r.customer_name), phone4, r.kind, r.stage, productText(r.product_snapshot), reasonBody(r.reason).replace(/\n/g, " "), r.amount_final, r.method, clean(r.account_last4), clean(r.transferred_at), clean(r.done_at)].map(esc).join(",");
     });
     const csv = "﻿" + [header.map(esc).join(","), ...body].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -273,7 +277,7 @@ export default function AdminLiveRefundLedgerPanel({ focusTaskId }: { focusTaskI
                   </button>
                   <div className="min-w-0">
                     <span className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-black ${KIND_COLOR[r.kind] || "bg-surface-2 text-ink-soft"}`}>{r.kind}</span>
-                    <div className="truncate text-[11px] text-ink-soft" title={clean(r.reason)}>{clean(r.reason).split("\n")[0] || "-"}</div>
+                    <div className="truncate text-[11px] text-ink-soft" title={reasonBody(r.reason)}>{reasonBody(r.reason).split("\n")[0] || "-"}</div>
                   </div>
                   <div className="min-w-0">
                     <span className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-black ${STAGE_COLOR[r.stage] || "bg-surface-2 text-ink-soft"}`}>{r.stage}</span>
