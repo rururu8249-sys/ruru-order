@@ -43,6 +43,28 @@ export function isCombinedShipmentPeer(mine: CombinePeerSelf, other: CombinePeer
   return Boolean((mine.broadcast && String(other.broadcast ?? "") === mine.broadcast) || (mine.day && String(other.day ?? "") === mine.day));
 }
 
+// [2026-09-26] 같은 주문에 환불 기록이 여러 개면 «대표» 1개 선택(이중 이체 방지).
+//   ①계좌번호/카드취소 정보가 있는 것 우선 → ②가장 최근 updated_at(없으면 created_at). 순수 함수.
+export function ledgerHasPayoutInfo(r: Record<string, unknown> | null | undefined): boolean {
+  if (!r) return false;
+  if (String(r.method ?? "") === "카드취소") return true;
+  return !!String(r.account_number ?? "").trim() || !!String(r.account_last4 ?? "").trim();
+}
+export function pickPrimaryLedger<T extends Record<string, unknown>>(rows: T[] | null | undefined): T | null {
+  const list = Array.isArray(rows) ? rows.filter(Boolean) : [];
+  if (list.length === 0) return null;
+  const ts = (r: Record<string, unknown>) => {
+    const t = Date.parse(String(r.updated_at ?? r.created_at ?? ""));
+    return Number.isNaN(t) ? 0 : t;
+  };
+  return [...list].sort((a, b) => {
+    const aa = ledgerHasPayoutInfo(a) ? 1 : 0;
+    const bb = ledgerHasPayoutInfo(b) ? 1 : 0;
+    if (aa !== bb) return bb - aa; // 계좌/카드 정보 있는 것 우선
+    return ts(b) - ts(a); // 그다음 최근 updated_at
+  })[0];
+}
+
 // [2026-09-26 카드 단순화] 카드 「다시 받을 돈」 = 차감 + 남기는 상품값(부분반품). 전체반품이면 남기는 상품=0 → 차감 그대로.
 //   ⚠️ «총액 − amount_final» 역산이 아니다(옛 저장 base 값에 오염되던 버그 방지).
 export function cardRefundBackAmount(deductTotal: unknown, keptProductTotal: unknown): number {

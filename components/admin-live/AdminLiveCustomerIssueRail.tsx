@@ -14,7 +14,15 @@ import { supabase } from "@/lib/supabase";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { pickIssueProductRows } from "@/lib/issueProductLabel";
 import { RefundProcessModal, type LedgerDetail } from "./AdminLiveRefundLedgerPanel";
-import { productSnapshotFromItems, refundListButtonLabel, ledgerSummaryLine } from "@/lib/refundLedger";
+import { productSnapshotFromItems, refundListButtonLabel, ledgerSummaryLine, pickPrimaryLedger } from "@/lib/refundLedger";
+
+// [2026-09-26] refund_ledger 목록 요약 행(대표 선택·표시용). 같은 주문에 여러 개면 pickPrimaryLedger 로 1개.
+type LedgerRow = {
+  id: string; admin_task_id: string; order_lookup_code: string; created_at: string; updated_at: string;
+  stage: string; kind: string; amount_final: number; method: string; done_at: string;
+  bank: string; account_holder: string; exchange_option: string; account_number: string; account_last4: string;
+  card_total: number; adjustments: Array<{ label: string; amount: number }>;
+};
 import { bankDisplayName } from "@/lib/parseBankAccount";
 import { ISSUE_FILTER_CHIPS, matchesIssueFilterChip, issueRawTypes } from "@/lib/issueFilter";
 
@@ -368,6 +376,8 @@ function IssueCard({
   photos = [],
   onPhotoZoom,
   ledgerInfo = null,
+  isRepresentativeIssue = false,
+  repIssueDate = "",
   amountText = "",
   onOpenRefund,
 }: {
@@ -392,6 +402,10 @@ function IssueCard({
   onPhotoZoom?: (url: string) => void;
   /** [2026-09-26] 교환·환불 건의 장부 요약(있을 때만). 진행단계·최종환불액·방법. */
   ledgerInfo?: { stage?: string; kind?: string; amount_final?: number; method?: string; done_at?: string; bank?: string; account_holder?: string; exchange_option?: string; account_number?: string; account_last4?: string; card_total?: number; adjustments?: Array<{ label: string; amount: number }> } | null;
+  /** [2026-09-26] 이 이슈가 주문의 «대표» 환불 기록인가(대표만 금액 요약, 나머지는 「같은 주문 처리 중」). */
+  isRepresentativeIssue?: boolean;
+  /** 대표 기록(대표 이슈) 등록일 — 다른 이슈 줄의 「M/D 이슈에서 처리 중」 표기용. */
+  repIssueDate?: string;
   /** [2026-09-26] 목록 「단가 × 수량」(매칭 성공 시). 교환/반품/환불 건에만. */
   amountText?: string;
   /** [2026-09-26] 「환불 처리」 — 처리 창 열기(교환/반품/환불 건에만). */
@@ -410,8 +424,14 @@ function IssueCard({
   // [2026-09-26 5차] 버튼 글자 — 교환만 「교환하기」, 반품/환불 「환불하기」(순수 함수, 기록·단계 무관)
   const _rawTypes = issueRawTypes(task);
   const refundBtnLabel = refundListButtonLabel(_rawTypes);
-  // [2026-09-26 5차] 💳 요약 — 사람말로(순수 함수). 값 있을 때만. 은행은 전체이름, 계좌번호는 표시 안 함.
-  const ledgerLine = isRefund ? ledgerSummaryLine(ledgerInfo, bankDisplayName(clean(ledgerInfo?.bank))) : "";
+  // [2026-09-26] 💳 요약 — 대표 이슈만 금액. 같은 주문의 다른 이슈는 「같은 주문 — M/D 이슈에서 처리 중」.
+  const ledgerLine = (() => {
+    if (!isRefund || !ledgerInfo) return "";
+    if (isRepresentativeIssue) return ledgerSummaryLine(ledgerInfo, bankDisplayName(clean(ledgerInfo?.bank)));
+    const d = new Date(String(repIssueDate).includes("T") ? String(repIssueDate) : String(repIssueDate).replace(" ", "T"));
+    const md = Number.isNaN(d.getTime()) ? "" : `${d.getMonth() + 1}/${d.getDate()}`;
+    return `같은 주문 — ${md ? `${md} ` : ""}이슈에서 처리 중`;
+  })();
   // 반품/교환 등록으로 만들어진 건인가 — 지울 때 포인트·반품기록까지 되돌려야 한다
   const fromReturn = clean((task as { source?: unknown }).source) === "order_return_flow";
   const issueTypes = getIssueTypes(task);
@@ -816,28 +836,45 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   const selectWholeTab = () => setSelectedIds(new Set(filteredIds));
 
   // ── [2026-09-26] 교환·환불 장부(고객이슈 안에서 처리) ──
-  //   현재 페이지의 교환/반품/환불 줄들의 refund_ledger 요약을 «한 번에» 묶어 조회(줄마다 개별 조회 금지).
-  const [ledgerByTask, setLedgerByTask] = useState<Record<string, { id: string; stage: string; kind: string; amount_final: number; method: string; done_at: string; bank: string; account_holder: string; exchange_option: string; account_number: string; account_last4: string; card_total: number; adjustments: Array<{ label: string; amount: number }> }>>({});
+  //   같은 주문(order_lookup_code)의 refund_ledger 는 «주문번호»로 묶어 조회 → 대표 1개로 표시(이중 이체 방지).
+  const [ledgerByOrder, setLedgerByOrder] = useState<Record<string, LedgerRow[]>>({});
   const [refundReloadTick, setRefundReloadTick] = useState(0);
   const [refundModalItem, setRefundModalItem] = useState<LedgerDetail | null>(null);
-  const refundPageIdsKey = pageTasks.filter(isRefundKindTask).map((t) => clean(t.id)).filter(Boolean).sort().join(",");
+  const [refundModalMeta, setRefundModalMeta] = useState<{ openedFromOther: boolean; repDate: string; linkedIssueCount: number }>({ openedFromOther: false, repDate: "", linkedIssueCount: 1 });
+  const refundOrderCodesKey = Array.from(new Set(pageTasks.filter(isRefundKindTask).map((t) => extractBodyField(t, "주문번호:")).filter(Boolean))).sort().join(",");
   useEffect(() => {
     let alive = true;
-    const ids = refundPageIdsKey ? refundPageIdsKey.split(",") : [];
-    if (ids.length === 0) { setLedgerByTask({}); return; }
+    const codes = refundOrderCodesKey ? refundOrderCodesKey.split(",") : [];
+    if (codes.length === 0) { setLedgerByOrder({}); return; }
     (async () => {
-      const res = await fetch(`/api/admin-live/refund-ledger?taskIds=${encodeURIComponent(ids.join(","))}`, { cache: "no-store" });
+      const res = await fetch(`/api/admin-live/refund-ledger?orderCodes=${encodeURIComponent(codes.join(","))}`, { cache: "no-store" });
       const p = await res.json().catch(() => null);
       if (!alive || !p?.ok) return;
-      const map: Record<string, { id: string; stage: string; kind: string; amount_final: number; method: string; done_at: string; bank: string; account_holder: string; exchange_option: string; account_number: string; account_last4: string; card_total: number; adjustments: Array<{ label: string; amount: number }> }> = {};
+      const map: Record<string, LedgerRow[]> = {};
       for (const r of (p.items || []) as Array<Record<string, unknown>>) {
-        const tid = clean(r.admin_task_id);
-        if (tid) map[tid] = { id: String(r.id), stage: String(r.stage ?? ""), kind: String(r.kind ?? ""), amount_final: Number(r.amount_final) || 0, method: String(r.method ?? ""), done_at: String(r.done_at ?? ""), bank: String(r.bank ?? ""), account_holder: String(r.account_holder ?? ""), exchange_option: String(r.exchange_option ?? ""), account_number: String(r.account_number ?? ""), account_last4: String(r.account_last4 ?? ""), card_total: Number(r.card_total) || 0, adjustments: Array.isArray(r.adjustments) ? r.adjustments : [] };
+        const code = clean(r.order_lookup_code);
+        if (!code) continue;
+        (map[code] || (map[code] = [])).push({
+          id: String(r.id), admin_task_id: clean(r.admin_task_id), order_lookup_code: code,
+          created_at: String(r.created_at ?? ""), updated_at: String(r.updated_at ?? ""),
+          stage: String(r.stage ?? ""), kind: String(r.kind ?? ""), amount_final: Number(r.amount_final) || 0,
+          method: String(r.method ?? ""), done_at: String(r.done_at ?? ""), bank: String(r.bank ?? ""),
+          account_holder: String(r.account_holder ?? ""), exchange_option: String(r.exchange_option ?? ""),
+          account_number: String(r.account_number ?? ""), account_last4: String(r.account_last4 ?? ""),
+          card_total: Number(r.card_total) || 0, adjustments: Array.isArray(r.adjustments) ? (r.adjustments as Array<{ label: string; amount: number }>) : [],
+        });
       }
-      setLedgerByTask(map);
+      setLedgerByOrder(map);
     })().catch(() => { /* 실패해도 목록은 정상, 요약만 생략 */ });
     return () => { alive = false; };
-  }, [refundPageIdsKey, refundReloadTick]);
+  }, [refundOrderCodesKey, refundReloadTick]);
+
+  // 주문번호별 «대표» 기록(계좌 있는 것 우선·최근순). 목록·처리창·복사·완료가 모두 이걸 쓴다.
+  const primaryByOrder = useMemo(() => {
+    const out: Record<string, LedgerRow | null> = {};
+    for (const code of Object.keys(ledgerByOrder)) out[code] = pickPrimaryLedger(ledgerByOrder[code]);
+    return out;
+  }, [ledgerByOrder]);
 
   // [2026-09-26] 목록 줄합계 — 주문번호가 있는 «모든» 페이지 줄의 주문 상품을 «주문번호로 한 번에» 조회(행마다 쿼리 금지).
   //   금액 = 매칭된 줄들의 줄합계(submitRowLineTotal 서버 계산) 합. 매칭 실패 시 생략(칸 비움).
@@ -874,14 +911,38 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageOrderCodesKey]);
 
+  // 같은 주문의 «열린» 환불/교환 이슈 수(완료 시 함께 해결완료할 대상). 페이지 기준.
+  const openIssueCountForOrder = (orderCode: string) =>
+    !orderCode ? 1 : Math.max(1, pageTasks.filter((t) => isRefundKindTask(t) && !isResolved(t) && clean(t.status).toLowerCase() !== "deleted" && extractBodyField(t, "주문번호:") === orderCode).length);
+
   const openRefund = async (task: AdminIssueTask) => {
     const tid = clean(task.id);
-    const existing = ledgerByTask[tid];
-    if (existing?.id) {
+    const orderCode = extractBodyField(task, "주문번호:");
+    const primary = orderCode ? primaryByOrder[orderCode] : null;
+    const siblings = orderCode ? (ledgerByOrder[orderCode] || []) : [];
+    const linkedIssueCount = openIssueCountForOrder(orderCode);
+    // 같은 주문에 이미 기록이 있으면 «대표»를 열어 편집(새 기록 생성 금지, 이중 이체 방지).
+    if (primary?.id) {
       try {
-        const res = await fetch(`/api/admin-live/refund-ledger?id=${encodeURIComponent(existing.id)}`, { cache: "no-store" });
+        const res = await fetch(`/api/admin-live/refund-ledger?id=${encodeURIComponent(primary.id)}`, { cache: "no-store" });
         const p = await res.json().catch(() => null);
-        if (p?.ok) { setRefundModalItem(p.item as LedgerDetail); return; }
+        if (p?.ok) {
+          const item = { ...(p.item as LedgerDetail) };
+          // 대표에 없는 계좌·차감 값을 형제 기록에서 보충(저장 눌러야 반영).
+          const acctSib = siblings.find((s) => clean(s.id) !== clean(item.id) && (clean(s.account_number) || clean(s.bank)));
+          if (acctSib) {
+            if (!clean(item.bank)) item.bank = acctSib.bank;
+            if (!clean(item.account_number)) item.account_number = acctSib.account_number;
+            if (!clean(item.account_holder)) item.account_holder = acctSib.account_holder;
+          }
+          if ((!Array.isArray(item.adjustments) || item.adjustments.length === 0)) {
+            const adjSib = siblings.find((s) => clean(s.id) !== clean(item.id) && Array.isArray(s.adjustments) && s.adjustments.length > 0);
+            if (adjSib) item.adjustments = adjSib.adjustments;
+          }
+          setRefundModalItem(item);
+          setRefundModalMeta({ openedFromOther: clean(primary.admin_task_id) !== tid, repDate: clean(primary.created_at), linkedIssueCount });
+          return;
+        }
       } catch { /* fallthrough */ }
       showAdminToast("장부 항목을 불러오지 못했습니다.", "error");
       return;
@@ -902,42 +963,51 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       nickname: getNickname(task),
       customer_name: getName(task),
       customer_phone: getPhone(task),
-      order_lookup_code: extractBodyField(task, "주문번호:"),
+      order_lookup_code: orderCode,
       reason: splitIssueBody(task.body).memo,
     });
+    setRefundModalMeta({ openedFromOther: false, repDate: "", linkedIssueCount });
   };
 
-  // 이체 목록 복사 — 선택 건 중 계좌이체·금액 있는 건만. 전체 계좌번호는 이때만 서버에서.
-  const copyTransferListBulk = async () => {
+  // 주문번호 묶음 → 그 주문들의 «대표» 기록만(주문당 1줄). 이중 이체 방지.
+  const fetchPrimariesForSelected = async (): Promise<Array<Record<string, unknown>>> => {
     const refundSel = selectedTasks.filter(isRefundKindTask);
-    if (refundSel.length === 0) { showAdminToast("선택한 교환·환불 건이 없어요."); return; }
-    const idsParam = refundSel.map((t) => clean(t.id)).filter(Boolean).join(",");
-    const listRes = await fetch(`/api/admin-live/refund-ledger?taskIds=${encodeURIComponent(idsParam)}`, { cache: "no-store" });
-    const listPayload = await listRes.json().catch(() => null);
-    const rows = (listPayload?.ok ? listPayload.items : []) as Array<Record<string, unknown>>;
-    const targets = rows.filter((r) => String(r.method) === "계좌이체" && (Number(r.amount_final) || 0) > 0);
+    const codes = Array.from(new Set(refundSel.map((t) => extractBodyField(t, "주문번호:")).filter(Boolean)));
+    if (codes.length === 0) return [];
+    const res = await fetch(`/api/admin-live/refund-ledger?orderCodes=${encodeURIComponent(codes.join(","))}`, { cache: "no-store" });
+    const p = await res.json().catch(() => null);
+    const rows = (p?.ok ? p.items : []) as Array<Record<string, unknown>>;
+    const byOrder: Record<string, Array<Record<string, unknown>>> = {};
+    for (const r of rows) { const c = clean(r.order_lookup_code); if (c) (byOrder[c] || (byOrder[c] = [])).push(r); }
+    return codes.map((c) => pickPrimaryLedger(byOrder[c])).filter((r): r is Record<string, unknown> => !!r);
+  };
+
+  // 이체 목록 복사 — 대표 기록 중 계좌이체·금액 있는 건만(주문당 1줄). 전체 계좌번호는 copyIds 1회.
+  const copyTransferListBulk = async () => {
+    if (selectedTasks.filter(isRefundKindTask).length === 0) { showAdminToast("선택한 교환·환불 건이 없어요."); return; }
+    const primaries = await fetchPrimariesForSelected();
+    const targets = primaries.filter((r) => String(r.method) === "계좌이체" && (Number(r.amount_final) || 0) > 0);
     if (targets.length === 0) { showAdminToast("계좌이체·금액이 있는 선택 건이 없어요."); return; }
-    const lines: string[] = [];
-    for (const r of targets) {
-      const res = await fetch(`/api/admin-live/refund-ledger?id=${encodeURIComponent(String(r.id))}`, { cache: "no-store" });
-      const p = await res.json().catch(() => null);
-      const d = p?.ok ? (p.item as LedgerDetail) : null;
-      const holder = clean(d?.account_holder) || clean(r.customer_name) || clean(r.nickname);
-      lines.push([clean(d?.bank), clean(d?.account_number), holder, `${(Number(r.amount_final) || 0).toLocaleString("ko-KR")}원`].filter(Boolean).join(" "));
-    }
+    const detailById: Record<string, LedgerDetail> = {};
+    try {
+      const dRes = await fetch(`/api/admin-live/refund-ledger?copyIds=${encodeURIComponent(targets.map((r) => String(r.id)).join(","))}`, { cache: "no-store" });
+      const dP = await dRes.json().catch(() => null);
+      if (dP?.ok) for (const d of (dP.items as LedgerDetail[]) || []) detailById[clean(d.id)] = d;
+    } catch { /* 실패해도 뒷4자리 없는 대로 */ }
+    const lines = targets.map((r) => {
+      const d = detailById[clean(r.id)] || null;
+      const holder = clean(d?.account_holder) || clean(r.account_holder) || clean(r.customer_name) || clean(r.nickname);
+      return [clean(d?.bank) || clean(r.bank), clean(d?.account_number), holder, `${(Number(r.amount_final) || 0).toLocaleString("ko-KR")}원`].filter(Boolean).join(" ");
+    });
     const textOut = lines.join("\n");
     try { await navigator.clipboard.writeText(textOut); showAdminToast(`이체 목록 ${targets.length}건 복사했어요 (은행 계좌 예금주 금액)`, "success"); }
     catch { showAdminToast("복사 실패 — 직접 복사하세요:\n\n" + textOut, "warning"); }
   };
 
-  // 엑셀(CSV) — 계좌는 뒷4자리만.
+  // 엑셀(CSV) — 대표 기록만(주문당 1줄), 계좌는 뒷4자리만.
   const downloadRefundExcel = async () => {
-    const refundSel = selectedTasks.filter(isRefundKindTask);
-    if (refundSel.length === 0) { showAdminToast("선택한 교환·환불 건이 없어요."); return; }
-    const idsParam = refundSel.map((t) => clean(t.id)).filter(Boolean).join(",");
-    const res = await fetch(`/api/admin-live/refund-ledger?taskIds=${encodeURIComponent(idsParam)}`, { cache: "no-store" });
-    const p = await res.json().catch(() => null);
-    const rows = (p?.ok ? p.items : []) as Array<Record<string, unknown>>;
+    if (selectedTasks.filter(isRefundKindTask).length === 0) { showAdminToast("선택한 교환·환불 건이 없어요."); return; }
+    const rows = await fetchPrimariesForSelected();
     if (rows.length === 0) { showAdminToast("장부에 기록된 선택 건이 없어요(처리 전이면 먼저 「환불 처리」).", "warning"); return; }
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const header = ["접수일", "고객", "전화뒷4", "구분", "단계", "최종환불액", "방법", "계좌뒷4", "이체일", "완료일"];
@@ -1766,7 +1836,9 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               onUnresolve={(t) => { void restoreIssueTask(t, true).then((ok) => { if (ok) showAdminToast("미해결로 되돌렸습니다.", "success"); }); }}
               onPurge={purgeIssueTask}
               busy={saving}
-              ledgerInfo={ledgerByTask[clean(task.id)] || null}
+              ledgerInfo={primaryByOrder[extractBodyField(task, "주문번호:")] || null}
+              isRepresentativeIssue={(() => { const pr = primaryByOrder[extractBodyField(task, "주문번호:")]; return !!pr && clean(pr.admin_task_id) === clean(task.id); })()}
+              repIssueDate={(primaryByOrder[extractBodyField(task, "주문번호:")]?.created_at) || ""}
               amountText={amountByTask[clean(task.id)] || ""}
               onOpenRefund={openRefund}
             />
@@ -1778,15 +1850,28 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       {refundModalItem ? (
         <RefundProcessModal
           item={refundModalItem}
+          openedFromOtherIssue={refundModalMeta.openedFromOther}
+          repIssueDate={refundModalMeta.repDate}
+          linkedIssueCount={refundModalMeta.linkedIssueCount}
           onClose={() => setRefundModalItem(null)}
           onSaved={() => { setRefundModalItem(null); setRefundReloadTick((v) => v + 1); setReloadKey((v) => v + 1); window.dispatchEvent(new Event("ruru-admin-task-updated")); }}
-          onCompleted={async (taskId) => {
-            // 환불/교환 완료 → 같은 이슈를 해결완료(상태값만 변경, 포인트/주문/입금 부수효과 없음 — 확인 완료)
-            try {
-              const res = await fetch("/api/admin-v2/admin-tasks", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: taskId, action: "resolve", resolved_note: "환불/교환 처리 완료(장부)" }) });
-              const p = await res.json().catch(() => null);
-              return !!(res.ok && p?.ok);
-            } catch { return false; }
+          onCompleted={async () => {
+            // 환불/교환 완료 → 같은 «주문»의 열린 이슈 전부 해결완료(상태값만 변경, 부수효과 없음 — 4차 확인).
+            const code = clean((refundModalItem as LedgerDetail).order_lookup_code);
+            const targets = code
+              ? pageTasks.filter((t) => isRefundKindTask(t) && !isResolved(t) && clean(t.status).toLowerCase() !== "deleted" && extractBodyField(t, "주문번호:") === code).map((t) => clean(t.id)).filter(Boolean)
+              : [clean((refundModalItem as LedgerDetail).admin_task_id)].filter(Boolean);
+            const ids = Array.from(new Set(targets));
+            if (ids.length === 0) return true;
+            let allOk = true;
+            for (const id of ids) {
+              try {
+                const res = await fetch("/api/admin-v2/admin-tasks", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, action: "resolve", resolved_note: "환불/교환 처리 완료(장부)" }) });
+                const p = await res.json().catch(() => null);
+                if (!(res.ok && p?.ok)) allOk = false;
+              } catch { allOk = false; }
+            }
+            return allOk;
           }}
         />
       ) : null}

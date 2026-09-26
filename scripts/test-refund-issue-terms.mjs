@@ -1,5 +1,5 @@
 // [2026-09-26 5·6차] 고객이슈 환불/교환 용어·💳 요약 문구 테스트
-import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, cardRefundBackAmount } from "../lib/refundLedger.ts";
+import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, cardRefundBackAmount, pickPrimaryLedger, ledgerHasPayoutInfo } from "../lib/refundLedger.ts";
 import { bankDisplayName } from "../lib/parseBankAccount.ts";
 
 let pass = 0;
@@ -121,5 +121,33 @@ eq(cardRefundBackAmount(0, 100000), 100000, "부분반품 차감0 → 남기는 
 
 // 배송비 = adjusted_shipping_fee ?? shipping_fee (주문상세 getGroupShippingFee 규칙). base 포함 확인.
 eq(computeRefundBase([{ lineTotal: 79000, qty: 1, unit: 79000, selectedQty: 1 }], true, 4000), 83000, "상품+배송비=83,000");
+
+// ── [묶기] 같은 주문 대표 기록 선택(pickPrimaryLedger) ──
+function ok2(c, m) { if (!c) throw new Error(m); pass++; }
+ok2(pickPrimaryLedger([]) === null, "빈 목록 → null");
+ok2(pickPrimaryLedger(null) === null, "null → null");
+// 계좌 있는 쪽 우선(9/19 계좌 vs 9/23 계좌없음·최근)
+{ const a = { id: "A", account_number: "12345678", updated_at: "2026-09-19T07:03:00", amount_final: 69000 };
+  const b = { id: "B", account_number: "", account_last4: "", updated_at: "2026-09-23T07:50:00", amount_final: 73000 };
+  eq(pickPrimaryLedger([b, a]).id, "A", "계좌 있는 쪽(9/19) 우선"); }
+// 둘 다 계좌 있으면 최근 updated_at
+{ const a = { id: "A", account_number: "111", updated_at: "2026-09-19T00:00:00" };
+  const b = { id: "B", account_number: "222", updated_at: "2026-09-23T00:00:00" };
+  eq(pickPrimaryLedger([a, b]).id, "B", "둘 다 계좌 → 최근 updated_at"); }
+// 둘 다 계좌 없으면 최근
+{ const a = { id: "A", account_number: "", updated_at: "2026-09-19T00:00:00" };
+  const b = { id: "B", account_number: "", updated_at: "2026-09-23T00:00:00" };
+  eq(pickPrimaryLedger([a, b]).id, "B", "둘 다 무계좌 → 최근"); }
+// 카드취소는 계좌 없어도 payout 정보 있음으로 우선
+{ const a = { id: "A", method: "카드취소", account_number: "", updated_at: "2026-09-19T00:00:00" };
+  const b = { id: "B", method: "계좌이체", account_number: "", updated_at: "2026-09-23T00:00:00" };
+  eq(pickPrimaryLedger([b, a]).id, "A", "카드취소 우선(payout 정보 있음)"); }
+ok2(ledgerHasPayoutInfo({ account_last4: "2708" }) === true, "뒷4자리 있으면 payout 정보");
+ok2(ledgerHasPayoutInfo({ method: "카드취소" }) === true, "카드취소 payout 정보");
+ok2(ledgerHasPayoutInfo({ account_number: "", account_last4: "", method: "없음" }) === false, "정보 없음");
+ok2(ledgerHasPayoutInfo(null) === false, "null → false");
+// 주문 1개·기록 1개 → 그 기록이 대표
+{ const only = { id: "X", account_number: "", updated_at: "2026-09-19T00:00:00" };
+  eq(pickPrimaryLedger([only]).id, "X", "기록 1개면 그것이 대표"); }
 
 console.log(`✅ refund-issue-terms ${pass}건 통과`);

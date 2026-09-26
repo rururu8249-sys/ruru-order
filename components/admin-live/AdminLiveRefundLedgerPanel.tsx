@@ -359,7 +359,7 @@ export default function AdminLiveRefundLedgerPanel({ focusTaskId }: { focusTaskI
 }
 
 // ── 시안 ③ 처리 창 ──
-export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { item: LedgerDetail; onClose: () => void; onSaved: () => void; onCompleted?: (taskId: string) => Promise<boolean> }) {
+export function RefundProcessModal({ item, onClose, onSaved, onCompleted, openedFromOtherIssue = false, repIssueDate = "", linkedIssueCount = 1 }: { item: LedgerDetail; onClose: () => void; onSaved: () => void; onCompleted?: (taskId: string) => Promise<boolean>; openedFromOtherIssue?: boolean; repIssueDate?: string; linkedIssueCount?: number }) {
   const orderCode = clean(item.order_lookup_code);
   // 교환→환불 전환(item 12). 저장 눌러야 반영.
   const [kindOverride, setKindOverride] = useState<string>("");
@@ -424,7 +424,6 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
   const [shipFeeTouched, setShipFeeTouched] = useState(false);
   const [manualBase, setManualBase] = useState(Math.round(Number(item.amount_base)) || 0);
 
-  const [dupWarn, setDupWarn] = useState<Array<{ amount_final: number; stage: string; created_at: string }>>([]);
 
   useEffect(() => {
     if (!orderCode) { setLinesLoaded(true); return; }
@@ -468,20 +467,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
         setLinesLoaded(true);
       } catch { if (alive) { setLinesError(true); setLinesLoaded(true); } }
     })();
-    // 같은 주문 다른 환불 기록 경고
-    (async () => {
-      try {
-        const res = await fetch(`/api/admin-live/refund-ledger?orderCode=${encodeURIComponent(orderCode)}`, { cache: "no-store" });
-        const p = await res.json().catch(() => null);
-        if (!alive || !p?.ok) return;
-        const others = ((p.items || []) as Array<Record<string, unknown>>).filter((r) => {
-          if (item.id && clean(r.id) === clean(item.id)) return false;
-          if (!item.id && item.admin_task_id && clean(r.admin_task_id) === clean(item.admin_task_id)) return false;
-          return true;
-        });
-        setDupWarn(others.map((r) => ({ amount_final: Number(r.amount_final) || 0, stage: String(r.stage ?? ""), created_at: String(r.created_at ?? "") })));
-      } catch { /* 무시 */ }
-    })();
+    // [묶기] 같은 주문은 이제 «대표 1개»로 자동 합쳐 열리므로 중복 경고는 없앤다.
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderCode, linesReloadTick]);
@@ -595,7 +581,8 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
 
   // 완료 — 모달 안 확인 → 기록 저장 → 이슈 해결완료 연동(부수효과 없는 상태변경만).
   const complete = async (extra: Record<string, unknown>, confirmMsg: string) => {
-    const ok = await showAdminConfirm(confirmMsg, { title: isExchange ? "재발송 완료" : "환불 완료", confirmText: "네", cancelText: "취소", tone: "info" });
+    const linkedNote = linkedIssueCount > 1 ? ` 같은 주문 이슈 ${linkedIssueCount}건이 함께 해결완료돼요.` : "";
+    const ok = await showAdminConfirm(confirmMsg + linkedNote, { title: isExchange ? "재발송 완료" : "환불 완료", confirmText: "네", cancelText: "취소", tone: "info" });
     if (!ok) return;
     const saved = await doPatch(extra);
     if (!saved) return;
@@ -627,6 +614,13 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
   const memoFirst = memoFull.split("\n")[0] || "";
   const nextActionSaved = clean(item.next_action);
   const INPUT = "h-11 rounded-lg border border-line bg-surface px-3 text-[16px] font-bold text-ink outline-none focus-visible:ring-2 focus-visible:ring-rose-deep";
+  // [묶기] 대표가 아닌 이슈에서 열었을 때 표기할 대표 이슈 날짜(M/D).
+  const repIssueDateMD = (() => {
+    const raw = clean(repIssueDate);
+    if (!raw) return "";
+    const d = new Date(raw.includes("T") ? raw : raw.replace(" ", "T"));
+    return Number.isNaN(d.getTime()) ? "" : `${d.getMonth() + 1}/${d.getDate()}`;
+  })();
   // [5차] 헤더 아래 회색 안내 — 돈이 여기서 안 나간다는 것을 명확히.
   const headerNotice = isExchange
     ? ""
@@ -645,6 +639,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
         <div className="flex items-start justify-between gap-2 border-b border-line px-5 pt-4 pb-3">
           <div className="min-w-0">
             <h3 className="text-lg font-black text-ink">{isExchange ? "교환하기" : "환불하기"}</h3>
+            {openedFromOtherIssue ? <div className="mt-1 text-[13px] leading-5 text-ink-mute">같은 주문의 {repIssueDateMD ? `${repIssueDateMD} ` : ""}이슈 기록을 열었어요.</div> : null}
             {headerNotice ? <div className="mt-1 text-[13px] leading-5 text-ink-mute">{headerNotice}</div> : null}
             <div className="mt-1 text-[13px] leading-5 text-ink-soft">
               <div className="truncate font-black text-ink">{clean(item.nickname) || "—"}{clean(item.customer_name) ? ` · ${clean(item.customer_name)}` : ""}{orderCode ? ` · ${orderCode}` : ""}</div>
@@ -655,11 +650,6 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
-          {dupWarn.length > 0 ? (
-            <div className="mb-3 rounded-lg border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">
-              같은 주문에 다른 환불 기록이 있어요: {dupWarn.map((d) => `${won(d.amount_final)} · ${d.stage}${(() => { const t = new Date(d.created_at); return Number.isNaN(t.getTime()) ? "" : ` (${t.getMonth() + 1}/${t.getDate()} 이슈)`; })()}`).join(", ")}
-            </div>
-          ) : null}
 
           {/* 2. 상품 */}
           <div className="mb-3">

@@ -147,6 +147,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ok: true, items });
     }
 
+    // ── 고객이슈 목록용: 주문번호(order_lookup_code) 묶음 → 그 주문들의 모든 환불 기록(대표 선택은 클라에서). ──
+    const orderCodesRaw = text(url.searchParams.get("orderCodes"), 4000);
+    if (orderCodesRaw) {
+      const codes = Array.from(new Set(orderCodesRaw.split(",").map((s) => s.trim()).filter(Boolean))).slice(0, 60);
+      if (codes.length === 0) return NextResponse.json({ ok: true, items: [] });
+      const { data, error } = await supabase.from("refund_ledger").select("*").in("order_lookup_code", codes);
+      if (error) return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+      const items = ((data as Row[]) || []).map((r) => toTaskSummaryRow(r, now));
+      await attachCardTotals(items, supabase);
+      return NextResponse.json({ ok: true, items });
+    }
+
     // ── 이체 목록 복사용: 선택 장부 id 묶음 → 전체 계좌번호(단 완료+30일 지나면 가림). 행마다 요청 금지 대응. ──
     const copyIdsRaw = text(url.searchParams.get("copyIds"), 4000);
     if (copyIdsRaw) {
