@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { submitRowLineTotal, submitRowQty } from "@/lib/submitRowPrice";
+import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 
 function getSupabaseAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
@@ -36,15 +37,16 @@ export async function GET(request: NextRequest) {
 
     const rows = ((data as Array<Record<string, unknown>>) || []).filter((r) => r.is_deleted !== true);
 
-    // 상품 사진(있으면) — product_id 한 번에 조회. 실패해도 무시(사진만 빠짐).
-    const photoByProduct: Record<string, string> = {};
+    // 상품 사진 — 목록 행과 «같은» 규칙(resolveOrderItemPhoto)으로. image_url 만 보면
+    //   색상별/세부상품 사진만 있는 상품(예: Lime RURU-MTFV6WC7)이 빈칸이 된다.
+    //   전체 상품 행을 받아 상품명·색상까지 넘겨 사진을 고른다. 실패해도 무시(사진만 빠짐).
+    const productById = new Map<string, Record<string, unknown>>();
     const productIds = Array.from(new Set(rows.map((r) => clean(r.product_id)).filter(Boolean)));
     if (productIds.length > 0) {
       try {
-        const { data: prods } = await supabase.from("products").select("id, image_url").in("id", productIds);
+        const { data: prods } = await supabase.from("products").select("*").in("id", productIds);
         for (const p of (prods as Array<Record<string, unknown>>) || []) {
-          const url2 = clean(p.image_url);
-          if (clean(p.id) && url2) photoByProduct[clean(p.id)] = url2;
+          if (clean(p.id)) productById.set(clean(p.id), p);
         }
       } catch { /* 사진 조회 실패는 무시 */ }
     }
@@ -59,6 +61,10 @@ export async function GET(request: NextRequest) {
       const qty = submitRowQty(r);
       const lineTotal = submitRowLineTotal(r);
       const unit = qty > 0 ? Math.floor(lineTotal / qty) : lineTotal;
+      const productRow = productById.get(clean(r.product_id));
+      const photo = productRow
+        ? resolveOrderItemPhoto(productRow, { productName: clean(r.product_name), color: clean(r.color) }).url
+        : "";
       entry.lines.push({
         id: clean(r.id),
         product_id: clean(r.product_id),
@@ -68,7 +74,7 @@ export async function GET(request: NextRequest) {
         qty,
         unit,
         lineTotal,
-        photo: photoByProduct[clean(r.product_id)] || "",
+        photo,
       });
       entry.shippingFee = Math.max(entry.shippingFee, Math.max(0, Math.round(num(r.shipping_fee))));
       entry.pointUsed += Math.max(0, Math.round(num(r.point_used_amount)));

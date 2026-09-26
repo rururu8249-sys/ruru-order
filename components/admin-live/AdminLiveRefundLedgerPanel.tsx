@@ -13,6 +13,7 @@ import {
   REFUND_STAGES,
   REFUND_KINDS,
   REASON_CHIPS,
+  optionLabelNoNone,
   computeAmountFinal,
   computeRefundBase,
   stageDisplay,
@@ -75,10 +76,12 @@ function formatDateTime(value: unknown) {
   return { line1: `${d.getFullYear()}.${p2(d.getMonth() + 1)}.${p2(d.getDate())}(${wd})`, line2: `${p2(d.getHours())}:${p2(d.getMinutes())}` };
 }
 
+// [6차] 옵션 표기에서 「없음」 제거 — 공용(lib) optionLabelNoNone 재사용
+const optLabel = optionLabelNoNone;
 function productText(snapshot: LedgerListRow["product_snapshot"]) {
   if (!Array.isArray(snapshot) || snapshot.length === 0) return "-";
   return snapshot
-    .map((it) => `${clean(it.productName) || "상품"}${[clean(it.color), clean(it.size)].filter(Boolean).length ? ` (${[clean(it.color), clean(it.size)].filter(Boolean).join("/")})` : ""} ×${Math.max(1, Math.round(Number(it.qty)) || 1)}`)
+    .map((it) => { const opt = optLabel(it.color, it.size); return `${clean(it.productName) || "상품"}${opt ? ` (${opt})` : ""} ×${Math.max(1, Math.round(Number(it.qty)) || 1)}`; })
     .join(", ");
 }
 
@@ -363,34 +366,33 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
   const [memo, setMemo] = useState(clean(item.memo));
   const [saving, setSaving] = useState(false);
 
-  // 계좌 — 저장된 예금주가 제외 단어(입니다 등)면 열 때 확인 안내 + 편집 펼침(자동 수정 금지)
+  // 계좌 — [6차] 항상 3칸 표시(요약/펼침 토글 폐지). 옛 예금주가 제외단어(입니다 등)면
+  //   손님 이름으로 «프리필»하고 노란 테두리+안내(저장 눌러야 DB 반영). 자동 저장 안 함.
   const holderExcluded = isExcludedHolder(clean(item.account_holder));
   const [bank, setBank] = useState(clean(item.bank));
   const [account, setAccount] = useState(clean(item.account_number));
-  const [holder, setHolder] = useState(clean(item.account_holder) || clean(item.customer_name) || clean(item.nickname));
+  const [holder, setHolder] = useState(
+    holderExcluded ? (clean(item.customer_name) || clean(item.nickname)) : (clean(item.account_holder) || clean(item.customer_name) || clean(item.nickname)),
+  );
   const [paste, setPaste] = useState("");
-  const [acctEdit, setAcctEdit] = useState(holderExcluded);
-  const [acctMissing, setAcctMissing] = useState<string[]>(holderExcluded ? ["holder"] : []);
+  const [acctMissing, setAcctMissing] = useState<string[]>([]);
 
-  // 반품 사유(reason 필드) — 칩 하나 선택. 저장된 값이 칩이면 그 칩, 짧은 텍스트면 기타, 메모 통째 같은 긴 값이면 비움.
+  // 반품 사유(reason 필드) — [6차] 저장값이 «칩»이면 그 칩만 선택. 메모 전문/긴 값·기타 텍스트는 프리필 안 함(미선택).
   const loadedReason = clean(item.reason);
-  const isLongReason = loadedReason.length > 20 || loadedReason.includes("\n");
-  const initReasonChip = (REASON_CHIPS as readonly string[]).includes(loadedReason)
-    ? loadedReason
-    : (loadedReason && !isLongReason ? "기타" : "");
+  const initReasonChip = (REASON_CHIPS as readonly string[]).includes(loadedReason) ? loadedReason : "";
   const [reasonChip, setReasonChip] = useState(initReasonChip);
-  const [reasonEtc, setReasonEtc] = useState(initReasonChip === "기타" ? loadedReason : "");
+  const [reasonEtc, setReasonEtc] = useState("");
   const [reasonDirty, setReasonDirty] = useState(false);
   const reasonVal = reasonChip === "기타" ? reasonEtc.trim() : reasonChip;
 
   // 차감 — 신규는 금액칸 1개. 기존 조정줄이 1개(차감)면 그 줄을 금액칸으로 불러와 편집(별도 줄 없음). 2개↑면 목록+입력.
+  //   [6차] 라벨은 «현재 사유»를 따라감(옛 저장 라벨 표시·유지 안 함).
   const initAdjs = (Array.isArray(item.adjustments) ? item.adjustments : [])
     .map((x) => ({ label: clean(x.label), amount: Math.round(Number(x.amount)) || 0 }))
     .filter((x) => x.label || x.amount !== 0);
   const singleAdj = initAdjs.length === 1 && initAdjs[0].amount < 0 ? initAdjs[0] : null;
   const [keptAdj, setKeptAdj] = useState<RefundAdjustment[]>(singleAdj ? [] : initAdjs);
   const [deductAmount, setDeductAmount] = useState(singleAdj ? Math.abs(singleAdj.amount) : 0);
-  const [deductLabel] = useState(singleAdj ? clean(singleAdj.label) : ""); // 기존 저장 라벨 유지
 
   // 돌려받을 상품
   type OrderLineRow = { id: string; product_id: string; product_name: string; color: string; size: string; qty: number; unit: number; lineTotal: number; photo: string };
@@ -460,7 +462,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
   const baseMismatch = !matchFailed && savedBase !== null && !matchAccepted && savedBase !== autoBase;
   const amountBase = matchFailed ? manualBase : (baseMismatch ? (savedBase as number) : autoBase);
 
-  const deductFinalLabel = deductLabel || (reasonVal ? `${reasonVal} 차감` : "차감");
+  const deductFinalLabel = reasonVal ? `${reasonVal} 차감` : "차감"; // [6차] 현재 사유를 따라감(옛 라벨 유지 안 함)
   const finalAdj: RefundAdjustment[] = [...keptAdj, ...(deductAmount > 0 ? [{ label: deductFinalLabel, amount: -deductAmount }] : [])];
   const amountFinal = computeAmountFinal(amountBase, finalAdj);
   const deductTotal = finalAdj.filter((a) => a.amount < 0).reduce((s, a) => s - a.amount, 0);
@@ -475,8 +477,8 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
     if (r.bank) setBank(r.bank);
     if (r.account) setAccount(r.account);
     if (r.holder) setHolder(r.holder);
-    setAcctMissing(r.missing);
-    if (r.missing.length > 0 && (r.bank || r.account || r.holder)) setAcctEdit(true); // 일부만 인식 → 펼쳐서 보정
+    // 붙여넣기로 뭔가 인식했을 때만 «인식 실패 칸»을 노란 테두리로. 아무것도 안 넣었으면(빈칸) 표시 없음.
+    setAcctMissing(raw.trim() && (r.bank || r.account || r.holder) ? r.missing : []);
   };
 
   // reason 저장: 사용자가 사유를 건드렸을 때만 새 값으로. 안 건드리면 신규는 이슈 메모, 기존은 유지(미전송).
@@ -621,7 +623,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
                       ) : <span className="h-10 w-10 shrink-0 rounded-lg border border-line bg-surface-2" />}
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-[14px] font-bold text-ink">{l.product_name}</div>
-                        <div className="truncate text-[13px] text-ink-mute">{[l.color, l.size].filter(Boolean).join("/")}{[l.color, l.size].filter(Boolean).length ? " · " : ""}{formatComma(l.unit)}원 × {l.qty}</div>
+                        <div className="truncate text-[13px] text-ink-mute">{optLabel(l.color, l.size)}{optLabel(l.color, l.size) ? " · " : ""}{formatComma(l.unit)}원 × {l.qty}</div>
                       </div>
                       {lines.length > 1 && l.qty > 1 && on ? (
                         <div className="flex shrink-0 items-center gap-1">
@@ -688,7 +690,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
                 ) : null}
                 <div className="flex flex-wrap items-center gap-1.5">
                   <input inputMode="numeric" value={formatComma(deductAmount)} onFocus={selectOnFocus} onChange={(e) => setDeductAmount(parseAmountInput(e.target.value))} placeholder="차감 금액" className={`w-32 text-right ${INPUT}`} />
-                  <span className="text-[13px] text-ink-mute">원 차감{deductAmount > 0 ? ` · ${deductFinalLabel}` : ""}</span>
+                  <span className="text-[13px] text-ink-mute">원 차감{reasonVal ? ` (${reasonVal})` : ""}</span>
                 </div>
               </div>
 
@@ -706,28 +708,23 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
                 {method === "계좌이체" ? (
                   <div className="rounded-xl border border-line p-3">
                     {holderExcluded ? (
-                      <div className="mb-2 rounded-lg border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">예금주가 &lsquo;{clean(item.account_holder)}&rsquo;로 저장돼 있어요. 확인해 주세요.</div>
+                      <div className="mb-2 rounded-lg border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">예금주가 &lsquo;{clean(item.account_holder)}&rsquo;로 잘못 저장돼 있었어요. 손님 이름으로 바꿔뒀어요. 맞으면 저장을 눌러주세요.</div>
                     ) : null}
                     {item.account_hidden ? (
                       <div className="text-[14px] font-bold text-ink">{[bankDisplayName(bank), holder].filter(Boolean).join(" · ")}<div className="mt-1 text-[13px] font-bold text-ink-mute">완료 후 30일이 지나 계좌번호는 가려졌습니다(은행·예금주는 유지).</div></div>
-                    ) : !(acctEdit || !account) ? (
-                      <div className="flex items-center gap-2">
-                        <span className="min-w-0 flex-1 truncate text-[14px] font-bold text-ink">{[bankDisplayName(bank), account, holder].filter(Boolean).join(" · ") || "계좌 정보를 붙여넣으세요"}</span>
-                        <button type="button" onClick={() => setAcctEdit(true)} className="shrink-0 text-[14px] font-black text-ink-soft underline">수정</button>
-                        <button type="button" onClick={copyTransferInfo} className="shrink-0 rounded-lg border border-rose-line bg-surface px-2 py-1 text-[14px] font-black text-rose-deep hover:bg-rose-soft">📋 복사</button>
-                      </div>
                     ) : (
+                      /* [6차] 항상 같은 모양 — 붙여넣기 + 3칸 + 복사(요약/펼침 토글 폐지) */
                       <>
                         <input value={paste} onChange={(e) => applyPaste(e.target.value)} onPaste={(e) => applyPaste(e.clipboardData.getData("text"))} placeholder="계좌 정보 붙여넣기 (예: 국민은행 123456 01 234567 홍길동)" className={`w-full ${INPUT}`} />
-                        <div className="mt-2 flex flex-wrap gap-2">
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
                           <select value={BANK_OPTIONS.includes(bank as typeof BANK_OPTIONS[number]) ? bank : (bank ? "기타" : "")} onChange={(e) => setBank(e.target.value === "기타" ? "" : e.target.value)} className={`w-32 ${INPUT} ${acctMissing.includes("bank") ? "ring-2 ring-warn-tx" : ""}`}>
                             <option value="">은행</option>
                             {BANK_OPTIONS.map((b) => <option key={b} value={b}>{bankDisplayName(b)}</option>)}
                           </select>
                           <input value={account} onChange={(e) => setAccount(e.target.value.replace(/[^0-9]/g, ""))} onFocus={selectOnFocus} placeholder="계좌번호(숫자)" inputMode="numeric" className={`min-w-0 flex-1 ${INPUT} ${acctMissing.includes("account") ? "ring-2 ring-warn-tx" : ""}`} />
-                          <input value={holder} onChange={(e) => setHolder(e.target.value)} placeholder="예금주" className={`w-24 ${INPUT} ${acctMissing.includes("holder") || holderExcluded ? "ring-2 ring-warn-tx" : ""}`} />
+                          <input value={holder} onChange={(e) => setHolder(e.target.value)} placeholder="예금주" className={`w-28 ${INPUT} ${acctMissing.includes("holder") || holderExcluded ? "ring-2 ring-warn-tx" : ""}`} />
+                          <button type="button" onClick={copyTransferInfo} className="shrink-0 rounded-lg border border-rose-line bg-surface px-3 py-2 text-[14px] font-black text-rose-deep hover:bg-rose-soft">📋 복사</button>
                         </div>
-                        {account ? <button type="button" onClick={copyTransferInfo} className="mt-2 rounded-lg border border-rose-line bg-surface px-2 py-1 text-[14px] font-black text-rose-deep hover:bg-rose-soft">📋 복사</button> : null}
                       </>
                     )}
                   </div>

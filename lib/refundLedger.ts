@@ -2,6 +2,8 @@
 //   ⚠️ 돈을 움직이지 않는다. 금액 합산·계좌 마스킹·고객이슈→장부 매핑 같은 «계산/표시»만.
 //   포인트 지급/회수는 이 파일에서 절대 하지 않는다(1단계 원칙).
 
+import { isExcludedHolder } from "./parseBankAccount";
+
 export const REFUND_STAGES = ["접수", "회수 대기", "도착·검수", "처리 필요", "완료", "거절·취소"] as const;
 export type RefundStage = (typeof REFUND_STAGES)[number];
 
@@ -25,6 +27,12 @@ export function stageDisplay(stage: unknown, kind?: unknown): string {
 // [2026-09-26] 반품 사유 칩 — reason 필드에 저장.
 export const REASON_CHIPS = ["단순변심", "사이즈", "불량", "오배송", "기타"] as const;
 
+// [2026-09-26 6차] 옵션 표기에서 「없음」 제거 — "없음/12"→"12", "없음" 단독→"".
+export function optionLabelNoNone(color: unknown, size: unknown): string {
+  const one = (v: unknown) => { const s = String(v ?? "").trim(); return s && s !== "없음" ? s : ""; };
+  return [one(color), one(size)].filter(Boolean).join("/");
+}
+
 // [2026-09-26 5차] 고객이슈 목록 버튼 글자 — 교환만 「교환하기」, 반품/환불 섞이면 「환불하기」(기록·단계 무관).
 export function refundListButtonLabel(rawTypes: unknown): string {
   const arr = Array.isArray(rawTypes) ? rawTypes.map((x) => String(x ?? "").toLowerCase()) : [];
@@ -44,29 +52,37 @@ function doneShortKo(v: unknown): string {
 }
 
 export type LedgerSummaryInput = {
-  kind?: unknown; method?: unknown; amount_final?: unknown;
+  kind?: unknown; method?: unknown; amount_final?: unknown; stage?: unknown;
   done_at?: unknown; bank?: unknown; account_holder?: unknown; exchange_option?: unknown;
+  account_number?: unknown; account_last4?: unknown;
 };
-// [2026-09-26 5차] 💳 요약 문구 — 사람말. 값 없으면 "".
-//   bankName 은 은행 전체이름 매핑 결과(호출부에서 bankDisplayName 적용). 계좌번호는 표시 안 함.
+// [2026-09-26 6차] 💳 요약 문구 — 사람말. 값 없으면 "".
+//   bankName = 은행 전체이름(호출부에서 bankDisplayName 적용).
+//   미완료 계좌이체는 계좌번호 «전체»(라우트가 미완료만 전체 반환), 완료는 «****뒤4»(30일 경과 시 뒤4도 없음).
 export function ledgerSummaryLine(li: LedgerSummaryInput | null | undefined, bankName: string): string {
   if (!li) return "";
   const s = (v: unknown) => String(v ?? "").trim();
   const amt = Math.round(Number(li.amount_final)) || 0;
   const wonTxt = `${amt.toLocaleString("ko-KR")}원`;
-  const completed = !!s(li.done_at);
+  const stage = s(li.stage);
+  const completed = !!s(li.done_at) || stage === "완료" || stage === "거절·취소";
   const isExchange = s(li.kind) === "교환" || s(li.kind) === "재발송";
   const method = s(li.method);
+  const bn = s(bankName);
   if (completed) {
     const dd = doneShortKo(li.done_at);
     if (isExchange) return `재발송함${dd ? ` · ${dd}` : ""}`;
     if (method === "없음") return "환불 없이 종료";
-    return `${wonTxt} 보냄${dd ? ` · ${dd}` : ""}`;
+    const last4 = s(li.account_last4);
+    const acctSeg = last4 ? `${bn ? `${bn} ` : ""}****${last4}` : bn;
+    return `${wonTxt} 보냄${dd ? ` · ${dd}` : ""}${acctSeg ? ` · ${acctSeg}` : ""}`;
   }
   if (isExchange) return `교환 · 바꿀 옵션 ${s(li.exchange_option) || "-"}`;
   if (method === "포인트" && amt > 0) return `포인트로 돌려줄 금액 ${wonTxt}`;
   if (method === "계좌이체" && amt > 0) {
-    const acct = [s(bankName), s(li.account_holder)].filter(Boolean).join(" ");
+    // [6차] 옛 예금주(입니다 등)는 노출 금지 → 「예금주 확인 필요」
+    const holderTxt = isExcludedHolder(li.account_holder) ? "예금주 확인 필요" : s(li.account_holder);
+    const acct = [bn, s(li.account_number), holderTxt].filter(Boolean).join(" ");
     return `보낼 돈 ${wonTxt}${acct ? ` · ${acct}` : ""}`;
   }
   return ""; // 아직 처리 전(값 없음) → 표시 안 함

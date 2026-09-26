@@ -391,7 +391,7 @@ function IssueCard({
   photos?: string[];
   onPhotoZoom?: (url: string) => void;
   /** [2026-09-26] 교환·환불 건의 장부 요약(있을 때만). 진행단계·최종환불액·방법. */
-  ledgerInfo?: { stage?: string; kind?: string; amount_final?: number; method?: string; done_at?: string; bank?: string; account_holder?: string; exchange_option?: string } | null;
+  ledgerInfo?: { stage?: string; kind?: string; amount_final?: number; method?: string; done_at?: string; bank?: string; account_holder?: string; exchange_option?: string; account_number?: string; account_last4?: string } | null;
   /** [2026-09-26] 목록 「단가 × 수량」(매칭 성공 시). 교환/반품/환불 건에만. */
   amountText?: string;
   /** [2026-09-26] 「환불 처리」 — 처리 창 열기(교환/반품/환불 건에만). */
@@ -817,7 +817,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
   // ── [2026-09-26] 교환·환불 장부(고객이슈 안에서 처리) ──
   //   현재 페이지의 교환/반품/환불 줄들의 refund_ledger 요약을 «한 번에» 묶어 조회(줄마다 개별 조회 금지).
-  const [ledgerByTask, setLedgerByTask] = useState<Record<string, { id: string; stage: string; kind: string; amount_final: number; method: string; done_at: string; bank: string; account_holder: string; exchange_option: string }>>({});
+  const [ledgerByTask, setLedgerByTask] = useState<Record<string, { id: string; stage: string; kind: string; amount_final: number; method: string; done_at: string; bank: string; account_holder: string; exchange_option: string; account_number: string; account_last4: string }>>({});
   const [refundReloadTick, setRefundReloadTick] = useState(0);
   const [refundModalItem, setRefundModalItem] = useState<LedgerDetail | null>(null);
   const refundPageIdsKey = pageTasks.filter(isRefundKindTask).map((t) => clean(t.id)).filter(Boolean).sort().join(",");
@@ -829,10 +829,10 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       const res = await fetch(`/api/admin-live/refund-ledger?taskIds=${encodeURIComponent(ids.join(","))}`, { cache: "no-store" });
       const p = await res.json().catch(() => null);
       if (!alive || !p?.ok) return;
-      const map: Record<string, { id: string; stage: string; kind: string; amount_final: number; method: string; done_at: string; bank: string; account_holder: string; exchange_option: string }> = {};
+      const map: Record<string, { id: string; stage: string; kind: string; amount_final: number; method: string; done_at: string; bank: string; account_holder: string; exchange_option: string; account_number: string; account_last4: string }> = {};
       for (const r of (p.items || []) as Array<Record<string, unknown>>) {
         const tid = clean(r.admin_task_id);
-        if (tid) map[tid] = { id: String(r.id), stage: String(r.stage ?? ""), kind: String(r.kind ?? ""), amount_final: Number(r.amount_final) || 0, method: String(r.method ?? ""), done_at: String(r.done_at ?? ""), bank: String(r.bank ?? ""), account_holder: String(r.account_holder ?? ""), exchange_option: String(r.exchange_option ?? "") };
+        if (tid) map[tid] = { id: String(r.id), stage: String(r.stage ?? ""), kind: String(r.kind ?? ""), amount_final: Number(r.amount_final) || 0, method: String(r.method ?? ""), done_at: String(r.done_at ?? ""), bank: String(r.bank ?? ""), account_holder: String(r.account_holder ?? ""), exchange_option: String(r.exchange_option ?? ""), account_number: String(r.account_number ?? ""), account_last4: String(r.account_last4 ?? "") };
       }
       setLedgerByTask(map);
     })().catch(() => { /* 실패해도 목록은 정상, 요약만 생략 */ });

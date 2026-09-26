@@ -38,6 +38,19 @@ function toListRow(row: Row) {
   return { ...rest, account_last4: accountLast4(account_number) };
 }
 
+// [2026-09-26 6차] 고객이슈 목록 💳 요약용: «미완료» 기록만 전체 계좌번호(관리자 인증됨),
+//   완료 기록은 뒷4자리(완료+30일 지나면 그것도 가림). 이체할 대상만 전체 번호가 보이게.
+function toTaskSummaryRow(row: Row, now: number) {
+  const stage = String(row.stage ?? "");
+  const completed = !!String(row.done_at ?? "").trim() || stage === "완료" || stage === "거절·취소";
+  const hide = shouldHideAccountNumber(row.done_at, now); // 완료+30일
+  const { account_number, ...rest } = row;
+  if (!completed) {
+    return { ...rest, account_number: text(account_number, 40), account_last4: accountLast4(account_number), account_hidden: false };
+  }
+  return { ...rest, account_number: "", account_last4: hide ? "" : accountLast4(account_number), account_hidden: hide };
+}
+
 // 단건(처리 창)용: 전체 계좌번호 포함. 단 done_at+30일 지나면 가린다(지연 마스킹).
 function toDetailRow(row: Row, now: number) {
   const hide = shouldHideAccountNumber(row.done_at, now);
@@ -103,7 +116,7 @@ export async function GET(request: NextRequest) {
       if (ids.length === 0) return NextResponse.json({ ok: true, items: [] });
       const { data, error } = await supabase.from("refund_ledger").select("*").in("admin_task_id", ids);
       if (error) return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
-      return NextResponse.json({ ok: true, items: ((data as Row[]) || []).map(toListRow) });
+      return NextResponse.json({ ok: true, items: ((data as Row[]) || []).map((r) => toTaskSummaryRow(r, now)) });
     }
 
     // ── 이체 목록 복사용: 선택 장부 id 묶음 → 전체 계좌번호(단 완료+30일 지나면 가림). 행마다 요청 금지 대응. ──
