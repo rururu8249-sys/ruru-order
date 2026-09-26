@@ -420,6 +420,8 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
   const [sel, setSel] = useState<Record<string, number>>({});
   const [includeShipping, setIncludeShipping] = useState(false);
   const [shippingTouched, setShippingTouched] = useState(false);
+  const [shipFee, setShipFee] = useState(0); // 편집 가능한 배송비 금액
+  const [shipFeeTouched, setShipFeeTouched] = useState(false);
   const [manualBase, setManualBase] = useState(Math.round(Number(item.amount_base)) || 0);
   const [matchAccepted, setMatchAccepted] = useState(false);
 
@@ -490,19 +492,27 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
   // [7차] 전체 반품 = 모든 줄이 «전체 수량»으로 선택됨(공용 isFullReturnSel).
   const isFullReturn = isFullReturnSel(lines.map((l) => ({ qty: l.qty, selectedQty: sel[l.id] || 0 })));
   // 배송비 — 이 주문 배송비가 0이고 합배송이면 «낸 쪽» 주문 배송비(combinedShipFee)를 정보로 쓴다.
+  //   (order-lines 가 총액−상품−카드추가금으로 배송비를 이미 보정하므로, 대부분 shippingFee 에 실린다)
   const shipMovedToPeer = shippingFee === 0 && combinedShipping && combinedShipFee > 0;
   const effectiveShippingFee = shippingFee > 0 ? shippingFee : (shipMovedToPeer ? combinedShipFee : 0);
   // [복구후속3] 배송비 줄은 배송비(또는 합배송 낸 쪽 배송비)>0이면 항상 표시(부분선택·복원 무관 — «체크 여부»만 자동/복원).
   const showShippingRow = !isExchange && effectiveShippingFee > 0;
 
-  // [7차] 배송비 자동 — 전체 반품이고 배송비>0일 때 기본 체크(합배송 공유면 해제). 사용자가 손대면 그 선택 유지.
+  // 편집 가능한 배송비 금액 — 사용자가 손대기 전엔 order-lines 값 따라감.
+  useEffect(() => {
+    if (shipFeeTouched) return;
+    setShipFee(effectiveShippingFee);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveShippingFee, shipFeeTouched]);
+
+  // [7차] 배송비 자동 체크 — 단독 주문 전체 반품 + 배송비>0일 때 기본 체크(합배송이면 해제). 사용자가 손대면 유지.
   useEffect(() => {
     if (shippingTouched) return;
-    setIncludeShipping(isFullReturn && shippingFee > 0 && !combinedShipping);
+    setIncludeShipping(isFullReturn && effectiveShippingFee > 0 && !combinedShipping);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFullReturn, shippingFee, combinedShipping, shippingTouched]);
+  }, [isFullReturn, effectiveShippingFee, combinedShipping, shippingTouched]);
   const selList: RefundLineSel[] = lines.map((l) => ({ lineTotal: l.lineTotal, qty: l.qty, unit: l.unit, selectedQty: sel[l.id] || 0 }));
-  const autoBase = computeRefundBase(selList, includeShipping, effectiveShippingFee);
+  const autoBase = computeRefundBase(selList, includeShipping, shipFee);
   const savedBase = item.id ? (Math.round(Number(item.amount_base)) || 0) : null;
 
   // [카드 단순화] 카드는 «무조건 전체 취소». amount_base = 카드 총결제액, 차감만 손님에게 따로 받는다.
@@ -710,10 +720,12 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
                     {shipMovedToPeer ? (
                       <div className="mb-1 text-[13px] text-ink-mute">배송비 0원 — 같이 배송된 {combinedWith || "다른"} 주문에 {formatComma(combinedShipFee)}원 포함</div>
                     ) : null}
-                    <label className="flex items-center gap-2 text-[13px] font-bold text-ink-soft">
-                      <input type="checkbox" checked={includeShipping} onChange={(e) => { setIncludeShipping(e.target.checked); setShippingTouched(true); }} className="h-5 w-5 accent-rose-deep" />
-                      배송비도 환불 <span className="text-ink-mute">({formatComma(effectiveShippingFee)}원)</span>
-                    </label>
+                    <div className="flex items-center gap-2 text-[13px] font-bold text-ink-soft">
+                      <input type="checkbox" checked={includeShipping} onChange={(e) => { setIncludeShipping(e.target.checked); setShippingTouched(true); }} className="h-5 w-5 shrink-0 accent-rose-deep" />
+                      <span>배송비도 환불</span>
+                      <input inputMode="numeric" value={formatComma(shipFee)} onFocus={selectOnFocus} onChange={(e) => { setShipFee(parseAmountInput(e.target.value)); setShipFeeTouched(true); }} className={`w-24 text-right ${INPUT}`} />
+                      <span className="text-ink-mute">원</span>
+                    </div>
                     {combinedShipping && !shipMovedToPeer ? <div className="mt-1 text-[13px] text-ink-mute">같이 배송된 주문{combinedWith ? `(${combinedWith})` : ""}이 있어서 배송비는 확인하세요.</div> : null}
                   </div>
                 ) : null}

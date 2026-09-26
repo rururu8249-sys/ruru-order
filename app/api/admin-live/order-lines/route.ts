@@ -9,7 +9,7 @@ import { submitRowLineTotal, submitRowQty } from "@/lib/submitRowPrice";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { shippingAddressKey } from "@/lib/shippingAddressKey";
 import { koreanPhoneVariants } from "@/lib/order/phone";
-import { isCombinedShipmentPeer } from "@/lib/refundLedger";
+import { isCombinedShipmentPeer, derivedShippingFee } from "@/lib/refundLedger";
 import { orderLinesSelect, orderLinesCombineSelect } from "@/lib/orderLinesColumns";
 
 function getSupabaseAdminClient() {
@@ -58,14 +58,14 @@ export async function GET(request: NextRequest) {
       } catch { /* 사진 조회 실패는 무시 */ }
     }
 
-    type Entry = { lines: Array<Record<string, unknown>>; shippingFee: number; pointUsed: number; orderDate: string; paymentMethod: string; cardExtra: number; cardTotal: number; combined: boolean; combinedWith: string; combinedShipFee: number };
+    type Entry = { lines: Array<Record<string, unknown>>; shippingFee: number; pointUsed: number; orderDate: string; paymentMethod: string; cardExtra: number; cardTotal: number; orderBaseSum: number; productLineSum: number; combined: boolean; combinedWith: string; combinedShipFee: number };
     const byCode: Record<string, Entry> = {};
-    // 합배송 판정용 코드별 메타(첫 줄 기준) — 같은 손님/주소/방송/날짜 비교에 쓴다.
-    const meta: Record<string, { addr: string; kakao: string; phones: string[]; broadcast: string; day: string }> = {};
+    // 합배송 판정용 코드별 메타(첫 줄 기준) — 같은 손님/주소/방송/날짜/결제방법 비교에 쓴다.
+    const meta: Record<string, { addr: string; kakao: string; phones: string[]; broadcast: string; day: string; paymentMethod: string }> = {};
     for (const r of rows) {
       const code = clean(r.order_lookup_code);
       if (!code) continue;
-      const entry = byCode[code] || (byCode[code] = { lines: [], shippingFee: 0, pointUsed: 0, orderDate: "", paymentMethod: "", cardExtra: 0, cardTotal: 0, combined: false, combinedWith: "", combinedShipFee: 0 });
+      const entry = byCode[code] || (byCode[code] = { lines: [], shippingFee: 0, pointUsed: 0, orderDate: "", paymentMethod: "", cardExtra: 0, cardTotal: 0, orderBaseSum: 0, productLineSum: 0, combined: false, combinedWith: "", combinedShipFee: 0 });
       if (!meta[code]) {
         meta[code] = {
           addr: shippingAddressKey(r.address, r.detail_address),
@@ -73,6 +73,7 @@ export async function GET(request: NextRequest) {
           phones: koreanPhoneVariants(clean(r.customer_phone)),
           broadcast: clean(r.broadcast_id),
           day: clean(r.created_at).slice(0, 10),
+          paymentMethod: clean(r.payment_method),
         };
       }
       const created = clean(r.created_at);
@@ -80,8 +81,10 @@ export async function GET(request: NextRequest) {
       // 결제방법·카드추가금·카드총액 — 주문상세와 같은 필드. 줄마다 저장되므로 합산(카드추가금=vat_amount).
       if (!entry.paymentMethod) entry.paymentMethod = clean(r.payment_method);
       entry.cardExtra += Math.max(0, Math.round(num(r.vat_amount))); // 카드추가금 = vat_amount(orders 실재 컬럼)
-      entry.cardTotal += Math.max(0, Math.round(num(r.adjusted_total_price ?? r.total_price ?? r.final_amount)));
-      if (clean(r.combine_shipping_memo)) entry.combined = true; // 합배송 흔적 → 배송비 공유 신호
+      // 주문상세와 같은 총액 규칙(orderBaseAmount: final_amount ?? adjusted_total_price ?? total_price).
+      const rowBase = Math.max(0, Math.round(num(r.final_amount ?? r.adjusted_total_price ?? r.total_price)));
+      entry.cardTotal += rowBase;
+      entry.orderBaseSum += rowBase;
       const qty = submitRowQty(r);
       const lineTotal = submitRowLineTotal(r);
       const unit = qty > 0 ? Math.floor(lineTotal / qty) : lineTotal;
@@ -100,8 +103,16 @@ export async function GET(request: NextRequest) {
         lineTotal,
         photo,
       });
+      entry.productLineSum += lineTotal;
       entry.shippingFee = Math.max(entry.shippingFee, Math.max(0, Math.round(num(r.shipping_fee))));
       entry.pointUsed += Math.max(0, Math.round(num(r.point_used_amount)));
+    }
+
+    // ── 배송비 보정 — shipping_fee 칼럼이 0이어도 총액 안에 배송비가 들어있는 주문이 있다(주문상세와 동일).
+    //   배송비 = max(칼럼값, 총액 − 상품줄합계 − 카드추가금). 상품/카드추가금을 뺀 나머지 = 배송비.
+    for (const code of Object.keys(byCode)) {
+      const e = byCode[code];
+      e.shippingFee = derivedShippingFee({ orderBaseSum: e.orderBaseSum, productLineSum: e.productLineSum, cardExtra: e.cardExtra, shippingFeeColumn: e.shippingFee });
     }
 
     // ── [7차 보완] 합배송 판정 — 같은 손님(kakao_id/전화)의 다른 주문 중 같은 주소키 + 같은 방송(또는 같은 날)이
@@ -125,8 +136,8 @@ export async function GET(request: NextRequest) {
           const m = meta[code];
           if (!m || !m.addr) continue;
           const peers = others.filter((o) => isCombinedShipmentPeer(
-            { code, addr: m.addr, kakao: m.kakao, phones: m.phones, broadcast: m.broadcast, day: m.day },
-            { code: clean(o.order_lookup_code), addr: shippingAddressKey(o.address, o.detail_address), kakao: clean(o.kakao_id), phone: clean(o.customer_phone), broadcast: clean(o.broadcast_id), day: clean(o.created_at).slice(0, 10) },
+            { code, addr: m.addr, kakao: m.kakao, phones: m.phones, broadcast: m.broadcast, day: m.day, paymentMethod: m.paymentMethod },
+            { code: clean(o.order_lookup_code), addr: shippingAddressKey(o.address, o.detail_address), kakao: clean(o.kakao_id), phone: clean(o.customer_phone), broadcast: clean(o.broadcast_id), day: clean(o.created_at).slice(0, 10), paymentMethod: clean(o.payment_method) },
           ));
           if (peers.length > 0) {
             byCode[code].combined = true;

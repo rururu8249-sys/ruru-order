@@ -30,15 +30,29 @@ export const REASON_CHIPS = ["단순변심", "사이즈", "불량", "오배송",
 // [2026-09-26 7차보완] 합배송 짝 판정(순수 비교) — 주소키는 호출부에서 shippingAddressKey 로 계산해 넘긴다.
 //   같은 손님(kakao_id 또는 전화) + 같은 주소키 + 같은 방송(또는 같은 날)이면 같이 배송된 주문으로 본다.
 //   배송비를 «낸 쪽»이든 «빠진 쪽»이든 대칭으로 잡힌다(주소키가 같으므로).
-export type CombinePeerSelf = { code: string; addr: string; kakao: string; phones: string[]; broadcast: string; day: string };
-export type CombinePeerOther = { code: string; addr: string; kakao: string; phone: string; broadcast: string; day: string };
+export type CombinePeerSelf = { code: string; addr: string; kakao: string; phones: string[]; broadcast: string; day: string; paymentMethod: string };
+export type CombinePeerOther = { code: string; addr: string; kakao: string; phone: string; broadcast: string; day: string; paymentMethod: string };
 export function isCombinedShipmentPeer(mine: CombinePeerSelf, other: CombinePeerOther): boolean {
   const oc = String(other.code ?? "").trim();
   if (!oc || oc === String(mine.code ?? "").trim()) return false;
   if (!mine.addr || String(other.addr ?? "") !== mine.addr) return false; // 주소를 모르거나 다르면 아님
   const sameCust = (!!mine.kakao && String(other.kakao ?? "") === mine.kakao) || (Array.isArray(mine.phones) && mine.phones.includes(String(other.phone ?? "")));
   if (!sameCust) return false;
+  // [정정] 결제방법이 다르면 합배송 아님(카드결제 별도 주문이 무통장 주문과 섞이던 오판 방지).
+  if (String(mine.paymentMethod ?? "").trim() !== String(other.paymentMethod ?? "").trim()) return false;
   return Boolean((mine.broadcast && String(other.broadcast ?? "") === mine.broadcast) || (mine.day && String(other.day ?? "") === mine.day));
+}
+
+// [2026-09-26 정정] 배송비 = max(칼럼값, 총액 − 상품줄합계 − 카드추가금). shipping_fee 칼럼이 0이어도
+//   total_price 안에 배송비가 들어있는 주문(주문상세와 동일 규칙)의 배송비를 뽑아낸다.
+export function derivedShippingFee(o: {
+  orderBaseSum: unknown; productLineSum: unknown; cardExtra: unknown; shippingFeeColumn: unknown;
+}): number {
+  const total = Math.round(Number(o.orderBaseSum)) || 0;
+  const product = Math.round(Number(o.productLineSum)) || 0;
+  const cardExtra = Math.round(Number(o.cardExtra)) || 0;
+  const col = Math.max(0, Math.round(Number(o.shippingFeeColumn)) || 0);
+  return Math.max(col, Math.max(0, total - product - cardExtra));
 }
 
 // [2026-09-26 카드 단순화] 카드 「다시 받을 돈」 = 차감 + 남기는 상품값(부분반품). 전체반품이면 남기는 상품=0 → 차감 그대로.

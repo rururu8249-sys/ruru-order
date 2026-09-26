@@ -1,5 +1,5 @@
 // [2026-09-26 5·6차] 고객이슈 환불/교환 용어·💳 요약 문구 테스트
-import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, shouldWarnBaseMismatch, cardRefundBackAmount } from "../lib/refundLedger.ts";
+import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer, shouldWarnBaseMismatch, cardRefundBackAmount, derivedShippingFee } from "../lib/refundLedger.ts";
 import { bankDisplayName } from "../lib/parseBankAccount.ts";
 
 let pass = 0;
@@ -91,17 +91,19 @@ eq(computeRefundBase([{ lineTotal: 79000, qty: 1, unit: 79000, selectedQty: 1 }]
 // 카드: base + 카드추가금(컴포넌트가 더함) — 272,850
 eq(computeRefundBase([{ lineTotal: 255000, qty: 1, unit: 255000, selectedQty: 1 }], false, 0) + 17850, 272850, "상품255,000+카드추가금17,850=272,850");
 
-// ── [7차 보완] 합배송 짝 판정 ──
-const me = { code: "A", addr: "서울시강남구|101", kakao: "KAK1", phones: ["01012345678"], broadcast: "BC1", day: "2026-09-16" };
-// 배송비 낸 쪽 ↔ 빠진 쪽: 주소·손님·방송 같으면 대칭으로 잡힌다
-eq(isCombinedShipmentPeer(me, { code: "B", addr: "서울시강남구|101", kakao: "KAK1", phone: "", broadcast: "BC1", day: "2026-09-16" }), true, "같은 손님·주소·방송→합배송");
-eq(isCombinedShipmentPeer(me, { code: "B", addr: "서울시강남구|101", kakao: "", phone: "01012345678", broadcast: "", day: "2026-09-16" }), true, "전화 일치+같은 날→합배송");
-eq(isCombinedShipmentPeer(me, { code: "B", addr: "서울시강남구|101", kakao: "KAK1", phone: "", broadcast: "", day: "2026-09-17" }), false, "방송 다르고 날 다르면 아님");
-eq(isCombinedShipmentPeer(me, { code: "B", addr: "부산시해운대|202", kakao: "KAK1", phone: "", broadcast: "BC1", day: "2026-09-16" }), false, "주소 다르면 아님");
-eq(isCombinedShipmentPeer(me, { code: "B", addr: "서울시강남구|101", kakao: "KAK2", phone: "01099998888", broadcast: "BC1", day: "2026-09-16" }), false, "다른 손님이면 아님");
-eq(isCombinedShipmentPeer(me, { code: "A", addr: "서울시강남구|101", kakao: "KAK1", phone: "", broadcast: "BC1", day: "2026-09-16" }), false, "자기 자신 제외");
-eq(isCombinedShipmentPeer({ ...me, addr: "" }, { code: "B", addr: "", kakao: "KAK1", phone: "", broadcast: "BC1", day: "2026-09-16" }), false, "주소 모르면 성립 안 함");
-eq(isCombinedShipmentPeer(me, { code: "", addr: "서울시강남구|101", kakao: "KAK1", phone: "", broadcast: "BC1", day: "2026-09-16" }), false, "상대 코드 없으면 아님");
+// ── [7차 보완·정정] 합배송 짝 판정(같은 결제방법일 때만) ──
+const me = { code: "A", addr: "서울시강남구|101", kakao: "KAK1", phones: ["01012345678"], broadcast: "BC1", day: "2026-09-16", paymentMethod: "무통장입금" };
+const P = (o) => ({ paymentMethod: "무통장입금", ...o }); // 상대 기본 무통장(me 와 같은 방법)
+eq(isCombinedShipmentPeer(me, P({ code: "B", addr: "서울시강남구|101", kakao: "KAK1", phone: "", broadcast: "BC1", day: "2026-09-16" })), true, "같은 손님·주소·방송·방법→합배송");
+eq(isCombinedShipmentPeer(me, P({ code: "B", addr: "서울시강남구|101", kakao: "", phone: "01012345678", broadcast: "", day: "2026-09-16" })), true, "전화 일치+같은 날→합배송");
+eq(isCombinedShipmentPeer(me, P({ code: "B", addr: "서울시강남구|101", kakao: "KAK1", phone: "", broadcast: "", day: "2026-09-17" })), false, "방송 다르고 날 다르면 아님");
+eq(isCombinedShipmentPeer(me, P({ code: "B", addr: "부산시해운대|202", kakao: "KAK1", phone: "", broadcast: "BC1", day: "2026-09-16" })), false, "주소 다르면 아님");
+eq(isCombinedShipmentPeer(me, P({ code: "B", addr: "서울시강남구|101", kakao: "KAK2", phone: "01099998888", broadcast: "BC1", day: "2026-09-16" })), false, "다른 손님이면 아님");
+eq(isCombinedShipmentPeer(me, P({ code: "A", addr: "서울시강남구|101", kakao: "KAK1", phone: "", broadcast: "BC1", day: "2026-09-16" })), false, "자기 자신 제외");
+eq(isCombinedShipmentPeer({ ...me, addr: "" }, P({ code: "B", addr: "", kakao: "KAK1", phone: "", broadcast: "BC1", day: "2026-09-16" })), false, "주소 모르면 성립 안 함");
+eq(isCombinedShipmentPeer(me, P({ code: "", addr: "서울시강남구|101", kakao: "KAK1", phone: "", broadcast: "BC1", day: "2026-09-16" })), false, "상대 코드 없으면 아님");
+// [정정] 결제방법 다르면 합배송 아님 — MU464IS3(무통장) vs 같은 날 카드결제 주문
+eq(isCombinedShipmentPeer(me, { code: "B", addr: "서울시강남구|101", kakao: "KAK1", phone: "", broadcast: "BC1", day: "2026-09-16", paymentMethod: "카드결제" }), false, "결제방법 다르면 합배송 아님");
 
 // ── [복구후속1] 저장금액≠주문금액 경고 표시 판정 ──
 const base = { linesLoaded: true, linesError: false, lineCount: 1, autoBase: 83000, savedBase: 79000, matchAccepted: false };
@@ -121,5 +123,15 @@ eq(cardRefundBackAmount(20000, 235000), 255000, "부분반품: 차감+남기는 
 eq(cardRefundBackAmount(0, 100000), 100000, "부분반품 차감0 → 남기는 상품만");
 // 옛 저장 base(255,000) 로 amount_final 이 235,000 이어도 «역산 아님»이라 영향 없음 — 차감만 반영
 { const deduct = 20000; eq(cardRefundBackAmount(deduct, 0), 20000, "옛 base 무관 — 차감 20,000 그대로"); }
+
+// ── [정정] 배송비 = 총액 − 상품 − 카드추가금 (shipping_fee 칼럼 0이어도) ──
+eq(derivedShippingFee({ orderBaseSum: 83000, productLineSum: 79000, cardExtra: 0, shippingFeeColumn: 0 }), 4000, "빛나리: 83,000−79,000=4,000(칼럼 0)");
+eq(derivedShippingFee({ orderBaseSum: 79000, productLineSum: 79000, cardExtra: 0, shippingFeeColumn: 0 }), 0, "배송비 없음→0");
+eq(derivedShippingFee({ orderBaseSum: 272850, productLineSum: 255000, cardExtra: 17850, shippingFeeColumn: 0 }), 0, "카드(총−상품−카드추가금)=0");
+eq(derivedShippingFee({ orderBaseSum: 87000, productLineSum: 79000, cardExtra: 0, shippingFeeColumn: 4000 }), 8000, "칼럼4000 vs 파생8000 → 큰 값");
+eq(derivedShippingFee({ orderBaseSum: 79000, productLineSum: 79000, cardExtra: 0, shippingFeeColumn: 4000 }), 4000, "칼럼만 4000");
+eq(derivedShippingFee({ orderBaseSum: 70000, productLineSum: 79000, cardExtra: 0, shippingFeeColumn: 0 }), 0, "음수 방지→0");
+// 배송비 포함 시 base: 79,000 + 4,000 = 83,000
+eq(computeRefundBase([{ lineTotal: 79000, qty: 1, unit: 79000, selectedQty: 1 }], true, 4000), 83000, "상품+배송비=83,000");
 
 console.log(`✅ refund-issue-terms ${pass}건 통과`);
