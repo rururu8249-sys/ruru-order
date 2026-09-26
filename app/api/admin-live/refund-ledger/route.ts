@@ -90,6 +90,32 @@ function buildWritePayload(body: Row) {
   return payload;
 }
 
+// [2026-09-26 7차보완] 카드취소 기록에 «카드 총결제액»을 붙인다(refund_ledger엔 없음 → orders 를 읽기 전용 조회).
+//   같은 order_lookup_code 의 카드 총액 = 줄별 adjusted_total_price 합(주문상세·order-lines 와 동일 규칙).
+//   행마다 요청 금지 → 카드 기록의 주문번호를 모아 한 번에.
+async function attachCardTotals(items: Array<Record<string, unknown>>, supabase: ReturnType<typeof getSupabaseAdminClient>) {
+  const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+  const codes = Array.from(new Set(items.filter((it) => String(it.method ?? "") === "카드취소").map((it) => String(it.order_lookup_code ?? "").trim()).filter(Boolean))).slice(0, 200);
+  if (codes.length === 0) return items;
+  try {
+    const { data } = await supabase
+      .from("orders")
+      .select("order_lookup_code, adjusted_total_price, total_price, final_amount, is_deleted")
+      .in("order_lookup_code", codes);
+    const totalByCode: Record<string, number> = {};
+    for (const r of ((data as Array<Record<string, unknown>>) || [])) {
+      if (r.is_deleted === true) continue;
+      const c = String(r.order_lookup_code ?? "").trim();
+      if (!c) continue;
+      totalByCode[c] = (totalByCode[c] || 0) + Math.max(0, Math.round(num(r.adjusted_total_price ?? r.total_price ?? r.final_amount)));
+    }
+    for (const it of items) {
+      if (String(it.method ?? "") === "카드취소") it.card_total = totalByCode[String(it.order_lookup_code ?? "").trim()] || 0;
+    }
+  } catch { /* 카드 총액 조회 실패는 무시(💳는 amount_final 로 대체) */ }
+  return items;
+}
+
 export async function GET(request: NextRequest) {
   const adminSession = await verifyAdminSessionFromRequest(request);
   if (!adminSession) return NextResponse.json({ ok: false, message: "관리자 로그인이 필요합니다." }, { status: 401 });
@@ -116,7 +142,9 @@ export async function GET(request: NextRequest) {
       if (ids.length === 0) return NextResponse.json({ ok: true, items: [] });
       const { data, error } = await supabase.from("refund_ledger").select("*").in("admin_task_id", ids);
       if (error) return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
-      return NextResponse.json({ ok: true, items: ((data as Row[]) || []).map((r) => toTaskSummaryRow(r, now)) });
+      const items = ((data as Row[]) || []).map((r) => toTaskSummaryRow(r, now));
+      await attachCardTotals(items, supabase);
+      return NextResponse.json({ ok: true, items });
     }
 
     // ── 이체 목록 복사용: 선택 장부 id 묶음 → 전체 계좌번호(단 완료+30일 지나면 가림). 행마다 요청 금지 대응. ──
@@ -126,7 +154,9 @@ export async function GET(request: NextRequest) {
       if (ids.length === 0) return NextResponse.json({ ok: true, items: [] });
       const { data, error } = await supabase.from("refund_ledger").select("*").in("id", ids);
       if (error) return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
-      return NextResponse.json({ ok: true, items: ((data as Row[]) || []).map((r) => toDetailRow(r, now)) });
+      const items = ((data as Row[]) || []).map((r) => toDetailRow(r, now));
+      await attachCardTotals(items, supabase);
+      return NextResponse.json({ ok: true, items });
     }
 
     // ── 같은 주문번호(order_lookup_code)의 다른 환불 기록 — 중복 환불 경고용. 뒷4자리만. ──

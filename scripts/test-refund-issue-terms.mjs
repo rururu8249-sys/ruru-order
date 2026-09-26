@@ -1,5 +1,5 @@
 // [2026-09-26 5·6차] 고객이슈 환불/교환 용어·💳 요약 문구 테스트
-import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase } from "../lib/refundLedger.ts";
+import { refundListButtonLabel, ledgerSummaryLine, optionLabelNoNone, isFullReturnSel, computeRefundBase, isCombinedShipmentPeer } from "../lib/refundLedger.ts";
 import { bankDisplayName } from "../lib/parseBankAccount.ts";
 
 let pass = 0;
@@ -49,13 +49,19 @@ const bn = (li) => bankDisplayName(String(li.bank ?? ""));
 { const li = { kind: "반품", method: "계좌이체", amount_final: 69000, stage: "완료", account_last4: "2708" };
   eq(ledgerSummaryLine(li, "국민은행"), "69,000원 보냄 · 국민은행 ****2708", "완료(stage=완료·날짜없음)"); }
 
-// ── [7차] 카드취소 💳 요약 ──
-{ const li = { kind: "반품", method: "카드취소", amount_final: 252850 };
-  eq(ledgerSummaryLine(li, ""), "카드 취소할 금액 252,850원", "미완료 카드취소"); }
-{ const li = { kind: "반품", method: "카드취소", amount_final: 252850, done_at: "2026-09-26T10:00:00" };
-  eq(ledgerSummaryLine(li, ""), "252,850원 카드 취소함 · 09.26(토)", "완료 카드취소"); }
-{ const li = { kind: "반품", method: "카드취소", amount_final: 0 };
-  eq(ledgerSummaryLine(li, ""), "", "카드취소 금액0 미완료→빈칸"); }
+// ── [7차보완] 카드취소 💳 요약 — 전체 취소 + 다시 받을 돈 ──
+{ const li = { kind: "반품", method: "카드취소", amount_final: 252850, card_total: 272850 };
+  eq(ledgerSummaryLine(li, ""), "카드 전체 취소 272,850원 · 다시 받을 돈 20,000원", "미완료 카드취소(차감 20,000)"); }
+{ const li = { kind: "반품", method: "카드취소", amount_final: 272850, card_total: 272850 };
+  eq(ledgerSummaryLine(li, ""), "카드 전체 취소 272,850원", "미완료 카드취소(다시 받을 돈 0→생략)"); }
+{ const li = { kind: "반품", method: "카드취소", amount_final: 252850, card_total: 272850, done_at: "2026-09-26T10:00:00" };
+  eq(ledgerSummaryLine(li, ""), "카드 전체 취소함 · 20,000원 받음 · 09.26(토)", "완료 카드취소(20,000 받음)"); }
+{ const li = { kind: "반품", method: "카드취소", amount_final: 272850, card_total: 272850, done_at: "2026-09-26T10:00:00" };
+  eq(ledgerSummaryLine(li, ""), "카드 전체 취소함 · 09.26(토)", "완료 카드취소(받을 돈 0)"); }
+{ const li = { kind: "반품", method: "카드취소", amount_final: 0, card_total: 0 };
+  eq(ledgerSummaryLine(li, ""), "", "카드취소 금액0·총액0 미완료→빈칸"); }
+{ const li = { kind: "반품", method: "카드취소", amount_final: 252850 }; // card_total 없는 옛 기록 → amount_final 로 대체
+  eq(ledgerSummaryLine(li, ""), "카드 전체 취소 252,850원", "card_total 없으면 amount_final 로 대체"); }
 
 // ── [6차] 옵션 「없음」 제거 ──
 eq(optionLabelNoNone("없음", "12"), "12", "없음/12→12");
@@ -84,5 +90,17 @@ eq(computeRefundBase([{ lineTotal: 79000, qty: 1, unit: 79000, selectedQty: 1 }]
 eq(computeRefundBase([{ lineTotal: 79000, qty: 1, unit: 79000, selectedQty: 1 }], false, 4000), 79000, "배송비 미포함=79,000");
 // 카드: base + 카드추가금(컴포넌트가 더함) — 272,850
 eq(computeRefundBase([{ lineTotal: 255000, qty: 1, unit: 255000, selectedQty: 1 }], false, 0) + 17850, 272850, "상품255,000+카드추가금17,850=272,850");
+
+// ── [7차 보완] 합배송 짝 판정 ──
+const me = { code: "A", addr: "서울시강남구|101", kakao: "KAK1", phones: ["01012345678"], broadcast: "BC1", day: "2026-09-16" };
+// 배송비 낸 쪽 ↔ 빠진 쪽: 주소·손님·방송 같으면 대칭으로 잡힌다
+eq(isCombinedShipmentPeer(me, { code: "B", addr: "서울시강남구|101", kakao: "KAK1", phone: "", broadcast: "BC1", day: "2026-09-16" }), true, "같은 손님·주소·방송→합배송");
+eq(isCombinedShipmentPeer(me, { code: "B", addr: "서울시강남구|101", kakao: "", phone: "01012345678", broadcast: "", day: "2026-09-16" }), true, "전화 일치+같은 날→합배송");
+eq(isCombinedShipmentPeer(me, { code: "B", addr: "서울시강남구|101", kakao: "KAK1", phone: "", broadcast: "", day: "2026-09-17" }), false, "방송 다르고 날 다르면 아님");
+eq(isCombinedShipmentPeer(me, { code: "B", addr: "부산시해운대|202", kakao: "KAK1", phone: "", broadcast: "BC1", day: "2026-09-16" }), false, "주소 다르면 아님");
+eq(isCombinedShipmentPeer(me, { code: "B", addr: "서울시강남구|101", kakao: "KAK2", phone: "01099998888", broadcast: "BC1", day: "2026-09-16" }), false, "다른 손님이면 아님");
+eq(isCombinedShipmentPeer(me, { code: "A", addr: "서울시강남구|101", kakao: "KAK1", phone: "", broadcast: "BC1", day: "2026-09-16" }), false, "자기 자신 제외");
+eq(isCombinedShipmentPeer({ ...me, addr: "" }, { code: "B", addr: "", kakao: "KAK1", phone: "", broadcast: "BC1", day: "2026-09-16" }), false, "주소 모르면 성립 안 함");
+eq(isCombinedShipmentPeer(me, { code: "", addr: "서울시강남구|101", kakao: "KAK1", phone: "", broadcast: "BC1", day: "2026-09-16" }), false, "상대 코드 없으면 아님");
 
 console.log(`✅ refund-issue-terms ${pass}건 통과`);

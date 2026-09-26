@@ -27,6 +27,20 @@ export function stageDisplay(stage: unknown, kind?: unknown): string {
 // [2026-09-26] 반품 사유 칩 — reason 필드에 저장.
 export const REASON_CHIPS = ["단순변심", "사이즈", "불량", "오배송", "기타"] as const;
 
+// [2026-09-26 7차보완] 합배송 짝 판정(순수 비교) — 주소키는 호출부에서 shippingAddressKey 로 계산해 넘긴다.
+//   같은 손님(kakao_id 또는 전화) + 같은 주소키 + 같은 방송(또는 같은 날)이면 같이 배송된 주문으로 본다.
+//   배송비를 «낸 쪽»이든 «빠진 쪽»이든 대칭으로 잡힌다(주소키가 같으므로).
+export type CombinePeerSelf = { code: string; addr: string; kakao: string; phones: string[]; broadcast: string; day: string };
+export type CombinePeerOther = { code: string; addr: string; kakao: string; phone: string; broadcast: string; day: string };
+export function isCombinedShipmentPeer(mine: CombinePeerSelf, other: CombinePeerOther): boolean {
+  const oc = String(other.code ?? "").trim();
+  if (!oc || oc === String(mine.code ?? "").trim()) return false;
+  if (!mine.addr || String(other.addr ?? "") !== mine.addr) return false; // 주소를 모르거나 다르면 아님
+  const sameCust = (!!mine.kakao && String(other.kakao ?? "") === mine.kakao) || (Array.isArray(mine.phones) && mine.phones.includes(String(other.phone ?? "")));
+  if (!sameCust) return false;
+  return Boolean((mine.broadcast && String(other.broadcast ?? "") === mine.broadcast) || (mine.day && String(other.day ?? "") === mine.day));
+}
+
 // [2026-09-26 7차] 전체 반품 판정 — 모든 줄이 «전체 수량»으로 선택됐는가(배송비·카드추가금 자동 체크 기준).
 export function isFullReturnSel(sels: Array<{ qty: unknown; selectedQty: unknown }>): boolean {
   const arr = Array.isArray(sels) ? sels : [];
@@ -61,7 +75,7 @@ function doneShortKo(v: unknown): string {
 export type LedgerSummaryInput = {
   kind?: unknown; method?: unknown; amount_final?: unknown; stage?: unknown;
   done_at?: unknown; bank?: unknown; account_holder?: unknown; exchange_option?: unknown;
-  account_number?: unknown; account_last4?: unknown;
+  account_number?: unknown; account_last4?: unknown; card_total?: unknown;
 };
 // [2026-09-26 6차] 💳 요약 문구 — 사람말. 값 없으면 "".
 //   bankName = 은행 전체이름(호출부에서 bankDisplayName 적용).
@@ -76,17 +90,20 @@ export function ledgerSummaryLine(li: LedgerSummaryInput | null | undefined, ban
   const isExchange = s(li.kind) === "교환" || s(li.kind) === "재발송";
   const method = s(li.method);
   const bn = s(bankName);
+  // 카드 총결제액(없으면 amount_final 로 대체) + 다시 받을 돈(= 카드총액 − 실제 환불액, 0 이하 숨김)
+  const cardTotal = Math.max(0, Math.round(Number(li.card_total)) || 0) || amt;
+  const refundBack = Math.max(0, cardTotal - amt);
   if (completed) {
     const dd = doneShortKo(li.done_at);
     if (isExchange) return `재발송함${dd ? ` · ${dd}` : ""}`;
     if (method === "없음") return "환불 없이 종료";
-    if (method === "카드취소") return `${wonTxt} 카드 취소함${dd ? ` · ${dd}` : ""}`;
+    if (method === "카드취소") return `카드 전체 취소함${refundBack > 0 ? ` · ${refundBack.toLocaleString("ko-KR")}원 받음` : ""}${dd ? ` · ${dd}` : ""}`;
     const last4 = s(li.account_last4);
     const acctSeg = last4 ? `${bn ? `${bn} ` : ""}****${last4}` : bn;
     return `${wonTxt} 보냄${dd ? ` · ${dd}` : ""}${acctSeg ? ` · ${acctSeg}` : ""}`;
   }
   if (isExchange) return `교환 · 바꿀 옵션 ${s(li.exchange_option) || "-"}`;
-  if (method === "카드취소" && amt > 0) return `카드 취소할 금액 ${wonTxt}`;
+  if (method === "카드취소" && cardTotal > 0) return `카드 전체 취소 ${cardTotal.toLocaleString("ko-KR")}원${refundBack > 0 ? ` · 다시 받을 돈 ${refundBack.toLocaleString("ko-KR")}원` : ""}`;
   if (method === "포인트" && amt > 0) return `포인트로 돌려줄 금액 ${wonTxt}`;
   if (method === "계좌이체" && amt > 0) {
     // [6차] 옛 예금주(입니다 등)는 노출 금지 → 「예금주 확인 필요」

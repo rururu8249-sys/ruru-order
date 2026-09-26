@@ -47,6 +47,7 @@ export type LedgerListRow = {
   bank?: string | null;
   account_last4?: string | null;
   account_holder?: string | null;
+  card_total?: number | null;
   transferred_at?: string | null;
   done_at?: string | null;
 };
@@ -95,7 +96,9 @@ function buildCopyLine(r: LedgerListRow, detail: LedgerDetail | null, orderDate:
   const product = productText(r.product_snapshot);
   const reason = reasonBody(r.reason).split("\n")[0] || "-";
   if (r.method === "카드취소") {
-    return [dateStr, product, reason, `카드취소 ${won(r.amount_final)}`, "카드"].map((x) => x || "-").join(" · ");
+    const cardTotal = Math.max(0, Math.round(Number(detail?.card_total ?? r.card_total)) || 0) || (Math.round(Number(r.amount_final)) || 0);
+    const back = Math.max(0, cardTotal - (Math.round(Number(r.amount_final)) || 0));
+    return [dateStr, product, reason, `카드 전체취소 ${won(cardTotal)}`, ...(back > 0 ? [`다시 받을 돈 ${won(back)}`] : [])].map((x) => x || "-").join(" · ");
   }
   const bank = bankDisplayName(clean(detail?.bank) || clean(r.bank));
   const acct = clean(detail?.account_number);
@@ -409,6 +412,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
   const [cardExtra, setCardExtra] = useState(0);
   const [cardTotal, setCardTotal] = useState(0);
   const [combinedShipping, setCombinedShipping] = useState(false);
+  const [combinedWith, setCombinedWith] = useState("");
   const [sel, setSel] = useState<Record<string, number>>({});
   const [includeShipping, setIncludeShipping] = useState(false);
   const [shippingTouched, setShippingTouched] = useState(false);
@@ -437,6 +441,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
         setCardExtra(Math.max(0, Math.round(Number(entry?.cardExtra)) || 0));
         setCardTotal(Math.max(0, Math.round(Number(entry?.cardTotal)) || 0));
         setCombinedShipping(Boolean(entry?.combined));
+        setCombinedWith(clean(entry?.combinedWith));
         // 카드결제 주문 → 방법 기본 「카드취소」(사용자가 저장해둔 방법이 없을 때만).
         if (clean(entry?.paymentMethod).includes("카드") && !isExchange && (!item.method || item.method === "없음")) {
           setMethod("카드취소");
@@ -503,6 +508,9 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
   const deductFinalLabel = reasonVal ? `${reasonVal} 차감` : "차감"; // [6차] 현재 사유를 따라감(옛 라벨 유지 안 함)
   const finalAdj: RefundAdjustment[] = [...keptAdj, ...(deductAmount > 0 ? [{ label: deductFinalLabel, amount: -deductAmount }] : [])];
   const amountFinal = computeAmountFinal(amountBase, finalAdj);
+  // [7차보완] 카드 전체 취소액 = 카드 총결제액(항상 전체). 다시 받을 돈 = 총액 − 실제 환불액(0 이하 숨김).
+  const cardTotalDisplay = cardTotal > 0 ? cardTotal : amountFinal;
+  const cardRefundBack = Math.max(0, cardTotalDisplay - amountFinal);
   const deductTotal = finalAdj.filter((a) => a.amount < 0).reduce((s, a) => s - a.amount, 0);
   const formula = deductTotal > 0 ? `${formatComma(amountBase)} − ${formatComma(deductTotal)}` : "";
 
@@ -590,7 +598,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
       : productText(lines.filter((l) => (sel[l.id] || 0) > 0).map((l) => ({ productName: l.product_name, color: l.color, size: l.size, qty: sel[l.id] || 0 })));
     const reason = reasonVal || reasonBody(item.reason).split("\n")[0] || "-";
     const line = isCardCancel
-      ? [dateStr, product || "-", reason, `카드취소 ${won(amountFinal)}`, "카드"].join(" · ")
+      ? [dateStr, product || "-", reason, `카드 전체취소 ${won(cardTotalDisplay)}`, ...(cardRefundBack > 0 ? [`다시 받을 돈 ${won(cardRefundBack)}`] : [])].join(" · ")
       : [dateStr, product || "-", reason, won(amountFinal), [bankDisplayName(bank), account].filter(Boolean).join(" ") || "-", holder || "-"].map((x) => x || "-").join(" · ");
     try { await navigator.clipboard.writeText(line); showAdminToast("이체 정보 복사했어요", "success"); }
     catch { showAdminToast("복사 실패:\n" + line, "warning"); }
@@ -604,7 +612,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
   const headerNotice = isExchange
     ? ""
     : method === "카드취소"
-      ? "여기서 카드가 취소되지 않아요. 페이스터에서 취소한 뒤 누르세요."
+      ? "여기서 카드가 취소되지 않아요. 페이스터에서 전체 취소한 뒤 누르세요."
       : method === "포인트"
         ? "포인트는 아직 자동 지급되지 않아요. 지급 후 [지급했어요]를 누르세요."
         : method === "계좌이체"
@@ -688,7 +696,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
                       <input type="checkbox" checked={includeShipping} onChange={(e) => { setIncludeShipping(e.target.checked); setShippingTouched(true); }} className="h-5 w-5 accent-rose-deep" />
                       배송비도 환불 <span className="text-ink-mute">({formatComma(shippingFee)}원)</span>
                     </label>
-                    {combinedShipping ? <div className="mt-1 text-[13px] text-ink-mute">합배송 주문이라 배송비는 확인하세요.</div> : null}
+                    {combinedShipping ? <div className="mt-1 text-[13px] text-ink-mute">같이 배송된 주문{combinedWith ? `(${combinedWith})` : ""}이 있어서 배송비는 확인하세요.</div> : null}
                   </div>
                 ) : null}
                 {!isExchange && isCardCancel && cardExtra > 0 && isFullReturn ? (
@@ -762,8 +770,23 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
               <div className="mb-3">
                 {method === "카드취소" ? (
                   <div className="rounded-xl border border-line p-3">
-                    <div className="text-[14px] font-bold text-ink">카드 결제 {won(cardTotal)}{cardExtra > 0 ? ` (카드추가금 ${formatComma(cardExtra)}원 포함)` : ""}</div>
-                    <div className="mt-1 text-[13px] font-bold text-ink-mute">카드 취소는 페이스터에서 진행하세요. 여기서는 기록만 남습니다.</div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[14px] font-black text-ink">카드 전체 취소</span>
+                      <span className="text-[14px] font-black text-ink">{won(cardTotalDisplay)}</span>
+                    </div>
+                    {cardRefundBack > 0 ? (
+                      <>
+                        <div className="mt-1 flex items-center justify-between">
+                          <span className="text-[14px] font-black text-rose-deep">다시 받을 돈</span>
+                          <span className="text-[14px] font-black text-rose-deep">{won(cardRefundBack)}</span>
+                        </div>
+                        <div className="mt-0.5 text-[13px] text-ink-mute">{isFullReturn ? "차감 금액이에요. 손님에게 따로 받으세요." : "남기는 상품·배송비·차감이 들어 있어요. 카드로 다시 결제받을 때 카드추가금은 따로 확인하세요."}</div>
+                      </>
+                    ) : null}
+                    <div className="mt-1 flex items-center justify-between">
+                      <span className="text-[13px] font-bold text-ink-mute">실제로 돌려주는 돈</span>
+                      <span className="text-[13px] font-bold text-ink-mute">{won(amountFinal)}</span>
+                    </div>
                   </div>
                 ) : method === "계좌이체" ? (
                   <div className="rounded-xl border border-line p-3">
@@ -839,7 +862,7 @@ export function RefundProcessModal({ item, onClose, onSaved, onCompleted }: { it
           {isExchange ? (
             <button type="button" disabled={saving} onClick={() => complete({ mark_done: true, stage: "완료" }, "재발송 완료로 기록하고 해결완료로 넘길까요?")} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">재발송했어요 → 해결완료</button>
           ) : method === "카드취소" ? (
-            <button type="button" disabled={saving} onClick={() => complete({ mark_done: true, stage: "완료" }, `${won(amountFinal)} 카드 취소 완료로 기록하고 해결완료로 넘길까요?`)} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">카드 취소했어요 → 해결완료</button>
+            <button type="button" disabled={saving} onClick={() => complete({ mark_done: true, stage: "완료" }, cardRefundBack > 0 ? `${won(cardTotalDisplay)} 카드 전체 취소, ${won(cardRefundBack)} 받음으로 기록하고 해결완료로 넘길까요?` : `${won(cardTotalDisplay)} 카드 전체 취소로 기록하고 해결완료로 넘길까요?`)} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">{cardRefundBack > 0 ? `카드 취소 + ${won(cardRefundBack)} 받았어요 → 해결완료` : "카드 전체 취소했어요 → 해결완료"}</button>
           ) : method === "계좌이체" ? (
             <button type="button" disabled={saving} onClick={() => complete({ mark_transferred: true, mark_done: true, stage: "완료" }, `${won(amountFinal)} 이체 완료로 기록하고 해결완료로 넘길까요?`)} className="ml-auto h-12 rounded-xl bg-rose-deep px-4 text-[14px] font-black text-white disabled:opacity-50">이체했어요 → 해결완료</button>
           ) : method === "포인트" ? (
