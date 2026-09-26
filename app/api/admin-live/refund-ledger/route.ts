@@ -96,6 +96,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ok: true, item: toDetailRow(data as Row, now) });
     }
 
+    // ── 고객이슈용 묶음 조회: admin_task_id IN (…) → 뒷4자리만. 줄마다 개별 조회 금지 대응. ──
+    const taskIdsRaw = text(url.searchParams.get("taskIds"), 4000);
+    if (taskIdsRaw) {
+      const ids = Array.from(new Set(taskIdsRaw.split(",").map((s) => s.trim()).filter(Boolean))).slice(0, 60);
+      if (ids.length === 0) return NextResponse.json({ ok: true, items: [] });
+      const { data, error } = await supabase.from("refund_ledger").select("*").in("admin_task_id", ids);
+      if (error) return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true, items: ((data as Row[]) || []).map(toListRow) });
+    }
+
     // ── 목록: 계좌 뒷4자리만 + 단계별 건수 ──
     const stage = text(url.searchParams.get("stage"), 20);
     const kind = text(url.searchParams.get("kind"), 20);

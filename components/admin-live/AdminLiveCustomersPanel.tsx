@@ -19,7 +19,6 @@ import AdminLiveLoyaltyReport, { type LoyaltyCustomerRef } from "./AdminLiveLoya
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import type { LiveOrder } from "./types";
 import AdminLiveCustomerIssueRail from "./AdminLiveCustomerIssueRail";
-import AdminLiveRefundLedgerPanel from "./AdminLiveRefundLedgerPanel";
 import AdminLivePhoneBlockPanel from "./AdminLivePhoneBlockPanel";
 import AdminLiveCustomerBlockReasonModal from "./AdminLiveCustomerBlockReasonModal";
 import AdminLiveCustomerPointPanel from "./AdminLiveCustomerPointPanel";
@@ -1128,18 +1127,8 @@ function CustomerDetailDrawer({
 
 export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = "members", openTabAt = 0, openIssueCount = 0, embedded = false, onTabChange }: Props) {
   // [2026-09-09] «계정 연결 요청» 탭 추가 — 손님이 카톡을 바꿔 회원이 갈라졌을 때 들어오는 요청함
-  const [custTab, setCustTab] = useState<"members" | "issues" | "loyalty" | "link" | "refund">(initialTab);
-  // [2026-09-26] 고객이슈 「장부에서 보기」로 넘어오면 교환·환불 탭 + 그 건 처리 창 열기
-  const [refundFocusTaskId, setRefundFocusTaskId] = useState("");
-  useEffect(() => {
-    const onOpenLedger = (e: Event) => {
-      const id = String((e as CustomEvent).detail?.adminTaskId ?? "").trim();
-      setRefundFocusTaskId(id);
-      setCustTab("refund");
-    };
-    window.addEventListener("ruru-open-refund-ledger", onOpenLedger as EventListener);
-    return () => window.removeEventListener("ruru-open-refund-ledger", onOpenLedger as EventListener);
-  }, []);
+  // [2026-09-26] 교환·환불은 «고객이슈 안»에서 처리(별도 탭 없음). refund 관련 탭/리스너 제거.
+  const [custTab, setCustTab] = useState<"members" | "issues" | "loyalty" | "link">(initialTab);
   // [2026-09-21] 바깥(고객이슈 알림 띠 등)에서 탭 열기 요청이 오면 실제로 전환하고 그 자리로 스크롤한다.
   const tabBarRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -1881,7 +1870,6 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
             {([
               ["members", "회원 목록", 0],
               ["issues", "고객이슈", openIssueCount],
-              ["refund", "교환·환불", 0],
               ["loyalty", "단골 리포트", 0],
               ["link", "계정 잇기", linkPendingCount],
             ] as const).map(([key, label, badge]) => {
@@ -1946,7 +1934,6 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
       {custTab === "link" ? <AdminLiveLinkRequestsPanel /> : null}
 
-      {custTab === "refund" ? <AdminLiveRefundLedgerPanel focusTaskId={refundFocusTaskId} /> : null}
 
       {custTab === "loyalty" ? (
         <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">

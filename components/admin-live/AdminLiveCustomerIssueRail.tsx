@@ -13,6 +13,8 @@ import { formatKoreanPhone } from "@/lib/order/phone";
 import { supabase } from "@/lib/supabase";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { pickIssueProductRows } from "@/lib/issueProductLabel";
+import { RefundProcessModal, type LedgerDetail } from "./AdminLiveRefundLedgerPanel";
+import { productSnapshotFromItems } from "@/lib/refundLedger";
 
 type AdminIssueTask = {
   id?: string | number | null;
@@ -61,6 +63,13 @@ type IssueForm = {
 
 // [2026-09-26] 고객이슈 표의 «단 하나의» grid 템플릿 — 머리글·모든 줄이 이 상수를 그대로 써서 칸이 어긋나지 않는다.
 const ISSUE_GRID = "grid-cols-[36px_76px_120px_88px_124px_112px_1fr_auto]";
+
+// [2026-09-26] 교환·환불 처리 대상인 이슈인가 — task_type(exchange/return/refund) 또는 유형 칩(교환/반품/환불).
+//   이 줄에만 「환불 처리」 버튼·장부 요약을 붙인다.
+export function isRefundKindTask(task: { task_type?: string | null }): boolean {
+  const t = String(task?.task_type ?? "").trim().toLowerCase();
+  return t === "exchange" || t === "return" || t === "refund";
+}
 
 const ISSUE_TYPE_OPTIONS: Array<[string, string]> = [
   ["exchange", "교환"],
@@ -347,6 +356,8 @@ function IssueCard({
   busy = false,
   photos = [],
   onPhotoZoom,
+  ledgerInfo = null,
+  onOpenRefund,
 }: {
   task: AdminIssueTask;
   index: number;
@@ -367,6 +378,10 @@ function IssueCard({
   /** [2026-09-23] 상품 사진 — 상품을 골라 등록한 이슈에만 붙는다. 없으면 빈 배열. */
   photos?: string[];
   onPhotoZoom?: (url: string) => void;
+  /** [2026-09-26] 교환·환불 건의 장부 요약(있을 때만). 진행단계·최종환불액·방법. */
+  ledgerInfo?: { stage?: string; amount_final?: number; method?: string } | null;
+  /** [2026-09-26] 「환불 처리」 — 처리 창 열기(교환/반품/환불 건에만). */
+  onOpenRefund?: (task: AdminIssueTask) => void;
 }) {
   // [2026-09-21 사장님] 「2번씩이나 클릭해야 하고 너무 보기 불편함.
   //   필요한 고객정보 닉네임·이름·전화번호·년월일·특이사항 보기 좋게 딱 안 돼?」
@@ -377,6 +392,11 @@ function IssueCard({
   //   (쿠팡 윙·스마트스토어 반품관리도 목록은 표다)
   const done = isResolved(task);
   const deleted = clean(task.status).toLowerCase() === "deleted";
+  const isRefund = isRefundKindTask(task);
+  // 장부 요약: 값이 있을 때만(행 없거나 초기값이면 표시 안 함)
+  const ledgerLine = isRefund && ledgerInfo
+    ? [ledgerInfo.stage, (Number(ledgerInfo.amount_final) || 0) > 0 ? `${(Number(ledgerInfo.amount_final) || 0).toLocaleString("ko-KR")}원` : "", ledgerInfo.method && ledgerInfo.method !== "없음" ? ledgerInfo.method : ""].filter(Boolean).join(" · ")
+    : "";
   // 반품/교환 등록으로 만들어진 건인가 — 지울 때 포인트·반품기록까지 되돌려야 한다
   const fromReturn = clean((task as { source?: unknown }).source) === "order_return_flow";
   const issueTypes = getIssueTypes(task);
@@ -445,17 +465,6 @@ function IssueCard({
             이 줄의 「지우기」는 회수한 포인트까지 되돌리므로, 손으로 적은 메모와 구분이 돼야 한다. */}
         {fromReturn ? (
           <span className="rounded bg-rose-soft px-1.5 py-0.5 text-[11px] font-black text-rose-deep" title="주문상세 반품/교환에서 자동 등록 — 지우면 회수한 포인트도 돌아갑니다">자동</span>
-        ) : null}
-        {/* [2026-09-26] 교환·반품·환불 건은 «교환·환불 장부»에서 이어서 처리. 링크만 — 고객이슈 기존 동작은 그대로. */}
-        {(fromReturn || ["exchange", "return", "refund"].includes(clean(task.task_type).toLowerCase())) ? (
-          <button
-            type="button"
-            onClick={() => window.dispatchEvent(new CustomEvent("ruru-open-refund-ledger", { detail: { adminTaskId: clean(task.id) } }))}
-            className="rounded border border-rose-line px-1.5 py-0.5 text-[11px] font-black text-rose-deep hover:bg-rose-soft"
-            title="교환·환불 장부에서 이 건을 열어 처리합니다"
-          >
-            장부에서 보기 ›
-          </button>
         ) : null}
       </div>
 
@@ -532,6 +541,13 @@ function IssueCard({
           ) : null}
           {!product && !memoShown ? <span className="font-bold text-ink-mute">내용 없음</span> : null}
           {!product && orderNo ? <div className="text-[11px] font-bold text-ink-mute">{orderNo}</div> : null}
+          {/* [2026-09-26] 교환·환불 장부 요약 — 진행단계 · 최종환불액 · 방법 (값 있을 때만) */}
+          {ledgerLine ? (
+            <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+              <span className="shrink-0" aria-hidden>💳</span>
+              <span className="min-w-0 truncate font-black text-info-tx">{ledgerLine}</span>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -569,6 +585,17 @@ function IssueCard({
           </>
         ) : (
           <>
+            {isRefund ? (
+              <button
+                type="button"
+                onClick={() => onOpenRefund?.(task)}
+                disabled={busy}
+                title="교환·환불 처리(단계·환불액·계좌) — 포인트는 움직이지 않고 기록만"
+                className={`${SUB_BTN} border-rose-line text-rose-deep hover:bg-rose-soft`}
+              >
+                환불 처리
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => onEdit(task)}
@@ -770,6 +797,106 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   const filteredIds = useMemo(() => visibleTasks.map((t) => clean(t.id)).filter(Boolean), [visibleTasks]);
   const canSelectWholeTab = allOnPageSelected && selectedIds.size < filteredIds.length;
   const selectWholeTab = () => setSelectedIds(new Set(filteredIds));
+
+  // ── [2026-09-26] 교환·환불 장부(고객이슈 안에서 처리) ──
+  //   현재 페이지의 교환/반품/환불 줄들의 refund_ledger 요약을 «한 번에» 묶어 조회(줄마다 개별 조회 금지).
+  const [ledgerByTask, setLedgerByTask] = useState<Record<string, { id: string; stage: string; amount_final: number; method: string }>>({});
+  const [refundReloadTick, setRefundReloadTick] = useState(0);
+  const [refundModalItem, setRefundModalItem] = useState<LedgerDetail | null>(null);
+  const refundPageIdsKey = pageTasks.filter(isRefundKindTask).map((t) => clean(t.id)).filter(Boolean).sort().join(",");
+  useEffect(() => {
+    let alive = true;
+    const ids = refundPageIdsKey ? refundPageIdsKey.split(",") : [];
+    if (ids.length === 0) { setLedgerByTask({}); return; }
+    (async () => {
+      const res = await fetch(`/api/admin-live/refund-ledger?taskIds=${encodeURIComponent(ids.join(","))}`, { cache: "no-store" });
+      const p = await res.json().catch(() => null);
+      if (!alive || !p?.ok) return;
+      const map: Record<string, { id: string; stage: string; amount_final: number; method: string }> = {};
+      for (const r of (p.items || []) as Array<Record<string, unknown>>) {
+        const tid = clean(r.admin_task_id);
+        if (tid) map[tid] = { id: String(r.id), stage: String(r.stage ?? ""), amount_final: Number(r.amount_final) || 0, method: String(r.method ?? "") };
+      }
+      setLedgerByTask(map);
+    })().catch(() => { /* 실패해도 목록은 정상, 요약만 생략 */ });
+    return () => { alive = false; };
+  }, [refundPageIdsKey, refundReloadTick]);
+
+  const openRefund = async (task: AdminIssueTask) => {
+    const tid = clean(task.id);
+    const existing = ledgerByTask[tid];
+    if (existing?.id) {
+      try {
+        const res = await fetch(`/api/admin-live/refund-ledger?id=${encodeURIComponent(existing.id)}`, { cache: "no-store" });
+        const p = await res.json().catch(() => null);
+        if (p?.ok) { setRefundModalItem(p.item as LedgerDetail); return; }
+      } catch { /* fallthrough */ }
+      showAdminToast("장부 항목을 불러오지 못했습니다.", "error");
+      return;
+    }
+    // 첫 처리 — 저장 시 admin_task_id 로 새 행 생성(UNIQUE). 상품·주문번호·고객·사유는 고객이슈에서.
+    const rawItems = (task.raw_payload && typeof task.raw_payload === "object" ? (task.raw_payload as Record<string, unknown>).items : undefined);
+    setRefundModalItem({
+      id: "",
+      created_at: "",
+      admin_task_id: tid,
+      kind: clean(task.task_type).toLowerCase() === "exchange" ? "교환" : "반품",
+      stage: "접수",
+      method: "없음",
+      amount_base: 0,
+      amount_final: 0,
+      adjustments: [],
+      product_snapshot: productSnapshotFromItems(rawItems),
+      nickname: getNickname(task),
+      customer_name: getName(task),
+      customer_phone: getPhone(task),
+      order_lookup_code: extractBodyField(task, "주문번호:"),
+      reason: splitIssueBody(task.body).memo,
+    });
+  };
+
+  // 이체 목록 복사 — 선택 건 중 계좌이체·금액 있는 건만. 전체 계좌번호는 이때만 서버에서.
+  const copyTransferListBulk = async () => {
+    const refundSel = selectedTasks.filter(isRefundKindTask);
+    if (refundSel.length === 0) { showAdminToast("선택한 교환·환불 건이 없어요."); return; }
+    const idsParam = refundSel.map((t) => clean(t.id)).filter(Boolean).join(",");
+    const listRes = await fetch(`/api/admin-live/refund-ledger?taskIds=${encodeURIComponent(idsParam)}`, { cache: "no-store" });
+    const listPayload = await listRes.json().catch(() => null);
+    const rows = (listPayload?.ok ? listPayload.items : []) as Array<Record<string, unknown>>;
+    const targets = rows.filter((r) => String(r.method) === "계좌이체" && (Number(r.amount_final) || 0) > 0);
+    if (targets.length === 0) { showAdminToast("계좌이체·금액이 있는 선택 건이 없어요."); return; }
+    const lines: string[] = [];
+    for (const r of targets) {
+      const res = await fetch(`/api/admin-live/refund-ledger?id=${encodeURIComponent(String(r.id))}`, { cache: "no-store" });
+      const p = await res.json().catch(() => null);
+      const d = p?.ok ? (p.item as LedgerDetail) : null;
+      const holder = clean(d?.account_holder) || clean(r.customer_name) || clean(r.nickname);
+      lines.push([clean(d?.bank), clean(d?.account_number), holder, `${(Number(r.amount_final) || 0).toLocaleString("ko-KR")}원`].filter(Boolean).join(" "));
+    }
+    const textOut = lines.join("\n");
+    try { await navigator.clipboard.writeText(textOut); showAdminToast(`이체 목록 ${targets.length}건 복사했어요 (은행 계좌 예금주 금액)`, "success"); }
+    catch { showAdminToast("복사 실패 — 직접 복사하세요:\n\n" + textOut, "warning"); }
+  };
+
+  // 엑셀(CSV) — 계좌는 뒷4자리만.
+  const downloadRefundExcel = async () => {
+    const refundSel = selectedTasks.filter(isRefundKindTask);
+    if (refundSel.length === 0) { showAdminToast("선택한 교환·환불 건이 없어요."); return; }
+    const idsParam = refundSel.map((t) => clean(t.id)).filter(Boolean).join(",");
+    const res = await fetch(`/api/admin-live/refund-ledger?taskIds=${encodeURIComponent(idsParam)}`, { cache: "no-store" });
+    const p = await res.json().catch(() => null);
+    const rows = (p?.ok ? p.items : []) as Array<Record<string, unknown>>;
+    if (rows.length === 0) { showAdminToast("장부에 기록된 선택 건이 없어요(처리 전이면 먼저 「환불 처리」).", "warning"); return; }
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const header = ["접수일", "고객", "전화뒷4", "구분", "단계", "최종환불액", "방법", "계좌뒷4", "이체일", "완료일"];
+    const body = rows.map((r) => [clean(r.created_at), clean(r.nickname) || clean(r.customer_name), clean(r.customer_phone).slice(-4), clean(r.kind), clean(r.stage), Number(r.amount_final) || 0, clean(r.method), clean(r.account_last4), clean(r.transferred_at), clean(r.done_at)].map(esc).join(","));
+    const csv = "﻿" + [header.map(esc).join(","), ...body].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `교환환불_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  };
   const toggleSelect = (task: AdminIssueTask) => {
     const id = clean(task.id);
     if (!id) return;
@@ -1514,6 +1641,9 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
             <button type="button" onClick={selectWholeTab} className="h-8 rounded-lg px-2 text-[11px] font-black text-rose-deep underline underline-offset-2 hover:bg-surface">이 탭 {visibleTasks.length.toLocaleString("ko-KR")}건 전체 선택</button>
           ) : null}
           <button type="button" onClick={clearSelection} className="h-8 rounded-lg px-2 text-[11px] font-black text-ink-soft hover:bg-surface">선택 해제</button>
+          {/* [2026-09-26] 교환·환불 건 대상 — 이체 목록 복사(계좌이체·금액 있는 건, 이때만 전체 계좌)·엑셀(계좌 뒷4만) */}
+          <button type="button" onClick={copyTransferListBulk} className="h-8 rounded-lg border border-rose-line bg-surface px-2 text-[11px] font-black text-rose-deep hover:bg-rose-soft">📋 이체 목록 복사</button>
+          <button type="button" onClick={downloadRefundExcel} className="h-8 rounded-lg border border-line bg-surface px-2 text-[11px] font-black text-ink-soft hover:bg-surface-2">⬇ 엑셀</button>
           <div className="ml-auto flex items-center gap-1.5">
             {activeTab === "deleted" ? (
               <>
@@ -1584,11 +1714,21 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               onUnresolve={(t) => { void restoreIssueTask(t, true).then((ok) => { if (ok) showAdminToast("미해결로 되돌렸습니다.", "success"); }); }}
               onPurge={purgeIssueTask}
               busy={saving}
+              ledgerInfo={ledgerByTask[clean(task.id)] || null}
+              onOpenRefund={openRefund}
             />
           ))}
           </div>
         )}
       </div>
+
+      {refundModalItem ? (
+        <RefundProcessModal
+          item={refundModalItem}
+          onClose={() => setRefundModalItem(null)}
+          onSaved={() => { setRefundModalItem(null); setRefundReloadTick((v) => v + 1); }}
+        />
+      ) : null}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-surface-2 p-2">
         <div className="text-xs font-black text-ink-mute">

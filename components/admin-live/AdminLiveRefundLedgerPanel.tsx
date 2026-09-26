@@ -15,7 +15,7 @@ import {
   type RefundAdjustment,
 } from "@/lib/refundLedger";
 
-type LedgerListRow = {
+export type LedgerListRow = {
   id: string;
   created_at: string;
   admin_task_id?: string | null;
@@ -37,7 +37,7 @@ type LedgerListRow = {
   done_at?: string | null;
 };
 
-type LedgerDetail = LedgerListRow & {
+export type LedgerDetail = LedgerListRow & {
   bank?: string | null;
   account_number?: string | null;
   account_holder?: string | null;
@@ -307,7 +307,7 @@ export default function AdminLiveRefundLedgerPanel({ focusTaskId }: { focusTaskI
 }
 
 // ── 시안 ③ 처리 창 ──
-function RefundProcessModal({ item, onClose, onSaved }: { item: LedgerDetail; onClose: () => void; onSaved: () => void }) {
+export function RefundProcessModal({ item, onClose, onSaved }: { item: LedgerDetail; onClose: () => void; onSaved: () => void }) {
   const [stage, setStage] = useState(item.stage || "접수");
   const [kind] = useState(item.kind || "반품");
   const [nextAction, setNextAction] = useState(clean(item.next_action));
