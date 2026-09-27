@@ -33,7 +33,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { getActiveBroadcast, loadAdminLiveBroadcasts } from "@/components/admin-live/liveBroadcastController";
-import { feedOrderLines, feedOrderParts, feedProductLabel, feedRowLayout, feedPinLayout, feedRowAvailW, feedPinAvailW, estimateTextWidth, marqueePlan, alertOneLine, FEED_MARQUEE_GAP, FEED_MARQUEE_HOLD_START_MS, FEED_PIN_SIZE, FEED_ROW_SIZES, type FeedLine, type FeedOrderItem, type FeedProduct } from "@/lib/feedText";
+import { feedOrderLines, feedOrderParts, feedProductLabel, feedRowLayout, feedPinLayout, feedRowAvailW, feedPinAvailW, estimateTextWidth, marqueePlan, alertOneLine, FEED_MARQUEE_GAP, FEED_PIN_SIZE, FEED_ROW_SIZES, type FeedLine, type FeedOrderItem, type FeedProduct } from "@/lib/feedText";
 import { formatOrderOptionText } from "@/lib/orderOptionText";
 
 type AnyRow = Record<string, any>;
@@ -494,10 +494,10 @@ export default function OrderFeedWidgetClient() {
               </div>
             );
           }
-          // [09-27] 알림 한 줄 고정. 축소해도 안 들어가면 28px + once 흐름(끝부분 알약 중간에서 멈춤 → 퇴장).
+          // [09-27] 알림 한 줄 고정. 축소해도 안 들어가면 28px + 흐름(공지와 같은 반복 흐름, 1.5바퀴 후 페이드).
           const { meta, parts, verb, rowFont, plan } = alertPlan(item);
           const isMarquee = plan.mode === "once";
-          const onceScrollMs = plan.mode === "once" ? Math.round(plan.scrollMs) : 0;
+          const onceCycleMs = plan.mode === "once" ? Math.round(plan.cycleMs) : 0;
           // 폭죽: 주문 줄이고, 막 등장했을 때(1.7초 안) 1회. 그 뒤엔 DOM 에서 빠진다.
           const burst = item.kind === "order" && now - item.at < CONFETTI_MS;
           // 한 줄 내용(닉네임님 · 아이콘 인사말 · 상품) — static·흐름 둘 다 같은 내용, nowrap.
@@ -528,21 +528,20 @@ export default function OrderFeedWidgetClient() {
                 background: "rgba(0,0,0,0.55)",                                        // [09-27] 검정 반투명 통일 · 테두리(강조바만 유지)/그림자/잔광 폐기
                 borderLeft: `5px solid ${meta.accent}`,
                 ...(isMarquee ? { width: "100%" } : {}),
+                // 등장=커튼. 퇴장: 흐르는 알림은 «움직이는 채로» 페이드아웃(opacity만), 그 외는 커튼 닫힘.
                 animation: leaving
-                  ? `ruruCurtainOut ${EXIT_MS}ms ease-in forwards`
+                  ? (isMarquee ? `ruruFadeOut ${EXIT_MS}ms linear forwards` : `ruruCurtainOut ${EXIT_MS}ms ease-in forwards`)
                   : "ruruCurtain 0.65s cubic-bezier(0.16,1,0.3,1) both",
                 textShadow: TEXT_SHADOW,
                 color: "#fff",
               } as React.CSSProperties}
             >
               {isMarquee ? (
+                // 공지 loop 와 같은 구조: 같은 글자 2벌 + GAP, translateX 0→−50% 무한. 정지 없음.
                 <span style={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
-                  <span style={{
-                    display: "inline-flex", whiteSpace: "nowrap", willChange: "transform",
-                    ["--ruru-end" as string]: `calc(-100% + ${Math.round(rowAvailW / 2)}px)`,
-                    animation: `ruruOnce ${onceScrollMs}ms linear ${FEED_MARQUEE_HOLD_START_MS}ms 1 forwards`,
-                  } as React.CSSProperties}>
-                    {content}
+                  <span style={{ display: "inline-flex", whiteSpace: "nowrap", willChange: "transform", animation: `ruruLoop ${onceCycleMs}ms linear infinite` }}>
+                    <span style={{ display: "inline-flex", whiteSpace: "nowrap", paddingRight: `${FEED_MARQUEE_GAP}px` }}>{content}</span>
+                    <span style={{ display: "inline-flex", whiteSpace: "nowrap", paddingRight: `${FEED_MARQUEE_GAP}px` }} aria-hidden>{content}</span>
                   </span>
                 </span>
               ) : content}
@@ -589,7 +588,7 @@ export default function OrderFeedWidgetClient() {
         @keyframes ruruCurtainOut { from { clip-path: inset(0 0 0 0 round 999px); opacity: 1; } to { clip-path: inset(0 0 0 100% round 999px); opacity: 0; } }
         @keyframes ruruVerbPop { from { opacity: 0; transform: scale(1.5); } 60% { opacity: 1; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         @keyframes ruruLoop    { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-        @keyframes ruruOnce    { from { transform: translateX(0); } to { transform: translateX(var(--ruru-end)); } }
+        @keyframes ruruFadeOut { from { opacity: 1; } to { opacity: 0; } }
       `}</style>
     </div>
   );

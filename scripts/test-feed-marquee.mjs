@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import {
   marqueePlan, alertOneLine,
-  FEED_MARQUEE_SPEED, FEED_MARQUEE_GAP, FEED_MARQUEE_HOLD_START_MS, FEED_MARQUEE_HOLD_END_MS,
+  FEED_MARQUEE_SPEED, FEED_MARQUEE_GAP, FEED_MARQUEE_ONCE_TURNS,
 } from "../lib/feedText.ts";
 
 let pass = 0;
@@ -23,16 +23,19 @@ eq(marqueePlan({ textW: 814, availW: 814, kind: "loop" }).mode, "static", "경�
 { const p = marqueePlan({ textW: 1600, availW: 778, kind: "loop" });
   near(p.durationMs, ((1600 + FEED_MARQUEE_GAP) / FEED_MARQUEE_SPEED) * 1000, "loop dur 1600"); }
 
-// ── once: 1회 흐르고 끝부분이 중간(availW/2)에서 멈춤 (2케이스) ──
+// ── once: 공지와 같은 반복 흐름(cycleMs) + 1.5바퀴 후 페이드(정지 없음) (2케이스) ──
 { const availW = 814, textW = 1400;
   const p = marqueePlan({ textW, availW, kind: "once" });
   eq(p.mode, "once", "once mode");
-  near(p.scrollPx, textW - availW / 2, "once scrollPx = textW - availW/2");
-  near(p.scrollMs, (textW - availW / 2) / FEED_MARQUEE_SPEED * 1000, "once scrollMs");
-  near(p.totalMs, FEED_MARQUEE_HOLD_START_MS + p.scrollMs + FEED_MARQUEE_HOLD_END_MS, "once totalMs = holdStart+scroll+holdEnd"); }
+  near(p.cycleMs, (textW + FEED_MARQUEE_GAP) / FEED_MARQUEE_SPEED * 1000, "once cycleMs = (textW+GAP)/SPEED");
+  near(p.totalMs, p.cycleMs * FEED_MARQUEE_ONCE_TURNS, "once totalMs = cycleMs×1.5");
+  eq(p.fadeMs, 500, "once fadeMs=500"); }
 { const availW = 900, textW = 1200;
   const p = marqueePlan({ textW, availW, kind: "once" });
-  near(p.scrollPx, textW - availW / 2, "once2 scrollPx"); }
+  near(p.cycleMs, (textW + FEED_MARQUEE_GAP) / FEED_MARQUEE_SPEED * 1000, "once2 cycleMs"); }
+// once 와 loop 는 같은 한 바퀴 길이(같은 반복 흐름)
+{ const availW = 814, textW = 1400;
+  near(marqueePlan({ textW, availW, kind: "once" }).cycleMs, marqueePlan({ textW, availW, kind: "loop" }).durationMs, "once cycle == loop dur"); }
 
 // ── alertOneLine: 닉네임님 + 아이콘 인사말 + 상품 " | " ──
 eq(
