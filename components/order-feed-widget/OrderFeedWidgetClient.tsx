@@ -149,8 +149,9 @@ function ProductRun({ products, accent, page, pageCount }: { products: FeedProdu
       {products.map((p, i) => (
         // 상품 하나는 «통째로» 줄을 바꾼다 — 「알로가방 / 1개」처럼 이름과 수량이 갈라지지 않게
         <span key={i} style={{ display: "inline", whiteSpace: "nowrap" }}>
+          {/* [09-27 ⑦] 구분자도 nowrap — 모든 줄 한 줄 규칙, 상품 사이 줄바꿈 금지 */}
           {i > 0 ? (
-            <span style={{ color: accent, fontWeight: 900, padding: "0 10px", textShadow: "none", whiteSpace: "normal" }}>|</span>
+            <span style={{ color: accent, fontWeight: 900, padding: "0 10px", textShadow: "none", whiteSpace: "nowrap" }}>|</span>
           ) : null}
           <span style={{ fontWeight: 800, color: "#fff" }}>{p.name}</span>
           {p.opt ? <span style={{ fontWeight: 800, color: "rgba(255,255,255,0.7)" }}>{` ${p.opt}`}</span> : null}
@@ -510,7 +511,7 @@ export default function OrderFeedWidgetClient() {
               {parts.length > 0 ? (
                 <span style={{ display: "inline-flex", alignItems: "baseline" }}>
                   <span style={{ fontSize: `${Math.round(rowFont * 0.86)}px`, opacity: 0.45, paddingRight: "8px" }}>·</span>
-                  <span style={{ fontSize: `${rowFont}px` }}><ProductRun products={parts} accent={meta.accent} page={0} pageCount={1} /></span>
+                  <span style={{ fontSize: `${rowFont}px`, whiteSpace: "nowrap" }}><ProductRun products={parts} accent={meta.accent} page={0} pageCount={1} /></span>
                 </span>
               ) : null}
             </span>
