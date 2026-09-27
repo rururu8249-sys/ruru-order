@@ -33,7 +33,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { getActiveBroadcast, loadAdminLiveBroadcasts } from "@/components/admin-live/liveBroadcastController";
-import { feedOrderLines, feedOrderParts, feedProductLabel, feedProductPages, feedRowFitsOneLine, feedRowLayout, feedPinFitsOneLine, feedPinFontSize, feedPinLayout, feedRowAvailW, feedPinAvailW, estimateTextWidth, FEED_PAGE_MS, FEED_ROW_SIZES, FEED_DETAIL_LINES_PER_PAGE, type FeedLine, type FeedOrderItem, type FeedProduct } from "@/lib/feedText";
+import { feedOrderLines, feedOrderParts, feedProductLabel, feedRowLayout, feedPinLayout, feedRowAvailW, feedPinAvailW, estimateTextWidth, marqueePlan, alertOneLine, FEED_MARQUEE_GAP, FEED_MARQUEE_HOLD_START_MS, FEED_PIN_SIZE, FEED_ROW_SIZES, type FeedLine, type FeedOrderItem, type FeedProduct } from "@/lib/feedText";
 import { formatOrderOptionText } from "@/lib/orderOptionText";
 
 type AnyRow = Record<string, any>;
@@ -72,7 +72,8 @@ const NOTICE_MS = 30000;    // 📢 상품 안내가 떠 있는 시간 — 사�
 //     공지 + 한줄 알림 3건        = 81 + 70×3   = 291 > 270  → 기존과 같이 오래된 1건이 빠진다
 const BUDGET_H = 270;
 const H_PAD_NOTICE = 34, H_LINE_NOTICE = 43;   // 📌공지·📢안내
-const H_ALERT_ONE = 62, H_DETAIL_LINE = 35;    // 알림 한 줄(28px+여백) / 주문내역 한 줄 추가분 — [09-17] 글자 28 통일 후 실측
+const H_PIN_ONE = H_PAD_NOTICE + H_LINE_NOTICE; // [09-27] 공지·안내는 항상 한 줄 = 77 (34×1.25 + 패딩)
+const H_ALERT_ONE = 62;                        // [09-27] 알림도 항상 한 줄(넘치면 흐름) — 높이 고정
 const KEEP_ITEMS = 6;                          // 메모리에 들고 있는 알림 수(그릴 때 예산으로 자른다)
 // [09-13 사장님 「가로 좀 늘려줘 길이가 아쉽네」] 640 → 860 (한 줄에 34% 더 들어감)
 // [2026-09-24 사장님 「왼쪽 오른쪽 여백을 최대한으로 활용해서 길게」] 이제 이 값은 «바닥(최소 폭)»이다.
@@ -90,7 +91,7 @@ const BOX_W = 880, BOX_H = 300;   // 폭 860 + 여백 20 / 높이 = 4줄(공지2
 //   «채팅보다 작은 글씨»라 안 읽혔다. 위젯 알약은 가로 x39~615 = 화면 폭의 88% — 가로는 이미 꽉 찼다.
 //   → 한 줄에 욱여넣는 한 글자는 못 키운다. «2줄로 나눠» 한 줄당 글자 수를 줄이고 그만큼 글자를 키운다.
 //   비어 있던 세로(내용 171 / 기준 320 = 절반을 버리고 있었다)를 그 글자로 채우므로 화면 점유는 그대로다.
-//   ⚠ 공지·안내는 «최대 2줄»로 잘라 높이가 예측 가능하게 고정한다(아래 WebkitLineClamp).
+//   ⚠ [09-27] 이제 모든 줄은 «한 줄» — 넘치면 옆으로 흐른다(공지 반복 / 알림 1회). 높이는 한 줄로 고정.
 // [2026-09-13 사장님 «반투명 제대로 + 가독성»] «유리»처럼: 배경은 옅게(공지 45% · 알림 42%)·흐림 없음 → 방송 화면이 그대로 비친다.
 //   읽히는 건 배경이 아니라 «글자 테두리»가 맡는다(검정 1.5px 8방향 + 아래 그림자). 공지 30px(유튜브 채팅과 비슷).
 //   실측: 인형 선반 배경 + 폰 크기(1080→390) + JPEG 45 압축 흉내에서도 읽힘. (직전 72%+blur 는 배경이 안 비쳐 «불투명»으로 보였음 — 폐기)
@@ -111,14 +112,9 @@ const KIND_META: Record<Exclude<FeedKind, "notice">, { icon: string; tag: string
 };
 
 
-// [2026-09-13 사장님] 알림 줄 등장 = «커튼이 젖혀지듯» 왼쪽→오른쪽 열림 + 빛 한 줄이 따라감 + 「주문 감사합니다」 톡 튀며 등장 + 강조색 잔광.
-//   📌 공지 줄은 상시라 애니메이션 없음. 전부 GPU 속성(clip-path·transform·opacity·box-shadow)이라 PRISM 부담 없음.
-//   글로우 색: CEF 구버전을 생각해 color-mix 대신 rgba 문자열을 직접 만든다.
-function glowOf(hex: string, alpha: number) {
-  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
-  if (!m) return `rgba(255,255,255,${alpha})`;
-  return `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${alpha})`;
-}
+// [2026-09-13 사장님] 알림 줄 등장 = «커튼이 젖혀지듯» 왼쪽→오른쪽 열림 + 「주문 감사합니다」 톡 튀며 등장.
+//   [09-27] 잔광·빛줄·노랑/분홍 테두리·그림자 폐기 — 배경은 검정 반투명 하나. 커튼 등장/퇴장만 유지.
+//   📌 공지 줄은 상시라 커튼 애니메이션 없음. 전부 GPU 속성이라 PRISM 부담 없음.
 
 // [2026-09-13 사장님] 닉네임 첫 글자 동그라미(아바타) 없앰 — 이름이 바로 첫 글자부터 보이게.
 const EXIT_MS = 500;        // 사라질 때 커튼이 닫히는 시간(왼쪽→오른쪽) — 등장과 대칭. 알림은 «1회성»: 등장 1번, 퇴장 1번, 반복 없음.
@@ -246,6 +242,27 @@ export default function OrderFeedWidgetClient() {
   const rowAvailW = feedRowAvailW(widgetW);
   const pinAvailW = feedPinAvailW(widgetW);
 
+  // [09-27] 알림 한 줄 계획 — 축소해서라도 한 줄이면 static(그 fontSize), 아니면 28px 고정 + once 흐름.
+  //   수명 계산(baseLifeOf)과 렌더가 «같은 값»을 봐야 한다.
+  const alertPlan = (item: FeedItem) => {
+    const meta = KIND_META[item.kind as Exclude<FeedKind, "notice">];
+    const parts = item.products || [];
+    const verb = parts.length > 0 ? meta.verb : meta.verbSolo;
+    const run = parts.map(feedProductLabel).join("  |  ");
+    const rowL = feedRowLayout(item.nick, `${meta.icon} ${verb}`, run, rowAvailW);
+    const rowFont = rowL.oneLine ? rowL.fontSize : FEED_ROW_SIZES.nick;
+    const textW = estimateTextWidth(alertOneLine({ nick: item.nick, icon: meta.icon, verb, products: parts }), rowFont);
+    const plan = rowL.oneLine ? { mode: "static" as const } : marqueePlan({ textW, availW: rowAvailW, kind: "once" });
+    return { meta, parts, verb, rowFont, plan };
+  };
+  // [09-27] 공지·안내 한 줄 계획 — feedPinLayout.lines===1 이면 static(그 fontSize), 2줄이면 34px 고정 + loop 흐름.
+  const pinPlan = (text: string) => {
+    const lay = feedPinLayout(text, pinAvailW);
+    if (lay.lines === 1) return { fontSize: lay.fontSize, plan: { mode: "static" as const } };
+    const textW = estimateTextWidth(text, FEED_PIN_SIZE);
+    return { fontSize: FEED_PIN_SIZE, plan: marqueePlan({ textW, availW: pinAvailW, kind: "loop" }) };
+  };
+
   // 배경 투명 (크로마키)
   useEffect(() => {
     const prevBody = document.body.style.background;
@@ -328,9 +345,9 @@ export default function OrderFeedWidgetClient() {
   const lifeOf = (item: FeedItem) => crowdedLife(item, baseLifeOf(item));
   const baseLifeOf = (item: FeedItem) => {
     if (item.kind === "notice") return NOTICE_MS;
-    const pages = feedProductPages(item.products || [], rowAvailW);
-    if (pages.length <= 1) return SHOW_MS;
-    return Math.max(SHOW_MS, pages.length * FEED_PAGE_MS + 1500);
+    // [09-27] 한 번 흐르는 알림은 흐름이 끝날 때까지(=plan.totalMs). 짧아서 안 흐르면 기존 10초.
+    const { plan } = alertPlan(item);
+    return plan.mode === "once" ? Math.max(SHOW_MS, plan.totalMs) : SHOW_MS;
   };
 
   const pushItem = (item: FeedItem) => {
@@ -407,19 +424,10 @@ export default function OrderFeedWidgetClient() {
   // [2026-09-16] «글자 줄» 예산으로 자른다. 주문 한 건 = 인사말 1줄 + 상품 최대 2줄, 📢 안내 = 2줄, 📌 공지 = 2줄.
   //   최신(맨 아래)부터 담고 예산이 차면 오래된 건 안 그린다 → 기준 높이를 넘지 않는다.
   // 이 줄이 화면에서 차지하는 «높이»(디자인 px)
-  const heightOf = (it: FeedItem) => {
-    if (it.kind === "notice") return H_PAD_NOTICE + H_LINE_NOTICE * (feedPinFitsOneLine(it.text || "", pinAvailW) ? 1 : 2);
-    const m = KIND_META[it.kind as Exclude<FeedKind, "notice">];
-    const pages = feedProductPages(it.products || [], rowAvailW);
-    if (pages.length === 0) return H_ALERT_ONE;
-    const run = pages[0].map(feedProductLabel).join("  |  ");
-    if (pages.length === 1 && feedRowLayout(it.nick, `${m.icon} ${m.verb}`, run, rowAvailW).oneLine) return H_ALERT_ONE;
-    // 상품 줄(28px)이 1줄이면 +35, 2줄이면 +70. 장이 여러 개면 «가장 큰 장» 기준(높이가 흔들리지 않게).
-    const maxLines = Math.max(...pages.map((pg) => Math.min(FEED_DETAIL_LINES_PER_PAGE, Math.ceil(estimateTextWidth(pg.map(feedProductLabel).join("  |  "), FEED_ROW_SIZES.detail) / rowAvailW))));
-    return H_ALERT_ONE + 35 * Math.max(1, maxLines);
-  };
+  // [09-27] 모든 줄 한 줄 → 높이 고정. 공지·안내=H_PIN_ONE, 알림=H_ALERT_ONE.
+  const heightOf = (it: FeedItem) => (it.kind === "notice" ? H_PIN_ONE : H_ALERT_ONE);
   // 📌 공지가 먼저 자리를 잡고, 남는 높이만큼 «최신 알림부터» 담는다.
-  let budget = BUDGET_H - (showPin ? H_PAD_NOTICE + H_LINE_NOTICE * (feedPinFitsOneLine(pinShown, pinAvailW) ? 1 : 2) + 4 : 0);
+  let budget = BUDGET_H - (showPin ? H_PIN_ONE + 4 : 0);
   const picked: FeedItem[] = [];
   for (let i = source.length - 1; i >= 0; i -= 1) {
     const cost = heightOf(source[i]) + (picked.length > 0 || showPin ? 8 : 0);
@@ -452,169 +460,136 @@ export default function OrderFeedWidgetClient() {
           // 📢 상품 안내 — [2026-09-13 사장님] 「📢 채팅」 버튼 문구. 30초짜리지만 3줄이 넘으면 새 주문·입금에 밀려난다.
           //   방송 화면에 «지금 이 상품»을 알리는 줄이라 주문 알림(초록·파랑)과 구분되게 노랑 테두리.
           if (item.kind === "notice") {
+            // [09-27] 한 줄 고정. 들어가면 static, 넘치면 loop(계속 흐름).
+            const pl = pinPlan(item.text || "");
             return (
               <div
                 key={item.id}
                 style={{
                   alignSelf: "flex-start",                                              // [09-24] 공지와 같은 왼쪽 기준선
-                  maxWidth: `${widgetW}px`, boxSizing: "border-box",                  // [09-16] 폭 자동 — 글자만큼만 (09-21: 퍼센트 → 픽셀)
+                  boxSizing: "border-box",
+                  ...(pl.plan.mode === "loop" ? { width: `${widgetW}px`, overflow: "hidden" } : { maxWidth: `${widgetW}px` }),
                   display: "flex", alignItems: "center", gap: "8px",
                   padding: "17px 12px 17px 14px",                                        // [09-24 2차] 좌우 여백 최소 — 남는 폭은 전부 글자에
                   borderRadius: "999px",
-                  background: "rgba(24, 20, 12, 0.45)",                                  // 흐림 없음 — 뒤가 그대로 비침
-                  boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
-                  border: "1.5px solid rgba(253, 224, 71, 0.7)",
+                  background: "rgba(0,0,0,0.55)",                                        // [09-27] 검정 반투명 통일 · 테두리/그림자 폐기
                   color: "#fff", textShadow: TEXT_SHADOW,
-                  // [09-16] 길면 글자를 줄여서라도 한 줄에 맞춘다(최소 27px). 그보다 길면 그때만 2줄.
-                  // [2026-09-20 사장님] 「긴 알림은 좌우 여백 살짝 띄우고 노는 공간 살려서, 폰트도 좀 키우고」
-                  //   → 글자 크기·줄 수·폭을 lib/feedText.ts 의 feedPinLayout 한 곳에서 정한다.
-                  fontSize: `${feedPinLayout(item.text || "", pinAvailW).fontSize}px`, fontWeight: 900, lineHeight: 1.25, wordBreak: "keep-all",
+                  fontSize: `${pl.fontSize}px`, fontWeight: 900, lineHeight: 1.25, wordBreak: "keep-all",
                   animation: leaving
                     ? `ruruCurtainOut ${EXIT_MS}ms ease-in forwards`
                     : "ruruCurtain 0.65s cubic-bezier(0.16,1,0.3,1) both",
                 }}
               >
                 <span style={{ flexShrink: 0, fontSize: "26px", textShadow: "none" }}>📢</span>
-                {/* 2줄이 될 때는 «절반쯤»에서 줄을 바꿔 두 줄 길이를 맞춘다 → 알약이 화면 끝까지 안 늘어나고 좌우에 여백이 남는다 */}
-                <span style={{ minWidth: 0, maxWidth: `${feedPinLayout(item.text || "", pinAvailW).maxWidth}px`, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{item.text}</span>
+                {pl.plan.mode === "loop" ? (
+                  <span style={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
+                    <span style={{ display: "inline-flex", whiteSpace: "nowrap", willChange: "transform", animation: `ruruLoop ${Math.round(pl.plan.durationMs)}ms linear infinite` }}>
+                      <span style={{ whiteSpace: "nowrap", paddingRight: `${FEED_MARQUEE_GAP}px` }}>{item.text}</span>
+                      <span style={{ whiteSpace: "nowrap", paddingRight: `${FEED_MARQUEE_GAP}px` }} aria-hidden>{item.text}</span>
+                    </span>
+                  </span>
+                ) : (
+                  <span style={{ minWidth: 0, whiteSpace: "nowrap", overflow: "hidden" }}>{item.text}</span>
+                )}
               </div>
             );
           }
-          const meta = KIND_META[item.kind as Exclude<FeedKind, "notice">];
-          const allParts = item.products || [];
-          // [2026-09-17 사장님] 「너무 길고 복잡하면 출력하고 빠르게 또 이어서 보여주고?」
-          //   → 상품이 많으면 «한 줄에 들어가는 만큼»씩 장을 넘겨가며 전부 보여준다.
-          //     화면 높이는 항상 그대로(최대 2줄)고, 주문내역은 하나도 안 버린다.
-          const pages = feedProductPages(allParts, rowAvailW);
-          const pageIdx = pages.length > 1
-            ? Math.min(pages.length - 1, Math.floor(Math.max(0, now - item.at) / FEED_PAGE_MS))
-            : 0;
-          const shownParts = pages[pageIdx] || [];
-          const runText = shownParts.map(feedProductLabel).join("  |  ");
-          // [2026-09-24 2차] 조금만 줄이면 한 줄인 경우 «글자를 줄여서라도» 한 줄로 간다(최소 24px).
-          //   2줄로 갈 때는 원래 크기(28px)를 그대로 쓴다 — 2층이라 줄일 이유가 없다.
-          const rowL = feedRowLayout(item.nick, `${meta.icon} ${meta.verb}`, runText, rowAvailW);
-          const oneLine = pages.length <= 1 && rowL.oneLine;
-          const rowFont = oneLine ? rowL.fontSize : FEED_ROW_SIZES.nick;
+          // [09-27] 알림 한 줄 고정. 축소해도 안 들어가면 28px + once 흐름(끝부분 알약 중간에서 멈춤 → 퇴장).
+          const { meta, parts, verb, rowFont, plan } = alertPlan(item);
+          const isMarquee = plan.mode === "once";
+          const onceScrollMs = plan.mode === "once" ? Math.round(plan.scrollMs) : 0;
           // 폭죽: 주문 줄이고, 막 등장했을 때(1.7초 안) 1회. 그 뒤엔 DOM 에서 빠진다.
           const burst = item.kind === "order" && now - item.at < CONFETTI_MS;
+          // 한 줄 내용(닉네임님 · 아이콘 인사말 · 상품) — static·흐름 둘 다 같은 내용, nowrap.
+          const content = (
+            <span style={{ display: "inline-flex", alignItems: "baseline", gap: "11px", whiteSpace: "nowrap", lineHeight: 1.12 }}>
+              <span style={{ flexShrink: 0, fontSize: `${rowFont}px`, fontWeight: 800 }}>{item.nick}<span style={{ fontWeight: 800 }}>님</span></span>
+              <span style={{ flexShrink: 0, fontSize: `${rowFont}px`, fontWeight: 800, color: meta.accent, transformOrigin: "left center", animation: "ruruVerbPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.35s both" }}>
+                {meta.icon} {verb}
+              </span>
+              {parts.length > 0 ? (
+                <span style={{ display: "inline-flex", alignItems: "baseline" }}>
+                  <span style={{ fontSize: `${Math.round(rowFont * 0.86)}px`, opacity: 0.45, paddingRight: "8px" }}>·</span>
+                  <span style={{ fontSize: `${rowFont}px` }}><ProductRun products={parts} accent={meta.accent} page={0} pageCount={1} /></span>
+                </span>
+              ) : null}
+            </span>
+          );
           return (
-            <div key={item.id} style={{ alignSelf: "flex-start", position: "relative", maxWidth: `${widgetW}px` }}>
+            <div key={item.id} style={{ alignSelf: "flex-start", position: "relative", ...(isMarquee ? { width: `${widgetW}px` } : { maxWidth: `${widgetW}px` }) }}>
             {burst ? <Confetti /> : null}
             <div
               style={{
-                // [2026-09-21 사장님 캡쳐] 방송화면에서 주문 알림이 위젯 폭을 «넘어가» 오른쪽이 잘렸다.
-                //   폭 제한이 maxWidth:"100%" 였는데, 부모가 절대위치+transform 인 실제 화면에서는
-                //   그 퍼센트가 기대대로 안 걸렸다(내 테스트 페이지에서는 걸렸다 — 그래서 재현이 안 됐다).
-                //   → 퍼센트에 기대지 말고 «픽셀»로 못박는다. 값은 위젯 폭 그대로라 디자인 변화 없음.
-                maxWidth: `${widgetW}px`, boxSizing: "border-box",                    // [09-16 사장님] 폭은 «글자 길이만큼». 길면 위젯 폭에서 멈춘다
-                position: "relative", overflow: "hidden",                            // 빛 줄이 말풍선 밖으로 안 나가게
+                maxWidth: `${widgetW}px`, boxSizing: "border-box",
+                position: "relative", overflow: "hidden",
                 display: "flex", alignItems: "center", gap: "12px",
-                // [09-16] 2층 구조라 여백은 최소로 — 남는 높이는 전부 «글자»에
-                // [2026-09-24] 왼쪽 24 → 12. 강조바 5 + 12 = 17 로, 공지(테두리 1.5 + 여백 16 = 17.5)와
-                //   글자 시작점이 같아진다. 예전엔 29 vs 17.5 라 알림 글자만 11.5px 더 안쪽에서 시작했다.
-                //   덤으로 5px 넘침도 사라진다(예전: 글자칸 814 + 24 + 22 + 바 5 = 865 > 위젯 폭 860).
-                // [09-24 2차] 좌우 여백 최소 — 10/14. 글자 시작점 5+10=15 로 공지(1.5+14=15.5)와 그대로 맞는다.
                 padding: "14px 14px 16px 10px",
                 borderRadius: "999px",
-                background: "rgba(14, 12, 18, 0.42)",                                 // 흐림 없음 — 뒤가 그대로 비침
-                boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
+                background: "rgba(0,0,0,0.55)",                                        // [09-27] 검정 반투명 통일 · 테두리(강조바만 유지)/그림자/잔광 폐기
                 borderLeft: `5px solid ${meta.accent}`,
-                // 등장: 커튼 열림(0.65초) → 강조색 잔광(0.4초 뒤, 1초).  퇴장: 커튼 닫힘(0.5초). 둘 다 1회.
+                ...(isMarquee ? { width: "100%" } : {}),
                 animation: leaving
                   ? `ruruCurtainOut ${EXIT_MS}ms ease-in forwards`
-                  : "ruruCurtain 0.65s cubic-bezier(0.16,1,0.3,1) both, ruruGlow 1s ease-out 0.4s",
-                ["--ruru-glow" as string]: glowOf(meta.accent, 0.6),
+                  : "ruruCurtain 0.65s cubic-bezier(0.16,1,0.3,1) both",
                 textShadow: TEXT_SHADOW,
                 color: "#fff",
               } as React.CSSProperties}
             >
-              {/* 빛 한 줄 — 커튼 가장자리를 따라 왼쪽→오른쪽으로 지나감 */}
-              <span
-                aria-hidden
-                style={{
-                  position: "absolute", top: 0, bottom: 0, left: 0, width: "38%", pointerEvents: "none",
-                  background: "linear-gradient(100deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.28) 40%, rgba(255,255,255,0.7) 50%, rgba(255,255,255,0.28) 60%, rgba(255,255,255,0) 100%)",
-                  transform: "translateX(-120%) skewX(-12deg)",
-                  animation: "ruruShine 0.8s cubic-bezier(0.16,1,0.3,1) 0.05s both",
-                }}
-              />
-              {/* [2026-09-16 사장님 «바람잡이»] 손님들이 «저런 걸 사는구나» 보게 하는 줄이다.
-                  → 금액은 빼고 «상품 이름»을 보여준다. 금액이 빠진 만큼 자리가 남아 대부분 한 줄로 끝난다(화면을 덜 가린다).
-                  들어가면 한 줄, 안 들어가면 2줄(1층 누가·인사말 / 2층 주문내역). 3줄은 만들지 않는다.
-                  글자 크기는 «유튜브 채팅과 같게» 맞췄다(실측: 채팅 글자 21px = 이 위젯 37px). */}
-              <span style={{ minWidth: 0, maxWidth: `${rowAvailW}px`, flex: "1 1 auto", display: "flex", flexDirection: "column", gap: "2px" }}>
-                <span style={{ minWidth: 0, display: "flex", alignItems: "baseline", gap: "11px", lineHeight: 1.12 }}>
-                  {/* 닉네임 = 손님이 자기 이름을 찾는 곳. 안 자른다(아주 긴 것만 60% 선에서 …) */}
-                  <span style={{ flexShrink: 0, maxWidth: "60%", fontSize: `${rowFont}px`, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {item.nick}<span style={{ fontSize: `${rowFont}px`, fontWeight: 800 }}>님</span>
-                  </span>
-                  <span
-                    style={{
-                      flexShrink: 0, fontSize: `${rowFont}px`, fontWeight: 800, color: meta.accent, whiteSpace: "nowrap",
-                      transformOrigin: "left center",
-                      animation: "ruruVerbPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.35s both",
-                    }}
-                  >
-                    {meta.icon} {allParts.length > 0 ? meta.verb : meta.verbSolo}
-                  </span>
-                  {oneLine && allParts[0] ? (
-                    <>
-                      <span style={{ flexShrink: 0, fontSize: `${Math.round(rowFont * 0.86)}px`, opacity: 0.45 }}>·</span>
-                      <span style={{ flexShrink: 1, minWidth: 0, fontSize: `${rowFont}px`, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        <ProductRun products={shownParts} accent={meta.accent} page={pageIdx} pageCount={pages.length} />
-                      </span>
-                    </>
-                  ) : null}
-                </span>
-                {!oneLine && allParts.length > 0 ? (
+              {isMarquee ? (
+                <span style={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
                   <span style={{
-                    // 폭을 픽셀로 못박아 «반드시» 여기서 줄이 바뀌게 한다(폭 계산 rowAvailW 와 같은 값).
-                    // overflowWrap:anywhere 는 마지막 안전장치 — 상품 이름 하나가 한 줄보다 길어도 밖으로 안 넘친다.
-                    minWidth: 0, maxWidth: `${rowAvailW}px`, fontSize: `${FEED_ROW_SIZES.detail}px`, lineHeight: 1.25, marginTop: "2px",
-                    display: "-webkit-box", WebkitLineClamp: FEED_DETAIL_LINES_PER_PAGE, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "keep-all", overflowWrap: "anywhere",
-                  }}>
-                    <ProductRun products={shownParts} accent={meta.accent} page={pageIdx} pageCount={pages.length} />
+                    display: "inline-flex", whiteSpace: "nowrap", willChange: "transform",
+                    ["--ruru-end" as string]: `calc(-100% + ${Math.round(rowAvailW / 2)}px)`,
+                    animation: `ruruOnce ${onceScrollMs}ms linear ${FEED_MARQUEE_HOLD_START_MS}ms 1 forwards`,
+                  } as React.CSSProperties}>
+                    {content}
                   </span>
-                ) : null}
-              </span>
-
+                </span>
+              ) : content}
             </div>
             </div>
           );
         })}
         {/* 📌 고정 공지 — [2026-09-13 사장님 «위치가 지맘대로 바뀌었다 돌아온다»] 알림이 오면 공지가 위로 밀렸다가 내려오던 것.
             → 공지를 «맨 아래 고정». 알림은 공지 «위»로 쌓이고(최신이 공지 바로 위), 사라져도 공지는 그 자리. 방송 ON 동안 상시. */}
-        {showPin ? (
+        {showPin ? (() => {
+          const pl = pinPlan(pinShown);
+          return (
           <div
             style={{
               // [09-22] 공지는 «기준선»이라 항상 왼쪽. [09-24] 이제 모든 줄이 이 기준선에 맞는다.
-              alignSelf: "flex-start",
-              maxWidth: `${widgetW}px`, boxSizing: "border-box",            // [09-16] 폭 자동 — 글자만큼만 (09-21: 퍼센트 → 픽셀)
+              alignSelf: "flex-start", boxSizing: "border-box",
+              ...(pl.plan.mode === "loop" ? { width: `${widgetW}px`, overflow: "hidden" } : { maxWidth: `${widgetW}px` }),
               display: "flex", alignItems: "center", gap: "8px",
               padding: "17px 12px 17px 14px", marginTop: "4px",               // [09-24 2차] 좌우 여백 최소 — 남는 폭은 전부 글자에
               borderRadius: "999px",
-              background: "rgba(123, 45, 67, 0.45)",                                  // 흐림 없음 — 뒤가 그대로 비침
-              boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
-              border: "1.5px solid rgba(255,217,224,0.6)",
+              background: "rgba(0,0,0,0.55)",                                        // [09-27] 검정 반투명 통일 · 테두리/그림자 폐기
               color: "#fff", textShadow: TEXT_SHADOW,
-              // [2026-09-16 사장님 「이 정도는 한 줄로 다 뜨게」] 길면 글자를 줄여 한 줄에 맞춘다(최소 27px)
-              // [2026-09-20] 📢 안내와 같은 기준 — feedPinLayout 이 한 줄/2줄·글자·폭을 정한다
-              fontSize: `${feedPinLayout(pinShown, pinAvailW).fontSize}px`, fontWeight: 900, lineHeight: 1.25, wordBreak: "keep-all",
+              fontSize: `${pl.fontSize}px`, fontWeight: 900, lineHeight: 1.25, wordBreak: "keep-all",
             }}
           >
             <span style={{ flexShrink: 0, fontSize: "26px", textShadow: "none" }}>📌</span>
-            <span style={{ minWidth: 0, maxWidth: `${feedPinLayout(pinShown, pinAvailW).maxWidth}px`, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{pinShown}</span>
+            {pl.plan.mode === "loop" ? (
+              <span style={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
+                <span style={{ display: "inline-flex", whiteSpace: "nowrap", willChange: "transform", animation: `ruruLoop ${Math.round(pl.plan.durationMs)}ms linear infinite` }}>
+                  <span style={{ whiteSpace: "nowrap", paddingRight: `${FEED_MARQUEE_GAP}px` }}>{pinShown}</span>
+                  <span style={{ whiteSpace: "nowrap", paddingRight: `${FEED_MARQUEE_GAP}px` }} aria-hidden>{pinShown}</span>
+                </span>
+              </span>
+            ) : (
+              <span style={{ minWidth: 0, whiteSpace: "nowrap", overflow: "hidden" }}>{pinShown}</span>
+            )}
           </div>
-        ) : null}
+          );
+        })() : null}
       </div>
       <style>{`
         @keyframes ruruConfetti { 0% { transform: translate(0, 0) rotate(0deg); opacity: 1; } 100% { transform: translate(var(--tx), var(--ty)) rotate(var(--r)); opacity: 0; } }
         @keyframes ruruCurtain { from { clip-path: inset(0 100% 0 0 round 999px); transform: translateX(-10px); opacity: 0.7; } to { clip-path: inset(0 0 0 0 round 999px); transform: translateX(0); opacity: 1; } }
         @keyframes ruruCurtainOut { from { clip-path: inset(0 0 0 0 round 999px); opacity: 1; } to { clip-path: inset(0 0 0 100% round 999px); opacity: 0; } }
-        @keyframes ruruShine   { from { transform: translateX(-120%) skewX(-12deg); } to { transform: translateX(330%) skewX(-12deg); } }
-        @keyframes ruruGlow    { 0% { box-shadow: 0 4px 14px rgba(0,0,0,0.25), 0 0 0 0 var(--ruru-glow); } 35% { box-shadow: 0 4px 14px rgba(0,0,0,0.25), 0 0 26px 3px var(--ruru-glow); } 100% { box-shadow: 0 4px 14px rgba(0,0,0,0.25), 0 0 0 0 rgba(0,0,0,0); } }
         @keyframes ruruVerbPop { from { opacity: 0; transform: scale(1.5); } 60% { opacity: 1; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        @keyframes ruruLoop    { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        @keyframes ruruOnce    { from { transform: translateX(0); } to { transform: translateX(var(--ruru-end)); } }
       `}</style>
     </div>
   );

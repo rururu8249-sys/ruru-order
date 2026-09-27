@@ -380,3 +380,38 @@ export function feedProductPages(
   if (cur.length > 0) pages.push(cur);
   return pages.length > 0 ? pages : [];
 }
+
+// ── [2026-09-27 사장님 확정] 위젯 «모든 줄 한 줄, 넘치면 흐름» ──────────────────
+//   짧은 줄은 글자만큼만(static). 한 줄에 못 담는 줄만 위젯 폭 끝까지 늘어나며 흐른다.
+//     📌공지·📢안내 = 길면 «계속» 흐름(loop, 반복).
+//     🛒주문·💰입금·카드 = 길면 «한 번» 흐르고, 끝부분이 알약 중간쯤(availW/2) 오면 멈췄다 사라짐(once).
+export const FEED_MARQUEE_SPEED = 120;          // px/초
+export const FEED_MARQUEE_GAP = 80;             // loop 에서 반복 사이 간격(px)
+export const FEED_MARQUEE_HOLD_START_MS = 1200; // once: 흐르기 전 잠깐 정지
+export const FEED_MARQUEE_HOLD_END_MS = 1000;   // once: 끝에서 잠깐 정지 후 퇴장
+
+export type MarqueePlan =
+  | { mode: "static" }
+  | { mode: "loop"; durationMs: number }
+  | { mode: "once"; scrollPx: number; scrollMs: number; totalMs: number };
+
+/** 글자 폭(textW)·가용 폭(availW)·종류(loop=공지 반복 / once=알림 1회)로 흐름 방식을 정한다. 순수함수. */
+export function marqueePlan(o: { textW: number; availW: number; kind: "loop" | "once" }): MarqueePlan {
+  const textW = Math.max(0, Number(o.textW) || 0);
+  const availW = Math.max(1, Number(o.availW) || 1);
+  if (textW <= availW) return { mode: "static" };
+  if (o.kind === "loop") {
+    return { mode: "loop", durationMs: ((textW + FEED_MARQUEE_GAP) / FEED_MARQUEE_SPEED) * 1000 };
+  }
+  const scrollPx = textW - availW / 2;   // 끝부분이 알약 중간에 올 때까지만 흐른다
+  const scrollMs = (scrollPx / FEED_MARQUEE_SPEED) * 1000;
+  const totalMs = FEED_MARQUEE_HOLD_START_MS + scrollMs + FEED_MARQUEE_HOLD_END_MS;
+  return { mode: "once", scrollPx, scrollMs, totalMs };
+}
+
+/** 알림 한 줄 문자열 — 닉네임님 + 아이콘 인사말 + 상품 전부 " | " 로 이음(폭 측정·한 줄 판정용). */
+export function alertOneLine(o: { nick?: unknown; icon?: unknown; verb?: unknown; products?: FeedProduct[] }): string {
+  const head = `${String(o.nick ?? "").trim()}님 ${String(o.icon ?? "").trim()} ${String(o.verb ?? "").trim()}`.replace(/\s+/g, " ").trim();
+  const body = (Array.isArray(o.products) ? o.products : []).map(feedProductLabel).join(" | ");
+  return body ? `${head}  ${body}` : head;
+}
