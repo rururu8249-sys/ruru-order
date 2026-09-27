@@ -424,6 +424,8 @@ async function assertShippingFeeNotSkipped(
   }
   const expectedShipping = baseShippingFee * Math.max(1, groups.size);
 
+  console.warn(`배송비 검증 시작: phone=${String(phone || "").replace(/[^0-9]/g, "").slice(-4)} 낸=${paidShipping} 필요=${expectedShipping} 대상줄=${chargeable.length}/${orderRows.length} 기본=${baseShippingFee}`);
+
   // 합배송이면 한 그룹분이 빠질 수 있으므로, 여기서는 "전액 냈으면 바로 통과"만 본다.
   //   (정상 주문 대부분이 여기서 끝 → 이전 주문 조회 0회 = 방송 중 DB 부하 증가 없음)
   if (paidShipping >= expectedShipping) return;
