@@ -33,6 +33,7 @@ const SHOP_INFO = {
   email: "rururu8249@gmail.com",
   phone: "",
   effectiveDate: "2026년 8월 14일",
+  revisedDate: "2026년 9월 27일",
 };
 
 // 값이 있는 항목만 표 행으로 렌더링
@@ -138,6 +139,12 @@ export default function PrivacyPage() {
             법률」 등 관련 법령을 준수합니다. 본 방침은 회사가 제공하는 온라인 쇼핑몰
             서비스({SHOP_INFO.siteUrl})에 적용됩니다.
           </p>
+          <div style={S.note}>
+            카카오톡 간편 로그인 동의 화면의 「개인정보 처리방침」 항목이 가리키는 문서는 본
+            문서입니다. 동의 화면에서 링크가 열리지 않더라도 {SHOP_INFO.siteUrl}/privacy 에서
+            언제든지 전문을 확인하실 수 있으며, 로그인 화면과 주문서 화면 하단에도 같은 링크가
+            있습니다.
+          </div>
         </div>
 
         {/* 1 */}
@@ -151,7 +158,11 @@ export default function PrivacyPage() {
               </tr>
               <tr>
                 <td style={S.td}>카카오톡 간편 로그인</td>
-                <td style={S.td}>카카오톡 회원번호, 카카오톡 닉네임, 프로필 이미지</td>
+                <td style={S.td}>
+                  [필수] 카카오 회원번호, 닉네임, 프로필 이미지, 카카오계정 이름
+                  <br />
+                  [선택] 카카오계정 전화번호, 카카오 배송지 정보(수령인명, 배송지 주소, 전화번호)
+                </td>
               </tr>
               <tr>
                 <td style={S.td}>주문·배송</td>
@@ -173,8 +184,48 @@ export default function PrivacyPage() {
           </table>
           <p style={{ ...S.p, marginTop: 12 }}>
             회사는 이용자가 서비스 화면에서 직접 입력하거나, 카카오톡 간편 로그인을 통해
-            동의한 정보를 수집합니다. 주민등록번호는 수집하지 않습니다.
+            동의한 정보를 수집합니다. 카카오 로그인 동의 화면의 선택 항목(전화번호, 배송지
+            정보)에 동의하지 않아도 로그인할 수 있으며, 이 경우 주문서에서 직접 입력한 정보를
+            이용합니다. 동의 화면에 표시되는 항목 중 카카오계정 이메일, 성별, 생일, 출생 연도는
+            회사가 서버에 저장하거나 이용하지 않습니다. 주민등록번호는 수집하지 않습니다.
           </p>
+        </section>
+
+        {/* 1-1 — 카카오로부터 제공받는 정보 (카카오 로그인 도입 서비스 필수 기재: developers.kakao.com/docs/ko/kakaosync/prerequisite) */}
+        <section style={S.card}>
+          <h2 style={S.h2}>1-1. 카카오톡 간편 로그인으로 카카오로부터 제공받는 정보</h2>
+          <p style={S.p}>
+            이용자가 카카오톡 간편 로그인 동의 화면에서 동의하면 주식회사 카카오가 아래
+            정보를 회사에 제공하며, 회사는 이를 다음과 같이 처리합니다.
+          </p>
+          <table style={S.table}>
+            <tbody>
+              <tr>
+                <th style={S.th}>구분</th>
+                <th style={S.th}>항목</th>
+                <th style={S.th}>이용 목적</th>
+                <th style={S.th}>보유 기간</th>
+              </tr>
+              <tr>
+                <td style={S.td}>필수</td>
+                <td style={S.td}>카카오 회원번호, 닉네임, 프로필 이미지, 카카오계정 이름</td>
+                <td style={S.td}>회원 식별·로그인, 주문 내역 조회, 주문서 자동 입력</td>
+                <td style={S.td}>회원 탈퇴 시까지</td>
+              </tr>
+              <tr>
+                <td style={S.td}>선택</td>
+                <td style={S.td}>카카오계정 전화번호, 카카오 배송지 정보(수령인명, 주소, 전화번호)</td>
+                <td style={S.td}>주문서 이름·연락처·배송지 자동 입력, 입금·배송 안내</td>
+                <td style={S.td}>회원 탈퇴 시까지</td>
+              </tr>
+            </tbody>
+          </table>
+          <ul style={{ ...S.ul, marginTop: 12 }}>
+            <li>제공받은 정보는 주문서 작성과 주문 조회에만 사용하며, 광고·마케팅 목적으로 이용하지 않습니다.</li>
+            <li>카카오계정 이메일, 성별, 생일, 출생 연도는 동의 화면에 표시되더라도 회사가 서버에 저장하거나 이용하지 않습니다.</li>
+            <li>이용자는 카카오톡 [더보기] &gt; [MY] &gt; [카카오계정] &gt; [연결된 서비스 관리](또는 카카오계정 관리 페이지 &gt; [계정 이용] &gt; [연결된 서비스 관리])에서 언제든지 본 서비스와의 연결을 끊어 카카오 정보 제공 동의를 철회할 수 있습니다. 카카오톡 앱 버전에 따라 메뉴 이름이 다를 수 있습니다.</li>
+            <li>카카오 연결을 끊어도 회사가 이미 보관 중인 회원·주문 정보는 자동으로 삭제되지 않습니다. 삭제(회원 탈퇴)를 원하시면 10번 항목의 문의처로 요청해 주세요. 요청을 받으면 관계 법령에 따라 보관해야 하는 정보를 제외하고 지체 없이 파기합니다.</li>
+          </ul>
         </section>
 
         {/* 2 */}
@@ -282,16 +333,16 @@ export default function PrivacyPage() {
                 <td style={S.td}>웹 서비스 호스팅</td>
               </tr>
               <tr>
-                <td style={S.td}>카카오톡</td>
-                <td style={S.td}>간편 로그인 인증</td>
+                <td style={S.td}>주식회사 카카오</td>
+                <td style={S.td}>카카오톡 간편 로그인 인증</td>
               </tr>
               <tr>
-                <td style={S.td}>입금 내역 조회 서비스</td>
-                <td style={S.td}>무통장 입금 확인 처리</td>
+                <td style={S.td}>입금 내역 조회 서비스(뱅크다)</td>
+                <td style={S.td}>무통장 입금 내역 자동 확인</td>
               </tr>
               <tr>
-                <td style={S.td}>메시지 발송 서비스</td>
-                <td style={S.td}>주문·배송 관련 알림 발송</td>
+                <td style={S.td}>메시지 발송 서비스(SOLAPI)</td>
+                <td style={S.td}>라이브 방송 시작 안내 카카오 알림톡 발송</td>
               </tr>
               <tr>
                 <td style={S.td}>배송 대행사</td>
@@ -299,6 +350,55 @@ export default function PrivacyPage() {
               </tr>
             </tbody>
           </table>
+        </section>
+
+        {/* 5-1 — 국외이전: 개인정보 보호법 제28조의8 제1항 제3호 가목(처리위탁·보관 목적 국외이전은 제2항 사항을 처리방침에 공개).
+            실측(2026-09-27): Supabase 프로젝트 리전 Southeast Asia (Singapore), Vercel 함수 리전 Washington D.C. (iad1) */}
+        <section style={S.card}>
+          <h2 style={S.h2}>5-1. 개인정보의 국외 이전(해외 서버 보관·처리)</h2>
+          <p style={S.p}>
+            회사는 서비스 운영을 위해 아래 해외 클라우드 서비스에 개인정보의 보관·처리를
+            위탁하고 있습니다. 이는 이용자와의 계약(주문) 이행을 위한 처리위탁·보관으로,
+            「개인정보 보호법」 제28조의8 제1항 제3호에 따라 아래 사항을 공개합니다.
+          </p>
+          <table style={S.table}>
+            <tbody>
+              <tr>
+                <th style={S.th}>이전받는 자</th>
+                <th style={S.th}>이전 국가</th>
+                <th style={S.th}>이전 일시·방법</th>
+                <th style={S.th}>이전 항목</th>
+                <th style={S.th}>이용 목적·보유 기간</th>
+              </tr>
+              <tr>
+                <td style={S.td}>
+                  Supabase, Inc.
+                  <br />
+                  (supabase.com/privacy)
+                </td>
+                <td style={S.td}>싱가포르</td>
+                <td style={S.td}>서비스 이용 시 네트워크를 통해 전송·보관</td>
+                <td style={S.td}>1번 항목의 수집 항목 전체(회원·주문·포인트·접속 기록)</td>
+                <td style={S.td}>데이터베이스 보관·관리 / 회원 탈퇴 또는 3번 항목의 보유 기간 종료 시까지</td>
+              </tr>
+              <tr>
+                <td style={S.td}>
+                  Vercel Inc.
+                  <br />
+                  (vercel.com/legal/privacy-policy)
+                </td>
+                <td style={S.td}>미국</td>
+                <td style={S.td}>서비스 이용 시 네트워크를 통해 전송</td>
+                <td style={S.td}>서비스 이용 과정에서 서버가 처리하는 요청 정보(1번 항목의 수집 항목)</td>
+                <td style={S.td}>웹 서비스 호스팅·서버 기능 실행 / 요청 처리 시에만 일시 처리하며, 서버 실행 로그는 Vercel 정책에 따라 최대 1일 보관 후 자동 삭제</td>
+              </tr>
+            </tbody>
+          </table>
+          <p style={{ ...S.p, marginTop: 12 }}>
+            이용자는 10번 항목의 문의처로 국외 이전을 거부할 수 있습니다. 다만 회사의 서비스가
+            위 해외 클라우드에서 운영되므로, 거부하시는 경우 회원 가입·주문 등 서비스 이용이
+            불가능합니다.
+          </p>
         </section>
 
         {/* 6 — YouTube API (필수) */}
@@ -357,9 +457,11 @@ export default function PrivacyPage() {
         <section style={S.card}>
           <h2 style={S.h2}>7. 이용자의 권리와 행사 방법</h2>
           <p style={S.p}>
-            이용자는 언제든지 본인의 개인정보에 대한 열람, 정정, 삭제, 처리정지를 요청할 수
-            있습니다. 서비스 내 &lsquo;내정보&rsquo; 화면에서 직접 확인·수정하거나, 아래
-            연락처로 요청하시면 지체 없이 처리합니다.
+            이용자는 언제든지 본인의 개인정보에 대한 열람, 정정, 삭제, 처리정지, 동의 철회
+            및 회원 탈퇴를 요청할 수 있습니다. 서비스 내 &lsquo;내정보&rsquo; 화면에서 직접
+            확인·수정하거나, 10번 항목의 개인정보 보호책임자 연락처(열람청구 접수·처리 창구)로
+            요청하시면 지체 없이 처리합니다. 법정대리인이나 위임을 받은 대리인을 통해
+            요청하는 경우 관계 법령에 따른 위임장을 제출하시면 됩니다.
           </p>
           <p style={S.p}>
             만 14세 미만 아동의 개인정보는 수집하지 않습니다.
@@ -384,6 +486,16 @@ export default function PrivacyPage() {
             <li>개인정보 처리 시스템에 대한 접근 통제</li>
             <li>전송 구간 암호화(HTTPS) 적용</li>
             <li>개인정보 취급자 최소화</li>
+          </ul>
+        </section>
+
+        {/* 9-1 — 자동 수집 장치 (개인정보 처리방침 작성지침 필수 항목). 손님 화면은 쿠키 미사용·localStorage 자동입력만 사용(코드 실측) */}
+        <section style={S.card}>
+          <h2 style={S.h2}>9-1. 개인정보 자동 수집 장치의 설치·운영 및 거부</h2>
+          <ul style={S.ul}>
+            <li>회사는 광고·행태정보 수집 목적의 쿠키를 사용하지 않습니다.</li>
+            <li>주문서 작성 편의를 위해 로그인 정보와 주문서 입력값(이름, 연락처, 배송지, 유튜브 닉네임 등)을 이용자 기기의 브라우저 저장소(localStorage)에 저장합니다. 이 정보는 이용자 기기에만 저장되며, 브라우저의 사이트 데이터 삭제 기능으로 언제든지 지울 수 있습니다. 삭제하면 다음 로그인 때 다시 입력해야 할 수 있습니다.</li>
+            <li>서비스 안정성과 부정 이용 방지를 위해 접속 일시·IP주소·이용 기록을 서버에 자동으로 기록하며, 3번 항목에 따라 90일이 지나면 자동 파기합니다.</li>
           </ul>
         </section>
 
@@ -418,10 +530,14 @@ export default function PrivacyPage() {
             통해 안내합니다. 다만 이용자 권리에 중대한 변경이 발생하는 경우에는 최소 30일
             전에 공지합니다.
           </p>
+          <ul style={S.ul}>
+            <li>{SHOP_INFO.effectiveDate} 제정·시행</li>
+            <li>{SHOP_INFO.revisedDate} 개정 — 카카오톡 간편 로그인으로 제공받는 정보(1-1), 해외 서버 보관·처리(5-1), 자동 수집 장치(9-1) 항목 추가 및 문구 정비. 이용자에게 불리하지 않은 보완 개정으로 게시한 날부터 적용합니다.</li>
+          </ul>
         </section>
 
         <p style={S.foot}>
-          시행일: {SHOP_INFO.effectiveDate}
+          시행일: {SHOP_INFO.effectiveDate} · 최종 개정: {SHOP_INFO.revisedDate}
           <br />
           {SHOP_INFO.serviceName}
         </p>

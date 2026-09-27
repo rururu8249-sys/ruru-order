@@ -507,6 +507,11 @@ export default function MyOrderPage() {
         )}
 
         <footer className="mt-8 border-t border-[#ead8c8] pt-5 text-center text-xs font-bold text-[#9b8d82]">
+          <div className="mb-2">
+            <a href="/terms" className="underline underline-offset-2">이용약관</a>
+            <span aria-hidden="true"> · </span>
+            <a href="/privacy" className="underline underline-offset-2">개인정보처리방침</a>
+          </div>
           {FOOTER_TEXT}
         </footer>
       </section>

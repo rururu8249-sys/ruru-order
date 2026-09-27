@@ -141,6 +141,12 @@ export default function KakaoStartPage() {
           <p className="mt-4 break-keep text-center text-[12px] font-bold leading-relaxed tracking-[-0.04em]" style={{ color: "#A08A92" }}>
             카카오톡에서 불러온 정보는 주문서 작성과 주문조회에만 사용됩니다.
           </p>
+          {/* [2026-09-27] 로그인 전에도 약관 전문을 볼 수 있게 — 카카오 동의화면 약관 링크(아임웹 옛 주소) 불량 대비. 표시만, 로그인 로직 무변경 */}
+          <p className="mt-2 text-center text-[12px] font-bold tracking-[-0.03em]" style={{ color: "#A08A92" }}>
+            <a href="/terms" className="underline underline-offset-2">이용약관</a>
+            <span aria-hidden="true"> · </span>
+            <a href="/privacy" className="underline underline-offset-2">개인정보처리방침</a>
+          </p>
         </section>
       </section>
     </main>
