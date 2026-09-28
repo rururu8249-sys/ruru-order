@@ -25,9 +25,11 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = getSupabaseAdminClient();
     // undo 와 같은 링크(이슈 body 의 「주문번호: {code}」) + source=order_return_flow. 되돌림 가능 조건(활성)만.
+    // [2026-09-29] admin_tasks 에 is_resolved 컬럼 없음 → 09-27 이후 이 라우트가 항상 500(주문상세 「반품 취소」 실패 원인).
+    //   해결 여부는 status="done" 또는 resolved_at 유무로 판단한다.
     const { data, error } = await supabase
       .from("admin_tasks")
-      .select("id, status, is_resolved, created_at, resolved_at")
+      .select("id, status, created_at, resolved_at")
       .eq("source", "order_return_flow")
       .ilike("body", `%주문번호: ${orderCode}%`)
       .order("created_at", { ascending: false });
@@ -36,7 +38,7 @@ export async function GET(request: NextRequest) {
     const rows = (data as Array<Record<string, unknown>>) || [];
     const active = rows.filter((t) => {
       const st = clean(t.status).toLowerCase();
-      return st !== "deleted" && st !== "done" && t.is_resolved !== true;
+      return st !== "deleted" && st !== "done" && !clean(t.resolved_at);
     });
     // [2026-09-29] 해결완료 연동 — deleted 제외 최신 1건의 해결 여부(주문상세 배지·「반품 취소」 숨김용).
     const latestRow = rows.find((t) => clean(t.status).toLowerCase() !== "deleted") || null;
@@ -44,7 +46,7 @@ export async function GET(request: NextRequest) {
       ? {
           id: clean(latestRow.id),
           status: clean(latestRow.status),
-          isResolved: clean(latestRow.status).toLowerCase() === "done" || latestRow.is_resolved === true,
+          isResolved: clean(latestRow.status).toLowerCase() === "done" || !!clean(latestRow.resolved_at),
           resolvedAt: clean(latestRow.resolved_at),
         }
       : null;
