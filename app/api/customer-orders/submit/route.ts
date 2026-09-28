@@ -5,7 +5,7 @@ import { assertValidCustomerPointPhone } from "@/lib/customerPoints";
 import { registeredProductPriceMode, registeredProductSubmittedPriceValid } from "@/lib/registeredProductPricePolicy";
 import { submitRowLineTotal, submitRowUnitPriceForCheck } from "@/lib/submitRowPrice";
 import { buildYoutubeOrderAnnouncementMessages } from "@/lib/orderYoutubeAnnouncement";
-import { buildCartHoldSnapshotItem } from "@/lib/cartHoldDetail";
+import { buildCartHoldSnapshotItem, missingCartHoldRows } from "@/lib/cartHoldDetail";
 import { koreanPhoneVariants } from "@/lib/order/phone";
 import { shippingAddressKey } from "@/lib/shippingAddressKey";
 import {
@@ -614,6 +614,38 @@ async function assertPurchaseLimit(
   }
 }
 
+// [2026-09-28 사장님 지시] 장바구니에서 사라진(만료·회수) 상품은 서버에서도 제출 거부.
+//   새로 담으면 선점(cart_reservations)이 생겨 통과. RPC/정규화/재고/돈 로직 무변경 — RPC 호출 전 검증만.
+const CART_HOLD_GATE_MSG =
+  "⏳ 담은 지 시간이 지났거나 장바구니가 비워진 상품이 있어요.\n새로고침 후 상품을 다시 담아 주세요.";
+async function assertCartHoldAlive(
+  supabase: any,
+  orderRows: AnyRow[],
+  cartSessionKey: string | null,
+): Promise<void> {
+  const targets = orderRows.filter((r) => text(r?.product_id));
+  if (targets.length === 0) return; // 직접입력만이면 선점 대상 없음
+  if (!cartSessionKey) {
+    console.warn("선점 검증 차단: 세션키 없음");
+    throw new Error(CART_HOLD_GATE_MSG);
+  }
+  const { data, error } = await supabase
+    .from("cart_reservations")
+    .select("product_id,color,size")
+    .eq("session_key", cartSessionKey)
+    .gt("expires_at", new Date().toISOString())
+    .limit(200);
+  if (error) {
+    console.warn("선점 검증 조회 실패(통과):", error.message); // 장애 시 판매 안 막음
+    return;
+  }
+  const missing = missingCartHoldRows(targets as any, (data || []) as any);
+  if (missing.length > 0) {
+    console.warn(`선점 검증 차단: session=${cartSessionKey.slice(0, 8)} 없음=${missing.join(",")}`);
+    throw new Error(CART_HOLD_GATE_MSG);
+  }
+}
+
 
 export async function POST(request: NextRequest) {
   try {
@@ -650,20 +682,22 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseOrderSubmitClient();
 
+    // [2026-08-11 담기 선착순] 세션키 전달 — RPC가 "남의 선점 못 뺏기" 검증 + 제출 성공 시 본인 선점 해제
+    //   [2026-09-28] 선점 검증(assertCartHoldAlive)에서도 이 값을 쓰므로 assert 들보다 위로 이동(내용 무변경).
+    const cartSessionKey = (() => {
+      const t = String(body.cart_session_key ?? body.cartSessionKey ?? "").trim();
+      return t.length >= 6 && t.length <= 80 ? t : null;
+    })();
+
     // 개인당 구매제한 차단(돈/재고/포인트 RPC 무변경 — RPC 호출 전 검증만)
     //   카톡 계정(kakao_id) 기준 누적 → 전화번호 바꿔도 제한 우회 불가
     await assertDirectInputAllowed(supabase, orderRows);
     const productCatalog = await assertRegisteredProductPrices(supabase, orderRows);
     await assertShippingFeeNotSkipped(supabase, orderRows, phone, productCatalog, text(body.kakao_id));
     await assertPurchaseLimit(supabase, orderRows, phone, text(body.kakao_id));
+    await assertCartHoldAlive(supabase, orderRows, cartSessionKey);
 
     const normalizedSubmit = await normalizeOrderRowsForSubmitSettings(supabase, orderRows);
-
-    // [2026-08-11 담기 선착순] 세션키 전달 — RPC가 "남의 선점 못 뺏기" 검증 + 제출 성공 시 본인 선점 해제
-    const cartSessionKey = (() => {
-      const t = String(body.cart_session_key ?? body.cartSessionKey ?? "").trim();
-      return t.length >= 6 && t.length <= 80 ? t : null;
-    })();
 
     const { data, error } = await supabase.rpc("submit_customer_order_with_points", {
       p_order_rows: normalizedSubmit.orderRows,

@@ -75,6 +75,28 @@ export function checkoutReminderCopy() {
   };
 }
 
+// [2026-09-28] 제출 서버 게이트 — 주문 줄 중 «유효 선점이 없는» 상품 이름 목록(순수함수).
+//   orderRows·holdRows 둘 다 buildCartHoldSnapshotItem 으로 «같은 정규화»(없음→""·trim·slice) → 키 일치.
+//   product_id 없는 직접입력 줄은 대상 아님(선점 개념 없음).
+export function missingCartHoldRows(
+  orderRows: Record<string, unknown>[],
+  holdRows: { product_id: unknown; color: unknown; size: unknown }[],
+): string[] {
+  const keyOf = (r: Record<string, unknown>) => {
+    const s = buildCartHoldSnapshotItem(r);
+    return `${s.productId}|${s.color}|${s.size}`;
+  };
+  const held = new Set<string>();
+  for (const h of Array.isArray(holdRows) ? holdRows : []) held.add(keyOf(h as Record<string, unknown>));
+  const missing: string[] = [];
+  for (const row of Array.isArray(orderRows) ? orderRows : []) {
+    const s = buildCartHoldSnapshotItem(row);
+    if (!s.productId) continue;                       // 직접입력(product_id 없음)은 선점 대상 아님
+    if (!held.has(`${s.productId}|${s.color}|${s.size}`)) missing.push(s.productName || s.productId);
+  }
+  return missing;
+}
+
 // [2026-09-28] 관리자 모달용 남은시간 계산(표시 전용·순수함수). 절대 만료 = created_at + hold.
 export type CartHoldTimeline = {
   remainMin: number;                       // 남은 분(0 하한, 올림)
