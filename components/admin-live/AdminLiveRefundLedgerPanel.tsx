@@ -369,7 +369,7 @@ export default function AdminLiveRefundLedgerPanel({ focusTaskId }: { focusTaskI
 }
 
 // ── 시안 ③ 처리 창 ──
-export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssue = false, repIssueDate = "", issueTypesInitial = [], issueBodyMemo = "", onSaveIssue, onDelete }: { item: LedgerDetail; onClose: () => void; onSaved: () => void; openedFromOtherIssue?: boolean; repIssueDate?: string; issueTypesInitial?: string[]; issueBodyMemo?: string; onSaveIssue?: (d: { issueType: "refund" | "exchange" | "etc"; memo: string }) => Promise<boolean>; onDelete?: () => void }) {
+export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssue = false, repIssueDate = "", issueTypesInitial = [], issueBodyMemo = "", onSaveIssue, onDelete, createMode = false, earnedPoints = 0, onCreateIssue }: { item: LedgerDetail; onClose: () => void; onSaved: () => void; openedFromOtherIssue?: boolean; repIssueDate?: string; issueTypesInitial?: string[]; issueBodyMemo?: string; onSaveIssue?: (d: { issueType: "refund" | "exchange" | "etc"; memo: string }) => Promise<boolean>; onDelete?: () => void; createMode?: boolean; earnedPoints?: number; onCreateIssue?: (d: { issueType: "refund" | "exchange" | "etc"; memo: string; selectedRowIds: number[] }) => Promise<{ taskId: string } | null> }) {
   const orderCode = clean(item.order_lookup_code);
   // [2026-09-27 ②] 유형 칩(환불/교환/기타) — 이 하나가 kind·하단 전환을 정한다. 기타는 하단 없음(admin-tasks 만 저장).
   const initIssueType: "refund" | "exchange" | "etc" = (() => {
@@ -631,6 +631,19 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
 
   // [②] 저장 하나 — 유형·메모(이슈)를 admin-tasks 에 먼저 저장 → (기타 아니면) refund-ledger PATCH. 순서대로, 부분 실패 안내.
   const saveOnly = async () => {
+    // [⑬ 초안 모드] 주문상세 「+ 고객이슈 등록」 — order-return 으로 이슈 생성(포인트 회수 규칙은 서버가), 받은 taskId 로 환불 기록 연결.
+    if (createMode) {
+      const ids = lines.filter((l) => (sel[l.id] || 0) > 0).map((l) => Number(l.id)).filter((n) => n > 0);
+      if (ids.length === 0) { showAdminToast("대상 상품을 1개 이상 선택해주세요.", "warning"); return; }
+      setSaving(true);
+      const created = await onCreateIssue?.({ issueType, memo: issueMemo, selectedRowIds: ids });
+      setSaving(false);
+      if (!created?.taskId) return;                       // 실패 토스트는 onCreateIssue 쪽에서
+      if (isEtc) { onSaved(); return; }
+      const okLedger = await doPatch({ admin_task_id: created.taskId });
+      if (!okLedger) { showAdminToast("고객이슈는 등록됐지만 환불 기록 저장에 실패했어요. 고객이슈 탭 「처리」에서 이어서 저장해 주세요.", "warning"); onSaved(); return; }
+      showAdminToast("등록됐어요", "success"); onSaved(); return;
+    }
     // 1) 고객이슈(admin-tasks) 저장 — 기존 수정 경로(메타줄 보존). 호출은 rail 이 넘긴 onSaveIssue.
     if (onSaveIssue) {
       const okIssue = await onSaveIssue({ issueType, memo: issueMemo });
@@ -695,7 +708,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
         {/* 1. 헤더 */}
         <div className="flex items-start justify-between gap-2 border-b border-line px-5 pt-4 pb-3">
           <div className="min-w-0">
-            <h3 className="text-lg font-black text-ink">{isEtc ? "고객이슈 처리" : isExchange ? "교환하기" : "환불하기"}</h3>
+            <h3 className="text-lg font-black text-ink">{createMode ? "고객이슈 등록" : isEtc ? "고객이슈 처리" : isExchange ? "교환하기" : "환불하기"}</h3>
             {openedFromOtherIssue ? <div className="mt-1 text-[13px] leading-5 text-ink-mute">같은 주문의 {repIssueDateMD ? `${repIssueDateMD} ` : ""}이슈 기록을 열었어요.</div> : null}
             {headerNotice ? <div className="mt-1 text-[13px] leading-5 text-ink-mute">{headerNotice}</div> : null}
             <div className="mt-1 text-[13px] leading-5 text-ink-soft">
@@ -848,6 +861,13 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
             </div>
           </div>
 
+          {/* [⑬ D] 등록 초안 + 환불 + 선택 있음 + 적립>0 일 때만 — 서버 order-return 안분 규칙(선택÷전체×적립)과 같은 식(표시 전용). */}
+          {createMode && !isExchange && earnedPoints > 0 && selectedCount > 0 ? (
+            <div className="mb-3 rounded-lg bg-rose-soft px-3 py-2 text-[12px] font-bold text-rose-deep">
+              환불 접수 시 선택 상품 기준 포인트 약 {won(totalLineSum > 0 ? (productSum >= totalLineSum ? earnedPoints : Math.floor(earnedPoints * productSum / totalLineSum)) : 0)} 회수 (주문 전체 적립 {won(earnedPoints)})
+            </div>
+          ) : null}
+
           {!isExchange ? (
             <>
               {/* 3. 금액 요약 표 — 차감/받을반품비 입력이 표 행 안에. 기준 줄(항상) + 상품/배송비/차감 → 환불할 금액 */}
@@ -971,8 +991,8 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
         {/* 9. 하단 고정 — 「저장」 하나. 완료(이체·취소·지급 등)는 목록 「해결완료」에서 처리. */}
         {saveError ? <div className="border-t border-danger-tx/40 bg-danger-bg px-5 py-2 text-[13px] font-bold text-danger-tx">저장 실패: {saveError}</div> : null}
         <div className="flex items-center gap-2 border-t border-line px-5 py-3">
-          {onDelete ? <button type="button" disabled={saving} onClick={onDelete} className="text-[13px] font-bold text-ink-mute underline hover:text-danger-tx disabled:opacity-50">삭제</button> : null}
-          <button type="button" disabled={saving || (!isEtc && !linesLoaded && !!orderCode) || (!isEtc && linesError)} onClick={saveOnly} className="ml-auto h-12 rounded-xl bg-rose-deep px-6 text-[14px] font-black text-white disabled:opacity-50">{saving ? "저장 중…" : "저장"}</button>
+          {onDelete && !createMode ? <button type="button" disabled={saving} onClick={onDelete} className="text-[13px] font-bold text-ink-mute underline hover:text-danger-tx disabled:opacity-50">삭제</button> : null}
+          <button type="button" disabled={saving || (!isEtc && !linesLoaded && !!orderCode) || (!isEtc && linesError)} onClick={saveOnly} className="ml-auto h-12 rounded-xl bg-rose-deep px-6 text-[14px] font-black text-white disabled:opacity-50">{saving ? (createMode ? "등록 중…" : "저장 중…") : (createMode ? "등록" : "저장")}</button>
         </div>
       </div>
     </div>

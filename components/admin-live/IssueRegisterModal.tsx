@@ -5,7 +5,7 @@
 //     · 탭에서 열면 → admin-tasks 생성(포인트 무접촉)
 //     · 주문상세에서 열면(orderContext) → order-return 등록(환불 유형일 때 서버에서 포인트 회수, 회수 규칙 불변)
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export type CustomerIssueCustomerOption = { key: string; nickname: string; name: string; phone: string };
 
@@ -63,15 +63,11 @@ export function IssueTypeChips({ value, onChange }: { value: string[]; onChange:
   );
 }
 
-export type OrderIssueLine = { id: string; productName: string; opt?: string; qty?: number; amount?: number; photo?: string };
-export type OrderIssueContext = {
-  orderCode: string; nickname: string; name: string; phone: string;
-  lines: OrderIssueLine[]; earnedPoints: number;
-};
+// [2026-09-29 ⑬] 주문상세 등록은 처리창(RefundProcessModal) 초안 모드로 이동 → 이 모달은 «고객이슈 탭 등록»만 담당.
 export type IssueRegisterSubmit = {
   nickname: string; name: string; phone: string;
   taskTypes: string[]; priority: string; memo: string;
-  mode: "refund" | "exchange" | "etc"; selectedRowIds: string[];
+  mode: "refund" | "exchange" | "etc";
 };
 
 type Props = {
@@ -80,42 +76,27 @@ type Props = {
   onSubmit: (data: IssueRegisterSubmit) => void | Promise<void>;
   saving?: boolean;
   customerOptions?: CustomerIssueCustomerOption[]; // 탭 모드 검색용
-  orderContext?: OrderIssueContext | null;         // 주문상세 모드
 };
 
-const won = (n: number) => `${Math.round(Number(n) || 0).toLocaleString("ko-KR")}원`;
 const INPUT_TAB = "h-11 rounded-xl border border-line px-3 text-sm font-bold outline-none focus:border-info-tx/35 focus:ring-4 focus:ring-info-bg";
 
-export default function IssueRegisterModal({ open, onClose, onSubmit, saving = false, customerOptions = [], orderContext = null }: Props) {
-  const isOrder = !!orderContext;
-  // 공용 폼
+export default function IssueRegisterModal({ open, onClose, onSubmit, saving = false, customerOptions = [] }: Props) {
+  // 탭 등록 폼
   const [nickname, setNickname] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [priority, setPriority] = useState("normal");
   const [memo, setMemo] = useState("");
-  // [B2] 유형 = 환불/교환/기타 단일 선택(두 경로 공통). 탭 저장 시 taskTypes 는 이 하나에서 파생(기타→general).
-  const [mode, setMode] = useState<"refund" | "exchange" | "etc">(isOrder ? "refund" : "etc");
-  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
-  // 탭 모드 검색
+  // 유형 = 환불/교환/기타 단일 선택. taskTypes 는 이 하나에서 파생(기타→general).
+  const [mode, setMode] = useState<"refund" | "exchange" | "etc">("etc");
   const [searchDraft, setSearchDraft] = useState("");
   const [searchKeyword, setSearchKeyword] = useState("");
 
-  // [2026-09-29] 주문상세가 렌더마다 새 orderContext 객체를 넘겨 입력 중 초기화되던 버그 → 의존성은 [open] 만,
-  //   effect 안에서는 ref 로 최신 orderContext 를 읽는다.
-  const ctxRef = useRef(orderContext); ctxRef.current = orderContext;
   useEffect(() => {
     if (!open) return;
-    const ctx = ctxRef.current;
-    setNickname(clean(ctx?.nickname));
-    setName(clean(ctx?.name));
-    setPhone(clean(ctx?.phone));
-    setPriority("normal");
-    setMemo("");
-    setMode(ctx ? "refund" : "etc");
-    setSelectedRowIds((ctx?.lines || []).map((l) => String(l.id)).filter(Boolean));
-    setSearchDraft("");
-    setSearchKeyword("");
+    setNickname(""); setName(""); setPhone("");
+    setPriority("normal"); setMemo(""); setMode("etc");
+    setSearchDraft(""); setSearchKeyword("");
   }, [open]);
 
   const searchResults = useMemo(() => {
@@ -128,12 +109,10 @@ export default function IssueRegisterModal({ open, onClose, onSubmit, saving = f
 
   if (!open) return null;
 
-  const toggleRow = (id: string) => setSelectedRowIds((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
-
   const submit = () => {
     // 탭 저장(admin-tasks)은 taskTypes[0] 을 task_type 으로 씀 → 기타=general, 나머지는 mode 그대로.
     const taskTypes = [mode === "etc" ? "general" : mode];
-    void onSubmit({ nickname: clean(nickname), name: clean(name), phone: clean(phone), taskTypes, priority, memo: cleanMultiline(memo), mode, selectedRowIds });
+    void onSubmit({ nickname: clean(nickname), name: clean(name), phone: clean(phone), taskTypes, priority, memo: cleanMultiline(memo), mode });
   };
 
   return (
@@ -142,72 +121,11 @@ export default function IssueRegisterModal({ open, onClose, onSubmit, saving = f
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="text-lg font-black text-ink">고객이슈 등록</h3>
-            {isOrder ? (
-              <div className="mt-1 truncate text-[13px] font-bold text-ink-soft">{nickname || "-"}{name ? ` · ${name}` : ""}{orderContext?.orderCode ? ` · ${orderContext.orderCode}` : ""}</div>
-            ) : null}
           </div>
           <button type="button" onClick={onClose} className="shrink-0 rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2">닫기</button>
         </div>
 
-        {isOrder ? (
-          <>
-            {/* [E] 처리창과 같은 구조 — 유형 칩 */}
-            <div className="mt-4">
-              <div className="mb-2 text-xs font-black text-ink-soft">유형</div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                {ORDER_ISSUE_TYPES.map(([key, label]) => (
-                  <button key={key} type="button" onClick={() => setMode(key as "refund" | "exchange" | "etc")}
-                    className={`rounded-xl px-3 py-1.5 text-[14px] font-black transition ${mode === key ? (key === "refund" ? "bg-rose-deep text-white" : "bg-[var(--color-ink-soft)] text-white") : "border border-line bg-surface text-ink-mute hover:bg-surface-2"}`}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* [E] 대상 상품 — 처리창 행 구조(✓ · 사진 h-10 · 이름/옵션 × 수량 · 금액) */}
-            <div className="mt-4">
-              <div className="mb-1 text-[13px] font-black text-ink-mute">대상 상품 ({selectedRowIds.length}/{orderContext?.lines.length || 0})</div>
-              <div className="rounded-xl border border-line">
-                {(orderContext?.lines || []).map((l) => {
-                  const id = String(l.id); const on = selectedRowIds.includes(id); const qty = Number(l.qty) || 1;
-                  return (
-                    <button key={id} type="button" onClick={() => toggleRow(id)}
-                      className="flex w-full items-center gap-2 border-b border-line px-2 py-2 text-left outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-rose-deep">
-                      <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[13px] ${on ? "border-rose-deep bg-rose-deep text-white" : "border-line bg-surface text-transparent"}`}>✓</span>
-                      {l.photo ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={l.photo} alt="" className="h-10 w-10 shrink-0 rounded-lg border border-line object-cover" loading="lazy" />
-                      ) : <span className="h-10 w-10 shrink-0 rounded-lg border border-line bg-surface-2" />}
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[14px] font-bold text-ink">{l.productName}</span>
-                        <span className="block truncate text-[13px] text-ink-mute">{l.opt || l.productName}{qty >= 2 ? ` × ${qty}` : ""}</span>
-                      </span>
-                      <span className={`w-20 shrink-0 pr-1 text-right text-[14px] font-black ${on ? "text-ink" : "text-ink-mute"}`}>{won(Number(l.amount) || 0)}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* [E] 메모 — 라벨 + textarea 2줄 */}
-            <div className="mt-4">
-              <div className="mb-1 text-[13px] font-black text-ink-mute">메모 (선택)</div>
-              <textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="예: 사이즈 교환 원함"
-                className="h-16 w-full resize-none rounded-lg border border-line p-2 text-sm font-bold leading-6 outline-none focus:border-info-tx/35 focus:ring-4 focus:ring-info-bg" />
-            </div>
-
-            {/* [D] 포인트 안내 — 환불 유형 + 선택 있을 때만. 서버 order-return 안분 규칙(선택 금액÷전체 금액)과 같은 식(표시 전용). */}
-            {mode === "refund" && selectedRowIds.length > 0 ? (() => {
-              const lns = orderContext?.lines || [];
-              const total = lns.reduce((s, l) => s + (Number(l.amount) || 0), 0);
-              const selected = lns.filter((l) => selectedRowIds.includes(String(l.id))).reduce((s, l) => s + (Number(l.amount) || 0), 0);
-              const earned = Number(orderContext?.earnedPoints) || 0;
-              if (earned <= 0) return <div className="mt-2 rounded-lg bg-rose-soft px-3 py-2 text-[12px] font-bold text-rose-deep">이 주문 적립 포인트 없음 — 회수 0원</div>;
-              const est = total > 0 ? (selected >= total ? earned : Math.floor(earned * selected / total)) : 0;
-              return <div className="mt-2 rounded-lg bg-rose-soft px-3 py-2 text-[12px] font-bold text-rose-deep">환불 접수 시 선택 상품 기준 포인트 약 {won(est)} 회수 (주문 전체 적립 {won(earned)})</div>;
-            })() : null}
-          </>
-        ) : (
+        {(
           <>
             {/* ChatGPT 정리 도우미 */}
             <div className="mt-4 rounded-2xl border border-line bg-surface-2 p-3">
@@ -255,7 +173,7 @@ export default function IssueRegisterModal({ open, onClose, onSubmit, saving = f
               <div className="flex flex-wrap items-center gap-1.5">
                 {ORDER_ISSUE_TYPES.map(([key, label]) => (
                   <button key={key} type="button" onClick={() => setMode(key as "refund" | "exchange" | "etc")}
-                    className={`rounded-xl px-3 py-1.5 text-[13px] font-black transition ${mode === key ? (key === "refund" ? "bg-rose-deep text-white" : "bg-[var(--color-ink-soft)] text-white") : "border border-line bg-surface text-ink-mute hover:bg-surface-2"}`}>
+                    className={`rounded-xl px-3 py-1.5 text-[14px] font-black transition ${mode === key ? (key === "refund" ? "bg-rose-deep text-white" : "bg-[var(--color-ink-soft)] text-white") : "border border-line bg-surface text-ink-mute hover:bg-surface-2"}`}>
                     {label}
                   </button>
                 ))}
@@ -268,8 +186,11 @@ export default function IssueRegisterModal({ open, onClose, onSubmit, saving = f
               </select>
             </div>
 
-            <textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="고객이슈 내용을 입력하세요."
-              className="mt-3 min-h-[180px] w-full resize-none rounded-2xl border border-line p-3 text-sm font-bold leading-6 outline-none focus:border-info-tx/35 focus:ring-4 focus:ring-info-bg" />
+            <div className="mt-3">
+              <div className="mb-1 text-[13px] font-black text-ink-mute">메모</div>
+              <textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="고객이슈 내용을 입력하세요."
+                className="min-h-[180px] w-full resize-none rounded-2xl border border-line p-3 text-sm font-bold leading-6 outline-none focus:border-info-tx/35 focus:ring-4 focus:ring-info-bg" />
+            </div>
           </>
         )}
 

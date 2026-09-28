@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
       .filter(Boolean)
       .join("\n");
 
-    const { error: taskErr } = await sb.from("admin_tasks").insert({
+    const { data: taskRow, error: taskErr } = await sb.from("admin_tasks").insert({
       task_type: mode === "refund" ? "refund" : mode === "exchange" ? "exchange" : "general",
       title: issueTitle,
       body: issueBody,
@@ -155,8 +155,10 @@ export async function POST(request: NextRequest) {
           qty: Math.max(1, num(r.qty) || 1),
         })),
       },
-    });
+    }).select("id").maybeSingle();
     const issueRegistered = !taskErr;
+    // [2026-09-29] 처리창 초안 모드가 이 taskId 로 refund-ledger 를 admin_task_id 연결한다(응답에만 추가·다른 로직 무변경).
+    const taskId = taskErr ? "" : String(taskRow?.id ?? "");
 
     // ── 3) 환불이면 적립 포인트 회수 (기록/이슈가 저장된 뒤에만 진행)
     let reclaimed = 0;
@@ -228,6 +230,7 @@ export async function POST(request: NextRequest) {
                 message: "기록·고객이슈는 저장됐지만 포인트 회수 실패: " + ledErr.message,
                 reclaimed: 0,
                 issueRegistered,
+                taskId,
               });
             }
 
@@ -255,6 +258,7 @@ export async function POST(request: NextRequest) {
                 message: "기록·고객이슈는 저장됐지만 포인트 잔액 반영 실패: " + balErr.message,
                 reclaimed: 0,
                 issueRegistered,
+                taskId,
               });
             }
             balanceAfter = next;
@@ -270,6 +274,7 @@ export async function POST(request: NextRequest) {
       products: productSummary,
       issueRegistered,
       issueError: taskErr ? taskErr.message : null,
+      taskId,
       reclaimed,
       balanceAfter,
       reclaimNote,

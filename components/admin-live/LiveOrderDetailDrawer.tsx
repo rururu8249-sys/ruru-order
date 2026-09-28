@@ -17,7 +17,7 @@ import { buildCustomerOrderCopyText, buildExtraDepositRequestNote, buildPaymentR
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import AdminLiveCustomerBlockReasonModal from "./AdminLiveCustomerBlockReasonModal";
 import { requestAdminCustomerBlock } from "@/lib/adminCustomerBlock";
-import IssueRegisterModal, { type IssueRegisterSubmit, type OrderIssueLine } from "./IssueRegisterModal";
+import { RefundProcessModal, type LedgerDetail } from "./AdminLiveRefundLedgerPanel";
 
 type Props = {
   order: LiveOrder;
@@ -1059,6 +1059,11 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   //   버튼이 곧 유형 선택이므로 편집기 안의 유형 버튼은 없앴고, 접수하면 고객이슈 자동 등록(별도 등록 버튼 삭제).
   // 「환불·교환 등록」 열기 — 이 주문 적립 포인트(안내 문구용)를 읽어온 뒤 모달을 연다(읽기 전용·계산 무관).
   const openIssueRegister = async () => {
+    // [⑬d] 처리창은 주문번호로 order-lines 를 불러오므로 주문번호 없으면 등록 불가.
+    if (!String((order as LiveOrder).orderNo || (order as Record<string, unknown>).order_lookup_code || "").trim()) {
+      showAdminToast("주문번호를 찾지 못해 고객이슈를 등록할 수 없어요.", "error");
+      return;
+    }
     const rowIds = items.map((item) => Number(item.id)).filter((id) => Number.isFinite(id) && id > 0);
     let earned = 0;
     if (rowIds.length > 0) {
@@ -1069,18 +1074,21 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     setIssueRegisterOpen(true);
   };
 
-  // 모달 제출 → 기존 order-return 등록 그대로 호출(환불이면 서버가 포인트 회수 — 회수 규칙 불변).
-  const handleIssueRegisterSubmit = async (data: IssueRegisterSubmit) => {
-    if (returnSaving) return;
+  // [⑬] 처리창 초안 모드 제출 → 기존 order-return 등록 그대로 호출(환불이면 서버가 포인트 회수 — 회수 규칙 불변).
+  //   생성된 taskId 를 돌려주면 처리창이 그 taskId 로 refund-ledger 를 이어서 저장한다.
+  const createIssueFromOrder = async (
+    data: { issueType: "refund" | "exchange" | "etc"; memo: string; selectedRowIds: number[] },
+  ): Promise<{ taskId: string } | null> => {
+    if (returnSaving) return null;
     const refRowId = Number(items[0]?.id);
     const rowIds = data.selectedRowIds.map((v) => Number(v)).filter((v) => Number.isFinite(v) && v > 0);
     if (!Number.isFinite(refRowId) || refRowId <= 0) {
       showAdminToast("기준 주문 행을 찾지 못했습니다.", "warning");
-      return;
+      return null;
     }
     if (rowIds.length === 0) {
       showAdminToast("대상 상품을 1개 이상 선택해주세요.", "warning");
-      return;
+      return null;
     }
     setReturnSaving(true);
     try {
@@ -1088,16 +1096,16 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
-        body: JSON.stringify({ mode: data.mode, refRowId, rowIds, detail: data.memo.trim() }),
+        body: JSON.stringify({ mode: data.issueType, refRowId, rowIds, detail: data.memo.trim() }),
       }).then((r) => r.json()).catch(() => null);
 
       if (!res?.ok) {
         showAdminToast("반품/교환 접수 실패\n\n" + (res?.message || "알 수 없는 오류"), "error");
-        return;
+        return null;
       }
 
       // [B3] 토스트는 화면 라벨(환불/교환/기타)로 — res.modeLabel(반품…) 대신.
-      const modeLabel = data.mode === "refund" ? "환불" : data.mode === "exchange" ? "교환" : "기타";
+      const modeLabel = data.issueType === "refund" ? "환불" : data.issueType === "exchange" ? "교환" : "기타";
       const lines = [`${modeLabel} 이슈 등록 완료`];
       if (res.issueRegistered) lines.push("🗂 고객이슈 자동 등록됨");
       if (Number(res.reclaimed) > 0) {
@@ -1111,8 +1119,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       }
       if (res.partial && res.message) lines.push(String(res.message));
       showAdminToast(lines.join("\n"), res.partial ? "warning" : "success");
-      setIssueRegisterOpen(false);
-      await onAfterStatusChange?.();
+      return { taskId: String(res.taskId || "") };
     } finally {
       setReturnSaving(false);
     }
@@ -1955,28 +1962,26 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         }}
       />
 
-      <IssueRegisterModal
-        open={issueRegisterOpen}
-        onClose={() => { if (!returnSaving) setIssueRegisterOpen(false); }}
-        saving={returnSaving}
-        onSubmit={handleIssueRegisterSubmit}
-        orderContext={{
-          // [A] LiveOrder 필드는 orderNo(어댑터 330행) — 옛 키는 존재하지 않아 항상 빈 값이었음.
-          orderCode: String((order as LiveOrder).orderNo || (order as Record<string, unknown>).order_lookup_code || "").trim(),
-          nickname: clean((orderForView as any).youtubeNickname) || clean(orderForView.nickname),
-          name: clean(orderForView.name),
-          phone: clean(orderForView.phone),
-          earnedPoints: issueEarnedPoints,
-          lines: items.map((item): OrderIssueLine => ({
-            id: String(item.id),
-            productName: String(item.productName || ""),
-            opt: [String(item.color || "").trim(), String(item.size || "").trim()].filter((v) => v && v !== "없음").join("/"),
-            qty: Number(item.qty) || 1,
-            amount: Number(item.amount) || 0,
-            photo: itemImages[String(item.id)] || "",   // [E] 상품 사진(있으면) — 처리창과 같은 방식
-          })),
-        }}
-      />
+      {/* [⑬] 주문상세 「+ 고객이슈 등록」 = 처리창(RefundProcessModal) 초안 모드. 손님·주문·상품·계좌·금액표까지 한 창. */}
+      {issueRegisterOpen ? (
+        <RefundProcessModal
+          createMode
+          earnedPoints={issueEarnedPoints}
+          item={{
+            id: "", created_at: "", admin_task_id: "", kind: "반품", stage: "접수", method: "없음",
+            amount_base: 0, amount_final: 0, adjustments: [], product_snapshot: [],
+            nickname: clean((orderForView as any).youtubeNickname) || clean(orderForView.nickname),
+            customer_name: clean(orderForView.name), customer_phone: clean(orderForView.phone),
+            order_lookup_code: String((order as LiveOrder).orderNo || (order as Record<string, unknown>).order_lookup_code || "").trim(),
+            reason: "",
+          } as LedgerDetail}
+          issueTypesInitial={["refund"]}
+          issueBodyMemo=""
+          onCreateIssue={createIssueFromOrder}
+          onClose={() => { if (!returnSaving) setIssueRegisterOpen(false); }}
+          onSaved={async () => { setIssueRegisterOpen(false); window.dispatchEvent(new Event("ruru-admin-task-updated")); await onAfterStatusChange?.(); }}
+        />
+      ) : null}
     </aside>
   );
 }
