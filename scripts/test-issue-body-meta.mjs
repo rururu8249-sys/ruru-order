@@ -85,4 +85,15 @@ const BODY = [
   assert.equal(splitIssueBody(saved).memo, memo, "다시 저장했더니 줄이 줄었다");
 }
 
-console.log("✅ test-issue-body-meta — 수정해도 전화번호·닉네임·이름이 보존됨 + 여러 줄 메모 유지");
+// [2026-09-29] 메타줄만 있고 사장님 메모가 없으면 memo="" — 자동날짜 줄이 memo 로 새면 안 된다.
+{
+  const metaOnly = [
+    "자동날짜: 2026. 09. 29. 화요일",
+    "이슈유형: 반품(환불)",
+    "닉네임: 빛나리",
+    "전화번호: 01071609281",
+  ].join("\n");
+  assert.equal(splitIssueBody(metaOnly).memo, "", "메타줄만 있는 body → memo 빈칸(자동날짜 새지 않음)");
+}
+
+console.log("✅ test-issue-body-meta — 수정해도 전화번호·닉네임·이름이 보존됨 + 여러 줄 메모 유지 + 메타줄만이면 memo 빈칸");

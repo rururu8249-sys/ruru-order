@@ -27,17 +27,28 @@ export async function GET(request: NextRequest) {
     // undo 와 같은 링크(이슈 body 의 「주문번호: {code}」) + source=order_return_flow. 되돌림 가능 조건(활성)만.
     const { data, error } = await supabase
       .from("admin_tasks")
-      .select("id, status, is_resolved, created_at")
+      .select("id, status, is_resolved, created_at, resolved_at")
       .eq("source", "order_return_flow")
       .ilike("body", `%주문번호: ${orderCode}%`)
       .order("created_at", { ascending: false });
     if (error) return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
 
-    const active = ((data as Array<Record<string, unknown>>) || []).filter((t) => {
+    const rows = (data as Array<Record<string, unknown>>) || [];
+    const active = rows.filter((t) => {
       const st = clean(t.status).toLowerCase();
       return st !== "deleted" && st !== "done" && t.is_resolved !== true;
     });
-    return NextResponse.json({ ok: true, taskId: active[0] ? clean(active[0].id) : "", count: active.length });
+    // [2026-09-29] 해결완료 연동 — deleted 제외 최신 1건의 해결 여부(주문상세 배지·「반품 취소」 숨김용).
+    const latestRow = rows.find((t) => clean(t.status).toLowerCase() !== "deleted") || null;
+    const latest = latestRow
+      ? {
+          id: clean(latestRow.id),
+          status: clean(latestRow.status),
+          isResolved: clean(latestRow.status).toLowerCase() === "done" || latestRow.is_resolved === true,
+          resolvedAt: clean(latestRow.resolved_at),
+        }
+      : null;
+    return NextResponse.json({ ok: true, taskId: active[0] ? clean(active[0].id) : "", count: active.length, latest });
   } catch (error) {
     return NextResponse.json({ ok: false, message: error instanceof Error ? error.message : "조회 실패" }, { status: 500 });
   }

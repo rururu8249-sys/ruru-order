@@ -160,9 +160,29 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const [issueEarnedPoints, setIssueEarnedPoints] = useState(0);
   // [E2] 위험 작업(입금확인 취소·주문서 자체 취소·손님 차단)은 화면 맨 아래 접힌 한 줄로 — 실수 방지(2클릭 마찰).
   const [dangerOpen, setDangerOpen] = useState(false);
+  // [2026-09-29 C] 이 주문 반품 이슈의 해결 여부(배지·「반품 취소」 숨김용). 조회 실패는 무시(null 유지).
+  const [issueLatest, setIssueLatest] = useState<{ isResolved: boolean; resolvedAt: string } | null>(null);
 
   useEffect(() => {
     setLocalOrder(order);
+  }, [order]);
+
+  // [2026-09-29 C] 서랍이 열릴 때(order 바뀔 때) 반품 이슈 해결 여부를 한 번 조회.
+  useEffect(() => {
+    const oo = order as Record<string, unknown>;
+    const orderCode = String((order as LiveOrder).orderNo || oo.order_lookup_code || "").trim();
+    if (!orderCode) { setIssueLatest(null); return; }
+    let alive = true;
+    (async () => {
+      try {
+        const r = await fetch(`/api/admin-live/order-return/find-task?orderCode=${encodeURIComponent(orderCode)}`, { cache: "no-store" });
+        const p = await r.json().catch(() => null);
+        if (!alive) return;
+        setIssueLatest(p?.ok && p.latest ? { isResolved: !!p.latest.isResolved, resolvedAt: String(p.latest.resolvedAt || "") } : null);
+      } catch { /* 조회 실패는 무시 — 기존 표시 유지 */ }
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order]);
 
   const handleItemSaved = async (result: LiveOrderItemEditSaveResult) => {
@@ -1472,11 +1492,13 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             <div className="rounded-lg border border-warn-tx/40 bg-warn-bg p-3 text-[12px] font-bold leading-6 text-warn-tx">
               {/* [B4] DB 값은 「반품(환불)/반품(교환)/기타」 — 화면에서만 「환불/교환/기타」로. 사유 앞머리 "[유형] " 제거. */}
               <span className="mr-2 rounded-lg bg-surface px-2 py-0.5 text-[11px] font-black">{String((order as any).returnStatus).replace("반품(환불)", "환불").replace("반품(교환)", "교환")}</span>
+              {/* [2026-09-29 C] 고객이슈가 해결완료면 배지 표시 + 「반품 취소」 숨김(기록 지우기는 유지). */}
+              {issueLatest?.isResolved ? (() => { const d = new Date(issueLatest.resolvedAt); const md = Number.isFinite(d.getTime()) ? `${d.getMonth() + 1}.${d.getDate()}` : ""; return <span className="mr-2 rounded-lg bg-ok-bg px-2 py-0.5 text-[11px] font-black text-ok-tx">✅ 해결완료{md ? ` ${md}` : ""}</span>; })() : null}
               {Number((order as any).returnAmount || 0) > 0 ? <span className="mr-2">환불 예정/완료 {money(Number((order as any).returnAmount || 0))}</span> : null}
               <div className="mt-1 whitespace-pre-wrap text-ink-soft">{String((order as any).returnReason || "사유 없음").replace(/^\[[^\]]*\]\s*/, "")}</div>
               <div className="mt-1 flex items-center justify-end gap-3">
                 <button type="button" disabled={returnSaving} onClick={() => void handleClearReturn()} title="기록만 지웁니다 — 정산·입금·재고 숫자는 바뀌지 않아요." className="text-[11px] font-black text-ink-mute underline hover:text-danger-tx disabled:opacity-50">기록 지우기</button>
-                <button type="button" disabled={returnSaving} onClick={handleUndoReturn} className="text-[11px] font-black text-ink-mute underline hover:text-rose-deep disabled:opacity-50">반품 취소</button>
+                {issueLatest?.isResolved ? null : <button type="button" disabled={returnSaving} onClick={handleUndoReturn} className="text-[11px] font-black text-ink-mute underline hover:text-rose-deep disabled:opacity-50">반품 취소</button>}
               </div>
             </div>
           ) : (
@@ -1951,6 +1973,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             opt: [String(item.color || "").trim(), String(item.size || "").trim()].filter((v) => v && v !== "없음").join("/"),
             qty: Number(item.qty) || 1,
             amount: Number(item.amount) || 0,
+            photo: itemImages[String(item.id)] || "",   // [E] 상품 사진(있으면) — 처리창과 같은 방식
           })),
         }}
       />

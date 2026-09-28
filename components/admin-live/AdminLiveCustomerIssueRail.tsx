@@ -264,9 +264,9 @@ function getIssueText(task: AdminIssueTask) {
 //   자르고 합치는 규칙은 lib/issueBodyMeta.ts 한 곳에만 둔다(기준이 갈라지면 또 지워진다).
 //   scripts/test-issue-body-meta.mjs 가 이를 지킨다.
 function getFullMemo(task: AdminIssueTask) {
-  const text = cleanMultiline(task.body);
-  if (!text) return getIssueText(task);
-  return splitIssueBody(text).memo || getIssueText(task);
+  // [2026-09-29] 메모 = 메타줄(자동날짜/유형/전화…)을 걷어낸 본문만. 메모 없으면 빈칸(자동날짜 줄이 새지 않게).
+  //   getIssueText 폴백 제거 — 그건 목록 표시용이라 메타줄이 섞여 메모칸에 들어가면 안 된다.
+  return splitIssueBody(cleanMultiline(task.body)).memo;
 }
 
 function pad2(value: number) {

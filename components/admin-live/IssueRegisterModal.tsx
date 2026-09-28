@@ -5,7 +5,7 @@
 //     · 탭에서 열면 → admin-tasks 생성(포인트 무접촉)
 //     · 주문상세에서 열면(orderContext) → order-return 등록(환불 유형일 때 서버에서 포인트 회수, 회수 규칙 불변)
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export type CustomerIssueCustomerOption = { key: string; nickname: string; name: string; phone: string };
 
@@ -63,7 +63,7 @@ export function IssueTypeChips({ value, onChange }: { value: string[]; onChange:
   );
 }
 
-export type OrderIssueLine = { id: string; productName: string; opt?: string; qty?: number; amount?: number };
+export type OrderIssueLine = { id: string; productName: string; opt?: string; qty?: number; amount?: number; photo?: string };
 export type OrderIssueContext = {
   orderCode: string; nickname: string; name: string; phone: string;
   lines: OrderIssueLine[]; earnedPoints: number;
@@ -101,19 +101,22 @@ export default function IssueRegisterModal({ open, onClose, onSubmit, saving = f
   const [searchDraft, setSearchDraft] = useState("");
   const [searchKeyword, setSearchKeyword] = useState("");
 
-  // 열 때마다 초기화
+  // [2026-09-29] 주문상세가 렌더마다 새 orderContext 객체를 넘겨 입력 중 초기화되던 버그 → 의존성은 [open] 만,
+  //   effect 안에서는 ref 로 최신 orderContext 를 읽는다.
+  const ctxRef = useRef(orderContext); ctxRef.current = orderContext;
   useEffect(() => {
     if (!open) return;
-    setNickname(clean(orderContext?.nickname));
-    setName(clean(orderContext?.name));
-    setPhone(clean(orderContext?.phone));
+    const ctx = ctxRef.current;
+    setNickname(clean(ctx?.nickname));
+    setName(clean(ctx?.name));
+    setPhone(clean(ctx?.phone));
     setPriority("normal");
     setMemo("");
-    setMode(isOrder ? "refund" : "etc");
-    setSelectedRowIds((orderContext?.lines || []).map((l) => String(l.id)).filter(Boolean));
+    setMode(ctx ? "refund" : "etc");
+    setSelectedRowIds((ctx?.lines || []).map((l) => String(l.id)).filter(Boolean));
     setSearchDraft("");
     setSearchKeyword("");
-  }, [open, orderContext]);
+  }, [open]);
 
   const searchResults = useMemo(() => {
     const keyword = cleanCompact(searchKeyword || searchDraft);
@@ -137,62 +140,72 @@ export default function IssueRegisterModal({ open, onClose, onSubmit, saving = f
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-ink-soft)]/35 px-4">
       <div className="max-h-[92vh] w-full max-w-[620px] overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <h3 className="text-lg font-black text-ink">고객이슈 등록</h3>
+            {isOrder ? (
+              <div className="mt-1 truncate text-[13px] font-bold text-ink-soft">{nickname || "-"}{name ? ` · ${name}` : ""}{orderContext?.orderCode ? ` · ${orderContext.orderCode}` : ""}</div>
+            ) : null}
           </div>
-          <button type="button" onClick={onClose} className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2">닫기</button>
+          <button type="button" onClick={onClose} className="shrink-0 rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2">닫기</button>
         </div>
 
         {isOrder ? (
           <>
-            {/* 손님·주문 고정 표시 */}
-            <div className="mt-4 rounded-2xl border border-line bg-surface-2 p-3 text-sm font-bold text-ink-soft">
-              <div className="text-ink"><b>{nickname || "-"}</b> · {name || "-"}</div>
-              <div className="mt-0.5 text-[12px] text-ink-mute">{formatPhone(phone) || "-"} · 주문 {orderContext?.orderCode || "-"}</div>
-            </div>
-
-            {/* 유형 (환불 / 교환 / 기타) */}
+            {/* [E] 처리창과 같은 구조 — 유형 칩 */}
             <div className="mt-4">
               <div className="mb-2 text-xs font-black text-ink-soft">유형</div>
               <div className="flex flex-wrap items-center gap-1.5">
                 {ORDER_ISSUE_TYPES.map(([key, label]) => (
                   <button key={key} type="button" onClick={() => setMode(key as "refund" | "exchange" | "etc")}
-                    className={`rounded-xl px-3 py-1.5 text-[13px] font-black transition ${mode === key ? (key === "refund" ? "bg-rose-deep text-white" : "bg-[var(--color-ink-soft)] text-white") : "border border-line bg-surface text-ink-mute hover:bg-surface-2"}`}>
+                    className={`rounded-xl px-3 py-1.5 text-[14px] font-black transition ${mode === key ? (key === "refund" ? "bg-rose-deep text-white" : "bg-[var(--color-ink-soft)] text-white") : "border border-line bg-surface text-ink-mute hover:bg-surface-2"}`}>
                     {label}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* 대상 상품 선택 */}
-            <div className="mt-3 space-y-1 rounded-lg border border-line bg-surface p-2">
-              <div className="text-[11px] font-black text-ink-mute">대상 상품 선택 ({selectedRowIds.length}/{orderContext?.lines.length || 0})</div>
-              {(orderContext?.lines || []).map((l) => {
-                const id = String(l.id);
-                const checked = selectedRowIds.includes(id);
-                return (
-                  <label key={id} className="flex cursor-pointer items-center gap-2 rounded-lg px-1 py-1 hover:bg-surface-2">
-                    <input type="checkbox" checked={checked} onChange={() => toggleRow(id)} className="h-4 w-4 shrink-0 accent-rose-deep" />
-                    <span className="min-w-0 flex-1 truncate text-[12px] font-bold text-ink">
-                      {l.productName}{l.opt ? <span className="text-ink-mute"> ({l.opt})</span> : null}
-                      <span className="ml-1 text-ink-mute">× {Number(l.qty) || 1}</span>
-                    </span>
-                    <span className="shrink-0 text-[11px] font-black text-ink-soft">{won(Number(l.amount) || 0)}</span>
-                  </label>
-                );
-              })}
+            {/* [E] 대상 상품 — 처리창 행 구조(✓ · 사진 h-10 · 이름/옵션 × 수량 · 금액) */}
+            <div className="mt-4">
+              <div className="mb-1 text-[13px] font-black text-ink-mute">대상 상품 ({selectedRowIds.length}/{orderContext?.lines.length || 0})</div>
+              <div className="rounded-xl border border-line">
+                {(orderContext?.lines || []).map((l) => {
+                  const id = String(l.id); const on = selectedRowIds.includes(id); const qty = Number(l.qty) || 1;
+                  return (
+                    <button key={id} type="button" onClick={() => toggleRow(id)}
+                      className="flex w-full items-center gap-2 border-b border-line px-2 py-2 text-left outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-rose-deep">
+                      <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[13px] ${on ? "border-rose-deep bg-rose-deep text-white" : "border-line bg-surface text-transparent"}`}>✓</span>
+                      {l.photo ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={l.photo} alt="" className="h-10 w-10 shrink-0 rounded-lg border border-line object-cover" loading="lazy" />
+                      ) : <span className="h-10 w-10 shrink-0 rounded-lg border border-line bg-surface-2" />}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[14px] font-bold text-ink">{l.productName}</span>
+                        <span className="block truncate text-[13px] text-ink-mute">{l.opt || l.productName}{qty >= 2 ? ` × ${qty}` : ""}</span>
+                      </span>
+                      <span className={`w-20 shrink-0 pr-1 text-right text-[14px] font-black ${on ? "text-ink" : "text-ink-mute"}`}>{won(Number(l.amount) || 0)}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* 메모 (선택) */}
-            <textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="메모 (선택)"
-              className="mt-3 h-20 w-full resize-none rounded-2xl border border-line p-3 text-sm font-bold leading-6 outline-none focus:border-info-tx/35 focus:ring-4 focus:ring-info-bg" />
+            {/* [E] 메모 — 라벨 + textarea 2줄 */}
+            <div className="mt-4">
+              <div className="mb-1 text-[13px] font-black text-ink-mute">메모 (선택)</div>
+              <textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="예: 사이즈 교환 원함"
+                className="h-16 w-full resize-none rounded-lg border border-line p-2 text-sm font-bold leading-6 outline-none focus:border-info-tx/35 focus:ring-4 focus:ring-info-bg" />
+            </div>
 
-            {/* 안내 — 환불 유형 + 주문상세 경로일 때만 한 줄 */}
-            {mode === "refund" ? (
-              <div className="mt-2 rounded-lg bg-rose-soft px-3 py-2 text-[12px] font-bold text-rose-deep">
-                환불 접수 시 이 주문 적립 포인트 {won(orderContext?.earnedPoints || 0)}을 회수해요
-              </div>
-            ) : null}
+            {/* [D] 포인트 안내 — 환불 유형 + 선택 있을 때만. 서버 order-return 안분 규칙(선택 금액÷전체 금액)과 같은 식(표시 전용). */}
+            {mode === "refund" && selectedRowIds.length > 0 ? (() => {
+              const lns = orderContext?.lines || [];
+              const total = lns.reduce((s, l) => s + (Number(l.amount) || 0), 0);
+              const selected = lns.filter((l) => selectedRowIds.includes(String(l.id))).reduce((s, l) => s + (Number(l.amount) || 0), 0);
+              const earned = Number(orderContext?.earnedPoints) || 0;
+              if (earned <= 0) return <div className="mt-2 rounded-lg bg-rose-soft px-3 py-2 text-[12px] font-bold text-rose-deep">이 주문 적립 포인트 없음 — 회수 0원</div>;
+              const est = total > 0 ? (selected >= total ? earned : Math.floor(earned * selected / total)) : 0;
+              return <div className="mt-2 rounded-lg bg-rose-soft px-3 py-2 text-[12px] font-bold text-rose-deep">환불 접수 시 선택 상품 기준 포인트 약 {won(est)} 회수 (주문 전체 적립 {won(earned)})</div>;
+            })() : null}
           </>
         ) : (
           <>

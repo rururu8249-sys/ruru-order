@@ -719,7 +719,12 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
               ))}
             </div>
             {/* [C2] 기타는 사유가 없으니 메모를 유형 칩 아래에 둔다. 환불·교환은 사유 칩 아래(아래쪽)에 렌더. */}
-            {isEtc ? <input value={issueMemo} onChange={(e) => setIssueMemo(e.target.value)} placeholder="메모 (선택)" className={`mt-2 w-full ${INPUT}`} /> : null}
+            {isEtc ? (
+              <div className="mt-2">
+                <div className="mb-1 text-[13px] font-black text-ink-mute">메모 (선택)</div>
+                <textarea value={issueMemo} onChange={(e) => setIssueMemo(e.target.value)} placeholder="예: 사이즈 교환 원함" className="h-16 w-full resize-none rounded-lg border border-line bg-surface p-2 text-[16px] font-bold leading-6 text-ink outline-none focus-visible:ring-2 focus-visible:ring-rose-deep" />
+              </div>
+            ) : null}
           </div>
 
           {/* 2. 상품 */}
@@ -836,8 +841,11 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                 </button>
               ))}
             </div>
-            {/* [C2] 환불·교환 메모는 사유 칩 바로 아래(입력은 하나·issueMemo). */}
-            <input value={issueMemo} onChange={(e) => setIssueMemo(e.target.value)} placeholder="메모 (선택)" className={`mt-2 w-full ${INPUT}`} />
+            {/* [C2] 환불·교환 메모는 사유 칩 바로 아래(입력은 하나·issueMemo). [E] 라벨+textarea 로 등록창과 통일. */}
+            <div className="mt-2">
+              <div className="mb-1 text-[13px] font-black text-ink-mute">메모 (선택)</div>
+              <textarea value={issueMemo} onChange={(e) => setIssueMemo(e.target.value)} placeholder="예: 사이즈 교환 원함" className="h-16 w-full resize-none rounded-lg border border-line bg-surface p-2 text-[16px] font-bold leading-6 text-ink outline-none focus-visible:ring-2 focus-visible:ring-rose-deep" />
+            </div>
           </div>
 
           {!isExchange ? (
