@@ -74,3 +74,28 @@ export function checkoutReminderCopy() {
     message: "장바구니에 담아두신 상품이 아직 주문 완료 전이에요. 시간이 지나면 장바구니가 자동으로 비워져요. 지금 주문서를 제출하고 결제까지 마쳐주세요 🙂",
   };
 }
+
+// [2026-09-28] 관리자 모달용 남은시간 계산(표시 전용·순수함수). 절대 만료 = created_at + hold.
+export type CartHoldTimeline = {
+  remainMin: number;                       // 남은 분(0 하한, 올림)
+  remainText: string;                      // "N분 남음" / "N시간 M분 남음" / "만료"
+  level: "danger" | "warn" | "ok";         // ≤30분 danger · ≤120분 warn · 그 외 ok
+  progress: number;                        // 경과 비율 0~1
+};
+export function cartHoldTimeline(input: { createdAtMs: number; expiresAtMs: number; nowMs: number }): CartHoldTimeline {
+  const created = Number(input.createdAtMs);
+  const expires = Number(input.expiresAtMs);
+  const now = Number(input.nowMs);
+  const remainMs = Math.max(0, expires - now);
+  const remainMin = Math.ceil(remainMs / 60000);
+  // 전체 수명(created→expires). created>expires 등 이상값은 방어(최소 1분).
+  const spanMs = Math.max(60000, expires - created);
+  const progress = expires <= now ? 1 : Math.min(1, Math.max(0, (now - created) / spanMs));
+  const remainText = remainMs <= 0
+    ? "만료"
+    : remainMin >= 60
+      ? `${Math.floor(remainMin / 60)}시간 ${remainMin % 60}분 남음`
+      : `${remainMin}분 남음`;
+  const level: CartHoldTimeline["level"] = remainMin <= 30 ? "danger" : remainMin <= 120 ? "warn" : "ok";
+  return { remainMin: remainMs <= 0 ? 0 : remainMin, remainText, level, progress };
+}

@@ -128,6 +128,7 @@ export async function GET(request: NextRequest) {
         qty: Number(r.qty) || 0,
         expiresAt: String(r.expires_at ?? ""),
         createdAt: String(r.created_at ?? ""),
+        lastSyncedAt: String(r.last_synced_at ?? ""),
       };
     });
 

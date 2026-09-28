@@ -45,12 +45,24 @@ declare
   v_all_ok boolean := true;
   v_norm_req_color text;
   v_norm_req_size text;
+  -- [2026-09-28] 절대 만료 — 옵션별 «처음 담은 시각»(created_at)을 교체 전에 보존한다.
+  v_first_map jsonb := '{}'::jsonb;
+  v_first timestamptz;
+  v_item_expires timestamptz;
+  v_key text;
 begin
   if p_session_key is null or length(trim(p_session_key)) < 6 or length(trim(p_session_key)) > 80 then
     return jsonb_build_object('ok', false, 'error', 'sessionKey 없음');
   end if;
 
   v_expires := v_now + make_interval(mins => v_minutes);
+
+  -- [2026-09-28] 교체 전에 옵션별 «처음 담은 시각»(min created_at)을 map 으로 보존 → 절대 만료 기준.
+  select coalesce(jsonb_object_agg(k, c), '{}'::jsonb) into v_first_map from (
+    select r.product_id || '|' || (case when coalesce(trim(r.color),'')='없음' then '' else coalesce(trim(r.color),'') end)
+           || '|' || (case when coalesce(trim(r.size),'')='없음' then '' else coalesce(trim(r.size),'') end) as k,
+           min(r.created_at) as c
+    from public.cart_reservations r where r.session_key = p_session_key group by 1) s;
 
   -- 교체 방식(멱등): 이 세션의 기존 선점 제거 후 현재 주문서 내용으로 다시 선점
   delete from public.cart_reservations where session_key = p_session_key;
@@ -96,6 +108,17 @@ begin
       v_qty := least(99, greatest(0, coalesce((v_item->>'qty')::integer, 0)));
       if v_qty <= 0 then continue; end if;
 
+      -- [2026-09-28] 절대 만료: 처음 담은 시각 + hold_minutes 가 지났으면 재선점 거부(자동 비움 신호).
+      v_key := v_pid || '|' || v_color || '|' || v_size;
+      v_first := coalesce((v_first_map->>v_key)::timestamptz, v_now);
+      v_item_expires := v_first + make_interval(mins => v_minutes);
+      if v_item_expires <= v_now then
+        v_all_ok := false;
+        v_results := v_results || jsonb_build_object('productId', v_pid, 'color', v_color, 'size', v_size,
+          'requested', v_qty, 'ok', false, 'expired', true, 'available', 0, 'firstAddedAt', v_first);
+        continue;
+      end if;
+
       v_available := null;
 
       if v_managed then
@@ -136,19 +159,19 @@ begin
         end if;
       end if;
 
-      -- ✅ 선점 확정
+      -- ✅ 선점 확정 — created_at=처음 담은 시각(절대 만료 기준), expires_at=v_first+hold, last_synced_at=지금
       insert into public.cart_reservations
-        (session_key, customer_phone, nickname, customer_name, product_id, color, size, qty, expires_at)
+        (session_key, customer_phone, nickname, customer_name, product_id, color, size, qty, created_at, expires_at, last_synced_at)
       values
         (p_session_key,
          nullif(regexp_replace(coalesce(p_phone,''), '[^0-9]', '', 'g'), ''),
          nullif(left(coalesce(trim(p_nickname),''),40), ''),
          nullif(left(coalesce(trim(p_customer_name),''),40), ''),
-         v_pid, v_color, v_size, v_qty, v_expires);
+         v_pid, v_color, v_size, v_qty, v_first, v_item_expires, v_now);
 
       v_results := v_results || jsonb_build_object(
         'productId', v_pid, 'color', v_color, 'size', v_size,
-        'requested', v_qty, 'ok', true, 'available', v_available);
+        'requested', v_qty, 'ok', true, 'available', v_available, 'expiresAt', v_item_expires);
     end loop;
   end loop;
 
@@ -157,4 +180,4 @@ end;
 $claim$;
 
 comment on function public.claim_cart_hold(text, text, text, text, jsonb, integer) is
-'담기 선착순 확정: products 행잠금으로 동시 담기를 도착순 직렬화, 가용재고(재고-타인선점) 검증 후 선점. 재고 숫자는 불변(실차감=제출 RPC). 2026-08-11';
+'담기 선착순 확정: products 행잠금으로 동시 담기를 도착순 직렬화, 가용재고(재고-타인선점) 검증 후 선점. 재고 숫자는 불변(실차감=제출 RPC). [2026-09-28] 절대 만료·created_at 보존(처음 담은 시각+hold 지나면 재선점 거부·expired 신호).';

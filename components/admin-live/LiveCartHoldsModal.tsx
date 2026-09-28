@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
-import { cartHoldPresentation } from "@/lib/cartHoldDetail";
+import { cartHoldPresentation, cartHoldTimeline } from "@/lib/cartHoldDetail";
 import { supabase } from "@/lib/supabase";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { formatKoreanPhone } from "@/lib/order/phone";
@@ -11,19 +11,18 @@ import { formatKoreanPhone } from "@/lib/order/phone";
 type Props = { onClose: () => void };
 type Hold = {
   sessionKey: string; phone: string; nickname: string; name: string; productId: string; productName: string; fallbackProductName: string;
-  detailName: string; unitPrice: number | null; legacySnapshot: boolean; color: string; size: string; qty: number; expiresAt: string; createdAt: string;
+  detailName: string; unitPrice: number | null; legacySnapshot: boolean; color: string; size: string; qty: number; expiresAt: string; createdAt: string; lastSyncedAt: string;
 };
-type Group = { sessionKey: string; phone: string; nickname: string; name: string; items: Hold[]; totalQty: number; minExpires: number; maxCreated: number };
+// [2026-09-28] 절대 만료 — minCreated=처음 담음(created_at), maxSynced=마지막 접속(last_synced_at). maxCreated 폐기.
+type Group = { sessionKey: string; phone: string; nickname: string; name: string; items: Hold[]; totalQty: number; minExpires: number; minCreated: number; maxSynced: number };
 type SortKey = "expires" | "recent" | "qty" | "name";
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: "expires", label: "남은 시간 짧은순" }, { value: "recent", label: "최신 담김순" }, { value: "qty", label: "담긴 수량 많은순" }, { value: "name", label: "닉네임순" },
+  { value: "expires", label: "남은 시간 짧은순" }, { value: "recent", label: "최근 접속순" }, { value: "qty", label: "담긴 수량 많은순" }, { value: "name", label: "닉네임순" },
 ];
 const phoneFmt = (p: string) => formatKoreanPhone(p);   // [2026-08-30] 표기 통일
-// [2026-08-30] "담음"이 아니라 "마지막 확인"이다.
-//   claim_cart_hold 은 동기화마다 delete 후 insert 라 created_at 이 매번 새로 찍힌다.
-//   그래서 이 값은 손님 화면이 마지막으로 신호를 보낸 시각이지, 처음 담은 시각이 아니다.
 const createdText = (ms: number) => !Number.isFinite(ms) || ms <= 0 ? "" : new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(ms));
-const remainText = (expiresMs: number, nowMs: number) => { const m = Math.max(0, Math.round((expiresMs-nowMs)/60000)); if (m >= 1440) return `${Math.floor(m/1440)}일 ${Math.floor((m%1440)/60)}시간 남음`; if (m >= 60) return `${Math.floor(m/60)}시간 ${m%60}분 남음`; return `${m}분 남음`; };
+// [2026-09-28] 항목 만료 시각 짧게(HH:MM) — 그룹 최소 만료보다 늦은 항목만 표기.
+const hhmm = (ms: number) => !Number.isFinite(ms) || ms <= 0 ? "" : new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(ms));
 const won = (n: number) => `${Math.max(0, Math.floor(n)).toLocaleString("ko-KR")}원`;
 
 export default function LiveCartHoldsModal({ onClose }: Props) {
@@ -92,15 +91,19 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
     const map = new Map<string, Group>();
     for (const h of holds) {
       const exp = new Date(h.expiresAt).getTime(); if (!Number.isFinite(exp) || exp <= now) continue;
-      const g = map.get(h.sessionKey) || { sessionKey:h.sessionKey, phone:h.phone, nickname:h.nickname, name:h.name, items:[], totalQty:0, minExpires:Infinity, maxCreated:0 };
+      const g = map.get(h.sessionKey) || { sessionKey:h.sessionKey, phone:h.phone, nickname:h.nickname, name:h.name, items:[], totalQty:0, minExpires:Infinity, minCreated:Infinity, maxSynced:0 };
       g.items.push(h); g.totalQty += h.qty; g.minExpires = Math.min(g.minExpires, exp);
-      const created = new Date(h.createdAt).getTime(); if (Number.isFinite(created)) g.maxCreated = Math.max(g.maxCreated, created);
+      const created = new Date(h.createdAt).getTime(); if (Number.isFinite(created) && created > 0) g.minCreated = Math.min(g.minCreated, created);
+      const synced = new Date(h.lastSyncedAt).getTime(); if (Number.isFinite(synced) && synced > 0) g.maxSynced = Math.max(g.maxSynced, synced);
       if (!g.phone && h.phone) g.phone=h.phone; if (!g.nickname && h.nickname) g.nickname=h.nickname; if (!g.name && h.name) g.name=h.name; map.set(h.sessionKey,g);
     }
     const list=Array.from(map.values()); const nameOf=(g:Group)=>(g.nickname||g.name||g.phone||"").toString();
-    return list.sort((a,b)=> sortKey==="recent"?b.maxCreated-a.maxCreated:sortKey==="qty"?b.totalQty-a.totalQty||a.minExpires-b.minExpires:sortKey==="name"?nameOf(a).localeCompare(nameOf(b),"ko"):a.minExpires-b.minExpires);
+    return list.sort((a,b)=> sortKey==="recent"?b.maxSynced-a.maxSynced:sortKey==="qty"?b.totalQty-a.totalQty||a.minExpires-b.minExpires:sortKey==="name"?nameOf(a).localeCompare(nameOf(b),"ko"):a.minExpires-b.minExpires);
   },[holds,now,sortKey]);
   const totalQty=groups.reduce((s,g)=>s+g.totalQty,0);
+  // [2026-09-28] 요약용 — 담긴 금액 합계·30분 내 만료 그룹 수(30분 이하=danger).
+  const grandKnown=groups.reduce((s,g)=>s+g.items.reduce((ss,it)=>ss+(it.unitPrice!==null?it.unitPrice*it.qty:0),0),0);
+  const soonCount=groups.filter(g=>cartHoldTimeline({createdAtMs:g.minCreated,expiresAtMs:g.minExpires,nowMs:now}).remainMin<=30).length;
   const groupLabel=(g:Group)=>{ const nick=[g.nickname,g.name&&g.nickname!==g.name?`(${g.name})`:""].filter(Boolean).join(" "); return nick||(g.phone?phoneFmt(g.phone):"번호 미입력 고객"); };
 
   const clearSession=async(g:Group)=>{
@@ -131,7 +134,7 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
         <div className="flex items-center gap-2"><button type="button" onClick={()=>void load()} disabled={loading} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50">{loading?"불러오는중":"새로고침"}</button><button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-[14px] font-black text-ink-mute hover:text-ink">✕</button></div>
       </div>
       <div className="border-b border-line bg-surface-2 px-5 py-2 text-xs font-black text-ink-soft">
-        <div className="flex flex-wrap items-center gap-2"><div className="min-w-0 flex-1">장바구니 {groups.length}개 · 담긴 수량 {totalQty}개 — 시간이 지나면 자동으로 비워집니다.</div>
+        <div className="flex flex-wrap items-center gap-2"><div className="min-w-0 flex-1">장바구니 {groups.length}개 · 수량 {totalQty}개 · 담긴 금액 {won(grandKnown)}{soonCount>0?<span className="ml-1 text-danger-tx"> · ⚠ 30분 내 만료 {soonCount}개</span>:null}</div>
           {groups.length>0?<button type="button" disabled={Boolean(reminding)} onClick={()=>void remindAll()} className="shrink-0 rounded-lg bg-[var(--color-rose-deep)] px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-50">{reminding==="__all__"?"알림 전송중":"🔔 전체 주문 확인 알림"}</button>:null}
           {groups.length>0?<button type="button" disabled={Boolean(clearing)} onClick={()=>void clearAll()} className="shrink-0 rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ink-soft hover:bg-danger-bg hover:text-danger-tx disabled:opacity-50">{clearing==="__all__"?"비우는중":"🧹 전체 비우기"}</button>:null}
           <select value={sortKey} onChange={(e)=>setSortKey(e.target.value as SortKey)} className="shrink-0 rounded-lg border border-line bg-surface px-2 py-1 text-[11px] font-black text-ink-soft" aria-label="담김 목록 정렬">{SORT_OPTIONS.map(opt=><option key={opt.value} value={opt.value}>{opt.label}</option>)}</select>
@@ -141,13 +144,30 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
       <div className="min-h-0 flex-1 overflow-y-auto p-4">{loading&&holds.length===0?<div className="py-10 text-center text-xs font-black text-ink-mute">불러오는 중...</div>:groups.length===0?<div className="py-10 text-center text-xs font-black text-ink-mute">담기만 하고 제출 안 한 고객이 없습니다. 방송 중 장바구니에 담으면 여기에 나옵니다.</div>:<div className="space-y-3">{groups.map(g=>{
         const presentations=g.items.map(it=>cartHoldPresentation({productName:it.productName,fallbackProductName:it.fallbackProductName,color:it.color,size:it.size,qty:it.qty,unitPrice:it.unitPrice,legacySnapshot:it.legacySnapshot}));
         const knownTotal=presentations.reduce((s,p)=>s+(p.rowTotal??0),0); const unknown=presentations.some(p=>p.rowTotal===null);
+        // [2026-09-28] 남은시간 배지·진행막대(cartHoldTimeline). danger=빨강·warn=주황·ok=회색.
+        const tl=cartHoldTimeline({createdAtMs:g.minCreated,expiresAtMs:g.minExpires,nowMs:now});
+        const badgeCls=tl.level==="danger"?"bg-danger-bg text-danger-tx":tl.level==="warn"?"bg-warn-bg text-warn-tx":"bg-surface-2 text-ink-soft";
+        const barCls=tl.level==="danger"?"bg-danger-tx":tl.level==="warn"?"bg-warn-tx":"bg-ink-soft";
+        // 2번째 줄: 담음 → 만료 · 마지막 접속 · 알림(있을 때만)
+        const line2:string[]=[`🛒 담음 ${createdText(g.minCreated)} → ⏳ 만료 ${createdText(g.minExpires)}`];
+        if(g.maxSynced>0) line2.push(`👀 마지막 접속 ${createdText(g.maxSynced)}`);
+        const a=alerts[g.sessionKey]; if(a?.sentAt){const sent=new Date(a.sentAt).getTime(); line2.push(`🔔 알림 ${createdText(sent)} ${a.seenAt?"봄":"보냄(안 봄)"}`);}
         return <div key={g.sessionKey} className="overflow-hidden rounded-2xl border border-line">
-          <div className="flex flex-wrap items-center gap-2 bg-surface-2 px-3 py-2"><span className="min-w-0 flex-1 text-[13px] font-black text-ink">👤 {groupLabel(g)}{g.phone?<span className="ml-1.5 text-[11px] font-bold text-ink-mute">📱 {phoneFmt(g.phone)}</span>:null}</span>{g.maxCreated>0?<span className="text-[11px] font-bold text-ink-mute" title="손님 화면이 45초마다 보내는 신호의 마지막 시각입니다. 처음 담은 시각이 아닙니다.">🕒 {createdText(g.maxCreated)} 확인</span>:null}{(()=>{const a=alerts[g.sessionKey];if(!a?.sentAt)return null;const sent=new Date(a.sentAt).getTime();return a.seenAt?<span className="rounded-lg bg-ok-bg px-1.5 py-0.5 text-[11px] font-black text-ok-tx" title={`보냄 ${createdText(sent)} · 손님이 확인함`}>✅ 알림 봄</span>:<span className="rounded-lg bg-warn-bg px-1.5 py-0.5 text-[11px] font-black text-warn-tx" title={`보냄 ${createdText(sent)} · 아직 손님 화면에 안 뜸(사이트에 들어와야 보입니다)`}>📨 보냄 {createdText(sent)}</span>;})()}<span className="text-[11px] font-black text-rose-deep">{remainText(g.minExpires,now)}</span>
-            <button type="button" disabled={Boolean(reminding)} onClick={()=>void remind(g)} className="rounded-lg border border-[var(--color-rose-deep)]/20 bg-white px-2 py-1 text-[11px] font-black text-[var(--color-rose-deep)] disabled:opacity-50">{reminding===g.sessionKey?"전송중":"🔔 주문 확인 알림"}</button>
-            <button type="button" disabled={clearing===g.sessionKey} onClick={()=>void clearSession(g)} className="rounded-lg border border-line bg-surface px-2 py-1 text-[11px] font-black text-ink-soft hover:bg-danger-bg hover:text-danger-tx disabled:opacity-50">{clearing===g.sessionKey?"비우는중":"🧹 비우기"}</button>
+          <div className="bg-surface-2 px-3 py-2">
+            <div className="flex items-start gap-2">
+              <span className="min-w-0 flex-1 text-[13px] font-black text-ink">👤 {groupLabel(g)}{g.phone?<span className="ml-1.5 text-[11px] font-bold text-ink-mute">📱 {phoneFmt(g.phone)}</span>:null}</span>
+              <span className="shrink-0 text-right">
+                <span className={`inline-block rounded-lg px-2 py-0.5 text-[11px] font-black ${badgeCls}`}>{tl.remainText}</span>
+                <span className="mt-1 block h-1 w-full overflow-hidden rounded-full bg-line"><span className={`block h-full rounded-full ${barCls}`} style={{width:`${Math.round(tl.progress*100)}%`}}/></span>
+              </span>
+            </div>
+            <div className="mt-1 text-[11px] font-bold text-ink-mute">{line2.join(" · ")}</div>
           </div>
-          <div className="divide-y divide-line">{g.items.map((it,i)=>{const p=presentations[i]; const img=holdImages[`${String(it.productId||"").trim()}|${String(it.detailName||"").trim()}`]||""; return <div key={i} className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-3 px-3 py-2.5">{img?<button type="button" title="사진 크게 보기" onClick={()=>setImagePreviewUrl(img)} className="h-11 w-11 shrink-0 self-center overflow-hidden rounded-lg border border-line bg-surface-2">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={img} alt="" loading="lazy" className="h-full w-full object-cover"/></button>:<span className="h-11 w-11 shrink-0 self-center rounded-lg border border-line bg-surface-2 text-center text-[18px] leading-[44px]">🛍</span>}<div className="min-w-0"><div className="break-words text-[13px] font-black leading-5 text-ink">{p.title}</div>{p.optionText?<div className="mt-0.5 text-[11px] font-bold text-ink-mute">옵션 · {p.optionText}</div>:null}{p.legacySnapshot?<div className="mt-0.5 text-[11px] font-bold text-warn-tx">예전 담김 기록 · 세부상품/당시금액 기록 없음</div>:null}</div><div className="text-right"><div className="text-[13px] font-black text-ink">{p.qty}개</div>{p.unitPrice!==null?<><div className="mt-0.5 text-[11px] font-bold text-ink-soft">개당 {won(p.unitPrice)}</div>{p.qty>1?<div className="text-[11px] font-black text-[var(--color-rose-deep)]">합계 {won(p.rowTotal||0)}</div>:null}</>:<div className="mt-0.5 text-[11px] font-bold text-ink-mute">금액 미기록</div>}</div></div>})}</div>
-          <div className="flex items-center justify-end gap-2 border-t border-line bg-white px-3 py-2 text-[11px] font-black"><span className="text-ink-mute">담긴 금액</span><span className="text-[var(--color-rose-deep)]">{won(knownTotal)}{unknown?" + 미기록":""}</span></div>
+          <div className="divide-y divide-line">{g.items.map((it,i)=>{const p=presentations[i]; const img=holdImages[`${String(it.productId||"").trim()}|${String(it.detailName||"").trim()}`]||""; const itExp=new Date(it.expiresAt).getTime(); const showExp=Number.isFinite(itExp)&&itExp-g.minExpires>=5*60000; return <div key={i} className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-3 px-3 py-2.5">{img?<button type="button" title="사진 크게 보기" onClick={()=>setImagePreviewUrl(img)} className="h-11 w-11 shrink-0 self-center overflow-hidden rounded-lg border border-line bg-surface-2">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={img} alt="" loading="lazy" className="h-full w-full object-cover"/></button>:<span className="h-11 w-11 shrink-0 self-center rounded-lg border border-line bg-surface-2 text-center text-[18px] leading-[44px]">🛍</span>}<div className="min-w-0"><div className="break-words text-[13px] font-black leading-5 text-ink">{p.title}</div>{p.optionText||showExp?<div className="mt-0.5 text-[11px] font-bold text-ink-mute">{p.optionText?`옵션 · ${p.optionText}`:"옵션 없음"}{showExp?` · 만료 ${hhmm(itExp)}`:""}</div>:null}{p.legacySnapshot?<div className="mt-0.5 text-[11px] font-bold text-warn-tx">예전 담김 기록 · 세부상품/당시금액 기록 없음</div>:null}</div><div className="text-right"><div className="text-[13px] font-black text-ink">{p.qty}개</div>{p.unitPrice!==null?<><div className="mt-0.5 text-[11px] font-bold text-ink-soft">개당 {won(p.unitPrice)}</div>{p.qty>1?<div className="text-[11px] font-black text-[var(--color-rose-deep)]">합계 {won(p.rowTotal||0)}</div>:null}</>:<div className="mt-0.5 text-[11px] font-bold text-ink-mute">금액 미기록</div>}</div></div>})}</div>
+          <div className="flex flex-wrap items-center gap-2 border-t border-line bg-white px-3 py-2 text-[11px] font-black"><span className="min-w-0 flex-1"><span className="text-ink-mute">담긴 금액</span> <span className="text-[var(--color-rose-deep)]">{won(knownTotal)}{unknown?" + 미기록":""}</span></span>
+            <button type="button" disabled={Boolean(reminding)} onClick={()=>void remind(g)} className="shrink-0 rounded-lg border border-[var(--color-rose-deep)]/20 bg-white px-2 py-1 text-[11px] font-black text-[var(--color-rose-deep)] disabled:opacity-50">{reminding===g.sessionKey?"전송중":"🔔 주문 확인 알림"}</button>
+            <button type="button" disabled={clearing===g.sessionKey} onClick={()=>void clearSession(g)} className="shrink-0 rounded-lg border border-line bg-surface px-2 py-1 text-[11px] font-black text-ink-soft hover:bg-danger-bg hover:text-danger-tx disabled:opacity-50">{clearing===g.sessionKey?"비우는중":"🧹 비우기"}</button>
+          </div>
         </div>})}</div>}</div>
     </div>
   </div>;

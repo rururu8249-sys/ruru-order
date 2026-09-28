@@ -116,7 +116,10 @@ export async function POST(request: NextRequest) {
       const rk = `cart_revoke_${sessionKey}`.slice(0, 250);
       const { data: rv } = await supabase.from("settings").select("value").eq("key", rk).limit(1).maybeSingle();
       if (rv) {
-        await supabase.from("settings").delete().eq("key", rk);
+        // [2026-09-28] 회수 지시는 3분간 유지 — 동시 sync/재접속이 옛 장바구니를 되살리지 못하게.
+        const revokedAt = new Date(String((rv as any).value || "")).getTime();
+        const withinGrace = Number.isFinite(revokedAt) && Date.now() - revokedAt < 3 * 60_000;
+        if (!withinGrace) await supabase.from("settings").delete().eq("key", rk);
         await supabase.from("cart_reservations").delete().eq("session_key", sessionKey);
         return NextResponse.json({ ok: true, revoked: true });
       }

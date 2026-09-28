@@ -3840,10 +3840,17 @@ export default function OrderPage() {
         showCustomerNotice("⚠️ 방송 운영자가 담긴 상품을 회수했어요 — 주문서가 비워졌습니다. 궁금한 점은 방송 채팅으로 문의해 주세요.");
         return;
       }
+      const normR = (s: unknown) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
+      // [2026-09-28] 절대 만료로 빠진 상품 — 조용히 장바구니에서 제거 + 안내(품절과 별개).
+      const expiredRows = (claim?.ok && Array.isArray(claim.results)) ? claim.results.filter((r: any) => r && r.ok === false && r.expired === true) : [];
+      if (expiredRows.length > 0) {
+        setItems((prev) => prev.filter((it) => !expiredRows.some((r: any) => String(r.productId) === String(it.product_id) && normR(r.color) === normR(it.color) && normR(r.size) === normR(it.size))));
+        const hm = Number(claim.holdMinutes) || 0; const hText = hm >= 60 ? `${Math.floor(hm / 60)}시간` : `${hm}분`;
+        showCustomerNotice(`⏳ 담은 지 ${hText}이 지나 장바구니에서 자동으로 비워진 상품이 있어요. 필요하면 다시 담아 주세요.`);
+      }
       if (claim?.ok && claim.allOk === false && Array.isArray(claim.results)) {
-        const rejected = claim.results.filter((r: any) => r && r.ok === false);
+        const rejected = claim.results.filter((r: any) => r && r.ok === false && !r.expired);
         if (rejected.length > 0) {
-          const normR = (s: unknown) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
           setItems((prev) => prev
             .map((it) => {
               const hit = rejected.find((r: any) =>
