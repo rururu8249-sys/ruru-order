@@ -644,10 +644,10 @@ function IssueCard({
               type="button"
               onClick={(e) => { e.stopPropagation(); onProcess(task); }}
               disabled={busy}
-              title="처리창 열기 — 유형·메모·상품·환불/교환 기록·삭제를 한 곳에서"
+              title="열기 — 내용 보기·수정·환불/교환 기록·삭제"
               className={`${SUB_BTN} text-ink-soft hover:bg-surface-2`}
             >
-              처리
+              열기
             </button>
             {done ? (
               <button
@@ -1163,7 +1163,13 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   //   ⚠ 실패해도 목록은 그대로 뜬다. 사진은 «보조»다.
   const [issuePhotos, setIssuePhotos] = useState<Record<string, string[]>>({});
   const photoLookupKey = pageTasks
-    .map((task, index) => `${taskKey(task, index)}:${extractBodyField(task, "주문번호:")}`)
+    .map((task, index) => {
+      // [⑳ A] 추가상품(extra_items)의 productId 도 키에 넣어, 관련상품을 바꾸면 사진을 다시 불러온다.
+      const extraIds = Array.isArray((task.raw_payload || {} as Record<string, unknown>).extra_items)
+        ? ((task.raw_payload as Record<string, unknown>).extra_items as Record<string, unknown>[]).map((it) => clean(it.productId)).filter(Boolean).join(",")
+        : "";
+      return `${taskKey(task, index)}:${extractBodyField(task, "주문번호:")}:${extraIds}`;
+    })
     .join("|");
 
   useEffect(() => {
@@ -1196,7 +1202,8 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
           const code = extractBodyField(task, "주문번호:");
           const target = extractBodyField(task, "대상상품:") || clean(task.related_product);
-          if (code && target) {
+          // [⑳ A] '상품 지정 없음'은 대상 없음으로 본다 → 아래 추가상품(registered) 사진 경로로 내려감.
+          if (code && target && target !== "상품 지정 없음") {
             needOrderLookup.push({ key, code, target });
             lookupCodes.push(code);
             return;

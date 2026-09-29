@@ -727,7 +727,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
         {/* 1. 헤더 */}
         <div className="flex items-start justify-between gap-2 border-b border-line px-6 pt-4 pb-3">
           <div className="min-w-0">
-            <h3 className="text-[20px] font-black text-ink">{createMode ? "고객이슈 등록" : isEtc ? "고객이슈 처리" : isExchange ? "교환하기" : "환불하기"}</h3>
+            <h3 className="text-[20px] font-black text-ink">{createMode ? "고객이슈 등록" : isEtc ? "고객이슈" : isExchange ? "교환하기" : "환불하기"}</h3>
             <div className="mt-1 flex items-center gap-2 text-[13px] leading-5 text-ink-soft">
               <div className="min-w-0 truncate"><span className="font-black text-ink">{clean(item.nickname) || "—"}</span>{clean(item.customer_name) ? ` · ${clean(item.customer_name)}` : ""}{orderCode ? ` · ${orderCode}` : ""}</div>
               {orderPaymentMethod ? <span className="shrink-0 rounded-full bg-surface-2 px-2.5 py-0.5 text-[12px] font-black text-ink-soft">{isCardOrder ? "카드" : "무통장"}</span> : null}

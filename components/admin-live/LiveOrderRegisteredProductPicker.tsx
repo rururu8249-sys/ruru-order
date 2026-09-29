@@ -231,25 +231,28 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
     return map;
   }, [products]);
 
+  // [⑳ B] 공백·하이픈 무시 검색(Rail searchKey 와 같은 규칙) — '폴로자켓' = '폴로 자켓'
+  const searchNorm = (s: string) => s.replace(/[\s-]/g, "").toLowerCase();
+
   const visibleProducts = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = searchNorm(search.trim());
     return products
       .filter((p) => productStatus(p) !== "deleted")
       .filter((p) => {
         if (!q) return true;
-        if (productName(p).toLowerCase().includes(q)) return true;
+        if (searchNorm(productName(p)).includes(q)) return true;
         const details = detailNamesById.get(productId(p));
-        return details ? details.some((n) => n.toLowerCase().includes(q)) : false;
+        return details ? details.some((n) => searchNorm(n).includes(q)) : false;
       })
       .slice(0, 40);
   }, [products, search, detailNamesById]);
 
   // 목록 줄에 "검색과 일치한 세부상품" 안내 — 왜 이 묶음이 나왔는지 바로 보이게
   const matchedDetailName = (p: ProductRow): string => {
-    const q = search.trim().toLowerCase();
-    if (!q || productName(p).toLowerCase().includes(q)) return "";
+    const q = searchNorm(search.trim());
+    if (!q || searchNorm(productName(p)).includes(q)) return "";
     const details = detailNamesById.get(productId(p));
-    return details?.find((n) => n.toLowerCase().includes(q)) || "";
+    return details?.find((n) => searchNorm(n).includes(q)) || "";
   };
 
   const selected = useMemo(() => products.find((p) => productId(p) === selectedId) || null, [products, selectedId]);
