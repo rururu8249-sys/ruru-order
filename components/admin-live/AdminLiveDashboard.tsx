@@ -796,6 +796,77 @@ export default function AdminLiveDashboard() {
         .limit(500);
       data = res.data;
       error = res.error;
+
+      // [㉕-A] 방송·날짜 선택 시 그 범위 줄 보충 조회 — 최근 500줄 밖 누락 방지(9/24 방송 91→51건 실측)
+      if (!error) {
+        try {
+          const pageAll = async (build: (from: number, to: number) => any): Promise<any[]> => {
+            const pageSize = 1000;
+            let from = 0;
+            const all: any[] = [];
+            while (true) {
+              const page = await build(from, from + pageSize - 1);
+              if (page.error) throw page.error;
+              const rows = page.data || [];
+              all.push(...rows);
+              if (rows.length < pageSize) break;
+              from += pageSize;
+            }
+            return all;
+          };
+          // KST 하루(00:00~24:00) created_at 범위 줄 — 필터의 orderDateKey 판정과 같은 하루.
+          const fetchDay = (dateKey: string) => {
+            const startISO = `${dateKey}T00:00:00+09:00`;
+            const endISO = new Date(new Date(startISO).getTime() + 24 * 60 * 60 * 1000).toISOString();
+            return pageAll((from, to) =>
+              supabase.from("orders").select("*").neq("is_deleted", true)
+                .gte("created_at", startISO).lt("created_at", endISO)
+                .order("created_at", { ascending: false }).range(from, to),
+            );
+          };
+
+          const alwaysDate = getAlwaysOrderDateFromFilter(filters.broadcast); // "YYYY-MM-DD" | ""
+          let supplemental: any[] = [];
+          if (alwaysDate) {
+            supplemental = await fetchDay(alwaysDate);
+          } else if (filters.broadcast === "none") {
+            const todayKey = getAlwaysOrderDateKey(new Date().toISOString());
+            if (todayKey) supplemental = await fetchDay(todayKey);
+          } else {
+            // 특정 방송(current=활성 방송): broadcast_id 매칭 + 방송 시간대(started_at~ended_at/지금) 줄 — 필터 1181행과 같은 기준.
+            const bc = filters.broadcast === "current"
+              ? activeBroadcast
+              : (broadcasts.find((b) => b.id === filters.broadcast) || null);
+            if (bc) {
+              const byId = await pageAll((from, to) =>
+                supabase.from("orders").select("*").neq("is_deleted", true)
+                  .eq("broadcast_id", bc.id)
+                  .order("created_at", { ascending: false }).range(from, to),
+              );
+              let byTime: any[] = [];
+              if (bc.started_at) {
+                const startISO = new Date(bc.started_at).toISOString();
+                const endISO = bc.ended_at ? new Date(bc.ended_at).toISOString() : new Date().toISOString();
+                byTime = await pageAll((from, to) =>
+                  supabase.from("orders").select("*").neq("is_deleted", true)
+                    .gte("created_at", startISO).lte("created_at", endISO)
+                    .order("created_at", { ascending: false }).range(from, to),
+                );
+              }
+              supplemental = [...byId, ...byTime];
+            }
+          }
+
+          if (supplemental.length > 0) {
+            const byIdMap = new Map<string, any>();
+            for (const r of (data || [])) byIdMap.set(String((r as any).id), r);
+            for (const r of supplemental) byIdMap.set(String((r as any).id), r);
+            data = Array.from(byIdMap.values());
+          }
+        } catch {
+          // 보충 실패 시 기존 500줄 결과만 사용(목록 비는 사고 금지 — setLoadError 건드리지 않음).
+        }
+      }
     }
 
     if (error) {
