@@ -557,7 +557,7 @@ function IssueCard({
 
         <div className="min-w-0 flex-1 text-[12px] leading-5" title={detail}>
           {/* 📦 상품 1줄 */}
-          {product ? (
+          {product && !(extra && product === "상품 지정 없음") ? (
             <div className="flex min-w-0 items-baseline gap-1.5">
               <span className="shrink-0" aria-hidden>📦</span>
               <span className="min-w-0 truncate font-black text-ink" title={product}>{product}</span>

@@ -1548,14 +1548,22 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               {Number((order as any).returnAmount || 0) > 0 ? <span className="mr-2">환불 예정/완료 {money(Number((order as any).returnAmount || 0))}</span> : null}
               {issueLatest?.task ? <span className="float-right text-[12px] font-black text-rose-deep">열기 ›</span> : null}
               {/* [⑰ B] 이슈가 있으면 그 이슈에서 대상·세부를 읽는다(표시만·orders 무접촉). 없으면 기존 return_reason. */}
-              {issueLatest?.task ? (
+              {issueLatest?.task ? (() => {
+                const body = String((issueLatest.task as Record<string, unknown>).body ?? "");
+                const target = fieldFromIssueBody(body, "대상상품:");
+                const add = fieldFromIssueBody(body, "추가상품:");
+                const memo = splitIssueBody(body).memo.split("\n").filter(Boolean).slice(0, 2).join("\n");
+                // [⑲ D] 대상상품이 비었거나 '상품 지정 없음'이고 추가상품이 있으면 「대상:」 줄 숨김.
+                const hideTarget = add && (!target || target === "상품 지정 없음");
+                return (
                 <div className="mt-1 text-ink-soft">
-                  <div className="whitespace-pre-wrap">대상: {fieldFromIssueBody(String((issueLatest.task as Record<string, unknown>).body ?? ""), "대상상품:") || "상품 지정 없음"}</div>
+                  {hideTarget ? null : <div className="whitespace-pre-wrap">대상: {target || "상품 지정 없음"}</div>}
                   {/* [⑱ D] 기타 이슈에 따로 추가한 관련 상품이 있으면 「추가:」 한 줄(표시만). */}
-                  {(() => { const a = fieldFromIssueBody(String((issueLatest.task as Record<string, unknown>).body ?? ""), "추가상품:"); return a ? <div className="mt-0.5 whitespace-pre-wrap">추가: {a}</div> : null; })()}
-                  {(() => { const m = splitIssueBody(String((issueLatest.task as Record<string, unknown>).body ?? "")).memo.split("\n").filter(Boolean).slice(0, 2).join("\n"); return m ? <div className="mt-0.5 whitespace-pre-wrap">세부: {m}</div> : null; })()}
+                  {add ? <div className="mt-0.5 whitespace-pre-wrap">추가: {add}</div> : null}
+                  {memo ? <div className="mt-0.5 whitespace-pre-wrap">세부: {memo}</div> : null}
                 </div>
-              ) : (
+                );
+              })() : (
                 <div className="mt-1 whitespace-pre-wrap text-ink-soft">{String((order as any).returnReason || "사유 없음").replace(/^\[[^\]]*\]\s*/, "")}</div>
               )}
               <div className="mt-1 flex items-center justify-end gap-3">

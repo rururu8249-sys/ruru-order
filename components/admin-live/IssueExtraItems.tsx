@@ -102,7 +102,7 @@ export default function IssueExtraItems({ value, onChange }: { value: IssueExtra
         </div>
       )}
 
-      {pickerOpen ? <LiveOrderRegisteredProductPicker onAdd={addRegistered} onClose={() => setPickerOpen(false)} adding={false} /> : null}
+      {pickerOpen ? <LiveOrderRegisteredProductPicker onAdd={addRegistered} onClose={() => setPickerOpen(false)} adding={false} title="관련 상품 고르기" confirmLabel="목록에 추가" /> : null}
     </div>
   );
 }

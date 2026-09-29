@@ -180,9 +180,11 @@ type Props = {
   onAdd: (input: LiveOrderRegisteredAddInput) => Promise<boolean>;
   onClose: () => void;
   adding: boolean;
+  title?: string;
+  confirmLabel?: string;
 };
 
-export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, adding }: Props) {
+export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, adding, title = "등록상품 추가 (재고 차감)", confirmLabel = "이 주문에 추가 (재고 차감)" }: Props) {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -407,7 +409,7 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
       >
         {/* 헤더 */}
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
-          <div className="text-[14px] font-black text-rose-deep">등록상품 추가 (재고 차감)</div>
+          <div className="text-[14px] font-black text-rose-deep">{title}</div>
           <button
             type="button"
             onClick={onClose}
@@ -526,7 +528,7 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
             onClick={handleAdd}
             className="w-full rounded-xl bg-rose-deep px-3 py-3 text-[14px] font-black text-white disabled:opacity-50"
           >
-            {adding ? "추가 중..." : "이 주문에 추가 (재고 차감)"}
+            {adding ? "추가 중..." : confirmLabel}
           </button>
         </div>
       </div>
