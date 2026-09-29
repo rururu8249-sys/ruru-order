@@ -7,12 +7,13 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
-import { splitIssueBody, mergeIssueBody } from "@/lib/issueBodyMeta";
+import { splitIssueBody } from "@/lib/issueBodyMeta";
+import { patchIssueTask } from "@/lib/issueTaskPatch";
 import { CUSTOMER_TERMS } from "./adminLiveCustomerTerms";
 import { formatKoreanPhone } from "@/lib/order/phone";
 import { supabase } from "@/lib/supabase";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
-import { pickIssueProductRows, issueProductSummary } from "@/lib/issueProductLabel";
+import { pickIssueProductRows } from "@/lib/issueProductLabel";
 import { RefundProcessModal, type LedgerDetail } from "./AdminLiveRefundLedgerPanel";
 import IssueRegisterModal, { type IssueRegisterSubmit } from "./IssueRegisterModal";
 import { productSnapshotFromItems, ledgerSummaryLine, pickPrimaryLedger, restoreSelectionFromSnapshot, listAmountParts, dateShortLabel, returnStagePrefix } from "@/lib/refundLedger";
@@ -1500,48 +1501,13 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   ): Promise<boolean> => {
     const id = clean(task.id);
     if (!id) { showAdminToast("고객이슈 ID가 없습니다.", "error"); return false; }
-    const memo = cleanMultiline(memoRaw);
-    const issueTypes = [issueTypeKey || "general"];
-    // [⑭] 기타 처리에서 선택 상품이 넘어오면 「대상상품:」 메타줄을 새로 쓰고 raw_payload.items 도 갱신. 없으면 기존과 동일.
-    const baseMeta = splitIssueBody(cleanMultiline(task.body)).metaLines;
-    let metaLines = baseMeta;
-    let rawExtra: Record<string, unknown> = {};
-    if (items) {
-      const summary = items.length ? issueProductSummary(items.map((i) => ({ product_name: i.productName, color: i.color, size: i.size, qty: i.qty }))) : "상품 지정 없음";
-      metaLines = baseMeta.filter((l) => !l.startsWith("대상상품:")).concat(`대상상품: ${summary}`);
-      rawExtra = { items: items.map((i) => ({ productId: i.productId, productName: i.productName, color: i.color, size: i.size, qty: i.qty })) };
-    }
-    const nextBody = mergeIssueBody(metaLines, memo);
-    try {
-      const response = await fetch("/api/admin-v2/admin-tasks", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id,
-          action: "update",
-          title: clean(task.title) || `[고객이슈] ${getNickname(task)}`,
-          body: nextBody,
-          task_type: issueTypes[0],
-          priority: clean(task.priority) || "normal",
-          raw_payload: {
-            ...(task.raw_payload || {}),
-            issue_types: issueTypes,
-            memo,
-            edited_from: "admin-live-customers",
-            ...rawExtra,
-          },
-        }),
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok || !payload?.ok) throw new Error(payload?.message || "고객이슈 저장 실패");
-      setIssuePage(1);
-      setReloadKey((value) => value + 1);
-      window.dispatchEvent(new Event("ruru-admin-task-updated"));
-      return true;
-    } catch (error) {
-      showAdminToast(error instanceof Error ? error.message : String(error), "error");
-      return false;
-    }
+    // [⑰] 저장(fetch·메타줄·items 규칙)은 공용 lib patchIssueTask 로 통일. Rail 은 성공 시 목록 갱신만.
+    const r = await patchIssueTask(task, { issueTypeKey, memo: memoRaw, items });
+    if (!r.ok) { showAdminToast(r.message || "고객이슈 저장 실패", "error"); return false; }
+    setIssuePage(1);
+    setReloadKey((value) => value + 1);
+    window.dispatchEvent(new Event("ruru-admin-task-updated"));
+    return true;
   };
 
   return (

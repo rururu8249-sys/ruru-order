@@ -647,11 +647,9 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
       showAdminToast("등록됐어요", "success"); onSaved(); return;
     }
     // 1) 고객이슈(admin-tasks) 저장 — 기존 수정 경로(메타줄 보존). 호출은 rail 이 넘긴 onSaveIssue.
-    //   [⑭] 기타는 선택 상품을 대상상품으로 저장(환불·교환은 refund-ledger 가 담당 → items 안 넘김).
+    //   [⑰] 이슈의 대상상품·수량은 «화면 선택»과 같아야 하므로 유형 상관없이 items 를 넘긴다(환불·교환 기록은 doPatch 가 별도 저장).
     if (onSaveIssue) {
-      const items = isEtc
-        ? lines.filter((l) => (sel[l.id] || 0) > 0).map((l) => ({ productId: String(l.product_id ?? ""), productName: l.product_name, color: l.color || "", size: l.size || "", qty: sel[l.id] }))
-        : undefined;
+      const items = lines.filter((l) => (sel[l.id] || 0) > 0).map((l) => ({ productId: String(l.product_id ?? ""), productName: l.product_name, color: l.color || "", size: l.size || "", qty: sel[l.id] }));
       const okIssue = await onSaveIssue({ issueType, memo: issueMemo, items });
       if (!okIssue) { setSaveError("고객이슈 저장에 실패했어요. 다시 시도해 주세요."); showAdminToast("고객이슈 저장 실패", "error"); return; }
     }
@@ -798,9 +796,10 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                           <span className="block truncate text-[13px] text-ink-mute">{optLabel(l.color, l.size) || l.product_name}{l.qty >= 2 ? ` × ${l.qty}` : ""}</span>
                         </span>
                       </button>
-                      {multi && l.qty > 1 && on ? (
+                      {/* [⑰] 한 줄 주문도 수량 조절 노출. 한 줄(비multi)은 1까지만(0 은 multi 일 때만 — 선택 해제). */}
+                      {l.qty > 1 && on ? (
                         <div className="flex shrink-0 items-center gap-1">
-                          <button type="button" onClick={() => setQty(l.id, picked - 1, l.qty)} className="h-8 w-8 rounded-lg border border-line text-[14px] font-black text-ink-soft">−</button>
+                          <button type="button" onClick={() => setQty(l.id, Math.max(multi ? 0 : 1, picked - 1), l.qty)} className="h-8 w-8 rounded-lg border border-line text-[14px] font-black text-ink-soft">−</button>
                           <span className="w-6 text-center text-[14px] font-black text-ink">{picked}</span>
                           <button type="button" onClick={() => setQty(l.id, picked + 1, l.qty)} className="h-8 w-8 rounded-lg border border-line text-[14px] font-black text-ink-soft">+</button>
                         </div>

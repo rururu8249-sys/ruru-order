@@ -19,7 +19,8 @@ import AdminLiveCustomerBlockReasonModal from "./AdminLiveCustomerBlockReasonMod
 import { requestAdminCustomerBlock } from "@/lib/adminCustomerBlock";
 import { RefundProcessModal, type LedgerDetail } from "./AdminLiveRefundLedgerPanel";
 import { pickPrimaryLedger } from "@/lib/refundLedger";
-import { splitIssueBody, mergeIssueBody } from "@/lib/issueBodyMeta";
+import { splitIssueBody, fieldFromIssueBody } from "@/lib/issueBodyMeta";
+import { patchIssueTask } from "@/lib/issueTaskPatch";
 
 type Props = {
   order: LiveOrder;
@@ -1162,27 +1163,6 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     setIssueProcessTask(task);
     setIssueProcessItem(item);
   };
-  // 기존 이슈 저장 = admin-tasks 수정(메타줄 보존). Rail 의 patchIssueFields 와 같은 방식.
-  const saveExistingIssue = async (task: Record<string, unknown>, d: { issueType: "refund" | "exchange" | "etc"; memo: string }): Promise<boolean> => {
-    const id = String(task.id ?? "");
-    if (!id) return false;
-    const taskType = d.issueType === "refund" ? "refund" : d.issueType === "exchange" ? "exchange" : "general";
-    const nextBody = mergeIssueBody(splitIssueBody(String(task.body ?? "")).metaLines, d.memo.trim());
-    try {
-      const res = await fetch("/api/admin-v2/admin-tasks", {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id, action: "update",
-          title: String(task.title ?? "") || "[고객이슈]",
-          body: nextBody, task_type: taskType, priority: String(task.priority ?? "") || "normal",
-          raw_payload: { ...((task.raw_payload as Record<string, unknown>) || {}), issue_types: [taskType], memo: d.memo.trim(), edited_from: "order-detail-drawer" },
-        }),
-      });
-      const p = await res.json().catch(() => null);
-      if (!res.ok || !p?.ok) { showAdminToast("고객이슈 저장 실패\n\n" + (p?.message || `오류 ${res.status}`), "error"); return false; }
-      return true;
-    } catch (e) { showAdminToast("고객이슈 저장 실패: " + (e instanceof Error ? e.message : "네트워크 오류"), "error"); return false; }
-  };
 
   // 기록 지우기 — 기존 동작 유지(return_* 컬럼만 null). 포인트/이슈는 건드리지 않는다.
   const handleClearReturn = async () => {
@@ -1567,7 +1547,15 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               {issueLatest?.isResolved ? (() => { const d = new Date(issueLatest.resolvedAt); const md = Number.isFinite(d.getTime()) ? `${d.getMonth() + 1}.${d.getDate()}` : ""; return <span className="mr-2 rounded-lg bg-ok-bg px-2 py-0.5 text-[11px] font-black text-ok-tx">✅ 해결완료{md ? ` ${md}` : ""}</span>; })() : null}
               {Number((order as any).returnAmount || 0) > 0 ? <span className="mr-2">환불 예정/완료 {money(Number((order as any).returnAmount || 0))}</span> : null}
               {issueLatest?.task ? <span className="float-right text-[12px] font-black text-rose-deep">열기 ›</span> : null}
-              <div className="mt-1 whitespace-pre-wrap text-ink-soft">{String((order as any).returnReason || "사유 없음").replace(/^\[[^\]]*\]\s*/, "")}</div>
+              {/* [⑰ B] 이슈가 있으면 그 이슈에서 대상·세부를 읽는다(표시만·orders 무접촉). 없으면 기존 return_reason. */}
+              {issueLatest?.task ? (
+                <div className="mt-1 text-ink-soft">
+                  <div className="whitespace-pre-wrap">대상: {fieldFromIssueBody(String((issueLatest.task as Record<string, unknown>).body ?? ""), "대상상품:") || "상품 지정 없음"}</div>
+                  {(() => { const m = splitIssueBody(String((issueLatest.task as Record<string, unknown>).body ?? "")).memo.split("\n").filter(Boolean).slice(0, 2).join("\n"); return m ? <div className="mt-0.5 whitespace-pre-wrap">세부: {m}</div> : null; })()}
+                </div>
+              ) : (
+                <div className="mt-1 whitespace-pre-wrap text-ink-soft">{String((order as any).returnReason || "사유 없음").replace(/^\[[^\]]*\]\s*/, "")}</div>
+              )}
               <div className="mt-1 flex items-center justify-end gap-3">
                 <button type="button" disabled={returnSaving} onClick={(e) => { e.stopPropagation(); void handleClearReturn(); }} title="기록만 지웁니다 — 정산·입금·재고 숫자는 바뀌지 않아요." className="text-[11px] font-black text-ink-mute underline hover:text-danger-tx disabled:opacity-50">기록 지우기</button>
                 {issueLatest?.isResolved ? null : <button type="button" disabled={returnSaving} onClick={(e) => { e.stopPropagation(); handleUndoReturn(); }} className="text-[11px] font-black text-ink-mute underline hover:text-rose-deep disabled:opacity-50">반품 취소</button>}
@@ -2054,7 +2042,12 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           item={issueProcessItem}
           issueTypesInitial={[String(issueProcessTask.task_type ?? "")]}
           issueBodyMemo={splitIssueBody(String(issueProcessTask.body ?? "")).memo}
-          onSaveIssue={async ({ issueType, memo }) => saveExistingIssue(issueProcessTask, { issueType, memo })}
+          onSaveIssue={async ({ issueType, memo, items }) => {
+            const issueTypeKey = issueType === "refund" ? "refund" : issueType === "exchange" ? "exchange" : "general";
+            const r = await patchIssueTask(issueProcessTask, { issueTypeKey, memo, items });
+            if (!r.ok) showAdminToast("고객이슈 저장 실패\n\n" + (r.message || "알 수 없는 오류"), "error");
+            return r.ok;
+          }}
           onClose={() => { setIssueProcessItem(null); setIssueProcessTask(null); }}
           onSaved={async () => { setIssueProcessItem(null); setIssueProcessTask(null); setFindTaskTick((v) => v + 1); window.dispatchEvent(new Event("ruru-admin-task-updated")); await onAfterStatusChange?.(); }}
         />
