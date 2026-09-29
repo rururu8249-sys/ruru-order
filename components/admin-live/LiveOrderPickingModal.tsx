@@ -93,6 +93,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
     for (const o of orders) {
       const status = clean(o.paymentStatus);
       if (status === "canceled") continue;
+      // [㉕-B] 테스트 주문 등 챙기기 제외 대상은 뺀다(엑셀 isPickingExportExcluded 와 같은 기준).
+      if (o.excludeFromPicking === true) continue;
       const paid = PAID_STATUSES.includes(status);
       const nickname = clean(o.nickname) || clean(o.name) || "-"; // 주문 닉네임(크게)
       const name = clean((o as any).recipientName) || clean(o.name) || ""; // 받는사람/이름(옆에 함께 표시)

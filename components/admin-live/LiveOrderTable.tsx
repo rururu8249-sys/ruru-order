@@ -371,6 +371,8 @@ export function deriveLiveOrderMatchKeys(order: LiveOrder) {
 
 type Props = {
   orders: LiveOrder[];
+  /** [㉕-B] 상태 칩 숫자용 — matchesStatus 만 뺀 목록(상태 필터 걸어도 칩 숫자가 안 무너지게). 없으면 기존 orders 기준. */
+  countBaseOrders?: LiveOrder[];
   allOrderCount: number;
   selectedOrderId: string;
   onSelectOrder: (order: LiveOrder) => void;
@@ -392,6 +394,7 @@ type Props = {
 
 export default function LiveOrderTable({
   orders,
+  countBaseOrders,
   allOrderCount,
   selectedOrderId,
   onSelectOrder,
@@ -486,6 +489,13 @@ export default function LiveOrderTable({
     setPage(1);
   }, [filters.broadcast, filters.scope, filters.date, filters.customStartDate, filters.customEndDate, filters.status, filters.keyword, sortMode, pageSize]);
 
+  // [㉕-B] 필터가 바뀌면 선택 초기화 — 안 보이는 주문이 선택된 채 남아 엉뚱하게 출고 처리되는 사고 방지.
+  const selectionResetMountedRef = useRef(false);
+  useEffect(() => {
+    if (!selectionResetMountedRef.current) { selectionResetMountedRef.current = true; return; }
+    setSelectedOrderIds(new Set());
+  }, [filters.broadcast, filters.scope, filters.date, filters.customStartDate, filters.customEndDate, filters.status, filters.keyword]);
+
   useEffect(() => {
     setPendingKeyword(filters.keyword);
   }, [filters.keyword]);
@@ -504,28 +514,47 @@ export default function LiveOrderTable({
     });
   }, [orders, broadcastStartedAt, filters.broadcast, filters.date]);
 
+  // [㉕-B] 칩 숫자 기준 — countBaseOrders(상태 무관)가 있으면 목록과 같은 «방송 컷 + 취소보기» 처리 후 센다.
+  //   없으면 기존과 동일하게 baseOrders 로 센다(동작 유지). 목록·페이지·엑셀·선택 로직은 orders 그대로.
+  const countSource = useMemo(() => {
+    if (!countBaseOrders) return baseOrders;
+    let cut = countBaseOrders;
+    if (broadcastStartedAt && filters.broadcast === "current" && filters.date === "all") {
+      const startMs = new Date(broadcastStartedAt).getTime();
+      if (!Number.isNaN(startMs)) {
+        cut = cut.filter((order) => {
+          const created = order.createdAt ? new Date(order.createdAt).getTime() : NaN;
+          return !Number.isNaN(created) && created >= startMs;
+        });
+      }
+    }
+    if (cancelViewFilter === "active") return cut.filter((order) => order.paymentStatus !== "canceled");
+    if (cancelViewFilter === "canceled") return cut.filter((order) => order.paymentStatus === "canceled");
+    return cut;
+  }, [countBaseOrders, baseOrders, broadcastStartedAt, filters.broadcast, filters.date, cancelViewFilter]);
+
   const counts = useMemo(() => {
-    const paid = baseOrders.filter((order) =>
+    const paid = countSource.filter((order) =>
       ["paid", "auto_paid", "manual_paid", "card_paid"].includes(order.paymentStatus)
     ).length;
-    const bankPaid = baseOrders.filter((order) =>
+    const bankPaid = countSource.filter((order) =>
       ["paid", "auto_paid", "manual_paid"].includes(order.paymentStatus) && order.paymentMethod === "무통장입금"
     ).length;
-    const manual = baseOrders.filter((order) => order.paymentStatus === "manual_match_needed").length;
-    const canceled = baseOrders.filter((order) => order.paymentStatus === "canceled").length;
-    const unpaid = baseOrders.filter((order) =>
+    const manual = countSource.filter((order) => order.paymentStatus === "manual_match_needed").length;
+    const canceled = countSource.filter((order) => order.paymentStatus === "canceled").length;
+    const unpaid = countSource.filter((order) =>
       ["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus)
     ).length;
     // 표시용 분해 카운트(입금대기 칩 보조설명) — 기존 unpaid 합산식/manual 정의는 그대로.
-    const pureUnpaid = baseOrders.filter((order) => order.paymentStatus === "unpaid").length;
-    const cardUnpaid = baseOrders.filter((order) => order.paymentStatus === "card_unpaid").length;
-    const shipped = baseOrders.filter((order) => {
+    const pureUnpaid = countSource.filter((order) => order.paymentStatus === "unpaid").length;
+    const cardUnpaid = countSource.filter((order) => order.paymentStatus === "card_unpaid").length;
+    const shipped = countSource.filter((order) => {
       const ship = String((order as { shippingStatus?: unknown }).shippingStatus || "").trim();
       return /출고|발송|배송/.test(ship) && !/대기/.test(ship);
     }).length;
 
     return {
-      total: baseOrders.length,
+      total: countSource.length,
       paid,
       unpaid,
       manual,
@@ -535,7 +564,7 @@ export default function LiveOrderTable({
       pureUnpaid,
       cardUnpaid,
     };
-  }, [baseOrders]);
+  }, [countSource]);
 
   const sortedOrders = useMemo(() => {
     const list = [...baseOrders];

@@ -1227,7 +1227,9 @@ export default function AdminLiveDashboard() {
     return [...counts.entries()].sort(([a],[b]) => b.localeCompare(a)).map(([dateKey,count]) => ({ id: alwaysOrderFilterValue(dateKey), dateKey, label: `${dateKey.replace(/-/g,".")} · ${count}건`, count }));
   }, [orders]);
 
-  const filteredOrders = useMemo(() => {
+  // [㉕-B] 상태 칩 숫자용 — filteredOrders 와 같은 조건에서 matchesStatus 만 뺀 목록.
+  //   (상태 필터를 걸면 목록엔 그 상태만 남지만, 칩 숫자는 «상태 무관 전체»로 세야 안 무너진다)
+  const filteredOrdersForCounts = useMemo(() => {
     const keyword = normalizeText(filters.keyword);
 
     return orders.filter((order) => {
@@ -1278,11 +1280,15 @@ export default function AdminLiveDashboard() {
         matchBroadcast &&
         matchScope &&
         matchesDate(order, filters) &&
-        matchesStatus(order, filters.status) &&
         matchKeyword
       );
     });
   }, [orders, filters, broadcasts, activeBroadcast]);
+
+  const filteredOrders = useMemo(
+    () => filteredOrdersForCounts.filter((order) => matchesStatus(order, filters.status)),
+    [filteredOrdersForCounts, filters.status],
+  );
 
   useEffect(() => {
     if (!filteredOrders.length) {
@@ -1718,6 +1724,7 @@ export default function AdminLiveDashboard() {
                   <div className="flex min-w-0 flex-col">
                     <LiveOrderTable
                       orders={filteredOrders}
+                      countBaseOrders={filteredOrdersForCounts}
                       allOrderCount={orders.length}
                       selectedOrderId={selectedOrder?.id || ""}
                       loading={loading}
