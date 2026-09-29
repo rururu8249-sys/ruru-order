@@ -8,9 +8,10 @@
 //   - 상단 "챙김 N개 / 전체 M개"는 수량 합계. picked_at 한 칸만 update(돈/주문 로직 무관).
 
 import { useEffect, useMemo, useState } from "react";
-import { formatOrderOptionText } from "@/lib/orderOptionText";
+import { formatOrderOptionText, stripNoneOptionParts } from "@/lib/orderOptionText";
 import { compareOrderOptions } from "@/lib/orderOptionSort";
 import { supabase } from "@/lib/supabase";
+import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 import type { LiveOrder, LiveOrderItem } from "./types";
@@ -19,7 +20,7 @@ import { exportLiveOrdersForPicking } from "./adminLiveOrderExcelExport";
 type Props = { orders: LiveOrder[]; filterLabel: string; onClose: () => void };
 
 // [2026-07-13 사장님 지침] amount = 주문에 저장된 상품금액(표시 전용, 재계산 안 함)
-type PickItem = { id: string; text: string; productName: string; optionText: string; color: string; size: string; qty: number; amount: number };
+type PickItem = { id: string; productId: string; text: string; productName: string; optionText: string; color: string; size: string; qty: number; amount: number };
 type Panel = { key: string; nickname: string; name: string; phone: string; search: string; paid: boolean; when: string; items: PickItem[]; totalQty: number };
 type BatchBuyer = { nickname: string; qty: number; paid: boolean; ids: string[] };
 // [2026-09-20 사장님 요청] 상품별 = 상품(총 N개) → 그 밑에 옵션(색상/사이즈)별 N개. 옵션은 색상 가나다 → 사이즈 순.
@@ -72,7 +73,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   const toggleCollapsedDone = (key: string) => setCollapsedDone((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
   const [paidOnly, setPaidOnly] = useState(true);
   const [unpickedOnly, setUnpickedOnly] = useState(false);
-  const [viewMode, setViewMode] = useState<"order" | "batch">("order");
+  const [viewMode, setViewMode] = useState<"order" | "batch">("batch");
   // [2026-08-23 상품별 집계 통합] 주문자 칩 표시 토글 — 집계 볼 땐 ON, 물건 집을 땐 OFF
   const [showBuyers, setShowBuyers] = useState(true);
   const [search, setSearch] = useState("");
@@ -97,11 +98,11 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
       const rawItems = Array.isArray(o.items) ? (o.items as LiveOrderItem[]) : [];
       const items: PickItem[] =
         rawItems.length === 0
-          ? [{ id: String(o.id), text: clean(o.orderSummary) || "상품", productName: clean(o.orderSummary) || "상품", optionText: "", color: "", size: "", qty: 1, amount: Number(o.productAmount || 0) }]
+          ? [{ id: String(o.id), productId: "", text: clean(o.orderSummary) || "상품", productName: clean(o.orderSummary) || "상품", optionText: "", color: "", size: "", qty: 1, amount: Number(o.productAmount || 0) }]
           : rawItems.map((it) => {
               const opt = formatOrderOptionText(it.color, it.size); // [2026-08-31] 없음 숨김·「사이즈 6」 표기
               const productName = clean(it.productName) || "상품";
-              return { id: String(it.id), text: productName + (opt ? ` (${opt})` : ""), productName, optionText: opt, color: clean(it.color), size: clean(it.size), qty: Number(it.qty || 1), amount: Number(it.amount || 0) };
+              return { id: String(it.id), productId: clean(it.productId), text: productName + (opt ? ` (${opt})` : ""), productName, optionText: opt, color: clean(it.color), size: clean(it.size), qty: Number(it.qty || 1), amount: Number(it.amount || 0) };
             });
       const totalQty = items.reduce((s, it) => s + (Number.isFinite(it.qty) ? it.qty : 1), 0);
       const phone = clean(o.phone).replace(/[^0-9]/g, ""); // 같은 고객 판정용(숫자만)
@@ -109,6 +110,42 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
     }
     return list;
   }, [orders]);
+
+  // [㉒] 상품 사진(읽기 전용·보조 표시). 공용 규칙(resolveOrderItemPhoto)만 쓴다 — 주문상세와 동일 패턴.
+  //   productId 있는 줄만 products 조회(200개씩), item.id → 사진 URL. 실패해도 조용히 무시.
+  const [itemPhoto, setItemPhoto] = useState<Record<string, string>>({});
+  const photoIdKey = useMemo(
+    () => Array.from(new Set(panels.flatMap((p) => p.items.map((it) => it.productId).filter(Boolean)))).sort().join(","),
+    [panels],
+  );
+  useEffect(() => {
+    let stopped = false;
+    const ids = photoIdKey ? photoIdKey.split(",") : [];
+    if (ids.length === 0) { setItemPhoto({}); return; }
+    (async () => {
+      try {
+        const byId = new Map<string, Record<string, unknown>>();
+        for (let i = 0; i < ids.length; i += 200) {
+          const { data } = await supabase.from("products").select("*").in("id", ids.slice(i, i + 200));
+          if (stopped) return;
+          for (const p of (data || []) as Record<string, unknown>[]) byId.set(String((p as { id?: unknown }).id ?? ""), p);
+        }
+        const next: Record<string, string> = {};
+        for (const panel of panels) {
+          for (const it of panel.items) {
+            if (!it.productId) continue;
+            const prow = byId.get(it.productId);
+            if (!prow) continue;
+            const r = resolveOrderItemPhoto(prow, { productName: it.productName, color: it.color });
+            if (r.url) next[it.id] = r.url;
+          }
+        }
+        if (!stopped) setItemPhoto(next);
+      } catch { /* 사진은 보조 — 실패해도 목록은 정상 */ }
+    })();
+    return () => { stopped = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photoIdKey]);
 
   // 범위(결제완료만 토글 + 정렬) — 진행률/초기화 기준
   const scopedPanels = useMemo(() => {
@@ -493,6 +530,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                   {batchProducts.map((prod) => {
                     const done = prod.ids.every((id) => pickedIds.has(id));
                     const some = !done && prod.ids.some((id) => pickedIds.has(id));
+                    const prodPhoto = prod.ids.map((id) => itemPhoto[id]).find(Boolean) || ""; // [㉒] 이 상품 첫 사진
                     const single = prod.options.length === 1 && !prod.options[0].optionText;
                     const singleBuyers = single ? prod.options[0].buyers : [];
                     const collapsed = done && collapsedDone.has(`p:${prod.name}`);   // [09-24] 직접 접었을 때만
@@ -501,6 +539,10 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                         {/* 상품 줄(스크롤해도 위에 붙음) — 네모 칸만 눌러야 그 상품 전부 챙김/해제(실수 방지) */}
                         <div className={`sticky top-0 z-[1] flex items-center gap-1 rounded-t-[10px] pl-1 ${done ? "bg-ok-bg" : single ? "bg-surface" : "bg-rose-soft"} ${collapsed ? "rounded-b-[10px]" : ""}`}>
                           <PickBox state={done ? "done" : some ? "some" : "none"} onPick={() => toggleIds(prod.ids)} label={`${prod.name} — 이 상품 ${prod.totalQty}개 전부 챙김 / 해제`} />
+                          {prodPhoto ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img src={prodPhoto} alt={prod.name} loading="lazy" className="h-11 w-11 shrink-0 rounded-lg border border-line object-cover" />
+                          ) : null}
                           <div className="flex min-w-0 flex-1 select-none items-center gap-3 py-3 pr-3">
                             <span className={`min-w-0 max-w-[60%] truncate text-[14px] font-black ${done ? "text-ink-mute line-through" : "text-ink"}`}>{prod.name}</span>
                             {single && showBuyers && singleBuyers.length === 1 ? <span className={`min-w-0 shrink truncate text-[12px] font-bold ${singleBuyers[0].paid ? "text-ink-mute" : "text-warn-tx"}`}>· {singleBuyers[0].nickname}{singleBuyers[0].paid ? "" : " ⏳"}</span> : null}
@@ -521,10 +563,15 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                             {prod.options.map((opt) => {
                               const oDone = opt.ids.every((id) => pickedIds.has(id));
                               const oSome = !oDone && opt.ids.some((id) => pickedIds.has(id));
+                              const optPhoto = opt.ids.map((id) => itemPhoto[id]).find(Boolean) || ""; // [㉒] 이 옵션 첫 사진
                               return (
                                 <div key={opt.key || "(옵션없음)"} className={`${oDone ? "bg-ok-bg/70" : "bg-surface"} last:rounded-b-[10px]`}>
                                   <div className="flex w-full items-center gap-1 pl-3 pr-3">
                                     <PickBox size="sm" state={oDone ? "done" : oSome ? "some" : "none"} onPick={() => toggleIds(opt.ids)} label={`${opt.optionText || "옵션 없음"} — ${opt.totalQty}개 전부 챙김 / 해제`} />
+                                    {optPhoto && optPhoto !== prodPhoto ? (
+                                      /* eslint-disable-next-line @next/next/no-img-element */
+                                      <img src={optPhoto} alt={opt.optionText || "옵션"} loading="lazy" className="h-9 w-9 shrink-0 rounded-lg border border-line object-cover" />
+                                    ) : null}
                                     <div className="flex min-w-0 flex-1 select-none items-center gap-2 py-2">
                                       <span className={`min-w-0 max-w-[60%] truncate text-[14px] font-bold ${oDone ? "text-ink-mute line-through" : "text-ink"}`}>{opt.optionText || "옵션 없음"}</span>
                                       {showBuyers && opt.buyers.length === 1 ? <span className={`min-w-0 shrink truncate text-[12px] font-bold ${opt.buyers[0].paid ? "text-ink-mute" : "text-warn-tx"}`}>· {opt.buyers[0].nickname}{opt.buyers[0].paid ? "" : " ⏳"}</span> : null}
@@ -591,9 +638,26 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                             return (
                               <button key={it.id} type="button" onClick={() => togglePick(it.id)} className={`flex w-full items-center gap-3 py-2.5 pl-6 pr-3 text-left last:rounded-b-[10px] ${picked ? "bg-ok-bg/70" : "bg-surface hover:bg-surface-2"}`}>
                                 <CheckBox state={picked ? "done" : "none"} size="sm" />
-                                <span className="flex min-w-0 flex-1 flex-col">
+                                {itemPhoto[it.id] ? (
+                                  /* eslint-disable-next-line @next/next/no-img-element */
+                                  <img src={itemPhoto[it.id]} alt={it.productName} loading="lazy" className="h-10 w-10 shrink-0 rounded-lg border border-line object-cover" />
+                                ) : null}
+                                <span className="flex min-w-0 flex-1 flex-col gap-1">
                                   <span className={`truncate text-[14px] font-bold ${picked ? "text-ink-mute line-through" : "text-ink"}`}>{it.productName}</span>
-                                  {it.optionText ? <span className={`truncate text-[12px] font-bold ${picked ? "text-ink-mute" : "text-rose-deep"}`}>{it.optionText}</span> : null}
+                                  {/* [㉒ C] 색상·사이즈 칩(없음 숨김=formatOrderOptionText 규칙). 둘 다 비었고 optionText 만 있으면 기존처럼 한 줄. */}
+                                  {(() => {
+                                    const colorChip = stripNoneOptionParts(it.color);
+                                    const sizeChip = stripNoneOptionParts(it.size);
+                                    if (colorChip || sizeChip) {
+                                      return (
+                                        <span className="flex flex-wrap items-center gap-1">
+                                          {colorChip ? <span className={`rounded-full border border-line px-2 py-0.5 text-[14px] font-black ${picked ? "text-ink-mute" : "text-rose-deep"}`}>{colorChip}</span> : null}
+                                          {sizeChip ? <span className={`rounded-full border border-line px-2 py-0.5 text-[14px] font-black ${picked ? "text-ink-mute" : "text-ink"}`}>{sizeChip}</span> : null}
+                                        </span>
+                                      );
+                                    }
+                                    return it.optionText ? <span className={`truncate text-[12px] font-bold ${picked ? "text-ink-mute" : "text-rose-deep"}`}>{it.optionText}</span> : null;
+                                  })()}
                                 </span>
                                 {it.amount > 0 ? <span className={`shrink-0 text-[12px] font-bold ${picked ? "text-ink-mute" : "text-ink-soft"}`}>{it.amount.toLocaleString("ko-KR")}원</span> : null}
                                 <span className={`shrink-0 text-[16px] font-black leading-none ${picked ? "text-ink-mute" : it.qty > 1 ? "text-rose-deep" : "text-ink"}`}>{it.qty}<span className="text-[11px]">개</span></span>
