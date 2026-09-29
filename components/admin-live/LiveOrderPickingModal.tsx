@@ -7,7 +7,7 @@
 //   - "결제완료만" 토글(기본 ON, 끄면 미결제 포함·취소건 항상 제외), ㄱㄴㄷ/시간 정렬, 전체 초기화, 엑셀.
 //   - 상단 "챙김 N개 / 전체 M개"는 수량 합계. picked_at 한 칸만 update(돈/주문 로직 무관).
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatOrderOptionText, stripNoneOptionParts } from "@/lib/orderOptionText";
 import { compareOrderOptions } from "@/lib/orderOptionSort";
 import { supabase } from "@/lib/supabase";
@@ -62,6 +62,10 @@ const whenText = (s: string) => {
 
 export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: Props) {
   const [pickedIds, setPickedIds] = useState<Set<string>>(new Set());
+  // [㉓] 2단계: ①collected_at(모음 — 선반/업체에서 꺼냄) / ②picked_at(담음 — 손님 봉투, 진짜 완료).
+  //   담았으면 당연히 모은 것 → isCollected 는 둘 중 하나라도 있으면 true.
+  const [collectedIds, setCollectedIds] = useState<Set<string>>(new Set());
+  const isCollected = (id: string) => collectedIds.has(id) || pickedIds.has(id);
   const [sortMode, setSortMode] = useState<"nickname" | "time">("nickname");
   // [2026-09-20 개편] 상품별 정렬(가나다 / 많은 순)
   const [batchSort, setBatchSort] = useState<"name" | "qty">("name");
@@ -206,7 +210,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
         prod.ids.push(it.id);
         prod.totalQty += it.qty;
         if (p.paid) prod.paidQty += it.qty;
-        if (pickedIds.has(it.id)) prod.pickedQty += it.qty;
+        if (collectedIds.has(it.id) || pickedIds.has(it.id)) prod.pickedQty += it.qty; // [㉓] 상품별=모음 기준
         products.set(it.productName, prod);
 
         const opts = optionMaps.get(it.productName) || new Map<string, BatchOption>();
@@ -215,7 +219,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
         opt.ids.push(it.id);
         opt.totalQty += it.qty;
         if (p.paid) opt.paidQty += it.qty;
-        if (pickedIds.has(it.id)) opt.pickedQty += it.qty;
+        if (collectedIds.has(it.id) || pickedIds.has(it.id)) opt.pickedQty += it.qty; // [㉓] 상품별=모음 기준
         opts.set(optKey, opt);
         optionMaps.set(it.productName, opts);
 
@@ -243,34 +247,41 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
     }
     if (unpickedOnly) list = list.filter((prod) => prod.pickedQty < prod.totalQty && prod.options.length > 0);
     return list.sort((a, b) => (batchSort === "qty" ? b.totalQty - a.totalQty : 0) || a.name.localeCompare(b.name, "ko"));
-  }, [scopedPanels, pickedIds, search, unpickedOnly, batchSort]);
+  }, [scopedPanels, pickedIds, collectedIds, search, unpickedOnly, batchSort]);
 
-  // 여러 항목 일괄 토글(전부 챙김이면 해제, 아니면 전부 챙김) — 상품별 뷰에서 한 줄 = 그 상품 전부.
-  const toggleIds = async (ids: string[]) => {
+  // [㉓] 여러 항목 일괄 «모음» 토글(상품별 뷰) — 전부 모음이면 해제, 아니면 모음.
+  //   해제 대상 중 이미 «봉투에 담은»(pickedIds) 건은 collected_at 만 지운다(picked_at=진짜 완료는 ②에서만 해제).
+  const collectHintShownRef = useRef(false);
+  const toggleCollectIds = async (ids: string[]) => {
     if (ids.length === 0) return;
-    const allPicked = ids.every((id) => pickedIds.has(id));
-    const makePicked = !allPicked;
-    setPickedIds((prev) => { const n = new Set(prev); ids.forEach((id) => (makePicked ? n.add(id) : n.delete(id))); return n; });
+    const allCollected = ids.every((id) => isCollected(id));
+    const makeCollected = !allCollected;
+    if (!makeCollected && ids.some((id) => pickedIds.has(id)) && !collectHintShownRef.current) {
+      collectHintShownRef.current = true;
+      showAdminToast("이미 봉투에 담은 물건은 ② 손님별 담기에서 해제하세요.", "info");
+    }
+    setCollectedIds((prev) => { const n = new Set(prev); ids.forEach((id) => (makeCollected ? n.add(id) : n.delete(id))); return n; });
     try {
-      await writePicked(ids, makePicked);
+      await writeCollected(ids, makeCollected);
     } catch (e: any) {
-      showAdminToast("일괄 체크 실패\n\n" + (e?.message || e), "error");
-      await resyncPickedFromServer(ids);   // 화면을 DB 실제값으로 되돌린다
+      showAdminToast("모음 체크 실패\n\n" + (e?.message || e), "error");
+      await resyncPickedFromServer(ids);   // 화면을 DB 실제값으로 되돌린다(picked·collected 둘 다)
     }
   };
 
-  // 열 때 서버에서 picked_at 조회
+  // 열 때 서버에서 picked_at(②담음)·collected_at(①모음) 함께 조회
   useEffect(() => {
     let alive = true;
     (async () => {
       const ids = panels.flatMap((p) => p.items.map((it) => Number(it.id))).filter((n) => Number.isFinite(n) && n > 0);
-      if (ids.length === 0) { setPickedIds(new Set()); return; }
+      if (ids.length === 0) { setPickedIds(new Set()); setCollectedIds(new Set()); return; }
       const picked = new Set<string>();
+      const collected = new Set<string>();
       for (let i = 0; i < ids.length; i += 500) {
-        const { data } = await supabase.from("orders").select("id, picked_at").in("id", ids.slice(i, i + 500));
-        (data || []).forEach((r: any) => { if (r.picked_at) picked.add(String(r.id)); });
+        const { data } = await supabase.from("orders").select("id, picked_at, collected_at").in("id", ids.slice(i, i + 500));
+        (data || []).forEach((r: any) => { if (r.picked_at) picked.add(String(r.id)); if (r.collected_at) collected.add(String(r.id)); });
       }
-      if (alive) setPickedIds(picked);
+      if (alive) { setPickedIds(picked); setCollectedIds(collected); }
     })();
     return () => { alive = false; };
   }, [panels]);
@@ -286,17 +297,23 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
     if (nums.length === 0) return;
     try {
       const truth = new Map<string, boolean>();
+      const truthCollected = new Map<string, boolean>();
       for (let i = 0; i < nums.length; i += 500) {
         const { data, error } = await supabase
           .from("orders")
-          .select("id, picked_at")
+          .select("id, picked_at, collected_at")
           .in("id", nums.slice(i, i + 500));
         if (error) throw error;
-        (data || []).forEach((r: any) => truth.set(String(r.id), Boolean(r.picked_at)));
+        (data || []).forEach((r: any) => { truth.set(String(r.id), Boolean(r.picked_at)); truthCollected.set(String(r.id), Boolean(r.collected_at)); });
       }
       setPickedIds((prev) => {
         const n = new Set(prev);
         truth.forEach((isPicked, id) => (isPicked ? n.add(id) : n.delete(id)));
+        return n;
+      });
+      setCollectedIds((prev) => {
+        const n = new Set(prev);
+        truthCollected.forEach((isColl, id) => (isColl ? n.add(id) : n.delete(id)));
         return n;
       });
     } catch {
@@ -310,6 +327,16 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
     const value = makePicked ? new Date().toISOString() : null;
     for (let i = 0; i < nums.length; i += 500) {
       const { error } = await supabase.from("orders").update({ picked_at: value }).in("id", nums.slice(i, i + 500));
+      if (error) throw error;
+    }
+  };
+
+  // [㉓] ①모음 저장 — collected_at 한 칸만 update(500개씩·writePicked 와 같은 패턴). picked_at 무접촉.
+  const writeCollected = async (ids: string[], makeCollected: boolean) => {
+    const nums = ids.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0);
+    const value = makeCollected ? new Date().toISOString() : null;
+    for (let i = 0; i < nums.length; i += 500) {
+      const { error } = await supabase.from("orders").update({ collected_at: value }).in("id", nums.slice(i, i + 500));
       if (error) throw error;
     }
   };
@@ -339,20 +366,60 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
     }
   };
 
+  // ②담기 초기화(order 뷰) — picked_at 만 해제. ①모음·주문·금액엔 영향 없음.
   const resetAll = async () => {
-    if (!(await showAdminConfirm("챙김 표시를 모두 초기화할까요?\n\n지금 보이는 목록의 모든 체크가 해제됩니다. (주문·금액엔 영향 없음)"))) return;
+    if (!(await showAdminConfirm("담기 체크를 모두 해제할까요?\n\n지금 보이는 목록의 ② 담기 체크가 모두 해제됩니다. (① 모음·주문·금액엔 영향 없음)"))) return;
     setResetting(true);
     try {
       const ids = scopedPanels.flatMap((p) => p.items.map((it) => it.id));
       await writePicked(ids, false);
       setPickedIds((prev) => { const n = new Set(prev); ids.forEach((id) => n.delete(id)); return n; });
-      showAdminToast("챙김 표시를 초기화했습니다.", "success");
+      showAdminToast("담기 표시를 초기화했습니다.", "success");
     } catch (e: any) {
       showAdminToast("초기화 실패\n\n" + (e?.message || e), "error");
       // 여기도 500개씩 나눠 쓰므로 «일부만 해제»될 수 있다 → DB 실제값으로 화면을 맞춘다
       await resyncPickedFromServer(scopedPanels.flatMap((p) => p.items.map((it) => it.id)));
     } finally {
       setResetting(false);
+    }
+  };
+
+  // [㉓] ①모음 초기화(batch 뷰) — collected_at 만 해제(담음=picked 은 그대로).
+  const resetCollected = async () => {
+    if (!(await showAdminConfirm("모음 체크를 모두 해제할까요?\n\n지금 보이는 목록의 ① 모음 표시가 해제됩니다. (② 봉투 담기·주문·금액엔 영향 없음)"))) return;
+    setResetting(true);
+    try {
+      const ids = scopedPanels.flatMap((p) => p.items.map((it) => it.id));
+      await writeCollected(ids, false);
+      setCollectedIds((prev) => { const n = new Set(prev); ids.forEach((id) => n.delete(id)); return n; });
+      showAdminToast("모음 표시를 초기화했습니다.", "success");
+    } catch (e: any) {
+      showAdminToast("초기화 실패\n\n" + (e?.message || e), "error");
+      await resyncPickedFromServer(scopedPanels.flatMap((p) => p.items.map((it) => it.id)));
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  // [㉓] 보이는 상품(batchProducts)을 모두 ①모음으로. 이미 모은 건 그대로, 새 것만 표시. 봉투 담기는 ②에서.
+  const collectAllVisible = async () => {
+    const visibleIds = new Set(batchProducts.flatMap((p) => p.ids));
+    const itemsFlat = scopedPanels.flatMap((p) => p.items).filter((it) => visibleIds.has(it.id));
+    const target = itemsFlat.filter((it) => !isCollected(it.id));
+    if (target.length === 0) { showAdminToast("이미 다 모았어요.", "info"); return; }
+    const totalQ = itemsFlat.reduce((s, it) => s + it.qty, 0);
+    const alreadyQ = itemsFlat.filter((it) => isCollected(it.id)).reduce((s, it) => s + it.qty, 0);
+    const targetQ = target.reduce((s, it) => s + it.qty, 0);
+    const warn = paidOnly ? "" : "\n⚠ 미결제 주문도 포함돼요";
+    if (!(await showAdminConfirm(`보이는 물건 ${totalQ}개를 모두 모음으로 표시할까요?\n이미 모은 ${alreadyQ}개는 그대로, ${targetQ}개만 표시해요.\n(봉투 담기는 ② 손님별 담기에서 따로 체크해요)${warn}`))) return;
+    const ids = target.map((it) => it.id);
+    setCollectedIds((prev) => { const n = new Set(prev); ids.forEach((id) => n.add(id)); return n; });
+    try {
+      await writeCollected(ids, true);
+      showAdminToast("보이는 물건을 모두 모음으로 표시했어요.", "success");
+    } catch (e: any) {
+      showAdminToast("모두 모음 실패\n\n" + (e?.message || e), "error");
+      await resyncPickedFromServer(ids);
     }
   };
 
@@ -368,12 +435,16 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
     }
   };
 
-  // 수량 합계
-  const { pickedQty, totalQty } = useMemo(() => {
-    let p = 0, t = 0;
-    for (const panel of scopedPanels) for (const it of panel.items) { t += it.qty; if (pickedIds.has(it.id)) p += it.qty; }
-    return { pickedQty: p, totalQty: t };
-  }, [scopedPanels, pickedIds]);
+  // 수량 합계 — picked=②담음, collected=①모음(담으면 자동 모음)
+  const { pickedQty, collectedQty, totalQty } = useMemo(() => {
+    let p = 0, c = 0, t = 0;
+    for (const panel of scopedPanels) for (const it of panel.items) {
+      t += it.qty;
+      if (pickedIds.has(it.id)) p += it.qty;
+      if (collectedIds.has(it.id) || pickedIds.has(it.id)) c += it.qty;
+    }
+    return { pickedQty: p, collectedQty: c, totalQty: t };
+  }, [scopedPanels, pickedIds, collectedIds]);
 
   // [2026-08-31 사장님 요청] 돈 표시등 — 상품값 합계와 "실제 받은 돈"을 나란히 보여준다 (표시 전용).
   //   상품값 = 상품금액 합(엑셀의 상품금액 칸과 동일). 실제 받은 돈 = 결제완료 주문의 총금액 합
@@ -391,6 +462,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   }, [orders, paidOnly]);
 
   const remainQty = Math.max(0, totalQty - pickedQty);
+  const remainCollectQty = Math.max(0, totalQty - collectedQty); // [㉓] 상품별=아직 안 모은 수량
   const percent = totalQty > 0 ? Math.round((pickedQty / totalQty) * 100) : 0;
   const broadcastTitle = String(filterLabel || "").split(" · ")[0].replace(/^방송:\s*/, "").trim();
 
@@ -415,15 +487,15 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   //     WCAG 최소치(24px)에도 못 미쳤다. 손가락으로 정확히 눌리지 않는다.
   //   칸 하나 = 주문자 1명(같은 닉네임이라도 결제/대기가 다르면 따로). 누르면 그 사람 것만 챙김/해제.
   const BuyerTiles = ({ buyers, className }: { buyers: BatchBuyer[]; className: string }) => {
-    const list = unpickedOnly ? buyers.filter((b) => !b.ids.every((id) => pickedIds.has(id))) : buyers;
+    const list = unpickedOnly ? buyers.filter((b) => !b.ids.every((id) => isCollected(id))) : buyers;
     if (list.length === 0) return null;
     return (
       <div className={`grid grid-cols-2 gap-2 ${className}`}>
         {list.map((b, i) => {
-          const bDone = b.ids.length > 0 && b.ids.every((id) => pickedIds.has(id));
-          const bSome = !bDone && b.ids.some((id) => pickedIds.has(id));
+          const bDone = b.ids.length > 0 && b.ids.every((id) => isCollected(id));
+          const bSome = !bDone && b.ids.some((id) => isCollected(id));
           return (
-            <button key={`${b.nickname}-${b.paid}-${i}`} type="button" onClick={() => toggleIds(b.ids)}
+            <button key={`${b.nickname}-${b.paid}-${i}`} type="button" onClick={() => toggleCollectIds(b.ids)}
               title={`${b.nickname} — 누르면 이 손님 것만 챙김 / 해제${b.paid ? "" : " (미결제 ⏳)"}`}
               className={`flex min-h-[44px] min-w-0 items-center gap-2 rounded-xl border-2 px-2 py-2 text-left active:scale-95 ${bDone ? "border-ok-tx/35 bg-[var(--color-ok-tx)]" : bSome ? "border-ok-tx/35 bg-ok-bg" : b.paid ? "border-line bg-surface" : "border-warn-tx/35 bg-warn-bg"}`}>
               <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 text-[12px] font-black ${bDone ? "border-white/40 bg-surface text-ok-tx" : bSome ? "border-ok-tx/35 bg-surface text-ok-tx" : "border-line bg-surface text-transparent"}`}>{bSome ? "–" : "✓"}</span>
@@ -465,7 +537,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
               )}
             </div>
             <div className="text-right text-[12px] font-bold text-ink-soft">
-              챙김 <span className="font-black text-ok-tx">{pickedQty.toLocaleString()}</span> / 전체 {totalQty.toLocaleString()}개 <span className="text-ink-mute">· {percent}%</span>
+              ① 모음 <span className="font-black text-rose-deep">{collectedQty.toLocaleString()}</span> · ② 담음 <span className="font-black text-ok-tx">{pickedQty.toLocaleString()}</span> / 전체 {totalQty.toLocaleString()}개 <span className="text-ink-mute">· {percent}%</span>
             </div>
           </div>
           <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-surface-2">
@@ -479,14 +551,14 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
         {/* ── 보기 방식(탭) ── */}
         <div className="shrink-0 px-4 pt-3">
           <div className="grid grid-cols-2 gap-1 rounded-xl bg-surface-2 p-1">
-            <button type="button" onClick={() => setViewMode("batch")} className={`rounded-lg py-2 text-[13px] font-black ${viewMode === "batch" ? "bg-rose-deep text-white shadow" : "text-ink-soft hover:text-ink"}`}>📦 상품별로 모으기</button>
-            <button type="button" onClick={() => setViewMode("order")} className={`rounded-lg py-2 text-[13px] font-black ${viewMode === "order" ? "bg-rose-deep text-white shadow" : "text-ink-soft hover:text-ink"}`}>👤 주문별로 담기</button>
+            <button type="button" onClick={() => setViewMode("batch")} className={`rounded-lg py-2 text-[13px] font-black ${viewMode === "batch" ? "bg-rose-deep text-white shadow" : "text-ink-soft hover:text-ink"}`}>📦 ① 모으기 (상품별)</button>
+            <button type="button" onClick={() => setViewMode("order")} className={`rounded-lg py-2 text-[13px] font-black ${viewMode === "order" ? "bg-rose-deep text-white shadow" : "text-ink-soft hover:text-ink"}`}>👤 ② 손님별 담기</button>
           </div>
         </div>
 
         {/* ── 필터·정렬 ── */}
         <div className="flex shrink-0 flex-wrap items-center gap-1.5 px-4 pt-2">
-          <button type="button" onClick={() => setUnpickedOnly((v) => !v)} className={chip(unpickedOnly)}>{unpickedOnly ? "✓ " : ""}안 챙긴 것만{remainQty > 0 ? ` ${remainQty.toLocaleString()}` : ""}</button>
+          <button type="button" onClick={() => setUnpickedOnly((v) => !v)} className={chip(unpickedOnly)}>{unpickedOnly ? "✓ " : ""}{viewMode === "batch" ? "안 모은 것만" : "안 담은 것만"}{(viewMode === "batch" ? remainCollectQty : remainQty) > 0 ? ` ${(viewMode === "batch" ? remainCollectQty : remainQty).toLocaleString()}` : ""}</button>
           <button type="button" onClick={() => setPaidOnly((v) => !v)} className={`rounded-lg px-3 py-1.5 text-[12px] font-black whitespace-nowrap ${paidOnly ? "bg-[var(--color-ok-tx)] text-white" : "border border-warn-tx/35 bg-warn-bg text-warn-tx"}`}>{paidOnly ? "✓ 결제완료만" : "⚠ 미결제 포함"}</button>
           {viewMode === "order" ? (
             <span className="inline-flex overflow-hidden rounded-lg border border-line">
@@ -525,11 +597,11 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
               <div className="py-14 text-center text-[14px] font-bold text-ink-mute">{unpickedOnly ? "안 챙긴 상품이 없어요! 🎉" : search ? "검색 결과가 없어요" : "챙길 상품이 없습니다."}</div>
             ) : (
               <>
-                <div className="mb-2 px-1 text-[11px] font-bold text-ink-mute">상품 {batchProducts.length}가지 · ✅ 네모 칸을 눌러야 챙김 표시가 돼요 · 한 옵션을 여러 명이 샀으면 아래 «손님 칸»을 눌러 한 명씩 챙기세요</div>
+                <div className="mb-2 px-1 text-[11px] font-bold text-ink-mute">상품 {batchProducts.length}가지 · 선반·업체에서 꺼냈으면 체크 — 봉투에 넣는 건 ② 손님별 담기에서</div>
                 <div className="space-y-2">
                   {batchProducts.map((prod) => {
-                    const done = prod.ids.every((id) => pickedIds.has(id));
-                    const some = !done && prod.ids.some((id) => pickedIds.has(id));
+                    const done = prod.ids.every((id) => isCollected(id));
+                    const some = !done && prod.ids.some((id) => isCollected(id));
                     const prodPhoto = prod.ids.map((id) => itemPhoto[id]).find(Boolean) || ""; // [㉒] 이 상품 첫 사진
                     const single = prod.options.length === 1 && !prod.options[0].optionText;
                     const singleBuyers = single ? prod.options[0].buyers : [];
@@ -538,7 +610,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                       <div key={prod.name} className={`rounded-xl border-2 ${done ? "border-ok-tx/35 bg-ok-bg/60" : "border-line bg-surface"}`}>
                         {/* 상품 줄(스크롤해도 위에 붙음) — 네모 칸만 눌러야 그 상품 전부 챙김/해제(실수 방지) */}
                         <div className={`sticky top-0 z-[1] flex items-center gap-1 rounded-t-[10px] pl-1 ${done ? "bg-ok-bg" : single ? "bg-surface" : "bg-rose-soft"} ${collapsed ? "rounded-b-[10px]" : ""}`}>
-                          <PickBox state={done ? "done" : some ? "some" : "none"} onPick={() => toggleIds(prod.ids)} label={`${prod.name} — 이 상품 ${prod.totalQty}개 전부 챙김 / 해제`} />
+                          <PickBox state={done ? "done" : some ? "some" : "none"} onPick={() => toggleCollectIds(prod.ids)} label={`${prod.name} — 이 상품 ${prod.totalQty}개 전부 모음 / 해제`} />
                           {prodPhoto ? (
                             /* eslint-disable-next-line @next/next/no-img-element */
                             <img src={prodPhoto} alt={prod.name} loading="lazy" className="h-11 w-11 shrink-0 rounded-lg border border-line object-cover" />
@@ -561,13 +633,13 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                         {!single && !collapsed ? (
                           <div className="divide-y divide-line border-t border-line">
                             {prod.options.map((opt) => {
-                              const oDone = opt.ids.every((id) => pickedIds.has(id));
-                              const oSome = !oDone && opt.ids.some((id) => pickedIds.has(id));
+                              const oDone = opt.ids.every((id) => isCollected(id));
+                              const oSome = !oDone && opt.ids.some((id) => isCollected(id));
                               const optPhoto = opt.ids.map((id) => itemPhoto[id]).find(Boolean) || ""; // [㉒] 이 옵션 첫 사진
                               return (
                                 <div key={opt.key || "(옵션없음)"} className={`${oDone ? "bg-ok-bg/70" : "bg-surface"} last:rounded-b-[10px]`}>
                                   <div className="flex w-full items-center gap-1 pl-3 pr-3">
-                                    <PickBox size="sm" state={oDone ? "done" : oSome ? "some" : "none"} onPick={() => toggleIds(opt.ids)} label={`${opt.optionText || "옵션 없음"} — ${opt.totalQty}개 전부 챙김 / 해제`} />
+                                    <PickBox size="sm" state={oDone ? "done" : oSome ? "some" : "none"} onPick={() => toggleCollectIds(opt.ids)} label={`${opt.optionText || "옵션 없음"} — ${opt.totalQty}개 전부 모음 / 해제`} />
                                     {optPhoto && optPhoto !== prodPhoto ? (
                                       /* eslint-disable-next-line @next/next/no-img-element */
                                       <img src={optPhoto} alt={opt.optionText || "옵션"} loading="lazy" className="h-9 w-9 shrink-0 rounded-lg border border-line object-cover" />
@@ -598,7 +670,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
             <div className="py-14 text-center text-[14px] font-bold text-ink-mute">{unpickedOnly ? "안 챙긴 게 없어요! 다 챙겼습니다 🎉" : search ? "검색 결과가 없어요" : "챙길 주문이 없습니다."}</div>
           ) : (
             <>
-              <div className="mb-2 px-1 text-[11px] font-bold text-ink-mute">주문 {displayPanels.length}건 · ✅ 닉네임 옆 네모 칸 = 그 주문 전부 · 상품 줄은 줄 아무 데나 눌러도 돼요(1건씩) · 다 챙겨도 그대로 펼쳐 있어요(▴ 누르면 접힘)</div>
+              <div className="mb-2 px-1 text-[11px] font-bold text-ink-mute">주문 {displayPanels.length}건 · 봉투에 넣을 때 하나씩 체크 — 여기 체크해야 챙김 완료</div>
               <div className="space-y-2">
                 {displayPanels.map((panel) => {
                   const pickedInPanel = panel.items.filter((it) => pickedIds.has(it.id)).length;
@@ -643,7 +715,11 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                                   <img src={itemPhoto[it.id]} alt={it.productName} loading="lazy" className="h-10 w-10 shrink-0 rounded-lg border border-line object-cover" />
                                 ) : null}
                                 <span className="flex min-w-0 flex-1 flex-col gap-1">
-                                  <span className={`truncate text-[14px] font-bold ${picked ? "text-ink-mute line-through" : "text-ink"}`}>{it.productName}</span>
+                                  <span className="flex min-w-0 items-center gap-1.5">
+                                    <span className={`min-w-0 truncate text-[14px] font-bold ${picked ? "text-ink-mute line-through" : "text-ink"}`}>{it.productName}</span>
+                                    {/* [㉓] ①모음만 되고 아직 ②담기 전 — 회색 칩으로 표시(담으면 사라짐) */}
+                                    {!picked && collectedIds.has(it.id) ? <span className="shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-[11px] font-black text-ink-mute">모음✓</span> : null}
+                                  </span>
                                   {/* [㉒ C] 색상·사이즈 칩(없음 숨김=formatOrderOptionText 규칙). 둘 다 비었고 optionText 만 있으면 기존처럼 한 줄. */}
                                   {(() => {
                                     const colorChip = stripNoneOptionParts(it.color);
@@ -676,9 +752,14 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
 
         {/* ── 푸터: 위험한 초기화는 왼쪽 글자 버튼, 엑셀·닫기는 오른쪽 ── */}
         <div className="flex shrink-0 items-center justify-between gap-2 border-t border-line bg-surface px-4 py-2.5">
-          <button type="button" onClick={resetAll} disabled={resetting} className="rounded-lg px-2 py-1.5 text-[12px] font-black text-[var(--color-danger-tx)] hover:bg-danger-bg disabled:opacity-50">{resetting ? "초기화중…" : "챙김 전체 초기화"}</button>
+          {viewMode === "batch" ? (
+            <button type="button" onClick={resetCollected} disabled={resetting} className="rounded-lg px-2 py-1.5 text-[12px] font-black text-[var(--color-danger-tx)] hover:bg-danger-bg disabled:opacity-50">{resetting ? "초기화중…" : "모음 초기화"}</button>
+          ) : (
+            <button type="button" onClick={resetAll} disabled={resetting} className="rounded-lg px-2 py-1.5 text-[12px] font-black text-[var(--color-danger-tx)] hover:bg-danger-bg disabled:opacity-50">{resetting ? "초기화중…" : "담기 초기화"}</button>
+          )}
           <div className="flex items-center gap-2">
             <span className="hidden text-[11px] font-bold text-ink-mute sm:inline">체크는 서버 저장 · 다른 기기에서도 유지</span>
+            {viewMode === "batch" ? <button type="button" onClick={collectAllVisible} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[12px] font-black text-rose-deep hover:bg-surface-2">✓ 모두 모음</button> : null}
             <button type="button" onClick={runExcel} disabled={exporting} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[12px] font-black text-ink hover:bg-surface-2 disabled:opacity-50">{exporting ? "내보내는중…" : "📄 엑셀"}</button>
             <button type="button" onClick={onClose} className="rounded-lg bg-rose-deep px-4 py-1.5 text-[12px] font-black text-white hover:opacity-90">닫기</button>
           </div>
