@@ -18,6 +18,8 @@ import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import AdminLiveCustomerBlockReasonModal from "./AdminLiveCustomerBlockReasonModal";
 import { requestAdminCustomerBlock } from "@/lib/adminCustomerBlock";
 import { RefundProcessModal, type LedgerDetail } from "./AdminLiveRefundLedgerPanel";
+import { pickPrimaryLedger } from "@/lib/refundLedger";
+import { splitIssueBody, mergeIssueBody } from "@/lib/issueBodyMeta";
 
 type Props = {
   order: LiveOrder;
@@ -160,8 +162,12 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const [issueEarnedPoints, setIssueEarnedPoints] = useState(0);
   // [E2] 위험 작업(입금확인 취소·주문서 자체 취소·손님 차단)은 화면 맨 아래 접힌 한 줄로 — 실수 방지(2클릭 마찰).
   const [dangerOpen, setDangerOpen] = useState(false);
-  // [2026-09-29 C] 이 주문 반품 이슈의 해결 여부(배지·「반품 취소」 숨김용). 조회 실패는 무시(null 유지).
-  const [issueLatest, setIssueLatest] = useState<{ isResolved: boolean; resolvedAt: string } | null>(null);
+  // [2026-09-29 C] 이 주문 반품 이슈의 해결 여부(배지·「반품 취소」 숨김용) + task 원본(같은 처리창으로 열기용). 조회 실패는 무시.
+  const [issueLatest, setIssueLatest] = useState<{ isResolved: boolean; resolvedAt: string; task: Record<string, unknown> | null } | null>(null);
+  const [findTaskTick, setFindTaskTick] = useState(0);
+  // [⑯ C] 기존 이슈를 «처리창»으로 열 때 담는 refund-ledger item(없으면 task 로 합성).
+  const [issueProcessItem, setIssueProcessItem] = useState<LedgerDetail | null>(null);
+  const [issueProcessTask, setIssueProcessTask] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     setLocalOrder(order);
@@ -178,12 +184,12 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         const r = await fetch(`/api/admin-live/order-return/find-task?orderCode=${encodeURIComponent(orderCode)}`, { cache: "no-store" });
         const p = await r.json().catch(() => null);
         if (!alive) return;
-        setIssueLatest(p?.ok && p.latest ? { isResolved: !!p.latest.isResolved, resolvedAt: String(p.latest.resolvedAt || "") } : null);
+        setIssueLatest(p?.ok && p.latest ? { isResolved: !!p.latest.isResolved, resolvedAt: String(p.latest.resolvedAt || ""), task: (p.latest.task as Record<string, unknown>) || null } : null);
       } catch { /* 조회 실패는 무시 — 기존 표시 유지 */ }
     })();
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [order]);
+  }, [order, findTaskTick]);
 
   const handleItemSaved = async (result: LiveOrderItemEditSaveResult) => {
     setRefreshingDetail(true);
@@ -1064,6 +1070,11 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       showAdminToast("주문번호를 찾지 못해 고객이슈를 등록할 수 없어요.", "error");
       return;
     }
+    // [⑯ C4] 이미 미해결 고객이슈가 있으면 기존 이슈를 열지 물어본다(중복 등록 방지).
+    if (issueLatest?.task && !issueLatest.isResolved) {
+      const openExisting = await showAdminConfirm("이미 등록된 고객이슈가 있어요.\n기존 이슈를 열까요?", { title: "고객이슈", confirmText: "기존 이슈 열기", cancelText: "새로 등록" });
+      if (openExisting) { void openExistingIssue(issueLatest.task as Record<string, unknown>); return; }
+    }
     const rowIds = items.map((item) => Number(item.id)).filter((id) => Number.isFinite(id) && id > 0);
     let earned = 0;
     if (rowIds.length > 0) {
@@ -1077,7 +1088,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   // [⑬] 처리창 초안 모드 제출 → 기존 order-return 등록 그대로 호출(환불이면 서버가 포인트 회수 — 회수 규칙 불변).
   //   생성된 taskId 를 돌려주면 처리창이 그 taskId 로 refund-ledger 를 이어서 저장한다.
   const createIssueFromOrder = async (
-    data: { issueType: "refund" | "exchange" | "etc"; memo: string; selectedRowIds: number[] },
+    data: { issueType: "refund" | "exchange" | "etc"; memo: string; selectedRowIds: number[]; rowQty?: Record<string, number> },
   ): Promise<{ taskId: string } | null> => {
     if (returnSaving) return null;
     const refRowId = Number(items[0]?.id);
@@ -1086,7 +1097,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       showAdminToast("기준 주문 행을 찾지 못했습니다.", "warning");
       return null;
     }
-    if (rowIds.length === 0) {
+    if (data.issueType !== "etc" && rowIds.length === 0) { // [⑯] 기타는 0개 허용
       showAdminToast("대상 상품을 1개 이상 선택해주세요.", "warning");
       return null;
     }
@@ -1096,7 +1107,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
-        body: JSON.stringify({ mode: data.issueType, refRowId, rowIds, detail: data.memo.trim() }),
+        body: JSON.stringify({ mode: data.issueType, refRowId, rowIds, detail: data.memo.trim(), rowQty: data.rowQty || {} }),
       }).then((r) => r.json()).catch(() => null);
 
       if (!res?.ok) {
@@ -1123,6 +1134,54 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     } finally {
       setReturnSaving(false);
     }
+  };
+
+  // [⑯ C] 이미 등록된 고객이슈를 «처리창»으로 연다 — 그 주문의 대표 refund-ledger 를 불러오고(없으면 task 로 합성) 창을 띄운다.
+  const synthIssueItem = (task: Record<string, unknown>, orderCode: string): LedgerDetail => ({
+    id: "", created_at: "", admin_task_id: String(task.id ?? ""),
+    kind: String(task.task_type) === "exchange" ? "교환" : "반품",
+    stage: "접수", method: "없음", amount_base: 0, amount_final: 0, adjustments: [],
+    product_snapshot: (task.raw_payload && typeof task.raw_payload === "object" ? (task.raw_payload as { items?: unknown }).items : []) as LedgerDetail["product_snapshot"],
+    nickname: clean((orderForView as any).youtubeNickname) || clean(orderForView.nickname),
+    customer_name: clean(orderForView.name), customer_phone: clean(orderForView.phone),
+    order_lookup_code: orderCode, reason: splitIssueBody(String(task.body ?? "")).memo,
+  } as LedgerDetail);
+  const openExistingIssue = async (task: Record<string, unknown>) => {
+    const orderCode = String((order as LiveOrder).orderNo || (order as Record<string, unknown>).order_lookup_code || "").trim();
+    let item = synthIssueItem(task, orderCode);
+    try {
+      const fr = await fetch(`/api/admin-live/refund-ledger?orderCodes=${encodeURIComponent(orderCode)}`, { cache: "no-store" });
+      const fp = await fr.json().catch(() => null);
+      const primary = fp?.ok && Array.isArray(fp.items) ? pickPrimaryLedger(fp.items) : null;
+      if (primary?.id) {
+        const dr = await fetch(`/api/admin-live/refund-ledger?id=${encodeURIComponent(String(primary.id))}`, { cache: "no-store" });
+        const dp = await dr.json().catch(() => null);
+        if (dp?.ok && dp.item) item = dp.item as LedgerDetail;
+      }
+    } catch { /* 조회 실패 시 task 합성본으로 */ }
+    setIssueProcessTask(task);
+    setIssueProcessItem(item);
+  };
+  // 기존 이슈 저장 = admin-tasks 수정(메타줄 보존). Rail 의 patchIssueFields 와 같은 방식.
+  const saveExistingIssue = async (task: Record<string, unknown>, d: { issueType: "refund" | "exchange" | "etc"; memo: string }): Promise<boolean> => {
+    const id = String(task.id ?? "");
+    if (!id) return false;
+    const taskType = d.issueType === "refund" ? "refund" : d.issueType === "exchange" ? "exchange" : "general";
+    const nextBody = mergeIssueBody(splitIssueBody(String(task.body ?? "")).metaLines, d.memo.trim());
+    try {
+      const res = await fetch("/api/admin-v2/admin-tasks", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id, action: "update",
+          title: String(task.title ?? "") || "[고객이슈]",
+          body: nextBody, task_type: taskType, priority: String(task.priority ?? "") || "normal",
+          raw_payload: { ...((task.raw_payload as Record<string, unknown>) || {}), issue_types: [taskType], memo: d.memo.trim(), edited_from: "order-detail-drawer" },
+        }),
+      });
+      const p = await res.json().catch(() => null);
+      if (!res.ok || !p?.ok) { showAdminToast("고객이슈 저장 실패\n\n" + (p?.message || `오류 ${res.status}`), "error"); return false; }
+      return true;
+    } catch (e) { showAdminToast("고객이슈 저장 실패: " + (e instanceof Error ? e.message : "네트워크 오류"), "error"); return false; }
   };
 
   // 기록 지우기 — 기존 동작 유지(return_* 컬럼만 null). 포인트/이슈는 건드리지 않는다.
@@ -1496,16 +1555,22 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             </button>
           </div>
           {(order as any).returnStatus ? (
-            <div className="rounded-lg border border-warn-tx/40 bg-warn-bg p-3 text-[12px] font-bold leading-6 text-warn-tx">
+            <div
+              role={issueLatest?.task ? "button" : undefined}
+              tabIndex={issueLatest?.task ? 0 : undefined}
+              onClick={issueLatest?.task ? () => void openExistingIssue(issueLatest.task as Record<string, unknown>) : undefined}
+              className={`rounded-lg border border-warn-tx/40 bg-warn-bg p-3 text-[12px] font-bold leading-6 text-warn-tx ${issueLatest?.task ? "cursor-pointer hover:bg-surface-2" : ""}`}
+            >
               {/* [B4] DB 값은 「반품(환불)/반품(교환)/기타」 — 화면에서만 「환불/교환/기타」로. 사유 앞머리 "[유형] " 제거. */}
               <span className="mr-2 rounded-lg bg-surface px-2 py-0.5 text-[11px] font-black">{String((order as any).returnStatus).replace("반품(환불)", "환불").replace("반품(교환)", "교환")}</span>
               {/* [2026-09-29 C] 고객이슈가 해결완료면 배지 표시 + 「반품 취소」 숨김(기록 지우기는 유지). */}
               {issueLatest?.isResolved ? (() => { const d = new Date(issueLatest.resolvedAt); const md = Number.isFinite(d.getTime()) ? `${d.getMonth() + 1}.${d.getDate()}` : ""; return <span className="mr-2 rounded-lg bg-ok-bg px-2 py-0.5 text-[11px] font-black text-ok-tx">✅ 해결완료{md ? ` ${md}` : ""}</span>; })() : null}
               {Number((order as any).returnAmount || 0) > 0 ? <span className="mr-2">환불 예정/완료 {money(Number((order as any).returnAmount || 0))}</span> : null}
+              {issueLatest?.task ? <span className="float-right text-[12px] font-black text-rose-deep">열기 ›</span> : null}
               <div className="mt-1 whitespace-pre-wrap text-ink-soft">{String((order as any).returnReason || "사유 없음").replace(/^\[[^\]]*\]\s*/, "")}</div>
               <div className="mt-1 flex items-center justify-end gap-3">
-                <button type="button" disabled={returnSaving} onClick={() => void handleClearReturn()} title="기록만 지웁니다 — 정산·입금·재고 숫자는 바뀌지 않아요." className="text-[11px] font-black text-ink-mute underline hover:text-danger-tx disabled:opacity-50">기록 지우기</button>
-                {issueLatest?.isResolved ? null : <button type="button" disabled={returnSaving} onClick={handleUndoReturn} className="text-[11px] font-black text-ink-mute underline hover:text-rose-deep disabled:opacity-50">반품 취소</button>}
+                <button type="button" disabled={returnSaving} onClick={(e) => { e.stopPropagation(); void handleClearReturn(); }} title="기록만 지웁니다 — 정산·입금·재고 숫자는 바뀌지 않아요." className="text-[11px] font-black text-ink-mute underline hover:text-danger-tx disabled:opacity-50">기록 지우기</button>
+                {issueLatest?.isResolved ? null : <button type="button" disabled={returnSaving} onClick={(e) => { e.stopPropagation(); handleUndoReturn(); }} className="text-[11px] font-black text-ink-mute underline hover:text-rose-deep disabled:opacity-50">반품 취소</button>}
               </div>
             </div>
           ) : (
@@ -1979,7 +2044,19 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           issueBodyMemo=""
           onCreateIssue={createIssueFromOrder}
           onClose={() => { if (!returnSaving) setIssueRegisterOpen(false); }}
-          onSaved={async () => { setIssueRegisterOpen(false); window.dispatchEvent(new Event("ruru-admin-task-updated")); await onAfterStatusChange?.(); }}
+          onSaved={async () => { setIssueRegisterOpen(false); setFindTaskTick((v) => v + 1); window.dispatchEvent(new Event("ruru-admin-task-updated")); await onAfterStatusChange?.(); }}
+        />
+      ) : null}
+
+      {/* [⑯ C] 이미 등록된 고객이슈를 «같은 처리창»으로 열기(초안 아님). 저장은 admin-tasks 수정. */}
+      {issueProcessItem && issueProcessTask ? (
+        <RefundProcessModal
+          item={issueProcessItem}
+          issueTypesInitial={[String(issueProcessTask.task_type ?? "")]}
+          issueBodyMemo={splitIssueBody(String(issueProcessTask.body ?? "")).memo}
+          onSaveIssue={async ({ issueType, memo }) => saveExistingIssue(issueProcessTask, { issueType, memo })}
+          onClose={() => { setIssueProcessItem(null); setIssueProcessTask(null); }}
+          onSaved={async () => { setIssueProcessItem(null); setIssueProcessTask(null); setFindTaskTick((v) => v + 1); window.dispatchEvent(new Event("ruru-admin-task-updated")); await onAfterStatusChange?.(); }}
         />
       ) : null}
     </aside>

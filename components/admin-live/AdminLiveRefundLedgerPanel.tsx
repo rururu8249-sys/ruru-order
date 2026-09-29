@@ -369,7 +369,7 @@ export default function AdminLiveRefundLedgerPanel({ focusTaskId }: { focusTaskI
 }
 
 // ── 시안 ③ 처리 창 ──
-export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssue = false, repIssueDate = "", issueTypesInitial = [], issueBodyMemo = "", onSaveIssue, onDelete, createMode = false, earnedPoints = 0, onCreateIssue }: { item: LedgerDetail; onClose: () => void; onSaved: () => void; openedFromOtherIssue?: boolean; repIssueDate?: string; issueTypesInitial?: string[]; issueBodyMemo?: string; onSaveIssue?: (d: { issueType: "refund" | "exchange" | "etc"; memo: string; items?: Array<{ productId: string; productName: string; color: string; size: string; qty: number }> }) => Promise<boolean>; onDelete?: () => void; createMode?: boolean; earnedPoints?: number; onCreateIssue?: (d: { issueType: "refund" | "exchange" | "etc"; memo: string; selectedRowIds: number[] }) => Promise<{ taskId: string } | null> }) {
+export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssue = false, repIssueDate = "", issueTypesInitial = [], issueBodyMemo = "", onSaveIssue, onDelete, createMode = false, earnedPoints = 0, onCreateIssue }: { item: LedgerDetail; onClose: () => void; onSaved: () => void; openedFromOtherIssue?: boolean; repIssueDate?: string; issueTypesInitial?: string[]; issueBodyMemo?: string; onSaveIssue?: (d: { issueType: "refund" | "exchange" | "etc"; memo: string; items?: Array<{ productId: string; productName: string; color: string; size: string; qty: number }> }) => Promise<boolean>; onDelete?: () => void; createMode?: boolean; earnedPoints?: number; onCreateIssue?: (d: { issueType: "refund" | "exchange" | "etc"; memo: string; selectedRowIds: number[]; rowQty: Record<string, number> }) => Promise<{ taskId: string } | null> }) {
   const orderCode = clean(item.order_lookup_code);
   // [2026-09-27 ②] 유형 칩(환불/교환/기타) — 이 하나가 kind·하단 전환을 정한다. 기타는 하단 없음(admin-tasks 만 저장).
   const initIssueType: "refund" | "exchange" | "etc" = (() => {
@@ -633,10 +633,12 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
   const saveOnly = async () => {
     // [⑬ 초안 모드] 주문상세 「+ 고객이슈 등록」 — order-return 으로 이슈 생성(포인트 회수 규칙은 서버가), 받은 taskId 로 환불 기록 연결.
     if (createMode) {
-      const ids = lines.filter((l) => (sel[l.id] || 0) > 0).map((l) => Number(l.id)).filter((n) => n > 0);
+      const chosen = lines.filter((l) => (sel[l.id] || 0) > 0);
+      const ids = chosen.map((l) => Number(l.id)).filter((n) => n > 0);
       if (!isEtc && ids.length === 0) { showAdminToast("대상 상품을 1개 이상 선택해주세요.", "warning"); return; } // [⑭] 기타는 0개 허용
+      const rowQty = Object.fromEntries(chosen.map((l) => [String(l.id), sel[l.id]])); // [⑯] 고른 수량 → 서버 회수 비율
       setSaving(true);
-      const created = await onCreateIssue?.({ issueType, memo: issueMemo, selectedRowIds: ids });
+      const created = await onCreateIssue?.({ issueType, memo: issueMemo, selectedRowIds: ids, rowQty });
       setSaving(false);
       if (!created?.taskId) return;                       // 실패 토스트는 onCreateIssue 쪽에서
       if (isEtc) { onSaved(); return; }
@@ -708,45 +710,46 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
 
   return (
     <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onClick={onClose}>
-      <div className="flex max-h-[94vh] w-full max-w-[560px] flex-col overflow-hidden rounded-t-2xl border border-line bg-surface shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="flex h-[min(92vh,880px)] w-full max-w-[600px] flex-col overflow-hidden rounded-t-2xl border border-line bg-surface shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
         {/* 1. 헤더 */}
-        <div className="flex items-start justify-between gap-2 border-b border-line px-5 pt-4 pb-3">
+        <div className="flex items-start justify-between gap-2 border-b border-line px-6 pt-4 pb-3">
           <div className="min-w-0">
-            <h3 className="text-lg font-black text-ink">{createMode ? "고객이슈 등록" : isEtc ? "고객이슈 처리" : isExchange ? "교환하기" : "환불하기"}</h3>
-            {openedFromOtherIssue ? <div className="mt-1 text-[13px] leading-5 text-ink-mute">같은 주문의 {repIssueDateMD ? `${repIssueDateMD} ` : ""}이슈 기록을 열었어요.</div> : null}
-            {headerNotice ? <div className="mt-1 text-[13px] leading-5 text-ink-mute">{headerNotice}</div> : null}
-            <div className="mt-1 text-[13px] leading-5 text-ink-soft">
-              <div className="truncate font-black text-ink">{clean(item.nickname) || "—"}{clean(item.customer_name) ? ` · ${clean(item.customer_name)}` : ""}{orderCode ? ` · ${orderCode}` : ""}</div>
+            <h3 className="text-[20px] font-black text-ink">{createMode ? "고객이슈 등록" : isEtc ? "고객이슈 처리" : isExchange ? "교환하기" : "환불하기"}</h3>
+            <div className="mt-1 flex items-center gap-2 text-[13px] leading-5 text-ink-soft">
+              <div className="min-w-0 truncate"><span className="font-black text-ink">{clean(item.nickname) || "—"}</span>{clean(item.customer_name) ? ` · ${clean(item.customer_name)}` : ""}{orderCode ? ` · ${orderCode}` : ""}</div>
+              {orderPaymentMethod ? <span className="shrink-0 rounded-full bg-surface-2 px-2.5 py-0.5 text-[12px] font-black text-ink-soft">{isCardOrder ? "카드" : "무통장"}</span> : null}
+              {clean(orderDate) ? <span className="shrink-0 rounded-full bg-surface-2 px-2.5 py-0.5 text-[12px] font-black text-ink-soft">{dateShortKo(orderDate)} 주문</span> : null}
             </div>
+            {openedFromOtherIssue ? <div className="mt-1 text-[12px] leading-5 text-ink-mute">같은 주문의 {repIssueDateMD ? `${repIssueDateMD} ` : ""}이슈 기록을 열었어요.</div> : null}
           </div>
           <button type="button" onClick={onClose} aria-label="닫기" className="shrink-0 rounded-full px-2 text-lg font-black text-ink-mute hover:bg-surface-2">✕</button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
 
-          {/* [②] 공통 상단 — 유형 칩(환불/교환/기타) + 메모(이슈 내용). 칩 바꾸면 하단이 즉시 전환된다. */}
-          <div className="mb-3">
-            <div className="mb-1 text-[13px] font-black text-ink-mute">유형</div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {(["refund", "exchange", "etc"] as const).map((t) => (
-                <button key={t} type="button" onClick={() => {
-                    setIssueType(t);
-                    // [⑭] 기타로 바꾸면 선택 비움(관련 상품은 «선택»). 환불·교환으로 바꿀 때 선택이 0개면 전체 체크(반품 기본).
-                    if (t === "etc") setSel({});
-                    else if (!lines.some((l) => (sel[l.id] || 0) > 0)) setSel(Object.fromEntries(lines.map((l) => [String(l.id), Math.max(1, Number(l.qty) || 1)])));
-                    if (t === "exchange") setMethod("교환재발송"); else if (t === "refund" && (method === "교환재발송" || method === "없음")) setMethod("계좌이체");
-                  }}
-                  className={`rounded-xl px-3 py-1.5 text-[14px] font-black transition ${issueType === t ? (t === "refund" ? "bg-rose-deep text-white" : "bg-[var(--color-ink-soft)] text-white") : "border border-line bg-surface text-ink-mute hover:bg-surface-2"}`}>
-                  {t === "refund" ? "환불" : t === "exchange" ? "교환" : "기타"}
-                </button>
-              ))}
-            </div>
+          {/* [⑯] 유형 — 큰 그리드 3칸(큰 글자 + 설명). 칩 바꾸면 하단이 즉시 전환된다. */}
+          <div className="mb-4 grid grid-cols-3 gap-1 rounded-2xl bg-surface-2 p-1">
+            {(["refund", "exchange", "etc"] as const).map((t) => (
+              <button key={t} type="button" aria-pressed={issueType === t} onClick={() => {
+                  setIssueType(t);
+                  // [⑭] 기타로 바꾸면 선택 비움(관련 상품은 «선택»). 환불·교환으로 바꿀 때 선택이 0개면 전체 체크(반품 기본).
+                  if (t === "etc") setSel({});
+                  else if (!lines.some((l) => (sel[l.id] || 0) > 0)) setSel(Object.fromEntries(lines.map((l) => [String(l.id), Math.max(1, Number(l.qty) || 1)])));
+                  if (t === "exchange") setMethod("교환재발송"); else if (t === "refund" && (method === "교환재발송" || method === "없음")) setMethod("계좌이체");
+                }}
+                className={`flex h-14 flex-col items-center justify-center gap-0.5 rounded-xl transition ${issueType === t ? "bg-rose-deep text-white" : "text-ink-soft hover:bg-surface"}`}>
+                <span className="text-[16px] font-black">{t === "refund" ? "환불" : t === "exchange" ? "교환" : "기타"}</span>
+                <span className="text-[11px] font-bold opacity-80">{t === "refund" ? "돈 돌려주기" : t === "exchange" ? "다른 옵션 보내기" : "요청·메모만"}</span>
+              </button>
+            ))}
           </div>
 
-          {/* 2. 상품 */}
-          <div className="mb-3">
-            {/* [⑭] 기타는 「관련 상품 (선택)」·없으면 비워두기. 환불=돌려받을 상품 / 교환=교환 대상 상품. */}
-            <div className="mb-1 text-[13px] font-black text-ink-mute">{isExchange ? "교환 대상 상품" : isEtc ? "관련 상품 (선택)" : "돌려받을 상품"}{isEtc ? <span className="ml-1 text-[12px] font-bold text-ink-mute">없으면 비워두세요</span> : null}</div>
+          {/* 2. 상품 — 제목줄 = 라벨 + N개 선택 / 오른쪽 안내 */}
+          <div className="mb-4">
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <div className="text-[13px] font-black text-ink-mute">{isExchange ? "교환 대상 상품" : isEtc ? "관련 상품 (선택)" : "돌려받을 상품"}{selectedCount > 0 ? <span className="ml-1 text-rose-deep">{selectedCount}개 선택</span> : null}</div>
+              <div className="shrink-0 text-[12px] font-bold text-ink-mute">{isEtc ? "선택 안 해도 돼요" : "수량까지 고르세요"}</div>
+            </div>
             {!linesLoaded ? (
               <div className="rounded-xl border border-line p-4 text-center text-[13px] font-bold text-ink-mute">주문 상품 불러오는 중…</div>
             ) : linesError ? (
@@ -818,56 +821,54 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
             ) : null}
           </div>
 
-          {/* [②] 유형이 기타면 아래(반품 날짜·사유·금액표·계좌·교환옵션)는 숨김 — admin-tasks 만 저장. */}
-          {!isEtc ? (
-          <>
-          {/* 2-0. 반품 접수/도착 날짜 — 칩 2개(표시·기록 전용, 기본값 없음) */}
-          <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="text-[13px] font-black text-ink-mute">📦 반품</span>
-            {([["req", "접수", returnRequestedOn, setReturnRequestedOn], ["recv", "도착", returnReceivedOn, setReturnReceivedOn]] as const).map(([key, label, val, setVal]) => {
-              const on = !!clean(val);
-              return (
-                <span key={key} className="flex items-center gap-1.5">
-                  <button type="button"
-                    onClick={() => { if (on) { setVal(""); if (editingReturnDate === key) setEditingReturnDate(""); } else { setVal(todayKST()); } }}
-                    className={`rounded-full px-3 py-1 text-[14px] font-black transition ${on ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}>{label}</button>
-                  {on ? (
-                    editingReturnDate === key ? (
-                      <input type="date" value={clean(val).slice(0, 10)} autoFocus onBlur={() => setEditingReturnDate("")} onChange={(e) => setVal(e.target.value)} className="h-8 rounded-lg border border-line px-2 text-[14px] font-bold text-ink outline-none focus-visible:ring-2 focus-visible:ring-rose-deep" />
-                    ) : (
-                      <button type="button" onClick={() => setEditingReturnDate(key)} className="text-[13px] font-bold text-ink-soft underline">{dateShortKo(val)}</button>
-                    )
-                  ) : null}
-                </span>
-              );
-            })}
-          </div>
-
-          {/* 2-1. 사유 (reason 필드) */}
-          <div className="mb-3">
-            <div className="mb-1 text-[13px] font-black text-ink-mute">{isExchange ? "교환 사유" : "사유"}</div>
-            <div className="flex flex-wrap items-center gap-1.5">
+          {/* [⑯] 사유 · 반품 날짜 — 위치 고정(항상 렌더), 기타면 흐리게 비활성. */}
+          <section className={`mb-4 flex flex-col gap-3 rounded-2xl bg-surface-2 p-4 ${isEtc ? "pointer-events-none select-none opacity-40" : ""}`} aria-disabled={isEtc}>
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-[13px] font-black text-ink-mute">사유 · 반품 날짜</div>
+              <div className="text-[12px] font-bold text-ink-mute">{isEtc ? "기타는 해당 없음" : "상품문제 → 반품비 0원"}</div>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
               {REASON_FAULT_CHIPS.map((c) => (
                 <button key={c.value} type="button"
                   onClick={() => {
                     const next = reasonChip === c.value ? "" : c.value;
                     setReasonChip(next); setReasonDirty(true);
-                    // 상품 문제(사업자 귀책) → 반품비 차감 0으로(전자상거래법 18조). 단순변심/기타/미선택은 차감 유지.
-                    if (next === "상품문제") setDeductAmount(0);
+                    if (next === "상품문제") setDeductAmount(0); // 상품문제(사업자 귀책) → 반품비 차감 0(전자상거래법 18조)
                   }}
-                  className={`rounded-2xl px-3 py-1.5 text-[14px] font-black leading-tight transition ${reasonChip === c.value ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}>
+                  className={`h-10 rounded-xl bg-surface text-[14px] transition ${reasonChip === c.value ? "border-[1.5px] border-rose-deep font-black text-rose-deep" : "border border-line text-ink-soft"}`}>
                   {c.value}
                 </button>
               ))}
             </div>
-          </div>
-          </>
-          ) : null}
+            <div className="grid grid-cols-2 gap-2">
+              {([["req", "반품 접수일", returnRequestedOn, setReturnRequestedOn], ["recv", "물건 도착일", returnReceivedOn, setReturnReceivedOn]] as const).map(([key, label, val, setVal]) => {
+                const on = !!clean(val);
+                return (
+                  <div key={key}>
+                    <div className="mb-1 text-[12px] text-ink-mute">{label}</div>
+                    {editingReturnDate === key ? (
+                      <div className="flex items-center gap-1">
+                        <input type="date" value={clean(val).slice(0, 10)} autoFocus onBlur={() => setEditingReturnDate("")} onChange={(e) => setVal(e.target.value)} className="h-10 min-w-0 flex-1 rounded-xl border border-line px-2 text-[14px] font-bold text-ink outline-none focus-visible:ring-2 focus-visible:ring-rose-deep" />
+                        <button type="button" onClick={() => { setVal(""); setEditingReturnDate(""); }} className="h-10 shrink-0 rounded-xl border border-line px-2 text-[12px] font-bold text-ink-mute">지우기</button>
+                      </div>
+                    ) : (
+                      <button type="button" onClick={() => { if (!on) setVal(todayKST()); else setEditingReturnDate(key); }}
+                        className="h-10 w-full rounded-xl border border-line bg-surface px-3 text-left text-[14px] outline-none focus-visible:ring-2 focus-visible:ring-rose-deep">
+                        {on ? <span className="font-black text-ink">{dateShortKo(val)}</span> : <span className="text-ink-mute">아직 안 옴 · 누르면 오늘</span>}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
 
-          {/* [⑭] 공통 메모 — 모든 유형(기타 포함) 한 번만 렌더(환불·교환 사유 아래, 기타는 상품 아래). */}
-          <div className="mb-3">
-            <div className="mb-1 text-[13px] font-black text-ink-mute">메모 (선택)</div>
-            <textarea value={issueMemo} onChange={(e) => setIssueMemo(e.target.value)} placeholder="예: 사이즈 교환 원함" className="h-16 w-full resize-none rounded-lg border border-line bg-surface p-2 text-[16px] font-bold leading-6 text-ink outline-none focus-visible:ring-2 focus-visible:ring-rose-deep" />
+          {/* [⑭] 공통 메모 — 모든 유형(기타 포함) 한 번만 렌더(환불·교환 사유 아래, 기타는 상품 아래). [⑯] placeholder 유형별. */}
+          <div className="mb-4">
+            <div className="mb-1 text-[13px] font-black text-ink-soft">메모 (선택)</div>
+            <textarea value={issueMemo} onChange={(e) => setIssueMemo(e.target.value)}
+              placeholder={isEtc ? "예: 차콜 XL 미발송, S 1개로 출고 요청" : isExchange ? "예: 오배송 — 베이지 M 으로 재발송" : "예: 사이즈 작아서 반품"}
+              className="h-[72px] w-full resize-none rounded-xl border border-line bg-surface p-3 text-[16px] font-bold leading-6 text-ink outline-none focus-visible:ring-2 focus-visible:ring-rose-deep" />
           </div>
 
           {/* [⑭] 세 번째 덩어리 — 환불·교환은 금액표·계좌·교환옵션, 기타는 안내. */}
@@ -970,11 +971,11 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                 ) : (
                   <div className="rounded-xl border border-line px-3 py-2 text-[13px] font-bold text-ink-mute">환불 없이 기록만 남깁니다(금액 이동 없음).</div>
                 )}
-                {/* [7] 방법 선택 — 계좌이체 · 포인트 · 환불 없음 (카드 건은 카드취소 포함), 현재 것 강조 */}
-                <div className="mt-1 flex flex-wrap gap-3 text-[13px] font-bold">
+                {/* [⑯] 환불 방법 — segmented(밑줄 링크 폐지) */}
+                <div className={`mt-2 grid gap-1 rounded-xl bg-surface-2 p-1 ${isCardOrder ? "grid-cols-4" : "grid-cols-3"}`}>
                   {(isCardOrder ? ["카드취소", "계좌이체", "포인트", "없음"] : ["계좌이체", "포인트", "없음"]).map((mth) => (
-                    <button key={mth} type="button" onClick={() => setMethod(mth)} className={`underline ${method === mth ? "text-rose-deep" : "text-ink-mute"}`}>
-                      {mth === "없음" ? "환불 없음" : mth}
+                    <button key={mth} type="button" onClick={() => setMethod(mth)} className={`h-10 rounded-lg text-[13px] transition ${method === mth ? "bg-surface shadow-sm font-black text-ink" : "text-ink-soft"}`}>
+                      {mth === "없음" ? "환불 없음" : mth === "포인트" ? "포인트로" : mth}
                     </button>
                   ))}
                 </div>
@@ -992,7 +993,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
           {nextActionSaved ? <div className="mb-1 text-[13px] text-ink-mute">다음 할 일: {nextActionSaved}</div> : null}
 
           {isExchange ? (
-            <button type="button" onClick={() => { setIssueType("refund"); setMethod("계좌이체"); }} className="mt-3 text-[13px] font-bold text-ink-mute underline">재고 없으면 → 환불로 바꾸기</button>
+            <div className="mt-3 flex items-center gap-2 text-[13px] font-bold text-ink-mute">재고가 없으면<button type="button" onClick={() => { setIssueType("refund"); setMethod("계좌이체"); }} className="h-9 rounded-lg border border-line px-3 font-black text-rose-deep hover:bg-rose-soft">환불로 바꾸기</button></div>
           ) : null}
           </>
           ) : (
@@ -1002,9 +1003,12 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
 
         {/* 9. 하단 고정 — 「저장」 하나. 완료(이체·취소·지급 등)는 목록 「해결완료」에서 처리. */}
         {saveError ? <div className="border-t border-danger-tx/40 bg-danger-bg px-5 py-2 text-[13px] font-bold text-danger-tx">저장 실패: {saveError}</div> : null}
-        <div className="flex items-center gap-2 border-t border-line px-5 py-3">
+        <div className="flex items-center gap-3 border-t border-line px-6 py-3.5">
           {onDelete && !createMode ? <button type="button" disabled={saving} onClick={onDelete} className="text-[13px] font-bold text-ink-mute underline hover:text-danger-tx disabled:opacity-50">삭제</button> : null}
-          <button type="button" disabled={saving || (!isEtc && !linesLoaded && !!orderCode) || (!isEtc && linesError)} onClick={saveOnly} className="ml-auto h-12 rounded-xl bg-rose-deep px-6 text-[14px] font-black text-white disabled:opacity-50">{saving ? (createMode ? "등록 중…" : "저장 중…") : (createMode ? "등록" : "저장")}</button>
+          {/* [⑯] headerNotice 문구를 버튼 줄 왼쪽으로(없으면 기본 안내). */}
+          <span className="min-w-0 flex-1 truncate text-[12px] text-ink-mute">{headerNotice || "여기서 돈이 나가지 않아요"}</span>
+          <button type="button" onClick={onClose} className="h-12 shrink-0 rounded-xl border border-line px-5 text-[16px] font-black text-ink-soft hover:bg-surface-2">취소</button>
+          <button type="button" disabled={saving || (!isEtc && !linesLoaded && !!orderCode) || (!isEtc && linesError)} onClick={saveOnly} className="h-12 min-w-[132px] shrink-0 rounded-xl bg-rose-deep px-6 text-[16px] font-black text-white disabled:opacity-50">{saving ? (createMode ? "등록 중…" : "저장 중…") : createMode ? (isEtc ? "이슈 등록" : isExchange ? "교환 등록" : "환불 등록") : "저장"}</button>
         </div>
       </div>
     </div>

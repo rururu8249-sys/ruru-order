@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { issueProductSummary } from "@/lib/issueProductLabel";
+import { selectedEligibleAmount } from "@/lib/orderReturnReclaim";
 
 // [2026-08-13 사장님 요청] 반품(환불)/반품(교환) 접수 — 상품 선택식 기록 + 고객이슈 자동 등록 + (환불 시) 적립 포인트 회수.
 //
@@ -60,6 +61,11 @@ export async function POST(request: NextRequest) {
     const selectedRowIds = Array.isArray(body.rowIds)
       ? (body.rowIds as unknown[]).map((v) => num(v)).filter((v) => v > 0)
       : [];
+    // [2026-09-29] {rowId: 고른수량} — 있으면 대상상품 수량·포인트 회수 비율에 반영(없으면 기존과 동일).
+    const rowQty: Record<string, number> | null =
+      body.rowQty && typeof body.rowQty === "object" && !Array.isArray(body.rowQty)
+        ? Object.fromEntries(Object.entries(body.rowQty as Record<string, unknown>).map(([k, v]) => [String(k), num(v)]).filter(([, v]) => (v as number) > 0))
+        : null;
     const detail = text(body.detail).slice(0, 1000);
 
     if (mode !== "refund" && mode !== "exchange" && mode !== "etc") return jsonError("유형(환불/교환/기타)을 선택해주세요.");
@@ -99,7 +105,16 @@ export async function POST(request: NextRequest) {
     const phone = digitsOnly(first.customer_phone);
     const orderNo = text(first.order_lookup_code);
     const modeLabel = mode === "refund" ? "반품(환불)" : mode === "exchange" ? "반품(교환)" : "기타";
-    const productSummary = issueProductSummary(selected as Record<string, unknown>[]);
+    // [2026-09-29] 고른 수량(rowQty)이 있으면 대상상품·raw_payload 수량을 그 값으로(1..원래수량 클램프).
+    const selectedForText = selected.map((r) => {
+      const key = String(r.id ?? "");
+      if (rowQty && rowQty[key]) {
+        const oq = Math.max(1, num(r.qty) || 1);
+        return { ...r, qty: Math.min(oq, Math.max(1, Math.floor(rowQty[key]) || 1)) };
+      }
+      return r;
+    });
+    const productSummary = issueProductSummary(selectedForText as Record<string, unknown>[]);
     const productSummaryText = productSummary || "상품 지정 없음"; // [⑭] 기타 0개면 «상품 지정 없음»(related_product 는 빈 값이면 null 유지)
 
     // ── 1) return_* 기록 (그룹 전체 행에 동일 기록 — 기존 [+기록] 저장과 같은 방식/컬럼)
@@ -148,7 +163,7 @@ export async function POST(request: NextRequest) {
       //   raw_payload 는 이미 있는 jsonb 칸이라 DB 변경이 없다(지금까지 {} 로 비워 두고 있었다).
       //   ⚠ 사진 주소를 «복사해 굳히지» 않는다 — 상품 사진을 바꾸면 이슈에도 최신 사진이 나와야 한다.
       raw_payload: {
-        items: selected.map((r) => ({
+        items: selectedForText.map((r) => ({
           productId: text(r.product_id),
           productName: text(r.product_name),
           color: text(r.color),
@@ -188,7 +203,8 @@ export async function POST(request: NextRequest) {
           const eligible = groupRows.filter((r) => num(r.point_used_amount) === 0);
           const denom = eligible.reduce((s, r) => s + rowProductAmount(r), 0);
           const selectedEligible = selected.filter((r) => num(r.point_used_amount) === 0);
-          const numer = selectedEligible.reduce((s, r) => s + rowProductAmount(r), 0);
+          // [2026-09-29] 2개 중 1개 환불인데 줄 전체로 과다 회수하던 버그 — 고른 수량 비율(rowQty)만큼만. rowQty 없으면 기존과 동일.
+          const numer = selectedEligibleAmount(selectedEligible as Record<string, unknown>[], rowQty, (r) => rowProductAmount(r as OrderRow));
 
           if (denom <= 0 || numer <= 0) {
             reclaimNote = "적립 대상 금액이 없어 회수 0원";

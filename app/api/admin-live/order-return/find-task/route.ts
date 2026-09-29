@@ -29,7 +29,8 @@ export async function GET(request: NextRequest) {
     //   해결 여부는 status="done" 또는 resolved_at 유무로 판단한다.
     const { data, error } = await supabase
       .from("admin_tasks")
-      .select("id, status, created_at, resolved_at")
+      // [⑯ C1] 주문상세에서 «같은 처리창»으로 열 수 있게 task 행 전체(읽기 전용) 포함.
+      .select("id, status, created_at, resolved_at, title, body, task_type, priority, raw_payload, customer_name, customer_nickname")
       .eq("source", "order_return_flow")
       .ilike("body", `%주문번호: ${orderCode}%`)
       .order("created_at", { ascending: false });
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
       const st = clean(t.status).toLowerCase();
       return st !== "deleted" && st !== "done" && !clean(t.resolved_at);
     });
-    // [2026-09-29] 해결완료 연동 — deleted 제외 최신 1건의 해결 여부(주문상세 배지·「반품 취소」 숨김용).
+    // [2026-09-29] 해결완료 연동 — deleted 제외 최신 1건의 해결 여부(주문상세 배지·「반품 취소」 숨김용) + task 원본.
     const latestRow = rows.find((t) => clean(t.status).toLowerCase() !== "deleted") || null;
     const latest = latestRow
       ? {
@@ -48,6 +49,7 @@ export async function GET(request: NextRequest) {
           status: clean(latestRow.status),
           isResolved: clean(latestRow.status).toLowerCase() === "done" || !!clean(latestRow.resolved_at),
           resolvedAt: clean(latestRow.resolved_at),
+          task: latestRow,
         }
       : null;
     return NextResponse.json({ ok: true, taskId: active[0] ? clean(active[0].id) : "", count: active.length, latest });
