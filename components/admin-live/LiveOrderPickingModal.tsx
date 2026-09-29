@@ -460,6 +460,19 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
       // [2026-07-16] 챙김 여부 컬럼용 — 화면과 동일한 체크 집합(pickedIds) 전달
       // [2026-09-20 사장님 요청] 엑셀 줄 순서 = 지금 보는 화면 순서(상품별: 상품→색상→사이즈 / 주문별: ㄱㄴㄷ·시간)
       await exportLiveOrdersForPicking(exportOrders, { filterLabel, rowOrder: viewMode === "batch" ? "product" : sortMode }, pickedIds);
+      // [㉕-C] 물건챙기기 엑셀 기록 — 챙기기 제외·취소 아닌 주문의 picking_list_printed_at 을 «처음 시각»으로만.
+      try {
+        const ids = exportOrders
+          .filter((o) => (o as { excludeFromPicking?: boolean }).excludeFromPicking !== true && clean(o.paymentStatus) !== "canceled")
+          .map((o) => Number(o.id)).filter((n) => Number.isFinite(n) && n > 0);
+        const now = new Date().toISOString();
+        for (let i = 0; i < ids.length; i += 500) {
+          const { error } = await supabase.from("orders").update({ picking_list_printed_at: now }).is("picking_list_printed_at", null).in("id", ids.slice(i, i + 500));
+          if (error) throw error;
+        }
+      } catch {
+        showAdminToast("엑셀은 받았는데 출력 기록 저장에 실패했어요.", "warning");
+      }
     } finally {
       setExporting(false);
     }

@@ -369,6 +369,56 @@ export function deriveLiveOrderMatchKeys(order: LiveOrder) {
   return { orderIds, orderGroupId, expectedAmount };
 }
 
+// [㉕-C] 물건챙기기·출력 상태 판정(표시 전용·pure). picked=②봉투 담음·collected=①모음.
+const PICK_PAID_STATUSES = ["paid", "auto_paid", "manual_paid", "card_paid"];
+function pickStateOf(order: LiveOrder) {
+  let total = 0, got = 0;
+  for (const it of order.items || []) {
+    const q = Number(it.qty) || 0;
+    total += q;
+    if (it.collectedAt || it.pickedAt) got += q;
+  }
+  return { total, got };
+}
+function hasInvoicePrinted(order: LiveOrder) { return (order.items || []).some((it) => Boolean(it.invoicePrintedAt)); }
+function firstInvoicePrintedAt(order: LiveOrder) { for (const it of order.items || []) { if (it.invoicePrintedAt) return it.invoicePrintedAt; } return ""; }
+function hasPickingListPrinted(order: LiveOrder) { return (order.items || []).some((it) => Boolean(it.pickingListPrintedAt)); }
+function firstPickingListPrintedAt(order: LiveOrder) { for (const it of order.items || []) { if (it.pickingListPrintedAt) return it.pickingListPrintedAt; } return ""; }
+function isShippedComplete(order: LiveOrder) { return String((order as { shippingStatus?: unknown }).shippingStatus || "").trim() === "출고완료"; }
+function matchesWorkFilter(order: LiveOrder, wf: string) {
+  if (!PICK_PAID_STATUSES.includes(order.paymentStatus ?? "")) return false; // 작업 현황은 결제완료 기준
+  const shipped = isShippedComplete(order);
+  if (wf === "shipped") return shipped;
+  if (wf === "printed") return hasInvoicePrinted(order) && !shipped;
+  const { total, got } = pickStateOf(order);
+  if (wf === "none") return got === 0;
+  if (wf === "doing") return got > 0 && got < total;
+  if (wf === "done") return total > 0 && got >= total;
+  return true;
+}
+
+// [㉕-C] 작업 칩(표시 전용). 챙김 상태 · 송장출력 · 물건챙기기 엑셀.
+function PickChip({ order }: { order: LiveOrder }) {
+  const { total, got } = pickStateOf(order);
+  if (got >= total && total > 0) {
+    return <span className="inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-ok-bg px-1.5 py-0.5 text-[11px] font-black leading-none text-ok-tx">✓ 챙김</span>;
+  }
+  if (got > 0) {
+    return <span className="inline-flex items-center justify-center whitespace-nowrap rounded-lg px-1.5 py-0.5 text-[11px] font-black leading-none text-rose-deep">챙김 {got}/{total}</span>;
+  }
+  return <span className="inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] font-black leading-none text-ink-mute">안 챙김</span>;
+}
+function InvoiceChip({ order }: { order: LiveOrder }) {
+  if (!hasInvoicePrinted(order)) return null;
+  const at = firstInvoicePrintedAt(order);
+  return <span title={at ? `송장 처음 출력: ${new Date(at).toLocaleString("ko-KR")}` : "송장 출력함"} className="inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-info-bg px-1.5 py-0.5 text-[11px] font-black leading-none text-[var(--color-info-tx)]">🖨 송장출력</span>;
+}
+function PickingListChip({ order }: { order: LiveOrder }) {
+  if (!hasPickingListPrinted(order)) return null;
+  const at = firstPickingListPrintedAt(order);
+  return <span title={at ? `물건챙기기 엑셀: ${new Date(at).toLocaleString("ko-KR")}` : "물건챙기기 엑셀 받음"} className="inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] font-black leading-none text-ink-mute">📄 엑셀</span>;
+}
+
 type Props = {
   orders: LiveOrder[];
   /** [㉕-B] 상태 칩 숫자용 — matchesStatus 만 뺀 목록(상태 필터 걸어도 칩 숫자가 안 무너지게). 없으면 기존 orders 기준. */
@@ -475,6 +525,8 @@ export default function LiveOrderTable({
   const [cartHoldsOpen, setCartHoldsOpen] = useState(false);
 
   const [cancelViewFilter, setCancelViewFilter] = useState<LiveOrderCancelViewFilterValue>("all");
+  // [㉕-C] 작업 현황 줄 필터 — none(안 챙김)/doing(챙기는 중)/done(챙김)/printed(송장출력·미출고)/shipped(택배출고). ""=끄기.
+  const [workFilter, setWorkFilter] = useState<"" | "none" | "doing" | "done" | "printed" | "shipped">("");
 
   // 필터/정렬 변경 시 1페이지로. 단, 첫 마운트(새로고침으로 복원된 페이지)에는 리셋하지 않음.
   const cancelViewMountedRef = useRef(false);
@@ -487,14 +539,14 @@ export default function LiveOrderTable({
   useEffect(() => {
     if (!filterChangeMountedRef.current) { filterChangeMountedRef.current = true; return; }
     setPage(1);
-  }, [filters.broadcast, filters.scope, filters.date, filters.customStartDate, filters.customEndDate, filters.status, filters.keyword, sortMode, pageSize]);
+  }, [filters.broadcast, filters.scope, filters.date, filters.customStartDate, filters.customEndDate, filters.status, filters.keyword, sortMode, pageSize, workFilter]);
 
   // [㉕-B] 필터가 바뀌면 선택 초기화 — 안 보이는 주문이 선택된 채 남아 엉뚱하게 출고 처리되는 사고 방지.
   const selectionResetMountedRef = useRef(false);
   useEffect(() => {
     if (!selectionResetMountedRef.current) { selectionResetMountedRef.current = true; return; }
     setSelectedOrderIds(new Set());
-  }, [filters.broadcast, filters.scope, filters.date, filters.customStartDate, filters.customEndDate, filters.status, filters.keyword]);
+  }, [filters.broadcast, filters.scope, filters.date, filters.customStartDate, filters.customEndDate, filters.status, filters.keyword, workFilter]);
 
   useEffect(() => {
     setPendingKeyword(filters.keyword);
@@ -598,17 +650,42 @@ export default function LiveOrderTable({
 
   const cancelFilteredActiveCount = sortedOrders.filter((order) => order.paymentStatus !== "canceled").length;
 
-  const totalPages = Math.max(1, Math.ceil(cancelViewFilteredOrders.length / pageSize));
+  // [㉕-C] 작업 현황 줄 숫자 — cancelViewFilteredOrders 의 «결제완료» 기준(workFilter 무관·항상 전체).
+  const workCounts = useMemo(() => {
+    const paidList = cancelViewFilteredOrders.filter((o) => PICK_PAID_STATUSES.includes(o.paymentStatus ?? ""));
+    let none = 0, doing = 0, done = 0, printed = 0, shipped = 0;
+    for (const o of paidList) {
+      const shp = isShippedComplete(o);
+      if (shp) shipped++;
+      const { total, got } = pickStateOf(o);
+      if (got === 0) none++;
+      else if (got < total) doing++;
+      else if (total > 0) done++;
+      if (hasInvoicePrinted(o) && !shp) printed++;
+    }
+    return { paid: paidList.length, none, doing, done, printed, shipped };
+  }, [cancelViewFilteredOrders]);
+
+  // [㉕-C] 목록/페이지/엑셀에 쓰는 최종 목록 — workFilter 켜지면 마지막 단계로 한 번만 거른다.
+  const workFilteredOrders = useMemo(
+    () => (workFilter ? cancelViewFilteredOrders.filter((o) => matchesWorkFilter(o, workFilter)) : cancelViewFilteredOrders),
+    [cancelViewFilteredOrders, workFilter]
+  );
+
+  const totalPages = Math.max(1, Math.ceil(workFilteredOrders.length / pageSize));
   const safePage = Math.min(page, totalPages);
-  const visibleOrders = cancelViewFilteredOrders.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const visibleOrders = workFilteredOrders.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const exportableOrders = useMemo(
-    () => cancelViewFilteredOrders.filter((order) => order.paymentStatus !== "canceled"),
-    [cancelViewFilteredOrders]
+    () => workFilteredOrders.filter((order) => order.paymentStatus !== "canceled"),
+    [workFilteredOrders]
   );
   const paidOnlyExportOrders = exportableOrders.filter((order) =>
     ["paid", "auto_paid", "manual_paid", "card_paid"].includes(order.paymentStatus ?? "")
   );
+  // [㉕-C] 송장 «새로 출력» 대상 — 결제완료 중 아직 송장 안 뽑았고 출고완료도 아닌 것.
+  const newInvoiceExportOrders = paidOnlyExportOrders.filter((o) => !hasInvoicePrinted(o) && !isShippedComplete(o));
+  const alreadyPrintedPaidCount = paidOnlyExportOrders.filter((o) => hasInvoicePrinted(o)).length;
 
   const allVisibleSelected = visibleOrders.length > 0 && visibleOrders.every((o) => selectedOrderIds.has(String(o.id)));
   const toggleSelectAll = () => {
@@ -684,6 +761,27 @@ export default function LiveOrderTable({
     const ok = await unmarkShipped(selectedExportOrders);
     if (ok) setSelectedOrderIds(new Set());
   };
+  // [㉕-C] 송장출력 표시만 지운다(주문·입금·출고 상태는 그대로). 재출력은 항상 가능하니 표시만 초기화.
+  const [unmarkingInvoice, setUnmarkingInvoice] = useState(false);
+  const handleUnmarkInvoice = async () => {
+    const targets = selectedExportOrders;
+    if (targets.length === 0) return;
+    if (!(await showAdminConfirm(`선택한 ${targets.length}건의 송장출력 표시를 지울까요?\n(주문·입금·출고 상태는 그대로예요)`))) return;
+    setUnmarkingInvoice(true);
+    try {
+      const ids = targets.map((o) => Number(o.id)).filter((n) => Number.isFinite(n) && n > 0);
+      for (let i = 0; i < ids.length; i += 500) {
+        const { error } = await supabase.from("orders").update({ invoice_printed_at: null }).in("id", ids.slice(i, i + 500));
+        if (error) throw error;
+      }
+      setSelectedOrderIds(new Set());
+      void onRefresh?.();
+    } catch (e: any) {
+      showAdminToast("송장출력 표시 지우기에 실패했어요\n\n" + (e?.message || e), "error");
+    } finally {
+      setUnmarkingInvoice(false);
+    }
+  };
 
 
   const currentFilterLabel = useMemo(() => {
@@ -738,6 +836,18 @@ export default function LiveOrderTable({
     try {
       if (kind === "rozen") {
         await exportLiveOrdersForRosen(orders, { filterLabel });
+        // [㉕-C] 송장 출력 기록 — 송장제외 아닌 주문의 invoice_printed_at 을 «처음 출력 시각»으로만 채운다(재출력 막지 않음).
+        try {
+          const ids = orders.filter((o) => o.excludeFromShipping !== true).map((o) => Number(o.id)).filter((n) => Number.isFinite(n) && n > 0);
+          const now = new Date().toISOString();
+          for (let i = 0; i < ids.length; i += 500) {
+            const { error } = await supabase.from("orders").update({ invoice_printed_at: now }).is("invoice_printed_at", null).in("id", ids.slice(i, i + 500));
+            if (error) throw error;
+          }
+          if (ids.length > 0) void onRefresh?.();
+        } catch {
+          showAdminToast("송장은 받았는데 출력 기록 저장에 실패했어요.", "warning");
+        }
       } else {
         await exportLiveOrdersForPicking(orders, { filterLabel });
       }
@@ -764,13 +874,29 @@ export default function LiveOrderTable({
             <div style={{ fontSize: "14px" }}>✅ 돈 받은 것(결제완료): <b style={{ color: "var(--color-ok-tx)", fontSize: "16px" }}>{paidOnlyExportOrders.length.toLocaleString("ko-KR")}건</b></div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            {/* 기본 추천: 결제완료만 — 크게/녹색/맨 위 */}
+            {/* [㉕-C] 송장 출력만: 맨 위 기본 = 아직 안 뽑은 결제완료. 그 아래 테두리 = 이미 뽑은 것까지 모두 다시. */}
+            {exportConfirm === "rozen" ? (
+              <button type="button"
+                disabled={newInvoiceExportOrders.length === 0}
+                onClick={() => { setExportConfirm(""); void runExport("rozen", newInvoiceExportOrders, "새로 출력"); }}
+                style={{ padding: "12px 16px", borderRadius: "8px", border: "none", background: "var(--color-ok-tx)", color: "#fff", fontWeight: 800, cursor: newInvoiceExportOrders.length === 0 ? "default" : "pointer", fontSize: "14px", opacity: newInvoiceExportOrders.length === 0 ? 0.4 : 1, textAlign: "left" }}>
+                ✅ 새로 출력 (아직 안 뽑은 결제완료 {newInvoiceExportOrders.length.toLocaleString("ko-KR")}건)
+                <div style={{ fontSize: "11px", fontWeight: 600, opacity: 0.85, marginTop: "2px" }}>이미 출력했거나 출고완료된 건은 빼요</div>
+              </button>
+            ) : null}
+
+            {/* 결제완료 전체 — rozen 에선 «다시 출력»(테두리), picking 에선 기본 추천(녹색/맨 위) */}
             <button type="button"
               disabled={paidOnlyExportOrders.length === 0}
               onClick={() => { const kind = exportConfirm as "rozen" | "picking"; setExportConfirm(""); void runExport(kind, paidOnlyExportOrders, "결제완료"); }}
-              style={{ padding: "12px 16px", borderRadius: "8px", border: "none", background: "var(--color-ok-tx)", color: "#fff", fontWeight: 800, cursor: paidOnlyExportOrders.length === 0 ? "default" : "pointer", fontSize: "14px", opacity: paidOnlyExportOrders.length === 0 ? 0.4 : 1, textAlign: "left" }}>
-              ✅ 돈 받은 것만 출력 ({paidOnlyExportOrders.length.toLocaleString("ko-KR")}건)
-              <div style={{ fontSize: "11px", fontWeight: 600, opacity: 0.85, marginTop: "2px" }}>입금확인·카드결제 완료분만</div>
+              style={exportConfirm === "rozen"
+                ? { padding: "8px 16px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontWeight: 800, cursor: paidOnlyExportOrders.length === 0 ? "default" : "pointer", fontSize: "14px", opacity: paidOnlyExportOrders.length === 0 ? 0.4 : 1, textAlign: "left" }
+                : { padding: "12px 16px", borderRadius: "8px", border: "none", background: "var(--color-ok-tx)", color: "#fff", fontWeight: 800, cursor: paidOnlyExportOrders.length === 0 ? "default" : "pointer", fontSize: "14px", opacity: paidOnlyExportOrders.length === 0 ? 0.4 : 1, textAlign: "left" }}>
+              {exportConfirm === "rozen"
+                ? <>이미 출력한 {alreadyPrintedPaidCount.toLocaleString("ko-KR")}건까지 모두 다시 출력 (결제완료 {paidOnlyExportOrders.length.toLocaleString("ko-KR")}건)
+                    <div style={{ fontSize: "11px", fontWeight: 600, opacity: 0.85, marginTop: "2px" }}>이미 출력한 {alreadyPrintedPaidCount.toLocaleString("ko-KR")}건도 다시 나와요</div></>
+                : <>✅ 돈 받은 것만 출력 ({paidOnlyExportOrders.length.toLocaleString("ko-KR")}건)
+                    <div style={{ fontSize: "11px", fontWeight: 600, opacity: 0.85, marginTop: "2px" }}>입금확인·카드결제 완료분만</div></>}
             </button>
 
             {selectedExportOrders.length > 0 ? (
@@ -885,6 +1011,15 @@ export default function LiveOrderTable({
                 title="잘못 누른 택배출고를 해제합니다 (출고대기로 되돌림)"
               >
                 {shippedSaving === "unship" ? "해제중..." : "↩ 택배출고 해제"}
+              </button>
+              <button
+                type="button"
+                onClick={handleUnmarkInvoice}
+                disabled={unmarkingInvoice}
+                className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
+                title="선택한 주문의 송장출력 표시만 지웁니다 (주문·입금·출고 상태는 그대로). 재출력은 항상 가능해요."
+              >
+                {unmarkingInvoice ? "지우는중..." : "🖨 송장출력 해제"}
               </button>
             </>
           )}
@@ -1060,6 +1195,31 @@ export default function LiveOrderTable({
         </div>
       </div>
 
+      {/* [㉕-C] 작업 현황 줄 — 결제완료 기준 챙김/송장출력/출고 진행. 숫자 누르면 그 상태만 걸러 보기(토글). */}
+      <div className="mb-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-xl bg-surface-2 px-3 py-2 text-[12px] font-black text-ink-soft">
+        <span className="text-ink-mute">작업 현황</span>
+        <span>결제완료 {workCounts.paid.toLocaleString()}</span>
+        {([
+          ["안 챙김", workCounts.none, "none"],
+          ["챙기는 중", workCounts.doing, "doing"],
+          ["✓ 챙김", workCounts.done, "done"],
+          ["🖨 송장출력", workCounts.printed, "printed"],
+          ["택배출고", workCounts.shipped, "shipped"],
+        ] as [string, number, "none" | "doing" | "done" | "printed" | "shipped"][]).map(([label, n, key]) => (
+          <Fragment key={key}>
+            <span className="text-ink-mute">│</span>
+            <button
+              type="button"
+              onClick={() => setWorkFilter((prev) => (prev === key ? "" : key))}
+              className={`rounded-lg px-1.5 py-0.5 ${workFilter === key ? "bg-rose-deep text-white" : "hover:bg-line/40"}`}
+            >
+              {label} {n.toLocaleString()}{workFilter === key ? " ✕ 해제" : ""}
+            </button>
+          </Fragment>
+        ))}
+        {workFilter === "printed" ? <span className="text-ink-mute">· 전체 선택 → 📦 택배출고 처리로 한 번에 바꿀 수 있어요</span> : null}
+      </div>
+
       {/* [2026-09-08] h-[1180px] 고정 → 부모가 준 높이를 채운다. 창 크기·모니터가 달라도 항상 맞음 */}
       <div className="ru-screen-scroll rounded-xl border border-line">
             {/* 헤더 행 (모바일 카드형에선 숨김) */}
@@ -1067,7 +1227,7 @@ export default function LiveOrderTable({
             /* [2026-08-29] 방송 중 아래로 스크롤하면 제목줄이 사라져 어느 칸이 금액인지 헷갈리던 문제.
                제목줄을 맨 위에 고정한다. 배경을 불투명으로 바꿔야 주문 행이 비쳐 보이지 않는다.
                표시 전용 — 주문·금액·입금 데이터와 무관. */
-            <div className="sticky top-0 z-20 grid min-w-[1000px] grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 border-b border-rose-line bg-rose-soft text-[12px] font-black text-ink-soft shadow-sm">
+            <div className="sticky top-0 z-20 grid min-w-[1000px] grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_88px] gap-0 border-b border-rose-line bg-rose-soft text-[12px] font-black text-ink-soft shadow-sm">
               <span className="flex items-center justify-center py-2.5">
                 <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} className="h-4 w-4 cursor-pointer accent-[var(--color-rose-deep)]" />
               </span>
@@ -1081,7 +1241,7 @@ export default function LiveOrderTable({
               <span className="whitespace-nowrap px-3 py-2.5 text-right">택배비</span>
               <span className="whitespace-nowrap px-3 py-2.5 text-right">총금액</span>
               <span className="whitespace-nowrap px-3 py-2.5 text-center">입금</span>
-              <span className="whitespace-nowrap px-3 py-2.5 text-center">출고</span>
+              <span className="whitespace-nowrap px-3 py-2.5 text-center">작업</span>
             </div>
             )}
 
@@ -1131,6 +1291,8 @@ export default function LiveOrderTable({
                               style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "2px 8px", cursor: "pointer" }}>
                               📋 주문서 복사
                             </button>
+                            <PickChip order={order} />
+                            <InvoiceChip order={order} />
                             {(order as any).shippingStatus ? (
                               <span className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg px-1.5 py-0.5 text-[11px] font-black leading-none ${String((order as any).shippingStatus) === "출고완료" ? "bg-info-bg text-[var(--color-info-tx)]" : "bg-surface-2 text-ink-soft"}`}>{shippingStatusLabel((order as any).shippingStatus)}</span>
                             ) : null}
@@ -1146,7 +1308,7 @@ export default function LiveOrderTable({
                   return (
                     <Fragment key={order.id}>
                     <div
-                      className={`grid min-w-[1000px] grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_68px] gap-0 items-start text-[14px] transition ${selected ? "bg-rose-soft/70" : "hover:bg-surface-2"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}
+                      className={`grid min-w-[1000px] grid-cols-[36px_108px_130px_90px_minmax(0,1fr)_48px_96px_72px_96px_116px_88px] gap-0 items-start text-[14px] transition ${selected ? "bg-rose-soft/70" : "hover:bg-surface-2"} ${order.paymentStatus === "manual_match_needed" ? "border-l-2 border-rose-deep" : ""}`}
                     >
                       {/* 0. 선택 체크박스 */}
                       <div className="flex items-center justify-center py-3" onClick={(e) => e.stopPropagation()}>
@@ -1239,8 +1401,11 @@ export default function LiveOrderTable({
                           </button>
                         ) : null}
                       </div>
-                      {/* 9. 출고 */}
-                      <div className="px-1 py-3 text-center">
+                      {/* 9. 작업 — 챙김 / 송장출력 / 엑셀 / 출고 */}
+                      <div className="flex flex-col items-center gap-1 px-1 py-3 text-center">
+                        <PickChip order={order} />
+                        <InvoiceChip order={order} />
+                        <PickingListChip order={order} />
                         {(order as any).shippingStatus ? (
                           <span
                             className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg px-1.5 py-0.5 text-[11px] font-black leading-none ${

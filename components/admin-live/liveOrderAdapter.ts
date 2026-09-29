@@ -260,6 +260,11 @@ function buildItem(row: OrderRow): LiveOrderItem {
     productEditCount: editCounts.productEditCount,
     amountEditCount: editCounts.amountEditCount,
     changeHistory,
+    // [㉕-C] 물건챙기기·출력 기록(표시 전용).
+    pickedAt: (row as Record<string, unknown>).picked_at as string | null ?? null,
+    collectedAt: (row as Record<string, unknown>).collected_at as string | null ?? null,
+    invoicePrintedAt: (row as Record<string, unknown>).invoice_printed_at as string | null ?? null,
+    pickingListPrintedAt: (row as Record<string, unknown>).picking_list_printed_at as string | null ?? null,
   };
 }
 
