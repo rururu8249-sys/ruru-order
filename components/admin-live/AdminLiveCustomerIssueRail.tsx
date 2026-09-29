@@ -12,7 +12,7 @@ import { CUSTOMER_TERMS } from "./adminLiveCustomerTerms";
 import { formatKoreanPhone } from "@/lib/order/phone";
 import { supabase } from "@/lib/supabase";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
-import { pickIssueProductRows } from "@/lib/issueProductLabel";
+import { pickIssueProductRows, issueProductSummary } from "@/lib/issueProductLabel";
 import { RefundProcessModal, type LedgerDetail } from "./AdminLiveRefundLedgerPanel";
 import IssueRegisterModal, { type IssueRegisterSubmit } from "./IssueRegisterModal";
 import { productSnapshotFromItems, ledgerSummaryLine, pickPrimaryLedger, restoreSelectionFromSnapshot, listAmountParts, dateShortLabel, returnStagePrefix } from "@/lib/refundLedger";
@@ -1492,12 +1492,26 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
   // [②] 고객이슈(admin-tasks) 유형·메모 저장 — 「처리」 창의 「저장」이 호출. 성공 여부 반환(창은 안 닫음).
   //   ⚠ 메타줄(전화번호·주문번호·대상상품·닉네임…) 보존 — body 통째 덮어쓰기 금지(mergeIssueBody).
-  const patchIssueFields = async (task: AdminIssueTask, issueTypeKey: string, memoRaw: string): Promise<boolean> => {
+  const patchIssueFields = async (
+    task: AdminIssueTask,
+    issueTypeKey: string,
+    memoRaw: string,
+    items?: Array<{ productId: string; productName: string; color: string; size: string; qty: number }>,
+  ): Promise<boolean> => {
     const id = clean(task.id);
     if (!id) { showAdminToast("고객이슈 ID가 없습니다.", "error"); return false; }
     const memo = cleanMultiline(memoRaw);
     const issueTypes = [issueTypeKey || "general"];
-    const nextBody = mergeIssueBody(splitIssueBody(cleanMultiline(task.body)).metaLines, memo);
+    // [⑭] 기타 처리에서 선택 상품이 넘어오면 「대상상품:」 메타줄을 새로 쓰고 raw_payload.items 도 갱신. 없으면 기존과 동일.
+    const baseMeta = splitIssueBody(cleanMultiline(task.body)).metaLines;
+    let metaLines = baseMeta;
+    let rawExtra: Record<string, unknown> = {};
+    if (items) {
+      const summary = items.length ? issueProductSummary(items.map((i) => ({ product_name: i.productName, color: i.color, size: i.size, qty: i.qty }))) : "상품 지정 없음";
+      metaLines = baseMeta.filter((l) => !l.startsWith("대상상품:")).concat(`대상상품: ${summary}`);
+      rawExtra = { items: items.map((i) => ({ productId: i.productId, productName: i.productName, color: i.color, size: i.size, qty: i.qty })) };
+    }
+    const nextBody = mergeIssueBody(metaLines, memo);
     try {
       const response = await fetch("/api/admin-v2/admin-tasks", {
         method: "PATCH",
@@ -1514,6 +1528,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
             issue_types: issueTypes,
             memo,
             edited_from: "admin-live-customers",
+            ...rawExtra,
           },
         }),
       });
@@ -1753,9 +1768,9 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           repIssueDate={refundModalMeta.repDate}
           issueTypesInitial={processTask ? getIssueTypes(processTask) : []}
           issueBodyMemo={processTask ? getFullMemo(processTask) : ""}
-          onSaveIssue={processTask ? async ({ issueType, memo }) => {
+          onSaveIssue={processTask ? async ({ issueType, memo, items }) => {
             const key = issueType === "refund" ? "refund" : issueType === "exchange" ? "exchange" : "general";
-            return patchIssueFields(processTask, key, memo);
+            return patchIssueFields(processTask, key, memo, items);
           } : undefined}
           onDelete={processTask ? () => { const t = processTask; setRefundModalItem(null); setProcessTask(null); void deleteIssueTask(t); } : undefined}
           onClose={() => { setRefundModalItem(null); setProcessTask(null); }}

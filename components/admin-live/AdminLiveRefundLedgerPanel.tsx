@@ -369,7 +369,7 @@ export default function AdminLiveRefundLedgerPanel({ focusTaskId }: { focusTaskI
 }
 
 // ── 시안 ③ 처리 창 ──
-export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssue = false, repIssueDate = "", issueTypesInitial = [], issueBodyMemo = "", onSaveIssue, onDelete, createMode = false, earnedPoints = 0, onCreateIssue }: { item: LedgerDetail; onClose: () => void; onSaved: () => void; openedFromOtherIssue?: boolean; repIssueDate?: string; issueTypesInitial?: string[]; issueBodyMemo?: string; onSaveIssue?: (d: { issueType: "refund" | "exchange" | "etc"; memo: string }) => Promise<boolean>; onDelete?: () => void; createMode?: boolean; earnedPoints?: number; onCreateIssue?: (d: { issueType: "refund" | "exchange" | "etc"; memo: string; selectedRowIds: number[] }) => Promise<{ taskId: string } | null> }) {
+export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssue = false, repIssueDate = "", issueTypesInitial = [], issueBodyMemo = "", onSaveIssue, onDelete, createMode = false, earnedPoints = 0, onCreateIssue }: { item: LedgerDetail; onClose: () => void; onSaved: () => void; openedFromOtherIssue?: boolean; repIssueDate?: string; issueTypesInitial?: string[]; issueBodyMemo?: string; onSaveIssue?: (d: { issueType: "refund" | "exchange" | "etc"; memo: string; items?: Array<{ productId: string; productName: string; color: string; size: string; qty: number }> }) => Promise<boolean>; onDelete?: () => void; createMode?: boolean; earnedPoints?: number; onCreateIssue?: (d: { issueType: "refund" | "exchange" | "etc"; memo: string; selectedRowIds: number[] }) => Promise<{ taskId: string } | null> }) {
   const orderCode = clean(item.order_lookup_code);
   // [2026-09-27 ②] 유형 칩(환불/교환/기타) — 이 하나가 kind·하단 전환을 정한다. 기타는 하단 없음(admin-tasks 만 저장).
   const initIssueType: "refund" | "exchange" | "etc" = (() => {
@@ -634,7 +634,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
     // [⑬ 초안 모드] 주문상세 「+ 고객이슈 등록」 — order-return 으로 이슈 생성(포인트 회수 규칙은 서버가), 받은 taskId 로 환불 기록 연결.
     if (createMode) {
       const ids = lines.filter((l) => (sel[l.id] || 0) > 0).map((l) => Number(l.id)).filter((n) => n > 0);
-      if (ids.length === 0) { showAdminToast("대상 상품을 1개 이상 선택해주세요.", "warning"); return; }
+      if (!isEtc && ids.length === 0) { showAdminToast("대상 상품을 1개 이상 선택해주세요.", "warning"); return; } // [⑭] 기타는 0개 허용
       setSaving(true);
       const created = await onCreateIssue?.({ issueType, memo: issueMemo, selectedRowIds: ids });
       setSaving(false);
@@ -645,8 +645,12 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
       showAdminToast("등록됐어요", "success"); onSaved(); return;
     }
     // 1) 고객이슈(admin-tasks) 저장 — 기존 수정 경로(메타줄 보존). 호출은 rail 이 넘긴 onSaveIssue.
+    //   [⑭] 기타는 선택 상품을 대상상품으로 저장(환불·교환은 refund-ledger 가 담당 → items 안 넘김).
     if (onSaveIssue) {
-      const okIssue = await onSaveIssue({ issueType, memo: issueMemo });
+      const items = isEtc
+        ? lines.filter((l) => (sel[l.id] || 0) > 0).map((l) => ({ productId: String(l.product_id ?? ""), productName: l.product_name, color: l.color || "", size: l.size || "", qty: sel[l.id] }))
+        : undefined;
+      const okIssue = await onSaveIssue({ issueType, memo: issueMemo, items });
       if (!okIssue) { setSaveError("고객이슈 저장에 실패했어요. 다시 시도해 주세요."); showAdminToast("고객이슈 저장 실패", "error"); return; }
     }
     // 2) 기타면 환불 기록은 만들지도 바꾸지도 않는다(💳 은 유형이 general 이라 목록에서 자동 숨김).
@@ -725,24 +729,24 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
             <div className="mb-1 text-[13px] font-black text-ink-mute">유형</div>
             <div className="flex flex-wrap items-center gap-1.5">
               {(["refund", "exchange", "etc"] as const).map((t) => (
-                <button key={t} type="button" onClick={() => { setIssueType(t); if (t === "exchange") setMethod("교환재발송"); else if (t === "refund" && (method === "교환재발송" || method === "없음")) setMethod("계좌이체"); }}
+                <button key={t} type="button" onClick={() => {
+                    setIssueType(t);
+                    // [⑭] 기타로 바꾸면 선택 비움(관련 상품은 «선택»). 환불·교환으로 바꿀 때 선택이 0개면 전체 체크(반품 기본).
+                    if (t === "etc") setSel({});
+                    else if (!lines.some((l) => (sel[l.id] || 0) > 0)) setSel(Object.fromEntries(lines.map((l) => [String(l.id), Math.max(1, Number(l.qty) || 1)])));
+                    if (t === "exchange") setMethod("교환재발송"); else if (t === "refund" && (method === "교환재발송" || method === "없음")) setMethod("계좌이체");
+                  }}
                   className={`rounded-xl px-3 py-1.5 text-[14px] font-black transition ${issueType === t ? (t === "refund" ? "bg-rose-deep text-white" : "bg-[var(--color-ink-soft)] text-white") : "border border-line bg-surface text-ink-mute hover:bg-surface-2"}`}>
                   {t === "refund" ? "환불" : t === "exchange" ? "교환" : "기타"}
                 </button>
               ))}
             </div>
-            {/* [C2] 기타는 사유가 없으니 메모를 유형 칩 아래에 둔다. 환불·교환은 사유 칩 아래(아래쪽)에 렌더. */}
-            {isEtc ? (
-              <div className="mt-2">
-                <div className="mb-1 text-[13px] font-black text-ink-mute">메모 (선택)</div>
-                <textarea value={issueMemo} onChange={(e) => setIssueMemo(e.target.value)} placeholder="예: 사이즈 교환 원함" className="h-16 w-full resize-none rounded-lg border border-line bg-surface p-2 text-[16px] font-bold leading-6 text-ink outline-none focus-visible:ring-2 focus-visible:ring-rose-deep" />
-              </div>
-            ) : null}
           </div>
 
           {/* 2. 상품 */}
           <div className="mb-3">
-            <div className="mb-1 text-[13px] font-black text-ink-mute">{isExchange ? "교환 대상 상품" : "돌려받을 상품"}</div>
+            {/* [⑭] 기타는 「관련 상품 (선택)」·없으면 비워두기. 환불=돌려받을 상품 / 교환=교환 대상 상품. */}
+            <div className="mb-1 text-[13px] font-black text-ink-mute">{isExchange ? "교환 대상 상품" : isEtc ? "관련 상품 (선택)" : "돌려받을 상품"}{isEtc ? <span className="ml-1 text-[12px] font-bold text-ink-mute">없으면 비워두세요</span> : null}</div>
             {!linesLoaded ? (
               <div className="rounded-xl border border-line p-4 text-center text-[13px] font-bold text-ink-mute">주문 상품 불러오는 중…</div>
             ) : linesError ? (
@@ -766,18 +770,20 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
               <div className="rounded-xl border border-line">
                 {lines.map((l) => {
                   const picked = sel[l.id] || 0;
-                  const on = lines.length === 1 ? true : picked > 0;
+                  // [⑭] 기타는 상품이 1개여도 «선택»(체크박스·토글 노출·기본 미선택). 환불·교환은 1개면 항상 선택.
+                  const multi = lines.length > 1 || isEtc;
+                  const on = multi ? picked > 0 : true;
                   const lineShown = on ? (picked === l.qty ? l.lineTotal : l.unit * picked) : l.lineTotal; // 체크 안 돼도 줄금액 표시(회색)
                   return (
                     <div key={l.id} className="flex items-center gap-2 border-b border-line last:border-b-0">
                       {/* [A3] 체크·사진·이름 전체가 «이 줄» 토글 버튼(44px+) — 다른 줄에 영향 없음 */}
                       <button
                         type="button"
-                        onClick={lines.length > 1 ? () => setQty(l.id, on ? 0 : l.qty, l.qty) : undefined}
-                        aria-label={lines.length > 1 ? "이 상품 선택" : undefined}
-                        className={`flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left outline-none ${lines.length > 1 ? "focus-visible:ring-2 focus-visible:ring-rose-deep" : "cursor-default"}`}
+                        onClick={multi ? () => setQty(l.id, on ? 0 : l.qty, l.qty) : undefined}
+                        aria-label={multi ? "이 상품 선택" : undefined}
+                        className={`flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left outline-none ${multi ? "focus-visible:ring-2 focus-visible:ring-rose-deep" : "cursor-default"}`}
                       >
-                        {lines.length > 1 ? (
+                        {multi ? (
                           <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[13px] ${on ? "border-rose-deep bg-rose-deep text-white" : "border-line bg-surface text-transparent"}`}>✓</span>
                         ) : null}
                         {l.photo ? (
@@ -789,7 +795,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                           <span className="block truncate text-[13px] text-ink-mute">{optLabel(l.color, l.size) || l.product_name}{l.qty >= 2 ? ` × ${l.qty}` : ""}</span>
                         </span>
                       </button>
-                      {lines.length > 1 && l.qty > 1 && on ? (
+                      {multi && l.qty > 1 && on ? (
                         <div className="flex shrink-0 items-center gap-1">
                           <button type="button" onClick={() => setQty(l.id, picked - 1, l.qty)} className="h-8 w-8 rounded-lg border border-line text-[14px] font-black text-ink-soft">−</button>
                           <span className="w-6 text-center text-[14px] font-black text-ink">{picked}</span>
@@ -854,13 +860,19 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                 </button>
               ))}
             </div>
-            {/* [C2] 환불·교환 메모는 사유 칩 바로 아래(입력은 하나·issueMemo). [E] 라벨+textarea 로 등록창과 통일. */}
-            <div className="mt-2">
-              <div className="mb-1 text-[13px] font-black text-ink-mute">메모 (선택)</div>
-              <textarea value={issueMemo} onChange={(e) => setIssueMemo(e.target.value)} placeholder="예: 사이즈 교환 원함" className="h-16 w-full resize-none rounded-lg border border-line bg-surface p-2 text-[16px] font-bold leading-6 text-ink outline-none focus-visible:ring-2 focus-visible:ring-rose-deep" />
-            </div>
+          </div>
+          </>
+          ) : null}
+
+          {/* [⑭] 공통 메모 — 모든 유형(기타 포함) 한 번만 렌더(환불·교환 사유 아래, 기타는 상품 아래). */}
+          <div className="mb-3">
+            <div className="mb-1 text-[13px] font-black text-ink-mute">메모 (선택)</div>
+            <textarea value={issueMemo} onChange={(e) => setIssueMemo(e.target.value)} placeholder="예: 사이즈 교환 원함" className="h-16 w-full resize-none rounded-lg border border-line bg-surface p-2 text-[16px] font-bold leading-6 text-ink outline-none focus-visible:ring-2 focus-visible:ring-rose-deep" />
           </div>
 
+          {/* [⑭] 세 번째 덩어리 — 환불·교환은 금액표·계좌·교환옵션, 기타는 안내. */}
+          {!isEtc ? (
+          <>
           {/* [⑬ D] 등록 초안 + 환불 + 선택 있음 + 적립>0 일 때만 — 서버 order-return 안분 규칙(선택÷전체×적립)과 같은 식(표시 전용). */}
           {createMode && !isExchange && earnedPoints > 0 && selectedCount > 0 ? (
             <div className="mb-3 rounded-lg bg-rose-soft px-3 py-2 text-[12px] font-bold text-rose-deep">

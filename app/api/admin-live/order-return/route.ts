@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
 
     if (mode !== "refund" && mode !== "exchange" && mode !== "etc") return jsonError("유형(환불/교환/기타)을 선택해주세요.");
     if (!refRowId) return jsonError("기준 주문 행이 없습니다.");
-    if (selectedRowIds.length === 0) return jsonError("반품할 상품을 1개 이상 선택해주세요.");
+    if (mode !== "etc" && selectedRowIds.length === 0) return jsonError("반품할 상품을 1개 이상 선택해주세요."); // [⑭] 기타는 0개 허용
 
     const sb = admin();
 
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
 
     const groupRowIds = new Set(groupRows.map((r) => num(r.id)));
     const selected = groupRows.filter((r) => selectedRowIds.includes(num(r.id)));
-    if (selected.length === 0 || !selectedRowIds.every((id) => groupRowIds.has(id))) {
+    if ((mode !== "etc" && selected.length === 0) || !selectedRowIds.every((id) => groupRowIds.has(id))) {
       return jsonError("선택한 상품이 이 주문그룹의 상품과 일치하지 않습니다.");
     }
 
@@ -100,9 +100,10 @@ export async function POST(request: NextRequest) {
     const orderNo = text(first.order_lookup_code);
     const modeLabel = mode === "refund" ? "반품(환불)" : mode === "exchange" ? "반품(교환)" : "기타";
     const productSummary = issueProductSummary(selected as Record<string, unknown>[]);
+    const productSummaryText = productSummary || "상품 지정 없음"; // [⑭] 기타 0개면 «상품 지정 없음»(related_product 는 빈 값이면 null 유지)
 
     // ── 1) return_* 기록 (그룹 전체 행에 동일 기록 — 기존 [+기록] 저장과 같은 방식/컬럼)
-    const reasonText = [`[${modeLabel}] 대상: ${productSummary}`, detail ? `세부: ${detail}` : ""]
+    const reasonText = [`[${modeLabel}] 대상: ${productSummaryText}`, detail ? `세부: ${detail}` : ""]
       .filter(Boolean)
       .join("\n");
     const { error: retErr } = await sb
@@ -125,7 +126,7 @@ export async function POST(request: NextRequest) {
       `이름: ${nm || "-"}`,
       `전화번호: ${phone || "-"}`,
       orderNo ? `주문번호: ${orderNo}` : "",
-      `대상상품: ${productSummary}`,
+      `대상상품: ${productSummaryText}`,
       "",
       detail || modeLabel,
     ]

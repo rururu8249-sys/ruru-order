@@ -96,4 +96,15 @@ const BODY = [
   assert.equal(splitIssueBody(metaOnly).memo, "", "메타줄만 있는 body → memo 빈칸(자동날짜 새지 않음)");
 }
 
-console.log("✅ test-issue-body-meta — 수정해도 전화번호·닉네임·이름이 보존됨 + 여러 줄 메모 유지 + 메타줄만이면 memo 빈칸");
+// [2026-09-29 ⑭] 기타 처리에서 대상상품 줄을 교체해도 «대상상품:» 줄은 1개만 남는다(중복 안 쌓임).
+{
+  const { metaLines } = splitIssueBody(BODY);
+  const nextMeta = metaLines.filter((l) => !l.startsWith("대상상품:")).concat("대상상품: 새상품(블랙/L)×1");
+  const saved = mergeIssueBody(nextMeta, "기타 처리 메모");
+  const targetLines = saved.split("\n").filter((l) => l.startsWith("대상상품:"));
+  assert.equal(targetLines.length, 1, "대상상품 줄은 1개만");
+  assert.equal(targetLines[0], "대상상품: 새상품(블랙/L)×1", "새 대상상품으로 교체됨");
+  assert.ok(saved.split("\n").some((l) => l.startsWith("전화번호:")), "다른 메타(전화번호)는 보존");
+}
+
+console.log("✅ test-issue-body-meta — 수정해도 전화번호·닉네임·이름이 보존됨 + 여러 줄 메모 유지 + 메타줄만이면 memo 빈칸 + 대상상품 줄 교체");
