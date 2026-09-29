@@ -8,7 +8,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 import { splitIssueBody } from "@/lib/issueBodyMeta";
-import { patchIssueTask } from "@/lib/issueTaskPatch";
+import { patchIssueTask, type IssueExtraItem } from "@/lib/issueTaskPatch";
 import { CUSTOMER_TERMS } from "./adminLiveCustomerTerms";
 import { formatKoreanPhone } from "@/lib/order/phone";
 import { supabase } from "@/lib/supabase";
@@ -425,6 +425,8 @@ function IssueCard({
   const phone = formatPhone(getPhone(task));
   const orderNo = extractBodyField(task, "주문번호:");
   const product = extractBodyField(task, "대상상품:") || clean(task.related_product);
+  // [⑱ D] 기타 이슈에 따로 추가한 관련 상품(있으면 「➕ 추가:」 한 줄).
+  const extra = extractBodyField(task, "추가상품:");
   // [2026-09-23 사장님] 「고객 이슈 들어가면 내용이 다 안보임 수정 눌러야만 전체 내용 확인 가능」
   //   원인은 칸 폭이나 줄 제한이 아니라 «읽는 함수»였다. getIssueText 는 본문을 줄로 쪼갠 뒤
   //   첫 줄 하나만 돌려준다(212~230행). 그래서 「불량 교환 완료 / 반품택배 미도착」의 둘째 줄이
@@ -561,6 +563,13 @@ function IssueCard({
               <span className="min-w-0 truncate font-black text-ink" title={product}>{product}</span>
             </div>
           ) : null}
+          {/* [⑱ D] ➕ 추가 상품 1줄(truncate) */}
+          {extra ? (
+            <div className="mt-0.5 flex min-w-0 items-baseline gap-1.5">
+              <span className="shrink-0" aria-hidden>➕</span>
+              <span className="min-w-0 truncate font-bold text-ink-soft" title={extra}>추가: {extra}</span>
+            </div>
+          ) : null}
           {/* 💬 메모 2줄 clamp + 넘치면 「…더보기」(처리창) */}
           {memoShown ? (
             <div className="mt-0.5 flex min-w-0 items-start gap-1.5">
@@ -580,7 +589,7 @@ function IssueCard({
               <span className="min-w-0 truncate font-black text-info-tx" title={ledgerLine}>{ledgerLine}</span>
             </div>
           ) : null}
-          {!product && !memoShown && !ledgerLine ? <span className="font-bold text-ink-mute">내용 없음</span> : null}
+          {!product && !extra && !memoShown && !ledgerLine ? <span className="font-bold text-ink-mute">내용 없음</span> : null}
         </div>
       </div>
 
@@ -1190,6 +1199,23 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           if (code && target) {
             needOrderLookup.push({ key, code, target });
             lookupCodes.push(code);
+            return;
+          }
+
+          // [⑱ D] 대상 상품이 없는 기타 이슈 — 「추가한 등록상품」의 사진을 대신 붙인다(첫 등록상품).
+          const extraItems = Array.isArray((task.raw_payload || {} as Record<string, unknown>).extra_items)
+            ? ((task.raw_payload as Record<string, unknown>).extra_items as Record<string, unknown>[])
+            : [];
+          const regExtra = extraItems.filter((it) => clean(it.source) === "registered" && clean(it.productId));
+          if (regExtra.length > 0) {
+            wants.push({
+              key,
+              rows: regExtra.map((it) => ({
+                productId: clean(it.productId),
+                productName: clean(it.productName),
+                color: clean(it.color),
+              })),
+            });
           }
         });
 
@@ -1308,6 +1334,13 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
       if (!response.ok || !payload?.ok) {
         throw new Error(payload?.message || "고객이슈 메모 추가 실패");
+      }
+
+      // [⑱ E] 기타 이슈 「관련 상품」 — 생성 후 받은 task 로 patchIssueTask 보강(「추가상품:」 메타·extra_items).
+      const extraItems = data.mode === "etc" ? (data.extraItems || []) : [];
+      if (extraItems.length > 0 && payload?.task) {
+        const r = await patchIssueTask(payload.task as Record<string, unknown>, { issueTypeKey: "general", memo, extraItems });
+        if (!r.ok) showAdminToast(r.message || "관련 상품 저장 실패", "error");
       }
 
       closeAdd();
@@ -1498,11 +1531,12 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     issueTypeKey: string,
     memoRaw: string,
     items?: Array<{ productId: string; productName: string; color: string; size: string; qty: number }>,
+    extraItems?: IssueExtraItem[],
   ): Promise<boolean> => {
     const id = clean(task.id);
     if (!id) { showAdminToast("고객이슈 ID가 없습니다.", "error"); return false; }
     // [⑰] 저장(fetch·메타줄·items 규칙)은 공용 lib patchIssueTask 로 통일. Rail 은 성공 시 목록 갱신만.
-    const r = await patchIssueTask(task, { issueTypeKey, memo: memoRaw, items });
+    const r = await patchIssueTask(task, { issueTypeKey, memo: memoRaw, items, extraItems });
     if (!r.ok) { showAdminToast(r.message || "고객이슈 저장 실패", "error"); return false; }
     setIssuePage(1);
     setReloadKey((value) => value + 1);
@@ -1734,9 +1768,10 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           repIssueDate={refundModalMeta.repDate}
           issueTypesInitial={processTask ? getIssueTypes(processTask) : []}
           issueBodyMemo={processTask ? getFullMemo(processTask) : ""}
-          onSaveIssue={processTask ? async ({ issueType, memo, items }) => {
+          extraInitial={processTask ? (((processTask.raw_payload as Record<string, unknown> | null)?.extra_items as IssueExtraItem[]) || []) : []}
+          onSaveIssue={processTask ? async ({ issueType, memo, items, extraItems }) => {
             const key = issueType === "refund" ? "refund" : issueType === "exchange" ? "exchange" : "general";
-            return patchIssueFields(processTask, key, memo, items);
+            return patchIssueFields(processTask, key, memo, items, extraItems);
           } : undefined}
           onDelete={processTask ? () => { const t = processTask; setRefundModalItem(null); setProcessTask(null); void deleteIssueTask(t); } : undefined}
           onClose={() => { setRefundModalItem(null); setProcessTask(null); }}

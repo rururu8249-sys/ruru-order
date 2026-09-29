@@ -7,6 +7,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { showAdminToast } from "@/lib/adminToast";
 import { splitIssueBody } from "@/lib/issueBodyMeta";
+import { patchIssueTask, type IssueExtraItem } from "@/lib/issueTaskPatch";
+import IssueExtraItems from "./IssueExtraItems";
 import { parseBankAccount, bankDisplayName, isExcludedHolder } from "@/lib/parseBankAccount";
 import {
   REFUND_STAGES,
@@ -369,7 +371,7 @@ export default function AdminLiveRefundLedgerPanel({ focusTaskId }: { focusTaskI
 }
 
 // ── 시안 ③ 처리 창 ──
-export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssue = false, repIssueDate = "", issueTypesInitial = [], issueBodyMemo = "", onSaveIssue, onDelete, createMode = false, earnedPoints = 0, onCreateIssue }: { item: LedgerDetail; onClose: () => void; onSaved: () => void; openedFromOtherIssue?: boolean; repIssueDate?: string; issueTypesInitial?: string[]; issueBodyMemo?: string; onSaveIssue?: (d: { issueType: "refund" | "exchange" | "etc"; memo: string; items?: Array<{ productId: string; productName: string; color: string; size: string; qty: number }> }) => Promise<boolean>; onDelete?: () => void; createMode?: boolean; earnedPoints?: number; onCreateIssue?: (d: { issueType: "refund" | "exchange" | "etc"; memo: string; selectedRowIds: number[]; rowQty: Record<string, number> }) => Promise<{ taskId: string } | null> }) {
+export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssue = false, repIssueDate = "", issueTypesInitial = [], issueBodyMemo = "", onSaveIssue, onDelete, createMode = false, earnedPoints = 0, extraInitial = [], onCreateIssue }: { item: LedgerDetail; onClose: () => void; onSaved: () => void; openedFromOtherIssue?: boolean; repIssueDate?: string; issueTypesInitial?: string[]; issueBodyMemo?: string; onSaveIssue?: (d: { issueType: "refund" | "exchange" | "etc"; memo: string; items?: Array<{ productId: string; productName: string; color: string; size: string; qty: number }>; extraItems?: IssueExtraItem[] }) => Promise<boolean>; onDelete?: () => void; createMode?: boolean; earnedPoints?: number; extraInitial?: IssueExtraItem[]; onCreateIssue?: (d: { issueType: "refund" | "exchange" | "etc"; memo: string; selectedRowIds: number[]; rowQty: Record<string, number> }) => Promise<{ taskId: string } | null> }) {
   const orderCode = clean(item.order_lookup_code);
   // [2026-09-27 ②] 유형 칩(환불/교환/기타) — 이 하나가 kind·하단 전환을 정한다. 기타는 하단 없음(admin-tasks 만 저장).
   const initIssueType: "refund" | "exchange" | "etc" = (() => {
@@ -390,6 +392,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
   const [exchangeOption, setExchangeOption] = useState(clean(item.exchange_option));
   const [memo] = useState(clean(item.memo)); // refund_ledger.memo — 화면에서 편집 안 함(doPatch 로 값 유지). 표시 메모는 issueMemo(이슈 내용).
   const [issueMemo, setIssueMemo] = useState(clean(issueBodyMemo)); // [②] 공통 상단 메모 = admin_tasks 이슈 내용
+  const [extra, setExtra] = useState<IssueExtraItem[]>(extraInitial); // [⑱] 기타 이슈에 따로 추가한 관련 상품
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
@@ -641,7 +644,18 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
       const created = await onCreateIssue?.({ issueType, memo: issueMemo, selectedRowIds: ids, rowQty });
       setSaving(false);
       if (!created?.taskId) return;                       // 실패 토스트는 onCreateIssue 쪽에서
-      if (isEtc) { onSaved(); return; }
+      if (isEtc) {
+        // [⑱] 기타 + 추가 상품이 있으면 방금 만든 이슈(taskId)에 extra_items 를 보강(order-return 서버 무변경).
+        if (extra.length > 0) {
+          try {
+            const fr = await fetch(`/api/admin-live/order-return/find-task?orderCode=${encodeURIComponent(orderCode)}`, { cache: "no-store" });
+            const fp = await fr.json().catch(() => null);
+            const t = (fp?.ok && fp.latest?.task) ? fp.latest.task : { id: created.taskId, body: "" };
+            await patchIssueTask(t, { issueTypeKey: "general", memo: issueMemo, extraItems: extra });
+          } catch { /* 보강 실패해도 이슈는 등록됨 */ }
+        }
+        onSaved(); return;
+      }
       const okLedger = await doPatch({ admin_task_id: created.taskId });
       if (!okLedger) { showAdminToast("고객이슈는 등록됐지만 환불 기록 저장에 실패했어요. 고객이슈 탭 「처리」에서 이어서 저장해 주세요.", "warning"); onSaved(); return; }
       showAdminToast("등록됐어요", "success"); onSaved(); return;
@@ -650,7 +664,8 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
     //   [⑰] 이슈의 대상상품·수량은 «화면 선택»과 같아야 하므로 유형 상관없이 items 를 넘긴다(환불·교환 기록은 doPatch 가 별도 저장).
     if (onSaveIssue) {
       const items = lines.filter((l) => (sel[l.id] || 0) > 0).map((l) => ({ productId: String(l.product_id ?? ""), productName: l.product_name, color: l.color || "", size: l.size || "", qty: sel[l.id] }));
-      const okIssue = await onSaveIssue({ issueType, memo: issueMemo, items });
+      // [⑱] 기타일 때만 추가 상품(extra) 저장. 환불·교환은 화면에서 숨기므로 넘기지 않음(값 보존).
+      const okIssue = await onSaveIssue({ issueType, memo: issueMemo, items, extraItems: isEtc ? extra : undefined });
       if (!okIssue) { setSaveError("고객이슈 저장에 실패했어요. 다시 시도해 주세요."); showAdminToast("고객이슈 저장 실패", "error"); return; }
     }
     // 2) 기타면 환불 기록은 만들지도 바꾸지도 않는다(💳 은 유형이 general 이라 목록에서 자동 숨김).
@@ -756,7 +771,10 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                 <button type="button" onClick={() => { setLinesLoaded(false); setLinesReloadTick((v) => v + 1); }} className="mt-2 rounded-lg border border-danger-tx/50 px-3 py-1.5 text-[14px] font-black text-danger-tx hover:bg-danger-bg">다시 시도</button>
               </div>
             ) : matchFailed ? (
-              isExchange ? (
+              isEtc ? (
+                /* [⑱ C1] 기타 + 주문 미연결 — 금액칸 대신 한 줄 안내(아래 「추가한 상품」으로 상품을 담는다). */
+                <div className="rounded-xl bg-surface-2 px-3.5 py-3 text-[14px] text-ink-mute">주문이 연결되지 않은 이슈예요</div>
+              ) : isExchange ? (
                 <div className="rounded-xl border border-line p-3 text-[14px] font-bold text-ink">{productText(item.product_snapshot)}</div>
               ) : (
                 <div className="rounded-xl border border-line p-3">
@@ -818,6 +836,8 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                 이 주문은 포인트 {formatComma(pointUsed)}원 사용 — 환불액 확인 필요 (자동 차감하지 않아요)
               </div>
             ) : null}
+            {/* [⑱] 기타 이슈 — 관련 상품 따로 추가(등록상품/직접). 환불·교환에선 숨김(값 유지). */}
+            {isEtc ? <IssueExtraItems value={extra} onChange={setExtra} /> : null}
           </div>
 
           {/* [⑯] 사유 · 반품 날짜 — 위치 고정(항상 렌더), 기타면 흐리게 비활성. */}

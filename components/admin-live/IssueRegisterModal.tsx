@@ -6,6 +6,8 @@
 //     · 주문상세에서 열면(orderContext) → order-return 등록(환불 유형일 때 서버에서 포인트 회수, 회수 규칙 불변)
 
 import { useEffect, useMemo, useState } from "react";
+import IssueExtraItems from "./IssueExtraItems";
+import type { IssueExtraItem } from "@/lib/issueTaskPatch";
 
 export type CustomerIssueCustomerOption = { key: string; nickname: string; name: string; phone: string };
 
@@ -68,6 +70,8 @@ export type IssueRegisterSubmit = {
   nickname: string; name: string; phone: string;
   taskTypes: string[]; priority: string; memo: string;
   mode: "refund" | "exchange" | "etc";
+  // [⑱ E] 기타 이슈에 따로 추가한 관련 상품(등록상품/직접입력). caller 가 생성 후 patchIssueTask 로 보강.
+  extraItems?: IssueExtraItem[];
 };
 
 type Props = {
@@ -89,13 +93,14 @@ export default function IssueRegisterModal({ open, onClose, onSubmit, saving = f
   const [memo, setMemo] = useState("");
   // 유형 = 환불/교환/기타 단일 선택. taskTypes 는 이 하나에서 파생(기타→general).
   const [mode, setMode] = useState<"refund" | "exchange" | "etc">("etc");
+  const [extra, setExtra] = useState<IssueExtraItem[]>([]);
   const [searchDraft, setSearchDraft] = useState("");
   const [searchKeyword, setSearchKeyword] = useState("");
 
   useEffect(() => {
     if (!open) return;
     setNickname(""); setName(""); setPhone("");
-    setPriority("normal"); setMemo(""); setMode("etc");
+    setPriority("normal"); setMemo(""); setMode("etc"); setExtra([]);
     setSearchDraft(""); setSearchKeyword("");
   }, [open]);
 
@@ -112,7 +117,7 @@ export default function IssueRegisterModal({ open, onClose, onSubmit, saving = f
   const submit = () => {
     // 탭 저장(admin-tasks)은 taskTypes[0] 을 task_type 으로 씀 → 기타=general, 나머지는 mode 그대로.
     const taskTypes = [mode === "etc" ? "general" : mode];
-    void onSubmit({ nickname: clean(nickname), name: clean(name), phone: clean(phone), taskTypes, priority, memo: cleanMultiline(memo), mode });
+    void onSubmit({ nickname: clean(nickname), name: clean(name), phone: clean(phone), taskTypes, priority, memo: cleanMultiline(memo), mode, extraItems: mode === "etc" ? extra : undefined });
   };
 
   return (
@@ -185,6 +190,14 @@ export default function IssueRegisterModal({ open, onClose, onSubmit, saving = f
                 {PRIORITY_OPTIONS.map(([value, label]) => (<option key={value} value={value}>우선순위: {label}</option>))}
               </select>
             </div>
+
+            {/* [⑱ E] 기타 이슈일 때만 「관련 상품」 — 등록상품 고르기 + 직접 입력(주문상세와 같은 부품). */}
+            {mode === "etc" ? (
+              <div className="mt-3">
+                <div className="mb-1 text-[13px] font-black text-ink-mute">관련 상품 <span className="font-bold text-ink-mute">(선택)</span></div>
+                <IssueExtraItems value={extra} onChange={setExtra} />
+              </div>
+            ) : null}
 
             <div className="mt-3">
               <div className="mb-1 text-[13px] font-black text-ink-mute">메모</div>

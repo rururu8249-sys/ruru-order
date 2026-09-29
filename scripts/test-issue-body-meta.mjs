@@ -107,4 +107,22 @@ const BODY = [
   assert.ok(saved.split("\n").some((l) => l.startsWith("전화번호:")), "다른 메타(전화번호)는 보존");
 }
 
-console.log("✅ test-issue-body-meta — 수정해도 전화번호·닉네임·이름이 보존됨 + 여러 줄 메모 유지 + 메타줄만이면 memo 빈칸 + 대상상품 줄 교체");
+// [2026-09-30 ⑱] 「추가상품:」도 메타줄 — 메모로 새지 않고, 교체 시 1줄만 남는다.
+{
+  const body = [
+    "이슈유형: 기타",
+    "대상상품: 니트(블랙/M)×1",
+    "추가상품: 양말(회색)×2",
+    "",
+    "사장님 메모",
+  ].join("\n");
+  const { metaLines, memo } = splitIssueBody(body);
+  assert.equal(memo, "사장님 메모", "추가상품 줄이 memo 로 새지 않는다");
+  assert.ok(metaLines.some((l) => l.startsWith("추가상품:")), "추가상품 줄은 메타");
+  const next = mergeIssueBody(metaLines.filter((l) => !l.startsWith("추가상품:")).concat("추가상품: 새양말×3"), memo);
+  const addLines = next.split("\n").filter((l) => l.startsWith("추가상품:"));
+  assert.equal(addLines.length, 1, "추가상품 줄은 1개만");
+  assert.equal(addLines[0], "추가상품: 새양말×3", "새 추가상품으로 교체");
+}
+
+console.log("✅ test-issue-body-meta — 수정해도 전화번호·닉네임·이름이 보존됨 + 여러 줄 메모 유지 + 메타줄만이면 memo 빈칸 + 대상상품/추가상품 줄 교체");

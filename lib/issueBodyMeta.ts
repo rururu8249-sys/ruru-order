@@ -30,6 +30,8 @@ export const ISSUE_META_PREFIXES = [
   //   예전엔 메모 쪽으로 딸려가서 수정창에 그대로 노출됐고, 사장님이 지우면 같이 사라졌다.
   "주문번호:",
   "대상상품:",
+  // [2026-09-30] 기타 이슈에서 «따로 추가한 관련 상품» 요약 줄(자동 기록·메모 아님).
+  "추가상품:",
 ] as const;
 
 export function isIssueMetaLine(line: string): boolean {

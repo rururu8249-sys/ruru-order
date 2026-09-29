@@ -20,7 +20,7 @@ import { requestAdminCustomerBlock } from "@/lib/adminCustomerBlock";
 import { RefundProcessModal, type LedgerDetail } from "./AdminLiveRefundLedgerPanel";
 import { pickPrimaryLedger } from "@/lib/refundLedger";
 import { splitIssueBody, fieldFromIssueBody } from "@/lib/issueBodyMeta";
-import { patchIssueTask } from "@/lib/issueTaskPatch";
+import { patchIssueTask, type IssueExtraItem } from "@/lib/issueTaskPatch";
 
 type Props = {
   order: LiveOrder;
@@ -1551,6 +1551,8 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               {issueLatest?.task ? (
                 <div className="mt-1 text-ink-soft">
                   <div className="whitespace-pre-wrap">대상: {fieldFromIssueBody(String((issueLatest.task as Record<string, unknown>).body ?? ""), "대상상품:") || "상품 지정 없음"}</div>
+                  {/* [⑱ D] 기타 이슈에 따로 추가한 관련 상품이 있으면 「추가:」 한 줄(표시만). */}
+                  {(() => { const a = fieldFromIssueBody(String((issueLatest.task as Record<string, unknown>).body ?? ""), "추가상품:"); return a ? <div className="mt-0.5 whitespace-pre-wrap">추가: {a}</div> : null; })()}
                   {(() => { const m = splitIssueBody(String((issueLatest.task as Record<string, unknown>).body ?? "")).memo.split("\n").filter(Boolean).slice(0, 2).join("\n"); return m ? <div className="mt-0.5 whitespace-pre-wrap">세부: {m}</div> : null; })()}
                 </div>
               ) : (
@@ -2042,9 +2044,10 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           item={issueProcessItem}
           issueTypesInitial={[String(issueProcessTask.task_type ?? "")]}
           issueBodyMemo={splitIssueBody(String(issueProcessTask.body ?? "")).memo}
-          onSaveIssue={async ({ issueType, memo, items }) => {
+          extraInitial={((issueProcessTask.raw_payload as Record<string, unknown> | null)?.extra_items as IssueExtraItem[]) || []}
+          onSaveIssue={async ({ issueType, memo, items, extraItems }) => {
             const issueTypeKey = issueType === "refund" ? "refund" : issueType === "exchange" ? "exchange" : "general";
-            const r = await patchIssueTask(issueProcessTask, { issueTypeKey, memo, items });
+            const r = await patchIssueTask(issueProcessTask, { issueTypeKey, memo, items, extraItems });
             if (!r.ok) showAdminToast("고객이슈 저장 실패\n\n" + (r.message || "알 수 없는 오류"), "error");
             return r.ok;
           }}
