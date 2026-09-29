@@ -78,6 +78,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   const [paidOnly, setPaidOnly] = useState(true);
   const [unpickedOnly, setUnpickedOnly] = useState(false);
   const [viewMode, setViewMode] = useState<"order" | "batch">("batch");
+  // [㉔] ② 손님별 담기의 두 화면: focus=한 손님씩(기본) / list=기존 전체 목록. focusKey=지금 보는 손님(panel.key).
+  const [orderLayout, setOrderLayout] = useState<"focus" | "list">("focus");
+  const [focusKey, setFocusKey] = useState<string>("");
   // [2026-08-23 상품별 집계 통합] 주문자 칩 표시 토글 — 집계 볼 땐 ON, 물건 집을 땐 OFF
   const [showBuyers, setShowBuyers] = useState(true);
   const [search, setSearch] = useState("");
@@ -187,6 +190,31 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
       .map((p) => ({ ...p, items: p.items.filter((it) => !pickedIds.has(it.id)) }))
       .filter((p) => p.items.length > 0);
   }, [visiblePanels, unpickedOnly, pickedIds]);
+
+  // [㉔] 한 손님씩 순서 — visiblePanels(검색·결제완료만·정렬 적용) 기준. unpickedOnly 는 무시(담는 중 목록이 사라지지 않게).
+  //   같은 phone 패널은 첫 등장 위치에 이어 붙여 «같은 손님»을 연달아 보게 한다(안정 정렬, 기존 순서 유지).
+  const focusPanels = useMemo(() => {
+    const seen = new Set<string>();
+    const out: Panel[] = [];
+    for (const p of visiblePanels) {
+      if (seen.has(p.key)) continue;
+      out.push(p); seen.add(p.key);
+      if (p.phone) {
+        for (const q of visiblePanels) {
+          if (q.phone === p.phone && !seen.has(q.key)) { out.push(q); seen.add(q.key); }
+        }
+      }
+    }
+    return out;
+  }, [visiblePanels]);
+
+  // 시작 손님 — focusKey 가 없거나 목록에 없으면 아직 다 안 담은 첫 손님(없으면 첫 손님)으로.
+  useEffect(() => {
+    if (viewMode !== "order" || orderLayout !== "focus" || focusPanels.length === 0) return;
+    if (focusKey && focusPanels.some((p) => p.key === focusKey)) return;
+    const firstUndone = focusPanels.find((p) => !p.items.every((it) => pickedIds.has(it.id)));
+    setFocusKey((firstUndone || focusPanels[0]).key);
+  }, [viewMode, orderLayout, focusPanels, focusKey, pickedIds]);
 
   // 같은 고객(전화번호) 묶음 — 여러 주문이 같은 사람이면 합배송 안내(중복배송·누락 방지).
   const phoneCount = useMemo(() => {
@@ -558,6 +586,13 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
 
         {/* ── 필터·정렬 ── */}
         <div className="flex shrink-0 flex-wrap items-center gap-1.5 px-4 pt-2">
+          {/* [㉔] ② 담기 화면 전환 — 한 손님씩 / 전체 목록 */}
+          {viewMode === "order" ? (
+            <span className="inline-flex overflow-hidden rounded-lg border border-line">
+              <button type="button" onClick={() => setOrderLayout("list")} className={`px-3 py-1.5 text-[12px] font-black ${orderLayout === "list" ? "bg-ink-soft text-white" : "bg-surface text-ink-soft"}`}>📋 목록</button>
+              <button type="button" onClick={() => setOrderLayout("focus")} className={`px-3 py-1.5 text-[12px] font-black ${orderLayout === "focus" ? "bg-ink-soft text-white" : "bg-surface text-ink-soft"}`}>🔍 한 손님씩</button>
+            </span>
+          ) : null}
           <button type="button" onClick={() => setUnpickedOnly((v) => !v)} className={chip(unpickedOnly)}>{unpickedOnly ? "✓ " : ""}{viewMode === "batch" ? "안 모은 것만" : "안 담은 것만"}{(viewMode === "batch" ? remainCollectQty : remainQty) > 0 ? ` ${(viewMode === "batch" ? remainCollectQty : remainQty).toLocaleString()}` : ""}</button>
           <button type="button" onClick={() => setPaidOnly((v) => !v)} className={`rounded-lg px-3 py-1.5 text-[12px] font-black whitespace-nowrap ${paidOnly ? "bg-[var(--color-ok-tx)] text-white" : "border border-warn-tx/35 bg-warn-bg text-warn-tx"}`}>{paidOnly ? "✓ 결제완료만" : "⚠ 미결제 포함"}</button>
           {viewMode === "order" ? (
@@ -666,6 +701,92 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
                 </div>
               </>
             )
+          ) : orderLayout === "focus" ? (
+            focusPanels.length === 0 ? (
+              <div className="py-14 text-center text-[14px] font-bold text-ink-mute">{search ? "검색 결과가 없어요 — 검색어를 지워 보세요" : "담을 주문이 없어요 — 위 필터(결제완료만)를 확인해 주세요"}</div>
+            ) : (() => {
+              const idx = Math.max(0, focusPanels.findIndex((p) => p.key === focusKey));
+              const panel = focusPanels[idx] || focusPanels[0];
+              const remainInPanel = panel.items.filter((it) => !pickedIds.has(it.id)).reduce((s, it) => s + it.qty, 0);
+              const allPicked = panel.items.length > 0 && panel.items.every((it) => pickedIds.has(it.id));
+              const isLast = idx >= focusPanels.length - 1;
+              const sameCustomer = panel.phone ? (phoneCount.get(panel.phone) || 0) : 0;
+              const goNext = () => setFocusKey((focusPanels[idx + 1] || focusPanels[0]).key);
+              const goPrev = () => { if (idx > 0) setFocusKey(focusPanels[idx - 1].key); };
+              return (
+                <div className="space-y-3">
+                  {/* 헤더 */}
+                  <div className="rounded-xl border-2 border-line bg-surface px-4 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-[11px] font-black text-ink-mute">{idx + 1} / {focusPanels.length}번째 손님</div>
+                        <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                          <span className={`text-[20px] font-black leading-tight ${allPicked ? "text-ok-tx" : "text-ink"}`}>{panel.nickname}</span>
+                          {panel.name && panel.name !== panel.nickname ? <span className="text-[13px] font-bold text-ink-soft">{panel.name}</span> : null}
+                        </div>
+                        {whenText(panel.when) ? <div className="mt-0.5 text-[11px] font-semibold text-ink-mute">{whenText(panel.when)}</div> : null}
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          {!panel.paid ? <span className="rounded-full bg-[var(--color-danger-tx)] px-2 py-0.5 text-[11px] font-black text-white">미결제</span> : null}
+                          {sameCustomer > 1 ? <span className="rounded-full bg-[var(--color-cardpay)]/12 px-2 py-0.5 text-[11px] font-black text-[var(--color-cardpay)]">📦 같은 고객 {sameCustomer}건 · 같은 봉투에 담으세요</span> : null}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="text-[11px] font-black text-ink-soft">남은 물건</div>
+                        <div className={`text-[20px] font-black leading-none ${remainInPanel > 0 ? "text-rose-deep" : "text-ok-tx"}`}>{remainInPanel.toLocaleString()}<span className="ml-0.5 text-[12px]">개</span></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 상품 줄 — 줄 전체 클릭 = 그 상품 담기/해제(기존 togglePick 그대로) */}
+                  <div className="overflow-hidden rounded-xl border-2 border-line bg-surface divide-y divide-line">
+                    {panel.items.map((it) => {
+                      const picked = pickedIds.has(it.id);
+                      const colorChip = stripNoneOptionParts(it.color);
+                      const sizeChip = stripNoneOptionParts(it.size);
+                      return (
+                        <button key={it.id} type="button" onClick={() => togglePick(it.id)} className={`flex w-full items-center gap-3 px-3 py-3 text-left ${picked ? "bg-ok-bg/70" : "bg-surface hover:bg-surface-2"}`}>
+                          <CheckBox state={picked ? "done" : "none"} />
+                          {itemPhoto[it.id] ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img src={itemPhoto[it.id]} alt={it.productName} loading="lazy" className="h-[72px] w-[72px] shrink-0 rounded-lg border border-line object-cover" />
+                          ) : null}
+                          <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+                            <span className="flex min-w-0 items-center gap-1.5">
+                              <span className={`min-w-0 text-[16px] font-black ${picked ? "text-ink-mute line-through" : "text-ink"}`}>{it.productName}</span>
+                              {!picked && collectedIds.has(it.id) ? <span className="shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-[11px] font-black text-ink-mute">모음✓</span> : null}
+                            </span>
+                            {colorChip || sizeChip ? (
+                              <span className="flex flex-wrap items-center gap-1">
+                                {colorChip ? <span className={`rounded-full border border-line px-2 py-0.5 text-[16px] font-black ${picked ? "text-ink-mute" : "text-rose-deep"}`}>{colorChip}</span> : null}
+                                {sizeChip ? <span className={`rounded-full border border-line px-2 py-0.5 text-[16px] font-black ${picked ? "text-ink-mute" : "text-ink"}`}>{sizeChip}</span> : null}
+                              </span>
+                            ) : it.optionText ? (
+                              <span className={`text-[13px] font-bold ${picked ? "text-ink-mute" : "text-rose-deep"}`}>{it.optionText}</span>
+                            ) : null}
+                          </span>
+                          <span className="shrink-0 whitespace-nowrap text-right">
+                            <span className={`block text-[24px] font-black leading-none ${picked ? "text-ink-mute" : it.qty > 1 ? "text-rose-deep" : "text-ink"}`}>{it.qty}<span className="text-[12px]">개</span></span>
+                            {it.qty > 1 ? <span className="mt-0.5 block text-[11px] font-black text-rose-deep">{it.qty}개 모두</span> : null}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* 하단 버튼 */}
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={goPrev} disabled={idx <= 0} className="rounded-xl border border-line bg-surface px-3 py-2.5 text-[13px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-40">◀ 이전</button>
+                    <button type="button" onClick={goNext} className="rounded-xl px-2 py-2.5 text-[12px] font-black text-ink-mute hover:text-ink">건너뛰기</button>
+                    <span className="flex-1" />
+                    {allPicked ? (
+                      <button type="button" onClick={isLast ? () => setFocusKey(focusPanels[0].key) : goNext} className="rounded-xl bg-rose-deep px-4 py-2.5 text-[14px] font-black text-white hover:opacity-90">{isLast ? "🎉 마지막 손님이에요 · 처음으로" : "다 담았어요 → 다음 손님 ▶"}</button>
+                    ) : (
+                      <button type="button" disabled className="rounded-xl bg-surface-2 px-4 py-2.5 text-[14px] font-black text-ink-mute">{remainInPanel}개 더 담아야 해요</button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()
           ) : displayPanels.length === 0 ? (
             <div className="py-14 text-center text-[14px] font-bold text-ink-mute">{unpickedOnly ? "안 챙긴 게 없어요! 다 챙겼습니다 🎉" : search ? "검색 결과가 없어요" : "챙길 주문이 없습니다."}</div>
           ) : (
