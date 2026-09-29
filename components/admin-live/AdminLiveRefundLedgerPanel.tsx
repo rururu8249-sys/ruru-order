@@ -479,7 +479,9 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
         //   item.id 있으면 저장 기록 → snapshot 만 복원(자동 체크 금지·불일치면 0개+안내). 없으면 신규 자동 체크.
         const savedSnap = Array.isArray(item.product_snapshot) ? item.product_snapshot : [];
         const derived = deriveInitialSelection({ hasLedger: Boolean(item.id), snapshot: savedSnap, lines: got });
-        setSel(derived.sel);
+        // [㉑] 기타(초기 유형 etc) + 환불기록 없음(!item.id) + 저장 대상 없음(savedSnap 0개) → 자동 전체 체크 금지(0개로 연다)
+        const etcNoTarget = initIssueType === "etc" && !item.id && savedSnap.length === 0;
+        setSel(etcNoTarget ? {} : derived.sel);
         setSnapshotUnmatched(derived.matchedNone);
         // 카드결제 주문 → 방법 기본 항상 「카드취소」(저장 방법 없을 때만). 카드는 전체 취소가 원칙.
         //   [C4] 카드 감지 이전 저장 기록이 「계좌이체」(계좌번호 없음)로 열려 이체 사고 위험(김미성 MTD0B5AY) → 그 경우도 카드취소로.
