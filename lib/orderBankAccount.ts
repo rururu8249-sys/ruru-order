@@ -14,6 +14,11 @@ export type OrderBankRoutingResult = {
   bankAccount: OrderBankAccountSnapshot;
 };
 
+export type OrderGroupBankAccountResolution = {
+  status: "snapshot" | "legacy" | "conflict";
+  bankAccount?: OrderBankAccountSnapshot;
+};
+
 const SERVER_BANK_FIELDS = new Set([
   "customer_order_segment",
   "payment_bank_account_id",
@@ -69,4 +74,52 @@ export function parseOrderBankRoutingResult(value: unknown): OrderBankRoutingRes
     customerOrderSegment: segment,
     bankAccount: { id, bankName, bankAccount, bankHolder },
   };
+}
+
+const ORDER_SNAPSHOT_FIELDS = [
+  "customer_order_segment",
+  "payment_bank_account_id",
+  "payment_bank_name",
+  "payment_bank_account",
+  "payment_bank_holder",
+] as const;
+
+export function resolveOrderGroupBankAccount(
+  rows: readonly unknown[],
+  legacyFallback: OrderBankAccountSnapshot,
+): OrderGroupBankAccountResolution {
+  const values: OrderBankRoutingResult[] = [];
+  let emptyRows = 0;
+
+  for (const value of rows) {
+    const row = record(value) || {};
+    const presentCount = ORDER_SNAPSHOT_FIELDS.filter((field) => clean(row[field]) !== "").length;
+    if (presentCount === 0) {
+      emptyRows += 1;
+      continue;
+    }
+    if (presentCount !== ORDER_SNAPSHOT_FIELDS.length) return { status: "conflict" };
+
+    try {
+      values.push(parseOrderBankRoutingResult({
+        customer_order_segment: row.customer_order_segment,
+        bank_account: {
+          id: row.payment_bank_account_id,
+          bankName: row.payment_bank_name,
+          bankAccount: row.payment_bank_account,
+          bankHolder: row.payment_bank_holder,
+        },
+      }));
+    } catch {
+      return { status: "conflict" };
+    }
+  }
+
+  if (values.length === 0) return { status: "legacy", bankAccount: { ...legacyFallback } };
+  if (emptyRows > 0) return { status: "conflict" };
+
+  const first = values[0];
+  const signature = JSON.stringify(first);
+  if (values.some((value) => JSON.stringify(value) !== signature)) return { status: "conflict" };
+  return { status: "snapshot", bankAccount: { ...first.bankAccount } };
 }

@@ -102,6 +102,7 @@ import ShopContactLink from "@/components/customer/ShopContactLink";
 import { useShopInfo } from "@/lib/useShopInfo";
 import {
   parseOrderBankRoutingResult,
+  resolveOrderGroupBankAccount,
   type OrderBankAccountSnapshot,
 } from "@/lib/orderBankAccount";
 import { detailCode, detailPricePresentation, detailProducts } from "@/lib/productDetailModel";
@@ -1499,6 +1500,7 @@ export default function OrderPage() {
     youtubeNickname.trim() && customerName.trim() && customerPhone.trim()
   );
   const [done, setDone] = useState<DoneData | null>(null);
+  const [historicalPaymentBankAccount, setHistoricalPaymentBankAccount] = useState<OrderBankAccountSnapshot | null>(null);
   const [copyDone, setCopyDone] = useState(false);
   const [nicknameCopyDone, setNicknameCopyDone] = useState(false);
   const [paymentGuideOpen, setPaymentGuideOpen] = useState(false);
@@ -5168,6 +5170,7 @@ export default function OrderPage() {
         finalAmount: savedFinalAmount,
         bankAccount: assignedBank.bankAccount,
       });
+      setHistoricalPaymentBankAccount(null);
 
       setPaymentGuideOpen(true);
       setOrderSheetOpen(false);
@@ -5210,7 +5213,7 @@ export default function OrderPage() {
     await submitOrder({ allowMissingDetailAddress: true });
   };
 
-  const activePaymentBankAccount: OrderBankAccountSnapshot = done?.bankAccount || {
+  const activePaymentBankAccount: OrderBankAccountSnapshot = historicalPaymentBankAccount || done?.bankAccount || {
     id: "primary",
     bankName: BANK_NAME,
     bankAccount: BANK_ACCOUNT,
@@ -5510,6 +5513,15 @@ export default function OrderPage() {
     return Array.from(map.entries()).map(([key, rows]) => {
       const head = rows[0];
       const status = ruruOrderLookupStatus(head);
+      const groupBank = resolveOrderGroupBankAccount(rows, {
+        id: "primary",
+        bankName: BANK_NAME,
+        bankAccount: BANK_ACCOUNT,
+        bankHolder: BANK_HOLDER,
+      });
+      if (groupBank.status === "conflict") {
+        console.error("주문 그룹 입금계좌 스냅샷 충돌", { orderGroupId: key });
+      }
       // 상품금액(배송비·카드수수료 제외) = product_price × qty (adjusted_product_price 우선)
       const rowProductAmount = (o: any) =>
         Number(o?.adjusted_product_price ?? Number(o?.product_price ?? 0) * Number(o?.qty ?? o?.quantity ?? 1));
@@ -5541,6 +5553,8 @@ export default function OrderPage() {
         statusDisplayText: status.displayText,
         deliveryLabel: status.filterKey === "출고완료" ? "출고완료" : "확인 중",
         paymentMethodLabel: ruruOrderLookupPaymentMethod(head),
+        bankAccountStatus: groupBank.status,
+        bankAccount: groupBank.bankAccount,
         // [송장 표시] 그룹 내 첫 송장 등록 행 기준 (읽기 전용)
         trackingNumber: (() => { const r = rows.find((o: any) => String(o?.tracking_number || "").trim()); return r ? String((r as any).tracking_number).trim() : ""; })(),
         trackingCompany: (() => { const r = rows.find((o: any) => String(o?.tracking_number || "").trim()); return r ? String((r as any).tracking_company || "").trim() : ""; })(),
@@ -8800,7 +8814,10 @@ export default function OrderPage() {
           }}
           onLoadMore={() => setOrderLookupVisibleCount((c) => c + 10)}
           onClose={() => setOrderLookupOpen(false)}
-          onOpenPaymentGuide={() => {
+          onOpenPaymentGuide={(group) => {
+            if (!group.bankAccount || group.bankAccountStatus === "conflict") return;
+            setHistoricalPaymentBankAccount(group.bankAccount);
+            setDone(null);
             setOrderLookupOpen(false);
             setPaymentGuideOpen(true);
           }}

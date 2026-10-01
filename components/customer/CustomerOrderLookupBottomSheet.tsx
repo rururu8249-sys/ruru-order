@@ -3,8 +3,9 @@
 // 주의: UI 전용. DB, API, 주문저장, 입금매칭, 정산, 배송 로직 없음. (시안 딥로즈 #7B2D43 인라인)
 
 import { useEffect, useRef, type CSSProperties } from "react";
+import type { OrderBankAccountSnapshot } from "@/lib/orderBankAccount";
 // [2026-09-20] 바텀시트 «한 벌» 틀(높이·헤더·✕·닫기 5종). 조회·필터·무한스크롤 로직은 그대로.
-import CustomerBottomSheet, { csPrimaryButtonStyle } from "@/components/customer/CustomerBottomSheet";
+import CustomerBottomSheet from "@/components/customer/CustomerBottomSheet";
 
 export type CustomerOrderLookupFilter = "전체" | "결제대기" | "결제완료" | "출고완료" | "주문취소";
 
@@ -35,6 +36,8 @@ export type CustomerOrderLookupGroup = {
   // [송장 표시] 관리자가 등록한 송장 — 있으면 카드에 배송조회 버튼 노출
   trackingNumber?: string;
   trackingCompany?: string;
+  bankAccountStatus?: "snapshot" | "legacy" | "conflict";
+  bankAccount?: OrderBankAccountSnapshot;
 };
 
 const trackingUrlOf = (num?: string, company?: string) => {
@@ -55,7 +58,7 @@ type CustomerOrderLookupBottomSheetProps = {
   onFilterChange: (filter: CustomerOrderLookupFilter) => void;
   onLoadMore: () => void;
   onClose: () => void;
-  onOpenPaymentGuide: () => void;
+  onOpenPaymentGuide: (group: CustomerOrderLookupGroup) => void;
 };
 
 // 시안 배지색(정확 hex): 결제완료 초록#0F6E56 / 출고완료 파랑#185FA5 / 결제대기 노랑#854F0B / 주문취소 빨강#C0392B / 그 외 회색
@@ -139,10 +142,6 @@ export default function CustomerOrderLookupBottomSheet({
               <p style={{ minWidth: 0, flex: 1, wordBreak: "keep-all", fontSize: "14px", fontWeight: 800, lineHeight: 1.3, letterSpacing: "-0.05em", color: "#1B5E20" }}>밴드에서 택배송장번호 확인 가능</p>
               <div style={{ flexShrink: 0, fontSize: "18px", fontWeight: 800, color: "#2E7D32" }}>›</div>
             </a>
-            {/* [2026-09-20] 왼쪽 「닫기」 삭제 — 닫기는 우상단 ✕(틀). 주 버튼 1개 풀폭. */}
-            <button type="button" onClick={onOpenPaymentGuide} style={csPrimaryButtonStyle(true)}>
-              입금 계좌 보기
-            </button>
         </div>
       )}
     >
@@ -209,6 +208,20 @@ export default function CustomerOrderLookupBottomSheet({
                           <span style={{ fontSize: "13px", fontWeight: 800, color: "#222" }}>결제금액</span>
                           <span style={{ fontSize: "18px", fontWeight: 800, letterSpacing: "-0.07em", color: "#7B2D43" }}>{group.totalAmountText}</span>
                         </div>
+                        {group.paymentMethodLabel === "무통장입금" && group.bankAccountStatus === "conflict" ? (
+                          <div style={{ marginTop: "8px", borderRadius: "10px", background: "#FBEAE7", padding: "9px 10px", fontSize: "12px", fontWeight: 800, lineHeight: 1.5, color: "#C0392B" }}>
+                            이 주문의 입금계좌 정보를 확인할 수 없습니다. 카톡채널로 문의해 주세요.
+                          </div>
+                        ) : null}
+                        {group.paymentMethodLabel === "무통장입금" && group.bankAccount ? (
+                          <button
+                            type="button"
+                            onClick={() => onOpenPaymentGuide(group)}
+                            style={{ marginTop: "8px", display: "flex", minHeight: "40px", width: "100%", alignItems: "center", justifyContent: "center", borderRadius: "11px", border: "1px solid #7B2D43", background: "#fff", padding: "0 12px", fontSize: "12.5px", fontWeight: 900, color: "#7B2D43", cursor: "pointer" }}
+                          >
+                            이 주문의 입금 계좌 보기
+                          </button>
+                        ) : null}
                         {group.trackingNumber ? (
                           <a
                             href={trackingUrlOf(group.trackingNumber, group.trackingCompany)}

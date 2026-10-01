@@ -7,6 +7,8 @@ import {
   normalizeLookupPhone,
   buildOrderLookupOrFilter,
 } from "../lib/customerOrderLookup.ts";
+import { resolveOrderGroupBankAccount } from "../lib/orderBankAccount.ts";
+import { readFile } from "node:fs/promises";
 
 function assert(c, m) { if (!c) throw new Error(m); }
 function equal(a, e, m) { if (a !== e) throw new Error(`${m}: expected=${String(e)} actual=${String(a)}`); }
@@ -58,5 +60,42 @@ equal(normalizeLookupKakaoId(" 987 "), "987", "공백은 정리");
 equal(normalizeLookupPhone("010-1234-5678"), "01012345678", "전화번호 숫자만");
 equal(normalizeLookupPhone("010)1234 5678,x"), "01012345678", "전화번호에서 기호 제거");
 equal(buildOrderLookupOrFilter("1;drop", "010"), null, "위험한 카카오ID는 폴백 처리");
+
+// 5. 주문 그룹 계좌 스냅샷은 모든 행이 같아야 하며, 추정해서 하나를 고르면 안 된다.
+const legacyFallback = { id: "primary", bankName: "국민은행", bankAccount: "111-222-333333", bankHolder: "홍길동" };
+const savedRow = {
+  customer_order_segment: "first_order",
+  payment_bank_account_id: "secondary",
+  payment_bank_name: "신한은행",
+  payment_bank_account: "444-555-666666",
+  payment_bank_holder: "김루루",
+};
+{
+  const resolved = resolveOrderGroupBankAccount([savedRow, { ...savedRow }], legacyFallback);
+  equal(resolved.status, "snapshot", "같은 스냅샷 행은 주문 계좌로 사용");
+  equal(resolved.bankAccount?.id, "secondary", "저장 계좌 ID");
+}
+{
+  const resolved = resolveOrderGroupBankAccount(
+    [savedRow, { ...savedRow, payment_bank_account: "999-999-999999" }],
+    legacyFallback,
+  );
+  equal(resolved.status, "conflict", "그룹 내 다른 계좌는 충돌");
+  equal(resolved.bankAccount, undefined, "충돌 계좌를 임의로 고르지 않음");
+}
+{
+  const resolved = resolveOrderGroupBankAccount([{}], legacyFallback);
+  equal(resolved.status, "legacy", "마이그레이션 전 주문은 legacy 폴백");
+  equal(resolved.bankAccount?.bankAccount, legacyFallback.bankAccount, "legacy primary 계좌");
+}
+{
+  const resolved = resolveOrderGroupBankAccount([{ payment_bank_name: "일부만" }], legacyFallback);
+  equal(resolved.status, "conflict", "불완전 스냅샷은 추정 금지");
+}
+
+const lookupSheet = await readFile(new URL("../components/customer/CustomerOrderLookupBottomSheet.tsx", import.meta.url), "utf8");
+assert(/onOpenPaymentGuide:\s*\(group:\s*CustomerOrderLookupGroup\)/.test(lookupSheet), "선택한 주문 그룹을 콜백으로 넘겨야 한다");
+assert(/group\.paymentMethodLabel\s*===\s*"무통장입금"/.test(lookupSheet), "무통장 주문에만 계좌 버튼을 보여야 한다");
+assert(/group\.bankAccountStatus\s*===\s*"conflict"/.test(lookupSheet), "충돌 주문은 고객 안내를 보여야 한다");
 
 console.log("customer order lookup tests passed");
