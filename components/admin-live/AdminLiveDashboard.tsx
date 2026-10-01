@@ -23,6 +23,8 @@ import { supabase } from "@/lib/supabase";
 import AdminLiveCustomersPanel from "./AdminLiveCustomersPanel";
 import AdminLiveNoticePanel from "./AdminLiveNoticePanel";
 import AdminLivePaymentPanel from "./AdminLivePaymentPanel";
+import AdminLiveSideDrawer from "./AdminLiveSideDrawer";
+import { resolveAdminLiveDestination, transitionAdminLiveDrawer, type AdminLiveDrawerState } from "./adminLiveDrawerState";
 import AdminLiveSettlementPanel from "./AdminLiveSettlementPanel";
 import AdminLiveSettingsPanel from "./AdminLiveSettingsPanel";
 import AdminLiveSidebar from "./AdminLiveSidebar";
@@ -545,7 +547,13 @@ async function saveLiveBroadcastEndReport({
 }
 
 export default function AdminLiveDashboard() {
-  const [activeMenu, setActiveMenu] = useState<AdminLiveMenuKey>(() => readMenuFromUrl());
+  const [activeMenu, setActiveScreen] = useState<AdminLiveMenuKey>(() => resolveAdminLiveDestination(readMenuFromUrl()).screen);
+  const [drawer, setDrawer] = useState<AdminLiveDrawerState>(() => resolveAdminLiveDestination(readMenuFromUrl()).drawer);
+  const setActiveMenu = (menu: AdminLiveMenuKey) => {
+    const destination = resolveAdminLiveDestination(menu);
+    setActiveScreen(destination.screen);
+    setDrawer(destination.drawer);
+  };
   const [customersInitialTab, setCustomersInitialTab] = useState<"members" | "issues">("members");
   // [2026-09-25] 고객·이슈 패널의 «현재» 탭 — 「고객이슈」 탭이면 위쪽 미해결 알림 띠를 숨긴다(중복 표시 방지).
   const [customersActiveTab, setCustomersActiveTab] = useState<"members" | "issues" | "loyalty" | "link" | "refund">("members");
@@ -646,8 +654,8 @@ export default function AdminLiveDashboard() {
   const [deposits, setDeposits] = useState<DepositRow[]>([]);
   const [cardPayOrder, setCardPayOrder] = useState<LiveOrder | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string>("");
-  const [orderDetailOpen, setOrderDetailOpen] = useState(false);
-  const [matchPanelOpen, setMatchPanelOpen] = useState(false);
+  const orderDetailOpen = drawer.kind === "order";
+  const matchPanelOpen = drawer.kind === "match";
   const [selectedOrderForMatch, setSelectedOrderForMatch] = useState<LiveOrder | null>(null);
   const [videoRatio, setVideoRatio] = useState<VideoRatio>("vertical");
   const [loadError, setLoadError] = useState("");
@@ -1041,8 +1049,8 @@ export default function AdminLiveDashboard() {
   }, []);
 
   useEffect(() => {
-    replacePanelInUrl(activeMenu);
-  }, [activeMenu]);
+    replacePanelInUrl(drawer.kind === "deposits" ? "payments" : activeMenu);
+  }, [activeMenu, drawer.kind]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1293,7 +1301,7 @@ export default function AdminLiveDashboard() {
   useEffect(() => {
     if (!filteredOrders.length) {
       setSelectedOrderId("");
-      setOrderDetailOpen(false);
+      setDrawer(current => current.kind === "order" ? {kind: "closed"} : current);
       return;
     }
 
@@ -1308,14 +1316,13 @@ export default function AdminLiveDashboard() {
   }, [filteredOrders, selectedOrderId]);
 
   const closeOrderDetail = () => {
-    setOrderDetailOpen(false);
+    setDrawer({kind: "closed"});
   };
 
   const openManualMatchForOrder = (order: LiveOrder) => {
     // 우측 입금매칭 패널을 해당 주문 매칭모드로 연다.
-    setOrderDetailOpen(false);
     setSelectedOrderForMatch(order);
-    setMatchPanelOpen(true);
+    setDrawer({kind: "match", orderId: order.id});
   };
 
   const refreshAfterManualMatch = async () => {
@@ -1603,7 +1610,7 @@ export default function AdminLiveDashboard() {
                   {activeSubTabs.length > 1 ? (
                     <div className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                       {activeSubTabs.map((tab) => {
-                        const active = tab.key === activeMenu;
+                        const active = drawer.kind === "deposits" ? tab.key === "payments" : tab.key === activeMenu;
                         return (
                           <button
                             key={tab.key}
@@ -1625,7 +1632,7 @@ export default function AdminLiveDashboard() {
                   <div className="flex items-center gap-1.5 pb-1.5">
                     <button
                       type="button"
-                      onClick={() => setMatchPanelOpen((v) => !v)}
+                      onClick={() => { setSelectedOrderForMatch(null); setDrawer(current => transitionAdminLiveDrawer(current, {kind: "match", orderId: null})); }}
                       className={[
                         "rounded-lg border px-2.5 py-1.5 text-xs font-black transition",
                         matchPanelOpen ? "border-rose-deep bg-rose-soft text-rose-deep" : "border-rose-line text-rose-deep hover:opacity-90",
@@ -1735,30 +1742,17 @@ export default function AdminLiveDashboard() {
                       broadcastStartedAt={activeBroadcast?.started_at || activeBroadcast?.created_at || null}
                       onSelectOrder={(order) => {
                         // 사이드 패널 단일 슬롯: 주문상세 열 때 입금매칭은 닫음
-                        setMatchPanelOpen(false);
                         setSelectedOrderForMatch(null);
                         setSelectedOrderId(order.id);
-                        setOrderDetailOpen(true);
+                        setDrawer({kind: "order", orderId: order.id});
                       }}
                       onFiltersChange={setFilters}
                       onRefresh={loadOrders}
                       onOpenManualMatch={openManualMatchForOrder}
                       onOpenCardPay={setCardPayOrder}
-                      onSelectForMatch={(order) => { setOrderDetailOpen(false); setSelectedOrderForMatch(order); setMatchPanelOpen(true); }}
+                      onSelectForMatch={(order) => { setSelectedOrderForMatch(order); setDrawer({kind: "match", orderId: order.id}); }}
                     />
                   </div>
-                </div>
-              ) : null}
-
-              {/* ── 주문·입금 › 입금내역 ── */}
-              {activeMenu === "payments" ? (
-                <div className="p-5">
-                  <AdminLivePaymentPanel
-                    deposits={deposits}
-                    orderGroups={orderGroups}
-                    onRefresh={loadDepositsFromServer}
-                    onBankdaSync={syncBankdaDepositsOnly}
-                  />
                 </div>
               ) : null}
 
@@ -1871,23 +1865,15 @@ export default function AdminLiveDashboard() {
           </div>
 
           {/* 주문상세 / 입금매칭 — 우측 오버레이 드로어(슬라이드인, 위로 떠서 표를 밀지 않음). 단일 슬롯. */}
-          {(matchPanelOpen || (selectedOrder && orderDetailOpen)) ? (
-            <>
-              <button
-                type="button"
-                aria-label="패널 닫기"
-                onClick={() => { setMatchPanelOpen(false); setSelectedOrderForMatch(null); setOrderDetailOpen(false); }}
-                className="fixed inset-0 z-40 bg-black/40"
-              />
-              <div
-                className="fixed inset-y-0 right-0 z-50 w-full max-w-[420px] overflow-y-auto border-l border-line bg-surface shadow-2xl"
-                style={{ animation: "ruruSidePanelIn 0.22s ease" }}
-              >
-                {matchPanelOpen ? (
+          {drawer.kind !== "closed" ? (
+              <AdminLiveSideDrawer title={drawer.kind === "deposits" ? "입금내역" : drawer.kind === "match" ? "입금매칭" : "주문상세"}
+                width={drawer.kind === "deposits" ? 560 : 420}
+                onClose={() => { setDrawer({kind: "closed"}); setSelectedOrderForMatch(null); }}>
+                {drawer.kind === "deposits" ? <div className="p-3"><AdminLivePaymentPanel deposits={deposits} orderGroups={orderGroups} onRefresh={loadDepositsFromServer} onBankdaSync={syncBankdaDepositsOnly} /></div> : matchPanelOpen ? (
                   <LiveFloatingMatchPanel
                     deposits={deposits}
                     orders={filteredOrders}
-                    onClose={() => { setMatchPanelOpen(false); setSelectedOrderForMatch(null); }}
+                    onClose={() => { setDrawer({kind: "closed"}); setSelectedOrderForMatch(null); }}
                     onMatched={refreshAfterManualMatch}
                     onSearchFilter={(keyword) => setFilters((prev) => ({ ...prev, keyword }))}
                     selectedOrderForMatch={selectedOrderForMatch}
@@ -1901,8 +1887,7 @@ export default function AdminLiveDashboard() {
                     onAfterStatusChange={() => loadOrders({ silent: true })}
                   />
                 ) : null}
-              </div>
-            </>
+              </AdminLiveSideDrawer>
           ) : null}
           <style>{`@keyframes ruruSidePanelIn { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }`}</style>
 
