@@ -37,7 +37,7 @@ const normalizeEmptyProductOptionValue = (value: unknown) => {
 
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { normalizeProductSearchText, productSearchMatches } from "@/lib/productSearch";
 import { HOWTO_DEFAULT, parseHowtoSteps } from "@/lib/howto";
 import { supabase } from "@/lib/supabase";
@@ -1702,7 +1702,17 @@ export default function OrderPage() {
   const [combineShippingSettings, setCombineShippingSettings] =
     useState<CombineShippingSettings>(DEFAULT_COMBINE_SHIPPING_SETTINGS);
   const [alreadyPaidShipping, setAlreadyPaidShipping] = useState(false);
-  const [paidShippingGroups, setPaidShippingGroups] = useState<PaidShippingGroups>({ ...EMPTY_PAID_SHIPPING_GROUPS });
+  const [storedPaidShippingGroups, setPaidShippingGroups] = useState<PaidShippingGroups>({ ...EMPTY_PAID_SHIPPING_GROUPS });
+  const [paidShippingScopeKey, setPaidShippingScopeKey] = useState("");
+  const currentPaidShippingScopeKey = JSON.stringify([
+    normalizePhone(customerPhone), shippingAddressKey(address, detailAddress),
+    combineShippingSettings.enabled, combineShippingSettings.startAt, combineShippingSettings.endAt,
+  ]);
+  const paidShippingGroups = paidShippingScopeKey === currentPaidShippingScopeKey
+    ? storedPaidShippingGroups : EMPTY_PAID_SHIPPING_GROUPS;
+  const combineShippingRequestRef = useRef(0);
+  const verifiedCombineShippingSettingsRef = useRef<CombineShippingSettings>(DEFAULT_COMBINE_SHIPPING_SETTINGS);
+  const [combineShippingCheckError, setCombineShippingCheckError] = useState("");
   const [customerPointBalance, setCustomerPointBalance] = useState(0);
   const [shippingAddresses, setShippingAddresses] = useState<any[]>([]);
   const [customerPointLoading, setCustomerPointLoading] = useState(false);
@@ -2803,7 +2813,7 @@ export default function OrderPage() {
   };
 
 
-  const loadCombineShippingSettings = async () => {
+  const loadCombineShippingSettings = async (requestId?: number) => {
     const { data, error } = await supabase
       .from("settings")
       .select("key,value")
@@ -2811,11 +2821,13 @@ export default function OrderPage() {
 
     if (error) {
       console.log("합배송 설정 불러오기 오류", error.message);
-      return combineShippingSettings;
+      throw new Error("배송비 확인을 위한 설정을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
     }
 
     const nextSettings = parseCombineShippingSettings(data);
-    setCombineShippingSettings(nextSettings);
+    if (requestId === undefined || requestId === combineShippingRequestRef.current) {
+      setCombineShippingSettings(nextSettings);
+    }
 
     return nextSettings;
   };
@@ -2824,6 +2836,14 @@ export default function OrderPage() {
   //   서버(app/api/customer-orders/submit/route.ts)와 반드시 같은 함수를 써야 한다.
   //   한쪽만 다르면 손님은 0원을 보내는데 서버가 막아 주문 자체가 실패한다.
   const currentShippingAddressSignature = shippingAddressKey(address, detailAddress);
+  const combineShippingContextRef = useRef("");
+  const combineShippingContext = JSON.stringify([
+    normalizePhone(customerPhone), currentShippingAddressSignature,
+    broadcast?.id, broadcast?.status, broadcast?.started_at, broadcast?.created_at,
+  ]);
+  useLayoutEffect(() => {
+    combineShippingContextRef.current = combineShippingContext;
+  }, [combineShippingContext]);
 
   const resolveCurrentCombineShippingSettings = (sourceSettings: CombineShippingSettings): CombineShippingSettings => {
     // 관리자 수동 시간설정이 켜져있고 "지금 유효"하면 방송 ON이어도 시간범위를 우선한다.
@@ -2919,6 +2939,13 @@ export default function OrderPage() {
   };
 
   const checkAlreadyPaidShippingGroups = async (phoneValue = customerPhone): Promise<PaidShippingGroups> => {
+    const requestId = ++combineShippingRequestRef.current;
+    const requestContext = combineShippingContextRef.current;
+    const isCurrentRequest = () => requestId === combineShippingRequestRef.current &&
+      requestContext === combineShippingContextRef.current;
+    const assertCurrentRequest = () => {
+      if (!isCurrentRequest()) throw new Error("배송비 확인 중 주문 정보가 변경되었습니다. 다시 시도해 주세요.");
+    };
     const cleanPhone = normalizePhone(phoneValue);
     const addressSignature = currentShippingAddressSignature;
 
@@ -2928,7 +2955,9 @@ export default function OrderPage() {
       return { ...EMPTY_PAID_SHIPPING_GROUPS };
     }
 
-    const loadedSettings = await loadCombineShippingSettings();
+    try {
+    const loadedSettings = await loadCombineShippingSettings(requestId);
+    assertCurrentRequest();
     const settings = resolveCurrentCombineShippingSettings(loadedSettings);
 
     const formattedPhone = formatOrderPhone(cleanPhone);
@@ -2972,10 +3001,9 @@ export default function OrderPage() {
 
     if (error) {
       console.log("기존 배송비 확인 오류", error.message);
-      setAlreadyPaidShipping(false);
-      setPaidShippingGroups({ ...EMPTY_PAID_SHIPPING_GROUPS });
-      return { ...EMPTY_PAID_SHIPPING_GROUPS };
+      throw new Error("배송비 확인을 위한 기존 주문을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
     }
+    assertCurrentRequest();
 
     const activeCombineShippingOrders = (data || []).filter((order: any) => {
       if (isCanceledOrderForCombineShipping(order)) return false;
@@ -3019,6 +3047,7 @@ export default function OrderPage() {
 
       if (productError) {
         console.log("배송비 상품유형 확인 오류", productError.message);
+        throw new Error("배송비 확인을 위한 상품 배송유형을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
       } else {
         (products || []).forEach((product: any) => {
           productShippingMap.set(String(product.id), product);
@@ -3036,18 +3065,35 @@ export default function OrderPage() {
       groups[group] = true;
     });
 
+    assertCurrentRequest();
+    verifiedCombineShippingSettingsRef.current = loadedSettings;
     if (groups.normal || groups.vendor) {
       markPaidShippingInThisBrowser(cleanPhone, settings, addressSignature);
     }
 
     setPaidShippingGroups(groups);
+    setPaidShippingScopeKey(JSON.stringify([
+      cleanPhone, addressSignature, loadedSettings.enabled, loadedSettings.startAt, loadedSettings.endAt,
+    ]));
     setAlreadyPaidShipping(groups.normal || groups.vendor);
+    setCombineShippingCheckError("");
     return groups;
+    } catch (error) {
+      // 조회 실패는 '기존 주문 없음'이 아니다. 이전 표시를 유지하고 제출은 상위 catch로 중단한다.
+      if (isCurrentRequest()) setCombineShippingCheckError("배송비를 확인하지 못했습니다. 표시된 배송비는 미확정이며, 주문 제출 시 다시 확인합니다.");
+      throw error;
+    }
   };
 
   const checkAlreadyPaidShipping = async (phoneValue = customerPhone) => {
-    const groups = await checkAlreadyPaidShippingGroups(phoneValue);
-    return groups.normal || groups.vendor;
+    try {
+      const groups = await checkAlreadyPaidShippingGroups(phoneValue);
+      return groups.normal || groups.vendor;
+    } catch (error) {
+      // 자동 재조회 실패는 처리하되, submitOrder는 위 검증 함수를 직접 호출하여 실패 시 저장하지 않는다.
+      console.warn("합배송 자동 확인 실패", error);
+      return false;
+    }
   };
 
   const logoutCustomerInfo = () => {
@@ -4979,6 +5025,12 @@ export default function OrderPage() {
     if (submitInFlightRef.current) return;
     submitInFlightRef.current = true;
     setSubmitting(true);
+    const submitShippingContext = combineShippingContextRef.current;
+    const assertSubmitShippingContext = () => {
+      if (submitShippingContext !== combineShippingContextRef.current) {
+        throw new Error("배송비 확인 중 주문 정보가 변경되었습니다. 다시 시도해 주세요.");
+      }
+    };
 
     try {
       const blockCheck = await refreshCustomerBlockStatus(customerPhone);
@@ -5003,6 +5055,7 @@ export default function OrderPage() {
           ? EMPTY_OPERATOR_TEST_ORDER_FLAGS
           : rawOperatorTestOrderFlags;
       const paidShippingGroupsBeforeSubmit = await checkAlreadyPaidShippingGroups(cleanPhone);
+      const submitShippingRequestId = combineShippingRequestRef.current;
       const paidShippingBeforeSubmit = paidShippingGroupsBeforeSubmit.normal || paidShippingGroupsBeforeSubmit.vendor;
       const validItems = items.filter(
         (item) =>
@@ -5018,9 +5071,9 @@ export default function OrderPage() {
           ? Math.round((productAmount + appliedShippingFee) * (cardRateForCustomer / 100))
           : 0;
       const appliedTotalAmount = productAmount + appliedShippingFee + appliedCardExtra;
-      const latestCombineSettings = await loadCombineShippingSettings();
-      const markCombineSettings = resolveCurrentCombineShippingSettings(latestCombineSettings);
+      const markCombineSettings = resolveCurrentCombineShippingSettings(verifiedCombineShippingSettingsRef.current);
 
+      assertSubmitShippingContext();
       await saveCustomer();
 
       // 멱등성: 재시도 시 같은 키를 재사용한다. 성공한 뒤에만(아래 성공 분기) 새 키로 비운다.
@@ -5124,6 +5177,7 @@ export default function OrderPage() {
           ? Math.min(requestedPointUseAmount, customerPointBalance, appliedTotalAmount)
           : 0;
 
+      assertSubmitShippingContext();
       const orderSubmitResponse = await fetch("/api/customer-orders/submit", {
         method: "POST",
         headers: {
@@ -5208,8 +5262,12 @@ export default function OrderPage() {
         markPaidShippingInThisBrowser(cleanPhone, markCombineSettings);
       }
 
-      setPaidShippingGroups(nextPaidShippingGroupsAfterSubmit);
-      setAlreadyPaidShipping(nextPaidShippingGroupsAfterSubmit.normal || nextPaidShippingGroupsAfterSubmit.vendor);
+      // 제출 응답 대기 중 새 고객/배송지 조회가 끝났다면 그 최신 판정을 덮지 않는다.
+      if (submitShippingContext === combineShippingContextRef.current &&
+          submitShippingRequestId === combineShippingRequestRef.current) {
+        setPaidShippingGroups(nextPaidShippingGroupsAfterSubmit);
+        setAlreadyPaidShipping(nextPaidShippingGroupsAfterSubmit.normal || nextPaidShippingGroupsAfterSubmit.vendor);
+      }
 
       setIsEditingCustomerInfo(false);
       setIsCustomerInfoOpen(false);
@@ -7488,7 +7546,10 @@ export default function OrderPage() {
               style={{ padding: "16px 18px", borderTop: "0.5px solid #E5E1DC" }}
             >
               {/* [2026-09-20 심플하게] 「최종 확인 / 결제금액 확인 / …확인해 주세요」 설명 3줄 삭제 — 금액표만. */}
-              {shippingNoticeText && (
+              {combineShippingCheckError && (
+                <div role="status" className="mb-3 text-[12px] font-bold text-red-700">{combineShippingCheckError}</div>
+              )}
+              {!combineShippingCheckError && shippingNoticeText && (
                 <div className="mb-3 break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em]" style={{ color: shippingFee > 0 ? "#80522B" : "#0F6E56" }}>
                   {shippingFee > 0 ? "🚚" : "✅"} {shippingNoticeText}
                 </div>
