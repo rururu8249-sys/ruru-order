@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import AdminLiveSettingsNavigation from "./AdminLiveSettingsNav";
+import SettingsUnsavedChangesDialog from "./SettingsUnsavedChangesDialog";
+import {type SettingsTab,type SettingsDestination} from "./adminLiveSettingsNavigation";
+import {useSettingsDraft,type SettingsDraftState} from "./useSettingsDraft";
 import YoutubeNotifyCard from "./YoutubeNotifyCard";
 import TelegramNotifyCard from "./TelegramNotifyCard";
 import TrendPanel from "./TrendPanel";
@@ -174,25 +178,6 @@ function decimalInput(value: string) {
 }
 
 // 설정 카테고리(좌측 네비) — 업계 표준: 카테고리별로 나눠 스크롤 최소화
-type SettingsTab = "shop" | "payment" | "combine" | "point" | "order" | "photo" | "screen" | "sound" | "youtube" | "telegram" | "trend" | "security";
-const SETTINGS_TABS: { key: SettingsTab; label: string; icon: string; desc: string }[] = [
-  // [2026-09-08] 상점 정보 — 문의 방식·페이스터·표시용 계좌. 자체 저장(API). 맨 위 + 기본 탭.
-  { key: "shop", label: "상점 정보", icon: "🏪", desc: "문의 방식·계좌·페이스터" },
-  { key: "payment", label: "결제·배송", icon: "💳", desc: "카드 수수료·배송비" },
-  { key: "combine", label: "합배송", icon: "🚚", desc: "시간범위 수동설정" },
-  { key: "point", label: "포인트 적립", icon: "🪙", desc: "자동적립·적립률" },
-  { key: "order", label: "주문서 표시", icon: "📝", desc: "선점시간·직접입력" },
-  // [2026-09-24] 상품사진 안내문구 — 사진에 구워 넣는 «연출컷» 고지. 자체 저장(API).
-  { key: "photo", label: "상품사진 문구", icon: "🖼", desc: "연출컷 안내문구 합성" },
-  // [2026-09-12] 방송 화면 — 프리즘 브라우저 소스 주소·크기·옵션. 저장 없음(안내판).
-  { key: "screen", label: "방송 화면", icon: "📺", desc: "프리즘 위젯 주소" },
-  // [2026-09-08 사장님 요청] 알림음은 사이드바가 아니라 설정에 둔다.
-  { key: "sound", label: "알림음", icon: "🔔", desc: "주문·입금 소리·볼륨" },
-  { key: "youtube", label: "유튜브 알림", icon: "📺", desc: "라이브 채팅 자동알림" },
-  { key: "telegram", label: "텔레그램 알림", icon: "📨", desc: "폰 푸시 알림" },
-  { key: "trend", label: "트렌드 추천", icon: "📈", desc: "셀럽·인스타 트렌드" },
-  { key: "security", label: "관리자 보안", icon: "🔒", desc: "로그인 정보" },
-];
 // 하단 공통 저장바(운영값)를 쓰는 탭 — 유튜브/보안은 자체 저장
 const GLOBAL_SAVE_TABS: SettingsTab[] = ["payment", "point", "order"];
 
@@ -201,12 +186,20 @@ type AdminLiveSettingsPanelProps = {
   onOpenNotice?: () => void;
   /** [2026-09-12] 「이벤트 열기」 바로가기 — 방송 화면 탭에서 이벤트 오버레이 주소를 찾아갈 때 */
   onOpenEvent?: () => void;
+  onOpenAudit?: () => void;
+  onNavigationGuardChange?: (guard:null|(()=>Promise<boolean>)) => void;
 };
 
-export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent }: AdminLiveSettingsPanelProps = {}) {
+export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onOpenAudit, onNavigationGuardChange }: AdminLiveSettingsPanelProps = {}) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>("shop");
+  const [focusSection,setFocusSection]=useState<"bank"|"payster">();
+  const [childDraft,setChildDraft]=useState<SettingsDraftState|null>(null);
+  const [globalDraftState,setGlobalDraftState]=useState<SettingsDraftState|null>(null);
+  const [choiceOpen,setChoiceOpen]=useState(false);
+  const pendingRef=useRef<((ok:boolean)=>void)|null>(null);
+  const draftRef=useRef<SettingsDraftState|null>(null);
 
   const [customerCardRate, setCustomerCardRate] = useState(String(DEFAULTS.customer_card_extra_rate));
   const [actualCardRate, setActualCardRate] = useState(String(DEFAULTS.actual_card_fee_rate));
@@ -282,7 +275,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent }: Ad
     };
   }, []);
 
-  const saveSettings = async () => {
+  const saveSettings = async ():Promise<boolean> => {
     const nextCustomerCardRate = Math.min(20, Math.max(0, toNumber(customerCardRate)));
     const nextActualCardRate = Math.min(20, Math.max(0, toNumber(actualCardRate)));
     const nextCardMinAmount = Math.max(0, Math.round(toNumber(cardMinAmount)));
@@ -317,7 +310,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent }: Ad
 
       if (error) {
         showAdminToast("설정 저장 실패\n\n" + error.message, "error");
-        return;
+        return false;
       }
 
       setCustomerCardRate(String(nextCustomerCardRate));
@@ -332,12 +325,40 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent }: Ad
       }
 
       showAdminToast("운영 설정을 저장했습니다.", "success");
+      markGlobalSaved();
+      return true;
+    } catch (error) {
+      showAdminToast("설정 저장 실패\n\n"+(error instanceof Error ? error.message : String(error)),"error");
+      return false;
     } finally {
       setSaving(false);
     }
   };
 
-  const cardClass = "rounded-2xl border border-line bg-surface p-5";
+  const globalDraft={customerCardRate,actualCardRate,cardMinAmount,defaultShippingFee,remoteShippingFee,pointAutoEarn,pointEarnRate,holdAmount,holdUnit,directInputEnabled,howtoEnabled,howtoSteps,howtoWarn,finalSubmitConfirmationEnabled,productNoticeMode,productNoticeCustom};
+  const markGlobalSaved=useSettingsDraft({value:globalDraft,loading,saving,save:saveSettings,onDraftStateChange:setGlobalDraftState,onDiscard:(value)=>{
+    setCustomerCardRate(value.customerCardRate);setActualCardRate(value.actualCardRate);setCardMinAmount(value.cardMinAmount);setDefaultShippingFee(value.defaultShippingFee);setRemoteShippingFee(value.remoteShippingFee);setPointAutoEarn(value.pointAutoEarn);setPointEarnRate(value.pointEarnRate);setHoldAmount(value.holdAmount);setHoldUnit(value.holdUnit);setDirectInputEnabled(value.directInputEnabled);setHowtoEnabled(value.howtoEnabled);setHowtoSteps(value.howtoSteps);setHowtoWarn(value.howtoWarn);setFinalSubmitConfirmationEnabled(value.finalSubmitConfirmationEnabled);setProductNoticeMode(value.productNoticeMode);setProductNoticeCustom(value.productNoticeCustom);
+  }});
+  draftRef.current=GLOBAL_SAVE_TABS.includes(activeTab) ? globalDraftState : childDraft;
+  const protectNavigation=useCallback(async()=>{
+    const draft=draftRef.current;
+    if (draft?.saving || pendingRef.current) return false;
+    if (!draft?.dirty) return true;
+    return new Promise<boolean>(resolve=>{pendingRef.current=resolve;setChoiceOpen(true);});
+  },[]);
+  useEffect(()=>{onNavigationGuardChange?.(protectNavigation);return()=>{onNavigationGuardChange?.(null);pendingRef.current?.(false);pendingRef.current=null;};},[onNavigationGuardChange,protectNavigation]);
+  useEffect(()=>{
+    const beforeUnload=(event:BeforeUnloadEvent)=>{if(draftRef.current?.dirty){event.preventDefault();event.returnValue="";}};
+    window.addEventListener("beforeunload",beforeUnload);return()=>window.removeEventListener("beforeunload",beforeUnload);
+  },[]);
+  const finishChoice=(ok:boolean)=>{const resolve=pendingRef.current;pendingRef.current=null;setChoiceOpen(false);resolve?.(ok);};
+  const selectDestination=async(destination:SettingsDestination)=>{
+    if ("menu" in destination) {if(destination.menu==="notice") onOpenNotice?.();else onOpenAudit?.();return;}
+    if ("tab" in destination && destination.tab===activeTab) {setFocusSection(destination.section);return;}
+    if (!(await protectNavigation())) return;
+    setChildDraft(null);setActiveTab(destination.tab);setFocusSection(destination.section);
+  };
+  const cardClass = "rounded-2xl border border-line bg-surface p-4";
   const sectionTitle = (title: string, desc: string) => (
     <div className="mb-4">
       <h2 className="text-base font-black text-ink">{title}</h2>
@@ -350,31 +371,17 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent }: Ad
        → 폰에서는 위아래로 쌓고(메뉴는 가로 스크롤 칩 줄), 넓은 화면(md+)에서만 예전처럼 좌우 2단. 표시 전용 */
     <div className="flex h-full min-h-0 flex-col md:flex-row">
       {/* 좌측 카테고리 네비 (업계표준: 카테고리로 나눠 스크롤 최소화) */}
-      <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-surface-2/60 p-2 [scrollbar-width:none] md:w-44 md:flex-col md:space-y-1 md:overflow-x-visible md:overflow-y-auto md:border-b-0 md:border-r md:p-3 [&::-webkit-scrollbar]:hidden">
-        {SETTINGS_TABS.map((t) => {
-          const active = activeTab === t.key;
-          return (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setActiveTab(t.key)}
-              className={`flex shrink-0 flex-col rounded-xl px-3 py-2 text-left transition md:w-full md:py-2.5 ${active ? "bg-rose-deep text-white" : "text-ink-soft hover:bg-surface"}`}
-            >
-              <span className="whitespace-nowrap text-sm font-black">{t.icon} {t.label}</span>
-              <span className={`mt-0.5 hidden text-[11px] font-bold md:block ${active ? "text-white/70" : "text-ink-mute"}`}>{t.desc}</span>
-            </button>
-          );
-        })}
-      </nav>
+      <AdminLiveSettingsNavigation activeTab={activeTab} section={focusSection} onSelect={destination=>void selectDestination(destination)} />
+      {choiceOpen ? <SettingsUnsavedChangesDialog saving={Boolean(draftRef.current?.saving)} onSave={()=>void(async()=>{try{if(await draftRef.current?.save()) {draftRef.current=null;finishChoice(true);}}catch(error){showAdminToast(error instanceof Error ? error.message : String(error),"error");}})()} onDiscard={()=>{draftRef.current?.discard();draftRef.current=null;finishChoice(true);}} onCancel={()=>{if(!draftRef.current?.saving) finishChoice(false);}} /> : null}
 
       {/* 우측 내용 */}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="flex-1 space-y-4 overflow-y-auto p-3 md:p-5">
           {/* ── 상점 정보 (자체 저장: /api/admin-live/shop-info) ── */}
-          {activeTab === "shop" && <ShopInfoSettingsTab />}
+          {activeTab === "shop" && <ShopInfoSettingsTab onDraftStateChange={setChildDraft} focusSection={focusSection} />}
 
           {/* ── 상품사진 문구 (자체 저장: /api/admin-live/product-image-notice) ── */}
-          {activeTab === "photo" && <ProductImageNoticeSettingsTab />}
+          {activeTab === "photo" && <ProductImageNoticeSettingsTab onDraftStateChange={setChildDraft} />}
 
           {/* ── 결제·배송 ── */}
           {activeTab === "payment" && (
@@ -705,7 +712,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent }: Ad
           )}
 
           {/* ── 유튜브 알림 (자체 저장) ── */}
-          {activeTab === "combine" && <CombineShippingSettingsTab />}
+          {activeTab === "combine" && <CombineShippingSettingsTab onDraftStateChange={setChildDraft} />}
 
           {/* ── 방송 화면 (저장 없음: 프리즘 소스 주소·크기 안내) ── */}
           {activeTab === "screen" && <BroadcastScreenSettingsTab onOpenEvent={onOpenEvent} />}
@@ -718,9 +725,9 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent }: Ad
             </div>
           )}
 
-          {activeTab === "youtube" && <YoutubeNotifyCard />}
+          {activeTab === "youtube" && <YoutubeNotifyCard onDraftStateChange={setChildDraft} />}
 
-          {activeTab === "telegram" && <TelegramNotifyCard />}
+          {activeTab === "telegram" && <TelegramNotifyCard onDraftStateChange={setChildDraft} />}
 
           {activeTab === "trend" && <TrendPanel />}
 

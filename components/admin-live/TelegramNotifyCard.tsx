@@ -3,9 +3,10 @@
 // 텔레그램 알림 설정 카드 — 봇 토큰/chat id 붙여넣고 저장 + 테스트 발송.
 //   비밀값은 서버전용 테이블에 보관(/api/admin-live/telegram). Vercel 환경변수 불필요.
 import { useEffect, useState } from "react";
+import {useSettingsDraft,type SettingsDraftProps} from "./useSettingsDraft";
 import { showAdminToast } from "@/lib/adminToast";
 
-export default function TelegramNotifyCard() {
+export default function TelegramNotifyCard({onDraftStateChange}:SettingsDraftProps = {}) {
   const [botToken, setBotToken] = useState("");
   const [chatId, setChatId] = useState("");
   const [enabled, setEnabled] = useState(true);
@@ -14,6 +15,7 @@ export default function TelegramNotifyCard() {
   const [chatIdSet, setChatIdSet] = useState(false);
   const [recipientCount, setRecipientCount] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
   // 서버에 «저장된» 토글 값 (화면 값과 달라지면 「아직 저장 안 됨」 표시)
   const [savedToggles, setSavedToggles] = useState<{ enabled: boolean; reportOnEnd: boolean } | null>(null);
   const [testing, setTesting] = useState(false);
@@ -33,6 +35,8 @@ export default function TelegramNotifyCard() {
       }
     } catch {
       /* ignore */
+    } finally {
+      setLoading(false);
     }
   };
   useEffect(() => {
@@ -41,7 +45,7 @@ export default function TelegramNotifyCard() {
 
   const toggleDirty = savedToggles !== null && (enabled !== savedToggles.enabled || reportOnEnd !== savedToggles.reportOnEnd);
 
-  const save = async () => {
+  const save = async ():Promise<boolean> => {
     setSaving(true);
     try {
       const body: Record<string, unknown> = { action: "save", enabled, reportOnEnd };
@@ -53,20 +57,26 @@ export default function TelegramNotifyCard() {
         body: JSON.stringify(body),
       });
       const j = await r.json();
-      if (j.ok) showAdminToast("텔레그램 설정을 저장했습니다.", "success");
+      if (r.ok && j.ok) showAdminToast("텔레그램 설정을 저장했습니다.", "success");
       else showAdminToast("저장 실패\n\n" + (j.error || ""), "error");
-      if (j.ok) {
+      if (r.ok && j.ok) {
         setBotToken("");
         setChatId("");
-        loadStatus();
+        setSavedToggles({enabled,reportOnEnd});
+        markSaved();
+        void loadStatus();
+        return true;
       }
+      return false;
     } catch (e: any) {
       showAdminToast("저장 실패\n\n" + (e?.message || e), "error");
+      return false;
     } finally {
       setSaving(false);
     }
   };
 
+  const markSaved=useSettingsDraft({value:{botToken,chatId,enabled,reportOnEnd},loading,saving,save,onDraftStateChange});
   const [detecting, setDetecting] = useState(false);
   const detectChat = async () => {
     setDetecting(true);

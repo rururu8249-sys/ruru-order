@@ -8,9 +8,10 @@
 //   모든 비밀값(refresh token)은 서버에서만 다루고, 이 카드는 /api/youtube/admin 만 호출.
 
 import { useEffect, useState } from "react";
+import {useSettingsDraft,type SettingsDraftProps} from "./useSettingsDraft";
 import { showAdminToast } from "@/lib/adminToast";
 
-export default function YoutubeNotifyCard() {
+export default function YoutubeNotifyCard({onDraftStateChange}:SettingsDraftProps = {}) {
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
   const [liveUrl, setLiveUrl] = useState("");
@@ -61,7 +62,7 @@ export default function YoutubeNotifyCard() {
     window.location.href = "/api/youtube/oauth-start";
   };
 
-  const saveSettings = async () => {
+  const saveSettings = async ():Promise<boolean> => {
     setSavingSettings(true);
     try {
       const res = await fetch("/api/youtube/admin", {
@@ -70,8 +71,11 @@ export default function YoutubeNotifyCard() {
         body: JSON.stringify({ action: "save-settings", notifyEnabled, messageTemplate }),
       });
       const json = await res.json();
-      if (json?.ok) showAdminToast("알림 설정을 저장했습니다.", "success");
-      else showAdminToast("저장 실패\n\n" + (json?.error || ""), "error");
+      if (res.ok && json?.ok) {showAdminToast("알림 설정을 저장했습니다.", "success");markSaved();return true;}
+      showAdminToast("저장 실패\n\n" + (json?.error || ""), "error");
+      return false;
+    } catch (error) {
+      showAdminToast("저장 실패\n\n"+(error instanceof Error ? error.message : String(error)),"error");return false;
     } finally {
       setSavingSettings(false);
     }
@@ -102,6 +106,7 @@ export default function YoutubeNotifyCard() {
     }
   };
 
+  const markSaved=useSettingsDraft({value:{notifyEnabled,messageTemplate},loading,saving:savingSettings,save:saveSettings,onDraftStateChange});
   return (
     <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
       <div className="mb-4 flex items-center justify-between gap-3">

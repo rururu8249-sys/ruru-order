@@ -10,6 +10,7 @@
 //   · 돈 로직 없음. 주문·입금·정산·배송·포인트·Bankda 와 무관.
 
 import { useEffect, useRef, useState } from "react";
+import {useSettingsDraft,type SettingsDraftProps} from "./useSettingsDraft";
 import {
   PRODUCT_IMAGE_NOTICE_DEFAULTS,
   NOTICE_TEXT_MAX,
@@ -45,7 +46,7 @@ function sectionTitle(title: string, desc: string) {
   );
 }
 
-export default function ProductImageNoticeSettingsTab() {
+export default function ProductImageNoticeSettingsTab({onDraftStateChange}:SettingsDraftProps = {}) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [storedKeys, setStoredKeys] = useState(0);
@@ -102,12 +103,12 @@ export default function ProductImageNoticeSettingsTab() {
     }
   }, [on, text, opacity]);
 
-  const save = async () => {
+  const save = async ():Promise<boolean> => {
     const draft: ProductImageNotice = { on, text: text.trim(), opacity };
     const message = validateProductImageNotice(draft);
     if (message) {
       showAdminToast(message, "error");
-      return;
+      return false;
     }
 
     setSaving(true);
@@ -120,7 +121,7 @@ export default function ProductImageNoticeSettingsTab() {
       const json = await res.json().catch(() => null);
       if (!res.ok || json?.ok === false) {
         showAdminToast("상품사진 문구 저장 실패\n\n" + (json?.error || `HTTP ${res.status}`), "error");
-        return;
+        return false;
       }
       if (json?.notice) {
         setOn(json.notice.on);
@@ -130,13 +131,17 @@ export default function ProductImageNoticeSettingsTab() {
       }
       clearProductImageNoticeCache();   // 다음 사진 업로드부터 바로 새 값으로
       showAdminToast("저장했습니다. 지금부터 올리는 사진에 적용됩니다.", "success");
+      markSaved();
+      return true;
     } catch (error) {
       showAdminToast("상품사진 문구 저장 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
+      return false;
     } finally {
       setSaving(false);
     }
   };
 
+  const markSaved=useSettingsDraft({value:{on,text,opacity},loading,saving,save,onDraftStateChange});
   return (
     <div className="space-y-4">
       <div className="space-y-4">

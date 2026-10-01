@@ -18,7 +18,7 @@ const clearLiveOrderAutoRefreshInterval = (intervalId: number | null) => {
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 import { primeAdminVoice, playOrderAlert, playDepositAlert } from "@/lib/adminVoice";
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import AdminLiveCustomersPanel from "./AdminLiveCustomersPanel";
 import AdminLiveNoticePanel from "./AdminLiveNoticePanel";
@@ -549,10 +549,15 @@ async function saveLiveBroadcastEndReport({
 export default function AdminLiveDashboard() {
   const [activeMenu, setActiveScreen] = useState<AdminLiveMenuKey>(() => resolveAdminLiveDestination(readMenuFromUrl()).screen);
   const [drawer, setDrawer] = useState<AdminLiveDrawerState>(() => resolveAdminLiveDestination(readMenuFromUrl()).drawer);
+  const settingsGuardRef=useRef<null|(()=>Promise<boolean>)>(null);
+  const registerSettingsGuard=useCallback((guard:null|(()=>Promise<boolean>))=>{settingsGuardRef.current=guard;},[]);
   const setActiveMenu = (menu: AdminLiveMenuKey) => {
-    const destination = resolveAdminLiveDestination(menu);
-    setActiveScreen(destination.screen);
-    setDrawer(destination.drawer);
+    void (async()=>{
+      if(activeMenu==="settings" && menu!=="settings" && settingsGuardRef.current && !(await settingsGuardRef.current())) return;
+      const destination = resolveAdminLiveDestination(menu);
+      setActiveScreen(destination.screen);
+      setDrawer(destination.drawer);
+    })();
   };
   const [customersInitialTab, setCustomersInitialTab] = useState<"members" | "issues">("members");
   // [2026-09-25] 고객·이슈 패널의 «현재» 탭 — 「고객이슈」 탭이면 위쪽 미해결 알림 띠를 숨긴다(중복 표시 방지).
@@ -1567,7 +1572,6 @@ export default function AdminLiveDashboard() {
           onExceptionBadgeClick={(kind) => {
             // [UX 2026-07-06] 배지 클릭 = 그 예외 주문만 바로 보기: 주문·입금 › 실시간 주문 + 기간/범위 전체 + 해당 상태 필터
             setActiveMenu("orders");
-            replacePanelInUrl("orders");
             setNavOpen(false);
             setFilters((prev) => ({
               ...prev,
@@ -1579,10 +1583,9 @@ export default function AdminLiveDashboard() {
           }}
           onMenuChange={(nextMenu) => {
             setActiveMenu(nextMenu);
-            replacePanelInUrl(nextMenu);
           }}
           broadcastOn={Boolean(activeBroadcast)}
-          onOpenVisitStats={() => { setActiveMenu("visits"); replacePanelInUrl("visits"); }}
+          onOpenVisitStats={() => { setActiveMenu("visits"); }}
         />
 
         <main className="flex min-w-0 flex-1 flex-col px-3 py-3 md:px-5 md:py-4">
@@ -1615,7 +1618,7 @@ export default function AdminLiveDashboard() {
                           <button
                             key={tab.key}
                             type="button"
-                            onClick={() => { setActiveMenu(tab.key); replacePanelInUrl(tab.key); }}
+                            onClick={() => { setActiveMenu(tab.key); }}
                             className={[
                               "-mb-px shrink-0 whitespace-nowrap rounded-t-lg border-b-2 px-3.5 py-2 text-[13px] font-black transition",
                               active ? "border-rose-deep bg-rose-soft/60 text-rose-deep" : "border-transparent text-ink-soft hover:opacity-90 hover:text-rose-deep",
@@ -1685,13 +1688,13 @@ export default function AdminLiveDashboard() {
                   />
                   <LiveMissionGauge
                     broadcastOn={Boolean(activeBroadcast)}
-                    onOpenMission={() => { setActiveMenu("event"); replacePanelInUrl("event"); }}
+                    onOpenMission={() => { setActiveMenu("event"); }}
                   />
                   <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
                   {/* [2026-09-08 사장님 지적] 시스템 점검은 「설정 › 시스템 점검」, 고객이슈는 「고객」으로 옮겼다.
                       방송/쇼핑몰 상관없는 공통 항목이라 방송 메뉴에 있을 자리가 아니다. */}
                   <div className="w-full">
-                    <LiveStatsPanel orders={orders} activeBroadcastId={activeBroadcast?.id || null} onOpenReport={() => { setActiveMenu("reports"); replacePanelInUrl("reports"); }} />
+                    <LiveStatsPanel orders={orders} activeBroadcastId={activeBroadcast?.id || null} onOpenReport={() => { setActiveMenu("reports"); }} />
                   </div>
                 </div>
               ) : null}
@@ -1705,7 +1708,7 @@ export default function AdminLiveDashboard() {
                   embedded
                   renderTrigger={false}
                   controlledOpen={activeMenu === "event"}
-                  onRequestClose={() => { setActiveMenu("broadcast"); replacePanelInUrl("broadcast"); }}
+                  onRequestClose={() => { setActiveMenu("broadcast"); }}
                   activeBroadcastId={activeBroadcast?.id || null}
                   filteredOrderGroupIds={filteredOrders.map((o) => String(o.groupId))}
                 />
@@ -1725,7 +1728,7 @@ export default function AdminLiveDashboard() {
                   <div className="shrink-0">
                     <LiveMissionGauge
                       broadcastOn={Boolean(activeBroadcast)}
-                      onOpenMission={() => { setActiveMenu("event"); replacePanelInUrl("event"); }}
+                      onOpenMission={() => { setActiveMenu("event"); }}
                     />
                   </div>
                   <div className="flex min-w-0 flex-col">
@@ -1764,7 +1767,6 @@ export default function AdminLiveDashboard() {
                     onGoToUnpaidOrders={() => {
                       // 미수금 줄 → 주문·입금 화면에서 «미입금 주문만» 바로 보기 (읽기 전용 이동, 돈 로직 무관)
                       setActiveMenu("orders");
-                      replacePanelInUrl("orders");
                       setFilters((prev) => ({ ...prev, broadcast: "all", scope: "all", date: "all", status: "unpaid" }));
                     }}
                   />
@@ -1843,8 +1845,10 @@ export default function AdminLiveDashboard() {
               {activeMenu === "settings" ? (
                 <div className="w-full">
                   <AdminLiveSettingsPanel
-                    onOpenNotice={() => { setActiveMenu("notice"); replacePanelInUrl("notice"); }}
-                    onOpenEvent={() => { setActiveMenu("event"); replacePanelInUrl("event"); }}
+                    onOpenNotice={() => { setActiveMenu("notice"); }}
+                    onOpenEvent={() => { setActiveMenu("event"); }}
+                    onOpenAudit={() => { setActiveMenu("audit"); }}
+                    onNavigationGuardChange={registerSettingsGuard}
                   />
                 </div>
               ) : null}
@@ -1919,7 +1923,6 @@ export default function AdminLiveDashboard() {
               onOpenSettlement={() => {
                 setBroadcastEndSummary(null);
                 setActiveMenu("settlement");
-                replacePanelInUrl("settlement");
               }}
             />
           ) : null}

@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {SETTINGS_NAV_GROUPS,searchSettingsNavigation} from '../components/admin-live/adminLiveSettingsNavigation.ts';
+const items=SETTINGS_NAV_GROUPS.flatMap(g=>g.items);
+assert.deepEqual([...new Set(items.filter(i=>'tab' in i.destination).map(i=>i.destination.tab))].sort(), ['combine','order','payment','photo','point','screen','security','shop','sound','telegram','trend','youtube']);
+assert.equal(SETTINGS_NAV_GROUPS.find(g=>g.items.some(i=>i.destination.tab==='trend')).collapsedByDefault,true);
+assert.deepEqual(searchSettingsNavigation('계좌').map(i=>i.destination),[{tab:'shop',section:'bank'}]);
+assert.deepEqual(searchSettingsNavigation('페이스터').map(i=>i.destination),[{tab:'shop',section:'payster'}]);
+assert.ok(searchSettingsNavigation('트렌드').some(i=>i.destination.tab==='trend'));
+assert.ok(items.some(i=>i.destination.menu==='notice'));
+assert.ok(items.some(i=>i.destination.menu==='audit'));
+console.log('PASS settings search destinations and preserved coverage');

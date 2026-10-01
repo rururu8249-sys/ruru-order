@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {useSettingsDraft,type SettingsDraftProps} from "./useSettingsDraft";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
@@ -25,7 +26,7 @@ function tonightPresetLocal() {
   };
 }
 
-export default function CombineShippingSettingsTab() {
+export default function CombineShippingSettingsTab({onDraftStateChange}:SettingsDraftProps = {}) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -79,7 +80,7 @@ export default function CombineShippingSettingsTab() {
     };
   }, []);
 
-  const save = async () => {
+  const save = async ():Promise<boolean> => {
     const startAt = fromDateTimeLocalValue(startLocal);
     const endAt = fromDateTimeLocalValue(endLocal);
 
@@ -87,14 +88,14 @@ export default function CombineShippingSettingsTab() {
       // 빈칸 차단
       if (!startAt || !endAt) {
         showAdminToast("합배송 시간을 사용하려면 시작·종료 시각을 모두 입력하세요.", "warning");
-        return;
+        return false;
       }
       const startMs = new Date(startAt).getTime();
       const endMs = new Date(endAt).getTime();
       // 시작 >= 종료 차단
       if (startMs >= endMs) {
         showAdminToast("종료 시각은 시작 시각보다 뒤여야 합니다.", "warning");
-        return;
+        return false;
       }
       // 종료가 이미 과거(만료된 범위) 차단 — 잘못 저장하면 사실상 적용 안 됨
       if (endMs <= Date.now()) {
@@ -102,7 +103,7 @@ export default function CombineShippingSettingsTab() {
           "종료 시간이 이미 지났습니다. 미래 시간으로 설정하세요(지금은 오늘 기준 적용됨).",
           "warning",
         );
-        return;
+        return false;
       }
       // 범위가 7일 초과면 확인 — 그 기간 같은 번호 주문 전부 배송비 0원
       const rangeDays = (endMs - startMs) / (1000 * 60 * 60 * 24);
@@ -111,7 +112,7 @@ export default function CombineShippingSettingsTab() {
           `합배송 범위가 약 ${Math.round(rangeDays)}일입니다. 그 기간 같은 번호 주문이 전부 배송비 0원 됩니다. 계속할까요?`,
           { title: "합배송 범위 확인", confirmText: "저장", cancelText: "취소", tone: "warning" },
         );
-        if (!ok) return;
+        if (!ok) return false;
       }
     }
 
@@ -128,15 +129,21 @@ export default function CombineShippingSettingsTab() {
 
       if (error) {
         showAdminToast("합배송 설정 저장 실패\n\n" + error.message, "error");
-        return;
+        return false;
       }
 
       showAdminToast("합배송 설정을 저장했습니다.", "success");
+      markSaved();
+      return true;
+    } catch (error) {
+      showAdminToast("합배송 설정 저장 실패\n\n" + (error instanceof Error ? error.message : String(error)),"error");
+      return false;
     } finally {
       setSaving(false);
     }
   };
 
+  const markSaved=useSettingsDraft({value:{enabled,startLocal,endLocal},loading,saving,save,onDraftStateChange});
   const statusLabel = enabled ? "🟢 켜짐" : "⚪ 꺼짐";
   const statusClass = enabled ? "bg-ok-bg text-ok-tx" : "bg-surface-2 text-ink-mute";
 

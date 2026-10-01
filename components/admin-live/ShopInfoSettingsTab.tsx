@@ -9,6 +9,7 @@
 //   · 돈 로직 없음. 입금 판정·뱅크다·정산은 이 화면과 무관.
 
 import { useEffect, useState } from "react";
+import {useSettingsDraft,type SettingsDraftProps} from "./useSettingsDraft";
 import {
   CONTACT_TYPE_LABEL,
   SHOP_INFO_DEFAULTS,
@@ -70,7 +71,7 @@ function sectionTitle(title: string, desc: string) {
   );
 }
 
-export default function ShopInfoSettingsTab() {
+export default function ShopInfoSettingsTab({onDraftStateChange,focusSection}:SettingsDraftProps & {focusSection?:"bank"|"payster"} = {}) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [storedKeys, setStoredKeys] = useState(0);
@@ -144,11 +145,11 @@ export default function ShopInfoSettingsTab() {
     if (next !== "channel") setAdminChatUrl("");
   };
 
-  const save = async () => {
+  const save = async ():Promise<boolean> => {
     const checked = validateShopInfo(draft);
     if (!checked.ok) {
       showAdminToast(checked.message, "error");
-      return;
+      return false;
     }
     const next = checked.value;
 
@@ -170,7 +171,7 @@ export default function ShopInfoSettingsTab() {
         ].join("\n"),
         { title: "입금계좌·노출방식 변경 확인", confirmText: "확인 후 저장", cancelText: "취소", tone: "danger" },
       );
-      if (!ok) return;
+      if (!ok) return false;
     }
 
     setSaving(true);
@@ -183,19 +184,24 @@ export default function ShopInfoSettingsTab() {
       const json = (await res.json().catch(() => null)) as { ok?: boolean; info?: ShopInfo; storedKeys?: number; error?: string } | null;
       if (!res.ok || !json?.ok || !json.info) {
         showAdminToast("상점 정보 저장 실패\n\n" + (json?.error || `HTTP ${res.status}`), "error");
-        return;
+        return false;
       }
       applyInfo(json.info);
       setStoredKeys(Number(json.storedKeys || 0));
       await refreshShopInfo();
       showAdminToast("상점 정보를 저장했습니다. 손님 화면과 사이드바에 바로 반영됩니다.", "success");
+      markSaved();
+      return true;
     } catch (error) {
       showAdminToast("상점 정보 저장 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
+      return false;
     } finally {
       setSaving(false);
     }
   };
 
+  const markSaved=useSettingsDraft({value:{contactType,contactValue,adminChatUrl,paysterUrl,bankAccounts,bankRouting},loading,saving,save,onDraftStateChange});
+  useEffect(()=>{if (!loading && focusSection) {const target=document.getElementById(`shop-setting-${focusSection}`);target?.scrollIntoView({block:"start"});target?.focus();}},[loading,focusSection]);
   const hint = CONTACT_HINT[contactType];
 
   return (
@@ -265,7 +271,7 @@ export default function ShopInfoSettingsTab() {
         </div>
 
         {/* ── 카드결제(페이스터) ── */}
-        <div className={cardClass}>
+        <div id="shop-setting-payster" tabIndex={-1} className={cardClass}>
           {sectionTitle("카드결제(페이스터) 주소", "사이드바 「카드결제」 버튼과 주문표의 카드결제 팝업이 여는 페이스터 문자결제 페이지입니다.")}
           <Field label="페이스터 문자결제 페이지 주소">
             <input
@@ -280,7 +286,7 @@ export default function ShopInfoSettingsTab() {
         </div>
 
         {/* ── 입금계좌 ── */}
-        <div className={cardClass}>
+        <div id="shop-setting-bank" tabIndex={-1} className={cardClass}>
           {sectionTitle("무통장 입금계좌와 고객별 노출", "현재 계좌를 유지하면서 계좌 한 개를 더 등록하고, 전체 고객 또는 기존회원·첫 주문 신규회원별로 보여줄 계좌를 선택합니다.")}
           <BankAccountRoutingSettings
             accounts={bankAccounts}

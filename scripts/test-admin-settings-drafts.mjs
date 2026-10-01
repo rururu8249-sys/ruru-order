@@ -1,0 +1,127 @@
+import assert from 'node:assert/strict';
+import React from 'react';
+import Renderer,{act} from 'react-test-renderer';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const {useSettingsDraft}=createUiLoader()('components/admin-live/useSettingsDraft.ts');
+let published, mark, ok=false;
+function Probe({value,loading=false,saving=false}) {
+  mark=useSettingsDraft({value,loading,saving,save:async()=>ok,onDraftStateChange:state=>{published=state;}});
+  return React.createElement('input',{value});
+}
+let tree;
+await act(async()=>{tree=Renderer.create(React.createElement(Probe,{value:'saved',loading:true}));});
+assert.equal(published.dirty,false,'loading not a draft');
+await act(async()=>tree.update(React.createElement(Probe,{value:'saved'})));
+assert.equal(published.dirty,false);
+await act(async()=>tree.update(React.createElement(Probe,{value:'changed'})));
+assert.equal(published.dirty,true,'change must guard navigation');
+assert.equal(await published.save(),false,'failed save remains blocked');
+assert.equal(published.dirty,true);
+await act(async()=>{mark(); tree.update(React.createElement(Probe,{value:'normalized'}));});
+assert.equal(published.dirty,false,'successful normalized value becomes baseline');
+await act(async()=>tree.update(React.createElement(Probe,{value:'normalized',saving:true})));
+assert.equal(published.saving,true);
+await act(async()=>tree.unmount());
+console.log('PASS settings load/change/failure/normalized-save draft lifecycle');
+let ownerDraft, deny=true, writes=0;
+const rows=[{key:'combine_shipping_enabled',value:'true'},{key:'combine_shipping_start_at',value:'2030-01-01T10:00:00Z'},{key:'combine_shipping_end_at',value:'2030-01-02T10:00:00Z'}];
+const db={from:()=>({select:()=>({in:async()=>({data:rows,error:null})}),upsert:async()=>{writes++;return {error:deny?{message:'denied'}:null};}})};
+const Combine=createUiLoader({'@/lib/supabase':{supabase:db},'@/lib/adminToast':{showAdminToast(){}},'@/lib/adminConfirm':{showAdminConfirm:async()=>true}})('components/admin-live/CombineShippingSettingsTab.tsx').default;
+await act(async()=>{tree=Renderer.create(React.createElement(Combine,{onDraftStateChange:state=>ownerDraft=state}));});
+assert.equal(ownerDraft?.dirty,false,'actual combine owner publishes loaded baseline');
+await act(async()=>tree.root.findAllByType('input')[1].props.onChange({target:{value:'2030-01-03T19:00'}}));
+assert.equal(ownerDraft.dirty,true);
+let result;
+await act(async()=>{result=await ownerDraft.save();});
+assert.equal(result,false); assert.equal(ownerDraft.dirty,true);
+deny=false;
+await act(async()=>{result=await ownerDraft.save();});
+assert.equal(result,true);assert.equal(ownerDraft.dirty,false);assert.equal(writes,2);
+await act(async()=>tree.unmount());
+console.log('PASS actual combine owner failed/successful save guard');
+
+// Exercise the actual settings coordinator: only unrelated owner screens/dialog DOM are substituted.
+let guard;
+globalThis.window={addEventListener(){},removeEventListener(){}};
+const Null=()=>null;
+const Dialog=props=>React.createElement('draft-dialog',props);
+const panelOverrides={'@/lib/supabase':{supabase:db},'@/lib/adminToast':{showAdminToast(){}},'./SettingsUnsavedChangesDialog':{default:Dialog}};
+for(const name of ['ShopInfoSettingsTab','ProductImageNoticeSettingsTab','YoutubeNotifyCard','TelegramNotifyCard','TrendPanel','AdminAuthSettingsPanel','AdminSoundControl','BroadcastScreenSettingsTab']) panelOverrides['./'+name]={default:Null};
+const Panel=createUiLoader(panelOverrides)('components/admin-live/AdminLiveSettingsPanel.tsx').default;
+await act(async()=>{tree=Renderer.create(React.createElement(Panel,{onNavigationGuardChange:value=>guard=value}));});
+const button=label=>tree.root.findAllByType('button').find(node=>node.children.join('')===label);
+async function select(label){await act(async()=>{button(label).props.onClick();});}
+await select('결제·배송');
+await act(async()=>tree.root.findAllByType('input').find(node=>node.props.value==='10').props.onChange({target:{value:'12'}}));
+await select('포인트 적립');
+assert.equal(tree.root.findAllByType('draft-dialog').length,1);
+await act(async()=>tree.root.findByType('draft-dialog').props.onCancel());
+assert(tree.root.findAllByType('input').some(node=>node.props.value==='12'),'cancel retains edit');
+await select('포인트 적립'); deny=true;const beforeWrites=writes;
+await act(async()=>tree.root.findByType('draft-dialog').props.onSave());
+assert.equal(writes,beforeWrites+1);assert.equal(tree.root.findAllByType('draft-dialog').length,1,'save failure does not navigate');
+deny=false;
+await act(async()=>tree.root.findByType('draft-dialog').props.onSave());
+assert.equal(writes,beforeWrites+2);assert.equal(tree.root.findAllByType('draft-dialog').length,0);
+assert.equal(await guard(),true,'saved settings permit external navigation');
+await select('결제·배송');
+await act(async()=>tree.root.findAllByType('input').find(node=>node.props.value==='12').props.onChange({target:{value:'14'}}));
+let external;
+await act(async()=>{external=guard();});
+await act(async()=>tree.root.findByType('draft-dialog').props.onCancel());
+assert.equal(await external,false,'external navigation cancel');
+await select('포인트 적립');
+await act(async()=>tree.root.findByType('draft-dialog').props.onDiscard());
+await select('결제·배송');
+assert(tree.root.findAllByType('input').some(node=>node.props.value==='12'),'discard restores saved value');
+await act(async()=>tree.unmount());
+assert.equal(guard,null,'guard unregisters');
+console.log('PASS actual settings coordinator cancel/discard/save failure/retry/external guard');
+
+let apiWrites=0,apiFail=false,ownerState;
+globalThis.fetch=async(_url,options)=>{
+ if(options?.method==='POST'){apiWrites++;return {ok:!apiFail,json:async()=>({ok:!apiFail,error:apiFail?'denied':undefined,notice:{on:false,text:'changed',opacity:0.45}})};}
+ return {ok:true,json:async()=>({ok:true,connected:false,enabled:true,reportOnEnd:true,notifyEnabled:false,messageTemplate:'saved',notice:{on:false,text:'saved',opacity:0.45}})};
+};
+const ownerOverrides={'@/lib/adminToast':{showAdminToast(){}},'@/components/admin-live/quick-product/productImageNoticeClient':{clearProductImageNoticeCache(){},drawProductImageNotice(){}}};
+for(const [name,tag,newValue] of [['YoutubeNotifyCard','textarea','changed'],['ProductImageNoticeSettingsTab','input','changed'],['TelegramNotifyCard','input','test-credential']]){
+ const Owner=createUiLoader(ownerOverrides)('components/admin-live/'+name+'.tsx').default;
+ await act(async()=>{tree=Renderer.create(React.createElement(Owner,{onDraftStateChange:state=>ownerState=state}));});
+ assert.equal(ownerState.dirty,false,name+' loaded baseline');
+ await act(async()=>tree.root.findAllByType(tag).find(node=>node.props.type!=='checkbox').props.onChange({target:{value:newValue}}));
+ assert.equal(ownerState.dirty,true,name+' edits tracked');
+ apiFail=true;const before=apiWrites;
+ await act(async()=>{result=await ownerState.save();});
+ assert.equal(result,false);assert.equal(ownerState.dirty,true);
+ apiFail=false;
+ await act(async()=>{result=await ownerState.save();});
+ assert.equal(result,true);assert.equal(ownerState.dirty,false);assert.equal(apiWrites,before+2);
+ await act(async()=>tree.unmount());
+}
+console.log('PASS actual photo/youtube/telegram owner failure/retry save lifecycle');
+globalThis.fetch=async()=>{throw new Error('load failed');};
+const Telegram=createUiLoader(ownerOverrides)('components/admin-live/TelegramNotifyCard.tsx').default;
+await act(async()=>{tree=Renderer.create(React.createElement(Telegram,{onDraftStateChange:state=>ownerState=state}));});
+await act(async()=>tree.root.findAllByType('input')[0].props.onChange({target:{value:'test-credential'}}));
+assert.equal(ownerState.dirty,true,'failed initial Telegram fetch must not disable draft protection');
+await act(async()=>tree.unmount());
+
+const info=createUiLoader()('lib/shopInfo.ts').SHOP_INFO_DEFAULTS;
+let confirms=0,allowConfirm=false,refreshes=0;
+globalThis.fetch=async(_url,options)=>{if(options?.method==='POST'){apiWrites++;return {ok:!apiFail,json:async()=>({ok:!apiFail,info:JSON.parse(options.body),error:'denied'})};}return {ok:true,json:async()=>({ok:true,info,storedKeys:8})};};
+const Shop=createUiLoader({...ownerOverrides,'@/lib/adminConfirm':{showAdminConfirm:async()=>{confirms++;return allowConfirm;}},'@/lib/useShopInfo':{refreshShopInfo:async()=>{refreshes++;}}})('components/admin-live/ShopInfoSettingsTab.tsx').default;
+await act(async()=>{tree=Renderer.create(React.createElement(Shop,{onDraftStateChange:state=>ownerState=state}));});
+assert.equal(ownerState.dirty,false);
+await act(async()=>tree.root.findAllByType('input').find(node=>node.props.value===info.bankHolder).props.onChange({target:{value:'테스트예금주'}}));
+const beforeShopWrites=apiWrites;
+await act(async()=>{result=await ownerState.save();});
+assert.equal(result,false);assert.equal(apiWrites,beforeShopWrites,'cancel bank confirmation performs no write');
+allowConfirm=true;apiFail=true;
+await act(async()=>{result=await ownerState.save();});
+assert.equal(result,false);assert.equal(ownerState.dirty,true);
+apiFail=false;
+await act(async()=>{result=await ownerState.save();});
+assert.equal(result,true);assert.equal(ownerState.dirty,false);assert.equal(apiWrites,beforeShopWrites+2);assert.equal(confirms,3);assert.equal(refreshes,1);
+await act(async()=>tree.unmount());
+console.log('PASS actual shop bank-change confirmation cancel/failure/retry/refresh');
