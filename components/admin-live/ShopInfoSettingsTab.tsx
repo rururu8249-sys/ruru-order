@@ -15,12 +15,16 @@ import {
   contactDesc,
   contactLabel,
   validateShopInfo,
+  type ShopBankAccount,
+  type ShopBankRouting,
   type ShopContactType,
   type ShopInfo,
 } from "@/lib/shopInfo";
+import { bankRoutingSummary } from "@/lib/bankAccountEditor";
 import { refreshShopInfo } from "@/lib/useShopInfo";
 import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
+import BankAccountRoutingSettings from "@/components/admin-live/BankAccountRoutingSettings";
 
 const CONTACT_TYPES: ShopContactType[] = ["channel", "kakao_id"];
 
@@ -77,9 +81,8 @@ export default function ShopInfoSettingsTab() {
   const [contactValue, setContactValue] = useState(SHOP_INFO_DEFAULTS.contactValue);
   const [adminChatUrl, setAdminChatUrl] = useState(SHOP_INFO_DEFAULTS.adminChatUrl);
   const [paysterUrl, setPaysterUrl] = useState(SHOP_INFO_DEFAULTS.paysterUrl);
-  const [bankName, setBankName] = useState(SHOP_INFO_DEFAULTS.bankName);
-  const [bankAccount, setBankAccount] = useState(SHOP_INFO_DEFAULTS.bankAccount);
-  const [bankHolder, setBankHolder] = useState(SHOP_INFO_DEFAULTS.bankHolder);
+  const [bankAccounts, setBankAccounts] = useState<ShopBankAccount[]>(SHOP_INFO_DEFAULTS.bankAccounts);
+  const [bankRouting, setBankRouting] = useState<ShopBankRouting>(SHOP_INFO_DEFAULTS.bankRouting);
 
   const applyInfo = (info: ShopInfo) => {
     setSaved(info);
@@ -87,9 +90,8 @@ export default function ShopInfoSettingsTab() {
     setContactValue(info.contactValue);
     setAdminChatUrl(info.adminChatUrl);
     setPaysterUrl(info.paysterUrl);
-    setBankName(info.bankName);
-    setBankAccount(info.bankAccount);
-    setBankHolder(info.bankHolder);
+    setBankAccounts(info.bankAccounts.map((account) => ({ ...account })));
+    setBankRouting({ ...info.bankRouting });
   };
 
   useEffect(() => {
@@ -117,7 +119,19 @@ export default function ShopInfoSettingsTab() {
   }, []);
 
   // 미리보기용 — 입력 중인 값으로 손님 화면 문구를 만든다(검사 전이라 대충이어도 됨)
-  const draft: ShopInfo = { contactType, contactValue: contactValue.trim(), adminChatUrl, paysterUrl, bankName, bankAccount, bankHolder };
+  const primaryDraft = bankAccounts.find((account) => account.id === "primary") || SHOP_INFO_DEFAULTS.bankAccounts[0];
+  const draft: ShopInfo = {
+    contactType,
+    contactValue: contactValue.trim(),
+    adminChatUrl,
+    paysterUrl,
+    bankName: primaryDraft.bankName,
+    bankAccount: primaryDraft.bankAccount,
+    bankHolder: primaryDraft.bankHolder,
+    bankAccounts,
+    bankRouting,
+  };
+  const draftValidation = validateShopInfo(draft);
 
   const onChangeType = (next: ShopContactType) => {
     if (next === contactType) return;
@@ -136,18 +150,22 @@ export default function ShopInfoSettingsTab() {
     const next = checked.value;
 
     const bankChanged =
-      next.bankName !== saved.bankName || next.bankAccount !== saved.bankAccount || next.bankHolder !== saved.bankHolder;
+      JSON.stringify(next.bankAccounts) !== JSON.stringify(saved.bankAccounts) ||
+      JSON.stringify(next.bankRouting) !== JSON.stringify(saved.bankRouting);
     if (bankChanged) {
       const ok = await showAdminConfirm(
         [
-          "손님에게 보이는 입금계좌를 바꿉니다. 저장 즉시 주문서·주문조회 화면에 새 계좌가 나갑니다.",
+          "손님에게 보이는 입금계좌와 고객별 노출 방식을 바꿉니다.",
           "",
-          `바꾸기 전: ${saved.bankName} ${saved.bankAccount} (${saved.bankHolder})`,
-          `바꾼 후:   ${next.bankName} ${next.bankAccount} (${next.bankHolder})`,
+          "바꾸기 전",
+          bankRoutingSummary(saved.bankAccounts, saved.bankRouting),
           "",
-          "뱅크다 자동입금확인에 등록된 계좌와 다르면 입금이 자동으로 확인되지 않습니다. 뱅크다 쪽도 같은 계좌인지 꼭 확인하세요.",
+          "바꾼 후",
+          bankRoutingSummary(next.bankAccounts, next.bankRouting),
+          "",
+          "이미 접수된 주문에는 주문 당시 계좌가 그대로 유지되고, 새 주문부터 변경된 기준이 적용됩니다.",
         ].join("\n"),
-        { title: "입금계좌 변경 확인", confirmText: "계좌 바꾸기", cancelText: "취소", tone: "danger" },
+        { title: "입금계좌·노출방식 변경 확인", confirmText: "확인 후 저장", cancelText: "취소", tone: "danger" },
       );
       if (!ok) return;
     }
@@ -260,30 +278,15 @@ export default function ShopInfoSettingsTab() {
 
         {/* ── 입금계좌 ── */}
         <div className={cardClass}>
-          {sectionTitle("무통장 입금계좌 (손님에게 보이는 계좌)", "주문완료 화면과 주문조회 「입금 계좌 보기」에 나가고, 「계좌번호 복사」로 복사되는 값입니다.")}
-          <div className="mb-3 rounded-2xl border border-line bg-danger-bg px-4 py-3 text-xs font-bold leading-5 text-danger-tx">
-            뱅크다 자동입금확인은 뱅크다에 등록한 계좌로 돌아갑니다. 여기 계좌를 바꾸면 뱅크다에 등록된 계좌도 같은 계좌인지 꼭 확인하세요. 다르면 손님이 입금해도 자동으로 확인되지 않습니다.
-          </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            <Field label="은행">
-              <input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="예: 새마을금고" className={inputClass} />
-            </Field>
-            <Field label="계좌번호" desc="숫자만(하이픈 가능). 손님이 복사하는 값 그대로.">
-              <input
-                value={bankAccount}
-                onChange={(e) => setBankAccount(e.target.value.replace(/[^0-9-]/g, ""))}
-                inputMode="numeric"
-                placeholder="예: 9002186993725"
-                className={inputClass}
-              />
-            </Field>
-            <Field label="예금주">
-              <input value={bankHolder} onChange={(e) => setBankHolder(e.target.value)} placeholder="예: 홍길동" className={inputClass} />
-            </Field>
-          </div>
-          <div className="mt-3 rounded-2xl border border-line bg-surface-2 px-4 py-3 text-xs font-bold leading-5 text-ink-soft">
-            손님 화면 미리보기 — <b className="text-ink">{bankName || "은행"} {bankAccount || "계좌번호"} ({bankHolder || "예금주"})</b>
-          </div>
+          {sectionTitle("무통장 입금계좌와 고객별 노출", "현재 계좌를 유지하면서 계좌 한 개를 더 등록하고, 전체 고객 또는 기존회원·첫 주문 신규회원별로 보여줄 계좌를 선택합니다.")}
+          <BankAccountRoutingSettings
+            accounts={bankAccounts}
+            routing={bankRouting}
+            onChange={(nextAccounts, nextRouting) => {
+              setBankAccounts(nextAccounts);
+              setBankRouting(nextRouting);
+            }}
+          />
         </div>
       </div>
 
@@ -293,10 +296,10 @@ export default function ShopInfoSettingsTab() {
         <button
           type="button"
           onClick={save}
-          disabled={saving || loading}
+          disabled={saving || loading || !draftValidation.ok}
           className="rounded-2xl bg-rose-deep px-6 py-2.5 text-sm font-black text-white shadow-sm transition hover:opacity-90 disabled:cursor-wait disabled:opacity-50"
         >
-          {saving ? "저장중..." : "상점 정보 저장"}
+          {saving ? "저장중..." : draftValidation.ok ? "상점 정보 저장" : "입력값 확인 필요"}
         </button>
       </div>
     </div>
