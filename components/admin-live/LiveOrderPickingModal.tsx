@@ -294,7 +294,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   const renderRow = ({ panel, item }: PickingRow) => {
     const done = pickedIds.has(item.id);
     return (
-      <div key={item.id} className={`grid grid-cols-[56px_minmax(0,1fr)_92px] items-center gap-2 px-3 py-2 ${done ? "bg-ok-bg/60" : "bg-surface"}`}>
+      <div key={item.id} className={`grid grid-cols-[56px_minmax(0,1fr)_92px] items-center gap-2 px-3 py-2 max-[360px]:grid-cols-[56px_minmax(0,1fr)] ${done ? "bg-ok-bg/60" : "bg-surface"}`}>
         {itemPhoto[item.id] ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img src={itemPhoto[item.id]} alt={item.productName} className="h-14 w-14 shrink-0 rounded-lg border border-line object-cover" />
@@ -305,7 +305,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
           <div className="mt-1 text-[12px] font-bold text-ink-soft">{panel.nickname}{panel.name && panel.name !== panel.nickname ? ` · ${panel.name}` : ""} · 주문 #{item.id}</div>
           {!panel.paid ? <span className="mt-1 inline-block rounded bg-warn-bg px-2 py-1 text-[12px] font-black text-[var(--color-danger-tx)]">미결제 · 조회만 가능</span> : null}
         </div>
-        <div className="text-right">
+        <div className="text-right max-[360px]:col-span-2 max-[360px]:flex max-[360px]:items-center max-[360px]:justify-between max-[360px]:border-t max-[360px]:border-line max-[360px]:pt-1">
           <div className="text-[20px] font-black text-ink">{item.qty}<span className="text-[12px]">개</span></div>
           <button type="button" role="checkbox" aria-checked={done} aria-label={`${panel.nickname} ${item.productName} ${item.optionText} ${item.qty}개 ${done ? "챙김 해제" : "챙김"}`}
             disabled={blocked || !panel.paid} onClick={() => updatePicked([item.id], !pickedRef.current.has(item.id))}
@@ -320,11 +320,11 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-2 sm:p-4">
       <div role="dialog" aria-modal="true" aria-label="물건챙기기" className="flex h-[94dvh] w-[min(1120px,98vw)] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
-        <div className="flex shrink-0 items-center gap-2 border-b border-line px-3 py-1.5">
+        <div className="relative flex shrink-0 items-center gap-2 border-b border-line px-3 py-1.5">
           <h2 className="shrink-0 text-[16px] font-black text-rose-deep">물건챙기기</h2>
-          <details className="relative min-w-0 text-[12px] text-ink-soft">
-            <summary className="flex min-h-8 cursor-pointer items-center font-bold">범위·안내</summary>
-            <div className="absolute left-0 top-full z-10 w-[min(300px,70vw)] rounded-lg border border-line bg-surface p-3 shadow-lg">
+          <details className="shrink-0 text-[12px] text-ink-soft">
+            <summary aria-label="작업 범위 및 안내" className="flex min-h-8 cursor-pointer items-center whitespace-nowrap font-bold">범위</summary>
+            <div className="absolute left-3 top-full z-10 w-[min(300px,calc(100%-24px))] rounded-lg border border-line bg-surface p-3 shadow-lg">
               <p className="break-words">작업 범위: {title} · 취소·챙기기 제외 주문 제외</p>
               <p className="mt-2">상품·옵션·수량 확인 후 체크 · 두 화면 연동 · 저장 후 목록 유지</p>
               {sortMode === 'remaining' ? <p className="mt-2">체크 후 순서 유지 · 다시 정렬로 갱신</p> : null}
@@ -343,8 +343,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center [&_label]:flex [&_label]:items-center [&_label]:gap-1 [&_select]:!mt-0 [&_select]:!h-9">
-            <label className="min-w-0 text-[11px] font-bold text-ink-soft">결제 범위<select aria-label="결제 범위" value={paymentFilter} onChange={event => {setPaymentFilter(event.target.value as typeof paymentFilter); setSortPickedIds(new Set(pickedIds));}} className="mt-1 block h-10 w-full rounded-lg border border-line bg-surface px-2 text-[13px] text-ink"><option value="paid">결제완료만</option><option value="all">미결제 포함</option><option value="unpaid">미결제만</option></select></label>
-            <label className="min-w-0 text-[11px] font-bold text-ink-soft">정렬<select aria-label="정렬 방식" value={sortMode} onChange={event => {setSortModes(previous => ({...previous,[viewMode]:event.target.value})); setSortPickedIds(new Set(pickedIds));}} className="mt-1 block h-10 w-full rounded-lg border border-line bg-surface px-2 text-[13px] text-ink"><option value="name">{viewMode === 'batch' ? '상품번호순' : '닉네임순'}</option>{viewMode === 'order' ? <option value="oldest">주문 오래된순</option> : null}<option value="remaining">남은 수량 많은순</option></select></label>
+            <label className="min-w-0 text-[11px] font-bold text-ink-soft"><span className="sr-only sm:not-sr-only sm:whitespace-nowrap">결제 범위</span><select aria-label="결제 범위" value={paymentFilter} onChange={event => {setPaymentFilter(event.target.value as typeof paymentFilter); setSortPickedIds(new Set(pickedIds));}} className="block h-9 w-full rounded-lg border border-line bg-surface px-2 text-[13px] text-ink"><option value="paid">결제완료만</option><option value="all">미결제 포함</option><option value="unpaid">미결제만</option></select></label>
+            <label className="min-w-0 text-[11px] font-bold text-ink-soft"><span className="sr-only sm:not-sr-only sm:whitespace-nowrap">정렬</span><select aria-label="정렬 방식" value={sortMode} onChange={event => {setSortModes(previous => ({...previous,[viewMode]:event.target.value})); setSortPickedIds(new Set(pickedIds));}} className="block h-9 w-full rounded-lg border border-line bg-surface px-2 text-[13px] text-ink"><option value="name">{viewMode === 'batch' ? '상품번호순' : '닉네임순'}</option>{viewMode === 'order' ? <option value="oldest">주문 오래된순</option> : null}<option value="remaining">남은 수량 많은순</option></select></label>
             {sortMode === 'remaining' ? <button type="button" disabled={blocked} onClick={() => setSortPickedIds(new Set(pickedIds))} className="text-[12px] font-bold text-rose-deep">다시 정렬</button> : null}
             <input value={search} onChange={event => setSearch(event.target.value)} placeholder="상품번호 · 고객 검색" aria-label="상품번호 또는 고객 이름 검색" className="col-span-2 h-9 min-w-0 flex-1 rounded-lg border border-line px-3 text-[13px]" />
           </div>
