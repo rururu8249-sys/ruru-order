@@ -2,13 +2,15 @@
 
 // 물건챙기기 체크리스트 팝업 (주문서 단위 패널).
 //   - 주문서 1건(같은 order_group_id) = 패널 1개. 같은 닉네임이라도 주문서 다르면 다른 패널.
-//   - 패널 안 상품별 "챙김" 체크 + 전부 체크되면 패널 자동 "완료". 패널 헤더로 일괄 체크/해제도 가능.
+//   - 상품별/고객별은 같은 주문 행의 챙김 상태를 보여주는 두 가지 보기.
 //   - 체크는 orders.picked_at(서버)에 저장 → 다른 기기/새로고침에도 유지.
-//   - "결제완료만" 토글(기본 ON, 끄면 미결제 포함·취소건 항상 제외), ㄱㄴㄷ/시간 정렬, 전체 초기화, 엑셀.
+//   - 결제완료 주문만 표시. 자동 접기와 일괄 완료 없이 개별 수량을 확인해 체크.
 //   - 상단 "챙김 N개 / 전체 M개"는 수량 합계. picked_at 한 칸만 update(돈/주문 로직 무관).
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatOrderOptionText, stripNoneOptionParts } from "@/lib/orderOptionText";
+import { pickingProgress, savePicking } from "@/lib/orderPicking";
+import { productSearchMatches } from "@/lib/productSearch";
 import { compareOrderOptions } from "@/lib/orderOptionSort";
 import { supabase } from "@/lib/supabase";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
@@ -22,10 +24,7 @@ type Props = { orders: LiveOrder[]; filterLabel: string; onClose: () => void };
 // [2026-07-13 사장님 지침] amount = 주문에 저장된 상품금액(표시 전용, 재계산 안 함)
 type PickItem = { id: string; productId: string; text: string; productName: string; optionText: string; color: string; size: string; qty: number; amount: number };
 type Panel = { key: string; nickname: string; name: string; phone: string; search: string; paid: boolean; when: string; items: PickItem[]; totalQty: number };
-type BatchBuyer = { nickname: string; qty: number; paid: boolean; ids: string[] };
 // [2026-09-20 사장님 요청] 상품별 = 상품(총 N개) → 그 밑에 옵션(색상/사이즈)별 N개. 옵션은 색상 가나다 → 사이즈 순.
-type BatchOption = { key: string; optionText: string; color: string; size: string; ids: string[]; totalQty: number; pickedQty: number; paidQty: number; buyers: BatchBuyer[] };
-type BatchProduct = { name: string; ids: string[]; totalQty: number; pickedQty: number; paidQty: number; options: BatchOption[] };
 
 const PAID_STATUSES = ["paid", "auto_paid", "manual_paid", "card_paid"];
 const clean = (v: unknown) => String(v ?? "").trim();
@@ -62,29 +61,9 @@ const whenText = (s: string) => {
 
 export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: Props) {
   const [pickedIds, setPickedIds] = useState<Set<string>>(new Set());
-  // [㉓] 2단계: ①collected_at(모음 — 선반/업체에서 꺼냄) / ②picked_at(담음 — 손님 봉투, 진짜 완료).
-  //   담았으면 당연히 모은 것 → isCollected 는 둘 중 하나라도 있으면 true.
-  const [collectedIds, setCollectedIds] = useState<Set<string>>(new Set());
-  const isCollected = (id: string) => collectedIds.has(id) || pickedIds.has(id);
-  const [sortMode, setSortMode] = useState<"nickname" | "time">("nickname");
-  // [2026-09-20 개편] 상품별 정렬(가나다 / 많은 순)
-  const [batchSort, setBatchSort] = useState<"name" | "qty">("name");
-  // [2026-09-24 사장님] 「체크완료시 화면 접히는기능 없애줘!! 귀찮아 죽겠네 확인이 안됨」
-  //   예전: 다 챙기면 «자동으로 접혔다»(펼친 것만 기억) → 방금 체크한 게 뭐였는지 확인이 안 됐다.
-  //   지금: 자동으로 안 접는다. 접은 것만 기억한다(▴ 를 직접 눌렀을 때만 접힘).
-  //   ⚠ 이 뒤집힘이 핵심이다. expandedDone(펼친 것) → collapsedDone(접은 것).
-  const [collapsedDone, setCollapsedDone] = useState<Set<string>>(new Set());
-  const toggleCollapsedDone = (key: string) => setCollapsedDone((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
-  const [paidOnly, setPaidOnly] = useState(true);
+  const [viewMode, setViewMode] = useState<"batch" | "order">("batch");
   const [unpickedOnly, setUnpickedOnly] = useState(false);
-  const [viewMode, setViewMode] = useState<"order" | "batch">("batch");
-  // [㉔] ② 손님별 담기의 두 화면: focus=한 손님씩(기본) / list=기존 전체 목록. focusKey=지금 보는 손님(panel.key).
-  const [orderLayout, setOrderLayout] = useState<"focus" | "list">("focus");
-  const [focusKey, setFocusKey] = useState<string>("");
-  // [2026-08-23 상품별 집계 통합] 주문자 칩 표시 토글 — 집계 볼 땐 ON, 물건 집을 땐 OFF
-  const [showBuyers, setShowBuyers] = useState(true);
   const [search, setSearch] = useState("");
-  const [resetting, setResetting] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   // 주문서 단위 패널 (취소건 제외)
@@ -97,19 +76,19 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
       if (o.excludeFromPicking === true) continue;
       const paid = PAID_STATUSES.includes(status);
       const nickname = clean(o.nickname) || clean(o.name) || "-"; // 주문 닉네임(크게)
-      const name = clean((o as any).recipientName) || clean(o.name) || ""; // 받는사람/이름(옆에 함께 표시)
+      const name = clean(o.recipientName) || clean(o.name) || "";
       // 검색용: 닉네임·이름·받는사람 전부 포함(닉네임으로 검색해도, 이름으로 검색해도 잡히게)
-      const searchText = [clean(o.nickname), clean(o.name), clean((o as any).recipientName)]
+      const searchText = [clean(o.nickname), clean(o.name), clean(o.recipientName)]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
-      const when = clean(o.createdAt) || clean((o as any).submittedAt);
+      const when = clean(o.createdAt) || clean(o.submittedAt);
       const rawItems = Array.isArray(o.items) ? (o.items as LiveOrderItem[]) : [];
       const items: PickItem[] =
         rawItems.length === 0
           ? [{ id: String(o.id), productId: "", text: clean(o.orderSummary) || "상품", productName: clean(o.orderSummary) || "상품", optionText: "", color: "", size: "", qty: 1, amount: Number(o.productAmount || 0) }]
           : rawItems.map((it) => {
-              const opt = formatOrderOptionText(it.color, it.size); // [2026-08-31] 없음 숨김·「사이즈 6」 표기
+              const opt = formatOrderOptionText(it.color, it.size) || stripNoneOptionParts(it.optionText);
               const productName = clean(it.productName) || "상품";
               return { id: String(it.id), productId: clean(it.productId), text: productName + (opt ? ` (${opt})` : ""), productName, optionText: opt, color: clean(it.color), size: clean(it.size), qty: Number(it.qty || 1), amount: Number(it.amount || 0) };
             });
@@ -130,7 +109,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   useEffect(() => {
     let stopped = false;
     const ids = photoIdKey ? photoIdKey.split(",") : [];
-    if (ids.length === 0) { setItemPhoto({}); return; }
+    if (ids.length === 0) return;
     (async () => {
       try {
         const byId = new Map<string, Record<string, unknown>>();
@@ -156,748 +135,200 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photoIdKey]);
 
-  // 범위(결제완료만 토글 + 정렬) — 진행률/초기화 기준
-  const scopedPanels = useMemo(() => {
-    const arr = panels.filter((p) => (paidOnly ? p.paid : true));
-    if (sortMode === "nickname") {
-      // 화면 큰 글씨(닉네임) 기준 정렬. 순서: 한글 → 영어 → 숫자 → 기타. 같은 그룹 안은 가나다/알파벳순.
-      const rank = (s: string) => {
-        const c = (s || "").trim().charAt(0);
-        if (/[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(c)) return 0;
-        if (/[a-zA-Z]/.test(c)) return 1;
-        if (/[0-9]/.test(c)) return 2;
-        return 3;
-      };
-      arr.sort((a, b) => {
-        const ra = rank(a.nickname), rb = rank(b.nickname);
-        if (ra !== rb) return ra - rb;
-        return a.nickname.localeCompare(b.nickname, "ko") || ts(a.when) - ts(b.when);
-      });
+
+  // Only paid, non-canceled orders participate. Both views use these same rows.
+  const scopedPanels = useMemo(() => panels.filter(p => p.paid).sort((a, b) =>
+    a.nickname.localeCompare(b.nickname, "ko") || ts(a.when) - ts(b.when)), [panels]);
+  const scopedIds = useMemo(() => scopedPanels.flatMap(p => p.items.map(it => it.id)), [scopedPanels]);
+  const idKey = scopedIds.slice().sort().join(",");
+  const pickedRef = useRef(pickedIds);
+  const busyRef = useRef(false);
+  const readingRef = useRef(true);
+  const readGeneration = useRef(0);
+  const [reading, setReading] = useState(true);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const loading = reading || loadedKey !== idKey;
+  const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+
+  const readPicked = async (ids: string[]) => {
+    const found = new Map<string, boolean>();
+    for (let i = 0; i < ids.length; i += 500) {
+      const { data, error } = await supabase.from("orders").select("id, picked_at").in("id", ids.slice(i, i + 500).map(Number));
+      if (error) throw error;
+      for (const row of data || []) found.set(String(row.id), Boolean(row.picked_at));
     }
-    else arr.sort((a, b) => ts(a.when) - ts(b.when));
-    return arr;
-  }, [panels, paidOnly, sortMode]);
-
-  // 검색(닉네임 또는 상품명) — 화면 표시용. 검색은 진행률/초기화 범위에 영향 없음.
-  const visiblePanels = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return scopedPanels;
-    return scopedPanels.filter((p) => p.search.includes(q) || p.nickname.toLowerCase().includes(q) || p.items.some((it) => it.text.toLowerCase().includes(q)));
-  }, [scopedPanels, search]);
-
-  // "안 챙긴 것만" 보기 — 켜면 다 챙긴 주문은 숨기고, 남은 주문은 안 챙긴 상품줄만 표시(막판 마무리용).
-  const displayPanels = useMemo(() => {
-    if (!unpickedOnly) return visiblePanels;
-    return visiblePanels
-      .map((p) => ({ ...p, items: p.items.filter((it) => !pickedIds.has(it.id)) }))
-      .filter((p) => p.items.length > 0);
-  }, [visiblePanels, unpickedOnly, pickedIds]);
-
-  // [㉔] 한 손님씩 순서 — visiblePanels(검색·결제완료만·정렬 적용) 기준. unpickedOnly 는 무시(담는 중 목록이 사라지지 않게).
-  //   같은 phone 패널은 첫 등장 위치에 이어 붙여 «같은 손님»을 연달아 보게 한다(안정 정렬, 기존 순서 유지).
-  const focusPanels = useMemo(() => {
-    const seen = new Set<string>();
-    const out: Panel[] = [];
-    for (const p of visiblePanels) {
-      if (seen.has(p.key)) continue;
-      out.push(p); seen.add(p.key);
-      if (p.phone) {
-        for (const q of visiblePanels) {
-          if (q.phone === p.phone && !seen.has(q.key)) { out.push(q); seen.add(q.key); }
-        }
-      }
-    }
-    return out;
-  }, [visiblePanels]);
-
-  // 시작 손님 — focusKey 가 없거나 목록에 없으면 아직 다 안 담은 첫 손님(없으면 첫 손님)으로.
-  useEffect(() => {
-    if (viewMode !== "order" || orderLayout !== "focus" || focusPanels.length === 0) return;
-    if (focusKey && focusPanels.some((p) => p.key === focusKey)) return;
-    const firstUndone = focusPanels.find((p) => !p.items.every((it) => pickedIds.has(it.id)));
-    setFocusKey((firstUndone || focusPanels[0]).key);
-  }, [viewMode, orderLayout, focusPanels, focusKey, pickedIds]);
-
-  // 같은 고객(전화번호) 묶음 — 여러 주문이 같은 사람이면 합배송 안내(중복배송·누락 방지).
-  const phoneCount = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const p of scopedPanels) if (p.phone) m.set(p.phone, (m.get(p.phone) || 0) + 1);
-    return m;
-  }, [scopedPanels]);
-
-  // 상품별 합계(배치 피킹) — [2026-09-20 사장님 요청] 상품 한 장(총 N개) 안에 옵션(색상/사이즈)별 줄.
-  //   예전엔 「막스라 코트 (베이지 / 사이즈 55)」 줄이 상품마다 흩어져 있어 "이 상품 총 몇 개"가 안 보였다.
-  //   옵션 줄 순서 = 색상 가나다 → 사이즈(55<66<77, S<M<L). 주문자 칩(입금대기 ⏳)은 옵션 줄마다. 챙김 체크 동작은 기존 그대로.
-  const batchProducts = useMemo<BatchProduct[]>(() => {
-    const products = new Map<string, BatchProduct>();
-    const optionMaps = new Map<string, Map<string, BatchOption>>();
-    const buyerMaps = new Map<string, Map<string, BatchBuyer>>(); // key = product|option
-    const q = search.trim().toLowerCase();
-    for (const p of scopedPanels) {
-      for (const it of p.items) {
-        if (q && !it.text.toLowerCase().includes(q) && !p.search.includes(q)) continue;
-        const prod = products.get(it.productName) || { name: it.productName, ids: [], totalQty: 0, pickedQty: 0, paidQty: 0, options: [] };
-        prod.ids.push(it.id);
-        prod.totalQty += it.qty;
-        if (p.paid) prod.paidQty += it.qty;
-        if (collectedIds.has(it.id) || pickedIds.has(it.id)) prod.pickedQty += it.qty; // [㉓] 상품별=모음 기준
-        products.set(it.productName, prod);
-
-        const opts = optionMaps.get(it.productName) || new Map<string, BatchOption>();
-        const optKey = it.optionText || "";
-        const opt = opts.get(optKey) || { key: optKey, optionText: it.optionText, color: it.color, size: it.size, ids: [], totalQty: 0, pickedQty: 0, paidQty: 0, buyers: [] };
-        opt.ids.push(it.id);
-        opt.totalQty += it.qty;
-        if (p.paid) opt.paidQty += it.qty;
-        if (collectedIds.has(it.id) || pickedIds.has(it.id)) opt.pickedQty += it.qty; // [㉓] 상품별=모음 기준
-        opts.set(optKey, opt);
-        optionMaps.set(it.productName, opts);
-
-        // 같은 닉네임이라도 결제/대기가 다르면 칩 분리(대기분이 묻히지 않게)
-        const bkey = `${it.productName}|${optKey}`;
-        const buyers = buyerMaps.get(bkey) || new Map<string, BatchBuyer>();
-        const bKey = `${p.nickname}|${p.paid ? "1" : "0"}`;
-        const chip = buyers.get(bKey) || { nickname: p.nickname, qty: 0, paid: p.paid, ids: [] };
-        chip.qty += it.qty;
-        chip.ids.push(it.id);
-        buyers.set(bKey, chip);
-        buyerMaps.set(bkey, buyers);
-      }
-    }
-    let list = Array.from(products.values());
-    for (const prod of list) {
-      const opts = Array.from((optionMaps.get(prod.name) || new Map<string, BatchOption>()).values());
-      for (const opt of opts) {
-        const buyers = buyerMaps.get(`${prod.name}|${opt.key}`);
-        opt.buyers = buyers ? [...buyers.values()].sort((a, b) => b.qty - a.qty || a.nickname.localeCompare(b.nickname, "ko")) : [];
-      }
-      prod.options = unpickedOnly
-        ? opts.filter((o) => o.pickedQty < o.totalQty).sort(compareOrderOptions)
-        : opts.sort(compareOrderOptions);
-    }
-    if (unpickedOnly) list = list.filter((prod) => prod.pickedQty < prod.totalQty && prod.options.length > 0);
-    return list.sort((a, b) => (batchSort === "qty" ? b.totalQty - a.totalQty : 0) || a.name.localeCompare(b.name, "ko"));
-  }, [scopedPanels, pickedIds, collectedIds, search, unpickedOnly, batchSort]);
-
-  // [㉓] 여러 항목 일괄 «모음» 토글(상품별 뷰) — 전부 모음이면 해제, 아니면 모음.
-  //   해제 대상 중 이미 «봉투에 담은»(pickedIds) 건은 collected_at 만 지운다(picked_at=진짜 완료는 ②에서만 해제).
-  const collectHintShownRef = useRef(false);
-  const toggleCollectIds = async (ids: string[]) => {
-    if (ids.length === 0) return;
-    const allCollected = ids.every((id) => isCollected(id));
-    const makeCollected = !allCollected;
-    if (!makeCollected && ids.some((id) => pickedIds.has(id)) && !collectHintShownRef.current) {
-      collectHintShownRef.current = true;
-      showAdminToast("이미 봉투에 담은 물건은 ② 손님별 담기에서 해제하세요.", "info");
-    }
-    setCollectedIds((prev) => { const n = new Set(prev); ids.forEach((id) => (makeCollected ? n.add(id) : n.delete(id))); return n; });
-    try {
-      await writeCollected(ids, makeCollected);
-    } catch (e: any) {
-      showAdminToast("모음 체크 실패\n\n" + (e?.message || e), "error");
-      await resyncPickedFromServer(ids);   // 화면을 DB 실제값으로 되돌린다(picked·collected 둘 다)
-    }
+    if (ids.some(id => !found.has(id))) throw new Error("일부 주문의 챙김 상태를 확인하지 못했습니다.");
+    return new Set([...found].filter(([, picked]) => picked).map(([id]) => id));
   };
 
-  // 열 때 서버에서 picked_at(②담음)·collected_at(①모음) 함께 조회
   useEffect(() => {
     let alive = true;
-    (async () => {
-      const ids = panels.flatMap((p) => p.items.map((it) => Number(it.id))).filter((n) => Number.isFinite(n) && n > 0);
-      if (ids.length === 0) { setPickedIds(new Set()); setCollectedIds(new Set()); return; }
-      const picked = new Set<string>();
-      const collected = new Set<string>();
-      for (let i = 0; i < ids.length; i += 500) {
-        const { data } = await supabase.from("orders").select("id, picked_at, collected_at").in("id", ids.slice(i, i + 500));
-        (data || []).forEach((r: any) => { if (r.picked_at) picked.add(String(r.id)); if (r.collected_at) collected.add(String(r.id)); });
+    const generation = ++readGeneration.current;
+    // A live refresh cannot race a save. The saving=false effect re-reads afterward.
+    if (busyRef.current) return;
+    readingRef.current = true;
+    void (async () => {
+      await Promise.resolve();
+      if (!alive) return;
+      setReading(true);
+      try {
+        const next = await readPicked(idKey ? idKey.split(",") : []);
+        if (alive && generation === readGeneration.current) {
+          pickedRef.current = next;
+          setPickedIds(next);
+          setLoadError(false);
+        }
+      } catch {
+        if (alive && generation === readGeneration.current) setLoadError(true);
+      } finally {
+        if (alive && generation === readGeneration.current) {
+          readingRef.current = false;
+          setReading(false);
+          setLoadedKey(idKey);
+        }
       }
-      if (alive) { setPickedIds(picked); setCollectedIds(collected); }
     })();
     return () => { alive = false; };
-  }, [panels]);
+  }, [idKey, panels, saving]);
 
-  // [2026-09-08 전수감사] 일괄 체크가 저장에 실패해도 화면은 「챙김」으로 남아 있었다.
-  //   → 화면은 챙겼다는데 DB(orders.picked_at)는 안 챙겨진 상태 = «누락 배송» 위험.
-  //   단순히 되돌리면 안 된다: writePicked 는 500개씩 나눠 쓰므로 «앞부분만 저장»된
-  //   부분 성공이 가능하다. 그래서 실패하면 해당 주문들의 picked_at 을 «DB에서 다시 읽어»
-  //   화면을 DB와 정확히 맞춘다. (원래 주석 「롤백 위해 재조회」가 의도했던 것)
-  //   ※ 읽기 전용 조회다. 주문·금액·입금엔 손대지 않는다.
-  const resyncPickedFromServer = async (ids: string[]) => {
-    const nums = ids.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0);
-    if (nums.length === 0) return;
+  const updatePicked = async (ids: string[], picked: boolean) => {
+    if (busyRef.current || readingRef.current || loading || loadError || ids.length === 0) return;
+    busyRef.current = true;
+    ++readGeneration.current;
+    setSaving(true);
     try {
-      const truth = new Map<string, boolean>();
-      const truthCollected = new Map<string, boolean>();
-      for (let i = 0; i < nums.length; i += 500) {
-        const { data, error } = await supabase
-          .from("orders")
-          .select("id, picked_at, collected_at")
-          .in("id", nums.slice(i, i + 500));
-        if (error) throw error;
-        (data || []).forEach((r: any) => { truth.set(String(r.id), Boolean(r.picked_at)); truthCollected.set(String(r.id), Boolean(r.collected_at)); });
-      }
-      setPickedIds((prev) => {
-        const n = new Set(prev);
-        truth.forEach((isPicked, id) => (isPicked ? n.add(id) : n.delete(id)));
-        return n;
-      });
-      setCollectedIds((prev) => {
-        const n = new Set(prev);
-        truthCollected.forEach((isColl, id) => (isColl ? n.add(id) : n.delete(id)));
-        return n;
-      });
-    } catch {
-      // 재조회까지 실패하면 화면을 건드리지 않는다(잘못된 상태로 덮어쓰는 게 더 위험).
-      showAdminToast("지금 화면의 챙김 표시가 실제와 다를 수 있어요.\n\n창을 닫았다 다시 열어 확인해주세요.", "error");
+      // Show completion only after the server confirms every affected row.
+      await savePicking(supabase, ids, picked);
+      const next = new Set(pickedRef.current);
+      for (const id of ids) { if (picked) next.add(id); else next.delete(id); }
+      pickedRef.current = next;
+      setPickedIds(next);
+    } catch (error: unknown) {
+      showAdminToast("챙김 저장 실패 — 완료로 처리하지 않았습니다.\n" + (error instanceof Error ? error.message : String(error)), "error");
+      try {
+        const truth = await readPicked(scopedIds);
+        pickedRef.current = truth;
+        setPickedIds(truth);
+      } catch { setLoadError(true); }
+    } finally {
+      busyRef.current = false;
+      setSaving(false);
     }
   };
 
-  const writePicked = async (ids: string[], makePicked: boolean) => {
-    const nums = ids.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0);
-    const value = makePicked ? new Date().toISOString() : null;
-    for (let i = 0; i < nums.length; i += 500) {
-      const { error } = await supabase.from("orders").update({ picked_at: value }).in("id", nums.slice(i, i + 500));
-      if (error) throw error;
-    }
-  };
-
-  // [㉓] ①모음 저장 — collected_at 한 칸만 update(500개씩·writePicked 와 같은 패턴). picked_at 무접촉.
-  const writeCollected = async (ids: string[], makeCollected: boolean) => {
-    const nums = ids.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0);
-    const value = makeCollected ? new Date().toISOString() : null;
-    for (let i = 0; i < nums.length; i += 500) {
-      const { error } = await supabase.from("orders").update({ collected_at: value }).in("id", nums.slice(i, i + 500));
-      if (error) throw error;
-    }
-  };
-
-  const togglePick = async (id: string) => {
-    const was = pickedIds.has(id);
-    setPickedIds((prev) => { const n = new Set(prev); if (was) n.delete(id); else n.add(id); return n; });
-    try {
-      await writePicked([id], !was);
-    } catch (e: any) {
-      setPickedIds((prev) => { const n = new Set(prev); if (was) n.add(id); else n.delete(id); return n; });
-      showAdminToast("챙김 저장 실패\n\n" + (e?.message || e), "error");
-    }
-  };
-
-  // 패널 전체 토글(전부 체크돼 있으면 해제, 아니면 전부 체크)
-  const togglePanel = async (panel: Panel) => {
-    const ids = panel.items.map((it) => it.id);
-    const allPicked = ids.every((id) => pickedIds.has(id));
-    const makePicked = !allPicked;
-    setPickedIds((prev) => { const n = new Set(prev); ids.forEach((id) => (makePicked ? n.add(id) : n.delete(id))); return n; });
-    try {
-      await writePicked(ids, makePicked);
-    } catch (e: any) {
-      showAdminToast("패널 일괄 체크 실패\n\n" + (e?.message || e), "error");
-      await resyncPickedFromServer(ids);   // 주석만 있고 없던 재조회 — 실제로 실행한다
-    }
-  };
-
-  // ②담기 초기화(order 뷰) — picked_at 만 해제. ①모음·주문·금액엔 영향 없음.
   const resetAll = async () => {
-    if (!(await showAdminConfirm("담기 체크를 모두 해제할까요?\n\n지금 보이는 목록의 ② 담기 체크가 모두 해제됩니다. (① 모음·주문·금액엔 영향 없음)"))) return;
-    setResetting(true);
-    try {
-      const ids = scopedPanels.flatMap((p) => p.items.map((it) => it.id));
-      await writePicked(ids, false);
-      setPickedIds((prev) => { const n = new Set(prev); ids.forEach((id) => n.delete(id)); return n; });
-      showAdminToast("담기 표시를 초기화했습니다.", "success");
-    } catch (e: any) {
-      showAdminToast("초기화 실패\n\n" + (e?.message || e), "error");
-      // 여기도 500개씩 나눠 쓰므로 «일부만 해제»될 수 있다 → DB 실제값으로 화면을 맞춘다
-      await resyncPickedFromServer(scopedPanels.flatMap((p) => p.items.map((it) => it.id)));
-    } finally {
-      setResetting(false);
-    }
-  };
-
-  // [㉓] ①모음 초기화(batch 뷰) — collected_at 만 해제(담음=picked 은 그대로).
-  const resetCollected = async () => {
-    if (!(await showAdminConfirm("모음 체크를 모두 해제할까요?\n\n지금 보이는 목록의 ① 모음 표시가 해제됩니다. (② 봉투 담기·주문·금액엔 영향 없음)"))) return;
-    setResetting(true);
-    try {
-      const ids = scopedPanels.flatMap((p) => p.items.map((it) => it.id));
-      await writeCollected(ids, false);
-      setCollectedIds((prev) => { const n = new Set(prev); ids.forEach((id) => n.delete(id)); return n; });
-      showAdminToast("모음 표시를 초기화했습니다.", "success");
-    } catch (e: any) {
-      showAdminToast("초기화 실패\n\n" + (e?.message || e), "error");
-      await resyncPickedFromServer(scopedPanels.flatMap((p) => p.items.map((it) => it.id)));
-    } finally {
-      setResetting(false);
-    }
-  };
-
-  // [㉓] 보이는 상품(batchProducts)을 모두 ①모음으로. 이미 모은 건 그대로, 새 것만 표시. 봉투 담기는 ②에서.
-  const collectAllVisible = async () => {
-    const visibleIds = new Set(batchProducts.flatMap((p) => p.ids));
-    const itemsFlat = scopedPanels.flatMap((p) => p.items).filter((it) => visibleIds.has(it.id));
-    const target = itemsFlat.filter((it) => !isCollected(it.id));
-    if (target.length === 0) { showAdminToast("이미 다 모았어요.", "info"); return; }
-    const totalQ = itemsFlat.reduce((s, it) => s + it.qty, 0);
-    const alreadyQ = itemsFlat.filter((it) => isCollected(it.id)).reduce((s, it) => s + it.qty, 0);
-    const targetQ = target.reduce((s, it) => s + it.qty, 0);
-    const warn = paidOnly ? "" : "\n⚠ 미결제 주문도 포함돼요";
-    if (!(await showAdminConfirm(`보이는 물건 ${totalQ}개를 모두 모음으로 표시할까요?\n이미 모은 ${alreadyQ}개는 그대로, ${targetQ}개만 표시해요.\n(봉투 담기는 ② 손님별 담기에서 따로 체크해요)${warn}`))) return;
-    const ids = target.map((it) => it.id);
-    setCollectedIds((prev) => { const n = new Set(prev); ids.forEach((id) => n.add(id)); return n; });
-    try {
-      await writeCollected(ids, true);
-      showAdminToast("보이는 물건을 모두 모음으로 표시했어요.", "success");
-    } catch (e: any) {
-      showAdminToast("모두 모음 실패\n\n" + (e?.message || e), "error");
-      await resyncPickedFromServer(ids);
-    }
+    if (busyRef.current || loading || loadError) return;
+    if (!(await showAdminConfirm("이 목록의 챙김 표시를 모두 해제할까요?\n주문·입금·금액·출고 상태는 바뀌지 않습니다."))) return;
+    await updatePicked(scopedIds, false);
   };
 
   const runExcel = async () => {
+    if (saving || loading || loadError) return;
     setExporting(true);
     try {
-      const exportOrders = paidOnly ? orders.filter((o) => PAID_STATUSES.includes(clean(o.paymentStatus))) : orders;
-      // [2026-07-16] 챙김 여부 컬럼용 — 화면과 동일한 체크 집합(pickedIds) 전달
-      // [2026-09-20 사장님 요청] 엑셀 줄 순서 = 지금 보는 화면 순서(상품별: 상품→색상→사이즈 / 주문별: ㄱㄴㄷ·시간)
-      await exportLiveOrdersForPicking(exportOrders, { filterLabel, rowOrder: viewMode === "batch" ? "product" : sortMode }, pickedIds);
-      // [㉕-C] 물건챙기기 엑셀 기록 — 챙기기 제외·취소 아닌 주문의 picking_list_printed_at 을 «처음 시각»으로만.
-      try {
-        const ids = exportOrders
-          .filter((o) => (o as { excludeFromPicking?: boolean }).excludeFromPicking !== true && clean(o.paymentStatus) !== "canceled")
-          .map((o) => Number(o.id)).filter((n) => Number.isFinite(n) && n > 0);
-        const now = new Date().toISOString();
-        for (let i = 0; i < ids.length; i += 500) {
-          const { error } = await supabase.from("orders").update({ picking_list_printed_at: now }).is("picking_list_printed_at", null).in("id", ids.slice(i, i + 500));
-          if (error) throw error;
-        }
-      } catch {
-        showAdminToast("엑셀은 받았는데 출력 기록 저장에 실패했어요.", "warning");
+      await exportLiveOrdersForPicking(orders.filter(o => PAID_STATUSES.includes(clean(o.paymentStatus))), { filterLabel }, pickedIds);
+      const ids = scopedIds.map(Number);
+      const now = new Date().toISOString();
+      for (let i = 0; i < ids.length; i += 500) {
+        const { error } = await supabase.from("orders").update({ picking_list_printed_at: now }).is("picking_list_printed_at", null).in("id", ids.slice(i, i + 500));
+        if (error) throw error;
       }
-    } finally {
-      setExporting(false);
-    }
+    } catch (error: unknown) {
+      showAdminToast("엑셀 내보내기 또는 출력 기록 저장 실패\n" + (error instanceof Error ? error.message : String(error)), "error");
+    } finally { setExporting(false); }
   };
 
-  // 수량 합계 — picked=②담음, collected=①모음(담으면 자동 모음)
-  const { pickedQty, collectedQty, totalQty } = useMemo(() => {
-    let p = 0, c = 0, t = 0;
-    for (const panel of scopedPanels) for (const it of panel.items) {
-      t += it.qty;
-      if (pickedIds.has(it.id)) p += it.qty;
-      if (collectedIds.has(it.id) || pickedIds.has(it.id)) c += it.qty;
-    }
-    return { pickedQty: p, collectedQty: c, totalQty: t };
-  }, [scopedPanels, pickedIds, collectedIds]);
-
-  // [2026-08-31 사장님 요청] 돈 표시등 — 상품값 합계와 "실제 받은 돈"을 나란히 보여준다 (표시 전용).
-  //   상품값 = 상품금액 합(엑셀의 상품금액 칸과 동일). 실제 받은 돈 = 결제완료 주문의 총금액 합
-  //   (카드수수료 포함·포인트 차감 — 매출 바와 동일 기준). 두 숫자가 다른 게 정상이다.
-  const moneySummary = useMemo(() => {
-    const target = paidOnly ? orders.filter((o) => PAID_STATUSES.includes(clean(o.paymentStatus))) : orders;
-    let goods = 0;
-    let received = 0;
-    for (const o of target) {
-      const items = Array.isArray(o.items) ? o.items : [];
-      goods += items.length > 0 ? items.reduce((sum, it) => sum + Number(it.amount || 0), 0) : Number(o.productAmount || 0);
-      if (PAID_STATUSES.includes(clean(o.paymentStatus))) received += Number(o.totalAmount || 0);
-    }
-    return { goods, received };
-  }, [orders, paidOnly]);
-
-  const remainQty = Math.max(0, totalQty - pickedQty);
-  const remainCollectQty = Math.max(0, totalQty - collectedQty); // [㉓] 상품별=아직 안 모은 수량
-  const percent = totalQty > 0 ? Math.round((pickedQty / totalQty) * 100) : 0;
-  const broadcastTitle = String(filterLabel || "").split(" · ")[0].replace(/^방송:\s*/, "").trim();
-
-  // 공용 조각 — 체크 표시(네모) · 주문자 칩 줄
-  const CheckBox = ({ state, size = "md" }: { state: "done" | "some" | "none"; size?: "md" | "sm" }) => (
-    <span className={`flex shrink-0 items-center justify-center rounded-lg border-2 font-black ${size === "md" ? "h-7 w-7 text-[13px]" : "h-6 w-6 text-[12px]"} ${state === "done" ? "border-ok-tx/35 bg-[var(--color-ok-tx)] text-white" : state === "some" ? "border-ok-tx/35 bg-ok-bg text-ok-tx" : "border-line bg-surface text-transparent"}`}>{state === "some" ? "–" : "✓"}</span>
-  );
-  // [2026-09-22 사장님 지적 「너무 민감해서 실수로 클릭되고 풀린다」]
-  //   묶음 체크(상품 전부 / 옵션 전부 / 주문 전부)는 «네모 칸»을 눌러야만 바뀐다.
-  //   예전엔 줄 전체가 버튼이라 「랜덤박스」 줄을 스치기만 해도 17개가 한 번에 뒤집혔다.
-  //   칸 크기 44×44 — Apple HIG 44pt · WCAG 2.2 AAA 44px(손가락 기준). 개별 1건 줄은 줄 전체 클릭 유지.
-  const PickBox = ({ state, onPick, label, size = "md" }: { state: "done" | "some" | "none"; onPick: () => void; label: string; size?: "md" | "sm" }) => (
-    <button type="button" onClick={onPick} aria-label={label} title={label}
-      className={`flex shrink-0 items-center justify-center rounded-xl hover:bg-line/40 active:scale-95 ${size === "md" ? "h-11 w-11" : "h-10 w-10"}`}>
-      <CheckBox state={state} size={size} />
-    </button>
-  );
-
-  // [2026-09-22 사장님 요청 「한 상품을 여러 명이 샀는데 부분부분 체크가 안 된다」]
-  //   물류 현장의 «분배(put-to-light)» 화면과 같은 구조 — 물건을 집은 뒤 사람별 칸에 나눠 담는다.
-  //   ⚠ 칩(글자)이 아니라 높이 44px «칸»으로 만든 이유: 예전 칩은 높이가 18px밖에 안 돼
-  //     WCAG 최소치(24px)에도 못 미쳤다. 손가락으로 정확히 눌리지 않는다.
-  //   칸 하나 = 주문자 1명(같은 닉네임이라도 결제/대기가 다르면 따로). 누르면 그 사람 것만 챙김/해제.
-  const BuyerTiles = ({ buyers, className }: { buyers: BatchBuyer[]; className: string }) => {
-    const list = unpickedOnly ? buyers.filter((b) => !b.ids.every((id) => isCollected(id))) : buyers;
-    if (list.length === 0) return null;
+  const allRows = scopedPanels.flatMap(panel => panel.items.map(item => ({ panel, item })));
+  const { total, got } = pickingProgress(allRows.map(({ item }) => ({ qty: item.qty, pickedAt: pickedIds.has(item.id) })));
+  const q = search.trim();
+  const matches = allRows.filter(({ panel, item }) =>
+    (!q || productSearchMatches([panel.nickname, panel.name, item.text].join(" "), q)) &&
+    (!unpickedOnly || !pickedIds.has(item.id)));
+  type PickingRow = typeof allRows[number];
+  const grouped = new Map<string, { title: string; subtitle: string; rows: PickingRow[] }>();
+  for (const row of matches) {
+    const key = viewMode === "batch" ? (row.item.productId || row.item.productName) + "|" + row.item.productName : row.panel.key;
+    const group = grouped.get(key) || {
+      title: viewMode === "batch" ? row.item.productName : row.panel.nickname,
+      subtitle: viewMode === "batch" ? "" : [row.panel.name, whenText(row.panel.when)].filter(Boolean).join(" · "),
+      rows: [],
+    };
+    group.rows.push(row);
+    grouped.set(key, group);
+  }
+  for (const group of grouped.values()) {
+    if (viewMode === "batch") group.rows.sort((a, b) => compareOrderOptions(a.item, b.item) || a.panel.nickname.localeCompare(b.panel.nickname, "ko"));
+  }
+  const blocked = loading || saving || loadError;
+  const title = String(filterLabel || "").split(" · ")[0].replace(/^방송:\s*/, "");
+  const renderRow = ({ panel, item }: PickingRow) => {
+    const done = pickedIds.has(item.id);
     return (
-      <div className={`grid grid-cols-2 gap-2 ${className}`}>
-        {list.map((b, i) => {
-          const bDone = b.ids.length > 0 && b.ids.every((id) => isCollected(id));
-          const bSome = !bDone && b.ids.some((id) => isCollected(id));
-          return (
-            <button key={`${b.nickname}-${b.paid}-${i}`} type="button" onClick={() => toggleCollectIds(b.ids)}
-              title={`${b.nickname} — 누르면 이 손님 것만 챙김 / 해제${b.paid ? "" : " (미결제 ⏳)"}`}
-              className={`flex min-h-[44px] min-w-0 items-center gap-2 rounded-xl border-2 px-2 py-2 text-left active:scale-95 ${bDone ? "border-ok-tx/35 bg-[var(--color-ok-tx)]" : bSome ? "border-ok-tx/35 bg-ok-bg" : b.paid ? "border-line bg-surface" : "border-warn-tx/35 bg-warn-bg"}`}>
-              <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 text-[12px] font-black ${bDone ? "border-white/40 bg-surface text-ok-tx" : bSome ? "border-ok-tx/35 bg-surface text-ok-tx" : "border-line bg-surface text-transparent"}`}>{bSome ? "–" : "✓"}</span>
-              <span className={`min-w-0 flex-1 truncate text-[13px] font-bold ${bDone ? "text-white line-through" : b.paid ? "text-ink" : "text-warn-tx"}`}>{b.nickname}{b.paid ? "" : " ⏳"}</span>
-              <span className={`shrink-0 whitespace-nowrap text-[13px] font-black ${bDone ? "text-white" : b.qty > 1 ? "text-rose-deep" : "text-ink-soft"}`}>{b.qty}<span className="text-[11px]">개</span></span>
-            </button>
-          );
-        })}
+      <div key={item.id} className={`flex items-center gap-3 p-3 ${done ? "bg-ok-bg/60" : "bg-surface"}`}>
+        {itemPhoto[item.id] ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={itemPhoto[item.id]} alt={item.productName} className="h-16 w-16 shrink-0 rounded-lg border border-line object-cover" />
+        ) : <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-[11px] text-ink-mute">사진 없음</span>}
+        <div className="min-w-0 flex-1">
+          <div className="break-words text-[16px] font-black text-ink">{item.productName}</div>
+          <div className="mt-1 break-words text-[16px] font-black text-rose-deep">{item.optionText || "기본 옵션"}</div>
+          <div className="mt-1 text-[12px] font-bold text-ink-soft">{panel.nickname}{panel.name && panel.name !== panel.nickname ? ` · ${panel.name}` : ""} · 주문 #{item.id}</div>
+        </div>
+        <div className="shrink-0 text-right">
+          <div className="text-[22px] font-black text-ink">{item.qty}<span className="text-[12px]">개</span></div>
+          <button type="button" role="checkbox" aria-checked={done} aria-label={`${panel.nickname} ${item.productName} ${item.optionText} ${item.qty}개 ${done ? "챙김 해제" : "챙김"}`}
+            disabled={blocked} onClick={() => updatePicked([item.id], !pickedRef.current.has(item.id))}
+            className={`mt-1 flex min-h-[44px] min-w-[92px] items-center justify-center gap-2 rounded-lg border-2 px-2 text-[13px] font-black disabled:opacity-50 ${done ? "border-ok-tx bg-[var(--color-ok-tx)] text-white" : "border-line bg-surface text-ink-soft"}`}>
+            <span aria-hidden="true">{done ? "✓" : "□"}</span>{done ? "챙김" : "안 챙김"}
+          </button>
+        </div>
       </div>
     );
   };
-  const chip = (on: boolean, extra = "") => `rounded-lg px-3 py-1.5 text-[12px] font-black whitespace-nowrap ${on ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"} ${extra}`;
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="flex h-[92vh] w-[min(720px,96vw)] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        {/* ── 헤더: 제목 · 방송 · 닫기 ── */}
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-3">
-          <div className="flex min-w-0 items-baseline gap-2">
-            <span className="text-[16px] font-black text-rose-deep">🛍 물건챙기기</span>
-            {broadcastTitle ? <span className="truncate text-[12px] font-bold text-ink-mute">{broadcastTitle}</span> : null}
-          </div>
-          <button type="button" onClick={onClose} aria-label="닫기" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-[18px] font-black text-ink-soft hover:bg-line hover:text-ink">✕</button>
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-2 sm:p-4">
+      <div role="dialog" aria-modal="true" aria-label="물건챙기기" className="flex h-[92vh] w-[min(840px,98vw)] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line p-4">
+          <div><h2 className="text-[18px] font-black text-rose-deep">물건챙기기</h2><div className="text-[12px] font-bold text-ink-soft">{title} · 결제완료 주문만</div></div>
+          <button type="button" disabled={saving} onClick={onClose} aria-label="닫기" className="h-11 w-11 rounded-full bg-surface-2 text-[22px] disabled:opacity-40">×</button>
         </div>
-
-        {/* ── 진행 상황: 남은 개수 크게 · 진행률 ── */}
-        <div className="shrink-0 border-b border-line px-4 pb-3 pt-3">
-          <div className="flex items-end justify-between gap-3">
-            <div className="flex items-baseline gap-2">
-              {remainQty > 0 ? (
-                <>
-                  <span className="text-[12px] font-black text-ink-soft">남은 물건</span>
-                  <span className="text-[24px] font-black leading-none text-rose-deep">{remainQty.toLocaleString()}<span className="ml-0.5 text-[14px]">개</span></span>
-                </>
-              ) : totalQty > 0 ? (
-                <span className="text-[20px] font-black leading-none text-ok-tx">🎉 다 챙겼어요</span>
-              ) : (
-                <span className="text-[16px] font-black leading-none text-ink-mute">챙길 물건이 없어요</span>
-              )}
-            </div>
-            <div className="text-right text-[12px] font-bold text-ink-soft">
-              ① 모음 <span className="font-black text-rose-deep">{collectedQty.toLocaleString()}</span> · ② 담음 <span className="font-black text-ok-tx">{pickedQty.toLocaleString()}</span> / 전체 {totalQty.toLocaleString()}개 <span className="text-ink-mute">· {percent}%</span>
-            </div>
+        <div className="shrink-0 space-y-3 border-b border-line p-4">
+          <div className="flex items-center justify-between gap-2" aria-live="polite">
+            <span className="text-[18px] font-black text-rose-deep">안 챙김 {loading || loadError ? "—" : total - got}개</span>
+            <span className="text-[14px] font-bold text-ok-tx">챙김 {loading || loadError ? "—" : got} / {total}개</span>
           </div>
-          <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-surface-2">
-            <div className="h-full rounded-full bg-[var(--color-ok-tx)] transition-all duration-300" style={{ width: `${percent}%` }} />
-          </div>
-          <div className="mt-1.5 text-[11px] font-bold text-ink-mute" title="상품값 = 상품금액만 합친 것. 실제 받은 돈 = 카드수수료를 더하고 포인트를 뺀, 손님이 실제로 낸 돈(매출 바와 같은 기준). 두 숫자가 다른 게 정상이에요.">
-            📦 상품값 {moneySummary.goods.toLocaleString()}원 · 💳 실제 받은 돈 {moneySummary.received.toLocaleString()}원
-          </div>
-        </div>
-
-        {/* ── 보기 방식(탭) ── */}
-        <div className="shrink-0 px-4 pt-3">
           <div className="grid grid-cols-2 gap-1 rounded-xl bg-surface-2 p-1">
-            <button type="button" onClick={() => setViewMode("batch")} className={`rounded-lg py-2 text-[13px] font-black ${viewMode === "batch" ? "bg-rose-deep text-white shadow" : "text-ink-soft hover:text-ink"}`}>📦 ① 모으기 (상품별)</button>
-            <button type="button" onClick={() => setViewMode("order")} className={`rounded-lg py-2 text-[13px] font-black ${viewMode === "order" ? "bg-rose-deep text-white shadow" : "text-ink-soft hover:text-ink"}`}>👤 ② 손님별 담기</button>
+            {(["batch", "order"] as const).map(mode => <button key={mode} type="button" onClick={() => setViewMode(mode)} aria-pressed={viewMode === mode} className={`min-h-[44px] rounded-lg text-[16px] font-black ${viewMode === mode ? "bg-rose-deep text-white" : "text-ink-soft"}`}>{mode === "batch" ? "상품별" : "고객별"}</button>)}
+          </div>
+          <div className="flex gap-2">
+            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="상품번호 · 고객 이름 검색" aria-label="상품번호 또는 고객 이름 검색" className="h-11 min-w-0 flex-1 rounded-lg border border-line px-3 text-[14px]" />
+            <button type="button" aria-pressed={unpickedOnly} onClick={() => setUnpickedOnly(value => !value)} className={`shrink-0 rounded-lg border border-line px-3 text-[12px] font-bold ${unpickedOnly ? "bg-rose-deep text-white" : "bg-surface text-ink-soft"}`}>안 챙김만</button>
+          </div>
+          <p className="text-[12px] font-bold text-ink-soft">상품·색상·사이즈·수량을 확인한 뒤 체크하세요. 두 화면의 체크는 같습니다.</p>
+          <div role="status" aria-live="polite" className="text-[12px] font-bold text-ink-soft">{loading ? "챙김 상태 확인 중…" : loadError ? "상태를 확인하지 못했습니다. 창을 다시 열어 주세요. 체크는 잠시 막았습니다." : saving ? "저장 중… 완료 확인 전까지 기다려 주세요." : "저장된 상태입니다. 체크한 줄은 자동으로 접히지 않습니다."}</div>
+        </div>
+        <div className="flex-1 overflow-y-auto bg-surface-2 p-3">
+          {!loading && !loadError && matches.length === 0 ? <div className="py-12 text-center font-bold text-ink-soft">{q ? "검색 결과가 없습니다." : unpickedOnly ? "모두 챙겼습니다." : "챙길 결제완료 주문이 없습니다."}</div> : null}
+          <div className="space-y-3">
+            {[...grouped].map(([key, group]) => {
+              const progress = pickingProgress(group.rows.map(({ item }) => ({ qty: item.qty, pickedAt: pickedIds.has(item.id) })));
+              return <section key={key} className="overflow-hidden rounded-xl border border-line bg-surface">
+                <div className="flex items-start justify-between gap-2 bg-rose-soft p-3">
+                  <div className="min-w-0"><h3 className="break-words text-[16px] font-black text-ink">{group.title}</h3>{group.subtitle ? <div className="mt-1 text-[12px] font-bold text-ink-soft">{group.subtitle}</div> : null}</div>
+                  <span className="shrink-0 text-[12px] font-black text-ink-soft">{progress.got}/{progress.total}개</span>
+                </div>
+                <div className="divide-y divide-line">{group.rows.map(renderRow)}</div>
+              </section>;
+            })}
           </div>
         </div>
-
-        {/* ── 필터·정렬 ── */}
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5 px-4 pt-2">
-          {/* [㉔] ② 담기 화면 전환 — 한 손님씩 / 전체 목록 */}
-          {viewMode === "order" ? (
-            <span className="inline-flex overflow-hidden rounded-lg border border-line">
-              <button type="button" onClick={() => setOrderLayout("list")} className={`px-3 py-1.5 text-[12px] font-black ${orderLayout === "list" ? "bg-ink-soft text-white" : "bg-surface text-ink-soft"}`}>📋 목록</button>
-              <button type="button" onClick={() => setOrderLayout("focus")} className={`px-3 py-1.5 text-[12px] font-black ${orderLayout === "focus" ? "bg-ink-soft text-white" : "bg-surface text-ink-soft"}`}>🔍 한 손님씩</button>
-            </span>
-          ) : null}
-          <button type="button" onClick={() => setUnpickedOnly((v) => !v)} className={chip(unpickedOnly)}>{unpickedOnly ? "✓ " : ""}{viewMode === "batch" ? "안 모은 것만" : "안 담은 것만"}{(viewMode === "batch" ? remainCollectQty : remainQty) > 0 ? ` ${(viewMode === "batch" ? remainCollectQty : remainQty).toLocaleString()}` : ""}</button>
-          <button type="button" onClick={() => setPaidOnly((v) => !v)} className={`rounded-lg px-3 py-1.5 text-[12px] font-black whitespace-nowrap ${paidOnly ? "bg-[var(--color-ok-tx)] text-white" : "border border-warn-tx/35 bg-warn-bg text-warn-tx"}`}>{paidOnly ? "✓ 결제완료만" : "⚠ 미결제 포함"}</button>
-          {viewMode === "order" ? (
-            <span className="inline-flex overflow-hidden rounded-lg border border-line">
-              <button type="button" onClick={() => setSortMode("nickname")} className={`px-3 py-1.5 text-[12px] font-black ${sortMode === "nickname" ? "bg-ink-soft text-white" : "bg-surface text-ink-soft"}`}>ㄱㄴㄷ순</button>
-              <button type="button" onClick={() => setSortMode("time")} className={`px-3 py-1.5 text-[12px] font-black ${sortMode === "time" ? "bg-ink-soft text-white" : "bg-surface text-ink-soft"}`}>주문 시간순</button>
-            </span>
-          ) : (
-            <>
-              <span className="inline-flex overflow-hidden rounded-lg border border-line">
-                <button type="button" onClick={() => setBatchSort("name")} className={`px-3 py-1.5 text-[12px] font-black ${batchSort === "name" ? "bg-ink-soft text-white" : "bg-surface text-ink-soft"}`}>ㄱㄴㄷ순</button>
-                <button type="button" onClick={() => setBatchSort("qty")} className={`px-3 py-1.5 text-[12px] font-black ${batchSort === "qty" ? "bg-ink-soft text-white" : "bg-surface text-ink-soft"}`}>많은 순</button>
-              </span>
-              <button type="button" onClick={() => setShowBuyers((v) => !v)} title="누가 샀는지 표시 — 한 옵션을 여러 명이 샀으면 손님별 칸이 생겨 한 명씩 챙길 수 있어요" className={chip(showBuyers)}>{showBuyers ? "✓ " : ""}주문자 이름</button>
-            </>
-          )}
-        </div>
-
-        {/* ── 검색 ── */}
-        <div className="shrink-0 px-4 pb-2 pt-2">
-          <div className="relative">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="닉네임 · 상품명 검색"
-              className="h-10 w-full rounded-xl border border-line bg-surface-2 pl-9 pr-9 text-[13px] font-bold outline-none focus:border-rose-deep focus:bg-surface"
-            />
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[14px]">🔍</span>
-            {search ? <button type="button" onClick={() => setSearch("")} aria-label="검색어 지우기" className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-line text-[13px] font-black text-ink-soft">×</button> : null}
-          </div>
-        </div>
-
-        {/* ── 목록 (이 영역만 스크롤) ── */}
-        <div className="flex-1 overflow-y-auto border-t border-line bg-surface-2 px-3 py-3">
-          {viewMode === "batch" ? (
-            batchProducts.length === 0 ? (
-              <div className="py-14 text-center text-[14px] font-bold text-ink-mute">{unpickedOnly ? "안 챙긴 상품이 없어요! 🎉" : search ? "검색 결과가 없어요" : "챙길 상품이 없습니다."}</div>
-            ) : (
-              <>
-                <div className="mb-2 px-1 text-[11px] font-bold text-ink-mute">상품 {batchProducts.length}가지 · 선반·업체에서 꺼냈으면 체크 — 봉투에 넣는 건 ② 손님별 담기에서</div>
-                <div className="space-y-2">
-                  {batchProducts.map((prod) => {
-                    const done = prod.ids.every((id) => isCollected(id));
-                    const some = !done && prod.ids.some((id) => isCollected(id));
-                    const prodPhoto = prod.ids.map((id) => itemPhoto[id]).find(Boolean) || ""; // [㉒] 이 상품 첫 사진
-                    const single = prod.options.length === 1 && !prod.options[0].optionText;
-                    const singleBuyers = single ? prod.options[0].buyers : [];
-                    const collapsed = done && collapsedDone.has(`p:${prod.name}`);   // [09-24] 직접 접었을 때만
-                    return (
-                      <div key={prod.name} className={`rounded-xl border-2 ${done ? "border-ok-tx/35 bg-ok-bg/60" : "border-line bg-surface"}`}>
-                        {/* 상품 줄(스크롤해도 위에 붙음) — 네모 칸만 눌러야 그 상품 전부 챙김/해제(실수 방지) */}
-                        <div className={`sticky top-0 z-[1] flex items-center gap-1 rounded-t-[10px] pl-1 ${done ? "bg-ok-bg" : single ? "bg-surface" : "bg-rose-soft"} ${collapsed ? "rounded-b-[10px]" : ""}`}>
-                          <PickBox state={done ? "done" : some ? "some" : "none"} onPick={() => toggleCollectIds(prod.ids)} label={`${prod.name} — 이 상품 ${prod.totalQty}개 전부 모음 / 해제`} />
-                          {prodPhoto ? (
-                            /* eslint-disable-next-line @next/next/no-img-element */
-                            <img src={prodPhoto} alt={prod.name} loading="lazy" className="h-11 w-11 shrink-0 rounded-lg border border-line object-cover" />
-                          ) : null}
-                          <div className="flex min-w-0 flex-1 select-none items-center gap-3 py-3 pr-3">
-                            <span className={`min-w-0 max-w-[60%] truncate text-[14px] font-black ${done ? "text-ink-mute line-through" : "text-ink"}`}>{prod.name}</span>
-                            {single && showBuyers && singleBuyers.length === 1 ? <span className={`min-w-0 shrink truncate text-[12px] font-bold ${singleBuyers[0].paid ? "text-ink-mute" : "text-warn-tx"}`}>· {singleBuyers[0].nickname}{singleBuyers[0].paid ? "" : " ⏳"}</span> : null}
-                            <span className="ml-auto shrink-0 whitespace-nowrap text-right">
-                              <span className={`text-[18px] font-black leading-none ${done ? "text-ink-mute" : "text-rose-deep"}`}>{prod.totalQty}<span className="text-[12px]">개</span></span>
-                              {!paidOnly && prod.totalQty !== prod.paidQty ? <span className="ml-1.5 text-[11px] font-black text-warn-tx">대기 {prod.totalQty - prod.paidQty}</span> : null}
-                              <span className={`ml-2 text-[11px] font-black ${done ? "text-ok-tx" : "text-ink-mute"}`}>{done ? "✓ 완료" : `${prod.pickedQty}/${prod.totalQty}`}</span>
-                            </span>
-                          </div>
-                          {done && !single ? (
-                            <button type="button" onClick={() => toggleCollapsedDone(`p:${prod.name}`)} aria-label={collapsed ? "펼치기" : "접기"} className="mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[12px] font-black text-ok-tx hover:bg-white/60">{collapsed ? "▾" : "▴"}</button>
-                          ) : null}
-                        </div>
-                        {single && showBuyers && singleBuyers.length > 1 && !collapsed ? <BuyerTiles buyers={singleBuyers} className="px-3 pb-3 pl-[52px]" /> : null}
-                        {/* 옵션 줄 — 색상 가나다 → 사이즈 순. 클릭 = 그 옵션만 */}
-                        {!single && !collapsed ? (
-                          <div className="divide-y divide-line border-t border-line">
-                            {prod.options.map((opt) => {
-                              const oDone = opt.ids.every((id) => isCollected(id));
-                              const oSome = !oDone && opt.ids.some((id) => isCollected(id));
-                              const optPhoto = opt.ids.map((id) => itemPhoto[id]).find(Boolean) || ""; // [㉒] 이 옵션 첫 사진
-                              return (
-                                <div key={opt.key || "(옵션없음)"} className={`${oDone ? "bg-ok-bg/70" : "bg-surface"} last:rounded-b-[10px]`}>
-                                  <div className="flex w-full items-center gap-1 pl-3 pr-3">
-                                    <PickBox size="sm" state={oDone ? "done" : oSome ? "some" : "none"} onPick={() => toggleCollectIds(opt.ids)} label={`${opt.optionText || "옵션 없음"} — ${opt.totalQty}개 전부 모음 / 해제`} />
-                                    {optPhoto && optPhoto !== prodPhoto ? (
-                                      /* eslint-disable-next-line @next/next/no-img-element */
-                                      <img src={optPhoto} alt={opt.optionText || "옵션"} loading="lazy" className="h-9 w-9 shrink-0 rounded-lg border border-line object-cover" />
-                                    ) : null}
-                                    <div className="flex min-w-0 flex-1 select-none items-center gap-2 py-2">
-                                      <span className={`min-w-0 max-w-[60%] truncate text-[14px] font-bold ${oDone ? "text-ink-mute line-through" : "text-ink"}`}>{opt.optionText || "옵션 없음"}</span>
-                                      {showBuyers && opt.buyers.length === 1 ? <span className={`min-w-0 shrink truncate text-[12px] font-bold ${opt.buyers[0].paid ? "text-ink-mute" : "text-warn-tx"}`}>· {opt.buyers[0].nickname}{opt.buyers[0].paid ? "" : " ⏳"}</span> : null}
-                                      <span className="ml-auto shrink-0 whitespace-nowrap text-right">
-                                        <span className={`text-[16px] font-black leading-none ${oDone ? "text-ink-mute" : "text-ink"}`}>{opt.totalQty}<span className="text-[11px]">개</span></span>
-                                        {!paidOnly && opt.totalQty !== opt.paidQty ? <span className="ml-1 text-[11px] font-black text-warn-tx">대기 {opt.totalQty - opt.paidQty}</span> : null}
-                                        <span className="ml-2 text-[11px] font-bold text-ink-mute">{opt.pickedQty}/{opt.totalQty}</span>
-                                      </span>
-                                    </div>
-                                  </div>
-                                  {showBuyers && opt.buyers.length > 1 ? <BuyerTiles buyers={opt.buyers} className="px-3 pb-2.5 pl-[52px]" /> : null}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )
-          ) : orderLayout === "focus" ? (
-            focusPanels.length === 0 ? (
-              <div className="py-14 text-center text-[14px] font-bold text-ink-mute">{search ? "검색 결과가 없어요 — 검색어를 지워 보세요" : "담을 주문이 없어요 — 위 필터(결제완료만)를 확인해 주세요"}</div>
-            ) : (() => {
-              const idx = Math.max(0, focusPanels.findIndex((p) => p.key === focusKey));
-              const panel = focusPanels[idx] || focusPanels[0];
-              const remainInPanel = panel.items.filter((it) => !pickedIds.has(it.id)).reduce((s, it) => s + it.qty, 0);
-              const allPicked = panel.items.length > 0 && panel.items.every((it) => pickedIds.has(it.id));
-              const isLast = idx >= focusPanels.length - 1;
-              const sameCustomer = panel.phone ? (phoneCount.get(panel.phone) || 0) : 0;
-              const goNext = () => setFocusKey((focusPanels[idx + 1] || focusPanels[0]).key);
-              const goPrev = () => { if (idx > 0) setFocusKey(focusPanels[idx - 1].key); };
-              return (
-                <div className="space-y-3">
-                  {/* 헤더 */}
-                  <div className="rounded-xl border-2 border-line bg-surface px-4 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="text-[11px] font-black text-ink-mute">{idx + 1} / {focusPanels.length}번째 손님</div>
-                        <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                          <span className={`text-[20px] font-black leading-tight ${allPicked ? "text-ok-tx" : "text-ink"}`}>{panel.nickname}</span>
-                          {panel.name && panel.name !== panel.nickname ? <span className="text-[13px] font-bold text-ink-soft">{panel.name}</span> : null}
-                        </div>
-                        {whenText(panel.when) ? <div className="mt-0.5 text-[11px] font-semibold text-ink-mute">{whenText(panel.when)}</div> : null}
-                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                          {!panel.paid ? <span className="rounded-full bg-[var(--color-danger-tx)] px-2 py-0.5 text-[11px] font-black text-white">미결제</span> : null}
-                          {sameCustomer > 1 ? <span className="rounded-full bg-[var(--color-cardpay)]/12 px-2 py-0.5 text-[11px] font-black text-[var(--color-cardpay)]">📦 같은 고객 {sameCustomer}건 · 같은 봉투에 담으세요</span> : null}
-                        </div>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <div className="text-[11px] font-black text-ink-soft">남은 물건</div>
-                        <div className={`text-[20px] font-black leading-none ${remainInPanel > 0 ? "text-rose-deep" : "text-ok-tx"}`}>{remainInPanel.toLocaleString()}<span className="ml-0.5 text-[12px]">개</span></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 상품 줄 — 줄 전체 클릭 = 그 상품 담기/해제(기존 togglePick 그대로) */}
-                  <div className="overflow-hidden rounded-xl border-2 border-line bg-surface divide-y divide-line">
-                    {panel.items.map((it) => {
-                      const picked = pickedIds.has(it.id);
-                      const colorChip = stripNoneOptionParts(it.color);
-                      const sizeChip = stripNoneOptionParts(it.size);
-                      return (
-                        <button key={it.id} type="button" onClick={() => togglePick(it.id)} className={`flex w-full items-center gap-3 px-3 py-3 text-left ${picked ? "bg-ok-bg/70" : "bg-surface hover:bg-surface-2"}`}>
-                          <CheckBox state={picked ? "done" : "none"} />
-                          {itemPhoto[it.id] ? (
-                            /* eslint-disable-next-line @next/next/no-img-element */
-                            <img src={itemPhoto[it.id]} alt={it.productName} loading="lazy" className="h-[72px] w-[72px] shrink-0 rounded-lg border border-line object-cover" />
-                          ) : null}
-                          <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-                            <span className="flex min-w-0 items-center gap-1.5">
-                              <span className={`min-w-0 text-[16px] font-black ${picked ? "text-ink-mute line-through" : "text-ink"}`}>{it.productName}</span>
-                              {!picked && collectedIds.has(it.id) ? <span className="shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-[11px] font-black text-ink-mute">모음✓</span> : null}
-                            </span>
-                            {colorChip || sizeChip ? (
-                              <span className="flex flex-wrap items-center gap-1">
-                                {colorChip ? <span className={`rounded-full border border-line px-2 py-0.5 text-[16px] font-black ${picked ? "text-ink-mute" : "text-rose-deep"}`}>{colorChip}</span> : null}
-                                {sizeChip ? <span className={`rounded-full border border-line px-2 py-0.5 text-[16px] font-black ${picked ? "text-ink-mute" : "text-ink"}`}>{sizeChip}</span> : null}
-                              </span>
-                            ) : it.optionText ? (
-                              <span className={`text-[13px] font-bold ${picked ? "text-ink-mute" : "text-rose-deep"}`}>{it.optionText}</span>
-                            ) : null}
-                          </span>
-                          <span className="shrink-0 whitespace-nowrap text-right">
-                            <span className={`block text-[24px] font-black leading-none ${picked ? "text-ink-mute" : it.qty > 1 ? "text-rose-deep" : "text-ink"}`}>{it.qty}<span className="text-[12px]">개</span></span>
-                            {it.qty > 1 ? <span className="mt-0.5 block text-[11px] font-black text-rose-deep">{it.qty}개 모두</span> : null}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* 하단 버튼 */}
-                  <div className="flex items-center gap-2">
-                    <button type="button" onClick={goPrev} disabled={idx <= 0} className="rounded-xl border border-line bg-surface px-3 py-2.5 text-[13px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-40">◀ 이전</button>
-                    <button type="button" onClick={goNext} className="rounded-xl px-2 py-2.5 text-[12px] font-black text-ink-mute hover:text-ink">건너뛰기</button>
-                    <span className="flex-1" />
-                    {allPicked ? (
-                      <button type="button" onClick={isLast ? () => setFocusKey(focusPanels[0].key) : goNext} className="rounded-xl bg-rose-deep px-4 py-2.5 text-[14px] font-black text-white hover:opacity-90">{isLast ? "🎉 마지막 손님이에요 · 처음으로" : "다 담았어요 → 다음 손님 ▶"}</button>
-                    ) : (
-                      <button type="button" disabled className="rounded-xl bg-surface-2 px-4 py-2.5 text-[14px] font-black text-ink-mute">{remainInPanel}개 더 담아야 해요</button>
-                    )}
-                  </div>
-                </div>
-              );
-            })()
-          ) : displayPanels.length === 0 ? (
-            <div className="py-14 text-center text-[14px] font-bold text-ink-mute">{unpickedOnly ? "안 챙긴 게 없어요! 다 챙겼습니다 🎉" : search ? "검색 결과가 없어요" : "챙길 주문이 없습니다."}</div>
-          ) : (
-            <>
-              <div className="mb-2 px-1 text-[11px] font-bold text-ink-mute">주문 {displayPanels.length}건 · 봉투에 넣을 때 하나씩 체크 — 여기 체크해야 챙김 완료</div>
-              <div className="space-y-2">
-                {displayPanels.map((panel) => {
-                  const pickedInPanel = panel.items.filter((it) => pickedIds.has(it.id)).length;
-                  const complete = panel.items.length > 0 && pickedInPanel === panel.items.length;
-                  const collapsed = complete && collapsedDone.has(`o:${panel.key}`);   // [09-24] 직접 접었을 때만
-                  const sameCustomer = panel.phone ? (phoneCount.get(panel.phone) || 0) : 0;
-                  return (
-                    <div key={panel.key} className={`rounded-xl border-2 ${complete ? "border-ok-tx/35 bg-ok-bg/60" : "border-line bg-surface"}`}>
-                      {/* 주문서(닉네임) 줄 — 네모 칸만 눌러야 그 주문 전체 챙김/해제(실수 방지) */}
-                      <div className={`sticky top-0 z-[1] flex items-center gap-1 rounded-t-[10px] pl-1 ${complete ? "bg-ok-bg" : "bg-rose-soft"} ${collapsed ? "rounded-b-[10px]" : ""}`}>
-                        <PickBox state={complete ? "done" : pickedInPanel > 0 ? "some" : "none"} onPick={() => togglePanel(panel)} label={`${panel.nickname} — 이 주문 ${panel.items.length}건 전부 챙김 / 해제`} />
-                        <div className="flex min-w-0 flex-1 select-none items-center gap-2.5 py-2.5 pr-3">
-                          <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-black text-white ${complete ? "bg-[var(--color-ok-tx)]" : "bg-rose-deep"}`}>{complete ? "✓" : (panel.nickname.charAt(0) || "?")}</span>
-                          <span className="flex min-w-0 flex-1 flex-col">
-                            <span className="flex min-w-0 items-baseline gap-1.5">
-                              <span className={`max-w-[60%] shrink-0 truncate text-[14px] font-black ${complete ? "text-ink-mute line-through" : "text-ink"}`}>{panel.nickname}</span>
-                              {panel.name && panel.name !== panel.nickname ? <span className="min-w-0 truncate text-[12px] font-bold text-ink-soft">· {panel.name}</span> : null}
-                            </span>
-                            <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-ink-mute">
-                              {whenText(panel.when) ? <span className="truncate">{whenText(panel.when)}</span> : null}
-                              {panel.items.length > 1 || panel.totalQty > 1 ? <span className="shrink-0">· 상품 {panel.items.length}종 {panel.totalQty}개</span> : null}
-                            </span>
-                          </span>
-                          {sameCustomer > 1 ? <span className="shrink-0 rounded-full bg-[var(--color-cardpay)]/12 px-2 py-0.5 text-[11px] font-black text-[var(--color-cardpay)]" title="같은 고객의 다른 주문도 있어요 — 한 박스로 같이 포장하세요(합배송)">📦 같은고객 {sameCustomer}건</span> : null}
-                          {!panel.paid ? <span className="shrink-0 rounded-full bg-[var(--color-danger-tx)] px-2 py-0.5 text-[11px] font-black text-white">미결제</span> : null}
-                          <span className={`shrink-0 text-[12px] font-black ${complete ? "text-ok-tx" : "text-rose-deep"}`}>{complete ? "✓ 완료" : `${pickedInPanel}/${panel.items.length}`}</span>
-                        </div>
-                        {complete ? (
-                          <button type="button" onClick={() => toggleCollapsedDone(`o:${panel.key}`)} aria-label={collapsed ? "펼치기" : "접기"} className="mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[12px] font-black text-ok-tx hover:bg-white/60">{collapsed ? "▾" : "▴"}</button>
-                        ) : null}
-                      </div>
-                      {/* 상품 줄 */}
-                      {!collapsed ? (
-                        <div className="divide-y divide-line border-t border-line">
-                          {panel.items.map((it) => {
-                            const picked = pickedIds.has(it.id);
-                            return (
-                              <button key={it.id} type="button" onClick={() => togglePick(it.id)} className={`flex w-full items-center gap-3 py-2.5 pl-6 pr-3 text-left last:rounded-b-[10px] ${picked ? "bg-ok-bg/70" : "bg-surface hover:bg-surface-2"}`}>
-                                <CheckBox state={picked ? "done" : "none"} size="sm" />
-                                {itemPhoto[it.id] ? (
-                                  /* eslint-disable-next-line @next/next/no-img-element */
-                                  <img src={itemPhoto[it.id]} alt={it.productName} loading="lazy" className="h-10 w-10 shrink-0 rounded-lg border border-line object-cover" />
-                                ) : null}
-                                <span className="flex min-w-0 flex-1 flex-col gap-1">
-                                  <span className="flex min-w-0 items-center gap-1.5">
-                                    <span className={`min-w-0 truncate text-[14px] font-bold ${picked ? "text-ink-mute line-through" : "text-ink"}`}>{it.productName}</span>
-                                    {/* [㉓] ①모음만 되고 아직 ②담기 전 — 회색 칩으로 표시(담으면 사라짐) */}
-                                    {!picked && collectedIds.has(it.id) ? <span className="shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-[11px] font-black text-ink-mute">모음✓</span> : null}
-                                  </span>
-                                  {/* [㉒ C] 색상·사이즈 칩(없음 숨김=formatOrderOptionText 규칙). 둘 다 비었고 optionText 만 있으면 기존처럼 한 줄. */}
-                                  {(() => {
-                                    const colorChip = stripNoneOptionParts(it.color);
-                                    const sizeChip = stripNoneOptionParts(it.size);
-                                    if (colorChip || sizeChip) {
-                                      return (
-                                        <span className="flex flex-wrap items-center gap-1">
-                                          {colorChip ? <span className={`rounded-full border border-line px-2 py-0.5 text-[14px] font-black ${picked ? "text-ink-mute" : "text-rose-deep"}`}>{colorChip}</span> : null}
-                                          {sizeChip ? <span className={`rounded-full border border-line px-2 py-0.5 text-[14px] font-black ${picked ? "text-ink-mute" : "text-ink"}`}>{sizeChip}</span> : null}
-                                        </span>
-                                      );
-                                    }
-                                    return it.optionText ? <span className={`truncate text-[12px] font-bold ${picked ? "text-ink-mute" : "text-rose-deep"}`}>{it.optionText}</span> : null;
-                                  })()}
-                                </span>
-                                {it.amount > 0 ? <span className={`shrink-0 text-[12px] font-bold ${picked ? "text-ink-mute" : "text-ink-soft"}`}>{it.amount.toLocaleString("ko-KR")}원</span> : null}
-                                <span className={`shrink-0 text-[16px] font-black leading-none ${picked ? "text-ink-mute" : it.qty > 1 ? "text-rose-deep" : "text-ink"}`}>{it.qty}<span className="text-[11px]">개</span></span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* ── 푸터: 위험한 초기화는 왼쪽 글자 버튼, 엑셀·닫기는 오른쪽 ── */}
-        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-line bg-surface px-4 py-2.5">
-          {viewMode === "batch" ? (
-            <button type="button" onClick={resetCollected} disabled={resetting} className="rounded-lg px-2 py-1.5 text-[12px] font-black text-[var(--color-danger-tx)] hover:bg-danger-bg disabled:opacity-50">{resetting ? "초기화중…" : "모음 초기화"}</button>
-          ) : (
-            <button type="button" onClick={resetAll} disabled={resetting} className="rounded-lg px-2 py-1.5 text-[12px] font-black text-[var(--color-danger-tx)] hover:bg-danger-bg disabled:opacity-50">{resetting ? "초기화중…" : "담기 초기화"}</button>
-          )}
-          <div className="flex items-center gap-2">
-            <span className="hidden text-[11px] font-bold text-ink-mute sm:inline">체크는 서버 저장 · 다른 기기에서도 유지</span>
-            {viewMode === "batch" ? <button type="button" onClick={collectAllVisible} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[12px] font-black text-rose-deep hover:bg-surface-2">✓ 모두 모음</button> : null}
-            <button type="button" onClick={runExcel} disabled={exporting} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[12px] font-black text-ink hover:bg-surface-2 disabled:opacity-50">{exporting ? "내보내는중…" : "📄 엑셀"}</button>
-            <button type="button" onClick={onClose} className="rounded-lg bg-rose-deep px-4 py-1.5 text-[12px] font-black text-white hover:opacity-90">닫기</button>
+        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-line p-3">
+          <button type="button" disabled={blocked || exporting} onClick={resetAll} className="min-h-[44px] px-2 text-[12px] font-bold text-[var(--color-danger-tx)] disabled:opacity-40">챙김 전체 해제</button>
+          <div className="flex gap-2">
+            <button type="button" disabled={blocked || exporting} onClick={runExcel} className="min-h-[44px] rounded-lg border border-line px-3 text-[13px] font-bold disabled:opacity-40">{exporting ? "내보내는 중…" : "엑셀"}</button>
+            <button type="button" disabled={saving || exporting} onClick={onClose} className="min-h-[44px] rounded-lg bg-rose-deep px-4 text-[13px] font-black text-white disabled:opacity-40">닫기</button>
           </div>
         </div>
       </div>

@@ -15,6 +15,7 @@ import BroadcastCalendarPicker, { type BroadcastCalendarItem } from "./Broadcast
 import { useLiveOrderShipped } from "./useLiveOrderShipped";
 import { buildCustomerOrderCopyText, buildPaymentRequestNote } from "./liveOrderCustomerCopy";
 import { showAdminConfirm } from "@/lib/adminConfirm";
+import { pickingProgress } from "@/lib/orderPicking";
 
 // 총금액 표시 전용: 포인트 사용 주문은 실결제금액(상품금액 + 택배비 - 사용포인트)으로 표시한다.
 // - 단일상품: final_amount에 포인트가 이미 반영돼 기존 값과 동일(변화 없음)
@@ -369,16 +370,10 @@ export function deriveLiveOrderMatchKeys(order: LiveOrder) {
   return { orderIds, orderGroupId, expectedAmount };
 }
 
-// [㉕-C] 물건챙기기·출력 상태 판정(표시 전용·pure). picked=②봉투 담음·collected=①모음.
+// 물건챙기기와 주문목록은 picked_at 하나로 챙김을 판정한다.
 const PICK_PAID_STATUSES = ["paid", "auto_paid", "manual_paid", "card_paid"];
 function pickStateOf(order: LiveOrder) {
-  let total = 0, got = 0;
-  for (const it of order.items || []) {
-    const q = Number(it.qty) || 0;
-    total += q;
-    if (it.collectedAt || it.pickedAt) got += q;
-  }
-  return { total, got };
+  return pickingProgress(order.items || []);
 }
 function hasInvoicePrinted(order: LiveOrder) { return (order.items || []).some((it) => Boolean(it.invoicePrintedAt)); }
 function firstInvoicePrintedAt(order: LiveOrder) { for (const it of order.items || []) { if (it.invoicePrintedAt) return it.invoicePrintedAt; } return ""; }
@@ -521,6 +516,9 @@ export default function LiveOrderTable({
   const [exporting, setExporting] = useState<"" | "rozen" | "picking">("");
   const [exportConfirm, setExportConfirm] = useState<"" | "rozen" | "picking">("");
   const [pickingOpen, setPickingOpen] = useState(false);
+  // Keep the opened work batch visible even when a live completion changes workFilter.
+  // Resolve current order data by ID, so cancellations/payment updates still apply.
+  const [pickingOrderIds, setPickingOrderIds] = useState<Set<string>>(new Set());
   // [2026-07-13] 담김 현황(장바구니 선점) 팝업 — 표시 전용, 주문/돈 로직 무관
   const [cartHoldsOpen, setCartHoldsOpen] = useState(false);
 
@@ -861,7 +859,7 @@ export default function LiveOrderTable({
     {cartHoldsOpen ? <LiveCartHoldsModal onClose={() => setCartHoldsOpen(false)} /> : null}
 
     {pickingOpen ? (
-      <LiveOrderPickingModal orders={exportableOrders} filterLabel={currentFilterLabel} onClose={() => setPickingOpen(false)} />
+          <LiveOrderPickingModal orders={baseOrders.filter(order => pickingOrderIds.has(String(order.id)))} filterLabel={currentFilterLabel} onClose={() => { setPickingOpen(false); void onRefresh?.(); }} />
     ) : null}
     {exportConfirm !== "" ? (
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setExportConfirm("")}>
@@ -1035,7 +1033,7 @@ export default function LiveOrderTable({
 
           <button
             type="button"
-            onClick={() => setPickingOpen(true)}
+            onClick={() => { setPickingOrderIds(new Set(exportableOrders.map(order => String(order.id)))); setPickingOpen(true); }}
             disabled={exportableOrders.length === 0}
             className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
             title="물건챙기기 체크리스트 팝업을 엽니다"
