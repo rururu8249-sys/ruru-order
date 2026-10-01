@@ -232,7 +232,7 @@ export default function AdminLiveSettlementPanel({ orders, onGoToUnpaidOrders }:
   }, [settings]);
 
   return (
-    <section className="grid gap-4">
+    <section className="grid min-w-0 grid-cols-1 gap-4">
       {/* [2026-09-08 사장님 지적] 화면 맨 위를 덮던 빨간 면책문 → 필요할 때만 펼치는 ⓘ 도움말 */}
       <details className="rounded-2xl border border-line bg-surface-2 px-4 py-2.5">
         <summary className="cursor-pointer list-none text-xs font-black text-ink-soft">

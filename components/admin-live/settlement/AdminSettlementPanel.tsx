@@ -516,7 +516,7 @@ export default function AdminSettlementPanel({
   })();
 
   return (
-    <section className="grid gap-5">
+    <section className="grid min-w-0 grid-cols-1 gap-5">
       <SettlementMoneyFlowDashboard
         onGoToUnpaidOrders={onGoToUnpaidOrders}
         stats={stats}

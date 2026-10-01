@@ -240,7 +240,7 @@ export default function SettlementMoneyFlowDashboard({
   );
 
   return (
-    <div className="grid gap-3">
+    <div className="grid min-w-0 grid-cols-1 gap-3">
       <section className="overflow-hidden rounded-2xl border border-rose-line bg-surface shadow-sm">
         <div className="border-b border-rose-line bg-gradient-to-r from-rose-soft via-surface to-surface px-5 py-3.5">
           <div className="flex flex-wrap items-start justify-between gap-4">
