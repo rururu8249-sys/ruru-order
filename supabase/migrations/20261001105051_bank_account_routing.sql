@@ -258,9 +258,9 @@ begin
           'id', 'primary',
           'enabled', true,
           'label', '기존 계좌',
-          'bankName', max(s.value) filter (where s.key = 'shop_bank_name'),
-          'bankAccount', max(s.value) filter (where s.key = 'shop_bank_account'),
-          'bankHolder', max(s.value) filter (where s.key = 'shop_bank_holder')
+        'bankName', coalesce(max(s.value) filter (where s.key = 'shop_bank_name'), '새마을금고'),
+        'bankAccount', coalesce(max(s.value) filter (where s.key = 'shop_bank_account'), '9002186993725'),
+        'bankHolder', coalesce(max(s.value) filter (where s.key = 'shop_bank_holder'), '유혜원')
         )),
         'routing', jsonb_build_object(
           'mode', 'all',

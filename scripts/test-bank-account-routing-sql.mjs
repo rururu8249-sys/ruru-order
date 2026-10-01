@@ -190,6 +190,18 @@ async function resetOrders() {
   await db.exec("truncate table public.orders restart identity");
 }
 
+// 아직 상점정보를 한 번도 저장하지 않은 기존 운영 상태도 예전 기본계좌로 주문이 막히지 않아야 한다.
+{
+  await db.exec("delete from public.settings");
+  await resetOrders();
+  const result = await submit({ group: "legacy-default", kakao: "90001", broadcast: broadcastA });
+  assert.equal(result.customer_order_segment, "first_order");
+  assert.equal(result.bank_account.id, "primary");
+  assert.equal(result.bank_account.bankName, "새마을금고");
+  assert.equal(result.bank_account.bankAccount, "9002186993725");
+  assert.equal(result.bank_account.bankHolder, "유혜원");
+}
+
 await setConfig();
 
 // 신규 고객의 첫 주문은 first_order + 신규 계좌.
