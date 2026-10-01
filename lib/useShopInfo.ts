@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { parseShopInfo, SHOP_INFO_DEFAULTS, SHOP_INFO_KEYS, type ShopInfo } from "@/lib/shopInfo";
+import { parseShopInfo, SHOP_INFO_DEFAULTS, SHOP_INFO_PUBLIC_KEYS, type ShopInfo } from "@/lib/shopInfo";
 
 let cache: ShopInfo | null = null;
 let inflight: Promise<ShopInfo> | null = null;
@@ -42,7 +42,7 @@ export async function loadShopInfo(force = false): Promise<ShopInfo> {
       const { data, error } = await supabase
         .from("settings")
         .select("key,value")
-        .in("key", [...SHOP_INFO_KEYS]);
+        .in("key", [...SHOP_INFO_PUBLIC_KEYS]);
       if (error) return cache || SHOP_INFO_DEFAULTS;
       const next = parseShopInfo((data || []) as Array<{ key: string; value: unknown }>);
       cache = next;

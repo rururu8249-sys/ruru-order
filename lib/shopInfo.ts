@@ -68,6 +68,17 @@ export const SHOP_INFO_KEYS = [
 ] as const;
 export type ShopInfoKey = (typeof SHOP_INFO_KEYS)[number];
 
+/** 고객 브라우저가 읽어도 되는 공개 키. 두 계좌 전체와 배정 규칙은 서버·관리자 전용이다. */
+export const SHOP_INFO_PUBLIC_KEYS = [
+  "shop_contact_type",
+  "shop_contact_value",
+  "shop_admin_chat_url",
+  "shop_payster_url",
+  "shop_bank_name",
+  "shop_bank_account",
+  "shop_bank_holder",
+] as const satisfies readonly ShopInfoKey[];
+
 export const SHOP_BANK_CONFIG_VERSION = 1 as const;
 
 const DEFAULT_PRIMARY_BANK: ShopBankAccount = {

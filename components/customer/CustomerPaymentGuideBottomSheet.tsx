@@ -209,6 +209,10 @@ export default function CustomerPaymentGuideBottomSheet({
                 </button>
               </div>
 
+              <div style={{ marginTop: "10px", borderRadius: "10px", background: "#FFF3CD", padding: "9px 10px", fontSize: "12.5px", fontWeight: 900, lineHeight: 1.5, color: "#7A1E47", wordBreak: "keep-all" }}>
+                입금 계좌는 변경될 수 있습니다. 입금 전 이 화면의 계좌번호를 꼭 확인해 주세요.
+              </div>
+
               {isOrderComplete ? (
                 <div style={{ marginTop: "12px", borderTop: "1px solid #F0E0B0", paddingTop: "10px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", fontSize: "12.5px", fontWeight: 700, color: "#397A68" }}>
                   <span>입금 확인은 보통 10~30분 걸려요</span>

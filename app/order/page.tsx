@@ -100,6 +100,10 @@ import { pickVisibleBadges, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_MIN_BUYERS, TOP_SE
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import ShopContactLink from "@/components/customer/ShopContactLink";
 import { useShopInfo } from "@/lib/useShopInfo";
+import {
+  parseOrderBankRoutingResult,
+  type OrderBankAccountSnapshot,
+} from "@/lib/orderBankAccount";
 import { detailCode, detailPricePresentation, detailProducts } from "@/lib/productDetailModel";
 import CustomerSizeChartSheet from "@/components/customer/CustomerSizeChartSheet";
 import { resolveSizeChart, sizeColumnIndex } from "@/lib/sizeChart";
@@ -190,6 +194,7 @@ type DoneData = {
   totalAmount: number;
   pointUsedAmount: number;
   finalAmount: number;
+  bankAccount: OrderBankAccountSnapshot;
 };
 
 type CustomerBlockStatus = {
@@ -5132,6 +5137,7 @@ export default function OrderPage() {
       if (!orderSubmitResponse.ok || !orderSubmitPayload?.ok) {
         throw new Error(orderSubmitPayload?.message || "주문 저장 실패");
       }
+      const assignedBank = parseOrderBankRoutingResult(orderSubmitPayload);
 
       // 제출 성공(서버가 신규 저장 또는 멱등 중복감지로 기존 주문을 반환) → 다음 주문은 새 키 사용
       pendingOrderKeyRef.current = null;
@@ -5160,6 +5166,7 @@ export default function OrderPage() {
         totalAmount: appliedTotalAmount,
         pointUsedAmount: savedPointUsedAmount,
         finalAmount: savedFinalAmount,
+        bankAccount: assignedBank.bankAccount,
       });
 
       setPaymentGuideOpen(true);
@@ -5203,13 +5210,20 @@ export default function OrderPage() {
     await submitOrder({ allowMissingDetailAddress: true });
   };
 
+  const activePaymentBankAccount: OrderBankAccountSnapshot = done?.bankAccount || {
+    id: "primary",
+    bankName: BANK_NAME,
+    bankAccount: BANK_ACCOUNT,
+    bankHolder: BANK_HOLDER,
+  };
+
   const copyBankAccount = async () => {
     try {
-      await navigator.clipboard.writeText(BANK_ACCOUNT);
+      await navigator.clipboard.writeText(activePaymentBankAccount.bankAccount);
       setCopyDone(true);
       setTimeout(() => setCopyDone(false), 1800);
     } catch {
-      showCustomerNotice(BANK_ACCOUNT);
+      showCustomerNotice(activePaymentBankAccount.bankAccount);
     }
   };
 
@@ -8720,9 +8734,9 @@ export default function OrderPage() {
         <CustomerPaymentGuideBottomSheet
           open={paymentGuideOpen}
           depositNickname={done?.nickname || youtubeNickname || customerName}
-          bankName={BANK_NAME}
-          bankAccount={BANK_ACCOUNT}
-          bankHolder={BANK_HOLDER}
+          bankName={activePaymentBankAccount.bankName}
+          bankAccount={activePaymentBankAccount.bankAccount}
+          bankHolder={activePaymentBankAccount.bankHolder}
           nicknameCopyDone={nicknameCopyDone}
           bankCopyDone={copyDone}
           onCopyNickname={copyDepositNickname}
