@@ -34,6 +34,7 @@ type ProductRow = Record<string, unknown>;
 type QuickProductFastFormProps = {
   activeBroadcastId: string | number | null;
   initialProduct?: ProductRow | null;
+  initialDetailName?: string;
   onClose?: () => void;
 };
 
@@ -734,6 +735,7 @@ function ImagePicker({
 export default function QuickProductFastForm({
   activeBroadcastId,
   initialProduct = null,
+  initialDetailName = "",
   onClose,
 }: QuickProductFastFormProps) {
   const [category, setCategory] = useState("");
@@ -1113,7 +1115,26 @@ export default function QuickProductFastForm({
       if (url) nextPhotos[name] = url;
     }
     setDetailPhotos(nextPhotos);
-  }, [initialProduct]);
+    // 목록에서 선택한 정확한 세부상품만 연다. 복원된 데이터로 구성해
+    // 첫 렌더의 빈 옵션/가격을 편집창에 넣지 않는다. 저장 로직은 기존 그대로.
+    const target = normalizeBrandKorean(initialDetailName.trim());
+    if (isBrandGroupEdit && target && restoredDetails.includes(target)) {
+      const config = normalizedDetailOptions[target] || { colors: [], sizes: [], variants: [] };
+      setBrandDetailEditDraft({
+        originalName: target,
+        name: target,
+        category: normalizedDetailCategories[target] || "",
+        plus: nextPlus[target] || "0",
+        hidden: hiddenList.includes(target),
+        photos: [...(normalizedPhotoSets[target] || (nextPhotos[target] ? [nextPhotos[target]] : []))],
+        variants: config.variants?.length
+          ? config.variants.map((variant) => ({ color: String(variant.color || "없음"), size: String(variant.size || "없음") }))
+          : [{ color: "없음", size: "없음" }],
+        colorsText: (config.colors || []).filter((v) => v !== "없음").join(", "),
+        sizesText: (config.sizes || []).filter((v) => v !== "없음").join(", "),
+      });
+    }
+  }, [initialProduct, initialDetailName]);
 
   const details = useMemo(() => unique(splitOptions(detailText)), [detailText]);
 
