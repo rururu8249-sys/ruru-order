@@ -24,11 +24,18 @@ export type ShopBankAccount = {
   bankHolder: string;
 };
 
+export type ShopBankFirstOrderWindow = {
+  enabled: boolean;
+  startDate: string;
+  endDate: string;
+};
+
 export type ShopBankRouting = {
   mode: ShopBankAudienceMode;
   allAccountId: ShopBankAccountId;
   existingAccountId: ShopBankAccountId;
   firstOrderAccountId: ShopBankAccountId;
+  firstOrderWindow: ShopBankFirstOrderWindow;
 };
 
 export type ShopInfo = {
@@ -77,7 +84,12 @@ const DEFAULT_BANK_ROUTING: ShopBankRouting = {
   allAccountId: "primary",
   existingAccountId: "primary",
   firstOrderAccountId: "primary",
+  firstOrderWindow: { enabled: false, startDate: "", endDate: "" },
 };
+
+function defaultBankRouting(): ShopBankRouting {
+  return { ...DEFAULT_BANK_ROUTING, firstOrderWindow: { ...DEFAULT_BANK_ROUTING.firstOrderWindow } };
+}
 
 /** 2026-09-08 이전 하드코딩값 그대로. 설정이 없으면 이 값이 나간다. */
 export const SHOP_INFO_DEFAULTS: ShopInfo = {
@@ -90,7 +102,7 @@ export const SHOP_INFO_DEFAULTS: ShopInfo = {
   bankAccount: DEFAULT_PRIMARY_BANK.bankAccount,
   bankHolder: DEFAULT_PRIMARY_BANK.bankHolder,
   bankAccounts: [{ ...DEFAULT_PRIMARY_BANK }],
-  bankRouting: { ...DEFAULT_BANK_ROUTING },
+  bankRouting: defaultBankRouting(),
 };
 
 export const CONTACT_TYPE_LABEL: Record<ShopContactType, string> = {
@@ -170,7 +182,7 @@ export function parseShopInfo(rows: ReadonlyArray<{ key: string; value: unknown 
     : { ...DEFAULT_PRIMARY_BANK };
 
   let bankAccounts: ShopBankAccount[] = [legacyPrimary];
-  let bankRouting: ShopBankRouting = { ...DEFAULT_BANK_ROUTING };
+  let bankRouting: ShopBankRouting = defaultBankRouting();
   const bankConfigRaw = get("shop_bank_config_v1");
 
   if (bankConfigRaw) {
@@ -223,6 +235,11 @@ export function toShopInfoRows(info: ShopInfo): Array<{ key: ShopInfoKey; value:
     allAccountId: info.bankRouting.allAccountId,
     existingAccountId: info.bankRouting.existingAccountId,
     firstOrderAccountId: info.bankRouting.firstOrderAccountId,
+    firstOrderWindow: {
+      enabled: info.bankRouting.firstOrderWindow.enabled,
+      startDate: info.bankRouting.firstOrderWindow.startDate,
+      endDate: info.bankRouting.firstOrderWindow.endDate,
+    },
   };
 
   return [
@@ -245,6 +262,16 @@ type BankConfigurationValidation =
 
 function normalizeAccountId(value: unknown): ShopBankAccountId | null {
   return value === "primary" || value === "secondary" ? value : null;
+}
+
+function isRealIsoDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }
 
 function validateBankConfiguration(accountsInput: unknown, routingInput: unknown): BankConfigurationValidation {
@@ -298,10 +325,25 @@ function validateBankConfiguration(accountsInput: unknown, routingInput: unknown
   const missing = referenced.find((id) => !enabledIds.has(id));
   if (missing) return { ok: false, message: `${missing === "primary" ? "기존" : "추가"} 계좌가 없거나 비활성 상태라 선택할 수 없습니다.` };
 
+  const windowInput = routingInput.firstOrderWindow;
+  const windowEnabled = isRecord(windowInput) && windowInput.enabled === true;
+  let firstOrderWindow: ShopBankFirstOrderWindow = { enabled: false, startDate: "", endDate: "" };
+  if (windowEnabled) {
+    const startDate = clean(windowInput.startDate);
+    const endDate = clean(windowInput.endDate);
+    if (!isRealIsoDate(startDate) || !isRealIsoDate(endDate)) {
+      return { ok: false, message: "신규회원 계좌 유지기간의 시작일과 종료일을 실제 날짜로 선택해 주세요." };
+    }
+    if (startDate > endDate) {
+      return { ok: false, message: "신규회원 계좌 유지기간의 시작일은 종료일보다 늦을 수 없습니다." };
+    }
+    firstOrderWindow = { enabled: true, startDate, endDate };
+  }
+
   return {
     ok: true,
     accounts,
-    routing: { mode, allAccountId, existingAccountId, firstOrderAccountId },
+    routing: { mode, allAccountId, existingAccountId, firstOrderAccountId, firstOrderWindow },
   };
 }
 

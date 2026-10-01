@@ -28,6 +28,7 @@ const split = {
   allAccountId: "primary",
   existingAccountId: "primary",
   firstOrderAccountId: "secondary",
+  firstOrderWindow: { enabled: true, startDate: "2026-10-01", endDate: "2026-10-07" },
 };
 
 // 생산 코드에서 추가 버튼을 잘못 여러 번 눌러도 세 번째 계좌가 생기면 안 된다.
@@ -54,6 +55,8 @@ const split = {
   const lines = editor.bankRoutingSummary([primary, secondary], split);
   assert.equal(lines.includes("기존회원: 기존 계좌 — 국민은행 111-222-333333 (홍길동)"), true);
   assert.equal(lines.includes("첫 주문 신규회원: 추가 계좌 — 신한은행 444-555-666666 (김루루)"), true);
+  assert.equal(lines.includes("2026-10-01 ~ 2026-10-07"), true, "신규회원 계좌 유지기간을 확인창에 보여준다");
+  assert.equal(lines.includes("방송·쇼핑몰 공통"), true, "방송과 쇼핑몰이 같은 규칙임을 확인창에 보여준다");
   assert.equal(lines.includes("뱅크다"), true);
 }
 
@@ -63,8 +66,18 @@ const split = {
     allAccountId: "primary",
     existingAccountId: "primary",
     firstOrderAccountId: "primary",
+    firstOrderWindow: { enabled: false, startDate: "", endDate: "" },
   });
   assert.equal(lines.includes("전체 고객: 기존 계좌 — 국민은행 111-222-333333 (홍길동)"), true);
+}
+
+{
+  const lines = editor.bankRoutingSummary([primary, secondary], {
+    ...split,
+    firstOrderWindow: { enabled: false, startDate: "", endDate: "" },
+  });
+  assert.equal(lines.includes("유지기간 미사용"), true);
+  assert.equal(lines.includes("새 방송·방송 종료 후 쇼핑몰 주문"), true, "기간 미사용 재판정 규칙을 확인창에 보여준다");
 }
 
 console.log("bank account settings behavior tests passed");

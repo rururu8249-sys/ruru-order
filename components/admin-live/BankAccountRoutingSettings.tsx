@@ -145,6 +145,7 @@ export default function BankAccountRoutingSettings({ accounts, routing, onChange
       <section className="rounded-2xl border border-line bg-surface-2 p-4">
         <h3 className="text-sm font-black text-ink">고객별 계좌 노출 방식</h3>
         <p className="mt-1 text-xs font-bold leading-5 text-ink-mute">첫 주문 여부는 삭제·취소·환불·테스트 주문을 제외한 실제 주문 이력으로 서버가 판단합니다.</p>
+        <p className="mt-1 text-xs font-bold leading-5 text-rose-deep">방송 주문과 쇼핑몰 주문에 같은 규칙을 적용합니다.</p>
 
         <div className="mt-3 grid gap-2 md:grid-cols-2">
           <button
@@ -188,6 +189,65 @@ export default function BankAccountRoutingSettings({ accounts, routing, onChange
             </>
           )}
         </div>
+
+        {routing.mode === "split" ? (
+          <div className="mt-3 rounded-2xl border border-line bg-surface p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-black text-ink">신규회원 계좌 유지기간</div>
+                <p className="mt-1 text-xs font-bold leading-5 text-ink-mute">
+                  기간 안에 생애 첫 주문한 고객은 다른 방송·쇼핑몰 추가 주문도 종료일까지 신규회원 계좌를 봅니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={routing.firstOrderWindow.enabled}
+                onClick={() => updateRouting({
+                  firstOrderWindow: routing.firstOrderWindow.enabled
+                    ? { enabled: false, startDate: "", endDate: "" }
+                    : { enabled: true, startDate: "", endDate: "" },
+                })}
+                className={`rounded-xl border px-4 py-2 text-xs font-black ${routing.firstOrderWindow.enabled ? "border-rose-deep bg-rose-soft text-rose-deep" : "border-line bg-surface-2 text-ink-soft"}`}
+              >
+                {routing.firstOrderWindow.enabled ? "사용 중" : "사용 안 함"}
+              </button>
+            </div>
+
+            {routing.firstOrderWindow.enabled ? (
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <label>
+                  <span className="mb-2 block text-xs font-black text-ink-soft">시작일 (한국시간)</span>
+                  <input
+                    type="date"
+                    aria-label="신규회원 계좌 유지 시작일"
+                    value={routing.firstOrderWindow.startDate}
+                    onChange={(event) => updateRouting({
+                      firstOrderWindow: { ...routing.firstOrderWindow, startDate: event.target.value },
+                    })}
+                    className={inputClass}
+                  />
+                </label>
+                <label>
+                  <span className="mb-2 block text-xs font-black text-ink-soft">종료일 (한국시간)</span>
+                  <input
+                    type="date"
+                    aria-label="신규회원 계좌 유지 종료일"
+                    value={routing.firstOrderWindow.endDate}
+                    onChange={(event) => updateRouting({
+                      firstOrderWindow: { ...routing.firstOrderWindow, endDate: event.target.value },
+                    })}
+                    className={inputClass}
+                  />
+                </label>
+              </div>
+            ) : (
+              <p className="mt-3 rounded-xl border border-line bg-surface-2 px-3 py-2 text-xs font-bold leading-5 text-ink-soft">
+                같은 방송에서만 최초 계좌를 유지합니다. 새 방송 또는 방송 종료 후 쇼핑몰 주문은 최신 설정과 주문 이력으로 다시 판정합니다.
+              </p>
+            )}
+          </div>
+        ) : null}
       </section>
 
       <div className="whitespace-pre-line rounded-2xl border border-line bg-surface-2 px-4 py-3 text-xs font-bold leading-5 text-ink-soft">

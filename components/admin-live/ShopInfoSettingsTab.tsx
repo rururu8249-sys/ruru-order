@@ -91,7 +91,10 @@ export default function ShopInfoSettingsTab() {
     setAdminChatUrl(info.adminChatUrl);
     setPaysterUrl(info.paysterUrl);
     setBankAccounts(info.bankAccounts.map((account) => ({ ...account })));
-    setBankRouting({ ...info.bankRouting });
+    setBankRouting({
+      ...info.bankRouting,
+      firstOrderWindow: { ...info.bankRouting.firstOrderWindow },
+    });
   };
 
   useEffect(() => {

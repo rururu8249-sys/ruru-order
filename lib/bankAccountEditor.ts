@@ -51,9 +51,15 @@ export function bankRoutingSummary(accounts: readonly ShopBankAccount[], routing
         `기존회원: ${accountSummary(accounts, routing.existingAccountId)}`,
         `첫 주문 신규회원: ${accountSummary(accounts, routing.firstOrderAccountId)}`,
       ];
+  const windowLines = routing.mode === "split"
+    ? routing.firstOrderWindow.enabled
+      ? [`신규회원 계좌 유지기간: ${routing.firstOrderWindow.startDate} ~ ${routing.firstOrderWindow.endDate} (방송·쇼핑몰 공통)`]
+      : ["신규회원 계좌 유지기간 미사용 — 같은 방송만 최초 계좌를 유지하고, 새 방송·방송 종료 후 쇼핑몰 주문은 최신 설정으로 다시 판정합니다."]
+    : ["방송·쇼핑몰 공통 적용"];
 
   return [
     ...assignmentLines,
+    ...windowLines,
     "",
     "뱅크다 자동입금확인은 뱅크다에 별도로 등록된 계좌를 사용합니다. 실제 입금 받을 모든 계좌가 뱅크다에도 등록되어 있는지 확인해 주세요.",
   ].join("\n");

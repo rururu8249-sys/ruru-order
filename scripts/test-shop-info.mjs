@@ -117,6 +117,9 @@ function assert(condition, message) {
   equal(legacy.bankAccounts[0].enabled, true, "legacy 계좌 활성");
   equal(legacy.bankRouting.mode, "all", "legacy는 전체고객 모드");
   equal(legacy.bankRouting.allAccountId, "primary", "legacy 전체 계좌");
+  equal(legacy.bankRouting.firstOrderWindow.enabled, false, "legacy 유지기간은 기본 꺼짐");
+  equal(legacy.bankRouting.firstOrderWindow.startDate, "", "legacy 시작일 비움");
+  equal(legacy.bankRouting.firstOrderWindow.endDate, "", "legacy 종료일 비움");
 }
 
 // 6) v1 설정 두 계좌 + 회원구분 라우팅 해석
@@ -126,7 +129,13 @@ const splitConfig = {
     { id: "primary", enabled: true, label: "기존 계좌", bankName: "국민은행", bankAccount: "111-222-333333", bankHolder: "홍길동" },
     { id: "secondary", enabled: true, label: "신규 계좌", bankName: "신한은행", bankAccount: "444-555-666666", bankHolder: "김루루" },
   ],
-  routing: { mode: "split", allAccountId: "primary", existingAccountId: "primary", firstOrderAccountId: "secondary" },
+  routing: {
+    mode: "split",
+    allAccountId: "primary",
+    existingAccountId: "primary",
+    firstOrderAccountId: "secondary",
+    firstOrderWindow: { enabled: true, startDate: "2026-10-01", endDate: "2026-10-07" },
+  },
 };
 {
   const parsed = parseShopInfo([
@@ -138,6 +147,9 @@ const splitConfig = {
   equal(parsed.bankAccounts.length, 2, "v1 계좌 두 개");
   equal(parsed.bankRouting.mode, "split", "회원 구분 모드");
   equal(parsed.bankRouting.firstOrderAccountId, "secondary", "첫 주문 계좌");
+  equal(parsed.bankRouting.firstOrderWindow.enabled, true, "신규 유지기간 사용");
+  equal(parsed.bankRouting.firstOrderWindow.startDate, "2026-10-01", "신규 유지기간 시작일");
+  equal(parsed.bankRouting.firstOrderWindow.endDate, "2026-10-07", "신규 유지기간 종료일");
   equal(parsed.bankName, "국민은행", "flat 은 primary 동기화");
   equal(bankLine(parsed.bankAccounts[1]), "신한은행 444-555-666666 (김루루)", "명시 계좌 한 줄");
 }
@@ -171,9 +183,49 @@ const splitConfig = {
   const same = validateShopInfo({
     ...SHOP_INFO_DEFAULTS,
     bankAccounts: [splitConfig.accounts[0]],
-    bankRouting: { mode: "split", allAccountId: "primary", existingAccountId: "primary", firstOrderAccountId: "primary" },
+    bankRouting: {
+      mode: "split",
+      allAccountId: "primary",
+      existingAccountId: "primary",
+      firstOrderAccountId: "primary",
+      firstOrderWindow: { enabled: false, startDate: "", endDate: "" },
+    },
   });
   equal(same.ok, true, "회원구분 두 대상 같은 계좌 허용");
+}
+
+// 11) 유지기간은 실제 달력 날짜·오름차순만 허용하고, 꺼짐 상태는 날짜를 비워 직렬화
+{
+  const disabled = validateShopInfo({
+    ...SHOP_INFO_DEFAULTS,
+    bankAccounts: splitConfig.accounts,
+    bankRouting: {
+      ...splitConfig.routing,
+      firstOrderWindow: { enabled: false, startDate: "2026-10-01", endDate: "2026-10-07" },
+    },
+  });
+  assert(disabled.ok, "꺼진 유지기간은 통과해야 한다");
+  equal(disabled.value.bankRouting.firstOrderWindow.startDate, "", "꺼진 유지기간 시작일 정리");
+  equal(disabled.value.bankRouting.firstOrderWindow.endDate, "", "꺼진 유지기간 종료일 정리");
+
+  const invalidCases = [
+    { enabled: true, startDate: "", endDate: "2026-10-07" },
+    { enabled: true, startDate: "2026-10-01", endDate: "" },
+    { enabled: true, startDate: "2026-02-30", endDate: "2026-03-01" },
+    { enabled: true, startDate: "2026-10-08", endDate: "2026-10-07" },
+    { enabled: true, startDate: "2026/10/01", endDate: "2026-10-07" },
+  ];
+  for (const [index, firstOrderWindow] of invalidCases.entries()) {
+    equal(
+      validateShopInfo({
+        ...SHOP_INFO_DEFAULTS,
+        bankAccounts: splitConfig.accounts,
+        bankRouting: { ...splitConfig.routing, firstOrderWindow },
+      }).ok,
+      false,
+      `잘못된 유지기간 ${index + 1} 거부`,
+    );
+  }
 }
 
 // 10) 저장된 JSON이 깨지면 화면은 legacy 3키로 안전 복구
