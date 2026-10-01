@@ -4,7 +4,7 @@
 //   - 주문서 1건(같은 order_group_id) = 패널 1개. 같은 닉네임이라도 주문서 다르면 다른 패널.
 //   - 상품별/고객별은 같은 주문 행의 챙김 상태를 보여주는 두 가지 보기.
 //   - 체크는 orders.picked_at(서버)에 저장 → 다른 기기/새로고침에도 유지.
-//   - 결제완료 주문만 표시. 자동 접기와 일괄 완료 없이 개별 수량을 확인해 체크.
+//   - 결제완료 기본, 미결제는 조회만. 자동 접기와 일괄 완료 없이 개별 수량을 확인해 체크.
 //   - 상단 "챙김 N개 / 전체 M개"는 수량 합계. picked_at 한 칸만 update(돈/주문 로직 무관).
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -62,7 +62,11 @@ const whenText = (s: string) => {
 export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: Props) {
   const [pickedIds, setPickedIds] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"batch" | "order">("batch");
-  const [unpickedOnly, setUnpickedOnly] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<"all" | "unpicked" | "picked">("all");
+  const [paymentFilter, setPaymentFilter] = useState<"paid" | "all" | "unpaid">("paid");
+  const [sortModes, setSortModes] = useState<{ batch: "name" | "remaining"; order: "name" | "remaining" | "oldest" }>({ batch: "name", order: "name" });
+  const [sortPickedIds, setSortPickedIds] = useState<Set<string>>(new Set());
+  const [toolsOpen, setToolsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [exporting, setExporting] = useState(false);
 
@@ -136,10 +140,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   }, [photoIdKey]);
 
 
-  // Only paid, non-canceled orders participate. Both views use these same rows.
-  const scopedPanels = useMemo(() => panels.filter(p => p.paid).sort((a, b) =>
-    a.nickname.localeCompare(b.nickname, "ko") || ts(a.when) - ts(b.when)), [panels]);
-  const scopedIds = useMemo(() => scopedPanels.flatMap(p => p.items.map(it => it.id)), [scopedPanels]);
+  // Read all eligible rows so switching filters never hides persisted completion.
+  const scopedPanels = useMemo(() => panels.filter(p => paymentFilter === "all" || (paymentFilter === "paid" ? p.paid : !p.paid)), [panels, paymentFilter]);
+  const scopedIds = useMemo(() => panels.flatMap(p => p.items.map(it => it.id)), [panels]);
   const idKey = scopedIds.slice().sort().join(",");
   const pickedRef = useRef(pickedIds);
   const busyRef = useRef(false);
@@ -194,6 +197,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
 
   const updatePicked = async (ids: string[], picked: boolean) => {
     if (busyRef.current || readingRef.current || loading || loadError || ids.length === 0) return;
+    const paidIds = new Set(panels.filter(p => p.paid).flatMap(p => p.items.map(it => it.id)));
+    if (ids.some(id => !paidIds.has(id))) return;
     busyRef.current = true;
     ++readGeneration.current;
     setSaving(true);
@@ -219,16 +224,27 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
 
   const resetAll = async () => {
     if (busyRef.current || loading || loadError) return;
-    if (!(await showAdminConfirm("이 목록의 챙김 표시를 모두 해제할까요?\n주문·입금·금액·출고 상태는 바뀌지 않습니다."))) return;
-    await updatePicked(scopedIds, false);
+    const ids = matches.filter(row => row.panel.paid && pickedIds.has(row.item.id)).map(row => row.item.id);
+    if (!ids.length) { showAdminToast("현재 조회 목록에 해제할 챙김 표시가 없습니다.", "warning"); return; }
+    if (!(await showAdminConfirm(`현재 조회 목록 ${ids.length}개 항목의 챙김 표시를 해제할까요?\n주문·입금·금액·출고 상태는 바뀌지 않습니다.`))) return;
+    await updatePicked(ids, false);
   };
 
   const runExcel = async () => {
     if (saving || loading || loadError) return;
+    if (!matches.length) { showAdminToast("내보낼 조회 목록이 없습니다.", "warning"); return; }
     setExporting(true);
     try {
-      await exportLiveOrdersForPicking(orders.filter(o => PAID_STATUSES.includes(clean(o.paymentStatus))), { filterLabel }, pickedIds);
-      const ids = scopedIds.map(Number);
+      const visibleIds = new Set(matches.map(row => row.item.id));
+      const exportOrders = orders.flatMap(order => {
+        const items = (order.items || []).filter(item => visibleIds.has(String(item.id)));
+        if (order.items?.length) return items.length ? [{...order, items}] : [];
+        return visibleIds.has(String(order.id)) ? [order] : [];
+      });
+      const paymentLabel = paymentFilter === 'paid' ? '결제완료만' : paymentFilter === 'unpaid' ? '미결제만' : '미결제 포함';
+      const stateLabel = statusFilter === 'all' ? '전체보기' : statusFilter === 'picked' ? '챙김만' : '안 챙김만';
+      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${filterLabel} · ${paymentLabel} · ${stateLabel}${q ? ` · 검색: ${q}` : ''}`, rowOrder: viewMode === 'batch' ? 'product' : sortMode === 'oldest' ? 'time' : 'nickname' }, pickedIds);
+      const ids = [...visibleIds].map(Number);
       const now = new Date().toISOString();
       for (let i = 0; i < ids.length; i += 500) {
         const { error } = await supabase.from("orders").update({ picking_list_printed_at: now }).is("picking_list_printed_at", null).in("id", ids.slice(i, i + 500));
@@ -243,8 +259,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   const { total, got } = pickingProgress(allRows.map(({ item }) => ({ qty: item.qty, pickedAt: pickedIds.has(item.id) })));
   const q = search.trim();
   const matches = allRows.filter(({ panel, item }) =>
-    (!q || productSearchMatches([panel.nickname, panel.name, item.text].join(" "), q)) &&
-    (!unpickedOnly || !pickedIds.has(item.id)));
+    (!q || productSearchMatches([panel.search, item.text].join(" "), q)) &&
+    (statusFilter === "all" || (statusFilter === "unpicked" ? !pickedIds.has(item.id) : pickedIds.has(item.id))));
   type PickingRow = typeof allRows[number];
   const grouped = new Map<string, { title: string; subtitle: string; rows: PickingRow[] }>();
   for (const row of matches) {
@@ -258,10 +274,23 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
     grouped.set(key, group);
   }
   for (const group of grouped.values()) {
-    if (viewMode === "batch") group.rows.sort((a, b) => compareOrderOptions(a.item, b.item) || a.panel.nickname.localeCompare(b.panel.nickname, "ko"));
+    group.rows.sort((a, b) => viewMode === "batch"
+      ? compareOrderOptions(a.item, b.item) || a.panel.nickname.localeCompare(b.panel.nickname, "ko") || ts(a.panel.when) - ts(b.panel.when)
+      : a.item.productName.localeCompare(b.item.productName, "ko", {numeric:true}) || compareOrderOptions(a.item,b.item));
   }
+  const sortMode = sortModes[viewMode];
+  const remainingByGroup = new Map<string, number>();
+  for (const row of allRows) {
+    const key = viewMode === 'batch' ? (row.item.productId || row.item.productName) + '|' + row.item.productName : row.panel.key;
+    remainingByGroup.set(key, (remainingByGroup.get(key) || 0) + (sortPickedIds.has(row.item.id) ? 0 : row.item.qty));
+  }
+  const sortedGroups = [...grouped].sort(([ak, a], [bk, b]) => {
+    const oldest = (group: typeof a) => Math.min(...group.rows.map(row => ts(row.panel.when)));
+    const primary = sortMode === "remaining" ? (remainingByGroup.get(bk) || 0) - (remainingByGroup.get(ak) || 0) : sortMode === "oldest" ? oldest(a) - oldest(b) : 0;
+    return primary || a.title.localeCompare(b.title, "ko", {numeric:true}) || ak.localeCompare(bk, "ko", {numeric:true});
+  });
   const blocked = loading || saving || loadError;
-  const title = String(filterLabel || "").split(" · ")[0].replace(/^방송:\s*/, "");
+  const title = String(filterLabel || "").replace(/^방송:\s*/, "");
   const renderRow = ({ panel, item }: PickingRow) => {
     const done = pickedIds.has(item.id);
     return (
@@ -274,11 +303,12 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
           <div className="break-words text-[16px] font-black text-ink">{item.productName}</div>
           <div className="mt-1 break-words text-[16px] font-black text-rose-deep">{item.optionText || "기본 옵션"}</div>
           <div className="mt-1 text-[12px] font-bold text-ink-soft">{panel.nickname}{panel.name && panel.name !== panel.nickname ? ` · ${panel.name}` : ""} · 주문 #{item.id}</div>
+          {!panel.paid ? <span className="mt-1 inline-block rounded bg-warn-bg px-2 py-1 text-[12px] font-black text-[var(--color-danger-tx)]">미결제 · 조회만 가능</span> : null}
         </div>
         <div className="col-span-2 flex items-center justify-between gap-2 border-t border-line pt-2 text-right sm:col-span-1 sm:block sm:border-t-0 sm:pt-0">
           <div className="text-[22px] font-black text-ink"><span className="mr-2 text-[12px] font-bold text-ink-soft sm:hidden">확인할 수량</span>{item.qty}<span className="text-[12px]">개</span></div>
           <button type="button" role="checkbox" aria-checked={done} aria-label={`${panel.nickname} ${item.productName} ${item.optionText} ${item.qty}개 ${done ? "챙김 해제" : "챙김"}`}
-            disabled={blocked} onClick={() => updatePicked([item.id], !pickedRef.current.has(item.id))}
+            disabled={blocked || !panel.paid} onClick={() => updatePicked([item.id], !pickedRef.current.has(item.id))}
             className={`mt-1 flex min-h-[44px] min-w-[92px] items-center justify-center gap-2 rounded-lg border-2 px-2 text-[13px] font-black disabled:opacity-50 ${done ? "border-ok-tx bg-[var(--color-ok-tx)] text-white" : "border-line bg-surface text-ink-soft"}`}>
             <span aria-hidden="true">{done ? "✓" : "□"}</span>{done ? "챙김" : "안 챙김"}
           </button>
@@ -289,12 +319,12 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-2 sm:p-4">
-      <div role="dialog" aria-modal="true" aria-label="물건챙기기" className="flex h-[92vh] w-[min(840px,98vw)] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
+      <div role="dialog" aria-modal="true" aria-label="물건챙기기" className="flex h-[94vh] w-[min(960px,98vw)] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line p-4">
-          <div><h2 className="text-[18px] font-black text-rose-deep">물건챙기기</h2><div className="text-[12px] font-bold text-ink-soft">{title} · 결제완료 주문만</div></div>
+          <div className="min-w-0"><h2 className="text-[18px] font-black text-rose-deep">물건챙기기</h2><div className="break-words text-[12px] font-bold text-ink-soft">작업 범위: {title} · 취소·챙기기 제외 주문 제외</div></div>
           <button type="button" disabled={saving} onClick={onClose} aria-label="닫기" className="h-11 w-11 rounded-full bg-surface-2 text-[22px] disabled:opacity-40">×</button>
         </div>
-        <div className="shrink-0 space-y-3 border-b border-line p-4">
+        <div className="shrink-0 space-y-2 border-b border-line p-3">
           <div className="flex items-center justify-between gap-2" aria-live="polite">
             <span className="text-[18px] font-black text-rose-deep">안 챙김 {loading || loadError ? "—" : total - got}개</span>
             <span className="text-[14px] font-bold text-ok-tx">챙김 {loading || loadError ? "—" : got} / {total}개</span>
@@ -302,17 +332,24 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
           <div className="grid grid-cols-2 gap-1 rounded-xl bg-surface-2 p-1">
             {(["batch", "order"] as const).map(mode => <button key={mode} type="button" onClick={() => setViewMode(mode)} aria-pressed={viewMode === mode} className={`min-h-[44px] rounded-lg text-[16px] font-black ${viewMode === mode ? "bg-rose-deep text-white" : "text-ink-soft"}`}>{mode === "batch" ? "상품별" : "고객별"}</button>)}
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {([['all','전체보기',total],['unpicked','안 챙김만',total-got],['picked','챙김만',got]] as const).map(([value,label,count]) => <button key={value} type="button" aria-label={label} aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)} className={`min-h-[40px] rounded-lg border border-line px-3 text-[13px] font-bold ${statusFilter === value ? 'bg-rose-deep text-white' : 'bg-surface text-ink-soft'}`}>{label} {loading || loadError ? '—' : count}개</button>)}
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+            <label className="min-w-0 text-[11px] font-bold text-ink-soft">결제 범위<select aria-label="결제 범위" value={paymentFilter} onChange={event => {setPaymentFilter(event.target.value as typeof paymentFilter); setSortPickedIds(new Set(pickedIds));}} className="mt-1 block h-10 w-full rounded-lg border border-line bg-surface px-2 text-[13px] text-ink"><option value="paid">결제완료만</option><option value="all">미결제 포함</option><option value="unpaid">미결제만</option></select></label>
+            <label className="min-w-0 text-[11px] font-bold text-ink-soft">정렬<select aria-label="정렬 방식" value={sortMode} onChange={event => {setSortModes(previous => ({...previous,[viewMode]:event.target.value})); setSortPickedIds(new Set(pickedIds));}} className="mt-1 block h-10 w-full rounded-lg border border-line bg-surface px-2 text-[13px] text-ink"><option value="name">{viewMode === 'batch' ? '상품번호순' : '닉네임순'}</option>{viewMode === 'order' ? <option value="oldest">주문 오래된순</option> : null}<option value="remaining">남은 수량 많은순</option></select></label>
+            {sortMode === 'remaining' ? <button type="button" disabled={blocked} onClick={() => setSortPickedIds(new Set(pickedIds))} className="text-[12px] font-bold text-rose-deep">다시 정렬</button> : null}
+          </div>
           <div className="flex gap-2">
             <input value={search} onChange={event => setSearch(event.target.value)} placeholder="상품번호 · 고객 이름 검색" aria-label="상품번호 또는 고객 이름 검색" className="h-11 min-w-0 flex-1 rounded-lg border border-line px-3 text-[14px]" />
-            <button type="button" aria-pressed={unpickedOnly} onClick={() => setUnpickedOnly(value => !value)} className={`shrink-0 rounded-lg border border-line px-3 text-[12px] font-bold ${unpickedOnly ? "bg-rose-deep text-white" : "bg-surface text-ink-soft"}`}>안 챙김만</button>
           </div>
-          <p className="text-[12px] font-bold text-ink-soft">상품·색상·사이즈·수량을 확인한 뒤 체크하세요. 두 화면의 체크는 같습니다.</p>
+          <p className="text-[12px] font-bold text-ink-soft">상품·옵션·수량 확인 후 체크 · 두 화면 연동{sortMode === 'remaining' ? ' · 체크 후 순서 유지, 다시 정렬로 갱신' : ''}</p>
           <div role="status" aria-live="polite" className="text-[12px] font-bold text-ink-soft">{loading ? "챙김 상태 확인 중…" : loadError ? "상태 확인 실패 · 창을 다시 열어 주세요. 체크는 잠시 막았습니다." : saving ? "저장 중… 잠시 기다려 주세요." : "저장 완료 · 체크해도 목록에 그대로 남습니다."}</div>
         </div>
         <div className="flex-1 overflow-y-auto bg-surface-2 p-3">
-          {!loading && !loadError && matches.length === 0 ? <div className="py-12 text-center font-bold text-ink-soft">{q ? "검색 결과가 없습니다." : unpickedOnly ? "모두 챙겼습니다." : "챙길 결제완료 주문이 없습니다."}</div> : null}
+          {!loading && !loadError && matches.length === 0 ? <div className="py-12 text-center font-bold text-ink-soft">현재 조회 조건에 맞는 상품이 없습니다.</div> : null}
           <div className="space-y-3">
-            {[...grouped].sort(([, a], [, b]) => a.title.localeCompare(b.title, "ko")).map(([key, group]) => {
+            {sortedGroups.map(([key, group]) => {
               const progress = pickingProgress(group.rows.map(({ item }) => ({ qty: item.qty, pickedAt: pickedIds.has(item.id) })));
               return <section key={key} className="overflow-hidden rounded-xl border border-line bg-surface">
                 <div className="flex items-start justify-between gap-2 bg-rose-soft p-3">
@@ -325,9 +362,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
           </div>
         </div>
         <div className="flex shrink-0 items-center justify-between gap-2 border-t border-line p-3">
-          <button type="button" disabled={blocked || exporting} onClick={resetAll} className="min-h-[44px] px-2 text-[12px] font-bold text-[var(--color-danger-tx)] disabled:opacity-40">챙김 전체 해제</button>
+          <div className="relative"><button type="button" aria-expanded={toolsOpen} onClick={() => setToolsOpen(value => !value)} className="min-h-[44px] px-2 text-[13px] font-bold text-ink-soft">더보기</button>{toolsOpen ? <div className="absolute bottom-full left-0 mb-2 w-52 rounded-lg border border-line bg-surface p-2 shadow-lg"><button type="button" disabled={blocked || exporting} onClick={resetAll} className="min-h-[44px] text-[12px] font-bold text-[var(--color-danger-tx)] disabled:opacity-40">조회 목록 챙김 해제</button></div> : null}</div>
           <div className="flex gap-2">
-            <button type="button" disabled={blocked || exporting} onClick={runExcel} className="min-h-[44px] rounded-lg border border-line px-3 text-[13px] font-bold disabled:opacity-40">{exporting ? "내보내는 중…" : "엑셀"}</button>
+            <button type="button" disabled={blocked || exporting || !matches.length} onClick={runExcel} className="min-h-[44px] rounded-lg border border-line px-3 text-[13px] font-bold disabled:opacity-40">{exporting ? "내보내는 중…" : "조회 목록 엑셀"}</button>
             <button type="button" disabled={saving || exporting} onClick={onClose} className="min-h-[44px] rounded-lg bg-rose-deep px-4 text-[13px] font-black text-white disabled:opacity-40">닫기</button>
           </div>
         </div>

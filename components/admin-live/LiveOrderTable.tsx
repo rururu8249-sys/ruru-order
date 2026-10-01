@@ -15,7 +15,7 @@ import BroadcastCalendarPicker, { type BroadcastCalendarItem } from "./Broadcast
 import { useLiveOrderShipped } from "./useLiveOrderShipped";
 import { buildCustomerOrderCopyText, buildPaymentRequestNote } from "./liveOrderCustomerCopy";
 import { showAdminConfirm } from "@/lib/adminConfirm";
-import { pickingProgress, isPickingComplete } from "@/lib/orderPicking";
+import { pickingProgress, isPickingComplete, pickingScope } from "@/lib/orderPicking";
 
 // 총금액 표시 전용: 포인트 사용 주문은 실결제금액(상품금액 + 택배비 - 사용포인트)으로 표시한다.
 // - 단일상품: final_amount에 포인트가 이미 반영돼 기존 값과 동일(변화 없음)
@@ -562,6 +562,7 @@ export default function LiveOrderTable({
       return !Number.isNaN(created) && created >= startMs;
     });
   }, [orders, broadcastStartedAt, filters.broadcast, filters.date]);
+  const pickingScopeOrders = useMemo(() => pickingScope(countBaseOrders || orders, broadcastStartedAt, filters.broadcast === 'current' && filters.date === 'all'), [countBaseOrders, orders, broadcastStartedAt, filters.broadcast, filters.date]);
 
   // [㉕-B] 칩 숫자 기준 — countBaseOrders(상태 무관)가 있으면 목록과 같은 «방송 컷 + 취소보기» 처리 후 센다.
   //   없으면 기존과 동일하게 baseOrders 로 센다(동작 유지). 목록·페이지·엑셀·선택 로직은 orders 그대로.
@@ -822,6 +823,7 @@ export default function LiveOrderTable({
       .filter(Boolean)
       .join(" · ");
   }, [broadcastOptions, filters]);
+  const pickingScopeLabel = currentFilterLabel.split(' · ').filter(part => !['상태: 전체보기','결제완료','미결제','매칭필요','입금확인','카드미결제','카드결제완료','주문서취소','택배출고'].includes(part)).join(' · ') + (filters.scope === 'shop' ? ' · 쇼핑몰 주문' : filters.scope === 'broadcast' ? ' · 방송 주문' : ' · 방송+쇼핑몰');
 
   const runExport = async (kind: "rozen" | "picking", orders: LiveOrder[], filterLabel: string) => {
     if (orders.length === 0) {
@@ -857,7 +859,7 @@ export default function LiveOrderTable({
     {cartHoldsOpen ? <LiveCartHoldsModal onClose={() => setCartHoldsOpen(false)} /> : null}
 
     {pickingOpen ? (
-          <LiveOrderPickingModal orders={baseOrders.filter(order => pickingOrderIds.has(String(order.id)))} filterLabel={currentFilterLabel} onClose={() => { setPickingOpen(false); void onRefresh?.(); }} />
+          <LiveOrderPickingModal orders={pickingScopeOrders.filter(order => pickingOrderIds.has(String(order.id)))} filterLabel={pickingScopeLabel} onClose={() => { setPickingOpen(false); void onRefresh?.(); }} />
     ) : null}
     {exportConfirm !== "" ? (
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setExportConfirm("")}>
@@ -1031,8 +1033,8 @@ export default function LiveOrderTable({
 
           <button
             type="button"
-            onClick={() => { setPickingOrderIds(new Set(exportableOrders.map(order => String(order.id)))); setPickingOpen(true); }}
-            disabled={exportableOrders.length === 0}
+            onClick={() => { setPickingOrderIds(new Set(pickingScopeOrders.map(order => String(order.id)))); setPickingOpen(true); }}
+            disabled={pickingScopeOrders.length === 0}
             className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
             title="물건챙기기 체크리스트 팝업을 엽니다"
           >

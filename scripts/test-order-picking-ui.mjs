@@ -9,8 +9,8 @@ import Renderer, { act } from 'react-test-renderer';
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const require = createRequire(import.meta.url);
 const root = path.resolve('.');
-const rows = new Map([[1, {id: 1, picked_at: null, collected_at: 'legacy'}], [2, {id: 2, picked_at: null}]]);
-const writes = [], toasts = [];
+const rows = new Map([[1, {id: 1, picked_at: null, collected_at: 'legacy'}], [2, {id: 2, picked_at: null}], [3, {id:3, picked_at:null}]]);
+const writes = [], toasts = [], exportsMade = [];
 let gate = null, deny = false, readGate = null;
 const db = { from(table) {
   return {
@@ -19,13 +19,13 @@ const db = { from(table) {
       if (readGate) await readGate;
       return { data, error: null };
     } }; },
-    update(payload) { return { in(_, ids) { return { async select() {
+    update(payload) { const chain = { is() { return chain; }, in(_, ids) { if ('picking_list_printed_at' in payload) {writes.push({payload,ids}); return Promise.resolve({error:null});} return { async select() {
       writes.push({payload, ids});
       if (gate) await gate;
       if (deny) return {data: [], error: null};
       for (const id of ids) Object.assign(rows.get(id), payload);
       return {data: ids.map(id => rows.get(id)), error: null};
-    } }; } }; },
+    } }; } }; return chain; },
   };
 } };
 const cache = new Map();
@@ -38,7 +38,7 @@ function load(filename) {
     if (spec === '@/lib/supabase') return {supabase: db};
     if (spec === '@/lib/adminToast') return {showAdminToast: (...args) => toasts.push(args)};
     if (spec === '@/lib/adminConfirm') return {showAdminConfirm: async () => true};
-    if (spec === './adminLiveOrderExcelExport') return {exportLiveOrdersForPicking: async () => {}};
+    if (spec === './adminLiveOrderExcelExport') return {exportLiveOrdersForPicking: async (orders,meta) => {exportsMade.push({orders,meta});}};
     if (spec.startsWith('@/') || spec.startsWith('.')) {
       const base = spec.startsWith('@/') ? path.join(root, spec.slice(2)) : path.resolve(path.dirname(filename), spec);
       const target = [base, base + '.ts', base + '.tsx'].find(p => fs.existsSync(p) && fs.statSync(p).isFile());
@@ -57,7 +57,7 @@ let tree;
 await act(async () => { tree = Renderer.create(React.createElement(Modal, {orders, filterLabel: '방송: 검수', onClose() {}})); });
 const checks = () => tree.root.findAll(node => node.type === 'button' && node.props.role === 'checkbox');
 const check = nickname => checks().find(node => node.props["aria-label"].startsWith(nickname + " "));
-const button = text => tree.root.findAllByType('button').find(node => node.children.join('') === text);
+const button = text => tree.root.findAllByType('button').find(node => node.props['aria-label'] === text || node.children.join('') === text);
 const text = () => JSON.stringify(tree.toJSON());
 assert.equal(checks().length, 2, 'only paid, non-canceled, included orders');
 assert.equal(check("고객1").props['aria-checked'], false, 'legacy collected must not imply completion');
@@ -124,5 +124,57 @@ const sortingFixture = [order(1, 'paid', [{...item(1, 3), productName: 'MIU-2'}]
 await act(async () => {tree = Renderer.create(React.createElement(Modal, {orders: sortingFixture, filterLabel: '검수', onClose() {}}));});
 assert.deepEqual(tree.root.findAllByType('h3').map(node => node.children.join('')), ['BB-69', 'MIU-2'], 'product groups sorted by product name, not customer name');
 await act(async () => tree.unmount());
+// Missing payment filters, natural sorting, or a moving remaining-quantity sort break these tests.
+for (const id of [1,2,3]) rows.set(id, {id, picked_at: null});
+const controlFixture = [order(1, 'paid', [{...item(1, 3), productName: 'MIU-10'}], {nickname: '나', createdAt:'2026-10-01T09:00:00Z'}), order(2, 'paid', [{...item(2, 1), productName:'MIU-2'}], {nickname:'가', createdAt:'2026-10-01T11:00:00Z'}), order(3, 'unpaid', [{...item(3, 7), productName:'MIU-1'}])];
+await act(async () => {tree = Renderer.create(React.createElement(Modal, {orders: controlFixture, filterLabel:'방송: 검수 · 오늘', onClose() {}}));});
+const select = label => tree.root.findAllByType('select').find(node=>node.props['aria-label']===label);
+const headings = () => tree.root.findAllByType('h3').map(node=>node.children.join(''));
+assert.ok(select('결제 범위'), 'payment scope must be selectable');
+assert.deepEqual(headings(), ['MIU-2','MIU-10'], 'numeric product ordering');
+await act(async()=>select('결제 범위').props.onChange({target:{value:'all'}}));
+assert.equal(checks().length,3,'include unpaid while excluding canceled');
+assert.equal(check('고객3').props.disabled,true,'unpaid is read-only');
+const beforeUnpaid = writes.length;
+await act(async()=>check('고객3').props.onClick());
+assert.equal(writes.length,beforeUnpaid,'unpaid cannot be marked through handler');
+await act(async()=>select('결제 범위').props.onChange({target:{value:'unpaid'}}));
+assert.equal(checks().length,1,'unpaid-only scope');
+await act(async()=>select('결제 범위').props.onChange({target:{value:'paid'}}));
+await act(async()=>select('정렬 방식').props.onChange({target:{value:'remaining'}}));
+assert.deepEqual(headings(),['MIU-10','MIU-2'],'remaining quantity sort');
+await act(async()=>check('나').props.onClick());
+assert.deepEqual(headings(),['MIU-10','MIU-2'],'checking must not move working position');
+await act(async()=>button('챙김만').props.onClick());
+assert.equal(checks().length,1,'completed-only filter');
+assert.equal(check('나').props['aria-checked'],true);
+await act(async()=>button('전체보기').props.onClick());
+await act(async()=>button('고객별').props.onClick());
+await act(async()=>select('정렬 방식').props.onChange({target:{value:'oldest'}}));
+assert.deepEqual(headings(),['나','가'],'oldest submitted customer first');
+await act(async()=>select('정렬 방식').props.onChange({target:{value:'name'}}));
+assert.deepEqual(headings(),['가','나'],'customer nickname sort');
+await act(async()=>button('안 챙김만').props.onClick());
+assert.equal(checks().length,1);
+assert.equal(check('가').props['aria-checked'],false);
+await act(async()=>tree.unmount());
+for (const id of [1,2,3]) rows.set(id,{id,picked_at:null});
+const stableFixture = [order(1,'paid',[{...item(1,3),productName:'MIU-10'}]),order(2,'paid',[{...item(2,2),productName:'MIU-2'}]),order(3,'paid',[{...item(3,1),productName:'MIU-10'}])];
+await act(async()=>{tree=Renderer.create(React.createElement(Modal,{orders:stableFixture,filterLabel:'검수',onClose(){}}));});
+await act(async()=>select('정렬 방식').props.onChange({target:{value:'remaining'}}));
+await act(async()=>button('안 챙김만').props.onClick());
+await act(async()=>check('고객1').props.onClick());
+assert.deepEqual(headings(),['MIU-10','MIU-2'],'remaining sort keeps partially visible groups in place under incomplete filter');
+await act(async()=>button('다시 정렬').props.onClick());
+assert.deepEqual(headings(),['MIU-2','MIU-10'],'explicit refresh updates remaining ranks');
+await act(async()=>tree.unmount());
 assert.ok(writes.every(write => Object.keys(write.payload).join() === 'picked_at'), 'no payment/order/collected writes');
+await act(async()=>{tree=Renderer.create(React.createElement(Modal,{orders:controlFixture,filterLabel:'검수',onClose(){}}));});
+await act(async()=>select('결제 범위').props.onChange({target:{value:'all'}}));
+await act(async()=>tree.root.findByType('input').props.onChange({target:{value:'miu1'}}));
+await act(async()=>(button('조회 목록 엑셀') || button('엑셀')).props.onClick());
+assert.deepEqual(exportsMade.at(-1).orders.flatMap(order=>order.items.map(item=>item.id)),['3'],'export uses visible scope, including unpaid if selected');
+assert.deepEqual(writes.at(-1).ids,[3],'print record covers exactly exported items');
+assert.ok(exportsMade.at(-1).meta.filterLabel.includes('miu1'),'export scope labeled');
+await act(async()=>tree.unmount());
 console.log('picking UI integration passed: scope, legacy options, save gate, rapid clicks, both-view check/undo, failure, filter, reopen, search');

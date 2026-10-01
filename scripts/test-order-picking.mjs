@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
-import { pickingProgress, isPickingComplete, savePicking } from '../lib/orderPicking.ts';
+import { pickingProgress, isPickingComplete, savePicking, pickingScope } from '../lib/orderPicking.ts';
+
+const scopeRows = [{id:'1',createdAt:'2026-10-01T09:00:00Z',paymentStatus:'paid'}, {id:'2',createdAt:'2026-10-01T11:00:00Z',paymentStatus:'unpaid'}, {id:'3',createdAt:'2026-10-01T12:00:00Z',paymentStatus:'canceled'}, {id:'4',createdAt:'2026-10-01T12:00:00Z',paymentStatus:'paid',excludeFromPicking:true}];
+assert.deepEqual(pickingScope(scopeRows,'2026-10-01T10:00:00Z',true).map(row=>row.id),['2'],'current broadcast preserves unpaid and excludes older/canceled/excluded');
+assert.deepEqual(pickingScope(scopeRows,'2026-10-01T10:00:00Z',false).map(row=>row.id),['1','2'],'historical scope not cut to active broadcast');
 
 assert.deepEqual(pickingProgress([{ qty: 3, pickedAt: null, collectedAt: 'old' }]), { total: 3, got: 0 });
 assert.deepEqual(pickingProgress([{ qty: 3, pickedAt: 'done' }, { qty: 2, pickedAt: null }]), { total: 5, got: 3 });

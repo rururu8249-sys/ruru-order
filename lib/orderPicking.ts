@@ -13,6 +13,13 @@ export function isPickingComplete(progress: { total: number; got: number }) {
   return progress.total > 0 && progress.got >= progress.total;
 }
 
+// Scope is broadcast/date/search, never the order table's payment/work filter.
+export function pickingScope<T extends { createdAt?: string | null; paymentStatus?: string | null; excludeFromPicking?: boolean }>(orders: readonly T[], startedAt: string | null | undefined, currentAllDates: boolean): T[] {
+  const start = startedAt && currentAllDates ? Date.parse(startedAt) : NaN;
+  return orders.filter(order => order.paymentStatus !== 'canceled' && !order.excludeFromPicking &&
+    (!Number.isFinite(start) || Date.parse(order.createdAt || '') >= start));
+}
+
 type PickingClient = { from(table: string): { update(values: { picked_at: string | null }): {
   in(column: string, ids: number[]): { select(columns: string): PromiseLike<{
     data: { id: number; picked_at: string | null }[] | null; error: unknown;
