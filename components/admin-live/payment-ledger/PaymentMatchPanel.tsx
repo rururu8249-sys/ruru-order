@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import DepositDetailModal from "./DepositDetailModal";
 import DepositLedgerFilters from "./DepositLedgerFilters";
 import DepositLedgerSummary from "./DepositLedgerSummary";
@@ -33,6 +33,7 @@ type Props = {
   orderGroups?: readonly unknown[];
   onSyncBankdaDeposits?: () => Promise<void> | void;
   variant?: string;
+  presentation?: "page" | "drawer";
 };
 
 function lastSyncedLabel(date: Date | null) {
@@ -58,7 +59,8 @@ function todayStart() {
   return now.getTime();
 }
 
-export default function PaymentMatchPanel({ deposits: depositsFromParent }: Props) {
+export default function PaymentMatchPanel({ deposits: depositsFromParent, presentation = "page" }: Props) {
+  const compact = presentation === "drawer";
   // 부모가 준 목록으로 바로 그린다(빈 배열이면 서버 응답을 기다린다)
   const parentRows = useMemo(
     () => (Array.isArray(depositsFromParent) ? (depositsFromParent as RawDepositRow[]) : []),
@@ -80,9 +82,14 @@ export default function PaymentMatchPanel({ deposits: depositsFromParent }: Prop
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [selectedDeposit, setSelectedDeposit] = useState<RawDepositRow | null>(null);
   const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(null);
+  const [hasConfirmedRows, setHasConfirmedRows] = useState(parentRows.length > 0);
+  const requestIdRef = useRef(0);
+  const aliveRef = useRef(true);
+  const syncingRef = useRef(false);
 
   // background=true 면 화면을 가리지 않고 뒤에서 최신화만 한다
   const loadDeposits = async (options: { background?: boolean; days?: number | "all" } = {}) => {
+    const requestId = ++requestIdRef.current;
     const background = options.background === true;
     if (background) setRefreshing(true);
     else setLoading(true);
@@ -98,6 +105,7 @@ export default function PaymentMatchPanel({ deposits: depositsFromParent }: Prop
       });
 
       const json = await response.json().catch(() => null);
+      if (!aliveRef.current || requestId !== requestIdRef.current) return false;
 
       if (!response.ok || !json?.ok) {
         throw new Error(json?.message || "입금내역 조회 실패");
@@ -106,18 +114,25 @@ export default function PaymentMatchPanel({ deposits: depositsFromParent }: Prop
       const rows = Array.isArray(json.deposits) ? json.deposits : [];
       setDeposits(rows);
       setLastLoadedAt(new Date());
+      setHasConfirmedRows(true);
+      return true;
     } catch (error) {
+      if (!aliveRef.current || requestId !== requestIdRef.current) return false;
       const text = error instanceof Error ? error.message : "입금내역 조회 실패";
       setMessage(text);
       // 뒤에서 돌던 최신화가 실패해도 이미 보고 있던 목록은 지우지 않는다
-      if (!background) setDeposits([]);
+      return false;
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (aliveRef.current && requestId === requestIdRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   };
 
   const refreshBankdaDeposits = async () => {
+    if (syncingRef.current) return;
+    syncingRef.current = true;
     setSyncing(true);
     setMessage("");
 
@@ -131,28 +146,43 @@ export default function PaymentMatchPanel({ deposits: depositsFromParent }: Prop
         throw new Error(json?.message || "뱅크다 입금내역 새로고침 실패");
       }
 
-      await loadDeposits();
-      setMessage("입금내역을 새로고침했습니다.");
+      if (!aliveRef.current) return;
+      const loaded = await loadDeposits({background: true});
+      if (loaded && aliveRef.current) setMessage("입금내역을 새로고침했습니다.");
     } catch (error) {
       const text = error instanceof Error ? error.message : "뱅크다 입금내역 새로고침 실패";
-      setMessage(text);
-      await loadDeposits();
+      if (aliveRef.current) {
+        await loadDeposits({background: true});
+        if (aliveRef.current) setMessage(text);
+      }
     } finally {
-      setSyncing(false);
+      syncingRef.current = false;
+      if (aliveRef.current) setSyncing(false);
     }
   };
 
   // 부모 목록이 갱신되면(뱅크다 자동조회 등) 화면도 같이 갱신
   useEffect(() => {
     if (parentRows.length > 0) {
-      setDeposits(parentRows);
+      setDeposits(current => {
+        if (requestIdRef.current === 0) return parentRows;
+        // Realtime parent snapshots may cover less history than this panel.
+        // Update known IDs without discarding period-specific older records.
+        const incoming = new Map(parentRows.filter(row => row.id != null).map(row => [String(row.id), row]));
+        const retained = current.map(row => incoming.get(String(row.id)) || row);
+        const ids = new Set(current.filter(row => row.id != null).map(row => String(row.id)));
+        return [...retained, ...parentRows.filter(row => row.id != null && !ids.has(String(row.id)))];
+      });
       setLoading(false);
+      setHasConfirmedRows(true);
     }
   }, [parentRows]);
 
   // 첫 진입: 부모 목록이 있으면 «뒤에서» 최신화(화면 안 가림), 없으면 평소처럼 불러온다
   useEffect(() => {
+    aliveRef.current = true;
     void loadDeposits({ background: parentRows.length > 0 });
+    return () => { aliveRef.current = false; ++requestIdRef.current; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -223,12 +253,13 @@ export default function PaymentMatchPanel({ deposits: depositsFromParent }: Prop
   };
 
   return (
-    <div className="grid w-full gap-5">
-      <section className="flex flex-col gap-4 rounded-2xl border border-line bg-gradient-to-br from-surface via-surface to-surface-2 p-6 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+    <div className={compact ? "grid w-full gap-2" : "grid w-full gap-5"}>
+      <div hidden={compact && selectedDeposit !== null}>
+      <section className={compact ? "flex items-center justify-between gap-2 py-1" : "flex flex-col gap-4 rounded-2xl border border-line bg-gradient-to-br from-surface via-surface to-surface-2 p-6 shadow-sm lg:flex-row lg:items-center lg:justify-between"}>
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-ink">입금내역</h1>
+          {compact ? <span className="text-xs font-bold text-ink-mute">조회·상세 확인</span> : <h1 className="text-2xl font-black tracking-tight text-ink">입금내역</h1>}
 
-          <p className="mt-2 text-sm font-bold text-ink-soft">
+          <p hidden={compact} className="mt-2 text-sm font-bold text-ink-soft">
             새마을금고 계좌에 들어온 입금을 뱅크다가 자동으로 모아 온 기록입니다. 주문과 연결된 내용은 「보기」에서 확인합니다.
           </p>
         </div>
@@ -236,16 +267,19 @@ export default function PaymentMatchPanel({ deposits: depositsFromParent }: Prop
         <button
           type="button"
           onClick={refreshBankdaDeposits}
-          disabled={syncing || loading}
-          className="h-13 shrink-0 rounded-2xl bg-rose-deep px-6 py-4 text-sm font-black text-white shadow-2xl transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-surface-3"
+          disabled={syncing || loading || refreshing}
+          className={compact ? "min-h-11 rounded-xl border border-line px-3 text-xs font-black text-ink md:min-h-9 disabled:opacity-50" : "h-13 shrink-0 rounded-2xl bg-rose-deep px-6 py-4 text-sm font-black text-white shadow-2xl transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-surface-3"}
         >
           {syncing ? "새로고침 중..." : refreshing ? "최신 확인 중..." : "입금내역 새로고침"}
         </button>
       </section>
 
-      <DepositLedgerSummary summary={summary} />
+      {hasConfirmedRows ? <DepositLedgerSummary summary={summary} compact={compact} /> : null}
 
       <DepositLedgerFilters
+        compact={compact}
+        appliedFromDate={appliedFromDate}
+        appliedToDate={appliedToDate}
         keyword={keyword}
         onKeywordChange={setKeyword}
         fromDate={fromDate}
@@ -259,7 +293,7 @@ export default function PaymentMatchPanel({ deposits: depositsFromParent }: Prop
       />
 
       {message ? (
-        <div className="rounded-2xl border border-line bg-info-bg px-5 py-4 text-sm font-black text-info-tx">
+        <div role="status" className="rounded-2xl border border-line bg-info-bg px-3 py-2 text-sm font-black text-info-tx">
           {message}
         </div>
       ) : null}
@@ -269,17 +303,19 @@ export default function PaymentMatchPanel({ deposits: depositsFromParent }: Prop
           <div className="text-lg font-black text-ink">입금내역을 불러오는 중입니다.</div>
           <div className="mt-2 text-sm font-bold text-ink-mute">잠시만요.</div>
         </section>
-      ) : (
+      ) : hasConfirmedRows ? (
         <DepositLedgerTable
+          compact={compact}
           rows={filteredRows}
           sortKey={sortKey}
           sortDirection={sortDirection}
           onSortChange={changeSort}
           onOpenDetail={setSelectedDeposit}
         />
-      )}
+      ) : <p className="py-4 text-sm text-ink-soft">입금내역을 확인하지 못했습니다. 새로고침으로 다시 시도해 주세요.</p>}
+      </div>
 
-      <DepositDetailModal row={selectedDeposit} onClose={() => setSelectedDeposit(null)} />
+      <DepositDetailModal presentation={compact ? "inline" : "modal"} row={selectedDeposit} onClose={() => setSelectedDeposit(null)} />
     </div>
   );
 }

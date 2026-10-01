@@ -19,6 +19,7 @@ type Props = {
   sortDirection: SortDirection;
   onSortChange: (key: SortKey) => void;
   onOpenDetail: (row: RawDepositRow) => void;
+  compact?: boolean;
 };
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
@@ -110,6 +111,7 @@ export default function DepositLedgerTable({
   sortDirection,
   onSortChange,
   onOpenDetail,
+  compact = false,
 }: Props) {
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
@@ -135,7 +137,7 @@ export default function DepositLedgerTable({
 
   return (
     <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft px-5 py-4">
+      <div hidden={compact} className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft px-5 py-4">
         <div>
           <div className="text-lg font-black text-ink">입금내역</div>
           <div className="mt-1 text-xs font-bold text-ink-mute">실제 입금 1건은 목록에서 반드시 1줄로만 표시됩니다.</div>
@@ -145,7 +147,18 @@ export default function DepositLedgerTable({
         </div>
       </div>
 
-      <div className="overflow-auto px-4 pb-3">
+      {compact ? <div>
+        <div className="flex flex-wrap gap-1 border-b border-line p-2">
+          {([['time','입금일시'],['name','입금자명'],['amount','금액']] as const).map(([key,label]) => <SortButton key={key} label={label} sortName={key} sortKey={sortKey} sortDirection={sortDirection} onSortChange={onSortChange} />)}
+        </div>
+        {visibleRows.length === 0 ? <p className="p-4 text-sm text-ink-soft">조회된 입금내역이 없습니다.</p> : visibleRows.map((row,index) => <div key={String(row.id ?? index)} className="flex items-center gap-2 border-b border-line-soft px-3 py-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm font-black text-ink"><span className="break-all">{getDepositName(row) || "-"}</span><span className="tabular-nums">{formatDepositMoney(getDepositAmount(row))}</span></div>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-mute"><span>{formatDepositDateTime(row)}</span><StatusBadge status={getDepositStatus(row)} /></div>
+          </div>
+          <button type="button" onClick={()=>onOpenDetail(row)} className="min-h-11 shrink-0 rounded-xl border border-line px-3 text-xs font-bold text-ink md:min-h-9">보기</button>
+        </div>)}
+      </div> : <div className="overflow-auto px-4 pb-3">
         <table className="w-full min-w-[760px] border-separate border-spacing-0">
           <colgroup>
             <col className="w-[26%]" />
@@ -230,7 +243,7 @@ export default function DepositLedgerTable({
             )}
           </tbody>
         </table>
-      </div>
+      </div>}
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft bg-surface px-5 py-4">
         <div className="text-xs font-black text-ink-mute">

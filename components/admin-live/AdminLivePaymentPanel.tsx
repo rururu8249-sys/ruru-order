@@ -25,6 +25,7 @@ type Props = {
   orderGroups: OrderGroup[];
   onRefresh?: () => Promise<void> | void;
   onBankdaSync?: () => Promise<BankdaSyncResult | void> | void;
+  presentation?: "page" | "drawer";
 };
 
 export default function AdminLivePaymentPanel({
@@ -32,6 +33,7 @@ export default function AdminLivePaymentPanel({
   orderGroups,
   onRefresh,
   onBankdaSync,
+  presentation = "page",
 }: Props) {
   const syncBankdaAndRefresh = async () => {
     if (onBankdaSync) {
@@ -103,6 +105,7 @@ export default function AdminLivePaymentPanel({
       orderGroups={orderGroups}
       onSyncBankdaDeposits={syncBankdaAndRefresh}
       variant="admin-live"
+      presentation={presentation}
     />
   );
 }

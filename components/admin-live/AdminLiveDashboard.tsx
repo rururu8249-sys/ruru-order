@@ -1869,7 +1869,7 @@ export default function AdminLiveDashboard() {
               <AdminLiveSideDrawer title={drawer.kind === "deposits" ? "입금내역" : drawer.kind === "match" ? "입금매칭" : "주문상세"}
                 width={drawer.kind === "deposits" ? 560 : 420}
                 onClose={() => { setDrawer({kind: "closed"}); setSelectedOrderForMatch(null); }}>
-                {drawer.kind === "deposits" ? <div className="p-3"><AdminLivePaymentPanel deposits={deposits} orderGroups={orderGroups} onRefresh={loadDepositsFromServer} onBankdaSync={syncBankdaDepositsOnly} /></div> : matchPanelOpen ? (
+                {drawer.kind === "deposits" ? <div className="p-3"><AdminLivePaymentPanel presentation="drawer" deposits={deposits} orderGroups={orderGroups} onRefresh={loadDepositsFromServer} onBankdaSync={syncBankdaDepositsOnly} /></div> : matchPanelOpen ? (
                   <LiveFloatingMatchPanel
                     deposits={deposits}
                     orders={filteredOrders}

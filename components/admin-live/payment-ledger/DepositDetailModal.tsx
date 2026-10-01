@@ -17,6 +17,7 @@ import {
 type Props = {
   row: RawDepositRow | null;
   onClose: () => void;
+  presentation?: "modal" | "inline";
 };
 
 function DetailLine({
@@ -66,7 +67,7 @@ function guideText(status: LedgerStatus) {
   };
 }
 
-export default function DepositDetailModal({ row, onClose }: Props) {
+export default function DepositDetailModal({ row, onClose, presentation = "modal" }: Props) {
   if (!row) return null;
 
   const status = getDepositStatus(row);
@@ -75,8 +76,9 @@ export default function DepositDetailModal({ row, onClose }: Props) {
   const amount = getDepositAmount(row);
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--color-ink-soft)]/35 px-4 py-4 backdrop-blur-sm">
-      <div className="flex max-h-[calc(100dvh-32px)] w-full max-w-[680px] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
+    <div className={presentation === "inline" ? "w-full" : "fixed inset-0 z-[80] flex items-center justify-center bg-[var(--color-ink-soft)]/35 px-4 py-4 backdrop-blur-sm"}>
+      <div className={presentation === "inline" ? "flex w-full flex-col rounded-2xl bg-surface" : "flex max-h-[calc(100dvh-32px)] w-full max-w-[680px] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl"}>
+        {presentation === "inline" ? <button type="button" onClick={onClose} className="min-h-11 self-start rounded-xl border border-line px-3 text-sm font-bold text-ink md:min-h-9">‹ 목록으로</button> : null}
         <div className="shrink-0 border-b border-line-soft px-6 py-4">
           <div>
             <div className="inline-flex rounded-full border border-line bg-info-bg px-3 py-1 text-xs font-black text-info-tx">
@@ -138,7 +140,7 @@ export default function DepositDetailModal({ row, onClose }: Props) {
               onClick={onClose}
               className="rounded-2xl bg-rose-deep px-7 py-3 text-sm font-black text-white shadow-sm transition hover:opacity-90"
             >
-              확인
+              {presentation === "inline" ? "목록으로" : "확인"}
             </button>
           </div>
         </div>

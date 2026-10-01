@@ -2,13 +2,19 @@ import type { DepositSummary } from "./depositLedgerTypes";
 
 type Props = {
   summary: DepositSummary;
+  compact?: boolean;
 };
 
 function money(value: number) {
   return `${Number(value || 0).toLocaleString()}원`;
 }
 
-export default function DepositLedgerSummary({ summary }: Props) {
+export default function DepositLedgerSummary({ summary, compact = false }: Props) {
+  if (compact) return <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line py-2 text-xs font-bold text-ink-soft">
+    <span>조회 조건 합계 <strong className="text-ink">{money(summary.totalAmount)}</strong> · {summary.totalCount.toLocaleString()}건</span>
+    <span>오늘 {money(summary.todayAmount)}</span>
+    <span className="text-ink-mute">조회 {summary.lastSyncedLabel || "-"}</span>
+  </div>;
   const cards = [
     {
       label: "기간 입금합계",

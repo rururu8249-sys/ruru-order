@@ -27,7 +27,7 @@ globalThis.document={activeElement:opener,body:{style:{overflow:'auto'}},addEven
 const Drawer=createUiLoader()('components/admin-live/AdminLiveSideDrawer.tsx').default;
 let closed=0, tree;
 await act(async()=>{tree=Renderer.create(React.createElement(Drawer,{title:'입금내역',width:560,onClose:()=>closed++},React.createElement('button',null,'목록')),{createNodeMock:()=>panel});});
-assert.equal(tree.root.findByProps({role:'dialog'}).props['aria-modal'],true);
+assert.equal(tree.root.findByProps({role:'dialog'}).props['aria-modal'],'true');
 assert.equal(document.activeElement,panel);
 assert.equal(document.body.style.overflow,'hidden');
 listeners.get('keydown')({key:'Tab',preventDefault(){},shiftKey:false});
