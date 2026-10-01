@@ -103,6 +103,11 @@ import {
   parseOrderPurchaseConsentSettings,
   type OrderPurchaseConsentConfig,
 } from "@/lib/orderPurchaseConsent";
+import {
+  FINAL_SUBMIT_CONFIRMATION_KEY,
+  finalSubmitConfirmationReady,
+  parseFinalSubmitConfirmationEnabled,
+} from "@/lib/finalSubmitConfirmation";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { compareMixOrder, mixSeedForToday } from "@/lib/productMixOrder";
 import { pickVisibleBadges, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_MIN_BUYERS, TOP_SELLER_RANK_PCT, POPULAR_RANK_PCT, HOLDING_MIN_PEOPLE } from "@/lib/productBadgePriority";
@@ -1515,6 +1520,8 @@ export default function OrderPage() {
   const [paymentGuideOpen, setPaymentGuideOpen] = useState(false);
   const [orderSheetOpen, setOrderSheetOpen] = useState(false);
   const [finalSubmitAcknowledged, setFinalSubmitAcknowledged] = useState(false);
+  const [finalSubmitConfirmationEnabled, setFinalSubmitConfirmationEnabled] = useState(true);
+  const finalSubmitReady = finalSubmitConfirmationReady(finalSubmitConfirmationEnabled, finalSubmitAcknowledged);
   const [customerInfoEditSheetOpen, setCustomerInfoEditSheetOpen] = useState(false);
   const [customerInfoEditInitialScreen, setCustomerInfoEditInitialScreen] = useState<"info" | "shipping_list" | "shipping_form">("info");
   const [customerInfoEditSnapshot, setCustomerInfoEditSnapshot] = useState<{
@@ -2374,6 +2381,7 @@ export default function OrderPage() {
         "popup_notice_fontsize",
         "popup_notice_color",
         "popup_band_url",
+        FINAL_SUBMIT_CONFIRMATION_KEY,
         ...ORDER_PURCHASE_CONSENT_KEYS,
         "product_notice_mode",
         "product_notice_custom",
@@ -2455,6 +2463,7 @@ export default function OrderPage() {
     setPopupNoticeTitle(pTitle);
     setPopupNoticeFontSize(pFont);
     setPopupNoticeColor(pColor);
+    setFinalSubmitConfirmationEnabled(parseFinalSubmitConfirmationEnabled(data || []));
     setPurchaseConsentConfig(parseOrderPurchaseConsentSettings(data || []));
     // [2026-08-30 공지 방식 변경] 전체 공지를 매번 팝업으로 덮지 않는다.
     //   · 평소에는 화면 맨 위 「띠」로 계속 보인다 — 손님이 닫을 필요가 없다.
@@ -5645,7 +5654,7 @@ export default function OrderPage() {
   const handleSubmitOrderClick = async (options?: { allowMissingDetailAddress?: boolean }) => {
     if (purchaseConsentDecisionRef.current || submitting) return;
     if (!validate(options)) return;
-    if (!finalSubmitAcknowledged) {
+    if (!finalSubmitReady) {
       showCustomerNotice("제출 버튼 바로 위 체크칸을 한 번 눌러 주세요.", "warning");
       return;
     }
@@ -7216,7 +7225,7 @@ export default function OrderPage() {
                 {/* [2026-08-29] 예전에는 이 체크칸이 스크롤 위쪽에 있어 손님이 못 보았고,
                     그래서 "마지막 확인 한 칸이 남았어요" 라는 안내문을 따로 띄워야 했다.
                     → 체크칸을 제출 버튼 바로 위(항상 보이는 자리)로 옮기고 안내문은 없앴다. */}
-                {!customerBlockStatus.blocked ? (
+                {!customerBlockStatus.blocked && finalSubmitConfirmationEnabled ? (
                   <label data-final-confirm="true" style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px", borderRadius: "12px", border: finalSubmitAcknowledged ? "1.5px solid #7A1E47" : "1.5px solid #E0A96D", background: finalSubmitAcknowledged ? "#F9EEF3" : "#FFF7ED", padding: "11px 12px", cursor: "pointer" }}>
                     <input type="checkbox" checked={finalSubmitAcknowledged} onChange={(event) => setFinalSubmitAcknowledged(event.target.checked)} style={{ width: "21px", height: "21px", flexShrink: 0, accentColor: "#7A1E47" }} />
                     <span style={{ fontSize: "13px", fontWeight: 900, lineHeight: 1.45, color: "#4B3540", wordBreak: "keep-all" }}>배송지·상품·옵션·수량을 확인했습니다</span>
@@ -7224,11 +7233,11 @@ export default function OrderPage() {
                 ) : null}
                 <button
                   type="button"
-                  aria-disabled={!finalSubmitAcknowledged}
+                  aria-disabled={!finalSubmitReady}
                   onClick={() => {
                     // [2026-08-28 P0-1] 확인 체크가 안 되어 있으면 막기만 하지 말고 그 자리로 데려간다.
                     if (submitting || checkingPurchaseConsent || customerBlockStatus.blocked) return;
-                    if (!finalSubmitAcknowledged) {
+                    if (!finalSubmitReady) {
                       const target = document.querySelector<HTMLElement>('[data-final-confirm="true"]');
                       target?.scrollIntoView({ behavior: "smooth", block: "center" });
                       showCustomerNotice("제출 버튼 바로 위 체크칸을 한 번 눌러 주세요.", "warning");
@@ -7237,7 +7246,7 @@ export default function OrderPage() {
                     void handleSubmitOrderClick();
                   }}
                   disabled={submitting || checkingPurchaseConsent || customerBlockStatus.blocked}
-                  style={{ width: "100%", padding: "14px", background: submitting || checkingPurchaseConsent || customerBlockStatus.blocked || !finalSubmitAcknowledged ? "#cbd5e1" : "#7A1E47", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: submitting || checkingPurchaseConsent || customerBlockStatus.blocked ? "default" : "pointer" }}
+                  style={{ width: "100%", padding: "14px", background: submitting || checkingPurchaseConsent || customerBlockStatus.blocked || !finalSubmitReady ? "#cbd5e1" : "#7A1E47", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: submitting || checkingPurchaseConsent || customerBlockStatus.blocked ? "default" : "pointer" }}
                 >
                   {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : checkingPurchaseConsent ? "구매 조건 확인 중..." : `${won(finalPaymentAmount)} · 주문서 제출`}
                 </button>

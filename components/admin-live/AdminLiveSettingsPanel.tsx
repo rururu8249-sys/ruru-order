@@ -15,6 +15,11 @@ import ShopInfoSettingsTab from "./ShopInfoSettingsTab";
 import ProductImageNoticeSettingsTab from "./ProductImageNoticeSettingsTab";
 import BroadcastScreenSettingsTab from "./BroadcastScreenSettingsTab";
 import { HOWTO_DEFAULT, parseHowtoSteps } from "@/lib/howto";
+import {
+  FINAL_SUBMIT_CONFIRMATION_KEY,
+  parseFinalSubmitConfirmationEnabled,
+  toFinalSubmitConfirmationRow,
+} from "@/lib/finalSubmitConfirmation";
 
 type SettingKey =
   | "customer_card_extra_rate"
@@ -28,6 +33,7 @@ type SettingKey =
   | "direct_input_enabled"
   | "howto_enabled"
   | "howto_steps"
+  | "final_submit_confirmation_enabled"
   | "product_notice_mode"
   | "product_notice_custom";
 
@@ -48,6 +54,7 @@ const SETTING_KEYS: SettingKey[] = [
   "direct_input_enabled",
   "howto_enabled",
   "howto_steps",
+  FINAL_SUBMIT_CONFIRMATION_KEY,
   "product_notice_mode",
   "product_notice_custom",
 ];
@@ -57,6 +64,7 @@ type NumericSettingKey = Exclude<
   | "direct_input_enabled"
   | "howto_enabled"
   | "howto_steps"
+  | "final_submit_confirmation_enabled"
   | "product_notice_mode"
   | "product_notice_custom"
 >;
@@ -217,6 +225,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent }: Ad
   const [howtoEnabled, setHowtoEnabled] = useState(true);
   const [howtoSteps, setHowtoSteps] = useState(HOWTO_DEFAULT.steps);
   const [howtoWarn, setHowtoWarn] = useState(HOWTO_DEFAULT.warn);
+  const [finalSubmitConfirmationEnabled, setFinalSubmitConfirmationEnabled] = useState(true);
   // [2026-09-22 사장님] 상품 주문 안내 문구 — 손님 상품창의 «수량·금액 줄 바로 위»에 한 줄로 뜬다
   const [productNoticeMode, setProductNoticeMode] = useState<ProductNoticeMode>("off");
   const [productNoticeCustom, setProductNoticeCustom] = useState("");
@@ -253,6 +262,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent }: Ad
         }
         setDirectInputEnabled(clean(rows.find((r) => r.key === "direct_input_enabled")?.value || "true") !== "false");
         setHowtoEnabled(clean(rows.find((r) => r.key === "howto_enabled")?.value || "true") !== "false");
+        setFinalSubmitConfirmationEnabled(parseFinalSubmitConfirmationEnabled(rows));
         {
           const cfg = parseHowtoSteps(rows.find((r) => r.key === "howto_steps")?.value);
           setHowtoSteps(cfg.steps);
@@ -298,6 +308,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent }: Ad
           { key: "direct_input_enabled", value: directInputEnabled ? "true" : "false" },
           { key: "howto_enabled", value: howtoEnabled ? "true" : "false" },
           { key: "howto_steps", value: JSON.stringify({ steps: howtoSteps, warn: howtoWarn }) },
+          toFinalSubmitConfirmationRow(finalSubmitConfirmationEnabled),
           { key: "product_notice_mode", value: productNoticeMode },
           { key: "product_notice_custom", value: productNoticeCustom.trim().slice(0, PRODUCT_NOTICE_MAX_LEN) },
         ],
@@ -658,6 +669,22 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent }: Ad
                     공지·쪽지 열기 ›
                   </button>
                 ) : null}
+              </div>
+
+              <div className="mt-3 flex items-start justify-between gap-3 rounded-xl border border-line bg-surface-2 p-4">
+                <div>
+                  <div className="text-sm font-black text-ink">주문 전 최종 확인 체크</div>
+                  <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
+                    고객 주문서 맨 아래의 「배송지·상품·옵션·수량을 확인했습니다」 체크칸입니다. OFF면 체크칸이 숨겨지고 체크 없이 제출할 수 있습니다.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFinalSubmitConfirmationEnabled((value) => !value)}
+                  className={`shrink-0 rounded-full px-4 py-2 text-xs font-black transition ${finalSubmitConfirmationEnabled ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}
+                >
+                  {finalSubmitConfirmationEnabled ? "최종 확인 ON" : "최종 확인 OFF"}
+                </button>
               </div>
 
               <div className="mt-3 flex items-start justify-between gap-3 rounded-xl border border-line bg-surface-2 p-4">
