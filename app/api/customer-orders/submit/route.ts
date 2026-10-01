@@ -12,6 +12,10 @@ import {
   canonicalCustomerDetailProductName,
   customerDetailInputEnabled,
 } from "@/lib/customerDetailProductName";
+import {
+  parseOrderBankRoutingResult,
+  sanitizeOrderRowsForBankRouting,
+} from "@/lib/orderBankAccount";
 
 export const dynamic = "force-dynamic";
 
@@ -655,7 +659,8 @@ export async function POST(request: NextRequest) {
       return jsonError("주문 요청 내용이 올바르지 않습니다.");
     }
 
-    const orderRows = Array.isArray(body.orderRows) ? body.orderRows : [];
+    const rawOrderRows = Array.isArray(body.orderRows) ? body.orderRows : [];
+    const orderRows = sanitizeOrderRowsForBankRouting(rawOrderRows) as AnyRow[];
 
     if (orderRows.length === 0) {
       return jsonError("주문 상품이 없습니다.");
@@ -679,6 +684,7 @@ export async function POST(request: NextRequest) {
         body.customerName ||
         firstOrderValue(orderRows, "customer_name")
     );
+    const kakaoId = text(body.kakao_id);
 
     const supabase = getSupabaseOrderSubmitClient();
 
@@ -693,24 +699,27 @@ export async function POST(request: NextRequest) {
     //   카톡 계정(kakao_id) 기준 누적 → 전화번호 바꿔도 제한 우회 불가
     await assertDirectInputAllowed(supabase, orderRows);
     const productCatalog = await assertRegisteredProductPrices(supabase, orderRows);
-    await assertShippingFeeNotSkipped(supabase, orderRows, phone, productCatalog, text(body.kakao_id));
-    await assertPurchaseLimit(supabase, orderRows, phone, text(body.kakao_id));
+    await assertShippingFeeNotSkipped(supabase, orderRows, phone, productCatalog, kakaoId);
+    await assertPurchaseLimit(supabase, orderRows, phone, kakaoId);
     await assertCartHoldAlive(supabase, orderRows, cartSessionKey);
 
     const normalizedSubmit = await normalizeOrderRowsForSubmitSettings(supabase, orderRows);
 
-    const { data, error } = await supabase.rpc("submit_customer_order_with_points", {
+    const { data, error } = await supabase.rpc("submit_customer_order_with_bank_routing", {
       p_order_rows: normalizedSubmit.orderRows,
       p_point_use_amount: pointUseAmount,
       p_customer_phone: phone,
       p_youtube_nickname: youtubeNickname,
       p_customer_name: customerName,
       p_session_key: cartSessionKey,
+      p_kakao_id: kakaoId,
     });
 
     if (error) {
       throw new Error(error.message || "주문 저장 실패");
     }
+
+    const assignedBank = parseOrderBankRoutingResult(data);
 
     // 받는사람(배송) 저장 — 주문 RPC 무변경. 제출 직후 order_group_id로만 보강.
     // 입금/정산/포인트와 무관(주문자 customer_name/phone은 그대로). 실패해도 주문은 성공 유지.
@@ -724,19 +733,6 @@ export async function POST(request: NextRequest) {
         .eq("order_group_id", recipientGroupId);
       if (recipientError) {
         console.warn("받는사람 저장 실패(주문은 정상 저장됨):", recipientError.message);
-      }
-    }
-
-    // 카카오 정체성 스탬프 — 안 바뀌는 kakao_id를 주문에 찍어, 이후 전화/이름 수정돼도 고객 조회가 안 깨지게.
-    //   받는사람 저장과 동일하게 RPC 무변경 + order_group_id로만 보강. 입금/정산/포인트 무관. 실패해도 주문은 성공 유지.
-    const kakaoId = text(body.kakao_id);
-    if (recipientGroupId && kakaoId) {
-      const { error: kakaoError } = await supabase
-        .from("orders")
-        .update({ kakao_id: kakaoId })
-        .eq("order_group_id", recipientGroupId);
-      if (kakaoError) {
-        console.warn("kakao_id 저장 실패(주문은 정상 저장됨):", kakaoError.message);
       }
     }
 
@@ -789,14 +785,11 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    if (!data || typeof data !== "object") {
-      return NextResponse.json({
-        ok: true,
-        result: data,
-      });
-    }
-
-    return NextResponse.json(data);
+    return NextResponse.json({
+      ...(data as Record<string, unknown>),
+      customerOrderSegment: assignedBank.customerOrderSegment,
+      bankAccount: assignedBank.bankAccount,
+    });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "주문 저장 실패", 400);
   }
