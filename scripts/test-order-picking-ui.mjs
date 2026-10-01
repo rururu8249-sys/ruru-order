@@ -64,8 +64,11 @@ assert.equal(check("고객1").props['aria-checked'], false, 'legacy collected mu
 assert.ok(text().includes('원본 옵션'), 'optionText-only legacy orders must keep their option');
 // Scope/help remains available without occupying permanent work-list space.
 const scopeDetails = tree.root.findAllByType('details');
-assert.equal(scopeDetails.length, 1, 'work scope and help have a collapsed disclosure');
-assert.ok(!scopeDetails[0].props.open, 'scope/help is collapsed initially');
+assert.equal(scopeDetails.length, 1, 'help has a collapsed disclosure');
+assert.ok(!scopeDetails[0].props.open, 'help is collapsed initially');
+const scopeLine=tree.root.findByProps({'aria-label':'작업 범위'});
+assert(!scopeLine.findAllByType('details').length,'scope is always visible outside disclosure');
+assert(scopeLine.children.join('').includes('취소·챙기기 제외 주문 제외'));
 assert.ok(scopeDetails[0].findByType('summary').children.length > 0);
 assert.equal(tree.root.findAll(node => node.props.role === 'status').length, 1, 'save/error feedback stays accessible');
 let release;

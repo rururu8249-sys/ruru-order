@@ -300,8 +300,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
           <img src={itemPhoto[item.id]} alt={item.productName} className="h-14 w-14 shrink-0 rounded-lg border border-line object-cover" />
         ) : <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-[11px] text-ink-mute">사진 없음</span>}
         <div className="min-w-0 flex-1">
-          {viewMode === "order" ? <div className="break-words text-[15px] font-black text-ink">{item.productName}</div> : null}
-          <div className="break-words text-[15px] font-black text-rose-deep">{item.optionText || "기본 옵션"}</div>
+          {viewMode === "order" ? <div className="break-words text-sm font-black text-ink">{item.productName}</div> : null}
+          <div className="break-words text-sm font-black text-rose-deep">{item.optionText || "기본 옵션"}</div>
           <div className="mt-1 text-[12px] font-bold text-ink-soft">{panel.nickname}{panel.name && panel.name !== panel.nickname ? ` · ${panel.name}` : ""} · 주문 #{item.id}</div>
           {!panel.paid ? <span className="mt-1 inline-block rounded bg-warn-bg px-2 py-1 text-[12px] font-black text-[var(--color-danger-tx)]">미결제 · 조회만 가능</span> : null}
         </div>
@@ -323,9 +323,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
         <div className="relative flex shrink-0 items-center gap-2 border-b border-line px-3 py-1.5">
           <h2 className="shrink-0 text-[16px] font-black text-rose-deep">물건챙기기</h2>
           <details className="shrink-0 text-[12px] text-ink-soft">
-            <summary aria-label="작업 범위 및 안내" className="flex min-h-8 cursor-pointer items-center whitespace-nowrap font-bold">범위</summary>
+            <summary aria-label="작업 안내" className="flex min-h-11 cursor-pointer items-center whitespace-nowrap font-bold md:min-h-8">안내</summary>
             <div className="absolute left-3 top-full z-10 w-[min(300px,calc(100%-24px))] rounded-lg border border-line bg-surface p-3 shadow-lg">
-              <p className="break-words">작업 범위: {title} · 취소·챙기기 제외 주문 제외</p>
               <p className="mt-2">상품·옵션·수량 확인 후 체크 · 두 화면 연동 · 저장 후 목록 유지</p>
               {sortMode === 'remaining' ? <p className="mt-2">체크 후 순서 유지 · 다시 정렬로 갱신</p> : null}
             </div>
@@ -333,13 +332,14 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
           <div className="ml-auto text-right text-[12px] font-bold" aria-live="polite"><span className="text-rose-deep">안 챙김 {loading || loadError ? "—" : total - got}</span><span className="ml-2 text-ok-tx">챙김 {loading || loadError ? "—" : got}/{total}개</span></div>
           <button type="button" disabled={saving} onClick={onClose} aria-label="닫기" className="h-9 w-9 shrink-0 rounded-full bg-surface-2 text-[22px] disabled:opacity-40">×</button>
         </div>
+        <p aria-label="작업 범위" className="shrink-0 break-words border-b border-line px-3 py-1 text-[11px] font-bold leading-4 text-ink-soft">작업 범위: {title} · 취소·챙기기 제외 주문 제외</p>
         <div className="shrink-0 space-y-2 border-b border-line px-3 py-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <div className="flex shrink-0 gap-1 rounded-lg bg-surface-2 p-0.5">
-              {(["batch", "order"] as const).map(mode => <button key={mode} type="button" onClick={() => setViewMode(mode)} aria-pressed={viewMode === mode} className={`min-h-8 rounded-md px-3 text-[13px] font-black ${viewMode === mode ? "bg-rose-deep text-white" : "text-ink-soft"}`}>{mode === "batch" ? "상품별" : "고객별"}</button>)}
+              {(["batch", "order"] as const).map(mode => <button key={mode} type="button" onClick={() => setViewMode(mode)} aria-pressed={viewMode === mode} className={`min-h-11 rounded-xl px-3 text-[13px] font-black md:min-h-8 ${viewMode === mode ? "bg-rose-deep text-white" : "text-ink-soft"}`}>{mode === "batch" ? "상품별" : "고객별"}</button>)}
             </div>
             <div className="flex gap-1">
-              {([['all','전체보기',total],['unpicked','안 챙김만',total-got],['picked','챙김만',got]] as const).map(([value,label,count]) => <button key={value} type="button" aria-label={label} aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)} className={`min-h-8 rounded-md border border-line px-2 text-[12px] font-bold ${statusFilter === value ? 'bg-rose-deep text-white' : 'bg-surface text-ink-soft'}`}>{value === 'all' ? '전체' : value === 'unpicked' ? '안 챙김' : '챙김'} {loading || loadError ? '—' : count}</button>)}
+              {([['all','전체보기',total],['unpicked','안 챙김만',total-got],['picked','챙김만',got]] as const).map(([value,label,count]) => <button key={value} type="button" aria-label={label} aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)} className={`min-h-11 rounded-xl border border-line px-2 text-[12px] font-bold md:min-h-8 ${statusFilter === value ? 'bg-rose-deep text-white' : 'bg-surface text-ink-soft'}`}>{value === 'all' ? '전체' : value === 'unpicked' ? '안 챙김' : '챙김'} {loading || loadError ? '—' : count}</button>)}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center [&_label]:flex [&_label]:items-center [&_label]:gap-1 [&_select]:!mt-0 [&_select]:!h-9">

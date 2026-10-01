@@ -20,6 +20,14 @@ for(const item of menu.ADMIN_LIVE_TOP_MENUS){
  await act(async()=>navButton.props.onClick());assert.equal(selected,item.defaultKey);
 }
 await act(async()=>tree.unmount());
+const SettingsNav=load('components/admin-live/AdminLiveSettingsNav.tsx').default;
+await act(async()=>{tree=Renderer.create(React.createElement(SettingsNav,{activeTab:'shop',onSelect:value=>selected=value}));});
+const mobileSelect=tree.root.findByProps({'aria-label':'설정 항목 선택'});
+assert.equal(mobileSelect.type,'select');
+assert.equal(tree.root.findAllByType('option').length,16,'all destinations remain available on small screens');
+await act(async()=>mobileSelect.props.onChange({target:{value:'합배송'}}));
+assert.deepEqual(selected,{tab:'combine'});
+await act(async()=>tree.unmount());
 const Tabs=load('components/admin-live/AdminLiveEventTabs.tsx').default;
 await act(async()=>{tree=Renderer.create(React.createElement(Tabs,{active:'survival',onSelect:key=>selected=key}));});
 assert.equal(tree.root.findAllByType('button').length,5);

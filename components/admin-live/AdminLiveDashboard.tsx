@@ -24,7 +24,7 @@ import AdminLiveCustomersPanel from "./AdminLiveCustomersPanel";
 import AdminLiveNoticePanel from "./AdminLiveNoticePanel";
 import AdminLivePaymentPanel from "./AdminLivePaymentPanel";
 import AdminLiveSideDrawer from "./AdminLiveSideDrawer";
-import { resolveAdminLiveDestination, transitionAdminLiveDrawer, type AdminLiveDrawerState } from "./adminLiveDrawerState";
+import { resolveAdminLiveDestination, transitionAdminLiveDrawer, resolveDrawerOrder, type AdminLiveDrawerState } from "./adminLiveDrawerState";
 import AdminLiveSettlementPanel from "./AdminLiveSettlementPanel";
 import AdminLiveSettingsPanel from "./AdminLiveSettingsPanel";
 import AdminLiveSidebar from "./AdminLiveSidebar";
@@ -1317,8 +1317,8 @@ export default function AdminLiveDashboard() {
   }, [filteredOrders]);
 
   const selectedOrder = useMemo(() => {
-    return filteredOrders.find((order) => order.id === selectedOrderId) || filteredOrders[0] || null;
-  }, [filteredOrders, selectedOrderId]);
+    return resolveDrawerOrder(drawer, orders, filteredOrders, selectedOrderId);
+  }, [drawer, orders, filteredOrders, selectedOrderId]);
 
   const closeOrderDetail = () => {
     setDrawer({kind: "closed"});

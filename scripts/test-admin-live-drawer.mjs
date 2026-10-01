@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import Renderer, {act} from 'react-test-renderer';
 import {createUiLoader} from './admin-ui-test-loader.mjs';
-import { resolveAdminLiveDestination, transitionAdminLiveDrawer } from '../components/admin-live/adminLiveDrawerState.ts';
+import { resolveAdminLiveDestination, transitionAdminLiveDrawer, resolveDrawerOrder } from '../components/admin-live/adminLiveDrawerState.ts';
 import { ADMIN_LIVE_ALL_MENU_KEYS } from '../components/admin-live/adminLiveMenu.ts';
 
 assert.deepEqual(resolveAdminLiveDestination('payments'), {screen:'orders', drawer:{kind:'deposits'}});
@@ -16,6 +16,10 @@ for (const next of [{kind:'order',orderId:'12'}, {kind:'match',orderId:'12'}, {k
 }
 assert.deepEqual(transitionAdminLiveDrawer({kind:'match',orderId:null}, {kind:'match',orderId:null}), {kind:'closed'}, 'header toggle closes the same drawer');
 assert.deepEqual(transitionAdminLiveDrawer({kind:'order',orderId:'1'}, {kind:'order',orderId:'2'}), {kind:'order',orderId:'2'}, 'different order replaces detail');
+const orders=[{id:'1'},{id:'2'}];
+assert.equal(resolveDrawerOrder({kind:'order',orderId:'1'},orders,[orders[1]],'2'),orders[0],'detail remains pinned after filter changes');
+assert.equal(resolveDrawerOrder({kind:'order',orderId:'gone'},orders,orders,'2'),null,'removed detail never silently displays a different customer');
+assert.equal(resolveDrawerOrder({kind:'closed'},orders,[orders[1]],'2'),orders[1]);
 console.log('PASS admin drawer destination and single-slot transitions');
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const listeners=new Map();
