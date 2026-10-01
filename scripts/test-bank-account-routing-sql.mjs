@@ -226,6 +226,19 @@ await setConfig();
   assert.equal(tested.customer_order_segment, "first_order");
 }
 
+// 배포 전 같은 방송 주문처럼 스냅샷이 없는 유효 이력도 사라진 이력으로 취급하면 안 된다.
+{
+  await resetOrders();
+  await setConfig();
+  await db.query(
+    "insert into public.orders(order_group_id,broadcast_id,customer_phone,phone,kakao_id,order_manage_status,is_test_order) values ('legacy-same',$1,$2,$2,$3,'주문확인전',false)",
+    [broadcastA, "01012345678", "25001"],
+  );
+  const result = await submit({ group: "after-legacy-same", kakao: "25001", broadcast: broadcastA });
+  assert.equal(result.customer_order_segment, "existing", "스냅샷 없는 같은 방송 유효 주문도 기존 이력");
+  assert.equal(result.bank_account.id, "primary");
+}
+
 // 카카오 ID가 같으면 전화번호가 바뀌어도 기존회원. 카카오가 없으면 정규화 전화번호 폴백.
 {
   await resetOrders();

@@ -235,7 +235,6 @@ begin
       into v_prior_exists, v_first_valid_order_at
     from public.orders o
     where o.order_group_id <> v_group_id
-      and (v_broadcast_id is null or o.broadcast_id is distinct from v_broadcast_id)
       and o.is_deleted is distinct from true
       and o.is_test_order is distinct from true
       and lower(concat_ws(' ', o.payment_status, o.order_manage_status, o.order_status, o.admin_status, o.admin_order_status_v2)) !~ '취소|환불|cancel|refund'
