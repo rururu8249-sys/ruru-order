@@ -1,4 +1,5 @@
 import { splitOptionText } from "./optionSplit";
+import { normalizeProductSearchText, productSearchMatches } from "./productSearch";
 export type ProductLike = Record<string, unknown>;
 export type DetailProduct = {
   parentId: string; parentName: string; detailName: string; code: string; hidden: boolean;
@@ -41,16 +42,14 @@ export function expandForWidget(row:ProductLike):ProductLike[]{const details=det
 // 고침: 칸을 이어붙이지 않고 하나씩 따로 본다.
 //   · 상품명 · 코드 · 색상 → 부분일치 (칸 안에서만 공백 무시 → "트렌치 코트" 로 "트렌치코트" 찾음)
 //   · 사이즈 → 정확히 같을 때만. 숫자라서 부분일치를 하면 "8" 이 "18"·"28" 에도 걸린다.
-const searchNorm = (v: unknown) => String(v ?? "").replace(/\s+/g, "").toLowerCase();
-
 export function adminDetailSearch(row: ProductLike, qraw: string): DetailProduct[] {
-  const q = searchNorm(qraw);
+  const q = normalizeProductSearchText(qraw);
   if (!q) return [];
   return detailProducts(row, { includeHidden: true }).filter((d) =>
-    searchNorm(d.detailName).includes(q) ||
-    searchNorm(d.code).includes(q) ||
-    d.colors.some((c) => searchNorm(c).includes(q)) ||
-    d.sizes.some((s) => searchNorm(s) === q)
+    productSearchMatches(d.detailName, q) ||
+    productSearchMatches(d.code, q) ||
+    d.colors.some((c) => productSearchMatches(c, q)) ||
+    d.sizes.some((s) => normalizeProductSearchText(s) === q)
   );
 }
 export function buildDetailChatLine(d:DetailProduct){const p=[d.detailName,`${Math.round(d.price).toLocaleString("ko-KR")}원`]; if(d.colors.length)p.push(`색상: ${d.colors.join(",")}`); if(d.sizes.length)p.push(`사이즈: ${d.sizes.join(",")}`); return p.join(" / ").replace(/[\r\n]+/g," ").trim();}

@@ -15,6 +15,7 @@ import { buildChatAnnounceText } from "@/lib/chatAnnounce";
 import { savedWidgetAutoMatches, savedWidgetPinMatches, widgetPinTargetBroadcastId } from "@/lib/widgetPinState";
 import { readPinHistory, recordPinHistory, removePinHistory } from "@/lib/pinHistory";
 import { splitOptionText } from "@/lib/optionSplit";
+import { normalizeProductSearchText, productSearchMatches } from "@/lib/productSearch";
 
 type ProductRow = Record<string, unknown>;
 
@@ -98,15 +99,12 @@ function pickArray(row: ProductRow, keys: string[]) {
 // [2026-07-23 사장님 지침] 조합형 상품은 세부상품명(예: "로스트 체리")으로도 검색되게 —
 //   고객 주문페이지 comboNamesMatchOrderProduct와 동일 기준(공백 제거·소문자).
 //   평소 상품(combo_mode 없음)은 false 반환 → 기존 상품명 검색 결과 무변경. 표시(필터) 전용.
-function normalizeSearchText(value: string) {
-  return value.replace(/\s+/g, "").toLowerCase();
-}
 function comboNamesMatch(p: ProductRow, rawQuery: string): boolean {
-  const q = normalizeSearchText(rawQuery);
+  const q = normalizeProductSearchText(rawQuery);
   if (!q) return false;
   const note = parseProductNote(p);
   if (note.combo_mode !== true) return false;
-  return pickArray(p, ["color_options"]).some((n) => normalizeSearchText(n).includes(q));
+  return pickArray(p, ["color_options"]).some((n) => productSearchMatches(n, q));
 }
 
 function parseProductNote(p: ProductRow): Record<string, unknown> {
@@ -364,7 +362,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   // [2026-07-23] 조합형이면 세부상품명 매칭도 허용(comboNamesMatch — 평소 상품은 항상 false)
   const nameMatch = (p: ProductRow) =>
     !search.trim() ||
-    productName(p).toLowerCase().includes(search.trim().toLowerCase()) ||
+    productSearchMatches(productName(p), search) ||
     comboNamesMatch(p, search) ||
     adminDetailSearch(p, search).length > 0;
 
@@ -1001,7 +999,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [sortKey, setSortKey] = useState<"default" | "latest" | "stock_low">("default");
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = normalizeProductSearchText(search);
     const list = products.filter((p) => {
       if (pickString(p, ["status", "product_status"], "") === "deleted") return false;
       if (category !== "전체" && productCategory(p) !== category) return false;
@@ -1011,7 +1009,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       }
       // 관리자 검색은 숨김 세부상품까지 포함해 정확한 상세상품명을 찾는다.
       // 대표상품명이 직접 검색된 경우는 대표카드만 보여주고, 세부상품명이 검색된 경우만 아래에서 자동 펼친다.
-      if (q && !productName(p).toLowerCase().includes(q) && adminDetailSearch(p, search).length === 0) return false;
+      if (q && !productSearchMatches(productName(p), q) && adminDetailSearch(p, search).length === 0) return false;
       return true;
     });
     // 정렬: 재고 적은순(재고관리 상품 우선, 미관리·재고없음은 뒤로)
@@ -2123,8 +2121,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       ? { background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", border: "1px solid var(--color-rose-line)" }
                       : { background: "var(--color-rose-deep)", color: "#fff", border: "none" };
                     const widgetText = state === "rotating" ? "▶ 순환 해제" : "▶ 순환 추가";
-                    const normalizedQuery = normalizeSearchText(search);
-                    const parentNameMatched = normalizedQuery ? normalizeSearchText(productName(p)).includes(normalizedQuery) : false;
+                    const normalizedQuery = normalizeProductSearchText(search);
+                    const parentNameMatched = normalizedQuery ? productSearchMatches(productName(p), normalizedQuery) : false;
                     const matchedDetails = normalizedQuery && !parentNameMatched ? adminDetailSearch(p, search) : [];
                     return (
                       <div key={id || productName(p)} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -2408,13 +2406,13 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             {/* 목록 */}
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 16px 8px" }}>
               {(() => {
-                const q = bcPickerSearch.trim().toLowerCase();
+                const q = normalizeProductSearchText(bcPickerSearch);
                 const pickList = products.filter((p) => {
                   if (pickString(p, ["status"], "") === "deleted") return false;
                   if (bcPickerFromBcId && bcPickerFromIds && !bcPickerFromIds.has(productId(p))) return false;
                   if (bcPickerDate && productRegDate(p) !== bcPickerDate) return false;
                   // [2026-07-23] 조합형 세부상품명 검색 허용(평소 상품 무변경)
-                  if (q && !productName(p).toLowerCase().includes(q) && !comboNamesMatch(p, bcPickerSearch)) return false;
+                  if (q && !productSearchMatches(productName(p), q) && !comboNamesMatch(p, bcPickerSearch)) return false;
                   return true;
                 });
                 if (pickList.length === 0) {
@@ -2482,11 +2480,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             {/* 목록 */}
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 16px 8px" }}>
               {(() => {
-                const q = shopPickerSearch.trim().toLowerCase();
+                const q = normalizeProductSearchText(shopPickerSearch);
                 const pickList = products.filter((p) => {
                   if (pickString(p, ["status"], "") === "deleted") return false;
                   // [2026-07-23] 조합형 세부상품명 검색 허용(평소 상품 무변경)
-                  if (q && !productName(p).toLowerCase().includes(q) && !comboNamesMatch(p, shopPickerSearch)) return false;
+                  if (q && !productSearchMatches(productName(p), q) && !comboNamesMatch(p, shopPickerSearch)) return false;
                   return true;
                 });
                 if (pickList.length === 0) {

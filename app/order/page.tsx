@@ -38,6 +38,7 @@ const normalizeEmptyProductOptionValue = (value: unknown) => {
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { normalizeProductSearchText, productSearchMatches } from "@/lib/productSearch";
 import { HOWTO_DEFAULT, parseHowtoSteps } from "@/lib/howto";
 import { supabase } from "@/lib/supabase";
 import { isRemoteAreaAddress } from "@/lib/order/shippingAddress";
@@ -443,7 +444,7 @@ function parseProductSuggestionNote(raw: unknown): ProductSuggestionNote | null 
 }
 
 function normalizeSuggestionText(value: string) {
-  return value.replace(/\s+/g, "").toLowerCase();
+  return normalizeProductSearchText(value);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -551,7 +552,7 @@ function productMatchesSuggestion(product: BroadcastProduct, query: string) {
     ...productSuggestionKeywords(product),
   ].map((target) => normalizeSuggestionText(String(target || "")));
 
-  return targets.some((target) => target.includes(normalizedQuery));
+  return targets.some((target) => productSearchMatches(target, normalizedQuery));
 }
 
 
@@ -820,7 +821,7 @@ function findMatchedBroadcastProduct(item: OrderItem, products: BroadcastProduct
     // 방금 담은 상품을 "판매 목록에 없음"으로 오판하지 않는다.
     products.find((product) => itemProductId && String(product.id ?? "").trim() === itemProductId) ||
     products.find((product) => normalizeSuggestionText(product.product_name) === itemName) ||
-    products.find((product) => normalizeSuggestionText(product.product_name).includes(itemName)) ||
+    products.find((product) => productSearchMatches(product.product_name, itemName)) ||
     null
   );
 }
@@ -1233,7 +1234,7 @@ function comboNamesMatchOrderProduct(product: unknown, query: string): boolean {
   if (!info) return false;
   const q = normalizeSuggestionText(query);
   if (!q) return false;
-  return info.names.some((n) => normalizeSuggestionText(n).includes(q));
+  return info.names.some((n) => productSearchMatches(n, q));
 }
 
 
@@ -7107,7 +7108,7 @@ export default function OrderPage() {
                               const nq = normalizeSuggestionText(dq);
                               if (!nq) return null;
                               const matchedDetails = detailProducts(product as unknown as Record<string, unknown>, { includeHidden: false })
-                                .filter((d) => normalizeSuggestionText(d.detailName).includes(nq));
+                                .filter((d) => productSearchMatches(d.detailName, nq));
                               if (matchedDetails.length === 0) return null;
                               const shown = matchedDetails.slice(0, 12);
                               return (
@@ -8231,9 +8232,9 @@ export default function OrderPage() {
                         const list = info.names.filter((n) => {
                           if (registeredOptionBrandGroup && registeredOptionDetailCategory !== "전체" && registeredOptionBrandGroup.detailCategories[n] !== registeredOptionDetailCategory) return false;
                           if (!query) return true;
-                          if (normalizeSuggestionText(n).includes(query)) return true;
+                          if (productSearchMatches(n, query)) return true;
                           const b = orderBrandOfDetailName(n);
-                          return !!b && normalizeSuggestionText(b).includes(query);
+                          return !!b && productSearchMatches(b, query);
                         });
                         const stockOf = (name: string): number | null => {
                           if (registeredOptionAxes3) {
