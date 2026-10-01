@@ -1562,7 +1562,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               key={k}
               type="button"
               onClick={() => setTab(k)}
-              style={{ flexShrink: 0, whiteSpace: "nowrap", padding: "12px 16px", fontSize: "13px", fontWeight: 800, background: "none", border: "none", borderBottom: "2px solid " + (tab === k ? "var(--color-rose-deep)" : "transparent"), color: tab === k ? "var(--color-rose-deep)" : "var(--color-ink-soft)", cursor: "pointer" }}
+              aria-pressed={tab === k}
+              className="min-h-11 md:min-h-9"
+              style={{ flexShrink: 0, whiteSpace: "nowrap", padding: "6px 12px", fontSize: "13px", fontWeight: 800, background: "none", border: "none", borderBottom: "2px solid " + (tab === k ? "var(--color-rose-deep)" : "transparent"), color: tab === k ? "var(--color-rose-deep)" : "var(--color-ink-soft)", cursor: "pointer" }}
             >
               {l}
             </button>
@@ -2206,6 +2208,10 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
                         {/* 수정 / 삭제 — 오른쪽 끝 나란히 */}
                         <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexShrink: 0, alignSelf: "flex-start" }}>
+                          <button type="button" onClick={() => editProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-info-tx)", background: "var(--color-info-bg)", border: "none", borderRadius: "8px", padding: "6px 12px", cursor: "pointer" }}>수정</button>
+                          <details className="relative">
+                            <summary className="min-h-9 cursor-pointer list-none rounded-xl border border-line px-2.5 py-1.5 text-xs font-bold text-ink-soft" aria-label={`${productName(p)} 더보기`}>더보기 ▾</summary>
+                            <div className="absolute right-0 z-20 flex min-w-28 flex-col gap-1 rounded-xl border border-line bg-surface p-1 shadow-lg">
                           <button
                             type="button"
                             title="고객 주문 딥링크 복사 — 방송 채팅 고정메시지에 붙이면 고객이 링크 탭 → 이 상품이 바로 열림"
@@ -2218,9 +2224,10 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             }}
                             style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ok-tx)", background: "var(--color-ok-bg)", border: "none", borderRadius: "8px", padding: "6px 12px", cursor: "pointer" }}
                           >🔗 링크</button>
-                          <button type="button" onClick={() => editProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-info-tx)", background: "var(--color-info-bg)", border: "none", borderRadius: "8px", padding: "6px 12px", cursor: "pointer" }}>수정</button>
                           <button type="button" onClick={() => duplicateProduct(p)} title="이 상품 내용으로 새 상품 등록 폼 열기" style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "6px 12px", cursor: "pointer" }}>복제</button>
                           <button type="button" onClick={() => void deleteProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", border: "none", borderRadius: "8px", padding: "6px 12px", cursor: "pointer" }}>삭제</button>
+                            </div>
+                          </details>
                         </div>
                       </div>
                       {matchedDetails.length > 0 ? (

@@ -77,12 +77,12 @@ export default function AdminLiveSidebar({
 
       <aside
         className={[
-          "fixed inset-y-0 left-0 z-40 flex w-[244px] shrink-0 flex-col overflow-y-auto border-r border-line bg-surface px-4 py-5 transition-transform duration-200",
+          "fixed inset-y-0 left-0 z-40 flex w-[220px] shrink-0 flex-col overflow-y-auto border-r border-line bg-surface px-3 py-3 transition-transform duration-200",
           "md:static md:z-auto md:translate-x-0",
           navOpen ? "translate-x-0" : "-translate-x-full",
         ].join(" ")}
       >
-        <div className="mb-6 flex items-center gap-2 px-1">
+        <div className="mb-3 flex items-center gap-2 px-1">
           <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-deep text-white">
             <AdminLiveMenuIcon menu="broadcast" className="h-[17px] w-[17px]" />
           </div>
@@ -121,7 +121,7 @@ export default function AdminLiveSidebar({
                 className={[
                   // [2026-09-08 수정] 배지를 라벨 옆에 두면 좁은 사이드바에서 「주문·입금」 글자가 세로로 눌린다.
                   //   → 위: 아이콘+이름 한 줄 / 아래: 배지 한 줄. 이름은 절대 줄바꿈하지 않는다.
-                  "flex w-full flex-col gap-1.5 rounded-2xl px-3 py-3 text-left transition",
+                  "flex min-h-11 w-full flex-col gap-1 rounded-xl px-2.5 py-2 text-left transition",
                   active
                     ? "bg-rose-soft text-rose-deep shadow-sm ring-1 ring-rose-line"
                     : "text-ink-soft hover:bg-surface-2 hover:text-ink",
@@ -139,7 +139,6 @@ export default function AdminLiveSidebar({
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block whitespace-nowrap text-[14px] font-black">{menu.label}</span>
-                    <span className="block truncate text-[11px] font-bold opacity-60">{menu.desc}</span>
                   </span>
                 </span>
                 {showBadges ? (

@@ -1859,14 +1859,14 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
             <button type="button" onClick={() => onClose?.()} className="text-ink-mute hover:text-ink text-lg leading-none">✕</button>
           </div>
         )}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-5 space-y-4">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-3">
           {/* [2026-09-21 사장님] 「고객 메뉴 레이아웃이 너무 별로」 — 순서를 바로잡았다.
               예전: 통계요약 → ⛔전화번호 차단 → 탭바 → 내용
                 회원 목록 보러 들어왔는데 «빨간 차단 상자»가 탭보다 먼저 눈에 들어왔다.
               지금: 탭바 → (회원 목록 탭일 때만) 통계요약 + ⛔차단 → 목록
                 무엇을 보는 화면인지가 맨 위에서 먼저 정해진다. */}
           {/* ── 1층: 탭 (무엇을 보는 화면인지 먼저) ── */}
-          <div ref={tabBarRef} className="flex flex-wrap gap-2 border-b border-rose-line">
+          <div ref={tabBarRef} className="flex gap-1 overflow-x-auto border-b border-rose-line">
             {([
               ["members", "회원 목록", 0],
               ["issues", "고객이슈", openIssueCount],
@@ -1879,7 +1879,8 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                   key={key}
                   type="button"
                   onClick={() => setCustTab(key)}
-                  className={`rounded-t-lg px-4 py-2 text-sm font-black transition ${on ? "bg-rose-deep text-white" : "text-ink-soft hover:bg-rose-soft hover:text-rose-deep"}`}
+                  aria-pressed={on}
+                  className={`min-h-11 shrink-0 whitespace-nowrap rounded-t-lg px-3 py-1.5 text-xs font-black transition md:min-h-9 ${on ? "bg-rose-deep text-white" : "text-ink-soft hover:bg-rose-soft hover:text-rose-deep"}`}
                 >
                   {label}
                   {badge > 0 ? (

@@ -400,7 +400,7 @@ export default function AdminLiveNoticePanel() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* 탭 — 손님에게 보이는 공지 / 공지사항 목록 */}
-      <div className="flex shrink-0 gap-2 border-b border-line bg-surface px-5 py-3">
+      <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-surface px-3 py-2">
         {([
           { key: "customer", label: "📢 손님 화면 공지", desc: "접속 팝업 · 상시 안내" },
           { key: "list", label: "📋 공지사항 목록", desc: "등록 · 고정 · 순서" },
@@ -411,15 +411,16 @@ export default function AdminLiveNoticePanel() {
             key={t.key}
             type="button"
             onClick={() => setTab(t.key)}
-            className={`rounded-xl px-4 py-2 text-left transition ${tab === t.key ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}
+            aria-pressed={tab === t.key}
+            title={t.desc}
+            className={`min-h-11 shrink-0 whitespace-nowrap rounded-xl px-3 py-1.5 text-left transition md:min-h-9 ${tab === t.key ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}
           >
             <span className="block text-[13px] font-black">{t.label}</span>
-            <span className={`block text-[11px] font-bold ${tab === t.key ? "text-white/70" : "text-ink-mute"}`}>{t.desc}</span>
           </button>
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-5">
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {tab === "customer" ? (
         <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
           {/* ─────────── 왼쪽: 입력 ─────────── */}

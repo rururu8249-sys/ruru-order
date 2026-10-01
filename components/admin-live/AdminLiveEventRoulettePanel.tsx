@@ -10,6 +10,8 @@ import AdminLiveEventSoundboard from "./AdminLiveEventSoundboard"; // [2026-08-1
 
 type RouletteMode = "live" | "test" | "preview";
 
+import AdminLiveEventTabs from "./AdminLiveEventTabs";
+
 const FIXED_OVERLAY_TOKEN = "roulette_luludongi_live";
 const FIXED_CLAW_OVERLAY_TOKEN = "claw_luludongi_live";
 const FIXED_SURVIVAL_OVERLAY_TOKEN = "survival_luludongi_live";
@@ -1545,16 +1547,7 @@ export default function AdminLiveEventRoulettePanel({
                 <span style={{ fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>◆ 이벤트</span>
                 <span style={{ marginLeft: "auto", display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap" }}>
                   {/* [2026-09-08] 탭 순서 = 실제 쓰는 순서(서바이벌·달리기 최다). 테스트/운영 토글은 삭제 — 「테스트로 해보기」 버튼으로 */}
-                  <span className="badge" style={{ padding: "4px 12px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "survival" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "survival" ? "#fff" : "var(--mut)" }}
-                    onClick={() => { setEventTab("survival"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>⛈️ 서바이벌</span>
-                  <span className="badge" style={{ padding: "4px 12px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "race" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "race" ? "#fff" : "var(--mut)" }}
-                    onClick={() => { setEventTab("race"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>🏁 달리기</span>
-                  <span className="badge" style={{ padding: "4px 16px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "roulette" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "roulette" ? "#fff" : "var(--mut)" }}
-                    onClick={() => { setEventTab("roulette"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>🎡 룰렛</span>
-                  <span className="badge" style={{ padding: "4px 16px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "claw" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "claw" ? "#fff" : "var(--mut)" }}
-                    onClick={() => { setEventTab("claw"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>🪆 인형뽑기</span>
-                  <span className="badge" style={{ padding: "4px 12px", cursor: "pointer", border: "1px solid var(--bd)", background: eventTab === "mission" ? "var(--rose)" : "var(--color-surface)", color: eventTab === "mission" ? "#fff" : "var(--mut)" }}
-                    onClick={() => { setEventTab("mission"); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }}>🎯 미션</span>
+                  <AdminLiveEventTabs active={eventTab} onSelect={(tab) => { setEventTab(tab); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }} />
                   <span style={{ width: "1px", height: "18px", background: "var(--bd)", margin: "0 4px" }} />
                   <button className="btn" style={{ height: "auto", padding: "4px 8px" }} onClick={() => { void resetEvent(); }}>↺ 초기화</button>
                   {embedded ? null : <button className="btn" style={{ height: "auto", padding: "4px 8px" }} onClick={closePanel}>✕</button>}
