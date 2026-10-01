@@ -22,6 +22,7 @@ import {
   orderNeedsPurchaseConsent,
   parseOrderPurchaseConsentSettings,
 } from "@/lib/orderPurchaseConsent";
+import { purchaseLimitProductSelect } from "@/lib/orderSchemaQueries";
 
 export const dynamic = "force-dynamic";
 
@@ -571,7 +572,7 @@ async function assertPurchaseLimit(
   const productIds = Array.from(requestedByProduct.keys()).map((id) => Number(id));
   const { data: products, error: productError } = await supabase
     .from("products")
-    .select("id, product_name, name, product_note")
+    .select(purchaseLimitProductSelect())
     .in("id", productIds);
 
   if (productError || !Array.isArray(products)) {
@@ -633,7 +634,7 @@ async function assertPurchaseLimit(
     }
 
     if (already + requested > limit) {
-      const pname = text(product?.product_name) || text(product?.name) || "이 상품";
+      const pname = text(product?.product_name) || "이 상품";
       const remain = Math.max(0, limit - already);
       throw new Error(
         already > 0

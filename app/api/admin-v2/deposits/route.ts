@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+import { buildDepositOrderLookupPlan } from "@/lib/orderSchemaQueries";
+
 export const dynamic = "force-dynamic";
 
 type AnyRow = Record<string, any>;
@@ -145,8 +147,8 @@ async function selectDeposits(supabase: any, sinceIso: string | null) {
   return { data: all, error: null };
 }
 
-function chunkList(list: string[], size: number) {
-  const out: string[][] = [];
+function chunkList<T>(list: T[], size: number) {
+  const out: T[][] = [];
   for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
   return out;
 }
@@ -192,10 +194,10 @@ async function selectOrdersForDeposits(supabase: any, deposits: AnyRow[]) {
   const collected: AnyRow[] = [];
   const CHUNK = 150;
 
-  const runIn = async (column: string, values: string[] | number[]) => {
-    for (const part of chunkList(values as string[], CHUNK)) {
+  const runIn = async (column: string, values: Array<string | number>) => {
+    for (const part of chunkList(values, CHUNK)) {
       const { data, error } = await supabase.from("orders").select("*").in(column, part);
-      // 없는 컬럼(42703) 등은 조용히 건너뛴다 — 기존 first() 방어 로직과 동일한 취지
+      // 향후 스키마 전환 중 컬럼이 사라져도 전체조회 폴백으로 이어질 수 있게 유지한다.
       if (error) {
         if (String((error as any)?.code || "") === "42703") return true;
         throw error;
@@ -207,25 +209,11 @@ async function selectOrdersForDeposits(supabase: any, deposits: AnyRow[]) {
 
   try {
     const groupList = Array.from(groupKeys);
-
-    if (groupList.length > 0) {
-      await runIn("order_group_id", groupList);
-      await runIn("order_lookup_code", groupList);
-      // buildOrderMaps 의 first() 가 보던 대체 컬럼도 동일하게 시도한다.
-      // 실제 스키마에 없으면 42703 으로 조용히 건너뛰므로 기존 동작과 어긋나지 않는다.
-      await runIn("group_id", groupList);
-      await runIn("lookup_code", groupList);
+    const lookupPlan = buildDepositOrderLookupPlan(groupList, Array.from(orderIdKeys));
+    for (const query of lookupPlan) {
+      await runIn(query.column, query.values);
     }
-
-    const numericIds = Array.from(orderIdKeys)
-      .map((value) => Number(value))
-      .filter((value) => Number.isFinite(value));
-
-    if (numericIds.length > 0) {
-      await runIn("id", numericIds as unknown as string[]);
-      await runIn("order_id", numericIds as unknown as string[]);
-    }
-  } catch (error) {
+  } catch {
     // 타깃 조회가 실패하면 예전 전체조회로 폴백해서 화면이 비지 않게 한다.
     return await selectAllOrdersFallback(supabase);
   }
