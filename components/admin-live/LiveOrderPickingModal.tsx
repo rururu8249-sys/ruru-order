@@ -265,7 +265,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   const renderRow = ({ panel, item }: PickingRow) => {
     const done = pickedIds.has(item.id);
     return (
-      <div key={item.id} className={`flex items-center gap-3 p-3 ${done ? "bg-ok-bg/60" : "bg-surface"}`}>
+      <div key={item.id} className={`grid grid-cols-[64px_minmax(0,1fr)] items-center gap-3 p-3 sm:grid-cols-[64px_minmax(0,1fr)_104px] ${done ? "bg-ok-bg/60" : "bg-surface"}`}>
         {itemPhoto[item.id] ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img src={itemPhoto[item.id]} alt={item.productName} className="h-16 w-16 shrink-0 rounded-lg border border-line object-cover" />
@@ -275,8 +275,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
           <div className="mt-1 break-words text-[16px] font-black text-rose-deep">{item.optionText || "기본 옵션"}</div>
           <div className="mt-1 text-[12px] font-bold text-ink-soft">{panel.nickname}{panel.name && panel.name !== panel.nickname ? ` · ${panel.name}` : ""} · 주문 #{item.id}</div>
         </div>
-        <div className="shrink-0 text-right">
-          <div className="text-[22px] font-black text-ink">{item.qty}<span className="text-[12px]">개</span></div>
+        <div className="col-span-2 flex items-center justify-between gap-2 border-t border-line pt-2 text-right sm:col-span-1 sm:block sm:border-t-0 sm:pt-0">
+          <div className="text-[22px] font-black text-ink"><span className="mr-2 text-[12px] font-bold text-ink-soft sm:hidden">확인할 수량</span>{item.qty}<span className="text-[12px]">개</span></div>
           <button type="button" role="checkbox" aria-checked={done} aria-label={`${panel.nickname} ${item.productName} ${item.optionText} ${item.qty}개 ${done ? "챙김 해제" : "챙김"}`}
             disabled={blocked} onClick={() => updatePicked([item.id], !pickedRef.current.has(item.id))}
             className={`mt-1 flex min-h-[44px] min-w-[92px] items-center justify-center gap-2 rounded-lg border-2 px-2 text-[13px] font-black disabled:opacity-50 ${done ? "border-ok-tx bg-[var(--color-ok-tx)] text-white" : "border-line bg-surface text-ink-soft"}`}>
@@ -307,12 +307,12 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
             <button type="button" aria-pressed={unpickedOnly} onClick={() => setUnpickedOnly(value => !value)} className={`shrink-0 rounded-lg border border-line px-3 text-[12px] font-bold ${unpickedOnly ? "bg-rose-deep text-white" : "bg-surface text-ink-soft"}`}>안 챙김만</button>
           </div>
           <p className="text-[12px] font-bold text-ink-soft">상품·색상·사이즈·수량을 확인한 뒤 체크하세요. 두 화면의 체크는 같습니다.</p>
-          <div role="status" aria-live="polite" className="text-[12px] font-bold text-ink-soft">{loading ? "챙김 상태 확인 중…" : loadError ? "상태를 확인하지 못했습니다. 창을 다시 열어 주세요. 체크는 잠시 막았습니다." : saving ? "저장 중… 완료 확인 전까지 기다려 주세요." : "저장된 상태입니다. 체크한 줄은 자동으로 접히지 않습니다."}</div>
+          <div role="status" aria-live="polite" className="text-[12px] font-bold text-ink-soft">{loading ? "챙김 상태 확인 중…" : loadError ? "상태 확인 실패 · 창을 다시 열어 주세요. 체크는 잠시 막았습니다." : saving ? "저장 중… 잠시 기다려 주세요." : "저장 완료 · 체크해도 목록에 그대로 남습니다."}</div>
         </div>
         <div className="flex-1 overflow-y-auto bg-surface-2 p-3">
           {!loading && !loadError && matches.length === 0 ? <div className="py-12 text-center font-bold text-ink-soft">{q ? "검색 결과가 없습니다." : unpickedOnly ? "모두 챙겼습니다." : "챙길 결제완료 주문이 없습니다."}</div> : null}
           <div className="space-y-3">
-            {[...grouped].map(([key, group]) => {
+            {[...grouped].sort(([, a], [, b]) => a.title.localeCompare(b.title, "ko")).map(([key, group]) => {
               const progress = pickingProgress(group.rows.map(({ item }) => ({ qty: item.qty, pickedAt: pickedIds.has(item.id) })));
               return <section key={key} className="overflow-hidden rounded-xl border border-line bg-surface">
                 <div className="flex items-start justify-between gap-2 bg-rose-soft p-3">

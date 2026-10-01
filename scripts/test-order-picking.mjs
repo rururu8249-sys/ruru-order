@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
-import { pickingProgress, savePicking } from '../lib/orderPicking.ts';
+import { pickingProgress, isPickingComplete, savePicking } from '../lib/orderPicking.ts';
 
 assert.deepEqual(pickingProgress([{ qty: 3, pickedAt: null, collectedAt: 'old' }]), { total: 3, got: 0 });
 assert.deepEqual(pickingProgress([{ qty: 3, pickedAt: 'done' }, { qty: 2, pickedAt: null }]), { total: 5, got: 3 });
 assert.deepEqual(pickingProgress([]), { total: 0, got: 0 });
+assert.equal(isPickingComplete({total: 3, got: 1}), false);
+assert.equal(isPickingComplete({total: 3, got: 3}), true);
+assert.equal(isPickingComplete({total: 0, got: 0}), false);
 const writes = [];
 const client = (returnRows) => ({ from(table) {
   assert.equal(table, 'orders');

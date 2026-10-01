@@ -9,6 +9,10 @@ export function pickingProgress(items: readonly { qty: unknown; pickedAt?: unkno
   return { total, got };
 }
 
+export function isPickingComplete(progress: { total: number; got: number }) {
+  return progress.total > 0 && progress.got >= progress.total;
+}
+
 type PickingClient = { from(table: string): { update(values: { picked_at: string | null }): {
   in(column: string, ids: number[]): { select(columns: string): PromiseLike<{
     data: { id: number; picked_at: string | null }[] | null; error: unknown;

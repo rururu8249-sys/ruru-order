@@ -15,7 +15,7 @@ import BroadcastCalendarPicker, { type BroadcastCalendarItem } from "./Broadcast
 import { useLiveOrderShipped } from "./useLiveOrderShipped";
 import { buildCustomerOrderCopyText, buildPaymentRequestNote } from "./liveOrderCustomerCopy";
 import { showAdminConfirm } from "@/lib/adminConfirm";
-import { pickingProgress } from "@/lib/orderPicking";
+import { pickingProgress, isPickingComplete } from "@/lib/orderPicking";
 
 // 총금액 표시 전용: 포인트 사용 주문은 실결제금액(상품금액 + 택배비 - 사용포인트)으로 표시한다.
 // - 단일상품: final_amount에 포인트가 이미 반영돼 기존 값과 동일(변화 없음)
@@ -386,20 +386,19 @@ function matchesWorkFilter(order: LiveOrder, wf: string) {
   if (wf === "shipped") return shipped;
   if (wf === "printed") return hasInvoicePrinted(order) && !shipped;
   const { total, got } = pickStateOf(order);
-  if (wf === "none") return got === 0;
-  if (wf === "doing") return got > 0 && got < total;
-  if (wf === "done") return total > 0 && got >= total;
+  if (wf === "none") return !isPickingComplete({ total, got });
+  if (wf === "done") return isPickingComplete({ total, got });
   return true;
 }
 
 // [㉕-C] 작업 칩(표시 전용). 챙김 상태 · 송장출력 · 물건챙기기 엑셀.
 function PickChip({ order }: { order: LiveOrder }) {
   const { total, got } = pickStateOf(order);
-  if (got >= total && total > 0) {
+  if (isPickingComplete({ total, got })) {
     return <span className="inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-ok-bg px-1.5 py-0.5 text-[11px] font-black leading-none text-ok-tx">✓ 챙김</span>;
   }
   if (got > 0) {
-    return <span className="inline-flex items-center justify-center whitespace-nowrap rounded-lg px-1.5 py-0.5 text-[11px] font-black leading-none text-rose-deep">챙김 {got}/{total}</span>;
+    return <span className="inline-flex items-center justify-center whitespace-nowrap rounded-lg px-1.5 py-0.5 text-[11px] font-black leading-none text-rose-deep">안 챙김 · {got}/{total}개 확인</span>;
   }
   return <span className="inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] font-black leading-none text-ink-mute">안 챙김</span>;
 }
@@ -523,8 +522,8 @@ export default function LiveOrderTable({
   const [cartHoldsOpen, setCartHoldsOpen] = useState(false);
 
   const [cancelViewFilter, setCancelViewFilter] = useState<LiveOrderCancelViewFilterValue>("all");
-  // [㉕-C] 작업 현황 줄 필터 — none(안 챙김)/doing(챙기는 중)/done(챙김)/printed(송장출력·미출고)/shipped(택배출고). ""=끄기.
-  const [workFilter, setWorkFilter] = useState<"" | "none" | "doing" | "done" | "printed" | "shipped">("");
+  // 안 챙김에는 아직 일부만 챙긴 주문도 포함한다. 별도 중간 작업 단계는 없다.
+  const [workFilter, setWorkFilter] = useState<"" | "none" | "done" | "printed" | "shipped">("");
 
   // 필터/정렬 변경 시 1페이지로. 단, 첫 마운트(새로고침으로 복원된 페이지)에는 리셋하지 않음.
   const cancelViewMountedRef = useRef(false);
@@ -651,17 +650,16 @@ export default function LiveOrderTable({
   // [㉕-C] 작업 현황 줄 숫자 — cancelViewFilteredOrders 의 «결제완료» 기준(workFilter 무관·항상 전체).
   const workCounts = useMemo(() => {
     const paidList = cancelViewFilteredOrders.filter((o) => PICK_PAID_STATUSES.includes(o.paymentStatus ?? ""));
-    let none = 0, doing = 0, done = 0, printed = 0, shipped = 0;
+    let none = 0, done = 0, printed = 0, shipped = 0;
     for (const o of paidList) {
       const shp = isShippedComplete(o);
       if (shp) shipped++;
       const { total, got } = pickStateOf(o);
-      if (got === 0) none++;
-      else if (got < total) doing++;
-      else if (total > 0) done++;
+      if (isPickingComplete({ total, got })) done++;
+      else none++;
       if (hasInvoicePrinted(o) && !shp) printed++;
     }
-    return { paid: paidList.length, none, doing, done, printed, shipped };
+    return { paid: paidList.length, none, done, printed, shipped };
   }, [cancelViewFilteredOrders]);
 
   // [㉕-C] 목록/페이지/엑셀에 쓰는 최종 목록 — workFilter 켜지면 마지막 단계로 한 번만 거른다.
@@ -1199,11 +1197,10 @@ export default function LiveOrderTable({
         <span>결제완료 {workCounts.paid.toLocaleString()}</span>
         {([
           ["안 챙김", workCounts.none, "none"],
-          ["챙기는 중", workCounts.doing, "doing"],
           ["✓ 챙김", workCounts.done, "done"],
           ["🖨 송장출력", workCounts.printed, "printed"],
           ["택배출고", workCounts.shipped, "shipped"],
-        ] as [string, number, "none" | "doing" | "done" | "printed" | "shipped"][]).map(([label, n, key]) => (
+        ] as [string, number, "none" | "done" | "printed" | "shipped"][]).map(([label, n, key]) => (
           <Fragment key={key}>
             <span className="text-ink-mute">│</span>
             <button
