@@ -16,6 +16,12 @@ import {
   parseOrderBankRoutingResult,
   sanitizeOrderRowsForBankRouting,
 } from "@/lib/orderBankAccount";
+import {
+  ORDER_PURCHASE_CONSENT_KEYS,
+  assertOrderPurchaseConsent,
+  orderNeedsPurchaseConsent,
+  parseOrderPurchaseConsentSettings,
+} from "@/lib/orderPurchaseConsent";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +43,7 @@ type OrderSubmitPayload = {
   cart_session_key?: string;
   cartSessionKey?: string;
   kakao_id?: string;
+  purchase_consent_accepted?: boolean;
 };
 
 function jsonError(message: string, status = 400) {
@@ -303,7 +310,7 @@ async function assertRegisteredProductPrices(
 
   const { data, error } = await supabase
     .from("products")
-    .select("id, product_name, price, product_note, shipping_type, combine_shipping")
+    .select("id, product_name, price, product_note, shipping_type, combine_shipping, badge_type, badge_types")
     .in("id", ids);
 
   if (error) {
@@ -358,6 +365,25 @@ async function assertRegisteredProductPrices(
   }
 
   return catalog; // 배송비 검증에서 배송그룹(일반/업체) 판정에 그대로 재사용 → 추가 조회 0회
+}
+
+async function assertCurrentOrderPurchaseConsent(
+  supabase: any,
+  orderRows: AnyRow[],
+  catalog: Map<string, AnyRow>,
+  accepted: boolean,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("settings")
+    .select("key,value")
+    .in("key", [...ORDER_PURCHASE_CONSENT_KEYS]);
+
+  if (error) {
+    console.warn("구매동의 설정 조회 실패: 안전 기본값(해외배송 자동) 적용", error.message);
+  }
+  const config = parseOrderPurchaseConsentSettings(error ? [] : (data || []));
+  const required = orderNeedsPurchaseConsent(config.mode, orderRows, catalog);
+  assertOrderPurchaseConsent(required, accepted);
 }
 
 // [2026-08-11] 배송비 안 내고 주문 넣는 것 차단.
@@ -699,6 +725,12 @@ export async function POST(request: NextRequest) {
     //   카톡 계정(kakao_id) 기준 누적 → 전화번호 바꿔도 제한 우회 불가
     await assertDirectInputAllowed(supabase, orderRows);
     const productCatalog = await assertRegisteredProductPrices(supabase, orderRows);
+    await assertCurrentOrderPurchaseConsent(
+      supabase,
+      orderRows,
+      productCatalog,
+      body.purchase_consent_accepted === true,
+    );
     await assertShippingFeeNotSkipped(supabase, orderRows, phone, productCatalog, kakaoId);
     await assertPurchaseLimit(supabase, orderRows, phone, kakaoId);
     await assertCartHoldAlive(supabase, orderRows, cartSessionKey);

@@ -5,6 +5,8 @@ export const ORDER_PURCHASE_CONSENT_KEYS = [
   "order_purchase_consent_checkbox",
 ] as const;
 
+export const ORDER_PURCHASE_CONSENT_REQUIRED_MESSAGE = "해외배송 상품 구매 동의를 확인해 주세요.";
+
 export type OrderPurchaseConsentMode = "auto" | "all" | "off";
 
 export type OrderPurchaseConsentConfig = {
@@ -94,6 +96,6 @@ export function orderNeedsPurchaseConsent(
 
 export function assertOrderPurchaseConsent(required: boolean, accepted: boolean): void {
   if (required && accepted !== true) {
-    throw new Error("해외배송 상품 구매 동의를 확인해 주세요.");
+    throw new Error(ORDER_PURCHASE_CONSENT_REQUIRED_MESSAGE);
   }
 }

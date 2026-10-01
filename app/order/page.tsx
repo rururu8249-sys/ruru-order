@@ -93,7 +93,16 @@ import CustomerToastNotice from "@/components/customer/CustomerToastNotice";
 import CustomerManualAddressPanel from "@/components/customer/CustomerManualAddressPanel";
 import CustomerMissingDetailAddressPanel from "@/components/customer/CustomerMissingDetailAddressPanel";
 import GroupBuyQuickSelect, { type GroupBuyQuickSelectProduct } from "@/components/order/GroupBuyQuickSelect";
-import { noticeBarLine } from "@/lib/noticeBar";
+import OrderPurchaseConsentModal from "@/components/order/OrderPurchaseConsentModal";
+import { noticeBarLine, shouldShowNoticeBar } from "@/lib/noticeBar";
+import {
+  DEFAULT_ORDER_PURCHASE_CONSENT,
+  ORDER_PURCHASE_CONSENT_KEYS,
+  ORDER_PURCHASE_CONSENT_REQUIRED_MESSAGE,
+  orderNeedsPurchaseConsent,
+  parseOrderPurchaseConsentSettings,
+  type OrderPurchaseConsentConfig,
+} from "@/lib/orderPurchaseConsent";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { compareMixOrder, mixSeedForToday } from "@/lib/productMixOrder";
 import { pickVisibleBadges, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_MIN_BUYERS, TOP_SELLER_RANK_PCT, POPULAR_RANK_PCT, HOLDING_MIN_PEOPLE } from "@/lib/productBadgePriority";
@@ -1666,10 +1675,11 @@ export default function OrderPage() {
     } catch { /* 기본 링크 동작 유지 */ }
   };
   const [popupOpen, setPopupOpen] = useState(false);
-  // [2026-08-30] 공지 띠 — 평소엔 이걸로 보이고, 「자세히」를 누르면 위 팝업이 열린다.
-  //   ✕ 로 닫아도 "이번 접속에만" 숨긴다(sessionStorage). 다시 들어오면 또 보인다.
-  //   중요한 공지를 한 번 닫았다고 영영 못 보면 문의가 늘어난다.
-  const [noticeBarHidden, setNoticeBarHidden] = useState(false);
+  const [purchaseConsentConfig, setPurchaseConsentConfig] = useState<OrderPurchaseConsentConfig>(DEFAULT_ORDER_PURCHASE_CONSENT);
+  const [purchaseConsentOpen, setPurchaseConsentOpen] = useState(false);
+  const [checkingPurchaseConsent, setCheckingPurchaseConsent] = useState(false);
+  const [pendingPurchaseConsentSubmit, setPendingPurchaseConsentSubmit] = useState<{ allowMissingDetailAddress?: boolean } | null>(null);
+  const purchaseConsentDecisionRef = useRef(false);
   // [2026-08-30 사장님 지적] 앱설치 배너가 뜨면 밴드 띠를 접게 했더니 밴드가 아예 안 보였다.
   //   밴드 노출은 사장님이 실제로 효과를 보신 부분이라 접지 않는다. 대신 띠 높이를 줄였다.
   // [2026-08-11 사고분석] 기본값을 false 로 둔다.
@@ -2364,6 +2374,7 @@ export default function OrderPage() {
         "popup_notice_fontsize",
         "popup_notice_color",
         "popup_band_url",
+        ...ORDER_PURCHASE_CONSENT_KEYS,
         "product_notice_mode",
         "product_notice_custom",
         ...COMBINE_SHIPPING_SETTING_KEYS,
@@ -2444,6 +2455,7 @@ export default function OrderPage() {
     setPopupNoticeTitle(pTitle);
     setPopupNoticeFontSize(pFont);
     setPopupNoticeColor(pColor);
+    setPurchaseConsentConfig(parseOrderPurchaseConsentSettings(data || []));
     // [2026-08-30 공지 방식 변경] 전체 공지를 매번 팝업으로 덮지 않는다.
     //   · 평소에는 화면 맨 위 「띠」로 계속 보인다 — 손님이 닫을 필요가 없다.
     //   · 팝업은 「처음 들어온 손님」에게만 1회. (밴드 가입 노출은 사장님이 실제로 효과를 보신 부분이라 유지)
@@ -3479,13 +3491,6 @@ export default function OrderPage() {
   const openNoticeBox = () => {
     try { window.dispatchEvent(new Event("ruru-open-notice-box")); } catch { setPopupOpen(true); }
   };
-
-  // [2026-08-30] 공지 띠 — 이번 접속에서 닫았는지 복원 + 앱설치 배너가 떠 있는지 구독
-  useEffect(() => {
-    try {
-      if (sessionStorage.getItem("ruru_notice_bar_hidden") === "1") setNoticeBarHidden(true);
-    } catch { /* 무시 */ }
-  }, []);
 
   // 쪽지함(CustomerSiteAlertPopup)이 안 읽은 개수를 알려오면 하단 메뉴 배지에 반영한다.
   useEffect(() => {
@@ -4959,7 +4964,7 @@ export default function OrderPage() {
     return true;
   };
 
-  const submitOrder = async (options?: { allowMissingDetailAddress?: boolean }) => {
+  const submitOrder = async (options?: { allowMissingDetailAddress?: boolean; purchaseConsentAccepted?: boolean }) => {
     // 연타/중복 제출 차단: 이미 처리 중이면 즉시 무시 (ref는 즉시 반영되어 state보다 안전)
     if (submitInFlightRef.current) return;
     submitInFlightRef.current = true;
@@ -5131,6 +5136,7 @@ export default function OrderPage() {
             typeof window !== "undefined"
               ? (localStorage.getItem("ruru_kakao_id") || "").trim()
               : "",
+          purchase_consent_accepted: options?.purchaseConsentAccepted === true,
         }),
       });
 
@@ -5200,7 +5206,22 @@ export default function OrderPage() {
 
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error: any) {
-      showCustomerNotice("주문서 제출 오류: " + error.message);
+      const message = String(error?.message || "주문 저장 실패");
+      if (message.includes(ORDER_PURCHASE_CONSENT_REQUIRED_MESSAGE)) {
+        try {
+          const decision = await loadLatestPurchaseConsentDecision();
+          if (decision.required) {
+            setPurchaseConsentConfig(decision.config);
+            setPendingPurchaseConsentSubmit({ allowMissingDetailAddress: options?.allowMissingDetailAddress });
+            setPurchaseConsentOpen(true);
+            showCustomerNotice("구매 동의 내용을 확인한 뒤 다시 제출해 주세요.", "warning");
+            return;
+          }
+        } catch (refreshError) {
+          console.warn("구매동의 재확인 실패:", refreshError);
+        }
+      }
+      showCustomerNotice("주문서 제출 오류: " + message);
       // 재시도를 위해 pendingOrderKeyRef는 비우지 않는다(같은 키 재사용 → 서버가 멱등 처리).
     } finally {
       submitInFlightRef.current = false;
@@ -5210,7 +5231,7 @@ export default function OrderPage() {
 
   const submitOrderWithoutDetailAddress = async () => {
     setMissingDetailAddressConfirmOpen(false);
-    await submitOrder({ allowMissingDetailAddress: true });
+    await handleSubmitOrderClick({ allowMissingDetailAddress: true });
   };
 
   const activePaymentBankAccount: OrderBankAccountSnapshot = historicalPaymentBankAccount || done?.bankAccount || {
@@ -5584,9 +5605,46 @@ export default function OrderPage() {
   const buttonBase = "transition-all duration-150 active:scale-[0.97]";
 
 
-  // [정리 2026-07-06] 입금확인 모달(OrderDepositConfirmModal)은 "띄우지 않는" 죽은 코드였음 → 사용 코드 제거
-  const handleSubmitOrderClick = () => {
-    if (!validate()) return;
+  const loadLatestPurchaseConsentDecision = async () => {
+    const orderRows = items
+      .filter((item) => item.product_name.trim())
+      .map((item) => ({ product_id: item.product_id }));
+    const productIds = Array.from(new Set(
+      orderRows.map((row) => String(row.product_id || "").trim()).filter((id) => /^\d+$/.test(id)),
+    ));
+
+    const [settingsResult, productsResult] = await Promise.all([
+      supabase.from("settings").select("key,value").in("key", [...ORDER_PURCHASE_CONSENT_KEYS]),
+      productIds.length > 0
+        ? supabase.from("products").select("id,badge_type,badge_types").in("id", productIds.map(Number))
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    const latestConfig = settingsResult.error
+      ? purchaseConsentConfig
+      : parseOrderPurchaseConsentSettings(settingsResult.data || []);
+    setPurchaseConsentConfig(latestConfig);
+
+    const catalog = new Map<string, BroadcastProduct>();
+    for (const product of [...broadcastProducts, ...groupBuyQuickProductsFromCatalog]) {
+      catalog.set(String(product.id), product);
+    }
+    if (!productsResult.error) {
+      for (const product of productsResult.data || []) {
+        catalog.set(String(product.id), product as BroadcastProduct);
+      }
+    }
+
+    return {
+      config: latestConfig,
+      required: orderNeedsPurchaseConsent(latestConfig.mode, orderRows, catalog),
+    };
+  };
+
+  // 기존 주문 검증을 모두 통과한 뒤, 실제 저장 직전에 최신 구매동의 설정과 상품 배지를 확인한다.
+  const handleSubmitOrderClick = async (options?: { allowMissingDetailAddress?: boolean }) => {
+    if (purchaseConsentDecisionRef.current || submitting) return;
+    if (!validate(options)) return;
     if (!finalSubmitAcknowledged) {
       showCustomerNotice("제출 버튼 바로 위 체크칸을 한 번 눌러 주세요.", "warning");
       return;
@@ -5608,7 +5666,39 @@ export default function OrderPage() {
         }
       }
     } catch { /* 확인창 실패 → 기존 흐름 그대로 */ }
-    void submitOrder();
+
+    purchaseConsentDecisionRef.current = true;
+    setCheckingPurchaseConsent(true);
+    try {
+      const decision = await loadLatestPurchaseConsentDecision();
+      if (decision.required) {
+        setPurchaseConsentConfig(decision.config);
+        setPendingPurchaseConsentSubmit(options || {});
+        setPurchaseConsentOpen(true);
+        return;
+      }
+      void submitOrder({ ...options, purchaseConsentAccepted: false });
+    } catch (error) {
+      console.warn("구매동의 설정 확인 실패:", error);
+      showCustomerNotice("구매 동의 설정을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.", "warning");
+    } finally {
+      purchaseConsentDecisionRef.current = false;
+      setCheckingPurchaseConsent(false);
+    }
+  };
+
+  const cancelPurchaseConsent = () => {
+    if (submitting) return;
+    setPurchaseConsentOpen(false);
+    setPendingPurchaseConsentSubmit(null);
+  };
+
+  const confirmPurchaseConsent = () => {
+    if (submitting) return;
+    const options = pendingPurchaseConsentSubmit || {};
+    setPurchaseConsentOpen(false);
+    setPendingPurchaseConsentSubmit(null);
+    void submitOrder({ ...options, purchaseConsentAccepted: true });
   };
 
   const selectedItemEntries = items
@@ -6236,7 +6326,11 @@ export default function OrderPage() {
   };
 
   // [2026-09-20] 상단 띠(공지·밴드)가 하나라도 떠 있는지 — 앱설치 배너를 접는 판단에만 쓴다. 표시 전용.
-  const noticeStripOn = Boolean(hasSavedInfo && popupNoticeEnabled && popupNoticeText.trim() && !noticeBarHidden);
+  const noticeStripOn = Boolean(hasSavedInfo && shouldShowNoticeBar({
+    bar: popupNoticeBarLine,
+    title: popupNoticeTitle,
+    text: popupNoticeText,
+  }));
   const bandStripOn = Boolean(hasSavedInfo && popupBandUrl);
   const topStripOn = noticeStripOn || bandStripOn;
 
@@ -6275,17 +6369,6 @@ export default function OrderPage() {
               style={{ flexShrink: 0, border: "none", background: "rgba(255,255,255,0.22)", color: "#fff", borderRadius: "999px", padding: "5px 11px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}
             >
               자세히
-            </button>
-            <button
-              type="button"
-              aria-label="공지 접기"
-              onClick={() => {
-                setNoticeBarHidden(true);
-                try { sessionStorage.setItem("ruru_notice_bar_hidden", "1"); } catch { /* 무시 */ }
-              }}
-              style={{ flexShrink: 0, border: "none", background: "none", color: "rgba(255,255,255,0.65)", fontSize: "15px", fontWeight: 700, cursor: "pointer", padding: "0 2px" }}
-            >
-              ✕
             </button>
           </div>
         </div>
@@ -6408,6 +6491,15 @@ export default function OrderPage() {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {purchaseConsentOpen ? (
+        <OrderPurchaseConsentModal
+          config={purchaseConsentConfig}
+          submitting={submitting}
+          onCancel={cancelPurchaseConsent}
+          onConfirm={confirmPurchaseConsent}
+        />
       ) : null}
 
       <CustomerPointGiftPopup />
@@ -7135,19 +7227,19 @@ export default function OrderPage() {
                   aria-disabled={!finalSubmitAcknowledged}
                   onClick={() => {
                     // [2026-08-28 P0-1] 확인 체크가 안 되어 있으면 막기만 하지 말고 그 자리로 데려간다.
-                    if (submitting || customerBlockStatus.blocked) return;
+                    if (submitting || checkingPurchaseConsent || customerBlockStatus.blocked) return;
                     if (!finalSubmitAcknowledged) {
                       const target = document.querySelector<HTMLElement>('[data-final-confirm="true"]');
                       target?.scrollIntoView({ behavior: "smooth", block: "center" });
                       showCustomerNotice("제출 버튼 바로 위 체크칸을 한 번 눌러 주세요.", "warning");
                       return;
                     }
-                    handleSubmitOrderClick();
+                    void handleSubmitOrderClick();
                   }}
-                  disabled={submitting || customerBlockStatus.blocked}
-                  style={{ width: "100%", padding: "14px", background: submitting || customerBlockStatus.blocked || !finalSubmitAcknowledged ? "#cbd5e1" : "#7A1E47", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: submitting || customerBlockStatus.blocked ? "default" : "pointer" }}
+                  disabled={submitting || checkingPurchaseConsent || customerBlockStatus.blocked}
+                  style={{ width: "100%", padding: "14px", background: submitting || checkingPurchaseConsent || customerBlockStatus.blocked || !finalSubmitAcknowledged ? "#cbd5e1" : "#7A1E47", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: submitting || checkingPurchaseConsent || customerBlockStatus.blocked ? "default" : "pointer" }}
                 >
-                  {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : `${won(finalPaymentAmount)} · 주문서 제출`}
+                  {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : checkingPurchaseConsent ? "구매 조건 확인 중..." : `${won(finalPaymentAmount)} · 주문서 제출`}
                 </button>
               </>
             )}

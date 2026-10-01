@@ -18,6 +18,14 @@ import { showAdminConfirm } from "@/lib/adminConfirm";
 import { NOTE_PRESETS, safeSearchTerm } from "@/lib/customerNotePresets";
 import { noteTimeText } from "@/lib/noteTime";
 import { noticeBarLine } from "@/lib/noticeBar";
+import {
+  DEFAULT_ORDER_PURCHASE_CONSENT,
+  ORDER_PURCHASE_CONSENT_KEYS,
+  parseOrderPurchaseConsentSettings,
+  toOrderPurchaseConsentRows,
+  type OrderPurchaseConsentConfig,
+  type OrderPurchaseConsentMode,
+} from "@/lib/orderPurchaseConsent";
 
 /** 이 화면이 저장하는 키 — 여기 없는 키는 절대 건드리지 않는다. */
 const NOTICE_KEYS = [
@@ -29,6 +37,7 @@ const NOTICE_KEYS = [
   "popup_notice_color",
   "popup_band_url",
   "notice_text",
+  ...ORDER_PURCHASE_CONSENT_KEYS,
 ] as const;
 
 const DEFAULT_BAND_URL = "https://band.us/@ruru8249";
@@ -78,6 +87,7 @@ export default function AdminLiveNoticePanel() {
   const [popupColor, setPopupColor] = useState("#7B2D43");
   const [popupBandUrl, setPopupBandUrl] = useState(DEFAULT_BAND_URL);
   const [noticeText, setNoticeText] = useState("");
+  const [purchaseConsent, setPurchaseConsent] = useState<OrderPurchaseConsentConfig>(DEFAULT_ORDER_PURCHASE_CONSENT);
 
   const [tab, setTab] = useState<PanelTab>("customer");
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -118,6 +128,7 @@ export default function AdminLiveNoticePanel() {
         setPopupColor(clean(get("popup_notice_color")) || "#7B2D43");
         setPopupBandUrl(clean(get("popup_band_url")) || DEFAULT_BAND_URL);
         setNoticeText(String(get("notice_text") ?? ""));
+        setPurchaseConsent(parseOrderPurchaseConsentSettings(rows));
       } finally {
         if (alive) setLoading(false);
       }
@@ -138,6 +149,7 @@ export default function AdminLiveNoticePanel() {
           { key: "popup_notice_color", value: popupColor },
           { key: "popup_band_url", value: popupBandUrl.trim() },
           { key: "notice_text", value: noticeText },
+          ...toOrderPurchaseConsentRows(purchaseConsent),
         ],
         { onConflict: "key" },
       );
@@ -513,6 +525,83 @@ export default function AdminLiveNoticePanel() {
                 <input value={popupBandUrl} onChange={(e) => setPopupBandUrl(e.target.value)} placeholder={DEFAULT_BAND_URL} className={input} />
                 <span className={help}>비우면 밴드 버튼이 숨겨집니다.</span>
               </label>
+            </div>
+
+            {/* 주문 최종 제출 전 구매 동의 — 접속 팝업과 별도 설정 */}
+            <div className={card}>
+              <div className="text-sm font-black text-ink">✅ 주문 전 구매 동의 팝업</div>
+              <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
+                손님이 주문서를 최종 제출할 때 뜹니다. <b className="text-ink-soft">자동</b>은 실제 상품의
+                <b className="text-ink-soft"> ✈️ 해외배송 배지</b>를 확인해 해당 주문에만 표시합니다.
+              </div>
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                {([
+                  ["auto", "자동", "해외배송 상품만"],
+                  ["all", "모든 주문", "국내·해외 모두"],
+                  ["off", "사용 안 함", "팝업 끄기"],
+                ] as [OrderPurchaseConsentMode, string, string][]).map(([mode, title, desc]) => {
+                  const selected = purchaseConsent.mode === mode;
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setPurchaseConsent((current) => ({ ...current, mode }))}
+                      className={`rounded-xl border px-3 py-3 text-left transition ${selected ? "border-rose-deep bg-rose-soft text-rose-deep" : "border-line bg-surface text-ink-soft"}`}
+                    >
+                      <span className="block text-[13px] font-black">{selected ? "● " : "○ "}{title}</span>
+                      <span className="mt-1 block text-[11px] font-bold text-ink-mute">{desc}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-3 rounded-xl border border-ok-line bg-ok-bg px-3 py-2 text-[11px] font-bold leading-5 text-ok-tx">
+                설정을 한 번도 저장하지 않아도 기본값은 「자동 · 해외배송 상품만」입니다. 사용 안 함은 관리자가 명시적으로 선택하고 저장할 때만 적용됩니다.
+              </div>
+
+              <label className="mt-3 block">
+                <span className={label}>팝업 제목</span>
+                <input
+                  value={purchaseConsent.title}
+                  onChange={(e) => setPurchaseConsent((current) => ({ ...current, title: e.target.value }))}
+                  className={input}
+                />
+              </label>
+
+              <label className="mt-3 block">
+                <span className={label}>필수 확인 내용</span>
+                <textarea
+                  value={purchaseConsent.text}
+                  onChange={(e) => setPurchaseConsent((current) => ({ ...current, text: e.target.value }))}
+                  rows={14}
+                  className="mt-1 w-full resize-y rounded-xl border border-line bg-surface p-3 text-sm font-bold leading-relaxed text-ink outline-none focus:border-rose-deep"
+                />
+              </label>
+
+              <label className="mt-3 block">
+                <span className={label}>필수 동의 체크 문구</span>
+                <input
+                  value={purchaseConsent.checkboxLabel}
+                  onChange={(e) => setPurchaseConsent((current) => ({ ...current, checkboxLabel: e.target.value }))}
+                  className={input}
+                />
+              </label>
+
+              <div className="mt-3 rounded-2xl border border-line bg-surface-2 p-4">
+                <div className="text-center text-base font-black text-ink">{purchaseConsent.title}</div>
+                <div className="mt-3 max-h-52 overflow-y-auto whitespace-pre-line rounded-xl bg-surface p-3 text-[12px] font-bold leading-6 text-ink-soft">
+                  {purchaseConsent.text}
+                </div>
+                <div className="mt-3 flex items-start gap-2 rounded-xl border border-rose-line bg-rose-soft px-3 py-3">
+                  <span className="mt-0.5 h-4 w-4 shrink-0 rounded border border-rose-deep bg-surface" />
+                  <span className="text-[12px] font-black leading-5 text-ink">{purchaseConsent.checkboxLabel}</span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="rounded-xl border border-line bg-surface py-2.5 text-center text-[12px] font-black text-ink-soft">취소</div>
+                  <div className="rounded-xl bg-rose-deep py-2.5 text-center text-[12px] font-black text-white">동의하고 주문하기</div>
+                </div>
+              </div>
             </div>
 
             {/* 상시 안내 문구 */}
