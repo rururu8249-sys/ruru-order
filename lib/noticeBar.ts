@@ -16,6 +16,19 @@ const DIVIDER = /^[-─—]{3,}$/;
 
 export const NOTICE_BAR_MAX = 34;
 
+type NoticeBarVisibilityInput = {
+  bar: unknown;
+  title: unknown;
+  text: unknown;
+  hidden?: boolean;
+};
+
+/** 접속 팝업 ON/OFF와 무관하게, 실제 바 원문이 있을 때만 상단 공지를 보인다. */
+export function shouldShowNoticeBar(input: NoticeBarVisibilityInput): boolean {
+  if (input.hidden === true) return false;
+  return [input.bar, input.title, input.text].some((value) => String(value ?? "").trim().length > 0);
+}
+
 export function noticeBarLine(title: unknown, text: unknown, max: number = NOTICE_BAR_MAX): string {
   const cut = (v: string) => (v.length > max ? v.slice(0, max) + "…" : v);
 

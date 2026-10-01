@@ -2,7 +2,7 @@
 // 공지 띠 한 줄 뽑기 검증 — lib/noticeBar.ts 의 실제 함수를 불러서 확인한다.
 //
 // 막으려는 사고: 띠가 두 줄로 늘어나 상품을 가리는 것 / 📢 가 두 번 나오는 것 / 빈 띠가 뜨는 것
-import { noticeBarLine, NOTICE_BAR_MAX } from "../lib/noticeBar.ts";
+import { noticeBarLine, NOTICE_BAR_MAX, shouldShowNoticeBar } from "../lib/noticeBar.ts";
 
 let fail = 0;
 const eq = (g, w, l) => { if (g === w) console.log(`✅ ${l} → ${JSON.stringify(g)}`); else { console.log(`❌ ${l}\n   나온값: ${JSON.stringify(g)}\n   기대값: ${JSON.stringify(w)}`); fail = 1; } };
@@ -25,6 +25,13 @@ eq(noticeBarLine("", ""), "새 공지가 있어요", "제목·본문 다 비면 
 eq(noticeBarLine(null, null), "새 공지가 있어요", "값이 없어도 안 깨진다");
 eq(noticeBarLine("", "---\n---"), "새 공지가 있어요", "구분선만 있으면 기본 문구");
 eq(noticeBarLine("", "   \n  "), "새 공지가 있어요", "공백만 있으면 기본 문구");
+
+console.log("\n── 접속 팝업과 상단 공지 바 분리 ──");
+eq(shouldShowNoticeBar({ bar: "배송 안내", title: "", text: "", hidden: false }), true, "팝업 ON 값 없이도 바 문구가 있으면 표시");
+eq(shouldShowNoticeBar({ bar: "", title: "공지", text: "", hidden: false }), true, "바 전용 문구가 없으면 제목으로 표시");
+eq(shouldShowNoticeBar({ bar: "", title: "", text: "본문", hidden: false }), true, "제목도 없으면 본문으로 표시");
+eq(shouldShowNoticeBar({ bar: "", title: "", text: "", hidden: false }), false, "실제 문구가 전혀 없으면 빈 바를 표시하지 않음");
+eq(shouldShowNoticeBar({ bar: "배송 안내", title: "", text: "", hidden: true }), false, "명시적으로 숨긴 경우만 표시하지 않음");
 
 console.log("\n── 길이 제한 (띠가 두 줄 되면 안 됨) ──");
 {
