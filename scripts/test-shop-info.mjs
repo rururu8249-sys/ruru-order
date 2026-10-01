@@ -16,6 +16,10 @@ function equal(actual, expected, message) {
   if (actual !== expected) throw new Error(`${message}: expected=${String(expected)} actual=${String(actual)}`);
 }
 
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
 // 1) 아무것도 저장 안 됨 → 기본값(예전 하드코딩값) 그대로
 {
   const info = parseShopInfo([]);
@@ -71,7 +75,16 @@ function equal(actual, expected, message) {
 
 // 4) 저장 전 검사
 {
-  const base = { ...SHOP_INFO_DEFAULTS };
+  // 구버전 관리자 번들은 구조화 계좌 필드 없이 flat 3키만 보낸다.
+  const base = {
+    contactType: SHOP_INFO_DEFAULTS.contactType,
+    contactValue: SHOP_INFO_DEFAULTS.contactValue,
+    adminChatUrl: SHOP_INFO_DEFAULTS.adminChatUrl,
+    paysterUrl: SHOP_INFO_DEFAULTS.paysterUrl,
+    bankName: SHOP_INFO_DEFAULTS.bankName,
+    bankAccount: SHOP_INFO_DEFAULTS.bankAccount,
+    bankHolder: SHOP_INFO_DEFAULTS.bankHolder,
+  };
   equal(validateShopInfo(base).ok, true, "기본값은 통과");
   equal(validateShopInfo({ ...base, contactType: "kakao_id", contactValue: "ab" }).ok, false, "ID 2자 거부");
   equal(validateShopInfo({ ...base, contactType: "kakao_id", contactValue: "ruru.live_1" }).ok, true, "ID 형식 통과");
@@ -84,9 +97,95 @@ function equal(actual, expected, message) {
   const ok = validateShopInfo({ ...base, bankAccount: " 1234-5678 ", adminChatUrl: "" });
   equal(ok.ok && ok.value.bankAccount, "1234-5678", "계좌 공백 정리");
   equal(validateShopInfo(null).ok, false, "본문 없으면 거부");
-  const rows = toShopInfoRows(base);
-  equal(rows.length, 7, "저장 줄 7개");
+  const checkedBase = validateShopInfo(base);
+  assert(checkedBase.ok, "구버전 flat 설정은 구조화 설정으로 변환되어야 한다");
+  const rows = toShopInfoRows(checkedBase.value);
+  equal(rows.length, 8, "저장 줄 8개");
   equal(rows.every((r) => r.key.startsWith("shop_")), true, "shop_ 키만 쓴다");
+}
+
+// 5) 예전 7키만 있어도 기본계좌 1개 + 전체고객 모드로 안전하게 마이그레이션
+{
+  const legacy = parseShopInfo([
+    { key: "shop_bank_name", value: "국민은행" },
+    { key: "shop_bank_account", value: "123456-78-901234" },
+    { key: "shop_bank_holder", value: "홍길동" },
+  ]);
+  assert(Array.isArray(legacy.bankAccounts), "legacy 설정도 bankAccounts 배열을 제공해야 한다");
+  equal(legacy.bankAccounts.length, 1, "legacy 계좌는 primary 한 개");
+  equal(legacy.bankAccounts[0].id, "primary", "legacy 계좌 id");
+  equal(legacy.bankAccounts[0].enabled, true, "legacy 계좌 활성");
+  equal(legacy.bankRouting.mode, "all", "legacy는 전체고객 모드");
+  equal(legacy.bankRouting.allAccountId, "primary", "legacy 전체 계좌");
+}
+
+// 6) v1 설정 두 계좌 + 회원구분 라우팅 해석
+const splitConfig = {
+  version: 1,
+  accounts: [
+    { id: "primary", enabled: true, label: "기존 계좌", bankName: "국민은행", bankAccount: "111-222-333333", bankHolder: "홍길동" },
+    { id: "secondary", enabled: true, label: "신규 계좌", bankName: "신한은행", bankAccount: "444-555-666666", bankHolder: "김루루" },
+  ],
+  routing: { mode: "split", allAccountId: "primary", existingAccountId: "primary", firstOrderAccountId: "secondary" },
+};
+{
+  const parsed = parseShopInfo([
+    { key: "shop_bank_config_v1", value: JSON.stringify(splitConfig) },
+    { key: "shop_bank_name", value: "무시은행" },
+    { key: "shop_bank_account", value: "999999" },
+    { key: "shop_bank_holder", value: "무시" },
+  ]);
+  equal(parsed.bankAccounts.length, 2, "v1 계좌 두 개");
+  equal(parsed.bankRouting.mode, "split", "회원 구분 모드");
+  equal(parsed.bankRouting.firstOrderAccountId, "secondary", "첫 주문 계좌");
+  equal(parsed.bankName, "국민은행", "flat 은 primary 동기화");
+  equal(bankLine(parsed.bankAccounts[1]), "신한은행 444-555-666666 (김루루)", "명시 계좌 한 줄");
+}
+
+// 7) 직렬화는 v1 JSON + legacy primary 3키를 함께 저장
+{
+  const checked = validateShopInfo({ ...SHOP_INFO_DEFAULTS, bankAccounts: splitConfig.accounts, bankRouting: splitConfig.routing });
+  assert(checked.ok, "정상 split 설정은 통과해야 한다");
+  const rows = toShopInfoRows(checked.value);
+  equal(rows.length, 8, "설정 줄 8개");
+  const configRow = rows.find((r) => r.key === "shop_bank_config_v1");
+  assert(configRow, "v1 설정 줄이 있어야 한다");
+  equal(configRow.value, JSON.stringify(splitConfig), "v1 JSON 결정적 직렬화");
+  equal(rows.find((r) => r.key === "shop_bank_name")?.value, "국민은행", "legacy 은행은 primary와 동기화");
+  equal(rows.find((r) => r.key === "shop_bank_account")?.value, "111-222-333333", "legacy 번호는 primary와 동기화");
+  equal(rows.find((r) => r.key === "shop_bank_holder")?.value, "홍길동", "legacy 예금주는 primary와 동기화");
+}
+
+// 8) 잘못된 계좌/라우팅은 저장 거부
+{
+  const third = { id: "third", enabled: true, label: "세 번째", bankName: "우리은행", bankAccount: "777777", bankHolder: "박세번째" };
+  equal(validateShopInfo({ ...SHOP_INFO_DEFAULTS, bankAccounts: [...splitConfig.accounts, third], bankRouting: splitConfig.routing }).ok, false, "세 번째 계좌 거부");
+  equal(validateShopInfo({ ...SHOP_INFO_DEFAULTS, bankAccounts: [splitConfig.accounts[0], { ...splitConfig.accounts[1], id: "primary" }], bankRouting: splitConfig.routing }).ok, false, "중복 id 거부");
+  equal(validateShopInfo({ ...SHOP_INFO_DEFAULTS, bankAccounts: [{ ...splitConfig.accounts[0], bankAccount: "12ab" }], bankRouting: { ...splitConfig.routing, mode: "all" } }).ok, false, "잘못된 계좌번호 거부");
+  equal(validateShopInfo({ ...SHOP_INFO_DEFAULTS, bankAccounts: [splitConfig.accounts[0]], bankRouting: splitConfig.routing }).ok, false, "없는 secondary 참조 거부");
+  equal(validateShopInfo({ ...SHOP_INFO_DEFAULTS, bankAccounts: [splitConfig.accounts[0], { ...splitConfig.accounts[1], enabled: false }], bankRouting: splitConfig.routing }).ok, false, "비활성 secondary 참조 거부");
+}
+
+// 9) split의 두 대상이 같은 활성 계좌여도 허용
+{
+  const same = validateShopInfo({
+    ...SHOP_INFO_DEFAULTS,
+    bankAccounts: [splitConfig.accounts[0]],
+    bankRouting: { mode: "split", allAccountId: "primary", existingAccountId: "primary", firstOrderAccountId: "primary" },
+  });
+  equal(same.ok, true, "회원구분 두 대상 같은 계좌 허용");
+}
+
+// 10) 저장된 JSON이 깨지면 화면은 legacy 3키로 안전 복구
+{
+  const parsed = parseShopInfo([
+    { key: "shop_bank_config_v1", value: "{broken" },
+    { key: "shop_bank_name", value: "하나은행" },
+    { key: "shop_bank_account", value: "123-456-789" },
+    { key: "shop_bank_holder", value: "복구계좌" },
+  ]);
+  equal(parsed.bankAccounts.length, 1, "깨진 JSON은 legacy 한 계좌");
+  equal(parsed.bankName, "하나은행", "깨진 JSON legacy 복구");
 }
 
 console.log("shop info tests passed");

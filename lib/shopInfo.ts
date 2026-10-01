@@ -12,6 +12,25 @@
 // [2026-09-08 사장님] 오픈채팅은 안 씀 → 채널 / 카카오톡 ID 두 가지만
 export type ShopContactType = "channel" | "kakao_id";
 
+export type ShopBankAccountId = "primary" | "secondary";
+export type ShopBankAudienceMode = "all" | "split";
+
+export type ShopBankAccount = {
+  id: ShopBankAccountId;
+  enabled: boolean;
+  label: string;
+  bankName: string;
+  bankAccount: string;
+  bankHolder: string;
+};
+
+export type ShopBankRouting = {
+  mode: ShopBankAudienceMode;
+  allAccountId: ShopBankAccountId;
+  existingAccountId: ShopBankAccountId;
+  firstOrderAccountId: ShopBankAccountId;
+};
+
 export type ShopInfo = {
   /** 손님이 문의하는 방법 */
   contactType: ShopContactType;
@@ -25,6 +44,9 @@ export type ShopInfo = {
   bankName: string;
   bankAccount: string;
   bankHolder: string;
+  /** 최대 2개. primary는 항상 존재·활성, secondary는 선택 사항 */
+  bankAccounts: ShopBankAccount[];
+  bankRouting: ShopBankRouting;
 };
 
 export const SHOP_INFO_KEYS = [
@@ -35,8 +57,27 @@ export const SHOP_INFO_KEYS = [
   "shop_bank_name",
   "shop_bank_account",
   "shop_bank_holder",
+  "shop_bank_config_v1",
 ] as const;
 export type ShopInfoKey = (typeof SHOP_INFO_KEYS)[number];
+
+export const SHOP_BANK_CONFIG_VERSION = 1 as const;
+
+const DEFAULT_PRIMARY_BANK: ShopBankAccount = {
+  id: "primary",
+  enabled: true,
+  label: "기존 계좌",
+  bankName: "새마을금고",
+  bankAccount: "9002186993725",
+  bankHolder: "유혜원",
+};
+
+const DEFAULT_BANK_ROUTING: ShopBankRouting = {
+  mode: "all",
+  allAccountId: "primary",
+  existingAccountId: "primary",
+  firstOrderAccountId: "primary",
+};
 
 /** 2026-09-08 이전 하드코딩값 그대로. 설정이 없으면 이 값이 나간다. */
 export const SHOP_INFO_DEFAULTS: ShopInfo = {
@@ -45,9 +86,11 @@ export const SHOP_INFO_DEFAULTS: ShopInfo = {
   adminChatUrl:
     "https://business.kakao.com/_RMxaqX/chats?t_src=business_partnercenter&t_ch=lnb&t_obj=%EB%82%B4%EC%B1%84%ED%8C%85_%ED%81%B4%EB%A6%AD",
   paysterUrl: "https://user.service.payster.co.kr/#/payment/smspayment",
-  bankName: "새마을금고",
-  bankAccount: "9002186993725",
-  bankHolder: "유혜원",
+  bankName: DEFAULT_PRIMARY_BANK.bankName,
+  bankAccount: DEFAULT_PRIMARY_BANK.bankAccount,
+  bankHolder: DEFAULT_PRIMARY_BANK.bankHolder,
+  bankAccounts: [{ ...DEFAULT_PRIMARY_BANK }],
+  bankRouting: { ...DEFAULT_BANK_ROUTING },
 };
 
 export const CONTACT_TYPE_LABEL: Record<ShopContactType, string> = {
@@ -63,6 +106,10 @@ export const CONTACT_TYPE_SHORT: Record<ShopContactType, string> = {
 
 function clean(value: unknown) {
   return String(value ?? "").trim();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 export function isHttpUrl(value: string) {
@@ -111,14 +158,48 @@ export function parseShopInfo(rows: ReadonlyArray<{ key: string; value: unknown 
   const bankHolder = get("shop_bank_holder");
   const bankOk = Boolean(bankName && bankHolder && isBankAccountNumber(bankAccount));
 
+  const legacyPrimary: ShopBankAccount = bankOk
+    ? {
+        id: "primary",
+        enabled: true,
+        label: "기존 계좌",
+        bankName,
+        bankAccount,
+        bankHolder,
+      }
+    : { ...DEFAULT_PRIMARY_BANK };
+
+  let bankAccounts: ShopBankAccount[] = [legacyPrimary];
+  let bankRouting: ShopBankRouting = { ...DEFAULT_BANK_ROUTING };
+  const bankConfigRaw = get("shop_bank_config_v1");
+
+  if (bankConfigRaw) {
+    try {
+      const parsed = JSON.parse(bankConfigRaw) as unknown;
+      if (isRecord(parsed) && Number(parsed.version) === SHOP_BANK_CONFIG_VERSION) {
+        const checked = validateBankConfiguration(parsed.accounts, parsed.routing);
+        if (checked.ok) {
+          bankAccounts = checked.accounts;
+          bankRouting = checked.routing;
+        }
+      }
+    } catch {
+      // 저장값이 깨져도 운영 화면은 기존 3키 계좌로 안전하게 복구한다.
+    }
+  }
+
+  const primary = bankAccounts.find((account) => account.id === "primary") || legacyPrimary;
+
   return {
     contactType,
     contactValue,
     adminChatUrl,
     paysterUrl,
-    bankName: bankOk ? bankName : SHOP_INFO_DEFAULTS.bankName,
-    bankAccount: bankOk ? bankAccount : SHOP_INFO_DEFAULTS.bankAccount,
-    bankHolder: bankOk ? bankHolder : SHOP_INFO_DEFAULTS.bankHolder,
+    bankName: primary.bankName,
+    bankAccount: primary.bankAccount,
+    bankHolder: primary.bankHolder,
+    bankAccounts,
+    bankRouting,
   };
 }
 
@@ -129,6 +210,21 @@ export function isBankAccountNumber(value: string) {
 
 /** ShopInfo → settings upsert 줄들 */
 export function toShopInfoRows(info: ShopInfo): Array<{ key: ShopInfoKey; value: string }> {
+  const accounts = info.bankAccounts.map((account) => ({
+    id: account.id,
+    enabled: account.enabled,
+    label: account.label,
+    bankName: account.bankName,
+    bankAccount: account.bankAccount,
+    bankHolder: account.bankHolder,
+  }));
+  const routing = {
+    mode: info.bankRouting.mode,
+    allAccountId: info.bankRouting.allAccountId,
+    existingAccountId: info.bankRouting.existingAccountId,
+    firstOrderAccountId: info.bankRouting.firstOrderAccountId,
+  };
+
   return [
     { key: "shop_contact_type", value: info.contactType },
     { key: "shop_contact_value", value: info.contactValue },
@@ -137,10 +233,77 @@ export function toShopInfoRows(info: ShopInfo): Array<{ key: ShopInfoKey; value:
     { key: "shop_bank_name", value: info.bankName },
     { key: "shop_bank_account", value: info.bankAccount },
     { key: "shop_bank_holder", value: info.bankHolder },
+    { key: "shop_bank_config_v1", value: JSON.stringify({ version: SHOP_BANK_CONFIG_VERSION, accounts, routing }) },
   ];
 }
 
 export type ShopInfoValidation = { ok: true; value: ShopInfo } | { ok: false; message: string };
+
+type BankConfigurationValidation =
+  | { ok: true; accounts: ShopBankAccount[]; routing: ShopBankRouting }
+  | { ok: false; message: string };
+
+function normalizeAccountId(value: unknown): ShopBankAccountId | null {
+  return value === "primary" || value === "secondary" ? value : null;
+}
+
+function validateBankConfiguration(accountsInput: unknown, routingInput: unknown): BankConfigurationValidation {
+  if (!Array.isArray(accountsInput) || accountsInput.length < 1 || accountsInput.length > 2) {
+    return { ok: false, message: "입금계좌는 기존 계좌와 추가 계좌를 합쳐 최대 2개까지 등록할 수 있습니다." };
+  }
+
+  const accounts: ShopBankAccount[] = [];
+  const usedIds = new Set<ShopBankAccountId>();
+
+  for (const [index, raw] of accountsInput.entries()) {
+    if (!isRecord(raw)) return { ok: false, message: `${index + 1}번 계좌 정보가 올바르지 않습니다.` };
+    const id = normalizeAccountId(raw.id);
+    if (!id) return { ok: false, message: "계좌 구분은 기존 계좌 또는 추가 계좌만 사용할 수 있습니다." };
+    if (usedIds.has(id)) return { ok: false, message: `${id === "primary" ? "기존" : "추가"} 계좌가 중복되었습니다.` };
+    usedIds.add(id);
+
+    const enabled = raw.enabled !== false;
+    const label = clean(raw.label) || (id === "primary" ? "기존 계좌" : "추가 계좌");
+    const bankName = clean(raw.bankName);
+    const bankAccount = clean(raw.bankAccount).replace(/\s+/g, "");
+    const bankHolder = clean(raw.bankHolder);
+
+    if (label.length > 30) return { ok: false, message: `${label.slice(0, 10)} 계좌 이름은 30자까지 적어 주세요.` };
+    if (enabled) {
+      if (!bankName || bankName.length > 30) return { ok: false, message: `${label}의 은행 이름을 적어 주세요. (30자까지)` };
+      if (!isBankAccountNumber(bankAccount)) return { ok: false, message: `${label}의 계좌번호는 숫자(하이픈 포함 가능) 6자리 이상으로 적어 주세요.` };
+      if (!bankHolder || bankHolder.length > 30) return { ok: false, message: `${label}의 예금주를 적어 주세요. (30자까지)` };
+    }
+
+    accounts.push({ id, enabled, label, bankName, bankAccount, bankHolder });
+  }
+
+  accounts.sort((a, b) => (a.id === "primary" ? -1 : b.id === "primary" ? 1 : 0));
+  const primary = accounts.find((account) => account.id === "primary");
+  if (!primary || !primary.enabled) return { ok: false, message: "기존 계좌는 삭제하거나 비활성화할 수 없습니다." };
+  if (!isRecord(routingInput)) return { ok: false, message: "고객별 계좌 노출 방식을 선택해 주세요." };
+
+  const mode = routingInput.mode;
+  if (mode !== "all" && mode !== "split") return { ok: false, message: "계좌 노출 방식은 전체 고객 또는 회원 구분 중에서 선택해 주세요." };
+
+  const allAccountId = normalizeAccountId(routingInput.allAccountId);
+  const existingAccountId = normalizeAccountId(routingInput.existingAccountId);
+  const firstOrderAccountId = normalizeAccountId(routingInput.firstOrderAccountId);
+  if (!allAccountId || !existingAccountId || !firstOrderAccountId) {
+    return { ok: false, message: "고객에게 보여줄 계좌를 모두 선택해 주세요." };
+  }
+
+  const enabledIds = new Set(accounts.filter((account) => account.enabled).map((account) => account.id));
+  const referenced = mode === "all" ? [allAccountId] : [existingAccountId, firstOrderAccountId];
+  const missing = referenced.find((id) => !enabledIds.has(id));
+  if (missing) return { ok: false, message: `${missing === "primary" ? "기존" : "추가"} 계좌가 없거나 비활성 상태라 선택할 수 없습니다.` };
+
+  return {
+    ok: true,
+    accounts,
+    routing: { mode, allAccountId, existingAccountId, firstOrderAccountId },
+  };
+}
 
 /** 저장 전 검사 — 화면(설정 탭)과 서버(API)가 같은 함수를 쓴다 */
 export function validateShopInfo(input: Partial<Record<keyof ShopInfo, unknown>> | null | undefined): ShopInfoValidation {
@@ -168,20 +331,36 @@ export function validateShopInfo(input: Partial<Record<keyof ShopInfo, unknown>>
   if (!isHttpUrl(paysterUrl)) {
     return { ok: false, message: "카드결제(페이스터) 주소는 https:// 로 시작하는 주소여야 합니다." };
   }
-  if (!bankName || bankName.length > 30) return { ok: false, message: "은행 이름을 적어 주세요. (30자까지)" };
-  if (!isBankAccountNumber(bankAccount)) return { ok: false, message: "계좌번호는 숫자(하이픈 포함 가능) 6자리 이상으로 적어 주세요." };
-  if (!bankHolder || bankHolder.length > 30) return { ok: false, message: "예금주를 적어 주세요. (30자까지)" };
+  const hasStructuredBankConfig = Array.isArray(src.bankAccounts) || src.bankRouting !== undefined;
+  const bankConfiguration = hasStructuredBankConfig
+    ? validateBankConfiguration(src.bankAccounts, src.bankRouting)
+    : validateBankConfiguration(
+        [{ id: "primary", enabled: true, label: "기존 계좌", bankName, bankAccount, bankHolder }],
+        DEFAULT_BANK_ROUTING,
+      );
+  if (!bankConfiguration.ok) return { ok: false, message: bankConfiguration.message };
+  const primary = bankConfiguration.accounts.find((account) => account.id === "primary")!;
 
   return {
     ok: true,
-    value: { contactType, contactValue, adminChatUrl, paysterUrl, bankName, bankAccount, bankHolder },
+    value: {
+      contactType,
+      contactValue,
+      adminChatUrl,
+      paysterUrl,
+      bankName: primary.bankName,
+      bankAccount: primary.bankAccount,
+      bankHolder: primary.bankHolder,
+      bankAccounts: bankConfiguration.accounts,
+      bankRouting: bankConfiguration.routing,
+    },
   };
 }
 
 // ───────────── 손님 화면 문구 ─────────────
 
 /** "새마을금고 9002186993725 (유혜원)" 꼴 — 쪽지·복사 문구용 */
-export function bankLine(info: ShopInfo): string {
+export function bankLine(info: Pick<ShopInfo, "bankName" | "bankAccount" | "bankHolder"> | ShopBankAccount): string {
   return `${info.bankName} ${info.bankAccount} (${info.bankHolder})`;
 }
 
