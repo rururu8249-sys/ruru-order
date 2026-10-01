@@ -8,6 +8,13 @@ const migrationName = (await readdir(new URL("../supabase/migrations/", import.m
   .find((name) => name.endsWith("_bank_account_routing.sql"));
 assert.ok(migrationName, "bank account routing migration이 필요하다");
 const migrationSql = await readFile(new URL(`../supabase/migrations/${migrationName}`, import.meta.url), "utf8");
+const hotfixMigrationName = (await readdir(new URL("../supabase/migrations/", import.meta.url)))
+  .find((name) => name.endsWith("_remove_missing_payment_status_reference.sql"));
+assert.ok(hotfixMigrationName, "payment_status 누락 스키마용 핫픽스 migration이 필요하다");
+const hotfixMigrationSql = await readFile(
+  new URL(`../supabase/migrations/${hotfixMigrationName}`, import.meta.url),
+  "utf8",
+);
 const verificationSql = await readFile(new URL("../supabase/sql/check/bank_account_routing_verification.sql", import.meta.url), "utf8");
 
 const db = new PGlite();
@@ -30,7 +37,6 @@ await db.exec(`
     kakao_id text,
     is_deleted boolean default false,
     is_test_order boolean default false,
-    payment_status text,
     order_manage_status text,
     order_status text,
     admin_status text,
@@ -74,6 +80,7 @@ await db.exec(`
 `);
 
 await db.exec(migrationSql);
+await db.exec(hotfixMigrationSql);
 
 const primary = { id: "primary", enabled: true, label: "기존 계좌", bankName: "국민은행", bankAccount: "111-222-333333", bankHolder: "홍길동" };
 const secondary = { id: "secondary", enabled: true, label: "추가 계좌", bankName: "신한은행", bankAccount: "444-555-666666", bankHolder: "김루루" };
