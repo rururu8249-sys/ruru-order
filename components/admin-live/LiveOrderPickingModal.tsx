@@ -294,19 +294,19 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   const renderRow = ({ panel, item }: PickingRow) => {
     const done = pickedIds.has(item.id);
     return (
-      <div key={item.id} className={`grid grid-cols-[64px_minmax(0,1fr)] items-center gap-3 p-3 sm:grid-cols-[64px_minmax(0,1fr)_104px] ${done ? "bg-ok-bg/60" : "bg-surface"}`}>
+      <div key={item.id} className={`grid grid-cols-[56px_minmax(0,1fr)_92px] items-center gap-2 px-3 py-2 ${done ? "bg-ok-bg/60" : "bg-surface"}`}>
         {itemPhoto[item.id] ? (
           /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={itemPhoto[item.id]} alt={item.productName} className="h-16 w-16 shrink-0 rounded-lg border border-line object-cover" />
-        ) : <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-[11px] text-ink-mute">사진 없음</span>}
+          <img src={itemPhoto[item.id]} alt={item.productName} className="h-14 w-14 shrink-0 rounded-lg border border-line object-cover" />
+        ) : <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-[11px] text-ink-mute">사진 없음</span>}
         <div className="min-w-0 flex-1">
-          <div className="break-words text-[16px] font-black text-ink">{item.productName}</div>
-          <div className="mt-1 break-words text-[16px] font-black text-rose-deep">{item.optionText || "기본 옵션"}</div>
+          {viewMode === "order" ? <div className="break-words text-[15px] font-black text-ink">{item.productName}</div> : null}
+          <div className="break-words text-[15px] font-black text-rose-deep">{item.optionText || "기본 옵션"}</div>
           <div className="mt-1 text-[12px] font-bold text-ink-soft">{panel.nickname}{panel.name && panel.name !== panel.nickname ? ` · ${panel.name}` : ""} · 주문 #{item.id}</div>
           {!panel.paid ? <span className="mt-1 inline-block rounded bg-warn-bg px-2 py-1 text-[12px] font-black text-[var(--color-danger-tx)]">미결제 · 조회만 가능</span> : null}
         </div>
-        <div className="col-span-2 flex items-center justify-between gap-2 border-t border-line pt-2 text-right sm:col-span-1 sm:block sm:border-t-0 sm:pt-0">
-          <div className="text-[22px] font-black text-ink"><span className="mr-2 text-[12px] font-bold text-ink-soft sm:hidden">확인할 수량</span>{item.qty}<span className="text-[12px]">개</span></div>
+        <div className="text-right">
+          <div className="text-[20px] font-black text-ink">{item.qty}<span className="text-[12px]">개</span></div>
           <button type="button" role="checkbox" aria-checked={done} aria-label={`${panel.nickname} ${item.productName} ${item.optionText} ${item.qty}개 ${done ? "챙김 해제" : "챙김"}`}
             disabled={blocked || !panel.paid} onClick={() => updatePicked([item.id], !pickedRef.current.has(item.id))}
             className={`mt-1 flex min-h-[44px] min-w-[92px] items-center justify-center gap-2 rounded-lg border-2 px-2 text-[13px] font-black disabled:opacity-50 ${done ? "border-ok-tx bg-[var(--color-ok-tx)] text-white" : "border-line bg-surface text-ink-soft"}`}>
@@ -319,40 +319,43 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-2 sm:p-4">
-      <div role="dialog" aria-modal="true" aria-label="물건챙기기" className="flex h-[94vh] w-[min(960px,98vw)] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line p-4">
-          <div className="min-w-0"><h2 className="text-[18px] font-black text-rose-deep">물건챙기기</h2><div className="break-words text-[12px] font-bold text-ink-soft">작업 범위: {title} · 취소·챙기기 제외 주문 제외</div></div>
-          <button type="button" disabled={saving} onClick={onClose} aria-label="닫기" className="h-11 w-11 rounded-full bg-surface-2 text-[22px] disabled:opacity-40">×</button>
+      <div role="dialog" aria-modal="true" aria-label="물건챙기기" className="flex h-[94dvh] w-[min(1120px,98vw)] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
+        <div className="flex shrink-0 items-center gap-2 border-b border-line px-3 py-1.5">
+          <h2 className="shrink-0 text-[16px] font-black text-rose-deep">물건챙기기</h2>
+          <details className="relative min-w-0 text-[12px] text-ink-soft">
+            <summary className="flex min-h-8 cursor-pointer items-center font-bold">범위·안내</summary>
+            <div className="absolute left-0 top-full z-10 w-[min(300px,70vw)] rounded-lg border border-line bg-surface p-3 shadow-lg">
+              <p className="break-words">작업 범위: {title} · 취소·챙기기 제외 주문 제외</p>
+              <p className="mt-2">상품·옵션·수량 확인 후 체크 · 두 화면 연동 · 저장 후 목록 유지</p>
+              {sortMode === 'remaining' ? <p className="mt-2">체크 후 순서 유지 · 다시 정렬로 갱신</p> : null}
+            </div>
+          </details>
+          <div className="ml-auto text-right text-[12px] font-bold" aria-live="polite"><span className="text-rose-deep">안 챙김 {loading || loadError ? "—" : total - got}</span><span className="ml-2 text-ok-tx">챙김 {loading || loadError ? "—" : got}/{total}개</span></div>
+          <button type="button" disabled={saving} onClick={onClose} aria-label="닫기" className="h-9 w-9 shrink-0 rounded-full bg-surface-2 text-[22px] disabled:opacity-40">×</button>
         </div>
-        <div className="shrink-0 space-y-2 border-b border-line p-3">
-          <div className="flex items-center justify-between gap-2" aria-live="polite">
-            <span className="text-[18px] font-black text-rose-deep">안 챙김 {loading || loadError ? "—" : total - got}개</span>
-            <span className="text-[14px] font-bold text-ok-tx">챙김 {loading || loadError ? "—" : got} / {total}개</span>
+        <div className="shrink-0 space-y-2 border-b border-line px-3 py-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <div className="flex shrink-0 gap-1 rounded-lg bg-surface-2 p-0.5">
+              {(["batch", "order"] as const).map(mode => <button key={mode} type="button" onClick={() => setViewMode(mode)} aria-pressed={viewMode === mode} className={`min-h-8 rounded-md px-3 text-[13px] font-black ${viewMode === mode ? "bg-rose-deep text-white" : "text-ink-soft"}`}>{mode === "batch" ? "상품별" : "고객별"}</button>)}
+            </div>
+            <div className="flex gap-1">
+              {([['all','전체보기',total],['unpicked','안 챙김만',total-got],['picked','챙김만',got]] as const).map(([value,label,count]) => <button key={value} type="button" aria-label={label} aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)} className={`min-h-8 rounded-md border border-line px-2 text-[12px] font-bold ${statusFilter === value ? 'bg-rose-deep text-white' : 'bg-surface text-ink-soft'}`}>{value === 'all' ? '전체' : value === 'unpicked' ? '안 챙김' : '챙김'} {loading || loadError ? '—' : count}</button>)}
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-1 rounded-xl bg-surface-2 p-1">
-            {(["batch", "order"] as const).map(mode => <button key={mode} type="button" onClick={() => setViewMode(mode)} aria-pressed={viewMode === mode} className={`min-h-[44px] rounded-lg text-[16px] font-black ${viewMode === mode ? "bg-rose-deep text-white" : "text-ink-soft"}`}>{mode === "batch" ? "상품별" : "고객별"}</button>)}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {([['all','전체보기',total],['unpicked','안 챙김만',total-got],['picked','챙김만',got]] as const).map(([value,label,count]) => <button key={value} type="button" aria-label={label} aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)} className={`min-h-[40px] rounded-lg border border-line px-3 text-[13px] font-bold ${statusFilter === value ? 'bg-rose-deep text-white' : 'bg-surface text-ink-soft'}`}>{label} {loading || loadError ? '—' : count}개</button>)}
-          </div>
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center [&_label]:flex [&_label]:items-center [&_label]:gap-1 [&_select]:!mt-0 [&_select]:!h-9">
             <label className="min-w-0 text-[11px] font-bold text-ink-soft">결제 범위<select aria-label="결제 범위" value={paymentFilter} onChange={event => {setPaymentFilter(event.target.value as typeof paymentFilter); setSortPickedIds(new Set(pickedIds));}} className="mt-1 block h-10 w-full rounded-lg border border-line bg-surface px-2 text-[13px] text-ink"><option value="paid">결제완료만</option><option value="all">미결제 포함</option><option value="unpaid">미결제만</option></select></label>
             <label className="min-w-0 text-[11px] font-bold text-ink-soft">정렬<select aria-label="정렬 방식" value={sortMode} onChange={event => {setSortModes(previous => ({...previous,[viewMode]:event.target.value})); setSortPickedIds(new Set(pickedIds));}} className="mt-1 block h-10 w-full rounded-lg border border-line bg-surface px-2 text-[13px] text-ink"><option value="name">{viewMode === 'batch' ? '상품번호순' : '닉네임순'}</option>{viewMode === 'order' ? <option value="oldest">주문 오래된순</option> : null}<option value="remaining">남은 수량 많은순</option></select></label>
             {sortMode === 'remaining' ? <button type="button" disabled={blocked} onClick={() => setSortPickedIds(new Set(pickedIds))} className="text-[12px] font-bold text-rose-deep">다시 정렬</button> : null}
+            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="상품번호 · 고객 검색" aria-label="상품번호 또는 고객 이름 검색" className="col-span-2 h-9 min-w-0 flex-1 rounded-lg border border-line px-3 text-[13px]" />
           </div>
-          <div className="flex gap-2">
-            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="상품번호 · 고객 이름 검색" aria-label="상품번호 또는 고객 이름 검색" className="h-11 min-w-0 flex-1 rounded-lg border border-line px-3 text-[14px]" />
-          </div>
-          <p className="text-[12px] font-bold text-ink-soft">상품·옵션·수량 확인 후 체크 · 두 화면 연동{sortMode === 'remaining' ? ' · 체크 후 순서 유지, 다시 정렬로 갱신' : ''}</p>
-          <div role="status" aria-live="polite" className="text-[12px] font-bold text-ink-soft">{loading ? "챙김 상태 확인 중…" : loadError ? "상태 확인 실패 · 창을 다시 열어 주세요. 체크는 잠시 막았습니다." : saving ? "저장 중… 잠시 기다려 주세요." : "저장 완료 · 체크해도 목록에 그대로 남습니다."}</div>
         </div>
-        <div className="flex-1 overflow-y-auto bg-surface-2 p-3">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-surface-2 p-2 sm:p-3">
           {!loading && !loadError && matches.length === 0 ? <div className="py-12 text-center font-bold text-ink-soft">현재 조회 조건에 맞는 상품이 없습니다.</div> : null}
-          <div className="space-y-3">
+          <div className="space-y-2">
             {sortedGroups.map(([key, group]) => {
               const progress = pickingProgress(group.rows.map(({ item }) => ({ qty: item.qty, pickedAt: pickedIds.has(item.id) })));
               return <section key={key} className="overflow-hidden rounded-xl border border-line bg-surface">
-                <div className="flex items-start justify-between gap-2 bg-rose-soft p-3">
+                <div className="flex items-start justify-between gap-2 bg-rose-soft px-3 py-1.5">
                   <div className="min-w-0"><h3 className="break-words text-[16px] font-black text-ink">{group.title}</h3>{group.subtitle ? <div className="mt-1 text-[12px] font-bold text-ink-soft">{group.subtitle}</div> : null}</div>
                   <span className="shrink-0 text-[12px] font-black text-ink-soft">{progress.got}/{progress.total}개</span>
                 </div>
@@ -361,7 +364,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
             })}
           </div>
         </div>
-        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-line p-3">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-line px-3 py-1.5">
+          <div role="status" aria-live="polite" className={`text-[12px] font-bold ${loadError ? 'w-full text-[var(--color-danger-tx)]' : 'text-ink-soft'}`}>{loading ? "상태 확인 중…" : loadError ? "상태 확인 실패 · 창을 다시 열어 주세요. 체크는 잠시 막았습니다." : saving ? "저장 중…" : "저장 완료"}</div>
           <div className="relative"><button type="button" aria-expanded={toolsOpen} onClick={() => setToolsOpen(value => !value)} className="min-h-[44px] px-2 text-[13px] font-bold text-ink-soft">더보기</button>{toolsOpen ? <div className="absolute bottom-full left-0 mb-2 w-52 rounded-lg border border-line bg-surface p-2 shadow-lg"><button type="button" disabled={blocked || exporting} onClick={resetAll} className="min-h-[44px] text-[12px] font-bold text-[var(--color-danger-tx)] disabled:opacity-40">조회 목록 챙김 해제</button></div> : null}</div>
           <div className="flex gap-2">
             <button type="button" disabled={blocked || exporting || !matches.length} onClick={runExcel} className="min-h-[44px] rounded-lg border border-line px-3 text-[13px] font-bold disabled:opacity-40">{exporting ? "내보내는 중…" : "조회 목록 엑셀"}</button>

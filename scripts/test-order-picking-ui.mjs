@@ -62,6 +62,12 @@ const text = () => JSON.stringify(tree.toJSON());
 assert.equal(checks().length, 2, 'only paid, non-canceled, included orders');
 assert.equal(check("고객1").props['aria-checked'], false, 'legacy collected must not imply completion');
 assert.ok(text().includes('원본 옵션'), 'optionText-only legacy orders must keep their option');
+// Scope/help remains available without occupying permanent work-list space.
+const scopeDetails = tree.root.findAllByType('details');
+assert.equal(scopeDetails.length, 1, 'work scope and help have a collapsed disclosure');
+assert.ok(!scopeDetails[0].props.open, 'scope/help is collapsed initially');
+assert.ok(scopeDetails[0].findByType('summary').children.length > 0);
+assert.equal(tree.root.findAll(node => node.props.role === 'status').length, 1, 'save/error feedback stays accessible');
 let release;
 gate = new Promise(resolve => {release = resolve;});
 let pending;
