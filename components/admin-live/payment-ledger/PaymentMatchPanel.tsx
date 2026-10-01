@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import DepositDetailModal from "./DepositDetailModal";
 import DepositLedgerFilters from "./DepositLedgerFilters";
 import DepositLedgerSummary from "./DepositLedgerSummary";
@@ -86,6 +86,30 @@ export default function PaymentMatchPanel({ deposits: depositsFromParent, presen
   const requestIdRef = useRef(0);
   const aliveRef = useRef(true);
   const syncingRef = useRef(false);
+  const appliedFromDateRef = useRef(appliedFromDate);
+  appliedFromDateRef.current = appliedFromDate;
+  const ledgerRef=useRef<HTMLDivElement>(null);
+  const listPositionRef=useRef<{scroller:HTMLElement|null;top:number;opener:HTMLElement|null}|null>(null);
+  const openDetail=(row:RawDepositRow)=>{
+    if(compact) {
+      const scroller=ledgerRef.current?.closest<HTMLElement>("[data-admin-drawer-scroll]") || null;
+      const opener=document.activeElement instanceof HTMLElement && ledgerRef.current?.contains(document.activeElement) ? document.activeElement : null;
+      listPositionRef.current={scroller,top:scroller?.scrollTop || 0,opener};
+    }
+    setSelectedDeposit(row);
+  };
+  useLayoutEffect(()=>{
+    if(!compact) return;
+    const position=listPositionRef.current;
+    if(selectedDeposit) {
+      ledgerRef.current?.querySelector<HTMLElement>("[data-deposit-detail] button")?.focus({preventScroll:true});
+      if(position?.scroller) position.scroller.scrollTop=0;
+    } else if(position) {
+      if(position.opener?.isConnected) position.opener.focus({preventScroll:true});
+      if(position.scroller) position.scroller.scrollTop=position.top;
+      listPositionRef.current=null;
+    }
+  },[compact,selectedDeposit]);
 
   // background=true 면 화면을 가리지 않고 뒤에서 최신화만 한다
   const loadDeposits = async (options: { background?: boolean; days?: number | "all" } = {}) => {
@@ -97,7 +121,7 @@ export default function PaymentMatchPanel({ deposits: depositsFromParent, presen
 
     try {
       // 화면에 보이는 기간만 받는다(기본 7일 + 여유 1일). 「전체 기간」이 필요하면 days:"all".
-      const days = options.days ?? Math.max(1, Math.ceil((Date.now() - new Date(appliedFromDate).getTime()) / 86400000) + 1);
+      const days = options.days ?? Math.max(1, Math.ceil((Date.now() - new Date(appliedFromDateRef.current).getTime()) / 86400000) + 1);
       const query = days === "all" ? "?days=all" : `?days=${days}`;
       const response = await fetch(`/api/admin-v2/deposits${query}`, {
         method: "GET",
@@ -253,7 +277,7 @@ export default function PaymentMatchPanel({ deposits: depositsFromParent, presen
   };
 
   return (
-    <div className={compact ? "grid w-full gap-2" : "grid w-full gap-5"}>
+    <div ref={ledgerRef} className={compact ? "grid w-full gap-2" : "grid w-full gap-5"}>
       <div hidden={compact && selectedDeposit !== null}>
       <section className={compact ? "flex items-center justify-between gap-2 py-1" : "flex flex-col gap-4 rounded-2xl border border-line bg-gradient-to-br from-surface via-surface to-surface-2 p-6 shadow-sm lg:flex-row lg:items-center lg:justify-between"}>
         <div>
@@ -310,12 +334,12 @@ export default function PaymentMatchPanel({ deposits: depositsFromParent, presen
           sortKey={sortKey}
           sortDirection={sortDirection}
           onSortChange={changeSort}
-          onOpenDetail={setSelectedDeposit}
+          onOpenDetail={openDetail}
         />
       ) : <p className="py-4 text-sm text-ink-soft">입금내역을 확인하지 못했습니다. 새로고침으로 다시 시도해 주세요.</p>}
       </div>
 
-      <DepositDetailModal presentation={compact ? "inline" : "modal"} row={selectedDeposit} onClose={() => setSelectedDeposit(null)} />
+      <div data-deposit-detail><DepositDetailModal presentation={compact ? "inline" : "modal"} row={selectedDeposit} onClose={() => setSelectedDeposit(null)} /></div>
     </div>
   );
 }

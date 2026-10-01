@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {useAdminModalFocus} from "./useAdminModalFocus";
 import { ADMIN_CONFIRM_EVENT, type AdminConfirmRequest } from "@/lib/adminConfirm";
 
 export default function AdminConfirmHost() {
   const [request, setRequest] = useState<AdminConfirmRequest | null>(null);
+  const panelRef=useRef<HTMLDivElement>(null);
+  const close=(ok:boolean)=>{if(!request) return;setRequest(null);request.resolve(ok);};
+  useAdminModalFocus(panelRef,()=>close(false),Boolean(request));
 
   useEffect(() => {
     const handleConfirmRequest = (event: Event) => {
@@ -51,15 +55,9 @@ export default function AdminConfirmHost() {
         ? "bg-[var(--color-info-tx)] hover:opacity-90"
         : "bg-rose-deep hover:opacity-90";
 
-  const close = (ok: boolean) => {
-    const resolve = request.resolve;
-    setRequest(null);
-    resolve(ok);
-  };
-
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[var(--color-ink-soft)]/35 px-4">
-      <div className="w-full max-w-md rounded-2xl border border-line bg-white p-5 shadow-2xl">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} className="w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
         <div className={`mb-4 rounded-2xl border px-4 py-3 ${toneClass}`}>
           <div className="text-sm font-black">{title}</div>
           <div className="mt-1 text-xs font-bold opacity-80">

@@ -190,7 +190,7 @@ export default function ShopInfoSettingsTab({onDraftStateChange,focusSection}:Se
       setStoredKeys(Number(json.storedKeys || 0));
       await refreshShopInfo();
       showAdminToast("상점 정보를 저장했습니다. 손님 화면과 사이드바에 바로 반영됩니다.", "success");
-      markSaved();
+      markSaved({contactType:json.info.contactType,contactValue:json.info.contactValue,adminChatUrl:json.info.adminChatUrl,paysterUrl:json.info.paysterUrl,bankAccounts:json.info.bankAccounts,bankRouting:json.info.bankRouting});
       return true;
     } catch (error) {
       showAdminToast("상점 정보 저장 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");

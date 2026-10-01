@@ -325,7 +325,8 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onOp
       }
 
       showAdminToast("운영 설정을 저장했습니다.", "success");
-      markGlobalSaved();
+      const holdNorm = decomposeHoldMinutes(nextHoldMinutes);
+      markGlobalSaved({...globalDraft,customerCardRate:String(nextCustomerCardRate),actualCardRate:String(nextActualCardRate),cardMinAmount:formatMoneyInput(nextCardMinAmount),defaultShippingFee:formatMoneyInput(nextDefaultShippingFee),remoteShippingFee:formatMoneyInput(nextRemoteShippingFee),holdAmount:holdNorm.amount,holdUnit:holdNorm.unit});
       return true;
     } catch (error) {
       showAdminToast("설정 저장 실패\n\n"+(error instanceof Error ? error.message : String(error)),"error");

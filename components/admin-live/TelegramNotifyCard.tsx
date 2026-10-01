@@ -63,7 +63,7 @@ export default function TelegramNotifyCard({onDraftStateChange}:SettingsDraftPro
         setBotToken("");
         setChatId("");
         setSavedToggles({enabled,reportOnEnd});
-        markSaved();
+        markSaved({botToken:"",chatId:"",enabled,reportOnEnd});
         void loadStatus();
         return true;
       }

@@ -131,7 +131,7 @@ export default function ProductImageNoticeSettingsTab({onDraftStateChange}:Setti
       }
       clearProductImageNoticeCache();   // 다음 사진 업로드부터 바로 새 값으로
       showAdminToast("저장했습니다. 지금부터 올리는 사진에 적용됩니다.", "success");
-      markSaved();
+      markSaved(json?.notice || draft);
       return true;
     } catch (error) {
       showAdminToast("상품사진 문구 저장 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");

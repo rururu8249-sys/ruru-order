@@ -46,3 +46,33 @@ assert.equal(document.activeElement,opener);
 assert.equal(document.body.style.overflow,'auto');
 assert.equal(listeners.size,0);
 console.log('PASS drawer keyboard containment and focus restoration');
+
+// Real drawer + confirmation host: only DOM focus/layout and native events are simulated.
+const keyboard=new Set(), confirmEvents=new Map();
+document.addEventListener=(_key,fn)=>keyboard.add(fn);
+document.removeEventListener=(_key,fn)=>keyboard.delete(fn);
+globalThis.window={addEventListener:(key,fn)=>confirmEvents.set(key,fn),removeEventListener:key=>confirmEvents.delete(key)};
+const confirmPanel=new Element(), cancel=new Element(), confirm=new Element();
+confirmPanel.querySelectorAll=()=>[cancel,confirm];
+const sharedLoad=createUiLoader();
+const RealDrawer=sharedLoad('components/admin-live/AdminLiveSideDrawer.tsx').default;
+const Host=sharedLoad('components/admin-live/AdminConfirmHost.tsx').default;
+const {ADMIN_CONFIRM_EVENT}=sharedLoad('lib/adminConfirm.ts');
+let confirmed;
+opener.focus();closed=0;
+await act(async()=>{tree=Renderer.create(React.createElement(React.Fragment,null,
+ React.createElement(RealDrawer,{title:'미저장 설정',width:420,onClose:()=>closed++},React.createElement('button',null,'저장 후 이동')),
+ React.createElement(Host)),{createNodeMock:element=>element.props['aria-label']==='계좌 변경 확인'?confirmPanel:panel});});
+await act(async()=>confirmEvents.get(ADMIN_CONFIRM_EVENT)({detail:{id:'bank',message:'계좌 변경',title:'계좌 변경 확인',resolve:ok=>confirmed=ok}}));
+assert.equal(document.activeElement,confirmPanel,'topmost financial confirmation takes focus');
+const press=key=>{for(const fn of [...keyboard]) fn({key,shiftKey:false,preventDefault(){},stopPropagation(){}});};
+press('Tab');assert.equal(document.activeElement,cancel,'keyboard enters topmost confirmation only');
+confirm.focus();press('Tab');assert.equal(document.activeElement,cancel);
+await act(async()=>press('Escape'));
+assert.equal(confirmed,false,'Escape cancels financial confirmation');
+assert.equal(closed,0,'Escape must not close underlying draft drawer');
+assert.equal(document.activeElement,panel,'confirmation restores underlying focus');
+await act(async()=>tree.unmount());
+assert.equal(document.activeElement,opener);
+assert.equal(keyboard.size,0);
+console.log('PASS stacked financial confirmation focus, tab, Escape and restore');
