@@ -1,5 +1,7 @@
 "use client";
 
+import AdminEventWidgetPreview from "./AdminEventWidgetPreview";
+
 // 미션 게이지(공동목표) 관리자 패널 — 목표/보상 설정 + 진행률 + 구매자 전원 지급 + 선물 명단 + 지급 기록 + OBS 위젯주소.
 //   - 설정은 /api/admin-live/mission(POST), 진행률은 GET. settings 키만 다룸.
 //   - [2026-09-08 4단계-B] 평소 흐름은 방송 시작 확인창(미션 켜기) → 콘솔 게이지 → 방송 종료 요약(지급 버튼).
@@ -297,6 +299,7 @@ export default function AdminLiveMissionPanel() {
 
       {/* 진행률 — 미션 켜진(진행 중) 동안만 표시. 종료되면 막대 숨기고 아래 "지급 내역"만 남김.
           새 이벤트를 켜면 카운트가 0부터 다시 시작(이벤트 시작 시각 기준). */}
+      <AdminEventWidgetPreview kind="mission" />
       {prog && prog.active ? (
         <div style={{ background: "var(--color-rose-soft)", borderRadius: 12, padding: "12px 16px", marginBottom: 16 }}>
           <div style={{ fontSize: 13, color: "var(--color-rose-deep)", fontWeight: 700 }}>

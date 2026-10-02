@@ -1,0 +1,35 @@
+import assert from 'node:assert/strict';
+import React from 'react';
+import Renderer,{act} from 'react-test-renderer';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+globalThis.window={location:{origin:'http://localhost:3000'}};
+let writes=0;
+globalThis.fetch=()=>{writes++;throw Error('preview wrapper must not call an API');};
+const Preview=createUiLoader()('components/admin-live/AdminEventWidgetPreview.tsx').default;
+for(const kind of ['survival','race','roulette','claw','mission']){
+ let tree;
+ await act(async()=>{tree=Renderer.create(React.createElement(Preview,{kind,eventId:'one'}));});
+ let frame=tree.root.findByType('iframe');
+ const url=new URL(frame.props.src);
+ assert.equal(url.origin,'http://localhost:3000');
+ assert.equal(url.pathname,kind==='claw'?'/event-claw/overlay':`/event-${kind}/live`);
+ assert.equal(url.searchParams.get('token'),`${kind}_luludongi_live`);
+ assert.equal(url.searchParams.get('sound'),'0');
+ assert.equal(frame.props.allow,undefined,'no autoplay permission');
+ assert.equal(frame.props.style.pointerEvents,'none','preview cannot operate embedded controls');
+ await act(async()=>frame.props.onLoad());
+ const loaded=frame;
+ await act(async()=>frame.props.onError());
+ const reload=tree.root.findAllByType('button').find(n=>n.children.join('')==='미리보기 재연결');
+ assert(reload);
+ await act(async()=>reload.props.onClick());
+ frame=tree.root.findByType('iframe');
+ assert.notEqual(frame,loaded,'reconnect replaces iframe only');
+ assert.equal(frame.props.src,url.toString(),'reconnect keeps same immutable read URL');
+ await act(async()=>tree.update(React.createElement(Preview,{kind,eventId:'two'})));
+ assert.equal(tree.root.findByType('iframe').props.src,url.toString(),'event metadata must not reset playback');
+ await act(async()=>tree.unmount());
+}
+assert.equal(writes,0);
+console.log('PASS five read-only current-origin silent widgets; reconnect only remounts iframe; zero operational requests');

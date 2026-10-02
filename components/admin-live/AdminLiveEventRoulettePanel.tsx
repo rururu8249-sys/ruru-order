@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { resolveOwnerPhoneBySteps, type PhoneResolveResult, type PhoneRow } from "@/lib/nicknameOwnerPhone";
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
 import AdminLiveMissionPanel from "./AdminLiveMissionPanel";
+import AdminEventWidgetPreview from "./AdminEventWidgetPreview";
 import AdminLiveEventSoundboard from "./AdminLiveEventSoundboard"; // [2026-08-12] 효과음 재생 버튼(표시·재생 전용)
 
 type RouletteMode = "live" | "test" | "preview";
@@ -442,15 +443,7 @@ export default function AdminLiveEventRoulettePanel({
   }, [finalParticipants, fixedWinnerNickname]);
 
   // 룰렛 휠 색상(시안 팔레트) + conic-gradient (참가자 N등분)
-  const WHEEL_COLORS = ["#ec4899", "#fb7185", "#f59e0b", "#22c55e", "#06b6d4", "#3b82f6", "#8b5cf6", "#7c3aed"];
-  const wheelCount = Math.max(finalParticipants.length, 1);
-  const wheelGradient = `conic-gradient(${Array.from({ length: wheelCount })
-    .map((_, i) => {
-      const start = (i / wheelCount) * 100;
-      const end = ((i + 1) / wheelCount) * 100;
-      return `${WHEEL_COLORS[i % WHEEL_COLORS.length]} ${start}% ${end}%`;
-    })
-    .join(", ")})`;
+
 
   // 이벤트목록 기간필터 (오늘/이번주/이번달/날짜선택) — winner_at 기준 클라이언트 필터
   const filteredWinners = useMemo(() => {
@@ -478,18 +471,7 @@ export default function AdminLiveEventRoulettePanel({
     });
   }, [recentWinners, listPeriod, listDate]);
 
-  // ===== 룰렛 canvas (실제 회전 스핀) =====
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const angleRef = useRef(0);
-  const rafRef = useRef<number | null>(null);
-  const animatedKeyRef = useRef("");
-  const namesRef = useRef<string[]>([]);
-  // [2026-09-08] 응모권 장수만큼 같은 이름 칸 반복 → 휠 칸 수 = 실제 확률 (방송 위젯도 같은 규칙)
-  namesRef.current = finalParticipants.flatMap((p) => {
-    const t = Math.max(1, Math.min(20, Math.floor(Number(p.tickets ?? p.weight ?? 1)) || 1));
-    return Array.from({ length: t }, () => p.nickname);
-  });
-  const wheelKey = namesRef.current.join("|");
+  // The broadcast widget is the only visual playback engine.
   const [centerWinner, setCenterWinner] = useState("");
   const rewardScheduledKeyRef = useRef("");
 
@@ -518,94 +500,9 @@ export default function AdminLiveEventRoulettePanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentEvent?.winner_nickname, currentEvent?.status, currentEvent?.result_at, currentEvent?.id]);
 
-  const drawWheel = (angle: number) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const size = canvas.width;
-    const cx = size / 2;
-    const cy = size / 2;
-    const r = size / 2 - 4;
-    const names = namesRef.current;
-    const n = Math.max(names.length, 1);
-    const seg = (Math.PI * 2) / n;
-    ctx.clearRect(0, 0, size, size);
-    for (let i = 0; i < n; i += 1) {
-      const a0 = angle - Math.PI / 2 + i * seg;
-      const a1 = a0 + seg;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, r, a0, a1);
-      ctx.closePath();
-      ctx.fillStyle = WHEEL_COLORS[i % WHEEL_COLORS.length];
-      ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,0.6)";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      if (names.length > 0 && n <= 40) {
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(a0 + seg / 2);
-        ctx.textAlign = "right";
-        ctx.fillStyle = "#ffffff";
-        const fs = Math.max(8, Math.min(13, 240 / n));
-        ctx.font = `700 ${fs}px -apple-system, "Apple SD Gothic Neo", sans-serif`;
-        const nm = names[i].length > 7 ? `${names[i].slice(0, 7)}` : names[i];
-        ctx.fillText(nm, r - 10, fs * 0.35);
-        ctx.restore();
-      }
-    }
-    ctx.beginPath();
-    ctx.arc(cx, cy, r * 0.27, 0, Math.PI * 2);
-    ctx.fillStyle = "#ffffff";
-    ctx.fill();
-  };
-
-  // 참가자/탭/열림 변할 때 휠 다시 그림(정지 상태)
   useEffect(() => {
-    drawWheel(angleRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wheelKey, open, eventTab]);
-
-  // 당첨자 확정(status=result) → 실제 회전 8~14바퀴, 4~6초, 당첨 칸에서 멈춤
-  useEffect(() => {
-    const winner = currentEvent?.winner_nickname || "";
-    if (!winner || currentEvent?.status !== "result") return;
-    const key = `${currentEvent?.id || ""}|${winner}|${currentEvent?.result_at || ""}`;
-    if (animatedKeyRef.current === key) return;
-    animatedKeyRef.current = key;
-
-    const names = namesRef.current;
-    const n = Math.max(names.length, 1);
-    const idx = Math.max(0, names.indexOf(winner));
-    const seg = (Math.PI * 2) / n;
-    const turns = 30; // 30바퀴
-    const duration = 4000 + Math.random() * 2000; // 4~6초
-    const target = turns * Math.PI * 2 - (idx * seg + seg / 2);
-
-    setCenterWinner("");
-    angleRef.current = 0;
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    const startTime = performance.now();
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - startTime) / duration);
-      const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
-      angleRef.current = target * eased;
-      drawWheel(angleRef.current);
-      if (t < 1) {
-        rafRef.current = requestAnimationFrame(tick);
-      } else {
-        setCenterWinner(winner);
-      }
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentEvent?.winner_nickname, currentEvent?.status, currentEvent?.result_at, currentEvent?.id]);
-
+    setCenterWinner(currentEvent?.status === "result" ? currentEvent.winner_nickname || "" : "");
+  }, [currentEvent?.id, currentEvent?.status, currentEvent?.winner_nickname]);
   // 같은 이벤트(event.id)에 대해 이번 세션에서 이미 지급했는지 기록(effect 재실행 중복지급 방지)
   const grantedEventIdsRef = useRef<Set<string>>(new Set());
 
@@ -1567,29 +1464,10 @@ export default function AdminLiveEventRoulettePanel({
                 <AdminLiveMissionPanel />
               ) : (
               <>
-              {/* 룰렛 + 참가자 */}
-              <div style={{ display: "flex", gap: "12px", alignItems: "stretch", marginBottom: "12px" }}>
-                <div style={{ flex: 1, background: "var(--color-surface-2)", borderRadius: "8px", minHeight: "190px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", position: "relative" }}>
-                  {eventTab === "roulette" ? (
-                    <div className="wheel">
-                      <span className="pt" style={{ top: "6px", fontSize: "24px" }}>▼</span>
-                      <canvas ref={canvasRef} width={300} height={300} style={{ width: "100%", height: "100%", borderRadius: "50%", display: "block" }} />
-                      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-                        <span style={{ fontSize: "12px", color: "var(--rose)", fontWeight: 600 }}>{finalParticipants.length}명</span>
-                      </div>
-                    </div>
-                  ) : isKWinnerTab ? (
-                    <div style={{ width: "150px", height: "150px", borderRadius: "16px", background: "var(--color-surface)", border: "1px solid var(--bd)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px" }}>
-                      <span style={{ fontSize: "44px", lineHeight: 1 }}>{eventTab === "race" ? "🏁" : "⛈️"}</span>
-                      <span style={{ fontSize: "12px", color: "var(--rose)", fontWeight: 600 }}>{eventTab === "race" ? "달리기" : "서바이벌"} · {finalParticipants.length}명</span>
-                      <span style={{ fontSize: "11px", color: "var(--mut2)" }}>{eventTab === "race" ? "당첨" : "생존"} {survivorCount}명</span>
-                    </div>
-                  ) : (
-                    <div style={{ width: "150px", height: "150px", borderRadius: "16px", background: "var(--color-surface)", border: "1px solid var(--bd)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "6px" }}>
-                      <span style={{ fontSize: "46px", lineHeight: 1 }}>🕹️</span>
-                      <span style={{ fontSize: "12px", color: "var(--rose)", fontWeight: 600 }}>인형뽑기 · {finalParticipants.length}명</span>
-                    </div>
-                  )}
+              <style>{` .event-work-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; margin-bottom:12px; } @media(max-width:720px){ .event-work-grid { grid-template-columns:minmax(0,1fr); } } `}</style>
+              <div className="event-work-grid">
+                <div style={{ minWidth: 0, background: "var(--color-surface-2)", borderRadius: "8px", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", paddingBottom: 12 }}>
+                  <AdminEventWidgetPreview kind={eventTab} eventId={currentEvent?.id} />
                   <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
                     <button className="btn rose" style={{ height: "auto", padding: "8px 32px" }} onClick={() => void startSpin(false)} disabled={spinning || finalParticipants.length === 0}>
                       {spinning ? "진행중..." : giftType === "point" && Number(giftPointAmount || 0) > 0 ? `▶ 시작 · ${isKWinnerTab ? `${survivorCount}명에게 ` : "당첨자에게 "}${Number(giftPointAmount).toLocaleString("ko-KR")}P 지급` : "▶ 시작"}
@@ -1744,17 +1622,6 @@ export default function AdminLiveEventRoulettePanel({
                 <span className="note" style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{widgetUrl || "준비중"}</span>
                 <button className="btn rose" style={{ height: "auto", padding: "4px 12px" }} onClick={() => void copyText(widgetUrl)} disabled={!widgetUrl}>복사</button>
               </div>
-
-              {/* [2026-09-08] 방송 위젯을 그대로 작게 — 시청자가 보는 화면(룰렛·인형뽑기). 읽기 전용 iframe */}
-              {(eventTab === "roulette" || eventTab === "claw") && widgetUrl ? (
-                <div style={{ marginBottom: "12px", borderRadius: "8px", overflow: "hidden", border: "1px solid var(--bd)", background: "#111" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 8px", fontSize: "11px", color: "#ddd" }}>
-                    <span>방송 화면 미리보기 (시청자가 보는 그대로)</span>
-                    <a href={widgetUrl} target="_blank" rel="noreferrer" style={{ color: "#ffd166" }}>새 창으로 열기 ↗</a>
-                  </div>
-                  <iframe src={widgetUrl} title="방송 위젯 미리보기" style={{ width: "100%", height: "280px", border: 0, display: "block", background: "#111" }} />
-                </div>
-              ) : null}
 
               {/* [2026-08-12] 효과음 사운드보드 — 서바이벌/달리기 탭에서만. 재생 전용(추첨·지급 무관) */}
               {isKWinnerTab && <AdminLiveEventSoundboard kind={eventTab === "race" ? "race" : "survival"} />}

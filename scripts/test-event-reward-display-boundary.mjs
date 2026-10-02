@@ -51,6 +51,12 @@ async function run(kind,runMode='live',gift='point',visual=true){
  if(visual&&raf)await act(async()=>raf(performance.now()+20000));
  for(const [id,t] of [...timers])if(t.ms>=4000&&t.ms<=6000){timers.delete(id);await act(async()=>t.fn());}
  assert.equal(grants.length,count,'metadata reload does not replay payout');
+ const writesBeforePreview=actions.length;
+ await act(async()=>tree.root.findByType('iframe').props.onLoad());
+ await act(async()=>button('미리보기 재연결').props.onClick());
+ await act(async()=>tree.root.findByType('iframe').props.onLoad());
+ assert.equal(actions.length,writesBeforePreview,'iframe load/reconnect cannot execute operational writes');
+ assert.equal(grants.length,count,'iframe load/reconnect cannot grant points');
  await act(async()=>tree.unmount());
 }
 for(const kind of ['roulette','claw','survival','race']){

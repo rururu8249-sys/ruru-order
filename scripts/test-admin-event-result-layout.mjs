@@ -32,7 +32,10 @@ await act(async()=>tree.root.findByType('textarea').props.onChange({target:{valu
 await act(async()=>button('테스트로 해보기').props.onClick());
 assert.equal(actions.length,2);
 assert.deepEqual(unexpected,[]);
-await act(async()=>raf(performance.now()+10000));
+const preview=tree.root.findByType('iframe');
+assert.equal(new URL(preview.props.src).pathname,'/event-survival/live');
+assert.equal(new URL(preview.props.src).searchParams.get('sound'),'0');
+assert.equal(tree.root.findAllByType('canvas').length,0,'no independent admin animation');
 const winner=tree.root.findAllByType('div').find(node=>node.children.join('')==='긴닉네임당첨자');
 assert(winner,'result should be announced');
 let ancestor=winner;
