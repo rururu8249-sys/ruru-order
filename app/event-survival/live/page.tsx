@@ -366,6 +366,8 @@ export default function SurvivalLiveWidget() {
       minHeight: "100vh", position: "relative", overflow: "hidden",
       display: "flex", alignItems: "flex-start", justifyContent: "center", background: "transparent",
       paddingTop: "1.5vh" }}>
+      <link rel="preload" as="image" href="/event-art/survival-tornado-v2.png"/>
+      <link rel="preload" as="image" href="/event-art/survival-tsunami-v2.png"/>
       <EventClockStyles elapsedMs={shared.elapsed} localAgeMs={fx?shared.elapsed-fx.key:undefined} sync={shared.sync}/>
       <SurvivalArtStyles/>
       <SurvivalReactionStyles/>
@@ -447,7 +449,7 @@ export default function SurvivalLiveWidget() {
         {phase === 'ready' ? <div style={{position:'absolute',inset:'110px 10px 62px',zIndex:30}}><EventRoster names={players.map(p=>p.name)} characters/></div> : null}
         <div data-survival-camera data-camera-scale={frame?.camera.scale||1} style={{position:'absolute',inset:0,pointerEvents:'none',transformOrigin:'50% 50%',transform:`scale(${frame?.camera.scale||1}) translate(${50-(frame?.camera.x||50)}%,${50-(frame?.camera.y||50)}%)`}}>
         {frame?.warning?<SurvivalWarning warning={frame.warning}/>:null}
-        {fx && <div data-event-local-age style={{position:"absolute",inset:0,pointerEvents:"none"}}><SurvivalDisaster fx={fx} /></div>}
+        {fx && <div data-event-local-age style={{position:"absolute",inset:0,pointerEvents:"none"}}><SurvivalDisaster fx={fx} ageMs={Math.max(0,(preview?demoElapsed:shared.elapsed)-fx.key)} /></div>}
         {(phase === 'ready' ? [] : players).map((p) => {
           const isW = winnerIdSet.has(p.id);
           const scale = isW ? (done ? (multi ? 1.7 : 2.6) : 1.7) : aliveCount <= 6 ? 1.4 : aliveCount <= NAME_SHOW_AT ? 1.15 : 1;
@@ -484,7 +486,7 @@ export default function SurvivalLiveWidget() {
             animation: `confetti ${1.4 + decorRandom() * 1.2}s linear ${decorRandom() * 1.1}s infinite` }} />
         ))}
 
-        {bursts.map(b=><SurvivalReaction key={b.id} type={b.dtype} index={Number(b.id.split("-")[0])} total={Math.max(8,aliveCount)} x={b.x} y={b.y}/>)}
+        {bursts.map(b=><SurvivalReaction key={b.id} type={b.dtype} index={Number(b.id.split("-")[0])} total={Math.max(8,aliveCount)} x={b.x} y={b.y} ageMs={fx?Math.max(0,(preview?demoElapsed:shared.elapsed)-fx.key):0}/>)}
         </div>
 
         {/* [2026-07-26 사장님] 다중 당첨자 명단 패널 — 여러 명일 때 하단에 크게, 잘 보이게 */}

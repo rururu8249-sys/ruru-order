@@ -11,6 +11,7 @@ const wind=renderToStaticMarkup(api.default({fx:fx('wind')}));
 assert(wind.includes('data-tornado-funnel'),'tornado requires a shaded continuous funnel');
 assert(!wind.includes('🍃'),'avoid decorative emoji standing in for flying debris');
 const bolt=renderToStaticMarkup(api.default({fx:fx('lightning')}));
+assert(bolt.includes('feGaussianBlur'),'lightning must have luminous diffuse glow, not solid thick lines');
 assert(bolt.includes('data-bolt-contact')&&bolt.includes('cx="50"')&&bolt.includes('cy="60"'),'bolt contact must coincide with actual strike endpoint');
 const wave=renderToStaticMarkup(api.default({fx:fx('wave')}));
 assert(wave.includes('data-wave-foam'),'wave needs a distinct foam crest that travels with the water');

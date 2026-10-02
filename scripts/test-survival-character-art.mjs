@@ -37,7 +37,7 @@ for(const type of ['lightning','wave','wind','hail','meteor']){
  const tree=serialize(Reaction({type,index:0,total:100,x:50,y:50}));
  assert.equal(tree.props['data-survival-reaction'],type);
  assert.equal(tree.props.style.pointerEvents,'none');
- const body=[tree.props.children].flat().find(c=>c?.type==='div');
+ const body=[tree.props.children].flat().find(c=>c?.props?.['data-reaction-body']!==undefined);
  animations.add(body.props.style.animation);
  assert(body.props.children.some(c=>typeof c?.type==='function'&&c.props.index===0),'reaction must retain the assigned character');
 }

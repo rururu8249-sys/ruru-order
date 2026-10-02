@@ -1,4 +1,5 @@
 "use client";
+import SurvivalDisasterSprite from './SurvivalDisasterSprite';
 import {eventSeed,seededRandom} from '@/lib/eventPlayback';
 
 export type SurvivalVisualFx={type:string;key:number;accent:string;streaks:{id:number;pts:string;br:string[]}[]};
@@ -37,7 +38,7 @@ export function SurvivalArtStyles(){return <style>{`
  `}</style>}
 
 // Bounded visual layers, seeded independently. Server scene and result are immutable.
-export default function SurvivalDisaster({fx}:{fx:SurvivalVisualFx}){
+export default function SurvivalDisaster({fx,ageMs=0}:{fx:SurvivalVisualFx;ageMs?:number}){
  const rand=seededRandom(eventSeed('visual:'+fx.key));
  const lightning=fx.type==='lightning',meteor=fx.type==='meteor';
  return <div data-survival-art data-disaster={fx.type} key={fx.key+':'+fx.type} style={{position:'absolute',inset:0,pointerEvents:'none',overflow:'hidden',zIndex:22}}>
@@ -45,34 +46,18 @@ export default function SurvivalDisaster({fx}:{fx:SurvivalVisualFx}){
   {lightning&&<>
    <div data-survival-flash style={{position:'absolute',inset:0,background:'#bdeeff',animation:'survivalStormPulse .8s ease-out both'}}/>
    <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{width:'100%',height:'100%',position:'absolute',inset:0,animation:'survivalBolt .82s ease-out both'}}>
+    <defs><filter id={`bolt-glow-${fx.key}`} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation=".65"/></filter></defs>
     {fx.streaks.slice(0,24).map(s=><g key={s.id}>
-     <polyline points={s.pts} fill="none" stroke="#3489ff" strokeWidth="12" opacity=".42" vectorEffect="non-scaling-stroke"/>
-     <polyline points={s.pts} fill="none" stroke="#9eeaff" strokeWidth="5" vectorEffect="non-scaling-stroke"/>
-     <polyline points={s.pts} fill="none" stroke="white" strokeWidth="2" vectorEffect="non-scaling-stroke"/>
-     {s.br.map((br,i)=><polyline key={i} points={br} fill="none" stroke="#baf1ff" strokeWidth="2" vectorEffect="non-scaling-stroke"/>)}
+     <polyline points={s.pts} fill="none" stroke="#479cff" strokeWidth="13" opacity=".85" filter={`url(#bolt-glow-${fx.key})`} vectorEffect="non-scaling-stroke"/>
+     <polyline points={s.pts} fill="none" stroke="#9eeaff" strokeWidth="4" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
+     <polyline points={s.pts} fill="none" stroke="white" strokeWidth="1.4" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
+     {s.br.map((br,i)=><g key={i}><polyline points={br} fill="none" stroke="#6ec5ff" strokeWidth="4" opacity=".65" filter={`url(#bolt-glow-${fx.key})`} vectorEffect="non-scaling-stroke"/><polyline points={br} fill="none" stroke="#e5faff" strokeWidth=".75" vectorEffect="non-scaling-stroke"/></g>)}
      {(()=>{const [x,y]=s.pts.trim().split(/\s+/).at(-1)!.split(',').map(Number);return Number.isFinite(x)&&Number.isFinite(y)?<g data-bolt-contact><circle cx={x} cy={y} r="3.8" fill="#d9fbff" opacity=".38"/><circle cx={x} cy={y} r="1.6" fill="white"/><path d={`M${x-5} ${y+2}L${x-2} ${y}M${x+2} ${y}L${x+5} ${y+2}`} stroke="#b7f5ff" strokeWidth=".6"/></g>:null})()}
     </g>)}
    </svg>
   </>}
-  {fx.type==='wave'&&<>
-   {[0,1].map(layer=><svg key={layer} viewBox="0 0 600 400" preserveAspectRatio="none" style={{position:'absolute',inset:0,width:'100%',height:'100%',opacity:layer?.8:1,animation:`survivalWave ${layer? .82:.68}s ease-out ${layer?.08:0}s both`}}>
-    <defs><linearGradient id={`wave-${fx.key}-${layer}`} x2="0" y2="1"><stop stopColor="#8fe9f6"/><stop offset=".38" stopColor="#219edf"/><stop offset="1" stopColor="#07385d"/></linearGradient></defs>
-    <path d="M0 400V170C80 170 125 180 160 135C215 60 160 15 115 65C145 -5 245 -20 298 70C332 128 318 190 357 210C420 243 462 190 520 230L600 270V400Z" fill={`url(#wave-${fx.key}-${layer})`}/>
-    <path d="M0 170C80 170 125 180 160 135C215 60 160 15 115 65C145 -5 245 -20 298 70C332 128 318 190 357 210C420 243 462 190 520 230L600 270" fill="none" stroke="#d5f9ff" strokeWidth="18"/>
-    <path d="M10 220Q105 240 175 180M220 300Q300 230 410 290M360 350Q460 295 595 340" fill="none" stroke="#7ee2ff" strokeWidth="9" opacity=".7"/>
-    <g data-wave-foam fill="#e4fcff" opacity=".85">{[[32,172],[63,176],[103,168],[140,154],[169,125],[186,89],[178,63],[260,28],[291,64],[305,111],[314,158],[333,192],[377,219],[420,219],[476,215],[532,238],[568,256]].map(([x,y],i)=><ellipse key={i} cx={x} cy={y} rx={8+i%3*3} ry={4+i%4*2} transform={`rotate(${i%2?30:-20} ${x} ${y})`}/>)}</g>
-   </svg>)}
-   {Array.from({length:24},(_,i)=><i key={i} style={{position:'absolute',left:`${rand()*100}%`,top:`${30+rand()*60}%`,width:5+i%5,height:10+i%7,borderRadius:'60% 60% 80% 80%',background:'#d5f9ff',animation:`survivalDebris .7s ease-out ${i%4*.03}s both`}}/>)}
-  </>}
-  {fx.type==='wind'&&<>
-   <svg data-tornado-funnel viewBox="0 0 300 420" style={{position:'absolute',left:0,bottom:'8%',height:'80%',width:'60%',animation:'survivalTornado .82s ease-out both'}}>
-    <defs><linearGradient id={`funnel-${fx.key}`}><stop stopColor="#203b52"/><stop offset=".4" stopColor="#d9eef0"/><stop offset=".65" stopColor="#698c9e"/><stop offset="1" stopColor="#172b41"/></linearGradient></defs>
-    <path d="M15 30Q150 -20 290 35Q270 120 220 190Q191 265 170 380L120 410Q98 343 100 250Q77 148 15 30Z" fill={`url(#funnel-${fx.key})`} opacity=".88"/>
-    <ellipse cx="150" cy="35" rx="139" ry="28" fill="#31485c" stroke="#bcdce5" strokeWidth="6"/>
-    {Array.from({length:10},(_,i)=><ellipse key={i} cx={150+Math.sin(i)*8} cy={35+i*35} rx={130-i*10} ry={18-i*.9} fill="none" stroke={i%2?'#efffff':'#88c8d0'} strokeWidth={6-i*.35} opacity=".85"/>)}
-   </svg>
-   {Array.from({length:16},(_,i)=><i key={i} style={{position:'absolute',left:`${rand()*70}%`,top:`${rand()*85}%`,width:4+i%3*3,height:3+i%4,borderRadius:i%2?'50%':'15%',background:i%2?'#d6e8e6':'#8b765f',boxShadow:'1px 2px 2px #172b4190',animation:`survivalDebris .8s ease-out ${i%4*.03}s both`}}/>)}
-  </>}
+  {fx.type==='wave'&&<div data-wave-foam style={{position:'absolute',left:0,bottom:0,width:'130%',animation:'survivalWave .82s ease-out both'}}><SurvivalDisasterSprite kind="tsunami" ageMs={ageMs}/></div>}
+  {fx.type==='wind'&&<div data-tornado-funnel data-disaster-sprite="tornado" style={{position:'absolute',left:0,bottom:'8%',width:'80%',animation:'survivalTornado .82s ease-out both'}}><SurvivalDisasterSprite kind="tornado" ageMs={ageMs}/></div>}
   {fx.type==='hail'&&<svg data-hail-field viewBox="0 0 100 100" preserveAspectRatio="none" style={{position:'absolute',inset:0,width:'100%',height:'100%'}}>
    <defs><radialGradient id={`ice-${fx.key}`} cx="30%" cy="20%"><stop stopColor="white"/><stop offset=".55" stopColor="#cbeaff"/><stop offset="1" stopColor="#688eb9"/></radialGradient></defs>
    {Array.from({length:36},(_,i)=>{const x=rand()*110,y=-12+rand()*22,r=.8+i%5*.25;return <g key={i} style={{animation:`survivalHail ${.6+rand()*.18}s linear ${i%5*.02}s both`}}>

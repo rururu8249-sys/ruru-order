@@ -1,4 +1,5 @@
 "use client";
+import SurvivalDisasterSprite from './SurvivalDisasterSprite';
 import SurvivalCharacter,{survivalCharacterSize} from './SurvivalCharacter';
 
 export function SurvivalReactionStyles(){return <style>{`
@@ -24,15 +25,12 @@ function ShockSkeleton(){return <svg data-reaction-xray viewBox="0 0 100 130" ar
  <g fill="#302119"><ellipse cx="39" cy="24" rx="5" ry="6"/><ellipse cx="56" cy="24" rx="5" ry="6"/><path d="M46 30L42 35H50Z"/><path d="M45 37H47V43H45ZM51 37H53V43H51Z"/></g>
 </svg>}
 
-export default function SurvivalReaction({type,index,total,x,y}:{type:string;index:number;total:number;x:number;y:number}){
+export default function SurvivalReaction({type,index,total,x,y,ageMs=0}:{type:string;index:number;total:number;x:number;y:number;ageMs?:number}){
  const animation=type==='wave'?'reactionWash':type==='wind'?'reactionWind':type==='hail'?'reactionHail':type==='meteor'?'reactionMeteor':'reactionZap';
  const size=survivalCharacterSize(total);
  return <div data-survival-reaction={type} data-event-local-age style={{position:'absolute',left:`${x}%`,top:`${y}%`,transform:'translate(-50%,-50%)',width:size,aspectRatio:'1',zIndex:27,pointerEvents:'none'}}>
-  {type==='wind'?<svg data-reaction-vortex viewBox="0 0 100 160" aria-hidden="true" style={{position:'absolute',left:'-50%',bottom:'-15%',width:'200%',height:'280%',animation:'reactionVortex .78s ease-out both'}}>
-   <path d="M3 18Q50 -4 97 18Q83 54 70 85L56 145L44 156L33 92Q21 55 3 18Z" fill="#749caf" opacity=".55"/>
-   {Array.from({length:7},(_,i)=><ellipse key={i} cx={50+Math.sin(i)*3} cy={19+i*20} rx={45-i*5.8} ry={9-i*.7} fill="none" stroke={i%2?'#cee9ed':'#547a91'} strokeWidth="3.5" opacity=".85"/>)}
-  </svg>:null}
-  <div style={{position:'relative',width:'100%',height:'100%',animation:`${animation} ${['lightning','wave','wind'].includes(type)?'.78':'.62'}s ease-out both`}}>
+  {type==='wind'?<div data-reaction-vortex style={{position:'absolute',left:'-75%',bottom:'-15%',width:'250%',animation:'reactionVortex .78s ease-out both'}}><SurvivalDisasterSprite kind="tornado" ageMs={ageMs}/></div>:null}
+  <div data-reaction-body style={{position:'relative',width:'100%',height:'100%',animation:`${animation} ${['lightning','wave','wind'].includes(type)?'.78':'.62'}s ease-out both`}}>
    {type==='lightning'?<svg viewBox="0 0 100 100" aria-hidden="true" style={{position:'absolute',inset:'-35%',width:'170%',height:'170%',animation:'reactionRing .78s ease-out both'}}><path d="M50 0L57 27L77 9L70 35L100 28L77 48L99 63L72 63L83 92L59 75L48 100L41 75L16 92L29 65L0 66L24 49L1 30L32 35L21 8L43 27Z" fill="#ffe733"/></svg>:null}
    <SurvivalCharacter index={index} total={total} sizeOverride="100%" moving pose="run"/>
    {type==='lightning'?<ShockSkeleton/>:null}
