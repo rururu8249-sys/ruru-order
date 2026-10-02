@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+const api=createUiLoader()('components/event-shared/SurvivalDisaster.tsx');
+const fx=type=>({type,key:2800,accent:'#fff',streaks:[{id:1,pts:'30,0 36,20 32,40 50,60',br:['36,20 44,25']}]});
+const hail=renderToStaticMarkup(api.default({fx:fx('hail')}));
+assert(hail.includes('data-hail-field'),'hail must use stage-relative SVG coordinates');
+const styles=renderToStaticMarkup(api.SurvivalArtStyles());
+assert(!styles.includes('88vh'),'hail must not fall relative to browser height');
+const wind=renderToStaticMarkup(api.default({fx:fx('wind')}));
+assert(wind.includes('data-tornado-funnel'),'tornado requires a shaded continuous funnel');
+assert(!wind.includes('🍃'),'avoid decorative emoji standing in for flying debris');
+const bolt=renderToStaticMarkup(api.default({fx:fx('lightning')}));
+assert(bolt.includes('data-bolt-contact')&&bolt.includes('cx="50"')&&bolt.includes('cy="60"'),'bolt contact must coincide with actual strike endpoint');
+const wave=renderToStaticMarkup(api.default({fx:fx('wave')}));
+assert(wave.includes('data-wave-foam'),'wave needs a distinct foam crest that travels with the water');
+console.log('PASS stage-relative hail, continuous shaded funnel, bounded non-emoji debris');

@@ -9,7 +9,7 @@ import {buildSurvivalScene,sampleSurvivalScene} from "@/lib/eventSurvivalScene";
 import {eventSeed,seededRandom} from "@/lib/eventPlayback";
 import EventRoster from '@/components/event-shared/EventRoster';
 import SurvivalCharacter from '@/components/event-shared/SurvivalCharacter';
-import SurvivalDisaster, {SurvivalArtStyles} from '@/components/event-shared/SurvivalDisaster';
+import SurvivalDisaster, {SurvivalArtStyles,SurvivalWarning} from '@/components/event-shared/SurvivalDisaster';
 import SurvivalReaction, {SurvivalReactionStyles} from '@/components/event-shared/SurvivalReaction';
 
 const ROSE = "#7B2D43";
@@ -421,7 +421,7 @@ export default function SurvivalLiveWidget() {
           <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,.75)", letterSpacing: 2 }}>남은 사람</div>
           <div style={{ fontSize: 46, fontWeight: 900, color: "#fff", lineHeight: 1,
             textShadow: "0 2px 12px rgba(0,0,0,.85)", fontVariantNumeric: "tabular-nums",
-            animation: phase === "running" ? "flick .6s infinite" : "none" }}>
+            animation: "none" }}>
             {done ? winners.length : aliveCount}<span style={{ fontSize: 18, color: "rgba(255,255,255,.55)" }}> / {total}</span>
           </div>
           <div style={{ minHeight: 40, marginTop: 3 }}>
@@ -446,7 +446,7 @@ export default function SurvivalLiveWidget() {
 
         {phase === 'ready' ? <div style={{position:'absolute',inset:'110px 10px 62px',zIndex:30}}><EventRoster names={players.map(p=>p.name)} characters/></div> : null}
         <div data-survival-camera data-camera-scale={frame?.camera.scale||1} style={{position:'absolute',inset:0,pointerEvents:'none',transformOrigin:'50% 50%',transform:`scale(${frame?.camera.scale||1}) translate(${50-(frame?.camera.x||50)}%,${50-(frame?.camera.y||50)}%)`}}>
-        {frame?.warning?<div aria-hidden style={{position:'absolute',top:'12%',left:'-10%',right:'-10%',fontSize:'clamp(30px,16cqw,85px)',opacity:.65,pointerEvents:'none',display:'flex',justifyContent:'space-between',zIndex:20}}><span>{frame.warning.type==='wave'?'🌊':'☁️'}</span><span>{frame.warning.type==='meteor'?'☄️':'☁️'}</span></div>:null}
+        {frame?.warning?<SurvivalWarning warning={frame.warning}/>:null}
         {fx && <div data-event-local-age style={{position:"absolute",inset:0,pointerEvents:"none"}}><SurvivalDisaster fx={fx} /></div>}
         {(phase === 'ready' ? [] : players).map((p) => {
           const isW = winnerIdSet.has(p.id);

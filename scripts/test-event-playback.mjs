@@ -16,7 +16,9 @@ assert.equal(eventSeed('abc'),440920331,'FNV-1a independently known vector');
 assert.equal(calculateEventDurationMs('claw',['A','B'],['A'],0),7200);
 assert.equal(calculateEventDurationMs('claw',['A','B'],['A'],1),15000);
 assert.equal(calculateEventDurationMs('claw',['A','B'],['A'],2),22800);
-assert.equal(calculateEventDurationMs('survival',['A','B','C'],['A'],0),5900);
+// Opening 2800 + final duel 2000 + last-impact tail 900, independently timed.
+assert.equal(calculateEventDurationMs('survival',['A','B','C'],['A'],0),5700);
+assert(makePlayback({...input,kind:'survival',participants:['A','B','C'],durationMs:5900}),'old 5900ms records must remain playable');
 assert.equal(calculateEventDurationMs('race',['A','B','C'],['A'],0),11320);
 assert.equal(calculateEventDurationMs('race',['A','B','C'],['A','B'],0),11770);
 assert.equal(calculateEventDurationMs('race',['A'],['A'],0),1);

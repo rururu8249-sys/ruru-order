@@ -11,11 +11,18 @@ export function eventSeed(key:string):number {
 }
 export function survivalKillCount(a:number):number {return Math.min(a,a>70?9:a>45?7:a>25?5:a>14?3:a>7?2:1);}
 export function legacySurvivalGapMs(a:number):number {return a>70?550:a>45?700:a>25?900:a>14?1150:a>7?1550:a>2?2050:2500;}
-export function survivalGapMs(a:number):number {return a>70?1800:a>45?2000:a>25?2400:a>14?2800:a>7?3200:a>2?4000:5000;}
+export function previousSurvivalGapMs(a:number):number {return a>70?1800:a>45?2000:a>25?2400:a>14?2800:a>7?3200:a>2?4000:5000;}
+export function survivalGapMs(a:number):number {return a===0?900:a<=2?2000:a<=7?2400:a<=14?1900:a<=25?2100:a<=45?1750:a<=70?1950:1600;}
+export function previousSurvivalPace(candidates:number){
+ let left=candidates,sum=0;
+ while(left>0){left-=survivalKillCount(left);sum+=previousSurvivalGapMs(left);}
+ const startMs=6000,scale=!sum?1:Math.max(1,(30000-startMs)/sum);
+ return {startMs,scale,durationMs:sum?Math.round(startMs+sum*scale):1};
+}
 export function survivalPace(candidates:number,legacy=false){
  let left=candidates,sum=0;
  while(left>0){left-=survivalKillCount(left);sum+=(legacy?legacySurvivalGapMs:survivalGapMs)(left);}
- const startMs=legacy?900:6000,scale=legacy||!sum?1:Math.max(1,(30000-startMs)/sum);
+ const startMs=legacy?900:2800,scale=1;
  return {startMs,scale,durationMs:sum?Math.round(startMs+sum*scale):1};
 }
 export function raceWinnerGapMs(k:number):number {return Math.min(600,Math.min(2600,Math.max(900,k*450))/Math.max(1,k));}
@@ -34,7 +41,8 @@ export function makePlayback(input:PlaybackInput):Playback|null {
   const key=JSON.stringify([input.kind,input.id,input.startedAt,1]);
   const seed=eventSeed(key),durationMs=calculateEventDurationMs(input.kind,input.participants,input.winners,seed);
   const legacyDuration=input.kind==='survival'?survivalPace(input.participants.length-input.winners.length,true).durationMs:null;
-  if(input.durationMs!==durationMs&&input.durationMs!==legacyDuration)return null;
+  const previousDuration=input.kind==='survival'?previousSurvivalPace(input.participants.length-input.winners.length).durationMs:null;
+  if(input.durationMs!==durationMs&&input.durationMs!==legacyDuration&&input.durationMs!==previousDuration)return null;
   return {version:1,key,kind:input.kind,seed,startedAtMs,durationMs:Number(input.durationMs)};
 }
 export function samplePlayback(playback:Playback,serverNowMs:number):PlaybackPhase {

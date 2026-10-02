@@ -17,7 +17,7 @@ for(const [kind,path] of Object.entries(paths)){
  for(const scenario of ['late','future','running']){
  timers.clear();requests=[];audio=0;
  const now=Date.now(),key='fixture-'+kind;
- const startMs=now+(scenario==='future'?30000:scenario==='running'?-(kind==='survival'?6100:3000):-120000);
+ const startMs=now+(scenario==='future'?30000:scenario==='running'?-3000:-120000);
  globalThis.fetch=async(url,init)=>{requests.push({url,init});assert(!init?.method||init.method==='GET','display must never POST');return {ok:true,status:200,json:async()=>({ok:true,active:true,server_now:now,started_at:new Date(startMs).toISOString(),title:'fixture mission',goalType:'orders',goal:1,current:1,pct:scenario==="late"?100:63,reward:1000,playback:{version:1,key,kind,seed:0,startedAtMs:startMs,durationMs:kind==="mission"?1:calculateEventDurationMs(kind,["A","B","C"],["A"],0)},event:{id:key,title:'fixture '+requests.length,status:'result',participants:[{nickname:'A'},{nickname:'B'},{nickname:'C'}],survivors:['A'],winner_nickname:'A',winner_note:'fixture gift',spin_started_at:new Date(startMs).toISOString(),result_at:new Date(startMs).toISOString(),updated_at:new Date(now+requests.length*1000).toISOString()}})};};
  let tree;const Widget=load(path).default;
  const realRandom=Math.random;

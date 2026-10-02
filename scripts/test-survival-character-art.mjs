@@ -16,7 +16,7 @@ for(let index=0;index<16;index++){
 }
 assert(existsSync('public/event-art/survival-known-run-v1.png'));
 for(const name of ['짱구','철수','유리','훈이','맹구','봉미선','신형만','짱아','흰둥이','키티','둘리','또치','희동이','고길동','도우너','마이콜'])assert(cast.some(c=>c.name===name),'requested character missing: '+name);
-assert.deepEqual(cast.slice(0,16).map(c=>c.name),['짱구','철수','유리','훈이','맹구','봉미선','신형만','짱아','흰둥이','키티','둘리','또치','희동이','고길동','도우너','마이콜']);
+assert.deepEqual(cast.slice(0,16).map(c=>c.name),['짱구','키티','둘리','흰둥이','철수','유리','훈이','맹구','봉미선','신형만','짱아','또치','희동이','고길동','도우너','마이콜']);
 assert(new Set(cast.map(c=>c.name)).size>=100,'100 distinct named characters required');
 for(const c of cast){assert(existsSync('public'+c.asset),'missing asset '+c.asset);assert.deepEqual(survivalCharacter(c.index),c,'reload must not change the assigned character');}
 for(const id of [-1,NaN,Infinity,100000])assert(survivalCharacter(id).asset);
@@ -37,8 +37,9 @@ for(const type of ['lightning','wave','wind','hail','meteor']){
  const tree=serialize(Reaction({type,index:0,total:100,x:50,y:50}));
  assert.equal(tree.props['data-survival-reaction'],type);
  assert.equal(tree.props.style.pointerEvents,'none');
- animations.add(tree.props.children.props.style.animation);
- assert(tree.props.children.props.children.some(c=>typeof c?.type==='function'&&c.props.index===0),'reaction must retain the assigned character');
+ const body=[tree.props.children].flat().find(c=>c?.type==='div');
+ animations.add(body.props.style.animation);
+ assert(body.props.children.some(c=>typeof c?.type==='function'&&c.props.index===0),'reaction must retain the assigned character');
 }
 assert.equal(animations.size,5,'each disaster needs its own body response');
 assert(cast.slice(31).every(c=>c.asset.includes('survival-human-cast')),'additional cast must be human characters');
