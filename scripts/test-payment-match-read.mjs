@@ -108,6 +108,13 @@ const cases = [
   [[{ ...base, deposit_confirmed_at: null }], [{ ...deposit, confirmed_at: null }]],
   [[{ ...base, youtube_nickname: "", nickname: "guest", final_amount: null, total_price: null, amount: 10000 }], [deposit]],
   [[{ ...base, payment_method: "카드" }], [deposit]],
+  // Age / broadcast changes must never silently exclude a late payment.
+  [[{ ...base, created_at: "2020-01-01T00:00:00Z", broadcast_id: "old-broadcast" }], [deposit]],
+  [[base], [{ ...deposit, deposited_time: "2020-01-01T00:00:00Z" }]],
+  [[{ ...base, final_amount: "10,000원", youtube_nickname: "@Guest" }], [deposit]],
+  [[{ ...base, final_amount: 0, point_used_amount: 11000 }], []],
+  [[base], [{ ...deposit, confirmed_at: null, match_customer_id: 99 }]],
+  [[{ ...base, deposit_confirmed_at: null, order_manage_status: "환불" }], [deposit]],
 ];
 // Deterministic multi-item / mixed-state datasets, not random live mutations.
 for (let seed = 0; seed < 60; seed++) {
@@ -144,4 +151,18 @@ const reopened = await readPaymentMatchRows(database({ orders: completedRows }),
 assert.deepEqual(reopened.data.map(row => row.id), [1, 2]);
 const concurrentReads = await Promise.all(Array.from({ length: 20 }, () => readPaymentMatchRows(database({ orders: completedRows }), "orders", null)));
 for (const result of concurrentReads) assert.deepEqual(result.data.map(row => row.id), [1, 2]);
+// Filtering must happen before pagination, including an exact 1000-row boundary.
+// The first probe row is completed; it must not hide the pending rows after it.
+for (const pendingCount of [999, 1000, 1001, 2001]) {
+  const completed = Array.from({ length: 1200 }, (_, i) => ({ ...base, id: i + 1, deposit_confirmed_at: "2026-10-01T00:00:00Z" }));
+  const open = Array.from({ length: pendingCount }, (_, i) => ({ ...base, id: i + 1201, deposit_confirmed_at: null }));
+  const rows = normalizeRows([...completed, ...open], PAYMENT_MATCH_ORDER_FIELDS);
+  const result = await readPaymentMatchRows(database({ orders: rows }), "orders", q => q.neq("is_deleted", true));
+  assert.deepEqual(result.data.map(row => row.id), open.map(row => row.id));
+}
+const depositHistory = normalizeRows(Array.from({ length: 2643 }, (_, i) => ({ ...deposit, id: i + 1, confirmed_at: i < 2451 ? "2026-10-01T00:00:00Z" : null })), PAYMENT_MATCH_DEPOSIT_FIELDS);
+const openDeposits = await readPaymentMatchRows(database({ deposits: depositHistory }), "deposits", null);
+assert.equal(openDeposits.data.length, 192);
+assert.equal(openDeposits.data[0].id, 2452);
+assert.equal(openDeposits.data.at(-1).id, 2643);
 console.log(`PASS: ${cases.length * 6} legacy/optimized matching response + write comparisons, pagination, schema/probe fallback, read/write failures, confirmation cancellation, concurrent reads, legacy schemas`);
