@@ -17,6 +17,13 @@ assert(at(1800).players.some(p=>p.pose==='run'),'opening must move, not remain s
 assert(at(2000).players.every(p=>p.pose==='look'),'brief startle when the warning appears');
 assert(at(2450).players.every(p=>p.pose==='run'),'warning must become an escape, not another idle pause');
 assert(at(2450).motionSpeed>2*at(1800).motionSpeed,'escape must accelerate relative to normal roaming');
+for(const [start,end,speed] of [[1600,1700,.55],[2400,2500,1.2]]){
+ for(const actor of at(start).players){
+  const next=at(end).players[actor.id];
+  assert(Math.abs(next.strideElapsedMs-actor.strideElapsedMs-(end-start)*speed)<.001,'limb cycle must follow the same accelerated clock as movement');
+ }
+}
+assert.equal(at(1700).players[1].strideElapsedMs-at(1700).players[0].strideElapsedMs,170,'actors use their movement phase, not synchronized marching');
 assert(at(2850).players.filter(p=>!p.dead).every(p=>p.pose==='duck'),'survivors react to the impact too');
 assert.equal(at(2850).players[0].x,at(2800).players[0].x,'struck actor must remain at the impact location');
 assert(at(3200).players.filter(p=>!p.dead).every(p=>p.pose==='look'),'short recovery follows the impact');
@@ -41,7 +48,7 @@ assert.deepEqual(at(7700).players,at(9700).players,'no wandering after the resul
 // Verify impact alignment and every warning across complete, real generated flows.
 for(const n of [2,3,8,30,100,200])for(const seed of [1,42,912]){
  const flow=buildSurvivalScene({participants:Array.from({length:n},(_,i)=>'P'+i),winners:['P0'],durationMs:null},seed);
- assert(flow.rounds[0].at<=3000,'opening may not consume six seconds without a disaster');
+ assert(flow.rounds[0].at<=4500,'opening may not consume six seconds without a disaster');
  for(const round of flow.rounds){
   const before=sampleSurvivalScene(flow,round.at-300);
   assert(before.warning,'every disaster must be foreshadowed');

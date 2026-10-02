@@ -15,4 +15,9 @@ assert(bolt.includes('feGaussianBlur'),'lightning must have luminous diffuse glo
 assert(bolt.includes('data-bolt-contact')&&bolt.includes('cx="50"')&&bolt.includes('cy="60"'),'bolt contact must coincide with actual strike endpoint');
 const wave=renderToStaticMarkup(api.default({fx:fx('wave')}));
 assert(wave.includes('data-wave-foam'),'wave needs a distinct foam crest that travels with the water');
+const meteor=renderToStaticMarkup(api.default({fx:fx('meteor'),ageMs:350}));
+assert(meteor.includes('data-meteor-rock'),'meteor must have an actual rock head');
+assert(!meteor.includes('polyline'),'meteors must not reuse jagged lightning paths');
+const meteorHit=renderToStaticMarkup(api.default({fx:fx('meteor'),ageMs:0}));
+assert(meteorHit.includes('left:50%')&&meteorHit.includes('top:60%'),'rock must contact the actor when the server-clock impact starts, not after the victim flies away');
 console.log('PASS stage-relative hail, continuous shaded funnel, bounded non-emoji debris');

@@ -5,12 +5,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {EventClockStyles} from "@/components/event-shared/EventClockStyles";
 import {useEventScene} from "@/components/event-shared/useEventScene";
-import {buildSurvivalScene,sampleSurvivalScene} from "@/lib/eventSurvivalScene";
+import {buildSurvivalScene,sampleSurvivalScene,survivalDialogue} from "@/lib/eventSurvivalScene";
 import {eventSeed,seededRandom} from "@/lib/eventPlayback";
 import EventRoster from '@/components/event-shared/EventRoster';
 import SurvivalCharacter from '@/components/event-shared/SurvivalCharacter';
 import SurvivalDisaster, {SurvivalArtStyles,SurvivalWarning} from '@/components/event-shared/SurvivalDisaster';
 import SurvivalReaction, {SurvivalReactionStyles} from '@/components/event-shared/SurvivalReaction';
+import SurvivalWinnerLineup from '@/components/event-shared/SurvivalWinnerLineup';
 
 const ROSE = "#7B2D43";
 const GOLD = "#F0C45A";
@@ -95,11 +96,13 @@ export default function SurvivalLiveWidget() {
   const demoScene=useMemo(()=>names?buildSurvivalScene({id:'preview',kind:'survival',status:'result',startedAt:'2030-01-01',durationMs:0,participants:names,winners:names.filter((_,i)=>survivorIds.has(i))},42):null,[names,survivorIds]);
   const frame=preview&&demoScene?sampleSurvivalScene(demoScene,demoElapsed):shared.scene?sampleSurvivalScene(shared.scene,shared.elapsed):null;
   const players=frame?.players||demoPlayers;
+  const castSeed=preview?eventSeed(names?.join('\u0000')||'preview'):shared.payload?.playback?.seed??eventSeed(shared.event?.id||'waiting');
   const phase=frame?.phase||"ready";
   const message=frame?.message||null;
   const winners=frame?.winners||[];
   const fx=frame?.fx||null;
   const bursts=frame?.bursts||[];
+  const dialogue=frame?survivalDialogue(frame,preview?demoElapsed:shared.elapsed):[];
   const total=preview?demoTotal:(shared.event?.participants.length||0);
   const winnerCount=preview?demoWinnerCount:(shared.event?.winner_count||shared.event?.survivors?.length||1);
 
@@ -366,8 +369,11 @@ export default function SurvivalLiveWidget() {
       minHeight: "100vh", position: "relative", overflow: "hidden",
       display: "flex", alignItems: "flex-start", justifyContent: "center", background: "transparent",
       paddingTop: "1.5vh" }}>
-      <link rel="preload" as="image" href="/event-art/survival-tornado-v2.png"/>
+      <link rel="preload" as="image" href="/event-art/storm-puff-00.png"/>
+      <link rel="preload" as="image" href="/event-art/storm-puff-05.png"/>
       <link rel="preload" as="image" href="/event-art/survival-tsunami-v2.png"/>
+      <link rel="preload" as="image" href="/event-art/survival-athletes-run-cycle-v1.png"/>
+      <link rel="preload" as="image" href="/event-art/survival-artists-run-cycle-v1.png"/>
       <EventClockStyles elapsedMs={shared.elapsed} localAgeMs={fx?shared.elapsed-fx.key:undefined} sync={shared.sync}/>
       <SurvivalArtStyles/>
       <SurvivalReactionStyles/>
@@ -376,8 +382,8 @@ export default function SurvivalLiveWidget() {
         @keyframes survivalDuck{0%,100%{transform:scaleY(.78) rotate(-7deg)}50%{transform:scaleY(.86) rotate(7deg)}}
         @keyframes survivalLook{0%,40%,100%{transform:rotate(-8deg)}50%,80%{transform:rotate(8deg)}}
         @media(prefers-reduced-motion:reduce){[data-survival-art]{animation:none!important}.survival-stage *{transition:none!important}}
-        .survival-stage{width:min(96vw,64.5vh);aspect-ratio:3/4;height:auto;container-type:inline-size}
-        @supports(height:100dvh){.survival-stage{width:min(96vw,64.5dvh)}}
+        .survival-stage{width:min(96vw,96vh);aspect-ratio:1/1;height:auto;container-type:inline-size}
+        @supports(height:100dvh){.survival-stage{width:min(96vw,96dvh)}}
         @keyframes rainfall{to{transform:translateY(120vh)}}
         @keyframes flick{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
         @keyframes rise{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
@@ -404,7 +410,7 @@ export default function SurvivalLiveWidget() {
         @keyframes sparkFlick{0%,100%{opacity:1}33%{opacity:.15}66%{opacity:.9}}
       `}</style>
 
-      {/* 명단과 진행 장면을 읽기 쉽게 세로 공간을 확대한다. 바깥 여백은 투명 유지. */}
+      {/* 방송 중앙 정사각형 영역에 맞춘다. OBS에서는 비율을 유지해 확대/축소. */}
       <div className="survival-stage" style={{ position: "relative",
         borderRadius: 20, overflow: "clip",
         background: "radial-gradient(ellipse at 50% 110%,#345d55 0%,transparent 65%),linear-gradient(180deg,#171d32,#273749 65%,#223a37)",
@@ -446,11 +452,11 @@ export default function SurvivalLiveWidget() {
           </div>
         </div>
 
-        {phase === 'ready' ? <div style={{position:'absolute',inset:'110px 10px 62px',zIndex:30}}><EventRoster names={players.map(p=>p.name)} characters/></div> : null}
+        {phase === 'ready' ? <div style={{position:'absolute',inset:'110px 10px 62px',zIndex:30}}><EventRoster castSeed={castSeed} names={players.map(p=>p.name)} characters/></div> : null}
         <div data-survival-camera data-camera-scale={frame?.camera.scale||1} style={{position:'absolute',inset:0,pointerEvents:'none',transformOrigin:'50% 50%',transform:`scale(${frame?.camera.scale||1}) translate(${50-(frame?.camera.x||50)}%,${50-(frame?.camera.y||50)}%)`}}>
         {frame?.warning?<SurvivalWarning warning={frame.warning}/>:null}
         {fx && <div data-event-local-age style={{position:"absolute",inset:0,pointerEvents:"none"}}><SurvivalDisaster fx={fx} ageMs={Math.max(0,(preview?demoElapsed:shared.elapsed)-fx.key)} /></div>}
-        {(phase === 'ready' ? [] : players).map((p) => {
+        {(phase === 'ready' || done ? [] : players.filter(p=>!p.dead)).map((p) => {
           const isW = winnerIdSet.has(p.id);
           const scale = isW ? (done ? (multi ? 1.7 : 2.6) : 1.7) : aliveCount <= 6 ? 1.4 : aliveCount <= NAME_SHOW_AT ? 1.15 : 1;
           // 단독 우승이면 가운데로 모음. 다중이면 제자리 강조.
@@ -463,6 +469,7 @@ export default function SurvivalLiveWidget() {
               opacity: p.dead ? 0 : 1, visibility:p.hit?'hidden':undefined, display: "flex", flexDirection: "column", alignItems: "center", gap: 1,
               zIndex: isW ? 30 : 10 }}>
               {isW && done && <div style={{ fontSize: multi ? 15 : 18, animation: "crownBounce 1s ease-in-out infinite" }}>👑</div>}
+              {dialogue.find(d=>!d.impact&&d.actorId===p.id)?<span data-survival-speech="warning" style={{position:'absolute',bottom:'100%',left:'50%',transform:'translateX(-50%)',whiteSpace:'nowrap',background:'#fff9e7',color:'#241520',border:'3px solid #241520',borderRadius:'12px 12px 12px 2px',padding:'5px 9px',fontSize:'clamp(18px,3.4cqw,28px)',fontWeight:900,boxShadow:'0 3px 0 #241520',zIndex:32}}>{dialogue.find(d=>!d.impact&&d.actorId===p.id)!.text}</span>:null}
               {!p.dead && (showNames || isW) && (
                 <span style={{ fontSize: isW && done ? (multi ? 12 : 14) : isW ? 12 : 10, fontWeight: 900,
                   color: isW ? "#231018" : "#fff", whiteSpace: "normal",maxWidth:'24cqw',overflowWrap:'anywhere',textAlign:'center',
@@ -471,7 +478,7 @@ export default function SurvivalLiveWidget() {
                   boxShadow: isW && done ? "0 4px 14px rgba(240,196,90,.6)" : "none" }}>{p.name}</span>
               )}
               <div style={{ animation: isW ? "flick .6s ease-in-out infinite" : "none" }}>
-                <SurvivalCharacter index={p.id} total={Math.max(8,aliveCount)} hit={p.hit} zap={p.hit && p.dtype === "lightning"} winner={isW} moving={phase === 'running' && !p.dead} pose={p.pose} facing={p.facing}/>
+                <SurvivalCharacter castSeed={castSeed} index={p.id} total={Math.max(8,aliveCount)} hit={p.hit} zap={p.hit && p.dtype === "lightning"} winner={isW} moving={phase === 'running' && !p.dead} pose={p.pose} facing={p.facing} elapsedMs={'strideElapsedMs' in p ? p.strideElapsedMs as number : 0}/>
               </div>
               {isW && <div style={{ position: "absolute", inset: done && !multi ? -50 : -28, borderRadius: "50%",
                 background: "radial-gradient(circle,rgba(240,196,90,.55),transparent 70%)",
@@ -486,28 +493,10 @@ export default function SurvivalLiveWidget() {
             animation: `confetti ${1.4 + decorRandom() * 1.2}s linear ${decorRandom() * 1.1}s infinite` }} />
         ))}
 
-        {bursts.map(b=><SurvivalReaction key={b.id} type={b.dtype} index={Number(b.id.split("-")[0])} total={Math.max(8,aliveCount)} x={b.x} y={b.y} ageMs={fx?Math.max(0,(preview?demoElapsed:shared.elapsed)-fx.key):0}/>)}
+        {bursts.map(b=><SurvivalReaction castSeed={castSeed} key={b.id} type={b.dtype} index={Number(b.id.split("-")[0])} total={Math.max(8,aliveCount)} x={b.x} y={b.y} speech={dialogue.find(d=>d.impact&&d.actorId===Number(b.id.split('-')[0]))?.text} ageMs={fx?Math.max(0,(preview?demoElapsed:shared.elapsed)-fx.key):0}/>)}
         </div>
 
-        {/* [2026-07-26 사장님] 다중 당첨자 명단 패널 — 여러 명일 때 하단에 크게, 잘 보이게 */}
-        {done && multi && (
-          <div style={{ position: "absolute", left: "50%", bottom: preview ? 66 : 18, transform: "translateX(-50%)",
-            zIndex: 45, maxWidth: "92%", padding: "12px 18px 13px", borderRadius: 16,
-            background: "rgba(18,10,16,.88)", border: `2px solid ${GOLD}`,
-            boxShadow: "0 8px 32px rgba(0,0,0,.55), 0 0 24px rgba(240,196,90,.35)",
-            animation: "winnerPanelIn .5s ease", textAlign: "center" }}>
-            <div style={{ fontSize: 17, fontWeight: 900, color: GOLD, marginBottom: 8, textShadow: "0 1px 6px #000" }}>
-              🏆 당첨자 {winners.length}명 🏆
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 7 }}>
-              {winners.map((w) => (
-                <span key={w.id} style={{ fontSize: 16, fontWeight: 900, color: "#231018",
-                  background: GOLD, padding: "4px 13px", borderRadius: 999, lineHeight: 1.4,
-                  boxShadow: "0 3px 10px rgba(240,196,90,.45)" }}>{w.name}</span>
-              ))}
-            </div>
-          </div>
-        )}
+        {done && <SurvivalWinnerLineup winners={winners} castSeed={castSeed} gift={preview?'':String(shared.event?.winner_note||'')}/>}
 
         {/* 진행자 컨트롤 — 미리보기(?preview=1)에서만. 실제 방송은 관리자 ▶돌리기가 서버로 트리거한다. */}
         {preview && previewControls ? (

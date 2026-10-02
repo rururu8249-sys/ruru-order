@@ -7,7 +7,8 @@ for(const n of [2,3,5,16,30,100,200]){
  assert(duration>=3500,'short rosters still have an opening and impact reaction');
  const input={id:'x',kind:'survival',status:'result',startedAt:'2030-01-01',durationMs:duration,participants:names,winners};
  const scene=s.buildSurvivalScene(input,42);
- assert(scene.rounds[0].at>=2000&&scene.rounds[0].at<=3000,'opening needs anticipation without six-second filler');
+ assert(scene.rounds[0].at>=3000&&scene.rounds[0].at<=4500,'opening gives viewers time to recognise the cast without six-second filler');
+ for(let i=1;i<scene.rounds.length;i++)assert(scene.rounds[i].at-scene.rounds[i-1].at>=2100,'impact, recovery and next warning must not become continuous frantic action');
  assert(duration-scene.rounds.at(-1).at<=1000,'announce promptly after final impact');
  if(scene.rounds.length>1)assert(scene.rounds.at(-1).at-scene.rounds.at(-2).at<=2600,'final duel cannot be stretched');
  assert.equal(scene.durationMs,duration);
@@ -21,6 +22,7 @@ for(const n of [2,3,5,16,30,100,200]){
  const yesterday={...input,durationMs:previous};
  assert.equal(p.makePlayback(yesterday).durationMs,previous,'previous deployed timeline remains playable');
  assert.equal(s.buildSurvivalScene(yesterday,42).durationMs,previous);
+ if(n===100){const compact={...input,durationMs:49350};assert.equal(p.makePlayback(compact)?.durationMs,49350,'already stored compact events remain readable');assert.equal(s.buildSurvivalScene(compact,42).rounds[0].at,2800);}
  for(const player of scene.players){assert(player.x>0&&player.x<100);assert(player.y>25&&player.y<88);}
 }
 console.log('PASS short final impact/duel, opening, both historical timelines, exact shared completion');

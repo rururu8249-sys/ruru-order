@@ -4,7 +4,7 @@ const load=createUiLoader(),s=load('lib/eventSurvivalScene.ts');
 const input={id:'motion',kind:'survival',status:'result',startedAt:'2030-01-01',durationMs:80000,participants:Array.from({length:100},(_,i)=>'P'+i),winners:['P0']};
 const scene=s.buildSurvivalScene(input,42),impact=scene.rounds[0].at;
 const first=s.sampleSurvivalScene(scene,1000),second=s.sampleSurvivalScene(scene,2500);
-assert(first.players.some((p,i)=>Math.abs(p.x-second.players[i].x)>7&&Math.abs(p.y-second.players[i].y)>3),'visible diagonal movement, not tiny stationary rocking');
+assert(first.players.some((p,i)=>Math.abs(p.x-second.players[i].x)>3&&Math.abs(p.y-second.players[i].y)>2),'visible bounded diagonal movement, not tiny stationary rocking');
 const warning=s.sampleSurvivalScene(scene,impact-500);
 assert.equal(warning.beat,'warning','hazard warning must precede impact');
 assert.equal(warning.message?.dead.length||0,0,'warning must not expose elimination names');

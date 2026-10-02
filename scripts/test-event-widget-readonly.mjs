@@ -10,6 +10,8 @@ globalThis.requestAnimationFrame=()=>++n;globalThis.cancelAnimationFrame=()=>{};
 globalThis.window={location:{origin:'http://localhost:3000',search:'?sound=0&showResult=1'},setTimeout:timeout,clearTimeout:id=>timers.delete(id),innerWidth:1280,innerHeight:720,AudioContext:class{constructor(){audio++;}},addEventListener(){},removeEventListener(){}};
 globalThis.document={documentElement:{style:{}},body:{style:{}},visibilityState:'visible',addEventListener(){},removeEventListener(){}};
 globalThis.Audio=class{constructor(){audio++;}play(){return Promise.resolve();}pause(){}};
+// Canvas textures are browser Image resources; renderer fixtures have no DOM.
+globalThis.Image=class{set src(value){this.onerror?.();}};
 const load=createUiLoader();
 const {calculateEventDurationMs}=load('lib/eventPlayback.ts');
 const paths={survival:'app/event-survival/live/page.tsx',race:'app/event-race/live/page.tsx',roulette:'components/event-roulette/EventRouletteOverlayClient.tsx',claw:'components/event-claw/EventClawOverlayClient.tsx',mission:'app/event-mission/live/page.tsx'};
@@ -17,7 +19,7 @@ for(const [kind,path] of Object.entries(paths)){
  for(const scenario of ['late','future','running']){
  timers.clear();requests=[];audio=0;
  const now=Date.now(),key='fixture-'+kind;
- const startMs=now+(scenario==='future'?30000:scenario==='running'?-3000:-120000);
+ const startMs=now+(scenario==='future'?30000:scenario==='running'?(kind==='survival'?-4600:-3000):-120000);
  globalThis.fetch=async(url,init)=>{requests.push({url,init});assert(!init?.method||init.method==='GET','display must never POST');return {ok:true,status:200,json:async()=>({ok:true,active:true,server_now:now,started_at:new Date(startMs).toISOString(),title:'fixture mission',goalType:'orders',goal:1,current:1,pct:scenario==="late"?100:63,reward:1000,playback:{version:1,key,kind,seed:0,startedAtMs:startMs,durationMs:kind==="mission"?1:calculateEventDurationMs(kind,["A","B","C"],["A"],0)},event:{id:key,title:'fixture '+requests.length,status:'result',participants:[{nickname:'A'},{nickname:'B'},{nickname:'C'}],survivors:['A'],winner_nickname:'A',winner_note:'fixture gift',spin_started_at:new Date(startMs).toISOString(),result_at:new Date(startMs).toISOString(),updated_at:new Date(now+requests.length*1000).toISOString()}})};};
  let tree;const Widget=load(path).default;
  const realRandom=Math.random;
@@ -33,9 +35,27 @@ for(const [kind,path] of Object.entries(paths)){
  assert(surface.length,kind+' '+scenario+' must show '+expected+', never restart the timeline');
  assert(tree.root.findAll(n=>n.props['data-event-clock']==='shared').length,kind+' CSS animation clock must be shared as well');
  assert.equal(audio,0,kind+' admin sound=0 must not instantiate audio');
+ if(kind==='survival'){
+  const css=tree.root.findAllByType('style').map(n=>n.children.join('')).join('\n');
+  assert.match(css,/\.survival-stage\{[^}]*aspect-ratio:1\/1/,'broadcast stage must fit the requested square region without stretching');
+  assert.match(css,/width:min\(96vw,96(?:d)?vh\)/,'square must be bounded by both source width and source height');
+  // Missing hints make the first moving frame wait for a newly requested sheet.
+  const links=tree.root.findAllByType('link');
+  for(const asset of ['survival-athletes-run-cycle-v1.png','survival-artists-run-cycle-v1.png'])
+   assert(links.some(n=>n.props.rel==='preload'&&n.props.as==='image'&&n.props.href==='/event-art/'+asset),'mounted survival surface must preload '+asset);
+ }
  if(kind==='survival'&&scenario==='running'){
+   const bodies=tree.root.findAll(n=>typeof n.props['data-survival-character']==='number');
+   for(const body of bodies)assert.equal(body.props['aria-label'],['시나모롤','짱아','유리'][body.props['data-survival-character']],'production seed=0 must reach actor and victim reaction');
    assert.equal(new Set(tree.root.findAll(n=>typeof n.props['data-survival-character']==='number').map(n=>n.props['data-survival-character'])).size,3,'survival must render character artwork, not stick figures');
    assert(tree.root.findAll(n=>n.props['data-survival-reaction']).length,'a disaster victim must react as a character, not just an emoji');
+ }
+ if(kind==='survival'&&scenario==='late'){
+  assert.equal(tree.root.findAll(n=>typeof n.props['data-survival-character']==='number').length,1,'completed widget must remove eliminated characters instead of updating invisible artwork');
+  assert.equal(tree.root.findByProps({'data-winner-gift':true}).children.join(''),'fixture gift','saved production reward must reach the result screen');
+ }
+ if(kind==='survival'&&scenario==='future'){
+  for(const body of tree.root.findAll(n=>typeof n.props['data-survival-character']==='number'))assert.equal(body.props['aria-label'],['시나모롤','짱아','유리'][body.props['data-survival-character']],'waiting roster must match running cast');
  }
  if(kind==='claw'){
   const css=tree.root.findAllByType('style').map(n=>n.children.join('')).join('\n');

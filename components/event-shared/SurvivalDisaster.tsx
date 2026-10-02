@@ -3,23 +3,23 @@ import SurvivalDisasterSprite from './SurvivalDisasterSprite';
 import {eventSeed,seededRandom} from '@/lib/eventPlayback';
 
 export type SurvivalVisualFx={type:string;key:number;accent:string;streaks:{id:number;pts:string;br:string[]}[]};
+function MeteorRock({x,y,size=6,opacity=1}:{x:number;y:number;size?:number;opacity?:number}){
+ return <div data-meteor-rock aria-hidden="true" style={{position:'absolute',left:`${x}%`,top:`${y}%`,width:`${size}%`,aspectRatio:'1',transform:'translate(-50%,-50%) rotate(-25deg)',opacity}}>
+  <div style={{position:'absolute',bottom:'30%',left:'5%',width:'90%',height:'360%',background:'linear-gradient(to top,#fff4b5 0%,#ff9d33 25%,#e64c1e66 60%,transparent)',clipPath:'polygon(0 100%,22% 0,42% 44%,63% 2%,80% 46%,100% 100%)',filter:'blur(2px)'}}/>
+  <div style={{position:'absolute',inset:'-45%',backgroundImage:'url(/event-art/storm-fire.png)',backgroundSize:'100% 100%'}}/>
+  <div style={{position:'absolute',inset:0,background:'radial-gradient(ellipse at 30% 24%,#a3998c,#4a3f39 46%,#211a16 80%)',clipPath:'polygon(13% 9%,56% 0,92% 23%,100% 69%,70% 96%,29% 100%,0 65%,4% 30%)',boxShadow:'inset 3px 3px 4px #d8bda3'}}/>
+ </div>;
+}
 // Pure server-clock progress: no local CSS loop and no knowledge of victims.
 export function SurvivalWarning({warning}:{warning:{type:string;progress:number}}){
  const p=Math.max(0,Math.min(1,warning.progress)),wave=warning.type==='wave',meteor=warning.type==='meteor';
  return <div data-survival-warning={warning.type} data-warning-progress={p.toFixed(3)} aria-hidden="true" style={{position:'absolute',inset:0,zIndex:18,pointerEvents:'none',overflow:'hidden',background:`radial-gradient(ellipse at center,transparent 35%,rgba(7,11,28,${.15+p*.3}) 100%)`}}>
-  <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{position:'absolute',inset:0,width:'100%',height:'100%'}}>
-   {wave?<g transform={`translate(${-28+p*13} 0)`} opacity={.45+p*.45}>
-    <path d="M0 100V43Q10 30 16 18Q25 2 32 15Q38 26 23 33Q36 36 40 55L40 100Z" fill="#197eb2"/>
-    <path d="M1 43Q10 30 16 18Q25 2 32 15Q38 26 23 33" fill="none" stroke="#c8f6ff" strokeWidth="2"/>
-   </g>:meteor?<g opacity={.35+p*.5} transform={`translate(${p*8} ${p*9})`}>
-    {[14,46,75].map(x=><g key={x}><path d={`M${x-12} 0L${x} 12`} stroke="#ff8846" strokeWidth="2"/><circle cx={x} cy="12" r="2.5" fill="#ffd06a"/></g>)}
-   </g>:warning.type==='wind'?<g fill="none" stroke="#b2dde2" strokeWidth="1" opacity={.3+p*.4} transform={`translate(${-18+p*18} 0)`}>
-    {[23,36,49].map(y=><path key={y} d={`M0 ${y}Q20 ${y-7} 42 ${y}T83 ${y}Q96 ${y+8} 85 ${y+12}`}/>)}
-   </g>:<g transform={`translate(0 ${-7+p*6})`}>
-    <path d="M0 26V0H100V24Q88 33 80 23Q64 33 58 23Q42 35 34 24Q20 34 12 24Q4 30 0 26Z" fill={warning.type==='hail'?'#97b9d8':'#11192f'} opacity={.5+p*.4}/>
-    {warning.type==='hail'?Array.from({length:10},(_,i)=><circle key={i} cx={7+i*9} cy={27+(i%3)*3+p*6} r={.8+i%2*.3} fill="#e4f6ff" opacity={.4+p*.5}/>):<path d="M20 18Q40 25 60 17T94 20" fill="none" stroke="#647bb6" strokeWidth=".8" opacity={p*.65}/>}
-   </g>}
-  </svg>
+  <div data-warning-weather style={{position:'absolute',inset:0}}>
+   {wave||warning.type==='wind'?<div style={{position:'absolute',left:`${-42+p*13}%`,bottom:wave?'0%':'15%',width:wave?'75%':'58%',opacity:.35+p*.5}}><SurvivalDisasterSprite kind={wave?'tsunami':'tornado'} ageMs={p*700}/></div>:meteor?<>{[14,46,75].map(x=><MeteorRock key={x} x={x+p*6} y={-8+p*22} size={4+p*2} opacity={.4+p*.5}/>)}</>:<>
+    {Array.from({length:12},(_,i)=><div key={i} style={{position:'absolute',left:`${-12+i*10}%`,top:`${-12+p*9+Math.sin(i*2+p*3)*3}%`,width:'28%',aspectRatio:'1.4',backgroundImage:`url(/event-art/storm-cloud-${i%2?'03':'01'}.png)`,backgroundSize:'100% 100%',filter:warning.type==='hail'?'brightness(.8) sepia(.15)':'brightness(.3) saturate(.5)',opacity:.5+p*.4}}/>)}
+    {warning.type==='hail'?Array.from({length:10},(_,i)=><div key={i} style={{position:'absolute',left:`${7+i*9}%`,top:`${19+(i%3)*3+p*6}%`,width:'1.5%',aspectRatio:'1',borderRadius:'40%',background:'radial-gradient(at 30% 20%,white,#b5d9ee)',opacity:.4+p*.5}}/>):null}
+   </>}
+  </div>
  </div>;
 }
 export function SurvivalArtStyles(){return <style>{`
@@ -41,13 +41,15 @@ export function SurvivalArtStyles(){return <style>{`
 export default function SurvivalDisaster({fx,ageMs=0}:{fx:SurvivalVisualFx;ageMs?:number}){
  const rand=seededRandom(eventSeed('visual:'+fx.key));
  const lightning=fx.type==='lightning',meteor=fx.type==='meteor';
+ const boltAge=Math.max(0,Number.isFinite(ageMs)?ageMs:0);
+ const boltOpacity=boltAge>=820?0:boltAge<160?1:boltAge<300?.55:boltAge<430?1:Math.max(0,(820-boltAge)/390);
  return <div data-survival-art data-disaster={fx.type} key={fx.key+':'+fx.type} style={{position:'absolute',inset:0,pointerEvents:'none',overflow:'hidden',zIndex:22}}>
   <div style={{position:'absolute',inset:0,background:lightning?'linear-gradient(#0c1434cc,transparent 55%)':fx.type==='wave'?'linear-gradient(transparent,#073a6a66)':fx.type==='wind'?'radial-gradient(ellipse,#527e8580,transparent 75%)':'none'}}/>
   {lightning&&<>
-   <div data-survival-flash style={{position:'absolute',inset:0,background:'#bdeeff',animation:'survivalStormPulse .8s ease-out both'}}/>
-   <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{width:'100%',height:'100%',position:'absolute',inset:0,animation:'survivalBolt .82s ease-out both'}}>
+   <div data-survival-flash style={{position:'absolute',inset:0,background:'#bdeeff',opacity:boltOpacity*.18}}/>
+   <svg data-lightning-bolts viewBox="0 0 100 100" preserveAspectRatio="none" style={{width:'100%',height:'100%',position:'absolute',inset:0,opacity:boltOpacity}}>
     <defs><filter id={`bolt-glow-${fx.key}`} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation=".65"/></filter></defs>
-    {fx.streaks.slice(0,24).map(s=><g key={s.id}>
+    {fx.streaks.slice(0,16).map(s=><g key={s.id}>
      <polyline points={s.pts} fill="none" stroke="#479cff" strokeWidth="13" opacity=".85" filter={`url(#bolt-glow-${fx.key})`} vectorEffect="non-scaling-stroke"/>
      <polyline points={s.pts} fill="none" stroke="#9eeaff" strokeWidth="4" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
      <polyline points={s.pts} fill="none" stroke="white" strokeWidth="1.4" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
@@ -56,8 +58,8 @@ export default function SurvivalDisaster({fx,ageMs=0}:{fx:SurvivalVisualFx;ageMs
     </g>)}
    </svg>
   </>}
-  {fx.type==='wave'&&<div data-wave-foam style={{position:'absolute',left:0,bottom:0,width:'130%',animation:'survivalWave .82s ease-out both'}}><SurvivalDisasterSprite kind="tsunami" ageMs={ageMs}/></div>}
-  {fx.type==='wind'&&<div data-tornado-funnel data-disaster-sprite="tornado" style={{position:'absolute',left:0,bottom:'8%',width:'80%',animation:'survivalTornado .82s ease-out both'}}><SurvivalDisasterSprite kind="tornado" ageMs={ageMs}/></div>}
+  {fx.type==='wave'&&<div data-wave-foam style={{position:'absolute',left:`${-80+Math.min(1,Math.max(0,ageMs)/850)*160}%`,bottom:0,width:'110%'}}><SurvivalDisasterSprite kind="tsunami" ageMs={ageMs}/></div>}
+  {fx.type==='wind'&&<div data-tornado-funnel data-disaster-sprite="tornado" style={{position:'absolute',left:`${-55+Math.min(1,Math.max(0,ageMs)/850)*130}%`,bottom:'8%',width:'80%'}}><SurvivalDisasterSprite kind="tornado" ageMs={ageMs} variant={fx.key%3}/></div>}
   {fx.type==='hail'&&<svg data-hail-field viewBox="0 0 100 100" preserveAspectRatio="none" style={{position:'absolute',inset:0,width:'100%',height:'100%'}}>
    <defs><radialGradient id={`ice-${fx.key}`} cx="30%" cy="20%"><stop stopColor="white"/><stop offset=".55" stopColor="#cbeaff"/><stop offset="1" stopColor="#688eb9"/></radialGradient></defs>
    {Array.from({length:36},(_,i)=>{const x=rand()*110,y=-12+rand()*22,r=.8+i%5*.25;return <g key={i} style={{animation:`survivalHail ${.6+rand()*.18}s linear ${i%5*.02}s both`}}>
@@ -66,7 +68,7 @@ export default function SurvivalDisaster({fx,ageMs=0}:{fx:SurvivalVisualFx;ageMs
    </g>})}
   </svg>}
   {meteor&&<>
-   {fx.streaks.slice(0,20).map(s=><svg key={s.id} viewBox="0 0 100 100" preserveAspectRatio="none" style={{position:'absolute',inset:0,width:'100%',height:'100%',animation:'survivalBolt .8s ease-out both'}}><polyline points={s.pts} fill="none" stroke="#e54425" strokeWidth="20" opacity=".22" vectorEffect="non-scaling-stroke"/><polyline points={s.pts} fill="none" stroke="#ffae38" strokeWidth="5" vectorEffect="non-scaling-stroke"/></svg>)}
+   {fx.streaks.slice(0,20).map(s=>{const [x,y]=s.pts.trim().split(/\s+/).at(-1)!.split(',').map(Number);return Number.isFinite(x)&&Number.isFinite(y)?<MeteorRock key={s.id} x={x} y={y} size={6} opacity={Math.max(0,1-Math.max(0,ageMs)/450)}/>:null;})}
    <div style={{position:'absolute',inset:0,background:'radial-gradient(ellipse at 50% 80%,#ff711966,transparent 65%)',animation:'survivalBolt .8s ease-out both'}}/>
   </>}
  </div>;
