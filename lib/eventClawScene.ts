@@ -44,7 +44,7 @@ export function sampleClawMotion(elapsedMs: number, seed: number, hasResult: boo
   const deepCable = 292;
   const midCable = 178;
 
-  const idleX = Math.sin(now / 1500) * 86;
+  const idleX = hasResult ? Math.sin(seed / 1500) * 86 : Math.sin(now / 1500) * 86;
 
   if (!hasResult) {
     return {
@@ -129,7 +129,7 @@ export function sampleClawMotion(elapsedMs: number, seed: number, hasResult: boo
   }
   t -= grabCatchMs;
 
-  if (t <= liftCatchMs) {
+  if (t < liftCatchMs) {
     return { phase: "lift-catch", x: catchX, cable: lerp(deepCable + 8, 126, t / liftCatchMs), clawClosed: true, showPrize: true, prizeX: catchX, prizeY: lerp(deepCable + 12, 160, t / liftCatchMs), showResult: false , isMiss: false};
   }
 

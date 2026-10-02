@@ -11,6 +11,7 @@ export function useEventPlayback<T extends Envelope=Envelope>({url}:{url:string}
   const retryRef=useRef<()=>void>(()=>{});
   const retry=useCallback(()=>retryRef.current(),[]);
   useEffect(()=>{
+    if(!url){setPayload(null);setSync('loading');setServerNowMs(0);return;}
     let disposed=false,sequence=0,controller:AbortController|null=null;
     let poll:number|undefined,deadline:number|undefined,raf=0;
     let anchor:ServerAnchor|null=null,lastSuccess=0,current:T|null=null,lastPaint=0;

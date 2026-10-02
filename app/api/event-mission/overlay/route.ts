@@ -30,6 +30,8 @@ export async function GET(request: NextRequest) {
       current: p.current,
       reward: p.reward,
       pct: p.pct,
+      started_at: p.startedAt || null,
+      server_now: Date.now(),
     });
   } catch (e) {
     return json({ ok: false, message: e instanceof Error ? e.message : String(e) }, 500);

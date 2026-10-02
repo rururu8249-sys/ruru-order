@@ -41,3 +41,11 @@ export function estimateServerAnchor(serverNowMs:number,sentMonoMs:number,receiv
   return {serverMs:serverNowMs+half,monoMs:receivedMonoMs,uncertaintyMs:half};
 }
 export function readServerTime(anchor:ServerAnchor,monoMs:number):number {return anchor.serverMs+Math.max(0,monoMs-anchor.monoMs);}
+export function seededRandom(seed:number):()=>number {
+  let state=seed>>>0;
+  return ()=>{state=(state+0x6D2B79F5)>>>0;let t=state;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};
+}
+export function winnerIndices(participants:string[],winners:string[]):number[] {
+  const used=new Set<number>();
+  return winners.map(name=>{const id=participants.findIndex((p,i)=>p===name&&!used.has(i));if(id>=0)used.add(id);return id;}).filter(id=>id>=0);
+}

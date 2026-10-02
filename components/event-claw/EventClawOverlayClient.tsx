@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from "react";
+import {EventClockStyles} from "@/components/event-shared/EventClockStyles";
+import {useEventPlayback} from "@/components/event-shared/useEventPlayback";
+import {eventSeed,type Playback} from "@/lib/eventPlayback";
 import {clawDurationMs as getClawTotalDurationMs, sampleClawMotion as getMotionState} from "@/lib/eventClawScene";
 
 type ClawEvent = {
+  id?: string;
   title?: string | null;
   status?: string | null;
   is_test?: boolean | null;
@@ -14,6 +18,8 @@ type ClawEvent = {
 };
 
 type OverlayPayload = {
+  server_now?:number;
+  playback?:Playback|null;
   ok: boolean;
   message?: string;
   event?: ClawEvent;
@@ -87,113 +93,26 @@ function pickPrizeKey(nickname: string, resultKey: string): PrizeKey {
 
 export default function EventClawOverlayClient({ initialToken }: EventClawOverlayClientProps) {
   const token = cleanText(initialToken) || FALLBACK_TOKEN;
-  const [event, setEvent] = useState<ClawEvent | null>(null);
-  const [message, setMessage] = useState("");
-  const [resultKey, setResultKey] = useState("");
-  const [animationStartedAt, setAnimationStartedAt] = useState(0);
-  const [now, setNow] = useState(() => Date.now());
-  const [machineSrc, setMachineSrc] = useState(`${ASSET_BASE}/claw-machine-main.png`);
-
-  useEffect(() => {
-    let cancelled = false;
-    // [2026-08-06 부하개선] 표시할 이벤트가 없을 땐 폴링을 늦추기 위한 플래그.
-    let hasEvent = false;
-
-    async function loadOverlay() {
-      try {
-        const response = await fetch(`/api/event-claw/overlay?token=${encodeURIComponent(token)}`, {
-          cache: "no-store",
-        });
-
-        const payload = (await response.json()) as OverlayPayload;
-
-        if (cancelled) return;
-
-        if (!payload.ok || !payload.event) {
-          hasEvent = false;
-          setEvent(null);
-          setMessage(payload.message || "표시할 인형뽑기 이벤트가 없습니다.");
-          return;
-        }
-
-        hasEvent = true;
-        setEvent(payload.event);
-        setMessage("");
-      } catch (error) {
-        if (cancelled) return;
-        hasEvent = false;
-        setEvent(null);
-        setMessage(error instanceof Error ? error.message : String(error));
-      }
-    }
-
-    // [2026-08-06 부하개선] 기존 setInterval(loadOverlay, 900) → 적응형 폴링.
-    // 이벤트가 떠 있는 동안엔 기존과 동일한 0.9초, 없을 땐 5초.
-    let timer: number | null = null;
-
-    const tick = async () => {
-      await loadOverlay();
-      if (cancelled) return;
-      timer = window.setTimeout(tick, hasEvent ? 900 : 5000);
-    };
-
-    void tick();
-
-    return () => {
-      cancelled = true;
-      if (timer !== null) window.clearTimeout(timer);
-    };
-  }, [token]);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 60);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const nextKey = makeResultKey(event);
-    if (nextKey && nextKey !== resultKey) {
-      setResultKey(nextKey);
-      setAnimationStartedAt(Date.now());
-    }
-  }, [event, resultKey]);
-
-  const winnerNickname = cleanText(event?.winner_nickname);
-  const winnerNote = cleanText(event?.winner_note) || "이벤트 당첨";
-  const hasResult = cleanText(event?.status) === "result" && Boolean(winnerNickname);
-  const resultDisplayKey = hasResult
-    ? [cleanText(event?.result_at), cleanText(event?.updated_at), winnerNickname].join("|")
-    : "";
-  const mountedAtRef = useRef(Date.now());
-  const resultEventTime = Date.parse(cleanText(event?.result_at) || cleanText(event?.updated_at) || "");
-  const isFreshResultForThisWidget =
-    Number.isFinite(resultEventTime) && resultEventTime >= mountedAtRef.current - 1000;
-  const seed = hashText(`${winnerNickname}|${resultKey}`);
-  const prizeKey = useMemo(() => pickPrizeKey(winnerNickname || "default", resultKey || "idle"), [winnerNickname, resultKey]);
-  const prizeSrc = PRIZE_ASSETS[prizeKey];
-  const missPrizeKey = pickPrizeKey((winnerNickname || "default") + "-miss", (resultKey || "idle") + "-miss");
-  const missPrizeSrc = PRIZE_ASSETS[missPrizeKey === prizeKey ? (Object.keys(PRIZE_ASSETS) as PrizeKey[]).filter((k) => k !== prizeKey)[0] : missPrizeKey];
-  const playAnimation = hasResult && isFreshResultForThisWidget;
-  const elapsedMs = playAnimation && animationStartedAt ? now - animationStartedAt : 0;
-  const motion = getMotionState(elapsedMs, seed, playAnimation, now);
-  const clawResultCardVisibleMs = 5000;
-
-  // 가장 단순하고 확실한 방식: 이번 판 경과시간이 연출 총길이를 넘으면 표시.
-  // 기억(ref) 없음 -> 이전 판 영향 없음, 시작하자마자 뜨는 일 구조적으로 불가능.
-  const clawTotalDurationMs = getClawTotalDurationMs(seed);
-  const animationFinished =
-    hasResult &&
-    animationStartedAt > 0 &&
-    elapsedMs >= clawTotalDurationMs &&
-    elapsedMs < clawTotalDurationMs + clawResultCardVisibleMs;
-
-  const resultCardVisible =
-    isFreshResultForThisWidget &&
-    Boolean(winnerNickname) &&
-    animationFinished;
+  const shared=useEventPlayback<OverlayPayload>({url:`/api/event-claw/overlay?token=${encodeURIComponent(token)}`});
+  const event=shared.payload?.event||null;
+  const message=shared.sync==="error"?"이벤트 연결을 확인해 주세요.":shared.sync==="checking"?"동기화 확인 중":"";
+  const resultKey=shared.payload?.playback?.key||event?.id||"idle";
+  const [machineSrc,setMachineSrc]=useState(`${ASSET_BASE}/claw-machine-main.png`);
+  const winnerNickname=cleanText(event?.winner_nickname);
+  const winnerNote=cleanText(event?.winner_note)||"이벤트 당첨";
+  const hasResult=cleanText(event?.status)==="result"&&!!winnerNickname;
+  const seed=shared.payload?.playback?.seed??eventSeed(event?.id||"");
+  const elapsedMs=shared.phase?.elapsedMs??(hasResult?getClawTotalDurationMs(seed):0);
+  const motion=getMotionState(elapsedMs,seed,hasResult&&shared.phase?.phase!=="waiting",shared.serverNowMs);
+  const prizeKey=useMemo(()=>pickPrizeKey(winnerNickname||"default",resultKey),[winnerNickname,resultKey]);
+  const prizeSrc=PRIZE_ASSETS[prizeKey];
+  const missPrizeKey=pickPrizeKey((winnerNickname||"default")+"-miss",resultKey+"-miss");
+  const missPrizeSrc=PRIZE_ASSETS[missPrizeKey===prizeKey?(Object.keys(PRIZE_ASSETS) as PrizeKey[]).filter(k=>k!==prizeKey)[0]:missPrizeKey];
+  const resultCardVisible=hasResult&&elapsedMs>=getClawTotalDurationMs(seed);
 
   return (
-    <main className="claw-root">
+    <main className="claw-root" data-event-clock={"shared"} data-event-key={resultKey} data-elapsed-ms={Math.round(elapsedMs)} data-event-phase={resultCardVisible?"done":hasResult&&shared.phase?.phase!=="waiting"?"running":"waiting"}>
+      <EventClockStyles elapsedMs={elapsedMs} sync={shared.sync}/>
       <style>{`
         html, body {
           margin: 0;

@@ -1,6 +1,9 @@
 "use client";
 
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import {EventClockStyles} from "@/components/event-shared/EventClockStyles";
+import {useEventPlayback} from "@/components/event-shared/useEventPlayback";
+import {calculateEventDurationMs,type Playback} from "@/lib/eventPlayback";
 
 type RouletteEvent = {
   id?: string;
@@ -17,6 +20,8 @@ type RouletteEvent = {
 };
 
 type OverlayPayload = {
+  server_now?:number;
+  playback?:Playback|null;
   ok?: boolean;
   message?: string;
   event?: RouletteEvent | null;
@@ -28,7 +33,7 @@ type EventRouletteOverlayClientProps = {
 
 const FALLBACK_TOKEN = "roulette_luludongi_live";
 const SPIN_TURNS = 30;
-const SPIN_MS = 9200;
+const SPIN_MS = calculateEventDurationMs("roulette",[],[],0);
 
 const COLORS = [
   "#ec4899",
@@ -301,8 +306,9 @@ function getLabelPoint(index: number, total: number) {
 }
 
 export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverlayClientProps) {
-  const [event, setEvent] = useState<RouletteEvent | null>(null);
-  const [message, setMessage] = useState("");
+  const shared=useEventPlayback<OverlayPayload>({url:`/api/event-roulette/overlay?token=${encodeURIComponent(getTokenFromLocation(initialToken))}`});
+  const event=shared.payload?.event||null;
+  const message=shared.sync==="error"?"이벤트 연결을 확인해 주세요.":shared.sync==="checking"?"동기화 확인 중":"";
   const [phase, setPhase] = useState<"idle" | "spinning" | "result">("idle");
   const [showResult, setShowResult] = useState(false);
   const [scale, setScale] = useState(0.72);
@@ -322,36 +328,7 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
   const isLocalDebugMode = Boolean(localDebugParticipants);
   const participants = localDebugParticipants || realParticipants;
   const winnerNickname = isLocalDebugMode ? "" : cleanText(event?.winner_nickname);
-  const resultDisplayKey =
-    !isLocalDebugMode && cleanText(event?.status) === "result" && winnerNickname
-      ? [cleanText(event?.result_at), cleanText(event?.updated_at), winnerNickname].join("|")
-      : "";
-  const mountedAtRef = useRef(Date.now());
-  const resultEventTime = Date.parse(cleanText(event?.result_at) || cleanText(event?.updated_at) || "");
-  const isFreshResultForThisWidget =
-    Number.isFinite(resultEventTime) && resultEventTime >= mountedAtRef.current - 1000;
-  const [resultCardVisible, setResultCardVisible] = useState(false);
-  const lastShownResultCardKeyRef = useRef("");
-
-  useEffect(() => {
-    if (!showResult || !winnerNickname || !resultDisplayKey || !isFreshResultForThisWidget) {
-      setResultCardVisible(false);
-      return;
-    }
-
-    if (lastShownResultCardKeyRef.current === resultDisplayKey) {
-      return;
-    }
-
-    lastShownResultCardKeyRef.current = resultDisplayKey;
-    setResultCardVisible(true);
-
-    const timeoutId = window.setTimeout(() => {
-      setResultCardVisible(false);
-    }, 5000);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [showResult, winnerNickname, resultDisplayKey, isFreshResultForThisWidget]);
+  const resultCardVisible=showResult&&!!winnerNickname;
 
   const eventIdentity = cleanText(event?.id) || cleanText(event?.overlay_token) || (event ? FALLBACK_TOKEN : "");
   const participantCount = Math.max(participants.length, 1);
@@ -367,159 +344,30 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
     setScale(getScaleFromLocation());
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    // [2026-08-06 부하개선] 표시할 이벤트가 없을 땐 폴링을 늦추기 위한 플래그.
-    let hasEvent = false;
-
-    const load = async () => {
-      try {
-        const token = getTokenFromLocation(initialToken);
-        const response = await fetch(`/api/event-roulette/overlay?token=${encodeURIComponent(token)}&_=${Date.now()}`, {
-          cache: "no-store",
-        });
-        const payload = (await response.json()) as OverlayPayload;
-
-        if (cancelled) return;
-
-        if (!payload.ok || !payload.event) {
-          hasEvent = false;
-          setEvent(null);
-          setMessage(payload.message || "표시할 룰렛 이벤트가 없습니다.");
-          setPhase("idle");
-          setShowResult(false);
-          return;
-        }
-
-        hasEvent = true;
-        setEvent(payload.event);
-        setMessage("");
-      } catch (error) {
-        if (cancelled) return;
-        hasEvent = false;
-        setEvent(null);
-        setMessage(error instanceof Error ? error.message : "룰렛 정보를 불러오지 못했습니다.");
-      }
-    };
-
-    // [2026-08-06 부하개선] 기존 setInterval(load, 900) → 적응형 폴링.
-    // 이벤트가 떠 있는 동안엔 기존과 동일한 0.9초(돌리기 반응속도 무변경),
-    // 표시할 이벤트가 없을 땐 5초로 낮춘다(OBS 소스만 켜둔 대기 상태의 상시 부하 제거).
-    let timer: number | null = null;
-
-    const tick = async () => {
-      await load();
-      if (cancelled) return;
-      timer = window.setTimeout(tick, hasEvent ? 900 : 5000);
-    };
-
-    void tick();
-
-    return () => {
-      cancelled = true;
-      if (timer !== null) window.clearTimeout(timer);
-    };
-  }, [initialToken]);
-
-  useEffect(() => {
-    if (!eventIdentity || !event) {
-      animationRef.current?.cancel();
-      animationRef.current = null;
-
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-
-      setPhase("idle");
-      setShowResult(false);
-      return;
+  useEffect(()=>{
+    const wheel=wheelRef.current;
+    if(!event||isLocalDebugMode||!winnerNickname||event.status!=="result"||shared.phase?.phase==="waiting"){
+      animationRef.current?.cancel();animationRef.current=null;
+      if(wheel)wheel.style.transform="rotate(0deg)";
+      setPhase("idle");setShowResult(false);return;
     }
-
-    const currentEvent = event;
-
-    const spinSignal = cleanText(currentEvent.spin_started_at) || cleanText(currentEvent.result_at) || cleanText(currentEvent.updated_at);
-    const key = `${eventIdentity}-${currentEvent.status || ""}-${spinSignal}-${currentEvent.winner_nickname || ""}`;
-
-    if (currentEvent.status === "result" && winnerNickname) {
-      if (lastAnimatedKeyRef.current === key) return;
-
-      lastAnimatedKeyRef.current = key;
-
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-
-      const wheel = wheelRef.current;
-      if (!wheel) return;
-
-      const winnerIndex = winnerIndexOf(participants, winnerNickname);
-      const safeWinnerIndex = winnerIndex >= 0 ? winnerIndex : 0;
-      const winnerCenterAngle = safeWinnerIndex * segmentAngle;
-      const finalAngle = SPIN_TURNS * 360 + (360 - winnerCenterAngle);
-
+    const elapsed=shared.phase?.elapsedMs??SPIN_MS;
+    const complete=elapsed>=SPIN_MS;
+    setPhase(complete?"result":"spinning");setShowResult(complete);
+    if(!wheel)return;
+    const index=winnerIndexOf(participants,winnerNickname);
+    if(index<0)return;
+    const finalAngle=SPIN_TURNS*360+(360-index*segmentAngle);
+    const key=shared.payload?.playback?.key||eventIdentity;
+    if(lastAnimatedKeyRef.current!==key||!animationRef.current){
       animationRef.current?.cancel();
-      animationRef.current = null;
-
-      wheel.style.transform = "rotate(0deg)";
-      wheel.getBoundingClientRect();
-
-      setShowResult(false);
-      setPhase("spinning");
-
-      const animation = wheel.animate(
-        [
-          { transform: "rotate(0deg)" },
-          { transform: `rotate(${finalAngle}deg)` },
-        ],
-        {
-          duration: SPIN_MS,
-          easing: "cubic-bezier(0.06, 0.8, 0.08, 1)",
-          fill: "forwards",
-        }
-      );
-
-      animationRef.current = animation;
-
-      timerRef.current = setTimeout(() => {
-        setPhase("result");
-        setShowResult(true);
-        timerRef.current = null;
-      }, SPIN_MS + 450);
-
-      return;
+      const animation=wheel.animate([{transform:"rotate(0deg)"},{transform:`rotate(${finalAngle}deg)`}],{duration:SPIN_MS,easing:"cubic-bezier(0.06, 0.8, 0.08, 1)",fill:"forwards"});
+      animation.pause();animationRef.current=animation;lastAnimatedKeyRef.current=key;
     }
+    animationRef.current.currentTime=Math.max(0,Math.min(SPIN_MS,elapsed));
+  },[event,eventIdentity,isLocalDebugMode,winnerNickname,participants,segmentAngle,shared.phase?.elapsedMs,shared.payload?.playback?.key]);
+  useEffect(()=>()=>{animationRef.current?.cancel();},[]);
 
-    if (currentEvent.status !== "result") {
-      animationRef.current?.cancel();
-      animationRef.current = null;
-
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-
-      if (wheelRef.current) {
-        wheelRef.current.style.transform = "rotate(0deg)";
-      }
-
-      setPhase("idle");
-      setShowResult(false);
-      lastAnimatedKeyRef.current = "";
-    }
-  }, [
-    eventIdentity,
-    event?.id,
-    event?.status,
-    event?.spin_started_at,
-    event?.result_at,
-    event?.winner_nickname,
-    event?.updated_at,
-    participants,
-    segmentAngle,
-    winnerNickname,
-  ]);
 
   const labelFontSize = labelLayout.fontSize;
 
@@ -536,7 +384,8 @@ export function EventRouletteOverlayClient({ initialToken }: EventRouletteOverla
   }, [isLocalDebugMode]);
 
   return (
-    <main className="roulette-overlay-root">
+    <main className="roulette-overlay-root" data-event-clock={"shared"} data-event-key={shared.payload?.playback?.key||eventIdentity} data-elapsed-ms={Math.round(shared.phase?.elapsedMs||0)} data-event-phase={phase==="result"?"done":phase==="spinning"?"running":"waiting"}>
+      <EventClockStyles elapsedMs={shared.phase?.elapsedMs||SPIN_MS} sync={shared.sync}/>
       <section className="roulette-stage" style={{ transform: `scale(${scale})` }} aria-label="루루동이 룰렛">
                                 <div className="pointer-wrap" aria-hidden="true">
           <div className="pointer-shadow" />

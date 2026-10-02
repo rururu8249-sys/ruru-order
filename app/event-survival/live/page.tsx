@@ -8,6 +8,10 @@
 //     실데이터 폴링(/api/event-survival/overlay)은 Phase 3에서 붙인다.
 //   - 돈/포인트 로직 없음. OBS 브라우저 소스로 사용.
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import {EventClockStyles} from "@/components/event-shared/EventClockStyles";
+import {useEventScene} from "@/components/event-shared/useEventScene";
+import {buildSurvivalScene,sampleSurvivalScene} from "@/lib/eventSurvivalScene";
+import {eventSeed,seededRandom} from "@/lib/eventPlayback";
 
 const ROSE = "#7B2D43";
 const GOLD = "#F0C45A";
@@ -122,20 +126,31 @@ type MsgState = { label: string; dead: string[] } | null;
 
 export default function SurvivalLiveWidget() {
   // 설정: preview 모드에서는 쿼리로 총원/생존자 수 조절 (기본 100명 중 1명 생존).
-  const [total, setTotal] = useState(100);
-  const [winnerCount, setWinnerCount] = useState(1);
+  const [demoTotal, setTotal] = useState(100);
+  const [demoWinnerCount, setWinnerCount] = useState(1);
   const [names, setNames] = useState<string[] | null>(null);
   const [survivorIds, setSurvivorIds] = useState<Set<number>>(new Set());
 
   const [mounted, setMounted] = useState(false); // SSR 후 클라 마운트 전까지 렌더 보류(hydration 불일치 방지)
   const [preview, setPreview] = useState(false);  // ?preview=1 이면 가짜 명단 데모(관리자 확인용)
   const [hasEvent, setHasEvent] = useState(false); // 실제 모드에서 서버 이벤트를 받았는지 (없으면 완전 투명)
-  const [players, setPlayers] = useState<Player[]>(() => makeScene(null, 100));
-  const [phase, setPhase] = useState<"ready" | "running" | "done">("ready");
-  const [message, setMessage] = useState<MsgState>(null);
-  const [winners, setWinners] = useState<Player[]>([]);
-  const [fx, setFx] = useState<FxState>(null);
-  const [bursts, setBursts] = useState<Burst[]>([]);
+  const [demoPlayers, setPlayers] = useState<Player[]>([]);
+  const [demoPhase, setPhase] = useState<"ready" | "running" | "done">("ready");
+  const [demoMessage, setMessage] = useState<MsgState>(null);
+  const [demoWinners, setWinners] = useState<Player[]>([]);
+  const [demoFx, setFx] = useState<FxState>(null);
+  const [demoBursts, setBursts] = useState<Burst[]>([]);
+
+  const shared=useEventScene({url:mounted&&!preview?`/api/event-survival/overlay?token=${TOKEN}`:"",kind:"survival",build:buildSurvivalScene});
+  const frame=shared.scene?sampleSurvivalScene(shared.scene,shared.elapsed):null;
+  const players=preview?demoPlayers:(frame?.players||[]);
+  const phase=preview?demoPhase:(frame?.phase||"ready");
+  const message=preview?demoMessage:(frame?.message||null);
+  const winners=preview?demoWinners:(frame?.winners||[]);
+  const fx=preview?demoFx:(frame?.fx||null);
+  const bursts=preview?demoBursts:(frame?.bursts||[]);
+  const total=preview?demoTotal:(shared.event?.participants.length||0);
+  const winnerCount=preview?demoWinnerCount:(shared.event?.winner_count||shared.event?.survivors?.length||1);
 
   const playersRef = useRef(players);
   useEffect(() => { playersRef.current = players; }, [players]);
@@ -220,7 +235,7 @@ export default function SurvivalLiveWidget() {
 
   // 실제 음원 파일 자동 인식: public/sfx/survival-번개.mp3 식으로 넣어두면 합성음 대신 사용
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || !soundOnRef.current) return;
     const kinds = ["lightning", "wave", "wind", "hail", "meteor", "win"];
     kinds.forEach((k) => {
       const url = `/sfx/survival-${k}.mp3`;
@@ -478,73 +493,18 @@ export default function SurvivalLiveWidget() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 실제 모드(OBS): 공개 오버레이 API 폴링. 결과 전이면 명단만 대기 표시,
-  //   위젯이 켜져 있는 동안 '새로' 확정된 결과에만 연출. 껐다 켜도(remount) 켠 시점의 옛 결과는 재생 안 함.
-  useEffect(() => {
-    if (!mounted || preview) return;
-    let alive = true;
-
-    const load = async () => {
-      try {
-        const res = await fetch(`/api/event-survival/overlay?token=${TOKEN}`, { cache: "no-store" });
-        const data = await res.json();
-        if (!alive || !data?.ok || !data.event) return;
-
-        const ev = data.event as {
-          status?: string;
-          participants?: { nickname?: string }[];
-          survivors?: string[];
-          winner_count?: number;
-          result_at?: string | null;
-          updated_at?: string | null;
-        };
-
-        const participantNames = Array.isArray(ev.participants)
-          ? ev.participants.map((p) => String(p?.nickname || "").trim()).filter(Boolean)
-          : [];
-        const survivorNames = Array.isArray(ev.survivors) ? ev.survivors : [];
-
-        // 아직 결과 전(idle/spinning): 참가자 명단만 대기 표시(연출 시작 안 함).
-        if (ev.status !== "result") {
-          firstLoadRef.current = false;
-          if (!running.current) {
-            const rkey = "roster:" + participantNames.join("|");
-            if (participantNames.length > 0) {
-              if (rkey !== rosterKeyRef.current) { rosterKeyRef.current = rkey; showRosterReady(participantNames, Number(ev.winner_count || 1)); }
-            } else if (rosterKeyRef.current !== "") { rosterKeyRef.current = ""; setHasEvent(false); }
-          }
-          return;
-        }
-
-        const key = `${ev.result_at || ""}|${ev.updated_at || ""}`;
-        if (!key || key === lastEventKeyRef.current) return; // 같은 판이면 아무것도 안 함
-
-        // 위젯을 켠 '시점에 이미' 확정돼 있던 옛 결과 → 재생하지 않고 명단만 대기 표시.
-        if (firstLoadRef.current) {
-          lastEventKeyRef.current = key;
-          firstLoadRef.current = false;
-          if (participantNames.length > 0) { rosterKeyRef.current = "roster:" + participantNames.join("|"); showRosterReady(participantNames, Number(ev.winner_count || survivorNames.length || 1)); }
-          else setHasEvent(false);
-          return;
-        }
-
-        // 위젯이 켜져 있는 동안 '새로' 확정된 결과 → 연출 시작.
-        if (survivorNames.length <= 0 || participantNames.length <= 0) return;
-        lastEventKeyRef.current = key;
-        rosterKeyRef.current = "";
-        startFromServer(participantNames, survivorNames, Number(ev.winner_count || survivorNames.length));
-      } catch {
-        /* 무시 — 다음 폴링에서 재시도 */
-      }
-    };
-
-    void load();
-    const t = setInterval(() => void load(), 2500);
-    return () => {
-      alive = false;
-      clearInterval(t);
-    };
-  }, [mounted, preview, startFromServer, showRosterReady]);
+  const soundCursor=useRef<{key:string;elapsed:number}|null>(null);
+  useEffect(()=>{
+    if(preview||!mounted)return;
+    if(!shared.event||!shared.scene)return;
+    const previous=soundCursor.current;
+    // No historical audio on late join, reconnect, or a new event.
+    if(previous?.key===shared.key&&shared.elapsed>=previous.elapsed&&shared.elapsed-previous.elapsed<=500){
+      for(const round of shared.scene.rounds)if(round.at>previous.elapsed&&round.at<=shared.elapsed)playSfx(round.dis.id);if(previous.elapsed<shared.scene.durationMs&&shared.elapsed>=shared.scene.durationMs)playSfx("win");
+    }
+    soundCursor.current={key:shared.key,elapsed:shared.elapsed};
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[preview,mounted,shared.scene,shared.event,shared.elapsed,shared.key]);
 
   useEffect(() => () => { running.current = false; clearT(); }, []);
 
@@ -553,13 +513,15 @@ export default function SurvivalLiveWidget() {
   // 클라 마운트 전(SSR 시점)에는 아무것도 안 그림 → Math.random 기반 렌더의 hydration 불일치 방지.
   if (!mounted) return null;
   // 실제 모드(OBS): 서버에 확정된 이벤트가 없으면 완전 투명(방송 화면에 빈 박스 안 뜨게).
-  if (!preview && !hasEvent) return null;
+  if(!preview&&!shared.event)return <EventClockStyles elapsedMs={0} sync={shared.sync}/>;
+  const decorRandom=seededRandom(eventSeed(shared.key||"demo"));
 
   return (
-    <div style={{ fontFamily: "'Pretendard','Apple SD Gothic Neo',sans-serif",
+    <div data-event-clock={preview?undefined:"shared"} data-event-key={preview?"demo":shared.key} data-elapsed-ms={preview?undefined:Math.round(shared.elapsed)} data-event-phase={phase} style={{ fontFamily: "'Pretendard','Apple SD Gothic Neo',sans-serif",
       minHeight: "100vh", position: "relative", overflow: "hidden",
       display: "flex", alignItems: "flex-start", justifyContent: "center", background: "transparent",
       paddingTop: "1.5vh" }}>
+      <EventClockStyles elapsedMs={shared.elapsed} localAgeMs={fx?shared.elapsed-fx.key:undefined} sync={shared.sync}/>
       <style>{`
         @keyframes rainfall{to{transform:translateY(120vh)}}
         @keyframes flick{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
@@ -597,9 +559,9 @@ export default function SurvivalLiveWidget() {
         border: "1px solid rgba(255,255,255,.14)", boxShadow: "0 12px 40px rgba(0,0,0,.4)" }}>
 
         {Array.from({ length: 20 }).map((_, i) => (
-          <div key={i} style={{ position: "absolute", top: "-10%", left: `${Math.random() * 100}%`,
+          <div key={i} style={{ position: "absolute", top: "-10%", left: `${decorRandom() * 100}%`,
             width: 1.5, height: 18, background: "linear-gradient(transparent,rgba(210,220,255,.5))",
-            animation: `rainfall ${0.5 + Math.random() * 0.5}s linear ${Math.random()}s infinite`,
+            animation: `rainfall ${0.5 + decorRandom() * 0.5}s linear ${decorRandom()}s infinite`,
             opacity: phase === "running" ? 0.5 : 0.2 }} />
         ))}
 
@@ -632,7 +594,7 @@ export default function SurvivalLiveWidget() {
           </div>
         </div>
 
-        {fx && <DisasterFX fx={fx} />}
+        {fx && <div data-event-local-age style={{position:"absolute",inset:0,pointerEvents:"none"}}><DisasterFX fx={fx} /></div>}
 
         {players.map((p) => {
           const isW = winnerIdSet.has(p.id);
@@ -665,9 +627,9 @@ export default function SurvivalLiveWidget() {
         })}
 
         {done && Array.from({ length: 32 }).map((_, i) => (
-          <div key={i} style={{ position: "absolute", top: 0, left: `${Math.random() * 100}%`,
+          <div key={i} style={{ position: "absolute", top: 0, left: `${decorRandom() * 100}%`,
             width: 6, height: 10, background: CONFETTI[i % CONFETTI.length], borderRadius: 2, zIndex: 35,
-            animation: `confetti ${1.4 + Math.random() * 1.2}s linear ${Math.random() * 1.1}s infinite` }} />
+            animation: `confetti ${1.4 + decorRandom() * 1.2}s linear ${decorRandom() * 1.1}s infinite` }} />
         ))}
 
         {bursts.map((b) => b.dtype === "lightning" ? (
@@ -738,6 +700,7 @@ export default function SurvivalLiveWidget() {
 }
 
 function DisasterFX({ fx }: { fx: NonNullable<FxState> }) {
+  const decorRandom=seededRandom(eventSeed(String(fx.key)));
   const { type, accent, streaks } = fx;
   if (type === "lightning" || type === "meteor") {
     const flash = type === "meteor" ? "rgba(255,140,80,.45)" : "rgba(255,255,255,.75)";
@@ -795,9 +758,9 @@ function DisasterFX({ fx }: { fx: NonNullable<FxState> }) {
       </div>
       {/* 앞쪽 물보라 스프레이 */}
       {Array.from({ length: 12 }).map((_, i) => (
-        <div key={"s" + i} style={{ position: "absolute", top: `${Math.random() * 90}%`, left: 0, width: "100%", height: 2,
+        <div key={"s" + i} style={{ position: "absolute", top: `${decorRandom() * 90}%`, left: 0, width: "100%", height: 2,
           background: "linear-gradient(90deg,transparent,rgba(220,245,255,.8),transparent)",
-          animation: `windSweep ${0.6 + Math.random() * 0.4}s ease-in ${Math.random() * 0.25}s` }} />
+          animation: `windSweep ${0.6 + decorRandom() * 0.4}s ease-in ${decorRandom() * 0.25}s` }} />
       ))}
     </div>);
   if (type === "wind") return (
@@ -811,9 +774,9 @@ function DisasterFX({ fx }: { fx: NonNullable<FxState> }) {
   if (type === "hail") return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 20 }}>
       {Array.from({ length: 18 }).map((_, i) => (
-        <div key={i} style={{ position: "absolute", top: 0, left: `${Math.random() * 100}%`,
+        <div key={i} style={{ position: "absolute", top: 0, left: `${decorRandom() * 100}%`,
           width: 8, height: 8, borderRadius: "50%", background: accent, boxShadow: `0 0 6px ${accent}`,
-          animation: `hailFall ${0.5 + Math.random() * 0.3}s linear ${Math.random() * 0.2}s` }} />
+          animation: `hailFall ${0.5 + decorRandom() * 0.3}s linear ${decorRandom() * 0.2}s` }} />
       ))}
     </div>);
   return null;

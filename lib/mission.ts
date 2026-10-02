@@ -28,6 +28,7 @@ export type MissionConfig = {
   title: string;
 };
 export type MissionProgress = MissionConfig & {
+  startedAt: string;
   current: number;
   pct: number;
   broadcastId: string;
@@ -181,11 +182,13 @@ export async function computeMissionProgress(supabase: Client): Promise<MissionP
   let current = 0;
   let broadcastId = "";
   let broadcastTitle = "";
+  let startedAt = "";
 
   if (bc && bc.started_at) {
     broadcastId = String(bc.id ?? "");
     broadcastTitle = String(bc.public_title ?? bc.title ?? "");
     const { start, end } = await resolveMissionWindow(supabase, bc, cfg.active);
+    startedAt = start;
     const rows = await fetchAllOrders(
       supabase,
       start,
@@ -200,7 +203,7 @@ export async function computeMissionProgress(supabase: Client): Promise<MissionP
   }
 
   const pct = cfg.goal > 0 ? Math.min(100, Math.round((current / cfg.goal) * 100)) : 0;
-  return { ...cfg, current, pct, broadcastId, broadcastTitle };
+  return { ...cfg, current, pct, broadcastId, broadcastTitle, startedAt };
 }
 
 // ── 2단계: 구매자 전원 지급용 ──

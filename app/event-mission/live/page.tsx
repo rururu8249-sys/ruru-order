@@ -5,10 +5,14 @@
 //   - 미션 OFF이거나 목표 미설정이면 아무것도 안 보임(완전 투명).
 //   - 돈/포인트 로직 없음. OBS 브라우저 소스로 사용.
 import { useEffect, useRef, useState } from "react";
+import {EventClockStyles} from "@/components/event-shared/EventClockStyles";
+import {useEventPlayback} from "@/components/event-shared/useEventPlayback";
 
 const TOKEN = "mission_luludongi_live";
 
 type MissionData = {
+  server_now?:number;
+  started_at?:string|null;
   ok: boolean;
   active?: boolean;
   title?: string;
@@ -33,13 +37,16 @@ const CONFETTI = Array.from({ length: 14 }, (_, i) => ({
 }));
 
 export default function MissionLiveWidget() {
-  const [data, setData] = useState<MissionData | null>(null);
+  const shared=useEventPlayback<MissionData>({url:`/api/event-mission/overlay?token=${TOKEN}`});
+  const data=shared.payload;
   const [preview, setPreview] = useState(false);
   // 바 폭(px). [2026-07-10] 사장님 지침 "가로 더 작게" → 560 → 470. ?w=520 처럼 조절 가능.
   const [barWidth, setBarWidth] = useState(470);
-  const [phase, setPhase] = useState(0); // 0=설명 문구, 1=진행 바 (4초마다 전환)
-  const [celebrate, setCelebrate] = useState(false); // 달성 순간 1회 반짝
-  const wasDoneRef = useRef(false);
+  const started=Date.parse(data?.started_at||"");
+  const elapsed=Number.isFinite(started)?Math.max(0,shared.serverNowMs-started):0;
+  const phase=Math.floor(elapsed/4000)%2;
+  // No persisted achievement timestamp exists; do not invent an eight-second replay.
+  const celebrate=false;
 
   useEffect(() => {
     document.documentElement.style.background = "transparent";
@@ -48,44 +55,7 @@ export default function MissionLiveWidget() {
     setPreview(q.get("preview") === "1");
     const w = Number(q.get("w"));
     if (Number.isFinite(w) && w >= 240 && w <= 1200) setBarWidth(w);
-    let alive = true;
-    const load = async () => {
-      try {
-        const res = await fetch(`/api/event-mission/overlay?token=${TOKEN}`, { cache: "no-store" });
-        const json = (await res.json()) as MissionData;
-        if (alive) setData(json);
-      } catch {
-        /* 무시 — 다음 폴링에서 재시도 */
-      }
-    };
-    load();
-    const t = setInterval(load, 4000);
-    return () => {
-      alive = false;
-      clearInterval(t);
-    };
   }, []);
-
-  // 문구 ↔ 진행 바 4초마다 전환
-  useEffect(() => {
-    const t = setInterval(() => setPhase((p) => (p === 0 ? 1 : 0)), 4000);
-    return () => clearInterval(t);
-  }, []);
-
-  // 100% 달성 "순간"에만 축하 연출(폭죽·반짝·🎉 튐)을 8초 재생하고, 이후엔 정적 고정 화면.
-  //   [2026-07-10 사장님 지침] 무한 반복은 산만 → CELEBRATE_MS 동안만.
-  useEffect(() => {
-    const livePct =
-      data && data.ok && data.active && data.goal && data.goal > 0 ? Math.min(100, data.pct || 0) : 0;
-    const isDone = livePct >= 100;
-    if (isDone && !wasDoneRef.current) {
-      wasDoneRef.current = true;
-      setCelebrate(true);
-      const to = setTimeout(() => setCelebrate(false), CELEBRATE_MS);
-      return () => clearTimeout(to);
-    }
-    if (!isDone) wasDoneRef.current = false; // 다시 100% 미만이면 재발동 가능(새 방송 등)
-  }, [data]);
 
   const liveOk = !!(data && data.ok && data.active && data.goal && data.goal > 0);
   if (!liveOk && !preview) {
@@ -106,6 +76,7 @@ export default function MissionLiveWidget() {
 
   return (
     <div
+      data-event-clock={preview?undefined:"shared"} data-event-key={data?.started_at||""} data-elapsed-ms={Math.round(elapsed)} data-event-phase={done?"done":Number.isFinite(started)&&shared.serverNowMs<started?"waiting":"running"}
       style={{
         fontFamily: "'Noto Sans KR', system-ui, sans-serif",
         display: "flex",
@@ -116,6 +87,7 @@ export default function MissionLiveWidget() {
         background: "transparent",
       }}
     >
+      <EventClockStyles elapsedMs={elapsed} sync={shared.sync}/>
       {/* [2026-07-10] 달성 연출 강화 — 금빛 반짝(무한) + 폭죽 낙하 + 🎉 튀는 효과.
           전부 CSS 애니메이션(표시 전용). 돈/지급 로직과 무관. */}
       <style>{`

@@ -7,6 +7,10 @@
 //   - 크기·채팅 안전 배치는 서바이벌 위젯과 동일(상단 63vh, 하단은 채팅 자리로 투명).
 //   - 돈/포인트 로직 없음. OBS 브라우저 소스로 사용.
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import {EventClockStyles} from "@/components/event-shared/EventClockStyles";
+import {useEventScene} from "@/components/event-shared/useEventScene";
+import {buildRaceScene,sampleRaceScene} from "@/lib/eventRaceScene";
+import {eventSeed,seededRandom} from "@/lib/eventPlayback";
 
 const ROSE = "#7B2D43";
 const GOLD = "#F0C45A";
@@ -162,23 +166,36 @@ function RunnerStick({ color, running, size, finished, hit, fallen }: { color: s
 }
 
 export default function RaceLiveWidget() {
-  const [total, setTotal] = useState(20);
-  const [winnerCount, setWinnerCount] = useState(1);
-  const [title, setTitle] = useState("🏁 루루동이 달리기 대회");
+  const [demoTotal, setTotal] = useState(20);
+  const [demoWinnerCount, setWinnerCount] = useState(1);
+  const [demoTitle, setTitle] = useState("🏁 루루동이 달리기 대회");
   const [names, setNames] = useState<string[] | null>(null);
   const [winnerOrder, setWinnerOrder] = useState<string[]>([]);
 
   const [mounted, setMounted] = useState(false);
   const [preview, setPreview] = useState(false);
   const [hasEvent, setHasEvent] = useState(false);
-  const [runners, setRunners] = useState<Runner[]>(() => makeRunners(null, 20, []));
-  const [phase, setPhase] = useState<"ready" | "countdown" | "running" | "done">("ready");
-  const [countText, setCountText] = useState("");
-  const [finishedRanks, setFinishedRanks] = useState<{ name: string; rank: number; color: string }[]>([]);
-  const [leader, setLeader] = useState("");        // 실시간 선두 닉네임(긴장감)
-  const [finalSprint, setFinalSprint] = useState(false); // 마지막 스퍼트 구간
-  const [items, setItems] = useState<ItemFx[]>([]); // 아이템 이펙트(바나나/부스터…)
-  const [shaking, setShaking] = useState(false);    // 큰 충돌 시 화면 흔들림
+  const [demoRunners, setRunners] = useState<Runner[]>([]);
+  const [demoPhase, setPhase] = useState<"ready" | "countdown" | "running" | "done">("ready");
+  const [demoCountText, setCountText] = useState("");
+  const [demoFinishedRanks, setFinishedRanks] = useState<{ name: string; rank: number; color: string }[]>([]);
+  const [demoLeader, setLeader] = useState("");        // 실시간 선두 닉네임(긴장감)
+  const [demoFinalSprint, setFinalSprint] = useState(false); // 마지막 스퍼트 구간
+  const [demoItems, setItems] = useState<ItemFx[]>([]); // 아이템 이펙트(바나나/부스터…)
+  const [demoShaking, setShaking] = useState(false);    // 큰 충돌 시 화면 흔들림
+  const shared=useEventScene({url:mounted&&!preview?`/api/event-race/overlay?token=${TOKEN}`:"",kind:"race",build:buildRaceScene});
+  const frame=shared.scene?sampleRaceScene(shared.scene,shared.elapsed):null;
+  const title=preview?demoTitle:(shared.event?.title||"달리기 대회");
+  const runners=preview?demoRunners:(frame?.runners||[]);
+  const phase=preview?demoPhase:(frame?.phase||"ready");
+  const countText=preview?demoCountText:(frame?.countText||"");
+  const finishedRanks=preview?demoFinishedRanks:(frame?.winners.map(r=>({name:r.name,rank:r.rank!,color:r.color}))||[]);
+  const leader=preview?demoLeader:(frame?.leader||"");
+  const finalSprint=preview?demoFinalSprint:(frame?.finalSprint||false);
+  const items=preview?demoItems:(frame?.items||[]);
+  const shaking=preview?demoShaking:(frame?.shaking||false);
+  const total=preview?demoTotal:(shared.event?.participants.length||0);
+  const winnerCount=preview?demoWinnerCount:(shared.event?.winner_count||shared.event?.survivors?.length||1);
   const shakingRef = useRef(false);
   const sprintFiredRef = useRef(false);
   const nextClutchRef = useRef(0);      // 결승선 덴탈(선두 비당첨자 미사일) 다음 발사 시각
@@ -224,7 +241,7 @@ export default function RaceLiveWidget() {
   const sfxFilesRef = useRef<Record<string, string>>({});
   const runLoopRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || !soundOnRef.current) return;
     ["start", "run", "finish"].forEach((k) => {
       const url = `/sfx/race-${k}.mp3`;
       const a = new Audio();
@@ -589,55 +606,25 @@ export default function RaceLiveWidget() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [names, winnerCount]);
 
-  // 실제 모드: 서버 폴링
-  useEffect(() => {
-    if (!mounted || preview) return;
-    let alive = true;
-    const load = async () => {
-      try {
-        const res = await fetch(`/api/event-race/overlay?token=${TOKEN}`, { cache: "no-store" });
-        const data = await res.json();
-        if (!alive || !data?.ok || !data.event) return;
-        const ev = data.event as {
-          title?: string; status?: string;
-          participants?: { nickname?: string }[]; survivors?: string[];
-          winner_count?: number; result_at?: string | null; updated_at?: string | null;
-        };
-        const pNames = Array.isArray(ev.participants) ? ev.participants.map((p) => String(p?.nickname || "").trim()).filter(Boolean) : [];
-        const wNames = Array.isArray(ev.survivors) ? ev.survivors.map((s) => String(s || "").trim()).filter(Boolean) : [];
-        const ttl = String(ev.title || "🏁 루루동이 달리기 대회");
-
-        if (ev.status !== "result") {
-          firstLoadRef.current = false;
-          if (phase !== "running" && phase !== "countdown") {
-            const rkey = "roster:" + pNames.join("|");
-            if (pNames.length > 0) { if (rkey !== rosterKeyRef.current) { rosterKeyRef.current = rkey; showRoster(pNames, Number(ev.winner_count || 1), ttl); } }
-            else if (rosterKeyRef.current !== "") { rosterKeyRef.current = ""; setHasEvent(false); }
-          }
-          return;
-        }
-        const key = `${ev.result_at || ""}|${ev.updated_at || ""}`;
-        if (!key || key === lastEventKeyRef.current) return;
-        if (firstLoadRef.current) {
-          lastEventKeyRef.current = key; firstLoadRef.current = false;
-          if (pNames.length > 0) { rosterKeyRef.current = "roster:" + pNames.join("|"); showRoster(pNames, Number(ev.winner_count || wNames.length || 1), ttl); }
-          else setHasEvent(false);
-          return;
-        }
-        if (wNames.length <= 0 || pNames.length <= 0) return;
-        lastEventKeyRef.current = key; rosterKeyRef.current = "";
-        beginRace(pNames, wNames, Number(ev.winner_count || wNames.length), ttl);
-      } catch { /* 다음 폴링 재시도 */ }
-    };
-    void load();
-    const t = setInterval(() => void load(), 2500);
-    return () => { alive = false; clearInterval(t); };
-  }, [mounted, preview, phase, showRoster, beginRace]);
+  const soundCursor=useRef<{key:string;elapsed:number}|null>(null);
+  useEffect(()=>{
+    if(preview||!mounted)return;
+    if(!shared.event||!shared.scene)return;
+    const previous=soundCursor.current;
+    if(previous?.key===shared.key&&shared.elapsed>=previous.elapsed&&shared.elapsed-previous.elapsed<=500){
+      if(previous.elapsed<2100&&shared.elapsed>=2100)playSfx("start");
+      if(previous.elapsed<8600&&shared.elapsed>=8600)playSfx("drumroll");
+      if(previous.elapsed<shared.scene.durationMs&&shared.elapsed>=shared.scene.durationMs)playSfx("finish");
+    }
+    soundCursor.current={key:shared.key,elapsed:shared.elapsed};
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[preview,mounted,shared.scene,shared.event,shared.elapsed,shared.key]);
 
   useEffect(() => () => { clearAll(); if (runLoopRef.current) runLoopRef.current.pause(); }, []);
 
   if (!mounted) return null;
-  if (!preview && !hasEvent) return null;
+  if(!preview&&!shared.event)return <EventClockStyles elapsedMs={0} sync={shared.sync}/>;
+  const decorRandom=seededRandom(eventSeed(shared.key||"demo"));
 
   // 레인 없음(마라톤 무리). 인원 많을수록 졸라맨 작게. 이름은 선두 소수 + 통과 당첨자만(글씨벽 방지).
   const figSize = total <= 16 ? 38 : total <= 35 ? 30 : total <= 60 ? 22 : total <= 90 ? 17 : 15;
@@ -653,9 +640,10 @@ export default function RaceLiveWidget() {
   //   현재 선두는 상단 HUD "현재 1위 OOO"로만 안내.
 
   return (
-    <div style={{ fontFamily: "'Pretendard','Apple SD Gothic Neo',sans-serif", minHeight: "100vh",
+    <div data-event-clock={preview?undefined:"shared"} data-event-key={preview?"demo":shared.key} data-elapsed-ms={preview?undefined:Math.round(shared.elapsed)} data-event-phase={phase} style={{ fontFamily: "'Pretendard','Apple SD Gothic Neo',sans-serif", minHeight: "100vh",
       position: "relative", overflow: "hidden", display: "flex", alignItems: "flex-start",
       justifyContent: "center", background: "transparent", paddingTop: "1.5vh" }}>
+      <EventClockStyles elapsedMs={shared.elapsed} sync={shared.sync}/>
       <style>{`
         @keyframes runBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
         @keyframes legF{0%{transform:rotate(38deg)}50%{transform:rotate(-32deg)}100%{transform:rotate(38deg)}}
@@ -797,9 +785,9 @@ export default function RaceLiveWidget() {
 
         {/* 완료: 색종이 + 당첨자 패널 */}
         {done && Array.from({ length: 30 }).map((_, i) => (
-          <div key={i} style={{ position: "absolute", top: 0, left: `${Math.random() * 100}%`, width: 6, height: 10,
+          <div key={i} style={{ position: "absolute", top: 0, left: `${decorRandom() * 100}%`, width: 6, height: 10,
             background: ["#F0C45A", "#7B2D43", "#6FC3E8", "#FF8A5A", "#fff"][i % 5], borderRadius: 2, zIndex: 35,
-            animation: `confetti ${1.3 + Math.random() * 1.1}s linear ${Math.random()}s infinite` }} />
+            animation: `confetti ${1.3 + decorRandom() * 1.1}s linear ${decorRandom()}s infinite` }} />
         ))}
         {done && finishedRanks.length > 0 && (
           <div style={{ position: "absolute", left: "50%", bottom: preview ? 60 : 16, transform: "translateX(-50%)",
