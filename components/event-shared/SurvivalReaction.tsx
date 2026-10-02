@@ -1,5 +1,5 @@
 "use client";
-import SurvivalCharacter from './SurvivalCharacter';
+import SurvivalCharacter,{survivalCharacterSize} from './SurvivalCharacter';
 
 export function SurvivalReactionStyles(){return <style>{`
 @keyframes reactionZap{0%{transform:scale(.9) rotate(-6deg);opacity:1}18%{transform:scale(1.12) rotate(7deg)}36%{transform:scale(1.05) rotate(-7deg)}65%{transform:translateY(-7px) rotate(5deg);opacity:1}100%{transform:translateY(28px) rotate(35deg) scale(.6);opacity:0}}
@@ -25,7 +25,7 @@ function ShockSkeleton(){return <svg data-reaction-xray viewBox="0 0 100 130" ar
 
 export default function SurvivalReaction({type,index,total,x,y}:{type:string;index:number;total:number;x:number;y:number}){
  const animation=type==='wave'?'reactionWash':type==='wind'?'reactionWind':type==='hail'?'reactionHail':type==='meteor'?'reactionMeteor':'reactionZap';
- const size=`clamp(18px,min(5.6vw,${52/Math.max(1,Math.ceil(total/12))}vh),68px)`;
+ const size=survivalCharacterSize(total);
  return <div data-survival-reaction={type} data-event-local-age style={{position:'absolute',left:`${x}%`,top:`${y}%`,transform:'translate(-50%,-50%)',width:size,aspectRatio:'1',zIndex:27,pointerEvents:'none'}}>
   <div style={{position:'relative',width:'100%',height:'100%',animation:`${animation} ${type==='lightning'?'.78':'.62'}s ease-out both`}}>
    {type==='lightning'?<svg viewBox="0 0 100 100" aria-hidden="true" style={{position:'absolute',inset:'-35%',width:'170%',height:'170%',animation:'reactionRing .78s ease-out both'}}><path d="M50 0L57 27L77 9L70 35L100 28L77 48L99 63L72 63L83 92L59 75L48 100L41 75L16 92L29 65L0 66L24 49L1 30L32 35L21 8L43 27Z" fill="#ffe733"/></svg>:null}

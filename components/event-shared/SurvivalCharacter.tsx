@@ -7,6 +7,9 @@ const DOOLY_CAST = ['둘리','또치','희동이','고길동','도우너','마�
 const EXTRAS = Array.from({length:80},(_,i)=>i<6?DOOLY_CAST[i]:`창작 ${HUMAN_ROLES[Math.floor(i/8)]} ${i%8+1}`);
 
 export const SURVIVAL_CHARACTER_COUNT = OFFICIALS.length + EXTRAS.length;
+export function survivalCharacterSize(total:number){
+  return total<=12?'clamp(44px,18cqw,120px)':total<=24?'clamp(36px,13cqw,92px)':total<=48?'clamp(30px,10cqw,76px)':total<=100?'clamp(14px,8cqw,68px)':'clamp(12px,5cqw,52px)';
+}
 // Measured transparent row separators in the 1122 × 1402 source, not a uniform grid.
 const ATLAS_ROW_EDGES = [0,132,280,427,575,725,875,1029,1164,1285,1402];
 export function survivalCharacter(index:number) {
@@ -19,13 +22,16 @@ export function survivalCharacter(index:number) {
   return {index:normalized,name:EXTRAS[cell],asset:'/event-art/survival-human-cast-v1.png',columns:8,rows:10,column:cell%8,row:Math.floor(cell/8)};
 }
 
-export default function SurvivalCharacter({index,total,hit=false,zap=false,winner=false,moving=false,sizeOverride}:{index:number;total:number;hit?:boolean;zap?:boolean;winner?:boolean;moving?:boolean;sizeOverride?:string}) {
+export default function SurvivalCharacter({index,total,hit=false,zap=false,winner=false,moving=false,sizeOverride,pose='rest',facing=1}:{index:number;total:number;hit?:boolean;zap?:boolean;winner?:boolean;moving?:boolean;sizeOverride?:string;pose?:'look'|'run'|'duck'|'rest';facing?:number}) {
   const avatar=survivalCharacter(index);
-  const rows=Math.max(1,Math.ceil(Math.max(1,total)/12));
-  const size=sizeOverride||`clamp(14px, min(5.6vw, ${52/rows}vh), 68px)`;
-  const unevenAtlas=avatar.columns===8;
-  const rowTop=ATLAS_ROW_EDGES[avatar.row];
-  const rowHeight=ATLAS_ROW_EDGES[avatar.row+1]-rowTop;
-  return <div role="img" aria-label={avatar.name} data-survival-art data-survival-character={avatar.index} title={avatar.name}
-    style={{width:size,aspectRatio:'1',flexShrink:0,backgroundImage:`url("${avatar.asset}")`,backgroundRepeat:'no-repeat',backgroundSize:avatar.columns===1?'contain':`${avatar.columns*100}% ${unevenAtlas?1402*100/rowHeight:avatar.rows*100}%`,backgroundPosition:avatar.columns===1?'center':`${avatar.column*100/(avatar.columns-1)}% ${unevenAtlas?rowTop*100/(1402-rowHeight):avatar.row*100/(avatar.rows-1)}%`,filter:zap?'brightness(1.8) drop-shadow(0 0 6px #a4eaff)':winner?'drop-shadow(0 0 7px #ffd878)':'drop-shadow(0 3px 2px rgba(0,0,0,.35))',animation:hit?'survivalAvatarHit .65s ease-out':winner?'survivalAvatarWin 1.4s ease-in-out infinite':moving?`survivalAvatarIdle ${1.8+avatar.index%5*.15}s ease-in-out infinite`:'none'}}/>;
+  const size=sizeOverride||survivalCharacterSize(total);
+  const running=moving&&pose==='run'&&avatar.index<16;
+  const sprite=running?{...avatar,asset:'/event-art/survival-known-run-v1.png',columns:4,rows:4,column:avatar.index%4,row:Math.floor(avatar.index/4)}:avatar;
+  const edges=running?[0,332,675,960,1275]:ATLAS_ROW_EDGES;
+  const atlasHeight=running?1275:1402;
+  const unevenAtlas=running||sprite.columns===8;
+  const rowTop=edges[sprite.row];
+  const rowHeight=edges[sprite.row+1]-rowTop;
+  return <div style={{position:'relative',transform:`scaleX(${facing})`}}><div role="img" aria-label={avatar.name} data-survival-art data-survival-character={avatar.index} data-survival-pose={pose} title={avatar.name}
+    style={{width:size,aspectRatio:'1',flexShrink:0,backgroundImage:`url("${sprite.asset}")`,backgroundRepeat:'no-repeat',backgroundSize:sprite.columns===1?'contain':`${sprite.columns*100}% ${unevenAtlas?atlasHeight*100/rowHeight:sprite.rows*100}%`,backgroundPosition:sprite.columns===1?'center':`${sprite.column*100/(sprite.columns-1)}% ${unevenAtlas?rowTop*100/(atlasHeight-rowHeight):sprite.row*100/(sprite.rows-1)}%`,filter:zap?'brightness(1.8) drop-shadow(0 0 6px #a4eaff)':winner?'drop-shadow(0 0 7px #ffd878)':'drop-shadow(0 3px 2px rgba(0,0,0,.35))',animation:hit?'survivalAvatarHit .65s ease-out':winner?'survivalAvatarWin 1.4s ease-in-out infinite':'none'}}/></div>;
 }

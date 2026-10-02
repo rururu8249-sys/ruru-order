@@ -2,8 +2,19 @@
 import assert from 'node:assert/strict';
 import {existsSync} from 'node:fs';
 import {createUiLoader} from './admin-ui-test-loader.mjs';
-const {survivalCharacter,SURVIVAL_CHARACTER_COUNT}=createUiLoader()('components/event-shared/SurvivalCharacter.tsx');
+const {survivalCharacter,SURVIVAL_CHARACTER_COUNT,survivalCharacterSize}=createUiLoader()('components/event-shared/SurvivalCharacter.tsx');
+assert.equal(typeof survivalCharacterSize,'function','alive-count sizing must be shared by actor and reaction');
+assert.equal(survivalCharacterSize(12),'clamp(44px,18cqw,120px)','remaining small cast gets a visibly larger body');
+assert.notEqual(survivalCharacterSize(12),survivalCharacterSize(100));
 const cast=Array.from({length:SURVIVAL_CHARACTER_COUNT},(_,i)=>survivalCharacter(i));
+const Character=createUiLoader()('components/event-shared/SurvivalCharacter.tsx').default;
+for(let index=0;index<16;index++){
+ const running=Character({index,total:16,moving:true,pose:'run'}).props.children;
+ assert(running.props.style.backgroundImage.includes('survival-known-run-v1.png'),'requested cast needs the running pose');
+ assert.equal(running.props.style.animation,'none','movement is a real path, not stationary bouncing');
+ assert.equal(running.props['aria-label'],cast[index].name,'run pose must preserve character identity');
+}
+assert(existsSync('public/event-art/survival-known-run-v1.png'));
 for(const name of ['짱구','철수','유리','훈이','맹구','봉미선','신형만','짱아','흰둥이','키티','둘리','또치','희동이','고길동','도우너','마이콜'])assert(cast.some(c=>c.name===name),'requested character missing: '+name);
 assert.deepEqual(cast.slice(0,16).map(c=>c.name),['짱구','철수','유리','훈이','맹구','봉미선','신형만','짱아','흰둥이','키티','둘리','또치','희동이','고길동','도우너','마이콜']);
 assert(new Set(cast.map(c=>c.name)).size>=100,'100 distinct named characters required');
