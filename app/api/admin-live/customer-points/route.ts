@@ -1,13 +1,10 @@
-import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 
 import {
   assertValidCustomerPointPhone,
-  buildCustomerPointBalancePayload,
-  buildCustomerPointChange,
-  buildCustomerPointLedgerPayload,
+  parseCustomerPointAmount,
   formatCustomerPointMoney,
   normalizeCustomerPointAction,
   readCurrentCustomerPoints,
@@ -122,8 +119,6 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  let ledgerIdForRollback = "";
-
   try {
     await assertAdminRequest(request);
 
@@ -136,7 +131,7 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseAdminClient();
     const phone = assertValidCustomerPointPhone((body as any).phone || (body as any).customer_phone);
     const action = normalizeCustomerPointAction((body as any).action);
-    const amount = (body as any).amount;
+    const amount = parseCustomerPointAmount((body as any).amount);
     const reason = sanitizeCustomerPointText((body as any).reason, 200);
     const adminMemo = sanitizeCustomerPointText((body as any).admin_memo || (body as any).adminMemo, 500);
     const youtubeNickname = sanitizeCustomerPointText((body as any).youtube_nickname || (body as any).youtubeNickname, 80);
@@ -148,114 +143,23 @@ export async function POST(request: NextRequest) {
       return jsonError(action === "grant" ? "지급 사유를 입력해주세요." : "차감 사유를 입력해주세요.");
     }
 
-    // [2026-08-30 중복지급 근본 차단] 같은 출처로 이미 나간 적이 있으면 여기서 끝낸다.
-    //   왜 필요한가(실측): 2026-08-29 서바이벌에서 「쩡이」에게 2,000P 가 두 번 나갔다.
-    //     첫 지급 뒤 화면의 '지급완료' 잠금이 44초간 실패했고 그 사이 재실행돼 또 지급됐다.
-    //     중복 방지가 화면에 있어서(세션 메모리 + 지급 후 잠금) 새로고침 한 번에 뚫렸다.
-    //   → 돈이 나가는 이 서버에서 막는다. 아래 조회로 못 잡아도 DB 유니크 인덱스가 최종 방어한다.
-    //   ⚠️ sourceKey 가 없으면(수동지급·주문 자동적립) 예전과 완전히 동일하게 동작한다.
-    if (sourceKey) {
-      const { data: already } = await supabase
-        .from("customer_point_ledger")
-        .select("id, amount, balance_after, created_at")
-        .eq("source_key", sourceKey)
-        .limit(1)
-        .maybeSingle();
-
-      if (already) {
-        const row = already as Record<string, unknown>;
-        return NextResponse.json({
-          ok: true,
-          duplicate: true,
-          message: "이미 지급된 건이라 다시 지급하지 않았습니다.",
-          phone,
-          source_key: sourceKey,
-          ledger_id: String(row.id ?? ""),
-          amount: Number(row.amount ?? 0),
-          current_points_after: Number(row.balance_after ?? 0),
-        });
-      }
-    }
-
-    const previousBalance = await fetchPointBalance(supabase, phone);
-    const currentPoints = readCurrentCustomerPoints(previousBalance);
-    const change = buildCustomerPointChange({
-      action,
-      amount,
-      currentPoints,
+    const { data, error } = await supabase.rpc("admin_change_customer_points", {
+      p_phone: phone, p_action: action, p_amount: amount, p_reason: reason,
+      p_admin_memo: adminMemo, p_nickname: youtubeNickname, p_customer_name: customerName,
+      p_customer_visible: (body as any).customer_visible !== false,
+      p_source_key: sourceKey || null,
     });
-
-    ledgerIdForRollback = randomUUID();
-
-    const ledgerPayload = buildCustomerPointLedgerPayload({
-      id: ledgerIdForRollback,
-      phone,
-      youtubeNickname,
-      customerName,
-      change,
-      reason,
-      adminMemo,
-      customerVisible: (body as any).customer_visible,
-      createdBy: "admin",
-      sourceKey,
-    });
-
-    const balancePayload = buildCustomerPointBalancePayload({
-      phone,
-      youtubeNickname,
-      customerName,
-      previousBalance,
-      change,
-      adminMemo,
-    });
-
-    const { error: ledgerError } = await supabase.from("customer_point_ledger").insert(ledgerPayload);
-
-    if (ledgerError) {
-      // 같은 순간에 두 번 들어온 경우 — DB 유니크 인덱스가 두 번째를 거부한다(최종 방어선).
-      //   돈은 나가지 않았으므로 오류가 아니라 "이미 지급됨"으로 알린다.
-      const duplicateHit =
-        sourceKey &&
-        /duplicate key|unique constraint|23505|source_key/i.test(String(ledgerError.message || ""));
-      if (duplicateHit) {
-        return NextResponse.json({
-          ok: true,
-          duplicate: true,
-          message: "이미 지급된 건이라 다시 지급하지 않았습니다.",
-          phone,
-          source_key: sourceKey,
-        });
-      }
-      throw new Error(ledgerError.message || "포인트 이력 저장 실패");
+    if (error || !data || typeof data.ok !== "boolean") {
+      // An uncertain result must never be "fixed" by a separate HTTP delete.
+      return jsonError("포인트 저장 결과를 확인하지 못했습니다. 지급 이력을 먼저 확인해 주세요.", 503);
     }
-
-    const { data: savedBalance, error: balanceError } = await supabase
-      .from("customer_point_balances")
-      .upsert(balancePayload, { onConflict: "customer_phone" })
-      .select("*")
-      .single();
-
-    if (balanceError) {
-      await supabase.from("customer_point_ledger").delete().eq("id", ledgerIdForRollback);
-      throw new Error(balanceError.message || "포인트 잔액 저장 실패");
-    }
-
+    if (!data.ok) return jsonError(data.message || "포인트 처리 실패", 409);
     return NextResponse.json({
-      ok: true,
-      message: change.action === "grant" ? "포인트 지급이 완료되었습니다." : "포인트 차감이 완료되었습니다.",
-      phone,
-      action: change.action,
-      change_type: change.changeType,
-      amount: change.signedAmount,
-      requested_amount: change.requestedAmount,
-      current_points_before: currentPoints,
-      current_points_after: change.nextPoints,
-      current_points_text: formatCustomerPointMoney(change.nextPoints),
-      summary: `${change.action === "grant" ? "포인트 지급" : "포인트 차감"} ${formatCustomerPointMoney(
-        change.requestedAmount
-      )}`,
-      balance: savedBalance,
-      ledger_id: ledgerIdForRollback,
+      ...data,
+      message: data.duplicate ? "이미 지급된 건이라 다시 지급하지 않았습니다."
+        : action === "grant" ? "포인트 지급이 완료되었습니다." : "포인트 차감이 완료되었습니다.",
+      current_points_text: formatCustomerPointMoney(data.current_points_after),
+      summary: `${action === "grant" ? "포인트 지급" : "포인트 차감"} ${formatCustomerPointMoney(amount)}`,
     });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "포인트 처리 실패", 400);
