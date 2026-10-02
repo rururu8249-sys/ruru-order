@@ -73,7 +73,7 @@ type PlaybackInput = { id: string; kind: EventKind; status: string;
 
 - [ ] Step 1 — 실패 테스트: 같은 입력 key/seed 일치; 제목/안내/updated_at 변경에도 key 동일; 시작 시각 변경은 다른 key; 잘못된 날짜/ID/길이는 null; 시작 전 elapsed=0/waiting; 종료 후 elapsed=duration/done. 공개 응답은 전화/주문 ID/응모 가중치 포함 금지. 기존 토큰의 400/403/404와 no-store 보존.
 - [ ] Step 2 — 두 신규 테스트 실행하여 아직 없는 계약 때문에 실패 확인.
-- [ ] Step 3 — version=1 시간표 구현. key는 JSON.stringify([kind,id,startedAt,1]); seed는 결정론적 32비트 문자열 해시. 룰렛 길이는 기존 위젯 9,200ms, 인형뽑기는 기존 miss/catch 공식; 서바이벌/달리기는 Task 4 시간표 길이 사용. 서버의 기존 결과 저장에서 `spin_duration_ms`만 해당 종류의 실제 연출 길이로 정합화. 시작 시각·당첨 선택은 기존 서버값 유지. 기존 duration이 새 종류별 공식과 맞지 않는 이전 판은 playback=null로 반환하고 결과만 표시. 새 DB 필드 없이 응답에 version 제공.
+- [ ] Step 3 — version=1 시간표 구현. key는 JSON.stringify([kind,id,startedAt,1]); seed는 결정론적 32비트 문자열 해시. 룰렛 길이는 기존 위젯 9,200ms, 인형뽑기는 기존 miss/catch 공식. 서바이벌은 시작 900ms에 첫 탈락을 시행하고, 기존 a 기준 탈락 수(>70:9, >45:7, >25:5, >14:3, >7:2, 나머지1), 탈락 후 na 기준 간격(>70:550, >45:700, >25:900, >14:1150, >7:1550, >2:2050, 나머지2500ms)을 합산하여 최종 완료 시각 계산. 달리기는 기존 countdown 2,800ms + 첫 결승 8,000ms + (K-1)×min(600,min(2600,max(900,K×450))/K) + 결승 jitter 최대120ms + 완료 여유400ms. 전원 당첨은 탈락/경주 없이 정적 결과로 안전 처리. 이 공식을 Task 4가 소비하여 미래 작업에 대한 의존성 없이 공통 길이를 확정. 서버의 기존 결과 저장에서 `spin_duration_ms`만 해당 종류의 실제 연출 길이로 정합화. 시작 시각·당첨 선택은 기존 서버값 유지. 기존 duration이 새 종류별 공식과 맞지 않는 이전 판은 playback=null로 반환하고 결과만 표시. 새 DB 필드 없이 응답에 version 제공.
 - [ ] Step 4 — overlay SELECT에 불변 `id` 추가. 최신 판 선택은 `created_at DESC, id DESC`로 고정해 예전 판의 메모 수정으로 선택이 뒤집히지 않게 함. 기존 토큰 의미와 상태 필터 유지. 네 API 응답의 `server_now`는 응답 직전 Date.now(); 기존 필드 유지. fixture로 UPDATE/INSERT가 발생하지 않는지 단언. 신규 테스트 및 기존 이벤트 응모권 테스트 통과 확인.
 - [ ] Step 5 — Task 2 파일만 커밋. DB 마이그레이션/패키지 추가 없음 확인.
 
