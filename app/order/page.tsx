@@ -3809,6 +3809,7 @@ export default function OrderPage() {
   //    API가 죽어도 담기/제출/입금/정산 전부 정상 동작(오버셀은 제출 RPC가 원래 막고 있음).
   const [reservedByVariant, setReservedByVariant] = useState<Record<string, number>>({});
   const [reservedByProduct, setReservedByProduct] = useState<Record<string, number>>({});
+  const [cartBankAccountOverride, setCartBankAccountOverride] = useState<OrderBankAccountSnapshot | null>(null);
   // [2026-09-20] 오늘(이번 방송)에 팔린 상품 id — 「급상승」 배지 판단 전용. 수량은 안 받는다.
   const [liveTrendingIds, setLiveTrendingIds] = useState<Set<string>>(new Set());
   // [2026-09-20] 「지금 N명이 담는 중」 — cart_reservations 선점에서 «나를 뺀» 다른 손님 수.
@@ -3897,14 +3898,30 @@ export default function OrderPage() {
           phone: onlyNumber(customerPhone || ""),
           nickname: String(youtubeNickname || "").trim().slice(0, 40),
           customerName: String(customerName || "").trim().slice(0, 40),
+          kakaoId: typeof window !== "undefined" ? (localStorage.getItem("ruru_kakao_id") || "").trim() : "",
           items: payload,
         }),
       });
       // [2026-08-11 담기 선착순] 서버 원자 검증 결과 반영 — 먼저 담은 손님이 임자.
       //   거부된 옵션은 남은 수량으로 자동 조정(0이면 제거) + "방금 품절" 안내. 돈/제출 로직 무관.
       const claim = await res.json().catch(() => null);
+      const override = claim?.bankAccountOverride;
+      const overrideAccount = override &&
+        (override.id === "primary" || override.id === "secondary") &&
+        String(override.bankName || "").trim() &&
+        /^[0-9-]{6,30}$/.test(String(override.bankAccount || "").trim()) &&
+        String(override.bankHolder || "").trim()
+        ? {
+            id: override.id,
+            bankName: String(override.bankName).trim(),
+            bankAccount: String(override.bankAccount).trim(),
+            bankHolder: String(override.bankHolder).trim(),
+          } as OrderBankAccountSnapshot
+        : null;
+      setCartBankAccountOverride(overrideAccount);
       // [2026-08-14 사장님 지시] 관리자가 선점 해제하면 손님 폰에서도 담긴 상품이 사라진다(직접입력 줄은 유지)
       if (claim?.ok && claim.revoked === true) {
+        setCartBankAccountOverride(null);
         setItems((prev) => prev.filter((it) => !(it.product_id && String(it.product_name || "").trim())));
         showCustomerNotice("⚠️ 방송 운영자가 담긴 상품을 회수했어요 — 주문서가 비워졌습니다. 궁금한 점은 방송 채팅으로 문의해 주세요.");
         return;
@@ -3934,7 +3951,11 @@ export default function OrderPage() {
           showCustomerNotice("앗, 방금 다른 손님이 먼저 담아서 일부 상품이 품절됐어요. 주문서 수량을 확인해 주세요!");
         }
       }
-    } catch { /* 실패해도 주문 흐름 무영향 */ }
+    } catch {
+      // 마지막 확인에 실패했을 때 예전 지정계좌를 계속 보여주는 것보다 숨기는 편이 안전하다.
+      // 최종 제출 계좌는 서버 RPC가 다시 확정하므로 주문 자체는 정상 진행된다.
+      setCartBankAccountOverride(null);
+    }
   };
   // 담긴 상품 변경 → 1.5초 디바운스 예약 동기화(주문서 비우면 예약 해제와 동일·제출 성공 시 items 리셋으로 자동 해제)
   useEffect(() => {
@@ -5242,6 +5263,7 @@ export default function OrderPage() {
         bankAccount: assignedBank.bankAccount,
       });
       setHistoricalPaymentBankAccount(null);
+      setCartBankAccountOverride(null);
 
       setPaymentGuideOpen(true);
       setOrderSheetOpen(false);
@@ -7514,7 +7536,10 @@ export default function OrderPage() {
                   <button
                     key={method}
                     type="button"
-                    onClick={() => setPaymentMethod(method)}
+                    onClick={() => {
+                      setPaymentMethod(method);
+                      if (method === "무통장입금") void syncCartReservationsRef.current();
+                    }}
                     style={{ height: "48px", borderRadius: "12px", border: paymentMethod === method ? "2px solid #7A1E47" : "1px solid #E5E1DC", background: paymentMethod === method ? "#F9EEF3" : "#fff", cursor: "pointer", fontSize: "15px", fontWeight: 800, color: paymentMethod === method ? "#7A1E47" : "#444" }}
                   >
                     {method === "카드결제" ? `카드결제 +${cardRateForCustomer}%` : method}
@@ -7528,6 +7553,37 @@ export default function OrderPage() {
                   <>입금자명 <b style={{ color: "#7A1E47" }}>「{youtubeNickname.trim() || customerName.trim() || "-"}」</b> 으로 입금해 주세요.</>
                 )}
               </div>
+
+              {paymentMethod === "무통장입금" && cartBankAccountOverride && finalPaymentAmount > 0 ? (
+                <div style={{ marginTop: "8px", borderRadius: "12px", border: "1.5px solid #E0C56E", background: "#FFFBEB", padding: "11px 12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "11px", fontWeight: 800, color: "#6E655E" }}>입금 계좌</div>
+                      <div style={{ marginTop: "2px", fontSize: "15px", fontWeight: 900, color: "#1A1A1A", wordBreak: "break-all" }}>
+                        {cartBankAccountOverride.bankName} {cartBankAccountOverride.bankAccount}
+                      </div>
+                      <div style={{ fontSize: "12px", fontWeight: 700, color: "#555" }}>예금주 {cartBankAccountOverride.bankHolder}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(cartBankAccountOverride.bankAccount);
+                          showCustomerNotice("계좌번호를 복사했습니다.", "success");
+                        } catch {
+                          showCustomerNotice(cartBankAccountOverride.bankAccount);
+                        }
+                      }}
+                      style={{ flexShrink: 0, minHeight: "38px", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", padding: "0 12px", fontSize: "12px", fontWeight: 900, color: "#7A1E47" }}
+                    >
+                      복사
+                    </button>
+                  </div>
+                  <div style={{ marginTop: "8px", borderRadius: "9px", background: "#FFF3CD", padding: "8px 9px", fontSize: "11.5px", fontWeight: 900, lineHeight: 1.5, color: "#7A1E47", wordBreak: "keep-all" }}>
+                    입금 계좌는 변경될 수 있습니다. 입금 전 이 화면의 계좌번호를 꼭 확인해 주세요.
+                  </div>
+                </div>
+              ) : null}
 
               {/* [2026-09-20 사장님] 「접혀 있으면 난독증 손님은 모른다」 → 항상 펼쳐 둔다(작게). */}
               <label className="mt-3 block">

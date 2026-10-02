@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { checkoutReminderCopy } from "@/lib/cartHoldDetail";
+import { parseShopInfo, SHOP_INFO_KEYS, type ShopBankAccountId } from "@/lib/shopInfo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,6 +15,13 @@ function getSupabaseAdmin() {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 const cleanKey = (v: unknown) => String(v ?? "").trim().slice(0, 80);
+const digits = (v: unknown) => String(v ?? "").replace(/[^0-9]/g, "");
+
+async function loadBankAccounts(supabase: ReturnType<typeof getSupabaseAdmin>) {
+  const { data, error } = await supabase.from("settings").select("key,value").in("key", [...SHOP_INFO_KEYS]);
+  if (error) throw new Error("입금계좌 설정 조회 실패: " + error.message);
+  return parseShopInfo((data || []) as Array<{ key: string; value: unknown }>).bankAccounts.filter((account) => account.enabled);
+}
 
 async function activeBroadcastProductIds(supabase: ReturnType<typeof getSupabaseAdmin>) {
   const { data: bcs } = await supabase
@@ -114,6 +122,7 @@ export async function GET(request: NextRequest) {
       const unitPrice = rawPrice === null || rawPrice === undefined || String(rawPrice).trim() === "" ? null : Math.max(0, Math.floor(Number(rawPrice) || 0));
       return {
         sessionKey: String(r.session_key ?? ""),
+        kakaoId: String(r.kakao_id ?? "").trim(),
         phone: ph,
         nickname: String(r.nickname ?? "").trim() || who[ph]?.nickname || "",
         name: String(r.customer_name ?? "").trim() || who[ph]?.name || "",
@@ -131,6 +140,64 @@ export async function GET(request: NextRequest) {
         lastSyncedAt: String(r.last_synced_at ?? ""),
       };
     });
+
+    const sessions = new Map<string, { cartStartedAt: string; phone: string; kakaoId: string }>();
+    for (const hold of holds) {
+      const startedMs = new Date(hold.createdAt).getTime();
+      const current = sessions.get(hold.sessionKey);
+      if (!current || (Number.isFinite(startedMs) && startedMs < new Date(current.cartStartedAt).getTime())) {
+        sessions.set(hold.sessionKey, { cartStartedAt: hold.createdAt, phone: digits(hold.phone), kakaoId: hold.kakaoId });
+      } else {
+        if (!current.phone && hold.phone) current.phone = digits(hold.phone);
+        if (!current.kakaoId && hold.kakaoId) current.kakaoId = hold.kakaoId;
+      }
+    }
+
+    const sessionKeys = Array.from(sessions.keys());
+    const groupMeta: Record<string, Record<string, unknown>> = {};
+    for (const [key, value] of sessions) {
+      groupMeta[key] = {
+        cartStartedAt: value.cartStartedAt,
+        isRegistered: false,
+        validOrderCount: 0,
+        lastOrderAt: "",
+        overrideAccount: null,
+      };
+    }
+
+    if (sessionKeys.length > 0) {
+      const identities = Array.from(sessions.entries()).map(([sessionKey, value]) => ({ sessionKey, phone: value.phone, kakaoId: value.kakaoId }));
+      const { data: memberRows, error: memberError } = await supabase.rpc("admin_cart_customer_order_meta", { p_identities: identities });
+      if (memberError) throw new Error("장바구니 고객 주문이력 조회 실패: " + memberError.message);
+      for (const row of (memberRows || []) as Record<string, unknown>[]) {
+        const key = cleanKey(row.session_key);
+        if (!key || !groupMeta[key]) continue;
+        groupMeta[key].isRegistered = row.is_registered === true;
+        groupMeta[key].validOrderCount = Math.max(0, Number(row.valid_order_count) || 0);
+        groupMeta[key].lastOrderAt = String(row.last_order_at ?? "");
+      }
+
+      const { data: overrideRows, error: overrideError } = await supabase
+        .from("cart_bank_account_overrides")
+        .select("session_key,cart_started_at,account_id,bank_name,bank_account,bank_holder,assigned_at")
+        .in("session_key", sessionKeys)
+        .eq("status", "active");
+      if (overrideError) throw new Error("장바구니 지정계좌 조회 실패: " + overrideError.message);
+      for (const row of (overrideRows || []) as Record<string, unknown>[]) {
+        const key = cleanKey(row.session_key);
+        const current = sessions.get(key);
+        if (!key || !current || new Date(String(row.cart_started_at ?? "")).getTime() !== new Date(current.cartStartedAt).getTime()) continue;
+        groupMeta[key].overrideAccount = {
+          id: String(row.account_id ?? ""),
+          bankName: String(row.bank_name ?? ""),
+          bankAccount: String(row.bank_account ?? ""),
+          bankHolder: String(row.bank_holder ?? ""),
+          assignedAt: String(row.assigned_at ?? ""),
+        };
+      }
+    }
+
+    const bankAccounts = await loadBankAccounts(supabase);
 
     // [2026-08-30 사장님 지적] "클릭해도 아무 반응없음" — 실제로는 발송됐는데
     //   보냈는지·손님이 봤는지 화면에서 확인할 방법이 없어 안 된 것처럼 보였다.
@@ -159,6 +226,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       holds,
+      groupMeta,
+      bankAccounts,
       alerts: alertBySession,
       scope: allowedProductIds ? "broadcast" : "all",
       broadcastTitle,
@@ -228,6 +297,68 @@ export async function POST(request: NextRequest) {
     const action = String(body?.action || "").trim();
     const supabase = getSupabaseAdmin();
 
+    if (action === "set-bank-override") {
+      const sessionKey = cleanKey(body?.sessionKey);
+      const accountId = String(body?.accountId || "default").trim();
+      if (!sessionKey) return NextResponse.json({ ok: false, error: { message: "장바구니 식별값이 없습니다." } }, { status: 400 });
+      if (accountId !== "default" && accountId !== "primary" && accountId !== "secondary") {
+        return NextResponse.json({ ok: false, error: { message: "선택한 계좌가 올바르지 않습니다." } }, { status: 400 });
+      }
+
+      const nowIso = new Date().toISOString();
+      const { data: firstHold, error: holdError } = await supabase
+        .from("cart_reservations")
+        .select("created_at")
+        .eq("session_key", sessionKey)
+        .gt("expires_at", nowIso)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (holdError) throw new Error(holdError.message);
+      const cartStartedAt = String((firstHold as Record<string, unknown> | null)?.created_at ?? "");
+      if (!cartStartedAt) return NextResponse.json({ ok: false, error: { message: "이미 비었거나 만료된 장바구니입니다. 새로고침해 주세요." } }, { status: 409 });
+
+      if (accountId === "default") {
+        const { error } = await supabase
+          .from("cart_bank_account_overrides")
+          .update({ status: "cancelled", cancelled_at: nowIso })
+          .eq("session_key", sessionKey)
+          .eq("cart_started_at", cartStartedAt)
+          .eq("status", "active");
+        if (error) throw new Error(error.message);
+        return NextResponse.json({ ok: true, account: null });
+      }
+
+      const accounts = await loadBankAccounts(supabase);
+      const account = accounts.find((item) => item.id === (accountId as ShopBankAccountId));
+      if (!account) return NextResponse.json({ ok: false, error: { message: "선택한 계좌가 없거나 비활성 상태입니다." } }, { status: 409 });
+      // 같은 브라우저 세션의 과거·만료 장바구니 지정은 새 장바구니로 절대 이어지지 않는다.
+      const { error: staleError } = await supabase
+        .from("cart_bank_account_overrides")
+        .update({ status: "cancelled", cancelled_at: nowIso })
+        .eq("session_key", sessionKey)
+        .eq("status", "active")
+        .neq("cart_started_at", cartStartedAt);
+      if (staleError) throw new Error(staleError.message);
+      const row = {
+        session_key: sessionKey,
+        cart_started_at: cartStartedAt,
+        account_id: account.id,
+        bank_name: account.bankName,
+        bank_account: account.bankAccount,
+        bank_holder: account.bankHolder,
+        status: "active",
+        assigned_at: nowIso,
+        assigned_by: String((session as any)?.username || (session as any)?.id || "admin").slice(0, 80),
+        consumed_at: null,
+        consumed_order_group_id: null,
+        cancelled_at: null,
+      };
+      const { error } = await supabase.from("cart_bank_account_overrides").upsert(row, { onConflict: "session_key,cart_started_at" });
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true, account });
+    }
+
     if (action === "remind" || action === "remind-all") {
       const requested = action === "remind" ? [body?.sessionKey] : (Array.isArray(body?.sessionKeys) ? body.sessionKeys : []);
       const result = await sendReminders(supabase, requested, String((session as any)?.username || (session as any)?.id || "admin").slice(0, 80));
@@ -241,6 +372,7 @@ export async function POST(request: NextRequest) {
       const { error } = await supabase.from("cart_reservations").delete().in("session_key", keys);
       if (error) return NextResponse.json({ ok: false, error: { message: error.message } }, { status: 500 });
       const nowIso = new Date().toISOString();
+      await supabase.from("cart_bank_account_overrides").update({ status: "cancelled", cancelled_at: nowIso }).in("session_key", keys).eq("status", "active");
       for (const key of keys) {
         try {
           const rk = `cart_revoke_${key}`.slice(0, 250);
@@ -257,6 +389,7 @@ export async function POST(request: NextRequest) {
     if (!sessionKey) return NextResponse.json({ ok: false, error: { message: "sessionKey 없음" } }, { status: 400 });
 
     const { error } = await supabase.from("cart_reservations").delete().eq("session_key", sessionKey);
+    await supabase.from("cart_bank_account_overrides").update({ status: "cancelled", cancelled_at: new Date().toISOString() }).eq("session_key", sessionKey).eq("status", "active");
     try {
       const rk = `cart_revoke_${sessionKey}`.slice(0, 250);
       const { data: ex } = await supabase.from("settings").select("key").eq("key", rk).limit(1);

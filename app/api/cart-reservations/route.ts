@@ -42,6 +42,42 @@ const cleanSessionKey = (v: unknown) => {
   return !t || t.length < 6 || t.length > 80 ? "" : t;
 };
 
+async function currentBankOverride(supabase: ReturnType<typeof getSupabaseAdmin>, sessionKey: string) {
+  const nowIso = new Date().toISOString();
+  const { data: firstHold } = await supabase
+    .from("cart_reservations")
+    .select("created_at")
+    .eq("session_key", sessionKey)
+    .gt("expires_at", nowIso)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  const cartStartedAt = String((firstHold as Record<string, unknown> | null)?.created_at ?? "");
+  if (!cartStartedAt) return null;
+  const { data } = await supabase
+    .from("cart_bank_account_overrides")
+    .select("account_id,bank_name,bank_account,bank_holder")
+    .eq("session_key", sessionKey)
+    .eq("cart_started_at", cartStartedAt)
+    .eq("status", "active")
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    id: String((data as any).account_id || ""),
+    bankName: String((data as any).bank_name || ""),
+    bankAccount: String((data as any).bank_account || ""),
+    bankHolder: String((data as any).bank_holder || ""),
+  };
+}
+
+async function cancelActiveBankOverrides(supabase: ReturnType<typeof getSupabaseAdmin>, sessionKey: string) {
+  await supabase
+    .from("cart_bank_account_overrides")
+    .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+    .eq("session_key", sessionKey)
+    .eq("status", "active");
+}
+
 export async function GET(request: NextRequest) {
   try {
     const idsParam = String(request.nextUrl.searchParams.get("ids") || "").trim();
@@ -93,6 +129,7 @@ export async function POST(request: NextRequest) {
     if (action === "clear") {
       const { error: delError } = await supabase.from("cart_reservations").delete().eq("session_key", sessionKey);
       if (delError) return NextResponse.json({ ok: false, error: delError.message }, { status: 500 });
+      await cancelActiveBankOverrides(supabase, sessionKey);
       return NextResponse.json({ ok: true, cleared: true });
     }
     if (action !== "sync") return NextResponse.json({ ok: false, error: "알 수 없는 action" }, { status: 400 });
@@ -100,6 +137,7 @@ export async function POST(request: NextRequest) {
     const phone = String(body?.phone ?? "").replace(/[^0-9]/g, "").slice(0, 20) || null;
     const nickname = String(body?.nickname ?? "").trim().slice(0, 40) || null;
     const customerName = String(body?.customerName ?? "").trim().slice(0, 40) || null;
+    const kakaoId = String(body?.kakaoId ?? "").trim().replace(/[^0-9]/g, "").slice(0, 80) || null;
     const rawItems = Array.isArray(body?.items) ? body.items.slice(0, MAX_ITEMS) : [];
     const items = rawItems
       .map((it: any) => buildCartHoldSnapshotItem({
@@ -121,6 +159,7 @@ export async function POST(request: NextRequest) {
         const withinGrace = Number.isFinite(revokedAt) && Date.now() - revokedAt < 3 * 60_000;
         if (!withinGrace) await supabase.from("settings").delete().eq("key", rk);
         await supabase.from("cart_reservations").delete().eq("session_key", sessionKey);
+        await cancelActiveBankOverrides(supabase, sessionKey);
         return NextResponse.json({ ok: true, revoked: true });
       }
     } catch { /* 확인 실패 시 평소처럼 sync */ }
@@ -136,12 +175,21 @@ export async function POST(request: NextRequest) {
     });
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
+    if (kakaoId) {
+      const { error: kakaoError } = await supabase.from("cart_reservations").update({ kakao_id: kakaoId }).eq("session_key", sessionKey);
+      if (kakaoError) return NextResponse.json({ ok: false, error: kakaoError.message }, { status: 500 });
+    }
+
+    const bankAccountOverride = await currentBankOverride(supabase, sessionKey);
+    if (items.length === 0) await cancelActiveBankOverrides(supabase, sessionKey);
+
     return NextResponse.json({
       ok: true,
       reserved: items.length,
       holdMinutes,
       allOk: (data as any)?.allOk !== false,
       results: (data as any)?.results ?? [],
+      bankAccountOverride,
     });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 });
