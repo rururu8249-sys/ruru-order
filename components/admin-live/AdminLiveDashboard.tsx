@@ -981,6 +981,12 @@ export default function AdminLiveDashboard() {
   }, [filters.broadcast, filters.date]);
 
   // 브라우저 음성 잠금 해제: 첫 사용자 클릭/키 입력 때 1회 무음 워밍업 → 이후 자동 알림 음성이 막히지 않음.
+  useEffect(()=>{
+    const reload=()=>void loadOrders({silent:true});
+    window.addEventListener('event-custom-gift-added',reload);
+    return ()=>window.removeEventListener('event-custom-gift-added',reload);
+  });
+
   useEffect(() => {
     const prime = () => primeAdminVoice();
     window.addEventListener("pointerdown", prime, { once: true });

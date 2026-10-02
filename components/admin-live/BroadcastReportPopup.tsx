@@ -148,7 +148,7 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
 
     const sales = paid.reduce((s, o) => s + Number(o.totalAmount || 0), 0);
     const productSales = paid.reduce((s, o) => s + Number(o.productAmount || 0), 0);
-    const qtyTotal = paid.reduce((s, o) => s + (o.items || []).reduce((q, it) => q + Number(it.qty || 0), 0), 0);
+    const qtyTotal = paid.reduce((s, o) => s + (o.items || []).reduce((q, it) => q + (it.eventGiftWinnerId?0:Number(it.qty || 0)), 0), 0);
     const bankCount = paid.filter((o) => o.paymentStatus === "paid" || o.paymentStatus === "auto_paid" || o.paymentStatus === "manual_paid").length;
     const cardCount = paid.filter((o) => o.paymentStatus === "card_paid").length;
 
@@ -156,6 +156,7 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
     const itemMap = new Map<string, { name: string; option: string; qty: number; sales: number }>();
     for (const o of paid) {
       for (const it of o.items || []) {
+        if(it.eventGiftWinnerId)continue;
         const option = it.optionText && it.optionText !== "옵션 없음" ? it.optionText : "";
         const key = `${it.productName}|${option}`;
         const cur = itemMap.get(key) || { name: it.productName, option, qty: 0, sales: 0 };
@@ -171,6 +172,7 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
     const catMap = new Map<string, { qty: number; sales: number; products: Map<string, { qty: number; sales: number }> }>();
     for (const o of paid) {
       for (const it of o.items || []) {
+        if(it.eventGiftWinnerId)continue;
         const cat = categoryOfRowId.get(String(it.id)) || "기타";
         const cur = catMap.get(cat) || { qty: 0, sales: 0, products: new Map<string, { qty: number; sales: number }>() };
         cur.qty += Number(it.qty || 0);

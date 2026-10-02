@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+import {pickingProgress} from '../lib/orderPicking.ts';
+import {buildRouletteParticipants} from '../lib/eventRoulette.ts';
+const gift={id:2,youtube_nickname:'A',product_name:'경품',qty:1,product_price:0,adjusted_product_price:0,shipping_fee:0,total_price:0,final_amount:0,order_group_id:'g',order_lookup_code:'c',created_at:'2030-01-01',payment_method:'카드결제',admin_order_status_v2:'카드결제완료',event_gift_winner_id:'w',picked_at:null};
+const original={...gift,id:1,product_name:'purchase',product_price:100,adjusted_product_price:100,total_price:100,final_amount:100,event_gift_winner_id:null,picked_at:'2030-01-01'};
+assert.equal(buildRouletteParticipants([original,gift])[0].qtySum,1,'gift is not an extra paid-purchase ticket');
+const adapter=createUiLoader()('components/admin-live/liveOrderAdapter.ts');
+const groups=adapter.buildAdminLiveOrderGroups([original,gift]);
+assert.equal(groups.length,1);
+const order=adapter.toAdminLiveOrder(groups[0]);
+const item=order.items.find(it=>it.id==='2');
+assert.equal(item.productName,'경품');assert.equal(item.qty,1);assert.equal(item.amount,0);assert.equal(item.pickedAt,null);assert.equal(item.eventGiftWinnerId,'w');assert.equal(item.optionText,'옵션 없음');
+assert.equal(order.totalAmount,100);assert.equal(order.paymentStatus,'card_paid');
+assert.deepEqual(pickingProgress([{qty:1,pickedAt:'now'},{qty:1,pickedAt:null}]),{total:2,got:1},'gift reopens picking');
+console.log('PASS gift order model: purchase tickets exclude gifts, zero-price gift remains one physical unpicked item');

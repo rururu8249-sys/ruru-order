@@ -144,7 +144,7 @@ async function fetchScopeBroadcast(sb: SupabaseClient): Promise<ScopeBc> {
 
 async function fetchOrders(sb: SupabaseClient, start: string, end: string): Promise<Record<string, unknown>[]> {
   const cols =
-    "id,order_group_id,order_lookup_code,customer_phone,youtube_nickname,customer_name,payment_method,qty,product_name,product_price,adjusted_product_price,total_price,adjusted_total_price,final_amount,admin_order_status_v2,order_manage_status,is_test_order,created_at";
+    "id,order_group_id,order_lookup_code,customer_phone,youtube_nickname,customer_name,payment_method,qty,product_name,product_price,adjusted_product_price,total_price,adjusted_total_price,final_amount,admin_order_status_v2,order_manage_status,is_test_order,created_at,event_gift_winner_id";
   const all: Record<string, unknown>[] = [];
   const size = 1000;
   let from = 0;
@@ -275,6 +275,7 @@ export async function computeLiveSummary(mode: "broadcast" | "today"): Promise<L
   const prodMap = new Map<string, RankProduct>();
   for (const g of paid) {
     for (const r of g.rows) {
+      if (r.event_gift_winner_id) continue;
       const name = String(r.product_name || "").trim() || "상품명 없음";
       const qty = num(r.qty) || 1;
       const amt = rowProductAmount(r);

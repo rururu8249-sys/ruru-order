@@ -1,4 +1,6 @@
 "use client";
+import {useEventCustomGift} from './useEventCustomGift';
+import EventCustomGiftStatus from './EventCustomGiftStatus';
 
 import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
@@ -98,6 +100,7 @@ type RouletteParticipant = {
 };
 
 type RouletteEvent = {
+  custom_gift_name?: string | null;
   id?: string;
   title: string;
   overlay_token?: string;
@@ -118,6 +121,7 @@ type RouletteEvent = {
 };
 
 type RouletteWinner = {
+  custom_gift_name?:string|null;
   id: string;
   event_id: string;
   nickname: string;
@@ -328,6 +332,14 @@ export default function AdminLiveEventRoulettePanel({
   const [clawResultType, setClawResultType] = useState<"capsule" | "doll">("capsule");
   const [showParticipantList, setShowParticipantList] = useState(false);
   const [giftType, setGiftType] = useState<"point" | "custom">("point");
+  const [giftWinners,setGiftWinners]=useState<{winnerId:string;isTest:boolean;customGiftName:string|null}[]>([]);
+  const customGifts=useEventCustomGift(giftWinners);
+  const registerGiftResult=(payload:EventPayload & {winners?:{winnerId:string}[]})=>{
+    const e=payload.event;
+    if(!e?.custom_gift_name||e.is_test||e.mode!=='live')return;
+    const ids=payload.winners?.map(w=>w.winnerId)||(payload.winnerId?[payload.winnerId]:[]);
+    setGiftWinners(previous=>[...previous,...ids.filter(id=>id&&!previous.some(w=>w.winnerId===id)).map(winnerId=>({winnerId,isTest:false,customGiftName:e.custom_gift_name||null}))]);
+  };
   const [giftPointAmount, setGiftPointAmount] = useState("");
   // 서바이벌(생존게임) 전용 상태 — 다른 탭 로직에는 영향 없음
   const [survivorCount, setSurvivorCount] = useState(1); // 최종 생존자(당첨자) 수 K
@@ -482,6 +494,8 @@ export default function AdminLiveEventRoulettePanel({
   useEffect(() => {
     const event = currentEvent;
     if (!event?.winner_nickname || event.status !== "result") return;
+    // Persisted reward type wins over a selector edited during an async draw.
+    if (event.custom_gift_name) return;
     const multi = /^(survival|race)_/.test(event.overlay_token || "") || eventTab === "survival" || eventTab === "race";
     if (multi) return;
     const key = `${event.id || ""}|${event.winner_nickname}|${event.result_at || ""}`;
@@ -832,6 +846,8 @@ export default function AdminLiveEventRoulettePanel({
         method: "POST",
         body: JSON.stringify({
           action: "create_event",
+          giftType,
+          winnerNote,
           mode: runMode,
           sourceDate,
           broadcastId,
@@ -877,6 +893,7 @@ export default function AdminLiveEventRoulettePanel({
 
       if (spinPayload.event.id && spinPayload.winnerId) winnerIdByEventRef.current.set(String(spinPayload.event.id), String(spinPayload.winnerId));
       setCurrentEvent(spinPayload.event);
+      registerGiftResult(spinPayload);
       setParticipants(spinPayload.event.participants || createPayload.event.participants || finalParticipants);
       await loadEventsAndWinners();
       showAdminToast(`인형뽑기 당첨자: ${spinPayload.event.winner_nickname || "-"}`, "success");
@@ -1039,6 +1056,7 @@ export default function AdminLiveEventRoulettePanel({
 
       if (payload.event.id && payload.winnerId) winnerIdByEventRef.current.set(String(payload.event.id), String(payload.winnerId));
       setCurrentEvent(payload.event);
+      registerGiftResult(payload);
       await loadEventsAndWinners();
       showAdminToast(`당첨자: ${payload.event.winner_nickname || "-"}`, "success");
     } catch (error) {
@@ -1146,6 +1164,8 @@ export default function AdminLiveEventRoulettePanel({
         method: "POST",
         body: JSON.stringify({
           action: "create_event",
+          giftType,
+          winnerNote,
           mode: runMode,
           sourceDate,
           broadcastId,
@@ -1182,6 +1202,7 @@ export default function AdminLiveEventRoulettePanel({
       }
 
       setCurrentEvent(resolvePayload.event || null);
+      registerGiftResult(resolvePayload);
       const survivors = resolvePayload.survivors || [];
       showAdminToast(
         `${kindLabel} ${winnerWord} ${survivors.length}명 확정!\n${survivors.join(", ")}\n\n방송 위젯에서 연출이 시작됩니다.`,
@@ -1224,6 +1245,8 @@ export default function AdminLiveEventRoulettePanel({
         method: "POST",
         body: JSON.stringify({
           action: "create_event",
+          giftType,
+          winnerNote,
           title,
           mode: runMode,
           sourceDate,
@@ -1262,6 +1285,7 @@ export default function AdminLiveEventRoulettePanel({
 
       if (spinPayload.event.id && spinPayload.winnerId) winnerIdByEventRef.current.set(String(spinPayload.event.id), String(spinPayload.winnerId));
       setCurrentEvent(spinPayload.event);
+      registerGiftResult(spinPayload);
       setParticipants(spinPayload.event.participants || createPayload.event.participants || finalParticipants);
       await loadEventsAndWinners();
       showAdminToast(`당첨자: ${spinPayload.event.winner_nickname || "-"}`, "success");
@@ -1604,6 +1628,7 @@ export default function AdminLiveEventRoulettePanel({
               </div>
 
               {/* 제목 + 당첨 내용(선물) */}
+              <EventCustomGiftStatus states={customGifts.states} retry={customGifts.retry} />
               <div style={{ display: "flex", gap: "6px", marginBottom: "12px" }}>
                 <input className="ipt" style={{ flex: 1 }} placeholder="이벤트 제목" value={title} maxLength={30} onChange={(e) => setTitle(e.target.value)} />
                 <select className="ipt" style={{ flex: "0 0 84px" }} value={giftType} onChange={(e) => { const next = e.target.value as "point" | "custom"; setGiftType(next); if (next === "point") setWinnerNote(`포인트 ${Number(giftPointAmount || 0).toLocaleString("ko-KR")}P`); }}>
@@ -1650,7 +1675,10 @@ export default function AdminLiveEventRoulettePanel({
                     <div key={`winner-${w.id}`} className="row">
                       <span className="note" style={{ width: "120px", flexShrink: 0 }}>{dateTimeFull(w.winner_at)}</span>
                       <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.is_test ? "테스트" : "운영"} · {(() => { const ev = events.find((e) => e.id === w.event_id); const token = ev?.overlay_token || ""; return token.startsWith("roulette") ? "🎡룰렛" : token.startsWith("claw") ? "🪆인형뽑기" : token.startsWith("survival") ? "⛈️서바이벌" : token.startsWith("race") ? "🏁달리기" : "이벤트"; })()} · 당첨 <b>{w.nickname}</b> · {w.winner_note || "이벤트 당첨"}</span>
-                      <button type="button" className={`badge ${w.is_reward_done ? "b-ok" : "b-card"}`} style={{ cursor: "pointer", flexShrink: 0, border: "1px solid transparent" }} onClick={() => markRewardDone(w, !w.is_reward_done)} title={w.is_reward_done ? "누르면 지급대기로 되돌립니다(확인창)" : "누르면 지급완료로 표시합니다"}>{w.is_reward_done ? "✓ 지급완료" : "지급대기 → 완료로"}</button>
+                      {w.custom_gift_name&&!w.is_test?<button type="button" className="btn" onClick={()=>{
+                        setGiftWinners(previous=>previous.some(x=>x.winnerId===w.id)?previous:[...previous,{winnerId:w.id,isTest:false,customGiftName:w.custom_gift_name||null}]);
+                        void customGifts.retry(w.id);
+                      }}>{w.is_reward_done?'경품 등록 확인':'경품 등록·재시도'}</button>:<button type="button" className={`badge ${w.is_reward_done ? "b-ok" : "b-card"}`} style={{ cursor: "pointer", flexShrink: 0, border: "1px solid transparent" }} onClick={() => markRewardDone(w, !w.is_reward_done)} title={w.is_reward_done ? "누르면 지급대기로 되돌립니다(확인창)" : "누르면 지급완료로 표시합니다"}>{w.is_reward_done ? "✓ 지급완료" : "지급대기 → 완료로"}</button>}
                       {/* [2026-09-08 전수감사] 예전엔 <span> 텍스트라 자주 누르는 「지급완료」 배지 바로 옆에서 오클릭되기 쉬웠다.
                             → 버튼으로 바꾸고 사이를 띄운다. (확인창은 원래 있었다) */}
                         <button type="button" className="btn" style={{ flexShrink: 0, marginLeft: "8px", color: "var(--color-danger-tx)", borderColor: "var(--color-danger-tx)" }} onClick={() => void deleteWinnerRecord(w)}>삭제</button>

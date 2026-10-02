@@ -2,6 +2,7 @@ export type EventRouletteMode = "live" | "test" | "preview";
 export type EventRouletteStatus = "idle" | "spinning" | "result" | "closed";
 
 export type EventRouletteOrderLike = {
+  event_gift_winner_id?: string | null;
   id?: string | number | null;
   youtube_nickname?: string | null;
   youtubeNickname?: string | null;
@@ -240,6 +241,7 @@ export function isRouletteCanceledLike(order: EventRouletteOrderLike): boolean {
 
 export function isRouletteOrderExcluded(order: EventRouletteOrderLike): boolean {
   return (
+    Boolean(order.event_gift_winner_id) ||
     toBooleanTrue(order.is_test_order) ||
     toBooleanTrue(order.isTestOrder) ||
     toBooleanTrue(order.event_excluded) ||

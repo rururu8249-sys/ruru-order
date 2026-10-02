@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {NextRequest} from 'next/server.js';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+process.env.NEXT_PUBLIC_SUPABASE_URL='http://localhost:54321';process.env.SUPABASE_SERVICE_ROLE_KEY='fixture';
+let payload;
+const db={from(table){let inserted=false;const q={select(){return q;},insert(value){payload=value;inserted=true;return q;},eq(){return q;},order(){return q;},limit(){return q;},single:async()=>({data:inserted?{id:'e',...payload}:null,error:null}),then(resolve){return Promise.resolve({data:[],error:null}).then(resolve);}};return q;}};
+const {POST}=createUiLoader({'@/lib/admin-auth':{verifyAdminSessionFromRequest:async()=>true},'@supabase/supabase-js':{createClient:()=>db}})('app/api/admin-live/event-roulette/route.ts');
+const call=extra=>POST(new NextRequest('http://localhost/api/admin-live/event-roulette',{method:'POST',body:JSON.stringify({action:'create_event',mode:'live',excludeDailyDup:false,participants:[{nickname:'A',orderIds:['1'],weight:1}],...extra})}));
+process.env.EVENT_CUSTOM_GIFT_ENABLED='false';assert.equal((await call({giftType:'custom',winnerNote:'선물'})).status,409);assert.equal(payload,undefined);
+process.env.EVENT_CUSTOM_GIFT_ENABLED='true';assert.equal((await call({giftType:'custom',winnerNote:'   '})).status,400);assert.equal(payload,undefined);
+const custom=await call({giftType:'custom',winnerNote:' 선물 A '});assert.equal(custom.status,200);assert.equal(payload.custom_gift_name,'선물 A');assert.equal((await custom.json()).event.custom_gift_name,'선물 A');
+await call({giftType:'point',winnerNote:'포인트 2,000P'});assert.equal(payload.custom_gift_name,undefined,'point event unchanged');
+console.log('PASS actual event-create route: feature disabled blocks custom, validation before write, immutable name, point no gift snapshot');

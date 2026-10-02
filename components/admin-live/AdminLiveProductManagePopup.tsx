@@ -938,7 +938,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     setHistDetailLoading(entryId);
     setHistExpand(entryId);
     try {
-      let q = supabase.from("orders").select("product_id, product_name, color, size, qty, product_price");
+      let q = supabase.from("orders").select("product_id, product_name, color, size, qty, product_price").is('event_gift_winner_id',null);
       q = entryId === "__shop__" ? q.is("broadcast_id", null) : q.eq("broadcast_id", entryId);
       q = q.in("admin_order_status_v2", HISTORY_PAID_STATUSES);
       const { data: ord } = await q;

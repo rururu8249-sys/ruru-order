@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+process.env.NEXT_PUBLIC_SUPABASE_URL='http://localhost:54321';
+process.env.SUPABASE_SERVICE_ROLE_KEY='fixture';
+const base={order_group_id:'g',created_at:new Date().toISOString(),admin_order_status_v2:'입금확인',payment_method:'무통장입금',customer_phone:'01012345678',qty:1,product_price:0,final_amount:0};
+const selected=[];
+const db={from(){const q={select(cols){selected.push(cols);return q;},gte(){return q;},lte(){return q;},order(){return q;},range(){return q;},then(resolve){return Promise.resolve({data:[{...base,id:1,product_name:'ordinary zero-price'},{...base,id:2,product_name:'event gift',event_gift_winner_id:'winner'}]}).then(resolve);}};return q;}};
+const {computeLiveSummary}=createUiLoader({'@supabase/supabase-js':{createClient:()=>db}})('lib/liveSummary.ts');
+const result=await computeLiveSummary('today');
+assert.ok(selected.some(cols=>cols.includes('event_gift_winner_id')));
+assert.deepEqual(result.productRanking.map(r=>r.name),['ordinary zero-price']);
+assert.equal(result.productRanking[0].qty,1);
+console.log('PASS actual live summary excludes event gifts, preserves ordinary zero-price products');

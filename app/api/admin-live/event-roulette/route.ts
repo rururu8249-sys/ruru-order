@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import {normalizeCustomGiftName} from '@/lib/eventCustomGift';
 import { NextRequest, NextResponse } from "next/server";
 import {calculateEventDurationMs, eventSeed} from "@/lib/eventPlayback";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
@@ -44,6 +45,7 @@ type RouletteBroadcastRow = Record<string, unknown> & {
 };
 
 type RouletteEventRow = {
+  custom_gift_name?: string | null;
   id: string;
   title: string;
   overlay_token: string;
@@ -221,6 +223,7 @@ function sanitizeEventForAdmin(event: RouletteEventRow) {
     participant_count: participants.length,
     winner_nickname: event.winner_nickname,
     winner_note: event.winner_note,
+    custom_gift_name: event.custom_gift_name || null,
     winner_order_ids: event.winner_order_ids || [],
     spin_started_at: event.spin_started_at,
     spin_duration_ms: event.spin_duration_ms,
@@ -306,6 +309,7 @@ async function fetchOrderRowsForBroadcast(supabase: SupabaseAdminClient, broadca
         "admin_order_status_v2",
         "order_manage_status",
         "is_test_order",
+        "event_gift_winner_id",
         // [2026-09-09] 자동 응모권 «단골» 판정용 — 사람 구분은 카카오ID 우선, 없으면 전화(8/31 확정 원칙)
         "kakao_id",
         "customer_phone",
@@ -341,6 +345,7 @@ async function fetchOrderRowsForDate(supabase: SupabaseAdminClient, sourceDate: 
         "admin_order_status_v2",
         "order_manage_status",
         "is_test_order",
+        "event_gift_winner_id",
         // [2026-09-09] 자동 응모권 «단골» 판정용 — 사람 구분은 카카오ID 우선, 없으면 전화(8/31 확정 원칙)
         "kakao_id",
         "customer_phone",
@@ -378,6 +383,7 @@ async function fetchOrderRowsByGroupIds(supabase: SupabaseAdminClient, groupIds:
     "admin_order_status_v2",
     "order_manage_status",
     "is_test_order",
+    "event_gift_winner_id",
     // [2026-09-09] 자동 응모권 «단골» 판정용 — 사람 구분은 카카오ID 우선, 없으면 전화(8/31 확정 원칙)
     "kakao_id",
     "customer_phone",
@@ -844,7 +850,7 @@ async function handleEvents(request: NextRequest) {
   let query = supabase
     .from("event_roulette_events")
     .select(
-      "id, title, overlay_token, mode, is_test, status, broadcast_id, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
+      "id, title, overlay_token, mode, is_test, status, broadcast_id, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at, custom_gift_name"
     )
     .order("created_at", { ascending: false })
     .limit(30);
@@ -888,12 +894,23 @@ async function handleWinners(request: NextRequest) {
     return json({ ok: false, message: error.message || "룰렛 당첨자 조회 실패" }, 500);
   }
 
-  return json({ ok: true, winners: data || [] });
+  const rows=(data||[]) as {event_id:string}[];
+  const ids=[...new Set(rows.map(w=>w.event_id).filter(Boolean))];
+  const metadata=ids.length?await supabase.from('event_roulette_events').select('id,custom_gift_name').in('id',ids):{data:[],error:null};
+  if(metadata.error)return json({ok:false,message:'경품 기록 확인에 실패했습니다.'},500);
+  const gifts=new Map((metadata.data||[]).map(e=>[e.id,e.custom_gift_name]));
+  return json({ ok: true, winners: rows.map(w=>({...w,custom_gift_name:gifts.get(w.event_id)||null})) });
 }
 
 async function createEvent(body: Record<string, unknown>) {
   const supabase = getSupabaseAdmin();
   const mode = normalizeEventRouletteMode(body.mode);
+  let customGiftName: string | null = null;
+  if(body.giftType === 'custom') {
+    if(process.env.EVENT_CUSTOM_GIFT_ENABLED !== 'true') return json({ok:false,message:'직접입력 경품 자동등록은 아직 활성화되지 않았습니다.'},409);
+    try { customGiftName=normalizeCustomGiftName(body.winnerNote); }
+    catch(error) { return json({ok:false,message:(error as Error).message},400); }
+  }
   const sourceDate = normalizeDateText(body.sourceDate);
   const broadcastId = cleanBroadcastId(body.broadcastId);
   const title = cleanText(body.title) || DEFAULT_TITLE;
@@ -960,6 +977,7 @@ async function createEvent(body: Record<string, unknown>) {
   const spinDurationMs = calculateRouletteSpinDurationMs(participants.length);
 
   const eventPayload = {
+    ...(customGiftName ? {custom_gift_name:customGiftName} : {}),
     title,
     overlay_token: overlayToken,
     mode,
@@ -981,7 +999,7 @@ async function createEvent(body: Record<string, unknown>) {
     .from("event_roulette_events")
     .insert(eventPayload)
     .select(
-      "id, title, overlay_token, mode, is_test, status, broadcast_id, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
+      "id, title, overlay_token, mode, is_test, status, broadcast_id, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at, custom_gift_name"
     )
     .single();
 
@@ -990,6 +1008,14 @@ async function createEvent(body: Record<string, unknown>) {
   }
 
   return json({ ok: true, event: sanitizeEventForAdmin(data as RouletteEventRow), saved: true });
+}
+
+async function finalizeCustomGift(supabase: SupabaseAdminClient,event:RouletteEventRow,winners:EventRouletteParticipant[],now:string,duration:number) {
+  const {data,error}=await supabase.rpc('admin_finalize_custom_gift_event',{
+    p_event_id:event.id,p_winners:winners.map(w=>({nickname:w.nickname,orderIds:w.orderIds||[]})),p_started_at:now,p_duration_ms:duration,
+  });
+  if(error||!data?.ok||!data.event) return json({ok:false,message:'직접입력 이벤트 결과 저장에 실패했습니다. 다시 확인해 주세요.'},500);
+  return json({...data,event:sanitizeEventForAdmin(data.event as RouletteEventRow),overlay_event:sanitizeEventForOverlayProbe(data.event as RouletteEventRow)});
 }
 
 async function spinEvent(body: Record<string, unknown>) {
@@ -1004,7 +1030,7 @@ async function spinEvent(body: Record<string, unknown>) {
   const { data: eventData, error: eventError } = await supabase
     .from("event_roulette_events")
     .select(
-      "id, title, overlay_token, mode, is_test, status, broadcast_id, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
+      "id, title, overlay_token, mode, is_test, status, broadcast_id, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at, custom_gift_name"
     )
     .eq("id", eventId)
     .single();
@@ -1026,6 +1052,7 @@ async function spinEvent(body: Record<string, unknown>) {
   }
 
   if (event.status === "result" && event.winner_nickname) {
+    if(event.custom_gift_name) return finalizeCustomGift(supabase,event,[],new Date().toISOString(),5000);
     return json({ ok: true, event: sanitizeEventForAdmin(event), already_result: true });
   }
 
@@ -1068,6 +1095,8 @@ async function spinEvent(body: Record<string, unknown>) {
   const kind = event.overlay_token.startsWith("claw_") ? "claw" : "roulette";
   const spinDurationMs = calculateEventDurationMs(kind, participants.map(p=>p.nickname), [picked.winner.nickname], eventSeed(JSON.stringify([kind,eventId,now,1])));
 
+  if(event.custom_gift_name) return finalizeCustomGift(supabase,event,[picked.winner],now,spinDurationMs);
+
   const { data: updatedEvent, error: updateError } = await supabase
     .from("event_roulette_events")
     .update({
@@ -1084,7 +1113,7 @@ async function spinEvent(body: Record<string, unknown>) {
     })
     .eq("id", eventId)
     .select(
-      "id, title, overlay_token, mode, is_test, status, broadcast_id, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
+      "id, title, overlay_token, mode, is_test, status, broadcast_id, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at, custom_gift_name"
     )
     .single();
 
@@ -1150,7 +1179,7 @@ async function resolveSurvivalEvent(body: Record<string, unknown>) {
   const { data: eventData, error: eventError } = await supabase
     .from("event_roulette_events")
     .select(
-      "id, title, overlay_token, mode, is_test, status, broadcast_id, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
+      "id, title, overlay_token, mode, is_test, status, broadcast_id, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at, custom_gift_name"
     )
     .eq("id", eventId)
     .single();
@@ -1161,6 +1190,9 @@ async function resolveSurvivalEvent(body: Record<string, unknown>) {
 
   const event = eventData as RouletteEventRow;
   const requestedParticipants = normalizeManualParticipantsForEvent(body.participants);
+  if (event.custom_gift_name && event.status === "result") {
+    return finalizeCustomGift(supabase, event, [], new Date().toISOString(), 5000);
+  }
   const participants = requestedParticipants.length > 0
     ? requestedParticipants
     : Array.isArray(event.participant_snapshot)
@@ -1228,6 +1260,8 @@ async function resolveSurvivalEvent(body: Record<string, unknown>) {
   const kind = event.overlay_token.startsWith("race_") ? "race" : "survival";
   const spinDurationMs = calculateEventDurationMs(kind, participants.map(p=>p.nickname), survivorNicknames, eventSeed(JSON.stringify([kind,eventId,now,1])));
 
+  if(event.custom_gift_name) return finalizeCustomGift(supabase,event,survivors,now,spinDurationMs);
+
   const { data: updatedEvent, error: updateError } = await supabase
     .from("event_roulette_events")
     .update({
@@ -1245,7 +1279,7 @@ async function resolveSurvivalEvent(body: Record<string, unknown>) {
     })
     .eq("id", eventId)
     .select(
-      "id, title, overlay_token, mode, is_test, status, broadcast_id, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
+      "id, title, overlay_token, mode, is_test, status, broadcast_id, event_date, source_date, participant_snapshot, winner_nickname, winner_note, winner_order_ids, spin_started_at, spin_duration_ms, result_at, created_at, updated_at, custom_gift_name"
     )
     .single();
 

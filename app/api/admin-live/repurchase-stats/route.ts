@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     const want = ["id", "created_at", "customer_phone", "kakao_id", "youtube_nickname", "order_group_id",
       "total_amount", "final_amount", "adjusted_total_price", "total_price",
       "shipping_fee", "adjusted_shipping_fee", "product_price", "adjusted_product_price", "qty", "product_name", "item_change_history",
-      "zipcode", "address", "detail_address", "broadcast_id", "order_manage_status", "is_deleted"];
+      "zipcode", "address", "detail_address", "broadcast_id", "order_manage_status", "is_deleted", "event_gift_winner_id"];
     const selectCols = Array.from(new Set([...want.filter((c) => allCols.includes(c)), ...statusCols])).join(",");
 
     type Row = Record<string, unknown>;
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
         .order("created_at", { ascending: true })
         .range(from, from + pageSize - 1);
       if (error) throw new Error(error.message);
-      rows.push(...((data || []) as unknown as Row[]));
+      rows.push(...((data || []) as unknown as Row[]).filter(o=>!o.event_gift_winner_id));
       if (!data || data.length < pageSize) break;
       if (rows.length > 200000) break; // 안전 상한
     }

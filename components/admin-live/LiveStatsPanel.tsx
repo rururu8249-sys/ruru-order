@@ -33,6 +33,7 @@ export default function LiveStatsPanel({ orders, activeBroadcastId, onOpenReport
     const qtyByName = new Map<string, number>();
     for (const o of rows) {
       for (const it of o.items || []) {
+        if(it.eventGiftWinnerId) continue;
         const name = String(it.productName || "").trim();
         if (!name || name === "상품명 없음") continue;
         qtyByName.set(name, (qtyByName.get(name) || 0) + Number(it.qty || 0));
