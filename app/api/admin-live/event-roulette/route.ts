@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import {normalizeCustomGiftName} from '@/lib/eventCustomGift';
+import {eventSaveError} from '@/lib/eventSaveError';
 import { NextRequest, NextResponse } from "next/server";
 import {calculateEventDurationMs, eventSeed} from "@/lib/eventPlayback";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
@@ -1014,7 +1015,10 @@ async function finalizeCustomGift(supabase: SupabaseAdminClient,event:RouletteEv
   const {data,error}=await supabase.rpc('admin_finalize_custom_gift_event',{
     p_event_id:event.id,p_winners:winners.map(w=>({nickname:w.nickname,orderIds:w.orderIds||[]})),p_started_at:now,p_duration_ms:duration,
   });
-  if(error||!data?.ok||!data.event) return json({ok:false,message:'직접입력 이벤트 결과 저장에 실패했습니다. 다시 확인해 주세요.'},500);
+  if(error||!data?.ok||!data.event) {
+    console.error('Custom gift event finalization failed', {eventId:event.id,code:error?.code,message:error?.message});
+    return json({ok:false,message:eventSaveError(error,'직접입력 이벤트 결과 저장에 실패했습니다. 다시 확인해 주세요.')},500);
+  }
   return json({...data,event:sanitizeEventForAdmin(data.event as RouletteEventRow),overlay_event:sanitizeEventForOverlayProbe(data.event as RouletteEventRow)});
 }
 
@@ -1286,9 +1290,7 @@ async function resolveSurvivalEvent(body: Record<string, unknown>) {
   if (updateError || !updatedEvent) {
     return json({
       ok: false,
-      message:
-        (updateError?.message || "서바이벌 결과 저장 실패") +
-        " — survivor_nicknames 컬럼이 없다면 Supabase에서 supabase/sql/event_survival_columns.sql 을 먼저 실행하세요.",
+      message: eventSaveError(updateError, "서바이벌 결과 저장에 실패했습니다. 다시 확인해 주세요."),
     }, 500);
   }
 

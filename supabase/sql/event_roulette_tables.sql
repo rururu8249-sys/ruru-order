@@ -25,7 +25,9 @@ create table if not exists public.event_roulette_events (
   winner_note text,
   winner_order_ids jsonb not null default '[]'::jsonb,
   spin_started_at timestamptz,
-  spin_duration_ms integer not null default 5000 check (spin_duration_ms >= 1000 and spin_duration_ms <= 10000),
+  spin_duration_ms integer not null default 5000 check (spin_duration_ms >= 1 and (
+    overlay_token like 'survival\_%' escape '\' or overlay_token like 'race\_%' escape '\'
+    or overlay_token like 'claw\_%' escape '\' or spin_duration_ms between 1000 and 10000)),
   result_at timestamptz,
   created_by text not null default 'admin-live',
   created_at timestamptz not null default now(),
