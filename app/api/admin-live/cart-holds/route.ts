@@ -141,13 +141,22 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    const sessions = new Map<string, { cartStartedAt: string; phone: string; kakaoId: string }>();
+    const sessions = new Map<string, { cartStartedAt: string; cartExpiresAt: string; phone: string; kakaoId: string }>();
     for (const hold of holds) {
       const startedMs = new Date(hold.createdAt).getTime();
+      const expiresMs = new Date(hold.expiresAt).getTime();
       const current = sessions.get(hold.sessionKey);
       if (!current || (Number.isFinite(startedMs) && startedMs < new Date(current.cartStartedAt).getTime())) {
-        sessions.set(hold.sessionKey, { cartStartedAt: hold.createdAt, phone: digits(hold.phone), kakaoId: hold.kakaoId });
+        sessions.set(hold.sessionKey, {
+          cartStartedAt: hold.createdAt,
+          cartExpiresAt: !current || (Number.isFinite(expiresMs) && expiresMs > new Date(current.cartExpiresAt).getTime())
+            ? hold.expiresAt
+            : current.cartExpiresAt,
+          phone: digits(hold.phone) || current?.phone || "",
+          kakaoId: hold.kakaoId || current?.kakaoId || "",
+        });
       } else {
+        if (Number.isFinite(expiresMs) && expiresMs > new Date(current.cartExpiresAt).getTime()) current.cartExpiresAt = hold.expiresAt;
         if (!current.phone && hold.phone) current.phone = digits(hold.phone);
         if (!current.kakaoId && hold.kakaoId) current.kakaoId = hold.kakaoId;
       }
@@ -179,14 +188,20 @@ export async function GET(request: NextRequest) {
 
       const { data: overrideRows, error: overrideError } = await supabase
         .from("cart_bank_account_overrides")
-        .select("session_key,cart_started_at,account_id,bank_name,bank_account,bank_holder,assigned_at")
+        .select("session_key,cart_started_at,cart_expires_at,account_id,bank_name,bank_account,bank_holder,assigned_at")
         .in("session_key", sessionKeys)
-        .eq("status", "active");
+        .eq("status", "active")
+        .gt("cart_expires_at", new Date().toISOString())
+        .order("assigned_at", { ascending: false });
       if (overrideError) throw new Error("장바구니 지정계좌 조회 실패: " + overrideError.message);
       for (const row of (overrideRows || []) as Record<string, unknown>[]) {
         const key = cleanKey(row.session_key);
         const current = sessions.get(key);
-        if (!key || !current || new Date(String(row.cart_started_at ?? "")).getTime() !== new Date(current.cartStartedAt).getTime()) continue;
+        if (!key || !current || groupMeta[key].overrideAccount) continue;
+        const overrideStart = new Date(String(row.cart_started_at ?? "")).getTime();
+        const overrideExpiry = new Date(String(row.cart_expires_at ?? "")).getTime();
+        const currentStart = new Date(current.cartStartedAt).getTime();
+        if (!Number.isFinite(overrideStart) || !Number.isFinite(overrideExpiry) || overrideStart > currentStart || overrideExpiry <= Date.now()) continue;
         groupMeta[key].overrideAccount = {
           id: String(row.account_id ?? ""),
           bankName: String(row.bank_name ?? ""),
@@ -305,58 +320,27 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: false, error: { message: "선택한 계좌가 올바르지 않습니다." } }, { status: 400 });
       }
 
-      const nowIso = new Date().toISOString();
-      const { data: firstHold, error: holdError } = await supabase
-        .from("cart_reservations")
-        .select("created_at")
-        .eq("session_key", sessionKey)
-        .gt("expires_at", nowIso)
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      if (holdError) throw new Error(holdError.message);
-      const cartStartedAt = String((firstHold as Record<string, unknown> | null)?.created_at ?? "");
-      if (!cartStartedAt) return NextResponse.json({ ok: false, error: { message: "이미 비었거나 만료된 장바구니입니다. 새로고침해 주세요." } }, { status: 409 });
-
-      if (accountId === "default") {
-        const { error } = await supabase
-          .from("cart_bank_account_overrides")
-          .update({ status: "cancelled", cancelled_at: nowIso })
-          .eq("session_key", sessionKey)
-          .eq("cart_started_at", cartStartedAt)
-          .eq("status", "active");
-        if (error) throw new Error(error.message);
-        return NextResponse.json({ ok: true, account: null });
+      const account = accountId === "default"
+        ? null
+        : (await loadBankAccounts(supabase)).find((item) => item.id === (accountId as ShopBankAccountId)) || null;
+      if (accountId !== "default" && !account) {
+        return NextResponse.json({ ok: false, error: { message: "선택한 계좌가 없거나 비활성 상태입니다." } }, { status: 409 });
       }
 
-      const accounts = await loadBankAccounts(supabase);
-      const account = accounts.find((item) => item.id === (accountId as ShopBankAccountId));
-      if (!account) return NextResponse.json({ ok: false, error: { message: "선택한 계좌가 없거나 비활성 상태입니다." } }, { status: 409 });
-      // 같은 브라우저 세션의 과거·만료 장바구니 지정은 새 장바구니로 절대 이어지지 않는다.
-      const { error: staleError } = await supabase
-        .from("cart_bank_account_overrides")
-        .update({ status: "cancelled", cancelled_at: nowIso })
-        .eq("session_key", sessionKey)
-        .eq("status", "active")
-        .neq("cart_started_at", cartStartedAt);
-      if (staleError) throw new Error(staleError.message);
-      const row = {
-        session_key: sessionKey,
-        cart_started_at: cartStartedAt,
-        account_id: account.id,
-        bank_name: account.bankName,
-        bank_account: account.bankAccount,
-        bank_holder: account.bankHolder,
-        status: "active",
-        assigned_at: nowIso,
-        assigned_by: String((session as any)?.username || (session as any)?.id || "admin").slice(0, 80),
-        consumed_at: null,
-        consumed_order_group_id: null,
-        cancelled_at: null,
-      };
-      const { error } = await supabase.from("cart_bank_account_overrides").upsert(row, { onConflict: "session_key,cart_started_at" });
-      if (error) throw new Error(error.message);
-      return NextResponse.json({ ok: true, account });
+      const { data: assigned, error } = await supabase.rpc("admin_set_cart_bank_override", {
+        p_session_key: sessionKey,
+        p_account_id: account?.id || null,
+        p_bank_name: account?.bankName || null,
+        p_bank_account: account?.bankAccount || null,
+        p_bank_holder: account?.bankHolder || null,
+        p_assigned_by: String((session as any)?.username || (session as any)?.id || "admin").slice(0, 80),
+      });
+      if (error) {
+        const message = error.message || "장바구니 계좌 저장 실패";
+        const status = message.includes("비었거나 만료") ? 409 : 500;
+        return NextResponse.json({ ok: false, error: { message } }, { status });
+      }
+      return NextResponse.json({ ok: true, account: (assigned as any)?.account || null });
     }
 
     if (action === "remind" || action === "remind-all") {

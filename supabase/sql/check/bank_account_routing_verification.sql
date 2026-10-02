@@ -6,6 +6,9 @@ declare
   v_signature regprocedure := to_regprocedure(
     'public.submit_customer_order_with_bank_routing(jsonb,integer,text,text,text,text,text)'
   );
+  v_admin_signature regprocedure := to_regprocedure(
+    'public.admin_set_cart_bank_override(text,text,text,text,text,text)'
+  );
   v_missing_columns text[];
   v_security_definer boolean;
   v_config text[];
@@ -19,7 +22,8 @@ begin
       ('payment_bank_name'),
       ('payment_bank_account'),
       ('payment_bank_holder'),
-      ('payment_bank_assigned_at')
+      ('payment_bank_assigned_at'),
+      ('payment_bank_assignment_source')
   ) as required(name)
   where not exists (
     select 1
@@ -53,6 +57,30 @@ begin
     raise exception 'submit_customer_order_with_bank_routing 함수가 없습니다.';
   end if;
 
+  if v_admin_signature is null then
+    raise exception 'admin_set_cart_bank_override 함수가 없습니다.';
+  end if;
+
+  if not exists (
+    select 1 from information_schema.columns c
+    where c.table_schema = 'public'
+      and c.table_name = 'cart_bank_account_overrides'
+      and c.column_name = 'cart_expires_at'
+      and c.is_nullable = 'NO'
+  ) then
+    raise exception 'cart_bank_account_overrides.cart_expires_at NOT NULL 컬럼이 없습니다.';
+  end if;
+
+  if not exists (
+    select 1 from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'cart_bank_account_overrides'
+      and c.relrowsecurity
+  ) then
+    raise exception 'cart_bank_account_overrides RLS가 활성화되어 있지 않습니다.';
+  end if;
+
   select p.prosecdef, p.proconfig
     into v_security_definer, v_config
   from pg_proc p
@@ -79,6 +107,14 @@ begin
   end if;
   if not has_function_privilege('service_role', v_signature, 'EXECUTE') then
     raise exception 'service_role에 계좌 라우팅 함수 실행 권한이 없습니다.';
+  end if;
+
+  if has_function_privilege('anon', v_admin_signature, 'EXECUTE')
+     or has_function_privilege('authenticated', v_admin_signature, 'EXECUTE') then
+    raise exception 'anon/authenticated에 장바구니 계좌 지정 함수 실행 권한이 남아 있습니다.';
+  end if;
+  if not has_function_privilege('service_role', v_admin_signature, 'EXECUTE') then
+    raise exception 'service_role에 장바구니 계좌 지정 함수 실행 권한이 없습니다.';
   end if;
 
   raise notice 'PASS: 계좌 라우팅 컬럼·제약조건·함수·권한 검증 완료';

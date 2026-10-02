@@ -19,6 +19,10 @@ const cartOverrideMigrationSql = await readFile(
   new URL("../supabase/migrations/20261002180000_cart_bank_account_override.sql", import.meta.url),
   "utf8",
 );
+const cartOverrideHardeningMigrationSql = await readFile(
+  new URL("../supabase/migrations/20261002193000_cart_bank_override_lifecycle_hardening.sql", import.meta.url),
+  "utf8",
+);
 const verificationSql = await readFile(new URL("../supabase/sql/check/bank_account_routing_verification.sql", import.meta.url), "utf8");
 
 const db = new PGlite();
@@ -83,6 +87,9 @@ await db.exec(`
     v_ids bigint[];
     v_count integer;
   begin
+    if v_group = 'force-fail' then
+      raise exception 'forced submit failure';
+    end if;
     select array_agg(id order by id), count(*) into v_ids, v_count
       from public.orders where order_group_id = v_group;
     if coalesce(v_count, 0) > 0 then
@@ -98,6 +105,8 @@ await db.exec(`
       from jsonb_array_elements(p_order_rows) as source(row_value)
     returning array[id] into v_ids;
 
+    delete from public.cart_reservations where session_key = p_session_key;
+
     return jsonb_build_object('ok', true, 'duplicate', false, 'inserted_count', jsonb_array_length(p_order_rows), 'order_ids', to_jsonb(v_ids));
   end;
   $$;
@@ -106,6 +115,7 @@ await db.exec(`
 await db.exec(migrationSql);
 await db.exec(hotfixMigrationSql);
 await db.exec(cartOverrideMigrationSql);
+await db.exec(cartOverrideHardeningMigrationSql);
 
 const primary = { id: "primary", enabled: true, label: "기존 계좌", bankName: "국민은행", bankAccount: "111-222-333333", bankHolder: "홍길동" };
 const secondary = { id: "secondary", enabled: true, label: "추가 계좌", bankName: "신한은행", bankAccount: "444-555-666666", bankHolder: "김루루" };
@@ -145,6 +155,133 @@ const clock = await db.query(`
     ((now() at time zone 'Asia/Seoul')::date + 1)::text as tomorrow
 `);
 const { today, yesterday, tomorrow } = clock.rows[0];
+
+// 관리자가 지정한 뒤 첫 상품만 삭제되어 min(created_at)이 바뀌어도 같은 살아 있는 장바구니에는 지정계좌가 유지된다.
+{
+  await resetOrders();
+  await db.exec("truncate table public.cart_reservations, public.cart_bank_account_overrides restart identity");
+  await setConfig({ first: "secondary", existing: "primary" });
+  await db.query(
+    `insert into public.cart_reservations(session_key,product_id,created_at,expires_at) values
+      ('lifecycle-cart','oldest',now()-interval '2 hours',now()+interval '2 hours'),
+      ('lifecycle-cart','remaining',now()-interval '1 hour',now()+interval '3 hours')`,
+  );
+  const assigned = await db.query(
+    "select public.admin_set_cart_bank_override('lifecycle-cart','primary',$1,$2,$3,'tester') as result",
+    [primary.bankName, primary.bankAccount, primary.bankHolder],
+  );
+  assert.equal(assigned.rows[0].result.account.bankHolder, primary.bankHolder);
+  await db.exec("delete from public.cart_reservations where session_key='lifecycle-cart' and product_id='oldest'");
+  const result = await submit({ group: "lifecycle-submit", kakao: "73001", session: "lifecycle-cart", broadcast: broadcastA });
+  assert.equal(result.bank_assignment_source, "cart_override");
+  assert.equal(result.bank_account.id, "primary");
+}
+
+// 기본 설정으로 되돌리면 현재 세션의 active 지정이 모두 취소되고, 제출은 정상 전역 규칙을 쓴다.
+{
+  await resetOrders();
+  await db.exec("truncate table public.cart_reservations, public.cart_bank_account_overrides restart identity");
+  await setConfig({ first: "secondary", existing: "primary" });
+  await db.exec("insert into public.cart_reservations(session_key,product_id,created_at,expires_at) values ('cancel-override','p1',now(),now()+interval '4 hours')");
+  await db.query(
+    "select public.admin_set_cart_bank_override('cancel-override','primary',$1,$2,$3,'tester')",
+    [primary.bankName, primary.bankAccount, primary.bankHolder],
+  );
+  const cancelled = await db.query("select public.admin_set_cart_bank_override('cancel-override',null,null,null,null,'tester') as result");
+  assert.equal(cancelled.rows[0].result.account, null);
+  const active = await db.query("select count(*)::int as count from public.cart_bank_account_overrides where session_key='cancel-override' and status='active'");
+  assert.equal(active.rows[0].count, 0);
+  const result = await submit({ group: "cancel-default", kakao: "74001", session: "cancel-override", broadcast: broadcastA });
+  assert.equal(result.bank_account.id, "secondary");
+  assert.equal(result.bank_assignment_source, undefined);
+}
+
+// 주문 제출이 실패하면 주문·지정계좌 소비가 함께 롤백되어 안전하게 같은 주문으로 재시도할 수 있다.
+{
+  await resetOrders();
+  await db.exec("truncate table public.cart_reservations, public.cart_bank_account_overrides restart identity");
+  await setConfig();
+  await db.exec("insert into public.cart_reservations(session_key,product_id,created_at,expires_at) values ('failure-cart','p1',now(),now()+interval '4 hours')");
+  await db.query(
+    "select public.admin_set_cart_bank_override('failure-cart','primary',$1,$2,$3,'tester')",
+    [primary.bankName, primary.bankAccount, primary.bankHolder],
+  );
+  await assert.rejects(
+    submit({ group: "force-fail", kakao: "75001", session: "failure-cart", broadcast: broadcastA }),
+    /forced submit failure/,
+  );
+  const state = await db.query("select status,consumed_order_group_id from public.cart_bank_account_overrides where session_key='failure-cart'");
+  assert.equal(state.rows[0].status, "active");
+  assert.equal(state.rows[0].consumed_order_group_id, null);
+  const orders = await db.query("select count(*)::int as count from public.orders where order_group_id='force-fail'");
+  assert.equal(orders.rows[0].count, 0);
+}
+
+// 제출이 먼저 끝난 장바구니에는 관리자가 뒤늦게 계좌를 지정할 수 없다.
+{
+  await resetOrders();
+  await db.exec("truncate table public.cart_reservations, public.cart_bank_account_overrides restart identity");
+  await setConfig();
+  await db.exec("insert into public.cart_reservations(session_key,product_id,created_at,expires_at) values ('late-admin','p1',now(),now()+interval '4 hours')");
+  await submit({ group: "already-submitted", kakao: "76001", session: "late-admin", broadcast: broadcastA });
+  await assert.rejects(
+    db.query("select public.admin_set_cart_bank_override('late-admin','primary',$1,$2,$3,'tester')", [primary.bankName, primary.bankAccount, primary.bankHolder]),
+    /이미 비었거나 만료된 장바구니/,
+  );
+}
+
+// 계좌 지정 함수는 잘못된 세션·계좌·계좌번호를 저장하지 않는다.
+{
+  await db.exec("truncate table public.cart_reservations, public.cart_bank_account_overrides restart identity");
+  await assert.rejects(
+    db.query("select public.admin_set_cart_bank_override('bad',null,null,null,null,'tester')"),
+    /장바구니 식별값이 올바르지 않습니다/,
+  );
+  await db.exec("insert into public.cart_reservations(session_key,product_id,created_at,expires_at) values ('invalid-account','p1',now(),now()+interval '4 hours')");
+  await assert.rejects(
+    db.query("select public.admin_set_cart_bank_override('invalid-account','tertiary','은행','123456','예금주','tester')"),
+    /선택한 계좌가 올바르지 않습니다/,
+  );
+  await assert.rejects(
+    db.query("select public.admin_set_cart_bank_override('invalid-account','primary','은행','12 34','예금주','tester')"),
+    /선택한 계좌 정보가 올바르지 않습니다/,
+  );
+}
+
+// 카카오 ID가 있으면 다른 사람의 재사용 전화번호를 회원 등록 판정에 섞지 않는다.
+{
+  await resetOrders();
+  await db.exec("truncate table public.customers restart identity");
+  await db.query("insert into public.customers(kakao_id,customer_phone) values ('owner-kakao','01099990000')");
+  const meta = await db.query(
+    "select * from public.admin_cart_customer_order_meta($1::jsonb)",
+    [JSON.stringify([{ sessionKey: "recycled-phone", phone: "01099990000", kakaoId: "different-kakao" }])],
+  );
+  assert.equal(meta.rows[0].is_registered, false);
+  assert.equal(Number(meta.rows[0].valid_order_count), 0);
+}
+
+// 같은 주문키를 다른 고객이 재사용하거나 한 주문 그룹의 계좌 스냅샷이 서로 다르면 제출을 차단한다.
+{
+  await resetOrders();
+  await setConfig();
+  await submit({ group: "identity-guard", kakao: "77001", phone: "01077000001", broadcast: broadcastA });
+  await assert.rejects(
+    submit({ group: "identity-guard", kakao: "77002", phone: "01077000002", broadcast: broadcastA }),
+    /고객 식별값이 일치하지 않습니다/,
+  );
+
+  await resetOrders();
+  await db.query(
+    `insert into public.orders(order_group_id,kakao_id,customer_phone,customer_order_segment,payment_bank_account_id,payment_bank_name,payment_bank_account,payment_bank_holder)
+     values ('conflict-snapshot','78001','01078000001','first_order','primary','A은행','111111','A'),
+            ('conflict-snapshot','78001','01078000001','first_order','secondary','B은행','222222','B')`,
+  );
+  await assert.rejects(
+    submit({ group: "conflict-snapshot", kakao: "78001", phone: "01078000001", broadcast: broadcastA }),
+    /같은 주문 그룹의 입금계좌 정보가 서로 달라/,
+  );
+}
 
 async function submit({ group, phone = "01012345678", kakao = "10001", broadcast = broadcastA, session = "session-key" } = {}) {
   serial += 1;
@@ -340,8 +477,8 @@ await setConfig();
     ["override-session", started],
   );
   await db.query(
-    `insert into public.cart_bank_account_overrides(session_key,cart_started_at,account_id,bank_name,bank_account,bank_holder)
-     values ($1,$2::timestamptz,'primary',$3,$4,$5)`,
+    `insert into public.cart_bank_account_overrides(session_key,cart_started_at,cart_expires_at,account_id,bank_name,bank_account,bank_holder)
+     values ($1,$2::timestamptz,now()+interval '4 hours','primary',$3,$4,$5)`,
     ["override-session", started, primary.bankName, primary.bankAccount, primary.bankHolder],
   );
 
@@ -380,8 +517,8 @@ await setConfig();
     "insert into public.cart_reservations(session_key,product_id,created_at,expires_at) values ('new-cart','product-new',now(),now()+interval '4 hours')",
   );
   await db.query(
-    `insert into public.cart_bank_account_overrides(session_key,cart_started_at,account_id,bank_name,bank_account,bank_holder)
-     values ('new-cart',now()-interval '1 day','primary',$1,$2,$3)`,
+    `insert into public.cart_bank_account_overrides(session_key,cart_started_at,cart_expires_at,account_id,bank_name,bank_account,bank_holder)
+     values ('new-cart',now()-interval '1 day',now()-interval '20 hours','primary',$1,$2,$3)`,
     [primary.bankName, primary.bankAccount, primary.bankHolder],
   );
   const result = await submit({ group: "new-cart-default", kakao: "71001", session: "new-cart", broadcast: broadcastB });
@@ -418,13 +555,23 @@ await setConfig();
 // Data API 역할은 실행할 수 없고 service_role만 호출할 수 있다.
 {
   const signature = "public.submit_customer_order_with_bank_routing(jsonb,integer,text,text,text,text,text)";
+  const adminSignature = "public.admin_set_cart_bank_override(text,text,text,text,text,text)";
   const privileges = await db.query(
-    "select has_function_privilege('anon',$1,'EXECUTE') as anon, has_function_privilege('authenticated',$1,'EXECUTE') as authenticated, has_function_privilege('service_role',$1,'EXECUTE') as service_role",
-    [signature],
+    `select
+      has_function_privilege('anon',$1,'EXECUTE') as anon,
+      has_function_privilege('authenticated',$1,'EXECUTE') as authenticated,
+      has_function_privilege('service_role',$1,'EXECUTE') as service_role,
+      has_function_privilege('anon',$2,'EXECUTE') as admin_anon,
+      has_function_privilege('authenticated',$2,'EXECUTE') as admin_authenticated,
+      has_function_privilege('service_role',$2,'EXECUTE') as admin_service_role`,
+    [signature, adminSignature],
   );
   assert.equal(privileges.rows[0].anon, false);
   assert.equal(privileges.rows[0].authenticated, false);
   assert.equal(privileges.rows[0].service_role, true);
+  assert.equal(privileges.rows[0].admin_anon, false);
+  assert.equal(privileges.rows[0].admin_authenticated, false);
+  assert.equal(privileges.rows[0].admin_service_role, true);
 }
 
 await db.exec(verificationSql);

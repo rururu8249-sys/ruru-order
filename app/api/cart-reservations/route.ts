@@ -44,24 +44,34 @@ const cleanSessionKey = (v: unknown) => {
 
 async function currentBankOverride(supabase: ReturnType<typeof getSupabaseAdmin>, sessionKey: string) {
   const nowIso = new Date().toISOString();
-  const { data: firstHold } = await supabase
+  const { data: holdRows } = await supabase
     .from("cart_reservations")
-    .select("created_at")
+    .select("created_at,expires_at")
     .eq("session_key", sessionKey)
     .gt("expires_at", nowIso)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  const cartStartedAt = String((firstHold as Record<string, unknown> | null)?.created_at ?? "");
-  if (!cartStartedAt) return null;
-  const { data } = await supabase
+    .limit(MAX_ITEMS);
+  const holds = (holdRows || []) as Array<Record<string, unknown>>;
+  if (holds.length === 0) return null;
+  const cartStartedAtMs = Math.min(...holds.map((row) => new Date(String(row.created_at ?? "")).getTime()).filter(Number.isFinite));
+  const cartExpiresAtMs = Math.max(...holds.map((row) => new Date(String(row.expires_at ?? "")).getTime()).filter(Number.isFinite));
+  if (!Number.isFinite(cartStartedAtMs) || !Number.isFinite(cartExpiresAtMs)) return null;
+  const { data: rows } = await supabase
     .from("cart_bank_account_overrides")
-    .select("account_id,bank_name,bank_account,bank_holder")
+    .select("id,cart_started_at,cart_expires_at,account_id,bank_name,bank_account,bank_holder,assigned_at")
     .eq("session_key", sessionKey)
-    .eq("cart_started_at", cartStartedAt)
     .eq("status", "active")
-    .maybeSingle();
+    .gt("cart_expires_at", nowIso)
+    .order("assigned_at", { ascending: false })
+    .limit(5);
+  const data = ((rows || []) as Array<Record<string, unknown>>).find((row) => {
+    const started = new Date(String(row.cart_started_at ?? "")).getTime();
+    const expires = new Date(String(row.cart_expires_at ?? "")).getTime();
+    return Number.isFinite(started) && Number.isFinite(expires) && started <= cartStartedAtMs && expires > Date.now();
+  });
   if (!data) return null;
+  if (cartExpiresAtMs > new Date(String(data.cart_expires_at ?? "")).getTime()) {
+    await supabase.from("cart_bank_account_overrides").update({ cart_expires_at: new Date(cartExpiresAtMs).toISOString() }).eq("id", data.id).eq("status", "active");
+  }
   return {
     id: String((data as any).account_id || ""),
     bankName: String((data as any).bank_name || ""),
