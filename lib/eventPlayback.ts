@@ -35,3 +35,9 @@ export function samplePlayback(playback:Playback,serverNowMs:number):PlaybackPha
   const elapsedMs=Math.max(0,Math.min(playback.durationMs,serverNowMs-playback.startedAtMs));
   return {phase:serverNowMs<playback.startedAtMs?'waiting':elapsedMs>=playback.durationMs?'done':'running',elapsedMs};
 }
+export type ServerAnchor = {serverMs:number;monoMs:number;uncertaintyMs:number};
+export function estimateServerAnchor(serverNowMs:number,sentMonoMs:number,receivedMonoMs:number):ServerAnchor {
+  const half=Math.max(0,receivedMonoMs-sentMonoMs)/2;
+  return {serverMs:serverNowMs+half,monoMs:receivedMonoMs,uncertaintyMs:half};
+}
+export function readServerTime(anchor:ServerAnchor,monoMs:number):number {return anchor.serverMs+Math.max(0,monoMs-anchor.monoMs);}
