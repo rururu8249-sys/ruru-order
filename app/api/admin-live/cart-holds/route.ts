@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { checkoutReminderCopy } from "@/lib/cartHoldDetail";
 import { parseShopInfo, SHOP_INFO_KEYS, type ShopBankAccountId } from "@/lib/shopInfo";
+import { buildCartHoldSummary } from "@/lib/cartHoldSummary";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,7 +53,9 @@ export async function GET(request: NextRequest) {
   if (!session) return NextResponse.json({ ok: false, error: { message: "관리자 인증이 필요합니다." } }, { status: 401 });
   try {
     const supabase = getSupabaseAdmin();
-    const scopeAll = new URL(request.url).searchParams.get("scope") === "all";
+    const searchParams = new URL(request.url).searchParams;
+    const scopeAll = searchParams.get("scope") === "all";
+    const summaryOnly = searchParams.get("summary") === "1";
     let broadcastTitle = "";
     let allowedProductIds: Set<string> | null = null;
     if (!scopeAll) {
@@ -61,16 +64,38 @@ export async function GET(request: NextRequest) {
       allowedProductIds = active.ids;
     }
 
-    const { data, error } = await supabase
-      .from("cart_reservations")
-      .select("*")
-      .gt("expires_at", new Date().toISOString())
-      .order("expires_at", { ascending: true })
-      .limit(2000);
+    const nowIso = new Date().toISOString();
+    const result = summaryOnly
+      ? await supabase
+          .from("cart_reservations")
+          .select("session_key,product_id,qty")
+          .gt("expires_at", nowIso)
+          .order("expires_at", { ascending: true })
+          .limit(2000)
+      : await supabase
+          .from("cart_reservations")
+          .select("*")
+          .gt("expires_at", nowIso)
+          .order("expires_at", { ascending: true })
+          .limit(2000);
+    const { data, error } = result;
     if (error) return NextResponse.json({ ok: false, error: { message: error.message } }, { status: 500 });
 
     let rows = (data || []) as Record<string, unknown>[];
     if (allowedProductIds) rows = rows.filter((r) => allowedProductIds!.has(String(r.product_id ?? "")));
+
+    // 실시간 주문 상단 버튼은 상세 고객·상품·계좌 정보를 필요로 하지 않는다.
+    // 경량 집계 응답을 사용해 10초 갱신 중에도 DB와 브라우저 부담을 최소화한다.
+    if (summaryOnly) {
+      return NextResponse.json({
+        ok: true,
+        summary: buildCartHoldSummary(rows),
+        scope: allowedProductIds ? "broadcast" : "all",
+        broadcastTitle,
+      }, {
+        headers: { "Cache-Control": "private, no-store, max-age=0" },
+      });
+    }
 
     const ids = Array.from(new Set(rows.map((r) => String(r.product_id ?? "")).filter(Boolean)));
     const names: Record<string, string> = {};

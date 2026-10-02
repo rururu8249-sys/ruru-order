@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LiveOrder } from "./types";
 import { exportLiveOrdersForPicking, exportLiveOrdersForRosen } from "./adminLiveOrderExcelExport";
 import LiveOrderPickingModal from "./LiveOrderPickingModal";
@@ -520,6 +520,55 @@ export default function LiveOrderTable({
   const [pickingOrderIds, setPickingOrderIds] = useState<Set<string>>(new Set());
   // [2026-07-13] 담김 현황(장바구니 선점) 팝업 — 표시 전용, 주문/돈 로직 무관
   const [cartHoldsOpen, setCartHoldsOpen] = useState(false);
+  const [cartHoldSummary, setCartHoldSummary] = useState({ cartCount: 0, totalQty: 0 });
+  const [cartHoldSummaryReady, setCartHoldSummaryReady] = useState(false);
+  const [cartHoldCountChanged, setCartHoldCountChanged] = useState(false);
+  const cartHoldSignatureRef = useRef("");
+  const cartHoldPulseTimerRef = useRef<number | null>(null);
+
+  const refreshCartHoldSummary = useCallback(async () => {
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+    try {
+      const response = await fetch("/api/admin-live/cart-holds?summary=1", { cache: "no-store" });
+      const json = await response.json().catch(() => null);
+      if (!response.ok || !json?.ok) return;
+      const next = {
+        cartCount: Math.max(0, Math.floor(Number(json.summary?.cartCount) || 0)),
+        totalQty: Math.max(0, Math.floor(Number(json.summary?.totalQty) || 0)),
+      };
+      const nextSignature = `${next.cartCount}:${next.totalQty}`;
+      const previousSignature = cartHoldSignatureRef.current;
+      cartHoldSignatureRef.current = nextSignature;
+      setCartHoldSummary(next);
+      setCartHoldSummaryReady(true);
+
+      // 첫 조회는 현재 상태를 보여주기만 하고, 이후 실제 수량 변화만 짧게 강조한다.
+      if (previousSignature && previousSignature !== nextSignature) {
+        setCartHoldCountChanged(true);
+        if (cartHoldPulseTimerRef.current !== null) window.clearTimeout(cartHoldPulseTimerRef.current);
+        cartHoldPulseTimerRef.current = window.setTimeout(() => setCartHoldCountChanged(false), 1800);
+      }
+    } catch {
+      // 보조 집계 실패가 주문 목록 사용을 막지 않게 하고 다음 주기에 다시 시도한다.
+    }
+  }, []);
+
+  useEffect(() => {
+    const initial = window.setTimeout(() => void refreshCartHoldSummary(), 0);
+    const timer = window.setInterval(() => void refreshCartHoldSummary(), 10_000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void refreshCartHoldSummary();
+    };
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      if (cartHoldPulseTimerRef.current !== null) window.clearTimeout(cartHoldPulseTimerRef.current);
+    };
+  }, [refreshCartHoldSummary]);
 
   const [cancelViewFilter, setCancelViewFilter] = useState<LiveOrderCancelViewFilterValue>("all");
   // 안 챙김에는 아직 일부만 챙긴 주문도 포함한다. 별도 중간 작업 단계는 없다.
@@ -856,7 +905,7 @@ export default function LiveOrderTable({
 
   return (
     <>
-    {cartHoldsOpen ? <LiveCartHoldsModal onClose={() => setCartHoldsOpen(false)} /> : null}
+    {cartHoldsOpen ? <LiveCartHoldsModal onClose={() => { setCartHoldsOpen(false); void refreshCartHoldSummary(); }} /> : null}
 
     {pickingOpen ? (
           <LiveOrderPickingModal orders={pickingScopeOrders.filter(order => pickingOrderIds.has(String(order.id)))} filterLabel={pickingScopeLabel} onClose={() => { setPickingOpen(false); void onRefresh?.(); }} />
@@ -1043,11 +1092,24 @@ export default function LiveOrderTable({
 
           <button
             type="button"
-            onClick={() => setCartHoldsOpen(true)}
-            className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2"
-            title="장바구니에 담기만 하고 아직 주문서 제출 안 한 고객 목록을 봅니다"
+            onClick={() => { setCartHoldsOpen(true); setCartHoldCountChanged(false); }}
+            className={`relative inline-flex items-center gap-1.5 rounded-xl border bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2 ${cartHoldCountChanged ? "border-red-400 ring-2 ring-red-200" : "border-line"}`}
+            title={cartHoldSummaryReady
+              ? `주문서 제출 전 장바구니 ${cartHoldSummary.cartCount}명 · 상품 ${cartHoldSummary.totalQty}개`
+              : "장바구니에 담기만 하고 아직 주문서 제출 안 한 고객 목록을 봅니다"}
           >
-            🛒 장바구니
+            <span>🛒 장바구니</span>
+            <span className="whitespace-nowrap text-[11px] text-ink-mute">
+              {cartHoldSummaryReady ? `${cartHoldSummary.cartCount}명` : "확인 중"}
+            </span>
+            {cartHoldSummaryReady && cartHoldSummary.totalQty > 0 ? (
+              <span
+                aria-label={`담긴 상품 ${cartHoldSummary.totalQty}개`}
+                className={`absolute -right-2 -top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black leading-none text-white shadow ${cartHoldCountChanged ? "animate-pulse" : ""}`}
+              >
+                {cartHoldSummary.totalQty > 99 ? "99+" : cartHoldSummary.totalQty}
+              </span>
+            ) : null}
           </button>
 
             
