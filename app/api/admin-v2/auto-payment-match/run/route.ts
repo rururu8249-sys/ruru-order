@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { filterPaymentMatchEligibleOrders } from "@/lib/admin-v2/paymentMatchTestOrderGuard";
+import { readPaymentMatchRows } from "@/lib/admin-v2/paymentMatchRead";
 
 export const dynamic = "force-dynamic";
 
@@ -570,26 +571,9 @@ export async function POST(request: NextRequest) {
     const confirm = body?.confirm === "RUN_AUTO_MATCH";
     const nowIso = new Date().toISOString();
 
-    async function fetchAllRows(table: string, applyFilter: ((q: any) => any) | null) {
-      const pageSize = 1000;
-      let from = 0;
-      const all: any[] = [];
-      while (true) {
-        let query = supabase.from(table).select("*").range(from, from + pageSize - 1);
-        if (applyFilter) query = applyFilter(query);
-        const { data, error } = await query;
-        if (error) return { data: null, error };
-        const rows = data || [];
-        all.push(...rows);
-        if (rows.length < pageSize) break;
-        from += pageSize;
-      }
-      return { data: all, error: null };
-    }
-
     const [ordersResult, depositsResult] = await Promise.all([
-      fetchAllRows("orders", (q) => q.neq("is_deleted", true)),
-      fetchAllRows("deposits", null),
+      readPaymentMatchRows(supabase, "orders", (q) => q.neq("is_deleted", true)),
+      readPaymentMatchRows(supabase, "deposits", null),
     ]);
 
     if (ordersResult.error) {
