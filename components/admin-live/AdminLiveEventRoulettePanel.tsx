@@ -491,6 +491,32 @@ export default function AdminLiveEventRoulettePanel({
   });
   const wheelKey = namesRef.current.join("|");
   const [centerWinner, setCenterWinner] = useState("");
+  const rewardScheduledKeyRef = useRef("");
+
+  // Completion belongs to the admin action, never to a canvas/iframe load or RAF.
+  // Multi-winner actions already pay each winner immediately using winner row IDs.
+  useEffect(() => {
+    const event = currentEvent;
+    if (!event?.winner_nickname || event.status !== "result") return;
+    const multi = /^(survival|race)_/.test(event.overlay_token || "") || eventTab === "survival" || eventTab === "race";
+    if (multi) return;
+    const key = `${event.id || ""}|${event.winner_nickname}|${event.result_at || ""}`;
+    if (rewardScheduledKeyRef.current === key) return;
+    rewardScheduledKeyRef.current = key;
+    const amount = Number(giftPointAmount || 0);
+    const type = giftType;
+    const reason = (winnerNote || title || "이벤트 당첨").trim();
+    const live = (event.mode || mode) === "live";
+    const orderIds = Array.isArray(event.winner_order_ids) ? event.winner_order_ids : [];
+    const timer = window.setTimeout(() => {
+      if (type !== "point" || amount <= 0) return;
+      if (live) void grantPointToWinner(event.winner_nickname!, amount, reason, event.id || "", orderIds);
+      else showAdminToast("테스트 모드라 포인트 자동지급은 건너뜁니다.", "info");
+    }, 4000 + Math.random() * 2000);
+    return () => window.clearTimeout(timer);
+    // Gift settings are captured when the server result is accepted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentEvent?.winner_nickname, currentEvent?.status, currentEvent?.result_at, currentEvent?.id]);
 
   const drawWheel = (angle: number) => {
     const canvas = canvasRef.current;
@@ -558,16 +584,6 @@ export default function AdminLiveEventRoulettePanel({
     const duration = 4000 + Math.random() * 2000; // 4~6초
     const target = turns * Math.PI * 2 - (idx * seg + seg / 2);
 
-    // 당첨 확정 시점의 선물 설정 캡처 (포인트 자동지급용)
-    const gType = giftType;
-    const gAmount = Number(giftPointAmount || 0);
-    const gReason = (winnerNote || title || "이벤트 당첨").trim();
-    // [2026-09-08] 이 판이 운영인지 — 화면 상태가 아니라 서버가 만든 이벤트 행의 mode 로 판단(테스트 한 판 중 상태 꼬임 방지)
-    const isLive = (currentEvent?.mode || mode) === "live";
-    const gEventId = currentEvent?.id || ""; // 중복지급 가드 키
-    // [2026-09-13] 당첨자의 «그 주문서» id — 포인트를 이 주문의 번호로 지급한다(닉네임 재조회 X)
-    const gOrderIds = Array.isArray(currentEvent?.winner_order_ids) ? currentEvent.winner_order_ids : [];
-
     setCenterWinner("");
     angleRef.current = 0;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -581,14 +597,6 @@ export default function AdminLiveEventRoulettePanel({
         rafRef.current = requestAnimationFrame(tick);
       } else {
         setCenterWinner(winner);
-        // 포인트 선물 + 금액 있으면 자동지급 (운영 모드만)
-        if (gType === "point" && gAmount > 0) {
-          if (isLive) {
-            void grantPointToWinner(winner, gAmount, gReason, gEventId, gOrderIds);
-          } else {
-            showAdminToast("테스트 모드라 포인트 자동지급은 건너뜁니다.", "info");
-          }
-        }
       }
     };
     rafRef.current = requestAnimationFrame(tick);
@@ -1353,6 +1361,7 @@ export default function AdminLiveEventRoulettePanel({
         throw new Error(spinPayload.message || "룰렛 시작 실패");
       }
 
+      if (spinPayload.event.id && spinPayload.winnerId) winnerIdByEventRef.current.set(String(spinPayload.event.id), String(spinPayload.winnerId));
       setCurrentEvent(spinPayload.event);
       setParticipants(spinPayload.event.participants || createPayload.event.participants || finalParticipants);
       await loadEventsAndWinners();
