@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import React from 'react';
+import Renderer,{act} from 'react-test-renderer';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+let id=0,timers=new Map(),failed=true;
+globalThis.window={location:{search:''},setTimeout(fn,ms){const key=++id;timers.set(key,{fn,ms});return key;},clearTimeout:key=>timers.delete(key)};
+globalThis.document={documentElement:{style:{}},body:{style:{}},visibilityState:'visible',addEventListener(){},removeEventListener(){}};
+globalThis.requestAnimationFrame=()=>++id;globalThis.cancelAnimationFrame=()=>{};
+globalThis.fetch=async()=>({ok:!failed,status:failed?500:200,json:async()=>failed?{ok:false}:{ok:true,server_now:Date.now(),active:false}});
+const Widget=createUiLoader()('app/event-mission/live/page.tsx').default;
+let tree;await act(async()=>{tree=Renderer.create(React.createElement(Widget));});
+assert.equal(tree.root.findAllByProps({role:'status'}).length,1,'failed mission must show connection explanation instead of an unexplained blank');
+assert.match(tree.root.findByProps({role:'status'}).children.join(''),/연결/);
+failed=false;const poll=[...timers.values()].find(t=>t.ms===2500);assert(poll);
+await act(async()=>poll.fn());assert.equal(tree.root.findAllByProps({role:'status'}).length,0,'successfully disabled mission remains transparent');
+await act(async()=>tree.unmount());assert.equal(timers.size,0);
+console.log('PASS failed mission displays status; disabled mission remains transparent after recovery');

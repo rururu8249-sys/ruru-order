@@ -20,7 +20,7 @@ export function useEventPlayback<T extends Envelope=Envelope>({url}:{url:string}
     const schedule=()=>{
       if(disposed||document.visibilityState==='hidden')return;
       const phase=current?.playback&&anchor?samplePlayback(current.playback,readServerTime(anchor,performance.now())):null;
-      poll=window.setTimeout(()=>void load(),current&&phase?.phase!=='done'?250:2500);
+      poll=window.setTimeout(()=>void load(),phase?.phase==='running'||phase?.phase==='waiting'?250:2500);
     };
     async function load(){
       if(disposed||controller)return;

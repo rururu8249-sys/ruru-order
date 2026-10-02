@@ -57,6 +57,9 @@ export default function PresenceHeartbeat() {
   const pageType = useMemo(() => detectPageType(pathname), [pathname]);
 
   useEffect(() => {
+    // OBS/embedded display routes share the parent's visitor key. They must
+    // never overwrite admin/customer presence or create visitor history.
+    if (/^\/event-(survival|race|roulette|claw|mission)(\/|$)/.test(pathname)) return;
     let stopped = false;
 
     const send = async () => {

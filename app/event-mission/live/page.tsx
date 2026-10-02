@@ -59,7 +59,7 @@ export default function MissionLiveWidget() {
 
   const liveOk = !!(data && data.ok && data.active && data.goal && data.goal > 0);
   if (!liveOk && !preview) {
-    return <div style={{ background: "transparent" }} />;
+    return <><EventClockStyles elapsedMs={elapsed} sync={shared.sync}/><div style={{ background: "transparent" }} /></>;
   }
   const useSample = !liveOk; // preview 인데 미션 OFF/미설정 → 샘플로 디자인만 보여줌
 
