@@ -365,10 +365,12 @@ export default function AdminLiveEventRoulettePanel({
   const [listDate, setListDate] = useState("");
 
 
-  const overlayUrl = useMemo(() => buildOverlayUrl(currentEvent), [currentEvent]);
-  const clawOverlayUrl = useMemo(() => buildClawOverlayUrl(), []);
-  const survivalOverlayUrl = useMemo(() => buildSurvivalOverlayUrl(), []);
-  const raceOverlayUrl = useMemo(() => buildRaceOverlayUrl(), []); // [2026-07-26] 달리기
+  const [browserReady, setBrowserReady] = useState(false);
+  useEffect(() => { setBrowserReady(true); }, []);
+  const overlayUrl = useMemo(() => browserReady ? buildOverlayUrl(currentEvent) : "", [browserReady, currentEvent]);
+  const clawOverlayUrl = useMemo(() => browserReady ? buildClawOverlayUrl() : "", [browserReady]);
+  const survivalOverlayUrl = useMemo(() => browserReady ? buildSurvivalOverlayUrl() : "", [browserReady]);
+  const raceOverlayUrl = useMemo(() => browserReady ? buildRaceOverlayUrl() : "", [browserReady]);
 
   const manualParticipants = useMemo<RouletteParticipant[]>(() => {
     const seen = new Set<string>();

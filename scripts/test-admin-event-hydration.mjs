@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import React from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+const Panel=createUiLoader({'./AdminLiveEventSoundboard':{default:()=>null}})('components/admin-live/AdminLiveEventRoulettePanel.tsx').default;
+const render=()=>renderToStaticMarkup(React.createElement(Panel,{controlledOpen:true,embedded:true,renderTrigger:false}));
+delete globalThis.window;
+const server=render();
+globalThis.window={location:{origin:'http://localhost:3000'},localStorage:{getItem:()=>null}};
+const initialClient=render();
+assert.equal(initialClient,server,'initial client render must match SSR before effects populate browser origin');
+console.log('PASS real admin initial render is identical on server and client before effects');

@@ -309,6 +309,7 @@ export default function EventClawOverlayClient({ initialToken }: EventClawOverla
           letter-spacing: -0.05em;
           color: #020617;
           word-break: keep-all;
+          overflow-wrap: anywhere;
         }
         .result-note {
           margin-top: 6px;

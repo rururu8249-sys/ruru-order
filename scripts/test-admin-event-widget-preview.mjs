@@ -17,6 +17,8 @@ for(const kind of ['survival','race','roulette','claw','mission']){
  assert.equal(url.searchParams.get('token'),`${kind}_luludongi_live`);
  assert.equal(url.searchParams.get('sound'),'0');
  assert.equal(frame.props.allow,undefined,'no autoplay permission');
+ assert.equal(frame.props.style.width,kind==='claw'||kind==='roulette'?720:1280,'preserve canonical widget coordinate width');
+ assert.equal(frame.props.style.height,kind==='claw'?1000:kind==='roulette'?900:kind==='mission'?240:720,'portrait widgets must not be cropped by a landscape viewport');
  assert.equal(frame.props.style.pointerEvents,'none','preview cannot operate embedded controls');
  await act(async()=>frame.props.onLoad());
  const loaded=frame;
