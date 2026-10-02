@@ -13,6 +13,9 @@ import {useEventScene} from "@/components/event-shared/useEventScene";
 import {buildSurvivalScene,sampleSurvivalScene} from "@/lib/eventSurvivalScene";
 import {eventSeed,seededRandom} from "@/lib/eventPlayback";
 import EventRoster from '@/components/event-shared/EventRoster';
+import SurvivalCharacter from '@/components/event-shared/SurvivalCharacter';
+import SurvivalDisaster, {SurvivalArtStyles} from '@/components/event-shared/SurvivalDisaster';
+import SurvivalReaction, {SurvivalReactionStyles} from '@/components/event-shared/SurvivalReaction';
 
 const ROSE = "#7B2D43";
 const GOLD = "#F0C45A";
@@ -72,20 +75,6 @@ function makeScene(names: string[] | null, n: number): Player[] {
   });
 }
 
-function Stick({ color, dead, hit, zap }: { color: string; dead: boolean; hit: boolean; zap: boolean }) {
-  const c = dead ? "#8a8a8a" : color;
-  return (
-    <svg width="20" height="27" viewBox="0 0 26 34"
-      style={{ overflow: "visible", animation: zap ? "electroFlick .4s linear" : "none" }}>
-      <circle cx="13" cy="6" r="5" fill="none" stroke={c} strokeWidth="2.8" />
-      <line x1="13" y1="11" x2="13" y2="22" stroke={c} strokeWidth="2.8" strokeLinecap="round" />
-      <line x1="13" y1="14" x2={hit ? 3 : 6} y2={hit ? 7 : 17} stroke={c} strokeWidth="2.8" strokeLinecap="round" />
-      <line x1="13" y1="14" x2={hit ? 23 : 20} y2={hit ? 7 : 17} stroke={c} strokeWidth="2.8" strokeLinecap="round" />
-      <line x1="13" y1="22" x2="7" y2="32" stroke={c} strokeWidth="2.8" strokeLinecap="round" />
-      <line x1="13" y1="22" x2="19" y2="32" stroke={c} strokeWidth="2.8" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 function deathTransform(t: string | null) {
   switch (t) {
@@ -527,6 +516,8 @@ export default function SurvivalLiveWidget() {
       display: "flex", alignItems: "flex-start", justifyContent: "center", background: "transparent",
       paddingTop: "1.5vh" }}>
       <EventClockStyles elapsedMs={shared.elapsed} localAgeMs={fx?shared.elapsed-fx.key:undefined} sync={shared.sync}/>
+      <SurvivalArtStyles/>
+      <SurvivalReactionStyles/>
       <style>{`
         @keyframes rainfall{to{transform:translateY(120vh)}}
         @keyframes flick{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
@@ -557,7 +548,7 @@ export default function SurvivalLiveWidget() {
       {/* 명단과 진행 장면을 읽기 쉽게 세로 공간을 확대한다. 바깥 여백은 투명 유지. */}
       <div ref={stageRef} style={{ position: "relative", width: "96vw", height: "86vh",
         borderRadius: 20, overflow: "hidden",
-        background: "linear-gradient(180deg,rgba(20,12,30,.62),rgba(45,26,44,.62))",
+        background: "radial-gradient(ellipse at 50% 110%,#345d55 0%,transparent 65%),linear-gradient(180deg,#171d32,#273749 65%,#223a37)",
         border: "1px solid rgba(255,255,255,.14)", boxShadow: "0 12px 40px rgba(0,0,0,.4)" }}>
 
         {Array.from({ length: 20 }).map((_, i) => (
@@ -596,9 +587,9 @@ export default function SurvivalLiveWidget() {
           </div>
         </div>
 
-        {fx && <div data-event-local-age style={{position:"absolute",inset:0,pointerEvents:"none"}}><DisasterFX fx={fx} /></div>}
+        {fx && <div data-event-local-age style={{position:"absolute",inset:0,pointerEvents:"none"}}><SurvivalDisaster fx={fx} /></div>}
 
-        {phase === 'ready' ? <div style={{position:'absolute',inset:'118px 16px 16px',zIndex:30}}><EventRoster names={players.map(p=>p.name)}/></div> : null}
+        {phase === 'ready' ? <div style={{position:'absolute',inset:'118px 16px 16px',zIndex:30}}><EventRoster names={players.map(p=>p.name)} characters/></div> : null}
         {(phase === 'ready' ? [] : players).map((p) => {
           const isW = winnerIdSet.has(p.id);
           const scale = isW ? (done ? (multi ? 1.7 : 2.6) : 1.7) : aliveCount <= 6 ? 1.4 : aliveCount <= NAME_SHOW_AT ? 1.15 : 1;
@@ -609,7 +600,7 @@ export default function SurvivalLiveWidget() {
             <div key={p.id} style={{ position: "absolute", left: `${cx}%`, top: `${cy}%`,
               transform: p.dead ? deathTransform(p.dtype) : `translate(-50%,-50%) scale(${scale})`,
               transition: "left .7s ease, top .7s ease, transform .8s cubic-bezier(.3,.8,.4,1), opacity .8s ease",
-              opacity: p.dead ? 0 : 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 1,
+              opacity: p.dead ? 0 : 1, visibility:p.hit?'hidden':undefined, display: "flex", flexDirection: "column", alignItems: "center", gap: 1,
               zIndex: isW ? 30 : 10 }}>
               {isW && done && <div style={{ fontSize: multi ? 15 : 18, animation: "crownBounce 1s ease-in-out infinite" }}>👑</div>}
               {!p.dead && (showNames || isW) && (
@@ -620,7 +611,7 @@ export default function SurvivalLiveWidget() {
                   boxShadow: isW && done ? "0 4px 14px rgba(240,196,90,.6)" : "none" }}>{p.name}</span>
               )}
               <div style={{ animation: isW ? "flick .6s ease-in-out infinite" : "none" }}>
-                <Stick color={isW ? GOLD : "#fff"} dead={p.dead} hit={p.hit} zap={p.dead && p.dtype === "lightning"} />
+                <SurvivalCharacter index={p.id} total={total} hit={p.hit} zap={p.hit && p.dtype === "lightning"} winner={isW} moving={phase === 'running' && !p.dead}/>
               </div>
               {isW && <div style={{ position: "absolute", inset: done && !multi ? -50 : -28, borderRadius: "50%",
                 background: "radial-gradient(circle,rgba(240,196,90,.55),transparent 70%)",
@@ -635,29 +626,7 @@ export default function SurvivalLiveWidget() {
             animation: `confetti ${1.4 + decorRandom() * 1.2}s linear ${decorRandom() * 1.1}s infinite` }} />
         ))}
 
-        {bursts.map((b) => b.dtype === "lightning" ? (
-          <div key={b.id} style={{ position: "absolute", left: `${b.x}%`, top: `${b.y}%`,
-            transform: "translate(-50%,-50%)", zIndex: 26, pointerEvents: "none",
-            display: "flex", alignItems: "center", justifyContent: "center", animation: "zapShake .5s ease-in-out" }}>
-            <div style={{ position: "absolute", borderRadius: "50%", border: "3px solid #FFE08A",
-              boxShadow: "0 0 16px #F0C45A", animation: "ringExpand .6s ease-out forwards" }} />
-            {[[-18, -12], [20, -9], [-14, 14], [16, 13]].map(([dx, dy], k) => (
-              <span key={k} style={{ position: "absolute", transform: `translate(${dx}px,${dy}px)`,
-                fontSize: 12, animation: `sparkFlick .45s linear ${k * 0.03}s` }}>⚡</span>
-            ))}
-            <span style={{ fontSize: 28, animation: "skullZap .75s ease-out forwards",
-              filter: "drop-shadow(0 0 6px rgba(255,224,138,.9))" }}>💀</span>
-          </div>
-        ) : (
-          <div key={b.id} style={{ position: "absolute", left: `${b.x}%`, top: `${b.y}%`,
-            transform: "translate(-50%,-50%)", zIndex: 25, pointerEvents: "none",
-            display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ position: "absolute", borderRadius: "50%", border: `3px solid ${b.accent}`,
-              boxShadow: `0 0 12px ${b.accent}`, animation: "ringExpand .55s ease-out forwards" }} />
-            <span style={{ fontSize: 20, animation: "burstPop .55s ease-out forwards",
-              filter: "drop-shadow(0 0 4px rgba(0,0,0,.6))" }}>{b.emoji}</span>
-          </div>
-        ))}
+        {bursts.map(b=><SurvivalReaction key={b.id} type={b.dtype} index={Number(b.id.split("-")[0])} total={total} x={b.x} y={b.y}/>)}
 
         {/* [2026-07-26 사장님] 다중 당첨자 명단 패널 — 여러 명일 때 하단에 크게, 잘 보이게 */}
         {done && multi && (
@@ -700,87 +669,4 @@ export default function SurvivalLiveWidget() {
       </div>
     </div>
   );
-}
-
-function DisasterFX({ fx }: { fx: NonNullable<FxState> }) {
-  const decorRandom=seededRandom(eventSeed(String(fx.key)));
-  const { type, accent, streaks } = fx;
-  if (type === "lightning" || type === "meteor") {
-    const flash = type === "meteor" ? "rgba(255,140,80,.45)" : "rgba(255,255,255,.75)";
-    return (<>
-      {/* [2026-07-26] 폭풍우 낙뢰: 하늘 어두워짐 → 2~3연속 섬광 → 가지 치는 본줄기+흰 심지 */}
-      {type === "lightning" && (
-        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 14,
-          background: "radial-gradient(ellipse at 50% 0%, rgba(10,6,20,.0), rgba(5,3,12,.85))",
-          animation: "stormDark .9s ease-out forwards" }} />
-      )}
-      <div style={{ position: "absolute", inset: 0, background: flash, pointerEvents: "none",
-        zIndex: 15, animation: `${type === "lightning" ? "stormFlash .55s" : "flashOut .3s"} ease-out forwards` }} />
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none"
-        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none",
-          zIndex: 16, animation: type === "lightning" ? "boltFade .8s ease-out forwards" : "none" }}>
-        {streaks.map((s) => (
-          <g key={s.id}>
-            {/* 가지 번개 */}
-            {(s.br || []).map((bp, i) => (
-              <polyline key={i} points={bp} fill="none" stroke={accent} strokeWidth="1.6"
-                vectorEffect="non-scaling-stroke" strokeLinejoin="round"
-                style={{ filter: `drop-shadow(0 0 5px ${accent})`, opacity: 0.85 }} />
-            ))}
-            {/* 본줄기: 바깥 광채 + 흰 심지 이중 스트로크 */}
-            <polyline points={s.pts} fill="none" stroke={accent} strokeWidth="5"
-              vectorEffect="non-scaling-stroke" strokeLinejoin="round"
-              style={{ filter: `drop-shadow(0 0 12px ${accent}) drop-shadow(0 0 24px ${accent})`, opacity: 0.9 }} />
-            <polyline points={s.pts} fill="none" stroke="#fff" strokeWidth="1.8"
-              vectorEffect="non-scaling-stroke" strokeLinejoin="round"
-              style={{ filter: "drop-shadow(0 0 4px #fff)" }} />
-          </g>
-        ))}
-      </svg>
-    </>);
-  }
-  if (type === "wave") return (
-    /* [2026-07-26] 쓰나미: 화면 전체 높이 3겹 물벽 + 물마루 포말 + 물보라 */
-    <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 20 }}>
-      {/* 뒷물결(느리고 어두움) */}
-      <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: "88%",
-        background: "linear-gradient(90deg,transparent,rgba(20,80,140,.5) 55%,rgba(60,140,200,.65))",
-        borderRadius: "0 45% 45% 0 / 0 60% 40% 0", animation: "tsunamiSweep2 1.15s ease-in-out" }} />
-      {/* 본물결(크고 밝음) */}
-      <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: "80%",
-        background: "linear-gradient(90deg,transparent 5%,rgba(50,130,200,.6) 45%,rgba(140,210,250,.85) 88%,rgba(240,252,255,.95))",
-        borderRadius: "0 38% 62% 0 / 0 55% 45% 0", animation: "tsunamiSweep 1s ease-in-out",
-        boxShadow: "8px 0 30px rgba(120,200,255,.5)" }}>
-        {/* 물마루 포말 방울 */}
-        {Array.from({ length: 9 }).map((_, i) => (
-          <div key={i} style={{ position: "absolute", right: -6, top: `${4 + i * 11}%`,
-            width: 10 + (i % 3) * 5, height: 10 + (i % 3) * 5, borderRadius: "50%",
-            background: "rgba(255,255,255,.9)", filter: "blur(1px)",
-            animation: `foamBob ${0.4 + (i % 3) * 0.15}s ease-in-out infinite` }} />
-        ))}
-      </div>
-      {/* 앞쪽 물보라 스프레이 */}
-      {Array.from({ length: 12 }).map((_, i) => (
-        <div key={"s" + i} style={{ position: "absolute", top: `${decorRandom() * 90}%`, left: 0, width: "100%", height: 2,
-          background: "linear-gradient(90deg,transparent,rgba(220,245,255,.8),transparent)",
-          animation: `windSweep ${0.6 + decorRandom() * 0.4}s ease-in ${decorRandom() * 0.25}s` }} />
-      ))}
-    </div>);
-  if (type === "wind") return (
-    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 20 }}>
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} style={{ position: "absolute", top: `${8 + i * 11}%`, left: 0, width: "70%", height: 3,
-          background: `linear-gradient(90deg,transparent,${accent},transparent)`, borderRadius: 3,
-          animation: `windSweep .8s ease-in ${i * 0.04}s` }} />
-      ))}
-    </div>);
-  if (type === "hail") return (
-    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 20 }}>
-      {Array.from({ length: 18 }).map((_, i) => (
-        <div key={i} style={{ position: "absolute", top: 0, left: `${decorRandom() * 100}%`,
-          width: 8, height: 8, borderRadius: "50%", background: accent, boxShadow: `0 0 6px ${accent}`,
-          animation: `hailFall ${0.5 + decorRandom() * 0.3}s linear ${decorRandom() * 0.2}s` }} />
-      ))}
-    </div>);
-  return null;
 }
