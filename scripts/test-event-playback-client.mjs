@@ -17,7 +17,7 @@ const load=createUiLoader(),{useEventPlayback}=load('components/event-shared/use
 const {estimateServerAnchor,readServerTime}=load('lib/eventPlayback.ts');
 assert.deepEqual(estimateServerAnchor(10000,100,300),{serverMs:10100,monoMs:300,uncertaintyMs:100});
 assert.equal(readServerTime(estimateServerAnchor(10000,100,300),500),10300);
-function Probe({url}){current=useEventPlayback({url});return React.createElement('div',null,current.sync);}
+function Probe({url,hideInitialCompleted=false}){current=useEventPlayback({url,hideInitialCompleted});return React.createElement('div',null,current.sync);}
 let tree;await act(async()=>{tree=Renderer.create(React.createElement(Probe,{url:'/fixture/one'}));});
 assert.equal(requests.length,1);assert.equal(requests[0].init.method,'GET');
 const playback={version:1,key:'one',kind:'roulette',seed:1,startedAtMs:9000,durationMs:9200};
@@ -47,3 +47,18 @@ assert.equal(last.init.signal.aborted,true);assert.equal(timers.size,0);assert.e
 await act(async()=>last.resolve({ok:true,status:200,json:async()=>({ok:true,server_now:10000,playback})}));
 assert(requests.every(r=>r.init.method==='GET'));
 console.log('PASS monotonic server clock, RTT uncertainty, GET-only, stale/aborted responses, 404/error, visibility and cleanup');
+for(const initial of ['completed','legacy','running','idle']){
+ await act(async()=>{tree=Renderer.create(React.createElement(Probe,{url:'/fixture/'+initial,hideInitialCompleted:true}));});
+ const first=requests.length-1;
+ const data={ok:true,server_now:100000,event:{id:'old',status:initial==='idle'?'idle':'result'},playback:initial==='legacy'||initial==='idle'?null:{...playback,startedAtMs:initial==='running'?99000:0}};
+ await reply(first,200,data,10);
+ const hidden=['completed','legacy'].includes(initial);
+ assert.equal(current.payload===null,hidden,initial);
+ await act(async()=>current.retry());await reply(requests.length-1,200,data,10);
+ assert.equal(current.payload===null,hidden,'reconnect must retain initial-result suppression');
+ await act(async()=>current.retry());
+ await reply(requests.length-1,200,{...data,event:{id:'new',status:'result'},playback:{...playback,startedAtMs:99000}},10);
+ assert.equal(current.payload.event.id,'new','new event appears without replaying old result');
+ await act(async()=>tree.unmount());
+}
+console.log('PASS initial completed/legacy hidden, active/idle retained, reconnect and new event transitions');

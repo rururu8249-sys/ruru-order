@@ -174,6 +174,8 @@ export default function RaceLiveWidget() {
 
   const [mounted, setMounted] = useState(false);
   const [preview, setPreview] = useState(false);
+  const [showInitialResult,setShowInitialResult] = useState(false);
+  const [requestedEventId,setRequestedEventId] = useState('');
   const [hasEvent, setHasEvent] = useState(false);
   const [demoRunners, setRunners] = useState<Runner[]>([]);
   const [demoPhase, setPhase] = useState<"ready" | "countdown" | "running" | "done">("ready");
@@ -183,7 +185,7 @@ export default function RaceLiveWidget() {
   const [demoFinalSprint, setFinalSprint] = useState(false); // 마지막 스퍼트 구간
   const [demoItems, setItems] = useState<ItemFx[]>([]); // 아이템 이펙트(바나나/부스터…)
   const [demoShaking, setShaking] = useState(false);    // 큰 충돌 시 화면 흔들림
-  const shared=useEventScene({url:mounted&&!preview?`/api/event-race/overlay?token=${TOKEN}`:"",kind:"race",build:buildRaceScene});
+  const shared=useEventScene({url:mounted&&!preview?`/api/event-race/overlay?token=${TOKEN}${requestedEventId ? `&eventId=${encodeURIComponent(requestedEventId)}` : ''}`:"",kind:"race",build:buildRaceScene,showInitialResult});
   const frame=shared.scene?sampleRaceScene(shared.scene,shared.elapsed):null;
   const title=preview?demoTitle:(shared.event?.title||"달리기 대회");
   const runners=preview?demoRunners:(frame?.runners||[]);
@@ -316,6 +318,8 @@ export default function RaceLiveWidget() {
     const q = new URLSearchParams(window.location.search);
     const isPreview = q.get("preview") === "1";
     setPreview(isPreview);
+    setShowInitialResult(q.get('showResult')==='1');
+    setRequestedEventId(q.get('eventId')||'');
     soundOnRef.current = q.get("sound") !== "0";
     if (isPreview) {
       const t = Math.max(2, Math.min(60, Number(q.get("total")) || 12));

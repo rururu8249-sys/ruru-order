@@ -5,8 +5,8 @@ import {useEventPlayback} from './useEventPlayback';
 
 type EventPayload={ok:boolean;server_now:number;playback:Playback|null;event:{id:string;title?:string;status:string;participants:{nickname:string}[];survivors?:string[];winner_nickname?:string;winner_count?:number;spin_started_at?:string|null;result_at?:string|null}};
 // Metadata refreshes must not regenerate the scene or restart its clock.
-export function useEventScene<S>({url,kind,build}:{url:string;kind:'survival'|'race';build:(input:PlaybackInput,seed:number)=>S}){
-  const playback=useEventPlayback<EventPayload>({url});
+export function useEventScene<S>({url,kind,build,showInitialResult=false}:{url:string;kind:'survival'|'race';build:(input:PlaybackInput,seed:number)=>S;showInitialResult?:boolean}){
+  const playback=useEventPlayback<EventPayload>({url,hideInitialCompleted:!showInitialResult});
   const event=playback.payload?.event;
   const identity=JSON.stringify([event?.id,event?.participants,event?.survivors,event?.winner_nickname,playback.payload?.playback?.seed]);
   const scene=useMemo(()=>{

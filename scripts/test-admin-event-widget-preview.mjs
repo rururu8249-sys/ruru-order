@@ -18,7 +18,7 @@ for(const kind of ['survival','race','roulette','claw','mission']){
  assert.equal(url.searchParams.get('sound'),'0');
  assert.equal(frame.props.allow,undefined,'no autoplay permission');
  assert.equal(frame.props.style.width,kind==='claw'||kind==='roulette'?720:1280,'preserve canonical widget coordinate width');
- assert.equal(frame.props.style.height,kind==='claw'?1000:kind==='roulette'?900:kind==='mission'?240:720,'portrait widgets must not be cropped by a landscape viewport');
+ assert.equal(frame.props.style.height,kind==='claw'?1000:kind==='roulette'?900:kind==='survival'?960:kind==='mission'?240:720,'portrait widgets must not be cropped by a landscape viewport');
  assert.equal(frame.props.style.pointerEvents,'none','preview cannot operate embedded controls');
  await act(async()=>frame.props.onLoad());
  const loaded=frame;
@@ -30,8 +30,16 @@ for(const kind of ['survival','race','roulette','claw','mission']){
  assert.notEqual(frame,loaded,'reconnect replaces iframe only');
  assert.equal(frame.props.src,url.toString(),'reconnect keeps same immutable read URL');
  await act(async()=>tree.update(React.createElement(Preview,{kind,eventId:'two'})));
- assert.equal(tree.root.findByType('iframe').props.src,url.toString(),'event metadata must not reset playback');
+ assert.equal(new URL(tree.root.findByType('iframe').props.src).searchParams.get('eventId'),'two','new event preview must follow its exact event ID');
  await act(async()=>tree.unmount());
 }
 assert.equal(writes,0);
+for(const n of [0,1,17,50,200,500]){
+ const names=Array.from({length:n},(_,i)=>`긴참가자이름_${i}`);let tree;
+ await act(async()=>{tree=Renderer.create(React.createElement(Preview,{kind:'survival',participants:names}));});
+ assert.equal(tree.root.findAllByType('iframe').length,0,'no event: never load historical overlay');
+ assert.equal(tree.root.findAll(n=>n.type==='div'&&typeof n.props.title==='string').length,n,'every name is present');
+ assert(tree.root.findAll(n=>n.props.style?.fontSize===12||n.props.style?.fontSize===14||n.props.style?.fontSize===16||n.props.style?.fontSize===20).length);
+ await act(async()=>tree.unmount());
+}
 console.log('PASS five read-only current-origin silent widgets; reconnect only remounts iframe; zero operational requests');

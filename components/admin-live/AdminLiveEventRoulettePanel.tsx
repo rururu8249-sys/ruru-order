@@ -320,6 +320,7 @@ export default function AdminLiveEventRoulettePanel({
   const [winnerNote, setWinnerNote] = useState("이벤트 당첨");
   const [participants, setParticipants] = useState<RouletteParticipant[]>([]);
   const [currentEvent, setCurrentEvent] = useState<RouletteEvent | null>(null);
+  const [publishingRoster,setPublishingRoster] = useState(false);
   const [events, setEvents] = useState<RouletteEvent[]>([]);
   const [winners, setWinners] = useState<RouletteWinner[]>([]);
   const [loading, setLoading] = useState(false);
@@ -953,7 +954,6 @@ export default function AdminLiveEventRoulettePanel({
       // 목록·인원수는 즉시 표시하고 로딩 해제(버벅임 방지). 미리보기 이벤트 생성(추가 서버 왕복)은
       //   화면을 막지 않게 백그라운드로 — 룰렛 휠은 잠시 뒤 채워짐. 추첨/지급 로직은 무변경.
       setLoading(false);
-      void ensureRoulettePreviewEvent(payload.participants || []);
     } catch (error) {
       showAdminToast("룰렛 참여자 조회 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
       setLoading(false);
@@ -1067,12 +1067,10 @@ export default function AdminLiveEventRoulettePanel({
   };
 
 
-  // [2026-09-09] 명단을 불러올 때마다 «대기 이벤트»를 DB에 새로 만들던 것 → 같은 명단이면 건너뛴다.
-  //   (예전: 명단 1회 로드 = participants + create_event + events + winners = 서버 왕복 4회,
-  //    게다가 테스트 이벤트 행이 계속 쌓였다)
+  // 명단 조회는 읽기 전용. 명시적으로 방송에 표시할 때만 지급 없는 대기 이벤트를 만든다.
   const previewSignatureRef = useRef("");
   const ensureRoulettePreviewEvent = async (nextParticipants: RouletteParticipant[]) => {
-    if (eventTab !== "roulette") return;
+    if (eventTab === 'mission' || spinning || publishingRoster) return;
     if (nextParticipants.length === 0) return;
 
     // 명단(닉네임+응모권 장수)과 방송·제목·규칙이 그대로면 위젯에 띄울 내용도 그대로다 → 서버에 안 간다.
@@ -1082,9 +1080,11 @@ export default function AdminLiveEventRoulettePanel({
       title,
       excludeDailyDup,
       ticketRuleKey,
+      eventTab,
     ]);
-    if (previewSignatureRef.current === signature) return;
+    if (previewSignatureRef.current === signature && currentEvent?.status === 'idle') return;
 
+    setPublishingRoster(true);
     try {
       const createPayload = await requestJson<EventPayload>("/api/admin-live/event-roulette", {
         method: "POST",
@@ -1097,7 +1097,7 @@ export default function AdminLiveEventRoulettePanel({
           sourceDate,
           broadcastId,
           participants: nextParticipants,
-          eventKind: "roulette",
+          eventKind: eventTab,
           excludeDailyDup,
           ...ticketRuleBody,
         }),
@@ -1118,6 +1118,8 @@ export default function AdminLiveEventRoulettePanel({
         "룰렛 미리보기 생성 실패\\n\\n" + (error instanceof Error ? error.message : String(error)),
         "error"
       );
+    } finally {
+      setPublishingRoster(false);
     }
   };
 
@@ -1479,9 +1481,9 @@ export default function AdminLiveEventRoulettePanel({
                 <span style={{ fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>◆ 이벤트</span>
                 <span style={{ marginLeft: "auto", display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap" }}>
                   {/* [2026-09-08] 탭 순서 = 실제 쓰는 순서(서바이벌·달리기 최다). 테스트/운영 토글은 삭제 — 「테스트로 해보기」 버튼으로 */}
-                  <AdminLiveEventTabs active={eventTab} onSelect={(tab) => { setEventTab(tab); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }} />
+                  <AdminLiveEventTabs active={eventTab} disabled={publishingRoster || spinning} onSelect={(tab) => { setEventTab(tab); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }} />
                   <span style={{ width: "1px", height: "18px", background: "var(--bd)", margin: "0 4px" }} />
-                  <button className="btn" style={{ height: "auto", padding: "4px 8px" }} onClick={() => { void resetEvent(); }}>↺ 초기화</button>
+                  <button className="btn" disabled={publishingRoster || spinning} style={{ height: "auto", padding: "4px 8px" }} onClick={() => { void resetEvent(); }}>↺ 초기화</button>
                   {embedded ? null : <button className="btn" style={{ height: "auto", padding: "4px 8px" }} onClick={closePanel}>✕</button>}
                 </span>
               </div>
@@ -1493,12 +1495,13 @@ export default function AdminLiveEventRoulettePanel({
               <style>{` .event-work-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; margin-bottom:12px; } @media(max-width:720px){ .event-work-grid { grid-template-columns:minmax(0,1fr); } } `}</style>
               <div className="event-work-grid">
                 <div style={{ minWidth: 0, background: "var(--color-surface-2)", borderRadius: "8px", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", paddingBottom: 12 }}>
-                  <AdminEventWidgetPreview kind={eventTab} eventId={currentEvent?.id} />
+                  <AdminEventWidgetPreview kind={eventTab} eventId={currentEvent?.status === 'result' || currentEvent?.status === 'spinning' ? currentEvent.id : undefined} participants={finalParticipants.map(p=>p.nickname)} />
                   <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
-                    <button className="btn rose" style={{ height: "auto", padding: "8px 32px" }} onClick={() => void startSpin(false)} disabled={spinning || finalParticipants.length === 0}>
+                    <button className="btn" style={{height:'auto',padding:'8px 12px'}} onClick={()=>void ensureRoulettePreviewEvent(finalParticipants)} disabled={spinning || publishingRoster || finalParticipants.length===0}>{publishingRoster?'명단 표시 중…':'방송에 명단 표시'}</button>
+                    <button className="btn rose" style={{ height: "auto", padding: "8px 32px" }} onClick={() => void startSpin(false)} disabled={spinning || publishingRoster || finalParticipants.length === 0}>
                       {spinning ? "진행중..." : giftType === "point" && Number(giftPointAmount || 0) > 0 ? `▶ 시작 · ${isKWinnerTab ? `${survivorCount}명에게 ` : "당첨자에게 "}${Number(giftPointAmount).toLocaleString("ko-KR")}P 지급` : "▶ 시작"}
                     </button>
-                    <button className="btn" style={{ height: "auto", padding: "8px 12px" }} onClick={() => void startSpin(true)} disabled={spinning || finalParticipants.length === 0} title="포인트가 나가지 않고 테스트 기록으로만 남습니다">
+                    <button className="btn" style={{ height: "auto", padding: "8px 12px" }} onClick={() => void startSpin(true)} disabled={spinning || publishingRoster || finalParticipants.length === 0} title="포인트가 나가지 않고 테스트 기록으로만 남습니다">
                       테스트로 해보기 · 포인트 안 나감
                     </button>
                   </div>
@@ -1513,7 +1516,7 @@ export default function AdminLiveEventRoulettePanel({
                   ) : null}
                 </div>
 
-                <div style={{ flex: 0.95, display: "flex", flexDirection: "column", gap: "8px" }}>
+                <fieldset disabled={publishingRoster} style={{margin:0,padding:0,border:0,minWidth:0,flex: 0.95, display: "flex", flexDirection: "column", gap: "8px" }}>
                   <div className="note">참가자 불러오기</div>
                   <button className="btn" style={{ textAlign: "left", height: "auto", padding: "8px", borderColor: participantSource === "auto" ? "var(--rose)" : "var(--bd)", color: participantSource === "auto" ? "var(--rose)" : "var(--ink)" }} onClick={() => changeParticipantSource("auto")} disabled={!canLoadParticipants}>👥 주문서 제출자 전체 <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "auto" ? (loading ? "불러오는 중…" : `${autoParticipantCount}명`) : ""}</span></button>
                   <button className="btn" style={{ textAlign: "left", height: "auto", padding: "8px", borderColor: participantSource === "paid" ? "var(--green)" : "var(--bd)", color: participantSource === "paid" ? "var(--green)" : "var(--ink)" }} onClick={() => changeParticipantSource("paid")} disabled={!canLoadParticipants}>💵 결제완료한 사람만 <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "paid" ? (loading ? "불러오는 중…" : `${autoParticipantCount}명`) : ""}</span></button>
@@ -1568,7 +1571,7 @@ export default function AdminLiveEventRoulettePanel({
                       </span>
                     </div>
                   ) : null}
-                </div>
+                </fieldset>
               </div>
 
               {/* 당첨 고정 */}

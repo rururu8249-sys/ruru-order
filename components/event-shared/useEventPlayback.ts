@@ -2,9 +2,9 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {estimateServerAnchor,readServerTime,samplePlayback,type Playback,type ServerAnchor} from '@/lib/eventPlayback';
 
-type Envelope = {ok?:boolean;server_now?:number;playback?:Playback|null};
+type Envelope = {ok?:boolean;server_now?:number;playback?:Playback|null;event?:{id?:string|null;status?:string|null}|null};
 type Sync = 'loading'|'ready'|'checking'|'error';
-export function useEventPlayback<T extends Envelope=Envelope>({url}:{url:string}) {
+export function useEventPlayback<T extends Envelope=Envelope>({url,hideInitialCompleted=false}:{url:string;hideInitialCompleted?:boolean}) {
   const [payload,setPayload]=useState<T|null>(null);
   const [sync,setSync]=useState<Sync>('loading');
   const [serverNowMs,setServerNowMs]=useState(0);
@@ -15,6 +15,7 @@ export function useEventPlayback<T extends Envelope=Envelope>({url}:{url:string}
     let disposed=false,sequence=0,controller:AbortController|null=null;
     let poll:number|undefined,deadline:number|undefined,raf=0;
     let anchor:ServerAnchor|null=null,lastSuccess=0,current:T|null=null,lastPaint=0;
+    let firstSuccess=true,hiddenEventId:string|null=null;
     setPayload(null);setSync('loading');setServerNowMs(0);
     const clearTimers=()=>{window.clearTimeout(poll);window.clearTimeout(deadline);};
     const schedule=()=>{
@@ -38,7 +39,13 @@ export function useEventPlayback<T extends Envelope=Envelope>({url}:{url:string}
         const next=data.playback;
         if(next&&current?.playback&&next.startedAtMs<current.playback.startedAtMs){setSync('checking');return;}
         anchor=estimateServerAnchor(data.server_now!,sent,received);lastSuccess=received;
-        current=data;setPayload(data);setServerNowMs(readServerTime(anchor,received));
+        if(firstSuccess){
+          firstSuccess=false;
+          const finished=next ? samplePlayback(next,data.server_now!).phase==='done' : data.event?.status==='result';
+          if(hideInitialCompleted&&finished)hiddenEventId=data.event?.id||next?.key||null;
+        }
+        const identity=data.event?.id||next?.key||null;
+        current=data;setPayload(hiddenEventId&&identity===hiddenEventId?null:data);setServerNowMs(readServerTime(anchor,received));
         setSync(anchor.uncertaintyMs>500?'checking':'ready');
       }catch{
         if(disposed||id!==sequence||ctrl.signal.aborted)return;
@@ -67,6 +74,6 @@ export function useEventPlayback<T extends Envelope=Envelope>({url}:{url:string}
     };
     raf=requestAnimationFrame(paint);void load();
     return()=>{disposed=true;sequence++;controller?.abort();clearTimers();cancelAnimationFrame(raf);document.removeEventListener('visibilitychange',visibility);retryRef.current=()=>{};};
-  },[url]);
+  },[url,hideInitialCompleted]);
   return {payload,phase:payload?.playback?samplePlayback(payload.playback,serverNowMs):null,sync,serverNowMs,retry};
 }

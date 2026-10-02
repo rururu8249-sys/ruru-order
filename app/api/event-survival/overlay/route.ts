@@ -82,13 +82,17 @@ export async function GET(request: NextRequest) {
 
     const supabase = getSupabaseClient();
 
-    const { data, error } = await supabase
+    const eventId = cleanText(request.nextUrl.searchParams.get('eventId'));
+    if(eventId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId)) return json({ok:false,message:'이벤트 번호가 올바르지 않습니다.'},400);
+    let query = supabase
       .from("event_roulette_events")
       .select(
         "id, title, mode, is_test, status, participant_snapshot, survivor_nicknames, winner_count, winner_nickname, winner_note, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
       )
       .like("overlay_token", `${token}%`)
-      .neq("status", "closed")
+      .neq("status", "closed");
+    if(eventId) query = query.eq('id',eventId);
+    const {data,error} = await query
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
       .limit(1)

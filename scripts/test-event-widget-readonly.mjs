@@ -7,7 +7,7 @@ let timers=new Map(),n=0,audio=0,requests=[];
 const timeout=(fn,ms)=>{const id=++n;timers.set(id,{fn,ms});return id;};
 globalThis.setInterval=timeout;globalThis.clearInterval=id=>timers.delete(id);
 globalThis.requestAnimationFrame=()=>++n;globalThis.cancelAnimationFrame=()=>{};
-globalThis.window={location:{origin:'http://localhost:3000',search:'?sound=0'},setTimeout:timeout,clearTimeout:id=>timers.delete(id),innerWidth:1280,innerHeight:720,AudioContext:class{constructor(){audio++;}},addEventListener(){},removeEventListener(){}};
+globalThis.window={location:{origin:'http://localhost:3000',search:'?sound=0&showResult=1'},setTimeout:timeout,clearTimeout:id=>timers.delete(id),innerWidth:1280,innerHeight:720,AudioContext:class{constructor(){audio++;}},addEventListener(){},removeEventListener(){}};
 globalThis.document={documentElement:{style:{}},body:{style:{}},visibilityState:'visible',addEventListener(){},removeEventListener(){}};
 globalThis.Audio=class{constructor(){audio++;}play(){return Promise.resolve();}pause(){}};
 const load=createUiLoader();

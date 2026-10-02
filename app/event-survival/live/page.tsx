@@ -12,6 +12,7 @@ import {EventClockStyles} from "@/components/event-shared/EventClockStyles";
 import {useEventScene} from "@/components/event-shared/useEventScene";
 import {buildSurvivalScene,sampleSurvivalScene} from "@/lib/eventSurvivalScene";
 import {eventSeed,seededRandom} from "@/lib/eventPlayback";
+import EventRoster from '@/components/event-shared/EventRoster';
 
 const ROSE = "#7B2D43";
 const GOLD = "#F0C45A";
@@ -133,6 +134,8 @@ export default function SurvivalLiveWidget() {
 
   const [mounted, setMounted] = useState(false); // SSR 후 클라 마운트 전까지 렌더 보류(hydration 불일치 방지)
   const [preview, setPreview] = useState(false);  // ?preview=1 이면 가짜 명단 데모(관리자 확인용)
+  const [showInitialResult, setShowInitialResult] = useState(false);
+  const [requestedEventId, setRequestedEventId] = useState('');
   const [hasEvent, setHasEvent] = useState(false); // 실제 모드에서 서버 이벤트를 받았는지 (없으면 완전 투명)
   const [demoPlayers, setPlayers] = useState<Player[]>([]);
   const [demoPhase, setPhase] = useState<"ready" | "running" | "done">("ready");
@@ -141,7 +144,7 @@ export default function SurvivalLiveWidget() {
   const [demoFx, setFx] = useState<FxState>(null);
   const [demoBursts, setBursts] = useState<Burst[]>([]);
 
-  const shared=useEventScene({url:mounted&&!preview?`/api/event-survival/overlay?token=${TOKEN}`:"",kind:"survival",build:buildSurvivalScene});
+  const shared=useEventScene({url:mounted&&!preview?`/api/event-survival/overlay?token=${TOKEN}${requestedEventId ? `&eventId=${encodeURIComponent(requestedEventId)}` : ''}`:"",kind:"survival",build:buildSurvivalScene,showInitialResult});
   const frame=shared.scene?sampleSurvivalScene(shared.scene,shared.elapsed):null;
   const players=preview?demoPlayers:(frame?.players||[]);
   const phase=preview?demoPhase:(frame?.phase||"ready");
@@ -166,7 +169,7 @@ export default function SurvivalLiveWidget() {
   const clearT = () => { timers.current.forEach(clearTimeout); timers.current = []; };
 
   const aliveCount = players.filter((p) => !p.dead).length;
-  const showNames = aliveCount <= NAME_SHOW_AT || phase === "done";
+  const showNames = phase === 'ready' || aliveCount <= NAME_SHOW_AT || phase === "done";
   const done = phase === "done";
   const winnerIdSet = new Set(winners.map((w) => w.id));
 
@@ -177,6 +180,8 @@ export default function SurvivalLiveWidget() {
     const q = new URLSearchParams(window.location.search);
     const isPreview = q.get("preview") === "1";
     setPreview(isPreview);
+    setShowInitialResult(q.get('showResult') === '1');
+    setRequestedEventId(q.get('eventId') || '');
     soundOnRef.current = q.get("sound") !== "0"; // [2026-07-26] ?sound=0 이면 효과음 끔
 
     if (isPreview) {
@@ -549,11 +554,8 @@ export default function SurvivalLiveWidget() {
         @keyframes sparkFlick{0%,100%{opacity:1}33%{opacity:.15}66%{opacity:.9}}
       `}</style>
 
-      {/* ── [2026-07-26 사장님] 채팅 안전 레이아웃: 화면 위쪽 2/3만 사용, 하단 1/3은 투명으로 비움
-             (9:16 세로 방송에서 시청자 유튜브 채팅이 하단에 겹치므로 가리지 않게) ── */}
-      {/* 가로 상한(105vh): PC 같은 와이드 화면에서 납작한 띠가 되지 않게 비율 제한.
-          OBS 세로(9:16) 화면에서는 96vw가 더 작아서 그대로 세로형 꽉 참. */}
-      <div ref={stageRef} style={{ position: "relative", width: "min(96vw, 105vh)", height: "63vh",
+      {/* 명단과 진행 장면을 읽기 쉽게 세로 공간을 확대한다. 바깥 여백은 투명 유지. */}
+      <div ref={stageRef} style={{ position: "relative", width: "96vw", height: "86vh",
         borderRadius: 20, overflow: "hidden",
         background: "linear-gradient(180deg,rgba(20,12,30,.62),rgba(45,26,44,.62))",
         border: "1px solid rgba(255,255,255,.14)", boxShadow: "0 12px 40px rgba(0,0,0,.4)" }}>
@@ -596,7 +598,8 @@ export default function SurvivalLiveWidget() {
 
         {fx && <div data-event-local-age style={{position:"absolute",inset:0,pointerEvents:"none"}}><DisasterFX fx={fx} /></div>}
 
-        {players.map((p) => {
+        {phase === 'ready' ? <div style={{position:'absolute',inset:'118px 16px 16px',zIndex:30}}><EventRoster names={players.map(p=>p.name)}/></div> : null}
+        {(phase === 'ready' ? [] : players).map((p) => {
           const isW = winnerIdSet.has(p.id);
           const scale = isW ? (done ? (multi ? 1.7 : 2.6) : 1.7) : aliveCount <= 6 ? 1.4 : aliveCount <= NAME_SHOW_AT ? 1.15 : 1;
           // 단독 우승이면 가운데로 모음. 다중이면 제자리 강조.
