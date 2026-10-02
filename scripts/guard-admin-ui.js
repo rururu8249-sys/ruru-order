@@ -34,6 +34,9 @@ const add = (file, line, rule, text) =>
 
 // 의도적으로 기준 밖인 곳 — 이유를 적고 여기 등록한다(그냥 무시하지 않는다)
 const ALLOW = [
+  // Existing portrait YouTube crop: only height is constrained, width is auto
+  // and derived from 9:16. This host replaces the previously exempt iframe.
+  { file: "LiveBroadcastPanels.tsx", match: "ref={video.hostRef}" },
   // 캔버스/휠 조각 색: CSS 변수를 해석할 수 없다
   { file: "AdminLiveEventRoulettePanel.tsx", match: "WHEEL_COLORS" },
   // 손님 폰 팝업 뒷배경 흉내 — 관리자 테마와 무관

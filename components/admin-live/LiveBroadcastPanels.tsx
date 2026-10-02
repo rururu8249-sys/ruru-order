@@ -3,7 +3,9 @@
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Script from "next/script";
+import { useAdminYoutubePlayer } from "./useAdminYoutubePlayer";
 import { supabase } from "@/lib/supabase";
 import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import type { CustomerRow } from "@/lib/admin-v2/types";
@@ -460,6 +462,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
   const [taskLoading, setTaskLoading] = useState(false);
   const [taskPage, setTaskPage] = useState(1);
   const [embedDomain, setEmbedDomain] = useState("");
+  const [chatRetry, setChatRetry] = useState(0);
 
   const [customerKeyword, setCustomerKeyword] = useState("");
   const [customerResults, setCustomerResults] = useState<CustomerRow[]>([]);
@@ -518,27 +521,10 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
   }, []);
 
   const videoId = useMemo(() => extractYoutubeVideoId(youtubeUrl), [youtubeUrl]);
-  const videoEmbedUrl = videoId ? `https://www.youtube.com/embed/${videoId}?playsinline=1&rel=0&enablejsapi=1` : "";
-  // 영상 음소거/볼륨 — 유튜브 자체 컨트롤이 cover로 잘려 안 보이므로 별도 제어(IFrame API postMessage)
-  const videoIframeRef = useRef<HTMLIFrameElement>(null);
-  const [videoMuted, setVideoMuted] = useState(true);
-  const [videoVolume, setVideoVolume] = useState(100);
-  const ytCmd = (func: string, args: (number | string)[] = []) =>
-    videoIframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args }), "*");
-  const toggleVideoMute = () => {
-    setVideoMuted((m) => {
-      const next = !m;
-      ytCmd(next ? "mute" : "unMute");
-      if (!next) ytCmd("setVolume", [videoVolume]);
-      return next;
-    });
-  };
-  const changeVideoVolume = (v: number) => {
-    setVideoVolume(v);
-    ytCmd("setVolume", [v]);
-    if (v > 0 && videoMuted) { setVideoMuted(false); ytCmd("unMute"); }
-    if (v === 0 && !videoMuted) { setVideoMuted(true); ytCmd("mute"); }
-  };
+  const videoEmbedUrl = videoId ? `https://www.youtube.com/embed/${videoId}` : "";
+  const video = useAdminYoutubePlayer(videoId);
+  const videoMuted = video.muted;
+  const videoVolume = video.volume;
   const chatEmbedUrl = videoId && embedDomain ? `https://www.youtube.com/live_chat?v=${videoId}&embed_domain=${embedDomain}` : "";
   // 채팅 테마 — 유튜브 채팅 iframe은 iframe 요소의 color-scheme으로 라이트/다크를 정함(실측).
   // ⚠️다크 임베드는 크롬이 캔버스를 불투명 흰색으로 처리해 흰 글씨 사고가 남(실측·우회 불가) → 항상 라이트 고정, 다크 토글 금지.
@@ -869,7 +855,10 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
               <>
                 <button
                   type="button"
-                  onClick={toggleVideoMute}
+                  onClick={video.toggleMute}
+                  disabled={!video.ready}
+                  aria-label={videoMuted ? "방송 소리 켜기" : "방송 음소거"}
+                  aria-pressed={videoMuted}
                   title={videoMuted ? "소리 켜기" : "음소거"}
                   className="rounded-lg bg-surface-2 px-1.5 py-0.5 text-[13px] leading-none hover:bg-surface-3"
                 >
@@ -880,7 +869,9 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
                   min={0}
                   max={100}
                   value={videoVolume}
-                  onChange={(e) => changeVideoVolume(Number(e.target.value))}
+                  onChange={(e) => video.changeVolume(Number(e.target.value))}
+                  disabled={!video.ready}
+                  aria-label="방송 영상 볼륨"
                   title={`볼륨 ${videoVolume}%`}
                   className="h-1 w-16 cursor-pointer accent-rose-deep"
                 />
@@ -891,14 +882,13 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
 
         <div className="relative flex-1 min-h-0 w-full overflow-hidden rounded-2xl border border-line bg-[var(--color-ink-soft)]">
           {videoEmbedUrl ? (
-            <iframe
-              ref={videoIframeRef}
-              title="YouTube live video"
-              src={videoEmbedUrl}
-              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[128%] w-auto max-w-none aspect-[9/16]"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-            />
+            <>
+              <Script key={video.scriptVersion} src={`https://www.youtube.com/iframe_api${video.scriptVersion ? `?retry=${video.scriptVersion}` : ""}`} strategy="afterInteractive" onError={video.failScript} />
+              <div ref={video.hostRef} className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[128%] w-auto max-w-none aspect-[9/16] [&_iframe]:h-full [&_iframe]:w-full [&_iframe]:border-0" />
+              {!video.ready ? <div className="absolute inset-0 flex items-center justify-center bg-surface-2 p-4 text-center text-xs font-bold text-ink-soft" role="status">
+                {video.error ? <div>영상 연결을 확인해 주세요.<button type="button" className="ml-2 rounded-lg border border-line px-2 py-1" onClick={video.retry}>다시 연결</button></div> : "방송 영상 준비 중 · 음소거 적용"}
+              </div> : null}
+            </>
           ) : (
             <div className="absolute inset-0 flex items-center justify-center bg-surface-2">
               <div className="w-[78%] rounded-2xl bg-surface/70 p-6 text-center shadow-sm backdrop-blur">
@@ -914,12 +904,16 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
       <div className={`min-w-0 rounded-2xl border border-line bg-surface p-3.5 shadow-sm flex flex-col ${isCol ? "min-h-[240px] w-full flex-[6_1_0%]" : "h-[420px]"}`} style={isCol ? undefined : { flex: "3 1 0%" }}>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-black text-ink">라이브 채팅</h2>
-          <span className="text-xs font-bold text-ink-soft">{chatEmbedUrl ? "채팅 연결" : "URL 대기"}</span>
+          {chatEmbedUrl ? <div className="flex items-center gap-2 text-xs font-bold text-ink-soft">
+            <button type="button" aria-label="YouTube 채팅 다시 연결" title="YouTube 채팅이 비거나 오류가 뜨면 다시 연결하세요" onClick={() => setChatRetry(value => value + 1)} className="rounded-lg border border-line px-2 py-1">재연결</button>
+            <a aria-label="YouTube 채팅 별도 창으로 열기" href={`https://www.youtube.com/live_chat?v=${videoId}&is_popout=1`} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-line px-2 py-1">새 창 ↗</a>
+          </div> : <span className="text-xs font-bold text-ink-soft">URL 대기</span>}
         </div>
 
         <div className="flex-1 min-h-0 overflow-hidden rounded-2xl border border-line bg-surface-2" style={chatEmbedUrl ? { background: "var(--color-surface)" } : undefined}>
           {chatEmbedUrl ? (
             <iframe
+              key={`${videoId}:${chatRetry}`}
               title="YouTube live chat"
               src={chatEmbedUrl}
               className="h-full w-full"

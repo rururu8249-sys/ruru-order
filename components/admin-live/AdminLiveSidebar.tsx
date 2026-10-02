@@ -110,14 +110,8 @@ export default function AdminLiveSidebar({
             const showBadges = menu.key === "orders" && exceptionBadges && (exceptionBadges.needMatch > 0 || exceptionBadges.cardUnpaid > 0);
 
             return (
-              <button
+              <div
                 key={menu.key}
-                type="button"
-                onClick={() => {
-                  onMenuChange(menu.defaultKey);
-                  onCloseNav?.();
-                }}
-                aria-current={active ? "page" : undefined}
                 className={[
                   // [2026-09-08 수정] 배지를 라벨 옆에 두면 좁은 사이드바에서 「주문·입금」 글자가 세로로 눌린다.
                   //   → 위: 아이콘+이름 한 줄 / 아래: 배지 한 줄. 이름은 절대 줄바꿈하지 않는다.
@@ -127,7 +121,9 @@ export default function AdminLiveSidebar({
                     : "text-ink-soft hover:bg-surface-2 hover:text-ink",
                 ].join(" ")}
               >
-                <span className="flex w-full items-center gap-3">
+                <button type="button" aria-current={active ? "page" : undefined}
+                  onClick={() => { onMenuChange(menu.defaultKey); onCloseNav?.(); }}
+                  className="flex w-full items-center gap-3 text-left rounded-lg focus-visible:outline-2 focus-visible:outline-rose-deep">
                   <span
                     className={[
                       "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-sm ring-1",
@@ -140,28 +136,28 @@ export default function AdminLiveSidebar({
                   <span className="min-w-0 flex-1">
                     <span className="block whitespace-nowrap text-[14px] font-black">{menu.label}</span>
                   </span>
-                </span>
+                </button>
                 {showBadges ? (
                   <span className="flex flex-wrap items-center gap-1 pl-12">
                     {exceptionBadges.needMatch > 0 ? (
-                      <span
-                        role="button"
+                      <button
+                        type="button"
                         title={`입금자명·금액이 주문과 자동으로 안 맞아 수동 확인이 필요한 주문 ${exceptionBadges.needMatch}건 — 클릭하면 해당 주문만 보여요`}
-                        onClick={(e) => { e.stopPropagation(); onExceptionBadgeClick?.("match"); onCloseNav?.(); }}
+                        onClick={() => { onExceptionBadgeClick?.("match"); onCloseNav?.(); }}
                         className="cursor-pointer whitespace-nowrap rounded-full bg-danger-bg px-2 py-0.5 text-[11px] font-black text-danger-tx hover:ring-2 hover:ring-danger-tx/30"
-                      >매칭필요 {exceptionBadges.needMatch} ›</span>
+                      >매칭필요 {exceptionBadges.needMatch} ›</button>
                     ) : null}
                     {exceptionBadges.cardUnpaid > 0 ? (
-                      <span
-                        role="button"
+                      <button
+                        type="button"
                         title={`카드결제 선택 후 아직 결제완료 처리 전인 주문 ${exceptionBadges.cardUnpaid}건 — 클릭하면 해당 주문만 보여요`}
-                        onClick={(e) => { e.stopPropagation(); onExceptionBadgeClick?.("card"); onCloseNav?.(); }}
+                        onClick={() => { onExceptionBadgeClick?.("card"); onCloseNav?.(); }}
                         className="cursor-pointer whitespace-nowrap rounded-full bg-danger-bg px-2 py-0.5 text-[11px] font-black text-danger-tx hover:ring-2 hover:ring-danger-tx/30"
-                      >카드미결제 {exceptionBadges.cardUnpaid} ›</span>
+                      >카드미결제 {exceptionBadges.cardUnpaid} ›</button>
                     ) : null}
                   </span>
                 ) : null}
-              </button>
+              </div>
             );
           })}
         </nav>
