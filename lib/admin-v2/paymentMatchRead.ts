@@ -1,4 +1,4 @@
-// Transfer optimization only: retain every row and every field read by matching.
+// Transfer optimization only: retain every candidate and every field read by matching.
 // Discover actual columns from one row, so legacy aliases / missing columns are
 // handled without assuming a production schema. No financial data is cached.
 export const PAYMENT_MATCH_ORDER_FIELDS = [
@@ -31,17 +31,25 @@ export async function readPaymentMatchRows(
   const fields = table === "orders" ? PAYMENT_MATCH_ORDER_FIELDS : PAYMENT_MATCH_DEPOSIT_FIELDS;
   const probe = await db.from(table).select("*").limit(1);
   let selection = probe.error ? "*" : paymentMatchProjection(probe.data?.[0], fields);
+  // Verified in production 2026-10-02: both confirmation fields are nullable
+  // timestamptz. The matching functions already reject every non-null timestamp.
+  // No date cutoff: late deposits and confirmation cancellations remain eligible.
+  const confirmationField = table === "orders" ? "deposit_confirmed_at" : "confirmed_at";
+  let filterConfirmed = !probe.error && Boolean(probe.data?.[0]) &&
+    Object.prototype.hasOwnProperty.call(probe.data[0], confirmationField);
   const pageSize = 1000;
   let from = 0;
   const all: any[] = [];
   while (true) {
     let query = db.from(table).select(selection).range(from, from + pageSize - 1);
     if (applyFilter) query = applyFilter(query);
+    if (filterConfirmed) query = query.is(confirmationField, null);
     const { data, error } = await query;
     // A concurrent schema change must not break payment processing. Restart
     // using the original read, never return a partial set of matching candidates.
     if (error && selection !== "*" && ["42703", "PGRST204"].includes(String(error.code))) {
       selection = "*";
+      filterConfirmed = false;
       from = 0;
       all.length = 0;
       continue;

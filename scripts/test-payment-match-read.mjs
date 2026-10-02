@@ -17,18 +17,20 @@ function database(tables, options = {}) {
   const writes = [], reads = [];
   let failed = false;
   return { writes, reads, from(table) {
-    let select = "*", start = 0, end = Infinity, limit = Infinity, excluded, update;
+    let select = "*", start = 0, end = Infinity, limit = Infinity, excluded, nullField, update;
     const query = {
       select(value) { select = value; return this; },
       range(a, b) { start = a; end = b; return this; },
       limit(value) { limit = value; return this; },
       neq(key, value) { excluded = [key, value]; return this; },
+      is(key, value) { assert.equal(value, null); nullField = key; return this; },
       update(value) { update = value; return this; },
       in(key, values) { writes.push({ table, update, key, values }); return this; },
       eq(key, value) { writes.push({ table, update, key, value }); return this; },
       then(resolve, reject) {
-        if (update) return Promise.resolve({ error: options.writeError ?? null }).then(resolve, reject);
+        if (update) return Promise.resolve({ error: options.writeErrorByTable?.[table] ?? options.writeError ?? null }).then(resolve, reject);
         reads.push({ table, select, start, limit });
+        if (options.probeError && limit === 1) return Promise.resolve({ data: null, error: { code: "08006", message: "probe failed" } }).then(resolve, reject);
         if (options.readError) return Promise.resolve({ data: null, error: { code: "08006", message: "unavailable" } }).then(resolve, reject);
         if (options.schemaChange && select !== "*" && !failed && start >= 1000) {
           failed = true;
@@ -36,6 +38,7 @@ function database(tables, options = {}) {
         }
         let rows = tables[table] ?? [];
         if (excluded) rows = rows.filter(row => row[excluded[0]] !== excluded[1]);
+        if (nullField) rows = rows.filter(row => row[nullField] == null);
         rows = rows.slice(start, Math.min(end + 1, start + limit));
         if (select !== "*") rows = rows.map(row => Object.fromEntries(select.split(",").map(key => [key, row[key]])));
         return Promise.resolve({ data: rows, error: null }).then(resolve, reject);
@@ -80,6 +83,16 @@ function normalizeRows(rows, fields) {
 }
 const base = { id: 1, order_group_id: "a", youtube_nickname: "guest", customer_name: "name", final_amount: 10000, total_price: 10000, payment_method: "무통장입금" };
 const deposit = { id: 1, depositor_name: "guest", amount: 10000, match_status: "미확인" };
+function matchingResponse(result) {
+  const copy = JSON.parse(JSON.stringify(result));
+  // These two diagnostic totals intentionally count the smaller read set.
+  // All candidates, exclusions, amounts, results and writes must stay identical.
+  if (copy.body.summary) {
+    delete copy.body.summary.checked_orders;
+    delete copy.body.summary.checked_deposits;
+  }
+  return JSON.stringify(copy);
+}
 const cases = [
   [[], []], [[base], [deposit]], [[base], []],
   [[base, { ...base, id: 2, order_group_id: "b" }], [deposit]],
@@ -90,6 +103,9 @@ const cases = [
   ...["is_test_order", "exclude_from_payment_match", "deposit_confirmed_at", "is_deleted"].map(key => [[{ ...base, [key]: key === "deposit_confirmed_at" ? "2026-10-02" : true }], [deposit]]),
   [[base], [{ ...deposit, confirmed_at: "2026-10-02" }]],
   [[base], [{ ...deposit, match_order_group_id: "already" }]],
+  [[{ ...base, deposit_confirmed_at: "2026-10-01T01:00:00Z" }, { ...base, id: 2, order_group_id: "next" }], [deposit]],
+  // Cancellation clears confirmation timestamps: the same read must include it again.
+  [[{ ...base, deposit_confirmed_at: null }], [{ ...deposit, confirmed_at: null }]],
   [[{ ...base, youtube_nickname: "", nickname: "guest", final_amount: null, total_price: null, amount: 10000 }], [deposit]],
   [[{ ...base, payment_method: "카드" }], [deposit]],
 ];
@@ -99,16 +115,16 @@ for (let seed = 0; seed < 60; seed++) {
 }
 for (const [orders, deposits] of cases) {
   const tables = { orders: normalizeRows(orders.map(row => ({ ...row, product_note: "large unused data".repeat(1000) })), PAYMENT_MATCH_ORDER_FIELDS), deposits: normalizeRows(deposits, PAYMENT_MATCH_DEPOSIT_FIELDS) };
-  for (const confirm of [false, true]) for (const writeError of [null, { message: "write failed" }]) {
-    const before = database(tables, { writeError }), after = database(tables, { writeError });
+  for (const confirm of [false, true]) for (const failure of [{}, { writeError: { message: "write failed" } }, { writeErrorByTable: { deposits: { message: "deposit write failed" } } }]) {
+    const before = database(tables, failure), after = database(tables, failure);
     const request = { json: async () => confirm ? { confirm: "RUN_AUTO_MATCH" } : {} };
     const legacy = await post(before, originalRead)(request), optimized = await post(after, readPaymentMatchRows)(request);
-    assert.equal(JSON.stringify(optimized), JSON.stringify(legacy));
+    assert.equal(matchingResponse(optimized), matchingResponse(legacy));
     assert.equal(JSON.stringify(after.writes), JSON.stringify(before.writes));
   }
 }
 const many = normalizeRows(Array.from({ length: 2001 }, (_, i) => ({ ...base, id: i + 1, product_note: "unused" })), PAYMENT_MATCH_ORDER_FIELDS);
-for (const options of [{}, { schemaChange: true }, { readError: true }]) {
+for (const options of [{}, { schemaChange: true }, { readError: true }, { probeError: true }]) {
   const result = await readPaymentMatchRows(database({ orders: many }, options), "orders", q => q.neq("is_deleted", true));
   if (options.readError) assert.equal(result.data, null);
   else { assert.equal(result.data.length, 2001); assert.equal(new Set(result.data.map(row => row.id)).size, 2001); }
@@ -116,4 +132,16 @@ for (const options of [{}, { schemaChange: true }, { readError: true }]) {
 // Legacy schemas without optional columns are supported without missing-column errors.
 const minimal = await readPaymentMatchRows(database({ orders: [base] }), "orders", null);
 assert.deepEqual(minimal.data, [base]);
-console.log(`PASS: ${cases.length * 4} legacy/optimized response + write comparisons, pagination, schema fallback, read failures, legacy schemas`);
+const completedRows = normalizeRows([
+  { ...base, deposit_confirmed_at: "2026-10-01T00:00:00Z" },
+  { ...base, id: 2, deposit_confirmed_at: null },
+], PAYMENT_MATCH_ORDER_FIELDS);
+const pending = await readPaymentMatchRows(database({ orders: completedRows }), "orders", null);
+assert.deepEqual(pending.data.map(row => row.id), [2]);
+// A cleared confirmation is read fresh each invocation; no cached payment state.
+completedRows[0].deposit_confirmed_at = null;
+const reopened = await readPaymentMatchRows(database({ orders: completedRows }), "orders", null);
+assert.deepEqual(reopened.data.map(row => row.id), [1, 2]);
+const concurrentReads = await Promise.all(Array.from({ length: 20 }, () => readPaymentMatchRows(database({ orders: completedRows }), "orders", null)));
+for (const result of concurrentReads) assert.deepEqual(result.data.map(row => row.id), [1, 2]);
+console.log(`PASS: ${cases.length * 6} legacy/optimized matching response + write comparisons, pagination, schema/probe fallback, read/write failures, confirmation cancellation, concurrent reads, legacy schemas`);
