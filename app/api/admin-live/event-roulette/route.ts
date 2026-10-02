@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
+import {calculateEventDurationMs, eventSeed} from "@/lib/eventPlayback";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { PAID_STATUS_VALUES } from "@/lib/admin-v2/statusDisplay";
 import { createClient } from "@supabase/supabase-js";
@@ -1064,7 +1065,8 @@ async function spinEvent(body: Record<string, unknown>) {
       }
     : pickRouletteWinner(eligibleParticipants);
   const now = new Date().toISOString();
-  const spinDurationMs = calculateRouletteSpinDurationMs(participants.length);
+  const kind = event.overlay_token.startsWith("claw_") ? "claw" : "roulette";
+  const spinDurationMs = calculateEventDurationMs(kind, participants.map(p=>p.nickname), [picked.winner.nickname], eventSeed(JSON.stringify([kind,eventId,now,1])));
 
   const { data: updatedEvent, error: updateError } = await supabase
     .from("event_roulette_events")
@@ -1222,8 +1224,9 @@ async function resolveSurvivalEvent(body: Record<string, unknown>) {
   }
 
   const now = new Date().toISOString();
-  const spinDurationMs = calculateRouletteSpinDurationMs(participants.length);
   const survivorNicknames = survivors.map((s) => s.nickname);
+  const kind = event.overlay_token.startsWith("race_") ? "race" : "survival";
+  const spinDurationMs = calculateEventDurationMs(kind, participants.map(p=>p.nickname), survivorNicknames, eventSeed(JSON.stringify([kind,eventId,now,1])));
 
   const { data: updatedEvent, error: updateError } = await supabase
     .from("event_roulette_events")

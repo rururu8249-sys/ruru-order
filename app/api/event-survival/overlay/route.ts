@@ -5,6 +5,7 @@
 //   - 돈/포인트 로직 없음. 이벤트 행을 읽기만 한다.
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {makePlayback} from "@/lib/eventPlayback";
 import type { EventRouletteParticipant } from "@/lib/eventRoulette";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,7 @@ export const dynamic = "force-dynamic";
 const FIXED_SURVIVAL_OVERLAY_TOKEN = "survival_luludongi_live";
 
 type SurvivalOverlayEventRow = {
+  id: string;
   title: string;
   mode: "live" | "test" | "preview";
   is_test: boolean;
@@ -83,12 +85,12 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase
       .from("event_roulette_events")
       .select(
-        "title, mode, is_test, status, participant_snapshot, survivor_nicknames, winner_count, winner_nickname, winner_note, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
+        "id, title, mode, is_test, status, participant_snapshot, survivor_nicknames, winner_count, winner_nickname, winner_note, spin_started_at, spin_duration_ms, result_at, created_at, updated_at"
       )
       .like("overlay_token", `${token}%`)
       .neq("status", "closed")
-      .order("updated_at", { ascending: false })
       .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
       .limit(1)
       .maybeSingle();
 
@@ -109,7 +111,10 @@ export async function GET(request: NextRequest) {
 
     return json({
       ok: true,
+      server_now: Date.now(),
+      playback: makePlayback({id:event.id,kind:"survival",status:event.status,startedAt:event.spin_started_at,durationMs:event.spin_duration_ms,participants:sanitizeParticipants(event.participant_snapshot).map(p=>p.nickname),winners:sanitizeSurvivors(event.survivor_nicknames)}),
       event: {
+        id: event.id,
         title: cleanText(event.title) || "⛈️ 루루동이 서바이벌",
         mode: event.mode,
         is_test: event.is_test,
