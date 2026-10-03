@@ -1,8 +1,14 @@
 import assert from 'node:assert/strict';
-import { loadPickingWorkspaceRows, parsePickingWorkspaceRequest } from '../lib/orderPickingScopeLoader.ts';
+import { kstDayStartIso, loadPickingWorkspaceRows, mergePickingWorkspaceRows, parsePickingWorkspaceRequest } from '../lib/orderPickingScopeLoader.ts';
 
 assert.deepEqual(parsePickingWorkspaceRequest({ broadcastIds: [] }), { broadcastIds: [] });
 assert.deepEqual(parsePickingWorkspaceRequest({ broadcastIds: [' b1 ', 'b1', 'b2'] }), { broadcastIds: ['b1', 'b2'] });
+assert.equal(kstDayStartIso('2026-10-04T03:00:00+09:00'), '2026-10-03T15:00:00.000Z');
+assert.deepEqual(
+  mergePickingWorkspaceRows([{ id: 1 }, { id: 2 }], [{ id: 2, safety: true }, { id: 3 }]).map((row) => row.id),
+  [1, 2, 3],
+  'global safety rows are merged without duplicating selected-broadcast rows',
+);
 assert.throws(() => parsePickingWorkspaceRequest({ broadcastIds: Array.from({ length: 32 }, (_, i) => `b${i}`) }), /31/);
 assert.throws(() => parsePickingWorkspaceRequest({ broadcastIds: 'b1' }), /방송/);
 

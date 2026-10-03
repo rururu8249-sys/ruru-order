@@ -2,6 +2,7 @@
 
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
+import { cardPaymentStatusPatch } from "@/lib/cardPaymentStatusUpdate";
 import { paymentStatusLabel } from "@/lib/orderLabels";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -1357,10 +1358,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     try {
       const { error } = await supabase
         .from("orders")
-        .update({
-          admin_order_status_v2: nextStatus,
-          order_manage_status: nextStatus,
-        })
+        .update(cardPaymentStatusPatch(nextStatus))
         .in("id", rowIds);
 
       if (error) {
