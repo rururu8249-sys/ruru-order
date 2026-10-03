@@ -409,13 +409,14 @@ export default function ProductWidgetClient() {
   }, [applyRotation, previewMode]);
 
   // 순환 자동 전환 (고정상품 없을 때만)
+  const rotationAdvances = widgetRotationShouldAdvance(rotationConfig, Boolean(pinned), rotation.length);
   useEffect(() => {
-    if (!widgetRotationShouldAdvance(rotationConfig, Boolean(pinned), rotation.length)) return;
+    if (!rotationAdvances) return;
     const timer = window.setInterval(() => {
       setRotIndex((i) => (i + 1) % rotation.length);
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [pinned, rotation.length, rotationConfig]);
+  }, [rotation.length, rotationAdvances]);
 
   // 실시간 이벤트 토스트: 주문(INSERT) / 입금확인·카드결제완료(UPDATE). 실제 컬럼명 기준.
   useEffect(() => {
@@ -579,6 +580,7 @@ export default function ProductWidgetClient() {
         {current ? (
           <div
             key={currentKey || String(rotIndex)}
+            data-ruru-widget-card
             style={{
               position: "relative",
               width: "100%",
@@ -592,7 +594,9 @@ export default function ProductWidgetClient() {
               //   → 카드 배경 없앰. 반투명은 사진칸·띠에 «한 겹(50%)»만.
               background: "transparent",
               color: "#fff",
-              animation: "ruruWidgetIn 0.34s cubic-bezier(0.22, 1, 0.36, 1)",
+              animation: rotationAdvances
+                ? "ruruWidgetCycle 5s linear both"
+                : "ruruWidgetIn 0.34s cubic-bezier(0.22, 1, 0.36, 1)",
             }}
           >
             {/* 사진칸 — [2026-09-11 사장님 지적 «사진이 잘린다·글자가 사진을 덮는다»]
@@ -826,6 +830,12 @@ export default function ProductWidgetClient() {
 
       <style>{`
         @keyframes ruruWidgetIn { from { opacity: 0; transform: translate3d(8px, 0, 0) scale(0.992); } to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); } }
+        @keyframes ruruWidgetCycle {
+          0% { opacity: 0; transform: translate3d(8px, 0, 0) scale(0.992); }
+          7% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+          93% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+          100% { opacity: 0; transform: translate3d(-8px, 0, 0) scale(0.992); }
+        }
         @keyframes ruruToastPop {
           0% { opacity: 0; transform: scale(0.8) translateY(8px); }
           60% { opacity: 1; transform: scale(1.05) translateY(0); }
@@ -836,7 +846,7 @@ export default function ProductWidgetClient() {
           100% { transform: translate(var(--tx), var(--ty)) rotate(var(--r)); opacity: 0; }
         }
         @media (prefers-reduced-motion: reduce) {
-          [style*="ruruWidgetIn"] { animation-duration: 0.01ms !important; }
+          [data-ruru-widget-card] { animation: none !important; }
         }
       `}</style>
     </div>
