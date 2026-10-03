@@ -6,6 +6,7 @@ alter table public.orders
 create or replace function public.orders_manage_repick_attention()
 returns trigger
 language plpgsql
+set search_path = ''
 as $$
 declare
   physical_changed boolean;

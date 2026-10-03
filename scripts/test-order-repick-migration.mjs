@@ -16,6 +16,8 @@ await db.exec(`
 `);
 const sql = await fs.readFile(new URL('../supabase/migrations/20261004010000_order_repick_attention.sql', import.meta.url), 'utf8');
 await db.exec(sql);
+const functionConfig = (await db.query(`select proconfig from pg_proc where proname = 'orders_manage_repick_attention'`)).rows[0]?.proconfig || [];
+assert.ok(functionConfig.some(value => String(value).startsWith('search_path=')), 'trigger function pins search_path');
 await db.exec(`insert into orders values (1, '재킷', '검정', 'M', 1, 10000, null)`);
 
 await db.exec(`update orders set size = 'L' where id = 1`);
