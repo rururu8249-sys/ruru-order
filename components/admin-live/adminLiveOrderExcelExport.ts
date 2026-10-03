@@ -562,8 +562,8 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
     });
   };
   const partitionedAttention = partitionPickingAttentionRows(builtRows.attentionRows);
-  appendAttentionSheet("뒤늦게 결제", partitionedAttention.latePaymentRows);
-  appendAttentionSheet("변경 후 재챙김", partitionedAttention.repickRows);
+  appendAttentionSheet("결제 후 추가 챙기기", partitionedAttention.latePaymentRows);
+  appendAttentionSheet("상품 변경 다시 챙기기", partitionedAttention.repickRows);
 
   // [2026-09-01 사장님 지시] 파일명 = 방송이름+날짜+루루
   //   방송 필터: "0827(목) 해외원정방송 1부" → 해외원정방송1부0827루루.xlsx

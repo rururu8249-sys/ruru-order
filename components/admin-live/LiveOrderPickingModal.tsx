@@ -27,7 +27,6 @@ type Props = { orders: LiveOrder[]; filterLabel: string; broadcastCalendar?: Bro
 // [2026-07-13 사장님 지침] amount = 주문에 저장된 상품금액(표시 전용, 재계산 안 함)
 type PickItem = { id: string; productId: string; text: string; productName: string; optionText: string; color: string; size: string; qty: number; amount: number; attentionKind: PickingAttentionKind; repickBefore?: LiveOrderItem["repickBefore"]; attentionAt?: string | null };
 type Panel = { key: string; nickname: string; name: string; phone: string; search: string; paid: boolean; when: string; items: PickItem[]; totalQty: number };
-type RecentCompletion = { ids: string[]; label: string };
 // [2026-09-20 사장님 요청] 상품별 = 상품(총 N개) → 그 밑에 옵션(색상/사이즈)별 N개. 옵션은 색상 가나다 → 사이즈 순.
 
 const PAID_STATUSES = ["paid", "auto_paid", "manual_paid", "card_paid"];
@@ -111,7 +110,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
   const [sortPickedIds, setSortPickedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [exporting, setExporting] = useState(false);
-  const [recentCompletion, setRecentCompletion] = useState<RecentCompletion | null>(null);
+  const [sessionCompletedIds, setSessionCompletedIds] = useState<Set<string>>(new Set());
 
   const activeSelectedOrders = remoteScopeApplied ? workspaceOrders : orders;
   const activeAdditionalOrders = additionalWorkspaceOrders;
@@ -277,21 +276,14 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
       for (const id of ids) { if (picked) next.add(id); else next.delete(id); }
       pickedRef.current = next;
       setPickedIds(next);
-      if (picked) {
-        const rows = allPaidPanels.flatMap(panel => panel.items
-          .filter(item => ids.includes(item.id))
-          .map(item => ({ panel, item })));
-        const qty = rows.reduce((sum, row) => sum + row.item.qty, 0);
-        const first = rows[0];
-        setRecentCompletion({
-          ids: [...ids],
-          label: rows.length === 1 && first
-            ? [first.item.productName, first.item.optionText || "기본 옵션", first.panel.nickname, `${first.item.qty}개`].join(" · ")
-            : `${rows.length}개 항목 · 총 ${qty}개`,
-        });
-      } else {
-        setRecentCompletion(current => current && ids.some(id => current.ids.includes(id)) ? null : current);
-      }
+      setSessionCompletedIds((current) => {
+        const updated = new Set(current);
+        for (const id of ids) {
+          if (picked) updated.add(id);
+          else updated.delete(id);
+        }
+        return updated;
+      });
     } catch (error: unknown) {
       showAdminToast("챙김 저장 실패 — 완료로 처리하지 않았습니다.\n" + (error instanceof Error ? error.message : String(error)), "error");
       try {
@@ -362,11 +354,11 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
   const additionalLateQty = additionalOpenRows.filter((item) => item.attentionKind === "late_paid" || item.attentionKind === "payment_time_missing").reduce((sum, item) => sum + item.qty, 0);
   const visibleTabs: ReadonlyArray<["standard" | "late_paid" | "repick" | "picked", string, number]> = workArea === "selected"
     ? [["standard", "일반 챙김", tabCounts.standard], ["picked", "챙김 완료", tabCounts.picked]]
-    : [["late_paid", "뒤늦게 결제", tabCounts.late_paid], ["repick", "변경 후 재챙김", tabCounts.repick], ["picked", "챙김 완료", tabCounts.picked]];
+    : [["late_paid", "결제 후 추가 챙기기", tabCounts.late_paid], ["repick", "상품 변경 · 다시 챙기기", tabCounts.repick], ["picked", "챙김 완료", tabCounts.picked]];
   const allRows = scopedRows.filter(({ item }) => {
     const done = pickedIds.has(item.id);
     if (workspaceTab === "picked") return done;
-    if (done) return false;
+    if (done && !sessionCompletedIds.has(item.id)) return false;
     if (workspaceTab === "repick") return item.attentionKind === "repick";
     if (workspaceTab === "late_paid") return item.attentionKind === "late_paid" || item.attentionKind === "payment_time_missing";
     return item.attentionKind === null;
@@ -422,16 +414,16 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
           <div className="mt-1 text-[12px] font-bold text-ink-soft">{panel.nickname}{panel.name && panel.name !== panel.nickname ? ` · ${panel.name}` : ""} · 주문 #{item.id}</div>
           {!done && item.attentionKind === "repick" ? (
             <div className="mt-1 rounded-lg bg-warn-bg px-2 py-1 text-[11px] font-black text-[var(--color-danger-tx)]">
-              변경 후 재챙김 · {[
+              상품 변경 · 다시 챙기기 · {[
                 item.repickBefore?.product_name,
                 [item.repickBefore?.color, item.repickBefore?.size].filter(Boolean).join(" / "),
                 item.repickBefore?.qty ? `${item.repickBefore.qty}개` : "",
               ].filter(Boolean).join(" · ")} → {item.productName} · {item.optionText || "기본 옵션"} · {item.qty}개
             </div>
           ) : !done && item.attentionKind === "late_paid" ? (
-            <div className="mt-1 inline-block rounded-lg bg-info-bg px-2 py-1 text-[11px] font-black text-[var(--color-info-tx)]">뒤늦게 결제됨 · 지금 챙겨야 합니다</div>
+            <div className="mt-1 inline-block rounded-lg bg-info-bg px-2 py-1 text-[11px] font-black text-[var(--color-info-tx)]">결제 후 추가로 챙겨야 합니다</div>
           ) : !done && item.attentionKind === "payment_time_missing" ? (
-            <div className="mt-1 inline-block rounded-lg bg-warn-bg px-2 py-1 text-[11px] font-black text-[var(--color-danger-tx)]">카드결제 완료 · 결제시각 누락 · 챙김 확인 필요</div>
+            <div className="mt-1 inline-block rounded-lg bg-info-bg px-2 py-1 text-[11px] font-black text-[var(--color-info-tx)]">카드결제 완료 · 추가로 챙겨야 합니다</div>
           ) : null}
           {!panel.paid ? <span className="mt-1 inline-block rounded bg-warn-bg px-2 py-1 text-[12px] font-black text-[var(--color-danger-tx)]">미결제 · 조회만 가능</span> : null}
         </div>
@@ -440,7 +432,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
           <button type="button" role="checkbox" aria-checked={done} aria-label={`${panel.nickname} ${item.productName} ${item.optionText} ${item.qty}개 ${done ? "챙김 해제" : "챙김"}`}
             disabled={blocked || !panel.paid} onClick={() => updatePicked([item.id], !pickedRef.current.has(item.id))}
             className={`mt-1 flex min-h-[44px] min-w-[92px] items-center justify-center gap-2 rounded-lg border-2 px-2 text-[13px] font-black disabled:opacity-50 ${done ? "border-ok-tx bg-[var(--color-ok-tx)] text-white" : "border-line bg-surface text-ink-soft"}`}>
-            <span aria-hidden="true">{done ? "✓" : "□"}</span>{done ? "완료됨" : item.attentionKind === "repick" ? "재챙김 완료" : "챙김 완료"}
+            <span aria-hidden="true">{done ? "✓" : "□"}</span>{done ? "챙김 완료" : item.attentionKind === "repick" ? "다시 챙김 완료" : "챙김 완료"}
           </button>
         </div>
       </div>
@@ -462,16 +454,16 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
           <div className="ml-auto text-right text-[12px] font-bold tabular-nums" aria-live="polite"><span className="text-rose-deep">안 챙김 {countersUnknown ? "—" : total - got}</span><span className="ml-2 text-ok-tx">챙김 {countersUnknown ? "—" : got}/{total}개</span></div>
           <button type="button" disabled={saving} onClick={onClose} aria-label="닫기" className="h-9 w-9 shrink-0 rounded-full bg-surface-2 text-[22px] disabled:opacity-40">×</button>
         </div>
-        <p aria-label="작업 범위" className="shrink-0 break-words border-b border-line px-3 py-1 text-[11px] font-bold leading-4 text-ink-soft">작업 범위: {workArea === "selected" ? title : "오늘 추가 작업 · 종료된 과거 방송 및 재챙김"} · 취소·챙기기 제외 주문 제외</p>
+        <p aria-label="작업 범위" className="shrink-0 break-words border-b border-line px-3 py-1 text-[11px] font-bold leading-4 text-ink-soft">작업 범위: {workArea === "selected" ? title : "오늘 추가 작업 · 과거 결제완료·미챙김 및 상품 변경"} · 취소·챙기기 제외 주문 제외</p>
         <div className="grid shrink-0 grid-cols-2 gap-1 border-b border-line bg-surface px-3 py-2">
           <button type="button" aria-label="선택 방송 작업" aria-pressed={workArea === "selected"} onClick={() => { setWorkArea("selected"); setWorkspaceTab("standard"); setSearch(""); }} className={`min-h-11 rounded-xl px-3 text-[13px] font-black ${workArea === "selected" ? "bg-rose-deep text-white" : "bg-surface-2 text-ink-soft"}`}>선택 방송 작업 <span className="tabular-nums">{countersUnknown ? "—" : selectedOpenQty}</span></button>
           <button type="button" aria-label="오늘 추가 작업" aria-pressed={workArea === "additional"} onClick={() => { setWorkArea("additional"); setWorkspaceTab(additionalLateQty > 0 ? "late_paid" : "repick"); setSearch(""); }} className={`min-h-11 rounded-xl px-3 text-[13px] font-black ${workArea === "additional" ? "bg-rose-deep text-white" : "bg-warn-bg text-[var(--color-danger-tx)]"}`}>오늘 추가 작업 <span className="tabular-nums">{countersUnknown ? "—" : additionalOpenQty}</span></button>
         </div>
-        {workArea === "selected" ? <PickingBroadcastSelector items={broadcastCalendar} selectedIds={appliedBroadcastIds} loading={scopeLoading} onChange={applyBroadcastScope} /> : <p className="shrink-0 border-b border-line bg-info-bg px-3 py-2 text-[12px] font-bold text-[var(--color-info-tx)]">선택한 방송과 섞이지 않는 별도 작업함입니다. 종료된 과거 방송의 뒤늦은 결제와 챙김 후 변경만 표시합니다.</p>}
+        {workArea === "selected" ? <PickingBroadcastSelector items={broadcastCalendar} selectedIds={appliedBroadcastIds} loading={scopeLoading} onChange={applyBroadcastScope} /> : <p className="shrink-0 border-b border-line bg-info-bg px-3 py-2 text-[12px] font-bold text-[var(--color-info-tx)]">선택한 방송과 섞이지 않는 별도 작업함입니다. 종료된 과거 방송의 결제완료·미챙김 상품과 챙김 완료 후 변경된 상품만 표시합니다.</p>}
         {workArea === "selected" && scopeError ? <p role="alert" className="shrink-0 bg-warn-bg px-3 py-2 text-[12px] font-black text-[var(--color-danger-tx)]">범위를 바꾸지 않았습니다 · {scopeError}</p> : null}
         <div className="shrink-0 space-y-2 border-b border-line px-3 py-2">
-          <div aria-label="물건챙기기 목록 도구" className="flex flex-wrap items-center gap-2">
-            <div className="grid w-full grid-cols-2 gap-1 rounded-xl border border-line bg-surface p-1 sm:w-auto sm:grid-cols-2">
+          <div aria-label="물건챙기기 목록 도구" className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1">
+            <div className="flex shrink-0 gap-1 rounded-xl border border-line bg-surface p-1">
               {visibleTabs.map(([value, label, count]) => (
                 <button key={value} type="button" aria-label={`${label} 탭`} aria-pressed={workspaceTab === value} onClick={() => setWorkspaceTab(value)} className={`min-h-11 rounded-lg px-3 text-[12px] font-black md:min-h-9 ${workspaceTab === value ? "bg-rose-deep text-white" : value === "late_paid" || value === "repick" ? "text-[var(--color-danger-tx)]" : "text-ink-soft"}`}>
                   {label} <span className="tabular-nums">{countersUnknown ? "—" : count}</span>
@@ -486,17 +478,10 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
               <select aria-label="정렬 방식" value={sortMode} onChange={event => {setSortModes(previous => ({...previous,[viewMode]:event.target.value})); setSortPickedIds(new Set(pickedIds));}} className="block h-9 w-full rounded-lg border border-line bg-surface px-2 text-[13px] text-ink"><option value="name">{viewMode === 'batch' ? '상품명 ㄱㄴㄷ순' : '닉네임 ㄱㄴㄷ순'}</option>{viewMode === 'order' ? <><option value="oldest">주문 오래된순</option><option value="newest">주문 최신순</option></> : null}<option value="remaining">남은 수량 많은순</option></select>
             </label>
             {sortMode === 'remaining' ? <button type="button" disabled={blocked} onClick={() => setSortPickedIds(new Set(pickedIds))} className="shrink-0 text-[12px] font-bold text-rose-deep">다시 정렬</button> : null}
-            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="상품번호 · 고객 검색" aria-label="상품번호 또는 고객 이름 검색" className="h-9 w-full min-w-0 max-w-[360px] flex-1 rounded-lg border border-line px-3 text-[13px] sm:min-w-[220px]" />
+            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="상품번호 · 고객 검색" aria-label="상품번호 또는 고객 이름 검색" className="h-9 min-w-[180px] max-w-[320px] flex-1 rounded-lg border border-line px-3 text-[13px]" />
           </div>
-          {recentCompletion ? (
-            <div aria-label="방금 챙김 완료" role="status" className="flex flex-wrap items-center gap-2 rounded-xl border border-ok-tx bg-ok-bg px-3 py-2">
-              <strong className="min-w-0 flex-1 break-words text-[12px] text-ok-tx">✓ 방금 챙김 완료 · {recentCompletion.label}</strong>
-              <button type="button" onClick={() => { setSearch(""); setWorkspaceTab("picked"); }} className="min-h-9 shrink-0 rounded-lg border border-ok-tx bg-surface px-3 text-[12px] font-black text-ok-tx">챙김 완료 목록으로 이동</button>
-              <button type="button" disabled={blocked} onClick={() => void updatePicked(recentCompletion.ids, false)} className="min-h-9 shrink-0 rounded-lg px-2 text-[12px] font-black text-rose-deep disabled:opacity-40">실수면 되돌리기</button>
-            </div>
-          ) : null}
-          {workspaceTab === "late_paid" ? <p className="rounded-lg bg-info-bg px-3 py-2 text-[12px] font-bold text-[var(--color-info-tx)]">종료된 과거 방송에서 뒤늦게 결제되어 추가로 챙겨야 하는 상품입니다. 한 건씩 확인해 주세요.</p> : null}
-          {workspaceTab === "repick" ? <p className="rounded-lg bg-warn-bg px-3 py-2 text-[12px] font-bold text-[var(--color-danger-tx)]">이미 챙긴 뒤 상품·색상·사이즈·수량이 바뀐 주문입니다. 변경 전후를 확인하고 다시 챙겨 주세요.</p> : null}
+          {workspaceTab === "late_paid" ? <p className="rounded-lg bg-info-bg px-3 py-2 text-[12px] font-bold text-[var(--color-info-tx)]">종료된 과거 방송의 결제완료·미챙김 상품입니다. 지금 추가로 챙겨 주세요.</p> : null}
+          {workspaceTab === "repick" ? <p className="rounded-lg bg-warn-bg px-3 py-2 text-[12px] font-bold text-[var(--color-danger-tx)]">챙김 완료 후 상품·색상·사이즈·수량이 변경됐습니다. 변경 전후를 확인하고 다시 챙겨 주세요.</p> : null}
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto bg-surface-2 p-2 sm:p-3">
           {!loading && !loadError && matches.length === 0 ? <div className="py-12 text-center font-bold text-ink-soft">현재 조회 조건에 맞는 상품이 없습니다.</div> : null}
