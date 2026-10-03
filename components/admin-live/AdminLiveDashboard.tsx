@@ -1716,6 +1716,7 @@ export default function AdminLiveDashboard() {
                   controlledOpen={activeMenu === "event"}
                   onRequestClose={() => { setActiveMenu("broadcast"); }}
                   activeBroadcastId={activeBroadcast?.id || null}
+                  selectedBroadcastId={filters.broadcast === "current" ? activeBroadcast?.id || null : broadcasts.find((broadcast) => broadcast.id === filters.broadcast)?.id || null}
                   filteredOrderGroupIds={filteredOrders.map((o) => String(o.groupId))}
                 />
               </div>
