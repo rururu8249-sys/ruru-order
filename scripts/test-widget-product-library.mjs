@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 
+import * as widgetLibrary from "../lib/widgetProductLibrary.ts";
+
 import {
   mergeWidgetHistory,
   filterAndSortWidgetHistory,
@@ -109,6 +111,52 @@ assert.deepEqual(
   selectWidgetRotationItems(candidates, { mode: "selected", paused: false, targets: [] }, targetOf, available),
   [],
   "an explicit empty selection must stay empty rather than reintroducing all products",
+);
+
+assert.equal(typeof widgetLibrary.selectableWidgetTargets, "function", "bulk selection helper must exist");
+assert.equal(typeof widgetLibrary.widgetRotationDraftChanged, "function", "rotation editor must detect unapplied changes");
+
+const libraryItems = [
+  { productId: "10", detailName: "", available: true, inBroadcast: true },
+  { productId: "20", detailName: "브라운", available: true, inBroadcast: true },
+  { productId: "30", detailName: "", available: false, inBroadcast: true },
+  { productId: "40", detailName: "", available: true, inBroadcast: false },
+];
+assert.deepEqual(
+  widgetLibrary.selectableWidgetTargets(libraryItems),
+  [{ productId: "10", detailName: "" }, { productId: "20", detailName: "브라운" }],
+  "bulk select must include only available products displayed in the current broadcast",
+);
+assert.deepEqual(
+  widgetLibrary.selectableWidgetTargets(libraryItems.slice(1, 3)),
+  [{ productId: "20", detailName: "브라운" }],
+  "search-scoped bulk select must affect only eligible search results",
+);
+
+const savedSelection = {
+  mode: "selected",
+  paused: false,
+  targets: [{ productId: "10", detailName: "" }, { productId: "20", detailName: "브라운" }],
+};
+assert.equal(
+  widgetLibrary.widgetRotationDraftChanged(savedSelection, "selected", new Set(["20|브라운", "10|"])),
+  false,
+  "selection order alone must not create a false unsaved-change warning",
+);
+assert.equal(
+  widgetLibrary.widgetRotationDraftChanged(savedSelection, "selected", new Set(["10|"])),
+  true,
+  "removing a selected product must create an unapplied change",
+);
+assert.equal(
+  widgetLibrary.widgetRotationDraftChanged(savedSelection, "all", new Set(["10|", "20|브라운"])),
+  true,
+  "switching from selected rotation to all-product rotation must require apply",
+);
+assert.equal(
+  widgetLibrary.widgetRotationDraftChanged({ mode: "all", paused: false, targets: [] }, "all", new Set(["10|"])),
+  false,
+  "draft product checks are irrelevant while the saved and draft modes are both all-product rotation",
 );
 
 console.log("widget product library tests passed");
