@@ -15,7 +15,7 @@ const ordinary = order(1, item(1));
 const late = order(2, item(2), { createdAt: '2026-10-01T01:00:00Z', paidAtFull: '2026-10-02T01:00:00Z' });
 const repick = order(3, item(3, { productName: '새 재킷', color: '아이보리', size: 'L', qty: 2, repickRequiredAt: '2026-10-03T03:00:00Z', repickBefore: { product_name: '재킷', color: '검정', size: 'M', qty: 1 } }));
 const missingTime = order(4, item(4), { paymentStatus: 'card_paid', paymentMethod: '카드결제', paidAt: null, paidAtFull: null });
-const result = buildPickingExportRows([ordinary, late, repick, missingTime], ['2', '3', '4']);
+const result = buildPickingExportRows([ordinary, late, repick, missingTime], ['2', '3', '4'], ['2', '3', '4']);
 
 assert.deepEqual(result.mainRows.map(row => row.itemId), ['2', '3', '4'], 'main sheet uses exactly the visible item IDs');
 assert.equal(result.mainRows[0].kind, '뒤늦게 결제');
@@ -34,6 +34,10 @@ assert.deepEqual(partitioned.repickRows.map(row => row.itemId), ['3']);
 const withOrdinary = buildPickingExportRows([ordinary, late, repick], ['1', '2', '3']);
 assert.equal(withOrdinary.mainRows.length, 3);
 assert.equal(withOrdinary.attentionRows.length, 2, 'ordinary rows stay off the attention sheet');
+
+const activeBroadcastMissingTime = buildPickingExportRows([missingTime], ['4'], []);
+assert.equal(activeBroadcastMissingTime.mainRows[0].kind, '일반', 'a selected active-broadcast card payment is ordinary work even when its legacy timestamp is missing');
+assert.equal(activeBroadcastMissingTime.attentionRows.length, 0, 'selected-broadcast work never leaks into the additional-work sheets');
 
 const workbookSource = fs.readFileSync(path.resolve('components/admin-live/adminLiveOrderExcelExport.ts'), 'utf8');
 for (const sheetName of ['오늘 챙길 전체', '뒤늦게 결제', '변경 후 재챙김']) {
