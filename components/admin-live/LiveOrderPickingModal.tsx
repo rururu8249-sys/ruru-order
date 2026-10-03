@@ -64,7 +64,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   const [viewMode, setViewMode] = useState<"batch" | "order">("batch");
   const [statusFilter, setStatusFilter] = useState<"all" | "unpicked" | "picked">("all");
   const [paymentFilter, setPaymentFilter] = useState<"paid" | "all" | "unpaid">("paid");
-  const [sortModes, setSortModes] = useState<{ batch: "name" | "remaining"; order: "name" | "remaining" | "oldest" }>({ batch: "name", order: "name" });
+  const [sortModes, setSortModes] = useState<{ batch: "name" | "remaining"; order: "name" | "remaining" | "oldest" | "newest" }>({ batch: "name", order: "name" });
   const [sortPickedIds, setSortPickedIds] = useState<Set<string>>(new Set());
   const [toolsOpen, setToolsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -299,7 +299,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   }
   const sortedGroups = [...grouped].sort(([ak, a], [bk, b]) => {
     const oldest = (group: typeof a) => Math.min(...group.rows.map(row => ts(row.panel.when)));
-    const primary = sortMode === "remaining" ? (remainingByGroup.get(bk) || 0) - (remainingByGroup.get(ak) || 0) : sortMode === "oldest" ? oldest(a) - oldest(b) : 0;
+    const newest = (group: typeof a) => Math.max(...group.rows.map(row => ts(row.panel.when)));
+    const primary = sortMode === "remaining" ? (remainingByGroup.get(bk) || 0) - (remainingByGroup.get(ak) || 0) : sortMode === "oldest" ? oldest(a) - oldest(b) : sortMode === "newest" ? newest(b) - newest(a) : 0;
     return primary || a.title.localeCompare(b.title, "ko", {numeric:true}) || ak.localeCompare(bk, "ko", {numeric:true});
   });
   const blocked = loading || saving || loadError;
@@ -357,7 +358,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
           </div>
           <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center [&_label]:flex [&_label]:items-center [&_label]:gap-1 [&_select]:!mt-0 [&_select]:!h-9">
             <label className="min-w-0 text-[11px] font-bold text-ink-soft"><span className="sr-only sm:not-sr-only sm:whitespace-nowrap">결제 범위</span><select aria-label="결제 범위" value={paymentFilter} onChange={event => {setPaymentFilter(event.target.value as typeof paymentFilter); setSortPickedIds(new Set(pickedIds));}} className="block h-9 w-full rounded-lg border border-line bg-surface px-2 text-[13px] text-ink"><option value="paid">결제완료만</option><option value="all">미결제 포함</option><option value="unpaid">미결제만</option></select></label>
-            <label className="min-w-0 text-[11px] font-bold text-ink-soft"><span className="sr-only sm:not-sr-only sm:whitespace-nowrap">정렬</span><select aria-label="정렬 방식" value={sortMode} onChange={event => {setSortModes(previous => ({...previous,[viewMode]:event.target.value})); setSortPickedIds(new Set(pickedIds));}} className="block h-9 w-full rounded-lg border border-line bg-surface px-2 text-[13px] text-ink"><option value="name">{viewMode === 'batch' ? '상품번호순' : '닉네임순'}</option>{viewMode === 'order' ? <option value="oldest">주문 오래된순</option> : null}<option value="remaining">남은 수량 많은순</option></select></label>
+            <label className="min-w-0 text-[11px] font-bold text-ink-soft"><span className="sr-only sm:not-sr-only sm:whitespace-nowrap">정렬</span><select aria-label="정렬 방식" value={sortMode} onChange={event => {setSortModes(previous => ({...previous,[viewMode]:event.target.value})); setSortPickedIds(new Set(pickedIds));}} className="block h-9 w-full rounded-lg border border-line bg-surface px-2 text-[13px] text-ink"><option value="name">{viewMode === 'batch' ? '상품명 ㄱㄴㄷ순' : '닉네임 ㄱㄴㄷ순'}</option>{viewMode === 'order' ? <><option value="oldest">주문 오래된순</option><option value="newest">주문 최신순</option></> : null}<option value="remaining">남은 수량 많은순</option></select></label>
             {sortMode === 'remaining' ? <button type="button" disabled={blocked} onClick={() => setSortPickedIds(new Set(pickedIds))} className="text-[12px] font-bold text-rose-deep">다시 정렬</button> : null}
             <input value={search} onChange={event => setSearch(event.target.value)} placeholder="상품번호 · 고객 검색" aria-label="상품번호 또는 고객 이름 검색" className="col-span-2 h-9 min-w-0 flex-1 rounded-lg border border-line px-3 text-[13px]" />
           </div>
