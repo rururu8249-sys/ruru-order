@@ -210,6 +210,15 @@ export function selectWidgetRotationItems<T>(
   });
 }
 
+export function widgetRotationShouldAdvance(
+  configInput: WidgetRotationConfig,
+  hasManualPin: boolean,
+  itemCount: number,
+): boolean {
+  const config = parseWidgetRotation(configInput);
+  return !hasManualPin && !config.paused && itemCount > 1;
+}
+
 export function parseWidgetLibraryRequest(value: unknown): WidgetLibraryRequest | null {
   const body = objectValue(value);
   if (!body) return null;

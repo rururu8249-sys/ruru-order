@@ -10,6 +10,7 @@ import {
   removeWidgetHistory,
   selectWidgetRotationItems,
   visibleWidgetHistory,
+  widgetRotationShouldAdvance,
   widgetRotationSettingKey,
 } from "../lib/widgetProductLibrary.ts";
 
@@ -89,5 +90,25 @@ assert.deepEqual(filterAndSortWidgetHistory(viewEntries, "", "frequent").map((en
 assert.deepEqual(filterAndSortWidgetHistory(viewEntries, "", "recent").map((entry) => entry.productId), ["3", "1", "2", "4", "5"]);
 assert.deepEqual(visibleWidgetHistory(viewEntries, false, 4).map((entry) => entry.productId), ["1", "2", "3", "4"]);
 assert.equal(visibleWidgetHistory(viewEntries, true, 4).length, 5);
+
+const pausedRotation = parseWidgetRotation(JSON.stringify({
+  mode: "selected",
+  paused: true,
+  targets: [{ productId: "20", detailName: "블랙" }, { productId: "20", detailName: "브라운" }],
+}));
+assert.equal(pausedRotation.paused, true);
+assert.deepEqual(
+  selectWidgetRotationItems(candidates, pausedRotation, targetOf, available).map((item) => item.id),
+  ["20-b", "20-a"],
+  "selected details must follow the operator's target order",
+);
+assert.equal(widgetRotationShouldAdvance(pausedRotation, false, 2), false, "paused selected rotation must not advance");
+assert.equal(widgetRotationShouldAdvance({ ...pausedRotation, paused: false }, true, 2), false, "manual pin must override rotation");
+assert.equal(widgetRotationShouldAdvance({ ...pausedRotation, paused: false }, false, 2), true);
+assert.deepEqual(
+  selectWidgetRotationItems(candidates, { mode: "selected", paused: false, targets: [] }, targetOf, available),
+  [],
+  "an explicit empty selection must stay empty rather than reintroducing all products",
+);
 
 console.log("widget product library tests passed");

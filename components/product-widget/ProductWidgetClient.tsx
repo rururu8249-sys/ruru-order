@@ -6,13 +6,20 @@
 // - 주문 들어오면 "🛒 ○○님 주문!" 2~3초 표시 후 사라짐 (orders INSERT 실시간)
 // - 배경 투명(크로마키). 읽기 전용 — 돈/주문 로직 건드리지 않음.
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { resolveProductImageUrl } from "@/components/admin-live/quick-product/productImageUrl";
 import { getActiveBroadcast, loadAdminLiveBroadcasts } from "@/components/admin-live/liveBroadcastController";
 import { expandForWidget } from "@/lib/productDetailModel";
 import { splitOptionText } from "@/lib/optionSplit";
 import { compressSizeList } from "@/lib/sizeRange";
+import {
+  parseWidgetRotation,
+  selectWidgetRotationItems,
+  widgetRotationSettingKey,
+  widgetRotationShouldAdvance,
+  type WidgetRotationConfig,
+} from "@/lib/widgetProductLibrary";
 
 type AnyProduct = Record<string, any>;
 
@@ -193,6 +200,12 @@ function isSoldOutWidgetProduct(p: AnyProduct | null): boolean {
   return Number.isFinite(stock) && stock <= 0;
 }
 
+function isAvailableWidgetProduct(p: AnyProduct | null): boolean {
+  if (!p) return false;
+  const status = String(p.status ?? p.product_status ?? "").trim().toLowerCase();
+  return status !== "deleted" && status !== "숨김" && !isSoldOutWidgetProduct(p);
+}
+
 // 주문성공/입금완료/카드결제완료 폭죽(표시 전용) — 카드 밖에서 사방으로 시원하게 퍼진다.
 //   [2026-07-09] 방송에서 잘 보이도록 입자 14 → 26개, 크기·비산거리 확대.
 const CONFETTI_PIECES = [
@@ -227,7 +240,9 @@ const CONFETTI_PIECES = [
 export default function ProductWidgetClient() {
   const [pinned, setPinned] = useState<AnyProduct | null>(null);
   const [rotation, setRotation] = useState<AnyProduct[]>([]);
+  const [rotationConfig, setRotationConfig] = useState<WidgetRotationConfig>({ mode: "all", paused: false, targets: [] });
   const [rotIndex, setRotIndex] = useState(0);
+  const rotationSignatureRef = useRef("");
   // 이벤트 토스트 — 여러 개 동시 도착 가능 → 큐로 순서대로 3초씩 표시
   // [2026-07-06] 문자열 → 구조화(제목/닉네임/내용): 상품 카드를 살짝 덮는 축하 오버레이로 표시
   const [toastQueue, setToastQueue] = useState<ToastItem[]>([]);
@@ -238,6 +253,15 @@ export default function ProductWidgetClient() {
   const [confettiOn, setConfettiOn] = useState(false);
   // 주문/취소 실시간 이벤트가 오면 상품(재고)을 즉시 다시 읽기 위한 핸들
   const reloadProductsRef = useRef<null | (() => void)>(null);
+
+  const applyRotation = useCallback((next: AnyProduct[]) => {
+    const signature = next.map((item) => `${String(item?.__parent_product_id ?? item?.id ?? item?.product_id ?? "")}|${String(item?.__detail_name || "").trim()}`).join(";");
+    if (signature !== rotationSignatureRef.current) {
+      rotationSignatureRef.current = signature;
+      setRotIndex(0);
+    }
+    setRotation(next);
+  }, []);
 
   // [2026-09-11 사장님 지적 «사진이 위젯 사이즈에 자동조절 안 되고 잘린다»]
   //   ① 사진: object-fit cover → contain (아래 img). 어떤 비율이든 카드 안에 통째로 들어온다.
@@ -305,7 +329,8 @@ export default function ProductWidgetClient() {
         if (active && (active as AnyProduct).widget_card_enabled === false) {
           if (alive) {
             setPinned(null);
-            setRotation([]);
+            applyRotation([]);
+            setRotationConfig({ mode: "all", paused: false, targets: [] });
           }
           return;
         }
@@ -315,28 +340,51 @@ export default function ProductWidgetClient() {
         //   활성 방송이 없거나 진열 0개면 카드 없음(배너는 별개로 항상 표시). 표시 전용 — 고정 저장/DB 무변경.
         let ids: string[] = [];
         if (active?.id) {
-          const { data: links } = await supabase
-            .from("broadcast_products")
-            .select("product_id, sort_order")
-            .eq("broadcast_id", active.id)
-            .order("sort_order", { ascending: true });
+          const [{ data: links }, { data: rotationSetting }] = await Promise.all([
+            supabase
+              .from("broadcast_products")
+              .select("product_id, sort_order")
+              .eq("broadcast_id", active.id)
+              .order("sort_order", { ascending: true }),
+            supabase
+              .from("settings")
+              .select("value")
+              .eq("key", widgetRotationSettingKey(String(active.id)))
+              .maybeSingle(),
+          ]);
           ids = ((links as { product_id: unknown }[]) || []).map((r) => String(r.product_id));
           const byId = new Map(list.map((x) => [String(x?.id ?? x?.product_id), x]));
-          const rot = ids.flatMap((id) => { const parent = byId.get(id); return parent ? (expandForWidget(parent) as AnyProduct[]) : []; }).filter((item) => !isSoldOutWidgetProduct(item));
-          if (alive) setRotation(rot);
+          const allBroadcastItems = ids.flatMap((id) => { const parent = byId.get(id); return parent ? (expandForWidget(parent) as AnyProduct[]) : []; });
+          const nextRotationConfig = parseWidgetRotation(rotationSetting?.value);
+          const rot = selectWidgetRotationItems(
+            allBroadcastItems,
+            nextRotationConfig,
+            (item) => ({
+              productId: String(item?.__parent_product_id ?? item?.id ?? item?.product_id ?? ""),
+              detailName: String(item?.__detail_name || "").trim(),
+            }),
+            isAvailableWidgetProduct,
+          );
+          const availableBroadcastItems = allBroadcastItems.filter(isAvailableWidgetProduct);
+          if (alive) {
+            applyRotation(rot);
+            setRotationConfig(nextRotationConfig);
+          }
 
           const pinMode = String((active as AnyProduct | null)?.widget_pin_mode || "auto");
           const pinProductId = String((active as AnyProduct | null)?.widget_pin_product_id ?? "");
           const pinDetailName = String((active as AnyProduct | null)?.widget_pin_detail_name || "").trim();
-          const pinnedInActive = pinMode === "pin" && pinProductId ? rot.find((item) => { const parentId=String(item?.__parent_product_id ?? item?.id ?? item?.product_id ?? ""); const detail=String(item?.__detail_name || "").trim(); return parentId===pinProductId && (!pinDetailName || detail===pinDetailName); }) || null : null;
+          // 수동 고정은 선택 순환 목록 밖 상품이어도 현재 방송에 담겨 있으면 항상 우선한다.
+          const pinnedInActive = pinMode === "pin" && pinProductId ? availableBroadcastItems.find((item) => { const parentId=String(item?.__parent_product_id ?? item?.id ?? item?.product_id ?? ""); const detail=String(item?.__detail_name || "").trim(); return parentId===pinProductId && (!pinDetailName || detail===pinDetailName); }) || null : null;
           if (alive) setPinned(pinnedInActive);
         } else if (alive) {
-          setRotation([]);
+          applyRotation([]);
+          setRotationConfig({ mode: "all", paused: false, targets: [] });
           setPinned(null);
           // 미리보기: 활성 방송이 없을 때만, 사진 있는 최근 상품 1개(품절 아닌 것)를 고정처럼 띄운다
           if (previewMode) {
             const sample = [...list]
-              .filter((x) => imageOf(x) && !isSoldOutWidgetProduct(x))
+              .filter((x) => imageOf(x) && isAvailableWidgetProduct(x))
               .sort((a, b) => String(b?.created_at || "").localeCompare(String(a?.created_at || "")))[0] || null;
             setPinned(sample);
           }
@@ -358,16 +406,16 @@ export default function ProductWidgetClient() {
       reloadProductsRef.current = null;
       window.clearInterval(timer);
     };
-  }, [previewMode]);
+  }, [applyRotation, previewMode]);
 
   // 순환 자동 전환 (고정상품 없을 때만)
   useEffect(() => {
-    if (pinned || rotation.length <= 1) return;
+    if (!widgetRotationShouldAdvance(rotationConfig, Boolean(pinned), rotation.length)) return;
     const timer = window.setInterval(() => {
       setRotIndex((i) => (i + 1) % rotation.length);
-    }, 4500);
+    }, 5000);
     return () => window.clearInterval(timer);
-  }, [pinned, rotation.length]);
+  }, [pinned, rotation.length, rotationConfig]);
 
   // 실시간 이벤트 토스트: 주문(INSERT) / 입금확인·카드결제완료(UPDATE). 실제 컬럼명 기준.
   useEffect(() => {
@@ -471,7 +519,7 @@ export default function ProductWidgetClient() {
     return () => window.clearTimeout(t);
   }, [confettiKey, confettiOn]);
 
-  const current = pinned || rotation[rotIndex] || null;
+  const current = pinned || (rotation.length > 0 ? rotation[rotIndex % rotation.length] : null);
   const img = imageOf(current);
 
   // [2026-07-12 사장님 지침] 간헐적 이미지 미표시 해결 — 불안정 회선(중국 현장 등)에서 저장소 이미지
@@ -530,7 +578,7 @@ export default function ProductWidgetClient() {
 
         {current ? (
           <div
-            key={String(current?.id ?? rotIndex)}
+            key={currentKey || String(rotIndex)}
             style={{
               position: "relative",
               width: "100%",
@@ -544,7 +592,7 @@ export default function ProductWidgetClient() {
               //   → 카드 배경 없앰. 반투명은 사진칸·띠에 «한 겹(50%)»만.
               background: "transparent",
               color: "#fff",
-              animation: "ruruWidgetIn 0.5s ease",
+              animation: "ruruWidgetIn 0.34s cubic-bezier(0.22, 1, 0.36, 1)",
             }}
           >
             {/* 사진칸 — [2026-09-11 사장님 지적 «사진이 잘린다·글자가 사진을 덮는다»]
@@ -777,7 +825,7 @@ export default function ProductWidgetClient() {
       </div>
 
       <style>{`
-        @keyframes ruruWidgetIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes ruruWidgetIn { from { opacity: 0; transform: translate3d(8px, 0, 0) scale(0.992); } to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); } }
         @keyframes ruruToastPop {
           0% { opacity: 0; transform: scale(0.8) translateY(8px); }
           60% { opacity: 1; transform: scale(1.05) translateY(0); }
@@ -786,6 +834,9 @@ export default function ProductWidgetClient() {
         @keyframes ruruConfetti {
           0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
           100% { transform: translate(var(--tx), var(--ty)) rotate(var(--r)); opacity: 0; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          [style*="ruruWidgetIn"] { animation-duration: 0.01ms !important; }
         }
       `}</style>
     </div>
