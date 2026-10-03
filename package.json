@@ -17,6 +17,7 @@
     "test:picking": "node --import ./scripts/_ts-resolve.mjs scripts/test-order-picking.mjs && node scripts/test-order-picking-ui.mjs",
     "test:picking-workspace": "node --import ./scripts/_ts-resolve.mjs scripts/test-order-picking-workspace.mjs",
     "test:picking-repick": "node scripts/test-order-repick-migration.mjs",
+    "test:picking-scope": "node --import ./scripts/_ts-resolve.mjs scripts/test-order-picking-scope-loader.mjs",
     "test:combine-shipping": "node scripts/simulate-combine-shipping.mjs",
     "guard:ui": "node scripts/guard-admin-ui.js",
     "guard": "node scripts/guard-bankda-cron.js && node scripts/guard-bankda-admin-live.js && node scripts/guard-admin-ui.js && node scripts/guard-option-split.js && node scripts/guard-payster-open.js && npm run guard:product-search"
