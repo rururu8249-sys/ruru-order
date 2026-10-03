@@ -219,4 +219,27 @@ assert.deepEqual(writes.at(-1).ids,[2],'bulk touches only matching unpaid-in-wor
 assert.equal(check('고객2').props['aria-checked'],true);
 assert.equal(rows.get(3).picked_at,null,'unpaid row never modified');
 await act(async()=>tree.unmount());
-console.log('picking UI integration passed including stable counters and scoped bulk completion');
+
+// Multi-broadcast and exception workflow: quick ranges, date filter, attention-only tab,
+// before→current detail, and no unsafe bulk completion for attention rows.
+for (const id of [8,9]) rows.set(id,{id,picked_at:null});
+const attentionFixture = [
+  order(8,'paid',[{...item(8,1,'L'),repickRequiredAt:'2026-10-04T01:00:00Z',repickBefore:{product_name:'재킷',color:'검정',size:'M',qty:1}}],{broadcastId:'b-today',createdAt:'2026-10-03T01:00:00Z',paidAtFull:'2026-10-03T02:00:00Z'}),
+  order(9,'paid',[item(9,1,'S')],{broadcastId:'b-yesterday',createdAt:'2026-10-01T01:00:00Z',paidAtFull:'2026-10-03T02:00:00Z'}),
+];
+const calendar=[{id:'b-today',dateKey:'2026-10-04',label:'오늘 방송'},{id:'b-yesterday',dateKey:'2026-10-03',label:'어제 방송'}];
+await act(async()=>{tree=Renderer.create(React.createElement(Modal,{orders:attentionFixture,broadcastCalendar:calendar,filterLabel:'검수',onClose(){}}));});
+assert(button('오늘+어제'),'today+yesterday scope shortcut exists');
+assert(button('선택 해제'),'scope can return to the incoming list');
+assert(select('결제일 기준'),'payment-date filtering is explicit');
+assert(button('추가 챙김'),'attention tab exists');
+await act(async()=>button('추가 챙김').props.onClick());
+assert.equal(checks().length,2,'late-paid and repick items appear in attention tab');
+assert(text().includes('변경 후 재챙김') && text().includes('검정 / M') && text().includes('→'),'repick shows before to current details');
+assert.equal(button('전체 챙김').props.disabled,true,'attention rows cannot be bulk-completed');
+await act(async()=>tree.unmount());
+
+const modalSource=fs.readFileSync(path.join(root,'components/admin-live/LiveOrderPickingModal.tsx'),'utf8');
+assert(modalSource.includes('/api/admin-live/picking-workspace'),'scope refresh uses the complete server loader');
+assert(modalSource.includes('setScopeError') && modalSource.includes('setWorkspaceOrders'),'scope failures are surfaced while successful results replace the list');
+console.log('picking UI integration passed including multi-broadcast attention workflow and safe bulk completion');
