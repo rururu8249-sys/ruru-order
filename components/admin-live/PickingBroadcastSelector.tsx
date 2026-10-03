@@ -14,6 +14,7 @@ type Props = {
 
 export default function PickingBroadcastSelector({ items, selectedIds, appliedIds, loading, onChange, onApply }: Props) {
   const selected = new Set(selectedIds);
+  const appliedItems = appliedIds.map((id) => items.find((item) => item.id === id)).filter((item): item is BroadcastCalendarItem => Boolean(item));
   const today = kstDateKey(new Date()) || "";
   const yesterdayDate = new Date();
   yesterdayDate.setDate(yesterdayDate.getDate() - 1);
@@ -43,6 +44,10 @@ export default function PickingBroadcastSelector({ items, selectedIds, appliedId
         ))}
         {items.length === 0 ? <span className="text-[11px] text-ink-mute">선택 가능한 방송 기록이 없습니다.</span> : null}
       </div>
+      {appliedItems.length > 0 ? <div aria-label="적용 중인 방송" className="mt-2 flex flex-wrap items-center gap-1 border-t border-line pt-2">
+        <strong className="text-[11px] font-black text-ink-soft">현재 적용:</strong>
+        {appliedItems.map((item) => <span key={item.id} className="rounded-full bg-rose-deep px-2 py-1 text-[11px] font-black text-white">{item.label}</span>)}
+      </div> : null}
     </section>
   );
 }

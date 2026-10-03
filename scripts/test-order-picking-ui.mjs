@@ -231,6 +231,23 @@ const calendar=[{id:'b-today',dateKey:'2026-10-04',label:'오늘 방송'},{id:'b
 await act(async()=>{tree=Renderer.create(React.createElement(Modal,{orders:attentionFixture,broadcastCalendar:calendar,filterLabel:'검수',onClose(){}}));});
 assert(button('오늘+어제'),'today+yesterday scope shortcut exists');
 assert(button('선택 해제'),'scope can return to the incoming list');
+const scopeRequests=[];
+let failScope=false;
+const originalFetch=globalThis.fetch;
+globalThis.fetch=async (_url,options)=>{
+  scopeRequests.push(JSON.parse(options.body));
+  return failScope ? {ok:false,json:async()=>({ok:false,message:'조회 실패'})} : {ok:true,json:async()=>({ok:true,orders:attentionFixture})};
+};
+await act(async()=>button('오늘+어제').props.onClick());
+await act(async()=>button('선택 적용').props.onClick());
+assert.deepEqual(scopeRequests.at(-1).broadcastIds,['b-today','b-yesterday'],'today+yesterday sends both real broadcast IDs');
+assert.equal(tree.root.findByProps({'aria-label':'적용 중인 방송'}).findAllByType('span').length,2,'applied scope is shown as named chips');
+failScope=true;
+await act(async()=>button('오늘').props.onClick());
+await act(async()=>button('선택 적용').props.onClick());
+assert.equal(checks().length,2,'failed scope refresh retains the previous usable rows');
+assert(text().includes('범위를 바꾸지 않았습니다'),'failed scope refresh explains that the old scope is retained');
+globalThis.fetch=originalFetch;
 assert(select('결제일 기준'),'payment-date filtering is explicit');
 assert(button('추가 챙김'),'attention tab exists');
 await act(async()=>button('추가 챙김').props.onClick());
