@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+const source=fs.readFileSync('components/admin-live/AdminLiveEventRoulettePanel.tsx','utf8');
+const start=source.indexOf('  const startSurvivalEvent = async');
+const end=source.indexOf('\n  const startRouletteOneClick',start);
+let created;
+const context={mode:'live',broadcastId:'deleted-legacy-broadcast',liveBroadcastId:'selected-current-broadcast',finalParticipants:[{nickname:'a',orderIds:['1']},{nickname:'b',orderIds:['2']}],survivorCount:1,fixedSurvivorNicknames:[],eventTab:'survival',giftPointAmount:'',giftType:'custom',winnerNote:'선물',sourceDate:'2026-10-03',title:'검수',participantSource:'auto',excludeDailyDup:false,ticketRuleBody:{},setCurrentEvent(){},setSpinning(){},registerGiftResult(){},showAdminToast(message,tone){assert.notEqual(tone,'error',message);},loadEventsAndWinners:async()=>{},requestJson:async(_url,opts)=>{const body=JSON.parse(opts.body);if(body.action==='create_event'){created=body;return {ok:true,event:{id:'event'}};}return {ok:true,event:{id:'event'},survivors:['a'],winners:[]};}};
+vm.createContext(context);
+vm.runInContext(ts.transpileModule(source.slice(start,end)+'\nglobalThis.run=startSurvivalEvent;', {compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,context);
+await context.run('live');
+assert.equal(created.broadcastId,'selected-current-broadcast','a stale bootstrap state must not choose the reward broadcast');
+console.log('PASS actual survival create request uses selected broadcast despite stale bootstrap state');
