@@ -237,6 +237,8 @@ await act(async()=>button('추가 챙김').props.onClick());
 assert.equal(checks().length,2,'late-paid and repick items appear in attention tab');
 assert(text().includes('변경 후 재챙김') && text().includes('검정 / M') && text().includes('→'),'repick shows before to current details');
 assert.equal(button('전체 챙김').props.disabled,true,'attention rows cannot be bulk-completed');
+await act(async()=>check('고객8').props.onClick());
+assert.equal(checks().length,1,'individually confirmed attention leaves the open-attention tab immediately');
 await act(async()=>tree.unmount());
 
 const modalSource=fs.readFileSync(path.join(root,'components/admin-live/LiveOrderPickingModal.tsx'),'utf8');

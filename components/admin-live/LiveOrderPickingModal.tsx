@@ -139,7 +139,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
           : rawItems.map((it) => {
               const opt = formatOrderOptionText(it.color, it.size) || stripNoneOptionParts(it.optionText);
               const productName = clean(it.productName) || "상품";
-              return { id: String(it.id), productId: clean(it.productId), text: productName + (opt ? ` (${opt})` : ""), productName, optionText: opt, color: clean(it.color), size: clean(it.size), qty: Number(it.qty || 1), amount: Number(it.amount || 0), attentionKind: classifyPickingAttention(o, it), repickBefore: it.repickBefore, attentionAt: it.repickRequiredAt || o.paidAtFull };
+              return { id: String(it.id), productId: clean(it.productId), text: productName + (opt ? ` (${opt})` : ""), productName, optionText: opt, color: clean(it.color), size: clean(it.size), qty: Number(it.qty || 1), amount: Number(it.amount || 0), attentionKind: classifyPickingAttention(o, { ...it, pickedAt: null }), repickBefore: it.repickBefore, attentionAt: it.repickRequiredAt || o.paidAtFull };
             });
       const totalQty = items.reduce((s, it) => s + (Number.isFinite(it.qty) ? it.qty : 1), 0);
       const phone = clean(o.phone).replace(/[^0-9]/g, ""); // 같은 고객 판정용(숫자만)
@@ -315,7 +315,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
 
   const allRows = scopedPanels
     .flatMap(panel => panel.items.map(item => ({ panel, item })))
-    .filter(({ item }) => workspaceTab === "all" || item.attentionKind !== null);
+    .filter(({ item }) => workspaceTab === "all" || (item.attentionKind !== null && !pickedIds.has(item.id)));
   const { total, got } = pickingProgress(allRows.map(({ item }) => ({ qty: item.qty, pickedAt: pickedIds.has(item.id) })));
   const q = search.trim();
   const matches = allRows.filter(({ panel, item }) =>
@@ -364,7 +364,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
           {viewMode === "order" ? <div className="break-words text-sm font-black text-ink">{item.productName}</div> : null}
           <div className="break-words text-sm font-black text-rose-deep">{item.optionText || "기본 옵션"}</div>
           <div className="mt-1 text-[12px] font-bold text-ink-soft">{panel.nickname}{panel.name && panel.name !== panel.nickname ? ` · ${panel.name}` : ""} · 주문 #{item.id}</div>
-          {item.attentionKind === "repick" ? (
+          {!done && item.attentionKind === "repick" ? (
             <div className="mt-1 rounded-lg bg-warn-bg px-2 py-1 text-[11px] font-black text-[var(--color-danger-tx)]">
               변경 후 재챙김 · {[
                 item.repickBefore?.product_name,
@@ -372,7 +372,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
                 item.repickBefore?.qty ? `${item.repickBefore.qty}개` : "",
               ].filter(Boolean).join(" · ")} → {item.productName} · {item.optionText || "기본 옵션"} · {item.qty}개
             </div>
-          ) : item.attentionKind === "late_paid" ? (
+          ) : !done && item.attentionKind === "late_paid" ? (
             <div className="mt-1 inline-block rounded-lg bg-info-bg px-2 py-1 text-[11px] font-black text-[var(--color-info-tx)]">결제 후 챙김 · 뒤늦게 결제 확인</div>
           ) : null}
           {!panel.paid ? <span className="mt-1 inline-block rounded bg-warn-bg px-2 py-1 text-[12px] font-black text-[var(--color-danger-tx)]">미결제 · 조회만 가능</span> : null}

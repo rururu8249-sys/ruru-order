@@ -449,7 +449,15 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
     orderedOrders.sort((a, b) => orderTime(a) - orderTime(b));
   }
 
-  const builtRows = buildPickingExportRows(orderedOrders, meta.visibleItemIds);
+  const exportStateOrders = pickedIds ? orderedOrders.map((order) => ({
+    ...order,
+    items: (order.items || []).map((item) => pickedIds.has(String(item.id)) ? {
+      ...item,
+      pickedAt: item.pickedAt || "confirmed-in-current-workspace",
+      repickResolvedAt: item.repickRequiredAt ? item.repickRequiredAt : item.repickResolvedAt,
+    } : item),
+  })) : orderedOrders;
+  const builtRows = buildPickingExportRows(exportStateOrders, meta.visibleItemIds);
   const mainByItemId = new Map(builtRows.mainRows.map((row) => [row.itemId, row]));
   const visible = meta.visibleItemIds ? new Set(meta.visibleItemIds.map(String)) : null;
   type RowWithKey = { row: WorkbookRow; unpaid: boolean; attention: boolean; product: string; color: string; size: string; time: number };
