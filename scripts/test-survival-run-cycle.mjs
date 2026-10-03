@@ -101,6 +101,5 @@ console.log('PASS real 8-frame run cycle, shared age, finite inputs, loop, uncha
 const Reaction=createUiLoader()('components/event-shared/SurvivalReaction.tsx').default;
 const reaction=Reaction({type:'wave',index:1,total:3,x:50,y:50,ageMs:240});
 const body=[reaction.props.children].flat().find(c=>c?.props?.['data-reaction-body']!==undefined);
-const findCharacter=n=>Array.isArray(n)?n.map(findCharacter).find(Boolean):n&&typeof n==='object'?(typeof n.type==='function'&&n.props.index===1?n:findCharacter(n.props.children)):undefined;
-const character=findCharacter(body.props.children);
-assert.equal(character.props.elapsedMs,240,'reaction character must not freeze at frame zero');
+const hasCharacter=n=>Array.isArray(n)?n.some(hasCharacter):n&&typeof n==='object'?(typeof n.type==='function'&&n.props.index===1)||hasCharacter(n.props.children):false;
+assert(!hasCharacter(body.props.children),'eliminated reaction must not add another countable character');

@@ -11,9 +11,8 @@ for(const type of ['lightning','wave','wind','hail','meteor']){
  assert.equal(walk(Reaction({type,index:9,total:100,x:43,y:61,ageMs:900})).find(n=>n.props?.['data-hazard-contact']===type).props.style.opacity,0);
 }
 console.log('PASS five victim-local physical contacts and completed fade');
-const shocked=walk(Reaction({type:'lightning',index:9,total:100,x:43,y:61,ageMs:300})).find(n=>n.props?.['data-reaction-character']);
-assert.equal(shocked?.props.style.opacity,0,'smiling running artwork must not remain visible underneath the electrocution skeleton');
-const untouched=walk(Reaction({type:'wave',index:9,total:100,x:43,y:61,ageMs:300})).find(n=>n.props?.['data-reaction-character']);
-assert.equal(untouched?.props.style.opacity,1,'lightning treatment must not hide other disaster reactions');
+for(const type of ['lightning','wave','wind','hail','meteor']){
+ assert(!walk(Reaction({type,index:9,total:100,x:43,y:61,ageMs:300})).some(n=>typeof n.props?.['data-survival-character']==='number'),'eliminated '+type+' effect cannot add a character beyond the remaining-person count');
+}
 const waveContact=walk(Reaction({type:'wave',index:9,total:100,x:43,y:61,ageMs:100})).find(n=>n.props?.['data-hazard-contact']==='wave');
 assert(!walk(waveContact).some(n=>n.type==='path'&&n.props.fill==='#1683ba'),'local water contact must not paste opaque clipped wave panels over the scene');

@@ -1,6 +1,6 @@
 "use client";
 import SurvivalDisasterSprite from './SurvivalDisasterSprite';
-import SurvivalCharacter,{survivalCharacterSize} from './SurvivalCharacter';
+import {survivalCharacterSize} from './SurvivalCharacter';
 
 export function SurvivalReactionStyles(){return <style>{`
 @keyframes reactionZap{0%{transform:scale(.9) rotate(-6deg);opacity:1}18%{transform:scale(1.12) rotate(7deg)}36%{transform:scale(1.05) rotate(-7deg)}65%{transform:translateY(-7px) rotate(5deg);opacity:1}100%{transform:translateY(28px) rotate(35deg) scale(.6);opacity:0}}
@@ -25,7 +25,9 @@ function ShockSkeleton(){return <svg data-reaction-xray viewBox="0 0 100 130" ar
  <g fill="#302119"><ellipse cx="39" cy="24" rx="5" ry="6"/><ellipse cx="56" cy="24" rx="5" ry="6"/><path d="M46 30L42 35H50Z"/><path d="M45 37H47V43H45ZM51 37H53V43H51Z"/></g>
 </svg>}
 
-export default function SurvivalReaction({type,index,total,x,y,ageMs=0,castSeed,speech}:{type:string;index:number;total:number;x:number;y:number;ageMs?:number;castSeed?:number;speech?:string}){
+type SurvivalReactionProps={type:string;index:number;total:number;x:number;y:number;ageMs?:number;speech?:string};
+
+export default function SurvivalReaction({type,index,total,x,y,ageMs=0,speech}:SurvivalReactionProps){
  const animation=type==='wave'?'reactionWash':type==='wind'?'reactionWind':type==='hail'?'reactionHail':type==='meteor'?'reactionMeteor':'reactionZap';
  const size=survivalCharacterSize(total);
  return <div data-survival-reaction={type} data-event-local-age style={{position:'absolute',left:`${x}%`,top:`${y}%`,transform:'translate(-50%,-50%)',width:size,aspectRatio:'1',zIndex:27,pointerEvents:'none'}}>
@@ -44,7 +46,6 @@ export default function SurvivalReaction({type,index,total,x,y,ageMs=0,castSeed,
   {speech&&ageMs<=220?<span data-survival-speech="impact" style={{position:'absolute',left:'50%',bottom:'100%',transform:'translateX(-50%)',whiteSpace:'nowrap',background:'#fff9e7',color:'#241520',border:'3px solid #241520',borderRadius:'12px 12px 12px 2px',padding:'5px 9px',fontWeight:900,fontSize:'clamp(18px,3.4cqw,28px)',boxShadow:'0 3px 0 #241520',zIndex:32}}>{speech}</span>:null}
   <div data-reaction-body style={{position:'relative',width:'100%',height:'100%',animation:`${animation} ${['lightning','wave','wind'].includes(type)?'.78':'.62'}s ease-out both`}}>
    {type==='lightning'?<svg viewBox="0 0 100 100" aria-hidden="true" style={{position:'absolute',inset:'-35%',width:'170%',height:'170%',animation:'reactionRing .78s ease-out both'}}><path d="M50 0L57 27L77 9L70 35L100 28L77 48L99 63L72 63L83 92L59 75L48 100L41 75L16 92L29 65L0 66L24 49L1 30L32 35L21 8L43 27Z" fill="#ffe733"/></svg>:null}
-   <div data-reaction-character style={{width:'100%',height:'100%',filter:type==='meteor'&&ageMs>=100?'brightness(.2) sepia(1)':undefined,opacity:type==='lightning'&&ageMs>=140&&ageMs<500?0:1}}><SurvivalCharacter index={index} total={total} castSeed={castSeed} sizeOverride="100%" moving pose="run" elapsedMs={ageMs}/></div>
    {type==='lightning'?<ShockSkeleton/>:null}
    {type==='wave'?<svg viewBox="0 0 100 100" aria-hidden="true" style={{position:'absolute',inset:'-20%',width:'140%',height:'140%'}}><path d="M0 78Q25 62 43 78T100 76" fill="none" stroke="#bff6ff" strokeWidth="6"/>{[10,28,70,90].map((cx,i)=><circle key={cx} cx={cx} cy={18+i*14} r={4+i%2*2} fill="none" stroke="#c9f9ff" strokeWidth="2"/>)}</svg>:null}
    {type==='hail'?<svg viewBox="0 0 100 100" aria-hidden="true" style={{position:'absolute',inset:'-35% -15%',width:'130%',height:'130%',animation:'reactionRing .62s ease-out both'}}><path d="M50 2L56 19L75 15L62 31L75 44L57 40L50 58L43 40L25 44L38 31L25 15L44 19Z" fill="#ffef72" stroke="#ee9e39" strokeWidth="2"/><path d="M8 23L12 31L20 32L14 38L15 46L8 42L1 46L3 38L0 32L5 31M89 30L93 38L100 39L95 45L96 52L89 49L82 52L84 45L79 39L87 38" fill="#fff5a1"/></svg>:null}

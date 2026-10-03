@@ -361,7 +361,7 @@ export default function SurvivalLiveWidget() {
   // 클라 마운트 전(SSR 시점)에는 아무것도 안 그림 → Math.random 기반 렌더의 hydration 불일치 방지.
   if (!mounted) return null;
   // 실제 모드(OBS): 서버에 확정된 이벤트가 없으면 완전 투명(방송 화면에 빈 박스 안 뜨게).
-  if(!preview&&!shared.event)return <EventClockStyles elapsedMs={0} sync={shared.sync}/>;
+  if(!preview&&!shared.event)return <EventClockStyles elapsedMs={0} sync={shared.sync} showStatus={false}/>;
   const decorRandom=seededRandom(eventSeed(shared.key||"demo"));
 
   return (
@@ -374,7 +374,7 @@ export default function SurvivalLiveWidget() {
       <link rel="preload" as="image" href="/event-art/survival-tsunami-v2.png"/>
       <link rel="preload" as="image" href="/event-art/survival-athletes-run-cycle-v1.png"/>
       <link rel="preload" as="image" href="/event-art/survival-artists-run-cycle-v1.png"/>
-      <EventClockStyles elapsedMs={shared.elapsed} localAgeMs={fx?shared.elapsed-fx.key:undefined} sync={shared.sync}/>
+      <EventClockStyles elapsedMs={shared.elapsed} localAgeMs={fx?shared.elapsed-fx.key:undefined} sync={shared.sync} showStatus={preview}/>
       <SurvivalArtStyles/>
       <SurvivalReactionStyles/>
       <style>{`
@@ -493,7 +493,7 @@ export default function SurvivalLiveWidget() {
             animation: `confetti ${1.4 + decorRandom() * 1.2}s linear ${decorRandom() * 1.1}s infinite` }} />
         ))}
 
-        {bursts.map(b=><SurvivalReaction castSeed={castSeed} key={b.id} type={b.dtype} index={Number(b.id.split("-")[0])} total={Math.max(8,aliveCount)} x={b.x} y={b.y} speech={dialogue.find(d=>d.impact&&d.actorId===Number(b.id.split('-')[0]))?.text} ageMs={fx?Math.max(0,(preview?demoElapsed:shared.elapsed)-fx.key):0}/>)}
+        {bursts.map(b=><SurvivalReaction key={b.id} type={b.dtype} index={Number(b.id.split("-")[0])} total={Math.max(8,aliveCount)} x={b.x} y={b.y} speech={dialogue.find(d=>d.impact&&d.actorId===Number(b.id.split('-')[0]))?.text} ageMs={fx?Math.max(0,(preview?demoElapsed:shared.elapsed)-fx.key):0}/>)}
         </div>
 
         {done && <SurvivalWinnerLineup winners={winners} castSeed={castSeed} gift={preview?'':String(shared.event?.winner_note||'')}/>}
