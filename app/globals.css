@@ -401,6 +401,12 @@ body {
       올렸을 때 진해지기만 한다)
    · 위치·동작은 app/order/page.tsx 의 대표사진 블록(.ru-photo-stage)에 있다. */
 .ru-photo-nav { display: none; }
+.ru-photo-track { scroll-behavior: smooth; }
+.ru-photo-track::-webkit-scrollbar { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ru-photo-track { scroll-behavior: auto; }
+}
 
 @media (hover: hover) and (pointer: fine) {
   .ru-photo-nav {

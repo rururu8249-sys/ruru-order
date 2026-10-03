@@ -75,6 +75,7 @@ import OrderPageShell from "@/components/order/OrderPageShell";
 import OrderPriceSummaryBox from "@/components/order/OrderPriceSummaryBox";
 import OrderCustomerInfoIntro from "@/components/order/OrderCustomerInfoIntro";
 import OrderCustomerInfoFormCard from "@/components/order/OrderCustomerInfoFormCard";
+import ProductPhotoCarousel from "@/components/order/ProductPhotoCarousel";
 import CustomerPaymentGuideBottomSheet from "@/components/customer/CustomerPaymentGuideBottomSheet";
 import CustomerNoteUnreadBadge from "@/components/customer/CustomerNoteUnreadBadge";
 import CustomerPointGiftPopup from "@/components/customer/CustomerPointGiftPopup";
@@ -1736,12 +1737,6 @@ export default function OrderPage() {
   // [2026-09-20 사장님 「타사이트처럼 사진 크게」] 대표사진은 본문 맨 위에 가로 꽉(정사각). 아래로 스크롤하면
   //   헤더에 64px 썸네일이 대신 나타난다(무신사·지그재그 방식). 열 때마다 false 로.
   const [registeredOptionHeroCollapsed, setRegisteredOptionHeroCollapsed] = useState(false);
-  // [2026-09-22 사장님] 「큰사진 자체에서 PC는 양옆 화살표, 모바일은 손가락으로 쓰윽」
-  //   확대창(lightbox)이 쓰는 방식과 같은 기준(45px)으로 맞춘다 — 두 화면의 손맛이 달라지면 안 된다.
-  //   세로 스크롤을 막지 않으려고 preventDefault 는 «쓰지 않고», 끝점만 재서 가로/세로를 비교한다.
-  const heroSwipeRef = useRef<{ x: number; y: number } | null>(null);
-  //   스와이프로 사진을 넘긴 직후의 «클릭»은 확대창을 열지 않는다(손가락을 떼면 클릭도 같이 발생한다).
-  const heroSwipedRef = useRef(false);
   const [registeredOptionSize, setRegisteredOptionSize] = useState("");
   const [registeredOptionCustomerDetail, setRegisteredOptionCustomerDetail] = useState("");
   const [registeredOptionQty, setRegisteredOptionQty] = useState(1);
@@ -8097,86 +8092,22 @@ export default function OrderPage() {
               </>
             )}
           >
-                {/* [2026-09-20 사장님 「타사이트처럼 사진 크게」] 대표사진 가로 꽉(정사각, 잘리지 않게 contain) + 🔍 크게. 스크롤하면 헤더 64px 썸네일로 접힘. */}
+                {/* [2026-10-03 사장님] 옵션이 첫 화면에 보이도록 대표사진 높이를 줄인다.
+                    여러 장은 지그재그처럼 하단 점으로 위치를 알리고, 브라우저 기본 가로 스크롤+스냅으로
+                    손가락을 따라 움직이게 한다. 확대·PC 화살표는 유지한다. */}
                 {(() => {
                   const defaultHeroPhoto = registeredOptionBrandDetailPhotos[0] || registeredOptionComboPhotos[registeredOptionDetail] || pickOrderProductImageUrl(registeredOptionSelectProduct);
                   const selectedPhoto = registeredOptionHeroPhoto || defaultHeroPhoto;
                   if (!selectedPhoto) return null;
-                  // [2026-09-22] 지금 몇 번째 사진인가 — 화살표·스와이프·번호표시·썸네일 테두리가 모두 이 값을 쓴다.
-                  //   (예전엔 썸네일 쪽에서 같은 식을 한 번 더 계산했다. 값이 같으므로 한 곳으로 합친다)
-                  const heroCount = registeredOptionAllImages.length;
-                  const heroIdx = registeredOptionAllImages.findIndex((img) => img === selectedPhoto);
-                  /** 옆 사진으로 넘긴다(끝에서 다음 → 처음으로 돌아온다). 확대창 moveLightbox 와 같은 방식.
-                   *  ⚠ 바뀌는 것은 «보여주는 사진»뿐 — 담기·가격·재고와 무관하다. */
-                  const moveHeroPhoto = (step: number) => {
-                    if (heroCount < 2 || heroIdx < 0) return;
-                    setRegisteredOptionHeroPhoto(registeredOptionAllImages[(heroIdx + step + heroCount) % heroCount]);
-                  };
                   return (
                     <div style={{ margin: "12px 0 6px" }}>
-                      <div
-                        className="ru-photo-stage"
-                        onClick={() => {
-                          if (heroSwipedRef.current) { heroSwipedRef.current = false; return; } // 넘긴 직후의 클릭은 무시
-                          openLightbox(selectedPhoto, registeredOptionAllImages, registeredOptionPhotoTitle);
-                        }}
-                        onTouchStart={(event) => {
-                          heroSwipedRef.current = false;
-                          if (event.touches.length !== 1) { heroSwipeRef.current = null; return; }
-                          const t = event.touches[0];
-                          heroSwipeRef.current = { x: t.clientX, y: t.clientY };
-                        }}
-                        onTouchEnd={(event) => {
-                          const start = heroSwipeRef.current;
-                          heroSwipeRef.current = null;
-                          if (!start || heroCount < 2) return;
-                          const end = event.changedTouches[0];
-                          if (!end) return;
-                          const dx = end.clientX - start.x;
-                          const dy = end.clientY - start.y;
-                          // 세로로 더 많이 움직였으면 «스크롤»이다 — 사진을 넘기지 않는다.
-                          if (Math.abs(dx) < 45 || Math.abs(dx) <= Math.abs(dy)) return;
-                          heroSwipedRef.current = true;
-                          moveHeroPhoto(dx > 0 ? -1 : 1);
-                        }}
-                        style={{ position: "relative", width: "100%", aspectRatio: "1 / 1", borderRadius: "14px", overflow: "hidden", background: "#F0EBE8", cursor: "zoom-in", touchAction: "pan-y" }}
-                      >
-                        <img src={selectedPhoto} alt={registeredOptionDetail || registeredOptionSelectProduct.product_name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                        {/* [2026-09-22 사장님] PC는 양옆 화살표. 마우스가 있는 기기에서만 보인다(globals.css .ru-photo-nav).
-                              모바일은 손가락으로 쓰윽 — 화살표가 사진을 가리지 않게 숨긴다. */}
-                        {heroCount > 1 ? (
-                          <>
-                            <button type="button" className="ru-photo-nav ru-photo-nav-prev" aria-label="이전 사진"
-                              onClick={(event) => { event.stopPropagation(); moveHeroPhoto(-1); }}>‹</button>
-                            <button type="button" className="ru-photo-nav ru-photo-nav-next" aria-label="다음 사진"
-                              onClick={(event) => { event.stopPropagation(); moveHeroPhoto(1); }}>›</button>
-                            <span style={{ position: "absolute", left: "8px", bottom: "8px", borderRadius: "999px", background: "rgba(0,0,0,0.62)", padding: "4px 9px", color: "#fff", fontSize: "11px", fontWeight: 900, lineHeight: 1 }}>
-                              {heroIdx >= 0 ? heroIdx + 1 : 1} / {heroCount}
-                            </span>
-                          </>
-                        ) : null}
-                        <span style={{ position: "absolute", right: "8px", bottom: "8px", borderRadius: "999px", background: "rgba(0,0,0,0.72)", padding: "4px 9px", color: "#fff", fontSize: "11px", fontWeight: 900, lineHeight: 1 }}>🔍 크게</span>
-                      </div>
-                  {/* [2026-09-09 3순위] 예전엔 썸네일을 눌러도 «확대창»만 떠서 위 대표사진은 그대로였다.
-                      → 탭하면 위 대표사진이 «그 사진으로 바뀐다». 지금 보고 있는 것에는 테두리를 준다.
-                      (Baymard 공개 조사: 모바일에서도 점 인디케이터보다 «썸네일»이 낫다 — 오탭이 적다)
-                      확대는 위 대표사진(🔍 크게)이 맡는다 — 역할을 겹치지 않게 나눴다. */}
-                  {heroCount > 1 ? (
-                    <div style={{ marginTop: "10px" }}>
-                      <div style={{ marginBottom: "5px", fontSize: "11px", fontWeight: 800, color: "#8A7F84" }}>
-                        사진 {heroCount}장{heroIdx >= 0 ? ` · 지금 ${heroIdx + 1}번째` : ""} — 옆으로 넘기거나 눌러서 바꿔 보세요
-                      </div>
-                      <div style={{ display: "flex", gap: "6px", overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: "2px" }}>
-                        {registeredOptionAllImages.map((img, i) => {
-                          const isHero = img === selectedPhoto;
-                          return (
-                            <img key={`thumb-${i}`} src={img} alt={`${i + 1}번째 상품 사진`} onClick={() => setRegisteredOptionHeroPhoto(img)} style={{ width: "46px", height: "46px", flexShrink: 0, borderRadius: "8px", objectFit: "cover", cursor: "pointer", border: isHero ? "2.5px solid #7A1E47" : "1px solid #EEE7E1", background: "#F0EBE8", opacity: isHero ? 1 : 0.72 }} />
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
-
+                      <ProductPhotoCarousel
+                        images={registeredOptionAllImages}
+                        selectedPhoto={selectedPhoto}
+                        alt={registeredOptionDetail || registeredOptionSelectProduct.product_name}
+                        onPhotoChange={setRegisteredOptionHeroPhoto}
+                        onOpen={(photo) => openLightbox(photo, registeredOptionAllImages, registeredOptionPhotoTitle)}
+                      />
                     </div>
                   );
                 })()}
