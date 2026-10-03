@@ -56,6 +56,32 @@ export function widgetTargetKey(target: WidgetProductTarget): string {
   return `${String(target.productId).trim()}|${String(target.detailName || "").trim()}`;
 }
 
+export function selectableWidgetTargets<T extends WidgetProductTarget & { available: boolean; inBroadcast: boolean }>(
+  items: T[],
+): WidgetProductTarget[] {
+  const unique = new Map<string, WidgetProductTarget>();
+  for (const item of items) {
+    if (!item.available || !item.inBroadcast) continue;
+    const target = normalizeWidgetTarget(item);
+    if (target) unique.set(widgetTargetKey(target), target);
+  }
+  return [...unique.values()];
+}
+
+export function widgetRotationDraftChanged(
+  savedInput: WidgetRotationConfig,
+  draftMode: WidgetRotationConfig["mode"],
+  selectedKeys: ReadonlySet<string>,
+): boolean {
+  const saved = parseWidgetRotation(savedInput);
+  if (saved.mode !== draftMode) return true;
+  if (draftMode === "all") return false;
+  const savedKeys = new Set(saved.targets.map(widgetTargetKey));
+  if (savedKeys.size !== selectedKeys.size) return true;
+  for (const key of savedKeys) if (!selectedKeys.has(key)) return true;
+  return false;
+}
+
 function normalizeHistoryEntry(value: unknown): WidgetHistoryEntry | null {
   const row = objectValue(value);
   const target = normalizeWidgetTarget(row);

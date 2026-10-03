@@ -19,6 +19,7 @@ import {
   parseWidgetHistory,
   parseWidgetRotation,
   recordWidgetHistory,
+  selectableWidgetTargets,
   widgetTargetKey,
   type WidgetHistoryEntry,
   type WidgetProductTarget,
@@ -272,6 +273,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   // 기존 브라우저 localStorage 기록은 첫 로드 때 idempotent merge하여 과거 목록도 최대한 살린다.
   const [widgetHistory, setWidgetHistory] = useState<WidgetHistoryEntry[]>([]);
   const [widgetRotation, setWidgetRotation] = useState<WidgetRotationConfig>({ mode: "all", paused: false, targets: [] });
+  const [widgetDraftMode, setWidgetDraftMode] = useState<WidgetRotationConfig["mode"]>("all");
   const [widgetSelectedKeys, setWidgetSelectedKeys] = useState<Set<string>>(new Set());
   const [widgetLibraryLoading, setWidgetLibraryLoading] = useState(false);
   const [widgetLibraryBusyKey, setWidgetLibraryBusyKey] = useState("");
@@ -438,12 +440,14 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       if (requestSeq !== widgetLibraryLoadSeqRef.current) return;
       setWidgetHistory(history);
       setWidgetRotation(rotation);
+      setWidgetDraftMode(rotation.mode);
       setWidgetSelectedKeys(new Set(rotation.mode === "selected" ? rotation.targets.map(widgetTargetKey) : []));
     } catch (error) {
       if (requestSeq !== widgetLibraryLoadSeqRef.current) return;
       // 서버 목록이 잠시 실패해도 이 컴퓨터의 기존 기록은 바로 쓸 수 있게 유지한다.
       setWidgetHistory(parseWidgetHistory(readPinHistory()));
       setWidgetRotation({ mode: "all", paused: false, targets: [] });
+      setWidgetDraftMode("all");
       setWidgetSelectedKeys(new Set());
       showAdminToast("자주 사용한 위젯 목록을 불러오지 못했습니다. 이 컴퓨터의 기존 기록을 표시합니다.\n\n" + (error instanceof Error ? error.message : String(error)), "warning");
     } finally {
@@ -472,6 +476,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       const json = await postWidgetLibrary({ action: "saveRotation", broadcastId: targetBroadcastId, rotation: next });
       const saved = parseWidgetRotation(json.rotation);
       setWidgetRotation(saved);
+      setWidgetDraftMode(saved.mode);
       setWidgetSelectedKeys(new Set(saved.mode === "selected" ? saved.targets.map(widgetTargetKey) : []));
       window.dispatchEvent(new Event("ruru-live-product-updated"));
       return true;
@@ -1382,6 +1387,20 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     });
   }, [bcProducts, products, widgetHistory]);
 
+  const widgetManualPinLabel = useMemo(() => {
+    if (bcWidgetPin.mode !== "pin" || !bcWidgetPin.productId) return "";
+    const row = bcProducts.find((item) => productId(item) === bcWidgetPin.productId);
+    let detail: DetailProduct | undefined;
+    if (row && bcWidgetPin.detailName) {
+      try {
+        detail = detailProducts(row, { includeHidden: true }).find((item) => item.detailName === bcWidgetPin.detailName);
+      } catch {
+        detail = undefined;
+      }
+    }
+    return detail?.detailName || bcWidgetPin.detailName || (row ? productName(row) : "특정 상품");
+  }, [bcProducts, bcWidgetPin.detailName, bcWidgetPin.mode, bcWidgetPin.productId]);
+
   const toggleWidgetLibrarySelection = (target: WidgetProductTarget) => {
     const key = widgetTargetKey(target);
     setWidgetSelectedKeys((previous) => {
@@ -1392,31 +1411,42 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     });
   };
 
-  const startWidgetLibraryRotation = async () => {
-    const allowed = new Set(widgetLibraryItems.filter((item) => item.available && item.inBroadcast).map(widgetTargetKey));
-    const targets = widgetHistory
-      .filter((entry) => widgetSelectedKeys.has(widgetTargetKey(entry)) && allowed.has(widgetTargetKey(entry)))
-      .map(({ productId: id, detailName }) => ({ productId: id, detailName }));
+  const replaceWidgetLibrarySelection = (targets: WidgetProductTarget[]) => {
+    setWidgetSelectedKeys(new Set(targets.map(widgetTargetKey)));
+  };
+
+  const discardWidgetRotationDraft = () => {
+    setWidgetDraftMode(widgetRotation.mode);
+    setWidgetSelectedKeys(new Set(widgetRotation.mode === "selected" ? widgetRotation.targets.map(widgetTargetKey) : []));
+  };
+
+  const applyWidgetLibraryRotation = async (mode: WidgetRotationConfig["mode"]) => {
+    if (mode === "all") {
+      if (await saveWidgetRotation({ mode: "all", paused: false, targets: [] })) {
+        showAdminToast("현재 방송의 전체 진열 상품을 자동 순환합니다.", "success");
+      }
+      return;
+    }
+    const targets = selectableWidgetTargets(widgetLibraryItems)
+      .filter((entry) => widgetSelectedKeys.has(widgetTargetKey(entry)));
     if (targets.length === 0) {
       showAdminToast("현재 방송에서 순환할 수 있는 상품을 선택해주세요.", "warning");
       return;
     }
     if (await saveWidgetRotation({ mode: "selected", paused: false, targets })) {
-      showAdminToast(`선택한 ${targets.length}개 상품만 자동 순환합니다.`, "success");
+      showAdminToast(
+        bcWidgetPin.mode === "pin"
+          ? `선택한 ${targets.length}개 상품을 저장했습니다. 현재 상품 고정을 해제하면 자동 순환합니다.`
+          : `선택한 ${targets.length}개 상품만 자동 순환합니다.`,
+        "success",
+      );
     }
   };
 
   const toggleWidgetLibraryPause = async () => {
-    if (widgetRotation.mode !== "selected") return;
     const next = { ...widgetRotation, paused: !widgetRotation.paused };
     if (await saveWidgetRotation(next)) {
       showAdminToast(next.paused ? "상품 위젯 순환을 잠시 멈췄습니다." : "상품 위젯 순환을 다시 시작했습니다.", "success");
-    }
-  };
-
-  const resetWidgetLibraryRotation = async () => {
-    if (await saveWidgetRotation({ mode: "all", paused: false, targets: [] })) {
-      showAdminToast("현재 방송의 전체 진열 상품 순환으로 돌아갑니다.", "success");
     }
   };
 
@@ -1992,6 +2022,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     items={widgetLibraryItems}
                     rotation={widgetRotation}
                     selectedKeys={widgetSelectedKeys}
+                    draftMode={widgetDraftMode}
+                    manualPinLabel={widgetManualPinLabel}
                     loading={widgetLibraryLoading}
                     busyKey={widgetLibraryBusyKey}
                     canManageRotation={Boolean(widgetPinTargetBroadcastId(bcSelId, activeBroadcastId))}
@@ -1999,9 +2031,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     onPin={(item) => void pinWidgetLibraryItem(item)}
                     onRemove={(target) => void removeWidgetLibraryItem(target)}
                     onToggleSelected={toggleWidgetLibrarySelection}
-                    onStartRotation={() => void startWidgetLibraryRotation()}
+                    onDraftModeChange={setWidgetDraftMode}
+                    onReplaceSelected={replaceWidgetLibrarySelection}
+                    onDiscardDraft={discardWidgetRotationDraft}
+                    onApplyDraft={(mode) => void applyWidgetLibraryRotation(mode)}
                     onTogglePause={() => void toggleWidgetLibraryPause()}
-                    onResetRotation={() => void resetWidgetLibraryRotation()}
                   />
                 ) : null}
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 8px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid var(--color-line)", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
@@ -2030,15 +2064,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   [📢 채팅] [📌 해제] 를 바로 누를 수 있게 한다. 검색 중이어도 항상 보인다. */}
               {(() => {
                 if (bcWidgetPin.mode !== "pin") {
-                  return (
-                    <div style={{ margin: "0 12px 8px", padding: "8px 8px", borderRadius: "8px", background: "var(--color-surface-2)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 900 }}>
-                      {widgetRotation.mode === "selected"
-                        ? widgetRotation.paused
-                          ? `Ⅱ 선택 상품 ${widgetRotation.targets.length}개 순환 일시정지`
-                          : `↻ 선택 상품 ${widgetRotation.targets.length}개 자동 순환 중`
-                        : "↻ 현재 방송의 전체 진열 상품 자동 순환 중"}
-                    </div>
-                  );
+                  return null;
                 }
                 const pinnedRow = bcProducts.find((row) => productId(row) === bcWidgetPin.productId);
                 const pinnedDetail = pinnedRow && bcWidgetPin.detailName

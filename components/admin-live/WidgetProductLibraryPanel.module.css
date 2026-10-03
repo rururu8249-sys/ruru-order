@@ -1,6 +1,6 @@
 .panel {
   margin: 0 0 8px;
-  padding: 9px;
+  padding: 10px;
   border: 1px solid var(--color-rose-line);
   border-radius: 12px;
   background: linear-gradient(135deg, var(--color-rose-soft), var(--color-surface));
@@ -9,9 +9,11 @@
 
 .header,
 .headingWrap,
-.headerActions,
 .toolbar,
-.actionBar,
+.liveStatus,
+.selectionToolbar,
+.selectionActions,
+.saveBar,
 .actionButtons,
 .meta {
   display: flex;
@@ -25,7 +27,6 @@
 }
 
 .headingWrap,
-.headerActions,
 .meta {
   gap: 6px;
   min-width: 0;
@@ -33,61 +34,166 @@
 
 .title {
   color: var(--color-rose-deep);
-  font-size: 12px;
-  font-weight: 900;
-  white-space: nowrap;
-}
-
-.count,
-.status {
-  border-radius: 999px;
-  padding: 2px 7px;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 900;
   white-space: nowrap;
 }
 
 .count {
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  padding: 2px 7px;
   background: var(--color-surface);
   color: var(--color-ink-soft);
-  border: 1px solid var(--color-line);
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
 }
 
-.status {
+.liveStatus {
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 9px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--color-ok-tx) 22%, var(--color-line));
+  border-radius: 9px;
   background: var(--color-ok-bg);
-  color: var(--color-ok-tx);
 }
 
-.status.paused {
-  background: var(--color-warn-bg);
+.pinnedStatus {
+  border-color: var(--color-rose-line);
+  background: var(--color-rose-soft);
+}
+
+.liveStatusText,
+.saveMessage {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
   color: var(--color-ink-soft);
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.liveStatusText strong {
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .toolbar {
-  gap: 6px;
+  gap: 7px;
   margin-bottom: 8px;
 }
 
 .search,
 .sort {
-  height: 30px;
+  height: 34px;
   border: 1px solid var(--color-line);
   border-radius: 8px;
   background: var(--color-surface);
   color: var(--color-ink);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 750;
 }
 
 .search {
   flex: 1;
   min-width: 0;
-  padding: 0 9px;
+  padding: 0 10px;
 }
 
 .sort {
   flex: 0 0 auto;
-  padding: 0 7px;
+  padding: 0 8px;
+}
+
+.modeSection {
+  margin-bottom: 8px;
+  padding: 9px;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-surface) 86%, transparent);
+}
+
+.sectionLabel {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.modeGroup {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.modeOption {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid var(--color-line);
+  border-radius: 9px;
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.modeOptionActive {
+  border-color: var(--color-rose-deep);
+  box-shadow: inset 0 0 0 1px var(--color-rose-deep);
+}
+
+.modeOption input {
+  width: 15px;
+  height: 15px;
+  margin: 1px 0 0;
+  accent-color: var(--color-rose-deep);
+}
+
+.modeOption span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.modeOption strong {
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.modeOption small {
+  color: var(--color-ink-mute);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.selectionToolbar {
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.selectionActions,
+.actionButtons {
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.selectionCount {
+  color: var(--color-ink-soft);
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 .grid {
@@ -97,7 +203,7 @@
 }
 
 .expandedGrid {
-  max-height: 266px;
+  max-height: 284px;
   overflow-y: auto;
   padding-right: 2px;
 }
@@ -105,11 +211,11 @@
 .card {
   position: relative;
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
   grid-template-rows: auto auto;
   gap: 4px 8px;
   min-width: 0;
-  padding: 7px 24px 7px 7px;
+  padding: 8px 25px 8px 8px;
   border: 1px solid var(--color-line);
   border-radius: 10px;
   background: var(--color-surface);
@@ -133,20 +239,17 @@
 
 .checkWrap {
   position: absolute;
-  top: 6px;
-  right: 22px;
+  top: 7px;
+  right: 24px;
   display: inline-flex;
   align-items: center;
-  gap: 2px;
   color: var(--color-ink-soft);
-  font-size: 9px;
-  font-weight: 900;
   cursor: pointer;
 }
 
 .checkWrap input {
-  width: 13px;
-  height: 13px;
+  width: 15px;
+  height: 15px;
   margin: 0;
   accent-color: var(--color-rose-deep);
 }
@@ -161,8 +264,8 @@
 
 .imageButton {
   grid-row: 1 / span 2;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   align-self: center;
   overflow: hidden;
   padding: 0;
@@ -190,7 +293,7 @@
 .name {
   overflow: hidden;
   color: var(--color-ink);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 900;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -200,7 +303,7 @@
 .price {
   margin-top: 2px;
   color: var(--color-rose-deep);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 900;
   white-space: nowrap;
 }
@@ -209,7 +312,7 @@
   margin-top: 2px;
   overflow: hidden;
   color: var(--color-ink-mute);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 800;
   white-space: nowrap;
 }
@@ -224,13 +327,13 @@
   grid-column: 3;
   grid-row: 2;
   align-self: end;
-  min-width: 54px;
-  padding: 5px 7px;
+  min-width: 58px;
+  padding: 6px 8px;
   border: 0;
   border-radius: 7px;
   background: var(--color-ok-tx);
   color: #fff;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 900;
   cursor: pointer;
 }
@@ -245,16 +348,16 @@
   position: absolute;
   top: 4px;
   right: 4px;
-  width: 17px;
-  height: 17px;
+  width: 19px;
+  height: 19px;
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: transparent;
   color: var(--color-ink-mute);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 900;
-  line-height: 17px;
+  line-height: 19px;
   cursor: pointer;
 }
 
@@ -263,33 +366,36 @@
   color: var(--color-danger-tx);
 }
 
-.actionBar {
+.saveBar {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   justify-content: space-between;
-  gap: 8px;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--color-rose-line);
+  gap: 10px;
+  margin-top: 9px;
+  padding: 9px 10px;
+  border: 1px solid var(--color-rose-deep);
+  border-radius: 10px;
+  background: var(--color-surface);
+  box-shadow: 0 6px 18px rgba(96, 27, 54, 0.16);
 }
 
-.actionSummary {
-  color: var(--color-ink-soft);
-  font-size: 10px;
+.saveMessage strong {
+  color: var(--color-ink);
+  font-size: 11px;
   font-weight: 900;
-  white-space: nowrap;
 }
 
-.actionButtons {
-  justify-content: flex-end;
-  gap: 5px;
-  min-width: 0;
+.validation {
+  color: var(--color-danger-tx);
 }
 
 .primaryButton,
 .secondaryButton,
 .ghostButton {
   border-radius: 8px;
-  padding: 5px 9px;
-  font-size: 10px;
+  padding: 6px 10px;
+  font-size: 11px;
   font-weight: 900;
   cursor: pointer;
   white-space: nowrap;
@@ -325,7 +431,7 @@
   border-radius: 8px;
   background: color-mix(in srgb, var(--color-surface) 82%, transparent);
   color: var(--color-ink-mute);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   text-align: center;
 }
@@ -336,13 +442,20 @@
   }
 
   .header,
-  .actionBar {
+  .liveStatus,
+  .selectionToolbar,
+  .saveBar {
     align-items: flex-start;
   }
 
   .headingWrap,
+  .selectionActions,
   .actionButtons {
     flex-wrap: wrap;
+  }
+
+  .modeGroup {
+    grid-template-columns: 1fr;
   }
 }
 
