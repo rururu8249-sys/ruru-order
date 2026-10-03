@@ -26,7 +26,6 @@ function getSupabaseAdmin() {
   if (!url || !key) throw new Error("Supabase 관리자 환경변수가 설정되지 않았습니다.");
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
-
 type AdminClient = ReturnType<typeof getSupabaseAdmin>;
 
 async function readSetting(sb: AdminClient, key: string): Promise<string | null> {
@@ -105,4 +104,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

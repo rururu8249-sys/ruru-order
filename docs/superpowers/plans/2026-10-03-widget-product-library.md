@@ -102,4 +102,3 @@
 - [ ] **Step 5: Inspect `/product-widget?preview=1` and the active-broadcast flow for selected rotation, manual pin precedence, pause, and smooth transition.**
 - [ ] **Step 6: Review the full diff against the spec and record any rulings or deferred minor findings.**
 - [ ] **Step 7: Commit any verification fixes with their RED→GREEN tests.**
-

@@ -29,4 +29,3 @@ Make the broadcast product widget workflow readable and practical: every product
 - Do not remove products from a broadcast when they are removed from the history library.
 - Preserve existing manual pin behavior and legacy rotation as the fallback.
 - Preserve the full current-broadcast product list below the compact library.
-
