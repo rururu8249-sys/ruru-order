@@ -35,6 +35,11 @@ export function kstDayStartIso(value: string | Date = new Date()): string {
   return new Date(`${dateKey}T00:00:00+09:00`).toISOString();
 }
 
+export function kstDaysAgoStartIso(value: string | Date = new Date(), days = 1): string {
+  const wholeDays = Math.max(0, Math.floor(days));
+  return new Date(Date.parse(kstDayStartIso(value)) - wholeDays * 24 * 60 * 60 * 1000).toISOString();
+}
+
 export function mergePickingWorkspaceRows<T extends PickingScopeRow>(...groups: readonly (readonly T[])[]): T[] {
   const byId = new Map<string, T>();
   for (const row of groups.flat()) {
