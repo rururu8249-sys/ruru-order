@@ -59,6 +59,7 @@ const checks = () => tree.root.findAll(node => node.type === 'button' && node.pr
 const check = nickname => checks().find(node => node.props["aria-label"].startsWith(nickname + " "));
 const button = text => tree.root.findAllByType('button').find(node => node.props['aria-label'] === text || node.children.join('') === text);
 const text = () => JSON.stringify(tree.toJSON());
+const nodeText = node => node.children.map(child => typeof child === 'string' ? child : nodeText(child)).join('');
 assert.equal(checks().length, 2, 'only paid, non-canceled, included orders');
 assert.equal(check("고객1").props['aria-checked'], false, 'legacy collected must not imply completion');
 assert.ok(text().includes('원본 옵션'), 'optionText-only legacy orders must keep their option');
@@ -87,7 +88,18 @@ assert.equal(check("고객2").props.disabled, true, 'overlapping writes blocked'
 await act(async () => { release(); await pending; });
 gate = null;
 assert.equal(checks().length, 1, 'completed rows leave the working tab');
-await act(async () => button('챙김 완료 탭').props.onClick());
+const recentCompletion = tree.root.findByProps({'aria-label':'방금 챙김 완료'});
+assert.ok(nodeText(recentCompletion).includes('MIU-2'));
+assert.ok(nodeText(recentCompletion).includes('S/36'));
+assert.ok(nodeText(recentCompletion).includes('고객1'));
+assert.ok(button('챙김 완료 목록으로 이동'), 'completed item can be found without hunting for its tab');
+assert.ok(button('실수면 되돌리기'), 'the latest completion can be undone from the confirmation row');
+await act(async () => button('실수면 되돌리기').props.onClick());
+assert.equal(check('고객1').props['aria-checked'], false, 'recent completion undo restores the item in the working list');
+assert.equal(tree.root.findAllByProps({'aria-label':'방금 챙김 완료'}).length, 0, 'undo clears the stale completion notice');
+await act(async () => check('고객1').props.onClick());
+await act(async () => button('챙김 완료 목록으로 이동').props.onClick());
+assert.equal(button('챙김 완료 탭').props['aria-pressed'], true, 'completion shortcut opens the completed list');
 assert.equal(check("고객1").props['aria-checked'], true);
 await act(async () => button('고객별').props.onClick());
 assert.equal(check("고객1").props['aria-checked'], true, 'customer view sees product-view completion');
