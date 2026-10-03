@@ -13,16 +13,11 @@ assert(warning.players.some(p=>p.pose==='run'),'warning triggers escape motion')
 assert(warning.camera,'camera framing must be provided');
 assert.equal(warning.camera.scale,1,'do not zoom onto predetermined victims before impact');
 const impactFrame=s.sampleSurvivalScene(scene,impact+200);
-assert(impactFrame.camera.scale>1,'dense cast needs a close-up after the hazard strikes');
-for(const id of scene.rounds[0].victims){
- const actor=impactFrame.players[id];
- assert(actor.x>=impactFrame.camera.left&&actor.x<=impactFrame.camera.right,'close-up cannot crop an affected actor');
- assert(actor.y>=impactFrame.camera.top&&actor.y<=impactFrame.camera.bottom,'close-up cannot crop an affected actor');
-}
+assert.equal(impactFrame.camera.scale,1,'impact camera must keep every survivor visible instead of zooming onto eliminated actors');
 for(let t=0;t<=scene.durationMs;t+=83){
  const frame=s.sampleSurvivalScene(scene,t);
  for(const p of frame.players){assert(p.x>=3&&p.x<=97);assert(p.y>=24&&p.y<=90);}
- assert(frame.camera.left>=0&&frame.camera.right<=100&&frame.camera.top>=0&&frame.camera.bottom<=100,'camera stays in the stage');
+ assert.deepEqual(frame.camera,{scale:1,x:50,y:50,left:0,right:100,top:0,bottom:100},'survivors must never disappear outside a temporary camera crop');
  assert.deepEqual(frame,s.sampleSurvivalScene(scene,t),'separate screens share deterministic motion');
  if(t<scene.durationMs)assert.equal(frame.winners.length,0);
 }

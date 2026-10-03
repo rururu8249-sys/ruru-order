@@ -46,9 +46,9 @@ for(const [kind,path] of Object.entries(paths)){
  }
  if(kind==='survival'&&scenario==='running'){
    const bodies=tree.root.findAll(n=>typeof n.props['data-survival-character']==='number');
-   for(const body of bodies)assert.equal(body.props['aria-label'],['시나모롤','짱아','유리'][body.props['data-survival-character']],'production seed=0 must reach actor and victim reaction');
-   assert.equal(new Set(tree.root.findAll(n=>typeof n.props['data-survival-character']==='number').map(n=>n.props['data-survival-character'])).size,3,'survival must render character artwork, not stick figures');
-   assert(tree.root.findAll(n=>n.props['data-survival-reaction']).length,'a disaster victim must react as a character, not just an emoji');
+   for(const body of bodies)assert.equal(body.props['aria-label'],['시나모롤','짱아','유리'][body.props['data-survival-character']],'production seed=0 must reach every visible survivor');
+   assert.equal(bodies.length,2,'visible character count must match the two remaining people after the first elimination');
+   assert(tree.root.findAll(n=>n.props['data-survival-reaction']).length,'a disaster victim still needs a clear non-character impact effect');
  }
  if(kind==='survival'&&scenario==='late'){
   assert.equal(tree.root.findAll(n=>typeof n.props['data-survival-character']==='number').length,1,'completed widget must remove eliminated characters instead of updating invisible artwork');

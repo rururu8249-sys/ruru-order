@@ -47,14 +47,6 @@ function actorMotion(p:SurvivalPlayer,clock:number){
   const from=point(segment),to=point(segment+1),smooth=fraction*fraction*(3-2*fraction);
   return {x:from.x+(to.x-from.x)*smooth,y:from.y+(to.y-from.y)*smooth,facing:to.x>=from.x?1:-1};
 }
-function cameraFrame(actors:SurvivalPlayer[],maximum:number){
-  if(!actors.length)return {scale:1,x:50,y:50,left:0,right:100,top:0,bottom:100};
-  const minX=Math.min(...actors.map(p=>p.x))-9,maxX=Math.max(...actors.map(p=>p.x))+9;
-  const minY=Math.min(...actors.map(p=>p.y))-9,maxY=Math.max(...actors.map(p=>p.y))+9;
-  const scale=Math.max(1,Math.min(maximum,100/Math.max(maxX-minX,maxY-minY))),half=50/scale;
-  const x=Math.max(half,Math.min(100-half,(minX+maxX)/2)),y=Math.max(half,Math.min(100-half,(minY+maxY)/2));
-  return {scale,x,y,left:x-half,right:x+half,top:y-half,bottom:y+half};
-}
 export function buildSurvivalScene(input:PlaybackInput,seed:number):SurvivalScene {
   const rand=seededRandom(seed),n=input.participants.length,cols=Math.max(1,Math.min(n,8)),rows=Math.max(1,Math.ceil(n/cols));
   const players=input.participants.map((name,i)=>({id:i,name,x:4.5+(i%cols+.5)*(91/cols)+rand()*.8-.4,y:27+(Math.floor(i/cols)+.5)*(58/rows)+rand()*.8-.4,dead:false,hit:false,dtype:null}));
@@ -100,11 +92,9 @@ export function sampleSurvivalScene(scene:SurvivalScene,elapsedMs:number){
     const position=actorMotion(p,hit?motionState(cues,latest!.at).clock:motion.clock);
     return {...p,...position,strideElapsedMs:motion.clock+p.id%5*170,dead:eliminated,hit,dtype:dead.get(p.id)||null,pose:done?'rest' as const:motion.pose};
   });
-  // Only focus already-struck actors, never signal future victims or winners.
-  const target=!done&&latest&&age<1400&&!warning?cameraFrame(latest.victims.map(id=>players[id]),2.1):cameraFrame([],1);
-  const blend=Math.max(0,Math.min(1,age/250,(1400-age)/250)),smooth=blend*blend*(3-2*blend);
-  const scale=1+(target.scale-1)*smooth,x=50+(target.x-50)*smooth,y=50+(target.y-50)*smooth,half=50/scale;
-  const camera={scale,x,y,left:x-half,right:x+half,top:y-half,bottom:y+half};
+  // The headline is a count of visible survivors. Keep the full stage framed so
+  // an impact cannot temporarily crop living actors and make that count look wrong.
+  const camera={scale:1,x:50,y:50,left:0,right:100,top:0,bottom:100};
   return {phase:done?'done' as const:elapsedMs<0?'ready' as const:'running' as const,players,winners:done?scene.winnerIds.map(id=>players[id]):[],
     fx:!done&&latest&&age<850?{type:latest.dis.id,key:latest.at,streaks:latest.streaks,accent:latest.dis.accent}:null,
     bursts:!done&&latest&&age<(['lightning','wave','wind'].includes(latest.dis.id)?800:650)?latest.victims.map(id=>({id:id+'-'+latest!.at,x:players[id].x,y:players[id].y,emoji:latest!.dis.emoji,accent:latest!.dis.accent,dtype:latest!.dis.id})):[],

@@ -40,8 +40,8 @@ for(const type of ['lightning','wave','wind','hail','meteor']){
  const body=[tree.props.children].flat().find(c=>c?.props?.['data-reaction-body']!==undefined);
  animations.add(body.props.style.animation);
  const containsCharacter=n=>Array.isArray(n)?n.some(containsCharacter):n&&typeof n==='object'?(typeof n.type==='function'&&n.props.index===0)||containsCharacter(n.props.children):false;
- assert(containsCharacter(body.props.children),'reaction must retain the assigned character');
+ assert(!containsCharacter(body.props.children),'elimination reaction must remain an effect, not a duplicate character');
 }
 assert.equal(animations.size,5,'each disaster needs its own body response');
 assert(cast.slice(35).every(c=>c.asset.includes('survival-human-cast')),'animated original people retain their idle identity');
-console.log('PASS five distinct character reactions, 100-person sizing, nonblocking controls, original human cast');
+console.log('PASS five distinct non-character reactions, 100-person sizing, nonblocking controls, original human cast');
