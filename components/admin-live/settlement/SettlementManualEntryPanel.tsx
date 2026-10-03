@@ -26,7 +26,7 @@ function getVisiblePages(currentPage: number, pageCount: number) {
   if (pageCount <= 5) return Array.from({ length: pageCount }, (_, index) => index + 1);
 
   let start = Math.max(1, currentPage - 2);
-  let end = Math.min(pageCount, start + 4);
+  const end = Math.min(pageCount, start + 4);
 
   if (end - start < 4) start = Math.max(1, end - 4);
 

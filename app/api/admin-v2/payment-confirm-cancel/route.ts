@@ -216,7 +216,7 @@ export async function POST(request: Request) {
       };
     });
 
-    let deposits: any[] = [];
+    const deposits: any[] = [];
     let depositError: any = null;
     {
       const pageSize = 1000;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { CUSTOMER_SESSION_VERSION_KEY, REQUIRED_CUSTOMER_SESSION_VERSION } from "@/lib/customer/customerSession";
 
 const setIfValue = (key: string, value: unknown) => {
@@ -162,13 +163,13 @@ export default function KakaoCallbackPage() {
           )}
 
           {status === "error" && (
-            <a
+            <Link
               href="/"
               className="mt-5 flex min-h-[52px] w-full items-center justify-center rounded-[18px] px-4 py-3 text-[16px] font-black tracking-[-0.05em] text-white"
               style={{ background: "#7B2D43" }}
             >
               처음 화면으로 돌아가기
-            </a>
+            </Link>
           )}
         </section>
       </section>
