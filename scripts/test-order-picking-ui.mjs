@@ -52,7 +52,7 @@ function load(filename) {
 const Modal = load(path.join(root, 'components/admin-live/LiveOrderPickingModal.tsx')).default;
 const item = (id, qty, size = 'S/36') => ({id: String(id), productId: '', productName: 'MIU-2', color: '', size, optionText: '원본 옵션', qty, amount: 10000});
 const order = (id, status, items, extra = {}) => ({id: String(id), groupId: String(id), nickname: '고객' + id, name: '받는분' + id, phone: '', createdAt: '2026-10-01T10:00:00Z', paymentStatus: status, items, ...extra});
-const orders = [order(1, 'paid', [item(1, 3)]), order(2, 'card_paid', [item(2, 1, '')]), order(3, 'unpaid', [item(3, 7)]), order(4, 'canceled', [item(4, 9)]), order(5, 'paid', [item(5, 11)], {excludeFromPicking: true})];
+const orders = [order(1, 'paid', [item(1, 3)]), order(2, 'card_paid', [item(2, 1, '')], {paidAtFull:'2026-10-01T10:05:00Z'}), order(3, 'unpaid', [item(3, 7)]), order(4, 'canceled', [item(4, 9)]), order(5, 'paid', [item(5, 11)], {excludeFromPicking: true})];
 let tree;
 await act(async () => { tree = Renderer.create(React.createElement(Modal, {orders, filterLabel: '방송: 검수', onClose() {}})); });
 const checks = () => tree.root.findAll(node => node.type === 'button' && node.props.role === 'checkbox');
@@ -80,11 +80,13 @@ assert.equal(check("고객1").props['aria-checked'], false, 'not completed until
 assert.equal(check("고객2").props.disabled, true, 'overlapping writes blocked');
 await act(async () => { release(); await pending; });
 gate = null;
+assert.equal(checks().length, 1, 'completed rows leave the working tab');
+await act(async () => button('챙김 완료 탭').props.onClick());
 assert.equal(check("고객1").props['aria-checked'], true);
-assert.equal(checks().length, 2, 'completed row remains visible for checking');
 await act(async () => button('고객별').props.onClick());
 assert.equal(check("고객1").props['aria-checked'], true, 'customer view sees product-view completion');
 await act(async () => { await check("고객1").props.onClick(); });
+await act(async () => button('일반 챙김 탭').props.onClick());
 await act(async () => button('상품별').props.onClick());
 assert.equal(check("고객1").props['aria-checked'], false, 'product view sees customer-view undo');
 deny = true;
@@ -93,13 +95,14 @@ assert.equal(check("고객1").props['aria-checked'], false, 'denied update never
 assert.ok(toasts.some(args => args[1] === 'error'));
 deny = false;
 await act(async () => { await check("고객2").props.onClick(); });
-await act(async () => button('안 챙김만').props.onClick());
 assert.equal(checks().length, 1, 'same incomplete filter uses saved completion');
 await act(async () => tree.unmount());
 await act(async () => { tree = Renderer.create(React.createElement(Modal, {orders, filterLabel: '검수', onClose() {}})); });
+await act(async () => button('챙김 완료 탭').props.onClick());
 assert.equal(check("고객2").props['aria-checked'], true, 'reopen reloads persisted state');
+await act(async () => button('일반 챙김 탭').props.onClick());
 await act(async () => tree.root.findByType('input').props.onChange({target: {value: 'miu2'}}));
-assert.equal(checks().length, 2, 'separator-free search works in picking');
+assert.equal(checks().length, 1, 'separator-free search works inside the active work tab');
 // Existing IDs can change through Dashboard realtime updates from another admin.
 rows.get(2).picked_at = null;
 const refreshed = orders.map(order => ({...order, items: order.items.map(item => ({...item, pickedAt: null}))}));
@@ -126,40 +129,33 @@ await act(async () => {releaseSave(); await saving;});
 gate = null;
 await act(async () => {releaseRead();});
 readGate = null;
+await act(async () => button('챙김 완료 탭').props.onClick());
 assert.equal(check('고객1').props['aria-checked'], true, 'scope refresh cannot undo a confirmed save');
 assert.ok(rows.get(1).picked_at);
 await act(async () => tree.unmount());
+for (const id of [1,2]) rows.set(id, {id, picked_at: null});
 const sortingFixture = [order(1, 'paid', [{...item(1, 3), productName: 'MIU-2'}]), order(2, 'paid', [{...item(2, 1), productName: 'BB-69'}])];
 await act(async () => {tree = Renderer.create(React.createElement(Modal, {orders: sortingFixture, filterLabel: '검수', onClose() {}}));});
 assert.deepEqual(tree.root.findAllByType('h3').map(node => node.children.join('')), ['BB-69', 'MIU-2'], 'product groups sorted by product name, not customer name');
 await act(async()=>tree.update(React.createElement(Modal,{orders:[order(1,'paid',[{...item(1,3),productName:'나 셔츠'}]),order(2,'paid',[{...item(2,1),productName:'가 셔츠10'}]),order(3,'paid',[{...item(3,1),productName:'가 셔츠2'}])],filterLabel:'검수',onClose(){}})));
 assert.deepEqual(tree.root.findAllByType('h3').map(node=>node.children.join('')),['가 셔츠2','가 셔츠10','나 셔츠'],'Korean product names use 가나다 and natural numeric order');
 await act(async () => tree.unmount());
-// Missing payment filters, natural sorting, or a moving remaining-quantity sort break these tests.
+// Natural sorting and stable working order remain available without payment/status filter clutter.
 for (const id of [1,2,3]) rows.set(id, {id, picked_at: null});
 const controlFixture = [order(1, 'paid', [{...item(1, 3), productName: 'MIU-10'}], {nickname: '나', createdAt:'2026-10-01T09:00:00Z'}), order(2, 'paid', [{...item(2, 1), productName:'MIU-2'}], {nickname:'가', createdAt:'2026-10-01T11:00:00Z'}), order(3, 'unpaid', [{...item(3, 7), productName:'MIU-1'}])];
 await act(async () => {tree = Renderer.create(React.createElement(Modal, {orders: controlFixture, filterLabel:'방송: 검수 · 오늘', onClose() {}}));});
 const select = label => tree.root.findAllByType('select').find(node=>node.props['aria-label']===label);
 const headings = () => tree.root.findAllByType('h3').map(node=>node.children.join(''));
-assert.ok(select('결제 범위'), 'payment scope must be selectable');
 assert.deepEqual(headings(), ['MIU-2','MIU-10'], 'numeric product ordering');
-await act(async()=>select('결제 범위').props.onChange({target:{value:'all'}}));
-assert.equal(checks().length,3,'include unpaid while excluding canceled');
-assert.equal(check('고객3').props.disabled,true,'unpaid is read-only');
-const beforeUnpaid = writes.length;
-await act(async()=>check('고객3').props.onClick());
-assert.equal(writes.length,beforeUnpaid,'unpaid cannot be marked through handler');
-await act(async()=>select('결제 범위').props.onChange({target:{value:'unpaid'}}));
-assert.equal(checks().length,1,'unpaid-only scope');
-await act(async()=>select('결제 범위').props.onChange({target:{value:'paid'}}));
+assert.equal(checks().length,2,'unpaid rows do not clutter the picking workspace');
 await act(async()=>select('정렬 방식').props.onChange({target:{value:'remaining'}}));
 assert.deepEqual(headings(),['MIU-10','MIU-2'],'remaining quantity sort');
 await act(async()=>check('나').props.onClick());
-assert.deepEqual(headings(),['MIU-10','MIU-2'],'checking must not move working position');
-await act(async()=>button('챙김만').props.onClick());
+await act(async()=>button('챙김 완료 탭').props.onClick());
 assert.equal(checks().length,1,'completed-only filter');
 assert.equal(check('나').props['aria-checked'],true);
-await act(async()=>button('전체보기').props.onClick());
+await act(async()=>check('나').props.onClick());
+await act(async()=>button('일반 챙김 탭').props.onClick());
 await act(async()=>button('고객별').props.onClick());
 await act(async()=>select('정렬 방식').props.onChange({target:{value:'oldest'}}));
 assert.deepEqual(headings(),['나','가'],'oldest submitted customer first');
@@ -174,15 +170,13 @@ await act(async()=>button('고객별').props.onClick());
 assert.equal(select('정렬 방식').props.value,'newest','customer sort survives view switch');
 await act(async()=>select('정렬 방식').props.onChange({target:{value:'name'}}));
 assert.deepEqual(headings(),['가','나'],'customer nickname sort');
-await act(async()=>button('안 챙김만').props.onClick());
-assert.equal(checks().length,1);
+assert.equal(checks().length,2);
 assert.equal(check('가').props['aria-checked'],false);
 await act(async()=>tree.unmount());
 for (const id of [1,2,3]) rows.set(id,{id,picked_at:null});
 const stableFixture = [order(1,'paid',[{...item(1,3),productName:'MIU-10'}]),order(2,'paid',[{...item(2,2),productName:'MIU-2'}]),order(3,'paid',[{...item(3,1),productName:'MIU-10'}])];
 await act(async()=>{tree=Renderer.create(React.createElement(Modal,{orders:stableFixture,filterLabel:'검수',onClose(){}}));});
 await act(async()=>select('정렬 방식').props.onChange({target:{value:'remaining'}}));
-await act(async()=>button('안 챙김만').props.onClick());
 await act(async()=>check('고객1').props.onClick());
 assert.deepEqual(headings(),['MIU-10','MIU-2'],'remaining sort keeps partially visible groups in place under incomplete filter');
 await act(async()=>button('다시 정렬').props.onClick());
@@ -190,12 +184,11 @@ assert.deepEqual(headings(),['MIU-2','MIU-10'],'explicit refresh updates remaini
 await act(async()=>tree.unmount());
 assert.ok(writes.every(write => Object.keys(write.payload).join() === 'picked_at'), 'no payment/order/collected writes');
 await act(async()=>{tree=Renderer.create(React.createElement(Modal,{orders:controlFixture,filterLabel:'검수',onClose(){}}));});
-await act(async()=>select('결제 범위').props.onChange({target:{value:'all'}}));
-await act(async()=>tree.root.findByType('input').props.onChange({target:{value:'miu1'}}));
-await act(async()=>(button('조회 목록 엑셀') || button('엑셀')).props.onClick());
-assert.deepEqual(exportsMade.at(-1).orders.flatMap(order=>order.items.map(item=>item.id)),['3'],'export uses visible scope, including unpaid if selected');
-assert.deepEqual(writes.at(-1).ids,[3],'print record covers exactly exported items');
-assert.ok(exportsMade.at(-1).meta.filterLabel.includes('miu1'),'export scope labeled');
+await act(async()=>tree.root.findByType('input').props.onChange({target:{value:'miu2'}}));
+await act(async()=>button('물건챙기기 엑셀').props.onClick());
+assert.deepEqual(exportsMade.at(-1).orders.flatMap(order=>order.items.map(item=>item.id)),['2'],'one workbook contains every paid, unpicked row in the applied scope regardless of the active tab');
+assert.deepEqual(writes.at(-1).ids,[2],'print record covers exactly exported items');
+assert.ok(exportsMade.at(-1).meta.filterLabel.includes('미챙김 전체'),'combined workbook scope is labeled');
 await act(async()=>tree.unmount());
 // A background confirmation read must not replace already-known counters with dashes.
 for (const id of [1,2,3]) rows.set(id,{id,picked_at:null});
@@ -206,31 +199,29 @@ await act(async()=>tree.update(React.createElement(Modal,{orders:orders.map(o=>(
 assert(!text().includes('—'),'confirmed counters remain visible during post-save read');
 await act(async()=>{releaseRead();});
 readGate=null;
-// Bulk completion is restricted to the displayed paid search scope, and remains server-confirmed.
-await act(async()=>select('결제 범위').props.onChange({target:{value:'all'}}));
+// Bulk completion is restricted to the displayed work scope, and remains server-confirmed.
 await act(async()=>tree.root.findByType('input').props.onChange({target:{value:'고객2'}}));
-assert(button('전체 챙김'),'bulk completion control exists');
+assert(button('현재 목록 모두 챙김 완료'),'bulk completion control exists');
 gate=new Promise(resolve=>{releaseSave=resolve;});
 let bulk;
-await act(async()=>{bulk=button('전체 챙김').props.onClick();});
+await act(async()=>{bulk=button('현재 목록 모두 챙김 완료').props.onClick();});
 assert.equal(check('고객2').props['aria-checked'],false,'bulk waits for server confirmation');
 await act(async()=>{releaseSave();await bulk;}); gate=null;
 assert.deepEqual(writes.at(-1).ids,[2],'bulk touches only matching unpaid-in-work paid rows');
+await act(async()=>button('챙김 완료 탭').props.onClick());
 assert.equal(check('고객2').props['aria-checked'],true);
 assert.equal(rows.get(3).picked_at,null,'unpaid row never modified');
 await act(async()=>tree.unmount());
 
 // Multi-broadcast and exception workflow: quick ranges, date filter, attention-only tab,
 // before→current detail, and no unsafe bulk completion for attention rows.
-for (const id of [8,9]) rows.set(id,{id,picked_at:null});
+for (const id of [8,9,10]) rows.set(id,{id,picked_at:null});
 const attentionFixture = [
   order(8,'paid',[{...item(8,1,'L'),repickRequiredAt:'2026-10-04T01:00:00Z',repickBefore:{product_name:'재킷',color:'검정',size:'M',qty:1}}],{broadcastId:'b-today',createdAt:'2026-10-03T01:00:00Z',paidAtFull:'2026-10-03T02:00:00Z'}),
   order(9,'paid',[item(9,1,'S')],{broadcastId:'b-yesterday',createdAt:'2026-10-01T01:00:00Z',paidAtFull:'2026-10-03T02:00:00Z'}),
+  order(10,'card_paid',[item(10,1,'M')],{broadcastId:'b-yesterday',createdAt:'2026-10-01T01:00:00Z',paidAtFull:null}),
 ];
 const calendar=[{id:'b-today',dateKey:'2026-10-04',label:'오늘 방송'},{id:'b-yesterday',dateKey:'2026-10-03',label:'어제 방송'}];
-await act(async()=>{tree=Renderer.create(React.createElement(Modal,{orders:attentionFixture,broadcastCalendar:calendar,filterLabel:'검수',onClose(){}}));});
-assert(button('오늘+어제'),'today+yesterday scope shortcut exists');
-assert(button('선택 해제'),'scope can return to the incoming list');
 const scopeRequests=[];
 let failScope=false;
 const originalFetch=globalThis.fetch;
@@ -238,27 +229,31 @@ globalThis.fetch=async (_url,options)=>{
   scopeRequests.push(JSON.parse(options.body));
   return failScope ? {ok:false,json:async()=>({ok:false,message:'조회 실패'})} : {ok:true,json:async()=>({ok:true,orders:attentionFixture})};
 };
-await act(async()=>button('오늘+어제').props.onClick());
-await act(async()=>button('선택 적용').props.onClick());
+await act(async()=>{tree=Renderer.create(React.createElement(Modal,{orders:attentionFixture,broadcastCalendar:calendar,filterLabel:'검수',onClose(){}}));});
+assert(button('오늘+어제 방송'),'today+yesterday scope shortcut exists');
+assert(button('현재 목록으로'),'scope can return to the incoming list');
+assert.deepEqual(scopeRequests.at(0).broadcastIds,['b-today','b-yesterday'],'opening the modal loads the real applied scope plus global safety rows');
+await act(async()=>button('오늘+어제 방송').props.onClick());
 assert.deepEqual(scopeRequests.at(-1).broadcastIds,['b-today','b-yesterday'],'today+yesterday sends both real broadcast IDs');
-assert.equal(tree.root.findByProps({'aria-label':'적용 중인 방송'}).findAllByType('span').length,2,'applied scope is shown as named chips');
 failScope=true;
-await act(async()=>button('오늘').props.onClick());
-await act(async()=>button('선택 적용').props.onClick());
-assert.equal(checks().length,2,'failed scope refresh retains the previous usable rows');
+await act(async()=>button('오늘 방송').props.onClick());
+assert.equal(tree.root.findAllByProps({role:'checkbox'}).length,0,'failed scope refresh retains rows outside the default work tab');
 assert(text().includes('범위를 바꾸지 않았습니다'),'failed scope refresh explains that the old scope is retained');
 globalThis.fetch=originalFetch;
-assert(select('결제일 기준'),'payment-date filtering is explicit');
-assert(button('추가 챙김'),'attention tab exists');
-await act(async()=>button('추가 챙김').props.onClick());
-assert.equal(checks().length,2,'late-paid and repick items appear in attention tab');
+assert(button('뒤늦게 결제 탭'),'late-payment tab exists');
+await act(async()=>button('뒤늦게 결제 탭').props.onClick());
+assert.equal(checks().length,2,'late-paid and card-paid-without-time items appear together');
+assert(text().includes('카드결제 완료 · 결제시각 누락'),'missing card timestamp is explicit');
+assert(!button('현재 목록 모두 챙김 완료'),'safety tabs never offer unsafe bulk completion');
+await act(async()=>button('변경 후 재챙김 탭').props.onClick());
+assert.equal(checks().length,1,'post-pick changes have their own work tab');
 assert(text().includes('변경 후 재챙김') && text().includes('검정 / M') && text().includes('→'),'repick shows before to current details');
-assert.equal(button('전체 챙김').props.disabled,true,'attention rows cannot be bulk-completed');
 await act(async()=>check('고객8').props.onClick());
-assert.equal(checks().length,1,'individually confirmed attention leaves the open-attention tab immediately');
+assert.equal(checks().length,0,'individually confirmed repick leaves the open tab immediately');
 await act(async()=>tree.unmount());
 
 const modalSource=fs.readFileSync(path.join(root,'components/admin-live/LiveOrderPickingModal.tsx'),'utf8');
 assert(modalSource.includes('/api/admin-live/picking-workspace'),'scope refresh uses the complete server loader');
 assert(modalSource.includes('setScopeError') && modalSource.includes('setWorkspaceOrders'),'scope failures are surfaced while successful results replace the list');
-console.log('picking UI integration passed including multi-broadcast attention workflow and safe bulk completion');
+assert(!modalSource.includes('조회 목록 챙김 해제') && !modalSource.includes('>더보기<'),'dangerous bulk undo and redundant overflow menu are removed');
+console.log('picking UI integration passed including simple work tabs, instant broadcast scope, safety exceptions, and safe bulk completion');

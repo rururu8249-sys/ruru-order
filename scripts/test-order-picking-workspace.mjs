@@ -20,6 +20,12 @@ assert.equal(kstDateKey(null), null);
 
 const late = order();
 assert.equal(classifyPickingAttention(late, late.items[0]), 'late_paid');
+const cardPaidWithoutTime = order({ paymentStatus: 'card_paid', paymentMethod: '카드결제', paidAt: null, paidAtFull: null });
+assert.equal(
+  classifyPickingAttention(cardPaidWithoutTime, cardPaidWithoutTime.items[0]),
+  'payment_time_missing',
+  'card-paid orders without a confirmation time must stay visible as a safety exception',
+);
 const repickItem = item({ repickRequiredAt: '2026-10-04T01:00:00Z', repickResolvedAt: null });
 assert.equal(classifyPickingAttention(order({ items: [repickItem] }), repickItem), 'repick', 'repick wins over late payment');
 assert.equal(classifyPickingAttention(order({ paidAtFull: '2026-10-02T15:00:00Z' }), item({ pickedAt: 'done' })), null);

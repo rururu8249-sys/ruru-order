@@ -1,7 +1,7 @@
 import type { LiveOrder, LiveOrderItem } from "@/components/admin-live/types";
 
 export type PickingPaymentDateFilter = "all_paid" | "today_paid" | "late_paid";
-export type PickingAttentionKind = "late_paid" | "repick" | null;
+export type PickingAttentionKind = "late_paid" | "payment_time_missing" | "repick" | null;
 
 const PAID_STATUSES = new Set(["paid", "auto_paid", "manual_paid", "card_paid"]);
 
@@ -33,6 +33,7 @@ export function classifyPickingAttention(
 ): PickingAttentionKind {
   if (hasOpenRepick(item)) return "repick";
   if (item.pickedAt || !isPaidPickingOrder(order)) return null;
+  if (order.paymentStatus === "card_paid" && !order.paidAtFull && !order.paidAt) return "payment_time_missing";
   const orderedDate = kstDateKey(order.createdAt || order.submittedAt);
   const paidDate = kstDateKey(order.paidAtFull || order.paidAt);
   return orderedDate && paidDate && paidDate > orderedDate ? "late_paid" : null;

@@ -10,6 +10,7 @@ import type { LiveOrder } from "./types";
 import { setBroadcastFeedNotice } from "./liveBroadcastController";
 import { buildCardPayNoticeText } from "@/lib/cardPayNoticeText";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
+import { cardPaymentStatusPatch } from "@/lib/cardPaymentStatusUpdate";
 // [2026-09-08] 페이스터 주소는 설정 › 상점 정보에서 온다(하드코딩 제거)
 import { getShopInfoNow, useShopInfo } from "@/lib/useShopInfo";
 // [2026-09-08] 복사 카드를 «항상 맨 위에 뜨는 작은 창»으로 빼내기 (사유·실측근거는 그 파일 상단)
@@ -346,10 +347,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
     try {
       const { error } = await supabase
         .from("orders")
-        .update({
-          admin_order_status_v2: "카드결제완료",
-          order_manage_status: "카드결제완료",
-        })
+        .update(cardPaymentStatusPatch("카드결제완료"))
         .in("id", rowIds);
 
       if (error) {

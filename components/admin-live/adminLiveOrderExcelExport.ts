@@ -4,7 +4,7 @@ import { compareOrderOptions } from "@/lib/orderOptionSort";
 import ExcelJS from "exceljs";
 import type { LiveOrder, LiveOrderItem } from "./types";
 import { paymentStatusLabel } from "@/lib/orderLabels";
-import { buildPickingExportRows } from "@/lib/orderPickingExportRows";
+import { buildPickingExportRows, partitionPickingAttentionRows, type PickingAttentionExportRow } from "@/lib/orderPickingExportRows";
 
 type ExportMeta = {
   filterLabel: string;
@@ -520,7 +520,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   ];
 
   const workbook = createWorkbook();
-  const sheet = workbook.addWorksheet("물건챙기기");
+  const sheet = workbook.addWorksheet("오늘 챙길 전체");
   addRows(sheet, rows);
   // 필터 범위 = 헤더~마지막 데이터 줄까지만 (위 합계 3줄은 범위 밖 = 고정)
   styleFilterSheet(sheet, headerRowNumber, headerRowNumber + itemRows.length, headers.length);
@@ -546,18 +546,23 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   });
 
   const attentionHeaders: WorkbookRow = ["구분", "주문일시", "결제/변경일시", "방송", "고객", "주문번호", "변경 전", "현재 내용", "확인 내용"];
-  const attentionSheet = workbook.addWorksheet("추가챙김");
-  addRows(attentionSheet, [
-    attentionHeaders,
-    ...builtRows.attentionRows.map((row) => [row.kind, row.orderedAt, row.attentionAt, row.broadcast, row.customer, row.orderNo, row.before, row.current, row.detail]),
-  ]);
-  styleFilterSheet(attentionSheet, 1, Math.max(1, builtRows.attentionRows.length + 1), attentionHeaders.length);
-  setColumnWidths(attentionSheet, [18, 22, 22, 24, 18, 18, 36, 36, 42]);
-  builtRows.attentionRows.forEach((_, index) => {
-    attentionSheet.getRow(index + 2).eachCell({ includeEmpty: true }, (cell) => {
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF1D6" } };
+  const appendAttentionSheet = (name: string, attentionRows: PickingAttentionExportRow[]) => {
+    const attentionSheet = workbook.addWorksheet(name);
+    addRows(attentionSheet, [
+      attentionHeaders,
+      ...attentionRows.map((row) => [row.kind, row.orderedAt, row.attentionAt, row.broadcast, row.customer, row.orderNo, row.before, row.current, row.detail]),
+    ]);
+    styleFilterSheet(attentionSheet, 1, Math.max(1, attentionRows.length + 1), attentionHeaders.length);
+    setColumnWidths(attentionSheet, [18, 22, 22, 24, 18, 18, 36, 36, 42]);
+    attentionRows.forEach((_, index) => {
+      attentionSheet.getRow(index + 2).eachCell({ includeEmpty: true }, (cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF1D6" } };
+      });
     });
-  });
+  };
+  const partitionedAttention = partitionPickingAttentionRows(builtRows.attentionRows);
+  appendAttentionSheet("뒤늦게 결제", partitionedAttention.latePaymentRows);
+  appendAttentionSheet("변경 후 재챙김", partitionedAttention.repickRows);
 
   // [2026-09-01 사장님 지시] 파일명 = 방송이름+날짜+루루
   //   방송 필터: "0827(목) 해외원정방송 1부" → 해외원정방송1부0827루루.xlsx

@@ -16,6 +16,7 @@
     "guard:product-search": "node --import ./scripts/_ts-resolve.mjs scripts/test-product-search.mjs",
     "test:picking": "node --import ./scripts/_ts-resolve.mjs scripts/test-order-picking.mjs && node scripts/test-order-picking-ui.mjs",
     "test:picking-workspace": "node --import ./scripts/_ts-resolve.mjs scripts/test-order-picking-workspace.mjs",
+    "test:card-payment-status": "node --import ./scripts/_ts-resolve.mjs scripts/test-card-payment-status-update.mjs",
     "test:picking-repick": "node scripts/test-order-repick-migration.mjs",
     "test:picking-scope": "node --import ./scripts/_ts-resolve.mjs scripts/test-order-picking-scope-loader.mjs",
     "test:picking-export": "node --import ./scripts/_ts-resolve.mjs scripts/test-order-picking-export.mjs",
