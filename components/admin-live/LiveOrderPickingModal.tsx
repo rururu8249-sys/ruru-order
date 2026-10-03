@@ -301,7 +301,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
       });
       const paymentLabel = paymentFilter === 'paid' ? '결제완료만' : paymentFilter === 'unpaid' ? '미결제만' : '미결제 포함';
       const stateLabel = statusFilter === 'all' ? '전체보기' : statusFilter === 'picked' ? '챙김만' : '안 챙김만';
-      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${filterLabel} · ${paymentLabel} · ${stateLabel}${q ? ` · 검색: ${q}` : ''}`, rowOrder: viewMode === 'batch' ? 'product' : sortMode === 'oldest' ? 'time' : 'nickname' }, pickedIds);
+      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${filterLabel} · ${paymentLabel} · ${stateLabel}${q ? ` · 검색: ${q}` : ''}`, rowOrder: viewMode === 'batch' ? 'product' : sortMode === 'oldest' ? 'time' : 'nickname', visibleItemIds: [...visibleIds] }, pickedIds);
       const ids = [...visibleIds].map(Number);
       const now = new Date().toISOString();
       for (let i = 0; i < ids.length; i += 500) {
