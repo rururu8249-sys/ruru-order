@@ -81,12 +81,18 @@ await act(async () => { tree = Renderer.create(React.createElement(Harness)); })
 const button = (label) => tree.root.findAllByType("button").find((node) => node.props["aria-label"] === label);
 const text = () => JSON.stringify(tree.toJSON());
 
-assert(button("순환 상품 설정 열기"), "collapsed panel must expose one clear settings entry point");
-assert(text().includes("선택 상품 2개 순환 중"), "the saved live state must be visible before editing");
+assert(button("순환 상품 선택·변경"), "the panel must name the selected-product task directly");
+assert(text().includes("방송화면 위젯 · 선택한 상품 2개 순환 중"), "the saved state must identify the broadcast widget rather than an ambiguous customer screen");
+assert(text().includes("방송 화면 오른쪽 상품 카드에 적용된 상태입니다."), "the status hint must identify the exact customer-facing surface");
+assert.equal(text().includes("손님 화면에 적용된 현재 상태입니다."), false, "the ambiguous customer-screen wording must be removed");
+assert(tree.root.findByProps({ "aria-label": "자주 사용한 상품 검색" }), "search must remain visible without opening the editor");
+assert.equal(tree.root.findAllByType("article").length, items.length, "every previously pinned product must be present in the default scrollable list");
+assert(tree.root.findAll((node) => String(node.props.className || "").includes("historyGrid")).length > 0, "the full history must use a bounded internal scroll area");
 assert.equal(tree.root.findAll((node) => node.props["aria-label"] === "순환 설정 변경사항").length, 0, "clean state must not show an apply bar");
 
-await act(async () => button("순환 상품 설정 열기").props.onClick());
+await act(async () => button("순환 상품 선택·변경").props.onClick());
 assert.equal(tree.root.findAll((node) => node.props.role === "radiogroup").length, 1, "all and selected rotation must be one exclusive mode control");
+assert(tree.root.findByProps({ "aria-label": "원하는 상품만 순환" }), "the selected-product mode must use task language that operators understand");
 assert(button("순환 가능 상품 전체 선택"), "expanded editor must expose bulk selection");
 assert(button("선택 상품 모두 해제"), "expanded editor must expose bulk clear");
 
