@@ -62,6 +62,14 @@ export type LiveOrderItem = {
   collectedAt?: string | null;
   invoicePrintedAt?: string | null;
   pickingListPrintedAt?: string | null;
+  repickRequiredAt?: string | null;
+  repickBefore?: {
+    product_name?: string | null;
+    color?: string | null;
+    size?: string | null;
+    qty?: number | null;
+  } | null;
+  repickResolvedAt?: string | null;
 };
 
 export type LiveOrder = {
