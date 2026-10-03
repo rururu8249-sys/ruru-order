@@ -5,7 +5,6 @@ import { useMemo, useState } from "react";
 import {
   filterAndSortWidgetHistory,
   selectableWidgetTargets,
-  visibleWidgetHistory,
   widgetRotationDraftChanged,
   widgetTargetKey,
   type WidgetHistoryEntry,
@@ -63,11 +62,10 @@ export default function WidgetProductLibraryPanel({
   onApplyDraft,
   onTogglePause,
 }: Props) {
-  const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<WidgetHistorySort>("recent");
   const filtered = useMemo(() => filterAndSortWidgetHistory(items, search, sort), [items, search, sort]);
-  const visible = visibleWidgetHistory(filtered, expanded, 4);
   const selectableTargets = useMemo(() => selectableWidgetTargets(items), [items]);
   const filteredSelectableTargets = useMemo(() => selectableWidgetTargets(filtered), [filtered]);
   const selectableKeys = useMemo(() => new Set(selectableTargets.map(widgetTargetKey)), [selectableTargets]);
@@ -92,19 +90,19 @@ export default function WidgetProductLibraryPanel({
     ? manualPinLabel
       ? `📌 ${manualPinLabel} 고정 기록`
       : rotation.mode === "selected"
-        ? `저장된 설정 · 선택 상품 ${rotation.targets.length}개 순환`
-        : "저장된 설정 · 전체 진열상품 순환"
+        ? `저장된 위젯 설정 · 선택한 상품 ${rotation.targets.length}개 순환`
+        : "저장된 위젯 설정 · 전체 진열상품 순환"
     : manualPinLabel
-      ? `📌 ${manualPinLabel} 고정 표시 중`
+      ? `방송화면 위젯 · ${manualPinLabel} 고정 표시 중`
       : rotation.mode === "selected"
         ? rotation.paused
-          ? `선택 상품 ${rotation.targets.length}개 순환 일시정지`
-          : `선택 상품 ${rotation.targets.length}개 순환 중`
+          ? `방송화면 위젯 · 선택한 상품 ${rotation.targets.length}개 순환 일시정지`
+          : `방송화면 위젯 · 선택한 상품 ${rotation.targets.length}개 순환 중`
         : rotation.paused
-          ? "전체 진열상품 순환 일시정지"
-          : "전체 진열상품 순환 중";
+          ? "방송화면 위젯 · 전체 진열상품 순환 일시정지"
+          : "방송화면 위젯 · 전체 진열상품 순환 중";
   const waitingStatus = rotation.mode === "selected"
-    ? `선택 상품 ${rotation.targets.length}개 순환 대기 · 고정 해제 시 자동 재개`
+    ? `선택한 상품 ${rotation.targets.length}개 순환 대기 · 고정 해제 시 자동 재개`
     : "전체 진열상품 순환 대기 · 고정 해제 시 자동 재개";
 
   return (
@@ -118,10 +116,10 @@ export default function WidgetProductLibraryPanel({
           <button
             type="button"
             className={styles.ghostButton}
-            aria-label={expanded ? "순환 상품 설정 접기" : "순환 상품 설정 열기"}
-            onClick={() => setExpanded((value) => !value)}
+            aria-label={editing ? "순환 상품 선택·변경 닫기" : "순환 상품 선택·변경"}
+            onClick={() => setEditing((value) => !value)}
           >
-            {expanded ? "▲ 접기" : "순환 설정"}
+            {editing ? "설정 닫기" : "순환 상품 선택·변경"}
           </button>
         ) : null}
       </div>
@@ -134,7 +132,7 @@ export default function WidgetProductLibraryPanel({
               ? "진행 중인 방송을 선택하면 이 설정을 변경할 수 있습니다."
               : manualPinLabel
                 ? waitingStatus
-                : "손님 화면에 적용된 현재 상태입니다."}
+                : "방송 화면 오른쪽 상품 카드에 적용된 상태입니다."}
           </span>
         </div>
         {!manualPinLabel && canManageRotation ? (
@@ -149,25 +147,25 @@ export default function WidgetProductLibraryPanel({
         ) : null}
       </div>
 
-      {expanded ? (
-        <>
-          <div className={styles.toolbar}>
-            <input
-              className={styles.search}
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="상품명·상품번호 검색"
-              aria-label="자주 사용한 상품 검색"
-            />
-            <select className={styles.sort} value={sort} onChange={(event) => setSort(event.target.value as WidgetHistorySort)} aria-label="자주 사용한 상품 정렬">
-              <option value="recent">최근 사용순</option>
-              <option value="frequent">많이 사용한 순</option>
-              <option value="name">상품명순</option>
-            </select>
-          </div>
+      <div className={styles.toolbar}>
+        <input
+          className={styles.search}
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="상품명·상품번호 검색"
+          aria-label="자주 사용한 상품 검색"
+        />
+        <select className={styles.sort} value={sort} onChange={(event) => setSort(event.target.value as WidgetHistorySort)} aria-label="자주 사용한 상품 정렬">
+          <option value="recent">최근 사용순</option>
+          <option value="frequent">많이 사용한 순</option>
+          <option value="name">상품명순</option>
+        </select>
+      </div>
 
+      {editing ? (
+        <>
           <div className={styles.modeSection}>
-            <strong className={styles.sectionLabel}>자동 순환 범위</strong>
+            <strong className={styles.sectionLabel}>순환 방식</strong>
             <div className={styles.modeGroup} role="radiogroup" aria-label="순환 방식">
               <label className={`${styles.modeOption} ${draftMode === "all" ? styles.modeOptionActive : ""}`}>
                 <input
@@ -184,12 +182,12 @@ export default function WidgetProductLibraryPanel({
                 <input
                   type="radio"
                   name="widget-rotation-mode"
-                  aria-label="선택 상품만 순환"
+                  aria-label="원하는 상품만 순환"
                   checked={draftMode === "selected"}
                   disabled={!canManageRotation}
                   onChange={() => onDraftModeChange("selected")}
                 />
-                <span><strong>선택 상품만</strong><small>아래에서 고른 상품만 반복 표시</small></span>
+                <span><strong>원하는 상품만 순환</strong><small>아래 목록에서 고른 상품만 반복 표시</small></span>
               </label>
             </div>
           </div>
@@ -220,23 +218,30 @@ export default function WidgetProductLibraryPanel({
         </>
       ) : null}
 
+      {!loading && items.length > 0 ? (
+        <div className={styles.listMeta}>
+          <strong>{searching ? `검색 결과 ${filtered.length}개` : `전체 ${items.length}개`}</strong>
+          <span>목록 안에서 위아래로 스크롤해 모두 볼 수 있습니다.</span>
+        </div>
+      ) : null}
+
       {loading ? (
         <div className={styles.empty}>자주 사용한 상품을 불러오는 중…</div>
       ) : items.length === 0 ? (
         <div className={styles.empty}>상품을 한 번이라도 고정하면 이곳에 계속 보관됩니다.</div>
-      ) : visible.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <div className={styles.empty}>검색 결과가 없습니다.</div>
       ) : (
-        <div className={`${styles.grid} ${expanded ? styles.expandedGrid : ""}`}>
-          {visible.map((item) => {
+        <div className={`${styles.grid} ${styles.historyGrid}`}>
+          {filtered.map((item) => {
             const key = widgetTargetKey(item);
             const selected = selectedKeys.has(key);
             const busy = busyKey === key;
             const selectable = item.available && item.inBroadcast;
             return (
-              <article key={key} className={`${styles.card} ${expanded && selected ? styles.selectedCard : ""} ${!item.available ? styles.unavailableCard : ""}`}>
-                {expanded ? (
-                  <label className={styles.checkWrap} title={draftMode === "selected" ? "자동 순환에 포함" : "선택 상품만 모드에서 사용할 수 있습니다"}>
+              <article key={key} className={`${styles.card} ${editing && selected ? styles.selectedCard : ""} ${!item.available ? styles.unavailableCard : ""}`}>
+                {editing ? (
+                  <label className={styles.checkWrap} title={draftMode === "selected" ? "자동 순환에 포함" : "원하는 상품만 순환에서 사용할 수 있습니다"}>
                     <input
                       type="checkbox"
                       checked={selected}
@@ -277,7 +282,7 @@ export default function WidgetProductLibraryPanel({
         </div>
       )}
 
-      {expanded && dirty ? (
+      {editing && dirty ? (
         <div className={styles.saveBar} aria-label="순환 설정 변경사항">
           <div className={styles.saveMessage}>
             <strong>변경사항이 아직 방송에 적용되지 않았습니다.</strong>
