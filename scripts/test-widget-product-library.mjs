@@ -2,12 +2,14 @@ import assert from "node:assert/strict";
 
 import {
   mergeWidgetHistory,
+  filterAndSortWidgetHistory,
   parseWidgetHistory,
   parseWidgetLibraryRequest,
   parseWidgetRotation,
   recordWidgetHistory,
   removeWidgetHistory,
   selectWidgetRotationItems,
+  visibleWidgetHistory,
   widgetRotationSettingKey,
 } from "../lib/widgetProductLibrary.ts";
 
@@ -75,5 +77,17 @@ assert.deepEqual(
 );
 assert.equal(parseWidgetLibraryRequest({ action: "saveRotation", broadcastId: "", rotation: {} }), null);
 
-console.log("widget product library tests passed");
+const viewEntries = [
+  { productId: "1", detailName: "", label: "BB-95", count: 2, lastAt: 500 },
+  { productId: "2", detailName: "초코바나나", label: "MIU-201 초코바나나", count: 8, lastAt: 300 },
+  { productId: "3", detailName: "", label: "가방-01", count: 4, lastAt: 700 },
+  { productId: "4", detailName: "", label: "신발-02", count: 1, lastAt: 200 },
+  { productId: "5", detailName: "", label: "의류-03", count: 1, lastAt: 100 },
+];
+assert.deepEqual(filterAndSortWidgetHistory(viewEntries, "miu 201", "recent").map((entry) => entry.productId), ["2"]);
+assert.deepEqual(filterAndSortWidgetHistory(viewEntries, "", "frequent").map((entry) => entry.productId), ["2", "3", "1", "4", "5"]);
+assert.deepEqual(filterAndSortWidgetHistory(viewEntries, "", "recent").map((entry) => entry.productId), ["3", "1", "2", "4", "5"]);
+assert.deepEqual(visibleWidgetHistory(viewEntries, false, 4).map((entry) => entry.productId), ["1", "2", "3", "4"]);
+assert.equal(visibleWidgetHistory(viewEntries, true, 4).length, 5);
 
+console.log("widget product library tests passed");

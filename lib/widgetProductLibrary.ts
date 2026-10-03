@@ -17,6 +17,8 @@ export type WidgetRotationConfig = {
   targets: WidgetProductTarget[];
 };
 
+export type WidgetHistorySort = "recent" | "frequent" | "name";
+
 export type WidgetLibraryRequest =
   | { action: "merge"; entries: WidgetHistoryEntry[] }
   | { action: "record"; target: WidgetProductTarget; label: string }
@@ -131,6 +133,37 @@ export function removeWidgetHistory(entries: unknown, targetInput: WidgetProduct
   return parseWidgetHistory(entries).filter((entry) => widgetTargetKey(entry) !== key);
 }
 
+function normalizeLibrarySearch(value: string): string {
+  return String(value || "")
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko-KR")
+    .replace(/[\s\-_./·()[\]{}]+/g, "");
+}
+
+export function filterAndSortWidgetHistory<T extends WidgetHistoryEntry>(
+  entries: T[],
+  search: string,
+  sort: WidgetHistorySort,
+): T[] {
+  const query = normalizeLibrarySearch(search);
+  const filtered = [...entries].filter((entry) => {
+    if (!query) return true;
+    return normalizeLibrarySearch(`${entry.label} ${entry.detailName} ${entry.productId}`).includes(query);
+  });
+  if (sort === "frequent") {
+    return filtered.sort((a, b) => b.count - a.count || b.lastAt - a.lastAt || a.label.localeCompare(b.label, "ko"));
+  }
+  if (sort === "name") {
+    return filtered.sort((a, b) => a.label.localeCompare(b.label, "ko") || b.lastAt - a.lastAt);
+  }
+  return filtered.sort((a, b) => b.lastAt - a.lastAt || b.count - a.count || a.label.localeCompare(b.label, "ko"));
+}
+
+export function visibleWidgetHistory<T>(entries: T[], expanded: boolean, compactLimit = 4): T[] {
+  if (expanded) return entries;
+  return entries.slice(0, Math.max(1, Math.floor(compactLimit) || 4));
+}
+
 function normalizeTargets(value: unknown): WidgetProductTarget[] {
   if (!Array.isArray(value)) return [];
   const unique = new Map<string, WidgetProductTarget>();
@@ -201,4 +234,3 @@ export function parseWidgetLibraryRequest(value: unknown): WidgetLibraryRequest 
   }
   return null;
 }
-
