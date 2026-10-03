@@ -1,6 +1,7 @@
 "use client";
 import {useEventCustomGift} from './useEventCustomGift';
 import EventCustomGiftStatus from './EventCustomGiftStatus';
+import { formatEventWinnerLabel, type EventWinnerCustomerRef } from "@/lib/eventCustomGift";
 
 import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
@@ -132,6 +133,9 @@ type RouletteWinner = {
   is_test: boolean;
   memo?: string | null;
   created_at?: string;
+  customer_name?: string | null;
+  customer_ref?: EventWinnerCustomerRef | null;
+  identity_status?: "resolved" | "ambiguous" | "not_found";
 };
 
 type BroadcastsPayload = {
@@ -184,6 +188,7 @@ type AdminLiveEventRoulettePanelProps = {
   activeBroadcastId?: string | number | null;
   selectedBroadcastId?: string | number | null;
   filteredOrderGroupIds?: string[]; // 주문서 화면 필터로 현재 보이는 주문 group_id 목록(룰렛 참가자 기준)
+  onOpenCustomer?: (customer: EventWinnerCustomerRef) => void;
 };
 
 type WinnersPayload = {
@@ -302,6 +307,7 @@ export default function AdminLiveEventRoulettePanel({
   activeBroadcastId,
   selectedBroadcastId,
   filteredOrderGroupIds,
+  onOpenCustomer,
 }: AdminLiveEventRoulettePanelProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
@@ -1680,7 +1686,23 @@ export default function AdminLiveEventRoulettePanel({
                   filteredWinners.map((w) => (
                     <div key={`winner-${w.id}`} className="row">
                       <span className="note" style={{ width: "120px", flexShrink: 0 }}>{dateTimeFull(w.winner_at)}</span>
-                      <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.is_test ? "테스트" : "운영"} · {(() => { const ev = events.find((e) => e.id === w.event_id); const token = ev?.overlay_token || ""; return token.startsWith("roulette") ? "🎡룰렛" : token.startsWith("claw") ? "🪆인형뽑기" : token.startsWith("survival") ? "⛈️서바이벌" : token.startsWith("race") ? "🏁달리기" : "이벤트"; })()} · 당첨 <b>{w.nickname}</b> · {w.winner_note || "이벤트 당첨"}</span>
+                      <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {w.is_test ? "테스트" : "운영"} · {(() => { const ev = events.find((e) => e.id === w.event_id); const token = ev?.overlay_token || ""; return token.startsWith("roulette") ? "🎡룰렛" : token.startsWith("claw") ? "🪆인형뽑기" : token.startsWith("survival") ? "⛈️서바이벌" : token.startsWith("race") ? "🏁달리기" : "이벤트"; })()} · 당첨{" "}
+                        {w.customer_ref && onOpenCustomer ? (
+                          <button
+                            type="button"
+                            onClick={() => onOpenCustomer(w.customer_ref!)}
+                            title="회원 상세 열기"
+                            style={{ border: 0, padding: 0, background: "transparent", color: "var(--rose-deep)", fontWeight: 900, textDecoration: "underline", cursor: "pointer" }}
+                          >
+                            {formatEventWinnerLabel(w.nickname, w.customer_name)}
+                          </button>
+                        ) : (
+                          <b title={w.identity_status === "ambiguous" ? "같은 닉네임의 회원이 여러 명이라 자동 연결하지 않았습니다." : undefined}>
+                            {formatEventWinnerLabel(w.nickname, w.customer_name)}
+                          </b>
+                        )}{" "}· {w.winner_note || "이벤트 당첨"}
+                      </span>
                       {w.custom_gift_name&&!w.is_test?<button type="button" className="btn" onClick={()=>{
                         setGiftWinners(previous=>previous.some(x=>x.winnerId===w.id)?previous:[...previous,{winnerId:w.id,isTest:false,customGiftName:w.custom_gift_name||null}]);
                         void customGifts.retry(w.id);

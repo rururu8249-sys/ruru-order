@@ -7,7 +7,7 @@ const originals=await sql('select jsonb_agg(to_jsonb(o) order by id) from orders
 const first=await register(); assert.equal(first.ok,true);assert.equal(first.orderGroupId,'g2');
 const row=JSON.parse(await sql(`select to_jsonb(o) from orders o where event_gift_winner_id='${W}'`));
 for(const k of ['product_price','total_price','final_amount','vat_amount','shipping_fee','point_used_amount','adjusted_product_price','adjusted_total_price','adjusted_shipping_fee','final_shipping_fee']) assert.equal(Number(row[k]),0,k);
-assert.equal(row.qty,1);assert.equal(row.product_name,'선물 A');assert.equal(row.address,'latest-address');assert.equal(row.payment_bank_account,'bank2');
+assert.equal(row.qty,1);assert.equal(row.product_name,'이벤트 선물 A');assert.equal(first.productName,'이벤트 선물 A');assert.equal(row.address,'latest-address');assert.equal(row.payment_bank_account,'bank2');
 for(const k of ['color','size','product_id','picked_at','point_ledger_id','inventory_ledger_id'])assert.equal(row[k],null,k);
 assert.equal(await sql('select jsonb_agg(to_jsonb(o) order by id) from orders o where id<=3'),originals,'original rows must remain unchanged');
 assert.equal((await register()).orderId,first.orderId);assert.equal(await sql('select count(*) from event_custom_gift_receipts'),'1');

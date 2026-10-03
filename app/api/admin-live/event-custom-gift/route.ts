@@ -10,14 +10,31 @@ function db(){
  if(!url||!key)throw new Error('관리자 DB 연결 설정이 없습니다.');
  return createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
 }
+const clean=(value:unknown)=>String(value??'').trim();
+const digits=(value:unknown)=>clean(value).replace(/\D/g,'');
 export async function POST(req:NextRequest){
  if(!await verifyAdminSessionFromRequest(req))return json({ok:false,message:'관리자 로그인이 필요합니다.'},401);
  try{
   const body=await req.json();
   if(!body||typeof body.winnerId!=='string'||!uuid.test(body.winnerId)||Object.keys(body).some(k=>k!=='winnerId'))return json({ok:false,message:'당첨 ID만 전달해 주세요.'},400);
-  const {data,error}=await db().rpc('admin_register_event_custom_gift',{p_winner_id:body.winnerId});
+  const client=db();
+  const {data,error}=await client.rpc('admin_register_event_custom_gift',{p_winner_id:body.winnerId});
   if(error||!data||typeof data.ok!=='boolean')return json({ok:false,message:'경품 저장 결과를 확인하지 못했습니다. 같은 당첨 건으로 재시도해 주세요.'},500);
-  return json(data,data.ok?200:data.code==='WINNER_NOT_FOUND'?404:409);
+  if(!data.ok)return json(data,data.code==='WINNER_NOT_FOUND'?404:409);
+
+  const [{data:winner},{data:order}]=await Promise.all([
+   client.from('event_roulette_winners').select('nickname').eq('id',body.winnerId).maybeSingle(),
+   client.from('orders').select('customer_name,customer_phone,phone,kakao_id,youtube_nickname').eq('id',data.orderId).maybeSingle(),
+  ]);
+  const nickname=clean(winner?.nickname)||clean(order?.youtube_nickname)||null;
+  const phone=digits(order?.customer_phone||order?.phone);
+  const kakao=clean(order?.kakao_id);
+  return json({
+   ...data,
+   nickname,
+   customerName:clean(order?.customer_name)||null,
+   customerRef:nickname&&(phone||kakao)?{kakao,phone,nick:nickname}:null,
+  });
  }catch{return json({ok:false,message:'경품 등록에 실패했습니다. 같은 당첨 건으로 재확인해 주세요.'},500);}
 }
 export async function GET(req:NextRequest){
