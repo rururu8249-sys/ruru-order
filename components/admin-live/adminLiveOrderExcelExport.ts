@@ -4,11 +4,13 @@ import { compareOrderOptions } from "@/lib/orderOptionSort";
 import ExcelJS from "exceljs";
 import type { LiveOrder, LiveOrderItem } from "./types";
 import { paymentStatusLabel } from "@/lib/orderLabels";
+import { buildPickingExportRows } from "@/lib/orderPickingExportRows";
 
 type ExportMeta = {
   filterLabel: string;
   // [2026-09-20] 물건챙기기 엑셀 줄 순서 — 팝업 화면과 같게. product: 상품명→색상→사이즈→시간 / nickname: 닉네임→시간 / time: 시간
   rowOrder?: "product" | "nickname" | "time";
+  visibleItemIds?: string[];
 };
 
 type WorkbookRow = Array<string | number | null>;
@@ -423,7 +425,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   // [2026-09-01 사장님 지시] 「챙김/안챙김」 칸 삭제(팝업 체크로 충분), 맨 끝에 빈 「비고」 칸 추가.
   void pickedIds; // 호출부 서명 유지용 — 챙김 칸이 빠져 더는 안 쓴다
   // [2026-09-01 사장님 지시] 첫 칸에 「날짜」(주문일 MM.DD) — 헤더 아래 데이터 줄부터 채움
-  const headers: WorkbookRow = ["날짜", "닉네임", "상품명", "옵션", "수량", "상품금액", "결제", "비고"];
+  const headers: WorkbookRow = ["구분", "날짜", "닉네임", "상품명", "옵션", "수량", "상품금액", "결제", "비고"];
   const orderDateLabel = (order: LiveOrder) => {
     const src = order.createdAt || order.submittedAt;
     if (!src) return "";
@@ -447,7 +449,18 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
     orderedOrders.sort((a, b) => orderTime(a) - orderTime(b));
   }
 
-  type RowWithKey = { row: WorkbookRow; unpaid: boolean; product: string; color: string; size: string; time: number };
+  const exportStateOrders = pickedIds ? orderedOrders.map((order) => ({
+    ...order,
+    items: (order.items || []).map((item) => pickedIds.has(String(item.id)) ? {
+      ...item,
+      pickedAt: item.pickedAt || "confirmed-in-current-workspace",
+      repickResolvedAt: item.repickRequiredAt ? item.repickRequiredAt : item.repickResolvedAt,
+    } : item),
+  })) : orderedOrders;
+  const builtRows = buildPickingExportRows(exportStateOrders, meta.visibleItemIds);
+  const mainByItemId = new Map(builtRows.mainRows.map((row) => [row.itemId, row]));
+  const visible = meta.visibleItemIds ? new Set(meta.visibleItemIds.map(String)) : null;
+  type RowWithKey = { row: WorkbookRow; unpaid: boolean; attention: boolean; product: string; color: string; size: string; time: number };
   const keyedRows: RowWithKey[] = [];
 
   orderedOrders.forEach((order) => {
@@ -455,7 +468,9 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
     const items = order.items || [];
 
     if (!items.length) {
+      if (visible && !visible.has(String(order.id))) return;
       const row: WorkbookRow = [
+        "일반",
         orderDateLabel(order),
         labelName(order),
         clean(order.orderSummary) || "상품명없음",
@@ -465,12 +480,15 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
       ];
       if (hasUnpaid) row.push(unpaid ? "미입금" : "완료");
       row.push(""); // 비고 — 사장님이 손으로 적는 빈칸
-      keyedRows.push({ row, unpaid, product: clean(order.orderSummary) || "상품명없음", color: "", size: "", time: orderTime(order) });
+      keyedRows.push({ row, unpaid, attention: false, product: clean(order.orderSummary) || "상품명없음", color: "", size: "", time: orderTime(order) });
       return;
     }
 
     items.forEach((item) => {
+      const built = mainByItemId.get(String(item.id));
+      if (!built) return;
       const row: WorkbookRow = [
+        built.kind,
         orderDateLabel(order),
         labelName(order),
         itemName(item),
@@ -480,7 +498,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
       ];
       if (hasUnpaid) row.push(unpaid ? "미입금" : "완료");
       row.push(""); // 비고 — 사장님이 손으로 적는 빈칸
-      keyedRows.push({ row, unpaid, product: itemName(item), color: clean(item.color), size: clean(item.size), time: orderTime(order) });
+      keyedRows.push({ row, unpaid, attention: built.kind !== "일반", product: itemName(item), color: clean(item.color), size: clean(item.size), time: orderTime(order) });
     });
   });
 
@@ -489,6 +507,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   }
   const itemRows: WorkbookRow[] = keyedRows.map((k) => k.row);
   const unpaidRowFlags: boolean[] = keyedRows.map((k) => k.unpaid); // itemRows 와 같은 순서 — 스타일용
+  const attentionRowFlags: boolean[] = keyedRows.map((k) => k.attention);
 
   // [2026-09-20 사장님 지시] 맨 위 합계 3줄(상품값 합계·실제 받은 돈·설명) 삭제 — 팝업 상단에 같은 숫자가 있고,
   //   엑셀에선 1행부터 표가 시작되는 게 정렬·필터에 편하다. (08-31 에 넣었던 것을 되돌림)
@@ -510,14 +529,34 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   const firstDataRow = headerRowNumber + 1;
   itemRows.forEach((_, index) => {
     const row = sheet.getRow(firstDataRow + index);
-    row.getCell(6).numFmt = "#,##0"; // 상품금액 쉼표
+    row.getCell(7).numFmt = "#,##0"; // 상품금액 쉼표
     if (unpaidRowFlags[index]) {
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
         if (colNumber > headers.length) return;
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF48FB1" } }; // 진한 핑크
         cell.font = { bold: true, color: { argb: "FF7A1E2E" } };
       });
+    } else if (attentionRowFlags[index]) {
+      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        if (colNumber > headers.length) return;
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF1D6" } };
+        if (colNumber === 1) cell.font = { bold: true, color: { argb: "FF9A3412" } };
+      });
     }
+  });
+
+  const attentionHeaders: WorkbookRow = ["구분", "주문일시", "결제/변경일시", "방송", "고객", "주문번호", "변경 전", "현재 내용", "확인 내용"];
+  const attentionSheet = workbook.addWorksheet("추가챙김");
+  addRows(attentionSheet, [
+    attentionHeaders,
+    ...builtRows.attentionRows.map((row) => [row.kind, row.orderedAt, row.attentionAt, row.broadcast, row.customer, row.orderNo, row.before, row.current, row.detail]),
+  ]);
+  styleFilterSheet(attentionSheet, 1, Math.max(1, builtRows.attentionRows.length + 1), attentionHeaders.length);
+  setColumnWidths(attentionSheet, [18, 22, 22, 24, 18, 18, 36, 36, 42]);
+  builtRows.attentionRows.forEach((_, index) => {
+    attentionSheet.getRow(index + 2).eachCell({ includeEmpty: true }, (cell) => {
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF1D6" } };
+    });
   });
 
   // [2026-09-01 사장님 지시] 파일명 = 방송이름+날짜+루루

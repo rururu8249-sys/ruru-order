@@ -262,10 +262,13 @@ function buildItem(row: OrderRow): LiveOrderItem {
     amountEditCount: editCounts.amountEditCount,
     changeHistory,
     // [㉕-C] 물건챙기기·출력 기록(표시 전용).
-    pickedAt: (row as Record<string, unknown>).picked_at as string | null ?? null,
-    collectedAt: (row as Record<string, unknown>).collected_at as string | null ?? null,
-    invoicePrintedAt: (row as Record<string, unknown>).invoice_printed_at as string | null ?? null,
-    pickingListPrintedAt: (row as Record<string, unknown>).picking_list_printed_at as string | null ?? null,
+    pickedAt: row.picked_at ?? null,
+    collectedAt: row.collected_at ?? null,
+    invoicePrintedAt: row.invoice_printed_at ?? null,
+    pickingListPrintedAt: row.picking_list_printed_at ?? null,
+    repickRequiredAt: row.repick_required_at ?? null,
+    repickBefore: row.repick_before ?? null,
+    repickResolvedAt: row.repick_resolved_at ?? null,
   };
 }
 

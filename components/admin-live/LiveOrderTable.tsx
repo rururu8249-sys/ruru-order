@@ -908,7 +908,7 @@ export default function LiveOrderTable({
     {cartHoldsOpen ? <LiveCartHoldsModal onClose={() => { setCartHoldsOpen(false); void refreshCartHoldSummary(); }} /> : null}
 
     {pickingOpen ? (
-          <LiveOrderPickingModal orders={pickingScopeOrders.filter(order => pickingOrderIds.has(String(order.id)))} filterLabel={pickingScopeLabel} onClose={() => { setPickingOpen(false); void onRefresh?.(); }} />
+          <LiveOrderPickingModal orders={pickingScopeOrders.filter(order => pickingOrderIds.has(String(order.id)))} filterLabel={pickingScopeLabel} broadcastCalendar={broadcastCalendar} onClose={() => { setPickingOpen(false); void onRefresh?.(); }} />
     ) : null}
     {exportConfirm !== "" ? (
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setExportConfirm("")}>

@@ -55,6 +55,18 @@ export type OrderRow = {
   inventory_restore_ledger_id?: string | null;
   inventory_restore_status?: string | null;
   inventory_restore_memo?: string | null;
+  picked_at?: string | null;
+  collected_at?: string | null;
+  invoice_printed_at?: string | null;
+  picking_list_printed_at?: string | null;
+  repick_required_at?: string | null;
+  repick_before?: {
+    product_name?: string | null;
+    color?: string | null;
+    size?: string | null;
+    qty?: number | null;
+  } | null;
+  repick_resolved_at?: string | null;
   is_deleted: boolean | null;
 };
 
