@@ -64,8 +64,9 @@ export function removePinHistory(productId: string, detailName: string) {
   } catch { /* 무시 */ }
 }
 
-// 자주 고정한 순(횟수 → 최근) 상위 limit개
-export function readPinHistory(limit = 8): PinHistoryEntry[] {
+// 서버 기록으로 옮길 때 기존 브라우저에 남은 최대 30개를 모두 읽는다.
+// limit를 넘기면 예전 호출부처럼 일부만 볼 수 있다.
+export function readPinHistory(limit = MAX_ENTRIES): PinHistoryEntry[] {
   return readRaw()
     .sort((a, b) => b.count - a.count || b.lastAt - a.lastAt)
     .slice(0, limit);

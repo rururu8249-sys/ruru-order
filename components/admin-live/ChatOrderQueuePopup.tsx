@@ -325,7 +325,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
                   </div>
                 ))}
               </div>
-              <div className="mt-1 text-[11px] font-bold text-warn-tx">방송에서 "○○님 주문서 제출해주세요~" 불러주시면 됩니다. 제출하면 자동으로 사라져요.</div>
+              <div className="mt-1 text-[11px] font-bold text-warn-tx">방송에서 “○○님 주문서 제출해주세요~” 불러주시면 됩니다. 제출하면 자동으로 사라져요.</div>
             </div>
           ) : null}
 
@@ -422,7 +422,7 @@ export default function ChatOrderQueuePopup({ onClose, embedded = false }: Props
               <div className="mt-1.5 max-h-32 overflow-auto">
                 {selfCheck.bad.slice(0, 10).map((b, i) => (
                   <div key={i} className="border-t border-warn-tx/35 py-1 font-bold text-warn-tx">
-                    "{b.text}" → <span className="text-danger-tx">{b.got}</span> <span className="opacity-70">(정답: {b.expected})</span>
+                    「{b.text}」 → <span className="text-danger-tx">{b.got}</span> <span className="opacity-70">(정답: {b.expected})</span>
                   </div>
                 ))}
               </div>

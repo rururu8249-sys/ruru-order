@@ -9,11 +9,21 @@ import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { createDraftBroadcast, setBroadcastFeedNotice } from "./liveBroadcastController";
 import ExcelBulkImportPopup from "./ExcelBulkImportPopup";
+import WidgetProductLibraryPanel, { type WidgetProductLibraryItem } from "./WidgetProductLibraryPanel";
 import { brandWordmarkThumbnail, productAutoThumbUrl, productNameThumbnail } from "@/lib/brandWordmarkThumbnail";
 import { adminDetailSearch, buildDetailChatLine, detailProducts, type DetailProduct } from "@/lib/productDetailModel";
 import { buildChatAnnounceText } from "@/lib/chatAnnounce";
 import { savedWidgetAutoMatches, savedWidgetPinMatches, widgetPinTargetBroadcastId } from "@/lib/widgetPinState";
 import { readPinHistory, recordPinHistory, removePinHistory } from "@/lib/pinHistory";
+import {
+  parseWidgetHistory,
+  parseWidgetRotation,
+  recordWidgetHistory,
+  widgetTargetKey,
+  type WidgetHistoryEntry,
+  type WidgetProductTarget,
+  type WidgetRotationConfig,
+} from "@/lib/widgetProductLibrary";
 import { splitOptionText } from "@/lib/optionSplit";
 import { normalizeProductSearchText, productSearchMatches } from "@/lib/productSearch";
 
@@ -258,19 +268,14 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [bcCustomFrom, setBcCustomFrom] = useState<string>(""); // YYYY-MM-DD
   const [bcCustomTo, setBcCustomTo] = useState<string>("");     // YYYY-MM-DD
   const [bcSearch, setBcSearch] = useState<string>("");         // 방송 이름 검색
-  // [2026-08-31 사장님 요청] 📌 자주 고정 — 고정 기록(localStorage) 상위 목록. 표시 전용.
-  const [pinHistoryVersion, setPinHistoryVersion] = useState(0);
-  const pinQuickList = useMemo(() => readPinHistory(8), [pinHistoryVersion]);
-  // [2026-08-31 사장님 지적] 칩이 여러 줄이 되면 아래 상품 목록을 가린다 → 한 줄 고정 + 접기(기억)
-  const [pinListOpen, setPinListOpen] = useState(() => {
-    try { return window.localStorage.getItem("ruru_pin_list_open") !== "false"; } catch { return true; }
-  });
-  const togglePinList = () => {
-    setPinListOpen((prev) => {
-      try { window.localStorage.setItem("ruru_pin_list_open", String(!prev)); } catch { /* 무시 */ }
-      return !prev;
-    });
-  };
+  // [2026-10-03] 한 번이라도 고정한 상품은 서버 settings에 계속 보관한다.
+  // 기존 브라우저 localStorage 기록은 첫 로드 때 idempotent merge하여 과거 목록도 최대한 살린다.
+  const [widgetHistory, setWidgetHistory] = useState<WidgetHistoryEntry[]>([]);
+  const [widgetRotation, setWidgetRotation] = useState<WidgetRotationConfig>({ mode: "all", paused: false, targets: [] });
+  const [widgetSelectedKeys, setWidgetSelectedKeys] = useState<Set<string>>(new Set());
+  const [widgetLibraryLoading, setWidgetLibraryLoading] = useState(false);
+  const [widgetLibraryBusyKey, setWidgetLibraryBusyKey] = useState("");
+  const widgetLibraryLoadSeqRef = useRef(0);
   const [bcWidgetPin, setBcWidgetPin] = useState<{ mode: "auto" | "pin"; productId: string; detailName: string }>({ mode: "auto", productId: "", detailName: "" });
   const [bcExpanded, setBcExpanded] = useState<Set<string>>(new Set());
   // 새 방송 만들기 모달
@@ -402,6 +407,80 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     }
   };
 
+  const postWidgetLibrary = async (body: Record<string, unknown>) => {
+    const response = await fetch("/api/admin-live/widget-library", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify(body),
+    });
+    const json = await response.json().catch(() => null);
+    if (!response.ok || json?.ok === false) throw new Error(json?.error || `요청 실패(${response.status})`);
+    return json as Record<string, unknown>;
+  };
+
+  const loadWidgetLibrary = async (broadcastIdValue: string) => {
+    const requestSeq = ++widgetLibraryLoadSeqRef.current;
+    setWidgetLibraryLoading(true);
+    try {
+      const query = broadcastIdValue ? `?broadcastId=${encodeURIComponent(broadcastIdValue)}` : "";
+      const response = await fetch(`/api/admin-live/widget-library${query}`, { cache: "no-store" });
+      const json = await response.json().catch(() => null);
+      if (!response.ok || json?.ok === false) throw new Error(json?.error || "목록을 불러오지 못했습니다.");
+
+      let history = parseWidgetHistory(json?.history);
+      const legacy = readPinHistory();
+      if (legacy.length > 0) {
+        const merged = await postWidgetLibrary({ action: "merge", entries: legacy });
+        history = parseWidgetHistory(merged.history);
+      }
+      const rotation = parseWidgetRotation(json?.rotation);
+      if (requestSeq !== widgetLibraryLoadSeqRef.current) return;
+      setWidgetHistory(history);
+      setWidgetRotation(rotation);
+      setWidgetSelectedKeys(new Set(rotation.mode === "selected" ? rotation.targets.map(widgetTargetKey) : []));
+    } catch (error) {
+      if (requestSeq !== widgetLibraryLoadSeqRef.current) return;
+      // 서버 목록이 잠시 실패해도 이 컴퓨터의 기존 기록은 바로 쓸 수 있게 유지한다.
+      setWidgetHistory(parseWidgetHistory(readPinHistory()));
+      setWidgetRotation({ mode: "all", paused: false, targets: [] });
+      setWidgetSelectedKeys(new Set());
+      showAdminToast("자주 사용한 위젯 목록을 불러오지 못했습니다. 이 컴퓨터의 기존 기록을 표시합니다.\n\n" + (error instanceof Error ? error.message : String(error)), "warning");
+    } finally {
+      if (requestSeq === widgetLibraryLoadSeqRef.current) setWidgetLibraryLoading(false);
+    }
+  };
+
+  const recordWidgetUsage = async (input: WidgetProductTarget & { label: string }) => {
+    recordPinHistory(input);
+    setWidgetHistory((previous) => recordWidgetHistory(previous, input));
+    try {
+      const json = await postWidgetLibrary({ action: "record", target: input, label: input.label });
+      setWidgetHistory(parseWidgetHistory(json.history));
+    } catch {
+      // 기록 저장은 방송 고정 성공 여부와 분리한다. 다음 로드에서 로컬 기록을 다시 병합한다.
+    }
+  };
+
+  const saveWidgetRotation = async (next: WidgetRotationConfig) => {
+    const targetBroadcastId = widgetPinTargetBroadcastId(bcSelId, activeBroadcastId);
+    if (!targetBroadcastId) {
+      showAdminToast("자동 순환은 현재 진행 중인 방송에서만 변경할 수 있습니다.", "warning");
+      return false;
+    }
+    try {
+      const json = await postWidgetLibrary({ action: "saveRotation", broadcastId: targetBroadcastId, rotation: next });
+      const saved = parseWidgetRotation(json.rotation);
+      setWidgetRotation(saved);
+      setWidgetSelectedKeys(new Set(saved.mode === "selected" ? saved.targets.map(widgetTargetKey) : []));
+      window.dispatchEvent(new Event("ruru-live-product-updated"));
+      return true;
+    } catch (error) {
+      showAdminToast("자동 순환 설정 저장 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
+      return false;
+    }
+  };
+
   // 현재 방송의 순환 목록(broadcast_products) product_id 세트
   const loadRotationIds = async () => {
     if (!activeBroadcastId) {
@@ -426,6 +505,13 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     return () => window.removeEventListener("ruru-live-product-updated", onUpdated);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeBroadcastId]);
+
+  useEffect(() => {
+    if (tab !== "broadcast") return;
+    const targetId = bcSelId;
+    queueMicrotask(() => void loadWidgetLibrary(targetId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, bcSelId]);
 
   useEffect(() => {
     setVisibleCount(PAGE_STEP);
@@ -1200,7 +1286,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       if (!savedWidgetAutoMatches(data as Record<string, unknown> | null)) throw new Error("DB 고정 해제값 확인에 실패했습니다.");
       setBcWidgetPin({ mode: "auto", productId: "", detailName: "" });
       window.dispatchEvent(new Event("ruru-live-product-updated"));
-      showAdminToast("위젯 고정을 해제했습니다. 다시 자동 순환합니다.", "success");
+      showAdminToast("위젯 고정을 해제했습니다. 설정된 상품 순환으로 돌아갑니다.", "success");
     } catch (e) {
       await loadBcWidgetPin(targetBroadcastId);
       showAdminToast("고정 해제 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
@@ -1230,9 +1316,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       if (error) throw error;
       if (!savedWidgetPinMatches(data as Record<string, unknown> | null, { productId: pid, detailName })) throw new Error("DB에 고정값이 저장되지 않았습니다. 다시 눌러주세요.");
       setBcWidgetPin({ mode: "pin", productId: pid, detailName });
-      // [2026-08-31] 고정 기록 — 「📌 자주 고정」 원클릭 목록용 (실패해도 고정은 정상)
-      recordPinHistory({ productId: pid, detailName, label: detail?.detailName || productName(p) });
-      setPinHistoryVersion((v) => v + 1);
+      // [2026-10-03] 성공한 고정은 서버 보관 목록에 누적한다. 기록 실패가 고정 성공을 되돌리지는 않는다.
+      await recordWidgetUsage({ productId: pid, detailName, label: detail?.detailName || productName(p) });
       window.dispatchEvent(new Event("ruru-live-product-updated"));
       showAdminToast(`${detail?.detailName || productName(p)} 위젯 고정 완료`, "success");
     } catch (e) {
@@ -1260,6 +1345,104 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       }
     }
     await broadcastOneClick(row, detail);
+  };
+
+  const widgetLibraryItems = useMemo<WidgetProductLibraryItem[]>(() => {
+    const byId = new Map(products.map((row) => [productId(row), row]));
+    const broadcastIds = new Set(bcProducts.map((row) => productId(row)));
+    return widgetHistory.map((entry) => {
+      const row = byId.get(entry.productId);
+      let detail: DetailProduct | undefined;
+      if (row && entry.detailName) {
+        try {
+          detail = detailProducts(row, { includeHidden: true }).find((item) => item.detailName === entry.detailName);
+        } catch {
+          detail = undefined;
+        }
+      }
+      const status = row ? pickString(row, ["status", "product_status"], "").toLowerCase() : "";
+      const hidden = status === "deleted" || status === "숨김" || Boolean(detail?.hidden);
+      const soldOut = detail
+        ? detail.stockManaged && detail.stock !== null && detail.stock <= 0
+        : row ? pickBoolean(row, ["is_soldout"], false) : false;
+      const detailMissing = Boolean(row && entry.detailName && !detail);
+      const available = Boolean(row) && !hidden && !soldOut && !detailMissing;
+      const image = detail?.image || (row ? mainImage(row) : "");
+      const priceLabel = detail
+        ? `${detail.price.toLocaleString("ko-KR")}원`
+        : row ? productPriceLabel(row) : "상품 정보 없음";
+      return {
+        ...entry,
+        image,
+        priceLabel,
+        available,
+        inBroadcast: broadcastIds.has(entry.productId),
+        unavailableReason: !row ? "삭제된 상품" : detailMissing ? "세부상품 없음" : soldOut ? "품절" : hidden ? "숨김 상품" : "",
+      };
+    });
+  }, [bcProducts, products, widgetHistory]);
+
+  const toggleWidgetLibrarySelection = (target: WidgetProductTarget) => {
+    const key = widgetTargetKey(target);
+    setWidgetSelectedKeys((previous) => {
+      const next = new Set(previous);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const startWidgetLibraryRotation = async () => {
+    const allowed = new Set(widgetLibraryItems.filter((item) => item.available && item.inBroadcast).map(widgetTargetKey));
+    const targets = widgetHistory
+      .filter((entry) => widgetSelectedKeys.has(widgetTargetKey(entry)) && allowed.has(widgetTargetKey(entry)))
+      .map(({ productId: id, detailName }) => ({ productId: id, detailName }));
+    if (targets.length === 0) {
+      showAdminToast("현재 방송에서 순환할 수 있는 상품을 선택해주세요.", "warning");
+      return;
+    }
+    if (await saveWidgetRotation({ mode: "selected", paused: false, targets })) {
+      showAdminToast(`선택한 ${targets.length}개 상품만 자동 순환합니다.`, "success");
+    }
+  };
+
+  const toggleWidgetLibraryPause = async () => {
+    if (widgetRotation.mode !== "selected") return;
+    const next = { ...widgetRotation, paused: !widgetRotation.paused };
+    if (await saveWidgetRotation(next)) {
+      showAdminToast(next.paused ? "상품 위젯 순환을 잠시 멈췄습니다." : "상품 위젯 순환을 다시 시작했습니다.", "success");
+    }
+  };
+
+  const resetWidgetLibraryRotation = async () => {
+    if (await saveWidgetRotation({ mode: "all", paused: false, targets: [] })) {
+      showAdminToast("현재 방송의 전체 진열 상품 순환으로 돌아갑니다.", "success");
+    }
+  };
+
+  const removeWidgetLibraryItem = async (target: WidgetProductTarget) => {
+    const key = widgetTargetKey(target);
+    const previous = widgetHistory;
+    setWidgetHistory((items) => items.filter((entry) => widgetTargetKey(entry) !== key));
+    setWidgetSelectedKeys((items) => { const next = new Set(items); next.delete(key); return next; });
+    removePinHistory(target.productId, target.detailName);
+    try {
+      const json = await postWidgetLibrary({ action: "remove", target });
+      setWidgetHistory(parseWidgetHistory(json.history));
+    } catch (error) {
+      setWidgetHistory(previous);
+      showAdminToast("자주 사용한 목록에서 삭제하지 못했습니다.\n\n" + (error instanceof Error ? error.message : String(error)), "error");
+    }
+  };
+
+  const pinWidgetLibraryItem = async (item: WidgetProductLibraryItem) => {
+    const key = widgetTargetKey(item);
+    setWidgetLibraryBusyKey(key);
+    try {
+      await pinFromHistory(item);
+    } finally {
+      setWidgetLibraryBusyKey("");
+    }
   };
 
   const copyTextToClipboard = async (text:string) => { if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(text);return;} const ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta); };
@@ -1803,58 +1986,23 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 ) : null}
               </div>
               <div style={{ padding: "8px 12px 0" }}>
-                {/* [2026-08-31 사장님 요청] 📌 자주 고정 — 고정했다 풀었다 반복하는 상품 원클릭 재고정 */}
-                {pinQuickList.length > 0 && !bcCopyMode ? (
-                  <div style={{ margin: "0 0 8px", padding: "6px 8px 8px", borderRadius: "8px", border: "1px solid var(--color-rose-line)", background: "var(--color-rose-soft)" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: pinListOpen ? "6px" : 0 }}>
-                      <span style={{ fontSize: "11px", fontWeight: 900, color: "var(--color-rose-deep)" }}>📌 자주 고정한 상품 — 누르면 바로 「▶ 방송」 · 사진 클릭=확대 · ✕=목록에서 삭제</span>
-                      <button type="button" onClick={togglePinList} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 900, color: "var(--color-rose-deep)", background: "var(--color-surface)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "2px 8px", cursor: "pointer" }}>{pinListOpen ? "▲ 접기" : "▼ 펴기"}</button>
-                    </div>
-                    {pinListOpen ? (
-                    <div style={{ display: "flex", flexWrap: "nowrap", overflowX: "auto", gap: "6px", paddingBottom: "2px" }}>
-                      {pinQuickList.map((entry) => {
-                        // [2026-08-31 사장님 지적] 글자만으론 무슨 상품인지 모른다 → 썸네일 + 클릭 확대
-                        const historyRow = bcProducts.find((r) => productId(r) === entry.productId);
-                        let historyImg = "";
-                        if (historyRow) {
-                          if (entry.detailName) {
-                            try { historyImg = detailProducts(historyRow, { includeHidden: true }).find((d) => d.detailName === entry.detailName)?.image || ""; } catch { /* 대표사진 폴백 */ }
-                          }
-                          if (!historyImg) historyImg = mainImage(historyRow);
-                        }
-                        return (
-                          <button
-                            key={`${entry.productId}|${entry.detailName}`}
-                            type="button"
-                            disabled={bcPinBusy}
-                            onClick={() => void pinFromHistory(entry)}
-                            title={`지금까지 ${entry.count}번 고정 — 클릭 한 번이면 고정+채팅 지정+문구 복사까지 끝 (사진을 누르면 크게 보기)`}
-                            style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, maxWidth: "250px", fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", background: "var(--color-surface)", border: "1px solid var(--color-rose-line)", borderRadius: "999px", padding: "4px 8px 4px 4px", cursor: bcPinBusy ? "wait" : "pointer" }}
-                          >
-                            <span
-                              onClick={(e) => { if (historyImg) { e.stopPropagation(); setLightbox(historyImg); } }}
-                              title={historyImg ? "사진 크게 보기" : undefined}
-                              style={{ width: "30px", height: "30px", flexShrink: 0, borderRadius: "50%", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: historyImg ? "zoom-in" : "inherit" }}
-                            >
-                              {historyImg ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={historyImg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                              ) : "🖼"}
-                            </span>
-                            <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {entry.label} <span style={{ color: "var(--color-rose-deep)", fontWeight: 900 }}>×{entry.count}</span>
-                            </span>
-                            <span
-                              onClick={(e) => { e.stopPropagation(); removePinHistory(entry.productId, entry.detailName); setPinHistoryVersion((v) => v + 1); }}
-                              title="이 상품을 자주 고정 목록에서 삭제"
-                              style={{ flexShrink: 0, width: "16px", height: "16px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 900, color: "var(--color-ink-mute)", background: "var(--color-surface-2)", cursor: "pointer" }}
-                            >✕</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    ) : null}
-                  </div>
+                {/* [2026-10-03] 빠른 재사용은 한 줄 카드, 전체 진열상품은 바로 아래 큰 작업영역으로 유지한다. */}
+                {!bcCopyMode ? (
+                  <WidgetProductLibraryPanel
+                    items={widgetLibraryItems}
+                    rotation={widgetRotation}
+                    selectedKeys={widgetSelectedKeys}
+                    loading={widgetLibraryLoading}
+                    busyKey={widgetLibraryBusyKey}
+                    canManageRotation={Boolean(widgetPinTargetBroadcastId(bcSelId, activeBroadcastId))}
+                    onPreview={setLightbox}
+                    onPin={(item) => void pinWidgetLibraryItem(item)}
+                    onRemove={(target) => void removeWidgetLibraryItem(target)}
+                    onToggleSelected={toggleWidgetLibrarySelection}
+                    onStartRotation={() => void startWidgetLibraryRotation()}
+                    onTogglePause={() => void toggleWidgetLibraryPause()}
+                    onResetRotation={() => void resetWidgetLibraryRotation()}
+                  />
                 ) : null}
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 8px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid var(--color-line)", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
                 {bcSelId && bcProducts.length > 0 && !bcDragEnabled && !bcCopyMode ? (
@@ -1884,7 +2032,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 if (bcWidgetPin.mode !== "pin") {
                   return (
                     <div style={{ margin: "0 12px 8px", padding: "8px 8px", borderRadius: "8px", background: "var(--color-surface-2)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 900 }}>
-                      ↻ 자동 순환 중
+                      {widgetRotation.mode === "selected"
+                        ? widgetRotation.paused
+                          ? `Ⅱ 선택 상품 ${widgetRotation.targets.length}개 순환 일시정지`
+                          : `↻ 선택 상품 ${widgetRotation.targets.length}개 자동 순환 중`
+                        : "↻ 현재 방송의 전체 진열 상품 자동 순환 중"}
                     </div>
                   );
                 }

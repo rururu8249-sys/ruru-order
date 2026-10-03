@@ -1093,7 +1093,7 @@ export default function LiveOrderTable({
           <button
             type="button"
             onClick={() => { setCartHoldsOpen(true); setCartHoldCountChanged(false); }}
-            className={`relative inline-flex items-center gap-1.5 rounded-xl border bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2 ${cartHoldCountChanged ? "border-red-400 ring-2 ring-red-200" : "border-line"}`}
+            className={`relative inline-flex items-center gap-1.5 rounded-xl border bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2 ${cartHoldCountChanged ? "border-danger-tx ring-2 ring-danger-tx/30" : "border-line"}`}
             title={cartHoldSummaryReady
               ? `주문서 제출 전 장바구니 ${cartHoldSummary.cartCount}명 · 상품 ${cartHoldSummary.totalQty}개`
               : "장바구니에 담기만 하고 아직 주문서 제출 안 한 고객 목록을 봅니다"}
@@ -1105,7 +1105,7 @@ export default function LiveOrderTable({
             {cartHoldSummaryReady && cartHoldSummary.totalQty > 0 ? (
               <span
                 aria-label={`담긴 상품 ${cartHoldSummary.totalQty}개`}
-                className={`absolute -right-2 -top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black leading-none text-white shadow ${cartHoldCountChanged ? "animate-pulse" : ""}`}
+                className={`absolute -right-2 -top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-danger-tx px-1 text-[11px] font-black leading-none text-white shadow ${cartHoldCountChanged ? "animate-pulse" : ""}`}
               >
                 {cartHoldSummary.totalQty > 99 ? "99+" : cartHoldSummary.totalQty}
               </span>

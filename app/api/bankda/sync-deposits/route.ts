@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
 
     const bankdaDescription = String((raw as any)?.response?.description || "");
 
-    let existing: any[] = [];
+    const existing: any[] = [];
     let existingError: any = null;
     {
       const pageSize = 1000;
