@@ -1,5 +1,9 @@
 import { randomUUID } from "crypto";
-import {normalizeCustomGiftName} from '@/lib/eventCustomGift';
+import {
+  normalizeCustomGiftName,
+  resolveEventWinnerIdentity,
+  type EventWinnerOrderIdentity,
+} from '@/lib/eventCustomGift';
 import {eventSaveError} from '@/lib/eventSaveError';
 import { NextRequest, NextResponse } from "next/server";
 import {calculateEventDurationMs, eventSeed} from "@/lib/eventPlayback";
@@ -881,7 +885,7 @@ async function handleWinners(request: NextRequest) {
 
   let query = supabase
     .from("event_roulette_winners")
-    .select("id, event_id, nickname, winner_note, winner_at, is_reward_done, reward_done_at, is_test, memo, created_at, updated_at")
+    .select("id, event_id, nickname, winner_order_ids, winner_note, winner_at, is_reward_done, reward_done_at, is_test, memo, created_at, updated_at")
     .order("winner_at", { ascending: false })
     .limit(100);
 
@@ -895,12 +899,83 @@ async function handleWinners(request: NextRequest) {
     return json({ ok: false, message: error.message || "룰렛 당첨자 조회 실패" }, 500);
   }
 
-  const rows=(data||[]) as {event_id:string}[];
+  type WinnerRow = {
+    id: string;
+    event_id: string;
+    nickname: string;
+    winner_order_ids?: unknown;
+  } & Record<string, unknown>;
+  type EventMeta = { id: string; custom_gift_name: string | null; broadcast_id: string | null };
+  type OrderIdentityRow = {
+    id: string | number;
+    broadcast_id?: string | null;
+    youtube_nickname?: string | null;
+    customer_id?: string | number | null;
+    customer_name?: string | null;
+    customer_phone?: string | null;
+    phone?: string | null;
+    kakao_id?: string | null;
+    created_at?: string | null;
+  };
+
+  const rows=(data||[]) as WinnerRow[];
   const ids=[...new Set(rows.map(w=>w.event_id).filter(Boolean))];
-  const metadata=ids.length?await supabase.from('event_roulette_events').select('id,custom_gift_name').in('id',ids):{data:[],error:null};
+  const metadata=ids.length?await supabase.from('event_roulette_events').select('id,custom_gift_name,broadcast_id').in('id',ids):{data:[],error:null};
   if(metadata.error)return json({ok:false,message:'경품 기록 확인에 실패했습니다.'},500);
-  const gifts=new Map((metadata.data||[]).map(e=>[e.id,e.custom_gift_name]));
-  return json({ ok: true, winners: rows.map(w=>({...w,custom_gift_name:gifts.get(w.event_id)||null})) });
+  const eventMeta=new Map(((metadata.data||[]) as EventMeta[]).map(event=>[event.id,event]));
+  const exactOrderIds=[...new Set(rows.flatMap(row=>Array.isArray(row.winner_order_ids)?row.winner_order_ids.map(cleanText):[]).filter(Boolean))];
+  const broadcastIds=[...new Set([...eventMeta.values()].map(event=>cleanText(event.broadcast_id)).filter(Boolean))];
+  const nicknames=[...new Set(rows.map(row=>cleanText(row.nickname)).filter(Boolean))];
+  const orderSelect='id,broadcast_id,youtube_nickname,customer_id,customer_name,customer_phone,phone,kakao_id,created_at';
+  const orderRows:OrderIdentityRow[]=[];
+
+  for(let start=0;start<exactOrderIds.length;start+=100){
+    const result=await supabase.from('orders').select(orderSelect).in('id',exactOrderIds.slice(start,start+100)).limit(5000);
+    if(result.error)return json({ok:false,message:'당첨 주문의 회원 정보를 확인하지 못했습니다.'},500);
+    orderRows.push(...((result.data||[]) as OrderIdentityRow[]));
+  }
+
+  if(broadcastIds.length&&nicknames.length){
+    for(let start=0;start<nicknames.length;start+=40){
+      const result=await supabase.from('orders').select(orderSelect)
+        .in('broadcast_id',broadcastIds).in('youtube_nickname',nicknames.slice(start,start+40)).limit(5000);
+      if(result.error)return json({ok:false,message:'이전 이벤트의 회원 정보를 확인하지 못했습니다.'},500);
+      orderRows.push(...((result.data||[]) as OrderIdentityRow[]));
+    }
+  }
+
+  const uniqueOrders=new Map<string,EventWinnerOrderIdentity>();
+  for(const order of orderRows){
+    const id=cleanText(order.id);
+    if(!id)continue;
+    uniqueOrders.set(id,{
+      id,
+      broadcastId:cleanText(order.broadcast_id),
+      nickname:cleanText(order.youtube_nickname),
+      customerId:cleanText(order.customer_id),
+      customerName:cleanText(order.customer_name),
+      phone:cleanText(order.customer_phone||order.phone),
+      kakaoId:cleanText(order.kakao_id),
+      createdAt:cleanText(order.created_at),
+    });
+  }
+  const identityOrders=[...uniqueOrders.values()];
+
+  return json({ ok: true, winners: rows.map(row=>{
+    const event=eventMeta.get(row.event_id);
+    const winnerOrderIds=Array.isArray(row.winner_order_ids)?row.winner_order_ids.map(cleanText).filter(Boolean):[];
+    const identity=resolveEventWinnerIdentity({
+      winner:{nickname:row.nickname,winnerOrderIds,broadcastId:cleanText(event?.broadcast_id)},
+      orders:identityOrders,
+    });
+    return {
+      ...row,
+      custom_gift_name:event?.custom_gift_name||null,
+      customer_name:identity.customerName,
+      customer_ref:identity.customerRef,
+      identity_status:identity.status,
+    };
+  }) });
 }
 
 async function createEvent(body: Record<string, unknown>) {
@@ -1140,6 +1215,7 @@ async function spinEvent(body: Record<string, unknown>) {
       .insert({
         event_id: eventId,
         nickname: picked.winner.nickname,
+        winner_order_ids: picked.winner.orderIds || [],
         winner_note: winnerNote,
         winner_at: now,
         is_reward_done: false,
@@ -1313,6 +1389,12 @@ async function resolveSurvivalEvent(body: Record<string, unknown>) {
         toInsert.map((nickname) => ({
           event_id: eventId,
           nickname,
+          winner_order_ids:
+            survivors.find(
+              (survivor) =>
+                normalizeWinnerNicknameForDedupe(survivor.nickname) ===
+                normalizeWinnerNicknameForDedupe(nickname),
+            )?.orderIds || [],
           winner_note: winnerNote,
           winner_at: now,
           is_reward_done: false,

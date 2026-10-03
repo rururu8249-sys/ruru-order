@@ -39,6 +39,9 @@ type Props = {
    *   값이 «매번 달라지는» 시각을 같이 보내 요청 때마다 확실히 전환한다.
    *   (탭 이름만 비교하면 같은 탭을 두 번째로 요청할 때 또 안 먹는 함정이 생긴다) */
   openTabAt?: number;
+  /** 이벤트 기록에서 당첨자 이름을 눌렀을 때 정확한 회원 상세를 연다. */
+  openCustomerRef?: LoyaltyCustomerRef | null;
+  openCustomerAt?: number;
   /** [2026-09-21] 「고객이슈」 탭 배지에 쓸 미해결 건수.
    *   위쪽 알림 띠가 이미 admin_tasks 를 읽으므로 그 값을 받아 쓴다(조회를 두 번 하지 않는다). */
   openIssueCount?: number;
@@ -1125,7 +1128,7 @@ function CustomerDetailDrawer({
 //   방송 중에 타이핑할 시간이 없다. 눌러서 넣고 필요하면 고쳐 쓴다.
 //   ⚠️ 문구만이다. 누르는 순간 나가지 않는다 — 입력창에 채워질 뿐이고 [보내기]를 눌러야 발송된다.
 
-export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = "members", openTabAt = 0, openIssueCount = 0, embedded = false, onTabChange }: Props) {
+export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = "members", openTabAt = 0, openCustomerRef = null, openCustomerAt = 0, openIssueCount = 0, embedded = false, onTabChange }: Props) {
   // [2026-09-09] «계정 연결 요청» 탭 추가 — 손님이 카톡을 바꿔 회원이 갈라졌을 때 들어오는 요청함
   // [2026-09-26] 교환·환불은 «고객이슈 안»에서 처리(별도 탭 없음). refund 관련 탭/리스너 제거.
   const [custTab, setCustTab] = useState<"members" | "issues" | "loyalty" | "link">(initialTab);
@@ -1739,6 +1742,34 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
     }
     openDetail(found);
   };
+
+  useEffect(() => {
+    if (!openCustomerAt || !openCustomerRef) return;
+    const kakaoKey = clean(openCustomerRef.kakao);
+    const phoneKey = digitsOnly(openCustomerRef.phone);
+    const nickKey = clean(openCustomerRef.nick).toLowerCase();
+    const nicknameMatches = nickKey
+      ? customers.filter((customer) => clean(customer.nickname).toLowerCase() === nickKey)
+      : [];
+    const found =
+      (kakaoKey ? customers.find((customer) => clean(customer.kakaoId) === kakaoKey) : undefined) ||
+      (phoneKey ? customers.find((customer) => digitsOnly(customer.phone) === phoneKey) : undefined) ||
+      (nicknameMatches.length === 1 ? nicknameMatches[0] : undefined);
+
+    if (!found) {
+      showAdminToast(
+        nicknameMatches.length > 1
+          ? "같은 닉네임의 회원이 여러 명이라 회원 상세를 자동으로 열지 않았습니다."
+          : "당첨자의 회원 정보를 찾지 못했습니다.",
+        "info",
+      );
+      return;
+    }
+    const timer = window.setTimeout(() => openDetail(found), 0);
+    // openCustomerAt is the request token; customer data is already present in the dashboard order snapshot.
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openCustomerAt]);
 
   const applyBlockResult = (result: { phone: string; blocked: boolean; reason: string }) => {
     const phoneKey = digitsOnly(result.phone);

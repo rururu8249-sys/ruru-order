@@ -71,6 +71,7 @@ import AdminLiveQuickProductDrawer from "./AdminLiveQuickProductDrawer";
 import AdminLiveProductManagePopup, { type ProductManageTab } from "./AdminLiveProductManagePopup";
 import AdminLiveCardPayPopup from "./AdminLiveCardPayPopup";
 import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
+import type { EventWinnerCustomerRef } from "@/lib/eventCustomGift";
 import ChatOrderQueuePopup from "./ChatOrderQueuePopup";
 import ChatOrderReaderLoop from "./ChatOrderReaderLoop";
 import {
@@ -565,6 +566,8 @@ export default function AdminLiveDashboard() {
   // [2026-09-21] 「바로 처리 →」 를 누른 «시각». 탭 이름만 넘기면 두 번째 클릭부터 안 먹는다
   //   (같은 값이라 화면이 바뀐 걸 모른다). 시각은 누를 때마다 달라지므로 매번 확실히 열린다.
   const [customersOpenTabAt, setCustomersOpenTabAt] = useState(0);
+  const [eventCustomerRef, setEventCustomerRef] = useState<EventWinnerCustomerRef | null>(null);
+  const [eventCustomerOpenAt, setEventCustomerOpenAt] = useState(0);
   // 고객이슈 미해결 건수 — 위 알림 띠가 읽은 값을 탭 배지에도 그대로 쓴다(조회 1번).
   const [openIssueCount, setOpenIssueCount] = useState(0);
   // [2026-09-08 5단계] 오른쪽 방송 레일 열림 — null 이면 "방송 중이면 열림, 아니면 접힘"(자동), 손잡이를 누르면 고정
@@ -1718,6 +1721,14 @@ export default function AdminLiveDashboard() {
                   activeBroadcastId={activeBroadcast?.id || null}
                   selectedBroadcastId={filters.broadcast === "current" ? activeBroadcast?.id || null : broadcasts.find((broadcast) => broadcast.id === filters.broadcast)?.id || null}
                   filteredOrderGroupIds={filteredOrders.map((o) => String(o.groupId))}
+                  onOpenCustomer={(customerRef) => {
+                    const requestedAt = Date.now();
+                    setEventCustomerRef(customerRef);
+                    setEventCustomerOpenAt(requestedAt);
+                    setCustomersInitialTab("members");
+                    setCustomersOpenTabAt(requestedAt);
+                    setActiveMenu("customers");
+                  }}
                 />
               </div>
 
@@ -1816,6 +1827,8 @@ export default function AdminLiveDashboard() {
                       orders={orders}
                       initialTab={customersInitialTab}
                       openTabAt={customersOpenTabAt}
+                      openCustomerRef={eventCustomerRef}
+                      openCustomerAt={eventCustomerOpenAt}
                       openIssueCount={openIssueCount}
                       onTabChange={setCustomersActiveTab}
                       onClose={() => setCustomersInitialTab("members")}
