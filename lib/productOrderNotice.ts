@@ -118,3 +118,28 @@ export function resolveProductNoticeFor(input: {
   if (pm !== "inherit") return resolveProductOrderNotice(pm, input.productCustom);
   return resolveProductOrderNotice(input.globalMode, input.globalCustom);
 }
+
+export type ProductNoticePresentation = {
+  badge: string;
+  message: string;
+};
+
+/**
+ * 손님 주문 시트의 표시 형태.
+ * 기본 상태는 가격 옆의 짧은 배지로, 직접 입력한 긴 문구는 잘라내지 않고 일반 안내문으로 보여준다.
+ */
+export function resolveProductNoticePresentationFor(input: {
+  productMode?: unknown;
+  productCustom?: unknown;
+  globalMode?: unknown;
+  globalCustom?: unknown;
+}): ProductNoticePresentation {
+  const productMode = parseProductNoticeProductMode(input.productMode);
+  const mode = productMode === "inherit" ? parseProductNoticeMode(input.globalMode) : productMode;
+  const custom = productMode === "inherit" ? input.globalCustom : input.productCustom;
+
+  if (mode === "instant") return { badge: "바로 구매 가능", message: "" };
+  if (mode === "live_only") return { badge: "방송 접수 후 구매 가능", message: "" };
+  if (mode === "custom") return { badge: "", message: resolveProductOrderNotice(mode, custom) };
+  return { badge: "", message: "" };
+}

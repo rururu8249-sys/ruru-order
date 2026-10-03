@@ -102,3 +102,33 @@ console.log("✅ product order notice (상품별) OK");
   });
 }
 console.log("✅ product order notice (두 줄) OK");
+
+// ── [2026-10-03 고객 피드백] 하단 고정 띠 → 가격 옆 상태 배지 ──────────────────────
+{
+  const { resolveProductNoticePresentationFor } = await import("../lib/productOrderNotice.ts");
+
+  assert.deepEqual(
+    resolveProductNoticePresentationFor({ globalMode: "instant" }),
+    { badge: "바로 구매 가능", message: "" },
+    "바로 구매 상태는 가격 옆에 한눈에 읽히는 배지로 보여야 한다",
+  );
+  assert.deepEqual(
+    resolveProductNoticePresentationFor({ globalMode: "live_only" }),
+    { badge: "방송 접수 후 구매 가능", message: "" },
+    "방송 접수가 필요한 상품은 조건이 분명해야 한다",
+  );
+  assert.deepEqual(resolveProductNoticePresentationFor({ globalMode: "off" }), { badge: "", message: "" });
+
+  // 긴 직접입력 안내를 배지에 잘라 넣지 않고 일반 안내문으로 보존한다.
+  assert.deepEqual(
+    resolveProductNoticePresentationFor({ globalMode: "custom", globalCustom: "  예약 상품이어서 방송 중 확정된 분만 주문해 주세요  " }),
+    { badge: "", message: "예약 상품이어서 방송 중 확정된 분만 주문해 주세요" },
+  );
+
+  // 상품별 설정이 전체 기본값보다 먼저인 기존 규칙을 배지에서도 지킨다.
+  assert.deepEqual(
+    resolveProductNoticePresentationFor({ productMode: "instant", globalMode: "live_only" }),
+    { badge: "바로 구매 가능", message: "" },
+  );
+}
+console.log("✅ product order notice (가격 옆 배지) OK");

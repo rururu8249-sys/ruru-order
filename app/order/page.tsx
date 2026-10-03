@@ -55,7 +55,7 @@ import { brandWordmarkThumbnail, normalizeBrandKorean, productNameThumbnail, pro
 import { toOptionList } from "@/lib/optionSplit";
 import { widgetPinnedProductId } from "@/lib/widgetPinState";
 // [2026-09-22] 상품 주문 안내 문구 — 문구 원문은 lib 한 곳에서만 정한다(관리자 설정과 같은 파일)
-import { resolveProductNoticeFor, splitProductOrderNotice } from "@/lib/productOrderNotice";
+import { resolveProductNoticePresentationFor } from "@/lib/productOrderNotice";
 import {
   CUSTOMER_SESSION_VERSION_KEY,
   YOUTUBE_NICKNAME_CONFIRM_VERSION_KEY,
@@ -7866,6 +7866,13 @@ export default function OrderPage() {
             const optionSheetHasPhoto = Boolean(registeredOptionBrandDetailPhotos[0] || registeredOptionComboPhotos[registeredOptionDetail] || pickOrderProductImageUrl(registeredOptionSelectProduct) || registeredOptionAllImages.length > 0);
             const optionSheetSimple = !registeredOptionBrandGroup && !registeredOptionComboInfo && !registeredOptionAxes3;
             const optionSheetHalf = !optionSheetHasPhoto && optionSheetSimple;
+            const optionNoticeNote = (parseProductSuggestionNote(registeredOptionSelectProduct.product_note) || {}) as Record<string, unknown>;
+            const optionNoticePresentation = resolveProductNoticePresentationFor({
+              productMode: optionNoticeNote.order_notice_mode,
+              productCustom: optionNoticeNote.order_notice_custom,
+              globalMode: productNoticeGlobal.mode,
+              globalCustom: productNoticeGlobal.custom,
+            });
             return (
           <CustomerBottomSheet
             open
@@ -7907,9 +7914,9 @@ export default function OrderPage() {
             })() : undefined}
             title={registeredOptionDetail || registeredOptionSelectProduct.product_name}
             subtitle={(
-              <>
-                {registeredOptionBrandGroup && registeredOptionDetail ? <span style={{ fontSize: "11px", fontWeight: 700, color: "#8A8A8A" }}>{registeredOptionBrandGroup.brandKo} · </span> : null}
-                <span style={{ fontSize: "15px", fontWeight: 800, color: "#7A1E47" }}>
+              <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: "6px" }}>
+                {registeredOptionBrandGroup && registeredOptionDetail ? <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 700, color: "#8A8A8A" }}>{registeredOptionBrandGroup.brandKo} ·</span> : null}
+                <span style={{ flexShrink: 0, fontSize: "15px", fontWeight: 800, color: "#7A1E47" }}>
                         {registeredOptionComboInfo
                           ? (registeredOptionBrandGroup ? registeredOptionDetail.trim() : registeredOptionColor.trim())
                             ? won(registeredOptionUnitPrice)
@@ -7922,8 +7929,19 @@ export default function OrderPage() {
                               ? "0원 · 🎁 무료나눔"
                               : "가격 직접입력"}
                 </span>
-              </>
+                {!registeredOptionHeroCollapsed && optionNoticePresentation.badge ? (
+                  <span
+                    data-product-order-notice-badge
+                    style={{ flexShrink: 0, height: "22px", display: "inline-flex", alignItems: "center", border: "1px solid #E8CDD7", borderRadius: "999px", background: "#F8E9EE", padding: "0 7px", color: "#7A1E47", fontSize: "10.5px", fontWeight: 900, lineHeight: 1, letterSpacing: "-0.02em" }}
+                  >{optionNoticePresentation.badge}</span>
+                ) : null}
+              </div>
             )}
+            headerBelow={optionNoticePresentation.message ? (
+              <div data-product-order-notice-message style={{ borderBottom: "1px solid #F0EAE0", background: "#FDF1E7", padding: "7px 16px", color: "#8A4B1A", fontSize: "11.5px", fontWeight: 800, lineHeight: 1.4, wordBreak: "keep-all" }}>
+                {optionNoticePresentation.message}
+              </div>
+            ) : undefined}
             footer={(
               <>
                 {registeredOptionBrandCartEntries.length > 0 ? (
@@ -7979,35 +7997,7 @@ export default function OrderPage() {
                   </div>
                 ) : null}
 
-                {/* [2026-09-22 사장님] 상품 주문 안내 문구 — 설정 → 주문서 표시에서 고른 한 줄.
-                      자리: 옵션 «밑»이 아니라 수량·금액 줄 «바로 위»다. 옵션은 스크롤하면 지나가지만
-                        «살 수 있는 조건»은 담기 버튼 옆에 있어야 누르기 전에 읽힌다(스마트스토어·쿠팡과 같은 자리).
-                      색: 빨강+* 은 이 화면에서 «품절·선택 안 함» 경고에 쓰고 있어 같은 빨강이면 «오류»로 오해한다.
-                        → 안내 톤(연한 살구 바탕 + 진한 갈색). 굵게만 주고 * 는 안 쓴다.
-                      ⚠ 표시 전용 — 주문을 막지 않는다(막으려면 재고·진열 쪽이라 위험분석이 따로 필요). */}
-                {(() => {
-                  // [2026-09-22 2차 사장님] 「특정상품에 개별로」 — 이 상품 설정이 먼저, «기본값 따름»이면 전체 설정.
-                  const note = (parseProductSuggestionNote(registeredOptionSelectProduct?.product_note) || {}) as Record<string, unknown>;
-                  const line = resolveProductNoticeFor({
-                    productMode: note.order_notice_mode,
-                    productCustom: note.order_notice_custom,
-                    globalMode: productNoticeGlobal.mode,
-                    globalCustom: productNoticeGlobal.custom,
-                  });
-                  if (!line) return null;
-                  // [2026-09-22 3차 사장님] 「문장이 짤려서 밑으로 내려가는게 싫은데」
-                  //   → 좁은 폰에서 아무 데서나 끊기지 않게, 가운데점(·)을 기준으로 «처음부터» 두 줄로 나눈다.
-                  //     윗줄 = 무엇을 하면 되는지(굵게) / 아랫줄 = 조건(작게). ·이 없으면 한 줄 그대로.
-                  const { head, sub } = splitProductOrderNotice(line);
-                  return (
-                    <div style={{ flexShrink: 0, borderTop: "1px solid #F0EAE0", background: "#FDF1E7", padding: "10px 18px", wordBreak: "keep-all" }}>
-                      <div style={{ fontSize: "12.5px", fontWeight: 800, lineHeight: 1.45, color: "#8A4B1A" }}>{head}</div>
-                      {sub ? <div style={{ marginTop: "2px", fontSize: "11.5px", fontWeight: 700, lineHeight: 1.45, color: "#A5713F" }}>{sub}</div> : null}
-                    </div>
-                  );
-                })()}
-
-                <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "14px 18px" }}>
+                <div data-product-order-footer-summary style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "8px 18px" }}>
                   {registeredOptionDetailSelected ? (
                     <>
                       <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
@@ -8047,14 +8037,14 @@ export default function OrderPage() {
                   )}
                 </div>
 
-                <div style={{ flexShrink: 0, display: "grid", gridTemplateColumns: "1fr", gap: "10px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "14px 18px calc(16px + env(safe-area-inset-bottom))" }}>
+                <div data-product-order-footer-action style={{ flexShrink: 0, display: "grid", gridTemplateColumns: "1fr", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "8px 18px calc(10px + env(safe-area-inset-bottom))" }}>
                   {registeredOptionShowBrandDoneOnly ? (
-                    <button type="button" onClick={closeRegisteredOptionSelectSheet} style={{ height: "52px", borderRadius: "16px", border: "none", background: "#7A1E47", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>상품 선택 완료 · 총 {registeredOptionBrandCartCount}개</button>
+                    <button type="button" onClick={closeRegisteredOptionSelectSheet} style={{ height: "44px", borderRadius: "14px", border: "none", background: "#7A1E47", fontSize: "14px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>상품 선택 완료 · 총 {registeredOptionBrandCartCount}개</button>
                   ) : (
                     <>
                     {/* [2026-09-20] 왼쪽 「닫기」 삭제 — 닫기는 우상단 ✕(틀). 세부상품 화면에서 «목록으로»는 본문 맨 위 「‹ 종류 다시 고르기」. */}
                     {allOptionsSoldOut ? (
-                    <button type="button" disabled style={{ height: "52px", borderRadius: "16px", border: "none", background: "#ccc", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "not-allowed" }}>품절</button>
+                    <button type="button" disabled style={{ height: "44px", borderRadius: "14px", border: "none", background: "#ccc", fontSize: "14px", fontWeight: 800, color: "#fff", cursor: "not-allowed" }}>품절</button>
                     ) : (
                     <button
                       type="button"
@@ -8071,7 +8061,7 @@ export default function OrderPage() {
                         }
                         confirmRegisteredOptionSelectSheet();
                       }}
-                      style={{ height: "52px", borderRadius: "16px", border: "none", background: registeredOptionSelectionReady ? "#7A1E47" : "#CFC4C8", fontSize: "16px", fontWeight: 800, color: "#fff", cursor: "pointer" }}
+                      style={{ height: "44px", borderRadius: "14px", border: "none", background: registeredOptionSelectionReady ? "#7A1E47" : "#CFC4C8", fontSize: "14px", fontWeight: 800, color: "#fff", cursor: "pointer" }}
                     >{registeredOptionSelectionReady
                       ? (registeredOptionBrandGroup ? "선택상품 담기" : "장바구니 담기")
                       : registeredOptionCustomerDetailRequired && !normalizeCustomerDetailName(registeredOptionCustomerDetail)
