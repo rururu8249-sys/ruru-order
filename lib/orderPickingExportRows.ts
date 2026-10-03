@@ -10,12 +10,12 @@ export type PickingMainExportRow = {
   qty: number;
   amount: number;
   payment: string;
-  kind: "일반" | "뒤늦게 결제" | "결제시각 확인" | "변경 후 재챙김";
+  kind: "일반" | "결제 후 추가 챙기기" | "상품 변경 · 다시 챙기기";
 };
 
 export type PickingAttentionExportRow = {
   itemId: string;
-  kind: "뒤늦게 결제" | "결제시각 확인" | "변경 후 재챙김";
+  kind: "결제 후 추가 챙기기" | "상품 변경 · 다시 챙기기";
   orderedAt: string;
   attentionAt: string;
   broadcast: string;
@@ -63,7 +63,7 @@ export function buildPickingExportRows(orders: readonly LiveOrder[], visibleItem
       const itemId = String(item.id);
       if (visible && !visible.has(itemId)) continue;
       const attention = attentionItems && !attentionItems.has(itemId) ? null : classifyPickingAttention(order, item);
-      const kind = attention === "repick" ? "변경 후 재챙김" : attention === "late_paid" ? "뒤늦게 결제" : attention === "payment_time_missing" ? "결제시각 확인" : "일반";
+      const kind = attention === "repick" ? "상품 변경 · 다시 챙기기" : attention === "late_paid" || attention === "payment_time_missing" ? "결제 후 추가 챙기기" : "일반";
       mainRows.push({
         itemId,
         orderedAt: formatPickingKstDateTime(order.createdAt || order.submittedAt),
@@ -76,7 +76,7 @@ export function buildPickingExportRows(orders: readonly LiveOrder[], visibleItem
         kind,
       });
       if (!attention) continue;
-      const attentionKind: PickingAttentionExportRow["kind"] = attention === "repick" ? "변경 후 재챙김" : attention === "payment_time_missing" ? "결제시각 확인" : "뒤늦게 결제";
+      const attentionKind: PickingAttentionExportRow["kind"] = attention === "repick" ? "상품 변경 · 다시 챙기기" : "결제 후 추가 챙기기";
       const orderedAt = formatPickingKstDateTime(order.createdAt || order.submittedAt);
       const attentionAt = formatPickingKstDateTime(attention === "repick" ? item.repickRequiredAt : order.paidAtFull || order.paidAt);
       attentionRows.push({
@@ -92,7 +92,7 @@ export function buildPickingExportRows(orders: readonly LiveOrder[], visibleItem
         detail: attention === "repick"
           ? `변경일 ${attentionAt}`
           : attention === "payment_time_missing"
-            ? `카드결제 완료 상태이나 결제시각이 없어 반드시 챙김 여부 확인`
+            ? `카드결제 완료 · 미챙김 · 추가로 챙기기`
             : `주문일 ${orderedAt} · 결제일 ${attentionAt}`,
       });
     }
@@ -102,7 +102,7 @@ export function buildPickingExportRows(orders: readonly LiveOrder[], visibleItem
 
 export function partitionPickingAttentionRows(rows: readonly PickingAttentionExportRow[]) {
   return {
-    latePaymentRows: rows.filter((row) => row.kind !== "변경 후 재챙김"),
-    repickRows: rows.filter((row) => row.kind === "변경 후 재챙김"),
+    latePaymentRows: rows.filter((row) => row.kind !== "상품 변경 · 다시 챙기기"),
+    repickRows: rows.filter((row) => row.kind === "상품 변경 · 다시 챙기기"),
   };
 }
