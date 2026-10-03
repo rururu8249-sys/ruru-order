@@ -215,7 +215,10 @@ await act(async()=>tree.unmount());
 
 // Multi-broadcast and exception workflow: quick ranges, date filter, attention-only tab,
 // before→current detail, and no unsafe bulk completion for attention rows.
-for (const id of [8,9,10]) rows.set(id,{id,picked_at:null});
+for (const id of [8,9,10,11]) rows.set(id,{id,picked_at:null});
+const selectedBroadcastFixture = [
+  order(11,'card_paid',[item(11,2,'XL')],{broadcastId:'b-today',createdAt:'2026-10-03T03:00:00Z',paidAtFull:null}),
+];
 const attentionFixture = [
   order(8,'paid',[{...item(8,1,'L'),repickRequiredAt:'2026-10-04T01:00:00Z',repickBefore:{product_name:'재킷',color:'검정',size:'M',qty:1}}],{broadcastId:'b-today',createdAt:'2026-10-03T01:00:00Z',paidAtFull:'2026-10-03T02:00:00Z'}),
   order(9,'paid',[item(9,1,'S')],{broadcastId:'b-yesterday',createdAt:'2026-10-01T01:00:00Z',paidAtFull:'2026-10-03T02:00:00Z'}),
@@ -227,24 +230,32 @@ let failScope=false;
 const originalFetch=globalThis.fetch;
 globalThis.fetch=async (_url,options)=>{
   scopeRequests.push(JSON.parse(options.body));
-  return failScope ? {ok:false,json:async()=>({ok:false,message:'조회 실패'})} : {ok:true,json:async()=>({ok:true,orders:attentionFixture})};
+  return failScope ? {ok:false,json:async()=>({ok:false,message:'조회 실패'})} : {ok:true,json:async()=>({ok:true,orders:selectedBroadcastFixture,additionalOrders:attentionFixture})};
 };
-await act(async()=>{tree=Renderer.create(React.createElement(Modal,{orders:attentionFixture,broadcastCalendar:calendar,filterLabel:'검수',onClose(){}}));});
+await act(async()=>{tree=Renderer.create(React.createElement(Modal,{orders:selectedBroadcastFixture,broadcastCalendar:calendar,filterLabel:'검수',onClose(){}}));});
 assert(button('오늘+어제 방송'),'today+yesterday scope shortcut exists');
 assert(button('현재 목록으로'),'scope can return to the incoming list');
-assert.deepEqual(scopeRequests.at(0).broadcastIds,['b-today','b-yesterday'],'opening the modal loads the real applied scope plus global safety rows');
+assert.deepEqual(scopeRequests.at(0).broadcastIds,['b-today'],'opening the modal loads only the incoming selected broadcast IDs');
+assert(button('선택 방송 작업'),'selected-broadcast work has its own top-level scope');
+assert(button('오늘 추가 작업'),'global safety work has a separate top-level scope');
+assert.equal(checks().length,1,'the selected-broadcast view never mixes global safety rows');
+assert(check('고객11'),'an active broadcast card payment without a timestamp remains normal selected-broadcast work');
 await act(async()=>button('오늘+어제 방송').props.onClick());
 assert.deepEqual(scopeRequests.at(-1).broadcastIds,['b-today','b-yesterday'],'today+yesterday sends both real broadcast IDs');
 failScope=true;
 await act(async()=>button('오늘 방송').props.onClick());
-assert.equal(tree.root.findAllByProps({role:'checkbox'}).length,0,'failed scope refresh retains rows outside the default work tab');
+assert.equal(checks().length,1,'failed scope refresh keeps the previously confirmed selected-broadcast rows');
 assert(text().includes('범위를 바꾸지 않았습니다'),'failed scope refresh explains that the old scope is retained');
 globalThis.fetch=originalFetch;
+await act(async()=>button('오늘 추가 작업').props.onClick());
 assert(button('뒤늦게 결제 탭'),'late-payment tab exists');
 await act(async()=>button('뒤늦게 결제 탭').props.onClick());
 assert.equal(checks().length,2,'late-paid and card-paid-without-time items appear together');
 assert(text().includes('카드결제 완료 · 결제시각 누락'),'missing card timestamp is explicit');
 assert(!button('현재 목록 모두 챙김 완료'),'safety tabs never offer unsafe bulk completion');
+await act(async()=>button('물건챙기기 엑셀').props.onClick());
+assert.deepEqual(exportsMade.at(-1).orders.flatMap(order=>order.items.map(item=>item.id)).sort(),['10','11','8','9'],'one workbook combines selected-broadcast work and additional work without using the active tab as a filter');
+assert.deepEqual(exportsMade.at(-1).meta.attentionItemIds.sort(),['10','8','9'],'only additional-work rows are labeled as exceptions in Excel');
 await act(async()=>button('변경 후 재챙김 탭').props.onClick());
 assert.equal(checks().length,1,'post-pick changes have their own work tab');
 assert(text().includes('변경 후 재챙김') && text().includes('검정 / M') && text().includes('→'),'repick shows before to current details');

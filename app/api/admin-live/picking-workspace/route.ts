@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { buildAdminLiveOrderGroups, sortLiveOrdersByCreatedDesc, toAdminLiveOrder } from "@/components/admin-live/liveOrderAdapter";
-import { kstDayStartIso, kstDaysAgoStartIso, loadPickingWorkspaceRows, mergePickingWorkspaceRows, parsePickingWorkspaceRequest, type PickingScopeSource } from "@/lib/orderPickingScopeLoader";
+import { kstDayStartIso, kstDaysAgoStartIso, loadPickingWorkspaceRows, parsePickingWorkspaceRequest, selectAdditionalPickingRows, type PickingScopeSource } from "@/lib/orderPickingScopeLoader";
 import type { OrderRow } from "@/lib/admin-v2/types";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,8 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseAdminClient();
     const source: PickingScopeSource<OrderRow> = {
       async getBroadcasts(ids) {
-        const { data, error } = await supabase.from("broadcasts").select("id, started_at, ended_at").in("id", [...ids]);
+        if (ids.length === 0) return [];
+        const { data, error } = await supabase.from("broadcasts").select("id, started_at, ended_at, status").in("id", [...ids]);
         if (error) throw new Error(`방송 조회 실패: ${error.message}`);
         return data || [];
       },
@@ -65,9 +66,21 @@ export async function POST(request: NextRequest) {
       readAllSafetyRows("repick"),
       readAllSafetyRows("recent_card_without_time"),
     ]);
-    const rows = mergePickingWorkspaceRows(selectedRows, paidTodayRows, repickRows, recentCardWithoutTimeRows);
-    const orders = sortLiveOrdersByCreatedDesc(buildAdminLiveOrderGroups(rows)).map(toAdminLiveOrder);
-    return NextResponse.json({ ok: true, orders, broadcastIds });
+    const safetyBroadcastIds = Array.from(new Set(
+      [...paidTodayRows, ...recentCardWithoutTimeRows]
+        .map((row) => String(row.broadcast_id || ""))
+        .filter(Boolean),
+    ));
+    const safetyBroadcasts = await source.getBroadcasts(safetyBroadcastIds);
+    const additionalRows = selectAdditionalPickingRows({
+      paidLaterRows: paidTodayRows,
+      recentCardWithoutTimeRows,
+      repickRows,
+      broadcasts: safetyBroadcasts,
+    });
+    const orders = sortLiveOrdersByCreatedDesc(buildAdminLiveOrderGroups(selectedRows)).map(toAdminLiveOrder);
+    const additionalOrders = sortLiveOrdersByCreatedDesc(buildAdminLiveOrderGroups(additionalRows)).map(toAdminLiveOrder);
+    return NextResponse.json({ ok: true, orders, additionalOrders, broadcastIds });
   } catch (error) {
     return NextResponse.json({ ok: false, message: error instanceof Error ? error.message : "물건챙기기 주문 조회에 실패했습니다." }, { status: 400 });
   }

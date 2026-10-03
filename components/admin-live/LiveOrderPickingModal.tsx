@@ -62,9 +62,40 @@ const whenText = (s: string) => {
   return `${get("year")}.${get("month")}.${get("day")}(${get("weekday")}) ${ampm} ${h12}:${get("minute")}`;
 };
 
+function buildPanels(orderList: readonly LiveOrder[], attentionSource: boolean): Panel[] {
+  const list: Panel[] = [];
+  for (const o of orderList) {
+    const status = clean(o.paymentStatus);
+    if (status === "canceled" || o.excludeFromPicking === true) continue;
+    const paid = PAID_STATUSES.includes(status);
+    const nickname = clean(o.nickname) || clean(o.name) || "-";
+    const name = clean(o.recipientName) || clean(o.name) || "";
+    const searchText = [clean(o.nickname), clean(o.name), clean(o.recipientName)].filter(Boolean).join(" ").toLowerCase();
+    const when = clean(o.createdAt) || clean(o.submittedAt);
+    const rawItems = Array.isArray(o.items) ? (o.items as LiveOrderItem[]) : [];
+    const items: PickItem[] = rawItems.length === 0
+      ? [{ id: String(o.id), productId: "", text: clean(o.orderSummary) || "상품", productName: clean(o.orderSummary) || "상품", optionText: "", color: "", size: "", qty: 1, amount: Number(o.productAmount || 0), attentionKind: null }]
+      : rawItems.map((it) => {
+          const opt = formatOrderOptionText(it.color, it.size) || stripNoneOptionParts(it.optionText);
+          const productName = clean(it.productName) || "상품";
+          return {
+            id: String(it.id), productId: clean(it.productId), text: productName + (opt ? ` (${opt})` : ""), productName,
+            optionText: opt, color: clean(it.color), size: clean(it.size), qty: Number(it.qty || 1), amount: Number(it.amount || 0),
+            attentionKind: attentionSource ? classifyPickingAttention(o, { ...it, pickedAt: null }) : null,
+            repickBefore: it.repickBefore, attentionAt: it.repickRequiredAt || o.paidAtFull,
+          };
+        });
+    const totalQty = items.reduce((sum, item) => sum + (Number.isFinite(item.qty) ? item.qty : 1), 0);
+    const phone = clean(o.phone).replace(/[^0-9]/g, "");
+    list.push({ key: String(o.groupId || o.id), nickname, name, phone, search: searchText, paid, when, items, totalQty });
+  }
+  return list;
+}
+
 export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCalendar = [], onClose }: Props) {
   const initialBroadcastIds = useMemo(() => Array.from(new Set(orders.map((order) => order.broadcastId).filter((id): id is string => Boolean(id)))), [orders]);
   const [workspaceOrders, setWorkspaceOrders] = useState<LiveOrder[]>(orders);
+  const [additionalWorkspaceOrders, setAdditionalWorkspaceOrders] = useState<LiveOrder[]>([]);
   const [appliedBroadcastIds, setAppliedBroadcastIds] = useState<string[]>(initialBroadcastIds);
   const [scopeLoading, setScopeLoading] = useState(false);
   const [scopeError, setScopeError] = useState("");
@@ -72,6 +103,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
   const scopeRequestRef = useRef(0);
   const initialScopeLoadedRef = useRef(false);
   const [pickedIds, setPickedIds] = useState<Set<string>>(new Set());
+  const [workArea, setWorkArea] = useState<"selected" | "additional">("selected");
   const [workspaceTab, setWorkspaceTab] = useState<"standard" | "late_paid" | "repick" | "picked">("standard");
   const [viewMode, setViewMode] = useState<"batch" | "order">("batch");
   const [sortModes, setSortModes] = useState<{ batch: "name" | "remaining"; order: "name" | "remaining" | "oldest" | "newest" }>({ batch: "name", order: "name" });
@@ -79,7 +111,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
   const [search, setSearch] = useState("");
   const [exporting, setExporting] = useState(false);
 
-  const activeWorkspaceOrders = remoteScopeApplied ? workspaceOrders : orders;
+  const activeSelectedOrders = remoteScopeApplied ? workspaceOrders : orders;
+  const activeAdditionalOrders = additionalWorkspaceOrders;
 
   const applyBroadcastScope = async (nextIds: string[]) => {
     const previousIds = appliedBroadcastIds;
@@ -88,6 +121,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
     setAppliedBroadcastIds(nextIds);
     if (nextIds.length === 0) {
       setWorkspaceOrders(orders);
+      setAdditionalWorkspaceOrders([]);
       setRemoteScopeApplied(false);
       return;
     }
@@ -98,10 +132,11 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ broadcastIds: nextIds }),
       });
-      const payload = await response.json() as { ok?: boolean; orders?: LiveOrder[]; message?: string };
-      if (!response.ok || !payload.ok || !Array.isArray(payload.orders)) throw new Error(payload.message || "방송 주문을 불러오지 못했습니다.");
+      const payload = await response.json() as { ok?: boolean; orders?: LiveOrder[]; additionalOrders?: LiveOrder[]; message?: string };
+      if (!response.ok || !payload.ok || !Array.isArray(payload.orders) || !Array.isArray(payload.additionalOrders)) throw new Error(payload.message || "방송 주문을 불러오지 못했습니다.");
       if (requestId !== scopeRequestRef.current) return;
       setWorkspaceOrders(payload.orders);
+      setAdditionalWorkspaceOrders(payload.additionalOrders);
       setRemoteScopeApplied(true);
     } catch (error) {
       if (requestId !== scopeRequestRef.current) return;
@@ -120,45 +155,22 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 주문서 단위 패널 (취소건 제외)
-  const panels = useMemo<Panel[]>(() => {
-    const list: Panel[] = [];
-    for (const o of activeWorkspaceOrders) {
-      const status = clean(o.paymentStatus);
-      if (status === "canceled") continue;
-      // [㉕-B] 테스트 주문 등 챙기기 제외 대상은 뺀다(엑셀 isPickingExportExcluded 와 같은 기준).
-      if (o.excludeFromPicking === true) continue;
-      const paid = PAID_STATUSES.includes(status);
-      const nickname = clean(o.nickname) || clean(o.name) || "-"; // 주문 닉네임(크게)
-      const name = clean(o.recipientName) || clean(o.name) || "";
-      // 검색용: 닉네임·이름·받는사람 전부 포함(닉네임으로 검색해도, 이름으로 검색해도 잡히게)
-      const searchText = [clean(o.nickname), clean(o.name), clean(o.recipientName)]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      const when = clean(o.createdAt) || clean(o.submittedAt);
-      const rawItems = Array.isArray(o.items) ? (o.items as LiveOrderItem[]) : [];
-      const items: PickItem[] =
-        rawItems.length === 0
-          ? [{ id: String(o.id), productId: "", text: clean(o.orderSummary) || "상품", productName: clean(o.orderSummary) || "상품", optionText: "", color: "", size: "", qty: 1, amount: Number(o.productAmount || 0), attentionKind: null }]
-          : rawItems.map((it) => {
-              const opt = formatOrderOptionText(it.color, it.size) || stripNoneOptionParts(it.optionText);
-              const productName = clean(it.productName) || "상품";
-              return { id: String(it.id), productId: clean(it.productId), text: productName + (opt ? ` (${opt})` : ""), productName, optionText: opt, color: clean(it.color), size: clean(it.size), qty: Number(it.qty || 1), amount: Number(it.amount || 0), attentionKind: classifyPickingAttention(o, { ...it, pickedAt: null }), repickBefore: it.repickBefore, attentionAt: it.repickRequiredAt || o.paidAtFull };
-            });
-      const totalQty = items.reduce((s, it) => s + (Number.isFinite(it.qty) ? it.qty : 1), 0);
-      const phone = clean(o.phone).replace(/[^0-9]/g, ""); // 같은 고객 판정용(숫자만)
-      list.push({ key: String(o.groupId || o.id), nickname, name, phone, search: searchText, paid, when, items, totalQty });
-    }
-    return list;
-  }, [activeWorkspaceOrders]);
+  const selectedPanels = useMemo(() => buildPanels(activeSelectedOrders, false), [activeSelectedOrders]);
+  const additionalPanels = useMemo(() => buildPanels(activeAdditionalOrders, true), [activeAdditionalOrders]);
+  const additionalItemIds = useMemo(() => new Set(additionalPanels.flatMap((panel) => panel.items.map((item) => item.id))), [additionalPanels]);
+  const selectedOnlyPanels = useMemo(() => selectedPanels.flatMap((panel) => {
+    const items = panel.items.filter((item) => !additionalItemIds.has(item.id));
+    return items.length ? [{ ...panel, items, totalQty: items.reduce((sum, item) => sum + item.qty, 0) }] : [];
+  }), [selectedPanels, additionalItemIds]);
+  const allPanels = useMemo(() => [...selectedOnlyPanels, ...additionalPanels], [selectedOnlyPanels, additionalPanels]);
+  const panels = workArea === "selected" ? selectedOnlyPanels : additionalPanels;
 
   // [㉒] 상품 사진(읽기 전용·보조 표시). 공용 규칙(resolveOrderItemPhoto)만 쓴다 — 주문상세와 동일 패턴.
   //   productId 있는 줄만 products 조회(200개씩), item.id → 사진 URL. 실패해도 조용히 무시.
   const [itemPhoto, setItemPhoto] = useState<Record<string, string>>({});
   const photoIdKey = useMemo(
-    () => Array.from(new Set(panels.flatMap((p) => p.items.map((it) => it.productId).filter(Boolean)))).sort().join(","),
-    [panels],
+    () => Array.from(new Set(allPanels.flatMap((p) => p.items.map((it) => it.productId).filter(Boolean)))).sort().join(","),
+    [allPanels],
   );
   useEffect(() => {
     let stopped = false;
@@ -173,7 +185,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
           for (const p of (data || []) as Record<string, unknown>[]) byId.set(String((p as { id?: unknown }).id ?? ""), p);
         }
         const next: Record<string, string> = {};
-        for (const panel of panels) {
+        for (const panel of allPanels) {
           for (const it of panel.items) {
             if (!it.productId) continue;
             const prow = byId.get(it.productId);
@@ -192,7 +204,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
 
   // Read all eligible rows so switching filters never hides persisted completion.
   const scopedPanels = useMemo(() => panels.filter((panel) => panel.paid), [panels]);
-  const scopedIds = useMemo(() => panels.flatMap(p => p.items.map(it => it.id)), [panels]);
+  const allPaidPanels = useMemo(() => allPanels.filter((panel) => panel.paid), [allPanels]);
+  const scopedIds = useMemo(() => allPanels.flatMap(p => p.items.map(it => it.id)), [allPanels]);
   const idKey = scopedIds.slice().sort().join(",");
   const pickedRef = useRef(pickedIds);
   const busyRef = useRef(false);
@@ -246,11 +259,11 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
       }
     })();
     return () => { alive = false; };
-  }, [idKey, panels, saving]);
+  }, [idKey, allPanels, saving]);
 
   const updatePicked = async (ids: string[], picked: boolean) => {
     if (busyRef.current || readingRef.current || loading || loadError || ids.length === 0) return;
-    const paidIds = new Set(panels.filter(p => p.paid).flatMap(p => p.items.map(it => it.id)));
+    const paidIds = new Set(allPaidPanels.flatMap(p => p.items.map(it => it.id)));
     if (ids.some(id => !paidIds.has(id))) return;
     busyRef.current = true;
     ++readGeneration.current;
@@ -287,16 +300,25 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
 
   const runExcel = async () => {
     if (saving || loading || loadError) return;
-    const visibleIds = new Set(scopedPanels.flatMap((panel) => panel.items).filter((item) => !pickedIds.has(item.id)).map((item) => item.id));
+    const visibleIds = new Set(allPaidPanels.flatMap((panel) => panel.items).filter((item) => !pickedIds.has(item.id)).map((item) => item.id));
     if (!visibleIds.size) { showAdminToast("엑셀로 내보낼 미챙김 상품이 없습니다.", "warning"); return; }
     setExporting(true);
     try {
-      const exportOrders = activeWorkspaceOrders.flatMap(order => {
-        const items = (order.items || []).filter(item => visibleIds.has(String(item.id)));
+      const seenItemIds = new Set<string>();
+      const exportOrders = [...activeSelectedOrders, ...activeAdditionalOrders].flatMap(order => {
+        const items = (order.items || []).filter(item => {
+          const id = String(item.id);
+          if (!visibleIds.has(id) || seenItemIds.has(id)) return false;
+          seenItemIds.add(id);
+          return true;
+        });
         if (order.items?.length) return items.length ? [{...order, items}] : [];
-        return visibleIds.has(String(order.id)) ? [order] : [];
+        const id = String(order.id);
+        if (!visibleIds.has(id) || seenItemIds.has(id)) return [];
+        seenItemIds.add(id);
+        return [order];
       });
-      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${title} · 미챙김 전체`, rowOrder: viewMode === 'batch' ? 'product' : sortMode === 'oldest' ? 'time' : 'nickname', visibleItemIds: [...visibleIds] }, pickedIds);
+      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${title} · 미챙김 전체`, rowOrder: viewMode === 'batch' ? 'product' : sortMode === 'oldest' ? 'time' : 'nickname', visibleItemIds: [...visibleIds], attentionItemIds: additionalPanels.flatMap((panel) => panel.items.map((item) => item.id)) }, pickedIds);
       const ids = [...visibleIds].map(Number);
       const now = new Date().toISOString();
       for (let i = 0; i < ids.length; i += 500) {
@@ -317,6 +339,13 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
     else counts.standard += item.qty;
     return counts;
   }, { standard: 0, late_paid: 0, repick: 0, picked: 0 });
+  const selectedOpenQty = selectedOnlyPanels.flatMap((panel) => panel.paid ? panel.items : []).reduce((sum, item) => sum + (pickedIds.has(item.id) ? 0 : item.qty), 0);
+  const additionalOpenRows = additionalPanels.flatMap((panel) => panel.paid ? panel.items : []).filter((item) => !pickedIds.has(item.id));
+  const additionalOpenQty = additionalOpenRows.reduce((sum, item) => sum + item.qty, 0);
+  const additionalLateQty = additionalOpenRows.filter((item) => item.attentionKind === "late_paid" || item.attentionKind === "payment_time_missing").reduce((sum, item) => sum + item.qty, 0);
+  const visibleTabs: ReadonlyArray<["standard" | "late_paid" | "repick" | "picked", string, number]> = workArea === "selected"
+    ? [["standard", "일반 챙김", tabCounts.standard], ["picked", "챙김 완료", tabCounts.picked]]
+    : [["late_paid", "뒤늦게 결제", tabCounts.late_paid], ["repick", "변경 후 재챙김", tabCounts.repick]];
   const allRows = scopedRows.filter(({ item }) => {
     const done = pickedIds.has(item.id);
     if (workspaceTab === "picked") return done;
@@ -416,18 +445,17 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
           <div className="ml-auto text-right text-[12px] font-bold tabular-nums" aria-live="polite"><span className="text-rose-deep">안 챙김 {countersUnknown ? "—" : total - got}</span><span className="ml-2 text-ok-tx">챙김 {countersUnknown ? "—" : got}/{total}개</span></div>
           <button type="button" disabled={saving} onClick={onClose} aria-label="닫기" className="h-9 w-9 shrink-0 rounded-full bg-surface-2 text-[22px] disabled:opacity-40">×</button>
         </div>
-        <p aria-label="작업 범위" className="shrink-0 break-words border-b border-line px-3 py-1 text-[11px] font-bold leading-4 text-ink-soft">작업 범위: {title} · 취소·챙기기 제외 주문 제외</p>
-        <PickingBroadcastSelector items={broadcastCalendar} selectedIds={appliedBroadcastIds} loading={scopeLoading} onChange={applyBroadcastScope} />
-        {scopeError ? <p role="alert" className="shrink-0 bg-warn-bg px-3 py-2 text-[12px] font-black text-[var(--color-danger-tx)]">범위를 바꾸지 않았습니다 · {scopeError}</p> : null}
+        <p aria-label="작업 범위" className="shrink-0 break-words border-b border-line px-3 py-1 text-[11px] font-bold leading-4 text-ink-soft">작업 범위: {workArea === "selected" ? title : "오늘 추가 작업 · 종료된 과거 방송 및 재챙김"} · 취소·챙기기 제외 주문 제외</p>
+        <div className="grid shrink-0 grid-cols-2 gap-1 border-b border-line bg-surface px-3 py-2">
+          <button type="button" aria-label="선택 방송 작업" aria-pressed={workArea === "selected"} onClick={() => { setWorkArea("selected"); setWorkspaceTab("standard"); setSearch(""); }} className={`min-h-11 rounded-xl px-3 text-[13px] font-black ${workArea === "selected" ? "bg-rose-deep text-white" : "bg-surface-2 text-ink-soft"}`}>선택 방송 작업 <span className="tabular-nums">{countersUnknown ? "—" : selectedOpenQty}</span></button>
+          <button type="button" aria-label="오늘 추가 작업" aria-pressed={workArea === "additional"} onClick={() => { setWorkArea("additional"); setWorkspaceTab(additionalLateQty > 0 ? "late_paid" : "repick"); setSearch(""); }} className={`min-h-11 rounded-xl px-3 text-[13px] font-black ${workArea === "additional" ? "bg-rose-deep text-white" : "bg-warn-bg text-[var(--color-danger-tx)]"}`}>오늘 추가 작업 <span className="tabular-nums">{countersUnknown ? "—" : additionalOpenQty}</span></button>
+        </div>
+        {workArea === "selected" ? <PickingBroadcastSelector items={broadcastCalendar} selectedIds={appliedBroadcastIds} loading={scopeLoading} onChange={applyBroadcastScope} /> : <p className="shrink-0 border-b border-line bg-info-bg px-3 py-2 text-[12px] font-bold text-[var(--color-info-tx)]">선택한 방송과 섞이지 않는 별도 작업함입니다. 종료된 과거 방송의 뒤늦은 결제와 챙김 후 변경만 표시합니다.</p>}
+        {workArea === "selected" && scopeError ? <p role="alert" className="shrink-0 bg-warn-bg px-3 py-2 text-[12px] font-black text-[var(--color-danger-tx)]">범위를 바꾸지 않았습니다 · {scopeError}</p> : null}
         <div className="shrink-0 space-y-2 border-b border-line px-3 py-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <div className="grid w-full grid-cols-2 gap-1 rounded-xl border border-line bg-surface p-1 sm:w-auto sm:grid-cols-4">
-              {([
-                ["standard", "일반 챙김", tabCounts.standard],
-                ["late_paid", "뒤늦게 결제", tabCounts.late_paid],
-                ["repick", "변경 후 재챙김", tabCounts.repick],
-                ["picked", "챙김 완료", tabCounts.picked],
-              ] as const).map(([value, label, count]) => (
+            <div className="grid w-full grid-cols-2 gap-1 rounded-xl border border-line bg-surface p-1 sm:w-auto sm:grid-cols-2">
+              {visibleTabs.map(([value, label, count]) => (
                 <button key={value} type="button" aria-label={`${label} 탭`} aria-pressed={workspaceTab === value} onClick={() => setWorkspaceTab(value)} className={`min-h-11 rounded-lg px-3 text-[12px] font-black md:min-h-9 ${workspaceTab === value ? "bg-rose-deep text-white" : value === "late_paid" || value === "repick" ? "text-[var(--color-danger-tx)]" : "text-ink-soft"}`}>
                   {label} <span className="tabular-nums">{countersUnknown ? "—" : count}</span>
                 </button>
@@ -437,7 +465,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
               {(["batch", "order"] as const).map(mode => <button key={mode} type="button" onClick={() => setViewMode(mode)} aria-pressed={viewMode === mode} className={`min-h-11 rounded-xl px-3 text-[13px] font-black md:min-h-8 ${viewMode === mode ? "bg-rose-deep text-white" : "text-ink-soft"}`}>{mode === "batch" ? "상품별" : "고객별"}</button>)}
             </div>
           </div>
-          {workspaceTab === "late_paid" ? <p className="rounded-lg bg-info-bg px-3 py-2 text-[12px] font-bold text-[var(--color-info-tx)]">지난 방송에서 주문하고 나중에 결제된 상품입니다. 한 건씩 챙긴 뒤 완료해 주세요.</p> : null}
+          {workspaceTab === "late_paid" ? <p className="rounded-lg bg-info-bg px-3 py-2 text-[12px] font-bold text-[var(--color-info-tx)]">종료된 과거 방송에서 뒤늦게 결제되어 추가로 챙겨야 하는 상품입니다. 한 건씩 확인해 주세요.</p> : null}
           {workspaceTab === "repick" ? <p className="rounded-lg bg-warn-bg px-3 py-2 text-[12px] font-bold text-[var(--color-danger-tx)]">이미 챙긴 뒤 상품·색상·사이즈·수량이 바뀐 주문입니다. 변경 전후를 확인하고 다시 챙겨 주세요.</p> : null}
           <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center [&_label]:flex [&_label]:items-center [&_label]:gap-1 [&_select]:!mt-0 [&_select]:!h-9">
             <label className="min-w-0 text-[11px] font-bold text-ink-soft"><span className="sr-only sm:not-sr-only sm:whitespace-nowrap">정렬</span><select aria-label="정렬 방식" value={sortMode} onChange={event => {setSortModes(previous => ({...previous,[viewMode]:event.target.value})); setSortPickedIds(new Set(pickedIds));}} className="block h-9 w-full rounded-lg border border-line bg-surface px-2 text-[13px] text-ink"><option value="name">{viewMode === 'batch' ? '상품명 ㄱㄴㄷ순' : '닉네임 ㄱㄴㄷ순'}</option>{viewMode === 'order' ? <><option value="oldest">주문 오래된순</option><option value="newest">주문 최신순</option></> : null}<option value="remaining">남은 수량 많은순</option></select></label>
@@ -464,8 +492,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
           <div role="status" aria-live="polite" className={`text-[12px] font-bold ${loadError ? 'w-full text-[var(--color-danger-tx)]' : 'text-ink-soft'}`}>{loading ? "상태 확인 중…" : loadError ? "상태 확인 실패 · 창을 다시 열어 주세요. 체크는 잠시 막았습니다." : saving ? "저장 중…" : "저장 완료"}</div>
           <div className="text-[11px] font-bold text-ink-mute">잘못 완료한 한 건은 해당 상품의 `완료됨` 버튼을 눌러 되돌릴 수 있습니다.</div>
           <div className="flex gap-2">
-            {workspaceTab === "standard" ? <button type="button" disabled={blocked || exporting || !matches.length} onClick={completeAll} className="min-h-[44px] rounded-lg border border-ok-tx bg-ok-bg px-3 text-[13px] font-black text-ok-tx disabled:opacity-40">현재 목록 모두 챙김 완료</button> : null}
-            <button type="button" disabled={blocked || exporting || total === got} onClick={runExcel} className="min-h-[44px] rounded-lg border border-line px-3 text-[13px] font-bold disabled:opacity-40">{exporting ? "내보내는 중…" : "물건챙기기 엑셀"}</button>
+            {workArea === "selected" && workspaceTab === "standard" ? <button type="button" disabled={blocked || exporting || !matches.length} onClick={completeAll} className="min-h-[44px] rounded-lg border border-ok-tx bg-ok-bg px-3 text-[13px] font-black text-ok-tx disabled:opacity-40">현재 목록 모두 챙김 완료</button> : null}
+            <button type="button" disabled={blocked || exporting || !allPaidPanels.some((panel) => panel.items.some((item) => !pickedIds.has(item.id)))} onClick={runExcel} className="min-h-[44px] rounded-lg border border-line px-3 text-[13px] font-bold disabled:opacity-40">{exporting ? "내보내는 중…" : "물건챙기기 엑셀"}</button>
             <button type="button" disabled={saving || exporting} onClick={onClose} className="min-h-[44px] rounded-lg bg-rose-deep px-4 text-[13px] font-black text-white disabled:opacity-40">닫기</button>
           </div>
         </div>

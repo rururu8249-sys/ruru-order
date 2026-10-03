@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { kstDayStartIso, kstDaysAgoStartIso, loadPickingWorkspaceRows, mergePickingWorkspaceRows, parsePickingWorkspaceRequest } from '../lib/orderPickingScopeLoader.ts';
+import { kstDayStartIso, kstDaysAgoStartIso, loadPickingWorkspaceRows, mergePickingWorkspaceRows, parsePickingWorkspaceRequest, selectAdditionalPickingRows } from '../lib/orderPickingScopeLoader.ts';
 
 assert.deepEqual(parsePickingWorkspaceRequest({ broadcastIds: [] }), { broadcastIds: [] });
 assert.deepEqual(parsePickingWorkspaceRequest({ broadcastIds: [' b1 ', 'b1', 'b2'] }), { broadcastIds: ['b1', 'b2'] });
@@ -9,6 +9,23 @@ assert.deepEqual(
   mergePickingWorkspaceRows([{ id: 1 }, { id: 2 }], [{ id: 2, safety: true }, { id: 3 }]).map((row) => row.id),
   [1, 2, 3],
   'global safety rows are merged without duplicating selected-broadcast rows',
+);
+const activeMissingTime = { id: 10, broadcast_id: 'active', created_at: '2026-10-03T13:00:00Z' };
+const closedMissingTime = { id: 11, broadcast_id: 'closed', created_at: '2026-10-02T13:00:00Z' };
+const closedLatePaid = { id: 12, broadcast_id: 'closed', created_at: '2026-10-02T14:00:00Z' };
+const activeRepick = { id: 13, broadcast_id: 'active', created_at: '2026-10-03T14:00:00Z' };
+assert.deepEqual(
+  selectAdditionalPickingRows({
+    paidLaterRows: [closedLatePaid, activeMissingTime],
+    recentCardWithoutTimeRows: [activeMissingTime, closedMissingTime],
+    repickRows: [activeRepick],
+    broadcasts: [
+      { id: 'active', status: 'ON', started_at: '2026-10-02T17:00:00Z', ended_at: null },
+      { id: 'closed', status: 'OFF', started_at: '2026-10-01T07:00:00Z', ended_at: '2026-10-02T16:00:00Z' },
+    ],
+  }).map((row) => row.id),
+  [12, 11, 13],
+  'only closed-broadcast payment exceptions enter additional work; repick remains urgent even during a live broadcast',
 );
 assert.throws(() => parsePickingWorkspaceRequest({ broadcastIds: Array.from({ length: 32 }, (_, i) => `b${i}`) }), /31/);
 assert.throws(() => parsePickingWorkspaceRequest({ broadcastIds: 'b1' }), /방송/);

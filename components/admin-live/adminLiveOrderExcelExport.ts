@@ -11,6 +11,7 @@ type ExportMeta = {
   // [2026-09-20] 물건챙기기 엑셀 줄 순서 — 팝업 화면과 같게. product: 상품명→색상→사이즈→시간 / nickname: 닉네임→시간 / time: 시간
   rowOrder?: "product" | "nickname" | "time";
   visibleItemIds?: string[];
+  attentionItemIds?: string[];
 };
 
 type WorkbookRow = Array<string | number | null>;
@@ -457,7 +458,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
       repickResolvedAt: item.repickRequiredAt ? item.repickRequiredAt : item.repickResolvedAt,
     } : item),
   })) : orderedOrders;
-  const builtRows = buildPickingExportRows(exportStateOrders, meta.visibleItemIds);
+  const builtRows = buildPickingExportRows(exportStateOrders, meta.visibleItemIds, meta.attentionItemIds);
   const mainByItemId = new Map(builtRows.mainRows.map((row) => [row.itemId, row]));
   const visible = meta.visibleItemIds ? new Set(meta.visibleItemIds.map(String)) : null;
   type RowWithKey = { row: WorkbookRow; unpaid: boolean; attention: boolean; product: string; color: string; size: string; time: number };

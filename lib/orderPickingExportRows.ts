@@ -52,8 +52,9 @@ function beforeText(item: LiveOrderItem): string {
   return [clean(before.product_name) || "상품", [clean(before.color), clean(before.size)].filter(Boolean).join(" / "), `${Number(before.qty || 1)}개`].filter(Boolean).join(" · ");
 }
 
-export function buildPickingExportRows(orders: readonly LiveOrder[], visibleItemIds?: readonly string[]) {
+export function buildPickingExportRows(orders: readonly LiveOrder[], visibleItemIds?: readonly string[], attentionItemIds?: readonly string[]) {
   const visible = visibleItemIds ? new Set(visibleItemIds.map(String)) : null;
+  const attentionItems = attentionItemIds ? new Set(attentionItemIds.map(String)) : null;
   const mainRows: PickingMainExportRow[] = [];
   const attentionRows: PickingAttentionExportRow[] = [];
 
@@ -61,7 +62,7 @@ export function buildPickingExportRows(orders: readonly LiveOrder[], visibleItem
     for (const item of order.items || []) {
       const itemId = String(item.id);
       if (visible && !visible.has(itemId)) continue;
-      const attention = classifyPickingAttention(order, item);
+      const attention = attentionItems && !attentionItems.has(itemId) ? null : classifyPickingAttention(order, item);
       const kind = attention === "repick" ? "변경 후 재챙김" : attention === "late_paid" ? "뒤늦게 결제" : attention === "payment_time_missing" ? "결제시각 확인" : "일반";
       mainRows.push({
         itemId,

@@ -2,6 +2,7 @@ export type PickingBroadcastWindow = {
   id: string;
   started_at: string | null;
   ended_at: string | null;
+  status?: string | null;
 };
 
 export type PickingScopeRow = {
@@ -48,6 +49,31 @@ export function mergePickingWorkspaceRows<T extends PickingScopeRow>(...groups: 
     if (!byId.has(key)) byId.set(key, row);
   }
   return [...byId.values()];
+}
+
+export function selectAdditionalPickingRows<T extends PickingScopeRow>({
+  paidLaterRows,
+  recentCardWithoutTimeRows,
+  repickRows,
+  broadcasts,
+}: {
+  paidLaterRows: readonly T[];
+  recentCardWithoutTimeRows: readonly T[];
+  repickRows: readonly T[];
+  broadcasts: readonly PickingBroadcastWindow[];
+}): T[] {
+  const closedBroadcastIds = new Set(
+    broadcasts
+      .filter((broadcast) => Boolean(broadcast.ended_at) || String(broadcast.status || "").toUpperCase() === "OFF")
+      .map((broadcast) => String(broadcast.id)),
+  );
+  const isClosedBroadcastRow = (row: T) => closedBroadcastIds.has(String(row.broadcast_id || ""));
+
+  return mergePickingWorkspaceRows(
+    paidLaterRows.filter(isClosedBroadcastRow),
+    recentCardWithoutTimeRows.filter(isClosedBroadcastRow),
+    repickRows,
+  );
 }
 
 async function readAllPages<T>(reader: (from: number, to: number) => Promise<T[]>): Promise<T[]> {
