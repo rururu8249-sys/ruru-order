@@ -275,6 +275,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [widgetSelectedKeys, setWidgetSelectedKeys] = useState<Set<string>>(new Set());
   const [widgetLibraryLoading, setWidgetLibraryLoading] = useState(false);
   const [widgetLibraryBusyKey, setWidgetLibraryBusyKey] = useState("");
+  const widgetLibraryLoadSeqRef = useRef(0);
   const [bcWidgetPin, setBcWidgetPin] = useState<{ mode: "auto" | "pin"; productId: string; detailName: string }>({ mode: "auto", productId: "", detailName: "" });
   const [bcExpanded, setBcExpanded] = useState<Set<string>>(new Set());
   // 새 방송 만들기 모달
@@ -419,6 +420,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   };
 
   const loadWidgetLibrary = async (broadcastIdValue: string) => {
+    const requestSeq = ++widgetLibraryLoadSeqRef.current;
     setWidgetLibraryLoading(true);
     try {
       const query = broadcastIdValue ? `?broadcastId=${encodeURIComponent(broadcastIdValue)}` : "";
@@ -433,17 +435,19 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         history = parseWidgetHistory(merged.history);
       }
       const rotation = parseWidgetRotation(json?.rotation);
+      if (requestSeq !== widgetLibraryLoadSeqRef.current) return;
       setWidgetHistory(history);
       setWidgetRotation(rotation);
       setWidgetSelectedKeys(new Set(rotation.mode === "selected" ? rotation.targets.map(widgetTargetKey) : []));
     } catch (error) {
+      if (requestSeq !== widgetLibraryLoadSeqRef.current) return;
       // 서버 목록이 잠시 실패해도 이 컴퓨터의 기존 기록은 바로 쓸 수 있게 유지한다.
       setWidgetHistory(parseWidgetHistory(readPinHistory()));
       setWidgetRotation({ mode: "all", paused: false, targets: [] });
       setWidgetSelectedKeys(new Set());
       showAdminToast("자주 사용한 위젯 목록을 불러오지 못했습니다. 이 컴퓨터의 기존 기록을 표시합니다.\n\n" + (error instanceof Error ? error.message : String(error)), "warning");
     } finally {
-      setWidgetLibraryLoading(false);
+      if (requestSeq === widgetLibraryLoadSeqRef.current) setWidgetLibraryLoading(false);
     }
   };
 
