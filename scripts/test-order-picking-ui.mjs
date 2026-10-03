@@ -93,6 +93,8 @@ assert.equal(checks().length, 2, 'a newly completed row stays in its original wo
 assert.equal(check('고객1').props['aria-checked'], true, 'the row itself clearly shows completion');
 assert.ok(nodeText(check('고객1')).includes('챙김 완료'), 'completed button uses plain-language status');
 assert.equal(tree.root.findAllByProps({'aria-label':'방금 챙김 완료'}).length, 0, 'redundant completion banner does not consume another row');
+assert.ok(text().includes('[챙김 완료] 버튼'), 'undo guidance names the visible completed button');
+assert.ok(!text().includes('`완료됨` 버튼'), 'undo guidance does not use the retired button label');
 await act(async () => check('고객1').props.onClick());
 assert.equal(check('고객1').props['aria-checked'], false, 'clicking the completed row again immediately undoes it');
 await act(async () => check('고객1').props.onClick());

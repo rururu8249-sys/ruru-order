@@ -500,7 +500,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-line px-3 py-1.5">
           <div role="status" aria-live="polite" className={`text-[12px] font-bold ${loadError ? 'w-full text-[var(--color-danger-tx)]' : 'text-ink-soft'}`}>{loading ? "상태 확인 중…" : loadError ? "상태 확인 실패 · 창을 다시 열어 주세요. 체크는 잠시 막았습니다." : saving ? "저장 중…" : "저장 완료"}</div>
-          <div className="text-[11px] font-bold text-ink-mute">잘못 완료한 한 건은 해당 상품의 `완료됨` 버튼을 눌러 되돌릴 수 있습니다.</div>
+          <div className="text-[11px] font-bold text-ink-mute">잘못 완료한 한 건은 해당 상품의 [챙김 완료] 버튼을 다시 눌러 되돌릴 수 있습니다.</div>
           <div className="flex gap-2">
             {workArea === "selected" && workspaceTab === "standard" ? <button type="button" disabled={blocked || exporting || !matches.length} onClick={completeAll} className="min-h-[44px] rounded-lg border border-ok-tx bg-ok-bg px-3 text-[13px] font-black text-ok-tx disabled:opacity-40">현재 목록 모두 챙김 완료</button> : null}
             <button type="button" disabled={blocked || exporting || !allPaidPanels.some((panel) => panel.items.some((item) => !pickedIds.has(item.id)))} onClick={runExcel} className="min-h-[44px] rounded-lg border border-line px-3 text-[13px] font-bold disabled:opacity-40">{exporting ? "내보내는 중…" : "물건챙기기 엑셀"}</button>
