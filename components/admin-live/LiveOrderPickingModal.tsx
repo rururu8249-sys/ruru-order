@@ -4,7 +4,7 @@
 //   - 주문서 1건(같은 order_group_id) = 패널 1개. 같은 닉네임이라도 주문서 다르면 다른 패널.
 //   - 상품별/고객별은 같은 주문 행의 챙김 상태를 보여주는 두 가지 보기.
 //   - 체크는 orders.picked_at(서버)에 저장 → 다른 기기/새로고침에도 유지.
-//   - 결제완료 기본, 미결제는 조회만. 자동 접기와 일괄 완료 없이 개별 수량을 확인해 체크.
+//   - 결제완료 기본, 미결제는 조회만. 일괄 챙김은 현재 조회된 결제완료 항목만 확인 후 저장.
 //   - 상단 "챙김 N개 / 전체 M개"는 수량 합계. picked_at 한 칸만 update(돈/주문 로직 무관).
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -153,6 +153,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
   const loading = reading || loadedKey !== idKey;
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  // Rechecking the same scope must not blank already-confirmed counters.
+  // New scopes and failed reads still hide uncertain values and block writes.
+  const countersUnknown = loadedKey !== idKey || loadError;
 
   const readPicked = async (ids: string[]) => {
     const found = new Map<string, boolean>();
@@ -228,6 +231,16 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
     if (!ids.length) { showAdminToast("현재 조회 목록에 해제할 챙김 표시가 없습니다.", "warning"); return; }
     if (!(await showAdminConfirm(`현재 조회 목록 ${ids.length}개 항목의 챙김 표시를 해제할까요?\n주문·입금·금액·출고 상태는 바뀌지 않습니다.`))) return;
     await updatePicked(ids, false);
+  };
+
+  const completeAll = async () => {
+    if (busyRef.current || readingRef.current || loading || loadError) return;
+    const targets = matches.filter(row => row.panel.paid && !pickedRef.current.has(row.item.id));
+    if (!targets.length) return;
+    const ids = [...new Set(targets.map(row => row.item.id))];
+    const qty = targets.reduce((sum, row) => sum + row.item.qty, 0);
+    if (!(await showAdminConfirm(`현재 조회된 결제완료 상품 ${ids.length}개 항목 · 수량 ${qty}개를 모두 챙김으로 표시할까요?\n미결제·취소 주문은 제외하며, 주문금액·입금·출고 상태는 바뀌지 않습니다.`))) return;
+    await updatePicked(ids, true);
   };
 
   const runExcel = async () => {
@@ -329,7 +342,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
               {sortMode === 'remaining' ? <p className="mt-2">체크 후 순서 유지 · 다시 정렬로 갱신</p> : null}
             </div>
           </details>
-          <div className="ml-auto text-right text-[12px] font-bold" aria-live="polite"><span className="text-rose-deep">안 챙김 {loading || loadError ? "—" : total - got}</span><span className="ml-2 text-ok-tx">챙김 {loading || loadError ? "—" : got}/{total}개</span></div>
+          <div className="ml-auto text-right text-[12px] font-bold tabular-nums" aria-live="polite"><span className="text-rose-deep">안 챙김 {countersUnknown ? "—" : total - got}</span><span className="ml-2 text-ok-tx">챙김 {countersUnknown ? "—" : got}/{total}개</span></div>
           <button type="button" disabled={saving} onClick={onClose} aria-label="닫기" className="h-9 w-9 shrink-0 rounded-full bg-surface-2 text-[22px] disabled:opacity-40">×</button>
         </div>
         <p aria-label="작업 범위" className="shrink-0 break-words border-b border-line px-3 py-1 text-[11px] font-bold leading-4 text-ink-soft">작업 범위: {title} · 취소·챙기기 제외 주문 제외</p>
@@ -339,7 +352,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
               {(["batch", "order"] as const).map(mode => <button key={mode} type="button" onClick={() => setViewMode(mode)} aria-pressed={viewMode === mode} className={`min-h-11 rounded-xl px-3 text-[13px] font-black md:min-h-8 ${viewMode === mode ? "bg-rose-deep text-white" : "text-ink-soft"}`}>{mode === "batch" ? "상품별" : "고객별"}</button>)}
             </div>
             <div className="flex gap-1">
-              {([['all','전체보기',total],['unpicked','안 챙김만',total-got],['picked','챙김만',got]] as const).map(([value,label,count]) => <button key={value} type="button" aria-label={label} aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)} className={`min-h-11 rounded-xl border border-line px-2 text-[12px] font-bold md:min-h-8 ${statusFilter === value ? 'bg-rose-deep text-white' : 'bg-surface text-ink-soft'}`}>{value === 'all' ? '전체' : value === 'unpicked' ? '안 챙김' : '챙김'} {loading || loadError ? '—' : count}</button>)}
+              {([['all','전체보기',total],['unpicked','안 챙김만',total-got],['picked','챙김만',got]] as const).map(([value,label,count]) => <button key={value} type="button" aria-label={label} aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)} className={`min-h-11 rounded-xl border border-line px-2 text-[12px] font-bold tabular-nums md:min-h-8 ${statusFilter === value ? 'bg-rose-deep text-white' : 'bg-surface text-ink-soft'}`}>{value === 'all' ? '전체' : value === 'unpicked' ? '안 챙김' : '챙김'} {countersUnknown ? '—' : count}</button>)}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center [&_label]:flex [&_label]:items-center [&_label]:gap-1 [&_select]:!mt-0 [&_select]:!h-9">
@@ -368,6 +381,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, onClose }: 
           <div role="status" aria-live="polite" className={`text-[12px] font-bold ${loadError ? 'w-full text-[var(--color-danger-tx)]' : 'text-ink-soft'}`}>{loading ? "상태 확인 중…" : loadError ? "상태 확인 실패 · 창을 다시 열어 주세요. 체크는 잠시 막았습니다." : saving ? "저장 중…" : "저장 완료"}</div>
           <div className="relative"><button type="button" aria-expanded={toolsOpen} onClick={() => setToolsOpen(value => !value)} className="min-h-[44px] px-2 text-[13px] font-bold text-ink-soft">더보기</button>{toolsOpen ? <div className="absolute bottom-full left-0 mb-2 w-52 rounded-lg border border-line bg-surface p-2 shadow-lg"><button type="button" disabled={blocked || exporting} onClick={resetAll} className="min-h-[44px] text-[12px] font-bold text-[var(--color-danger-tx)] disabled:opacity-40">조회 목록 챙김 해제</button></div> : null}</div>
           <div className="flex gap-2">
+            <button type="button" disabled={blocked || exporting || !matches.some(row => row.panel.paid && !pickedIds.has(row.item.id))} onClick={completeAll} className="min-h-[44px] rounded-lg border border-ok-tx bg-ok-bg px-3 text-[13px] font-black text-ok-tx disabled:opacity-40">전체 챙김</button>
             <button type="button" disabled={blocked || exporting || !matches.length} onClick={runExcel} className="min-h-[44px] rounded-lg border border-line px-3 text-[13px] font-bold disabled:opacity-40">{exporting ? "내보내는 중…" : "조회 목록 엑셀"}</button>
             <button type="button" disabled={saving || exporting} onClick={onClose} className="min-h-[44px] rounded-lg bg-rose-deep px-4 text-[13px] font-black text-white disabled:opacity-40">닫기</button>
           </div>

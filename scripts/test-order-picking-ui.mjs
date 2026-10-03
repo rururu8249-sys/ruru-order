@@ -186,4 +186,26 @@ assert.deepEqual(exportsMade.at(-1).orders.flatMap(order=>order.items.map(item=>
 assert.deepEqual(writes.at(-1).ids,[3],'print record covers exactly exported items');
 assert.ok(exportsMade.at(-1).meta.filterLabel.includes('miu1'),'export scope labeled');
 await act(async()=>tree.unmount());
-console.log('picking UI integration passed: scope, legacy options, save gate, rapid clicks, both-view check/undo, failure, filter, reopen, search');
+// A background confirmation read must not replace already-known counters with dashes.
+for (const id of [1,2,3]) rows.set(id,{id,picked_at:null});
+await act(async()=>{tree=Renderer.create(React.createElement(Modal,{orders,filterLabel:'검수',onClose(){}}));});
+readGate = new Promise(resolve=>{releaseRead=resolve;});
+await act(async()=>{await check('고객1').props.onClick();});
+await act(async()=>tree.update(React.createElement(Modal,{orders:orders.map(o=>({...o})),filterLabel:'검수',onClose(){}})));
+assert(!text().includes('—'),'confirmed counters remain visible during post-save read');
+await act(async()=>{releaseRead();});
+readGate=null;
+// Bulk completion is restricted to the displayed paid search scope, and remains server-confirmed.
+await act(async()=>select('결제 범위').props.onChange({target:{value:'all'}}));
+await act(async()=>tree.root.findByType('input').props.onChange({target:{value:'고객2'}}));
+assert(button('전체 챙김'),'bulk completion control exists');
+gate=new Promise(resolve=>{releaseSave=resolve;});
+let bulk;
+await act(async()=>{bulk=button('전체 챙김').props.onClick();});
+assert.equal(check('고객2').props['aria-checked'],false,'bulk waits for server confirmation');
+await act(async()=>{releaseSave();await bulk;}); gate=null;
+assert.deepEqual(writes.at(-1).ids,[2],'bulk touches only matching unpaid-in-work paid rows');
+assert.equal(check('고객2').props['aria-checked'],true);
+assert.equal(rows.get(3).picked_at,null,'unpaid row never modified');
+await act(async()=>tree.unmount());
+console.log('picking UI integration passed including stable counters and scoped bulk completion');
