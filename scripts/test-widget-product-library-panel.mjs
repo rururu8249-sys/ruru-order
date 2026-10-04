@@ -81,7 +81,7 @@ await act(async () => { tree = Renderer.create(React.createElement(Harness)); })
 const button = (label) => tree.root.findAllByType("button").find((node) => node.props["aria-label"] === label);
 const text = () => JSON.stringify(tree.toJSON());
 
-assert(tree.root.findByProps({"aria-label":"등록한 모든 상품 순환"}));
+assert(tree.root.findByProps({"aria-label":"현재 방송에 담긴 모든 상품 순환"}));
 assert(tree.root.findByProps({"aria-label":"고정 기록 상품 전체 순환"}));
 assert(text().includes("방송화면 위젯 · 선택한 상품 2개 순환 중"), "the saved state must identify the broadcast widget rather than an ambiguous customer screen");
 assert(text().includes("방송 화면 오른쪽 상품 카드에 적용된 상태입니다."), "the status hint must identify the exact customer-facing surface");
@@ -109,9 +109,9 @@ assert.equal(button("순환 설정 적용").props.disabled, false);
 await act(async () => button("순환 설정 적용").props.onClick());
 assert.deepEqual(applied, ["selected"], "apply must use the explicitly chosen rotation mode");
 
-const allMode = tree.root.findByProps({ "aria-label": "등록한 모든 상품 순환" });
+const allMode = tree.root.findByProps({ "aria-label": "현재 방송에 담긴 모든 상품 순환" });
 await act(async () => allMode.props.onChange());
-assert(text().includes("등록 상품 전체 순환 시작"));
+assert(text().includes("현재 방송 상품 전체 순환 시작"));
 await act(async () => tree.root.findByProps({"aria-label":"고정 기록 상품 전체 순환"}).props.onChange());
 await act(async () => button("순환 설정 적용").props.onClick());
 assert.deepEqual(applied, ["selected","history"]);

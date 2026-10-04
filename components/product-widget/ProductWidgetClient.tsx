@@ -343,7 +343,7 @@ export default function ProductWidgetClient() {
           }
           return;
         }
-        // 순환은 등록 상품 전체/고정 기록/선택 상품 기준. 단일 고정은 현재 방송 진열 상품만 허용.
+        // 모든 순환 방식과 단일 고정은 현재 방송에 담긴 상품 안에서만 허용한다.
         // 활성 방송이 없으면 카드 없음. 위젯 OFF와 수동 고정 우선순위는 유지한다.
         let ids: string[] = [];
         if (active?.id) {
@@ -367,7 +367,7 @@ export default function ProductWidgetClient() {
           const allBroadcastItems = ids.flatMap((id) => { const parent = byId.get(id); return parent ? (expandForWidget(parent) as AnyProduct[]) : []; });
           const nextRotationConfig = parseWidgetRotation(rotationSetting?.value);
           const rot = selectWidgetRotationItems(
-            list.flatMap((parent) => expandForWidget(parent) as AnyProduct[]),
+            allBroadcastItems,
             nextRotationConfig,
             (item) => ({
               productId: String(item?.__parent_product_id ?? item?.id ?? item?.product_id ?? ""),

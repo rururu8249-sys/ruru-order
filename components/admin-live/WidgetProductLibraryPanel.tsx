@@ -92,7 +92,7 @@ export default function WidgetProductLibraryPanel({
       ? `📌 ${manualPinLabel} 고정 기록`
       : rotation.mode === "selected"
         ? `저장된 위젯 설정 · 선택한 상품 ${rotation.targets.length}개 순환`
-        : rotation.mode === "history" ? "저장된 위젯 설정 · 고정 기록 상품 순환" : "저장된 위젯 설정 · 등록 상품 전체 순환"
+        : rotation.mode === "history" ? "저장된 위젯 설정 · 방송 내 고정 기록 상품 순환" : "저장된 위젯 설정 · 현재 방송 상품 전체 순환"
     : manualPinLabel
       ? `방송화면 위젯 · ${manualPinLabel} 고정 표시 중`
       : rotation.mode === "selected"
@@ -100,8 +100,8 @@ export default function WidgetProductLibraryPanel({
           ? `방송화면 위젯 · 선택한 상품 ${rotation.targets.length}개 순환 일시정지`
           : `방송화면 위젯 · 선택한 상품 ${rotation.targets.length}개 순환 중`
         : rotation.paused
-          ? `방송화면 위젯 · ${rotation.mode === "history" ? "고정 기록 상품" : "등록 상품 전체"} 순환 일시정지`
-          : `방송화면 위젯 · ${rotation.mode === "history" ? "고정 기록 상품" : "등록 상품 전체"} 순환 중`;
+          ? `방송화면 위젯 · ${rotation.mode === "history" ? "방송 내 고정 기록 상품" : "현재 방송 상품 전체"} 순환 일시정지`
+          : `방송화면 위젯 · ${rotation.mode === "history" ? "방송 내 고정 기록 상품" : "현재 방송 상품 전체"} 순환 중`;
   const waitingStatus = rotation.mode === "selected"
     ? `선택한 상품 ${rotation.targets.length}개 순환 대기 · 고정 해제 시 자동 재개`
     : "순환 시작을 누르면 현재 상품 고정을 해제하고 순환합니다.";
@@ -162,16 +162,16 @@ export default function WidgetProductLibraryPanel({
                 <input
                   type="radio"
                   name="widget-rotation-mode"
-                  aria-label="등록한 모든 상품 순환"
+                  aria-label="현재 방송에 담긴 모든 상품 순환"
                   checked={draftMode === "all"}
                   disabled={!canManageRotation}
                   onChange={() => onDraftModeChange("all")}
                 />
-                <span><strong>등록한 모든 상품</strong><small>방송에 담지 않은 상품도 포함하여 순환</small></span>
+                <span><strong>현재 방송 상품 전체</strong><small>현재 방송에 담긴 상품만 순환</small></span>
               </label>
               <label className={`${styles.modeOption} ${draftMode === "history" ? styles.modeOptionActive : ""}`}>
                 <input type="radio" name="widget-rotation-mode" aria-label="고정 기록 상품 전체 순환" checked={draftMode === "history"} disabled={!canManageRotation} onChange={() => onDraftModeChange("history")} />
-                <span><strong>고정 기록 상품 전체</strong><small>아래 고정 기록의 사용 가능한 상품만 순환</small></span>
+                <span><strong>고정 기록 상품 전체</strong><small>현재 방송에 담긴 상품 중 고정 기록이 있는 상품만 순환</small></span>
               </label>
               <label className={`${styles.modeOption} ${draftMode === "selected" ? styles.modeOptionActive : ""}`}>
                 <input
@@ -182,7 +182,7 @@ export default function WidgetProductLibraryPanel({
                   disabled={!canManageRotation}
                   onChange={() => onDraftModeChange("selected")}
                 />
-                <span><strong>원하는 상품만 순환</strong><small>아래 목록에서 고른 상품만 반복 표시</small></span>
+                <span><strong>원하는 상품만 순환</strong><small>현재 방송 상품 중 아래 고정 기록에서 선택</small></span>
               </label>
             </div>
           </div>
@@ -233,7 +233,7 @@ export default function WidgetProductLibraryPanel({
             const key = widgetTargetKey(item);
             const selected = selectedKeys.has(key);
             const busy = busyKey === key;
-            const selectable = item.available;
+            const selectable = item.available && item.inBroadcast;
             return (
               <article key={key} className={`${styles.card} ${editing && selected ? styles.selectedCard : ""} ${!item.available ? styles.unavailableCard : ""}`}>
                 {editing ? (
@@ -259,7 +259,7 @@ export default function WidgetProductLibraryPanel({
                   <div className={styles.price}>{item.priceLabel || "가격 확인 필요"}</div>
                   <div className={styles.meta}>
                     <span>고정 {item.count}회</span>
-                    {!item.available ? <span className={styles.warning}>{item.unavailableReason || "사용 불가"}</span> : !item.inBroadcast ? <span>미진열 · 순환 가능</span> : null}
+                    {!item.available ? <span className={styles.warning}>{item.unavailableReason || "사용 불가"}</span> : !item.inBroadcast ? <span className={styles.warning}>현재 방송 미진열 · 순환 제외</span> : null}
                   </div>
                 </div>
                 <button
@@ -282,7 +282,7 @@ export default function WidgetProductLibraryPanel({
         <div className={styles.saveBar} aria-label="순환 설정 변경사항">
           <div className={styles.saveMessage}>
             <strong>{dirty ? "변경사항이 아직 방송에 적용되지 않았습니다." : "순환 방식을 선택하고 시작하세요."}</strong>
-            <span>품절·숨김·삭제 상품은 제외합니다.{manualPinLabel ? " 시작하면 현재 상품 고정을 해제합니다." : ""}</span>
+            <span>현재 방송에 담긴 상품만 표시하며, 품절·숨김·삭제 상품은 제외합니다.{manualPinLabel ? " 시작하면 현재 상품 고정을 해제합니다." : ""}</span>
             {selectedModeEmpty ? <span className={styles.validation}>선택 상품은 한 개 이상 선택해주세요.</span> : null}
           </div>
           <div className={styles.actionButtons}>
@@ -295,7 +295,7 @@ export default function WidgetProductLibraryPanel({
               onClick={() => onApplyDraft(draftMode)}
             >
               {draftMode === "all"
-                ? "등록 상품 전체 순환 시작"
+                ? "현재 방송 상품 전체 순환 시작"
                 : draftMode === "history" ? `고정 기록 ${selectableTargets.length}개 순환 시작` : `선택 ${selectedCount}개 순환 시작`}
             </button>
           </div>

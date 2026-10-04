@@ -1436,7 +1436,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       }
       if (await saveWidgetRotation({ mode, paused: false, targets: [] })) {
         if (bcWidgetPin.mode === "pin" && !(await clearBroadcastPin())) return;
-        showAdminToast(mode === "history" ? "고정 기록의 상품만 자동 순환합니다." : "등록한 모든 상품을 자동 순환합니다.", "success");
+        showAdminToast(mode === "history" ? "현재 방송에 담긴 상품 중 고정 기록이 있는 상품만 순환합니다." : "현재 방송에 담긴 모든 상품을 자동 순환합니다.", "success");
       }
       return;
     }

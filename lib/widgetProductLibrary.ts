@@ -61,7 +61,7 @@ export function selectableWidgetTargets<T extends WidgetProductTarget & { availa
 ): WidgetProductTarget[] {
   const unique = new Map<string, WidgetProductTarget>();
   for (const item of items) {
-    if (!item.available) continue;
+    if (!item.available || !item.inBroadcast) continue;
     const target = normalizeWidgetTarget(item);
     if (target) unique.set(widgetTargetKey(target), target);
   }

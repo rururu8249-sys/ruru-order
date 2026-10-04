@@ -124,7 +124,7 @@ const libraryItems = [
 ];
 assert.deepEqual(
   widgetLibrary.selectableWidgetTargets(libraryItems),
-  [{ productId: "10", detailName: "" }, { productId: "20", detailName: "브라운" }, { productId: "40", detailName: "" }],
+  [{ productId: "10", detailName: "" }, { productId: "20", detailName: "브라운" }],
   "bulk select must include only available products displayed in the current broadcast",
 );
 assert.equal(parseWidgetRotation({mode:"history"}).mode, "history");

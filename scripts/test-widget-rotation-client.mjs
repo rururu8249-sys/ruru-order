@@ -16,8 +16,8 @@ const supabase = {
     const q = {
       select(){return q;},eq(col,value){if(col==='key')key=value;return q;},order(){return q;},
       range(a,b){ranges.push([a,b]);return Promise.resolve({data:catalog.slice(a,b+1),error:null});},
-      maybeSingle(){return Promise.resolve({data:{value:JSON.stringify(key==='widget_product_history_v2'?[{productId:'1001',detailName:'',label:'마지막 상품',count:1,lastAt:1}]:{mode,paused:false,targets:[{productId:'1001',detailName:''} ]})},error:null});},
-      then(resolve,reject){return Promise.resolve({data:[{product_id:1}],error:null}).then(resolve,reject);},
+      maybeSingle(){return Promise.resolve({data:{value:JSON.stringify(key==='widget_product_history_v2'?[{productId:'4',detailName:'',label:'방송 상품',count:1,lastAt:1},{productId:'1001',detailName:'',label:'미진열 상품',count:1,lastAt:1}]:{mode,paused:false,targets:[{productId:'4',detailName:''},{productId:'1001',detailName:''}]})},error:null});},
+      then(resolve,reject){return Promise.resolve({data:[{product_id:1},{product_id:2},{product_id:3},{product_id:4}],error:null}).then(resolve,reject);},
     };return q;
   },
   channel(){const ch={on(){return ch;},subscribe(){return ch;}};return ch;},removeChannel(){},
@@ -37,12 +37,18 @@ for (mode of ['all','history','selected']) {
   if(mode==='all'){
     assert(rendered().includes('상품-1'));
     await act(async()=>intervals.get(5000)());
-    assert(rendered().includes('상품-4'),'must skip hidden and sold-out and rotate outside broadcast list');
-  }else assert(rendered().includes('상품-1001'),'history and selected must display a non-broadcast catalog target');
+    assert(rendered().includes('상품-4'),'must skip hidden and sold-out within broadcast');
+    await act(async()=>intervals.get(5000)());
+    assert(rendered().includes('상품-1'),'must wrap inside broadcast; never expose an unlisted catalog product');
+  }else {
+    assert(rendered().includes('상품-4'),'history and selected retain an eligible broadcast product');
+    assert.equal(rendered().includes('상품-1001'),false,'history and selected must reject a non-broadcast target');
+    assert.equal(intervals.has(5000),false,'excluded targets must not contribute to rotation or cycle into view');
+  }
   await act(async()=>tree.unmount());
 }
 mode='history';pin=true;
 await act(async()=>{tree=Renderer.create(React.createElement(Client));});
 assert(JSON.stringify(tree.toJSON()).includes('상품-1'),'manual pin must override history rotation until explicitly released');
 await act(async()=>tree.unmount());
-console.log('PASS real widget component: all/history/selected, >1000 pagination, non-broadcast, hidden/sold-out, manual pin');
+console.log('PASS real widget component: all/history/selected confined to broadcast; unlisted targets excluded, pagination, hidden/sold-out, manual pin');
