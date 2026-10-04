@@ -4,7 +4,7 @@ type Customer={customer_phone?:unknown;customer_name?:unknown;live_alert_optin?:
 type Order={customer_phone?:unknown;phone?:unknown;created_at?:string|null;order_status?:string|null;admin_order_status_v2?:string|null;is_deleted?:boolean|null;is_permanently_deleted?:boolean|null;is_test_order?:boolean|null};
 export type AlertTarget={phone:string;name:string;orderDays:number;recent:boolean};
 export type AlertManifest={broadcastId:string;actor:string;phones:string[];expires:number;mode?:string;policy?:string};
-export const ALERT_SELECTION_POLICY='buyers-first-5pct-v1';
+export const ALERT_SELECTION_POLICY='buyers-first-5pct-v2';
 export const alertPhone=(value:unknown)=>String(value??'').replace(/\D/g,'');
 export function selectAlertRecipients(customers:Customer[],orders:Order[],excluded:Set<string>,options:{limit:number;orderDays:number;recentDays:number;now:number;random?:()=>number}):AlertTarget[]{
  const {limit,orderDays,recentDays,now}=options;
@@ -27,7 +27,9 @@ export function selectAlertRecipients(customers:Customer[],orders:Order[],exclud
   const count=days.get(phone)?.size||0,t=Date.parse(c.live_alert_optin_at||'');
   const recent=Number.isFinite(t)&&t<=now&&t>=now-recentDays*86400000;
   if(count<2&&!recent)return [];
-  const weight=1+Math.min(count,30)+(recent?5:0);
+  // Order-day count determines buyer priority; signup recency grants entry,
+  // not a bonus that could outweigh a more frequent customer's orders.
+  const weight=Math.max(1,count);
   const u=Math.max(Number.MIN_VALUE,Math.min(1,random()));
   return [{phone,name:String(c.customer_name||''),orderDays:count,recent,rank:-Math.log(u)/weight}];
  }).sort((a,b)=>a.rank-b.rank||a.phone.localeCompare(b.phone));

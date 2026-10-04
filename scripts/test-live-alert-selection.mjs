@@ -38,6 +38,7 @@ const scarce=selectAlertRecipients(mixedCustomers,mixedOrders.slice(0,20),new Se
 assert.equal(scarce.length,25,'10 buyers + at most 15 non-buyers, never backfill to 300');
 const newBuyer={customer_phone:phone(999),live_alert_optin:true,live_alert_optin_at:'2026-10-03T01:00:00Z'};
 const newBuyerOrders=[{customer_phone:phone(999),created_at:'2026-10-03T01:00:00Z'}];
+assert.equal(selectAlertRecipients([customers[0],newBuyer],[...orders,...newBuyerOrders],new Set(),{...options,limit:1})[0]?.phone,phone(1),'equal random draws must favor more order days, not a one-day signup bonus');
 assert.equal(selectAlertRecipients([newBuyer],newBuyerOrders,new Set(),{...options,limit:1})[0]?.phone,phone(999),'a recent signup with one order day is a buyer, not in the 5% group');
 assert.equal(selectAlertRecipients([newBuyer],[],new Set(),{...options,limit:1}).length,0,'no zero-order exception when the cap is zero');
 for(const limit of [0,-1,1.5,NaN,10001])assert.throws(()=>selectAlertRecipients(customers,orders,new Set(),{...options,limit}));
