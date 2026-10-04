@@ -64,5 +64,7 @@ export function buildOrderLookupOrFilter(kakaoIdRaw: unknown, phoneRaw: unknown)
   const phoneValues = orderLookupPhoneValues(phoneRaw);
   if (!kakaoId) return null;
   if (phoneValues.length === 0) return `kakao_id.eq.${kakaoId}`;
-  return `kakao_id.eq.${kakaoId},and(kakao_id.is.null,customer_phone.in.(${phoneValues.join(",")}))`;
+  // 카드 주문 등 과거 저장 경로는 미지정 ID를 null 대신 ""로 저장했다.
+  // 다른 계정의 ID는 여전히 제외하고, ID가 없는 두 형식만 번호로 찾는다.
+  return `kakao_id.eq.${kakaoId},and(or(kakao_id.is.null,kakao_id.eq.""),customer_phone.in.(${phoneValues.join(",")}))`;
 }
