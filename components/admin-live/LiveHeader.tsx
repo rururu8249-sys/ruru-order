@@ -486,7 +486,7 @@ export default function LiveHeader({
                   ["최근 알림 신청 기간 (일)", alertRecentDays, setAlertRecentDays, 365],
                 ] as const).map(([label, value, setter, max]) => <label key={label} className="text-sm font-bold text-ink">{label}<input type="number" min={1} max={max} step={1} disabled={alertSending} value={value} onChange={e => { setter(e.target.value); alertRequest.current++; setAlertPreview(null); setAlertPreviewLoading(false); }} className="mt-1 w-full rounded-lg border border-line px-3 py-2" /></label>)}
               </div>
-              <p className="mt-2 text-sm text-ink-soft">알림 ON 회원 중 조회 기간에 서로 다른 주문일이 2일 이상이거나 최근 알림 신청한 회원만 선정합니다. 주문일이 많을수록 우선하며 최근 신청자도 우대합니다. 후보가 적으면 가능한 인원만 선정됩니다.</p>
+              <p className="mt-2 text-sm text-ink-soft">알림 ON 회원 중 최근 주문일이 많은 단골과 주문을 시작한 최근 알림 신청자를 중심으로 랜덤 선정합니다. 주문일이 많을수록 우선합니다. 조회 기간 내 주문이 없는 최근 신청자는 입력 인원의 최대 5%만 포함하며, 소수점은 버립니다. 주문 회원이 부족해도 이 제한을 넘어 채우지 않습니다.</p>
               <button type="button" disabled={alertSending || alertPreviewLoading} onClick={() => void loadAlertPreview("priority")} className="mt-3 rounded-lg border border-line px-4 py-2 font-bold">{alertPreviewLoading ? "선정 중…" : "대상 선정 / 다시 뽑기"}</button>
             </div>}
 
@@ -512,6 +512,12 @@ export default function LiveHeader({
                 <div className="text-ink-mute">{alertResult || "대상 없음"}</div>
               )}
             </div>
+
+            {alertMode === "priority" && alertPreview?.selectionGroups && <div aria-label="선정 그룹별 인원" className="mb-3 grid grid-cols-1 sm:grid-cols-3 gap-2 rounded-xl border border-line px-3 py-3 text-sm font-bold text-ink">
+              <span>단골 {alertPreview.selectionGroups.frequent}명 <small className="block text-ink-mute">최근 주문일 2일 이상</small></span>
+              <span>주문 시작 회원 {alertPreview.selectionGroups.newBuyer}명 <small className="block text-ink-mute">주문일 1일 · 최근 알림 신청</small></span>
+              <span>최근 주문 없음 {alertPreview.selectionGroups.noRecentOrders}명 / 최대 {alertPreview.selectionGroups.noRecentOrdersMax}명 <small className="block text-ink-mute">최근 알림 신청 · 입력 인원의 5% 이내</small></span>
+            </div>}
 
             {/* 이번에 받을 사람 목록(샘플) */}
             {alertPreview?.sample?.length ? (

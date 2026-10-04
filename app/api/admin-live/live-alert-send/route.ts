@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { SolapiMessageService } from "solapi";
-import { selectAlertRecipients, sealAlertSelection, readAlertSelection } from "@/lib/liveAlertSelection";
+import { selectAlertRecipients, sealAlertSelection, readAlertSelection, ALERT_SELECTION_POLICY } from "@/lib/liveAlertSelection";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -111,6 +111,7 @@ export async function POST(request: NextRequest) {
       let manifest;
       try{manifest=readAlertSelection(String(body.selectionToken||""),apiSecret,broadcastId,actor,Date.now());if(manifest.mode!==mode)throw new Error("발송 설정이 변경되었습니다. 명단을 다시 확인해 주세요.");}
       catch(error){return NextResponse.json({ok:false,error:error instanceof Error?error.message:"명단 확인 실패"},{status:409});}
+      if(mode==="priority"&&manifest.policy!==ALERT_SELECTION_POLICY)return NextResponse.json({ok:false,error:"선정 기준이 변경되었습니다. 대상 선정 / 다시 뽑기를 눌러 명단을 확인해 주세요. 발송하지 않았습니다."},{status:409});
       const eligible=new Set(targets);
       // Never replace removed recipients with newly selected people behind the operator's back.
       if(manifest.phones.some(p=>!eligible.has(p)))return NextResponse.json({ok:false,error:"동의 또는 발송 이력이 변경되었습니다. 명단을 다시 확인해 주세요."},{status:409});
@@ -127,8 +128,14 @@ export async function POST(request: NextRequest) {
         const detail=details.get(p);
         return {name:candidates.get(p)||"",phone:maskPhone(p),...(detail?{orderDays:detail.orderDays,recent:detail.recent}:{})};
       });
-      const selectionToken=sealAlertSelection({broadcastId,actor,mode,phones:targets,expires:Date.now()+15*60000},apiSecret);
-      return NextResponse.json({ ok: true, dryRun: true, mode, candidateCount, receivedCount, targetCount, sample, selectionToken });
+      const selectionToken=sealAlertSelection({broadcastId,actor,mode,policy:ALERT_SELECTION_POLICY,phones:targets,expires:Date.now()+15*60000},apiSecret);
+      const selectionGroups=mode==="priority"?{
+        frequent:selected.filter(p=>p.orderDays>=2).length,
+        newBuyer:selected.filter(p=>p.orderDays===1).length,
+        noRecentOrders:selected.filter(p=>p.orderDays===0).length,
+        noRecentOrdersMax:Math.floor(Number(body.limit)/20),
+      }:undefined;
+      return NextResponse.json({ ok: true, dryRun: true, mode, candidateCount, receivedCount, targetCount, sample, selectionToken, selectionGroups });
     }
 
     if (targetCount === 0) {

@@ -3,7 +3,8 @@ import {createHmac,timingSafeEqual} from 'node:crypto';
 type Customer={customer_phone?:unknown;customer_name?:unknown;live_alert_optin?:boolean|null;live_alert_optin_at?:string|null};
 type Order={customer_phone?:unknown;phone?:unknown;created_at?:string|null;order_status?:string|null;admin_order_status_v2?:string|null;is_deleted?:boolean|null;is_permanently_deleted?:boolean|null;is_test_order?:boolean|null};
 export type AlertTarget={phone:string;name:string;orderDays:number;recent:boolean};
-export type AlertManifest={broadcastId:string;actor:string;phones:string[];expires:number;mode?:string};
+export type AlertManifest={broadcastId:string;actor:string;phones:string[];expires:number;mode?:string;policy?:string};
+export const ALERT_SELECTION_POLICY='buyers-first-5pct-v1';
 export const alertPhone=(value:unknown)=>String(value??'').replace(/\D/g,'');
 export function selectAlertRecipients(customers:Customer[],orders:Order[],excluded:Set<string>,options:{limit:number;orderDays:number;recentDays:number;now:number;random?:()=>number}):AlertTarget[]{
  const {limit,orderDays,recentDays,now}=options;
@@ -21,7 +22,7 @@ export function selectAlertRecipients(customers:Customer[],orders:Order[],exclud
  // If legacy duplicate profiles disagree, explicit OFF wins.
  for(const c of customers){const p=alertPhone(c.customer_phone);if(!unique.has(p)||c.live_alert_optin===false)unique.set(p,c);}
  const random=options.random||Math.random;
- return [...unique].flatMap(([phone,c])=>{
+ const ranked=[...unique].flatMap(([phone,c])=>{
   if(c.live_alert_optin!==true||excluded.has(phone)||!/^01[016789]\d{7,8}$/.test(phone))return [];
   const count=days.get(phone)?.size||0,t=Date.parse(c.live_alert_optin_at||'');
   const recent=Number.isFinite(t)&&t<=now&&t>=now-recentDays*86400000;
@@ -29,7 +30,14 @@ export function selectAlertRecipients(customers:Customer[],orders:Order[],exclud
   const weight=1+Math.min(count,30)+(recent?5:0);
   const u=Math.max(Number.MIN_VALUE,Math.min(1,random()));
   return [{phone,name:String(c.customer_name||''),orderDays:count,recent,rank:-Math.log(u)/weight}];
- }).sort((a,b)=>a.rank-b.rank||a.phone.localeCompare(b.phone)).slice(0,limit).map(({rank,...target})=>target);
+ }).sort((a,b)=>a.rank-b.rank||a.phone.localeCompare(b.phone));
+ // Recent signup boosts never let people without recent orders displace
+ // more than the approved 5% of the operator's requested recipient count.
+ // Keep one-day recent signups in the buyer pool (not the 5% pool).
+ const buyers=ranked.filter(p=>p.orderDays>0);
+ const nonBuyerLimit=Math.floor(limit/20);
+ const nonBuyers=ranked.filter(p=>p.orderDays===0).slice(0,nonBuyerLimit);
+ return [...buyers.slice(0,limit-nonBuyers.length),...nonBuyers].map(({rank,...target})=>target);
 }
 function validateManifest(m:AlertManifest){
  if(!m.broadcastId||!m.actor||!Number.isFinite(m.expires)||!Array.isArray(m.phones)||m.phones.length>10000||new Set(m.phones).size!==m.phones.length||m.phones.some(p=>!/^01[016789]\d{7,8}$/.test(p)))throw new Error('잘못된 발송 명단입니다.');
