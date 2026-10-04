@@ -426,7 +426,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   // [2026-09-01 사장님 지시] 「챙김/안챙김」 칸 삭제(팝업 체크로 충분), 맨 끝에 빈 「비고」 칸 추가.
   void pickedIds; // 호출부 서명 유지용 — 챙김 칸이 빠져 더는 안 쓴다
   // [2026-09-01 사장님 지시] 첫 칸에 「날짜」(주문일 MM.DD) — 헤더 아래 데이터 줄부터 채움
-  const headers: WorkbookRow = ["구분", "날짜", "닉네임", "상품명", "옵션", "수량", "상품금액", "결제", "비고"];
+  const headers: WorkbookRow = ["날짜", "닉네임", "상품명", "옵션", "수량", "상품금액", "결제", "비고"];
   const orderDateLabel = (order: LiveOrder) => {
     const src = order.createdAt || order.submittedAt;
     if (!src) return "";
@@ -460,6 +460,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   })) : orderedOrders;
   const builtRows = buildPickingExportRows(exportStateOrders, meta.visibleItemIds, meta.attentionItemIds);
   const mainByItemId = new Map(builtRows.mainRows.map((row) => [row.itemId, row]));
+  const attentionByItemId = new Map(builtRows.attentionRows.map((row) => [row.itemId, row]));
   const visible = meta.visibleItemIds ? new Set(meta.visibleItemIds.map(String)) : null;
   type RowWithKey = { row: WorkbookRow; unpaid: boolean; attention: boolean; product: string; color: string; size: string; time: number };
   const keyedRows: RowWithKey[] = [];
@@ -471,7 +472,6 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
     if (!items.length) {
       if (visible && !visible.has(String(order.id))) return;
       const row: WorkbookRow = [
-        "일반",
         orderDateLabel(order),
         labelName(order),
         clean(order.orderSummary) || "상품명없음",
@@ -489,7 +489,6 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
       const built = mainByItemId.get(String(item.id));
       if (!built) return;
       const row: WorkbookRow = [
-        built.kind,
         orderDateLabel(order),
         labelName(order),
         itemName(item),
@@ -498,7 +497,10 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
         Number(item.amount || 0),
       ];
       if (hasUnpaid) row.push(unpaid ? "미입금" : "완료");
-      row.push(""); // 비고 — 사장님이 손으로 적는 빈칸
+      const attention = attentionByItemId.get(String(item.id));
+      row.push(attention?.kind === "상품 변경 · 다시 챙기기"
+        ? `이전 주문 상품 변경 · 다시 챙기기\n변경 전: ${attention.before || "기록 없음"}\n변경 후: ${attention.current}`
+        : attention ? "결제 후 추가 챙기기" : "");
       keyedRows.push({ row, unpaid, attention: built.kind !== "일반", product: itemName(item), color: clean(item.color), size: clean(item.size), time: orderTime(order) });
     });
   });
@@ -525,12 +527,28 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   addRows(sheet, rows);
   // 필터 범위 = 헤더~마지막 데이터 줄까지만 (위 합계 3줄은 범위 밖 = 고정)
   styleFilterSheet(sheet, headerRowNumber, headerRowNumber + itemRows.length, headers.length);
+  // Picking-only widths/alignment: the shared formatter also serves shipping exports.
+  setColumnWidths(sheet, [22, 18, 24, 30, 7, 14, 10, 52]);
+  sheet.eachRow((row, rowNumber) => {
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    });
+    if (rowNumber > headerRowNumber) {
+      let lines = 1;
+      row.eachCell((cell, column) => {
+        const width = Math.max(1, (sheet.getColumn(column).width || 10) - 2);
+        const cellLines = String(cell.value ?? "").split("\n").reduce((sum, line) => sum + Math.max(1, Math.ceil(Array.from(line).reduce((n, c) => n + (/[^\x00-\x7F]/.test(c) ? 2 : 1), 0) / width)), 0);
+        lines = Math.max(lines, cellLines);
+      });
+      row.height = Math.max(24, lines * 18 + 6);
+    }
+  });
 
   // 데이터 줄 스타일 — 헤더 다음부터.
   const firstDataRow = headerRowNumber + 1;
   itemRows.forEach((_, index) => {
     const row = sheet.getRow(firstDataRow + index);
-    row.getCell(7).numFmt = "#,##0"; // 상품금액 쉼표
+    row.getCell(6).numFmt = "#,##0"; // 상품금액 쉼표
     if (unpaidRowFlags[index]) {
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
         if (colNumber > headers.length) return;
@@ -541,7 +559,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
         if (colNumber > headers.length) return;
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF1D6" } };
-        if (colNumber === 1) cell.font = { bold: true, color: { argb: "FF9A3412" } };
+        if (colNumber === 8) cell.font = { bold: true, color: { argb: "FF9A3412" } };
       });
     }
   });
