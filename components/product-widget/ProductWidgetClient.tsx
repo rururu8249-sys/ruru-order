@@ -618,7 +618,7 @@ export default function ProductWidgetClient() {
                 → 카드 폭과 같은 200×200 고정. 2026-09-20 이후 등록한 대표사진은 이미 1:1 이라 여백 없이 꽉 찬다.
                 그 전에 올린 사진(비율 제각각)은 아래 «흐린 같은 사진»이 남는 자리를 메운다. */}
             {img ? (
-              <div style={{ position: "relative", flex: `0 0 ${CARD}px`, height: `${CARD}px`, width: "100%", background: GLASS_BG, overflow: "hidden" }}>
+              <div data-ruru-widget-photo style={{ position: "relative", flex: `1 1 ${CARD}px`, minHeight: 0, width: "100%", background: GLASS_BG, overflow: "hidden" }}>
                 {/* [2026-09-19 사장님 «위아래 빈 공간이 거슬린다»] 사진 비율이 틀과 안 맞을 때 생기던 반투명 빈칸을
                     «같은 사진을 흐리게 키운 것»으로 채운다(쇼핑앱 상세 사진과 같은 방식). 틀은 고정, 사진은 안 잘리고, 빈칸은 없다. */}
                 <img
@@ -640,7 +640,7 @@ export default function ProductWidgetClient() {
                 />
               </div>
             ) : (
-              <div style={{ flex: `0 0 ${CARD}px`, height: `${CARD}px`, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "56px", opacity: 0.8, background: GLASS_BG }}>👟</div>
+              <div data-ruru-widget-photo style={{ flex: `1 1 ${CARD}px`, minHeight: 0, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "56px", opacity: 0.8, background: GLASS_BG }}>👟</div>
             )}
 
             {/* [2026-07-09] 상품이 가려져서 하단 어두운 그라데이션 제거.
@@ -690,13 +690,14 @@ export default function ProductWidgetClient() {
                   · 반투명(62%) + 뒤 흐림이라 띠 뒤로 사진이 비친다. 높이는 글자 2줄(상품명 / 옵션·금액) ≈ 카드의 1/4
                   · 아웃라인 글씨(text-shadow)는 띠가 생겨 필요 없어짐 → 제거(더 깔끔) */}
             <div
+              data-ruru-widget-info
               style={{
                 position: "relative", zIndex: 2, flex: "0 0 auto",
                 padding: "8px 10px 9px",
                 // [2026-09-12 사장님 결정] 띠 50% — 방송 화면이 더 비친다. 흰 글자가 밝은 배경(흰 옷·밝은 벽)에서도 읽히게
                 //   글자마다 옅은 그림자(SOFT_TEXT)를 얹는다(예전 2px 검정 테두리보다 훨씬 옅음).
                 //   계산: 검정 50% 위 흰 글자 = 밝은 배경에서 대비 약 3.6:1(기준 4.5:1 미달) → 그림자로 보완. 74%였을 땐 약 9:1.
-                background: GLASS_BG,                                                 // [09-13] 42% · 흐림 없음 — 뒤가 그대로 비침
+                background: "rgba(12,18,28,0.86)",
                 borderTop: "1px solid rgba(255,255,255,0.14)",
                 textShadow: SOFT_TEXT,
               }}
@@ -705,8 +706,7 @@ export default function ProductWidgetClient() {
                   띄어쓰기 없는 긴 이름도 밖으로 안 튀어나가게 overflowWrap */}
               <div
                 style={{
-                  fontSize: "16px", fontWeight: 900, lineHeight: 1.2, color: "#fff", wordBreak: "keep-all", overflowWrap: "anywhere",
-                  overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as const,
+                  fontSize: "16px", fontWeight: 900, lineHeight: 1.2, color: "#FFE59A", wordBreak: "keep-all", overflowWrap: "anywhere",
                 }}
               >
                 {nameOf(current)}
@@ -719,7 +719,7 @@ export default function ProductWidgetClient() {
                     style={{
                       flexShrink: 0, marginTop: "1px",
                       fontSize: "10px", fontWeight: 900, lineHeight: 1, letterSpacing: "0.02em",
-                      color: "rgba(255,255,255,0.72)", background: "rgba(255,255,255,0.13)",
+                      color: "#fff", background: "rgba(255,255,255,0.18)",
                       borderRadius: "5px", padding: "3px 5px",
                     }}
                   >
@@ -727,8 +727,8 @@ export default function ProductWidgetClient() {
                   </span>
                   <span
                     style={{
-                      minWidth: 0, fontSize: "12.5px", fontWeight: 800, lineHeight: 1.3, color: "rgba(255,255,255,0.95)",
-                      wordBreak: "keep-all", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+                      minWidth: 0, fontSize: "13px", fontWeight: 800, lineHeight: 1.3, color: row.label === "색상" ? "#9EEAFF" : "#C5F5B2",
+                      wordBreak: "keep-all", overflowWrap: "anywhere",
                     }}
                   >
                     {row.value}
@@ -746,7 +746,7 @@ export default function ProductWidgetClient() {
                 >
                   {stock || "·"}
                 </span>
-                <span style={{ fontSize: "22px", fontWeight: 900, lineHeight: 1, color: "#fff", whiteSpace: "nowrap" }}>
+                <span data-ruru-widget-price style={{ fontSize: "22px", fontWeight: 900, lineHeight: 1, color: "#FFE59A", whiteSpace: "nowrap" }}>
                   {priceOf(current).toLocaleString("ko-KR")}
                   {/* [2026-07-23] 조합형 + 추가금 옵션 존재 시 "원~" — 고객 주문페이지 카드와 동일 규칙. 평소 상품은 "원" 그대로. */}
                   <span style={{ fontSize: "13px", fontWeight: 800, marginLeft: "1px" }}>{comboInfo && comboInfo.maxPlus > 0 ? "원~" : "원"}</span>
