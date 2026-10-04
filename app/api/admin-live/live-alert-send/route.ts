@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { SolapiMessageService } from "solapi";
+import { selectAlertRecipients, sealAlertSelection, readAlertSelection } from "@/lib/liveAlertSelection";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ function maskPhone(p: string): string {
 //   - "optin": 방송알림 신청(live_alert_optin=true) 회원만  (안전, 기본값)
 //   - "all"  : 전체 회원 (신청 안 한 사람 포함) — 동의 미확인자에게 발송 = 카카오 채널 제재 위험
 // 어느 모드든 "이 방송에서 이미 받은 사람"은 자동 제외(증분 발송). 재발송해도 중복 안 감.
-type SendMode = "optin" | "all";
+type SendMode = "optin" | "all" | "priority";
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,9 +46,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({} as any));
     const broadcastId = String(body?.broadcastId ?? "").trim();
     const dryRun = body?.dryRun === true;
-    const mode: SendMode = body?.mode === "all" ? "all" : "optin";
+    const mode: SendMode = body?.mode === "priority" ? "priority" : body?.mode === "all" ? "all" : "optin";
+    const actor = String((session as any)?.sub ?? (session as any)?.name ?? "admin");
+    if (!broadcastId) return NextResponse.json({ok:false,error:"현재 방송을 선택해 주세요."},{status:400});
 
     const supabase = getSupabaseAdmin();
+    const {data:broadcast,error:broadcastError}=await supabase.from("broadcasts").select("id,status").eq("id",broadcastId).maybeSingle();
+    if(broadcastError||!broadcast||String(broadcast.status).toUpperCase()!=="ON")return NextResponse.json({ok:false,error:"진행 중인 방송을 확인할 수 없습니다. 발송하지 않았습니다."},{status:409});
 
     // 이 방송에서 이미 받은 사람(성공 기록) — 증분 발송을 위해 제외 목록으로 사용
     const received = new Set<string>();
@@ -57,9 +62,9 @@ export async function POST(request: NextRequest) {
           .from("live_alert_recipients")
           .select("customer_phone")
           .eq("broadcast_id", broadcastId)
-          .eq("status", "success")
+          .order("id")
           .range(from, from + 999);
-        if (error) break; // 기록 테이블 조회 실패해도 발송 자체는 진행(최악: 중복발송 방지만 약해짐)
+        if (error) return NextResponse.json({ok:false,error:"중복 발송 기록을 확인하지 못했습니다. 발송하지 않았습니다."},{status:503});
         if (!data || data.length === 0) break;
         for (const r of data) {
           const p = normalizePhone((r as any).customer_phone);
@@ -71,28 +76,59 @@ export async function POST(request: NextRequest) {
 
     // 후보 회원(모드별) — 전화번호 + 이름(미리보기용)
     const candidates = new Map<string, string>(); // phone -> name
+    const customerRows: any[] = [];
     for (let from = 0; ; from += 1000) {
-      let q = supabase.from("customers").select("customer_phone, customer_name").range(from, from + 999);
-      if (mode === "optin") q = q.eq("live_alert_optin", true);
+      const q = supabase.from("customers").select("id,customer_phone,customer_name,live_alert_optin,live_alert_optin_at").order("id").range(from, from + 999);
       const { data, error } = await q;
       if (error) return NextResponse.json({ ok: false, error: `고객 조회 실패: ${error.message}` }, { status: 500 });
       if (!data || data.length === 0) break;
+      customerRows.push(...data);
       for (const row of data) {
         const p = normalizePhone((row as any).customer_phone);
-        if (p.length >= 10 && !candidates.has(p)) candidates.set(p, String((row as any).customer_name ?? ""));
+        if (/^01[016789]\d{7,8}$/.test(p) && (mode === "all" || row.live_alert_optin === true) && !candidates.has(p)) candidates.set(p, String((row as any).customer_name ?? ""));
       }
       if (data.length < 1000) break;
     }
 
     // 대상 = 후보 − 이미 받은 사람
-    const targets = Array.from(candidates.keys()).filter((p) => !received.has(p));
+    // Explicit OFF wins if old duplicate customer records disagree.
+    if(mode!=="all")for(const c of customerRows)if(c.live_alert_optin===false)candidates.delete(normalizePhone(c.customer_phone));
+    let targets = Array.from(candidates.keys()).filter((p) => !received.has(p));
+    let selected: ReturnType<typeof selectAlertRecipients> = [];
+    if(mode==="priority"&&dryRun){
+      const limit=Number(body.limit),orderDays=Number(body.orderDays),recentDays=Number(body.recentDays);
+      if(!Number.isInteger(limit)||limit<1||limit>10000||[orderDays,recentDays].some(n=>!Number.isInteger(n)||n<1||n>365))return NextResponse.json({ok:false,error:"발송 인원 1~10,000명, 기간 1~365일을 입력해 주세요."},{status:400});
+      const orders:any[]=[];
+      for(let from=0;;from+=1000){
+        const {data,error}=await supabase.from("orders").select("id,customer_phone,phone,created_at,order_status,admin_order_status_v2,is_deleted,is_permanently_deleted,is_test_order").gte("created_at",new Date(Date.now()-orderDays*86400000).toISOString()).order("id").range(from,from+999);
+        if(error)return NextResponse.json({ok:false,error:"주문 이력 조회 실패. 발송하지 않았습니다."},{status:503});
+        orders.push(...(data||[]));if(!data||data.length<1000)break;
+      }
+      selected=selectAlertRecipients(customerRows,orders,received,{limit,orderDays,recentDays,now:Date.now()});
+      targets=selected.map(p=>p.phone);
+    }
+    if(!dryRun){
+      let manifest;
+      try{manifest=readAlertSelection(String(body.selectionToken||""),apiSecret,broadcastId,actor,Date.now());if(manifest.mode!==mode)throw new Error("발송 설정이 변경되었습니다. 명단을 다시 확인해 주세요.");}
+      catch(error){return NextResponse.json({ok:false,error:error instanceof Error?error.message:"명단 확인 실패"},{status:409});}
+      const eligible=new Set(targets);
+      // Never replace removed recipients with newly selected people behind the operator's back.
+      if(manifest.phones.some(p=>!eligible.has(p)))return NextResponse.json({ok:false,error:"동의 또는 발송 이력이 변경되었습니다. 명단을 다시 확인해 주세요."},{status:409});
+      targets=manifest.phones;
+    }
     const targetCount = targets.length;
     const candidateCount = candidates.size;
     const receivedCount = received.size;
 
     if (dryRun) {
-      const sample = targets.slice(0, 100).map((p) => ({ name: candidates.get(p) || "", phone: maskPhone(p) }));
-      return NextResponse.json({ ok: true, dryRun: true, mode, candidateCount, receivedCount, targetCount, sample });
+      if(targets.length>10000)return NextResponse.json({ok:false,error:"대상이 10,000명을 초과합니다. 인원 제한 모드를 사용해 주세요."},{status:400});
+      const details=new Map(selected.map(s=>[s.phone,s]));
+      const sample = targets.slice(0, mode==="priority"?10000:100).map((p) => {
+        const detail=details.get(p);
+        return {name:candidates.get(p)||"",phone:maskPhone(p),...(detail?{orderDays:detail.orderDays,recent:detail.recent}:{})};
+      });
+      const selectionToken=sealAlertSelection({broadcastId,actor,mode,phones:targets,expires:Date.now()+15*60000},apiSecret);
+      return NextResponse.json({ ok: true, dryRun: true, mode, candidateCount, receivedCount, targetCount, sample, selectionToken });
     }
 
     if (targetCount === 0) {
@@ -106,8 +142,18 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Unique broadcast/phone rows reserve delivery before contacting SOLAPI.
+    // Retries and concurrent clicks cannot submit the same recipient twice.
+    const claimedPhones:string[]=[];
+    for(let i=0;i<targets.length;i+=500){
+      const {data:claimed,error:claimError}=await supabase.from("live_alert_recipients").upsert(targets.slice(i,i+500).map(p=>({broadcast_id:broadcastId,customer_phone:p,status:"pending"})),{onConflict:"broadcast_id,customer_phone",ignoreDuplicates:true}).select("customer_phone");
+      if(claimError)return NextResponse.json({ok:false,error:"발송 예약 기록에 실패했습니다. 발송하지 않았습니다. 일부 예약은 중복 방지를 위해 유지됩니다."},{status:503});
+      claimedPhones.push(...(claimed||[]).map(r=>normalizePhone(r.customer_phone)));
+    }
+    if(!claimedPhones.length)return NextResponse.json({ok:false,error:"이미 발송 처리 중인 명단입니다. 중복 발송하지 않았습니다."},{status:409});
+
     const messageService = new SolapiMessageService(apiKey, apiSecret);
-    const messages = targets.map((to) => ({
+    const messages = claimedPhones.map((to) => ({
       to,
       from: sender,
       kakaoOptions: { pfId, templateId, variables: {}, disableSms: true },
@@ -131,13 +177,13 @@ export async function POST(request: NextRequest) {
     } catch (e: any) {
       status = "fail";
       memo = String(e?.message ?? e).slice(0, 500);
-      for (const p of targets) failedPhones.add(p);
+      for (const p of claimedPhones) failedPhones.add(p);
       rawResults.push({ error: memo });
     }
 
-    const successPhones = targets.filter((p) => !failedPhones.has(p));
+    const successPhones = claimedPhones.filter((p) => !failedPhones.has(p));
     const successCount = successPhones.length;
-    const failCount = targetCount - successCount;
+    const failCount = claimedPhones.length - successCount;
     if (status !== "fail") status = failCount === 0 ? "success" : successCount === 0 ? "fail" : "partial";
 
     // 성공한 수신자 기록(증분 발송 근거). 중복은 무시(유니크 인덱스 + ignoreDuplicates). broadcastId 있을 때만.
@@ -150,8 +196,8 @@ export async function POST(request: NextRequest) {
         }));
         const { error: recErr } = await supabase
           .from("live_alert_recipients")
-          .upsert(rows, { onConflict: "broadcast_id,customer_phone", ignoreDuplicates: true });
-        if (recErr) console.warn("[live-alert] 수신자 기록 실패(발송은 완료됨):", recErr.message);
+          .upsert(rows, { onConflict: "broadcast_id,customer_phone" });
+        if (recErr) console.warn("[live-alert] 수신자 기록 실패(예약 유지):", recErr.message);
       }
     }
 
@@ -169,7 +215,7 @@ export async function POST(request: NextRequest) {
       raw_result: rawResults,
     });
 
-    return NextResponse.json({ ok: status !== "fail", mode, targetCount, successCount, failCount, status });
+    return NextResponse.json({ ok: status !== "fail", mode, targetCount:claimedPhones.length, successCount, failCount, status, error: status==="fail" ? "접수 여부를 확정하지 못했습니다. 중복 방지를 위해 예약을 유지합니다. SOLAPI 내역 확인 후 처리해 주세요." : undefined });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 });
   }

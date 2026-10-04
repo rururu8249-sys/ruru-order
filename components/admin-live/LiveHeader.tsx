@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { AdminLiveBroadcast } from "./liveBroadcastController";
 import { formatBroadcastTime } from "./liveBroadcastController";
 import { supabase } from "@/lib/supabase";
@@ -142,14 +142,20 @@ export default function LiveHeader({
 
   // 방송알림: 대상(신청자/전체) 선택 + 이미 받은 사람 제외(증분) + 미리보기
   const [alertOpen, setAlertOpen] = useState(false);
-  const [alertMode, setAlertMode] = useState<"optin" | "all">("optin");
+  const [alertMode, setAlertMode] = useState<"priority" | "optin" | "all">("priority");
+  const [alertLimit, setAlertLimit] = useState("300");
+  const [alertOrderDays, setAlertOrderDays] = useState("90");
+  const [alertRecentDays, setAlertRecentDays] = useState("30");
+  const alertRequest = useRef(0);
+  useEffect(() => { alertRequest.current++; setAlertPreview(null); setAlertPreviewLoading(false); }, [activeBroadcast?.id]);
   const [alertPreview, setAlertPreview] = useState<any>(null);
   const [alertPreviewLoading, setAlertPreviewLoading] = useState(false);
   const [alertSending, setAlertSending] = useState(false);
   const [alertResult, setAlertResult] = useState("");
 
-  const loadAlertPreview = async (mode: "optin" | "all") => {
-    if (!activeBroadcast) return;
+  const loadAlertPreview = async (mode: "priority" | "optin" | "all") => {
+    if (!activeBroadcast || alertSending) return;
+    const requestId = ++alertRequest.current;
     setAlertPreviewLoading(true);
     setAlertPreview(null);
     setAlertResult("");
@@ -157,23 +163,25 @@ export default function LiveHeader({
       const r = await fetch("/api/admin-live/live-alert-send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ broadcastId: activeBroadcast.id, dryRun: true, mode }),
+        body: JSON.stringify({ broadcastId: activeBroadcast.id, dryRun: true, mode, limit: Number(alertLimit), orderDays: Number(alertOrderDays), recentDays: Number(alertRecentDays) }),
       }).then((res) => res.json()).catch(() => null);
+      if (requestId !== alertRequest.current) return;
       if (!r?.ok) { setAlertResult("대상 조회 실패: " + (r?.error || "권한/네트워크 확인")); return; }
       setAlertPreview(r);
     } finally {
-      setAlertPreviewLoading(false);
+      if (requestId === alertRequest.current) setAlertPreviewLoading(false);
     }
   };
 
   const openAlert = () => {
     if (!activeBroadcast) return;
     setAlertOpen(true);
-    setAlertMode("optin");
-    void loadAlertPreview("optin");
+    setAlertMode("priority");
+    void loadAlertPreview("priority");
   };
 
-  const changeAlertMode = (mode: "optin" | "all") => {
+  const changeAlertMode = (mode: "priority" | "optin" | "all") => {
+    if (alertSending) return;
     setAlertMode(mode);
     void loadAlertPreview(mode);
   };
@@ -195,10 +203,10 @@ export default function LiveHeader({
       const r = await fetch("/api/admin-live/live-alert-send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ broadcastId: activeBroadcast.id, mode: alertMode }),
+        body: JSON.stringify({ broadcastId: activeBroadcast.id, mode: alertMode, selectionToken: alertPreview?.selectionToken }),
       }).then((res) => res.json()).catch(() => null);
-      setAlertResult(r?.ok ? `✅ 발송 완료 · 성공 ${r.successCount} / 실패 ${r.failCount}` : "발송 실패: " + (r?.error || "알 수 없는 오류"));
-      await loadAlertPreview(alertMode); // 발송 후 인원 갱신(이미 받은 사람 반영)
+      setAlertResult(r?.ok ? `✅ 발송 접수 ${r.successCount}명 · 즉시 실패 ${r.failCount}명 (최종 수신 결과는 SOLAPI에서 확인)` : "발송 확인 필요: " + (r?.error || "알 수 없는 오류"));
+      setAlertPreview(null);
     } finally {
       setAlertSending(false);
     }
@@ -430,7 +438,8 @@ export default function LiveHeader({
           onClick={() => !alertSending && setAlertOpen(false)}
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-surface p-4 shadow-xl"
+            role="dialog" aria-modal="true" aria-label="방송알림 발송"
+            className="w-full max-w-[960px] max-h-[calc(100dvh-32px)] overflow-y-auto rounded-2xl bg-surface p-4 sm:p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
@@ -445,7 +454,8 @@ export default function LiveHeader({
             </div>
 
             {/* 대상 선택 */}
-            <div className="mb-3 grid grid-cols-2 gap-2">
+            <div className="mb-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <button type="button" disabled={alertSending} onClick={() => changeAlertMode("priority")} className={`h-10 rounded-xl text-sm font-black border border-line ${alertMode === "priority" ? "bg-info-tx text-white" : "text-ink-soft"}`}>단골 · 최근 신청자 랜덤</button>
               <button
                 type="button"
                 onClick={() => changeAlertMode("optin")}
@@ -468,6 +478,18 @@ export default function LiveHeader({
               </button>
             </div>
 
+            {alertMode === "priority" && <div className="mb-4 rounded-xl border border-line p-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {([
+                  ["발송 인원 (최대)", alertLimit, setAlertLimit, 10000],
+                  ["최근 주문 조회 기간 (일)", alertOrderDays, setAlertOrderDays, 365],
+                  ["최근 알림 신청 기간 (일)", alertRecentDays, setAlertRecentDays, 365],
+                ] as const).map(([label, value, setter, max]) => <label key={label} className="text-sm font-bold text-ink">{label}<input type="number" min={1} max={max} step={1} disabled={alertSending} value={value} onChange={e => { setter(e.target.value); alertRequest.current++; setAlertPreview(null); setAlertPreviewLoading(false); }} className="mt-1 w-full rounded-lg border border-line px-3 py-2" /></label>)}
+              </div>
+              <p className="mt-2 text-sm text-ink-soft">알림 ON 회원 중 조회 기간에 서로 다른 주문일이 2일 이상이거나 최근 알림 신청한 회원만 선정합니다. 주문일이 많을수록 우선하며 최근 신청자도 우대합니다. 후보가 적으면 가능한 인원만 선정됩니다.</p>
+              <button type="button" disabled={alertSending || alertPreviewLoading} onClick={() => void loadAlertPreview("priority")} className="mt-3 rounded-lg border border-line px-4 py-2 font-bold">{alertPreviewLoading ? "선정 중…" : "대상 선정 / 다시 뽑기"}</button>
+            </div>}
+
             {alertMode === "all" && (
               <div className="mb-3 rounded-xl border border-danger-tx/35 bg-danger-bg px-3 py-2 text-[12px] font-bold text-danger-tx">
                 ⚠️ 신청 안 한 회원에게도 발송합니다. 동의 미확인자 발송은 카카오 알림톡 채널이 제재/차단될 수 있어요.
@@ -482,7 +504,7 @@ export default function LiveHeader({
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span>후보 <b className="text-ink">{alertPreview.candidateCount}</b>명</span>
                   <span className="text-ink-mute">·</span>
-                  <span>이미 받음 <b className="text-ink">{alertPreview.receivedCount}</b>명</span>
+                  <span>발송 처리 이력 <b className="text-ink">{alertPreview.receivedCount}</b>명</span>
                   <span className="text-ink-mute">·</span>
                   <span className="text-info-tx">이번에 받을 <b>{alertPreview.targetCount}</b>명</span>
                 </div>
@@ -493,14 +515,14 @@ export default function LiveHeader({
 
             {/* 이번에 받을 사람 목록(샘플) */}
             {alertPreview?.sample?.length ? (
-              <div className="mb-3 max-h-40 overflow-auto rounded-xl border border-line">
+              <div className="mb-3 max-h-[min(52dvh,480px)] overflow-auto rounded-xl border border-line">
                 <div className="sticky top-0 bg-surface-2 px-3 py-1.5 text-[11px] font-black text-ink-soft">
-                  이번에 받을 사람 (최대 100명 표시)
+                  이번 발송 명단 · {alertPreview.sample.length}명 표시 / 총 {alertPreview.targetCount}명
                 </div>
-                <ul className="divide-y divide-line">
+                <ul className="grid grid-cols-1 sm:grid-cols-2">
                   {alertPreview.sample.map((s: any, i: number) => (
-                    <li key={i} className="flex items-center justify-between px-3 py-1.5 text-[12px] font-bold text-ink">
-                      <span>{s.name || "(이름없음)"}</span>
+                    <li key={i} className="flex items-center justify-between gap-3 border-b border-line px-3 py-3 text-sm font-bold text-ink">
+                      <span>{i + 1}. {s.name || "(이름없음)"}{s.orderDays !== undefined && <small className="block text-ink-mute">주문 {s.orderDays}일{s.recent ? " · 최근 신청" : ""}</small>}</span>
                       <span className="text-ink-mute">{s.phone}</span>
                     </li>
                   ))}
