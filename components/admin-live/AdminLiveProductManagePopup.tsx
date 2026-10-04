@@ -399,9 +399,15 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const loadProducts = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const { data, error } = await supabase.from("products").select("*");
-      if (error) throw error;
-      setProducts((data as ProductRow[]) || []);
+      const allProducts: ProductRow[] = [];
+      for (let offset = 0; ; offset += 1000) {
+        const { data, error } = await supabase.from("products").select("*").order("id").range(offset, offset + 999);
+        if (error) throw error;
+        const page = (data || []) as ProductRow[];
+        allProducts.push(...page);
+        if (page.length < 1000) break;
+      }
+      setProducts(allProducts);
     } catch (e) {
       showAdminToast("상품 불러오기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
     } finally {
@@ -1292,9 +1298,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       setBcWidgetPin({ mode: "auto", productId: "", detailName: "" });
       window.dispatchEvent(new Event("ruru-live-product-updated"));
       showAdminToast("위젯 고정을 해제했습니다. 설정된 상품 순환으로 돌아갑니다.", "success");
+      return true;
     } catch (e) {
       await loadBcWidgetPin(targetBroadcastId);
       showAdminToast("고정 해제 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+      return false;
     } finally {
       setBcPinBusy(false);
     }
@@ -1421,9 +1429,14 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   };
 
   const applyWidgetLibraryRotation = async (mode: WidgetRotationConfig["mode"]) => {
-    if (mode === "all") {
-      if (await saveWidgetRotation({ mode: "all", paused: false, targets: [] })) {
-        showAdminToast("현재 방송의 전체 진열 상품을 자동 순환합니다.", "success");
+    if (mode !== "selected") {
+      if (mode === "history" && selectableWidgetTargets(widgetLibraryItems).length === 0) {
+        showAdminToast("고정 기록에 순환 가능한 상품이 없습니다.", "warning");
+        return;
+      }
+      if (await saveWidgetRotation({ mode, paused: false, targets: [] })) {
+        if (bcWidgetPin.mode === "pin" && !(await clearBroadcastPin())) return;
+        showAdminToast(mode === "history" ? "고정 기록의 상품만 자동 순환합니다." : "등록한 모든 상품을 자동 순환합니다.", "success");
       }
       return;
     }
@@ -1434,12 +1447,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       return;
     }
     if (await saveWidgetRotation({ mode: "selected", paused: false, targets })) {
-      showAdminToast(
-        bcWidgetPin.mode === "pin"
-          ? `선택한 ${targets.length}개 상품을 저장했습니다. 현재 상품 고정을 해제하면 자동 순환합니다.`
-          : `선택한 ${targets.length}개 상품만 자동 순환합니다.`,
-        "success",
-      );
+      if (bcWidgetPin.mode === "pin" && !(await clearBroadcastPin())) return;
+      showAdminToast(`선택한 ${targets.length}개 상품만 자동 순환합니다.`, "success");
     }
   };
 

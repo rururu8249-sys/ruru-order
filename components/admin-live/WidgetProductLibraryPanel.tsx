@@ -62,10 +62,11 @@ export default function WidgetProductLibraryPanel({
   onApplyDraft,
   onTogglePause,
 }: Props) {
-  const [editing, setEditing] = useState(false);
+  const editing = true;
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<WidgetHistorySort>("recent");
-  const filtered = useMemo(() => filterAndSortWidgetHistory(items, search, sort), [items, search, sort]);
+  const [selectedOnly, setSelectedOnly] = useState(false);
+  const filtered = useMemo(() => filterAndSortWidgetHistory(items, search, sort).filter((item) => !selectedOnly || selectedKeys.has(widgetTargetKey(item))), [items, search, sort, selectedOnly, selectedKeys]);
   const selectableTargets = useMemo(() => selectableWidgetTargets(items), [items]);
   const filteredSelectableTargets = useMemo(() => selectableWidgetTargets(filtered), [filtered]);
   const selectableKeys = useMemo(() => new Set(selectableTargets.map(widgetTargetKey)), [selectableTargets]);
@@ -91,7 +92,7 @@ export default function WidgetProductLibraryPanel({
       ? `📌 ${manualPinLabel} 고정 기록`
       : rotation.mode === "selected"
         ? `저장된 위젯 설정 · 선택한 상품 ${rotation.targets.length}개 순환`
-        : "저장된 위젯 설정 · 전체 진열상품 순환"
+        : rotation.mode === "history" ? "저장된 위젯 설정 · 고정 기록 상품 순환" : "저장된 위젯 설정 · 등록 상품 전체 순환"
     : manualPinLabel
       ? `방송화면 위젯 · ${manualPinLabel} 고정 표시 중`
       : rotation.mode === "selected"
@@ -99,29 +100,19 @@ export default function WidgetProductLibraryPanel({
           ? `방송화면 위젯 · 선택한 상품 ${rotation.targets.length}개 순환 일시정지`
           : `방송화면 위젯 · 선택한 상품 ${rotation.targets.length}개 순환 중`
         : rotation.paused
-          ? "방송화면 위젯 · 전체 진열상품 순환 일시정지"
-          : "방송화면 위젯 · 전체 진열상품 순환 중";
+          ? `방송화면 위젯 · ${rotation.mode === "history" ? "고정 기록 상품" : "등록 상품 전체"} 순환 일시정지`
+          : `방송화면 위젯 · ${rotation.mode === "history" ? "고정 기록 상품" : "등록 상품 전체"} 순환 중`;
   const waitingStatus = rotation.mode === "selected"
     ? `선택한 상품 ${rotation.targets.length}개 순환 대기 · 고정 해제 시 자동 재개`
-    : "전체 진열상품 순환 대기 · 고정 해제 시 자동 재개";
+    : "순환 시작을 누르면 현재 상품 고정을 해제하고 순환합니다.";
 
   return (
     <section className={styles.panel} aria-label="자주 사용한 상품 위젯">
       <div className={styles.header}>
         <div className={styles.headingWrap}>
-          <strong className={styles.title}>📌 자주 사용한 상품 위젯</strong>
+          <strong className={styles.title}>📌 상품 위젯 순환 · 고정 기록</strong>
           <span className={styles.count}>{items.length}개</span>
         </div>
-        {items.length > 0 ? (
-          <button
-            type="button"
-            className={styles.ghostButton}
-            aria-label={editing ? "순환 상품 선택·변경 닫기" : "순환 상품 선택·변경"}
-            onClick={() => setEditing((value) => !value)}
-          >
-            {editing ? "설정 닫기" : "순환 상품 선택·변경"}
-          </button>
-        ) : null}
       </div>
 
       <div className={`${styles.liveStatus} ${manualPinLabel ? styles.pinnedStatus : ""}`}>
@@ -171,12 +162,16 @@ export default function WidgetProductLibraryPanel({
                 <input
                   type="radio"
                   name="widget-rotation-mode"
-                  aria-label="전체 진열상품 순환"
+                  aria-label="등록한 모든 상품 순환"
                   checked={draftMode === "all"}
                   disabled={!canManageRotation}
                   onChange={() => onDraftModeChange("all")}
                 />
-                <span><strong>전체 진열상품</strong><small>현재 방송에 진열된 상품을 차례로 표시</small></span>
+                <span><strong>등록한 모든 상품</strong><small>방송에 담지 않은 상품도 포함하여 순환</small></span>
+              </label>
+              <label className={`${styles.modeOption} ${draftMode === "history" ? styles.modeOptionActive : ""}`}>
+                <input type="radio" name="widget-rotation-mode" aria-label="고정 기록 상품 전체 순환" checked={draftMode === "history"} disabled={!canManageRotation} onChange={() => onDraftModeChange("history")} />
+                <span><strong>고정 기록 상품 전체</strong><small>아래 고정 기록의 사용 가능한 상품만 순환</small></span>
               </label>
               <label className={`${styles.modeOption} ${draftMode === "selected" ? styles.modeOptionActive : ""}`}>
                 <input
@@ -194,6 +189,7 @@ export default function WidgetProductLibraryPanel({
 
           <div className={styles.selectionToolbar}>
             <span className={styles.selectionCount}>선택 {selectedCount}개</span>
+            <label><input type="checkbox" checked={selectedOnly} onChange={(event) => setSelectedOnly(event.target.checked)} /> 선택한 상품만 보기</label>
             <div className={styles.selectionActions}>
               <button
                 type="button"
@@ -237,7 +233,7 @@ export default function WidgetProductLibraryPanel({
             const key = widgetTargetKey(item);
             const selected = selectedKeys.has(key);
             const busy = busyKey === key;
-            const selectable = item.available && item.inBroadcast;
+            const selectable = item.available;
             return (
               <article key={key} className={`${styles.card} ${editing && selected ? styles.selectedCard : ""} ${!item.available ? styles.unavailableCard : ""}`}>
                 {editing ? (
@@ -263,17 +259,17 @@ export default function WidgetProductLibraryPanel({
                   <div className={styles.price}>{item.priceLabel || "가격 확인 필요"}</div>
                   <div className={styles.meta}>
                     <span>고정 {item.count}회</span>
-                    {!item.inBroadcast ? <span className={styles.warning}>현재 방송 미진열</span> : !item.available ? <span className={styles.warning}>{item.unavailableReason || "사용 불가"}</span> : null}
+                    {!item.available ? <span className={styles.warning}>{item.unavailableReason || "사용 불가"}</span> : !item.inBroadcast ? <span>미진열 · 순환 가능</span> : null}
                   </div>
                 </div>
                 <button
                   type="button"
                   className={styles.pinButton}
-                  disabled={!selectable || busy}
+                  disabled={!selectable || !item.inBroadcast || busy}
                   onClick={() => onPin(item)}
                   title={!item.inBroadcast ? "현재 방송에 먼저 상품을 담아주세요" : "고정·채팅 지정·문구 복사"}
                 >
-                  {busy ? "처리 중" : "▶ 방송"}
+                  {busy ? "처리 중" : "이 상품 고정"}
                 </button>
                 <button type="button" className={styles.removeButton} onClick={() => onRemove(item)} aria-label={`${item.label} 사용 목록에서 삭제`}>×</button>
               </article>
@@ -282,10 +278,11 @@ export default function WidgetProductLibraryPanel({
         </div>
       )}
 
-      {editing && dirty ? (
+      {editing ? (
         <div className={styles.saveBar} aria-label="순환 설정 변경사항">
           <div className={styles.saveMessage}>
-            <strong>변경사항이 아직 방송에 적용되지 않았습니다.</strong>
+            <strong>{dirty ? "변경사항이 아직 방송에 적용되지 않았습니다." : "순환 방식을 선택하고 시작하세요."}</strong>
+            <span>품절·숨김·삭제 상품은 제외합니다.{manualPinLabel ? " 시작하면 현재 상품 고정을 해제합니다." : ""}</span>
             {selectedModeEmpty ? <span className={styles.validation}>선택 상품은 한 개 이상 선택해주세요.</span> : null}
           </div>
           <div className={styles.actionButtons}>
@@ -294,14 +291,12 @@ export default function WidgetProductLibraryPanel({
               type="button"
               className={styles.primaryButton}
               aria-label="순환 설정 적용"
-              disabled={!canManageRotation || selectedModeEmpty}
+              disabled={!canManageRotation || loading || selectedModeEmpty || (draftMode === "history" && selectableTargets.length === 0)}
               onClick={() => onApplyDraft(draftMode)}
             >
               {draftMode === "all"
-                ? "전체 진열상품으로 적용"
-                : manualPinLabel
-                  ? `선택 ${selectedCount}개 순환 예약`
-                  : `선택 ${selectedCount}개로 순환 적용`}
+                ? "등록 상품 전체 순환 시작"
+                : draftMode === "history" ? `고정 기록 ${selectableTargets.length}개 순환 시작` : `선택 ${selectedCount}개 순환 시작`}
             </button>
           </div>
         </div>

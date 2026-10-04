@@ -124,9 +124,12 @@ const libraryItems = [
 ];
 assert.deepEqual(
   widgetLibrary.selectableWidgetTargets(libraryItems),
-  [{ productId: "10", detailName: "" }, { productId: "20", detailName: "브라운" }],
+  [{ productId: "10", detailName: "" }, { productId: "20", detailName: "브라운" }, { productId: "40", detailName: "" }],
   "bulk select must include only available products displayed in the current broadcast",
 );
+assert.equal(parseWidgetRotation({mode:"history"}).mode, "history");
+assert.deepEqual(selectWidgetRotationItems(candidates, {mode:"history",paused:false,targets:[]}, targetOf, available, [{productId:"20",detailName:""}]).map(item=>item.id), ["20-a","20-b"]);
+assert.deepEqual(selectWidgetRotationItems(candidates, {mode:"history",paused:false,targets:[]}, targetOf, available, []), []);
 assert.deepEqual(
   widgetLibrary.selectableWidgetTargets(libraryItems.slice(1, 3)),
   [{ productId: "20", detailName: "브라운" }],

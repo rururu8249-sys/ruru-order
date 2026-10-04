@@ -15,6 +15,8 @@ import { splitOptionText } from "@/lib/optionSplit";
 import { compressSizeList } from "@/lib/sizeRange";
 import {
   parseWidgetRotation,
+  parseWidgetHistory,
+  WIDGET_PRODUCT_HISTORY_SETTING_KEY,
   selectWidgetRotationItems,
   widgetRotationSettingKey,
   widgetRotationShouldAdvance,
@@ -181,6 +183,7 @@ function stockLabel(p: AnyProduct | null): string {
 //   읽기 전용(주문/재고 로직 무관, 표시만).
 function isSoldOutWidgetProduct(p: AnyProduct | null): boolean {
   if (!p) return false;
+  if (p.is_soldout === true) return true;
   let note: any = p.product_note;
   if (typeof note === "string") {
     try {
@@ -319,8 +322,14 @@ export default function ProductWidgetClient() {
     let alive = true;
     const load = async () => {
       try {
-        const { data: products } = await supabase.from("products").select("*");
-        const list = (products || []) as AnyProduct[];
+        const list: AnyProduct[] = [];
+        for (let offset = 0; ; offset += 1000) {
+          const { data, error } = await supabase.from("products").select("*").order("id").range(offset, offset + 999);
+          if (error) throw error;
+          const page = (data || []) as AnyProduct[];
+          list.push(...page);
+          if (page.length < 1000) break;
+        }
 
         const broadcasts = await loadAdminLiveBroadcasts();
         const active = getActiveBroadcast(broadcasts);
@@ -334,13 +343,11 @@ export default function ProductWidgetClient() {
           }
           return;
         }
-        // [2026-07-12 사장님 지침] 현재 방송에 안 담긴 상품은 위젯에 안 띄운다.
-        //   고정(is_pinned)이 전역 플래그라 지난 방송에서 고정한 상품이 새 방송에도 떠서
-        //   "안 담았는데 왜 공개되냐" 사고가 남 → 고정 상품도 활성 방송 진열 목록에 있을 때만 표시.
-        //   활성 방송이 없거나 진열 0개면 카드 없음(배너는 별개로 항상 표시). 표시 전용 — 고정 저장/DB 무변경.
+        // 순환은 등록 상품 전체/고정 기록/선택 상품 기준. 단일 고정은 현재 방송 진열 상품만 허용.
+        // 활성 방송이 없으면 카드 없음. 위젯 OFF와 수동 고정 우선순위는 유지한다.
         let ids: string[] = [];
         if (active?.id) {
-          const [{ data: links }, { data: rotationSetting }] = await Promise.all([
+          const [{ data: links }, rotationResult, historyResult] = await Promise.all([
             supabase
               .from("broadcast_products")
               .select("product_id, sort_order")
@@ -351,19 +358,23 @@ export default function ProductWidgetClient() {
               .select("value")
               .eq("key", widgetRotationSettingKey(String(active.id)))
               .maybeSingle(),
+            supabase.from("settings").select("value").eq("key", WIDGET_PRODUCT_HISTORY_SETTING_KEY).maybeSingle(),
           ]);
+          if (rotationResult.error) throw rotationResult.error;
+          const rotationSetting = rotationResult.data;
           ids = ((links as { product_id: unknown }[]) || []).map((r) => String(r.product_id));
           const byId = new Map(list.map((x) => [String(x?.id ?? x?.product_id), x]));
           const allBroadcastItems = ids.flatMap((id) => { const parent = byId.get(id); return parent ? (expandForWidget(parent) as AnyProduct[]) : []; });
           const nextRotationConfig = parseWidgetRotation(rotationSetting?.value);
           const rot = selectWidgetRotationItems(
-            allBroadcastItems,
+            list.flatMap((parent) => expandForWidget(parent) as AnyProduct[]),
             nextRotationConfig,
             (item) => ({
               productId: String(item?.__parent_product_id ?? item?.id ?? item?.product_id ?? ""),
               detailName: String(item?.__detail_name || "").trim(),
             }),
             isAvailableWidgetProduct,
+            historyResult.error ? [] : parseWidgetHistory(historyResult.data?.value),
           );
           const availableBroadcastItems = allBroadcastItems.filter(isAvailableWidgetProduct);
           if (alive) {

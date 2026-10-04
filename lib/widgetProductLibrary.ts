@@ -12,7 +12,7 @@ export type WidgetHistoryEntry = WidgetProductTarget & {
 };
 
 export type WidgetRotationConfig = {
-  mode: "all" | "selected";
+  mode: "all" | "history" | "selected";
   paused: boolean;
   targets: WidgetProductTarget[];
 };
@@ -61,7 +61,7 @@ export function selectableWidgetTargets<T extends WidgetProductTarget & { availa
 ): WidgetProductTarget[] {
   const unique = new Map<string, WidgetProductTarget>();
   for (const item of items) {
-    if (!item.available || !item.inBroadcast) continue;
+    if (!item.available) continue;
     const target = normalizeWidgetTarget(item);
     if (target) unique.set(widgetTargetKey(target), target);
   }
@@ -75,7 +75,7 @@ export function widgetRotationDraftChanged(
 ): boolean {
   const saved = parseWidgetRotation(savedInput);
   if (saved.mode !== draftMode) return true;
-  if (draftMode === "all") return false;
+  if (draftMode !== "selected") return false;
   const savedKeys = new Set(saved.targets.map(widgetTargetKey));
   if (savedKeys.size !== selectedKeys.size) return true;
   for (const key of savedKeys) if (!selectedKeys.has(key)) return true;
@@ -203,7 +203,7 @@ function normalizeTargets(value: unknown): WidgetProductTarget[] {
 export function parseWidgetRotation(value: unknown): WidgetRotationConfig {
   const parsed = objectValue(parseJson(value));
   if (!parsed) return { ...DEFAULT_ROTATION, targets: [] };
-  const mode = parsed.mode === "selected" ? "selected" : "all";
+  const mode = parsed.mode === "selected" ? "selected" : parsed.mode === "history" ? "history" : "all";
   return {
     mode,
     paused: parsed.paused === true,
@@ -220,6 +220,7 @@ export function selectWidgetRotationItems<T>(
   configInput: WidgetRotationConfig,
   targetOf: (item: T) => WidgetProductTarget,
   isAvailable: (item: T) => boolean = () => true,
+  history: WidgetProductTarget[] = [],
 ): T[] {
   const config = parseWidgetRotation(configInput);
   const availableItems = items.filter(isAvailable);
@@ -230,10 +231,14 @@ export function selectWidgetRotationItems<T>(
     const target = normalizeWidgetTarget(targetOf(item));
     if (target) byTarget.set(widgetTargetKey(target), item);
   }
-  return config.targets.flatMap((target) => {
-    const item = byTarget.get(widgetTargetKey(target));
-    return item === undefined ? [] : [item];
-  });
+  const result = new Map<string, T>();
+  for (const target of config.mode === "history" ? normalizeTargets(history) : config.targets) {
+    for (const [key, item] of byTarget) {
+      const actual = targetOf(item);
+      if (String(actual.productId) === target.productId && (!target.detailName || actual.detailName === target.detailName)) result.set(key, item);
+    }
+  }
+  return [...result.values()];
 }
 
 export function widgetRotationShouldAdvance(
