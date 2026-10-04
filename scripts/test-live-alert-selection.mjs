@@ -17,6 +17,9 @@ const orders=[
 ];
 const options={limit:300,orderDays:90,recentDays:30,now,random:()=>.5};
 const selected=selectAlertRecipients(customers,orders,new Set(),options);
+const pool=selectAlertRecipients(customers,orders,new Set(),{...options,includeAllEligible:true});
+assert.equal(pool.length,4,'manual search includes opted-in members outside automatic priority criteria');
+assert.equal(pool.find(p=>p.phone===phone(3)).orderDays,1);
 assert.deepEqual(selected.map(p=>p.phone).sort(),[phone(1),phone(2)]);
 assert.equal(selected.find(p=>p.phone===phone(1)).orderDays,2,'same KST date counts once, not product lines');
 assert.equal(selectAlertRecipients(customers,orders,new Set([phone(1)]),options).length,1);

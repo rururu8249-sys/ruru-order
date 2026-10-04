@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { SolapiMessageService } from "solapi";
+import { createHmac } from "node:crypto";
 import { selectAlertRecipients, sealAlertSelection, readAlertSelection, ALERT_SELECTION_POLICY } from "@/lib/liveAlertSelection";
 
 export const runtime = "nodejs";
@@ -95,6 +96,17 @@ export async function POST(request: NextRequest) {
     if(mode!=="all")for(const c of customerRows)if(c.live_alert_optin===false)candidates.delete(normalizePhone(c.customer_phone));
     let targets = Array.from(candidates.keys()).filter((p) => !received.has(p));
     let selected: ReturnType<typeof selectAlertRecipients> = [];
+    let members: ReturnType<typeof selectAlertRecipients> = [];
+    const memberId=(phone:string)=>createHmac("sha256",apiSecret).update(`recipient:${broadcastId}:${actor}:${phone}`).digest("base64url");
+    const manualIds=new Set<string>();
+    const excludedIds=new Set<string>();
+    if(dryRun){
+      for(const [key,set] of [["includeIds",manualIds],["excludeIds",excludedIds]] as const){
+        const ids=body[key]??[];
+        if(!Array.isArray(ids)||ids.length>10000||ids.some((id:unknown)=>typeof id!=="string"||id.length>100))return NextResponse.json({ok:false,error:"잘못된 회원 선택입니다."},{status:400});
+        ids.forEach((id:string)=>set.add(id));
+      }
+    }
     if(mode==="priority"&&dryRun){
       const limit=Number(body.limit),orderDays=Number(body.orderDays),recentDays=Number(body.recentDays);
       if(!Number.isInteger(limit)||limit<1||limit>10000||[orderDays,recentDays].some(n=>!Number.isInteger(n)||n<1||n>365))return NextResponse.json({ok:false,error:"발송 인원 1~10,000명, 기간 1~365일을 입력해 주세요."},{status:400});
@@ -104,8 +116,40 @@ export async function POST(request: NextRequest) {
         if(error)return NextResponse.json({ok:false,error:"주문 이력 조회 실패. 발송하지 않았습니다."},{status:503});
         orders.push(...(data||[]));if(!data||data.length<1000)break;
       }
-      selected=selectAlertRecipients(customerRows,orders,received,{limit,orderDays,recentDays,now:Date.now()});
+      const options={limit,orderDays,recentDays,now:Date.now()};
+      members=selectAlertRecipients(customerRows,orders,received,{...options,includeAllEligible:true});
+      const byId=new Map(members.map(p=>[memberId(p.phone),p]));
+      if([...manualIds].some(id=>!byId.has(id)||excludedIds.has(id)))return NextResponse.json({ok:false,error:"추가한 회원의 알림 동의 또는 발송 이력이 변경되었습니다. 명단을 다시 확인해 주세요."},{status:409});
+      const pinned=[...manualIds].map(id=>byId.get(id)!);
+      const cap=Math.floor(limit/20);
+      if(pinned.length>limit||pinned.filter(p=>p.orderDays===0).length>cap)return NextResponse.json({ok:false,error:"최대 인원 또는 최근 주문 없는 회원 5% 제한을 초과합니다. 먼저 제외하거나 인원을 늘려주세요."},{status:409});
+      if(body.selectionToken){
+        let previous;
+        try{previous=readAlertSelection(String(body.selectionToken),apiSecret,broadcastId,actor,Date.now());if(previous.mode!==mode||previous.policy!==ALERT_SELECTION_POLICY)throw new Error("선정 기준이 변경되었습니다. 명단을 다시 확인해 주세요.");}
+        catch(error){return NextResponse.json({ok:false,error:error instanceof Error?error.message:"명단 확인 실패"},{status:409});}
+        const byPhone=new Map(members.map(p=>[p.phone,p]));
+        if(previous.phones.some(p=>!byPhone.has(p)))return NextResponse.json({ok:false,error:"동의 또는 발송 이력이 변경되었습니다. 명단을 다시 확인해 주세요."},{status:409});
+        selected=previous.phones.filter(p=>!excludedIds.has(memberId(p))&&!manualIds.has(memberId(p))).map(p=>byPhone.get(p)!);
+        selected=[...pinned,...selected];
+      }else{
+        const blocked=new Set([...received,...members.filter(p=>excludedIds.has(memberId(p.phone))||manualIds.has(memberId(p.phone))).map(p=>p.phone)]);
+        const automatic=selectAlertRecipients(customerRows,orders,blocked,options);
+        let slots=limit-pinned.length,zeroSlots=cap-pinned.filter(p=>p.orderDays===0).length;
+        selected=[...pinned];
+        for(const p of automatic){if(!slots)break;if(p.orderDays===0&&!zeroSlots)continue;selected.push(p);slots--;if(p.orderDays===0)zeroSlots--;}
+      }
+      if(selected.length>limit||selected.filter(p=>p.orderDays===0).length>cap)return NextResponse.json({ok:false,error:"정원입니다. 먼저 회원을 제외하거나 발송 인원을 늘려주세요. 최근 주문 없는 회원은 최대 5%입니다."},{status:409});
       targets=selected.map(p=>p.phone);
+    }
+    if(dryRun&&mode!=="priority"){
+      members=selectAlertRecipients(customerRows,[],received,{limit:10000,orderDays:90,recentDays:30,now:Date.now(),includeAllEligible:true});
+      const byId=new Map(members.map(p=>[memberId(p.phone),p]));
+      if([...manualIds].some(id=>!byId.has(id)||excludedIds.has(id)))return NextResponse.json({ok:false,error:"추가할 수 없는 회원입니다. 알림 동의와 발송 이력을 확인해 주세요."},{status:409});
+      if(body.selectionToken){
+        try{const previous=readAlertSelection(String(body.selectionToken),apiSecret,broadcastId,actor,Date.now());if(previous.mode!==mode||previous.phones.some(p=>!targets.includes(p)))throw new Error("동의 또는 발송 이력이 변경되었습니다. 명단을 다시 확인해 주세요.");targets=previous.phones;}
+        catch(error){return NextResponse.json({ok:false,error:error instanceof Error?error.message:"명단 확인 실패"},{status:409});}
+      }
+      targets=[...new Set([...targets.filter(p=>!excludedIds.has(memberId(p))),...[...manualIds].map(id=>byId.get(id)!.phone)])];
     }
     if(!dryRun){
       let manifest;
@@ -124,9 +168,9 @@ export async function POST(request: NextRequest) {
     if (dryRun) {
       if(targets.length>10000)return NextResponse.json({ok:false,error:"대상이 10,000명을 초과합니다. 인원 제한 모드를 사용해 주세요."},{status:400});
       const details=new Map(selected.map(s=>[s.phone,s]));
-      const sample = targets.slice(0, mode==="priority"?10000:100).map((p) => {
+      const sample = targets.map((p) => {
         const detail=details.get(p);
-        return {name:candidates.get(p)||"",phone:maskPhone(p),...(detail?{orderDays:detail.orderDays,recent:detail.recent}:{})};
+        return {id:memberId(p),manual:manualIds.has(memberId(p)),name:candidates.get(p)||"",phone:maskPhone(p),...(detail?{orderDays:detail.orderDays,recent:detail.recent}:{})};
       });
       const selectionToken=sealAlertSelection({broadcastId,actor,mode,policy:ALERT_SELECTION_POLICY,phones:targets,expires:Date.now()+15*60000},apiSecret);
       const selectionGroups=mode==="priority"?{
@@ -135,7 +179,7 @@ export async function POST(request: NextRequest) {
         noRecentOrders:selected.filter(p=>p.orderDays===0).length,
         noRecentOrdersMax:Math.floor(Number(body.limit)/20),
       }:undefined;
-      return NextResponse.json({ ok: true, dryRun: true, mode, candidateCount, receivedCount, targetCount, sample, selectionToken, selectionGroups });
+      return NextResponse.json({ ok: true, dryRun: true, mode, candidateCount, receivedCount, targetCount, sample, selectionToken, selectionGroups, members:members.map(p=>({id:memberId(p.phone),name:p.name,phone:maskPhone(p.phone),orderDays:p.orderDays,recent:p.recent})) });
     }
 
     if (targetCount === 0) {

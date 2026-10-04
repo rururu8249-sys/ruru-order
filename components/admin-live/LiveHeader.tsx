@@ -11,6 +11,7 @@ import { buildDetailChatLine, detailProducts } from "@/lib/productDetailModel";
 import { feedPinLayout, FEED_PIN_SIZE } from "@/lib/feedText";
 
 type VideoRatio = "vertical" | "wide" | "auto";
+type AlertMember = { id: string; name: string; phone: string; orderDays?: number; recent?: boolean; manual?: boolean };
 
 type Props = {
   videoRatio: VideoRatio;
@@ -147,49 +148,82 @@ export default function LiveHeader({
   const [alertOrderDays, setAlertOrderDays] = useState("90");
   const [alertRecentDays, setAlertRecentDays] = useState("30");
   const alertRequest = useRef(0);
-  useEffect(() => { alertRequest.current++; setAlertPreview(null); setAlertPreviewLoading(false); }, [activeBroadcast?.id]);
+  const [alertIncluded, setAlertIncluded] = useState<string[]>([]);
+  const [alertExcluded, setAlertExcluded] = useState<string[]>([]);
+  const [alertSearch, setAlertSearch] = useState("");
+  const [alertSort, setAlertSort] = useState("name");
+  const [alertList, setAlertList] = useState<"selected" | "members" | "excluded">("selected");
+  const alertBusy = useRef(false);
+  useEffect(() => { alertRequest.current++; setAlertPreview(null); setAlertPreviewLoading(false); setAlertIncluded([]); setAlertExcluded([]); setAlertResult(""); }, [activeBroadcast?.id]);
   const [alertPreview, setAlertPreview] = useState<any>(null);
   const [alertPreviewLoading, setAlertPreviewLoading] = useState(false);
   const [alertSending, setAlertSending] = useState(false);
   const [alertResult, setAlertResult] = useState("");
 
-  const loadAlertPreview = async (mode: "priority" | "optin" | "all") => {
-    if (!activeBroadcast || alertSending) return;
+  const loadAlertPreview = async (mode: "priority" | "optin" | "all", edits?: {includeIds:string[];excludeIds:string[];selectionToken?:string}) => {
+    if (!activeBroadcast || alertSending || alertBusy.current) return;
     const requestId = ++alertRequest.current;
     setAlertPreviewLoading(true);
-    setAlertPreview(null);
+    if (!edits?.selectionToken) setAlertPreview(null);
     setAlertResult("");
     try {
       const r = await fetch("/api/admin-live/live-alert-send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ broadcastId: activeBroadcast.id, dryRun: true, mode, limit: Number(alertLimit), orderDays: Number(alertOrderDays), recentDays: Number(alertRecentDays) }),
+        body: JSON.stringify({ broadcastId: activeBroadcast.id, dryRun: true, mode, limit: Number(alertLimit), orderDays: Number(alertOrderDays), recentDays: Number(alertRecentDays), includeIds:edits?.includeIds ?? alertIncluded,excludeIds:edits?.excludeIds ?? alertExcluded,selectionToken:edits?.selectionToken }),
       }).then((res) => res.json()).catch(() => null);
       if (requestId !== alertRequest.current) return;
       if (!r?.ok) { setAlertResult("대상 조회 실패: " + (r?.error || "권한/네트워크 확인")); return; }
       setAlertPreview(r);
+      if(edits){setAlertIncluded(edits.includeIds);setAlertExcluded(edits.excludeIds);}
     } finally {
       if (requestId === alertRequest.current) setAlertPreviewLoading(false);
     }
   };
 
   const openAlert = () => {
-    if (!activeBroadcast) return;
+    if (!activeBroadcast || alertBusy.current) return;
     setAlertOpen(true);
+    setAlertList("selected");setAlertSearch("");
     setAlertMode("priority");
-    void loadAlertPreview("priority");
+    if(alertMode!=="priority"){
+      setAlertIncluded([]);setAlertExcluded([]);
+      void loadAlertPreview("priority",{includeIds:[],excludeIds:[]});
+    }else void loadAlertPreview("priority");
   };
 
   const changeAlertMode = (mode: "priority" | "optin" | "all") => {
-    if (alertSending) return;
+    if (alertSending || alertPreviewLoading || alertBusy.current) return;
     setAlertMode(mode);
-    void loadAlertPreview(mode);
+    setAlertIncluded([]);setAlertExcluded([]);setAlertList("selected");
+    void loadAlertPreview(mode,{includeIds:[],excludeIds:[]});
   };
 
+  const editAlertMember = (id:string, include:boolean) => {
+    if(alertPreviewLoading||alertSending||alertBusy.current||!alertPreview?.selectionToken)return;
+    const includeIds=include?[...new Set([...alertIncluded,id])]:alertIncluded.filter(p=>p!==id);
+    const excludeIds=include?alertExcluded.filter(p=>p!==id):[...new Set([...alertExcluded,id])];
+    void loadAlertPreview(alertMode,{includeIds,excludeIds,selectionToken:alertPreview.selectionToken});
+  };
+  const visibleAlertMembers = useMemo(() => {
+    const source:AlertMember[]=alertList==="selected"?(alertPreview?.sample||[]):(alertPreview?.members||[]).filter((m:AlertMember)=>alertList!=="excluded"||alertExcluded.includes(m.id));
+    const query=alertSearch.trim().toLocaleLowerCase("ko");
+    const rows=source.filter(m=>!query||`${m.name} ${m.phone}`.toLocaleLowerCase("ko").includes(query));
+    return [...rows].sort((a,b)=>{
+      if(alertSort==="orders"&&(b.orderDays||0)!==(a.orderDays||0))return (b.orderDays||0)-(a.orderDays||0);
+      if(alertSort==="group"&&!!b.manual!==!!a.manual)return Number(!!b.manual)-Number(!!a.manual);
+      return a.name.localeCompare(b.name,"ko",{numeric:true})||a.id.localeCompare(b.id);
+    });
+  },[alertPreview,alertList,alertExcluded,alertSearch,alertSort]);
+
   const sendAlert = async () => {
-    if (!activeBroadcast || alertSending) return;
+    if (!activeBroadcast || alertSending || alertPreviewLoading || alertBusy.current) return;
     const count = Number(alertPreview?.targetCount || 0);
     if (count === 0) return;
+    const selectionToken=alertPreview.selectionToken;
+    alertBusy.current=true;
+    setAlertSending(true);
+    try {
     if (alertMode === "all") {
       const okAll = await showAdminConfirm(`신청 안 한 회원까지 ${count}명에게 발송합니다.\n동의 미확인자 발송은 카카오 채널 제재 위험이 있습니다.\n정말 보낼까요?`, { title: "전체 발송", confirmText: "전체 발송", cancelText: "취소", tone: "danger" });
       if (!okAll) return;
@@ -197,17 +231,17 @@ export default function LiveHeader({
       const okSend = await showAdminConfirm(`${count}명에게 방송알림을 발송합니다. 계속할까요?`, { title: "방송알림 발송", confirmText: "발송", cancelText: "취소", tone: "info" });
       if (!okSend) return;
     }
-    setAlertSending(true);
     setAlertResult("");
-    try {
       const r = await fetch("/api/admin-live/live-alert-send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ broadcastId: activeBroadcast.id, mode: alertMode, selectionToken: alertPreview?.selectionToken }),
+        body: JSON.stringify({ broadcastId: activeBroadcast.id, mode: alertMode, selectionToken }),
       }).then((res) => res.json()).catch(() => null);
       setAlertResult(r?.ok ? `✅ 발송 접수 ${r.successCount}명 · 즉시 실패 ${r.failCount}명 (최종 수신 결과는 SOLAPI에서 확인)` : "발송 확인 필요: " + (r?.error || "알 수 없는 오류"));
       setAlertPreview(null);
+      setAlertIncluded([]);setAlertExcluded([]);
     } finally {
+      alertBusy.current=false;
       setAlertSending(false);
     }
   };
@@ -458,7 +492,7 @@ export default function LiveHeader({
               <button type="button" disabled={alertSending} onClick={() => changeAlertMode("priority")} className={`h-10 rounded-xl text-sm font-black border border-line ${alertMode === "priority" ? "bg-info-tx text-white" : "text-ink-soft"}`}>단골 · 최근 신청자 랜덤</button>
               <button
                 type="button"
-                onClick={() => changeAlertMode("optin")}
+                disabled={alertSending || alertPreviewLoading} onClick={() => changeAlertMode("optin")}
                 className={[
                   "h-10 rounded-xl text-sm font-black transition",
                   alertMode === "optin" ? "bg-[var(--color-info-tx)] text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2",
@@ -468,7 +502,7 @@ export default function LiveHeader({
               </button>
               <button
                 type="button"
-                onClick={() => changeAlertMode("all")}
+                disabled={alertSending || alertPreviewLoading} onClick={() => changeAlertMode("all")}
                 className={[
                   "h-10 rounded-xl text-sm font-black transition",
                   alertMode === "all" ? "bg-[var(--color-danger-tx)] text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2",
@@ -509,30 +543,42 @@ export default function LiveHeader({
                   <span className="text-info-tx">이번에 받을 <b>{alertPreview.targetCount}</b>명</span>
                 </div>
               ) : (
-                <div className="text-ink-mute">{alertResult || "대상 없음"}</div>
+                <div className="text-ink-mute">{alertResult ? "발송 결과는 아래 안내를 확인해 주세요." : "대상 없음"}</div>
               )}
             </div>
 
             {alertMode === "priority" && alertPreview?.selectionGroups && <div aria-label="선정 그룹별 인원" className="mb-3 grid grid-cols-1 sm:grid-cols-3 gap-2 rounded-xl border border-line px-3 py-3 text-sm font-bold text-ink">
               <span>단골 {alertPreview.selectionGroups.frequent}명 <small className="block text-ink-mute">최근 주문일 2일 이상</small></span>
-              <span>주문 시작 회원 {alertPreview.selectionGroups.newBuyer}명 <small className="block text-ink-mute">주문일 1일 · 최근 알림 신청</small></span>
-              <span>최근 주문 없음 {alertPreview.selectionGroups.noRecentOrders}명 / 최대 {alertPreview.selectionGroups.noRecentOrdersMax}명 <small className="block text-ink-mute">최근 알림 신청 · 입력 인원의 5% 이내</small></span>
+              <span>주문 시작 회원 {alertPreview.selectionGroups.newBuyer}명 <small className="block text-ink-mute">최근 주문일 1일 · 수동 포함도 집계</small></span>
+              <span>최근 주문 없음 {alertPreview.selectionGroups.noRecentOrders}명 / 최대 {alertPreview.selectionGroups.noRecentOrdersMax}명 <small className="block text-ink-mute">수동 포함도 입력 인원의 5% 이내</small></span>
             </div>}
 
-            {/* 이번에 받을 사람 목록(샘플) */}
-            {alertPreview?.sample?.length ? (
+            {alertPreview && <div className="mb-3 rounded-xl border border-line p-3">
+              <div className="flex flex-wrap gap-2 mb-3">
+                {([["selected","선정 명단"],["members","회원 추가"],["excluded","제외 명단"]] as const).map(([value,label])=><button key={value} type="button" disabled={alertSending || alertPreviewLoading} onClick={()=>setAlertList(value)} className={`rounded-lg border px-3 py-2 text-sm font-bold ${alertList===value?"bg-info-tx text-white":"border-line text-ink"}`}>{label}</button>)}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_220px] gap-2">
+                <input aria-label="명단 검색" type="search" value={alertSearch} onChange={e=>setAlertSearch(e.target.value)} placeholder="회원 이름 또는 전화번호 뒤 4자리 검색" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
+                <select aria-label="명단 정렬" value={alertSort} onChange={e=>setAlertSort(e.target.value)} className="rounded-lg border border-line px-3 py-2 text-sm"><option value="name">이름 가나다순</option><option value="orders">최근 주문일 수 많은순</option><option value="group">수동 포함 우선</option></select>
+              </div>
+              <p className="mt-2 text-sm font-bold text-ink">전체 선정 {alertPreview.targetCount}명 · 검색 결과 {visibleAlertMembers.length}명 · 수동 포함 {alertIncluded.length}명 · 제외 {alertExcluded.length}명</p>
+              <p className="mt-1 text-xs text-ink-soft">검색·정렬은 표시만 바꿉니다. 발송은 전체 선정 명단에 진행합니다. 직접 포함·제외한 회원은 다시 뽑아도 유지됩니다. 회원 추가는 알림 ON·발송 이력 없는 회원만 가능합니다.</p>
+            </div>}
+
+            {alertPreview ? (
               <div className="mb-3 max-h-[min(52dvh,480px)] overflow-auto rounded-xl border border-line">
                 <div className="sticky top-0 bg-surface-2 px-3 py-1.5 text-[11px] font-black text-ink-soft">
-                  이번 발송 명단 · {alertPreview.sample.length}명 표시 / 총 {alertPreview.targetCount}명
+                  {alertList==="selected"?"이번 발송 명단":alertList==="members"?"추가 가능한 회원":"이번 명단에서 제외한 회원"} · {visibleAlertMembers.length}명 표시
                 </div>
                 <ul className="grid grid-cols-1 sm:grid-cols-2">
-                  {alertPreview.sample.map((s: any, i: number) => (
-                    <li key={i} className="flex items-center justify-between gap-3 border-b border-line px-3 py-3 text-sm font-bold text-ink">
-                      <span>{i + 1}. {s.name || "(이름없음)"}{s.orderDays !== undefined && <small className="block text-ink-mute">주문 {s.orderDays}일{s.recent ? " · 최근 신청" : ""}</small>}</span>
-                      <span className="text-ink-mute">{s.phone}</span>
+                  {visibleAlertMembers.map((s, i) => (
+                    <li key={s.id} className="flex items-center justify-between gap-2 border-b border-line px-3 py-3 text-sm font-bold text-ink">
+                      <span className="min-w-0 break-words">{i + 1}. {s.name || "(이름없음)"}{(s.manual||alertIncluded.includes(s.id))&&<small className="ml-1 text-info-tx">직접 포함</small>}{s.orderDays !== undefined && <small className="block text-ink-mute">주문 {s.orderDays}일{s.recent ? " · 최근 신청" : ""}</small>}<small className="block text-ink-mute">{s.phone}</small></span>
+                      {alertList==="selected"||alertPreview.sample.some((p:AlertMember)=>p.id===s.id)?<button type="button" disabled={alertSending||alertPreviewLoading} onClick={()=>editAlertMember(s.id,false)} className="shrink-0 rounded-lg border border-line px-3 py-2 text-danger-tx">제외</button>:<button type="button" disabled={alertSending||alertPreviewLoading} onClick={()=>editAlertMember(s.id,true)} className="shrink-0 rounded-lg border border-line px-3 py-2 text-info-tx">{alertList==="excluded"?"다시 포함":"포함"}</button>}
                     </li>
                   ))}
                 </ul>
+                {!visibleAlertMembers.length&&<p className="p-4 text-sm text-ink-mute">표시할 회원이 없습니다.</p>}
               </div>
             ) : null}
 

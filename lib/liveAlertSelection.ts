@@ -6,7 +6,7 @@ export type AlertTarget={phone:string;name:string;orderDays:number;recent:boolea
 export type AlertManifest={broadcastId:string;actor:string;phones:string[];expires:number;mode?:string;policy?:string};
 export const ALERT_SELECTION_POLICY='buyers-first-5pct-v2';
 export const alertPhone=(value:unknown)=>String(value??'').replace(/\D/g,'');
-export function selectAlertRecipients(customers:Customer[],orders:Order[],excluded:Set<string>,options:{limit:number;orderDays:number;recentDays:number;now:number;random?:()=>number}):AlertTarget[]{
+export function selectAlertRecipients(customers:Customer[],orders:Order[],excluded:Set<string>,options:{limit:number;orderDays:number;recentDays:number;now:number;random?:()=>number;includeAllEligible?:boolean}):AlertTarget[]{
  const {limit,orderDays,recentDays,now}=options;
  if(!Number.isInteger(limit)||limit<1||limit>10000)throw new Error('발송 인원은 1~10,000명의 정수로 입력해 주세요.');
  if([orderDays,recentDays].some(n=>!Number.isInteger(n)||n<1||n>365)||!Number.isFinite(now))throw new Error('조회 기간은 1~365일로 입력해 주세요.');
@@ -26,7 +26,7 @@ export function selectAlertRecipients(customers:Customer[],orders:Order[],exclud
   if(c.live_alert_optin!==true||excluded.has(phone)||!/^01[016789]\d{7,8}$/.test(phone))return [];
   const count=days.get(phone)?.size||0,t=Date.parse(c.live_alert_optin_at||'');
   const recent=Number.isFinite(t)&&t<=now&&t>=now-recentDays*86400000;
-  if(count<2&&!recent)return [];
+  if(!options.includeAllEligible&&count<2&&!recent)return [];
   // Order-day count determines buyer priority; signup recency grants entry,
   // not a bonus that could outweigh a more frequent customer's orders.
   const weight=Math.max(1,count);
@@ -36,6 +36,7 @@ export function selectAlertRecipients(customers:Customer[],orders:Order[],exclud
  // Recent signup boosts never let people without recent orders displace
  // more than the approved 5% of the operator's requested recipient count.
  // Keep one-day recent signups in the buyer pool (not the 5% pool).
+ if(options.includeAllEligible)return ranked.map(({rank,...target})=>target);
  const buyers=ranked.filter(p=>p.orderDays>0);
  const nonBuyerLimit=Math.floor(limit/20);
  const nonBuyers=ranked.filter(p=>p.orderDays===0).slice(0,nonBuyerLimit);
