@@ -1792,7 +1792,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         </div>
 
         {tab === "history" ? (
-          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px", maxWidth: "1440px", width: "100%", margin: "0 auto" }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 32px 16px 16px", maxWidth: "1240px", width: "100%", margin: "0 auto" }}>
             {/* 요약카드 3개 */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "12px" }}>
               {([
@@ -1833,35 +1833,42 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             ) : histFiltered.length === 0 ? (
               <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "14px", fontWeight: 700, lineHeight: 1.7 }}>선택한 조건에 결제완료 판매기록이 없습니다. 기간이나 검색어를 변경해 주세요.</div>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: isNarrow ? "minmax(0,1fr)" : "minmax(300px, 0.85fr) minmax(0, 1.65fr)", gap: "12px 20px", alignItems:"start" }}>
-                {!isNarrow && !histFiltered.some(b=>b.id===histExpand) ? <div style={{gridColumn:2,gridRow:"1 / span 2",border:"1px dashed var(--color-line)",borderRadius:12,padding:32,color:"var(--color-ink-soft)",fontSize:15}}>왼쪽에서 방송을 선택해 판매 품목을 확인하세요.</div> : null}
-                {histFiltered.map((b, index) => {
+              <div style={{ display: "grid", gridTemplateColumns: isNarrow ? "minmax(0,1fr)" : "minmax(280px, 340px) minmax(0, 1fr)", gap: "16px", alignItems:"start" }}>
+                {/* Separate columns: detail height must never size the broadcast list rows. */}
+                <nav aria-label="판매 방송 목록" style={{display:"flex",flexDirection:"column",gap:8,minWidth:0,maxHeight:isNarrow ? 240 : "max(160px, calc(100dvh - 350px))",overflowY:"auto"}}>
+                {histFiltered.map((b) => {
                   const isShop = b.id === "__shop__";
                   const st = isShop ? shopFilteredStat : (histStats.get(b.id) || { sales: 0, count: 0 });
                   const expanded = histExpand === b.id;
                   const d = new Date(b.started_at);
                   const dateLabel = isShop ? "상시 판매" : Number.isNaN(d.getTime()) ? "-" : `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
-                  const detail = histDetail.get(b.id);
-                  const detailSubtotal = (detail || []).reduce((acc, r) => ({ sales: acc.sales + r.sales, qty: acc.qty + r.qty }), { sales: 0, qty: 0 });
                   return (
-                    <div key={b.id} style={{ display:isNarrow ? "block" : "contents" }}>
+                    <div key={b.id}>
                       {/* 헤더 행 */}
-                      <div role="button" tabIndex={0} aria-expanded={expanded} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();void loadBroadcastDetail(b.id);}}} onClick={() => void loadBroadcastDetail(b.id)} style={{ gridColumn:1,gridRow:isNarrow ? undefined : index+1,border:"1px solid "+(expanded ? "var(--color-rose-deep)" : "var(--color-line)"),borderRadius:10,display: "flex", alignItems: "center", gap: "12px", padding: "16px 12px", cursor: "pointer", background: expanded ? "var(--color-rose-soft)" : "var(--color-surface)" }}>
+                      <div role="button" tabIndex={0} aria-expanded={expanded} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();void loadBroadcastDetail(b.id);}}} onClick={() => void loadBroadcastDetail(b.id)} style={{border:"1px solid "+(expanded ? "var(--color-rose-deep)" : "var(--color-line)"),borderRadius:10,display: "flex", flexWrap:"wrap",alignItems: "center", gap: "8px", padding: "12px", cursor: "pointer", background: expanded ? "var(--color-rose-soft)" : "var(--color-surface)" }}>
                         <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, padding: "4px 8px", borderRadius: "8px", background: isShop ? "var(--color-ok-bg)" : "var(--color-warn-bg)", color: isShop ? "var(--color-ok-tx)" : "var(--color-warn-tx)" }}>{isShop ? "🛍 쇼핑몰" : "📺 방송"}</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-ink)", overflowWrap:"anywhere" }}>{b.title}</div>
                           <div style={{ fontSize: "11px", color: "var(--color-ink-soft)", marginTop: "2px" }}>{dateLabel}</div>
                         </div>
-                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ textAlign: "right", flexShrink: 0,marginLeft:"auto" }}>
                           <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{money(st.sales)}</div>
                           <div style={{ fontSize: "11px", color: "var(--color-ink-soft)", marginTop: "2px" }}>주문 {st.count.toLocaleString("ko-KR")}건</div>
                         </div>
                         <span style={{ flexShrink: 0, color: "var(--color-ink-soft)", fontSize: "12px" }}>{expanded ? "▴" : "▾"}</span>
                       </div>
-
+                    </div>
+                  );
+                })}
+                </nav>
+                {!histFiltered.some(b=>b.id===histExpand) ? <div style={{border:"1px dashed var(--color-line)",borderRadius:12,padding:24,color:"var(--color-ink-soft)",fontSize:15}}>방송을 선택하면 이곳에 판매 품목이 표시됩니다.</div> : null}
+                {histFiltered.filter(b=>b.id===histExpand).map(b=>{
+                  const st=b.id==="__shop__" ? shopFilteredStat : (histStats.get(b.id)||{sales:0,count:0});
+                  const detail=histDetail.get(b.id);
+                  const detailSubtotal=(detail||[]).reduce((acc,r)=>({sales:acc.sales+r.sales,qty:acc.qty+r.qty}),{sales:0,qty:0});
+                  return (<div key={b.id}>
                       {/* 펼침: 상품별 상세 */}
-                      {expanded ? (
-                        <div style={{gridColumn:isNarrow ? undefined : 2,gridRow:isNarrow ? undefined : `1 / span ${Math.max(histFiltered.length,2)}`,position:isNarrow ? "static" : "sticky",top:0,border:"1px solid var(--color-line)",borderRadius:12,padding: "16px", background: "var(--color-surface-2)",minWidth:0,overflowX:"auto" }}>
+                        <section aria-label="선택 방송 판매 품목" style={{border:"1px solid var(--color-line)",borderRadius:12,padding: "16px", background: "var(--color-surface)",minWidth:0,overflowX:"auto" }}>
                           <h3 style={{fontSize:18,margin:"0 0 6px",color:"var(--color-ink)"}}>{b.title} · 판매 품목</h3>
                           <p style={{fontSize:13,margin:"0 0 16px",color:"var(--color-ink-soft)"}}>결제금액 {money(st.sales)} · 아래 상품 소계는 배송비·카드 수수료·포인트 차감과 구분됩니다.</p>
                           {histDetailLoading === b.id && !detail ? (
@@ -1871,24 +1878,24 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           ) : (
                             <>
                               {/* 펼침 헤더: 빈칸 / 상품명·옵션 / 수량 / 단가 / 매출 */}
-                              <div style={{ minWidth:480,display: "grid", gridTemplateColumns: "48px minmax(120px,1fr) 48px 85px 100px", gap: "12px", alignItems: "center", padding: "0 0 12px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink-soft)", borderBottom: "1px solid var(--color-line)" }}>
+                              <div style={{ minWidth:440,display: "grid", gridTemplateColumns: "36px minmax(140px,1fr) 44px 82px 96px", gap: "8px", alignItems: "center", padding: "8px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink-soft)",background:"var(--color-surface-2)", borderBottom: "1px solid var(--color-line)" }}>
                                 <span />
                                 <span>상품명·옵션</span>
                                 <span style={{ textAlign: "right" }}>수량</span>
                                 <span style={{ textAlign: "right" }}>단가</span>
                                 <span style={{ textAlign: "right" }}>매출</span>
                               </div>
-                              {detail.map((r) => (
-                                <div key={r.key} style={{minWidth:480, display: "grid", gridTemplateColumns: "48px minmax(120px,1fr) 48px 85px 100px", gap: "12px", alignItems: "center", padding: "16px 0", borderBottom: "1px solid var(--color-line)" }}>
+                              {detail.map((r,index) => (
+                                <div key={r.key} style={{minWidth:440, display: "grid", gridTemplateColumns: "36px minmax(140px,1fr) 44px 82px 96px", gap: "8px", alignItems: "start", padding: "12px 8px",background:index%2 ? "var(--color-surface-2)" : "var(--color-surface)",fontVariantNumeric:"tabular-nums", borderBottom: "1px solid var(--color-line)" }}>
                                   <span
                                     onClick={(e) => { e.stopPropagation(); if (r.thumb) setImagePreviewUrl(r.thumb); }}
-                                    style={{ width: "48px", height: "48px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface)", border: "1px solid var(--color-line)", display: "flex", alignItems: "center", justifyContent: "center", cursor: r.thumb ? "zoom-in" : "default" }}
+                                    style={{ width: "36px", height: "36px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface)", border: "1px solid var(--color-line)", display: "flex", alignItems: "center", justifyContent: "center", cursor: r.thumb ? "zoom-in" : "default" }}
                                   >
                                     {r.thumb ? <img src={r.thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "14px" }}>🖼</span>}
                                   </span>
                                   <div style={{ minWidth: 0 }}>
                                     <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-ink)",overflowWrap:"anywhere" }}>{r.name}</div>
-                                    {r.option ? <div style={{ fontSize: "13px", color: "var(--color-ink-soft)", marginTop: "6px",whiteSpace:"pre-wrap",lineHeight:1.7,overflowWrap:"anywhere" }}>{r.option}</div> : null}
+                                    {r.option ? <div style={{ fontSize: "13px", color: "var(--color-ink-soft)", marginTop: "4px",whiteSpace:"pre-wrap",lineHeight:1.45,overflowWrap:"anywhere" }}>{r.option}</div> : null}
                                   </div>
                                   <div style={{ textAlign: "right", fontSize: "14px", fontWeight: 700, color: "var(--color-ink)" }}>{r.qty.toLocaleString("ko-KR")}개</div>
                                   <div style={{ textAlign: "right", fontSize: "13px", color: "var(--color-ink-soft)" }}>{money(r.price)}</div>
@@ -1902,8 +1909,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                               </div>
                             </>
                           )}
-                        </div>
-                      ) : null}
+                        </section>
                     </div>
                   );
                 })}
