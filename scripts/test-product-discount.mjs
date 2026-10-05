@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+const m=await import('../lib/productDiscount.ts').catch(()=>({}));
+assert.equal(typeof m.resolveProductDiscount,'function','discount display resolver must exist');
+const note={discount_display:{enabled:true,original_price:219000,details:{'GY-3':{enabled:true,original_price:169000}}}};
+assert.deepEqual(m.resolveProductDiscount(note,129000),{originalPrice:219000,percent:41});
+assert.deepEqual(m.resolveProductDiscount(note,99000,'GY-3'),{originalPrice:169000,percent:41});
+assert.equal(m.resolveProductDiscount({},129000),null,'default OFF');
+assert.equal(m.resolveProductDiscount(note,99000,'unknown'),null,'never borrow parent original price for a different detail');
+assert.equal(m.resolveProductDiscount(note,129000,'','widget'),null,'widget always actual price only');
+for(const original of [0,129000,100000,-1,'bad',Infinity])assert.equal(m.resolveProductDiscount({discount_display:{enabled:true,original_price:original}},129000),null);
+assert.equal(m.resolveProductDiscount({discount_display:{enabled:false,original_price:219000}},129000),null);
+assert.equal(m.resolveProductDiscount(note,0),null);
+console.log('product discount: PASS');
+assert.equal(typeof m.renameDiscountDetail,'function','renaming a detail must carry discount settings');
+assert.deepEqual(m.renameDiscountDetail(note.discount_display,'GY-3','GY-3(앙쥬)').details,{'GY-3(앙쥬)':{enabled:true,original_price:169000}});
+assert.equal(note.discount_display.details['GY-3'].original_price,169000,'rename must not mutate saved metadata');

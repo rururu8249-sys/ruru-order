@@ -1,4 +1,6 @@
 "use client";
+import DiscountDisplayEditor from './DiscountDisplayEditor';
+import {resolveProductDiscount,renameDiscountDetail,type DiscountDisplay,type DiscountSetting} from '@/lib/productDiscount';
 
 import { ChangeEvent, type CSSProperties, DragEvent, type MouseEvent as ReactMouseEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -56,6 +58,7 @@ type BrandDetailOptionConfig = {
 };
 
 type BrandDetailEditDraft = {
+  discount: DiscountSetting;
   info: DetailInfo;
   originalName: string;
   name: string;
@@ -258,6 +261,7 @@ type ParsedProductNote = Record<string, unknown> & {
       combo_mode?: boolean;
       option_label?: string;
       option_pricing?: Record<string, number>; // { 세부상품명: 추가금(원, 0 이상) }
+      discount_display?: DiscountDisplay;
       combo_hidden?: string[]; // 등록만 하고 고객 노출 막은 세부상품명(가격 미정 등)
       // [2026-08-10 옵션 통합] 축 정의 — 고객 화면이 몇 단으로 보여줄지 판단하는 원천
       option_axes?: Array<{ key: "detail" | "color" | "size"; label: string; values: string[] }>;
@@ -811,6 +815,7 @@ export default function QuickProductFastForm({
   const [brandGroupDetailCategories, setBrandGroupDetailCategories] = useState<Record<string, string>>({});
   const [brandGroupDetailOptions, setBrandGroupDetailOptions] = useState<Record<string, BrandDetailOptionConfig>>({});
   const [brandGroupDetailInfo, setBrandGroupDetailInfo] = useState<Record<string, DetailInfo>>({});
+  const [discountDisplay,setDiscountDisplay]=useState<DiscountDisplay>({enabled:false,original_price:0,details:{}});
   const [brandDetailSection, setBrandDetailSection] = useState<'basic'|'options'|'info'>('basic');
   const [brandDetailEditDraft, setBrandDetailEditDraft] = useState<BrandDetailEditDraft | null>(null);
   const [brandDetailSearch, setBrandDetailSearch] = useState("");
@@ -985,6 +990,7 @@ export default function QuickProductFastForm({
       productNote?.brand_group?.detail_options && typeof productNote.brand_group.detail_options === "object" ? productNote.brand_group.detail_options : {},
     );
     setStockManagementEnabled(productNote?.stock_management_enabled !== false);
+    setDiscountDisplay(productNote?.discount_display||{enabled:false,original_price:0,details:{}});
     setPurchaseLimitEnabled(productNote?.purchase_limit_enabled === true);
     setPurchaseLimitText(String(productNote?.purchase_limit_qty && productNote.purchase_limit_qty > 0 ? productNote.purchase_limit_qty : 1));
     setRegisteredOrderEnabled(productNote?.registered_order_enabled !== false);
@@ -1137,6 +1143,7 @@ export default function QuickProductFastForm({
     if (isBrandGroupEdit && target && restoredDetails.includes(target)) {
       const config = normalizedDetailOptions[target] || { colors: [], sizes: [], variants: [] };
       setBrandDetailEditDraft({
+        discount:productNote?.discount_display?.details?.[target]||{enabled:false,original_price:0},
         info: restoredDetailInfo[target] ? {...restoredDetailInfo[target],chips:[...restoredDetailInfo[target].chips]} : {mode:'inherit',chips:[],description:''},
         originalName: target,
         name: target,
@@ -1324,6 +1331,7 @@ export default function QuickProductFastForm({
       ? config.variants.map((variant) => ({ color: String(variant.color || "없음"), size: String(variant.size || "없음") }))
       : [{ color: "없음", size: "없음" }];
     setBrandDetailEditDraft({
+      discount: discountDisplay.details?.[name]||{enabled:false,original_price:0},
       info: brandGroupDetailInfo[name] ? {...brandGroupDetailInfo[name],chips:[...brandGroupDetailInfo[name].chips]} : {mode:'inherit',chips:[],description:''},
       originalName: name,
       name,
@@ -1348,6 +1356,7 @@ export default function QuickProductFastForm({
       ? sample.variants.map((v) => ({ color: String(v.color || "없음"), size: String(v.size || "없음") }))
       : [{ color: "없음", size: "없음" }];
     setBrandDetailEditDraft({
+      discount:{enabled:false,original_price:0},
       info: {mode:'inherit',chips:[],description:''},
       originalName: "",          // 빈 값 = 새로 만드는 중
       name: "",
@@ -1365,6 +1374,8 @@ export default function QuickProductFastForm({
     if (!brandDetailEditDraft) return false;
     const oldName = brandDetailEditDraft.originalName;
     const nextName = brandDetailEditDraft.name.trim();
+    const actualPrice=moneyNumber(priceText)+Math.max(0,Number(brandDetailEditDraft.plus)||0);
+    if(brandDetailEditDraft.discount.enabled&&!resolveProductDiscount({discount_display:brandDetailEditDraft.discount},actualPrice)){showAdminToast('원래 판매가는 실제 판매가보다 큰 금액이어야 합니다.','error');return false;}
     if (!nextName) {
       showAdminToast("세부상품명을 입력해주세요.", "error");
       return false;
@@ -1402,6 +1413,7 @@ export default function QuickProductFastForm({
     setBrandGroupDetailCategories((prev) => moveKey(prev, brandDetailEditDraft.category.trim()));
     setBrandGroupDetailOptions((prev) => moveKey(prev, { colors, sizes, variants: nextVariants }));
     setBrandGroupDetailInfo((prev) => moveKey(prev, {...brandDetailEditDraft.info,chips:normalizeDetailChips(brandDetailEditDraft.info.chips)}));
+    setDiscountDisplay(prev=>{const rows={...prev.details};delete rows[oldName];rows[nextName]=brandDetailEditDraft.discount;return {...prev,details:rows};});
     setDetailHidden((prev) => {
       const withoutEdited = prev.filter((name) => name !== oldName && name !== nextName);
       return brandDetailEditDraft.hidden
@@ -1621,6 +1633,7 @@ export default function QuickProductFastForm({
       return false;
     }
     applyDetailState(result.state);
+    setDiscountDisplay(prev=>renameDiscountDetail(prev,oldName,normalizeBrandKorean(rawNext.trim())));
     return true;
   };
 
@@ -1713,6 +1726,7 @@ export default function QuickProductFastForm({
     setBrandGroupDetailCategories((prev) => removeKey(prev));
     setBrandGroupDetailOptions((prev) => removeKey(prev));
     setBrandGroupDetailInfo((prev) => removeKey(prev));
+    setDiscountDisplay(prev=>({...prev,details:removeKey(prev.details||{})}));
     setDetailHidden((prev) => prev.filter((name) => name !== target));
     setVariantRows((prev) => prev.filter((row) => row.detail !== target));
     setBrandDetailEditDraft(null);
@@ -1761,6 +1775,7 @@ export default function QuickProductFastForm({
     setBrandGroupDetailCategories({});
     setBrandGroupDetailOptions({});
     setBrandGroupDetailInfo({});
+    setDiscountDisplay({ enabled: false, original_price: 0, details: {} });
     setBrandDetailEditDraft(null);
     setBrandDetailSearch("");
     setBrandDetailCategoryFilter("전체");
@@ -1783,6 +1798,14 @@ export default function QuickProductFastForm({
     const name = productName.trim();
     // [무료나눔] 켜져 있으면 가격 0 고정(입력값 무시) — 0원 제출 허용은 note.free_product 플래그로 판별
     const price = freeProductEnabled ? 0 : moneyNumber(priceText);
+    if(!brandGroupActive&&discountDisplay.enabled&&!resolveProductDiscount({discount_display:discountDisplay},price)){
+      showAdminToast('원래 판매가는 실제 판매가보다 큰 금액이어야 합니다.','error');return;
+    }
+    for(const detail of details){
+      if(discountDisplay.details?.[detail]?.enabled&&!resolveProductDiscount({discount_display:discountDisplay},price+Math.max(0,Number(detailPlus[detail])||0),detail)){
+        showAdminToast(`${detail}: 원래 판매가는 실제 판매가보다 큰 금액이어야 합니다.`,'error');return;
+      }
+    }
     // product_type: 수정은 기존 값 보존(기존 group_buy 17개 덮어쓰기 금지).
     // 신규는 방송 중이면 "broadcast"(방송상품), 방송 OFF면 "group_buy"(상시판매)로 등록 → 방송 안 해도 상품 등록 가능.
     const resolvedProductType = isEditMode
@@ -1890,10 +1913,12 @@ export default function QuickProductFastForm({
             //   예전에 남아 있던 묶음 데이터도 함께 사라진다(추가 작업 불필요).
             ...(initialProductNote?.import_batch ? { import_batch: initialProductNote.import_batch } : {}),
             ...(initialProductNote?.vendor_code ? { vendor_code: initialProductNote.vendor_code } : {}),
+            ...(initialProductNote?.import_source ? { import_source: initialProductNote.import_source } : {}),
           }
         : {};
 
       const productNote = JSON.stringify({
+        discount_display:discountDisplay,
         ...preservedBrandNote,
         ...((linkedBrandParent || initialProductNote?.linked_detail_info) ? {linked_detail_info:{mode:linkedInfoMode,chips:normalizeDetailChips(specChipsText.split(/[,\n]/)),description:normalizeTextareaText(description)}} : {}),
         stock_mode: stockMode,
@@ -2829,6 +2854,7 @@ export default function QuickProductFastForm({
                     ⚠ 이 값을 바꾸면 세부상품 {details.length}개의 판매가가 <b>같이 움직입니다</b> (판매가 = 이 값 + 추가금)
                   </div>
                 ) : null}
+                {!brandGroupActive&&<DiscountDisplayEditor value={discountDisplay} actualPrice={moneyNumber(priceText)} onChange={value=>{setDiscountDisplay(prev=>({...prev,...value}));setFormTouched(true);}}/>}
               </div>
               <div>
                 <label style={fieldLabel}>배송</label>
@@ -3353,6 +3379,7 @@ export default function QuickProductFastForm({
               </div>
 
               </div>
+              {brandDetailSection==='basic'&&<DiscountDisplayEditor value={brandDetailEditDraft.discount} actualPrice={moneyNumber(priceText)+Math.max(0,Number(brandDetailEditDraft.plus)||0)} onChange={discount=>setBrandDetailEditDraft(prev=>prev?{...prev,discount}:prev)}/>}
               <div style={{display:brandDetailSection==='options'?'block':'none'}}>
               <div style={{ marginTop: "12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <span style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-ink)" }}>색상·사이즈 <span style={{ fontWeight: 700, color: "var(--color-ink-mute)" }}>— 이 상품에 있을 때만 · 없으면 비워두세요</span></span>
