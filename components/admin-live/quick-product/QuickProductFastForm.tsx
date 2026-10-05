@@ -2286,7 +2286,7 @@ export default function QuickProductFastForm({
                   지금: 표에서 칸을 누르면 그 자리에서 고쳐진다. 창은 색상·사이즈를 세밀하게 손볼 때만 연다.
                   저장되는 형태는 창에서 고칠 때와 완전히 동일하다. */}
               {/* 독립된 고객 직접입력 설정. 기존 custom_input_label/color 저장 경로는 주문 호환성을 위해 유지한다. */}
-              {!brandGroupActive && details.length === 0 && realColors.length === 0 ? (
+              {!brandGroupActive && realColors.length === 0 ? (
                 <div style={{ background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: "10px", padding: "12px", marginTop: "12px" }}>
                   <label style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 800, fontSize: "13px" }}>
                     <input type="checkbox" aria-label="고객 직접입력 사용" checked={customInputEnabled} onChange={(e) => {

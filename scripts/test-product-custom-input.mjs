@@ -32,3 +32,11 @@ await act(async()=>buttons().find(button=>text(button)==='저장').props.onClick
 assert.equal(JSON.parse(saved.values.product_note).custom_input_label,label,'enabled entry with empty title must retain a usable default');
 await act(async()=>renderer.unmount());
 console.log('PASS independent customer input setting, legacy keys, and explicit disable');
+const comboProduct={...product,product_name:'기존 세부상품',product_note:JSON.stringify({stock_management_enabled:false,custom_input_label:label,combo_mode:true,option_axes:[{key:'detail',label:'종류',values:['A']},{key:'color',label:'색상',values:[]},{key:'size',label:'사이즈',values:['M']}],option_pricing:{A:0}})};
+await act(async()=>{renderer=TestRenderer.create(React.createElement(Form,{activeBroadcastId:null,initialProduct:comboProduct}));});
+assert.equal(toggle().props.checked,true,'existing combo custom field must remain editable');
+await act(async()=>renderer.root.findByProps({'aria-label':'직접입력 칸 제목'}).props.onChange({target:{value:'주문 옵션'}}));
+await act(async()=>buttons().find(button=>text(button)==='저장').props.onClick());
+assert.equal(JSON.parse(saved.values.product_note).custom_input_label,'주문 옵션');
+await act(async()=>renderer.unmount());
+console.log('PASS existing combo custom input remains editable');
