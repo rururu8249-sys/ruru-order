@@ -769,6 +769,8 @@ export default function QuickProductFastForm({
   const [shippingType, setShippingType] = useState("normal");
   // [2026-09-03 사장님 요청] 손님 직접입력 칸의 제목(예: 상품숫자) — 비우면 기존대로 "색상". note.custom_input_label 로 저장.
   const [customInputLabel, setCustomInputLabel] = useState("");
+  const [customInputEnabled, setCustomInputEnabled] = useState(false);
+  const effectiveCustomInputLabel = customInputEnabled ? customInputLabel.trim() || "상품번호 · 옵션(색상·사이즈)" : "";
   // [2026-09-03 사장님 요청] 색상별 사진(선택) — 색상 옵션마다 작은 사진 1장.
   //   note.color_photos 새 키로만 저장(ADD only) — 기존 저장 형식·다른 키는 무변경.
   const [colorPhotos, setColorPhotos] = useState<Record<string, string>>({});
@@ -1005,6 +1007,7 @@ export default function QuickProductFastForm({
     setOrderNoticeMode(parseProductNoticeProductMode(productNote?.order_notice_mode));
     setOrderNoticeCustom(String(productNote?.order_notice_custom || "").trim());
     setCustomInputLabel(String((productNote as { custom_input_label?: unknown } | null)?.custom_input_label || "").trim());
+    setCustomInputEnabled(Boolean(String((productNote as { custom_input_label?: unknown } | null)?.custom_input_label || "").trim()));
     {
       // [2026-09-03] 색상별 사진 로드 — 값이 있는 것만(없으면 빈 맵 → 기존 상품 무변화)
       const rawColorPhotos = (productNote as { color_photos?: unknown } | null)?.color_photos;
@@ -1766,6 +1769,8 @@ export default function QuickProductFastForm({
     setFreeProductEnabled(false);
     setStockManagementEnabled(false); // [2026-09-03 사장님 지시] 새 상품 폼 초기화도 기본 OFF
     setCustomerDetailInputEnabled(false);
+    setCustomInputEnabled(false);
+    setCustomInputLabel("");
     setDetailText("");
     setDetailLabel(DETAIL_LABEL_FIXED);
     setDetailPlus({});
@@ -1946,7 +1951,7 @@ export default function QuickProductFastForm({
         category: category.trim(),
         customer_category_visible: customerCategoryVisible,
         free_product: freeProductEnabled,
-        ...(customInputLabel.trim() ? { custom_input_label: customInputLabel.trim() } : {}),
+        ...(effectiveCustomInputLabel ? { custom_input_label: effectiveCustomInputLabel } : {}),
         // [2026-09-20] 한눈에 정보 칩 — 비어 있으면 키 생략(기존 상품 note 구성 무변화)
         ...(() => {
           const chips = normalizeSpecChips(specChipsText);
@@ -2160,6 +2165,12 @@ export default function QuickProductFastForm({
               <div style={brandGroupActive ? { ...optRow, display: "none" } : optRow}>
                 <span style={optLabel}>색상</span>
                 {/* [2026-09-20 사장님] 「안 써요」일 땐 「없음」 글자 대신 «기본»으로 — 저장값은 기존 그대로("없음" = 재고 키라 못 바꿈). 누르면 색상 입력으로 */}
+                {effectiveCustomInputLabel && realColors.length === 0 ? (
+                  <>
+                    <span style={{ ...optInput, background: "var(--color-surface-2)", color: "var(--color-ink-mute)" }}>사용 안 함 — 아래 고객 직접입력칸을 사용합니다</span>
+                    <button type="button" aria-label="색상 사용 안 함" aria-pressed={true} disabled style={{ border: "1px solid var(--color-rose-deep)", borderRadius: "999px", padding: "8px 12px", color: "var(--color-rose-deep)", background: "var(--color-rose-light)" }}>안 써요</button>
+                  </>
+                ) : <>
                 {splitOptions(colorText).length > 0 && splitOptions(colorText).every((x) => x === "없음") ? (
                   <button type="button" onClick={() => { setFormTouched(true); setColorText(""); }} title="누르면 색상을 넣을 수 있어요" style={{ ...optInput, textAlign: "left", cursor: "pointer", background: "var(--color-surface-2)", color: "var(--color-ink)", fontWeight: 800 }}>
                     기본 <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>— 색상 하나뿐 · 손님이 고를 게 없어요</span>
@@ -2190,6 +2201,7 @@ export default function QuickProductFastForm({
                   {optionModeChip(colorText.trim() === "", "✏️ 손님이 적어요", () => { setFormTouched(true); setColorText(""); })}
                   {optionModeChip(splitOptions(colorText).length > 0 && splitOptions(colorText).every((x) => x === "없음"), "🚫 안 써요", () => { setFormTouched(true); setColorText("없음"); })}
                 </div>
+                </>}
               </div>
 
 
@@ -2273,14 +2285,24 @@ export default function QuickProductFastForm({
                   예전: 카드 클릭 → 창 뜸 → 고침 → [변경내용 적용] → 창 닫음 → 또 [저장]  (상품 20개면 20번)
                   지금: 표에서 칸을 누르면 그 자리에서 고쳐진다. 창은 색상·사이즈를 세밀하게 손볼 때만 연다.
                   저장되는 형태는 창에서 고칠 때와 완전히 동일하다. */}
-              {/* [2026-09-03 사장님 요청] 손님 입력칸의 제목을 사장님이 정한다 (예: 상품숫자).
-                  색상에 실제 옵션값이 없을 때(비움 또는 "없음") 항상 노출 —
-                  제목을 적으면 색상·사이즈를 "없음"으로 꺼놔도 손님에게 이 제목의 입력칸이 나간다. */}
-              {!brandGroupActive && splitOptions(colorText).every((x) => x === "없음") ? (
-                <div style={{ ...optRow, background: "var(--color-warn-bg)", border: "1px dashed var(--color-warn-tx)", borderRadius: "8px", padding: "8px 8px" }}>
-                  <span style={{ ...optLabel, color: "var(--color-warn-tx)" }}>✏️ 칸 제목</span>
-                  <input style={optInput} type="text" placeholder="예: 상품숫자 (손님 입력칸 제목)" value={customInputLabel} onChange={(e) => { setFormTouched(true); setCustomInputLabel(e.target.value); }} />
-                  <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-warn-tx)", whiteSpace: "nowrap" }}>{customInputLabel.trim() ? "🚫 안 써요여도 이 칸은 나가요" : "비우면 「색상」"}</span>
+              {/* 독립된 고객 직접입력 설정. 기존 custom_input_label/color 저장 경로는 주문 호환성을 위해 유지한다. */}
+              {!brandGroupActive && details.length === 0 && realColors.length === 0 ? (
+                <div style={{ background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: "10px", padding: "12px", marginTop: "12px" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 800, fontSize: "13px" }}>
+                    <input type="checkbox" aria-label="고객 직접입력 사용" checked={customInputEnabled} onChange={(e) => {
+                      setFormTouched(true);
+                      setCustomInputEnabled(e.target.checked);
+                      if (e.target.checked && !customInputLabel.trim()) setCustomInputLabel("상품번호 · 옵션(색상·사이즈)");
+                      if (!e.target.checked && colorText.trim() === "") setColorText("없음");
+                    }} />
+                    고객 직접입력
+                  </label>
+                  <div style={{ fontSize: "12px", color: "var(--color-ink-mute)", marginTop: "6px", lineHeight: 1.6 }}>상품번호와 옵션을 고객이 한 칸에 적습니다. 색상 선택칸과는 별도입니다.</div>
+                  {customInputEnabled ? <div style={{ display: "grid", gap: "6px", marginTop: "10px" }}>
+                    <label htmlFor="product-custom-input-label" style={{ fontSize: "12px", fontWeight: 700 }}>입력칸 제목</label>
+                    <input id="product-custom-input-label" aria-label="직접입력 칸 제목" style={optInput} type="text" placeholder="상품번호 · 옵션(색상·사이즈)" value={customInputLabel} onChange={(e) => { setFormTouched(true); setCustomInputLabel(e.target.value); }} />
+                    <span style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>고객 입력 예: BB-60 / 베이지 / M · 입력 내용은 주문서에 저장됩니다.</span>
+                  </div> : null}
                 </div>
               ) : null}
 
@@ -2554,7 +2576,7 @@ export default function QuickProductFastForm({
                 <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-warn-tx)", padding: "2px 2px 0", lineHeight: 1.6 }}>
                   {(() => {
                     // 실제 손님 화면 그대로: 비움=손님이 적어요(필수), 없음=안 씀. 칸 제목은 없음이어도 뜬다.
-                    const label = customInputLabel.trim();
+                    const label = effectiveCustomInputLabel;
                     const colorAsks = colors.length === 0 || label !== "";
                     const sizeAsks = sizes.length === 0;
                     const asks = [colorAsks ? `「${label || "색상"}」` : "", sizeAsks ? "「사이즈」" : ""].filter(Boolean).join("과 ");
@@ -2904,7 +2926,7 @@ export default function QuickProductFastForm({
             >
               ▾ 자세히 열기 — 옵션(색상·사이즈) · 재고 · 노출 · 카테고리 · 뱃지 · 설명
               <span style={{ display: "block", marginTop: "4px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>
-                지금 설정 · {(() => { const parts = [colors.length === 0 ? (customInputLabel.trim() ? `「${customInputLabel.trim()}」 손님이 적음` : "색상 손님이 적음") : colors.every((c) => c === "없음") ? "색상 안 씀" : `색상 ${colors.filter((c) => c !== "없음").length}개`, sizes.length === 0 ? "사이즈 손님이 적음" : sizes.every((c) => c === "없음") ? "사이즈 안 씀" : `사이즈 ${sizes.filter((c) => c !== "없음").length}개`, stockManagementEnabled ? "재고 관리함" : "재고 안 셈", isVisible ? "손님에게 보임" : "숨김"]; return parts.join(" · "); })()}
+                지금 설정 · {(() => { const parts = [effectiveCustomInputLabel && realColors.length === 0 ? "색상 안 씀" : colors.length === 0 ? "색상 손님이 적음" : colors.every((c) => c === "없음") ? "색상 안 씀" : `색상 ${realColors.length}개`, sizes.length === 0 ? "사이즈 손님이 적음" : sizes.every((c) => c === "없음") ? "사이즈 안 씀" : `사이즈 ${realSizes.length}개`, effectiveCustomInputLabel && realColors.length === 0 ? `고객 직접입력: ${effectiveCustomInputLabel}` : "", stockManagementEnabled ? "재고 관리함" : "재고 안 셈", isVisible ? "손님에게 보임" : "숨김"]; return parts.filter(Boolean).join(" · "); })()}
               </span>
             </button>
           ) : null}

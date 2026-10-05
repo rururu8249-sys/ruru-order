@@ -83,6 +83,7 @@ import CustomerPointGiftPopup from "@/components/customer/CustomerPointGiftPopup
 import CustomerInfoEditBottomSheet from "@/components/customer/CustomerInfoEditBottomSheet";
 // [2026-09-20 사장님] 바텀시트 «한 벌» 틀 — 손님 시트 전부 같은 높이·헤더·✕·닫기 5종
 import CustomerBottomSheet, { CS_SHEET_Z_STACKED, csPrimaryButtonStyle, csCancelButtonStyle } from "@/components/customer/CustomerBottomSheet";
+import CustomerManualField from "@/components/customer/CustomerManualField";
 import CustomerDialog from "@/components/customer/CustomerDialog";
 import { KakaoPostcodeEmbed } from "react-daum-postcode";
 import CustomerOrderLookupBottomSheet, {
@@ -8017,19 +8018,6 @@ export default function OrderPage() {
                   </section>
                 ) : null}
 
-                {registeredOptionDetailSelected && registeredOptionNeedsManualPrice ? (
-                  <div style={{ flexShrink: 0, borderTop: "1px solid #F0EAE0", background: "#FFF8FA", padding: "12px 18px" }}>
-                    {/* [2026-09-03 재설계 4단계 · 표시 전용] 가격 직접입력 — 주황 점선+배지+예시 (0원 금지 등 검증 무수정) */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
-                      <span style={{ fontSize: "12px", fontWeight: 900, color: "#7A1E47" }}>상품 금액</span>
-                      <span style={{ background: "#9A6212", color: "#fff", fontSize: "10px", fontWeight: 900, borderRadius: "9999px", padding: "2px 8px" }}>🖊 직접 입력</span>
-                      <span style={{ fontSize: "11px", fontWeight: 800, color: "#9A6212" }}>방송에서 들은 금액을 적어주세요</span>
-                    </div>
-                    <input inputMode="numeric" value={registeredOptionManualPrice > 0 ? registeredOptionManualPrice.toLocaleString("ko-KR") : ""} onChange={(e) => setRegisteredOptionManualPrice(Math.max(0, Number(e.target.value.replace(/[^0-9]/g, "")) || 0))} placeholder="예: 59,000" style={{ width: "100%", height: "46px", boxSizing: "border-box", borderRadius: "12px", border: registeredOptionManualPrice > 0 ? "1.5px solid #B08794" : "2px dashed #E2B64D", padding: "0 13px", fontSize: "16px", fontWeight: 900, color: "#222", background: registeredOptionManualPrice > 0 ? "#fff" : "#FFFDF5", outline: "none" }} />
-                    {registeredOptionManualPrice < 1 ? <div style={{ marginTop: "5px", fontSize: "11px", fontWeight: 800, color: "#C0392B" }}>이 상품은 고객이 금액을 직접 입력하는 상품입니다.</div> : null}
-                  </div>
-                ) : null}
-
                 <div data-product-order-footer-summary style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "8px 18px" }}>
                   {registeredOptionDetailSelected ? (
                     <>
@@ -8103,11 +8091,11 @@ export default function OrderPage() {
                           ? "세부상품을 먼저 선택"
                           : !registeredOptionColorSelected
                             ? (registeredOptionColorMode === "input"
-                                ? (() => { const lb = getCustomInputLabel(registeredOptionResolvedProduct || registeredOptionSelectProduct); return lb ? `${lb}${koEulReul(lb)} 입력해 주세요` : "색상을 입력해 주세요"; })()
+                                ? (getCustomInputLabel(registeredOptionResolvedProduct || registeredOptionSelectProduct) ? "주문 내용을 입력해 주세요" : "색상을 입력해 주세요")
                                 : "색상을 선택해 주세요")
                             : !registeredOptionSizeSelected
                               ? (registeredOptionSizeMode === "input" ? "사이즈를 입력해 주세요" : "사이즈를 선택해 주세요")
-                              : "옵션을 선택해 주세요"}</button>
+                              : registeredOptionNeedsManualPrice && registeredOptionManualPrice < 1 ? "금액을 입력해 주세요" : "옵션을 선택해 주세요"}</button>
                     )}
                     </>
                   )}
@@ -8430,16 +8418,10 @@ export default function OrderPage() {
                     // [2026-09-03 사장님 요청] 칸 제목은 사장님이 정한 라벨(예: 상품숫자), 없으면 기존대로 "색상"
                     const inputLabel = getCustomInputLabel(registeredOptionResolvedProduct || registeredOptionSelectProduct) || "색상";
                     return (
-                    <div style={{ marginBottom: "16px" }}>
-                      {/* [2026-09-03 재설계 4단계 · 표시 전용] 직접입력 칸 — 주황 점선+배지+예시로 "내가 적어야 함"을 바로 인식 */}
-                      <div style={{ marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
-                        <span style={{ fontSize: "14px", fontWeight: 800, color: "#333" }}>{inputLabel}</span>
-                        <span style={{ background: "#9A6212", color: "#fff", fontSize: "10px", fontWeight: 900, borderRadius: "9999px", padding: "2px 8px" }}>🖊 직접 입력</span>
-                      </div>
-                      <input value={registeredOptionColor} onChange={(e) => setRegisteredOptionColor(e.target.value)} placeholder={inputLabel === "색상" ? "색상을 적어주세요 (예: 베이지)" : `${inputLabel} 입력칸이에요 — 방송에서 안내한 대로 적어주세요`} style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: !registeredOptionColor.trim() ? "2px dashed #E2B64D" : "1.5px solid #E8E2DD", background: !registeredOptionColor.trim() ? "#FFFDF5" : "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
-                      {/* [2026-08-28 P0-4] 문구가 사라질 때 아래 버튼이 위로 밀려 오클릭이 나던 문제 → 자리를 항상 잡아둔다 */}
-                      <div data-order-option-missing={!registeredOptionColor.trim() ? "true" : undefined} style={{ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" }}>{!registeredOptionColor.trim() ? `${inputLabel}${koEulReul(inputLabel)} 입력해 주세요` : ""}</div>
-                    </div>
+                    <CustomerManualField id="registered-product-options" label={inputLabel} value={registeredOptionColor} onChange={setRegisteredOptionColor}
+                      placeholder={inputLabel === "색상" ? "예: 베이지" : /상품번호.*옵션/.test(inputLabel) ? "예: BB-60 / 베이지 / M" : "방송에서 안내한 내용을 입력"}
+                      help={inputLabel === "색상" ? "방송에서 안내한 색상을 입력해 주세요." : "방송에서 확인한 내용을 입력해 주세요."}
+                      error={registeredOptionAttempted && !registeredOptionColor.trim() ? (inputLabel === "색상" ? "색상을 입력해 주세요." : "주문 내용을 입력해 주세요.") : ""} />
                     );
                   })() : null}
 
@@ -8526,8 +8508,20 @@ export default function OrderPage() {
                     </div>
                   ) : null}
 
+                  {registeredOptionDetailSelected && registeredOptionNeedsManualPrice ? (
+                    <CustomerManualField id="registered-product-amount" label="상품 1개 금액" numeric
+                      value={registeredOptionManualPrice > 0 ? registeredOptionManualPrice.toLocaleString("ko-KR") : ""}
+                      onChange={(value) => setRegisteredOptionManualPrice(Math.max(0, Number(value.replace(/[^0-9]/g, "")) || 0))}
+                      placeholder="예: 59,000" help="방송에서 안내한 상품 1개 가격을 입력해 주세요."
+                      error={registeredOptionAttempted && registeredOptionManualPrice < 1 ? "금액을 입력해 주세요." : ""} />
+                  ) : null}
                   {/* [2026-09-20 사장님] 「사진 N장 크게 보기 없애도 될 듯」 — 대표사진이 크게 뜨고 🔍 크게가 있으니 삭제. 설명 글이 있을 때만 「상품 상세」. */}
-                  {registeredOptionDetailSelected && registeredOptionDescription ? (
+                  {registeredOptionDetailSelected && registeredOptionDescription && registeredOptionNeedsManualPrice ? (
+                    <details style={{ marginTop: "16px", borderTop: "1px solid #F0EAE0", paddingTop: "12px", fontSize: "13px", color: "#555" }}>
+                      <summary style={{ cursor: "pointer", padding: "8px 0", fontWeight: 700 }}>상품 안내</summary>
+                      <div style={{ lineHeight: 1.7, whiteSpace: "pre-wrap", marginTop: "8px" }}>{registeredOptionDescription}</div>
+                    </details>
+                  ) : registeredOptionDetailSelected && registeredOptionDescription ? (
                     <div style={{ marginTop: "16px", borderTop: "1px solid #F0EAE0", paddingTop: "14px" }}>
                       {/* [2026-09-09 사장님 지적] 「위에 사진들이 나열돼 있는데 밑에 또 크게 띄울 필요가 있나?
                             중복 개념 아닌가? 결국 상세 설명은 사진들 끝에 있어서 글이 보이지도 않음」
