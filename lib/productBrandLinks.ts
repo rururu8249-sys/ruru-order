@@ -1,5 +1,6 @@
 import { cleanOptionValues, detailCode, detailProducts, expandForWidget, isBrandGroup, parseProductNote, type DetailProduct, type ProductLike } from './productDetailModel';
 import { normalizeProductSearchText, productSearchMatches } from './productSearch';
+import { linkedSourceInfo } from './productDetailInfo';
 
 export type DetailInfo = { mode: 'inherit' | 'custom' | 'hidden'; chips: string[]; description: string };
 export type BrandProductLink = { sourceId: string; parentId: string; detailName: string; originalName: string; movedAt: string };
@@ -55,7 +56,7 @@ export function resolveBrandCatalog(products: ProductLike[], links: BrandProduct
       colors: cleanOptionValues(source.color_options), sizes: cleanOptionValues(source.size_options),
       stockManaged: note.stock_management_enabled === true, stockVariants,
       stock: source.stock == null ? null : Number(source.stock),
-      info: { mode: 'inherit', chips: [], description: '' },
+      info: linkedSourceInfo(source),
     };
     bySourceId.set(link.sourceId, detail);
     detailsByParent.set(link.parentId, [...siblings, detail]);

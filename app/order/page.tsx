@@ -122,7 +122,7 @@ import {
   type OrderBankAccountSnapshot,
 } from "@/lib/orderBankAccount";
 import { detailCode, detailPricePresentation, detailProducts } from "@/lib/productDetailModel";
-import { selectedDetailInfo } from "@/lib/productDetailInfo";
+import { linkedSourceInfo, resolveDetailInfo, selectedDetailInfo } from "@/lib/productDetailInfo";
 import { buildBrandOrderCatalog, resolveBrandOrderSelection, findBrandOrderProductById } from "@/lib/productBrandOrder";
 import { loadProductBrandCatalog } from "@/lib/productBrandCatalogClient";
 import CustomerSizeChartSheet from "@/components/customer/CustomerSizeChartSheet";
@@ -1320,6 +1320,7 @@ function normalizeOrderProductRow(product: any): BroadcastProduct {
   return {
     id: product?.id,
     __linked_order_sources: product?.__linked_order_sources,
+    __linked_brand_parent: product?.__linked_brand_parent,
     product_name: String(product?.product_name ?? product?.name ?? ""),
     price: Number.isFinite(price) ? price : 0,
     stock: Number(product?.stock ?? 0),
@@ -2782,6 +2783,7 @@ export default function OrderPage() {
       .map((product: any) => ({
         id: product.id,
         __linked_order_sources: product.__linked_order_sources,
+        __linked_brand_parent: product.__linked_brand_parent,
         product_name: product.product_name || "",
         price: Number(product.price || 0),
         product_note: product.product_note ?? null,
@@ -6105,7 +6107,9 @@ export default function OrderPage() {
     ? normalizeDetailImages(registeredOptionSelectProduct.detail_image_urls)
     : [];
   const registeredOptionInfo = registeredOptionResolvedProduct
-    ? selectedDetailInfo(registeredOptionResolvedProduct as unknown as Record<string,unknown>,registeredOptionResolvedProduct === registeredOptionSelectProduct ? registeredOptionDetail : '')
+    ? (registeredOptionResolvedProduct as unknown as Record<string,unknown>).__linked_brand_parent
+      ? resolveDetailInfo((registeredOptionResolvedProduct as unknown as Record<string,unknown>).__linked_brand_parent as Record<string,unknown>, linkedSourceInfo(registeredOptionResolvedProduct as unknown as Record<string,unknown>))
+      : selectedDetailInfo(registeredOptionResolvedProduct as unknown as Record<string,unknown>,registeredOptionResolvedProduct === registeredOptionSelectProduct ? registeredOptionDetail : '')
     : {chips:[],description:''};
   const registeredOptionDescription = registeredOptionInfo.description;
   // [2026-09-20 사장님] 한눈에 정보 칩 — 관리자 상품등록 「한눈에 정보」(product_note.spec_chips). 표시 전용, 없으면 아무것도 안 그린다.

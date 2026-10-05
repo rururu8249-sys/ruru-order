@@ -11,6 +11,8 @@ export function buildBrandOrderCatalog(products: ProductLike[], links: BrandProd
   return [...requested].filter(id => !catalog.bySourceId.has(id) || !requested.has(catalog.bySourceId.get(id)!.parentId)).map(id => {
     const parent = rows.get(id);
     if (!parent) throw new Error(`Unresolved order product: ${id}`);
+    const sourceDetail = catalog.bySourceId.get(id);
+    if (sourceDetail) return {...parent, product_name:sourceDetail.detailName, __linked_brand_parent:rows.get(sourceDetail.parentId)};
     const linked = (catalog.detailsByParent.get(id) ?? []).filter(detail => 'sourceProductId' in detail && !detail.hidden);
     if (!linked.length) return parent;
     const note = parseProductNote(parent);
@@ -21,7 +23,7 @@ export function buildBrandOrderCatalog(products: ProductLike[], links: BrandProd
     for (const detail of linked) {
       if (!('sourceProductId' in detail)) continue;
       const source = rows.get(detail.sourceProductId)!;
-      sources[detail.detailName] = {...source, product_name: detail.detailName};
+      sources[detail.detailName] = {...source, product_name: detail.detailName, __linked_brand_parent:parent};
       const variants = detail.stockVariants.length
         ? detail.stockVariants.map(({color,size}) => ({color,size}))
         : (detail.colors.length ? detail.colors : ['']).flatMap(color => (detail.sizes.length ? detail.sizes : ['']).map(size => ({color,size})));

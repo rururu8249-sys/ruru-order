@@ -5,14 +5,21 @@ assert.ok(fs.existsSync('app/api/admin-live/product-brand-move/route.ts'),'move 
 process.env.NEXT_PUBLIC_SUPABASE_URL='https://example.supabase.co';
 process.env.SUPABASE_SERVICE_ROLE_KEY='test-server-key';
 let session=null,calls=[],error=null;
-const {POST}=createUiLoader({
+const {POST,GET}=createUiLoader({
   '@/lib/admin-auth':{verifyAdminSessionFromRequest:async()=>session},
   '@supabase/supabase-js':{createClient:()=>({rpc:async(name,args)=>{calls.push({name,args});return {data:{link:null,replayed:false},error};}})},
 })('app/api/admin-live/product-brand-move/route.ts');
 const body={action:'move',sourceId:'2',parentId:'1',detailName:'NEW',requestId:'request-1',expectedSourceVersion:'a'.repeat(32),expectedParentVersion:'b'.repeat(32)};
 const call=async payload=>POST({json:async()=>payload});
+assert.equal(typeof GET,'function','authenticated preview snapshot endpoint must exist');
+const preview=()=>GET({url:'https://example.test/api/admin-live/product-brand-move?sourceId=2&parentId=1'});
+assert.equal((await preview()).status,401);
 assert.equal((await call(body)).status,401); assert.equal(calls.length,0);
 session={sub:'admin'};
+const previewResponse=await preview();
+assert.equal(previewResponse.status,200);
+assert.equal(previewResponse.headers.get('Cache-Control'),'no-store');
+assert.deepEqual(calls.pop(),{name:'product_brand_move_snapshot',args:{p_source_id:'2',p_parent_id:'1'}});
 assert.equal((await call({...body,sourceId:'2 OR 1=1'})).status,400);
 assert.equal((await call({...body,detailName:''})).status,400);
 assert.equal(calls.length,0,'validation must run before database');

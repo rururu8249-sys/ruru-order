@@ -28,7 +28,7 @@ import {
 import { brandWordmarkThumbnail, normalizeBrandKorean, productAutoThumbUrl, productNameThumbnail } from "@/lib/brandWordmarkThumbnail";
 import { detailCode } from "@/lib/productDetailModel";
 import { splitOptionText } from "@/lib/optionSplit";
-import { normalizeDetailChips, type DetailInfo } from '@/lib/productDetailInfo';
+import { linkedSourceInfo, resolveDetailInfo, normalizeDetailChips, type DetailInfo } from '@/lib/productDetailInfo';
 import BrandDetailInfoEditor from './BrandDetailInfoEditor';
 
 type ProductRow = Record<string, unknown>;
@@ -779,6 +779,8 @@ export default function QuickProductFastForm({
   const [purchaseLimitText, setPurchaseLimitText] = useState("1");
   const [suggestionKeywordsText, setSuggestionKeywordsText] = useState("");
   const [specChipsText, setSpecChipsText] = useState(""); // [2026-09-20] 한눈에 정보 칩 (쉼표 구분)
+  const [linkedInfoMode, setLinkedInfoMode] = useState<DetailInfo['mode']>('custom');
+  const linkedBrandParent = initialProduct?.__linked_brand_parent as ProductRow | undefined;
   // [2026-09-22 사장님] 「특정상품에 개별로」 — 이 상품만의 주문 안내 문구.
   //   기본은 «기본값 따름» → 상품을 100개 올려도 매번 고를 필요가 없다. 다른 상품만 골라서 바꾼다.
   const [orderNoticeMode, setOrderNoticeMode] = useState<ProductNoticeProductMode>("inherit");
@@ -988,6 +990,9 @@ export default function QuickProductFastForm({
     setCustomerDetailInputEnabled(productNote?.customer_detail_input_enabled === true);
     setSuggestionKeywordsText(Array.isArray(productNote?.suggestion_keywords) ? productNote.suggestion_keywords.join(", ") : "");
     setSpecChipsText(Array.isArray(productNote?.spec_chips) ? productNote.spec_chips.map((v) => String(v ?? "").trim()).filter(Boolean).join(", ") : "");
+    const sourceInfo = linkedSourceInfo(initialProduct);
+    setLinkedInfoMode(sourceInfo.mode);
+    if (linkedBrandParent || productNote?.linked_detail_info) setSpecChipsText(sourceInfo.chips.join(','));
     // [2026-09-22] 이 상품만의 주문 안내 문구. 키가 없는 예전 상품은 «기본값 따름»으로 읽힌다.
     setOrderNoticeMode(parseProductNoticeProductMode(productNote?.order_notice_mode));
     setOrderNoticeCustom(String(productNote?.order_notice_custom || "").trim());
@@ -1034,7 +1039,7 @@ export default function QuickProductFastForm({
     setDetailImages(pickImageArray(initialProduct, ["detail_image_urls", "detail_images", "images"]).slice(0, 9)); // [2026-09-03 재설계 1단계] 한 줄 10장(대표1+상세9)
     setColorText(pickArray(initialProduct, ["color_options", "colors"]).map(normalizeBrandKorean).join(", "));
     setSizeText(pickArray(initialProduct, ["size_options", "sizes"]).map(normalizeBrandKorean).join(", "));
-    setDescription(normalizeTextareaText(pickString(initialProduct, ["product_description", "description", "detail_description"], "")));
+    setDescription(linkedBrandParent || productNote?.linked_detail_info ? sourceInfo.description : normalizeTextareaText(pickString(initialProduct, ["product_description", "description", "detail_description"], "")));
 
     if (noteVariants.length > 0) {
       setStockMode("option");
@@ -1888,6 +1893,7 @@ export default function QuickProductFastForm({
 
       const productNote = JSON.stringify({
         ...preservedBrandNote,
+        ...((linkedBrandParent || initialProductNote?.linked_detail_info) ? {linked_detail_info:{mode:linkedInfoMode,chips:normalizeDetailChips(specChipsText.split(/[,\n]/)),description:normalizeTextareaText(description)}} : {}),
         stock_mode: stockMode,
         stock_variants: variantStockPayload,
         stock_management_enabled: stockManagementEnabled,
@@ -3116,7 +3122,11 @@ export default function QuickProductFastForm({
           </div>
 
           {/* [2026-09-20] 한눈에 정보 칩 — 손님이 긴 설명을 안 읽어도 되게 짧은 칩으로 (표시 전용) */}
-          <div style={{ marginBottom: "12px" }}>
+          {linkedBrandParent ? <div style={{marginBottom:16}}><BrandDetailInfoEditor
+            value={{mode:linkedInfoMode,chips:specChipsText.split(/[,\n]/),description}}
+            parentPreview={resolveDetailInfo(linkedBrandParent)}
+            onChange={info=>{setFormTouched(true);setLinkedInfoMode(info.mode);setSpecChipsText(info.chips.join(','));setDescription(info.description);}}
+          /></div> : <div style={{ marginBottom: "12px" }}>
             <div style={sectionLabel}>한눈에 정보 (선택)</div>
             <input
               value={specChipsText}
@@ -3137,7 +3147,7 @@ export default function QuickProductFastForm({
                 </div>
               );
             })()}
-          </div>
+          </div>}
 
           {/* [2026-09-22 사장님] 「특정상품에 개별로」 — 이 상품만의 주문 안내 문구.
                 손님 상품창의 «수량·금액 줄 바로 위»에 한 줄로 뜬다.
@@ -3189,7 +3199,7 @@ export default function QuickProductFastForm({
           </div>
 
           {/* 상세설명 */}
-          <div style={{ marginBottom: "12px" }}>
+          {!linkedBrandParent && <div style={{ marginBottom: "12px" }}>
             <div style={sectionLabel}>상세설명</div>
             <textarea
               style={{ width: "100%", fontSize: "13px", padding: "8px 12px", border: "1px solid var(--color-line)", borderRadius: "8px", minHeight: "90px", resize: "vertical", background: "var(--color-surface)", fontFamily: "inherit", outline: "none" }}
@@ -3197,7 +3207,7 @@ export default function QuickProductFastForm({
               value={description}
               onChange={(e) => { setFormTouched(true); setDescription(e.target.value); }}
             />
-          </div>
+          </div>}
 
           </>) : null}
 

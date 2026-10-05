@@ -22,9 +22,15 @@ try {
   const sourceBefore = (await db.query('select to_jsonb(p) as value from products p where id=2')).rows[0].value;
   const version = async id => (await db.query('select public.product_brand_version($1) as version',[id])).rows[0].version;
   const sourceVersion = await version(2), parentVersion = await version(1);
+  const snapshot = (await db.query('select public.product_brand_move_snapshot($1,$2) as value',[2,1])).rows[0].value;
+  assert.deepEqual(snapshot.source,sourceBefore);
+  assert.equal(snapshot.sourceVersion,sourceVersion);
+  assert.equal(snapshot.parentVersion,parentVersion);
+  assert.deepEqual(snapshot.history,[]);
   const args = ['move',2,1,'NEW','test-request-1',sourceVersion,parentVersion];
   const move = values => db.query('select public.product_brand_move($1,$2,$3,$4,$5,$6,$7) as result',values);
   await db.exec('set role anon');
+  await assert.rejects(()=>db.query('select public.product_brand_move_snapshot(2,1)'),/permission denied/i);
   await assert.rejects(()=>move(args),/permission denied/i);
   await db.exec('reset role; set role authenticated');
   await assert.rejects(()=>move(args),/permission denied/i);
@@ -35,6 +41,9 @@ try {
   assert.equal(first.replayed,false);
   assert.equal(first.link.sourceId,'2');
   assert.equal(first.link.parentId,'1');
+  const movedSnapshot=(await db.query('select public.product_brand_move_snapshot(2,1) as value')).rows[0].value;
+  assert.equal(movedSnapshot.history[0].action,'move');
+  assert.equal(movedSnapshot.history[0].detail_name,'NEW');
   assert.equal((await move(args)).rows[0].result.replayed,true);
   assert.equal((await db.query('select count(*)::integer as n from product_brand_move_audit')).rows[0].n,1);
   assert.deepEqual((await db.query('select to_jsonb(p) as value from products p where id=2')).rows[0].value,sourceBefore);

@@ -85,3 +85,8 @@ assert.deepEqual(model.searchBrandDetails(adminCatalog,'1','new').map(detail=>de
 assert.deepEqual(model.searchBrandDetails(adminCatalog,'1','다른 방송 상품'),[]);
 assert.deepEqual(model.searchBrandDetails(adminCatalog,'1','베이지').map(detail=>detail.detailName),['NEW']);
 assert.deepEqual(model.searchBrandDetails(adminCatalog,'1','S').map(detail=>detail.detailName),['NEW']);
+assert.deepEqual(order.buildBrandOrderCatalog(fixture,links,['2']).map(row=>[row.id,row.product_name]),[[2,'NEW']],'source-only broadcast must use final detail name with original ID');
+const normalizeNode=pageAst.statements.find(node=>ts.isFunctionDeclaration(node)&&node.name?.text==='normalizeOrderProductRow');
+const normalizeCompiled=ts.transpileModule(normalizeNode.getText(pageAst),{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;
+const normalize=new Function('pickOrderProductImageUrl',normalizeCompiled+';return normalizeOrderProductRow;')(()=> 'actual.jpg');
+assert.equal(normalize(order.buildBrandOrderCatalog(fixture,links,['2'])[0]).__linked_brand_parent.id,1,'customer row normalizer must preserve explicit parent information context');

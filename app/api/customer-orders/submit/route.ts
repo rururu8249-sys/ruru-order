@@ -321,6 +321,27 @@ async function assertRegisteredProductPrices(
 
   for (const item of (data || []) as AnyRow[]) catalog.set(String(item?.id), item);
 
+  // 연결은 표시 이름만 바꾼다. 가격·재고·배송 정책은 원본 상품 ID의 행을 유지한다.
+  for (let offset = 0; offset < ids.length; offset += 100) {
+    const batch = ids.slice(offset, offset + 100);
+    for (let start = 0; ; start += 1000) {
+      const { data: links, error: linkError } = await supabase
+        .from("product_brand_links")
+        .select("source_id, detail_name")
+        .in("source_id", batch)
+        .order("source_id", { ascending: true })
+        .range(start, start + 999);
+      if (linkError) throw new Error("상품 연결 정보를 확인할 수 없어요. 잠시 후 다시 주문해 주세요.");
+      for (const link of (links || []) as AnyRow[]) {
+        const id = String(link?.source_id);
+        const original = catalog.get(id);
+        const name = text(link?.detail_name);
+        if (original && name) catalog.set(id, { ...original, product_name: name });
+      }
+      if ((links || []).length < 1000) break;
+    }
+  }
+
   for (const t of targets) {
     const product = catalog.get(t.pid);
 

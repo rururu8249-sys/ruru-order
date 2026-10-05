@@ -32,6 +32,7 @@ import { productPage } from "@/lib/productPagination";
 import ProductPagination from "./ProductPagination";
 import ProductToolbar from "./ProductToolbar";
 import { resolveBrandCatalog, searchBrandDetails, type BrandProductLink } from "@/lib/productBrandLinks";
+import ProductBrandMoveDialog from "./ProductBrandMoveDialog";
 
 type ProductRow = Record<string, unknown>;
 
@@ -245,6 +246,7 @@ function sortProductRows(rows: ProductRow[], key: ProductSortKey) {
 export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose, initialTab, onTabChange, initialSearch, onSearchChange, embedded = false, salesOnly = false, headerTarget }: Props) {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [brandLinks, setBrandLinks] = useState<BrandProductLink[]>([]);
+  const [brandMove, setBrandMove] = useState<{source:ProductRow;undoParentId?:string}|null>(null);
   const brandCatalog = useMemo(() => resolveBrandCatalog(products, brandLinks), [products, brandLinks]);
   const [rotationIds, setRotationIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -2438,6 +2440,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           <details className="relative">
                             <summary className="min-h-9 cursor-pointer list-none rounded-xl border border-line px-2.5 py-1.5 text-xs font-bold text-ink-soft" aria-label={`${productName(p)} 더보기`}>더보기 ▾</summary>
                             <div className="absolute right-0 z-20 flex min-w-28 flex-col gap-1 rounded-xl border border-line bg-surface p-1 shadow-lg">
+                          {!isBrandGroupProduct(p)?<button type="button" onClick={()=>setBrandMove({source:p})} className="rounded-lg px-3 py-2 text-left text-xs font-bold text-ink">브랜드 하위로 이동</button>:null}
                           <button
                             type="button"
                             title="고객 주문 딥링크 복사 — 방송 채팅 고정메시지에 붙이면 고객이 링크 탭 → 이 상품이 바로 열림"
@@ -2474,9 +2477,10 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                               </div>
                               <button type="button" onClick={() => {
                                 const source = 'sourceProductId' in detail ? products.find(row => productId(row) === detail.sourceProductId) : p;
-                                if (source) editProduct(source, 'sourceProductId' in detail ? '' : detail.detailName);
+                                if (source) editProduct('sourceProductId' in detail ? {...source,__linked_brand_parent:p} : source, 'sourceProductId' in detail ? '' : detail.detailName);
                                 else showAdminToast('원본 상품을 확인하지 못했습니다. 새로고침해주세요.', 'error');
                               }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-info-tx)", background: "var(--color-info-bg)", border: "none", borderRadius: "8px", padding: "4px 8px", cursor: "pointer" }}>세부관리</button>
+                              {'sourceProductId' in detail?<button type="button" onClick={()=>{const source=products.find(row=>productId(row)===detail.sourceProductId);if(source)setBrandMove({source,undoParentId:String(p.id)});}} className="rounded-lg border border-line px-2 py-1 text-xs font-bold text-ink-soft">연결 되돌리기</button>:null}
                             </div>
                           ))}
                         </div>
@@ -2560,6 +2564,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       ) : null}
 
       {/* 사진 확대 lightbox */}
+      {brandMove?<ProductBrandMoveDialog source={brandMove.source} brands={products.filter(isBrandGroupProduct)} undoParentId={brandMove.undoParentId} onClose={()=>setBrandMove(null)} onMoved={()=>{setBrandMove(null);void loadProducts();}} />:null}
       {lightbox ? (
         <div
           onClick={() => setLightbox("")}

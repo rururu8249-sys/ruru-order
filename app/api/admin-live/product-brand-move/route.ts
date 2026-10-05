@@ -6,6 +6,26 @@ export const dynamic = 'force-dynamic';
 const validId = (value: unknown): value is string => typeof value === 'string' && value.length <= 19 && /^[1-9][0-9]*$/.test(value) && BigInt(value) <= BigInt('9223372036854775807');
 const validVersion = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{32}$/.test(value);
 
+export async function GET(request: NextRequest) {
+  const headers = { 'Cache-Control': 'no-store' };
+  try {
+    if (!await verifyAdminSessionFromRequest(request)) return NextResponse.json({error:'관리자 로그인이 필요합니다.'},{status:401,headers});
+    const params = new URL(request.url).searchParams;
+    const sourceId = params.get('sourceId'), parentId = params.get('parentId');
+    if (!validId(sourceId) || !validId(parentId) || sourceId === parentId) return NextResponse.json({error:'상품과 브랜드를 확인해주세요.'},{status:400,headers});
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE || '';
+    if (!url || !key) throw new Error('Missing server configuration');
+    const db = createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
+    const {data,error} = await db.rpc('product_brand_move_snapshot',{p_source_id:sourceId,p_parent_id:parentId});
+    if (error) throw error;
+    if (!data) return NextResponse.json({error:'상품 또는 브랜드를 찾을 수 없습니다.'},{status:404,headers});
+    return NextResponse.json(data,{headers});
+  } catch {
+    return NextResponse.json({error:'최신 상품 상태를 불러오지 못했습니다. 다시 확인해주세요.'},{status:503,headers});
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     if (!await verifyAdminSessionFromRequest(request)) return NextResponse.json({error:'관리자 로그인이 필요합니다.'},{status:401});

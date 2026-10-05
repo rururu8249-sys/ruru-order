@@ -38,6 +38,26 @@ returns text language sql immutable security invoker set search_path = '' as $$
   from (select regexp_match(btrim(p_name),'^([A-Za-z]+)(?:\([^)]*\))?-([0-9]+[A-Za-z]*)') as m) x;
 $$;
 
+-- One statement snapshot: preview rows and optimistic versions must describe
+-- the same MVCC state, rather than separate browser reads racing with edits.
+create or replace function public.product_brand_move_snapshot(p_source_id bigint, p_parent_id bigint)
+returns jsonb language sql stable security invoker set search_path = '' as $$
+  select jsonb_build_object(
+    'source',to_jsonb(s),'parent',to_jsonb(p),
+    'sourceVersion',public.product_brand_version(s.id),
+    'parentVersion',public.product_brand_version(p.id),
+    'link',(select to_jsonb(l) from public.product_brand_links l where l.source_id=s.id),
+    'history',coalesce((select jsonb_agg(to_jsonb(h) order by h.created_at desc) from (
+      select action,original_name,detail_name,parent_id::text,created_at
+      from public.product_brand_move_audit where source_id=s.id
+      order by created_at desc limit 20
+    ) h),'[]'::jsonb)
+  ) from public.products s cross join public.products p
+  where s.id=p_source_id and p.id=p_parent_id and s.id<>p.id;
+$$;
+revoke all on function public.product_brand_move_snapshot(bigint,bigint) from public, anon, authenticated;
+grant execute on function public.product_brand_move_snapshot(bigint,bigint) to service_role;
+
 create or replace function public.product_brand_move(
   p_action text, p_source_id bigint, p_parent_id bigint, p_detail_name text,
   p_request_id text, p_source_version text, p_parent_version text

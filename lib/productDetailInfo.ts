@@ -6,6 +6,20 @@ export function normalizeDetailChips(values: string[]): string[] {
   return [...new Set(values.map(value => [...value.trim()].slice(0,10).join('')).filter(Boolean))].slice(0,6);
 }
 
+/** Source-owned metadata; absent mode preserves the source's existing text, never guessed inheritance. */
+export function linkedSourceInfo(source: ProductLike): DetailInfo {
+  const raw = parseProductNote(source).linked_detail_info;
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const info = raw as Record<string,unknown>;
+    if (['inherit','custom','hidden'].includes(String(info.mode))) return {
+      mode:info.mode as DetailInfo['mode'],
+      chips:normalizeDetailChips(Array.isArray(info.chips)?info.chips.filter((chip):chip is string=>typeof chip==='string'):[]),
+      description:typeof info.description==='string'?info.description:'',
+    };
+  }
+  return {mode:'custom',...resolveDetailInfo(source)};
+}
+
 /** Empty custom information is intentional, not an instruction to inherit. */
 export function resolveDetailInfo(parent: ProductLike, info?: DetailInfo): {chips:string[];description:string} {
   if (info?.mode === 'hidden') return {chips:[],description:''};
