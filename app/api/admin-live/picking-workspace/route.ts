@@ -5,6 +5,7 @@ import { buildAdminLiveOrderGroups, sortLiveOrdersByCreatedDesc, toAdminLiveOrde
 import { kstDayStartIso, kstDaysAgoStartIso, loadPickingWorkspaceRows, parsePickingWorkspaceRequest, selectAdditionalPickingRows, type PickingScopeSource } from "@/lib/orderPickingScopeLoader";
 import type { OrderRow } from "@/lib/admin-v2/types";
 import { buildPickingExceptions, buildPickingCancellations } from "@/lib/orderPickingExceptions";
+import { fieldFromIssueBody } from "@/lib/issueBodyMeta";
 
 export const dynamic = "force-dynamic";
 
@@ -111,7 +112,23 @@ export async function POST(request: NextRequest) {
         readAll("admin_tasks", "id,created_at,task_type,body,status,resolved_at,customer_name,customer_nickname,related_product"),
         readAll("refund_ledger", "id,created_at,admin_task_id,order_group_id,order_lookup_code,nickname,customer_name,kind,reason,stage,next_action,done_at,memo,product_snapshot"),
       ]);
-      exceptions = buildPickingExceptions(selectedRows, tasks, ledgers);
+      // Issue sheet is global. Fetch only explicitly linked order identities for
+      // broadcast labels; never infer a customer's broadcast from their name.
+      const issueOrders = new Map<string, Record<string, unknown>>(selectedRows.map(row => [String(row.id), row as unknown as Record<string, unknown>]));
+      const codes = [...new Set([...tasks.map(task => fieldFromIssueBody(task.body, "주문번호:")), ...ledgers.map(ledger => String(ledger.order_lookup_code || ""))].filter(Boolean))];
+      const groups = [...new Set(ledgers.map(ledger => String(ledger.order_group_id || "")).filter(Boolean))];
+      for (const [column, values] of [["order_lookup_code", codes], ["order_group_id", groups]] as const) {
+        for (let offset = 0; offset < values.length; offset += 200) {
+          for (let from = 0; ; from += 1000) {
+            const { data, error } = await supabase.from("orders").select("id,created_at,order_lookup_code,order_group_id,broadcast_name,product_name,color,size,qty,youtube_nickname,customer_name,picked_at,admin_order_status_v2,order_manage_status").in(column, values.slice(offset, offset + 200)).order("id", { ascending: true }).range(from, from + 999);
+            if (error) throw new Error(`고객이슈 연결 주문 조회 실패: ${error.message}`);
+            const page = (data || []) as Record<string, unknown>[];
+            page.forEach(row => issueOrders.set(String(row.id), row));
+            if (page.length < 1000) break;
+          }
+        }
+      }
+      exceptions = buildPickingExceptions([...issueOrders.values()], tasks, ledgers, { includeAllIssues: true, cancellationOrders: selectedRows });
     }
     const cancellations = input.includeExceptions === true ? buildPickingCancellations(selectedRows) : undefined;
     return NextResponse.json({ ok: true, orders, additionalOrders, broadcastIds, exceptions, cancellations });

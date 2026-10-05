@@ -3,7 +3,7 @@ import { formatPickingKstDateTime } from "./orderPickingExportRows";
 import { issueProductLabel, issueProductSummary } from "./issueProductLabel";
 
 type RecordRow = Record<string, unknown>;
-export type PickingExceptionRow = { date: string; customer: string; product: string; action: string; status: string; memo: string };
+export type PickingExceptionRow = { date: string; customer: string; product: string; action: string; status: string; memo: string; broadcast?: string };
 export type PickingCancellationRow = { customer: string; broadcast: string; orderedAt: string; before: string; current: string; attentionAt: string; kind: string };
 const text = (value: unknown) => String(value ?? "").trim();
 const closedTask = (row: RecordRow) => Boolean(row.resolved_at) || /^(done|resolved|completed|complete|deleted|완료|해결|삭제)$/i.test(text(row.status));
@@ -33,48 +33,56 @@ export function buildPickingCancellations(orders: readonly RecordRow[]): Picking
 }
 
 /** Only explicit order identifiers associate an issue with the selected broadcast. Never match names. */
-export function buildPickingExceptions(orders: readonly RecordRow[], tasks: readonly RecordRow[], ledgers: readonly RecordRow[]): PickingExceptionRow[] {
+export function buildPickingExceptions(orders: readonly RecordRow[], tasks: readonly RecordRow[], ledgers: readonly RecordRow[], options: { includeAllIssues?: boolean; cancellationOrders?: readonly RecordRow[] } = {}): PickingExceptionRow[] {
   const rows: PickingExceptionRow[] = [];
   const handled = new Set<string>();
   const exportedLedgers = new Set<string>();
+  const broadcastLabel = (linked: readonly RecordRow[]) => [...new Set(linked.map(row => text(row.broadcast_name)).filter(Boolean))].join("\n") || "주문 연결 없음";
   const appendLedger = (ledger: RecordRow, linked: readonly RecordRow[], task?: RecordRow) => {
     exportedLedgers.add(text(ledger.id));
     const target = ledgerTarget(ledger) || (task ? taskTarget(task) : "");
     if (financialIssue(ledger.kind)) exactProductRows(linked, target).forEach(order => handled.add(text(order.id)));
     if (closedLedger(ledger)) return;
-    rows.push({ date: formatPickingKstDateTime(text(ledger.created_at)), customer: text(ledger.nickname || ledger.customer_name || linked[0]?.youtube_nickname || linked[0]?.customer_name), product: target || productText(linked), action: actionLabel(ledger.kind), status: text(ledger.stage) || "처리 확인 필요", memo: [...new Set([task ? splitIssueBody(task.body).memo : "", text(ledger.next_action), text(ledger.reason), text(ledger.memo)].filter(Boolean))].join("\n") });
+    rows.push({ date: formatPickingKstDateTime(text(ledger.created_at)), customer: text(ledger.nickname || ledger.customer_name || task?.customer_nickname || task?.customer_name || linked[0]?.youtube_nickname || linked[0]?.customer_name), broadcast: broadcastLabel(linked), product: target || productText(linked), action: actionLabel(ledger.kind), status: text(ledger.stage) || "처리 확인 필요", memo: [...new Set([task ? splitIssueBody(task.body).memo : "", text(ledger.next_action), text(ledger.reason), text(ledger.memo)].filter(Boolean))].join("\n") });
   };
   for (const task of tasks) {
     const code = fieldFromIssueBody(task.body, "주문번호:");
     const taskLedgers = ledgers.filter(ledger => text(ledger.admin_task_id) === text(task.id));
     const linked = orders.filter(order => Boolean(code && code === text(order.order_lookup_code)) || taskLedgers.some(ledger => matchesOrder(ledger, order)));
-    if (!linked.length) continue;
+    // Global sheet mirrors the customer-issue screen. A stale ledger stage must
+    // not resurrect a task the operator already resolved or deleted.
+    if (options.includeAllIssues && closedTask(task)) {
+      taskLedgers.forEach(ledger => exportedLedgers.add(text(ledger.id)));
+      if (text(task.status) !== "deleted" && financialIssue(task.task_type)) exactProductRows(linked, taskTarget(task)).forEach(order => handled.add(text(order.id)));
+      continue;
+    }
+    if (!linked.length && !options.includeAllIssues) continue;
     let scopedLedger = false;
     for (const ledger of taskLedgers) {
       // Explicit ledger order identifiers take precedence over the task's code.
       const ledgerLinked = text(ledger.order_lookup_code) || text(ledger.order_group_id)
         ? orders.filter(order => matchesOrder(ledger, order)) : linked;
-      if (!ledgerLinked.length) continue;
+      if (!ledgerLinked.length && !options.includeAllIssues) continue;
       appendLedger(ledger, ledgerLinked, task);
       scopedLedger = true;
     }
-    if (scopedLedger) continue;
+    if (scopedLedger && (!options.includeAllIssues || taskLedgers.some(ledger => !closedLedger(ledger)) || closedTask(task))) continue;
     if (closedTask(task)) {
       // A resolved issue is completion evidence; deleting an issue is not.
       if (text(task.status) !== "deleted" && financialIssue(task.task_type)) exactProductRows(linked, taskTarget(task)).forEach(order => handled.add(text(order.id)));
       continue;
     }
     if (financialIssue(task.task_type)) exactProductRows(linked, taskTarget(task)).forEach(order => handled.add(text(order.id)));
-    rows.push({ date: formatPickingKstDateTime(text(task.created_at)), customer: text(task.customer_nickname || task.customer_name || linked[0].youtube_nickname || linked[0].customer_name), product: taskTarget(task) || productText(linked), action: actionLabel(task.task_type), status: "미처리", memo: splitIssueBody(task.body).memo });
+    rows.push({ date: formatPickingKstDateTime(text(task.created_at)), customer: text(task.customer_nickname || task.customer_name || linked[0]?.youtube_nickname || linked[0]?.customer_name), broadcast: broadcastLabel(linked), product: taskTarget(task) || productText(linked), action: actionLabel(task.task_type), status: "미처리", memo: splitIssueBody(task.body).memo });
   }
   for (const ledger of ledgers) {
     if (exportedLedgers.has(text(ledger.id))) continue;
     const linked = orders.filter(order => matchesOrder(ledger, order));
-    if (linked.length) appendLedger(ledger, linked);
+    if (linked.length || options.includeAllIssues) appendLedger(ledger, linked);
   }
-  for (const order of orders) {
+  for (const order of options.cancellationOrders || orders) {
     if (handled.has(text(order.id)) || !order.picked_at || !/취소/.test(text(order.admin_order_status_v2) + text(order.order_manage_status))) continue;
-    rows.push({ date: formatPickingKstDateTime(text(order.created_at)), customer: text(order.youtube_nickname || order.customer_name), product: productText([order]), action: "취소 · 환불/회수 확인", status: "처리 기록 확인 필요", memo: "챙김 완료 후 취소된 상품입니다. 출고하지 말고 환불·회수 처리 여부를 확인해주세요." });
+    rows.push({ date: formatPickingKstDateTime(text(order.created_at)), customer: text(order.youtube_nickname || order.customer_name), broadcast: broadcastLabel([order]), product: productText([order]), action: "취소 · 환불/회수 확인", status: "처리 기록 확인 필요", memo: "챙김 완료 후 취소된 상품입니다. 출고하지 말고 환불·회수 처리 여부를 확인해주세요." });
   }
   return rows;
 }

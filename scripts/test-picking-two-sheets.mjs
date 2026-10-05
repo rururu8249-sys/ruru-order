@@ -43,7 +43,8 @@ const issues=[{date:'2026. 10. 05.',customer:'검수',product:'취소상품 · L
 const issueOnly=await run([],{exceptions:issues});
 assert.equal(issueOnly.getWorksheet('물건챙기기').rowCount,1);
 assert.equal(issueOnly.getWorksheet('변경 및 추가').rowCount,1);
-assert.equal(issueOnly.getWorksheet('고객이슈·특이사항').getCell('C2').value,issues[0].product);
+assert.equal(issueOnly.getWorksheet('고객이슈·특이사항').getCell('D2').value,issues[0].product);
+assert.equal(issueOnly.getWorksheet('고객이슈·특이사항').getCell('C1').value,'방송');
 for(const sheet of issueOnly.worksheets) assert(!sheet.getRow(1).values.includes('주문번호'));
 assert.equal(additional.getCell('F1').value,'변경 후');
 const canceled=await run([],{cancellations:[{customer:'취소고객',broadcast:'의류',orderedAt:'2026. 10. 03. 10:00',attentionAt:'',before:'상의 · L · 1개',current:'주문 취소',kind:'주문 취소 · 출고 제외'}]});

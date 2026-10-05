@@ -24,4 +24,11 @@ assert(!JSON.stringify(result).includes('RURU-A'),'order identifier is internal 
 assert(!JSON.stringify(result).includes('group-a'));
 assert.deepEqual(buildPickingCancellations([{...orders[0],created_at:'2026-10-03T01:00:00Z',broadcast_name:'의류'}]),[{customer:'',broadcast:'의류',orderedAt:'2026. 10. 03. 10:00',before:'상의 · L · 1개',current:'주문 취소',attentionAt:'',kind:'주문 취소 · 출고 제외'}]);
 assert.equal(buildPickingCancellations([{...orders[0],picked_at:null}]).length,0);
+const all=buildPickingExceptions([{...orders[0],broadcast_name:'의류2'}],[task,{id:'manual',status:'open',customer_nickname:'수동고객',task_type:'general',body:'메모: 확인 필요'}],[],{includeAllIssues:true,cancellationOrders:[]});
+assert.equal(all.length,2,'all open issues export regardless of selected broadcast or order link');
+assert.equal(all[0].broadcast,'의류2');
+assert.equal(all[1].broadcast,'주문 연결 없음');
+assert.equal(all[1].memo,'확인 필요');
+assert.equal(buildPickingExceptions([], [{...task,status:'done'}], [],{includeAllIssues:true,cancellationOrders:[]}).length,0);
+for (const status of ['done','deleted']) assert.equal(buildPickingExceptions(orders,[{...task,status}],[pending],{includeAllIssues:true,cancellationOrders:[]}).length,0,'global issue sheet follows resolved/deleted issue state even when old ledger stage is stale');
 console.log('PASS scoped exceptions: exact links, cancellation, pending ledger, completed exclusion, no order identifiers');

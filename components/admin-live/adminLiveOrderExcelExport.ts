@@ -586,11 +586,11 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   };
   appendAttentionSheet("변경 및 추가", [...builtRows.attentionRows, ...(meta.cancellations || [])]);
   const exceptionSheet = workbook.addWorksheet("고객이슈·특이사항");
-  const exceptionHeaders: WorkbookRow = ["등록일", "고객", "상품·옵션", "처리할 내용", "처리 상태", "메모"];
+  const exceptionHeaders: WorkbookRow = ["등록일", "고객", "방송", "상품·옵션", "처리할 내용", "처리 상태", "메모"];
   const exceptions = meta.exceptions || [];
-  addRows(exceptionSheet, [exceptionHeaders, ...exceptions.map(row => [row.date, row.customer, row.product, row.action, row.status, row.memo])]);
+  addRows(exceptionSheet, [exceptionHeaders, ...exceptions.map(row => [row.date, row.customer, row.broadcast || "주문 연결 없음", row.product, row.action, row.status, row.memo])]);
   styleFilterSheet(exceptionSheet, 1, exceptions.length + 1, exceptionHeaders.length);
-  setColumnWidths(exceptionSheet, [22, 18, 36, 24, 22, 52]);
+  setColumnWidths(exceptionSheet, [22, 18, 24, 36, 24, 22, 52]);
   // Multi-line descriptions must be readable without manually resizing Excel rows.
   for (const detailSheet of [workbook.getWorksheet("변경 및 추가")!, exceptionSheet]) {
     detailSheet.eachRow((row, index) => {
