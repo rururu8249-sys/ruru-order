@@ -28,6 +28,8 @@ import {
 import { splitOptionText } from "@/lib/optionSplit";
 import { normalizeProductSearchText, productSearchMatches } from "@/lib/productSearch";
 import { aggregateSalesItems, eligibleSalesOrder, salesPaymentAmount, sortedSalesBroadcasts, SALES_PAID_STATUSES } from "@/lib/salesHistory";
+import { productPage } from "@/lib/productPagination";
+import ProductPagination from "./ProductPagination";
 
 type ProductRow = Record<string, unknown>;
 
@@ -46,7 +48,6 @@ type Props = {
   embedded?: boolean;
 };
 
-const PAGE_STEP = 10;
 const BASE_CATEGORIES = ["전체", "신발", "의류", "잡화"];
 // 기록 탭: 결제완료 계열 주문만 매출/주문 집계
 const HISTORY_PAID_STATUSES = SALES_PAID_STATUSES;
@@ -243,7 +244,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [tab, setTab] = useState<ProductManageTab>(initialTab ?? "broadcast");
   const [search, setSearch] = useState(initialSearch ?? "");
   const [category, setCategory] = useState("전체");
-  const [visibleCount, setVisibleCount] = useState(PAGE_STEP);
+  const [productPageNumber, setProductPageNumber] = useState(1);
+  const [productPageSize, setProductPageSize] = useState(20);
   const [lightbox, setLightbox] = useState("");
   const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   const [copied, setCopied] = useState(false);
@@ -310,7 +312,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   // 드래그 순서변경
   const [shopDragPid, setShopDragPid] = useState<string | null>(null);
   const [shopDragOver, setShopDragOver] = useState<number | null>(null);
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const productListTopRef = useRef<HTMLDivElement | null>(null);
+  const productListScrollRef = useRef<HTMLDivElement | null>(null);
 
   // 방송상품 드래그 중 가장자리 자동 스크롤 (sort_order/저장 로직 무관, UX만)
   const bcScrollRef = useRef<HTMLDivElement>(null);
@@ -525,10 +528,6 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     queueMicrotask(() => void loadWidgetLibrary(targetId));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, bcSelId]);
-
-  useEffect(() => {
-    setVisibleCount(PAGE_STEP);
-  }, [tab, search, category]);
 
   // 현재 탭을 부모(Dashboard)에 보고 → 닫힘/재오픈 사이 탭 위치 보존
   useEffect(() => {
@@ -1091,7 +1090,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   // 재고임박 필터 (전체 상품 탭): 재고관리 중 && 재고 3개 이하
   const [lowOnly, setLowOnly] = useState(false);
   // 정렬 (전체 상품 탭): 기본(고정 우선)/최신 등록순/재고 적은순 — 표시 순서만, 데이터 무변경
-  const [sortKey, setSortKey] = useState<"default" | "latest" | "stock_low">("default");
+  const [sortKey, setSortKey] = useState<"default" | "latest" | "stock_low">("latest");
 
   const filtered = useMemo(() => {
     const q = normalizeProductSearchText(search);
@@ -1128,20 +1127,22 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products, search, category, lowOnly, sortKey]);
 
-  const visible = filtered.slice(0, visibleCount);
-
-  // 무한스크롤: sentinel 보이면 PAGE_STEP씩 누적
+  const productPagination = productPage(filtered, productPageNumber, productPageSize);
+  const visible = productPagination.items;
   useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el || tab !== "products") return;
-    const io = new IntersectionObserver((entries) => {
-      if (entries[0]?.isIntersecting) {
-        setVisibleCount((v) => (v < filtered.length ? v + PAGE_STEP : v));
-      }
-    });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [tab, filtered.length, visibleCount]);
+    setProductPageNumber(1);
+  }, [tab, search, category, lowOnly, sortKey, productPageSize]);
+  // Keep state in range after deleting the last row on a page or refreshing data.
+  useEffect(() => {
+    if (productPageNumber !== productPagination.page) setProductPageNumber(productPagination.page);
+  }, [productPageNumber, productPagination.page]);
+  useEffect(() => {
+    productListScrollRef.current?.scrollTo({ top: 0 });
+  }, [productPagination.page, search, category, lowOnly, sortKey, productPageSize]);
+  const changeProductPage = (page: number) => {
+    setProductPageNumber(page);
+    productListTopRef.current?.scrollIntoView({block:"start"});
+  };
 
   const categories = BASE_CATEGORIES;
 
@@ -1792,7 +1793,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         </div>
 
         {tab === "history" ? (
-          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 32px 16px 16px", maxWidth: "1240px", width: "100%", margin: "0 auto" }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 32px 16px 16px", maxWidth: "1040px", width: "100%", margin: "0 auto" }}>
             {/* 요약카드 3개 */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "12px" }}>
               {([
@@ -2303,8 +2304,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               </select>
             </div>
 
-            {/* 상품 목록 (무한스크롤) */}
-            <div style={{ flex: 1, minHeight: "400px", overflowY: "auto", padding: "0 16px 16px" }}>
+            <div ref={productListTopRef} style={{padding:"0 16px"}}>
+              {!loading ? <ProductPagination {...productPagination} size={productPageSize} label="상품 목록 상단 페이지 이동" onPage={changeProductPage} onSize={setProductPageSize} /> : null}
+            </div>
+            {/* 상품 목록 (페이지별 표시) */}
+            <div ref={productListScrollRef} style={{ flex: 1, minHeight: "400px", overflowY: "auto", padding: "0 16px 16px" }}>
               {loading ? (
                 <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>불러오는 중…</div>
               ) : visible.length === 0 ? (
@@ -2450,14 +2454,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       </div>
                     );
                   })}
-                  {/* 무한스크롤 sentinel */}
-                  {visibleCount < filtered.length ? (
-                    <div ref={sentinelRef} style={{ height: "1px" }} />
-                  ) : (
-                    <div style={{ textAlign: "center", padding: "8px 0", fontSize: "11px", color: "var(--color-ink-mute)" }}>총 {filtered.length}개</div>
-                  )}
                 </div>
               )}
+              {!loading ? <ProductPagination {...productPagination} size={productPageSize} label="상품 목록 하단 페이지 이동" onPage={changeProductPage} onSize={setProductPageSize} /> : null}
             </div>
           </>
         )}
