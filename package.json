@@ -12,6 +12,8 @@
     "guard:survival-assets": "node scripts/test-survival-deployment-assets.mjs",
     "test:live-alert": "node scripts/test-live-alert-selection.mjs && node scripts/test-live-alert-route.mjs && node scripts/test-live-alert-ui.mjs",
     "test:sales-history": "node --import ./scripts/_ts-resolve.mjs scripts/test-sales-history.mjs",
+    "test:broadcast-report": "node scripts/test-broadcast-report-loading.mjs",
+    "test:inventory-management-off": "node scripts/test-inventory-management-off.mjs",
     "test:product-pagination": "node --import ./scripts/_ts-resolve.mjs scripts/test-product-pagination.mjs",
     "test:product-brand-links": "node --import ./scripts/_ts-resolve.mjs scripts/test-product-brand-links.mjs",
     "test:brand-linked-consumers": "node --import ./scripts/_ts-resolve.mjs scripts/test-brand-linked-consumers.mjs && node scripts/test-brand-linked-catalog-route.mjs && node scripts/test-brand-linked-chat.mjs && node scripts/test-admin-brand-catalog.mjs && node scripts/test-brand-linked-admin-actions.mjs && node --import ./scripts/_ts-resolve.mjs scripts/test-brand-linked-inventory.mjs && node --import ./scripts/_ts-resolve.mjs scripts/test-brand-linked-submit.mjs",

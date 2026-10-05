@@ -33,6 +33,8 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
   // [2026-07-24 사장님] 카테고리별 집계용 — 주문행 id → 상품 카테고리(products.note.category). 읽기 전용.
   const [categoryOfRowId, setCategoryOfRowId] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const [bestSort, setBestSort] = useState<"qty" | "sales">("qty");
   const [catExpand, setCatExpand] = useState<string>(""); // 펼친 대분류(카테고리 카드 클릭)
   const [buyerSearch, setBuyerSearch] = useState("");
@@ -41,14 +43,18 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
   // 방송 목록 로드(팝업 열릴 때 1회)
   useEffect(() => {
     if (!open) return;
+    let alive = true;
     void (async () => {
-      const { data } = await supabase
+      try {
+      const { data, error } = await supabase
         .from("broadcasts")
         .select("id, public_title, started_at")
         .neq("is_deleted", true)
         .not("started_at", "is", null)
         .order("started_at", { ascending: false })
         .limit(40);
+      if (!alive) return;
+      if (error) throw error;
       const list = ((data as Array<Record<string, unknown>>) || []).map((b) => ({
         id: String(b.id),
         title: String(b.public_title || "제목 없음"),
@@ -56,8 +62,12 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
       }));
       setBroadcasts(list);
       setSelectedId((cur) => cur || (initialBroadcastId && list.some((b) => b.id === initialBroadcastId) ? initialBroadcastId : list[0]?.id || ""));
+      } catch {
+        if (alive) { setLoadError(true); setLoading(false); }
+      }
     })();
-  }, [open, initialBroadcastId]);
+    return () => { alive = false; };
+  }, [open, initialBroadcastId, retryCount]);
 
   // 선택 방송 주문 로드 — 대시보드와 동일한 어댑터로 변환(숫자 일치)
   useEffect(() => {
@@ -65,6 +75,10 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
     let alive = true;
     void (async () => {
       setLoading(true);
+      setLoadError(false);
+      setOrders([]);
+      setCategoryOfRowId(new Map());
+      try {
       const pageSize = 1000;
       let from = 0;
       const all: OrderRow[] = [];
@@ -77,19 +91,17 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
           .order("created_at", { ascending: false })
           .range(from, from + pageSize - 1);
         if (page.error) {
-          if (alive) showAdminToast("리포트 주문 조회 실패\n\n" + page.error.message, "error");
-          break;
+          throw page.error;
         }
+        if (!alive) return;
         const rows = (page.data || []) as OrderRow[];
         all.push(...rows);
         if (rows.length < pageSize) break;
         from += pageSize;
       }
       if (!alive) return;
-      setOrders(buildAdminLiveOrderGroups(all).map(toAdminLiveOrder));
 
       // 카테고리 매핑: 주문행 product_id → products.product_note.category (직접입력 등 매핑 불가는 "기타")
-      try {
         const rowProduct = new Map<string, string>();
         for (const r of all) {
           const pid = String((r as Record<string, unknown>).product_id || "");
@@ -98,10 +110,12 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
         const pids = Array.from(new Set(Array.from(rowProduct.values())));
         const catByPid = new Map<string, string>();
         for (let i = 0; i < pids.length; i += 300) {
-          const { data: prows } = await supabase
+          const { data: prows, error } = await supabase
             .from("products")
             .select("id, product_note")
             .in("id", pids.slice(i, i + 300));
+          if (!alive) return;
+          if (error) throw error;
           ((prows as Array<Record<string, unknown>>) || []).forEach((p) => {
             let note: unknown = p.product_note;
             if (typeof note === "string") {
@@ -120,16 +134,19 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
           const c = catByPid.get(pid);
           if (c) catOfRow.set(rowId, c);
         });
-        if (alive) setCategoryOfRowId(catOfRow);
+        if (!alive) return;
+        setCategoryOfRowId(catOfRow);
+        setOrders(buildAdminLiveOrderGroups(all).map(toAdminLiveOrder));
       } catch {
-        if (alive) setCategoryOfRowId(new Map()); // 매핑 실패해도 리포트 본체는 정상 표시("기타"로 묶임)
+        if (alive) setLoadError(true);
+      } finally {
+        if (alive) setLoading(false);
       }
-      setLoading(false);
     })();
     return () => {
       alive = false;
     };
-  }, [open, selectedId]);
+  }, [open, selectedId, retryCount]);
 
   // ESC 닫기
   useEffect(() => {
@@ -253,6 +270,7 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
 
   // 카톡/메모 복붙용 텍스트 리포트
   const copyReport = async () => {
+    if (loading || loadError || !selectedId) return;
     const lines: string[] = [];
     lines.push(`[방송 판매 리포트] ${selectedBroadcast?.title || ""} ${dateLabel}`);
     lines.push(`결제완료 기준 · 취소 제외`);
@@ -310,9 +328,13 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
         <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", borderBottom: "1px solid var(--color-line)", flexShrink: 0 }}>
           <span style={{ fontSize: "16px", fontWeight: 900, color: "var(--color-ink)" }}>📊 방송 판매 리포트</span>
           <select
+            aria-label="리포트 방송 선택"
             value={selectedId}
             onChange={(e) => {
               setSelectedId(e.target.value);
+              setLoading(true);
+              setOrders([]);
+              setCategoryOfRowId(new Map());
               setBuyerExpand("");
               setCatExpand("");
             }}
@@ -329,7 +351,7 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
               );
             })}
           </select>
-          <button type="button" onClick={copyReport} style={{ flexShrink: 0, height: "34px", padding: "0 12px", borderRadius: "8px", border: "1px solid var(--color-rose-line)", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}>
+          <button type="button" onClick={copyReport} disabled={loading || loadError || !selectedId} style={{ flexShrink: 0, height: "34px", padding: "0 12px", borderRadius: "8px", border: "1px solid var(--color-rose-line)", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}>
             📋 복사
           </button>
           {embedded ? null : (
@@ -347,7 +369,13 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
             {report.unpaidCount > 0 ? <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>미결제 대기 {report.unpaidCount}건은 집계 제외</span> : null}
           </div>
 
-          {loading ? (
+          {loadError ? (
+            <div role="alert" style={{ padding: "32px 16px", textAlign: "center", color: "var(--color-ink)" }}>
+              <p style={{ fontWeight: 800 }}>리포트를 불러오지 못했습니다.</p>
+              <p>일부 주문만 합산하지 않습니다. 다시 불러와 주세요.</p>
+              <button type="button" onClick={() => setRetryCount((value) => value + 1)} style={{ marginTop: "12px", padding: "10px 16px", borderRadius: "8px", border: "1px solid var(--color-rose-line)", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", fontWeight: 800, cursor: "pointer" }}>다시 불러오기</button>
+            </div>
+          ) : loading || !selectedId ? (
             <div style={{ textAlign: "center", padding: "64px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>불러오는 중…</div>
           ) : (
             <>
