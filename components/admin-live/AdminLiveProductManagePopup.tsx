@@ -314,7 +314,6 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   // 드래그 순서변경
   const [shopDragPid, setShopDragPid] = useState<string | null>(null);
   const [shopDragOver, setShopDragOver] = useState<number | null>(null);
-  const productListTopRef = useRef<HTMLDivElement | null>(null);
   const productListScrollRef = useRef<HTMLDivElement | null>(null);
 
   // 방송상품 드래그 중 가장자리 자동 스크롤 (sort_order/저장 로직 무관, UX만)
@@ -1148,7 +1147,6 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   }, [productPagination.page, search, category, lowOnly, sortKey, productPageSize]);
   const changeProductPage = (page: number) => {
     setProductPageNumber(page);
-    productListTopRef.current?.scrollIntoView({block:"start"});
   };
 
   const categories = BASE_CATEGORIES;
@@ -2316,7 +2314,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               </select>
             </div>
 
-            <div ref={productListTopRef} style={{padding:"0 16px"}}>
+            <div style={{padding:"0 16px"}}>
               {!loading ? <ProductPagination {...productPagination} size={productPageSize} label="상품 목록 상단 페이지 이동" onPage={changeProductPage} onSize={setProductPageSize} /> : null}
             </div>
             {/* 상품 목록 (페이지별 표시) */}
