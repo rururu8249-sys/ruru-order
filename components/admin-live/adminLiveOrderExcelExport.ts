@@ -4,7 +4,7 @@ import { compareOrderOptions } from "@/lib/orderOptionSort";
 import ExcelJS from "exceljs";
 import type { LiveOrder, LiveOrderItem } from "./types";
 import { paymentStatusLabel } from "@/lib/orderLabels";
-import { buildPickingExportRows, partitionPickingAttentionRows, type PickingAttentionExportRow } from "@/lib/orderPickingExportRows";
+import { buildPickingExportRows, type PickingAttentionExportRow } from "@/lib/orderPickingExportRows";
 
 type ExportMeta = {
   filterLabel: string;
@@ -508,9 +508,12 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   if (rowOrder === "product") {
     keyedRows.sort((a, b) => a.product.localeCompare(b.product, "ko") || compareOrderOptions(a, b) || a.time - b.time);
   }
-  const itemRows: WorkbookRow[] = keyedRows.map((k) => k.row);
-  const unpaidRowFlags: boolean[] = keyedRows.map((k) => k.unpaid); // itemRows 와 같은 순서 — 스타일용
-  const attentionRowFlags: boolean[] = keyedRows.map((k) => k.attention);
+  // Each pending item belongs to exactly one sheet. Changed/late-paid items
+  // are actionable only in the separate attention sheet, never duplicated here.
+  const ordinaryRows = keyedRows.filter((row) => !row.attention);
+  const itemRows: WorkbookRow[] = ordinaryRows.map((k) => k.row);
+  const unpaidRowFlags: boolean[] = ordinaryRows.map((k) => k.unpaid);
+  const attentionRowFlags: boolean[] = ordinaryRows.map((k) => k.attention);
 
   // [2026-09-20 사장님 지시] 맨 위 합계 3줄(상품값 합계·실제 받은 돈·설명) 삭제 — 팝업 상단에 같은 숫자가 있고,
   //   엑셀에선 1행부터 표가 시작되는 게 정렬·필터에 편하다. (08-31 에 넣었던 것을 되돌림)
@@ -523,7 +526,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   ];
 
   const workbook = createWorkbook();
-  const sheet = workbook.addWorksheet("오늘 챙길 전체");
+  const sheet = workbook.addWorksheet("물건챙기기");
   addRows(sheet, rows);
   // 필터 범위 = 헤더~마지막 데이터 줄까지만 (위 합계 3줄은 범위 밖 = 고정)
   styleFilterSheet(sheet, headerRowNumber, headerRowNumber + itemRows.length, headers.length);
@@ -579,9 +582,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
       });
     });
   };
-  const partitionedAttention = partitionPickingAttentionRows(builtRows.attentionRows);
-  appendAttentionSheet("결제 후 추가 챙기기", partitionedAttention.latePaymentRows);
-  appendAttentionSheet("상품 변경 다시 챙기기", partitionedAttention.repickRows);
+  appendAttentionSheet("변경 및 추가", builtRows.attentionRows);
 
   // [2026-09-01 사장님 지시] 파일명 = 방송이름+날짜+루루
   //   방송 필터: "0827(목) 해외원정방송 1부" → 해외원정방송1부0827루루.xlsx

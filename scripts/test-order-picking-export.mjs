@@ -41,7 +41,7 @@ assert.equal(activeBroadcastMissingTime.mainRows[0].kind, '일반', 'a selected 
 assert.equal(activeBroadcastMissingTime.attentionRows.length, 0, 'selected-broadcast work never leaks into the additional-work sheets');
 
 const workbookSource = fs.readFileSync(path.resolve('components/admin-live/adminLiveOrderExcelExport.ts'), 'utf8');
-for (const sheetName of ['오늘 챙길 전체', '결제 후 추가 챙기기', '상품 변경 다시 챙기기']) {
+for (const sheetName of ['물건챙기기', '변경 및 추가']) {
   assert.ok(workbookSource.includes(`addWorksheet("${sheetName}")`) || workbookSource.includes(`appendAttentionSheet("${sheetName}"`), `${sheetName} sheet must be created`);
 }
 
