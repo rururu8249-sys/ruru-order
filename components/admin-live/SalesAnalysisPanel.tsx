@@ -1,6 +1,6 @@
 'use client';
 
-import {useEffect,useMemo,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import {supabase} from '@/lib/supabase';
 import {loadSalesAnalysisSnapshot,type SalesAnalysisSnapshot} from '@/lib/salesAnalysisLoader';
 import {aggregateSalesItems,salesProductPhotos} from '@/lib/salesHistory';
@@ -36,6 +36,12 @@ export default function SalesAnalysisPanel({initialBroadcastId}:{initialBroadcas
   const [detailView,setDetailView]=useState('products');
   const [buyerSearch,setBuyerSearch]=useState('');
   const [category,setCategory]=useState('all');
+  const [photo,setPhoto]=useState<{src:string;name:string}|null>(null);
+  const photoDialog=useRef<HTMLDialogElement>(null);
+  useEffect(()=>{
+    const dialog=photoDialog.current;
+    if(photo&&dialog&&!dialog.open)dialog.showModal();
+  },[photo]);
   useEffect(()=>{setProductSearch('');setBuyerSearch('');setCategory('all');setDetailView('products');},[selected]);
   useEffect(()=>{
     let current=true;
@@ -131,7 +137,7 @@ export default function SalesAnalysisPanel({initialBroadcastId}:{initialBroadcas
             <div className="mt-4 flex flex-wrap gap-2" aria-label="상품 분류 필터"><button className={control} aria-pressed={category==='all'} onClick={()=>setCategory('all')}>전체 분류</button>{categories.map(c=><button key={c.name} className={`${control} ${category===c.name?'border-rose-line bg-rose-soft':''}`} aria-pressed={category===c.name} onClick={()=>setCategory(c.name)}>{c.name} · {c.qty}개 · {won(c.amount)}</button>)}</div>
             <div className="my-4 flex flex-wrap gap-2"><input className={`${control} min-w-0 flex-1`} aria-label="판매 상품·옵션 검색" placeholder="상품명·색상·사이즈 검색" value={productSearch} onChange={e=>setProductSearch(e.target.value)}/><select className={control} aria-label="상품 정렬" value={productSort} onChange={e=>setProductSort(e.target.value)}><option value="sales">상품금액순</option><option value="qty">판매수량순</option><option value="name">상품명순</option></select></div>
             <div className="overflow-x-auto rounded-lg border border-line" role="region" aria-label="상품별 판매 현황 표" tabIndex={0}>
-              <table className="w-full min-w-[640px] border-collapse text-sm"><caption className="sr-only">{selectedEntry!.title} 상품·옵션별 판매 현황</caption><thead className="bg-surface-2 text-ink-soft"><tr>{['상품','구매 옵션별 수량','판매수량','단가','상품금액'].map(label=><th key={label} scope="col" className="px-3 py-3 text-left">{label}</th>)}</tr></thead><tbody>{shownProducts.map(item=><tr key={item.key} className="border-t border-line even:bg-surface-2"><th scope="row" className="w-[180px] px-3 py-3 text-left"><div className="flex items-center gap-3">{item.thumb?<a href={item.thumb} target="_blank" rel="noopener noreferrer" aria-label={`${item.name} 상품 사진 확대`}><img src={item.thumb} alt={item.name} loading="lazy" className="h-20 w-16 rounded-lg object-contain"/></a>:<span className="w-16 shrink-0 text-xs font-normal text-ink-soft">세부 사진<br/>미등록</span>}<span className="break-words font-bold">{item.name}</span></div></th><td className="min-w-[200px] px-3 py-3"><div className="flex flex-col gap-2">{item.optionGroups.map(group=><div key={group.label} className="rounded-lg border border-line bg-surface px-3 py-2">{group.label?<p className="mb-1 font-bold">{group.label}</p>:null}<div className="flex flex-wrap gap-x-3 gap-y-1">{group.sizes.map(size=><span key={size.label}>{size.label} <strong className="text-[#b42318]">{size.qty}개</strong></span>)}</div></div>)}</div></td><td className="whitespace-nowrap px-3 py-3 font-extrabold text-[#b42318]">{item.qty}개</td><td className="whitespace-nowrap px-3 py-3 text-ink-soft">{won(item.price)}</td><td className="whitespace-nowrap px-3 py-3 font-extrabold text-rose-deep">{won(item.sales)}</td></tr>)}</tbody></table>
+              <table className="w-full min-w-[640px] border-collapse text-sm"><caption className="sr-only">{selectedEntry!.title} 상품·옵션별 판매 현황</caption><thead className="bg-surface-2 text-ink-soft"><tr>{['상품','구매 옵션별 수량','판매수량','단가','상품금액'].map(label=><th key={label} scope="col" className="px-3 py-3 text-left">{label}</th>)}</tr></thead><tbody>{shownProducts.map(item=><tr key={item.key} className="border-t border-line even:bg-surface-2"><th scope="row" className="w-[180px] px-3 py-3 text-left"><div className="flex items-center gap-3">{item.thumb?<button type="button" onClick={()=>setPhoto({src:item.thumb,name:item.name})} className="shrink-0 cursor-zoom-in rounded-lg focus-visible:outline-2 focus-visible:outline-rose-deep" aria-label={`${item.name} 상품 사진 확대`}><img src={item.thumb} alt={item.name} loading="lazy" className="h-20 w-16 rounded-lg object-contain"/></button>:<span className="w-16 shrink-0 text-xs font-normal text-ink-soft">세부 사진<br/>미등록</span>}<span className="break-words font-bold">{item.name}</span></div></th><td className="min-w-[200px] px-3 py-3"><div className="flex flex-wrap items-start gap-2">{item.optionGroups.map(group=><div key={group.label} aria-label="사이즈별 수량" className="w-44 shrink-0 overflow-hidden rounded-lg border border-line bg-surface">{group.label?<p className="border-b border-line px-3 py-2 font-bold break-words">{group.label}</p>:null}<div className="grid grid-cols-2 border-b border-line bg-surface-2 text-xs font-bold text-ink-soft"><span className="px-3 py-1.5">사이즈</span><span className="border-l border-line px-3 py-1.5 text-right">수량</span></div>{group.sizes.map(size=><dl key={size.label} aria-label={`${size.label==='수량'?'옵션 없음':`사이즈 ${size.label}`}, 수량 ${size.qty}개`} className="grid grid-cols-2 border-b border-line last:border-b-0"><dt className="break-words px-3 py-1.5 font-bold">{size.label==='수량'?'없음':size.label}</dt><dd className="border-l border-line bg-[#fff4f2] px-3 py-1.5 text-right"><strong className="text-[#b42318]">{size.qty}개</strong></dd></dl>)}</div>)}</div></td><td className="whitespace-nowrap px-3 py-3 font-extrabold text-[#b42318]">{item.qty}개</td><td className="whitespace-nowrap px-3 py-3 text-ink-soft">{won(item.price)}</td><td className="whitespace-nowrap px-3 py-3 font-extrabold text-rose-deep">{won(item.sales)}</td></tr>)}</tbody></table>
             </div>{shownProducts.length===0?<p className="py-6 text-center text-ink-soft">검색 조건에 맞는 판매 상품이 없습니다.</p>:null}
             <p className="mt-3 text-xs text-ink-soft">표시 {shownProducts.length}개 상품·단가 묶음 / 전체 {products.length}개 · 같은 상품도 단가가 다르면 구분합니다.</p>
             </>:<>
@@ -143,5 +149,9 @@ export default function SalesAnalysisPanel({initialBroadcastId}:{initialBroadcas
         </>:<div className="rounded-xl border border-dashed border-line p-8 text-center text-ink-soft">방송을 선택하면 상세 분석이 표시됩니다.</div>}</div>
       </div>
     </>}
+    {photo?<dialog ref={photoDialog} aria-label={`${photo.name} 상품 사진 확대`} onCancel={event=>{event.preventDefault();setPhoto(null);}} onClick={event=>{if(event.target===event.currentTarget)setPhoto(null);}} className="m-auto max-h-[95dvh] w-[min(92vw,900px)] max-w-none overflow-auto rounded-xl border-0 bg-surface p-3 shadow-xl backdrop:bg-black/75">
+      <div className="mb-3 flex items-center justify-between gap-3"><p className="font-bold">{photo.name}</p><button type="button" autoFocus aria-label="사진 확대 닫기" onClick={()=>setPhoto(null)} className="rounded-lg border border-line px-4 py-2 font-bold">✕ 닫기</button></div>
+      <img src={photo.src} alt={`${photo.name} 확대 사진`} className="mx-auto max-h-[78dvh] max-w-full object-contain"/>
+    </dialog>:null}
   </section>;
 }

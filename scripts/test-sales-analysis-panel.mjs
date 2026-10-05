@@ -28,6 +28,12 @@ assert(text().includes('베이지 / 화이트'),'original option must remain rea
 assert.equal(loads,1,'opening details cannot load the same orders twice');
 assert.equal(tree.root.findAllByType('table').length,1,'primary product/option breakdown is a structured table');
 assert(text().includes('구매 옵션별 수량'),'color and size quantities are grouped, not repeated order rows');
+const optionUnits=tree.root.findAllByProps({'aria-label':'사이즈 M, 수량 2개'});
+assert.equal(optionUnits.length,1,'each size and quantity is a separately labeled option unit');
+assert.equal(optionUnits[0].findAllByType('strong')[0].children.join(''),'2개');
+assert.equal(optionUnits[0].type,'dl','option and quantity have explicit term/value relationships');
+assert.equal(optionUnits[0].findByType('dt').children.join(''),'M');
+assert.equal(tree.root.findAllByProps({'aria-label':'사이즈별 수량'}).length,2,'each product has a compact size quantity block');
 assert.equal(tree.root.findAllByType('details').length,0,'buyers are not appended underneath products');
 await act(async()=>tree.root.findAllByType('button').find(b=>b.children.includes('구매자별')).props.onClick());
 assert.equal(tree.root.findAllByType('table').length,0,'buyer view replaces product view rather than stacking pages');
@@ -60,9 +66,19 @@ await act(async()=>tree.unmount());
 pending=Promise.resolve({...snapshot,orders:[
  {id:20,order_group_id:'catA',broadcast_id:'A',product_id:'clothing',product_name:'동일 이름',color:'그린',size:'XL',qty:2,product_price:10000,adjusted_product_price:18000,total_price:18000,admin_order_status_v2:'입금확인'},
  {id:21,order_group_id:'catB',broadcast_id:'A',product_id:'bags',product_name:'동일 이름',color:'탄',qty:1,product_price:10000,total_price:10000,admin_order_status_v2:'입금확인'},
-],products:[{id:'clothing',product_note:{category:'의류'}},{id:'bags',product_note:{category:'가방'}}]});
+],products:[{id:'clothing',image_url:'https://example.com/clothing.jpg',product_note:{category:'의류'}},{id:'bags',product_note:{category:'가방'}}]});
 await act(async()=>{tree=Renderer.create(React.createElement(Panel,{initialBroadcastId:'A'}));});
 assert.equal(tree.root.findAllByType('tbody')[0].findAllByType('tr').length,2,'same name and price across catalog identities are not merged');
+const photoButton=tree.root.findAllByType('button').find(b=>b.props['aria-label']==='동일 이름 상품 사진 확대');
+assert(photoButton,'photo enlargement is an in-page action, not a new-tab link');
+await act(async()=>photoButton.props.onClick());
+assert.equal(tree.root.findAllByType('dialog').length,1,'photo opens in current-page modal');
+assert.equal(tree.root.findByType('dialog').findByType('img').props.src,'https://example.com/clothing.jpg');
+await act(async()=>tree.root.findByProps({'aria-label':'사진 확대 닫기'}).props.onClick());
+assert.equal(tree.root.findAllByType('dialog').length,0,'close returns to analysis');
+await act(async()=>photoButton.props.onClick());
+await act(async()=>tree.root.findByType('dialog').props.onCancel({preventDefault(){}}));
+assert.equal(tree.root.findAllByType('dialog').length,0,'Escape dismisses photo');
 const categoryButtons=tree.root.findByProps({'aria-label':'상품 분류 필터'}).findAllByType('button');
 assert(categoryButtons.some(b=>b.children.join('')==='의류 · 2개 · 18,000원')&&categoryButtons.some(b=>b.children.join('')==='가방 · 1개 · 10,000원'),'category totals retain original row attribution');
 await act(async()=>categoryButtons.find(b=>b.children.join('').startsWith('가방 ·')).props.onClick());
