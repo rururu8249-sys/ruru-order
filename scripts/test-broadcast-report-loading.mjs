@@ -37,4 +37,15 @@ assert(text().includes('불러오는 중'),'old response must not complete newer
 await act(async()=>requests[1].resolve({data:[],error:null}));
 assert(text().includes('총 매출 (결제완료)'));
 await act(async()=>tree.unmount());
+// Supplied complete snapshot must render the real report without issuing another query.
+const SnapshotComponent=createUiLoader({'@/lib/supabase':{supabase:{from(){throw new Error('duplicate report query');}}},'@/lib/adminToast':{showAdminToast(){}}})('components/admin-live/BroadcastReportPopup.tsx').default;
+const suppliedSnapshot={broadcasts:[{id:'A',title:'방송 A',started_at:'2026-10-01T00:00:00Z'}],orders:[
+ {id:100,order_group_id:'G1',broadcast_id:'A',product_name:'상의',qty:1,product_price:10000,total_price:10000,admin_order_status_v2:'입금확인'},
+ {id:101,order_group_id:'G1',broadcast_id:'A',product_name:'하의',qty:1,product_price:20000,total_price:23000,shipping_fee:3000,admin_order_status_v2:'입금확인'},
+],products:[]};
+await act(async()=>{tree=Renderer.create(React.createElement(SnapshotComponent,{open:true,onClose(){},initialBroadcastId:'A',embedded:true,suppliedSnapshot}));});
+assert(text().includes('33,000원'),'supplied snapshot preserves checkout amount');
+assert(text().includes('30,000원'),'supplied snapshot preserves product amount');
+assert.equal(text().includes('리포트를 불러오지 못했습니다'),false,'injected snapshot cannot make duplicate database calls');
+await act(async()=>tree.unmount());
 console.log('PASS real report: partial-page failure hides totals/copy, retry distinguishes empty success, stale broadcast response cannot end current loading');

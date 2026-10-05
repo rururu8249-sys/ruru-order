@@ -33,7 +33,7 @@ export type AdminLiveTopMenuItem = {
 export const ADMIN_LIVE_TOP_MENUS: AdminLiveTopMenuItem[] = [
   // 아이콘은 AdminLiveMenuIcon.tsx (SVG) — 기기마다 모양이 달라지는 이모지를 쓰지 않는다
   { key: "broadcast", label: "방송", desc: "시작·종료 · 채팅주문 · 기록", defaultKey: "broadcast" },
-  { key: "orders", label: "주문·입금", desc: "실시간 주문 · 입금내역 · 판매기록 · 정산 · 이벤트", defaultKey: "orders" },
+  { key: "orders", label: "주문·입금", desc: "실시간 주문 · 입금내역 · 판매분석 · 정산 · 이벤트", defaultKey: "orders" },
   { key: "products", label: "상품", desc: "방송 상품 · 쇼핑몰 · 등록", defaultKey: "products" },
   { key: "customers", label: "고객", desc: "회원 · 이슈 · 쪽지·공지 · 접속 기록", defaultKey: "customers" },
   { key: "settings", label: "설정", desc: "상점 · 결제 · 알림 · 점검", defaultKey: "settings" },
@@ -46,13 +46,12 @@ export const ADMIN_LIVE_SUB_TABS: Record<AdminLiveTopMenuKey, AdminLiveSubTab[]>
   broadcast: [
     { key: "broadcast", label: "방송 콘솔" },
     { key: "chatorder", label: "채팅주문" },
-    { key: "reports", label: "방송 기록·리포트" },
   ],
   // [2026-09-09 사장님 요청] 이벤트를 방송 → 주문·입금 안으로 옮겼다
   orders: [
     { key: "orders", label: "실시간 주문" },
     { key: "payments", label: "입금내역" },
-    { key: "sales", label: "판매기록" },
+    { key: "sales", label: "판매분석" },
     { key: "settlement", label: "정산" },
     { key: "event", label: "이벤트" },
   ],
@@ -72,7 +71,7 @@ const TOP_MENU_OF: Record<AdminLiveMenuKey, AdminLiveTopMenuKey> = {
   broadcast: "broadcast",
   chatorder: "broadcast",
   event: "orders", // [2026-09-09 사장님 요청] 방송 → 주문·입금
-  reports: "broadcast",
+  reports: "orders",
   orders: "orders",
   payments: "orders",
   sales: "orders",
@@ -101,6 +100,7 @@ export function isAdminLiveMenuKey(value: unknown): value is AdminLiveMenuKey {
 
 /** 화면 제목(페이지 헤더용) */
 export function getAdminLiveScreenTitle(key: AdminLiveMenuKey): string {
+  if(key==='reports') key='sales';
   const top = getAdminLiveTopMenu(topMenuOf(key));
   const sub = ADMIN_LIVE_SUB_TABS[top.key].find((t) => t.key === key);
   return sub && ADMIN_LIVE_SUB_TABS[top.key].length > 1 ? `${top.label} › ${sub.label}` : top.label;

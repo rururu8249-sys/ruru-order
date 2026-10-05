@@ -31,7 +31,7 @@ import AdminLiveSidebar from "./AdminLiveSidebar";
 import LiveHeader from "./LiveHeader";
 import LiveStatsCards from "./LiveStatsCards";
 import LiveStatsPanel from "./LiveStatsPanel";
-import BroadcastReportPopup from "./BroadcastReportPopup";
+import SalesAnalysisPanel from "./SalesAnalysisPanel";
 import SystemAuditCard from "./SystemAuditCard";
 import LiveIssueRailPanel from "./LiveIssueRailPanel";
 import LiveBroadcastEndSummaryModal, { type LiveBroadcastEndMission, type LiveBroadcastEndSummary } from "./LiveBroadcastEndSummaryModal";
@@ -1624,7 +1624,7 @@ export default function AdminLiveDashboard() {
                   {activeSubTabs.length > 1 ? (
                     <div className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                       {activeSubTabs.map((tab) => {
-                        const active = drawer.kind === "deposits" ? tab.key === "payments" : tab.key === activeMenu;
+                        const active = drawer.kind === "deposits" ? tab.key === "payments" : tab.key === (activeMenu==='reports'?'sales':activeMenu);
                         return (
                           <button
                             key={tab.key}
@@ -1735,8 +1735,8 @@ export default function AdminLiveDashboard() {
               </div>
 
               {/* ── 방송 › 방송 기록·리포트 (읽기 전용) ── */}
-              {activeMenu === "reports" ? (
-                <BroadcastReportPopup embedded open onClose={() => {}} initialBroadcastId={activeBroadcast?.id || null} />
+              {activeMenu === "reports" || activeMenu === "sales" ? (
+                <SalesAnalysisPanel initialBroadcastId={activeBroadcast?.id || null} />
               ) : null}
 
               {/* ── 주문·입금 › 실시간 주문 ── */}
@@ -1794,15 +1794,6 @@ export default function AdminLiveDashboard() {
               ) : null}
 
               {/* ── 상품 ── */}
-              {activeMenu === "sales" ? (
-                <AdminLiveProductManagePopup
-                  key="sales"
-                  embedded
-                  salesOnly
-                  activeBroadcastId={activeBroadcast?.id || null}
-                  onClose={() => {}}
-                />
-              ) : null}
               {activeMenu === "products" ? (
                 <AdminLiveProductManagePopup
                   key="products"

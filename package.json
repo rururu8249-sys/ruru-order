@@ -12,6 +12,7 @@
     "guard:survival-assets": "node scripts/test-survival-deployment-assets.mjs",
     "test:live-alert": "node scripts/test-live-alert-selection.mjs && node scripts/test-live-alert-route.mjs && node scripts/test-live-alert-ui.mjs",
     "test:sales-history": "node --import ./scripts/_ts-resolve.mjs scripts/test-sales-history.mjs",
+    "test:sales-analysis": "node scripts/test-sales-analysis.mjs && node scripts/test-sales-analysis-panel.mjs",
     "test:broadcast-report": "node scripts/test-broadcast-report-loading.mjs",
     "test:inventory-management-off": "node scripts/test-inventory-management-off.mjs",
     "test:product-pagination": "node --import ./scripts/_ts-resolve.mjs scripts/test-product-pagination.mjs",

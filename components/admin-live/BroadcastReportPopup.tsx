@@ -12,6 +12,7 @@ import type { OrderRow } from "@/lib/admin-v2/types";
 import { buildAdminLiveOrderGroups, toAdminLiveOrder } from "./liveOrderAdapter";
 import type { LiveOrder } from "./types";
 import { showAdminToast } from "@/lib/adminToast";
+import type { SalesAnalysisSnapshot } from '@/lib/salesAnalysisLoader';
 
 const won = (v: number) => `${Number(v || 0).toLocaleString("ko-KR")}원`;
 const PAID = new Set(["paid", "auto_paid", "manual_paid", "card_paid"]);
@@ -24,9 +25,10 @@ type Props = {
   initialBroadcastId: string | null;
   /** [2026-09-08 5단계] 페이지 안에 그대로(방송 › 기록·리포트 탭). 팝업 껍데기·✕ 없음 */
   embedded?: boolean;
+  suppliedSnapshot?: SalesAnalysisSnapshot;
 };
 
-export default function BroadcastReportPopup({ open, onClose, initialBroadcastId, embedded = false }: Props) {
+export default function BroadcastReportPopup({ open, onClose, initialBroadcastId, embedded = false, suppliedSnapshot }: Props) {
   const [broadcasts, setBroadcasts] = useState<BroadcastEntry[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
   const [orders, setOrders] = useState<LiveOrder[]>([]);
@@ -42,7 +44,7 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
 
   // 방송 목록 로드(팝업 열릴 때 1회)
   useEffect(() => {
-    if (!open) return;
+    if (!open || suppliedSnapshot) return;
     let alive = true;
     void (async () => {
       try {
@@ -67,11 +69,31 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
       }
     })();
     return () => { alive = false; };
-  }, [open, initialBroadcastId, retryCount]);
+  }, [open, initialBroadcastId, retryCount, suppliedSnapshot]);
+
+  useEffect(() => {
+    if (!open || !suppliedSnapshot) return;
+    const id=initialBroadcastId || suppliedSnapshot.broadcasts[0]?.id || '';
+    setBroadcasts(suppliedSnapshot.broadcasts);
+    setSelectedId(id);
+    setOrders(buildAdminLiveOrderGroups(suppliedSnapshot.orders).map(toAdminLiveOrder));
+    const categories=new Map<string,string>();
+    const byProduct=new Map(suppliedSnapshot.products.map(p=>[String(p.id),p]));
+    for(const row of suppliedSnapshot.orders) {
+      const product=byProduct.get(String((row as Record<string,unknown>).product_id));
+      let note=product?.product_note;
+      if(typeof note==='string') {try {note=JSON.parse(note);} catch {note=null;}}
+      const category=String((note as {category?:unknown}|null)?.category||'').trim();
+      if(category) categories.set(String(row.id),category);
+    }
+    setCategoryOfRowId(categories);
+    setLoadError(false);
+    setLoading(false);
+  },[open,suppliedSnapshot,initialBroadcastId]);
 
   // 선택 방송 주문 로드 — 대시보드와 동일한 어댑터로 변환(숫자 일치)
   useEffect(() => {
-    if (!open || !selectedId) return;
+    if (!open || !selectedId || suppliedSnapshot) return;
     let alive = true;
     void (async () => {
       setLoading(true);
@@ -146,7 +168,7 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
     return () => {
       alive = false;
     };
-  }, [open, selectedId, retryCount]);
+  }, [open, selectedId, retryCount, suppliedSnapshot]);
 
   // ESC 닫기
   useEffect(() => {
@@ -164,7 +186,7 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
     const paid = valid.filter((o) => PAID.has(o.paymentStatus));
 
     const sales = paid.reduce((s, o) => s + Number(o.totalAmount || 0), 0);
-    const productSales = paid.reduce((s, o) => s + Number(o.productAmount || 0), 0);
+    const productSales = paid.reduce((s, o) => s + (suppliedSnapshot ? o.items.reduce((value,item)=>value+Number(item.amount||0),0) : Number(o.productAmount || 0)), 0);
     const qtyTotal = paid.reduce((s, o) => s + (o.items || []).reduce((q, it) => q + (it.eventGiftWinnerId?0:Number(it.qty || 0)), 0), 0);
     const bankCount = paid.filter((o) => o.paymentStatus === "paid" || o.paymentStatus === "auto_paid" || o.paymentStatus === "manual_paid").length;
     const cardCount = paid.filter((o) => o.paymentStatus === "card_paid").length;
@@ -221,7 +243,7 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
       const key = o.phone && o.phone !== "-" ? o.phone : `${o.nickname}|${o.name}`;
       const cur = buyerMap.get(key) || { nickname: o.nickname, name: o.name, orderCount: 0, productSum: 0, paySum: 0, items: [] };
       cur.orderCount += 1;
-      cur.productSum += Number(o.productAmount || 0);
+      cur.productSum += suppliedSnapshot ? o.items.reduce((sum,item)=>sum+Number(item.amount||0),0) : Number(o.productAmount || 0);
       cur.paySum += Number(o.totalAmount || 0);
       for (const it of o.items || []) {
         const option = it.optionText && it.optionText !== "옵션 없음" ? ` (${it.optionText})` : "";
@@ -247,7 +269,7 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
       categories,
       buyers,
     };
-  }, [orders, categoryOfRowId]);
+  }, [orders, categoryOfRowId, suppliedSnapshot]);
 
   const best = useMemo(() => {
     const sorted = [...report.bestAll].sort((a, b) => (bestSort === "qty" ? b.qty - a.qty : b.sales - a.sales));
@@ -326,8 +348,8 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
       >
         {/* 헤더 */}
         <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", borderBottom: "1px solid var(--color-line)", flexShrink: 0 }}>
-          <span style={{ fontSize: "16px", fontWeight: 900, color: "var(--color-ink)" }}>📊 방송 판매 리포트</span>
-          <select
+          <span style={{ fontSize: "16px", fontWeight: 900, color: "var(--color-ink)" }}>{suppliedSnapshot ? '방송 상세 분석' : '📊 방송 판매 리포트'}</span>
+          {suppliedSnapshot ? <span style={{flex:1,fontWeight:700}}>{broadcasts.find(b=>b.id===selectedId)?.title}</span> : <select
             aria-label="리포트 방송 선택"
             value={selectedId}
             onChange={(e) => {
@@ -350,7 +372,7 @@ export default function BroadcastReportPopup({ open, onClose, initialBroadcastId
                 </option>
               );
             })}
-          </select>
+          </select>}
           <button type="button" onClick={copyReport} disabled={loading || loadError || !selectedId} style={{ flexShrink: 0, height: "34px", padding: "0 12px", borderRadius: "8px", border: "1px solid var(--color-rose-line)", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}>
             📋 복사
           </button>
