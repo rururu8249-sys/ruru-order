@@ -123,6 +123,8 @@ import {
 } from "@/lib/orderBankAccount";
 import { detailCode, detailPricePresentation, detailProducts } from "@/lib/productDetailModel";
 import { selectedDetailInfo } from "@/lib/productDetailInfo";
+import { buildBrandOrderCatalog, resolveBrandOrderSelection, findBrandOrderProductById } from "@/lib/productBrandOrder";
+import { loadProductBrandCatalog } from "@/lib/productBrandCatalogClient";
 import CustomerSizeChartSheet from "@/components/customer/CustomerSizeChartSheet";
 import { resolveSizeChart, sizeColumnIndex } from "@/lib/sizeChart";
 import { registeredProductEditManualPrice, registeredProductPriceMode } from "@/lib/registeredProductPricePolicy";
@@ -822,7 +824,7 @@ function findMatchedBroadcastProduct(item: OrderItem, products: BroadcastProduct
     // 브랜드 대표상품은 주문서에 실제 세부상품명을 저장하지만 product_id는
     // 대표상품 ID를 유지한다. 따라서 이름보다 ID를 먼저 대조해야 옵션 변경 시
     // 방금 담은 상품을 "판매 목록에 없음"으로 오판하지 않는다.
-    products.find((product) => itemProductId && String(product.id ?? "").trim() === itemProductId) ||
+    (itemProductId ? findBrandOrderProductById(products as unknown as Record<string,unknown>[],itemProductId) as unknown as BroadcastProduct | null : null) ||
     products.find((product) => normalizeSuggestionText(product.product_name) === itemName) ||
     products.find((product) => productSearchMatches(product.product_name, itemName)) ||
     null
@@ -1317,8 +1319,11 @@ function normalizeOrderProductRow(product: any): BroadcastProduct {
 
   return {
     id: product?.id,
+    __linked_order_sources: product?.__linked_order_sources,
     product_name: String(product?.product_name ?? product?.name ?? ""),
     price: Number.isFinite(price) ? price : 0,
+    stock: Number(product?.stock ?? 0),
+    combine_shipping: String(product?.combine_shipping ?? 'Y'),
     product_note: product?.product_note ?? product?.note ?? product?.memo ?? "",
     description: String(product?.description ?? ""),
     detail_description: String(product?.detail_description ?? ""),
@@ -2655,7 +2660,16 @@ export default function OrderPage() {
       return;
     }
 
-    const nextProducts = (data || [])
+    let linkedProducts;
+    try {
+      const catalog = await loadProductBrandCatalog((data || []).map(row => String(row.id)));
+      linkedProducts = buildBrandOrderCatalog(catalog.products, catalog.links, catalog.products.map(row => String(row.id)));
+    } catch {
+      setGroupBuyQuickProductsFromCatalog([]);
+      showCustomerNotice("상품 연결 정보를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.");
+      return;
+    }
+    const nextProducts = linkedProducts
       .map((product: any) => normalizeOrderProductRow(product))
       .filter((product) => product.product_name.trim())
       .filter((product) => (product.status !== "숨김" || productSuggestionEnabled(product)) && product.status !== "deleted");
@@ -2749,11 +2763,25 @@ export default function OrderPage() {
       return;
     }
 
-    const nextProducts = (data || [])
+    let linkedRows;
+    try {
+      const ids = (data || []).filter(row => row.products).map(row => String(row.product_id));
+      const catalog = await loadProductBrandCatalog(ids);
+      const available = new Set(catalog.products.map(row => String(row.id)));
+      const sorts = new Map((data || []).map(row => [String(row.product_id), row.sort_order]));
+      linkedRows = buildBrandOrderCatalog(catalog.products, catalog.links, ids.filter(id => available.has(id)))
+        .map(product => ({products:product,sort_order:sorts.get(String(product.id))}));
+    } catch {
+      setBroadcastProducts([]);
+      showCustomerNotice("상품 연결 정보를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.");
+      return;
+    }
+    const nextProducts = linkedRows
       .map((row: any) => (row.products ? { ...row.products, __bpSort: row.sort_order } : null))
       .filter((product: any) => product)
       .map((product: any) => ({
         id: product.id,
+        __linked_order_sources: product.__linked_order_sources,
         product_name: product.product_name || "",
         price: Number(product.price || 0),
         product_note: product.product_note ?? null,
@@ -4490,10 +4518,12 @@ export default function OrderPage() {
   };
 
   const confirmRegisteredOptionSelectSheet = async () => {
-    const product = registeredOptionSelectProduct;
-    if (!product) return;
-
-    const brandGroup = readBrandGroupOrderProduct(product);
+    const parent = registeredOptionSelectProduct;
+    if (!parent) return;
+    let product: BroadcastProduct;
+    try { product = resolveBrandOrderSelection(parent as unknown as Record<string,unknown>,registeredOptionDetail) as unknown as BroadcastProduct; }
+    catch { showCustomerNotice("선택한 상품의 연결 상태를 확인해주세요."); return; }
+    const brandGroup = readBrandGroupOrderProduct(parent);
     const requiresCustomerDetail = customerDetailInputEnabled(product.product_note);
     const normalizedCustomerDetail = normalizeCustomerDetailName(registeredOptionCustomerDetail);
     const customerDetailDisplayName = requiresCustomerDetail
@@ -4511,7 +4541,7 @@ export default function OrderPage() {
     }
 
     // [2026-08-10 3단] 세부상품(1번 축)을 먼저 골라야 한다.
-    const axes3ForAdd = readOrderAxes3(product);
+    const axes3ForAdd = readOrderAxes3(parent);
     if (axes3ForAdd && !registeredOptionDetail.trim()) {
       showCustomerNotice(`${axes3ForAdd.detailLabel} 선택이 필요합니다.`);
       return;
@@ -4633,7 +4663,7 @@ export default function OrderPage() {
     }
     if (!pid.trim()) { deepLinkHandledRef.current = true; return; }
     deepLinkHandledRef.current = true;
-    const target = quickGroupBuyProducts.find((pr: any) => String(pr?.id ?? "") === pid.trim());
+    const target = findBrandOrderProductById(quickGroupBuyProducts as unknown as Record<string,unknown>[],pid.trim());
     if (!target) {
       // [2026-08-31 전수조사 수정] 링크의 상품이 내려갔으면 아무 반응이 없어
       //   손님이 링크가 고장난 줄 알고 나갔다. → 한 줄이라도 알려준다.
@@ -6066,11 +6096,16 @@ export default function OrderPage() {
   const broadcastYoutubeUrl = String(broadcast?.youtube_live_url || broadcast?.youtube_url || "").trim();
 
   const directInputItem = items[directInputTargetIndex] || null;
+  const registeredOptionResolvedProduct = (() => {
+    if (!registeredOptionSelectProduct) return null;
+    try { return resolveBrandOrderSelection(registeredOptionSelectProduct as unknown as Record<string,unknown>,registeredOptionDetail) as unknown as BroadcastProduct; }
+    catch { return null; }
+  })();
   const registeredOptionDetailImages = registeredOptionSelectProduct
     ? normalizeDetailImages(registeredOptionSelectProduct.detail_image_urls)
     : [];
-  const registeredOptionInfo = registeredOptionSelectProduct
-    ? selectedDetailInfo(registeredOptionSelectProduct as unknown as Record<string,unknown>,registeredOptionDetail)
+  const registeredOptionInfo = registeredOptionResolvedProduct
+    ? selectedDetailInfo(registeredOptionResolvedProduct as unknown as Record<string,unknown>,registeredOptionResolvedProduct === registeredOptionSelectProduct ? registeredOptionDetail : '')
     : {chips:[],description:''};
   const registeredOptionDescription = registeredOptionInfo.description;
   // [2026-09-20 사장님] 한눈에 정보 칩 — 관리자 상품등록 「한눈에 정보」(product_note.spec_chips). 표시 전용, 없으면 아무것도 안 그린다.
@@ -6095,12 +6130,12 @@ export default function OrderPage() {
         ].filter(Boolean)))
     : [];
   const registeredOptionStockVariants: { color: string; size: string; stock: number }[] = (() => {
-    if (!registeredOptionSelectProduct) return [];
+    if (!registeredOptionResolvedProduct) return [];
     try {
-      const note = typeof registeredOptionSelectProduct.product_note === "string"
-        ? JSON.parse(registeredOptionSelectProduct.product_note)
-        : (registeredOptionSelectProduct.product_note as any);
-      const stockMgmtOn = (note as any)?.stock_management_enabled === true || (registeredOptionSelectProduct as any)?.stock_management_enabled === true;
+      const note = typeof registeredOptionResolvedProduct.product_note === "string"
+        ? JSON.parse(registeredOptionResolvedProduct.product_note)
+        : (registeredOptionResolvedProduct.product_note as any);
+      const stockMgmtOn = (note as any)?.stock_management_enabled === true || (registeredOptionResolvedProduct as any)?.stock_management_enabled === true;
       if (!stockMgmtOn) return [];
       return Array.isArray((note as any)?.stock_variants) ? (note as any).stock_variants : [];
     } catch { return []; }
@@ -6118,7 +6153,7 @@ export default function OrderPage() {
       : registeredOptionColor;
     const matched = registeredOptionStockVariants.find((v) => nm2(v.color) === nm2(colorKey) && nm2(v.size) === nm2(registeredOptionSize));
     if (!matched) return null;
-    const pid = String(registeredOptionSelectProduct.id ?? "");
+    const pid = String(registeredOptionResolvedProduct?.id ?? "");
     const reserved = pid ? Number(reservedByVariant[reservationVariantKey(pid, matched.color, matched.size)] || 0) : 0;
     return Math.max(0, Number(matched.stock) - Math.max(0, reserved));
   })();
@@ -6131,7 +6166,7 @@ export default function OrderPage() {
       : color;
     const matched = registeredOptionStockVariants.find((v) => nm2(v.color) === nm2(colorKey) && nm2(v.size) === nm2(size));
     if (!matched) return null;
-    const pid = String(registeredOptionSelectProduct.id ?? "");
+    const pid = String(registeredOptionResolvedProduct?.id ?? "");
     const reserved = pid ? Number(reservedByVariant[reservationVariantKey(pid, matched.color, matched.size)] || 0) : 0;
     return Math.max(0, Number(matched.stock) - Math.max(0, reserved));
   };
@@ -6147,7 +6182,7 @@ export default function OrderPage() {
     const nc = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
     color = joinAxisColor(color);
     // [재고 홀드] 다른 고객이 담아둔(예약) 수량까지 빼고 품절 판정 — 표시 전용(실차감은 제출 RPC)
-    const pid = String(registeredOptionSelectProduct?.id ?? "");
+    const pid = String(registeredOptionResolvedProduct?.id ?? "");
     return registeredOptionStockVariants.length > 0 &&
       registeredOptionStockVariants.some((v) => {
         if (nc(v.color) !== nc(color) || nc(v.size) !== nc(size)) return false;
@@ -6186,18 +6221,18 @@ export default function OrderPage() {
   const registeredOptionColorPhotos = registeredOptionSelectProduct ? readColorPhotosOrderProduct(registeredOptionSelectProduct) : {};
   const registeredOptionColorMode = registeredOptionSelectedDetailConfig && registeredOptionColorChoices.length === 0
     ? "none"
-    : registeredOptionSelectProduct
-      ? getRegisteredOptionMode(registeredOptionSelectProduct, "color")
+    : registeredOptionResolvedProduct
+      ? getRegisteredOptionMode(registeredOptionResolvedProduct, "color")
       : "none";
   const registeredOptionSizeMode = registeredOptionSelectedDetailConfig && registeredOptionSizeChoices.length === 0
     ? "none"
-    : registeredOptionSelectProduct
-      ? getRegisteredOptionMode(registeredOptionSelectProduct, "size")
+    : registeredOptionResolvedProduct
+      ? getRegisteredOptionMode(registeredOptionResolvedProduct, "size")
       : "none";
-  const registeredOptionPrice = registeredOptionSelectProduct ? Number(registeredOptionSelectProduct.price || 0) : 0;
+  const registeredOptionPrice = registeredOptionResolvedProduct ? Number(registeredOptionResolvedProduct.price || 0) : 0;
   // [조합형 옵션] 시트 표시/선택금액 — 선택한 세부상품 추가금 반영(조합형 아니면 plus=0 → 기존 동일)
   const registeredOptionComboInfo = registeredOptionSelectProduct ? readComboInfoOrderProduct(registeredOptionSelectProduct) : null;
-  const registeredOptionComboPlus = registeredOptionComboInfo
+  const registeredOptionComboPlus = registeredOptionComboInfo && registeredOptionResolvedProduct === registeredOptionSelectProduct
     ? comboPlusOfOrderProduct(registeredOptionSelectProduct, registeredOptionAxes3 ? registeredOptionDetail : registeredOptionColor)
     : 0;
   const registeredOptionPhotoTitle = registeredOptionSelectProduct
@@ -6208,7 +6243,7 @@ export default function OrderPage() {
         : String(registeredOptionSelectProduct.product_name || "상품").trim()
     : "상품";
   const registeredOptionConfiguredPrice = registeredOptionPrice + registeredOptionComboPlus;
-  const registeredOptionPriceMode = registeredOptionSelectProduct ? registeredProductPriceMode(registeredOptionConfiguredPrice, isFreeOrderProduct(registeredOptionSelectProduct)) : "fixed";
+  const registeredOptionPriceMode = registeredOptionResolvedProduct ? registeredProductPriceMode(registeredOptionConfiguredPrice, isFreeOrderProduct(registeredOptionResolvedProduct)) : "fixed";
   const registeredOptionNeedsManualPrice = registeredOptionPriceMode === "direct";
   const registeredOptionUnitPrice = registeredOptionNeedsManualPrice ? registeredOptionManualPrice : registeredOptionConfiguredPrice;
   const registeredOptionTotalPrice = Math.max(1, registeredOptionQty) * (Number.isFinite(registeredOptionUnitPrice) ? registeredOptionUnitPrice : 0);
