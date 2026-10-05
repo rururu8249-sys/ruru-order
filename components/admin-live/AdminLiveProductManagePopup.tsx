@@ -27,6 +27,7 @@ import {
 } from "@/lib/widgetProductLibrary";
 import { splitOptionText } from "@/lib/optionSplit";
 import { normalizeProductSearchText, productSearchMatches } from "@/lib/productSearch";
+import { aggregateSalesItems, eligibleSalesOrder, salesPaymentAmount, sortedSalesBroadcasts, SALES_PAID_STATUSES } from "@/lib/salesHistory";
 
 type ProductRow = Record<string, unknown>;
 
@@ -48,7 +49,7 @@ type Props = {
 const PAGE_STEP = 10;
 const BASE_CATEGORIES = ["전체", "신발", "의류", "잡화"];
 // 기록 탭: 결제완료 계열 주문만 매출/주문 집계
-const HISTORY_PAID_STATUSES = ["입금확인", "수동입금확인", "자동입금확인", "출고대기", "출고완료", "카드결제완료"];
+const HISTORY_PAID_STATUSES = SALES_PAID_STATUSES;
 
 // --- pick helpers ---
 function pickString(row: ProductRow | null | undefined, keys: string[], fallback = "") {
@@ -394,6 +395,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [histExpand, setHistExpand] = useState("");
   const [histDetail, setHistDetail] = useState<Map<string, Array<{ key: string; name: string; productId: string; thumb: string; qty: number; price: number; sales: number; option: string }>>>(new Map());
   const [histDetailLoading, setHistDetailLoading] = useState("");
+  const [historyOrders, setHistoryOrders] = useState<Record<string, unknown>[]>([]);
 
   // 상품 fetch (기존 loadProducts 재사용)
   const loadProducts = async (silent = false) => {
@@ -905,40 +907,38 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const loadHistory = async () => {
     setHistLoading(true);
     try {
-      const { data: bc } = await supabase
+      const { data: bc, error: bcError } = await supabase
         .from("broadcasts")
         .select("id, public_title, started_at, ended_at")
-        .order("started_at", { ascending: false });
+        .order("started_at", { ascending: false, nullsFirst: false });
+      if (bcError) throw bcError;
       const broadcasts = ((bc as Array<Record<string, unknown>>) || []).map((b) => ({
         id: String(b.id),
         title: String(b.public_title || "제목 없음"),
         started_at: String(b.started_at || ""),
         ended_at: String(b.ended_at || ""),
       }));
-      const ids = broadcasts.map((b) => b.id).filter(Boolean);
       const stats = new Map<string, { sales: number; count: number }>();
-      if (ids.length > 0) {
-        const { data: ord } = await supabase
-          .from("orders")
-          .select("broadcast_id, total_price")
-          .in("broadcast_id", ids)
-          .in("admin_order_status_v2", HISTORY_PAID_STATUSES);
-        ((ord as Array<{ broadcast_id: unknown; total_price: unknown }>) || []).forEach((o) => {
-          const bid = String(o.broadcast_id);
+      const allOrders: Record<string, unknown>[] = [];
+      for (let offset = 0; ; offset += 1000) {
+        const { data, error } = await supabase.from("orders")
+          .select("id,broadcast_id,created_at,product_id,product_name,color,size,qty,product_price,adjusted_product_price,total_price,adjusted_total_price,final_amount,admin_order_status_v2,order_status,order_manage_status,is_deleted,is_permanently_deleted,is_test_order,exclude_from_settlement,event_gift_winner_id")
+          .in("admin_order_status_v2", HISTORY_PAID_STATUSES).order("id").range(offset, offset + 999);
+        if (error) throw error;
+        const page = (data || []) as Record<string, unknown>[];
+        allOrders.push(...page.filter(eligibleSalesOrder));
+        if (page.length < 1000) break;
+      }
+      allOrders.forEach((o) => {
+          const bid = o.broadcast_id == null ? "__shop__" : String(o.broadcast_id);
           const cur = stats.get(bid) || { sales: 0, count: 0 };
-          cur.sales += Number(o.total_price || 0);
+          cur.sales += salesPaymentAmount(o);
           cur.count += 1;
           stats.set(bid, cur);
-        });
-      }
+      });
       // 쇼핑몰(broadcast_id NULL) 주문 집계 → __shop__ 키(전체 합계) + shopOrders(년/월 필터용)
-      const { data: shopOrd } = await supabase
-        .from("orders")
-        .select("total_price, created_at")
-        .is("broadcast_id", null)
-        .in("admin_order_status_v2", HISTORY_PAID_STATUSES);
-      const shopList = ((shopOrd as Array<{ total_price: unknown; created_at: unknown }>) || []).map((o) => ({
-        total_price: Number(o.total_price || 0),
+      const shopList = allOrders.filter(o=>o.broadcast_id == null).map((o) => ({
+        total_price: salesPaymentAmount(o),
         created_at: String(o.created_at || ""),
       }));
       setShopOrders(shopList);
@@ -949,6 +949,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
       setHistBroadcasts(broadcasts);
       setHistStats(stats);
+      setHistoryOrders(allOrders);
+      setHistDetail(new Map());
+      setHistExpand("");
       setHistLoaded(true);
     } catch (e) {
       showAdminToast("기록 불러오기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
@@ -974,7 +977,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
   // 방송 목록 + 쇼핑몰(__shop__) 가상행
   const histEntries = useMemo(() => {
-    const entries: Array<{ id: string; title: string; started_at: string; ended_at: string }> = [...histBroadcasts];
+    const entries: Array<{ id: string; title: string; started_at: string; ended_at: string }> = sortedSalesBroadcasts(histBroadcasts, histStats);
     if (histStats.has("__shop__")) entries.push({ id: "__shop__", title: "쇼핑몰 주문", started_at: "", ended_at: "" });
     return entries;
   }, [histBroadcasts, histStats]);
@@ -986,14 +989,17 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       if (histMode === "broadcast" && isShop) return false;
       if (histMode === "shop" && !isShop) return false;
       if (q && !b.title.toLowerCase().includes(q)) return false;
-      if (isShop) return true;
+      if (isShop) return shopOrders.some(o=>{
+        const d = new Date(o.created_at);
+        return (histYear === "전체" || String(d.getFullYear()) === histYear) && (histMonth === "전체" || String(d.getMonth()+1) === histMonth);
+      });
       const d = new Date(b.started_at);
       if (Number.isNaN(d.getTime())) return histYear === "전체" && histMonth === "전체";
       if (histYear !== "전체" && String(d.getFullYear()) !== histYear) return false;
       if (histMonth !== "전체" && String(d.getMonth() + 1) !== histMonth) return false;
       return true;
     });
-  }, [histEntries, histMode, histSearch, histYear, histMonth]);
+  }, [histEntries, histMode, histSearch, histYear, histMonth, shopOrders]);
 
   // 쇼핑몰 행: 년/월 기준 클라이언트 필터 (created_at)
   const shopFilteredStat = useMemo(() => {
@@ -1027,35 +1033,29 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   }, [histFiltered, histStats, shopFilteredStat]);
 
   // 행 펼침 → 상품별 집계 (orders + products 썸네일). broadcast_id NULL이면 쇼핑몰.
+  useEffect(() => {
+    setHistExpand("");
+    setHistDetail(prev=>{const next=new Map(prev);next.delete("__shop__");return next;});
+  }, [histYear, histMonth]);
+
   const loadBroadcastDetail = async (entryId: string) => {
-    if (histDetail.has(entryId)) {
+    if (histDetail.has(entryId) && entryId !== "__shop__") {
       setHistExpand((cur) => (cur === entryId ? "" : entryId));
       return;
     }
     setHistDetailLoading(entryId);
     setHistExpand(entryId);
     try {
-      let q = supabase.from("orders").select("product_id, product_name, color, size, qty, product_price").is('event_gift_winner_id',null);
-      q = entryId === "__shop__" ? q.is("broadcast_id", null) : q.eq("broadcast_id", entryId);
-      q = q.in("admin_order_status_v2", HISTORY_PAID_STATUSES);
-      const { data: ord } = await q;
-      const map = new Map<string, { key: string; name: string; productId: string; thumb: string; qty: number; price: number; sales: number; opts: Map<string, number> }>();
-      ((ord as Array<Record<string, unknown>>) || []).forEach((o) => {
-        const pid = o.product_id ? String(o.product_id) : "";
-        const key = pid || String(o.product_name || "상품");
-        const cur = map.get(key) || { key, name: String(o.product_name || "상품"), productId: pid, thumb: "", qty: 0, price: Number(o.product_price || 0), sales: 0, opts: new Map<string, number>() };
-        const qty = Number(o.qty || 0);
-        cur.qty += qty;
-        cur.price = Number(o.product_price || 0);
-        cur.sales += Number(o.product_price || 0) * qty;
-        const opt = [o.color, o.size].filter(Boolean).join("/");
-        if (opt) cur.opts.set(opt, (cur.opts.get(opt) || 0) + qty);
-        map.set(key, cur);
-      });
-      const rows = [...map.values()];
+      const rows = aggregateSalesItems(historyOrders.filter(o=>{
+        if (entryId !== "__shop__") return String(o.broadcast_id) === entryId;
+        if (o.broadcast_id != null) return false;
+        const d = new Date(String(o.created_at));
+        return (histYear === "전체" || String(d.getFullYear()) === histYear) && (histMonth === "전체" || String(d.getMonth()+1) === histMonth);
+      }));
       const pids = rows.map((r) => r.productId).filter(Boolean);
       if (pids.length > 0) {
-        const { data: prods } = await supabase.from("products").select("id, image_url").in("id", pids);
+        const { data: prods, error } = await supabase.from("products").select("id, image_url").in("id", pids);
+        if (error) throw error;
         const thumbs = new Map<string, string>();
         ((prods as ProductRow[]) || []).forEach((p) => {
           const url = String((p as { image_url?: unknown }).image_url || "");
@@ -1079,9 +1079,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
           if (t) r.thumb = t;
         });
       }
-      const detailRows = rows
-        .sort((a, b) => b.sales - a.sales)
-        .map((r) => ({ key: r.key, name: r.name, productId: r.productId, thumb: r.thumb, qty: r.qty, price: r.price, sales: r.sales, option: [...r.opts.keys()].join(" · ") }));
+      const detailRows = rows;
       setHistDetail((prev) => new Map(prev).set(entryId, detailRows));
     } catch (e) {
       showAdminToast("상세 불러오기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
@@ -1794,23 +1792,23 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         </div>
 
         {tab === "history" ? (
-          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "12px 16px 16px" }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px", maxWidth: "1440px", width: "100%", margin: "0 auto" }}>
             {/* 요약카드 3개 */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "12px" }}>
               {([
-                ["방송 수", `${histSummary.broadcastCount}회`],
-                ["총 매출", money(histSummary.sales)],
-                ["총 주문", `${histSummary.count.toLocaleString("ko-KR")}건`],
+                ["판매 있는 방송", `${histSummary.broadcastCount}회`],
+                ["결제금액 합계", money(histSummary.sales)],
+                ["결제완료 주문 품목", `${histSummary.count.toLocaleString("ko-KR")}건`],
               ] as const).map(([label, value]) => (
                 <div key={label} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", padding: "12px 8px", textAlign: "center", background: "var(--color-surface-2)" }}>
-                  <div style={{ fontSize: "11px", color: "var(--color-ink-soft)", marginBottom: "4px" }}>{label}</div>
-                  <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{value}</div>
+                  <div style={{ fontSize: "13px", color: "var(--color-ink-soft)", marginBottom: "4px" }}>{label}</div>
+                  <div style={{ fontSize: "20px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{value}</div>
                 </div>
               ))}
             </div>
 
             {/* 필터: 모드 + 년/월 */}
-            <div style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
               <select value={histMode} onChange={(e) => setHistMode(e.target.value as "all" | "broadcast" | "shop")} style={{ height: "34px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 8px", fontSize: "13px", background: "var(--color-surface)", cursor: "pointer", color: "var(--color-ink)" }}>
                 <option value="all">전체</option>
                 <option value="broadcast">방송모드</option>
@@ -1825,16 +1823,19 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((m) => <option key={m} value={m}>{m}월</option>)}
               </select>
               <input value={histSearch} onChange={(e) => setHistSearch(e.target.value)} placeholder="🔍 방송명 검색" style={{ flex: 1, minWidth: "120px", height: "34px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 8px", fontSize: "13px", outline: "none", color: "var(--color-ink)" }} />
+              <button type="button" disabled={histLoading} onClick={()=>void loadHistory()} style={{border:"1px solid var(--color-line)",borderRadius:8,padding:"0 12px",background:"var(--color-surface)",color:"var(--color-ink)",cursor:"pointer"}}>새로고침</button>
             </div>
+            <p style={{fontSize:13,color:"var(--color-ink-soft)",margin:"0 0 12px"}}>최근 방송부터 표시합니다. 결제완료 주문만 집계하며 취소·삭제·테스트·이벤트 선물은 제외합니다. 방송을 선택하면 판매 품목을 확인할 수 있습니다.</p>
 
             {/* 방송/쇼핑몰 목록 */}
             {histLoading ? (
               <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>불러오는 중…</div>
             ) : histFiltered.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>아직 기록이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "4px" }}>상품을 방송에 담거나 진열하면 여기에 남습니다.</div></div>
+              <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "14px", fontWeight: 700, lineHeight: 1.7 }}>선택한 조건에 결제완료 판매기록이 없습니다. 기간이나 검색어를 변경해 주세요.</div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                {histFiltered.map((b) => {
+              <div style={{ display: "grid", gridTemplateColumns: isNarrow ? "minmax(0,1fr)" : "minmax(300px, 0.85fr) minmax(0, 1.65fr)", gap: "12px 20px", alignItems:"start" }}>
+                {!isNarrow && !histFiltered.some(b=>b.id===histExpand) ? <div style={{gridColumn:2,gridRow:"1 / span 2",border:"1px dashed var(--color-line)",borderRadius:12,padding:32,color:"var(--color-ink-soft)",fontSize:15}}>왼쪽에서 방송을 선택해 판매 품목을 확인하세요.</div> : null}
+                {histFiltered.map((b, index) => {
                   const isShop = b.id === "__shop__";
                   const st = isShop ? shopFilteredStat : (histStats.get(b.id) || { sales: 0, count: 0 });
                   const expanded = histExpand === b.id;
@@ -1843,16 +1844,16 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   const detail = histDetail.get(b.id);
                   const detailSubtotal = (detail || []).reduce((acc, r) => ({ sales: acc.sales + r.sales, qty: acc.qty + r.qty }), { sales: 0, qty: 0 });
                   return (
-                    <div key={b.id} style={{ border: "1px solid " + (expanded ? "var(--color-rose-line)" : "var(--color-line)"), borderRadius: "8px", overflow: "hidden", background: "var(--color-surface)" }}>
+                    <div key={b.id} style={{ display:isNarrow ? "block" : "contents" }}>
                       {/* 헤더 행 */}
-                      <div onClick={() => void loadBroadcastDetail(b.id)} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 12px", cursor: "pointer", background: expanded ? "var(--color-rose-soft)" : "var(--color-surface)" }}>
+                      <div role="button" tabIndex={0} aria-expanded={expanded} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();void loadBroadcastDetail(b.id);}}} onClick={() => void loadBroadcastDetail(b.id)} style={{ gridColumn:1,gridRow:isNarrow ? undefined : index+1,border:"1px solid "+(expanded ? "var(--color-rose-deep)" : "var(--color-line)"),borderRadius:10,display: "flex", alignItems: "center", gap: "12px", padding: "16px 12px", cursor: "pointer", background: expanded ? "var(--color-rose-soft)" : "var(--color-surface)" }}>
                         <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, padding: "4px 8px", borderRadius: "8px", background: isShop ? "var(--color-ok-bg)" : "var(--color-warn-bg)", color: isShop ? "var(--color-ok-tx)" : "var(--color-warn-tx)" }}>{isShop ? "🛍 쇼핑몰" : "📺 방송"}</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</div>
+                          <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-ink)", overflowWrap:"anywhere" }}>{b.title}</div>
                           <div style={{ fontSize: "11px", color: "var(--color-ink-soft)", marginTop: "2px" }}>{dateLabel}</div>
                         </div>
                         <div style={{ textAlign: "right", flexShrink: 0 }}>
-                          <div style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{money(st.sales)}</div>
+                          <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{money(st.sales)}</div>
                           <div style={{ fontSize: "11px", color: "var(--color-ink-soft)", marginTop: "2px" }}>주문 {st.count.toLocaleString("ko-KR")}건</div>
                         </div>
                         <span style={{ flexShrink: 0, color: "var(--color-ink-soft)", fontSize: "12px" }}>{expanded ? "▴" : "▾"}</span>
@@ -1860,7 +1861,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
                       {/* 펼침: 상품별 상세 */}
                       {expanded ? (
-                        <div style={{ borderTop: "1px solid var(--color-line)", padding: "8px 12px", background: "var(--color-surface-2)" }}>
+                        <div style={{gridColumn:isNarrow ? undefined : 2,gridRow:isNarrow ? undefined : `1 / span ${Math.max(histFiltered.length,2)}`,position:isNarrow ? "static" : "sticky",top:0,border:"1px solid var(--color-line)",borderRadius:12,padding: "16px", background: "var(--color-surface-2)",minWidth:0,overflowX:"auto" }}>
+                          <h3 style={{fontSize:18,margin:"0 0 6px",color:"var(--color-ink)"}}>{b.title} · 판매 품목</h3>
+                          <p style={{fontSize:13,margin:"0 0 16px",color:"var(--color-ink-soft)"}}>결제금액 {money(st.sales)} · 아래 상품 소계는 배송비·카드 수수료·포인트 차감과 구분됩니다.</p>
                           {histDetailLoading === b.id && !detail ? (
                             <div style={{ textAlign: "center", padding: "16px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>불러오는 중…</div>
                           ) : !detail || detail.length === 0 ? (
@@ -1868,7 +1871,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           ) : (
                             <>
                               {/* 펼침 헤더: 빈칸 / 상품명·옵션 / 수량 / 단가 / 매출 */}
-                              <div style={{ display: "grid", gridTemplateColumns: "32px 1fr 44px 72px 84px", gap: "8px", alignItems: "center", padding: "0 0 6px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", borderBottom: "1px solid var(--color-line)" }}>
+                              <div style={{ minWidth:480,display: "grid", gridTemplateColumns: "48px minmax(120px,1fr) 48px 85px 100px", gap: "12px", alignItems: "center", padding: "0 0 12px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink-soft)", borderBottom: "1px solid var(--color-line)" }}>
                                 <span />
                                 <span>상품명·옵션</span>
                                 <span style={{ textAlign: "right" }}>수량</span>
@@ -1876,20 +1879,20 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                                 <span style={{ textAlign: "right" }}>매출</span>
                               </div>
                               {detail.map((r) => (
-                                <div key={r.key} style={{ display: "grid", gridTemplateColumns: "32px 1fr 44px 72px 84px", gap: "8px", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--color-line)" }}>
+                                <div key={r.key} style={{minWidth:480, display: "grid", gridTemplateColumns: "48px minmax(120px,1fr) 48px 85px 100px", gap: "12px", alignItems: "center", padding: "16px 0", borderBottom: "1px solid var(--color-line)" }}>
                                   <span
                                     onClick={(e) => { e.stopPropagation(); if (r.thumb) setImagePreviewUrl(r.thumb); }}
-                                    style={{ width: "32px", height: "32px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface)", border: "1px solid var(--color-line)", display: "flex", alignItems: "center", justifyContent: "center", cursor: r.thumb ? "zoom-in" : "default" }}
+                                    style={{ width: "48px", height: "48px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface)", border: "1px solid var(--color-line)", display: "flex", alignItems: "center", justifyContent: "center", cursor: r.thumb ? "zoom-in" : "default" }}
                                   >
                                     {r.thumb ? <img src={r.thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "14px" }}>🖼</span>}
                                   </span>
                                   <div style={{ minWidth: 0 }}>
-                                    <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
-                                    {r.option ? <div style={{ fontSize: "11px", color: "var(--color-ink-soft)", marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.option}</div> : null}
+                                    <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-ink)",overflowWrap:"anywhere" }}>{r.name}</div>
+                                    {r.option ? <div style={{ fontSize: "13px", color: "var(--color-ink-soft)", marginTop: "6px",whiteSpace:"pre-wrap",lineHeight:1.7,overflowWrap:"anywhere" }}>{r.option}</div> : null}
                                   </div>
-                                  <div style={{ textAlign: "right", fontSize: "11px", fontWeight: 700, color: "var(--color-ink)" }}>{r.qty.toLocaleString("ko-KR")}개</div>
-                                  <div style={{ textAlign: "right", fontSize: "11px", color: "var(--color-ink-soft)" }}>{money(r.price)}</div>
-                                  <div style={{ textAlign: "right", fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{money(r.sales)}</div>
+                                  <div style={{ textAlign: "right", fontSize: "14px", fontWeight: 700, color: "var(--color-ink)" }}>{r.qty.toLocaleString("ko-KR")}개</div>
+                                  <div style={{ textAlign: "right", fontSize: "13px", color: "var(--color-ink-soft)" }}>{money(r.price)}</div>
+                                  <div style={{ textAlign: "right", fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{money(r.sales)}</div>
                                 </div>
                               ))}
                               {/* 상품 소계 (N종) */}
