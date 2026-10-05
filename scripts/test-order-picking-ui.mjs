@@ -232,6 +232,14 @@ await act(async()=>tree.unmount());
 
 // Multi-broadcast and exception workflow: quick ranges, date filter, attention-only tab,
 // before→current detail, and no unsafe bulk completion for attention rows.
+// The fixture's "today" is October 4 KST; do not let the machine's date
+// silently turn its "yesterday" broadcast into an older broadcast.
+const SystemDate = globalThis.Date;
+const fixtureNow = SystemDate.parse('2026-10-04T09:00:00+09:00');
+globalThis.Date = class extends SystemDate {
+  constructor(...args) { super(...(args.length ? args : [fixtureNow])); }
+  static now() { return fixtureNow; }
+};
 for (const id of [8,9,10,11]) rows.set(id,{id,picked_at:null});
 const selectedBroadcastFixture = [
   order(11,'card_paid',[item(11,2,'XL')],{broadcastId:'b-today',createdAt:'2026-10-03T03:00:00Z',paidAtFull:null}),
@@ -283,6 +291,7 @@ assert.equal(check('고객8').props['aria-checked'],true,'repick row itself show
 await act(async()=>tree.unmount());
 
 const modalSource=fs.readFileSync(path.join(root,'components/admin-live/LiveOrderPickingModal.tsx'),'utf8');
+globalThis.Date = SystemDate;
 assert(modalSource.includes('/api/admin-live/picking-workspace'),'scope refresh uses the complete server loader');
 assert(modalSource.includes('setScopeError') && modalSource.includes('setWorkspaceOrders'),'scope failures are surfaced while successful results replace the list');
 assert(!modalSource.includes('조회 목록 챙김 해제') && !modalSource.includes('>더보기<'),'dangerous bulk undo and redundant overflow menu are removed');

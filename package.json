@@ -11,6 +11,7 @@
     "prebuild": "npm run guard:bankda && npm run guard:bankda-cron && npm run guard:product-search && npm run test:payment-match-read && npm run guard:survival-assets",
     "guard:survival-assets": "node scripts/test-survival-deployment-assets.mjs",
     "test:live-alert": "node scripts/test-live-alert-selection.mjs && node scripts/test-live-alert-route.mjs && node scripts/test-live-alert-ui.mjs",
+    "test:sales-history": "node --import ./scripts/_ts-resolve.mjs scripts/test-sales-history.mjs",
     "test:payment-match-read": "node --import ./scripts/_ts-resolve.mjs scripts/test-payment-match-read.mjs",
     "test:widget-library": "node --import ./scripts/_ts-resolve.mjs scripts/test-widget-product-library.mjs && node scripts/test-widget-product-library-panel.mjs && node scripts/test-widget-rotation-client.mjs",
     "guard:bankda-cron": "node scripts/guard-bankda-cron.js",
