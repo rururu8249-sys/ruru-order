@@ -30,7 +30,7 @@
     "test:card-payment-status": "node --import ./scripts/_ts-resolve.mjs scripts/test-card-payment-status-update.mjs",
     "test:picking-repick": "node scripts/test-order-repick-migration.mjs",
     "test:picking-scope": "node --import ./scripts/_ts-resolve.mjs scripts/test-order-picking-scope-loader.mjs",
-    "test:picking-export": "node --import ./scripts/_ts-resolve.mjs scripts/test-order-picking-export.mjs && node scripts/test-picking-two-sheets.mjs",
+    "test:picking-export": "node --import ./scripts/_ts-resolve.mjs scripts/test-order-picking-export.mjs && node scripts/test-picking-two-sheets.mjs && node scripts/test-picking-exceptions.mjs && node scripts/test-picking-exceptions-route.mjs",
     "test:combine-shipping": "node scripts/simulate-combine-shipping.mjs",
     "guard:ui": "node scripts/guard-admin-ui.js",
     "guard": "node scripts/guard-bankda-cron.js && node scripts/guard-bankda-admin-live.js && node scripts/guard-admin-ui.js && node scripts/guard-option-split.js && node scripts/guard-payster-open.js && npm run guard:product-search"

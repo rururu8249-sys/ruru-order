@@ -116,6 +116,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
   const activeAdditionalOrders = additionalWorkspaceOrders;
 
   const applyBroadcastScope = async (nextIds: string[]) => {
+    if (exporting) return;
     const previousIds = appliedBroadcastIds;
     const requestId = ++scopeRequestRef.current;
     setScopeError("");
@@ -308,13 +309,20 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
   };
 
   const runExcel = async () => {
-    if (saving || loading || loadError) return;
-    const visibleIds = new Set(allPaidPanels.flatMap((panel) => panel.items).filter((item) => !pickedIds.has(item.id)).map((item) => item.id));
-    if (!visibleIds.size) { showAdminToast("엑셀로 내보낼 미챙김 상품이 없습니다.", "warning"); return; }
+    if (saving || loading || loadError || scopeLoading || scopeError || exporting) return;
+    const requestId = scopeRequestRef.current;
     setExporting(true);
     try {
+      const response = await fetch("/api/admin-live/picking-workspace", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ broadcastIds: appliedBroadcastIds, includeExceptions: true, orderIds: appliedBroadcastIds.length ? undefined : activeSelectedOrders.flatMap(order => order.items?.length ? order.items.map(item => String(item.id)) : [String(order.id)]) }) });
+      const payload = await response.json() as { ok?: boolean; orders?: LiveOrder[]; additionalOrders?: LiveOrder[]; exceptions?: import("@/lib/orderPickingExceptions").PickingExceptionRow[]; message?: string };
+      if (!response.ok || !payload.ok || !Array.isArray(payload.exceptions) || !Array.isArray(payload.orders) || !Array.isArray(payload.additionalOrders)) throw new Error(payload.message || "주문과 고객이슈를 모두 확인하지 못했습니다. 다시 시도해주세요.");
+      if (requestId !== scopeRequestRef.current) throw new Error("방송 선택이 바뀌었습니다. 새 범위에서 다시 내보내주세요.");
+      const freshOrders = [...payload.orders, ...payload.additionalOrders];
+      const currentPickedIds = new Set(freshOrders.flatMap(order => (order.items || []).filter(item => item.pickedAt && classifyPickingAttention(order, item) !== "repick").map(item => String(item.id))));
+      const visibleIds = new Set(buildPanels(freshOrders, false).filter(panel => panel.paid).flatMap(panel => panel.items).filter(item => !currentPickedIds.has(item.id)).map(item => item.id));
+      if (!visibleIds.size && !payload.exceptions.length) { showAdminToast("내보낼 미챙김 상품이나 미처리 고객이슈가 없습니다.", "warning"); return; }
       const seenItemIds = new Set<string>();
-      const exportOrders = [...activeSelectedOrders, ...activeAdditionalOrders].flatMap(order => {
+      const exportOrders = freshOrders.flatMap(order => {
         const items = (order.items || []).filter(item => {
           const id = String(item.id);
           if (!visibleIds.has(id) || seenItemIds.has(id)) return false;
@@ -327,7 +335,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
         seenItemIds.add(id);
         return [order];
       });
-      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${title} · 미챙김 전체`, rowOrder: viewMode === 'batch' ? 'product' : sortMode === 'oldest' ? 'time' : 'nickname', visibleItemIds: [...visibleIds], attentionItemIds: additionalPanels.flatMap((panel) => panel.items.map((item) => item.id)) }, pickedIds);
+      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${title} · 미챙김 전체`, rowOrder: viewMode === 'batch' ? 'product' : sortMode === 'oldest' ? 'time' : 'nickname', visibleItemIds: [...visibleIds], attentionItemIds: payload.additionalOrders.flatMap(order => (order.items || []).map(item => String(item.id))), exceptions: payload.exceptions }, currentPickedIds);
       const ids = [...visibleIds].map(Number);
       const now = new Date().toISOString();
       for (let i = 0; i < ids.length; i += 500) {
@@ -397,7 +405,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
     const primary = sortMode === "remaining" ? (remainingByGroup.get(bk) || 0) - (remainingByGroup.get(ak) || 0) : sortMode === "oldest" ? oldest(a) - oldest(b) : sortMode === "newest" ? newest(b) - newest(a) : 0;
     return primary || a.title.localeCompare(b.title, "ko", {numeric:true}) || ak.localeCompare(bk, "ko", {numeric:true});
   });
-  const blocked = loading || saving || loadError;
+  const blocked = loading || saving || loadError || exporting;
   const appliedScopeTitle = appliedBroadcastIds.map((id) => broadcastCalendar.find((item) => item.id === id)?.label).filter(Boolean).join(", ");
   const title = appliedScopeTitle || String(filterLabel || "").replace(/^방송:\s*/, "");
   const renderRow = ({ panel, item }: PickingRow) => {
@@ -452,7 +460,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
             </div>
           </details>
           <div className="ml-auto text-right text-[12px] font-bold tabular-nums" aria-live="polite"><span className="text-rose-deep">안 챙김 {countersUnknown ? "—" : total - got}</span><span className="ml-2 text-ok-tx">챙김 {countersUnknown ? "—" : got}/{total}개</span></div>
-          <button type="button" disabled={saving} onClick={onClose} aria-label="닫기" className="h-9 w-9 shrink-0 rounded-full bg-surface-2 text-[22px] disabled:opacity-40">×</button>
+          <button type="button" disabled={saving || exporting} onClick={onClose} aria-label="닫기" className="h-9 w-9 shrink-0 rounded-full bg-surface-2 text-[22px] disabled:opacity-40">×</button>
         </div>
         <p aria-label="작업 범위" className="shrink-0 break-words border-b border-line px-3 py-1 text-[11px] font-bold leading-4 text-ink-soft">작업 범위: {workArea === "selected" ? title : "오늘 추가 작업 · 과거 결제완료·미챙김 및 상품 변경"} · 취소·챙기기 제외 주문 제외</p>
         <div className="grid shrink-0 grid-cols-2 gap-1 border-b border-line bg-surface px-3 py-2">
@@ -503,7 +511,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
           <div className="text-[11px] font-bold text-ink-mute">잘못 완료한 한 건은 해당 상품의 [챙김 완료] 버튼을 다시 눌러 되돌릴 수 있습니다.</div>
           <div className="flex gap-2">
             {workArea === "selected" && workspaceTab === "standard" ? <button type="button" disabled={blocked || exporting || !matches.length} onClick={completeAll} className="min-h-[44px] rounded-lg border border-ok-tx bg-ok-bg px-3 text-[13px] font-black text-ok-tx disabled:opacity-40">현재 목록 모두 챙김 완료</button> : null}
-            <button type="button" disabled={blocked || exporting || !allPaidPanels.some((panel) => panel.items.some((item) => !pickedIds.has(item.id)))} onClick={runExcel} className="min-h-[44px] rounded-lg border border-line px-3 text-[13px] font-bold disabled:opacity-40">{exporting ? "내보내는 중…" : "물건챙기기 엑셀"}</button>
+            <button type="button" disabled={blocked || exporting || scopeLoading || Boolean(scopeError)} onClick={runExcel} className="min-h-[44px] rounded-lg border border-line px-3 text-[13px] font-bold disabled:opacity-40">{exporting ? "내보내는 중…" : "물건챙기기 엑셀"}</button>
             <button type="button" disabled={saving || exporting} onClick={onClose} className="min-h-[44px] rounded-lg bg-rose-deep px-4 text-[13px] font-black text-white disabled:opacity-40">닫기</button>
           </div>
         </div>

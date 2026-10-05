@@ -49,7 +49,7 @@ function currentText(item: LiveOrderItem): string {
 function beforeText(item: LiveOrderItem): string {
   const before = item.repickBefore;
   if (!before) return "";
-  return [clean(before.product_name) || "상품", [clean(before.color), clean(before.size)].filter(Boolean).join(" / "), `${Number(before.qty || 1)}개`].filter(Boolean).join(" · ");
+  return [clean(before.product_name) || "상품", [clean(before.color), clean(before.size)].filter(value => value && value !== "없음").join(" / "), `${Number(before.qty || 1)}개`].filter(Boolean).join(" · ");
 }
 
 export function buildPickingExportRows(orders: readonly LiveOrder[], visibleItemIds?: readonly string[], attentionItemIds?: readonly string[]) {

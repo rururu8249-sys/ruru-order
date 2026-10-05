@@ -14,7 +14,7 @@ async function run(orders,meta={}){
  const workbook=new ExcelJS.Workbook();await workbook.xlsx.load(await blob.arrayBuffer());return workbook;
 }
 const workbook=await run([ordinary,repick,late]);
-assert.deepEqual(workbook.worksheets.map(s=>s.name),['물건챙기기','변경 및 추가']);
+assert.deepEqual(workbook.worksheets.map(s=>s.name),['물건챙기기','변경 및 추가','고객이슈·특이사항']);
 const main=workbook.getWorksheet('물건챙기기');
 const additional=workbook.getWorksheet('변경 및 추가');
 assert.equal(main.rowCount,2,'only ordinary work belongs in the main sheet');
@@ -23,12 +23,12 @@ assert.equal(main.getCell('E2').value,2);
 assert.equal(main.getCell('F2').value,20000);
 assert.equal(main.getCell('F2').numFmt,'#,##0');
 assert.equal(additional.rowCount,3,'changed and additional work appear exactly once');
-assert.match(additional.getCell('G2').value,/BB-60.*L.*2개/);
-assert.match(additional.getCell('H2').value,/BB-58.*XL.*1개/);
+assert.match(additional.getCell('D2').value,/BB-60.*L.*2개/);
+assert.match(additional.getCell('E2').value,/BB-58.*XL.*1개/);
 assert.equal(additional.getCell('A3').value,'결제 후 추가 챙기기');
-assert.match(additional.getCell('H3').value,/추가상품.*38.*1개/);
+assert.match(additional.getCell('E3').value,/추가상품.*38.*1개/);
 assert.equal(main.autoFilter,'A1:H2');
-assert.equal(additional.autoFilter,'A1:I3');
+assert.equal(additional.autoFilter,'A1:F3');
 assert(main.getColumn(5).width<=8);
 const onlyAttention=await run([repick,late]);
 assert.equal(onlyAttention.getWorksheet('물건챙기기').rowCount,1,'empty ordinary sheet keeps a header');
@@ -39,4 +39,11 @@ assert.equal(visible.getWorksheet('변경 및 추가').rowCount,2,'excluded item
 const active=await run([{...ordinary,paymentStatus:'card_paid',paidAtFull:null}],{attentionItemIds:[]});
 assert.equal(active.getWorksheet('물건챙기기').rowCount,2);
 assert.equal(active.getWorksheet('변경 및 추가').rowCount,1,'selected-broadcast card payments stay in ordinary work');
-console.log('PASS real XLSX roundtrip: exactly two disjoint sheets, unchanged amounts and visible-item scope');
+const issues=[{date:'2026. 10. 05.',customer:'검수',product:'취소상품 · L · 1개',action:'환불',status:'미처리',memo:'출고 제외'}];
+const issueOnly=await run([],{exceptions:issues});
+assert.equal(issueOnly.getWorksheet('물건챙기기').rowCount,1);
+assert.equal(issueOnly.getWorksheet('변경 및 추가').rowCount,1);
+assert.equal(issueOnly.getWorksheet('고객이슈·특이사항').getCell('C2').value,issues[0].product);
+for(const sheet of issueOnly.worksheets) assert(!sheet.getRow(1).values.includes('주문번호'));
+assert.equal(additional.getCell('E1').value,'변경 후');
+console.log('PASS real XLSX roundtrip: three disjoint sheets, issue-only export, simplified headers and unchanged amounts');

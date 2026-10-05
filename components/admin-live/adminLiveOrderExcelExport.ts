@@ -12,6 +12,7 @@ type ExportMeta = {
   rowOrder?: "product" | "nickname" | "time";
   visibleItemIds?: string[];
   attentionItemIds?: string[];
+  exceptions?: import("@/lib/orderPickingExceptions").PickingExceptionRow[];
 };
 
 type WorkbookRow = Array<string | number | null>;
@@ -405,7 +406,7 @@ export async function exportLiveOrdersForRosen(orders: LiveOrder[], meta: Export
 export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: ExportMeta, pickedIds?: Set<string>) {
   const exportOrders = orders.filter((order) => !isPickingExportExcluded(order));
 
-  if (!exportOrders.length) {
+  if (!exportOrders.length && !meta.exceptions?.length) {
     showAdminToast("내보낼 주문이 없습니다. 필터 조건을 확인해주세요.");
     return;
   }
@@ -567,15 +568,15 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
     }
   });
 
-  const attentionHeaders: WorkbookRow = ["구분", "주문일시", "결제/변경일시", "방송", "고객", "주문번호", "변경 전", "현재 내용", "확인 내용"];
+  const attentionHeaders: WorkbookRow = ["작업", "고객", "방송", "변경 전", "변경 후", "결제/변경일시"];
   const appendAttentionSheet = (name: string, attentionRows: PickingAttentionExportRow[]) => {
     const attentionSheet = workbook.addWorksheet(name);
     addRows(attentionSheet, [
       attentionHeaders,
-      ...attentionRows.map((row) => [row.kind, row.orderedAt, row.attentionAt, row.broadcast, row.customer, row.orderNo, row.before, row.current, row.detail]),
+      ...attentionRows.map((row) => [row.kind, row.customer, row.broadcast, row.before, row.current, row.attentionAt]),
     ]);
     styleFilterSheet(attentionSheet, 1, Math.max(1, attentionRows.length + 1), attentionHeaders.length);
-    setColumnWidths(attentionSheet, [18, 22, 22, 24, 18, 18, 36, 36, 42]);
+    setColumnWidths(attentionSheet, [24, 18, 24, 36, 36, 22]);
     attentionRows.forEach((_, index) => {
       attentionSheet.getRow(index + 2).eachCell({ includeEmpty: true }, (cell) => {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF1D6" } };
@@ -583,6 +584,25 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
     });
   };
   appendAttentionSheet("변경 및 추가", builtRows.attentionRows);
+  const exceptionSheet = workbook.addWorksheet("고객이슈·특이사항");
+  const exceptionHeaders: WorkbookRow = ["등록일", "고객", "상품·옵션", "처리할 내용", "처리 상태", "메모"];
+  const exceptions = meta.exceptions || [];
+  addRows(exceptionSheet, [exceptionHeaders, ...exceptions.map(row => [row.date, row.customer, row.product, row.action, row.status, row.memo])]);
+  styleFilterSheet(exceptionSheet, 1, exceptions.length + 1, exceptionHeaders.length);
+  setColumnWidths(exceptionSheet, [22, 18, 36, 24, 22, 52]);
+  // Multi-line descriptions must be readable without manually resizing Excel rows.
+  for (const detailSheet of [workbook.getWorksheet("변경 및 추가")!, exceptionSheet]) {
+    detailSheet.eachRow((row, index) => {
+      if (index === 1) return;
+      let lines = 1;
+      row.eachCell({ includeEmpty: true }, (cell, column) => {
+        cell.alignment = { horizontal: "left", vertical: "middle", wrapText: true };
+        const width = Math.max(1, (detailSheet.getColumn(column).width || 10) - 2);
+        lines = Math.max(lines, String(cell.value ?? "").split("\n").reduce((sum, line) => sum + Math.max(1, Math.ceil(Array.from(line).reduce((n, c) => n + (/[^\x00-\x7F]/.test(c) ? 2 : 1), 0) / width)), 0));
+      });
+      row.height = Math.max(30, lines * 18 + 8);
+    });
+  }
 
   // [2026-09-01 사장님 지시] 파일명 = 방송이름+날짜+루루
   //   방송 필터: "0827(목) 해외원정방송 1부" → 해외원정방송1부0827루루.xlsx
