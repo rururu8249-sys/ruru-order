@@ -4,6 +4,7 @@ import { issueProductLabel, issueProductSummary } from "./issueProductLabel";
 
 type RecordRow = Record<string, unknown>;
 export type PickingExceptionRow = { date: string; customer: string; product: string; action: string; status: string; memo: string };
+export type PickingCancellationRow = { customer: string; broadcast: string; orderedAt: string; before: string; current: string; attentionAt: string; kind: string };
 const text = (value: unknown) => String(value ?? "").trim();
 const closedTask = (row: RecordRow) => Boolean(row.resolved_at) || /^(done|resolved|completed|complete|deleted|완료|해결|삭제)$/i.test(text(row.status));
 const closedLedger = (row: RecordRow) => Boolean(row.done_at) || ["완료", "거절·취소"].includes(text(row.stage));
@@ -22,6 +23,15 @@ const exactProductRows = (orders: readonly RecordRow[], target: string) => {
   return orders.filter(order => labels.has(issueProductLabel(order)));
 };
 
+/** No cancellation timestamp is stored: never substitute refund-registration time. */
+export function buildPickingCancellations(orders: readonly RecordRow[]): PickingCancellationRow[] {
+  return orders.filter(order => order.picked_at && /취소/.test(text(order.admin_order_status_v2) + text(order.order_manage_status))).map(order => ({
+    customer: text(order.youtube_nickname || order.customer_name), broadcast: text(order.broadcast_name),
+    orderedAt: formatPickingKstDateTime(text(order.created_at)), before: productText([order]),
+    current: "주문 취소", attentionAt: "", kind: "주문 취소 · 출고 제외",
+  }));
+}
+
 /** Only explicit order identifiers associate an issue with the selected broadcast. Never match names. */
 export function buildPickingExceptions(orders: readonly RecordRow[], tasks: readonly RecordRow[], ledgers: readonly RecordRow[]): PickingExceptionRow[] {
   const rows: PickingExceptionRow[] = [];
@@ -32,7 +42,7 @@ export function buildPickingExceptions(orders: readonly RecordRow[], tasks: read
     const target = ledgerTarget(ledger) || (task ? taskTarget(task) : "");
     if (financialIssue(ledger.kind)) exactProductRows(linked, target).forEach(order => handled.add(text(order.id)));
     if (closedLedger(ledger)) return;
-    rows.push({ date: formatPickingKstDateTime(text(ledger.created_at)), customer: text(ledger.nickname || ledger.customer_name || linked[0]?.youtube_nickname || linked[0]?.customer_name), product: target || productText(linked), action: actionLabel(ledger.kind), status: text(ledger.stage) || "처리 확인 필요", memo: [text(ledger.next_action), text(ledger.reason), text(ledger.memo)].filter(Boolean).join("\n") });
+    rows.push({ date: formatPickingKstDateTime(text(ledger.created_at)), customer: text(ledger.nickname || ledger.customer_name || linked[0]?.youtube_nickname || linked[0]?.customer_name), product: target || productText(linked), action: actionLabel(ledger.kind), status: text(ledger.stage) || "처리 확인 필요", memo: [...new Set([task ? splitIssueBody(task.body).memo : "", text(ledger.next_action), text(ledger.reason), text(ledger.memo)].filter(Boolean))].join("\n") });
   };
   for (const task of tasks) {
     const code = fieldFromIssueBody(task.body, "주문번호:");

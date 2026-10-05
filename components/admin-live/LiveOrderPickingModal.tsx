@@ -314,13 +314,13 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
     setExporting(true);
     try {
       const response = await fetch("/api/admin-live/picking-workspace", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ broadcastIds: appliedBroadcastIds, includeExceptions: true, orderIds: appliedBroadcastIds.length ? undefined : activeSelectedOrders.flatMap(order => order.items?.length ? order.items.map(item => String(item.id)) : [String(order.id)]) }) });
-      const payload = await response.json() as { ok?: boolean; orders?: LiveOrder[]; additionalOrders?: LiveOrder[]; exceptions?: import("@/lib/orderPickingExceptions").PickingExceptionRow[]; message?: string };
+      const payload = await response.json() as { ok?: boolean; orders?: LiveOrder[]; additionalOrders?: LiveOrder[]; exceptions?: import("@/lib/orderPickingExceptions").PickingExceptionRow[]; cancellations?: import("@/lib/orderPickingExceptions").PickingCancellationRow[]; message?: string };
       if (!response.ok || !payload.ok || !Array.isArray(payload.exceptions) || !Array.isArray(payload.orders) || !Array.isArray(payload.additionalOrders)) throw new Error(payload.message || "주문과 고객이슈를 모두 확인하지 못했습니다. 다시 시도해주세요.");
       if (requestId !== scopeRequestRef.current) throw new Error("방송 선택이 바뀌었습니다. 새 범위에서 다시 내보내주세요.");
       const freshOrders = [...payload.orders, ...payload.additionalOrders];
       const currentPickedIds = new Set(freshOrders.flatMap(order => (order.items || []).filter(item => item.pickedAt && classifyPickingAttention(order, item) !== "repick").map(item => String(item.id))));
       const visibleIds = new Set(buildPanels(freshOrders, false).filter(panel => panel.paid).flatMap(panel => panel.items).filter(item => !currentPickedIds.has(item.id)).map(item => item.id));
-      if (!visibleIds.size && !payload.exceptions.length) { showAdminToast("내보낼 미챙김 상품이나 미처리 고객이슈가 없습니다.", "warning"); return; }
+      if (!visibleIds.size && !payload.exceptions.length && !payload.cancellations?.length) { showAdminToast("내보낼 미챙김 상품이나 미처리 고객이슈가 없습니다.", "warning"); return; }
       const seenItemIds = new Set<string>();
       const exportOrders = freshOrders.flatMap(order => {
         const items = (order.items || []).filter(item => {
@@ -335,7 +335,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
         seenItemIds.add(id);
         return [order];
       });
-      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${title} · 미챙김 전체`, rowOrder: viewMode === 'batch' ? 'product' : sortMode === 'oldest' ? 'time' : 'nickname', visibleItemIds: [...visibleIds], attentionItemIds: payload.additionalOrders.flatMap(order => (order.items || []).map(item => String(item.id))), exceptions: payload.exceptions }, currentPickedIds);
+      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${title} · 미챙김 전체`, rowOrder: viewMode === 'batch' ? 'product' : sortMode === 'oldest' ? 'time' : 'nickname', visibleItemIds: [...visibleIds], attentionItemIds: payload.additionalOrders.flatMap(order => (order.items || []).map(item => String(item.id))), exceptions: payload.exceptions, cancellations: payload.cancellations }, currentPickedIds);
       const ids = [...visibleIds].map(Number);
       const now = new Date().toISOString();
       for (let i = 0; i < ids.length; i += 500) {

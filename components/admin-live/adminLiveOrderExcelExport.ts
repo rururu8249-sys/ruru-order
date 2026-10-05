@@ -13,6 +13,7 @@ type ExportMeta = {
   visibleItemIds?: string[];
   attentionItemIds?: string[];
   exceptions?: import("@/lib/orderPickingExceptions").PickingExceptionRow[];
+  cancellations?: import("@/lib/orderPickingExceptions").PickingCancellationRow[];
 };
 
 type WorkbookRow = Array<string | number | null>;
@@ -406,7 +407,7 @@ export async function exportLiveOrdersForRosen(orders: LiveOrder[], meta: Export
 export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: ExportMeta, pickedIds?: Set<string>) {
   const exportOrders = orders.filter((order) => !isPickingExportExcluded(order));
 
-  if (!exportOrders.length && !meta.exceptions?.length) {
+  if (!exportOrders.length && !meta.exceptions?.length && !meta.cancellations?.length) {
     showAdminToast("내보낼 주문이 없습니다. 필터 조건을 확인해주세요.");
     return;
   }
@@ -568,22 +569,22 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
     }
   });
 
-  const attentionHeaders: WorkbookRow = ["작업", "고객", "방송", "변경 전", "변경 후", "결제/변경일시"];
-  const appendAttentionSheet = (name: string, attentionRows: PickingAttentionExportRow[]) => {
+  const attentionHeaders: WorkbookRow = ["고객", "방송", "최초 주문일시", "변경·취소/결제일시", "변경 전", "변경 후", "비고"];
+  const appendAttentionSheet = (name: string, attentionRows: (PickingAttentionExportRow | import("@/lib/orderPickingExceptions").PickingCancellationRow)[]) => {
     const attentionSheet = workbook.addWorksheet(name);
     addRows(attentionSheet, [
       attentionHeaders,
-      ...attentionRows.map((row) => [row.kind, row.customer, row.broadcast, row.before, row.current, row.attentionAt]),
+      ...attentionRows.map((row) => [row.customer, row.broadcast, row.orderedAt || "기록 없음", `${row.kind === "상품 변경 · 다시 챙기기" ? "변경" : row.kind === "주문 취소 · 출고 제외" ? "취소" : "결제"}: ${row.attentionAt || "기록 없음"}`, row.before, row.current, row.kind]),
     ]);
     styleFilterSheet(attentionSheet, 1, Math.max(1, attentionRows.length + 1), attentionHeaders.length);
-    setColumnWidths(attentionSheet, [24, 18, 24, 36, 36, 22]);
+    setColumnWidths(attentionSheet, [18, 24, 22, 28, 36, 36, 26]);
     attentionRows.forEach((_, index) => {
       attentionSheet.getRow(index + 2).eachCell({ includeEmpty: true }, (cell) => {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF1D6" } };
       });
     });
   };
-  appendAttentionSheet("변경 및 추가", builtRows.attentionRows);
+  appendAttentionSheet("변경 및 추가", [...builtRows.attentionRows, ...(meta.cancellations || [])]);
   const exceptionSheet = workbook.addWorksheet("고객이슈·특이사항");
   const exceptionHeaders: WorkbookRow = ["등록일", "고객", "상품·옵션", "처리할 내용", "처리 상태", "메모"];
   const exceptions = meta.exceptions || [];

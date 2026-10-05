@@ -4,7 +4,7 @@ import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { buildAdminLiveOrderGroups, sortLiveOrdersByCreatedDesc, toAdminLiveOrder } from "@/components/admin-live/liveOrderAdapter";
 import { kstDayStartIso, kstDaysAgoStartIso, loadPickingWorkspaceRows, parsePickingWorkspaceRequest, selectAdditionalPickingRows, type PickingScopeSource } from "@/lib/orderPickingScopeLoader";
 import type { OrderRow } from "@/lib/admin-v2/types";
-import { buildPickingExceptions } from "@/lib/orderPickingExceptions";
+import { buildPickingExceptions, buildPickingCancellations } from "@/lib/orderPickingExceptions";
 
 export const dynamic = "force-dynamic";
 
@@ -113,7 +113,8 @@ export async function POST(request: NextRequest) {
       ]);
       exceptions = buildPickingExceptions(selectedRows, tasks, ledgers);
     }
-    return NextResponse.json({ ok: true, orders, additionalOrders, broadcastIds, exceptions });
+    const cancellations = input.includeExceptions === true ? buildPickingCancellations(selectedRows) : undefined;
+    return NextResponse.json({ ok: true, orders, additionalOrders, broadcastIds, exceptions, cancellations });
   } catch (error) {
     return NextResponse.json({ ok: false, message: error instanceof Error ? error.message : "물건챙기기 주문 조회에 실패했습니다." }, { status: 400 });
   }
