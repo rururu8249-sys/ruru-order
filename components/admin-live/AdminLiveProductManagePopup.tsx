@@ -27,7 +27,7 @@ import {
 } from "@/lib/widgetProductLibrary";
 import { splitOptionText } from "@/lib/optionSplit";
 import { normalizeProductSearchText, productSearchMatches } from "@/lib/productSearch";
-import { aggregateSalesItems, eligibleSalesOrder, salesPaymentAmount, sortedSalesBroadcasts, salesProductPhotos, SALES_PAID_STATUSES } from "@/lib/salesHistory";
+import { aggregateSalesItems, eligibleSalesOrder, salesPaymentAmount, sortedSalesBroadcasts, salesProductPhotos, SALES_PAID_STATUSES, type SalesOptionGroup } from "@/lib/salesHistory";
 import { productPage } from "@/lib/productPagination";
 import ProductPagination from "./ProductPagination";
 
@@ -396,7 +396,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [histMode, setHistMode] = useState<"all" | "broadcast" | "shop">("all");
   const [histSearch, setHistSearch] = useState("");
   const [histExpand, setHistExpand] = useState("");
-  const [histDetail, setHistDetail] = useState<Map<string, Array<{ key: string; name: string; productId: string; thumb: string; brandThumb: string; qty: number; price: number; sales: number; option: string }>>>(new Map());
+  const [histDetail, setHistDetail] = useState<Map<string, Array<{ key: string; name: string; productId: string; thumb: string; brandThumb: string; qty: number; price: number; sales: number; option: string; optionGroups: SalesOptionGroup[] }>>>(new Map());
   const [histDetailLoading, setHistDetailLoading] = useState("");
   const [historyOrders, setHistoryOrders] = useState<Record<string, unknown>[]>([]);
 
@@ -1884,7 +1884,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           ) : (
                             <>
                               {/* 펼침 헤더: 빈칸 / 상품명·옵션 / 수량 / 단가 / 매출 */}
-                              <div style={{ minWidth:560,display: "grid", gridTemplateColumns: "minmax(130px,1fr) minmax(140px,1fr) 44px 82px 96px", gap: "8px", alignItems: "center", padding: "8px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink-soft)",background:"var(--color-surface-2)", borderBottom: "1px solid var(--color-line)" }}>
+                              <div style={{ minWidth:560,display: "grid", gridTemplateColumns: "110px minmax(180px,1fr) 44px 82px 96px", gap: "8px", alignItems: "center", padding: "8px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink-soft)",background:"var(--color-surface-2)", borderBottom: "1px solid var(--color-line)" }}>
                                 <span>상품 사진·상품명</span>
                                 <span>구매 옵션별 수량</span>
                                 <span style={{ textAlign: "right" }}>수량</span>
@@ -1892,7 +1892,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                                 <span style={{ textAlign: "right" }}>매출</span>
                               </div>
                               {detail.map((r,index) => (
-                                <div key={r.key} style={{minWidth:560, display: "grid", gridTemplateColumns: "minmax(130px,1fr) minmax(140px,1fr) 44px 82px 96px", gap: "8px", alignItems: "start", padding: "12px 8px",background:index%2 ? "var(--color-surface-2)" : "var(--color-surface)",fontVariantNumeric:"tabular-nums", borderBottom: "1px solid var(--color-line)" }}>
+                                <div key={r.key} style={{minWidth:560, display: "grid", gridTemplateColumns: "110px minmax(180px,1fr) 44px 82px 96px", gap: "8px", alignItems: "start", padding: "12px 8px",background:index%2 ? "var(--color-surface-2)" : "var(--color-surface)",fontVariantNumeric:"tabular-nums", borderBottom: "1px solid var(--color-line)" }}>
                                   <div style={{minWidth:0}}>
                                     <div style={{display:'flex',gap:6,alignItems:'flex-end',marginBottom:8}}>
                                       <button type="button" aria-label={`${r.name} 상품 사진 확대`} disabled={!r.thumb} onClick={()=>setImagePreviewUrl(r.thumb)} style={{width:64,height:72,padding:0,borderRadius:8,border:'1px solid var(--color-line)',overflow:'hidden',background:'var(--color-surface)',cursor:r.thumb?'zoom-in':'default'}}>
@@ -1902,8 +1902,13 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                                     </div>
                                     <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-ink)",overflowWrap:"anywhere" }}>{r.name}</div>
                                   </div>
-                                  <div style={{display:'flex',flexWrap:'wrap',alignContent:'flex-start',gap:6}}>{r.option.split('\n').map(option=><span key={option} style={{padding:'5px 8px',borderRadius:8,border:'1px solid var(--color-line)',background:'var(--color-surface)',fontSize:13,color:'var(--color-ink)',lineHeight:1.4,overflowWrap:'anywhere'}}>{option}</span>)}</div>
-                                  <div style={{ textAlign: "right", fontSize: "14px", fontWeight: 700, color: "var(--color-ink)" }}>{r.qty.toLocaleString("ko-KR")}개</div>
+                                  <div aria-label={`${r.name} 구매 옵션별 수량`} style={{display:'grid',gap:6,minWidth:0}}>
+                                    {r.optionGroups.map(group=><div key={group.label} style={{display:'grid',gridTemplateColumns:group.label?'minmax(32px,auto) 1fr':'1fr',gap:8,padding:'6px 8px',borderRadius:8,border:'1px solid var(--color-line)',background:'var(--color-surface)',fontSize:13,lineHeight:1.5}}>
+                                      {group.label ? <strong style={{color:'var(--color-ink)',overflowWrap:'anywhere',maxWidth:72}}>{group.label}</strong>:null}
+                                      <div style={{display:'flex',flexWrap:'wrap',gap:'4px 12px',minWidth:0}}>{group.sizes.map(size=><span key={size.label} style={{color:'var(--color-ink-soft)',overflowWrap:'anywhere'}}>{size.label} <strong style={{color:'#b42318',fontWeight:800,whiteSpace:'nowrap'}}>{size.qty.toLocaleString('ko-KR')}개</strong></span>)}</div>
+                                    </div>)}
+                                  </div>
+                                  <div style={{ textAlign: "right", fontSize: "14px", fontWeight: 800, color: "#b42318" }}>{r.qty.toLocaleString("ko-KR")}개</div>
                                   <div style={{ textAlign: "right", fontSize: "13px", color: "var(--color-ink-soft)" }}>{money(r.price)}</div>
                                   <div style={{ textAlign: "right", fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{money(r.sales)}</div>
                                 </div>

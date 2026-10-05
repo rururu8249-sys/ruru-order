@@ -16,6 +16,26 @@ const rows = aggregateSalesItems([
 assert.equal(rows.length,2);
 assert.equal(rows.find(r=>r.name==='BB-58').sales,585000);
 assert.equal(rows.find(r=>r.name==='BB-58').option,'M · 3개');
+// Catch encounter-order display, split identities containing '/', and lost duplicate quantities.
+const grouped = aggregateSalesItems([
+ {product_name:'셔츠',color:'3번',size:'XL',qty:8,product_price:39000},
+ {product_name:'셔츠',color:'2번',size:'XXL',qty:2,product_price:39000},
+ {product_name:'셔츠',color:'3번',size:'S',qty:3,product_price:39000},
+ {product_name:'셔츠',color:'2번',size:'M',qty:1,product_price:39000},
+ {product_name:'셔츠',color:'2번',size:'M',qty:1,product_price:39000},
+])[0];
+assert.deepEqual(grouped.optionGroups,[
+ {label:'2번',sizes:[{label:'M',qty:2},{label:'XXL',qty:2}]},
+ {label:'3번',sizes:[{label:'S',qty:3},{label:'XL',qty:8}]},
+]);
+assert.equal(grouped.qty,15);
+assert.equal(grouped.sales,585000);
+assert.deepEqual(aggregateSalesItems([
+ {product_name:'옷',color:'베이지 / 화이트',size:'M/38',qty:2},
+ {product_name:'옷',color:'베이지 / 화이트',size:'36',qty:1},
+])[0].optionGroups,[{label:'베이지 / 화이트',sizes:[{label:'36',qty:1},{label:'M/38',qty:2}]}]);
+assert.deepEqual(aggregateSalesItems([{product_name:'단독',color:'없음',size:'M',qty:3}])[0].optionGroups,[{label:'',sizes:[{label:'M',qty:3}]}]);
+assert.deepEqual(aggregateSalesItems([{product_name:'단독',qty:1}])[0].optionGroups,[{label:'',sizes:[{label:'옵션 없음',qty:1}]}]);
 for(const flag of ['is_deleted','is_permanently_deleted','is_test_order','exclude_from_settlement']) assert.equal(eligibleSalesOrder({admin_order_status_v2:'카드결제완료',[flag]:true}),false);
 assert.equal(eligibleSalesOrder({admin_order_status_v2:'카드결제완료',event_gift_winner_id:42}),false);
 assert.equal(eligibleSalesOrder({admin_order_status_v2:'취소'}),false);
