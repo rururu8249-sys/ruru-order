@@ -1399,6 +1399,7 @@ export default function OrderPage() {
   // [2026-08-21] 방송정보 조회가 끝났는지. false(로딩중)를 "방송 꺼짐"으로 오판해
   //   "지금은 방송 전이에요" 배너가 먼저 떴다가 라이브 배너로 바뀌던 깜빡임 방지. 표시 전용.
   const [broadcastLoaded, setBroadcastLoaded] = useState(false);
+  const [productListState, setProductListState] = useState<"loading" | "ready" | "error">("loading");
   const [broadcastProducts, setBroadcastProducts] = useState<BroadcastProduct[]>([]);
   const [groupBuyQuickProductsFromCatalog, setGroupBuyQuickProductsFromCatalog] = useState<BroadcastProduct[]>([]);
   // 쇼핑몰 열기/닫기(settings.shop_open) — 방송 OFF일 때만 영향. 기본 열림.
@@ -2091,7 +2092,7 @@ export default function OrderPage() {
     loadOrderSettings();
     // [2026-08-21] 어떤 경로로 끝나든(성공/오류/예외) 반드시 로드완료로 표시한다.
     //   안 그러면 예외 1번에 방송 배너가 영영 안 뜬다. 표시 전용 안전장치.
-    void Promise.resolve(loadBroadcast()).catch(() => {}).finally(() => setBroadcastLoaded(true));
+    void loadBroadcast().catch(() => { setProductListState("error"); setBroadcastLoaded(true); });
     clearLegacyCustomerSessionIfNeeded();
     loadSavedCustomerInfo();
     // [2026-09-04 사장님 지시 · 서버가 이긴다] 회원의 정체성은 카카오 계정(8/31 확정)인데,
@@ -2660,7 +2661,7 @@ export default function OrderPage() {
     if (error) {
       console.log("등록상품 빠른선택 불러오기 오류", error.message);
       setGroupBuyQuickProductsFromCatalog([]);
-      return;
+      return false;
     }
 
     let linkedProducts;
@@ -2670,7 +2671,7 @@ export default function OrderPage() {
     } catch {
       setGroupBuyQuickProductsFromCatalog([]);
       showCustomerNotice("상품 연결 정보를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.");
-      return;
+      return false;
     }
     const nextProducts = linkedProducts
       .map((product: any) => normalizeOrderProductRow(product))
@@ -2678,40 +2679,43 @@ export default function OrderPage() {
       .filter((product) => (product.status !== "숨김" || productSuggestionEnabled(product)) && product.status !== "deleted");
 
     setGroupBuyQuickProductsFromCatalog(nextProducts);
+    return true;
   };
 
   const loadBroadcast = async () => {
-    await loadGroupBuyQuickProductsFromCatalog();
+    setProductListState("loading");
 
     // 쇼핑몰 열기/닫기 상태(settings.shop_open) — 값 "false"면 닫힘, 그 외/없음은 열림(기본).
-    const { data: shopSetting } = await supabase
+    const shopRequest = supabase
       .from("settings")
       .select("value")
       .eq("key", "shop_open")
       .maybeSingle();
-    setShopOpen(String(shopSetting?.value ?? "").trim().toLowerCase() !== "false");
 
     // [리뉴얼] 다음 방송 일시(표시 전용) — 없거나 실패하면 배너에서 그 줄만 안 나온다.
-    const { data: nextLiveSetting } = await supabase
+    const nextLiveRequest = supabase
       .from("settings")
       .select("value")
       .eq("key", "next_live_text")
       .maybeSingle();
-    setNextLiveText(String(nextLiveSetting?.value ?? "").trim());
 
-    const { data, error } = await supabase
+    const broadcastRequest = supabase
       .from("broadcasts")
       .select("*")
       .eq("status", "ON")
       .order("started_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+    const [{ data: shopSetting }, { data: nextLiveSetting }, { data, error }] = await Promise.all([shopRequest, nextLiveRequest, broadcastRequest]);
+    setShopOpen(String(shopSetting?.value ?? "").trim().toLowerCase() !== "false");
+    setNextLiveText(String(nextLiveSetting?.value ?? "").trim());
 
     if (error) {
       console.log("방송정보 불러오기 오류", error.message);
       setBroadcast(null);
       setBroadcastProducts([]);
       setBroadcastLoaded(true);
+      setProductListState("error");
       return;
     }
 
@@ -2719,12 +2723,18 @@ export default function OrderPage() {
       setBroadcast(null);
       setBroadcastProducts([]);
       setBroadcastLoaded(true);
+      const ok = await loadGroupBuyQuickProductsFromCatalog();
+      setProductListState(ok ? "ready" : "error");
       return;
     }
 
     setBroadcast(data);
     setBroadcastLoaded(true);
-    await loadBroadcastProducts(data.id);
+    const ok = await loadBroadcastProducts(data.id);
+    setProductListState(ok ? "ready" : "error");
+    // 전체 목록은 추천/기존 주문 옵션 조회에도 사용하므로 따로 유지한다.
+    // 방송 카드 준비 상태는 방송 상품 조회 결과로만 결정한다.
+    void loadGroupBuyQuickProductsFromCatalog().catch(() => {});
   };
 
   // [라이브 동기화] 방송 ON 동안 45초마다 방송 상품(고정상품 포함) 재조회 — 관리자가 "지금 띄운 상품"을 바꾸면
@@ -2762,8 +2772,7 @@ export default function OrderPage() {
 
     if (error) {
       console.log("방송상품 불러오기 오류", error.message);
-      setBroadcastProducts([]);
-      return;
+      return false;
     }
 
     let linkedRows;
@@ -2775,9 +2784,8 @@ export default function OrderPage() {
       linkedRows = buildBrandOrderCatalog(catalog.products, catalog.links, ids.filter(id => available.has(id)))
         .map(product => ({products:product,sort_order:sorts.get(String(product.id))}));
     } catch {
-      setBroadcastProducts([]);
       showCustomerNotice("상품 연결 정보를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.");
-      return;
+      return false;
     }
     const nextProducts = linkedRows
       .map((row: any) => (row.products ? { ...row.products, __bpSort: row.sort_order } : null))
@@ -2839,6 +2847,8 @@ export default function OrderPage() {
       }));
 
     setBroadcastProducts(nextProducts);
+    setProductListState("ready");
+    return true;
   };
 
 
@@ -6717,7 +6727,7 @@ export default function OrderPage() {
           {/* P4. 상품 목록 — 검색 + 2열 격자 + 페이지네이션 (시안). quickGroupBuyProducts / selectQuickGroupBuyProduct 재사용 */}
           {(() => {
             // 쇼핑몰 닫힘(방송 OFF + shop_open=false)이면 그리드 대신 준비중 안내. 방송 ON이면 무관(항상 그리드).
-            if (!isBroadcastOn && !shopOpen) {
+            if (broadcastLoaded && productListState === "ready" && !isBroadcastOn && !shopOpen) {
               return (
                 <section style={{ margin: "12px auto 0", width: "100%", maxWidth: "560px" }}>
                   <div style={{ padding: "44px 26px", textAlign: "center", color: "#7A1E47", fontSize: "16px", fontWeight: 800, border: "1px solid #D9C5CC", borderRadius: "16px", background: "#fff", lineHeight: 1.8 }}>
@@ -6727,11 +6737,14 @@ export default function OrderPage() {
                 </section>
               );
             }
-            // [2026-09-09 사장님 지적] 「새로고침 하면 노출 안 시킨 상품이 보였다가 사라져」
-            //   원인(실측): loadBroadcast() 가 카탈로그를 «먼저» 채우고(:2537) 방송 정보를 «나중에» 읽는다(:2555).
-            //   그 사이 broadcast=null 이라 quickGroupBuyProducts 가 «쇼핑몰 모드»로 오인해 카탈로그를 그렸다.
-            //   → 방송 정보를 다 읽기 전에는 목록을 안 그린다. ⚠ 표시 전용 — 주문·돈 로직 무관.
-            if (!broadcastLoaded) {
+            if (productListState === "error") {
+              return <section role="alert" style={{ margin: "12px auto", maxWidth: "560px", padding: "30px 20px", textAlign: "center", background: "#fff", borderRadius: "16px" }}>
+                <p>상품을 불러오지 못했습니다. 다시 시도해 주세요.</p>
+                <button type="button" onClick={() => { void loadBroadcast().catch(() => { setProductListState("error"); setBroadcastLoaded(true); }); }} style={{ marginTop: "12px", padding: "12px 20px", borderRadius: "10px", background: "#7A1E47", color: "#fff", fontWeight: 700 }}>다시 불러오기</button>
+              </section>;
+            }
+            // Broadcast metadata alone is not enough: wait for the active mode's products.
+            if (!broadcastLoaded || productListState === "loading") {
               return (
                 <section style={{ margin: "12px auto 0", width: "100%", maxWidth: "560px" }}>
                   <div style={{ padding: "44px 26px", textAlign: "center", color: "#7A1E47", fontSize: "14px", fontWeight: 700, border: "1px solid #D9C5CC", borderRadius: "16px", background: "#fff" }}>

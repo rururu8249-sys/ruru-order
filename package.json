@@ -20,6 +20,7 @@
     "test:product-brand-move": "node scripts/test-product-brand-move.mjs && node scripts/test-product-brand-move-route.mjs && node scripts/test-product-brand-move-ui.mjs",
     "test:product-detail-info": "node --import ./scripts/_ts-resolve.mjs scripts/test-product-detail-info.mjs && node scripts/test-product-detail-info-ui.mjs && node scripts/test-product-detail-form.mjs && node --import ./scripts/_ts-resolve.mjs scripts/test-brand-detail-table.mjs",
     "test:product-custom-input": "node scripts/test-product-custom-input.mjs && node scripts/test-customer-manual-field.mjs",
+    "test:customer-product-loading": "node scripts/test-customer-product-loading.mjs",
     "test:sales-menu": "node scripts/test-admin-menu-layout.mjs && node scripts/test-sales-menu-workspace.mjs && node scripts/test-product-toolbar.mjs",
     "test:payment-match-read": "node --import ./scripts/_ts-resolve.mjs scripts/test-payment-match-read.mjs",
     "test:verified-bank-match": "node scripts/test-bank-deposit-date.mjs && node scripts/test-verified-bank-match.mjs",
