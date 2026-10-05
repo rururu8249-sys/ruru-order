@@ -31,7 +31,7 @@ import { aggregateSalesItems, eligibleSalesOrder, salesPaymentAmount, sortedSale
 import { productPage } from "@/lib/productPagination";
 import ProductPagination from "./ProductPagination";
 import ProductToolbar from "./ProductToolbar";
-import { resolveBrandCatalog, searchBrandDetails, type BrandProductLink } from "@/lib/productBrandLinks";
+import { resolveBrandCatalog, resolveAdminBrandTarget, searchBrandDetails, type BrandProductLink } from "@/lib/productBrandLinks";
 import ProductBrandMoveDialog from "./ProductBrandMoveDialog";
 
 type ProductRow = Record<string, unknown>;
@@ -1293,7 +1293,17 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   };
 
   const broadcastPinKey = (productIdValue: string, detailName = "") => `${productIdValue}|${detailName}`;
-  const isBroadcastPinned = (productIdValue: string, detailName = "") => bcWidgetPin.mode === "pin" && bcWidgetPin.productId === String(productIdValue) && bcWidgetPin.detailName === String(detailName || "").trim();
+  const findBroadcastProduct = (id:string):ProductRow|undefined => {
+    const direct=bcProducts.find(row=>productId(row)===id);
+    const link=brandCatalog.bySourceId.get(id);
+    const source=direct ?? (link && bcProducts.some(row=>productId(row)===link.parentId)?products.find(row=>productId(row)===id):undefined);
+    return source?resolveAdminBrandTarget(products,brandCatalog,source).product:undefined;
+  };
+  const isBroadcastPinned = (productIdValue: string, detailName = "") => {
+    const row=products.find(product=>productId(product)===productIdValue);
+    const target=row?resolveAdminBrandTarget(products,brandCatalog,row,detailName):null;
+    return bcWidgetPin.mode === "pin" && bcWidgetPin.productId === (target?productId(target.product):String(productIdValue)) && bcWidgetPin.detailName === String(target?.detailName ?? detailName).trim();
+  };
   // [2026-09-19 사장님] 「종료했다고 해제가 안 되네?」 — 해제는 지난 방송에서도 되게(«자동»으로 되돌릴 뿐이라 손님 화면 무관).
   //   새로 고정하는 건 여전히 진행 중 방송만(pinBroadcastProduct).
   const clearBroadcastPin = async () => {
@@ -1327,6 +1337,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     }
   };
   const pinBroadcastProduct = async (p: ProductRow, detail?: DetailProduct) => {
+    const target=resolveAdminBrandTarget(products,brandCatalog,p,detail?.detailName);
+    p=target.product;
+    if(!target.detailName)detail=undefined;
     const pid = productId(p);
     const targetBroadcastId = widgetPinTargetBroadcastId(bcSelId, activeBroadcastId);
     if (!pid || !targetBroadcastId || bcPinBusy) {
@@ -1361,7 +1374,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   };
   // [2026-08-31 사장님 요청] 📌 자주 고정 칩 클릭 = ▶ 방송 원클릭(고정+채팅 현재상품+문구 복사)
   const pinFromHistory = async (entry: { productId: string; detailName: string; label: string }) => {
-    const row = bcProducts.find((r) => productId(r) === entry.productId);
+    const row = findBroadcastProduct(entry.productId);
     if (!row) {
       showAdminToast(`「${entry.label}」은(는) 이 방송 진열에 없어요.\n「+ 상품 담기」로 먼저 담아주세요.`, "warning");
       return;
@@ -1382,6 +1395,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const widgetLibraryItems = useMemo<WidgetProductLibraryItem[]>(() => {
     const byId = new Map(products.map((row) => [productId(row), row]));
     const broadcastIds = new Set(bcProducts.map((row) => productId(row)));
+    for(const link of brandLinks)if(broadcastIds.has(link.parentId))broadcastIds.add(link.sourceId);
     return widgetHistory.map((entry) => {
       const row = byId.get(entry.productId);
       let detail: DetailProduct | undefined;
@@ -1412,11 +1426,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         unavailableReason: !row ? "삭제된 상품" : detailMissing ? "세부상품 없음" : soldOut ? "품절" : hidden ? "숨김 상품" : "",
       };
     });
-  }, [bcProducts, products, widgetHistory]);
+  }, [bcProducts, products, widgetHistory,brandLinks]);
 
   const widgetManualPinLabel = useMemo(() => {
     if (bcWidgetPin.mode !== "pin" || !bcWidgetPin.productId) return "";
-    const row = bcProducts.find((item) => productId(item) === bcWidgetPin.productId);
+    const row = findBroadcastProduct(bcWidgetPin.productId);
     let detail: DetailProduct | undefined;
     if (row && bcWidgetPin.detailName) {
       try {
@@ -1426,7 +1440,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       }
     }
     return detail?.detailName || bcWidgetPin.detailName || (row ? productName(row) : "특정 상품");
-  }, [bcProducts, bcWidgetPin.detailName, bcWidgetPin.mode, bcWidgetPin.productId]);
+  }, [bcProducts,products,brandCatalog, bcWidgetPin.detailName, bcWidgetPin.mode, bcWidgetPin.productId]);
 
   const toggleWidgetLibrarySelection = (target: WidgetProductTarget) => {
     const key = widgetTargetKey(target);
@@ -1512,6 +1526,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   //      (유튜브 쿼터가 넉넉하지 않다 — 봇 글은 하루 60건 상한을 여러 기능이 나눠 쓴다)
   //      예전처럼 클립보드에 복사만 하고, 사장님이 채팅에 붙여넣는다.
   const setChatCurrentAndCopy = async (p: ProductRow, detail?: DetailProduct) => {
+    const target=resolveAdminBrandTarget(products,brandCatalog,p,detail?.detailName);
+    p=target.product;
+    if(!target.detailName)detail=undefined;
     const pid = productId(p);
     if (!pid) return;
     const detailName = detail?.detailName || "";
@@ -1604,6 +1621,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   };
 
   const editProduct = (p: ProductRow, detailName = "") => {
+    const target=resolveAdminBrandTarget(products,brandCatalog,p,detailName);
+    p=target.product;detailName=target.detailName;
+    if(p.__linked_brand_parent){const original=products.find(row=>productId(row)===productId(p));if(original)p={...original,__linked_brand_parent:p.__linked_brand_parent};}
     window.dispatchEvent(detailName
       ? new CustomEvent("ruru-edit-quick-product-detail", { detail: { product: p, detailName } })
       : new CustomEvent("ruru-edit-quick-product", { detail: p }));
@@ -2112,7 +2132,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 if (bcWidgetPin.mode !== "pin") {
                   return null;
                 }
-                const pinnedRow = bcProducts.find((row) => productId(row) === bcWidgetPin.productId);
+                const pinnedRow = findBroadcastProduct(bcWidgetPin.productId);
                 const pinnedDetail = pinnedRow && bcWidgetPin.detailName
                   ? detailProducts(pinnedRow, { includeHidden: true }).find((d) => d.detailName === bcWidgetPin.detailName)
                   : undefined;
@@ -2190,8 +2210,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     {bcProductsView.filter(nameMatch).map((p, i) => {
                       const img = mainImage(p);
                       const pid = productId(p);
-                      const allDetails = detailProducts(p, { includeHidden: false });
-                      const matchedDetails = search.trim() ? adminDetailSearch(p, search) : [];
+                      const allDetails = (brandCatalog.detailsByParent.get(pid) ?? detailProducts(p, { includeHidden: false })).filter(detail=>!detail.hidden);
+                      const matchedDetails = search.trim() ? searchBrandDetails(brandCatalog,pid,search) : [];
                       const isBrandFolder = allDetails.length > 0;
                       const expanded = isBrandFolder && (bcExpanded.has(pid) || matchedDetails.length > 0);
                       const detailRows = matchedDetails.length > 0 ? matchedDetails.filter((detail) => !detail.hidden) : allDetails;

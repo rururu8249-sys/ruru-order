@@ -11,6 +11,16 @@ export type ResolvedCatalog = {
   bySourceId: Map<string, ResolvedDetail>;
 };
 
+export function resolveAdminBrandTarget(products:ProductLike[],catalog:ResolvedCatalog,row:ProductLike,detailName=''): {product:ProductLike;detailName:string} {
+  const linked=detailName
+    ? (catalog.detailsByParent.get(String(row.id)) ?? []).find(detail=>detail.detailName===detailName && 'sourceProductId' in detail)
+    : catalog.bySourceId.get(String(row.id));
+  if(!linked || !('sourceProductId' in linked))return {product:row,detailName};
+  const source=products.find(product=>String(product.id)===linked.sourceProductId);
+  if(!source)throw new Error('연결된 원본 상품을 찾을 수 없습니다.');
+  return {product:{...source,product_name:linked.detailName,__linked_brand_parent:products.find(product=>String(product.id)===linked.parentId)},detailName:''};
+}
+
 export function searchBrandDetails(catalog: ResolvedCatalog, parentId: string, query: string): Array<DetailProduct | ResolvedDetail> {
   const normalized = normalizeProductSearchText(query);
   if (!normalized) return [];
