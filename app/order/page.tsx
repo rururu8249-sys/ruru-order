@@ -8420,7 +8420,7 @@ export default function OrderPage() {
                     return (
                     <CustomerManualField id="registered-product-options" label={inputLabel} value={registeredOptionColor} onChange={setRegisteredOptionColor}
                       placeholder={inputLabel === "색상" ? "예: 베이지" : /상품번호.*옵션/.test(inputLabel) ? "예: BB-60 / 베이지 / M" : "방송에서 안내한 내용을 입력"}
-                      help={inputLabel === "색상" ? "방송에서 안내한 색상을 입력해 주세요." : "방송에서 확인한 내용을 입력해 주세요."}
+                      help={inputLabel === "색상" ? "방송에서 안내한 색상을 직접 입력해 주세요." : /상품번호.*옵션/.test(inputLabel) ? "방송에서 확인한 상품번호와 옵션을 직접 입력해 주세요." : "방송에서 확인한 내용을 직접 입력해 주세요."}
                       error={registeredOptionAttempted && !registeredOptionColor.trim() ? (inputLabel === "색상" ? "색상을 입력해 주세요." : "주문 내용을 입력해 주세요.") : ""} />
                     );
                   })() : null}
@@ -8512,7 +8512,7 @@ export default function OrderPage() {
                     <CustomerManualField id="registered-product-amount" label="상품 1개 금액" numeric
                       value={registeredOptionManualPrice > 0 ? registeredOptionManualPrice.toLocaleString("ko-KR") : ""}
                       onChange={(value) => setRegisteredOptionManualPrice(Math.max(0, Number(value.replace(/[^0-9]/g, "")) || 0))}
-                      placeholder="예: 59,000" help="방송에서 안내한 상품 1개 가격을 입력해 주세요."
+                      placeholder="예: 59,000" help="방송에서 안내한 상품 1개 가격을 직접 입력해 주세요."
                       error={registeredOptionAttempted && registeredOptionManualPrice < 1 ? "금액을 입력해 주세요." : ""} />
                   ) : null}
                   {/* [2026-09-20 사장님] 「사진 N장 크게 보기 없애도 될 듯」 — 대표사진이 크게 뜨고 🔍 크게가 있으니 삭제. 설명 글이 있을 때만 「상품 상세」. */}

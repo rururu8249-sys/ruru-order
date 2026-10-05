@@ -20,7 +20,7 @@ export default function CustomerManualField({id, label, value, onChange, placeho
         <input id={id} value={value} onChange={(e) => onChange(e.target.value)} inputMode={numeric ? "numeric" : "text"} aria-required={true} aria-invalid={Boolean(error)} aria-describedby={`${id}-help${error ? ` ${id}-error` : ""}`} placeholder={placeholder} style={{ minWidth: 0, width: "100%", height: "48px", border: "none", background: "transparent", fontSize: "16px", color: "#222" }} />
         {numeric ? <span style={{ flexShrink: 0, fontSize: "14px", color: "#675B61" }}>원</span> : null}
       </div>
-      <div id={`${id}-help`} style={{ marginTop: "6px", fontSize: "12px", color: "#675B61", lineHeight: 1.6 }}>{help}</div>
+      <div id={`${id}-help`} style={{ marginTop: "6px", fontSize: "12px", color: "#B42318", fontWeight: 700, lineHeight: 1.6 }}>{help}</div>
       {error ? <div id={`${id}-error`} role="alert" data-order-option-missing="true" style={{ marginTop: "5px", fontSize: "12px", color: "#C0392B", fontWeight: 700 }}>{error}</div> : null}
     </div>
   );
