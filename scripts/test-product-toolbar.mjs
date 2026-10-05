@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import React from 'react';
+import Renderer,{act} from 'react-test-renderer';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+let Toolbar;
+try {Toolbar=createUiLoader()('components/admin-live/ProductToolbar.tsx').default;}catch{}
+assert.equal(typeof Toolbar,'function','shared product toolbar must exist');
+let selected,action,tree;
+await act(async()=>{tree=Renderer.create(React.createElement(Toolbar,{tab:'products',onTab:tab=>selected=tab,onImport:()=>action='import',onCreate:()=>action='create'}));});
+const buttons=tree.root.findAllByType('button');
+assert.equal(buttons.length,5,'three destinations and two catalog actions, no duplicate controls');
+await act(async()=>buttons[0].props.onClick());assert.equal(selected,'broadcast');
+await act(async()=>buttons[1].props.onClick());assert.equal(selected,'shop');
+await act(async()=>buttons[2].props.onClick());assert.equal(selected,'products');
+await act(async()=>buttons[3].props.onClick());assert.equal(action,'import');
+await act(async()=>buttons[4].props.onClick());assert.equal(action,'create');
+assert.equal(buttons[2].props['aria-pressed'],true);
+await act(async()=>tree.unmount());
+console.log('PASS compact product toolbar destinations and actions');

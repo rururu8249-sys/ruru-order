@@ -19,6 +19,7 @@ await act(async()=>tree.unmount());
 await act(async()=>{tree=Renderer.create(React.createElement(Panel,{embedded:true,initialTab:'history',onClose(){}}));});
 assert.equal(labels(tree).includes('판매 기록'),false,'catalog navigation must not retain moved sales tab');
 assert.ok(labels(tree).includes('방송 상품'),'stale history tab must fall back to catalog workspace');
+assert.equal(JSON.stringify(tree.toJSON()).includes('📦 상품 관리'),false,'embedded catalog must not repeat the page title');
 await act(async()=>tree.unmount());
 console.log('PASS sales-only workspace and stale catalog-tab fallback');
 let outerScrolls=0;

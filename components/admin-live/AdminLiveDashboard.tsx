@@ -548,6 +548,7 @@ async function saveLiveBroadcastEndReport({
 }
 
 export default function AdminLiveDashboard() {
+  const [productHeaderTarget,setProductHeaderTarget]=useState<HTMLDivElement|null>(null);
   const [activeMenu, setActiveScreen] = useState<AdminLiveMenuKey>(() => resolveAdminLiveDestination(readMenuFromUrl()).screen);
   const [drawer, setDrawer] = useState<AdminLiveDrawerState>(() => resolveAdminLiveDestination(readMenuFromUrl()).drawer);
   const settingsGuardRef=useRef<null|(()=>Promise<boolean>)>(null);
@@ -1617,8 +1618,9 @@ export default function AdminLiveDashboard() {
               <div className="sticky top-0 z-30 -mx-3 -mt-3 mb-2 flex flex-wrap items-end justify-between gap-2 border-b border-rose-line bg-canvas px-3 pt-2 md:-mx-4 md:px-4">
                 {/* [2026-09-20 사장님 폰 화면 깨짐] 폰에서 「실시간 주\n문」처럼 탭 글자가 중간에서 잘렸다.
                     → 제목·탭은 절대 줄바꿈하지 않고(whitespace-nowrap), 탭 줄이 넘치면 옆으로 미는 스크롤로 바꾼다. 표시 전용 */}
-                <div className="flex min-w-0 items-end gap-3">
+                <div className={`flex min-w-0 items-end gap-3 ${activeMenu==='products'?'w-full':''}`}>
                   <h1 className="shrink-0 whitespace-nowrap pb-2 text-lg font-black tracking-tight text-ink">{activeTopMenu.label}</h1>
+                  {activeMenu==='products' && <div ref={setProductHeaderTarget} className="flex min-w-0 flex-1" />}
                   {activeSubTabs.length > 1 ? (
                     <div className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                       {activeSubTabs.map((tab) => {
@@ -1804,6 +1806,7 @@ export default function AdminLiveDashboard() {
               {activeMenu === "products" ? (
                 <AdminLiveProductManagePopup
                   key="products"
+                  headerTarget={productHeaderTarget}
                   embedded
                   activeBroadcastId={activeBroadcast?.id || null}
                   onClose={() => {}}
