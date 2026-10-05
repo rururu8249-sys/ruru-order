@@ -1,4 +1,17 @@
 type Row = Record<string, unknown>;
+// Exact stored detail keys only: never substitute another product's photo.
+export function salesProductPhotos(name: string, product: Row) {
+  let note: Row = {};
+  try { note = typeof product.product_note === 'string' ? JSON.parse(product.product_note) : (product.product_note || {}) as Row; } catch { /* legacy invalid notes */ }
+  const sets = note?.detail_photo_sets as Record<string, unknown> | undefined;
+  const photos = note?.detail_photos as Record<string, unknown> | undefined;
+  const set = sets?.[name];
+  const detail = Array.isArray(set) ? set.find(v=>typeof v==='string' && v.trim()) : undefined;
+  const direct = photos?.[name];
+  const brand = String(product.image_url || '');
+  const grouped = note?.combo_mode === true || (note?.brand_group as Row | undefined)?.enabled === true;
+  return {brand, detail: String(detail || (typeof direct === 'string' ? direct : '') || (!grouped && String(product.product_name || '') === name ? brand : ''))};
+}
 export const SALES_PAID_STATUSES = ['입금확인','수동입금확인','자동입금확인','출고대기','출고완료','카드결제완료'];
 export function eligibleSalesOrder(row: Row) {
   return SALES_PAID_STATUSES.includes(String(row.admin_order_status_v2)) &&
@@ -22,7 +35,7 @@ export function aggregateSalesItems(orders: Row[]) {
     cur.opts.set(option,(cur.opts.get(option)||0)+qty);
     map.set(key,cur);
   }
-  return [...map.values()].sort((a,b)=>b.sales-a.sales || a.name.localeCompare(b.name,'ko')).map(({opts,...row})=>({...row,option:[...opts].map(([option,qty])=>`${option} · ${qty}개`).join('\n')}));
+  return [...map.values()].sort((a,b)=>b.sales-a.sales || a.name.localeCompare(b.name,'ko')).map(({opts,...row})=>({...row,brandThumb:'',option:[...opts].map(([option,qty])=>`${option} · ${qty}개`).join('\n')}));
 }
 export function sortedSalesBroadcasts<T extends {id:string;started_at:string}>(rows:T[], stats:Map<string,{count:number}>) {
   return rows.filter(row=>(stats.get(row.id)?.count || 0)>0).sort((a,b)=>(Date.parse(b.started_at)||0)-(Date.parse(a.started_at)||0));

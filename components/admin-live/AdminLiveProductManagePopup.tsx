@@ -27,7 +27,7 @@ import {
 } from "@/lib/widgetProductLibrary";
 import { splitOptionText } from "@/lib/optionSplit";
 import { normalizeProductSearchText, productSearchMatches } from "@/lib/productSearch";
-import { aggregateSalesItems, eligibleSalesOrder, salesPaymentAmount, sortedSalesBroadcasts, SALES_PAID_STATUSES } from "@/lib/salesHistory";
+import { aggregateSalesItems, eligibleSalesOrder, salesPaymentAmount, sortedSalesBroadcasts, salesProductPhotos, SALES_PAID_STATUSES } from "@/lib/salesHistory";
 import { productPage } from "@/lib/productPagination";
 import ProductPagination from "./ProductPagination";
 
@@ -396,7 +396,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [histMode, setHistMode] = useState<"all" | "broadcast" | "shop">("all");
   const [histSearch, setHistSearch] = useState("");
   const [histExpand, setHistExpand] = useState("");
-  const [histDetail, setHistDetail] = useState<Map<string, Array<{ key: string; name: string; productId: string; thumb: string; qty: number; price: number; sales: number; option: string }>>>(new Map());
+  const [histDetail, setHistDetail] = useState<Map<string, Array<{ key: string; name: string; productId: string; thumb: string; brandThumb: string; qty: number; price: number; sales: number; option: string }>>>(new Map());
   const [histDetailLoading, setHistDetailLoading] = useState("");
   const [historyOrders, setHistoryOrders] = useState<Record<string, unknown>[]>([]);
 
@@ -1053,29 +1053,34 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       }));
       const pids = rows.map((r) => r.productId).filter(Boolean);
       if (pids.length > 0) {
-        const { data: prods, error } = await supabase.from("products").select("id, image_url").in("id", pids);
+        const { data: prods, error } = await supabase.from("products").select("id, product_name, image_url, product_note").in("id", pids);
         if (error) throw error;
-        const thumbs = new Map<string, string>();
-        ((prods as ProductRow[]) || []).forEach((p) => {
-          const url = String((p as { image_url?: unknown }).image_url || "");
-          if (url) thumbs.set(String((p as { id?: unknown }).id), resolveProductImageUrl(url));
+        const byId = new Map(((prods as ProductRow[]) || []).map(p=>[String(p.id),p]));
+        rows.forEach(r=>{
+          const product=byId.get(r.productId);
+          if (!product) return;
+          const photos=salesProductPhotos(r.name,product);
+          r.thumb=photos.detail ? resolveProductImageUrl(photos.detail) : '';
+          r.brandThumb=photos.brand ? resolveProductImageUrl(photos.brand) : '';
         });
-        rows.forEach((r) => { r.thumb = thumbs.get(r.productId) || ""; });
       }
       // product_id로 못 찾은 행(또는 product_id 없는 행) → products 전체 조회 후 product_name 클라이언트 매칭
-      const nameRows = rows.filter((r) => !r.thumb && r.name);
+      const nameRows = rows.filter((r) => !r.thumb && !r.brandThumb && r.name);
       if (nameRows.length > 0) {
-        const { data: allProds } = await supabase.from("products").select("id, product_name, image_url");
-        const nameThumbs = new Map<string, string>();
-        ((allProds as ProductRow[]) || []).forEach((p) => {
-          const nm = String((p as { product_name?: unknown }).product_name || "").toLowerCase().trim();
-          if (!nm || nameThumbs.has(nm)) return;
-          const url = String((p as { image_url?: unknown }).image_url || "");
-          if (url) nameThumbs.set(nm, resolveProductImageUrl(url));
-        });
-        nameRows.forEach((r) => {
-          const t = nameThumbs.get(r.name.toLowerCase().trim());
-          if (t) r.thumb = t;
+        const allProds: ProductRow[]=[];
+        for(let offset=0;;offset+=1000){
+          const {data,error}=await supabase.from('products').select('id, product_name, image_url, product_note').order('id').range(offset,offset+999);
+          if(error) throw error;
+          const page=(data||[]) as ProductRow[];
+          allProds.push(...page);
+          if(page.length<1000) break;
+        }
+        nameRows.forEach(r=>{
+          const candidates=allProds.map(p=>salesProductPhotos(r.name,p)).filter(p=>p.detail);
+          // A missing legacy ID never permits guessing between brand parents.
+          if(candidates.length!==1) return;
+          r.thumb=resolveProductImageUrl(candidates[0].detail);
+          r.brandThumb=candidates[0].brand ? resolveProductImageUrl(candidates[0].brand) : '';
         });
       }
       const detailRows = rows;
@@ -1879,25 +1884,25 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           ) : (
                             <>
                               {/* 펼침 헤더: 빈칸 / 상품명·옵션 / 수량 / 단가 / 매출 */}
-                              <div style={{ minWidth:440,display: "grid", gridTemplateColumns: "36px minmax(140px,1fr) 44px 82px 96px", gap: "8px", alignItems: "center", padding: "8px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink-soft)",background:"var(--color-surface-2)", borderBottom: "1px solid var(--color-line)" }}>
-                                <span />
-                                <span>상품명·옵션</span>
+                              <div style={{ minWidth:560,display: "grid", gridTemplateColumns: "minmax(130px,1fr) minmax(140px,1fr) 44px 82px 96px", gap: "8px", alignItems: "center", padding: "8px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink-soft)",background:"var(--color-surface-2)", borderBottom: "1px solid var(--color-line)" }}>
+                                <span>상품 사진·상품명</span>
+                                <span>구매 옵션별 수량</span>
                                 <span style={{ textAlign: "right" }}>수량</span>
                                 <span style={{ textAlign: "right" }}>단가</span>
                                 <span style={{ textAlign: "right" }}>매출</span>
                               </div>
                               {detail.map((r,index) => (
-                                <div key={r.key} style={{minWidth:440, display: "grid", gridTemplateColumns: "36px minmax(140px,1fr) 44px 82px 96px", gap: "8px", alignItems: "start", padding: "12px 8px",background:index%2 ? "var(--color-surface-2)" : "var(--color-surface)",fontVariantNumeric:"tabular-nums", borderBottom: "1px solid var(--color-line)" }}>
-                                  <span
-                                    onClick={(e) => { e.stopPropagation(); if (r.thumb) setImagePreviewUrl(r.thumb); }}
-                                    style={{ width: "36px", height: "36px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface)", border: "1px solid var(--color-line)", display: "flex", alignItems: "center", justifyContent: "center", cursor: r.thumb ? "zoom-in" : "default" }}
-                                  >
-                                    {r.thumb ? <img src={r.thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "14px" }}>🖼</span>}
-                                  </span>
-                                  <div style={{ minWidth: 0 }}>
+                                <div key={r.key} style={{minWidth:560, display: "grid", gridTemplateColumns: "minmax(130px,1fr) minmax(140px,1fr) 44px 82px 96px", gap: "8px", alignItems: "start", padding: "12px 8px",background:index%2 ? "var(--color-surface-2)" : "var(--color-surface)",fontVariantNumeric:"tabular-nums", borderBottom: "1px solid var(--color-line)" }}>
+                                  <div style={{minWidth:0}}>
+                                    <div style={{display:'flex',gap:6,alignItems:'flex-end',marginBottom:8}}>
+                                      <button type="button" aria-label={`${r.name} 상품 사진 확대`} disabled={!r.thumb} onClick={()=>setImagePreviewUrl(r.thumb)} style={{width:64,height:72,padding:0,borderRadius:8,border:'1px solid var(--color-line)',overflow:'hidden',background:'var(--color-surface)',cursor:r.thumb?'zoom-in':'default'}}>
+                                        {r.thumb ? <img src={r.thumb} alt={`${r.name} 실제 상품`} style={{width:'100%',height:'100%',objectFit:'contain'}}/> : <span style={{fontSize:11,color:'var(--color-ink-soft)'}}>세부 사진<br/>미등록</span>}
+                                      </button>
+                                      {r.brandThumb && r.brandThumb!==r.thumb ? <img src={r.brandThumb} alt={`${r.name} 브랜드 대표`} style={{width:24,height:24,objectFit:'contain',borderRadius:6}}/> : null}
+                                    </div>
                                     <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-ink)",overflowWrap:"anywhere" }}>{r.name}</div>
-                                    {r.option ? <div style={{ fontSize: "13px", color: "var(--color-ink-soft)", marginTop: "4px",whiteSpace:"pre-wrap",lineHeight:1.45,overflowWrap:"anywhere" }}>{r.option}</div> : null}
                                   </div>
+                                  <div style={{display:'flex',flexWrap:'wrap',alignContent:'flex-start',gap:6}}>{r.option.split('\n').map(option=><span key={option} style={{padding:'5px 8px',borderRadius:8,border:'1px solid var(--color-line)',background:'var(--color-surface)',fontSize:13,color:'var(--color-ink)',lineHeight:1.4,overflowWrap:'anywhere'}}>{option}</span>)}</div>
                                   <div style={{ textAlign: "right", fontSize: "14px", fontWeight: 700, color: "var(--color-ink)" }}>{r.qty.toLocaleString("ko-KR")}개</div>
                                   <div style={{ textAlign: "right", fontSize: "13px", color: "var(--color-ink-soft)" }}>{money(r.price)}</div>
                                   <div style={{ textAlign: "right", fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{money(r.sales)}</div>
