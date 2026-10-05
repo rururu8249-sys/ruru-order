@@ -35,6 +35,7 @@ assert.equal(renderer.root.findByProps({'aria-label':'상세설명'}).props.valu
 await act(async()=>renderer.unmount());
 console.log('detail form: exact selection and cancelled draft PASS');
 const linked={id:9002,product_name:'임시',price:1000,product_description:'원본 설명',product_note:JSON.stringify({spec_chips:['원본'],linked_detail_info:{mode:'inherit',chips:['원본'],description:'원본 설명'}}),__linked_brand_parent:{id:9001,product_name:'브랜드',product_description:'브랜드 설명',product_note:{spec_chips:['브랜드']}}};
+linked.__catalog_edit_version='a'.repeat(32);
 await act(async()=>{renderer=TestRenderer.create(React.createElement(Form,{activeBroadcastId:null,initialProduct:linked}));});
 const detailsButton=buttons().find(button=>text(button).includes('자세히 열기'));
 if(detailsButton) await act(async()=>detailsButton.props.onClick());
@@ -50,6 +51,7 @@ assert.equal(linked.product_description,'원본 설명');
 await act(async()=>buttons().find(button=>text(button)==='저장').props.onClick());
 assert.ok(saved,'save must persist source-owned information');
 assert.equal(saved.filters[0].val,'9002');
+assert.equal(saved.expectedVersion,'a'.repeat(32),'rendered editor must send the preview version with its update');
 assert.deepEqual(JSON.parse(saved.values.product_note).linked_detail_info,{mode:'custom',chips:['원본'],description:'개별 설명\n실측'});
 await act(async()=>renderer.unmount());
 console.log('PASS source-owned linked information modes and independent draft');

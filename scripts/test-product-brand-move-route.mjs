@@ -34,3 +34,20 @@ const {POST:catalogPost}=createUiLoader({
 })('app/api/admin-live/catalog-write/route.ts');
 assert.equal((await catalogPost({json:async()=>({table:'products',op:'update',values:{product_note:'{}'},filters:[{type:'eq',col:'id',val:1}]})})).status,409,'catalog must surface protected linked writes as conflicts');
 console.log('brand move route: PASS');
+let editCalls=[],editError=null;
+const editRoute=createUiLoader({
+  '@/lib/admin-auth':{verifyAdminSessionFromRequest:async()=>session},
+  '@supabase/supabase-js':{createClient:()=>({rpc:async(name,args)=>{editCalls.push({name,args});return {data:{id:2,product:{id:2,stock:5},version:'a'.repeat(32)},error:editError};}})},
+})('app/api/admin-live/catalog-write/route.ts');
+session=null;
+assert.equal((await editRoute.GET({url:'https://example.test?productId=2'})).status,401);
+session={sub:'admin'};
+assert.equal((await editRoute.GET({url:'https://example.test?productId=2'})).status,200);
+const editBody={table:'products',op:'update',values:{stock:5},filters:[{type:'eq',col:'id',val:'2'}],expectedVersion:'a'.repeat(32),single:true};
+assert.equal((await editRoute.POST({json:async()=>editBody})).status,200);
+assert.deepEqual(editCalls.pop(),{name:'product_catalog_update',args:{p_id:'2',p_version:'a'.repeat(32),p_values:{stock:5}}});
+editError={code:'40001',message:'SQL private detail'};
+const conflict=await editRoute.POST({json:async()=>editBody});
+assert.equal(conflict.status,409);
+assert.equal(JSON.stringify(await conflict.json()).includes('SQL private detail'),false);
+console.log('PASS authenticated versioned editor snapshot and atomic conflict response');

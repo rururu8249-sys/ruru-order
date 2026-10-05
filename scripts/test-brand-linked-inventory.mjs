@@ -6,6 +6,8 @@ import {resolveBroadcastBrandProducts} from '../lib/productBrandLinks.ts';
 import {aggregateSalesItems} from '../lib/salesHistory.ts';
 import {resolveOrderItemPhoto} from '../lib/orderItemPhoto.ts';
 import {createUiLoader} from './admin-ui-test-loader.mjs';
+import React from 'react';
+import Renderer,{act} from 'react-test-renderer';
 
 const db=new PGlite();
 try {
@@ -40,7 +42,25 @@ try {
     const response=await POST({json:async()=>({action,sourceId:'2',parentId:'1',detailName:action==='move'?'NEW':null,requestId:request,expectedSourceVersion:current.sourceVersion,expectedParentVersion:current.parentVersion})});
     assert.equal(response.status,200);return response.json();
   };
-  const link=(await move('move','inventory-move')).link;
+  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+  const {default:Dialog}=createUiLoader({})('components/admin-live/ProductBrandMoveDialog.tsx');
+  let movedResult,dialogSaved=0;
+  globalThis.fetch=async(url,options)=>{
+    const response=options?.method==='POST'
+      ? await POST({json:async()=>JSON.parse(options.body)})
+      : await GET({url:`https://isolated.example${url}`});
+    if(options?.method==='POST'&&response.ok)movedResult=await response.clone().json();
+    return response;
+  };
+  let dialog;
+  await act(async()=>{dialog=Renderer.create(React.createElement(Dialog,{source,brands:[brand],onClose(){},onMoved:()=>dialogSaved++}));});
+  await act(async()=>dialog.root.findByProps({'aria-label':'이동할 브랜드'}).props.onChange({target:{value:'1'}}));
+  await act(async()=>dialog.root.findByProps({'aria-label':'이동 후 상품명'}).props.onChange({target:{value:'NEW'}}));
+  await act(async()=>dialog.root.findAllByType('button').find(button=>button.children.includes('이 브랜드로 이동')).props.onClick());
+  assert.equal(dialogSaved,1,'real dialog must complete authenticated handler and DB transaction');
+  const link=movedResult.link;
+  assert.equal(link.sourceId,'2');assert.equal(link.detailName,'NEW');
+  await act(async()=>dialog.unmount());
   const beforeSubmitSnapshot=await snapshot();
   const projected=resolveBroadcastBrandProducts([brand,source],[link],['1','2']);
   assert.equal(projected.filter(row=>row.id===2).length,1);

@@ -15,6 +15,7 @@ export type CatalogWritePayload = {
   select?: string;
   single?: boolean;
   upsertOptions?: Record<string, unknown>;
+  expectedVersion?: string;
 };
 
 export async function adminCatalogWrite(

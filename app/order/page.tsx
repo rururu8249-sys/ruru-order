@@ -4388,7 +4388,7 @@ export default function OrderPage() {
     for (const row of chatClaimRows) {
       const key = String(row?.id ?? "");
       if (!key || chatClaimDoneRef.current.has(key)) continue;
-      const product = pool.find((p) => String((p as any)?.id ?? "") === String(row?.product_id ?? ""));
+      const product = findBrandOrderProductById(pool as unknown as Record<string,unknown>[], String(row?.product_id ?? ""));
       if (!product) continue; // 지금 판매 목록에 없는 상품 — 담지 않고 보류(강제 담기 금지)
       chatClaimDoneRef.current.add(key);
       for (const it of chatClaimItemsOf(row)) {
@@ -4532,8 +4532,8 @@ export default function OrderPage() {
       ? buildCustomerDetailProductName(product.product_name, normalizedCustomerDetail)
       : "";
     const selectedDetailConfig = brandGroup?.detailOptions[registeredOptionDetail] || null;
-    const detailHasNoColor = Boolean(selectedDetailConfig && selectedDetailConfig.colors.every((value) => normalizeEmptyProductOptionValue(value) === ""));
-    const detailHasNoSize = Boolean(selectedDetailConfig && selectedDetailConfig.sizes.every((value) => normalizeEmptyProductOptionValue(value) === ""));
+    const detailHasNoColor = Boolean(product === parent && selectedDetailConfig && selectedDetailConfig.colors.every((value) => normalizeEmptyProductOptionValue(value) === ""));
+    const detailHasNoSize = Boolean(product === parent && selectedDetailConfig && selectedDetailConfig.sizes.every((value) => normalizeEmptyProductOptionValue(value) === ""));
     const colorMode = detailHasNoColor ? "none" : getRegisteredOptionMode(product, "color");
     const sizeMode = detailHasNoSize ? "none" : getRegisteredOptionMode(product, "size");
 
@@ -4598,10 +4598,10 @@ export default function OrderPage() {
         color: brandGroup ? (registeredOptionColor.trim() || "없음") : registeredOptionStorageColor,
         size: registeredOptionSize,
         qty: registeredOptionQty,
-        ...(brandGroup
+        ...(requiresCustomerDetail
+          ? { displayName: customerDetailDisplayName }
+          : brandGroup
           ? { displayName: registeredOptionDetail, priceKey: registeredOptionDetail }
-          : requiresCustomerDetail
-            ? { displayName: customerDetailDisplayName }
             : {}),
         ...(registeredOptionNeedsManualPrice ? { unitPrice: registeredOptionManualPrice } : {}),
       });
@@ -4621,10 +4621,10 @@ export default function OrderPage() {
     const isDuplicate = await checkDuplicateOrder({
       // 브랜드 묶음/고객 세부상품명 직접입력은 같은 대표 product_id 아래 실제 주문명을 상품명으로 구분한다.
       productId: brandGroup || requiresCustomerDetail ? "" : String(product.id ?? ""),
-      productName: brandGroup
+      productName: requiresCustomerDetail
+        ? customerDetailDisplayName
+        : brandGroup
         ? registeredOptionDetail
-        : requiresCustomerDetail
-          ? customerDetailDisplayName
           : product.product_name,
       color: brandGroup ? (registeredOptionColor.trim() || "없음") : registeredOptionStorageColor,
       size: registeredOptionSize,
@@ -6222,13 +6222,13 @@ export default function OrderPage() {
       ? getSelectableRegisteredOptions(registeredOptionSelectProduct, "size")
       : [];
   // [2026-09-03] 색상별 사진 — 색상 버튼 앞 작은 썸네일(클릭=확대). 없으면 빈 맵이라 기존 그대로.
-  const registeredOptionColorPhotos = registeredOptionSelectProduct ? readColorPhotosOrderProduct(registeredOptionSelectProduct) : {};
-  const registeredOptionColorMode = registeredOptionSelectedDetailConfig && registeredOptionColorChoices.length === 0
+  const registeredOptionColorPhotos = registeredOptionResolvedProduct ? readColorPhotosOrderProduct(registeredOptionResolvedProduct) : {};
+  const registeredOptionColorMode = registeredOptionResolvedProduct === registeredOptionSelectProduct && registeredOptionSelectedDetailConfig && registeredOptionColorChoices.length === 0
     ? "none"
     : registeredOptionResolvedProduct
       ? getRegisteredOptionMode(registeredOptionResolvedProduct, "color")
       : "none";
-  const registeredOptionSizeMode = registeredOptionSelectedDetailConfig && registeredOptionSizeChoices.length === 0
+  const registeredOptionSizeMode = registeredOptionResolvedProduct === registeredOptionSelectProduct && registeredOptionSelectedDetailConfig && registeredOptionSizeChoices.length === 0
     ? "none"
     : registeredOptionResolvedProduct
       ? getRegisteredOptionMode(registeredOptionResolvedProduct, "size")
@@ -6251,8 +6251,8 @@ export default function OrderPage() {
   const registeredOptionNeedsManualPrice = registeredOptionPriceMode === "direct";
   const registeredOptionUnitPrice = registeredOptionNeedsManualPrice ? registeredOptionManualPrice : registeredOptionConfiguredPrice;
   const registeredOptionTotalPrice = Math.max(1, registeredOptionQty) * (Number.isFinite(registeredOptionUnitPrice) ? registeredOptionUnitPrice : 0);
-  const registeredOptionCustomerDetailRequired = registeredOptionSelectProduct
-    ? customerDetailInputEnabled(registeredOptionSelectProduct.product_note)
+  const registeredOptionCustomerDetailRequired = registeredOptionResolvedProduct
+    ? customerDetailInputEnabled(registeredOptionResolvedProduct.product_note)
     : false;
   const registeredOptionCustomerDetailReady =
     !registeredOptionCustomerDetailRequired || Boolean(normalizeCustomerDetailName(registeredOptionCustomerDetail));
@@ -8100,7 +8100,7 @@ export default function OrderPage() {
                           ? "세부상품을 먼저 선택"
                           : !registeredOptionColorSelected
                             ? (registeredOptionColorMode === "input"
-                                ? (() => { const lb = getCustomInputLabel(registeredOptionSelectProduct); return lb ? `${lb}${koEulReul(lb)} 입력해 주세요` : "색상을 입력해 주세요"; })()
+                                ? (() => { const lb = getCustomInputLabel(registeredOptionResolvedProduct || registeredOptionSelectProduct); return lb ? `${lb}${koEulReul(lb)} 입력해 주세요` : "색상을 입력해 주세요"; })()
                                 : "색상을 선택해 주세요")
                             : !registeredOptionSizeSelected
                               ? (registeredOptionSizeMode === "input" ? "사이즈를 입력해 주세요" : "사이즈를 선택해 주세요")
@@ -8420,7 +8420,7 @@ export default function OrderPage() {
 
                   {registeredOptionDetailSelected && registeredOptionColorMode === "input" ? (() => {
                     // [2026-09-03 사장님 요청] 칸 제목은 사장님이 정한 라벨(예: 상품숫자), 없으면 기존대로 "색상"
-                    const inputLabel = getCustomInputLabel(registeredOptionSelectProduct) || "색상";
+                    const inputLabel = getCustomInputLabel(registeredOptionResolvedProduct || registeredOptionSelectProduct) || "색상";
                     return (
                     <div style={{ marginBottom: "16px" }}>
                       {/* [2026-09-03 재설계 4단계 · 표시 전용] 직접입력 칸 — 주황 점선+배지+예시로 "내가 적어야 함"을 바로 인식 */}

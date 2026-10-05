@@ -133,15 +133,26 @@ create or replace function public.product_brand_guard_parent_note()
 returns trigger language plpgsql security invoker set search_path = '' as $$
 declare v_note jsonb;
 begin
-  if not exists(select 1 from public.product_brand_links where parent_id=new.id) then return new; end if;
+  if not exists(select 1 from public.product_brand_links where parent_id=new.id or source_id=new.id) then return new; end if;
   v_note := coalesce(nullif(new.product_note,'')::jsonb,'{}'::jsonb);
+  if exists(select 1 from public.product_brand_links where source_id=new.id)
+    and v_note #>> '{brand_group,enabled}' = 'true' then
+    raise exception 'Linked source cannot become a brand' using errcode='23505';
+  end if;
+  if not exists(select 1 from public.product_brand_links where parent_id=new.id) then return new; end if;
   if v_note #>> '{brand_group,enabled}' is distinct from 'true' then
     raise exception 'Linked detail parent cannot become standalone' using errcode='23505';
   end if;
   if exists (
     select 1 from public.product_brand_links l
-    join jsonb_object_keys(coalesce(v_note #> '{brand_group,detail_options}','{}'::jsonb)) n(name)
-      on n.name=l.detail_name
+    join (
+      select jsonb_object_keys(coalesce(v_note #> '{brand_group,detail_options}','{}'::jsonb)) as name
+      union select jsonb_array_elements_text(coalesce(v_note->'combo_detail_values','[]'::jsonb))
+    ) n
+      on n.name=l.detail_name or (
+        public.product_brand_detail_code(n.name) is not null
+        and public.product_brand_detail_code(n.name)=public.product_brand_detail_code(l.detail_name)
+      )
     where l.parent_id=new.id
   ) then raise exception 'Linked detail cannot be overwritten by parent' using errcode='23505'; end if;
   return new;
@@ -152,3 +163,36 @@ create trigger product_brand_guard_parent_note_trg before update of product_note
   for each row execute function public.product_brand_guard_parent_note();
 revoke all on function public.product_brand_guard_parent_note() from public, anon, authenticated;
 grant execute on function public.product_brand_guard_parent_note() to service_role;
+
+-- General editing uses the same atomic version boundary as move/undo.
+create or replace function public.product_catalog_edit_snapshot(p_id bigint)
+returns jsonb language sql stable security invoker set search_path = '' as $$
+  select jsonb_build_object('product',to_jsonb(p),'version',public.product_brand_version(p.id),
+    'parent',(select to_jsonb(parent) from public.product_brand_links l join public.products parent on parent.id=l.parent_id where l.source_id=p.id))
+  from public.products p where p.id=p_id;
+$$;
+create or replace function public.product_catalog_update(p_id bigint,p_version text,p_values jsonb)
+returns jsonb language plpgsql security invoker set search_path = '' as $$
+declare v_key text; v_set text := ''; v_result jsonb;
+begin
+  if p_version is null or jsonb_typeof(p_values) is distinct from 'object' or p_values='{}'::jsonb then
+    raise exception 'Invalid product update' using errcode='22023';
+  end if;
+  perform id from public.products where id=p_id for update;
+  if not found then raise exception 'Missing product' using errcode='22023'; end if;
+  if public.product_brand_version(p_id) is distinct from p_version then
+    raise exception 'Conflict: product changed' using errcode='40001';
+  end if;
+  for v_key in select jsonb_object_keys(p_values) loop
+    if v_key in ('id','created_at') then raise exception 'Protected product column' using errcode='22023'; end if;
+    if not exists(select 1 from pg_catalog.pg_attribute where attrelid='public.products'::regclass and attname=v_key and attnum>0 and not attisdropped and attgenerated='') then
+      raise exception 'column "%" does not exist',v_key using errcode='42703';
+    end if;
+    v_set := v_set || case when v_set='' then '' else ',' end || pg_catalog.format('%I=(jsonb_populate_record(null::public.products,$1)).%I',v_key,v_key);
+  end loop;
+  execute 'update public.products p set '||v_set||' where id=$2 returning to_jsonb(p)' into v_result using p_values,p_id;
+  return v_result;
+end;
+$$;
+revoke all on function public.product_catalog_edit_snapshot(bigint), public.product_catalog_update(bigint,text,jsonb) from public,anon,authenticated;
+grant execute on function public.product_catalog_edit_snapshot(bigint), public.product_catalog_update(bigint,text,jsonb) to service_role;

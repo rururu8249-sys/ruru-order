@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import QuickProductFastForm from "./quick-product/QuickProductFastForm";
 
 type ProductRow = Record<string, unknown>;
@@ -15,31 +15,51 @@ export default function AdminLiveQuickProductDrawer({
   const [isOpen, setIsOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductRow | null>(null);
   const [editingDetailName, setEditingDetailName] = useState("");
+  const editRequest=useRef(0);
 
   useEffect(() => {
     const openDrawer = () => {
+      editRequest.current++;
       setEditingProduct(null);
       setEditingDetailName("");
       setIsOpen(true);
     };
 
     const closeDrawer = () => {
+      editRequest.current++;
       setIsOpen(false);
     };
 
+    const openEdit = async (product: ProductRow | null, detailName: string) => {
+      if (!product?.id) {
+        editRequest.current++;
+        setEditingProduct(product);
+        setEditingDetailName(detailName);
+        setIsOpen(true);
+        return;
+      }
+      const request=++editRequest.current;
+      try {
+        const response=await fetch(`/api/admin-live/catalog-write?productId=${encodeURIComponent(String(product.id))}`,{cache:'no-store'});
+        const snapshot=await response.json();
+        if(request!==editRequest.current) return;
+        if(!response.ok || !snapshot?.product || !/^[a-f0-9]{32}$/.test(snapshot.version)) throw new Error(snapshot?.error || '최신 상품을 불러오지 못했습니다.');
+        setEditingProduct({...snapshot.product,__catalog_edit_version:snapshot.version,...(snapshot.parent?{__linked_brand_parent:snapshot.parent}:{})});
+        setEditingDetailName(detailName);
+        setIsOpen(true);
+      } catch(error) {
+        if(request===editRequest.current) window.alert(error instanceof Error?error.message:'최신 상품을 불러오지 못했습니다. 다시 열어주세요.');
+      }
+    };
     const editDrawer = (event: Event) => {
       const customEvent = event as CustomEvent<ProductRow>;
-      setEditingProduct(customEvent.detail || null);
-      setEditingDetailName("");
-      setIsOpen(true);
+      void openEdit(customEvent.detail || null, '');
     };
 
     const editDetailDrawer = (event: Event) => {
       const { product, detailName } = (event as CustomEvent<{ product: ProductRow; detailName: string }>).detail;
       if (!product || !detailName) return;
-      setEditingProduct(product);
-      setEditingDetailName(detailName);
-      setIsOpen(true);
+      void openEdit(product, detailName);
     };
 
     window.addEventListener("ruru-open-quick-product-panel", openDrawer);
@@ -48,6 +68,7 @@ export default function AdminLiveQuickProductDrawer({
     window.addEventListener("ruru-edit-quick-product-detail", editDetailDrawer);
 
     return () => {
+      editRequest.current++;
       window.removeEventListener("ruru-open-quick-product-panel", openDrawer);
       window.removeEventListener("ruru-close-quick-product-panel", closeDrawer);
       window.removeEventListener("ruru-edit-quick-product", editDrawer);

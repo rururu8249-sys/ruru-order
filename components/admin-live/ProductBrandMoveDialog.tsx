@@ -18,6 +18,14 @@ export default function ProductBrandMoveDialog({source,brands,onClose,onMoved,un
   const [revision,setRevision]=useState(0);
   const requestId=useRef<string|null>(null);
   const inFlight=useRef(false);
+  const dialogRef=useRef<HTMLElement|null>(null);
+  useEffect(()=>{
+    const dialog=dialogRef.current;
+    if(!dialog) return;
+    const previous=document.activeElement as HTMLElement|null;
+    (dialog.querySelector<HTMLElement>('input,select,button') ?? dialog).focus({preventScroll:true});
+    return ()=>{if(previous?.isConnected) previous.focus({preventScroll:true});};
+  },[]);
   useEffect(()=>{
     let current=true;
     setSnapshot(null);requestId.current=null;
@@ -48,7 +56,15 @@ export default function ProductBrandMoveDialog({source,brands,onClose,onMoved,un
   const info=resolveDetailInfo(snapshot?.parent ?? preview,linkedSourceInfo(preview));
   const label=undoParentId?'독립 상품으로 되돌리기':'이 브랜드로 이동';
   return <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
-    <section role="dialog" aria-modal="true" aria-label="브랜드 하위 상품 이동" className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-xl">
+    <section ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="브랜드 하위 상품 이동" onKeyDown={event=>{
+      if(event.key==='Escape'){event.preventDefault();event.stopPropagation();if(!inFlight.current)onClose();}
+      if(event.key!=='Tab')return;
+      const controls=Array.from(event.currentTarget.querySelectorAll<HTMLElement>('input:not(:disabled),select:not(:disabled),button:not(:disabled),[tabindex="0"]'));
+      const first=controls[0],last=controls[controls.length-1];
+      if(!first){event.preventDefault();event.currentTarget.focus();return;}
+      if(event.shiftKey && (document.activeElement===first || document.activeElement===event.currentTarget)){event.preventDefault();last.focus();}
+      else if(!event.shiftKey && document.activeElement===last){event.preventDefault();first.focus();}
+    }} className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-xl">
       <header className="border-b border-line p-5"><h2 className="text-lg font-extrabold text-ink">{undoParentId?'브랜드 연결 되돌리기':'브랜드 하위로 이동'}</h2><p className="mt-1 text-sm text-ink-soft">기존 주문·판매기록과 원본 상품 ID, 가격, 재고는 그대로 유지됩니다.</p></header>
       <div className="space-y-4 overflow-y-auto p-5">
         {!undoParentId?<div className="grid gap-3 sm:grid-cols-2"><label className="text-sm font-bold">브랜드 검색<input aria-label="브랜드 검색" value={query} disabled={busy} onChange={event=>setQuery(event.target.value)} className="mt-1 w-full rounded-xl border border-line p-3" /></label><label className="text-sm font-bold">이동할 브랜드<select aria-label="이동할 브랜드" value={parentId} disabled={busy} onChange={event=>setParentId(event.target.value)} className="mt-1 w-full rounded-xl border border-line p-3"><option value="">직접 선택해주세요</option>{filtered.map(brand=><option key={String(brand.id)} value={String(brand.id)}>{String(brand.product_name)}</option>)}</select></label></div>:null}

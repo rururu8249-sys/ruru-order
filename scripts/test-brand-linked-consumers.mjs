@@ -55,6 +55,8 @@ assert.deepEqual(widget.widgetTargetFromProduct(projected[0]),{productId:'1',det
 const order=await import('../lib/productBrandOrder.ts').catch(()=>({}));
 assert.equal(typeof order.buildBrandOrderCatalog,'function');
 const orderRoots=order.buildBrandOrderCatalog(fixture,links,['1','2','3']);
+const hiddenParent={...brand,product_note:{brand_group:{enabled:true,detail_options:{VISIBLE:{},HIDDEN:{}}},combo_hidden:['HIDDEN'],combo_detail_values:['VISIBLE']}};
+assert.deepEqual(order.buildBrandOrderCatalog([hiddenParent,source],links,['1'])[0].product_note.combo_detail_values,['VISIBLE','NEW'],'moving a source must not expose hidden legacy details');
 assert.deepEqual(orderRoots.map(row=>row.id),[1,3]);
 const selected=order.resolveBrandOrderSelection(orderRoots[0],'NEW');
 assert.deepEqual(orderRoots[0].product_note.brand_group.detail_options.NEW.variants,[{color:'베이지',size:'S'}],'customer size selector must see the original option combinations');
@@ -67,6 +69,40 @@ assert.equal(order.findBrandOrderProductById(orderRoots,'2').id,2,'original-ID d
 assert.equal(order.findBrandOrderProductById(orderRoots,'999'),null,'unknown ID cannot guess a nearby name');
 assert.equal(JSON.stringify(fixture),original,'building selection metadata cannot change original rows');
 console.log('PASS brand selection source ID, legacy identity and original-ID deep links');
+// Execute the real selection confirmation, including nested source settings.
+const customerFs=await import('node:fs');
+const customerTs=(await import('typescript')).default;
+const customerText=customerFs.readFileSync('app/order/page.tsx','utf8');
+const customerAst=customerTs.createSourceFile('page.tsx',customerText,customerTs.ScriptTarget.Latest,true,customerTs.ScriptKind.TSX);
+let confirmNode;
+const visitConfirm=node=>{if(customerTs.isVariableDeclaration(node)&&node.name.getText(customerAst)==='confirmRegisteredOptionSelectSheet')confirmNode=node.initializer;customerTs.forEachChild(node,visitConfirm);};
+visitConfirm(customerAst);
+const confirmJs=customerTs.transpileModule('const confirm = '+confirmNode.getText(customerAst),{compilerOptions:{target:customerTs.ScriptTarget.ES2022}}).outputText;
+const directSource={...source,product_note:{customer_detail_input_enabled:true,custom_input_label:'상품숫자'}};
+const directParent=order.buildBrandOrderCatalog([brand,directSource],links,['1'])[0];
+let added=null;
+const notices=[];
+const confirmContext={registeredOptionSelectProduct:directParent,registeredOptionDetail:'NEW',resolveBrandOrderSelection:order.resolveBrandOrderSelection,readBrandGroupOrderProduct:p=>({detailOptions:p.product_note.brand_group.detail_options}),
+ customerDetailInputEnabled:note=>note?.customer_detail_input_enabled===true,normalizeCustomerDetailName:v=>v.trim(),registeredOptionCustomerDetail:'123',buildCustomerDetailProductName:(name,detail)=>`${name} · ${detail}`,
+ normalizeEmptyProductOptionValue:v=>String(v??'').replace(/^없음$/,''),getRegisteredOptionMode:()=> 'input',registeredOptionColor:'42',registeredOptionSize:'S',readOrderAxes3:()=>({detailLabel:'세부상품'}),showCustomerNotice:v=>notices.push(v),readComboInfoOrderProduct:()=>null,getCustomInputLabel:()=> '상품숫자',koEulReul:()=> '를',registeredOptionStorageColor:'42',registeredOptionNeedsManualPrice:false,registeredOptionEditIndex:null,registeredOptionQty:1,registeredOptionManualPrice:0,
+ addRegisteredProductToOrderItems:(product,options)=>{added={product,options};},checkDuplicateOrder:async()=>false,setRegisteredOptionDetail:()=>{},setRegisteredOptionColor:()=>{},setRegisteredOptionSize:()=>{},setRegisteredOptionQty:()=>{},setRegisteredOptionManualPrice:()=>{},setRegisteredOptionComboSearch:()=>{},closeRegisteredOptionSelectSheet:()=>{}};
+await new Function(...Object.keys(confirmContext),confirmJs+';return confirm;')(...Object.values(confirmContext))();
+assert.deepEqual(notices,[]);
+assert.equal(added.product.id,2);
+assert.equal(added.options.displayName,'NEW · 123','linked customer input must survive final cart name');
+const declaration=name=>{let found;const visit=node=>{if(customerTs.isVariableDeclaration(node)&&node.name.getText(customerAst)===name)found=node.initializer.getText(customerAst);customerTs.forEachChild(node,visit);};visit(customerAst);return found;};
+const evaluate=(name,context)=>new Function(...Object.keys(context),'return ('+customerTs.transpileModule('const result='+declaration(name),{compilerOptions:{target:customerTs.ScriptTarget.ES2022}}).outputText.replace(/^const result = /,'').replace(/;\s*$/,'')+');')(...Object.values(context));
+const fieldContext={registeredOptionResolvedProduct:directSource,registeredOptionSelectProduct:directParent,registeredOptionSelectedDetailConfig:{colors:[],sizes:[]},registeredOptionColorChoices:[],registeredOptionSizeChoices:[],getRegisteredOptionMode:()=> 'input',customerDetailInputEnabled:confirmContext.customerDetailInputEnabled,readColorPhotosOrderProduct:p=>p===directSource?{베이지:'SOURCE.jpg'}:{베이지:'PARENT.jpg'}};
+assert.equal(evaluate('registeredOptionCustomerDetailRequired',fieldContext),true,'source direct-input field must be visible');
+assert.equal(evaluate('registeredOptionColorMode',fieldContext),'input','empty projection cannot suppress original direct-input mode');
+assert.equal(evaluate('registeredOptionSizeMode',fieldContext),'input');
+assert.equal(evaluate('registeredOptionColorPhotos',fieldContext).베이지,'SOURCE.jpg');
+let chatLookup;
+const visitChat=node=>{if(customerTs.isVariableDeclaration(node)&&node.name.getText(customerAst)==='product'&&node.initializer?.getText(customerAst).includes('row?.product_id'))chatLookup=node.initializer.getText(customerAst);customerTs.forEachChild(node,visitChat);};
+visitChat(customerAst);
+const chatLookupJs=customerTs.transpileModule('const product='+chatLookup,{compilerOptions:{target:customerTs.ScriptTarget.ES2022}}).outputText;
+assert.equal(new Function('pool','row','findBrandOrderProductById',chatLookupJs+';return product;')(orderRoots,{product_id:2},order.findBrandOrderProductById).id,2,'actual chat auto-add must resolve a source nested below a brand');
+console.log('PASS actual customer confirmation, input field modes and source color photos');
 // Execute the customer's actual matching boundary, without mounting unrelated login/payment UI.
 const fs=await import('node:fs');
 const ts=(await import('typescript')).default;

@@ -22,6 +22,7 @@ type WriteBody = {
   select?: string;
   single?: boolean;
   upsertOptions?: Record<string, unknown>;
+  expectedVersion?: string;
 };
 
 function getServiceClient() {
@@ -30,6 +31,18 @@ function getServiceClient() {
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE || "";
   if (!url || !key) throw new Error("Supabase 관리자 환경변수가 설정되지 않았습니다.");
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+}
+
+export async function GET(request: NextRequest) {
+  const headers={'Cache-Control':'no-store'};
+  try {
+    if (!await verifyAdminSessionFromRequest(request)) return NextResponse.json({error:'관리자 로그인이 필요합니다.'},{status:401,headers});
+    const id=new URL(request.url).searchParams.get('productId');
+    if (!id || !/^[1-9][0-9]{0,18}$/.test(id) || BigInt(id)>BigInt('9223372036854775807')) return NextResponse.json({error:'상품을 확인해주세요.'},{status:400,headers});
+    const {data,error}=await getServiceClient().rpc('product_catalog_edit_snapshot',{p_id:id});
+    if(error) throw error;
+    return NextResponse.json(data ?? {error:'상품을 찾을 수 없습니다.'},{status:data?200:404,headers});
+  } catch {return NextResponse.json({error:'최신 상품을 불러오지 못했습니다. 다시 열어주세요.'},{status:503,headers});}
 }
 
 export async function POST(request: NextRequest) {
@@ -54,6 +67,16 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getServiceClient();
+    if(body?.expectedVersion !== undefined) {
+      const filters=Array.isArray(body.filters)?body.filters:[];
+      const id=filters.length===1 && filters[0].type==='eq' && filters[0].col==='id' ? String(filters[0].val) : '';
+      if(table!=='products'||op!=='update'||!/^\d+$/.test(id)||!/^[a-f0-9]{32}$/.test(body.expectedVersion)||!body.values||Array.isArray(body.values)||typeof body.values!=='object') {
+        return NextResponse.json({data:null,error:{message:'상품 저장 요청을 확인해주세요.'}},{status:400});
+      }
+      const {data,error}=await supabase.rpc('product_catalog_update',{p_id:id,p_version:body.expectedVersion,p_values:body.values});
+      if(error) return NextResponse.json({data:null,error:{message:error.code==='42703'?error.message:'상품이 변경되어 저장하지 않았습니다. 최신 상품을 다시 열어 확인해주세요.'}},{status:['40001','23505'].includes(error.code)?409:400});
+      return NextResponse.json({data:body.single?{id:data.id}:data,error:null});
+    }
     let query: any = supabase.from(table);
 
     if (op === "insert") query = query.insert(body?.values as any);

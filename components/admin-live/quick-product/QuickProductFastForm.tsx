@@ -443,7 +443,8 @@ async function insertProductSchemaSafe(payload: Record<string, unknown>) {
   throw new Error("products 저장 재시도 횟수를 초과했습니다.");
 }
 
-async function updateProductSchemaSafe(productId: string, payload: Record<string, unknown>) {
+async function updateProductSchemaSafe(productId: string, payload: Record<string, unknown>, expectedVersion: string) {
+  if (!/^[a-f0-9]{32}$/.test(expectedVersion)) throw new Error('최신 상품 상태가 없습니다. 편집창을 다시 열어주세요.');
   const requiredColumns = new Set(["product_name"]);
   const workingPayload = { ...payload };
   const removedColumns: string[] = [];
@@ -456,6 +457,7 @@ async function updateProductSchemaSafe(productId: string, payload: Record<string
       filters: [{ type: "eq", col: "id", val: productId }],
       select: "id",
       single: true,
+      expectedVersion,
     });
 
     if (!error) {
@@ -1999,7 +2001,7 @@ export default function QuickProductFastForm({
       };
 
       const result = isEditMode
-        ? await updateProductSchemaSafe(editingProductId, payload)
+        ? await updateProductSchemaSafe(editingProductId, payload, String(initialProduct?.__catalog_edit_version ?? ''))
         : await insertProductSchemaSafe(payload);
 
       const productId = result.data?.id;

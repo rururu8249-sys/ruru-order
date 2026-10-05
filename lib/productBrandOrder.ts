@@ -31,7 +31,8 @@ export function buildBrandOrderCatalog(products: ProductLike[], links: BrandProd
       photos[detail.detailName] = detail.images;
     }
     const axes = Array.isArray(note.option_axes) ? note.option_axes.map(axis => ({...record(axis)})) : [];
-    const names = [...new Set([...Object.keys(options), ...(Array.isArray(note.combo_detail_values) ? note.combo_detail_values.map(String) : [])])];
+    const hidden = new Set(Array.isArray(note.combo_hidden) ? note.combo_hidden.map(value => String(value).trim()) : []);
+    const names = [...new Set([...Object.keys(options), ...(Array.isArray(note.combo_detail_values) ? note.combo_detail_values.map(String) : [])])].filter(name => !hidden.has(name));
     const detailAxis = axes.find(axis => axis.key === 'detail');
     if (detailAxis) detailAxis.values = names;
     else axes.unshift({key:'detail',label:'세부상품',values:names});

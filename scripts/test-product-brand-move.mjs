@@ -19,6 +19,7 @@ try {
       (2,'임시',39000,7,'{"stock_management_enabled":true}',null,'actual.jpg','["back.jpg"]','["베이지"]','["S","M"]','설명',null,'판매중');
   `);
   await db.exec(sql);
+  await db.exec(`insert into products(id,product_name,price,stock) values(3,'기존 메모 상품',1000,1); update products set product_note='기존 일반 메모' where id=3`);
   const sourceBefore = (await db.query('select to_jsonb(p) as value from products p where id=2')).rows[0].value;
   const version = async id => (await db.query('select public.product_brand_version($1) as version',[id])).rows[0].version;
   const sourceVersion = await version(2), parentVersion = await version(1);
@@ -60,10 +61,20 @@ try {
   assert.equal((await db.query('select count(*)::integer as n from product_brand_links')).rows[0].n,0,'failed audit rolls back link too');
   await db.exec('drop trigger force_failure on product_brand_move_audit');
   await move(['move',2,1,'NEW','guard-move',await version(2),await version(1)]);
+  await assert.rejects(()=>db.exec(`update products set product_note='{"brand_group":{"enabled":true}}' where id=2`),/linked.*source/i,'linked stock owner cannot become a brand');
   await assert.rejects(()=>db.exec(`delete from products where id=2`),/foreign key/i,'linked stock owner cannot be deleted');
   await assert.rejects(()=>db.exec(`update products set product_note='{"brand_group":{"enabled":true,"detail_options":{"NEW":{}}}}' where id=1`),/linked.*detail/i,'parent editor cannot create shadow copy of linked detail');
   await move(['undo',2,1,null,'guard-undo',await version(2),await version(1)]);
   await db.exec(`update products set product_note='{"brand_group":{"enabled":true,"detail_options":{"BB(버버리)-201 상의":{}}}}' where id=1`);
   await assert.rejects(async()=>move(['move',2,1,'BB-201','code-alias',await version(2),await version(1)]),/duplicate/i,'same code with brand parentheses must collide');
+  await db.exec(`update products set product_note='{"brand_group":{"enabled":true,"detail_options":{}}}' where id=1`);
+  await move(['move',2,1,'BB-201','reverse-code-alias',await version(2),await version(1)]);
+  await assert.rejects(()=>db.exec(`update products set product_note='{"brand_group":{"enabled":true,"detail_options":{"BB(버버리)-201 다른이름":{}}}}' where id=1`),/linked.*detail/i,'parent edits must reject normalized code collisions too');
+  const editSnapshot=(await db.query('select public.product_catalog_edit_snapshot(2) as value')).rows[0].value;
+  assert.equal(editSnapshot.product.stock,7);
+  await db.exec(`update products set stock=5 where id=2`);
+  await assert.rejects(()=>db.query('select public.product_catalog_update($1,$2,$3)',[2,editSnapshot.version,{stock:7}]),/conflict/i,'stale editors cannot restore sold inventory');
+  await db.query('select public.product_catalog_update($1,$2,$3)',[2,await version(2),{product_description:'새 설명'}]);
+  assert.equal((await db.query('select stock,product_description from products where id=2')).rows[0].stock,5);
   console.log('atomic brand move: PASS');
 } finally { await db.close(); }

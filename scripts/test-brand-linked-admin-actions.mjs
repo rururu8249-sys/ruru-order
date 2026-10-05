@@ -11,7 +11,7 @@ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{clipboard
 window.dispatchEvent=event=>{if(event.type.startsWith('ruru-edit'))edited=event;};
 const products=[{id:1,product_name:'브랜드',price:129000,product_note:{brand_group:{enabled:true,detail_options:{OLD:{sizes:['M']}}}}},{id:2,product_name:'원본 임시',price:39000,image_url:'actual.jpg',stock:7,color_options:['베이지'],size_options:['S']}];
 const links=[{sourceId:'2',parentId:'1',detailName:'NEW',originalName:'원본 임시',movedAt:'2026-10-05'}];
-const makeQuery=table=>{let single=false;const q=new Proxy({}, {get:(_,key)=>key==='then'?(resolve=>Promise.resolve({data:table==='products'?products:table==='broadcast_products'?[{product_id:1,sort_order:0}]:table==='broadcasts'?(single?{widget_pin_mode:'auto'}:[{id:42,public_title:'검증 방송',status:'ON',started_at:'2026-10-05'}]):[],error:null}).then(resolve)):(()=>{if(key==='maybeSingle')single=true;return q;})});return q;};
+const makeQuery=table=>{let single=false;const q=new Proxy({}, {get:(_,key)=>key==='then'?(resolve=>Promise.resolve({data:table==='products'?products:table==='broadcast_products'?[{product_id:1,sort_order:0},{product_id:2,sort_order:1}]:table==='broadcasts'?(single?{widget_pin_mode:'auto'}:[{id:42,public_title:'검증 방송',status:'ON',started_at:'2026-10-05'}]):[],error:null}).then(resolve)):(()=>{if(key==='maybeSingle')single=true;return q;})});return q;};
 globalThis.fetch=async(url,options)=>{if(String(url)==='/api/chat-orders/current')chat=JSON.parse(options.body);return {ok:true,json:async()=>String(url).includes('product-brand-catalog')?{links}:{ok:true,history:[],rotation:{mode:'all',paused:false,targets:[]}}};};
 const Panel=createUiLoader({'./WidgetProductLibraryPanel.module.css':{default:{}},'@/lib/supabase':{supabase:{from:makeQuery}},'@/lib/adminToast':{showAdminToast(){}},'@/lib/adminCatalogWrite':{adminCatalogWrite:async payload=>{writes.push(payload);return {data:payload.values,error:null};}},'./liveBroadcastController':{setBroadcastFeedNotice:async()=>{}},'./ExcelBulkImportPopup':{default:()=>null}})('components/admin-live/AdminLiveProductManagePopup.tsx').default;
 let tree;
@@ -29,3 +29,25 @@ await act(async()=>tree.root.findAllByType('button').find(button=>button.childre
 assert.equal(edited.detail.id,2);assert.equal(edited.detail.product_name,'원본 임시');
 await act(async()=>tree.unmount());
 console.log('PASS rendered linked broadcast search, pin, chat and original editor identity');
+// A stale list row must never initialize the stock editor: fetch row + version together.
+const listeners=new Map();
+window.addEventListener=(name,listener)=>listeners.set(name,listener);
+window.removeEventListener=name=>listeners.delete(name);
+const alerts=[];window.alert=message=>alerts.push(message);
+let snapshotFailure=false;
+globalThis.fetch=async()=>({ok:!snapshotFailure,json:async()=>snapshotFailure?{error:'최신 상태 없음'}:{product:{id:2,product_name:'원본 임시',stock:5},version:'a'.repeat(32),parent:products[0]}});
+const Form=props=>React.createElement('editor-fixture',props);
+const Drawer=createUiLoader({'./quick-product/QuickProductFastForm':{default:Form}})('components/admin-live/AdminLiveQuickProductDrawer.tsx').default;
+await act(async()=>{tree=Renderer.create(React.createElement(Drawer,{activeBroadcastId:42}));});
+await act(async()=>{listeners.get('ruru-edit-quick-product')({detail:products[1]});});
+assert.equal(tree.root.findByType('editor-fixture').props.initialProduct.stock,5);
+assert.equal(tree.root.findByType('editor-fixture').props.initialProduct.__catalog_edit_version,'a'.repeat(32));
+assert.equal(tree.root.findByType('editor-fixture').props.initialProduct.__linked_brand_parent.id,1);
+await act(async()=>{listeners.get('ruru-close-quick-product-panel')();});
+snapshotFailure=true;
+await act(async()=>{listeners.get('ruru-edit-quick-product')({detail:products[1]});});
+assert.equal(tree.root.findAllByType('editor-fixture').length,0,'failed fresh read cannot fall back to stale stock');
+assert.deepEqual(alerts,['최신 상태 없음']);
+await act(async()=>tree.unmount());
+assert.equal(listeners.size,0);
+console.log('PASS rendered editor loads atomic fresh snapshot and fails closed');

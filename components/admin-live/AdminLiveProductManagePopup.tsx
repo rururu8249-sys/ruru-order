@@ -2209,7 +2209,10 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>진열된 상품이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "4px" }}>아래 목록에서 상품을 골라 「진열」을 누르면 손님 화면에 올라갑니다.</div></div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                    {bcProductsView.filter(nameMatch).map((p, i) => {
+                    {bcProductsView.filter(p=>{
+                      const link=brandCatalog.bySourceId.get(productId(p));
+                      return !link || !bcProductsView.some(parent=>productId(parent)===link.parentId);
+                    }).filter(nameMatch).map((p, i) => {
                       const img = mainImage(p);
                       const pid = productId(p);
                       const allDetails = (brandCatalog.detailsByParent.get(pid) ?? detailProducts(p, { includeHidden: false })).filter(detail=>!detail.hidden);
