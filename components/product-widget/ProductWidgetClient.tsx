@@ -10,7 +10,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { resolveProductImageUrl } from "@/components/admin-live/quick-product/productImageUrl";
 import { getActiveBroadcast, loadAdminLiveBroadcasts } from "@/components/admin-live/liveBroadcastController";
-import { expandForWidget } from "@/lib/productDetailModel";
+import { resolveBroadcastBrandProducts } from "@/lib/productBrandLinks";
+import { loadProductBrandCatalog } from "@/lib/productBrandCatalogClient";
 import { splitOptionText } from "@/lib/optionSplit";
 import { compressSizeList } from "@/lib/sizeRange";
 import {
@@ -20,6 +21,7 @@ import {
   selectWidgetRotationItems,
   widgetRotationSettingKey,
   widgetRotationShouldAdvance,
+  widgetTargetFromProduct,
   type WidgetRotationConfig,
 } from "@/lib/widgetProductLibrary";
 
@@ -363,16 +365,14 @@ export default function ProductWidgetClient() {
           if (rotationResult.error) throw rotationResult.error;
           const rotationSetting = rotationResult.data;
           ids = ((links as { product_id: unknown }[]) || []).map((r) => String(r.product_id));
-          const byId = new Map(list.map((x) => [String(x?.id ?? x?.product_id), x]));
-          const allBroadcastItems = ids.flatMap((id) => { const parent = byId.get(id); return parent ? (expandForWidget(parent) as AnyProduct[]) : []; });
+          const catalog = await loadProductBrandCatalog(ids);
+          const allBroadcastItems = resolveBroadcastBrandProducts(catalog.products, catalog.links,
+            ids.filter(id => catalog.products.some(row => String(row.id) === id))) as AnyProduct[];
           const nextRotationConfig = parseWidgetRotation(rotationSetting?.value);
           const rot = selectWidgetRotationItems(
             allBroadcastItems,
             nextRotationConfig,
-            (item) => ({
-              productId: String(item?.__parent_product_id ?? item?.id ?? item?.product_id ?? ""),
-              detailName: String(item?.__detail_name || "").trim(),
-            }),
+            widgetTargetFromProduct,
             isAvailableWidgetProduct,
             historyResult.error ? [] : parseWidgetHistory(historyResult.data?.value),
           );
@@ -386,7 +386,12 @@ export default function ProductWidgetClient() {
           const pinProductId = String((active as AnyProduct | null)?.widget_pin_product_id ?? "");
           const pinDetailName = String((active as AnyProduct | null)?.widget_pin_detail_name || "").trim();
           // 수동 고정은 선택 순환 목록 밖 상품이어도 현재 방송에 담겨 있으면 항상 우선한다.
-          const pinnedInActive = pinMode === "pin" && pinProductId ? availableBroadcastItems.find((item) => { const parentId=String(item?.__parent_product_id ?? item?.id ?? item?.product_id ?? ""); const detail=String(item?.__detail_name || "").trim(); return parentId===pinProductId && (!pinDetailName || detail===pinDetailName); }) || null : null;
+          const pinnedInActive = pinMode === "pin" && pinProductId ? availableBroadcastItems.find((item) => {
+            const target = widgetTargetFromProduct(item);
+            const parentId = String(item.__parent_product_id ?? target.productId);
+            const detail = String(item.__detail_name ?? '').trim();
+            return (target.productId === pinProductId || parentId === pinProductId) && (!pinDetailName || detail === pinDetailName);
+          }) || null : null;
           if (alive) setPinned(pinnedInActive);
         } else if (alive) {
           applyRotation([]);
@@ -401,7 +406,8 @@ export default function ProductWidgetClient() {
           }
         }
       } catch {
-        /* 로드 실패해도 위젯은 빈 화면 유지 */
+        // 연결 확인 실패 시 이전 상품을 계속 방송하지 않는다.
+        if (alive) { setPinned(null); applyRotation([]); }
       }
     };
     // [2026-07-09] 주문이 들어오면 실시간 구독 쪽에서 이 함수를 불러 재고를 즉시 다시 읽는다.

@@ -9,15 +9,25 @@ globalThis.window = {innerWidth:280,innerHeight:542,location:{search:''},addEven
 globalThis.document = {body:{style:{}},documentElement:{style:{}}};
 let mode = 'all';
 let pin = false;
+let pinId = 1;
+let brandLinks=[];
+let selectedTargets=[{productId:'4',detailName:''},{productId:'1001',detailName:''}];
 const catalog = Array.from({length:1001}, (_,i)=>({id:i+1,product_name:`상품-${i+1}`,price:1000,image_url:`https://example.com/${i+1}.png`,status:i===1?'숨김':'active',is_soldout:i===2}));
 const ranges = [];
+let catalogUnavailable=false;
+globalThis.fetch = async (url,options) => {
+  assert.equal(url,'/api/product-brand-catalog');
+  const {ids}=JSON.parse(options.body);
+  assert.deepEqual(ids,['1','2','3','4'],'widget lookup must use current broadcast IDs only');
+  return {ok:!catalogUnavailable,json:async()=>({products:catalog.filter(row=>ids.includes(String(row.id))),links:brandLinks})};
+};
 const supabase = {
   from(table){
     let key = '';
     const q = {
       select(){return q;},eq(col,value){if(col==='key')key=value;return q;},order(){return q;},
       range(a,b){ranges.push([a,b]);return Promise.resolve({data:catalog.slice(a,b+1),error:null});},
-      maybeSingle(){return Promise.resolve({data:{value:JSON.stringify(key==='widget_product_history_v2'?[{productId:'4',detailName:'',label:'방송 상품',count:1,lastAt:1},{productId:'1001',detailName:'',label:'미진열 상품',count:1,lastAt:1}]:{mode,paused:false,targets:[{productId:'4',detailName:''},{productId:'1001',detailName:''}]})},error:null});},
+      maybeSingle(){return Promise.resolve({data:{value:JSON.stringify(key==='widget_product_history_v2'?[{productId:'4',detailName:'',label:'방송 상품',count:1,lastAt:1},{productId:'1001',detailName:'',label:'미진열 상품',count:1,lastAt:1}]:{mode,paused:false,targets:selectedTargets})},error:null});},
       then(resolve,reject){return Promise.resolve({data:[{product_id:1},{product_id:2},{product_id:3},{product_id:4}],error:null}).then(resolve,reject);},
     };return q;
   },
@@ -25,7 +35,7 @@ const supabase = {
 };
 const load = createUiLoader({
   '@/lib/supabase':{supabase},
-  '@/components/admin-live/liveBroadcastController':{loadAdminLiveBroadcasts:async()=>[],getActiveBroadcast:()=>({id:'broadcast',widget_pin_mode:pin?'pin':'auto',widget_pin_product_id:1})},
+  '@/components/admin-live/liveBroadcastController':{loadAdminLiveBroadcasts:async()=>[],getActiveBroadcast:()=>({id:'broadcast',widget_pin_mode:pin?'pin':'auto',widget_pin_product_id:pinId})},
   '@/components/admin-live/quick-product/productImageUrl':{resolveProductImageUrl:x=>x},
 });
 const Client = load('components/product-widget/ProductWidgetClient.tsx').default;
@@ -57,7 +67,20 @@ assert.equal(photo.props.style.flex,'1 1 200px','photo must yield space to wrapp
 for (const node of card.findAll(n=>Boolean(n.props.style?.WebkitLineClamp))) {
   assert.fail('product name/options must not silently discard lines');
 }
+catalogUnavailable=true;
+await act(async()=>intervals.get(20000)());
+assert.equal(JSON.stringify(tree.toJSON()).includes('상품-1'),false,'failed catalog refresh must clear a stale pinned item');
+catalogUnavailable=false;
 await act(async()=>tree.unmount());
+const originalFirst={...catalog[0]};
+Object.assign(catalog[0],{product_note:{brand_group:{enabled:true}}});
+brandLinks=[{sourceId:'4',parentId:'1',detailName:'이동 상품',originalName:'상품-4',movedAt:'2026-10-05T00:00:00Z'}];
+pinId=4;mode='selected';
+selectedTargets=[{productId:'1001',detailName:''}];
+await act(async()=>{tree=Renderer.create(React.createElement(Client));});
+assert(JSON.stringify(tree.toJSON()).includes('이동 상품'),'source-ID manual pin must survive moving under a brand');
+await act(async()=>tree.unmount());
+catalog[0]=originalFirst;brandLinks=[];pinId=1;
 if (process.env.WIDGET_LAYOUT_OUTPUT) {
   const escape = value => String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
   const html = node => {

@@ -56,6 +56,15 @@ export function widgetTargetKey(target: WidgetProductTarget): string {
   return `${String(target.productId).trim()}|${String(target.detailName || "").trim()}`;
 }
 
+/** Linked products retain their existing independent target; legacy details retain parent/name. */
+export function widgetTargetFromProduct(product: Record<string, unknown>): WidgetProductTarget {
+  const source = String(product.__source_product_id ?? '').trim();
+  return {
+    productId: source || String(product.__parent_product_id ?? product.id ?? product.product_id ?? ''),
+    detailName: source ? '' : String(product.__detail_name ?? '').trim(),
+  };
+}
+
 export function selectableWidgetTargets<T extends WidgetProductTarget & { available: boolean; inBroadcast: boolean }>(
   items: T[],
 ): WidgetProductTarget[] {

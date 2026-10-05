@@ -1,4 +1,4 @@
-import { cleanOptionValues, detailCode, detailProducts, isBrandGroup, parseProductNote, type DetailProduct, type ProductLike } from './productDetailModel';
+import { cleanOptionValues, detailCode, detailProducts, expandForWidget, isBrandGroup, parseProductNote, type DetailProduct, type ProductLike } from './productDetailModel';
 
 export type DetailInfo = { mode: 'inherit' | 'custom' | 'hidden'; chips: string[]; description: string };
 export type BrandProductLink = { sourceId: string; parentId: string; detailName: string; originalName: string; movedAt: string };
@@ -52,4 +52,39 @@ export function resolveBrandCatalog(products: ProductLike[], links: BrandProduct
     detailsByParent.set(link.parentId, [...siblings, detail]);
   }
   return { roots: products.filter(row => !bySourceId.has(String(row.id))), detailsByParent, bySourceId };
+}
+
+/** Display projection only. id and option stock keys always belong to the original row. */
+export function resolveBroadcastBrandProducts(
+  products: ProductLike[], links: BrandProductLink[], broadcastProductIds: string[],
+): ProductLike[] {
+  const catalog = resolveBrandCatalog(products, links);
+  const rows = new Map(products.map(row => [String(row.id), row]));
+  const result: ProductLike[] = [];
+  const emitted = new Set<string>();
+  const visible = (row: ProductLike) => ![row.product_status, row.status].some(value => ['hidden', '숨김', 'deleted'].includes(String(value)));
+  const emitLinked = (detail: ResolvedDetail) => {
+    const source = rows.get(detail.sourceProductId)!; // resolveBrandCatalog rejects unresolved links.
+    const key = `source:${detail.sourceProductId}`;
+    if (detail.hidden || emitted.has(key)) return;
+    emitted.add(key);
+    result.push({ ...source, product_name: detail.detailName,
+      __parent_product_id: detail.parentId, __detail_name: detail.detailName,
+      __detail_code: detail.code, __source_product_id: detail.sourceProductId });
+  };
+  for (const id of [...new Set(broadcastProductIds)]) {
+    const row = rows.get(id);
+    if (!row) throw new Error(`Unresolved broadcast product: ${id}`);
+    if (!visible(row)) continue;
+    const linked = catalog.bySourceId.get(id);
+    if (linked) { emitLinked(linked); continue; }
+    const linkedDetails = (catalog.detailsByParent.get(id) ?? []).filter((detail): detail is ResolvedDetail => 'sourceProductId' in detail);
+    const legacyItems = isBrandGroup(row) && linkedDetails.length && !detailProducts(row, { includeHidden: false }).length ? [] : expandForWidget(row);
+    for (const item of legacyItems) {
+      const key = `legacy:${id}:${String(item.__detail_name ?? '')}`;
+      if (!emitted.has(key)) { emitted.add(key); result.push(item); }
+    }
+    for (const detail of linkedDetails) emitLinked(detail);
+  }
+  return result;
 }
