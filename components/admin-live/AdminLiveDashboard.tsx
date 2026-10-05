@@ -1792,8 +1792,18 @@ export default function AdminLiveDashboard() {
               ) : null}
 
               {/* ── 상품 ── */}
+              {activeMenu === "sales" ? (
+                <AdminLiveProductManagePopup
+                  key="sales"
+                  embedded
+                  salesOnly
+                  activeBroadcastId={activeBroadcast?.id || null}
+                  onClose={() => {}}
+                />
+              ) : null}
               {activeMenu === "products" ? (
                 <AdminLiveProductManagePopup
+                  key="products"
                   embedded
                   activeBroadcastId={activeBroadcast?.id || null}
                   onClose={() => {}}

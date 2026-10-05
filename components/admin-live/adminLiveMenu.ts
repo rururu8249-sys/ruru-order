@@ -11,6 +11,7 @@ export type AdminLiveMenuKey =
   | "reports" // 방송 기록·판매 리포트
   | "orders" // 실시간 주문(주문표)
   | "payments" // 입금내역
+  | "sales" // 판매기록
   | "settlement" // 정산
   | "products" // 상품
   | "customers" // 회원·이슈·단골
@@ -32,7 +33,7 @@ export type AdminLiveTopMenuItem = {
 export const ADMIN_LIVE_TOP_MENUS: AdminLiveTopMenuItem[] = [
   // 아이콘은 AdminLiveMenuIcon.tsx (SVG) — 기기마다 모양이 달라지는 이모지를 쓰지 않는다
   { key: "broadcast", label: "방송", desc: "시작·종료 · 채팅주문 · 기록", defaultKey: "broadcast" },
-  { key: "orders", label: "주문·입금", desc: "실시간 주문 · 입금내역 · 정산 · 이벤트", defaultKey: "orders" },
+  { key: "orders", label: "주문·입금", desc: "실시간 주문 · 입금내역 · 판매기록 · 정산 · 이벤트", defaultKey: "orders" },
   { key: "products", label: "상품", desc: "방송 상품 · 쇼핑몰 · 등록", defaultKey: "products" },
   { key: "customers", label: "고객", desc: "회원 · 이슈 · 쪽지·공지 · 접속 기록", defaultKey: "customers" },
   { key: "settings", label: "설정", desc: "상점 · 결제 · 알림 · 점검", defaultKey: "settings" },
@@ -51,6 +52,7 @@ export const ADMIN_LIVE_SUB_TABS: Record<AdminLiveTopMenuKey, AdminLiveSubTab[]>
   orders: [
     { key: "orders", label: "실시간 주문" },
     { key: "payments", label: "입금내역" },
+    { key: "sales", label: "판매기록" },
     { key: "settlement", label: "정산" },
     { key: "event", label: "이벤트" },
   ],
@@ -73,6 +75,7 @@ const TOP_MENU_OF: Record<AdminLiveMenuKey, AdminLiveTopMenuKey> = {
   reports: "broadcast",
   orders: "orders",
   payments: "orders",
+  sales: "orders",
   settlement: "orders",
   products: "products",
   customers: "customers",

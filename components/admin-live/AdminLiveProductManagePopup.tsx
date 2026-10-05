@@ -46,6 +46,8 @@ type Props = {
   onSearchChange?: (search: string) => void;
   /** [2026-09-08 5단계] 페이지 안에 그대로(상품 메뉴). 팝업 껍데기·✕ 없음, 포털 안 씀 */
   embedded?: boolean;
+  /** Read-only sales workspace, mounted from 주문·입금. */
+  salesOnly?: boolean;
 };
 
 const BASE_CATEGORIES = ["전체", "신발", "의류", "잡화"];
@@ -237,11 +239,11 @@ function sortProductRows(rows: ProductRow[], key: ProductSortKey) {
   return copy.sort((a, b) => productCreatedAt(b) - productCreatedAt(a)); // recent
 }
 
-export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose, initialTab, onTabChange, initialSearch, onSearchChange, embedded = false }: Props) {
+export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose, initialTab, onTabChange, initialSearch, onSearchChange, embedded = false, salesOnly = false }: Props) {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [rotationIds, setRotationIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState<ProductManageTab>(initialTab ?? "broadcast");
+  const [tab, setTab] = useState<ProductManageTab>(salesOnly ? "history" : initialTab === "history" ? "broadcast" : initialTab ?? "broadcast");
   const [search, setSearch] = useState(initialSearch ?? "");
   const [category, setCategory] = useState("전체");
   const [productPageNumber, setProductPageNumber] = useState(1);
@@ -1761,12 +1763,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         ? { width: "100%", height: "100%", display: "flex", flexDirection: "column", background: "var(--color-surface)", overflow: "hidden" }
         : { width: "960px", maxWidth: "100%", flexShrink: 0, height: "680px", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "12px", overflow: "hidden" }}>
         {/* 헤더 */}
-        <div style={{ display: "flex", alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--color-line)" }}>
+        {!salesOnly && <div style={{ display: "flex", alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--color-line)" }}>
           <span style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-rose-deep)" }}>📦 상품 관리</span>
           <button type="button" onClick={() => setExcelImportOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "13px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-surface)", border: "1.5px solid var(--color-rose-deep)", borderRadius: "8px", padding: "6px 12px", cursor: "pointer", marginLeft: "auto" }}>📄 엑셀 대량등록</button>
           <button type="button" onClick={openCreate} style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "13px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "8px", padding: "8px 12px", cursor: "pointer", marginLeft: "8px" }}>+ 상품 등록</button>
           {embedded ? null : <button type="button" onClick={onClose} style={{ marginLeft: "8px", border: "none", background: "none", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>✕</button>}
-        </div>
+        </div>}
 
         {excelImportOpen ? (
           <ExcelBulkImportPopup
@@ -1782,8 +1784,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
         {/* 탭 2개 */}
         {/* [2026-09-20 사장님 폰 화면 깨짐] 「방송 상\n품」처럼 탭 글자가 잘렸다 → 줄바꿈 금지 + 넘치면 가로 스크롤 */}
-        <div style={{ display: "flex", gap: "2px", padding: "0 16px", borderBottom: "1px solid var(--color-line)", overflowX: "auto", scrollbarWidth: "none" }}>
-          {([["broadcast", "방송 상품"], ["shop", "쇼핑몰 진열"], ["products", "전체 상품"], ["history", "판매 기록"]] as const).map(([k, l]) => (
+        {!salesOnly && <div style={{ display: "flex", gap: "2px", padding: "0 16px", borderBottom: "1px solid var(--color-line)", overflowX: "auto", scrollbarWidth: "none" }}>
+          {([["broadcast", "방송 상품"], ["shop", "쇼핑몰 진열"], ["products", "전체 상품"]] as const).map(([k, l]) => (
             <button
               key={k}
               type="button"
@@ -1795,7 +1797,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               {l}
             </button>
           ))}
-        </div>
+        </div>}
 
         {tab === "history" ? (
           <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 32px 16px 16px", maxWidth: "1040px", width: "100%", margin: "0 auto" }}>
