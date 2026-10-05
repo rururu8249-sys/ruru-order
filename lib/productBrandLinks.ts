@@ -1,4 +1,5 @@
 import { cleanOptionValues, detailCode, detailProducts, expandForWidget, isBrandGroup, parseProductNote, type DetailProduct, type ProductLike } from './productDetailModel';
+import { normalizeProductSearchText, productSearchMatches } from './productSearch';
 
 export type DetailInfo = { mode: 'inherit' | 'custom' | 'hidden'; chips: string[]; description: string };
 export type BrandProductLink = { sourceId: string; parentId: string; detailName: string; originalName: string; movedAt: string };
@@ -8,6 +9,14 @@ export type ResolvedCatalog = {
   detailsByParent: Map<string, Array<DetailProduct | ResolvedDetail>>;
   bySourceId: Map<string, ResolvedDetail>;
 };
+
+export function searchBrandDetails(catalog: ResolvedCatalog, parentId: string, query: string): Array<DetailProduct | ResolvedDetail> {
+  const normalized = normalizeProductSearchText(query);
+  if (!normalized) return [];
+  return (catalog.detailsByParent.get(parentId) ?? []).filter(detail => productSearchMatches(detail.detailName, normalized)
+    || productSearchMatches(detail.code, normalized) || detail.colors.some(color => productSearchMatches(color, normalized))
+    || detail.sizes.some(size => normalizeProductSearchText(size) === normalized));
+}
 
 /** Presentation relation only. Original rows remain the sole inventory/order owners. */
 export function resolveBrandCatalog(products: ProductLike[], links: BrandProductLink[]): ResolvedCatalog {

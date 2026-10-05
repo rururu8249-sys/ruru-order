@@ -79,3 +79,9 @@ assert.deepEqual(model.resolveChatBrandProducts(fixture,links,['2']).map(row=>[r
 const sales=await import('../lib/salesHistory.ts');
 assert.equal(sales.salesProductPhotos('이전 상품명',source,'2').detail,'actual.jpg','exact original ID preserves photo after rename');
 assert.equal(sales.salesProductPhotos('이전 상품명',source,'999').detail,'','a different ID must not borrow source photo');
+assert.equal(typeof model.searchBrandDetails,'function');
+const adminCatalog=model.resolveBrandCatalog(fixture,links);
+assert.deepEqual(model.searchBrandDetails(adminCatalog,'1','new').map(detail=>detail.detailName),['NEW']);
+assert.deepEqual(model.searchBrandDetails(adminCatalog,'1','다른 방송 상품'),[]);
+assert.deepEqual(model.searchBrandDetails(adminCatalog,'1','베이지').map(detail=>detail.detailName),['NEW']);
+assert.deepEqual(model.searchBrandDetails(adminCatalog,'1','S').map(detail=>detail.detailName),['NEW']);

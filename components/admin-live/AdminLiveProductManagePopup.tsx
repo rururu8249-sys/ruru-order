@@ -31,6 +31,7 @@ import { aggregateSalesItems, eligibleSalesOrder, salesPaymentAmount, sortedSale
 import { productPage } from "@/lib/productPagination";
 import ProductPagination from "./ProductPagination";
 import ProductToolbar from "./ProductToolbar";
+import { resolveBrandCatalog, searchBrandDetails, type BrandProductLink } from "@/lib/productBrandLinks";
 
 type ProductRow = Record<string, unknown>;
 
@@ -243,6 +244,8 @@ function sortProductRows(rows: ProductRow[], key: ProductSortKey) {
 
 export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose, initialTab, onTabChange, initialSearch, onSearchChange, embedded = false, salesOnly = false, headerTarget }: Props) {
   const [products, setProducts] = useState<ProductRow[]>([]);
+  const [brandLinks, setBrandLinks] = useState<BrandProductLink[]>([]);
+  const brandCatalog = useMemo(() => resolveBrandCatalog(products, brandLinks), [products, brandLinks]);
   const [rotationIds, setRotationIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<ProductManageTab>(salesOnly ? "history" : initialTab === "history" ? "broadcast" : initialTab ?? "broadcast");
@@ -415,8 +418,16 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         allProducts.push(...page);
         if (page.length < 1000) break;
       }
+      const response = await fetch('/api/admin-live/product-brand-catalog', { cache: 'no-store' });
+      const catalog = await response.json().catch(() => null);
+      if (!response.ok || !Array.isArray(catalog?.links)) throw new Error(catalog?.error || '브랜드 연결을 확인하지 못했습니다.');
+      // Validate before either state update: unresolved relations cannot expose duplicate roots.
+      resolveBrandCatalog(allProducts, catalog.links);
       setProducts(allProducts);
+      setBrandLinks(catalog.links);
     } catch (e) {
+      setProducts([]);
+      setBrandLinks([]);
       showAdminToast("상품 불러오기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
     } finally {
       if (!silent) setLoading(false);
@@ -1102,7 +1113,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
   const filtered = useMemo(() => {
     const q = normalizeProductSearchText(search);
-    const list = products.filter((p) => {
+    const list = brandCatalog.roots.filter((p) => {
       if (pickString(p, ["status", "product_status"], "") === "deleted") return false;
       if (category !== "전체" && productCategory(p) !== category) return false;
       if (lowOnly) {
@@ -1111,7 +1122,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       }
       // 관리자 검색은 숨김 세부상품까지 포함해 정확한 상세상품명을 찾는다.
       // 대표상품명이 직접 검색된 경우는 대표카드만 보여주고, 세부상품명이 검색된 경우만 아래에서 자동 펼친다.
-      if (q && !productSearchMatches(productName(p), q) && adminDetailSearch(p, search).length === 0) return false;
+      if (q && !productSearchMatches(productName(p), q) && searchBrandDetails(brandCatalog, productId(p), search).length === 0) return false;
       return true;
     });
     // 정렬: 재고 적은순(재고관리 상품 우선, 미관리·재고없음은 뒤로)
@@ -1133,7 +1144,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     // 기본: 저장된 상품 순서를 그대로 유지한다.
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products, search, category, lowOnly, sortKey]);
+  }, [brandCatalog, search, category, lowOnly, sortKey]);
 
   const productPagination = productPage(filtered, productPageNumber, productPageSize);
   const visible = productPagination.items;
@@ -2341,7 +2352,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     const widgetText = state === "rotating" ? "▶ 순환 해제" : "▶ 순환 추가";
                     const normalizedQuery = normalizeProductSearchText(search);
                     const parentNameMatched = normalizedQuery ? productSearchMatches(productName(p), normalizedQuery) : false;
-                    const matchedDetails = normalizedQuery && !parentNameMatched ? adminDetailSearch(p, search) : [];
+                    const linkedDetails = (brandCatalog.detailsByParent.get(id) ?? []).filter(detail => 'sourceProductId' in detail);
+                    const matchedDetails = normalizedQuery && !parentNameMatched ? searchBrandDetails(brandCatalog, id, search) : linkedDetails;
                     return (
                       <div key={id || productName(p)} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                       <div style={{ display: "flex", gap: "12px", alignItems: "center", border: "1px solid var(--color-line)", borderRadius: "12px", padding: "8px" }}>
@@ -2446,7 +2458,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       </div>
                       {matchedDetails.length > 0 ? (
                         <div style={{ marginLeft: "96px", border: "1px solid var(--color-rose-line)", borderRadius: "8px", overflow: "hidden", background: "var(--color-surface)" }}>
-                          <div style={{ padding: "6px 8px", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", fontSize: "11px", fontWeight: 900 }}>🔎 세부상품 검색결과 {matchedDetails.length}개</div>
+                          <div style={{ padding: "6px 8px", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", fontSize: "11px", fontWeight: 900 }}>{normalizedQuery && !parentNameMatched ? '🔎 세부상품 검색결과' : '연결된 세부상품'} {matchedDetails.length}개</div>
                           {matchedDetails.map((detail) => (
                             <div key={detail.detailName} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 8px", borderTop: "1px solid var(--color-line)" }}>
                               <button type="button" onClick={() => detail.image && setLightbox(detail.image)} style={{ width: "54px", height: "54px", flexShrink: 0, border: "none", borderRadius: "8px", overflow: "hidden", padding: 0, background: "var(--color-surface-2)", cursor: detail.image ? "zoom-in" : "default" }}>
@@ -2460,7 +2472,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                                 <div style={{ marginTop: "2px", fontSize: "12px", fontWeight: 900, color: "var(--color-rose-deep)" }}>{money(detail.price)}</div>
                                 {(detail.colors.length > 0 || detail.sizes.length > 0) ? <div style={{ marginTop: "2px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>{detail.colors.length > 0 ? `색상: ${detail.colors.join(", ")}` : ""}{detail.colors.length > 0 && detail.sizes.length > 0 ? " · " : ""}{detail.sizes.length > 0 ? `사이즈: ${detail.sizes.join(", ")}` : ""}</div> : null}
                               </div>
-                              <button type="button" onClick={() => editProduct(p)} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-info-tx)", background: "var(--color-info-bg)", border: "none", borderRadius: "8px", padding: "4px 8px", cursor: "pointer" }}>세부관리</button>
+                              <button type="button" onClick={() => {
+                                const source = 'sourceProductId' in detail ? products.find(row => productId(row) === detail.sourceProductId) : p;
+                                if (source) editProduct(source, 'sourceProductId' in detail ? '' : detail.detailName);
+                                else showAdminToast('원본 상품을 확인하지 못했습니다. 새로고침해주세요.', 'error');
+                              }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-info-tx)", background: "var(--color-info-bg)", border: "none", borderRadius: "8px", padding: "4px 8px", cursor: "pointer" }}>세부관리</button>
                             </div>
                           ))}
                         </div>
