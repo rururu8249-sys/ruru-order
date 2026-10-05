@@ -38,6 +38,7 @@ export default function SalesAnalysisPanel({initialBroadcastId}:{initialBroadcas
   const [category,setCategory]=useState('all');
   const [photo,setPhoto]=useState<{src:string;name:string}|null>(null);
   const photoDialog=useRef<HTMLDialogElement>(null);
+  const closePhoto=()=>{photoDialog.current?.close();setPhoto(null);};
   useEffect(()=>{
     const dialog=photoDialog.current;
     if(photo&&dialog&&!dialog.open)dialog.showModal();
@@ -149,8 +150,8 @@ export default function SalesAnalysisPanel({initialBroadcastId}:{initialBroadcas
         </>:<div className="rounded-xl border border-dashed border-line p-8 text-center text-ink-soft">방송을 선택하면 상세 분석이 표시됩니다.</div>}</div>
       </div>
     </>}
-    {photo?<dialog ref={photoDialog} aria-label={`${photo.name} 상품 사진 확대`} onCancel={event=>{event.preventDefault();setPhoto(null);}} onClick={event=>{if(event.target===event.currentTarget)setPhoto(null);}} className="m-auto max-h-[95dvh] w-[min(92vw,900px)] max-w-none overflow-auto rounded-xl border-0 bg-surface p-3 shadow-xl backdrop:bg-black/75">
-      <div className="mb-3 flex items-center justify-between gap-3"><p className="font-bold">{photo.name}</p><button type="button" autoFocus aria-label="사진 확대 닫기" onClick={()=>setPhoto(null)} className="rounded-lg border border-line px-4 py-2 font-bold">✕ 닫기</button></div>
+    {photo?<dialog ref={photoDialog} aria-label={`${photo.name} 상품 사진 확대`} onCancel={event=>{event.preventDefault();closePhoto();}} onClick={event=>{if(event.target===event.currentTarget)closePhoto();}} className="m-auto max-h-[95dvh] w-[min(92vw,900px)] max-w-none overflow-auto rounded-xl border-0 bg-surface p-3 shadow-xl backdrop:bg-black/75">
+      <div className="mb-3 flex items-center justify-between gap-3"><p className="font-bold">{photo.name}</p><button type="button" autoFocus aria-label="사진 확대 닫기" onClick={closePhoto} className="rounded-lg border border-line px-4 py-2 font-bold">✕ 닫기</button></div>
       <img src={photo.src} alt={`${photo.name} 확대 사진`} className="mx-auto max-h-[78dvh] max-w-full object-contain"/>
     </dialog>:null}
   </section>;
