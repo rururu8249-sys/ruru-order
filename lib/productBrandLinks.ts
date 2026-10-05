@@ -88,3 +88,29 @@ export function resolveBroadcastBrandProducts(
   }
   return result;
 }
+
+/** Chat keeps legacy parent variants intact; linked leaves retain their inventory owner ID. */
+export function resolveChatBrandProducts(products: ProductLike[], links: BrandProductLink[], requestedIds: string[]): ProductLike[] {
+  const catalog = resolveBrandCatalog(products, links);
+  const rows = new Map(products.map(row => [String(row.id), row]));
+  const result: ProductLike[] = [];
+  const emitted = new Set<string>();
+  const emit = (row: ProductLike) => {
+    const id = String(row.id);
+    if (emitted.has(id) || [row.product_status, row.status].some(value => ['hidden', '숨김', 'deleted'].includes(String(value)))) return;
+    emitted.add(id);
+    result.push(row);
+  };
+  const leaf = (detail: ResolvedDetail) => emit({ ...rows.get(detail.sourceProductId)!, product_name: detail.detailName });
+  for (const id of new Set(requestedIds)) {
+    const row = rows.get(id);
+    if (!row) throw new Error(`Unresolved chat product: ${id}`);
+    if ([row.product_status, row.status].some(value => ['hidden', '숨김', 'deleted'].includes(String(value)))) continue;
+    const linked = catalog.bySourceId.get(id);
+    if (linked) { leaf(linked); continue; }
+    const children = (catalog.detailsByParent.get(id) ?? []).filter((detail): detail is ResolvedDetail => 'sourceProductId' in detail);
+    if (!isBrandGroup(row) || !children.length || detailProducts(row, { includeHidden: false }).length) emit(row);
+    for (const child of children) leaf(child);
+  }
+  return result;
+}

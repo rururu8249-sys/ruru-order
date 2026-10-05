@@ -8,6 +8,39 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ParseProduct } from "@/lib/chatOrderParser";
 import { readSetting } from "@/lib/youtube";
 import { SETTING_TEST_LIVE_URL } from "@/lib/youtubeChatRead";
+import { resolveChatBrandProducts, type BrandProductLink } from "@/lib/productBrandLinks";
+import type { ProductLike } from "@/lib/productDetailModel";
+
+async function linkedChatRows(sb: SupabaseClient, rows: Record<string, unknown>[]): Promise<Record<string, unknown>[]> {
+  const ids = [...new Set(rows.map(row => String(row.id)))];
+  if (!ids.length) return [];
+  const links: BrandProductLink[] = [];
+  for (let offset = 0; offset < ids.length; offset += 100) {
+    const batch = ids.slice(offset, offset + 100);
+    for (let page = 0; ; page += 1000) {
+      const { data, error } = await sb.from('product_brand_links').select('*')
+        .or(`source_id.in.(${batch.join(',')}),parent_id.in.(${batch.join(',')})`)
+        .order('source_id').range(page, page + 999);
+      if (error) throw new Error('채팅 상품 연결을 확인하지 못했습니다.');
+      const values = (data ?? []) as Record<string, unknown>[];
+      for (const value of values) {
+        if (!links.some(link => link.sourceId === String(value.source_id))) links.push({
+          sourceId: String(value.source_id), parentId: String(value.parent_id), detailName: String(value.detail_name),
+          originalName: String(value.original_name), movedAt: String(value.moved_at),
+        });
+      }
+      if (values.length < 1000) break;
+    }
+  }
+  const all = new Map(rows.map(row => [String(row.id), row]));
+  const missing = [...new Set(links.flatMap(link => [link.sourceId, link.parentId]))].filter(id => !all.has(id));
+  for (let offset = 0; offset < missing.length; offset += 100) {
+    const { data, error } = await sb.from('products').select('*').in('id', missing.slice(offset, offset + 100));
+    if (error) throw new Error('채팅 상품 원본을 확인하지 못했습니다.');
+    for (const row of (data ?? []) as Record<string, unknown>[]) all.set(String(row.id), row);
+  }
+  return resolveChatBrandProducts([...all.values()] as ProductLike[], links, ids) as Record<string, unknown>[];
+}
 
 // "없음/무/-" 같은 빈 옵션 표기는 세부상품명이 아니다. 채팅에서 잘못 잡히면 안 되므로 제외.
 //   (기준은 위젯 cleanOptionText 의 EMPTY_OPTION_WORDS 와 동일)
@@ -95,12 +128,13 @@ export async function loadParseProducts(sb: SupabaseClient): Promise<LoadedProdu
     const merged: ParseProduct[] = [];
     const recent0 = list[0] || null;
     if (recent0) merged.push(...(await loadBroadcastProducts(sb, String(recent0.id))));
-    const { data: shopRows2 } = await sb
+    const { data: shopRows2, error: shopError2 } = await sb
       .from("products")
-      .select("id,product_name,product_note,color_options,size_options")
+      .select("*")
       .eq("in_shop", true)
       .limit(500);
-    for (const p of rowsToParseProducts((shopRows2 || []) as Record<string, unknown>[])) {
+    if (shopError2) throw new Error('채팅 진열 상품을 확인하지 못했습니다.');
+    for (const p of rowsToParseProducts(await linkedChatRows(sb, (shopRows2 || []) as Record<string, unknown>[]))) {
       if (!merged.some((x) => x.id === p.id)) merged.push(p);
     }
     if (merged.length > 0) {
@@ -109,12 +143,13 @@ export async function loadParseProducts(sb: SupabaseClient): Promise<LoadedProdu
   }
 
   // 쇼핑몰 모드: 진열 상품만
-  const { data: shopRows } = await sb
+  const { data: shopRows, error: shopError } = await sb
     .from("products")
-    .select("id,product_name,product_note,color_options,size_options")
+    .select("*")
     .eq("in_shop", true)
     .limit(500);
-  const shop = rowsToParseProducts((shopRows || []) as Record<string, unknown>[]);
+  if (shopError) throw new Error('채팅 진열 상품을 확인하지 못했습니다.');
+  const shop = rowsToParseProducts(await linkedChatRows(sb, (shopRows || []) as Record<string, unknown>[]));
   if (shop.length > 0) return { products: shop, broadcastId: null, source: "shop" };
 
   // 폴백: 가장 최근 방송 (테스트용)
@@ -125,15 +160,16 @@ export async function loadParseProducts(sb: SupabaseClient): Promise<LoadedProdu
 }
 
 async function loadBroadcastProducts(sb: SupabaseClient, broadcastId: string): Promise<ParseProduct[]> {
-  const { data: bpRows } = await sb
+  const { data: bpRows, error } = await sb
     .from("broadcast_products")
-    .select("product_id, sort_order, products(id,product_name,product_note,color_options,size_options)")
+    .select("product_id, sort_order, products(*)")
     .eq("broadcast_id", broadcastId);
+  if (error) throw new Error('채팅 방송 상품을 확인하지 못했습니다.');
   const rows: Record<string, unknown>[] = [];
   for (const row of (bpRows || []) as Record<string, unknown>[]) {
     if (row.products) rows.push(row.products as Record<string, unknown>);
   }
-  return rowsToParseProducts(rows);
+  return rowsToParseProducts(await linkedChatRows(sb, rows));
 }
 
 function rowsToParseProducts(rows: Record<string, unknown>[]): ParseProduct[] {

@@ -71,3 +71,11 @@ const functions=['normalizeSuggestionText','findMatchedBroadcastProduct'].map(na
 const compiled=ts.transpileModule(functions,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;
 const match=new Function('normalizeProductSearchText','productSearchMatches','findBrandOrderProductById',compiled+';return findMatchedBroadcastProduct;')(search.normalizeProductSearchText,search.productSearchMatches,order.findBrandOrderProductById);
 assert.equal(match({product_id:'2',product_name:'상품명 없음-6'},orderRoots)?.id,2,'existing original-ID order must still find nested source after rename/move');
+assert.equal(typeof model.resolveChatBrandProducts,'function');
+const chatRows=model.resolveChatBrandProducts(fixture,links,['1','2']);
+assert.deepEqual(chatRows.map(row=>[row.id,row.product_name]),[[1,'브랜드'],[2,'NEW']],'chat must recognize source ID without replacing legacy parent variants');
+assert.deepEqual(chatRows[0].product_note,brand.product_note,'existing chat variant semantics must remain unchanged');
+assert.deepEqual(model.resolveChatBrandProducts(fixture,links,['2']).map(row=>[row.id,row.product_name]),[[2,'NEW']]);
+const sales=await import('../lib/salesHistory.ts');
+assert.equal(sales.salesProductPhotos('이전 상품명',source,'2').detail,'actual.jpg','exact original ID preserves photo after rename');
+assert.equal(sales.salesProductPhotos('이전 상품명',source,'999').detail,'','a different ID must not borrow source photo');

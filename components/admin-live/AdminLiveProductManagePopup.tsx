@@ -1062,7 +1062,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         rows.forEach(r=>{
           const product=byId.get(r.productId);
           if (!product) return;
-          const photos=salesProductPhotos(r.name,product);
+          const photos=salesProductPhotos(r.name,product,r.productId);
           r.thumb=photos.detail ? resolveProductImageUrl(photos.detail) : '';
           r.brandThumb=photos.brand ? resolveProductImageUrl(photos.brand) : '';
         });

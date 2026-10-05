@@ -8,7 +8,7 @@ function compareSize(a:string,b:string) {
   return a.localeCompare(b,'ko',{numeric:true});
 }
 // Exact stored detail keys only: never substitute another product's photo.
-export function salesProductPhotos(name: string, product: Row) {
+export function salesProductPhotos(name: string, product: Row, originalProductId?: string) {
   let note: Row = {};
   try { note = typeof product.product_note === 'string' ? JSON.parse(product.product_note) : (product.product_note || {}) as Row; } catch { /* legacy invalid notes */ }
   const sets = note?.detail_photo_sets as Record<string, unknown> | undefined;
@@ -18,7 +18,8 @@ export function salesProductPhotos(name: string, product: Row) {
   const direct = photos?.[name];
   const brand = String(product.image_url || '');
   const grouped = note?.combo_mode === true || (note?.brand_group as Row | undefined)?.enabled === true;
-  return {brand, detail: String(detail || (typeof direct === 'string' ? direct : '') || (!grouped && String(product.product_name || '') === name ? brand : ''))};
+  const exactId = originalProductId != null && String(product.id) === originalProductId;
+  return {brand, detail: String(detail || (typeof direct === 'string' ? direct : '') || (!grouped && (exactId || String(product.product_name || '') === name) ? brand : ''))};
 }
 export const SALES_PAID_STATUSES = ['입금확인','수동입금확인','자동입금확인','출고대기','출고완료','카드결제완료'];
 export function eligibleSalesOrder(row: Row) {
