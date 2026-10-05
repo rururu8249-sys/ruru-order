@@ -122,6 +122,7 @@ import {
   type OrderBankAccountSnapshot,
 } from "@/lib/orderBankAccount";
 import { detailCode, detailPricePresentation, detailProducts } from "@/lib/productDetailModel";
+import { selectedDetailInfo } from "@/lib/productDetailInfo";
 import CustomerSizeChartSheet from "@/components/customer/CustomerSizeChartSheet";
 import { resolveSizeChart, sizeColumnIndex } from "@/lib/sizeChart";
 import { registeredProductEditManualPrice, registeredProductPriceMode } from "@/lib/registeredProductPricePolicy";
@@ -6068,22 +6069,12 @@ export default function OrderPage() {
   const registeredOptionDetailImages = registeredOptionSelectProduct
     ? normalizeDetailImages(registeredOptionSelectProduct.detail_image_urls)
     : [];
-  const registeredOptionDescription = registeredOptionSelectProduct
-    ? String(registeredOptionSelectProduct.product_description || registeredOptionSelectProduct.detail_description || registeredOptionSelectProduct.description || "").trim()
-    : "";
+  const registeredOptionInfo = registeredOptionSelectProduct
+    ? selectedDetailInfo(registeredOptionSelectProduct as unknown as Record<string,unknown>,registeredOptionDetail)
+    : {chips:[],description:''};
+  const registeredOptionDescription = registeredOptionInfo.description;
   // [2026-09-20 사장님] 한눈에 정보 칩 — 관리자 상품등록 「한눈에 정보」(product_note.spec_chips). 표시 전용, 없으면 아무것도 안 그린다.
-  const registeredOptionSpecChips: string[] = (() => {
-    if (!registeredOptionSelectProduct) return [];
-    const raw = readOrderNoteObject(registeredOptionSelectProduct)?.spec_chips;
-    if (!Array.isArray(raw)) return [];
-    const out: string[] = [];
-    for (const v of raw) {
-      const t = String(v ?? "").trim().slice(0, 10);
-      if (t && !out.includes(t)) out.push(t);
-      if (out.length >= 6) break;
-    }
-    return out;
-  })();
+  const registeredOptionSpecChips: string[] = registeredOptionInfo.chips;
   // [상세UI] 상단 썸네일 스트립용: 대표(커버) + 상세사진 통합(중복 제거). Baymard: 숨은 썸네일은 노출로 신호.
   // [2026-08-11] 세부상품별 사진 — 고른 세부상품의 사진이 있으면 맨 앞(대표)으로 올린다.
   const registeredOptionComboPhotos = registeredOptionSelectProduct ? readComboPhotosOrderProduct(registeredOptionSelectProduct) : {};

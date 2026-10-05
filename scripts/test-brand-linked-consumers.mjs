@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import * as info from '../lib/productDetailInfo.ts';
+assert.equal(typeof info.selectedDetailInfo,'function','customer selection must resolve detail-specific information');
+const parent={product_description:'브랜드 설명',product_note:JSON.stringify({spec_chips:['공통'],brand_group:{enabled:true,detail_info:{A:{mode:'custom',chips:['면'],description:'A 설명\n실측'},B:{mode:'hidden',chips:['실크'],description:'B 비공개'},C:{mode:'inherit',chips:[],description:''}}}})};
+assert.deepEqual(info.selectedDetailInfo(parent,'A'),{chips:['면'],description:'A 설명\n실측'});
+assert.deepEqual(info.selectedDetailInfo(parent,'B'),{chips:[],description:''});
+assert.deepEqual(info.selectedDetailInfo(parent,'C'),{chips:['공통'],description:'브랜드 설명'});
+assert.deepEqual(info.selectedDetailInfo(parent,'AA'),{chips:['공통'],description:'브랜드 설명'},'similar names must never borrow detail metadata');
+assert.deepEqual(info.selectedDetailInfo(parent,''),{chips:['공통'],description:'브랜드 설명'});
+assert.deepEqual(info.selectedDetailInfo({detail_description:'기존 설명'},''),{chips:[],description:'기존 설명'},'legacy description fallback survives');
+assert.deepEqual(info.selectedDetailInfo({product_note:{brand_group:{detail_info:{A:{mode:'custom',chips:null,description:null}}}}},'A'),{chips:[],description:''},'malformed optional fields cannot break the customer page');
+console.log('PASS exact selected detail information, mode switching and legacy fallback');
