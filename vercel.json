@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "app/api/product-brand-catalog/route.ts": {
+      "regions": ["sin1"]
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/bankda-sync",

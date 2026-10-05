@@ -24,7 +24,8 @@ export async function POST(request: NextRequest) {
     const privateDb = createClient(url, service, options);
     const { data: initial, error: initialError } = await publicDb.from('products').select('*').in('id', ids);
     if (initialError) throw initialError;
-    const admitted = (initial ?? []).filter(visible).map(row => String(row.id));
+    const initialProducts = (initial ?? []).filter(visible);
+    const admitted = initialProducts.map(row => String(row.id));
     if (!admitted.length) return NextResponse.json({ products: [], links: [] });
     const raw: Array<Record<string, unknown>> = [];
     for (let offset = 0; ; offset += 1000) {
@@ -36,8 +37,12 @@ export async function POST(request: NextRequest) {
       raw.push(...(data ?? []));
       if ((data ?? []).length < 1000) break;
     }
-    const needed = [...new Set([...admitted, ...raw.flatMap(link => [String(link.source_id), String(link.parent_id)])])];
-    const products: Array<Record<string, unknown>> = [];
+    // Reuse rows already admitted through anon/RLS within this request only.
+    // Linked rows still require their own public/RLS read; no shared price cache.
+    const initialIds = new Set(admitted);
+    const needed = [...new Set(raw.flatMap(link => [String(link.source_id), String(link.parent_id)]))]
+      .filter(id => !initialIds.has(id));
+    const products: Array<Record<string, unknown>> = [...initialProducts];
     for (let offset = 0; offset < needed.length; offset += 100) {
       const { data, error } = await publicDb.from('products').select('*').in('id', needed.slice(offset, offset + 100));
       if (error) throw error;

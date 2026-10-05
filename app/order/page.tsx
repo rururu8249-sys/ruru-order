@@ -2767,7 +2767,7 @@ export default function OrderPage() {
   const loadBroadcastProducts = async (broadcastId: string | number) => {
     const { data, error } = await supabase
       .from("broadcast_products")
-      .select("product_id, sort_order, products(*)")
+      .select("product_id, sort_order, products(id)")
       .eq("broadcast_id", broadcastId);
 
     if (error) {

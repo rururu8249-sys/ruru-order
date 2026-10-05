@@ -11,6 +11,13 @@ visit(ast);
 let productLoader;
 const findProductLoader=n=>{if(ts.isVariableDeclaration(n)&&n.name.getText(ast)==='loadBroadcastProducts')productLoader=n.initializer;ts.forEachChild(n,findProductLoader);};
 findProductLoader(ast);
+// Run the real first DB query: products are hydrated by the catalog, not twice.
+const queryStatement=productLoader.body.statements[0].getText(ast);
+const queryJs=ts.transpileModule('async function query(){'+queryStatement+';return data;}',{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;
+let projection='';
+const queryDouble={select:value=>{projection=value;return queryDouble;},eq:async()=>({data:[{product_id:7,sort_order:1,products:{id:7}}],error:null})};
+await new Function('supabase','broadcastId',queryJs+';return query();')({from:table=>{assert.equal(table,'broadcast_products');return queryDouble;}},7);
+assert.equal(projection,'product_id, sort_order, products(id)','broadcast membership read must not download full catalog product fields twice');
 assert.match(productLoader.getText(ast), /setBroadcastProducts\(nextProducts\);\s*setProductListState\("ready"\)/, 'successful polling must recover readiness');
 assert.match(text, /if \(broadcastLoaded && productListState === "ready" && !isBroadcastOn && !shopOpen\)/, 'closed-shop notice must not mask loading or retry');
 const js=ts.transpileModule('const load='+node.getText(ast),{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;
