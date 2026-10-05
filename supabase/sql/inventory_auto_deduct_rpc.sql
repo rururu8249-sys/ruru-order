@@ -148,7 +148,8 @@ begin
   from public.product_inventory_variants
   where product_id = new.id::bigint;
 
-  if jsonb_typeof(v_note->'stock_variants') = 'array'
+  if lower(coalesce(v_note->>'stock_management_enabled', 'true')) not in ('false', 'f', '0', 'no', 'n')
+     and jsonb_typeof(v_note->'stock_variants') = 'array'
      and jsonb_array_length(v_note->'stock_variants') > 0 then
     update public.products
       set
