@@ -79,6 +79,10 @@ export async function POST(request: NextRequest) {
 
     const { data, error } = await query;
     if (error) {
+      // Protected brand links reject destructive/shadow writes in the same DB transaction.
+      if (table === 'products' && ['23503', '23505', '40001'].includes(error.code)) {
+        return NextResponse.json({data:null,error:{message:'연결된 상품 또는 변경된 상태가 있습니다. 최신 상품을 확인해주세요.'}},{status:409});
+      }
       return NextResponse.json({ data: null, error: { message: error.message } }, { status: 200 });
     }
     return NextResponse.json({ data: data ?? null, error: null });

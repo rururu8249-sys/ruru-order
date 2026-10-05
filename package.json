@@ -14,6 +14,7 @@
     "test:sales-history": "node --import ./scripts/_ts-resolve.mjs scripts/test-sales-history.mjs",
     "test:product-pagination": "node --import ./scripts/_ts-resolve.mjs scripts/test-product-pagination.mjs",
     "test:product-brand-links": "node --import ./scripts/_ts-resolve.mjs scripts/test-product-brand-links.mjs",
+    "test:product-brand-move": "node scripts/test-product-brand-move.mjs && node scripts/test-product-brand-move-route.mjs",
     "test:payment-match-read": "node --import ./scripts/_ts-resolve.mjs scripts/test-payment-match-read.mjs",
     "test:widget-library": "node --import ./scripts/_ts-resolve.mjs scripts/test-widget-product-library.mjs && node scripts/test-widget-product-library-panel.mjs && node scripts/test-widget-rotation-client.mjs",
     "guard:bankda-cron": "node scripts/guard-bankda-cron.js",
