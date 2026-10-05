@@ -2,7 +2,7 @@
 // Discover actual columns from one row, so legacy aliases / missing columns are
 // handled without assuming a production schema. No financial data is cached.
 export const PAYMENT_MATCH_ORDER_FIELDS = [
-  "id", "order_group_id", "group_id", "youtube_nickname", "nickname", "customer_nickname",
+  "id", "created_at", "order_group_id", "order_lookup_code", "group_id", "youtube_nickname", "nickname", "customer_nickname",
   "customer_name", "name", "buyer_name", "final_amount", "adjusted_total_price", "total_price",
   "payment_amount", "deposit_amount", "order_amount", "amount", "point_used_amount",
   "pointUsedAmount", "used_point_amount", "admin_order_status_v2", "order_manage_status",
@@ -14,7 +14,7 @@ export const PAYMENT_MATCH_DEPOSIT_FIELDS = [
   "id", "deposit_id", "bankda_id", "transaction_id", "depositor_name", "deposit_name",
   "sender_name", "bkjukyo", "amount", "deposit_amount", "input_amount", "bkinput",
   "match_status", "status", "payment_status", "confirmed_at", "match_order_group_id",
-  "match_customer_id",
+  "match_customer_id", "deposited_at",
 ] as const;
 
 export function paymentMatchProjection(row: Record<string, unknown> | undefined, fields: readonly string[]) {

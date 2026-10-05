@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { canAutoMatchDepositDate } from "@/lib/admin-v2/paymentMatchDateGuard";
+import { confirmVerifiedBankMatch } from "@/lib/admin-v2/confirmVerifiedBankMatch";
 import { createClient } from "@supabase/supabase-js";
 import { filterPaymentMatchEligibleOrders } from "@/lib/admin-v2/paymentMatchTestOrderGuard";
 
@@ -310,7 +312,7 @@ export async function POST() {
     for (const [key, orderRows] of ordersByKey.entries()) {
       const depositRows = depositsByKey.get(key) || [];
 
-      if (orderRows.length === 1 && depositRows.length === 1) {
+      if (orderRows.length === 1 && depositRows.length === 1 && canAutoMatchDepositDate(orderRows, depositRows[0])) {
         candidates.push({
           key,
           order: orderRows[0],
@@ -338,12 +340,7 @@ export async function POST() {
         continue;
       }
 
-      const orderUpdate = await supabase
-        .from("orders")
-        .update(orderPatch)
-        .eq("id", order.id)
-        .select("*")
-        .maybeSingle();
+      const orderUpdate = await confirmVerifiedBankMatch(supabase, [order], deposit, String(order.order_group_id || order.id));
 
       if (orderUpdate.error) {
         failed.push({
@@ -351,23 +348,6 @@ export async function POST() {
           order_id: order.id,
           deposit_id: deposit.id,
           reason: orderUpdate.error.message,
-        });
-        continue;
-      }
-
-      const depositUpdate = await supabase
-        .from("deposits")
-        .update(depositPatch)
-        .eq("id", deposit.id)
-        .select("*")
-        .maybeSingle();
-
-      if (depositUpdate.error) {
-        failed.push({
-          key,
-          order_id: order.id,
-          deposit_id: deposit.id,
-          reason: depositUpdate.error.message,
         });
         continue;
       }

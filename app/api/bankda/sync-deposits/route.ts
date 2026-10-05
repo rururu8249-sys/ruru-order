@@ -97,6 +97,12 @@ export async function POST(request: NextRequest) {
     );
 
     const bankdaDescription = String((raw as any)?.response?.description || "");
+    if (body?.dry_run === true) {
+      return NextResponse.json({ ok: true, mode: 'read_only_bank_transactions', deposits });
+    }
+    if (deposits.some(item => !item.deposited_time)) {
+      return NextResponse.json({ ok: false, message: '은행 거래 날짜가 확인되지 않아 저장·자동확인을 중단했습니다. 입금내역을 확인해주세요.' }, { status: 422 });
+    }
 
     const existing: any[] = [];
     let existingError: any = null;
@@ -106,7 +112,7 @@ export async function POST(request: NextRequest) {
       while (true) {
         const { data, error } = await supabase
           .from("deposits")
-          .select("id,depositor_name,amount,deposited_time")
+          .select("id,depositor_name,amount,deposited_time,deposited_at,created_at")
           .range(from, from + pageSize - 1);
         if (error) { existingError = error; break; }
         const rows = data || [];
@@ -123,22 +129,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const existingKeys = new Set(
-      (existing || []).map((item) =>
-        sameDepositKey({
-          depositor_name: item.depositor_name,
-          amount: item.amount,
-          deposited_time: toDepositDbTime(item.deposited_time),
-        })
-      )
-    );
+    const datedKey = (item: any, timestamp: string) => `${sameDepositKey(item)}|${new Date(timestamp).toISOString()}`;
+    const existingKeys = new Set(existing.filter(item => item.deposited_at).map(item => datedKey(item, item.deposited_at)));
 
     const insertRows = deposits
-      .filter((item) => !existingKeys.has(sameDepositKey(item)))
+      .filter((item) => {
+        const key = datedKey(item, item.deposited_time);
+        if (existingKeys.has(key)) return false;
+        // Unknown historical rows might already represent this bank transaction.
+        // Never create a second spendable deposit or infer a date from import time.
+        if (existing.some(old => !old.deposited_at && sameDepositKey(old) === sameDepositKey(item) &&
+          Date.parse(old.created_at) >= Date.parse(item.deposited_time))) return false;
+        existingKeys.add(key);
+        return true;
+      })
       .map((item) => ({
         depositor_name: item.depositor_name,
         amount: item.amount,
         deposited_time: toDepositDbTime(item.deposited_time),
+        deposited_at: item.deposited_time,
         match_order_group_id: null,
         match_customer_id: null,
         match_status: "미확인",

@@ -3,6 +3,9 @@
 // 조건: 입금자명=유튜브닉네임 완전일치 + 금액 완전일치 + 1:1 단일 후보만 처리
 
 import { filterPaymentMatchEligibleOrders } from "@/lib/admin-v2/paymentMatchTestOrderGuard";
+import { canAutoMatchDepositDate } from "@/lib/admin-v2/paymentMatchDateGuard";
+import { confirmVerifiedBankMatch } from "@/lib/admin-v2/confirmVerifiedBankMatch";
+import { readPaymentMatchRows } from "@/lib/admin-v2/paymentMatchRead";
 
 type AnyRow = Record<string, any>;
 
@@ -23,7 +26,7 @@ function isUnpaidBankOrder(order: AnyRow) {
   const status = getStatus(order);
   const paymentMethod = String(order.payment_method || "무통장입금").trim();
 
-  if (PAID_STATUSES.includes(status)) return false;
+  if (PAID_STATUSES.includes(status) || status === '자동입금확인' || order.deposit_confirmed_at) return false;
   if (status === "주문취소" || status === "환불") return false;
   if (paymentMethod && paymentMethod !== "무통장입금") return false;
 
@@ -33,7 +36,7 @@ function isUnpaidBankOrder(order: AnyRow) {
 function isUnmatchedDeposit(deposit: AnyRow) {
   const status = String(deposit.match_status || "").trim();
 
-  if (deposit.confirmed_at) return false;
+  if (deposit.confirmed_at || deposit.match_order_group_id || deposit.match_customer_id) return false;
 
   if (!status) return true;
   if (status === "미확인") return true;
@@ -93,22 +96,13 @@ function groupOrders(orders: AnyRow[]) {
 }
 
 export async function runAutoPaymentMatch(supabase: any) {
-  const { data: rawOrders, error: orderError } = await supabase
-    .from("orders")
-    .select("*")
-    .neq("is_deleted", true)
-    .order("created_at", { ascending: true })
-    .limit(3000);
+  const { data: rawOrders, error: orderError } = await readPaymentMatchRows(supabase, 'orders', q => q.neq('is_deleted', true));
 
   if (orderError) {
     throw new Error(orderError.message);
   }
 
-  const { data: rawDeposits, error: depositError } = await supabase
-    .from("deposits")
-    .select("*")
-    .order("id", { ascending: true })
-    .limit(3000);
+  const { data: rawDeposits, error: depositError } = await readPaymentMatchRows(supabase, 'deposits', null);
 
   if (depositError) {
     throw new Error(depositError.message);
@@ -141,6 +135,7 @@ export async function runAutoPaymentMatch(supabase: any) {
     if (matchedGroups.length !== 1) continue;
 
     const group = matchedGroups[0];
+    if (!canAutoMatchDepositDate(group.rows, deposit)) continue;
 
     const sameGroupDepositCandidates = deposits.filter((otherDeposit: AnyRow) => {
       return (
@@ -167,32 +162,10 @@ export async function runAutoPaymentMatch(supabase: any) {
   for (const pair of candidatePairs) {
     if (pair.orderIds.length === 0 || !pair.depositId) continue;
 
-    const nowIso = new Date().toISOString();
-
-    const { error: orderUpdateError } = await supabase
-      .from("orders")
-      .update({
-        admin_order_status_v2: "입금확인",
-        order_manage_status: "입금확인",
-        deposit_confirmed_at: nowIso,
-      })
-      .in("id", pair.orderIds);
-
-    if (orderUpdateError) continue;
-
-    const { error: depositUpdateError } = await supabase
-      .from("deposits")
-      .update({
-        match_order_group_id: pair.groupId,
-        match_customer_id: pair.customerId,
-        match_status: "자동입금확인",
-        confirmed_at: nowIso,
-        confirmed_note: "닉네임+금액 완전일치 자동매칭",
-      })
-      .eq("id", pair.depositId)
-      .is("confirmed_at", null);
-
-    if (depositUpdateError) continue;
+    const result = await confirmVerifiedBankMatch(supabase,
+      paymentMatchOrders.filter(order => pair.orderIds.includes(Number(order.id))),
+      deposits.find((deposit: AnyRow) => Number(deposit.id) === pair.depositId), pair.groupId);
+    if (result.error) continue;
 
     matchedCount += 1;
     matched.push({

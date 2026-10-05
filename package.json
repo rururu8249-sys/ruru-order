@@ -21,6 +21,7 @@
     "test:product-detail-info": "node --import ./scripts/_ts-resolve.mjs scripts/test-product-detail-info.mjs && node scripts/test-product-detail-info-ui.mjs && node scripts/test-product-detail-form.mjs && node --import ./scripts/_ts-resolve.mjs scripts/test-brand-detail-table.mjs",
     "test:sales-menu": "node scripts/test-admin-menu-layout.mjs && node scripts/test-sales-menu-workspace.mjs && node scripts/test-product-toolbar.mjs",
     "test:payment-match-read": "node --import ./scripts/_ts-resolve.mjs scripts/test-payment-match-read.mjs",
+    "test:verified-bank-match": "node scripts/test-bank-deposit-date.mjs && node scripts/test-verified-bank-match.mjs",
     "test:widget-library": "node --import ./scripts/_ts-resolve.mjs scripts/test-widget-product-library.mjs && node scripts/test-widget-product-library-panel.mjs && node scripts/test-widget-rotation-client.mjs",
     "guard:bankda-cron": "node scripts/guard-bankda-cron.js",
     "guard:product-search": "node --import ./scripts/_ts-resolve.mjs scripts/test-product-search.mjs",

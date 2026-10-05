@@ -4,6 +4,8 @@ import vm from "node:vm";
 import ts from "typescript";
 import { readPaymentMatchRows, PAYMENT_MATCH_ORDER_FIELDS, PAYMENT_MATCH_DEPOSIT_FIELDS } from "../lib/admin-v2/paymentMatchRead.ts";
 import { filterPaymentMatchEligibleOrders } from "../lib/admin-v2/paymentMatchTestOrderGuard.ts";
+import { canAutoMatchDepositDate } from "../lib/admin-v2/paymentMatchDateGuard.ts";
+import { confirmVerifiedBankMatch } from "../lib/admin-v2/confirmVerifiedBankMatch.ts";
 
 const source = fs.readFileSync(new URL("../app/api/admin-v2/auto-payment-match/run/route.ts", import.meta.url), "utf8");
 // Guard against later matching changes silently omitting required fields.
@@ -16,7 +18,10 @@ for (const [object, fields] of [["order", PAYMENT_MATCH_ORDER_FIELDS], ["deposit
 function database(tables, options = {}) {
   const writes = [], reads = [];
   let failed = false;
-  return { writes, reads, from(table) {
+  return { writes, reads, async rpc(name, args) {
+    writes.push({ name, args });
+    return { data: { ok: true }, error: options.writeErrorByTable?.deposits ?? options.writeError ?? null };
+  }, from(table) {
     let select = "*", start = 0, end = Infinity, limit = Infinity, excluded, nullField, update;
     const query = {
       select(value) { select = value; return this; },
@@ -72,6 +77,8 @@ function post(db, reader) {
       if (name === "@supabase/supabase-js") return { createClient: () => db };
       if (name.endsWith("paymentMatchTestOrderGuard")) return { filterPaymentMatchEligibleOrders };
       if (name.endsWith("paymentMatchRead")) return { readPaymentMatchRows: reader };
+      if (name.endsWith("paymentMatchDateGuard")) return { canAutoMatchDepositDate };
+      if (name.endsWith("confirmVerifiedBankMatch")) return { confirmVerifiedBankMatch };
       throw new Error(name);
     },
   });
@@ -81,8 +88,25 @@ function post(db, reader) {
 function normalizeRows(rows, fields) {
   return rows.map(row => ({ ...Object.fromEntries(fields.map(key => [key, null])), ...row }));
 }
-const base = { id: 1, order_group_id: "a", youtube_nickname: "guest", customer_name: "name", final_amount: 10000, total_price: 10000, payment_method: "무통장입금" };
-const deposit = { id: 1, depositor_name: "guest", amount: 10000, match_status: "미확인" };
+const base = { id: 1, created_at: '2026-10-01T00:00:00Z', order_group_id: "a", youtube_nickname: "guest", customer_name: "name", final_amount: 10000, total_price: 10000, payment_method: "무통장입금" };
+const deposit = { id: 1, deposited_at: '2026-10-01T00:01:00Z', depositor_name: "guest", amount: 10000, match_status: "미확인" };
+// Incident regression: a July import must never pay an October order.
+{
+  const db = database({ orders: [{ ...base, created_at: "2026-10-01T14:00:44Z" }],
+    deposits: [{ ...deposit, deposited_at: null, created_at: "2026-07-22T16:11:23Z", deposited_time: "01:03:14" }] });
+  const result = await post(db, originalRead)({ json: async () => ({ confirm: "RUN_AUTO_MATCH" }) });
+  assert.equal(result.body.summary.success_count, 0, "Historical undated deposit must not confirm a new order");
+  assert.equal(db.writes.length, 0, "No order or deposit may change for an unverified bank date");
+}
+for (const [date, expected] of [
+  ['2026-07-22T16:11:23Z', 0], [null, 0], ['invalid', 0], ['2099-01-01T00:00:00Z', 0],
+  ['2026-10-01T00:01:00Z', 1], ['2026-10-04T00:00:00Z', 1],
+]) {
+  const db = database({ orders: [base], deposits: [{ ...deposit, deposited_at: date }] });
+  const result = await post(db, readPaymentMatchRows)({ json: async () => ({ confirm: 'RUN_AUTO_MATCH' }) });
+  assert.equal(result.body.summary.success_count, expected, `Actual bank date ${date} eligibility`);
+  assert.equal(db.writes.length, expected, 'Valid match uses one atomic claim; rejected date causes no writes');
+}
 function matchingResponse(result) {
   const copy = JSON.parse(JSON.stringify(result));
   // These two diagnostic totals intentionally count the smaller read set.

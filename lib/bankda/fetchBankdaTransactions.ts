@@ -69,10 +69,8 @@ function parseDateTime(row: BankdaRawTransaction) {
     "입금일시",
   ]);
 
-  if (direct) {
-    const d = new Date(direct);
-    if (Number.isFinite(d.getTime())) return d.toISOString();
-  }
+  const full = direct.match(/^(\d{4})[-/]?(\d{2})[-/]?(\d{2})[T\s]?(\d{2}):?(\d{2}):?(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/);
+  if (full) return validatedBankDate(full[1], full[2], full[3], full[4], full[5], full[6], full[7] || '+09:00');
 
   const dateText = pickText(row, [
     "bkdate",
@@ -99,7 +97,7 @@ function parseDateTime(row: BankdaRawTransaction) {
   const digitsDate = dateText.replace(/[^0-9]/g, "");
   const digitsTime = timeText.replace(/[^0-9]/g, "");
 
-  if (digitsDate.length >= 8) {
+  if (digitsDate.length === 8 && digitsTime.length === 6) {
     const y = digitsDate.slice(0, 4);
     const m = digitsDate.slice(4, 6);
     const d = digitsDate.slice(6, 8);
@@ -107,11 +105,19 @@ function parseDateTime(row: BankdaRawTransaction) {
     const mm = digitsTime.slice(2, 4) || "00";
     const ss = digitsTime.slice(4, 6) || "00";
 
-    const parsed = new Date(`${y}-${m}-${d}T${hh}:${mm}:${ss}+09:00`);
-    if (Number.isFinite(parsed.getTime())) return parsed.toISOString();
+    return validatedBankDate(y, m, d, hh, mm, ss, '+09:00');
   }
 
-  return new Date().toISOString();
+  // Unknown bank date is not "now": exclude it from automatic confirmation.
+  return '';
+}
+
+function validatedBankDate(y: string, m: string, d: string, hh: string, mm: string, ss: string, zone: string) {
+  const calendar = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
+  if (calendar.getUTCFullYear() !== Number(y) || calendar.getUTCMonth() + 1 !== Number(m) || calendar.getUTCDate() !== Number(d) ||
+      Number(hh) > 23 || Number(mm) > 59 || Number(ss) > 59) return '';
+  const parsed = new Date(`${y}-${m}-${d}T${hh}:${mm}:${ss}${zone}`);
+  return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : '';
 }
 
 function flattenRows(data: unknown): BankdaRawTransaction[] {

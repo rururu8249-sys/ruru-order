@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { filterPaymentMatchEligibleOrders } from "@/lib/admin-v2/paymentMatchTestOrderGuard";
 import { readPaymentMatchRows } from "@/lib/admin-v2/paymentMatchRead";
+import { canAutoMatchDepositDate } from "@/lib/admin-v2/paymentMatchDateGuard";
+import { confirmVerifiedBankMatch } from "@/lib/admin-v2/confirmVerifiedBankMatch";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +13,7 @@ type OrderGroupCandidate = {
   orderGroupId: string;
   orderIds: number[];
   firstOrder: AnyRow;
+  rows: AnyRow[];
   nickname: string;
   customerName: string;
   amount: number;
@@ -283,6 +286,7 @@ function buildOrderGroups(orders: AnyRow[]) {
       orderGroupId: groupId,
       orderIds,
       firstOrder,
+      rows: groupOrders,
       nickname,
       customerName,
       amount,
@@ -359,6 +363,11 @@ function buildCandidates(orders: AnyRow[], deposits: AnyRow[]) {
       const orderCandidate = keyOrders[0];
       const group = orderCandidate.group;
       const deposit = keyDeposits[0];
+
+      if (!canAutoMatchDepositDate(group.rows, deposit)) {
+        blocked.push({ key, orderCount: 1, depositCount: 1, reason: "실제 은행 거래 날짜가 없거나 주문 이전 입금 — 자동확인 제외, 거래 날짜 확인 필요" });
+        continue;
+      }
 
       rawCandidates.push({
         order_group_id: group.orderGroupId,
@@ -638,43 +647,16 @@ export async function POST(request: NextRequest) {
     let failedCount = 0;
 
     for (const candidate of preview.candidates) {
-      const orderUpdate = await supabase
-        .from("orders")
-        .update({
-          admin_order_status_v2: "자동입금확인",
-          order_manage_status: "자동입금확인",
-          deposit_confirmed_at: nowIso,
-        })
-        .in("id", candidate.order_ids);
-
-      if (orderUpdate.error) {
+      const result = await confirmVerifiedBankMatch(supabase,
+        orders.filter(order => candidate.order_ids.includes(Number(order.id))),
+        deposits.find(deposit => Number(deposit.id) === candidate.deposit_id), candidate.order_group_id);
+      if (result.error) {
         failedCount += 1;
         results.push({
           ok: false,
           candidate,
-          step: "orders_update",
-          error: orderUpdate.error.message,
-        });
-        continue;
-      }
-
-      const depositUpdate = await supabase
-        .from("deposits")
-        .update({
-          match_order_group_id: candidate.order_group_id,
-          match_status: "자동입금확인",
-          confirmed_at: nowIso,
-          confirmed_note: "자동매칭: 닉네임 완전일치 + 금액 완전일치 + 1:1 단일 후보",
-        })
-        .eq("id", candidate.deposit_id);
-
-      if (depositUpdate.error) {
-        failedCount += 1;
-        results.push({
-          ok: false,
-          candidate,
-          step: "deposits_update",
-          error: depositUpdate.error.message,
+          step: "atomic_verified_match",
+          error: result.error.message,
         });
         continue;
       }
