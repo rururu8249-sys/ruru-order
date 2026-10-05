@@ -1,4 +1,5 @@
 import { splitOptionText } from "./optionSplit";
+import type { DetailInfo } from './productDetailInfo';
 // lib/brandDetailTableOps.ts
 // [2026-08-29] 브랜드 상품 "표에서 바로 고치기"의 계산 부분만 따로 뺀 것.
 //
@@ -28,6 +29,7 @@ export type VariantRow = {
 };
 
 export type BrandDetailState = {
+  detailInfo?: Record<string, DetailInfo>;
   details: string[];
   detailPlus: Record<string, string>;
   detailPhotos: Record<string, string>;
@@ -110,6 +112,7 @@ export function renameDetail(
       photoSets: move(state.photoSets),
       categories: move(state.categories),
       options: move(state.options),
+      ...(state.detailInfo ? {detailInfo:move(state.detailInfo)} : {}),
       hidden: state.hidden.map((n) => (n === oldName ? nextName : n)),
       variantRows: state.variantRows.map((row) => {
         if (row.detail !== oldName) return row;
@@ -221,6 +224,7 @@ export function removeDetailRow(
       photoSets: drop(state.photoSets),
       categories: drop(state.categories),
       options: drop(state.options),
+      ...(state.detailInfo ? {detailInfo:drop(state.detailInfo)} : {}),
       hidden: state.hidden.filter((n) => n !== target),
       variantRows: state.variantRows.filter((row) => row.detail !== target),
     },

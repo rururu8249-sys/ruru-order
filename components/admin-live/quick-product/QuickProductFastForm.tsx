@@ -28,6 +28,8 @@ import {
 import { brandWordmarkThumbnail, normalizeBrandKorean, productAutoThumbUrl, productNameThumbnail } from "@/lib/brandWordmarkThumbnail";
 import { detailCode } from "@/lib/productDetailModel";
 import { splitOptionText } from "@/lib/optionSplit";
+import { normalizeDetailChips, type DetailInfo } from '@/lib/productDetailInfo';
+import BrandDetailInfoEditor from './BrandDetailInfoEditor';
 
 type ProductRow = Record<string, unknown>;
 
@@ -54,6 +56,7 @@ type BrandDetailOptionConfig = {
 };
 
 type BrandDetailEditDraft = {
+  info: DetailInfo;
   originalName: string;
   name: string;
   category: string;
@@ -269,6 +272,7 @@ type ParsedProductNote = Record<string, unknown> & {
         brand_en?: string;
         detail_categories?: Record<string, string>;
         detail_options?: Record<string, BrandDetailOptionConfig>;
+        detail_info?: Record<string, DetailInfo>;
       };
       // [무료나눔 · 2026-07-22] true면 0원 상품(선물). 가격 비움(손님 직접입력)과 구분되는 명시 플래그
       free_product?: boolean;
@@ -802,6 +806,8 @@ export default function QuickProductFastForm({
   const [brandGroupDetailPhotoSets, setBrandGroupDetailPhotoSets] = useState<Record<string, string[]>>({});
   const [brandGroupDetailCategories, setBrandGroupDetailCategories] = useState<Record<string, string>>({});
   const [brandGroupDetailOptions, setBrandGroupDetailOptions] = useState<Record<string, BrandDetailOptionConfig>>({});
+  const [brandGroupDetailInfo, setBrandGroupDetailInfo] = useState<Record<string, DetailInfo>>({});
+  const [brandDetailSection, setBrandDetailSection] = useState<'basic'|'options'|'info'>('basic');
   const [brandDetailEditDraft, setBrandDetailEditDraft] = useState<BrandDetailEditDraft | null>(null);
   const [brandDetailSearch, setBrandDetailSearch] = useState("");
   const [brandDetailCategoryFilter, setBrandDetailCategoryFilter] = useState("전체");
@@ -1001,6 +1007,9 @@ export default function QuickProductFastForm({
     setBrandGroupDetailPhotoSets(normalizedPhotoSets);
     setBrandGroupDetailCategories(normalizedDetailCategories);
     setBrandGroupDetailOptions(normalizedDetailOptions);
+    const restoredDetailInfo = normalizeBrandRecordKeys<DetailInfo>(productNote?.brand_group?.detail_info || {});
+    setBrandGroupDetailInfo(restoredDetailInfo);
+    setBrandDetailSection('basic');
     setBrandDetailEditDraft(null);
     setBrandDetailSearch("");
     setBrandDetailCategoryFilter("전체");
@@ -1121,6 +1130,7 @@ export default function QuickProductFastForm({
     if (isBrandGroupEdit && target && restoredDetails.includes(target)) {
       const config = normalizedDetailOptions[target] || { colors: [], sizes: [], variants: [] };
       setBrandDetailEditDraft({
+        info: restoredDetailInfo[target] ? {...restoredDetailInfo[target],chips:[...restoredDetailInfo[target].chips]} : {mode:'inherit',chips:[],description:''},
         originalName: target,
         name: target,
         category: normalizedDetailCategories[target] || "",
@@ -1307,6 +1317,7 @@ export default function QuickProductFastForm({
       ? config.variants.map((variant) => ({ color: String(variant.color || "없음"), size: String(variant.size || "없음") }))
       : [{ color: "없음", size: "없음" }];
     setBrandDetailEditDraft({
+      info: brandGroupDetailInfo[name] ? {...brandGroupDetailInfo[name],chips:[...brandGroupDetailInfo[name].chips]} : {mode:'inherit',chips:[],description:''},
       originalName: name,
       name,
       category: String(brandGroupDetailCategories[name] || ""),
@@ -1323,12 +1334,14 @@ export default function QuickProductFastForm({
   //   (엑셀로 만든 것만 수정 가능 = 새 상품이 들어오면 엑셀을 다시 돌려야 했다)
   //   → 같은 수정창을 빈 상태로 열어서 새로 하나 만들 수 있게 한다.
   const openBrandDetailEditorForNew = () => {
+    setBrandDetailSection('basic');
     // 이미 있는 세부상품의 색상·사이즈 구성을 기본값으로 가져온다(대부분 같은 구성이라 손이 덜 감).
     const sample = details.map((n) => brandGroupDetailOptions[n]).find((cfg) => cfg && (cfg.variants || []).length > 0);
     const variants = sample && Array.isArray(sample.variants) && sample.variants.length > 0
       ? sample.variants.map((v) => ({ color: String(v.color || "없음"), size: String(v.size || "없음") }))
       : [{ color: "없음", size: "없음" }];
     setBrandDetailEditDraft({
+      info: {mode:'inherit',chips:[],description:''},
       originalName: "",          // 빈 값 = 새로 만드는 중
       name: "",
       category: brandDetailCategoryFilter !== "전체" ? brandDetailCategoryFilter : "",
@@ -1381,6 +1394,7 @@ export default function QuickProductFastForm({
     setBrandGroupDetailPhotoSets((prev) => moveKey(prev, brandDetailEditDraft.photos.length ? [...brandDetailEditDraft.photos] : undefined));
     setBrandGroupDetailCategories((prev) => moveKey(prev, brandDetailEditDraft.category.trim()));
     setBrandGroupDetailOptions((prev) => moveKey(prev, { colors, sizes, variants: nextVariants }));
+    setBrandGroupDetailInfo((prev) => moveKey(prev, {...brandDetailEditDraft.info,chips:normalizeDetailChips(brandDetailEditDraft.info.chips)}));
     setDetailHidden((prev) => {
       const withoutEdited = prev.filter((name) => name !== oldName && name !== nextName);
       return brandDetailEditDraft.hidden
@@ -1574,6 +1588,7 @@ export default function QuickProductFastForm({
     photoSets: brandGroupDetailPhotoSets,
     categories: brandGroupDetailCategories,
     options: brandGroupDetailOptions,
+    detailInfo: brandGroupDetailInfo,
     hidden: detailHidden,
     variantRows,
   });
@@ -1586,6 +1601,7 @@ export default function QuickProductFastForm({
     setBrandGroupDetailPhotoSets(next.photoSets);
     setBrandGroupDetailCategories(next.categories);
     setBrandGroupDetailOptions(next.options);
+    setBrandGroupDetailInfo(next.detailInfo || {});
     setDetailHidden(next.hidden);
     setVariantRows(next.variantRows);
   };
@@ -1689,6 +1705,7 @@ export default function QuickProductFastForm({
     setBrandGroupDetailPhotoSets((prev) => removeKey(prev));
     setBrandGroupDetailCategories((prev) => removeKey(prev));
     setBrandGroupDetailOptions((prev) => removeKey(prev));
+    setBrandGroupDetailInfo((prev) => removeKey(prev));
     setDetailHidden((prev) => prev.filter((name) => name !== target));
     setVariantRows((prev) => prev.filter((row) => row.detail !== target));
     setBrandDetailEditDraft(null);
@@ -1736,6 +1753,7 @@ export default function QuickProductFastForm({
     setBrandGroupDetailPhotoSets({});
     setBrandGroupDetailCategories({});
     setBrandGroupDetailOptions({});
+    setBrandGroupDetailInfo({});
     setBrandDetailEditDraft(null);
     setBrandDetailSearch("");
     setBrandDetailCategoryFilter("전체");
@@ -1857,6 +1875,7 @@ export default function QuickProductFastForm({
               ...(effectiveBrandEn ? { brand_en: effectiveBrandEn } : {}),
               detail_categories: brandGroupDetailCategories,
               detail_options: brandGroupDetailOptions,
+              detail_info: brandGroupDetailInfo,
             },
             detail_photo_sets: brandGroupDetailPhotoSets,
             // [2026-08-29] 같은 디자인 묶기는 사장님 지시로 되돌렸다.
@@ -3249,7 +3268,11 @@ export default function QuickProductFastForm({
               <button type="button" onClick={() => setBrandDetailEditDraft(null)} style={{ border: "none", background: "transparent", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer" }}>×</button>
             </div>
             <div style={{ overflowY: "auto", padding: "12px 16px" }}>
-              <div style={{ marginBottom: "12px" }}>
+              <nav aria-label="세부상품 편집 항목" style={{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap'}}>
+                {([['basic','기본정보'],['options','사진·옵션'],['info','한눈에 정보·상세설명']] as const).map(([key,label])=><button key={key} type="button" aria-pressed={brandDetailSection===key} onClick={()=>setBrandDetailSection(key)} style={{padding:'9px 12px',border:'1px solid var(--color-line)',borderRadius:8,fontSize:13,fontWeight:800,cursor:'pointer',background:brandDetailSection===key?'var(--color-rose-deep)':'var(--color-surface)',color:brandDetailSection===key?'#fff':'var(--color-ink)'}}>{label}</button>)}
+              </nav>
+              {brandDetailSection==='info' && <BrandDetailInfoEditor value={brandDetailEditDraft.info} onChange={info=>setBrandDetailEditDraft(prev=>prev?{...prev,info}:prev)} parentPreview={{chips:normalizeSpecChips(specChipsText),description}} />}
+              <div style={{display:brandDetailSection==='options'?'block':'none',marginBottom: "12px" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "6px" }}><div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>상세사진 {brandDetailEditDraft.photos.length}장 — 첫 장이 대표 · ☆을 누르면 대표로</div><button type="button" disabled={brandDetailPhotoUploading} onClick={() => brandDetailPhotoInputRef.current?.click()} style={{ border:"1px solid var(--color-rose-line)",borderRadius:8,background:"var(--color-surface)",color:"var(--color-rose-deep)",padding:"4px 8px",fontSize:"11px",fontWeight:900,cursor:"pointer" }}>{brandDetailPhotoUploading ? "업로드 중…" : "+ 상세사진 추가"}</button></div>
                 <input ref={brandDetailPhotoInputRef} type="file" accept="image/*" multiple onChange={handleBrandDetailPhotoFiles} style={{ display:"none" }} />
                 {/* [2026-09-03] 사진 조작을 단품 한 줄 10장과 동일하게 통일 — 첫 장 ★대표, ☆ 누르면 맨 앞으로, 화살표 제거 */}
@@ -3267,6 +3290,7 @@ export default function QuickProductFastForm({
                   </div>
                 ))}</div> : <div style={{fontSize:"11px",color:"var(--color-ink-mute)"}}>등록된 상세사진이 없습니다.</div>}
               </div>
+              <div style={{display:brandDetailSection==='basic'?'block':'none'}}>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 150px", gap: "8px" }}>
                 <label style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>상품명
                   <input value={brandDetailEditDraft.name} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, name: event.target.value } : prev)} style={{ ...fieldInput, marginTop: "4px" }} />
@@ -3316,6 +3340,8 @@ export default function QuickProductFastForm({
                 })()}
               </div>
 
+              </div>
+              <div style={{display:brandDetailSection==='options'?'block':'none'}}>
               <div style={{ marginTop: "12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <span style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-ink)" }}>색상·사이즈 <span style={{ fontWeight: 700, color: "var(--color-ink-mute)" }}>— 이 상품에 있을 때만 · 없으면 비워두세요</span></span>
               </div>
@@ -3329,6 +3355,7 @@ export default function QuickProductFastForm({
                 <input value={brandDetailEditDraft.sizesText} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, sizesText: event.target.value } : prev)} placeholder="220, 230, 240 (쉼표로 여러 개)" style={fieldInput} />
               </div>
               <div style={{ marginTop: "8px", fontSize: "11px", color: "var(--color-ink-mute)" }}>조합과 재고 줄은 자동으로 만들어져요 (기존 수량 유지) · 둘 다 비우면 옵션 없는 상품</div>
+              </div>
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "12px 16px", borderTop: "1px solid var(--color-line)", background: "var(--color-surface-2)", flexWrap: "wrap" }}>
               {/* 새로 만드는 중일 때는 지울 게 없으므로 삭제 버튼을 숨긴다 */}
