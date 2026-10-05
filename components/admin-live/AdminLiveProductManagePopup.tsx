@@ -382,6 +382,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const nameMatch = (p: ProductRow) =>
     !search.trim() ||
     productSearchMatches(productName(p), search) ||
+    productSearchMatches(brandCatalog.bySourceId.get(productId(p))?.detailName ?? '', search) ||
+    searchBrandDetails(brandCatalog, productId(p), search).length > 0 ||
     comboNamesMatch(p, search) ||
     adminDetailSearch(p, search).length > 0;
 
