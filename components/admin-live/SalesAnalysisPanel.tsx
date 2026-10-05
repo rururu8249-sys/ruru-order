@@ -3,11 +3,12 @@
 import {useEffect,useMemo,useState} from 'react';
 import {supabase} from '@/lib/supabase';
 import {loadSalesAnalysisSnapshot,type SalesAnalysisSnapshot} from '@/lib/salesAnalysisLoader';
-import {salesProductPhotos} from '@/lib/salesHistory';
+import {aggregateSalesItems,salesProductPhotos} from '@/lib/salesHistory';
 import {isCanceledStatus} from '@/lib/admin-v2/statusDisplay';
 import type {OrderRow} from '@/lib/admin-v2/types';
 import {buildAdminLiveOrderGroups,toAdminLiveOrder} from './liveOrderAdapter';
-import BroadcastReportPopup from './BroadcastReportPopup';
+import type {LiveOrder} from './types';
+import {showAdminToast} from '@/lib/adminToast';
 
 const paid=new Set(['paid','auto_paid','manual_paid','card_paid']);
 const won=(value:number)=>`${value.toLocaleString('ko-KR')}원`;
@@ -30,6 +31,12 @@ export default function SalesAnalysisPanel({initialBroadcastId}:{initialBroadcas
   const [year,setYear]=useState('all');
   const [month,setMonth]=useState('all');
   const [search,setSearch]=useState('');
+  const [productSearch,setProductSearch]=useState('');
+  const [productSort,setProductSort]=useState('sales');
+  const [detailView,setDetailView]=useState('products');
+  const [buyerSearch,setBuyerSearch]=useState('');
+  const [category,setCategory]=useState('all');
+  useEffect(()=>{setProductSearch('');setBuyerSearch('');setCategory('all');setDetailView('products');},[selected]);
   useEffect(()=>{
     let current=true;
     setSnapshot(null);setError(false);
@@ -66,7 +73,39 @@ export default function SalesAnalysisPanel({initialBroadcastId}:{initialBroadcas
   },[snapshot,channel,year,month,search]);
   const selectedEntry=model?.list.find(b=>b.id===selected);
   const detail=useMemo(()=>snapshot&&model&&selectedEntry?{...snapshot,broadcasts:[selectedEntry],orders:model.scoped.filter(row=>channelOf(row)===selectedEntry.id)}:null,[snapshot,model,selectedEntry]);
-  const sold=useMemo(()=>detail?buildAdminLiveOrderGroups(detail.orders).map(toAdminLiveOrder).filter(o=>paid.has(o.paymentStatus)).flatMap(o=>o.items):[],[detail]);
+  const paidOrders=useMemo(()=>detail?buildAdminLiveOrderGroups(detail.orders).map(toAdminLiveOrder).filter(o=>paid.has(o.paymentStatus)):[],[detail]);
+  const sold=useMemo(()=>paidOrders.flatMap(o=>o.items),[paidOrders]);
+  const buyers=useMemo(()=>{
+    const groups=new Map<string,{nickname:string;name:string;orders:LiveOrder[];amount:number;qty:number}>();
+    for(const order of paidOrders){
+      const key=order.phone&&order.phone!=='-'?order.phone:`${order.nickname}|${order.name}`;
+      const buyer=groups.get(key)||{nickname:order.nickname,name:order.name,orders:[],amount:0,qty:0};
+      buyer.orders.push(order);buyer.amount+=order.totalAmount;buyer.qty+=order.items.reduce((sum,item)=>sum+item.qty,0);groups.set(key,buyer);
+    }
+    return [...groups].map(([key,buyer])=>({key,...buyer})).sort((a,b)=>b.amount-a.amount);
+  },[paidOrders]);
+  const products=useMemo(()=>{
+    if(!detail)return [];
+    const originals=new Map(detail.orders.map(row=>[String(row.id),row]));
+    return aggregateSalesItems(sold.map(item=>({...originals.get(item.id),product_name:item.productName,product_id:item.productId,qty:item.qty,adjusted_product_price:null,product_price:item.unitPrice,lineAmount:item.amount})),row=>Number(row.lineAmount),row=>String(row.product_id||'')).map(item=>{
+      const product=detail.products.find(p=>String(p.id)===item.productId);
+      const photo=product?salesProductPhotos(item.name,product,item.productId||undefined).detail:'';
+      let note:Record<string,unknown>={};
+      try{note=typeof product?.product_note==='string'?JSON.parse(product.product_note):product?.product_note as Record<string,unknown>||{};}catch{/* Invalid legacy metadata remains unclassified. */}
+      return {...item,thumb:photo,category:String(note?.category||'').trim()||'기타'};
+    });
+  },[detail,sold]);
+  const categories=useMemo(()=>{
+    const groups=new Map<string,{qty:number;amount:number}>();
+    for(const item of products){const group=groups.get(item.category)||{qty:0,amount:0};group.qty+=item.qty;group.amount+=item.sales;groups.set(item.category,group);}
+    return [...groups].map(([name,group])=>({name,...group})).sort((a,b)=>b.qty-a.qty);
+  },[products]);
+  const shownProducts=useMemo(()=>products.filter(p=>(category==='all'||category===p.category)&&`${p.name} ${p.option}`.toLowerCase().includes(productSearch.toLowerCase())).sort((a,b)=>productSort==='name'?a.name.localeCompare(b.name,'ko',{numeric:true}):productSort==='qty'?b.qty-a.qty||b.sales-a.sales:b.sales-a.sales),[products,productSearch,productSort,category]);
+  async function copyAnalysis(){
+    if(!selectedEntry)return;
+    const lines=[`${selectedEntry.title} 판매분석`,'결제완료 기준 · 취소·삭제·테스트·선물 제외',`결제금액 ${won(paidOrders.reduce((sum,o)=>sum+o.totalAmount,0))}`,`상품금액 ${won(products.reduce((sum,p)=>sum+p.sales,0))}`,`구매자 ${buyers.length}명 · 주문 ${paidOrders.length}건 · 판매수량 ${sold.reduce((sum,p)=>sum+p.qty,0)}개`,'','상품·옵션별 판매 현황',...products.flatMap(p=>[`${p.name} · ${p.qty}개 · 단가 ${won(p.price)} · 상품금액 ${won(p.sales)}`,p.option])];
+    try{await navigator.clipboard.writeText(lines.join('\n'));showAdminToast('판매분석을 복사했습니다.','success');}catch{showAdminToast('복사하지 못했습니다. 브라우저의 클립보드 권한을 확인해 주세요.','error');}
+  }
   const years=useMemo(()=>snapshot?[...new Set([...snapshot.broadcasts.map(b=>b.started_at),...snapshot.orders.filter(r=>r.broadcast_id==null).map(r=>String(r.created_at||''))].filter(Boolean).map(date=>new Date(date).toLocaleDateString('en-CA',{timeZone:'Asia/Seoul',year:'numeric'})))].filter(y=>/^\d{4}$/.test(y)).sort().reverse():[],[snapshot]);
   const control='rounded-lg border border-line bg-surface px-3 py-2 text-sm';
   return <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4" aria-label="판매분석">
@@ -79,15 +118,28 @@ export default function SalesAnalysisPanel({initialBroadcastId}:{initialBroadcas
     </div>
     <p className="text-xs text-ink-soft">결제완료 기준 · 취소·삭제·테스트·선물 제외. 방송은 시작일, 쇼핑몰은 주문일 기준입니다. 주문건수는 주문서 수, 품목 수는 주문서 안의 상품 줄 수입니다.</p>
     {error?<div role="alert" className="rounded-xl border border-line p-8 text-center"><p>판매분석을 불러오지 못했습니다.</p><p className="mt-2 text-sm">일부 주문만 합산하지 않습니다. 새로고침으로 다시 시도해 주세요.</p></div>:!model||!snapshot?<p role="status" className="p-8 text-center">판매분석을 불러오는 중…</p>:<>
+      <p className="text-sm font-bold">조회 조건 전체 합계 · {model.list.length}개 판매 경로</p>
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">{[['결제금액',won(model.total.amount)],['상품금액',won(model.total.productAmount)],['주문건수',`${model.total.count.toLocaleString()}건`],['품목 수',`${model.total.items.toLocaleString()}줄`],['판매수량',`${model.total.qty.toLocaleString()}개`]].map(([label,value])=><div key={label} className="rounded-xl border border-line bg-surface-2 p-3"><p className="text-xs text-ink-soft">{label}</p><p className="mt-1 text-lg font-extrabold text-rose-deep">{value}</p></div>)}</div>
       <div className="grid min-h-0 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
         <nav aria-label="분석할 방송" className="flex max-h-72 flex-col gap-2 overflow-y-auto lg:max-h-[65vh]">{model.list.map(b=><button key={b.id} aria-label={`${b.title} 분석`} aria-pressed={selected===b.id} className={`rounded-xl border p-3 text-left ${selected===b.id?'border-rose-line bg-rose-soft':'border-line bg-surface'}`} onClick={()=>setSelected(b.id)}><p className="font-bold">{b.title}</p><p className="mt-1 text-sm">{won(model.stats.get(b.id)?.amount||0)}</p><p className="text-xs text-ink-soft">{b.started_at?new Date(b.started_at).toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul'}):'기간 내 주문'} · 주문 {model.stats.get(b.id)?.count}건 · 품목 {model.stats.get(b.id)?.items}줄</p></button>)}{model.list.length===0?<p className="p-4 text-sm">선택한 조건에 결제완료 판매가 없습니다.</p>:null}</nav>
         <div className="min-w-0">{detail?<>
-          <BroadcastReportPopup key={selectedEntry!.id} embedded open onClose={()=>{}} initialBroadcastId={selectedEntry!.id} suppliedSnapshot={detail}/>
-          <details className="mt-4 rounded-xl border border-line p-4"><summary className="cursor-pointer font-bold">상품·옵션별 판매내역 ({sold.length}줄)</summary><div className="mt-3 flex flex-col gap-2">{sold.map(item=>{
-            const product=detail.products.find(p=>String(p.id)===item.productId);const photo=product?salesProductPhotos(item.productName,product,item.productId||undefined).detail:'';
-            return <div key={item.id} className="flex items-center gap-3 border-b border-line py-2">{photo?<img src={photo} alt={item.productName} loading="lazy" className="h-14 w-14 rounded-lg object-cover"/>:null}<div className="min-w-0 flex-1"><p className="font-bold">{item.productName}</p><p className="break-words text-sm text-ink-soft">{item.optionText} · {item.qty}개</p></div><span className="shrink-0 font-bold">{won(item.amount)}</span></div>;
-          })}</div></details>
+          <section className="rounded-xl border border-line bg-surface p-4" aria-label="선택 방송 판매 품목">
+            <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-lg font-extrabold">{selectedEntry!.title}</h3><p className="mt-1 text-sm text-ink-soft">상품별 판매 현황 · 색상과 사이즈별 수량을 함께 확인하세요.</p><button className={`${control} mt-2`} onClick={copyAnalysis}>분석 복사</button></div><div className="text-right"><p className="text-xs text-ink-soft">상품금액 합계</p><p className="text-xl font-extrabold text-rose-deep">{won(products.reduce((sum,item)=>sum+item.sales,0))}</p><p className="text-xs text-ink-soft">판매수량 {sold.reduce((sum,item)=>sum+item.qty,0)}개 · 배송비·결제 부가금액 제외</p></div></div>
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{[['결제금액',won(paidOrders.reduce((sum,order)=>sum+order.totalAmount,0))],['구매자',`${buyers.length}명`],['주문건수',`${paidOrders.length}건`],['판매수량',`${sold.reduce((sum,item)=>sum+item.qty,0)}개`]].map(([label,value])=><div key={label} className="rounded-lg bg-surface-2 p-3"><p className="text-xs text-ink-soft">{label}</p><p className="mt-1 font-extrabold">{value}</p></div>)}</div>
+            <div className="mt-4 flex gap-2 border-b border-line pb-3" aria-label="상세 분석 보기">{[['products','상품·옵션별'],['buyers','구매자별']].map(([key,label])=><button key={key} aria-pressed={detailView===key} onClick={()=>setDetailView(key)} className={`rounded-lg px-4 py-2 text-sm font-bold ${detailView===key?'bg-rose-deep text-white':'bg-surface-2 text-ink-soft'}`}>{label}</button>)}</div>
+            {detailView==='products'?<>
+            <div className="mt-4 flex flex-wrap gap-2" aria-label="상품 분류 필터"><button className={control} aria-pressed={category==='all'} onClick={()=>setCategory('all')}>전체 분류</button>{categories.map(c=><button key={c.name} className={`${control} ${category===c.name?'border-rose-line bg-rose-soft':''}`} aria-pressed={category===c.name} onClick={()=>setCategory(c.name)}>{c.name} · {c.qty}개 · {won(c.amount)}</button>)}</div>
+            <div className="my-4 flex flex-wrap gap-2"><input className={`${control} min-w-0 flex-1`} aria-label="판매 상품·옵션 검색" placeholder="상품명·색상·사이즈 검색" value={productSearch} onChange={e=>setProductSearch(e.target.value)}/><select className={control} aria-label="상품 정렬" value={productSort} onChange={e=>setProductSort(e.target.value)}><option value="sales">상품금액순</option><option value="qty">판매수량순</option><option value="name">상품명순</option></select></div>
+            <div className="overflow-x-auto rounded-lg border border-line" role="region" aria-label="상품별 판매 현황 표" tabIndex={0}>
+              <table className="w-full min-w-[640px] border-collapse text-sm"><caption className="sr-only">{selectedEntry!.title} 상품·옵션별 판매 현황</caption><thead className="bg-surface-2 text-ink-soft"><tr>{['상품','구매 옵션별 수량','판매수량','단가','상품금액'].map(label=><th key={label} scope="col" className="px-3 py-3 text-left">{label}</th>)}</tr></thead><tbody>{shownProducts.map(item=><tr key={item.key} className="border-t border-line even:bg-surface-2"><th scope="row" className="w-[180px] px-3 py-3 text-left"><div className="flex items-center gap-3">{item.thumb?<a href={item.thumb} target="_blank" rel="noopener noreferrer" aria-label={`${item.name} 상품 사진 확대`}><img src={item.thumb} alt={item.name} loading="lazy" className="h-20 w-16 rounded-lg object-contain"/></a>:<span className="w-16 shrink-0 text-xs font-normal text-ink-soft">세부 사진<br/>미등록</span>}<span className="break-words font-bold">{item.name}</span></div></th><td className="min-w-[200px] px-3 py-3"><div className="flex flex-col gap-2">{item.optionGroups.map(group=><div key={group.label} className="rounded-lg border border-line bg-surface px-3 py-2">{group.label?<p className="mb-1 font-bold">{group.label}</p>:null}<div className="flex flex-wrap gap-x-3 gap-y-1">{group.sizes.map(size=><span key={size.label}>{size.label} <strong className="text-[#b42318]">{size.qty}개</strong></span>)}</div></div>)}</div></td><td className="whitespace-nowrap px-3 py-3 font-extrabold text-[#b42318]">{item.qty}개</td><td className="whitespace-nowrap px-3 py-3 text-ink-soft">{won(item.price)}</td><td className="whitespace-nowrap px-3 py-3 font-extrabold text-rose-deep">{won(item.sales)}</td></tr>)}</tbody></table>
+            </div>{shownProducts.length===0?<p className="py-6 text-center text-ink-soft">검색 조건에 맞는 판매 상품이 없습니다.</p>:null}
+            <p className="mt-3 text-xs text-ink-soft">표시 {shownProducts.length}개 상품·단가 묶음 / 전체 {products.length}개 · 같은 상품도 단가가 다르면 구분합니다.</p>
+            </>:<>
+              <input className={`${control} my-4 w-full`} aria-label="구매자 검색" placeholder="닉네임·이름 검색" value={buyerSearch} onChange={e=>setBuyerSearch(e.target.value)}/>
+              <div className="flex flex-col gap-2">{buyers.filter(b=>`${b.nickname} ${b.name}`.toLowerCase().includes(buyerSearch.toLowerCase())).map(b=><details key={`${selectedEntry!.id}:${b.key}`} className="rounded-lg border border-line"><summary className="cursor-pointer p-3"><span className="font-bold">{b.nickname}{b.name&&b.name!==b.nickname&&b.name!=='-'?` (${b.name})`:''}</span><span className="ml-3 text-sm text-ink-soft">주문 {b.orders.length}건 · {b.qty}개</span><strong className="float-right text-rose-deep">{won(b.amount)}</strong></summary><div className="border-t border-line bg-surface-2 px-3 py-2">{b.orders.flatMap(o=>o.items).map(item=><div key={item.id} className="flex gap-3 py-2 text-sm"><span className="min-w-0 flex-1 break-words">{item.productName} · {item.optionText}</span><span className="shrink-0">{item.qty}개</span><strong className="shrink-0">{won(item.amount)}</strong></div>)}</div></details>)}</div>
+              {buyers.filter(b=>`${b.nickname} ${b.name}`.toLowerCase().includes(buyerSearch.toLowerCase())).length===0?<p className="py-6 text-center text-ink-soft">검색 조건에 맞는 구매자가 없습니다.</p>:null}
+            </>}
+          </section>
         </>:<div className="rounded-xl border border-dashed border-line p-8 text-center text-ink-soft">방송을 선택하면 상세 분석이 표시됩니다.</div>}</div>
       </div>
     </>}

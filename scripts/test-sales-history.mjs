@@ -30,6 +30,18 @@ assert.deepEqual(grouped.optionGroups,[
 ]);
 assert.equal(grouped.qty,15);
 assert.equal(grouped.sales,585000);
+const adjusted=aggregateSalesItems([
+ {product_name:'셔츠',color:'그린',size:'XL',qty:2,product_price:10000,line_amount:18000},
+ {product_name:'셔츠',color:'그린',size:'M',qty:1,product_price:10000,line_amount:10000},
+ {product_name:'셔츠',color:'그린',size:'M',qty:1,product_price:12000,line_amount:12000},
+],row=>Number(row.line_amount));
+assert.equal(adjusted.length,2,'same name but different unit prices remain separate');
+assert.equal(adjusted[0].sales,28000,'adjusted line total is not multiplied by quantity again');
+assert.deepEqual(adjusted[0].optionGroups,[{label:'그린',sizes:[{label:'M',qty:1},{label:'XL',qty:2}]}]);
+assert.equal(aggregateSalesItems([
+ {product_id:'A',product_name:'셔츠',qty:1,product_price:10000,line_amount:10000},
+ {product_id:'B',product_name:'셔츠',qty:1,product_price:10000,line_amount:10000},
+],row=>Number(row.line_amount),row=>String(row.product_id)).length,2,'distinct catalog identities cannot inherit another category or photo');
 assert.deepEqual(aggregateSalesItems([
  {product_name:'옷',color:'베이지 / 화이트',size:'M/38',qty:2},
  {product_name:'옷',color:'베이지 / 화이트',size:'36',qty:1},

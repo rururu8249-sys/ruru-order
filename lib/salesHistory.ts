@@ -30,17 +30,17 @@ export function eligibleSalesOrder(row: Row) {
 export function salesPaymentAmount(row: Row) {
   return Number(row.final_amount ?? row.adjusted_total_price ?? row.total_price ?? 0);
 }
-export function aggregateSalesItems(orders: Row[]) {
+export function aggregateSalesItems(orders: Row[], lineAmount?: (row: Row) => number, identity?: (row: Row) => string) {
   const map = new Map<string,{key:string;name:string;productId:string;thumb:string;qty:number;price:number;sales:number;opts:Map<string,number>;groups:Map<string,Map<string,number>>}>();
   for (const row of orders) {
     const name = String(row.product_name || '상품명 없음').trim();
     const price = Number(row.adjusted_product_price ?? row.product_price ?? 0);
     // IDs can identify a brand/parent containing many different products.
-    const key = JSON.stringify([name, price]);
+    const key = JSON.stringify(identity ? [identity(row), name, price] : [name, price]);
     const cur = map.get(key) || {key,name,productId:String(row.product_id || ''),thumb:'',qty:0,price,sales:0,opts:new Map<string,number>(),groups:new Map<string,Map<string,number>>()};
     const qty = Number(row.qty || 0);
     const option = [row.color,row.size].map(v=>String(v || '').trim()).filter(v=>v && v!=='없음').join(' / ') || '옵션 없음';
-    cur.qty += qty; cur.sales += price * qty;
+    cur.qty += qty; cur.sales += lineAmount ? lineAmount(row) : price * qty;
     cur.opts.set(option,(cur.opts.get(option)||0)+qty);
     // Use the original fields, not a split display string: slashes can be part of an option.
     const color=String(row.color || '').trim();

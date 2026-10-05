@@ -26,6 +26,14 @@ assert.equal(text().includes('테스트제외'),false);
 assert(text().includes('품목 수'),'item count is not mislabeled as orders');
 assert(text().includes('베이지 / 화이트'),'original option must remain readable');
 assert.equal(loads,1,'opening details cannot load the same orders twice');
+assert.equal(tree.root.findAllByType('table').length,1,'primary product/option breakdown is a structured table');
+assert(text().includes('구매 옵션별 수량'),'color and size quantities are grouped, not repeated order rows');
+assert.equal(tree.root.findAllByType('details').length,0,'buyers are not appended underneath products');
+await act(async()=>tree.root.findAllByType('button').find(b=>b.children.includes('구매자별')).props.onClick());
+assert.equal(tree.root.findAllByType('table').length,0,'buyer view replaces product view rather than stacking pages');
+assert(tree.root.findAllByType('details').every(node=>node.props.open===undefined),'buyer items are disclosed only when requested');
+assert.equal(loads,1,'switching analysis view does not query again');
+await act(async()=>tree.root.findAllByType('button').find(b=>b.children.includes('상품·옵션별')).props.onClick());
 await act(async()=>tree.root.findAllByType('button').find(b=>b.props['aria-label']==='방송 B 분석').props.onClick());
 assert.equal(loads,1,'broadcast switch uses the loaded snapshot');
 assert(text().includes('방송 B'));
@@ -48,5 +56,17 @@ assert.equal(text().includes('취소상품'),false);
 await act(async()=>tree.root.findByProps({'aria-label':'판매 경로'}).props.onChange({target:{value:'shop'}}));
 assert(text().includes('4,000원'),'shop filter uses net payment');
 assert.equal(text().includes('출고상품'),false,'filtered-out selection does not retain old detail');
+await act(async()=>tree.unmount());
+pending=Promise.resolve({...snapshot,orders:[
+ {id:20,order_group_id:'catA',broadcast_id:'A',product_id:'clothing',product_name:'동일 이름',color:'그린',size:'XL',qty:2,product_price:10000,adjusted_product_price:18000,total_price:18000,admin_order_status_v2:'입금확인'},
+ {id:21,order_group_id:'catB',broadcast_id:'A',product_id:'bags',product_name:'동일 이름',color:'탄',qty:1,product_price:10000,total_price:10000,admin_order_status_v2:'입금확인'},
+],products:[{id:'clothing',product_note:{category:'의류'}},{id:'bags',product_note:{category:'가방'}}]});
+await act(async()=>{tree=Renderer.create(React.createElement(Panel,{initialBroadcastId:'A'}));});
+assert.equal(tree.root.findAllByType('tbody')[0].findAllByType('tr').length,2,'same name and price across catalog identities are not merged');
+const categoryButtons=tree.root.findByProps({'aria-label':'상품 분류 필터'}).findAllByType('button');
+assert(categoryButtons.some(b=>b.children.join('')==='의류 · 2개 · 18,000원')&&categoryButtons.some(b=>b.children.join('')==='가방 · 1개 · 10,000원'),'category totals retain original row attribution');
+await act(async()=>categoryButtons.find(b=>b.children.join('').startsWith('가방 ·')).props.onClick());
+assert.equal(tree.root.findAllByType('tbody')[0].findAllByType('tr').length,1,'category filter displays only selected catalog category');
+assert(text().includes('28,000원'),'full selected-broadcast total does not become filtered product subtotal');
 await act(async()=>tree.unmount());
 console.log('PASS unified analysis grouped amounts, option identity, no duplicate reads, failed refresh');
