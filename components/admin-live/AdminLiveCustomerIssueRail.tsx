@@ -68,7 +68,7 @@ type IssueTab = "open" | "all" | "resolved" | "deleted";
 
 
 // [2026-09-26] 고객이슈 표의 «단 하나의» grid 템플릿 — 머리글·모든 줄이 이 상수를 그대로 써서 칸이 어긋나지 않는다.
-const ISSUE_GRID = "grid-cols-[36px_60px_184px_1fr_124px_142px]";
+const ISSUE_GRID = "grid-cols-[36px_minmax(0,1fr)] xl:grid-cols-[36px_60px_184px_1fr_124px_142px]";
 
 // [2026-09-26] 교환·환불 처리 대상인 이슈인가 — task_type(exchange/return/refund) 또는 유형 칩(교환/반품/환불).
 //   이 줄에만 「환불 처리」 버튼·장부 요약을 붙인다.
@@ -347,13 +347,13 @@ function IssueTypeChips({
 //   ⚠ 너비를 «고정»한다. min-width 로 두면 글자 수에 따라(지우기 3자 vs 영구삭제 4자)
 //     탭마다 처리 칸 너비가 187/189/198px 로 어긋난다 — 실제로 렌더해서 재 보고 고친 값이다.
 const SUB_BTN =
-  "flex h-8 w-[64px] shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-[11px] font-black transition disabled:opacity-45";
+  "flex h-11 w-[64px] xl:h-8 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-[13px] xl:text-[11px] font-black transition disabled:opacity-45";
 const MAIN_BTN =
-  "flex h-8 w-[72px] shrink-0 items-center justify-center rounded-lg text-[11px] font-black transition hover:opacity-90 disabled:opacity-45";
+  "flex h-11 w-[72px] xl:h-8 shrink-0 items-center justify-center rounded-lg text-[13px] xl:text-[11px] font-black transition hover:opacity-90 disabled:opacity-45";
 /** 버튼이 없는 칸 — 자리를 비워 두어 탭을 옮겨도 처리 칸이 안 흔들린다 */
 const SUB_BTN_SLOT = "h-8 w-[64px] shrink-0";
 
-function IssueCard({
+export function IssueCard({
   task,
   index,
   selected = false,
@@ -454,7 +454,12 @@ function IssueCard({
   const [memoOverflow, setMemoOverflow] = useState(false);
   useLayoutEffect(() => {
     const el = memoRef.current;
-    setMemoOverflow(!!el && el.scrollHeight > el.clientHeight + 1);
+    const measure = () => setMemoOverflow(!!el && el.scrollHeight > el.clientHeight + 1);
+    measure();
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
   }, [memoShown]);
 
   return (
@@ -465,7 +470,8 @@ function IssueCard({
       //   지금: 글자는 그대로 또렷하게. 상태는 «왼쪽 색 띠 + 연한 초록 배경»으로만 가른다.
       //   (물건챙기기의 다 챙긴 카드와 같은 방식 — bg-ok-bg)
       onClick={deleted ? undefined : () => onProcess(task)}
-      className={`relative grid ${ISSUE_GRID} items-start gap-x-3 gap-y-1 border-b border-line px-3 py-2 transition hover:bg-surface-2 ${deleted ? "" : "cursor-pointer"} ${selected ? "bg-rose-soft/50" : done ? "bg-ok-bg/40" : ""}`}
+      data-issue-card
+      className={`relative grid ${ISSUE_GRID} items-start gap-x-3 gap-y-3 xl:gap-y-1 border-b border-line px-3 py-3 xl:py-2 transition hover:bg-surface-2 ${deleted ? "" : "cursor-pointer"} ${selected ? "bg-rose-soft/50" : done ? "bg-ok-bg/40" : ""}`}
     >
       <span className={`absolute left-0 top-0 h-full w-1 ${done ? "bg-[var(--color-ok-tx)]" : "bg-[var(--color-danger-tx)]"}`} />
 
@@ -482,7 +488,7 @@ function IssueCard({
       </label>
 
       {/* [③] 유형 60px — 배지 세로로 쌓기, 우선순위(보통 제외)는 아래 작은 배지 */}
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-wrap gap-1 self-center xl:flex-col xl:self-start">
         {issueTypes.map((type) => (
           <span key={type} className={`w-fit rounded px-1.5 py-0.5 text-[11px] font-black ${typeTone(type)}`}>
             {getIssueTypeLabel(type)}
@@ -494,9 +500,9 @@ function IssueCard({
       </div>
 
       {/* [③] 고객 184px — 닉네임 / 이름·전화 / 등록일·주문번호 세 줄 */}
-      <div className="min-w-0">
-        <div className="truncate text-[13px] font-black text-ink" title={nickname}>{nickname || "-"}</div>
-        <div className="truncate text-[12px] text-ink-soft">
+      <div className="col-span-2 min-w-0 [overflow-wrap:anywhere] xl:col-span-1">
+        <div className="text-[14px] xl:truncate xl:text-[13px] font-black text-ink" title={nickname}>{nickname || "-"}</div>
+        <div className="text-[12px] xl:truncate text-ink-soft">
           <span title={name}>{name || "-"}</span>
           <span className="text-ink-mute"> · </span>
           {phone ? (
@@ -512,7 +518,7 @@ function IssueCard({
             <span className="text-ink-mute">번호 없음</span>
           )}
         </div>
-        <div className="truncate text-[11px] text-ink-mute">
+        <div className="text-[11px] xl:truncate text-ink-mute">
           <span title={dateLabel(task.created_at)}>{dateShortLabel(task.created_at)}</span>
           {orderNo ? (
             <>
@@ -531,7 +537,7 @@ function IssueCard({
       </div>
 
       {/* [③] 내용 1fr — 📦 상품 1줄 / 💬 메모 2줄(넘치면 더보기) / 💳 상태 1줄. 셋 다 없으면 「내용 없음」 */}
-      <div className="flex min-w-0 items-start gap-2">
+      <div data-issue-content className="col-span-2 flex min-w-0 flex-col items-start gap-2 xl:col-span-1 xl:flex-row">
         {/* 상품 사진 — 최대 3장, 누르면 크게(줄 클릭과 분리) */}
         {photos.length > 0 ? (
           <div className="flex shrink-0 gap-1">
@@ -555,19 +561,19 @@ function IssueCard({
           </div>
         ) : null}
 
-        <div className="min-w-0 flex-1 text-[12px] leading-5" title={detail}>
+        <div className="w-full min-w-0 flex-1 text-[14px] xl:text-[12px] leading-5 [overflow-wrap:anywhere]" title={detail}>
           {/* 📦 상품 1줄 */}
           {product && !(extra && product === "상품 지정 없음") ? (
             <div className="flex min-w-0 items-baseline gap-1.5">
               <span className="shrink-0" aria-hidden>📦</span>
-              <span className="min-w-0 truncate font-black text-ink" title={product}>{product}</span>
+              <span className="min-w-0 xl:truncate font-black text-ink" title={product}>{product}</span>
             </div>
           ) : null}
           {/* [⑱ D] ➕ 추가 상품 1줄(truncate) */}
           {extra ? (
             <div className="mt-0.5 flex min-w-0 items-baseline gap-1.5">
               <span className="shrink-0" aria-hidden>➕</span>
-              <span className="min-w-0 truncate font-bold text-ink-soft" title={extra}>추가: {extra}</span>
+              <span className="min-w-0 xl:truncate font-bold text-ink-soft" title={extra}>추가: {extra}</span>
             </div>
           ) : null}
           {/* 💬 메모 2줄 clamp + 넘치면 「…더보기」(처리창) */}
@@ -575,7 +581,7 @@ function IssueCard({
             <div className="mt-0.5 flex min-w-0 items-start gap-1.5">
               <span className="shrink-0" aria-hidden>💬</span>
               <div className="min-w-0 flex-1">
-                <div ref={memoRef} className="line-clamp-2 whitespace-pre-line break-words font-bold text-ink-soft">{memoShown}</div>
+                <div ref={memoRef} className="xl:line-clamp-2 whitespace-pre-line break-words font-bold text-ink-soft">{memoShown}</div>
                 {memoOverflow ? (
                   <button type="button" onClick={(e) => { e.stopPropagation(); onProcess(task); }} className="mt-0.5 text-[11px] font-black text-rose-deep hover:underline">…더보기</button>
                 ) : null}
@@ -586,7 +592,7 @@ function IssueCard({
           {ledgerLine ? (
             <div className="mt-0.5 flex min-w-0 items-start gap-1.5 text-[13px]">
               <span className="shrink-0" aria-hidden>💳</span>
-              <span className="min-w-0 truncate font-black text-info-tx" title={ledgerLine}>{ledgerLine}</span>
+              <span className="min-w-0 xl:truncate font-black text-info-tx" title={ledgerLine}>{ledgerLine}</span>
             </div>
           ) : null}
           {!product && !extra && !memoShown && !ledgerLine ? <span className="font-bold text-ink-mute">내용 없음</span> : null}
@@ -594,7 +600,8 @@ function IssueCard({
       </div>
 
       {/* [③] 금액 124px — head(합계) 굵게 / sub(내역) 작게, 오른쪽 정렬·tabular. 없으면 「—」 */}
-      <div className="text-right [font-variant-numeric:tabular-nums]">
+      <div className="col-span-2 min-w-0 border-t border-line pt-2 text-right xl:col-span-1 xl:border-0 xl:pt-0 [font-variant-numeric:tabular-nums]">
+        <div className="text-[12px] text-ink-soft xl:hidden">금액</div>
         {amount ? (
           <>
             <div className="text-[14px] font-black text-ink">{amount.head}</div>
@@ -615,7 +622,7 @@ function IssueCard({
           (윈도우 휴지통·구글 드라이브). Polaris 로 치면 삭제=Remove(목록에서 빼되 보관), 영구삭제=Delete.
           탭 이름도 「지운 건」 → 「삭제함」 으로 맞췄다(버튼은 삭제인데 탭은 지운 건이면 또 어긋난다).
           생김새도 하나로: 보조 = 흰 바탕 + 테두리(글자색만 다름), 주 = 채움. 높이 32px 통일. */}
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div className="col-span-2 flex flex-wrap justify-end gap-1.5 xl:col-span-1 xl:flex-nowrap xl:justify-start">
         {deleted ? (
           <>
             <span className={SUB_BTN_SLOT} />
@@ -1724,7 +1731,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
             표시할 고객이슈가 없습니다.
           </div>
         ) : (
-          <div className="min-w-[820px]">
+          <div className="min-w-0 xl:min-w-[820px]">
             <div className={`sticky top-0 z-10 grid ${ISSUE_GRID} items-center gap-x-3 border-b border-line bg-surface-2 px-3 py-2 text-[11px] font-black text-ink-mute`}>
               {/* 전체선택 = 이 페이지 전부. 일부만 켜져 있으면 ▪(indeterminate) */}
               <label className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg hover:bg-surface" title={allOnPageSelected ? "이 페이지 전체 선택 해제" : "이 페이지 전체 선택"}>
@@ -1737,11 +1744,12 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
                   className="h-[18px] w-[18px] cursor-pointer accent-[var(--color-rose-deep)] outline-none focus-visible:ring-2 focus-visible:ring-rose-deep"
                 />
               </label>
-              <div>유형</div>
-              <div>고객</div>
-              <div>내용</div>
-              <div className="text-right">금액</div>
-              <div />
+              <span className="xl:hidden">이 페이지 전체 선택</span>
+              <div className="hidden xl:block">유형</div>
+              <div className="hidden xl:block">고객</div>
+              <div className="hidden xl:block">내용</div>
+              <div className="hidden text-right xl:block">금액</div>
+              <div className="hidden xl:block" />
             </div>
             {pageTasks.map((task, index) => (
             <IssueCard
