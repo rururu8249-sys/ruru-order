@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { issueProductSummary } from "@/lib/issueProductLabel";
 import { selectedEligibleAmount } from "@/lib/orderReturnReclaim";
+import { submitRowLineTotal } from "@/lib/submitRowPrice";
 
 // [2026-08-13 사장님 요청] 반품(환불)/반품(교환) 접수 — 상품 선택식 기록 + 고객이슈 자동 등록 + (환불 시) 적립 포인트 회수.
 //
@@ -44,9 +45,7 @@ const num = (v: unknown) => {
 type OrderRow = Record<string, any>;
 
 function rowProductAmount(row: OrderRow) {
-  const unit = num(row.adjusted_product_price) || num(row.product_price);
-  const qty = Math.max(1, num(row.qty) || 1);
-  return Math.max(0, unit * qty);
+  return submitRowLineTotal(row);
 }
 
 
@@ -172,9 +171,15 @@ export async function POST(request: NextRequest) {
         })),
       },
     }).select("id").maybeSingle();
-    const issueRegistered = !taskErr;
+    const issueRegistered = !taskErr && Boolean(taskRow?.id);
     // [2026-09-29] 처리창 초안 모드가 이 taskId 로 refund-ledger 를 admin_task_id 연결한다(응답에만 추가·다른 로직 무변경).
     const taskId = taskErr ? "" : String(taskRow?.id ?? "");
+    if (!issueRegistered) {
+      return NextResponse.json({
+        ok: true, partial: true, issueRegistered: false, taskId: "", reclaimed: 0,
+        message: "반품/교환 기록은 저장됐지만 고객이슈 등록에 실패했습니다. 포인트는 변경하지 않았습니다. " + (taskErr?.message || "등록 결과를 확인하지 못했습니다."),
+      });
+    }
 
     // ── 3) 환불이면 적립 포인트 회수 (기록/이슈가 저장된 뒤에만 진행)
     let reclaimed = 0;
@@ -190,12 +195,18 @@ export async function POST(request: NextRequest) {
         reclaimNote = "이 주문으로 적립된 포인트 없음(회수 0원)";
       } else {
         // 이중 회수 방지: 같은 그룹으로 이미 회수한 이력이 있으면 건너뜀
-        const { data: prior } = await sb
+        const { data: prior, error: priorErr } = await sb
           .from("customer_point_ledger")
           .select("id, amount")
           .eq("related_order_id", groupId || String(refRowId))
           .eq("created_by", "order_return_flow")
           .limit(1);
+        if (priorErr || !Array.isArray(prior)) {
+          return NextResponse.json({
+            ok: true, partial: true, issueRegistered, taskId, reclaimed: 0,
+            message: "기록·고객이슈는 저장됐지만 이전 포인트 회수 내역을 확인하지 못해 포인트를 변경하지 않았습니다. 고객이슈에서 확인해 주세요.",
+          });
+        }
         if (Array.isArray(prior) && prior.length > 0) {
           reclaimNote = `이미 회수한 주문그룹(이전 회수 ${Math.abs(num(prior[0].amount)).toLocaleString("ko-KR")}원) — 이번엔 회수 안 함`;
         } else {
@@ -214,11 +225,17 @@ export async function POST(request: NextRequest) {
           }
 
           if (reclaimed > 0) {
-            const { data: bal } = await sb
+            const { data: bal, error: balanceErr } = await sb
               .from("customer_point_balances")
               .select("*")
               .eq("customer_phone", phone)
               .maybeSingle();
+            if (balanceErr || !bal || bal.current_points == null || !Number.isFinite(Number(bal.current_points))) {
+              return NextResponse.json({
+                ok: true, partial: true, issueRegistered, taskId, reclaimed: 0,
+                message: "기록·고객이슈는 저장됐지만 포인트 잔액을 확인하지 못해 포인트를 변경하지 않았습니다. 고객이슈에서 확인해 주세요.",
+              });
+            }
             const current = num((bal as any)?.current_points);
             const next = current - reclaimed; // 잔액 부족 시 마이너스 허용(사장님 지시)
 
@@ -290,7 +307,7 @@ export async function POST(request: NextRequest) {
       modeLabel,
       products: productSummary,
       issueRegistered,
-      issueError: taskErr ? taskErr.message : null,
+      issueError: null,
       taskId,
       reclaimed,
       balanceAfter,

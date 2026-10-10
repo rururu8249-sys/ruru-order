@@ -1117,6 +1117,11 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         return null;
       }
 
+      if (!res.issueRegistered || !String(res.taskId || "").trim()) {
+        showAdminToast(res.message || "고객이슈 등록 결과를 확인하지 못했습니다. 기록을 확인해 주세요.", "error");
+        return null;
+      }
+
       // [B3] 토스트는 화면 라벨(환불/교환/기타)로 — res.modeLabel(반품…) 대신.
       const modeLabel = data.issueType === "refund" ? "환불" : data.issueType === "exchange" ? "교환" : "기타";
       const lines = [`${modeLabel} 이슈 등록 완료`];
