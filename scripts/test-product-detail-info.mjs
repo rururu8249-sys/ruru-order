@@ -7,7 +7,7 @@ assert.deepEqual(model.resolveDetailInfo(parent,{mode:'custom',chips:[],descript
 assert.deepEqual(model.resolveDetailInfo(parent,{mode:'hidden',chips:['비공개'],description:'비공개'}),{chips:[],description:''});
 const draft={mode:'custom',chips:['😀'.repeat(12),'A','B','C','D','E','F'],description:'첫 줄\n다음 줄'};
 const before=JSON.stringify(draft);
-assert.deepEqual(model.resolveDetailInfo(parent,draft),{chips:['😀'.repeat(10),'A','B','C','D','E'],description:'첫 줄\n다음 줄'});
+assert.deepEqual(model.resolveDetailInfo(parent,draft),{chips:['😀'.repeat(12),'A','B','C','D','E','F'],description:'첫 줄\n다음 줄'},'long text and seventh chip must not silently disappear');
 assert.equal(JSON.stringify(draft),before,'resolution leaves editing draft unchanged');
 console.log('detail info model: PASS');
 assert.equal(typeof model.linkedSourceInfo,'function');

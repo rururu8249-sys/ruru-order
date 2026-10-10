@@ -48,11 +48,14 @@ await act(async()=>renderer.root.findByProps({'aria-label':'정보 적용 방식
 await act(async()=>renderer.root.findByProps({'aria-label':'정보 적용 방식'}).props.onChange({target:{value:'custom'}}));
 assert.equal(renderer.root.findByProps({'aria-label':'상세설명'}).props.value,'개별 설명\n실측','switching information mode cannot discard custom draft');
 assert.equal(linked.product_description,'원본 설명');
+const savedChips=['열글자보다긴상품안내문구입니다','두번째','세번째','네번째','다섯번째','여섯번째','일곱번째'];
+await act(async()=>renderer.root.findByProps({'aria-label':'한눈에 정보'}).props.onChange({target:{value:savedChips.join(',')}}));
 await act(async()=>buttons().find(button=>text(button)==='저장').props.onClick());
 assert.ok(saved,'save must persist source-owned information');
 assert.equal(saved.filters[0].val,'9002');
 assert.equal(saved.expectedVersion,'a'.repeat(32),'rendered editor must send the preview version with its update');
-assert.deepEqual(JSON.parse(saved.values.product_note).linked_detail_info,{mode:'custom',chips:['원본'],description:'개별 설명\n실측'});
+assert.deepEqual(JSON.parse(saved.values.product_note).linked_detail_info,{mode:'custom',chips:savedChips,description:'개별 설명\n실측'});
+assert.deepEqual(JSON.parse(saved.values.product_note).spec_chips,savedChips,'shared normalizer must preserve long and seventh chips in saved payload');
 await act(async()=>renderer.unmount());
 console.log('PASS source-owned linked information modes and independent draft');
 await act(async()=>{renderer=TestRenderer.create(React.createElement(Form,{activeBroadcastId:null,initialProduct:{...linked,...saved.values}}));});
@@ -60,4 +63,5 @@ const reopenDetails=buttons().find(button=>text(button).includes('자세히 열�
 if(reopenDetails) await act(async()=>reopenDetails.props.onClick());
 assert.equal(renderer.root.findByProps({'aria-label':'정보 적용 방식'}).props.value,'custom');
 assert.equal(renderer.root.findByProps({'aria-label':'상세설명'}).props.value,'개별 설명\n실측');
+assert.equal(renderer.root.findByProps({'aria-label':'한눈에 정보'}).props.value,savedChips.join(','),'saved information must survive reopening');
 await act(async()=>renderer.unmount());

@@ -26,6 +26,14 @@ Verification: all 25 package test scripts passed; final production build passed.
 
 ## Review Focus
 
+### Release verification (2026-10-10)
+
+- Released commit `8effa70fccb530ce0897465cab3c29fd41fe38a8`; Vercel production `dpl_GBhZmnbboYQ6i2qjPmZ85ve7ZaET` READY with matching SHA and no alias error.
+- All 25 package `test:*` commands and production build passed before release.
+- Live admin public-list selection and exact linked title/body preview verified without saving. Reload discarded the test selection. Production currently has no selected top notice; no real notice was arbitrarily published.
+- Direct-article behavior covered by automated interaction tests; live customer banner click with a saved selection remains unverified.
+- The original task checklist below is historical. Final implementation intentionally keeps arrival-popup content independent; missing selection hides the banner rather than using legacy popup content.
+
 - Missing/deleted/non-public notice: no stale banner.
 - Failed settings load: admin cannot overwrite defaults.
 - Long notice: body retained; existing modal scrolls.

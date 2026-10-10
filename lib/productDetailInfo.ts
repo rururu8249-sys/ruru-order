@@ -3,7 +3,7 @@ import type { DetailInfo } from './productBrandLinks';
 export type { DetailInfo } from './productBrandLinks';
 
 export function normalizeDetailChips(values: string[]): string[] {
-  return [...new Set(values.map(value => [...value.trim()].slice(0,10).join('')).filter(Boolean))].slice(0,6);
+  return [...new Set(values.map(value => value.trim()).filter(Boolean))];
 }
 
 /** Source-owned metadata; absent mode preserves the source's existing text, never guessed inheritance. */

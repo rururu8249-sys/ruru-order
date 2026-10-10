@@ -280,24 +280,15 @@ type ParsedProductNote = Record<string, unknown> & {
       };
       // [무료나눔 · 2026-07-22] true면 0원 상품(선물). 가격 비움(손님 직접입력)과 구분되는 명시 플래그
       free_product?: boolean;
-      // [2026-09-20] 한눈에 정보 칩 — 손님 옵션 시트에 「면 100%」「국내배송」처럼 짧은 칩으로 표시(표시 전용, 최대 6개·10자)
+      // 한눈에 정보 — 표시 전용. 입력 내용을 자르지 않고 긴 문구는 줄바꿈한다.
       spec_chips?: string[];
       // [2026-08-29] 사이즈 실측표 — SQL로만 넣는 표시 전용 데이터. 폼은 만지지 않고 저장 시 그대로 보존만 한다.
       size_charts?: Record<string, unknown>;
 };
 
-// [2026-09-20] 한눈에 정보 칩 정규화 — 쉼표/줄바꿈 구분, 중복 제거, 최대 6개, 한 칩 10자
-export const SPEC_CHIP_MAX_COUNT = 6;
-export const SPEC_CHIP_MAX_LENGTH = 10;
+// 쉼표/줄바꿈 구분, 빈 항목과 중복만 제거. 입력한 내용을 잘라내지 않는다.
 export function normalizeSpecChips(text: string): string[] {
-  const out: string[] = [];
-  for (const raw of String(text ?? "").split(/[,\n]/)) {
-    const v = raw.trim().slice(0, SPEC_CHIP_MAX_LENGTH);
-    if (!v || out.includes(v)) continue;
-    out.push(v);
-    if (out.length >= SPEC_CHIP_MAX_COUNT) break;
-  }
-  return out;
+  return normalizeDetailChips(String(text ?? "").split(/[,\n]/));
 }
 
 function parseProductNote(row: ProductRow | null | undefined): ParsedProductNote | null {
@@ -3189,10 +3180,10 @@ export default function QuickProductFastForm({
               return (
                 <div style={{ marginTop: "6px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", minHeight: "20px" }}>
                   {chips.map((c) => (
-                    <span key={c} style={{ fontSize: "12px", fontWeight: 800, background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", borderRadius: "20px", padding: "4px 8px" }}>{c}</span>
+                    <span key={c} style={{ maxWidth: "100%", boxSizing: "border-box", overflowWrap: "anywhere", fontSize: "12px", fontWeight: 800, background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", borderRadius: "20px", padding: "4px 8px" }}>{c}</span>
                   ))}
                   <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>
-                    {chips.length === 0 ? "손님 옵션 창 위쪽에 칩으로 보여요 · 최대 6개, 한 칩 10자" : `${chips.length}/6개 · 손님 옵션 창에 이렇게 보여요`}
+                    {chips.length === 0 ? "쉼표로 구분해 주세요 · 손님 옵션 창 위쪽에 보여요" : `${chips.length}개 · 손님 옵션 창에 이렇게 보여요`}
                   </span>
                 </div>
               );

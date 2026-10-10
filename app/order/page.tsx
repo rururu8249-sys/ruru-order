@@ -8145,7 +8145,7 @@ export default function OrderPage() {
                 {registeredOptionSpecChips.length > 0 ? (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}>
                     {registeredOptionSpecChips.map((c) => (
-                      <span key={`spec-${c}`} style={{ fontSize: "12px", fontWeight: 800, background: "#F5E6EB", color: "#7A1E47", borderRadius: "999px", padding: "6px 10px" }}>{c}</span>
+                      <span key={`spec-${c}`} style={{ maxWidth: "100%", boxSizing: "border-box", overflowWrap: "anywhere", fontSize: "12px", fontWeight: 800, background: "#F5E6EB", color: "#7A1E47", borderRadius: "999px", padding: "6px 10px" }}>{c}</span>
                     ))}
                   </div>
                 ) : null}

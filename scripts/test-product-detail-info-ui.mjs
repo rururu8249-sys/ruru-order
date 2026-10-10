@@ -15,6 +15,13 @@ await act(async()=>renderer.root.findByProps({'aria-label':'정보 적용 방식
 assert.equal(value.mode,'custom');
 await act(async()=>renderer.root.findByProps({'aria-label':'한눈에 정보'}).props.onChange({target:{value:'면,'}}));
 assert.equal(renderer.root.findByProps({'aria-label':'한눈에 정보'}).props.value,'면,','typing a separator must not insert spaces or move the caret');
+const longChips=['긴상품안내문구를잘라내지않습니다','국내배송','면 100%','세탁 안내','핏 안내','제작 안내','일곱째 안내'];
+await act(async()=>renderer.root.findByProps({'aria-label':'한눈에 정보'}).props.onChange({target:{value:longChips.join(',')}}));
+await act(async()=>renderer.root.findByProps({'aria-label':'한눈에 정보'}).props.onBlur());
+assert.deepEqual(value.chips,longChips,'blur must preserve all information');
+const longChip=renderer.root.findAllByType('span').find(node=>node.children.includes(longChips[0]));
+assert.equal(longChip.props.style.overflowWrap,'anywhere','long unbroken information must wrap inside preview');
+assert.equal(longChip.props.style.maxWidth,'100%');
 await act(async()=>renderer.root.findByProps({'aria-label':'상세설명'}).props.onChange({target:{value:'첫 줄\n둘째 줄'}}));
 assert.equal(value.description,'첫 줄\n둘째 줄');
 assert.ok(JSON.stringify(renderer.toJSON()).includes('첫 줄\\n둘째 줄'));
