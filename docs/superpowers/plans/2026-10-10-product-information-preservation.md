@@ -15,7 +15,9 @@ Reference read: https://design-system.service.gov.uk/components/character-count/
 - Real form save payload and reopen preserve both source-owned and shared chips.
 - `npm run test:product-detail-info` passed (model/editor/form and 20 brand-table checks).
 - `npm run build` passed, with existing module-type, renderer-deprecation and middleware-convention warnings.
-- All 25 package `test:*` scripts passed sequentially. Not deployed yet.
+- All 25 package `test:*` scripts passed sequentially.
+- Released commit `252f5de8b58fc9d5ff5e758fa1b751e6f99b03d2`; production deployment `dpl_BsqosVtPGnWPnBU5N5iGVJ9CqWD6` READY, matching SHA, production alias and no alias error.
+- Live admin new-product form: entered a long Korean phrase plus seven entries; exact complete phrase and seventh preview chip visible, count says 7개. Screenshot visually inspected. Cancelled and confirmed discard; no product saved. Customer-side long-chip visual check remains unperformed; its wrap styling and shared resolution path are covered by code review/model tests, not a live customer fixture.
 
 ## Next sequential unit
 

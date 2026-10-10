@@ -82,7 +82,8 @@ const directSource={...source,product_note:{customer_detail_input_enabled:true,c
 const directParent=order.buildBrandOrderCatalog([brand,directSource],links,['1'])[0];
 let added=null;
 const notices=[];
-const confirmContext={registeredOptionSelectProduct:directParent,registeredOptionDetail:'NEW',resolveBrandOrderSelection:order.resolveBrandOrderSelection,readBrandGroupOrderProduct:p=>({detailOptions:p.product_note.brand_group.detail_options}),
+const {isOptionManuallySoldOut}=await import('../lib/productOptionAvailability.ts');
+const confirmContext={isOptionManuallySoldOut,registeredOptionSelectProduct:directParent,registeredOptionDetail:'NEW',resolveBrandOrderSelection:order.resolveBrandOrderSelection,readBrandGroupOrderProduct:p=>({detailOptions:p.product_note.brand_group.detail_options}),
  customerDetailInputEnabled:note=>note?.customer_detail_input_enabled===true,normalizeCustomerDetailName:v=>v.trim(),registeredOptionCustomerDetail:'123',buildCustomerDetailProductName:(name,detail)=>`${name} · ${detail}`,
  normalizeEmptyProductOptionValue:v=>String(v??'').replace(/^없음$/,''),getRegisteredOptionMode:()=> 'input',registeredOptionColor:'42',registeredOptionSize:'S',readOrderAxes3:()=>({detailLabel:'세부상품'}),showCustomerNotice:v=>notices.push(v),readComboInfoOrderProduct:()=>null,getCustomInputLabel:()=> '상품숫자',koEulReul:()=> '를',registeredOptionStorageColor:'42',registeredOptionNeedsManualPrice:false,registeredOptionEditIndex:null,registeredOptionQty:1,registeredOptionManualPrice:0,
  addRegisteredProductToOrderItems:(product,options)=>{added={product,options};},checkDuplicateOrder:async()=>false,setRegisteredOptionDetail:()=>{},setRegisteredOptionColor:()=>{},setRegisteredOptionSize:()=>{},setRegisteredOptionQty:()=>{},setRegisteredOptionManualPrice:()=>{},setRegisteredOptionComboSearch:()=>{},closeRegisteredOptionSelectSheet:()=>{}};
@@ -90,6 +91,12 @@ await new Function(...Object.keys(confirmContext),confirmJs+';return confirm;')(
 assert.deepEqual(notices,[]);
 assert.equal(added.product.id,2);
 assert.equal(added.options.displayName,'NEW · 123','linked customer input must survive final cart name');
+directSource.product_note.stock_variants=[{color:'42',size:'S',stock:0,manual_soldout:true}];
+confirmContext.registeredOptionSelectProduct=order.buildBrandOrderCatalog([brand,directSource],links,['1'])[0];
+added=null;
+await new Function(...Object.keys(confirmContext),confirmJs+';return confirm;')(...Object.values(confirmContext))();
+assert.equal(added,null,'actual confirmation must reject linked manual soldout even without inventory');
+assert.match(notices.at(-1),/품절/);
 const declaration=name=>{let found;const visit=node=>{if(customerTs.isVariableDeclaration(node)&&node.name.getText(customerAst)===name)found=node.initializer.getText(customerAst);customerTs.forEachChild(node,visit);};visit(customerAst);return found;};
 const evaluate=(name,context)=>new Function(...Object.keys(context),'return ('+customerTs.transpileModule('const result='+declaration(name),{compilerOptions:{target:customerTs.ScriptTarget.ES2022}}).outputText.replace(/^const result = /,'').replace(/;\s*$/,'')+');')(...Object.values(context));
 const fieldContext={registeredOptionResolvedProduct:directSource,registeredOptionSelectProduct:directParent,registeredOptionSelectedDetailConfig:{colors:[],sizes:[]},registeredOptionColorChoices:[],registeredOptionSizeChoices:[],getRegisteredOptionMode:()=> 'input',customerDetailInputEnabled:confirmContext.customerDetailInputEnabled,readColorPhotosOrderProduct:p=>p===directSource?{베이지:'SOURCE.jpg'}:{베이지:'PARENT.jpg'}};

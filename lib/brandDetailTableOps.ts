@@ -24,6 +24,7 @@ export type VariantRow = {
   color: string;      // "세부상품 / 색상" (저장 형태)
   size: string;
   stock: number;
+  manual_soldout?: boolean;
   detail: string;
   colorOnly: string;
 };
@@ -66,13 +67,15 @@ export function buildRowsForDetail(
       const color = [detail, c].filter(Boolean).join(AXIS_JOIN);
       const size = z === "없음" ? "" : z;
       const before = previous.find(
-        (row) => row.detail === detail && row.colorOnly === c && clean(row.size) === size,
+        (row) => row.detail === detail && (clean(row.colorOnly) === "없음" ? "" : clean(row.colorOnly)) === (c === "없음" ? "" : c)
+          && (clean(row.size) === "없음" ? "" : clean(row.size)) === size,
       );
       return {
         key: variantKey(color, size),
         color,
         size,
         stock: Number(before?.stock || 0),
+        manual_soldout: before?.manual_soldout === true,
         detail,
         colorOnly: c,
       };

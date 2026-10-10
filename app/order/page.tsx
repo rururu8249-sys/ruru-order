@@ -21,6 +21,7 @@
 
 "use client";
 import ProductDiscountLabel from '@/components/order/ProductDiscountLabel';
+import { isOptionManuallySoldOut } from '@/lib/productOptionAvailability';
 const normalizeEmptyProductOptionValue = (value: unknown) => {
   // data-ruru-no-auto-none-option="enabled"
   // 등록상품 선택 시 색상/사이즈 옵션이 비어 있으면 고객 입력칸도 빈칸으로 유지합니다.
@@ -4595,6 +4596,10 @@ export default function OrderPage() {
     const note = (() => { try { return typeof product.product_note === "string" ? JSON.parse(product.product_note) : product.product_note; } catch { return null; } })();
     const variants = Array.isArray((note as any)?.stock_variants) ? (note as any).stock_variants : [];
     const stockMgmtEnabled = (() => { try { const n = typeof product.product_note === "string" ? JSON.parse(product.product_note) : product.product_note; return (n as any)?.stock_management_enabled === true || (product as any).stock_management_enabled === true; } catch { return false; } })();
+    if (isOptionManuallySoldOut(note, registeredOptionStorageColor, registeredOptionSize, registeredOptionDetail)) {
+      showCustomerNotice("선택한 옵션은 품절입니다. 다른 옵션을 선택해 주세요.");
+      return;
+    }
     if (variants.length > 0 && stockMgmtEnabled) {
       const nm = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
       const matched = variants.find((v: any) => nm(v.color) === nm(registeredOptionStorageColor) && nm(v.size) === nm(registeredOptionSize));
@@ -6172,6 +6177,10 @@ export default function OrderPage() {
   //   수량 칸 밑 「최대 N개」 표시와 [+] 상한에 같이 쓴다. 표시·입력 상한 전용 — 실제 차감은 제출 RPC 그대로.
   //   (예전 [+] 상한은 홀드를 안 빼서 품절 표시와 어긋날 수 있었다 → 품절 판정(isSoldOutColorSize)과 같은 계산으로 맞춤)
   const registeredOptionAvailableQty: number | null = (() => {
+    if (isOptionManuallySoldOut(registeredOptionResolvedProduct?.product_note,
+      registeredOptionAxes3 && !registeredOptionBrandGroup
+        ? [registeredOptionDetail, registeredOptionColor].filter(Boolean).join(ORDER_AXIS_JOIN) : registeredOptionColor,
+      registeredOptionSize, registeredOptionDetail)) return 0;
     if (!registeredOptionSelectProduct || registeredOptionStockVariants.length === 0) return null;
     const nm2 = (v: string) => { const t = String(v ?? "").trim(); return t === "없음" ? "" : t; };
     const colorKey = registeredOptionAxes3 && !registeredOptionBrandGroup
@@ -6185,6 +6194,10 @@ export default function OrderPage() {
   })();
   // [2026-09-20] 드롭다운 항목 라벨(「L · 2개 남음」)용 — registeredOptionAvailableQty 와 같은 계산을 색상·사이즈로 받는다. 표시 전용.
   const availableQtyColorSize = (color: string, size: string): number | null => {
+    if (isOptionManuallySoldOut(registeredOptionResolvedProduct?.product_note,
+      registeredOptionAxes3 && !registeredOptionBrandGroup
+        ? [registeredOptionDetail, color].filter(Boolean).join(ORDER_AXIS_JOIN) : color,
+      size, registeredOptionDetail)) return 0;
     if (!registeredOptionSelectProduct || registeredOptionStockVariants.length === 0) return null;
     const nm2 = (v: string) => { const t = String(v ?? "").trim(); return t === "없음" ? "" : t; };
     const colorKey = registeredOptionAxes3 && !registeredOptionBrandGroup
@@ -6207,6 +6220,7 @@ export default function OrderPage() {
   const isSoldOutColorSize = (color: string, size: string) => {
     const nc = (s: string) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
     color = joinAxisColor(color);
+    if (isOptionManuallySoldOut(registeredOptionResolvedProduct?.product_note, color, size, registeredOptionDetail)) return true;
     // [재고 홀드] 다른 고객이 담아둔(예약) 수량까지 빼고 품절 판정 — 표시 전용(실차감은 제출 RPC)
     const pid = String(registeredOptionResolvedProduct?.id ?? "");
     return registeredOptionStockVariants.length > 0 &&
@@ -6281,7 +6295,7 @@ export default function OrderPage() {
   const registeredOptionDetailSelected = !registeredOptionAxes3 || Boolean(registeredOptionDetail.trim());
   const registeredOptionColorSelected = registeredOptionColorMode === "none" || Boolean(normalizeEmptyProductOptionValue(registeredOptionColor));
   const registeredOptionSizeSelected = registeredOptionSizeMode === "none" || Boolean(normalizeEmptyProductOptionValue(registeredOptionSize));
-  const registeredOptionSelectionReady = registeredOptionCustomerDetailReady && registeredOptionDetailSelected && registeredOptionColorSelected && registeredOptionSizeSelected && (!registeredOptionNeedsManualPrice || registeredOptionManualPrice > 0);
+  const registeredOptionSelectionReady = registeredOptionCustomerDetailReady && registeredOptionDetailSelected && registeredOptionColorSelected && registeredOptionSizeSelected && (!registeredOptionNeedsManualPrice || registeredOptionManualPrice > 0) && !isSoldOutColorSize(registeredOptionColor, registeredOptionSize);
   // [2026-09-20 사장님] 색상(또는 사이즈)이 딱 하나뿐인 상품은 손님이 그 하나를 굳이 누를 필요 없게 — 시트를 열면 미리 골라둔다.
   //   조합형·브랜드묶음·3단(세부상품 먼저 고르는 상품)은 제외(선택 흐름이 다르다). 품절이면 미리 고르지 않는다(품절 칩 그대로 보이게).
   //   등록된 값 그대로를 고르는 것이라 재고 키(color,size)·담기·금액 계산은 기존 경로 그대로다.

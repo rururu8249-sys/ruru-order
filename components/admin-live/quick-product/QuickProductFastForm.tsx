@@ -47,6 +47,7 @@ type VariantStockRow = {
   color: string;   // 저장 키 (3단이면 "세부상품 / 색상"으로 합쳐진 값)
   size: string;
   stock: number;
+  manual_soldout?: boolean;
   detail: string;  // 표시용 — 1번 축(세부상품) 값
   colorOnly: string; // 표시용 — 2번 축(색상) 값
 };
@@ -244,7 +245,7 @@ type ParsedProductNote = Record<string, unknown> & {
       // false여도 상품 자체는 '전체' 목록에서 정상 노출된다.
       customer_category_visible?: boolean;
       stock_mode?: "total" | "option";
-      stock_variants?: Array<{ color?: string; size?: string; stock?: number }>;
+      stock_variants?: Array<{ color?: string; size?: string; stock?: number; manual_soldout?: boolean }>;
       stock_management_enabled?: boolean;
       registered_order_enabled?: boolean;
       name_suggestion_enabled?: boolean;
@@ -360,7 +361,9 @@ function buildVariantRows(details: string[], colors: string[], sizes: string[], 
           const owner = looseOwner.get(looseVariantKey(key));
           if (owner) usedPrevKeys.add(owner);
         } else if (alt !== undefined) usedPrevKeys.add(altKey);
-        rows.push({ key, color, size, stock: resolved ?? 0, detail, colorOnly });
+        const ownerKey = exact !== undefined ? key : loose !== undefined && loose !== null ? looseOwner.get(looseVariantKey(key)) : alt !== undefined ? altKey : undefined;
+        const manual_soldout = previous.find(row => row.key === ownerKey)?.manual_soldout === true;
+        rows.push({ key, color, size, stock: resolved ?? 0, manual_soldout, detail, colorOnly });
         matchedFlags.push(resolved !== undefined && resolved !== null);
       }
     }
@@ -377,6 +380,7 @@ function buildVariantRows(details: string[], colors: string[], sizes: string[], 
     if (leftovers.length === unmatchedIdx.length) {
       unmatchedIdx.forEach((rowIdx, k) => {
         const carried = Number(leftovers[k]?.stock ?? 0);
+        rows[rowIdx] = { ...rows[rowIdx], manual_soldout: leftovers[k]?.manual_soldout === true };
         if (Number.isFinite(carried) && carried > 0) rows[rowIdx] = { ...rows[rowIdx], stock: carried };
       });
     }
@@ -1055,6 +1059,7 @@ export default function QuickProductFastForm({
             color: savedColor,
             size: row.size || "",
             stock: Number(row.stock || 0),
+            manual_soldout: row.manual_soldout === true,
             detail: sepAt >= 0 ? savedColor.slice(0, sepAt) : savedColor,
             colorOnly: sepAt >= 0 ? savedColor.slice(sepAt + AXIS_JOIN.length) : "",
           };
@@ -1425,6 +1430,7 @@ export default function QuickProductFastForm({
         color: storedColor,
         size: variant.size === "없음" ? "" : variant.size,
         stock: Number(previous?.stock || 0),
+        manual_soldout: previous?.manual_soldout === true,
         detail: nextName,
         colorOnly: variant.color,
       };
@@ -1874,6 +1880,7 @@ export default function QuickProductFastForm({
         color: row.color,
         size: row.size,
         stock: Number(row.stock || 0),
+        manual_soldout: row.manual_soldout === true,
       }));
 
       // 축 정의는 "세부상품 + (색상 또는 사이즈)" 3단 이상일 때만 기록 →
@@ -2599,17 +2606,17 @@ export default function QuickProductFastForm({
               ) : null}
 
               {/* ── 재고 입력 ── */}
-              {stockManagementEnabled ? (
+              {stockManagementEnabled || stockMode === "option" ? (
                 stockMode === "option" ? (
                   <div style={{ marginTop: "8px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
                       <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>조합 {resolvedVariantRows.length}개</span>
-                      <span style={{ fontSize: "11px", color: "var(--color-ink-mute)", display: "flex", alignItems: "center", gap: "4px" }}>
+                      {stockManagementEnabled ? <span style={{ fontSize: "11px", color: "var(--color-ink-mute)", display: "flex", alignItems: "center", gap: "4px" }}>
                         전체
                         <input style={{ fontSize: "11px", padding: "4px 6px", border: "1px solid var(--color-line)", borderRadius: "4px", textAlign: "right", width: "46px" }} type="text" inputMode="numeric" value={bulkStockText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setBulkStockText(e.target.value.replace(/[^0-9]/g, ""))} />
                         개
                         <button type="button" onClick={applyBulkStock} style={{ border: "1.5px dashed var(--color-rose-deep)", background: "var(--color-surface)", color: "var(--color-rose-deep)", fontSize: "11px", fontWeight: 800, borderRadius: "8px", padding: "4px 8px", cursor: "pointer" }}>일괄적용</button>
-                      </span>
+                      </span> : <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>수량을 세지 않아도 옵션별 품절 설정 가능</span>}
                     </div>
 
                     <div style={{ background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", maxHeight: "260px", overflowY: "auto", border: "1px solid var(--color-line)" }}>
@@ -2691,15 +2698,20 @@ export default function QuickProductFastForm({
                             const label = [displayColor, row.size].filter(Boolean).join(" / ");
                             const heldQty = heldOf(String(row.color ?? row.colorOnly ?? ""), String(row.size ?? ""));
                             const sellable = Math.max(0, Number(row.stock || 0) - heldQty);
-                            const soldOut = sellable <= 0;
+                            const soldOut = row.manual_soldout === true || (stockManagementEnabled && sellable <= 0);
                             return (
-                              <div key={row.key} style={{ display: "grid", gridTemplateColumns: "1fr 74px 20px", gap: "6px", alignItems: "center", padding: "4px 0 4px " + (group.detail ? "12px" : "2px") }}>
+                              <div key={row.key} style={{ display: "grid", gridTemplateColumns: stockManagementEnabled ? "minmax(0, 1fr) 74px 70px" : "minmax(0, 1fr) 70px", gap: "8px", alignItems: "center", padding: "6px 0 6px " + (group.detail ? "12px" : "2px") }}>
                                 <span style={{ fontSize: "12px", color: soldOut ? "var(--color-danger-tx)" : "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                   {label || (group.detail ? "재고" : "기본")}
                                 </span>
-                                <input style={{ fontSize: "12px", padding: "4px 8px", border: "1px solid var(--color-line)", borderRadius: "8px", textAlign: "right", width: "100%" }} type="number" min={0} inputMode="numeric" value={row.stock} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => updateVariantStock(row.key, Math.max(0, Number(e.target.value) || 0))} />
-                                <span style={{ fontSize: "11px", fontWeight: 800, color: soldOut ? "var(--color-danger-tx)" : "var(--color-ink-mute)" }}>{soldOut ? "품절" : "개"}</span>
-                                {heldQty > 0 ? (
+                                {stockManagementEnabled ? <input aria-label={`${label || "기본"} 재고 수량`} style={{ fontSize: "12px", padding: "4px 8px", border: "1px solid var(--color-line)", borderRadius: "8px", textAlign: "right", width: "100%" }} type="number" min={0} inputMode="numeric" value={row.stock} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => updateVariantStock(row.key, Math.max(0, Number(e.target.value) || 0))} /> : null}
+                                <button type="button" aria-label={`${[group.detail, label].filter(Boolean).join(" / ") || "기본"} 판매 상태`} aria-pressed={row.manual_soldout === true}
+                                  title={row.manual_soldout ? "눌러서 수동 품절 해제" : "눌러서 품절로 변경"}
+                                  onClick={() => setVariantRows(resolvedVariantRows.map(v => v.key === row.key ? {...v, manual_soldout: !v.manual_soldout} : v))}
+                                  style={{ minHeight: "36px", border: "1px solid var(--color-line)", borderRadius: "8px", background: soldOut ? "var(--color-danger-bg)" : "var(--color-surface)", color: soldOut ? "var(--color-danger-tx)" : "var(--color-ink)", fontWeight: 700, cursor: "pointer" }}>
+                                  {row.manual_soldout ? "품절" : soldOut ? "재고 0" : "판매중"}
+                                </button>
+                                {stockManagementEnabled && heldQty > 0 ? (
                                   <span style={{ gridColumn: "1 / -1", marginTop: "1px", fontSize: "11px", fontWeight: 700, color: "var(--color-warn-tx)", paddingLeft: group.detail ? "12px" : "2px" }}>
                                     담김 {heldQty}개 · 지금 판매가능 <b style={{ color: sellable > 0 ? "var(--color-ok-tx)" : "var(--color-danger-tx)" }}>{sellable}개</b>
                                   </span>
@@ -2711,13 +2723,13 @@ export default function QuickProductFastForm({
                       ))}
                     </div>
 
-                    <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--color-ink-mute)", display: "flex", justifyContent: "space-between" }}>
+                    {stockManagementEnabled ? <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--color-ink-mute)", display: "flex", justifyContent: "space-between" }}>
                       <span>
                         실재고 <b style={{ color: "var(--color-ink)" }}>{totalStock.toLocaleString("ko-KR")}</b>개
                         {heldTotal > 0 ? <> · 담김 <b style={{ color: "var(--color-warn-tx)" }}>{heldTotal}</b>개 · 판매가능 <b style={{ color: "var(--color-ok-tx)" }}>{Math.max(0, totalStock - heldTotal).toLocaleString("ko-KR")}</b>개</> : null}
                       </span>
                       <span>{resolvedVariantRows.filter((row) => Number(row.stock || 0) <= 0).length > 0 ? `품절 ${resolvedVariantRows.filter((row) => Number(row.stock || 0) <= 0).length}개` : ""}</span>
-                    </div>
+                    </div> : null}
                   </div>
                 ) : (
                   <div style={{ background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", marginTop: "8px", display: "flex", alignItems: "center", gap: "8px", border: "1px solid var(--color-line)" }}>
