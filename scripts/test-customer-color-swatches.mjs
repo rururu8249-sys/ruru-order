@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import React from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+assert.ok(fs.existsSync('components/customer/ProductColorSwatches.tsx'),'customer needs saved-color previews');
+const {default:Preview,ColorSwatch}=createUiLoader()('components/customer/ProductColorSwatches.tsx');
+const render=(value)=>renderToStaticMarkup(React.createElement(Preview,{value}));
+assert.equal(render({}), '');
+assert.equal(render({'미지색':null}), '');
+const markup=render({'화이트':'#ffffff','모카':'#9d7651'});
+assert.ok(markup.includes('화이트'));assert.ok(markup.includes('모카'));assert.ok(markup.includes('border:'));
+assert.ok(!markup.includes('<button'),'preview must not introduce another purchase action');
+assert.ok(!render({'bad':'url(evil)'}).includes('evil'),'only validated HEX can reach style');
+assert.equal(renderToStaticMarkup(React.createElement(ColorSwatch,{hex:null})), '');
+console.log('PASS saved customer preview, names, white border, invalid CSS rejection, non-interactive display');

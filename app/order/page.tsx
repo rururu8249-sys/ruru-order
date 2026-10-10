@@ -22,6 +22,8 @@
 "use client";
 import ProductDiscountLabel from '@/components/order/ProductDiscountLabel';
 import CustomerPressButton from '@/components/customer/CustomerPressButton';
+import ProductColorSwatches, {ColorSwatch} from '@/components/customer/ProductColorSwatches';
+import {readProductColorSwatches, retainColorSwatches} from '@/lib/productColorSwatches';
 import { isOptionManuallySoldOut } from '@/lib/productOptionAvailability';
 const normalizeEmptyProductOptionValue = (value: unknown) => {
   // data-ruru-no-auto-none-option="enabled"
@@ -6256,6 +6258,7 @@ export default function OrderPage() {
       : [];
   // [2026-09-03] 색상별 사진 — 색상 버튼 앞 작은 썸네일(클릭=확대). 없으면 빈 맵이라 기존 그대로.
   const registeredOptionColorPhotos = registeredOptionResolvedProduct ? readColorPhotosOrderProduct(registeredOptionResolvedProduct) : {};
+  const registeredOptionColorSwatches = readProductColorSwatches(registeredOptionResolvedProduct?.product_note, registeredOptionResolvedProduct === registeredOptionSelectProduct ? registeredOptionDetail : undefined);
   const registeredOptionColorMode = registeredOptionResolvedProduct === registeredOptionSelectProduct && registeredOptionSelectedDetailConfig && registeredOptionColorChoices.length === 0
     ? "none"
     : registeredOptionResolvedProduct
@@ -7191,6 +7194,7 @@ export default function OrderPage() {
                             <div style={listView === "grid"
                               ? { fontSize: "14px", fontWeight: 800, color: "#222", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "break-word" as const }
                               : { fontSize: "15px", fontWeight: 800, color: "#222", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.product_name}</div>
+                            {!brandGroup && !readComboInfoOrderProduct(product) ? <ProductColorSwatches value={retainColorSwatches(readProductColorSwatches(product.product_note),getSelectableRegisteredOptions(product,"color"))} /> : null}
                             {/* 바로구매 부가설명 — 사장님 지침: 배지만으론 신규 고객이 뜻을 모름.
                                 [2026-09-20] 중복(위 띠 + 배지 + 이 줄)을 이유로 방송 OFF에서 잠깐 접었다가 되돌림.
                                   사장님이 직접 남긴 지침이 먼저다. 방송 켜짐/꺼짐과 무관하게 항상 표시한다.
@@ -7212,7 +7216,8 @@ export default function OrderPage() {
                               //      값 사이 구분도 「카멜·베이지」→「카멜 · 베이지」로 띄워 읽기 쉽게. 표시 전용.
                               const lineOf = (label: string, vals: string[], max: number) =>
                                 vals.length <= 1 ? null : { label, value: vals.length <= max ? vals.join(" · ") : `${vals.length}가지` };
-                              const parts = [lineOf("색상", colorVals, 4), lineOf("사이즈", sizeVals, 5)]
+                              const savedColors = readProductColorSwatches(product.product_note);
+                              const parts = [colorVals.every(color=>savedColors[color]) ? null : lineOf("색상", colorVals, 4), lineOf("사이즈", sizeVals, 5)]
                                 .filter(Boolean) as Array<{ label: string; value: string }>;
                               if (parts.length === 0) return null;
                               return (
@@ -8420,7 +8425,7 @@ export default function OrderPage() {
                             const selected = registeredOptionColor === option;
                             const soldOut = isSoldOutColorSize(option, registeredOptionSize);
                             return (
-                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; const next = selected ? "" : option; setRegisteredOptionColor(next); if (!sizeKeepableForColor(next, registeredOptionSize)) setRegisteredOptionSize(""); const nextPhoto = next ? (registeredOptionColorPhotos[next] || "") : ""; setRegisteredOptionHeroPhoto(nextPhoto); }} style={{ height: "48px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", padding: "0 8px" }}>{registeredOptionColorPhotos[option] ? <img src={registeredOptionColorPhotos[option]} alt={option} loading="lazy" decoding="async" style={{ flexShrink: 0, width: "36px", height: "36px", objectFit: "cover", borderRadius: "10px", display: "block" }} /> : null}<span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{soldOut ? option + " (품절)" : option}</span></button>
+                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; const next = selected ? "" : option; setRegisteredOptionColor(next); if (!sizeKeepableForColor(next, registeredOptionSize)) setRegisteredOptionSize(""); const nextPhoto = next ? (registeredOptionColorPhotos[next] || "") : ""; setRegisteredOptionHeroPhoto(nextPhoto); }} style={{ minHeight: "48px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", padding: "8px" }}>{registeredOptionColorPhotos[option] ? <img src={registeredOptionColorPhotos[option]} alt={option} loading="lazy" decoding="async" style={{ flexShrink: 0, width: "36px", height: "36px", objectFit: "cover", borderRadius: "10px", display: "block" }} /> : <ColorSwatch hex={registeredOptionColorSwatches[option]}/>}<span style={{ overflowWrap: "anywhere", minWidth:0 }}>{soldOut ? option + " (품절)" : option}</span></button>
                             );
                           })}
                         </div>
@@ -8438,6 +8443,7 @@ export default function OrderPage() {
                           })}
                         </select>
                       )}
+                      {registeredOptionColorChoices.length > 4 && registeredOptionColorSwatches[registeredOptionColor] ? <ProductColorSwatches value={{[registeredOptionColor]:registeredOptionColorSwatches[registeredOptionColor]}}/> : null}
                       {/* [2026-08-28 P0-4] 문구가 사라질 때 아래 버튼이 위로 밀려 오클릭이 나던 문제 → 자리를 항상 잡아둔다 */}
                       <div data-order-option-missing={!registeredOptionColor.trim() ? "true" : undefined} style={{ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" }}>{!registeredOptionColor.trim() ? "색상을 선택해 주세요" : ""}</div>
                     </div>

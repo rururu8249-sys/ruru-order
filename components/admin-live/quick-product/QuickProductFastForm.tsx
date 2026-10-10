@@ -32,6 +32,8 @@ import { detailCode } from "@/lib/productDetailModel";
 import { splitOptionText } from "@/lib/optionSplit";
 import { linkedSourceInfo, resolveDetailInfo, normalizeDetailChips, type DetailInfo } from '@/lib/productDetailInfo';
 import BrandDetailInfoEditor from './BrandDetailInfoEditor';
+import ColorSwatchEditor from './ColorSwatchEditor';
+import {readProductColorSwatches, retainColorSwatches, type ColorSwatchMap} from '@/lib/productColorSwatches';
 
 type ProductRow = Record<string, unknown>;
 
@@ -59,6 +61,7 @@ type BrandDetailOptionConfig = {
 };
 
 type BrandDetailEditDraft = {
+  swatches?: ColorSwatchMap;
   discount: DiscountSetting;
   info: DetailInfo;
   originalName: string;
@@ -769,6 +772,8 @@ export default function QuickProductFastForm({
   // [2026-09-03 사장님 요청] 색상별 사진(선택) — 색상 옵션마다 작은 사진 1장.
   //   note.color_photos 새 키로만 저장(ADD only) — 기존 저장 형식·다른 키는 무변경.
   const [colorPhotos, setColorPhotos] = useState<Record<string, string>>({});
+  const [colorSwatches, setColorSwatches] = useState<ColorSwatchMap>({});
+  const [detailColorSwatches, setDetailColorSwatches] = useState<Record<string, ColorSwatchMap>>({});
   const [colorPhotoUploading, setColorPhotoUploading] = useState("");
   const colorPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const colorPhotoTargetRef = useRef("");
@@ -1015,6 +1020,10 @@ export default function QuickProductFastForm({
       }
       setColorPhotos(nextColorPhotos);
     }
+    setColorSwatches(readProductColorSwatches(productNote));
+    const rawDetailSwatches = productNote?.detail_color_swatches;
+    setDetailColorSwatches(rawDetailSwatches && typeof rawDetailSwatches === 'object' && !Array.isArray(rawDetailSwatches)
+      ? Object.fromEntries(Object.keys(rawDetailSwatches).filter(key=>!['__proto__','constructor','prototype'].includes(key)).map(key=>[key,readProductColorSwatches(productNote,key)])) : {});
     setBrandGroupDetailPhotoSets(normalizedPhotoSets);
     setBrandGroupDetailCategories(normalizedDetailCategories);
     setBrandGroupDetailOptions(normalizedDetailOptions);
@@ -1333,6 +1342,7 @@ export default function QuickProductFastForm({
       discount: discountDisplay.details?.[name]||{enabled:false,original_price:0},
       info: brandGroupDetailInfo[name] ? {...brandGroupDetailInfo[name],chips:[...brandGroupDetailInfo[name].chips]} : {mode:'inherit',chips:[],description:''},
       originalName: name,
+      swatches: {...(detailColorSwatches[name] || colorSwatches)},
       name,
       category: String(brandGroupDetailCategories[name] || ""),
       plus: String(Math.max(0, Number(detailPlus[name]) || 0)),
@@ -1412,6 +1422,7 @@ export default function QuickProductFastForm({
     setBrandGroupDetailCategories((prev) => moveKey(prev, brandDetailEditDraft.category.trim()));
     setBrandGroupDetailOptions((prev) => moveKey(prev, { colors, sizes, variants: nextVariants }));
     setBrandGroupDetailInfo((prev) => moveKey(prev, {...brandDetailEditDraft.info,chips:normalizeDetailChips(brandDetailEditDraft.info.chips)}));
+    setDetailColorSwatches(prev=>moveKey(prev,brandDetailEditDraft.swatches ?? prev[oldName]));
     setDiscountDisplay(prev=>{const rows={...prev.details};delete rows[oldName];rows[nextName]=brandDetailEditDraft.discount;return {...prev,details:rows};});
     setDetailHidden((prev) => {
       const withoutEdited = prev.filter((name) => name !== oldName && name !== nextName);
@@ -1634,6 +1645,7 @@ export default function QuickProductFastForm({
     }
     applyDetailState(result.state);
     setDiscountDisplay(prev=>renameDiscountDetail(prev,oldName,normalizeBrandKorean(rawNext.trim())));
+    setDetailColorSwatches(prev=>{const next={...prev};delete next[oldName];if(Object.hasOwn(prev,oldName))next[normalizeBrandKorean(rawNext.trim())]=prev[oldName];return next;});
     return true;
   };
 
@@ -1667,6 +1679,7 @@ export default function QuickProductFastForm({
     const result = removeDetailRowState(collectDetailState(), target);
     if (!result.ok) { showAdminToast(result.reason, "warning"); return; }
     applyDetailState(result.state);
+    setDetailColorSwatches(prev=>{const next={...prev};delete next[target];return next;});
   };
 
   // 사진 여러 장을 한꺼번에 놓으면 → 장수만큼 줄을 만들고 파일 이름을 상품명으로 쓴다.
@@ -1726,6 +1739,7 @@ export default function QuickProductFastForm({
     setBrandGroupDetailCategories((prev) => removeKey(prev));
     setBrandGroupDetailOptions((prev) => removeKey(prev));
     setBrandGroupDetailInfo((prev) => removeKey(prev));
+    setDetailColorSwatches((prev) => removeKey(prev));
     setDiscountDisplay(prev=>({...prev,details:removeKey(prev.details||{})}));
     setDetailHidden((prev) => prev.filter((name) => name !== target));
     setVariantRows((prev) => prev.filter((row) => row.detail !== target));
@@ -1744,6 +1758,8 @@ export default function QuickProductFastForm({
   }, [details, resolvedVariantRows]);
 
   const resetForm = () => {
+    setColorSwatches({});
+    setDetailColorSwatches({});
     setCategory("");
     setCustomerCategoryVisible(true);
     setProductName("");
@@ -1957,6 +1973,11 @@ export default function QuickProductFastForm({
         })(),
         // [2026-09-20] 사이즈 실측표는 폼에 입력칸이 없어 재저장 때 지워지던 문제 → 있던 그대로 보존(표시 전용)
         ...(initialProductNote?.size_charts && typeof initialProductNote.size_charts === "object" ? { size_charts: initialProductNote.size_charts } : {}),
+        ...(() => {
+          const kept = retainColorSwatches(colorSwatches, brandGroupActive ? brandColors : colors);
+          const scoped = Object.fromEntries(details.filter(name=>Object.hasOwn(detailColorSwatches,name)).map(name=>[name,retainColorSwatches(detailColorSwatches[name],brandGroupActive ? brandGroupDetailOptions[name]?.colors || [] : colors)]));
+          return {...(Object.keys(kept).length ? {color_swatches:kept} : {}),...(Object.keys(scoped).length ? {detail_color_swatches:scoped} : {})};
+        })(),
         // [2026-09-03] 색상별 사진 — 실제로 사진 넣은 색상만, 지금 색상 목록에 남아 있는 것만 저장(없으면 키 생략)
         ...(() => {
           const keptColorPhotos = Object.fromEntries(
@@ -2203,6 +2224,8 @@ export default function QuickProductFastForm({
               </div>
 
 
+              {!brandGroupActive ? <ColorSwatchEditor labels={colors} value={colorSwatches} onChange={next=>{setFormTouched(true);setColorSwatches(next);}} /> : null}
+              {!brandGroupActive && details.length > 0 ? details.map(detail=><div key={`swatches-${detail}`}><span style={{fontSize:12,fontWeight:700}}>{detail}</span><ColorSwatchEditor labels={colors} value={detailColorSwatches[detail] || colorSwatches} onChange={next=>{setFormTouched(true);setDetailColorSwatches(prev=>({...prev,[detail]:next}));}}/></div>) : null}
               {/* [2026-09-03 사장님 요청] 색상별 사진(선택) — 색상마다 작은 사진 1장. 손님 색상 버튼 앞에 떠서 클릭하면 확대 */}
               {!brandGroupActive && colors.filter((c) => c !== "없음").length > 0 ? (
                 <div style={{ display: "flex", alignItems: "flex-start", gap: "8px", flexWrap: "wrap", margin: "0 0 8px", padding: "8px 8px", background: "var(--color-surface-2)", border: "1px dashed var(--color-line)", borderRadius: "8px" }}>
@@ -2498,6 +2521,7 @@ export default function QuickProductFastForm({
                                         onKeyDown={(event) => { if (event.key === "Enter") (event.target as HTMLInputElement).blur(); }}
                                       />
                                     </div>
+                                    <ColorSwatchEditor labels={cfg.colors || []} value={detailColorSwatches[name] || colorSwatches} onChange={next=>{setFormTouched(true);setDetailColorSwatches(prev=>({...prev,[name]:next}));}} />
                                   </td>
 
                                   <td style={{ padding: "6px 8px", verticalAlign: "top" }}>
@@ -3415,6 +3439,7 @@ export default function QuickProductFastForm({
                 <span style={{ width: "44px", fontSize: "12px", fontWeight: 900, color: "var(--color-ink-mute)", flexShrink: 0 }}>색상</span>
                 <input value={brandDetailEditDraft.colorsText} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, colorsText: event.target.value } : prev)} placeholder="화이트, 블랙, 베이지 (쉼표로 여러 개)" style={fieldInput} />
               </div>
+              <ColorSwatchEditor key={brandDetailEditDraft.originalName || 'new'} labels={splitOptions(brandDetailEditDraft.colorsText)} value={brandDetailEditDraft.swatches ?? detailColorSwatches[brandDetailEditDraft.originalName] ?? colorSwatches} onChange={swatches=>setBrandDetailEditDraft(prev=>prev?{...prev,swatches}:prev)}/>
               <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
                 <span style={{ width: "44px", fontSize: "12px", fontWeight: 900, color: "var(--color-ink-mute)", flexShrink: 0 }}>사이즈</span>
                 <input value={brandDetailEditDraft.sizesText} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, sizesText: event.target.value } : prev)} placeholder="220, 230, 240 (쉼표로 여러 개)" style={fieldInput} />

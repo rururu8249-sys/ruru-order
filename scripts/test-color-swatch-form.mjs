@@ -1,0 +1,58 @@
+import assert from 'node:assert/strict';
+import React from 'react';
+import Renderer,{act} from 'react-test-renderer';
+import {createUiLoader} from './admin-ui-test-loader.mjs';
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+globalThis.window={innerWidth:1200,addEventListener(){},removeEventListener(){},dispatchEvent(){}};
+globalThis.document={addEventListener(){},removeEventListener(){}};
+let saved;
+const Form=createUiLoader({'@/lib/supabase':{supabase:{}},'@/lib/adminCatalogWrite':{adminCatalogWrite:async payload=>{saved=payload;return {data:{id:9002},error:null};}},'@/lib/adminToast':{showAdminToast(){}},'@/lib/adminConfirm':{showAdminConfirm:async()=>true}})('components/admin-live/quick-product/QuickProductFastForm.tsx').default;
+const text=n=>n.children.map(c=>typeof c==='string'?c:typeof c==='object'?text(c):'').join('');
+for (const brand of [false,true]) {
+  const color_swatches={'블랙':'#123456','화이트':null};
+  const detail_color_swatches={'A':{'블랙':'#112233'},'B':{'블랙':'#445566'}};
+  const note={color_swatches,...(brand?{detail_color_swatches,brand_group:{enabled:true,detail_options:{A:{colors:['블랙'],sizes:['M'],variants:[{color:'블랙',size:'M'}]},B:{colors:['블랙'],sizes:['M'],variants:[{color:'블랙',size:'M'}]}}},combo_mode:true,combo_detail_values:['A','B'],option_axes:[{key:'detail',label:'종류',values:['A','B']},{key:'color',label:'색상',values:['블랙']}],option_pricing:{A:0,B:0}}:{})};
+  const product={id:9002,product_name:'테스트',price:1000,color_options:brand?['A','B']:['블랙','화이트'],size_options:['M'],product_note:JSON.stringify(note),__catalog_edit_version:'a'.repeat(32)};
+  let tree;await act(async()=>{tree=Renderer.create(React.createElement(Form,{activeBroadcastId:null,initialProduct:product}));});
+  if(brand){
+    await act(async()=>tree.root.findAllByType('button').find(b=>text(b)==='수정').props.onClick());
+    const dialog=tree.root.findByProps({'aria-label':'세부상품 수정'});
+    const input=dialog.findAll(n=>n.props['aria-label']==='블랙 표시색')[0];
+    assert.ok(input,'detail modal must allow color editing, not just the inline table');
+    assert.equal(input.props.value,'#112233');
+    await act(async()=>input.props.onChange({target:{value:'#abcdef'}}));
+    await act(async()=>dialog.findAllByType('button').find(b=>text(b)==='취소').props.onClick());
+  }
+  await act(async()=>tree.root.findAllByType('button').find(b=>text(b)==='저장').props.onClick());
+  assert.ok(saved,'save executed');
+  const result=JSON.parse(saved.values.product_note);
+  assert.deepEqual(result.color_swatches,brand?{'블랙':'#123456'}:color_swatches,'resave must preserve saved display colors');
+  if(brand)assert.deepEqual(result.detail_color_swatches,detail_color_swatches,'same label in two details must stay independent');
+  assert.deepEqual(saved.values.color_options,brand?['A','B']:['블랙','화이트'],'swatch metadata must not rename original option keys');
+  await act(async()=>tree.unmount());saved=undefined;
+}
+console.log('PASS regular/brand form save preserves colors and option identifiers');
+const legacy={id:9003,product_name:'이전 조합형',price:1000,color_options:['블랙'],size_options:['M'],product_note:JSON.stringify({combo_mode:true,combo_detail_values:['A','B'],option_axes:[{key:'detail',label:'종류',values:['A','B']},{key:'color',label:'색상',values:['블랙']},{key:'size',label:'사이즈',values:['M']}],detail_color_swatches:{A:{블랙:'#112233'},B:{블랙:'#445566'}},stock_variants:[{color:'A / 블랙',size:'M',stock:1},{color:'B / 블랙',size:'M',stock:1}]})};
+legacy.__catalog_edit_version='a'.repeat(32);
+legacy.product_note=JSON.stringify({...JSON.parse(legacy.product_note),stock_management_enabled:true});
+let legacyTree;await act(async()=>{legacyTree=Renderer.create(React.createElement(Form,{activeBroadcastId:null,initialProduct:legacy}));});
+const scoped=legacyTree.root.findAll(n=>n.type==='input'&&n.props['aria-label']==='블랙 표시색');
+assert.ok(scoped.some(n=>n.props.value==='#112233')&&scoped.some(n=>n.props.value==='#445566'),'legacy combo must expose independently editable detail swatches');
+await act(async()=>scoped.find(n=>n.props.value==='#112233').props.onChange({target:{value:'#abcdef'}}));
+await act(async()=>legacyTree.root.findAllByType('button').find(b=>text(b)==='저장').props.onClick());
+assert.deepEqual(JSON.parse(saved.values.product_note).detail_color_swatches,{A:{블랙:'#ABCDEF'},B:{블랙:'#445566'}});
+await act(async()=>legacyTree.unmount());
+console.log('PASS legacy combo independently editable scoped colors');
+let newTree;
+await act(async()=>{newTree=Renderer.create(React.createElement(Form,{activeBroadcastId:null}));});
+await act(async()=>newTree.root.findAllByType('button').find(b=>text(b).includes('자세히 열기')).props.onClick());
+await act(async()=>newTree.root.findByProps({placeholder:'예: 스웨이드 로퍼'}).props.onChange({target:{value:'첫 상품'}}));
+await act(async()=>newTree.root.findByProps({placeholder:'화이트, 블랙, 베이지'}).props.onChange({target:{value:'블랙'}}));
+await act(async()=>newTree.root.findByProps({'aria-label':'블랙 표시색'}).props.onChange({target:{value:'#123456'}}));
+saved=undefined;
+await act(async()=>newTree.root.findAllByType('button').find(b=>text(b)==='등록').props.onClick());
+assert.ok(saved,'new product must save before testing reset');
+await act(async()=>newTree.root.findByProps({placeholder:'화이트, 블랙, 베이지'}).props.onChange({target:{value:'블랙'}}));
+assert.equal(newTree.root.findByProps({'aria-label':'블랙 표시색'}).props.value,'#ffffff','new product must not inherit the previous product swatch');
+await act(async()=>newTree.unmount());
+console.log('PASS new product reset does not leak previous swatches');

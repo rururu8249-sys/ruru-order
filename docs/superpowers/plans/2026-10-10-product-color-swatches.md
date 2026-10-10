@@ -12,6 +12,16 @@
 
 ## Global Constraints
 
+## Execution evidence — 2026-10-10
+
+- Task 1 committed as `09c8a63` after contract tests.
+- Tasks 2–3 implementation and component tests completed locally. Dictionary pinned to MIT `color-name-list@14.51.0` (31,918 English entries); 205 Korean aliases are editable representative translations, not certified fabric colors.
+- Review corrections: brand-detail modal supports draft/cancel; legacy combo exposes independent detail maps. New-product reset regression reproduced (`#123456` leaked), corrected, and passed.
+- Fresh all-package run: all 29 `test:*` commands passed; `npm run build` exited 0; `git diff --check` passed. Existing React test-renderer and module-type warnings remain.
+- Real-component static fixture inspected at desktop and 390px: wrapping and white borders visible, no horizontal overflow. This is layout verification, not interactive browser E2E.
+- Remaining release check: deployed unsaved admin draft/name lookup and photo sampler browser interaction. No production product/order writes used for tests.
+- Dependency audit reports 19 advisories in other packages; no advisory names the new dictionary. Dependency upgrades remain separate work; this is not a clean security audit claim.
+
 - Never rename option/stock keys or mutate existing orders.
 - Customer code uses only saved values; dictionary loads only in admin editing.
 - Existing products without maps retain their existing appearance.

@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "test:product-color-swatches": "node --import ./scripts/_ts-resolve.mjs scripts/test-product-color-swatches.mjs && node --import ./scripts/_ts-resolve.mjs scripts/test-admin-color-swatches.mjs && node scripts/test-color-swatch-editor.mjs && node scripts/test-photo-color-sampler.mjs && node scripts/test-color-swatch-form.mjs && node scripts/test-customer-color-swatches.mjs",
     "test:customer-press-feedback": "node scripts/test-customer-press-feedback.mjs",
     "test:guide-notice": "node scripts/test-guide-notice-migration.mjs && node scripts/test-guide-notice-api.mjs && npm run test:customer-notice",
     "test:option-manual-soldout": "node scripts/test-option-manual-soldout-db.mjs && node scripts/test-option-manual-soldout-ui.mjs",
@@ -45,6 +46,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",
+    "color-name-list": "14.51.0",
     "exceljs": "^4.4.0",
     "heic-to": "^1.5.2",
     "heic2any": "^0.0.4",
