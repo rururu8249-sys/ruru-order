@@ -21,6 +21,7 @@
 
 "use client";
 import ProductDiscountLabel from '@/components/order/ProductDiscountLabel';
+import CustomerPressButton from '@/components/customer/CustomerPressButton';
 import { isOptionManuallySoldOut } from '@/lib/productOptionAvailability';
 const normalizeEmptyProductOptionValue = (value: unknown) => {
   // data-ruru-no-auto-none-option="enabled"
@@ -7038,6 +7039,7 @@ export default function OrderPage() {
                       return (
                         <div
                           key={String(product.id)}
+                          className="ruru-customer-product-card"
                           style={listView === "grid"
                             ? { display: "flex", flexDirection: "column", padding: "10px", borderRadius: "14px", background: "#fff", border: isBroadcastOn && pinned ? "1.5px solid #7A1E47" : "1px solid #EFE6DE", boxShadow: isBroadcastOn && pinned ? "0 4px 16px rgba(122,30,71,0.10)" : "none" }
                             : isBroadcastOn && pinned
@@ -7052,9 +7054,9 @@ export default function OrderPage() {
                           <div style={listView === "grid"
                             ? { display: "flex", flexDirection: "column", gap: "8px", alignItems: "stretch", flex: 1, minWidth: 0 }
                             : { display: "flex", gap: "12px", alignItems: "center" }}>
-                          <div onClick={() => { if (img) openLightbox(img, [img], String(product.product_name || "상품")); }} style={listView === "grid"
-                            ? { position: "relative", width: "100%", aspectRatio: "1 / 1", borderRadius: "10px", background: "#F0EBE8", overflow: "hidden", cursor: img ? "zoom-in" : "default" }
-                            : { position: "relative", flexShrink: 0, width: "84px", height: "84px", borderRadius: "10px", background: "#F0EBE8", overflow: "hidden", cursor: img ? "zoom-in" : "default" }}>
+                          <CustomerPressButton aria-label={`${String(product.product_name || "상품")} 사진 확대`} disabled={!img} onClick={() => { if (img) openLightbox(img, [img], String(product.product_name || "상품")); }} style={listView === "grid"
+                            ? { border: 0, padding: 0, position: "relative", width: "100%", aspectRatio: "1 / 1", borderRadius: "10px", background: "#F0EBE8", overflow: "hidden", cursor: img ? "zoom-in" : "default" }
+                            : { border: 0, padding: 0, position: "relative", flexShrink: 0, width: "84px", height: "84px", borderRadius: "10px", background: "#F0EBE8", overflow: "hidden", cursor: img ? "zoom-in" : "default" }}>
                             {/* [2026-08-29] 브랜드 상품이라도 관리자가 대표사진을 올렸으면 그 사진을 쓴다.
                                 안 올렸을 때만 브랜드 글자 썸네일을 자동으로 보여준다. */}
                             {brandGroup && !img ? (
@@ -7075,18 +7077,18 @@ export default function OrderPage() {
                               })()
                             )}
                             {sold ? (
-                              <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", borderRadius: "inherit", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                              <span style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", borderRadius: "inherit", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
                                 <span style={{ color: "white", fontSize: "11px", fontWeight: 800, letterSpacing: "0.1em" }}>SOLD OUT</span>
-                              </div>
+                              </span>
                             ) : null}
                             {/* [2026-09-02 사장님 지시] 방송 중 고정(위젯) 상품은 썸네일 사진 위에 「라이브 소개중」 뱃지 */}
                             {isBroadcastOn && pinned ? (
-                              <div style={{ position: "absolute", top: "6px", left: "6px", zIndex: 2, display: "flex", alignItems: "center", gap: "4px", background: "#E8340A", color: "#fff", fontSize: "10px", fontWeight: 900, borderRadius: "999px", padding: "3px 8px", boxShadow: "0 2px 6px rgba(0,0,0,0.3)" }}>
+                              <span style={{ position: "absolute", top: "6px", left: "6px", zIndex: 2, display: "flex", alignItems: "center", gap: "4px", background: "#E8340A", color: "#fff", fontSize: "10px", fontWeight: 900, borderRadius: "999px", padding: "3px 8px", boxShadow: "0 2px 6px rgba(0,0,0,0.3)" }}>
                                 <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#fff", animation: "shimmer 1.2s ease-in-out infinite" }} />
                                 라이브 소개중
-                              </div>
+                              </span>
                             ) : null}
-                          </div>
+                          </CustomerPressButton>
                           <div style={listView === "grid" ? { minWidth: 0, flex: 1, display: "flex", flexDirection: "column" } : { minWidth: 0, flex: 1 }}>
                             {/* [2026-09-20 전면 정리] 배지는 «쌓기»가 아니라 «고르기».
                                 실측: 폰 420px 격자에서 카드 폭 167px — 배지 4개면 배지 줄만 42px(2줄), 5~6개면 3줄.
@@ -7282,7 +7284,7 @@ export default function OrderPage() {
                               : { marginTop: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                               {!readComboInfoOrderProduct(product) && <ProductDiscountLabel note={product.product_note} actualPrice={Number(product.price || 0)} />}
                               <span style={{ fontSize: "17px", fontWeight: 800, color: "#7A1E47" }}>{(() => { const ci = readComboInfoOrderProduct(product); return brandGroup ? `최저가 ${won(Number(product.price || 0))} 부터 ~` : ci && ci.maxPlus > 0 ? won(Number(product.price || 0)) + "~" : won(Number(product.price || 0)); })()}</span>
-                              <button
+                              <CustomerPressButton
                                 type="button"
                                 disabled={sold}
                                 onClick={() => selectQuickGroupBuyProduct(product as BroadcastProduct)}
@@ -7291,7 +7293,7 @@ export default function OrderPage() {
                                   : { flexShrink: 0, height: "40px", padding: "0 18px", borderRadius: "10px", border: "none", background: sold ? "#ccc" : "#7A1E47", color: "#fff", fontSize: "14px", fontWeight: 800, cursor: sold ? "default" : "pointer" }}
                               >
                                 {sold ? "품절" : brandGroup ? "상품 선택" : "장바구니 담기"}
-                              </button>
+                              </CustomerPressButton>
                             </div>
                           </div>
                           </div>
@@ -8096,7 +8098,7 @@ export default function OrderPage() {
                     {allOptionsSoldOut ? (
                     <button type="button" disabled style={{ height: "44px", borderRadius: "14px", border: "none", background: "#ccc", fontSize: "14px", fontWeight: 800, color: "#fff", cursor: "not-allowed" }}>품절</button>
                     ) : (
-                    <button
+                    <CustomerPressButton
                       type="button"
                       aria-disabled={!registeredOptionSelectionReady}
                       onClick={() => {
@@ -8124,7 +8126,7 @@ export default function OrderPage() {
                                 : "색상을 선택해 주세요")
                             : !registeredOptionSizeSelected
                               ? (registeredOptionSizeMode === "input" ? "사이즈를 입력해 주세요" : "사이즈를 선택해 주세요")
-                              : registeredOptionNeedsManualPrice && registeredOptionManualPrice < 1 ? "금액을 입력해 주세요" : "옵션을 선택해 주세요"}</button>
+                              : registeredOptionNeedsManualPrice && registeredOptionManualPrice < 1 ? "금액을 입력해 주세요" : "옵션을 선택해 주세요"}</CustomerPressButton>
                     )}
                     </>
                   )}
@@ -8584,9 +8586,9 @@ export default function OrderPage() {
               return !typed || window.confirm("입력 중인 내용이 지워져요. 닫을까요?");
             }}
             footer={(
-              <button type="button" onClick={confirmDirectInputSheet} style={csPrimaryButtonStyle(true)}>
+              <CustomerPressButton type="button" onClick={confirmDirectInputSheet} style={csPrimaryButtonStyle(true)}>
                 장바구니 담기
-              </button>
+              </CustomerPressButton>
             )}
           >
                   <div className="grid min-w-0 gap-3 overflow-x-hidden">

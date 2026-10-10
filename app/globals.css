@@ -1,5 +1,32 @@
 @import "tailwindcss";
 
+/* Customer product actions: press feedback is not a cart-success state. */
+.ruru-customer-press {
+  transition: transform 100ms ease-out, filter 100ms ease-out;
+  -webkit-tap-highlight-color: transparent;
+}
+.ruru-customer-press:focus-visible {
+  outline: 3px solid #7a1e47;
+  outline-offset: 3px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .ruru-customer-press:not(:disabled):not([aria-disabled="true"]):hover {
+    filter: brightness(0.94);
+  }
+}
+.ruru-customer-press[data-pressing="true"] {
+  transform: scale(0.975);
+  filter: brightness(0.86);
+}
+.ruru-customer-product-card:has(.ruru-customer-press[data-pressing="true"]) {
+  outline: 2px solid #7a1e47;
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ruru-customer-press { transition: none; }
+  .ruru-customer-press[data-pressing="true"] { transform: none; }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
