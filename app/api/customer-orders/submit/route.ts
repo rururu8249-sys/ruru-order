@@ -315,8 +315,9 @@ async function assertRegisteredProductPrices(
     .in("id", ids);
 
   if (error) {
-    console.warn("상품 금액 검증: 조회 실패(주문은 진행):", error?.message);
-    return catalog; // 조회 실패 → 허용(주문을 막지 않는다). 빈 카탈로그 = 배송그룹도 행 값으로 폴백.
+    // Price and shipping validation require authoritative catalog data.
+    // A failed read is not an empty catalog and must never authorize submission.
+    throw new Error("상품 정보를 확인할 수 없어요. 잠시 후 다시 주문해 주세요.");
   }
 
   for (const item of (data || []) as AnyRow[]) catalog.set(String(item?.id), item);
