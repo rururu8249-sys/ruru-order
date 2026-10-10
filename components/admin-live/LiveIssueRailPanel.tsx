@@ -6,6 +6,7 @@
 //   돈/입금/정산/주문 무관.
 
 import { useCallback, useEffect, useState } from "react";
+import { isCustomerIssueTask, isCustomerIssueResolved, isCustomerIssueDeleted } from "@/lib/customerIssueStatus";
 
 type Task = {
   id?: unknown;
@@ -13,22 +14,13 @@ type Task = {
   status?: string | null;
   is_resolved?: boolean | null;
   resolved_at?: string | null;
+  completed_at?: string | null;
+  body?: string | null;
+  task_type?: string | null;
+  customer_id?: string | number | null;
   customer_nickname?: string | null;
   created_at?: string | null;
 };
-
-function isResolved(t: Task) {
-  const s = String(t.status || "").toLowerCase();
-  return Boolean(
-    t.is_resolved ||
-      t.resolved_at ||
-      s.includes("resolved") ||
-      s.includes("done") ||
-      s.includes("complete") ||
-      s.includes("해결") ||
-      s.includes("완료"),
-  );
-}
 
 function timeLabel(iso?: string | null) {
   if (!iso) return "";
@@ -86,7 +78,7 @@ export default function LiveIssueRailPanel({ onOpenAll, onCountChange, variant =
     };
   }, [load]);
 
-  const open = tasks.filter((t) => !isResolved(t));
+  const open = tasks.filter((t) => isCustomerIssueTask(t) && !isCustomerIssueDeleted(t) && !isCustomerIssueResolved(t));
 
   useEffect(() => {
     onCountChange?.(open.length);

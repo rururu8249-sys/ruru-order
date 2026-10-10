@@ -29,6 +29,7 @@ type LedgerRow = {
 };
 import { bankDisplayName } from "@/lib/parseBankAccount";
 import { ISSUE_FILTER_CHIPS, matchesIssueFilterChip } from "@/lib/issueFilter";
+import { isCustomerIssueTask, isCustomerIssueResolved as isResolved, isCustomerIssueDeleted as isDeleted } from "@/lib/customerIssueStatus";
 
 type AdminIssueTask = {
   id?: string | number | null;
@@ -143,21 +144,6 @@ function normalizePayload(payload: unknown): AdminIssueTask[] {
   if (Array.isArray(row?.items)) return row.items;
 
   return [];
-}
-
-function isResolved(task: AdminIssueTask) {
-  const status = clean(task.status).toLowerCase();
-
-  return Boolean(
-    task.is_resolved ||
-      task.resolved_at ||
-      task.completed_at ||
-      status.includes("resolved") ||
-      status.includes("done") ||
-      status.includes("complete") ||
-      status.includes("해결") ||
-      status.includes("완료")
-  );
 }
 
 function taskKey(task: AdminIssueTask, index: number) {
@@ -731,13 +717,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       try {
         const response = await fetch("/api/admin-v2/admin-tasks", { cache: "no-store" });
         const payload = await response.json().catch(() => null);
-        const rows = normalizePayload(payload)
-          .filter((task) => {
-            const haystack = [task.title, task.body, task.task_type].map(clean).join(" ");
-
-            return haystack.includes("고객이슈") || haystack.includes("issue") || Boolean(task.customer_id);
-          })
-          ;   // [2026-09-23] 지운 건도 들고 온다 — 「지운 건」 탭에서 되살릴 수 있어야 한다
+        const rows = normalizePayload(payload).filter(isCustomerIssueTask);
 
         if (alive) setTasks(rows);
       } catch {
@@ -764,7 +744,6 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     };
   }, []);
 
-  const isDeleted = (task: AdminIssueTask) => clean(task.status).toLowerCase() === "deleted";
   // 「지운 건」은 미해결·전체·해결 어디에도 안 섞인다. 예전과 같은 화면을 유지한다.
   const liveTasks = useMemo(() => tasks.filter((task) => !isDeleted(task)), [tasks]);
   const deletedTasks = useMemo(() => tasks.filter(isDeleted), [tasks]);
