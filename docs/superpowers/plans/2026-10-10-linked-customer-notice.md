@@ -10,6 +10,12 @@
 
 **Spec:** docs/superpowers/specs/2026-10-10-crm-operating-architecture.md (notice integration slice only).
 
+## 2026-10-10 correction in progress
+
+User clarified that the arrival popup is NOT the public notice detail. The earlier reuse of that popup was incorrect. Current local correction dispatches the exact public notice ID to the notice-detail reader, keeps the arrival popup independent, and displays no banner when no public notice is selected. Existing popup fields remain unchanged. The public notice list now offers selection followed by the existing explicit settings save; list pinning is labelled separately.
+
+Verification: all 25 package test scripts passed; final production build passed. Customer-notice coverage includes direct public read, error hiding, racing responses, no personal-message writes, list selection without implicit publishing, and reopening the inbox at its list (regression observed RED then GREEN). Correction is not yet released. Additional product/card requests remain queued in the architecture spec, not marked complete.
+
 ## Global Constraints
 
 - Preserve old popup settings when no link exists; do not migrate or delete live content automatically.

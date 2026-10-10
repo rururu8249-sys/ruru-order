@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import CustomerBottomSheet, { csPrimaryButtonStyle } from "@/components/customer/CustomerBottomSheet";
 import CustomerDialog from "@/components/customer/CustomerDialog";
 import { noteTimeText, noteAgoText } from "@/lib/noteTime";
+import { supabase } from "@/lib/supabase";
 
 type SiteAlert = { id: number; kind: string; title: string; message: string; created_at: string; expires_at: string };
 type BoxItem = SiteAlert & { seen_at?: string | null; dismissed_at?: string | null };
@@ -79,6 +80,35 @@ export default function CustomerSiteAlertPopup() {
   const [hasMore, setHasMore] = useState(false);
   const [nextOffset, setNextOffset] = useState(0);
   const [moreLoading, setMoreLoading] = useState(false);
+  const [directNotice, setDirectNotice] = useState<NoticeItem | null>(null);
+  const [directNoticeId, setDirectNoticeId] = useState<number | null>(null);
+  const [directNoticeLoading, setDirectNoticeLoading] = useState(false);
+
+  // A banner names one public article, not the arrival popup or a personal message.
+  useEffect(() => {
+    let sequence = 0;
+    const open = async (event: Event) => {
+      const id = Number((event as CustomEvent)?.detail?.id);
+      if (!Number.isSafeInteger(id) || id <= 0) return;
+      const request = ++sequence;
+      setDirectNoticeId(id);
+      setDirectNotice(null);
+      setDirectNoticeLoading(true);
+      setBoxTab("notice");
+      setDetail({ kind: "notice", id });
+      setBoxOpen(true);
+      try {
+        const { data, error } = await supabase.from("notices")
+          .select("id,title,content,created_at,is_visible").eq("id", id).eq("is_visible", true).maybeSingle();
+        if (request === sequence && !error && data?.id === id && data.is_visible === true) setDirectNotice(data);
+      } finally {
+        if (request === sequence) setDirectNoticeLoading(false);
+      }
+    };
+    const listener = (event: Event) => { void open(event).catch(() => undefined); };
+    window.addEventListener("ruru-open-public-notice", listener);
+    return () => { sequence++; window.removeEventListener("ruru-open-public-notice", listener); };
+  }, []);
 
   useEffect(() => {
     // [2026-09-11] /product-widget(방송 송출 오버레이)에서는 쪽지 팝업·🔔 버튼이 방송 화면에 찍히면 안 된다 → 관리자와 같이 제외.
@@ -118,7 +148,7 @@ export default function CustomerSiteAlertPopup() {
     const timer = window.setInterval(() => { if (document.visibilityState === "visible") void load(); }, 30000);
     const onFocus = () => void load();
     // 접속 팝업 공지의 [📬 공지 · 쪽지 전체보기] 에서 열 수 있게
-    const onOpenBox = () => { setBoxOpen(true); void load(); };
+    const onOpenBox = () => { setDetail(null); setBoxOpen(true); void load(); };
     // 접속 공지 팝업이 떠 있는지 — 떠 있으면 쪽지 팝업을 미룬다
     const onNoticePopup = (e: Event) => setNoticePopupOpen(Boolean((e as CustomEvent).detail));
     try {
@@ -255,12 +285,13 @@ export default function CustomerSiteAlertPopup() {
                   );
                 }
                 if (detail.kind === "notice") {
-                  const n = notices.find((x) => x.id === detail.id);
-                  if (!n) return <div className="py-12 text-center text-sm font-bold text-slate-400">공지를 찾을 수 없어요.</div>;
+                  const n = directNoticeId === detail.id ? directNotice : notices.find((x) => x.id === detail.id);
+                  if (directNoticeId === detail.id && directNoticeLoading) return <div>{back}<p role="status">공지를 불러오는 중…</p></div>;
+                  if (!n) return <div>{back}<p className="py-12 text-center text-sm font-bold text-slate-400">공지를 찾을 수 없어요.</p></div>;
                   return (
                     <div>
                       {back}
-                      <h3 className="text-[15px] font-black text-slate-950">{stripLeadIcon(n.title)}</h3>
+                      <h3 className="text-[15px] font-black text-slate-950">{n.title}</h3>
                       <div className="mt-1 text-[11px] font-bold text-slate-400">{timeText(n.created_at)}{agoText(n.created_at) ? ` · ${agoText(n.created_at)}` : ""}</div>
                       <p className="mt-3 whitespace-pre-line text-[13.5px] font-bold leading-6 text-slate-700">{n.content}</p>
                     </div>

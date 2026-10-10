@@ -404,8 +404,8 @@ export default function AdminLiveNoticePanel() {
 
   // 미리보기 — 손님 팝업이 --- 를 가로줄로 바꿔 보여주는 것과 같은 방식
   const linkedNotice = notices.find(n => String(n.id) === linkedNoticeId && n.is_visible);
-  const previewTitle = linkedNoticeId ? linkedNotice?.title || "" : popupTitle;
-  const previewText = linkedNoticeId ? linkedNotice?.content || "" : popupText;
+  const previewTitle = popupTitle;
+  const previewText = popupText;
   const previewBlocks = previewText.split(/\n/).reduce<string[][]>((acc, line) => {
     if (line.trim() === "---") acc.push([]);
     else acc[acc.length - 1].push(line);
@@ -446,54 +446,31 @@ export default function AdminLiveNoticePanel() {
                 <div>
                   <div className="text-sm font-black text-ink">상단 고정 공지</div>
                   <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
-                    공지 제목이 상단에 표시되고, ‘자세히’를 누르면 해당 본문이 열립니다. 접속 시 자동으로 열지는 별도로 선택합니다.
+                    공지목록에서 글 하나를 선택하세요. 제목을 누르면 그 글의 상세 화면이 열립니다. 접속 팝업과는 별개입니다.
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setPopupEnabled((v) => !v)}
-                  className={`shrink-0 rounded-full px-4 py-2 text-xs font-black transition ${popupEnabled ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}
-                >
-                  {popupEnabled ? "팝업 ON" : "팝업 OFF"}
-                </button>
               </div>
 
               <label className="mt-3 block">
                 <span className={label}>표시할 공지</span>
                 <select aria-label="상단에 표시할 공지" value={linkedNoticeId} onChange={event => setLinkedNoticeId(event.target.value)} disabled={!settingsReady} className={input}>
-                  <option value="">기존 직접 작성 내용 유지</option>
+                  <option value="">상단에 표시하지 않음</option>
                   {linkedNoticeId && !linkedNotice ? <option value={linkedNoticeId}>연결된 공지를 확인할 수 없습니다</option> : null}
                   {notices.filter(n => n.is_visible).map(n => <option key={n.id} value={String(n.id)}>{n.title}</option>)}
                 </select>
                 <span className={help}>공지사항에서 작성한 글을 선택하면 제목과 본문이 함께 연결됩니다.</span>
               </label>
               {linkedNoticeId ? <div className="mt-3 rounded-xl border border-line p-3">
-                <p className="font-bold text-ink">{previewTitle || "공개된 공지를 선택해 주세요."}</p>
-                <p className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap text-sm text-ink-soft">{previewText}</p>
+                <p className="font-bold text-ink">{linkedNotice?.title || "공개된 공지를 선택해 주세요."}</p>
+                <p className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap text-sm text-ink-soft">{linkedNotice?.content}</p>
                 <button type="button" onClick={() => setTab("list")} className="mt-3 text-sm font-bold text-rose-deep">공지사항에서 내용 수정</button>
-              </div> : <>
-              {/* 기존 내용은 자동 삭제하지 않는다. 공지를 연결하면 중복 입력을 숨긴다. */}
-              <div className="mt-3 rounded-xl border border-rose-line bg-rose-soft/40 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[12px] font-black text-ink">📢 띠에 보여줄 한 줄</span>
-                  <span className={`text-[11px] font-black ${barLine.trim().length > 30 ? "text-danger-tx" : "text-ink-mute"}`}>
-                    {barLine.trim().length} / 30자
-                  </span>
-                </div>
-                <input
-                  value={barLine}
-                  onChange={(e) => setBarLine(e.target.value)}
-                  placeholder="예) 해외배송은 9/2 이후 순차 발송돼요"
-                  className={input}
-                />
-                <div className="mt-2 rounded-lg px-2.5 py-1.5" style={{ background: popupColor }}>
-                  <span className="text-[12px] font-bold text-white">📢 {noticeBarLine(barLine || popupTitle, popupText)}</span>
-                </div>
-                <span className={help}>
-                  손님 화면 맨 위에 <b>이 한 줄</b>만 보입니다. 비우면 제목이나 본문 첫 줄이 자동으로 들어가는데,
-                  문장 중간에서 잘릴 수 있으니 <b>직접 적는 편이 좋습니다.</b> 30자를 넘으면 「…」로 잘립니다.
-                </span>
-              </div>
+              </div> : null}
+            </div>
+            <details className={card}>
+              <summary className="cursor-pointer text-sm font-black text-ink">접속 팝업 설정 (상단 공지와 별개)</summary>
+              <button type="button" onClick={() => setPopupEnabled(v => !v)} className="mt-3 rounded-full border border-line px-4 py-2 text-xs font-bold">
+                {popupEnabled ? "팝업 ON" : "팝업 OFF"}
+              </button>
 
               <label className="mt-3 block">
                 <span className={label}>제목 (팝업 위 색상 띠 글씨)</span>
@@ -529,7 +506,6 @@ export default function AdminLiveNoticePanel() {
                 </span>
               </div>
 
-              </>}
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className={label}>글자 크기</span>
@@ -556,7 +532,7 @@ export default function AdminLiveNoticePanel() {
                 <input value={popupBandUrl} onChange={(e) => setPopupBandUrl(e.target.value)} placeholder={DEFAULT_BAND_URL} className={input} />
                 <span className={help}>비우면 밴드 버튼이 숨겨집니다.</span>
               </label>
-            </div>
+            </details>
 
             {/* 주문 최종 제출 전 구매 동의 — 접속 팝업과 별도 설정 */}
             <div className={card}>
@@ -749,7 +725,7 @@ export default function AdminLiveNoticePanel() {
                 onClick={() => setForm({ ...form, is_pinned: !form.is_pinned })}
                 className={`ru-btn ru-btn-sm ${form.is_pinned ? "ru-btn-on" : ""}`}
               >
-                {form.is_pinned ? "📌 상단 고정" : "고정 안 함"}
+                {form.is_pinned ? "📌 목록 상단 고정" : "목록 고정 안 함"}
               </button>
               <button
                 type="button"
@@ -798,9 +774,10 @@ export default function AdminLiveNoticePanel() {
                   </div>
 
                   <div className="mt-3 flex flex-wrap gap-1.5">
+                    {n.is_visible && <button type="button" aria-label={`${n.title}를 상단 공지로 선택`} disabled={!settingsReady} onClick={() => { setLinkedNoticeId(String(n.id)); setTab("customer"); }} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-rose-deep disabled:opacity-30">상단 공지로 선택</button>}
                     <button type="button" onClick={() => moveNotice(n, "up")} disabled={i === 0 || listBusy} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft disabled:opacity-30">↑ 위로</button>
                     <button type="button" onClick={() => moveNotice(n, "down")} disabled={i === notices.length - 1 || listBusy} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft disabled:opacity-30">↓ 아래로</button>
-                    <button type="button" onClick={() => toggleNotice(n, "is_pinned")} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft">{n.is_pinned ? "고정 풀기" : "📌 상단 고정"}</button>
+                    <button type="button" onClick={() => toggleNotice(n, "is_pinned")} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft">{n.is_pinned ? "목록 고정 풀기" : "📌 목록 상단 고정"}</button>
                     <button type="button" onClick={() => toggleNotice(n, "is_visible")} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft">{n.is_visible ? "🙈 숨기기" : "👁 공개하기"}</button>
                     <button type="button" onClick={() => setForm(n)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft">✏️ 수정</button>
                     <button type="button" onClick={() => deleteNotice(n)} className="ml-auto rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-danger-tx">🗑 삭제</button>

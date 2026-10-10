@@ -1674,7 +1674,8 @@ export default function OrderPage() {
   // 접속 팝업 공지(설정에서 문구/제목/글자크기/색상/ON·OFF 수정). 밴드 바로가기 + 24시간 안 보기 + 확인.
   const [popupNoticeEnabled, setPopupNoticeEnabled] = useState(false);
   const [popupNoticeTitle, setPopupNoticeTitle] = useState("");
-  const [popupNoticeLinked, setPopupNoticeLinked] = useState(false);
+  const [topNoticeId, setTopNoticeId] = useState<number | null>(null);
+  const [topNoticeTitle, setTopNoticeTitle] = useState("");
   const [popupNoticeText, setPopupNoticeText] = useState("");
   // [2026-08-30] 띠에 보여줄 한 줄 — 관리자에서 직접 적는다. 비우면 제목/본문 첫 줄로 자동.
   //   본문 첫 줄이 「해외방송 주문건은」처럼 문장 조각이면 손님이 무슨 말인지 모른다.
@@ -2479,9 +2480,9 @@ export default function OrderPage() {
       if (result.error) throw result.error;
       return result.data;
     });
-    const pText = noticeSource.text;
+    const pText = String((data || []).find((i: any) => i.key === "popup_notice_text")?.value || "");
     const pBand = String((data || []).find((i: any) => i.key === "popup_band_url")?.value || "").trim() || "https://band.us/@ruru8249";
-    const pTitle = noticeSource.title;
+    const pTitle = String((data || []).find((i: any) => i.key === "popup_notice_title")?.value || "");
     const pFont = String((data || []).find((i: any) => i.key === "popup_notice_fontsize")?.value || "").trim() || "normal";
     const pColor = String((data || []).find((i: any) => i.key === "popup_notice_color")?.value || "").trim() || "#7B2D43";
     setPopupNoticeEnabled(pEnabled);
@@ -2489,7 +2490,8 @@ export default function OrderPage() {
     setPopupNoticeBarLine(noticeSource.bar);
     setPopupBandUrl(pBand);
     setPopupNoticeTitle(pTitle);
-    setPopupNoticeLinked(noticeSource.linked);
+    setTopNoticeId(noticeSource.linked && noticeSource.available ? Number((data || []).find((i: any) => i.key === CUSTOMER_NOTICE_ID_KEY)?.value) : null);
+    setTopNoticeTitle(noticeSource.linked && noticeSource.available ? noticeSource.title : "");
     setPopupNoticeFontSize(pFont);
     setPopupNoticeColor(pColor);
     // [2026-08-30 공지 방식 변경] 전체 공지를 매번 팝업으로 덮지 않는다.
@@ -3588,11 +3590,11 @@ export default function OrderPage() {
 
   // 띠에 보여줄 한 줄 — 규칙은 lib/noticeBar.ts (테스트가 같은 함수를 쓴다)
   //   관리자에서 「띠 한 줄」을 직접 적어두면 그걸 쓰고, 비어 있으면 제목/본문 첫 줄을 쓴다.
-  const noticeBarText = popupNoticeLinked ? popupNoticeTitle : noticeBarLine(popupNoticeBarLine || popupNoticeTitle, popupNoticeText);
+  const noticeBarText = topNoticeTitle;
 
   // 상단 제목의 「자세히」는 같은 공지 본문을 직접 연다. 하단 공지함 진입과 구분한다.
   const openNoticeBox = () => {
-    setPopupOpen(true);
+    if (topNoticeId) window.dispatchEvent(new CustomEvent("ruru-open-public-notice", { detail: { id: topNoticeId } }));
   };
 
   // 쪽지함(CustomerSiteAlertPopup)이 안 읽은 개수를 알려오면 하단 메뉴 배지에 반영한다.
@@ -6462,11 +6464,7 @@ export default function OrderPage() {
   };
 
   // [2026-09-20] 상단 띠(공지·밴드)가 하나라도 떠 있는지 — 앱설치 배너를 접는 판단에만 쓴다. 표시 전용.
-  const noticeStripOn = Boolean(hasSavedInfo && shouldShowNoticeBar({
-    bar: popupNoticeBarLine,
-    title: popupNoticeTitle,
-    text: popupNoticeText,
-  }));
+  const noticeStripOn = Boolean(hasSavedInfo && topNoticeId && topNoticeTitle.trim());
   const bandStripOn = Boolean(hasSavedInfo && popupBandUrl);
   const topStripOn = noticeStripOn || bandStripOn;
 
