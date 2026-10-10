@@ -27,13 +27,17 @@ assert(text().includes('품목 수'),'item count is not mislabeled as orders');
 assert(text().includes('베이지 / 화이트'),'original option must remain readable');
 assert.equal(loads,1,'opening details cannot load the same orders twice');
 assert.equal(tree.root.findAllByType('table').length,1,'primary product/option breakdown is a structured table');
+const productName=tree.root.findAllByType('span').find(node=>node.children.includes('상의'));
+assert(productName.props.className.includes('min-w-0')&&productName.props.className.includes('[overflow-wrap:anywhere]'),'mobile product name must shrink and wrap unbroken product codes');
 assert(text().includes('구매 옵션별 수량'),'color and size quantities are grouped, not repeated order rows');
 const optionUnits=tree.root.findAllByProps({'aria-label':'사이즈 M, 수량 2개'});
 assert.equal(optionUnits.length,1,'each size and quantity is a separately labeled option unit');
 assert.equal(optionUnits[0].findAllByType('strong')[0].children.join(''),'2개');
 assert.equal(optionUnits[0].type,'dl','option and quantity have explicit term/value relationships');
 assert.equal(optionUnits[0].findByType('dt').children.join(''),'M');
-assert.equal(tree.root.findAllByProps({'aria-label':'사이즈별 수량'}).length,2,'each product has a compact size quantity block');
+assert.equal(tree.root.findAllByProps({'aria-label':'사이즈별 수량'}).length,1,'only products with sizes have a size heading');
+assert.equal(tree.root.findAllByProps({'aria-label':'옵션별 수량'}).length,1,'a product without sizes shows quantity without a fictitious size');
+assert.equal(tree.root.findByProps({'aria-label':'옵션 없음, 수량 1개'}).findByType('dt').children.join(''),'수량');
 assert.equal(tree.root.findAllByType('details').length,0,'buyers are not appended underneath products');
 await act(async()=>tree.root.findAllByType('button').find(b=>b.children.includes('구매자별')).props.onClick());
 assert.equal(tree.root.findAllByType('table').length,0,'buyer view replaces product view rather than stacking pages');
@@ -43,10 +47,16 @@ await act(async()=>tree.root.findAllByType('button').find(b=>b.children.includes
 await act(async()=>tree.root.findAllByType('button').find(b=>b.props['aria-label']==='방송 B 분석').props.onClick());
 assert.equal(loads,1,'broadcast switch uses the loaded snapshot');
 assert(text().includes('방송 B'));
+await act(async()=>tree.root.findByProps({'aria-label':'분석할 방송 선택'}).props.onChange({target:{value:'A'}}));
+assert.equal(loads,1,'compact mobile selector reuses the same snapshot');
+assert(text().includes('40,000원'),'mobile selection updates the selected broadcast detail');
 pending=Promise.reject(new Error('refresh failure'));
 await act(async()=>tree.root.findAllByType('button').find(b=>b.children.includes('새로고침')).props.onClick());
 assert(text().includes('불러오지 못했습니다'));
 assert.equal(text().includes('48,000원'),false,'failed refresh cannot keep apparently-current totals');
+pending=Promise.resolve(snapshot);
+await act(async()=>tree.root.findAllByType('button').find(b=>b.children.includes('다시 불러오기')).props.onClick());
+assert(text().includes('48,000원'),'retry recovers the complete snapshot');
 await act(async()=>tree.unmount());
 pending=Promise.resolve({...snapshot,orders:[
  {id:10,order_group_id:'same',broadcast_id:'A',created_at:'2026-10-05',product_name:'출고상품',qty:2,product_price:10000,adjusted_product_price:18000,total_price:18000,admin_order_status_v2:'출고완료',shipped_prev_status:'수동입금확인'},

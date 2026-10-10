@@ -140,7 +140,7 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
   };
 
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl border border-rose-line bg-surface px-4 py-2.5 text-[12px] font-black">
+    <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-rose-line bg-surface px-4 py-2.5 text-[13px] font-black md:gap-y-1 md:text-[12px] [&>span]:max-w-full [&>span>span]:inline-block [&>span>span]:whitespace-nowrap [&>span>span]:tabular-nums">
       {/* [UI 2026-07-06] 기준 명시 — 정산 팝업(이번달 자동조회)과 숫자가 달라 헷갈리던 것 방지 */}
       {/* [2026-08-31 사장님 요청] 유치원생 기준 — 상품값과 실제 받은 돈을 나란히 크게 */}
       <span className="text-ink-soft" title="결제완료 주문의 순수 상품금액만 합친 것 — 카드수수료·배송비·포인트 반영 전">📦 상품값 <span className="text-ink text-[13px]">{money(goodsPaid)}</span></span>

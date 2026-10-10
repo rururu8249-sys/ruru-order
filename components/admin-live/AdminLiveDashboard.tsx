@@ -1616,13 +1616,21 @@ export default function AdminLiveDashboard() {
               {/* 화면 제목 + 작은 탭 */}
               {/* 페이지가 스크롤해도 화면 이름·탭은 위에 붙어 있다(내용이 뒤로 지나가도 가려지지 않게 배경 지정) */}
               <div className="sticky top-0 z-30 -mx-3 -mt-3 mb-2 flex flex-wrap items-end justify-between gap-2 border-b border-rose-line bg-canvas px-3 pt-2 md:-mx-4 md:px-4">
-                {/* [2026-09-20 사장님 폰 화면 깨짐] 폰에서 「실시간 주\n문」처럼 탭 글자가 중간에서 잘렸다.
-                    → 제목·탭은 절대 줄바꿈하지 않고(whitespace-nowrap), 탭 줄이 넘치면 옆으로 미는 스크롤로 바꾼다. 표시 전용 */}
-                <div className={`flex min-w-0 items-end gap-3 ${activeMenu==='products'?'w-full':''}`}>
+                {/* 모바일은 모든 하위 화면을 선택 목록으로 제공하고, 데스크톱은 기존 탭을 유지한다. */}
+                <div className={`flex w-full min-w-0 flex-wrap items-end gap-3 md:flex-nowrap ${activeMenu==='products'?'':'md:w-auto'}`}>
                   <h1 className="shrink-0 whitespace-nowrap pb-2 text-lg font-black tracking-tight text-ink">{activeTopMenu.label}</h1>
                   {activeMenu==='products' && <div ref={setProductHeaderTarget} className="flex min-w-0 flex-1" />}
                   {activeSubTabs.length > 1 ? (
-                    <div className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <>
+                    <select
+                      aria-label={`${activeTopMenu.label} 화면 선택`}
+                      value={drawer.kind==='deposits'?'payments':activeMenu==='reports'?'sales':activeMenu}
+                      onChange={event=>setActiveMenu(event.target.value as typeof activeMenu)}
+                      className="mb-2 min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-base font-bold md:hidden"
+                    >
+                      {activeSubTabs.map(tab=><option key={tab.key} value={tab.key}>{tab.label}</option>)}
+                    </select>
+                    <div className="hidden min-w-0 items-center gap-1 overflow-x-auto md:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                       {activeSubTabs.map((tab) => {
                         const active = drawer.kind === "deposits" ? tab.key === "payments" : tab.key === (activeMenu==='reports'?'sales':activeMenu);
                         return (
@@ -1640,6 +1648,7 @@ export default function AdminLiveDashboard() {
                         );
                       })}
                     </div>
+                    </>
                   ) : null}
                 </div>
                 {activeMenu === "orders" ? (

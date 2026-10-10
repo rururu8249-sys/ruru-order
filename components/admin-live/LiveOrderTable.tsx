@@ -135,7 +135,7 @@ function getVisibleOrderSummaryParts(order: LiveOrder) {
   };
 }
 
-function renderOrderSummary(order: LiveOrder) {
+function renderOrderSummary(order: LiveOrder, wrap = false) {
   const { parts, hiddenCount } = getVisibleOrderSummaryParts(order);
   // [UI 2026-07-06] 여러 상품을 한 칸에 다 구겨넣으면 각각 "룰..."로 뭉개져 아무것도 못 읽음
   // → 첫 상품은 온전히 + "외 N개"로 표시. 전체 목록은 hover(title)와 주문상세에서 확인.
@@ -144,8 +144,8 @@ function renderOrderSummary(order: LiveOrder) {
   const fullText = [...parts].join(", ") + (hiddenCount > 0 ? ` 외 ${hiddenCount}개` : "");
 
   return (
-    <span className="inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap" title={fullText}>
-      <span className="truncate">{firstPart}</span>
+    <span className={wrap ? "inline-flex min-w-0 max-w-full flex-wrap items-start gap-x-2 gap-y-1 whitespace-normal" : "inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap"} title={fullText}>
+      <span className={wrap ? "min-w-0 break-words [overflow-wrap:anywhere]" : "truncate"}>{firstPart}</span>
       {restCount > 0 && (
         <span className="shrink-0 font-black text-ink-soft">외 {restCount}개</span>
       )}
@@ -1317,7 +1317,7 @@ export default function LiveOrderTable({
                     return (
                       <div key={order.id} onClick={() => onSelectOrder(order)}
                         style={{ background: "var(--color-surface)", border: "1px solid #eadfe3", borderLeft: order.paymentStatus === "manual_match_needed" ? "3px solid var(--color-rose-deep)" : "1px solid #eadfe3", borderRadius: "12px", padding: "12px 12px", marginBottom: "8px", cursor: "pointer" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
                           <input type="checkbox" checked={selectedOrderIds.has(String(order.id))} onChange={() => toggleSelectOrder(String(order.id))} onClick={(e) => e.stopPropagation()} style={{ width: "16px", height: "16px", accentColor: "var(--color-rose-deep)" }} />
                           <span style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{order.nickname}</span>
                           <span style={{ fontSize: "11px", color: "#888" }}>{order.name || ""}</span>
@@ -1339,7 +1339,7 @@ export default function LiveOrderTable({
                             })()}
                           </span>
                         </div>
-                        <div style={{ fontSize: "12px", color: "#444", marginBottom: "8px", lineHeight: 1.4 }}>{renderOrderSummary(order)} · {getTotalQty(order)}개</div>
+                        <div className="mb-2 text-sm leading-relaxed text-ink">{renderOrderSummary(order,true)}<span className="mt-1 block font-bold text-ink-soft">총 수량 {getTotalQty(order)}개</span></div>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", flexWrap: "wrap" }}>
                           <div style={{ display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
                             {statusBadge(order, {
@@ -1487,11 +1487,11 @@ export default function LiveOrderTable({
             </div>
       </div>
 
-      <div className="mt-3 flex-shrink-0 flex items-center">
+      <div className="mt-3 flex-shrink-0 flex flex-wrap items-center gap-3">
         <div className="text-xs font-black text-ink-soft">
           총 {orders.length}건 / 전체 {allOrderCount}건
         </div>
-        <div className="mx-auto flex items-center gap-5 text-sm font-black">
+        <div className="mx-auto flex max-w-full flex-wrap items-center justify-center gap-3 text-sm font-black sm:gap-5">
           <button type="button" onClick={() => setPage(Math.max(1, safePage - 1))} disabled={safePage <= 1} className="text-ink-mute disabled:opacity-30" aria-label="이전 페이지">‹</button>
           {(() => {
             let start = Math.max(1, safePage - 2);
