@@ -10,6 +10,6 @@ export default function ProductColorSwatches({value}:{value:ColorSwatchMap}) {
   const entries=Object.entries(normalizeSwatchMap(value)).filter((entry):entry is [string,string]=>Boolean(entry[1]));
   if(!entries.length)return null;
   return <div aria-label="상품 색상" style={{display:'flex',flexWrap:'wrap',gap:6,margin:'7px 0'}}>
-    {entries.map(([label,hex])=><span key={label} title={label} style={{display:'inline-flex',alignItems:'center',gap:4,fontSize:11,color:'#655d61',maxWidth:'100%'}}><ColorSwatch hex={hex}/><span style={{overflowWrap:'anywhere'}}>{label}</span></span>)}
+    {entries.map(([label,hex])=><span key={label} role="img" aria-label={label} title={label} style={{display:'inline-flex',alignItems:'center'}}><ColorSwatch hex={hex}/></span>)}
   </div>;
 }

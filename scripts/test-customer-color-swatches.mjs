@@ -10,6 +10,8 @@ assert.equal(render({}), '');
 assert.equal(render({'미지색':null}), '');
 const markup=render({'화이트':'#ffffff','모카':'#9d7651'});
 assert.ok(markup.includes('화이트'));assert.ok(markup.includes('모카'));assert.ok(markup.includes('border:'));
+assert.ok(markup.includes('role="img" aria-label="화이트"'),'each preview must keep its accessible color name');
+assert.ok(!markup.includes('>화이트<')&&!markup.includes('>모카<'),'list cards must show swatches without repeated visible names');
 assert.ok(!markup.includes('<button'),'preview must not introduce another purchase action');
 assert.ok(!render({'bad':'url(evil)'}).includes('evil'),'only validated HEX can reach style');
 assert.equal(renderToStaticMarkup(React.createElement(ColorSwatch,{hex:null})), '');
