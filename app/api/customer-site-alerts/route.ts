@@ -123,12 +123,14 @@ async function readBox(
     /* 공지 조회 실패는 쪽지함 표시를 막지 않는다 */
   }
 
-  // [2026-08-30 회귀 복구] 「주문서 공지 문구」(settings.notice_text) — 쪽지함 맨 위 「쇼핑 전 꼭 확인」.
-  //   교환·반품 비용 안내가 여기 들어 있어 손님이 못 보면 분쟁이 된다.
+  // Migration moves the guide into notices. Keep fallback only for databases not
+  // migrated yet; never revive a hidden/deleted notice from the recovery copy.
   let shopGuide = "";
   try {
-    const { data: sRows } = await sb.from("settings").select("key,value").eq("key", "notice_text").limit(1);
-    shopGuide = String((sRows || [])[0]?.value ?? "").trim();
+    const { data: sRows } = await sb.from("settings").select("key,value").in("key", ["notice_text", "shop_guide_notice_id"]);
+    if (!(sRows || []).some(row => row.key === "shop_guide_notice_id")) {
+      shopGuide = String((sRows || []).find(row => row.key === "notice_text")?.value ?? "").trim();
+    }
   } catch {
     /* 안내 문구 조회 실패는 쪽지함 표시를 막지 않는다 */
   }

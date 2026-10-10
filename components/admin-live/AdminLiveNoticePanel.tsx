@@ -38,7 +38,6 @@ const NOTICE_KEYS = [
   "popup_notice_fontsize",
   "popup_notice_color",
   "popup_band_url",
-  "notice_text",
   ...ORDER_PURCHASE_CONSENT_KEYS,
 ] as const;
 
@@ -90,7 +89,6 @@ export default function AdminLiveNoticePanel() {
   // ⚠ 이 값은 settings(popup_notice_color)로 저장돼 손님 화면에 그대로 쓰인다 → 관리자 CSS 변수 금지, 실제 색값만.
   const [popupColor, setPopupColor] = useState("#7B2D43");
   const [popupBandUrl, setPopupBandUrl] = useState(DEFAULT_BAND_URL);
-  const [noticeText, setNoticeText] = useState("");
   const [purchaseConsent, setPurchaseConsent] = useState<OrderPurchaseConsentConfig>(DEFAULT_ORDER_PURCHASE_CONSENT);
 
   const [tab, setTab] = useState<PanelTab>("customer");
@@ -132,7 +130,6 @@ export default function AdminLiveNoticePanel() {
         setPopupFont(clean(get("popup_notice_fontsize")) || "normal");
         setPopupColor(clean(get("popup_notice_color")) || "#7B2D43");
         setPopupBandUrl(clean(get("popup_band_url")) || DEFAULT_BAND_URL);
-        setNoticeText(String(get("notice_text") ?? ""));
         setPurchaseConsent(parseOrderPurchaseConsentSettings(rows));
         setSettingsReady(true);
       } finally {
@@ -160,7 +157,6 @@ export default function AdminLiveNoticePanel() {
           { key: "popup_notice_fontsize", value: popupFont },
           { key: "popup_notice_color", value: popupColor },
           { key: "popup_band_url", value: popupBandUrl.trim() },
-          { key: "notice_text", value: noticeText },
           ...toOrderPurchaseConsentRows(purchaseConsent),
         ],
         { onConflict: "key" },
@@ -611,24 +607,6 @@ export default function AdminLiveNoticePanel() {
               </div>
             </div>
 
-            {/* 상시 안내 문구 */}
-            <div className={card}>
-              <div className="text-sm font-black text-ink">📌 쇼핑 전 꼭 확인 (상시 안내)</div>
-              <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
-                손님 <b className="text-ink-soft">쪽지함 맨 위</b>에 항상 보이는 안내입니다. 사이즈 오차·교환반품 비용처럼
-                <b className="text-ink-soft"> 늘 해당되는 내용</b>을 넣으세요. 비우면 안 보입니다.
-              </div>
-              <textarea
-                value={noticeText}
-                onChange={(e) => setNoticeText(e.target.value)}
-                placeholder={"예) 사이즈는 측정 방법에 따라 차이가 있어 100% 정확하지 않을 수 있습니다.\n단순 변심 교환·반품 시 택배비를 포함해 10,000원의 비용이 발생할 수 있습니다."}
-                rows={4}
-                className="mt-3 w-full resize-none rounded-xl border border-line bg-surface p-3 text-sm font-bold leading-relaxed text-ink outline-none focus:border-rose-deep"
-              />
-              <div className="mt-2 rounded-xl border border-line bg-warn-bg px-3 py-2 text-[11px] font-bold leading-5 text-warn-tx">
-                예전엔 「설정 → 주문서 표시 → 주문서 공지 문구」였습니다. 같은 내용이고, 여기서 고치면 됩니다.
-              </div>
-            </div>
           </div>
 
           {/* ─────────── 오른쪽: 미리보기 ─────────── */}
@@ -674,17 +652,6 @@ export default function AdminLiveNoticePanel() {
                 )}
               </div>
 
-              <div className="mt-3 text-[11px] font-black text-ink-soft">쪽지함 맨 위</div>
-              <div className="mt-1 rounded-2xl border border-rose-line bg-rose-soft/40 p-3">
-                {noticeText.trim() ? (
-                  <>
-                    <div className="text-[11px] font-black text-ink-mute">📌 쇼핑 전 꼭 확인</div>
-                    <p className="mt-1 whitespace-pre-line text-[12px] font-bold leading-5 text-ink-soft">{noticeText}</p>
-                  </>
-                ) : (
-                  <div className="py-4 text-center text-[11px] font-bold text-ink-mute">비어 있어 안 보입니다.</div>
-                )}
-              </div>
             </div>
           </div>
         </div>

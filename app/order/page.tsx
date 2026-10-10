@@ -1556,7 +1556,6 @@ export default function OrderPage() {
     if (orderSheetOpen) setFinalSubmitAcknowledged(false);
   }, [orderSheetOpen]);
   const [inquirySheetOpen, setInquirySheetOpen] = useState(false);
-  const [noticeSheetOpen, setNoticeSheetOpen] = useState(false);
   // [2026-07-10] 주문 방법 팝업 — 관리자 설정(howto_enabled)이 켜져 있을 때만 뜬다.
   //   설정을 읽기 전엔 안 띄운다(꺼둔 상태로 깜빡이는 것 방지). loadOrderSettings에서 연다.
   const [howToOpen, setHowToOpen] = useState(false);
@@ -1671,7 +1670,6 @@ export default function OrderPage() {
   const [defaultShippingFee, setDefaultShippingFee] = useState(4000);
   const [remoteAreaShippingFee, setRemoteAreaShippingFee] = useState(6000);
   const [pointEarnRateForDisplay, setPointEarnRateForDisplay] = useState(0);
-  const [noticeText, setNoticeText] = useState("");
   // 접속 팝업 공지(설정에서 문구/제목/글자크기/색상/ON·OFF 수정). 밴드 바로가기 + 24시간 안 보기 + 확인.
   const [popupNoticeEnabled, setPopupNoticeEnabled] = useState(false);
   const [popupNoticeTitle, setPopupNoticeTitle] = useState("");
@@ -2391,7 +2389,6 @@ export default function OrderPage() {
         "remote_area_shipping_fee",
         "point_auto_earn_enabled",
         "point_earn_rate",
-        "notice_text",
         "direct_input_enabled",
         "howto_enabled",
         "howto_steps",
@@ -2445,7 +2442,6 @@ export default function OrderPage() {
     const pointEarnRate = Math.min(100, Math.max(0, readNumber("point_earn_rate", 0)));
     setPointEarnRateForDisplay(pointAutoEarnEnabled ? pointEarnRate : 0);
 
-    setNoticeText(String((data || []).find((i: any) => i.key === "notice_text")?.value || ""));
     // [2026-09-22 사장님] 주문 안내 문구의 «전체 기본값»(설정 → 주문서 표시). 상품별 설정이 없을 때만 쓰인다.
     setProductNoticeGlobal({
       mode: String((data || []).find((i: any) => i.key === "product_notice_mode")?.value || "off"),
@@ -8808,7 +8804,7 @@ export default function OrderPage() {
               {[
                 { key: "home", label: "홈", icon: "🏠", onClick: () => window.scrollTo({ top: 0, behavior: "smooth" }) },
                 // [2026-08-30 사장님 요청] 하단에 쪽지함 진입점. 공지와 쪽지를 한 곳에서 본다.
-                { key: "notice", label: "공지·쪽지", icon: "📬", badge: noteUnread, onClick: () => { try { window.dispatchEvent(new Event("ruru-open-notice-box")); } catch { setNoticeSheetOpen(true); } } },
+                { key: "notice", label: "공지·쪽지", icon: "📬", badge: noteUnread, onClick: () => { window.dispatchEvent(new Event("ruru-open-notice-box")); } },
                 { key: "orders", label: "주문내역", icon: "📦", onClick: () => openOrderLookupBottomSheet() },
                 { key: "inquiry", label: "문의", icon: "💬", onClick: () => setInquirySheetOpen(true) },
                 { key: "me", label: "내정보", icon: "👤", onClick: () => openCustomerInfoEditBottomSheet() },
@@ -8939,17 +8935,6 @@ export default function OrderPage() {
           </CustomerBottomSheet>
         ) : null}
 
-        {noticeSheetOpen ? (
-          <CustomerBottomSheet
-            open
-            size="half"
-            onClose={() => setNoticeSheetOpen(false)}
-            title="📢 공지사항"
-            bodyPadding="14px 18px"
-          >
-              <div style={{ background: "#F9EEF3", borderLeft: "3px solid #7A1E47", borderRadius: "8px", padding: "13px", fontSize: "14px", color: "#3a2f33", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{noticeText && noticeText.trim() ? noticeText : "등록된 공지가 없어요."}</div>
-          </CustomerBottomSheet>
-        ) : null}
 
         <CustomerPaymentGuideBottomSheet
           open={paymentGuideOpen}

@@ -3,7 +3,7 @@ import React from 'react';
 import Renderer,{act} from 'react-test-renderer';
 import {createUiLoader} from './admin-ui-test-loader.mjs';
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
-const settings=[{key:'popup_notice_title',value:'기존 제목'},{key:'popup_notice_text',value:'기존 본문'},{key:'popup_notice_bar',value:'기존 요약'}];
+const settings=[{key:'popup_notice_title',value:'기존 제목'},{key:'popup_notice_text',value:'기존 본문'},{key:'popup_notice_bar',value:'기존 요약'},{key:'notice_text',value:'보존할 상시 안내'}];
 const notices=[{id:17,title:'배송 공지',content:'배송 본문',is_visible:true,is_pinned:false,category:'공지',sort_order:1},{id:18,title:'비공개 글',content:'비공개 본문',is_visible:false,is_pinned:false,category:'공지',sort_order:2}];
 let failSettings=false,writes=[];
 const db={from(table){
@@ -15,6 +15,7 @@ const {default:Panel}=createUiLoader({'@/lib/supabase':{supabase:db},'@/lib/admi
 let ui;
 await act(async()=>{ui=Renderer.create(React.createElement(Panel));});
 const select=ui.root.findByProps({'aria-label':'상단에 표시할 공지'});
+assert.equal(ui.root.findAllByType('textarea').some(n=>n.props.value==='보존할 상시 안내'),false,'guide must use the ordinary notice editor, not a duplicate textarea');
 assert.equal(select.findAllByType('option').some(n=>n.children.includes('비공개 글')),false);
 await act(async()=>select.props.onChange({target:{value:'17'}}));
 assert.equal(ui.root.findAllByType('details').some(n=>n.findAllByType('textarea').some(t=>t.props.value==='기존 본문')),true,'arrival popup remains independent inside collapsed settings');
@@ -23,6 +24,7 @@ const save=()=>ui.root.findAllByType('button').find(n=>n.props.onClick?.name==='
 await act(async()=>save().props.onClick());
 assert.equal(writes[0].find(r=>r.key==='popup_notice_id').value,'17');
 assert.equal(writes[0].find(r=>r.key==='popup_notice_text').value,'기존 본문','linking must preserve legacy content');
+assert.equal(writes[0].some(r=>r.key==='notice_text'),false,'settings save must not overwrite the recovery copy');
 await act(async()=>select.props.onChange({target:{value:''}}));
 assert.ok(ui.root.findAllByType('textarea').some(n=>n.props.value==='기존 본문'));
 await act(async()=>ui.root.findByProps({title:'등록 · 고정 · 순서'}).props.onClick());
