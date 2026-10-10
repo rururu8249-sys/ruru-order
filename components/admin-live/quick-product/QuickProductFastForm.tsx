@@ -2705,12 +2705,13 @@ export default function QuickProductFastForm({
                                   {label || (group.detail ? "재고" : "기본")}
                                 </span>
                                 {stockManagementEnabled ? <input aria-label={`${label || "기본"} 재고 수량`} style={{ fontSize: "12px", padding: "4px 8px", border: "1px solid var(--color-line)", borderRadius: "8px", textAlign: "right", width: "100%" }} type="number" min={0} inputMode="numeric" value={row.stock} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => updateVariantStock(row.key, Math.max(0, Number(e.target.value) || 0))} /> : null}
-                                <button type="button" aria-label={`${[group.detail, label].filter(Boolean).join(" / ") || "기본"} 판매 상태`} aria-pressed={row.manual_soldout === true}
-                                  title={row.manual_soldout ? "눌러서 수동 품절 해제" : "눌러서 품절로 변경"}
-                                  onClick={() => setVariantRows(resolvedVariantRows.map(v => v.key === row.key ? {...v, manual_soldout: !v.manual_soldout} : v))}
-                                  style={{ minHeight: "36px", border: "1px solid var(--color-line)", borderRadius: "8px", background: soldOut ? "var(--color-danger-bg)" : "var(--color-surface)", color: soldOut ? "var(--color-danger-tx)" : "var(--color-ink)", fontWeight: 700, cursor: "pointer" }}>
-                                  {row.manual_soldout ? "품절" : soldOut ? "재고 0" : "판매중"}
-                                </button>
+                                <label style={{ minHeight: "36px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", borderRadius: "8px", background: row.manual_soldout ? "var(--color-danger-bg)" : "transparent", color: row.manual_soldout ? "var(--color-danger-tx)" : "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
+                                  <input type="checkbox" aria-label={`${[group.detail, label].filter(Boolean).join(" / ") || "기본"} 품절`} checked={row.manual_soldout === true}
+                                    onChange={(e) => { const checked = e.target.checked; setVariantRows(resolvedVariantRows.map(v => v.key === row.key ? {...v, manual_soldout: checked} : v)); }}
+                                    style={{ width: "16px", height: "16px", accentColor: "var(--color-danger-tx)" }} />
+                                  품절
+                                </label>
+                                {!row.manual_soldout && stockManagementEnabled && sellable <= 0 ? <span style={{ gridColumn: "1 / -1", fontSize: "11px", color: "var(--color-danger-tx)" }}>재고 소진 · 자동 품절</span> : null}
                                 {stockManagementEnabled && heldQty > 0 ? (
                                   <span style={{ gridColumn: "1 / -1", marginTop: "1px", fontSize: "11px", fontWeight: 700, color: "var(--color-warn-tx)", paddingLeft: group.detail ? "12px" : "2px" }}>
                                     담김 {heldQty}개 · 지금 판매가능 <b style={{ color: sellable > 0 ? "var(--color-ok-tx)" : "var(--color-danger-tx)" }}>{sellable}개</b>
