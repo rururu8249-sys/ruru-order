@@ -8,7 +8,7 @@ import PhotoColorSampler from './PhotoColorSampler';
 type Props = {labels: string[]; value: ColorSwatchMap; onChange: (value: ColorSwatchMap) => void};
 const button: CSSProperties = {border:'1px solid var(--color-line)',borderRadius:7,padding:'6px 9px',background:'var(--color-surface)',color:'var(--color-ink)',cursor:'pointer',fontSize:12};
 
-/** Display-only editor; mounting never changes a product or replaces an operator's correction. */
+/** Suggestions update only the draft; saved/manual colors and explicit suppression win. */
 export default function ColorSwatchEditor({labels, value, onChange}: Props) {
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState('');
@@ -18,10 +18,34 @@ export default function ColorSwatchEditor({labels, value, onChange}: Props) {
   latest.current={labels,value,onChange};
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   const colors=labels.filter(label=>label.trim() && label!=='없음');
+  const missingKey=JSON.stringify(colors.filter(label=>!Object.hasOwn(value,label)));
+  useEffect(()=>{
+    const requested: string[]=JSON.parse(missingKey);
+    if(!requested.length)return;
+    let cancelled=false;
+    const timer=setTimeout(async()=>{
+      try {
+        const results=await Promise.all(requested.map(async label=>[label,await suggestColorName(label)] as const));
+        if(cancelled)return;
+        const current=latest.current;
+        const next={...current.value};
+        let changed=false;
+        for(const [label,hex] of results){
+          if(hex && current.labels.includes(label) && !Object.hasOwn(next,label)){
+            next[label]=hex;changed=true;
+          }
+        }
+        if(changed)current.onChange(next);
+      } catch {
+        if(!cancelled)setMessage('자동 색상 인식을 불러오지 못했어요. 이름으로 채우기를 다시 누르거나 직접 선택해 주세요.');
+      }
+    },250);
+    return()=>{cancelled=true;clearTimeout(timer);};
+  },[missingKey]);
   const update=(label:string,hex:string|null)=>onChange({...value,...normalizeSwatchMap({[label]:hex})});
   if(!colors.length)return null;
-  return <details style={{margin:'6px 0',maxWidth:'100%',fontSize:12}}>
-    <summary style={{cursor:'pointer',fontWeight:700,padding:'6px 0'}}>색상 표시 <span style={{fontWeight:400,color:'var(--color-ink-mute)'}}>· 이름으로 채우거나 직접 선택</span></summary>
+  return <details open style={{margin:'6px 0',maxWidth:'100%',fontSize:12}}>
+    <summary style={{cursor:'pointer',fontWeight:700,padding:'6px 0'}}>색상 표시 <span style={{fontWeight:400,color:'var(--color-ink-mute)'}}>· 이름 자동 인식 · 직접 선택 · 사진에서 선택</span></summary>
     <div style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:8,margin:'6px 0'}}>
       <button type="button" aria-label="색상 이름으로 표시색 채우기" disabled={busy} style={button} onClick={async()=>{
         setBusy(true);setMessage('');

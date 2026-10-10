@@ -9,10 +9,12 @@ assert.ok(fs.existsSync('components/admin-live/quick-product/ColorSwatchEditor.t
 const Editor=createUiLoader({'color-name-list':await import('color-name-list')})('components/admin-live/quick-product/ColorSwatchEditor.tsx').default;
 let value={'블랙':'#123456','화이트':null};
 let tree;
-function Harness(){const [v,setV]=React.useState(value);return React.createElement(Editor,{labels:['블랙','화이트','모카','미지색'],value:v,onChange:n=>{value=n;setV(n);}});}
+let setLabels;
+function Harness(){const [v,setV]=React.useState(value);const [labels,updateLabels]=React.useState(['블랙','화이트','모카','미지색']);setLabels=updateLabels;return React.createElement(Editor,{labels,value:v,onChange:n=>{value=n;setV(n);}});}
 await act(async()=>{tree=Renderer.create(React.createElement(Harness));});
 const byLabel=label=>tree.root.find(n=>n.props['aria-label']===label);
-await act(async()=>{await byLabel('색상 이름으로 표시색 채우기').props.onClick();});
+await act(async()=>{await new Promise(resolve=>setTimeout(resolve,350));});
+assert.equal(value['모카'],'#9D7651','names must fill automatically without clicking a button');
 assert.equal(value['블랙'],'#123456','manual correction must not be replaced');
 assert.equal(value['화이트'],null,'explicit no-swatch must not be restored');
 assert.equal(value['모카'],'#9D7651');
@@ -21,5 +23,15 @@ await act(async()=>byLabel('모카 표시색').props.onChange({target:{value:'#f
 assert.equal(value['모카'],'#FF0000');
 await act(async()=>byLabel('모카 색상표시 안 함').props.onClick());
 assert.equal(value['모카'],null);
+await act(async()=>setLabels(['블랙','화이트','모카','미지색','그레이','네이비']));
+await act(async()=>byLabel('네이비 표시색').props.onChange({target:{value:'#112233'}}));
+await act(async()=>{await new Promise(resolve=>setTimeout(resolve,350));});
+assert.match(value['그레이'],/^#[0-9A-F]{6}$/,'newly typed options automatically receive a color');
+assert.equal(value['네이비'],'#112233','manual selection during debounce wins');
+assert.equal(value['모카'],null,'suppression survives subsequent automatic fills');
+await act(async()=>setLabels(['삭제될색','오트밀']));
+await act(async()=>setLabels([]));
+await act(async()=>{await new Promise(resolve=>setTimeout(resolve,350));});
+assert.equal(Object.hasOwn(value,'오트밀'),false,'removed options must not receive a late suggestion');
 await act(async()=>tree.unmount());
 console.log('PASS actual editor name fill, manual precedence, suppression, unknown handling');
