@@ -63,14 +63,16 @@ function toDetailRow(row: Row, now: number) {
 }
 
 // 저장 payload 구성(생성·수정 공용). amount_final 은 서버가 재계산. 계좌는 숫자만.
-function buildWritePayload(body: Row) {
-  const adjustments = normalizeAdjustments(body.adjustments);
-  const amountBase = Math.max(0, Math.round(Number(body.amount_base)) || 0);
-  const payload: Row = {
-    amount_base: amountBase,
-    adjustments,
-    amount_final: computeAmountFinal(amountBase, adjustments),
-  };
+function buildWritePayload(body: Row, partial = false) {
+  const payload: Row = {};
+  // PATCH must not turn omitted amounts into zero during a status-only update.
+  if (!partial || body.amount_base !== undefined || body.adjustments !== undefined) {
+    const adjustments = normalizeAdjustments(body.adjustments);
+    const amountBase = Math.max(0, Math.round(Number(body.amount_base)) || 0);
+    payload.amount_base = amountBase;
+    payload.adjustments = adjustments;
+    payload.amount_final = computeAmountFinal(amountBase, adjustments);
+  }
   if (body.kind !== undefined) payload.kind = isValidKind(body.kind) ? body.kind : "반품";
   if (body.stage !== undefined) payload.stage = isValidStage(body.stage) ? body.stage : "접수";
   if (body.method !== undefined) payload.method = isValidMethod(body.method) ? body.method : "없음";
@@ -251,10 +253,13 @@ export async function PATCH(request: NextRequest) {
   const body = (await request.json().catch(() => null)) as Row | null;
   const id = text(body?.id, 60);
   if (!body || !id) return NextResponse.json({ ok: false, message: "수정할 항목 id가 없습니다." }, { status: 400 });
+  if ((body.amount_base !== undefined) !== (body.adjustments !== undefined)) {
+    return NextResponse.json({ ok: false, message: "금액 수정 시 상품금액과 차감·추가 내역을 함께 보내 주세요." }, { status: 400 });
+  }
 
   try {
     const supabase = getSupabaseAdminClient();
-    const payload = buildWritePayload(body);
+    const payload = buildWritePayload(body, true);
     // 상태 전이 시각 기록(값이 명시적으로 왔을 때만) — 돈은 안 움직이고 «시각»만 남긴다.
     if (body.mark_transferred === true) payload.transferred_at = new Date().toISOString();
     if (body.mark_done === true) {

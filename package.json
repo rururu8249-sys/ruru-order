@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "test:issue-resolution": "node scripts/test-issue-resolution-safety.mjs && node scripts/test-refund-ledger-patch.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

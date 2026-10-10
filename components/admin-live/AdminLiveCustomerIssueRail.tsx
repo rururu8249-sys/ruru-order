@@ -73,9 +73,11 @@ const ISSUE_GRID = "grid-cols-[36px_minmax(0,1fr)] xl:grid-cols-[36px_60px_184px
 
 // [2026-09-26] 교환·환불 처리 대상인 이슈인가 — task_type(exchange/return/refund) 또는 유형 칩(교환/반품/환불).
 //   이 줄에만 「환불 처리」 버튼·장부 요약을 붙인다.
-export function isRefundKindTask(task: { task_type?: string | null }): boolean {
-  const t = String(task?.task_type ?? "").trim().toLowerCase();
-  return t === "exchange" || t === "return" || t === "refund";
+export function isRefundKindTask(task: { task_type?: string | null; raw_payload?: Record<string, unknown> | null }): boolean {
+  const extra = task.raw_payload?.issue_types;
+  return [task.task_type, ...(Array.isArray(extra) ? extra : [])].some((value) =>
+    ["exchange", "return", "refund"].includes(String(value ?? "").trim().toLowerCase())
+  );
 }
 
 const ISSUE_TYPE_OPTIONS: Array<[string, string]> = [
@@ -1095,6 +1097,10 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   const bulkResolve = async () => {
     const items = selectedTasks.filter((t) => !isDeleted(t) && !isResolved(t));
     if (items.length === 0) { showAdminToast("해결완료로 바꿀 미해결 건이 선택되지 않았어요."); return; }
+    if (items.some(isRefundKindTask)) {
+      showAdminToast("환불·반품·교환 건은 금액과 실제 처리 여부를 개별 확인한 뒤 해결완료해 주세요. 선택한 건은 아직 변경하지 않았습니다.", "warning");
+      return;
+    }
     const ok = await showAdminConfirm(`선택한 ${items.length}건을 해결완료 처리할까요?`, { title: "일괄 해결완료", confirmText: `${items.length}건 해결완료`, cancelText: "그만두기", tone: "info" });
     if (!ok) return;
     await runBulk(items, "해결완료", (id) => patchOne(id, { action: "resolve", resolved_note: "고객관리에서 일괄 해결완료" }));
@@ -1357,14 +1363,36 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       return;
     }
 
-    const ok = await showAdminConfirm("이 고객이슈를 해결완료 처리할까요?");
-    if (!ok) return;
-
     // [환불 통합] 이 이슈 주문에 «미완료» 대표 환불 기록이 있으면 먼저 완료 처리(done_at 기록) → 성공해야 resolve.
     //   같은 주문의 다른 이슈는 건드리지 않는다(그 줄은 「보냄」으로 표시). 기록 없으면 기존대로 resolve 만.
     const orderCode = extractBodyField(task, "주문번호:");
-    const primary = orderCode ? primaryByOrder[orderCode] : null;
+    // Completion must not use the optional, potentially stale list summary.
+    let primary: LedgerRow | null = null;
+    if (isRefundKindTask(task)) {
+      try {
+        const query = orderCode ? `orderCodes=${encodeURIComponent(orderCode)}` : `taskIds=${encodeURIComponent(id)}`;
+        const response = await fetch(`/api/admin-live/refund-ledger?${query}`, { cache: "no-store" });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok || !Array.isArray(payload.items)) throw new Error("환불·교환 기록을 확인하지 못했습니다.");
+        const rows = (payload.items as LedgerRow[]).filter((row) => orderCode ? clean(row.order_lookup_code) === orderCode : clean(row.admin_task_id) === id);
+        const linked = rows.filter((row) => clean(row.admin_task_id) === id);
+        const candidates = linked.length ? linked : rows.filter((row) => !clean(row.admin_task_id));
+        if (candidates.length > 1 || (rows.length > 0 && candidates.length === 0)) {
+          showAdminToast("연결된 환불·교환 기록이 여러 건이거나 다른 이슈에 연결되어 있습니다. 열기에서 처리할 기록을 확인해 주세요. 완료 상태는 변경하지 않았습니다.", "warning");
+          return;
+        }
+        primary = candidates[0] ?? null;
+      } catch {
+        showAdminToast("환불·교환 기록 조회에 실패했습니다. 완료 처리하지 않았으니 잠시 후 다시 시도해 주세요.", "warning");
+        return;
+      }
+    }
     const primaryIncomplete = primary && !clean(primary.done_at) && String(primary.stage) !== "완료" && String(primary.stage) !== "거절·취소";
+    const confirmation = primary?.id && primaryIncomplete
+      ? `${clean(primary.method) || "처리 방법 미등록"} · ${Number(primary.amount_final).toLocaleString("ko-KR")}원\n\n실제 환불·교환 처리를 마쳤나요?\n확인하면 연결된 장부와 고객이슈를 완료로 기록합니다. 이 버튼은 송금·카드취소·포인트 지급·재발송을 실행하지 않습니다.`
+      : "이 고객이슈를 해결완료 처리할까요?\n고객이슈 상태만 변경하며 실제 환불·교환을 실행하지 않습니다.";
+    const ok = await showAdminConfirm(confirmation, { title: "처리완료 확인", confirmText: "처리 확인 후 완료", cancelText: "돌아가기", tone: "warning" });
+    if (!ok) return;
     if (primary?.id && primaryIncomplete) {
       try {
         const lr = await fetch("/api/admin-live/refund-ledger", {
