@@ -99,6 +99,7 @@ import CustomerMissingDetailAddressPanel from "@/components/customer/CustomerMis
 import GroupBuyQuickSelect, { type GroupBuyQuickSelectProduct } from "@/components/order/GroupBuyQuickSelect";
 import OrderPurchaseConsentModal from "@/components/order/OrderPurchaseConsentModal";
 import { noticeBarLine, shouldShowNoticeBar } from "@/lib/noticeBar";
+import { CUSTOMER_NOTICE_ID_KEY, resolveCustomerNotice } from "@/lib/customerNoticeSource";
 import {
   DEFAULT_ORDER_PURCHASE_CONSENT,
   ORDER_PURCHASE_CONSENT_KEYS,
@@ -1673,6 +1674,7 @@ export default function OrderPage() {
   // 접속 팝업 공지(설정에서 문구/제목/글자크기/색상/ON·OFF 수정). 밴드 바로가기 + 24시간 안 보기 + 확인.
   const [popupNoticeEnabled, setPopupNoticeEnabled] = useState(false);
   const [popupNoticeTitle, setPopupNoticeTitle] = useState("");
+  const [popupNoticeLinked, setPopupNoticeLinked] = useState(false);
   const [popupNoticeText, setPopupNoticeText] = useState("");
   // [2026-08-30] 띠에 보여줄 한 줄 — 관리자에서 직접 적는다. 비우면 제목/본문 첫 줄로 자동.
   //   본문 첫 줄이 「해외방송 주문건은」처럼 문장 조각이면 손님이 무슨 말인지 모른다.
@@ -2392,6 +2394,7 @@ export default function OrderPage() {
         "howto_enabled",
         "howto_steps",
         "popup_notice_enabled",
+        CUSTOMER_NOTICE_ID_KEY,
         "popup_notice_title",
         "popup_notice_text",
         "popup_notice_bar",
@@ -2467,21 +2470,28 @@ export default function OrderPage() {
     }
 
     // 접속 팝업 공지: 설정값 반영 + "24시간 안 보기"가 안 걸려 있으면 접속하자마자 표시
+    // 공지 조회가 지연되어도 주문 확인·구매동의 설정은 즉시 적용한다.
+    setFinalSubmitConfirmationEnabled(parseFinalSubmitConfirmationEnabled(data || []));
+    setPurchaseConsentConfig(parseOrderPurchaseConsentSettings(data || []));
     const pEnabled = String((data || []).find((i: any) => i.key === "popup_notice_enabled")?.value || "").trim() === "true";
-    const pText = String((data || []).find((i: any) => i.key === "popup_notice_text")?.value || "");
+    const noticeSource = await resolveCustomerNotice(data || [], async (id) => {
+      const result = await supabase.from("notices").select("id,title,content,is_visible").eq("id", id).eq("is_visible", true).maybeSingle();
+      if (result.error) throw result.error;
+      return result.data;
+    });
+    const pText = noticeSource.text;
     const pBand = String((data || []).find((i: any) => i.key === "popup_band_url")?.value || "").trim() || "https://band.us/@ruru8249";
-    const pTitle = String((data || []).find((i: any) => i.key === "popup_notice_title")?.value || "");
+    const pTitle = noticeSource.title;
     const pFont = String((data || []).find((i: any) => i.key === "popup_notice_fontsize")?.value || "").trim() || "normal";
     const pColor = String((data || []).find((i: any) => i.key === "popup_notice_color")?.value || "").trim() || "#7B2D43";
     setPopupNoticeEnabled(pEnabled);
     setPopupNoticeText(pText);
-    setPopupNoticeBarLine(String((data || []).find((i: any) => i.key === "popup_notice_bar")?.value || "").trim());
+    setPopupNoticeBarLine(noticeSource.bar);
     setPopupBandUrl(pBand);
     setPopupNoticeTitle(pTitle);
+    setPopupNoticeLinked(noticeSource.linked);
     setPopupNoticeFontSize(pFont);
     setPopupNoticeColor(pColor);
-    setFinalSubmitConfirmationEnabled(parseFinalSubmitConfirmationEnabled(data || []));
-    setPurchaseConsentConfig(parseOrderPurchaseConsentSettings(data || []));
     // [2026-08-30 공지 방식 변경] 전체 공지를 매번 팝업으로 덮지 않는다.
     //   · 평소에는 화면 맨 위 「띠」로 계속 보인다 — 손님이 닫을 필요가 없다.
     //   · 팝업은 「처음 들어온 손님」에게만 1회. (밴드 가입 노출은 사장님이 실제로 효과를 보신 부분이라 유지)
@@ -3578,13 +3588,11 @@ export default function OrderPage() {
 
   // 띠에 보여줄 한 줄 — 규칙은 lib/noticeBar.ts (테스트가 같은 함수를 쓴다)
   //   관리자에서 「띠 한 줄」을 직접 적어두면 그걸 쓰고, 비어 있으면 제목/본문 첫 줄을 쓴다.
-  const noticeBarText = noticeBarLine(popupNoticeBarLine || popupNoticeTitle, popupNoticeText);
+  const noticeBarText = popupNoticeLinked ? popupNoticeTitle : noticeBarLine(popupNoticeBarLine || popupNoticeTitle, popupNoticeText);
 
-  // [2026-08-30] 「자세히」는 공지·쪽지함을 연다.
-  //   예전엔 팝업을 열고, 그 안에서 「공지·쪽지 전체보기」를 또 눌러야 했다(두 번 누름).
-  //   공지의 집은 쪽지함이다 — 공지와 내 쪽지를 한자리에서 본다.
+  // 상단 제목의 「자세히」는 같은 공지 본문을 직접 연다. 하단 공지함 진입과 구분한다.
   const openNoticeBox = () => {
-    try { window.dispatchEvent(new Event("ruru-open-notice-box")); } catch { setPopupOpen(true); }
+    setPopupOpen(true);
   };
 
   // 쪽지함(CustomerSiteAlertPopup)이 안 읽은 개수를 알려오면 하단 메뉴 배지에 반영한다.

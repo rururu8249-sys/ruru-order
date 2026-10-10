@@ -18,6 +18,7 @@ import { showAdminConfirm } from "@/lib/adminConfirm";
 import { NOTE_PRESETS, safeSearchTerm } from "@/lib/customerNotePresets";
 import { noteTimeText } from "@/lib/noteTime";
 import { noticeBarLine } from "@/lib/noticeBar";
+import { CUSTOMER_NOTICE_ID_KEY } from "@/lib/customerNoticeSource";
 import {
   DEFAULT_ORDER_PURCHASE_CONSENT,
   ORDER_PURCHASE_CONSENT_KEYS,
@@ -29,6 +30,7 @@ import {
 
 /** 이 화면이 저장하는 키 — 여기 없는 키는 절대 건드리지 않는다. */
 const NOTICE_KEYS = [
+  CUSTOMER_NOTICE_ID_KEY,
   "popup_notice_enabled",
   "popup_notice_title",
   "popup_notice_text",
@@ -75,6 +77,8 @@ type SentNote = {
 export default function AdminLiveNoticePanel() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [settingsReady, setSettingsReady] = useState(false);
+  const [linkedNoticeId, setLinkedNoticeId] = useState("");
 
   const [popupEnabled, setPopupEnabled] = useState(false);
   const [popupTitle, setPopupTitle] = useState("");
@@ -120,6 +124,7 @@ export default function AdminLiveNoticePanel() {
         }
         const rows = (data || []) as { key: string; value: string | number | null }[];
         const get = (k: string) => rows.find((r) => r.key === k)?.value;
+        setLinkedNoticeId(clean(get(CUSTOMER_NOTICE_ID_KEY)));
         setPopupEnabled(clean(get("popup_notice_enabled")) === "true");
         setPopupTitle(String(get("popup_notice_title") ?? ""));
         setPopupText(String(get("popup_notice_text") ?? ""));
@@ -129,6 +134,7 @@ export default function AdminLiveNoticePanel() {
         setPopupBandUrl(clean(get("popup_band_url")) || DEFAULT_BAND_URL);
         setNoticeText(String(get("notice_text") ?? ""));
         setPurchaseConsent(parseOrderPurchaseConsentSettings(rows));
+        setSettingsReady(true);
       } finally {
         if (alive) setLoading(false);
       }
@@ -137,10 +143,16 @@ export default function AdminLiveNoticePanel() {
   }, []);
 
   const save = async () => {
+    if (!settingsReady) return;
+    if (linkedNoticeId && !notices.some(n => String(n.id) === linkedNoticeId && n.is_visible)) {
+      showAdminToast("연결할 공개 공지를 확인해 주세요. 삭제되거나 비공개인 공지는 연결할 수 없습니다.", "error");
+      return;
+    }
     setSaving(true);
     try {
       const { error } = await supabase.from("settings").upsert(
         [
+          { key: CUSTOMER_NOTICE_ID_KEY, value: linkedNoticeId },
           { key: "popup_notice_enabled", value: popupEnabled ? "true" : "false" },
           { key: "popup_notice_title", value: popupTitle.trim() },
           { key: "popup_notice_text", value: popupText },
@@ -391,7 +403,10 @@ export default function AdminLiveNoticePanel() {
   const help = "mt-1 block text-[11px] font-bold leading-5 text-ink-mute";
 
   // 미리보기 — 손님 팝업이 --- 를 가로줄로 바꿔 보여주는 것과 같은 방식
-  const previewBlocks = popupText.split(/\n/).reduce<string[][]>((acc, line) => {
+  const linkedNotice = notices.find(n => String(n.id) === linkedNoticeId && n.is_visible);
+  const previewTitle = linkedNoticeId ? linkedNotice?.title || "" : popupTitle;
+  const previewText = linkedNoticeId ? linkedNotice?.content || "" : popupText;
+  const previewBlocks = previewText.split(/\n/).reduce<string[][]>((acc, line) => {
     if (line.trim() === "---") acc.push([]);
     else acc[acc.length - 1].push(line);
     return acc;
@@ -429,9 +444,9 @@ export default function AdminLiveNoticePanel() {
             <div className={card}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-sm font-black text-ink">📢 접속 팝업 공지</div>
+                  <div className="text-sm font-black text-ink">상단 고정 공지</div>
                   <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
-                    손님이 사이트에 들어오자마자 뜨는 팝업입니다. 밴드 바로가기 + 24시간 안 보기 + 확인 버튼이 같이 나옵니다.
+                    공지 제목이 상단에 표시되고, ‘자세히’를 누르면 해당 본문이 열립니다. 접속 시 자동으로 열지는 별도로 선택합니다.
                   </div>
                 </div>
                 <button
@@ -443,7 +458,21 @@ export default function AdminLiveNoticePanel() {
                 </button>
               </div>
 
-              {/* 띠 한 줄 — 손님이 맨 처음 보는 문장이라 여기가 제일 중요하다 */}
+              <label className="mt-3 block">
+                <span className={label}>표시할 공지</span>
+                <select aria-label="상단에 표시할 공지" value={linkedNoticeId} onChange={event => setLinkedNoticeId(event.target.value)} disabled={!settingsReady} className={input}>
+                  <option value="">기존 직접 작성 내용 유지</option>
+                  {linkedNoticeId && !linkedNotice ? <option value={linkedNoticeId}>연결된 공지를 확인할 수 없습니다</option> : null}
+                  {notices.filter(n => n.is_visible).map(n => <option key={n.id} value={String(n.id)}>{n.title}</option>)}
+                </select>
+                <span className={help}>공지사항에서 작성한 글을 선택하면 제목과 본문이 함께 연결됩니다.</span>
+              </label>
+              {linkedNoticeId ? <div className="mt-3 rounded-xl border border-line p-3">
+                <p className="font-bold text-ink">{previewTitle || "공개된 공지를 선택해 주세요."}</p>
+                <p className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap text-sm text-ink-soft">{previewText}</p>
+                <button type="button" onClick={() => setTab("list")} className="mt-3 text-sm font-bold text-rose-deep">공지사항에서 내용 수정</button>
+              </div> : <>
+              {/* 기존 내용은 자동 삭제하지 않는다. 공지를 연결하면 중복 입력을 숨긴다. */}
               <div className="mt-3 rounded-xl border border-rose-line bg-rose-soft/40 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[12px] font-black text-ink">📢 띠에 보여줄 한 줄</span>
@@ -500,6 +529,7 @@ export default function AdminLiveNoticePanel() {
                 </span>
               </div>
 
+              </>}
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className={label}>글자 크기</span>
@@ -633,11 +663,11 @@ export default function AdminLiveNoticePanel() {
 
               {/* ⚠ 이 어두운 배경은 «손님 폰의 팝업 뒷배경»을 흉내낸 것 → 관리자 테마와 무관. 토큰으로 바꾸지 말 것. */}
               <div className="mt-3 rounded-2xl bg-slate-900/70 p-4">
-                {popupEnabled && popupText.trim() ? (
+                {popupEnabled && previewText.trim() ? (
                   <div className="overflow-hidden rounded-2xl bg-white shadow-lg">
-                    {popupTitle.trim() ? (
+                    {previewTitle.trim() ? (
                       <div className="px-4 py-2.5 text-center text-[13px] font-black text-white" style={{ background: popupColor }}>
-                        {popupTitle}
+                        {previewTitle}
                       </div>
                     ) : null}
                     <div className="px-4 py-4">
@@ -986,7 +1016,7 @@ export default function AdminLiveNoticePanel() {
           <button
             type="button"
             onClick={save}
-            disabled={saving || loading}
+            disabled={saving || loading || !settingsReady}
             className="rounded-full bg-rose-deep px-6 py-2.5 text-sm font-black text-white transition disabled:opacity-50"
           >
             {saving ? "저장 중..." : "공지 저장"}
