@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "test:issue-resolution": "node scripts/test-issue-resolution-safety.mjs && node scripts/test-refund-ledger-patch.mjs && node scripts/test-order-return-route.mjs",
+    "test:issue-resolution": "node scripts/test-issue-resolution-safety.mjs && node scripts/test-refund-ledger-patch.mjs && node scripts/test-order-return-route.mjs && node scripts/test-order-return-undo-route.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

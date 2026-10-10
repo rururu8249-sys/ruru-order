@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { randomUUID } from "crypto";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import {
   planReturnUndo,
   canClearReturnRecord,
-  returnUndoSourceKey,
   detectManualRefund,
   RETURN_RECLAIM_CREATED_BY,
-  RETURN_UNDO_CREATED_BY,
 } from "@/lib/orderReturnUndo";
 
 // [2026-09-23 사장님 요청] 「고객이슈 잘못 등록 된건 되돌리기?」
@@ -117,6 +114,16 @@ export async function POST(request: NextRequest) {
     const customerName = text(liveRows[0]?.customer_name);
     const groupRowIds = liveRows.map((r: any) => num(r.id)).filter((n) => n > 0);
 
+    // Verify cleanup scope before any point mutation; failed reads are not empty lists.
+    const { data: siblingIssues, error: siblingErr } = await sb
+      .from("admin_tasks")
+      .select("id, created_at, status, body, source")
+      .eq("source", "order_return_flow")
+      .ilike("body", `%주문번호: ${orderNo}%`);
+    if (siblingErr || !Array.isArray(siblingIssues)) {
+      return jsonError("같은 주문의 고객이슈를 확인하지 못해 되돌리기를 중단했습니다.", 500);
+    }
+
     // ── 3) 포인트 되돌림 — 회수했던 «그 금액 그대로» ──
     let refunded = 0;
     let pointNote = "";
@@ -146,13 +153,16 @@ export async function POST(request: NextRequest) {
           .pop() || "";
 
         if (reclaimedAt) {
-          const { data: afterRows } = await sb
+          const { data: afterRows, error: afterErr } = await sb
             .from("customer_point_ledger")
             .select("amount, created_by, created_at, related_order_id")
             .eq("customer_phone", phone)
             .gt("created_at", reclaimedAt)
             .order("created_at", { ascending: true })
             .limit(50);
+          if (afterErr || !Array.isArray(afterRows)) {
+            return jsonError("이후 포인트 지급 내역을 확인하지 못해 되돌리기를 중단했습니다.", 500);
+          }
 
           const manual = detectManualRefund({
             ledgerRows: afterRows || [],
@@ -181,61 +191,20 @@ export async function POST(request: NextRequest) {
       }
 
       if (plan.refundPoints > 0) {
-        const { data: bal } = await sb
-          .from("customer_point_balances")
-          .select("*")
-          .eq("customer_phone", phone)
-          .maybeSingle();
-        const current = num((bal as any)?.current_points);
-        const next = current + plan.refundPoints;
-
-        const ledgerId = randomUUID();
-        const { error: insErr } = await sb.from("customer_point_ledger").insert({
-          id: ledgerId,
-          customer_phone: phone,
-          youtube_nickname: nickname || null,
-          customer_name: customerName || null,
-          change_type: "adjust",
-          amount: plan.refundPoints,                       // 양수 = 되돌려 지급
-          balance_after: next,
-          reason: "반품/교환 등록 취소 — 회수 포인트 반환",
-          admin_memo: `주문 ${orderNo} · 고객이슈 취소로 자동 반환`.slice(0, 500),
-          related_order_id: groupId,
-          related_broadcast_id: null,
-          customer_visible: true,
-          customer_seen_at: null,
-          created_by: RETURN_UNDO_CREATED_BY,
-          // ⚠ 이중 지급 차단의 핵심 — DB 유니크 인덱스가 두 번째를 거부한다
-          source_key: returnUndoSourceKey(groupId),
+        const { data: result, error: undoErr } = await sb.rpc("undo_order_return_points", {
+          p_phone: phone,
+          p_group_id: groupId,
+          p_nickname: nickname,
+          p_customer_name: customerName,
+          p_memo: `주문 ${orderNo} · 고객이슈 취소로 자동 반환`.slice(0, 500),
         });
-
-        if (insErr) {
-          const duplicate = /duplicate key|unique constraint|23505|source_key/i.test(String(insErr.message || ""));
-          if (duplicate) {
-            // 돈은 나가지 않았다 — 이미 되돌린 건이다. 오류가 아니라 «이미 처리됨»으로 알린다.
-            pointNote = "이미 되돌린 건이라 포인트를 다시 지급하지 않았습니다.";
-          } else {
-            return jsonError("포인트 반환 실패(아무것도 바뀌지 않았습니다): " + insErr.message, 500);
-          }
-        } else {
-          const { error: balErr } = await sb.from("customer_point_balances").upsert(
-            {
-              customer_phone: phone,
-              youtube_nickname: nickname || (bal as any)?.youtube_nickname || null,
-              customer_name: customerName || (bal as any)?.customer_name || null,
-              current_points: next,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "customer_phone" },
-          );
-          if (balErr) {
-            // 잔액 갱신 실패 → 방금 넣은 원장 줄을 되돌린다(돈 기록이 어긋나면 안 된다)
-            await sb.from("customer_point_ledger").delete().eq("id", ledgerId);
-            return jsonError("포인트 잔액 갱신 실패(아무것도 바뀌지 않았습니다): " + balErr.message, 500);
-          }
-          refunded = plan.refundPoints;
-          pointNote = `회수했던 ${refunded.toLocaleString("ko-KR")}원을 돌려드렸습니다.`;
+        if (undoErr || result?.ok !== true) {
+          return jsonError("포인트 반환 결과를 확인하지 못했습니다. 고객이슈는 그대로 두었습니다. 포인트 내역을 확인해 주세요. " + (result?.message || undoErr?.message || ""), 500);
         }
+        refunded = num(result.refunded);
+        pointNote = refunded > 0
+          ? `회수했던 ${refunded.toLocaleString("ko-KR")}원을 돌려드렸습니다.`
+          : String(result.message || "이미 되돌린 건이라 포인트를 다시 지급하지 않았습니다.");
       }
     }
 
@@ -245,12 +214,6 @@ export async function POST(request: NextRequest) {
 
     // ── 4) 반품기록 정리 — «가장 최근 등록»일 때만 ──
     let recordNote = "";
-    const { data: siblingIssues } = await sb
-      .from("admin_tasks")
-      .select("id, created_at, status, body, source")
-      .eq("source", "order_return_flow")
-      .ilike("body", `%주문번호: ${orderNo}%`);
-
     const clearable = canClearReturnRecord(task as any, (siblingIssues || []) as any[]);
 
     if (clearable && groupRowIds.length > 0) {
