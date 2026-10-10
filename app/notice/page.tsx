@@ -1,37 +1,10 @@
 "use client";
 
-// app/notice/page.tsx
-// 전체 교체용
-// 파일 위치:
-// /Users/ruru/Desktop/ruru-order-app/app/notice/page.tsx
-//
-// 기능 유지:
-// - Supabase notices 테이블에서 공지글 불러오기
-// - 관리자에서 등록/수정/숨김 처리한 내용 자동 반영
-// - 고정공지 우선 노출
-// - 관리자에서 정한 sort_order 순서대로 노출
-//
-// 디자인 변경:
-// - 홈화면 리뉴얼 톤에 맞춘 모바일 우선 핑크/화이트 카드형 UI
-// - 기존 Supabase 조회 로직은 유지
+// Standalone entry uses the same public board as the customer notice inbox.
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import CustomerTopNav from "@/components/customer/CustomerTopNav";
-import NoticePageHero from "@/components/notice/NoticePageHero";
-import NoticeStateMessage from "@/components/notice/NoticeStateMessage";
-import NoticeCard from "@/components/notice/NoticeCard";
-
-type Notice = {
-  id: number;
-  title: string;
-  content: string;
-  category: string;
-  is_pinned: boolean;
-  is_visible: boolean;
-  sort_order: number;
-  created_at: string;
-};
+import PublicNoticeBoard from "@/components/notice/PublicNoticeBoard";
 
 const blockCustomerCopyEvents = () => {
   const block = (event: Event) => event.preventDefault();
@@ -74,58 +47,14 @@ export default function NoticePage() {
     return blockCustomerCopyEvents();
   }, []);
 
-  const [notices, setNotices] = useState<Notice[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadNotices();
-  }, []);
-
-  const loadNotices = async () => {
-    setLoading(true);
-
-    const { data, error } = await supabase
-      .from("notices")
-      .select("*")
-      .eq("is_visible", true)
-      .order("is_pinned", { ascending: false })
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: false });
-
-    if (!error) {
-      setNotices(data || []);
-    }
-
-    setLoading(false);
-  };
-
-
-
-
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   return (
     <main className="min-h-screen select-none bg-[#F6F4F2] px-4 py-6 text-[#151923]" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
-      <section className="mx-auto w-full max-w-md">
+      <section className="mx-auto w-full max-w-2xl">
         <CustomerTopNav />
-        <NoticePageHero />
-
-        {loading && <NoticeStateMessage message="공지사항 불러오는 중..." />}
-
-        {!loading && notices.length === 0 && (
-          <NoticeStateMessage message="등록된 공지사항이 없습니다." />
-        )}
-
-        {/* [2026-09-20] 공지 7개를 «2개씩 4페이지»로 넘겨 보던 것 → 전부 한 화면에.
-            대신 제목 줄을 눌러 펼치는 접이식.
-            [2026-09-20 2차] «중요공지 전부 펼침»이면 고정공지가 3~4개일 때 다시 글벽이 된다.
-            맨 위 1개만 펼치고 나머지는 접어 둔다 — 제목 줄이 한눈에 들어오게. */}
-        <div className="space-y-2.5">
-          {notices.map((notice, index) => (
-            <NoticeCard key={notice.id} notice={notice} defaultOpen={index === 0} />
-          ))}
-        </div>
-
-
+        <h1 className="my-5 text-xl font-bold">공지사항</h1>
+        <PublicNoticeBoard selectedId={selectedId} onSelect={setSelectedId} />
         <footer className="py-8 text-center">
           <p className="text-[15px] font-medium tracking-[-0.04em] text-slate-500">
             오늘도 루루동이와 함께 행복한 쇼핑 되세요!♡

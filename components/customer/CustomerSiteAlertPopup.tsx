@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import CustomerBottomSheet, { csPrimaryButtonStyle } from "@/components/customer/CustomerBottomSheet";
 import CustomerDialog from "@/components/customer/CustomerDialog";
 import { noteTimeText, noteAgoText } from "@/lib/noteTime";
-import { supabase } from "@/lib/supabase";
+import PublicNoticeBoard from "@/components/notice/PublicNoticeBoard";
 
 type SiteAlert = { id: number; kind: string; title: string; message: string; created_at: string; expires_at: string };
 type BoxItem = SiteAlert & { seen_at?: string | null; dismissed_at?: string | null };
@@ -80,34 +80,20 @@ export default function CustomerSiteAlertPopup() {
   const [hasMore, setHasMore] = useState(false);
   const [nextOffset, setNextOffset] = useState(0);
   const [moreLoading, setMoreLoading] = useState(false);
-  const [directNotice, setDirectNotice] = useState<NoticeItem | null>(null);
-  const [directNoticeId, setDirectNoticeId] = useState<number | null>(null);
-  const [directNoticeLoading, setDirectNoticeLoading] = useState(false);
+  const [noticeRequest, setNoticeRequest] = useState(0);
 
   // A banner names one public article, not the arrival popup or a personal message.
   useEffect(() => {
-    let sequence = 0;
-    const open = async (event: Event) => {
+    const open = (event: Event) => {
       const id = Number((event as CustomEvent)?.detail?.id);
       if (!Number.isSafeInteger(id) || id <= 0) return;
-      const request = ++sequence;
-      setDirectNoticeId(id);
-      setDirectNotice(null);
-      setDirectNoticeLoading(true);
+      setNoticeRequest(n => n + 1);
       setBoxTab("notice");
       setDetail({ kind: "notice", id });
       setBoxOpen(true);
-      try {
-        const { data, error } = await supabase.from("notices")
-          .select("id,title,content,created_at,is_visible").eq("id", id).eq("is_visible", true).maybeSingle();
-        if (request === sequence && !error && data?.id === id && data.is_visible === true) setDirectNotice(data);
-      } finally {
-        if (request === sequence) setDirectNoticeLoading(false);
-      }
     };
-    const listener = (event: Event) => { void open(event).catch(() => undefined); };
-    window.addEventListener("ruru-open-public-notice", listener);
-    return () => { sequence++; window.removeEventListener("ruru-open-public-notice", listener); };
+    window.addEventListener("ruru-open-public-notice", open);
+    return () => { window.removeEventListener("ruru-open-public-notice", open); };
   }, []);
 
   useEffect(() => {
@@ -271,7 +257,15 @@ export default function CustomerSiteAlertPopup() {
                   → 게시판처럼 제목만 보이고, 누르면 펼쳐진다. 탭으로 공지/내 쪽지를 나눈다.
                      안 읽은 쪽지는 처음부터 펼쳐 둔다(놓치면 안 되는 것). */}
               {/* [2026-08-31 사장님 지시] 게시판형 — 목록엔 번호·제목·읽음만, 누르면 내용 화면으로 전환 */}
-              {detail ? (() => {
+              <div hidden={boxTab === "mine" || (detail !== null && detail.kind !== "notice")}>
+                <PublicNoticeBoard
+                  selectedId={detail?.kind === "notice" ? detail.id ?? null : null}
+                  requestKey={noticeRequest}
+                  onSelect={id => { setNoticeRequest(n => n + 1); setDetail(id === null ? null : { kind: "notice", id }); }}
+                />
+                {!detail && shopGuide ? <button type="button" onClick={() => setDetail({ kind: "guide" })} className="my-3 text-sm font-bold text-[#7B2D43]">쇼핑 전 꼭 확인</button> : null}
+              </div>
+              {detail?.kind === "notice" ? null : detail ? (() => {
                 const back = (
                   <button type="button" onClick={() => setDetail(null)} className="mb-3 inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-black text-slate-600 active:bg-slate-50">← 목록으로</button>
                 );
@@ -281,19 +275,6 @@ export default function CustomerSiteAlertPopup() {
                       {back}
                       <h3 className="text-[15px] font-black text-slate-950">쇼핑 전 꼭 확인</h3>
                       <p className="mt-3 whitespace-pre-line text-[13.5px] font-bold leading-6 text-slate-700">{shopGuide}</p>
-                    </div>
-                  );
-                }
-                if (detail.kind === "notice") {
-                  const n = directNoticeId === detail.id ? directNotice : notices.find((x) => x.id === detail.id);
-                  if (directNoticeId === detail.id && directNoticeLoading) return <div>{back}<p role="status">공지를 불러오는 중…</p></div>;
-                  if (!n) return <div>{back}<p className="py-12 text-center text-sm font-bold text-slate-400">공지를 찾을 수 없어요.</p></div>;
-                  return (
-                    <div>
-                      {back}
-                      <h3 className="text-[15px] font-black text-slate-950">{n.title}</h3>
-                      <div className="mt-1 text-[11px] font-bold text-slate-400">{timeText(n.created_at)}{agoText(n.created_at) ? ` · ${agoText(n.created_at)}` : ""}</div>
-                      <p className="mt-3 whitespace-pre-line text-[13.5px] font-bold leading-6 text-slate-700">{n.content}</p>
                     </div>
                   );
                 }
@@ -311,41 +292,6 @@ export default function CustomerSiteAlertPopup() {
                 );
               })() : (
                 <>
-                  {/* ── 공지 표 — 고정 공지가 맨 위, 그다음 「쇼핑 전 꼭 확인」, 나머지는 번호 순 ── */}
-                  {boxTab !== "mine" ? (() => {
-                    const pinned = notices.filter((n) => Boolean(n.is_pinned));
-                    const normal = notices.filter((n) => !n.is_pinned);
-                    type Row = { key: string; chip: string | number; title: string; date?: string; onClick: () => void };
-                    const rows: Row[] = [
-                      ...pinned.map((n): Row => ({ key: `n-${n.id}`, chip: "고정", title: stripLeadIcon(n.title), date: n.created_at, onClick: () => setDetail({ kind: "notice", id: n.id }) })),
-                      ...(shopGuide ? [{ key: "guide", chip: "필독", title: "쇼핑 전 꼭 확인", onClick: () => setDetail({ kind: "guide" }) } as Row] : []),
-                      ...normal.map((n, i): Row => ({ key: `n-${n.id}`, chip: i + 1, title: stripLeadIcon(n.title), date: n.created_at, onClick: () => setDetail({ kind: "notice", id: n.id }) })),
-                    ];
-                    if (rows.length === 0) return boxTab === "notice" ? <div className="py-12 text-center text-sm font-bold text-slate-400">등록된 공지가 없어요.</div> : null;
-                    return (
-                      <div className="mb-3">
-                        {boxTab === "all" ? <div className="mb-1.5 px-1 text-[11px] font-black text-slate-400">공지</div> : null}
-                        <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
-                          {rows.map((r) => (
-                            <li key={r.key}>
-                              <button type="button" onClick={r.onClick} className="grid w-full grid-cols-[46px_minmax(0,1fr)_50px] items-center gap-2 px-2 py-3 text-left active:bg-slate-50">
-                                <span className="text-center">
-                                  {typeof r.chip === "number" ? (
-                                    <span className="text-[12px] font-black text-slate-400">{r.chip}</span>
-                                  ) : (
-                                    <span className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-black ${r.chip === "고정" ? "bg-[#7B2D43] text-white" : "border border-rose-200 bg-rose-50 text-[#7B2D43]"}`}>{r.chip}</span>
-                                  )}
-                                </span>
-                                <span className="truncate text-[13.5px] font-black text-slate-900">{r.title}</span>
-                                <span className="text-center text-[11px] font-bold text-slate-400">{r.date ? shortDate(r.date) : ""}</span>
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    );
-                  })() : null}
-
                   {/* ── 내 쪽지 표 — 누르면 내용 화면 + 그 자리에서 읽음 처리 ── */}
                   {boxTab !== "notice" ? (
                     box.length === 0 ? (

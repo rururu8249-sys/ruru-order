@@ -7,7 +7,7 @@
     "test:customer-press-feedback": "node scripts/test-customer-press-feedback.mjs",
     "test:guide-notice": "node scripts/test-guide-notice-migration.mjs && node scripts/test-guide-notice-api.mjs && npm run test:customer-notice",
     "test:option-manual-soldout": "node scripts/test-option-manual-soldout-db.mjs && node scripts/test-option-manual-soldout-ui.mjs",
-    "test:customer-notice": "node --import ./scripts/_ts-resolve.mjs scripts/test-customer-notice-source.mjs && node scripts/test-admin-notice-link.mjs && node scripts/test-order-notice-integration.mjs && node scripts/test-public-notice-detail.mjs && node scripts/test-notice-bar.mjs",
+    "test:customer-notice": "node --import ./scripts/_ts-resolve.mjs scripts/test-customer-notice-source.mjs && node scripts/test-admin-notice-link.mjs && node scripts/test-order-notice-integration.mjs && node scripts/test-public-notice-board.mjs && node scripts/test-public-notice-detail.mjs && node scripts/test-notice-bar.mjs",
     "test:issue-resolution": "node scripts/test-issue-resolution-safety.mjs && node scripts/test-refund-ledger-patch.mjs && node scripts/test-order-return-route.mjs && node scripts/test-order-return-undo-route.mjs",
     "dev": "next dev",
     "build": "next build",

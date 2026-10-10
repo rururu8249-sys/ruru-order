@@ -9,7 +9,7 @@ globalThis.localStorage={getItem:()=>''};
 globalThis.document={visibilityState:'visible'};
 let pending=[],writes=0;
 globalThis.fetch=async()=>{writes++;throw Error('public article must not mark personal notes read');};
-const db={from(table){assert.equal(table,'notices');return {select(){return this;},eq(){return this;},maybeSingle(){return new Promise(resolve=>pending.push(resolve));}};}};
+const db={from(table){assert.equal(table,'notices');return {select(){return this;},eq(){return this;},order(){return this;},range:async()=>({data:[],error:null}),maybeSingle(){return new Promise(resolve=>pending.push(resolve));}};}};
 const {default:Panel}=createUiLoader({'@/lib/supabase':{supabase:db},'@/components/customer/CustomerBottomSheet':{default:({children})=>React.createElement('section',null,children),csPrimaryButtonStyle:()=>({})},'@/components/customer/CustomerDialog':{default:()=>null}})('components/customer/CustomerSiteAlertPopup.tsx');
 let ui;await act(async()=>{ui=Renderer.create(React.createElement(Panel));});
 const open=id=>listeners.get('ruru-open-public-notice')({detail:{id}});
@@ -20,7 +20,8 @@ assert.match(text(),/등록된 본문/);assert.doesNotMatch(text(),/밴드 바�
 await act(async()=>open(17));
 await act(async()=>pending.shift()({data:null,error:{message:'network'}}));
 assert.doesNotMatch(text(),/등록된 본문/);assert.match(text(),/공지를 찾을 수 없어요/);
-await act(async()=>{open(17);open(18);});
+await act(async()=>open(17));
+await act(async()=>open(18));
 await act(async()=>pending.pop()({data:{id:18,title:'최신 제목',content:'최신 본문',created_at:'2026-10-10',is_visible:true},error:null}));
 await act(async()=>pending.shift()({data:{id:17,title:'늦은 제목',content:'늦은 본문',created_at:'2026-10-10',is_visible:true},error:null}));
 assert.match(text(),/최신 본문/);assert.doesNotMatch(text(),/늦은 본문/);assert.equal(writes,0);
