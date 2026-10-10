@@ -1,0 +1,43 @@
+import assert from 'node:assert/strict';
+import {existsSync,readFileSync} from 'node:fs';
+import {sql,reset as resetCluster} from './event-custom-gift-db-fixture.mjs';
+import {preparePointFixture} from './admin-points-db-fixture.mjs';
+resetCluster(); await preparePointFixture();
+// Match verified production constraints: negative balances are allowed for returns.
+await sql('alter table customer_point_balances drop constraint customer_point_balances_current_points_check; alter table customer_point_ledger drop constraint customer_point_ledger_balance_after_check');
+const migration='supabase/migrations/20261010120000_order_return_points_atomic.sql';
+if(existsSync(migration)) await sql(readFileSync(migration,'utf8'));
+const phone='01012345678';
+const quote=x=>"'"+String(x).replaceAll("'","''")+"'";
+const reclaim=(group,amount=100,p=phone)=>sql(`set role service_role;select reclaim_order_return_points(${quote(p)},${quote(group)},${amount},'','','fixture')`).then(JSON.parse);
+const reset=async()=>{await sql(`truncate customer_point_ledger,customer_point_balances;insert into customer_point_balances(customer_phone,current_points) values('${phone}',1000)`);};
+await reset();
+const same=await Promise.all(Array.from({length:20},()=>reclaim('same')));
+assert.equal(same.filter(r=>r.reclaimed===100).length,1);
+assert.equal(same.filter(r=>r.duplicate).length,19);
+assert.equal(await sql('select current_points from customer_point_balances'),'900');
+assert.equal(await sql('select count(*) from customer_point_ledger'),'1');
+await reset();
+const distinct=await Promise.all(Array.from({length:20},(_,i)=>reclaim('group-'+i)));
+assert(distinct.every(r=>r.ok));
+assert.equal(await sql('select current_points from customer_point_balances'),'-1000');
+assert.equal(await sql('select total_canceled_points from customer_point_balances'),'2000');
+assert.equal(await sql('select count(*) from customer_point_ledger'),'20');
+assert.equal((await reclaim('group-0')).duplicate,true);
+assert.equal(await sql('select current_points from customer_point_balances'),'-1000');
+await reset();
+await sql(`insert into customer_point_ledger(customer_phone,amount,balance_after,change_type,related_order_id,created_by) values('${phone}',-50,1000,'cancel','legacy','order_return_flow')`);
+assert.equal((await reclaim('legacy')).duplicate,true);
+assert.equal(await sql('select current_points from customer_point_balances'),'1000');
+assert.equal((await reclaim('missing',100,'01099999999')).ok,false);
+assert.equal(await sql('select count(*) from customer_point_balances'),'1');
+for(const table of ['customer_point_ledger','customer_point_balances']) {
+  await reset();
+  await sql(`create or replace function fixture_return_fail() returns trigger language plpgsql as $$begin raise exception 'injected';end$$;create trigger fixture_return_fail before ${table.endsWith('ledger')?'insert':'update'} on ${table} for each row execute function fixture_return_fail()`);
+  await assert.rejects(()=>reclaim('failure'));
+  assert.equal(await sql('select current_points from customer_point_balances'),'1000');
+  assert.equal(await sql('select count(*) from customer_point_ledger'),'0');
+  await sql(`drop trigger fixture_return_fail on ${table}`);
+}
+for(const role of ['anon','authenticated']) await assert.rejects(()=>sql(`set role ${role};select reclaim_order_return_points('${phone}','unauthorized',100,'','','')`));
+console.log('PASS PostgreSQL return reclaim: 20 same-group and 20 distinct concurrent requests, negative balance policy, legacy/retry, missing balance, both write rollbacks, service-only privileges');

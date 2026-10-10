@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { randomUUID } from "crypto";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { issueProductSummary } from "@/lib/issueProductLabel";
 import { selectedEligibleAmount } from "@/lib/orderReturnReclaim";
@@ -225,77 +224,29 @@ export async function POST(request: NextRequest) {
           }
 
           if (reclaimed > 0) {
-            const { data: bal, error: balanceErr } = await sb
-              .from("customer_point_balances")
-              .select("*")
-              .eq("customer_phone", phone)
-              .maybeSingle();
-            if (balanceErr || !bal || bal.current_points == null || !Number.isFinite(Number(bal.current_points))) {
+            // DB transaction rechecks legacy history under a group lock, then locks
+            // the balance and commits both writes together. Never fall back to HTTP writes.
+            const { data: result, error: reclaimErr } = await sb.rpc("reclaim_order_return_points", {
+              p_phone: phone,
+              p_group_id: groupId || String(refRowId),
+              p_amount: reclaimed,
+              p_nickname: nick,
+              p_customer_name: nm,
+              p_memo: `주문 ${orderNo || groupId} · ${productSummary}`.slice(0, 500),
+            });
+            if (reclaimErr || result?.ok !== true) {
               return NextResponse.json({
                 ok: true, partial: true, issueRegistered, taskId, reclaimed: 0,
-                message: "기록·고객이슈는 저장됐지만 포인트 잔액을 확인하지 못해 포인트를 변경하지 않았습니다. 고객이슈에서 확인해 주세요.",
+                message: "기록·고객이슈는 저장됐지만 포인트 회수 결과를 확인하지 못했습니다. 중복 접수하지 말고 고객이슈와 포인트 내역을 확인해 주세요. " + (result?.message || reclaimErr?.message || ""),
               });
             }
-            const current = num((bal as any)?.current_points);
-            const next = current - reclaimed; // 잔액 부족 시 마이너스 허용(사장님 지시)
-
-            const ledgerId = randomUUID();
-            const { error: ledErr } = await sb.from("customer_point_ledger").insert({
-              id: ledgerId,
-              customer_phone: phone,
-              youtube_nickname: nick || null,
-              customer_name: nm || null,
-              change_type: "cancel",
-              amount: -reclaimed,
-              balance_after: next,
-              reason: `${modeLabel} 적립 포인트 회수`,
-              admin_memo: `주문 ${orderNo || groupId} · ${productSummary}`.slice(0, 500),
-              related_order_id: groupId || String(refRowId),
-              related_broadcast_id: null,
-              customer_visible: true,
-              customer_seen_at: null,
-              created_by: "order_return_flow",
-            });
-            if (ledErr) {
-              // 마이너스 잔액 제약이 아직 안 풀린 경우 등 — 기록/이슈는 이미 저장됨을 알려준다
-              return NextResponse.json({
-                ok: true,
-                partial: true,
-                message: "기록·고객이슈는 저장됐지만 포인트 회수 실패: " + ledErr.message,
-                reclaimed: 0,
-                issueRegistered,
-                taskId,
-              });
+            if (result.duplicate === true) {
+              reclaimed = 0;
+              reclaimNote = String(result.message || "이미 회수한 주문그룹 — 이번엔 회수 안 함");
+            } else {
+              reclaimed = num(result.reclaimed);
+              balanceAfter = Number(result.balance_after);
             }
-
-            const { error: balErr } = await sb
-              .from("customer_point_balances")
-              .upsert(
-                {
-                  customer_phone: phone,
-                  youtube_nickname: nick || (bal as any)?.youtube_nickname || null,
-                  customer_name: nm || (bal as any)?.customer_name || null,
-                  current_points: next,
-                  total_granted_points: Math.max(0, num((bal as any)?.total_granted_points)),
-                  total_used_points: Math.max(0, num((bal as any)?.total_used_points)),
-                  total_canceled_points: Math.max(0, num((bal as any)?.total_canceled_points)) + reclaimed,
-                  total_adjusted_points: num((bal as any)?.total_adjusted_points),
-                  updated_at: new Date().toISOString(),
-                },
-                { onConflict: "customer_phone" }
-              );
-            if (balErr) {
-              await sb.from("customer_point_ledger").delete().eq("id", ledgerId);
-              return NextResponse.json({
-                ok: true,
-                partial: true,
-                message: "기록·고객이슈는 저장됐지만 포인트 잔액 반영 실패: " + balErr.message,
-                reclaimed: 0,
-                issueRegistered,
-                taskId,
-              });
-            }
-            balanceAfter = next;
           }
         }
       }

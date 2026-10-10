@@ -6,12 +6,19 @@ import ts from 'typescript';
 // Exercise the real POST; replace only external authorization/database boundaries.
 async function run(options={}) {
   const writes=[];
+  const rpcCalls=[];
   const rows=[
     {id:1,order_group_id:'fixture',qty:2,product_price:10000,adjusted_product_price:20000,point_earned_amount:300,point_used_amount:0,customer_phone:'01000000000',product_name:'A'},
     {id:2,order_group_id:'fixture',qty:1,product_price:10000,adjusted_product_price:10000,point_earned_amount:300,point_used_amount:0,customer_phone:'01000000000',product_name:'B'},
   ];
   if(options.zero) rows[0].adjusted_product_price=0;
-  const db={from(table){
+  const db={async rpc(name,payload){
+    rpcCalls.push({name,payload});
+    if(options.balanceError||options.missingBalance||options.invalidBalance) return {data:{ok:false,message:'balance unavailable'},error:null};
+    if(options.rpcError) return {data:null,error:{message:'RPC unavailable'}};
+    if(options.duplicate) return {data:{ok:true,duplicate:true,reclaimed:0,balance_after:null,message:'already reclaimed'},error:null};
+    return {data:{ok:true,duplicate:false,reclaimed:payload.p_amount,balance_after:1000-payload.p_amount},error:null};
+  },from(table){
     let action='select',payload,filters=[];
     const q={select(){return q;},eq(k,v){filters.push([k,v]);return q;},in(){return q;},limit(){return q;},
       update(p){action='update';payload=p;return q;},insert(p){action='insert';payload=p;return q;},upsert(p){action='upsert';payload=p;return q;},
@@ -31,28 +38,38 @@ async function run(options={}) {
   process.env.SUPABASE_SERVICE_ROLE_KEY='test-only';
   const {POST}=load('app/api/admin-live/order-return/route.ts');
   const response=await POST(new Request('https://fixture.invalid',{method:'POST',body:JSON.stringify({mode:options.mode||'refund',refRowId:1,rowIds:[1],rowQty:{1:1}})}));
-  return {body:await response.json(),writes};
+  return {body:await response.json(),writes,rpcCalls};
 }
 const failures=[];
 async function test(name,fn){try{await fn();console.log('PASS',name);}catch(e){failures.push(name);console.error('FAIL',name,e.message);}}
 await test('partial quantity uses line total once: 10000 of 30000 earns a 100-point reclaim',async()=>{
-  const {body,writes}=await run();
+  const {body,writes,rpcCalls}=await run();
   assert.equal(body.reclaimed,100);
   assert.equal(body.balanceAfter,900);
-  assert.equal(writes.find(w=>w.table==='customer_point_ledger').payload.amount,-100);
+  assert.equal(writes.filter(w=>w.table.startsWith('customer_point_')).length,0,'point writes must be atomic, not separate HTTP operations');
+  assert.equal(rpcCalls.length,1);
+  assert.equal(rpcCalls[0].name,'reclaim_order_return_points');
+  assert.equal(rpcCalls[0].payload.p_amount,100);
 });
 await test('explicit zero line amount does not fall back to list price',async()=>{
   const {body,writes}=await run({zero:true});
   assert.equal(body.reclaimed,0);
   assert.equal(writes.filter(w=>w.table.startsWith('customer_point_')).length,0);
 });
-for(const flag of ['taskError','priorError','balanceError','missingTask','missingBalance','invalidBalance']) await test(flag+' blocks point mutation and reports incomplete processing',async()=>{
+for(const flag of ['taskError','priorError','balanceError','missingTask','missingBalance','invalidBalance','rpcError']) await test(flag+' blocks point mutation and reports incomplete processing',async()=>{
   const {body,writes}=await run({[flag]:true});
   assert.equal(writes.filter(w=>w.table.startsWith('customer_point_')).length,0);
   assert.equal(body.reclaimed,0);
   assert.equal(body.partial,true);
   assert.ok(body.message);
   if(flag==='taskError') assert.equal(body.issueRegistered,false);
+});
+await test('concurrent duplicate RPC result does not announce another reclaim',async()=>{
+  const {body,writes}=await run({duplicate:true});
+  assert.equal(body.reclaimed,0);
+  assert.equal(body.balanceAfter,null);
+  assert.ok(body.reclaimNote);
+  assert.equal(writes.filter(w=>w.table.startsWith('customer_point_')).length,0);
 });
 for(const mode of ['exchange','etc']) await test(mode+' registers issue without point changes',async()=>{
   const {body,writes}=await run({mode});
