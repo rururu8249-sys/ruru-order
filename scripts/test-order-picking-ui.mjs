@@ -319,6 +319,28 @@ await act(async()=>tree.unmount());
 
 const modalSource=fs.readFileSync(path.join(root,'components/admin-live/LiveOrderPickingModal.tsx'),'utf8');
 globalThis.Date = SystemDate;
+// Opening from all orders must preserve the current list, not submit an
+// automatically inferred 54-broadcast request that the API rejects (>31).
+const broadOrders=Array.from({length:54},(_,i)=>{
+  const id=100+i;
+  rows.set(id,{id,picked_at:null});
+  return order(id,'paid',[item(id,1)],{broadcastId:`broad-${i}`});
+});
+let broadRequests=0;
+globalThis.fetch=async()=>{broadRequests++;throw new Error('unexpected broad request');};
+await act(async()=>{tree=Renderer.create(React.createElement(Modal,{orders:broadOrders,filterLabel:'전체 주문',onClose(){}}));});
+assert.equal(broadRequests,0,'opening 54 broadcasts must use the existing current-list scope, not an invalid request');
+assert.equal(checks().length,54,'never silently truncate the current work list to 31 broadcasts');
+assert(text().includes('현재 주문 목록'));
+assert.equal(button('물건챙기기 엑셀').props.disabled,false);
+const Selector=load(path.join(root,'components/admin-live/PickingBroadcastSelector.tsx')).default;
+await act(async()=>tree.root.findByType(Selector).props.onChange(Array.from({length:32},(_,i)=>`selected-${i}`)));
+assert.equal(broadRequests,0,'manual over-limit selection must be stopped before fetching');
+assert.deepEqual(tree.root.findByType(Selector).props.selectedIds,[],'rejected selection must not change the active scope');
+assert.match(toasts.at(-1)[0],/최대 31개/);
+assert.equal(button('물건챙기기 엑셀').props.disabled,false,'rejected selection must not lock the valid current list');
+await act(async()=>tree.unmount());
+globalThis.fetch=originalFetch;
 assert(modalSource.includes('/api/admin-live/picking-workspace'),'scope refresh uses the complete server loader');
 assert(modalSource.includes('setScopeError') && modalSource.includes('setWorkspaceOrders'),'scope failures are surfaced while successful results replace the list');
 assert(!modalSource.includes('조회 목록 챙김 해제') && !modalSource.includes('>더보기<'),'dangerous bulk undo and redundant overflow menu are removed');

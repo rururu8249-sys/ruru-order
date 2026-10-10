@@ -19,11 +19,13 @@ export type PickingScopeSource<T extends PickingScopeRow = PickingScopeRow> = {
   getOrdersByTimeRange(startedAt: string, endedAt: string, from: number, to: number): Promise<T[]>;
 };
 
+export const MAX_PICKING_BROADCASTS = 31;
+
 export function parsePickingWorkspaceRequest(input: unknown): { broadcastIds: string[] } {
   const value = input as { broadcastIds?: unknown } | null;
   if (!value || !Array.isArray(value.broadcastIds)) throw new Error("방송 선택값이 올바르지 않습니다.");
   const broadcastIds = Array.from(new Set(value.broadcastIds.map((id) => String(id ?? "").trim()).filter(Boolean)));
-  if (broadcastIds.length > 31) throw new Error("방송은 최대 31개까지 선택할 수 있습니다.");
+  if (broadcastIds.length > MAX_PICKING_BROADCASTS) throw new Error(`방송은 최대 ${MAX_PICKING_BROADCASTS}개까지 선택할 수 있습니다.`);
   return { broadcastIds };
 }
 

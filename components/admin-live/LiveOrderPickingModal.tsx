@@ -21,6 +21,7 @@ import { exportLiveOrdersForPicking } from "./adminLiveOrderExcelExport";
 import PickingBroadcastSelector from "./PickingBroadcastSelector";
 import type { BroadcastCalendarItem } from "./BroadcastCalendarPicker";
 import { classifyPickingAttention, type PickingAttentionKind } from "@/lib/orderPickingWorkspace";
+import { MAX_PICKING_BROADCASTS } from "@/lib/orderPickingScopeLoader";
 
 type Props = { orders: LiveOrder[]; filterLabel: string; broadcastCalendar?: BroadcastCalendarItem[]; onClose: () => void };
 
@@ -93,7 +94,12 @@ function buildPanels(orderList: readonly LiveOrder[], attentionSource: boolean):
 }
 
 export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCalendar = [], onClose }: Props) {
-  const initialBroadcastIds = useMemo(() => Array.from(new Set(orders.map((order) => order.broadcastId).filter((id): id is string => Boolean(id)))), [orders]);
+  const initialBroadcastIds = useMemo(() => {
+    const ids = Array.from(new Set(orders.map((order) => order.broadcastId).filter((id): id is string => Boolean(id))));
+    // Broad order searches already have a current-list scope. Keep every row
+    // rather than truncating it or issuing a request the server must reject.
+    return ids.length > MAX_PICKING_BROADCASTS ? [] : ids;
+  }, [orders]);
   const [workspaceOrders, setWorkspaceOrders] = useState<LiveOrder[]>(orders);
   const [additionalWorkspaceOrders, setAdditionalWorkspaceOrders] = useState<LiveOrder[]>([]);
   const [appliedBroadcastIds, setAppliedBroadcastIds] = useState<string[]>(initialBroadcastIds);
@@ -117,6 +123,10 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
 
   const applyBroadcastScope = async (nextIds: string[]) => {
     if (exporting) return;
+    if (nextIds.length > MAX_PICKING_BROADCASTS) {
+      showAdminToast(`방송은 최대 ${MAX_PICKING_BROADCASTS}개까지 선택할 수 있습니다. 전체 조회는 ‘현재 목록으로’를 이용해 주세요.`, "warning");
+      return;
+    }
     const previousIds = appliedBroadcastIds;
     const requestId = ++scopeRequestRef.current;
     setScopeError("");
