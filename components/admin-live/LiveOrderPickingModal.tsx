@@ -329,8 +329,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
       if (requestId !== scopeRequestRef.current) throw new Error("방송 선택이 바뀌었습니다. 새 범위에서 다시 내보내주세요.");
       const freshOrders = [...payload.orders, ...payload.additionalOrders];
       const currentPickedIds = new Set(freshOrders.flatMap(order => (order.items || []).filter(item => item.pickedAt && classifyPickingAttention(order, item) !== "repick").map(item => String(item.id))));
-      const visibleIds = new Set(buildPanels(freshOrders, false).filter(panel => panel.paid).flatMap(panel => panel.items).filter(item => !currentPickedIds.has(item.id)).map(item => item.id));
-      if (!visibleIds.size && !payload.exceptions.length && !payload.cancellations?.length) { showAdminToast("내보낼 미챙김 상품이나 미처리 고객이슈가 없습니다.", "warning"); return; }
+      // [㉖] 챙김 여부와 관계없이 범위 안 결제완료 줄 전부 — 챙긴 줄은 엑셀 「챙김」 칸에 ✓.
+      const visibleIds = new Set(buildPanels(freshOrders, false).filter(panel => panel.paid).flatMap(panel => panel.items).map(item => item.id));
+      if (!visibleIds.size && !payload.exceptions.length && !payload.cancellations?.length) { showAdminToast("내보낼 결제완료 상품이나 미처리 고객이슈가 없습니다.", "warning"); return; }
       const seenItemIds = new Set<string>();
       const exportOrders = freshOrders.flatMap(order => {
         const items = (order.items || []).filter(item => {
@@ -345,7 +346,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
         seenItemIds.add(id);
         return [order];
       });
-      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${title} · 미챙김 전체`, rowOrder: viewMode === 'batch' ? 'product' : sortMode === 'oldest' ? 'time' : 'nickname', visibleItemIds: [...visibleIds], attentionItemIds: payload.additionalOrders.flatMap(order => (order.items || []).map(item => String(item.id))), exceptions: payload.exceptions, cancellations: payload.cancellations }, currentPickedIds);
+      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${title} · 결제완료 전체`, rowOrder: viewMode === 'batch' ? 'product' : sortMode === 'oldest' ? 'time' : 'nickname', visibleItemIds: [...visibleIds], attentionItemIds: payload.additionalOrders.flatMap(order => (order.items || []).map(item => String(item.id))), exceptions: payload.exceptions, cancellations: payload.cancellations }, currentPickedIds);
       const ids = [...visibleIds].map(Number);
       const now = new Date().toISOString();
       for (let i = 0; i < ids.length; i += 500) {
@@ -376,7 +377,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
   const allRows = scopedRows.filter(({ item }) => {
     const done = pickedIds.has(item.id);
     if (workspaceTab === "picked") return done;
-    if (done && !sessionCompletedIds.has(item.id)) return false;
+    // [㉖] 「일반 챙김」은 이전에 챙긴 줄도 ✓(초록 배경·버튼)로 계속 보인다 — 다시 열어도 확인 가능.
+    //   추가 작업 탭(결제 후 추가·다시 챙기기)은 기존대로 이번에 체크한 줄만 남긴다.
+    if (done && workspaceTab !== "standard" && !sessionCompletedIds.has(item.id)) return false;
     if (workspaceTab === "repick") return item.attentionKind === "repick";
     if (workspaceTab === "late_paid") return item.attentionKind === "late_paid" || item.attentionKind === "payment_time_missing";
     return item.attentionKind === null;

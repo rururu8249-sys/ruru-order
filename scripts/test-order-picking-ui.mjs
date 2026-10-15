@@ -41,7 +41,7 @@ function load(filename) {
     if (spec === '@/lib/supabase') return {supabase: db};
     if (spec === '@/lib/adminToast') return {showAdminToast: (...args) => toasts.push(args)};
     if (spec === '@/lib/adminConfirm') return {showAdminConfirm: async () => true};
-    if (spec === './adminLiveOrderExcelExport') return {exportLiveOrdersForPicking: async (orders,meta) => {exportsMade.push({orders,meta});}};
+    if (spec === './adminLiveOrderExcelExport') return {exportLiveOrdersForPicking: async (orders,meta,pickedIds) => {exportsMade.push({orders,meta,pickedIds});}};
     if (spec.startsWith('@/') || spec.startsWith('.')) {
       const base = spec.startsWith('@/') ? path.join(root, spec.slice(2)) : path.resolve(path.dirname(filename), spec);
       const target = [base, base + '.ts', base + '.tsx'].find(p => fs.existsSync(p) && fs.statSync(p).isFile());
@@ -121,8 +121,14 @@ await act(async () => { tree = Renderer.create(React.createElement(Modal, {order
 await act(async () => button('챙김 완료 탭').props.onClick());
 assert.equal(check("고객2").props['aria-checked'], true, 'reopen reloads persisted state');
 await act(async () => button('일반 챙김 탭').props.onClick());
+// [㉖] 다시 열어도 「일반 챙김」에 이전에 챙긴 줄이 ✓로 그대로 보인다(챙김 완료 탭으로만 숨지 않음).
+assert.equal(checks().length, 2, 'reopened standard tab keeps previously picked rows visible');
+assert.equal(check("고객2").props['aria-checked'], true, 'previously picked row is shown as completed, not hidden');
 await act(async () => tree.root.findByType('input').props.onChange({target: {value: 'miu2'}}));
-assert.equal(checks().length, 1, 'separator-free search works inside the active work tab');
+assert.equal(checks().length, 2, 'separator-free search works inside the active work tab');
+await act(async () => tree.root.findByType('input').props.onChange({target: {value: '고객1'}}));
+assert.equal(checks().length, 1, 'search narrows the standard tab to the matching customer');
+await act(async () => tree.root.findByType('input').props.onChange({target: {value: 'miu2'}}));
 // Existing IDs can change through Dashboard realtime updates from another admin.
 rows.get(2).picked_at = null;
 const refreshed = orders.map(order => ({...order, items: order.items.map(item => ({...item, pickedAt: null}))}));
@@ -207,9 +213,11 @@ await act(async()=>{tree=Renderer.create(React.createElement(Modal,{orders:contr
 await act(async()=>tree.root.findByType('input').props.onChange({target:{value:'miu2'}}));
 exportSnapshot=controlFixture.map(order=>({...order,items:order.items.map(item=>({...item,pickedAt:rows.get(Number(item.id))?.picked_at}))}));
 await act(async()=>button('물건챙기기 엑셀').props.onClick());
-assert.deepEqual(exportsMade.at(-1).orders.flatMap(order=>order.items.map(item=>item.id)),['2'],'one workbook contains every paid, unpicked row in the applied scope regardless of the active tab');
-assert.deepEqual(writes.at(-1).ids,[2],'print record covers exactly exported items');
-assert.ok(exportsMade.at(-1).meta.filterLabel.includes('미챙김 전체'),'combined workbook scope is labeled');
+// [㉖] 챙김 여부와 관계없이 범위 안 결제완료 줄 전부 + 챙긴 줄은 pickedIds 로 넘겨 「챙김」 칸 ✓.
+assert.deepEqual(exportsMade.at(-1).orders.flatMap(order=>order.items.map(item=>item.id)),['1','2'],'one workbook contains every paid row in the applied scope, picked or not, regardless of the active tab or search');
+assert.deepEqual([...exportsMade.at(-1).pickedIds],['1'],'picked rows are passed so the 챙김 column shows ✓');
+assert.deepEqual(writes.at(-1).ids,[1,2],'print record covers exactly exported items');
+assert.ok(exportsMade.at(-1).meta.filterLabel.includes('결제완료 전체'),'combined workbook scope is labeled');
 const previousExports=exportsMade.length,previousWrites=writes.length;
 failExceptions=true;
 await act(async()=>button('물건챙기기 엑셀').props.onClick());
@@ -222,12 +230,15 @@ await act(async()=>button('물건챙기기 엑셀').props.onClick());
 assert.equal(exportsMade.length,previousExports,'cancelled after opening the modal cannot enter picking export');
 exportSnapshot=pendingSnapshot.map(order=>({...order,items:order.items.map(item=>({...item,pickedAt:'2026-10-05'}))}));
 await act(async()=>button('물건챙기기 엑셀').props.onClick());
-assert.equal(exportsMade.length,previousExports,'picked elsewhere after opening is excluded from the fresh export');
+assert.equal(exportsMade.length,previousExports+1,'picked elsewhere after opening is still exported');
+assert.ok(['1','2'].every(id=>exportsMade.at(-1).pickedIds.has(id)),'fresh picked state marks every exported row ✓');
+const writesBeforeIssueOnly=writes.length;
+exportSnapshot=pendingSnapshot.map(order=>({...order,paymentStatus:'canceled'}));
 exportExceptions=[{date:'2026.10.05',customer:'검수',product:'취소상품',action:'환불',status:'미처리',memo:'출고 제외'}];
 await act(async()=>button('물건챙기기 엑셀').props.onClick());
-assert.equal(exportsMade.at(-1).orders.length,0,'issue-only export works when every item was picked');
+assert.equal(exportsMade.at(-1).orders.length,0,'issue-only export works when no paid item remains');
 assert.equal(exportsMade.at(-1).meta.exceptions.length,1);
-assert.equal(writes.length,previousWrites,'issue-only export makes no picking/payment/issue writes');
+assert.equal(writes.length,writesBeforeIssueOnly,'issue-only export makes no picking/payment/issue writes');
 exportExceptions=[];exportSnapshot=pendingSnapshot;
 await act(async()=>tree.unmount());
 // A background confirmation read must not replace already-known counters with dashes.

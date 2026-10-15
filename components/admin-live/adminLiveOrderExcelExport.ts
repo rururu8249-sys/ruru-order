@@ -425,10 +425,10 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   //   → 항상 넣는다. 전부 완료면 전부 '완료'로 보일 뿐이다.
   const hasUnpaid = true;
 
-  // [2026-09-01 사장님 지시] 「챙김/안챙김」 칸 삭제(팝업 체크로 충분), 맨 끝에 빈 「비고」 칸 추가.
-  void pickedIds; // 호출부 서명 유지용 — 챙김 칸이 빠져 더는 안 쓴다
+  // [2026-09-01 사장님 지시] 맨 끝에 빈 「비고」 칸 추가. (「챙김」 칸은 ㉖에서 ✓/빈칸으로 다시 넣음 — 챙긴 줄도 엑셀에 나오므로)
   // [2026-09-01 사장님 지시] 첫 칸에 「날짜」(주문일 MM.DD) — 헤더 아래 데이터 줄부터 채움
-  const headers: WorkbookRow = ["날짜", "닉네임", "상품명", "옵션", "수량", "상품금액", "결제", "비고"];
+  // [㉖] 맨 끝 「챙김」 칸 — 챙겼으면 ✓, 아니면 빈칸. pickedIds(창의 현재 챙김)가 있으면 그것, 없으면 주문의 picked_at(다시 챙기기 대기는 제외).
+  const headers: WorkbookRow = ["날짜", "닉네임", "상품명", "옵션", "수량", "상품금액", "결제", "비고", "챙김"];
   const orderDateLabel = (order: LiveOrder) => {
     const src = order.createdAt || order.submittedAt;
     if (!src) return "";
@@ -483,6 +483,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
       ];
       if (hasUnpaid) row.push(unpaid ? "미입금" : "완료");
       row.push(""); // 비고 — 사장님이 손으로 적는 빈칸
+      row.push(pickedIds?.has(String(order.id)) ? "✓" : "");
       keyedRows.push({ row, unpaid, attention: false, product: clean(order.orderSummary) || "상품명없음", color: "", size: "", time: orderTime(order) });
       return;
     }
@@ -503,6 +504,8 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
       row.push(attention?.kind === "상품 변경 · 다시 챙기기"
         ? `이전 주문 상품 변경 · 다시 챙기기\n변경 전: ${attention.before || "기록 없음"}\n변경 후: ${attention.current}`
         : attention ? "결제 후 추가 챙기기" : "");
+      const picked = pickedIds ? pickedIds.has(String(item.id)) : Boolean(item.pickedAt) && built.kind !== "상품 변경 · 다시 챙기기";
+      row.push(picked ? "✓" : "");
       keyedRows.push({ row, unpaid, attention: built.kind !== "일반", product: itemName(item), color: clean(item.color), size: clean(item.size), time: orderTime(order) });
     });
   });
@@ -533,7 +536,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
   // 필터 범위 = 헤더~마지막 데이터 줄까지만 (위 합계 3줄은 범위 밖 = 고정)
   styleFilterSheet(sheet, headerRowNumber, headerRowNumber + itemRows.length, headers.length);
   // Picking-only widths/alignment: the shared formatter also serves shipping exports.
-  setColumnWidths(sheet, [22, 18, 24, 30, 7, 14, 10, 52]);
+  setColumnWidths(sheet, [22, 18, 24, 30, 7, 14, 10, 52, 8]);
   sheet.eachRow((row, rowNumber) => {
     row.eachCell({ includeEmpty: true }, (cell) => {
       cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
