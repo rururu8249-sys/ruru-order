@@ -115,6 +115,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
   const [sortModes, setSortModes] = useState<{ batch: "name" | "remaining"; order: "name" | "remaining" | "oldest" | "newest" }>({ batch: "name", order: "name" });
   const [sortPickedIds, setSortPickedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  // [㉘] 결제 상태 보기 — 목록(allRows/matches)·엑셀만 바뀐다. 숫자·챙김 진행은 결제완료 기준 그대로. 미결제 줄은 조회만(버튼 disabled).
+  const [payView, setPayView] = useState<"paid" | "unpaid" | "all">("paid");
+  const inPayView = (panel: { paid: boolean }) => payView === "all" || (payView === "paid" ? panel.paid : !panel.paid);
   const [exporting, setExporting] = useState(false);
   const [sessionCompletedIds, setSessionCompletedIds] = useState<Set<string>>(new Set());
 
@@ -330,8 +333,12 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
       const freshOrders = [...payload.orders, ...payload.additionalOrders];
       const currentPickedIds = new Set(freshOrders.flatMap(order => (order.items || []).filter(item => item.pickedAt && classifyPickingAttention(order, item) !== "repick").map(item => String(item.id))));
       // [㉖] 챙김 여부와 관계없이 범위 안 결제완료 줄 전부 — 챙긴 줄은 엑셀 「챙김」 칸에 ✓.
-      const visibleIds = new Set(buildPanels(freshOrders, false).filter(panel => panel.paid).flatMap(panel => panel.items).map(item => item.id));
-      if (!visibleIds.size && !payload.exceptions.length && !payload.cancellations?.length) { showAdminToast("내보낼 결제완료 상품이나 미처리 고객이슈가 없습니다.", "warning"); return; }
+      // [㉘] 결제 상태 칩을 따른다. 미결제 줄은 엑셀 기존 처리(결제 칸 「미입금」·분홍 배경). 출력 기록은 결제완료 줄에만.
+      const freshPanels = buildPanels(freshOrders, false).filter(inPayView);
+      const visibleIds = new Set(freshPanels.flatMap(panel => panel.items).map(item => item.id));
+      const printedIds = freshPanels.filter(panel => panel.paid).flatMap(panel => panel.items).map(item => item.id);
+      const payScopeLabel = payView === "paid" ? "결제완료 전체" : payView === "unpaid" ? "미결제만" : "미결제 포함 전체";
+      if (!visibleIds.size && !payload.exceptions.length && !payload.cancellations?.length) { showAdminToast(`내보낼 ${payView === "paid" ? "결제완료 " : payView === "unpaid" ? "미결제 " : ""}상품이나 미처리 고객이슈가 없습니다.`, "warning"); return; }
       const seenItemIds = new Set<string>();
       const exportOrders = freshOrders.flatMap(order => {
         const items = (order.items || []).filter(item => {
@@ -346,8 +353,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
         seenItemIds.add(id);
         return [order];
       });
-      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${title} · 결제완료 전체`, rowOrder: viewMode === 'batch' ? 'product' : sortMode === 'oldest' ? 'time' : 'nickname', visibleItemIds: [...visibleIds], attentionItemIds: payload.additionalOrders.flatMap(order => (order.items || []).map(item => String(item.id))), exceptions: payload.exceptions, cancellations: payload.cancellations }, currentPickedIds);
-      const ids = [...visibleIds].map(Number);
+      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${title} · ${payScopeLabel}`, rowOrder: viewMode === 'batch' ? 'product' : sortMode === 'oldest' ? 'time' : 'nickname', visibleItemIds: [...visibleIds], attentionItemIds: payload.additionalOrders.flatMap(order => (order.items || []).map(item => String(item.id))), exceptions: payload.exceptions, cancellations: payload.cancellations }, currentPickedIds);
+      const ids = printedIds.map(Number);
       const now = new Date().toISOString();
       for (let i = 0; i < ids.length; i += 500) {
         const { error } = await supabase.from("orders").update({ picking_list_printed_at: now }).is("picking_list_printed_at", null).in("id", ids.slice(i, i + 500));
@@ -374,7 +381,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
   const visibleTabs: ReadonlyArray<["standard" | "late_paid" | "repick" | "picked", string, number]> = workArea === "selected"
     ? [["standard", "일반 챙김", tabCounts.standard], ["picked", "챙김 완료", tabCounts.picked]]
     : [["late_paid", "결제 후 추가 챙기기", tabCounts.late_paid], ["repick", "상품 변경 · 다시 챙기기", tabCounts.repick], ["picked", "챙김 완료", tabCounts.picked]];
-  const allRows = scopedRows.filter(({ item }) => {
+  // [㉘] 화면 목록 = 결제 상태 칩 범위(미결제 포함 가능). scopedRows(결제완료)는 숫자 계산 전용으로 그대로.
+  const viewRows = panels.filter(inPayView).flatMap(panel => panel.items.map(item => ({ panel, item })));
+  const allRows = viewRows.filter(({ item }) => {
     const done = pickedIds.has(item.id);
     if (workspaceTab === "picked") return done;
     // [㉖] 「일반 챙김」은 이전에 챙긴 줄도 ✓(초록 배경·버튼)로 계속 보인다 — 다시 열어도 확인 가능.
@@ -496,6 +505,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
             <div className="flex shrink-0 gap-1 rounded-lg bg-surface-2 p-0.5">
               {(["batch", "order"] as const).map(mode => <button key={mode} type="button" onClick={() => setViewMode(mode)} aria-pressed={viewMode === mode} className={`min-h-11 rounded-xl px-3 text-[13px] font-black md:min-h-8 ${viewMode === mode ? "bg-rose-deep text-white" : "text-ink-soft"}`}>{mode === "batch" ? "상품별" : "고객별"}</button>)}
             </div>
+            <div role="group" aria-label="결제 상태 보기" className="flex shrink-0 gap-1 rounded-lg bg-surface-2 p-0.5">
+              {([["paid", "결제완료만"], ["unpaid", "미결제만"], ["all", "전체"]] as const).map(([value, label]) => <button key={value} type="button" onClick={() => setPayView(value)} aria-pressed={payView === value} className={`min-h-11 rounded-xl px-3 text-[13px] font-black md:min-h-8 ${payView === value ? "bg-rose-deep text-white" : "text-ink-soft"}`}>{label}</button>)}
+            </div>
             <label className="flex w-[180px] shrink-0 items-center text-[11px] font-bold text-ink-soft">
               <span className="sr-only">정렬</span>
               <select aria-label="정렬 방식" value={sortMode} onChange={event => {setSortModes(previous => ({...previous,[viewMode]:event.target.value})); setSortPickedIds(new Set(pickedIds));}} className="block h-9 w-full rounded-lg border border-line bg-surface px-2 text-[13px] text-ink"><option value="name">{viewMode === 'batch' ? '상품명 ㄱㄴㄷ순' : '닉네임 ㄱㄴㄷ순'}</option>{viewMode === 'order' ? <><option value="oldest">주문 오래된순</option><option value="newest">주문 최신순</option></> : null}<option value="remaining">남은 수량 많은순</option></select>
@@ -510,7 +522,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
           {!loading && !loadError && matches.length === 0 ? <div className="py-12 text-center font-bold text-ink-soft">현재 조회 조건에 맞는 상품이 없습니다.</div> : null}
           <div className="space-y-2">
             {sortedGroups.map(([key, group]) => {
-              const progress = pickingProgress(group.rows.map(({ item }) => ({ qty: item.qty, pickedAt: pickedIds.has(item.id) })));
+              // [㉘] 챙김 진행은 결제완료 줄 기준, 미결제 수량은 「미결제 N」으로 따로.
+              const progress = pickingProgress(group.rows.filter(({ panel }) => panel.paid).map(({ item }) => ({ qty: item.qty, pickedAt: pickedIds.has(item.id) })));
+              const unpaidQty = group.rows.filter(({ panel }) => !panel.paid).reduce((sum, { item }) => sum + item.qty, 0);
               if (viewMode === "batch") {
                 // [㉗] 상품 → 옵션별 합계 → 그 옵션을 산 손님. 옵션 순서 = 행 정렬(compareOrderOptions) 첫 등장 순.
                 const productPhoto = group.rows.map(({ item }) => itemPhoto[item.id]).find(Boolean) || "";
@@ -528,11 +542,12 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
                     <h3 className="min-w-0 flex-1 break-words text-[18px] font-black text-ink">{group.title}</h3>
                     <div className="shrink-0 text-right">
                       <div className="text-[20px] font-black leading-tight text-ink tabular-nums">총 {progress.total}개</div>
-                      <div className="text-[12px] font-bold text-ink-soft tabular-nums">챙김 {progress.got}/{progress.total}</div>
+                      <div className="text-[12px] font-bold text-ink-soft tabular-nums">챙김 {progress.got}/{progress.total}{unpaidQty > 0 ? <span className="ml-1.5 text-[var(--color-danger-tx)]">미결제 {unpaidQty}</span> : null}</div>
                     </div>
                   </div>
                   {[...options].map(([optKey, optRows]) => {
-                    const optProgress = pickingProgress(optRows.map(({ item }) => ({ qty: item.qty, pickedAt: pickedIds.has(item.id) })));
+                    const optProgress = pickingProgress(optRows.filter(({ panel }) => panel.paid).map(({ item }) => ({ qty: item.qty, pickedAt: pickedIds.has(item.id) })));
+                    const optUnpaidQty = optRows.filter(({ panel }) => !panel.paid).reduce((sum, { item }) => sum + item.qty, 0);
                     const optDone = optProgress.total > 0 && optProgress.got >= optProgress.total;
                     const optPhoto = optRows.map(({ item }) => itemPhoto[item.id]).find(Boolean) || "";
                     return <div key={optKey} className="border-t border-line">
@@ -545,7 +560,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
                         {optDone ? <span className="shrink-0 rounded-full bg-[var(--color-ok-tx)] px-2 py-0.5 text-[12px] font-black text-white">✓ 다 챙김</span> : null}
                         <div className="shrink-0 text-right">
                           <div className="text-[18px] font-black leading-tight text-ink tabular-nums">{optProgress.total}개</div>
-                          <div className="text-[12px] font-bold text-ink-soft tabular-nums">{optProgress.got}/{optProgress.total}</div>
+                          <div className="text-[12px] font-bold text-ink-soft tabular-nums">{optProgress.got}/{optProgress.total}{optUnpaidQty > 0 ? <span className="ml-1.5 text-[var(--color-danger-tx)]">미결제 {optUnpaidQty}</span> : null}</div>
                         </div>
                       </div>
                       <div className="divide-y divide-line border-t border-line">{optRows.map(renderRow)}</div>
@@ -556,7 +571,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
               return <section key={key} className="overflow-hidden rounded-xl border border-line bg-surface">
                 <div className="flex items-start justify-between gap-2 bg-rose-soft px-3 py-1.5">
                   <div className="min-w-0"><h3 className="break-words text-[16px] font-black text-ink">{group.title}</h3>{group.subtitle ? <div className="mt-1 text-[12px] font-bold text-ink-soft">{group.subtitle}</div> : null}</div>
-                  <span className="shrink-0 text-[12px] font-black text-ink-soft">{progress.got}/{progress.total}개</span>
+                  <span className="shrink-0 text-[12px] font-black text-ink-soft">{progress.got}/{progress.total}개{unpaidQty > 0 ? <span className="ml-1.5 text-[var(--color-danger-tx)]">미결제 {unpaidQty}</span> : null}</span>
                 </div>
                 <div className="divide-y divide-line">{group.rows.map(renderRow)}</div>
               </section>;

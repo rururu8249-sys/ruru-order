@@ -39,6 +39,11 @@ assert.equal(pickedFromRow.getCell('I2').value,'✓','picked_at marks the row �
 const pickedFromSet=(await exportLiveOrdersForPicking([ordinary],{filterLabel:'전체보기'},new Set(['1'])),new ExcelJS.Workbook());
 await pickedFromSet.xlsx.load(await blob.arrayBuffer());
 assert.equal(pickedFromSet.getWorksheet('물건챙기기').getCell('I2').value,'✓','modal picked set marks the row ✓');
+// [㉘] 미결제 줄(창 「미결제만/전체」) — 메인 시트에 결제 「미입금」 + 분홍 배경(기존 처리).
+const unpaidSheet=(await run([{...ordinary,paymentStatus:'unpaid',paidAtFull:null}])).getWorksheet('물건챙기기');
+assert.equal(unpaidSheet.rowCount,2,'unpaid row is exported to the main sheet');
+assert.equal(unpaidSheet.getCell('G2').value,'미입금');
+assert.equal(unpaidSheet.getCell('C2').fill?.fgColor?.argb,'FFF48FB1','unpaid row keeps the pink fill');
 const onlyAttention=await run([repick,late]);
 assert.equal(onlyAttention.getWorksheet('물건챙기기').rowCount,1,'empty ordinary sheet keeps a header');
 assert.equal(onlyAttention.getWorksheet('변경 및 추가').rowCount,3);
