@@ -423,16 +423,18 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
   const title = appliedScopeTitle || String(filterLabel || "").replace(/^방송:\s*/, "");
   const renderRow = ({ panel, item }: PickingRow) => {
     const done = pickedIds.has(item.id);
+    // [㉗] 상품별 = 옵션 아래 «손님 줄» — 사진·옵션명은 옵션 머리줄에 있으므로 줄에선 뺀다. 고객별은 기존 그대로.
+    const batch = viewMode === "batch";
     return (
-      <div key={item.id} className={`grid grid-cols-[56px_minmax(0,1fr)_92px] items-center gap-2 px-3 py-2 max-[360px]:grid-cols-[56px_minmax(0,1fr)] ${done ? "bg-ok-bg/60" : "bg-surface"}`}>
-        {itemPhoto[item.id] ? (
+      <div key={item.id} className={`grid items-center gap-2 px-3 py-2 ${batch ? "grid-cols-[minmax(0,1fr)_92px] max-[360px]:grid-cols-1" : "grid-cols-[56px_minmax(0,1fr)_92px] max-[360px]:grid-cols-[56px_minmax(0,1fr)]"} ${done ? "bg-ok-bg/60" : "bg-surface"}`}>
+        {batch ? null : itemPhoto[item.id] ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img src={itemPhoto[item.id]} alt={item.productName} className="h-14 w-14 shrink-0 rounded-lg border border-line object-cover" />
         ) : <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-[11px] text-ink-mute">사진 없음</span>}
         <div className="min-w-0 flex-1">
           {viewMode === "order" ? <div className="break-words text-sm font-black text-ink">{item.productName}</div> : null}
-          <div className="break-words text-sm font-black text-rose-deep">{item.optionText || "기본 옵션"}</div>
-          <div className="mt-1 text-[12px] font-bold text-ink-soft">{panel.nickname}{panel.name && panel.name !== panel.nickname ? ` · ${panel.name}` : ""} · 주문 #{item.id}</div>
+          {batch ? null : <div className="break-words text-sm font-black text-rose-deep">{item.optionText || "기본 옵션"}</div>}
+          <div className={batch ? "break-words text-[14px] font-bold text-ink" : "mt-1 text-[12px] font-bold text-ink-soft"}>{panel.nickname}{panel.name && panel.name !== panel.nickname ? ` · ${panel.name}` : ""} · 주문 #{item.id}</div>
           {!done && item.attentionKind === "repick" ? (
             <div className="mt-1 rounded-lg bg-warn-bg px-2 py-1 text-[11px] font-black text-[var(--color-danger-tx)]">
               상품 변경 · 다시 챙기기 · {[
@@ -449,7 +451,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
           {!panel.paid ? <span className="mt-1 inline-block rounded bg-warn-bg px-2 py-1 text-[12px] font-black text-[var(--color-danger-tx)]">미결제 · 조회만 가능</span> : null}
         </div>
         <div className="text-right max-[360px]:col-span-2 max-[360px]:flex max-[360px]:items-center max-[360px]:justify-between max-[360px]:border-t max-[360px]:border-line max-[360px]:pt-1">
-          <div className="text-[20px] font-black text-ink">{item.qty}<span className="text-[12px]">개</span></div>
+          <div className={`text-[20px] font-black ${batch && item.qty >= 2 ? "text-[var(--color-danger-tx)]" : "text-ink"}`}>{item.qty}<span className="text-[12px]">개</span></div>
           <button type="button" role="checkbox" aria-checked={done} aria-label={`${panel.nickname} ${item.productName} ${item.optionText} ${item.qty}개 ${done ? "챙김 해제" : "챙김"}`}
             disabled={blocked || !panel.paid} onClick={() => updatePicked([item.id], !pickedRef.current.has(item.id))}
             className={`mt-1 flex min-h-[44px] min-w-[92px] items-center justify-center gap-2 rounded-lg border-2 px-2 text-[13px] font-black disabled:opacity-50 ${done ? "border-ok-tx bg-[var(--color-ok-tx)] text-white" : "border-line bg-surface text-ink-soft"}`}>
@@ -509,6 +511,48 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
           <div className="space-y-2">
             {sortedGroups.map(([key, group]) => {
               const progress = pickingProgress(group.rows.map(({ item }) => ({ qty: item.qty, pickedAt: pickedIds.has(item.id) })));
+              if (viewMode === "batch") {
+                // [㉗] 상품 → 옵션별 합계 → 그 옵션을 산 손님. 옵션 순서 = 행 정렬(compareOrderOptions) 첫 등장 순.
+                const productPhoto = group.rows.map(({ item }) => itemPhoto[item.id]).find(Boolean) || "";
+                const options = new Map<string, PickingRow[]>();
+                for (const row of group.rows) {
+                  const optKey = row.item.optionText || "기본 옵션";
+                  options.set(optKey, [...(options.get(optKey) || []), row]);
+                }
+                return <section key={key} className="overflow-hidden rounded-xl border border-line bg-surface">
+                  <div className="flex items-center gap-3 bg-rose-soft px-3 py-2">
+                    {productPhoto ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={productPhoto} alt={group.title} className="h-14 w-14 shrink-0 rounded-lg border border-line object-cover" />
+                    ) : null}
+                    <h3 className="min-w-0 flex-1 break-words text-[18px] font-black text-ink">{group.title}</h3>
+                    <div className="shrink-0 text-right">
+                      <div className="text-[20px] font-black leading-tight text-ink tabular-nums">총 {progress.total}개</div>
+                      <div className="text-[12px] font-bold text-ink-soft tabular-nums">챙김 {progress.got}/{progress.total}</div>
+                    </div>
+                  </div>
+                  {[...options].map(([optKey, optRows]) => {
+                    const optProgress = pickingProgress(optRows.map(({ item }) => ({ qty: item.qty, pickedAt: pickedIds.has(item.id) })));
+                    const optDone = optProgress.total > 0 && optProgress.got >= optProgress.total;
+                    const optPhoto = optRows.map(({ item }) => itemPhoto[item.id]).find(Boolean) || "";
+                    return <div key={optKey} className="border-t border-line">
+                      <div className="flex items-center gap-2 bg-surface-2 px-3 py-2">
+                        {optPhoto && optPhoto !== productPhoto ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={optPhoto} alt={optKey} className="h-10 w-10 shrink-0 rounded-lg border border-line object-cover" />
+                        ) : null}
+                        <h4 className="min-w-0 flex-1 break-words text-[16px] font-black text-rose-deep">{optKey}</h4>
+                        {optDone ? <span className="shrink-0 rounded-full bg-[var(--color-ok-tx)] px-2 py-0.5 text-[12px] font-black text-white">✓ 다 챙김</span> : null}
+                        <div className="shrink-0 text-right">
+                          <div className="text-[18px] font-black leading-tight text-ink tabular-nums">{optProgress.total}개</div>
+                          <div className="text-[12px] font-bold text-ink-soft tabular-nums">{optProgress.got}/{optProgress.total}</div>
+                        </div>
+                      </div>
+                      <div className="divide-y divide-line border-t border-line">{optRows.map(renderRow)}</div>
+                    </div>;
+                  })}
+                </section>;
+              }
               return <section key={key} className="overflow-hidden rounded-xl border border-line bg-surface">
                 <div className="flex items-start justify-between gap-2 bg-rose-soft px-3 py-1.5">
                   <div className="min-w-0"><h3 className="break-words text-[16px] font-black text-ink">{group.title}</h3>{group.subtitle ? <div className="mt-1 text-[12px] font-bold text-ink-soft">{group.subtitle}</div> : null}</div>

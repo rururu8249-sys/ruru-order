@@ -66,6 +66,10 @@ const nodeText = node => node.children.map(child => typeof child === 'string' ? 
 assert.equal(checks().length, 2, 'only paid, non-canceled, included orders');
 assert.equal(check("고객1").props['aria-checked'], false, 'legacy collected must not imply completion');
 assert.ok(text().includes('원본 옵션'), 'optionText-only legacy orders must keep their option');
+// [㉗] 상품별 = 상품 머리(총 N개·챙김 n/N) → 옵션 머리(h4·N개·n/N) → 사진 없는 손님 줄
+assert.ok(tree.root.findAllByType('h4').length >= 1, 'batch view groups customer rows under option headers');
+assert.ok(text().includes('총 '), 'product header shows the total quantity');
+assert.ok(!text().includes('사진 없음'), 'customer rows under an option carry no photo cell');
 // Scope/help remains available without occupying permanent work-list space.
 const scopeDetails = tree.root.findAllByType('details');
 assert.equal(scopeDetails.length, 1, 'help has a collapsed disclosure');
@@ -124,6 +128,9 @@ await act(async () => button('일반 챙김 탭').props.onClick());
 // [㉖] 다시 열어도 「일반 챙김」에 이전에 챙긴 줄이 ✓로 그대로 보인다(챙김 완료 탭으로만 숨지 않음).
 assert.equal(checks().length, 2, 'reopened standard tab keeps previously picked rows visible');
 assert.equal(check("고객2").props['aria-checked'], true, 'previously picked row is shown as completed, not hidden');
+// 고객1(S/36)·고객2(사이즈 없음)는 서로 다른 옵션 — 고객2 옵션만 전부 챙김이라 배지는 정확히 1개.
+assert.equal(check("고객1").props['aria-checked'], false);
+assert.equal(text().split('✓ 다 챙김').length - 1, 1, 'option badge shows only on the option whose every row is picked');
 await act(async () => tree.root.findByType('input').props.onChange({target: {value: 'miu2'}}));
 assert.equal(checks().length, 2, 'separator-free search works inside the active work tab');
 await act(async () => tree.root.findByType('input').props.onChange({target: {value: '고객1'}}));
