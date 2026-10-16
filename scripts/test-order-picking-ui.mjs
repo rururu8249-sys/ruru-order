@@ -418,6 +418,17 @@ await act(async()=>zoomButtons[0].props.onClick());
 assert.equal(tree.root.findAll(node=>node.type==='img'&&node.props.alt==='상품 사진').length,1,'zoom overlay opens');
 await act(async()=>button('사진 닫기').props.onClick());
 assert.equal(tree.root.findAll(node=>node.type==='img'&&node.props.alt==='상품 사진').length,0,'zoom overlay closes');
+// [㉙-3] 폰(640px 미만) 전용 구조 — 방송 범위 한 줄 버튼으로 접기/펼치기, 옵션 머리 sticky 해제, 짧은 푸터 글자.
+const scopeToggle=tree.root.findAll(node=>node.type==='button'&&node.props['aria-expanded']!==undefined&&nodeText(node).startsWith('방송 범위:'))[0];
+assert.ok(scopeToggle && /sm:hidden/.test(scopeToggle.props.className),'phone shows a one-line broadcast range button');
+assert.ok(nodeText(scopeToggle).includes('코트 방송'),'range button names the applied broadcast');
+const selectorWrap=()=>{let node=tree.root.findByProps({'aria-label':'작업할 방송'}).parent; while(node&&node.type!=='div') node=node.parent; return node;};
+assert.match(selectorWrap().props.className,/max-sm:hidden/,'range selector is collapsed on phones by default');
+await act(async()=>scopeToggle.props.onClick());
+assert.doesNotMatch(selectorWrap().props.className,/max-sm:hidden/,'range button expands the selector');
+assert.ok(tree.root.findAllByType('h4').every(node=>/max-sm:static/.test(node.parent.props.className)),'option heads are not sticky on phones');
+assert.match(tree.root.findByType('h3').parent.parent.props.className,/sticky top-0/,'product head stays sticky on phones');
+assert.ok(button('물건챙기기 엑셀') && button('현재 목록 모두 챙김 완료'),'short phone labels keep full accessible names');
 productRows=[];
 globalThis.fetch=originalFetch;
 await act(async()=>tree.unmount());
