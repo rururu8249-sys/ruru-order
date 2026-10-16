@@ -26,7 +26,7 @@ import { MAX_PICKING_BROADCASTS } from "@/lib/orderPickingScopeLoader";
 type Props = { orders: LiveOrder[]; filterLabel: string; broadcastCalendar?: BroadcastCalendarItem[]; onClose: () => void };
 
 // [2026-07-13 사장님 지침] amount = 주문에 저장된 상품금액(표시 전용, 재계산 안 함)
-type PickItem = { id: string; productId: string; text: string; productName: string; optionText: string; color: string; size: string; qty: number; amount: number; attentionKind: PickingAttentionKind; repickBefore?: LiveOrderItem["repickBefore"]; attentionAt?: string | null };
+type PickItem = { id: string; productId: string; text: string; productName: string; optionText: string; color: string; size: string; qty: number; amount: number; attentionKind: PickingAttentionKind; latePaid?: boolean; repickBefore?: LiveOrderItem["repickBefore"]; attentionAt?: string | null };
 type Panel = { key: string; nickname: string; name: string; phone: string; search: string; paid: boolean; when: string; items: PickItem[]; totalQty: number };
 // [2026-09-20 사장님 요청] 상품별 = 상품(총 N개) → 그 밑에 옵션(색상/사이즈)별 N개. 옵션은 색상 가나다 → 사이즈 순.
 
@@ -83,6 +83,8 @@ function buildPanels(orderList: readonly LiveOrder[], attentionSource: boolean):
             id: String(it.id), productId: clean(it.productId), text: productName + (opt ? ` (${opt})` : ""), productName,
             optionText: opt, color: clean(it.color), size: clean(it.size), qty: Number(it.qty || 1), amount: Number(it.amount || 0),
             attentionKind: attentionSource ? classifyPickingAttention(o, { ...it, pickedAt: null }) : null,
+            // [㉙-0] 표시 전용 「늦은 입금」 배지 — 주문일보다 늦은 날 입금확인(자정 넘긴 방송 포함). 분류·목록 이동엔 안 쓴다.
+            latePaid: classifyPickingAttention(o, { ...it, pickedAt: null }) === "late_paid",
             repickBefore: it.repickBefore, attentionAt: it.repickRequiredAt || o.paidAtFull,
           };
         });
@@ -172,13 +174,21 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
 
   const selectedPanels = useMemo(() => buildPanels(activeSelectedOrders, false), [activeSelectedOrders]);
   const additionalPanels = useMemo(() => buildPanels(activeAdditionalOrders, true), [activeAdditionalOrders]);
-  const additionalItemIds = useMemo(() => new Set(additionalPanels.flatMap((panel) => panel.items.map((item) => item.id))), [additionalPanels]);
+  // [㉙-0] 자정 넘긴 방송 — 선택 방송에 속한 주문(서버가 broadcast_id 일치 또는 방송 시간 안으로 준 목록)은
+  //   입금 시각과 무관하게 「선택 방송 작업」에 남긴다. 「오늘 추가 작업」은 선택 방송에 없는 줄 + 다시 챙기기(repick)만.
+  //   repick 은 기존대로 추가 작업에만(선택 방송에서 뺀다). 같은 줄이 두 곳에 동시에 나오지 않는다.
+  const selectedItemIds = useMemo(() => new Set(selectedPanels.flatMap((panel) => panel.items.map((item) => item.id))), [selectedPanels]);
+  const repickItemIds = useMemo(() => new Set(additionalPanels.flatMap((panel) => panel.items.filter((item) => item.attentionKind === "repick").map((item) => item.id))), [additionalPanels]);
   const selectedOnlyPanels = useMemo(() => selectedPanels.flatMap((panel) => {
-    const items = panel.items.filter((item) => !additionalItemIds.has(item.id));
+    const items = panel.items.filter((item) => !repickItemIds.has(item.id));
     return items.length ? [{ ...panel, items, totalQty: items.reduce((sum, item) => sum + item.qty, 0) }] : [];
-  }), [selectedPanels, additionalItemIds]);
-  const allPanels = useMemo(() => [...selectedOnlyPanels, ...additionalPanels], [selectedOnlyPanels, additionalPanels]);
-  const panels = workArea === "selected" ? selectedOnlyPanels : additionalPanels;
+  }), [selectedPanels, repickItemIds]);
+  const additionalOnlyPanels = useMemo(() => additionalPanels.flatMap((panel) => {
+    const items = panel.items.filter((item) => item.attentionKind === "repick" || !selectedItemIds.has(item.id));
+    return items.length ? [{ ...panel, items, totalQty: items.reduce((sum, item) => sum + item.qty, 0) }] : [];
+  }), [additionalPanels, selectedItemIds]);
+  const allPanels = useMemo(() => [...selectedOnlyPanels, ...additionalOnlyPanels], [selectedOnlyPanels, additionalOnlyPanels]);
+  const panels = workArea === "selected" ? selectedOnlyPanels : additionalOnlyPanels;
 
   // [㉒] 상품 사진(읽기 전용·보조 표시). 공용 규칙(resolveOrderItemPhoto)만 쓴다 — 주문상세와 동일 패턴.
   //   productId 있는 줄만 products 조회(200개씩), item.id → 사진 URL. 실패해도 조용히 무시.
@@ -353,7 +363,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
         seenItemIds.add(id);
         return [order];
       });
-      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${title} · ${payScopeLabel}`, rowOrder: viewMode === 'batch' ? 'product' : sortMode === 'oldest' ? 'time' : 'nickname', visibleItemIds: [...visibleIds], attentionItemIds: payload.additionalOrders.flatMap(order => (order.items || []).map(item => String(item.id))), exceptions: payload.exceptions, cancellations: payload.cancellations }, currentPickedIds);
+      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${title} · ${payScopeLabel}`, rowOrder: viewMode === 'batch' ? 'product' : sortMode === 'oldest' ? 'time' : 'nickname', visibleItemIds: [...visibleIds], attentionItemIds: (() => { const selectedExportIds = new Set(payload.orders.flatMap(order => (order.items || []).map(item => String(item.id)))); return payload.additionalOrders.flatMap(order => (order.items || []).filter(item => classifyPickingAttention(order, item) === "repick" || !selectedExportIds.has(String(item.id))).map(item => String(item.id))); })(), exceptions: payload.exceptions, cancellations: payload.cancellations }, currentPickedIds);
       const ids = printedIds.map(Number);
       const now = new Date().toISOString();
       for (let i = 0; i < ids.length; i += 500) {
@@ -375,7 +385,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
     return counts;
   }, { standard: 0, late_paid: 0, repick: 0, picked: 0 });
   const selectedOpenQty = selectedOnlyPanels.flatMap((panel) => panel.paid ? panel.items : []).reduce((sum, item) => sum + (pickedIds.has(item.id) ? 0 : item.qty), 0);
-  const additionalOpenRows = additionalPanels.flatMap((panel) => panel.paid ? panel.items : []).filter((item) => !pickedIds.has(item.id));
+  const additionalOpenRows = additionalOnlyPanels.flatMap((panel) => panel.paid ? panel.items : []).filter((item) => !pickedIds.has(item.id));
   const additionalOpenQty = additionalOpenRows.reduce((sum, item) => sum + item.qty, 0);
   const additionalLateQty = additionalOpenRows.filter((item) => item.attentionKind === "late_paid" || item.attentionKind === "payment_time_missing").reduce((sum, item) => sum + item.qty, 0);
   const visibleTabs: ReadonlyArray<["standard" | "late_paid" | "repick" | "picked", string, number]> = workArea === "selected"
@@ -444,6 +454,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
           {viewMode === "order" ? <div className="break-words text-sm font-black text-ink">{item.productName}</div> : null}
           {batch ? null : <div className="break-words text-sm font-black text-rose-deep">{item.optionText || "기본 옵션"}</div>}
           <div className={batch ? "break-words text-[14px] font-bold text-ink" : "mt-1 text-[12px] font-bold text-ink-soft"}>{panel.nickname}{panel.name && panel.name !== panel.nickname ? ` · ${panel.name}` : ""} · 주문 #{item.id}</div>
+          {item.attentionKind === null && item.latePaid ? <span className="mt-1 inline-block rounded bg-info-bg px-1.5 py-0.5 text-[11px] font-black text-[var(--color-info-tx)]">늦은 입금</span> : null}
           {!done && item.attentionKind === "repick" ? (
             <div className="mt-1 rounded-lg bg-warn-bg px-2 py-1 text-[11px] font-black text-[var(--color-danger-tx)]">
               상품 변경 · 다시 챙기기 · {[
@@ -486,12 +497,12 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
           <div className="ml-auto text-right text-[12px] font-bold tabular-nums" aria-live="polite"><span className="text-rose-deep">안 챙김 {countersUnknown ? "—" : total - got}</span><span className="ml-2 text-ok-tx">챙김 {countersUnknown ? "—" : got}/{total}개</span></div>
           <button type="button" disabled={saving || exporting} onClick={onClose} aria-label="닫기" className="h-9 w-9 shrink-0 rounded-full bg-surface-2 text-[22px] disabled:opacity-40">×</button>
         </div>
-        <p aria-label="작업 범위" className="shrink-0 break-words border-b border-line px-3 py-1 text-[11px] font-bold leading-4 text-ink-soft">작업 범위: {workArea === "selected" ? title : "오늘 추가 작업 · 과거 결제완료·미챙김 및 상품 변경"} · 취소·챙기기 제외 주문 제외</p>
+        <p aria-label="작업 범위" className="shrink-0 break-words border-b border-line px-3 py-1 text-[11px] font-bold leading-4 text-ink-soft">작업 범위: {workArea === "selected" ? title : "오늘 추가 작업 · 선택 방송 밖 결제 후 추가 및 상품 변경"} · 취소·챙기기 제외 주문 제외</p>
         <div className="grid shrink-0 grid-cols-2 gap-1 border-b border-line bg-surface px-3 py-2">
           <button type="button" aria-label="선택 방송 작업" aria-pressed={workArea === "selected"} onClick={() => { setWorkArea("selected"); setWorkspaceTab("standard"); setSearch(""); }} className={`min-h-11 rounded-xl px-3 text-[13px] font-black ${workArea === "selected" ? "bg-rose-deep text-white" : "bg-surface-2 text-ink-soft"}`}>선택 방송 작업 <span className="tabular-nums">{countersUnknown ? "—" : selectedOpenQty}</span></button>
           <button type="button" aria-label="오늘 추가 작업" aria-pressed={workArea === "additional"} onClick={() => { setWorkArea("additional"); setWorkspaceTab(additionalLateQty > 0 ? "late_paid" : "repick"); setSearch(""); }} className={`min-h-11 rounded-xl px-3 text-[13px] font-black ${workArea === "additional" ? "bg-rose-deep text-white" : "bg-warn-bg text-[var(--color-danger-tx)]"}`}>오늘 추가 작업 <span className="tabular-nums">{countersUnknown ? "—" : additionalOpenQty}</span></button>
         </div>
-        {workArea === "selected" ? <PickingBroadcastSelector items={broadcastCalendar} selectedIds={appliedBroadcastIds} loading={scopeLoading} onChange={applyBroadcastScope} /> : <p className="shrink-0 border-b border-line bg-info-bg px-3 py-2 text-[12px] font-bold text-[var(--color-info-tx)]">선택한 방송과 섞이지 않는 별도 작업함입니다. 종료된 과거 방송의 결제완료·미챙김 상품과 챙김 완료 후 변경된 상품만 표시합니다.</p>}
+        {workArea === "selected" ? <PickingBroadcastSelector items={broadcastCalendar} selectedIds={appliedBroadcastIds} loading={scopeLoading} onChange={applyBroadcastScope} /> : <p className="shrink-0 border-b border-line bg-info-bg px-3 py-2 text-[12px] font-bold text-[var(--color-info-tx)]">선택한 방송과 섞이지 않는 별도 작업함입니다. 선택한 방송에 속하지 않는 종료 방송 주문 중 주문일보다 늦게(오늘) 입금확인된 미챙김 상품과, 챙김 완료 후 변경된 상품만 표시합니다. 선택한 방송의 늦은 입금은 「선택 방송 작업」에 「늦은 입금」 배지로 있습니다.</p>}
         {workArea === "selected" && scopeError ? <p role="alert" className="shrink-0 bg-warn-bg px-3 py-2 text-[12px] font-black text-[var(--color-danger-tx)]">범위를 바꾸지 않았습니다 · {scopeError}</p> : null}
         <div className="shrink-0 space-y-2 border-b border-line px-3 py-2">
           <div aria-label="물건챙기기 목록 도구" className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1">
@@ -515,7 +526,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
             {sortMode === 'remaining' ? <button type="button" disabled={blocked} onClick={() => setSortPickedIds(new Set(pickedIds))} className="shrink-0 text-[12px] font-bold text-rose-deep">다시 정렬</button> : null}
             <input value={search} onChange={event => setSearch(event.target.value)} placeholder="상품번호 · 고객 검색" aria-label="상품번호 또는 고객 이름 검색" className="h-9 min-w-[180px] max-w-[320px] flex-1 rounded-lg border border-line px-3 text-[13px]" />
           </div>
-          {workspaceTab === "late_paid" ? <p className="rounded-lg bg-info-bg px-3 py-2 text-[12px] font-bold text-[var(--color-info-tx)]">종료된 과거 방송의 결제완료·미챙김 상품입니다. 지금 추가로 챙겨 주세요.</p> : null}
+          {workspaceTab === "late_paid" ? <p className="rounded-lg bg-info-bg px-3 py-2 text-[12px] font-bold text-[var(--color-info-tx)]">선택한 방송에 속하지 않는 종료 방송 주문 중, 주문일보다 늦게(오늘) 입금확인된 미챙김 상품입니다. 지금 추가로 챙겨 주세요.</p> : null}
           {workspaceTab === "repick" ? <p className="rounded-lg bg-warn-bg px-3 py-2 text-[12px] font-bold text-[var(--color-danger-tx)]">챙김 완료 후 상품·색상·사이즈·수량이 변경됐습니다. 변경 전후를 확인하고 다시 챙겨 주세요.</p> : null}
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto bg-surface-2 p-2 sm:p-3">

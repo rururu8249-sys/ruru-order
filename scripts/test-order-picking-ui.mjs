@@ -360,6 +360,29 @@ assert.equal(checks().length,1,'individually confirmed repick stays visible and 
 assert.equal(check('고객8').props['aria-checked'],true,'repick row itself shows that it was handled');
 await act(async()=>tree.unmount());
 
+// [㉙-0] 자정 넘긴 방송 — 선택 방송 23시대 주문이 자정 이후(오늘) 입금돼도 선택 방송 일반 챙김에 남고(「늦은 입금」 배지),
+//   「오늘 추가 작업」엔 선택 방송 밖 줄과 repick 만. 같은 줄이 두 곳에 동시에 나오지 않는다.
+for (const id of [20,21,22]) rows.set(id,{id,picked_at:null});
+const nightLate=order(20,'paid',[item(20,1,'L')],{broadcastId:'b-night',createdAt:'2026-10-03T14:30:00Z',paidAtFull:'2026-10-03T15:40:00Z'});
+const nightRepick=order(21,'paid',[{...item(21,1,'M'),repickRequiredAt:'2026-10-04T00:10:00Z',repickBefore:{product_name:'셔츠',color:'흰',size:'S',qty:1}}],{broadcastId:'b-night',createdAt:'2026-10-03T13:00:00Z',paidAtFull:'2026-10-03T13:10:00Z'});
+const otherLate=order(22,'paid',[item(22,1,'S')],{broadcastId:'b-other',createdAt:'2026-10-02T01:00:00Z',paidAtFull:'2026-10-03T16:00:00Z'});
+globalThis.fetch=async()=>({ok:true,json:async()=>({ok:true,orders:[nightLate,nightRepick],additionalOrders:[nightLate,nightRepick,otherLate],exceptions:[]})});
+await act(async()=>{tree=Renderer.create(React.createElement(Modal,{orders:[nightLate,nightRepick],broadcastCalendar:[{id:'b-night',dateKey:'2026-10-03',label:'밤 방송'}],filterLabel:'검수',onClose(){}}));});
+assert.deepEqual(checks().map(node=>node.props['aria-label'].split(' ')[0]),['고객20'],'selected broadcast keeps its late-paid row; repick stays out');
+assert.ok(text().includes('늦은 입금'),'late payment is marked with a small badge only');
+await act(async()=>button('오늘 추가 작업').props.onClick());
+await act(async()=>button('결제 후 추가 챙기기 탭').props.onClick());
+assert.deepEqual(checks().map(node=>node.props['aria-label'].split(' ')[0]),['고객22'],'additional work shows only rows outside the selected broadcast');
+await act(async()=>button('상품 변경 · 다시 챙기기 탭').props.onClick());
+assert.deepEqual(checks().map(node=>node.props['aria-label'].split(' ')[0]),['고객21'],'repick keeps its existing additional-work tab');
+assert.ok(text().includes('선택한 방송에 속하지 않는'),'additional-work guidance names the real rule');
+globalThis.fetch=originalFetch;
+exportSnapshot=[nightLate,nightRepick];exportAdditional=[nightLate,nightRepick,otherLate];
+await act(async()=>button('물건챙기기 엑셀').props.onClick());
+assert.deepEqual(exportsMade.at(-1).orders.flatMap(order=>order.items.map(item=>item.id)).sort(),['20','21','22'],'each row is exported exactly once');
+assert.deepEqual(exportsMade.at(-1).meta.attentionItemIds.sort(),['21','22'],'selected-broadcast late payment goes to the main sheet, not the additional sheet');
+await act(async()=>tree.unmount());
+
 const modalSource=fs.readFileSync(path.join(root,'components/admin-live/LiveOrderPickingModal.tsx'),'utf8');
 globalThis.Date = SystemDate;
 // Opening from all orders must preserve the current list, not submit an
