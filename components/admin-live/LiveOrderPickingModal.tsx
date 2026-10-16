@@ -9,7 +9,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatOrderOptionText, stripNoneOptionParts } from "@/lib/orderOptionText";
-import { pickingProgress, savePicking } from "@/lib/orderPicking";
+import { isPickingComplete, pickingProgress, savePicking } from "@/lib/orderPicking";
 import { productSearchMatches } from "@/lib/productSearch";
 import { compareOrderOptions } from "@/lib/orderOptionSort";
 import { supabase } from "@/lib/supabase";
@@ -26,7 +26,7 @@ import { MAX_PICKING_BROADCASTS } from "@/lib/orderPickingScopeLoader";
 type Props = { orders: LiveOrder[]; filterLabel: string; broadcastCalendar?: BroadcastCalendarItem[]; onClose: () => void };
 
 // [2026-07-13 사장님 지침] amount = 주문에 저장된 상품금액(표시 전용, 재계산 안 함)
-type PickItem = { id: string; productId: string; text: string; productName: string; optionText: string; color: string; size: string; qty: number; amount: number; attentionKind: PickingAttentionKind; latePaid?: boolean; repickBefore?: LiveOrderItem["repickBefore"]; attentionAt?: string | null };
+type PickItem = { id: string; productId: string; text: string; productName: string; optionText: string; color: string; size: string; qty: number; amount: number; unitPrice?: number; attentionKind: PickingAttentionKind; latePaid?: boolean; repickBefore?: LiveOrderItem["repickBefore"]; attentionAt?: string | null };
 type Panel = { key: string; nickname: string; name: string; phone: string; search: string; paid: boolean; when: string; items: PickItem[]; totalQty: number };
 // [2026-09-20 사장님 요청] 상품별 = 상품(총 N개) → 그 밑에 옵션(색상/사이즈)별 N개. 옵션은 색상 가나다 → 사이즈 순.
 
@@ -75,13 +75,14 @@ function buildPanels(orderList: readonly LiveOrder[], attentionSource: boolean):
     const when = clean(o.createdAt) || clean(o.submittedAt);
     const rawItems = Array.isArray(o.items) ? (o.items as LiveOrderItem[]) : [];
     const items: PickItem[] = rawItems.length === 0
-      ? [{ id: String(o.id), productId: "", text: clean(o.orderSummary) || "상품", productName: clean(o.orderSummary) || "상품", optionText: "", color: "", size: "", qty: 1, amount: Number(o.productAmount || 0), attentionKind: null }]
+      ? [{ id: String(o.id), productId: "", text: clean(o.orderSummary) || "상품", productName: clean(o.orderSummary) || "상품", optionText: "", color: "", size: "", qty: 1, amount: Number(o.productAmount || 0), unitPrice: Number(o.productAmount || 0), attentionKind: null }]
       : rawItems.map((it) => {
           const opt = formatOrderOptionText(it.color, it.size) || stripNoneOptionParts(it.optionText);
           const productName = clean(it.productName) || "상품";
           return {
             id: String(it.id), productId: clean(it.productId), text: productName + (opt ? ` (${opt})` : ""), productName,
             optionText: opt, color: clean(it.color), size: clean(it.size), qty: Number(it.qty || 1), amount: Number(it.amount || 0),
+            unitPrice: Number(it.unitPrice || 0), // [㉙-2] 표시 전용 단가(어댑터 값 그대로, 재계산 없음)
             attentionKind: attentionSource ? classifyPickingAttention(o, { ...it, pickedAt: null }) : null,
             // [㉙-0] 표시 전용 「늦은 입금」 배지 — 주문일보다 늦은 날 입금확인(자정 넘긴 방송 포함). 분류·목록 이동엔 안 쓴다.
             latePaid: classifyPickingAttention(o, { ...it, pickedAt: null }) === "late_paid",
@@ -121,6 +122,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
   const [payView, setPayView] = useState<"paid" | "unpaid" | "all">("paid");
   const inPayView = (panel: { paid: boolean }) => payView === "all" || (payView === "paid" ? panel.paid : !panel.paid);
   const [exporting, setExporting] = useState(false);
+  // [㉙-2] 사진 크게 보기(회원목록 photoZoom 패턴) · 누락 대조 줄의 취소/제외 목록 펼침
+  const [photoZoom, setPhotoZoom] = useState("");
+  const [showDropped, setShowDropped] = useState(false);
   const [sessionCompletedIds, setSessionCompletedIds] = useState<Set<string>>(new Set());
 
   const activeSelectedOrders = remoteScopeApplied ? workspaceOrders : orders;
@@ -393,7 +397,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
     : [["late_paid", "결제 후 추가 챙기기", tabCounts.late_paid], ["repick", "상품 변경 · 다시 챙기기", tabCounts.repick], ["picked", "챙김 완료", tabCounts.picked]];
   // [㉘] 화면 목록 = 결제 상태 칩 범위(미결제 포함 가능). scopedRows(결제완료)는 숫자 계산 전용으로 그대로.
   const viewRows = panels.filter(inPayView).flatMap(panel => panel.items.map(item => ({ panel, item })));
-  const allRows = viewRows.filter(({ item }) => {
+  const inTab = ({ item }: { item: PickItem }) => {
     const done = pickedIds.has(item.id);
     if (workspaceTab === "picked") return done;
     // [㉖] 「일반 챙김」은 이전에 챙긴 줄도 ✓(초록 배경·버튼)로 계속 보인다 — 다시 열어도 확인 가능.
@@ -402,12 +406,31 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
     if (workspaceTab === "repick") return item.attentionKind === "repick";
     if (workspaceTab === "late_paid") return item.attentionKind === "late_paid" || item.attentionKind === "payment_time_missing";
     return item.attentionKind === null;
-  });
+  };
+  const allRows = viewRows.filter(inTab);
   const total = progress.total;
   const got = progress.got;
   const q = search.trim();
   const matches = allRows.filter(({ panel, item }) =>
     !q || productSearchMatches([panel.search, item.text].join(" "), q));
+  // [㉙-2] 이 탭에서 검색어·결제 칩 때문에 숨겨진 수량(경고 줄용, 표시 전용).
+  const sumQty = (rows: readonly { item: PickItem }[]) => rows.reduce((sum, { item }) => sum + item.qty, 0);
+  const hiddenQty = sumQty(panels.flatMap(panel => panel.items.map(item => ({ panel, item }))).filter(inTab)) - sumQty(matches);
+  // [㉙-2] 누락 대조(선택 방송 작업) — 주문서 기준 N = 결제완료 a + 미결제 b + 추가 작업(다시 챙기기) c + 취소/제외 d.
+  const droppedRows = activeSelectedOrders.filter(o => clean(o.paymentStatus) === "canceled" || o.excludeFromPicking === true)
+    .flatMap(o => (o.items?.length ? o.items : [{ id: String(o.id), productName: clean(o.orderSummary) || "상품", optionText: "", qty: 1 } as LiveOrderItem]).map(it => ({ o, it })));
+  const recon = {
+    paid: selectedOnlyPanels.filter(panel => panel.paid).reduce((sum, panel) => sum + panel.totalQty, 0),
+    unpaid: selectedOnlyPanels.filter(panel => !panel.paid).reduce((sum, panel) => sum + panel.totalQty, 0),
+    moved: selectedPanels.flatMap(panel => panel.items).filter(item => repickItemIds.has(item.id)).reduce((sum, item) => sum + item.qty, 0),
+    dropped: droppedRows.reduce((sum, { it }) => sum + Math.max(1, Number(it.qty) || 1), 0),
+  };
+  const reconTotal = recon.paid + recon.unpaid + recon.moved + recon.dropped;
+  const priceText = (rows: readonly { item: PickItem }[]) => {
+    const prices = [...new Set(rows.map(({ item }) => item.unitPrice || 0).filter(price => price > 0))].sort((a, b) => a - b);
+    if (!prices.length) return "";
+    return prices.length === 1 ? `${prices[0].toLocaleString("ko-KR")}원` : `${prices[0].toLocaleString("ko-KR")}~${prices[prices.length - 1].toLocaleString("ko-KR")}원`;
+  };
   type PickingRow = typeof allRows[number];
   const grouped = new Map<string, { title: string; subtitle: string; rows: PickingRow[] }>();
   for (const row of matches) {
@@ -440,15 +463,33 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
   const blocked = loading || saving || loadError || exporting;
   const appliedScopeTitle = appliedBroadcastIds.map((id) => broadcastCalendar.find((item) => item.id === id)?.label).filter(Boolean).join(", ");
   const title = appliedScopeTitle || String(filterLabel || "").replace(/^방송:\s*/, "");
+  // [㉙-2] 머리 숫자 — 결제완료 기준 「남은 n / 전체 N개」 + 얇은 진행바, 다 챙기면 「✓ 다 챙김」. 미결제는 빨간 「미결제 N」 따로.
+  const progressBlock = (p: { total: number; got: number }, unpaid: number, size: "lg" | "md") => {
+    const done = isPickingComplete(p);
+    return (
+      <div className={`shrink-0 text-right ${size === "lg" ? "w-[136px]" : "w-[120px]"}`}>
+        {done
+          ? <span className="inline-block rounded-full bg-[var(--color-ok-tx)] px-2 py-0.5 text-[12px] font-black text-white">✓ 다 챙김</span>
+          : <div className={`font-black leading-tight text-ink tabular-nums ${size === "lg" ? "text-[16px]" : "text-[14px]"}`}>남은 {p.total - p.got} <span className="text-[12px] font-bold text-ink-soft">/ 전체 {p.total}개</span></div>}
+        {!done && p.total > 0 ? <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-line"><div className="h-full rounded-full bg-[var(--color-ok-tx)]" style={{ width: `${Math.round((p.got / p.total) * 100)}%` }} /></div> : null}
+        {unpaid > 0 ? <div className="text-[12px] font-bold text-[var(--color-danger-tx)] tabular-nums">미결제 {unpaid}</div> : null}
+      </div>
+    );
+  };
   const renderRow = ({ panel, item }: PickingRow) => {
     const done = pickedIds.has(item.id);
     // [㉗] 상품별 = 옵션 아래 «손님 줄» — 사진·옵션명은 옵션 머리줄에 있으므로 줄에선 뺀다. 고객별은 기존 그대로.
     const batch = viewMode === "batch";
     return (
-      <div key={item.id} className={`grid items-center gap-2 px-3 py-2 ${batch ? "grid-cols-[minmax(0,1fr)_92px] max-[360px]:grid-cols-1" : "grid-cols-[56px_minmax(0,1fr)_92px] max-[360px]:grid-cols-[56px_minmax(0,1fr)]"} ${done ? "bg-ok-bg/60" : "bg-surface"}`}>
-        {batch ? null : itemPhoto[item.id] ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={itemPhoto[item.id]} alt={item.productName} className="h-14 w-14 shrink-0 rounded-lg border border-line object-cover" />
+      <div key={item.id} className={`grid items-center gap-2 px-3 py-2 ${batch ? "grid-cols-[48px_minmax(0,1fr)_92px] max-[360px]:grid-cols-[48px_minmax(0,1fr)]" : "grid-cols-[56px_minmax(0,1fr)_92px] max-[360px]:grid-cols-[56px_minmax(0,1fr)]"} ${done ? "bg-ok-bg/60" : "bg-surface"}`}>
+        {batch ? (
+          // [㉙-2] 수량을 맨 앞 큰 배지로 — 2개 이상이면 빨강(놓치기 쉬운 수량 강조).
+          <span aria-label={`수량 ${item.qty}개`} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[20px] font-black tabular-nums ${item.qty >= 2 ? "bg-danger-bg text-[var(--color-danger-tx)]" : "bg-surface-2 text-ink"}`}>{item.qty}</span>
+        ) : itemPhoto[item.id] ? (
+          <button type="button" onClick={() => setPhotoZoom(itemPhoto[item.id])} aria-label="사진 크게 보기" className="shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={itemPhoto[item.id]} alt={item.productName} className="h-14 w-14 rounded-lg border border-line object-cover" />
+          </button>
         ) : <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-[11px] text-ink-mute">사진 없음</span>}
         <div className="min-w-0 flex-1">
           {viewMode === "order" ? <div className="break-words text-sm font-black text-ink">{item.productName}</div> : null}
@@ -471,7 +512,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
           {!panel.paid ? <span className="mt-1 inline-block rounded bg-warn-bg px-2 py-1 text-[12px] font-black text-[var(--color-danger-tx)]">미결제 · 조회만 가능</span> : null}
         </div>
         <div className="text-right max-[360px]:col-span-2 max-[360px]:flex max-[360px]:items-center max-[360px]:justify-between max-[360px]:border-t max-[360px]:border-line max-[360px]:pt-1">
-          <div className={`text-[20px] font-black ${batch && item.qty >= 2 ? "text-[var(--color-danger-tx)]" : "text-ink"}`}>{item.qty}<span className="text-[12px]">개</span></div>
+          {batch ? null : <div className="text-[20px] font-black text-ink">{item.qty}<span className="text-[12px]">개</span></div>}
           <button type="button" role="checkbox" aria-checked={done} aria-label={`${panel.nickname} ${item.productName} ${item.optionText} ${item.qty}개 ${done ? "챙김 해제" : "챙김"}`}
             disabled={blocked || !panel.paid} onClick={() => updatePicked([item.id], !pickedRef.current.has(item.id))}
             className={`mt-1 flex min-h-[44px] min-w-[92px] items-center justify-center gap-2 rounded-lg border-2 px-2 text-[13px] font-black disabled:opacity-50 ${done ? "border-ok-tx bg-[var(--color-ok-tx)] text-white" : "border-line bg-surface text-ink-soft"}`}>
@@ -484,6 +525,13 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-2 sm:p-4">
+      {photoZoom ? (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 p-6" onClick={() => setPhotoZoom("")}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={photoZoom} alt="상품 사진" className="max-h-[80vh] max-w-[80vw] rounded-2xl object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />
+          <button type="button" onClick={() => setPhotoZoom("")} className="absolute right-5 top-5 rounded-full bg-white/90 px-3 py-1 text-sm font-black text-ink shadow" aria-label="사진 닫기">✕</button>
+        </div>
+      ) : null}
       <div role="dialog" aria-modal="true" aria-label="물건챙기기" className="flex h-[94dvh] w-[min(1120px,98vw)] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
         <div className="relative flex shrink-0 items-center gap-2 border-b border-line px-3 py-1.5">
           <h2 className="shrink-0 text-[16px] font-black text-rose-deep">물건챙기기</h2>
@@ -498,6 +546,31 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
           <button type="button" disabled={saving || exporting} onClick={onClose} aria-label="닫기" className="h-9 w-9 shrink-0 rounded-full bg-surface-2 text-[22px] disabled:opacity-40">×</button>
         </div>
         <p aria-label="작업 범위" className="shrink-0 break-words border-b border-line px-3 py-1 text-[11px] font-bold leading-4 text-ink-soft">작업 범위: {workArea === "selected" ? title : "오늘 추가 작업 · 선택 방송 밖 결제 후 추가 및 상품 변경"} · 취소·챙기기 제외 주문 제외</p>
+        {workArea === "selected" && !countersUnknown ? (
+          <div aria-label="누락 대조" className="shrink-0 border-b border-line px-3 py-1 text-[12px] font-bold text-ink-soft tabular-nums">
+            주문서 기준 {reconTotal}개 = 결제완료{" "}
+            <button type="button" onClick={() => { setWorkspaceTab("standard"); setPayView("paid"); }} className="font-black text-ink underline underline-offset-2">{recon.paid}</button>
+            {" "}+ 미결제{" "}
+            <button type="button" onClick={() => { setWorkspaceTab("standard"); setPayView("unpaid"); }} className="font-black text-[var(--color-danger-tx)] underline underline-offset-2">{recon.unpaid}</button>
+            {" "}· 추가 작업{" "}
+            <button type="button" onClick={() => { setWorkArea("additional"); setWorkspaceTab("repick"); setSearch(""); }} className="font-black text-ink underline underline-offset-2">{recon.moved}</button>
+            {" "}· 취소/제외{" "}
+            <button type="button" aria-expanded={showDropped} onClick={() => setShowDropped(open => !open)} className="font-black text-ink underline underline-offset-2">{recon.dropped}</button>
+            {showDropped ? (
+              <ul aria-label="취소·챙기기 제외 목록" className="mt-1 space-y-0.5 rounded-lg bg-surface-2 px-2 py-1 font-semibold">
+                {droppedRows.length === 0 ? <li>없음</li> : droppedRows.map(({ o, it }) => (
+                  <li key={String(it.id)}>{clean(o.paymentStatus) === "canceled" ? "취소" : "챙기기 제외"} · {clean(o.nickname) || clean(o.name) || "-"} · {clean(it.productName)}{it.optionText ? ` (${stripNoneOptionParts(it.optionText)})` : ""} × {Math.max(1, Number(it.qty) || 1)} · 주문 #{String(it.id)}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+        {hiddenQty > 0 ? (
+          <div aria-label="숨김 경고" className="flex shrink-0 items-center justify-between gap-2 border-b border-line bg-warn-bg px-3 py-1 text-[12px] font-black text-warn-tx">
+            <span>검색어·결제 칩 때문에 이 목록에서 {hiddenQty}개가 숨겨져 있어요</span>
+            <button type="button" onClick={() => { setSearch(""); setPayView("all"); }} className="shrink-0 rounded-lg border border-warn-tx/35 bg-surface px-2 py-0.5 text-[12px] font-black">지우기</button>
+          </div>
+        ) : null}
         <div className="grid shrink-0 grid-cols-2 gap-1 border-b border-line bg-surface px-3 py-2">
           <button type="button" aria-label="선택 방송 작업" aria-pressed={workArea === "selected"} onClick={() => { setWorkArea("selected"); setWorkspaceTab("standard"); setSearch(""); }} className={`min-h-11 rounded-xl px-3 text-[13px] font-black ${workArea === "selected" ? "bg-rose-deep text-white" : "bg-surface-2 text-ink-soft"}`}>선택 방송 작업 <span className="tabular-nums">{countersUnknown ? "—" : selectedOpenQty}</span></button>
           <button type="button" aria-label="오늘 추가 작업" aria-pressed={workArea === "additional"} onClick={() => { setWorkArea("additional"); setWorkspaceTab(additionalLateQty > 0 ? "late_paid" : "repick"); setSearch(""); }} className={`min-h-11 rounded-xl px-3 text-[13px] font-black ${workArea === "additional" ? "bg-rose-deep text-white" : "bg-warn-bg text-[var(--color-danger-tx)]"}`}>오늘 추가 작업 <span className="tabular-nums">{countersUnknown ? "—" : additionalOpenQty}</span></button>
@@ -531,7 +604,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto bg-surface-2 p-2 sm:p-3">
           {!loading && !loadError && matches.length === 0 ? <div className="py-12 text-center font-bold text-ink-soft">현재 조회 조건에 맞는 상품이 없습니다.</div> : null}
-          <div className="space-y-2">
+          <div className="mx-auto max-w-[760px] space-y-2">
             {sortedGroups.map(([key, group]) => {
               // [㉘] 챙김 진행은 결제완료 줄 기준, 미결제 수량은 「미결제 N」으로 따로.
               const progress = pickingProgress(group.rows.filter(({ panel }) => panel.paid).map(({ item }) => ({ qty: item.qty, pickedAt: pickedIds.has(item.id) })));
@@ -544,37 +617,41 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
                   const optKey = row.item.optionText || "기본 옵션";
                   options.set(optKey, [...(options.get(optKey) || []), row]);
                 }
-                return <section key={key} className="overflow-hidden rounded-xl border border-line bg-surface">
-                  <div className="flex items-center gap-3 bg-rose-soft px-3 py-2">
+                // [㉙-2] 단가: 상품 머리엔 항상, 옵션별 단가가 다르면 옵션 머리에도.
+                const productPrice = priceText(group.rows);
+                const optionPricesDiffer = new Set(group.rows.map(({ item }) => item.unitPrice || 0).filter(price => price > 0)).size > 1;
+                // sticky 가 동작하도록 section 은 overflow-clip(overflow-hidden 은 sticky 를 막는다). 머리 높이 고정: 상품 72px · 옵션 48px.
+                return <section key={key} className="overflow-clip rounded-xl border border-line bg-surface">
+                  <div className="sticky top-0 z-[2] flex h-[72px] items-center gap-3 bg-rose-soft px-3 py-1.5">
                     {productPhoto ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={productPhoto} alt={group.title} className="h-14 w-14 shrink-0 rounded-lg border border-line object-cover" />
+                      <button type="button" onClick={() => setPhotoZoom(productPhoto)} aria-label="사진 크게 보기" className="shrink-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={productPhoto} alt={group.title} className="h-14 w-14 rounded-lg border border-line object-cover" />
+                      </button>
                     ) : null}
-                    <h3 className="min-w-0 flex-1 break-words text-[18px] font-black text-ink">{group.title}</h3>
-                    <div className="shrink-0 text-right">
-                      <div className="text-[20px] font-black leading-tight text-ink tabular-nums">총 {progress.total}개</div>
-                      <div className="text-[12px] font-bold text-ink-soft tabular-nums">챙김 {progress.got}/{progress.total}{unpaidQty > 0 ? <span className="ml-1.5 text-[var(--color-danger-tx)]">미결제 {unpaidQty}</span> : null}</div>
+                    <div className="min-w-0 flex-1">
+                      <h3 title={group.title} className="line-clamp-2 break-words text-[18px] font-black leading-tight text-ink">{group.title}</h3>
+                      {productPrice ? <div className="text-[12px] font-bold text-ink-soft tabular-nums">{productPrice}</div> : null}
                     </div>
+                    {progressBlock(progress, unpaidQty, "lg")}
                   </div>
                   {[...options].map(([optKey, optRows]) => {
                     const optProgress = pickingProgress(optRows.filter(({ panel }) => panel.paid).map(({ item }) => ({ qty: item.qty, pickedAt: pickedIds.has(item.id) })));
                     const optUnpaidQty = optRows.filter(({ panel }) => !panel.paid).reduce((sum, { item }) => sum + item.qty, 0);
-                    const optDone = optProgress.total > 0 && optProgress.got >= optProgress.total;
                     const optPhoto = optRows.map(({ item }) => itemPhoto[item.id]).find(Boolean) || "";
+                    const optPrice = optionPricesDiffer ? priceText(optRows) : "";
                     return <div key={optKey} className="border-t border-line">
-                      <div className="flex items-center gap-2 bg-surface-2 px-3 py-2">
+                      <div className="sticky top-[72px] z-[1] flex h-12 items-center gap-2 border-b border-line bg-surface-2 px-3">
                         {optPhoto && optPhoto !== productPhoto ? (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img src={optPhoto} alt={optKey} className="h-10 w-10 shrink-0 rounded-lg border border-line object-cover" />
+                          <button type="button" onClick={() => setPhotoZoom(optPhoto)} aria-label="사진 크게 보기" className="shrink-0">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={optPhoto} alt={optKey} className="h-10 w-10 rounded-lg border border-line object-cover" />
+                          </button>
                         ) : null}
-                        <h4 className="min-w-0 flex-1 break-words text-[16px] font-black text-rose-deep">{optKey}</h4>
-                        {optDone ? <span className="shrink-0 rounded-full bg-[var(--color-ok-tx)] px-2 py-0.5 text-[12px] font-black text-white">✓ 다 챙김</span> : null}
-                        <div className="shrink-0 text-right">
-                          <div className="text-[18px] font-black leading-tight text-ink tabular-nums">{optProgress.total}개</div>
-                          <div className="text-[12px] font-bold text-ink-soft tabular-nums">{optProgress.got}/{optProgress.total}{optUnpaidQty > 0 ? <span className="ml-1.5 text-[var(--color-danger-tx)]">미결제 {optUnpaidQty}</span> : null}</div>
-                        </div>
+                        <h4 title={optKey} className="min-w-0 flex-1 truncate text-[16px] font-black text-rose-deep">{optKey}{optPrice ? <span className="ml-2 text-[12px] font-bold text-ink-soft tabular-nums">{optPrice}</span> : null}</h4>
+                        {progressBlock(optProgress, optUnpaidQty, "md")}
                       </div>
-                      <div className="divide-y divide-line border-t border-line">{optRows.map(renderRow)}</div>
+                      <div className="divide-y divide-line">{optRows.map(renderRow)}</div>
                     </div>;
                   })}
                 </section>;
@@ -582,7 +659,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, broadcastCa
               return <section key={key} className="overflow-hidden rounded-xl border border-line bg-surface">
                 <div className="flex items-start justify-between gap-2 bg-rose-soft px-3 py-1.5">
                   <div className="min-w-0"><h3 className="break-words text-[16px] font-black text-ink">{group.title}</h3>{group.subtitle ? <div className="mt-1 text-[12px] font-bold text-ink-soft">{group.subtitle}</div> : null}</div>
-                  <span className="shrink-0 text-[12px] font-black text-ink-soft">{progress.got}/{progress.total}개{unpaidQty > 0 ? <span className="ml-1.5 text-[var(--color-danger-tx)]">미결제 {unpaidQty}</span> : null}</span>
+                  {progressBlock(progress, unpaidQty, "md")}
                 </div>
                 <div className="divide-y divide-line">{group.rows.map(renderRow)}</div>
               </section>;

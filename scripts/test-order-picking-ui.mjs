@@ -15,10 +15,11 @@ const root = path.resolve('.');
 const rows = new Map([[1, {id: 1, picked_at: null, collected_at: 'legacy'}], [2, {id: 2, picked_at: null}], [3, {id:3, picked_at:null}]]);
 const writes = [], toasts = [], exportsMade = [];
 let gate = null, deny = false, readGate = null;
+let productRows = [];
 const db = { from(table) {
   return {
     select() { return { async in(_, ids) {
-      const data = table === 'products' ? [] : ids.map(id => rows.get(Number(id))).filter(Boolean).map(row => ({...row}));
+      const data = table === 'products' ? productRows.filter(row => ids.map(String).includes(String(row.id))) : ids.map(id => rows.get(Number(id))).filter(Boolean).map(row => ({...row}));
       if (readGate) await readGate;
       return { data, error: null };
     } }; },
@@ -68,7 +69,7 @@ assert.equal(check("고객1").props['aria-checked'], false, 'legacy collected mu
 assert.ok(text().includes('원본 옵션'), 'optionText-only legacy orders must keep their option');
 // [㉗] 상품별 = 상품 머리(총 N개·챙김 n/N) → 옵션 머리(h4·N개·n/N) → 사진 없는 손님 줄
 assert.ok(tree.root.findAllByType('h4').length >= 1, 'batch view groups customer rows under option headers');
-assert.ok(text().includes('총 '), 'product header shows the total quantity');
+assert.ok(text().includes('전체 '), 'product header shows remaining / total quantity');
 assert.ok(!text().includes('사진 없음'), 'customer rows under an option carry no photo cell');
 // Scope/help remains available without occupying permanent work-list space.
 const scopeDetails = tree.root.findAllByType('details');
@@ -238,7 +239,7 @@ assert.ok(text().includes('미결제 · 조회만 가능'), 'unpaid badge is kep
 assert.equal(counterText(), countersBefore, 'header counters stay paid-based');
 await act(async()=>payChip('전체').props.onClick());
 assert.equal(checks().length, 3, 'all view lists paid and unpaid rows');
-assert.ok(tree.root.findAll(node => node.type === 'span' && nodeText(node) === '미결제 7').length >= 1, 'unpaid quantity is shown separately on the group header');
+assert.ok(tree.root.findAll(node => (node.type === 'span' || node.type === 'div') && nodeText(node) === '미결제 7').length >= 1, 'unpaid quantity is shown separately on the group header');
 assert.equal(counterText(), countersBefore, 'header counters stay paid-based in all view');
 await act(async()=>button('물건챙기기 엑셀').props.onClick());
 assert.deepEqual(exportsMade.at(-1).orders.flatMap(order=>order.items.map(item=>item.id)).sort(),['1','2','3'],'all view exports unpaid rows too');
@@ -381,6 +382,44 @@ exportSnapshot=[nightLate,nightRepick];exportAdditional=[nightLate,nightRepick,o
 await act(async()=>button('물건챙기기 엑셀').props.onClick());
 assert.deepEqual(exportsMade.at(-1).orders.flatMap(order=>order.items.map(item=>item.id)).sort(),['20','21','22'],'each row is exported exactly once');
 assert.deepEqual(exportsMade.at(-1).meta.attentionItemIds.sort(),['21','22'],'selected-broadcast late payment goes to the main sheet, not the additional sheet');
+await act(async()=>tree.unmount());
+
+// [㉙-2] 누락 대조 줄 · 숨김 경고 · 수량 배지 · sticky 머리 · 단가 · 사진 확대
+for (const id of [30,31,32]) rows.set(id,{id,picked_at:null});
+productRows=[{id:'p1',image_url:'https://img.test/p1.jpg'}];
+const priced=(id,qty,size,price)=>({...item(id,qty,size),productId:'p1',productName:'코트',unitPrice:price});
+const layoutFixture=[order(30,'paid',[priced(30,2,'S',50000)],{broadcastId:'b-z'}),order(31,'unpaid',[priced(31,1,'M',60000)],{broadcastId:'b-z'}),order(32,'canceled',[priced(32,1,'L',50000)],{broadcastId:'b-z'})];
+globalThis.fetch=async()=>({ok:true,json:async()=>({ok:true,orders:layoutFixture,additionalOrders:[],exceptions:[]})});
+await act(async()=>{tree=Renderer.create(React.createElement(Modal,{orders:layoutFixture,broadcastCalendar:[{id:'b-z',dateKey:'2026-10-04',label:'코트 방송'}],filterLabel:'검수',onClose(){}}));});
+const recon=tree.root.findByProps({'aria-label':'누락 대조'});
+assert.ok(nodeText(recon).includes('주문서 기준 4개'),'order-sheet total = paid + unpaid + moved + cancelled/excluded');
+const reconButtons=recon.findAllByType('button');
+assert.deepEqual(reconButtons.map(node=>nodeText(node)),['2','1','0','1'],'each part of the equation is a clickable number');
+await act(async()=>reconButtons[3].props.onClick());
+assert.ok(nodeText(tree.root.findByProps({'aria-label':'취소·챙기기 제외 목록'})).includes('취소'),'cancelled/excluded number opens the dropped list');
+const warning=()=>tree.root.findAll(node=>node.type==='div'&&node.props['aria-label']==='숨김 경고');
+assert.equal(warning().length,1,'hidden-by-chip warning appears while unpaid rows are hidden');
+assert.ok(nodeText(warning()[0]).includes('1개가 숨겨져'));
+await act(async()=>warning()[0].findByType('button').props.onClick());
+assert.equal(warning().length,0,'clear shows everything again');
+assert.equal(checks().length,2,'paid and unpaid rows are listed after clearing');
+const badge=tree.root.findByProps({'aria-label':'수량 2개'});
+assert.match(badge.props.className,/danger/,'quantity of 2+ is a red badge at the front of the row');
+const h3=tree.root.findByType('h3'); const h4s=tree.root.findAllByType('h4');
+assert.match(h3.parent.parent.props.className,/sticky top-0/,'product head is sticky');
+assert.ok(h4s.every(node=>/sticky top-\[72px\]/.test(node.parent.props.className)),'option heads stick under the product head');
+assert.ok(nodeText(h3.parent).includes('50,000~60,000원'),'product head shows the unit price range');
+assert.ok(h4s.some(node=>nodeText(node).includes('60,000원')),'option heads show their own price when prices differ');
+assert.ok(tree.root.findAll(node=>node.type==='div'&&nodeText(node)==='남은 2 / 전체 2개').length>=1,'remaining / total wording');
+assert.ok(tree.root.findAll(node=>node.type==='div'&&/mx-auto max-w-\[760px\]/.test(node.props.className||'')).length===1,'list is centered with a 760px max width');
+const zoomButtons=tree.root.findAll(node=>node.type==='button'&&node.props['aria-label']==='사진 크게 보기');
+assert.ok(zoomButtons.length>=1,'thumbnails are zoom buttons');
+await act(async()=>zoomButtons[0].props.onClick());
+assert.equal(tree.root.findAll(node=>node.type==='img'&&node.props.alt==='상품 사진').length,1,'zoom overlay opens');
+await act(async()=>button('사진 닫기').props.onClick());
+assert.equal(tree.root.findAll(node=>node.type==='img'&&node.props.alt==='상품 사진').length,0,'zoom overlay closes');
+productRows=[];
+globalThis.fetch=originalFetch;
 await act(async()=>tree.unmount());
 
 const modalSource=fs.readFileSync(path.join(root,'components/admin-live/LiveOrderPickingModal.tsx'),'utf8');
