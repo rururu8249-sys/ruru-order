@@ -397,6 +397,9 @@ const recon=tree.root.findByProps({'aria-label':'누락 대조'});
 assert.ok(nodeText(recon).includes('주문서 기준 4개'),'order-sheet total = paid + unpaid + moved + cancelled/excluded');
 const reconButtons=recon.findAllByType('button');
 assert.deepEqual(reconButtons.map(node=>nodeText(node)),['2','1','0','1'],'each part of the equation is a clickable number');
+// [㉚-1] 좁은 화면에서 잘리지 않게 — 줄 전체 nowrap/가로 스크롤 금지, 항목 단위(nowrap span)로만 줄바꿈.
+assert.doesNotMatch(recon.props.className,/whitespace-nowrap|overflow-x-auto/,'reconciliation line may wrap on phones');
+assert.ok(reconButtons.every(node=>node.parent.type==='span'&&/whitespace-nowrap/.test(node.parent.props.className)),'each label+number item stays together when wrapping');
 await act(async()=>reconButtons[3].props.onClick());
 assert.ok(nodeText(tree.root.findByProps({'aria-label':'취소·챙기기 제외 목록'})).includes('취소'),'cancelled/excluded number opens the dropped list');
 const warning=()=>tree.root.findAll(node=>node.type==='div'&&node.props['aria-label']==='숨김 경고');

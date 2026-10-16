@@ -502,15 +502,17 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
         </div>
         <p aria-label="작업 범위" className={`shrink-0 break-words border-b border-line px-3 py-1 text-[11px] font-bold leading-4 text-ink-soft`}>작업 범위: {workArea === "selected" ? title : "오늘 추가 작업 · 주문서 범위 밖 결제 후 추가 및 상품 변경"} · 취소·챙기기 제외 주문 제외</p>
         {workArea === "selected" && !scopeTooWide && !countersUnknown ? (
-          <div aria-label="누락 대조" className="shrink-0 border-b border-line px-3 py-1 max-sm:py-0.5 max-sm:overflow-x-auto max-sm:whitespace-nowrap text-[12px] font-bold text-ink-soft tabular-nums">
-            주문서 기준 {reconTotal}개 = 결제완료{" "}
-            <button type="button" onClick={() => { setWorkspaceTab("standard"); setPayView("paid"); }} className="font-black text-ink underline underline-offset-2">{recon.paid}</button>
-            {" "}+ 미결제{" "}
-            <button type="button" onClick={() => { setWorkspaceTab("standard"); setPayView("unpaid"); }} className="font-black text-[var(--color-danger-tx)] underline underline-offset-2">{recon.unpaid}</button>
-            {" "}· 추가 작업{" "}
-            <button type="button" onClick={() => { setWorkArea("additional"); setWorkspaceTab("repick"); setSearch(""); }} className="font-black text-ink underline underline-offset-2">{recon.moved}</button>
-            {" "}· 취소/제외{" "}
-            <button type="button" aria-expanded={showDropped} onClick={() => setShowDropped(open => !open)} className="font-black text-ink underline underline-offset-2">{recon.dropped}</button>
+          <div aria-label="누락 대조" className="shrink-0 border-b border-line px-3 py-1 max-sm:py-0.5 text-[12px] font-bold text-ink-soft tabular-nums">
+            {/* [㉚-1] 좁은 화면에선 항목 단위로만 줄바꿈(항목 안은 안 끊김) — 가로 넘침 0. 넓은 화면은 한 줄 그대로. */}
+            <span className="whitespace-nowrap">주문서 기준 {reconTotal}개 =</span>{" "}
+            <span className="whitespace-nowrap">결제완료{" "}
+            <button type="button" onClick={() => { setWorkspaceTab("standard"); setPayView("paid"); }} className="font-black text-ink underline underline-offset-2">{recon.paid}</button></span>
+            {" "}<span className="whitespace-nowrap">+ 미결제{" "}
+            <button type="button" onClick={() => { setWorkspaceTab("standard"); setPayView("unpaid"); }} className="font-black text-[var(--color-danger-tx)] underline underline-offset-2">{recon.unpaid}</button></span>
+            {" "}<span className="whitespace-nowrap">· 추가 작업{" "}
+            <button type="button" onClick={() => { setWorkArea("additional"); setWorkspaceTab("repick"); setSearch(""); }} className="font-black text-ink underline underline-offset-2">{recon.moved}</button></span>
+            {" "}<span className="whitespace-nowrap">· 취소/제외{" "}
+            <button type="button" aria-expanded={showDropped} onClick={() => setShowDropped(open => !open)} className="font-black text-ink underline underline-offset-2">{recon.dropped}</button></span>
             {showDropped ? (
               <ul aria-label="취소·챙기기 제외 목록" className="mt-1 space-y-0.5 rounded-lg bg-surface-2 px-2 py-1 font-semibold">
                 {droppedRows.length === 0 ? <li>없음</li> : droppedRows.map(({ o, it }) => (
