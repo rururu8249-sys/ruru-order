@@ -1252,9 +1252,8 @@ export default function AdminLiveDashboard() {
 
   // [㉕-B] 상태 칩 숫자용 — filteredOrders 와 같은 조건에서 matchesStatus 만 뺀 목록.
   //   (상태 필터를 걸면 목록엔 그 상태만 남지만, 칩 숫자는 «상태 무관 전체»로 세야 안 무너진다)
-  const filteredOrdersForCounts = useMemo(() => {
-    const keyword = normalizeText(filters.keyword);
-
+  // [㉚] 물건챙기기 범위 = 방송·범위·기간만(상태칩·검색 무관). 표 칩 숫자(filteredOrdersForCounts)는 여기에 검색만 더 건다.
+  const pickingBaseOrders = useMemo(() => {
     return orders.filter((order) => {
       const selectedAlwaysOrderDate = getAlwaysOrderDateFromFilter(filters.broadcast);
 
@@ -1286,6 +1285,18 @@ export default function AdminLiveDashboard() {
             ? isAlwaysOrderLike(order as any)
             : !isAlwaysOrderLike(order as any);
 
+      return (
+        matchBroadcast &&
+        matchScope &&
+        matchesDate(order, filters)
+      );
+    });
+  }, [orders, filters, broadcasts, activeBroadcast]);
+
+  const filteredOrdersForCounts = useMemo(() => {
+    const keyword = normalizeText(filters.keyword);
+
+    return pickingBaseOrders.filter((order) => {
       const matchKeyword =
         !keyword ||
         normalizeText([
@@ -1299,14 +1310,9 @@ export default function AdminLiveDashboard() {
           ...order.items.map((item) => `${item.productName} ${item.optionText}`),
         ].join(" ")).includes(keyword);
 
-      return (
-        matchBroadcast &&
-        matchScope &&
-        matchesDate(order, filters) &&
-        matchKeyword
-      );
+      return matchKeyword;
     });
-  }, [orders, filters, broadcasts, activeBroadcast]);
+  }, [pickingBaseOrders, filters.keyword]);
 
   const filteredOrders = useMemo(
     () => filteredOrdersForCounts.filter((order) => matchesStatus(order, filters.status)),
@@ -1764,6 +1770,7 @@ export default function AdminLiveDashboard() {
                     <LiveOrderTable
                       orders={filteredOrders}
                       countBaseOrders={filteredOrdersForCounts}
+                      pickingBaseOrders={pickingBaseOrders}
                       allOrderCount={orders.length}
                       selectedOrderId={selectedOrder?.id || ""}
                       loading={loading}

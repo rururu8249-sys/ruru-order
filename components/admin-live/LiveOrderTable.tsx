@@ -417,6 +417,8 @@ type Props = {
   orders: LiveOrder[];
   /** [㉕-B] 상태 칩 숫자용 — matchesStatus 만 뺀 목록(상태 필터 걸어도 칩 숫자가 안 무너지게). 없으면 기존 orders 기준. */
   countBaseOrders?: LiveOrder[];
+  /** [㉚] 물건챙기기 범위용 — 방송·범위·기간만 적용(상태칩·검색 무관). 없으면 countBaseOrders → orders. */
+  pickingBaseOrders?: LiveOrder[];
   allOrderCount: number;
   selectedOrderId: string;
   onSelectOrder: (order: LiveOrder) => void;
@@ -439,6 +441,7 @@ type Props = {
 export default function LiveOrderTable({
   orders,
   countBaseOrders,
+  pickingBaseOrders,
   allOrderCount,
   selectedOrderId,
   onSelectOrder,
@@ -611,7 +614,16 @@ export default function LiveOrderTable({
       return !Number.isNaN(created) && created >= startMs;
     });
   }, [orders, broadcastStartedAt, filters.broadcast, filters.date]);
-  const pickingScopeOrders = useMemo(() => pickingScope(countBaseOrders || orders, broadcastStartedAt, filters.broadcast === 'current' && filters.date === 'all'), [countBaseOrders, orders, broadcastStartedAt, filters.broadcast, filters.date]);
+  // [㉚] 물건챙기기 범위 = 주문서에서 고른 방송·범위·기간(상태칩·작업현황·검색 무관). 창 안 방송 선택은 없다.
+  const pickingSourceOrders = pickingBaseOrders || countBaseOrders || orders;
+  const pickingScopeOrders = useMemo(() => pickingScope(pickingSourceOrders, broadcastStartedAt, filters.broadcast === 'current' && filters.date === 'all'), [pickingSourceOrders, broadcastStartedAt, filters.broadcast, filters.date]);
+  // 창에는 취소·챙기기 제외 주문도 함께 넘긴다(누락 대조 「취소/제외」 숫자·엑셀 취소 시트용 — 창 목록엔 안 나옴). 시작 컷은 pickingScope 와 같은 규칙.
+  const pickingModalSourceOrders = useMemo(() => {
+    const start = broadcastStartedAt && filters.broadcast === 'current' && filters.date === 'all' ? Date.parse(broadcastStartedAt) : NaN;
+    return pickingSourceOrders.filter(order => !Number.isFinite(start) || Date.parse(order.createdAt || '') >= start);
+  }, [pickingSourceOrders, broadcastStartedAt, filters.broadcast, filters.date]);
+  // 주문서 필터가 전체 방송·전체 기간이면 범위가 너무 넓다 → 창은 열리되 목록 대신 안내만.
+  const pickingScopeTooWide = filters.broadcast === 'all' && filters.date === 'all';
 
   // [㉕-B] 칩 숫자 기준 — countBaseOrders(상태 무관)가 있으면 목록과 같은 «방송 컷 + 취소보기» 처리 후 센다.
   //   없으면 기존과 동일하게 baseOrders 로 센다(동작 유지). 목록·페이지·엑셀·선택 로직은 orders 그대로.
@@ -872,7 +884,15 @@ export default function LiveOrderTable({
       .filter(Boolean)
       .join(" · ");
   }, [broadcastOptions, filters]);
-  const pickingScopeLabel = currentFilterLabel.split(' · ').filter(part => !['상태: 전체보기','결제완료','미결제','매칭필요','입금확인','카드미결제','카드결제완료','주문서취소','택배출고'].includes(part)).join(' · ') + (filters.scope === 'shop' ? ' · 쇼핑몰 주문' : filters.scope === 'broadcast' ? ' · 방송 주문' : ' · 방송+쇼핑몰');
+  // [㉚] 물건챙기기 「작업 범위」 = 주문서 필터 이름 그대로(상태·검색·기본값 「날짜: 전체보기」·「방송+쇼핑몰」은 뺀다).
+  //   「현재 방송」은 실제 방송 이름으로 바꾼다(엑셀 파일명이 이 이름의 첫 부분을 쓴다 — 예: 롱샴랜덤박스1016루루.xlsx).
+  const pickingCurrentBroadcastLabel = filters.broadcast === 'current'
+    ? Array.from(new Set(pickingModalSourceOrders.map(order => order.broadcastId).filter(Boolean))).map(id => broadcastCalendar.find(item => item.id === id)?.label).filter(Boolean).join(', ')
+    : '';
+  const pickingScopeLabel = currentFilterLabel.split(' · ')
+    .filter(part => !['상태: 전체보기','결제완료','미결제','매칭필요','입금확인','카드미결제','카드결제완료','주문서취소','택배출고','날짜: 전체보기'].includes(part) && !part.startsWith('검색:'))
+    .map(part => (part === '현재 방송' && pickingCurrentBroadcastLabel ? `방송: ${pickingCurrentBroadcastLabel}` : part))
+    .join(' · ') + (filters.scope === 'shop' ? ' · 쇼핑몰 주문' : filters.scope === 'broadcast' ? ' · 방송 주문' : '');
 
   const runExport = async (kind: "rozen" | "picking", orders: LiveOrder[], filterLabel: string) => {
     if (orders.length === 0) {
@@ -908,7 +928,7 @@ export default function LiveOrderTable({
     {cartHoldsOpen ? <LiveCartHoldsModal onClose={() => { setCartHoldsOpen(false); void refreshCartHoldSummary(); }} /> : null}
 
     {pickingOpen ? (
-          <LiveOrderPickingModal orders={pickingScopeOrders.filter(order => pickingOrderIds.has(String(order.id)))} filterLabel={pickingScopeLabel} broadcastCalendar={broadcastCalendar} onClose={() => { setPickingOpen(false); void onRefresh?.(); }} />
+          <LiveOrderPickingModal orders={pickingScopeTooWide ? [] : pickingModalSourceOrders.filter(order => pickingOrderIds.has(String(order.id)))} filterLabel={pickingScopeLabel} scopeTooWide={pickingScopeTooWide} onClose={() => { setPickingOpen(false); void onRefresh?.(); }} />
     ) : null}
     {exportConfirm !== "" ? (
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setExportConfirm("")}>
@@ -1082,8 +1102,8 @@ export default function LiveOrderTable({
 
           <button
             type="button"
-            onClick={() => { setPickingOrderIds(new Set(pickingScopeOrders.map(order => String(order.id)))); setPickingOpen(true); }}
-            disabled={pickingScopeOrders.length === 0}
+            onClick={() => { setPickingOrderIds(new Set(pickingScopeTooWide ? [] : pickingModalSourceOrders.map(order => String(order.id)))); setPickingOpen(true); }}
+            disabled={!pickingScopeTooWide && pickingScopeOrders.length === 0}
             className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
             title="물건챙기기 체크리스트 팝업을 엽니다"
           >
