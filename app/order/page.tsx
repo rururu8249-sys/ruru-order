@@ -127,6 +127,7 @@ import { readCustomerUiPreview, resolveCustomerUiV2, UI_PREVIEW_DEFAULTS, UI_V2_
 import { restyleClassV2, stripDecorativeEmojiV2 } from "@/lib/customerUiV2Restyle";
 import { CUSTOMER_ORDER_FILTERS, cleanCustomerOptionValue, orderLookupStatusView } from "@/lib/customerOrderStatusView";
 import CartAddFeedbackV2 from "@/components/customer/CartAddFeedbackV2";
+import LiveBadgeCompactV2 from "@/components/customer/LiveBadgeCompactV2";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import ShopContactLink from "@/components/customer/ShopContactLink";
 import { useShopInfo } from "@/lib/useShopInfo";
@@ -7133,7 +7134,9 @@ export default function OrderPage() {
                               </span>
                             ) : null}
                             {/* [2026-09-02 사장님 지시] 방송 중 고정(위젯) 상품은 썸네일 사진 위에 「라이브 소개중」 뱃지 */}
-                            {isBroadcastOn && pinned ? (
+                            {isBroadcastOn && pinned && uiV2 && listView !== "grid" ? (
+                              <LiveBadgeCompactV2 />
+                            ) : isBroadcastOn && pinned ? (
                               <span style={uiV2 ? { position: "absolute", top: "8px", left: "8px", zIndex: 2, display: "flex", alignItems: "center", gap: "5px", background: "#111111", color: "#FFFFFF", fontSize: "13px", fontWeight: 600, borderRadius: "9999px", padding: "4px 10px" } : { position: "absolute", top: "6px", left: "6px", zIndex: 2, display: "flex", alignItems: "center", gap: "4px", background: "#E8340A", color: "#fff", fontSize: "10px", fontWeight: 900, borderRadius: "999px", padding: "3px 8px", boxShadow: "0 2px 6px rgba(0,0,0,0.3)" }}>
                                 <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#fff", animation: "shimmer 1.2s ease-in-out infinite" }} />
                                 라이브 소개중
