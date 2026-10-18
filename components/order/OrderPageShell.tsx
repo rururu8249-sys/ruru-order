@@ -6,12 +6,14 @@ import type { ReactNode } from "react";
 
 type OrderPageShellProps = {
   children: ReactNode;
+  // [㉜] 손님화면 새 모양(ui=v2) — 바탕 흰색(DESIGN.md canvas). 없으면 기존 그대로.
+  tone?: "v2";
 };
 
-export default function OrderPageShell({ children }: OrderPageShellProps) {
+export default function OrderPageShell({ children, tone }: OrderPageShellProps) {
   return (
     <main
-      className="min-h-screen bg-[#F6F4F2] px-2 py-4 text-[#151923] select-none sm:px-4"
+      className={tone === "v2" ? "min-h-screen bg-white px-2 py-4 text-[#111111] select-none sm:px-4" : "min-h-screen bg-[#F6F4F2] px-2 py-4 text-[#151923] select-none sm:px-4"}
       style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
     >
       <section className="mx-auto w-full max-w-[560px]">{children}</section>

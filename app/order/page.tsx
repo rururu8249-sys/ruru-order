@@ -119,7 +119,9 @@ import {
 } from "@/lib/finalSubmitConfirmation";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { compareMixOrder, mixSeedForToday } from "@/lib/productMixOrder";
-import { pickVisibleBadges, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_MIN_BUYERS, TOP_SELLER_RANK_PCT, POPULAR_RANK_PCT, HOLDING_MIN_PEOPLE } from "@/lib/productBadgePriority";
+import { pickVisibleBadges, BADGE_INFO_KEYS, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_MIN_BUYERS, TOP_SELLER_RANK_PCT, POPULAR_RANK_PCT, HOLDING_MIN_PEOPLE } from "@/lib/productBadgePriority";
+import ProductColorRowV2 from "@/components/customer/ProductColorRowV2";
+import { resolveColorDisplay } from "@/lib/colorNameSwatch";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import ShopContactLink from "@/components/customer/ShopContactLink";
 import { useShopInfo } from "@/lib/useShopInfo";
@@ -299,6 +301,10 @@ const emptyItem: OrderItem = {
 };
 
 const ORDER_DRAFT_STORAGE_KEY = "ruru_order_draft_v1";
+// [㉜ 2026-10-18] 손님화면 새 모양(테스트 스위치 /order?ui=v2 → localStorage ruru_ui_v2=1) 전용 값 — 루트 DESIGN.md 기준.
+//   스위치가 꺼진 손님은 기존 화면 그대로(아래 모든 v2 값은 uiV2 일 때만 쓰인다). 모양만 — 동작·계산 무관.
+const UI_V2_STORAGE_KEY = "ruru_ui_v2";
+const v2Badge = (sale = false): CSSProperties => ({ display: "inline-flex", alignItems: "center", height: "24px", padding: "0 8px", borderRadius: "9999px", border: "1px solid #CACACB", background: "#FFFFFF", color: sale ? "#D30005" : "#111111", fontSize: "13px", fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap" });
 // [㉛ 사장님 확정 문구] 관리자 비우기·유지시간 만료 둘 다 같은 안내(같은 비움에 한 번만).
 const CART_CLEARED_NOTICE = "주문서 제출 없이 시간이 지나 장바구니가 비워졌어요.\n상품은 주문서 제출 후 입금까지 마쳐야 주문이 확정돼요.";
 
@@ -1009,7 +1015,7 @@ function isSoldOutOrderProduct(product: any): boolean {
 // 재고 임박 표시 전용(읽기만·주문/재고 로직 무관)
 // ※2026-07-05 사장님 지침: 옵션 상품은 "합산(총재고)" 표시 안 함 — 임박한 옵션만 옵션별로 표시.
 // 옵션 없는(총재고) 상품 전용: 재고관리 중이고 남은 수량 1~5개일 때만 숫자 반환
-function lowStockRemainOrderProduct(product: any, reservedQty = 0): number | null {
+function lowStockRemainOrderProduct(product: any, reservedQty = 0, maxRemain = 5): number | null {
   const note = readOrderNoteObject(product);
   if (note?.stock_management_enabled !== true) return null;
   const variants = Array.isArray(note?.stock_variants) ? note.stock_variants : [];
@@ -1018,11 +1024,11 @@ function lowStockRemainOrderProduct(product: any, reservedQty = 0): number | nul
   if (!Number.isFinite(stock)) return null;
   // [재고 홀드] 다른 고객이 담아둔(예약) 수량 반영 — 표시 전용
   const remain = Math.max(0, stock - Math.max(0, Number(reservedQty) || 0));
-  return remain >= 1 && remain <= 5 ? remain : null;
+  return remain >= 1 && remain <= maxRemain ? remain : null;
 }
 
 // 옵션 상품 전용: 재고 1~5개인 "임박 옵션"만 [{label, stock}]로 반환 (재고관리 중일 때만)
-function lowStockOptionsOrderProduct(product: any, reservedOf?: (color: unknown, size: unknown) => number): Array<{ label: string; stock: number; color: string; size: string }> {
+function lowStockOptionsOrderProduct(product: any, reservedOf?: (color: unknown, size: unknown) => number, maxRemain = 5): Array<{ label: string; stock: number; color: string; size: string }> {
   const note = readOrderNoteObject(product);
   if (note?.stock_management_enabled !== true) return [];
   const variants = Array.isArray(note?.stock_variants) ? note.stock_variants : [];
@@ -1039,7 +1045,7 @@ function lowStockOptionsOrderProduct(product: any, reservedOf?: (color: unknown,
       // [재고 홀드] 다른 고객 예약 수량 차감 — 표시 전용
       stock: Number(v.stock ?? 0) - Math.max(0, Number(reservedOf ? reservedOf(v.color, v.size) : 0) || 0),
     }))
-    .filter((x: { stock: number }) => Number.isFinite(x.stock) && x.stock >= 1 && x.stock <= 5);
+    .filter((x: { stock: number }) => Number.isFinite(x.stock) && x.stock >= 1 && x.stock <= maxRemain);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1459,6 +1465,17 @@ export default function OrderPage() {
   const [pin, setPin] = useState("");
   const [autoSaveInfo, setAutoSaveInfo] = useState(true);
   const [hasSavedInfo, setHasSavedInfo] = useState(false);
+  // [㉜] 손님화면 새 모양 테스트 스위치 — ?ui=v2 켜기 / ?ui=v1 끄기(이 브라우저에만 저장). 기본 꺼짐 = 기존 화면 그대로.
+  //   서버 렌더와 첫 화면을 맞추려고 처음엔 false, 화면이 뜬 뒤에 읽는다(켠 사람만 잠깐 깜빡일 수 있음).
+  const [uiV2, setUiV2] = useState(false);
+  useEffect(() => {
+    try {
+      const want = new URLSearchParams(window.location.search).get("ui");
+      if (want === "v2") window.localStorage.setItem(UI_V2_STORAGE_KEY, "1");
+      else if (want === "v1") window.localStorage.removeItem(UI_V2_STORAGE_KEY);
+      setUiV2(window.localStorage.getItem(UI_V2_STORAGE_KEY) === "1");
+    } catch { /* 저장소 못 쓰면 기존 화면 */ }
+  }, []);
   const [isEditingCustomerInfo, setIsEditingCustomerInfo] = useState(false);
   const [isCustomerInfoOpen, setIsCustomerInfoOpen] = useState(false);
   const [showSavedCustomerDetail, setShowSavedCustomerDetail] = useState(false);
@@ -6115,7 +6132,7 @@ export default function OrderPage() {
     ).length;
 
     return (
-      <header style={{ position: "sticky", top: 0, zIndex: 30, background: "#fff", borderBottom: "1px solid #E8E2DD", padding: "10px 12px" }}>
+      <header style={uiV2 ? { position: "sticky", top: 0, zIndex: 30, background: "#FFFFFF", borderBottom: "1px solid #E5E5E5", padding: "10px 16px" } : { position: "sticky", top: 0, zIndex: 30, background: "#fff", borderBottom: "1px solid #E8E2DD", padding: "10px 12px" }}>
         <div style={{ margin: "0 auto", width: "100%", maxWidth: "560px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
             {/* [2026-08-12 리뉴얼 1단계] 로고 — 집(대문) 아이콘 + 「루루동이 / 집구석 LIVE」 워드마크.
@@ -6125,18 +6142,18 @@ export default function OrderPage() {
                   기기(아이폰/안드로이드/윈도우)마다 그림이 조금씩 다르게 나오는 건 이모지 특성이다. */}
               <span style={{ fontSize: "25px", lineHeight: 1, display: "block" }} aria-hidden>🏠</span>
               <span style={{ lineHeight: 1.05 }}>
-                <span style={{ display: "block", fontSize: "15.5px", fontWeight: 900, letterSpacing: "-0.02em", color: "#7A1E47" }}>루루동이</span>
-                <span style={{ display: "flex", alignItems: "center", gap: "3px", marginTop: "2px", fontSize: "10px", fontWeight: 800, color: "#A8807F" }}>
+                <span style={uiV2 ? { display: "block", fontSize: "16px", fontWeight: 700, letterSpacing: "-0.02em", color: "#111111" } : { display: "block", fontSize: "15.5px", fontWeight: 900, letterSpacing: "-0.02em", color: "#7A1E47" }}>루루동이</span>
+                <span style={uiV2 ? { display: "flex", alignItems: "center", gap: "4px", marginTop: "2px", fontSize: "13px", fontWeight: 600, color: "#707072" } : { display: "flex", alignItems: "center", gap: "3px", marginTop: "2px", fontSize: "10px", fontWeight: 800, color: "#A8807F" }}>
                   집구석
-                  <span style={{ fontSize: "8.5px", fontWeight: 900, color: "#fff", background: broadcast ? "#E8340A" : "#B98A9C", borderRadius: "4px", padding: "1px 4px", letterSpacing: "0.05em" }}>LIVE</span>
+                  <span style={uiV2 ? { fontSize: "13px", fontWeight: 700, color: broadcast ? "#D30005" : "#707072", letterSpacing: "0.02em" } : { fontSize: "8.5px", fontWeight: 900, color: "#fff", background: broadcast ? "#E8340A" : "#B98A9C", borderRadius: "4px", padding: "1px 4px", letterSpacing: "0.05em" }}>LIVE</span>
                 </span>
               </span>
             </Link>
-            <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "14px", fontWeight: 800, color: "#7A1E47" }}>👋 {safeGreetingName}님!</span>
+            <span style={uiV2 ? { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "14px", fontWeight: 600, color: "#111111" } : { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "14px", fontWeight: 800, color: "#7A1E47" }}>👋 {safeGreetingName}님!</span>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: "5px", height: "38px", padding: "0 13px", borderRadius: "99px", border: "1px solid #E7C9D4", background: "#F9EEF3", fontSize: "13px", fontWeight: 800, color: "#7A1E47", whiteSpace: "nowrap" }}>
+            <div style={uiV2 ? { display: "inline-flex", alignItems: "center", gap: "5px", height: "38px", padding: "0 14px", borderRadius: "9999px", border: "1px solid #CACACB", background: "#F5F5F5", fontSize: "14px", fontWeight: 600, color: "#111111", whiteSpace: "nowrap" } : { display: "inline-flex", alignItems: "center", gap: "5px", height: "38px", padding: "0 13px", borderRadius: "99px", border: "1px solid #E7C9D4", background: "#F9EEF3", fontSize: "13px", fontWeight: 800, color: "#7A1E47", whiteSpace: "nowrap" }}>
               🪙 {`${Math.max(0, Number(customerPointBalance || 0)).toLocaleString()}P`}
             </div>
           </div>
@@ -6516,7 +6533,7 @@ export default function OrderPage() {
   const topStripOn = noticeStripOn || bandStripOn;
 
   return (
-    <OrderPageShell>
+    <OrderPageShell tone={uiV2 ? "v2" : undefined}>
       <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}.ruru-cat-scroll::-webkit-scrollbar{display:none}`}</style>
       {hasSavedInfo && <TopCustomerNav />}
       {/* [2026-09-20 실측] 손님 첫 화면에서 상품이 보이기까지 상단 «껍데기»가 388px였다.
@@ -6534,20 +6551,20 @@ export default function OrderPage() {
           · 「자세히」를 누르면 기존 팝업(전문)이 그대로 열린다
           띠는 최대 두 개까지만 — 앱설치 배너가 떠 있으면 밴드 띠는 접는다(상품이 안 보이면 주문이 준다). */}
       {noticeStripOn ? (
-        <div style={{ background: popupNoticeColor, color: "#fff" }}>
+        <div style={uiV2 ? { background: "#F5F5F5", color: "#111111", borderBottom: "1px solid #E5E5E5" } : { background: popupNoticeColor, color: "#fff" }}>
           <div style={{ margin: "0 auto", width: "100%", maxWidth: "560px", display: "flex", alignItems: "center", gap: "8px", padding: "7px 12px" }}>
             <span style={{ flexShrink: 0, fontSize: "14px" }}>📢</span>
             <button
               type="button"
               onClick={openNoticeBox}
-              style={{ minWidth: 0, flex: 1, textAlign: "left", border: "none", background: "none", padding: 0, cursor: "pointer", color: "#fff", fontSize: "12.5px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+              style={uiV2 ? { minWidth: 0, flex: 1, textAlign: "left", border: "none", background: "none", padding: 0, cursor: "pointer", color: "#111111", fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } : { minWidth: 0, flex: 1, textAlign: "left", border: "none", background: "none", padding: 0, cursor: "pointer", color: "#fff", fontSize: "12.5px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
             >
               {noticeBarText}
             </button>
             <button
               type="button"
               onClick={openNoticeBox}
-              style={{ flexShrink: 0, border: "none", background: "rgba(255,255,255,0.22)", color: "#fff", borderRadius: "999px", padding: "5px 11px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}
+              style={uiV2 ? { flexShrink: 0, border: "1px solid #CACACB", background: "#FFFFFF", color: "#111111", borderRadius: "9999px", padding: "5px 12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" } : { flexShrink: 0, border: "none", background: "rgba(255,255,255,0.22)", color: "#fff", borderRadius: "999px", padding: "5px 11px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}
             >
               자세히
             </button>
@@ -6558,7 +6575,7 @@ export default function OrderPage() {
       {/* 밴드 가입 띠 — 사장님 실측: 노출하면 은근히 많이 가입한다.
           팝업(하루 한 번 몇 초)보다 여기가 접속해 있는 내내 보인다. 닫기는 막지 않는다. */}
       {bandStripOn ? (
-        <div style={{ background: "#EAFBEF", borderBottom: "1px solid #CDEBD7" }}>
+        <div style={uiV2 ? { background: "#FFFFFF", borderBottom: "1px solid #E5E5E5" } : { background: "#EAFBEF", borderBottom: "1px solid #CDEBD7" }}>
           {/* [2026-08-31 사장님 지적] 위 공지 띠처럼 칸 아무 데나 눌러도 밴드로 이동한다 */}
           <a
             href={popupBandUrl}
@@ -6569,10 +6586,10 @@ export default function OrderPage() {
           >
             <span style={{ flexShrink: 0, fontSize: "16px" }}>🟢</span>
             {/* [2026-08-31 사장님 지적] 방송 알림은 사이트 자체 기능 — 밴드는 밴드대로 소개한다 */}
-            <span style={{ minWidth: 0, flex: 1, fontSize: "12px", fontWeight: 800, color: "#0B5A24", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              루루동이 네이버밴드 <span style={{ fontWeight: 700, color: "#3E8354" }}>— 택배송장 · 후기이벤트 · 공지</span>
+            <span style={uiV2 ? { minWidth: 0, flex: 1, fontSize: "13px", fontWeight: 600, color: "#111111", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } : { minWidth: 0, flex: 1, fontSize: "12px", fontWeight: 800, color: "#0B5A24", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              루루동이 네이버밴드 <span style={uiV2 ? { fontWeight: 400, color: "#707072" } : { fontWeight: 700, color: "#3E8354" }}>— 택배송장 · 후기이벤트 · 공지</span>
             </span>
-            <span style={{ flexShrink: 0, background: "#03C75A", color: "#fff", borderRadius: "999px", padding: "5px 13px", fontSize: "11px", fontWeight: 800, boxShadow: "0 1px 3px rgba(3,199,90,0.35)" }}>
+            <span style={uiV2 ? { flexShrink: 0, background: "#FFFFFF", color: "#111111", border: "1px solid #CACACB", borderRadius: "9999px", padding: "5px 14px", fontSize: "13px", fontWeight: 600 } : { flexShrink: 0, background: "#03C75A", color: "#fff", borderRadius: "999px", padding: "5px 13px", fontSize: "11px", fontWeight: 800, boxShadow: "0 1px 3px rgba(3,199,90,0.35)" }}>
               가입
             </span>
           </a>
@@ -6697,49 +6714,49 @@ export default function OrderPage() {
                  「🛍 쇼핑몰 모드」 머리말은 우리 내부 용어라 손님은 뜻을 모른다 → 삭제.
                  알림 신청 동작·시트(setAlertSheetOpen)·유튜브 열기는 그대로. */
             liveAlertOptin ? (
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "linear-gradient(135deg,#7A1E47,#9A3560)", borderRadius: "14px", padding: "10px 13px", color: "#fff" }}>
+              <div style={uiV2 ? { display: "flex", alignItems: "center", gap: "8px", background: "#F5F5F5", borderRadius: "16px", padding: "10px 14px", color: "#111111" } : { display: "flex", alignItems: "center", gap: "8px", background: "linear-gradient(135deg,#7A1E47,#9A3560)", borderRadius: "14px", padding: "10px 13px", color: "#fff" }}>
                 <span style={{ flexShrink: 0, fontSize: "15px" }}>🛍</span>
-                <div style={{ minWidth: 0, flex: 1, fontSize: "12.5px", fontWeight: 800, lineHeight: 1.45 }}>
+                <div style={uiV2 ? { minWidth: 0, flex: 1, fontSize: "14px", fontWeight: 600, lineHeight: 1.5 } : { minWidth: 0, flex: 1, fontSize: "12.5px", fontWeight: 800, lineHeight: 1.45 }}>
                   방송 전이에요 · 아래 상품 {quickGroupBuyProducts.length}개는 <b>지금 바로 주문</b> 가능
-                  {nextLiveText ? <div style={{ fontSize: "11.5px", fontWeight: 700, opacity: 0.88 }}>다음 라이브 · {nextLiveText}</div> : null}
+                  {nextLiveText ? <div style={uiV2 ? { fontSize: "13px", fontWeight: 400, color: "#707072" } : { fontSize: "11.5px", fontWeight: 700, opacity: 0.88 }}>다음 라이브 · {nextLiveText}</div> : null}
                 </div>
-                <button type="button" onClick={() => setAlertSheetOpen(true)} style={{ flexShrink: 0, height: "30px", padding: "0 10px", border: "1px solid rgba(255,255,255,0.45)", borderRadius: "999px", background: "rgba(255,255,255,0.14)", color: "#fff", fontSize: "11px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>🔔 알림 받는 중 ✓</button>
+                <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flexShrink: 0, height: "36px", padding: "0 12px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" } : { flexShrink: 0, height: "30px", padding: "0 10px", border: "1px solid rgba(255,255,255,0.45)", borderRadius: "999px", background: "rgba(255,255,255,0.14)", color: "#fff", fontSize: "11px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>🔔 알림 받는 중 ✓</button>
                 {broadcastYoutubeUrl ? (
-                  <button type="button" aria-label="유튜브 채널 열기" onClick={() => openYoutubeApp(broadcastYoutubeUrl)} style={{ flexShrink: 0, width: "30px", height: "30px", border: "1px solid rgba(255,255,255,0.45)", borderRadius: "999px", background: "transparent", color: "#fff", fontSize: "11px", fontWeight: 900, cursor: "pointer" }}>▶</button>
+                  <button type="button" aria-label="유튜브 채널 열기" onClick={() => openYoutubeApp(broadcastYoutubeUrl)} style={uiV2 ? { flexShrink: 0, width: "36px", height: "36px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 600, cursor: "pointer" } : { flexShrink: 0, width: "30px", height: "30px", border: "1px solid rgba(255,255,255,0.45)", borderRadius: "999px", background: "transparent", color: "#fff", fontSize: "11px", fontWeight: 900, cursor: "pointer" }}>▶</button>
                 ) : null}
               </div>
             ) : (
-            <div style={{ position: "relative", overflow: "hidden", background: "linear-gradient(135deg,#7A1E47,#9A3560)", borderRadius: "18px", padding: "14px", color: "#fff" }}>
+            <div style={uiV2 ? { position: "relative", overflow: "hidden", background: "#F5F5F5", borderRadius: "16px", padding: "16px", color: "#111111" } : { position: "relative", overflow: "hidden", background: "linear-gradient(135deg,#7A1E47,#9A3560)", borderRadius: "18px", padding: "14px", color: "#fff" }}>
               <span style={{ position: "absolute", right: "-6px", bottom: "-14px", fontSize: "74px", opacity: 0.18, pointerEvents: "none" }}>🛍️</span>
-              <div style={{ fontSize: "17px", fontWeight: 900, marginBottom: "4px" }}>지금은 방송 전이에요</div>
-              <div style={{ fontSize: "12.5px", fontWeight: 700, opacity: 0.92, lineHeight: 1.5 }}>
+              <div style={uiV2 ? { fontSize: "18px", fontWeight: 700, marginBottom: "4px" } : { fontSize: "17px", fontWeight: 900, marginBottom: "4px" }}>지금은 방송 전이에요</div>
+              <div style={uiV2 ? { fontSize: "14px", fontWeight: 400, color: "#39393B", lineHeight: 1.5 } : { fontSize: "12.5px", fontWeight: 700, opacity: 0.92, lineHeight: 1.5 }}>
                 {nextLiveText ? <>다음 라이브 · {nextLiveText}<br /></> : null}
                 아래 상품 {quickGroupBuyProducts.length}개는 <b>지금 바로 주문</b>하실 수 있어요 👇
               </div>
               <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
-                <button type="button" onClick={() => setAlertSheetOpen(true)} style={{ flex: 1.2, height: "40px", border: "none", borderRadius: "12px", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}>
+                <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flex: 1.2, height: "44px", border: "none", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "15px", fontWeight: 600, cursor: "pointer" } : { flex: 1.2, height: "40px", border: "none", borderRadius: "12px", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}>
                   🔔 방송 알림 받기
                 </button>
                 {broadcastYoutubeUrl ? (
-                  <button type="button" onClick={() => openYoutubeApp(broadcastYoutubeUrl)} style={{ flex: 0.8, height: "40px", border: "1.5px solid rgba(255,255,255,0.55)", borderRadius: "12px", background: "transparent", color: "#fff", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}>▶ 유튜브 채널</button>
+                  <button type="button" onClick={() => openYoutubeApp(broadcastYoutubeUrl)} style={uiV2 ? { flex: 0.8, height: "44px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, cursor: "pointer" } : { flex: 0.8, height: "40px", border: "1.5px solid rgba(255,255,255,0.55)", borderRadius: "12px", background: "transparent", color: "#fff", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}>▶ 유튜브 채널</button>
                 ) : null}
               </div>
             </div>
             )
           ) : (
-            <div style={{ background: "#1D1418", borderRadius: "16px", padding: "13px 14px", color: "#fff" }}>
+            <div style={uiV2 ? { background: "#111111", borderRadius: "16px", padding: "14px", color: "#FFFFFF" } : { background: "#1D1418", borderRadius: "16px", padding: "13px 14px", color: "#fff" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
-                <span style={{ width: "9px", height: "9px", borderRadius: "50%", background: "#E8340A", flexShrink: 0, animation: "shimmer 1.2s ease-in-out infinite" }} />
+                <span style={uiV2 ? { width: "9px", height: "9px", borderRadius: "50%", background: "#FFFFFF", flexShrink: 0, animation: "shimmer 1.2s ease-in-out infinite" } : { width: "9px", height: "9px", borderRadius: "50%", background: "#E8340A", flexShrink: 0, animation: "shimmer 1.2s ease-in-out infinite" }} />
                 <span style={{ fontSize: "14px", fontWeight: 900 }}>라이브 방송 중!</span>
-                <span style={{ marginLeft: "auto", fontSize: "11.5px", fontWeight: 700, opacity: 0.75 }}>
+                <span style={uiV2 ? { marginLeft: "auto", fontSize: "13px", fontWeight: 400, opacity: 0.8 } : { marginLeft: "auto", fontSize: "11.5px", fontWeight: 700, opacity: 0.75 }}>
                   {String(broadcast?.broadcast_public_title || broadcast?.public_title || "").trim() || "루루동이 라이브"}
                 </span>
               </div>
               <div style={{ display: "flex", gap: "8px" }}>
-                <button type="button" onClick={() => setAlertSheetOpen(true)} style={{ flex: 1, height: "40px", border: "1.5px solid rgba(255,255,255,0.5)", borderRadius: "11px", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: "12.5px", fontWeight: 800, cursor: "pointer" }}>
+                <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flex: 1, height: "44px", border: "1px solid rgba(255,255,255,0.5)", borderRadius: "9999px", background: "transparent", color: "#FFFFFF", fontSize: "14px", fontWeight: 600, cursor: "pointer" } : { flex: 1, height: "40px", border: "1.5px solid rgba(255,255,255,0.5)", borderRadius: "11px", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: "12.5px", fontWeight: 800, cursor: "pointer" }}>
                   {liveAlertOptin ? "🔔 알림 받는 중 ✓" : "🔔 다음방송 알림받기"}
                 </button>
-                <button type="button" disabled={!broadcastYoutubeUrl} onClick={() => openYoutubeApp(broadcastYoutubeUrl)} style={{ flex: 1, height: "40px", border: "none", borderRadius: "11px", background: broadcastYoutubeUrl ? "#FF0033" : "#5A4048", color: "#fff", fontSize: "12.5px", fontWeight: 900, cursor: broadcastYoutubeUrl ? "pointer" : "default", opacity: broadcastYoutubeUrl ? 1 : 0.6 }}>▶ 방송 보러가기</button>
+                <button type="button" disabled={!broadcastYoutubeUrl} onClick={() => openYoutubeApp(broadcastYoutubeUrl)} style={uiV2 ? { flex: 1, height: "44px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, cursor: broadcastYoutubeUrl ? "pointer" : "default", opacity: broadcastYoutubeUrl ? 1 : 0.6 } : { flex: 1, height: "40px", border: "none", borderRadius: "11px", background: broadcastYoutubeUrl ? "#FF0033" : "#5A4048", color: "#fff", fontSize: "12.5px", fontWeight: 900, cursor: broadcastYoutubeUrl ? "pointer" : "default", opacity: broadcastYoutubeUrl ? 1 : 0.6 }}>▶ 방송 보러가기</button>
               </div>
             </div>
           )}
@@ -6880,7 +6897,7 @@ export default function OrderPage() {
                   value={productSearchText}
                   onChange={(e) => { setProductSearchText(e.target.value); setProductPage(1); setVisibleProductCount(10); }}
                   placeholder="🔍 상품 이름 검색"
-                  style={{ width: "100%", height: "48px", boxSizing: "border-box", border: "1px solid #B08794", borderRadius: "14px", padding: "0 16px", fontSize: "15px", fontWeight: 700, color: "#333", outline: "none" }}
+                  style={uiV2 ? { width: "100%", height: "48px", boxSizing: "border-box", border: "1px solid #CACACB", borderRadius: "24px", padding: "0 18px", fontSize: "16px", fontWeight: 400, color: "#111111", background: "#F5F5F5", outline: "none" } : { width: "100%", height: "48px", boxSizing: "border-box", border: "1px solid #B08794", borderRadius: "14px", padding: "0 16px", fontSize: "15px", fontWeight: 700, color: "#333", outline: "none" }}
                 />
                 {/* [2026-08-12 리뉴얼 4단계] 카테고리 칩
                     · 실제 등록된 카테고리만 나옴(기존 로직 유지)
@@ -6895,11 +6912,11 @@ export default function OrderPage() {
                       {categoryTabs.map((cat) => {
                         const on = effectiveCategoryFilter === cat;
                         return (
-                          <button key={cat} type="button" onClick={() => { setCategoryFilter(cat); setVisibleProductCount(10); }} style={{ flexShrink: 0, height: "36px", padding: "0 16px", borderRadius: "999px", border: on ? "none" : "1px solid #D9C5CC", background: on ? "#7A1E47" : "#fff", color: on ? "#fff" : "#7A1E47", fontSize: "13px", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>{cat}</button>
+                          <button key={cat} type="button" onClick={() => { setCategoryFilter(cat); setVisibleProductCount(10); }} style={uiV2 ? { flexShrink: 0, height: "44px", padding: "0 18px", borderRadius: "9999px", border: on ? "1px solid #111111" : "1px solid #CACACB", background: on ? "#111111" : "#FFFFFF", color: on ? "#FFFFFF" : "#111111", fontSize: "15px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" } : { flexShrink: 0, height: "36px", padding: "0 16px", borderRadius: "999px", border: on ? "none" : "1px solid #D9C5CC", background: on ? "#7A1E47" : "#fff", color: on ? "#fff" : "#7A1E47", fontSize: "13px", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>{cat}</button>
                         );
                       })}
                     </div>
-                    <span style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "26px", background: "linear-gradient(90deg,rgba(253,247,249,0),#FDF7F9)", pointerEvents: "none" }} />
+                    <span style={uiV2 ? { position: "absolute", top: 0, right: 0, bottom: 0, width: "26px", background: "linear-gradient(90deg,rgba(255,255,255,0),#FFFFFF)", pointerEvents: "none" } : { position: "absolute", top: 0, right: 0, bottom: 0, width: "26px", background: "linear-gradient(90deg,rgba(253,247,249,0),#FDF7F9)", pointerEvents: "none" }} />
                   </div>
                 ) : null}
                 {/* [2026-07-10] 상품 수 · 보기전환 · 정렬 — 한 줄.
@@ -6916,7 +6933,7 @@ export default function OrderPage() {
                         1) 12px·연회색 글씨가 옆의 36px 박스 둘에 비해 너무 작고 흐려 «떨어져 나간 글자»로 보였다
                            → 같은 36px 높이로 세로 가운데 맞추고, 13px·굵게·진한 색으로 무게를 맞춘다.
                         2) 가운데가 휑했다 → 오른쪽 묶음이 남는 폭을 먹도록 해서 빈 칸을 줄인다(아래 flex:1). */}
-                  <span style={{ display: "inline-flex", alignItems: "center", flexShrink: 0, height: "36px", paddingLeft: "2px", fontSize: "13px", fontWeight: 800, color: "#6E655E" }}>총 {visibleItems.length}개</span>
+                  <span style={uiV2 ? { display: "inline-flex", alignItems: "center", flexShrink: 0, height: "40px", paddingLeft: "2px", fontSize: "14px", fontWeight: 600, color: "#39393B" } : { display: "inline-flex", alignItems: "center", flexShrink: 0, height: "36px", paddingLeft: "2px", fontSize: "13px", fontWeight: 800, color: "#6E655E" }}>총 {visibleItems.length}개</span>
                   {/* [2026-09-20 사장님] «두 박스 크기도 미묘하게 차이나고, 너무 붙어 있는 느낌»
                       실측으로 확인 — 전부 맞는 지적이었다.
                         보기전환 36.0px / 모서리 9px  / 테두리 #D9C5CC
@@ -6960,13 +6977,13 @@ export default function OrderPage() {
                             NN/g 기준으로는 «항상 보이는 글자 라벨»이 곧 설명이다.
                             그 이상(툴팁·별도 안내문)은 필요 없고 화면만 복잡해진다.
                             출처: nngroup.com/articles/icon-usability */}
-                    <div style={{ display: "flex", flexShrink: 0, height: "36px", boxSizing: "border-box", border: "1px solid #D9C5CC", borderRadius: "10px", overflow: "hidden", background: "#fff" }}>
+                    <div style={uiV2 ? { display: "flex", flexShrink: 0, height: "40px", boxSizing: "border-box", border: "1px solid #CACACB", borderRadius: "9999px", overflow: "hidden", background: "#FFFFFF", padding: "1px" } : { display: "flex", flexShrink: 0, height: "36px", boxSizing: "border-box", border: "1px solid #D9C5CC", borderRadius: "10px", overflow: "hidden", background: "#fff" }}>
                       <button type="button" aria-label="사진 작게 보기 — 한 줄에 상품 한 개" onClick={() => changeListView("list")}
-                        style={{ display: "inline-flex", alignItems: "center", gap: "3px", height: "100%", padding: "0 9px", border: "none", background: listView === "list" ? "#7A1E47" : "#fff", color: listView === "list" ? "#fff" : "#7A1E47", fontSize: "12.5px", fontWeight: 800, cursor: "pointer", lineHeight: 1, whiteSpace: "nowrap", fontFamily: "inherit" }}>
+                        style={uiV2 ? { display: "inline-flex", alignItems: "center", gap: "3px", height: "100%", padding: "0 12px", border: "none", borderRadius: "9999px", background: listView === "list" ? "#111111" : "#FFFFFF", color: listView === "list" ? "#FFFFFF" : "#111111", fontSize: "14px", fontWeight: 600, cursor: "pointer", lineHeight: 1, whiteSpace: "nowrap", fontFamily: "inherit" } : { display: "inline-flex", alignItems: "center", gap: "3px", height: "100%", padding: "0 9px", border: "none", background: listView === "list" ? "#7A1E47" : "#fff", color: listView === "list" ? "#fff" : "#7A1E47", fontSize: "12.5px", fontWeight: 800, cursor: "pointer", lineHeight: 1, whiteSpace: "nowrap", fontFamily: "inherit" }}>
                         <span style={{ fontSize: "13px" }}>☰</span>작게
                       </button>
                       <button type="button" aria-label="사진 크게 보기 — 한 줄에 상품 두 개" onClick={() => changeListView("grid")}
-                        style={{ display: "inline-flex", alignItems: "center", gap: "3px", height: "100%", padding: "0 9px", border: "none", borderLeft: "1px solid #EADCE2", background: listView === "grid" ? "#7A1E47" : "#fff", color: listView === "grid" ? "#fff" : "#7A1E47", fontSize: "12.5px", fontWeight: 800, cursor: "pointer", lineHeight: 1, whiteSpace: "nowrap", fontFamily: "inherit" }}>
+                        style={uiV2 ? { display: "inline-flex", alignItems: "center", gap: "3px", height: "100%", padding: "0 12px", border: "none", borderRadius: "9999px", background: listView === "grid" ? "#111111" : "#FFFFFF", color: listView === "grid" ? "#FFFFFF" : "#111111", fontSize: "14px", fontWeight: 600, cursor: "pointer", lineHeight: 1, whiteSpace: "nowrap", fontFamily: "inherit" } : { display: "inline-flex", alignItems: "center", gap: "3px", height: "100%", padding: "0 9px", border: "none", borderLeft: "1px solid #EADCE2", background: listView === "grid" ? "#7A1E47" : "#fff", color: listView === "grid" ? "#fff" : "#7A1E47", fontSize: "12.5px", fontWeight: 800, cursor: "pointer", lineHeight: 1, whiteSpace: "nowrap", fontFamily: "inherit" }}>
                         <span style={{ fontSize: "13px" }}>⊞</span>크게
                       </button>
                     </div>
@@ -6974,7 +6991,7 @@ export default function OrderPage() {
                       value={productSort}
                       onChange={(e) => { setProductSort(e.target.value as typeof productSort); setVisibleProductCount(10); }}
                       aria-label="상품 정렬"
-                      style={{ minWidth: 0, flex: "1 1 auto", maxWidth: "168px", height: "36px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", fontSize: "12.5px", fontWeight: 800, padding: "0 6px", cursor: "pointer", outline: "none", fontFamily: "inherit" }}
+                      style={uiV2 ? { minWidth: 0, flex: "1 1 auto", maxWidth: "176px", height: "40px", boxSizing: "border-box", borderRadius: "9999px", border: "1px solid #CACACB", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, padding: "0 12px", cursor: "pointer", outline: "none", fontFamily: "inherit" } : { minWidth: 0, flex: "1 1 auto", maxWidth: "168px", height: "36px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", fontSize: "12.5px", fontWeight: 800, padding: "0 6px", cursor: "pointer", outline: "none", fontFamily: "inherit" }}
                     >
                       <option value="default">루루동이 추천순</option>
                       <option value="mix">골고루 보기</option>
@@ -6999,9 +7016,11 @@ export default function OrderPage() {
                     · 배송비 «계산» 로직(generalShippingFee·remoteAreaShippingFee·합배송)은
                       하나도 안 건드렸다. 화면에서 문구만 뺐다. */}
                 {visibleItems.length === 0 ? (
-                  <div style={{ marginTop: "14px", padding: "26px", textAlign: "center", color: "#999", fontSize: "14px", fontWeight: 700 }}>찾는 상품이 없어요. 아래 직접 입력으로 담아 주세요.</div>
+                  <div style={uiV2 ? { marginTop: "14px", padding: "26px", textAlign: "center", color: "#707072", fontSize: "15px", fontWeight: 400 } : { marginTop: "14px", padding: "26px", textAlign: "center", color: "#999", fontSize: "14px", fontWeight: 700 }}>찾는 상품이 없어요. 아래 직접 입력으로 담아 주세요.</div>
                 ) : (
-                  <div style={listView === "grid"
+                  <div style={uiV2 ? (listView === "grid"
+                    ? { marginTop: "12px", display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "28px 8px", alignItems: "stretch" }
+                    : { marginTop: "8px", display: "flex", flexDirection: "column" }) : listView === "grid"
                     ? { marginTop: "10px", display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px", alignItems: "stretch" }
                     : { marginTop: "8px", display: "flex", flexDirection: "column" }}>
                     {visibleItems.map((product) => {
@@ -7072,11 +7091,33 @@ export default function OrderPage() {
                       // 「급상승」 = 최근 30일 2개 이상 «또는» 오늘(이번 방송)에 팔렸음.
                       //   방송이 하루 단위라 30일 집계만으론 오늘 올린 상품이 영영 못 받는다(사장님 지적).
                       const soldRecent = soldQty30d >= SOLD_RECENT_MIN_QTY || liveTrendingIds.has(String(product.id ?? ""));
+                      // [㉜] 새 모양 「N개 남음」 — 10개 이하일 때만 가격 근처 빨간 글씨(이모지·배지 없음). 계산은 기존 함수 그대로.
+                      const lowTextV2 = uiV2 && !sold ? (() => {
+                        const pid = String(product.id ?? "");
+                        const opts = lowStockOptionsOrderProduct(product, (c, z) => Number(reservedByVariant[reservationVariantKey(pid, c, z)] || 0), 10);
+                        if (opts.length > 0) {
+                          const isCombo = Boolean(readComboInfoOrderProduct(product));
+                          const EMPTY = new Set(["", "기본", "없음", "단일", "-"]);
+                          const nameOf = (o: { label: string; color: string; size: string }) => {
+                            if (isCombo) return String(o.label).replace(/\s*\/\s*없음\s*/g, "").trim();
+                            const c = EMPTY.has(String(o.color || "").trim()) ? "" : String(o.color).trim();
+                            const z = EMPTY.has(String(o.size || "").trim()) ? "" : String(o.size).trim();
+                            if (z && c) return `${c} ${z} 사이즈`;
+                            if (z) return `${z} 사이즈`;
+                            return c;
+                          };
+                          return `${[...opts].sort((a, b) => a.stock - b.stock).slice(0, 2).map((o) => `${nameOf(o)} ${o.stock}개`.trim()).join(" · ")} 남음`;
+                        }
+                        const remain = lowStockRemainOrderProduct(product, Number(reservedByProduct[pid] || 0), 10);
+                        return remain !== null ? `${remain}개 남음` : null;
+                      })() : null;
                       return (
                         <div
                           key={String(product.id)}
                           className="ruru-customer-product-card"
-                          style={listView === "grid"
+                          style={uiV2 ? (listView === "grid"
+                            ? { display: "flex", flexDirection: "column", padding: 0, background: "transparent" }
+                            : { padding: "16px 0", borderBottom: "1px solid #E5E5E5" }) : listView === "grid"
                             ? { display: "flex", flexDirection: "column", padding: "10px", borderRadius: "14px", background: "#fff", border: isBroadcastOn && pinned ? "1.5px solid #7A1E47" : "1px solid #EFE6DE", boxShadow: isBroadcastOn && pinned ? "0 4px 16px rgba(122,30,71,0.10)" : "none" }
                             : isBroadcastOn && pinned
                             ? { padding: "12px", margin: "8px 0 12px", borderRadius: "14px", border: "1.5px solid #7A1E47", background: "#FDF3F7", boxShadow: "0 4px 16px rgba(122,30,71,0.10)" }
@@ -7087,10 +7128,14 @@ export default function OrderPage() {
                                 「● 라이브 소개중」 빨간 배지와 «같은 말»이라 한 카드에 두 번 나왔다.
                                 남는 신호: 사진 위 빨간 배지 + 카드 자주색 테두리·분홍 배경 + 목록 맨 위 정렬.
                                 ⚠ 되살리지 말 것(중복). 문구를 바꾸고 싶으면 사진 배지 쪽(「라이브 소개중」)을 고친다. */}
-                          <div style={listView === "grid"
+                          <div style={uiV2 ? (listView === "grid"
+                            ? { display: "flex", flexDirection: "column", gap: "8px", alignItems: "stretch", flex: 1, minWidth: 0 }
+                            : { display: "flex", gap: "12px", alignItems: "flex-start" }) : listView === "grid"
                             ? { display: "flex", flexDirection: "column", gap: "8px", alignItems: "stretch", flex: 1, minWidth: 0 }
                             : { display: "flex", gap: "12px", alignItems: "center" }}>
-                          <CustomerPressButton aria-label={`${String(product.product_name || "상품")} 사진 확대`} disabled={!img} onClick={() => { if (img) openLightbox(img, [img], String(product.product_name || "상품")); }} style={listView === "grid"
+                          <CustomerPressButton aria-label={`${String(product.product_name || "상품")} 사진 확대`} disabled={!img} onClick={() => { if (img) openLightbox(img, [img], String(product.product_name || "상품")); }} style={uiV2 ? (listView === "grid"
+                            ? { border: 0, padding: 0, position: "relative", width: "100%", aspectRatio: "1 / 1", borderRadius: 0, background: "#F5F5F5", overflow: "hidden", cursor: img ? "zoom-in" : "default" }
+                            : { border: 0, padding: 0, position: "relative", flexShrink: 0, width: "104px", height: "104px", borderRadius: 0, background: "#F5F5F5", overflow: "hidden", cursor: img ? "zoom-in" : "default" }) : listView === "grid"
                             ? { border: 0, padding: 0, position: "relative", width: "100%", aspectRatio: "1 / 1", borderRadius: "10px", background: "#F0EBE8", overflow: "hidden", cursor: img ? "zoom-in" : "default" }
                             : { border: 0, padding: 0, position: "relative", flexShrink: 0, width: "84px", height: "84px", borderRadius: "10px", background: "#F0EBE8", overflow: "hidden", cursor: img ? "zoom-in" : "default" }}>
                             {/* [2026-08-29] 브랜드 상품이라도 관리자가 대표사진을 올렸으면 그 사진을 쓴다.
@@ -7114,12 +7159,12 @@ export default function OrderPage() {
                             )}
                             {sold ? (
                               <span style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", borderRadius: "inherit", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                                <span style={{ color: "white", fontSize: "11px", fontWeight: 800, letterSpacing: "0.1em" }}>SOLD OUT</span>
+                                <span style={uiV2 ? { color: "white", fontSize: "13px", fontWeight: 700, letterSpacing: "0.08em" } : { color: "white", fontSize: "11px", fontWeight: 800, letterSpacing: "0.1em" }}>SOLD OUT</span>
                               </span>
                             ) : null}
                             {/* [2026-09-02 사장님 지시] 방송 중 고정(위젯) 상품은 썸네일 사진 위에 「라이브 소개중」 뱃지 */}
                             {isBroadcastOn && pinned ? (
-                              <span style={{ position: "absolute", top: "6px", left: "6px", zIndex: 2, display: "flex", alignItems: "center", gap: "4px", background: "#E8340A", color: "#fff", fontSize: "10px", fontWeight: 900, borderRadius: "999px", padding: "3px 8px", boxShadow: "0 2px 6px rgba(0,0,0,0.3)" }}>
+                              <span style={uiV2 ? { position: "absolute", top: "8px", left: "8px", zIndex: 2, display: "flex", alignItems: "center", gap: "5px", background: "#111111", color: "#FFFFFF", fontSize: "13px", fontWeight: 600, borderRadius: "9999px", padding: "4px 10px" } : { position: "absolute", top: "6px", left: "6px", zIndex: 2, display: "flex", alignItems: "center", gap: "4px", background: "#E8340A", color: "#fff", fontSize: "10px", fontWeight: 900, borderRadius: "999px", padding: "3px 8px", boxShadow: "0 2px 6px rgba(0,0,0,0.3)" }}>
                                 <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#fff", animation: "shimmer 1.2s ease-in-out infinite" }} />
                                 라이브 소개중
                               </span>
@@ -7164,7 +7209,7 @@ export default function OrderPage() {
                               })();
 
                               // 켜져 있는 배지 목록 — 그리는 순서도 이 배열 순서를 따른다
-                              const all: Array<{ key: string; on: boolean; node: React.ReactNode }> = [
+                              const all: Array<{ key: string; on: boolean; node: React.ReactNode; text?: string }> = [
                                 { key: "low", on: Boolean(lowNode), node: lowNode },
                                 /* [2026-09-20] 🏆 누적 판매 — products.sold_qty_total(집계 컬럼)을 그대로 읽는다.
                                    · 고객 페이지는 products를 select("*")로 이미 받고 있어 «추가 쿼리 0».
@@ -7173,20 +7218,20 @@ export default function OrderPage() {
                                      (입금확인/카드결제완료/출고 등 = 판매, 취소·환불·테스트·삭제 제외)
                                    · 컬럼이 아직 없으면 0 → 배지가 안 뜰 뿐, 오류 없음. */
                                 /* 최다판매 — 판매 순위 상위 3%. 절대 수치가 아니라 «순위»라 작은 숫자로 초라해지지 않는다. */
-                                { key: "topSeller", on: isTopSeller, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 900, padding: "2px 6px", background: "#FFF4D6", color: "#8A5A00" }}>베스트</span> },
+                                { key: "topSeller", on: isTopSeller, text: "베스트", node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 900, padding: "2px 6px", background: "#FFF4D6", color: "#8A5A00" }}>베스트</span> },
                                 /* 요즘 잘나가요 — 최근 30일 판매. 숫자는 안 보여준다(한 달 치라 작게 보이면 역효과). */
-                                { key: "trending", on: soldRecent, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#E7F3EE", color: "#0F6E56" }}>급상승</span> },
+                                { key: "trending", on: soldRecent, text: "급상승", node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#E7F3EE", color: "#0F6E56" }}>급상승</span> },
                                 /* [2026-09-20] 🔁 재구매 — 같은 사람이 2번 이상 산 상품. 단골 장사에서 가장 강한 증거.
                                    판정은 재구매율 리포트와 같은 기준(kakao_id 우선 · order_group_id 1건=1회 · 2건 이상).
                                    products.repeat_buyer_count 집계 컬럼을 그대로 읽는다 — 추가 쿼리 0. */
-                                { key: "repeat", on: repeatBuyers >= REPEAT_BADGE_MIN_BUYERS, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#F0E9FB", color: "#5B3A9B" }}>재구매</span> },
-                                { key: "special", on: badges.includes("special"), node: <span style={{ fontSize: "10px", fontWeight: 900, color: "#9A6212", background: "#FFF4D6", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>특가</span> },
-                                { key: "limit", on: badges.includes("limit"), node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#854F0B", background: "#FBF1E0", borderRadius: "5px", padding: "2px 6px" }}>마감임박</span> },
-                                { key: "pick", on: badges.includes("pick"), node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#FDEEF3", color: "#C2447A" }}>💖 루루픽</span> },
+                                { key: "repeat", on: repeatBuyers >= REPEAT_BADGE_MIN_BUYERS, text: "재구매", node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#F0E9FB", color: "#5B3A9B" }}>재구매</span> },
+                                { key: "special", on: badges.includes("special"), text: "특가", node: <span style={{ fontSize: "10px", fontWeight: 900, color: "#9A6212", background: "#FFF4D6", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>특가</span> },
+                                { key: "limit", on: badges.includes("limit"), text: "마감임박", node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#854F0B", background: "#FBF1E0", borderRadius: "5px", padding: "2px 6px" }}>마감임박</span> },
+                                { key: "pick", on: badges.includes("pick"), text: "💖 루루픽", node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#FDEEF3", color: "#C2447A" }}>💖 루루픽</span> },
                                 /* [2026-09-20] 지금 다른 손님이 장바구니에 담아둔 사람 수(15분 선점 기준).
                                    방송 중 가장 즉각적인 신호 — 「지금 누가 가져가고 있다」.
                                    품절된 상품엔 의미가 없으므로 끈다. 지어낸 숫자가 아니라 실제 선점 데이터. */
-                                { key: "holding", on: !sold && holdingPeople >= HOLDING_MIN_PEOPLE, node: <span style={{ fontSize: "10px", fontWeight: 900, color: "#7A1E47", background: "#F7E4EC", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>여러 명이 담는 중</span> },
+                                { key: "holding", on: !sold && holdingPeople >= HOLDING_MIN_PEOPLE, text: "여러 명이 담는 중", node: <span style={{ fontSize: "10px", fontWeight: 900, color: "#7A1E47", background: "#F7E4EC", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>여러 명이 담는 중</span> },
                                 /* [2026-09-20] 「방송 중 N개 주문」은 «상품 카드에서 뺐다».
                                    사장님 지적: «7개 주문만 계속 관심받고 다른 상품은 소외야?»
                                    맞는 말이다. 상품마다 숫자를 붙이면 필연적으로 줄 세우기가 되고,
@@ -7195,25 +7240,41 @@ export default function OrderPage() {
                                      합계라서 소외되는 상품이 없고, 방송의 활기는 그대로 전달된다.
                                    상품 카드의 실시간 역동성은 「여러 명이 담는 중」이 맡는다 —
                                    이건 실시간으로 이 상품 저 상품 옮겨다녀 한 상품에 고정되지 않는다. */
-                                { key: "recommend", on: !isBroadcastOn && pinned, node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#7A1E47", borderRadius: "5px", padding: "2px 6px" }}>📌 추천</span> },
-                                { key: "hot", on: badges.includes("hot") || autoHot, node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>인기</span> },
-                                { key: "new", on: badges.includes("new") || autoNew, node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#0F6E56", background: "#E7F3EE", borderRadius: "5px", padding: "2px 6px" }}>신상</span> },
+                                { key: "recommend", on: !isBroadcastOn && pinned, text: "📌 추천", node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#fff", background: "#7A1E47", borderRadius: "5px", padding: "2px 6px" }}>📌 추천</span> },
+                                { key: "hot", on: badges.includes("hot") || autoHot, text: "인기", node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#C0392B", background: "#FBEAE7", borderRadius: "5px", padding: "2px 6px", animation: "shimmer 1.5s ease-in-out infinite" }}>인기</span> },
+                                { key: "new", on: badges.includes("new") || autoNew, text: "신상", node: <span style={{ fontSize: "10px", fontWeight: 800, color: "#0F6E56", background: "#E7F3EE", borderRadius: "5px", padding: "2px 6px" }}>신상</span> },
                                 /* [무료나눔] 0원 선물 상품 배지 — 표시 전용 */
-                                { key: "free", on: isFreeOrderProduct(product), node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#E7F3EE", color: "#0F6E56" }}>🎁 무료나눔</span> },
+                                { key: "free", on: isFreeOrderProduct(product), text: "🎁 무료나눔", node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#E7F3EE", color: "#0F6E56" }}>🎁 무료나눔</span> },
                                 /* [2026-09-20] 무료배송 — 판매 실적과 «무관한» 축이라 한 개도 안 팔린 상품에도 붙는다.
                                    사장님: «잘 안 팔리는 상품도, 한 개도 안 팔린 상품도 노출되고 관심을 갖게 해야 하니»
                                    조사 결과 쿠팡(「무료배송」)·무신사(「무배당발」)도 판매 실적이 없는 상품에
                                    이 축(배송·재고·속성)의 배지를 붙인다.
                                    판정: 설정 배송비가 0원일 때만. 업체배송 상품은 배송비가 따로라 제외.
                                    ⚠️ 표시 전용 — 배송비 계산(generalShippingFee)은 읽기만 하고 안 건드린다. */
-                                { key: "freeship", on: generalShippingFee <= 0 && productDeliveryLabel(product) !== "업체배송", node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#EAF4FF", color: "#1D4ED8" }}>무료배송</span> },
+                                { key: "freeship", on: generalShippingFee <= 0 && productDeliveryLabel(product) !== "업체배송", text: "무료배송", node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 800, padding: "2px 6px", background: "#EAF4FF", color: "#1D4ED8" }}>무료배송</span> },
                                 /* [2026-07-10] 해외배송 배지 — 표시 전용(배송비 계산과 무관) */
-                                { key: "overseas", on: badges.includes("overseas"), node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#EEF6F3", color: "#0F6E56" }}>✈️ 해외배송</span> },
+                                { key: "overseas", on: badges.includes("overseas"), text: "✈️ 해외배송", node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#EEF6F3", color: "#0F6E56" }}>✈️ 해외배송</span> },
                                 /* [2026-07-23 사장님 지시] 업체배송 상품 카드 배지 — 표시 전용(배송비 계산과 무관) */
-                                { key: "company", on: productDeliveryLabel(product) === "업체배송", node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#EEF2FA", color: "#3B5BA5" }}>🚚 업체배송</span> },
+                                { key: "company", on: productDeliveryLabel(product) === "업체배송", text: "🚚 업체배송", node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#EEF2FA", color: "#3B5BA5" }}>🚚 업체배송</span> },
                                 /* 바로구매 — 사장님 지침대로 방송 켜짐/꺼짐과 무관하게 항상 표시(정보 배지, 개수 제한 밖) */
-                                { key: "direct", on: badges.includes("direct"), node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#E8F0FE", color: "#1D4ED8" }}>🛒 바로구매</span> },
+                                { key: "direct", on: badges.includes("direct"), text: "🛒 바로구매", node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#E8F0FE", color: "#1D4ED8" }}>🛒 바로구매</span> },
                               ];
+                              // [㉜] 새 모양 배지 — 흰 알약+hairline 13px(「특가」만 빨간 글자), 줄당 최대 3개(정보 배지 먼저, 남는 자리에 마케팅).
+                              //   「N개 남음」은 배지가 아니라 가격 근처 글씨로(lowTextV2). 어떤 배지를 켤지 판정은 위 그대로.
+                              if (uiV2) {
+                                const onKeys = all.filter((b) => b.on && b.key !== "low").map((b) => b.key);
+                                const infoKeys = new Set<string>(BADGE_INFO_KEYS);
+                                const infoOn = onKeys.filter((k) => infoKeys.has(k)).slice(0, 3);
+                                const promoOn = pickVisibleBadges(onKeys.filter((k) => !infoKeys.has(k)), Math.max(0, 3 - infoOn.length));
+                                const show = new Set<string>([...infoOn, ...promoOn]);
+                                const nodesV2 = all.filter((b) => show.has(b.key) && b.text);
+                                if (nodesV2.length === 0) return null;
+                                return (
+                                  <div style={{ display: "flex", gap: "4px", marginBottom: "6px", flexWrap: "wrap" }}>
+                                    {nodesV2.map((b) => <span key={b.key} style={v2Badge(b.key === "special")}>{b.text}</span>)}
+                                  </div>
+                                );
+                              }
                               const visible = pickVisibleBadges(all.filter((b) => b.on).map((b) => b.key));
                               const nodes = all.filter((b) => b.on && visible.has(b.key));
                               if (nodes.length === 0) return null;
@@ -7224,15 +7285,21 @@ export default function OrderPage() {
                               );
                             })()}
                             {/* [2026-09-11 manysell 실측 흡수] 상품명 13→15px(목록)·14px(격자) — 주 고객 중장년, 마켓오리진 16px 대비 우리가 작았다(표시 전용) */}
-                            <div style={listView === "grid"
+                            <div style={uiV2 ? { fontSize: listView === "grid" ? "16px" : "17px", fontWeight: 600, color: "#111111", lineHeight: 1.45, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "break-word" as const } : listView === "grid"
                               ? { fontSize: "14px", fontWeight: 800, color: "#222", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "break-word" as const }
                               : { fontSize: "15px", fontWeight: 800, color: "#222", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.product_name}</div>
-                            {!brandGroup && !readComboInfoOrderProduct(product) ? <ProductColorSwatches value={retainColorSwatches(readProductColorSwatches(product.product_note),getSelectableRegisteredOptions(product,"color"))} /> : null}
+                            {!brandGroup && !readComboInfoOrderProduct(product) ? (uiV2 ? (() => {
+                              const colorLabels = getSelectableRegisteredOptions(product as BroadcastProduct, "color");
+                              const adminColors = retainColorSwatches(readProductColorSwatches(product.product_note), colorLabels);
+                              // 기존과 같은 노출 조건: 색상이 2개 이상이거나 관리자 지정 색이 있을 때
+                              if (colorLabels.length <= 1 && !colorLabels.some((c) => adminColors[c])) return null;
+                              return <ProductColorRowV2 items={resolveColorDisplay(colorLabels, adminColors)} />;
+                            })() : <ProductColorSwatches value={retainColorSwatches(readProductColorSwatches(product.product_note),getSelectableRegisteredOptions(product,"color"))} />) : null}
                             {/* 바로구매 부가설명 — 사장님 지침: 배지만으론 신규 고객이 뜻을 모름.
                                 [2026-09-20] 중복(위 띠 + 배지 + 이 줄)을 이유로 방송 OFF에서 잠깐 접었다가 되돌림.
                                   사장님이 직접 남긴 지침이 먼저다. 방송 켜짐/꺼짐과 무관하게 항상 표시한다.
                                   중복 문제는 «배지 개수 제한»(lib/productBadgePriority.ts)으로 해결한다. */}
-                            {badges.includes("direct") ? (<div style={{ fontSize: 11, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>방송 접수 없이 지금 바로 구매 가능</div>) : null}
+                            {badges.includes("direct") ? (<div style={uiV2 ? { fontSize: 13, color: "#707072", marginTop: 4, lineHeight: 1.45 } : { fontSize: 11, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>방송 접수 없이 지금 바로 구매 가능</div>) : null}
                             {/* [2026-09-11 manysell 실측 흡수] 옵션 있는 상품은 「색상 3 · 사이즈 4」 한 줄 — 시트 열기 전에 내 사이즈가 있는지 보이게.
                                 브랜드묶음·조합형은 자기 안내줄이 따로 있어 제외. 표시 전용(담기·재고·금액 무관) */}
                             {!brandGroup && !sold ? (() => {
@@ -7250,15 +7317,15 @@ export default function OrderPage() {
                               const lineOf = (label: string, vals: string[], max: number) =>
                                 vals.length <= 1 ? null : { label, value: vals.length <= max ? vals.join(" · ") : `${vals.length}가지` };
                               const savedColors = readProductColorSwatches(product.product_note);
-                              const parts = [colorVals.every(color=>savedColors[color]) ? null : lineOf("색상", colorVals, 4), lineOf("사이즈", sizeVals, 5)]
+                              const parts = [uiV2 ? null : (colorVals.every(color=>savedColors[color]) ? null : lineOf("색상", colorVals, 4)), lineOf("사이즈", sizeVals, 5)]
                                 .filter(Boolean) as Array<{ label: string; value: string }>;
                               if (parts.length === 0) return null;
                               return (
                                 <div style={{ marginTop: 3, display: "grid", gap: 2 }}>
                                   {parts.map((p) => (
                                     <div key={p.label} style={{ display: "flex", alignItems: "baseline", gap: "5px", lineHeight: 1.3, minWidth: 0 }}>
-                                      <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 800, color: "#A79A92" }}>{p.label}</span>
-                                      <span style={{ minWidth: 0, fontSize: 12.5, fontWeight: 800, color: "#3B332D", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.value}</span>
+                                      <span style={uiV2 ? { flexShrink: 0, fontSize: 13, fontWeight: 400, color: "#707072" } : { flexShrink: 0, fontSize: 10.5, fontWeight: 800, color: "#A79A92" }}>{p.label}</span>
+                                      <span style={uiV2 ? { minWidth: 0, fontSize: 14, fontWeight: 600, color: "#39393B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } : { minWidth: 0, fontSize: 12.5, fontWeight: 800, color: "#3B332D", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.value}</span>
                                     </div>
                                   ))}
                                 </div>
@@ -7269,7 +7336,7 @@ export default function OrderPage() {
                               const ci = readComboInfoOrderProduct(product);
                               if (!ci || ci.names.length <= 1) return null;
                               return (
-                                <div style={{ fontSize: 11, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>
+                                <div style={uiV2 ? { fontSize: 13, color: "#707072", marginTop: 4, lineHeight: 1.45 } : { fontSize: 11, color: "#8A8A8A", marginTop: 2, lineHeight: 1.3 }}>
                                   {brandGroup
                                     ? `세부상품 ${ci.names.length}가지 · 상품별 금액이 달라요`
                                     : `종류 ${ci.names.length}가지 · 눌러서 선택`}
@@ -7290,7 +7357,7 @@ export default function OrderPage() {
                               const shown = matchedDetails.slice(0, 12);
                               return (
                                 <div style={{ marginTop: "8px", display: "grid", gap: "5px" }}>
-                                  <div style={{ fontSize: "11px", fontWeight: 900, color: "#7A1E47" }}>
+                                  <div style={uiV2 ? { fontSize: "13px", fontWeight: 600, color: "#111111" } : { fontSize: "11px", fontWeight: 900, color: "#7A1E47" }}>
                                     &ldquo;{dq}&rdquo; 검색결과 {matchedDetails.length}개
                                   </div>
                                   {shown.map((d) => (
@@ -7298,25 +7365,46 @@ export default function OrderPage() {
                                       key={`${String(product.id)}-${d.detailName}`}
                                       type="button"
                                       onClick={() => openRegisteredOptionSelectSheet(product as BroadcastProduct, d.detailName)}
-                                      style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", padding: "6px", borderRadius: "10px", border: "1px solid #EFE3E8", background: "#FFFDFB", textAlign: "left", cursor: "pointer" }}
+                                      style={uiV2 ? { display: "flex", alignItems: "center", gap: "8px", width: "100%", padding: "6px", borderRadius: "8px", border: "1px solid #CACACB", background: "#FFFFFF", textAlign: "left", cursor: "pointer" } : { display: "flex", alignItems: "center", gap: "8px", width: "100%", padding: "6px", borderRadius: "10px", border: "1px solid #EFE3E8", background: "#FFFDFB", textAlign: "left", cursor: "pointer" }}
                                     >
-                                      <span style={{ width: "38px", height: "38px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "#F0EBE8" }}>
+                                      <span style={uiV2 ? { width: "38px", height: "38px", flexShrink: 0, borderRadius: 0, overflow: "hidden", background: "#F5F5F5" } : { width: "38px", height: "38px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "#F0EBE8" }}>
                                         {d.image ? <img src={d.image} alt="" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
                                       </span>
-                                      <span style={{ flex: 1, minWidth: 0, fontSize: "12px", fontWeight: 800, color: "#3F3438", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                      <span style={uiV2 ? { flex: 1, minWidth: 0, fontSize: "14px", fontWeight: 600, color: "#111111", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } : { flex: 1, minWidth: 0, fontSize: "12px", fontWeight: 800, color: "#3F3438", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                         {orderDetailDisplayName(String(product.product_name ?? ""), d.detailName)}
                                       </span>
-                                      <span style={{ flexShrink: 0, fontSize: "12px", fontWeight: 900, color: "#7A1E47" }}>{won(Number(d.price) || 0)}</span>
+                                      <span style={uiV2 ? { flexShrink: 0, fontSize: "14px", fontWeight: 700, color: "#111111" } : { flexShrink: 0, fontSize: "12px", fontWeight: 900, color: "#7A1E47" }}>{won(Number(d.price) || 0)}</span>
                                     </button>
                                   ))}
                                   {matchedDetails.length > shown.length ? (
-                                    <div style={{ fontSize: "10.5px", fontWeight: 700, color: "#8B7D83" }}>
+                                    <div style={uiV2 ? { fontSize: "13px", fontWeight: 400, color: "#707072" } : { fontSize: "10.5px", fontWeight: 700, color: "#8B7D83" }}>
                                       나머지 {matchedDetails.length - shown.length}개는 아래 [상품 선택]에서 볼 수 있어요
                                     </div>
                                   ) : null}
                                 </div>
                               );
                             })()}
+                            {uiV2 ? (
+                            <div style={listView === "grid"
+                              ? { marginTop: "auto", paddingTop: "8px", display: "flex", flexDirection: "column", alignItems: "stretch", gap: "4px" }
+                              : { marginTop: "8px", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "8px" }}>
+                              <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
+                                {!readComboInfoOrderProduct(product) && <ProductDiscountLabel tone="v2" note={product.product_note} actualPrice={Number(product.price || 0)} />}
+                                <span style={{ fontSize: listView === "grid" ? "20px" : "19px", fontWeight: 700, color: "#111111", lineHeight: 1.35 }}>{(() => { const ci = readComboInfoOrderProduct(product); return brandGroup ? `최저가 ${won(Number(product.price || 0))} 부터 ~` : ci && ci.maxPlus > 0 ? won(Number(product.price || 0)) + "~" : won(Number(product.price || 0)); })()}</span>
+                                {lowTextV2 ? <span style={{ fontSize: "14px", fontWeight: 600, color: "#D30005", lineHeight: 1.4 }}>{lowTextV2}</span> : null}
+                              </div>
+                              <CustomerPressButton
+                                type="button"
+                                disabled={sold}
+                                onClick={() => selectQuickGroupBuyProduct(product as BroadcastProduct)}
+                                style={listView === "grid"
+                                  ? { width: "100%", height: "48px", marginTop: "6px", padding: "0 12px", borderRadius: "9999px", border: "none", background: sold ? "#F5F5F5" : "#111111", color: sold ? "#707072" : "#FFFFFF", fontSize: "16px", fontWeight: 600, cursor: sold ? "default" : "pointer" }
+                                  : { flexShrink: 0, height: "44px", padding: "0 20px", borderRadius: "9999px", border: "none", background: sold ? "#F5F5F5" : "#111111", color: sold ? "#707072" : "#FFFFFF", fontSize: "15px", fontWeight: 600, cursor: sold ? "default" : "pointer" }}
+                              >
+                                {sold ? "품절" : brandGroup ? "상품 선택" : listView === "grid" ? "장바구니 담기" : "담기"}
+                              </CustomerPressButton>
+                            </div>
+                            ) : (
                             <div style={listView === "grid"
                               ? { marginTop: "auto", paddingTop: "6px", display: "flex", flexDirection: "column", alignItems: "stretch", gap: "6px" }
                               : { marginTop: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
@@ -7333,6 +7421,7 @@ export default function OrderPage() {
                                 {sold ? "품절" : brandGroup ? "상품 선택" : "장바구니 담기"}
                               </CustomerPressButton>
                             </div>
+                            )}
                           </div>
                           </div>
                         </div>
@@ -8818,11 +8907,11 @@ export default function OrderPage() {
                   isBroadcastOn && chatUiEnabled && chatShowFind ? (
                     <button type="button"
                       onClick={() => { setChatFindOpen(true); setOrderSheetOpen(true); window.setTimeout(() => document.getElementById("orderSheetSection")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}
-                      style={{ position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, background: "rgba(122,30,71,0.10)", backdropFilter: "blur(2.5px)", WebkitBackdropFilter: "blur(2.5px)", border: "1px solid rgba(122,30,71,0.22)", borderRadius: "12px", padding: "9px 14px", textAlign: "center", fontSize: "12px", fontWeight: 800, color: "#7A1E47", fontFamily: "inherit", cursor: "pointer" }}>
+                      style={uiV2 ? { position: "fixed", left: 0, right: 0, bottom: "calc(68px + env(safe-area-inset-bottom))", zIndex: 39, background: "#FFFFFF", border: "none", borderTop: "1px solid #E5E5E5", padding: "14px 16px", textAlign: "center", fontSize: "15px", fontWeight: 400, color: "#707072", fontFamily: "inherit", cursor: "pointer" } : { position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, background: "rgba(122,30,71,0.10)", backdropFilter: "blur(2.5px)", WebkitBackdropFilter: "blur(2.5px)", border: "1px solid rgba(122,30,71,0.22)", borderRadius: "12px", padding: "9px 14px", textAlign: "center", fontSize: "12px", fontWeight: 800, color: "#7A1E47", fontFamily: "inherit", cursor: "pointer" }}>
                       🛒 담은 상품이 없어요 · 💬 채팅주문 하셨나요?
                     </button>
                   ) : (
-                    <div style={{ position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, background: "rgba(122,30,71,0.10)", backdropFilter: "blur(2.5px)", WebkitBackdropFilter: "blur(2.5px)", border: "1px solid rgba(122,30,71,0.22)", borderRadius: "12px", padding: "9px 14px", textAlign: "center", fontSize: "12px", fontWeight: 800, color: "#7A1E47", pointerEvents: "none" }}>
+                    <div style={uiV2 ? { position: "fixed", left: 0, right: 0, bottom: "calc(68px + env(safe-area-inset-bottom))", zIndex: 39, background: "#FFFFFF", border: "none", borderTop: "1px solid #E5E5E5", padding: "14px 16px", textAlign: "center", fontSize: "15px", fontWeight: 400, color: "#707072", fontFamily: "inherit", pointerEvents: "none" } : { position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, background: "rgba(122,30,71,0.10)", backdropFilter: "blur(2.5px)", WebkitBackdropFilter: "blur(2.5px)", border: "1px solid rgba(122,30,71,0.22)", borderRadius: "12px", padding: "9px 14px", textAlign: "center", fontSize: "12px", fontWeight: 800, color: "#7A1E47", pointerEvents: "none" }}>
                       🛒 담은 상품이 없어요
                     </div>
                   )
@@ -8832,16 +8921,28 @@ export default function OrderPage() {
                 <button
                   type="button"
                   onClick={() => { setOrderSheetOpen(true); window.setTimeout(() => document.getElementById("orderSheetSection")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}
-                  style={{ position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, display: "flex", alignItems: "center", gap: "10px", background: "#7A1E47", border: "none", borderRadius: "15px", padding: "11px 14px", boxShadow: "0 8px 22px rgba(122,30,71,0.35)", cursor: "pointer" }}
+                  style={uiV2 ? { position: "fixed", left: 0, right: 0, bottom: "calc(68px + env(safe-area-inset-bottom))", zIndex: 39, display: "flex", alignItems: "center", gap: "12px", background: "#FFFFFF", border: "none", borderTop: "1px solid #E5E5E5", padding: "10px 16px", boxShadow: "0 -4px 12px rgba(0,0,0,0.06)", cursor: "pointer", fontFamily: "inherit" } : { position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, display: "flex", alignItems: "center", gap: "10px", background: "#7A1E47", border: "none", borderRadius: "15px", padding: "11px 14px", boxShadow: "0 8px 22px rgba(122,30,71,0.35)", cursor: "pointer" }}
                 >
+                  {uiV2 ? (
+                    <>
+                      <span style={{ minWidth: 0, flex: 1, display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left" }}>
+                        <span style={{ fontSize: "14px", fontWeight: 400, color: "#707072", whiteSpace: "nowrap" }}>담은 상품 {cartCount}개</span>
+                        <span style={{ fontSize: "18px", fontWeight: 700, color: "#111111" }}>{cartTotal > 0 ? `${cartTotal.toLocaleString()}원` : ""}</span>
+                      </span>
+                      <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", height: "52px", padding: "0 24px", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "16px", fontWeight: 600 }}>주문서 확인</span>
+                    </>
+                  ) : (
+                    <>
                   <span style={{ fontSize: "12px", fontWeight: 800, color: "#F5D9E5", whiteSpace: "nowrap" }}>🛒 담은 상품 {cartCount}개</span>
                   <span style={{ flex: 1, textAlign: "left", fontSize: "14px", fontWeight: 900, color: "#fff" }}>{cartTotal > 0 ? `${cartTotal.toLocaleString()}원` : ""}</span>
                   <span style={{ flexShrink: 0, fontSize: "13.5px", fontWeight: 900, color: "#7A1E47", background: "#fff", borderRadius: "10px", padding: "9px 14px" }}>주문서 확인 →</span>
+                    </>
+                  )}
                 </button>
               );
             })()}
 
-            <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 40, height: "calc(68px + env(safe-area-inset-bottom))", paddingBottom: "env(safe-area-inset-bottom)", background: "#fff", borderTop: "1px solid #EFE6DE", display: "grid", gridTemplateColumns: "repeat(5,1fr)" }}>
+            <nav style={uiV2 ? { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 40, height: "calc(68px + env(safe-area-inset-bottom))", paddingBottom: "env(safe-area-inset-bottom)", background: "#FFFFFF", borderTop: "1px solid #E5E5E5", display: "grid", gridTemplateColumns: "repeat(5,1fr)" } : { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 40, height: "calc(68px + env(safe-area-inset-bottom))", paddingBottom: "env(safe-area-inset-bottom)", background: "#fff", borderTop: "1px solid #EFE6DE", display: "grid", gridTemplateColumns: "repeat(5,1fr)" }}>
               {[
                 { key: "home", label: "홈", icon: "🏠", onClick: () => window.scrollTo({ top: 0, behavior: "smooth" }) },
                 // [2026-08-30 사장님 요청] 하단에 쪽지함 진입점. 공지와 쪽지를 한 곳에서 본다.
@@ -8854,7 +8955,7 @@ export default function OrderPage() {
                   key={tab.key}
                   type="button"
                   onClick={tab.onClick}
-                  style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "3px", border: "none", background: "none", padding: 0, cursor: "pointer", fontSize: "10px", fontWeight: 800, color: "#B0A6A0" }}
+                  style={uiV2 ? { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px", border: "none", background: "none", padding: 0, cursor: "pointer", fontSize: "13px", fontWeight: 600, color: "#39393B", fontFamily: "inherit" } : { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "3px", border: "none", background: "none", padding: 0, cursor: "pointer", fontSize: "10px", fontWeight: 800, color: "#B0A6A0" }}
                 >
                   {/* [2026-09-20] 빨간 숫자 배지 — Material Design 3 Badge specs(16dp·모서리 8dp·error 색) 기준. 99 넘으면 99+ */}
                   <span style={{ position: "relative", fontSize: "19px", lineHeight: 1 }}>
