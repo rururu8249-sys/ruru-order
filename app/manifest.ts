@@ -21,8 +21,8 @@ export default function manifest(): MetadataRoute.Manifest {
     display_override: ["standalone", "minimal-ui"],
     // 세로 고정 — 가로로 돌아가면 폭이 넓어져 「PC 화면처럼」 보인다
     orientation: "portrait",
-    background_color: "#FBEFF3",
-    theme_color: "#7B2D43",
+    background_color: "#FFFFFF",
+    theme_color: "#FFFFFF",
     categories: ["shopping"],
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },

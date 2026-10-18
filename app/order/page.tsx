@@ -123,6 +123,7 @@ import { pickVisibleBadges, BADGE_INFO_KEYS, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_M
 import ProductColorRowV2 from "@/components/customer/ProductColorRowV2";
 import { colorNameSwatch, isLightSwatch, resolveColorDisplay } from "@/lib/colorNameSwatch";
 import { restyleV2 } from "@/lib/customerUiV2Restyle";
+import { resolveCustomerUiV2 } from "@/lib/customerUiSwitch";
 import CartAddFeedbackV2 from "@/components/customer/CartAddFeedbackV2";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import ShopContactLink from "@/components/customer/ShopContactLink";
@@ -306,6 +307,10 @@ const ORDER_DRAFT_STORAGE_KEY = "ruru_order_draft_v1";
 // [㉜ 2026-10-18] 손님화면 새 모양(테스트 스위치 /order?ui=v2 → localStorage ruru_ui_v2=1) 전용 값 — 루트 DESIGN.md 기준.
 //   스위치가 꺼진 손님은 기존 화면 그대로(아래 모든 v2 값은 uiV2 일 때만 쓰인다). 모양만 — 동작·계산 무관.
 const UI_V2_STORAGE_KEY = "ruru_ui_v2";
+// [㉜ 2026-10-18 사장님 확정] 손님 기본값 = 새 모양(v2). 예전 모양으로 전체 되돌리려면 이 값만 false 로.
+//   true  : 아무 값 없는 손님 = 새 모양, ?ui=v1 고른 브라우저(저장값 "0")만 예전 모양.
+//   false : 예전처럼 ?ui=v2 고른 브라우저(저장값 "1")만 새 모양.
+const UI_V2_DEFAULT = true;
 const v2Badge = (sale = false): CSSProperties => ({ display: "inline-flex", alignItems: "center", height: "24px", padding: "0 8px", borderRadius: "9999px", border: "1px solid #CACACB", background: "#FFFFFF", color: sale ? "#D30005" : "#111111", fontSize: "13px", fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap" });
 // [㉛ 사장님 확정 문구] 관리자 비우기·유지시간 만료 둘 다 같은 안내(같은 비움에 한 번만).
 const CART_CLEARED_NOTICE = "주문서 제출 없이 시간이 지나 장바구니가 비워졌어요.\n상품은 주문서 제출 후 입금까지 마쳐야 주문이 확정돼요.";
@@ -1467,16 +1472,15 @@ export default function OrderPage() {
   const [pin, setPin] = useState("");
   const [autoSaveInfo, setAutoSaveInfo] = useState(true);
   const [hasSavedInfo, setHasSavedInfo] = useState(false);
-  // [㉜] 손님화면 새 모양 테스트 스위치 — ?ui=v2 켜기 / ?ui=v1 끄기(이 브라우저에만 저장). 기본 꺼짐 = 기존 화면 그대로.
-  //   서버 렌더와 첫 화면을 맞추려고 처음엔 false, 화면이 뜬 뒤에 읽는다(켠 사람만 잠깐 깜빡일 수 있음).
-  const [uiV2, setUiV2] = useState(false);
+  // [㉜] 손님화면 모양 스위치 — ?ui=v2 켜기("1") / ?ui=v1 끄기("0")(이 브라우저에만 저장). 저장값 없으면 UI_V2_DEFAULT.
+  //   서버 렌더와 첫 화면을 맞추려고 처음엔 기본값, 화면이 뜬 뒤에 저장값을 읽는다(기본값과 다른 쪽을 고른 사람만 잠깐 깜빡일 수 있음).
+  const [uiV2, setUiV2] = useState(UI_V2_DEFAULT);
   useEffect(() => {
     try {
-      const want = new URLSearchParams(window.location.search).get("ui");
-      if (want === "v2") window.localStorage.setItem(UI_V2_STORAGE_KEY, "1");
-      else if (want === "v1") window.localStorage.removeItem(UI_V2_STORAGE_KEY);
-      setUiV2(window.localStorage.getItem(UI_V2_STORAGE_KEY) === "1");
-    } catch { /* 저장소 못 쓰면 기존 화면 */ }
+      const decision = resolveCustomerUiV2(new URLSearchParams(window.location.search).get("ui"), window.localStorage.getItem(UI_V2_STORAGE_KEY), UI_V2_DEFAULT);
+      if (decision.store) window.localStorage.setItem(UI_V2_STORAGE_KEY, decision.store);
+      setUiV2(decision.v2);
+    } catch { /* 저장소 못 쓰면 기본값 */ }
   }, []);
   // [㉜ 2단계] 옵션 창 등 스타일이 많은 화면의 새 모양 정리(로즈→흑백·13px 미만→13px) — 스위치 꺼지면 원래 스타일 그대로.
   const sv = (style: CSSProperties | undefined): CSSProperties | undefined => (uiV2 ? restyleV2(style) : style);

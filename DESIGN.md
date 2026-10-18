@@ -175,6 +175,7 @@ size:
 
 ## 9-4. 테스트 스위치 범위
 - 지금 스위치(?ui=v2 → localStorage ruru_ui_v2)는 /order 에서 읽음. /myorder·/notice 를 바꿀 때 같은 값을 읽게 해서 한 번 켜면 손님 화면 전체가 새 모양.
+- 2026-10-18 손님 기본값 v2로 전환, ?ui=v1 비상 복귀 (app/order/page.tsx 상수 UI_V2_DEFAULT — false 로 바꾸면 전체 예전 모양. 저장값 ?ui=v2→"1" / ?ui=v1→"0", 없으면 기본값).
 
 ## 10. 하지 말 것
 - 로즈·자주·분홍 계열 색, 새 강조색 추가.
