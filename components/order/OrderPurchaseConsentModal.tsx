@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { OrderPurchaseConsentConfig } from "@/lib/orderPurchaseConsent";
+import { useCustomerStageRestyle } from "@/lib/useCustomerUiStage";
 
 type Props = {
   config: OrderPurchaseConsentConfig;
@@ -17,6 +18,8 @@ export default function OrderPurchaseConsentModal({
   onCancel,
   onConfirm,
 }: Props) {
+  // [㉜ 5단계] ?preview=s5 에서만 새 모양(로즈→흑백·13px 미만→13px·그림자 정리). 꺼지면 원래 스타일 그대로.
+  const { on: v5, s: s5, c: c5 } = useCustomerStageRestyle("s5", { keepShadow: true });
   const [accepted, setAccepted] = useState(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
@@ -63,7 +66,7 @@ export default function OrderPurchaseConsentModal({
 
   return (
     <div
-      style={{
+      style={s5({
         position: "fixed",
         inset: 0,
         zIndex: 5200,
@@ -72,14 +75,14 @@ export default function OrderPurchaseConsentModal({
         justifyContent: "center",
         padding: "14px",
         background: "rgba(20, 12, 16, 0.62)",
-      }}
+      })}
     >
       <section
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="order-purchase-consent-title"
-        style={{
+        style={s5({
           width: "100%",
           maxWidth: "430px",
           maxHeight: "92dvh",
@@ -90,35 +93,35 @@ export default function OrderPurchaseConsentModal({
           borderRadius: "22px",
           background: "#fff",
           boxShadow: "0 24px 72px rgba(0,0,0,0.34)",
-        }}
+        })}
       >
-        <div style={{ padding: "19px 20px 14px", borderBottom: "1px solid #E8DDE1" }}>
+        <div style={s5({ padding: "19px 20px 14px", borderBottom: "1px solid #E8DDE1" })}>
           <h2
             id="order-purchase-consent-title"
             ref={titleRef}
             tabIndex={-1}
-            style={{ margin: 0, color: "#221B1E", fontSize: "20px", fontWeight: 900, lineHeight: 1.35, outline: "none", wordBreak: "keep-all" }}
+            style={s5({ margin: 0, color: "#221B1E", fontSize: "20px", fontWeight: 900, lineHeight: 1.35, outline: "none", wordBreak: "keep-all" })}
           >
             {config.title}
           </h2>
         </div>
 
-        <div style={{ minHeight: 0, overflowY: "auto", padding: "16px 18px" }}>
+        <div style={s5({ minHeight: 0, overflowY: "auto", padding: "16px 18px" })}>
           <div
-            style={{
+            style={s5({
               whiteSpace: "pre-line",
               color: "#3F3338",
               fontSize: "14px",
               fontWeight: 700,
               lineHeight: 1.72,
               wordBreak: "keep-all",
-            }}
+            })}
           >
             {config.text}
           </div>
 
           <label
-            style={{
+            style={s5({
               display: "flex",
               alignItems: "flex-start",
               gap: "10px",
@@ -128,27 +131,27 @@ export default function OrderPurchaseConsentModal({
               borderRadius: "13px",
               background: accepted ? "#F9EEF3" : "#FFF7ED",
               cursor: submitting ? "default" : "pointer",
-            }}
+            })}
           >
             <input
               type="checkbox"
               checked={accepted}
               disabled={submitting}
               onChange={(event) => setAccepted(event.target.checked)}
-              style={{ width: "22px", height: "22px", flexShrink: 0, accentColor: "#7A1E47" }}
+              style={s5({ width: "22px", height: "22px", flexShrink: 0, accentColor: "#7A1E47" })}
             />
-            <span style={{ color: "#3F3338", fontSize: "13.5px", fontWeight: 900, lineHeight: 1.5, wordBreak: "keep-all" }}>
+            <span style={s5({ color: "#3F3338", fontSize: "13.5px", fontWeight: 900, lineHeight: 1.5, wordBreak: "keep-all" })}>
               {config.checkboxLabel}
             </span>
           </label>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1.35fr", gap: "10px", padding: "14px 18px 18px", borderTop: "1px solid #E8DDE1" }}>
+        <div style={s5({ display: "grid", gridTemplateColumns: "1fr 1.35fr", gap: "10px", padding: "14px 18px 18px", borderTop: "1px solid #E8DDE1" })}>
           <button
             type="button"
             disabled={submitting}
             onClick={onCancel}
-            style={{ minHeight: "50px", border: "1.5px solid #D9C5CC", borderRadius: "13px", background: "#fff", color: "#664B56", fontSize: "14px", fontWeight: 900, cursor: submitting ? "default" : "pointer" }}
+            style={s5({ minHeight: "50px", border: "1.5px solid #D9C5CC", borderRadius: "13px", background: "#fff", color: "#664B56", fontSize: "14px", fontWeight: 900, cursor: submitting ? "default" : "pointer" })}
           >
             취소
           </button>
@@ -159,7 +162,7 @@ export default function OrderPurchaseConsentModal({
               if (!accepted || submitting) return;
               onConfirm();
             }}
-            style={{ minHeight: "50px", border: "none", borderRadius: "13px", background: accepted && !submitting ? "#7A1E47" : "#D8CCD1", color: "#fff", fontSize: "14px", fontWeight: 900, cursor: accepted && !submitting ? "pointer" : "default" }}
+            style={s5({ minHeight: "50px", border: "none", borderRadius: "13px", background: accepted && !submitting ? "#7A1E47" : "#D8CCD1", color: "#fff", fontSize: "14px", fontWeight: 900, cursor: accepted && !submitting ? "pointer" : "default" })}
           >
             {submitting ? "주문서 제출 중..." : "동의하고 주문하기"}
           </button>

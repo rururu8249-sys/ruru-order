@@ -35,3 +35,30 @@ assert.equal(stripDecorativeEmojiV2('0원 · 🎁 무료나눔'), '0원 · 무�
 assert.equal(stripDecorativeEmojiV2('🖊 직접 입력'), '직접 입력');
 assert.equal(stripDecorativeEmojiV2('사이즈 실측 보기'), '사이즈 실측 보기');
 console.log('customer ui v2 restyle rules passed');
+
+// [㉜ 5단계] Tailwind 클래스판
+import { restyleClassV2 } from '../lib/customerUiV2Restyle.ts';
+assert.equal(restyleClassV2('rounded-full bg-coral-600 px-4 text-[12px] font-black text-white shadow-[0_10px_22px_rgba(0,0,0,0.2)]'),
+  'rounded-full bg-[#111111] px-4 text-[13px] font-bold text-white shadow-none');
+assert.equal(restyleClassV2('bg-rose-soft text-rose-deep ring-1 ring-rose-line'), 'bg-[#F5F5F5] text-[#111111] ring-1 ring-[#CACACB]');
+assert.equal(restyleClassV2('text-blue-700 bg-blue-50 border-blue-100'), 'text-[#111111] bg-[#F5F5F5] border-[#CACACB]');
+assert.equal(restyleClassV2('hover:bg-coral-700 focus:border-rose-deep accent-rose-deep'), 'hover:bg-[#111111] focus:border-[#111111] accent-[#111111]');
+assert.equal(restyleClassV2('text-xs text-slate-500 bg-white'), 'text-[13px] text-slate-500 bg-white', 'neutrals untouched');
+assert.equal(restyleClassV2('text-red-600 bg-red-50 border-red-200'), 'text-[#D30005] bg-[#F5F5F5] border-[#D30005]', 'red only as text/line');
+assert.equal(restyleClassV2('text-emerald-700 bg-emerald-50'), 'text-[#007D48] bg-[#E6F4EC]');
+assert.equal(restyleClassV2('text-[#7A1E47] bg-[#F5E6EB] border-[#D9C5CC]'), 'text-[#111111] bg-[#F5F5F5] border-[#CACACB]');
+assert.equal(restyleClassV2('bg-rose-50/50 text-[15px] min-[390px]:text-[11px]'), 'bg-[#F5F5F5] text-[15px] min-[390px]:text-[13px]');
+assert.equal(restyleClassV2('shadow-lg', { keepShadow: true }), 'shadow-lg');
+assert.equal(restyleClassV2(undefined), undefined);
+// 출력 색은 모두 globals.css @source inline 에 등록된 팔레트 안
+const allowed = new Set(['#111111', '#FFFFFF', '#F5F5F5', '#39393B', '#707072', '#CACACB', '#E5E5E5', '#D30005', '#007D48', '#E6F4EC', '#1151FF']);
+for (const input of ['bg-orange-100', 'text-amber-800', 'border-sky-300', 'bg-[#FFF8E6]', 'text-[#8A6A1E]', 'ring-[#E0344B]', 'divide-rose-100', 'from-rose-50', 'bg-[#FDF3F7]']) {
+  const out = restyleClassV2(input);
+  const hex = out.match(/\[(#[0-9A-F]{6})\]/);
+  assert.ok(hex && allowed.has(hex[1]), `${input} → ${out}`);
+}
+assert.equal(restyleV2({ background: '#7B2D430D' }).background, '#F5F5F50D'.replace('#F5F5F5', mapColorV2('#7B2D43', 'fill')), '8-digit hex keeps alpha');
+assert.equal(restyleV2({ border: '1.5px dashed #7B2D4366' }).border, '1.5px dashed ' + mapColorV2('#7B2D43', 'line') + '66');
+assert.equal(restyleV2({ boxShadow: '0 4px 8px #000' }, { keepShadow: true }).boxShadow, '0 4px 8px #000');
+assert.equal(restyleV2({ accentColor: '#7A1E47' }).accentColor, '#111111', 'checkbox accent');
+console.log('customer ui v2 class restyle passed');

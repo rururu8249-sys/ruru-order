@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 // [2026-09-20] 가운데 확인창 «한 벌» 틀 — ✕·배경·뒤로가기도 「확인했어요」와 같은 closeGift(확인 기록). 지급 로직 무관.
 import CustomerDialog from "./CustomerDialog";
+import { useCustomerStageRestyle } from "@/lib/useCustomerUiStage";
 
 type PointGift = {
   id: string;
@@ -40,6 +41,8 @@ function fallbackMoney(value: unknown): string {
 }
 
 export default function CustomerPointGiftPopup() {
+  // [㉜ 5단계] ?preview=s5 에서만 새 모양(로즈→흑백·13px 미만→13px·그림자 정리). 꺼지면 원래 스타일 그대로.
+  const { on: v5, s: s5, c: c5 } = useCustomerStageRestyle("s5", { keepShadow: true });
   const [giftState, setGiftState] = useState<GiftState>({
     loading: false,
     gift: null,
@@ -140,27 +143,27 @@ export default function CustomerPointGiftPopup() {
       open
       onClose={closeGift}
       closeDisabled={giftState.closing}
-      title="🎁 포인트 선물이 도착했어요!"
+      title={v5 ? "포인트 선물이 도착했어요!" : "🎁 포인트 선물이 도착했어요!"}
       ariaLabel="포인트 선물 알림"
       hideCancel
       primary={{ label: giftState.closing ? "확인 저장중" : "확인했어요", onClick: closeGift, disabled: giftState.closing }}
     >
-      <p style={{ fontSize: "13px", fontWeight: 700, color: "#666" }}>루루동이님이 보낸 선물 · 감사합니다 💝</p>
-      <div style={{ marginTop: "10px", borderRadius: "16px", border: "1px solid #D9C5CC", background: "#F5E6EB", padding: "14px", textAlign: "center" }}>
-        <div style={{ fontSize: "13px", fontWeight: 800, color: "#7B2D43" }}>지급 포인트</div>
-        <div style={{ marginTop: "4px", fontSize: "28px", fontWeight: 800, lineHeight: 1.2, color: "#7B2D43" }}>{amountText}</div>
+      <p style={s5({ fontSize: "13px", fontWeight: 700, color: "#666" })}>{v5 ? "루루동이님이 보낸 선물 · 감사합니다" : "루루동이님이 보낸 선물 · 감사합니다 💝"}</p>
+      <div style={s5({ marginTop: "10px", borderRadius: "16px", border: "1px solid #D9C5CC", background: "#F5E6EB", padding: "14px", textAlign: "center" })}>
+        <div style={s5({ fontSize: "13px", fontWeight: 800, color: "#7B2D43" })}>지급 포인트</div>
+        <div style={s5({ marginTop: "4px", fontSize: "28px", fontWeight: 800, lineHeight: 1.2, color: "#7B2D43" })}>{amountText}</div>
       </div>
-      <div style={{ marginTop: "10px", borderRadius: "14px", background: "#FAF6F2", padding: "10px 16px", textAlign: "center" }}>
-        <div style={{ fontSize: "12px", fontWeight: 800, color: "#888" }}>현재 보유 포인트</div>
-        <div style={{ marginTop: "2px", fontSize: "18px", fontWeight: 800, color: "#222" }}>{balanceText}</div>
+      <div style={s5({ marginTop: "10px", borderRadius: "14px", background: "#FAF6F2", padding: "10px 16px", textAlign: "center" })}>
+        <div style={s5({ fontSize: "12px", fontWeight: 800, color: "#888" })}>현재 보유 포인트</div>
+        <div style={s5({ marginTop: "2px", fontSize: "18px", fontWeight: 800, color: "#222" })}>{balanceText}</div>
       </div>
       {reasonText ? (
-        <div style={{ marginTop: "10px", borderRadius: "14px", border: "1px solid #E8E2DD", background: "#fff", padding: "10px 16px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "#666" }}>
+        <div style={s5({ marginTop: "10px", borderRadius: "14px", border: "1px solid #E8E2DD", background: "#fff", padding: "10px 16px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "#666" })}>
           {reasonText}
         </div>
       ) : null}
       {/* [2026-09-20] 예전 문구 「아직 주문 결제에 자동 차감되지 않아요·별도 안내 후 적용」은 사실과 달라 정정 — 주문서에서 바로 쓸 수 있다. */}
-      <p style={{ marginTop: "10px", textAlign: "center", fontSize: "12px", fontWeight: 700, color: "#999" }}>
+      <p style={s5({ marginTop: "10px", textAlign: "center", fontSize: "12px", fontWeight: 700, color: "#999" })}>
         주문서 확인 화면의 「포인트 전부 쓰기」로 바로 쓸 수 있어요.
       </p>
     </CustomerDialog>

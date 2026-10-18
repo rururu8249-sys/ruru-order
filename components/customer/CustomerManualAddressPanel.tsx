@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 // [2026-09-20] 가운데 확인창 «한 벌» 틀 — ✕·배경·뒤로가기·ESC 동일, 1:1 [취소][주소 적용]. 주소 적용 로직 무변경.
 import CustomerDialog from "./CustomerDialog";
+import { useCustomerStageRestyle } from "@/lib/useCustomerUiStage";
 
 type Props = {
   open: boolean;
@@ -16,6 +17,8 @@ type Props = {
 };
 
 export default function CustomerManualAddressPanel({ open, defaultValue = "", onClose, onSubmit }: Props) {
+  // [㉜ 5단계] ?preview=s5 에서만 새 모양(로즈→흑백·13px 미만→13px·그림자 정리). 꺼지면 원래 스타일 그대로.
+  const { on: v5, s: s5, c: c5 } = useCustomerStageRestyle("s5");
   const [value, setValue] = useState(defaultValue);
 
   useEffect(() => {
@@ -34,14 +37,14 @@ export default function CustomerManualAddressPanel({ open, defaultValue = "", on
       closeGuard={() => !cleanValue || cleanValue === (defaultValue || "").trim() || window.confirm("입력 중인 주소가 지워져요. 닫을까요?")}
       primary={{ label: "주소 적용", onClick: () => onSubmit(cleanValue), disabled: !cleanValue }}
     >
-      <p className="break-keep text-[13px] font-bold text-slate-500">주소검색창이 안 뜨는 경우에만 직접 입력해 주세요.</p>
-      <label className="mt-3 block">
-        <span className="text-[13px] font-black text-slate-700">기본주소</span>
+      <p className={c5("break-keep text-[13px] font-bold text-slate-500")}>주소검색창이 안 뜨는 경우에만 직접 입력해 주세요.</p>
+      <label className={c5("mt-3 block")}>
+        <span className={c5("text-[13px] font-black text-slate-700")}>기본주소</span>
         <textarea
           value={value}
           onChange={(event) => setValue(event.target.value)}
           placeholder="예) 서울 강남구 테헤란로 123"
-          className="mt-2 min-h-[96px] w-full resize-none rounded-2xl border border-slate-200 bg-white p-3 text-[15px] font-bold text-slate-800 outline-none focus:border-rose-deep"
+          className={c5("mt-2 min-h-[96px] w-full resize-none rounded-2xl border border-slate-200 bg-white p-3 text-[15px] font-bold text-slate-800 outline-none focus:border-rose-deep")}
         />
       </label>
     </CustomerDialog>

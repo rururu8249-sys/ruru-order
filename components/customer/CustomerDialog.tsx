@@ -9,6 +9,7 @@
 
 import type { ReactNode } from "react";
 import { useCustomerOverlayClose, csPrimaryButtonStyle, csCancelButtonStyle } from "./CustomerBottomSheet";
+import { useCustomerStageRestyle } from "@/lib/useCustomerUiStage";
 
 export const CS_DIALOG_Z = 120;
 
@@ -53,6 +54,8 @@ export default function CustomerDialog({
   width = 340,
   ariaLabel,
 }: Props) {
+  // [㉜ 5단계] ?preview=s5 에서만 새 모양(로즈→흑백·13px 미만→13px·그림자 정리). 꺼지면 원래 스타일 그대로.
+  const { on: v5, s: s5, c: c5 } = useCustomerStageRestyle("s5", { keepShadow: true });
   const { key, requestClose } = useCustomerOverlayClose({ open, onClose, closeGuard, closeDisabled });
   if (!open) return null;
 
@@ -61,7 +64,7 @@ export default function CustomerDialog({
       onClick={(event) => {
         if (backdropClose && event.target === event.currentTarget) requestClose();
       }}
-      style={{ position: "fixed", inset: 0, zIndex, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 20px" }}
+      style={s5({ position: "fixed", inset: 0, zIndex, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 20px" })}
     >
       <div
         role="dialog"
@@ -69,12 +72,12 @@ export default function CustomerDialog({
         aria-labelledby={typeof title === "string" ? key : undefined}
         aria-label={ariaLabel}
         onClick={(event) => event.stopPropagation()}
-        style={{ width: `${width}px`, maxWidth: "100%", maxHeight: "calc(100dvh - 80px)", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "20px", boxShadow: "0 18px 50px rgba(0,0,0,0.28)", overflow: "hidden" }}
+        style={s5({ width: `${width}px`, maxWidth: "100%", maxHeight: "calc(100dvh - 80px)", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "20px", boxShadow: "0 18px 50px rgba(0,0,0,0.28)", overflow: "hidden" })}
       >
-        <div style={{ flexShrink: 0, display: "flex", alignItems: "flex-start", gap: "8px", padding: showClose ? "14px 12px 0 20px" : "22px 20px 0" }}>
-          <div style={{ flex: 1, minWidth: 0, paddingTop: showClose ? "6px" : 0 }}>
-            {icon ? <div style={{ fontSize: "34px", lineHeight: 1, marginBottom: "8px" }}>{icon}</div> : null}
-            <div id={key} style={{ fontSize: "17px", fontWeight: 800, color: "#151923", lineHeight: 1.35, wordBreak: "keep-all" }}>{title}</div>
+        <div style={s5({ flexShrink: 0, display: "flex", alignItems: "flex-start", gap: "8px", padding: showClose ? "14px 12px 0 20px" : "22px 20px 0" })}>
+          <div style={s5({ flex: 1, minWidth: 0, paddingTop: showClose ? "6px" : 0 })}>
+            {icon ? <div style={s5({ fontSize: "34px", lineHeight: 1, marginBottom: "8px" })}>{icon}</div> : null}
+            <div id={key} style={s5({ fontSize: "17px", fontWeight: 800, color: "#151923", lineHeight: 1.35, wordBreak: "keep-all" })}>{title}</div>
           </div>
           {showClose ? (
             <button
@@ -82,7 +85,7 @@ export default function CustomerDialog({
               onClick={() => { requestClose(); }}
               aria-label="닫기"
               disabled={closeDisabled}
-              style={{ flexShrink: 0, width: "36px", height: "36px", borderRadius: "50%", border: "none", background: "#F1ECEE", color: "#444", fontSize: "16px", fontWeight: 800, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", cursor: closeDisabled ? "not-allowed" : "pointer", opacity: closeDisabled ? 0.5 : 1 }}
+              style={s5({ flexShrink: 0, width: "36px", height: "36px", borderRadius: "50%", border: "none", background: "#F1ECEE", color: "#444", fontSize: "16px", fontWeight: 800, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", cursor: closeDisabled ? "not-allowed" : "pointer", opacity: closeDisabled ? 0.5 : 1 })}
             >
               ✕
             </button>
@@ -90,15 +93,15 @@ export default function CustomerDialog({
         </div>
 
         {children ? (
-          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "10px 20px 4px", fontSize: "14px", fontWeight: 600, color: "#555", lineHeight: 1.65, wordBreak: "keep-all" }}>
+          <div style={s5({ flex: 1, minHeight: 0, overflowY: "auto", padding: "10px 20px 4px", fontSize: "14px", fontWeight: 600, color: "#555", lineHeight: 1.65, wordBreak: "keep-all" })}>
             {children}
           </div>
         ) : null}
 
         {primary ? (
-          <div style={{ flexShrink: 0, padding: "14px 20px 20px", display: "grid", gridTemplateColumns: hideCancel ? "1fr" : "1fr 1fr", gap: "10px" }}>
+          <div style={s5({ flexShrink: 0, padding: "14px 20px 20px", display: "grid", gridTemplateColumns: hideCancel ? "1fr" : "1fr 1fr", gap: "10px" })}>
             {hideCancel ? null : (
-              <button type="button" onClick={() => { requestClose(); }} disabled={closeDisabled} style={{ ...csCancelButtonStyle, color: "#666", opacity: closeDisabled ? 0.5 : 1 }}>
+              <button type="button" onClick={() => { requestClose(); }} disabled={closeDisabled} style={s5({ ...csCancelButtonStyle, color: "#666", opacity: closeDisabled ? 0.5 : 1 })}>
                 {cancelLabel}
               </button>
             )}
@@ -106,7 +109,7 @@ export default function CustomerDialog({
               type="button"
               onClick={primary.onClick}
               disabled={primary.disabled}
-              style={{ ...csPrimaryButtonStyle(!primary.disabled), ...(primary.danger ? { background: "#C0392B" } : null) }}
+              style={s5({ ...csPrimaryButtonStyle(!primary.disabled), ...(primary.danger ? { background: "#C0392B" } : null) })}
             >
               {primary.label}
             </button>

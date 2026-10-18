@@ -9,6 +9,7 @@ import { usePathname } from "next/navigation";
 import ShopContactLink from "@/components/customer/ShopContactLink";
 import { contactGuideSentence } from "@/lib/shopInfo";
 import { useShopInfo } from "@/lib/useShopInfo";
+import { useCustomerStageRestyle } from "@/lib/useCustomerUiStage";
 
 type BlockState = {
   checking: boolean;
@@ -75,6 +76,8 @@ function shouldGuardPath(pathname: string | null) {
 }
 
 export default function CustomerAccessBlockGuard() {
+  // [㉜ 5단계] ?preview=s5 에서만 새 모양(로즈→흑백·13px 미만→13px·그림자 정리). 꺼지면 원래 스타일 그대로.
+  const { on: v5, s: s5, c: c5 } = useCustomerStageRestyle("s5", { keepShadow: true });
   const shopInfo = useShopInfo();
   const pathname = usePathname();
   const shouldGuard = useMemo(() => shouldGuardPath(pathname), [pathname]);
@@ -160,34 +163,34 @@ export default function CustomerAccessBlockGuard() {
   if (!state.blocked) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black px-4 py-5 text-white">
-      <div className="flex min-h-dvh items-center justify-center">
-        <section className="max-h-[calc(100dvh-40px)] w-full max-w-[390px] overflow-y-auto rounded-[26px] border border-red-300/70 bg-neutral-950 p-5 shadow-2xl">
-          <div className="text-center">
-            <div className="text-[10px] font-black uppercase tracking-[0.38em] text-red-300">Access Restricted</div>
-            <h1 className="mt-3 text-[30px] font-black leading-[1.08] tracking-[-0.06em] text-white">
+    <div className={c5("fixed inset-0 z-[9999] overflow-y-auto bg-black px-4 py-5 text-white")}>
+      <div className={c5("flex min-h-dvh items-center justify-center")}>
+        <section className={c5("max-h-[calc(100dvh-40px)] w-full max-w-[390px] overflow-y-auto rounded-[26px] border border-red-300/70 bg-neutral-950 p-5 shadow-2xl")}>
+          <div className={c5("text-center")}>
+            <div className={c5("text-[10px] font-black uppercase tracking-[0.38em] text-red-300")}>Access Restricted</div>
+            <h1 className={c5("mt-3 text-[30px] font-black leading-[1.08] tracking-[-0.06em] text-white")}>
               접속이 제한되어
               <br />
               있습니다.
             </h1>
-            <p className="mt-4 text-[14px] font-bold leading-6 text-neutral-300">
+            <p className={c5("mt-4 text-[14px] font-bold leading-6 text-neutral-300")}>
               현재 주문서 작성 및 고객 화면 이용이 제한된 상태입니다.
               <br />
               문의는 카톡채널로 부탁드립니다.
             </p>
           </div>
 
-          <div className="mt-5 rounded-[22px] bg-red-50 px-4 py-5 text-slate-950">
-            <div className="flex items-start gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-600 text-2xl text-white">
-                🚫
+          <div className={c5("mt-5 rounded-[22px] bg-red-50 px-4 py-5 text-slate-950")}>
+            <div className={c5("flex items-start gap-3")}>
+              <div className={c5("flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-600 text-2xl text-white")}>
+                {v5 ? <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><path d="M5.6 5.6l12.8 12.8" /></svg> : "🚫"}
               </div>
-              <div className="min-w-0">
-                <div className="text-[10px] font-black uppercase tracking-[0.28em] text-red-500">Order Limited</div>
-                <h2 className="mt-1 text-[22px] font-black leading-[1.25] tracking-[-0.05em] text-slate-950">
+              <div className={c5("min-w-0")}>
+                <div className={c5("text-[10px] font-black uppercase tracking-[0.28em] text-red-500")}>Order Limited</div>
+                <h2 className={c5("mt-1 text-[22px] font-black leading-[1.25] tracking-[-0.05em] text-slate-950")}>
                   현재 주문서 작성이 제한되어 있습니다.
                 </h2>
-                <p className="mt-3 text-[14px] font-black leading-6 text-red-700">
+                <p className={c5("mt-3 text-[14px] font-black leading-6 text-red-700")}>
                   운영 확인 후 안내드리겠습니다.
                   <br />
                   {contactGuideSentence(shopInfo)}
@@ -197,7 +200,7 @@ export default function CustomerAccessBlockGuard() {
 
             <ShopContactLink
               labelForm="long"
-              className="mt-5 flex h-12 w-full items-center justify-center rounded-2xl bg-slate-950 text-[15px] font-black text-white shadow-lg"
+              className={c5("mt-5 flex h-12 w-full items-center justify-center rounded-2xl bg-slate-950 text-[15px] font-black text-white shadow-lg")}
             />
           </div>
 
@@ -207,12 +210,12 @@ export default function CustomerAccessBlockGuard() {
               clearCustomerLoginStorage();
               window.location.href = "/";
             }}
-            className="mt-4 h-12 w-full rounded-2xl bg-white text-[15px] font-black text-slate-950 shadow-lg"
+            className={c5("mt-4 h-12 w-full rounded-2xl bg-white text-[15px] font-black text-slate-950 shadow-lg")}
           >
             로그인 정보 지우고 처음으로
           </button>
 
-          <p className="mt-4 text-center text-[11px] font-bold leading-5 text-neutral-500">
+          <p className={c5("mt-4 text-center text-[11px] font-bold leading-5 text-neutral-500")}>
             주문 및 고객 화면 이용 관련 문의는 카톡채널로 부탁드립니다.
           </p>
         </section>

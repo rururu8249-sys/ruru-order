@@ -76,17 +76,22 @@ const COLOR_KEYS: Record<string, Role> = {
   borderRight: "sep",
   outline: "line",
   textDecorationColor: "text",
+  accentColor: "text",     // 체크박스·라디오 색
+  caretColor: "text",
+  outlineColor: "line",
 };
 
 function recolorString(value: string, role: Role): string {
   return value
+    // 8자리(#RRGGBBAA, 예: `${관리자색}0D`) — 앞 6자리만 바꾸고 투명도는 그대로
+    .replace(/#([0-9a-fA-F]{6})([0-9a-fA-F]{2})\b/g, (_m, rgb: string, alpha: string) => mapColorV2("#" + rgb, role) + alpha)
     .replace(/#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g, (m) => mapColorV2(m, role))
     .replace(/rgba\(\s*122\s*,\s*30\s*,\s*71\s*,/g, "rgba(17,17,17,")
     .replace(/rgba\(\s*52\s*,\s*20\s*,\s*31\s*,/g, "rgba(17,17,17,");
 }
 
 /** 인라인 스타일 하나를 새 모양으로(원본은 그대로 두고 새 객체). */
-export function restyleV2(style: CSSProperties | undefined): CSSProperties | undefined {
+export function restyleV2(style: CSSProperties | undefined, options: { keepShadow?: boolean } = {}): CSSProperties | undefined {
   if (!style) return style;
   const out: Record<string, unknown> = { ...style };
   for (const [key, value] of Object.entries(out)) {
@@ -96,7 +101,7 @@ export function restyleV2(style: CSSProperties | undefined): CSSProperties | und
       if (Number.isFinite(n) && n < 13) out[key] = typeof value === "number" ? 13 : "13px";
     }
     if (key === "fontWeight" && (value === 800 || value === 900 || value === "800" || value === "900")) out[key] = 700;
-    if (key === "boxShadow" && typeof value === "string" && value !== "none") out[key] = "none";
+    if (key === "boxShadow" && typeof value === "string" && value !== "none" && options.keepShadow !== true) out[key] = "none";
   }
   return out as CSSProperties;
 }
@@ -104,4 +109,74 @@ export function restyleV2(style: CSSProperties | undefined): CSSProperties | und
 /** 화면 장식 이모지 빼기(DESIGN.md §9-2) — 글자 내용은 그대로, 앞뒤 공백 정리. 🏠 로고·관리자가 쓴 내용은 호출부에서 제외. */
 export function stripDecorativeEmojiV2(text: string): string {
   return text.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/gu, "").replace(/\s{2,}/g, " ").replace(/^\s*·\s*|\s*·\s*$/g, "").trim();
+}
+
+// ── [㉜ 5단계] Tailwind 클래스판 — 손님 창(시트·팝업)에 흩어진 클래스 색·글씨를 DESIGN.md 로 한 번에 정리 ──
+//   출력 클래스는 app/globals.css 의 @source inline(…) 에 미리 등록해 둔 것만 나온다(JIT 가 생성하도록).
+//   규칙: 로즈·코랄·분홍·파랑·보라·주황·노랑 → ink/charcoal/mute/soft-cloud/hairline, 빨강 글자·테두리 → sale, 초록 → success,
+//         13px 미만·text-xs → 13px, font-black/extrabold → font-bold, 그림자 → shadow-none(떠 있는 창은 keepShadow).
+//         회색(slate·gray 등)·흰색·크기·간격 클래스는 그대로.
+const ACCENT_FAMILIES = new Set(["rose", "coral", "pink", "fuchsia", "blue", "sky", "indigo", "violet", "purple", "orange", "amber", "yellow", "lime", "cyan"]);
+const COLOR_PREFIX = /^(text|bg|border(?:-[trblxy])?|ring|from|via|to|accent|outline|divide|decoration|placeholder|caret|fill|stroke)-(.+)$/;
+
+function shadeIsLight(token: string): boolean {
+  if (/^(soft|line|light|50|100|200|300)$/.test(token)) return true;
+  if (/^\d+$/.test(token)) return Number(token) <= 300;
+  return false; // deep·dark·400 이상
+}
+
+function mapNamedColor(prefix: string, family: string, shade: string): string | null {
+  const light = shadeIsLight(shade);
+  const role = prefix === "text" || prefix === "placeholder" || prefix === "caret" || prefix === "decoration" ? "text"
+    : prefix === "bg" || prefix === "from" || prefix === "via" || prefix === "to" ? "fill"
+    : prefix === "accent" || prefix === "fill" || prefix === "stroke" ? "accent" : "line";
+  if (family === "red") {
+    if (role === "text" || role === "line" || role === "accent") return "#D30005";
+    return light ? "#F5F5F5" : "#111111";
+  }
+  if (family === "green" || family === "emerald" || family === "teal") {
+    if (role === "text") return "#007D48";
+    if (role === "fill") return light ? "#E6F4EC" : "#111111";
+    return light ? "#CACACB" : "#007D48";
+  }
+  if (!ACCENT_FAMILIES.has(family)) return null;
+  if (role === "text") return light ? "#707072" : "#111111";
+  if (role === "fill") return light ? "#F5F5F5" : "#111111";
+  if (role === "accent") return "#111111";
+  return light ? "#CACACB" : "#111111";
+}
+
+function restyleUtilityV2(utility: string, keepShadow: boolean): string {
+  const size = utility.match(/^text-\[(\d+(?:\.\d+)?)px\]$/);
+  if (size) return Number(size[1]) < 13 ? "text-[13px]" : utility;
+  if (utility === "text-xs" || utility === "text-[10px]") return "text-[13px]";
+  if (utility === "font-black" || utility === "font-extrabold") return "font-bold";
+  if (utility === "uppercase") return "normal-case"; // DESIGN §10 대문자 변환 없음
+  if (/^shadow(-.+)?$/.test(utility) && utility !== "shadow-none") return keepShadow ? utility : "shadow-none";
+  const m = utility.match(COLOR_PREFIX);
+  if (!m) return utility;
+  const prefix = m[1].startsWith("border") ? "border" : m[1];
+  const rest = m[2].replace(/\/\d+$/, "");
+  const hex = rest.match(/^\[(#[0-9a-fA-F]{3,6})\]$/);
+  if (hex) {
+    const role = prefix === "text" || prefix === "placeholder" || prefix === "caret" || prefix === "decoration" || prefix === "accent" ? "text"
+      : prefix === "bg" || prefix === "from" || prefix === "via" || prefix === "to" ? "fill" : "line";
+    return `${m[1]}-[${mapColorV2(hex[1], role)}]`;
+  }
+  const named = rest.match(/^([a-z]+)-([a-z0-9]+)$/);
+  if (!named) return utility;
+  const out = mapNamedColor(prefix, named[1], named[2]);
+  return out ? `${m[1]}-[${out}]` : utility;
+}
+
+/** className 문자열 하나를 새 모양으로. 변형(hover: 등)은 앞에 그대로 붙인다. */
+export function restyleClassV2(className: string | undefined, options: { keepShadow?: boolean } = {}): string | undefined {
+  if (!className) return className;
+  return className.split(/\s+/).filter(Boolean).map((token) => {
+    const cut = token.lastIndexOf(":");
+    const variant = cut >= 0 ? token.slice(0, cut + 1) : "";
+    const base = cut >= 0 ? token.slice(cut + 1) : token;
+    const important = base.startsWith("!") ? "!" : "";
+    return variant + important + restyleUtilityV2(important ? base.slice(1) : base, options.keepShadow === true);
+  }).join(" ");
 }

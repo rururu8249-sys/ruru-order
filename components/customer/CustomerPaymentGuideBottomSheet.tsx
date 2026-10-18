@@ -6,6 +6,7 @@ import { useState } from "react";
 import type { CSSProperties } from "react";
 // [2026-09-20] 바텀시트 «한 벌» 틀(높이·헤더·✕·닫기 5종). 계좌·금액·안내 내용은 그대로.
 import CustomerBottomSheet, { csPrimaryButtonStyle } from "@/components/customer/CustomerBottomSheet";
+import { useCustomerStageRestyle } from "@/lib/useCustomerUiStage";
 
 type CustomerPaymentGuideOrderItem = {
   product_name?: string;
@@ -97,6 +98,8 @@ export default function CustomerPaymentGuideBottomSheet({
   liveAlertSaving = false,
   onLiveAlertRequest,
 }: CustomerPaymentGuideBottomSheetProps) {
+  // [㉜ 5단계] ?preview=s5 에서만 새 모양(로즈→흑백·13px 미만→13px·그림자 정리). 꺼지면 원래 스타일 그대로.
+  const { on: v5, s: s5, c: c5 } = useCustomerStageRestyle("s5");
   const [installHint, setInstallHint] = useState(false);
 
   if (!open) return null;
@@ -139,85 +142,85 @@ export default function CustomerPaymentGuideBottomSheet({
   const doneButtonStyle: CSSProperties = { ...normalButtonStyle, border: "1px solid #7B2D43", background: "#7B2D43", color: "#fff" };
   const sumRow: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0", fontSize: "13px", fontWeight: 700, color: "#666" };
 
-  const sheetTitle = isOrderComplete ? "✅ 주문 접수됐어요" : "입금 안내";
+  const sheetTitle = isOrderComplete ? (v5 ? "주문 접수됐어요" : "✅ 주문 접수됐어요") : "입금 안내";
   const sheetSubtitle = isOrderComplete
     ? (isFullyPaidByPoints ? "추가 결제 없이 접수됐어요" : showCardGuide ? "카카오톡으로 전송되는 결제링크에서 결제해 주세요" : "아래 계좌로 입금해 주세요")
     : "현재 보이는 닉네임으로 입금해 주세요.";
 
   return (
-    <CustomerBottomSheet
+    <CustomerBottomSheet tone={v5 ? "v2" : undefined}
       open
       onClose={onClose}
       title={sheetTitle}
       subtitle={sheetSubtitle}
       ariaLabel={isOrderComplete ? "주문 접수 완료 및 입금 안내" : "입금 안내"}
       bodyPadding="4px 16px 16px"
-      footer={<button type="button" onClick={onClose} style={csPrimaryButtonStyle(true)}>확인</button>}
+      footer={<button type="button" onClick={onClose} style={s5(csPrimaryButtonStyle(true))}>확인</button>}
     >
           {/* [2026-09-20 사장님 「제출 후 화면도 심플하고 난독증 손님이 봐도 보기 좋게」]
               · 무통장: 상자 3개(입금자명·금액·계좌)+화살표+손가락 → «이렇게 입금해 주세요» 상자 1개, 줄 3개, 복사는 줄 옆 버튼.
               · 포인트 전액: 초록 한 줄. · 배송지 ⚠️ 상자 → 회색 한 줄. · 「다음 방송」 상자 → 버튼 2개 한 줄.
               계좌·금액·닉네임 값과 복사 동작(onCopy*)은 그대로. */}
           {isFullyPaidByPoints && (
-            <section style={{ marginTop: "12px", borderRadius: "14px", background: "#E1F5EE", border: "1px solid #C7EBDD", padding: "14px 16px", display: "flex", alignItems: "center", gap: "10px" }}>
-              <span style={{ fontSize: "22px", lineHeight: 1 }}>✅</span>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: "16px", fontWeight: 900, color: "#0F6E56" }}>포인트로 결제 끝났어요</div>
-                <div style={{ marginTop: "2px", fontSize: "13px", fontWeight: 700, color: "#397A68" }}>더 낼 돈이 없습니다.</div>
+            <section style={s5({ marginTop: "12px", borderRadius: "14px", background: "#E1F5EE", border: "1px solid #C7EBDD", padding: "14px 16px", display: "flex", alignItems: "center", gap: "10px" })}>
+              <span style={s5({ fontSize: "22px", lineHeight: 1 })}>{v5 ? <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#007D48" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M8 12.5l2.7 2.7L16 9.8" /></svg> : "✅"}</span>
+              <div style={s5({ minWidth: 0 })}>
+                <div style={s5({ fontSize: "16px", fontWeight: 900, color: "#0F6E56" })}>포인트로 결제 끝났어요</div>
+                <div style={s5({ marginTop: "2px", fontSize: "13px", fontWeight: 700, color: "#397A68" })}>더 낼 돈이 없습니다.</div>
               </div>
             </section>
           )}
 
           {showCardGuide && (
-            <section style={{ marginTop: "12px", borderRadius: "14px", background: "#F9EEF3", border: "1px solid #D9C5CC", padding: "14px 16px", display: "flex", alignItems: "center", gap: "10px" }}>
-              <span style={{ fontSize: "22px", lineHeight: 1 }}>💳</span>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: "16px", fontWeight: 900, color: "#7A1E47" }}>카카오톡으로 결제링크를 보내드려요</div>
-                <div style={{ marginTop: "2px", fontSize: "13px", fontWeight: 700, color: "#7A1E47", wordBreak: "keep-all" }}>카톡이 오면 링크에서 {won(safeFinalAmount)} 결제해 주세요.</div>
+            <section style={s5({ marginTop: "12px", borderRadius: "14px", background: "#F9EEF3", border: "1px solid #D9C5CC", padding: "14px 16px", display: "flex", alignItems: "center", gap: "10px" })}>
+              <span style={s5({ fontSize: "22px", lineHeight: 1 })}>{v5 ? <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5.5" width="18" height="13" rx="2" /><path d="M3 10h18M7 15h4" /></svg> : "💳"}</span>
+              <div style={s5({ minWidth: 0 })}>
+                <div style={s5({ fontSize: "16px", fontWeight: 900, color: "#7A1E47" })}>카카오톡으로 결제링크를 보내드려요</div>
+                <div style={s5({ marginTop: "2px", fontSize: "13px", fontWeight: 700, color: "#7A1E47", wordBreak: "keep-all" })}>카톡이 오면 링크에서 {won(safeFinalAmount)} 결제해 주세요.</div>
               </div>
             </section>
           )}
 
           {showBankGuide && (
-            <section style={{ marginTop: "12px", borderRadius: "16px", background: "#FFFBEB", border: "1.5px solid #F0E0B0", padding: "14px 16px" }}>
-              <div style={{ fontSize: "15px", fontWeight: 900, color: "#1A1A1A" }}>이렇게 입금해 주세요</div>
+            <section style={s5({ marginTop: "12px", borderRadius: "16px", background: "#FFFBEB", border: "1.5px solid #F0E0B0", padding: "14px 16px" })}>
+              <div style={s5({ fontSize: "15px", fontWeight: 900, color: "#1A1A1A" })}>이렇게 입금해 주세요</div>
 
-              <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "10px" }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: "12px", fontWeight: 700, color: "#6E655E" }}>① 입금자명 (닉네임)</div>
-                  <div style={{ fontSize: "22px", fontWeight: 900, color: "#1A1A1A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{safeNickname}</div>
+              <div style={s5({ marginTop: "12px", display: "flex", alignItems: "center", gap: "10px" })}>
+                <div style={s5({ flex: 1, minWidth: 0 })}>
+                  <div style={s5({ fontSize: "12px", fontWeight: 700, color: "#6E655E" })}>① 입금자명 (닉네임)</div>
+                  <div style={s5({ fontSize: "22px", fontWeight: 900, color: "#1A1A1A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" })}>{safeNickname}</div>
                 </div>
-                <button type="button" onClick={onCopyNickname} style={{ ...(nicknameCopyDone ? doneButtonStyle : normalButtonStyle), flexShrink: 0, minHeight: "40px", padding: "0 14px", fontSize: "13px" }}>
+                <button type="button" onClick={onCopyNickname} style={s5({ ...(nicknameCopyDone ? doneButtonStyle : normalButtonStyle), flexShrink: 0, minHeight: "40px", padding: "0 14px", fontSize: "13px" })}>
                   {nicknameCopyDone ? "복사됨" : "복사"}
                 </button>
               </div>
-              <div style={{ marginTop: "4px", fontSize: "12px", fontWeight: 800, color: "#854F0B" }}>⚠️ 꼭 이 이름으로 입금해야 확인돼요</div>
+              <div style={s5({ marginTop: "4px", fontSize: "12px", fontWeight: 800, color: "#854F0B" })}>{v5 ? "꼭 이 이름으로 입금해야 확인돼요" : "⚠️ 꼭 이 이름으로 입금해야 확인돼요"}</div>
 
-              <div style={{ marginTop: "12px", borderTop: "1px solid #F0E0B0", paddingTop: "12px" }}>
-                <div style={{ fontSize: "12px", fontWeight: 700, color: "#6E655E" }}>② 입금금액</div>
-                <div style={{ fontSize: "26px", fontWeight: 900, color: "#7A1E47" }}>{won(safeFinalAmount)}</div>
+              <div style={s5({ marginTop: "12px", borderTop: "1px solid #F0E0B0", paddingTop: "12px" })}>
+                <div style={s5({ fontSize: "12px", fontWeight: 700, color: "#6E655E" })}>② 입금금액</div>
+                <div style={s5({ fontSize: "26px", fontWeight: 900, color: "#7A1E47" })}>{won(safeFinalAmount)}</div>
               </div>
 
-              <div style={{ marginTop: "12px", borderTop: "1px solid #F0E0B0", paddingTop: "12px", display: "flex", alignItems: "center", gap: "10px" }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: "12px", fontWeight: 700, color: "#6E655E" }}>③ 계좌</div>
-                  <div style={{ fontSize: "17px", fontWeight: 900, color: "#1A1A1A", wordBreak: "break-all" }}>{safeBankName} {safeBankAccount}</div>
-                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#555" }}>예금주 {safeBankHolder}</div>
+              <div style={s5({ marginTop: "12px", borderTop: "1px solid #F0E0B0", paddingTop: "12px", display: "flex", alignItems: "center", gap: "10px" })}>
+                <div style={s5({ flex: 1, minWidth: 0 })}>
+                  <div style={s5({ fontSize: "12px", fontWeight: 700, color: "#6E655E" })}>③ 계좌</div>
+                  <div style={s5({ fontSize: "17px", fontWeight: 900, color: "#1A1A1A", wordBreak: "break-all" })}>{safeBankName} {safeBankAccount}</div>
+                  <div style={s5({ fontSize: "13px", fontWeight: 700, color: "#555" })}>예금주 {safeBankHolder}</div>
                 </div>
-                <button type="button" onClick={onCopyBankAccount} style={{ ...(bankCopyDone ? doneButtonStyle : normalButtonStyle), flexShrink: 0, minHeight: "40px", padding: "0 14px", fontSize: "13px" }}>
+                <button type="button" onClick={onCopyBankAccount} style={s5({ ...(bankCopyDone ? doneButtonStyle : normalButtonStyle), flexShrink: 0, minHeight: "40px", padding: "0 14px", fontSize: "13px" })}>
                   {bankCopyDone ? "복사됨" : "복사"}
                 </button>
               </div>
 
-              <div style={{ marginTop: "10px", borderRadius: "10px", background: "#FFF3CD", padding: "9px 10px", fontSize: "12.5px", fontWeight: 900, lineHeight: 1.5, color: "#7A1E47", wordBreak: "keep-all" }}>
+              <div style={s5({ marginTop: "10px", borderRadius: "10px", background: "#FFF3CD", padding: "9px 10px", fontSize: "12.5px", fontWeight: 900, lineHeight: 1.5, color: "#7A1E47", wordBreak: "keep-all" })}>
                 입금 계좌는 변경될 수 있습니다. 입금 전 이 화면의 계좌번호를 꼭 확인해 주세요.
               </div>
 
               {isOrderComplete ? (
-                <div style={{ marginTop: "12px", borderTop: "1px solid #F0E0B0", paddingTop: "10px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", fontSize: "12.5px", fontWeight: 700, color: "#397A68" }}>
+                <div style={s5({ marginTop: "12px", borderTop: "1px solid #F0E0B0", paddingTop: "10px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", fontSize: "12.5px", fontWeight: 700, color: "#397A68" })}>
                   <span>입금 확인은 보통 10~30분 걸려요</span>
                   {onOpenOrderLookup ? (
-                    <button type="button" onClick={onOpenOrderLookup} style={{ flexShrink: 0, border: "none", background: "none", padding: 0, fontSize: "12.5px", fontWeight: 900, color: "#0F6E56", textDecoration: "underline", cursor: "pointer" }}>주문내역 보기</button>
+                    <button type="button" onClick={onOpenOrderLookup} style={s5({ flexShrink: 0, border: "none", background: "none", padding: 0, fontSize: "12.5px", fontWeight: 900, color: "#0F6E56", textDecoration: "underline", cursor: "pointer" })}>주문내역 보기</button>
                   ) : null}
                 </div>
               ) : null}
@@ -225,81 +228,81 @@ export default function CustomerPaymentGuideBottomSheet({
           )}
 
           {isOrderComplete && (
-            <section style={{ marginTop: "12px", borderRadius: "16px", background: "#fff", border: "1px solid #E8E2DD", padding: "14px 16px" }}>
-              <div style={{ marginBottom: "8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
-                <h3 style={{ fontSize: "15px", fontWeight: 900, color: "#222" }}>주문 상품</h3>
-                <span style={{ fontSize: "12px", fontWeight: 800, color: "#7B2D43" }}>총 {totalQty}개</span>
+            <section style={s5({ marginTop: "12px", borderRadius: "16px", background: "#fff", border: "1px solid #E8E2DD", padding: "14px 16px" })}>
+              <div style={s5({ marginBottom: "8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" })}>
+                <h3 style={s5({ fontSize: "15px", fontWeight: 900, color: "#222" })}>주문 상품</h3>
+                <span style={s5({ fontSize: "12px", fontWeight: 800, color: "#7B2D43" })}>총 {totalQty}개</span>
               </div>
 
-              <div style={{ display: "grid", gap: "6px" }}>
+              <div style={s5({ display: "grid", gap: "6px" })}>
                 {orderItems.length > 0 ? (
                   orderItems.map((item, index) => {
                     const qty = toNumber(item.qty);
                     const amount = toNumber(item.product_price) * qty;
                     return (
-                      <div key={`${itemTitle(item)}-${index}`} style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", padding: "8px 0", borderBottom: "0.5px solid #EEE7E1" }}>
-                        <div style={{ minWidth: 0 }}>
-                          <p style={{ wordBreak: "keep-all", fontSize: "14px", fontWeight: 800, lineHeight: 1.5, color: "#222" }}>{itemTitle(item)}</p>
-                          <p style={{ marginTop: "2px", fontSize: "12px", fontWeight: 700, color: "#888" }}>{qty || 0}개</p>
+                      <div key={`${itemTitle(item)}-${index}`} style={s5({ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", padding: "8px 0", borderBottom: "0.5px solid #EEE7E1" })}>
+                        <div style={s5({ minWidth: 0 })}>
+                          <p style={s5({ wordBreak: "keep-all", fontSize: "14px", fontWeight: 800, lineHeight: 1.5, color: "#222" })}>{itemTitle(item)}</p>
+                          <p style={s5({ marginTop: "2px", fontSize: "12px", fontWeight: 700, color: "#888" })}>{qty || 0}개</p>
                         </div>
-                        <p style={{ flexShrink: 0, textAlign: "right", fontSize: "14px", fontWeight: 800, color: "#7B2D43" }}>{won(amount)}</p>
+                        <p style={s5({ flexShrink: 0, textAlign: "right", fontSize: "14px", fontWeight: 800, color: "#7B2D43" })}>{won(amount)}</p>
                       </div>
                     );
                   })
                 ) : (
-                  <div style={{ padding: "12px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "#888" }}>주문 상품 정보가 없습니다.</div>
+                  <div style={s5({ padding: "12px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "#888" })}>주문 상품 정보가 없습니다.</div>
                 )}
               </div>
 
-              <div style={{ marginTop: "10px" }}>
-                <div style={sumRow}><span>상품금액</span><span>{won(safeProductAmount)}</span></div>
-                <div style={sumRow}><span>배송비</span><span>{won(safeShippingFee)}</span></div>
+              <div style={s5({ marginTop: "10px" })}>
+                <div style={s5(sumRow)}><span>상품금액</span><span>{won(safeProductAmount)}</span></div>
+                <div style={s5(sumRow)}><span>배송비</span><span>{won(safeShippingFee)}</span></div>
                 {safeCardExtra > 0 && (
-                  <div style={sumRow}><span>카드 추가금</span><span>+{won(safeCardExtra)}</span></div>
+                  <div style={s5(sumRow)}><span>카드 추가금</span><span>+{won(safeCardExtra)}</span></div>
                 )}
                 {safePointUsedAmount > 0 && (
-                  <div style={{ ...sumRow, fontWeight: 800, color: "#0F6E56" }}><span>포인트 사용</span><span>-{won(safePointUsedAmount)}</span></div>
+                  <div style={s5({ ...sumRow, fontWeight: 800, color: "#0F6E56" })}><span>포인트 사용</span><span>-{won(safePointUsedAmount)}</span></div>
                 )}
-                <div style={{ marginTop: "6px", display: "flex", alignItems: "baseline", justifyContent: "space-between", borderTop: "1px solid #E8E2DD", paddingTop: "8px", fontSize: "15px", fontWeight: 900, color: "#222" }}>
+                <div style={s5({ marginTop: "6px", display: "flex", alignItems: "baseline", justifyContent: "space-between", borderTop: "1px solid #E8E2DD", paddingTop: "8px", fontSize: "15px", fontWeight: 900, color: "#222" })}>
                   <span>{safePointUsedAmount > 0 ? "최종 결제금액" : "결제금액"}</span>
-                  <span style={{ color: "#7A1E47", fontSize: "20px" }}>{won(safeFinalAmount)}</span>
+                  <span style={s5({ color: "#7A1E47", fontSize: "20px" })}>{won(safeFinalAmount)}</span>
                 </div>
               </div>
             </section>
           )}
 
           {isOrderComplete && (
-            <section style={{ marginTop: "12px", borderRadius: "16px", background: "#fff", border: "1px solid #E8E2DD", padding: "14px 16px" }}>
-              <h3 style={{ fontSize: "15px", fontWeight: 900, color: "#222" }}>🚚 받는 곳</h3>
-              <div style={{ marginTop: "6px", fontSize: "14px", fontWeight: 800, color: "#222" }}>{safeRecipientName} · {safeRecipientPhone}</div>
-              <div style={{ marginTop: "2px", fontSize: "13px", fontWeight: 600, color: "#444", wordBreak: "keep-all" }}>{safeShippingAddress}</div>
-              <div style={{ marginTop: "8px", fontSize: "12px", fontWeight: 700, color: "#8A7A7D" }}>배송지를 바꿔야 하면 카톡채널로 알려주세요. (내정보에서 바꿔도 이 주문엔 적용 안 돼요)</div>
+            <section style={s5({ marginTop: "12px", borderRadius: "16px", background: "#fff", border: "1px solid #E8E2DD", padding: "14px 16px" })}>
+              <h3 style={s5({ fontSize: "15px", fontWeight: 900, color: "#222" })}>{v5 ? "받는 곳" : "🚚 받는 곳"}</h3>
+              <div style={s5({ marginTop: "6px", fontSize: "14px", fontWeight: 800, color: "#222" })}>{safeRecipientName} · {safeRecipientPhone}</div>
+              <div style={s5({ marginTop: "2px", fontSize: "13px", fontWeight: 600, color: "#444", wordBreak: "keep-all" })}>{safeShippingAddress}</div>
+              <div style={s5({ marginTop: "8px", fontSize: "12px", fontWeight: 700, color: "#8A7A7D" })}>배송지를 바꿔야 하면 카톡채널로 알려주세요. (내정보에서 바꿔도 이 주문엔 적용 안 돼요)</div>
             </section>
           )}
 
           {/* 주문완료 = 참여도 최고점 — 알림 신청·앱 추가는 한 줄 버튼 2개로만 */}
           {isOrderComplete && (onLiveAlertRequest || !isStandaloneApp) && (
-            <section style={{ marginTop: "12px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: onLiveAlertRequest && !isStandaloneApp ? "1fr 1fr" : "1fr", gap: "8px" }}>
+            <section style={s5({ marginTop: "12px" })}>
+              <div style={s5({ display: "grid", gridTemplateColumns: onLiveAlertRequest && !isStandaloneApp ? "1fr 1fr" : "1fr", gap: "8px" })}>
                 {onLiveAlertRequest ? (
                   liveAlertOptin ? (
-                    <div style={{ minHeight: "44px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "12px", background: "#E1F5EE", border: "1px solid #C7EBDD", padding: "0 10px", fontSize: "12.5px", fontWeight: 800, color: "#0F6E56", textAlign: "center", wordBreak: "keep-all" }}>
-                      🔔 방송 알림 받는 중
+                    <div style={s5({ minHeight: "44px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "12px", background: "#E1F5EE", border: "1px solid #C7EBDD", padding: "0 10px", fontSize: "12.5px", fontWeight: 800, color: "#0F6E56", textAlign: "center", wordBreak: "keep-all" })}>
+                      {v5 ? "방송 알림 받는 중" : "🔔 방송 알림 받는 중"}
                     </div>
                   ) : (
-                    <button type="button" disabled={liveAlertSaving} onClick={onLiveAlertRequest} style={{ minHeight: "44px", borderRadius: "12px", border: "1px solid #D9C5CC", background: "#fff", padding: "0 10px", fontSize: "12.5px", fontWeight: 800, color: "#7B2D43", cursor: "pointer" }}>
-                      {liveAlertSaving ? "신청 중..." : "🔔 방송 알림 받기"}
+                    <button type="button" disabled={liveAlertSaving} onClick={onLiveAlertRequest} style={s5({ minHeight: "44px", borderRadius: "12px", border: "1px solid #D9C5CC", background: "#fff", padding: "0 10px", fontSize: "12.5px", fontWeight: 800, color: "#7B2D43", cursor: "pointer" })}>
+                      {liveAlertSaving ? "신청 중..." : v5 ? "방송 알림 받기" : "🔔 방송 알림 받기"}
                     </button>
                   )
                 ) : null}
                 {!isStandaloneApp ? (
-                  <button type="button" onClick={handleInstallClick} style={{ minHeight: "44px", borderRadius: "12px", border: "1px solid #D9C5CC", background: "#fff", padding: "0 10px", fontSize: "12.5px", fontWeight: 800, color: "#7B2D43", cursor: "pointer" }}>
-                    📲 홈 화면에 추가
+                  <button type="button" onClick={handleInstallClick} style={s5({ minHeight: "44px", borderRadius: "12px", border: "1px solid #D9C5CC", background: "#fff", padding: "0 10px", fontSize: "12.5px", fontWeight: 800, color: "#7B2D43", cursor: "pointer" })}>
+                    {v5 ? "홈 화면에 추가" : "📲 홈 화면에 추가"}
                   </button>
                 ) : null}
               </div>
               {installHint && (
-                <div style={{ marginTop: "8px", fontSize: "12px", fontWeight: 700, lineHeight: 1.6, color: "#8a6b76" }}>
+                <div style={s5({ marginTop: "8px", fontSize: "12px", fontWeight: 700, lineHeight: 1.6, color: "#8a6b76" })}>
                   아이폰: Safari 하단 <b>공유</b> 버튼 → <b>홈 화면에 추가</b>
                   <br />
                   안드로이드: 브라우저 메뉴(⋮) → <b>홈 화면에 추가</b>

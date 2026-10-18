@@ -124,6 +124,7 @@ import ProductColorRowV2 from "@/components/customer/ProductColorRowV2";
 import { colorNameSwatch, isLightSwatch, resolveColorDisplay } from "@/lib/colorNameSwatch";
 import { restyleV2 } from "@/lib/customerUiV2Restyle";
 import { readCustomerUiPreview, resolveCustomerUiV2, UI_PREVIEW_DEFAULTS, UI_V2_DEFAULT, UI_V2_STORAGE_KEY } from "@/lib/customerUiSwitch";
+import { restyleClassV2, stripDecorativeEmojiV2 } from "@/lib/customerUiV2Restyle";
 import CartAddFeedbackV2 from "@/components/customer/CartAddFeedbackV2";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import ShopContactLink from "@/components/customer/ShopContactLink";
@@ -1474,6 +1475,9 @@ export default function OrderPage() {
   // [㉜ 3단계] 주문서 확인 창 새 모양 — ?preview=s3 브라우저만(기본값 UI_PREVIEW_DEFAULTS.s3). 새 모양(v2) 켜진 손님에게만.
   const [previewS3, setPreviewS3] = useState<boolean>(UI_PREVIEW_DEFAULTS.s3);
   const uiS3 = uiV2 && previewS3;
+  // [㉜ 5단계] 나머지 손님 창(주소 검색·직접 입력·주문 방법·방송 알림·문의하기·확인창·접속 팝업) 새 모양 — ?preview=s5 (기본값 UI_PREVIEW_DEFAULTS.s5)
+  const [previewS5, setPreviewS5] = useState<boolean>(UI_PREVIEW_DEFAULTS.s5);
+  const uiS5 = uiV2 && previewS5;
   useEffect(() => {
     try {
       const decision = resolveCustomerUiV2(new URLSearchParams(window.location.search).get("ui"), window.localStorage.getItem(UI_V2_STORAGE_KEY), UI_V2_DEFAULT);
@@ -1481,11 +1485,15 @@ export default function OrderPage() {
       setUiV2(decision.v2);
     } catch { /* 저장소 못 쓰면 기본값 */ }
     setPreviewS3(readCustomerUiPreview("s3"));
+    setPreviewS5(readCustomerUiPreview("s5"));
   }, []);
   // [㉜ 2단계] 옵션 창 등 스타일이 많은 화면의 새 모양 정리(로즈→흑백·13px 미만→13px) — 스위치 꺼지면 원래 스타일 그대로.
   const sv = (style: CSSProperties | undefined): CSSProperties | undefined => (uiV2 ? restyleV2(style) : style);
   // [㉜ 3단계] 주문서 확인 창 정리(로즈→흑백·13px 미만→13px) — 미리보기 꺼지면 원래 스타일 그대로.
   const s3s = (style: CSSProperties | undefined): CSSProperties | undefined => (uiS3 ? restyleV2(style) : style);
+  // [㉜ 5단계] 창들 정리(로즈→흑백·13px 미만→13px). 떠 있는 창(팝업·확인창)이라 그림자는 둔다. 꺼지면 원래 그대로.
+  const s5s = (style: CSSProperties | undefined): CSSProperties | undefined => (uiS5 ? restyleV2(style, { keepShadow: true }) : style);
+  const c5s = (className: string | undefined): string | undefined => (uiS5 ? restyleClassV2(className, { keepShadow: true }) : className);
   const [isEditingCustomerInfo, setIsEditingCustomerInfo] = useState(false);
   const [isCustomerInfoOpen, setIsCustomerInfoOpen] = useState(false);
   const [showSavedCustomerDetail, setShowSavedCustomerDetail] = useState(false);
@@ -6169,7 +6177,7 @@ export default function OrderPage() {
 
           <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
             <div style={uiV2 ? { display: "inline-flex", alignItems: "center", gap: "5px", height: "38px", padding: "0 14px", borderRadius: "9999px", border: "1px solid #CACACB", background: "#F5F5F5", fontSize: "14px", fontWeight: 600, color: "#111111", whiteSpace: "nowrap" } : { display: "inline-flex", alignItems: "center", gap: "5px", height: "38px", padding: "0 13px", borderRadius: "99px", border: "1px solid #E7C9D4", background: "#F9EEF3", fontSize: "13px", fontWeight: 800, color: "#7A1E47", whiteSpace: "nowrap" }}>
-              🪙 {`${Math.max(0, Number(customerPointBalance || 0)).toLocaleString()}P`}
+              {uiS5 ? null : "🪙 "}{`${Math.max(0, Number(customerPointBalance || 0)).toLocaleString()}P`}
             </div>
           </div>
         </div>
@@ -6574,7 +6582,7 @@ export default function OrderPage() {
       {noticeStripOn ? (
         <div style={uiV2 ? { background: "#F5F5F5", color: "#111111", borderBottom: "1px solid #E5E5E5" } : { background: popupNoticeColor, color: "#fff" }}>
           <div style={{ margin: "0 auto", width: "100%", maxWidth: "560px", display: "flex", alignItems: "center", gap: "8px", padding: "7px 12px" }}>
-            <span style={{ flexShrink: 0, fontSize: "14px" }}>📢</span>
+            <span style={{ flexShrink: 0, fontSize: "14px" }}>{uiS5 ? <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="M4 10v4h3l6 4V6L7 10z" /><path d="M16.5 9.5a3.5 3.5 0 0 1 0 5" /></svg> : "📢"}</span>
             <button
               type="button"
               onClick={openNoticeBox}
@@ -6605,7 +6613,7 @@ export default function OrderPage() {
             onClick={openBandInApp}
             style={{ margin: "0 auto", width: "100%", maxWidth: "560px", display: "flex", alignItems: "center", gap: "8px", padding: "6px 12px", textDecoration: "none" }}
           >
-            <span style={{ flexShrink: 0, fontSize: "16px" }}>🟢</span>
+            <span style={{ flexShrink: 0, fontSize: "16px" }}>{uiS5 ? <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="M4 6.5h16v9H9l-5 3.5z" /></svg> : "🟢"}</span>
             {/* [2026-08-31 사장님 지적] 방송 알림은 사이트 자체 기능 — 밴드는 밴드대로 소개한다 */}
             <span style={uiV2 ? { minWidth: 0, flex: 1, fontSize: "13px", fontWeight: 600, color: "#111111", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } : { minWidth: 0, flex: 1, fontSize: "12px", fontWeight: 800, color: "#0B5A24", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               루루동이 네이버밴드 <span style={uiV2 ? { fontWeight: 400, color: "#707072" } : { fontWeight: 700, color: "#3E8354" }}>— 택배송장 · 후기이벤트 · 공지</span>
@@ -6621,20 +6629,20 @@ export default function OrderPage() {
       {popupOpen && hasSavedInfo ? (
         <div
           onClick={() => setPopupOpen(false)}
-          style={{ position: "fixed", inset: 0, zIndex: 3000, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}
+          style={s5s({ position: "fixed", inset: 0, zIndex: 3000, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" })}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ width: "100%", maxWidth: "380px", maxHeight: "88vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "22px", boxShadow: "0 24px 70px rgba(0,0,0,0.32)", overflow: "hidden", border: `2.5px solid ${popupNoticeColor}` }}
+            style={s5s({ width: "100%", maxWidth: "380px", maxHeight: "88vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "22px", boxShadow: "0 24px 70px rgba(0,0,0,0.32)", overflow: "hidden", border: `2.5px solid ${popupNoticeColor}` })}
           >
             {/* 색상 헤더 바 (제목 비우면 안 뜸) */}
             {popupNoticeTitle.trim() ? (
-              <div style={{ background: popupNoticeColor, color: "#fff", padding: "15px 18px", fontSize: "19px", fontWeight: 800, textAlign: "center", letterSpacing: "0.3px" }}>{popupNoticeTitle}</div>
+              <div style={uiS5 ? { background: "#111111", color: "#FFFFFF", padding: "15px 18px", fontSize: "19px", fontWeight: 700, textAlign: "center" } : { background: popupNoticeColor, color: "#fff", padding: "15px 18px", fontSize: "19px", fontWeight: 800, textAlign: "center", letterSpacing: "0.3px" }}>{popupNoticeTitle}</div>
             ) : null}
-            <div style={{ padding: "20px 18px 6px", overflowY: "auto" }}>
+            <div style={s5s({ padding: "20px 18px 6px", overflowY: "auto" })}>
               {/* 점선 테두리 콘텐츠 박스 */}
               <div
-                style={{
+                style={s5s({
                   background: `${popupNoticeColor}0D`,
                   border: `1.5px dashed ${popupNoticeColor}66`,
                   borderRadius: "16px",
@@ -6646,7 +6654,7 @@ export default function OrderPage() {
                   whiteSpace: "pre-wrap",
                   textAlign: "center",
                   wordBreak: "keep-all",
-                }}
+                })}
               >
                 {/* [2026-07-29] 문구 안에 --- 만 있는 줄 → 그 자리에 가로 구분선.
                     구분선이 없으면 통짜 문구 1개라 기존과 동일하게 보임(회귀 0). */}
@@ -6656,11 +6664,11 @@ export default function OrderPage() {
                     <div key={index}>
                       {index > 0 ? (
                         <div
-                          style={{
+                          style={s5s({
                             height: "1px",
                             background: `${popupNoticeColor}40`,
                             margin: "14px -4px",
-                          }}
+                          })}
                         />
                       ) : null}
                       <div>{segment.replace(/^\n+|\n+$/g, "")}</div>
@@ -6668,22 +6676,22 @@ export default function OrderPage() {
                   ))}
               </div>
             </div>
-            <div style={{ padding: "18px 22px 22px", display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div style={s5s({ padding: "18px 22px 22px", display: "flex", flexDirection: "column", gap: "10px" })}>
               {popupBandUrl ? (
                 <a
                   href={popupBandUrl}
                   target="_blank"
                   rel="noreferrer"
                   onClick={openBandInApp}
-                  style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", height: "54px", borderRadius: "13px", background: "#03C75A", color: "#fff", fontSize: "16px", fontWeight: 800, textDecoration: "none" }}
+                  style={uiS5 ? { display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", height: "52px", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", border: "1px solid #CACACB", fontSize: "16px", fontWeight: 600, textDecoration: "none" } : { display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", height: "54px", borderRadius: "13px", background: "#03C75A", color: "#fff", fontSize: "16px", fontWeight: 800, textDecoration: "none" }}
                 >
-                  👉 루루동이 밴드 바로가기
+                  {uiS5 ? "루루동이 밴드 바로가기" : "👉 루루동이 밴드 바로가기"}
                 </a>
               ) : null}
               <button
                 type="button"
                 onClick={() => setPopupOpen(false)}
-                style={{ height: "54px", borderRadius: "13px", background: popupNoticeColor, color: "#fff", border: "none", fontSize: "16px", fontWeight: 800, cursor: "pointer" }}
+                style={uiS5 ? { height: "52px", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", border: "none", fontSize: "16px", fontWeight: 600, cursor: "pointer" } : { height: "54px", borderRadius: "13px", background: popupNoticeColor, color: "#fff", border: "none", fontSize: "16px", fontWeight: 800, cursor: "pointer" }}
               >
                 확인
               </button>
@@ -6695,16 +6703,16 @@ export default function OrderPage() {
                   setPopupOpen(false);
                   try { window.dispatchEvent(new Event("ruru-open-notice-box")); } catch { /* 무시 */ }
                 }}
-                style={{ height: "46px", borderRadius: "13px", background: "#fff", color: popupNoticeColor, border: `1.5px solid ${popupNoticeColor}`, fontSize: "14px", fontWeight: 800, cursor: "pointer" }}
+                style={s5s({ height: "46px", borderRadius: "13px", background: "#fff", color: popupNoticeColor, border: `1.5px solid ${popupNoticeColor}`, fontSize: "14px", fontWeight: 800, cursor: "pointer" })}
               >
-                📬 공지 · 쪽지 전체보기
+                {uiS5 ? "공지 · 쪽지 전체보기" : "📬 공지 · 쪽지 전체보기"}
               </button>
               {/* [2026-08-30] 「24시간 동안 열지 않기」 삭제.
                   이제 이 팝업은 처음 들어온 손님에게만 1회 뜬다 — 안 눌러도 다시 안 뜬다.
                   대신 공지는 화면 맨 위 띠에 계속 남는다(놓칠 일이 없다).
                   ※ 예전에 이 버튼을 눌러둔 손님의 값(ruru_popup_notice_hide_until)은
                     지금도 존중한다(위 불러오기에서 계속 확인한다). */}
-              <div style={{ paddingTop: "2px", textAlign: "center", fontSize: "12px", fontWeight: 700, color: "#A99BA0", lineHeight: 1.6 }}>
+              <div style={s5s({ paddingTop: "2px", textAlign: "center", fontSize: "12px", fontWeight: 700, color: "#A99BA0", lineHeight: 1.6 })}>
                 이 공지는 화면 맨 위에 계속 있어요
               </div>
             </div>
@@ -6736,7 +6744,7 @@ export default function OrderPage() {
                  알림 신청 동작·시트(setAlertSheetOpen)·유튜브 열기는 그대로. */
             liveAlertOptin ? (
               <div style={uiV2 ? { display: "flex", alignItems: "center", gap: "8px", background: "#F5F5F5", borderRadius: "16px", padding: "10px 14px", color: "#111111" } : { display: "flex", alignItems: "center", gap: "8px", background: "linear-gradient(135deg,#7A1E47,#9A3560)", borderRadius: "14px", padding: "10px 13px", color: "#fff" }}>
-                <span style={{ flexShrink: 0, fontSize: "15px" }}>🛍</span>
+                <span style={{ flexShrink: 0, fontSize: "15px" }}>{uiS5 ? <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="M5 8h14l-1 12H6z" /><path d="M9 8V6.5a3 3 0 0 1 6 0V8" /></svg> : "🛍"}</span>
                 <div style={uiV2 ? { minWidth: 0, flex: 1, fontSize: "14px", fontWeight: 600, lineHeight: 1.5 } : { minWidth: 0, flex: 1, fontSize: "12.5px", fontWeight: 800, lineHeight: 1.45 }}>
                   방송 전이에요 · 아래 상품 {quickGroupBuyProducts.length}개는 <b>지금 바로 주문</b> 가능
                   {nextLiveText ? <div style={uiV2 ? { fontSize: "13px", fontWeight: 400, color: "#707072" } : { fontSize: "11.5px", fontWeight: 700, opacity: 0.88 }}>다음 라이브 · {nextLiveText}</div> : null}
@@ -6748,15 +6756,15 @@ export default function OrderPage() {
               </div>
             ) : (
             <div style={uiV2 ? { position: "relative", overflow: "hidden", background: "#F5F5F5", borderRadius: "16px", padding: "16px", color: "#111111" } : { position: "relative", overflow: "hidden", background: "linear-gradient(135deg,#7A1E47,#9A3560)", borderRadius: "18px", padding: "14px", color: "#fff" }}>
-              <span style={{ position: "absolute", right: "-6px", bottom: "-14px", fontSize: "74px", opacity: 0.18, pointerEvents: "none" }}>🛍️</span>
+              {uiS5 ? null : <span style={{ position: "absolute", right: "-6px", bottom: "-14px", fontSize: "74px", opacity: 0.18, pointerEvents: "none" }}>🛍️</span>}
               <div style={uiV2 ? { fontSize: "18px", fontWeight: 700, marginBottom: "4px" } : { fontSize: "17px", fontWeight: 900, marginBottom: "4px" }}>지금은 방송 전이에요</div>
               <div style={uiV2 ? { fontSize: "14px", fontWeight: 400, color: "#39393B", lineHeight: 1.5 } : { fontSize: "12.5px", fontWeight: 700, opacity: 0.92, lineHeight: 1.5 }}>
                 {nextLiveText ? <>다음 라이브 · {nextLiveText}<br /></> : null}
-                아래 상품 {quickGroupBuyProducts.length}개는 <b>지금 바로 주문</b>하실 수 있어요 👇
+                아래 상품 {quickGroupBuyProducts.length}개는 <b>지금 바로 주문</b>하실 수 있어요{uiS5 ? "" : " 👇"}
               </div>
               <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
                 <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flex: 1.2, height: "44px", border: "none", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "15px", fontWeight: 600, cursor: "pointer" } : { flex: 1.2, height: "40px", border: "none", borderRadius: "12px", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}>
-                  🔔 방송 알림 받기
+                  {uiS5 ? "방송 알림 받기" : "🔔 방송 알림 받기"}
                 </button>
                 {broadcastYoutubeUrl ? (
                   <button type="button" onClick={() => openYoutubeApp(broadcastYoutubeUrl)} style={uiV2 ? { flex: 0.8, height: "44px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, cursor: "pointer" } : { flex: 0.8, height: "40px", border: "1.5px solid rgba(255,255,255,0.55)", borderRadius: "12px", background: "transparent", color: "#fff", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}>▶ 유튜브 채널</button>
@@ -6775,7 +6783,7 @@ export default function OrderPage() {
               </div>
               <div style={{ display: "flex", gap: "8px" }}>
                 <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flex: 1, height: "44px", border: "1px solid rgba(255,255,255,0.5)", borderRadius: "9999px", background: "transparent", color: "#FFFFFF", fontSize: "14px", fontWeight: 600, cursor: "pointer" } : { flex: 1, height: "40px", border: "1.5px solid rgba(255,255,255,0.5)", borderRadius: "11px", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: "12.5px", fontWeight: 800, cursor: "pointer" }}>
-                  {liveAlertOptin ? "🔔 알림 받는 중 ✓" : "🔔 다음방송 알림받기"}
+                  {liveAlertOptin ? (uiS5 ? "알림 받는 중 ✓" : "🔔 알림 받는 중 ✓") : (uiS5 ? "다음방송 알림받기" : "🔔 다음방송 알림받기")}
                 </button>
                 <button type="button" disabled={!broadcastYoutubeUrl} onClick={() => openYoutubeApp(broadcastYoutubeUrl)} style={uiV2 ? { flex: 1, height: "44px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, cursor: broadcastYoutubeUrl ? "pointer" : "default", opacity: broadcastYoutubeUrl ? 1 : 0.6 } : { flex: 1, height: "40px", border: "none", borderRadius: "11px", background: broadcastYoutubeUrl ? "#FF0033" : "#5A4048", color: "#fff", fontSize: "12.5px", fontWeight: 900, cursor: broadcastYoutubeUrl ? "pointer" : "default", opacity: broadcastYoutubeUrl ? 1 : 0.6 }}>▶ 방송 보러가기</button>
               </div>
@@ -6821,9 +6829,9 @@ export default function OrderPage() {
             if (broadcastLoaded && productListState === "ready" && !isBroadcastOn && !shopOpen) {
               return (
                 <section style={{ margin: "12px auto 0", width: "100%", maxWidth: "560px" }}>
-                  <div style={{ padding: "44px 26px", textAlign: "center", color: "#7A1E47", fontSize: "16px", fontWeight: 800, border: "1px solid #D9C5CC", borderRadius: "16px", background: "#fff", lineHeight: 1.8 }}>
-                    🛍 쇼핑몰 준비 중입니다
-                    <div style={{ marginTop: "6px", fontSize: "13px", fontWeight: 600, color: "#6E655E" }}>잠시 후 다시 찾아 주세요.</div>
+                  <div style={s5s({ padding: "44px 26px", textAlign: "center", color: "#7A1E47", fontSize: "16px", fontWeight: 800, border: "1px solid #D9C5CC", borderRadius: "16px", background: "#fff", lineHeight: 1.8 })}>
+                    {uiS5 ? "쇼핑몰 준비 중입니다" : "🛍 쇼핑몰 준비 중입니다"}
+                    <div style={s5s({ marginTop: "6px", fontSize: "13px", fontWeight: 600, color: "#6E655E" })}>잠시 후 다시 찾아 주세요.</div>
                   </div>
                 </section>
               );
@@ -6917,7 +6925,7 @@ export default function OrderPage() {
                 <input
                   value={productSearchText}
                   onChange={(e) => { setProductSearchText(e.target.value); setProductPage(1); setVisibleProductCount(10); }}
-                  placeholder="🔍 상품 이름 검색"
+                  placeholder={uiS5 ? "상품 이름 검색" : "🔍 상품 이름 검색"}
                   style={uiV2 ? { width: "100%", height: "48px", boxSizing: "border-box", border: "1px solid #CACACB", borderRadius: "24px", padding: "0 18px", fontSize: "16px", fontWeight: 400, color: "#111111", background: "#F5F5F5", outline: "none" } : { width: "100%", height: "48px", boxSizing: "border-box", border: "1px solid #B08794", borderRadius: "14px", padding: "0 16px", fontSize: "15px", fontWeight: 700, color: "#333", outline: "none" }}
                 />
                 {/* [2026-08-12 리뉴얼 4단계] 카테고리 칩
@@ -7315,7 +7323,7 @@ export default function OrderPage() {
                                 if (nodesV2.length === 0) return null;
                                 return (
                                   <div style={{ display: "flex", gap: "4px", marginBottom: "6px", flexWrap: "wrap" }}>
-                                    {nodesV2.map((b) => <span key={b.key} style={v2Badge(b.key === "special")}>{b.text}</span>)}
+                                    {nodesV2.map((b) => <span key={b.key} style={v2Badge(b.key === "special")}>{uiS5 ? stripDecorativeEmojiV2(String(b.text)) : b.text}</span>)}
                                   </div>
                                 );
                               }
@@ -7940,7 +7948,7 @@ export default function OrderPage() {
                       ③ 이미 만들어져 있던 CustomerManualAddressPanel 을 여기서 연다
                       (직접 입력해도 주문은 정상 제출된다 — 검증은 주소 유무만 본다) */}
             {addressSearchOpen ? (
-              <CustomerBottomSheet
+              <CustomerBottomSheet tone={uiS5 ? "v2" : undefined}
                 open
                 onClose={() => setAddressSearchOpen(false)}
                 zIndex={CS_SHEET_Z_STACKED}
@@ -7952,20 +7960,20 @@ export default function OrderPage() {
                   <button
                     type="button"
                     onClick={() => { setAddressSearchOpen(false); setManualAddressOpen(true); }}
-                    style={csCancelButtonStyle}
-                  >✏️ 검색이 안 되면 직접 입력</button>
+                    style={s5s(csCancelButtonStyle)}
+                  >{uiS5 ? "검색이 안 되면 직접 입력" : "✏️ 검색이 안 되면 직접 입력"}</button>
                 )}
               >
                     <KakaoPostcodeEmbed
                       onComplete={handleAddressSearchComplete}
                       onClose={(state) => { if (state === "FORCE_CLOSE") setAddressSearchOpen(false); }}
                       autoClose={false}
-                      style={{ width: "100%", height: "100%", flex: 1, minHeight: 0 }}
+                      style={s5s({ width: "100%", height: "100%", flex: 1, minHeight: 0 })}
                       errorMessage={
-                        <div style={{ padding: "28px 20px", textAlign: "center" }}>
-                          <div style={{ fontSize: "34px" }}>😥</div>
-                          <div style={{ marginTop: "10px", fontSize: "16px", fontWeight: 900, color: "#0f172a" }}>주소검색 창을 열지 못했어요</div>
-                          <div style={{ marginTop: "8px", fontSize: "13px", fontWeight: 700, lineHeight: 1.7, color: "#64748b" }}>
+                        <div style={s5s({ padding: "28px 20px", textAlign: "center" })}>
+                          <div style={s5s({ fontSize: "34px" })}>{uiS5 ? <svg aria-hidden="true" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#707072" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: "inline-block" }}><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5M12 16h.01" /></svg> : "😥"}</div>
+                          <div style={s5s({ marginTop: "10px", fontSize: "16px", fontWeight: 900, color: "#0f172a" })}>주소검색 창을 열지 못했어요</div>
+                          <div style={s5s({ marginTop: "8px", fontSize: "13px", fontWeight: 700, lineHeight: 1.7, color: "#64748b" })}>
                             카카오톡·인스타 안에서 열었거나 인터넷이 불안정하면
                             <br />주소검색 창이 안 뜰 수 있어요.
                             <br />아래에서 <b>주소를 직접 입력</b>하셔도 주문됩니다.
@@ -7973,8 +7981,8 @@ export default function OrderPage() {
                           <button
                             type="button"
                             onClick={() => { setAddressSearchOpen(false); setManualAddressOpen(true); }}
-                            style={{ marginTop: "18px", height: "48px", padding: "0 22px", borderRadius: "16px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "15px", fontWeight: 900, cursor: "pointer" }}
-                          >✏️ 주소 직접 입력하기</button>
+                            style={s5s({ marginTop: "18px", height: "48px", padding: "0 22px", borderRadius: "16px", border: "none", background: "#7B2D43", color: "#fff", fontSize: "15px", fontWeight: 900, cursor: "pointer" })}
+                          >{uiS5 ? "주소 직접 입력하기" : "✏️ 주소 직접 입력하기"}</button>
                         </div>
                       }
                     />
@@ -8105,13 +8113,13 @@ export default function OrderPage() {
             <CustomerDialog
               open
               onClose={() => setChatGuardAction(null)}
-              icon="⚠️"
+              icon={uiS5 ? undefined : "⚠️"}
               title="잠깐만요!"
               primary={{ label: chatGuardAction.verb, onClick: () => { const a = chatGuardAction; setChatGuardAction(null); a.run(); } }}
             >
-              <div style={{ background: "#F9EEF3", borderRadius: "12px", padding: "10px 12px", fontSize: "13.5px", fontWeight: 800, color: "#7A1E47" }}>{chatGuardAction.label}</div>
-              <div style={{ marginTop: "10px" }}>임의로 수정·취소하시면 <b style={{ color: "#3A2F34" }}>상품이 잘못 가거나 누락될 수 있어요.</b></div>
-              <div style={{ marginTop: "6px" }}>방송 채팅으로 <b style={{ color: "#3A2F34" }}>루루언니에게 먼저 여쭤본 뒤</b> 바꿔 주세요 🙏</div>
+              <div style={s5s({ background: "#F9EEF3", borderRadius: "12px", padding: "10px 12px", fontSize: "13.5px", fontWeight: 800, color: "#7A1E47" })}>{chatGuardAction.label}</div>
+              <div style={s5s({ marginTop: "10px" })}>임의로 수정·취소하시면 <b style={s5s({ color: "#3A2F34" })}>상품이 잘못 가거나 누락될 수 있어요.</b></div>
+              <div style={s5s({ marginTop: "6px" })}>방송 채팅으로 <b style={s5s({ color: "#3A2F34" })}>루루언니에게 먼저 여쭤본 뒤</b> 바꿔 주세요{uiS5 ? "" : " 🙏"}</div>
             </CustomerDialog>
           ) : null}
 
@@ -8119,11 +8127,11 @@ export default function OrderPage() {
             <CustomerDialog
               open
               onClose={() => { setChatNameChanged(null); chatNameChangeDismissedRef.current = true; }}
-              title="📺 유튜브 이름이 바뀌셨네요!"
+              title={uiS5 ? "유튜브 이름이 바뀌셨네요!" : "📺 유튜브 이름이 바뀌셨네요!"}
               cancelLabel="나중에"
               primary={{ label: "똑같이 바꾸기", onClick: () => { void applyChatNameChange(); } }}
             >
-              유튜브 이름이 <b style={{ color: "#7A1E47" }}>{chatNameChanged}</b>(으)로 확인됐어요.<br />사이트 닉네임도 똑같이 바꿀까요?<br /><span style={{ fontSize: "12.5px", color: "#999" }}>똑같아야 주문 확인과 입금 확인이 정확해요.</span>
+              유튜브 이름이 <b style={s5s({ color: "#7A1E47" })}>{chatNameChanged}</b>(으)로 확인됐어요.<br />사이트 닉네임도 똑같이 바꿀까요?<br /><span style={s5s({ fontSize: "12.5px", color: "#999" })}>똑같아야 주문 확인과 입금 확인이 정확해요.</span>
             </CustomerDialog>
           ) : null}
 
@@ -8131,7 +8139,7 @@ export default function OrderPage() {
             <CustomerDialog
               open
               onClose={() => { setDuplicateWarningOpen(false); setDuplicateWarningPendingAction(null); }}
-              icon="🚨"
+              icon={uiS5 ? undefined : "🚨"}
               title="잠깐! 이미 담은 상품이에요"
               primary={{ label: "그래도 담기", onClick: () => { const action = duplicateWarningPendingAction; setDuplicateWarningOpen(false); setDuplicateWarningPendingAction(null); action?.(); } }}
             >
@@ -8812,7 +8820,7 @@ export default function OrderPage() {
           })()}
 
           {directInputOpen && directInputItem && (
-          <CustomerBottomSheet
+          <CustomerBottomSheet tone={uiS5 ? "v2" : undefined}
             open
             onClose={closeDirectInputSheet}
             title="상품 직접 입력"
@@ -8826,15 +8834,15 @@ export default function OrderPage() {
               return !typed || window.confirm("입력 중인 내용이 지워져요. 닫을까요?");
             }}
             footer={(
-              <CustomerPressButton type="button" onClick={confirmDirectInputSheet} style={csPrimaryButtonStyle(true)}>
+              <CustomerPressButton type="button" onClick={confirmDirectInputSheet} style={s5s(csPrimaryButtonStyle(true))}>
                 장바구니 담기
               </CustomerPressButton>
             )}
           >
-                  <div className="grid min-w-0 gap-3 overflow-x-hidden">
-                    <div data-ruru-product-search-area className={directInputProductSearchMode ? "sticky top-0 z-20 grid gap-2 rounded-b-2xl bg-white pb-2" : "grid gap-2"}>
-                      <label className="min-w-0 grid gap-2">
-                        <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">상품명</span>
+                  <div className={c5s("grid min-w-0 gap-3 overflow-x-hidden")}>
+                    <div data-ruru-product-search-area className={c5s(directInputProductSearchMode ? "sticky top-0 z-20 grid gap-2 rounded-b-2xl bg-white pb-2" : "grid gap-2")}>
+                      <label className={c5s("min-w-0 grid gap-2")}>
+                        <span className={c5s("text-[14px] font-black tracking-[-0.04em] text-slate-700")}>상품명</span>
                         <input
                           value={directInputItem.product_name}
                           onChange={(event) => {
@@ -8872,22 +8880,22 @@ export default function OrderPage() {
                             }
                           }}
                           placeholder="상품명을 입력해 주세요"
-                          className="h-13 min-w-0 w-full rounded-[18px] border border-rose-deep bg-white px-4 text-[17px] font-black tracking-[-0.05em] text-slate-950 outline-none focus:border-rose-deep"
+                          className={c5s("h-13 min-w-0 w-full rounded-[18px] border border-rose-deep bg-white px-4 text-[17px] font-black tracking-[-0.05em] text-slate-950 outline-none focus:border-rose-deep")}
                         />
                       </label>
 
                       {productSearchOpenIndex === directInputTargetIndex && productSearchText.trim().length > 0 ? (
-                        <div className={directInputProductSearchMode ? "max-h-[32dvh] overscroll-contain overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-2" : "max-h-44 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-2"}>
-                          <div className="px-3 py-2 text-[11px] font-bold tracking-[-0.03em] text-slate-400">
+                        <div className={c5s(directInputProductSearchMode ? "max-h-[32dvh] overscroll-contain overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-2" : "max-h-44 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-2")}>
+                          <div className={c5s("px-3 py-2 text-[11px] font-bold tracking-[-0.03em] text-slate-400")}>
                             혹시 이 상품인가요? (눌러서 자동입력)
                           </div>
 
                           {filteredBroadcastProducts.length === 0 ? (
-                            <div className="px-3 py-4 text-[13px] font-bold leading-5 text-slate-500">
+                            <div className={c5s("px-3 py-4 text-[13px] font-bold leading-5 text-slate-500")}>
                               추천 상품명이 없어요. 방송에서 안내한 상품명 그대로 입력해 주세요.
                             </div>
                           ) : (
-                            <div className="space-y-1">
+                            <div className={c5s("space-y-1")}>
                               {filteredBroadcastProducts.map((product) => (
                                 <button
                                   key={String(product.id)}
@@ -8905,16 +8913,16 @@ export default function OrderPage() {
                                       document.activeElement.blur();
                                     }
                                   }}
-                                  className="w-full rounded-xl px-3 py-2 text-left hover:bg-white active:scale-[0.99]"
+                                  className={c5s("w-full rounded-xl px-3 py-2 text-left hover:bg-white active:scale-[0.99]")}
                                 >
-                                  <div className="line-clamp-1 text-[13px] font-bold leading-5 tracking-[-0.04em] text-slate-600">
+                                  <div className={c5s("line-clamp-1 text-[13px] font-bold leading-5 tracking-[-0.04em] text-slate-600")}>
                                     {product.product_name}
                                   </div>
-                                  <div className="mt-0.5 flex items-center justify-between gap-2 text-[11px] font-bold text-slate-400">
-                                    <span className="min-w-0 truncate">
+                                  <div className={c5s("mt-0.5 flex items-center justify-between gap-2 text-[11px] font-bold text-slate-400")}>
+                                    <span className={c5s("min-w-0 truncate")}>
                                       {productSuggestionKeywords(product).slice(0, 3).join(", ") || "등록상품"}
                                     </span>
-                                    <span className="shrink-0 text-slate-500">{won(Number(product.price || 0))}</span>
+                                    <span className={c5s("shrink-0 text-slate-500")}>{won(Number(product.price || 0))}</span>
                                   </div>
                                 </button>
                               ))}
@@ -8924,36 +8932,36 @@ export default function OrderPage() {
                       ) : null}
                     </div>
 
-                    <div className="grid min-w-0 grid-cols-2 gap-3">
-                      <label className="min-w-0 grid gap-2">
-                        <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">옵션 / 색상</span>
+                    <div className={c5s("grid min-w-0 grid-cols-2 gap-3")}>
+                      <label className={c5s("min-w-0 grid gap-2")}>
+                        <span className={c5s("text-[14px] font-black tracking-[-0.04em] text-slate-700")}>옵션 / 색상</span>
                         <input
                           value={directInputItem.color}
                           onChange={(event) => updateItem(directInputTargetIndex, "color", event.target.value)}
                           placeholder="색상 (없으면 비워두세요)"
-                          className="h-12 min-w-0 w-full rounded-[17px] border border-slate-200 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none focus:border-rose-deep"
+                          className={c5s("h-12 min-w-0 w-full rounded-[17px] border border-slate-200 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none focus:border-rose-deep")}
                         />
                       </label>
 
-                      <label className="min-w-0 grid gap-2">
-                        <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">옵션 / 사이즈</span>
+                      <label className={c5s("min-w-0 grid gap-2")}>
+                        <span className={c5s("text-[14px] font-black tracking-[-0.04em] text-slate-700")}>옵션 / 사이즈</span>
                         <input
                           value={directInputItem.size}
                           onChange={(event) => updateItem(directInputTargetIndex, "size", event.target.value)}
                           placeholder="사이즈 (없으면 비워두세요)"
-                          className="h-12 min-w-0 w-full rounded-[17px] border border-slate-200 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none focus:border-rose-deep"
+                          className={c5s("h-12 min-w-0 w-full rounded-[17px] border border-slate-200 bg-white px-4 text-[15px] font-bold tracking-[-0.04em] outline-none focus:border-rose-deep")}
                         />
                       </label>
                     </div>
 
-                    <div data-ruru-direct-input-amount-same-row="enabled" className="grid min-w-0 grid-cols-[0.82fr_1.18fr] gap-3">
-                      <label className="min-w-0 grid gap-2">
-                        <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">수량</span>
-                        <div className="grid h-12 grid-cols-[42px_1fr_42px] overflow-hidden rounded-[17px] border border-slate-200 bg-white">
+                    <div data-ruru-direct-input-amount-same-row="enabled" className={c5s("grid min-w-0 grid-cols-[0.82fr_1.18fr] gap-3")}>
+                      <label className={c5s("min-w-0 grid gap-2")}>
+                        <span className={c5s("text-[14px] font-black tracking-[-0.04em] text-slate-700")}>수량</span>
+                        <div className={c5s("grid h-12 grid-cols-[42px_1fr_42px] overflow-hidden rounded-[17px] border border-slate-200 bg-white")}>
                           <button
                             type="button"
                             onClick={() => updateItem(directInputTargetIndex, "qty", String(Math.max(1, (toNumber(directInputItem.qty) || 1) - 1)))}
-                            className="border-r border-slate-100 text-[18px] font-black text-slate-700"
+                            className={c5s("border-r border-slate-100 text-[18px] font-black text-slate-700")}
                           >
                             -
                           </button>
@@ -8961,34 +8969,34 @@ export default function OrderPage() {
                             value={directInputItem.qty}
                             onChange={(event) => updateItem(directInputTargetIndex, "qty", onlyNumber(event.target.value))}
                             inputMode="numeric"
-                            className="min-w-0 text-center text-[16px] font-black tracking-[-0.04em] outline-none"
+                            className={c5s("min-w-0 text-center text-[16px] font-black tracking-[-0.04em] outline-none")}
                           />
                           <button
                             type="button"
                             onClick={() => updateItem(directInputTargetIndex, "qty", String((toNumber(directInputItem.qty) || 0) + 1))}
-                            className="border-l border-slate-100 text-[18px] font-black text-rose-deep"
+                            className={c5s("border-l border-slate-100 text-[18px] font-black text-rose-deep")}
                           >
                             +
                           </button>
                         </div>
                       </label>
 
-                      <label className="min-w-0 grid gap-2">
-                        <span className="text-[14px] font-black tracking-[-0.04em] text-slate-700">금액</span>
-                        <div className="flex h-12 min-w-0 items-center rounded-[17px] border border-slate-200 bg-white px-3">
+                      <label className={c5s("min-w-0 grid gap-2")}>
+                        <span className={c5s("text-[14px] font-black tracking-[-0.04em] text-slate-700")}>금액</span>
+                        <div className={c5s("flex h-12 min-w-0 items-center rounded-[17px] border border-slate-200 bg-white px-3")}>
                           <input
                             value={directInputItem.product_price ? Number(directInputItem.product_price).toLocaleString("ko-KR") : ""}
                             onChange={(event) => updateItem(directInputTargetIndex, "product_price", onlyNumber(event.target.value))}
                             inputMode="numeric"
                             placeholder="0"
-                            className="min-w-0 flex-1 text-right text-[14px] font-black tracking-[-0.04em] outline-none"
+                            className={c5s("min-w-0 flex-1 text-right text-[14px] font-black tracking-[-0.04em] outline-none")}
                           />
-                          <span className="ml-1.5 shrink-0 text-[13px] font-black text-slate-400">원</span>
+                          <span className={c5s("ml-1.5 shrink-0 text-[13px] font-black text-slate-400")}>원</span>
                         </div>
                       </label>
                     </div>
 
-                    <div className="rounded-2xl bg-rose-soft px-4 py-3 text-[13px] font-black leading-5 tracking-[-0.04em] text-rose-deep">
+                    <div className={c5s("rounded-2xl bg-rose-soft px-4 py-3 text-[13px] font-black leading-5 tracking-[-0.04em] text-rose-deep")}>
                       방송에서 안내받은 상품명, 옵션, 금액을 입력해 주세요. 색상·사이즈를 직접 입력해 주세요.
                     </div>
 
@@ -9020,11 +9028,11 @@ export default function OrderPage() {
                     <button type="button"
                       onClick={() => { setChatFindOpen(true); setOrderSheetOpen(true); window.setTimeout(() => document.getElementById("orderSheetSection")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}
                       style={uiV2 ? { position: "fixed", left: 0, right: 0, bottom: "calc(68px + env(safe-area-inset-bottom))", zIndex: 39, background: "#FFFFFF", border: "none", borderTop: "1px solid #E5E5E5", padding: "14px 16px", textAlign: "center", fontSize: "15px", fontWeight: 400, color: "#707072", fontFamily: "inherit", cursor: "pointer" } : { position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, background: "rgba(122,30,71,0.10)", backdropFilter: "blur(2.5px)", WebkitBackdropFilter: "blur(2.5px)", border: "1px solid rgba(122,30,71,0.22)", borderRadius: "12px", padding: "9px 14px", textAlign: "center", fontSize: "12px", fontWeight: 800, color: "#7A1E47", fontFamily: "inherit", cursor: "pointer" }}>
-                      🛒 담은 상품이 없어요 · 💬 채팅주문 하셨나요?
+                      {uiS5 ? "담은 상품이 없어요 · 채팅주문 하셨나요?" : "🛒 담은 상품이 없어요 · 💬 채팅주문 하셨나요?"}
                     </button>
                   ) : (
                     <div style={uiV2 ? { position: "fixed", left: 0, right: 0, bottom: "calc(68px + env(safe-area-inset-bottom))", zIndex: 39, background: "#FFFFFF", border: "none", borderTop: "1px solid #E5E5E5", padding: "14px 16px", textAlign: "center", fontSize: "15px", fontWeight: 400, color: "#707072", fontFamily: "inherit", pointerEvents: "none" } : { position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, background: "rgba(122,30,71,0.10)", backdropFilter: "blur(2.5px)", WebkitBackdropFilter: "blur(2.5px)", border: "1px solid rgba(122,30,71,0.22)", borderRadius: "12px", padding: "9px 14px", textAlign: "center", fontSize: "12px", fontWeight: 800, color: "#7A1E47", pointerEvents: "none" }}>
-                      🛒 담은 상품이 없어요
+                      {uiS5 ? "담은 상품이 없어요" : "🛒 담은 상품이 없어요"}
                     </div>
                   )
                 );
@@ -9071,7 +9079,15 @@ export default function OrderPage() {
                 >
                   {/* [2026-09-20] 빨간 숫자 배지 — Material Design 3 Badge specs(16dp·모서리 8dp·error 색) 기준. 99 넘으면 99+ */}
                   <span style={{ position: "relative", fontSize: "19px", lineHeight: 1 }}>
-                    {tab.icon}
+                    {uiS5 ? (
+                      <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+                        {tab.key === "home" ? <><path d="M4 11l8-7 8 7" /><path d="M6 10v10h12V10" /></>
+                          : tab.key === "notice" ? <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></>
+                          : tab.key === "orders" ? <><path d="M4 8l8-4 8 4v8l-8 4-8-4z" /><path d="M4 8l8 4 8-4M12 12v8" /></>
+                          : tab.key === "inquiry" ? <><path d="M4 6.5h16v9H9l-5 3.5z" /></>
+                          : <><circle cx="12" cy="8.5" r="3.5" /><path d="M5 20c1-3.5 3.8-5 7-5s6 1.5 7 5" /></>}
+                      </svg>
+                    ) : tab.icon}
                     <CustomerNoteUnreadBadge count={Number((tab as { badge?: number }).badge) || 0} />
                   </span>
                   {tab.label}
@@ -9084,25 +9100,25 @@ export default function OrderPage() {
       )}
 
         {howToOpen ? (
-          <CustomerBottomSheet
+          <CustomerBottomSheet tone={uiS5 ? "v2" : undefined}
             open
             onClose={() => setHowToOpen(false)}
-            title="📌 주문 방법"
+            title={uiS5 ? "주문 방법" : "📌 주문 방법"}
             bodyPadding="4px 0 16px"
-            footer={<button type="button" onClick={() => setHowToOpen(false)} style={csPrimaryButtonStyle(true)}>확인</button>}
+            footer={<button type="button" onClick={() => setHowToOpen(false)} style={s5s(csPrimaryButtonStyle(true))}>확인</button>}
           >
               {/* [2026-07-10] 3단계 내용은 관리자 설정(howto_steps)에서 수정. 설정이 없으면 기본 문구. */}
-              <div style={{ padding: "0 20px" }}>
+              <div style={s5s({ padding: "0 20px" })}>
                 {howToSteps.map((step, i) => {
                   const last = i === howToSteps.length - 1;
                   return (
-                    <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "14px", padding: "13px 0", borderBottom: last ? "none" : "0.5px solid #E5E1DC" }}>
-                      <span style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#7A1E47", color: "#fff", fontSize: "14px", fontWeight: 800, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{i + 1}</span>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: "14px", fontWeight: 700, color: "#1A1A1A" }}>{step.title}</div>
-                        {step.desc ? <div style={{ fontSize: "12px", color: "#6B6460", marginTop: "3px" }}>{step.desc}</div> : null}
+                    <div key={i} style={s5s({ display: "flex", alignItems: "flex-start", gap: "14px", padding: "13px 0", borderBottom: last ? "none" : "0.5px solid #E5E1DC" })}>
+                      <span style={s5s({ width: "32px", height: "32px", borderRadius: "50%", background: "#7A1E47", color: "#fff", fontSize: "14px", fontWeight: 800, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" })}>{i + 1}</span>
+                      <div style={s5s({ minWidth: 0 })}>
+                        <div style={s5s({ fontSize: "14px", fontWeight: 700, color: "#1A1A1A" })}>{step.title}</div>
+                        {step.desc ? <div style={s5s({ fontSize: "12px", color: "#6B6460", marginTop: "3px" })}>{step.desc}</div> : null}
                         {last && howToWarn.trim() ? (
-                          <span style={{ fontSize: "11px", color: "#C0392B", background: "#FFF0F0", borderRadius: "6px", padding: "4px 8px", display: "inline-block", marginTop: "4px", lineHeight: 1.6 }}>{howToWarn}</span>
+                          <span style={s5s({ fontSize: "11px", color: "#C0392B", background: "#FFF0F0", borderRadius: "6px", padding: "4px 8px", display: "inline-block", marginTop: "4px", lineHeight: 1.6 })}>{howToWarn}</span>
                         ) : null}
                       </div>
                     </div>
@@ -9111,11 +9127,11 @@ export default function OrderPage() {
               </div>
 
               {/* [2026-09-20] 「확인」은 푸터(풀폭 1개)로. 「오늘 하루 열지 않기」는 본문 끝 글자 버튼. */}
-              <div style={{ padding: "16px 20px 0", textAlign: "center" }}>
+              <div style={s5s({ padding: "16px 20px 0", textAlign: "center" })}>
                 <button
                   type="button"
                   onClick={() => { localStorage.setItem("ruru_howto_hide_until", String(Date.now() + 86400000)); setHowToOpen(false); }}
-                  style={{ border: "none", background: "none", fontSize: "13px", fontWeight: 700, color: "#6E655E", textDecoration: "underline", cursor: "pointer", padding: "8px" }}
+                  style={s5s({ border: "none", background: "none", fontSize: "13px", fontWeight: 700, color: "#6E655E", textDecoration: "underline", cursor: "pointer", padding: "8px" })}
                 >
                   오늘 하루 열지 않기
                 </button>
@@ -9124,20 +9140,20 @@ export default function OrderPage() {
         ) : null}
 
         {alertSheetOpen ? (
-          <CustomerBottomSheet
+          <CustomerBottomSheet tone={uiS5 ? "v2" : undefined}
             open
             size="half"
             onClose={() => setAlertSheetOpen(false)}
-            title={liveAlertOptin ? "🔔 방송 시작 알림을 받고 있어요" : "🔔 방송 시작 알림을 받으시겠어요?"}
+            title={liveAlertOptin ? (uiS5 ? "방송 시작 알림을 받고 있어요" : "🔔 방송 시작 알림을 받고 있어요") : (uiS5 ? "방송 시작 알림을 받으시겠어요?" : "🔔 방송 시작 알림을 받으시겠어요?")}
             bodyPadding="14px 18px"
             footer={liveAlertOptin ? (
-              <button type="button" disabled={liveAlertSaving} onClick={() => saveLiveAlertOptin(false)} style={{ ...csCancelButtonStyle, opacity: liveAlertSaving ? 0.6 : 1 }}>{liveAlertSaving ? "처리 중..." : "알림 끄기"}</button>
+              <button type="button" disabled={liveAlertSaving} onClick={() => saveLiveAlertOptin(false)} style={s5s({ ...csCancelButtonStyle, opacity: liveAlertSaving ? 0.6 : 1 })}>{liveAlertSaving ? "처리 중..." : "알림 끄기"}</button>
             ) : (
-              <button type="button" disabled={liveAlertSaving} onClick={() => saveLiveAlertOptin(true)} style={csPrimaryButtonStyle(!liveAlertSaving)}>{liveAlertSaving ? "처리 중..." : "방송 알림 받기"}</button>
+              <button type="button" disabled={liveAlertSaving} onClick={() => saveLiveAlertOptin(true)} style={s5s(csPrimaryButtonStyle(!liveAlertSaving))}>{liveAlertSaving ? "처리 중..." : "방송 알림 받기"}</button>
             )}
           >
               {/* [2026-07-29] 카톡 로그인 시 알림이 기본 ON이므로, 켜져 있는 손님에겐 "자동으로 켜졌고 여기서 끌 수 있다"고 알려준다(카카오 채널 정책 대비 고지). */}
-              <div style={{ fontSize: "14px", color: "#555", lineHeight: 1.7 }}>
+              <div style={s5s({ fontSize: "14px", color: "#555", lineHeight: 1.7 })}>
                 {liveAlertOptin
                   ? "카카오톡 로그인을 하시면 방송 시작 알림이 자동으로 켜집니다. 라이브가 시작되면 카카오 알림톡으로 알려드려요. 원하지 않으시면 바로 아래 [알림 끄기] 버튼을 눌러 주세요."
                   : "신청하면 라이브 시작 때 카카오 알림톡으로 알려드려요. 신청 시 알림 수신에 동의하며, 언제든 끌 수 있어요."}
@@ -9146,7 +9162,7 @@ export default function OrderPage() {
         ) : null}
 
         {inquirySheetOpen ? (
-          <CustomerBottomSheet
+          <CustomerBottomSheet tone={uiS5 ? "v2" : undefined}
             open
             size="half"
             onClose={() => setInquirySheetOpen(false)}
@@ -9174,15 +9190,21 @@ export default function OrderPage() {
                 )}
               </ShopContactLink>
               {/* [2026-09-20 사장님] 「카톡채널처럼 한 줄씩」 — 유튜브·밴드·인스타도 카톡 버튼과 같은 높이·폭의 한 줄 버튼. 링크 주소는 그대로. */}
-              <div style={{ display: "grid", gap: "8px" }}>
+              <div style={s5s({ display: "grid", gap: "8px" })}>
                 {([
                   { href: "https://youtube.com/channel/UCBbrUWUnHvq5Ldpxgy5GdMw?si=2wsmT_wEinvKzzEF", icon: "▶️", label: "유튜브 채널" },
                   { href: "https://band.us/@ruru8249", icon: "🎵", label: "밴드 (택배 송장 확인)" },
                   { href: "https://www.instagram.com/ruru8249_?igsh=MXR3Z2xnYmI1cG0ybQ==", icon: "📷", label: "인스타그램" },
                 ] as const).map((link) => (
-                  <a key={link.href} href={link.href} target="_blank" rel="noreferrer" style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "center", gap: "8px", padding: "15px 12px", borderRadius: "12px", background: "#F5F3F0", textDecoration: "none" }}>
-                    <span style={{ fontSize: "18px" }}>{link.icon}</span>
-                    <span style={{ fontSize: "15px", color: "#3F3438", fontWeight: 800 }}>{link.label}</span>
+                  <a key={link.href} href={link.href} target="_blank" rel="noreferrer" style={s5s({ display: "flex", width: "100%", alignItems: "center", justifyContent: "center", gap: "8px", padding: "15px 12px", borderRadius: "12px", background: "#F5F3F0", textDecoration: "none" })}>
+                    <span style={s5s({ fontSize: "18px" })}>{uiS5 ? (
+                      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+                        {link.href.includes("youtube") ? <><rect x="3" y="6" width="18" height="12" rx="3" /><path d="M10.5 9.5v5l4-2.5z" /></>
+                          : link.href.includes("instagram") ? <><rect x="4" y="4" width="16" height="16" rx="4.5" /><circle cx="12" cy="12" r="3.5" /><path d="M16.8 7.2h.01" /></>
+                          : <><path d="M4 6.5h16v9H9l-5 3.5z" /></>}
+                      </svg>
+                    ) : link.icon}</span>
+                    <span style={s5s({ fontSize: "15px", color: "#3F3438", fontWeight: 800 })}>{link.label}</span>
                   </a>
                 ))}
               </div>

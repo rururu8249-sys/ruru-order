@@ -12,3 +12,18 @@ export function useCustomerUiStage(stage: UiPreviewStage): boolean {
   }, [stage]);
   return on;
 }
+
+// [㉜ 5단계] 단계가 켜졌을 때만 인라인 스타일(restyleV2)·클래스(restyleClassV2)를 새 모양으로 바꿔 주는 도우미.
+//   꺼져 있으면 넘긴 값 그대로 돌려준다 → 예전 화면 변화 0.
+import type { CSSProperties } from "react";
+import { restyleClassV2, restyleV2 } from "@/lib/customerUiV2Restyle";
+
+export function useCustomerStageRestyle(stage: UiPreviewStage, options: { keepShadow?: boolean } = {}) {
+  const on = useCustomerUiStage(stage);
+  const keepShadow = options.keepShadow === true;
+  return {
+    on,
+    s: (style: CSSProperties | undefined): CSSProperties | undefined => (on ? restyleV2(style, { keepShadow }) : style),
+    c: (className: string | undefined): string | undefined => (on ? restyleClassV2(className, { keepShadow }) : className),
+  };
+}

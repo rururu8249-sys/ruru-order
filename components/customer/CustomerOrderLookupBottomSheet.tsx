@@ -6,6 +6,7 @@ import { useEffect, useRef, type CSSProperties } from "react";
 import type { OrderBankAccountSnapshot } from "@/lib/orderBankAccount";
 // [2026-09-20] 바텀시트 «한 벌» 틀(높이·헤더·✕·닫기 5종). 조회·필터·무한스크롤 로직은 그대로.
 import CustomerBottomSheet from "@/components/customer/CustomerBottomSheet";
+import { useCustomerStageRestyle } from "@/lib/useCustomerUiStage";
 
 export type CustomerOrderLookupFilter = "전체" | "결제대기" | "결제완료" | "출고완료" | "주문취소";
 
@@ -84,6 +85,8 @@ export default function CustomerOrderLookupBottomSheet({
   onClose,
   onOpenPaymentGuide,
 }: CustomerOrderLookupBottomSheetProps) {
+  // [㉜ 5단계] ?preview=s5 에서만 새 모양(로즈→흑백·13px 미만→13px·그림자 정리). 꺼지면 원래 스타일 그대로.
+  const { on: v5, s: s5, c: c5 } = useCustomerStageRestyle("s5");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // 스크롤 끝 근처 도달 시 추가 로드
@@ -103,7 +106,7 @@ export default function CustomerOrderLookupBottomSheet({
   if (!open) return null;
 
   return (
-    <CustomerBottomSheet
+    <CustomerBottomSheet tone={v5 ? "v2" : undefined}
       open
       onClose={onClose}
       title="주문조회"
@@ -112,8 +115,8 @@ export default function CustomerOrderLookupBottomSheet({
       onBodyScroll={handleScroll}
       bodyPadding="8px 16px"
       headerBelow={(
-        <div style={{ padding: "10px 16px 8px" }}>
-            <div style={{ marginTop: "14px", display: "grid", gridTemplateColumns: `repeat(${filters.length}, 1fr)`, borderRadius: "14px", background: "#F5F1F2", padding: "4px", gap: "2px" }}>
+        <div style={s5({ padding: "10px 16px 8px" })}>
+            <div style={s5({ marginTop: "14px", display: "grid", gridTemplateColumns: `repeat(${filters.length}, 1fr)`, borderRadius: "14px", background: "#F5F1F2", padding: "4px", gap: "2px" })}>
               {filters.map((filter) => {
                 const selected = activeFilter === filter;
                 return (
@@ -121,7 +124,7 @@ export default function CustomerOrderLookupBottomSheet({
                     key={filter}
                     type="button"
                     onClick={() => onFilterChange(filter)}
-                    style={{ minHeight: "38px", borderRadius: "11px", border: "none", padding: "0 4px", fontSize: "12px", fontWeight: 800, cursor: "pointer", background: selected ? "#7B2D43" : "transparent", color: selected ? "#fff" : "#888", whiteSpace: "nowrap" }}
+                    style={s5({ minHeight: "38px", borderRadius: "11px", border: "none", padding: "0 4px", fontSize: "12px", fontWeight: 800, cursor: "pointer", background: selected ? "#7B2D43" : "transparent", color: selected ? "#fff" : "#888", whiteSpace: "nowrap" })}
                   >
                     {filter}
                   </button>
@@ -131,85 +134,85 @@ export default function CustomerOrderLookupBottomSheet({
         </div>
       )}
       footer={(
-        <div style={{ display: "grid", rowGap: "6px" }}>
+        <div style={s5({ display: "grid", rowGap: "6px" })}>
             <a
               href={BAND_TRACKING_URL}
               target="_blank"
               rel="noreferrer"
-              style={{ display: "flex", minHeight: "46px", alignItems: "center", gap: "10px", borderRadius: "14px", border: "1px solid #C8E6C9", background: "#EAF6EA", padding: "6px 12px", textDecoration: "none" }}
+              style={s5({ display: "flex", minHeight: "46px", alignItems: "center", gap: "10px", borderRadius: "14px", border: "1px solid #C8E6C9", background: "#EAF6EA", padding: "6px 12px", textDecoration: "none" })}
             >
-              <div style={{ display: "flex", height: "36px", width: "36px", flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: "50%", background: "#21c531", fontSize: "11px", fontWeight: 800, color: "#fff" }}>BAND</div>
-              <p style={{ minWidth: 0, flex: 1, wordBreak: "keep-all", fontSize: "14px", fontWeight: 800, lineHeight: 1.3, letterSpacing: "-0.05em", color: "#1B5E20" }}>밴드에서 택배송장번호 확인 가능</p>
-              <div style={{ flexShrink: 0, fontSize: "18px", fontWeight: 800, color: "#2E7D32" }}>›</div>
+              <div style={s5({ display: "flex", height: "36px", width: "36px", flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: "50%", background: "#21c531", fontSize: "11px", fontWeight: 800, color: "#fff" })}>BAND</div>
+              <p style={s5({ minWidth: 0, flex: 1, wordBreak: "keep-all", fontSize: "14px", fontWeight: 800, lineHeight: 1.3, letterSpacing: "-0.05em", color: "#1B5E20" })}>밴드에서 택배송장번호 확인 가능</p>
+              <div style={s5({ flexShrink: 0, fontSize: "18px", fontWeight: 800, color: "#2E7D32" })}>›</div>
             </a>
         </div>
       )}
     >
             {groups.length > 0 ? (
-              <div style={{ display: "grid", gap: "10px" }}>
+              <div style={s5({ display: "grid", gap: "10px" })}>
                 {groups.map((group) => {
                   const orderMeta = [group.orderCode, group.dateText].filter(Boolean).join(" · ");
 
                   return (
-                    <article key={group.id} style={{ borderRadius: "16px", background: "#fff", border: "1px solid #E8E2DD", padding: "12px 16px" }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                        <div style={{ display: "flex", minWidth: 0, alignItems: "center", gap: "6px" }}>
-                          <span style={{ ...chipBaseStyle, ...paymentChipStyle(group.statusLabel) }}>{group.statusDisplayText}</span>
+                    <article key={group.id} style={s5({ borderRadius: "16px", background: "#fff", border: "1px solid #E8E2DD", padding: "12px 16px" })}>
+                      <div style={s5({ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" })}>
+                        <div style={s5({ display: "flex", minWidth: 0, alignItems: "center", gap: "6px" })}>
+                          <span style={s5({ ...chipBaseStyle, ...paymentChipStyle(group.statusLabel) })}>{group.statusDisplayText}</span>
                         </div>
                         {group.paymentMethodLabel ? (
-                          <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "#7B2D43" }}>{group.paymentMethodLabel}</span>
+                          <span style={s5({ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "#7B2D43" })}>{group.paymentMethodLabel}</span>
                         ) : null}
                       </div>
 
-                      <div style={{ marginTop: "10px", display: "grid", gap: "6px" }}>
+                      <div style={s5({ marginTop: "10px", display: "grid", gap: "6px" })}>
                         {group.products.map((product, productIndex) => {
                           const optionLine = [product.optionText, product.quantityText].filter(Boolean).join(" · ");
                           return (
-                            <div key={`${group.id}-${productIndex}`} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "10px" }}>
-                              <div style={{ minWidth: 0, flex: 1 }}>
-                                <p style={{ wordBreak: "break-all", whiteSpace: "normal", fontSize: "13px", fontWeight: 800, lineHeight: 1.3, letterSpacing: "-0.04em", color: "#222" }}>
+                            <div key={`${group.id}-${productIndex}`} style={s5({ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "10px" })}>
+                              <div style={s5({ minWidth: 0, flex: 1 })}>
+                                <p style={s5({ wordBreak: "break-all", whiteSpace: "normal", fontSize: "13px", fontWeight: 800, lineHeight: 1.3, letterSpacing: "-0.04em", color: "#222" })}>
                                   {product.name || "주문상품"}
-                                  {optionLine ? <span style={{ fontWeight: 700, color: "#999" }}> {optionLine}</span> : null}
+                                  {optionLine ? <span style={s5({ fontWeight: 700, color: "#999" })}> {optionLine}</span> : null}
                                 </p>
                               </div>
                               {product.amountText ? (
-                                <span style={{ flexShrink: 0, fontSize: "13px", fontWeight: 800, letterSpacing: "-0.05em", color: "#7B2D43" }}>{product.amountText}</span>
+                                <span style={s5({ flexShrink: 0, fontSize: "13px", fontWeight: 800, letterSpacing: "-0.05em", color: "#7B2D43" })}>{product.amountText}</span>
                               ) : null}
                             </div>
                           );
                         })}
                       </div>
 
-                      <div style={{ marginTop: "10px", borderTop: "1px solid #F0EBE6", paddingTop: "8px" }}>
-                        <p style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 800, color: "#999", marginBottom: "8px" }}>
+                      <div style={s5({ marginTop: "10px", borderTop: "1px solid #F0EBE6", paddingTop: "8px" })}>
+                        <p style={s5({ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 800, color: "#999", marginBottom: "8px" })}>
                           {orderMeta || "-"}
                         </p>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#666", marginBottom: "3px" }}>
+                        <div style={s5({ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#666", marginBottom: "3px" })}>
                           <span>상품금액</span>
-                          <span style={{ fontWeight: 700, color: "#444" }}>{group.productAmountText ?? group.totalAmountText}</span>
+                          <span style={s5({ fontWeight: 700, color: "#444" })}>{group.productAmountText ?? group.totalAmountText}</span>
                         </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#666", marginBottom: group.cardExtraText ? "3px" : "6px" }}>
+                        <div style={s5({ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#666", marginBottom: group.cardExtraText ? "3px" : "6px" })}>
                           <span>배송비</span>
-                          <span style={{ fontWeight: 700, color: "#444" }}>{group.shippingFeeText ?? "-"}</span>
+                          <span style={s5({ fontWeight: 700, color: "#444" })}>{group.shippingFeeText ?? "-"}</span>
                         </div>
                         {group.cardExtraText ? (
-                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#666", marginBottom: "6px" }}>
+                          <div style={s5({ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#666", marginBottom: "6px" })}>
                             <span>카드수수료</span>
-                            <span style={{ fontWeight: 700, color: "#444" }}>{group.cardExtraText}</span>
+                            <span style={s5({ fontWeight: 700, color: "#444" })}>{group.cardExtraText}</span>
                           </div>
                         ) : null}
                         {group.pointUsedText ? (
-                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#666", marginBottom: "6px" }}>
+                          <div style={s5({ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#666", marginBottom: "6px" })}>
                             <span>포인트 사용</span>
-                            <span style={{ fontWeight: 700, color: "#0F6E56" }}>{group.pointUsedText}</span>
+                            <span style={s5({ fontWeight: 700, color: "#0F6E56" })}>{group.pointUsedText}</span>
                           </div>
                         ) : null}
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid #F0EBE6", paddingTop: "6px" }}>
-                          <span style={{ fontSize: "13px", fontWeight: 800, color: "#222" }}>결제금액</span>
-                          <span style={{ fontSize: "18px", fontWeight: 800, letterSpacing: "-0.07em", color: "#7B2D43" }}>{group.totalAmountText}</span>
+                        <div style={s5({ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderTop: "1px solid #F0EBE6", paddingTop: "6px" })}>
+                          <span style={s5({ fontSize: "13px", fontWeight: 800, color: "#222" })}>결제금액</span>
+                          <span style={s5({ fontSize: "18px", fontWeight: 800, letterSpacing: "-0.07em", color: "#7B2D43" })}>{group.totalAmountText}</span>
                         </div>
                         {group.paymentMethodLabel === "무통장입금" && group.bankAccountStatus === "conflict" ? (
-                          <div style={{ marginTop: "8px", borderRadius: "10px", background: "#FBEAE7", padding: "9px 10px", fontSize: "12px", fontWeight: 800, lineHeight: 1.5, color: "#C0392B" }}>
+                          <div style={s5({ marginTop: "8px", borderRadius: "10px", background: "#FBEAE7", padding: "9px 10px", fontSize: "12px", fontWeight: 800, lineHeight: 1.5, color: "#C0392B" })}>
                             이 주문의 입금계좌 정보를 확인할 수 없습니다. 카톡채널로 문의해 주세요.
                           </div>
                         ) : null}
@@ -217,7 +220,7 @@ export default function CustomerOrderLookupBottomSheet({
                           <button
                             type="button"
                             onClick={() => onOpenPaymentGuide(group)}
-                            style={{ marginTop: "8px", display: "flex", minHeight: "40px", width: "100%", alignItems: "center", justifyContent: "center", borderRadius: "11px", border: "1px solid #7B2D43", background: "#fff", padding: "0 12px", fontSize: "12.5px", fontWeight: 900, color: "#7B2D43", cursor: "pointer" }}
+                            style={s5({ marginTop: "8px", display: "flex", minHeight: "40px", width: "100%", alignItems: "center", justifyContent: "center", borderRadius: "11px", border: "1px solid #7B2D43", background: "#fff", padding: "0 12px", fontSize: "12.5px", fontWeight: 900, color: "#7B2D43", cursor: "pointer" })}
                           >
                             이 주문의 입금 계좌 보기
                           </button>
@@ -227,12 +230,12 @@ export default function CustomerOrderLookupBottomSheet({
                             href={trackingUrlOf(group.trackingNumber, group.trackingCompany)}
                             target="_blank"
                             rel="noreferrer"
-                            style={{ marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", borderRadius: "12px", background: "#EBF2FE", border: "1px solid #D3E2FC", padding: "9px 12px", textDecoration: "none" }}
+                            style={s5({ marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", borderRadius: "12px", background: "#EBF2FE", border: "1px solid #D3E2FC", padding: "9px 12px", textDecoration: "none" })}
                           >
-                            <span style={{ minWidth: 0, fontSize: "12px", fontWeight: 800, color: "#1D4ED8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              🚚 {group.trackingCompany || "로젠택배"} {group.trackingNumber}
+                            <span style={s5({ minWidth: 0, fontSize: "12px", fontWeight: 800, color: "#1D4ED8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" })}>
+                              {v5 ? null : "🚚 "}{group.trackingCompany || "로젠택배"} {group.trackingNumber}
                             </span>
-                            <span style={{ flexShrink: 0, fontSize: "12px", fontWeight: 800, color: "#1D4ED8" }}>배송조회 ›</span>
+                            <span style={s5({ flexShrink: 0, fontSize: "12px", fontWeight: 800, color: "#1D4ED8" })}>배송조회 ›</span>
                           </a>
                         ) : null}
                       </div>
@@ -241,20 +244,20 @@ export default function CustomerOrderLookupBottomSheet({
                 })}
 
                 {hasMore ? (
-                  <div style={{ padding: "12px 0", textAlign: "center", fontSize: "12px", fontWeight: 700, color: "#6E655E" }}>
+                  <div style={s5({ padding: "12px 0", textAlign: "center", fontSize: "12px", fontWeight: 700, color: "#6E655E" })}>
                     더 불러오는 중…
                   </div>
                 ) : null}
               </div>
             ) : (
-              <div style={{ borderRadius: "16px", background: "#FAF6F2", padding: "20px", textAlign: "center", border: "1px solid #E8E2DD" }}>
-                <p style={{ fontSize: "15px", fontWeight: 800, letterSpacing: "-0.05em", color: "#555" }}>선택한 상태의 주문내역이 없습니다.</p>
-                <p style={{ marginTop: "4px", fontSize: "12px", fontWeight: 700, color: "#999" }}>다른 상태를 눌러 확인해 주세요.</p>
+              <div style={s5({ borderRadius: "16px", background: "#FAF6F2", padding: "20px", textAlign: "center", border: "1px solid #E8E2DD" })}>
+                <p style={s5({ fontSize: "15px", fontWeight: 800, letterSpacing: "-0.05em", color: "#555" })}>선택한 상태의 주문내역이 없습니다.</p>
+                <p style={s5({ marginTop: "4px", fontSize: "12px", fontWeight: 700, color: "#999" })}>다른 상태를 눌러 확인해 주세요.</p>
                 {/* [2026-08-31 실사고: 하루한켠_log 님] 주문·DB·조회 전부 정상인데 손님 화면만 비어 있었다.
                     원인: 다른 브라우저(네이버앱 등)에 카카오 연결 전 옛 로그인 정보가 남아 조회 열쇠가 어긋남.
                     서버는 고칠 게 없고, 손님이 그 브라우저에서 카카오 로그인만 다시 하면 해결된다.
                     → 빈 화면에서 스스로 해결할 수 있게 안내를 붙인다. */}
-                <p style={{ marginTop: "10px", fontSize: "12px", fontWeight: 700, color: "#7A1E47", lineHeight: 1.6 }}>
+                <p style={s5({ marginTop: "10px", fontSize: "12px", fontWeight: 700, color: "#7A1E47", lineHeight: 1.6 })}>
                   주문하셨는데 안 보이나요?<br />
                   화면 아래 「내정보」에서 로그아웃 후 <b>카카오 로그인을 다시 한 번</b> 해주세요.<br />
                   (다른 앱·브라우저에는 예전 정보가 남아 있을 수 있어요)
