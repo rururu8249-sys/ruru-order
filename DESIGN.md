@@ -177,6 +177,7 @@ size:
 - 지금 스위치(?ui=v2 → localStorage ruru_ui_v2)는 /order 에서 읽음. /myorder·/notice 를 바꿀 때 같은 값을 읽게 해서 한 번 켜면 손님 화면 전체가 새 모양.
 - 2026-10-18 손님 기본값 v2로 전환, ?ui=v1 비상 복귀 (app/order/page.tsx 상수 UI_V2_DEFAULT — false 로 바꾸면 전체 예전 모양. 저장값 ?ui=v2→"1" / ?ui=v1→"0", 없으면 기본값).
 - 단계별 미리보기(3~5단계): ?preview=s3 (s4·s5) 로 들어온 브라우저만 그 단계 새 모양, ?preview=off 는 전부 끔(localStorage ruru_preview_s3 등). 손님 기본값 전환 = lib/customerUiSwitch.ts 의 UI_PREVIEW_DEFAULTS 에서 그 단계만 true. 새 모양(v2)이 꺼진 손님(?ui=v1)에게는 미리보기도 안 보임.
+- 2026-10-18 3단계(주문서 확인 창) 손님 기본값 전환 — UI_PREVIEW_DEFAULTS.s3 = true. 되돌리기는 false 로(또는 그 브라우저만 ?preview=off).
 
 ## 10. 하지 말 것
 - 로즈·자주·분홍 계열 색, 새 강조색 추가.

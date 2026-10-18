@@ -19,7 +19,8 @@ console.log('customer ui switch passed');
 
 // [㉜ 3~5단계] 단계별 미리보기
 import { resolveCustomerUiPreview, UI_PREVIEW_DEFAULTS } from '../lib/customerUiSwitch.ts';
-assert.equal(UI_PREVIEW_DEFAULTS.s3, false, 's3 is preview-only until the owner turns it on');
+assert.equal(UI_PREVIEW_DEFAULTS.s3, true, 's3 is the customer default since 2026-10-18');
+assert.equal(UI_PREVIEW_DEFAULTS.s4, false, 's4 stays preview-only');
 assert.deepEqual(resolveCustomerUiPreview(null, null, 's3', false), { store: null, v2: false }, 'normal customer: no change');
 assert.deepEqual(resolveCustomerUiPreview('s3', null, 's3', false), { store: '1', v2: true }, '?preview=s3 turns on');
 assert.deepEqual(resolveCustomerUiPreview(null, '1', 's3', false), { store: null, v2: true }, 'remembered');

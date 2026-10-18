@@ -7848,6 +7848,8 @@ export default function OrderPage() {
             </section>
             )}
 
+            {/* [㉜ 3단계] 담은 상품 0개면 금액표(상품금액·총 입금금액·포인트 적립) 영역 숨김 — 표시만, 계산 무관 */}
+            {uiS3 && selectedItemEntries.length === 0 ? null : (
             <section
               data-ruru-price-section="redesigned"
               style={uiS3 ? { padding: "16px", borderTop: "1px solid #E5E5E5" } : { padding: "16px 18px", borderTop: "0.5px solid #E5E1DC" }}
@@ -7909,6 +7911,7 @@ export default function OrderPage() {
               {/* [2026-09-20 심플하게] ⚠️ 배송지 확인 경고 상자 삭제 — 제출 버튼 위 체크칸(배송지·상품·옵션·수량 확인)이 같은 역할. */}
 
             </section>
+            )}
           </CustomerBottomSheet>
           )}
 
