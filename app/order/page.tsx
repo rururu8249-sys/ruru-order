@@ -7662,7 +7662,7 @@ export default function OrderPage() {
                   return (
                     <article
                       key={`selected-item-${index}`}
-                      style={uiS3 ? { padding: "16px", borderBottom: "1px solid #E5E5E5", display: "flex", gap: "12px", alignItems: "flex-start" } : { padding: "12px 18px", borderBottom: "0.5px solid #E5E1DC", display: "flex", gap: "10px", alignItems: "flex-start" }}
+                      style={uiS3 ? { padding: "16px", borderBottom: "1px solid #E5E5E5", display: "flex", flexWrap: "wrap", columnGap: "12px", rowGap: 0, alignItems: "flex-start" } : { padding: "12px 18px", borderBottom: "0.5px solid #E5E1DC", display: "flex", gap: "10px", alignItems: "flex-start" }}
                     >
                       <div style={uiS3 ? { width: "72px", height: "72px", borderRadius: 0, background: "#F5F5F5", flexShrink: 0, overflow: "hidden" } : { width: "54px", height: "54px", borderRadius: "8px", background: "#F0EBE8", flexShrink: 0, overflow: "hidden" }}>
                         {imageUrl ? (
@@ -7672,17 +7672,17 @@ export default function OrderPage() {
                         )}
                       </div>
 
-                      <div style={s3s({ flex: 1, minWidth: 0 })}>
+                      <div style={uiS3 ? { display: "contents" } : { flex: 1, minWidth: 0 }}>
                         {/* [2026-09-20 사장님] 「옵션 변경이 단가 밑에 작게 있어 누르기 애매 → 삭제 앞에, 누르기 쉽게」
                             타사(manysell) 담은 상품 줄 실측: 이름 굵게 / 「단가 × N개」 회색 / 스테퍼 36px / 줄 합계 굵게 / [삭제] 64×40.
                             우리: 오른쪽 위 [옵션 변경][삭제] 같은 크기(40px), 아래 줄 스테퍼는 옵션 시트와 같은 모양(한 상자 −/N/+). */}
-                        <div style={s3s({ display: "flex", alignItems: "flex-start", gap: "8px" })}>
-                          <div style={s3s({ flex: 1, minWidth: 0 })}>
+                        <div style={uiS3 ? { display: "contents" } : { display: "flex", alignItems: "flex-start", gap: "8px" }}>
+                          <div style={uiS3 ? { flex: "1 1 0", minWidth: 0, order: 1 } : { flex: 1, minWidth: 0 }}>
                             {/* [2026-08-13] 상품명·옵션명이 잘리면 제출 전에 확인을 못 한다 → 2줄 줄바꿈 */}
                             <div style={uiS3 ? { fontSize: "16px", fontWeight: 600, color: "#111111", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" } : { fontSize: "14px", fontWeight: 800, color: "#1A1A1A", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{item.product_name || "상품명 없음"}{item.chat_source === "Y" ? <span style={s3s({ marginLeft: "5px", verticalAlign: "1px", display: "inline-block", padding: "1px 6px", borderRadius: "999px", background: "#E8F0FE", color: "#1D4ED8", fontSize: "10px", fontWeight: 800 })}>채팅주문</span> : null}</div>
-                            <div style={uiS3 ? { fontSize: "14px", fontWeight: 400, color: "#707072", marginTop: "2px", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" } : { fontSize: "12px", color: "#6E655E", marginTop: "2px", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{optionSummaryText} · {won(toNumber(item.product_price))} × {toNumber(item.qty)}개</div>
+                            <div style={uiS3 ? { fontSize: "14px", fontWeight: 400, color: "#707072", marginTop: "4px", lineHeight: 1.45, wordBreak: "keep-all", overflowWrap: "anywhere" } : { fontSize: "12px", color: "#6E655E", marginTop: "2px", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{optionSummaryText} · {won(toNumber(item.product_price))} × {toNumber(item.qty)}개</div>
                           </div>
-                          <div style={s3s({ display: "flex", gap: "6px", flexShrink: 0 })}>
+                          <div style={uiS3 ? { display: "flex", gap: "8px", flexShrink: 0, order: 5, marginLeft: "auto", marginTop: "12px" } : { display: "flex", gap: "6px", flexShrink: 0 }}>
                             {itemIsRegisteredProduct && !itemHasNoOptions ? (
                               <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · 옵션 변경`, "바꿀게요", () => openSheetItemOptionEdit(index))}
                                 style={uiS3 ? { height: "40px", padding: "0 14px", borderRadius: "9999px", border: "1px solid #CACACB", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" } : { height: "40px", padding: "0 12px", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
@@ -7696,17 +7696,18 @@ export default function OrderPage() {
                           </div>
                         </div>
 
-                        <div style={uiS3 ? { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px", gap: "8px" } : { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px", gap: "8px" }}>
-                          <div style={uiS3 ? { display: "grid", gridTemplateColumns: "44px 44px 44px", height: "44px", alignItems: "center", gap: "4px" } : { display: "grid", gridTemplateColumns: "40px 44px 40px", height: "40px", borderRadius: "10px", border: "1px solid #E8E2DD", overflow: "hidden" }}>
+                        <div style={uiS3 ? { display: "contents" } : { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px", gap: "8px" }}>
+                          <div style={uiS3 ? { display: "grid", gridTemplateColumns: "44px 44px 44px", height: "44px", alignItems: "center", gap: "4px", order: 4, marginTop: "12px" } : { display: "grid", gridTemplateColumns: "40px 44px 40px", height: "40px", borderRadius: "10px", border: "1px solid #E8E2DD", overflow: "hidden" }}>
                             <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · ${toNumber(item.qty)}개 → ${Math.max(1, toNumber(item.qty) - 1)}개`, "바꿀게요", () => changeSheetItemQty(index, -1))} aria-label="수량 줄이기"
                               style={uiS3 ? { width: "44px", height: "44px", borderRadius: "9999px", border: "1px solid #CACACB", background: "#FFFFFF", color: "#111111", fontSize: "20px", fontWeight: 600, cursor: "pointer" } : { borderRight: "1px solid #F0EAE0", border: "none", background: "#fff", color: "#555", fontSize: "18px", fontWeight: 800, cursor: "pointer" }}>−</button>
                             <div style={uiS3 ? { display: "flex", alignItems: "center", justifyContent: "center", fontSize: "17px", fontWeight: 700, color: "#111111" } : { display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: 800, color: "#222", borderLeft: "1px solid #F0EAE0", borderRight: "1px solid #F0EAE0" }}>{toNumber(item.qty)}</div>
                             <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · ${toNumber(item.qty)}개 → ${toNumber(item.qty) + 1}개`, "바꿀게요", () => changeSheetItemQty(index, 1))} aria-label="수량 늘리기"
                               style={uiS3 ? { width: "44px", height: "44px", borderRadius: "9999px", border: "1px solid #CACACB", background: "#FFFFFF", color: "#111111", fontSize: "20px", fontWeight: 600, cursor: "pointer" } : { border: "none", background: "#fff", color: "#7A1E47", fontSize: "18px", fontWeight: 800, cursor: "pointer" }}>+</button>
                           </div>
-                          <span style={uiS3 ? { flexShrink: 0, fontSize: "16px", fontWeight: 700, color: "#111111" } : { flexShrink: 0, fontSize: "15px", fontWeight: 900, color: "#7A1E47" }}>{won(itemAmount)}</span>
+                          <span style={uiS3 ? { flexShrink: 0, order: 2, fontSize: "16px", fontWeight: 700, color: "#111111", lineHeight: 1.4 } : { flexShrink: 0, fontSize: "15px", fontWeight: 900, color: "#7A1E47" }}>{won(itemAmount)}</span>
                         </div>
                       </div>
+                      {uiS3 ? <div aria-hidden="true" style={{ order: 3, flexBasis: "100%", height: 0 }} /> : null}
                     </article>
                   );
                 })}
@@ -7769,7 +7770,8 @@ export default function OrderPage() {
                       setPaymentMethod(method);
                       if (method === "무통장입금") void syncCartReservationsRef.current();
                     }}
-                    style={uiS3 ? { height: "52px", borderRadius: "8px", border: paymentMethod === method ? "2px solid #111111" : "1px solid #CACACB", background: "#FFFFFF", cursor: "pointer", fontSize: "15px", fontWeight: 600, color: "#111111", fontFamily: "inherit" } : { height: "48px", borderRadius: "12px", border: paymentMethod === method ? "2px solid #7A1E47" : "1px solid #E5E1DC", background: paymentMethod === method ? "#F9EEF3" : "#fff", cursor: "pointer", fontSize: "15px", fontWeight: 800, color: paymentMethod === method ? "#7A1E47" : "#444" }}
+                    aria-pressed={uiS3 ? paymentMethod === method : undefined}
+                    style={uiS3 ? { height: "52px", borderRadius: "8px", border: paymentMethod === method ? "1px solid #111111" : "1px solid #CACACB", background: paymentMethod === method ? "#111111" : "#FFFFFF", cursor: "pointer", fontSize: "15px", fontWeight: 600, color: paymentMethod === method ? "#FFFFFF" : "#111111", fontFamily: "inherit" } : { height: "48px", borderRadius: "12px", border: paymentMethod === method ? "2px solid #7A1E47" : "1px solid #E5E1DC", background: paymentMethod === method ? "#F9EEF3" : "#fff", cursor: "pointer", fontSize: "15px", fontWeight: 800, color: paymentMethod === method ? "#7A1E47" : "#444" }}
                   >
                     {method === "카드결제" ? `카드결제 +${cardRateForCustomer}%` : method}
                   </button>
