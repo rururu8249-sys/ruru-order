@@ -125,6 +125,7 @@ import { colorNameSwatch, isLightSwatch, resolveColorDisplay } from "@/lib/color
 import { restyleV2 } from "@/lib/customerUiV2Restyle";
 import { readCustomerUiPreview, resolveCustomerUiV2, UI_PREVIEW_DEFAULTS, UI_V2_DEFAULT, UI_V2_STORAGE_KEY } from "@/lib/customerUiSwitch";
 import { restyleClassV2, stripDecorativeEmojiV2 } from "@/lib/customerUiV2Restyle";
+import { CUSTOMER_ORDER_FILTERS, cleanCustomerOptionValue, orderLookupStatusView } from "@/lib/customerOrderStatusView";
 import CartAddFeedbackV2 from "@/components/customer/CartAddFeedbackV2";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import ShopContactLink from "@/components/customer/ShopContactLink";
@@ -272,7 +273,8 @@ const resolveShippingGroupFromValue = (value: unknown): "normal" | "vendor" => {
 
 // [2026-09-08] BANK_NAME/BANK_ACCOUNT/BANK_HOLDER 는 OrderPage 안에서 useShopInfo() 로 받는다(설정 › 상점 정보).
 
-const ORDER_LOOKUP_FILTERS = ["전체", "결제대기", "결제완료", "출고완료", "주문취소"] as const;
+// [㊲] /myorder 와 같은 필터 이름(입금대기·입금확인) — lib/customerOrderStatusView
+const ORDER_LOOKUP_FILTERS = CUSTOMER_ORDER_FILTERS;
 const ORDER_LOOKUP_PER_PAGE = 2;
 const FOOTER_TEXT = "© since 2024 루루동이 | All Rights Reserved.";
 const MENU_ITEM_STYLE: CSSProperties = {
@@ -5553,72 +5555,11 @@ export default function OrderPage() {
 
   // 고객 표시용 상태: filterKey(필터 카테고리 4종)와 displayText(배지 6종, 이모지 포함)를 함께 반환.
   // ⚠️ 관리자 페이지 용어/로직과 무관. 고객 주문조회 표시 전용.
+  // [㊲ 2026-10-19] 판정은 lib/customerOrderStatusView.orderLookupStatusView 로 옮김(규칙 그대로).
+  //   필터 이름만 /myorder 와 같게(입금대기·입금확인), 배지는 이모지 없이 /myorder 와 같은 글자(환불은 「환불완료」/「부분환불」).
   const ruruOrderLookupStatus = (
     order: any,
-  ): { filterKey: CustomerOrderLookupFilter; displayText: string } => {
-    // 1) 주문취소 최우선
-    const cancelText = [
-      order?.payment_status,
-      order?.paymentStatus,
-      order?.order_manage_status,
-      order?.order_status,
-      order?.admin_status,
-      order?.admin_order_status_v2,
-      order?.status,
-    ]
-      .map(ruruOrderLookupText)
-      .join(" ");
-
-    if (/주문서취소|주문취소|취소|환불|cancel|refund/i.test(cancelText)) {
-      return { filterKey: "주문취소", displayText: "❌ 주문취소" };
-    }
-
-    // 2) 출고완료
-    const deliveryText = [
-      order?.delivery_status,
-      order?.shipping_status,
-      order?.tracking_number,
-      order?.invoice_number,
-      order?.waybill_number,
-      order?.order_manage_status,
-      order?.admin_status,
-    ]
-      .map(ruruOrderLookupText)
-      .join(" ");
-
-    if (/출고완료|택배출고|배송출발|배송완료|송장|shipped/i.test(deliveryText)) {
-      return { filterKey: "출고완료", displayText: "🚚 출고완료" };
-    }
-
-    // 3) 결제상태 (무통장 vs 카드)
-    const paymentText = [
-      order?.payment_status,
-      order?.deposit_status,
-      order?.admin_order_status_v2,
-      order?.order_manage_status,
-      order?.order_status,
-      order?.admin_status,
-      order?.status,
-    ]
-      .map(ruruOrderLookupText)
-      .join(" ");
-
-    const isCard = /카드/.test(ruruOrderLookupText(order?.payment_method)) || /card/i.test(paymentText);
-
-    if (isCard) {
-      if (/카드결제완료|card_paid|결제완료/i.test(paymentText)) {
-        return { filterKey: "결제완료", displayText: "✅ 결제완료" };
-      }
-      return { filterKey: "결제대기", displayText: "💳 카결대기" };
-    }
-
-    // 무통장입금
-    if (/입금확인|자동입금|수동입금|입금완료|확인완료|출고준비|결제완료|bank_paid|auto_paid|manual_paid/i.test(paymentText)) {
-      return { filterKey: "결제완료", displayText: "✅ 결제완료" };
-    }
-
-    return { filterKey: "결제대기", displayText: "💰 입금대기" };
-  };
+  ): { filterKey: CustomerOrderLookupFilter; displayText: string } => orderLookupStatusView(order);
 
   const ruruOrderLookupProductName = (order: any) =>
     ruruOrderLookupText(order?.product_name) ||
@@ -5629,7 +5570,7 @@ export default function OrderPage() {
 
   const ruruOrderLookupOptionText = (order: any) =>
     [order?.color, order?.size, order?.option, order?.product_option]
-      .map(ruruOrderLookupText)
+      .map(cleanCustomerOptionValue) // [㊲] 「없음」 류는 안 보이게(/myorder 와 같은 규칙)
       .filter(Boolean)
       .join(" / ");
 

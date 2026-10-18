@@ -8,7 +8,10 @@ import type { OrderBankAccountSnapshot } from "@/lib/orderBankAccount";
 import CustomerBottomSheet from "@/components/customer/CustomerBottomSheet";
 import { useCustomerStageRestyle } from "@/lib/useCustomerUiStage";
 
-export type CustomerOrderLookupFilter = "전체" | "결제대기" | "결제완료" | "출고완료" | "주문취소";
+import type { CustomerOrderFilter } from "@/lib/customerOrderStatusView";
+
+// [㊲] /myorder 와 같은 이름: 전체·입금대기·입금확인·출고완료·주문취소
+export type CustomerOrderLookupFilter = "전체" | CustomerOrderFilter;
 
 const BAND_TRACKING_URL = "https://band.us/@ruru8249";
 
@@ -65,11 +68,19 @@ type CustomerOrderLookupBottomSheetProps = {
 // 시안 배지색(정확 hex): 결제완료 초록#0F6E56 / 출고완료 파랑#185FA5 / 결제대기 노랑#854F0B / 주문취소 빨강#C0392B / 그 외 회색
 // (무통장 입금대기·카드 카결대기는 모두 결제대기=노랑, 무통장·카드 완료는 모두 결제완료=초록으로 묶임)
 const paymentChipStyle = (statusLabel: CustomerOrderLookupFilter): CSSProperties => {
-  if (statusLabel === "결제완료") return { background: "#E1F5EE", color: "#0F6E56" };
+  if (statusLabel === "입금확인") return { background: "#E1F5EE", color: "#0F6E56" };
   if (statusLabel === "출고완료") return { background: "#E6F1FB", color: "#185FA5" };
-  if (statusLabel === "결제대기") return { background: "#FAEEDA", color: "#854F0B" };
+  if (statusLabel === "입금대기") return { background: "#FAEEDA", color: "#854F0B" };
   if (statusLabel === "주문취소") return { background: "#FBEAE7", color: "#C0392B" };
   return { background: "#EEEEEE", color: "#888888" };
+};
+
+// [㊲] 새 모양(5단계) 배지 색 — DESIGN.md §9(연한 바탕 + 진한 글자), 주문취소·환불은 회색(사장님 지시). 글자는 그대로.
+const paymentChipStyleV2 = (statusLabel: CustomerOrderLookupFilter): CSSProperties => {
+  if (statusLabel === "입금확인") return { background: "#E6F4EC", color: "#007D48" };
+  if (statusLabel === "출고완료") return { background: "#111111", color: "#FFFFFF" };
+  if (statusLabel === "입금대기") return { background: "#FFF4E0", color: "#9E5A00" };
+  return { background: "#F5F5F5", color: "#39393B" };
 };
 
 const chipBaseStyle: CSSProperties = { borderRadius: "999px", padding: "4px 10px", fontSize: "11px", fontWeight: 800 };
@@ -157,7 +168,7 @@ export default function CustomerOrderLookupBottomSheet({
                     <article key={group.id} style={s5({ borderRadius: "16px", background: "#fff", border: "1px solid #E8E2DD", padding: "12px 16px" })}>
                       <div style={s5({ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" })}>
                         <div style={s5({ display: "flex", minWidth: 0, alignItems: "center", gap: "6px" })}>
-                          <span style={s5({ ...chipBaseStyle, ...paymentChipStyle(group.statusLabel) })}>{group.statusDisplayText}</span>
+                          <span style={v5 ? { ...chipBaseStyle, fontSize: "13px", fontWeight: 600, ...paymentChipStyleV2(group.statusLabel) } : { ...chipBaseStyle, ...paymentChipStyle(group.statusLabel) }}>{group.statusDisplayText}</span>
                         </div>
                         {group.paymentMethodLabel ? (
                           <span style={s5({ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "#7B2D43" })}>{group.paymentMethodLabel}</span>
@@ -211,12 +222,13 @@ export default function CustomerOrderLookupBottomSheet({
                           <span style={s5({ fontSize: "13px", fontWeight: 800, color: "#222" })}>결제금액</span>
                           <span style={s5({ fontSize: "18px", fontWeight: 800, letterSpacing: "-0.07em", color: "#7B2D43" })}>{group.totalAmountText}</span>
                         </div>
-                        {group.paymentMethodLabel === "무통장입금" && group.bankAccountStatus === "conflict" ? (
+                        {group.statusLabel !== "주문취소" && group.paymentMethodLabel === "무통장입금" && group.bankAccountStatus === "conflict" ? (
                           <div style={s5({ marginTop: "8px", borderRadius: "10px", background: "#FBEAE7", padding: "9px 10px", fontSize: "12px", fontWeight: 800, lineHeight: 1.5, color: "#C0392B" })}>
                             이 주문의 입금계좌 정보를 확인할 수 없습니다. 카톡채널로 문의해 주세요.
                           </div>
                         ) : null}
-                        {group.paymentMethodLabel === "무통장입금" && group.bankAccount ? (
+                        {/* [㊲] 취소·환불 주문엔 입금 계좌 버튼 숨김 */}
+                        {group.statusLabel !== "주문취소" && group.paymentMethodLabel === "무통장입금" && group.bankAccount ? (
                           <button
                             type="button"
                             onClick={() => onOpenPaymentGuide(group)}

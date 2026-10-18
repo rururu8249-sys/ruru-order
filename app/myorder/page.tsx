@@ -2,7 +2,8 @@
 
 import CustomerToastNotice from "@/components/customer/CustomerToastNotice";
 
-import { getCustomerOrderStatusLabel } from "@/lib/admin-v2/statusDisplay";
+// [㊲] 상태 표시는 lib/customerOrderStatusView 한 곳(주문서 화면 「주문내역」 창과 같은 판정)
+import { CUSTOMER_ORDER_FILTERS, myOrderFilterOf, myOrderStatusLabel, type CustomerOrderFilter } from "@/lib/customerOrderStatusView";
 
 // app/myorder/page.tsx
 // 전체 교체용
@@ -36,8 +37,9 @@ import { useCustomerUiStage } from "@/lib/useCustomerUiStage";
 const FOOTER_TEXT = "© since 2024 루루동이 | All Rights Reserved.";
 // [2026-09-08] BANK_NAME/BANK_ACCOUNT/BANK_HOLDER 는 MyOrderPage 안에서 useShopInfo() 로 받는다.
 
-const MY_ORDER_FILTERS = ["전체", "입금대기", "입금확인", "출고완료"] as const;
-type MyOrderFilter = (typeof MY_ORDER_FILTERS)[number];
+// [㊲] 「주문취소」 필터 추가 — 취소·환불이 예전엔 입금대기에 섞였다.
+const MY_ORDER_FILTERS = CUSTOMER_ORDER_FILTERS;
+type MyOrderFilter = "전체" | CustomerOrderFilter;
 
 const normalizePhone = (value: string) =>
   String(value || "").replace(/[^0-9]/g, "");
@@ -73,18 +75,13 @@ function cleanOption(value: any) {
   return text;
 }
 
+// [㊲] 원래 이 자리 계산을 lib 로 옮김(내용 동일) — 주문서 화면과 같이 쓰려고.
 function getCustomerStatusLabel(order: any) {
-  const manageStatus = String(order.order_manage_status || order.admin_order_status_v2 || "");
-  const refundType = String(order.refund_type || "");
-
-  if (manageStatus === "환불" && refundType === "부분환불") return "부분환불";
-  if (manageStatus === "환불") return "환불완료";
-
-  return getCustomerOrderStatusLabel(manageStatus || order.order_status);
+  return myOrderStatusLabel(order);
 }
 
 function getStatusClassName(label: string) {
-  if (label === "주문서 취소") return "bg-red-100 text-red-700";
+  if (label === "주문서 취소" || label === "주문서취소" || label === "주문취소") return "bg-red-100 text-red-700";
   if (label === "환불완료") return "bg-gray-200 text-gray-800";
   if (label === "부분환불") return "bg-orange-100 text-orange-700";
   if (label === "배송출발") return "bg-green-100 text-green-700";
@@ -94,23 +91,9 @@ function getStatusClassName(label: string) {
   return "bg-gray-100 text-gray-700";
 }
 
+// [㊲] 취소·환불 → 「주문취소」(예전엔 「주문서취소」를 몰라 입금대기로 갔다). 나머지 규칙은 그대로(lib).
 function getMyOrderFilterLabel(label: string): MyOrderFilter {
-  if (label === "배송출발" || label === "출고완료") return "출고완료";
-
-  const paidLabels = [
-    "입금확인완료",
-    "입금확인",
-    "자동입금확인",
-    "수동입금확인",
-    "확인완료",
-    "출고준비중",
-    "결제완료",
-    "카드결제완료",
-  ];
-
-  if (paidLabels.includes(label)) return "입금확인";
-
-  return "입금대기";
+  return myOrderFilterOf(label);
 }
 
 const blockCustomerCopyEvents = () => {
@@ -336,6 +319,9 @@ export default function MyOrderPage() {
     safeOrderPage * ORDERS_PER_PAGE
   );
 
+  const allOrdersCanceled =
+    orders.length > 0 && orders.every((order) => getMyOrderFilterLabel(getCustomerStatusLabel(order)) === "주문취소");
+
   const depositNickname =
     String(orders[0]?.youtube_nickname || "").trim() ||
     String(orders[0]?.nickname || "").trim() ||
@@ -373,7 +359,8 @@ export default function MyOrderPage() {
 
         <MyOrderPageHero isLoggedIn={isLoggedIn} customerName={customerName} />
 
-        {isLoggedIn && (
+        {/* [㊲] 주문이 전부 취소·환불이면 「입금 계좌 보기」 숨김(낼 돈이 없는데 계좌를 보여주지 않게) */}
+        {isLoggedIn && !allOrdersCanceled && (
           <section
             data-ruru-myorder-payment-guide-button="shell-v1"
             className={v2 ? "mt-3 rounded-[8px] bg-[#F5F5F5] p-4" : "mt-3 rounded-[20px] bg-white p-3 ring-1 ring-slate-200"}
@@ -453,7 +440,7 @@ export default function MyOrderPage() {
                 </span>
               </div>
 
-              <div className="mt-3 grid grid-cols-4 gap-1.5">
+              <div className="mt-3 grid grid-cols-5 gap-1.5">
                 {MY_ORDER_FILTERS.map((filter) => (
                   <button
                     key={filter}

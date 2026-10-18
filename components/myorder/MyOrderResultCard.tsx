@@ -6,6 +6,7 @@
 
 import { formatMyOrderDateTime } from "@/components/myorder/myOrderDateFormat";
 import { useCustomerUiStage } from "@/lib/useCustomerUiStage";
+import { myOrderChipView } from "@/lib/customerOrderStatusView";
 
 type MyOrderResultCardProps = {
   order: any;
@@ -28,8 +29,8 @@ const statusChipClassV2 = (text: string) => {
   if (text === "출고완료" || text === "배송출발") return "bg-[#111111] text-white";
   if (text === "입금확인" || text === "입금확인완료") return "bg-[#E6F4EC] text-[#007D48]";
   if (text === "입금대기" || text === "주문접수" || text === "부분환불") return "bg-[#FFF4E0] text-[#9E5A00]";
-  if (text === "주문취소" || text === "주문서 취소" || text === "주문서취소") return "bg-[#FDECEC] text-[#D30005]";
-  return "bg-[#F5F5F5] text-[#39393B]"; // 환불완료·출고준비중·픽업예정 등
+  // [㊲ 2026-10-19 사장님] 주문취소는 회색 계열(빨강 아님) — 환불완료와 같은 회색
+  return "bg-[#F5F5F5] text-[#39393B]"; // 주문취소·환불완료·출고준비중·픽업예정 등
 };
 
 export default function MyOrderResultCard({
@@ -59,34 +60,9 @@ export default function MyOrderResultCard({
       formattedDate
   );
 
-  const paidLabels = [
-    "입금확인완료",
-    "입금확인",
-    "자동입금확인",
-    "수동입금확인",
-    "확인완료",
-    "배송출발",
-    "출고준비중",
-    "출고완료",
-    "결제완료",
-    "카드결제완료",
-  ];
-
-  const paymentStatus =
-    label === "주문취소" || label === "주문서 취소" || label === "환불완료"
-      ? label
-      : paidLabels.includes(label)
-        ? "입금확인"
-        : "입금대기";
-
-  const deliveryStatus =
-    label === "배송출발" || label === "출고완료"
-      ? "출고완료"
-      : label === "출고준비중" || label === "확인완료"
-        ? "출고준비"
-        : label === "주문취소" || label === "주문서 취소" || label === "환불완료"
-          ? label
-          : "확인중";
+  // [㊲] 결제·배송 상태 계산은 lib/customerOrderStatusView 로 옮김(내용 같음 + 「주문서취소」·부분환불 인식).
+  //   예전엔 취소 글자가 "주문서취소"(띄어쓰기 없음)로 와서 「입금대기」로 보였다.
+  const { paymentStatus, deliveryStatus } = myOrderChipView(label);
 
   // [송장 표시] DB에 관리자가 입력한 송장(tracking_number)이 있으면 앱에서 바로 조회 — 밴드 안내는 송장 미등록 시 폴백
   const trackingNumber = String(order.tracking_number || "").trim();
