@@ -4,6 +4,7 @@ import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { checkoutReminderCopy } from "@/lib/cartHoldDetail";
 import { parseShopInfo, SHOP_INFO_KEYS, type ShopBankAccountId } from "@/lib/shopInfo";
 import { buildCartHoldSummary } from "@/lib/cartHoldSummary";
+import { sweepExpiredCartHolds } from "@/lib/cartHoldSweep";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,6 +54,8 @@ export async function GET(request: NextRequest) {
   if (!session) return NextResponse.json({ ok: false, error: { message: "관리자 인증이 필요합니다." } }, { status: 401 });
   try {
     const supabase = getSupabaseAdmin();
+    // [㉛] 담김 현황을 볼 때마다 만료 줄을 먼저 서버에서 정리(비움 기록 expired + 삭제). 실패해도 목록은 정상.
+    try { await sweepExpiredCartHolds(supabase); } catch { /* 무시 */ }
     const searchParams = new URL(request.url).searchParams;
     const scopeAll = searchParams.get("scope") === "all";
     const summaryOnly = searchParams.get("summary") === "1";
@@ -329,6 +332,33 @@ async function sendReminders(supabase: ReturnType<typeof getSupabaseAdmin>, requ
   return { sent: rows.length, skipped: keys.length - rows.length };
 }
 
+// [㉛] 관리자 비우기 = 영구 비움 기록(cart_clear_marks). 세션키 + 그 세션의 kakao_id(우선)·전화로 기록해
+//   다른 탭·다른 브라우저(세션키가 달라도 같은 손님)에서도 옛 장바구니가 되살아나지 않게 한다. 표시용 선점 전용.
+//   기록 성공 = true. 실패(테이블 없음 등)면 false → 호출부가 예전 3분 회수 지시로 대신한다.
+async function writeAdminClearMarks(supabase: any, keys: string[], reason: "admin_clear" | "admin_clear_all"): Promise<boolean> {
+  try {
+    const { data: rows } = await supabase.from("cart_reservations").select("session_key,kakao_id,customer_phone").in("session_key", keys).limit(5000);
+    const bySession = new Map<string, { kakao: string; phone: string }>();
+    for (const row of (rows || []) as Record<string, unknown>[]) {
+      const key = cleanKey(row.session_key);
+      const prev = bySession.get(key) || { kakao: "", phone: "" };
+      bySession.set(key, {
+        kakao: prev.kakao || String(row.kakao_id ?? "").trim(),
+        phone: prev.phone || String(row.customer_phone ?? "").replace(/[^0-9]/g, ""),
+      });
+    }
+    const marks = keys.map((key) => ({
+      reason, session_key: key,
+      kakao_id: bySession.get(key)?.kakao || null,
+      customer_phone: bySession.get(key)?.phone || null,
+    }));
+    const { error } = await supabase.from("cart_clear_marks").insert(marks);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: NextRequest) {
   const session = await verifyAdminSessionFromRequest(request);
   if (!session) return NextResponse.json({ ok: false, error: { message: "관리자 인증이 필요합니다." } }, { status: 401 });
@@ -378,11 +408,12 @@ export async function POST(request: NextRequest) {
     if (action === "clear-all") {
       const keys = Array.from(new Set(((Array.isArray(body?.sessionKeys) ? body.sessionKeys : []) as unknown[]).map(cleanKey).filter((k) => k.length >= 6))).slice(0, 250);
       if (keys.length === 0) return NextResponse.json({ ok: false, error: { message: "sessionKeys 없음" } }, { status: 400 });
+      const marked = await writeAdminClearMarks(supabase, keys, "admin_clear_all"); // 지우기 «전»에 kakao_id·전화를 읽어 둔다
       const { error } = await supabase.from("cart_reservations").delete().in("session_key", keys);
       if (error) return NextResponse.json({ ok: false, error: { message: error.message } }, { status: 500 });
       const nowIso = new Date().toISOString();
       await supabase.from("cart_bank_account_overrides").update({ status: "cancelled", cancelled_at: nowIso }).in("session_key", keys).eq("status", "active");
-      for (const key of keys) {
+      for (const key of marked ? [] : keys) { // [㉛] 영구 기록이 됐으면 예전 3분 회수 지시는 쓰지 않는다
         try {
           const rk = `cart_revoke_${key}`.slice(0, 250);
           const { data: ex } = await supabase.from("settings").select("key").eq("key", rk).limit(1);
@@ -397,14 +428,17 @@ export async function POST(request: NextRequest) {
     if (action !== "clear") return NextResponse.json({ ok: false, error: { message: "알 수 없는 action" } }, { status: 400 });
     if (!sessionKey) return NextResponse.json({ ok: false, error: { message: "sessionKey 없음" } }, { status: 400 });
 
+    const marked = await writeAdminClearMarks(supabase, [sessionKey], "admin_clear"); // 지우기 «전»에 kakao_id·전화를 읽어 둔다
     const { error } = await supabase.from("cart_reservations").delete().eq("session_key", sessionKey);
     await supabase.from("cart_bank_account_overrides").update({ status: "cancelled", cancelled_at: new Date().toISOString() }).eq("session_key", sessionKey).eq("status", "active");
-    try {
-      const rk = `cart_revoke_${sessionKey}`.slice(0, 250);
-      const { data: ex } = await supabase.from("settings").select("key").eq("key", rk).limit(1);
-      if (Array.isArray(ex) && ex.length > 0) await supabase.from("settings").update({ value: new Date().toISOString() }).eq("key", rk);
-      else await supabase.from("settings").insert({ key: rk, value: new Date().toISOString() });
-    } catch { /* 회수 지시 실패해도 해제 자체는 유지 */ }
+    if (!marked) { // [㉛] 영구 기록이 안 됐을 때만 예전 3분 회수 지시로 대신
+      try {
+        const rk = `cart_revoke_${sessionKey}`.slice(0, 250);
+        const { data: ex } = await supabase.from("settings").select("key").eq("key", rk).limit(1);
+        if (Array.isArray(ex) && ex.length > 0) await supabase.from("settings").update({ value: new Date().toISOString() }).eq("key", rk);
+        else await supabase.from("settings").insert({ key: rk, value: new Date().toISOString() });
+      } catch { /* 회수 지시 실패해도 해제 자체는 유지 */ }
+    }
     if (error) return NextResponse.json({ ok: false, error: { message: error.message } }, { status: 500 });
     return NextResponse.json({ ok: true, cleared: true });
   } catch (e: any) {

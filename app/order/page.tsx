@@ -136,6 +136,7 @@ import CustomerSizeChartSheet from "@/components/customer/CustomerSizeChartSheet
 import { resolveSizeChart, sizeColumnIndex } from "@/lib/sizeChart";
 import { registeredProductEditManualPrice, registeredProductPriceMode } from "@/lib/registeredProductPricePolicy";
 import { buildCartHoldSnapshotItem } from "@/lib/cartHoldDetail";
+import { CART_SEQ_NEW, readCartSeqField } from "@/lib/cartClearMarks";
 import {
   CUSTOMER_DETAIL_NAME_MAX_LENGTH,
   buildCustomerDetailProductName,
@@ -155,6 +156,8 @@ type OrderItem = {
   product_price: string;
   shipping_type?: string;
   combine_shipping?: string;
+  // [㉛] 담은 번호(cart_clear_marks seq) — 서버가 「이 번호 뒤에 비워졌으면」 거절. undefined=이 화면에서 새로 담아 아직 번호 전.
+  cart_seq?: number;
 };
 
 type BroadcastProduct = {
@@ -296,6 +299,8 @@ const emptyItem: OrderItem = {
 };
 
 const ORDER_DRAFT_STORAGE_KEY = "ruru_order_draft_v1";
+// [㉛ 사장님 확정 문구] 관리자 비우기·유지시간 만료 둘 다 같은 안내(같은 비움에 한 번만).
+const CART_CLEARED_NOTICE = "주문서 제출 없이 시간이 지나 장바구니가 비워졌어요.\n상품은 주문서 제출 후 입금까지 마쳐야 주문이 확정돼요.";
 
 type OrderDraftData = {
   items?: OrderItem[];
@@ -337,6 +342,7 @@ const normalizeOrderDraftItem = (value: unknown): OrderItem | null => {
     shipping_type: readOrderDraftText(record.shipping_type),
     combine_shipping: readOrderDraftText(record.combine_shipping),
   };
+  nextItem.cart_seq = readCartSeqField(record.cart_seq); // [㉛] 없음=0(옛 장바구니) · -1=번호 전 · 숫자=담은 번호
 
   return isMeaningfulOrderItem(nextItem) ? nextItem : null;
 };
@@ -1802,7 +1808,8 @@ export default function OrderPage() {
     const draft = readOrderDraftData();
 
     if (draft) {
-      const draftItems = normalizeOrderDraftItems(draft.items);
+      // [㉛] 「번호 전」(-1)으로 저장된 줄은 다시 「새로 담음」(undefined)으로 — 다음 동기화 때 서버 번호를 받는다.
+      const draftItems = normalizeOrderDraftItems(draft.items).map((it) => (it.cart_seq === CART_SEQ_NEW ? { ...it, cart_seq: undefined } : it));
 
       setItems(draftItems);
 
@@ -1824,7 +1831,8 @@ export default function OrderPage() {
   useEffect(() => {
     if (!orderDraftRestored || done) return;
 
-    const draftItems = normalizeOrderDraftItems(items);
+    // [㉛] 아직 번호 전인 줄은 -1 로 저장(다시 열면 「새로 담음」으로 복원). 번호 없는 옛 장바구니는 읽을 때 0.
+    const draftItems = normalizeOrderDraftItems(items.map((it) => (it.cart_seq === undefined ? { ...it, cart_seq: CART_SEQ_NEW } : it)));
     const hasMeaningfulDraft =
       draftItems.some((item) => isMeaningfulOrderItem(item)) ||
       requestMemo.trim() ||
@@ -3931,9 +3939,10 @@ export default function OrderPage() {
     try {
       const key = getCartSessionKey();
       if (!key) return;
+      // [㉛] 줄마다 담은 번호(cartSeq) — 번호 전(undefined)은 CART_SEQ_NEW(-1) = 방금 담음.
       const payload = items
         .filter((it) => it.product_id && String(it.product_name || "").trim())
-        .map((it) => buildCartHoldSnapshotItem(it as unknown as Record<string, unknown>))
+        .map((it) => ({ ...buildCartHoldSnapshotItem(it as unknown as Record<string, unknown>), cartSeq: it.cart_seq === undefined ? CART_SEQ_NEW : it.cart_seq }))
         .filter((r) => r.qty > 0);
       const res = await fetch("/api/cart-reservations", {
         method: "POST",
@@ -3971,19 +3980,37 @@ export default function OrderPage() {
       if (claim?.ok && claim.revoked === true) {
         setCartBankAccountOverride(null);
         setItems((prev) => prev.filter((it) => !(it.product_id && String(it.product_name || "").trim())));
-        showCustomerNotice("⚠️ 방송 운영자가 담긴 상품을 회수했어요 — 주문서가 비워졌습니다. 궁금한 점은 방송 채팅으로 문의해 주세요.");
+        showCustomerNotice(CART_CLEARED_NOTICE);
         return;
       }
+      // [㉛] 번호 전 줄에 서버 번호를 붙인다 — 이후 관리자 비우기·만료·제출 기록보다 «먼저 담은 줄»로 판정되게.
+      const serverCartSeq = Number(claim?.cartSeq);
+      if (claim?.ok && Number.isFinite(serverCartSeq) && serverCartSeq >= 0) {
+        setItems((prev) => (prev.some((it) => it.product_id && it.cart_seq === undefined)
+          ? prev.map((it) => (it.product_id && it.cart_seq === undefined ? { ...it, cart_seq: serverCartSeq } : it))
+          : prev));
+      }
       const normR = (s: unknown) => { const t = String(s ?? "").trim(); return t === "없음" ? "" : t; };
-      // [2026-09-28] 절대 만료로 빠진 상품 — 조용히 장바구니에서 제거 + 안내(품절과 별개).
-      const expiredRows = (claim?.ok && Array.isArray(claim.results)) ? claim.results.filter((r: any) => r && r.ok === false && r.expired === true) : [];
-      if (expiredRows.length > 0) {
-        setItems((prev) => prev.filter((it) => !expiredRows.some((r: any) => String(r.productId) === String(it.product_id) && normR(r.color) === normR(it.color) && normR(r.size) === normR(it.size))));
-        const hm = Number(claim.holdMinutes) || 0; const hText = hm >= 60 ? `${Math.floor(hm / 60)}시간` : `${hm}분`;
-        showCustomerNotice(`⏳ 담은 지 ${hText}이 지나 장바구니에서 자동으로 비워진 상품이 있어요. 필요하면 다시 담아 주세요.`);
+      // [2026-09-28 · ㉛] 서버가 뺀 줄 — 만료(expired)·관리자 비우기/제출 뒤 옛 줄(cleared)·내린 상품(unavailable).
+      //   화면과 임시 장바구니에서 지운다. 안내는 관리자 비우기·만료만, 같은 비움 기록에 대해 한 번만(제출 후 정리는 조용히).
+      const droppedRows = (claim?.ok && Array.isArray(claim.results))
+        ? claim.results.filter((r: any) => r && r.ok === false && (r.expired === true || r.cleared === true || r.unavailable === true))
+        : [];
+      if (droppedRows.length > 0) {
+        setItems((prev) => prev.filter((it) => !droppedRows.some((r: any) => String(r.productId) === String(it.product_id) && normR(r.color) === normR(it.color) && normR(r.size) === normR(it.size))));
+        const noticeRows = droppedRows.filter((r: any) => r.expired === true && r.silent !== true);
+        if (noticeRows.length > 0) {
+          const noticeSeq = Number(claim.clearedSeq) || 0;
+          let shownSeq = 0;
+          try { shownSeq = Number(window.localStorage.getItem("ruru_cart_notice_seq")) || 0; } catch { /* 무시 */ }
+          if (!noticeSeq || noticeSeq > shownSeq) {
+            showCustomerNotice(CART_CLEARED_NOTICE);
+            if (noticeSeq) { try { window.localStorage.setItem("ruru_cart_notice_seq", String(noticeSeq)); } catch { /* 무시 */ } }
+          }
+        }
       }
       if (claim?.ok && claim.allOk === false && Array.isArray(claim.results)) {
-        const rejected = claim.results.filter((r: any) => r && r.ok === false && !r.expired);
+        const rejected = claim.results.filter((r: any) => r && r.ok === false && !r.expired && !r.cleared && !r.unavailable);
         if (rejected.length > 0) {
           setItems((prev) => prev
             .map((it) => {
@@ -4047,7 +4074,13 @@ export default function OrderPage() {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       void syncCartReservationsRef.current().then(() => fetchCartReservationsRef.current());
     }, 45000);
-    return () => clearInterval(t);
+    // [㉛] 화면이 다시 보이는 순간 즉시 동기화 — 오래 숨어 있던 탭도 비움·만료를 바로 반영(45초 기다리지 않음).
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      void syncCartReservationsRef.current().then(() => fetchCartReservationsRef.current());
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { clearInterval(t); document.removeEventListener("visibilitychange", onVisible); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasSavedInfo, quickGroupBuyProducts.length]);
 

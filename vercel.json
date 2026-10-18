@@ -16,6 +16,10 @@
     {
       "path": "/api/cron/product-sales-stats",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/cart-holds-sweep",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

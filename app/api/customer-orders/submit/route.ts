@@ -817,6 +817,30 @@ export async function POST(request: NextRequest) {
       console.warn("유령 담기 홀드 정리 실패(주문은 정상):", (holdCleanupError as Error)?.message);
     }
 
+    // [㉛ 2026-10-17] 제출 성공 «이후» 비움 기록 — 방금 주문한 상품·옵션이 다른 탭·다른 브라우저의
+    //   옛 장바구니에서 다시 담기지 않게(손님이 일부러 다시 담는 건 허용: 새로 담은 줄은 번호가 더 크다).
+    //   표시용 선점 보조 테이블(cart_clear_marks)만 쓴다 — 주문 RPC·금액·재고·입금 무접촉. 실패해도 주문 성공 응답 유지.
+    try {
+      const markPhone = String(phone || "").replace(/[^0-9]/g, "") || null;
+      const markKakao = String(kakaoId || "").trim() || null;
+      const seenMarks = new Set<string>();
+      const submittedMarks: Record<string, unknown>[] = [];
+      for (const row of orderRows) {
+        const snap = buildCartHoldSnapshotItem(row as Record<string, unknown>);
+        if (!snap.productId) continue; // 직접입력 상품은 장바구니 선점이 없다
+        const key = `${snap.productId}|${snap.color}|${snap.size}`;
+        if (seenMarks.has(key)) continue;
+        seenMarks.add(key);
+        submittedMarks.push({ reason: "submitted", session_key: cartSessionKey, kakao_id: markKakao, customer_phone: markPhone, product_id: snap.productId, color: snap.color, size: snap.size });
+      }
+      if (submittedMarks.length > 0 && (cartSessionKey || markKakao || markPhone)) {
+        const { error: markError } = await supabase.from("cart_clear_marks").insert(submittedMarks);
+        if (markError) console.warn("제출 후 장바구니 비움 기록 실패(주문은 정상):", markError.message);
+      }
+    } catch (markCleanupError) {
+      console.warn("제출 후 장바구니 비움 기록 실패(주문은 정상):", (markCleanupError as Error)?.message);
+    }
+
     // 유튜브 라이브 채팅 자동 게시(자동알림 ON일 때만). 주문 저장 완료 후 응답과 별개로 실행 →
     //   - after()로 응답 보낸 뒤 실행하므로 주문 제출 속도/성공에 영향 0.
     //   - postLiveChatMessage는 throw하지 않고 notify OFF면 내부에서 스킵. 실패해도 주문과 무관.

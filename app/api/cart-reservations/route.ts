@@ -4,6 +4,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { buildCartHoldSnapshotItem } from "@/lib/cartHoldDetail";
+import { CART_SEQ_NEW, cartClearNeedsNotice, cartItemClearedBy, normCartOpt, type CartClearMark, type CartIdentity } from "@/lib/cartClearMarks";
+import { sweepExpiredCartHolds } from "@/lib/cartHoldSweep";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -88,6 +90,43 @@ async function cancelActiveBankOverrides(supabase: ReturnType<typeof getSupabase
     .eq("status", "active");
 }
 
+// [㉛] 비움 기록(cart_clear_marks) — 표시용 선점 전용. 테이블이 없거나 읽기 실패면 null(기존 동작 그대로).
+const MARK_LOOKBACK_DAYS = 31; // 손님 임시 장바구니 7일·선점 최대 30일보다 길게
+async function readCartMarks(supabase: ReturnType<typeof getSupabaseAdmin>, who: CartIdentity): Promise<CartClearMark[] | null> {
+  const q = (v: string) => `"${v.replace(/["\\]/g, "")}"`; // PostgREST or 필터 값 따옴표(쉼표·괄호 안전)
+  const ors = [`session_key.eq.${q(who.sessionKey)}`];
+  if (who.kakaoId) ors.push(`kakao_id.eq.${q(who.kakaoId)}`);
+  if (who.phone) ors.push(`customer_phone.eq.${q(who.phone)}`);
+  const since = new Date(Date.now() - MARK_LOOKBACK_DAYS * 86_400_000).toISOString();
+  const { data, error } = await supabase
+    .from("cart_clear_marks")
+    .select("seq,reason,session_key,kakao_id,customer_phone,product_id,color,size")
+    .or(ors.join(","))
+    .gte("created_at", since)
+    .order("seq", { ascending: false })
+    .limit(500);
+  if (error) return null;
+  return (data || []) as CartClearMark[];
+}
+async function readCurrentCartSeq(supabase: ReturnType<typeof getSupabaseAdmin>): Promise<number | null> {
+  const { data, error } = await supabase.from("cart_clear_marks").select("seq").order("seq", { ascending: false }).limit(1);
+  if (error) return null;
+  return Number((data as Array<{ seq?: unknown }> | null)?.[0]?.seq) || 0;
+}
+// 만료 줄 정리 — 동기화마다 돌면 과하므로 서버 인스턴스당 1분에 한 번만(cron 이 5분마다 따로 돈다).
+let lastSweepAt = 0;
+async function sweepExpiredThrottled(supabase: ReturnType<typeof getSupabaseAdmin>) {
+  if (Date.now() - lastSweepAt < 60_000) return;
+  lastSweepAt = Date.now();
+  try { await sweepExpiredCartHolds(supabase); } catch { /* 정리 실패해도 동기화는 정상 */ }
+}
+async function insertCartMarks(supabase: ReturnType<typeof getSupabaseAdmin>, rows: Array<Record<string, unknown>>): Promise<number> {
+  if (rows.length === 0) return 0;
+  const { data, error } = await supabase.from("cart_clear_marks").insert(rows).select("seq");
+  if (error) return 0;
+  return Math.max(0, ...((data || []) as Array<{ seq?: unknown }>).map((r) => Number(r.seq) || 0));
+}
+
 export async function GET(request: NextRequest) {
   try {
     const idsParam = String(request.nextUrl.searchParams.get("ids") || "").trim();
@@ -149,7 +188,8 @@ export async function POST(request: NextRequest) {
     const customerName = String(body?.customerName ?? "").trim().slice(0, 40) || null;
     const kakaoId = String(body?.kakaoId ?? "").trim().replace(/[^0-9]/g, "").slice(0, 80) || null;
     const rawItems = Array.isArray(body?.items) ? body.items.slice(0, MAX_ITEMS) : [];
-    const items = rawItems
+    const who: CartIdentity = { sessionKey, kakaoId, phone };
+    let items = rawItems
       .map((it: any) => buildCartHoldSnapshotItem({
         productId: it?.productId,
         productName: it?.productName,
@@ -159,7 +199,53 @@ export async function POST(request: NextRequest) {
         unitPrice: it?.unitPrice,
       }))
       .filter((r: ReturnType<typeof buildCartHoldSnapshotItem>) => r.productId && r.qty > 0);
+    // [㉛] 줄마다 «담은 번호» — 손님 화면이 담을 때 붙인 cart_clear_marks seq(없으면 0 = 옛 장바구니).
+    const seqByKey = new Map<string, number>();
+    for (const it of rawItems) {
+      const key = `${String(it?.productId ?? "").trim()}|${normCartOpt(it?.color)}|${normCartOpt(it?.size)}`;
+      const raw = Number(it?.cartSeq);
+      // -1(CART_SEQ_NEW) = 이 화면에서 방금 담아 아직 번호 전 → 거절 대상 아님. 없음·0 = 옛 장바구니.
+      const n = raw === CART_SEQ_NEW ? CART_SEQ_NEW : Math.max(0, Math.floor(Number.isFinite(raw) ? raw : 0));
+      const prev = seqByKey.get(key);
+      // 같은 옵션이 여러 줄이면 더 오래된 쪽 기준(보수적). 「새로 담음(-1)」은 번호 있는 줄이 있으면 그 번호를 따른다.
+      seqByKey.set(key, prev === undefined ? n : prev === CART_SEQ_NEW ? n : n === CART_SEQ_NEW ? prev : Math.min(prev, n));
+    }
+    const keyOf = (r: { productId: string; color: string; size: string }) => `${r.productId}|${normCartOpt(r.color)}|${normCartOpt(r.size)}`;
 
+    // [㉛] 예전 3분 회수 지시(settings.cart_revoke_*)는 영구 비움 기록으로 한 번 옮기고 지운다(배포 전 비우기 호환).
+    try {
+      const rk = `cart_revoke_${sessionKey}`.slice(0, 250);
+      const { data: rv } = await supabase.from("settings").select("value").eq("key", rk).limit(1).maybeSingle();
+      if (rv) {
+        const { data: oldRows } = await supabase.from("cart_reservations").select("kakao_id,customer_phone").eq("session_key", sessionKey).limit(1);
+        const inserted = await insertCartMarks(supabase, [{
+          reason: "admin_clear", session_key: sessionKey,
+          kakao_id: String((oldRows as any)?.[0]?.kakao_id || kakaoId || "").trim() || null,
+          customer_phone: String((oldRows as any)?.[0]?.customer_phone || phone || "").replace(/[^0-9]/g, "") || null,
+        }]);
+        if (inserted > 0) await supabase.from("settings").delete().eq("key", rk);
+      }
+    } catch { /* 옮기기 실패 시 아래 기존 회수 처리로 */ }
+
+    // [㉛] 만료 줄 서버 정리(손님이 안 와도 지워지게 — cron 과 별도로 동기화 때도 1분에 한 번)
+    await sweepExpiredThrottled(supabase);
+
+    // [㉛] 비움 기록 거절 — 관리자 비우기·만료·제출 뒤 옛 줄은 상품 상태와 무관하게 «무조건» 거절.
+    //   선점 함수(claim_cart_hold) 부르기 전에 걸러낸다(함수 무변경).
+    const marks = await readCartMarks(supabase, who).catch(() => null);
+    const clearedResults: Array<Record<string, unknown>> = [];
+    let clearedSeq = 0; // 안내(관리자 비우기·만료)가 필요한 거절의 가장 큰 기록 번호
+    if (marks && marks.length > 0) {
+      items = items.filter((r: ReturnType<typeof buildCartHoldSnapshotItem>) => {
+        const hit = cartItemClearedBy({ productId: r.productId, color: r.color, size: r.size, cartSeq: seqByKey.get(keyOf(r)) ?? 0 }, marks, who);
+        if (!hit) return true;
+        const notice = cartClearNeedsNotice(hit.reason);
+        if (notice) clearedSeq = Math.max(clearedSeq, hit.seq);
+        // expired:true 는 예전 손님 화면(배포 전 열린 탭)도 품절 안내 없이 줄을 빼게 하려는 호환 표시.
+        clearedResults.push({ productId: r.productId, color: r.color, size: r.size, requested: r.qty, ok: false, cleared: true, expired: true, silent: !notice, clearedSeq: hit.seq, available: 0 });
+        return false;
+      });
+    }
     try {
       const rk = `cart_revoke_${sessionKey}`.slice(0, 250);
       const { data: rv } = await supabase.from("settings").select("value").eq("key", rk).limit(1).maybeSingle();
@@ -185,6 +271,17 @@ export async function POST(request: NextRequest) {
     });
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
+    // [㉛] 만료된 줄은 그 상품·옵션만 영구 비움 기록 — 다른 탭이 옛 줄을 다시 보내도 처음 담은 시각이 리셋되지 않게.
+    const rpcResults = Array.isArray((data as any)?.results) ? ((data as any).results as Array<Record<string, unknown>>) : [];
+    const expiredRows = rpcResults.filter((r) => r && r.ok === false && r.expired === true);
+    if (marks && expiredRows.length > 0) {
+      const inserted = await insertCartMarks(supabase, expiredRows.map((r) => ({
+        reason: "expired", session_key: sessionKey, kakao_id: kakaoId, customer_phone: phone,
+        product_id: String(r.productId ?? ""), color: normCartOpt(r.color), size: normCartOpt(r.size),
+      })));
+      clearedSeq = Math.max(clearedSeq, inserted);
+    }
+
     if (kakaoId) {
       const { error: kakaoError } = await supabase.from("cart_reservations").update({ kakao_id: kakaoId }).eq("session_key", sessionKey);
       if (kakaoError) return NextResponse.json({ ok: false, error: kakaoError.message }, { status: 500 });
@@ -193,13 +290,17 @@ export async function POST(request: NextRequest) {
     const bankAccountOverride = await currentBankOverride(supabase, sessionKey);
     if (items.length === 0) await cancelActiveBankOverrides(supabase, sessionKey);
 
+    const allResults = [...rpcResults, ...clearedResults];
     return NextResponse.json({
       ok: true,
       reserved: items.length,
       holdMinutes,
-      allOk: (data as any)?.allOk !== false,
-      results: (data as any)?.results ?? [],
+      allOk: (data as any)?.allOk !== false && clearedResults.length === 0,
+      results: allResults,
       bankAccountOverride,
+      // [㉛] 손님 화면이 새로 담는 상품에 붙일 번호 · 이번에 거절을 일으킨 비움 기록 번호(안내 1번만 띄우는 기준)
+      cartSeq: marks ? await readCurrentCartSeq(supabase) : null,
+      clearedSeq: clearedSeq || null,
     });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 });
