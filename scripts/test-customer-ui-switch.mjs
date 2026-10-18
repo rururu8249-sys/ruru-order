@@ -21,7 +21,7 @@ console.log('customer ui switch passed');
 import { resolveCustomerUiPreview, UI_PREVIEW_DEFAULTS } from '../lib/customerUiSwitch.ts';
 assert.equal(UI_PREVIEW_DEFAULTS.s3, true, 's3 is the customer default since 2026-10-18');
 assert.equal(UI_PREVIEW_DEFAULTS.s4, true, 's4 is the customer default since 2026-10-18');
-assert.equal(UI_PREVIEW_DEFAULTS.s5, false, 's5 stays preview-only');
+assert.equal(UI_PREVIEW_DEFAULTS.s5, true, 's5 is the customer default since 2026-10-18');
 assert.deepEqual(resolveCustomerUiPreview(null, null, 's3', false), { store: null, v2: false }, 'normal customer: no change');
 assert.deepEqual(resolveCustomerUiPreview('s3', null, 's3', false), { store: '1', v2: true }, '?preview=s3 turns on');
 assert.deepEqual(resolveCustomerUiPreview(null, '1', 's3', false), { store: null, v2: true }, 'remembered');

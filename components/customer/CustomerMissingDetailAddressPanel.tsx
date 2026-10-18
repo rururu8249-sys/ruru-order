@@ -28,7 +28,7 @@ export default function CustomerMissingDetailAddressPanel({ open, onClose, onCon
       cancelLabel="돌아가서 입력"
       primary={{ label: "그래도 제출하기", onClick: onConfirm, danger: true }}
     >
-      아파트·빌라·오피스텔은 <b style={s5({ color: "#3A2F34" })}>동·호수가 없으면</b> 배송이 늦어지거나 반송될 수 있어요.<br />
+      {v5 ? null : "아파트·빌라·오피스텔은 "}<b style={s5({ color: "#3A2F34" })}>동·호수가 없으면</b> 배송이 늦어지거나 반송될 수 있어요.<br />
       정말 상세주소 없이 보낼 때만 「그래도 제출하기」를 눌러 주세요.
     </CustomerDialog>
   );

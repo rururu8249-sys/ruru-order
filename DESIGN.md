@@ -181,6 +181,7 @@ size:
 - 2026-10-18 4단계(주문내역·공지·쪽지 창) ?preview=s4 미리보기로 배포. /myorder·/notice 도 같은 스위치(lib/customerUiSwitch.ts 의 UI_V2_DEFAULT·UI_PREVIEW_DEFAULTS, 훅 lib/useCustomerUiStage)를 읽는다. 손님 기본 전환 = UI_PREVIEW_DEFAULTS.s4 true.
 - 2026-10-18 4단계(주문내역·공지·쪽지 창) 손님 기본값 전환 — UI_PREVIEW_DEFAULTS.s4 = true. 되돌리기는 false 로(또는 그 브라우저만 ?preview=off). ?ui=v1 손님은 예전 화면.
 - 2026-10-18 5단계(나머지 손님 창 15개 + 첫 화면 장식 이모지→선 아이콘) ?preview=s5 미리보기로 배포(UI_PREVIEW_DEFAULTS.s5=false). 창 스타일은 restyleV2(인라인)·restyleClassV2(Tailwind 클래스) 한 규칙으로 정리 — 클래스판 출력은 app/globals.css @source inline 에 등록된 DESIGN 팔레트만. 예외: 문의하기 「카카오톡」 버튼은 카카오 공식 노란색 유지. 손님 기본 전환 = s5 true.
+- 2026-10-19 5단계 손님 기본값 전환 — UI_PREVIEW_DEFAULTS.s5 = true(이제 s3·s4·s5 모두 기본). 되돌리기는 그 단계만 false(또는 그 브라우저만 ?preview=off), ?ui=v1 은 전체 예전 화면.
 
 ## 10. 하지 말 것
 - 로즈·자주·분홍 계열 색, 새 강조색 추가.

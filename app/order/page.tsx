@@ -6172,7 +6172,7 @@ export default function OrderPage() {
                 </span>
               </span>
             </Link>
-            <span style={uiV2 ? { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "14px", fontWeight: 600, color: "#111111" } : { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "14px", fontWeight: 800, color: "#7A1E47" }}>👋 {safeGreetingName}님!</span>
+            <span style={uiV2 ? { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "14px", fontWeight: 600, color: "#111111" } : { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "14px", fontWeight: 800, color: "#7A1E47" }}>{uiS5 ? null : "👋 "}{safeGreetingName}님!</span>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>

@@ -232,7 +232,7 @@ export default function CustomerInfoEditBottomSheet({
       closeGuard={closeGuard}
       closeDisabled={saving}
       bodyPadding={screen === "shipping_form" ? "20px 16px" : "16px"}
-      bodyStyle={{ background: "#F7F4F1" }}
+      bodyStyle={v5 ? { background: "#F5F5F5" } : { background: "#F7F4F1" }}
     >
       {screen === "shipping_form" ? (
         <>
@@ -343,11 +343,15 @@ export default function CustomerInfoEditBottomSheet({
               />
               {ordererPhoneOk ? (
                 ordererPhoneIsMobile ? (
-                  <div style={s5({ marginTop: "6px", fontSize: "12px", color: "#6E655E" })}>배송지 연락처와 달라도 괜찮습니다. 이 번호로 주문·입금 확인이 연결됩니다.</div>
+                  <div style={s5({ marginTop: "6px", fontSize: "12px", color: "#6E655E" })}>{v5 ? "입금 확인·주문 조회에 쓰는 번호예요. 카드결제 링크·방송 알림톡은 휴대폰 번호로만 가요." : "배송지 연락처와 달라도 괜찮습니다. 이 번호로 주문·입금 확인이 연결됩니다."}</div>
                 ) : (
                   <div style={s5({ marginTop: "6px", fontSize: "11.5px", color: "#8A6A1E", background: "#FFF8E6", border: "1px solid #F0E0B0", borderRadius: "8px", padding: "8px 10px", lineHeight: 1.7 })}>
+                    {v5 ? "입금 확인·주문 조회에 쓰는 번호예요. 카드결제 링크·방송 알림톡은 휴대폰 번호로만 가요." : (
+                      <>
                     <b>집·사무실 전화번호로 주문하셔도 됩니다.</b><br />
                     다만 이 번호로는 <b>카드결제 링크</b>와 <b>방송 시작 알림톡</b>을 보내드릴 수 없어요.
+                      </>
+                    )}
                   </div>
                 )
               ) : (

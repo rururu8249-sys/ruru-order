@@ -137,6 +137,8 @@ export default function CustomerPaymentGuideBottomSheet({
   const showBankGuide =
     !isOrderComplete || (safePaymentMethod === "무통장입금" && !isFullyPaidByPoints);
   const showCardGuide = isOrderComplete && safePaymentMethod === "카드결제" && !isFullyPaidByPoints;
+  // [㉜ 5단계] 특정 주문 없이 열린 경우(주문내역 「입금 계좌 보기」 등, 금액 0원)는 「② 입금금액 0원」 줄을 숨긴다 — 표시만.
+  const hideAmountRowV5 = !isOrderComplete && safeFinalAmount <= 0;
 
   const normalButtonStyle: CSSProperties = { display: "flex", minHeight: "46px", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", padding: "8px 12px", fontSize: "13px", fontWeight: 800, letterSpacing: "-0.04em", color: "#444", cursor: "pointer" };
   const doneButtonStyle: CSSProperties = { ...normalButtonStyle, border: "1px solid #7B2D43", background: "#7B2D43", color: "#fff" };
@@ -144,7 +146,7 @@ export default function CustomerPaymentGuideBottomSheet({
 
   const sheetTitle = isOrderComplete ? (v5 ? "주문 접수됐어요" : "✅ 주문 접수됐어요") : "입금 안내";
   const sheetSubtitle = isOrderComplete
-    ? (isFullyPaidByPoints ? "추가 결제 없이 접수됐어요" : showCardGuide ? "카카오톡으로 전송되는 결제링크에서 결제해 주세요" : "아래 계좌로 입금해 주세요")
+    ? (isFullyPaidByPoints ? "추가 결제 없이 접수됐어요" : showCardGuide ? (v5 ? "카톡으로 오는 결제링크에서 결제해 주세요" : "카카오톡으로 전송되는 결제링크에서 결제해 주세요") : "아래 계좌로 입금해 주세요")
     : "현재 보이는 닉네임으로 입금해 주세요.";
 
   return (
@@ -196,14 +198,16 @@ export default function CustomerPaymentGuideBottomSheet({
               </div>
               <div style={s5({ marginTop: "4px", fontSize: "12px", fontWeight: 800, color: "#854F0B" })}>{v5 ? "꼭 이 이름으로 입금해야 확인돼요" : "⚠️ 꼭 이 이름으로 입금해야 확인돼요"}</div>
 
+              {v5 && hideAmountRowV5 ? null : (
               <div style={s5({ marginTop: "12px", borderTop: "1px solid #F0E0B0", paddingTop: "12px" })}>
                 <div style={s5({ fontSize: "12px", fontWeight: 700, color: "#6E655E" })}>② 입금금액</div>
                 <div style={s5({ fontSize: "26px", fontWeight: 900, color: "#7A1E47" })}>{won(safeFinalAmount)}</div>
               </div>
+              )}
 
               <div style={s5({ marginTop: "12px", borderTop: "1px solid #F0E0B0", paddingTop: "12px", display: "flex", alignItems: "center", gap: "10px" })}>
                 <div style={s5({ flex: 1, minWidth: 0 })}>
-                  <div style={s5({ fontSize: "12px", fontWeight: 700, color: "#6E655E" })}>③ 계좌</div>
+                  <div style={s5({ fontSize: "12px", fontWeight: 700, color: "#6E655E" })}>{v5 && hideAmountRowV5 ? "② 계좌" : "③ 계좌"}</div>
                   <div style={s5({ fontSize: "17px", fontWeight: 900, color: "#1A1A1A", wordBreak: "break-all" })}>{safeBankName} {safeBankAccount}</div>
                   <div style={s5({ fontSize: "13px", fontWeight: 700, color: "#555" })}>예금주 {safeBankHolder}</div>
                 </div>
@@ -276,7 +280,7 @@ export default function CustomerPaymentGuideBottomSheet({
               <h3 style={s5({ fontSize: "15px", fontWeight: 900, color: "#222" })}>{v5 ? "받는 곳" : "🚚 받는 곳"}</h3>
               <div style={s5({ marginTop: "6px", fontSize: "14px", fontWeight: 800, color: "#222" })}>{safeRecipientName} · {safeRecipientPhone}</div>
               <div style={s5({ marginTop: "2px", fontSize: "13px", fontWeight: 600, color: "#444", wordBreak: "keep-all" })}>{safeShippingAddress}</div>
-              <div style={s5({ marginTop: "8px", fontSize: "12px", fontWeight: 700, color: "#8A7A7D" })}>배송지를 바꿔야 하면 카톡채널로 알려주세요. (내정보에서 바꿔도 이 주문엔 적용 안 돼요)</div>
+              <div style={s5({ marginTop: "8px", fontSize: "12px", fontWeight: 700, color: "#8A7A7D" })}>{v5 ? "배송지 변경은 카톡채널로 알려주세요. 내정보에서 바꾸면 다음 주문부터 적용돼요." : "배송지를 바꿔야 하면 카톡채널로 알려주세요. (내정보에서 바꿔도 이 주문엔 적용 안 돼요)"}</div>
             </section>
           )}
 
