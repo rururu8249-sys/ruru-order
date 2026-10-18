@@ -28,6 +28,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 (없음)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-10-18 **[재고] ㉟ 적용 완료(2026-10-18 23시경)** — 사장님 SQL Editor 실행: 가드 v2 설치(is_v2=true)·616 정리(백업 1건), 남은 중복은 616 「1+9998」 한 그룹(보류). SQL Editor 는 temp table on commit drop 이 바로 사라짐 — 이후 SQL 은 temp table 쓰지 말 것. 기록: 작업기록/2026-10-18_재고유령줄_가드v2_적용완료.md
 - 2026-10-18 **[재고] ㉟ 유령줄 근본 재발방지 SQL(DB 미실행) + 손님 옵션창 방어** 배포 완료 c2c3629: supabase/sql/hotfix/piv_alias_guard_v2_20261018.sql — PIV BEFORE INSERT 가드 함수만 교체(트리거 이름 동일·재고 RPC 4개/제출 RPC 본문 무변경): 한 축만 ''/'없음'+다른 축 정확히 같은 기존 행이 있으면 들어온 재고 0(RPC 경로)=기존 행 사용·이름만 맞춤(새 행 없음), 기존이 0개 유령=교체, 둘 다 재고>0=지금처럼 새 행(총합 불변), 두 축 다 빈값=08-13 규칙 그대로. 같은 파일에 라이브 확인 SELECT·1회 정리(note·PIV, 재고 0 줄만, 둘 다 재고면 목록만, manual_soldout 줄은 보류, 백업 테이블 ruru_alias_cleanup_backup_20261018)·전후 SELECT·자가 시뮬레이션(rollback). 원복 piv_alias_guard_v2_rollback_20261018.sql(가드 v1 복원 + 선택적 데이터 복원). PGlite 메모리 DB 로 파일 그대로 실행 검증 scripts/test-piv-alias-guard-v2.mjs(616·699·766 실데이터 모양·RPC 흐름·원복까지). 손님 화면 isSoldOutColorSize·availableQtyColorSize = ''/'없음' 중복줄이면 재고 많은 줄 기준(줄 하나면 동일). 현재 라이브 중복은 616 두 묶음뿐(699·766 은 이미 정리됨, PIV id 바뀐 것으로 products→PIV 재구성 트리거 라이브 확인). **⚠ 사장님 SQL Editor 실행 필요(가드 v2)**.
 - 2026-10-18 **[손님화면] ㉝ 4단계 — 주문내역·공지·쪽지 창 새 모양(?preview=s4 에서만, 기본값 전환 안 함)** 배포 완료 ca0facc(c2c3629 와 함께): 머리말(CustomerTopNav)·주문내역(배지 DESIGN §9 색·글자 그대로·한 페이지 10건(새 모양만, 조회 쿼리 무변경)·「조회전용」 배지 삭제·📬💰💼🔎🚚 장식 이모지→선 아이콘/삭제)·공지 게시판·공지·쪽지함 시트(탭·번호·「주문서로 가기」 검정)·안 읽음 배지 검정, 13px 미만·그림자 없음. 「관리자」 표시는 operator_test_accounts 활성 번호만(조건 유지). UI_V2_DEFAULT·UI_V2_STORAGE_KEY 를 lib/customerUiSwitch.ts 로 이동 + lib/useCustomerUiStage 훅. 검수 접기 비교(예전 화면 차이=className 같은 값·{""} 감싸기뿐)·새 모양 로즈/13px 미만/그림자 0·tsc 0·build(BANKDA 2)·test 212 통과(기존 DB 10 실패 동일). 기본 전환 = UI_PREVIEW_DEFAULTS.s4 true.
 - 2026-10-18 **[긴급 ㉞] 재고 중복줄("없음"/"") 품절 오표시 — 조사·정리 SQL만(코드 무변경)**: 상품 699 stock_variants 0번에 {color:"",M,0} 유령줄 → 손님 옵션창 isSoldOutColorSize(.some, 없음="")가 M 품절. 생긴 경로 실측(inventory_ledger): 10-18 22:09 KST 주문 5812 「재고연동 상품수정」 RPC(admin_update_inventory_linked_order_item)가 "없음"→'' 정규화 후 PIV 에 ('','M') 를 insert…on conflict do nothing 으로 새로 만들고 복구+1/차감-1(순변화 0) → note 역동기화. 같은 패턴 RPC: 취소복구·주문상품 추가/삭제/수정(08-13 가드 트리거는 색·사이즈 «둘 다» 빈값일 때만 막음). 관리자 상품 저장(QuickProductFastForm)은 현재 색×사이즈 격자로만 저장 → 직접 원인 아님. 제출 RPC: v2(note 배열 앞에서부터 첫 일치)·PIV 버전 모두 M 주문 시 재고 0 줄을 먼저 잡아 「재고가 부족합니다」 거부(라이브 버전은 check SQL B로 확인 필요 — customer_order_submit 원장 마지막 2026-06-02 → PIV 버전은 아닌 것으로 보임). 전수(753개): 699(""/M) · 616 종이방향제 2묶음(사이즈 ""/없음). SQL: supabase/sql/hotfix/fix_699_ghost_variant_20261018.sql(699 한 줄만, 사장님 SQL Editor 실행 필요) · supabase/sql/check/stock_variant_none_dup_scan_20261018.sql(읽기). 재발 방지 코드는 사장님 결정 대기.
@@ -118,7 +119,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 - 📁 2026-08-31 이전 진행상황은 docs/진행상황_아카이브.md 로 이관(내용 그대로 보존).
 
 ## 남은 작업 (우선순위 순 · 끝나면 지우고 진행상황에 기록)
-- **[㉟ SQL 실행 대기]** Supabase SQL Editor 에서 supabase/sql/hotfix/piv_alias_guard_v2_20261018.sql 실행(가드 v2 + 616 정리). 616 그룹1(사이즈 "" 1개 + "없음" 9998개, 둘 다 재고)은 자동 정리 안 함 — 합칠지 사장님 결정. 옵션창 하단 「N개 남음」·[+] 상한(registeredOptionAvailableQty)은 담기 상한이라 이번 방어에서 제외 — 필요 시 결정.
+- **[㉟ 보류]** 616 종이방향제 「사이즈 "" 1개 + "없음" 9998개」 한 그룹 — 합칠지 사장님 결정. 옵션창 하단 「N개 남음」·[+] 상한(registeredOptionAvailableQty)은 담기 상한이라 중복줄 방어에서 제외 — 필요 시 결정.
 - **[㉝ 4단계 기본값 전환 대기]** 사장님 「s4 켜」 시 UI_PREVIEW_DEFAULTS.s4 = true.
 - **[카카오 로그인 앱 정리 — 2026-09-27 조사 완료·미착수]** ①사이트에 사업자 정보 표시(첫 화면 하단 + /privacy SHOP_INFO + /terms: 상호·대표자·사업자등록번호·주소·통신판매업신고번호·연락처, 전자상거래법 + 카카오 심사 반려사유 1번) ②카카오 데브톡에 앱 1395444 아임웹 호스팅사 해제 시 전화번호·배송지 동의항목 유지 여부 질문 ③답변 따라 방송 없는 날 해제 → 간편가입 약관 URL(현재 rurude.imweb.me 404)을 /terms·/privacy 로. ⚠️ 새 앱(1465746)으로 갈아타기 금지(앱 바뀌면 kakao_id 전부 바뀜 → 고객 식별 붕괴). 아임웹 카카오싱크 OFF·사이트 삭제 금지. 상세: 작업기록/2026-09-27_카카오로그인_앱출처확인_아임웹싱크앱_재사용_정당성.md
 - **주문서 리뉴얼 v12 구현 (방송 후)**: ①로고+헤더 ②영상패널 삭제+배너/스트립 ③하단탭5+제출바+시트 ④보기토글+칩규칙+버튼문구+유튜브 앱 딥링크. 기준: 작업기록/2026-08-12_주문서_리뉴얼_확정시안_v12.md + docs/주문서_리뉴얼_확정시안_v12.html. 관리자 설정에 「다음 방송 일시」 칸 신설 포함.
@@ -175,6 +176,7 @@ grep -r "TODO\|FIXME\|console.log" components/ app/
 git status
 
 ## 기술 함정
+- **Supabase SQL Editor 에서는 `create temp table … on commit drop` 이 바로 사라진다(42P01). SQL 파일에 temp table 쓰지 말 것. begin/rollback 시험 실행도 그 화면에선 안 먹으니(실데이터 바뀜) 시뮬레이션은 SQL Editor 에서 돌리지 말 것.** (㉟ 2026-10-18)
 - 맥 sed s///1은 줄마다 첫 매칭이라 여러 줄 다 바뀜 → 여러 줄 치환은 python 스크립트 사용
 - 긴 체인(sed+build+commit+push 한 줄)은 중간에 멎음 → 단계 분리
 
