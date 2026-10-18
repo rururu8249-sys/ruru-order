@@ -7028,7 +7028,7 @@ export default function OrderPage() {
                   <div style={uiV2 ? { marginTop: "14px", padding: "26px", textAlign: "center", color: "#707072", fontSize: "15px", fontWeight: 400 } : { marginTop: "14px", padding: "26px", textAlign: "center", color: "#999", fontSize: "14px", fontWeight: 700 }}>찾는 상품이 없어요. 아래 직접 입력으로 담아 주세요.</div>
                 ) : (
                   <div style={uiV2 ? (listView === "grid"
-                    ? { marginTop: "12px", display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "28px 8px", alignItems: "stretch" }
+                    ? { marginTop: "12px", display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "44px 8px", alignItems: "stretch" }
                     : { marginTop: "8px", display: "flex", flexDirection: "column" }) : listView === "grid"
                     ? { marginTop: "10px", display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px", alignItems: "stretch" }
                     : { marginTop: "8px", display: "flex", flexDirection: "column" }}>
@@ -7138,7 +7138,7 @@ export default function OrderPage() {
                                 남는 신호: 사진 위 빨간 배지 + 카드 자주색 테두리·분홍 배경 + 목록 맨 위 정렬.
                                 ⚠ 되살리지 말 것(중복). 문구를 바꾸고 싶으면 사진 배지 쪽(「라이브 소개중」)을 고친다. */}
                           <div style={uiV2 ? (listView === "grid"
-                            ? { display: "flex", flexDirection: "column", gap: "8px", alignItems: "stretch", flex: 1, minWidth: 0 }
+                            ? { position: "relative", display: "flex", flexDirection: "column", gap: "8px", alignItems: "stretch", flex: 1, minWidth: 0 }
                             : { display: "flex", gap: "12px", alignItems: "flex-start" }) : listView === "grid"
                             ? { display: "flex", flexDirection: "column", gap: "8px", alignItems: "stretch", flex: 1, minWidth: 0 }
                             : { display: "flex", gap: "12px", alignItems: "center" }}>
@@ -7179,6 +7179,29 @@ export default function OrderPage() {
                               </span>
                             ) : null}
                           </CustomerPressButton>
+                          {uiV2 && listView === "grid" ? (
+                            /* [㉜ 1단계 보정] 「+ 담기」 — 사진 확대 버튼 «안»이 아니라 형제로 사진 위에 겹친다(버튼 안 버튼 금지).
+                               겹침 층은 사진과 같은 정사각(위·왼쪽 0, 폭 100%, 1:1)이고 pointerEvents none → 버튼 밖을 누르면 아래 사진(확대)이 눌린다.
+                               버튼은 기존 담기 버튼과 같은 함수·같은 품절 처리. 형제라 확대 버튼으로 이벤트가 안 올라가지만 stopPropagation 으로 한 번 더 막는다. */
+                            <div style={{ position: "absolute", top: 0, left: 0, width: "100%", aspectRatio: "1 / 1", pointerEvents: "none", zIndex: 3 }}>
+                              <CustomerPressButton
+                                type="button"
+                                disabled={sold}
+                                aria-label={sold ? `${String(product.product_name || "상품")} 품절` : brandGroup ? `${String(product.product_name || "상품")} 상품 선택` : `${String(product.product_name || "상품")} 담기`}
+                                onClick={(event) => { event.stopPropagation(); selectQuickGroupBuyProduct(product as BroadcastProduct); }}
+                                style={{ position: "absolute", right: "6px", bottom: "6px", pointerEvents: "auto", padding: "2px", border: "none", background: "transparent", cursor: sold ? "not-allowed" : "pointer", fontFamily: "inherit" }}
+                              >
+                                <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", height: "40px", padding: "0 16px", boxSizing: "border-box", borderRadius: "9999px", border: "1.5px solid #FFFFFF", background: sold ? "#F5F5F5" : "#111111", color: sold ? "#707072" : "#FFFFFF", fontSize: "15px", fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap" }}>
+                                  {sold ? "품절" : brandGroup ? "상품 선택" : (
+                                    <>
+                                      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5v11M1.5 7h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+                                      담기
+                                    </>
+                                  )}
+                                </span>
+                              </CustomerPressButton>
+                            </div>
+                          ) : null}
                           <div style={listView === "grid" ? { minWidth: 0, flex: 1, display: "flex", flexDirection: "column" } : { minWidth: 0, flex: 1 }}>
                             {/* [2026-09-20 전면 정리] 배지는 «쌓기»가 아니라 «고르기».
                                 실측: 폰 420px 격자에서 카드 폭 167px — 배지 4개면 배지 줄만 42px(2줄), 5~6개면 3줄.
@@ -7402,16 +7425,16 @@ export default function OrderPage() {
                                 <span style={{ fontSize: listView === "grid" ? "20px" : "19px", fontWeight: 700, color: "#111111", lineHeight: 1.35 }}>{(() => { const ci = readComboInfoOrderProduct(product); return brandGroup ? `최저가 ${won(Number(product.price || 0))} 부터 ~` : ci && ci.maxPlus > 0 ? won(Number(product.price || 0)) + "~" : won(Number(product.price || 0)); })()}</span>
                                 {lowTextV2 ? <span style={{ fontSize: "14px", fontWeight: 600, color: "#D30005", lineHeight: 1.4 }}>{lowTextV2}</span> : null}
                               </div>
+{listView === "grid" ? null : (
                               <CustomerPressButton
                                 type="button"
                                 disabled={sold}
                                 onClick={() => selectQuickGroupBuyProduct(product as BroadcastProduct)}
-                                style={listView === "grid"
-                                  ? { width: "100%", height: "48px", marginTop: "6px", padding: "0 12px", borderRadius: "9999px", border: "none", background: sold ? "#F5F5F5" : "#111111", color: sold ? "#707072" : "#FFFFFF", fontSize: "16px", fontWeight: 600, cursor: sold ? "default" : "pointer" }
-                                  : { flexShrink: 0, height: "44px", padding: "0 20px", borderRadius: "9999px", border: "none", background: sold ? "#F5F5F5" : "#111111", color: sold ? "#707072" : "#FFFFFF", fontSize: "15px", fontWeight: 600, cursor: sold ? "default" : "pointer" }}
+                                style={{ flexShrink: 0, height: "44px", padding: "0 20px", borderRadius: "9999px", border: "none", background: sold ? "#F5F5F5" : "#111111", color: sold ? "#707072" : "#FFFFFF", fontSize: "15px", fontWeight: 600, cursor: sold ? "default" : "pointer" }}
                               >
-                                {sold ? "품절" : brandGroup ? "상품 선택" : listView === "grid" ? "장바구니 담기" : "담기"}
+                                {sold ? "품절" : brandGroup ? "상품 선택" : "+ 담기"}
                               </CustomerPressButton>
+                              )}
                             </div>
                             ) : (
                             <div style={listView === "grid"
