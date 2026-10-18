@@ -31,6 +31,7 @@ import MyOrderEmptyState from "@/components/myorder/MyOrderEmptyState";
 import MyOrderPagination from "@/components/myorder/MyOrderPagination";
 // [2026-09-08] 표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import { useShopInfo } from "@/lib/useShopInfo";
+import { useCustomerUiStage } from "@/lib/useCustomerUiStage";
 
 const FOOTER_TEXT = "© since 2024 루루동이 | All Rights Reserved.";
 // [2026-09-08] BANK_NAME/BANK_ACCOUNT/BANK_HOLDER 는 MyOrderPage 안에서 useShopInfo() 로 받는다.
@@ -154,6 +155,8 @@ export default function MyOrderPage() {
   const BANK_NAME = shopInfo.bankName;
   const BANK_ACCOUNT = shopInfo.bankAccount;
   const BANK_HOLDER = shopInfo.bankHolder;
+  // [㉜ 4단계] 주문내역 새 모양 — ?preview=s4 (기본값 UI_PREVIEW_DEFAULTS.s4). ?ui=v1 손님은 예전 그대로. 표시 전용.
+  const v2 = useCustomerUiStage("s4");
   const [customerName, setCustomerName] = useState("");
 
   const [customerNotice, setCustomerNotice] = useState<{
@@ -318,7 +321,7 @@ export default function MyOrderPage() {
     }
   };
 
-  const ORDERS_PER_PAGE = 2;
+  const ORDERS_PER_PAGE = v2 ? 10 : 2; // [㉜ 4단계] 새 모양 10건 — 조회 쿼리·필터 무변경(화면 나누기만)
   const filteredOrders =
     orderFilter === "전체"
       ? orders
@@ -342,7 +345,7 @@ export default function MyOrderPage() {
 
   return (
     <main
-      className="min-h-screen select-none bg-[#F6F4F2] px-3 py-4 text-[#151923] sm:px-4 sm:py-6"
+      className={v2 ? "min-h-screen select-none bg-white px-4 py-4 text-[#111111] sm:py-6" : "min-h-screen select-none bg-[#F6F4F2] px-3 py-4 text-[#151923] sm:px-4 sm:py-6"}
       style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
     >
         <CustomerToastNotice
@@ -373,14 +376,14 @@ export default function MyOrderPage() {
         {isLoggedIn && (
           <section
             data-ruru-myorder-payment-guide-button="shell-v1"
-            className="mt-3 rounded-[20px] bg-white p-3 ring-1 ring-slate-200"
+            className={v2 ? "mt-3 rounded-[8px] bg-[#F5F5F5] p-4" : "mt-3 rounded-[20px] bg-white p-3 ring-1 ring-slate-200"}
           >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[12px] font-black tracking-[-0.04em] text-coral-700">
+                <p className={v2 ? "text-[14px] font-bold text-[#111111]" : "text-[12px] font-black tracking-[-0.04em] text-coral-700"}>
                   입금계좌
                 </p>
-                <p className="mt-0.5 break-keep text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
+                <p className={v2 ? "mt-0.5 break-keep text-[14px] font-normal leading-relaxed text-[#707072]" : "mt-0.5 break-keep text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600"}>
                   계좌정보는 필요할 때만 확인할 수 있어요.
                 </p>
               </div>
@@ -388,7 +391,7 @@ export default function MyOrderPage() {
               <button
                 type="button"
                 onClick={() => setPaymentGuideOpen(true)}
-                className="shrink-0 rounded-[16px] bg-coral-600 px-4 py-3 text-[13px] font-black tracking-[-0.04em] text-white shadow-[0_10px_22px_rgba(216,90,48,0.20)] transition active:scale-[0.98]"
+                className={v2 ? "shrink-0 min-h-[44px] rounded-full bg-[#111111] px-5 text-[15px] font-semibold text-white transition active:scale-[0.97]" : "shrink-0 rounded-[16px] bg-coral-600 px-4 py-3 text-[13px] font-black tracking-[-0.04em] text-white shadow-[0_10px_22px_rgba(216,90,48,0.20)] transition active:scale-[0.98]"}
               >
                 입금 계좌 보기
               </button>
@@ -408,16 +411,16 @@ export default function MyOrderPage() {
         )}
 
         {!isLegacyMode && !isLoggedIn && (
-          <section className="mt-4 rounded-[26px] bg-white p-4 text-center shadow-[0_10px_24px_rgba(30,64,175,0.08)] ring-1 ring-coral-100 min-[390px]:rounded-[28px] min-[390px]:p-5">
-            <h2 className="text-[22px] font-black tracking-[-0.06em] text-[#151923]">
+          <section className={v2 ? "mt-4 rounded-[8px] bg-[#F5F5F5] p-5 text-center" : "mt-4 rounded-[26px] bg-white p-4 text-center shadow-[0_10px_24px_rgba(30,64,175,0.08)] ring-1 ring-coral-100 min-[390px]:rounded-[28px] min-[390px]:p-5"}>
+            <h2 className={v2 ? "text-[22px] font-bold text-[#111111]" : "text-[22px] font-black tracking-[-0.06em] text-[#151923]"}>
               카카오 간편주문 후 조회 가능
             </h2>
-            <p className="mt-2 break-keep text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
+            <p className={v2 ? "mt-2 break-keep text-[15px] font-normal leading-relaxed text-[#39393B]" : "mt-2 break-keep text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600"}>
               주문조회는 카카오 간편주문에 저장된 전화번호 기준으로 확인됩니다.
             </p>
             <Link
               href="/"
-              className="mt-4 flex min-h-[54px] w-full items-center justify-center rounded-[20px] bg-coral-600 px-4 py-3 text-[16px] font-black text-white shadow-[0_12px_26px_rgba(216,90,48,0.22)] transition active:scale-[0.98]"
+              className={v2 ? "mt-4 flex min-h-[52px] w-full items-center justify-center rounded-full bg-[#111111] px-4 text-[16px] font-semibold text-white transition active:scale-[0.97]" : "mt-4 flex min-h-[54px] w-full items-center justify-center rounded-[20px] bg-coral-600 px-4 py-3 text-[16px] font-black text-white shadow-[0_12px_26px_rgba(216,90,48,0.22)] transition active:scale-[0.98]"}
             >
               카카오톡으로 간편 주문 시작
             </Link>
@@ -432,18 +435,20 @@ export default function MyOrderPage() {
             data-ruru-myorder-list="shell-v2"
             className="mt-4"
           >
-            <div className="mb-3 rounded-[20px] bg-white p-3 ring-1 ring-slate-200">
+            <div className={v2 ? "mb-3 border-b border-[#E5E5E5] pb-4" : "mb-3 rounded-[20px] bg-white p-3 ring-1 ring-slate-200"}>
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
+                  {v2 ? null : (
                   <p className="text-[12px] font-black tracking-[-0.04em] text-coral-700">
                     주문내역
                   </p>
-                  <h2 className="mt-0.5 text-[20px] font-black leading-tight tracking-[-0.06em] text-slate-950">
+                  )}
+                  <h2 className={v2 ? "text-[20px] font-bold leading-tight text-[#111111]" : "mt-0.5 text-[20px] font-black leading-tight tracking-[-0.06em] text-slate-950"}>
                     최근 주문내역
                   </h2>
                 </div>
 
-                <span className="shrink-0 rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-black tracking-[-0.04em] text-slate-600 ring-1 ring-slate-100">
+                <span className={v2 ? "shrink-0 rounded-full border border-[#CACACB] bg-white px-3 py-1 text-[13px] font-semibold text-[#39393B]" : "shrink-0 rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-black tracking-[-0.04em] text-slate-600 ring-1 ring-slate-100"}>
                   {filteredOrders.length}/{orders.length}건
                 </span>
               </div>
@@ -458,7 +463,11 @@ export default function MyOrderPage() {
                       setOrderPage(1);
                     }}
                     className={
-                      orderFilter === filter
+                      v2
+                        ? orderFilter === filter
+                          ? "min-h-[44px] rounded-full bg-[#111111] px-1 text-[14px] font-semibold text-white transition active:scale-[0.97]"
+                          : "min-h-[44px] rounded-full border border-[#CACACB] bg-white px-1 text-[14px] font-semibold text-[#111111] transition active:scale-[0.97]"
+                        : orderFilter === filter
                         ? "min-h-[34px] rounded-full bg-coral-700 px-2 text-[11px] font-black tracking-[-0.04em] text-white transition active:scale-[0.98]"
                         : "min-h-[34px] rounded-full bg-slate-50 px-2 text-[11px] font-black tracking-[-0.04em] text-slate-600 ring-1 ring-slate-100 transition active:scale-[0.98]"
                     }
@@ -497,8 +506,8 @@ export default function MyOrderPage() {
                 />
               </div>
             ) : (
-              <div className="rounded-[20px] bg-white p-4 text-center ring-1 ring-slate-200">
-                <p className="text-[14px] font-black tracking-[-0.04em] text-slate-700">
+              <div className={v2 ? "rounded-[8px] bg-[#F5F5F5] p-5 text-center" : "rounded-[20px] bg-white p-4 text-center ring-1 ring-slate-200"}>
+                <p className={v2 ? "text-[15px] font-normal text-[#39393B]" : "text-[14px] font-black tracking-[-0.04em] text-slate-700"}>
                   선택한 상태의 주문내역이 없습니다.
                 </p>
               </div>
@@ -506,7 +515,7 @@ export default function MyOrderPage() {
           </section>
         )}
 
-        <footer className="mt-8 border-t border-[#ead8c8] pt-5 text-center text-xs font-bold text-[#9b8d82]">
+        <footer className={v2 ? "mt-8 border-t border-[#E5E5E5] pt-5 text-center text-[13px] font-normal text-[#707072]" : "mt-8 border-t border-[#ead8c8] pt-5 text-center text-xs font-bold text-[#9b8d82]"}>
           <div className="mb-2">
             <a href="/terms" className="underline underline-offset-2">이용약관</a>
             <span aria-hidden="true"> · </span>

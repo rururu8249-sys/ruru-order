@@ -2,6 +2,9 @@
 // 목적: 주문조회 최근 주문내역 모바일 페이지네이션 UI
 // 주의: Supabase 조회, 주문 상태, 금액 계산 로직 없음.
 
+"use client";
+import { useCustomerUiStage } from "@/lib/useCustomerUiStage";
+
 type MyOrderPaginationProps = {
   page: number;
   totalPages: number;
@@ -15,6 +18,7 @@ export default function MyOrderPagination({
   totalPages,
   onPageChange,
 }: MyOrderPaginationProps) {
+  const v2 = useCustomerUiStage("s4"); // [㉜ 4단계] 표시 전용
   if (totalPages <= 1) return null;
 
   const safePage = Math.min(Math.max(1, page), totalPages);
@@ -53,16 +57,17 @@ export default function MyOrderPagination({
     displayItems.push(pageNumber);
   });
 
-  const buttonBaseClass =
-    "h-9 min-w-9 rounded-full px-3 text-[13px] font-black tracking-[-0.04em] transition active:scale-[0.98]";
-  const activeClass = "bg-blue-700 text-white shadow-[0_8px_18px_rgba(37,99,235,0.20)]";
-  const inactiveClass = "bg-white text-slate-700 ring-1 ring-slate-200";
-  const disabledClass = "cursor-not-allowed bg-slate-100 text-slate-400 ring-1 ring-slate-100";
+  const buttonBaseClass = v2
+    ? "h-11 min-w-11 rounded-full px-3 text-[15px] font-semibold transition active:scale-[0.97]"
+    : "h-9 min-w-9 rounded-full px-3 text-[13px] font-black tracking-[-0.04em] transition active:scale-[0.98]";
+  const activeClass = v2 ? "bg-[#111111] text-white" : "bg-blue-700 text-white shadow-[0_8px_18px_rgba(37,99,235,0.20)]";
+  const inactiveClass = v2 ? "bg-white text-[#111111] border border-[#CACACB]" : "bg-white text-slate-700 ring-1 ring-slate-200";
+  const disabledClass = v2 ? "cursor-not-allowed bg-[#F5F5F5] text-[#CACACB]" : "cursor-not-allowed bg-slate-100 text-slate-400 ring-1 ring-slate-100";
 
   return (
     <nav
       data-ruru-myorder-pagination="compact"
-      className="mt-4 rounded-[20px] bg-slate-50 p-3 ring-1 ring-slate-100"
+      className={v2 ? "mt-4 py-2" : "mt-4 rounded-[20px] bg-slate-50 p-3 ring-1 ring-slate-100"}
       aria-label="주문내역 페이지"
     >
       <div className="flex items-center justify-center gap-1.5">
@@ -80,7 +85,7 @@ export default function MyOrderPagination({
           item === "..." ? (
             <span
               key={`ellipsis-${index}`}
-              className="flex h-9 min-w-7 items-center justify-center text-[13px] font-black text-slate-400"
+              className={v2 ? "flex h-11 min-w-7 items-center justify-center text-[15px] font-semibold text-[#707072]" : "flex h-9 min-w-7 items-center justify-center text-[13px] font-black text-slate-400"}
             >
               ...
             </span>

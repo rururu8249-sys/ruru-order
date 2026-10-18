@@ -5,6 +5,7 @@
 // 주의: 고객 전화번호 기준 read-only 조회만 수행합니다. 주문금액/정산/입금/배송/포인트 차감 로직 없음.
 
 import { useEffect, useState } from "react";
+import { useCustomerUiStage } from "@/lib/useCustomerUiStage";
 
 type CustomerPointBadgeProps = {
   className?: string;
@@ -30,6 +31,7 @@ function formatPointText(value: unknown): string {
 }
 
 export default function CustomerPointBadge({ className = "" }: CustomerPointBadgeProps) {
+  const v2 = useCustomerUiStage("s4"); // [㉜ 4단계] 표시 전용(포인트 조회 무변경)
   const [pointState, setPointState] = useState<PointState>({
     loading: false,
     text: "포인트 0원",
@@ -92,10 +94,10 @@ export default function CustomerPointBadge({ className = "" }: CustomerPointBadg
 
   return (
     <div
-      className={`inline-flex shrink-0 items-center justify-end gap-1 text-right text-[15px] font-black leading-tight tracking-[-0.04em] text-coral-700 whitespace-nowrap ${className}`}
+      className={v2 ? `inline-flex shrink-0 items-center justify-end gap-1 text-right text-[14px] font-semibold leading-tight text-[#111111] whitespace-nowrap ${className}` : `inline-flex shrink-0 items-center justify-end gap-1 text-right text-[15px] font-black leading-tight tracking-[-0.04em] text-coral-700 whitespace-nowrap ${className}`}
       title="보유 포인트"
     >
-      <span>💰</span>
+      {v2 ? null : <span>💰</span>}
       <span>{pointState.loading ? "포인트 조회중" : pointState.text}</span>
     </div>
   );

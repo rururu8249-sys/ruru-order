@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useCustomerUiStage } from "@/lib/useCustomerUiStage";
 
 type BadgeState = {
   loading: boolean;
@@ -15,6 +16,7 @@ function readCustomerPhoneFromStorage() {
 }
 
 export default function CustomerTestAccountBadge() {
+  const v2 = useCustomerUiStage("s4"); // [㉜ 4단계] 표시 전용
   const [state, setState] = useState<BadgeState>({
     loading: true,
     visible: false,
@@ -85,8 +87,8 @@ export default function CustomerTestAccountBadge() {
   if (state.loading || !state.visible) return null;
 
   return (
-    <div className="inline-flex shrink-0 items-center justify-end gap-1 text-right text-[15px] font-black leading-tight text-slate-950 whitespace-nowrap">
-      💼 {state.label}
+    <div className={v2 ? "inline-flex shrink-0 items-center justify-end gap-1 text-right text-[14px] font-semibold leading-tight text-[#111111] whitespace-nowrap" : "inline-flex shrink-0 items-center justify-end gap-1 text-right text-[15px] font-black leading-tight text-slate-950 whitespace-nowrap"}>
+      {v2 ? null : "💼 "}{state.label}
     </div>
   );
 }

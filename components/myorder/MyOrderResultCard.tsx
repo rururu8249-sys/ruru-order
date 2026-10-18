@@ -2,7 +2,10 @@
 // 목적: 고객 주문조회 결과 카드 UI
 // 주의: UI 전용. 주문조회 Supabase 로직, 상태 저장 로직 없음.
 
+"use client";
+
 import { formatMyOrderDateTime } from "@/components/myorder/myOrderDateFormat";
+import { useCustomerUiStage } from "@/lib/useCustomerUiStage";
 
 type MyOrderResultCardProps = {
   order: any;
@@ -20,6 +23,15 @@ const toMoneyNumber = (value: unknown) => {
 
 const pointWon = (value: unknown) => `${toMoneyNumber(value).toLocaleString("ko-KR")}원`;
 
+// [㉜ 4단계] 상태 배지 색 — DESIGN.md §9(연한 바탕 + 진한 글자). 글자(라벨)는 그대로, 색만.
+const statusChipClassV2 = (text: string) => {
+  if (text === "출고완료" || text === "배송출발") return "bg-[#111111] text-white";
+  if (text === "입금확인" || text === "입금확인완료") return "bg-[#E6F4EC] text-[#007D48]";
+  if (text === "입금대기" || text === "주문접수" || text === "부분환불") return "bg-[#FFF4E0] text-[#9E5A00]";
+  if (text === "주문취소" || text === "주문서 취소" || text === "주문서취소") return "bg-[#FDECEC] text-[#D30005]";
+  return "bg-[#F5F5F5] text-[#39393B]"; // 환불완료·출고준비중·픽업예정 등
+};
+
 export default function MyOrderResultCard({
   order,
   label,
@@ -28,6 +40,7 @@ export default function MyOrderResultCard({
   formattedDate,
   amountText,
 }: MyOrderResultCardProps) {
+  const v2 = useCustomerUiStage("s4"); // [㉜ 4단계] 표시 전용
   const orderCode =
     order.order_lookup_code ||
     order.order_group_id ||
@@ -118,65 +131,65 @@ export default function MyOrderResultCard({
   return (
     <article
       data-ruru-myorder-result-card="shell-v2"
-      className="rounded-[20px] bg-white p-3 ring-1 ring-slate-200"
+      className={v2 ? "border-b border-[#E5E5E5] bg-white py-4" : "rounded-[20px] bg-white p-3 ring-1 ring-slate-200"}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black tracking-[-0.04em] text-slate-600">
+            <span className={v2 ? "rounded-full border border-[#CACACB] bg-white px-2.5 py-1 text-[13px] font-semibold text-[#39393B]" : "rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black tracking-[-0.04em] text-slate-600"}>
               {paymentLabel}
             </span>
-            <span className={`rounded-full px-2 py-1 text-[11px] font-black tracking-[-0.04em] ${statusChipClass}`}>
+            <span className={v2 ? `rounded-full px-2.5 py-1 text-[13px] font-semibold ${statusChipClassV2(deliveryStatus === "출고완료" ? "출고완료" : paymentStatus)}` : `rounded-full px-2 py-1 text-[11px] font-black tracking-[-0.04em] ${statusChipClass}`}>
               {deliveryStatus === "출고완료" ? "출고완료" : paymentStatus}
             </span>
           </div>
 
-          <h3 className="mt-2 break-keep text-[16px] font-black leading-snug tracking-[-0.06em] text-slate-950">
+          <h3 className={v2 ? "mt-2 break-keep text-[16px] font-semibold leading-snug text-[#111111]" : "mt-2 break-keep text-[16px] font-black leading-snug tracking-[-0.06em] text-slate-950"}>
             {productName}
           </h3>
 
-          <p className="mt-1 truncate text-[12px] font-bold tracking-[-0.04em] text-slate-500" title={optionAndQuantity}>
+          <p className={v2 ? "mt-1 break-keep text-[14px] font-normal text-[#707072]" : "mt-1 truncate text-[12px] font-bold tracking-[-0.04em] text-slate-500"} title={optionAndQuantity}>
             {optionAndQuantity}
           </p>
         </div>
 
         <div className="shrink-0 text-right">
-          <p className="text-[11px] font-bold tracking-[-0.04em] text-slate-400">
+          <p className={v2 ? "text-[13px] font-normal text-[#707072]" : "text-[11px] font-bold tracking-[-0.04em] text-slate-400"}>
             결제금액
           </p>
-          <p className="mt-1 text-[18px] font-black tracking-[-0.06em] text-slate-950">
+          <p className={v2 ? "mt-1 text-[19px] font-bold text-[#111111]" : "mt-1 text-[18px] font-black tracking-[-0.06em] text-slate-950"}>
             {amountText}
           </p>
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2 rounded-[16px] bg-slate-50 px-3 py-2 text-[12px] font-bold tracking-[-0.04em] text-slate-600 ring-1 ring-slate-100">
+      <div className={v2 ? "mt-3 grid grid-cols-2 gap-2 rounded-[8px] bg-[#F5F5F5] px-3 py-2 text-[13px] font-normal text-[#39393B]" : "mt-3 grid grid-cols-2 gap-2 rounded-[16px] bg-slate-50 px-3 py-2 text-[12px] font-bold tracking-[-0.04em] text-slate-600 ring-1 ring-slate-100"}>
         <div className="min-w-0">
-          <p className="text-slate-400">주문번호</p>
-          <p className="mt-0.5 truncate font-black text-slate-800" title={orderCode}>
+          <p className={v2 ? "text-[#707072]" : "text-slate-400"}>주문번호</p>
+          <p className={v2 ? "mt-0.5 truncate font-semibold text-[#111111]" : "mt-0.5 truncate font-black text-slate-800"} title={orderCode}>
             {orderCode}
           </p>
         </div>
 
         <div className="min-w-0 text-right">
-          <p className="text-slate-400">주문일</p>
-          <p className="mt-0.5 truncate font-black text-slate-800">
+          <p className={v2 ? "text-[#707072]" : "text-slate-400"}>주문일</p>
+          <p className={v2 ? "mt-0.5 truncate font-semibold text-[#111111]" : "mt-0.5 truncate font-black text-slate-800"}>
             {displayDate}
           </p>
         </div>
       </div>
 
       {pointUsedAmount > 0 ? (
-        <div className="mt-2 rounded-[16px] bg-emerald-50 px-3 py-2 text-[12px] font-black leading-relaxed tracking-[-0.04em] text-emerald-800 ring-1 ring-emerald-100">
+        <div className={v2 ? "mt-2 rounded-[8px] bg-[#F5F5F5] px-3 py-2 text-[14px] font-normal leading-relaxed text-[#39393B]" : "mt-2 rounded-[16px] bg-emerald-50 px-3 py-2 text-[12px] font-black leading-relaxed tracking-[-0.04em] text-emerald-800 ring-1 ring-emerald-100"}>
           <div className="flex items-center justify-between gap-3">
             <span>상품금액</span>
             <span>{pointWon(pointOriginalAmount)}</span>
           </div>
-          <div className="mt-0.5 flex items-center justify-between gap-3 text-emerald-700">
+          <div className={v2 ? "mt-0.5 flex items-center justify-between gap-3 text-[#39393B]" : "mt-0.5 flex items-center justify-between gap-3 text-emerald-700"}>
             <span>포인트 사용</span>
             <span>-{pointWon(pointUsedAmount)}</span>
           </div>
-          <div className="mt-0.5 flex items-center justify-between gap-3 border-t border-emerald-100 pt-1 text-orange-700">
+          <div className={v2 ? "mt-0.5 flex items-center justify-between gap-3 border-t border-[#CACACB] pt-1 font-semibold text-[#111111]" : "mt-0.5 flex items-center justify-between gap-3 border-t border-emerald-100 pt-1 text-orange-700"}>
             <span>최종 결제금액</span>
             <span>{pointWon(finalPaymentAmount)}</span>
           </div>
@@ -184,14 +197,14 @@ export default function MyOrderResultCard({
       ) : null}
 
       {trackingNumber ? (
-        <div className="mt-2 rounded-[16px] bg-blue-50 p-3 ring-1 ring-blue-100">
-          <p className="text-[12px] font-bold tracking-[-0.04em] text-slate-600">🚚 {trackingCompany || "로젠택배"} 송장번호</p>
-          <p className="mt-0.5 text-[15px] font-black tracking-[-0.02em] text-slate-900" style={{ wordBreak: "break-all" }}>{trackingNumber}</p>
+        <div className={v2 ? "mt-2 rounded-[8px] bg-[#F5F5F5] p-3" : "mt-2 rounded-[16px] bg-blue-50 p-3 ring-1 ring-blue-100"}>
+          <p className={v2 ? "text-[14px] font-normal text-[#707072]" : "text-[12px] font-bold tracking-[-0.04em] text-slate-600"}>{v2 ? null : "🚚 "}{trackingCompany || "로젠택배"} 송장번호</p>
+          <p className={v2 ? "mt-0.5 text-[16px] font-semibold text-[#111111]" : "mt-0.5 text-[15px] font-black tracking-[-0.02em] text-slate-900"} style={{ wordBreak: "break-all" }}>{trackingNumber}</p>
           <a
             href={trackingUrl}
             target="_blank"
             rel="noreferrer"
-            className="mt-2 flex min-h-[38px] items-center justify-center rounded-[14px] bg-blue-700 px-3 py-2 text-[12px] font-black tracking-[-0.04em] text-white transition active:scale-[0.98]"
+            className={v2 ? "mt-2 flex min-h-[44px] items-center justify-center rounded-full bg-[#111111] px-3 text-[15px] font-semibold text-white transition active:scale-[0.97]" : "mt-2 flex min-h-[38px] items-center justify-center rounded-[14px] bg-blue-700 px-3 py-2 text-[12px] font-black tracking-[-0.04em] text-white transition active:scale-[0.98]"}
           >
             배송 조회하기
           </a>
@@ -199,15 +212,15 @@ export default function MyOrderResultCard({
       ) : null}
 
       {showBandTrackingNotice ? (
-        <div className="mt-2 rounded-[16px] bg-blue-50 p-3 ring-1 ring-blue-100">
-          <p className="break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
+        <div className={v2 ? "mt-2 rounded-[8px] bg-[#F5F5F5] p-3" : "mt-2 rounded-[16px] bg-blue-50 p-3 ring-1 ring-blue-100"}>
+          <p className={v2 ? "break-keep text-[14px] font-normal leading-relaxed text-[#39393B]" : "break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600"}>
             출고완료 후 당일 늦은 오후~저녁 사이 밴드에서 송장조회가 가능합니다.
           </p>
           <a
             href="https://band.us/@ruru8249"
             target="_blank"
             rel="noreferrer"
-            className="mt-2 flex min-h-[38px] items-center justify-center rounded-[14px] bg-white px-3 py-2 text-[12px] font-black tracking-[-0.04em] text-blue-700 ring-1 ring-blue-100 transition active:scale-[0.98]"
+            className={v2 ? "mt-2 flex min-h-[44px] items-center justify-center rounded-full border border-[#CACACB] bg-white px-3 text-[15px] font-semibold text-[#111111] transition active:scale-[0.97]" : "mt-2 flex min-h-[38px] items-center justify-center rounded-[14px] bg-white px-3 py-2 text-[12px] font-black tracking-[-0.04em] text-blue-700 ring-1 ring-blue-100 transition active:scale-[0.98]"}
           >
             밴드에서 송장조회
           </a>
@@ -215,7 +228,7 @@ export default function MyOrderResultCard({
       ) : null}
 
       {order.cancel_reason ? (
-        <div className="mt-2 rounded-[16px] bg-red-50 p-3 text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-red-600 ring-1 ring-red-100">
+        <div className={v2 ? "mt-2 rounded-[8px] bg-[#F5F5F5] p-3 text-[14px] font-semibold leading-relaxed text-[#D30005]" : "mt-2 rounded-[16px] bg-red-50 p-3 text-[12px] font-bold leading-relaxed tracking-[-0.04em] text-red-600 ring-1 ring-red-100"}>
           취소 사유: {order.cancel_reason}
         </div>
       ) : null}

@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import CustomerTopNav from "@/components/customer/CustomerTopNav";
 import PublicNoticeBoard from "@/components/notice/PublicNoticeBoard";
+import { useCustomerUiStage } from "@/lib/useCustomerUiStage";
 
 const blockCustomerCopyEvents = () => {
   const block = (event: Event) => event.preventDefault();
@@ -48,19 +49,20 @@ export default function NoticePage() {
   }, []);
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const v2 = useCustomerUiStage("s4"); // [㉜ 4단계] 표시 전용
 
   return (
-    <main className="min-h-screen select-none bg-[#F6F4F2] px-4 py-6 text-[#151923]" style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
+    <main className={v2 ? "min-h-screen select-none bg-white px-4 py-4 text-[#111111]" : "min-h-screen select-none bg-[#F6F4F2] px-4 py-6 text-[#151923]"} style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
       <section className="mx-auto w-full max-w-2xl">
         <CustomerTopNav />
-        <h1 className="my-5 text-xl font-bold">공지사항</h1>
+        <h1 className={v2 ? "my-5 text-[24px] font-bold text-[#111111]" : "my-5 text-xl font-bold"}>공지사항</h1>
         <PublicNoticeBoard selectedId={selectedId} onSelect={setSelectedId} />
         <footer className="py-8 text-center">
-          <p className="text-[15px] font-medium tracking-[-0.04em] text-slate-500">
+          <p className={v2 ? "text-[15px] font-normal text-[#707072]" : "text-[15px] font-medium tracking-[-0.04em] text-slate-500"}>
             오늘도 루루동이와 함께 행복한 쇼핑 되세요!♡
           </p>
-          <div className="mx-auto mt-5 h-px w-full bg-[#E9DFE4]" />
-          <p className="mt-4 text-[12px] text-slate-400">
+          <div className={v2 ? "mx-auto mt-5 h-px w-full bg-[#E5E5E5]" : "mx-auto mt-5 h-px w-full bg-[#E9DFE4]"} />
+          <p className={v2 ? "mt-4 text-[13px] text-[#707072]" : "mt-4 text-[12px] text-slate-400"}>
             copyright © since 2024 루루동이. All rights reserved.
           </p>
         </footer>

@@ -6,6 +6,7 @@ import CustomerBottomSheet, { csPrimaryButtonStyle } from "@/components/customer
 import CustomerDialog from "@/components/customer/CustomerDialog";
 import { noteTimeText, noteAgoText } from "@/lib/noteTime";
 import PublicNoticeBoard from "@/components/notice/PublicNoticeBoard";
+import { useCustomerUiStage } from "@/lib/useCustomerUiStage";
 
 type SiteAlert = { id: number; kind: string; title: string; message: string; created_at: string; expires_at: string };
 type BoxItem = SiteAlert & { seen_at?: string | null; dismissed_at?: string | null };
@@ -81,6 +82,8 @@ export default function CustomerSiteAlertPopup() {
   const [nextOffset, setNextOffset] = useState(0);
   const [moreLoading, setMoreLoading] = useState(false);
   const [noticeRequest, setNoticeRequest] = useState(0);
+  // [㉜ 4단계] 공지·쪽지함 새 모양 — ?preview=s4. 표시 전용(목록·읽음 처리·서버 호출 무변경).
+  const v2 = useCustomerUiStage("s4");
 
   // A banner names one public article, not the arrival popup or a personal message.
   useEffect(() => {
@@ -222,10 +225,11 @@ export default function CustomerSiteAlertPopup() {
         <CustomerBottomSheet
           open
           onClose={() => { setBoxOpen(false); setDetail(null); }}
-          title="📬 공지 · 쪽지함"
+          title={v2 ? "공지 · 쪽지함" : "📬 공지 · 쪽지함"}
+          tone={v2 ? "v2" : undefined}
           bodyPadding="12px 16px"
           headerBelow={(
-            <div className="flex gap-1.5 border-b border-slate-100 px-4 py-2.5">
+            <div className={v2 ? "flex gap-2 border-b border-[#E5E5E5] px-4 py-2.5" : "flex gap-1.5 border-b border-slate-100 px-4 py-2.5"}>
               {([
                 { key: "all", label: "전체", n: unread },
                 { key: "notice", label: "공지", n: 0 },
@@ -235,11 +239,11 @@ export default function CustomerSiteAlertPopup() {
                   key={t.key}
                   type="button"
                   onClick={() => { setBoxTab(t.key); setDetail(null); }}
-                  className={`rounded-full px-3.5 py-1.5 text-[12.5px] font-black transition ${boxTab === t.key ? "bg-[#7B2D43] text-white" : "bg-slate-100 text-slate-500"}`}
+                  className={v2 ? `inline-flex min-h-[40px] items-center rounded-full px-4 text-[14px] font-semibold transition ${boxTab === t.key ? "bg-[#111111] text-white" : "border border-[#CACACB] bg-white text-[#111111]"}` : `rounded-full px-3.5 py-1.5 text-[12.5px] font-black transition ${boxTab === t.key ? "bg-[#7B2D43] text-white" : "bg-slate-100 text-slate-500"}`}
                 >
                   {t.label}
                   {t.n > 0 ? (
-                    <span className={`ml-1 rounded-full px-1.5 text-[10px] ${boxTab === t.key ? "bg-white/25 text-white" : "bg-red-500 text-white"}`}>{t.n}</span>
+                    <span className={v2 ? `ml-1.5 rounded-full px-1.5 text-[13px] font-semibold ${boxTab === t.key ? "bg-white text-[#111111]" : "bg-[#111111] text-white"}` : `ml-1 rounded-full px-1.5 text-[10px] ${boxTab === t.key ? "bg-white/25 text-white" : "bg-red-500 text-white"}`}>{t.n}</span>
                   ) : null}
                 </button>
               ))}
@@ -249,7 +253,7 @@ export default function CustomerSiteAlertPopup() {
             <button
               type="button"
               onClick={() => { setBoxOpen(false); if (window.location.pathname !== "/order") window.location.href = "/order"; }}
-              style={csPrimaryButtonStyle(true)}
+              style={v2 ? { width: "100%", height: "52px", borderRadius: "9999px", border: "none", background: "#111111", color: "#FFFFFF", fontSize: "16px", fontWeight: 600, cursor: "pointer" } : csPrimaryButtonStyle(true)}
             >주문서로 가기</button>
           )}
         >
@@ -263,31 +267,31 @@ export default function CustomerSiteAlertPopup() {
                   requestKey={noticeRequest}
                   onSelect={id => { setNoticeRequest(n => n + 1); setDetail(id === null ? null : { kind: "notice", id }); }}
                 />
-                {!detail && shopGuide ? <button type="button" onClick={() => setDetail({ kind: "guide" })} className="my-3 text-sm font-bold text-[#7B2D43]">쇼핑 전 꼭 확인</button> : null}
+                {!detail && shopGuide ? <button type="button" onClick={() => setDetail({ kind: "guide" })} className={v2 ? "my-3 text-[15px] font-semibold text-[#111111] underline underline-offset-4" : "my-3 text-sm font-bold text-[#7B2D43]"}>쇼핑 전 꼭 확인</button> : null}
               </div>
               {detail?.kind === "notice" ? null : detail ? (() => {
                 const back = (
-                  <button type="button" onClick={() => setDetail(null)} className="mb-3 inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-black text-slate-600 active:bg-slate-50">← 목록으로</button>
+                  <button type="button" onClick={() => setDetail(null)} className={v2 ? "mb-3 inline-flex min-h-[40px] items-center gap-1 rounded-full border border-[#CACACB] bg-white px-4 text-[14px] font-semibold text-[#111111] active:bg-[#F5F5F5]" : "mb-3 inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-black text-slate-600 active:bg-slate-50"}>← 목록으로</button>
                 );
                 if (detail.kind === "guide") {
                   return (
                     <div>
                       {back}
-                      <h3 className="text-[15px] font-black text-slate-950">쇼핑 전 꼭 확인</h3>
-                      <p className="mt-3 whitespace-pre-line text-[13.5px] font-bold leading-6 text-slate-700">{shopGuide}</p>
+                      <h3 className={v2 ? "text-[17px] font-bold text-[#111111]" : "text-[15px] font-black text-slate-950"}>쇼핑 전 꼭 확인</h3>
+                      <p className={v2 ? "mt-3 whitespace-pre-line text-[16px] font-normal leading-7 text-[#39393B]" : "mt-3 whitespace-pre-line text-[13.5px] font-bold leading-6 text-slate-700"}>{shopGuide}</p>
                     </div>
                   );
                 }
                 const b = box.find((x) => x.id === detail.id);
-                if (!b) return <div className="py-12 text-center text-sm font-bold text-slate-400">쪽지를 찾을 수 없어요.</div>;
+                if (!b) return <div className={v2 ? "py-12 text-center text-[15px] font-normal text-[#707072]" : "py-12 text-center text-sm font-bold text-slate-400"}>쪽지를 찾을 수 없어요.</div>;
                 return (
                   <div>
                     {back}
-                    <h3 className="text-[15px] font-black text-slate-950">{stripLeadIcon(b.title)}</h3>
-                    <div className="mt-1 text-[11px] font-bold text-slate-400">
+                    <h3 className={v2 ? "text-[17px] font-bold text-[#111111]" : "text-[15px] font-black text-slate-950"}>{stripLeadIcon(b.title)}</h3>
+                    <div className={v2 ? "mt-1 text-[13px] font-normal text-[#707072]" : "mt-1 text-[11px] font-bold text-slate-400"}>
                       받은 날짜 {timeText(b.created_at)}{b.seen_at ? ` · 읽은 날짜 ${timeText(b.seen_at)}` : ""}
                     </div>
-                    <p className="mt-3 whitespace-pre-line text-[13.5px] font-bold leading-6 text-slate-600">{b.message}</p>
+                    <p className={v2 ? "mt-3 whitespace-pre-line text-[16px] font-normal leading-7 text-[#39393B]" : "mt-3 whitespace-pre-line text-[13.5px] font-bold leading-6 text-slate-600"}>{b.message}</p>
                   </div>
                 );
               })() : (
@@ -296,25 +300,25 @@ export default function CustomerSiteAlertPopup() {
                   {boxTab !== "notice" ? (
                     box.length === 0 ? (
                       boxTab === "mine" ? (
-                        <div className="py-12 text-center text-sm font-bold text-slate-400">받은 쪽지가 없어요.</div>
+                        <div className={v2 ? "py-12 text-center text-[15px] font-normal text-[#707072]" : "py-12 text-center text-sm font-bold text-slate-400"}>받은 쪽지가 없어요.</div>
                       ) : null
                     ) : (
                       <div className="mb-1">
-                        {boxTab === "all" ? <div className="mb-1.5 px-1 text-[11px] font-black text-slate-400">내 쪽지</div> : null}
-                        <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                        {boxTab === "all" ? <div className={v2 ? "mb-1.5 px-1 text-[13px] font-semibold text-[#707072]" : "mb-1.5 px-1 text-[11px] font-black text-slate-400"}>내 쪽지</div> : null}
+                        <ul className={v2 ? "divide-y divide-[#E5E5E5] overflow-hidden border-y border-[#E5E5E5] bg-white" : "divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white"}>
                           {box.map((b, i) => (
                             <li key={`b-${b.id}`}>
-                              <button type="button" onClick={() => openNote(b)} className={`grid w-full grid-cols-[46px_minmax(0,1fr)_62px] items-center gap-2 px-2 py-3 text-left active:bg-slate-50 ${b.seen_at ? "" : "bg-rose-50/50"}`}>
-                                <span className="text-center text-[12px] font-black text-slate-400">{i + 1}</span>
+                              <button type="button" onClick={() => openNote(b)} className={v2 ? `grid w-full grid-cols-[40px_minmax(0,1fr)_68px] items-center gap-2 px-1 py-3 text-left active:bg-[#F5F5F5] ${b.seen_at ? "" : "bg-[#F5F5F5]"}` : `grid w-full grid-cols-[46px_minmax(0,1fr)_62px] items-center gap-2 px-2 py-3 text-left active:bg-slate-50 ${b.seen_at ? "" : "bg-rose-50/50"}`}>
+                                <span className={v2 ? "text-center text-[13px] font-semibold text-[#707072]" : "text-center text-[12px] font-black text-slate-400"}>{i + 1}</span>
                                 <span className="min-w-0">
-                                  <span className={`block truncate text-[13.5px] ${b.seen_at ? "font-bold text-slate-600" : "font-black text-slate-900"}`}>{stripLeadIcon(b.title)}</span>
-                                  <span className="block text-[10.5px] font-bold text-slate-400">{shortDate(b.created_at)}{agoText(b.created_at) ? ` · ${agoText(b.created_at)}` : ""}</span>
+                                  <span className={v2 ? `block truncate text-[15px] ${b.seen_at ? "font-normal text-[#39393B]" : "font-semibold text-[#111111]"}` : `block truncate text-[13.5px] ${b.seen_at ? "font-bold text-slate-600" : "font-black text-slate-900"}`}>{stripLeadIcon(b.title)}</span>
+                                  <span className={v2 ? "block text-[13px] font-normal text-[#707072]" : "block text-[10.5px] font-bold text-slate-400"}>{shortDate(b.created_at)}{agoText(b.created_at) ? ` · ${agoText(b.created_at)}` : ""}</span>
                                 </span>
                                 <span className="text-center">
                                   {b.seen_at ? (
-                                    <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-400">읽음</span>
+                                    <span className={v2 ? "inline-block rounded-full border border-[#CACACB] bg-white px-2 py-0.5 text-[13px] font-semibold text-[#707072]" : "inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-400"}>읽음</span>
                                   ) : (
-                                    <span className="inline-block rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white">안 읽음</span>
+                                    <span className={v2 ? "inline-block rounded-full bg-[#111111] px-2 py-0.5 text-[13px] font-semibold text-white" : "inline-block rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white"}>안 읽음</span>
                                   )}
                                 </span>
                               </button>
@@ -347,14 +351,14 @@ export default function CustomerSiteAlertPopup() {
                           setMoreLoading(false);
                         }
                       }}
-                      className="mt-2 w-full rounded-2xl border border-slate-200 bg-white py-3 text-[13px] font-black text-slate-500 disabled:opacity-50"
+                      className={v2 ? "mt-2 w-full min-h-[44px] rounded-full border border-[#CACACB] bg-white text-[15px] font-semibold text-[#111111] disabled:opacity-50" : "mt-2 w-full rounded-2xl border border-slate-200 bg-white py-3 text-[13px] font-black text-slate-500 disabled:opacity-50"}
                     >
                       {moreLoading ? "불러오는 중…" : "이전 쪽지 더 보기"}
                     </button>
                   ) : null}
 
                   {boxTab === "all" && box.length === 0 && notices.length === 0 && !shopGuide ? (
-                    <div className="py-12 text-center text-sm font-bold text-slate-400">받은 쪽지가 없어요.</div>
+                    <div className={v2 ? "py-12 text-center text-[15px] font-normal text-[#707072]" : "py-12 text-center text-sm font-bold text-slate-400"}>받은 쪽지가 없어요.</div>
                   ) : null}
                 </>
               )}

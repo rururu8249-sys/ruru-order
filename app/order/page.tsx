@@ -123,7 +123,7 @@ import { pickVisibleBadges, BADGE_INFO_KEYS, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_M
 import ProductColorRowV2 from "@/components/customer/ProductColorRowV2";
 import { colorNameSwatch, isLightSwatch, resolveColorDisplay } from "@/lib/colorNameSwatch";
 import { restyleV2 } from "@/lib/customerUiV2Restyle";
-import { readCustomerUiPreview, resolveCustomerUiV2, UI_PREVIEW_DEFAULTS } from "@/lib/customerUiSwitch";
+import { readCustomerUiPreview, resolveCustomerUiV2, UI_PREVIEW_DEFAULTS, UI_V2_DEFAULT, UI_V2_STORAGE_KEY } from "@/lib/customerUiSwitch";
 import CartAddFeedbackV2 from "@/components/customer/CartAddFeedbackV2";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import ShopContactLink from "@/components/customer/ShopContactLink";
@@ -306,11 +306,7 @@ const emptyItem: OrderItem = {
 const ORDER_DRAFT_STORAGE_KEY = "ruru_order_draft_v1";
 // [㉜ 2026-10-18] 손님화면 새 모양(테스트 스위치 /order?ui=v2 → localStorage ruru_ui_v2=1) 전용 값 — 루트 DESIGN.md 기준.
 //   스위치가 꺼진 손님은 기존 화면 그대로(아래 모든 v2 값은 uiV2 일 때만 쓰인다). 모양만 — 동작·계산 무관.
-const UI_V2_STORAGE_KEY = "ruru_ui_v2";
-// [㉜ 2026-10-18 사장님 확정] 손님 기본값 = 새 모양(v2). 예전 모양으로 전체 되돌리려면 이 값만 false 로.
-//   true  : 아무 값 없는 손님 = 새 모양, ?ui=v1 고른 브라우저(저장값 "0")만 예전 모양.
-//   false : 예전처럼 ?ui=v2 고른 브라우저(저장값 "1")만 새 모양.
-const UI_V2_DEFAULT = true;
+// UI_V2_DEFAULT·UI_V2_STORAGE_KEY 는 lib/customerUiSwitch.ts 로 옮김(주문내역·공지도 같은 값을 읽게).
 const v2Badge = (sale = false): CSSProperties => ({ display: "inline-flex", alignItems: "center", height: "24px", padding: "0 8px", borderRadius: "9999px", border: "1px solid #CACACB", background: "#FFFFFF", color: sale ? "#D30005" : "#111111", fontSize: "13px", fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap" });
 // [㉛ 사장님 확정 문구] 관리자 비우기·유지시간 만료 둘 다 같은 안내(같은 비움에 한 번만).
 const CART_CLEARED_NOTICE = "주문서 제출 없이 시간이 지나 장바구니가 비워졌어요.\n상품은 주문서 제출 후 입금까지 마쳐야 주문이 확정돼요.";

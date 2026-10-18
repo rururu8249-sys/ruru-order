@@ -14,6 +14,7 @@
 
 import { useEffect, useState } from "react";
 import { noteBadgeText } from "@/lib/noteBadge";
+import { useCustomerUiStage } from "@/lib/useCustomerUiStage";
 
 /** 안 읽은 개수 구독 (쪽지함이 보내주는 값). */
 export function useNoteUnread(): number {
@@ -31,6 +32,7 @@ export function useNoteUnread(): number {
 
 /** 아이콘 오른쪽 위에 붙이는 빨간 숫자 배지. 0이면 아무것도 안 그린다. */
 export default function CustomerNoteUnreadBadge({ count, offset }: { count: number; offset?: { top: number; right: number } }) {
+  const v2 = useCustomerUiStage("s4"); // [㉜ 4단계] 표시 전용
   const n = Math.max(0, Math.floor(Number(count) || 0));
   if (n <= 0) return null;
   return (
@@ -40,16 +42,16 @@ export default function CustomerNoteUnreadBadge({ count, offset }: { count: numb
         position: "absolute",
         top: `${offset?.top ?? -2}px`,
         right: `${offset?.right ?? -4}px`,
-        height: "16px",
-        minWidth: "16px",
-        maxWidth: "34px",
+        height: v2 ? "20px" : "16px",
+        minWidth: v2 ? "20px" : "16px",
+        maxWidth: v2 ? "40px" : "34px",
         padding: "0 5px",
-        borderRadius: "8px",
-        background: "#E23B3B",
+        borderRadius: v2 ? "9999px" : "8px",
+        background: v2 ? "#111111" : "#E23B3B",
         color: "#fff",
-        fontSize: "11px",
-        fontWeight: 900,
-        lineHeight: "16px",
+        fontSize: v2 ? "13px" : "11px",
+        fontWeight: v2 ? 700 : 900,
+        lineHeight: v2 ? "20px" : "16px",
         textAlign: "center",
         boxSizing: "border-box",
         boxShadow: "0 0 0 2px #fff",
