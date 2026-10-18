@@ -179,6 +179,7 @@ size:
 - 단계별 미리보기(3~5단계): ?preview=s3 (s4·s5) 로 들어온 브라우저만 그 단계 새 모양, ?preview=off 는 전부 끔(localStorage ruru_preview_s3 등). 손님 기본값 전환 = lib/customerUiSwitch.ts 의 UI_PREVIEW_DEFAULTS 에서 그 단계만 true. 새 모양(v2)이 꺼진 손님(?ui=v1)에게는 미리보기도 안 보임.
 - 2026-10-18 3단계(주문서 확인 창) 손님 기본값 전환 — UI_PREVIEW_DEFAULTS.s3 = true. 되돌리기는 false 로(또는 그 브라우저만 ?preview=off).
 - 2026-10-18 4단계(주문내역·공지·쪽지 창) ?preview=s4 미리보기로 배포. /myorder·/notice 도 같은 스위치(lib/customerUiSwitch.ts 의 UI_V2_DEFAULT·UI_PREVIEW_DEFAULTS, 훅 lib/useCustomerUiStage)를 읽는다. 손님 기본 전환 = UI_PREVIEW_DEFAULTS.s4 true.
+- 2026-10-18 4단계(주문내역·공지·쪽지 창) 손님 기본값 전환 — UI_PREVIEW_DEFAULTS.s4 = true. 되돌리기는 false 로(또는 그 브라우저만 ?preview=off). ?ui=v1 손님은 예전 화면.
 
 ## 10. 하지 말 것
 - 로즈·자주·분홍 계열 색, 새 강조색 추가.
