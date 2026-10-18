@@ -90,6 +90,8 @@ type Props = {
   size?: CustomerSheetSize;
   /** 키보드가 올라온 만큼 시트를 위로(직접입력 시트의 visualViewport 계산값). 0이면 무시. */
   bottomInset?: number;
+  /** [㉜] 손님화면 새 모양(ui=v2) — 머리말 색만 DESIGN.md(제목 ink·✕ soft-cloud·부제 13px mute). 없으면 기존 그대로. */
+  tone?: "v2";
 };
 
 const TITLE_ID_PREFIX = "cs-sheet-title-";
@@ -234,6 +236,7 @@ export default function CustomerBottomSheet({
   onBodyScroll,
   size = "full",
   bottomInset = 0,
+  tone,
 }: Props) {
   const { key, requestClose } = useCustomerOverlayClose({ open, onClose, closeGuard, closeDisabled });
 
@@ -273,11 +276,11 @@ export default function CustomerBottomSheet({
       >
         <SheetGrabber onClose={() => { requestClose(); }} style={{ paddingTop: "8px", paddingBottom: "6px", minHeight: "24px" }} />
 
-        <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "10px", padding: "0 16px 12px", borderBottom: "1px solid #F0EAE0" }}>
+        <div style={tone === "v2" ? { flexShrink: 0, display: "flex", alignItems: "center", gap: "10px", padding: "0 16px 12px", borderBottom: "1px solid #E5E5E5" } : { flexShrink: 0, display: "flex", alignItems: "center", gap: "10px", padding: "0 16px 12px", borderBottom: "1px solid #F0EAE0" }}>
           {headerLeft ? <div style={{ flexShrink: 0 }}>{headerLeft}</div> : null}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div id={key} style={{ fontSize: "17px", fontWeight: 800, color: "#151923", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
-            {subtitle ? <div style={{ marginTop: "2px", fontSize: "12px", fontWeight: 700, color: "#6E655E", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</div> : null}
+            <div id={key} style={tone === "v2" ? { fontSize: "17px", fontWeight: 800, color: "#111111", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } : { fontSize: "17px", fontWeight: 800, color: "#151923", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
+            {subtitle ? <div style={tone === "v2" ? { marginTop: "2px", fontSize: "13px", fontWeight: 400, color: "#707072", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } : { marginTop: "2px", fontSize: "12px", fontWeight: 700, color: "#6E655E", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</div> : null}
           </div>
           {headerRight ? <div style={{ flexShrink: 0 }}>{headerRight}</div> : null}
           <button
@@ -285,7 +288,7 @@ export default function CustomerBottomSheet({
             onClick={() => { requestClose(); }}
             aria-label="닫기"
             disabled={closeDisabled}
-            style={{ flexShrink: 0, width: "40px", height: "40px", borderRadius: "50%", border: "none", background: "#F1ECEE", color: "#444", fontSize: "18px", fontWeight: 800, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", cursor: closeDisabled ? "not-allowed" : "pointer", opacity: closeDisabled ? 0.5 : 1 }}
+            style={tone === "v2" ? { flexShrink: 0, width: "40px", height: "40px", borderRadius: "50%", border: "none", background: "#F5F5F5", color: "#111111", fontSize: "18px", fontWeight: 800, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", cursor: closeDisabled ? "not-allowed" : "pointer", opacity: closeDisabled ? 0.5 : 1 } : { flexShrink: 0, width: "40px", height: "40px", borderRadius: "50%", border: "none", background: "#F1ECEE", color: "#444", fontSize: "18px", fontWeight: 800, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", cursor: closeDisabled ? "not-allowed" : "pointer", opacity: closeDisabled ? 0.5 : 1 }}
           >
             ✕
           </button>

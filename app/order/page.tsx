@@ -121,7 +121,9 @@ import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { compareMixOrder, mixSeedForToday } from "@/lib/productMixOrder";
 import { pickVisibleBadges, BADGE_INFO_KEYS, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_MIN_BUYERS, TOP_SELLER_RANK_PCT, POPULAR_RANK_PCT, HOLDING_MIN_PEOPLE } from "@/lib/productBadgePriority";
 import ProductColorRowV2 from "@/components/customer/ProductColorRowV2";
-import { resolveColorDisplay } from "@/lib/colorNameSwatch";
+import { colorNameSwatch, isLightSwatch, resolveColorDisplay } from "@/lib/colorNameSwatch";
+import { restyleV2 } from "@/lib/customerUiV2Restyle";
+import CartAddFeedbackV2 from "@/components/customer/CartAddFeedbackV2";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import ShopContactLink from "@/components/customer/ShopContactLink";
 import { useShopInfo } from "@/lib/useShopInfo";
@@ -1476,6 +1478,8 @@ export default function OrderPage() {
       setUiV2(window.localStorage.getItem(UI_V2_STORAGE_KEY) === "1");
     } catch { /* 저장소 못 쓰면 기존 화면 */ }
   }, []);
+  // [㉜ 2단계] 옵션 창 등 스타일이 많은 화면의 새 모양 정리(로즈→흑백·13px 미만→13px) — 스위치 꺼지면 원래 스타일 그대로.
+  const sv = (style: CSSProperties | undefined): CSSProperties | undefined => (uiV2 ? restyleV2(style) : style);
   const [isEditingCustomerInfo, setIsEditingCustomerInfo] = useState(false);
   const [isCustomerInfoOpen, setIsCustomerInfoOpen] = useState(false);
   const [showSavedCustomerDetail, setShowSavedCustomerDetail] = useState(false);
@@ -1635,8 +1639,13 @@ export default function OrderPage() {
   useEffect(() => {
     if (!cartAddedOpen) return;
     // [2026-09-20 사장님 지적] 토스트 안 [담은 상품 보기] 버튼을 없앴으므로 «누를 시간»이 필요 없다 → 2.4초로 원복.
-    const t = setTimeout(() => setCartAddedOpen(false), 2400);
+    const t = setTimeout(() => setCartAddedOpen(false), uiV2 ? 2500 : 2400);
     return () => clearTimeout(t);
+  }, [cartAddedOpen, cartAddedItem]);
+  // [㉜ 2단계] 새 모양 담기 피드백(날아가기·한 줄 확인)을 담을 때마다 다시 틀기 위한 번호 — 담기 성공 신호(cartAddedOpen)를 그대로 따른다.
+  const [cartFxNonce, setCartFxNonce] = useState(0);
+  useEffect(() => {
+    if (cartAddedOpen) setCartFxNonce((n) => n + 1);
   }, [cartAddedOpen, cartAddedItem]);
   const [lightboxImage, setLightboxImage] = useState<string>("");
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
@@ -6258,7 +6267,7 @@ export default function OrderPage() {
     const reserved = pid ? Number(reservedByVariant[reservationVariantKey(pid, matched.color, matched.size)] || 0) : 0;
     return Math.max(0, Number(matched.stock) - Math.max(0, reserved));
   };
-  const optionQtyLabel = (qty: number | null) => qty === null ? "" : qty <= 0 ? " · 품절" : qty <= 3 ? ` · ${qty}개 남음` : ` · 재고 ${qty}개`;
+  const optionQtyLabel = (qty: number | null) => qty === null ? "" : qty <= 0 ? " · 품절" : uiV2 ? (qty <= 10 ? ` · ${qty}개 남음` : "") : qty <= 3 ? ` · ${qty}개 남음` : ` · 재고 ${qty}개`;
   const joinAxisColor = (colorValue: string) =>
     registeredOptionAxes3 && !registeredOptionBrandGroup
       ? [registeredOptionDetail, colorValue].map((v) => String(v ?? "").trim()).filter(Boolean).join(ORDER_AXIS_JOIN)
@@ -7990,7 +7999,24 @@ export default function OrderPage() {
               근거: Material Design 3 Snackbar 지침(직접 확인) — ①「자주 쓰는 터치 영역이나 내비게이션 앞에 두지 말 것」
               ②「아래쪽 다른 UI(도킹된 바 등)와 겹치면 위로 밀어 올릴 것」 ③ 동작 버튼은 있어도 하나, 필수가 아님.
               → 중복 버튼을 «버리고», 장바구니 바 위로 올려 아무것도 가리지 않게 했다. 담은 개수·금액·이동은 아래 바가 담당. */}
-          {cartAddedOpen && (
+          {/* [㉜ 2단계] 새 모양은 CartAddFeedbackV2(사진 날아가기 + 바 위 한 줄). 기존 토스트는 스위치 꺼진 손님만. */}
+          {uiV2 ? (() => {
+            const added = cartAddedItem as Partial<OrderItem> | null;
+            const addedId = String(added?.product_id ?? "");
+            const addedProduct = addedId ? [...broadcastProducts, ...groupBuyQuickProductsFromCatalog].find((p) => String(p?.id ?? "") === addedId) : undefined;
+            const opts = [normalizeEmptyProductOptionValue(String(added?.color ?? "")), normalizeEmptyProductOptionValue(String(added?.size ?? ""))].filter(Boolean).join(" / ");
+            const qtyText = `${Math.max(1, Number(added?.qty) || 1)}개`;
+            return (
+              <CartAddFeedbackV2
+                open={cartAddedOpen}
+                nonce={cartFxNonce}
+                productName={String(added?.product_name || "상품")}
+                optionText={opts ? `${opts} · ${qtyText}` : qtyText}
+                image={addedProduct ? pickOrderProductImageUrl(addedProduct) : ""}
+              />
+            );
+          })() : null}
+          {cartAddedOpen && !uiV2 && (
             <div
               role="status"
               aria-live="polite"
@@ -8070,6 +8096,7 @@ export default function OrderPage() {
             size={optionSheetHalf ? "half" : "full"}
             onClose={closeRegisteredOptionSelectSheet}
             ariaLabel="옵션 선택"
+            tone={uiV2 ? "v2" : undefined}
             bodyDataAttr="data-registered-option-scroll"
             bodyPadding={optionSheetHasPhoto ? "0 16px 16px" : "16px 16px 16px"}
             onBodyScroll={(event) => {
@@ -8087,17 +8114,17 @@ export default function OrderPage() {
                       //   대신 «지금 보는 사진 / 더 있음 / 확대»를 표시로 알린다.
                       const defaultHeroPhoto = registeredOptionBrandDetailPhotos[0] || registeredOptionComboPhotos[registeredOptionDetail] || pickOrderProductImageUrl(registeredOptionSelectProduct);
                       const selectedPhoto = registeredOptionHeroPhoto || defaultHeroPhoto;
-                      return <div onClick={() => { if (selectedPhoto) openLightbox(selectedPhoto, registeredOptionAllImages, registeredOptionPhotoTitle); }} style={{ position: "relative", width: "64px", height: "64px", flexShrink: 0, borderRadius: "14px", overflow: "hidden", background: "#F0EBE8", cursor: selectedPhoto ? "zoom-in" : "default" }}>
+                      return <div onClick={() => { if (selectedPhoto) openLightbox(selectedPhoto, registeredOptionAllImages, registeredOptionPhotoTitle); }} style={sv({ position: "relative", width: "64px", height: "64px", flexShrink: 0, borderRadius: "14px", overflow: "hidden", background: "#F0EBE8", cursor: selectedPhoto ? "zoom-in" : "default" })}>
                       {selectedPhoto ? (
-                        <img src={selectedPhoto} alt={registeredOptionDetail || registeredOptionSelectProduct.product_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        <img src={selectedPhoto} alt={registeredOptionDetail || registeredOptionSelectProduct.product_name} style={sv({ width: "100%", height: "100%", objectFit: "cover" })} />
                       ) : registeredOptionBrandGroup ? (
-                        <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "3px", background: "linear-gradient(145deg,#fff,#F7EFF2)", color: "#2F2026", textAlign: "center", padding: "5px" }}>
-                          <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: "10px", fontWeight: 800, letterSpacing: "0.04em", lineHeight: 1.05 }}>{registeredOptionBrandGroup.brandEn || registeredOptionBrandGroup.brandKo}</span>
-                          <span style={{ fontSize: "8px", fontWeight: 800, color: "#7A1E47" }}>{registeredOptionBrandGroup.brandKo}</span>
+                        <div style={sv({ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "3px", background: "linear-gradient(145deg,#fff,#F7EFF2)", color: "#2F2026", textAlign: "center", padding: "5px" })}>
+                          <span style={sv({ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: "10px", fontWeight: 800, letterSpacing: "0.04em", lineHeight: 1.05 })}>{registeredOptionBrandGroup.brandEn || registeredOptionBrandGroup.brandKo}</span>
+                          <span style={sv({ fontSize: "8px", fontWeight: 800, color: "#7A1E47" })}>{registeredOptionBrandGroup.brandKo}</span>
                         </div>
                       ) : null}
                       {/* [2026-09-09] 「눌러도 되는지 몰랐다」 → 확대 신호를 사진 위에 붙인다 (모바일엔 마우스 커서가 없다) */}
-                      {selectedPhoto ? <span style={{ position: "absolute", right: "4px", bottom: "4px", borderRadius: "999px", background: "rgba(0,0,0,0.72)", padding: "3px 7px", color: "#fff", fontSize: "10px", fontWeight: 900, lineHeight: 1 }}>🔍 크게</span> : null}
+                      {selectedPhoto ? <span style={sv({ position: "absolute", right: "4px", bottom: "4px", borderRadius: "999px", background: "rgba(0,0,0,0.72)", padding: "3px 7px", color: "#fff", fontSize: "10px", fontWeight: 900, lineHeight: 1 })}>{uiV2 ? "크게" : "🔍 크게"}</span> : null}
                     </div>;
                     })()}
                 </>
@@ -8105,10 +8132,10 @@ export default function OrderPage() {
             })() : undefined}
             title={registeredOptionDetail || registeredOptionSelectProduct.product_name}
             subtitle={(
-              <div style={{ minWidth: 0, display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px" }}>
-                {(!registeredOptionComboInfo || registeredOptionDetail) && <ProductDiscountLabel note={registeredOptionSelectProduct.product_note} actualPrice={registeredOptionUnitPrice} detail={registeredOptionDetail} />}
-                {registeredOptionBrandGroup && registeredOptionDetail ? <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 700, color: "#8A8A8A" }}>{registeredOptionBrandGroup.brandKo} ·</span> : null}
-                <span style={{ flexShrink: 0, fontSize: "15px", fontWeight: 800, color: "#7A1E47" }}>
+              <div style={sv({ minWidth: 0, display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px" })}>
+                {(!registeredOptionComboInfo || registeredOptionDetail) && <ProductDiscountLabel tone={uiV2 ? "v2" : undefined} note={registeredOptionSelectProduct.product_note} actualPrice={registeredOptionUnitPrice} detail={registeredOptionDetail} />}
+                {registeredOptionBrandGroup && registeredOptionDetail ? <span style={sv({ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 700, color: "#8A8A8A" })}>{registeredOptionBrandGroup.brandKo} ·</span> : null}
+                <span style={sv({ flexShrink: 0, fontSize: "15px", fontWeight: 800, color: "#7A1E47" })}>
                         {registeredOptionComboInfo
                           ? (registeredOptionBrandGroup ? registeredOptionDetail.trim() : registeredOptionColor.trim())
                             ? won(registeredOptionUnitPrice)
@@ -8118,31 +8145,31 @@ export default function OrderPage() {
                           : registeredOptionPrice > 0
                             ? won(registeredOptionPrice)
                             : registeredOptionSelectProduct && isFreeOrderProduct(registeredOptionSelectProduct)
-                              ? "0원 · 🎁 무료나눔"
+                              ? (uiV2 ? "0원 · 무료나눔" : "0원 · 🎁 무료나눔")
                               : "가격 직접입력"}
                 </span>
                 {!registeredOptionHeroCollapsed && optionNoticePresentation.badge ? (
                   <span
                     data-product-order-notice-badge
-                    style={{ flexShrink: 0, height: "22px", display: "inline-flex", alignItems: "center", border: "1px solid #E8CDD7", borderRadius: "999px", background: "#F8E9EE", padding: "0 7px", color: "#7A1E47", fontSize: "10.5px", fontWeight: 900, lineHeight: 1, letterSpacing: "-0.02em" }}
+                    style={sv({ flexShrink: 0, height: "22px", display: "inline-flex", alignItems: "center", border: "1px solid #E8CDD7", borderRadius: "999px", background: "#F8E9EE", padding: "0 7px", color: "#7A1E47", fontSize: "10.5px", fontWeight: 900, lineHeight: 1, letterSpacing: "-0.02em" })}
                   >{optionNoticePresentation.badge}</span>
                 ) : null}
               </div>
             )}
             headerBelow={optionNoticePresentation.message ? (
-              <div data-product-order-notice-message style={{ borderBottom: "1px solid #F0EAE0", background: "#FDF1E7", padding: "7px 16px", color: "#8A4B1A", fontSize: "11.5px", fontWeight: 800, lineHeight: 1.4, wordBreak: "keep-all" }}>
+              <div data-product-order-notice-message style={sv({ borderBottom: "1px solid #F0EAE0", background: "#FDF1E7", padding: "7px 16px", color: "#8A4B1A", fontSize: "11.5px", fontWeight: 800, lineHeight: 1.4, wordBreak: "keep-all" })}>
                 {optionNoticePresentation.message}
               </div>
             ) : undefined}
             footer={(
               <>
                 {registeredOptionBrandCartEntries.length > 0 ? (
-                  <section style={{ flexShrink: 0, maxHeight: "138px", overflowY: "auto", borderTop: "1px solid #D8EADF", background: "#F3FBF7", padding: "9px 14px" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "6px" }}>
-                      <strong style={{ fontSize: "12px", color: "#0F6E56" }}>✓ 이 브랜드에서 담은 상품</strong>
-                      <span style={{ borderRadius: "999px", background: "#0F6E56", padding: "2px 8px", color: "#fff", fontSize: "10px", fontWeight: 900 }}>총 {registeredOptionBrandCartCount}개</span>
+                  <section style={sv({ flexShrink: 0, maxHeight: "138px", overflowY: "auto", borderTop: "1px solid #D8EADF", background: "#F3FBF7", padding: "9px 14px" })}>
+                    <div style={sv({ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "6px" })}>
+                      <strong style={sv({ fontSize: "12px", color: "#0F6E56" })}>✓ 이 브랜드에서 담은 상품</strong>
+                      <span style={sv({ borderRadius: "999px", background: "#0F6E56", padding: "2px 8px", color: "#fff", fontSize: "10px", fontWeight: 900 })}>총 {registeredOptionBrandCartCount}개</span>
                     </div>
-                    <div style={{ display: "grid", gap: "5px" }}>
+                    <div style={sv({ display: "grid", gap: "5px" })}>
                       {registeredOptionBrandCartEntries.map(({ item, itemIndex }, index) => {
                         // [2026-08-28 P0-3] "색상 없음"을 손님에게 보여주지 않는다(표시 전용).
                         const colorText = normalizeEmptyProductOptionValue(item.color);
@@ -8154,12 +8181,12 @@ export default function OrderPage() {
                           `수량 ${qty}개`,
                         ].filter(Boolean).join(" · ");
                         return (
-                          <div key={`brand-cart-summary-${index}`} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto auto", alignItems: "center", gap: "8px", borderRadius: "9px", background: "#fff", padding: "7px 9px", border: "1px solid #DDEEE4" }}>
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 900, color: "#263A31" }}>{item.product_name}</div>
-                              <div style={{ marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "10px", fontWeight: 700, color: "#6B8074" }}>{optionSummary}</div>
+                          <div key={`brand-cart-summary-${index}`} style={sv({ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto auto", alignItems: "center", gap: "8px", borderRadius: "9px", background: "#fff", padding: "7px 9px", border: "1px solid #DDEEE4" })}>
+                            <div style={sv({ minWidth: 0 })}>
+                              <div style={sv({ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 900, color: "#263A31" })}>{item.product_name}</div>
+                              <div style={sv({ marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "10px", fontWeight: 700, color: "#6B8074" })}>{optionSummary}</div>
                             </div>
-                            <strong style={{ alignSelf: "center", fontSize: "11px", color: "#0F6E56" }}>{won(toNumber(item.product_price) * qty)}</strong>
+                            <strong style={sv({ alignSelf: "center", fontSize: "11px", color: "#0F6E56" })}>{won(toNumber(item.product_price) * qty)}</strong>
                             <button
                               type="button"
                               aria-label={`${item.product_name} 주문서에서 삭제`}
@@ -8167,7 +8194,7 @@ export default function OrderPage() {
                                 removeItem(itemIndex);
                                 showCustomerNotice(`${item.product_name}을(를) 주문서에서 삭제했어요.`, "info");
                               })}
-                              style={{ minWidth: "42px", height: "28px", borderRadius: "8px", border: "1px solid #E3C6CD", background: "#FFF7F8", padding: "0 7px", color: "#A13A50", fontSize: "10px", fontWeight: 900, cursor: "pointer" }}
+                              style={sv({ minWidth: "42px", height: "28px", borderRadius: "8px", border: "1px solid #E3C6CD", background: "#FFF7F8", padding: "0 7px", color: "#A13A50", fontSize: "10px", fontWeight: 900, cursor: "pointer" })}
                             >삭제</button>
                           </div>
                         );
@@ -8176,54 +8203,58 @@ export default function OrderPage() {
                   </section>
                 ) : null}
 
-                <div data-product-order-footer-summary style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "8px 18px" }}>
+                <div data-product-order-footer-summary style={sv({ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "8px 18px" })}>
                   {registeredOptionDetailSelected ? (
                     <>
-                      <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                        <span style={{ fontSize: "14px", fontWeight: 800, color: "#333" }}>수량</span>
-                        {registeredOptionAvailableQty !== null ? (
+                      <div style={sv({ display: "flex", flexDirection: "column", minWidth: 0 })}>
+                        <span style={sv({ fontSize: "14px", fontWeight: 800, color: "#333" })}>수량</span>
+                        {uiV2 ? (registeredOptionAvailableQty !== null && registeredOptionAvailableQty <= 10 ? (
+                          <span style={{ fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap", color: "#D30005" }}>
+                            {registeredOptionAvailableQty > 0 ? `${registeredOptionAvailableQty}개 남음` : "품절"}
+                          </span>
+                        ) : null) : registeredOptionAvailableQty !== null ? (
                           <span style={{ fontSize: "10.5px", fontWeight: 800, whiteSpace: "nowrap", color: registeredOptionAvailableQty <= 3 ? "#C0392B" : "#0F6E56" }}>
                             {registeredOptionAvailableQty > 0 ? `최대 ${registeredOptionAvailableQty}개` : "지금 품절"}
                           </span>
                         ) : null}
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "40px 44px 40px", height: "44px", borderRadius: "12px", border: "1px solid #E8E2DD", overflow: "hidden" }}>
-                        <button type="button" onClick={() => setRegisteredOptionQty((c) => Math.max(1, c - 1))} style={{ borderRight: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#555", cursor: "pointer" }}>−</button>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionQty}</div>
+                      <div style={uiV2 ? { display: "grid", gridTemplateColumns: "44px 44px 44px", height: "44px", alignItems: "center", gap: "4px" } : { display: "grid", gridTemplateColumns: "40px 44px 40px", height: "44px", borderRadius: "12px", border: "1px solid #E8E2DD", overflow: "hidden" }}>
+                        <button type="button" onClick={() => setRegisteredOptionQty((c) => Math.max(1, c - 1))} style={uiV2 ? { width: "44px", height: "44px", borderRadius: "9999px", border: "1px solid #CACACB", background: "#FFFFFF", fontSize: "20px", fontWeight: 600, color: "#111111", cursor: "pointer" } : { borderRight: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#555", cursor: "pointer" }}>−</button>
+                        <div style={uiV2 ? { display: "flex", alignItems: "center", justifyContent: "center", fontSize: "17px", fontWeight: 700, color: "#111111" } : { display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionQty}</div>
                         <button type="button" onClick={() => {
                           // [2026-09-11] 상한 = 「최대 N개」와 같은 숫자(재고 − 홀드). 재고연동 아니면 예전처럼 999.
                           const maxStock = registeredOptionAvailableQty === null ? 999 : Math.max(1, registeredOptionAvailableQty);
                           setRegisteredOptionQty((c) => Math.min(c + 1, maxStock));
-                        }} style={{ borderLeft: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+</button>
+                        }} style={uiV2 ? { width: "44px", height: "44px", borderRadius: "9999px", border: "1px solid #CACACB", background: "#FFFFFF", fontSize: "20px", fontWeight: 600, color: "#111111", cursor: "pointer" } : { borderLeft: "1px solid #F0EAE0", background: "#fff", fontSize: "18px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+</button>
                       </div>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: "11px", fontWeight: 700, color: "#999" }}>선택금액</div>
-                        <div style={{ fontSize: "16px", fontWeight: 800, color: "#222" }}>{registeredOptionTotalPrice > 0 ? won(registeredOptionTotalPrice) : "가격 직접입력"}</div>
+                      <div style={sv({ textAlign: "right" })}>
+                        <div style={sv({ fontSize: "11px", fontWeight: 700, color: "#999" })}>선택금액</div>
+                        <div style={sv({ fontSize: "16px", fontWeight: 800, color: "#222" })}>{registeredOptionTotalPrice > 0 ? won(registeredOptionTotalPrice) : "가격 직접입력"}</div>
                       </div>
                     </>
                   ) : registeredOptionBrandGroup && registeredOptionBrandCartCount > 0 ? (
-                    <div style={{ width: "100%" }}>
-                      <strong style={{ display: "block", fontSize: "13px", color: "#0F6E56" }}>이 브랜드에서 총 {registeredOptionBrandCartCount}개 담았어요</strong>
+                    <div style={sv({ width: "100%" })}>
+                      <strong style={sv({ display: "block", fontSize: "13px", color: "#0F6E56" })}>이 브랜드에서 총 {registeredOptionBrandCartCount}개 담았어요</strong>
                     </div>
                   ) : (
-                    <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+                    <div style={sv({ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" })}>
                       <div>
-                        <strong style={{ display: "block", fontSize: "13px", color: "#4A3D42" }}>세부상품을 먼저 선택해 주세요</strong>
-                        <span style={{ display: "block", marginTop: "2px", fontSize: "10px", fontWeight: 700, color: "#9A8E93" }}>선택 후 수량과 금액이 표시됩니다</span>
+                        <strong style={sv({ display: "block", fontSize: "13px", color: "#4A3D42" })}>세부상품을 먼저 선택해 주세요</strong>
+                        <span style={sv({ display: "block", marginTop: "2px", fontSize: "10px", fontWeight: 700, color: "#9A8E93" })}>선택 후 수량과 금액이 표시됩니다</span>
                       </div>
-                      <span style={{ flexShrink: 0, fontSize: "13px", fontWeight: 900, color: "#B2A9AD" }}>수량 — · 금액 —</span>
+                      <span style={sv({ flexShrink: 0, fontSize: "13px", fontWeight: 900, color: "#B2A9AD" })}>수량 — · 금액 —</span>
                     </div>
                   )}
                 </div>
 
-                <div data-product-order-footer-action style={{ flexShrink: 0, display: "grid", gridTemplateColumns: "1fr", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "8px 18px calc(10px + env(safe-area-inset-bottom))" }}>
+                <div data-product-order-footer-action style={sv({ flexShrink: 0, display: "grid", gridTemplateColumns: "1fr", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "8px 18px calc(10px + env(safe-area-inset-bottom))" })}>
                   {registeredOptionShowBrandDoneOnly ? (
-                    <button type="button" onClick={closeRegisteredOptionSelectSheet} style={{ height: "44px", borderRadius: "14px", border: "none", background: "#7A1E47", fontSize: "14px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>상품 선택 완료 · 총 {registeredOptionBrandCartCount}개</button>
+                    <button type="button" onClick={closeRegisteredOptionSelectSheet} style={uiV2 ? { width: "100%", height: "52px", borderRadius: "9999px", border: "none", background: "#111111", fontSize: "16px", fontWeight: 600, color: "#FFFFFF", cursor: "pointer" } : { height: "44px", borderRadius: "14px", border: "none", background: "#7A1E47", fontSize: "14px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>상품 선택 완료 · 총 {registeredOptionBrandCartCount}개</button>
                   ) : (
                     <>
                     {/* [2026-09-20] 왼쪽 「닫기」 삭제 — 닫기는 우상단 ✕(틀). 세부상품 화면에서 «목록으로»는 본문 맨 위 「‹ 종류 다시 고르기」. */}
                     {allOptionsSoldOut ? (
-                    <button type="button" disabled style={{ height: "44px", borderRadius: "14px", border: "none", background: "#ccc", fontSize: "14px", fontWeight: 800, color: "#fff", cursor: "not-allowed" }}>품절</button>
+                    <button type="button" disabled style={uiV2 ? { width: "100%", height: "52px", borderRadius: "9999px", border: "none", background: "#F5F5F5", fontSize: "16px", fontWeight: 600, color: "#707072", cursor: "not-allowed" } : { height: "44px", borderRadius: "14px", border: "none", background: "#ccc", fontSize: "14px", fontWeight: 800, color: "#fff", cursor: "not-allowed" }}>품절</button>
                     ) : (
                     <CustomerPressButton
                       type="button"
@@ -8240,7 +8271,7 @@ export default function OrderPage() {
                         }
                         confirmRegisteredOptionSelectSheet();
                       }}
-                      style={{ height: "44px", borderRadius: "14px", border: "none", background: registeredOptionSelectionReady ? "#7A1E47" : "#CFC4C8", fontSize: "14px", fontWeight: 800, color: "#fff", cursor: "pointer" }}
+                      style={uiV2 ? { width: "100%", height: "52px", borderRadius: "9999px", border: "none", background: registeredOptionSelectionReady ? "#111111" : "#F5F5F5", fontSize: "16px", fontWeight: 600, color: registeredOptionSelectionReady ? "#FFFFFF" : "#707072", cursor: "pointer" } : { height: "44px", borderRadius: "14px", border: "none", background: registeredOptionSelectionReady ? "#7A1E47" : "#CFC4C8", fontSize: "14px", fontWeight: 800, color: "#fff", cursor: "pointer" }}
                     >{registeredOptionSelectionReady
                       ? (registeredOptionBrandGroup ? "선택상품 담기" : "장바구니 담기")
                       : registeredOptionCustomerDetailRequired && !normalizeCustomerDetailName(registeredOptionCustomerDetail)
@@ -8269,8 +8300,9 @@ export default function OrderPage() {
                   const selectedPhoto = registeredOptionHeroPhoto || defaultHeroPhoto;
                   if (!selectedPhoto) return null;
                   return (
-                    <div style={{ margin: "12px 0 6px" }}>
+                    <div style={sv({ margin: "12px 0 6px" })}>
                       <ProductPhotoCarousel
+                        tone={uiV2 ? "v2" : undefined}
                         images={registeredOptionAllImages}
                         selectedPhoto={selectedPhoto}
                         alt={registeredOptionDetail || registeredOptionSelectProduct.product_name}
@@ -8282,9 +8314,9 @@ export default function OrderPage() {
                 })()}
                 {/* [2026-09-20 사장님] 한눈에 정보 칩 — 긴 설명 대신 「면 100%」「국내배송」 같은 짧은 칩 (표시 전용) */}
                 {registeredOptionSpecChips.length > 0 ? (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}>
+                  <div style={sv({ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" })}>
                     {registeredOptionSpecChips.map((c) => (
-                      <span key={`spec-${c}`} style={{ maxWidth: "100%", boxSizing: "border-box", overflowWrap: "anywhere", fontSize: "12px", fontWeight: 800, background: "#F5E6EB", color: "#7A1E47", borderRadius: "999px", padding: "6px 10px" }}>{c}</span>
+                      <span key={`spec-${c}`} style={sv({ maxWidth: "100%", boxSizing: "border-box", overflowWrap: "anywhere", fontSize: "12px", fontWeight: 800, background: "#F5E6EB", color: "#7A1E47", borderRadius: "999px", padding: "6px 10px" })}>{c}</span>
                     ))}
                   </div>
                 ) : null}
@@ -8299,11 +8331,11 @@ export default function OrderPage() {
                       setRegisteredOptionCustomerDetail("");
                       setRegisteredOptionQty(1);
                     }}
-                    style={{ marginBottom: "10px", border: "1px solid #D9C5CC", background: "#fff", borderRadius: "999px", padding: "7px 12px", fontSize: "12px", fontWeight: 900, color: "#7A1E47", cursor: "pointer" }}
+                    style={sv({ marginBottom: "10px", border: "1px solid #D9C5CC", background: "#fff", borderRadius: "999px", padding: "7px 12px", fontSize: "12px", fontWeight: 900, color: "#7A1E47", cursor: "pointer" })}
                   >‹ 종류 다시 고르기</button>
                 ) : null}
                   {registeredOptionColorMode === "none" && registeredOptionSizeMode === "none" && !(registeredOptionSelectProduct && (readOrderAxes3(registeredOptionSelectProduct) || readComboInfoOrderProduct(registeredOptionSelectProduct))) ? (
-                    <div style={{ padding: "12px 16px 0", fontSize: "12px", color: "#6E655E" }}>
+                    <div style={sv({ padding: "12px 16px 0", fontSize: "12px", color: "#6E655E" })}>
                       {/* [2026-08-29] 예전에는 색상·사이즈만 보고 "옵션이 없습니다. 수량만 선택"이라고 했는데,
                           세부상품명이나 금액을 손님이 직접 적어야 하는 상품에서도 같은 문구가 떠서 말이 안 맞았다.
                           → 이 상품에서 실제로 뭘 입력해야 하는지 그대로 알려준다. */}
@@ -8319,9 +8351,9 @@ export default function OrderPage() {
 
                   {/* [조합형 옵션] 종류 선택 — 검색(8종 초과 시) + 세부상품 목록(추가금·품절·N개 남음 표시) */}
                   {registeredOptionCustomerDetailRequired ? (
-                    <div style={{ marginBottom: "16px" }}>
-                      <div style={{ marginBottom: "7px", fontSize: "13px", fontWeight: 900, color: "#333" }}>
-                        세부상품명 <span style={{ color: "#C0392B" }}>*</span>
+                    <div style={sv({ marginBottom: "16px" })}>
+                      <div style={sv({ marginBottom: "7px", fontSize: "13px", fontWeight: 900, color: "#333" })}>
+                        세부상품명 <span style={sv({ color: "#C0392B" })}>*</span>
                       </div>
                       <input
                         value={registeredOptionCustomerDetail}
@@ -8329,7 +8361,7 @@ export default function OrderPage() {
                         onChange={(e) => setRegisteredOptionCustomerDetail(e.target.value)}
                         placeholder="세부상품명을 입력해 주세요"
                         autoComplete="off"
-                        style={{
+                        style={sv({
                           height: "46px",
                           width: "100%",
                           boxSizing: "border-box",
@@ -8341,15 +8373,15 @@ export default function OrderPage() {
                           fontWeight: 700,
                           color: "#222",
                           outline: "none",
-                        }}
+                        })}
                       />
-                      <div style={{ marginTop: "5px", display: "flex", justifyContent: "space-between", gap: "8px", fontSize: "11px", fontWeight: 700 }}>
-                        <span style={{ color: normalizeCustomerDetailName(registeredOptionCustomerDetail) ? "#7A1E47" : "#C0392B" }}>
+                      <div style={sv({ marginTop: "5px", display: "flex", justifyContent: "space-between", gap: "8px", fontSize: "11px", fontWeight: 700 })}>
+                        <span style={sv({ color: normalizeCustomerDetailName(registeredOptionCustomerDetail) ? "#7A1E47" : "#C0392B" })}>
                           {normalizeCustomerDetailName(registeredOptionCustomerDetail)
                             ? "입력한 세부상품명이 주문서·송장·물건챙기기에 함께 표시됩니다."
                             : "세부상품명을 입력해 주세요."}
                         </span>
-                        <span style={{ flexShrink: 0, color: "#A49A9E" }}>
+                        <span style={sv({ flexShrink: 0, color: "#A49A9E" })}>
                           {normalizeCustomerDetailName(registeredOptionCustomerDetail).length}/{CUSTOMER_DETAIL_NAME_MAX_LENGTH}
                         </span>
                       </div>
@@ -8357,9 +8389,9 @@ export default function OrderPage() {
                   ) : null}
 
                   {registeredOptionComboInfo ? (
-                    <div style={{ marginBottom: "16px" }}>
+                    <div style={sv({ marginBottom: "16px" })}>
                       {/* [2026-08-31 사장님 지시] 「◀ 다시 고르기」 줄 삭제 — 하단 「닫기」가 목록 복귀 역할, 중복이라 화면만 차지 */}
-                      <div style={{ display: registeredOptionAxes3 && registeredOptionDetail.trim() ? "none" : "block" }}>
+                      <div style={sv({ display: registeredOptionAxes3 && registeredOptionDetail.trim() ? "none" : "block" })}>
                       {/* [2026-08-12] 제목에 살 수 있는 개수를 먼저 보여준다 — 143가지 중 뭘 살 수 있는지 바로 알게 */}
                       {(() => {
                         const total = registeredOptionComboInfo.names.length;
@@ -8368,9 +8400,9 @@ export default function OrderPage() {
                           return v ? Number(v.stock ?? 0) <= 0 : false;
                         }).length;
                         return (
-                          <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>
+                          <div style={sv({ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" })}>
                             {registeredOptionAxes3 ? `1단계 · ${registeredOptionAxes3.detailLabel}` : "종류"} 선택{" "}
-                            <span style={{ fontSize: "12px", fontWeight: 700, color: "#6E655E" }}>
+                            <span style={sv({ fontSize: "12px", fontWeight: 700, color: "#6E655E" })}>
                               {soldCount > 0 ? `(판매중 ${total - soldCount}가지 · 품절 ${soldCount}가지)` : `(${total}가지)`}
                             </span>
                           </div>
@@ -8384,30 +8416,30 @@ export default function OrderPage() {
                         const categories = preferred.filter((category) => category === "전체" || present.includes(category));
                         for (const category of present) if (!categories.includes(category)) categories.push(category);
                         return categories.length > 2 ? (
-                          <div style={{ position: "relative", marginBottom: "8px" }}>
-                            <div style={{ display: "flex", gap: "6px", overflowX: "auto", paddingRight: "22px", scrollbarWidth: "none" }}>
+                          <div style={sv({ position: "relative", marginBottom: "8px" })}>
+                            <div style={sv({ display: "flex", gap: "6px", overflowX: "auto", paddingRight: "22px", scrollbarWidth: "none" })}>
                               {categories.map((category) => {
                                 const selected = registeredOptionDetailCategory === category;
-                                return <button key={`detail-cat-${category}`} type="button" onClick={() => { setRegisteredOptionDetailCategory(category); setRegisteredOptionDetail(""); setRegisteredOptionColor(""); setRegisteredOptionSize(""); }} style={{ flexShrink: 0, minHeight: "36px", padding: "0 14px", borderRadius: "999px", border: selected ? "none" : "1px solid #D9C5CC", background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#7A1E47", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}>{category}</button>;
+                                return <button key={`detail-cat-${category}`} type="button" onClick={() => { setRegisteredOptionDetailCategory(category); setRegisteredOptionDetail(""); setRegisteredOptionColor(""); setRegisteredOptionSize(""); }} style={sv({ flexShrink: 0, minHeight: "36px", padding: "0 14px", borderRadius: "999px", border: selected ? "none" : "1px solid #D9C5CC", background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#7A1E47", fontSize: "12px", fontWeight: 800, cursor: "pointer" })}>{category}</button>;
                               })}
                             </div>
                           </div>
                         ) : null;
                       })() : null}
                       {registeredOptionComboInfo.names.length > 8 ? (
-                        <div style={{ position: "relative", marginBottom: "8px" }}>
+                        <div style={sv({ position: "relative", marginBottom: "8px" })}>
                           <input
                             value={registeredOptionComboSearch}
                             onChange={(e) => setRegisteredOptionComboSearch(e.target.value)}
                             placeholder="브랜드·이름으로 검색 (예: 샤넬, 탐다오)"
-                            style={{ height: "44px", width: "100%", boxSizing: "border-box", borderRadius: "12px", border: "1.5px solid #E8E2DD", background: "#fff", padding: "0 14px", fontSize: "14px", fontWeight: 700, color: "#222", outline: "none" }}
+                            style={sv({ height: "44px", width: "100%", boxSizing: "border-box", borderRadius: "12px", border: "1.5px solid #E8E2DD", background: "#fff", padding: "0 14px", fontSize: "14px", fontWeight: 700, color: "#222", outline: "none" })}
                           />
                           {registeredOptionComboSearch.trim() ? (
                             <button
                               type="button"
                               onClick={() => setRegisteredOptionComboSearch("")}
                               aria-label="검색어 지우기"
-                              style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", width: "28px", height: "28px", borderRadius: "50%", border: "none", background: "#F1ECEE", color: "#8A8A8A", fontSize: "15px", fontWeight: 800, cursor: "pointer", lineHeight: 1 }}
+                              style={sv({ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", width: "28px", height: "28px", borderRadius: "50%", border: "none", background: "#F1ECEE", color: "#8A8A8A", fontSize: "15px", fontWeight: 800, cursor: "pointer", lineHeight: 1 })}
                             >×</button>
                           ) : null}
                         </div>
@@ -8419,12 +8451,12 @@ export default function OrderPage() {
                         if (chips.length < 2) return null;
                         const cur = registeredOptionComboSearch.trim();
                         return (
-                          <div style={{ position: "relative", marginBottom: "8px" }}>
-                            <div style={{ display: "flex", gap: "6px", overflowX: "auto", paddingRight: "26px", scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}>
+                          <div style={sv({ position: "relative", marginBottom: "8px" })}>
+                            <div style={sv({ display: "flex", gap: "6px", overflowX: "auto", paddingRight: "26px", scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" })}>
                             <button
                               type="button"
                               onClick={() => setRegisteredOptionComboSearch("")}
-                              style={{ flexShrink: 0, whiteSpace: "nowrap", fontSize: "12px", fontWeight: 700, padding: "6px 11px", borderRadius: "999px", border: `1.5px solid ${!cur ? "#7A1E47" : "#E8E2DD"}`, background: !cur ? "#7A1E47" : "#fff", color: !cur ? "#fff" : "#555", cursor: "pointer" }}
+                              style={sv({ flexShrink: 0, whiteSpace: "nowrap", fontSize: "12px", fontWeight: 700, padding: "6px 11px", borderRadius: "999px", border: `1.5px solid ${!cur ? "#7A1E47" : "#E8E2DD"}`, background: !cur ? "#7A1E47" : "#fff", color: !cur ? "#fff" : "#555", cursor: "pointer" })}
                             >전체 {registeredOptionComboInfo.names.length}</button>
                             {chips.map(({ brand, count }) => {
                               const on = normalizeSuggestionText(cur) === normalizeSuggestionText(brand);
@@ -8433,12 +8465,12 @@ export default function OrderPage() {
                                   key={`brand-${brand}`}
                                   type="button"
                                   onClick={() => setRegisteredOptionComboSearch((prev) => (normalizeSuggestionText(prev) === normalizeSuggestionText(brand) ? "" : brand))}
-                                  style={{ flexShrink: 0, whiteSpace: "nowrap", fontSize: "12px", fontWeight: 700, padding: "6px 11px", borderRadius: "999px", border: `1.5px solid ${on ? "#7A1E47" : "#E8E2DD"}`, background: on ? "#7A1E47" : "#fff", color: on ? "#fff" : "#555", cursor: "pointer" }}
+                                  style={sv({ flexShrink: 0, whiteSpace: "nowrap", fontSize: "12px", fontWeight: 700, padding: "6px 11px", borderRadius: "999px", border: `1.5px solid ${on ? "#7A1E47" : "#E8E2DD"}`, background: on ? "#7A1E47" : "#fff", color: on ? "#fff" : "#555", cursor: "pointer" })}
                                 >{brand} {count}</button>
                               );
                             })}
                             </div>
-                            <span style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "26px", background: "linear-gradient(90deg,rgba(255,255,255,0),#fff)", pointerEvents: "none" }} />
+                            <span style={sv({ position: "absolute", top: 0, right: 0, bottom: 0, width: "26px", background: "linear-gradient(90deg,rgba(255,255,255,0),#fff)", pointerEvents: "none" })} />
                           </div>
                         );
                       })() : null}
@@ -8475,9 +8507,9 @@ export default function OrderPage() {
                         };
                         if (list.length === 0) {
                           return (
-                            <div style={{ padding: "18px 14px", textAlign: "center", border: "1px solid #F0EAE0", borderRadius: "12px" }}>
-                              <div style={{ fontSize: "13px", fontWeight: 700, color: "#6E655E" }}>검색 결과가 없어요</div>
-                              <button type="button" onClick={() => setRegisteredOptionComboSearch("")} style={{ marginTop: "10px", height: "36px", padding: "0 16px", borderRadius: "10px", border: "1.5px solid #E8E2DD", background: "#fff", fontSize: "13px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>전체 보기</button>
+                            <div style={sv({ padding: "18px 14px", textAlign: "center", border: "1px solid #F0EAE0", borderRadius: "12px" })}>
+                              <div style={sv({ fontSize: "13px", fontWeight: 700, color: "#6E655E" })}>검색 결과가 없어요</div>
+                              <button type="button" onClick={() => setRegisteredOptionComboSearch("")} style={sv({ marginTop: "10px", height: "36px", padding: "0 16px", borderRadius: "10px", border: "1.5px solid #E8E2DD", background: "#fff", fontSize: "13px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" })}>전체 보기</button>
                             </div>
                           );
                         }
@@ -8510,16 +8542,16 @@ export default function OrderPage() {
                           return { selected, remain, soldOut, plus, priceView, gallery: gallery.length ? gallery : [autoCover], cover: gallery[0] || autoCover, knownColor, code: detailCode(name) };
                         };
                         return (
-                          <div style={{ display: "grid", gap: "9px" }}>
+                          <div style={sv({ display: "grid", gap: "9px" })}>
                             {entries.map((entry) => {
                               const name=entry.name, m=metaOf(name);
-                              return <button key={name} type="button" onClick={()=>chooseDetail(name,m.soldOut)} disabled={m.soldOut} style={{display:"flex",alignItems:"center",gap:"8px",width:"100%",padding:"9px",border:"1px solid #F0EAE0",borderRadius:"12px",background:m.selected?"#7A1E47":"#FFFDFB",opacity:m.soldOut?.45:1}}>{/* [2026-09-09 3순위] 예전엔 사진을 누르면 «확대창»이 떠서 «고르려던» 손님이 헷갈렸다(색상칩도 같은 문제였다).
+                              return <button key={name} type="button" onClick={()=>chooseDetail(name,m.soldOut)} disabled={m.soldOut} style={sv({display:"flex",alignItems:"center",gap:"8px",width:"100%",padding:"9px",border:"1px solid #F0EAE0",borderRadius:"12px",background:m.selected?"#7A1E47":"#FFFDFB",opacity:m.soldOut?.45:1})}>{/* [2026-09-09 3순위] 예전엔 사진을 누르면 «확대창»이 떠서 «고르려던» 손님이 헷갈렸다(색상칩도 같은 문제였다).
                                   → 사진을 눌러도 그냥 «선택»된다. 확대는 위 대표사진(🔍 크게)이 맡는다. */}
-                              {m.cover?<span style={{position:"relative",width:48,height:48,flexShrink:0}}><img src={m.cover} alt="" loading="lazy" decoding="async" style={{width:48,height:48,objectFit:"cover",borderRadius:8}}/>{m.gallery.length>1?<span style={{position:"absolute",right:2,bottom:2,borderRadius:999,background:"rgba(0,0,0,.68)",padding:"1px 4px",color:"#fff",fontSize:"8px",fontWeight:900}}>사진 {m.gallery.length}장</span>:null}</span>:null}
-                              <span style={{flex:1,minWidth:0,textAlign:"left",fontSize:13,fontWeight:800,color:m.selected?'#fff':'#333',overflowWrap:'anywhere'}}>{orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name??''),name)}</span>
-                              <span style={{maxWidth:'48%',minWidth:0,textAlign:'right',lineHeight:1.4}}>
-                                {!m.selected&&<ProductDiscountLabel note={registeredOptionSelectProduct.product_note} actualPrice={registeredOptionPrice+m.plus} detail={name}/>}
-                                <b style={{display:'block',fontSize:13,color:m.selected?'#F5D9E5':'#7A1E47'}}>{m.priceView.actualLabel}</b>
+                              {m.cover?<span style={sv({position:"relative",width:48,height:48,flexShrink:0})}><img src={m.cover} alt="" loading="lazy" decoding="async" style={sv({width:48,height:48,objectFit:"cover",borderRadius:8})}/>{m.gallery.length>1?<span style={sv({position:"absolute",right:2,bottom:2,borderRadius:999,background:"rgba(0,0,0,.68)",padding:"1px 4px",color:"#fff",fontSize:"8px",fontWeight:900})}>사진 {m.gallery.length}장</span>:null}</span>:null}
+                              <span style={sv({flex:1,minWidth:0,textAlign:"left",fontSize:13,fontWeight:800,color:m.selected?'#fff':'#333',overflowWrap:'anywhere'})}>{orderDetailDisplayName(String(registeredOptionSelectProduct?.product_name??''),name)}</span>
+                              <span style={sv({maxWidth:'48%',minWidth:0,textAlign:'right',lineHeight:1.4})}>
+                                {!m.selected&&<ProductDiscountLabel tone={uiV2 ? "v2" : undefined} note={registeredOptionSelectProduct.product_note} actualPrice={registeredOptionPrice+m.plus} detail={name}/>}
+                                <b style={sv({display:'block',fontSize:13,color:m.selected?'#F5D9E5':'#7A1E47'})}>{m.priceView.actualLabel}</b>
                               </span></button>;
                             })}
                           </div>
@@ -8530,24 +8562,39 @@ export default function OrderPage() {
                   ) : null}
 
                   {registeredOptionDetailSelected && (!registeredOptionComboInfo || registeredOptionAxes3) && registeredOptionColorChoices.length > 0 ? (
-                    <div style={{ marginBottom: "16px", opacity: registeredOptionAxes3 && !registeredOptionDetail.trim() ? 0.45 : 1, pointerEvents: registeredOptionAxes3 && !registeredOptionDetail.trim() ? "none" : "auto" }}>
-                      <div style={{ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" }}>
+                    <div style={sv({ marginBottom: "16px", opacity: registeredOptionAxes3 && !registeredOptionDetail.trim() ? 0.45 : 1, pointerEvents: registeredOptionAxes3 && !registeredOptionDetail.trim() ? "none" : "auto" })}>
+                      <div style={sv({ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" })}>
                         색상
                         {/* [2026-09-09] 색상 사진이 실제로 있을 때만 안내 — 없는 상품엔 헛말이 되지 않게 */}
                         {registeredOptionColorChoices.some((c) => registeredOptionColorPhotos[c]) && !(registeredOptionAxes3 && !registeredOptionDetail.trim())
-                          ? <span style={{ marginLeft: "5px", fontSize: "11px", fontWeight: 800, color: "#8A7F84" }}>— 누르면 위 사진이 그 색으로 바뀌어요</span>
+                          ? <span style={sv({ marginLeft: "5px", fontSize: "11px", fontWeight: 800, color: "#8A7F84" })}>— 누르면 위 사진이 그 색으로 바뀌어요</span>
                           : null}
                         {registeredOptionAxes3 && !registeredOptionDetail.trim()
-                          ? <span style={{ marginLeft: "6px", fontSize: "12px", fontWeight: 700, color: "#6E655E" }}>— {registeredOptionAxes3.detailLabel}부터 선택</span>
+                          ? <span style={sv({ marginLeft: "6px", fontSize: "12px", fontWeight: 700, color: "#6E655E" })}>— {registeredOptionAxes3.detailLabel}부터 선택</span>
                           : null}
                       </div>
-                      {registeredOptionColorChoices.length <= 4 ? (
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                      {uiV2 && registeredOptionColorChoices.every((c) => registeredOptionColorSwatches[c] || colorNameSwatch(c)) ? (
+                        /* [㉜ 2단계] 색 점 고르기 — 40px 점(관리자 색 → 이름표 자동 색), 고른 점은 검정 2px 링 + 흰 2px 틈, 점 아래 색상 이름. */
+                        <div role="radiogroup" aria-label="색상" style={{ display: "flex", flexWrap: "wrap", gap: "12px 8px" }}>
+                          {registeredOptionColorChoices.map((option) => {
+                            const selected = registeredOptionColor === option;
+                            const soldOut = isSoldOutColorSize(option, registeredOptionSize);
+                            const hex = registeredOptionColorSwatches[option] || colorNameSwatch(option) || "#F5F5F5";
+                            return (
+                              <button key={`cd-${option}`} type="button" role="radio" aria-checked={selected} aria-label={soldOut ? `${option} 품절` : option} disabled={soldOut} onClick={() => { if (soldOut) return; const next = selected ? "" : option; setRegisteredOptionColor(next); if (!sizeKeepableForColor(next, registeredOptionSize)) setRegisteredOptionSize(""); const nextPhoto = next ? (registeredOptionColorPhotos[next] || "") : ""; setRegisteredOptionHeroPhoto(nextPhoto); }} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", minWidth: "56px", maxWidth: "88px", padding: "4px", border: "none", background: "transparent", cursor: soldOut ? "not-allowed" : "pointer", opacity: soldOut ? 0.4 : 1, fontFamily: "inherit" }}>
+                                <span aria-hidden="true" style={{ width: "40px", height: "40px", flexShrink: 0, borderRadius: "9999px", backgroundColor: hex, border: isLightSwatch(hex) ? "1px solid #CACACB" : "1px solid transparent", boxSizing: "border-box", boxShadow: selected ? "0 0 0 2px #FFFFFF, 0 0 0 4px #111111" : "none" }} />
+                                <span style={{ fontSize: "13px", fontWeight: selected ? 700 : 400, color: selected ? "#111111" : "#39393B", lineHeight: 1.3, textAlign: "center", wordBreak: "keep-all", overflowWrap: "anywhere" }}>{soldOut ? `${option} (품절)` : option}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : registeredOptionColorChoices.length <= 4 ? (
+                        <div style={sv({ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" })}>
                           {registeredOptionColorChoices.map((option) => {
                             const selected = registeredOptionColor === option;
                             const soldOut = isSoldOutColorSize(option, registeredOptionSize);
                             return (
-                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; const next = selected ? "" : option; setRegisteredOptionColor(next); if (!sizeKeepableForColor(next, registeredOptionSize)) setRegisteredOptionSize(""); const nextPhoto = next ? (registeredOptionColorPhotos[next] || "") : ""; setRegisteredOptionHeroPhoto(nextPhoto); }} style={{ minHeight: "48px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", padding: "8px" }}>{registeredOptionColorPhotos[option] ? <img src={registeredOptionColorPhotos[option]} alt={option} loading="lazy" decoding="async" style={{ flexShrink: 0, width: "36px", height: "36px", objectFit: "cover", borderRadius: "10px", display: "block" }} /> : <ColorSwatch hex={registeredOptionColorSwatches[option]}/>}<span style={{ overflowWrap: "anywhere", minWidth:0 }}>{soldOut ? option + " (품절)" : option}</span></button>
+                              <button key={`c-${option}`} type="button" onClick={() => { if (soldOut) return; const next = selected ? "" : option; setRegisteredOptionColor(next); if (!sizeKeepableForColor(next, registeredOptionSize)) setRegisteredOptionSize(""); const nextPhoto = next ? (registeredOptionColorPhotos[next] || "") : ""; setRegisteredOptionHeroPhoto(nextPhoto); }} style={uiV2 ? { minHeight: "52px", borderRadius: "8px", border: selected ? "2px solid #111111" : "1px solid #CACACB", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, cursor: soldOut ? "not-allowed" : "pointer", opacity: soldOut ? 0.4 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", padding: selected ? "7px" : "8px", fontFamily: "inherit" } : { minHeight: "48px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", padding: "8px" }}>{registeredOptionColorPhotos[option] ? <img src={registeredOptionColorPhotos[option]} alt={option} loading="lazy" decoding="async" style={sv({ flexShrink: 0, width: "36px", height: "36px", objectFit: "cover", borderRadius: "10px", display: "block" })} /> : uiV2 ? (() => { const hx = registeredOptionColorSwatches[option] || colorNameSwatch(option); return hx ? <span aria-hidden="true" style={{ flexShrink: 0, width: "22px", height: "22px", borderRadius: "9999px", backgroundColor: hx, border: isLightSwatch(hx) ? "1px solid #CACACB" : "1px solid transparent", boxSizing: "border-box" }} /> : null; })() : <ColorSwatch hex={registeredOptionColorSwatches[option]}/>}<span style={sv({ overflowWrap: "anywhere", minWidth:0 })}>{soldOut ? option + " (품절)" : option}</span></button>
                             );
                           })}
                         </div>
@@ -8556,7 +8603,7 @@ export default function OrderPage() {
                         <select
                           value={registeredOptionColor}
                           onChange={(e) => { const next = e.target.value; setRegisteredOptionColor(next); if (!sizeKeepableForColor(next, registeredOptionSize)) setRegisteredOptionSize(""); setRegisteredOptionHeroPhoto(next ? (registeredOptionColorPhotos[next] || "") : ""); }}
-                          style={{ width: "100%", height: "52px", borderRadius: "12px", border: `1.5px solid ${registeredOptionColor ? "#7A1E47" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 800, color: registeredOptionColor ? "#7A1E47" : "#444" }}
+                          style={uiV2 ? { width: "100%", height: "52px", borderRadius: "8px", border: registeredOptionColor ? "2px solid #111111" : "1px solid #CACACB", background: "#FFFFFF", padding: "0 14px", fontSize: "16px", fontWeight: 600, color: "#111111", fontFamily: "inherit" } : { width: "100%", height: "52px", borderRadius: "12px", border: `1.5px solid ${registeredOptionColor ? "#7A1E47" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 800, color: registeredOptionColor ? "#7A1E47" : "#444" }}
                         >
                           <option value="">색상을 골라주세요 ({registeredOptionColorChoices.length}가지)</option>
                           {registeredOptionColorChoices.map((option) => {
@@ -8565,9 +8612,9 @@ export default function OrderPage() {
                           })}
                         </select>
                       )}
-                      {registeredOptionColorChoices.length > 4 && registeredOptionColorSwatches[registeredOptionColor] ? <ProductColorSwatches value={{[registeredOptionColor]:registeredOptionColorSwatches[registeredOptionColor]}}/> : null}
+                      {!uiV2 && registeredOptionColorChoices.length > 4 && registeredOptionColorSwatches[registeredOptionColor] ? <ProductColorSwatches value={{[registeredOptionColor]:registeredOptionColorSwatches[registeredOptionColor]}}/> : null}
                       {/* [2026-08-28 P0-4] 문구가 사라질 때 아래 버튼이 위로 밀려 오클릭이 나던 문제 → 자리를 항상 잡아둔다 */}
-                      <div data-order-option-missing={!registeredOptionColor.trim() ? "true" : undefined} style={{ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" }}>{!registeredOptionColor.trim() ? "색상을 선택해 주세요" : ""}</div>
+                      <div data-order-option-missing={!registeredOptionColor.trim() ? "true" : undefined} style={sv({ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" })}>{!registeredOptionColor.trim() ? "색상을 선택해 주세요" : ""}</div>
                     </div>
                   ) : null}
 
@@ -8577,7 +8624,7 @@ export default function OrderPage() {
                     // [2026-09-03 사장님 요청] 칸 제목은 사장님이 정한 라벨(예: 상품숫자), 없으면 기존대로 "색상"
                     const inputLabel = getCustomInputLabel(registeredOptionResolvedProduct || registeredOptionSelectProduct) || "색상";
                     return (
-                    <CustomerManualField id="registered-product-options" label={inputLabel} value={registeredOptionColor} onChange={setRegisteredOptionColor}
+                    <CustomerManualField tone={uiV2 ? "v2" : undefined} id="registered-product-options" label={inputLabel} value={registeredOptionColor} onChange={setRegisteredOptionColor}
                       placeholder={inputLabel === "색상" ? "예: 베이지" : /상품번호.*옵션/.test(inputLabel) ? "예: BB-60 / 베이지 / M" : "방송에서 안내한 내용을 입력"}
                       help={inputLabel === "색상" ? "방송에서 안내한 색상을 직접 입력해 주세요." : /상품번호.*옵션/.test(inputLabel) ? "방송에서 확인한 상품번호와 옵션을 직접 입력해 주세요." : "방송에서 확인한 내용을 직접 입력해 주세요."}
                       error={registeredOptionAttempted && !registeredOptionColor.trim() ? (inputLabel === "색상" ? "색상을 입력해 주세요." : "주문 내용을 입력해 주세요.") : ""} />
@@ -8585,30 +8632,33 @@ export default function OrderPage() {
                   })() : null}
 
                   {registeredOptionDetailSelected && registeredOptionSizeChoices.length > 0 ? (
-                    <div style={{ marginBottom: "16px", opacity: registeredOptionAxes3 && !registeredOptionDetail.trim() ? 0.45 : 1, pointerEvents: registeredOptionAxes3 && !registeredOptionDetail.trim() ? "none" : "auto" }}>
-                      <div style={{ marginBottom: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "14px", fontWeight: 800, color: "#333" }}>사이즈</span>
+                    <div style={sv({ marginBottom: "16px", opacity: registeredOptionAxes3 && !registeredOptionDetail.trim() ? 0.45 : 1, pointerEvents: registeredOptionAxes3 && !registeredOptionDetail.trim() ? "none" : "auto" })}>
+                      <div style={sv({ marginBottom: "8px", display: "flex", alignItems: "center", gap: "8px" })}>
+                        <span style={sv({ fontSize: "14px", fontWeight: 800, color: "#333" })}>사이즈</span>
                         {registeredOptionAxes3 && !registeredOptionDetail.trim()
-                          ? <span style={{ fontSize: "12px", fontWeight: 700, color: "#6E655E" }}>— {registeredOptionAxes3.detailLabel}부터 선택</span>
+                          ? <span style={sv({ fontSize: "12px", fontWeight: 700, color: "#6E655E" })}>— {registeredOptionAxes3.detailLabel}부터 선택</span>
                           : null}
                         {/* [2026-08-29] 치수가 등록된 상품에서만 나온다. 없으면 이 버튼 자체가 없다. */}
                         {registeredOptionSizeChart ? (
                           <button
                             type="button"
                             onClick={() => setSizeChartOpen(true)}
-                            style={{ marginLeft: "auto", border: "1.5px solid #7A1E47", borderRadius: "999px", background: "#fff", color: "#7A1E47", padding: "5px 11px", fontSize: "12px", fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap" }}
+                            style={sv({ marginLeft: "auto", border: "1.5px solid #7A1E47", borderRadius: "999px", background: "#fff", color: "#7A1E47", padding: "5px 11px", fontSize: "12px", fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap" })}
                           >
                             사이즈 실측 보기
                           </button>
                         ) : null}
                       </div>
                       {registeredOptionSizeChoices.length <= 4 ? (
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                        <div style={sv({ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" })}>
                           {registeredOptionSizeChoices.map((option) => {
                             const selected = registeredOptionSize === option;
                             const soldOut = isSoldOutColorSize(registeredOptionColor, option);
                             return (
-                              <button key={`s-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionSize((prev) => prev === option ? "" : option); }} style={{ height: "48px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? sizeDisplayLabel(option) + " (품절)" : sizeDisplayLabel(option)}</button>
+                              uiV2 ? (() => {
+                                const qtyLeft = registeredOptionColor.trim() || registeredOptionColorChoices.length === 0 ? availableQtyColorSize(registeredOptionColor, option) : null;
+                                return <button key={`s-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionSize((prev) => prev === option ? "" : option); }} style={{ minHeight: "52px", borderRadius: "8px", border: selected ? "2px solid #111111" : "1px solid #CACACB", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, cursor: soldOut ? "not-allowed" : "pointer", opacity: soldOut ? 0.4 : 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "2px", padding: selected ? "5px 7px" : "6px 8px", fontFamily: "inherit" }}><span>{soldOut ? sizeDisplayLabel(option) + " (품절)" : sizeDisplayLabel(option)}</span>{!soldOut && qtyLeft !== null && qtyLeft > 0 && qtyLeft <= 10 ? <span style={{ fontSize: "13px", fontWeight: 600, color: "#D30005" }}>{qtyLeft}개 남음</span> : null}</button>;
+                              })() : <button key={`s-${option}`} type="button" onClick={() => { if (soldOut) return; setRegisteredOptionSize((prev) => prev === option ? "" : option); }} style={{ height: "48px", borderRadius: "12px", border: `1.5px solid ${selected ? "#7A1E47" : "#E8E2DD"}`, background: selected ? "#7A1E47" : "#fff", color: selected ? "#fff" : "#444", fontSize: "14px", fontWeight: 800, cursor: "pointer", opacity: soldOut ? 0.4 : 1 }}>{soldOut ? sizeDisplayLabel(option) + " (품절)" : sizeDisplayLabel(option)}</button>
                             );
                           })}
                         </div>
@@ -8617,7 +8667,7 @@ export default function OrderPage() {
                         <select
                           value={registeredOptionSize}
                           onChange={(e) => setRegisteredOptionSize(e.target.value)}
-                          style={{ width: "100%", height: "52px", borderRadius: "12px", border: `1.5px solid ${registeredOptionSize ? "#7A1E47" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 800, color: registeredOptionSize ? "#7A1E47" : "#444" }}
+                          style={uiV2 ? { width: "100%", height: "52px", borderRadius: "8px", border: registeredOptionSize ? "2px solid #111111" : "1px solid #CACACB", background: "#FFFFFF", padding: "0 14px", fontSize: "16px", fontWeight: 600, color: "#111111", fontFamily: "inherit" } : { width: "100%", height: "52px", borderRadius: "12px", border: `1.5px solid ${registeredOptionSize ? "#7A1E47" : "#E8E2DD"}`, background: "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 800, color: registeredOptionSize ? "#7A1E47" : "#444" }}
                         >
                           <option value="">사이즈를 골라주세요 ({registeredOptionSizeChoices.length}가지)</option>
                           {registeredOptionSizeChoices.map((option) => {
@@ -8628,7 +8678,7 @@ export default function OrderPage() {
                         </select>
                       )}
                       {/* [2026-08-28 P0-4] 문구가 사라질 때 아래 버튼이 위로 밀려 오클릭이 나던 문제 → 자리를 항상 잡아둔다 */}
-                      <div data-order-option-missing={!registeredOptionSize.trim() ? "true" : undefined} style={{ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" }}>{!registeredOptionSize.trim() ? "사이즈를 선택해 주세요" : ""}</div>
+                      <div data-order-option-missing={!registeredOptionSize.trim() ? "true" : undefined} style={sv({ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" })}>{!registeredOptionSize.trim() ? "사이즈를 선택해 주세요" : ""}</div>
                       {/* [2026-09-20 사장님] 치수 칩 — 사이즈를 고르면 그 사이즈 열의 앞 3개 치수(가슴단면 57 …)를 바로 보여준다.
                           원천은 사이즈 실측표(size_charts) 그대로, 전체 표는 「사이즈 실측 보기」. 표시 전용. */}
                       {registeredOptionSizeChart && registeredOptionSize.trim() ? (() => {
@@ -8640,9 +8690,9 @@ export default function OrderPage() {
                           .slice(0, 3);
                         if (chips.length === 0) return null;
                         return (
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "2px" }}>
+                          <div style={sv({ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "2px" })}>
                             {chips.map((c) => (
-                              <span key={c.label} style={{ fontSize: "12px", fontWeight: 800, background: "#F5E6EB", color: "#7A1E47", borderRadius: "999px", padding: "6px 10px" }}>
+                              <span key={c.label} style={sv({ fontSize: "12px", fontWeight: 800, background: "#F5E6EB", color: "#7A1E47", borderRadius: "999px", padding: "6px 10px" })}>
                                 {c.label} {c.value}{registeredOptionSizeChart.unit}
                               </span>
                             ))}
@@ -8655,20 +8705,20 @@ export default function OrderPage() {
                   {/* [UI] 옵션 없는 상품의 "없음" 죽은 칸 제거 — 안내 문구가 이미 있음 */}
 
                   {registeredOptionDetailSelected && registeredOptionSizeMode === "input" ? (
-                    <div style={{ marginBottom: "16px" }}>
+                    <div style={sv({ marginBottom: "16px" })}>
                       {/* [2026-09-03 재설계 4단계 · 표시 전용] 직접입력 칸 — 주황 점선+배지+예시 */}
-                      <div style={{ marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
-                        <span style={{ fontSize: "14px", fontWeight: 800, color: "#333" }}>사이즈</span>
-                        <span style={{ background: "#9A6212", color: "#fff", fontSize: "10px", fontWeight: 900, borderRadius: "9999px", padding: "2px 8px" }}>🖊 직접 입력</span>
+                      <div style={sv({ marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" })}>
+                        <span style={sv({ fontSize: "14px", fontWeight: 800, color: "#333" })}>사이즈</span>
+                        <span style={sv({ background: "#9A6212", color: "#fff", fontSize: "10px", fontWeight: 900, borderRadius: "9999px", padding: "2px 8px" })}>{uiV2 ? "직접 입력" : "🖊 직접 입력"}</span>
                       </div>
-                      <input value={registeredOptionSize} onChange={(e) => setRegisteredOptionSize(e.target.value)} placeholder="사이즈를 적어주세요 (예: 66, 프리)" style={{ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: !registeredOptionSize.trim() ? "2px dashed #E2B64D" : "1.5px solid #E8E2DD", background: !registeredOptionSize.trim() ? "#FFFDF5" : "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" }} />
+                      <input value={registeredOptionSize} onChange={(e) => setRegisteredOptionSize(e.target.value)} placeholder="사이즈를 적어주세요 (예: 66, 프리)" style={sv({ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: !registeredOptionSize.trim() ? "2px dashed #E2B64D" : "1.5px solid #E8E2DD", background: !registeredOptionSize.trim() ? "#FFFDF5" : "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" })} />
                       {/* [2026-08-28 P0-4] 문구가 사라질 때 아래 버튼이 위로 밀려 오클릭이 나던 문제 → 자리를 항상 잡아둔다 */}
-                      <div data-order-option-missing={!registeredOptionSize.trim() ? "true" : undefined} style={{ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" }}>{!registeredOptionSize.trim() ? "사이즈를 입력해 주세요" : ""}</div>
+                      <div data-order-option-missing={!registeredOptionSize.trim() ? "true" : undefined} style={sv({ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" })}>{!registeredOptionSize.trim() ? "사이즈를 입력해 주세요" : ""}</div>
                     </div>
                   ) : null}
 
                   {registeredOptionDetailSelected && registeredOptionNeedsManualPrice ? (
-                    <CustomerManualField id="registered-product-amount" label="상품 1개 금액" numeric
+                    <CustomerManualField tone={uiV2 ? "v2" : undefined} id="registered-product-amount" label="상품 1개 금액" numeric
                       value={registeredOptionManualPrice > 0 ? registeredOptionManualPrice.toLocaleString("ko-KR") : ""}
                       onChange={(value) => setRegisteredOptionManualPrice(Math.max(0, Number(value.replace(/[^0-9]/g, "")) || 0))}
                       placeholder="예: 59,000" help="방송에서 안내한 상품 1개 가격을 직접 입력해 주세요."
@@ -8676,12 +8726,12 @@ export default function OrderPage() {
                   ) : null}
                   {/* [2026-09-20 사장님] 「사진 N장 크게 보기 없애도 될 듯」 — 대표사진이 크게 뜨고 🔍 크게가 있으니 삭제. 설명 글이 있을 때만 「상품 상세」. */}
                   {registeredOptionDetailSelected && registeredOptionDescription && registeredOptionNeedsManualPrice ? (
-                    <details style={{ marginTop: "16px", borderTop: "1px solid #F0EAE0", paddingTop: "12px", fontSize: "13px", color: "#555" }}>
-                      <summary style={{ cursor: "pointer", padding: "8px 0", fontWeight: 700 }}>상품 안내</summary>
-                      <div style={{ lineHeight: 1.7, whiteSpace: "pre-wrap", marginTop: "8px" }}>{registeredOptionDescription}</div>
+                    <details style={sv({ marginTop: "16px", borderTop: "1px solid #F0EAE0", paddingTop: "12px", fontSize: "13px", color: "#555" })}>
+                      <summary style={sv({ cursor: "pointer", padding: "8px 0", fontWeight: 700 })}>상품 안내</summary>
+                      <div style={sv({ lineHeight: 1.7, whiteSpace: "pre-wrap", marginTop: "8px" })}>{registeredOptionDescription}</div>
                     </details>
                   ) : registeredOptionDetailSelected && registeredOptionDescription ? (
-                    <div style={{ marginTop: "16px", borderTop: "1px solid #F0EAE0", paddingTop: "14px" }}>
+                    <div style={sv({ marginTop: "16px", borderTop: "1px solid #F0EAE0", paddingTop: "14px" })}>
                       {/* [2026-09-09 사장님 지적] 「위에 사진들이 나열돼 있는데 밑에 또 크게 띄울 필요가 있나?
                             중복 개념 아닌가? 결국 상세 설명은 사진들 끝에 있어서 글이 보이지도 않음」
                           맞는 지적이라 고쳤다. 예전엔 위 썸네일 줄과 «똑같은 사진 배열»을 여기서 전부
@@ -8689,9 +8739,9 @@ export default function OrderPage() {
                           바꾼 것: ① 설명 글을 맨 위로(바로 읽힌다) ② 사진 중복 나열 삭제
                                    ③ 사진은 위 썸네일 줄에 이미 다 있으므로 「모두 보기」 한 줄로 크게 본다
                           (무신사·29CM·쿠팡 모두 갤러리는 위, 상세 영역은 설명 글이 먼저다) */}
-                      <div style={{ marginBottom: "10px", fontSize: "14px", fontWeight: 800, color: "#333" }}>상품 상세</div>
+                      <div style={sv({ marginBottom: "10px", fontSize: "14px", fontWeight: 800, color: "#333" })}>상품 상세</div>
                       {registeredOptionDescription ? (
-                        <div style={{ fontSize: "13px", color: "#555", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{registeredOptionDescription}</div>
+                        <div style={sv({ fontSize: "13px", color: "#555", lineHeight: 1.7, whiteSpace: "pre-wrap" })}>{registeredOptionDescription}</div>
                       ) : null}
                     </div>
                   ) : null}
@@ -8926,7 +8976,7 @@ export default function OrderPage() {
                   {uiV2 ? (
                     <>
                       <span style={{ minWidth: 0, flex: 1, display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left" }}>
-                        <span style={{ fontSize: "14px", fontWeight: 400, color: "#707072", whiteSpace: "nowrap" }}>담은 상품 {cartCount}개</span>
+                        <span data-cart-bar-count style={{ display: "inline-block", transformOrigin: "left center", fontSize: "14px", fontWeight: 400, color: "#707072", whiteSpace: "nowrap" }}>담은 상품 {cartCount}개</span>
                         <span style={{ fontSize: "18px", fontWeight: 700, color: "#111111" }}>{cartTotal > 0 ? `${cartTotal.toLocaleString()}원` : ""}</span>
                       </span>
                       <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", height: "52px", padding: "0 24px", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "16px", fontWeight: 600 }}>주문서 확인</span>

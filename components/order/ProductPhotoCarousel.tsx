@@ -8,6 +8,8 @@ type ProductPhotoCarouselProps = {
   alt: string;
   onPhotoChange: (photo: string) => void;
   onOpen: (photo: string) => void;
+  /** [㉜] 손님화면 새 모양(ui=v2) — 사진 무대 soft-cloud·모서리 0, 장수 표시 13px. 없으면 기존 그대로. */
+  tone?: "v2";
 };
 
 const reducedMotionBehavior = (): ScrollBehavior => {
@@ -23,6 +25,7 @@ export default function ProductPhotoCarousel({
   alt,
   onPhotoChange,
   onOpen,
+  tone,
 }: ProductPhotoCarouselProps) {
   const photos = useMemo(() => {
     const ordered = Array.from(new Set(images.map((photo) => String(photo || "").trim()).filter(Boolean)));
@@ -82,9 +85,9 @@ export default function ProductPhotoCarousel({
         position: "relative",
         width: "100%",
         height: "clamp(220px, 62vw, 280px)",
-        borderRadius: "14px",
+        borderRadius: tone === "v2" ? 0 : "14px",
         overflow: "hidden",
-        background: "#F0EBE8",
+        background: tone === "v2" ? "#F5F5F5" : "#F0EBE8",
       }}
     >
       <div
@@ -226,7 +229,7 @@ export default function ProductPhotoCarousel({
         </>
       ) : null}
 
-      <span style={{ position: "absolute", zIndex: 2, right: "8px", bottom: "8px", borderRadius: "999px", background: "rgba(0,0,0,0.72)", padding: "4px 9px", color: "#fff", fontSize: "11px", fontWeight: 900, lineHeight: 1, pointerEvents: "none" }}>🔍 크게</span>
+      <span style={tone === "v2" ? { position: "absolute", zIndex: 2, right: "8px", bottom: "8px", borderRadius: "999px", background: "rgba(0,0,0,0.72)", padding: "4px 9px", color: "#fff", fontSize: "13px", fontWeight: 600, lineHeight: 1, pointerEvents: "none" } : { position: "absolute", zIndex: 2, right: "8px", bottom: "8px", borderRadius: "999px", background: "rgba(0,0,0,0.72)", padding: "4px 9px", color: "#fff", fontSize: "11px", fontWeight: 900, lineHeight: 1, pointerEvents: "none" }}>{tone === "v2" ? "크게" : "🔍 크게"}</span>
     </div>
   );
 }
