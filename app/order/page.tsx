@@ -123,7 +123,7 @@ import { pickVisibleBadges, BADGE_INFO_KEYS, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_M
 import ProductColorRowV2 from "@/components/customer/ProductColorRowV2";
 import { colorNameSwatch, isLightSwatch, resolveColorDisplay } from "@/lib/colorNameSwatch";
 import { restyleV2 } from "@/lib/customerUiV2Restyle";
-import { resolveCustomerUiV2 } from "@/lib/customerUiSwitch";
+import { readCustomerUiPreview, resolveCustomerUiV2, UI_PREVIEW_DEFAULTS } from "@/lib/customerUiSwitch";
 import CartAddFeedbackV2 from "@/components/customer/CartAddFeedbackV2";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import ShopContactLink from "@/components/customer/ShopContactLink";
@@ -1475,15 +1475,21 @@ export default function OrderPage() {
   // [㉜] 손님화면 모양 스위치 — ?ui=v2 켜기("1") / ?ui=v1 끄기("0")(이 브라우저에만 저장). 저장값 없으면 UI_V2_DEFAULT.
   //   서버 렌더와 첫 화면을 맞추려고 처음엔 기본값, 화면이 뜬 뒤에 저장값을 읽는다(기본값과 다른 쪽을 고른 사람만 잠깐 깜빡일 수 있음).
   const [uiV2, setUiV2] = useState(UI_V2_DEFAULT);
+  // [㉜ 3단계] 주문서 확인 창 새 모양 — ?preview=s3 브라우저만(기본값 UI_PREVIEW_DEFAULTS.s3). 새 모양(v2) 켜진 손님에게만.
+  const [previewS3, setPreviewS3] = useState<boolean>(UI_PREVIEW_DEFAULTS.s3);
+  const uiS3 = uiV2 && previewS3;
   useEffect(() => {
     try {
       const decision = resolveCustomerUiV2(new URLSearchParams(window.location.search).get("ui"), window.localStorage.getItem(UI_V2_STORAGE_KEY), UI_V2_DEFAULT);
       if (decision.store) window.localStorage.setItem(UI_V2_STORAGE_KEY, decision.store);
       setUiV2(decision.v2);
     } catch { /* 저장소 못 쓰면 기본값 */ }
+    setPreviewS3(readCustomerUiPreview("s3"));
   }, []);
   // [㉜ 2단계] 옵션 창 등 스타일이 많은 화면의 새 모양 정리(로즈→흑백·13px 미만→13px) — 스위치 꺼지면 원래 스타일 그대로.
   const sv = (style: CSSProperties | undefined): CSSProperties | undefined => (uiV2 ? restyleV2(style) : style);
+  // [㉜ 3단계] 주문서 확인 창 정리(로즈→흑백·13px 미만→13px) — 미리보기 꺼지면 원래 스타일 그대로.
+  const s3s = (style: CSSProperties | undefined): CSSProperties | undefined => (uiS3 ? restyleV2(style) : style);
   const [isEditingCustomerInfo, setIsEditingCustomerInfo] = useState(false);
   const [isCustomerInfoOpen, setIsCustomerInfoOpen] = useState(false);
   const [showSavedCustomerDetail, setShowSavedCustomerDetail] = useState(false);
@@ -7478,12 +7484,13 @@ export default function OrderPage() {
             onClose={() => { if (!submitting) setOrderSheetOpen(false); }}
             closeDisabled={submitting}
             title="주문서 확인"
+            tone={uiS3 ? "v2" : undefined}
             subtitle={selectedItemEntries.length > 0 ? `담은 상품 ${selectedItemEntries.length}개` : undefined}
             bodyPadding="0"
             headerBelow={(
-              <div style={{ padding: "9px 14px", borderBottom: "1px solid #F0EAE0", background: "#FBF5F7", overflowX: "auto" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", minWidth: "360px", color: "#7A1E47", fontSize: "10.5px", fontWeight: 900, whiteSpace: "nowrap" }}>
-                  <span>상품 담기 완료 ✓</span><span style={{ color: "#C9A8B5" }}>→</span><span>주문서 확인·제출 (현재)</span><span style={{ color: "#C9A8B5" }}>→</span><span>입금·결제</span>
+              <div style={uiS3 ? { padding: "10px 16px", borderBottom: "1px solid #E5E5E5", background: "#FFFFFF", overflowX: "auto" } : { padding: "9px 14px", borderBottom: "1px solid #F0EAE0", background: "#FBF5F7", overflowX: "auto" }}>
+                <div style={uiS3 ? { display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", minWidth: "340px", color: "#707072", fontSize: "13px", fontWeight: 400, whiteSpace: "nowrap" } : { display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", minWidth: "360px", color: "#7A1E47", fontSize: "10.5px", fontWeight: 900, whiteSpace: "nowrap" }}>
+                  <span>상품 담기 완료 ✓</span><span style={s3s({ color: "#C9A8B5" })}>→</span><span style={uiS3 ? { color: "#111111", fontWeight: 700 } : undefined}>주문서 확인·제출 (현재)</span><span style={s3s({ color: "#C9A8B5" })}>→</span><span>입금·결제</span>
                 </div>
               </div>
             )}
@@ -7491,7 +7498,7 @@ export default function OrderPage() {
               <>
                 {operatorTestAccount ? (
                   <label
-                    style={{
+                    style={s3s({
                       display: "flex",
                       alignItems: "flex-start",
                       gap: "10px",
@@ -7501,26 +7508,26 @@ export default function OrderPage() {
                       border: adminTestOrderMode ? "1.5px solid #C7B8D8" : "1.5px solid #E24A4A",
                       background: adminTestOrderMode ? "#F6F2FA" : "#FFF2F2",
                       cursor: "pointer",
-                    }}
+                    })}
                   >
                     <input
                       type="checkbox"
                       checked={adminTestOrderMode}
                       onChange={(event) => setAdminTestOrderMode(event.target.checked)}
-                      style={{ marginTop: "2px", width: "18px", height: "18px", flexShrink: 0, accentColor: "#7A1E47" }}
+                      style={s3s({ marginTop: "2px", width: "18px", height: "18px", flexShrink: 0, accentColor: "#7A1E47" })}
                     />
-                    <span style={{ fontSize: "12.5px", fontWeight: 800, lineHeight: 1.5, color: adminTestOrderMode ? "#5B3E72" : "#B3261E" }}>
+                    <span style={s3s({ fontSize: "12.5px", fontWeight: 800, lineHeight: 1.5, color: adminTestOrderMode ? "#5B3E72" : "#B3261E" })}>
                       {adminTestOrderMode ? (
                         <>
                           🧪 테스트 주문으로 제출
                           <br />
-                          <span style={{ fontWeight: 700, color: "#7A6A80" }}>정산·입금확인·송장·피킹에서 제외됩니다. 실제 주문이면 체크를 해제하세요.</span>
+                          <span style={s3s({ fontWeight: 700, color: "#7A6A80" })}>정산·입금확인·송장·피킹에서 제외됩니다. 실제 주문이면 체크를 해제하세요.</span>
                         </>
                       ) : (
                         <>
                           ⚠️ 실제 주문으로 접수됩니다
                           <br />
-                          <span style={{ fontWeight: 700 }}>정산·입금확인·송장에 그대로 포함됩니다.</span>
+                          <span style={s3s({ fontWeight: 700 })}>정산·입금확인·송장에 그대로 포함됩니다.</span>
                         </>
                       )}
                     </span>
@@ -7530,9 +7537,9 @@ export default function OrderPage() {
                     그래서 "마지막 확인 한 칸이 남았어요" 라는 안내문을 따로 띄워야 했다.
                     → 체크칸을 제출 버튼 바로 위(항상 보이는 자리)로 옮기고 안내문은 없앴다. */}
                 {!customerBlockStatus.blocked && finalSubmitConfirmationEnabled ? (
-                  <label data-final-confirm="true" style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px", borderRadius: "12px", border: finalSubmitAcknowledged ? "1.5px solid #7A1E47" : "1.5px solid #E0A96D", background: finalSubmitAcknowledged ? "#F9EEF3" : "#FFF7ED", padding: "11px 12px", cursor: "pointer" }}>
-                    <input type="checkbox" checked={finalSubmitAcknowledged} onChange={(event) => setFinalSubmitAcknowledged(event.target.checked)} style={{ width: "21px", height: "21px", flexShrink: 0, accentColor: "#7A1E47" }} />
-                    <span style={{ fontSize: "13px", fontWeight: 900, lineHeight: 1.45, color: "#4B3540", wordBreak: "keep-all" }}>배송지·상품·옵션·수량을 확인했습니다</span>
+                  <label data-final-confirm="true" style={uiS3 ? { display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px", minHeight: "52px", boxSizing: "border-box", borderRadius: "8px", border: finalSubmitAcknowledged ? "2px solid #111111" : "1px solid #CACACB", background: "#FFFFFF", padding: finalSubmitAcknowledged ? "9px 13px" : "10px 14px", cursor: "pointer" } : s3s({ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px", borderRadius: "12px", border: finalSubmitAcknowledged ? "1.5px solid #7A1E47" : "1.5px solid #E0A96D", background: finalSubmitAcknowledged ? "#F9EEF3" : "#FFF7ED", padding: "11px 12px", cursor: "pointer" })}>
+                    <input type="checkbox" checked={finalSubmitAcknowledged} onChange={(event) => setFinalSubmitAcknowledged(event.target.checked)} style={uiS3 ? { width: "22px", height: "22px", flexShrink: 0, accentColor: "#111111" } : { width: "21px", height: "21px", flexShrink: 0, accentColor: "#7A1E47" }} />
+                    <span style={uiS3 ? { fontSize: "15px", fontWeight: 600, lineHeight: 1.45, color: "#111111", wordBreak: "keep-all" } : { fontSize: "13px", fontWeight: 900, lineHeight: 1.45, color: "#4B3540", wordBreak: "keep-all" }}>배송지·상품·옵션·수량을 확인했습니다</span>
                   </label>
                 ) : null}
                 <button
@@ -7550,7 +7557,7 @@ export default function OrderPage() {
                     void handleSubmitOrderClick();
                   }}
                   disabled={submitting || checkingPurchaseConsent || customerBlockStatus.blocked}
-                  style={{ width: "100%", padding: "14px", background: submitting || checkingPurchaseConsent || customerBlockStatus.blocked || !finalSubmitReady ? "#cbd5e1" : "#7A1E47", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: submitting || checkingPurchaseConsent || customerBlockStatus.blocked ? "default" : "pointer" }}
+                  style={uiS3 ? { width: "100%", height: "52px", padding: "0 16px", background: submitting || checkingPurchaseConsent || customerBlockStatus.blocked || !finalSubmitReady ? "#E5E5E5" : "#111111", color: submitting || checkingPurchaseConsent || customerBlockStatus.blocked || !finalSubmitReady ? "#707072" : "#FFFFFF", border: "none", borderRadius: "9999px", fontSize: "16px", fontWeight: 600, cursor: submitting || checkingPurchaseConsent || customerBlockStatus.blocked ? "not-allowed" : "pointer" } : { width: "100%", padding: "14px", background: submitting || checkingPurchaseConsent || customerBlockStatus.blocked || !finalSubmitReady ? "#cbd5e1" : "#7A1E47", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: submitting || checkingPurchaseConsent || customerBlockStatus.blocked ? "default" : "pointer" }}
                 >
                   {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : checkingPurchaseConsent ? "구매 조건 확인 중..." : `${won(finalPaymentAmount)} · 주문서 제출`}
                 </button>
@@ -7559,15 +7566,15 @@ export default function OrderPage() {
           >
                 {/* 🚚 배송지 카드 */}
                 {/* [2026-09-20 사장님 「난독증도 이해하게 심플하게」] 배송지 = 받는 분·연락처 한 줄 + 주소 한 줄. 닉네임은 결제(입금자명) 줄로 옮김. */}
-                <div style={{ margin: "12px 16px 0", border: "1px solid #E5E1DC", borderRadius: "12px", padding: "12px 14px", background: "#FAF8F6" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                    <span style={{ fontSize: "13px", fontWeight: 800, color: "#1A1A1A" }}>🚚 받는 곳</span>
-                    <button type="button" onClick={() => { setFinalSubmitAcknowledged(false); openCustomerInfoEditBottomSheet("shipping_list"); }} style={{ border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", borderRadius: "8px", padding: "4px 12px", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>변경</button>
+                <div style={uiS3 ? { margin: 0, border: "none", borderBottom: "1px solid #E5E5E5", borderRadius: 0, padding: "16px", background: "#FFFFFF" } : { margin: "12px 16px 0", border: "1px solid #E5E1DC", borderRadius: "12px", padding: "12px 14px", background: "#FAF8F6" }}>
+                  <div style={uiS3 ? { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" } : { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                    <span style={uiS3 ? { fontSize: "15px", fontWeight: 700, color: "#111111" } : { fontSize: "13px", fontWeight: 800, color: "#1A1A1A" }}>{uiS3 ? "받는 곳" : "🚚 받는 곳"}</span>
+                    <button type="button" onClick={() => { setFinalSubmitAcknowledged(false); openCustomerInfoEditBottomSheet("shipping_list"); }} style={uiS3 ? { flexShrink: 0, height: "40px", padding: "0 16px", border: "1px solid #CACACB", background: "#FFFFFF", color: "#111111", borderRadius: "9999px", fontSize: "14px", fontWeight: 600, cursor: "pointer" } : { border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", borderRadius: "8px", padding: "4px 12px", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>변경</button>
                   </div>
-                  <div style={{ fontSize: "14px", fontWeight: 800, color: "#222", lineHeight: 1.5 }}>
+                  <div style={uiS3 ? { fontSize: "16px", fontWeight: 600, color: "#111111", lineHeight: 1.5 } : { fontSize: "14px", fontWeight: 800, color: "#222", lineHeight: 1.5 }}>
                     {(recipientName.trim() || customerName.trim()) || "-"} · {formatPhone(recipientPhone.trim() || customerPhone) || "-"}
                   </div>
-                  <div style={{ marginTop: "2px", fontSize: "13px", fontWeight: 600, color: "#444", lineHeight: 1.5, wordBreak: "keep-all" }}>
+                  <div style={uiS3 ? { marginTop: "2px", fontSize: "15px", fontWeight: 400, color: "#39393B", lineHeight: 1.5, wordBreak: "keep-all" } : { marginTop: "2px", fontSize: "13px", fontWeight: 600, color: "#444", lineHeight: 1.5, wordBreak: "keep-all" }}>
                     {address.trim() ? `${address.trim()}${detailAddress.trim() ? " " + detailAddress.trim() : ""}` : "주소 미입력"}
                   </div>
                 </div>
@@ -7583,43 +7590,43 @@ export default function OrderPage() {
                   // [2026-09-20 심플하게] 정상 휴대폰이면 이 카드는 안 보인다. 문제(못 내는 번호·집전화)일 때만 그 자리에 뜬다.
                   if (phoneOk && phoneIsMobile) return null;
                   return (
-                    <div style={{ margin: "8px 16px 0", border: `1px solid ${phoneOk ? "#E5E1DC" : "#E0344B"}`, borderRadius: "12px", padding: "12px 14px", background: phoneOk ? "#FAF8F6" : "#FFF4F5" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "13px", fontWeight: 800, color: phoneOk ? "#1A1A1A" : "#B3202F" }}>
-                          📱 주문하시는 분 연락처
+                    <div style={s3s({ margin: "8px 16px 0", border: `1px solid ${phoneOk ? "#E5E1DC" : "#E0344B"}`, borderRadius: "12px", padding: "12px 14px", background: phoneOk ? "#FAF8F6" : "#FFF4F5" })}>
+                      <div style={s3s({ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" })}>
+                        <span style={s3s({ fontSize: "13px", fontWeight: 800, color: phoneOk ? "#1A1A1A" : "#B3202F" })}>
+                          {uiS3 ? "주문하시는 분 연락처" : "📱 주문하시는 분 연락처"}
                         </span>
                         <button
                           type="button"
                           onClick={() => { setFinalSubmitAcknowledged(false); openCustomerInfoEditBottomSheet("info"); }}
-                          style={{ flexShrink: 0, border: phoneOk ? "1px solid #D9C5CC" : "none", background: phoneOk ? "#fff" : "#E0344B", color: phoneOk ? "#7A1E47" : "#fff", borderRadius: "8px", padding: "4px 12px", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}
+                          style={s3s({ flexShrink: 0, border: phoneOk ? "1px solid #D9C5CC" : "none", background: phoneOk ? "#fff" : "#E0344B", color: phoneOk ? "#7A1E47" : "#fff", borderRadius: "8px", padding: "4px 12px", fontSize: "12px", fontWeight: 700, cursor: "pointer" })}
                         >
                           {phoneOk ? "변경" : "고치기"}
                         </button>
                       </div>
-                      <div style={{ marginTop: "6px", fontSize: "13px", fontWeight: 800, color: phoneOk ? "#444" : "#B3202F" }}>
+                      <div style={s3s({ marginTop: "6px", fontSize: "13px", fontWeight: 800, color: phoneOk ? "#444" : "#B3202F" })}>
                         {ordererPhone ? formatPhone(ordererPhone) : "번호 없음"}
                       </div>
                       {phoneOk ? (
                         phoneIsMobile ? (
-                          <div style={{ marginTop: "4px", fontSize: "11.5px", color: "#8A7A7D", lineHeight: 1.6 }}>
+                          <div style={s3s({ marginTop: "4px", fontSize: "11.5px", color: "#8A7A7D", lineHeight: 1.6 })}>
                             입금 확인과 주문 조회에 쓰는 번호예요. 위 배송지 연락처와 달라도 괜찮습니다.
                           </div>
                         ) : (
                           /* [2026-08-30] 집·사무실 전화도 주문은 되게 열었다.
                              다만 카드결제 링크와 방송 알림톡은 휴대폰으로만 가므로 미리 알려준다. */
-                          <div style={{ marginTop: "6px", fontSize: "11.5px", color: "#8A6A1E", background: "#FFF8E6", border: "1px solid #F0E0B0", borderRadius: "8px", padding: "8px 10px", lineHeight: 1.7 }}>
+                          <div style={s3s({ marginTop: "6px", fontSize: "11.5px", color: "#8A6A1E", background: "#FFF8E6", border: "1px solid #F0E0B0", borderRadius: "8px", padding: "8px 10px", lineHeight: 1.7 })}>
                             <b>집·사무실 전화번호로 주문하셔도 됩니다.</b><br />
                             다만 이 번호로는 <b>카드결제 링크</b>와 <b>방송 시작 알림톡</b>을 보내드릴 수 없어요.<br />
                             필요하시면 휴대폰 번호로 바꿔주세요.
                           </div>
                         )
                       ) : (
-                        <div style={{ marginTop: "6px", fontSize: "12px", color: "#B3202F", fontWeight: 700, lineHeight: 1.7 }}>
+                        <div style={s3s({ marginTop: "6px", fontSize: "12px", color: "#B3202F", fontWeight: 700, lineHeight: 1.7 })}>
                           이 번호로는 주문서를 낼 수 없어요.<br />
                           <b>위 「고치기」를 눌러 연락처를 고쳐주세요.</b><br />
                           휴대폰(010…) 또는 집·사무실 전화(02…, 031…) 모두 됩니다.
                           <br />
-                          <span style={{ color: "#8A7A7D", fontWeight: 600 }}>
+                          <span style={s3s({ color: "#8A7A7D", fontWeight: 600 })}>
                             ※ 배송지 연락처를 고쳐도 이 번호는 바뀌지 않아요.
                           </span>
                         </div>
@@ -7628,9 +7635,9 @@ export default function OrderPage() {
                   );
                 })()}
             {selectedItemEntries.length === 0 ? (
-              <div style={{ padding: "40px 18px", textAlign: "center" }}>
-                <p style={{ fontSize: "14px", fontWeight: 800, color: "#1A1A1A" }}>아직 담은 상품이 없습니다.</p>
-                <p style={{ marginTop: "6px", fontSize: "12px", fontWeight: 600, color: "#6E655E", lineHeight: 1.6 }}>상품목록에서 [담기]를 누르거나 [직접 입력]으로 담아 주세요.</p>
+              <div style={s3s({ padding: "40px 18px", textAlign: "center" })}>
+                <p style={s3s({ fontSize: "14px", fontWeight: 800, color: "#1A1A1A" })}>아직 담은 상품이 없습니다.</p>
+                <p style={s3s({ marginTop: "6px", fontSize: "12px", fontWeight: 600, color: "#6E655E", lineHeight: 1.6 })}>상품목록에서 [담기]를 누르거나 [직접 입력]으로 담아 주세요.</p>
               </div>
             ) : (
               <div>
@@ -7655,49 +7662,49 @@ export default function OrderPage() {
                   return (
                     <article
                       key={`selected-item-${index}`}
-                      style={{ padding: "12px 18px", borderBottom: "0.5px solid #E5E1DC", display: "flex", gap: "10px", alignItems: "flex-start" }}
+                      style={uiS3 ? { padding: "16px", borderBottom: "1px solid #E5E5E5", display: "flex", gap: "12px", alignItems: "flex-start" } : { padding: "12px 18px", borderBottom: "0.5px solid #E5E1DC", display: "flex", gap: "10px", alignItems: "flex-start" }}
                     >
-                      <div style={{ width: "54px", height: "54px", borderRadius: "8px", background: "#F0EBE8", flexShrink: 0, overflow: "hidden" }}>
+                      <div style={uiS3 ? { width: "72px", height: "72px", borderRadius: 0, background: "#F5F5F5", flexShrink: 0, overflow: "hidden" } : { width: "54px", height: "54px", borderRadius: "8px", background: "#F0EBE8", flexShrink: 0, overflow: "hidden" }}>
                         {imageUrl ? (
-                          <img src={imageUrl} alt={item.product_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          <img src={imageUrl} alt={item.product_name} style={s3s({ width: "100%", height: "100%", objectFit: "cover" })} />
                         ) : (
-                          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", fontWeight: 800, color: "#6E655E", textAlign: "center", padding: "0 4px" }}>{itemSourceLabel}</div>
+                          <div style={s3s({ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", fontWeight: 800, color: "#6E655E", textAlign: "center", padding: "0 4px" })}>{itemSourceLabel}</div>
                         )}
                       </div>
 
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={s3s({ flex: 1, minWidth: 0 })}>
                         {/* [2026-09-20 사장님] 「옵션 변경이 단가 밑에 작게 있어 누르기 애매 → 삭제 앞에, 누르기 쉽게」
                             타사(manysell) 담은 상품 줄 실측: 이름 굵게 / 「단가 × N개」 회색 / 스테퍼 36px / 줄 합계 굵게 / [삭제] 64×40.
                             우리: 오른쪽 위 [옵션 변경][삭제] 같은 크기(40px), 아래 줄 스테퍼는 옵션 시트와 같은 모양(한 상자 −/N/+). */}
-                        <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={s3s({ display: "flex", alignItems: "flex-start", gap: "8px" })}>
+                          <div style={s3s({ flex: 1, minWidth: 0 })}>
                             {/* [2026-08-13] 상품명·옵션명이 잘리면 제출 전에 확인을 못 한다 → 2줄 줄바꿈 */}
-                            <div style={{ fontSize: "14px", fontWeight: 800, color: "#1A1A1A", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{item.product_name || "상품명 없음"}{item.chat_source === "Y" ? <span style={{ marginLeft: "5px", verticalAlign: "1px", display: "inline-block", padding: "1px 6px", borderRadius: "999px", background: "#E8F0FE", color: "#1D4ED8", fontSize: "10px", fontWeight: 800 }}>채팅주문</span> : null}</div>
-                            <div style={{ fontSize: "12px", color: "#6E655E", marginTop: "2px", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{optionSummaryText} · {won(toNumber(item.product_price))} × {toNumber(item.qty)}개</div>
+                            <div style={uiS3 ? { fontSize: "16px", fontWeight: 600, color: "#111111", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" } : { fontSize: "14px", fontWeight: 800, color: "#1A1A1A", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{item.product_name || "상품명 없음"}{item.chat_source === "Y" ? <span style={s3s({ marginLeft: "5px", verticalAlign: "1px", display: "inline-block", padding: "1px 6px", borderRadius: "999px", background: "#E8F0FE", color: "#1D4ED8", fontSize: "10px", fontWeight: 800 })}>채팅주문</span> : null}</div>
+                            <div style={uiS3 ? { fontSize: "14px", fontWeight: 400, color: "#707072", marginTop: "2px", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" } : { fontSize: "12px", color: "#6E655E", marginTop: "2px", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{optionSummaryText} · {won(toNumber(item.product_price))} × {toNumber(item.qty)}개</div>
                           </div>
-                          <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                          <div style={s3s({ display: "flex", gap: "6px", flexShrink: 0 })}>
                             {itemIsRegisteredProduct && !itemHasNoOptions ? (
                               <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · 옵션 변경`, "바꿀게요", () => openSheetItemOptionEdit(index))}
-                                style={{ height: "40px", padding: "0 12px", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
+                                style={uiS3 ? { height: "40px", padding: "0 14px", borderRadius: "9999px", border: "1px solid #CACACB", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" } : { height: "40px", padding: "0 12px", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
                                 옵션 변경
                               </button>
                             ) : null}
                             <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · ${toNumber(item.qty)}개 삭제`, "삭제할게요", () => removeItem(index))} aria-label="상품 삭제"
-                              style={{ height: "40px", padding: "0 12px", borderRadius: "10px", border: "1px solid #F0DDD9", background: "#FDF6F4", color: "#C0554A", fontSize: "13px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
+                              style={uiS3 ? { height: "40px", padding: "0 14px", borderRadius: "9999px", border: "1px solid #CACACB", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" } : { height: "40px", padding: "0 12px", borderRadius: "10px", border: "1px solid #F0DDD9", background: "#FDF6F4", color: "#C0554A", fontSize: "13px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
                               삭제
                             </button>
                           </div>
                         </div>
 
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px", gap: "8px" }}>
-                          <div style={{ display: "grid", gridTemplateColumns: "40px 44px 40px", height: "40px", borderRadius: "10px", border: "1px solid #E8E2DD", overflow: "hidden" }}>
+                        <div style={uiS3 ? { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px", gap: "8px" } : { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px", gap: "8px" }}>
+                          <div style={uiS3 ? { display: "grid", gridTemplateColumns: "44px 44px 44px", height: "44px", alignItems: "center", gap: "4px" } : { display: "grid", gridTemplateColumns: "40px 44px 40px", height: "40px", borderRadius: "10px", border: "1px solid #E8E2DD", overflow: "hidden" }}>
                             <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · ${toNumber(item.qty)}개 → ${Math.max(1, toNumber(item.qty) - 1)}개`, "바꿀게요", () => changeSheetItemQty(index, -1))} aria-label="수량 줄이기"
-                              style={{ borderRight: "1px solid #F0EAE0", border: "none", background: "#fff", color: "#555", fontSize: "18px", fontWeight: 800, cursor: "pointer" }}>−</button>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: 800, color: "#222", borderLeft: "1px solid #F0EAE0", borderRight: "1px solid #F0EAE0" }}>{toNumber(item.qty)}</div>
+                              style={uiS3 ? { width: "44px", height: "44px", borderRadius: "9999px", border: "1px solid #CACACB", background: "#FFFFFF", color: "#111111", fontSize: "20px", fontWeight: 600, cursor: "pointer" } : { borderRight: "1px solid #F0EAE0", border: "none", background: "#fff", color: "#555", fontSize: "18px", fontWeight: 800, cursor: "pointer" }}>−</button>
+                            <div style={uiS3 ? { display: "flex", alignItems: "center", justifyContent: "center", fontSize: "17px", fontWeight: 700, color: "#111111" } : { display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: 800, color: "#222", borderLeft: "1px solid #F0EAE0", borderRight: "1px solid #F0EAE0" }}>{toNumber(item.qty)}</div>
                             <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · ${toNumber(item.qty)}개 → ${toNumber(item.qty) + 1}개`, "바꿀게요", () => changeSheetItemQty(index, 1))} aria-label="수량 늘리기"
-                              style={{ border: "none", background: "#fff", color: "#7A1E47", fontSize: "18px", fontWeight: 800, cursor: "pointer" }}>+</button>
+                              style={uiS3 ? { width: "44px", height: "44px", borderRadius: "9999px", border: "1px solid #CACACB", background: "#FFFFFF", color: "#111111", fontSize: "20px", fontWeight: 600, cursor: "pointer" } : { border: "none", background: "#fff", color: "#7A1E47", fontSize: "18px", fontWeight: 800, cursor: "pointer" }}>+</button>
                           </div>
-                          <span style={{ flexShrink: 0, fontSize: "15px", fontWeight: 900, color: "#7A1E47" }}>{won(itemAmount)}</span>
+                          <span style={uiS3 ? { flexShrink: 0, fontSize: "16px", fontWeight: 700, color: "#111111" } : { flexShrink: 0, fontSize: "15px", fontWeight: 900, color: "#7A1E47" }}>{won(itemAmount)}</span>
                         </div>
                       </div>
                     </article>
@@ -7708,32 +7715,32 @@ export default function OrderPage() {
 
             {/* [셀프 연결 · 사장님 확정 위치] 주문서 확인 안 — 채팅주문 손님만 여길 보니까 남들에겐 안 거슬림 */}
             {isBroadcastOn && chatUiEnabled && chatShowFind ? (
-              <div style={{ padding: "2px 18px 10px" }}>
+              <div style={s3s({ padding: "2px 18px 10px" })}>
                 {chatFindOpen ? ( chatLinked ? (
-                  <div style={{ background: "#FFF6FA", border: "1.5px solid #E8A3C0", borderRadius: "12px", padding: "12px" }}>
-                    <div style={{ fontSize: "14px", fontWeight: 900, color: "#7A1E47" }}>🔄 채팅 주문 다시 불러오기</div>
-                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#A96E86", margin: "4px 0 9px", lineHeight: 1.6 }}>회수되었거나 지워진 <b>내 채팅 주문</b>을 다시 담아드려요.</div>
-                    <div style={{ display: "flex", gap: "7px" }}>
-                      <button type="button" onClick={() => void findMyChatOrders(undefined, true)} style={{ flex: 1, height: "40px", border: "none", borderRadius: "10px", background: "#7A1E47", color: "#fff", fontSize: "13.5px", fontWeight: 900, cursor: "pointer" }}>내 주문 다시 담기</button>
-                      <button type="button" onClick={() => setChatFindOpen(false)} style={{ flexShrink: 0, height: "40px", padding: "0 12px", border: "none", borderRadius: "10px", background: "transparent", color: "#B08FA0", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>닫기</button>
+                  <div style={s3s({ background: "#FFF6FA", border: "1.5px solid #E8A3C0", borderRadius: "12px", padding: "12px" })}>
+                    <div style={s3s({ fontSize: "14px", fontWeight: 900, color: "#7A1E47" })}>{uiS3 ? "채팅 주문 다시 불러오기" : "🔄 채팅 주문 다시 불러오기"}</div>
+                    <div style={s3s({ fontSize: "12px", fontWeight: 700, color: "#A96E86", margin: "4px 0 9px", lineHeight: 1.6 })}>회수되었거나 지워진 <b>내 채팅 주문</b>을 다시 담아드려요.</div>
+                    <div style={s3s({ display: "flex", gap: "7px" })}>
+                      <button type="button" onClick={() => void findMyChatOrders(undefined, true)} style={s3s({ flex: 1, height: "40px", border: "none", borderRadius: "10px", background: "#7A1E47", color: "#fff", fontSize: "13.5px", fontWeight: 900, cursor: "pointer" })}>내 주문 다시 담기</button>
+                      <button type="button" onClick={() => setChatFindOpen(false)} style={s3s({ flexShrink: 0, height: "40px", padding: "0 12px", border: "none", borderRadius: "10px", background: "transparent", color: "#B08FA0", fontSize: "13px", fontWeight: 700, cursor: "pointer" })}>닫기</button>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ background: "#FFF6FA", border: "1.5px solid #E8A3C0", borderRadius: "12px", padding: "10px 12px" }}>
-                    <div style={{ fontSize: "14px", fontWeight: 900, color: "#7A1E47" }}>💬 채팅으로 주문하셨나요?</div>
-                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#A96E86", margin: "4px 0 9px", lineHeight: 1.6 }}>채팅 닉네임 <b>한 글자</b>만 쳐도 이름이 떠요 — 고르면 <b>주문이 바로 담깁니다.</b></div>
-                    <div style={{ display: "flex", gap: "7px" }}>
+                  <div style={s3s({ background: "#FFF6FA", border: "1.5px solid #E8A3C0", borderRadius: "12px", padding: "10px 12px" })}>
+                    <div style={s3s({ fontSize: "14px", fontWeight: 900, color: "#7A1E47" })}>{uiS3 ? "채팅으로 주문하셨나요?" : "💬 채팅으로 주문하셨나요?"}</div>
+                    <div style={s3s({ fontSize: "12px", fontWeight: 700, color: "#A96E86", margin: "4px 0 9px", lineHeight: 1.6 })}>채팅 닉네임 <b>한 글자</b>만 쳐도 이름이 떠요 — 고르면 <b>주문이 바로 담깁니다.</b></div>
+                    <div style={s3s({ display: "flex", gap: "7px" })}>
                       <input value={chatFindName} onChange={(e) => onChatFindNameChange(e.target.value)} placeholder="채팅 닉네임 입력"
-                        style={{ flex: 1, minWidth: 0, height: "38px", borderRadius: "10px", border: "1px solid #E8D5DD", padding: "0 12px", fontSize: "14px", fontWeight: 700 }} />
-                      <button type="button" onClick={() => void findMyChatOrders()} style={{ flexShrink: 0, height: "38px", padding: "0 15px", border: "none", borderRadius: "10px", background: "#7A1E47", color: "#fff", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}>찾기</button>
-                      <button type="button" onClick={() => setChatFindOpen(false)} style={{ flexShrink: 0, height: "38px", padding: "0 9px", border: "none", borderRadius: "10px", background: "transparent", color: "#B08FA0", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>닫기</button>
+                        style={s3s({ flex: 1, minWidth: 0, height: "38px", borderRadius: "10px", border: "1px solid #E8D5DD", padding: "0 12px", fontSize: "14px", fontWeight: 700 })} />
+                      <button type="button" onClick={() => void findMyChatOrders()} style={s3s({ flexShrink: 0, height: "38px", padding: "0 15px", border: "none", borderRadius: "10px", background: "#7A1E47", color: "#fff", fontSize: "13px", fontWeight: 900, cursor: "pointer" })}>찾기</button>
+                      <button type="button" onClick={() => setChatFindOpen(false)} style={s3s({ flexShrink: 0, height: "38px", padding: "0 9px", border: "none", borderRadius: "10px", background: "transparent", color: "#B08FA0", fontSize: "13px", fontWeight: 700, cursor: "pointer" })}>닫기</button>
                     </div>
                     {chatFindSug.length > 0 ? (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" }}>
+                      <div style={s3s({ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" })}>
                         {chatFindSug.map((n) => (
                           <button key={n} type="button"
                             onClick={() => { setChatFindName(n); setChatFindSug([]); void findMyChatOrders(n); }}
-                            style={{ padding: "7px 12px", border: "1px solid #E8A3C0", borderRadius: "999px", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}>
+                            style={s3s({ padding: "7px 12px", border: "1px solid #E8A3C0", borderRadius: "999px", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 800, cursor: "pointer" })}>
                             {n}
                           </button>
                         ))}
@@ -7742,8 +7749,8 @@ export default function OrderPage() {
                   </div>
                 ) ) : (
                   <button type="button" onClick={() => setChatFindOpen(true)}
-                    style={{ width: "100%", padding: "7px 0", border: "none", background: "transparent", color: "#B08FA0", fontSize: "12px", fontWeight: 700, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px" }}>
-                    💬 채팅으로 주문했는데 주문서에 안 보이나요?
+                    style={s3s({ width: "100%", padding: "7px 0", border: "none", background: "transparent", color: "#B08FA0", fontSize: "12px", fontWeight: 700, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px" })}>
+                    {uiS3 ? "채팅으로 주문했는데 주문서에 안 보이나요?" : "💬 채팅으로 주문했는데 주문서에 안 보이나요?"}
                   </button>
                 )}
               </div>
@@ -7751,9 +7758,9 @@ export default function OrderPage() {
 
             {/* [2026-09-20 사장님 「심플하게」] 결제 = 버튼 2개(라벨만) + 고른 쪽 밑에 한 줄.
                 무통장: 「{닉네임} 이름으로 입금」 / 카드: 「제출하면 카톡으로 결제링크」 + 최소금액. 요청사항은 접어 둠. 계산·제출 로직 무변경. */}
-            <section style={{ padding: "14px 18px", borderTop: "0.5px solid #E5E1DC" }}>
-              <div style={{ fontSize: "14px", fontWeight: 800, color: "#1A1A1A", marginBottom: "8px" }}>결제</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+            <section style={uiS3 ? { padding: "16px", borderTop: "1px solid #E5E5E5" } : { padding: "14px 18px", borderTop: "0.5px solid #E5E1DC" }}>
+              <div style={uiS3 ? { fontSize: "15px", fontWeight: 700, color: "#111111", marginBottom: "10px" } : { fontSize: "14px", fontWeight: 800, color: "#1A1A1A", marginBottom: "8px" }}>결제</div>
+              <div style={s3s({ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" })}>
                 {(["무통장입금", "카드결제"] as const).map((method) => (
                   <button
                     key={method}
@@ -7762,29 +7769,29 @@ export default function OrderPage() {
                       setPaymentMethod(method);
                       if (method === "무통장입금") void syncCartReservationsRef.current();
                     }}
-                    style={{ height: "48px", borderRadius: "12px", border: paymentMethod === method ? "2px solid #7A1E47" : "1px solid #E5E1DC", background: paymentMethod === method ? "#F9EEF3" : "#fff", cursor: "pointer", fontSize: "15px", fontWeight: 800, color: paymentMethod === method ? "#7A1E47" : "#444" }}
+                    style={uiS3 ? { height: "52px", borderRadius: "8px", border: paymentMethod === method ? "2px solid #111111" : "1px solid #CACACB", background: "#FFFFFF", cursor: "pointer", fontSize: "15px", fontWeight: 600, color: "#111111", fontFamily: "inherit" } : { height: "48px", borderRadius: "12px", border: paymentMethod === method ? "2px solid #7A1E47" : "1px solid #E5E1DC", background: paymentMethod === method ? "#F9EEF3" : "#fff", cursor: "pointer", fontSize: "15px", fontWeight: 800, color: paymentMethod === method ? "#7A1E47" : "#444" }}
                   >
                     {method === "카드결제" ? `카드결제 +${cardRateForCustomer}%` : method}
                   </button>
                 ))}
               </div>
-              <div style={{ marginTop: "8px", borderRadius: "10px", background: "#FAF8F6", border: "1px solid #E5E1DC", padding: "9px 12px", fontSize: "13px", fontWeight: 800, lineHeight: 1.6, color: "#4B3540", wordBreak: "keep-all" }}>
+              <div style={uiS3 ? { marginTop: "10px", borderRadius: "8px", background: "#F5F5F5", border: "none", padding: "12px 14px", fontSize: "15px", fontWeight: 400, lineHeight: 1.6, color: "#39393B", wordBreak: "keep-all" } : { marginTop: "8px", borderRadius: "10px", background: "#FAF8F6", border: "1px solid #E5E1DC", padding: "9px 12px", fontSize: "13px", fontWeight: 800, lineHeight: 1.6, color: "#4B3540", wordBreak: "keep-all" }}>
                 {paymentMethod === "카드결제" ? (
-                  <>제출하면 <b style={{ color: "#7A1E47" }}>카카오톡으로 결제링크</b>를 보내드려요. (택배비 포함 {cardPaymentMinAmount.toLocaleString()}원 이상)</>
+                  <>제출하면 <b style={uiS3 ? { color: "#111111", fontWeight: 700 } : { color: "#7A1E47" }}>카카오톡으로 결제링크</b>를 보내드려요. (택배비 포함 {cardPaymentMinAmount.toLocaleString()}원 이상)</>
                 ) : (
-                  <>입금자명 <b style={{ color: "#7A1E47" }}>「{youtubeNickname.trim() || customerName.trim() || "-"}」</b> 으로 입금해 주세요.</>
+                  <>입금자명 <b style={uiS3 ? { color: "#111111", fontWeight: 700 } : { color: "#7A1E47" }}>「{youtubeNickname.trim() || customerName.trim() || "-"}」</b> 으로 입금해 주세요.</>
                 )}
               </div>
 
               {paymentMethod === "무통장입금" && cartBankAccountOverride && finalPaymentAmount > 0 ? (
-                <div style={{ marginTop: "8px", borderRadius: "12px", border: "1.5px solid #E0C56E", background: "#FFFBEB", padding: "11px 12px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "11px", fontWeight: 800, color: "#6E655E" }}>입금 계좌</div>
-                      <div style={{ marginTop: "2px", fontSize: "15px", fontWeight: 900, color: "#1A1A1A", wordBreak: "break-all" }}>
+                <div style={s3s({ marginTop: "8px", borderRadius: "12px", border: "1.5px solid #E0C56E", background: "#FFFBEB", padding: "11px 12px" })}>
+                  <div style={s3s({ display: "flex", alignItems: "center", gap: "10px" })}>
+                    <div style={s3s({ flex: 1, minWidth: 0 })}>
+                      <div style={s3s({ fontSize: "11px", fontWeight: 800, color: "#6E655E" })}>입금 계좌</div>
+                      <div style={s3s({ marginTop: "2px", fontSize: "15px", fontWeight: 900, color: "#1A1A1A", wordBreak: "break-all" })}>
                         {cartBankAccountOverride.bankName} {cartBankAccountOverride.bankAccount}
                       </div>
-                      <div style={{ fontSize: "12px", fontWeight: 700, color: "#555" }}>예금주 {cartBankAccountOverride.bankHolder}</div>
+                      <div style={s3s({ fontSize: "12px", fontWeight: 700, color: "#555" })}>예금주 {cartBankAccountOverride.bankHolder}</div>
                     </div>
                     <button
                       type="button"
@@ -7796,12 +7803,12 @@ export default function OrderPage() {
                           showCustomerNotice(cartBankAccountOverride.bankAccount);
                         }
                       }}
-                      style={{ flexShrink: 0, minHeight: "38px", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", padding: "0 12px", fontSize: "12px", fontWeight: 900, color: "#7A1E47" }}
+                      style={s3s({ flexShrink: 0, minHeight: "38px", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", padding: "0 12px", fontSize: "12px", fontWeight: 900, color: "#7A1E47" })}
                     >
                       복사
                     </button>
                   </div>
-                  <div style={{ marginTop: "8px", borderRadius: "9px", background: "#FFF3CD", padding: "8px 9px", fontSize: "11.5px", fontWeight: 900, lineHeight: 1.5, color: "#7A1E47", wordBreak: "keep-all" }}>
+                  <div style={s3s({ marginTop: "8px", borderRadius: "9px", background: "#FFF3CD", padding: "8px 9px", fontSize: "11.5px", fontWeight: 900, lineHeight: 1.5, color: "#7A1E47", wordBreak: "keep-all" })}>
                     입금 계좌는 변경될 수 있습니다. 입금 전 이 화면의 계좌번호를 꼭 확인해 주세요.
                   </div>
                 </div>
@@ -7809,33 +7816,35 @@ export default function OrderPage() {
 
               {/* [2026-09-20 사장님] 「접혀 있으면 난독증 손님은 모른다」 → 항상 펼쳐 둔다(작게). */}
               <label className="mt-3 block">
-                <span className="mb-2 block text-[13px] font-black tracking-[-0.04em] text-slate-700">요청사항 <span style={{ fontWeight: 700, color: "#6E655E" }}>(선택 · 안 적어도 돼요)</span></span>
+                <span className={uiS3 ? "mb-2 block" : "mb-2 block text-[13px] font-black tracking-[-0.04em] text-slate-700"} style={uiS3 ? { fontSize: "15px", fontWeight: 700, color: "#111111" } : undefined}>요청사항 <span style={uiS3 ? { fontSize: "14px", fontWeight: 400, color: "#707072" } : { fontWeight: 700, color: "#6E655E" }}>(선택 · 안 적어도 돼요)</span></span>
                 <textarea
                   value={requestMemo}
                   onChange={(event) => setRequestMemo(event.target.value)}
                   placeholder="예) 문 앞에 놓아 주세요 / 배송 전 연락 주세요"
                   rows={2}
-                  className="w-full resize-none rounded-[14px] border border-slate-200 bg-slate-50 p-3 text-[15px] font-bold leading-relaxed tracking-[-0.04em] outline-none focus:border-rose-deep"
+                  className={uiS3 ? "w-full resize-none" : "w-full resize-none rounded-[14px] border border-slate-200 bg-slate-50 p-3 text-[15px] font-bold leading-relaxed tracking-[-0.04em] outline-none focus:border-rose-deep"}
+                  style={uiS3 ? { display: "block", boxSizing: "border-box", borderRadius: "16px", border: "1px solid #CACACB", background: "#FFFFFF", padding: "12px 16px", fontSize: "16px", fontWeight: 400, lineHeight: 1.5, color: "#111111", outlineColor: "#111111" } : undefined}
                 />
               </label>
             </section>
 
             <section
               data-ruru-price-section="redesigned"
-              style={{ padding: "16px 18px", borderTop: "0.5px solid #E5E1DC" }}
+              style={uiS3 ? { padding: "16px", borderTop: "1px solid #E5E5E5" } : { padding: "16px 18px", borderTop: "0.5px solid #E5E1DC" }}
             >
               {/* [2026-09-20 심플하게] 「최종 확인 / 결제금액 확인 / …확인해 주세요」 설명 3줄 삭제 — 금액표만. */}
               {combineShippingCheckError && (
-                <div role="status" className="mb-3 text-[12px] font-bold text-red-700">{combineShippingCheckError}</div>
+                <div role="status" className={uiS3 ? "mb-3" : "mb-3 text-[12px] font-bold text-red-700"} style={uiS3 ? { fontSize: "14px", fontWeight: 600, color: "#D30005", lineHeight: 1.5 } : undefined}>{combineShippingCheckError}</div>
               )}
               {!combineShippingCheckError && shippingNoticeText && (
-                <div className="mb-3 break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em]" style={{ color: shippingFee > 0 ? "#80522B" : "#0F6E56" }}>
-                  {shippingFee > 0 ? "🚚" : "✅"} {shippingNoticeText}
+                <div className={uiS3 ? "mb-3 break-keep" : "mb-3 break-keep text-[12px] font-bold leading-relaxed tracking-[-0.04em]"} style={uiS3 ? { fontSize: "14px", fontWeight: 600, lineHeight: 1.5, color: shippingFee > 0 ? "#39393B" : "#007D48" } : { color: shippingFee > 0 ? "#80522B" : "#0F6E56" }}>
+                  {uiS3 ? null : <>{shippingFee > 0 ? "🚚" : "✅"} </>}{shippingNoticeText}
                 </div>
               )}
 
               <div data-ruru-price-summary-wrapper="flat">
                 <OrderPriceSummaryBox
+                  tone={uiS3 ? "v2" : undefined}
                   productAmount={productAmount}
                   shippingFee={shippingFee}
                   cardExtra={cardExtra}
@@ -7855,7 +7864,7 @@ export default function OrderPage() {
               </div>
 
               {!hasPrivacyConsent && !hasSavedOrderCustomerInfo && (
-                <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-[22px] bg-rose-soft p-4 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-rose-deep ring-1 ring-rose-line active:scale-[0.99]">
+                <label className={uiS3 ? "mt-4 flex cursor-pointer items-start gap-3" : "mt-4 flex cursor-pointer items-start gap-3 rounded-[22px] bg-rose-soft p-4 text-[13px] font-black leading-relaxed tracking-[-0.04em] text-rose-deep ring-1 ring-rose-line active:scale-[0.99]"} style={uiS3 ? { borderRadius: "8px", background: "#F5F5F5", padding: "16px", fontSize: "15px", fontWeight: 600, lineHeight: 1.5, color: "#111111" } : undefined}>
                   <input
                     type="checkbox"
                     checked={privacyConsentChecked}
@@ -7866,12 +7875,13 @@ export default function OrderPage() {
                         window.localStorage.setItem(PRIVACY_CONSENT_STORAGE_KEY, PRIVACY_CONSENT_VERSION);
                       }
                     }}
-                    className="mt-1 h-5 w-5 shrink-0 accent-rose-deep"
+                    className={uiS3 ? "mt-0.5 h-5 w-5 shrink-0" : "mt-1 h-5 w-5 shrink-0 accent-rose-deep"}
+                    style={uiS3 ? { accentColor: "#111111" } : undefined}
                   />
                   <span>
                     [필수] 개인정보 수집·이용 및 배송정보 제공 안내를 확인했습니다.
                     <br />
-                    <span className="text-slate-500">한 번 동의하면 다음부터 다시 묻지 않습니다.</span>
+                    <span className={uiS3 ? undefined : "text-slate-500"} style={uiS3 ? { fontSize: "14px", fontWeight: 400, color: "#707072" } : undefined}>한 번 동의하면 다음부터 다시 묻지 않습니다.</span>
                   </span>
                 </label>
               )}

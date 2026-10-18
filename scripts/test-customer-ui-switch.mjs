@@ -16,3 +16,15 @@ assert.equal(resolveCustomerUiV2(null, null, false).v2, false, 'revert: fresh br
 assert.equal(resolveCustomerUiV2(null, '1', false).v2, true, 'revert: ?ui=v2 testers keep v2');
 assert.equal(resolveCustomerUiV2('v1', '1', false).v2, false);
 console.log('customer ui switch passed');
+
+// [㉜ 3~5단계] 단계별 미리보기
+import { resolveCustomerUiPreview, UI_PREVIEW_DEFAULTS } from '../lib/customerUiSwitch.ts';
+assert.equal(UI_PREVIEW_DEFAULTS.s3, false, 's3 is preview-only until the owner turns it on');
+assert.deepEqual(resolveCustomerUiPreview(null, null, 's3', false), { store: null, v2: false }, 'normal customer: no change');
+assert.deepEqual(resolveCustomerUiPreview('s3', null, 's3', false), { store: '1', v2: true }, '?preview=s3 turns on');
+assert.deepEqual(resolveCustomerUiPreview(null, '1', 's3', false), { store: null, v2: true }, 'remembered');
+assert.deepEqual(resolveCustomerUiPreview('s4', null, 's3', false), { store: null, v2: false }, 'other stage does not turn s3 on');
+assert.deepEqual(resolveCustomerUiPreview('off', '1', 's3', false), { store: '0', v2: false }, '?preview=off turns off');
+assert.equal(resolveCustomerUiPreview(null, null, 's3', true).v2, true, 'after switching default on');
+assert.equal(resolveCustomerUiPreview(null, '0', 's3', true).v2, false, 'off stays off');
+console.log('customer ui preview passed');

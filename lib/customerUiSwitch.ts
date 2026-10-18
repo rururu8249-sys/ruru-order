@@ -7,3 +7,27 @@ export function resolveCustomerUiV2(want: string | null, saved: string | null, d
   const effective = store ?? saved;
   return { store, v2: effective === "1" ? true : effective === "0" ? false : defaultV2 };
 }
+
+// [㉜ 3~5단계] 단계별 미리보기 — ?preview=s3 (s4·s5) 로 들어온 브라우저만 그 단계 새 모양. ?preview=off 는 전부 끔.
+//   손님 기본값으로 전환하려면 아래 값만 true 로(단계마다 한 줄). 저장 키는 ruru_preview_s3 등.
+export const UI_PREVIEW_DEFAULTS = { s3: false, s4: false, s5: false } as const;
+export type UiPreviewStage = keyof typeof UI_PREVIEW_DEFAULTS;
+export const uiPreviewStorageKey = (stage: UiPreviewStage) => `ruru_preview_${stage}`;
+
+export function resolveCustomerUiPreview(want: string | null, saved: string | null, stage: UiPreviewStage, defaultOn: boolean): UiSwitchDecision {
+  const store = want === stage ? "1" : want === "off" ? "0" : null;
+  const effective = store ?? saved;
+  return { store, v2: effective === "1" ? true : effective === "0" ? false : defaultOn };
+}
+
+/** 브라우저에서 한 단계 미리보기 켜짐 여부(주소 읽고 저장까지). 저장소를 못 쓰면 기본값. */
+export function readCustomerUiPreview(stage: UiPreviewStage): boolean {
+  try {
+    const key = uiPreviewStorageKey(stage);
+    const d = resolveCustomerUiPreview(new URLSearchParams(window.location.search).get("preview"), window.localStorage.getItem(key), stage, UI_PREVIEW_DEFAULTS[stage]);
+    if (d.store) window.localStorage.setItem(key, d.store);
+    return d.v2;
+  } catch {
+    return UI_PREVIEW_DEFAULTS[stage];
+  }
+}
