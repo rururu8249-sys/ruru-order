@@ -7498,7 +7498,17 @@ export default function OrderPage() {
               <>
                 {operatorTestAccount ? (
                   <label
-                    style={s3s({
+                    style={uiS3 ? {
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "10px",
+                      marginBottom: "12px",
+                      padding: adminTestOrderMode ? "11px 13px" : "10px 12px",
+                      borderRadius: "8px",
+                      border: adminTestOrderMode ? "1px solid #CACACB" : "2px solid #111111",
+                      background: adminTestOrderMode ? "#F5F5F5" : "#FFFFFF",
+                      cursor: "pointer",
+                    } : {
                       display: "flex",
                       alignItems: "flex-start",
                       gap: "10px",
@@ -7508,15 +7518,15 @@ export default function OrderPage() {
                       border: adminTestOrderMode ? "1.5px solid #C7B8D8" : "1.5px solid #E24A4A",
                       background: adminTestOrderMode ? "#F6F2FA" : "#FFF2F2",
                       cursor: "pointer",
-                    })}
+                    }}
                   >
                     <input
                       type="checkbox"
                       checked={adminTestOrderMode}
                       onChange={(event) => setAdminTestOrderMode(event.target.checked)}
-                      style={s3s({ marginTop: "2px", width: "18px", height: "18px", flexShrink: 0, accentColor: "#7A1E47" })}
+                      style={uiS3 ? { marginTop: "2px", width: "20px", height: "20px", flexShrink: 0, accentColor: "#111111" } : { marginTop: "2px", width: "18px", height: "18px", flexShrink: 0, accentColor: "#7A1E47" }}
                     />
-                    <span style={s3s({ fontSize: "12.5px", fontWeight: 800, lineHeight: 1.5, color: adminTestOrderMode ? "#5B3E72" : "#B3261E" })}>
+                    <span style={uiS3 ? { fontSize: "14px", fontWeight: 700, lineHeight: 1.5, color: "#111111" } : { fontSize: "12.5px", fontWeight: 800, lineHeight: 1.5, color: adminTestOrderMode ? "#5B3E72" : "#B3261E" }}>
                       {adminTestOrderMode ? (
                         <>
                           🧪 테스트 주문으로 제출
@@ -7556,10 +7566,10 @@ export default function OrderPage() {
                     }
                     void handleSubmitOrderClick();
                   }}
-                  disabled={submitting || checkingPurchaseConsent || customerBlockStatus.blocked}
-                  style={uiS3 ? { width: "100%", height: "52px", padding: "0 16px", background: submitting || checkingPurchaseConsent || customerBlockStatus.blocked || !finalSubmitReady ? "#E5E5E5" : "#111111", color: submitting || checkingPurchaseConsent || customerBlockStatus.blocked || !finalSubmitReady ? "#707072" : "#FFFFFF", border: "none", borderRadius: "9999px", fontSize: "16px", fontWeight: 600, cursor: submitting || checkingPurchaseConsent || customerBlockStatus.blocked ? "not-allowed" : "pointer" } : { width: "100%", padding: "14px", background: submitting || checkingPurchaseConsent || customerBlockStatus.blocked || !finalSubmitReady ? "#cbd5e1" : "#7A1E47", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: submitting || checkingPurchaseConsent || customerBlockStatus.blocked ? "default" : "pointer" }}
+                  disabled={submitting || checkingPurchaseConsent || customerBlockStatus.blocked || (uiS3 && selectedItemEntries.length === 0)}
+                  style={uiS3 ? { width: "100%", height: "52px", padding: "0 16px", background: submitting || checkingPurchaseConsent || customerBlockStatus.blocked || !finalSubmitReady || selectedItemEntries.length === 0 ? "#E5E5E5" : "#111111", color: submitting || checkingPurchaseConsent || customerBlockStatus.blocked || !finalSubmitReady || selectedItemEntries.length === 0 ? "#707072" : "#FFFFFF", border: "none", borderRadius: "9999px", fontSize: "16px", fontWeight: 600, cursor: submitting || checkingPurchaseConsent || customerBlockStatus.blocked ? "not-allowed" : "pointer" } : { width: "100%", padding: "14px", background: submitting || checkingPurchaseConsent || customerBlockStatus.blocked || !finalSubmitReady ? "#cbd5e1" : "#7A1E47", color: "#fff", border: "none", borderRadius: "12px", fontSize: "15px", fontWeight: 700, cursor: submitting || checkingPurchaseConsent || customerBlockStatus.blocked ? "default" : "pointer" }}
                 >
-                  {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : checkingPurchaseConsent ? "구매 조건 확인 중..." : `${won(finalPaymentAmount)} · 주문서 제출`}
+                  {customerBlockStatus.blocked ? "주문 제한됨" : submitting ? "제출 중..." : checkingPurchaseConsent ? "구매 조건 확인 중..." : uiS3 && selectedItemEntries.length === 0 ? "상품을 담아 주세요" : `${won(finalPaymentAmount)} · 주문서 제출`}
                 </button>
               </>
             )}
@@ -7615,9 +7625,13 @@ export default function OrderPage() {
                           /* [2026-08-30] 집·사무실 전화도 주문은 되게 열었다.
                              다만 카드결제 링크와 방송 알림톡은 휴대폰으로만 가므로 미리 알려준다. */
                           <div style={s3s({ marginTop: "6px", fontSize: "11.5px", color: "#8A6A1E", background: "#FFF8E6", border: "1px solid #F0E0B0", borderRadius: "8px", padding: "8px 10px", lineHeight: 1.7 })}>
+                            {uiS3 ? "집 전화로도 주문돼요. 카드결제 링크·방송 알림톡은 휴대폰 번호로만 보내드려요." : (
+                              <>
                             <b>집·사무실 전화번호로 주문하셔도 됩니다.</b><br />
                             다만 이 번호로는 <b>카드결제 링크</b>와 <b>방송 시작 알림톡</b>을 보내드릴 수 없어요.<br />
                             필요하시면 휴대폰 번호로 바꿔주세요.
+                              </>
+                            )}
                           </div>
                         )
                       ) : (
@@ -7759,6 +7773,7 @@ export default function OrderPage() {
 
             {/* [2026-09-20 사장님 「심플하게」] 결제 = 버튼 2개(라벨만) + 고른 쪽 밑에 한 줄.
                 무통장: 「{닉네임} 이름으로 입금」 / 카드: 「제출하면 카톡으로 결제링크」 + 최소금액. 요청사항은 접어 둠. 계산·제출 로직 무변경. */}
+            {uiS3 && selectedItemEntries.length === 0 ? null : (
             <section style={uiS3 ? { padding: "16px", borderTop: "1px solid #E5E5E5" } : { padding: "14px 18px", borderTop: "0.5px solid #E5E1DC" }}>
               <div style={uiS3 ? { fontSize: "15px", fontWeight: 700, color: "#111111", marginBottom: "10px" } : { fontSize: "14px", fontWeight: 800, color: "#1A1A1A", marginBottom: "8px" }}>결제</div>
               <div style={s3s({ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" })}>
@@ -7777,6 +7792,7 @@ export default function OrderPage() {
                   </button>
                 ))}
               </div>
+              {uiS3 && !paymentMethod ? null : (
               <div style={uiS3 ? { marginTop: "10px", borderRadius: "8px", background: "#F5F5F5", border: "none", padding: "12px 14px", fontSize: "15px", fontWeight: 400, lineHeight: 1.6, color: "#39393B", wordBreak: "keep-all" } : { marginTop: "8px", borderRadius: "10px", background: "#FAF8F6", border: "1px solid #E5E1DC", padding: "9px 12px", fontSize: "13px", fontWeight: 800, lineHeight: 1.6, color: "#4B3540", wordBreak: "keep-all" }}>
                 {paymentMethod === "카드결제" ? (
                   <>제출하면 <b style={uiS3 ? { color: "#111111", fontWeight: 700 } : { color: "#7A1E47" }}>카카오톡으로 결제링크</b>를 보내드려요. (택배비 포함 {cardPaymentMinAmount.toLocaleString()}원 이상)</>
@@ -7784,6 +7800,7 @@ export default function OrderPage() {
                   <>입금자명 <b style={uiS3 ? { color: "#111111", fontWeight: 700 } : { color: "#7A1E47" }}>「{youtubeNickname.trim() || customerName.trim() || "-"}」</b> 으로 입금해 주세요.</>
                 )}
               </div>
+              )}
 
               {paymentMethod === "무통장입금" && cartBankAccountOverride && finalPaymentAmount > 0 ? (
                 <div style={s3s({ marginTop: "8px", borderRadius: "12px", border: "1.5px solid #E0C56E", background: "#FFFBEB", padding: "11px 12px" })}>
@@ -7829,6 +7846,7 @@ export default function OrderPage() {
                 />
               </label>
             </section>
+            )}
 
             <section
               data-ruru-price-section="redesigned"

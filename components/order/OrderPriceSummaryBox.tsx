@@ -83,8 +83,12 @@ export default function OrderPriceSummaryBox({
           /* [2026-08-31 전수조사 수정] 조회 실패를 조용히 0원으로 보여주면
              손님은 포인트가 사라진 줄 알거나 그냥 못 쓰고 결제한다. 실패는 실패라고 말한다. */
           <div style={t({ marginTop: "16px", borderRadius: "14px", background: "#FFF8E6", border: "1px solid #F0E0B0", padding: "12px 16px", fontSize: "13px", fontWeight: 700, color: "#8A6A1E", lineHeight: 1.6 })}>
+            {v2 ? "포인트를 못 불러왔어요(포인트는 그대로예요). 쓰시려면 새로고침 후 주문해 주세요." : (
+              <>
             포인트를 못 불러왔어요. 포인트가 사라진 건 아니니 걱정 마세요!<br />
             새로고침하면 다시 보여요. 포인트를 쓰실 거면 새로고침 후 주문해 주세요.
+              </>
+            )}
           </div>
         ) : showPointUse ? (
           <div style={t({ marginTop: "16px", borderTop: "1px solid #D9C5CC", paddingTop: "16px" })}>
