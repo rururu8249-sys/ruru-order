@@ -6267,11 +6267,14 @@ export default function OrderPage() {
     const colorKey = registeredOptionAxes3 && !registeredOptionBrandGroup
       ? [registeredOptionDetail, color].map((v) => String(v ?? "").trim()).filter(Boolean).join(ORDER_AXIS_JOIN)
       : color;
-    const matched = registeredOptionStockVariants.find((v) => nm2(v.color) === nm2(colorKey) && nm2(v.size) === nm2(size));
-    if (!matched) return null;
+    // [㉞ 2026-10-18] ""/"없음" 만 다른 중복줄이 남아 있어도 «재고 많은 줄» 기준(표시 전용). 줄이 하나면 예전과 같다.
+    const matches = registeredOptionStockVariants.filter((v) => nm2(v.color) === nm2(colorKey) && nm2(v.size) === nm2(size));
+    if (matches.length === 0) return null;
     const pid = String(registeredOptionResolvedProduct?.id ?? "");
-    const reserved = pid ? Number(reservedByVariant[reservationVariantKey(pid, matched.color, matched.size)] || 0) : 0;
-    return Math.max(0, Number(matched.stock) - Math.max(0, reserved));
+    return Math.max(...matches.map((matched) => {
+      const reserved = pid ? Number(reservedByVariant[reservationVariantKey(pid, matched.color, matched.size)] || 0) : 0;
+      return Math.max(0, Number(matched.stock) - Math.max(0, reserved));
+    }));
   };
   const optionQtyLabel = (qty: number | null) => qty === null ? "" : qty <= 0 ? " · 품절" : uiV2 ? (qty <= 10 ? ` · ${qty}개 남음` : "") : qty <= 3 ? ` · ${qty}개 남음` : ` · 재고 ${qty}개`;
   const joinAxisColor = (colorValue: string) =>
@@ -6287,12 +6290,15 @@ export default function OrderPage() {
     if (isOptionManuallySoldOut(registeredOptionResolvedProduct?.product_note, color, size, registeredOptionDetail)) return true;
     // [재고 홀드] 다른 고객이 담아둔(예약) 수량까지 빼고 품절 판정 — 표시 전용(실차감은 제출 RPC)
     const pid = String(registeredOptionResolvedProduct?.id ?? "");
-    return registeredOptionStockVariants.length > 0 &&
-      registeredOptionStockVariants.some((v) => {
-        if (nc(v.color) !== nc(color) || nc(v.size) !== nc(size)) return false;
-        const reserved = pid ? Number(reservedByVariant[reservationVariantKey(pid, v.color, v.size)] || 0) : 0;
-        return Number(v.stock) - Math.max(0, reserved) <= 0;
-      });
+    // [㉞ 2026-10-18] ""/"없음" 만 다른 중복줄(예: 0개 유령줄 + 10개 진짜줄)이 있어도 «재고 많은 줄» 기준으로 판정.
+    //   예전 .some 은 하나라도 0이면 품절이라 진짜 재고가 있어도 품절로 보였다. 줄이 하나면 예전과 같은 결과(표시 전용).
+    const matches = registeredOptionStockVariants.filter((v) => nc(v.color) === nc(color) && nc(v.size) === nc(size));
+    if (matches.length === 0) return false;
+    const best = Math.max(...matches.map((v) => {
+      const reserved = pid ? Number(reservedByVariant[reservationVariantKey(pid, v.color, v.size)] || 0) : 0;
+      return Number(v.stock) - Math.max(0, reserved);
+    }));
+    return best <= 0;
   };
   // [2026-09-20 사장님] 「55 고르고 카멜 누르면 사이즈가 풀린다」 — 색상을 바꿀 때 이미 고른 사이즈가 그 색상에도 있고
   //   품절이 아니면 그대로 둔다. 없거나 품절이면 예전처럼 비운다. 표시·선택 상태만(재고 판정 함수는 그대로 사용).
