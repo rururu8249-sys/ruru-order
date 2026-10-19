@@ -1498,6 +1498,10 @@ export default function OrderPage() {
   const sv = (style: CSSProperties | undefined): CSSProperties | undefined => (uiV2 ? restyleV2(style) : style);
   // [㉜ 3단계] 주문서 확인 창 정리(로즈→흑백·13px 미만→13px) — 미리보기 꺼지면 원래 스타일 그대로.
   const s3s = (style: CSSProperties | undefined): CSSProperties | undefined => (uiS3 ? restyleV2(style) : style);
+  // [㊵] 전역 CSS(app/globals.css 상품 카드 포커스·누름 테두리)가 새 모양을 알 수 있게 — 표시 전용
+  useEffect(() => {
+    try { document.documentElement.dataset.ruruUi = uiV2 ? "v2" : "v1"; } catch { /* 무시 */ }
+  }, [uiV2]);
   // [㉜ 5단계] 창들 정리(로즈→흑백·13px 미만→13px). 떠 있는 창(팝업·확인창)이라 그림자는 둔다. 꺼지면 원래 그대로.
   const s5s = (style: CSSProperties | undefined): CSSProperties | undefined => (uiS5 ? restyleV2(style, { keepShadow: true }) : style);
   const c5s = (className: string | undefined): string | undefined => (uiS5 ? restyleClassV2(className, { keepShadow: true }) : className);
@@ -6430,14 +6434,14 @@ export default function OrderPage() {
       <OrderPageShell>
         <section
           className="rounded-[32px] p-8 text-center"
-          style={{ background: "linear-gradient(to bottom, #ffffff, #F5E6EB)", border: "1px solid #D9C5CC", boxShadow: "0 22px 55px rgba(123,45,67,0.13)" }}
+          style={uiV2 ? { background: "#FFFFFF", border: "1px solid #E5E5E5", boxShadow: "none" } : { background: "linear-gradient(to bottom, #ffffff, #F5E6EB)", border: "1px solid #D9C5CC", boxShadow: "0 22px 55px rgba(123,45,67,0.13)" }}
         >
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] text-[32px]" style={{ background: "#F9EDF1", border: "1px solid #E8D5DD" }}>⏳</div>
-          <p className="mt-5 text-[13px] font-black tracking-[-0.04em]" style={{ color: "#7B2D43" }}>루루동이 LIVE</p>
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] text-[32px]" style={uiV2 ? { background: "#F5F5F5", border: "none" } : { background: "#F9EDF1", border: "1px solid #E8D5DD" }}>{uiV2 ? <svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg> : "⏳"}</div>
+          <p className="mt-5 text-[13px] font-black tracking-[-0.04em]" style={{ color: uiV2 ? "#111111" : "#7B2D43" }}>루루동이 LIVE</p>
           <h1 className="mt-2 break-keep text-[26px] font-black leading-tight tracking-[-0.07em] text-slate-950">주문 정보 확인 중</h1>
-          <p className="mt-3 break-keep text-[14.5px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">닉네임과 배송지를 불러오고 있어요. 잠시만요!</p>
-          <div className="mt-5 overflow-hidden rounded-full" style={{ background: "#F0E4E9" }}>
-            <div className="h-2 w-2/3 animate-pulse rounded-full" style={{ background: "#7B2D43" }} />
+          <p className={uiV2 ? "mt-3 break-keep text-[15px] font-normal leading-relaxed text-[#39393B]" : "mt-3 break-keep text-[14.5px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600"}>닉네임과 배송지를 불러오고 있어요. 잠시만요!</p>
+          <div className="mt-5 overflow-hidden rounded-full" style={{ background: uiV2 ? "#F5F5F5" : "#F0E4E9" }}>
+            <div className="h-2 w-2/3 animate-pulse rounded-full" style={{ background: uiV2 ? "#111111" : "#7B2D43" }} />
           </div>
         </section>
       </OrderPageShell>
@@ -6703,7 +6707,7 @@ export default function OrderPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <span style={{ flexShrink: 0, fontSize: "15px" }}>{uiS5 ? <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="M5 8h14l-1 12H6z" /><path d="M9 8V6.5a3 3 0 0 1 6 0V8" /></svg> : "🛍"}</span>
                 <div style={uiV2 ? { minWidth: 0, flex: 1, fontSize: "14px", fontWeight: 600, lineHeight: 1.5 } : { minWidth: 0, flex: 1, fontSize: "12.5px", fontWeight: 800, lineHeight: 1.45 }}>
-                  방송 전이에요 · 아래 상품 {quickGroupBuyProducts.length}개는 <b>지금 바로 주문</b> 가능
+                  방송 전이에요 · 아래 상품{productListState === "loading" ? "은" : ` ${quickGroupBuyProducts.length}개는`} <b>지금 바로 주문</b> 가능
                   {nextLiveText ? <div style={uiV2 ? { fontSize: "13px", fontWeight: 400, color: "#707072" } : { fontSize: "11.5px", fontWeight: 700, opacity: 0.88 }}>다음 라이브 · {nextLiveText}</div> : null}
                 </div>
                 <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flexShrink: 0, height: "36px", padding: "0 12px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" } : { flexShrink: 0, height: "30px", padding: "0 10px", border: "1px solid rgba(255,255,255,0.45)", borderRadius: "999px", background: "rgba(255,255,255,0.14)", color: "#fff", fontSize: "11px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>{uiS5 ? "알림 받는 중 ✓" : "🔔 알림 받는 중 ✓"}</button>
@@ -6716,7 +6720,7 @@ export default function OrderPage() {
               <div style={uiV2 ? { display: "flex", alignItems: "center", gap: "8px", background: "#F5F5F5", borderRadius: "16px", padding: "10px 14px", color: "#111111" } : { display: "flex", alignItems: "center", gap: "8px", background: "linear-gradient(135deg,#7A1E47,#9A3560)", borderRadius: "14px", padding: "10px 13px", color: "#fff" }}>
                 <span style={{ flexShrink: 0, fontSize: "15px" }}>{uiS5 ? <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="M5 8h14l-1 12H6z" /><path d="M9 8V6.5a3 3 0 0 1 6 0V8" /></svg> : "🛍"}</span>
                 <div style={uiV2 ? { minWidth: 0, flex: 1, fontSize: "14px", fontWeight: 600, lineHeight: 1.5 } : { minWidth: 0, flex: 1, fontSize: "12.5px", fontWeight: 800, lineHeight: 1.45 }}>
-                  방송 전이에요 · 아래 상품 {quickGroupBuyProducts.length}개는 <b>지금 바로 주문</b> 가능
+                  방송 전이에요 · 아래 상품{productListState === "loading" ? "은" : ` ${quickGroupBuyProducts.length}개는`} <b>지금 바로 주문</b> 가능
                   {nextLiveText ? <div style={uiV2 ? { fontSize: "13px", fontWeight: 400, color: "#707072" } : { fontSize: "11.5px", fontWeight: 700, opacity: 0.88 }}>다음 라이브 · {nextLiveText}</div> : null}
                 </div>
                 <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flexShrink: 0, height: "36px", padding: "0 12px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" } : { flexShrink: 0, height: "30px", padding: "0 10px", border: "1px solid rgba(255,255,255,0.45)", borderRadius: "999px", background: "rgba(255,255,255,0.14)", color: "#fff", fontSize: "11px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>{uiS5 ? "알림 받는 중 ✓" : "🔔 알림 받는 중 ✓"}</button>
@@ -6738,7 +6742,7 @@ export default function OrderPage() {
               <div style={uiV2 ? { fontSize: "18px", fontWeight: 700, marginBottom: "4px" } : { fontSize: "17px", fontWeight: 900, marginBottom: "4px" }}>지금은 방송 전이에요</div>
               <div style={uiV2 ? { fontSize: "14px", fontWeight: 400, color: "#39393B", lineHeight: 1.5 } : { fontSize: "12.5px", fontWeight: 700, opacity: 0.92, lineHeight: 1.5 }}>
                 {nextLiveText ? <>다음 라이브 · {nextLiveText}<br /></> : null}
-                아래 상품 {quickGroupBuyProducts.length}개는 <b>지금 바로 주문</b>하실 수 있어요{uiS5 ? "" : " 👇"}
+                아래 상품{productListState === "loading" ? "은" : ` ${quickGroupBuyProducts.length}개는`} <b>지금 바로 주문</b>하실 수 있어요{uiS5 ? "" : " 👇"}
               </div>
               <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
                 <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flex: 1.2, height: "44px", border: "none", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "15px", fontWeight: 600, cursor: "pointer" } : { flex: 1.2, height: "40px", border: "none", borderRadius: "12px", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}>
@@ -6824,14 +6828,14 @@ export default function OrderPage() {
             if (productListState === "error") {
               return <section role="alert" style={{ margin: "12px auto", maxWidth: "560px", padding: "30px 20px", textAlign: "center", background: "#fff", borderRadius: "16px" }}>
                 <p>상품을 불러오지 못했습니다. 다시 시도해 주세요.</p>
-                <button type="button" onClick={() => { void loadBroadcast().catch(() => { setProductListState("error"); setBroadcastLoaded(true); }); }} style={{ marginTop: "12px", padding: "12px 20px", borderRadius: "10px", background: "#7A1E47", color: "#fff", fontWeight: 700 }}>다시 불러오기</button>
+                <button type="button" onClick={() => { void loadBroadcast().catch(() => { setProductListState("error"); setBroadcastLoaded(true); }); }} style={uiV2 ? { marginTop: "12px", height: "48px", padding: "0 24px", borderRadius: "9999px", border: "none", background: "#111111", color: "#FFFFFF", fontSize: "16px", fontWeight: 600 } : { marginTop: "12px", padding: "12px 20px", borderRadius: "10px", background: "#7A1E47", color: "#fff", fontWeight: 700 }}>다시 불러오기</button>
               </section>;
             }
             // Broadcast metadata alone is not enough: wait for the active mode's products.
             if (!broadcastLoaded || productListState === "loading") {
               return (
                 <section style={{ margin: "12px auto 0", width: "100%", maxWidth: "560px" }}>
-                  <div style={{ padding: "44px 26px", textAlign: "center", color: "#7A1E47", fontSize: "14px", fontWeight: 700, border: "1px solid #D9C5CC", borderRadius: "16px", background: "#fff" }}>
+                  <div style={uiV2 ? { padding: "44px 26px", textAlign: "center", color: "#707072", fontSize: "15px", fontWeight: 400, border: "1px solid #E5E5E5", borderRadius: "16px", background: "#FFFFFF" } : { padding: "44px 26px", textAlign: "center", color: "#7A1E47", fontSize: "14px", fontWeight: 700, border: "1px solid #D9C5CC", borderRadius: "16px", background: "#fff" }}>
                     상품을 불러오는 중…
                   </div>
                 </section>
@@ -7484,7 +7488,7 @@ export default function OrderPage() {
                   </div>
                 )}
                 {directInputEnabled ? (
-                  <button type="button" onClick={openDirectInputSheet} style={{ marginTop: "12px", width: "100%", border: "1px solid #D9C5CC", background: "#fff", borderRadius: "14px", padding: "13px", fontSize: "14px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+ 상품을 못 찾으셨나요? 직접 입력하기</button>
+                  <button type="button" onClick={openDirectInputSheet} style={uiV2 ? { marginTop: "12px", width: "100%", minHeight: "48px", border: "1px solid #CACACB", background: "#FFFFFF", borderRadius: "9999px", padding: "0 16px", fontSize: "15px", fontWeight: 600, color: "#111111", cursor: "pointer" } : { marginTop: "12px", width: "100%", border: "1px solid #D9C5CC", background: "#fff", borderRadius: "14px", padding: "13px", fontSize: "14px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+ 상품을 못 찾으셨나요? 직접 입력하기</button>
                 ) : null}
               </section>
             );

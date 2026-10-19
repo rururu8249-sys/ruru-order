@@ -26,6 +26,9 @@
   outline: 2px solid #7a1e47;
   outline-offset: 2px;
 }
+/* [㊵] 새 모양(ui=v2) — 포커스·누름 테두리 로즈 → ink #111111 (예전 모양은 위 그대로) */
+html[data-ruru-ui="v2"] .ruru-customer-press:focus-visible { outline-color: #111111; }
+html[data-ruru-ui="v2"] .ruru-customer-product-card:has(.ruru-customer-press[data-pressing="true"]) { outline-color: #111111; }
 @media (prefers-reduced-motion: reduce) {
   .ruru-customer-press { transition: none; }
   .ruru-customer-press[data-pressing="true"] { transform: none; }
