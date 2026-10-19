@@ -132,3 +132,14 @@ console.log("✅ product order notice (두 줄) OK");
   );
 }
 console.log("✅ product order notice (가격 옆 배지) OK");
+
+// [㊺-2] 바로구매 기준 한 곳 — 상품 직접 선택 > (기본값 따름이면) 옛 「바로구매」 배지 > 전체 기본값
+import { effectiveProductNoticeMode, isInstantOrderProduct } from "../lib/productOrderNotice.ts";
+assert.equal(effectiveProductNoticeMode("inherit", ["direct"]), "instant");
+assert.equal(effectiveProductNoticeMode("live_only", ["direct"]), "live_only");
+assert.equal(effectiveProductNoticeMode("inherit", []), "inherit");
+assert.equal(isInstantOrderProduct("inherit", ["direct"], "live_only"), true);
+assert.equal(isInstantOrderProduct("inherit", [], "live_only"), false);
+assert.equal(isInstantOrderProduct("inherit", [], "instant"), true);
+assert.equal(isInstantOrderProduct("live_only", ["direct"], "instant"), false);
+console.log("✅ ㊺-2 바로구매 기준 하나로 OK");

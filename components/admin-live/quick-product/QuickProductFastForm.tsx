@@ -11,6 +11,7 @@ import {
   PRODUCT_NOTICE_PRODUCT_OPTIONS,
   PRODUCT_NOTICE_MAX_LEN,
   PRODUCT_NOTICE_PRESETS,
+  effectiveProductNoticeMode,
   parseProductNoticeProductMode,
   splitProductOrderNotice,
   type ProductNoticeProductMode,
@@ -1044,6 +1045,7 @@ export default function QuickProductFastForm({
       ? (initialProduct as any).badge_types.filter(Boolean).map((x: any) => String(x))
       : ((initialProduct as any)?.badge_type && (initialProduct as any).badge_type !== "none" ? [String((initialProduct as any).badge_type)] : []);
     setBadgeTypes(_bt);
+    setOrderNoticeMode(effectiveProductNoticeMode(productNote?.order_notice_mode, _bt)); // [㊺-2] 옛 바로구매 배지 상품은 「바로 구매 가능」으로 미리 선택
     setProductName(normalizeBrandKorean(pickString(initialProduct, ["product_name", "name", "title"], "")));
     setPriceText(formatNumberWithComma(pickNumber(initialProduct, ["price", "sale_price", "selling_price"], 0)));
     setShippingType(pickString(initialProduct, ["shipping_type", "delivery_type"], "normal"));
@@ -3140,12 +3142,12 @@ export default function QuickProductFastForm({
             <div style={sectionLabel}>상품 뱃지</div>
             <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginBottom: "6px", lineHeight: 1.6 }}>
               손님 상품 목록에 표시되는 뱃지 · <b style={{ color: "var(--color-ok-tx)" }}>배지를 하나도 안 골라도 자동으로 붙습니다</b> — 신상(등록 7일) · 급상승(담김 많거나 판매 상위 10%) · 💖루루픽(판매 상위 3%) · 「N개 남음」(재고) · 「방송 중 N개 주문」(실시간) · 「판매 N개」 · 「재구매 N명」. 배지는 «더» 강조하고 싶을 때만 누르세요.
-              <br />🛒 바로구매 · ✈️ 해외배송은 구매·배송 방식과 직결이라 <b>자동으로 절대 안 붙습니다(사장님 수동 전용)</b>.
+              <br />🛒 바로구매는 아래 「주문 안내 문구」에서 정합니다. ✈️ 해외배송은 배송 방식과 직결이라 <b>자동으로 절대 안 붙습니다(사장님 수동 전용)</b>.
             </div>
             <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}`}</style>
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
               {/* [2026-07-10] 해외배송 배지 추가 (표시 전용 — 배송비/배송 로직과 무관) */}
-              {([["none", "없음"], ["new", "신상"], ["hot", "급상승"], ["special", "특가"], ["limit", "⏰ 마감임박"], ["pick", "💖 루루픽"], ["direct", "🛒 바로구매"], ["overseas", "✈️ 해외배송"]] as const).map(([v, l]) => {
+              {([["none", "없음"], ["new", "신상"], ["hot", "급상승"], ["special", "특가"], ["limit", "⏰ 마감임박"], ["pick", "💖 루루픽"], ["overseas", "✈️ 해외배송"]] as const).map(([v, l]) => {
                 const on = v === "none" ? badgeTypes.length === 0 : badgeTypes.includes(v);
                 return (
                   <div
@@ -3236,7 +3238,7 @@ export default function QuickProductFastForm({
             <div style={sectionLabel}>주문 안내 문구 (선택)</div>
             <select
               value={orderNoticeMode}
-              onChange={(e) => { setFormTouched(true); setOrderNoticeMode(parseProductNoticeProductMode(e.target.value)); }}
+              onChange={(e) => { setFormTouched(true); const nm = parseProductNoticeProductMode(e.target.value); setOrderNoticeMode(nm); setBadgeTypes((prev) => nm === "instant" ? (prev.includes("direct") ? prev : [...prev, "direct"]) : prev.filter((x) => x !== "direct")); }}
               style={{ width: "100%", height: "36px", boxSizing: "border-box", fontSize: "13px", padding: "0 12px", border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", color: "var(--color-ink)" }}
             >
               {PRODUCT_NOTICE_PRODUCT_OPTIONS.map((o) => (

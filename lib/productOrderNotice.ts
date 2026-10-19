@@ -143,3 +143,15 @@ export function resolveProductNoticePresentationFor(input: {
   if (mode === "custom") return { badge: "", message: resolveProductOrderNotice(mode, custom) };
   return { badge: "", message: "" };
 }
+
+// [㊺-2 2026-10-20] 바로구매 기준 한 곳 — 상품 직접 선택 > (기본값 따름이면) 옛 「바로구매」 배지 > 전체 기본값
+export function effectiveProductNoticeMode(productMode: unknown, badgeTypes: unknown): ProductNoticeProductMode {
+  const pm = parseProductNoticeProductMode(productMode);
+  if (pm !== "inherit") return pm;
+  const list = Array.isArray(badgeTypes) ? badgeTypes : [badgeTypes];
+  return list.map((x) => String(x ?? "").trim().toLowerCase()).includes("direct") ? "instant" : "inherit";
+}
+export function isInstantOrderProduct(productMode: unknown, badgeTypes: unknown, globalMode: unknown): boolean {
+  const m = effectiveProductNoticeMode(productMode, badgeTypes);
+  return m === "inherit" ? parseProductNoticeMode(globalMode) === "instant" : m === "instant";
+}

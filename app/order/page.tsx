@@ -60,7 +60,7 @@ import { brandWordmarkThumbnail, normalizeBrandKorean, productNameThumbnail, pro
 import { toOptionList } from "@/lib/optionSplit";
 import { widgetPinnedProductId } from "@/lib/widgetPinState";
 // [2026-09-22] 상품 주문 안내 문구 — 문구 원문은 lib 한 곳에서만 정한다(관리자 설정과 같은 파일)
-import { resolveProductNoticePresentationFor } from "@/lib/productOrderNotice";
+import { resolveProductNoticePresentationFor, effectiveProductNoticeMode, isInstantOrderProduct } from "@/lib/productOrderNotice";
 import {
   CUSTOMER_SESSION_VERSION_KEY,
   YOUTUBE_NICKNAME_CONFIRM_VERSION_KEY,
@@ -7311,7 +7311,7 @@ export default function OrderPage() {
                                 /* [2026-07-23 사장님 지시] 업체배송 상품 카드 배지 — 표시 전용(배송비 계산과 무관) */
                                 { key: "company", on: productDeliveryLabel(product) === "업체배송", text: "🚚 업체배송", node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#EEF2FA", color: "#3B5BA5" }}>🚚 업체배송</span> },
                                 /* 바로구매 — 사장님 지침대로 방송 켜짐/꺼짐과 무관하게 항상 표시(정보 배지, 개수 제한 밖) */
-                                { key: "direct", on: badges.includes("direct"), text: "🛒 바로구매", node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#E8F0FE", color: "#1D4ED8" }}>🛒 바로구매</span> },
+                                { key: "direct", on: isInstantOrderProduct((parseProductSuggestionNote(product.product_note) as Record<string, unknown> | null)?.order_notice_mode, badges, productNoticeGlobal.mode), text: "🛒 바로구매", node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#E8F0FE", color: "#1D4ED8" }}>🛒 바로구매</span> },
                               ];
                               // [㉜] 새 모양 배지 — 흰 알약+hairline 13px(「특가」만 빨간 글자), 줄당 최대 3개(정보 배지 먼저, 남는 자리에 마케팅).
                               //   「N개 남음」은 배지가 아니라 가격 근처 글씨로(lowTextV2). 어떤 배지를 켤지 판정은 위 그대로.
@@ -8168,7 +8168,7 @@ export default function OrderPage() {
             const optionSheetHalf = !optionSheetHasPhoto && optionSheetSimple;
             const optionNoticeNote = (parseProductSuggestionNote(registeredOptionSelectProduct.product_note) || {}) as Record<string, unknown>;
             const optionNoticePresentation = resolveProductNoticePresentationFor({
-              productMode: optionNoticeNote.order_notice_mode,
+              productMode: effectiveProductNoticeMode(optionNoticeNote.order_notice_mode, Array.isArray((registeredOptionSelectProduct as any).badge_types) && (registeredOptionSelectProduct as any).badge_types.length ? (registeredOptionSelectProduct as any).badge_types : [(registeredOptionSelectProduct as any).badge_type]),
               productCustom: optionNoticeNote.order_notice_custom,
               globalMode: productNoticeGlobal.mode,
               globalCustom: productNoticeGlobal.custom,
