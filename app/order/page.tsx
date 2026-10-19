@@ -7188,7 +7188,7 @@ export default function OrderPage() {
                             )}
                             {sold ? (
                               <span style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", borderRadius: "inherit", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                                <span style={uiV2 ? { color: "white", fontSize: "13px", fontWeight: 700, letterSpacing: "0.08em" } : { color: "white", fontSize: "11px", fontWeight: 800, letterSpacing: "0.1em" }}>SOLD OUT</span>
+                                <span style={uiV2 ? { color: "white", fontSize: "15px", fontWeight: 700 } : { color: "white", fontSize: "11px", fontWeight: 800, letterSpacing: "0.1em" }}>{uiV2 ? "품절" : "SOLD OUT"}</span>
                               </span>
                             ) : null}
                             {/* [2026-09-02 사장님 지시] 방송 중 고정(위젯) 상품은 썸네일 사진 위에 「라이브 소개중」 뱃지 */}
@@ -7201,7 +7201,7 @@ export default function OrderPage() {
                               </span>
                             ) : null}
                           </CustomerPressButton>
-                          {uiV2 && listView === "grid" ? (
+                          {uiV2 && listView === "grid" && !sold ? (
                             /* [㉜ 1단계 보정] 「+ 담기」 — 사진 확대 버튼 «안»이 아니라 형제로 사진 위에 겹친다(버튼 안 버튼 금지).
                                겹침 층은 사진과 같은 정사각(위·왼쪽 0, 폭 100%, 1:1)이고 pointerEvents none → 버튼 밖을 누르면 아래 사진(확대)이 눌린다.
                                버튼은 기존 담기 버튼과 같은 함수·같은 품절 처리. 형제라 확대 버튼으로 이벤트가 안 올라가지만 stopPropagation 으로 한 번 더 막는다. */
