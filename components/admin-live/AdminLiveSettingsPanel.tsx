@@ -584,7 +584,8 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onOp
                     색: 빨강+* 은 이 화면에서 «품절·선택 안 함» 경고에 쓰고 있어서, 같은 빨강이면 손님이
                       «오류»로 오해한다. 그래서 안내 톤(연한 살구 바탕 + 진한 갈색)으로 구분했다.
                     ⚠ 표시 전용 — 주문을 «막지» 않는다. 재고·진열·주문 로직과 무관. */}
-              <div className="mb-3 rounded-xl border border-line bg-surface-2 p-4">
+              {/* [51] 바로구매는 상품 등록 화면 버튼 하나로 — 전체 기본값 칸 숨김(값은 live_only 그대로 저장·유지) */}
+              <div className="hidden mb-3 rounded-xl border border-line bg-surface-2 p-4">
                 <div className="text-sm font-black text-ink">📣 상품 주문 안내 문구 — 전체 기본값</div>
                 <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
                   손님이 상품을 눌렀을 때 <b>수량·금액 줄 바로 위</b>에 한 줄로 보입니다. 안내만 할 뿐 주문을 막지는 않습니다.

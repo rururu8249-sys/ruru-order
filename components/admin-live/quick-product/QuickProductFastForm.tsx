@@ -8,12 +8,9 @@ import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import { showAdminToast } from "@/lib/adminToast";
 // [2026-09-22] 상품별 주문 안내 문구 — 문구 원문·모드는 lib 한 곳에서만 정한다(설정 화면과 같은 파일)
 import {
-  PRODUCT_NOTICE_PRODUCT_OPTIONS,
   PRODUCT_NOTICE_MAX_LEN,
-  PRODUCT_NOTICE_PRESETS,
   effectiveProductNoticeMode,
   parseProductNoticeProductMode,
-  splitProductOrderNotice,
   type ProductNoticeProductMode,
 } from "@/lib/productOrderNotice";
 import { showAdminConfirm } from "@/lib/adminConfirm";
@@ -792,7 +789,7 @@ export default function QuickProductFastForm({
   const linkedBrandParent = initialProduct?.__linked_brand_parent as ProductRow | undefined;
   // [2026-09-22 사장님] 「특정상품에 개별로」 — 이 상품만의 주문 안내 문구.
   //   기본은 «기본값 따름» → 상품을 100개 올려도 매번 고를 필요가 없다. 다른 상품만 골라서 바꾼다.
-  const [orderNoticeMode, setOrderNoticeMode] = useState<ProductNoticeProductMode>("inherit");
+  const [orderNoticeMode, setOrderNoticeMode] = useState<ProductNoticeProductMode>("live_only"); // [51] 새 상품 기본 = 방송 접수 후 구매
   const [orderNoticeCustom, setOrderNoticeCustom] = useState("");
 
   const [coverImages, setCoverImages] = useState<string[]>([]);
@@ -1045,7 +1042,7 @@ export default function QuickProductFastForm({
       ? (initialProduct as any).badge_types.filter(Boolean).map((x: any) => String(x))
       : ((initialProduct as any)?.badge_type && (initialProduct as any).badge_type !== "none" ? [String((initialProduct as any).badge_type)] : []);
     setBadgeTypes(_bt);
-    setOrderNoticeMode(effectiveProductNoticeMode(productNote?.order_notice_mode, _bt)); // [㊺-2] 옛 바로구매 배지 상품은 「바로 구매 가능」으로 미리 선택
+    { const em = effectiveProductNoticeMode(productNote?.order_notice_mode, _bt); setOrderNoticeMode(em === "inherit" ? "live_only" : em); } // [㊺-2] 옛 바로구매 배지 상품은 「바로 구매 가능」으로 미리 선택 · [51] 기본값 따름은 「방송 접수 후 구매」로
     setProductName(normalizeBrandKorean(pickString(initialProduct, ["product_name", "name", "title"], "")));
     setPriceText(formatNumberWithComma(pickNumber(initialProduct, ["price", "sale_price", "selling_price"], 0)));
     setShippingType(pickString(initialProduct, ["shipping_type", "delivery_type"], "normal"));
@@ -1779,7 +1776,8 @@ export default function QuickProductFastForm({
     setDescription("");
     setSpecChipsText("");
     // [2026-09-22] 새 상품은 «기본값 따름» — 등록할 때마다 고를 필요가 없다
-    setOrderNoticeMode("inherit");
+    // [51 2026-10-20] 바로구매는 상품 등록 버튼 2개로 하나 — 새 상품 기본 = 「방송 접수 후 구매」
+    setOrderNoticeMode("live_only");
     setOrderNoticeCustom("");
     setFreeProductEnabled(false);
     setStockManagementEnabled(false); // [2026-09-03 사장님 지시] 새 상품 폼 초기화도 기본 OFF
@@ -3142,7 +3140,7 @@ export default function QuickProductFastForm({
             <div style={sectionLabel}>상품 뱃지</div>
             <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginBottom: "6px", lineHeight: 1.6 }}>
               손님 상품 목록에 표시되는 뱃지 · <b style={{ color: "var(--color-ok-tx)" }}>배지를 하나도 안 골라도 자동으로 붙습니다</b> — 신상(등록 7일) · 급상승(담김 많거나 판매 상위 10%) · 💖루루픽(판매 상위 3%) · 「N개 남음」(재고) · 「방송 중 N개 주문」(실시간) · 「판매 N개」 · 「재구매 N명」. 배지는 «더» 강조하고 싶을 때만 누르세요.
-              <br />🛒 바로구매는 아래 「주문 안내 문구」에서 정합니다. ✈️ 해외배송은 배송 방식과 직결이라 <b>자동으로 절대 안 붙습니다(사장님 수동 전용)</b>.
+              <br />🛒 바로구매는 아래 「바로구매」 버튼에서 정합니다. ✈️ 해외배송은 배송 방식과 직결이라 <b>자동으로 절대 안 붙습니다(사장님 수동 전용)</b>.
             </div>
             <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}`}</style>
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
@@ -3235,45 +3233,22 @@ export default function QuickProductFastForm({
                 다른 상품만 골라서 바꾼다. 저장 자리는 product_note JSON(키 2개) — DB 변경 없음.
                 ⚠ 표시 전용 — 주문을 «막지» 않는다. */}
           <div style={{ marginBottom: "12px" }}>
-            <div style={sectionLabel}>주문 안내 문구 (선택)</div>
-            <select
-              value={orderNoticeMode}
-              onChange={(e) => { setFormTouched(true); const nm = parseProductNoticeProductMode(e.target.value); setOrderNoticeMode(nm); setBadgeTypes((prev) => nm === "instant" ? (prev.includes("direct") ? prev : [...prev, "direct"]) : prev.filter((x) => x !== "direct")); }}
-              style={{ width: "100%", height: "36px", boxSizing: "border-box", fontSize: "13px", padding: "0 12px", border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", color: "var(--color-ink)" }}
-            >
-              {PRODUCT_NOTICE_PRODUCT_OPTIONS.map((o) => (
-                <option key={o.mode} value={o.mode}>{o.label}</option>
-              ))}
-            </select>
-
-            {orderNoticeMode === "custom" ? (
-              <input
-                value={orderNoticeCustom}
-                onChange={(e) => { setFormTouched(true); setOrderNoticeCustom(e.target.value.slice(0, PRODUCT_NOTICE_MAX_LEN)); }}
-                placeholder={`이 상품에만 보일 문구 (${PRODUCT_NOTICE_MAX_LEN}자까지)`}
-                style={{ width: "100%", height: "36px", boxSizing: "border-box", marginTop: "6px", fontSize: "13px", padding: "0 12px", border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", color: "var(--color-ink)" }}
-              />
-            ) : null}
-
-            {/* 손님 화면에 그대로 보일 모습 — 저장 전에 눈으로 확인 */}
+            <div style={sectionLabel}>바로구매</div>
+            {/* [51 2026-10-20 사장님] 바로구매는 이 버튼 2개로 하나 — 손님 화면 판정(isInstantOrderProduct)·저장 키(order_notice_mode)는 그대로.
+                고른 값: 「바로구매 가능」=instant(+배지 direct) / 「방송 접수 후 구매」=live_only(배지 direct 뺌). 그 외 옛 값(off·custom)은 「방송 접수 후 구매」 쪽으로 보인다. */}
             {(() => {
-              if (orderNoticeMode === "inherit") {
-                return <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--color-ink-mute)" }}>설정 → 주문서 표시에서 정한 «전체 기본 문구»를 따릅니다.</div>;
-              }
-              if (orderNoticeMode === "off") {
-                return <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--color-ink-mute)" }}>이 상품에는 안내 문구가 안 보입니다.</div>;
-              }
-              const preview = orderNoticeMode === "custom"
-                ? orderNoticeCustom.trim()
-                : (PRODUCT_NOTICE_PRESETS.find((x) => x.mode === orderNoticeMode)?.text || "");
-              if (!preview) return <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--color-ink-mute)" }}>문구를 적어주세요 — 비어 있으면 안 보입니다.</div>;
-              // [2026-09-22 3차] 손님 화면과 «같은 모양» — 가운데점(·) 기준 두 줄
-              const { head, sub } = splitProductOrderNotice(preview);
+              const instant = orderNoticeMode === "instant";
+              const btn = (on: boolean): CSSProperties => ({ flex: 1, height: "40px", boxSizing: "border-box", borderRadius: "8px", fontSize: "13px", fontWeight: on ? 800 : 600, cursor: "pointer", border: on ? "1px solid var(--color-ink)" : "1px solid var(--color-line)", background: on ? "var(--color-ink)" : "var(--color-surface)", color: on ? "#fff" : "var(--color-ink-soft)" });
               return (
-                <div style={{ marginTop: "6px", borderRadius: "8px", background: "#FDF1E7", border: "1px solid #F3D9C2", padding: "8px 12px", wordBreak: "keep-all" }}>
-                  <div style={{ fontSize: "13px", fontWeight: 800, lineHeight: 1.45, color: "#8A4B1A" }}>{head}</div>
-                  {sub ? <div style={{ marginTop: "2px", fontSize: "12px", fontWeight: 700, lineHeight: 1.45, color: "#A5713F" }}>{sub}</div> : null}
-                </div>
+                <>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button type="button" aria-pressed={instant} style={btn(instant)} onClick={() => { setFormTouched(true); setOrderNoticeMode("instant"); setBadgeTypes((prev) => prev.includes("direct") ? prev : [...prev, "direct"]); }}>바로구매 가능</button>
+                    <button type="button" aria-pressed={!instant} style={btn(!instant)} onClick={() => { setFormTouched(true); setOrderNoticeMode("live_only"); setBadgeTypes((prev) => prev.filter((x) => x !== "direct")); }}>방송 접수 후 구매</button>
+                  </div>
+                  <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--color-ink-mute)" }}>
+                    {instant ? "방송 접수 없이 바로 주문할 수 있어요 · 손님 카드에 「바로구매」 표시" : "방송에서 접수한 분만 주문할 수 있어요"}
+                  </div>
+                </>
               );
             })()}
           </div>
