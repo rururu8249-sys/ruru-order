@@ -2004,7 +2004,7 @@ export default function OrderPage() {
         return `제주/도서/산간 배송지 기준 배송비 ${won(shippingFee)}이 적용됩니다.`;
       }
 
-      return `배송비 ${won(shippingFee)}이 적용됩니다.`;
+      return ""; // [㊽] 바로 아래 금액표 「배송비」와 중복 — 기본 경우만 숨김(업체배송·제주·별도출고 안내는 유지). 계산 무변경
     }
 
     if (isFreeShippingEvent) {
@@ -7515,7 +7515,7 @@ export default function OrderPage() {
             headerBelow={(
               <div style={uiS3 ? { padding: "10px 16px", borderBottom: "1px solid #E5E5E5", background: "#FFFFFF", overflowX: "auto" } : { padding: "9px 14px", borderBottom: "1px solid #F0EAE0", background: "#FBF5F7", overflowX: "auto" }}>
                 <div style={uiS3 ? { display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", minWidth: "340px", color: "#707072", fontSize: "13px", fontWeight: 400, whiteSpace: "nowrap" } : { display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", minWidth: "360px", color: "#7A1E47", fontSize: "10.5px", fontWeight: 900, whiteSpace: "nowrap" }}>
-                  <span>상품 담기 완료 ✓</span><span style={s3s({ color: "#C9A8B5" })}>→</span><span style={uiS3 ? { color: "#111111", fontWeight: 700 } : undefined}>주문서 확인·제출 (현재)</span><span style={s3s({ color: "#C9A8B5" })}>→</span><span>입금·결제</span>
+                  <span>상품 담기 완료 ✓</span><span style={s3s({ color: "#C9A8B5" })}>→</span><span style={uiS3 ? { color: "#111111", fontWeight: 700 } : undefined}>주문서 확인·제출</span><span style={s3s({ color: "#C9A8B5" })}>→</span><span>입금·결제</span>
                 </div>
               </div>
             )}
@@ -7676,7 +7676,7 @@ export default function OrderPage() {
             {selectedItemEntries.length === 0 ? (
               <div style={s3s({ padding: "40px 18px", textAlign: "center" })}>
                 <p style={s3s({ fontSize: "14px", fontWeight: 800, color: "#1A1A1A" })}>아직 담은 상품이 없습니다.</p>
-                <p style={s3s({ marginTop: "6px", fontSize: "12px", fontWeight: 600, color: "#6E655E", lineHeight: 1.6 })}>상품목록에서 [담기]를 누르거나 [직접 입력]으로 담아 주세요.</p>
+                <p style={s3s({ marginTop: "6px", fontSize: "12px", fontWeight: 600, color: "#6E655E", lineHeight: 1.6 })}>상품 목록에서 [담기]를 눌러 담아 주세요.</p>
               </div>
             ) : (
               <div>
@@ -7692,7 +7692,7 @@ export default function OrderPage() {
                   const optionSizeText = normalizeEmptyProductOptionValue(item.size);
                   const itemHasNoOptions = !optionColorText && !optionSizeText;
                   const optionSummaryText = itemHasNoOptions
-                    ? "옵션 없음"
+                    ? ""
                     : [optionColorText, optionSizeText].filter(Boolean).join(" / ");
                   const canInlineChangeQty = itemIsRegisteredProduct && itemHasNoOptions;
                   const itemSourceLabel = itemIsRegisteredProduct ? "선택상품" : "직접입력";
@@ -7719,7 +7719,7 @@ export default function OrderPage() {
                           <div style={uiS3 ? { flex: "1 1 0", minWidth: 0, order: 1 } : { flex: 1, minWidth: 0 }}>
                             {/* [2026-08-13] 상품명·옵션명이 잘리면 제출 전에 확인을 못 한다 → 2줄 줄바꿈 */}
                             <div style={uiS3 ? { fontSize: "16px", fontWeight: 600, color: "#111111", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" } : { fontSize: "14px", fontWeight: 800, color: "#1A1A1A", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{item.product_name || "상품명 없음"}{item.chat_source === "Y" ? <span style={s3s({ marginLeft: "5px", verticalAlign: "1px", display: "inline-block", padding: "1px 6px", borderRadius: "999px", background: "#E8F0FE", color: "#1D4ED8", fontSize: "10px", fontWeight: 800 })}>채팅주문</span> : null}</div>
-                            <div style={uiS3 ? { fontSize: "14px", fontWeight: 400, color: "#707072", marginTop: "4px", lineHeight: 1.45, wordBreak: "keep-all", overflowWrap: "anywhere" } : { fontSize: "12px", color: "#6E655E", marginTop: "2px", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{optionSummaryText} · {won(toNumber(item.product_price))} × {toNumber(item.qty)}개</div>
+                            <div style={uiS3 ? { fontSize: "14px", fontWeight: 400, color: "#707072", marginTop: "4px", lineHeight: 1.45, wordBreak: "keep-all", overflowWrap: "anywhere" } : { fontSize: "12px", color: "#6E655E", marginTop: "2px", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "keep-all", overflowWrap: "anywhere" }}>{optionSummaryText ? `${optionSummaryText} · ` : ""}{won(toNumber(item.product_price))} × {toNumber(item.qty)}개</div>
                           </div>
                           <div style={uiS3 ? { display: "flex", gap: "8px", flexShrink: 0, order: 5, marginLeft: "auto", marginTop: "12px" } : { display: "flex", gap: "6px", flexShrink: 0 }}>
                             {itemIsRegisteredProduct && !itemHasNoOptions ? (
@@ -7820,9 +7820,9 @@ export default function OrderPage() {
               {uiS3 && !paymentMethod ? null : (
               <div style={uiS3 ? { marginTop: "10px", borderRadius: "8px", background: "#F5F5F5", border: "none", padding: "12px 14px", fontSize: "15px", fontWeight: 400, lineHeight: 1.6, color: "#39393B", wordBreak: "keep-all" } : { marginTop: "8px", borderRadius: "10px", background: "#FAF8F6", border: "1px solid #E5E1DC", padding: "9px 12px", fontSize: "13px", fontWeight: 800, lineHeight: 1.6, color: "#4B3540", wordBreak: "keep-all" }}>
                 {paymentMethod === "카드결제" ? (
-                  <>제출하면 <b style={uiS3 ? { color: "#111111", fontWeight: 700 } : { color: "#7A1E47" }}>카카오톡으로 결제링크</b>를 보내드려요. (택배비 포함 {cardPaymentMinAmount.toLocaleString()}원 이상)</>
+                  <>카드결제는 택배비 포함 {cardPaymentMinAmount.toLocaleString()}원 이상 가능해요. 제출하면 <b style={uiS3 ? { color: "#111111", fontWeight: 700 } : { color: "#7A1E47" }}>카카오톡으로 결제링크</b>를 보내드려요.</>
                 ) : (
-                  <>입금자명 <b style={uiS3 ? { color: "#111111", fontWeight: 700 } : { color: "#7A1E47" }}>「{youtubeNickname.trim() || customerName.trim() || "-"}」</b> 으로 입금해 주세요.</>
+                  <>입금자명 <b style={uiS3 ? { color: "#111111", fontWeight: 700 } : { color: "#7A1E47" }}>「{youtubeNickname.trim() || customerName.trim() || "-"}」</b>{(() => { const n = (youtubeNickname.trim() || customerName.trim() || "-"); const c = n.charCodeAt(n.length - 1) - 0xac00; if (c < 0 || c > 11171) return "(으)로"; const j = c % 28; return j === 0 || j === 8 ? "로" : "으로"; })()} 입금해 주세요.</>
                 )}
               </div>
               )}
@@ -7860,7 +7860,7 @@ export default function OrderPage() {
 
               {/* [2026-09-20 사장님] 「접혀 있으면 난독증 손님은 모른다」 → 항상 펼쳐 둔다(작게). */}
               <label className="mt-3 block">
-                <span className={uiS3 ? "mb-2 block" : "mb-2 block text-[13px] font-black tracking-[-0.04em] text-slate-700"} style={uiS3 ? { fontSize: "15px", fontWeight: 700, color: "#111111" } : undefined}>요청사항 <span style={uiS3 ? { fontSize: "14px", fontWeight: 400, color: "#707072" } : { fontWeight: 700, color: "#6E655E" }}>(선택 · 안 적어도 돼요)</span></span>
+                <span className={uiS3 ? "mb-2 block" : "mb-2 block text-[13px] font-black tracking-[-0.04em] text-slate-700"} style={uiS3 ? { fontSize: "15px", fontWeight: 700, color: "#111111" } : undefined}>요청사항 <span style={uiS3 ? { fontSize: "14px", fontWeight: 400, color: "#707072" } : { fontWeight: 700, color: "#6E655E" }}>(선택)</span></span>
                 <textarea
                   value={requestMemo}
                   onChange={(event) => setRequestMemo(event.target.value)}
@@ -8419,7 +8419,7 @@ export default function OrderPage() {
                     style={sv({ marginBottom: "10px", border: "1px solid #D9C5CC", background: "#fff", borderRadius: "999px", padding: "7px 12px", fontSize: "12px", fontWeight: 900, color: "#7A1E47", cursor: "pointer" })}
                   >‹ 종류 다시 고르기</button>
                 ) : null}
-                  {registeredOptionColorMode === "none" && registeredOptionSizeMode === "none" && !(registeredOptionSelectProduct && (readOrderAxes3(registeredOptionSelectProduct) || readComboInfoOrderProduct(registeredOptionSelectProduct))) ? (
+                  {registeredOptionColorMode === "none" && registeredOptionSizeMode === "none" && !(registeredOptionSelectProduct && (readOrderAxes3(registeredOptionSelectProduct) || readComboInfoOrderProduct(registeredOptionSelectProduct))) && (registeredOptionCustomerDetailRequired || registeredOptionNeedsManualPrice) ? (
                     <div style={sv({ padding: "12px 16px 0", fontSize: "12px", color: "#6E655E" })}>
                       {/* [2026-08-29] 예전에는 색상·사이즈만 보고 "옵션이 없습니다. 수량만 선택"이라고 했는데,
                           세부상품명이나 금액을 손님이 직접 적어야 하는 상품에서도 같은 문구가 떠서 말이 안 맞았다.
@@ -8430,7 +8430,7 @@ export default function OrderPage() {
                           ? "세부상품명과 수량을 입력해 주세요."
                           : registeredOptionNeedsManualPrice
                             ? "금액과 수량을 입력해 주세요."
-                            : "이 상품은 옵션이 없습니다. 수량만 선택해 주세요."}
+                            : null}
                     </div>
                   ) : null}
 

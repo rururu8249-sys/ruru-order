@@ -325,7 +325,7 @@ export default function CustomerInfoEditBottomSheet({
               {youtubeNicknameError ? (
                 <div style={s5({ marginTop: "6px", fontSize: "12px", color: "#e74c3c", fontWeight: 600 })}>{youtubeNicknameError}</div>
               ) : (
-                <div style={s5({ marginTop: "6px", fontSize: "12px", color: "#6E655E" })}>현재 보이는 닉네임과 다르면 주문 누락이 생길 수 있습니다.</div>
+                <div style={s5({ marginTop: "6px", fontSize: "12px", color: "#6E655E" })}>방송 채팅에 쓰는 유튜브 닉네임과 똑같이 적어 주세요.</div>
               )}
             </div>
 

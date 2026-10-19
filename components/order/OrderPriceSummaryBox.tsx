@@ -108,7 +108,7 @@ export default function OrderPriceSummaryBox({
                   placeholder="쓸 만큼 숫자 입력"
                   style={v2 ? { height: "48px", width: "100%", boxSizing: "border-box", borderRadius: "24px", border: "1px solid #CACACB", background: "#FFFFFF", padding: "0 32px 0 16px", textAlign: "center", fontSize: "16px", fontWeight: 600, color: "#111111", outlineColor: "#111111" } : { height: "48px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: "1px solid #D9C5CC", background: "#fff", padding: "0 32px 0 14px", textAlign: "center", fontSize: "15px", fontWeight: 800, color: "#222", outline: "none" }}
                 />
-                <span style={t({ position: "absolute", right: "14px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", fontWeight: 800, color: "#7B2D43", pointerEvents: "none" })}>원</span>
+                <span style={t({ position: "absolute", right: "14px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", fontWeight: 800, color: "#707072", pointerEvents: "none" })}>P</span>
               </div>
 
               <button
