@@ -1484,6 +1484,9 @@ export default function OrderPage() {
   // [㊴ 6단계] 첫 화면 정리(띠 1줄·카드 배지 글자 2개·카드 전체 탭=옵션 창) — ?preview=s6 (기본값 UI_PREVIEW_DEFAULTS.s6)
   const [previewS6, setPreviewS6] = useState<boolean>(UI_PREVIEW_DEFAULTS.s6);
   const uiS6 = uiV2 && previewS6;
+  // [㊶ 7단계] 첫 화면 다듬기(좌우 여백 16px 한 줄·포인트 칩·작게/크게·정렬 테두리·낱말 줄바꿈) — ?preview=s7 (기본값 UI_PREVIEW_DEFAULTS.s7)
+  const [previewS7, setPreviewS7] = useState<boolean>(UI_PREVIEW_DEFAULTS.s7);
+  const uiS7 = uiV2 && previewS7;
   useEffect(() => {
     try {
       const decision = resolveCustomerUiV2(new URLSearchParams(window.location.search).get("ui"), window.localStorage.getItem(UI_V2_STORAGE_KEY), UI_V2_DEFAULT);
@@ -1493,6 +1496,7 @@ export default function OrderPage() {
     setPreviewS3(readCustomerUiPreview("s3"));
     setPreviewS5(readCustomerUiPreview("s5"));
     setPreviewS6(readCustomerUiPreview("s6"));
+    setPreviewS7(readCustomerUiPreview("s7"));
   }, []);
   // [㉜ 2단계] 옵션 창 등 스타일이 많은 화면의 새 모양 정리(로즈→흑백·13px 미만→13px) — 스위치 꺼지면 원래 스타일 그대로.
   const sv = (style: CSSProperties | undefined): CSSProperties | undefined => (uiV2 ? restyleV2(style) : style);
@@ -6105,7 +6109,7 @@ export default function OrderPage() {
     ).length;
 
     return (
-      <header style={uiV2 ? { position: "sticky", top: 0, zIndex: 30, background: "#FFFFFF", borderBottom: "1px solid #E5E5E5", padding: "10px 16px" } : { position: "sticky", top: 0, zIndex: 30, background: "#fff", borderBottom: "1px solid #E8E2DD", padding: "10px 12px" }}>
+      <header style={uiS7 ? { position: "sticky", top: 0, zIndex: 30, background: "#FFFFFF", borderBottom: "1px solid #E5E5E5", padding: "10px 16px", margin: "0 -16px" } : uiV2 ? { position: "sticky", top: 0, zIndex: 30, background: "#FFFFFF", borderBottom: "1px solid #E5E5E5", padding: "10px 16px" } : { position: "sticky", top: 0, zIndex: 30, background: "#fff", borderBottom: "1px solid #E8E2DD", padding: "10px 12px" }}>
         <div style={{ margin: "0 auto", width: "100%", maxWidth: "560px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
             {/* [2026-08-12 리뉴얼 1단계] 로고 — 집(대문) 아이콘 + 「루루동이 / 집구석 LIVE」 워드마크.
@@ -6126,7 +6130,7 @@ export default function OrderPage() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-            <div style={uiV2 ? { display: "inline-flex", alignItems: "center", gap: "5px", height: "38px", padding: "0 14px", borderRadius: "9999px", border: "1px solid #CACACB", background: "#F5F5F5", fontSize: "14px", fontWeight: 600, color: "#111111", whiteSpace: "nowrap" } : { display: "inline-flex", alignItems: "center", gap: "5px", height: "38px", padding: "0 13px", borderRadius: "99px", border: "1px solid #E7C9D4", background: "#F9EEF3", fontSize: "13px", fontWeight: 800, color: "#7A1E47", whiteSpace: "nowrap" }}>
+            <div style={uiS7 ? { display: "inline-flex", alignItems: "center", gap: "5px", height: "36px", padding: "0 14px", borderRadius: "9999px", border: "none", background: "#F5F5F5", fontSize: "15px", fontWeight: 700, color: "#111111", whiteSpace: "nowrap" } : uiV2 ? { display: "inline-flex", alignItems: "center", gap: "5px", height: "38px", padding: "0 14px", borderRadius: "9999px", border: "1px solid #CACACB", background: "#F5F5F5", fontSize: "14px", fontWeight: 600, color: "#111111", whiteSpace: "nowrap" } : { display: "inline-flex", alignItems: "center", gap: "5px", height: "38px", padding: "0 13px", borderRadius: "99px", border: "1px solid #E7C9D4", background: "#F9EEF3", fontSize: "13px", fontWeight: 800, color: "#7A1E47", whiteSpace: "nowrap" }}>
               {uiS5 ? null : "🪙 "}{`${Math.max(0, Number(customerPointBalance || 0)).toLocaleString()}P`}
             </div>
           </div>
@@ -6512,7 +6516,7 @@ export default function OrderPage() {
   const topStripOn = noticeStripOn || bandStripOn;
 
   return (
-    <OrderPageShell tone={uiV2 ? "v2" : undefined}>
+    <OrderPageShell tone={uiV2 ? "v2" : undefined} edge16={uiS7}>
       <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}.ruru-cat-scroll::-webkit-scrollbar{display:none}`}</style>
       {hasSavedInfo && <TopCustomerNav />}
       {/* [2026-09-20 실측] 손님 첫 화면에서 상품이 보이기까지 상단 «껍데기»가 388px였다.
@@ -6687,7 +6691,7 @@ export default function OrderPage() {
           손님이 유튜브 앱에서 방송을 보다 이 페이지로 오면 폰이 알아서 미니플레이어(PIP)를 띄운다.
           우리 페이지는 주문에만 집중: 방송 OFF=예고 배너 / 방송 ON=검은 스트립 2줄. */}
       {hasSavedInfo && broadcastLoaded ? (
-        <section style={{ margin: "8px auto 0", width: "100%", maxWidth: "560px", padding: "0 14px 12px" }}>
+        <section style={{ margin: "8px auto 0", width: "100%", maxWidth: "560px", padding: uiS7 ? "0 0 12px" : "0 14px 12px" }}>
           {!isBroadcastOn ? (
             /* [2026-09-20] 방송 전 카드 — 166px였다. 하는 일이 ①상태 알림 ②방송알림 신청 두 개인데,
                  이미 알림을 신청한 손님에게는 ②가 «알림 받는 중 ✓» 라는 40px짜리 표시로만 남아 자리만 먹었다.
@@ -6700,13 +6704,13 @@ export default function OrderPage() {
               {uiS6 && noticeStripOn ? (
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", paddingBottom: "10px", borderBottom: false ? "1px solid rgba(255,255,255,0.2)" : "1px solid #E5E5E5" }}>
                   <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M4 10v4h3l6 4V6L7 10z" /><path d="M16.5 9.5a3.5 3.5 0 0 1 0 5" /></svg>
-                  <button type="button" onClick={openNoticeBox} style={{ minWidth: 0, flex: 1, textAlign: "left", border: "none", background: "none", padding: 0, cursor: "pointer", color: "inherit", fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "inherit" }}>{noticeBarText}</button>
+                  <button type="button" onClick={openNoticeBox} style={{ minWidth: 0, flex: 1, textAlign: "left", border: "none", background: "none", padding: 0, cursor: "pointer", color: "inherit", fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "inherit", ...(uiS7 ? { wordBreak: "keep-all" as const } : {}) }}>{noticeBarText}</button>
                   <button type="button" onClick={openNoticeBox} style={{ flexShrink: 0, height: "32px", border: false ? "1px solid rgba(255,255,255,0.5)" : "1px solid #CACACB", background: false ? "transparent" : "#FFFFFF", color: "inherit", borderRadius: "9999px", padding: "0 12px", fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>자세히</button>
                 </div>
               ) : null}
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <span style={{ flexShrink: 0, fontSize: "15px" }}>{uiS5 ? <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="M5 8h14l-1 12H6z" /><path d="M9 8V6.5a3 3 0 0 1 6 0V8" /></svg> : "🛍"}</span>
-                <div style={uiV2 ? { minWidth: 0, flex: 1, fontSize: "14px", fontWeight: 600, lineHeight: 1.5 } : { minWidth: 0, flex: 1, fontSize: "12.5px", fontWeight: 800, lineHeight: 1.45 }}>
+                <div style={uiV2 ? { minWidth: 0, flex: 1, fontSize: "14px", fontWeight: 600, lineHeight: 1.5, ...(uiS7 ? { wordBreak: "keep-all" as const } : {}) } : { minWidth: 0, flex: 1, fontSize: "12.5px", fontWeight: 800, lineHeight: 1.45 }}>
                   방송 전이에요 · 아래 상품{productListState === "loading" ? "은" : ` ${quickGroupBuyProducts.length}개는`} <b>지금 바로 주문</b> 가능
                   {nextLiveText ? <div style={uiV2 ? { fontSize: "13px", fontWeight: 400, color: "#707072" } : { fontSize: "11.5px", fontWeight: 700, opacity: 0.88 }}>다음 라이브 · {nextLiveText}</div> : null}
                 </div>
@@ -6719,7 +6723,7 @@ export default function OrderPage() {
               ) : (
               <div style={uiV2 ? { display: "flex", alignItems: "center", gap: "8px", background: "#F5F5F5", borderRadius: "16px", padding: "10px 14px", color: "#111111" } : { display: "flex", alignItems: "center", gap: "8px", background: "linear-gradient(135deg,#7A1E47,#9A3560)", borderRadius: "14px", padding: "10px 13px", color: "#fff" }}>
                 <span style={{ flexShrink: 0, fontSize: "15px" }}>{uiS5 ? <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="M5 8h14l-1 12H6z" /><path d="M9 8V6.5a3 3 0 0 1 6 0V8" /></svg> : "🛍"}</span>
-                <div style={uiV2 ? { minWidth: 0, flex: 1, fontSize: "14px", fontWeight: 600, lineHeight: 1.5 } : { minWidth: 0, flex: 1, fontSize: "12.5px", fontWeight: 800, lineHeight: 1.45 }}>
+                <div style={uiV2 ? { minWidth: 0, flex: 1, fontSize: "14px", fontWeight: 600, lineHeight: 1.5, ...(uiS7 ? { wordBreak: "keep-all" as const } : {}) } : { minWidth: 0, flex: 1, fontSize: "12.5px", fontWeight: 800, lineHeight: 1.45 }}>
                   방송 전이에요 · 아래 상품{productListState === "loading" ? "은" : ` ${quickGroupBuyProducts.length}개는`} <b>지금 바로 주문</b> 가능
                   {nextLiveText ? <div style={uiV2 ? { fontSize: "13px", fontWeight: 400, color: "#707072" } : { fontSize: "11.5px", fontWeight: 700, opacity: 0.88 }}>다음 라이브 · {nextLiveText}</div> : null}
                 </div>
@@ -6735,12 +6739,12 @@ export default function OrderPage() {
               {uiS6 && noticeStripOn ? (
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", paddingBottom: "10px", borderBottom: false ? "1px solid rgba(255,255,255,0.2)" : "1px solid #E5E5E5" }}>
                   <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M4 10v4h3l6 4V6L7 10z" /><path d="M16.5 9.5a3.5 3.5 0 0 1 0 5" /></svg>
-                  <button type="button" onClick={openNoticeBox} style={{ minWidth: 0, flex: 1, textAlign: "left", border: "none", background: "none", padding: 0, cursor: "pointer", color: "inherit", fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "inherit" }}>{noticeBarText}</button>
+                  <button type="button" onClick={openNoticeBox} style={{ minWidth: 0, flex: 1, textAlign: "left", border: "none", background: "none", padding: 0, cursor: "pointer", color: "inherit", fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "inherit", ...(uiS7 ? { wordBreak: "keep-all" as const } : {}) }}>{noticeBarText}</button>
                   <button type="button" onClick={openNoticeBox} style={{ flexShrink: 0, height: "32px", border: false ? "1px solid rgba(255,255,255,0.5)" : "1px solid #CACACB", background: false ? "transparent" : "#FFFFFF", color: "inherit", borderRadius: "9999px", padding: "0 12px", fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>자세히</button>
                 </div>
               ) : null}
-              <div style={uiV2 ? { fontSize: "18px", fontWeight: 700, marginBottom: "4px" } : { fontSize: "17px", fontWeight: 900, marginBottom: "4px" }}>지금은 방송 전이에요</div>
-              <div style={uiV2 ? { fontSize: "14px", fontWeight: 400, color: "#39393B", lineHeight: 1.5 } : { fontSize: "12.5px", fontWeight: 700, opacity: 0.92, lineHeight: 1.5 }}>
+              <div style={uiV2 ? { fontSize: "18px", fontWeight: 700, marginBottom: "4px", ...(uiS7 ? { wordBreak: "keep-all" as const } : {}) } : { fontSize: "17px", fontWeight: 900, marginBottom: "4px" }}>지금은 방송 전이에요</div>
+              <div style={uiV2 ? { fontSize: "14px", fontWeight: 400, color: "#39393B", lineHeight: 1.5, ...(uiS7 ? { wordBreak: "keep-all" as const } : {}) } : { fontSize: "12.5px", fontWeight: 700, opacity: 0.92, lineHeight: 1.5 }}>
                 {nextLiveText ? <>다음 라이브 · {nextLiveText}<br /></> : null}
                 아래 상품{productListState === "loading" ? "은" : ` ${quickGroupBuyProducts.length}개는`} <b>지금 바로 주문</b>하실 수 있어요{uiS5 ? "" : " 👇"}
               </div>
@@ -6759,7 +6763,7 @@ export default function OrderPage() {
               {uiS6 && noticeStripOn ? (
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", paddingBottom: "10px", borderBottom: true ? "1px solid rgba(255,255,255,0.2)" : "1px solid #E5E5E5" }}>
                   <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M4 10v4h3l6 4V6L7 10z" /><path d="M16.5 9.5a3.5 3.5 0 0 1 0 5" /></svg>
-                  <button type="button" onClick={openNoticeBox} style={{ minWidth: 0, flex: 1, textAlign: "left", border: "none", background: "none", padding: 0, cursor: "pointer", color: "inherit", fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "inherit" }}>{noticeBarText}</button>
+                  <button type="button" onClick={openNoticeBox} style={{ minWidth: 0, flex: 1, textAlign: "left", border: "none", background: "none", padding: 0, cursor: "pointer", color: "inherit", fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "inherit", ...(uiS7 ? { wordBreak: "keep-all" as const } : {}) }}>{noticeBarText}</button>
                   <button type="button" onClick={openNoticeBox} style={{ flexShrink: 0, height: "32px", border: true ? "1px solid rgba(255,255,255,0.5)" : "1px solid #CACACB", background: true ? "transparent" : "#FFFFFF", color: "inherit", borderRadius: "9999px", padding: "0 12px", fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>자세히</button>
                 </div>
               ) : null}
@@ -6995,7 +6999,7 @@ export default function OrderPage() {
                             NN/g 기준으로는 «항상 보이는 글자 라벨»이 곧 설명이다.
                             그 이상(툴팁·별도 안내문)은 필요 없고 화면만 복잡해진다.
                             출처: nngroup.com/articles/icon-usability */}
-                    <div style={uiV2 ? { display: "flex", flexShrink: 0, height: "40px", boxSizing: "border-box", border: "1px solid #CACACB", borderRadius: "9999px", overflow: "hidden", background: "#FFFFFF", padding: "1px" } : { display: "flex", flexShrink: 0, height: "36px", boxSizing: "border-box", border: "1px solid #D9C5CC", borderRadius: "10px", overflow: "hidden", background: "#fff" }}>
+                    <div style={uiV2 ? { display: "flex", flexShrink: 0, height: "40px", boxSizing: "border-box", border: uiS7 ? "1px solid #E5E5E5" : "1px solid #CACACB", borderRadius: "9999px", overflow: "hidden", background: "#FFFFFF", padding: "1px" } : { display: "flex", flexShrink: 0, height: "36px", boxSizing: "border-box", border: "1px solid #D9C5CC", borderRadius: "10px", overflow: "hidden", background: "#fff" }}>
                       <button type="button" aria-label="사진 작게 보기 — 한 줄에 상품 한 개" onClick={() => changeListView("list")}
                         style={uiV2 ? { display: "inline-flex", alignItems: "center", gap: "3px", height: "100%", padding: "0 12px", border: "none", borderRadius: "9999px", background: listView === "list" ? "#111111" : "#FFFFFF", color: listView === "list" ? "#FFFFFF" : "#111111", fontSize: "14px", fontWeight: 600, cursor: "pointer", lineHeight: 1, whiteSpace: "nowrap", fontFamily: "inherit" } : { display: "inline-flex", alignItems: "center", gap: "3px", height: "100%", padding: "0 9px", border: "none", background: listView === "list" ? "#7A1E47" : "#fff", color: listView === "list" ? "#fff" : "#7A1E47", fontSize: "12.5px", fontWeight: 800, cursor: "pointer", lineHeight: 1, whiteSpace: "nowrap", fontFamily: "inherit" }}>
                         <span style={{ fontSize: "13px" }}>☰</span>작게
@@ -7009,7 +7013,7 @@ export default function OrderPage() {
                       value={productSort}
                       onChange={(e) => { setProductSort(e.target.value as typeof productSort); setVisibleProductCount(10); }}
                       aria-label="상품 정렬"
-                      style={uiV2 ? { minWidth: 0, flex: "1 1 auto", maxWidth: "176px", height: "40px", boxSizing: "border-box", borderRadius: "9999px", border: "1px solid #CACACB", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, padding: "0 12px", cursor: "pointer", outline: "none", fontFamily: "inherit" } : { minWidth: 0, flex: "1 1 auto", maxWidth: "168px", height: "36px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", fontSize: "12.5px", fontWeight: 800, padding: "0 6px", cursor: "pointer", outline: "none", fontFamily: "inherit" }}
+                      style={uiV2 ? { minWidth: 0, flex: "1 1 auto", maxWidth: "176px", height: "40px", boxSizing: "border-box", borderRadius: "9999px", border: uiS7 ? "1px solid #E5E5E5" : "1px solid #CACACB", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, padding: "0 12px", cursor: "pointer", outline: "none", fontFamily: "inherit" } : { minWidth: 0, flex: "1 1 auto", maxWidth: "168px", height: "36px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", fontSize: "12.5px", fontWeight: 800, padding: "0 6px", cursor: "pointer", outline: "none", fontFamily: "inherit" }}
                     >
                       <option value="default">루루동이 추천순</option>
                       <option value="mix">골고루 보기</option>
