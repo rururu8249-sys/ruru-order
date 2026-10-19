@@ -43,7 +43,7 @@ export default function MyOrderPageHero({
       {isLoggedIn ? (
         <div className={v2 ? "mt-3 rounded-[8px] bg-[#F5F5F5] px-4 py-3" : "mt-3 rounded-[18px] bg-white px-4 py-3 ring-1 ring-slate-200"}>
           <div className={v2 ? "flex items-center justify-between gap-3 text-[15px]" : "flex items-center justify-between gap-3 text-[13px] font-black tracking-[-0.04em]"}>
-            <span className={v2 ? "shrink-0 font-normal text-[#707072]" : "shrink-0 text-slate-500"}>닉네임</span>
+            <span className={v2 ? "shrink-0 font-normal text-[#707072]" : "shrink-0 text-slate-500"}>주문자</span>
             <span className={v2 ? "min-w-0 truncate text-right font-semibold text-[#111111]" : "min-w-0 truncate text-right text-blue-700"} title={displayName}>
               {displayName}
             </span>

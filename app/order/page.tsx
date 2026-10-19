@@ -6711,7 +6711,7 @@ export default function OrderPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", paddingBottom: "10px", borderBottom: false ? "1px solid rgba(255,255,255,0.2)" : "1px solid #E5E5E5" }}>
                   <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M4 10v4h3l6 4V6L7 10z" /><path d="M16.5 9.5a3.5 3.5 0 0 1 0 5" /></svg>
                   <button type="button" onClick={openNoticeBox} style={{ minWidth: 0, flex: 1, textAlign: "left", border: "none", background: "none", padding: 0, cursor: "pointer", color: "inherit", fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "inherit", ...(uiS7 ? { wordBreak: "keep-all" as const } : {}) }}>{noticeBarText}</button>
-                  <button type="button" onClick={openNoticeBox} style={{ flexShrink: 0, height: "32px", border: false ? "1px solid rgba(255,255,255,0.5)" : "1px solid #CACACB", background: false ? "transparent" : "#FFFFFF", color: "inherit", borderRadius: "9999px", padding: "0 12px", fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>자세히</button>
+                  <button type="button" onClick={openNoticeBox} style={{ flexShrink: 0, height: "40px", border: false ? "1px solid rgba(255,255,255,0.5)" : "1px solid #CACACB", background: false ? "transparent" : "#FFFFFF", color: "inherit", borderRadius: "9999px", padding: "0 12px", fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>자세히</button>
                 </div>
               ) : null}
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -6720,7 +6720,7 @@ export default function OrderPage() {
                   방송 전이에요{productListState === "loading" || instantReadyCount > 0 ? <> · 아래 상품{productListState === "loading" ? "은" : ` ${instantReadyCount}개는`} <b>지금 바로 주문</b> 가능</> : null}
                   {nextLiveText ? <div style={uiV2 ? { fontSize: "13px", fontWeight: 400, color: "#707072" } : { fontSize: "11.5px", fontWeight: 700, opacity: 0.88 }}>다음 라이브 · {nextLiveText}</div> : null}
                 </div>
-                <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flexShrink: 0, height: "36px", padding: "0 12px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" } : { flexShrink: 0, height: "30px", padding: "0 10px", border: "1px solid rgba(255,255,255,0.45)", borderRadius: "999px", background: "rgba(255,255,255,0.14)", color: "#fff", fontSize: "11px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>{uiS5 ? "알림 받는 중 ✓" : "🔔 알림 받는 중 ✓"}</button>
+                <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flexShrink: 0, height: "40px", padding: "0 12px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" } : { flexShrink: 0, height: "30px", padding: "0 10px", border: "1px solid rgba(255,255,255,0.45)", borderRadius: "999px", background: "rgba(255,255,255,0.14)", color: "#fff", fontSize: "11px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>{uiS5 ? "알림 받는 중 ✓" : "🔔 알림 받는 중 ✓"}</button>
                 {broadcastYoutubeUrl ? (
                   <button type="button" aria-label="유튜브 채널 열기" onClick={() => openYoutubeApp(broadcastYoutubeUrl)} style={uiV2 ? { flexShrink: 0, width: "36px", height: "36px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 600, cursor: "pointer" } : { flexShrink: 0, width: "30px", height: "30px", border: "1px solid rgba(255,255,255,0.45)", borderRadius: "999px", background: "transparent", color: "#fff", fontSize: "11px", fontWeight: 900, cursor: "pointer" }}>▶</button>
                 ) : null}
@@ -6733,7 +6733,7 @@ export default function OrderPage() {
                   방송 전이에요{productListState === "loading" || instantReadyCount > 0 ? <> · 아래 상품{productListState === "loading" ? "은" : ` ${instantReadyCount}개는`} <b>지금 바로 주문</b> 가능</> : null}
                   {nextLiveText ? <div style={uiV2 ? { fontSize: "13px", fontWeight: 400, color: "#707072" } : { fontSize: "11.5px", fontWeight: 700, opacity: 0.88 }}>다음 라이브 · {nextLiveText}</div> : null}
                 </div>
-                <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flexShrink: 0, height: "36px", padding: "0 12px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" } : { flexShrink: 0, height: "30px", padding: "0 10px", border: "1px solid rgba(255,255,255,0.45)", borderRadius: "999px", background: "rgba(255,255,255,0.14)", color: "#fff", fontSize: "11px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>{uiS5 ? "알림 받는 중 ✓" : "🔔 알림 받는 중 ✓"}</button>
+                <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flexShrink: 0, height: "40px", padding: "0 12px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" } : { flexShrink: 0, height: "30px", padding: "0 10px", border: "1px solid rgba(255,255,255,0.45)", borderRadius: "999px", background: "rgba(255,255,255,0.14)", color: "#fff", fontSize: "11px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>{uiS5 ? "알림 받는 중 ✓" : "🔔 알림 받는 중 ✓"}</button>
                 {broadcastYoutubeUrl ? (
                   <button type="button" aria-label="유튜브 채널 열기" onClick={() => openYoutubeApp(broadcastYoutubeUrl)} style={uiV2 ? { flexShrink: 0, width: "36px", height: "36px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 600, cursor: "pointer" } : { flexShrink: 0, width: "30px", height: "30px", border: "1px solid rgba(255,255,255,0.45)", borderRadius: "999px", background: "transparent", color: "#fff", fontSize: "11px", fontWeight: 900, cursor: "pointer" }}>▶</button>
                 ) : null}
@@ -6746,7 +6746,7 @@ export default function OrderPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", paddingBottom: "10px", borderBottom: false ? "1px solid rgba(255,255,255,0.2)" : "1px solid #E5E5E5" }}>
                   <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M4 10v4h3l6 4V6L7 10z" /><path d="M16.5 9.5a3.5 3.5 0 0 1 0 5" /></svg>
                   <button type="button" onClick={openNoticeBox} style={{ minWidth: 0, flex: 1, textAlign: "left", border: "none", background: "none", padding: 0, cursor: "pointer", color: "inherit", fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "inherit", ...(uiS7 ? { wordBreak: "keep-all" as const } : {}) }}>{noticeBarText}</button>
-                  <button type="button" onClick={openNoticeBox} style={{ flexShrink: 0, height: "32px", border: false ? "1px solid rgba(255,255,255,0.5)" : "1px solid #CACACB", background: false ? "transparent" : "#FFFFFF", color: "inherit", borderRadius: "9999px", padding: "0 12px", fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>자세히</button>
+                  <button type="button" onClick={openNoticeBox} style={{ flexShrink: 0, height: "40px", border: false ? "1px solid rgba(255,255,255,0.5)" : "1px solid #CACACB", background: false ? "transparent" : "#FFFFFF", color: "inherit", borderRadius: "9999px", padding: "0 12px", fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>자세히</button>
                 </div>
               ) : null}
               <div style={uiV2 ? { fontSize: "18px", fontWeight: 700, marginBottom: "4px", ...(uiS7 ? { wordBreak: "keep-all" as const } : {}) } : { fontSize: "17px", fontWeight: 900, marginBottom: "4px" }}>지금은 방송 전이에요</div>
@@ -6770,7 +6770,7 @@ export default function OrderPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", paddingBottom: "10px", borderBottom: true ? "1px solid rgba(255,255,255,0.2)" : "1px solid #E5E5E5" }}>
                   <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M4 10v4h3l6 4V6L7 10z" /><path d="M16.5 9.5a3.5 3.5 0 0 1 0 5" /></svg>
                   <button type="button" onClick={openNoticeBox} style={{ minWidth: 0, flex: 1, textAlign: "left", border: "none", background: "none", padding: 0, cursor: "pointer", color: "inherit", fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "inherit", ...(uiS7 ? { wordBreak: "keep-all" as const } : {}) }}>{noticeBarText}</button>
-                  <button type="button" onClick={openNoticeBox} style={{ flexShrink: 0, height: "32px", border: true ? "1px solid rgba(255,255,255,0.5)" : "1px solid #CACACB", background: true ? "transparent" : "#FFFFFF", color: "inherit", borderRadius: "9999px", padding: "0 12px", fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>자세히</button>
+                  <button type="button" onClick={openNoticeBox} style={{ flexShrink: 0, height: "40px", border: true ? "1px solid rgba(255,255,255,0.5)" : "1px solid #CACACB", background: true ? "transparent" : "#FFFFFF", color: "inherit", borderRadius: "9999px", padding: "0 12px", fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>자세히</button>
                 </div>
               ) : null}
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
@@ -9168,7 +9168,7 @@ export default function OrderPage() {
             )}
           >
               {/* [2026-07-29] 카톡 로그인 시 알림이 기본 ON이므로, 켜져 있는 손님에겐 "자동으로 켜졌고 여기서 끌 수 있다"고 알려준다(카카오 채널 정책 대비 고지). */}
-              <div style={s5s({ fontSize: "14px", color: "#555", lineHeight: 1.7 })}>
+              <div style={s5s({ fontSize: "14px", color: "#39393B", lineHeight: 1.7, wordBreak: "keep-all" })}>
                 {liveAlertOptin
                   ? "카카오톡 로그인을 하시면 방송 시작 알림이 자동으로 켜집니다. 라이브가 시작되면 카카오 알림톡으로 알려드려요. 원하지 않으시면 바로 아래 [알림 끄기] 버튼을 눌러 주세요."
                   : "신청하면 라이브 시작 때 카카오 알림톡으로 알려드려요. 신청 시 알림 수신에 동의하며, 언제든 끌 수 있어요."}
@@ -9314,7 +9314,7 @@ export default function OrderPage() {
         onClose={() => setSizeChartOpen(false)}
       />
 
-      <footer className="pt-8 pb-56 text-center text-[11px] font-bold tracking-[-0.03em] text-slate-400">
+      <footer className="pt-8 pb-56 text-center text-[13px] font-normal text-[#707072]">
         <div className="mb-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
           <a href="/privacy" className="underline underline-offset-2">개인정보처리방침</a>
           <span aria-hidden="true">·</span>

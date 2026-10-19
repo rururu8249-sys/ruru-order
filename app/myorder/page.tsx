@@ -452,8 +452,8 @@ export default function MyOrderPage() {
                     className={
                       v2
                         ? orderFilter === filter
-                          ? "min-h-[44px] rounded-full bg-[#111111] px-1 text-[14px] font-semibold text-white transition active:scale-[0.97]"
-                          : "min-h-[44px] rounded-full border border-[#CACACB] bg-white px-1 text-[14px] font-semibold text-[#111111] transition active:scale-[0.97]"
+                          ? "min-h-[44px] rounded-full bg-[#111111] px-0 text-[13px] font-semibold whitespace-nowrap text-white transition active:scale-[0.97]"
+                          : "min-h-[44px] rounded-full border border-[#CACACB] bg-white px-0 text-[13px] font-semibold whitespace-nowrap text-[#111111] transition active:scale-[0.97]"
                         : orderFilter === filter
                         ? "min-h-[34px] rounded-full bg-coral-700 px-2 text-[11px] font-black tracking-[-0.04em] text-white transition active:scale-[0.98]"
                         : "min-h-[34px] rounded-full bg-slate-50 px-2 text-[11px] font-black tracking-[-0.04em] text-slate-600 ring-1 ring-slate-100 transition active:scale-[0.98]"

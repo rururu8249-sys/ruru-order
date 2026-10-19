@@ -149,7 +149,7 @@ export default function MyOrderResultCard({
 
         <div className="min-w-0 text-right">
           <p className={v2 ? "text-[#707072]" : "text-slate-400"}>주문일</p>
-          <p className={v2 ? "mt-0.5 truncate font-semibold text-[#111111]" : "mt-0.5 truncate font-black text-slate-800"}>
+          <p className={v2 ? "mt-0.5 break-keep font-semibold text-[#111111]" : "mt-0.5 truncate font-black text-slate-800"}>
             {displayDate}
           </p>
         </div>
