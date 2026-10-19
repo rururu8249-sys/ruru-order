@@ -5548,6 +5548,24 @@ export default function OrderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasSavedInfo]);
 
+  // [㊾] 주문조회·공지 화면 아래 메뉴의 「문의」「내정보」 → /order?open=inquiry|me 로 와서 그 창을 연다(표시·이동만).
+  //   내정보 창(openCustomerInfoEditBottomSheet)은 열 때 지금 닉네임·이름·전화를 «되돌리기용»으로 찍어 두고
+  //   닫으면 그 값으로 되돌린다 → 손님 정보가 아직 안 불러와진 상태에서 열면 빈 값이 찍혀 닫을 때 지워질 수 있다.
+  //   그래서 위 닉네임 재확인과 같이 hasSavedInfo(손님 정보 불러오기 끝) 뒤에, ref 로 한 번만 연다.
+  const openParamHandledRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || openParamHandledRef.current || !hasSavedInfo) return;
+    const p = new URLSearchParams(window.location.search);
+    const o = p.get("open");
+    if (o !== "inquiry" && o !== "me") return;
+    openParamHandledRef.current = true;
+    if (o === "inquiry") setInquirySheetOpen(true); else openCustomerInfoEditBottomSheet();
+    p.delete("open");
+    const q = p.toString();
+    window.history.replaceState(null, "", window.location.pathname + (q ? `?${q}` : ""));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasSavedInfo]);
+
   const ruruOrderLookupWon = (value: unknown) => {
     const amount = Number(value || 0);
     if (!Number.isFinite(amount)) return "0원";

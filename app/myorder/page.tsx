@@ -24,6 +24,7 @@ import {
   orderLookupPhoneValues,
 } from "@/lib/customerOrderLookup";
 import CustomerTopNav from "@/components/customer/CustomerTopNav";
+import CustomerBottomNav from "@/components/customer/CustomerBottomNav";
 import MyOrderPageHero from "@/components/myorder/MyOrderPageHero";
 import CustomerPaymentGuideBottomSheet from "@/components/customer/CustomerPaymentGuideBottomSheet";
 import MyOrderLookupForm from "@/components/myorder/MyOrderLookupForm";
@@ -355,7 +356,7 @@ export default function MyOrderPage() {
         />
 
       <section className="mx-auto w-full max-w-md">
-        <CustomerTopNav activeTab="myorder" variant="compact" />
+        <CustomerTopNav activeTab="myorder" variant="compact" bottomNav />
 
         <MyOrderPageHero isLoggedIn={isLoggedIn} customerName={customerName} />
 
@@ -510,7 +511,10 @@ export default function MyOrderPage() {
           </div>
           {FOOTER_TEXT}
         </footer>
+        {/* [㊾] 아래 5칸 메뉴에 안 가리게(새 모양만 — 옛 화면엔 아래 메뉴 없음) */}
+        {v2 ? <div aria-hidden="true" style={{ height: "calc(84px + env(safe-area-inset-bottom))" }} /> : null}
       </section>
+      <CustomerBottomNav active="orders" />
     </main>
   );
 }

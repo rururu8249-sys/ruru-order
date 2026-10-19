@@ -38,6 +38,8 @@ type CustomerTopNavProps = {
   className?: string;
   activeTab?: "home" | "myorder" | "edit";
   variant?: "card" | "compact";
+  // [㊾] 아래 5칸 메뉴(CustomerBottomNav)를 쓰는 화면 — 새 모양이면 위쪽 메뉴 줄·「공지·쪽지」 버튼을 안 그린다(로그아웃은 내정보 창 안)
+  bottomNav?: boolean;
 };
 
 const navButtonClass =
@@ -54,6 +56,7 @@ export default function CustomerTopNav({
   className = "",
   activeTab,
   variant = "card",
+  bottomNav = false,
 }: CustomerTopNavProps) {
   const [customerInfo, setCustomerInfo] = useState<SavedCustomerInfo>(initialInfo);
   const [isReady, setIsReady] = useState(false);
@@ -61,6 +64,7 @@ export default function CustomerTopNav({
   const noteUnread = useNoteUnread();
   // [㉜ 4단계] 머리말 새 모양(주문내역·공지) — ?preview=s4. 표시 전용(로그인·로그아웃·이동 동작 무변경).
   const v2 = useCustomerUiStage("s4");
+  const hideTopMenus = v2 && bottomNav; // [㊾] 새 모양 + 아래 메뉴 있는 화면
 
   useEffect(() => {
     setCustomerInfo(readSavedCustomerInfo());
@@ -110,6 +114,7 @@ export default function CustomerTopNav({
 
         {isLoggedIn && (
           <div className="flex shrink-0 flex-col items-end justify-start gap-1 self-start text-right">
+            {hideTopMenus ? null : (
             <button
               type="button"
               onClick={() => { try { window.dispatchEvent(new Event("ruru-open-notice-box")); } catch { /* 무시 */ } }}
@@ -122,6 +127,7 @@ export default function CustomerTopNav({
               </span>
               공지·쪽지
             </button>
+            )}
             <CustomerPointBadge />
             <CustomerPointGiftPopup />
             <CustomerTestAccountBadge />
@@ -129,6 +135,7 @@ export default function CustomerTopNav({
         )}
       </div>
 
+      {hideTopMenus ? null : (
       <nav className={v2 ? `mt-3 grid gap-1.5 ${isLoggedIn ? "grid-cols-4" : "grid-cols-1"}` : isCompact ? `mt-3 grid gap-1 ${isLoggedIn ? "grid-cols-4" : "grid-cols-1"}` : `mt-3 grid gap-2 ${isLoggedIn ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-1"}`}>
         <Link href="/" className={activeTab === "home" ? activeButtonClass : inactiveButtonClass}>
           {isCompact || v2 ? "HOME" : "🏠 HOME"}
@@ -150,6 +157,7 @@ export default function CustomerTopNav({
           </>
         )}
       </nav>
+      )}
     </header>
   );
 }

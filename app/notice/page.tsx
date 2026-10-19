@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from "react";
 import CustomerTopNav from "@/components/customer/CustomerTopNav";
+import CustomerBottomNav from "@/components/customer/CustomerBottomNav";
 import PublicNoticeBoard from "@/components/notice/PublicNoticeBoard";
 import { useCustomerUiStage } from "@/lib/useCustomerUiStage";
 
@@ -54,7 +55,7 @@ export default function NoticePage() {
   return (
     <main className={v2 ? "min-h-screen select-none bg-white px-4 py-4 text-[#111111]" : "min-h-screen select-none bg-[#F6F4F2] px-4 py-6 text-[#151923]"} style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
       <section className="mx-auto w-full max-w-2xl">
-        <CustomerTopNav />
+        <CustomerTopNav bottomNav />
         <h1 className={v2 ? "my-5 text-[24px] font-bold text-[#111111]" : "my-5 text-xl font-bold"}>공지사항</h1>
         <PublicNoticeBoard selectedId={selectedId} onSelect={setSelectedId} />
         <footer className="py-8 text-center">
@@ -66,7 +67,10 @@ export default function NoticePage() {
             copyright © since 2024 루루동이. All rights reserved.
           </p>
         </footer>
+        {/* [㊾] 아래 5칸 메뉴에 안 가리게(새 모양만 — 옛 화면엔 아래 메뉴 없음) */}
+        {v2 ? <div aria-hidden="true" style={{ height: "calc(84px + env(safe-area-inset-bottom))" }} /> : null}
       </section>
+      <CustomerBottomNav active="notice" />
     </main>
   );
 }
