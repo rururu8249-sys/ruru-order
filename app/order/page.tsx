@@ -7319,10 +7319,10 @@ export default function OrderPage() {
                                 const pick = pickCardBadgesS6(all.filter((b) => b.on).map((b) => b.key));
                                 const byKey = new Map(all.map((b) => [b.key, b] as const));
                                 const textBadges = pick.map((k) => byKey.get(k)).filter((b): b is NonNullable<typeof b> => Boolean(b && b.text));
-                                if (textBadges.length === 0) return null;
+                                if (sold || textBadges.length === 0) return null;
                                 return (
                                   <div style={{ display: "flex", gap: "8px", marginBottom: "4px", flexWrap: "wrap" }}>
-                                    {textBadges.map((b) => <span key={b.key} style={{ fontSize: "13px", fontWeight: 600, lineHeight: 1.4, color: b.key === "special" ? "#D30005" : "#707072" }}>{stripDecorativeEmojiV2(String(b.text))}</span>)}
+                                    {textBadges.map((b) => <span key={b.key} style={{ fontSize: "13px", fontWeight: 600, lineHeight: 1.4, color: (b.key === "special" || b.key === "limit") ? "#D30005" : "#111111" }}>{stripDecorativeEmojiV2(String(b.text))}</span>)}
                                   </div>
                                 );
                               }
