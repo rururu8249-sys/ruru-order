@@ -7460,7 +7460,7 @@ export default function OrderPage() {
                                 <span style={{ fontSize: listView === "grid" ? "20px" : "19px", fontWeight: 700, color: "#111111", lineHeight: 1.35 }}>{(() => { const ci = readComboInfoOrderProduct(product); return brandGroup ? `최저가 ${won(Number(product.price || 0))} 부터 ~` : ci && ci.maxPlus > 0 ? won(Number(product.price || 0)) + "~" : won(Number(product.price || 0)); })()}</span>
                                 {lowTextV2 ? <span style={{ fontSize: "14px", fontWeight: 600, color: "#D30005", lineHeight: 1.4 }}>{lowTextV2}</span> : null}
                               </div>
-{listView === "grid" ? null : (
+{listView === "grid" || sold ? null : (
                               <CustomerPressButton
                                 type="button"
                                 disabled={sold}
