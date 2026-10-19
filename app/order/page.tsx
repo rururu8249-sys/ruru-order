@@ -1646,6 +1646,10 @@ export default function OrderPage() {
   //     · 평점순은 우리에 리뷰 기능이 없어 제외
   //   · 「골고루 보기」(mix)는 우리만의 항목이다. 플랫폼 표준은 아니지만
   //     «안 팔린 상품도 노출되게» 하려면 배지만으로는 한계가 있어 넣었다(lib/productMixOrder.ts).
+  //
+  //   [㊷ 2026-10-20 사장님 결정] 「추천순·인기순 비슷해 추천순 하나로」 — 선택지는 3개만:
+  //     「추천순」(default = 방송 고정 → 진열 순서 그대로, 예전 「루루동이 추천순」) · 「낮은 가격순」 · 「높은 가격순」.
+  //     mix·sold·new 는 select 에서만 뺐다. 정렬 계산(아래 sort)·이 타입은 그대로 둬서 option 한 줄로 되돌릴 수 있다.
   const [productSort, setProductSort] = useState<"default" | "mix" | "sold" | "new" | "price_asc" | "price_desc">("default");
   // [2026-08-12 리뉴얼 4단계] 상품 보기 방식 — 기기에 기억(UI 취향값만 저장).
   // [2026-09-20 사장님 지시] 기본값을 ⊞격자(2열)로. «디폴트값 가로형 아님».
@@ -7015,10 +7019,9 @@ export default function OrderPage() {
                       aria-label="상품 정렬"
                       style={uiV2 ? { minWidth: 0, flex: "1 1 auto", maxWidth: "176px", height: "40px", boxSizing: "border-box", borderRadius: "9999px", border: uiS7 ? "1px solid #E5E5E5" : "1px solid #CACACB", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, padding: "0 12px", cursor: "pointer", outline: "none", fontFamily: "inherit" } : { minWidth: 0, flex: "1 1 auto", maxWidth: "168px", height: "36px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid #D9C5CC", background: "#fff", color: "#7A1E47", fontSize: "12.5px", fontWeight: 800, padding: "0 6px", cursor: "pointer", outline: "none", fontFamily: "inherit" }}
                     >
-                      <option value="default">루루동이 추천순</option>
-                      <option value="mix">골고루 보기</option>
-                      <option value="sold">판매량순</option>
-                      <option value="new">최신순</option>
+                      {/* [㊷ 2026-10-20 사장님 결정] 추천순·인기순이 비슷해 추천순 하나로 — 3개만 보인다.
+                          「골고루 보기」(mix)·「판매량순」(sold)·「최신순」(new)은 선택지에서만 뺐다(정렬 계산 코드는 위에 그대로 — 되살리려면 option 줄만 다시 넣으면 된다). */}
+                      <option value="default">추천순</option>
                       <option value="price_asc">낮은 가격순</option>
                       <option value="price_desc">높은 가격순</option>
                     </select>
