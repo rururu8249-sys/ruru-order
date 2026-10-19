@@ -138,7 +138,7 @@ export function pickVisibleBadges(activeKeys: BadgeKey[], maxPromo: number = MAX
 
 // [㊴ 2026-10-19 사장님] 상품 카드 배지(새 모양 6단계) — 테두리 없는 글자로 «최대 2개», 우선순위 특가 > 바로구매 > 신상 > 그 외(기존 순위).
 //   어떤 배지를 켤지 판정은 화면 쪽 그대로 — 여기선 고르기만. 표시 전용.
-export const CARD_BADGE_HEAD_S6 = ["special", "direct", "new"] as const;
+export const CARD_BADGE_HEAD_S6 = ["overseas", "company", "special", "direct", "new"] as const; // [㊺-1] 해외배송·업체배송 = 배송 사실이라 항상 먼저
 export function pickCardBadgesS6(activeKeys: BadgeKey[], max = 2): BadgeKey[] {
   const uniq = Array.from(new Set(activeKeys.filter((k) => typeof k === "string" && k.trim() !== "" && k !== "low")));
   const head = CARD_BADGE_HEAD_S6.filter((k) => uniq.includes(k));
