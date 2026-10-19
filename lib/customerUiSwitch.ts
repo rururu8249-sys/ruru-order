@@ -18,7 +18,7 @@ export function resolveCustomerUiV2(want: string | null, saved: string | null, d
 // [㉜ 3~5단계] 단계별 미리보기 — ?preview=s3 (s4·s5) 로 들어온 브라우저만 그 단계 새 모양. ?preview=off 는 전부 끔.
 //   손님 기본값으로 전환하려면 아래 값만 true 로(단계마다 한 줄). 저장 키는 ruru_preview_s3 등.
 // 2026-10-18 s3(주문서 확인 창)·s4(주문내역·공지·쪽지 창)·s5(나머지 손님 창·첫 화면 이모지) 손님 기본값 전환 — 되돌리려면 그 단계를 false 로.
-export const UI_PREVIEW_DEFAULTS = { s3: true, s4: true, s5: true, s6: true, s7: false } as const; // 2026-10-20 s6(첫 화면 정리) 기본 전환
+export const UI_PREVIEW_DEFAULTS = { s3: true, s4: true, s5: true, s6: true, s7: true } as const; // 2026-10-20 s6(첫 화면 정리) 기본 전환
 export type UiPreviewStage = keyof typeof UI_PREVIEW_DEFAULTS;
 export const uiPreviewStorageKey = (stage: UiPreviewStage) => `ruru_preview_${stage}`;
 
