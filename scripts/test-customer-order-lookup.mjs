@@ -1,6 +1,9 @@
 // [2026-08-29] 손님 주문내역 조회 규칙 회귀 테스트
 import {
   CUSTOMER_ORDER_LOOKUP_DAYS,
+  CUSTOMER_ORDER_VISIBLE_DAYS,
+  CUSTOMER_ORDER_VISIBLE_DAYS_OVERSEAS,
+  applyCustomerOrderVisibleWindow,
   CUSTOMER_ORDER_LOOKUP_LIMIT,
   customerOrderLookupSinceIso,
   normalizeLookupKakaoId,
@@ -13,22 +16,25 @@ import { readFile } from "node:fs/promises";
 function assert(c, m) { if (!c) throw new Error(m); }
 function equal(a, e, m) { if (a !== e) throw new Error(`${m}: expected=${String(e)} actual=${String(a)}`); }
 
-// 1. 조회 기간이 7일보다 충분히 길어야 한다 (해외원정방송 배송 2~3주 커버)
-assert(CUSTOMER_ORDER_LOOKUP_DAYS >= 60, "조회 기간이 너무 짧다");
+// 1. [㊿ 2026-10-20 사장님] 불러오기 30일 · 보이기 14일(해외배송 상품이 든 주문서는 30일)
+//    (예전 「60일 이상」 단정은 180일 시절 기준 — 사장님 결정으로 바뀜)
+equal(CUSTOMER_ORDER_LOOKUP_DAYS, 30, "불러오는 최대 범위 30일");
+equal(CUSTOMER_ORDER_VISIBLE_DAYS, 14, "보이는 기간 14일");
+equal(CUSTOMER_ORDER_VISIBLE_DAYS_OVERSEAS, 30, "해외배송 주문서 보이는 기간 30일");
+assert(CUSTOMER_ORDER_LOOKUP_DAYS >= CUSTOMER_ORDER_VISIBLE_DAYS_OVERSEAS, "불러오는 범위가 가장 긴 보이는 기간 이상이어야 한다");
 assert(CUSTOMER_ORDER_LOOKUP_LIMIT > 0, "조회 상한이 있어야 한다");
 
-// 2. 실제 신고 사례 재현 — 루루짱929 님의 7월 주문이 조회 범위에 들어와야 한다
+// 2. 불러오기 범위 — 해외원정방송(배송 2~3주) 주문은 30일 안이라 불러와진다. (예전 7일 규칙에선 안 보였던 사례)
+//    [㊿] 35일 전(예: 2026-07-25 → 08-29) 주문은 이제 범위 밖 — 180일 → 30일 사장님 결정.
 {
   const today = new Date("2026-08-29T00:00:00+09:00");
   const since = new Date(customerOrderLookupSinceIso(today));
-  const julyOrder1 = new Date("2026-07-25T00:04:00+09:00");
-  const julyOrder2 = new Date("2026-07-24T23:56:00+09:00");
-  assert(julyOrder1 >= since, "7월 25일 주문이 조회 범위에 있어야 한다");
-  assert(julyOrder2 >= since, "7월 24일 주문이 조회 범위에 있어야 한다");
-
-  // 기존 7일 규칙이었다면 안 보였다는 것도 함께 못박아 둔다
+  const order20 = new Date("2026-08-09T12:00:00+09:00");
+  const order35 = new Date("2026-07-25T00:04:00+09:00");
+  assert(order20 >= since, "20일 전 주문은 불러오기 범위 안");
+  assert(order35 < since, "35일 전 주문은 불러오기 범위 밖");
   const old7 = new Date(today.getTime()); old7.setDate(old7.getDate() - 7);
-  assert(julyOrder1 < old7, "기존 7일 규칙에서는 안 보였음이 맞다");
+  assert(order20 < old7, "기존 7일 규칙에서는 안 보였음이 맞다");
 }
 
 // 3. 카카오ID 우선, 전화번호 폴백
@@ -97,5 +103,39 @@ const lookupSheet = await readFile(new URL("../components/customer/CustomerOrder
 assert(/onOpenPaymentGuide:\s*\(group:\s*CustomerOrderLookupGroup\)/.test(lookupSheet), "선택한 주문 그룹을 콜백으로 넘겨야 한다");
 assert(/group\.paymentMethodLabel\s*===\s*"무통장입금"/.test(lookupSheet), "무통장 주문에만 계좌 버튼을 보여야 한다");
 assert(/group\.bankAccountStatus\s*===\s*"conflict"/.test(lookupSheet), "충돌 주문은 고객 안내를 보여야 한다");
+
+// 5. [㊿] 보이는 기간 거르기 — 가짜 supabase(상품 조회만)
+{
+  const now = new Date("2026-10-20T12:00:00+09:00");
+  const daysAgo = (d) => new Date(now.getTime() - d * 86400000).toISOString();
+  const products = [{ id: 1, badge_type: "none", badge_types: [] }, { id: 2, badge_type: "", badge_types: ["overseas"] }, { id: 3, badge_type: "overseas", badge_types: null }];
+  let queried = 0;
+  const fakeSupabase = (fail = false) => ({
+    from(table) {
+      equal(table, "products", "상품 표만 읽는다");
+      return { select() { return { in(_col, ids) { queried += 1; return Promise.resolve(fail ? { data: null, error: new Error("boom") } : { data: products.filter((p) => ids.includes(String(p.id))), error: null }); } }; } };
+    },
+  });
+  const rows = [
+    { id: "a1", order_group_id: "A", created_at: daysAgo(10), product_id: 1 },              // 10일 전 일반 → 보임
+    { id: "b1", order_group_id: "B", created_at: daysAgo(20), product_id: 1 },              // 20일 전 일반 → 숨김
+    { id: "c1", order_group_id: "C", created_at: daysAgo(20), product_id: 1 },              // 20일 전, 같은 주문서에
+    { id: "c2", order_group_id: "C", created_at: daysAgo(20), product_id: 2 },              //   해외배송 상품 → 주문서 통째로 보임
+    { id: "d1", order_group_id: "D", created_at: daysAgo(35), product_id: 3 },              // 35일 전 해외 → 숨김(애초에 30일 밖)
+    { id: "e1", order_group_id: "", created_at: daysAgo(25), product_id: 3 },               // 묶음 id 없음 → id 로, 25일 전 해외(옛 badge_type) → 보임
+  ];
+  const shown = await applyCustomerOrderVisibleWindow(fakeSupabase(), rows, now);
+  equal(shown.map((r) => r.id).join(","), "a1,c1,c2,e1", "보이는 주문서(순서 유지)");
+  equal(queried, 1, "상품 조회는 한 번만");
+
+  const failed = await applyCustomerOrderVisibleWindow(fakeSupabase(true), rows, now);
+  equal(failed.length, rows.length, "상품 조회 오류면 숨기지 않고 전부 보임");
+
+  const recentOnly = [{ id: "x", created_at: daysAgo(3), product_id: 1 }];
+  queried = 0;
+  equal((await applyCustomerOrderVisibleWindow(fakeSupabase(), recentOnly, now)).length, 1, "14일 이내만 있으면 그대로");
+  equal(queried, 0, "14일 이내만 있으면 상품 조회 안 함");
+  equal((await applyCustomerOrderVisibleWindow(fakeSupabase(), [], now)).length, 0, "빈 목록");
+}
 
 console.log("customer order lookup tests passed");

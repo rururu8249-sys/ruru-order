@@ -55,6 +55,7 @@ import {
   customerOrderLookupSinceIso,
   buildOrderLookupOrFilter,
   orderLookupPhoneValues,
+  applyCustomerOrderVisibleWindow,
 } from "@/lib/customerOrderLookup";
 import { brandWordmarkThumbnail, normalizeBrandKorean, productNameThumbnail, productAutoThumbUrl } from "@/lib/brandWordmarkThumbnail";
 import { toOptionList } from "@/lib/optionSplit";
@@ -5698,7 +5699,7 @@ export default function OrderPage() {
       return;
     }
 
-    setOrderLookupOrders(data || []);
+    setOrderLookupOrders(await applyCustomerOrderVisibleWindow(supabase, data || [])); // [㊿] 14일(해외배송 주문서 30일)만 보이게
     setOrderLookupLoading(false);
   };
 

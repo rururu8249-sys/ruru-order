@@ -24,17 +24,17 @@ function formatPointText(value: unknown): string {
   const amount = Math.max(0, Math.floor(Number(value || 0)));
 
   if (!Number.isFinite(amount)) {
-    return "포인트 0원";
+    return "포인트 0P";
   }
 
-  return `포인트 ${amount.toLocaleString("ko-KR")}원`;
+  return `포인트 ${amount.toLocaleString("ko-KR")}P`;
 }
 
 export default function CustomerPointBadge({ className = "" }: CustomerPointBadgeProps) {
   const v2 = useCustomerUiStage("s4"); // [㉜ 4단계] 표시 전용(포인트 조회 무변경)
   const [pointState, setPointState] = useState<PointState>({
     loading: false,
-    text: "포인트 0원",
+    text: "포인트 0P",
   });
 
   useEffect(() => {
@@ -43,7 +43,7 @@ export default function CustomerPointBadge({ className = "" }: CustomerPointBadg
     const phone = normalizePhone(window.localStorage.getItem("ruru_customer_phone") || "");
 
     if (phone.length < 9) {
-      setPointState({ loading: false, text: "포인트 0원" });
+      setPointState({ loading: false, text: "포인트 0P" });
       return () => {
         alive = false;
       };
@@ -68,7 +68,7 @@ export default function CustomerPointBadge({ className = "" }: CustomerPointBadg
 
         const text =
           typeof payload.current_points_text === "string" && payload.current_points_text.trim()
-            ? `포인트 ${payload.current_points_text.trim()}`
+            ? `포인트 ${payload.current_points_text.trim().replace(/원$/, "P")}` // [㊿] 표시 단위만 P(서버 문자열·계산 무변경)
             : formatPointText(payload.current_points);
 
         setPointState({
@@ -80,7 +80,7 @@ export default function CustomerPointBadge({ className = "" }: CustomerPointBadg
 
         setPointState({
           loading: false,
-          text: "포인트 0원",
+          text: "포인트 0P",
         });
       }
     };

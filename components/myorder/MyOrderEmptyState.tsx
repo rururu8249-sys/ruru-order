@@ -19,11 +19,11 @@ export default function MyOrderEmptyState() {
       )}
 
       <h2 className={v2 ? "mt-4 text-[20px] font-bold text-[#111111]" : "mt-4 text-[22px] font-black tracking-[-0.06em] text-[#151923]"}>
-        최근 6개월 주문내역이 없습니다
+        최근 14일 주문내역이 없어요
       </h2>
 
       <p className={v2 ? "mt-2 break-keep text-[15px] font-normal leading-relaxed text-[#39393B]" : "mt-2 break-keep text-[14px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600"}>
-        7일이 지난 주문은 카톡채널로 문의해주세요.
+        해외배송 상품은 30일까지 보여요. 지난 주문은 카톡채널로 문의해 주세요.
       </p>
     </section>
   );

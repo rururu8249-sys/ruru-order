@@ -22,6 +22,7 @@ import {
   customerOrderLookupSinceIso,
   buildOrderLookupOrFilter,
   orderLookupPhoneValues,
+  applyCustomerOrderVisibleWindow,
 } from "@/lib/customerOrderLookup";
 import CustomerTopNav from "@/components/customer/CustomerTopNav";
 import CustomerBottomNav from "@/components/customer/CustomerBottomNav";
@@ -268,7 +269,7 @@ export default function MyOrderPage() {
     localStorage.setItem("ruru_customer_phone", cleanPhone);
     setHasCustomerInfo(true);
 
-    setOrders(data || []);
+    setOrders(await applyCustomerOrderVisibleWindow(supabase, data || [])); // [㊿] 14일(해외배송 주문서 30일)만 보이게
     setOrderPage(1);
     setOrderFilter("전체");
     setLoading(false);

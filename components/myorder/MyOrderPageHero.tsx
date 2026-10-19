@@ -25,7 +25,7 @@ export default function MyOrderPageHero({
       <div className="flex items-end justify-between gap-3">
         <div className="min-w-0">
           <p className={v2 ? "text-[14px] font-normal text-[#707072]" : "text-[12px] font-black tracking-[-0.04em] text-blue-700"}>
-            최근 6개월
+            최근 14일 · 해외배송 30일
           </p>
           <h1 className={v2 ? "mt-0.5 text-[24px] font-bold leading-tight text-[#111111]" : "mt-0.5 text-[24px] font-black leading-tight tracking-[-0.07em] text-slate-950"}>
             주문조회
@@ -52,7 +52,7 @@ export default function MyOrderPageHero({
       ) : (
         <div className={v2 ? "mt-3 rounded-[8px] bg-[#F5F5F5] px-4 py-3" : "mt-3 rounded-[18px] bg-white px-4 py-3 ring-1 ring-slate-200"}>
           <p className={v2 ? "break-keep text-[15px] font-normal leading-relaxed text-[#39393B]" : "break-keep text-[13px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600"}>
-            주문조회는 저장된 전화번호 기준으로 최근 6개월 주문내역을 확인합니다.
+            주문조회는 저장된 전화번호 기준으로 최근 14일(해외배송 상품은 30일) 주문내역을 확인합니다.
           </p>
         </div>
       )}

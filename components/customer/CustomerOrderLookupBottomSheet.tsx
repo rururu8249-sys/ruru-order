@@ -121,7 +121,7 @@ export default function CustomerOrderLookupBottomSheet({
       open
       onClose={onClose}
       title="주문조회"
-      subtitle="최근 6개월 주문내역"
+      subtitle="최근 14일 · 해외배송 30일"
       bodyRef={scrollRef}
       onBodyScroll={handleScroll}
       bodyPadding="8px 16px"
