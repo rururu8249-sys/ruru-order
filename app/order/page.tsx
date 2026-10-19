@@ -3918,6 +3918,8 @@ export default function OrderPage() {
       return String(b.created_at || b.updated_at || b.id).localeCompare(String(a.created_at || a.updated_at || a.id));
     });
   }, [broadcastProducts, groupBuyQuickProductsFromCatalog, broadcast?.status, broadcast?.widget_pin_mode, broadcast?.widget_pin_product_id]);
+  // [㊺-3] 첫 화면 «지금 바로 주문 가능» 숫자 — 품절 아님 + 바로구매 기준(카드·옵션창과 같은 isInstantOrderProduct). 표시 전용.
+  const instantReadyCount = useMemo(() => quickGroupBuyProducts.filter((p) => !isSoldOutOrderProduct(p) && isInstantOrderProduct((parseProductSuggestionNote((p as any).product_note) as Record<string, unknown> | null)?.order_notice_mode, Array.isArray((p as any).badge_types) && (p as any).badge_types.length ? (p as any).badge_types : [(p as any).badge_type], productNoticeGlobal.mode)).length, [quickGroupBuyProducts, productNoticeGlobal.mode]);
 
   // ============ [재고 홀드] 담는 즉시 서버에 예약(15분) — 다른 고객 화면·품절 판정에 즉시 차감 반영 ============
   // ⚠️ 진짜 재고 차감/복구는 기존 제출 RPC·취소 복구가 단일 소유(무변경). 이 예약은 표시용 선점 전용이라
@@ -6715,7 +6717,7 @@ export default function OrderPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <span style={{ flexShrink: 0, fontSize: "15px" }}>{uiS5 ? <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="M5 8h14l-1 12H6z" /><path d="M9 8V6.5a3 3 0 0 1 6 0V8" /></svg> : "🛍"}</span>
                 <div style={uiV2 ? { minWidth: 0, flex: 1, fontSize: "14px", fontWeight: 600, lineHeight: 1.5, ...(uiS7 ? { wordBreak: "keep-all" as const } : {}) } : { minWidth: 0, flex: 1, fontSize: "12.5px", fontWeight: 800, lineHeight: 1.45 }}>
-                  방송 전이에요 · 아래 상품{productListState === "loading" ? "은" : ` ${quickGroupBuyProducts.length}개는`} <b>지금 바로 주문</b> 가능
+                  방송 전이에요{productListState === "loading" || instantReadyCount > 0 ? <> · 아래 상품{productListState === "loading" ? "은" : ` ${instantReadyCount}개는`} <b>지금 바로 주문</b> 가능</> : null}
                   {nextLiveText ? <div style={uiV2 ? { fontSize: "13px", fontWeight: 400, color: "#707072" } : { fontSize: "11.5px", fontWeight: 700, opacity: 0.88 }}>다음 라이브 · {nextLiveText}</div> : null}
                 </div>
                 <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flexShrink: 0, height: "36px", padding: "0 12px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" } : { flexShrink: 0, height: "30px", padding: "0 10px", border: "1px solid rgba(255,255,255,0.45)", borderRadius: "999px", background: "rgba(255,255,255,0.14)", color: "#fff", fontSize: "11px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>{uiS5 ? "알림 받는 중 ✓" : "🔔 알림 받는 중 ✓"}</button>
@@ -6728,7 +6730,7 @@ export default function OrderPage() {
               <div style={uiV2 ? { display: "flex", alignItems: "center", gap: "8px", background: "#F5F5F5", borderRadius: "16px", padding: "10px 14px", color: "#111111" } : { display: "flex", alignItems: "center", gap: "8px", background: "linear-gradient(135deg,#7A1E47,#9A3560)", borderRadius: "14px", padding: "10px 13px", color: "#fff" }}>
                 <span style={{ flexShrink: 0, fontSize: "15px" }}>{uiS5 ? <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="M5 8h14l-1 12H6z" /><path d="M9 8V6.5a3 3 0 0 1 6 0V8" /></svg> : "🛍"}</span>
                 <div style={uiV2 ? { minWidth: 0, flex: 1, fontSize: "14px", fontWeight: 600, lineHeight: 1.5, ...(uiS7 ? { wordBreak: "keep-all" as const } : {}) } : { minWidth: 0, flex: 1, fontSize: "12.5px", fontWeight: 800, lineHeight: 1.45 }}>
-                  방송 전이에요 · 아래 상품{productListState === "loading" ? "은" : ` ${quickGroupBuyProducts.length}개는`} <b>지금 바로 주문</b> 가능
+                  방송 전이에요{productListState === "loading" || instantReadyCount > 0 ? <> · 아래 상품{productListState === "loading" ? "은" : ` ${instantReadyCount}개는`} <b>지금 바로 주문</b> 가능</> : null}
                   {nextLiveText ? <div style={uiV2 ? { fontSize: "13px", fontWeight: 400, color: "#707072" } : { fontSize: "11.5px", fontWeight: 700, opacity: 0.88 }}>다음 라이브 · {nextLiveText}</div> : null}
                 </div>
                 <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flexShrink: 0, height: "36px", padding: "0 12px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" } : { flexShrink: 0, height: "30px", padding: "0 10px", border: "1px solid rgba(255,255,255,0.45)", borderRadius: "999px", background: "rgba(255,255,255,0.14)", color: "#fff", fontSize: "11px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>{uiS5 ? "알림 받는 중 ✓" : "🔔 알림 받는 중 ✓"}</button>
@@ -6750,7 +6752,7 @@ export default function OrderPage() {
               <div style={uiV2 ? { fontSize: "18px", fontWeight: 700, marginBottom: "4px", ...(uiS7 ? { wordBreak: "keep-all" as const } : {}) } : { fontSize: "17px", fontWeight: 900, marginBottom: "4px" }}>지금은 방송 전이에요</div>
               <div style={uiV2 ? { fontSize: "14px", fontWeight: 400, color: "#39393B", lineHeight: 1.5, ...(uiS7 ? { wordBreak: "keep-all" as const } : {}) } : { fontSize: "12.5px", fontWeight: 700, opacity: 0.92, lineHeight: 1.5 }}>
                 {nextLiveText ? <>다음 라이브 · {nextLiveText}<br /></> : null}
-                아래 상품{productListState === "loading" ? "은" : ` ${quickGroupBuyProducts.length}개는`} <b>지금 바로 주문</b>하실 수 있어요{uiS5 ? "" : " 👇"}
+                {productListState === "loading" || instantReadyCount > 0 ? <>아래 상품{productListState === "loading" ? "은" : ` ${instantReadyCount}개는`} <b>지금 바로 주문</b>하실 수 있어요{uiS5 ? "" : " 👇"}</> : null}
               </div>
               <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
                 <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flex: 1.2, height: "44px", border: "none", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "15px", fontWeight: 600, cursor: "pointer" } : { flex: 1.2, height: "40px", border: "none", borderRadius: "12px", background: "#fff", color: "#7A1E47", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}>
