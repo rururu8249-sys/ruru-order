@@ -417,7 +417,7 @@ export default function MyOrderPage() {
         )}
 
 
-        {searched && orders.length === 0 && <MyOrderEmptyState />}
+        {searched && !loading && orders.length === 0 && <MyOrderEmptyState />}
 
         {orders.length > 0 && (
           <section
