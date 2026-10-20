@@ -170,7 +170,7 @@ function nameList(people: VisitPerson[] | undefined, capped: boolean | undefined
                           <span style={{ display: "block", marginLeft: "12px", fontSize: "11px", fontWeight: 700, color: ipDup ? "var(--color-warn-tx)" : "var(--color-ink-mute)", overflow: "hidden", textOverflow: "ellipsis" }}>
                             {ip}
                             {ipDup ? (
-                              <span style={{ display: "block" }} title={sameIpNames.join(", ")}>⚠ {sameIpText}</span>
+                              <span style={{ display: "block" }} title={sameIpNames.join(", ")}>{sameIpText}</span>
                             ) : null}
                           </span>
                         ) : null}
@@ -348,7 +348,7 @@ export default function VisitStatsView({ embedded = false, state, style }: Visit
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: 0, ...style }}>
       <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", borderBottom: "1px solid var(--color-line)" }}>
-        <span style={{ fontSize: "14px", fontWeight: 900, color: "var(--color-ink)", whiteSpace: "nowrap" }}>📊 접속 기록</span>
+        <span style={{ fontSize: "14px", fontWeight: 900, color: "var(--color-ink)", whiteSpace: "nowrap" }}>접속 기록</span>
         <span style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)", whiteSpace: "nowrap" }}>
           {visitStatsSummaryText(stats)}
         </span>

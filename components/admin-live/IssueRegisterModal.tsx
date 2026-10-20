@@ -134,8 +134,8 @@ export default function IssueRegisterModal({ open, onClose, onSubmit, saving = f
           <>
             {/* ChatGPT 정리 도우미 */}
             <div className="mt-4 rounded-2xl border border-line bg-surface-2 p-3">
-              <div className="text-xs font-black text-ink">🤖 ChatGPT로 고객이슈 정리</div>
-              <button type="button" onClick={() => window.open("https://chatgpt.com/", "_blank", "noopener")} className="mt-2 h-9 rounded-lg bg-rose-deep px-3 text-xs font-black text-white">🤖 ChatGPT 열기</button>
+              <div className="text-xs font-black text-ink">ChatGPT로 내용 정리</div>
+              <button type="button" onClick={() => window.open("https://chatgpt.com/", "_blank", "noopener")} className="mt-2 h-9 rounded-lg bg-rose-deep px-3 text-xs font-black text-white">ChatGPT 열기</button>
               <div className="mt-1.5 text-[11px] font-bold leading-4 text-ink-mute">ChatGPT 창에 카톡 대화를 붙여넣고 &quot;손님 말만 골라 닉네임/이름/유형/내용으로 정리해줘&quot;라고 하세요. 나온 결과를 아래 메모칸에 붙여넣으면 됩니다.</div>
             </div>
 

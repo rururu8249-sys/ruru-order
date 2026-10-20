@@ -113,7 +113,7 @@ const CUSTOMER_HISTORY_FIELD_LABEL: Record<string, string> = {
   detail_address: "상세주소",
   zipcode: "우편번호",
   youtube_nickname: "유튜브 닉네임",
-  customer_phone_change_skipped: "⚠ 전화번호 변경 보류",
+  customer_phone_change_skipped: "전화번호 변경 보류",
 };
 const customerHistoryFieldLabel = (field: unknown) => {
   const key = String(field ?? "").trim();
@@ -208,7 +208,7 @@ function BlockedCardBody({
       )}
 
       {address ? (
-        <div className="mt-3 break-keep text-[11px] font-bold leading-5 text-ink-mute">📍 {address}</div>
+        <div className="mt-3 break-keep text-[11px] font-bold leading-5 text-ink-mute">{address}</div>
       ) : null}
 
       <div className="mt-3 flex flex-wrap gap-2">{children}</div>
@@ -725,7 +725,7 @@ function CustomerDetailDrawer({
         "",
         "※ 닉네임/이름은 이 회원의 주문서 표시에도 반영됩니다.",
         "※ 미입금 주문은 입금 자동매칭 기준(입금자명)도 새 닉네임으로 바뀝니다.",
-        "※ 전화번호는 위의 [📞 번호 변경] 으로 따로 바꿉니다.",
+        "전화번호는 [번호 변경]에서 바꿉니다.",
       ].join("\n")
     );
     if (!ok) return;
@@ -790,8 +790,8 @@ function CustomerDetailDrawer({
       >
         {/* 헤더 */}
         <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid var(--color-line)", padding: "12px 16px" }}>
-          <span style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-ink)" }}>👤 회원 상세</span>
-          <button type="button" onClick={editOpen ? () => setEditOpen(false) : openEdit} style={{ marginLeft: "auto", marginRight: "8px", height: "30px", padding: "0 12px", borderRadius: "8px", border: "1px solid var(--color-rose-line)", background: editOpen ? "var(--color-surface-2)" : "var(--color-rose-deep)", color: editOpen ? "var(--color-ink-soft)" : "#fff", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}>{editOpen ? "취소" : "✎ 정보 수정"}</button>
+          <span style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-ink)" }}>회원 상세</span>
+          <button type="button" onClick={editOpen ? () => setEditOpen(false) : openEdit} style={{ marginLeft: "auto", marginRight: "8px", height: "30px", padding: "0 12px", borderRadius: "8px", border: "1px solid var(--color-rose-line)", background: editOpen ? "var(--color-surface-2)" : "var(--color-rose-deep)", color: editOpen ? "var(--color-ink-soft)" : "#fff", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}>{editOpen ? "취소" : "정보 수정"}</button>
           <button type="button" onClick={onClose} style={{ width: "27px", height: "27px", border: "none", background: "none", color: "var(--color-ink-mute)", fontSize: "18px", cursor: "pointer" }}>✕</button>
         </div>
 
@@ -819,19 +819,19 @@ function CustomerDetailDrawer({
                   <span
                     title={profile.live_alert_optin_at ? `신청일 ${new Date(profile.live_alert_optin_at).toLocaleDateString("ko-KR")}` : "방송알림 신청"}
                     style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: 9999, fontSize: 12, fontWeight: 600, background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", marginLeft: 6 }}
-                  >🔔 방송알림</span>
+                  >방송알림</span>
                 ) : null}
               </div>
               <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", lineHeight: 1.8 }}>
-                📞 {formatPhone(customer.phone) || "-"}<br />
-                📍 {customer.address || "주소 정보 없음"}<br />
-                🕒 {customer.orderCount > 0 ? formatOrderDateTime(customer.latestOrderAt) : "주문 전 회원"}
-                {profile?.kakao_nickname ? <><br />💬 카카오: {profile.kakao_nickname}</> : null}
+                {formatPhone(customer.phone) || "-"}<br />
+                {customer.address || "주소 없음"}<br />
+                마지막 주문 {customer.orderCount > 0 ? formatOrderDateTime(customer.latestOrderAt) : "없음"}
+                {profile?.kakao_nickname ? <><br />카카오 {profile.kakao_nickname}</> : null}
                 {kakaoRaw ? (
                   <>
                     <br />
                     <span title={kakaoRaw.syncedAt ? `카카오 로그인 때 받은 원본 · ${formatOrderDateTime(kakaoRaw.syncedAt)}` : "카카오 로그인 때 받은 원본"} style={{ color: "var(--color-rose-deep)", fontWeight: 800 }}>
-                      🪪 카카오 원본: {[kakaoRaw.accountName, kakaoRaw.accountPhone ? formatPhone(kakaoRaw.accountPhone) : ""].filter(Boolean).join(" · ") || "-"}
+                      카카오 원본 {[kakaoRaw.accountName, kakaoRaw.accountPhone ? formatPhone(kakaoRaw.accountPhone) : ""].filter(Boolean).join(" · ") || "-"}
                       {kakaoRaw.shippingName || kakaoRaw.shippingPhone ? ` / 배송지 ${[kakaoRaw.shippingName, kakaoRaw.shippingPhone ? formatPhone(kakaoRaw.shippingPhone) : ""].filter(Boolean).join(" · ")}` : ""}
                     </span>
                     {kakaoRaw.accountName && customer.name && kakaoRaw.accountName !== clean(customer.name) ? (
@@ -842,8 +842,8 @@ function CustomerDetailDrawer({
                     ) : null}
                   </>
                 ) : null}
-                {profile?.first_login_at ? <><br />📅 최초 로그인: {formatOrderDateTime(profile.first_login_at)}</> : null}
-                {profile?.last_login_at ? <><br />🕒 최근 로그인: {formatOrderDateTime(profile.last_login_at)}</> : null}
+                {profile?.first_login_at ? <><br />첫 로그인 {formatOrderDateTime(profile.first_login_at)}</> : null}
+                {profile?.last_login_at ? <><br />최근 로그인 {formatOrderDateTime(profile.last_login_at)}</> : null}
               </div>
             </div>
           </div>
@@ -884,7 +884,7 @@ function CustomerDetailDrawer({
           {/* 정보 수정 폼 (닉네임/이름/주소 교정 + [📞 번호 변경] 전용 블록) */}
           {editOpen ? (
             <div style={{ marginBottom: "12px", border: "1px solid var(--color-rose-line)", borderRadius: "12px", background: "var(--color-surface-2)", padding: "12px 12px" }}>
-              <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "8px" }}>✎ 회원 정보 수정 <span style={{ fontWeight: 700, color: "var(--color-ink-mute)" }}>(기본배송지 기준)</span></div>
+              <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "8px" }}>회원 정보 수정 <span style={{ fontWeight: 700, color: "var(--color-ink-mute)" }}>(기본배송지 기준)</span></div>
               {([
                 { label: "닉네임(유튜브 핸들명)", val: fNick, set: setFNick, ph: "예: @rur8249" },
                 { label: "이름", val: fName, set: setFName, ph: "주문자 이름" },
@@ -903,7 +903,7 @@ function CustomerDetailDrawer({
                   <input value={fZip} readOnly placeholder="우편번호"
                     style={{ width: "110px", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface-2)", padding: "0 12px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none" }} />
                   <button type="button" onClick={searchEditAddress}
-                    style={{ flex: 1, height: "38px", borderRadius: "8px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}>🔍 주소 검색</button>
+                    style={{ flex: 1, height: "38px", borderRadius: "8px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}>주소 검색</button>
                 </div>
                 <input value={fAddr} readOnly placeholder="주소 검색을 눌러 선택하세요"
                   style={{ width: "100%", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface-2)", padding: "0 12px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none", marginBottom: "6px" }} />
@@ -921,7 +921,7 @@ function CustomerDetailDrawer({
                     type="button"
                     onClick={() => { setPhoneEditOpen((v) => !v); setFNewPhone(""); }}
                     style={{ marginLeft: "auto", height: "30px", padding: "0 12px", borderRadius: "8px", border: "1px solid var(--color-rose-line)", background: phoneEditOpen ? "var(--color-surface-2)" : "var(--color-rose-soft)", color: "var(--color-rose-deep)", fontSize: "12px", fontWeight: 900, cursor: "pointer" }}
-                  >{phoneEditOpen ? "취소" : "📞 번호 변경"}</button>
+                  >{phoneEditOpen ? "취소" : "번호 변경"}</button>
                 </div>
 
                 {phoneEditOpen ? (
@@ -952,7 +952,7 @@ function CustomerDetailDrawer({
                       onClick={savePhoneChange}
                       disabled={phoneSaving}
                       style={{ width: "100%", height: "40px", borderRadius: "8px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "14px", fontWeight: 900, cursor: phoneSaving ? "not-allowed" : "pointer", opacity: phoneSaving ? 0.6 : 1 }}
-                    >{phoneSaving ? "변경 중…" : "📞 전화번호 변경하기"}</button>
+                    >{phoneSaving ? "변경 중…" : "전화번호 변경"}</button>
                   </div>
                 ) : null}
               </div>
@@ -960,7 +960,7 @@ function CustomerDetailDrawer({
               {/* 쪽지 보내기 — 사이트 안 알림. 접속만 하면 카톡 인앱브라우저·아이폰 모두 보인다. */}
               <div style={{ margin: "8px 0", border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", padding: "8px 12px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)" }}>📩 쪽지 보내기</span>
+                  <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)" }}>쪽지 보내기</span>
                   <button
                     type="button"
                     onClick={() => { setNoteOpen((v) => !v); setNoteText(""); }}
@@ -983,14 +983,14 @@ function CustomerDetailDrawer({
                     <textarea
                       value={noteText}
                       onChange={(e) => setNoteText(e.target.value)}
-                      placeholder="예) 주문서 제출만 하시면 됩니다! 마감 임박이에요 🙏"
+                      placeholder="예) 주문서 제출만 하시면 됩니다"
                       rows={3}
                       style={{ width: "100%", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", padding: "8px 12px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", outline: "none", boxSizing: "border-box", resize: "none", lineHeight: 1.6 }}
                     />
                     <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.7, margin: "6px 0 8px" }}>
                       · 손님이 사이트에 들어오면 팝업으로 뜹니다<br />
                       · 이미 보고 있으면 15초 안에 뜹니다<br />
-                      · 놓쳐도 손님 화면 🔔 쪽지함에 12시간 남습니다<br />
+                      · 손님 쪽지함에 12시간 남습니다<br />
                       · 위 버튼은 문구만 채웁니다 — 고쳐 쓰셔도 되고, [보내기]를 눌러야 나갑니다
                     </div>
                     <button
@@ -998,7 +998,7 @@ function CustomerDetailDrawer({
                       onClick={sendCustomerNote}
                       disabled={noteSending || !clean(noteText)}
                       style={{ width: "100%", height: "40px", borderRadius: "8px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "14px", fontWeight: 900, cursor: noteSending ? "not-allowed" : "pointer", opacity: noteSending || !clean(noteText) ? 0.5 : 1 }}
-                    >{noteSending ? "보내는 중…" : "📩 쪽지 보내기"}</button>
+                    >{noteSending ? "보내는 중…" : "쪽지 보내기"}</button>
                   </div>
                 ) : null}
               </div>
@@ -1016,7 +1016,7 @@ function CustomerDetailDrawer({
           {/* 등록 배송지 (고객이 등록한 customers.shipping_addresses 배열 — 읽기 전용) */}
           {Array.isArray(profile?.shipping_addresses) && profile.shipping_addresses.length > 0 ? (
             <div style={{ marginBottom: "12px" }}>
-              <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "8px" }}>📦 등록 배송지 ({profile.shipping_addresses.length}건)</div>
+              <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", marginBottom: "8px" }}>등록 배송지 ({profile.shipping_addresses.length}건)</div>
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {[...profile.shipping_addresses]
                   .sort((a, b) => (b?.isDefault ? 1 : 0) - (a?.isDefault ? 1 : 0))
@@ -1108,7 +1108,7 @@ function CustomerDetailDrawer({
               disabled={blockSaving}
               style={{ border: "1px solid", borderColor: customer.blocked ? "var(--color-rose-line)" : "var(--color-rose-line)", borderRadius: "8px", background: customer.blocked ? "#fff" : "var(--color-danger-bg)", padding: "8px 12px", fontSize: "11px", fontWeight: 800, color: customer.blocked ? "var(--color-ink-soft)" : "var(--color-danger-tx)", cursor: blockSaving ? "wait" : "pointer", opacity: blockSaving ? 0.5 : 1 }}
             >
-              {customer.blocked ? `✅ ${CUSTOMER_TERMS.unblock}` : `🚫 ${CUSTOMER_TERMS.block}`}
+              {customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}
             </button>
             <button
               type="button"
@@ -1886,7 +1886,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
       <div className={embedded ? "flex h-full w-full flex-col overflow-hidden bg-surface" : "flex h-[88vh] w-full max-w-[640px] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl"}>
         {embedded ? null : (
           <div className="flex items-center justify-between border-b border-rose-line px-5 py-3 shrink-0">
-            <span className="text-[14px] font-black text-ink">👥 고객·이슈</span>
+            <span className="text-[14px] font-black text-ink">고객</span>
             <button type="button" onClick={() => onClose?.()} className="text-ink-mute hover:text-ink text-lg leading-none">✕</button>
           </div>
         )}
@@ -1953,7 +1953,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                   onClick={() => setPhoneBlockOpen((v) => !v)}
                   className={`shrink-0 rounded-lg px-3 py-1.5 text-[11px] font-black transition ${phoneBlockOpen ? "bg-rose-deep text-white" : "border border-danger-tx/40 bg-surface text-danger-tx hover:bg-danger-bg"}`}
                 >
-                  ⛔ 전화번호 차단
+                  전화번호 차단
                 </button>
               </div>
               {phoneBlockOpen ? (
@@ -2021,7 +2021,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                 onClick={() => { setKeyword(""); setStatusFilter("all"); setSortMode("latest"); setBuyersOnly(false); setPage(1); }}
                 className="h-11 shrink-0 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink-soft hover:bg-surface-2"
               >
-                ✕ 초기화
+                초기화
               </button>
             ) : null}
           </div>
@@ -2043,7 +2043,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                 onClick={openBulk}
                 className="ml-auto h-8 rounded-lg bg-rose-deep px-3 text-[12px] font-black text-white"
               >
-                🪙 일괄 포인트 지급
+                포인트 일괄 지급
               </button>
             </div>
           ) : null}
@@ -2113,7 +2113,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                               <>
                                 {customer.unpaidCount > 0 ? <span className="rounded bg-warn-bg px-1 py-0.5 text-[11px] font-black text-warn-tx" title="상세와 같은 기준 — 아직 입금 전(자동매칭 실패 포함)">미입금 {customer.unpaidCount}건</span> : null}
                                 {d.openIssues > 0 ? <span className="rounded bg-danger-bg px-1 py-0.5 text-[11px] font-black text-danger-tx" title="미해결 고객이슈">이슈 {d.openIssues}</span> : null}
-                                {customer.liveAlertOptin === false ? <span className="rounded bg-surface-2 px-1 py-0.5 text-[11px] font-black text-ink-mute" title="방송 알림 미신청">🔕 알림OFF</span> : null}
+                                {customer.liveAlertOptin === false ? <span className="rounded bg-surface-2 px-1 py-0.5 text-[11px] font-black text-ink-mute" title="방송 알림 미신청">알림OFF</span> : null}
                               </>
                             ) : <span className="text-[11px] text-ink-mute">-</span>}
                           </div>
@@ -2163,7 +2163,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                             {!customer.kakaoId ? <span className="shrink-0 rounded-lg bg-warn-bg px-1.5 py-0.5 text-[11px] font-black text-warn-tx" title="카카오 로그인 기록이 없는 옛 회원(전화번호만). 다시 카톡 로그인하면 자동 연결됩니다.">카카오 미연동</span> : null}
                             {customer.unpaidCount > 0 ? <span className="shrink-0 rounded-lg bg-warn-bg px-1.5 py-0.5 text-[11px] font-black text-warn-tx" title="상세와 같은 기준 — 아직 입금 전(자동매칭 실패 포함)">미입금 {customer.unpaidCount}건</span> : null}
                             {d.openIssues > 0 ? <span className="shrink-0 rounded-lg bg-danger-bg px-1.5 py-0.5 text-[11px] font-black text-danger-tx" title="이 회원의 미해결 고객이슈">이슈 {d.openIssues}</span> : null}
-                            {customer.liveAlertOptin === false ? <span className="shrink-0 rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] font-black text-ink-mute" title="방송 시작 알림을 받지 않는 회원">🔕 알림OFF</span> : null}
+                            {customer.liveAlertOptin === false ? <span className="shrink-0 rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] font-black text-ink-mute" title="방송 시작 알림을 받지 않는 회원">알림OFF</span> : null}
                           </div>
                           {customer.blocked ? (
                             <div className="mt-0.5 min-w-0" title={d.blockTitle || "차단됨"}>
@@ -2235,7 +2235,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
           {bulkOpen ? (
             <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4" onClick={() => !bulkRunning && setBulkOpen(false)}>
               <div className="w-[min(460px,94vw)] rounded-2xl bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                <div className="mb-1 text-[16px] font-black text-ink">🪙 포인트 일괄지급</div>
+                <div className="mb-1 text-[16px] font-black text-ink">포인트 일괄 지급</div>
                 <div className="mb-2 text-xs font-bold text-ink-soft">선택한 {selectedPhones.size}명에게 같은 금액을 지급합니다.</div>
 
                 {/* 받는 사람 목록 */}
@@ -2298,7 +2298,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                 ) : (
                   <>
                     <div className="rounded-xl border border-line bg-ok-bg px-3 py-3 text-sm font-black text-ok-tx">
-                      ✅ {bulkResult.success}명 지급 완료{bulkResult.failed.length > 0 ? ` · ❌ ${bulkResult.failed.length}명 실패` : ""}
+                      {bulkResult.success}명 지급 완료{bulkResult.failed.length > 0 ? ` · ${bulkResult.failed.length}명 실패` : ""}
                     </div>
                     {bulkResult.failed.length > 0 ? (
                       <div className="mt-2 max-h-40 overflow-y-auto rounded-xl border border-danger-tx bg-danger-bg p-2 text-[11px] font-bold leading-5 text-danger-tx">

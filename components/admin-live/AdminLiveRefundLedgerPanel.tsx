@@ -299,7 +299,7 @@ export default function AdminLiveRefundLedgerPanel({ focusTaskId }: { focusTaskI
           <span className="text-ink-soft">계좌이체 {selBankCount} · 포인트 {selPointCount}</span>
           <button type="button" onClick={() => setSelected(new Set())} className="h-8 rounded-lg px-2 text-[11px] text-ink-soft hover:bg-surface">선택 해제</button>
           <div className="ml-auto flex items-center gap-1.5">
-            <button type="button" onClick={copyTransferList} className="h-8 rounded-lg border border-rose-line bg-surface px-3 text-[11px] font-black text-rose-deep hover:bg-rose-soft">📋 이체 목록 복사</button>
+            <button type="button" onClick={copyTransferList} className="h-8 rounded-lg border border-rose-line bg-surface px-3 text-[11px] font-black text-rose-deep hover:bg-rose-soft">이체 목록 복사</button>
             <button type="button" onClick={downloadExcel} className="h-8 rounded-lg border border-line bg-surface px-3 text-[11px] font-black text-ink-soft hover:bg-surface-2">⬇ 엑셀 다운로드</button>
           </div>
         </div>
@@ -982,7 +982,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                           </select>
                           <input value={account} onChange={(e) => setAccount(e.target.value.replace(/[^0-9]/g, ""))} onFocus={selectOnFocus} placeholder="계좌번호(숫자)" inputMode="numeric" className={`min-w-0 flex-1 ${INPUT} ${acctMissing.includes("account") ? "ring-2 ring-warn-tx" : ""}`} />
                           <input value={holder} onChange={(e) => setHolder(e.target.value)} placeholder="예금주" className={`w-28 ${INPUT} ${acctMissing.includes("holder") || holderExcluded ? "ring-2 ring-warn-tx" : ""}`} />
-                          <button type="button" onClick={copyTransferInfo} className="shrink-0 rounded-lg border border-rose-line bg-surface px-3 py-2 text-[14px] font-black text-rose-deep hover:bg-rose-soft">📋 복사</button>
+                          <button type="button" onClick={copyTransferInfo} className="shrink-0 rounded-lg border border-rose-line bg-surface px-3 py-2 text-[14px] font-black text-rose-deep hover:bg-rose-soft">복사</button>
                         </div>
                       </>
                     )}

@@ -34,10 +34,10 @@ const DEFAULT_POINT = 2000; // [사장님 결정 09-05] 기본 2,000P — 보낼
 const COMEBACK_REASON = "복귀 감사 포인트"; // ⚠️ 재지급 잠금이 "복귀" 문구로 식별 — 바꾸면 잠금도 같이 볼 것
 
 const SEG_META: Record<SegKey, { emoji: string; label: string; desc: (days: number) => string; hot?: boolean; defaultChecked: boolean }> = {
-  fresh: { emoji: "🌱", label: "새손님", desc: () => "1번 사봤어요 — 두 번째 구매가 단골의 시작", defaultChecked: false },
-  loyal: { emoji: "💖", label: "단골", desc: (d) => `2번 이상 샀고 최근 ${d}일 안에도 샀어요`, defaultChecked: false },
-  atRisk: { emoji: "🚨", label: "떠나려는 단골", desc: (d) => `단골이었는데 ${d}일 넘게 조용해요 — 명단에서 붙잡으세요`, hot: true, defaultChecked: true },
-  gone: { emoji: "💤", label: "떠난 손님", desc: () => "1번 사고 90일 넘게 소식 없어요", defaultChecked: false },
+  fresh: { emoji: "", label: "새손님", desc: () => "1번 사봤어요 — 두 번째 구매가 단골의 시작", defaultChecked: false },
+  loyal: { emoji: "", label: "단골", desc: (d) => `2번 이상 샀고 최근 ${d}일 안에도 샀어요`, defaultChecked: false },
+  atRisk: { emoji: "", label: "떠나려는 단골", desc: (d) => `단골이었는데 ${d}일 넘게 조용해요 — 명단에서 붙잡으세요`, hot: true, defaultChecked: true },
+  gone: { emoji: "", label: "떠난 손님", desc: () => "1번 사고 90일 넘게 소식 없어요", defaultChecked: false },
 };
 
 const money = (n: number) => {
@@ -105,7 +105,7 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
     if (targets.length === 0) { showAdminToast("보낼 대상이 없습니다.", "error"); return; }
     const totalWon = amountNum * targets.length;
     const ok = await showAdminConfirm(
-      `${SEG_META[seg].emoji} ${SEG_META[seg].label} ${targets.length}명에게 ${amountNum.toLocaleString()}P씩, 총 ${totalWon.toLocaleString()}P를 지급하고 쪽지를 보냅니다.\n\n(최근 30일 안에 이미 받은 분은 자동 제외)\n\n진행할까요?`,
+      `${SEG_META[seg].label} ${targets.length}명에게 ${amountNum.toLocaleString()}P씩, 총 ${totalWon.toLocaleString()}P를 지급하고 쪽지를 보냅니다.\n\n(최근 30일 안에 이미 받은 분은 자동 제외)\n\n진행할까요?`,
       { title: "포인트 + 쪽지 보내기", confirmText: "보내기", cancelText: "취소", tone: "warning" },
     );
     if (!ok) return;
@@ -149,7 +149,7 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
       void load(days);
     } catch (e) {
       // grant/쪽지 도중 예외가 나도 화면이 멈추지 않게 — 완료 안내를 반드시 띄운다.
-      showAdminToast("보내기 처리 중 문제가 있었어요. 명단의 🔒 '이미 보냄' 표시로 실제 지급 여부를 확인해 주세요.\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+      showAdminToast("보내기 처리 중 문제가 있었어요. 명단의 '이미 보냄' 표시로 실제 지급 여부를 확인해 주세요.\n\n" + (e instanceof Error ? e.message : String(e)), "error");
       void load(days);
     } finally {
       setSending(false);
@@ -188,7 +188,7 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
               onClick={() => pickSeg(k)}
               className={`rounded-2xl border p-4 text-left transition ${active ? "border-rose-deep bg-rose-soft/40 shadow-sm" : "border-line bg-surface hover:border-rose-line"}`}
             >
-              <div className="text-[13px] font-black text-ink-soft">{m.emoji} {m.label}</div>
+              <div className="text-[13px] font-black text-ink-soft">{m.label}</div>
               <div className={`mt-1 text-3xl font-black ${m.hot || active ? "text-rose-deep" : "text-ink"}`}>{(stats?.segments[k] ?? 0).toLocaleString()}<span className="ml-1 text-sm font-bold text-ink-mute">명</span></div>
               <div className="mt-1 text-[11px] font-bold leading-4 text-ink-mute">{m.desc(days)}</div>
               <div className={`mt-2 text-[11px] font-black ${active ? "text-rose-deep" : "text-ink-mute"}`}>{active ? "▾ 아래에 명단이 열려 있어요" : "누르면 명단 보기"}</div>
@@ -200,7 +200,7 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
       {/* 선택 세그먼트 명단 + 보내기 */}
       <div className="rounded-2xl border border-rose-line bg-surface p-4">
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          <span className="text-[14px] font-black text-ink">{SEG_META[seg].emoji} {SEG_META[seg].label} 명단 <span className="text-ink-mute">({rows.length}명)</span></span>
+          <span className="text-[14px] font-black text-ink">{SEG_META[seg].label} 명단 <span className="text-ink-mute">({rows.length}명)</span></span>
           <button
             type="button"
             onClick={() => {
@@ -214,12 +214,12 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
             disabled={loading || checked.size === 0}
             onClick={() => { setNoteText(""); setSendOpen(true); }}
             className="ml-auto rounded-xl bg-rose-deep px-4 py-2 text-[13px] font-black text-white disabled:opacity-40"
-          >💝 선택 {checked.size}명에게 포인트+쪽지 보내기</button>
+          >선택 {checked.size}명에게 포인트+쪽지 보내기</button>
         </div>
-        <div className="mb-2 text-[11px] font-bold text-ink-mute">체크된 분들에게만 갑니다 · 최근 30일 안에 이미 복귀 포인트를 받은 분은 🔒 자동 제외 · 관리자 계정은 통계에서 빠져 있어요</div>
+        <div className="mb-2 text-[11px] font-bold text-ink-mute">체크된 분들에게만 갑니다 · 최근 30일 안에 받은 분은 자동 제외(이미 보냄)</div>
         {loading ? <div className="py-8 text-center text-[13px] font-bold text-ink-mute">불러오는 중…</div> : null}
         {!loading && rows.length === 0 ? (
-          <div className="py-8 text-center text-[13px] font-bold text-ink-mute">이 칸에는 지금 아무도 없어요 👍</div>
+          <div className="py-8 text-center text-[13px] font-bold text-ink-mute">해당 손님 없음</div>
         ) : null}
         <div className="max-h-[320px] space-y-1 overflow-y-auto">
           {rows.map((c, i) => {
@@ -244,7 +244,7 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
                 <span className="text-[12px] font-bold text-ink-soft">{c.buys}회</span>
                 <span className="w-[64px] text-right text-[12px] font-bold text-ink-soft">{money(c.spend)}</span>
                 <span className="w-[86px] text-right text-[12px] font-bold text-rose-deep">{c.daysSince}일째 조용</span>
-                {locked ? <span className="text-[11px] font-black text-ink-mute">🔒 이미 보냄</span> : null}
+                {locked ? <span className="text-[11px] font-black text-ink-mute">이미 보냄</span> : null}
               </label>
             );
           })}
@@ -254,7 +254,7 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
       {/* TOP 10 — 횟수순/금액순 전환 */}
       <div className="rounded-2xl border border-line bg-surface p-4">
         <div className="mb-2 flex items-center gap-2">
-          <span className="text-[13px] font-black text-ink">👑 우리 가게 최고 단골 TOP 10</span>
+          <span className="text-[13px] font-black text-ink">단골 TOP 10</span>
           <div className="ml-auto flex gap-1">
             <button type="button" onClick={() => setTopMode("count")} className={`rounded-lg px-2.5 py-1 text-[12px] font-black ${topMode === "count" ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}>횟수순</button>
             <button type="button" onClick={() => setTopMode("spend")} className={`rounded-lg px-2.5 py-1 text-[12px] font-black ${topMode === "spend" ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}>금액순</button>
@@ -283,7 +283,7 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
       {sendOpen ? (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4" onClick={() => !sending && setSendOpen(false)}>
           <div className="w-full max-w-md rounded-2xl bg-surface p-5" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 text-[14px] font-black text-ink">💝 {SEG_META[seg].label} {checked.size}명에게 보내기</div>
+            <div className="mb-3 text-[14px] font-black text-ink">{SEG_META[seg].label} {checked.size}명에게 보내기</div>
             <label className="mb-1 block text-[12px] font-black text-ink-soft">1인당 포인트</label>
             <input value={amountText ? Number(amountText).toLocaleString("ko-KR") : ""} inputMode="numeric" onChange={(e) => setAmountText(e.target.value.replace(/[^0-9]/g, ""))} className="mb-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-[14px] font-black text-ink outline-none focus:border-rose-deep" />
             <div className="mb-3 text-[11px] font-bold text-ink-mute">총 {(amountNum * checked.size).toLocaleString()}P · 업계 통상 1,000~3,000P — 기본 2,000P, 금액은 자유롭게 바꾸세요</div>

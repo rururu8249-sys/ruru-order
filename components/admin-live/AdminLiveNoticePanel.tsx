@@ -481,7 +481,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
                 <input
                   value={popupTitle}
                   onChange={(e) => setPopupTitle(e.target.value)}
-                  placeholder="예) 📢 중요 공지  ·  비우면 제목 띠 없이 본문만 표시"
+                  placeholder="예) 중요 공지 · 비우면 본문만 표시"
                   className={input}
                 />
                 <span className={help}>본문에 제목을 또 쓰면 두 번 나옵니다.</span>
@@ -501,7 +501,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
                 <textarea
                   value={popupText}
                   onChange={(e) => setPopupText(e.target.value)}
-                  placeholder={"예) 👜 롱샴 7/27(월) 출고완료\n---\n💄 향수&화장품 7/27(월)~ 업체 순차출고"}
+                  placeholder={"예) 롱샴 7/27(월) 출고완료\n---\n향수·화장품 7/27(월)~ 업체 순차출고"}
                   rows={6}
                   className="mt-1 w-full resize-none rounded-xl border border-line bg-surface p-3 text-sm font-bold leading-relaxed text-ink outline-none focus:border-rose-deep"
                 />
@@ -540,10 +540,10 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
 
             {/* 주문 최종 제출 전 구매 동의 — 접속 팝업과 별도 설정 */}
             <div className={card}>
-              <div className="text-sm font-black text-ink">✅ 주문 전 구매 동의 팝업</div>
+              <div className="text-sm font-black text-ink">주문 전 구매 동의 팝업</div>
               <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
                 손님이 주문서를 최종 제출할 때 뜹니다. <b className="text-ink-soft">자동</b>은 실제 상품의
-                <b className="text-ink-soft"> ✈️ 해외배송 배지</b>를 확인해 해당 주문에만 표시합니다.
+                <b className="text-ink-soft"> 해외배송 배지</b>를 확인해 해당 주문에만 표시합니다.
               </div>
 
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
@@ -620,7 +620,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
           {/* ─────────── 오른쪽: 미리보기 ─────────── */}
           <div className="lg:sticky lg:top-0 lg:self-start">
             <div className="rounded-xl border border-line bg-surface-2 p-4">
-              <div className="text-sm font-black text-ink">👀 손님 화면 미리보기</div>
+              <div className="text-sm font-black text-ink">손님 화면 미리보기</div>
               <div className="mt-1 text-[11px] font-bold text-ink-mute">저장 전 모습입니다. 실제 반영은 저장 후.</div>
 
               {/* ⚠ 이 어두운 배경은 «손님 폰의 팝업 뒷배경»을 흉내낸 것 → 관리자 테마와 무관. 토큰으로 바꾸지 말 것. */}
@@ -647,7 +647,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
                     </div>
                     <div className="space-y-2 px-4 pb-4">
                       {popupBandUrl.trim() ? (
-                        <div className="rounded-xl bg-ok-tx py-2.5 text-center text-[13px] font-black text-white">🟢 밴드 바로가기</div>
+                        <div className="rounded-xl bg-ok-tx py-2.5 text-center text-[13px] font-black text-white">밴드 바로가기</div>
                       ) : null}
                       <div className="rounded-xl py-2.5 text-center text-[13px] font-black text-white" style={{ background: popupColor }}>확인</div>
                       <div className="pt-1 text-center text-[11px] font-bold text-ink-mute">24시간 동안 열지 않기</div>
@@ -668,7 +668,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
         <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
           {/* 쓰기 */}
           <div className={`${card} lg:sticky lg:top-0 lg:self-start`}>
-            <div className="text-sm font-black text-ink">{form.id ? "✏️ 공지 수정" : "➕ 새 공지 쓰기"}</div>
+            <div className="text-sm font-black text-ink">{form.id ? "공지 수정" : "새 공지"}</div>
             <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
               손님 <b className="text-ink-soft">쪽지함</b>과 <b className="text-ink-soft">공지사항 페이지</b>에 함께 나옵니다.
             </div>
@@ -700,14 +700,14 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
                 onClick={() => setForm({ ...form, is_pinned: !form.is_pinned })}
                 className={`ru-btn ru-btn-sm ${form.is_pinned ? "ru-btn-on" : ""}`}
               >
-                {form.is_pinned ? "📌 목록 상단 고정" : "목록 고정 안 함"}
+                {form.is_pinned ? "상단 고정" : "고정 안 함"}
               </button>
               <button
                 type="button"
                 onClick={() => setForm({ ...form, is_visible: !form.is_visible })}
                 className={`ru-btn ru-btn-sm ${form.is_visible ? "ru-btn-on" : ""}`}
               >
-                {form.is_visible ? "👁 공개" : "🙈 숨김"}
+                {form.is_visible ? "공개" : "숨김"}
               </button>
             </div>
 
@@ -736,7 +736,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
               notices.map((n, i) => (
                 <div key={n.id} className={`rounded-xl border p-4 ${n.is_visible ? "border-line bg-surface" : "border-line bg-surface-2 opacity-60"}`}>
                   <div className="flex items-start gap-2">
-                    <span className="text-base">{n.is_pinned ? "📌" : "📢"}</span>
+                    <span className="text-base">{n.is_pinned ? "고정" : ""}</span>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="text-[14px] font-black text-ink">{n.title}</span>
@@ -752,10 +752,10 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
                     {n.is_visible && mode === "all" && <button type="button" aria-label={`${n.title}를 상단 공지로 선택`} disabled={!settingsReady} onClick={() => { setLinkedNoticeId(String(n.id)); setTab("customer"); }} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-rose-deep disabled:opacity-30">상단 공지로 선택</button>}
                     <button type="button" onClick={() => moveNotice(n, "up")} disabled={i === 0 || listBusy} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft disabled:opacity-30">↑ 위로</button>
                     <button type="button" onClick={() => moveNotice(n, "down")} disabled={i === notices.length - 1 || listBusy} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft disabled:opacity-30">↓ 아래로</button>
-                    <button type="button" onClick={() => toggleNotice(n, "is_pinned")} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft">{n.is_pinned ? "목록 고정 풀기" : "📌 목록 상단 고정"}</button>
-                    <button type="button" onClick={() => toggleNotice(n, "is_visible")} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft">{n.is_visible ? "🙈 숨기기" : "👁 공개하기"}</button>
-                    <button type="button" onClick={() => setForm(n)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft">✏️ 수정</button>
-                    <button type="button" onClick={() => deleteNotice(n)} className="ml-auto rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-danger-tx">🗑 삭제</button>
+                    <button type="button" onClick={() => toggleNotice(n, "is_pinned")} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft">{n.is_pinned ? "고정 풀기" : "상단 고정"}</button>
+                    <button type="button" onClick={() => toggleNotice(n, "is_visible")} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft">{n.is_visible ? "숨기기" : "공개"}</button>
+                    <button type="button" onClick={() => setForm(n)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft">수정</button>
+                    <button type="button" onClick={() => deleteNotice(n)} className="ml-auto rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-danger-tx">삭제</button>
                   </div>
                 </div>
               ))
@@ -779,7 +779,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
               />
               <button type="button" onClick={() => void searchCustomers()} disabled={searching}
                 className="shrink-0 rounded-xl bg-rose-deep px-4 text-sm font-black text-white disabled:opacity-50">
-                {searching ? "찾는 중" : "🔍 찾기"}
+                {searching ? "찾는 중" : "찾기"}
               </button>
             </div>
 
@@ -809,7 +809,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
                 return (
                   <button key={c.id} type="button" onClick={() => togglePick(c)} disabled={!phone}
                     className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left transition ${on ? "border-rose-deep bg-rose-soft/60" : "border-line bg-surface"} ${!phone ? "opacity-40" : ""}`}>
-                    <span className="text-sm">{on ? "☑️" : "⬜"}</span>
+                    <span className="text-sm">{on ? "✓" : ""}</span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13px] font-black text-ink">{String(c.youtube_nickname || c.customer_name || "이름없음")}</span>
                       <span className="block text-[11px] font-bold text-ink-mute">
@@ -861,7 +861,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
 
             <button type="button" onClick={() => void sendNotes()} disabled={sending || picked.length === 0 || !noteText.trim()}
               className="mt-4 h-12 w-full rounded-2xl bg-rose-deep text-[14px] font-black text-white transition disabled:opacity-40">
-              {sending ? "보내는 중…" : picked.length > 0 ? `📩 ${picked.length}명에게 보내기` : "받을 손님을 먼저 고르세요"}
+              {sending ? "보내는 중…" : picked.length > 0 ? `${picked.length}명에게 보내기` : "받을 손님을 먼저 고르세요"}
             </button>
             <div className="mt-2 rounded-xl border border-line bg-warn-bg px-3 py-2 text-[11px] font-bold leading-5 text-warn-tx">
               같은 손님에게 같은 내용을 <b>10분 안에 또 보내면 한 번만</b> 갑니다. 실수로 두 번 눌러도 손님에게 두 번 뜨지 않습니다.
@@ -873,12 +873,12 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
         <div>
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
-              <div className="text-sm font-black text-ink">📤 보낸 쪽지</div>
+              <div className="text-sm font-black text-ink">보낸 쪽지</div>
               <div className="mt-0.5 text-xs font-bold text-ink-mute">누구에게 · 언제 · 읽었는지. 잘못 보낸 건 회수합니다.</div>
             </div>
             <button type="button" onClick={() => void loadSent()} disabled={sentLoading}
               className="shrink-0 rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft disabled:opacity-50">
-              {sentLoading ? "불러오는 중" : "🔄 새로고침"}
+              {sentLoading ? "불러오는 중" : "새로고침"}
             </button>
           </div>
 
@@ -894,7 +894,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
                 <span className="text-[11px] font-bold text-ink-soft">표시 기간이 끝나 손님 화면에서 사라졌습니다. 포인트는 이미 지급돼 있어요.</span>
                 <button type="button" onClick={() => void reviveAllMissed(missedCount)}
                   className="ml-auto rounded-lg bg-rose-deep px-3 py-1.5 text-[11px] font-black text-white">
-                  🔔 전부 다시 띄우기
+                  전부 다시 띄우기
                 </button>
               </div>
             );
@@ -940,7 +940,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
                       {missed ? (
                         <button type="button" onClick={() => void reviveNote(n)}
                           className="ml-auto rounded-lg bg-rose-deep px-2.5 py-1.5 text-[11px] font-black text-white">
-                          🔔 다시 띄우기
+                          다시 띄우기
                         </button>
                       ) : null}
                       {!revoked ? (

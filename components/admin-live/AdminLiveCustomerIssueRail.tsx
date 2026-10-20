@@ -553,21 +553,21 @@ export function IssueCard({
           {/* 📦 상품 1줄 */}
           {product && !(extra && product === "상품 지정 없음") ? (
             <div className="flex min-w-0 items-baseline gap-1.5">
-              <span className="shrink-0" aria-hidden>📦</span>
+              <span className="shrink-0 text-ink-mute" aria-hidden>상품</span>
               <span className="min-w-0 xl:truncate font-black text-ink" title={product}>{product}</span>
             </div>
           ) : null}
           {/* [⑱ D] ➕ 추가 상품 1줄(truncate) */}
           {extra ? (
             <div className="mt-0.5 flex min-w-0 items-baseline gap-1.5">
-              <span className="shrink-0" aria-hidden>➕</span>
+              <span className="shrink-0 text-ink-mute" aria-hidden>추가</span>
               <span className="min-w-0 xl:truncate font-bold text-ink-soft" title={extra}>추가: {extra}</span>
             </div>
           ) : null}
           {/* 💬 메모 2줄 clamp + 넘치면 「…더보기」(처리창) */}
           {memoShown ? (
             <div className="mt-0.5 flex min-w-0 items-start gap-1.5">
-              <span className="shrink-0" aria-hidden>💬</span>
+              <span className="shrink-0 text-ink-mute" aria-hidden>메모</span>
               <div className="min-w-0 flex-1">
                 <div ref={memoRef} className="xl:line-clamp-2 whitespace-pre-line break-words font-bold text-ink-soft">{memoShown}</div>
                 {memoOverflow ? (
@@ -579,7 +579,7 @@ export function IssueCard({
           {/* 💳 상태 1줄 */}
           {ledgerLine ? (
             <div className="mt-0.5 flex min-w-0 items-start gap-1.5 text-[13px]">
-              <span className="shrink-0" aria-hidden>💳</span>
+              <span className="shrink-0 text-ink-mute" aria-hidden>처리</span>
               <span className="min-w-0 xl:truncate font-black text-info-tx" title={ledgerLine}>{ledgerLine}</span>
             </div>
           ) : null}
@@ -1573,7 +1573,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
             → 왼쪽에 이 화면이 뭘 하는 곳인지 한 줄, 버튼 이름도 창과 같게 맞춘다. */}
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <div className="min-w-0">
-            <div className="text-[13px] font-black text-ink">📮 고객이슈</div>
+            <div className="text-[13px] font-black text-ink">고객이슈</div>
             <div className="text-[12px] font-bold text-ink-mute">반품·교환·문의를 적어두고 처리되면 해결완료로 넘깁니다</div>
           </div>
 
@@ -1636,7 +1636,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       {/* ── 찾기 줄 — 검색 한 칸 + 유형 칩. 켜져 있으면 「초기화」가 나타난다(NN/g) ── */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <div className="relative min-w-[220px] flex-1">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-ink-mute">🔍</span>
+          
           <input
             type="text"
             value={keyword}
@@ -1680,7 +1680,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
             onClick={() => { setKeyword(""); setTypeFilter(""); }}
             className="h-10 rounded-xl border border-rose-deep bg-surface px-3 text-[12px] font-black text-rose-deep hover:bg-rose-soft"
           >
-            ✕ 초기화
+            초기화
           </button>
         ) : null}
 
@@ -1703,8 +1703,8 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           ) : null}
           <button type="button" onClick={clearSelection} className="h-8 rounded-lg px-2 text-[11px] font-black text-ink-soft hover:bg-surface">선택 해제</button>
           {/* [2026-09-26] 교환·환불 건 대상 — 이체 목록 복사(계좌이체·금액 있는 건, 이때만 전체 계좌)·엑셀(계좌 뒷4만) */}
-          <button type="button" onClick={copyTransferListBulk} className="h-8 rounded-lg border border-rose-line bg-surface px-2 text-[11px] font-black text-rose-deep hover:bg-rose-soft">📋 이체 목록 복사</button>
-          <button type="button" onClick={downloadRefundExcel} className="h-8 rounded-lg border border-line bg-surface px-2 text-[11px] font-black text-ink-soft hover:bg-surface-2">⬇ 엑셀</button>
+          <button type="button" onClick={copyTransferListBulk} className="h-8 rounded-lg border border-rose-line bg-surface px-2 text-[11px] font-black text-rose-deep hover:bg-rose-soft">이체 목록 복사</button>
+          <button type="button" onClick={downloadRefundExcel} className="h-8 rounded-lg border border-line bg-surface px-2 text-[11px] font-black text-ink-soft hover:bg-surface-2">엑셀</button>
           <div className="ml-auto flex items-center gap-1.5">
             {activeTab === "deleted" ? (
               <>

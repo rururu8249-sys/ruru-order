@@ -98,7 +98,7 @@ export default function LiveIssueRailPanel({ onOpenAll, onCountChange, variant =
 
     return (
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-warn-tx/40 bg-warn-bg px-4 py-2.5">
-        <span className="text-[13px] font-black text-warn-tx">📮 미해결 고객이슈 {open.length}건</span>
+        <span className="text-[13px] font-black text-warn-tx">미해결 고객이슈 {open.length}건</span>
         {oldest?.created_at ? (
           <span className="text-[12px] font-bold text-ink-soft">가장 오래된 건 {timeLabel(oldest.created_at)}</span>
         ) : null}
@@ -124,7 +124,7 @@ export default function LiveIssueRailPanel({ onOpenAll, onCountChange, variant =
   return (
     <div className="min-w-0 w-full rounded-2xl border border-line bg-surface p-3 shadow-sm flex flex-col xl:h-full">
       <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
-        <span className="text-xs font-black text-ink">📮 고객이슈</span>
+        <span className="text-xs font-black text-ink">고객이슈</span>
         <div className="flex shrink-0 items-center gap-1.5">
           <span
             className={[
@@ -148,7 +148,7 @@ export default function LiveIssueRailPanel({ onOpenAll, onCountChange, variant =
       <div className="min-h-0 flex-1 overflow-auto">
         {open.length === 0 ? (
           <div className="flex h-full min-h-[64px] items-center justify-center rounded-lg bg-surface-2 px-3 py-4 text-center text-[11px] font-bold text-ink-mute">
-            {loading ? "불러오는 중…" : "미해결 고객이슈 없음 👍"}
+            {loading ? "불러오는 중…" : "미해결 고객이슈 없음"}
           </div>
         ) : (
           <ul className="space-y-1">
