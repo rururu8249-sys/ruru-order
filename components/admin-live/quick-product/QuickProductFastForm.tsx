@@ -32,6 +32,7 @@ import { linkedSourceInfo, resolveDetailInfo, normalizeDetailChips, type DetailI
 import BrandDetailInfoEditor from './BrandDetailInfoEditor';
 import ColorSwatchEditor from './ColorSwatchEditor';
 import {readProductColorSwatches, retainColorSwatches, type ColorSwatchMap} from '@/lib/productColorSwatches';
+import { readAdminUiPreview } from "@/lib/adminUiSwitch";
 
 type ProductRow = Record<string, unknown>;
 
@@ -903,6 +904,9 @@ export default function QuickProductFastForm({
   // [2026-09-03 최종 구조] 기본 화면 = 사진·이름·가격·배송·세부상품·등록. 나머지는 「자세히」 뒤로.
   //   세부상품이 있거나 수정 모드면 자동으로 펼쳐져 숨는 것 없음. 표시 전용 — 값·저장 무변경.
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
+  // [2026-10-21 a2-2] 새 배치 미리보기(?preview=a2) — 폼이 열릴 때 1회 읽음 · 「더 보기」 열림은 이 화면 안에서만(저장 안 함)
+  const [formV2] = useState(() => readAdminUiPreview("a2"));
+  const [v2MoreOpen, setV2MoreOpen] = useState(false);
   const [brandKoText, setBrandKoText] = useState("");
   const [brandEnText, setBrandEnText] = useState("");
   // brandGroupNew/brandGroupActive 는 details 정의 이후(아래)에서 파생 계산
@@ -2160,6 +2164,147 @@ export default function QuickProductFastForm({
   const tgStyle = (on: boolean): CSSProperties => ({ width: "40px", height: "22px", borderRadius: "12px", background: on ? "var(--color-ok-tx)" : "var(--color-line)", position: "relative", cursor: "pointer", flexShrink: 0 });
   const tgKnob = (on: boolean): CSSProperties => ({ position: "absolute", width: "18px", height: "18px", background: "var(--color-surface)", borderRadius: "50%", top: "2px", ...(on ? { right: "2px" } : { left: "2px" }) });
 
+  // [2026-10-21 a2-2] 재고 입력 격자 — 기존 화면(아래 optionStockSection)과 새 배치(?preview=a2)가 «같은 JSX»를 쓴다. 계산·핸들러 무변경, 자리만 옮김.
+  const stockGrid = (
+              stockManagementEnabled || stockMode === "option" ? (
+                stockMode === "option" ? (
+                  <div style={{ marginTop: "8px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                      <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>조합 {resolvedVariantRows.length}개</span>
+                      {stockManagementEnabled ? <span style={{ fontSize: "11px", color: "var(--color-ink-mute)", display: "flex", alignItems: "center", gap: "4px" }}>
+                        전체
+                        <input style={{ fontSize: "11px", padding: "4px 6px", border: "1px solid var(--color-line)", borderRadius: "4px", textAlign: "right", width: "46px" }} type="text" inputMode="numeric" value={bulkStockText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setBulkStockText(e.target.value.replace(/[^0-9]/g, ""))} />
+                        개
+                        <button type="button" onClick={applyBulkStock} style={{ border: "1.5px dashed var(--color-rose-deep)", background: "var(--color-surface)", color: "var(--color-rose-deep)", fontSize: "11px", fontWeight: 800, borderRadius: "8px", padding: "4px 8px", cursor: "pointer" }}>일괄적용</button>
+                      </span> : <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>수량을 세지 않아도 옵션별 품절 설정 가능</span>}
+                    </div>
+
+                    <div style={{ background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", maxHeight: "260px", overflowY: "auto", border: "1px solid var(--color-line)" }}>
+                      {variantGroups.map((group) => (
+                        <div key={`grp-${group.detail || "__none__"}`} style={{ marginBottom: "4px" }}>
+                          {group.detail ? (
+                            <div style={{ display: "grid", gridTemplateColumns: "36px 1fr 100px 34px", gap: "6px", alignItems: "center", background: "var(--color-rose-soft)", borderRadius: "8px", padding: "4px 8px", marginBottom: "4px" }}>
+                              {/* [2026-08-11] 세부상품별 대표사진 — 손님이 종류 고를 때 사진으로 구분 (스마트스토어·쿠팡의 옵션별 이미지와 동일 개념) */}
+                              <button
+                                type="button"
+                                onClick={() => pickDetailPhoto(group.detail)}
+                                title={detailPhotos[group.detail] ? "사진 바꾸기 (우클릭하면 삭제)" : "이 세부상품 사진 넣기"}
+                                onContextMenu={(e) => {
+                                  // [2026-08-29] 예전에는 우클릭하면 확인 없이 바로 지워져서 실수로 날아갔다.
+                                  e.preventDefault();
+                                  if (!detailPhotos[group.detail]) return;
+                                  void (async () => {
+                                    const ok = await showAdminConfirm(`"${group.detail}" 대표사진을 뺄까요?`, { title: "세부상품 사진 빼기", confirmText: "빼기", cancelText: "취소", tone: "danger" });
+                                    if (ok) removeDetailPhoto(group.detail);
+                                  })();
+                                }}
+                                style={{ width: "36px", height: "36px", borderRadius: "8px", border: detailPhotos[group.detail] ? "none" : "1.5px dashed var(--color-rose-line)", background: detailPhotos[group.detail] ? `center/cover no-repeat url(${JSON.stringify(resolveProductImageUrl(detailPhotos[group.detail]))})` : "var(--color-surface)", cursor: "pointer", padding: 0, fontSize: "14px", fontWeight: 800, color: "var(--color-rose-line)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}
+                              >
+                                {detailPhotoUploading === group.detail ? "…" : detailPhotos[group.detail] ? "" : "＋"}
+                              </button>
+                              <span style={{ minWidth: 0, opacity: detailHidden.includes(group.detail) ? 0.5 : 1 }}>
+                                <span style={{ display: "block", fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {group.detail}
+                                </span>
+                                {/* [2026-08-29 사장님 요청] 추가금만 보이면 실제로 얼마에 팔리는지 모른 채 등록하게 된다.
+                                    실제 판매가 = 대표가 + 추가금 (엑셀 대량등록 화면과 같은 기준) */}
+                                {(() => {
+                                  const realPrice = moneyNumber(priceText) + Math.max(0, Number(detailPlus[group.detail]) || 0);
+                                  if (realPrice <= 0) return null;
+                                  return (
+                                    <span style={{ display: "block", marginTop: "1px", fontSize: "11px", fontWeight: 900, color: "var(--color-ok-tx)" }}>
+                                      판매가 {realPrice.toLocaleString("ko-KR")}원
+                                    </span>
+                                  );
+                                })()}
+                              </span>
+                              {/* [2026-08-29 개선 A] 예전에는 "추가금"만 넣어서 실제로 얼마에 팔리는지
+                                  머릿속으로 더해야 했다. → 팔 금액을 그대로 넣고, 추가금은 시스템이 역산한다.
+                                  저장되는 값·계산식은 예전과 동일(실제가 = 대표가 + 추가금). */}
+                              {(() => {
+                                const base = moneyNumber(priceText);
+                                const plusNow = Math.max(0, Number(detailPlus[group.detail]) || 0);
+                                const draft = salePriceDraft[group.detail];
+                                const shown = draft !== undefined
+                                  ? formatNumberWithComma(draft)
+                                  : (detailPlus[group.detail] === "" ? "" : formatNumberWithComma(String(base + plusNow)));
+                                const typedNum = Number(String(draft ?? "").replace(/[^0-9]/g, "")) || 0;
+                                const tooLow = draft !== undefined && String(draft).trim() !== "" && typedNum < base;
+                                return (
+                                  <span style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
+                                    <input
+                                      style={{ fontSize: "11px", padding: "4px 6px", border: `1px solid ${tooLow ? "var(--color-danger-tx)" : "var(--color-rose-line)"}`, borderRadius: "4px", textAlign: "right", width: "100%", background: "var(--color-surface)", fontWeight: 800 }}
+                                      type="text" inputMode="numeric" placeholder="판매가"
+                                      title="손님이 실제로 내는 금액. 대표가와의 차액이 추가금으로 자동 저장됩니다."
+                                      value={shown}
+                                      onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }}
+                                      onChange={(e) => applySalePrice(group.detail, e.target.value)}
+                                      onBlur={() => clearSalePriceDraft(group.detail)}
+                                    />
+                                    <span style={{ fontSize: "11px", fontWeight: 800, color: tooLow ? "var(--color-danger-tx)" : "var(--color-ink-soft)", textAlign: "right", whiteSpace: "nowrap" }}>
+                                      {tooLow ? "대표가보다 낮음" : `추가금 +${plusNow.toLocaleString("ko-KR")}`}
+                                    </span>
+                                  </span>
+                                );
+                              })()}
+                              <button type="button" title={detailHidden.includes(group.detail) ? "숨김 — 누르면 노출" : "노출 중 — 누르면 숨김"} onClick={() => toggleDetailHidden(group.detail)} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: "14px", padding: 0 }}>
+                                {detailHidden.includes(group.detail) ? "🚫" : "👁"}
+                              </button>
+                            </div>
+                          ) : null}
+
+                          {group.rows.map((row) => {
+                            const displayColor = String(row.colorOnly || "").trim() === "없음" ? "" : row.colorOnly;
+                            const label = [displayColor, row.size].filter(Boolean).join(" / ");
+                            const heldQty = heldOf(String(row.color ?? row.colorOnly ?? ""), String(row.size ?? ""));
+                            const sellable = Math.max(0, Number(row.stock || 0) - heldQty);
+                            const soldOut = row.manual_soldout === true || (stockManagementEnabled && sellable <= 0);
+                            return (
+                              <div key={row.key} style={{ display: "grid", gridTemplateColumns: stockManagementEnabled ? "minmax(0, 1fr) 74px 70px" : "minmax(0, 1fr) 70px", gap: "8px", alignItems: "center", padding: "6px 0 6px " + (group.detail ? "12px" : "2px") }}>
+                                <span style={{ fontSize: "12px", color: soldOut ? "var(--color-danger-tx)" : "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {label || (group.detail ? "재고" : "기본")}
+                                </span>
+                                {stockManagementEnabled ? <input aria-label={`${label || "기본"} 재고 수량`} style={{ fontSize: "12px", padding: "4px 8px", border: "1px solid var(--color-line)", borderRadius: "8px", textAlign: "right", width: "100%" }} type="number" min={0} inputMode="numeric" value={row.stock} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => updateVariantStock(row.key, Math.max(0, Number(e.target.value) || 0))} /> : null}
+                                <label style={{ minHeight: "36px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", borderRadius: "8px", background: row.manual_soldout ? "var(--color-danger-bg)" : "transparent", color: row.manual_soldout ? "var(--color-danger-tx)" : "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
+                                  <input type="checkbox" aria-label={`${[group.detail, label].filter(Boolean).join(" / ") || "기본"} 품절`} checked={row.manual_soldout === true}
+                                    onChange={(e) => { const checked = e.target.checked; setVariantRows(resolvedVariantRows.map(v => v.key === row.key ? {...v, manual_soldout: checked} : v)); }}
+                                    style={{ width: "16px", height: "16px", accentColor: "var(--color-danger-tx)" }} />
+                                  품절
+                                </label>
+                                {!row.manual_soldout && stockManagementEnabled && sellable <= 0 ? <span style={{ gridColumn: "1 / -1", fontSize: "11px", color: "var(--color-danger-tx)" }}>재고 소진 · 자동 품절</span> : null}
+                                {stockManagementEnabled && heldQty > 0 ? (
+                                  <span style={{ gridColumn: "1 / -1", marginTop: "1px", fontSize: "11px", fontWeight: 700, color: "var(--color-warn-tx)", paddingLeft: group.detail ? "12px" : "2px" }}>
+                                    담김 {heldQty}개 · 지금 판매가능 <b style={{ color: sellable > 0 ? "var(--color-ok-tx)" : "var(--color-danger-tx)" }}>{sellable}개</b>
+                                  </span>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+
+                    {stockManagementEnabled ? <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--color-ink-mute)", display: "flex", justifyContent: "space-between" }}>
+                      <span>
+                        실재고 <b style={{ color: "var(--color-ink)" }}>{totalStock.toLocaleString("ko-KR")}</b>개
+                        {heldTotal > 0 ? <> · 담김 <b style={{ color: "var(--color-warn-tx)" }}>{heldTotal}</b>개 · 판매가능 <b style={{ color: "var(--color-ok-tx)" }}>{Math.max(0, totalStock - heldTotal).toLocaleString("ko-KR")}</b>개</> : null}
+                      </span>
+                      <span>{resolvedVariantRows.filter((row) => Number(row.stock || 0) <= 0).length > 0 ? `품절 ${resolvedVariantRows.filter((row) => Number(row.stock || 0) <= 0).length}개` : ""}</span>
+                    </div> : null}
+                  </div>
+                ) : (
+                  <div style={{ background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", marginTop: "8px", display: "flex", alignItems: "center", gap: "8px", border: "1px solid var(--color-line)" }}>
+                    <span style={{ fontSize: "12px", color: "var(--color-ink)", flex: 1 }}>총 재고 수량</span>
+                    <input style={{ fontSize: "12px", padding: "4px 8px", border: "1px solid var(--color-line)", borderRadius: "8px", textAlign: "right", width: "80px" }} type="number" min={0} inputMode="numeric" value={totalStockText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setTotalStockText(e.target.value)} />
+                    <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
+                    {heldTotal > 0 ? (
+                      <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-warn-tx)", whiteSpace: "nowrap" }}>담김 {heldTotal} · 판매가능 {Math.max(0, (Number(totalStockText) || 0) - heldTotal)}</span>
+                    ) : null}
+                  </div>
+                )
+              ) : null
+  );
+
   // [2026-09-03 재설계] 옵션·세부상품·재고 섹션 — 단품에선 원래 자리, 묶음에선 브랜드 이름 바로 아래(주인공)로.
   const optionStockSection = (
           <div style={{ marginBottom: "12px" }}>
@@ -2630,143 +2775,7 @@ export default function QuickProductFastForm({
               ) : null}
 
               {/* ── 재고 입력 ── */}
-              {stockManagementEnabled || stockMode === "option" ? (
-                stockMode === "option" ? (
-                  <div style={{ marginTop: "8px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                      <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-ink)" }}>조합 {resolvedVariantRows.length}개</span>
-                      {stockManagementEnabled ? <span style={{ fontSize: "11px", color: "var(--color-ink-mute)", display: "flex", alignItems: "center", gap: "4px" }}>
-                        전체
-                        <input style={{ fontSize: "11px", padding: "4px 6px", border: "1px solid var(--color-line)", borderRadius: "4px", textAlign: "right", width: "46px" }} type="text" inputMode="numeric" value={bulkStockText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setBulkStockText(e.target.value.replace(/[^0-9]/g, ""))} />
-                        개
-                        <button type="button" onClick={applyBulkStock} style={{ border: "1.5px dashed var(--color-rose-deep)", background: "var(--color-surface)", color: "var(--color-rose-deep)", fontSize: "11px", fontWeight: 800, borderRadius: "8px", padding: "4px 8px", cursor: "pointer" }}>일괄적용</button>
-                      </span> : <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>수량을 세지 않아도 옵션별 품절 설정 가능</span>}
-                    </div>
-
-                    <div style={{ background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", maxHeight: "260px", overflowY: "auto", border: "1px solid var(--color-line)" }}>
-                      {variantGroups.map((group) => (
-                        <div key={`grp-${group.detail || "__none__"}`} style={{ marginBottom: "4px" }}>
-                          {group.detail ? (
-                            <div style={{ display: "grid", gridTemplateColumns: "36px 1fr 100px 34px", gap: "6px", alignItems: "center", background: "var(--color-rose-soft)", borderRadius: "8px", padding: "4px 8px", marginBottom: "4px" }}>
-                              {/* [2026-08-11] 세부상품별 대표사진 — 손님이 종류 고를 때 사진으로 구분 (스마트스토어·쿠팡의 옵션별 이미지와 동일 개념) */}
-                              <button
-                                type="button"
-                                onClick={() => pickDetailPhoto(group.detail)}
-                                title={detailPhotos[group.detail] ? "사진 바꾸기 (우클릭하면 삭제)" : "이 세부상품 사진 넣기"}
-                                onContextMenu={(e) => {
-                                  // [2026-08-29] 예전에는 우클릭하면 확인 없이 바로 지워져서 실수로 날아갔다.
-                                  e.preventDefault();
-                                  if (!detailPhotos[group.detail]) return;
-                                  void (async () => {
-                                    const ok = await showAdminConfirm(`"${group.detail}" 대표사진을 뺄까요?`, { title: "세부상품 사진 빼기", confirmText: "빼기", cancelText: "취소", tone: "danger" });
-                                    if (ok) removeDetailPhoto(group.detail);
-                                  })();
-                                }}
-                                style={{ width: "36px", height: "36px", borderRadius: "8px", border: detailPhotos[group.detail] ? "none" : "1.5px dashed var(--color-rose-line)", background: detailPhotos[group.detail] ? `center/cover no-repeat url(${JSON.stringify(resolveProductImageUrl(detailPhotos[group.detail]))})` : "var(--color-surface)", cursor: "pointer", padding: 0, fontSize: "14px", fontWeight: 800, color: "var(--color-rose-line)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}
-                              >
-                                {detailPhotoUploading === group.detail ? "…" : detailPhotos[group.detail] ? "" : "＋"}
-                              </button>
-                              <span style={{ minWidth: 0, opacity: detailHidden.includes(group.detail) ? 0.5 : 1 }}>
-                                <span style={{ display: "block", fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                  {group.detail}
-                                </span>
-                                {/* [2026-08-29 사장님 요청] 추가금만 보이면 실제로 얼마에 팔리는지 모른 채 등록하게 된다.
-                                    실제 판매가 = 대표가 + 추가금 (엑셀 대량등록 화면과 같은 기준) */}
-                                {(() => {
-                                  const realPrice = moneyNumber(priceText) + Math.max(0, Number(detailPlus[group.detail]) || 0);
-                                  if (realPrice <= 0) return null;
-                                  return (
-                                    <span style={{ display: "block", marginTop: "1px", fontSize: "11px", fontWeight: 900, color: "var(--color-ok-tx)" }}>
-                                      판매가 {realPrice.toLocaleString("ko-KR")}원
-                                    </span>
-                                  );
-                                })()}
-                              </span>
-                              {/* [2026-08-29 개선 A] 예전에는 "추가금"만 넣어서 실제로 얼마에 팔리는지
-                                  머릿속으로 더해야 했다. → 팔 금액을 그대로 넣고, 추가금은 시스템이 역산한다.
-                                  저장되는 값·계산식은 예전과 동일(실제가 = 대표가 + 추가금). */}
-                              {(() => {
-                                const base = moneyNumber(priceText);
-                                const plusNow = Math.max(0, Number(detailPlus[group.detail]) || 0);
-                                const draft = salePriceDraft[group.detail];
-                                const shown = draft !== undefined
-                                  ? formatNumberWithComma(draft)
-                                  : (detailPlus[group.detail] === "" ? "" : formatNumberWithComma(String(base + plusNow)));
-                                const typedNum = Number(String(draft ?? "").replace(/[^0-9]/g, "")) || 0;
-                                const tooLow = draft !== undefined && String(draft).trim() !== "" && typedNum < base;
-                                return (
-                                  <span style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
-                                    <input
-                                      style={{ fontSize: "11px", padding: "4px 6px", border: `1px solid ${tooLow ? "var(--color-danger-tx)" : "var(--color-rose-line)"}`, borderRadius: "4px", textAlign: "right", width: "100%", background: "var(--color-surface)", fontWeight: 800 }}
-                                      type="text" inputMode="numeric" placeholder="판매가"
-                                      title="손님이 실제로 내는 금액. 대표가와의 차액이 추가금으로 자동 저장됩니다."
-                                      value={shown}
-                                      onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }}
-                                      onChange={(e) => applySalePrice(group.detail, e.target.value)}
-                                      onBlur={() => clearSalePriceDraft(group.detail)}
-                                    />
-                                    <span style={{ fontSize: "11px", fontWeight: 800, color: tooLow ? "var(--color-danger-tx)" : "var(--color-ink-soft)", textAlign: "right", whiteSpace: "nowrap" }}>
-                                      {tooLow ? "대표가보다 낮음" : `추가금 +${plusNow.toLocaleString("ko-KR")}`}
-                                    </span>
-                                  </span>
-                                );
-                              })()}
-                              <button type="button" title={detailHidden.includes(group.detail) ? "숨김 — 누르면 노출" : "노출 중 — 누르면 숨김"} onClick={() => toggleDetailHidden(group.detail)} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: "14px", padding: 0 }}>
-                                {detailHidden.includes(group.detail) ? "🚫" : "👁"}
-                              </button>
-                            </div>
-                          ) : null}
-
-                          {group.rows.map((row) => {
-                            const displayColor = String(row.colorOnly || "").trim() === "없음" ? "" : row.colorOnly;
-                            const label = [displayColor, row.size].filter(Boolean).join(" / ");
-                            const heldQty = heldOf(String(row.color ?? row.colorOnly ?? ""), String(row.size ?? ""));
-                            const sellable = Math.max(0, Number(row.stock || 0) - heldQty);
-                            const soldOut = row.manual_soldout === true || (stockManagementEnabled && sellable <= 0);
-                            return (
-                              <div key={row.key} style={{ display: "grid", gridTemplateColumns: stockManagementEnabled ? "minmax(0, 1fr) 74px 70px" : "minmax(0, 1fr) 70px", gap: "8px", alignItems: "center", padding: "6px 0 6px " + (group.detail ? "12px" : "2px") }}>
-                                <span style={{ fontSize: "12px", color: soldOut ? "var(--color-danger-tx)" : "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                  {label || (group.detail ? "재고" : "기본")}
-                                </span>
-                                {stockManagementEnabled ? <input aria-label={`${label || "기본"} 재고 수량`} style={{ fontSize: "12px", padding: "4px 8px", border: "1px solid var(--color-line)", borderRadius: "8px", textAlign: "right", width: "100%" }} type="number" min={0} inputMode="numeric" value={row.stock} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => updateVariantStock(row.key, Math.max(0, Number(e.target.value) || 0))} /> : null}
-                                <label style={{ minHeight: "36px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", borderRadius: "8px", background: row.manual_soldout ? "var(--color-danger-bg)" : "transparent", color: row.manual_soldout ? "var(--color-danger-tx)" : "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
-                                  <input type="checkbox" aria-label={`${[group.detail, label].filter(Boolean).join(" / ") || "기본"} 품절`} checked={row.manual_soldout === true}
-                                    onChange={(e) => { const checked = e.target.checked; setVariantRows(resolvedVariantRows.map(v => v.key === row.key ? {...v, manual_soldout: checked} : v)); }}
-                                    style={{ width: "16px", height: "16px", accentColor: "var(--color-danger-tx)" }} />
-                                  품절
-                                </label>
-                                {!row.manual_soldout && stockManagementEnabled && sellable <= 0 ? <span style={{ gridColumn: "1 / -1", fontSize: "11px", color: "var(--color-danger-tx)" }}>재고 소진 · 자동 품절</span> : null}
-                                {stockManagementEnabled && heldQty > 0 ? (
-                                  <span style={{ gridColumn: "1 / -1", marginTop: "1px", fontSize: "11px", fontWeight: 700, color: "var(--color-warn-tx)", paddingLeft: group.detail ? "12px" : "2px" }}>
-                                    담김 {heldQty}개 · 지금 판매가능 <b style={{ color: sellable > 0 ? "var(--color-ok-tx)" : "var(--color-danger-tx)" }}>{sellable}개</b>
-                                  </span>
-                                ) : null}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ))}
-                    </div>
-
-                    {stockManagementEnabled ? <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--color-ink-mute)", display: "flex", justifyContent: "space-between" }}>
-                      <span>
-                        실재고 <b style={{ color: "var(--color-ink)" }}>{totalStock.toLocaleString("ko-KR")}</b>개
-                        {heldTotal > 0 ? <> · 담김 <b style={{ color: "var(--color-warn-tx)" }}>{heldTotal}</b>개 · 판매가능 <b style={{ color: "var(--color-ok-tx)" }}>{Math.max(0, totalStock - heldTotal).toLocaleString("ko-KR")}</b>개</> : null}
-                      </span>
-                      <span>{resolvedVariantRows.filter((row) => Number(row.stock || 0) <= 0).length > 0 ? `품절 ${resolvedVariantRows.filter((row) => Number(row.stock || 0) <= 0).length}개` : ""}</span>
-                    </div> : null}
-                  </div>
-                ) : (
-                  <div style={{ background: "var(--color-surface-2)", borderRadius: "8px", padding: "8px", marginTop: "8px", display: "flex", alignItems: "center", gap: "8px", border: "1px solid var(--color-line)" }}>
-                    <span style={{ fontSize: "12px", color: "var(--color-ink)", flex: 1 }}>총 재고 수량</span>
-                    <input style={{ fontSize: "12px", padding: "4px 8px", border: "1px solid var(--color-line)", borderRadius: "8px", textAlign: "right", width: "80px" }} type="number" min={0} inputMode="numeric" value={totalStockText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setTotalStockText(e.target.value)} />
-                    <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>개</span>
-                    {heldTotal > 0 ? (
-                      <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-warn-tx)", whiteSpace: "nowrap" }}>담김 {heldTotal} · 판매가능 {Math.max(0, (Number(totalStockText) || 0) - heldTotal)}</span>
-                    ) : null}
-                  </div>
-                )
-              ) : null}
+              {stockGrid}
 
               {/* 세부상품 사진 업로드용 숨은 input (그룹 헤더 사진칸이 이걸 부름) */}
               <input ref={detailPhotoInputRef} type="file" accept="image/*" onChange={handleDetailPhotoChange} style={{ display: "none" }} />
@@ -2809,6 +2818,260 @@ export default function QuickProductFastForm({
             </div>
           </div>
   );
+
+  // [2026-10-21 a2-2] 상품 등록 폼 새 배치(?preview=a2 · lib/adminUiSwitch). 렌더 배치·문구·스타일만 — state·saveProduct·payload·업로드·재고 계산 무변경.
+  //   단품(브랜드 묶음·옛 조합형·연결 세부상품 아님)일 때만. 그 밖의 상품은 아래 기존 화면 그대로.
+  //   여기서 안 그리는 칸(색상별 사진·견본색·한눈에 정보·실측표·추천 키워드·직접입력칸 제목 등)도 state 는 그대로라 저장값이 유지된다.
+  if (formV2 && !brandGroupActive && !legacyComboLoaded && details.length === 0 && !linkedBrandParent) {
+    const v2Section = "border-t border-line pt-4 mt-4 first:mt-0 first:border-t-0 first:pt-0";
+    const v2Label = "block text-[13px] font-semibold text-ink mb-1";
+    const v2Hint = "mt-1 text-[12px] text-ink-mute";
+    const v2Input = "w-full h-11 rounded-xl border border-line bg-surface px-3 text-sm text-ink outline-none focus-visible:border-ink";
+    const v2Switch = (on: boolean, onToggle: () => void, label: string, disabled = false) => (
+      <button type="button" role="switch" aria-checked={on} aria-label={label} disabled={disabled} onClick={onToggle}
+        className={`relative h-6 w-11 shrink-0 rounded-full transition ${on ? "bg-ink" : "bg-line"} ${disabled ? "opacity-50" : ""}`}>
+        <span className={`absolute top-1 h-4 w-4 rounded-full bg-surface transition-all ${on ? "left-6" : "left-1"}`} />
+      </button>
+    );
+    const v2Row = (title: string, hint: string, control: React.ReactNode) => (
+      <div className="flex items-center justify-between gap-3 py-2">
+        <div className="min-w-0">
+          <div className="text-[13px] font-semibold text-ink">{title}</div>
+          <div className="text-[12px] text-ink-mute">{hint}</div>
+        </div>
+        {control}
+      </div>
+    );
+    const colorOff = splitOptions(colorText).length > 0 && splitOptions(colorText).every((x) => x === "없음");
+    const sizeOff = splitOptions(sizeText).length > 0 && splitOptions(sizeText).every((x) => x === "없음");
+    const instant = orderNoticeMode === "instant";
+    return (
+      <div
+        className="ruru-product-sian"
+        style={{ position: "fixed", inset: 0, zIndex: 90, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", padding: "16px" }}
+      >
+        {/* 모달 틀(위치·끌기·그림자)은 기존과 같고 폭만 640 */}
+        <div style={{ width: "640px", maxWidth: "100%", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "12px", boxShadow: "0 0 0 2px var(--color-ink), 0 8px 40px rgba(0,0,0,0.35)", overflow: "hidden", transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}>
+          <div onMouseDown={onHeaderMouseDown} className="flex cursor-grab select-none items-center justify-between border-b border-line bg-surface px-4 py-3">
+            <h2 className="m-0 text-base font-bold text-ink">{isEditMode ? "상품 수정" : "상품 등록"}</h2>
+            <button type="button" aria-label="닫기" onClick={() => { void requestClose(); }} className="h-10 w-10 rounded-xl text-[20px] leading-none text-ink-mute hover:bg-surface-2">×</button>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+            <section className={v2Section}>
+              <span className={v2Label}>사진</span>
+              <ProductImageNoticeToggle />
+              <ImagePicker
+                label=""
+                value={[...coverImages, ...detailImages]}
+                maxFiles={10}
+                uploadKind="cover"
+                mode="strip"
+                onChange={(next) => { setFormTouched(true); setCoverImages(next.slice(0, 1)); setDetailImages(next.slice(1, 10)); }}
+                triggerRef={coverUploadRef}
+              />
+              <div className={v2Hint}>첫 장이 대표 · 나머지는 상세사진 · 우클릭으로 빼기</div>
+            </section>
+
+            <section className={v2Section}>
+              <label className={v2Label} htmlFor="v2-product-name">상품명 <span className="text-danger-tx">*</span></label>
+              <input
+                id="v2-product-name"
+                className={`${v2Input} ${nameError ? "border-danger-tx" : ""}`}
+                type="text"
+                placeholder="예: 스웨이드 로퍼"
+                value={productName}
+                onChange={(e) => { setFormTouched(true); setProductName(e.target.value); if (nameError) setNameError(false); }}
+              />
+              {nameError ? <div className="mt-1 text-[12px] text-danger-tx">상품명을 넣어 주세요</div> : null}
+              <div className={v2Hint}>브랜드 상품은 전체 상품 › 세부관리</div>
+            </section>
+
+            <section className={v2Section}>
+              <label className={v2Label} htmlFor="v2-product-price">판매가</label>
+              <div className="relative">
+                <input
+                  id="v2-product-price"
+                  className={`${v2Input} pr-8 text-right tabular-nums ${freeProductEnabled ? "opacity-50" : ""}`}
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="59,000"
+                  value={freeProductEnabled ? "0" : priceText}
+                  disabled={freeProductEnabled}
+                  onChange={(e) => { setFormTouched(true); setPriceText(formatNumberWithComma(e.target.value)); }}
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-ink-mute">원</span>
+              </div>
+              <div className={v2Hint}>{freeProductEnabled ? "무료나눔 — 0원 고정" : "손님이 실제로 내는 금액 · 비우면 손님이 적음"}</div>
+            </section>
+
+            <section className={v2Section}>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className={v2Label} htmlFor="v2-product-colors">색상</label>
+                  {colorOff ? (
+                    <div className={`${v2Input} flex items-center bg-surface-2 text-ink-mute`}>사용 안 함</div>
+                  ) : (
+                    <input id="v2-product-colors" className={v2Input} type="text" placeholder="화이트, 블랙, 베이지" value={colorText} onChange={(e) => setColorText(e.target.value)} />
+                  )}
+                  <label className="mt-1 flex items-center gap-2 text-[12px] text-ink-soft">
+                    <input type="checkbox" checked={colorOff} onChange={(e) => { setFormTouched(true); setColorText(e.target.checked ? "없음" : ""); }} className="h-4 w-4 accent-ink" />
+                    사용 안 함
+                  </label>
+                  <div className={v2Hint}>{colorText.trim() === "" ? "쉼표로 구분 · 비우면 손님이 적음" : "쉼표로 구분"}</div>
+                </div>
+                <div>
+                  <label className={v2Label} htmlFor="v2-product-sizes">사이즈</label>
+                  {sizeOff ? (
+                    <div className={`${v2Input} flex items-center bg-surface-2 text-ink-mute`}>사용 안 함</div>
+                  ) : (
+                    <input id="v2-product-sizes" className={v2Input} type="text" placeholder="S, M, L" value={sizeText} onChange={(e) => setSizeText(e.target.value)} />
+                  )}
+                  <label className="mt-1 flex items-center gap-2 text-[12px] text-ink-soft">
+                    <input type="checkbox" checked={sizeOff} onChange={(e) => { setFormTouched(true); setSizeText(e.target.checked ? "없음" : ""); }} className="h-4 w-4 accent-ink" />
+                    사용 안 함
+                  </label>
+                  <div className={v2Hint}>{sizeText.trim() === "" ? "쉼표로 구분 · 비우면 손님이 적음" : "쉼표로 구분"}</div>
+                </div>
+              </div>
+            </section>
+
+            <section className={v2Section}>
+              {v2Row("옵션별 수량 세기", stockManagementEnabled ? "수량이 0이 되면 품절" : "수량 안 셈 — 무제한 판매", v2Switch(stockManagementEnabled, () => setStockManagementEnabled((v) => !v), "옵션별 수량 세기"))}
+              {!stockManagementEnabled && totalStock > 0 ? <div className="text-[12px] font-semibold text-danger-tx">수량을 넣었지만 세지 않음 — 무제한 판매</div> : null}
+              {/* 격자는 기존 화면과 같은 JSX(stockGrid) — 계산·핸들러 무변경이라 스타일도 기존 그대로 둔다 */}
+              {stockGrid}
+            </section>
+
+            <section className={v2Section}>
+              <span className={v2Label}>분류</span>
+              <div className="flex flex-wrap gap-2">
+                {categoryChips.map((c) => {
+                  const on = category === c;
+                  const isCustom = !PRESET_CATEGORIES.includes(c);
+                  return (
+                    <span key={c} className={`inline-flex h-9 items-center gap-1 rounded-full border px-3 text-[13px] ${on ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink-soft"}`}>
+                      <button type="button" aria-pressed={on} onClick={() => setCategory((cur) => (cur === c ? "" : c))}>{c}</button>
+                      {isCustom ? <button type="button" aria-label={`${c} 삭제`} onClick={() => removeCustomCategory(c)} className="leading-none">×</button> : null}
+                    </span>
+                  );
+                })}
+                {!addingCategory ? (
+                  <button type="button" onClick={() => setAddingCategory(true)} className="h-9 rounded-full border border-dashed border-line bg-surface px-3 text-[13px] text-ink-mute hover:bg-surface-2">추가</button>
+                ) : null}
+              </div>
+              {addingCategory ? (
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    autoFocus
+                    aria-label="분류 이름"
+                    placeholder="분류 이름"
+                    value={newCategoryText}
+                    onChange={(e) => setNewCategoryText(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); confirmAddCategory(); } }}
+                    className={v2Input}
+                  />
+                  <button type="button" onClick={confirmAddCategory} className="h-11 shrink-0 rounded-xl bg-ink px-4 text-[13px] font-bold text-white">추가</button>
+                  <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryText(""); }} className="h-11 shrink-0 rounded-xl border border-line bg-surface px-4 text-[13px] text-ink hover:bg-surface-2">취소</button>
+                </div>
+              ) : null}
+              <label className="mt-2 flex items-center gap-2 text-[12px] text-ink-soft">
+                <input type="checkbox" checked={customerCategoryVisible} onChange={(e) => setCustomerCategoryVisible(e.target.checked)} className="h-4 w-4 accent-ink" />
+                손님 분류 버튼에 표시
+              </label>
+            </section>
+
+            <section className={v2Section}>
+              <span className={v2Label}>배송</span>
+              <div className="grid grid-cols-3 gap-1 rounded-xl bg-surface-2 p-1" role="group" aria-label="배송">
+                {([["normal", "일반"], ["vendor", "업체1"], ["vendor2", "업체2"]] as const).map(([value, label]) => (
+                  <button key={value} type="button" aria-pressed={shippingType === value} onClick={() => setShippingType(value)}
+                    className={`h-10 rounded-lg text-[13px] font-semibold ${shippingType === value ? "bg-surface text-ink" : "text-ink-mute hover:text-ink"}`}>{label}</button>
+                ))}
+              </div>
+            </section>
+
+            {realColors.length === 0 ? (
+              <section className={v2Section}>
+                {v2Row("손님이 상품번호·옵션 직접 적기", "주문서에 그대로 저장", v2Switch(customInputEnabled, () => {
+                  const next = !customInputEnabled;
+                  setFormTouched(true);
+                  setCustomInputEnabled(next);
+                  if (next && !customInputLabel.trim()) setCustomInputLabel("상품번호 · 옵션(색상·사이즈)");
+                  if (!next && colorText.trim() === "") setColorText("없음");
+                }, "손님이 상품번호·옵션 직접 적기"))}
+              </section>
+            ) : null}
+
+            <section className={v2Section}>
+              <button type="button" aria-expanded={v2MoreOpen} onClick={() => setV2MoreOpen((v) => !v)} className="flex h-11 w-full items-center justify-between rounded-xl border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2">
+                더 보기 <span aria-hidden>{v2MoreOpen ? "▴" : "▾"}</span>
+              </button>
+              {v2MoreOpen ? (
+                <div className="mt-3 space-y-4">
+                  <div>
+                    <span className={v2Label}>바로구매</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button type="button" aria-pressed={instant} onClick={() => { setFormTouched(true); setOrderNoticeMode("instant"); setBadgeTypes((prev) => prev.includes("direct") ? prev : [...prev, "direct"]); }}
+                        className={`h-10 rounded-xl border text-[13px] font-semibold ${instant ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink-soft hover:bg-surface-2"}`}>바로구매 가능</button>
+                      <button type="button" aria-pressed={!instant} onClick={() => { setFormTouched(true); setOrderNoticeMode("live_only"); setBadgeTypes((prev) => prev.filter((x) => x !== "direct")); }}
+                        className={`h-10 rounded-xl border text-[13px] font-semibold ${!instant ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink-soft hover:bg-surface-2"}`}>방송 접수 후 구매</button>
+                    </div>
+                    <div className={v2Hint}>{instant ? "방송 접수 없이 바로 주문" : "방송에서 접수한 손님만 주문"}</div>
+                  </div>
+
+                  <div>
+                    <span className={v2Label}>수동 뱃지</span>
+                    <div className="flex flex-wrap gap-4">
+                      {([["special", "특가"], ["overseas", "해외배송"]] as const).map(([value, label]) => (
+                        <label key={value} className="flex items-center gap-2 text-[13px] text-ink">
+                          <input type="checkbox" checked={badgeTypes.includes(value)} onChange={() => setBadgeTypes((prev) => (prev.includes(value) ? prev.filter((x) => x !== value) : [...prev, value]))} className="h-4 w-4 accent-ink" />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                    <div className={v2Hint}>업체배송은 배송에서 고르면 자동 표시</div>
+                  </div>
+
+                  <div>
+                    <label className={v2Label} htmlFor="v2-product-description">상세설명</label>
+                    <textarea id="v2-product-description" className="min-h-24 w-full resize-y rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus-visible:border-ink" placeholder="선택" value={description} onChange={(e) => { setFormTouched(true); setDescription(e.target.value); }} />
+                  </div>
+
+                  <div>
+                    <span className={v2Label}>할인표시</span>
+                    <DiscountDisplayEditor value={discountDisplay} actualPrice={moneyNumber(priceText)} onChange={value=>{setDiscountDisplay(prev=>({...prev,...value}));setFormTouched(true);}}/>
+                  </div>
+
+                  <div>
+                    {v2Row("1인 구매제한", purchaseLimitEnabled ? "한 사람(카톡 계정)당 개수 제한" : "제한 없음", v2Switch(purchaseLimitEnabled, () => setPurchaseLimitEnabled((v) => !v), "1인 구매제한"))}
+                    {purchaseLimitEnabled ? (
+                      <div className="flex items-center gap-2">
+                        <span className="flex-1 text-[13px] text-ink">1인당 최대</span>
+                        <input aria-label="1인당 최대 개수" className="h-10 w-24 rounded-xl border border-line bg-surface px-3 text-right text-sm tabular-nums text-ink outline-none" type="number" min={1} inputMode="numeric" value={purchaseLimitText} onFocus={(e) => { const t = e.currentTarget; requestAnimationFrame(() => t.select()); }} onChange={(e) => setPurchaseLimitText(e.target.value)} />
+                        <span className="text-[13px] text-ink-mute">개</span>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div>
+                    {v2Row("고객 노출", isVisible ? "손님 주문서에 보임" : "숨김 — 손님에게 안 보임", v2Switch(isVisible, () => setIsVisible((v) => !v), "고객 노출"))}
+                    {v2Row("무료나눔", freeProductEnabled ? "0원 — 손님에게 선물" : "끔", v2Switch(freeProductEnabled, () => setFreeProductEnabled((v) => !v), "무료나눔"))}
+                    {v2Row("세부상품명 손님 직접입력", customerDetailInputUnavailable ? "세부상품 선택형에는 못 씀" : "주문서·송장·물건챙기기에 표시", v2Switch(!customerDetailInputUnavailable && customerDetailInputEnabled, () => setCustomerDetailInputEnabled((v) => !v), "세부상품명 손님 직접입력", customerDetailInputUnavailable))}
+                  </div>
+                </div>
+              ) : null}
+            </section>
+          </div>
+
+          <div className="flex shrink-0 justify-end gap-2 border-t border-line bg-surface px-4 py-3">
+            <button type="button" onClick={() => { void requestClose(); }} disabled={saving} className="h-[52px] rounded-xl border border-line bg-surface px-6 text-sm font-semibold text-ink hover:bg-surface-2 disabled:opacity-50">취소</button>
+            <button type="button" onClick={() => void saveProduct()} disabled={saving} className="h-[52px] rounded-xl bg-ink px-8 text-sm font-bold text-white disabled:opacity-50">{saving ? "저장 중…" : "저장"}</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
