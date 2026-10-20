@@ -98,6 +98,26 @@ html[data-ruru-ui="v2"] .ruru-customer-product-card:has(.ruru-customer-press[dat
   --color-info-bg: #e8f0fa;   --color-info-tx: #185fa5;
 }
 
+/* [2026-10-21 a1-3] 관리자 새 색 — DESIGN-ADMIN.md §1·§7. data-ruru-admin-ui="v2" 아래서만 토큰 값 교체
+   (?preview=a1 · lib/adminUiSwitch.ts). 위 @theme 값은 그대로 = 스위치 끈 화면 변화 0.
+   속성은 <html> 에 붙고(portal·토스트 포함) .dark 는 안쪽 대시보드 div 라 다크 토글이 우선(1차는 라이트만). */
+[data-ruru-admin-ui="v2"] {
+  --color-canvas: #F5F5F5; --color-surface: #FFFFFF; --color-surface-2: #F5F5F5; --color-surface-3: #F5F5F5;
+  --color-ink: #111111; --color-ink-soft: #39393B; --color-ink-mute: #707072;
+  --color-line: #E5E5E5; --color-line-soft: #E5E5E5;
+  --color-rose-deep: #111111; --color-rose-soft: #F5F5F5; --color-rose-line: #E5E5E5;
+  --color-cardpay: #111111; --color-cardpay-hover: #39393B;
+  --color-coral-500: #111111; --color-coral-600: #111111; --color-coral-700: #39393B; --color-coral-400: #707072;
+  --color-coral-50: #F5F5F5; --color-coral-100: #F5F5F5; --color-coral-200: #E5E5E5; --color-coral-300: #CACACB;
+  --color-ok-bg: #E6F4EC; --color-ok-tx: #007D48;
+  --color-warn-bg: #FFF4E0; --color-warn-tx: #9E5A00;
+  --color-danger-bg: #FBEAE7; --color-danger-tx: #D30005;
+  --color-info-bg: #E8F0FA; --color-info-tx: #1151FF;
+}
+[data-ruru-admin-ui="v2"] * { font-variant-numeric: tabular-nums; }
+[data-ruru-admin-ui="v2"] :focus { outline: none; }
+[data-ruru-admin-ui="v2"] :focus-visible { outline: 2px solid #111111; outline-offset: 2px; }
+
 .dark {
   /* 따뜻한 뉴트럴 그레이(푸른 기 없음, 부드러운 대비) — Claude 앱 톤 */
   --color-canvas: #161512;

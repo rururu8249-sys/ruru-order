@@ -72,6 +72,7 @@ import AdminLiveCardPayPopup from "./AdminLiveCardPayPopup";
 import AdminLiveEventRoulettePanel from "./AdminLiveEventRoulettePanel";
 import type { EventWinnerCustomerRef } from "@/lib/eventCustomGift";
 import ChatOrderQueuePopup from "./ChatOrderQueuePopup";
+import { ADMIN_PREVIEW_DEFAULTS, readAdminUiPreview } from "@/lib/adminUiSwitch";
 import ChatOrderReaderLoop from "./ChatOrderReaderLoop";
 import {
   alwaysOrderFilterValue,
@@ -600,6 +601,14 @@ export default function AdminLiveDashboard() {
       return next;
     });
   };
+  // [2026-10-21 a1-3] 관리자 새 색 미리보기 — ?preview=a1 켬 / ?preview=off 끔(그 브라우저만). 색 토큰만 바뀜(app/globals.css)
+  const [previewA1, setPreviewA1] = useState<boolean>(ADMIN_PREVIEW_DEFAULTS.a1);
+  useEffect(() => { setPreviewA1(readAdminUiPreview("a1")); }, []);
+  // <html> 에 단다 — 바깥에 붙는 창(portal)·토스트도 같은 색을 받게. 관리자 화면을 떠나면 뗀다.
+  useEffect(() => {
+    document.documentElement.setAttribute("data-ruru-admin-ui", previewA1 ? "v2" : "v1");
+    return () => document.documentElement.removeAttribute("data-ruru-admin-ui");
+  }, [previewA1]);
   // 모바일 사이드바(드로어) 열림 상태 — 데스크탑(md+)에선 항상 보이므로 무관.
   const [navOpen, setNavOpen] = useState(false);
   const [integrityOpen, setIntegrityOpen] = useState(false);
