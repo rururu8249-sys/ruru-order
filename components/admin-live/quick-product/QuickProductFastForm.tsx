@@ -2943,7 +2943,7 @@ export default function QuickProductFastForm({
             </section>
 
             <section className={v2Section}>
-              {v2Row("옵션별 수량 세기", stockManagementEnabled ? "수량이 0이 되면 품절" : "수량 안 셈 — 무제한 판매", v2Switch(stockManagementEnabled, () => setStockManagementEnabled((v) => !v), "옵션별 수량 세기"))}
+              {v2Row("옵션별 재고 관리", stockManagementEnabled ? "재고가 0이 되면 품절" : "재고 안 셈 — 무제한 판매", v2Switch(stockManagementEnabled, () => setStockManagementEnabled((v) => !v), "옵션별 재고 관리"))}
               {!stockManagementEnabled && totalStock > 0 ? <div className="text-[12px] font-semibold text-danger-tx">수량을 넣었지만 세지 않음 — 무제한 판매</div> : null}
               {/* 격자는 기존 화면과 같은 JSX(stockGrid) — 계산·핸들러 무변경이라 스타일도 기존 그대로 둔다 */}
               {stockGrid}
@@ -2997,9 +2997,20 @@ export default function QuickProductFastForm({
               </div>
             </section>
 
+            {/* [2026-10-21 a2-5] 브랜드 묶음(예: 나이키 아래 세부상품 여러 개) 진입로 — a2-2 새 배치에서 빠져 있던 것.
+                누르면 details 가 생겨 이 폼은 기존 묶음 화면으로 넘어간다(기존 openBrandDetailEditorForNew 그대로). */}
+            <section className={v2Section}>
+              {v2Row("세부상품 여러 개로 묶기", "브랜드 하나 아래 상품 여러 개 · 상품별 가격·사진", (
+                <button type="button" onClick={openBrandDetailEditorForNew}
+                  className="h-9 shrink-0 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2">
+                  + 세부상품 추가
+                </button>
+              ))}
+            </section>
+
             {realColors.length === 0 ? (
               <section className={v2Section}>
-                {v2Row("손님이 상품번호·옵션 직접 적기", "주문서에 그대로 저장", v2Switch(customInputEnabled, () => {
+                {v2Row("손님이 상품번호·옵션 직접 적기", "색상 칸 대신 글로 적음 · 주문서 옵션 칸에 저장", v2Switch(customInputEnabled, () => {
                   const next = !customInputEnabled;
                   setFormTouched(true);
                   setCustomInputEnabled(next);
@@ -3029,14 +3040,14 @@ export default function QuickProductFastForm({
                   <div>
                     <span className={v2Label}>수동 뱃지</span>
                     <div className="flex flex-wrap gap-4">
-                      {([["special", "특가"], ["overseas", "해외배송"]] as const).map(([value, label]) => (
+                      {([["special", "특가"], ["limit", "마감임박"], ["pick", "루루픽"], ["overseas", "해외배송"]] as const).map(([value, label]) => (
                         <label key={value} className="flex items-center gap-2 text-[13px] text-ink">
                           <input type="checkbox" checked={badgeTypes.includes(value)} onChange={() => setBadgeTypes((prev) => (prev.includes(value) ? prev.filter((x) => x !== value) : [...prev, value]))} className="h-4 w-4 accent-ink" />
                           {label}
                         </label>
                       ))}
                     </div>
-                    <div className={v2Hint}>업체배송은 배송에서 고르면 자동 표시</div>
+                    <div className={v2Hint}>신상·급상승·베스트·인기는 자동 · 업체배송은 배송에서 고르면 자동</div>
                   </div>
 
                   <div>
@@ -3063,7 +3074,7 @@ export default function QuickProductFastForm({
                   <div>
                     {v2Row("고객 노출", isVisible ? "손님 주문서에 보임" : "숨김 — 손님에게 안 보임", v2Switch(isVisible, () => setIsVisible((v) => !v), "고객 노출"))}
                     {v2Row("무료나눔", freeProductEnabled ? "0원 — 손님에게 선물" : "끔", v2Switch(freeProductEnabled, () => setFreeProductEnabled((v) => !v), "무료나눔"))}
-                    {v2Row("세부상품명 손님 직접입력", customerDetailInputUnavailable ? "세부상품 선택형에는 못 씀" : "주문서·송장·물건챙기기에 표시", v2Switch(!customerDetailInputUnavailable && customerDetailInputEnabled, () => setCustomerDetailInputEnabled((v) => !v), "세부상품명 손님 직접입력", customerDetailInputUnavailable))}
+                    {v2Row("세부상품명 손님 직접입력", customerDetailInputUnavailable ? "세부상품 선택형에는 못 씀" : "손님이 적은 글이 상품명이 됨 · 송장·물건챙기기에 그 이름", v2Switch(!customerDetailInputUnavailable && customerDetailInputEnabled, () => setCustomerDetailInputEnabled((v) => !v), "세부상품명 손님 직접입력", customerDetailInputUnavailable))}
                   </div>
                 </div>
               ) : null}
