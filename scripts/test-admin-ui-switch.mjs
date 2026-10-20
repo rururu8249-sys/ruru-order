@@ -21,7 +21,7 @@ window.location.search = '?preview=off'; assert.equal(readAdminUiPreview('a1'), 
 window.localStorage = { getItem() { throw new Error('blocked'); }, setItem() {} };
 assert.equal(readAdminUiPreview('a1'), true, 'storage blocked → default (on)');
 // [2026-10-21 a2-2] 상품 등록 폼 새 배치 — 기본 꺼짐, ?preview=a2 켬(a1 은 안 건드림)
-assert.equal(ADMIN_PREVIEW_DEFAULTS.a2, false, 'a2 is preview-only until the owner switches the default');
+assert.equal(ADMIN_PREVIEW_DEFAULTS.a2, true, 'a2 is the default since 2026-10-21 a2-2b (?preview=off turns it off per browser)');
 assert.equal(adminPreviewStorageKey('a2'), 'ruru_admin_preview_a2');
 assert.deepEqual(resolveAdminUiPreview('a2', null, 'a2', false), { store: '1', on: true });
 assert.deepEqual(resolveAdminUiPreview('a2', '1', 'a1', true), { store: null, on: true }, '?preview=a2 leaves a1 as it was');

@@ -89,6 +89,8 @@ type ImagePickerProps = {
   mode: "cover" | "detail" | "strip";
   onChange: (nextValue: string[]) => void;
   triggerRef?: { current: (() => void) | null };
+  /** [2026-10-21 a2-2b] 새 배치(v2) 전용 — 머리줄(제목·N/10)·아래 안내 글 생략(폼 섹션이 대신 보여줌) */
+  compact?: boolean;
 };
 
 const COLOR_PRESETS = ["없음", "블랙", "화이트", "베이지", "그린", "네이비", "그레이"];
@@ -492,6 +494,7 @@ function ImagePicker({
   mode,
   onChange,
   triggerRef,
+  compact = false,
 }: ImagePickerProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -642,10 +645,12 @@ function ImagePicker({
   if (mode === "strip") {
     return (
       <div className="min-w-0">
-        <div className="mb-1 flex items-center justify-between">
-          <span className="text-[11px] font-black text-ink">{label || "사진"}</span>
-          <span className="text-[11px] font-black text-ink-mute">{value.length}/{maxFiles}</span>
-        </div>
+        {compact ? null : (
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-[11px] font-black text-ink">{label || "사진"}</span>
+            <span className="text-[11px] font-black text-ink-mute">{value.length}/{maxFiles}</span>
+          </div>
+        )}
         <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileChange} />
         <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
           {value.map((image, index) => (
@@ -668,10 +673,10 @@ function ImagePicker({
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "6px", flexWrap: "wrap" }}>
           <label style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "12px", fontWeight: 700, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}>
-            📷 촬영하기
+            촬영하기
             <input type="file" accept="image/*" capture="environment" hidden onChange={handleFileChange} />
           </label>
-          <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>첫 장이 대표 사진 · 다른 사진의 ☆을 누르면 대표가 바뀝니다</span>
+          {compact ? null : <span style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>첫 장이 대표 사진 · 다른 사진의 ☆을 누르면 대표가 바뀝니다</span>}
         </div>
       </div>
     );
@@ -2867,10 +2872,11 @@ export default function QuickProductFastForm({
                 maxFiles={10}
                 uploadKind="cover"
                 mode="strip"
+                compact
                 onChange={(next) => { setFormTouched(true); setCoverImages(next.slice(0, 1)); setDetailImages(next.slice(1, 10)); }}
                 triggerRef={coverUploadRef}
               />
-              <div className={v2Hint}>첫 장이 대표 · 나머지는 상세사진 · 우클릭으로 빼기</div>
+              <div className={v2Hint}>첫 장이 대표 · ☆ 누르면 대표 바꿈 · 최대 10장</div>
             </section>
 
             <section className={v2Section}>
