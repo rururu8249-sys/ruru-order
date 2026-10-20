@@ -53,8 +53,8 @@ export default function BankAccountRoutingSettings({ accounts, routing, onChange
 
   return (
     <div className="grid gap-4">
-      <div className="rounded-2xl border border-line bg-danger-bg px-4 py-3 text-xs font-bold leading-5 text-danger-tx">
-        뱅크다 자동입금확인은 뱅크다에 별도로 등록한 계좌로 돌아갑니다. 손님에게 노출할 모든 계좌가 뱅크다에도 등록되어 있는지 꼭 확인해 주세요.
+      <div className="rounded-2xl border border-line bg-warn-bg px-4 py-3 text-xs font-bold leading-5 text-warn-tx">
+        뱅크다에 등록된 계좌만 자동 입금확인 됩니다
       </div>
 
       <div className="grid gap-3">

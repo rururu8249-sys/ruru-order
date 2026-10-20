@@ -5,20 +5,10 @@
 
 export default function AdminAuthSettingsPanel() {
   return (
-    <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
-      <h3 className="text-base font-black text-ink">관리자 로그인</h3>
-      <p className="mt-2 text-sm font-bold leading-6 text-ink-soft">
-        관리자 아이디와 비밀번호는 이 화면에서 바꾸지 않습니다. 서버 설정에서만 바뀝니다.
-      </p>
-
-      <div className="mt-4 rounded-2xl border border-line bg-surface-2 p-4 text-sm font-bold leading-7 text-ink-soft">
-        아이디나 비밀번호를 바꾸고 싶으면 <b className="text-ink">개발자에게 요청</b>하세요.
-        바뀐 뒤에는 새 아이디·비밀번호로 다시 로그인하면 됩니다.
-      </div>
-
-      <div className="mt-3 text-xs font-bold text-ink-mute">
-        개발자용 절차는 저장소의 <span className="font-black">docs/인수인계_관리자설정.md</span> 에 있습니다.
-      </div>
+    <section className="rounded-2xl border border-line bg-surface p-5">
+      <h3 className="text-base font-bold text-ink">관리자 로그인</h3>
+      <p className="mt-2 text-sm font-bold leading-6 text-ink-soft">아이디·비밀번호는 개발자에게 요청해 서버에서 바꿉니다.</p>
+      <div className="mt-2 text-xs font-bold text-ink-mute">개발자용: docs/인수인계_관리자설정.md</div>
     </section>
   );
 }

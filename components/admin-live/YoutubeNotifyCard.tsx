@@ -45,7 +45,7 @@ export default function YoutubeNotifyCard({onDraftStateChange}:SettingsDraftProp
       const params = new URLSearchParams(window.location.search);
       const yt = params.get("yt");
       const msg = params.get("msg") || "";
-      if (yt === "connected") showAdminToast("유튜브 연결 완료 ✅", "success");
+      if (yt === "connected") showAdminToast("유튜브 연결 완료", "success");
       else if (yt === "error") showAdminToast("유튜브 연결 실패\n\n" + msg, "error");
       if (yt) {
         params.delete("yt");
@@ -99,7 +99,7 @@ export default function YoutubeNotifyCard({onDraftStateChange}:SettingsDraftProp
         body: JSON.stringify({ action: "test", message: preview }),
       });
       const json = await res.json();
-      if (json?.ok) showAdminToast("테스트 메시지를 라이브 채팅에 올렸습니다 ✅", "success");
+      if (json?.ok) showAdminToast("테스트 메시지를 라이브 채팅에 올렸습니다", "success");
       else showAdminToast("테스트 발송 실패\n\n" + (json?.reason || json?.error || "알 수 없는 오류"), "error");
     } finally {
       setTesting(false);

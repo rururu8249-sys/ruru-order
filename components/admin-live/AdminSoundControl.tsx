@@ -51,7 +51,7 @@ export default function AdminSoundControl() {
       {/* 켜기/끄기 */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface-2 px-4 py-3">
         <div className="min-w-0">
-          <div className="text-sm font-black text-ink">{soundOn ? "🔊" : "🔇"} 알림음 {soundOn ? "켜짐" : "꺼짐"}</div>
+          <div className="text-sm font-black text-ink">알림음 {soundOn ? "켜짐" : "꺼짐"}</div>
           <div className="mt-0.5 text-xs font-bold text-ink-mute">
             {soundOn ? "새 주문·입금 소리 알림" : "소리 없이 화면으로만 표시됩니다."}
           </div>
@@ -110,14 +110,14 @@ export default function AdminSoundControl() {
             onClick={() => playOrderAlert()}
             className="h-10 min-w-[132px] flex-1 rounded-xl border-[1.5px] border-rose-deep bg-surface px-4 text-sm font-black text-rose-deep transition hover:bg-rose-soft"
           >
-            🛒 주문 알림 듣기
+            주문 알림 듣기
           </button>
           <button
             type="button"
             onClick={() => playDepositAlert()}
             className="h-10 min-w-[132px] flex-1 rounded-xl border-[1.5px] border-ok-tx bg-surface px-4 text-sm font-black text-ok-tx transition hover:bg-ok-bg"
           >
-            💰 입금 알림 듣기
+            입금 알림 듣기
           </button>
         </div>
         <p className="mt-2 text-xs font-bold text-ink-mute">

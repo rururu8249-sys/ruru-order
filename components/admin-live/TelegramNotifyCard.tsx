@@ -88,7 +88,7 @@ export default function TelegramNotifyCard({onDraftStateChange}:SettingsDraftPro
       });
       const j = await r.json();
       if (j.ok) {
-        showAdminToast(`연결됐어요${j.name ? ` — ${j.name}` : ""} (번호 ${j.chatId}). 이제 🔔 테스트 보내기를 눌러보세요.`, "success");
+        showAdminToast(`연결됐어요${j.name ? ` — ${j.name}` : ""} (번호 ${j.chatId}). 이제 테스트 보내기를 눌러보세요.`, "success");
         loadStatus();
       } else {
         showAdminToast(`아직 못 찾았어요 — ② 봇에게 말을 한 번 보냈는지 확인한 뒤 다시 눌러주세요.\n\n(${j.reason || j.error || "응답 없음"})`, "error");
@@ -140,7 +140,7 @@ export default function TelegramNotifyCard({onDraftStateChange}:SettingsDraftPro
   return (
     <div className="space-y-4">
       <div>
-        <div className="text-base font-black text-ink">📨 텔레그램 알림</div>
+        <div className="text-base font-black text-ink">텔레그램 알림</div>
         <div className="mt-1 text-xs font-bold leading-5 text-ink-soft">
           알림과 방송 결산을 폰으로 받기
         </div>
@@ -183,10 +183,10 @@ export default function TelegramNotifyCard({onDraftStateChange}:SettingsDraftPro
         <div className="text-xs font-black text-ink">③ 연결 찾기</div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <button type="button" onClick={detectChat} disabled={detecting} className="h-10 rounded-xl bg-rose-deep px-4 text-sm font-black text-white disabled:opacity-50">
-            {detecting ? "찾는 중…" : "🔍 연결 찾기"}
+            {detecting ? "찾는 중…" : "연결 찾기"}
           </button>
           <button type="button" onClick={sendTest} disabled={testing} className="h-10 rounded-xl border border-line bg-surface px-4 text-sm font-black text-ink-soft transition hover:bg-surface-3 disabled:opacity-50">
-            {testing ? "보내는 중…" : "🔔 테스트 보내기"}
+            {testing ? "보내는 중…" : "테스트 보내기"}
           </button>
         </div>
         <details className="mt-2">
@@ -227,7 +227,7 @@ export default function TelegramNotifyCard({onDraftStateChange}:SettingsDraftPro
 
       <div className="flex items-center gap-2">
         <button type="button" onClick={sendReport} disabled={reporting} className="h-10 rounded-xl bg-ok-tx px-4 text-sm font-black text-white disabled:opacity-50">
-          {reporting ? "보내는 중…" : "📊 지금 결산 보내기"}
+          {reporting ? "보내는 중…" : "지금 결산 보내기"}
         </button>
         <span className="text-[11px] font-bold text-ink-mute">오늘 매출·미입금 요약을 폰으로</span>
       </div>

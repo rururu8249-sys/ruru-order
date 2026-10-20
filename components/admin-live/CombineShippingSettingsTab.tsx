@@ -144,7 +144,7 @@ export default function CombineShippingSettingsTab({onDraftStateChange}:Settings
   };
 
   const markSaved=useSettingsDraft({value:{enabled,startLocal,endLocal},loading,saving,save,onDraftStateChange});
-  const statusLabel = enabled ? "🟢 켜짐" : "⚪ 꺼짐";
+  const statusLabel = enabled ? "켜짐" : "꺼짐";
   const statusClass = enabled ? "bg-ok-bg text-ok-tx" : "bg-surface-2 text-ink-mute";
 
   if (loading) {

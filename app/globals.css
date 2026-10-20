@@ -120,6 +120,8 @@ html[data-ruru-ui="v2"] .ruru-customer-product-card:has(.ruru-customer-press[dat
 /* [2026-10-21 a1-4] DESIGN-ADMIN §2 굵기 최대 700 · §3 그림자 없음(떠 있는 창용 shadow-lg/xl/2xl 은 유지) */
 [data-ruru-admin-ui="v2"] .font-black { font-weight: 700; }
 [data-ruru-admin-ui="v2"] .shadow-sm, [data-ruru-admin-ui="v2"] .shadow-md { box-shadow: none; }
+/* [2026-10-21 a1-5] DESIGN-ADMIN §3 판 모서리 12px */
+[data-ruru-admin-ui="v2"] .rounded-2xl, [data-ruru-admin-ui="v2"] .rounded-3xl { border-radius: 12px; }
 
 .dark {
   /* 따뜻한 뉴트럴 그레이(푸른 기 없음, 부드러운 대비) — Claude 앱 톤 */

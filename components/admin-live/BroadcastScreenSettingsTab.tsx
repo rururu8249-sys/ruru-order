@@ -42,7 +42,7 @@ function WidgetCard({
 }) {
   return (
     <div className={cardClass}>
-      <div className="text-base font-black text-ink">{icon} {title}</div>
+      <div className="text-base font-black text-ink">{icon ? `${icon} ` : ""}{title}</div>
       <div className="mt-1 text-[13px] font-bold leading-6 text-ink-soft">{what}</div>
 
       <div className="mt-4 flex items-center gap-2">
@@ -87,7 +87,7 @@ export default function BroadcastScreenSettingsTab({ onOpenEvent }: Props) {
   return (
     <div className="space-y-4">
       <div className={cardClass}>
-        <h2 className="text-base font-black text-ink">📺 방송 화면에 띄우는 위젯</h2>
+        <h2 className="text-base font-black text-ink">방송 화면에 띄우는 위젯</h2>
         <p className="mt-1 text-[13px] font-bold leading-6 text-ink-soft">
           위젯은 <b className="text-ink">2개</b>이고 각각 주소가 하나씩 있습니다. 프리즘에서 <b className="text-ink">소스 추가 › 브라우저 소스</b>를 누르고
           주소를 붙여넣은 뒤, 폭·높이를 아래 숫자로 적으면 끝입니다. 배경은 저절로 투명하게 나오고, 위치는 프리즘 화면에서 끌어서 정합니다.
@@ -96,7 +96,7 @@ export default function BroadcastScreenSettingsTab({ onOpenEvent }: Props) {
       </div>
 
       <WidgetCard
-        icon="🛍"
+        icon=""
         title="상품 카드"
         what="방송 중 상품 카드. 켜고 끄기는 방송 콘솔"
         url={productUrl}
@@ -107,7 +107,7 @@ export default function BroadcastScreenSettingsTab({ onOpenEvent }: Props) {
       />
 
       <WidgetCard
-        icon="💬"
+        icon=""
         title="주문·입금 알림"
         what="주문·입금 알림이 뜨는 띠"
         url={feedUrl}

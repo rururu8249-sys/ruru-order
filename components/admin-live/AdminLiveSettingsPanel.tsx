@@ -193,7 +193,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>("shop");
-  const [focusSection,setFocusSection]=useState<"bank"|"payster">();
+  const [focusSection,setFocusSection]=useState<"bank"|"payster"|undefined>("bank");   // [2026-10-21 a1-5] 설정 첫 화면 = 입금계좌
   const [childDraft,setChildDraft]=useState<SettingsDraftState|null>(null);
   const [globalDraftState,setGlobalDraftState]=useState<SettingsDraftState|null>(null);
   const [choiceOpen,setChoiceOpen]=useState(false);
@@ -386,7 +386,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
           {activeTab === "payment" && (
             <>
               <div className="rounded-2xl border border-line bg-warn-bg px-4 py-3 text-xs font-bold leading-5 text-warn-tx">
-                결제·배송 설정은 주문금액 계산에 직접 영향을 줍니다. 저장 이후 새 주문부터 적용됩니다(기존 주문 재계산 없음).
+                저장 후 새 주문부터 적용(기존 주문 재계산 없음)
               </div>
 
               <div className={cardClass}>
@@ -483,7 +483,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
               {/* [2026-07-13 사장님 지침] 장바구니 선점 유지시간 — 담는 순간 다른 고객 화면 남은 수량에서
                   빠져 보이는 시간. 지나면 자동 해제(표시용 예약만 — 진짜 재고/주문/차감 로직 무관). */}
               <div className="mb-3 rounded-xl border border-line bg-surface-2 p-4">
-                <div className="text-sm font-black text-ink">🛒 장바구니 선점 유지시간</div>
+                <div className="text-sm font-black text-ink">장바구니 선점 유지시간</div>
                 <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
                   고객이 장바구니에 담으면 이 시간 동안 다른 고객에게 남은 수량에서 빠져 보입니다. 시간이 지나면 자동
                   해제됩니다. 실제 재고 차감은 기존대로 주문서 제출 때만 일어납니다. (최소 10분 ~ 최대 30일)
@@ -512,7 +512,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
               <div className="mb-3 rounded-xl border border-line bg-surface-2 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-sm font-black text-ink">📌 주문 방법 팝업</div>
+                    <div className="text-sm font-black text-ink">주문 방법 팝업</div>
                     <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
                       손님이 주문서에 접속하면 바로 뜹니다. 끄면 아예 안 뜹니다.
                     </div>
@@ -624,7 +624,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
                       value={productNoticeCustom}
                       onChange={(e) => setProductNoticeCustom(e.target.value.slice(0, PRODUCT_NOTICE_MAX_LEN))}
                       rows={2}
-                      placeholder="예) 📺 방송 중에만 주문받는 상품이에요"
+                      placeholder="예) 방송 중에만 주문받는 상품이에요"
                       className="mt-2 w-full resize-none rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm font-bold text-ink outline-none transition focus:border-rose-deep"
                     />
                     <div className="mt-1 text-[11px] font-bold text-ink-mute">{productNoticeCustom.trim().length} / {PRODUCT_NOTICE_MAX_LEN}자</div>
@@ -639,9 +639,9 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
                     {(() => {
                       const { head, sub } = splitProductOrderNotice(resolveProductOrderNotice(productNoticeMode, productNoticeCustom));
                       return (
-                        <div className="rounded-xl px-3 py-2.5" style={{ background: "#FDF1E7", border: "1px solid #F3D9C2", wordBreak: "keep-all" }}>
-                          <div className="text-sm font-bold leading-6" style={{ color: "#8A4B1A" }}>{head}</div>
-                          {sub ? <div className="text-xs font-bold leading-5" style={{ color: "#A5713F" }}>{sub}</div> : null}
+                        <div className="rounded-xl border border-warn-tx/30 bg-warn-bg px-3 py-2.5" style={{ wordBreak: "keep-all" }}>
+                          <div className="text-sm font-bold leading-6 text-warn-tx">{head}</div>
+                          {sub ? <div className="text-xs font-bold leading-5 text-warn-tx">{sub}</div> : null}
                         </div>
                       );
                     })()}
