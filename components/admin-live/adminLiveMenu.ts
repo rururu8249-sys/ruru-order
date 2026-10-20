@@ -35,11 +35,13 @@ export const ADMIN_LIVE_TOP_MENUS: AdminLiveTopMenuItem[] = [
   { key: "broadcast", label: "방송", desc: "시작·종료 · 기록", defaultKey: "broadcast" },
   { key: "orders", label: "주문·입금", desc: "실시간 주문 · 입금내역 · 정산 · 판매분석 · 이벤트", defaultKey: "orders" },
   { key: "products", label: "상품", desc: "방송 상품 · 쇼핑몰 · 등록", defaultKey: "products" },
-  { key: "customers", label: "고객", desc: "회원 · 이슈 · 쪽지·공지사항 · 접속 기록", defaultKey: "customers" },
+  { key: "customers", label: "고객", desc: "회원 · 고객이슈 · 쪽지·공지사항 · 단골 · 접속 기록 · 계정 잇기", defaultKey: "customers" },
   { key: "settings", label: "설정", desc: "돈·결제 · 손님 화면 · 방송·알림 · 상점", defaultKey: "settings" },
 ];
 
-export type AdminLiveSubTab = { key: AdminLiveMenuKey; label: string };
+export type AdminLiveCustomersTab = "members" | "issues" | "loyalty" | "link";
+/** custTab 이 있으면 같은 화면(customers) 안의 탭 — [2026-10-21 a3-2] 고객 메뉴 2층 탭을 1층으로 편 것 */
+export type AdminLiveSubTab = { key: AdminLiveMenuKey; label: string; custTab?: AdminLiveCustomersTab };
 
 /** 큰 메뉴 안의 작은 탭(화면 상단 가로 탭). 1개뿐이면 탭 줄을 안 그린다 */
 export const ADMIN_LIVE_SUB_TABS: Record<AdminLiveTopMenuKey, AdminLiveSubTab[]> = {
@@ -56,10 +58,14 @@ export const ADMIN_LIVE_SUB_TABS: Record<AdminLiveTopMenuKey, AdminLiveSubTab[]>
     { key: "event", label: "이벤트" },
   ],
   products: [{ key: "products", label: "상품" }],
+  // [2026-10-21 a3-2] 2층(회원·이슈·단골 안의 탭) → 1층 6탭. 화면 키는 그대로(customers 안 탭은 custTab 으로 구분)
   customers: [
-    { key: "customers", label: "회원·이슈·단골" },
+    { key: "customers", label: "회원", custTab: "members" },
+    { key: "customers", label: "고객이슈", custTab: "issues" },
     { key: "notice", label: "쪽지·공지사항" },
+    { key: "customers", label: "단골", custTab: "loyalty" },
     { key: "visits", label: "접속 기록" },
+    { key: "customers", label: "계정 잇기", custTab: "link" },
   ],
   // audit(시스템 점검): 2026-10-21 메뉴에서 뺌. ?panel=audit 로 들어오면 설정으로 폴백
   settings: [{ key: "settings", label: "설정" }],

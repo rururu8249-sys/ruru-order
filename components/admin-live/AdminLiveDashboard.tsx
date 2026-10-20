@@ -563,7 +563,9 @@ export default function AdminLiveDashboard() {
       setDrawer(destination.drawer);
     })();
   };
-  const [customersInitialTab, setCustomersInitialTab] = useState<"members" | "issues">("members");
+  const [customersInitialTab, setCustomersInitialTab] = useState<"members" | "issues" | "loyalty" | "link">("members");
+  // [2026-10-21 a3-2] 계정 잇기 대기 수 — 상단 탭 배지용(패널이 알려줌)
+  const [customersLinkPendingCount, setCustomersLinkPendingCount] = useState(0);
   // [2026-09-25] 고객·이슈 패널의 «현재» 탭 — 「고객이슈」 탭이면 위쪽 미해결 알림 띠를 숨긴다(중복 표시 방지).
   const [customersActiveTab, setCustomersActiveTab] = useState<"members" | "issues" | "loyalty" | "link" | "refund">("members");
   // [2026-09-21] 「바로 처리 →」 를 누른 «시각». 탭 이름만 넘기면 두 번째 클릭부터 안 먹는다
@@ -1645,26 +1647,38 @@ export default function AdminLiveDashboard() {
                     <>
                     <select
                       aria-label={`${activeTopMenu.label} 화면 선택`}
-                      value={drawer.kind==='deposits'?'payments':activeMenu==='reports'?'sales':activeMenu}
-                      onChange={event=>setActiveMenu(event.target.value as typeof activeMenu)}
+                      value={drawer.kind==='deposits'?'payments':activeMenu==='reports'?'sales':activeMenu==='customers'?`customers:${customersActiveTab}`:activeMenu}
+                      onChange={event=>{
+                        const v = event.target.value;
+                        if (v.startsWith("customers:")) { setCustomersInitialTab(v.slice(10) as "members" | "issues" | "loyalty" | "link"); setCustomersOpenTabAt(Date.now()); setActiveMenu("customers"); return; }
+                        setActiveMenu(v as typeof activeMenu);
+                      }}
                       className="mb-2 min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-base font-bold md:hidden"
                     >
-                      {activeSubTabs.map(tab=><option key={tab.key} value={tab.key}>{tab.label}</option>)}
+                      {activeSubTabs.map(tab=>{ const v = tab.custTab ? `customers:${tab.custTab}` : tab.key; return <option key={v} value={v}>{tab.label}</option>; })}
                     </select>
                     <div className="hidden min-w-0 items-center gap-1 overflow-x-auto md:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                       {activeSubTabs.map((tab) => {
-                        const active = drawer.kind === "deposits" ? tab.key === "payments" : tab.key === (activeMenu==='reports'?'sales':activeMenu);
+                        const active = drawer.kind === "deposits" ? tab.key === "payments"
+                          : tab.custTab ? (activeMenu === "customers" && customersActiveTab === tab.custTab)
+                          : tab.key === (activeMenu==='reports'?'sales':activeMenu);
+                        // [2026-10-21 a3-2] 고객 탭 배지(미해결 이슈·계정 잇기 대기) — 패널 안 탭바가 숨겨져 여기서 보여준다
+                        const badge = tab.custTab === "issues" ? openIssueCount : tab.custTab === "link" ? customersLinkPendingCount : 0;
                         return (
                           <button
-                            key={tab.key}
+                            key={tab.custTab ? `customers:${tab.custTab}` : tab.key}
                             type="button"
-                            onClick={() => { setActiveMenu(tab.key); }}
+                            onClick={() => {
+                              if (tab.custTab) { setCustomersInitialTab(tab.custTab); setCustomersOpenTabAt(Date.now()); }
+                              setActiveMenu(tab.key);
+                            }}
                             className={[
                               "-mb-px shrink-0 whitespace-nowrap border-b-2 px-3.5 py-2 text-[14px] font-bold transition",
                               active ? "border-ink text-ink" : "border-transparent text-ink-mute hover:text-ink",
                             ].join(" ")}
                           >
                             {tab.label}
+                            {badge > 0 ? <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[12px] font-semibold ${active ? "bg-ink text-white" : "bg-warn-bg text-warn-tx"}`}>{badge}</span> : null}
                           </button>
                         );
                       })}
@@ -1858,6 +1872,8 @@ export default function AdminLiveDashboard() {
                       openCustomerAt={eventCustomerOpenAt}
                       openIssueCount={openIssueCount}
                       onTabChange={setCustomersActiveTab}
+                      hideTabBar
+                      onLinkPendingCountChange={setCustomersLinkPendingCount}
                       onClose={() => setCustomersInitialTab("members")}
                     />
                   </div>

@@ -32,7 +32,7 @@ type Props = {
   orders: LiveOrder[];
   onClose?: () => void;
   // [2026-09-08] loyalty(단골 리포트)도 바깥에서 바로 열 수 있게(예전엔 타입에 빠져 있었음)
-  initialTab?: "members" | "issues" | "loyalty";
+  initialTab?: "members" | "issues" | "loyalty" | "link";
   /** [2026-09-21] «탭을 열어달라»는 요청 시각(Date.now()).
    *   initialTab 만으로는 못 연다 — useState 는 «처음 한 번»만 초깃값을 읽기 때문에
    *   이미 떠 있는 화면에서 prop 이 바뀌어도 탭이 안 바뀌었다(사장님: 「전체 보기 눌러도 반응 없음」).
@@ -49,6 +49,10 @@ type Props = {
   embedded?: boolean;
   /** [2026-09-25] 현재 탭을 바깥에 알린다 — 「고객이슈」 탭에선 위쪽 미해결 알림 띠를 숨기려고. */
   onTabChange?: (tab: "members" | "issues" | "loyalty" | "link" | "refund") => void;
+  /** [2026-10-21 a3-2] 바깥(상단 탭 줄)이 탭을 그리면 패널 안 탭바는 숨긴다 */
+  hideTabBar?: boolean;
+  /** [2026-10-21 a3-2] 계정 잇기 대기 건수를 바깥 탭 배지에 알린다 */
+  onLinkPendingCountChange?: (n: number) => void;
 };
 
 type LooseLiveOrder = LiveOrder & Record<string, any>;
@@ -1128,7 +1132,7 @@ function CustomerDetailDrawer({
 //   방송 중에 타이핑할 시간이 없다. 눌러서 넣고 필요하면 고쳐 쓴다.
 //   ⚠️ 문구만이다. 누르는 순간 나가지 않는다 — 입력창에 채워질 뿐이고 [보내기]를 눌러야 발송된다.
 
-export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = "members", openTabAt = 0, openCustomerRef = null, openCustomerAt = 0, openIssueCount = 0, embedded = false, onTabChange }: Props) {
+export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = "members", openTabAt = 0, openCustomerRef = null, openCustomerAt = 0, openIssueCount = 0, embedded = false, onTabChange, hideTabBar = false, onLinkPendingCountChange }: Props) {
   // [2026-09-09] «계정 연결 요청» 탭 추가 — 손님이 카톡을 바꿔 회원이 갈라졌을 때 들어오는 요청함
   // [2026-09-26] 교환·환불은 «고객이슈 안»에서 처리(별도 탭 없음). refund 관련 탭/리스너 제거.
   const [custTab, setCustTab] = useState<"members" | "issues" | "loyalty" | "link">(initialTab);
@@ -1160,6 +1164,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
     window.addEventListener(LINK_REQUESTS_CHANGED_EVENT, refresh);
     return () => { alive = false; window.removeEventListener(LINK_REQUESTS_CHANGED_EVENT, refresh); };
   }, [custTab]);
+  useEffect(() => { onLinkPendingCountChange?.(linkPendingCount); }, [linkPendingCount, onLinkPendingCountChange]);
   const [phoneBlockOpen, setPhoneBlockOpen] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -1897,7 +1902,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
               지금: 탭바 → (회원 목록 탭일 때만) 통계요약 + ⛔차단 → 목록
                 무엇을 보는 화면인지가 맨 위에서 먼저 정해진다. */}
           {/* ── 1층: 탭 (무엇을 보는 화면인지 먼저) ── */}
-          <div ref={tabBarRef} className="flex gap-1 overflow-x-auto border-b border-rose-line">
+          <div ref={tabBarRef} className={hideTabBar ? "hidden" : "flex gap-1 overflow-x-auto border-b border-rose-line"}>
             {([
               ["members", "회원 목록", 0],
               ["issues", "고객이슈", openIssueCount],
