@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import AdminLiveSettingsNavigation from "./AdminLiveSettingsNav";
+import AdminLiveNoticePanel from "./AdminLiveNoticePanel";
 import SettingsUnsavedChangesDialog from "./SettingsUnsavedChangesDialog";
 import {type SettingsTab,type SettingsDestination} from "./adminLiveSettingsNavigation";
 import {useSettingsDraft,type SettingsDraftState} from "./useSettingsDraft";
@@ -352,7 +353,6 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
   },[]);
   const finishChoice=(ok:boolean)=>{const resolve=pendingRef.current;pendingRef.current=null;setChoiceOpen(false);resolve?.(ok);};
   const selectDestination=async(destination:SettingsDestination)=>{
-    if ("menu" in destination) {onOpenNotice?.();return;}
     if ("tab" in destination && destination.tab===activeTab) {setFocusSection(destination.section);return;}
     if (!(await protectNavigation())) return;
     setChildDraft(null);setActiveTab(destination.tab);setFocusSection(destination.section);
@@ -712,6 +712,9 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
           {activeTab === "youtube" && <YoutubeNotifyCard onDraftStateChange={setChildDraft} />}
 
           {activeTab === "telegram" && <TelegramNotifyCard onDraftStateChange={setChildDraft} />}
+
+          {/* [2026-10-21 a1-2] 손님 공지·구매동의 — 공지 패널을 설정 모드로(자체 「공지 저장」 사용, 공통 저장줄 없음) */}
+          {activeTab === "notice" && <AdminLiveNoticePanel mode="settings" />}
 
 
           {/* ── 관리자 보안 (읽기 전용) ── */}

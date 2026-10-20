@@ -1861,7 +1861,7 @@ export default function AdminLiveDashboard() {
               {/* ── 고객 › 쪽지·공지 ── */}
               {activeMenu === "notice" ? (
                 <div className="w-full">
-                  <AdminLiveNoticePanel />
+                  <AdminLiveNoticePanel mode="messages" />
                 </div>
               ) : null}
 

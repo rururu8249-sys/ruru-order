@@ -15,7 +15,7 @@ export type AdminLiveMenuKey =
   | "settlement" // 정산
   | "products" // 상품
   | "customers" // 회원·이슈·단골
-  | "notice" // 쪽지·공지
+  | "notice" // 쪽지·공지사항(손님 화면 공지 설정은 설정 › 손님 공지·구매동의)
   | "visits" // 접속 기록(날짜별·방송별)
   | "settings" // 설정
   | "audit"; // 시스템 점검(공통 — 방송/쇼핑몰 상관없음)
@@ -35,7 +35,7 @@ export const ADMIN_LIVE_TOP_MENUS: AdminLiveTopMenuItem[] = [
   { key: "broadcast", label: "방송", desc: "시작·종료 · 기록", defaultKey: "broadcast" },
   { key: "orders", label: "주문·입금", desc: "실시간 주문 · 입금내역 · 정산 · 판매분석 · 이벤트", defaultKey: "orders" },
   { key: "products", label: "상품", desc: "방송 상품 · 쇼핑몰 · 등록", defaultKey: "products" },
-  { key: "customers", label: "고객", desc: "회원 · 이슈 · 쪽지·공지 · 접속 기록", defaultKey: "customers" },
+  { key: "customers", label: "고객", desc: "회원 · 이슈 · 쪽지·공지사항 · 접속 기록", defaultKey: "customers" },
   { key: "settings", label: "설정", desc: "돈·결제 · 손님 화면 · 방송·알림 · 상점", defaultKey: "settings" },
 ];
 
@@ -58,7 +58,7 @@ export const ADMIN_LIVE_SUB_TABS: Record<AdminLiveTopMenuKey, AdminLiveSubTab[]>
   products: [{ key: "products", label: "상품" }],
   customers: [
     { key: "customers", label: "회원·이슈·단골" },
-    { key: "notice", label: "쪽지·공지" },
+    { key: "notice", label: "쪽지·공지사항" },
     { key: "visits", label: "접속 기록" },
   ],
   // audit(시스템 점검): 2026-10-21 메뉴에서 뺌. ?panel=audit 로 들어오면 설정으로 폴백

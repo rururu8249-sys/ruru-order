@@ -62,6 +62,12 @@ const EMPTY_NOTICE: Notice = { id: 0, title: "", content: "", category: "공지"
 
 type PanelTab = "customer" | "list" | "send" | "sent";
 
+// [2026-10-21 a1-2] 같은 컴포넌트를 두 곳에서 쓴다(코드 이동 없음, 표시만 나눔).
+//   all      = 예전 그대로 탭 4개
+//   settings = 설정 › 손님 공지·구매동의 (손님 화면 공지 탭 + 저장바만, 탭 줄 없음)
+//   messages = 고객 › 쪽지·공지사항 (공지사항 목록·쪽지 보내기·보낸 쪽지)
+type Props = { mode?: "all" | "settings" | "messages" };
+
 // 쪽지 보낼 손님 검색 결과
 type NoteCustomer = { id: number; youtube_nickname: string | null; customer_name: string | null; customer_phone: string | null };
 // 보낸 쪽지 한 줄
@@ -73,7 +79,7 @@ type SentNote = {
   youtube_nickname?: string | null; customer_name?: string | null;
 };
 
-export default function AdminLiveNoticePanel() {
+export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settingsReady, setSettingsReady] = useState(false);
@@ -91,7 +97,7 @@ export default function AdminLiveNoticePanel() {
   const [popupBandUrl, setPopupBandUrl] = useState(DEFAULT_BAND_URL);
   const [purchaseConsent, setPurchaseConsent] = useState<OrderPurchaseConsentConfig>(DEFAULT_ORDER_PURCHASE_CONSENT);
 
-  const [tab, setTab] = useState<PanelTab>("customer");
+  const [tab, setTab] = useState<PanelTab>(mode === "messages" ? "list" : "customer");
   const [notices, setNotices] = useState<Notice[]>([]);
   const [form, setForm] = useState<Notice>(EMPTY_NOTICE);
   const [listBusy, setListBusy] = useState(false);
@@ -411,13 +417,14 @@ export default function AdminLiveNoticePanel() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* 탭 — 손님에게 보이는 공지 / 공지사항 목록 */}
+      {mode !== "settings" ? (
       <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-surface px-3 py-2">
         {([
-          { key: "customer", label: "📢 손님 화면 공지", desc: "접속 팝업 · 상시 안내" },
-          { key: "list", label: "📋 공지사항 목록", desc: "등록 · 고정 · 순서" },
-          { key: "send", label: "📩 쪽지 보내기", desc: "검색 · 여러 명 한 번에" },
-          { key: "sent", label: "📤 보낸 쪽지", desc: "읽음 확인 · 회수" },
-        ] as { key: PanelTab; label: string; desc: string }[]).map((t) => (
+          { key: "customer", label: "손님 화면 공지", desc: "접속 팝업 · 상시 안내" },
+          { key: "list", label: "공지사항 목록", desc: "등록 · 고정 · 순서" },
+          { key: "send", label: "쪽지 보내기", desc: "검색 · 여러 명 한 번에" },
+          { key: "sent", label: "보낸 쪽지", desc: "읽음 확인 · 회수" },
+        ] as { key: PanelTab; label: string; desc: string }[]).filter((t) => mode !== "messages" || t.key !== "customer").map((t) => (
           <button
             key={t.key}
             type="button"
@@ -430,9 +437,10 @@ export default function AdminLiveNoticePanel() {
           </button>
         ))}
       </div>
+      ) : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        {tab === "customer" ? (
+        {tab === "customer" && mode !== "messages" ? (
         <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
           {/* ─────────── 왼쪽: 입력 ─────────── */}
           <div className="space-y-4">
@@ -459,7 +467,7 @@ export default function AdminLiveNoticePanel() {
               {linkedNoticeId ? <div className="mt-3 rounded-xl border border-line p-3">
                 <p className="font-bold text-ink">{linkedNotice?.title || "공개된 공지를 선택해 주세요."}</p>
                 <p className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap text-sm text-ink-soft">{linkedNotice?.content}</p>
-                <button type="button" onClick={() => setTab("list")} className="mt-3 text-sm font-bold text-rose-deep">공지사항에서 내용 수정</button>
+                {mode === "all" ? <button type="button" onClick={() => setTab("list")} className="mt-3 text-sm font-bold text-rose-deep">공지사항에서 내용 수정</button> : null}
               </div> : null}
             </div>
             <details className={card}>
@@ -741,7 +749,7 @@ export default function AdminLiveNoticePanel() {
                   </div>
 
                   <div className="mt-3 flex flex-wrap gap-1.5">
-                    {n.is_visible && <button type="button" aria-label={`${n.title}를 상단 공지로 선택`} disabled={!settingsReady} onClick={() => { setLinkedNoticeId(String(n.id)); setTab("customer"); }} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-rose-deep disabled:opacity-30">상단 공지로 선택</button>}
+                    {n.is_visible && mode === "all" && <button type="button" aria-label={`${n.title}를 상단 공지로 선택`} disabled={!settingsReady} onClick={() => { setLinkedNoticeId(String(n.id)); setTab("customer"); }} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-rose-deep disabled:opacity-30">상단 공지로 선택</button>}
                     <button type="button" onClick={() => moveNotice(n, "up")} disabled={i === 0 || listBusy} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft disabled:opacity-30">↑ 위로</button>
                     <button type="button" onClick={() => moveNotice(n, "down")} disabled={i === notices.length - 1 || listBusy} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft disabled:opacity-30">↓ 아래로</button>
                     <button type="button" onClick={() => toggleNotice(n, "is_pinned")} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft">{n.is_pinned ? "목록 고정 풀기" : "📌 목록 상단 고정"}</button>
@@ -952,7 +960,7 @@ export default function AdminLiveNoticePanel() {
       </div>
 
       {/* 하단 저장바 — 손님 화면 공지 탭에서만. 목록 탭은 항목마다 바로 저장된다. */}
-      {tab === "customer" ? (
+      {tab === "customer" && mode !== "messages" ? (
         <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-surface px-5 py-3">
           <span className="text-xs font-bold text-ink-mute">
             {loading ? "불러오는 중..." : "저장하면 손님이 새로 들어올 때부터 보입니다."}
