@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { resolveAdminUiPreview, ADMIN_PREVIEW_DEFAULTS, adminPreviewStorageKey, readAdminUiPreview } from '../lib/adminUiSwitch.ts';
 
-assert.equal(ADMIN_PREVIEW_DEFAULTS.a1, false, 'a1 is preview-only until the owner switches the default');
+assert.equal(ADMIN_PREVIEW_DEFAULTS.a1, true, 'a1 is on by default (2026-10-21 a1-4) — ?preview=off turns it off per browser');
 assert.equal(adminPreviewStorageKey('a1'), 'ruru_admin_preview_a1');
 assert.deepEqual(resolveAdminUiPreview('a1', null, 'a1', false), { store: '1', on: true }, '?preview=a1 turns on and remembers');
 assert.deepEqual(resolveAdminUiPreview('off', '1', 'a1', false), { store: '0', on: false }, '?preview=off turns off and remembers');
@@ -19,5 +19,5 @@ assert.equal(readAdminUiPreview('a1'), true); assert.equal(store.get('ruru_admin
 window.location.search = ''; assert.equal(readAdminUiPreview('a1'), true, 'reload without query keeps it on');
 window.location.search = '?preview=off'; assert.equal(readAdminUiPreview('a1'), false); assert.equal(store.get('ruru_admin_preview_a1'), '0');
 window.localStorage = { getItem() { throw new Error('blocked'); }, setItem() {} };
-assert.equal(readAdminUiPreview('a1'), false, 'storage blocked → default');
+assert.equal(readAdminUiPreview('a1'), true, 'storage blocked → default (on)');
 console.log('admin ui switch passed');

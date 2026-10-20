@@ -4,7 +4,7 @@
 //   관리자 전원 기본값으로 전환하려면 아래 a1 만 true 로. 저장 키는 ruru_admin_preview_a1.
 export type AdminUiSwitchDecision = { store: "1" | "0" | null; on: boolean };
 
-export const ADMIN_PREVIEW_DEFAULTS = { a1: false } as const;
+export const ADMIN_PREVIEW_DEFAULTS = { a1: true } as const;
 export type AdminPreviewStage = keyof typeof ADMIN_PREVIEW_DEFAULTS;
 export const adminPreviewStorageKey = (stage: AdminPreviewStage) => `ruru_admin_preview_${stage}`;
 

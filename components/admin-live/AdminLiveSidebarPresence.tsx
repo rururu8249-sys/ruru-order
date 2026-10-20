@@ -182,7 +182,7 @@ export default function AdminLiveSidebarPresence({ onOpenVisitStats }: Props = {
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[12px] font-black text-ink">{displayNickname(visitor.nickname)}</span>
                       {String(visitor.viewingProduct || "").trim() ? (
-                        <span className="block truncate text-[11px] font-bold text-rose-deep">👀 {String(visitor.viewingProduct).trim()}</span>
+                        <span className="block truncate text-[11px] font-bold text-rose-deep">{String(visitor.viewingProduct).trim()}</span>
                       ) : null}
                     </span>
                     <span className="shrink-0 text-[11px] font-black text-ink-mute">{visitor.pageLabel}</span>
@@ -212,12 +212,12 @@ export default function AdminLiveSidebarPresence({ onOpenVisitStats }: Props = {
             <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 p-4" onClick={() => setCartFor("")}>
               <div className="w-full max-w-[360px] overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center justify-between border-b border-line px-4 py-3">
-                  <span className="text-[14px] font-black text-ink">🛒 {displayNickname(nick)} 장바구니</span>
+                  <span className="text-[14px] font-black text-ink">{displayNickname(nick)} 장바구니</span>
                   <button type="button" onClick={() => setCartFor("")} className="text-lg leading-none text-ink-mute hover:text-ink">✕</button>
                 </div>
                 <div className="max-h-[50vh] overflow-y-auto px-4 py-3 text-[13px] font-bold leading-6 text-ink-soft">
                   {String(visitor?.viewingProduct || "").trim() ? (
-                    <div className="mb-2 rounded-lg bg-rose-soft px-2.5 py-1.5 text-[12px] font-black text-rose-deep">👀 최근 담은 상품 · {String(visitor?.viewingProduct).trim()}</div>
+                    <div className="mb-2 rounded-lg bg-surface-2 px-2.5 py-1.5 text-[12px] font-black text-ink">최근 담은 상품 · {String(visitor?.viewingProduct).trim()}</div>
                   ) : null}
                   {!nick ? (
                     "비회원(닉네임 없음)은 장바구니를 연결할 수 없어요."
@@ -252,7 +252,7 @@ export default function AdminLiveSidebarPresence({ onOpenVisitStats }: Props = {
         onClick={() => onOpenVisitStats?.()}
         className="mt-2 w-full rounded-xl bg-surface-2 px-2 py-1.5 text-[11px] font-black text-ink-soft hover:bg-surface-3"
       >
-        📊 접속 기록 보기
+        접속 기록 보기
       </button>
     </section>
   );

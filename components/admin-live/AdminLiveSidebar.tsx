@@ -83,7 +83,7 @@ export default function AdminLiveSidebar({
         ].join(" ")}
       >
         <div className="mb-3 flex items-center gap-2 px-1">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-deep text-white">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-ink text-white">
             <AdminLiveMenuIcon menu="broadcast" className="h-[17px] w-[17px]" />
           </div>
           <div className="min-w-0">
@@ -117,24 +117,24 @@ export default function AdminLiveSidebar({
                   //   → 위: 아이콘+이름 한 줄 / 아래: 배지 한 줄. 이름은 절대 줄바꿈하지 않는다.
                   "flex min-h-11 w-full flex-col gap-1 rounded-xl px-2.5 py-2 text-left transition",
                   active
-                    ? "bg-rose-soft text-rose-deep shadow-sm ring-1 ring-rose-line"
+                    ? "bg-surface-2 text-ink"
                     : "text-ink-soft hover:bg-surface-2 hover:text-ink",
                 ].join(" ")}
               >
                 <button type="button" aria-current={active ? "page" : undefined}
                   onClick={() => { onMenuChange(menu.defaultKey); onCloseNav?.(); }}
-                  className="flex w-full items-center gap-3 text-left rounded-lg focus-visible:outline-2 focus-visible:outline-rose-deep">
+                  className="flex w-full items-center gap-3 text-left rounded-lg focus-visible:outline-2 focus-visible:outline-ink">
                   <span
                     className={[
-                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-sm ring-1",
-                      active ? "bg-rose-deep text-white ring-rose-deep" : "bg-surface text-ink-soft ring-line",
+                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+                      active ? "bg-ink text-white" : "bg-surface-2 text-ink-soft",
                     ].join(" ")}
                     aria-hidden
                   >
                     <AdminLiveMenuIcon menu={menu.key} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block whitespace-nowrap text-[14px] font-black">{menu.label}</span>
+                    <span className="block whitespace-nowrap text-[14px] font-bold">{menu.label}</span>
                   </span>
                 </button>
                 {showBadges ? (
@@ -144,7 +144,7 @@ export default function AdminLiveSidebar({
                         type="button"
                         title={`입금자명·금액이 주문과 자동으로 안 맞아 수동 확인이 필요한 주문 ${exceptionBadges.needMatch}건 — 클릭하면 해당 주문만 보여요`}
                         onClick={() => { onExceptionBadgeClick?.("match"); onCloseNav?.(); }}
-                        className="cursor-pointer whitespace-nowrap rounded-full bg-danger-bg px-2 py-0.5 text-[11px] font-black text-danger-tx hover:ring-2 hover:ring-danger-tx/30"
+                        className="cursor-pointer whitespace-nowrap rounded-full bg-warn-bg px-2 py-0.5 text-[11px] font-bold text-warn-tx hover:ring-2 hover:ring-warn-tx/30"
                       >매칭필요 {exceptionBadges.needMatch} ›</button>
                     ) : null}
                     {exceptionBadges.cardUnpaid > 0 ? (
@@ -152,7 +152,7 @@ export default function AdminLiveSidebar({
                         type="button"
                         title={`카드결제 선택 후 아직 결제완료 처리 전인 주문 ${exceptionBadges.cardUnpaid}건 — 클릭하면 해당 주문만 보여요`}
                         onClick={() => { onExceptionBadgeClick?.("card"); onCloseNav?.(); }}
-                        className="cursor-pointer whitespace-nowrap rounded-full bg-danger-bg px-2 py-0.5 text-[11px] font-black text-danger-tx hover:ring-2 hover:ring-danger-tx/30"
+                        className="cursor-pointer whitespace-nowrap rounded-full bg-warn-bg px-2 py-0.5 text-[11px] font-bold text-warn-tx hover:ring-2 hover:ring-warn-tx/30"
                       >카드미결제 {exceptionBadges.cardUnpaid} ›</button>
                     ) : null}
                   </span>
@@ -172,17 +172,17 @@ export default function AdminLiveSidebar({
               type="button"
               onClick={openKakao}
               title="손님이 남긴 카톡 문의에 답하는 관리자 채팅창을 엽니다 (설정 › 상점 정보에서 주소 변경)"
-              className="flex h-10 items-center justify-center gap-1 rounded-xl border border-rose-line bg-rose-soft text-[11px] font-black text-rose-deep transition hover:opacity-90 active:scale-[0.98]"
+              className="flex h-10 items-center justify-center gap-1 rounded-xl border border-line bg-surface text-[13px] font-bold text-ink transition hover:bg-surface-2 active:scale-[0.98]"
             >
-              💬 {CONTACT_TYPE_SHORT[shopInfo.contactType]}
+              {CONTACT_TYPE_SHORT[shopInfo.contactType]}
             </button>
             <button
               type="button"
               onClick={() => openPayster(shopInfo.paysterUrl)}
               title="페이스터 문자결제 페이지를 새 창으로 엽니다"
-              className="flex h-10 items-center justify-center gap-1 rounded-xl border border-line bg-surface-2 text-[11px] font-black text-ink-soft transition hover:bg-surface-3 active:scale-[0.98]"
+              className="flex h-10 items-center justify-center gap-1 rounded-xl border border-line bg-surface text-[13px] font-bold text-ink transition hover:bg-surface-2 active:scale-[0.98]"
             >
-              💳 카드결제
+              카드결제
             </button>
           </div>
         </section>
@@ -192,9 +192,9 @@ export default function AdminLiveSidebar({
           <button
             type="button"
             onClick={onToggleTheme}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface-2 py-2.5 text-xs font-black text-ink-soft transition hover:bg-surface-3"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface-2 py-2.5 text-[13px] font-bold text-ink-soft transition hover:bg-surface-3"
           >
-            {theme === "dark" ? "☀️ 라이트 모드" : "🌙 다크 모드"}
+            {theme === "dark" ? "라이트 모드" : "다크 모드"}
           </button>
           <AdminLiveLogoutButton />
         </div>

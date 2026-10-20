@@ -611,11 +611,14 @@ export default function AdminLiveDashboard() {
   }, [previewA1]);
   // 모바일 사이드바(드로어) 열림 상태 — 데스크탑(md+)에선 항상 보이므로 무관.
   const [navOpen, setNavOpen] = useState(false);
+  // [2026-10-21 사장님] 화면에서 뺌·보존 — 정합성 점검 결과 창 state(runIntegrityCheck 와 함께 남겨 둠)
+  /* eslint-disable @typescript-eslint/no-unused-vars */
   const [integrityOpen, setIntegrityOpen] = useState(false);
   const [integrityLoading, setIntegrityLoading] = useState(false);
   const [integrityResult, setIntegrityResult] = useState<any>(null);
   const [integrityRecentOnly, setIntegrityRecentOnly] = useState(true);
   const [auditExpanded, setAuditExpanded] = useState<Record<string, boolean>>({});
+  /* eslint-enable @typescript-eslint/no-unused-vars */
   const [orders, setOrders] = useState<LiveOrder[]>([]);
   // [2026-09-13] 첫 조회가 끝났는지 — 아래 «자동입금확인 소리» 감지가 이 값을 봐야 해서 여기로 올렸다(선언 위치만 이동).
   const [loading, setLoading] = useState(true);
@@ -746,6 +749,8 @@ export default function AdminLiveDashboard() {
     }
   };
 
+  // [2026-10-21 사장님] 화면에서 뺌·보존 — 정합성 점검 버튼·결과 창은 지웠고 함수·state·app/api 는 남겨 둠(필요 시 다시 붙임)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const runIntegrityCheck = async () => {
     setIntegrityOpen(true);
     setIntegrityLoading(true);
@@ -1619,9 +1624,9 @@ export default function AdminLiveDashboard() {
           <button
             type="button"
             onClick={() => setNavOpen(true)}
-            className="mb-3 inline-flex shrink-0 items-center gap-2 self-start rounded-xl border border-line bg-surface px-3 py-2 text-sm font-black text-ink shadow-sm md:hidden"
+            className="mb-3 inline-flex shrink-0 items-center gap-2 self-start rounded-xl border border-line bg-surface px-3 py-2 text-sm font-bold text-ink md:hidden"
           >
-            ☰ 메뉴
+            메뉴
           </button>
 
           {/* [2026-09-08 5단계 · 레이아웃 B] 왼쪽 = 큰 메뉴 화면(통째로 전환) / 오른쪽 = 접이식 방송·채팅 레일 */}
@@ -1631,10 +1636,10 @@ export default function AdminLiveDashboard() {
             <div className="flex min-w-0 flex-1 flex-col">
               {/* 화면 제목 + 작은 탭 */}
               {/* 페이지가 스크롤해도 화면 이름·탭은 위에 붙어 있다(내용이 뒤로 지나가도 가려지지 않게 배경 지정) */}
-              <div className="sticky top-0 z-30 -mx-3 -mt-3 mb-2 flex flex-wrap items-end justify-between gap-2 border-b border-rose-line bg-canvas px-3 pt-2 md:-mx-4 md:px-4">
+              <div className="sticky top-0 z-30 -mx-3 -mt-3 mb-2 flex flex-wrap items-end justify-between gap-2 border-b border-line bg-canvas px-3 pt-2 md:-mx-4 md:px-4">
                 {/* 모바일은 모든 하위 화면을 선택 목록으로 제공하고, 데스크톱은 기존 탭을 유지한다. */}
                 <div className={`flex w-full min-w-0 flex-wrap items-end gap-3 md:flex-nowrap ${activeMenu==='products'?'':'md:w-auto'}`}>
-                  <h1 className="shrink-0 whitespace-nowrap pb-2 text-lg font-black tracking-tight text-ink">{activeTopMenu.label}</h1>
+                  <h1 className="shrink-0 whitespace-nowrap pb-2 text-[20px] font-bold tracking-tight text-ink">{activeTopMenu.label}</h1>
                   {activeMenu==='products' && <div ref={setProductHeaderTarget} className="flex min-w-0 flex-1" />}
                   {activeSubTabs.length > 1 ? (
                     <>
@@ -1655,8 +1660,8 @@ export default function AdminLiveDashboard() {
                             type="button"
                             onClick={() => { setActiveMenu(tab.key); }}
                             className={[
-                              "-mb-px shrink-0 whitespace-nowrap rounded-t-lg border-b-2 px-3.5 py-2 text-[13px] font-black transition",
-                              active ? "border-rose-deep bg-rose-soft/60 text-rose-deep" : "border-transparent text-ink-soft hover:opacity-90 hover:text-rose-deep",
+                              "-mb-px shrink-0 whitespace-nowrap border-b-2 px-3.5 py-2 text-[14px] font-bold transition",
+                              active ? "border-ink text-ink" : "border-transparent text-ink-mute hover:text-ink",
                             ].join(" ")}
                           >
                             {tab.label}
@@ -1673,19 +1678,11 @@ export default function AdminLiveDashboard() {
                       type="button"
                       onClick={() => { setSelectedOrderForMatch(null); setDrawer(current => transitionAdminLiveDrawer(current, {kind: "match", orderId: null})); }}
                       className={[
-                        "rounded-lg border px-2.5 py-1.5 text-xs font-black transition",
-                        matchPanelOpen ? "border-rose-deep bg-rose-soft text-rose-deep" : "border-rose-line text-rose-deep hover:opacity-90",
+                        "rounded-lg border px-2.5 py-1.5 text-[13px] font-bold transition",
+                        matchPanelOpen ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink hover:bg-surface-2",
                       ].join(" ")}
                     >
                       {matchPanelOpen ? "입금매칭 닫기" : "입금매칭 열기"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void runIntegrityCheck()}
-                      title="정합성 점검"
-                      className="rounded-lg border border-rose-line px-2.5 py-1.5 text-xs font-black text-rose-deep transition hover:bg-rose-soft"
-                    >
-                      🛡️ 점검
                     </button>
                   </div>
                 ) : null}
@@ -1967,177 +1964,6 @@ export default function AdminLiveDashboard() {
           <AdminLiveQuickProductDrawer activeBroadcastId={activeBroadcast?.id || null} />
         </main>
       </div>
-
-      {integrityOpen && (
-        <div
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}
-          onClick={() => setIntegrityOpen(false)}
-        >
-          <div
-            style={{ background: "var(--color-surface)", borderRadius: "16px", width: "100%", maxWidth: "560px", maxHeight: "80vh", overflowY: "auto", padding: "20px 24px", boxShadow: "0 18px 50px rgba(0,0,0,0.25)" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-              <div style={{ fontSize: "18px", fontWeight: 800, color: "var(--color-rose-deep)" }}>🛡️ 정합성 점검</div>
-              <button
-                type="button"
-                onClick={() => setIntegrityOpen(false)}
-                style={{ width: "30px", height: "30px", borderRadius: "50%", border: "none", background: "#F1ECEE", color: "var(--color-ink-soft)", fontSize: "14px", cursor: "pointer" }}
-              >
-                ✕
-              </button>
-            </div>
-
-            {integrityLoading ? (
-              <div style={{ padding: "32px 0", textAlign: "center", fontSize: "14px", fontWeight: 700, color: "var(--color-ink-mute)" }}>점검 중...</div>
-            ) : integrityResult ? (
-              integrityResult.ok === false ? (
-                <div style={{ padding: "16px", borderRadius: "12px", background: "#FEF2F2", color: "var(--color-danger-tx)", fontSize: "14px", fontWeight: 700 }}>
-                  점검 실패: {integrityResult.error || integrityResult.message || "알 수 없는 오류"}
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <div style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
-                    <button type="button" onClick={() => setIntegrityRecentOnly(true)}
-                      style={{ fontSize: "12px", fontWeight: 700, padding: "4px 12px", borderRadius: "8px", border: "1px solid #E5C7CE", cursor: "pointer", background: integrityRecentOnly ? "#7A1E47" : "#fff", color: integrityRecentOnly ? "#fff" : "#7A1E47" }}>최근 7일만</button>
-                    <button type="button" onClick={() => setIntegrityRecentOnly(false)}
-                      style={{ fontSize: "12px", fontWeight: 700, padding: "4px 12px", borderRadius: "8px", border: "1px solid #E5C7CE", cursor: "pointer", background: !integrityRecentOnly ? "#7A1E47" : "#fff", color: !integrityRecentOnly ? "#fff" : "#7A1E47" }}>전체 보기</button>
-                  </div>
-                  {[
-                    // [2026-08-11] 재고 안전장치 생존 감시 — 제출RPC 거부로직·경비원·담기선점이 하나라도 죽으면 표시 (0건=안전)
-                    { title: "재고 안전장치 이상", count: integrityResult.summary?.check10_inventory_guard ?? 0, items: integrityResult.check10?.items ?? [], kind: "check10" },
-                    { title: "자동입금확인인데 입금없음", count: integrityResult.summary?.check1_auto_paid_no_deposit ?? 0, items: integrityResult.check1?.items ?? [], kind: "check1" },
-                    { title: "주문그룹 중복입금", count: integrityResult.summary?.check2_group_multi_deposit ?? 0, items: integrityResult.check2?.items ?? [], kind: "check2" },
-                    { title: "날짜 역전 매칭(오매칭 의심)", count: integrityResult.summary?.check9_date_inverted_match ?? 0, items: integrityResult.check9?.items ?? [], kind: "check9" },
-                    { title: "중복 입금내역", count: integrityResult.summary?.check3_duplicate_deposit ?? 0, items: integrityResult.check3?.items ?? [], kind: "check3" },
-                    // [2026-07-25 전체점검] 점검4~8 — API가 만들어주는 label 문자열을 그대로 표시
-                    { title: "취소인데 재고 미복구", count: integrityResult.summary?.check4_cancel_not_restored ?? 0, items: integrityResult.check4?.items ?? [], kind: "check4" },
-                    { title: "재고 장부 불일치", count: integrityResult.summary?.check5_stock_ledger_mismatch ?? 0, items: integrityResult.check5?.items ?? [], kind: "check5" },
-                    { title: "금액 공식 불일치", count: integrityResult.summary?.check6_amount_formula ?? 0, items: integrityResult.check6?.items ?? [], kind: "check6" },
-                    { title: "포인트 잔액≠이력", count: integrityResult.summary?.check7_point_mismatch ?? 0, items: integrityResult.check7?.items ?? [], kind: "check7" },
-                    { title: "입금확인 시각 누락", count: integrityResult.summary?.check8_paid_no_timestamp ?? 0, items: integrityResult.check8?.items ?? [], kind: "check8" },
-                  ].map((card) => {
-                    const now = Date.now();
-                    const SEVEN = 7 * 24 * 60 * 60 * 1000;
-                    const itemsWithDate = card.items.map((item: any) => {
-                      // [2026-07-26] 입금 관련 날짜는 created_at 사용 — deposited_time은 "시각만" 저장이라 날짜없음 오표시됐었음
-                      const dateRaw = card.kind === "check1" ? item.created_at
-                        : card.kind === "check2" ? (item.latest_created_at ?? item.latest_deposited_time)
-                        : card.kind === "check3" ? (item.created_at ?? item.deposited_time)
-                        : card.kind === "check9" ? item.deposit_created_at
-                        : item.created_at;
-                      const t = dateRaw ? new Date(dateRaw).getTime() : NaN;
-                      // 날짜 없는 항목(재고 장부·포인트)은 "최근 7일만" 필터에서도 항상 표시
-                      // 날짜 역전 매칭(check9)은 오래된 오매칭도 살아있는 위험이라 항상 표시
-                      const isRecent = card.kind === "check9" ? true
-                        : dateRaw ? (Number.isFinite(t) ? (now - t) <= SEVEN : false) : true;
-                      return { item, dateRaw, isRecent };
-                    });
-                    const shownItems = integrityRecentOnly ? itemsWithDate.filter((x: any) => x.isRecent) : itemsWithDate;
-                    const recentCount = itemsWithDate.filter((x: any) => x.isRecent).length;
-                    const shownCount = integrityRecentOnly ? recentCount : card.count;
-                    const isOk = shownCount === 0;
-                    const color = isOk ? "var(--color-ok-tx)" : "#B91C1C";
-                    const fmtDate = (raw: any) => {
-                      if (!raw) return "날짜없음";
-                      const d = new Date(raw);
-                      if (!Number.isFinite(d.getTime())) return "날짜없음";
-                      return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
-                    };
-                    // 상세용: 연·월·일 (필요 시 시각 뒷 5자리 HH:MM)
-                    const fmtFull = (raw: any, withTime = false) => {
-                      if (!raw) return "날짜없음";
-                      const d = new Date(raw);
-                      if (!Number.isFinite(d.getTime())) return "날짜없음";
-                      const base = `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
-                      if (!withTime) return base;
-                      return `${base} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-                    };
-                    return (
-                      <div key={card.kind} style={{ border: `1px solid ${isOk ? "#D1E7DD" : "#F5C2C7"}`, borderRadius: "12px", padding: "12px 12px" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-ink)" }}>{card.title}</div>
-                          <div style={{ fontSize: "14px", fontWeight: 800, color }}>{isOk ? "정상" : `${shownCount}건`}</div>
-                        </div>
-                        {!isOk && shownItems.length > 0 ? (
-                          <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "4px" }}>
-                            {shownItems.slice(0, 10).map((x: any, idx: number) => {
-                              const item = x.item;
-                              const dateStr = fmtDate(x.dateRaw);
-                              const lineColor = x.isRecent ? "#666" : "#AAA";
-                              // check2·check9 는 클릭하면 상세(입금자·각 입금·연결 주문·의심사유)가 펼쳐진다
-                              const expandable = card.kind === "check2" || card.kind === "check9";
-                              const ekey = `${card.kind}__${idx}`;
-                              const open = !!auditExpanded[ekey];
-                              const suspicious = card.kind === "check9" || (card.kind === "check2" && item.date_inverted);
-                              const summaryText = card.kind === "check1"
-                                ? `${item.nickname || "-"} / ${Number(item.amount || 0).toLocaleString("ko-KR")}원${item.order_lookup_code ? ` / ${item.order_lookup_code}` : ""} · ${dateStr}`
-                                : card.kind === "check2"
-                                  ? `${item.nickname || "주문미상"} · 입금 ${item.deposit_ids?.length || 0}건 / ${Number(item.total_deposit_amount || 0).toLocaleString("ko-KR")}원 · ${dateStr}`
-                                  : card.kind === "check9"
-                                    ? `${item.depositor_name || "-"} · ${Number(item.amount || 0).toLocaleString("ko-KR")}원 · 입금 ${fmtDate(item.deposit_created_at)} → 주문 ${item.nickname || "-"} ${fmtDate(item.order_created_at)}`
-                                    : card.kind === "check3"
-                                      ? `${item.depositor_name || "-"} / ${Number(item.amount || 0).toLocaleString("ko-KR")}원 / ${item.deposit_ids?.length || 0}줄 · ${dateStr}`
-                                      : `${item.label || "-"}${x.dateRaw ? ` · ${dateStr}` : ""}`;
-                              return (
-                                <div key={idx} style={{ fontSize: "12px", color: lineColor, lineHeight: 1.5 }}>
-                                  <div
-                                    onClick={expandable ? () => setAuditExpanded((p) => ({ ...p, [ekey]: !p[ekey] })) : undefined}
-                                    style={{ display: "flex", alignItems: "center", gap: "6px", cursor: expandable ? "pointer" : "default", flexWrap: "wrap" }}
-                                  >
-                                    {expandable ? <span style={{ color: "#B91C1C", fontWeight: 800, width: "10px" }}>{open ? "▾" : "▸"}</span> : <span>·</span>}
-                                    <span style={{ fontWeight: expandable ? 700 : 400, color: expandable ? "var(--color-ink)" : lineColor }}>{summaryText}</span>
-                                    {suspicious ? (
-                                      <span style={{ fontSize: "11px", fontWeight: 800, color: "#fff", background: "#B91C1C", borderRadius: "8px", padding: "1px 6px" }}>⚠️ 오매칭 의심</span>
-                                    ) : card.kind === "check2" ? (
-                                      <span style={{ fontSize: "11px", fontWeight: 800, color: "#92400E", background: "#FEF3C7", borderRadius: "8px", padding: "1px 6px" }}>고객 중복입금?</span>
-                                    ) : null}
-                                  </div>
-                                  {expandable && open ? (
-                                    <div style={{ marginTop: "6px", marginLeft: "16px", marginBottom: "4px", padding: "8px 8px", background: suspicious ? "#FEF2F2" : "#FAF6F7", border: `1px solid ${suspicious ? "#F5C2C7" : "#E5C7CE"}`, borderRadius: "8px", color: "#444", fontSize: "12px", lineHeight: 1.7 }}>
-                                      {card.kind === "check2" ? (
-                                        <>
-                                          <div style={{ fontWeight: 700, color: "var(--color-ink)" }}>연결 주문: {item.nickname || "-"}{item.customer_name ? ` (${item.customer_name})` : ""}{item.order_lookup_code ? ` · ${item.order_lookup_code}` : ""} · 주문일 {fmtFull(item.order_created_at)}</div>
-                                          <div style={{ marginTop: "4px", fontWeight: 700, color: "var(--color-ink)" }}>입금 {item.deposits?.length || 0}건</div>
-                                          {(item.deposits ?? []).map((d: any, di: number) => (
-                                            <div key={di} style={{ color: d.date_inverted ? "#B91C1C" : "#444" }}>
-                                              · 입금자 <b>{d.depositor_name || "-"}</b> · {Number(d.amount || 0).toLocaleString("ko-KR")}원 · {d.deposited_time || "시각없음"} · {fmtFull(d.created_at)}{d.date_inverted ? " ⚠️ 입금이 주문보다 빠름" : ""}
-                                            </div>
-                                          ))}
-                                          <div style={{ marginTop: "6px", fontWeight: 700, color: suspicious ? "#B91C1C" : "#92400E" }}>
-                                            {suspicious
-                                              ? "⚠️ 입금일이 주문 생성일보다 빠릅니다 = 다른 주문의 입금이 이 주문에 잘못 물렸을 의심. 입금확인을 취소하고 올바른 주문(또는 미확인 입금)으로 수동 연결하세요."
-                                              : "한 주문에 입금이 2건 이상입니다. 고객이 2번 입금했거나 분할입금일 수 있어요. 입금자·금액을 확인하세요."}
-                                          </div>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <div>이 입금(입금자 <b>{item.depositor_name || "-"}</b>, {Number(item.amount || 0).toLocaleString("ko-KR")}원)은 <b>{fmtFull(item.deposit_created_at)}</b> 기록인데, 연결된 주문(<b>{item.nickname || "-"}</b>{item.order_lookup_code ? ` · ${item.order_lookup_code}` : ""})은 <b>{fmtFull(item.order_created_at)}</b>에 생성됐습니다.</div>
-                                          <div style={{ marginTop: "6px", fontWeight: 700, color: "#B91C1C" }}>⚠️ 입금이 주문보다 {item.days_early}일 빠름 = 자동매칭이 다른 주문의 입금을 잘못 물었을 가능성. 입금확인을 취소하고 올바른 주문(또는 미확인 입금)으로 수동 연결하세요.</div>
-                                        </>
-                                      )}
-                                    </div>
-                                  ) : null}
-                                </div>
-                              );
-                            })}
-                            {shownItems.length > 10 ? (
-                              <div style={{ fontSize: "11px", color: "var(--color-ink-mute)" }}>… 외 {shownItems.length - 10}건</div>
-                            ) : null}
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                  {integrityResult.generated_at ? (
-                    <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", textAlign: "right" }}>점검 시각: {new Date(integrityResult.generated_at).toLocaleString("ko-KR")}</div>
-                  ) : null}
-                </div>
-              )
-            ) : null}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
