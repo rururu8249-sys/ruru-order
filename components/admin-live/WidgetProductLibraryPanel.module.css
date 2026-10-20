@@ -56,9 +56,9 @@
   gap: 10px;
   margin-bottom: 9px;
   padding: 8px 10px;
-  border: 1px solid color-mix(in srgb, var(--color-ok-tx) 22%, var(--color-line));
+  border: 1px solid var(--color-line);
   border-radius: 9px;
-  background: var(--color-ok-bg);
+  background: var(--color-surface-2);   /* [2026-10-21 a2-1] 초록 안내 → 회색(DESIGN-ADMIN) */
 }
 
 .pinnedStatus {

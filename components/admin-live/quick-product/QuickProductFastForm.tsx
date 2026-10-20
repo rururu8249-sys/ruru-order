@@ -2362,7 +2362,7 @@ export default function QuickProductFastForm({
                         type="button"
                         onClick={(event) => { event.stopPropagation(); openBrandDetailEditorForNew(); }}
                         style={{ border: "none", borderRadius: "8px", background: "var(--color-rose-deep)", color: "#fff", padding: "12px 24px", fontSize: "14px", fontWeight: 900, cursor: "pointer" }}
-                      >＋ 세부상품 추가 — 이름·가격만</button>
+                      >세부상품 추가</button>
                       <div style={{ marginTop: "8px", fontSize: "11px", fontWeight: 700, color: "var(--color-ok-tx)" }}>
                         사진 없어도 됩니다 — 손님에게는 <b>상품명 자동 그림</b>이 나가요 (화장품→화장품 그림)
                       </div>
@@ -2392,7 +2392,7 @@ export default function QuickProductFastForm({
                             type="button"
                             onClick={() => { setFormTouched(true); setDetailHidden([]); }}
                             style={{ marginLeft: "auto", border: "1px solid var(--color-ok-bg)", borderRadius: "8px", background: "var(--color-ok-bg)", color: "var(--color-ok-tx)", padding: "4px 12px", fontSize: "11px", fontWeight: 900, cursor: "pointer" }}
-                          >👁 전부 다시 보이게</button>
+                          >숨김 해제</button>
                         </div>
                       ) : null}
                       <div style={{ overflowX: "auto" }}>
@@ -2577,12 +2577,12 @@ export default function QuickProductFastForm({
                             addDetailRow(undefined, base + plus);
                           }}
                           style={{ border: "1px solid var(--color-rose-line)", borderRadius: "8px", background: "var(--color-surface)", color: "var(--color-ink)", padding: "8px 12px", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}
-                        >⧉ 윗줄 복제</button>
+                        >윗줄 복제</button>
                         <button
                           type="button"
                           onClick={() => { setBulkNamesText(""); setBulkNamesOpen(true); }}
                           style={{ border: "1px solid var(--color-rose-line)", borderRadius: "8px", background: "var(--color-surface)", color: "var(--color-ink)", padding: "8px 12px", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}
-                        >📋 이름 여러 개 붙여넣기</button>
+                        >여러 개 붙여넣기</button>
                         <span style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>칸을 누르면 바로 고쳐집니다</span>
                       </div>
                     </div>
@@ -2937,11 +2937,11 @@ export default function QuickProductFastForm({
             type="button"
             onClick={openBrandDetailEditorForNew}
             style={{ border: "none", borderRadius: "8px", background: "var(--color-rose-deep)", color: "#fff", padding: "8px 16px", fontSize: "13px", fontWeight: 900, cursor: "pointer" }}
-              >＋ 세부상품 추가 (A-1, A-2처럼 여러 개)</button>
+              >세부상품 추가</button>
               <div
             onClick={() => bulkRowPhotoInputRef.current?.click()}
             style={{ marginTop: "6px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", cursor: "pointer" }}
-              >📸 사진 몽땅 끌어놓으면 장수만큼 자동 생성 (파일명=이름)</div>
+              >사진 여러 장 끌어놓으면 장수만큼 생성</div>
             </div>
           ) : null}
 
@@ -2970,7 +2970,7 @@ export default function QuickProductFastForm({
               onClick={() => setPreviewOpen((v) => !v)}
               style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "8px 12px", border: "none", background: "transparent", cursor: "pointer" }}
             >
-              <span style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-rose-deep)" }}>👀 손님 화면 미리보기</span>
+              <span style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-rose-deep)" }}>손님 화면 미리보기</span>
               <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>{previewOpen ? "접기 ▲" : "펴기 ▼"}</span>
             </button>
 
@@ -3140,7 +3140,7 @@ export default function QuickProductFastForm({
             <div style={sectionLabel}>상품 뱃지</div>
             <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginBottom: "6px", lineHeight: 1.6 }}>
               손님 상품 목록에 표시되는 뱃지 · <b style={{ color: "var(--color-ok-tx)" }}>배지를 하나도 안 골라도 자동으로 붙습니다</b> — 신상(등록 7일) · 급상승(담김 많거나 판매 상위 10%) · 💖루루픽(판매 상위 3%) · 「N개 남음」(재고) · 「방송 중 N개 주문」(실시간) · 「판매 N개」 · 「재구매 N명」. 배지는 «더» 강조하고 싶을 때만 누르세요.
-              <br />🛒 바로구매는 아래 「바로구매」 버튼에서 정합니다. ✈️ 해외배송은 배송 방식과 직결이라 <b>자동으로 절대 안 붙습니다(사장님 수동 전용)</b>.
+              <br />해외배송 뱃지는 직접 골라야 붙습니다
             </div>
             <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}`}</style>
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>

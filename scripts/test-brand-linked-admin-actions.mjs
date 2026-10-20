@@ -13,7 +13,7 @@ const products=[{id:1,product_name:'브랜드',price:129000,product_note:{brand_
 const links=[{sourceId:'2',parentId:'1',detailName:'NEW',originalName:'원본 임시',movedAt:'2026-10-05'}];
 const makeQuery=table=>{let single=false;const q=new Proxy({}, {get:(_,key)=>key==='then'?(resolve=>Promise.resolve({data:table==='products'?products:table==='broadcast_products'?[{product_id:1,sort_order:0},{product_id:2,sort_order:1}]:table==='broadcasts'?(single?{widget_pin_mode:'auto'}:[{id:42,public_title:'검증 방송',status:'ON',started_at:'2026-10-05'}]):[],error:null}).then(resolve)):(()=>{if(key==='maybeSingle')single=true;return q;})});return q;};
 globalThis.fetch=async(url,options)=>{if(String(url)==='/api/chat-orders/current')chat=JSON.parse(options.body);return {ok:true,json:async()=>String(url).includes('product-brand-catalog')?{links}:{ok:true,history:[],rotation:{mode:'all',paused:false,targets:[]}}};};
-const Panel=createUiLoader({'./WidgetProductLibraryPanel.module.css':{default:{}},'@/lib/supabase':{supabase:{from:makeQuery}},'@/lib/adminToast':{showAdminToast(){}},'@/lib/adminCatalogWrite':{adminCatalogWrite:async payload=>{writes.push(payload);return {data:payload.values,error:null};}},'./liveBroadcastController':{setBroadcastFeedNotice:async()=>{}},'./ExcelBulkImportPopup':{default:()=>null}})('components/admin-live/AdminLiveProductManagePopup.tsx').default;
+const Panel=createUiLoader({'./WidgetProductLibraryPanel.module.css':{default:{}},'@/lib/supabase':{supabase:{from:makeQuery}},'@/lib/adminToast':{showAdminToast(){}},'@/lib/adminCatalogWrite':{adminCatalogWrite:async payload=>{writes.push(payload);return {data:payload.values,error:null};}},'./liveBroadcastController':{setBroadcastFeedNotice:async()=>{}}})('components/admin-live/AdminLiveProductManagePopup.tsx').default;
 let tree;
 await act(async()=>{tree=Renderer.create(React.createElement(Panel,{embedded:true,initialTab:'broadcast',activeBroadcastId:42,initialSearch:'NEW',onClose(){}}));});
 assert.equal(tree.root.findAllByProps({'aria-label':'NEW 수정'}).length,1,'search must find linked detail through broadcast-contained brand');
@@ -21,7 +21,7 @@ const row=tree.root.findByProps({'aria-label':'NEW 수정'}).parent;
 await act(async()=>row.findAllByType('button').find(button=>button.children.includes('📌 고정')).props.onClick());
 const pin=writes.find(write=>write.values?.widget_pin_mode==='pin');
 assert.deepEqual(pin.values,{widget_pin_mode:'pin',widget_pin_product_id:'2',widget_pin_detail_name:null});
-const pinnedChat=tree.root.findAllByType('button').find(button=>button.children.includes('📢 채팅'));
+const pinnedChat=tree.root.findAllByType('button').find(button=>button.children.includes('채팅'));
 await act(async()=>pinnedChat.props.onClick());
 assert.deepEqual(chat,{productId:'2',productName:'NEW',detailName:''});
 assert.ok(copied.includes('39,000원'));assert.equal(copied.includes('129,000원'),false);

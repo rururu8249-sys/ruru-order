@@ -8,7 +8,6 @@ import { resolveProductImageUrl } from "./quick-product/productImageUrl";
 import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { createDraftBroadcast, setBroadcastFeedNotice } from "./liveBroadcastController";
-import ExcelBulkImportPopup from "./ExcelBulkImportPopup";
 import WidgetProductLibraryPanel, { type WidgetProductLibraryItem } from "./WidgetProductLibraryPanel";
 import { brandWordmarkThumbnail, productAutoThumbUrl, productNameThumbnail } from "@/lib/brandWordmarkThumbnail";
 import { adminDetailSearch, buildDetailChatLine, detailProducts, type DetailProduct } from "@/lib/productDetailModel";
@@ -27,7 +26,6 @@ import {
 } from "@/lib/widgetProductLibrary";
 import { splitOptionText } from "@/lib/optionSplit";
 import { normalizeProductSearchText, productSearchMatches } from "@/lib/productSearch";
-import { aggregateSalesItems, eligibleSalesOrder, salesPaymentAmount, sortedSalesBroadcasts, salesProductPhotos, SALES_PAID_STATUSES, type SalesOptionGroup } from "@/lib/salesHistory";
 import { productPage } from "@/lib/productPagination";
 import ProductPagination from "./ProductPagination";
 import ProductToolbar from "./ProductToolbar";
@@ -36,7 +34,7 @@ import ProductBrandMoveDialog from "./ProductBrandMoveDialog";
 
 type ProductRow = Record<string, unknown>;
 
-export type ProductManageTab = "broadcast" | "shop" | "products" | "history";
+export type ProductManageTab = "broadcast" | "shop" | "products";
 
 type Props = {
   activeBroadcastId?: string | number | null;
@@ -49,14 +47,10 @@ type Props = {
   onSearchChange?: (search: string) => void;
   /** [2026-09-08 5단계] 페이지 안에 그대로(상품 메뉴). 팝업 껍데기·✕ 없음, 포털 안 씀 */
   embedded?: boolean;
-  /** Read-only sales workspace, mounted from 주문·입금. */
-  salesOnly?: boolean;
   headerTarget?: HTMLElement | null;
 };
 
 const BASE_CATEGORIES = ["전체", "신발", "의류", "잡화"];
-// 기록 탭: 결제완료 계열 주문만 매출/주문 집계
-const HISTORY_PAID_STATUSES = SALES_PAID_STATUSES;
 
 // --- pick helpers ---
 function pickString(row: ProductRow | null | undefined, keys: string[], fallback = "") {
@@ -243,14 +237,14 @@ function sortProductRows(rows: ProductRow[], key: ProductSortKey) {
   return copy.sort((a, b) => productCreatedAt(b) - productCreatedAt(a)); // recent
 }
 
-export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose, initialTab, onTabChange, initialSearch, onSearchChange, embedded = false, salesOnly = false, headerTarget }: Props) {
+export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose, initialTab, onTabChange, initialSearch, onSearchChange, embedded = false, headerTarget }: Props) {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [brandLinks, setBrandLinks] = useState<BrandProductLink[]>([]);
   const [brandMove, setBrandMove] = useState<{source:ProductRow;undoParentId?:string}|null>(null);
   const brandCatalog = useMemo(() => resolveBrandCatalog(products, brandLinks), [products, brandLinks]);
   const [rotationIds, setRotationIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState<ProductManageTab>(salesOnly ? "history" : initialTab === "history" ? "broadcast" : initialTab ?? "broadcast");
+  const [tab, setTab] = useState<ProductManageTab>(initialTab === "shop" || initialTab === "products" ? initialTab : "broadcast");   // 예전 기록(history) 탭 값이 와도 방송 진열로
   const [search, setSearch] = useState(initialSearch ?? "");
   const [category, setCategory] = useState("전체");
   const [productPageNumber, setProductPageNumber] = useState(1);
@@ -264,8 +258,6 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   useEffect(() => { setBcListOpen(!isNarrow); }, [isNarrow]); // 데스크톱=열림, 모바일=접힘 기본
   // 위젯 설정(일괄) 화면
   const [widgetSettingsOpen, setWidgetSettingsOpen] = useState(false);
-  // [2026-08-20] 엑셀 대량등록 팝업
-  const [excelImportOpen, setExcelImportOpen] = useState(false);
   const [wsSelected, setWsSelected] = useState<Set<string>>(new Set());
   const [wsSaving, setWsSaving] = useState(false);
 
@@ -394,21 +386,6 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
-
-  // 기록 탭(방송별 매출/주문)
-  const [histLoaded, setHistLoaded] = useState(false);
-  const [histLoading, setHistLoading] = useState(false);
-  const [histBroadcasts, setHistBroadcasts] = useState<Array<{ id: string; title: string; started_at: string; ended_at: string }>>([]);
-  const [histStats, setHistStats] = useState<Map<string, { sales: number; count: number }>>(new Map());
-  const [shopOrders, setShopOrders] = useState<Array<{ total_price: number; created_at: string }>>([]);
-  const [histYear, setHistYear] = useState("전체");
-  const [histMonth, setHistMonth] = useState("전체");
-  const [histMode, setHistMode] = useState<"all" | "broadcast" | "shop">("all");
-  const [histSearch, setHistSearch] = useState("");
-  const [histExpand, setHistExpand] = useState("");
-  const [histDetail, setHistDetail] = useState<Map<string, Array<{ key: string; name: string; productId: string; thumb: string; brandThumb: string; qty: number; price: number; sales: number; option: string; optionGroups: SalesOptionGroup[] }>>>(new Map());
-  const [histDetailLoading, setHistDetailLoading] = useState("");
-  const [historyOrders, setHistoryOrders] = useState<Record<string, unknown>[]>([]);
 
   // 상품 fetch (기존 loadProducts 재사용)
   const loadProducts = async (silent = false) => {
@@ -918,196 +895,6 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     const to = bcProducts.findIndex((p) => productId(p) === toPid);
     if (from < 0 || to < 0) return;
     void reorderBc(from, to);
-  };
-
-  // 기록 탭: 방송 목록 + 방송별 매출/주문수 집계 (broadcasts + orders)
-  const loadHistory = async () => {
-    setHistLoading(true);
-    try {
-      const { data: bc, error: bcError } = await supabase
-        .from("broadcasts")
-        .select("id, public_title, started_at, ended_at")
-        .order("started_at", { ascending: false, nullsFirst: false });
-      if (bcError) throw bcError;
-      const broadcasts = ((bc as Array<Record<string, unknown>>) || []).map((b) => ({
-        id: String(b.id),
-        title: String(b.public_title || "제목 없음"),
-        started_at: String(b.started_at || ""),
-        ended_at: String(b.ended_at || ""),
-      }));
-      const stats = new Map<string, { sales: number; count: number }>();
-      const allOrders: Record<string, unknown>[] = [];
-      for (let offset = 0; ; offset += 1000) {
-        const { data, error } = await supabase.from("orders")
-          .select("id,broadcast_id,created_at,product_id,product_name,color,size,qty,product_price,adjusted_product_price,total_price,adjusted_total_price,final_amount,admin_order_status_v2,order_status,order_manage_status,is_deleted,is_permanently_deleted,is_test_order,exclude_from_settlement,event_gift_winner_id")
-          .in("admin_order_status_v2", HISTORY_PAID_STATUSES).order("id").range(offset, offset + 999);
-        if (error) throw error;
-        const page = (data || []) as Record<string, unknown>[];
-        allOrders.push(...page.filter(eligibleSalesOrder));
-        if (page.length < 1000) break;
-      }
-      allOrders.forEach((o) => {
-          const bid = o.broadcast_id == null ? "__shop__" : String(o.broadcast_id);
-          const cur = stats.get(bid) || { sales: 0, count: 0 };
-          cur.sales += salesPaymentAmount(o);
-          cur.count += 1;
-          stats.set(bid, cur);
-      });
-      // 쇼핑몰(broadcast_id NULL) 주문 집계 → __shop__ 키(전체 합계) + shopOrders(년/월 필터용)
-      const shopList = allOrders.filter(o=>o.broadcast_id == null).map((o) => ({
-        total_price: salesPaymentAmount(o),
-        created_at: String(o.created_at || ""),
-      }));
-      setShopOrders(shopList);
-      let shopSales = 0;
-      let shopCount = 0;
-      shopList.forEach((o) => { shopSales += o.total_price; shopCount += 1; });
-      if (shopCount > 0) stats.set("__shop__", { sales: shopSales, count: shopCount });
-
-      setHistBroadcasts(broadcasts);
-      setHistStats(stats);
-      setHistoryOrders(allOrders);
-      setHistDetail(new Map());
-      setHistExpand("");
-      setHistLoaded(true);
-    } catch (e) {
-      showAdminToast("기록 불러오기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
-    } finally {
-      setHistLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (tab === "history" && !histLoaded) void loadHistory();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, histLoaded]);
-
-  // 년/월 옵션 + 필터된 방송 + 요약
-  const histYearOptions = useMemo(() => {
-    const set = new Set<string>();
-    histBroadcasts.forEach((b) => {
-      const d = new Date(b.started_at);
-      if (!Number.isNaN(d.getTime())) set.add(String(d.getFullYear()));
-    });
-    return [...set].sort((a, b) => Number(b) - Number(a));
-  }, [histBroadcasts]);
-
-  // 방송 목록 + 쇼핑몰(__shop__) 가상행
-  const histEntries = useMemo(() => {
-    const entries: Array<{ id: string; title: string; started_at: string; ended_at: string }> = sortedSalesBroadcasts(histBroadcasts, histStats);
-    if (histStats.has("__shop__")) entries.push({ id: "__shop__", title: "쇼핑몰 주문", started_at: "", ended_at: "" });
-    return entries;
-  }, [histBroadcasts, histStats]);
-
-  const histFiltered = useMemo(() => {
-    const q = histSearch.trim().toLowerCase();
-    return histEntries.filter((b) => {
-      const isShop = b.id === "__shop__";
-      if (histMode === "broadcast" && isShop) return false;
-      if (histMode === "shop" && !isShop) return false;
-      if (q && !b.title.toLowerCase().includes(q)) return false;
-      if (isShop) return shopOrders.some(o=>{
-        const d = new Date(o.created_at);
-        return (histYear === "전체" || String(d.getFullYear()) === histYear) && (histMonth === "전체" || String(d.getMonth()+1) === histMonth);
-      });
-      const d = new Date(b.started_at);
-      if (Number.isNaN(d.getTime())) return histYear === "전체" && histMonth === "전체";
-      if (histYear !== "전체" && String(d.getFullYear()) !== histYear) return false;
-      if (histMonth !== "전체" && String(d.getMonth() + 1) !== histMonth) return false;
-      return true;
-    });
-  }, [histEntries, histMode, histSearch, histYear, histMonth, shopOrders]);
-
-  // 쇼핑몰 행: 년/월 기준 클라이언트 필터 (created_at)
-  const shopFilteredStat = useMemo(() => {
-    let sales = 0;
-    let count = 0;
-    shopOrders.forEach((o) => {
-      const d = new Date(o.created_at);
-      if (histYear !== "전체" && (Number.isNaN(d.getTime()) || String(d.getFullYear()) !== histYear)) return;
-      if (histMonth !== "전체" && (Number.isNaN(d.getTime()) || String(d.getMonth() + 1) !== histMonth)) return;
-      sales += o.total_price;
-      count += 1;
-    });
-    return { sales, count };
-  }, [shopOrders, histYear, histMonth]);
-
-  const histSummary = useMemo(() => {
-    let sales = 0;
-    let count = 0;
-    let broadcastCount = 0;
-    histFiltered.forEach((b) => {
-      if (b.id === "__shop__") {
-        sales += shopFilteredStat.sales;
-        count += shopFilteredStat.count;
-        return;
-      }
-      broadcastCount += 1;
-      const st = histStats.get(b.id);
-      if (st) { sales += st.sales; count += st.count; }
-    });
-    return { broadcastCount, sales, count };
-  }, [histFiltered, histStats, shopFilteredStat]);
-
-  // 행 펼침 → 상품별 집계 (orders + products 썸네일). broadcast_id NULL이면 쇼핑몰.
-  useEffect(() => {
-    setHistExpand("");
-    setHistDetail(prev=>{const next=new Map(prev);next.delete("__shop__");return next;});
-  }, [histYear, histMonth]);
-
-  const loadBroadcastDetail = async (entryId: string) => {
-    if (histDetail.has(entryId) && entryId !== "__shop__") {
-      setHistExpand((cur) => (cur === entryId ? "" : entryId));
-      return;
-    }
-    setHistDetailLoading(entryId);
-    setHistExpand(entryId);
-    try {
-      const rows = aggregateSalesItems(historyOrders.filter(o=>{
-        if (entryId !== "__shop__") return String(o.broadcast_id) === entryId;
-        if (o.broadcast_id != null) return false;
-        const d = new Date(String(o.created_at));
-        return (histYear === "전체" || String(d.getFullYear()) === histYear) && (histMonth === "전체" || String(d.getMonth()+1) === histMonth);
-      }));
-      const pids = rows.map((r) => r.productId).filter(Boolean);
-      if (pids.length > 0) {
-        const { data: prods, error } = await supabase.from("products").select("id, product_name, image_url, product_note").in("id", pids);
-        if (error) throw error;
-        const byId = new Map(((prods as ProductRow[]) || []).map(p=>[String(p.id),p]));
-        rows.forEach(r=>{
-          const product=byId.get(r.productId);
-          if (!product) return;
-          const photos=salesProductPhotos(r.name,product,r.productId);
-          r.thumb=photos.detail ? resolveProductImageUrl(photos.detail) : '';
-          r.brandThumb=photos.brand ? resolveProductImageUrl(photos.brand) : '';
-        });
-      }
-      // product_id로 못 찾은 행(또는 product_id 없는 행) → products 전체 조회 후 product_name 클라이언트 매칭
-      const nameRows = rows.filter((r) => !r.thumb && !r.brandThumb && r.name);
-      if (nameRows.length > 0) {
-        const allProds: ProductRow[]=[];
-        for(let offset=0;;offset+=1000){
-          const {data,error}=await supabase.from('products').select('id, product_name, image_url, product_note').order('id').range(offset,offset+999);
-          if(error) throw error;
-          const page=(data||[]) as ProductRow[];
-          allProds.push(...page);
-          if(page.length<1000) break;
-        }
-        nameRows.forEach(r=>{
-          const candidates=allProds.map(p=>salesProductPhotos(r.name,p)).filter(p=>p.detail);
-          // A missing legacy ID never permits guessing between brand parents.
-          if(candidates.length!==1) return;
-          r.thumb=resolveProductImageUrl(candidates[0].detail);
-          r.brandThumb=candidates[0].brand ? resolveProductImageUrl(candidates[0].brand) : '';
-        });
-      }
-      const detailRows = rows;
-      setHistDetail((prev) => new Map(prev).set(entryId, detailRows));
-    } catch (e) {
-      showAdminToast("상세 불러오기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
-    } finally {
-      setHistDetailLoading("");
-    }
   };
 
   // 재고임박 필터 (전체 상품 탭): 재고관리 중 && 재고 3개 이하
@@ -1798,31 +1585,18 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         ? { width: "100%", height: "100%", display: "flex", flexDirection: "column", background: "var(--color-surface)", overflow: "hidden" }
         : { width: "960px", maxWidth: "100%", flexShrink: 0, height: "680px", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "12px", overflow: "hidden" }}>
         {/* 헤더 */}
-        {!salesOnly && headerTarget && createPortal(<ProductToolbar tab={tab} onTab={setTab} onImport={()=>setExcelImportOpen(true)} onCreate={openCreate} />,headerTarget)}
-        {!salesOnly && !embedded && <div style={{ display: "flex", alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--color-line)" }}>
-          <span style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-rose-deep)" }}>📦 상품 관리</span>
-          <button type="button" onClick={() => setExcelImportOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "13px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-surface)", border: "1.5px solid var(--color-rose-deep)", borderRadius: "8px", padding: "6px 12px", cursor: "pointer", marginLeft: "auto" }}>📄 엑셀 대량등록</button>
+        {headerTarget && createPortal(<ProductToolbar tab={tab} onTab={setTab} onCreate={openCreate} />,headerTarget)}
+        {!embedded && <div style={{ display: "flex", alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--color-line)" }}>
+          <span style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-rose-deep)" }}>상품 관리</span>
           <button type="button" onClick={openCreate} style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "13px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "8px", padding: "8px 12px", cursor: "pointer", marginLeft: "8px" }}>+ 상품 등록</button>
           {embedded ? null : <button type="button" onClick={onClose} style={{ marginLeft: "8px", border: "none", background: "none", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>✕</button>}
         </div>}
 
-        {excelImportOpen ? (
-          <ExcelBulkImportPopup
-            onClose={() => setExcelImportOpen(false)}
-            onDone={() => {
-              void loadProducts(true);
-              if (bcSelId) void reloadBcProducts(bcSelId);
-            }}
-            targetBroadcastId={tab === "broadcast" ? bcSelId : null}
-            targetBroadcastTitle={tab === "broadcast" ? (bcList.find((broadcast) => broadcast.id === bcSelId)?.title || "") : ""}
-          />
-        ) : null}
-
         {/* 탭 2개 */}
         {/* [2026-09-20 사장님 폰 화면 깨짐] 「방송 상\n품」처럼 탭 글자가 잘렸다 → 줄바꿈 금지 + 넘치면 가로 스크롤 */}
-        {!salesOnly && embedded && !headerTarget && <ProductToolbar tab={tab} onTab={setTab} onImport={()=>setExcelImportOpen(true)} onCreate={openCreate} />}
-        {!salesOnly && !embedded && <div style={{ display: "flex", gap: "2px", padding: "0 16px", borderBottom: "1px solid var(--color-line)", overflowX: "auto", scrollbarWidth: "none" }}>
-          {([["broadcast", "방송 상품"], ["shop", "쇼핑몰 진열"], ["products", "전체 상품"]] as const).map(([k, l]) => (
+        {embedded && !headerTarget && <ProductToolbar tab={tab} onTab={setTab} onCreate={openCreate} />}
+        {!embedded && <div style={{ display: "flex", gap: "2px", padding: "0 16px", borderBottom: "1px solid var(--color-line)", overflowX: "auto", scrollbarWidth: "none" }}>
+          {([["broadcast", "방송 진열"], ["shop", "쇼핑몰 진열"], ["products", "전체 상품"]] as const).map(([k, l]) => (
             <button
               key={k}
               type="button"
@@ -1836,137 +1610,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
           ))}
         </div>}
 
-        {tab === "history" ? (
-          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 32px 16px 16px", maxWidth: "1040px", width: "100%", margin: "0 auto" }}>
-            {/* 요약카드 3개 */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "12px" }}>
-              {([
-                ["판매 있는 방송", `${histSummary.broadcastCount}회`],
-                ["결제금액 합계", money(histSummary.sales)],
-                ["결제완료 주문 품목", `${histSummary.count.toLocaleString("ko-KR")}건`],
-              ] as const).map(([label, value]) => (
-                <div key={label} style={{ border: "1px solid var(--color-line)", borderRadius: "8px", padding: "12px 8px", textAlign: "center", background: "var(--color-surface-2)" }}>
-                  <div style={{ fontSize: "13px", color: "var(--color-ink-soft)", marginBottom: "4px" }}>{label}</div>
-                  <div style={{ fontSize: "20px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{value}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* 필터: 모드 + 년/월 */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
-              <select value={histMode} onChange={(e) => setHistMode(e.target.value as "all" | "broadcast" | "shop")} style={{ height: "34px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 8px", fontSize: "13px", background: "var(--color-surface)", cursor: "pointer", color: "var(--color-ink)" }}>
-                <option value="all">전체</option>
-                <option value="broadcast">방송모드</option>
-                <option value="shop">쇼핑몰모드</option>
-              </select>
-              <select value={histYear} onChange={(e) => setHistYear(e.target.value)} style={{ height: "34px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 8px", fontSize: "13px", background: "var(--color-surface)", cursor: "pointer", color: "var(--color-ink)" }}>
-                <option value="전체">전체 연도</option>
-                {histYearOptions.map((y) => <option key={y} value={y}>{y}년</option>)}
-              </select>
-              <select value={histMonth} onChange={(e) => setHistMonth(e.target.value)} style={{ height: "34px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 8px", fontSize: "13px", background: "var(--color-surface)", cursor: "pointer", color: "var(--color-ink)" }}>
-                <option value="전체">전체 월</option>
-                {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((m) => <option key={m} value={m}>{m}월</option>)}
-              </select>
-              <input value={histSearch} onChange={(e) => setHistSearch(e.target.value)} placeholder="🔍 방송명 검색" style={{ flex: 1, minWidth: "120px", height: "34px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 8px", fontSize: "13px", outline: "none", color: "var(--color-ink)" }} />
-              <button type="button" disabled={histLoading} onClick={()=>void loadHistory()} style={{border:"1px solid var(--color-line)",borderRadius:8,padding:"0 12px",background:"var(--color-surface)",color:"var(--color-ink)",cursor:"pointer"}}>새로고침</button>
-            </div>
-            <p style={{fontSize:13,color:"var(--color-ink-soft)",margin:"0 0 12px"}}>최근 방송부터 표시합니다. 결제완료 주문만 집계하며 취소·삭제·테스트·이벤트 선물은 제외합니다. 방송을 선택하면 판매 품목을 확인할 수 있습니다.</p>
-
-            {/* 방송/쇼핑몰 목록 */}
-            {histLoading ? (
-              <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>불러오는 중…</div>
-            ) : histFiltered.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "14px", fontWeight: 700, lineHeight: 1.7 }}>선택한 조건에 결제완료 판매기록이 없습니다. 기간이나 검색어를 변경해 주세요.</div>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: isNarrow ? "minmax(0,1fr)" : "minmax(280px, 340px) minmax(0, 1fr)", gap: "16px", alignItems:"start" }}>
-                {/* Separate columns: detail height must never size the broadcast list rows. */}
-                <nav aria-label="판매 방송 목록" style={{display:"flex",flexDirection:"column",gap:8,minWidth:0,maxHeight:isNarrow ? 240 : "max(160px, calc(100dvh - 350px))",overflowY:"auto"}}>
-                {histFiltered.map((b) => {
-                  const isShop = b.id === "__shop__";
-                  const st = isShop ? shopFilteredStat : (histStats.get(b.id) || { sales: 0, count: 0 });
-                  const expanded = histExpand === b.id;
-                  const d = new Date(b.started_at);
-                  const dateLabel = isShop ? "상시 판매" : Number.isNaN(d.getTime()) ? "-" : `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
-                  return (
-                    <div key={b.id}>
-                      {/* 헤더 행 */}
-                      <div role="button" tabIndex={0} aria-expanded={expanded} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();void loadBroadcastDetail(b.id);}}} onClick={() => void loadBroadcastDetail(b.id)} style={{border:"1px solid "+(expanded ? "var(--color-rose-deep)" : "var(--color-line)"),borderRadius:10,display: "flex", flexWrap:"wrap",alignItems: "center", gap: "8px", padding: "12px", cursor: "pointer", background: expanded ? "var(--color-rose-soft)" : "var(--color-surface)" }}>
-                        <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, padding: "4px 8px", borderRadius: "8px", background: isShop ? "var(--color-ok-bg)" : "var(--color-warn-bg)", color: isShop ? "var(--color-ok-tx)" : "var(--color-warn-tx)" }}>{isShop ? "🛍 쇼핑몰" : "📺 방송"}</span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-ink)", overflowWrap:"anywhere" }}>{b.title}</div>
-                          <div style={{ fontSize: "11px", color: "var(--color-ink-soft)", marginTop: "2px" }}>{dateLabel}</div>
-                        </div>
-                        <div style={{ textAlign: "right", flexShrink: 0,marginLeft:"auto" }}>
-                          <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{money(st.sales)}</div>
-                          <div style={{ fontSize: "11px", color: "var(--color-ink-soft)", marginTop: "2px" }}>주문 {st.count.toLocaleString("ko-KR")}건</div>
-                        </div>
-                        <span style={{ flexShrink: 0, color: "var(--color-ink-soft)", fontSize: "12px" }}>{expanded ? "▴" : "▾"}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-                </nav>
-                {!histFiltered.some(b=>b.id===histExpand) ? <div style={{border:"1px dashed var(--color-line)",borderRadius:12,padding:24,color:"var(--color-ink-soft)",fontSize:15}}>방송을 선택하면 이곳에 판매 품목이 표시됩니다.</div> : null}
-                {histFiltered.filter(b=>b.id===histExpand).map(b=>{
-                  const st=b.id==="__shop__" ? shopFilteredStat : (histStats.get(b.id)||{sales:0,count:0});
-                  const detail=histDetail.get(b.id);
-                  const detailSubtotal=(detail||[]).reduce((acc,r)=>({sales:acc.sales+r.sales,qty:acc.qty+r.qty}),{sales:0,qty:0});
-                  return (<div key={b.id}>
-                      {/* 펼침: 상품별 상세 */}
-                        <section aria-label="선택 방송 판매 품목" style={{border:"1px solid var(--color-line)",borderRadius:12,padding: "16px", background: "var(--color-surface)",minWidth:0,overflowX:"auto" }}>
-                          <h3 style={{fontSize:18,margin:"0 0 6px",color:"var(--color-ink)"}}>{b.title} · 판매 품목</h3>
-                          <p style={{fontSize:13,margin:"0 0 16px",color:"var(--color-ink-soft)"}}>결제금액 {money(st.sales)} · 아래 상품 소계는 배송비·카드 수수료·포인트 차감과 구분됩니다.</p>
-                          {histDetailLoading === b.id && !detail ? (
-                            <div style={{ textAlign: "center", padding: "16px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>불러오는 중…</div>
-                          ) : !detail || detail.length === 0 ? (
-                            <div style={{ textAlign: "center", padding: "16px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>주문이 없습니다. 방송 중 손님이 주문하면 여기에 바로 나옵니다.</div>
-                          ) : (
-                            <>
-                              {/* 펼침 헤더: 빈칸 / 상품명·옵션 / 수량 / 단가 / 매출 */}
-                              <div style={{ minWidth:560,display: "grid", gridTemplateColumns: "110px minmax(180px,1fr) 44px 82px 96px", gap: "8px", alignItems: "center", padding: "8px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink-soft)",background:"var(--color-surface-2)", borderBottom: "1px solid var(--color-line)" }}>
-                                <span>상품 사진·상품명</span>
-                                <span>구매 옵션별 수량</span>
-                                <span style={{ textAlign: "right" }}>수량</span>
-                                <span style={{ textAlign: "right" }}>단가</span>
-                                <span style={{ textAlign: "right" }}>매출</span>
-                              </div>
-                              {detail.map((r,index) => (
-                                <div key={r.key} style={{minWidth:560, display: "grid", gridTemplateColumns: "110px minmax(180px,1fr) 44px 82px 96px", gap: "8px", alignItems: "start", padding: "12px 8px",background:index%2 ? "var(--color-surface-2)" : "var(--color-surface)",fontVariantNumeric:"tabular-nums", borderBottom: "1px solid var(--color-line)" }}>
-                                  <div style={{minWidth:0}}>
-                                    <div style={{display:'flex',gap:6,alignItems:'flex-end',marginBottom:8}}>
-                                      <button type="button" aria-label={`${r.name} 상품 사진 확대`} disabled={!r.thumb} onClick={()=>setImagePreviewUrl(r.thumb)} style={{width:64,height:72,padding:0,borderRadius:8,border:'1px solid var(--color-line)',overflow:'hidden',background:'var(--color-surface)',cursor:r.thumb?'zoom-in':'default'}}>
-                                        {r.thumb ? <img src={r.thumb} alt={`${r.name} 실제 상품`} style={{width:'100%',height:'100%',objectFit:'contain'}}/> : <span style={{fontSize:11,color:'var(--color-ink-soft)'}}>세부 사진<br/>미등록</span>}
-                                      </button>
-                                      {r.brandThumb && r.brandThumb!==r.thumb ? <img src={r.brandThumb} alt={`${r.name} 브랜드 대표`} style={{width:24,height:24,objectFit:'contain',borderRadius:6}}/> : null}
-                                    </div>
-                                    <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-ink)",overflowWrap:"anywhere" }}>{r.name}</div>
-                                  </div>
-                                  <div aria-label={`${r.name} 구매 옵션별 수량`} style={{display:'grid',gap:6,minWidth:0}}>
-                                    {r.optionGroups.map(group=><div key={group.label} style={{display:'grid',gridTemplateColumns:group.label?'minmax(32px,auto) 1fr':'1fr',gap:8,padding:'6px 8px',borderRadius:8,border:'1px solid var(--color-line)',background:'var(--color-surface)',fontSize:13,lineHeight:1.5}}>
-                                      {group.label ? <strong style={{color:'var(--color-ink)',overflowWrap:'anywhere',maxWidth:72}}>{group.label}</strong>:null}
-                                      <div style={{display:'flex',flexWrap:'wrap',gap:'4px 12px',minWidth:0}}>{group.sizes.map(size=><span key={size.label} style={{color:'var(--color-ink-soft)',overflowWrap:'anywhere'}}>{size.label} <strong style={{color:'#b42318',fontWeight:800,whiteSpace:'nowrap'}}>{size.qty.toLocaleString('ko-KR')}개</strong></span>)}</div>
-                                    </div>)}
-                                  </div>
-                                  <div style={{ textAlign: "right", fontSize: "14px", fontWeight: 800, color: "#b42318" }}>{r.qty.toLocaleString("ko-KR")}개</div>
-                                  <div style={{ textAlign: "right", fontSize: "13px", color: "var(--color-ink-soft)" }}>{money(r.price)}</div>
-                                  <div style={{ textAlign: "right", fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{money(r.sales)}</div>
-                                </div>
-                              ))}
-                              {/* 상품 소계 (N종) */}
-                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "8px", fontSize: "12px", fontWeight: 800 }}>
-                                <span style={{ color: "var(--color-ink)" }}>상품 소계 ({detail.length}종)</span>
-                                <span style={{ color: "var(--color-rose-deep)" }}>{money(detailSubtotal.sales)}</span>
-                              </div>
-                            </>
-                          )}
-                        </section>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        ) : tab === "broadcast" ? (
+        {tab === "broadcast" ? (
           <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: isNarrow ? "column" : "row", gap: "12px", padding: "12px 16px 16px" }}>
             {/* 좌측: 방송 목록 */}
             <div style={{ width: isNarrow ? "100%" : "260px", flexShrink: 0, ...(isNarrow && bcListOpen ? { maxHeight: "210px" } : {}), display: "flex", flexDirection: "column", border: "1px solid var(--color-line)", borderRadius: "8px", overflow: "hidden" }}>
@@ -2029,7 +1673,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 {bcLoading ? (
                   <div style={{ textAlign: "center", padding: "32px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>불러오는 중…</div>
                 ) : bcList.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>방송이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "4px" }}>방송 콘솔에서 ▶ 방송시작을 누르면 여기에 나옵니다.</div></div>
+                  <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>방송 없음 — 방송 시작 후 생김</div></div>
                 ) : bcListView.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "24px 12px", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700, lineHeight: 1.6 }}>조건에 맞는 방송이 없습니다.<br /><span style={{ fontSize: "11px" }}>기간을 「전체」로 바꾸거나 검색어를 지워보세요.</span></div>
                 ) : (
@@ -2073,7 +1717,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   <select
                     value={bcSort}
                     onChange={(e) => setBcSort(e.target.value as ProductSortKey)}
-                    title="화면에 보이는 순서만 바꿉니다. 저장된 진열 순서는 그대로예요."
+                    title="보기 순서만 바꿈(저장 안 됨)"
                     style={{ height: "26px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 800, padding: "0 6px", cursor: "pointer" }}
                   >
                     {PRODUCT_SORT_OPTIONS.map((o) => (<option key={o.key} value={o.key}>{o.label}</option>))}
@@ -2106,7 +1750,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     onTogglePause={() => void toggleWidgetLibraryPause()}
                   />
                 ) : null}
-                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 8px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid var(--color-line)", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="상품명 검색" style={{ width: "100%", height: "34px", padding: "0 8px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid var(--color-line)", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
                 {bcSelId && bcProducts.length > 0 && !bcDragEnabled && !bcCopyMode ? (
                   <div style={{ margin: "0 0 8px", padding: "6px 8px", borderRadius: "8px", background: "var(--color-warn-bg)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 700, lineHeight: 1.4 }}>
                     {search.trim() ? "🔍 검색 중에는 순서를 바꿀 수 없어요. 검색어를 지워주세요." : "↕ 순서를 바꾸려면 정렬을 「진열 순서 (드래그)」로 두세요. (지금은 보기만 바뀐 상태 — 저장된 순서는 그대로)"}
@@ -2172,7 +1816,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           onClick={() => void setChatCurrentAndCopy(pinnedRow, pinnedDetail)}
                           title="이 상품 안내글을 복사합니다"
                           style={{ flexShrink: 0, fontSize: "11px", fontWeight: 900, color: "var(--color-ink-soft)", background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}
-                        >📢 채팅</button>
+                        >채팅</button>
                       ) : null}
                       {/* [2026-09-19 사장님] 「고정 상태에서는 왜 상품 수정이 안 돼?」 — 고정 상품 줄은 목록에서 빠지는데(08-29 중복 방지)
                           이 카드엔 [수정]이 없어 닿을 수 없었다. 목록 줄과 같은 editProduct. */}
@@ -2206,7 +1850,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 {!bcSelId ? (
                   <div style={{ textAlign: "center", padding: "32px 0", color: "var(--color-ink-mute)", fontSize: "12px", fontWeight: 700 }}>방송을 선택하세요.</div>
                 ) : bcProducts.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>진열된 상품이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "4px" }}>아래 목록에서 상품을 골라 「진열」을 누르면 손님 화면에 올라갑니다.</div></div>
+                  <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>진열된 상품 없음 — 아래에서 골라 「진열」</div></div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                     {bcProductsView.filter(p=>{
@@ -2239,11 +1883,11 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             <span onClick={(e) => { e.stopPropagation(); if (img) setLightbox(img); }} style={{ width: "48px", height: "48px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: img ? "zoom-in" : "default" }}>{img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "18px" }}>🖼</span>}</span>
                             <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div><div style={{ fontSize: "11px", fontWeight: 800, color: isBrandFolder ? "var(--color-ink-soft)" : "var(--color-rose-deep)", marginTop: "2px" }}>{isBrandFolder ? `브랜드 그룹 · 세부상품 ${allDetails.length}개` : productPriceLabel(p)}</div></div>
                             {isBrandFolder && !bcCopyMode ? <button type="button" onClick={(e) => { e.stopPropagation(); setBcExpanded((prev) => { const next = new Set(prev); if (next.has(pid)) next.delete(pid); else next.add(pid); return next; }); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}>{expanded ? "접기" : "세부상품"}</button> : null}
-                            {!isBrandFolder && !bcCopyMode ? <><button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void broadcastOneClick(p); }} title="고정 + 채팅 현재상품 + 문구 복사를 한 번에 — 유튜브 채팅엔 붙여넣기만 하면 돼요" style={{ flexShrink: 0, fontSize: "11px", fontWeight: 900, borderRadius: "8px", padding: "6px 8px", cursor: bcPinBusy ? "wait" : "pointer", color: "#fff", background: "var(--color-ok-tx)", border: "1px solid var(--color-ok-tx)" }}>▶ 방송</button><button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void pinBroadcastProduct(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, borderRadius: "8px", padding: "6px 8px", cursor: bcPinBusy ? "wait" : "pointer", color: parentPinned ? "#fff" : "var(--color-ink-soft)", background: parentPinned ? "var(--color-rose-deep)" : "var(--color-surface-2)", border: `1px solid ${parentPinned ? "var(--color-rose-deep)" : "var(--color-line)"}` }}>{parentPinned ? "📌 고정중" : "📌 고정"}</button><button type="button" onClick={(e) => { e.stopPropagation(); void setChatCurrentAndCopy(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}>📢 채팅</button></> : null}
+                            {!isBrandFolder && !bcCopyMode ? <><button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void broadcastOneClick(p); }} title="고정·채팅 현재상품·문구 복사" style={{ flexShrink: 0, fontSize: "11px", fontWeight: 900, borderRadius: "8px", padding: "6px 8px", cursor: bcPinBusy ? "wait" : "pointer", color: "var(--color-ink)", background: "var(--color-surface)", border: "1px solid var(--color-line)" }}>방송</button><button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void pinBroadcastProduct(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, borderRadius: "8px", padding: "6px 8px", cursor: bcPinBusy ? "wait" : "pointer", color: parentPinned ? "#fff" : "var(--color-ink-soft)", background: parentPinned ? "var(--color-rose-deep)" : "var(--color-surface-2)", border: `1px solid ${parentPinned ? "var(--color-rose-deep)" : "var(--color-line)"}` }}>{parentPinned ? "📌 고정중" : "📌 고정"}</button><button type="button" onClick={(e) => { e.stopPropagation(); void setChatCurrentAndCopy(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}>채팅</button></> : null}
                             <button type="button" onClick={(e) => { e.stopPropagation(); editProduct(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}>수정</button>
-                            <button type="button" disabled={bcBusy} onClick={(e) => { e.stopPropagation(); void removeBcProduct(pid); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", border: "none", borderRadius: "8px", padding: "6px 8px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcBusy ? 0.6 : 1 }}>빼기</button>
+                            <button type="button" disabled={bcBusy} onClick={(e) => { e.stopPropagation(); void removeBcProduct(pid); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "6px 8px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcBusy ? 0.6 : 1 }}>빼기</button>
                           </div>
-                          {isBrandFolder && expanded ? <div style={{ borderTop: "1px solid var(--color-line)", padding: "8px", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", gap: "6px" }}>{detailRows.filter((detail) => bcCopyMode || !isBroadcastPinned(pid, detail.detailName)).map((detail) => { const pinned=isBroadcastPinned(pid,detail.detailName); const optionText=[detail.colors.length?`색상 ${detail.colors.join(",")}`:"",detail.sizes.length?`사이즈 ${detail.sizes.join(",")}`:""].filter(Boolean).join(" · ")||"옵션 없음"; return <div key={broadcastPinKey(pid,detail.detailName)} style={{ display:"grid",gridTemplateColumns:"44px minmax(0,1fr) auto auto auto auto",gap:"8px",alignItems:"center",border:pinned?"2px solid var(--color-rose-deep)":"1px solid var(--color-line)",borderRadius:"8px",padding:"8px",background:pinned?"var(--color-rose-soft)":"var(--color-surface)" }}><button type="button" onClick={()=>detail.image&&setLightbox(detail.image)} style={{width:42,height:42,border:0,borderRadius:7,overflow:"hidden",padding:0,background:"var(--color-surface-2)"}}>{detail.image?<img src={detail.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🖼"}</button><div style={{minWidth:0}}><div style={{fontSize:"12px",fontWeight:900,color:"var(--color-ink)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{detail.detailName}</div><div style={{fontSize:"11px",fontWeight:800,color:"var(--color-rose-deep)",marginTop:2}}>{detail.price.toLocaleString("ko-KR")}원</div><div style={{fontSize:"11px",fontWeight:700,color:"var(--color-ink-soft)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{optionText}{detail.stockManaged&&detail.stock!==null?` · 재고 ${detail.stock}`:""}</div></div><button type="button" disabled={bcPinBusy} onClick={()=>void broadcastOneClick(p,detail)} title="고정 + 채팅 현재상품 + 문구 복사를 한 번에 — 유튜브 채팅엔 붙여넣기만 하면 돼요" style={{fontSize:"11px",fontWeight:900,borderRadius:6,padding:"6px 8px",color:"#fff",background:"var(--color-ok-tx)",border:"1px solid var(--color-ok-tx)"}}>▶ 방송</button><button type="button" disabled={bcPinBusy} onClick={()=>void pinBroadcastProduct(p,detail)} style={{fontSize:"11px",fontWeight:900,borderRadius:6,padding:"6px 8px",color:pinned?"#fff":"var(--color-ink-soft)",background:pinned?"var(--color-rose-deep)":"var(--color-surface-2)",border:`1px solid ${pinned?"var(--color-rose-deep)":"var(--color-line)"}`}}>{pinned?"📌 고정중":"📌 고정"}</button><button type="button" aria-label={`${detail.detailName} 수정`} onClick={(event)=>{event.stopPropagation();editProduct(p,detail.detailName);}} style={{fontSize:"11px",fontWeight:900,color:"var(--color-rose-deep)",background:"var(--color-rose-soft)",border:"1px solid var(--color-rose-line)",borderRadius:6,padding:"6px 8px",cursor:"pointer"}}>수정</button><button type="button" onClick={()=>void setChatCurrentAndCopy(p,detail)} style={{fontSize:"11px",fontWeight:900,color:"var(--color-ink-soft)",background:"var(--color-surface-2)",border:"1px solid var(--color-line)",borderRadius:6,padding:"6px 8px"}}>📢 채팅</button></div>})}{detailRows.length>0&&detailRows.filter((detail)=>bcCopyMode||!isBroadcastPinned(pid,detail.detailName)).length===0?<div style={{padding:"8px",textAlign:"center",fontSize:"11px",fontWeight:700,color:"var(--color-ink-mute)"}}>📌 고정 중인 상품이라 맨 위 카드에 있습니다.</div>:null}</div> : null}
+                          {isBrandFolder && expanded ? <div style={{ borderTop: "1px solid var(--color-line)", padding: "8px", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", gap: "6px" }}>{detailRows.filter((detail) => bcCopyMode || !isBroadcastPinned(pid, detail.detailName)).map((detail) => { const pinned=isBroadcastPinned(pid,detail.detailName); const optionText=[detail.colors.length?`색상 ${detail.colors.join(",")}`:"",detail.sizes.length?`사이즈 ${detail.sizes.join(",")}`:""].filter(Boolean).join(" · ")||"옵션 없음"; return <div key={broadcastPinKey(pid,detail.detailName)} style={{ display:"grid",gridTemplateColumns:"44px minmax(0,1fr) auto auto auto auto",gap:"8px",alignItems:"center",border:pinned?"2px solid var(--color-rose-deep)":"1px solid var(--color-line)",borderRadius:"8px",padding:"8px",background:pinned?"var(--color-rose-soft)":"var(--color-surface)" }}><button type="button" onClick={()=>detail.image&&setLightbox(detail.image)} style={{width:42,height:42,border:0,borderRadius:7,overflow:"hidden",padding:0,background:"var(--color-surface-2)"}}>{detail.image?<img src={detail.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🖼"}</button><div style={{minWidth:0}}><div style={{fontSize:"12px",fontWeight:900,color:"var(--color-ink)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{detail.detailName}</div><div style={{fontSize:"11px",fontWeight:800,color:"var(--color-rose-deep)",marginTop:2}}>{detail.price.toLocaleString("ko-KR")}원</div><div style={{fontSize:"11px",fontWeight:700,color:"var(--color-ink-soft)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{optionText}{detail.stockManaged&&detail.stock!==null?` · 재고 ${detail.stock}`:""}</div></div><button type="button" disabled={bcPinBusy} onClick={()=>void broadcastOneClick(p,detail)} title="고정·채팅 현재상품·문구 복사" style={{fontSize:"11px",fontWeight:900,borderRadius:6,padding:"6px 8px",color:"var(--color-ink)",background:"var(--color-surface)",border:"1px solid var(--color-line)"}}>방송</button><button type="button" disabled={bcPinBusy} onClick={()=>void pinBroadcastProduct(p,detail)} style={{fontSize:"11px",fontWeight:900,borderRadius:6,padding:"6px 8px",color:pinned?"#fff":"var(--color-ink-soft)",background:pinned?"var(--color-rose-deep)":"var(--color-surface-2)",border:`1px solid ${pinned?"var(--color-rose-deep)":"var(--color-line)"}`}}>{pinned?"📌 고정중":"📌 고정"}</button><button type="button" aria-label={`${detail.detailName} 수정`} onClick={(event)=>{event.stopPropagation();editProduct(p,detail.detailName);}} style={{fontSize:"11px",fontWeight:900,color:"var(--color-rose-deep)",background:"var(--color-rose-soft)",border:"1px solid var(--color-rose-line)",borderRadius:6,padding:"6px 8px",cursor:"pointer"}}>수정</button><button type="button" onClick={()=>void setChatCurrentAndCopy(p,detail)} style={{fontSize:"11px",fontWeight:900,color:"var(--color-ink-soft)",background:"var(--color-surface-2)",border:"1px solid var(--color-line)",borderRadius:6,padding:"6px 8px"}}>채팅</button></div>})}{detailRows.length>0&&detailRows.filter((detail)=>bcCopyMode||!isBroadcastPinned(pid,detail.detailName)).length===0?<div style={{padding:"8px",textAlign:"center",fontSize:"11px",fontWeight:700,color:"var(--color-ink-mute)"}}>고정 중인 상품이라 맨 위 카드에 있습니다.</div>:null}</div> : null}
                         </div>
                       );
                     })}
@@ -2260,7 +1904,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 <select
                   value={shopSort}
                   onChange={(e) => setShopSort(e.target.value as ProductSortKey)}
-                  title="화면에 보이는 순서만 바꿉니다. 저장된 진열 순서는 그대로예요."
+                  title="보기 순서만 바꿈(저장 안 됨)"
                   style={{ marginLeft: "auto", height: "26px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 800, padding: "0 6px", cursor: "pointer" }}
                 >
                   {PRODUCT_SORT_OPTIONS.map((o) => (<option key={o.key} value={o.key}>{o.label}</option>))}
@@ -2268,7 +1912,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               ) : null}
               <button type="button" disabled={shopBusy} onClick={openShopPicker} style={{ marginLeft: shopRows.length > 0 ? undefined : "auto", fontSize: "11px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "8px", padding: "4px 12px", cursor: shopBusy ? "wait" : "pointer", opacity: shopBusy ? 0.5 : 1 }}>+ 쇼핑몰에 상품 추가</button>
             </div>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "34px", padding: "0 8px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid var(--color-line)", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="상품명 검색" style={{ width: "100%", height: "34px", padding: "0 8px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid var(--color-line)", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
             <div
               ref={shopScrollRef}
               onDragOver={handleShopDragAutoScroll}
@@ -2322,7 +1966,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
           <>
             {/* 검색 */}
             <div style={{ padding: "0 16px 8px" }}>
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none", color: "var(--color-ink)" }} />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="상품명 검색" style={{ width: "100%", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none", color: "var(--color-ink)" }} />
             </div>
 
             {/* 카테고리 칩 */}
@@ -2364,7 +2008,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               {loading ? (
                 <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>불러오는 중…</div>
               ) : visible.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>등록된 상품이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "4px" }}>오른쪽 위 「+ 상품 등록」 또는 「📄 엑셀 대량등록」으로 추가하세요.</div></div>
+                <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 800, color: "var(--color-ink-soft)" }}>등록된 상품이 없습니다.</div><div style={{ fontSize: "12px", marginTop: "4px" }}>「+ 상품 등록」으로 추가하세요</div></div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   {visible.map((p) => {
@@ -2427,7 +2071,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                               return (
                                 <div style={{ marginTop: "4px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>
                                   재고 {m.stock.toLocaleString("ko-KR")}개
-                                  <button type="button" onClick={() => { setInlineStockId(id); setInlineStockText(String(m.stock)); }} style={{ marginLeft: "4px", fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "4px", padding: "2px 8px", cursor: "pointer" }}>✎ 수정</button>
+                                  <button type="button" onClick={() => { setInlineStockId(id); setInlineStockText(String(m.stock)); }} style={{ marginLeft: "4px", fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "4px", padding: "2px 8px", cursor: "pointer" }}>수정</button>
                                 </div>
                               );
                             }
@@ -2477,7 +2121,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                               );
                             }}
                             style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ok-tx)", background: "var(--color-ok-bg)", border: "none", borderRadius: "8px", padding: "6px 12px", cursor: "pointer" }}
-                          >🔗 링크</button>
+                          >링크</button>
                           <button type="button" onClick={() => duplicateProduct(p)} title="이 상품 내용으로 새 상품 등록 폼 열기" style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "6px 12px", cursor: "pointer" }}>복제</button>
                           <button type="button" onClick={() => void deleteProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", border: "none", borderRadius: "8px", padding: "6px 12px", cursor: "pointer" }}>삭제</button>
                             </div>
@@ -2530,7 +2174,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
           <div style={{ width: "520px", maxWidth: "100%", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "12px", overflow: "hidden" }}>
             {/* 헤더 */}
             <div style={{ display: "flex", alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--color-line)" }}>
-              <span style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>📺 위젯 설정</span>
+              <span style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>위젯 설정</span>
               <button type="button" onClick={() => setWidgetSettingsOpen(false)} style={{ marginLeft: "auto", border: "none", background: "none", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>✕</button>
             </div>
 
@@ -2649,7 +2293,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   onChange={(e) => { const v = e.target.value; if (!v) return; setBcPickerFromBcId(""); setBcPickerFromIds(null); setBcPickerDate(v); }}
                   style={{ height: "34px", borderRadius: "999px", border: "1.5px solid " + (bcPickerDate && bcPickerDate !== todayStr && bcPickerDate !== yesterdayStr ? "var(--color-rose-deep)" : "var(--color-rose-line)"), padding: "0 8px", fontSize: "12px", fontWeight: 800, outline: "none", color: "var(--color-rose-deep)", background: "var(--color-surface)", maxWidth: "170px" }}
                 >
-                  <option value="">📅 다른 등록일…</option>
+                  <option value="">다른 등록일</option>
                   {bcPickerDateGroups.map(([d, n]) => <option key={d} value={d}>🗓 {d} 등록 · {n}개</option>)}
                 </select>
               </div>
@@ -2658,14 +2302,14 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 onChange={(e) => { setBcPickerDate(""); void changeBcPickerFrom(e.target.value); }}
                 style={{ width: "100%", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 8px", fontSize: "13px", fontWeight: 700, outline: "none", color: "var(--color-ink)", background: "var(--color-surface)" }}
               >
-                <option value="">📺 지난 방송에서 불러오기…</option>
+                <option value="">지난 방송에서 불러오기</option>
                 {bcList.filter((b) => b.id !== bcSelId).map((b) => {
                   const d = new Date(b.started_at);
                   const dateLabel = Number.isNaN(d.getTime()) ? "" : ` (${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")})`;
                   return <option key={b.id} value={b.id}>📺 {b.title}{dateLabel} 방송에서 불러오기</option>;
                 })}
               </select>
-              <input value={bcPickerSearch} onChange={(e) => setBcPickerSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none", color: "var(--color-ink)" }} />
+              <input value={bcPickerSearch} onChange={(e) => setBcPickerSearch(e.target.value)} placeholder="상품명 검색" style={{ width: "100%", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none", color: "var(--color-ink)" }} />
             </div>
             {/* 목록 */}
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 16px 8px" }}>
@@ -2739,7 +2383,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             </div>
             {/* 검색 */}
             <div style={{ padding: "12px 16px 8px" }}>
-              <input value={shopPickerSearch} onChange={(e) => setShopPickerSearch(e.target.value)} placeholder="🔍 상품명 검색" style={{ width: "100%", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none", color: "var(--color-ink)" }} />
+              <input value={shopPickerSearch} onChange={(e) => setShopPickerSearch(e.target.value)} placeholder="상품명 검색" style={{ width: "100%", height: "38px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none", color: "var(--color-ink)" }} />
             </div>
             {/* 목록 */}
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 16px 8px" }}>

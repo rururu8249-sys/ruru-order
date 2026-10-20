@@ -23,8 +23,7 @@ const BAD_SPLIT = /\.split\(\s*\/\[[^\]]*[/|·][^\]]*\][^)]*\)/;
 
 // 옵션이 «아닌» 것을 나누는 곳은 정상 — 이유와 함께 등록한다
 const ALLOW = [
-  // 엑셀 배지 칸(NEW/HOT/해외배송)은 「/」로 나누는 게 자연스럽다. 옵션이 아니다.
-  { file: "lib/excelBulkParse.ts", near: "parseOfficialBadges" },
+  // (2026-10-21 a2-1) 엑셀 대량등록 삭제로 엑셀 배지 칸 예외 항목도 뺌
 ];
 
 const files = [];
