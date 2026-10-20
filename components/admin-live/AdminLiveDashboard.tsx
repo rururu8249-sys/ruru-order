@@ -32,7 +32,6 @@ import LiveHeader from "./LiveHeader";
 import LiveStatsCards from "./LiveStatsCards";
 import LiveStatsPanel from "./LiveStatsPanel";
 import SalesAnalysisPanel from "./SalesAnalysisPanel";
-import SystemAuditCard from "./SystemAuditCard";
 import LiveIssueRailPanel from "./LiveIssueRailPanel";
 import LiveBroadcastEndSummaryModal, { type LiveBroadcastEndMission, type LiveBroadcastEndSummary } from "./LiveBroadcastEndSummaryModal";
 // [2026-09-08 4단계-B] 방송 시작 확인창(미션 설정 포함) + 콘솔 미션 게이지
@@ -304,7 +303,9 @@ function readMenuFromUrl(): AdminLiveMenuKey {
   const params = new URLSearchParams(window.location.search);
   const panel = params.get("panel");
 
-  return isMenuKeyForUrl(panel) ? panel : "broadcast";
+  if (!isMenuKeyForUrl(panel)) return "broadcast";
+  // [2026-10-21] 시스템 점검 화면은 메뉴에서 뺐다 → 옛 주소 ?panel=audit 는 설정으로
+  return panel === "audit" ? "settings" : panel;
 }
 
 function replacePanelInUrl(menu: AdminLiveMenuKey) {
@@ -1864,18 +1865,6 @@ export default function AdminLiveDashboard() {
                 </div>
               ) : null}
 
-              {/* ── 설정 › 시스템 점검 (공통) ── */}
-              {activeMenu === "audit" ? (
-                <div className="space-y-3 p-4">
-                  {/* [2026-07-25 사장님] 상시 시스템 점검 카드 — 이상 없어도 초록 표시 */}
-                  <SystemAuditCard onOpenDetail={() => void runIntegrityCheck()} />
-                  <div className="rounded-2xl border border-line bg-surface-2 px-4 py-3 text-xs font-bold leading-5 text-ink-soft">
-                    주문·입금 데이터가 서로 어긋나는 곳이 있는지 훑어봅니다. 방송 중이든 아니든 언제나 같은 기준으로 봅니다.
-                    「자세히 보기」를 누르면 어떤 주문인지 목록으로 나옵니다.
-                  </div>
-                </div>
-              ) : null}
-
               {/* ── 고객 › 접속 기록 (읽기 전용) ── */}
               {activeMenu === "visits" ? (
                 <VisitStatsView embedded style={{ height: "100%" }} />
@@ -1887,7 +1876,6 @@ export default function AdminLiveDashboard() {
                   <AdminLiveSettingsPanel
                     onOpenNotice={() => { setActiveMenu("notice"); }}
                     onOpenEvent={() => { setActiveMenu("event"); }}
-                    onOpenAudit={() => { setActiveMenu("audit"); }}
                     onNavigationGuardChange={registerSettingsGuard}
                   />
                 </div>

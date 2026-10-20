@@ -109,7 +109,7 @@ export default function CombineShippingSettingsTab({onDraftStateChange}:Settings
       const rangeDays = (endMs - startMs) / (1000 * 60 * 60 * 24);
       if (rangeDays > 7) {
         const ok = await showAdminConfirm(
-          `합배송 범위가 약 ${Math.round(rangeDays)}일입니다. 그 기간 같은 번호 주문이 전부 배송비 0원 됩니다. 계속할까요?`,
+          `${Math.round(rangeDays)}일 동안 같은 손님 주문은 배송비 0원. 계속할까요?`,
           { title: "합배송 범위 확인", confirmText: "저장", cancelText: "취소", tone: "warning" },
         );
         if (!ok) return false;
@@ -156,7 +156,7 @@ export default function CombineShippingSettingsTab({onDraftStateChange}:Settings
       <div className="rounded-2xl border border-line bg-warn-bg px-4 py-3 text-xs font-bold leading-5 text-warn-tx">
         아래 시간범위 안에 같은 고객이 주문하면 배송비 0원(합배송)이에요.
         <span className="mt-1 block text-[11px] font-bold text-ink-mute">
-          ※ 방송을 껐다 켜도(쇼핑몰모드 포함) 이 범위 안이면 합배송돼요.
+          방송을 껐다 켜도(쇼핑몰모드 포함) 이 범위 안이면 합배송돼요.
         </span>
       </div>
 

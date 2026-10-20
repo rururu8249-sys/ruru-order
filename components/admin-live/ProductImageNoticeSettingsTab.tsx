@@ -154,7 +154,7 @@ export default function ProductImageNoticeSettingsTab({onDraftStateChange}:Setti
         <div className={cardClass}>
           {sectionTitle(
             "상품사진 안내문구",
-            "사진을 올릴 때 오른쪽 아래에 검정 반투명 띠와 문구를 «사진 자체에» 그려 넣습니다. 손님 화면·방송 위젯·카톡 공유·다운로드 어디서 봐도 문구가 따라갑니다.",
+            "사진에 직접 새겨져 어디서든 보임",
           )}
 
           <button
@@ -233,7 +233,7 @@ export default function ProductImageNoticeSettingsTab({onDraftStateChange}:Setti
 
       <div className="flex items-center justify-between gap-3 border-t border-line pt-4">
         <span className="text-xs font-bold text-ink-mute">
-          {loading ? "불러오는 중..." : "저장 후 올리는 사진부터 적용됩니다. 이미 올라간 사진은 바뀌지 않습니다."}
+          {loading ? "불러오는 중..." : "새로 올리는 사진부터 적용"}
         </span>
         <button
           type="button"

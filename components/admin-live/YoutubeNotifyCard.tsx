@@ -112,7 +112,7 @@ export default function YoutubeNotifyCard({onDraftStateChange}:SettingsDraftProp
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-black text-ink">유튜브 라이브 알림</h2>
-          <p className="mt-1 text-xs font-bold text-ink-mute">주문 제출 시 유튜브 라이브 채팅에 자동으로 알림을 올립니다. (봇 계정 기준)</p>
+          <p className="mt-1 text-xs font-bold text-ink-mute">주문 제출 시 라이브 채팅에 알림</p>
         </div>
         <span className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-black ${connected ? "bg-ok-bg text-ok-tx" : "bg-surface-2 text-ink-soft"}`}>
           {loading ? "확인 중..." : connected ? "● 연결됨" : "○ 미연결"}
@@ -152,7 +152,6 @@ export default function YoutubeNotifyCard({onDraftStateChange}:SettingsDraftProp
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-sm font-black text-ink">자동 알림</div>
-            <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">ON이면 손님이 주문서를 제출할 때마다 채팅에 알림을 올립니다.</div>
           </div>
           <button
             type="button"
@@ -192,7 +191,7 @@ export default function YoutubeNotifyCard({onDraftStateChange}:SettingsDraftProp
             {testing ? "발송중..." : "테스트 발송"}
           </button>
         </div>
-        <div className="mt-2 text-[11px] font-bold leading-5 text-ink-mute">※ 테스트 발송은 ON/OFF와 상관없이 1건 보냅니다. 연결 + 라이브 주소 저장 + 실제 방송 중일 때 채팅에 떠요.</div>
+        <div className="mt-2 text-[11px] font-bold leading-5 text-ink-mute">테스트는 방송 중에만 보임</div>
       </div>
     </div>
   );

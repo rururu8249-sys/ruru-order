@@ -159,15 +159,13 @@ export default function ShopInfoSettingsTab({onDraftStateChange,focusSection}:Se
     if (bankChanged) {
       const ok = await showAdminConfirm(
         [
-          "손님에게 보이는 입금계좌와 고객별 노출 방식을 바꿉니다.",
-          "",
           "바꾸기 전",
           bankRoutingSummary(saved.bankAccounts, saved.bankRouting),
           "",
           "바꾼 후",
           bankRoutingSummary(next.bankAccounts, next.bankRouting),
           "",
-          "이미 접수된 주문에는 주문 당시 계좌가 그대로 유지되고, 새 주문부터 변경된 기준이 적용됩니다.",
+          "새 주문부터 적용",
         ].join("\n"),
         { title: "입금계좌·노출방식 변경 확인", confirmText: "확인 후 저장", cancelText: "취소", tone: "danger" },
       );
@@ -215,7 +213,7 @@ export default function ShopInfoSettingsTab({onDraftStateChange,focusSection}:Se
 
         {/* ── 손님 문의 방식 ── */}
         <div className={cardClass}>
-          {sectionTitle("손님 문의 받는 방법", "손님 주문서·주문조회·홈 화면의 「문의하기」 버튼이 여기서 고른 방식으로 바뀝니다.")}
+          {sectionTitle("손님 문의 받는 방법", "손님 「문의하기」 버튼 방식")}
           <div className="grid gap-3">
             <div className="grid grid-cols-2 gap-2">
               {CONTACT_TYPES.map((type) => {
@@ -249,7 +247,7 @@ export default function ShopInfoSettingsTab({onDraftStateChange,focusSection}:Se
             {contactType === "channel" ? (
               <Field
                 label="관리자 채팅 콘솔 주소 (선택)"
-                desc="사이드바 「카톡채널」 버튼이 여는 주소입니다. 카카오 비즈니스 › 채팅 화면 주소를 넣으면 손님 채널이 아니라 관리자 채팅창이 바로 열립니다. 비우면 위 채널 주소가 열립니다."
+                desc="비우면 채널 주소로 열림"
               >
                 <input
                   value={adminChatUrl}
@@ -272,7 +270,7 @@ export default function ShopInfoSettingsTab({onDraftStateChange,focusSection}:Se
 
         {/* ── 카드결제(페이스터) ── */}
         <div id="shop-setting-payster" tabIndex={-1} className={cardClass}>
-          {sectionTitle("카드결제(페이스터) 주소", "사이드바 「카드결제」 버튼과 주문표의 카드결제 팝업이 여는 페이스터 문자결제 페이지입니다.")}
+          {sectionTitle("카드결제(페이스터) 주소", "페이스터 문자결제 주소")}
           <Field label="페이스터 문자결제 페이지 주소">
             <input
               value={paysterUrl}
@@ -287,7 +285,7 @@ export default function ShopInfoSettingsTab({onDraftStateChange,focusSection}:Se
 
         {/* ── 입금계좌 ── */}
         <div id="shop-setting-bank" tabIndex={-1} className={cardClass}>
-          {sectionTitle("무통장 입금계좌와 고객별 노출", "현재 계좌를 유지하면서 계좌 한 개를 더 등록하고, 전체 고객 또는 기존회원·첫 주문 신규회원별로 보여줄 계좌를 선택합니다.")}
+          {sectionTitle("무통장 입금계좌와 고객별 노출", "계좌 2개까지, 회원 구분별로 보여줄 계좌 선택")}
           <BankAccountRoutingSettings
             accounts={bankAccounts}
             routing={bankRouting}
@@ -301,7 +299,7 @@ export default function ShopInfoSettingsTab({onDraftStateChange,focusSection}:Se
 
       {/* 자체 저장바 — 하단 공통 저장바(운영값)와 분리. 이 탭은 API 로만 저장 */}
       <div className="flex items-center justify-between gap-3 border-t border-line pt-4">
-        <span className="text-xs font-bold text-ink-mute">{loading ? "불러오는 중..." : "저장 즉시 손님 화면·사이드바에 반영됩니다."}</span>
+        <span className="text-xs font-bold text-ink-mute">{loading ? "불러오는 중..." : null}</span>
         <button
           type="button"
           onClick={save}

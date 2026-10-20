@@ -63,9 +63,6 @@ export default function BankAccountRoutingSettings({ accounts, routing, onChange
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div>
                 <div className="text-sm font-black text-ink">계좌 {index + 1} · {account.id === "primary" ? "기존 계좌" : "추가 계좌"}</div>
-                <div className="mt-1 text-xs font-bold text-ink-mute">
-                  {account.id === "primary" ? "항상 유지되는 기본 계좌입니다." : "필요할 때 삭제할 수 있는 두 번째 계좌입니다."}
-                </div>
               </div>
               {account.id === "secondary" ? (
                 <button
@@ -144,8 +141,6 @@ export default function BankAccountRoutingSettings({ accounts, routing, onChange
 
       <section className="rounded-2xl border border-line bg-surface-2 p-4">
         <h3 className="text-sm font-black text-ink">고객별 계좌 노출 방식</h3>
-        <p className="mt-1 text-xs font-bold leading-5 text-ink-mute">첫 주문 여부는 삭제·취소·환불·테스트 주문을 제외한 실제 주문 이력으로 서버가 판단합니다.</p>
-        <p className="mt-1 text-xs font-bold leading-5 text-rose-deep">방송 주문과 쇼핑몰 주문에 같은 규칙을 적용합니다.</p>
 
         <div className="mt-3 grid gap-2 md:grid-cols-2">
           <button

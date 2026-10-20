@@ -53,7 +53,7 @@ export default function AdminSoundControl() {
         <div className="min-w-0">
           <div className="text-sm font-black text-ink">{soundOn ? "🔊" : "🔇"} 알림음 {soundOn ? "켜짐" : "꺼짐"}</div>
           <div className="mt-0.5 text-xs font-bold text-ink-mute">
-            {soundOn ? "새 주문·입금이 들어오면 소리로 알려줍니다." : "소리 없이 화면으로만 표시됩니다."}
+            {soundOn ? "새 주문·입금 소리 알림" : "소리 없이 화면으로만 표시됩니다."}
           </div>
         </div>
         <button

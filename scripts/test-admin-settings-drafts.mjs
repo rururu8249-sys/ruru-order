@@ -59,7 +59,7 @@ const Panel=createUiLoader(panelOverrides)('components/admin-live/AdminLiveSetti
 await act(async()=>{tree=Renderer.create(React.createElement(Panel,{onNavigationGuardChange:value=>guard=value}));});
 const button=label=>tree.root.findAllByType('button').find(node=>node.children.join('')===label);
 async function select(label){await act(async()=>{button(label).props.onClick();});}
-await select('결제·배송');
+await select('수수료·배송비');
 await act(async()=>tree.root.findAllByType('input').find(node=>node.props.value==='10').props.onChange({target:{value:'12'}}));
 await select('포인트 적립');
 assert.equal(tree.root.findAllByType('draft-dialog').length,1);
@@ -72,7 +72,7 @@ deny=false;
 await act(async()=>tree.root.findByType('draft-dialog').props.onSave());
 assert.equal(writes,beforeWrites+2);assert.equal(tree.root.findAllByType('draft-dialog').length,0);
 assert.equal(await guard(),true,'saved settings permit external navigation');
-await select('결제·배송');
+await select('수수료·배송비');
 await act(async()=>tree.root.findAllByType('input').find(node=>node.props.value==='12').props.onChange({target:{value:'14'}}));
 let external;
 await act(async()=>{external=guard();});
@@ -80,7 +80,7 @@ await act(async()=>tree.root.findByType('draft-dialog').props.onCancel());
 assert.equal(await external,false,'external navigation cancel');
 await select('포인트 적립');
 await act(async()=>tree.root.findByType('draft-dialog').props.onDiscard());
-await select('결제·배송');
+await select('수수료·배송비');
 assert(tree.root.findAllByType('input').some(node=>node.props.value==='12'),'discard restores saved value');
 await act(async()=>tree.unmount());
 assert.equal(guard,null,'guard unregisters');

@@ -32,11 +32,11 @@ export type AdminLiveTopMenuItem = {
 
 export const ADMIN_LIVE_TOP_MENUS: AdminLiveTopMenuItem[] = [
   // 아이콘은 AdminLiveMenuIcon.tsx (SVG) — 기기마다 모양이 달라지는 이모지를 쓰지 않는다
-  { key: "broadcast", label: "방송", desc: "시작·종료 · 채팅주문 · 기록", defaultKey: "broadcast" },
-  { key: "orders", label: "주문·입금", desc: "실시간 주문 · 입금내역 · 판매분석 · 정산 · 이벤트", defaultKey: "orders" },
+  { key: "broadcast", label: "방송", desc: "시작·종료 · 기록", defaultKey: "broadcast" },
+  { key: "orders", label: "주문·입금", desc: "실시간 주문 · 입금내역 · 정산 · 판매분석 · 이벤트", defaultKey: "orders" },
   { key: "products", label: "상품", desc: "방송 상품 · 쇼핑몰 · 등록", defaultKey: "products" },
   { key: "customers", label: "고객", desc: "회원 · 이슈 · 쪽지·공지 · 접속 기록", defaultKey: "customers" },
-  { key: "settings", label: "설정", desc: "상점 · 결제 · 알림 · 점검", defaultKey: "settings" },
+  { key: "settings", label: "설정", desc: "돈·결제 · 손님 화면 · 방송·알림 · 상점", defaultKey: "settings" },
 ];
 
 export type AdminLiveSubTab = { key: AdminLiveMenuKey; label: string };
@@ -45,14 +45,14 @@ export type AdminLiveSubTab = { key: AdminLiveMenuKey; label: string };
 export const ADMIN_LIVE_SUB_TABS: Record<AdminLiveTopMenuKey, AdminLiveSubTab[]> = {
   broadcast: [
     { key: "broadcast", label: "방송 콘솔" },
-    { key: "chatorder", label: "채팅주문" },
+    // chatorder(채팅주문): 2026-10-21 사장님: 나중을 위해 보존, 메뉴에서만 숨김 (?panel=chatorder 로는 열림)
   ],
   // [2026-09-09 사장님 요청] 이벤트를 방송 → 주문·입금 안으로 옮겼다
   orders: [
     { key: "orders", label: "실시간 주문" },
     { key: "payments", label: "입금내역" },
-    { key: "sales", label: "판매분석" },
     { key: "settlement", label: "정산" },
+    { key: "sales", label: "판매분석" },
     { key: "event", label: "이벤트" },
   ],
   products: [{ key: "products", label: "상품" }],
@@ -61,10 +61,8 @@ export const ADMIN_LIVE_SUB_TABS: Record<AdminLiveTopMenuKey, AdminLiveSubTab[]>
     { key: "notice", label: "쪽지·공지" },
     { key: "visits", label: "접속 기록" },
   ],
-  settings: [
-    { key: "settings", label: "설정" },
-    { key: "audit", label: "시스템 점검" },
-  ],
+  // audit(시스템 점검): 2026-10-21 메뉴에서 뺌. ?panel=audit 로 들어오면 설정으로 폴백
+  settings: [{ key: "settings", label: "설정" }],
 };
 
 const TOP_MENU_OF: Record<AdminLiveMenuKey, AdminLiveTopMenuKey> = {

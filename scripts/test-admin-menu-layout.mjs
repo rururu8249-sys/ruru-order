@@ -11,10 +11,12 @@ assert.equal(menu.isAdminLiveMenuKey('sales'),true,'sales deep link must survive
 assert.equal(menu.getAdminLiveScreenTitle('sales'),'주문·입금 › 판매분석');
 assert.equal(menu.topMenuOf('reports'),'orders','legacy report must lead to the same analysis workspace');
 assert.equal(menu.getAdminLiveScreenTitle('reports'),menu.getAdminLiveScreenTitle('sales'));
-assert.deepEqual(menu.ADMIN_LIVE_SUB_TABS.orders.map(tab=>tab.key),['orders','payments','sales','settlement','event']);
+assert.deepEqual(menu.ADMIN_LIVE_SUB_TABS.orders.map(tab=>tab.key),['orders','payments','settlement','sales','event']);
 assert.equal(menu.ADMIN_LIVE_TOP_MENUS.length,5);
 const routes=Object.values(menu.ADMIN_LIVE_SUB_TABS).flat().map(tab=>tab.key).sort();
-assert.deepEqual(routes,menu.ADMIN_LIVE_ALL_MENU_KEYS.filter(key=>key!=='reports').sort());
+// [2026-10-21 a1-1] chatorder·audit 는 메뉴에서만 숨김(키·주소는 보존)
+assert.deepEqual(routes,menu.ADMIN_LIVE_ALL_MENU_KEYS.filter(key=>!['reports','chatorder','audit'].includes(key)).sort());
+assert.equal(menu.isAdminLiveMenuKey('chatorder'),true);assert.equal(menu.isAdminLiveMenuKey('audit'),true);
 const Sidebar=createUiLoader({'./AdminLiveSidebarPresence':{default:()=>null},'./AdminLiveLogoutButton':{default:()=>null},'./AdminLiveCardPayPopup':{openPayster(){}},'@/lib/useShopInfo':{useShopInfo:()=>({contactType:'channel',contactValue:'https://example.com',adminChatUrl:'',paysterUrl:''})}})('components/admin-live/AdminLiveSidebar.tsx').default;
 let selected,tree;
 await act(async()=>{tree=Renderer.create(React.createElement(Sidebar,{activeMenu:'orders',onMenuChange:key=>selected=key,theme:'light',onToggleTheme(){},exceptionBadges:{needMatch:1,cardUnpaid:1}}));});
@@ -29,7 +31,7 @@ const SettingsNav=load('components/admin-live/AdminLiveSettingsNav.tsx').default
 await act(async()=>{tree=Renderer.create(React.createElement(SettingsNav,{activeTab:'shop',onSelect:value=>selected=value}));});
 const mobileSelect=tree.root.findByProps({'aria-label':'설정 항목 선택'});
 assert.equal(mobileSelect.type,'select');
-assert.equal(tree.root.findAllByType('option').length,16,'all destinations remain available on small screens');
+assert.equal(tree.root.findAllByType('option').length,14,'all destinations remain available on small screens');
 await act(async()=>mobileSelect.props.onChange({target:{value:'합배송'}}));
 assert.deepEqual(selected,{tab:'combine'});
 await act(async()=>tree.unmount());

@@ -7,7 +7,6 @@ import {type SettingsTab,type SettingsDestination} from "./adminLiveSettingsNavi
 import {useSettingsDraft,type SettingsDraftState} from "./useSettingsDraft";
 import YoutubeNotifyCard from "./YoutubeNotifyCard";
 import TelegramNotifyCard from "./TelegramNotifyCard";
-import TrendPanel from "./TrendPanel";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 // [2026-09-22] 상품 주문 안내 문구 — 문구 원문·기본값은 한 곳(lib)에서만 정한다
@@ -138,7 +137,7 @@ function SettingInput({
   inputMode,
 }: {
   label: string;
-  desc: string;
+  desc?: string;
   value: string;
   suffix: string;
   onChange: (value: string) => void;
@@ -151,7 +150,7 @@ function SettingInput({
   return (
     <div className="rounded-2xl border border-line bg-surface-2 p-4">
       <div className="text-sm font-black text-ink">{label}</div>
-      <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">{desc}</div>
+      {desc ? <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">{desc}</div> : null}
       <div className="mt-3 flex items-center gap-2">
         <input
           value={value}
@@ -186,11 +185,10 @@ type AdminLiveSettingsPanelProps = {
   onOpenNotice?: () => void;
   /** [2026-09-12] 「이벤트 열기」 바로가기 — 방송 화면 탭에서 이벤트 오버레이 주소를 찾아갈 때 */
   onOpenEvent?: () => void;
-  onOpenAudit?: () => void;
   onNavigationGuardChange?: (guard:null|(()=>Promise<boolean>)) => void;
 };
 
-export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onOpenAudit, onNavigationGuardChange }: AdminLiveSettingsPanelProps = {}) {
+export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNavigationGuardChange }: AdminLiveSettingsPanelProps = {}) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>("shop");
@@ -212,7 +210,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onOp
   const [holdAmount, setHoldAmount] = useState(String(DEFAULTS.cart_hold_minutes));
   const [holdUnit, setHoldUnit] = useState<HoldUnit>("minute");
   const [directInputEnabled, setDirectInputEnabled] = useState(true);
-  // [2026-08-30] 접속 팝업 공지 / 주문서 공지 문구는 「📢 공지·쪽지」 메뉴로 옮겼다.
+  // [2026-08-30] 접속 팝업 공지 / 주문서 공지 문구는 「공지·쪽지」 메뉴로 옮겼다.
   //   같은 키를 두 화면이 저장하면 한쪽이 다른 쪽을 되돌려버려서, 여기서는 아예 뺐다.
   // [2026-07-10] 주문 방법 팝업 — 켜고/끄기 + 내용 수정
   const [howtoEnabled, setHowtoEnabled] = useState(true);
@@ -354,16 +352,16 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onOp
   },[]);
   const finishChoice=(ok:boolean)=>{const resolve=pendingRef.current;pendingRef.current=null;setChoiceOpen(false);resolve?.(ok);};
   const selectDestination=async(destination:SettingsDestination)=>{
-    if ("menu" in destination) {if(destination.menu==="notice") onOpenNotice?.();else onOpenAudit?.();return;}
+    if ("menu" in destination) {onOpenNotice?.();return;}
     if ("tab" in destination && destination.tab===activeTab) {setFocusSection(destination.section);return;}
     if (!(await protectNavigation())) return;
     setChildDraft(null);setActiveTab(destination.tab);setFocusSection(destination.section);
   };
   const cardClass = "rounded-2xl border border-line bg-surface p-4";
-  const sectionTitle = (title: string, desc: string) => (
+  const sectionTitle = (title: string, desc?: string) => (
     <div className="mb-4">
       <h2 className="text-base font-black text-ink">{title}</h2>
-      <p className="mt-1 text-xs font-bold text-ink-mute">{desc}</p>
+      {desc ? <p className="mt-1 text-xs font-bold text-ink-mute">{desc}</p> : null}
     </div>
   );
 
@@ -392,25 +390,25 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onOp
               </div>
 
               <div className={cardClass}>
-                {sectionTitle("카드결제", "카드결제 최소금액과 수수료율을 관리합니다.")}
+                {sectionTitle("카드결제")}
                 <div className="grid gap-3">
                   <SettingInput
                     label="고객 카드 부가세율"
-                    desc="고객이 카드결제를 선택할 때 주문금액에 추가되는 비율입니다."
+                    desc="손님 주문금액에 더해지는 비율"
                     value={customerCardRate}
                     suffix="%"
                     onChange={(value) => setCustomerCardRate(onlyDigits(value))}
                   />
                   <SettingInput
                     label="실제 카드업체 수수료율"
-                    desc="정산통계에서 카드수수료 지출로 계산되는 비율입니다."
+                    desc="정산에서 지출로 잡는 비율"
                     value={actualCardRate}
                     suffix="%"
                     onChange={(value) => setActualCardRate(onlyDigits(value))}
                   />
                   <SettingInput
                     label="카드결제 최소금액"
-                    desc="고객 주문서에서 카드결제를 선택할 수 있는 최소 주문금액입니다."
+                    desc="이 금액 미만은 카드결제 불가"
                     value={cardMinAmount}
                     suffix="원"
                     onChange={(value) => setCardMinAmount(formatMoneyInput(value))}
@@ -419,18 +417,17 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onOp
               </div>
 
               <div className={cardClass}>
-                {sectionTitle("배송비", "주문서 배송비 계산에 적용되는 기준입니다.")}
+                {sectionTitle("배송비")}
                 <div className="grid gap-3">
                   <SettingInput
                     label="기본 배송비"
-                    desc="일반 지역 주문서에 적용되는 기본 배송비입니다."
                     value={defaultShippingFee}
                     suffix="원"
                     onChange={(value) => setDefaultShippingFee(formatMoneyInput(value))}
                   />
                   <SettingInput
                     label="제주/산간 배송비"
-                    desc="제주/산간 주소로 감지될 때 적용되는 배송비입니다. 기본 배송비보다 낮게 저장되지 않습니다."
+                    desc="기본 배송비보다 낮게 저장 안 됨"
                     value={remoteShippingFee}
                     suffix="원"
                     onChange={(value) => setRemoteShippingFee(formatMoneyInput(value))}
@@ -446,7 +443,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onOp
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
                   <h2 className="text-base font-black text-ink">포인트 적립 규칙</h2>
-                  <p className="mt-1 text-xs font-bold text-ink-mute">결제완료(자동·수동 입금확인, 카드결제완료) 시 구매금액(택배비 제외)의 일정 비율을 자동 적립합니다.</p>
+                  <p className="mt-1 text-xs font-bold text-ink-mute">결제완료 시 상품금액(배송비 제외)의 비율만큼 적립</p>
                 </div>
                 <button
                   type="button"
@@ -460,7 +457,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onOp
               <div className={pointAutoEarn ? "" : "pointer-events-none opacity-50"}>
                 <SettingInput
                   label="적립률"
-                  desc="상품금액(택배비 제외) 대비 적립 비율입니다. 소수점 가능. 예: 1.5% → 1만원 구매 시 150P 적립."
+                  desc="예) 1.5 → 1만원에 150P"
                   value={pointEarnRate}
                   suffix="%"
                   type="number"
@@ -481,7 +478,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onOp
           {/* ── 주문서 표시 ── */}
           {activeTab === "order" && (
             <div className={cardClass}>
-              {sectionTitle("주문서 표시", "장바구니 선점 유지시간, 주문 방법 팝업, “직접 입력하기” 버튼을 관리합니다. 공지는 「📢 공지·쪽지」 메뉴에 있습니다.")}
+              {sectionTitle("주문서 표시")}
 
               {/* [2026-07-13 사장님 지침] 장바구니 선점 유지시간 — 담는 순간 다른 고객 화면 남은 수량에서
                   빠져 보이는 시간. 지나면 자동 해제(표시용 예약만 — 진짜 재고/주문/차감 로직 무관). */}
@@ -507,7 +504,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onOp
                     <option value="hour">시간</option>
                     <option value="day">일</option>
                   </select>
-                  <span className="text-xs font-bold text-ink-mute">동안 선점 유지 (저장 후 새 담기부터 적용)</span>
+                  <span className="text-xs font-bold text-ink-mute">동안 장바구니 유지</span>
                 </div>
               </div>
 
@@ -568,9 +565,6 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onOp
                         className="mt-2 w-full resize-none rounded-xl border border-line bg-surface-2 px-3 py-2 text-xs font-bold text-ink outline-none transition focus:border-rose-deep"
                       />
                     </div>
-                    <div className="text-[11px] font-bold text-ink-mute">
-                      ※ 아래 <b>저장</b>을 눌러야 손님 화면에 반영됩니다. 손님이 “오늘 하루 열지 않기”를 누르면 그 사람에겐 24시간 안 뜹니다.
-                    </div>
                   </div>
                 ) : null}
               </div>
@@ -586,13 +580,8 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onOp
                     ⚠ 표시 전용 — 주문을 «막지» 않는다. 재고·진열·주문 로직과 무관. */}
               {/* [51] 바로구매는 상품 등록 화면 버튼 하나로 — 전체 기본값 칸 숨김(값은 live_only 그대로 저장·유지) */}
               <div className="hidden mb-3 rounded-xl border border-line bg-surface-2 p-4">
-                <div className="text-sm font-black text-ink">📣 상품 주문 안내 문구 — 전체 기본값</div>
-                <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
-                  손님이 상품을 눌렀을 때 <b>수량·금액 줄 바로 위</b>에 한 줄로 보입니다. 안내만 할 뿐 주문을 막지는 않습니다.
-                  <br />
-                  ※ 여기 값은 <b>기본값</b>입니다. 상품마다 다르게 하려면 <b>상품 수정 → 자세히 → 「주문 안내 문구」</b>에서
-                  그 상품만 바꾸세요(기본은 「기본값 따름」).
-                </div>
+                <div className="text-sm font-black text-ink">상품 주문 안내 문구(기본값)</div>
+                <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">상품마다 따로 정한 문구가 우선</div>
 
                 <div className="mt-3 space-y-2">
                   {PRODUCT_NOTICE_PRESETS.map((preset) => {
@@ -658,17 +647,10 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onOp
                     })()}
                   </div>
                 ) : null}
-
-                <div className="mt-2 text-[11px] font-bold text-ink-mute">
-                  ※ 아래 <b>저장</b>을 눌러야 손님 화면에 반영됩니다. 상품에서 따로 고른 문구가 있으면 <b>그 상품은 그쪽이 우선</b>입니다.
-                </div>
               </div>
 
-              {/* [2026-08-30] 공지 문구·접속 팝업 공지는 사이드바 「📢 공지·쪽지」 메뉴로 옮겼다. */}
+              {/* [2026-08-30] 공지 문구·접속 팝업 공지는 사이드바 「공지·쪽지」 메뉴로 옮겼다. */}
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface-2 p-4">
-                <div className="text-xs font-bold leading-5 text-ink-soft">
-                  「주문서 공지 문구」와 「접속 팝업 공지」는 <b className="text-ink">공지·쪽지</b> 메뉴에 있습니다. 손님 화면 미리보기도 거기서 볼 수 있어요.
-                </div>
                 {onOpenNotice ? (
                   <button
                     type="button"
@@ -699,7 +681,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onOp
               <div className="mt-3 flex items-start justify-between gap-3 rounded-xl border border-line bg-surface-2 p-4">
                 <div>
                   <div className="text-sm font-black text-ink">직접 입력하기 버튼</div>
-                  <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">상품 목록에서 못 찾은 상품을 손님이 직접 입력하는 버튼입니다. OFF 시 버튼이 숨겨집니다.</div>
+                  <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">손님이 상품을 직접 적어 주문하는 버튼</div>
                 </div>
                 <button
                   type="button"
@@ -722,7 +704,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onOp
           {/* ── 알림음 (이 브라우저에만 저장: localStorage) ── */}
           {activeTab === "sound" && (
             <div className={cardClass}>
-              {sectionTitle("알림음", "새 주문·입금이 들어오면 소리로 알려줍니다. 이 컴퓨터(브라우저)에만 저장되고, 다른 기기엔 따로 설정해야 합니다.")}
+              {sectionTitle("알림음", "이 컴퓨터에만 적용")}
               <AdminSoundControl />
             </div>
           )}
@@ -731,7 +713,6 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onOp
 
           {activeTab === "telegram" && <TelegramNotifyCard onDraftStateChange={setChildDraft} />}
 
-          {activeTab === "trend" && <TrendPanel />}
 
           {/* ── 관리자 보안 (읽기 전용) ── */}
           {activeTab === "security" && <AdminAuthSettingsPanel />}

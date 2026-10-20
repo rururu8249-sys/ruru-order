@@ -142,19 +142,19 @@ export default function TelegramNotifyCard({onDraftStateChange}:SettingsDraftPro
       <div>
         <div className="text-base font-black text-ink">📨 텔레그램 알림</div>
         <div className="mt-1 text-xs font-bold leading-5 text-ink-soft">
-          미입금·출고밀림 같은 알림과 방송 결산을 폰(텔레그램)으로 받습니다. 아래 세 단계면 끝나요.
+          알림과 방송 결산을 폰으로 받기
         </div>
       </div>
 
       <div className={`rounded-xl border border-line px-3 py-2 text-xs font-black ${connected ? "bg-ok-bg text-ok-tx" : "bg-warn-bg text-warn-tx"}`}>
-        {connected ? `✅ 연결됨 · 받는 사람 ${recipientCount}명` : "아직 연결 안 됨 — 아래 ①②③ 순서대로"}
+        {connected ? `연결됨 · 받는 사람 ${recipientCount}명` : "연결 안 됨"}
       </div>
 
       {/* ① 봇 토큰 */}
       <div className="rounded-2xl border border-line bg-surface-2 p-3">
         <div className="text-xs font-black text-ink">① 봇 토큰 붙여넣고 저장</div>
         <div className="mt-1 text-[11px] font-bold leading-5 text-ink-mute">
-          텔레그램 앱에서 <b>@BotFather</b>를 찾아 <b>/newbot</b> 을 보내면 봇이 만들어지고 토큰(긴 영문·숫자)이 나옵니다. 그걸 여기 붙여넣으세요.
+          @BotFather 에 /newbot 보내 받은 토큰
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <input
@@ -174,7 +174,7 @@ export default function TelegramNotifyCard({onDraftStateChange}:SettingsDraftPro
       <div className="rounded-2xl border border-line bg-surface-2 p-3">
         <div className="text-xs font-black text-ink">② 텔레그램에서 그 봇에게 아무 말이나 한 번 보내기</div>
         <div className="mt-1 text-[11px] font-bold leading-5 text-ink-mute">
-          알림을 받을 사람마다 한 번씩. (같이 운영하는 사람도 그 봇에게 말을 걸면 ③에서 같이 잡힙니다)
+          알림 받을 사람마다 한 번씩
         </div>
       </div>
 
@@ -222,16 +222,14 @@ export default function TelegramNotifyCard({onDraftStateChange}:SettingsDraftPro
               {saving ? "저장 중…" : "지금 저장"}
             </button>
           </span>
-        ) : (
-          <span className="text-[11px] font-bold text-ink-mute">바꾸면 여기에 「지금 저장」 버튼이 나옵니다.</span>
-        )}
+        ) : null}
       </div>
 
       <div className="flex items-center gap-2">
         <button type="button" onClick={sendReport} disabled={reporting} className="h-10 rounded-xl bg-ok-tx px-4 text-sm font-black text-white disabled:opacity-50">
           {reporting ? "보내는 중…" : "📊 지금 결산 보내기"}
         </button>
-        <span className="text-[11px] font-bold text-ink-mute">오늘 매출·미입금·큰손을 폰으로 한 통</span>
+        <span className="text-[11px] font-bold text-ink-mute">오늘 매출·미입금 요약을 폰으로</span>
       </div>
     </div>
   );

@@ -60,7 +60,7 @@ function WidgetCard({
           target="_blank"
           rel="noreferrer"
           className={`${smallBtn} flex items-center border border-line bg-surface text-ink-soft hover:bg-surface-2`}
-          title="새 창에서 견본을 띄웁니다 (방송이 없어도 모양 확인용)"
+          title="견본 열기"
         >
           미리보기 ↗
         </a>
@@ -98,37 +98,29 @@ export default function BroadcastScreenSettingsTab({ onOpenEvent }: Props) {
       <WidgetCard
         icon="🛍"
         title="상품 카드"
-        what="지금 파는 상품의 사진·이름·색상/사이즈·남은 개수·가격이 카드로 뜹니다. 방송 중에만 보이고, 켜고 끄는 건 방송 컨트롤타워의 「📺 상품 카드 ON/OFF」 버튼입니다."
+        what="방송 중 상품 카드. 켜고 끄기는 방송 콘솔"
         url={productUrl}
         previewUrl={origin ? `${origin}/product-widget?preview=1` : ""}
         w={280}
         h={448}
-        where="세로 방송(1080×1920) 기준 · 화면 폭의 약 1/4. 보통 오른쪽 위에 둡니다. 예전 542 높이 네모를 그대로 써도 됩니다(카드가 아래에 붙고 위는 방송이 비침)."
+        where="세로 방송 기준, 오른쪽 위 추천"
       />
 
       <WidgetCard
         icon="💬"
         title="주문·입금 알림"
-        what="손님이 주문하거나 입금(카드결제)하면 「OO님 주문 감사합니다」가 뜹니다. 주문은 상품명·옵션·수량까지(금액은 안 나옵니다). 상품이 많으면 3.5초마다 넘겨가며 전부 보여주고, 주문 줄이 뜰 땐 폭죽이 한 번 터집니다. 10초 뒤 사라지고, 새 알림이 붙으면 앞 알림은 4초 뒤 빠집니다. 📌 공지는 맨 아래에 고정되고 알림은 그 위로 쌓입니다."
+        what="주문·입금 알림이 뜨는 띠"
         url={feedUrl}
         previewUrl={origin ? `${origin}/order-feed-widget?preview=1` : ""}
         w={880}
         h={300}
-        where="세로 방송(1080×1920) 기준. 네모 아래쪽 끝을 채팅창 바로 위에 맞추면 공지가 거기 고정됩니다."
-        extra={
-          <div className="mt-3 rounded-xl border border-rose-line bg-rose-soft/40 px-3 py-2.5 text-[13px] font-bold leading-6 text-ink-soft">
-            📌 <b className="text-ink">공지 한 줄</b>은 알림 맨 아래에 계속 붙어 있습니다. 방송마다 내용이 달라서(예: 「오늘 9시 마감」)
-            방송을 시작한 뒤 <b className="text-ink">방송 컨트롤타워 › 제목·URL 수정 ▼ › 📌 방송 화면 공지</b>에 쓰면 바로 뜨고, 방송이 끝나면 자동으로 지워집니다.
-            <br />
-            📢 <b className="text-ink">상품 안내</b>는 상품 화면에서 <b className="text-ink">「📢 채팅」</b>을 누르면 그 상품 문구가 공지 바로 위에 <b className="text-ink">30초</b> 뜹니다(문구 복사는 그대로 됩니다).
-          </div>
-        }
+        where="채팅창 바로 위에 맞추기"
       />
 
       <div className={cardClass}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-base font-black text-ink">🎉 이벤트 (룰렛 · 서바이벌 · 레이스 · 뽑기)</div>
+            <div className="text-base font-black text-ink">이벤트</div>
             <div className="mt-1 text-[13px] font-bold leading-6 text-ink-soft">
               이벤트 화면 주소는 이벤트마다 달라서 <b className="text-ink">이벤트 화면의 「방송용 위젯주소 › 복사」</b>에서 가져옵니다.
             </div>
