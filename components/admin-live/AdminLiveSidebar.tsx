@@ -3,6 +3,7 @@
 //   · 예외 배지(매칭필요·카드미결제)는 「주문·입금」에 붙는다.
 //   · 카톡 문의·카드결제는 어느 화면에서든 쓰므로 여기 고정. 알림음은 설정 › 알림음 탭으로 옮겼다(2026-09-08 사장님 요청).
 //   · 실시간 접속 위젯은 그대로(방송 중 바로 보는 숫자).
+import { useEffect, useState } from "react";
 import { ADMIN_LIVE_TOP_MENUS, topMenuOf, type AdminLiveMenuKey } from "./adminLiveMenu";
 import AdminLiveLogoutButton from "./AdminLiveLogoutButton";
 // [2026-09-08] 페이스터는 opener 가 남은 창에서 안 열린다 → 공용 여는 함수 사용(AdminLiveCardPayPopup 상단 주석 참고)
@@ -28,7 +29,27 @@ type Props = {
   broadcastOn?: boolean;
   /** 「접속 기록 보기」 → 고객 › 접속 기록 화면으로 (예전엔 사이드바 안 팝업이었다) */
   onOpenVisitStats?: () => void;
+  /** [2026-10-21 a4-1] 방송 카드 — 「방송」 큰 메뉴를 없애고 시작·종료·관리를 여기로 */
+  broadcastCard?: {
+    title: string;
+    startedAt: string | null;
+    saving: boolean;
+    onStart: () => void;
+    onEnd: () => void;
+    onManage: () => void;
+  };
 };
+
+// [a4-1] 경과 시간 「1시간 23분」 — 표시 전용
+function elapsedLabel(startedAt: string | null, now: number): string {
+  if (!startedAt) return "";
+  const t = new Date(startedAt).getTime();
+  if (!Number.isFinite(t) || t > now) return "";
+  const min = Math.floor((now - t) / 60000);
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return h > 0 ? `${h}시간 ${m}분` : `${m}분`;
+}
 
 export default function AdminLiveSidebar({
   activeMenu,
@@ -41,7 +62,15 @@ export default function AdminLiveSidebar({
   onExceptionBadgeClick,
   broadcastOn = false,
   onOpenVisitStats,
+  broadcastCard,
 }: Props) {
+  // [a4-1] 방송 중 경과 시간은 1분마다 갱신(방송 중일 때만)
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!broadcastOn) return;
+    const id = window.setInterval(() => setNowMs(Date.now()), 60000);
+    return () => window.clearInterval(id);
+  }, [broadcastOn]);
   const activeTop = topMenuOf(activeMenu);
   const shopInfo = useShopInfo();
   const chatTarget = adminChatTarget(shopInfo);
@@ -161,6 +190,26 @@ export default function AdminLiveSidebar({
             );
           })}
         </nav>
+
+        {/* [2026-10-21 a4-1] 방송 카드 — 대기: [방송 시작] · 방송 중: 제목·경과·[방송 종료]. 「방송 관리」= 제목·URL·방송 화면 공지·알림 발송 창 */}
+        {broadcastCard ? (
+          <section className="mt-3 shrink-0 rounded-xl border border-line bg-surface p-3">
+            <div className="flex items-center gap-2">
+              <span className={`inline-block h-2 w-2 rounded-full ${broadcastOn ? "bg-danger-tx" : "bg-line"}`} />
+              <span className="text-[13px] font-bold text-ink">{broadcastOn ? "방송 중" : "방송 대기"}</span>
+              {broadcastOn ? <span className="ml-auto text-[12px] font-semibold text-ink-mute">{elapsedLabel(broadcastCard.startedAt, nowMs)}</span> : null}
+            </div>
+            {broadcastOn && broadcastCard.title ? <div className="mt-1 truncate text-[13px] font-semibold text-ink-soft" title={broadcastCard.title}>{broadcastCard.title}</div> : null}
+            <div className="mt-2 grid grid-cols-2 gap-1.5">
+              {broadcastOn ? (
+                <button type="button" disabled={broadcastCard.saving} onClick={() => { broadcastCard.onEnd(); onCloseNav?.(); }} className="h-9 rounded-lg border border-line bg-surface text-[13px] font-bold text-danger-tx transition hover:bg-surface-2 disabled:opacity-50">방송 종료</button>
+              ) : (
+                <button type="button" disabled={broadcastCard.saving} onClick={() => { broadcastCard.onStart(); onCloseNav?.(); }} className="h-9 rounded-lg bg-ink text-[13px] font-bold text-white transition disabled:opacity-50">방송 시작</button>
+              )}
+              <button type="button" onClick={() => { broadcastCard.onManage(); onCloseNav?.(); }} className="h-9 rounded-lg border border-line bg-surface text-[13px] font-bold text-ink transition hover:bg-surface-2">방송 관리</button>
+            </div>
+          </section>
+        ) : null}
 
         {/* [2026-08-29 사장님 요청] 실시간 접속자 — 사이드바에서 바로 보이게 */}
         <AdminLiveSidebarPresence onOpenVisitStats={() => { onOpenVisitStats?.(); onCloseNav?.(); }} />

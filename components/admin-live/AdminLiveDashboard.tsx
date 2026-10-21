@@ -299,14 +299,22 @@ function isMenuKeyForUrl(value: string | null): value is AdminLiveMenuKey {
 }
 
 function readMenuFromUrl(): AdminLiveMenuKey {
-  if (typeof window === "undefined") return "broadcast";
+  if (typeof window === "undefined") return "orders";
 
   const params = new URLSearchParams(window.location.search);
   const panel = params.get("panel");
 
-  if (!isMenuKeyForUrl(panel)) return "broadcast";
+  // [2026-10-21 a4-1] 첫 화면 = 주문·입금(실시간 주문). 「방송」 메뉴 삭제 → ?panel=broadcast 는 주문·입금 + 방송 관리 창
+  if (!isMenuKeyForUrl(panel)) return "orders";
   // [2026-10-21] 시스템 점검 화면은 메뉴에서 뺐다 → 옛 주소 ?panel=audit 는 설정으로
-  return panel === "audit" ? "settings" : panel;
+  if (panel === "audit") return "settings";
+  if (panel === "broadcast") return "orders";
+  return panel;
+}
+
+function readBroadcastManageFromUrl(): boolean {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get("panel") === "broadcast";
 }
 
 function replacePanelInUrl(menu: AdminLiveMenuKey) {
@@ -553,6 +561,8 @@ export default function AdminLiveDashboard() {
   const [productHeaderTarget,setProductHeaderTarget]=useState<HTMLDivElement|null>(null);
   const [activeMenu, setActiveScreen] = useState<AdminLiveMenuKey>(() => resolveAdminLiveDestination(readMenuFromUrl()).screen);
   const [drawer, setDrawer] = useState<AdminLiveDrawerState>(() => resolveAdminLiveDestination(readMenuFromUrl()).drawer);
+  // [2026-10-21 a4-1] 방송 관리 창(제목·URL·방송 화면 공지·알림 발송·상품 카드·쇼핑몰 열림) — 사이드바 방송 카드 「방송 관리」로 연다
+  const [broadcastManageOpen, setBroadcastManageOpen] = useState<boolean>(() => readBroadcastManageFromUrl());
   const settingsGuardRef=useRef<null|(()=>Promise<boolean>)>(null);
   const registerSettingsGuard=useCallback((guard:null|(()=>Promise<boolean>))=>{settingsGuardRef.current=guard;},[]);
   const setActiveMenu = (menu: AdminLiveMenuKey) => {
@@ -1619,6 +1629,14 @@ export default function AdminLiveDashboard() {
           }}
           broadcastOn={Boolean(activeBroadcast)}
           onOpenVisitStats={() => { setActiveMenu("visits"); }}
+          broadcastCard={{
+            title: activeBroadcast ? broadcastTitle : "",
+            startedAt: activeBroadcast?.started_at || activeBroadcast?.created_at || null,
+            saving: savingBroadcast,
+            onStart: () => { void startBroadcast({ title: broadcastTitle, youtubeUrl: broadcastYoutubeUrl }); },
+            onEnd: () => { void endBroadcast(); },
+            onManage: () => setBroadcastManageOpen(true),
+          }}
         />
 
         <main className="flex min-w-0 flex-1 flex-col px-3 py-3 md:px-4 md:py-3">
@@ -1702,7 +1720,7 @@ export default function AdminLiveDashboard() {
                 ) : null}
               </div>
 
-              {loadError && (activeMenu === "orders" || activeMenu === "broadcast") ? (
+              {loadError && activeMenu === "orders" ? (
                 <div className="mb-3 shrink-0 rounded-2xl border border-danger-tx/40 bg-danger-bg px-4 py-3 text-sm font-black text-danger-tx">
                   주문 데이터 불러오기 실패: {loadError}
                 </div>
@@ -1712,39 +1730,7 @@ export default function AdminLiveDashboard() {
               <div className={`w-full rounded-2xl border border-line bg-surface ${SCREEN_SHELL_HEIGHT}`}>
 
               {/* ── 방송 › 방송 콘솔 ── */}
-              {activeMenu === "broadcast" ? (
-                <div className="space-y-3 p-4">
-                  <LiveHeader
-                    activeBroadcast={activeBroadcast}
-                    savingBroadcast={savingBroadcast}
-                    videoRatio={videoRatio}
-                    onVideoRatioChange={setVideoRatio}
-                    onStartBroadcast={startBroadcast}
-                    onEndBroadcast={endBroadcast}
-                    onSaveBroadcast={saveBroadcast}
-                    title={broadcastTitle}
-                    onTitleChange={setBroadcastTitle}
-                    youtubeUrl={broadcastYoutubeUrl}
-                    onYoutubeUrlChange={setBroadcastYoutubeUrl}
-                    productCount={broadcastProductCount ?? undefined}
-                    shopOpen={shopOpen}
-                    onToggleShopOpen={handleToggleShopOpen}
-                    widgetCardOn={widgetCardOn}
-                    onToggleWidgetCard={handleToggleWidgetCard}
-                    onSaveFeedPin={handleSaveFeedPin}
-                  />
-                  <LiveMissionGauge
-                    broadcastOn={Boolean(activeBroadcast)}
-                    onOpenMission={() => { setActiveMenu("event"); }}
-                  />
-                  <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
-                  {/* [2026-09-08 사장님 지적] 시스템 점검은 「설정 › 시스템 점검」, 고객이슈는 「고객」으로 옮겼다.
-                      방송/쇼핑몰 상관없는 공통 항목이라 방송 메뉴에 있을 자리가 아니다. */}
-                  <div className="w-full">
-                    <LiveStatsPanel orders={orders} activeBroadcastId={activeBroadcast?.id || null} onOpenReport={() => { setActiveMenu("reports"); }} />
-                  </div>
-                </div>
-              ) : null}
+              {/* [2026-10-21 a4-1] 「방송」 화면 삭제 — 컨트롤타워(LiveHeader)는 아래 방송 관리 창으로, 숫자 띠·미션은 실시간 주문에 이미 있음, 라이브 현황(LiveStatsPanel)은 판매분석 위로 */}
 
               {/* ── 방송 › 채팅주문 대기열(판정 결과 확인 전용, 담기 없음) ── */}
               {activeMenu === "chatorder" ? <ChatOrderQueuePopup embedded onClose={() => {}} /> : null}
@@ -1755,7 +1741,7 @@ export default function AdminLiveDashboard() {
                   embedded
                   renderTrigger={false}
                   controlledOpen={activeMenu === "event"}
-                  onRequestClose={() => { setActiveMenu("broadcast"); }}
+                  onRequestClose={() => { setActiveMenu("orders"); }}
                   activeBroadcastId={activeBroadcast?.id || null}
                   selectedBroadcastId={filters.broadcast === "current" ? activeBroadcast?.id || null : broadcasts.find((broadcast) => broadcast.id === filters.broadcast)?.id || null}
                   filteredOrderGroupIds={filteredOrders.map((o) => String(o.groupId))}
@@ -1772,7 +1758,13 @@ export default function AdminLiveDashboard() {
 
               {/* ── 방송 › 방송 기록·리포트 (읽기 전용) ── */}
               {activeMenu === "reports" || activeMenu === "sales" ? (
-                <SalesAnalysisPanel initialBroadcastId={activeBroadcast?.id || null} />
+                <div className="flex flex-col gap-3">
+                  {/* [2026-10-21 a4-1] 라이브 현황(이번 방송 KPI·TOP) — 방송 메뉴에서 이리로. a4-2 에서 「판매·정산」 탭으로 정리 예정 */}
+                  <div className="px-4 pt-4">
+                    <LiveStatsPanel orders={orders} activeBroadcastId={activeBroadcast?.id || null} onOpenReport={() => { setActiveMenu("reports"); }} />
+                  </div>
+                  <SalesAnalysisPanel initialBroadcastId={activeBroadcast?.id || null} />
+                </div>
               ) : null}
 
               {/* ── 주문·입금 › 실시간 주문 ── */}
@@ -1957,6 +1949,33 @@ export default function AdminLiveDashboard() {
 
           {/* 채팅읽기 상주 루프 — 컨트롤타워가 열려 있으면 자동으로 읽는다 (OFF면 서버가 건너뜀) */}
           <ChatOrderReaderLoop />
+
+          {/* [2026-10-21 a4-1] 방송 관리 창 — 옛 「방송」 메뉴의 컨트롤타워 그대로(핸들러 동일), 자리만 창으로 */}
+          {broadcastManageOpen ? (
+            <AdminLiveSideDrawer title="방송 관리" width={560} onClose={() => setBroadcastManageOpen(false)}>
+              <div className="space-y-3 p-3">
+                <LiveHeader
+                  activeBroadcast={activeBroadcast}
+                  savingBroadcast={savingBroadcast}
+                  videoRatio={videoRatio}
+                  onVideoRatioChange={setVideoRatio}
+                  onStartBroadcast={startBroadcast}
+                  onEndBroadcast={endBroadcast}
+                  onSaveBroadcast={saveBroadcast}
+                  title={broadcastTitle}
+                  onTitleChange={setBroadcastTitle}
+                  youtubeUrl={broadcastYoutubeUrl}
+                  onYoutubeUrlChange={setBroadcastYoutubeUrl}
+                  productCount={broadcastProductCount ?? undefined}
+                  shopOpen={shopOpen}
+                  onToggleShopOpen={handleToggleShopOpen}
+                  widgetCardOn={widgetCardOn}
+                  onToggleWidgetCard={handleToggleWidgetCard}
+                  onSaveFeedPin={handleSaveFeedPin}
+                />
+              </div>
+            </AdminLiveSideDrawer>
+          ) : null}
 
           <LiveBroadcastStartModal
             open={Boolean(broadcastStartDraft)}

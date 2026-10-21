@@ -12,8 +12,11 @@ assert.equal(menu.getAdminLiveScreenTitle('sales'),'주문·입금 › 판매분
 assert.equal(menu.topMenuOf('reports'),'orders','legacy report must lead to the same analysis workspace');
 assert.equal(menu.getAdminLiveScreenTitle('reports'),menu.getAdminLiveScreenTitle('sales'));
 assert.deepEqual(menu.ADMIN_LIVE_SUB_TABS.orders.map(tab=>tab.key),['orders','payments','settlement','sales','event']);
-assert.equal(menu.ADMIN_LIVE_TOP_MENUS.length,5);
-const routes=Object.values(menu.ADMIN_LIVE_SUB_TABS).flat().map(tab=>tab.key).sort();
+// [2026-10-21 a4-1] 「방송」 큰 메뉴 삭제 → 4개(주문·입금/상품/고객/설정). broadcast 키·주소는 보존
+assert.equal(menu.ADMIN_LIVE_TOP_MENUS.length,4);
+assert.equal(menu.topMenuOf('broadcast'),'orders','old ?panel=broadcast must land in orders');
+// [2026-10-21 a3-2] 고객 탭은 같은 화면 키(customers)를 custTab 으로 나눠 쓴다 → 키는 중복 제거해서 비교
+const routes=[...new Set(Object.values(menu.ADMIN_LIVE_SUB_TABS).flat().map(tab=>tab.key))].sort();
 // [2026-10-21 a1-1] chatorder·audit 는 메뉴에서만 숨김(키·주소는 보존)
 assert.deepEqual(routes,menu.ADMIN_LIVE_ALL_MENU_KEYS.filter(key=>!['reports','chatorder','audit'].includes(key)).sort());
 assert.equal(menu.isAdminLiveMenuKey('chatorder'),true);assert.equal(menu.isAdminLiveMenuKey('audit'),true);

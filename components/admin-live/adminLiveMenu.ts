@@ -32,7 +32,8 @@ export type AdminLiveTopMenuItem = {
 
 export const ADMIN_LIVE_TOP_MENUS: AdminLiveTopMenuItem[] = [
   // 아이콘은 AdminLiveMenuIcon.tsx (SVG) — 기기마다 모양이 달라지는 이모지를 쓰지 않는다
-  { key: "broadcast", label: "방송", desc: "시작·종료 · 기록", defaultKey: "broadcast" },
+  // [2026-10-21 a4-1] 「방송」 큰 메뉴 삭제 — 시작·종료·방송 관리는 사이드바 방송 카드로(사장님: 시작할 때만 쓰는데 왜 메뉴인가).
+  //   화면 키 "broadcast"·sub-tab 정의는 보존(?panel=broadcast 옛 주소 → 주문·입금 + 방송 관리 창).
   { key: "orders", label: "주문·입금", desc: "실시간 주문 · 입금내역 · 정산 · 판매분석 · 이벤트", defaultKey: "orders" },
   { key: "products", label: "상품", desc: "방송 상품 · 쇼핑몰 · 등록", defaultKey: "products" },
   { key: "customers", label: "고객", desc: "회원 · 고객이슈 · 쪽지·공지사항 · 단골 · 접속 기록 · 계정 잇기", defaultKey: "customers" },
@@ -72,8 +73,8 @@ export const ADMIN_LIVE_SUB_TABS: Record<AdminLiveTopMenuKey, AdminLiveSubTab[]>
 };
 
 const TOP_MENU_OF: Record<AdminLiveMenuKey, AdminLiveTopMenuKey> = {
-  broadcast: "broadcast",
-  chatorder: "broadcast",
+  broadcast: "orders", // [2026-10-21 a4-1] 방송 메뉴 삭제 → 주문·입금 안에서 방송 관리 창
+  chatorder: "orders",
   event: "orders", // [2026-09-09 사장님 요청] 방송 → 주문·입금
   reports: "orders",
   orders: "orders",
@@ -89,11 +90,11 @@ const TOP_MENU_OF: Record<AdminLiveMenuKey, AdminLiveTopMenuKey> = {
 };
 
 export function topMenuOf(key: AdminLiveMenuKey): AdminLiveTopMenuKey {
-  return TOP_MENU_OF[key] || "broadcast";
+  return TOP_MENU_OF[key] || "orders";
 }
 
 export function getAdminLiveTopMenu(key: AdminLiveTopMenuKey): AdminLiveTopMenuItem {
-  return ADMIN_LIVE_TOP_MENUS.find((menu) => menu.key === key) || ADMIN_LIVE_TOP_MENUS[0];
+  return ADMIN_LIVE_TOP_MENUS.find((menu) => menu.key === key) || ADMIN_LIVE_TOP_MENUS[0]; // [a4-1] broadcast 는 목록에 없음 → 첫 메뉴(주문·입금)
 }
 
 export const ADMIN_LIVE_ALL_MENU_KEYS: AdminLiveMenuKey[] = Object.keys(TOP_MENU_OF) as AdminLiveMenuKey[];
