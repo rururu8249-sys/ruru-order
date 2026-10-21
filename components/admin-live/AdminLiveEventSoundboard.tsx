@@ -23,12 +23,12 @@ type SoundDef = { key: string; label: string; file: string; dur: string; main?: 
 //   - 보조 버튼 1개 = 우승 팡파레만 따로(서바이벌은 끝나는 시점이 인원수마다 달라 통짜에 못 넣음).
 const SOUNDS: Record<"survival" | "race", SoundDef[]> = {
   survival: [
-    { key: "event", label: "⛈️ 서바이벌 효과음 (폭풍우+천둥 전체)", file: "/sfx/survival-event.mp3", dur: "45초", main: true },
-    { key: "win", label: "🏆 우승 팡파레+함성", file: "/sfx/survival-win.mp3", dur: "6.5초" },
+    { key: "event", label: "서바이벌 효과음 (폭풍우+천둥 전체)", file: "/sfx/survival-event.mp3", dur: "45초", main: true },
+    { key: "win", label: "우승 팡파레+함성", file: "/sfx/survival-win.mp3", dur: "6.5초" },
   ],
   race: [
-    { key: "event", label: "🏁 달리기 효과음 (카운트다운→총성→함성→팡파레)", file: "/sfx/race-event.mp3", dur: "14초", main: true },
-    { key: "finish", label: "🎺 결승 팡파레만", file: "/sfx/race-finish.mp3", dur: "3.2초" },
+    { key: "event", label: "달리기 효과음 (카운트다운→총성→함성→팡파레)", file: "/sfx/race-event.mp3", dur: "14초", main: true },
+    { key: "finish", label: "결승 팡파레만", file: "/sfx/race-finish.mp3", dur: "3.2초" },
   ],
 };
 
@@ -69,7 +69,7 @@ export default function AdminLiveEventSoundboard({ kind }: { kind: "survival" | 
   return (
     <div style={{ border: "1px solid var(--bd)", borderRadius: "8px", padding: "8px 12px", marginBottom: "12px", background: "var(--color-surface)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px", flexWrap: "wrap" }}>
-        <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--rose)" }}>🔊 효과음 재생 (실제 녹음)</span>
+        <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--rose)" }}>효과음 재생 (실제 녹음)</span>
         <span className="note" style={{ fontSize: "11px" }}>이 컴퓨터 스피커로 재생 — 방송 송출은 OBS 데스크탑 오디오 캡처</span>
         <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "4px" }}>
           <span className="note" style={{ fontSize: "11px" }}>볼륨 {volume}%</span>
@@ -94,7 +94,7 @@ export default function AdminLiveEventSoundboard({ kind }: { kind: "survival" | 
               onClick={() => (on ? stopAll() : play(s))}
               title={`${s.dur} · 다시 누르면 정지`}
             >
-              {on ? "▶ " : ""}{s.label} <span style={{ fontWeight: 400, opacity: 0.7 }}>({s.dur})</span>
+              {on ? "재생 중 · " : ""}{s.label} <span style={{ fontWeight: 400, opacity: 0.7 }}>({s.dur})</span>
             </button>
           );
         })}

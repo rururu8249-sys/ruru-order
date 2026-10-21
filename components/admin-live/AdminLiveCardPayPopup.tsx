@@ -448,7 +448,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
     //   → 본문만 스크롤하고, 결제 버튼 두 개는 아래에 «고정»한다. 이제 어떤 창 높이에서도 안 잘린다.
     <div style={{ width: "100%", height: "100%", background: "#F4F6FB", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div className="flex items-center justify-between px-5 py-4" style={{ background: "#101C3D" }}>
-          <span className="text-[16px] font-black text-white">💳 카드결제 — {order.nickname}</span>
+          <span className="text-[16px] font-black text-white">카드결제 — {order.nickname}</span>
           <button type="button" onClick={onClose} className="text-xl leading-none text-white/60 hover:text-white">
             ✕
           </button>
@@ -460,7 +460,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
             <span>오른쪽 페이스터 창에 1 → 2 → 3 순서대로 붙여넣으세요 (숫자키 1~4) · 페이스터 창은 <b>닫지도, 최소화하지도 마세요</b>(로그인 유지)</span>
             {/* [2026-09-08] 페이스터 창을 실수로 닫았을 때 다시 여는 길. 복사창 바로 오른쪽 자리에 뜬다. */}
             <button type="button" onClick={() => openPayster(paysterUrl)} className="ru-btn ru-btn-sm" title="페이스터 창을 복사창 오른쪽에 다시 엽니다(닫았을 때)">
-              페이스터 창 다시 열기 ↗
+              페이스터 창 다시 열기
             </button>
           </div>
           {/* [2026-09-22 B안] 페이지 모달(비상구)일 때만 — 그날 첫 결제는 클릭 권한을 페이스터에 써서 복사창이 못 열린다.
@@ -482,7 +482,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
                 className="shrink-0 rounded-lg px-3 py-2 text-[12px] font-black text-white"
                 style={{ background: "#2B6BEB" }}
               >
-                복사창 열기 ↗
+                복사창 열기
               </button>
             </div>
           ) : null}
@@ -527,7 +527,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
 
           {/* [2026-08-31 사장님 요청] 가운데 빈 공간 활용 — 결제 전에 주문·금액을 눈으로 검산 (표시 전용) */}
           <div className="mt-4 flex flex-col rounded-2xl bg-white px-4 py-3.5 shadow-sm" style={{ border: "1px solid #DDE4F2" }}>
-            <div className="mb-2 shrink-0 text-[12px] font-black" style={{ color: "#5A6B92" }}>🧾 이 주문 내용 — 결제 전에 확인하세요</div>
+            <div className="mb-2 shrink-0 text-[12px] font-black" style={{ color: "#5A6B92" }}>이 주문 내용 — 결제 전에 확인하세요</div>
             <div className="space-y-1.5">
               {/* [2026-09-09 사장님 지적] 복사창에서 이 칸이 «비어» 있었다. 원인은 order.items 가 빈 주문.
                     빈 칸으로 두면 화면이 고장 난 것처럼 보이고, 결제 전 검산도 못 한다.
@@ -545,7 +545,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={itemImages[String(item.id)]} alt="" onClick={() => setImagePreviewUrl(itemImages[String(item.id)])} className="h-9 w-9 shrink-0 cursor-zoom-in rounded-lg object-cover" style={{ border: "1px solid #DDE4F2" }} />
                     ) : (
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[14px]" style={{ background: "#F4F6FB" }}>🛍</span>
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold text-ink-mute" style={{ background: "#F4F6FB" }}>상품</span>
                     )}
                     <span className="min-w-0 flex-1 truncate">
                       {item.productName}
@@ -569,7 +569,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
         {/* [2026-09-09] 결제 버튼은 «항상 보이게» 아래 고정. 위 본문만 스크롤한다. */}
         <div className="shrink-0 px-5 pb-5 pt-3" style={{ background: "#F4F6FB", borderTop: "1px solid #E3E9F5" }}>
           {/* [2026-09-17 사장님] 이 버튼은 «카드결제 링크를 카톡으로 보냈다»는 안내다(발송완료 아님 — 이름 정정).
-              누르면 ① 채팅 붙여넣기용으로 복사 ② 방송 화면 알림 위젯에도 30초 표시(상품관리 「📢 채팅」과 같은 방식).
+              누르면 ① 채팅 붙여넣기용으로 복사 ② 방송 화면 알림 위젯에도 30초 표시(상품 목록 「소개」와 같은 방식).
               위젯 표시가 실패해도 복사는 그대로 된다(돈·주문 무관). */}
           <button
             type="button"
@@ -578,7 +578,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
             className="w-full rounded-2xl px-4 py-3.5 text-sm font-black shadow-md transition"
             style={copiedKey === "chatNotice" ? { background: "#059669", color: "#fff" } : { background: "#101C3D", color: "#fff" }}
           >
-            {copiedKey === "chatNotice" ? "✔ 복사됨 · 방송 화면에도 표시됨" : "📢 「카톡으로 결제링크 보냈어요」 안내 복사 + 방송 표시"}
+            {copiedKey === "chatNotice" ? "복사됨 · 방송 화면에도 표시됨" : "「카톡으로 결제링크 보냈어요」 안내 복사 + 방송 표시"}
           </button>
 
           <button
@@ -587,7 +587,7 @@ export default function AdminLiveCardPayPopup({ order, onClose, onAfterStatusCha
             onClick={handleComplete}
             className="mt-2.5 w-full rounded-2xl bg-[var(--color-ok-tx)] px-4 py-3.5 text-sm font-black text-white shadow-md transition hover:bg-[var(--color-ok-tx)] disabled:bg-surface-3"
           >
-            {saving ? "처리 중…" : "✔ 카드결제완료 처리"}
+            {saving ? "처리 중…" : "카드결제완료 처리"}
           </button>
           {pipCompleteError && !pipConfirmOpen ? (
             <div style={{ marginTop: "8px", fontSize: "12px", fontWeight: 800, color: "#B42318", whiteSpace: "pre-wrap" }}>{pipCompleteError}</div>

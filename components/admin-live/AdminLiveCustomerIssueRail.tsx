@@ -1605,7 +1605,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
             onClick={() => { const t = undoTarget; setUndoTarget(null); void restoreIssueTask(t); }}
             className="h-9 shrink-0 rounded-lg bg-[var(--color-ok-tx)] px-3 text-[12px] font-black text-white hover:opacity-90"
           >
-            ↩ 되돌리기
+            되돌리기
           </button>
         </div>
       ) : null}

@@ -2,8 +2,8 @@
 
 export type EventTab = "survival" | "race" | "roulette" | "claw" | "mission";
 const TABS: readonly [EventTab, string][] = [
-  ["survival", "⛈️ 서바이벌"], ["race", "🏁 달리기"], ["roulette", "🎡 룰렛"],
-  ["claw", "🪆 인형뽑기"], ["mission", "🎯 미션"],
+  ["survival", "서바이벌"], ["race", "달리기"], ["roulette", "룰렛"],
+  ["claw", "인형뽑기"], ["mission", "미션"],
 ];
 
 export default function AdminLiveEventTabs({active, onSelect,disabled=false}: {active: EventTab; onSelect: (tab: EventTab) => void;disabled?:boolean}) {

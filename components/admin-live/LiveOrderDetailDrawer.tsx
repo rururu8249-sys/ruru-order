@@ -668,7 +668,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     const nick = String(orderForView.nickname || orderForView.name || "고객").trim();
     const ok = await showAdminConfirm(
       `${nick}님이 ${diff.toLocaleString()}원을 더 냈어요.\n\n이 돈을 포인트 ${diff.toLocaleString()}P로 돌려줄까요?\n(포인트는 다음 주문 때 돈처럼 쓸 수 있어요)`,
-      { title: "💰 차액 포인트로 돌려주기", confirmText: "돌려주기" },
+      { title: "차액 포인트로 돌려주기", confirmText: "돌려주기" },
     );
     if (!ok || balanceWorking) return;
     setBalanceWorking(true);
@@ -1125,7 +1125,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       // [B3] 토스트는 화면 라벨(환불/교환/기타)로 — res.modeLabel(반품…) 대신.
       const modeLabel = data.issueType === "refund" ? "환불" : data.issueType === "exchange" ? "교환" : "기타";
       const lines = [`${modeLabel} 이슈 등록 완료`];
-      if (res.issueRegistered) lines.push("🗂 고객이슈 자동 등록됨");
+      if (res.issueRegistered) lines.push("고객이슈 자동 등록됨");
       if (Number(res.reclaimed) > 0) {
         const after = Number(res.balanceAfter);
         lines.push(
@@ -1392,7 +1392,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           onClick={() => void copyCustomerOrderSummary()}
           className="ml-auto rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft transition hover:border-rose-deep hover:text-rose-deep"
         >
-          📋 고객용 복사
+          고객용 복사
         </button>
         {["unpaid", "manual_match_needed", "card_unpaid"].includes(orderForView.paymentStatus) ? (
           <button
@@ -1401,9 +1401,9 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             aria-label="결제요청 쪽지 보내기"
             disabled={payRequestSending}
             onClick={() => void sendPaymentRequest()}
-            className="rounded-full px-1.5 text-[16px] leading-none opacity-75 transition hover:opacity-100 disabled:opacity-35"
+            className="rounded-lg border border-line bg-surface px-2 py-0.5 text-[12px] font-bold text-ink transition hover:bg-surface-2 disabled:opacity-35"
           >
-            🔔
+            쪽지
           </button>
         ) : null}
         <button
@@ -1473,7 +1473,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 </label>
               </div>
               <button type="button" onClick={() => { setEditRecipientName(editName.trim()); setEditRecipientPhone(editPhone.replace(/[^0-9]/g, "")); }} className="h-8 w-full rounded-lg border border-dashed border-line bg-surface text-[11px] font-black text-ink-soft hover:border-rose-deep hover:text-rose-deep">
-                ↕ 받는분을 주문자와 동일하게
+                받는분을 주문자와 동일하게
               </button>
               <div className="grid gap-1 text-[11px] font-black text-ink-mute">우편번호 · 주소
                 <div className="flex gap-2">
@@ -1487,7 +1487,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 <input value={editMemo} onChange={(e) => setEditMemo(e.target.value)} placeholder="배송 요청사항" className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
               </label>
               <button type="button" onClick={handleSaveCustomerFields} disabled={savingCustomer} className="mt-1 h-9 w-full rounded-lg bg-[var(--color-ok-tx)] text-[13px] font-black text-white hover:bg-[var(--color-ok-tx)] disabled:bg-surface-3">
-                {savingCustomer ? "저장중..." : "✔ 고객/배송 정보 저장"}
+                {savingCustomer ? "저장중..." : "고객/배송 정보 저장"}
               </button>
               <div className="rounded-lg bg-warn-bg px-2.5 py-1.5 text-[11px] font-bold leading-4 text-warn-tx">상품명·옵션·금액은 아래 상품 카드에서 수정합니다. 여기선 닉네임·고객·주소·메모만 저장됩니다(배송비/합계 미변경).</div>
             </div>
@@ -1594,21 +1594,21 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           if (diff === 0) {
             return (
               <div className="mt-2 rounded-xl border border-ok-tx/35 bg-ok-bg px-3 py-2 text-[12px] font-black leading-5 text-ok-tx">
-                ✅ 받은 돈 {money(balanceInfo.depositSum)} = 주문 금액 {money(balanceOrderTotal)} — 딱 맞아요. 하실 일 없어요!
+                받은 돈 {money(balanceInfo.depositSum)} = 주문 금액 {money(balanceOrderTotal)} — 딱 맞아요.
               </div>
             );
           }
           if (diff > 0) {
             return (
               <div className="mt-2 space-y-2 rounded-xl border border-warn-tx/35 bg-warn-bg px-3 py-2.5 leading-5">
-                <div className="text-[13px] font-black text-warn-tx">💰 손님이 {money(diff)} 더 냈어요.</div>
+                <div className="text-[13px] font-black text-warn-tx">손님이 {money(diff)} 더 냈어요.</div>
                 <div className="text-[11px] font-bold text-warn-tx">받은 돈 {money(balanceInfo.depositSum)} − 주문 금액 {money(balanceOrderTotal)} = {money(diff)}</div>
                 {refundDone && balanceInfo.lastRefund ? (
-                  <div className="rounded-lg bg-ok-bg px-2.5 py-1.5 text-[12px] font-black text-ok-tx">✅ 이미 {money(balanceInfo.lastRefund.amount)}를 포인트로 돌려줬어요. 끝!</div>
+                  <div className="rounded-lg bg-ok-bg px-2.5 py-1.5 text-[12px] font-black text-ok-tx">이미 {money(balanceInfo.lastRefund.amount)}를 포인트로 돌려줬어요.</div>
                 ) : (
                   <>
                     <button type="button" disabled={balanceWorking} onClick={() => void handleRefundDiffAsPoints(diff)} className="w-full rounded-lg bg-[var(--color-warn-tx)] px-3 py-2 text-[13px] font-black text-white hover:bg-[var(--color-warn-tx)] disabled:opacity-50">
-                      {balanceWorking ? "처리 중…" : `👉 ${money(diff)} 포인트로 돌려주기 (버튼 한 번이면 끝)`}
+                      {balanceWorking ? "처리 중…" : `${money(diff)} 포인트로 돌려주기`}
                     </button>
                     {balanceInfo.lastRefund ? (
                       <div className="text-[11px] font-bold text-warn-tx">참고: 전에 이 주문으로 {money(balanceInfo.lastRefund.amount)}를 돌려준 기록이 있어요. 그 뒤 금액이 또 바뀐 경우에만 다시 누르세요.</div>
@@ -1624,7 +1624,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               <div className="text-[13px] font-black text-danger-tx">⚠️ 받은 돈이 {money(-diff)} 부족해요.</div>
               <div className="text-[11px] font-bold text-danger-tx">주문 금액 {money(balanceOrderTotal)} − 받은 돈 {money(balanceInfo.depositSum)} = {money(-diff)}</div>
               <button type="button" disabled={balanceWorking} onClick={() => void handleRequestShortageDeposit(-diff)} className="w-full rounded-lg bg-[var(--color-danger-tx)] px-3 py-2 text-[13px] font-black text-white hover:bg-[var(--color-danger-tx)] disabled:opacity-50">
-                {balanceWorking ? "처리 중…" : `🔔 ${money(-diff)} 더 입금해달라고 쪽지 보내기`}
+                {balanceWorking ? "처리 중…" : `${money(-diff)} 더 입금해달라고 쪽지 보내기`}
               </button>
             </div>
           );
@@ -1765,7 +1765,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                   onClick={() => { setShipEditText(String(shippingFee)); setShipEditOpen((v) => !v); }}
                   className="rounded-lg border border-line bg-surface px-1.5 py-0.5 text-[11px] font-black text-ink-soft hover:border-rose-deep hover:text-rose-deep"
                 >
-                  ✎ 수정
+                  수정
                 </button>
               ) : null}
             </span>
@@ -1806,7 +1806,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               disabled={methodChanging}
               className="h-10 w-full rounded-xl border border-rose-line bg-rose-soft text-[13px] font-black text-rose-deep shadow-sm hover:bg-rose-line/40 active:scale-[0.99] disabled:bg-surface-2 disabled:text-ink-mute"
             >
-              {methodChanging ? "계산중..." : `💳 ${nextPaymentMethod}으로 변경`}
+              {methodChanging ? "계산중..." : `${nextPaymentMethod}으로 변경`}
             </button>
           ) : null}
 
@@ -1949,7 +1949,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 ) : blockedNow ? (
                   <>
                     <div className="mt-2 rounded-xl border border-danger-tx bg-danger-bg px-3 py-2">
-                      <div className="text-[12px] font-black text-danger-tx">🚫 이미 차단된 손님입니다</div>
+                      <div className="text-[12px] font-black text-danger-tx">이미 차단된 손님입니다</div>
                       {blockedReason ? (
                         <pre className="mt-1 whitespace-pre-wrap break-words text-[11px] font-bold leading-4 text-danger-tx">{blockedReason}</pre>
                       ) : null}
@@ -1977,7 +1977,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                       disabled={blockSaving}
                       className="mt-2 h-10 w-full rounded-xl border border-line bg-surface text-[13px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50"
                     >
-                      {blockSaving ? "처리중…" : "✅ 차단 해제"}
+                      {blockSaving ? "처리중…" : "차단 해제"}
                     </button>
                   </>
                 ) : (
@@ -1987,7 +1987,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                       onClick={() => { setBlockError(""); setBlockOpen(true); }}
                       className="mt-2 h-10 w-full rounded-xl border border-danger-tx bg-surface text-[13px] font-black text-danger-tx hover:bg-danger-bg active:scale-[0.99]"
                     >
-                      🚫 이 손님 차단 (거파 품목 고르기)
+                      이 손님 차단 (거파 품목 고르기)
                     </button>
                     <div className="mt-1.5 text-[11px] font-bold leading-4 text-ink-mute">
                       차단하면 이 손님은 주문서를 새로 쓸 수 없습니다. 이미 들어온 주문·입금·정산은 그대로 남습니다.

@@ -298,7 +298,7 @@ async function copyText(value: string) {
 }
 
 export default function AdminLiveEventRoulettePanel({
-  buttonLabel = "🎁 이벤트",
+  buttonLabel = "이벤트",
   buttonClassName = "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-xl bg-[var(--color-cardpay)] px-3 text-xs font-black text-white shadow-sm transition hover:bg-[var(--color-cardpay)]",
   renderTrigger = true,
   controlledOpen,
@@ -1152,7 +1152,7 @@ export default function AdminLiveEventRoulettePanel({
 
     // [2026-07-26] 달리기(race)는 서바이벌과 동일 엔진 — 탭에 따라 eventKind/문구만 다름.
     const isRace = eventTab === "race";
-    const kindLabel = isRace ? "🏁 달리기 대회" : "⛈️ 서바이벌";
+    const kindLabel = isRace ? "달리기 대회" : "서바이벌";
     const winnerWord = isRace ? "당첨자" : "생존자";
 
     // 실제 돈이 나가므로 총 지급액을 먼저 확인시킨다(운영모드 + 포인트 선물일 때만).
@@ -1448,7 +1448,7 @@ export default function AdminLiveEventRoulettePanel({
     // 룰렛·인형뽑기: 운영 + 포인트 > 0 이면 서바이벌과 같은 시작 확인창(당첨자 1명에게 실제 지급)
     if (runMode === "live" && giftType === "point" && amt > 0 && (eventTab === "roulette" || eventTab === "claw")) {
       const okStart = await showAdminConfirm(
-        `${eventTab === "roulette" ? "🎡 룰렛" : "🪆 인형뽑기"}을 시작합니다.\n\n당첨자 1명에게 ${amt.toLocaleString("ko-KR")}P 가 실제로 지급됩니다.\n\n진행할까요?`,
+        `${eventTab === "roulette" ? "룰렛" : "인형뽑기"}을 시작합니다.\n\n당첨자 1명에게 ${amt.toLocaleString("ko-KR")}P 가 실제로 지급됩니다.\n\n진행할까요?`,
         { title: "이벤트 시작", confirmText: "시작", cancelText: "취소", tone: "warning" },
       );
       if (!okStart) return;
@@ -1508,7 +1508,7 @@ export default function AdminLiveEventRoulettePanel({
                   <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
                     <button className="btn" style={{height:'auto',padding:'8px 12px'}} onClick={()=>void ensureRoulettePreviewEvent(finalParticipants)} disabled={spinning || publishingRoster || finalParticipants.length===0}>{publishingRoster?'명단 표시 중…':'방송에 명단 표시'}</button>
                     <button className="btn rose" style={{ height: "auto", padding: "8px 32px" }} onClick={() => void startSpin(false)} disabled={spinning || publishingRoster || finalParticipants.length === 0}>
-                      {spinning ? "진행중..." : giftType === "point" && Number(giftPointAmount || 0) > 0 ? `▶ 시작 · ${isKWinnerTab ? `${survivorCount}명에게 ` : "당첨자에게 "}${Number(giftPointAmount).toLocaleString("ko-KR")}P 지급` : "▶ 시작"}
+                      {spinning ? "진행중..." : giftType === "point" && Number(giftPointAmount || 0) > 0 ? `시작 · ${isKWinnerTab ? `${survivorCount}명에게 ` : "당첨자에게 "}${Number(giftPointAmount).toLocaleString("ko-KR")}P 지급` : "시작"}
                     </button>
                     <button className="btn" style={{ height: "auto", padding: "8px 12px" }} onClick={() => void startSpin(true)} disabled={spinning || publishingRoster || finalParticipants.length === 0} title="포인트가 나가지 않고 테스트 기록으로만 남습니다">
                       테스트로 해보기 · 포인트 안 나감
@@ -1527,9 +1527,9 @@ export default function AdminLiveEventRoulettePanel({
 
                 <fieldset disabled={publishingRoster} style={{margin:0,padding:0,border:0,minWidth:0,flex: 0.95, display: "flex", flexDirection: "column", gap: "8px" }}>
                   <div className="note">참가자 불러오기</div>
-                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "8px", borderColor: participantSource === "auto" ? "var(--rose)" : "var(--bd)", color: participantSource === "auto" ? "var(--rose)" : "var(--ink)" }} onClick={() => changeParticipantSource("auto")} disabled={!canLoadParticipants}>👥 주문서 제출자 전체 <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "auto" ? (loading ? "불러오는 중…" : `${autoParticipantCount}명`) : ""}</span></button>
-                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "8px", borderColor: participantSource === "paid" ? "var(--green)" : "var(--bd)", color: participantSource === "paid" ? "var(--green)" : "var(--ink)" }} onClick={() => changeParticipantSource("paid")} disabled={!canLoadParticipants}>💵 결제완료한 사람만 <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "paid" ? (loading ? "불러오는 중…" : `${autoParticipantCount}명`) : ""}</span></button>
-                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "8px", borderColor: participantSource === "manual" ? "var(--rose)" : "var(--bd)", color: participantSource === "manual" ? "var(--rose)" : "var(--ink)" }} onClick={() => changeParticipantSource("manual")}>✎ 수동 입력 (쉼표로 자동분리) <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "manual" ? `${manualParticipantCount}명` : ""}</span></button>
+                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "8px", borderColor: participantSource === "auto" ? "var(--rose)" : "var(--bd)", color: participantSource === "auto" ? "var(--rose)" : "var(--ink)" }} onClick={() => changeParticipantSource("auto")} disabled={!canLoadParticipants}>주문서 제출자 전체 <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "auto" ? (loading ? "불러오는 중…" : `${autoParticipantCount}명`) : ""}</span></button>
+                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "8px", borderColor: participantSource === "paid" ? "var(--green)" : "var(--bd)", color: participantSource === "paid" ? "var(--green)" : "var(--ink)" }} onClick={() => changeParticipantSource("paid")} disabled={!canLoadParticipants}>결제완료한 사람만 <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "paid" ? (loading ? "불러오는 중…" : `${autoParticipantCount}명`) : ""}</span></button>
+                  <button className="btn" style={{ textAlign: "left", height: "auto", padding: "8px", borderColor: participantSource === "manual" ? "var(--rose)" : "var(--bd)", color: participantSource === "manual" ? "var(--rose)" : "var(--ink)" }} onClick={() => changeParticipantSource("manual")}>수동 입력 (쉼표로 자동분리) <span style={{ float: "right", color: "var(--mut2)" }}>{participantSource === "manual" ? `${manualParticipantCount}명` : ""}</span></button>
                   {participantSource === "manual" ? (
                     <textarea value={manualParticipantText} onChange={(e) => setManualParticipantText(e.target.value)} onPaste={handleManualPaste}
                       placeholder={"닉네임/쉼표 구분. 채팅 붙여넣으면 @닉네임만 자동 추출."}
@@ -1586,13 +1586,13 @@ export default function AdminLiveEventRoulettePanel({
               {/* 당첨 고정 */}
               <div style={{ border: "1px solid var(--rose-bd)", background: "var(--rose-bg)", borderRadius: "8px", padding: "8px 12px", marginBottom: "12px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
-                  <span style={{ fontSize: "11px", color: "var(--rose)", fontWeight: 600 }}>🎯 당첨 고정 (닉네임 클릭){isKWinnerTab ? ` · 최대 ${survivorCount}명` : ""}</span>
+                  <span style={{ fontSize: "11px", color: "var(--rose)", fontWeight: 600 }}>당첨 고정 (닉네임 클릭){isKWinnerTab ? ` · 최대 ${survivorCount}명` : ""}</span>
                   <span style={{ fontSize: "11px", color: "var(--mut2)" }}>ㄱㄴㄷ 순 · 안 고르면 전원 추첨</span>
                   {/* [2026-09-08] 61명 중에서 눈으로 찾기 어렵다 → 검색칸. 찾는 즉시 걸러진다. */}
                   <input
                     className="ipt"
                     style={{ marginLeft: "auto", width: "150px", height: "26px", padding: "0 8px", fontSize: "11px" }}
-                    placeholder="🔍 닉네임 찾기"
+                    placeholder="닉네임 찾기"
                     value={nickFilter}
                     onChange={(e) => setNickFilter(e.target.value)}
                   />
@@ -1629,14 +1629,14 @@ export default function AdminLiveEventRoulettePanel({
                       // [2026-09-13] 같은 닉네임으로 «서로 다른 손님»이 주문하면 한 칸으로 합쳐진다. 표시만 해서 알려준다.
                       const mixed = Number(p.person_count || 0) >= 2;
                       return (
-                        <span key={`fix-${p.nickname}-${i}`} className={`nick ${on ? "win" : ""}`} onClick={toggleFixed} title={mixed ? `⚠️ 이 이름으로 주문한 손님이 ${p.person_count}명입니다(번호가 다름). 당첨되면 자동지급이 멈추고 수동지급 안내가 뜹니다.` : (ticketEnabled ? `결제완료 ${Number(p.paid_amount_sum || 0).toLocaleString("ko-KR")}원` : undefined)}>{on ? "👑 " : ""}{p.nickname}{mixed ? <span style={{ color: "#f59e0b", fontSize: "11px", fontWeight: 700 }}> ⚠️{p.person_count}명</span> : null}{ticketTail ? <span style={{ color: "var(--mut2)", fontSize: "11px" }}>{ticketTail}</span> : null}</span>
+                        <span key={`fix-${p.nickname}-${i}`} className={`nick ${on ? "win" : ""}`} onClick={toggleFixed} title={mixed ? `⚠ 이 이름으로 주문한 손님이 ${p.person_count}명입니다(번호가 다름). 당첨되면 자동지급이 멈추고 수동지급 안내가 뜹니다.` : (ticketEnabled ? `결제완료 ${Number(p.paid_amount_sum || 0).toLocaleString("ko-KR")}원` : undefined)}>{on ? "고정 · " : ""}{p.nickname}{mixed ? <span style={{ color: "#f59e0b", fontSize: "11px", fontWeight: 700 }}> ⚠{p.person_count}명</span> : null}{ticketTail ? <span style={{ color: "var(--mut2)", fontSize: "11px" }}>{ticketTail}</span> : null}</span>
                       );
                     })
                   )}
                 </div>
                 <div className="note" style={{ marginTop: "8px" }}>{isKWinnerTab
-                    ? (fixedSurvivorNicknames.length > 0 ? `👑 고정 ${fixedSurvivorNicknames.length}/${survivorCount}명 — ${fixedSurvivorNicknames.join(", ")}` : "👑 아무도 고정 안 함 (전원 추첨)")
-                    : (fixedWinnerNickname ? `👑 고정: ${fixedWinnerNickname}` : "👑 아무도 고정 안 함 (전원 추첨)")}</div>
+                    ? (fixedSurvivorNicknames.length > 0 ? `고정 ${fixedSurvivorNicknames.length}/${survivorCount}명 — ${fixedSurvivorNicknames.join(", ")}` : "아무도 고정 안 함 (전원 추첨)")
+                    : (fixedWinnerNickname ? `고정: ${fixedWinnerNickname}` : "아무도 고정 안 함 (전원 추첨)")}</div>
               </div>
 
               {/* 제목 + 당첨 내용(선물) */}
@@ -1687,7 +1687,7 @@ export default function AdminLiveEventRoulettePanel({
                     <div key={`winner-${w.id}`} className="row">
                       <span className="note" style={{ width: "120px", flexShrink: 0 }}>{dateTimeFull(w.winner_at)}</span>
                       <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {w.is_test ? "테스트" : "운영"} · {(() => { const ev = events.find((e) => e.id === w.event_id); const token = ev?.overlay_token || ""; return token.startsWith("roulette") ? "🎡룰렛" : token.startsWith("claw") ? "🪆인형뽑기" : token.startsWith("survival") ? "⛈️서바이벌" : token.startsWith("race") ? "🏁달리기" : "이벤트"; })()} · 당첨{" "}
+                        {w.is_test ? "테스트" : "운영"} · {(() => { const ev = events.find((e) => e.id === w.event_id); const token = ev?.overlay_token || ""; return token.startsWith("roulette") ? "룰렛" : token.startsWith("claw") ? "인형뽑기" : token.startsWith("survival") ? "서바이벌" : token.startsWith("race") ? "달리기" : "이벤트"; })()} · 당첨{" "}
                         {w.customer_ref && onOpenCustomer ? (
                           <button
                             type="button"
