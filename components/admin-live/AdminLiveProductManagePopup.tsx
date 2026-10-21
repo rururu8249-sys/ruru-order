@@ -1214,15 +1214,30 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   //   타겟은 {productId, detailName:""} — 위젯은 detailName 이 빈 값이면 그 상품의 모든 세부상품을 순환에 넣는다.
   //   옛 「고정 기록만(history)」 저장값은 그대로 읽어 보여주되(소개했던 상품), 새로 저장하는 길은 전체/체크한 상품만 두 가지.
   const bcAllPids = useMemo(() => bcProducts.map((row) => productId(row)).filter(Boolean), [bcProducts]);
-  const rotationIncludedPids = useMemo<Set<string>>(() => {
+  //   브랜드 묶음 줄: 연결된 세부상품(다른 상품을 묶어 넣은 것)은 위젯 타겟이 «원래 상품 id» 라서(widgetTargetFromProduct),
+  //   줄 하나를 체크하면 부모 id + 연결 세부상품 원래 id 를 함께 저장해야 그 묶음 전체가 순환에 들어간다.
+  const rotationPidsForRow = (pid: string): string[] => {
+    const linked = (brandCatalog.detailsByParent.get(pid) ?? [])
+      .map((detail) => ("sourceProductId" in detail ? String((detail as { sourceProductId?: unknown }).sourceProductId ?? "") : ""))
+      .filter(Boolean);
+    return [pid, ...linked];
+  };
+  const rotationTargetPids = useMemo<Set<string>>(() => {
     if (widgetRotation.mode === "all") return new Set(bcAllPids);
     if (widgetRotation.mode === "history") return new Set(widgetHistory.map((entry) => String(entry.productId)));
     return new Set(widgetRotation.targets.map((target) => String(target.productId)));
   }, [bcAllPids, widgetHistory, widgetRotation]);
+  // 줄 기준 「순환 포함」 = 그 줄 id 또는 그 줄에 묶인 세부상품 id 가 타겟에 있으면
+  const rotationIncludedPids = useMemo<Set<string>>(() => {
+    const out = new Set<string>();
+    for (const pid of bcAllPids) if (rotationPidsForRow(pid).some((id) => rotationTargetPids.has(id))) out.add(pid);
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bcAllPids, rotationTargetPids, brandCatalog]);
   const rotationLive = Boolean(widgetPinTargetBroadcastId(bcSelId, activeBroadcastId));
   const rotationSelectedCount = widgetRotation.mode === "all" ? bcAllPids.length : bcAllPids.filter((pid) => rotationIncludedPids.has(pid)).length;
   const saveRotationPids = async (pids: string[], doneMessage: string) => {
-    const unique = [...new Set(pids.filter((pid) => bcAllPids.includes(pid)))];
+    const unique = [...new Set(pids.filter((pid) => bcAllPids.includes(pid)).flatMap(rotationPidsForRow))];
     if (unique.length === 0) {
       showAdminToast("순환할 상품이 하나도 없어요. 최소 1개는 남겨 주세요.", "warning");
       return;
@@ -1248,7 +1263,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const rotationRemoveChecked = async () => {
     const checked = new Set(bcRotSel);
     if (checked.size === 0) return;
-    await saveRotationPids(bcAllPids.filter((pid) => rotationIncludedPids.has(pid) && !checked.has(pid)), `순환에서 ${checked.size}개 뺐어요.`);
+    const drop = new Set([...checked].flatMap(rotationPidsForRow));
+    await saveRotationPids(bcAllPids.filter((pid) => rotationIncludedPids.has(pid) && !drop.has(pid)), `순환에서 ${checked.size}개 뺐어요.`);
   };
   const toggleRotSel = (pid: string) => setBcRotSel((prev) => { const next = new Set(prev); if (next.has(pid)) next.delete(pid); else next.add(pid); return next; });
 

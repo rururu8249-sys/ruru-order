@@ -80,6 +80,16 @@ selectedTargets=[{productId:'1001',detailName:''}];
 await act(async()=>{tree=Renderer.create(React.createElement(Client));});
 assert(JSON.stringify(tree.toJSON()).includes('이동 상품'),'source-ID manual pin must survive moving under a brand');
 await act(async()=>tree.unmount());
+// [2026-10-21 a2-10] 방송 상품 줄 체크 → {productId, detailName:""} 로 저장. 브랜드 묶음이면 세부상품 전부가 순환에 들어와야 한다.
+//   연결 세부상품(sourceId 4 → 부모 1)의 위젯 타겟은 원래 id(4)라, 관리자는 부모 줄 체크 시 [1,4] 를 저장한다(scripts/test-brand-linked-admin-actions 에서 검증).
+pin=false;mode='selected';selectedTargets=[{productId:'1',detailName:''},{productId:'4',detailName:''}];
+await act(async()=>{tree=Renderer.create(React.createElement(Client));});
+assert(JSON.stringify(tree.toJSON()).includes('이동 상품'),'a2-10: parent+source targets with empty detailName must rotate the linked detail');
+await act(async()=>tree.unmount());
+selectedTargets=[{productId:'3',detailName:''}];
+await act(async()=>{tree=Renderer.create(React.createElement(Client));});
+assert.equal(JSON.stringify(tree.toJSON()).includes('상품-3'),false,'a2-10: checked sold-out product must still be skipped by the widget');
+await act(async()=>tree.unmount());
 catalog[0]=originalFirst;brandLinks=[];pinId=1;
 if (process.env.WIDGET_LAYOUT_OUTPUT) {
   const escape = value => String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');

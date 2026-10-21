@@ -30,8 +30,15 @@ assert.ok(pinnedRow.findAllByType('button').some(button=>button.children.include
 assert.ok(copied.includes('39,000원'));assert.equal(copied.includes('129,000원'),false);
 await act(async()=>tree.root.findAllByType('button').find(button=>button.children.includes('수정')).props.onClick({stopPropagation(){}}));
 assert.equal(edited.detail.id,2);assert.equal(edited.detail.product_name,'원본 임시');
+// [a2-10] 브랜드 줄(1) 체크 → 「체크한 것만 순환」 = 부모 1 + 연결 세부상품 원래 id 2 를 함께 저장
+let savedRotation=null;
+globalThis.fetch=async(url,options)=>{if(String(url)==='/api/chat-orders/current')chat=JSON.parse(options.body);if(String(url).includes('widget-library')&&options?.body){const b=JSON.parse(options.body);if(b.action==='saveRotation'){savedRotation=b.rotation;return {ok:true,json:async()=>({ok:true,rotation:b.rotation})};}}return {ok:true,json:async()=>String(url).includes('product-brand-catalog')?{links}:{ok:true,history:[],rotation:{mode:'all',paused:false,targets:[]}}};};
+await act(async()=>tree.root.findByProps({'aria-label':'브랜드 순환 체크'}).props.onChange());
+await act(async()=>tree.root.findAllByType('button').find(button=>button.children.includes('체크한 것만 순환')).props.onClick());
+assert.deepEqual(savedRotation,{mode:'selected',paused:false,targets:[{productId:'1',detailName:''},{productId:'2',detailName:''}]},'brand row check must save parent + linked source ids');
+assert.ok(tree.root.findAllByType('span').some(span=>span.children.includes('순환')),'brand row shows 순환 badge after save');
 await act(async()=>tree.unmount());
-console.log('PASS rendered linked broadcast search, pin, chat and original editor identity');
+console.log('PASS rendered linked broadcast search, pin, chat, rotation targets and original editor identity');
 // A stale list row must never initialize the stock editor: fetch row + version together.
 const listeners=new Map();
 window.addEventListener=(name,listener)=>listeners.set(name,listener);
