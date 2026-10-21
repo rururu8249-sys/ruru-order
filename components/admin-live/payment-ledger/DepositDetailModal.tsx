@@ -48,23 +48,23 @@ function StatusBadge({ status }: { status: LedgerStatus }) {
 function guideText(status: LedgerStatus) {
   if (status === "확인완료") {
     return {
-      title: "주문과 매칭이 끝난 입금입니다.",
-      body: "메인 목록은 은행 입금 1건 기준으로만 표시하고, 주문 연결·처리방식은 상세정보에서만 확인합니다.",
+      title: "주문과 연결이 끝난 입금이에요.",
+      body: "연결된 주문은 아래 「연결된 주문」에서 확인해요.",
       className: "border-line bg-ok-bg text-ok-tx",
     };
   }
 
   if (status === "주의") {
     return {
-      title: "확인이 필요한 입금입니다.",
-      body: "입금자명, 금액, 입금시간 또는 상태값을 다시 확인하세요.",
+      title: "확인이 필요한 입금이에요.",
+      body: "입금자명·금액·입금시간을 다시 확인해 주세요.",
       className: "border-line bg-warn-bg text-warn-tx",
     };
   }
 
   return {
-    title: "아직 주문과 매칭되지 않은 입금입니다.",
-    body: "실제 은행 입금내역은 존재하지만 주문 연결 또는 처리 상태 확인이 필요할 수 있습니다.",
+    title: "아직 주문과 연결되지 않은 입금이에요.",
+    body: "아래 「입금매칭에서 주문 연결」로 주문을 찾아 연결해요.",
     className: "border-line bg-surface-2 text-ink",
   };
 }
@@ -83,11 +83,8 @@ export default function DepositDetailModal({ row, onClose, presentation = "modal
         {presentation === "inline" ? <button type="button" onClick={onClose} className="min-h-11 self-start rounded-xl border border-line px-3 text-sm font-bold text-ink md:min-h-9">‹ 목록으로</button> : null}
         <div className="shrink-0 border-b border-line-soft px-6 py-4">
           <div>
-            <div className="inline-flex rounded-full border border-line bg-info-bg px-3 py-1 text-xs font-black text-info-tx">
-              읽기전용 상세정보
-            </div>
-            <div className="mt-2 text-2xl font-black tracking-tight text-ink">입금 상세정보</div>
-            <div className="mt-1 text-sm font-bold text-ink-mute">실제 은행 입금 1건에 대한 상세 기록입니다.</div>
+            <div className="text-[20px] font-bold text-ink">입금 상세</div>
+            <div className="mt-1 text-[13px] text-ink-mute">은행 입금 1건의 기록 — 여기서는 바꿀 수 없어요.</div>
           </div>
 
           <div className="mt-4 grid gap-2 md:grid-cols-3">
@@ -128,10 +125,6 @@ export default function DepositDetailModal({ row, onClose, presentation = "modal
 
           <div className="mt-3">
             <DepositLinkedOrderInfo row={row} />
-          </div>
-
-          <div className="mt-3 rounded-2xl border border-line bg-info-bg px-4 py-3 text-xs font-bold leading-5 text-info-tx">
-            메인 입금내역 목록은 은행앱처럼 단순 조회용으로 유지합니다. 운영 정보는 이 상세정보에서만 확인합니다.
           </div>
         </div>
 

@@ -412,12 +412,12 @@ export default function LiveFloatingMatchPanel({
                         </span>
                       )}
                       {!isMatched && rec && (
-                        <span style={{ fontSize: 11, fontWeight: 800, color: "#fff", background: "var(--color-ok-tx)", borderRadius: 4, padding: "1px 4px" }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-ok-tx)", background: "var(--color-ok-bg)", borderRadius: 4, padding: "1px 4px" }}>
                           추천
                         </span>
                       )}
                       {!isMatched && rec && matchMode && (
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: "var(--color-rose-deep)", borderRadius: 4, padding: "1px 4px" }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-ink)", background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: 4, padding: "1px 4px" }}>
                           금액일치
                         </span>
                       )}
@@ -443,7 +443,7 @@ export default function LiveFloatingMatchPanel({
                       <button onClick={e => { e.stopPropagation(); confirmDepositToOrder(dep, bestOrder); }}
                         disabled={matchSaving}
                         style={{
-                          marginTop: 4, background: "var(--color-ok-tx)", color: "#fff", border: "none",
+                          marginTop: 4, background: "var(--color-ink)", color: "#fff", border: "none",
                           borderRadius: 8, padding: "4px 8px", fontSize: 11, fontWeight: 700,
                           cursor: "pointer",
                         }}>매칭</button>
