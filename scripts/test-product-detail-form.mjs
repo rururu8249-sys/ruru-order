@@ -12,7 +12,7 @@ let renderer;
 await act(async()=>{renderer=TestRenderer.create(React.createElement(Form,{activeBroadcastId:null,initialProduct:product,initialDetailName:'A'}));});
 const buttons=()=>renderer.root.findAllByType('button');
 const text=node=>node.children.map(child=>typeof child==='string'?child:typeof child==='object'?text(child):'').join('');
-const infoTab=()=>buttons().find(button=>text(button)==='한눈에 정보·상세설명');
+const infoTab=()=>buttons().find(button=>text(button)==='정보·설명');
 assert.ok(infoTab(),'detail editor must expose information section');
 await act(async()=>infoTab().props.onClick());
 assert.equal(renderer.root.findByProps({'aria-label':'상세설명'}).props.value,'A 설명');
@@ -24,7 +24,7 @@ await act(async()=>buttons().find(button=>text(button)==='수정').props.onClick
 await act(async()=>infoTab().props.onClick());
 assert.equal(renderer.root.findByProps({'aria-label':'상세설명'}).props.value,'A 설명','reopening restores saved information, not cancelled draft');
 await act(async()=>renderer.root.findByProps({'aria-label':'상세설명'}).props.onChange({target:{value:'A 저장내용\n둘째 줄'}}));
-await act(async()=>buttons().find(button=>text(button)==='변경내용 적용').props.onClick());
+await act(async()=>buttons().find(button=>text(button)==='적용').props.onClick());
 await act(async()=>buttons().find(button=>text(button)==='수정').props.onClick());
 await act(async()=>infoTab().props.onClick());
 assert.equal(renderer.root.findByProps({'aria-label':'상세설명'}).props.value,'A 저장내용\n둘째 줄','apply keeps changes for reopening within parent draft');

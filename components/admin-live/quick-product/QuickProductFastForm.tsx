@@ -2835,47 +2835,71 @@ export default function QuickProductFastForm({
 
   // [2026-10-21 a2-11 버그] 세부상품 추가/수정 창 — 새 배치(v2) 폼은 위에서 먼저 return 하는데 이 창이 옛 폼 안에만 있어
   //   v2 폼에서 「+ 세부상품 추가」를 눌러도 아무것도 안 떴다. 두 폼이 같이 쓰도록 여기로 올림(내용 무변경).
-  const brandDetailEditorModal = brandDetailEditDraft ? (
-    <div style={{ position: "fixed", inset: 0, zIndex: 100002, background: "rgba(39,28,33,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
-      <div role="dialog" aria-modal="true" aria-label={brandDetailEditDraft.originalName ? "세부상품 수정" : "세부상품 추가"} style={{ width: "min(620px, 94vw)", maxHeight: "88vh", display: "flex", flexDirection: "column", borderRadius: "12px", overflow: "hidden", background: "var(--color-surface)", boxShadow: "0 22px 70px rgba(0,0,0,0.28)" }}>
-        <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-line)", display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--color-surface-2)" }}>
-          <span style={{ fontSize: "14px", fontWeight: 900, color: "var(--color-ink)" }}>{brandDetailEditDraft.originalName ? "세부상품 수정" : "＋ 세부상품 추가"}</span>
-          <button type="button" onClick={() => setBrandDetailEditDraft(null)} style={{ border: "none", background: "transparent", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer" }}>×</button>
+  // [2026-10-21 a2-12] 세부상품 추가/수정 창 — DESIGN-ADMIN 기준으로 모양·문구만 정리(핸들러·draft 저장·plus 역산·사진 업로드 무변경).
+  //   밑줄 탭(기본정보·사진·옵션·정보·설명) · 라벨 13/600 위 + 설명 12 mute 1줄 · 주버튼 1개(검정 「추가」/「적용」) ·
+  //   「추가하고 계속」·「취소」·「숨김」은 보조(흰 1px 36px) · 「삭제」는 보조+빨간 글자 · 초록 바탕·굵기 800/900·＋/▸/★/☆ 글리프 없음.
+  const brandDetailEditorModal = brandDetailEditDraft ? (() => {
+    const mSecondary: CSSProperties = { height: "36px", padding: "0 12px", border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", color: "var(--color-ink)", fontSize: "13px", fontWeight: 600, cursor: "pointer" };
+    const mPrimary: CSSProperties = { height: "40px", padding: "0 16px", border: "none", borderRadius: "8px", background: "var(--color-ink)", color: "#fff", fontSize: "13px", fontWeight: 700, cursor: "pointer" };
+    const mLabel: CSSProperties = { display: "block", fontSize: "13px", fontWeight: 600, color: "var(--color-ink)" };
+    const mHint: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--color-ink-mute)", lineHeight: 1.5 };
+    const mInput: CSSProperties = { ...fieldInput, marginTop: "4px", height: "36px", boxSizing: "border-box" };
+    const isEditing = Boolean(brandDetailEditDraft.originalName);
+    return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 100002, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+      <div role="dialog" aria-modal="true" aria-label={isEditing ? "세부상품 수정" : "세부상품 추가"} style={{ width: "min(620px, 94vw)", maxHeight: "88vh", display: "flex", flexDirection: "column", borderRadius: "12px", overflow: "hidden", background: "var(--color-surface)", boxShadow: "0 8px 24px rgba(0,0,0,0.08)" }}>
+        <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-line)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ fontSize: "16px", fontWeight: 700, color: "var(--color-ink)" }}>{isEditing ? "세부상품 수정" : "세부상품 추가"}</span>
+          <button type="button" aria-label="닫기" onClick={() => setBrandDetailEditDraft(null)} style={{ width: "36px", height: "36px", border: "none", background: "transparent", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer" }}>×</button>
         </div>
-        <div style={{ overflowY: "auto", padding: "12px 16px" }}>
-          <nav aria-label="세부상품 편집 항목" style={{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap'}}>
-            {([['basic','기본정보'],['options','사진·옵션'],['info','한눈에 정보·상세설명']] as const).map(([key,label])=><button key={key} type="button" aria-pressed={brandDetailSection===key} onClick={()=>setBrandDetailSection(key)} style={{padding:'9px 12px',border:'1px solid var(--color-line)',borderRadius:8,fontSize:13,fontWeight:800,cursor:'pointer',background:brandDetailSection===key?'var(--color-rose-deep)':'var(--color-surface)',color:brandDetailSection===key?'#fff':'var(--color-ink)'}}>{label}</button>)}
+        <div style={{ overflowY: "auto", padding: "0 16px 16px" }}>
+          <nav aria-label="세부상품 편집 항목" style={{ display: "flex", gap: "16px", borderBottom: "1px solid var(--color-line)", marginBottom: "16px" }}>
+            {([['basic', '기본정보'], ['options', '사진·옵션'], ['info', '정보·설명']] as const).map(([key, label]) => {
+              const on = brandDetailSection === key;
+              return (
+                <button key={key} type="button" aria-pressed={on} onClick={() => setBrandDetailSection(key)}
+                  style={{ height: "40px", padding: 0, border: "none", borderBottom: on ? "2px solid var(--color-ink)" : "2px solid transparent", marginBottom: "-1px", background: "transparent", fontSize: "13px", fontWeight: 600, color: on ? "var(--color-ink)" : "var(--color-ink-mute)", cursor: "pointer" }}>
+                  {label}
+                </button>
+              );
+            })}
           </nav>
           {brandDetailSection==='info' && <BrandDetailInfoEditor value={brandDetailEditDraft.info} onChange={info=>setBrandDetailEditDraft(prev=>prev?{...prev,info}:prev)} parentPreview={{chips:normalizeSpecChips(specChipsText),description}} />}
-          <div style={{display:brandDetailSection==='options'?'block':'none',marginBottom: "12px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "6px" }}><div style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>상세사진 {brandDetailEditDraft.photos.length}장 — 첫 장이 대표 · ☆을 누르면 대표로</div><button type="button" disabled={brandDetailPhotoUploading} onClick={() => brandDetailPhotoInputRef.current?.click()} style={{ border:"1px solid var(--color-rose-line)",borderRadius:8,background:"var(--color-surface)",color:"var(--color-rose-deep)",padding:"4px 8px",fontSize:"11px",fontWeight:900,cursor:"pointer" }}>{brandDetailPhotoUploading ? "업로드 중…" : "+ 상세사진 추가"}</button></div>
+          <div style={{display:brandDetailSection==='options'?'block':'none',marginBottom: "16px" }}>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "8px", marginBottom: "8px" }}>
+              <div>
+                <span style={mLabel}>사진 {brandDetailEditDraft.photos.length}장</span>
+                <div style={mHint}>첫 장이 대표 · 「대표로」 누르면 바뀜</div>
+              </div>
+              <button type="button" disabled={brandDetailPhotoUploading} onClick={() => brandDetailPhotoInputRef.current?.click()} style={{ ...mSecondary, flexShrink: 0 }}>{brandDetailPhotoUploading ? "업로드 중…" : "사진 추가"}</button>
+            </div>
             <input ref={brandDetailPhotoInputRef} type="file" accept="image/*" multiple onChange={handleBrandDetailPhotoFiles} style={{ display:"none" }} />
-            {/* [2026-09-03] 사진 조작을 단품 한 줄 10장과 동일하게 통일 — 첫 장 ★대표, ☆ 누르면 맨 앞으로, 화살표 제거 */}
+            {/* [2026-09-03] 사진 조작을 단품 한 줄 10장과 동일하게 통일 — 첫 장 대표, 「대표로」 누르면 맨 앞으로, 화살표 제거 */}
             {brandDetailEditDraft.photos.length ? <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>{brandDetailEditDraft.photos.map((photo, index) => (
               <div key={`${photo}-${index}`} style={{ position: "relative", width: "88px", height: "88px", flexShrink: 0 }}>
-                <button type="button" onClick={() => setDetailPreviewImage(resolveProductImageUrl(photo))} style={{ width: "100%", height: "100%", padding: 0, border: index === 0 ? "2px solid var(--color-rose-deep)" : "1px solid var(--color-rose-line)", borderRadius: "8px", overflow: "hidden", background: "var(--color-line-soft)", cursor: "zoom-in", boxSizing: "border-box" }}>
+                <button type="button" onClick={() => setDetailPreviewImage(resolveProductImageUrl(photo))} style={{ width: "100%", height: "100%", padding: 0, border: index === 0 ? "2px solid var(--color-ink)" : "1px solid var(--color-line)", borderRadius: "8px", overflow: "hidden", background: "var(--color-line-soft)", cursor: "zoom-in", boxSizing: "border-box" }}>
                   <img src={resolveProductImageUrl(photo)} alt={`${brandDetailEditDraft.name} 사진 ${index + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 </button>
                 {index === 0 ? (
-                  <span style={{ position: "absolute", top: "4px", left: "4px", background: "var(--color-rose-deep)", color: "#fff", fontSize: "11px", fontWeight: 900, borderRadius: "9999px", padding: "2px 6px", pointerEvents: "none" }}>★ 대표</span>
+                  <span style={{ position: "absolute", top: "4px", left: "4px", background: "var(--color-ink)", color: "#fff", fontSize: "11px", fontWeight: 600, borderRadius: "8px", padding: "2px 6px", pointerEvents: "none" }}>대표</span>
                 ) : (
-                  <button type="button" title="이 사진을 대표로" onClick={() => setBrandDetailEditDraft((prev) => { if (!prev) return prev; const a = [prev.photos[index], ...prev.photos.filter((_, i) => i !== index)]; return { ...prev, photos: a }; })} style={{ position: "absolute", top: "3px", left: "3px", background: "rgba(255,255,255,0.92)", color: "var(--color-rose-deep)", fontSize: "11px", fontWeight: 900, borderRadius: "9999px", padding: "1px 6px", border: "1px solid var(--color-rose-line)", cursor: "pointer" }}>☆</button>
+                  <button type="button" title="이 사진을 대표로" onClick={() => setBrandDetailEditDraft((prev) => { if (!prev) return prev; const a = [prev.photos[index], ...prev.photos.filter((_, i) => i !== index)]; return { ...prev, photos: a }; })} style={{ position: "absolute", top: "3px", left: "3px", background: "rgba(255,255,255,0.92)", color: "var(--color-ink)", fontSize: "11px", fontWeight: 600, borderRadius: "8px", padding: "1px 6px", border: "1px solid var(--color-line)", cursor: "pointer" }}>대표로</button>
                 )}
-                <button type="button" onClick={() => setBrandDetailEditDraft((prev) => prev ? { ...prev, photos: prev.photos.filter((_, i) => i !== index) } : prev)} style={{ position: "absolute", top: "3px", right: "3px", width: "16px", height: "16px", background: "rgba(0,0,0,0.55)", color: "#fff", borderRadius: "50%", fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", padding: 0 }}>×</button>
+                <button type="button" aria-label="사진 삭제" onClick={() => setBrandDetailEditDraft((prev) => prev ? { ...prev, photos: prev.photos.filter((_, i) => i !== index) } : prev)} style={{ position: "absolute", top: "3px", right: "3px", width: "20px", height: "20px", background: "rgba(0,0,0,0.55)", color: "#fff", borderRadius: "50%", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", padding: 0 }}>×</button>
               </div>
-            ))}</div> : <div style={{fontSize:"11px",color:"var(--color-ink-mute)"}}>등록된 상세사진이 없습니다.</div>}
+            ))}</div> : <div style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}>아직 사진이 없어요.</div>}
           </div>
           <div style={{display:brandDetailSection==='basic'?'block':'none'}}>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 150px", gap: "8px" }}>
-            <label style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>상품명
-              <input value={brandDetailEditDraft.name} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, name: event.target.value } : prev)} style={{ ...fieldInput, marginTop: "4px" }} />
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 160px", gap: "12px" }}>
+            <label style={mLabel}>상품명
+              <input value={brandDetailEditDraft.name} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, name: event.target.value } : prev)} placeholder="예: 폴로 자켓" style={mInput} />
             </label>
-            <label style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>상품구분 <span style={{ fontWeight: 700 }}>(선택)</span>
-              <input value={brandDetailEditDraft.category} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, category: event.target.value } : prev)} placeholder="상의, 하의, 세트…" style={{ ...fieldInput, marginTop: "4px" }} />
+            <label style={mLabel}>상품구분 (선택)
+              <input value={brandDetailEditDraft.category} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, category: event.target.value } : prev)} placeholder="상의, 하의, 세트…" style={mInput} />
             </label>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "8px", marginTop: "8px" }}>
-            {/* [2026-08-29 개선 A] 팔 금액을 그대로 넣는다. 추가금은 시스템이 역산해서 저장한다. */}
+          <div style={{ marginTop: "12px" }}>
+            {/* [2026-08-29 개선 A] 팔 금액을 그대로 넣는다. 추가금은 시스템이 역산해서 저장한다(표시에서는 「추가금」 용어 안 씀). */}
             {(() => {
               const base = moneyNumber(priceText);
               const plusNow = Math.max(0, Number(brandDetailEditDraft.plus) || 0);
@@ -2884,33 +2908,33 @@ export default function QuickProductFastForm({
               const typedNum = Number(String(draft ?? "").replace(/[^0-9]/g, "")) || 0;
               const tooLow = draft !== undefined && String(draft).trim() !== "" && typedNum < base;
               return (
-                <>
-                  <label style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)" }}>판매가 <span style={{ fontWeight: 700 }}>(손님이 내는 금액)</span>
-                    <div style={{ position: "relative", marginTop: "4px" }}>
-                      <input
-                        value={shown}
-                        inputMode="numeric"
-                        style={{ ...fieldInput, paddingRight: "24px", fontWeight: 800, borderColor: tooLow ? "var(--color-danger-tx)" : undefined }}
-                        onChange={(event) => {
-                          const typed = event.target.value;
-                          setSalePriceDraft((prev) => ({ ...prev, __modal__: typed }));
-                          const digits = String(typed || "").replace(/[^0-9]/g, "");
-                          if (!digits) { setBrandDetailEditDraft((prev) => (prev ? { ...prev, plus: "0" } : prev)); return; }
-                          const sale = Number(digits) || 0;
-                          if (sale < base) return;   // 음수 추가금은 만들지 않는다
-                          setBrandDetailEditDraft((prev) => (prev ? { ...prev, plus: String(sale - base) } : prev));
-                        }}
-                        onBlur={() => setSalePriceDraft((prev) => { const next = { ...prev }; delete next.__modal__; return next; })}
-                      />
-                      <span style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", color: "var(--color-ink-mute)", fontSize: "12px" }}>원</span>
-                    </div>
-                  </label>
-                  <div style={{ padding: "20px 12px 0", fontSize: "12px", fontWeight: 900, color: tooLow ? "var(--color-danger-tx)" : "var(--color-rose-deep)", lineHeight: 1.5 }}>
-                    {tooLow
-                      ? <>대표가({base.toLocaleString("ko-KR")}원)보다<br />낮게는 못 넣습니다</>
-                      : <><b>팔 금액을 그대로</b> 적으세요<br />추가금({plusNow.toLocaleString("ko-KR")}원)은 자동 계산</>}
+                <label style={mLabel}>판매가
+                  <div style={{ position: "relative", maxWidth: isMobile ? "100%" : "240px" }}>
+                    <input
+                      value={shown}
+                      inputMode="numeric"
+                      style={{ ...mInput, paddingRight: "32px", fontWeight: 600, borderColor: tooLow ? "var(--color-danger-tx)" : undefined }}
+                      onChange={(event) => {
+                        const typed = event.target.value;
+                        setSalePriceDraft((prev) => ({ ...prev, __modal__: typed }));
+                        const digits = String(typed || "").replace(/[^0-9]/g, "");
+                        if (!digits) { setBrandDetailEditDraft((prev) => (prev ? { ...prev, plus: "0" } : prev)); return; }
+                        const sale = Number(digits) || 0;
+                        if (sale < base) return;   // 음수 추가금은 만들지 않는다
+                        setBrandDetailEditDraft((prev) => (prev ? { ...prev, plus: String(sale - base) } : prev));
+                      }}
+                      onBlur={() => setSalePriceDraft((prev) => { const next = { ...prev }; delete next.__modal__; return next; })}
+                    />
+                    <span style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(calc(-50% + 2px))", color: "var(--color-ink-mute)", fontSize: "12px" }}>원</span>
                   </div>
-                </>
+                  <div style={{ ...mHint, color: tooLow ? "var(--color-danger-tx)" : "var(--color-ink-mute)" }}>
+                    {tooLow
+                      ? `대표 상품 판매가(${base.toLocaleString("ko-KR")}원)보다 낮게는 안 돼요`
+                      : base > 0
+                        ? `손님이 내는 금액 그대로 · 대표 상품 판매가 ${base.toLocaleString("ko-KR")}원 이상`
+                        : "손님이 내는 금액 그대로 적으세요"}
+                  </div>
+                </label>
               );
             })()}
           </div>
@@ -2918,39 +2942,24 @@ export default function QuickProductFastForm({
           </div>
           {brandDetailSection==='basic'&&<DiscountDisplayEditor value={brandDetailEditDraft.discount} actualPrice={moneyNumber(priceText)+Math.max(0,Number(brandDetailEditDraft.plus)||0)} onChange={discount=>setBrandDetailEditDraft(prev=>prev?{...prev,discount}:prev)}/>}
           <div style={{display:brandDetailSection==='options'?'block':'none'}}>
-          <div style={{ marginTop: "12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-ink)" }}>색상·사이즈 <span style={{ fontWeight: 700, color: "var(--color-ink-mute)" }}>— 이 상품에 있을 때만 · 없으면 비워두세요</span></span>
+          <div style={{ borderTop: "1px solid var(--color-line)", paddingTop: "16px" }}>
+            <span style={mLabel}>색상·사이즈</span>
+            <div style={mHint}>쉼표로 여러 개 · 없으면 비워 두세요 · 조합과 재고 줄은 자동(기존 수량 유지)</div>
           </div>
           {/* [2026-09-03 사장님 확정] 본문 옵션과 같은 형식 — 쉼표로 여러 개, 조합·재고 줄은 자동 */}
-          <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ width: "44px", fontSize: "12px", fontWeight: 900, color: "var(--color-ink-mute)", flexShrink: 0 }}>색상</span>
-            <input value={brandDetailEditDraft.colorsText} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, colorsText: event.target.value } : prev)} placeholder="화이트, 블랙, 베이지 (쉼표로 여러 개)" style={fieldInput} />
-          </div>
+          <label style={{ ...mLabel, marginTop: "12px" }}>색상
+            <input value={brandDetailEditDraft.colorsText} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, colorsText: event.target.value } : prev)} placeholder="화이트, 블랙, 베이지" style={mInput} />
+          </label>
           <ColorSwatchEditor key={brandDetailEditDraft.originalName || 'new'} labels={splitOptions(brandDetailEditDraft.colorsText)} value={brandDetailEditDraft.swatches ?? detailColorSwatches[brandDetailEditDraft.originalName] ?? colorSwatches} onChange={swatches=>setBrandDetailEditDraft(prev=>prev?{...prev,swatches}:prev)}/>
-          <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ width: "44px", fontSize: "12px", fontWeight: 900, color: "var(--color-ink-mute)", flexShrink: 0 }}>사이즈</span>
-            <input value={brandDetailEditDraft.sizesText} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, sizesText: event.target.value } : prev)} placeholder="220, 230, 240 (쉼표로 여러 개)" style={fieldInput} />
-          </div>
-          <div style={{ marginTop: "8px", fontSize: "11px", color: "var(--color-ink-mute)" }}>조합과 재고 줄은 자동으로 만들어져요 (기존 수량 유지) · 둘 다 비우면 옵션 없는 상품</div>
+          <label style={{ ...mLabel, marginTop: "12px" }}>사이즈
+            <input value={brandDetailEditDraft.sizesText} onChange={(event) => setBrandDetailEditDraft((prev) => prev ? { ...prev, sizesText: event.target.value } : prev)} placeholder="220, 230, 240" style={mInput} />
+          </label>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "12px 16px", borderTop: "1px solid var(--color-line)", background: "var(--color-surface-2)", flexWrap: "wrap" }}>
           {/* 새로 만드는 중일 때는 지울 게 없으므로 삭제 버튼을 숨긴다 */}
-          {brandDetailEditDraft.originalName ? (
-            <button
-              type="button"
-              onClick={() => void deleteBrandDetail()}
-              style={{
-                padding: "8px 12px",
-                border: "1px solid var(--color-danger-bg)",
-                borderRadius: "8px",
-                background: "var(--color-surface)",
-                color: "var(--color-danger-tx)",
-                fontSize: "12px",
-                fontWeight: 800,
-                cursor: "pointer",
-              }}
-            >
+          {isEditing ? (
+            <button type="button" onClick={() => void deleteBrandDetail()} style={{ ...mSecondary, color: "var(--color-danger-tx)" }}>
               삭제
             </button>
           ) : <span />}
@@ -2958,6 +2967,7 @@ export default function QuickProductFastForm({
           <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "8px", flexWrap: "wrap" }}>
             <button
               type="button"
+              aria-pressed={brandDetailEditDraft.hidden}
               onClick={() =>
                 setBrandDetailEditDraft((prev) =>
                   prev ? { ...prev, hidden: !prev.hidden } : prev
@@ -2965,53 +2975,37 @@ export default function QuickProductFastForm({
               }
               title={
                 brandDetailEditDraft.hidden
-                  ? "고객 주문서에 다시 노출"
-                  : "데이터는 유지하고 고객 주문서에서만 숨김"
+                  ? "손님 화면에 다시 보이게"
+                  : "데이터는 두고 손님 화면에서만 숨김"
               }
-              style={{
-                padding: "8px 12px",
-                border: "1px solid var(--color-rose-line)",
-                borderRadius: "8px",
-                background: brandDetailEditDraft.hidden ? "var(--color-line-soft)" : "#fff",
-                color: brandDetailEditDraft.hidden ? "var(--color-ink-soft)" : "var(--color-rose-deep)",
-                fontSize: "12px",
-                fontWeight: 900,
-                cursor: "pointer",
-              }}
+              style={{ ...mSecondary, background: brandDetailEditDraft.hidden ? "var(--color-line-soft)" : "var(--color-surface)", color: brandDetailEditDraft.hidden ? "var(--color-ink-soft)" : "var(--color-ink)" }}
             >
               {brandDetailEditDraft.hidden ? "숨김 해제" : "숨김"}
             </button>
 
-            <button
-              type="button"
-              onClick={() => setBrandDetailEditDraft(null)}
-              style={{ padding: "8px 12px", border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", color: "var(--color-ink)", cursor: "pointer" }}
-            >
+            <button type="button" onClick={() => setBrandDetailEditDraft(null)} style={mSecondary}>
               취소
             </button>
 
-            {!brandDetailEditDraft.originalName ? (
+            {!isEditing ? (
               <button
                 type="button"
-                title="이 세부상품을 추가하고, 빈 창을 바로 다시 연다 — A-1, A-2, A-3 연속 입력"
+                title="이 세부상품을 추가하고, 빈 창을 바로 다시 연다"
                 onClick={() => { if (applyBrandDetailEditor()) openBrandDetailEditorForNew(); }}
-                style={{ padding: "8px 12px", border: "1.5px solid var(--color-ok-tx)", borderRadius: "8px", background: "var(--color-surface)", color: "var(--color-ok-tx)", fontWeight: 900, cursor: "pointer" }}
+                style={mSecondary}
               >
-                추가하고 다음 ▸
+                추가하고 계속
               </button>
             ) : null}
-            <button
-              type="button"
-              onClick={applyBrandDetailEditor}
-              style={{ padding: "8px 16px", border: "none", borderRadius: "8px", background: "var(--color-ok-tx)", color: "#fff", fontWeight: 900, cursor: "pointer" }}
-            >
-              {brandDetailEditDraft.originalName ? "변경내용 적용" : "추가하고 닫기"}
+            <button type="button" onClick={applyBrandDetailEditor} style={mPrimary}>
+              {isEditing ? "적용" : "추가"}
             </button>
           </div>
         </div>
       </div>
     </div>
-  ) : null;
+    );
+  })() : null;
 
   // [2026-10-21 a2-2] 상품 등록 폼 새 배치(?preview=a2 · lib/adminUiSwitch). 렌더 배치·문구·스타일만 — state·saveProduct·payload·업로드·재고 계산 무변경.
   //   단품(브랜드 묶음·옛 조합형·연결 세부상품 아님)일 때만. 그 밖의 상품은 아래 기존 화면 그대로.
