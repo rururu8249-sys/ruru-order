@@ -123,7 +123,8 @@ export default function LiveFloatingMatchPanel({
   const grouped = useMemo(() => {
     const map = new Map<string, any[]>();
     for (const dep of filtered) {
-      const label = liveDepositDateLabel(dep) ?? "날짜 미상";
+      // [2026-10-21 입금 통합] 날짜(요일)까지만 묶음 머리로 — 시각은 줄마다 이미 보인다(표시만)
+      const label = (liveDepositDateLabel(dep) ?? "날짜 미상").replace(/^(\d{4}\.\d{2}\.\d{2}\([^)]+\)).*$/, "$1");
       if (!map.has(label)) map.set(label, []);
       map.get(label)!.push(dep);
     }
