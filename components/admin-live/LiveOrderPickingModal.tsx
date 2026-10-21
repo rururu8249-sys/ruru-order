@@ -420,6 +420,15 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
   // [㉙-2] 머리 숫자 — 결제완료 기준 「남은 n / 전체 N개」 + 얇은 진행바, 다 챙기면 상품=「완료」 칩+전체 N개 · 옵션=「N개 완료」 회색 글자(2026-10-21). 미결제는 빨간 「미결제 N」 따로.
   const progressBlock = (p: { total: number; got: number }, unpaid: number, size: "lg" | "md", mobilePrice = "") => {
     const done = isPickingComplete(p);
+    // [2026-10-21 시뮬] 결제완료 줄이 하나도 없고 미결제만 있으면 「남은 0 / 전체 0개」 대신 「미결제 N개」 한 줄만.
+    if (p.total <= 0 && unpaid > 0) {
+      return (
+        <div className={`shrink-0 text-right max-sm:w-auto ${size === "lg" ? "w-[136px]" : "w-[120px]"}`}>
+          <div className="whitespace-nowrap text-[13px] font-bold text-[var(--color-danger-tx)] tabular-nums">미결제 {unpaid}개</div>
+          {mobilePrice ? <div className="text-[12px] font-bold text-ink-soft tabular-nums sm:hidden">{mobilePrice}</div> : null}
+        </div>
+      );
+    }
     return (
       <div className={`shrink-0 text-right max-sm:w-auto ${size === "lg" ? "w-[136px]" : "w-[120px]"}`}>
         {done

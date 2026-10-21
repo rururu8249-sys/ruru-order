@@ -241,7 +241,7 @@ assert.ok(text().includes('미결제'), 'unpaid badge is kept');
 assert.equal(counterText(), countersBefore, 'header counters stay paid-based');
 await act(async()=>payChip('전체').props.onClick());
 assert.equal(checks().length, 3, 'all view lists paid and unpaid rows');
-assert.ok(tree.root.findAll(node => (node.type === 'span' || node.type === 'div') && nodeText(node) === '미결제 7').length >= 1, 'unpaid quantity is shown separately on the group header');
+assert.ok(tree.root.findAll(node => (node.type === 'span' || node.type === 'div') && (nodeText(node) === '미결제 7' || nodeText(node) === '미결제 7개')).length >= 1, 'unpaid quantity is shown separately on the group header');
 assert.equal(counterText(), countersBefore, 'header counters stay paid-based in all view');
 await act(async()=>button('물건챙기기 엑셀').props.onClick());
 assert.deepEqual(exportsMade.at(-1).orders.flatMap(order=>order.items.map(item=>item.id)).sort(),['1','2','3'],'all view exports unpaid rows too');
