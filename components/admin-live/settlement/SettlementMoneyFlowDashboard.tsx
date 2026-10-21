@@ -453,6 +453,25 @@ export default function SettlementMoneyFlowDashboard({
           <CalcRow sign="" label="지금 남는 돈" amount={stats.netAmount} emphasis="total" />
         </div>
 
+        {/* [a2-3 2026-10-21] 상품 원가(자동) — 위 계산엔 안 섞고 아래 참고 2줄. orders.cost_price_snapshot(주문 시점 단가)×수량, 결제완료 줄만.
+            스냅샷 없는 줄(원가 미입력·트리거 전 주문)은 제외하고 건수만. 수동 「창고정산」 항목과 겹칠 수 있어 한 줄 안내. */}
+        {stats.productCostRowCount > 0 ? (
+          <div className="divide-y divide-line-soft border-t border-line">
+            <CalcRow
+              sign="−"
+              label="상품 원가(자동)"
+              hint={`원가 있는 주문 ${countText(stats.productCostRowCount)}${stats.productCostMissingCount > 0 ? ` · 원가 없는 ${countText(stats.productCostMissingCount)} 제외` : ""}`}
+              amount={stats.productCostAmount}
+            />
+            <CalcRow sign="" label="원가 뺀 남는 돈" amount={stats.netAfterProductCost} emphasis="subtotal" />
+            {stats.manualExpenseCount > 0 ? (
+              <div className="px-4 py-2 text-[11px] font-bold leading-5 text-ink-mute">· 「창고·기타 지출」에 창고정산을 손으로 넣었으면 상품 원가와 두 번 빠질 수 있어요.</div>
+            ) : null}
+          </div>
+        ) : (
+          <div className="border-t border-line px-5 py-2 text-[11px] font-bold leading-5 text-ink-mute">· 상품 원가(자동)는 상품 등록 폼 「원가」를 넣은 뒤 들어온 주문부터 계산돼요.</div>
+        )}
+
         <div className="grid gap-1 border-t border-line bg-surface-2 px-5 py-3 text-[11px] font-bold leading-5 text-ink-mute">
           <div className="flex flex-wrap items-center gap-x-2">
             <span>참고 · 주문서 총금액(추가 수익 포함)</span>

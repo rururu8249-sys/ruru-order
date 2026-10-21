@@ -60,6 +60,8 @@ export type LiveOrderItem = {
   // [㉕-C] 물건챙기기·출력 기록(표시 전용). picked=②봉투 담음·collected=①모음.
   pickedAt?: string | null;
   collectedAt?: string | null;
+  // [a2-3] 주문 시점 원가(1개 단가·표시 전용)
+  costPriceSnapshot?: number | null;
   invoicePrintedAt?: string | null;
   pickingListPrintedAt?: string | null;
   repickRequiredAt?: string | null;

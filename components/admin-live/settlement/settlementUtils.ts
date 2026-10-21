@@ -152,6 +152,28 @@ export function orderActualCardFee(row: AnyRow, fallbackRate: number) {
   return Math.round(orderNetAmount(row) * (appliedRate / 100));
 }
 
+/** [a2-3] 원가 스냅샷(1개 단가). 컬럼 없음/null/0 이하/숫자 아님 → null(=원가 없음). */
+function costSnapshotValue(raw: unknown): number | null {
+  if (raw === null || raw === undefined || raw === "") return null;
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? Math.round(value) : null;
+}
+
+/** [a2-3] 주문의 상품 원가(자동) — LiveOrder(items[])면 줄마다 costPriceSnapshot×qty, flat 주문 줄이면 cost_price_snapshot×qty.
+ *  {amount: 스냅샷 있는 줄 합, withCost: 스냅샷 있는 줄 수, missing: 없는 줄 수}. 돈 컬럼은 읽지 않는다. */
+export function orderProductCost(row: AnyRow): { amount: number; withCost: number; missing: number } {
+  const lines: Array<{ cost: number | null; qty: number }> = Array.isArray(row?.items) && row.items.length > 0
+    ? row.items.map((item: AnyRow) => ({ cost: costSnapshotValue(item?.costPriceSnapshot ?? item?.cost_price_snapshot), qty: toNumber(item?.qty) || 1 }))
+    : [{ cost: costSnapshotValue(row?.cost_price_snapshot ?? row?.costPriceSnapshot), qty: toNumber(row?.qty) || 1 }];
+  let amount = 0, withCost = 0, missing = 0;
+  for (const line of lines) {
+    if (line.cost === null) { missing += 1; continue; }
+    withCost += 1;
+    amount += line.cost * Math.max(1, line.qty);
+  }
+  return { amount, withCost, missing };
+}
+
 export function orderWarehouseOtherExpense(row: AnyRow) {
   return (
     toNumber(row.warehouse_other_expense) ||
@@ -370,6 +392,13 @@ export function calculateStats(
   const totalExpense = actualCardFee + warehouseOtherExpense;
   const refundAmount = activeRows.reduce((sum, row) => sum + orderRefundAmount(row), 0);
   const canceledAmount = canceledRows.reduce((sum, row) => sum + orderGrossAmount(row), 0);
+  // [a2-3] 상품 원가(자동): 스냅샷 있는 결제완료 줄만 Σ qty × 단가. 없는 줄(트리거 전 주문·원가 미입력)은 제외하고 건수만.
+  const productCost = paidRows.reduce((acc, row) => {
+    const c = orderProductCost(row);
+    return { amount: acc.amount + c.amount, withCost: acc.withCost + c.withCost, missing: acc.missing + c.missing };
+  }, { amount: 0, withCost: 0, missing: 0 });
+  const productCostAmount = productCost.amount;
+  const netAmount = paidAmount + manualIncomeAmount - totalExpense;
 
   return {
     totalOrderAmount,
@@ -382,7 +411,7 @@ export function calculateStats(
     actualCardFee,
     warehouseOtherExpense,
     totalExpense,
-    netAmount: paidAmount + manualIncomeAmount - totalExpense,
+    netAmount,
     refundAmount,
     canceledAmount,
     orderCount: activeRows.length,
@@ -392,6 +421,10 @@ export function calculateStats(
     otherCount: otherRows.length,
     manualIncomeCount: manualIncomeEntries.length,
     manualExpenseCount: manualExpenseEntries.length,
+    productCostAmount,
+    productCostRowCount: productCost.withCost,
+    productCostMissingCount: productCost.missing,
+    netAfterProductCost: netAmount - productCostAmount,
   };
 }
 

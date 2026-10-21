@@ -92,6 +92,11 @@ export type SettlementStats = {
   otherCount: number;
   manualIncomeCount: number;
   manualExpenseCount: number;
+  // [a2-3 2026-10-21] 상품 원가(자동) — orders.cost_price_snapshot(주문 시점 1개 단가) × qty, 결제완료 줄만. 기존 숫자엔 안 섞음(참고 줄).
+  productCostAmount: number;
+  productCostRowCount: number;
+  productCostMissingCount: number;
+  netAfterProductCost: number;
 };
 
 export type SettlementBroadcastRow = {

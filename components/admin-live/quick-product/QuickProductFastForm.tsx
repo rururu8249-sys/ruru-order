@@ -285,6 +285,9 @@ type ParsedProductNote = Record<string, unknown> & {
       };
       // [무료나눔 · 2026-07-22] true면 0원 상품(선물). 가격 비움(손님 직접입력)과 구분되는 명시 플래그
       free_product?: boolean;
+      // [a2-3 2026-10-21] 원가(창고 입금가·1개 단가). 정산 「상품 원가(자동)」용. 비우면 키 없음. 브랜드 묶음 옛 세부상품은 cost_by_detail{세부상품명: 원가}
+      cost_price?: number;
+      cost_by_detail?: Record<string, number>;
       // 한눈에 정보 — 표시 전용. 입력 내용을 자르지 않고 긴 문구는 줄바꿈한다.
       spec_chips?: string[];
       // [2026-08-29] 사이즈 실측표 — SQL로만 넣는 표시 전용 데이터. 폼은 만지지 않고 저장 시 그대로 보존만 한다.
@@ -763,6 +766,8 @@ export default function QuickProductFastForm({
   const [newCategoryText, setNewCategoryText] = useState("");
   const [productName, setProductName] = useState("");
   const [priceText, setPriceText] = useState("");
+  // [a2-3] 원가(창고 입금가) — product_note.cost_price 에만 저장(컬럼 없음). 정산 표시 전용.
+  const [costText, setCostText] = useState("");
   // [2026-08-10 0단계] 기본 ON — 방송 상품은 거의 전부 재고관리가 필요한데 기본이 꺼져 있어
   //   재고를 입력하고도 무제한으로 저장되는 사고가 있었다(8/10 오버셀과 같은 경로).
   // [2026-09-03 사장님 지시] 새 상품 기본값 OFF — 기존 상품은 로드 시 저장된 값을 그대로 복원(보호)
@@ -1089,6 +1094,7 @@ export default function QuickProductFastForm({
 
     // [무료나눔] 플래그 복원
     setFreeProductEnabled(productNote?.free_product === true);
+    setCostText(Number(productNote?.cost_price) > 0 ? formatNumberWithComma(String(Math.round(Number(productNote?.cost_price)))) : "");
 
     // [2026-08-10 옵션 통합] 수정 모드 복원 — 축(세부상품/색상/사이즈) 되살리기
     const pricing = normalizeBrandRecordKeys<unknown>(
@@ -1771,6 +1777,7 @@ export default function QuickProductFastForm({
     setCustomerCategoryVisible(true);
     setProductName("");
     setPriceText("");
+    setCostText("");
     setShippingType("normal");
     setIsVisible(true);
     setIsPinned(false);
@@ -1973,6 +1980,9 @@ export default function QuickProductFastForm({
         category: category.trim(),
         customer_category_visible: customerCategoryVisible,
         free_product: freeProductEnabled,
+        // [a2-3] 원가 — 넣었을 때만 키 생성. 브랜드 부모의 cost_by_detail 은 폼에 칸이 없어 있던 그대로 보존
+        ...(moneyNumber(costText) > 0 ? { cost_price: moneyNumber(costText) } : {}),
+        ...(initialProductNote?.cost_by_detail && typeof initialProductNote.cost_by_detail === "object" ? { cost_by_detail: initialProductNote.cost_by_detail } : {}),
         ...(effectiveCustomInputLabel ? { custom_input_label: effectiveCustomInputLabel } : {}),
         // [2026-09-20] 한눈에 정보 칩 — 비어 있으면 키 생략(기존 상품 note 구성 무변화)
         ...(() => {
@@ -2910,6 +2920,24 @@ export default function QuickProductFastForm({
               <div className={v2Hint}>{freeProductEnabled ? "무료나눔 — 0원 고정" : "손님이 실제로 내는 금액 · 비우면 손님이 적음"}</div>
             </section>
 
+            {/* [a2-3 2026-10-21] 원가 — 손님 화면엔 안 나옴. 정산 「상품 원가(자동)」에 주문 시점 값으로 들어감 */}
+            <section className={v2Section}>
+              <label className={v2Label} htmlFor="v2-product-cost">원가 <span className="text-[12px] font-normal text-ink-mute">(선택)</span></label>
+              <div className="relative">
+                <input
+                  id="v2-product-cost"
+                  className={`${v2Input} pr-8 text-right tabular-nums`}
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="미입력"
+                  value={costText}
+                  onChange={(e) => { setFormTouched(true); setCostText(formatNumberWithComma(e.target.value)); }}
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-ink-mute">원</span>
+              </div>
+              <div className={v2Hint}>창고 입금가 1개 기준 · 손님에겐 안 보임 · 정산 「원가 뺀 남는 돈」 계산에 씀</div>
+            </section>
+
             <section className={v2Section}>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
@@ -3182,6 +3210,15 @@ export default function QuickProductFastForm({
                 {details.length > 0 && !freeProductEnabled ? (
                   <div style={{ marginTop: "4px", fontSize: "11px", fontWeight: 800, color: "var(--color-warn-tx)", lineHeight: 1.45 }}>
                     ⚠ 이 값을 바꾸면 세부상품 {details.length}개의 판매가가 <b>같이 움직입니다</b> (판매가 = 이 값 + 추가금)
+                  </div>
+                ) : null}
+                {!brandGroupActive ? (
+                  <div style={{ marginTop: "8px" }}>
+                    <label style={fieldLabel}>원가 <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(선택 · 창고 입금가 1개 기준 · 손님에겐 안 보임)</span></label>
+                    <div style={{ position: "relative" }}>
+                      <input style={{ ...fieldInput, paddingRight: "32px" }} type="text" inputMode="numeric" placeholder="미입력" value={costText} onChange={(e) => { setFormTouched(true); setCostText(formatNumberWithComma(e.target.value)); }} />
+                      <span style={{ position: "absolute", right: "11px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", color: "var(--color-ink-mute)", pointerEvents: "none" }}>원</span>
+                    </div>
                   </div>
                 ) : null}
                 {!brandGroupActive&&<DiscountDisplayEditor value={discountDisplay} actualPrice={moneyNumber(priceText)} onChange={value=>{setDiscountDisplay(prev=>({...prev,...value}));setFormTouched(true);}}/>}

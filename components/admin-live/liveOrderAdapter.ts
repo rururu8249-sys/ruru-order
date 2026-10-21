@@ -264,6 +264,7 @@ function buildItem(row: OrderRow): LiveOrderItem {
     // [㉕-C] 물건챙기기·출력 기록(표시 전용).
     pickedAt: row.picked_at ?? null,
     collectedAt: row.collected_at ?? null,
+    costPriceSnapshot: row.cost_price_snapshot ?? null,
     invoicePrintedAt: row.invoice_printed_at ?? null,
     pickingListPrintedAt: row.picking_list_printed_at ?? null,
     repickRequiredAt: row.repick_required_at ?? null,

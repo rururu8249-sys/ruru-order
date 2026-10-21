@@ -56,6 +56,8 @@ export type OrderRow = {
   inventory_restore_status?: string | null;
   inventory_restore_memo?: string | null;
   picked_at?: string | null;
+  // [a2-3 2026-10-21] 주문 시점 원가(1개 단가) — DB 트리거가 채움, 정산 「상품 원가(자동)」 표시 전용
+  cost_price_snapshot?: number | null;
   collected_at?: string | null;
   invoice_printed_at?: string | null;
   picking_list_printed_at?: string | null;
