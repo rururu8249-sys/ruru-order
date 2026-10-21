@@ -16,6 +16,7 @@ import { useLiveOrderShipped } from "./useLiveOrderShipped";
 import { buildCustomerOrderCopyText, buildPaymentRequestNote } from "./liveOrderCustomerCopy";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { pickingProgress, isPickingComplete, pickingScope } from "@/lib/orderPicking";
+import ProductPagination from "./ProductPagination";
 
 // 총금액 표시 전용: 포인트 사용 주문은 실결제금액(상품금액 + 택배비 - 사용포인트)으로 표시한다.
 // - 단일상품: final_amount에 포인트가 이미 반영돼 기존 값과 동일(변화 없음)
@@ -470,7 +471,7 @@ export default function LiveOrderTable({
   }, [page]);
   const [pendingKeyword, setPendingKeyword] = useState(filters.keyword);
   const [sortMode, setSortMode] = useState<SortMode>("latest");
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(20); // [2026-10-21 a5-6] 기본 20건(사장님)
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -1142,18 +1143,6 @@ export default function LiveOrderTable({
             {sortLabel}
           </button>
 
-          <select
-            value={pageSize}
-            onChange={(event) => setPageSize(Number(event.target.value))}
-            className="h-9 rounded-xl border border-line bg-surface px-3 text-xs font-black text-ink-soft outline-none hover:bg-surface-2"
-          >
-            <option value={10}>페이지당 10건</option>
-            <option value={20}>페이지당 20건</option>
-            <option value={30}>페이지당 30건</option>
-            <option value={50}>페이지당 50건</option>
-            <option value={100}>페이지당 100건</option>
-          </select>
-
           <button
             type="button"
             onClick={refreshOrders}
@@ -1507,35 +1496,22 @@ export default function LiveOrderTable({
             </div>
       </div>
 
-      <div className="mt-3 flex-shrink-0 flex flex-wrap items-center gap-3">
-        <div className="text-xs font-black text-ink-soft">
-          총 {orders.length}건 / 전체 {allOrderCount}건
-        </div>
-        <div className="mx-auto flex max-w-full flex-wrap items-center justify-center gap-3 text-sm font-black sm:gap-5">
-          <button type="button" onClick={() => setPage(Math.max(1, safePage - 1))} disabled={safePage <= 1} className="text-ink-mute disabled:opacity-30" aria-label="이전 페이지">‹</button>
-          {(() => {
-            let start = Math.max(1, safePage - 2);
-            const end = Math.min(totalPages, start + 4);
-            start = Math.max(1, end - 4);
-            return Array.from({ length: end - start + 1 }, (_, i) => start + i);
-          })().map((pageNumber) => {
-            return (
-              <button
-                key={pageNumber}
-                type="button"
-                onClick={() => setPage(pageNumber)}
-                className={
-                  safePage === pageNumber
-                    ? "flex h-8 w-8 items-center justify-center rounded-full bg-rose-deep text-white"
-                    : "text-ink-soft"
-                }
-              >
-                {pageNumber}
-              </button>
-            );
-          })}
-          <button type="button" onClick={() => setPage(Math.min(totalPages, safePage + 1))} disabled={safePage >= totalPages} className="text-ink-mute disabled:opacity-30" aria-label="다음 페이지">›</button>
-        </div>
+      {/* [2026-10-21 a5-6] 페이지 넘김 = 상품 목록과 같은 부품(ProductPagination). 페이지 계산(totalPages·safePage·visibleOrders)은 그대로. */}
+      <div className="mt-1 flex-shrink-0">
+        <ProductPagination
+          page={safePage}
+          pageCount={totalPages}
+          total={workFilteredOrders.length}
+          start={workFilteredOrders.length === 0 ? 0 : (safePage - 1) * pageSize + 1}
+          end={Math.min(workFilteredOrders.length, safePage * pageSize)}
+          size={pageSize}
+          sizes={[10, 20, 50, 100]}
+          unit="건"
+          extra={`전체 ${allOrderCount.toLocaleString("ko-KR")}건`}
+          label="주문 목록 페이지 이동"
+          onPage={setPage}
+          onSize={setPageSize}
+        />
       </div>
     </section>
     </>

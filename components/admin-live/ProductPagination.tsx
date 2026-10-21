@@ -1,16 +1,18 @@
 type Props = {
   page: number; pageCount: number; total: number; start: number; end: number;
   size: number; label: string; onPage: (page: number) => void; onSize: (size: number) => void;
+  /** [2026-10-21 a5-6] 주문서도 같은 부품을 쓴다 — 단위 글자(개/건)·크기 선택지·꼬리 글자만 다름 */
+  unit?: string; sizes?: number[]; extra?: string;
 };
 
-export default function ProductPagination({ page, pageCount, total, start, end, size, label, onPage, onSize }: Props) {
+export default function ProductPagination({ page, pageCount, total, start, end, size, label, onPage, onSize, unit = "개", sizes = [10, 20, 50], extra }: Props) {
   const pages = Array.from(new Set([1, page - 1, page, page + 1, pageCount])).filter(p => p >= 1 && p <= pageCount).sort((a,b) => a-b);
   const buttonStyle = { minWidth: 32, minHeight: 36, padding: '4px 8px', border: '1px solid var(--color-line)', borderRadius: 8, background: 'var(--color-surface)', color: 'var(--color-ink)', fontSize: 13, cursor: 'pointer' };
   return <nav aria-label={label} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,flexWrap:'wrap',padding:'12px 0'}}>
-    <span aria-live="polite" style={{fontSize:13,color:'var(--color-ink-soft)'}}>총 {total.toLocaleString('ko-KR')}개 · {start}–{end} 표시</span>
+    <span aria-live="polite" style={{fontSize:13,color:'var(--color-ink-soft)'}}>총 {total.toLocaleString('ko-KR')}{unit} · {total > 0 ? `${start}–${end} 표시` : "표시할 것 없음"}{extra ? ` · ${extra}` : ""}</span>
     <div style={{display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
       <select aria-label={`${label} 페이지당 상품 수`} value={size} onChange={e=>onSize(Number(e.target.value))} style={buttonStyle}>
-        {[10,20,50].map(n=><option key={n} value={n}>{n}개씩</option>)}
+        {sizes.map(n=><option key={n} value={n}>{n}{unit}씩</option>)}
       </select>
       <button type="button" disabled={page===1} onClick={()=>onPage(page-1)} style={{...buttonStyle,opacity:page===1 ? 0.45 : 1}}>이전</button>
       {pages.map((p,i)=><span key={p} style={{display:'inline-flex',alignItems:'center',gap:4}}>
