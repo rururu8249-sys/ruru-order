@@ -27,7 +27,7 @@ const Panel=createUiLoader({'./AdminLiveEventSoundboard':{default:()=>null},'@/l
 let tree;
 await act(async()=>{tree=Renderer.create(React.createElement(Panel,{controlledOpen:true,embedded:true,renderTrigger:false}));});
 const button=prefix=>tree.root.findAllByType('button').find(node=>node.children.join('').startsWith(prefix));
-await act(async()=>button('✎ 수동 입력').props.onClick());
+await act(async()=>button('수동 입력').props.onClick());
 await act(async()=>tree.root.findByType('textarea').props.onChange({target:{value:'긴닉네임당첨자,참가자2,참가자3'}}));
 await act(async()=>button('테스트로 해보기').props.onClick());
 assert.equal(actions.length,2);
@@ -40,7 +40,7 @@ const winner=tree.root.findAllByType('div').find(node=>node.children.join('')===
 assert(winner,'result should be announced');
 let ancestor=winner;
 while(ancestor){assert.notEqual(ancestor.props?.style?.position,'absolute','winner must reserve layout space, never cover start controls');ancestor=ancestor.parent;}
-assert.equal(button('▶ 시작').props.disabled,false,'start remains usable after result');
+assert.equal(button('시작').props.disabled,false,'start remains usable after result');
 await act(async()=>button('테스트로 해보기').props.onClick());
 assert.equal(actions.length,4,'restart still works after winner announcement');
 await act(async()=>tree.unmount());

@@ -468,7 +468,34 @@ export default function AdminLiveEventRoulettePanel({
   // 룰렛 휠 색상(시안 팔레트) + conic-gradient (참가자 N등분)
 
 
-  // 이벤트목록 기간필터 (오늘/이번주/이번달/날짜선택) — winner_at 기준 클라이언트 필터
+  // 이벤트목록 기간필터 (오늘/이번주/이번달/날짜선택) — winner_at 기준
+  //   [2026-10-22 P2] 기간을 서버에서 조회(listWinners)해 최근 100건 밖 날짜도 보인다. 아래 클라 필터는 같은 기준 안전망.
+  //   ※ winners(최근 100건)는 포인트 중복지급 가드가 쓰므로 그대로 둔다 — 이 목록은 화면 표시 전용.
+  const winnerListRange = useMemo(() => {
+    const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const now = new Date();
+    if (listPeriod === "today") return { from: startOf(now), to: 0 };
+    if (listPeriod === "week") return { from: startOf(now) - ((now.getDay() + 6) % 7) * 86400000, to: 0 };
+    if (listPeriod === "month") return { from: new Date(now.getFullYear(), now.getMonth(), 1).getTime(), to: 0 };
+    if (listPeriod === "date" && listDate) {
+      const [y, m, d] = listDate.split("-").map(Number);
+      const from = new Date(y, (m || 1) - 1, d || 1).getTime();
+      return { from, to: from + 86400000 };
+    }
+    return null;
+  }, [listPeriod, listDate]);
+  const [listWinners, setListWinners] = useState<RouletteWinner[] | null>(null);
+  useEffect(() => {
+    if (!open || !winnerListRange) { setListWinners(null); return; }
+    let alive = true;
+    const qs = new URLSearchParams({ action: "winners", includeTest: "true", from: new Date(winnerListRange.from).toISOString() });
+    if (winnerListRange.to) qs.set("to", new Date(winnerListRange.to).toISOString());
+    requestJson<WinnersPayload>(`/api/admin-live/event-roulette?${qs.toString()}`)
+      .then((payload) => { if (alive) setListWinners(payload.ok ? payload.winners || [] : null); })
+      .catch(() => { if (alive) setListWinners(null); });
+    return () => { alive = false; };
+    // winners 가 다시 불러와지면(새 당첨) 목록도 다시 조회
+  }, [open, winnerListRange, winners]);
   const filteredWinners = useMemo(() => {
     const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
     const now = new Date();
@@ -486,13 +513,13 @@ export default function AdminLiveEventRoulettePanel({
       from = startOf(picked);
       to = from + 86400000;
     }
-    return recentWinners.filter((w) => {
+    return (listWinners ?? recentWinners).filter((w) => {
       const raw = String(w.winner_at || "");
       const t = raw ? new Date(raw).getTime() : 0;
       if (!Number.isFinite(t) || t === 0) return listPeriod === "today" ? false : true;
       return t >= from && t < to;
     });
-  }, [recentWinners, listPeriod, listDate]);
+  }, [listWinners, recentWinners, listPeriod, listDate]);
 
   // The broadcast widget is the only visual playback engine.
   const [centerWinner, setCenterWinner] = useState("");

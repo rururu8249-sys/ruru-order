@@ -1,3 +1,4 @@
+// [2026-10-22] 옛 배치(v1) 폼 검사 — 새 배치(v2)는 test-product-form-v2 가 검사. v1 은 ?preview=off·브랜드 묶음에서 그대로 쓰임.
 import assert from 'node:assert/strict';
 import React from 'react';
 import Renderer,{act} from 'react-test-renderer';
@@ -6,7 +7,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 globalThis.window={innerWidth:1200,addEventListener(){},removeEventListener(){},dispatchEvent(){}};
 globalThis.document={addEventListener(){},removeEventListener(){}};
 let saved;
-const Form=createUiLoader({'@/lib/supabase':{supabase:{}},'@/lib/adminCatalogWrite':{adminCatalogWrite:async payload=>{saved=payload;return {data:{id:9002},error:null};}},'@/lib/adminToast':{showAdminToast(){}},'@/lib/adminConfirm':{showAdminConfirm:async()=>true}})('components/admin-live/quick-product/QuickProductFastForm.tsx').default;
+const Form=createUiLoader({'@/lib/supabase':{supabase:{}},'@/lib/adminCatalogWrite':{adminCatalogWrite:async payload=>{saved=payload;return {data:{id:9002},error:null};}},'@/lib/adminToast':{showAdminToast(){}},'@/lib/adminConfirm':{showAdminConfirm:async()=>true},'@/lib/adminUiSwitch':{readAdminUiPreview:()=>false}})('components/admin-live/quick-product/QuickProductFastForm.tsx').default;
 const text=n=>n.children.map(c=>typeof c==='string'?c:typeof c==='object'?text(c):'').join('');
 for (const brand of [false,true]) {
   const color_swatches={'블랙':'#123456','화이트':null};

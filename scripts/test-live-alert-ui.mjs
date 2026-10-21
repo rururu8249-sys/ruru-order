@@ -15,7 +15,7 @@ const props={videoRatio:'auto',activeBroadcast:{id:'broadcast',status:'ON'},titl
 const text=node=>node.children.map(c=>typeof c==='string'?c:text(c)).join('');
 const button=label=>tree.root.findAllByType('button').find(n=>text(n).includes(label));
 await act(async()=>{tree=Renderer.create(React.createElement(Header,props))});
-await act(async()=>{await button('방송알림').props.onClick()});
+await act(async()=>{await button('알림 보내기').props.onClick()});
 const dialog=tree.root.findByProps({role:'dialog'});
 assert.match(dialog.props.className,/960px/);assert.match(dialog.props.className,/100dvh/);
 assert.equal(dialog.findAllByType('li').length,300);

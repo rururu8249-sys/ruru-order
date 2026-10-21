@@ -44,6 +44,8 @@ const note = {
   detail_photo_sets: { 'HM-100': ['https://example.com/hm100.jpg', 'https://example.com/hm100-back.jpg'], 'HM-101': ['https://example.com/hm101.jpg'] },
 };
 const product = { id: 'brand-1', product_name: '에르메스', price: 119000, product_note: JSON.stringify(note) };
+// [2026-10-22] 서랍은 열 때 최신 상품을 catalog-write 로 다시 읽는다(편집 버전 확인) — 그 응답을 흉내 냄(읽기만, 저장 없음)
+globalThis.fetch = async url => String(url).includes('/api/admin-live/catalog-write') ? { ok: true, json: async () => ({ product, version: 'a'.repeat(32) }) } : { ok: true, json: async () => ({ ok: true, items: [] }) };
 let tree;
 await act(async () => { tree = Renderer.create(React.createElement(Form, { activeBroadcastId: null, initialProduct: product, initialDetailName: 'HM-100' })); });
 const dialogs = tree.root.findAll(node => node.props.role === 'dialog' && node.props['aria-label'] === '세부상품 수정');

@@ -1,3 +1,4 @@
+// [2026-10-22] 옛 배치(v1) 폼 검사 — 새 배치(v2)는 test-product-form-v2 가 검사. v1 은 ?preview=off·브랜드 묶음에서 그대로 쓰임.
 import assert from 'node:assert/strict';
 import React from 'react';
 import TestRenderer, {act} from 'react-test-renderer';
@@ -6,7 +7,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 globalThis.window = {innerWidth:1200,addEventListener(){},removeEventListener(){},dispatchEvent(){}};
 globalThis.document = {addEventListener(){},removeEventListener(){}};
 let saved;
-const {default:Form} = createUiLoader({'@/lib/supabase':{supabase:{}},'@/lib/adminCatalogWrite':{adminCatalogWrite:async payload=>{saved=payload;return {data:{id:9002},error:null};}},'@/lib/adminToast':{showAdminToast(){}},'@/lib/adminConfirm':{showAdminConfirm:async()=>true}})('components/admin-live/quick-product/QuickProductFastForm.tsx');
+const {default:Form} = createUiLoader({'@/lib/supabase':{supabase:{}},'@/lib/adminCatalogWrite':{adminCatalogWrite:async payload=>{saved=payload;return {data:{id:9002},error:null};}},'@/lib/adminToast':{showAdminToast(){}},'@/lib/adminConfirm':{showAdminConfirm:async()=>true},'@/lib/adminUiSwitch':{readAdminUiPreview:()=>false}})('components/admin-live/quick-product/QuickProductFastForm.tsx');
 const label = '상품번호 · 옵션(색상·사이즈)';
 const product = {id:9002,__catalog_edit_version:'a'.repeat(32),product_name:'특가상품',price:0,stock:0,color_options:[],size_options:['없음'],product_note:JSON.stringify({stock_management_enabled:false,custom_input_label:label})};
 let renderer;

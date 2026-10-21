@@ -886,12 +886,20 @@ async function handleWinners(request: NextRequest) {
   let query = supabase
     .from("event_roulette_winners")
     .select("id, event_id, nickname, winner_order_ids, winner_note, winner_at, is_reward_done, reward_done_at, is_test, memo, created_at, updated_at")
-    .order("winner_at", { ascending: false })
-    .limit(100);
+    .order("winner_at", { ascending: false });
 
   if (!includeTest) {
     query = query.eq("is_test", false);
   }
+
+  // [2026-10-22 이벤트 P2] 당첨 기록 기간 조회 — from/to(ISO) 가 오면 그 기간만 서버에서 거른다(최근 100건 밖 날짜도 보이게).
+  //   읽기 전용. 기간 없으면 예전처럼 최근 100건.
+  const fromIso = cleanText(request.nextUrl.searchParams.get("from"));
+  const toIso = cleanText(request.nextUrl.searchParams.get("to"));
+  const validIso = (v: string) => v !== "" && Number.isFinite(new Date(v).getTime());
+  if (validIso(fromIso)) query = query.gte("winner_at", new Date(fromIso).toISOString());
+  if (validIso(toIso)) query = query.lt("winner_at", new Date(toIso).toISOString());
+  query = query.limit(validIso(fromIso) || validIso(toIso) ? 500 : 100);
 
   const { data, error } = await query;
 
