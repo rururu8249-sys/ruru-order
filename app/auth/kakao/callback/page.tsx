@@ -119,59 +119,58 @@ export default function KakaoCallbackPage() {
     login();
   }, []);
 
-  const statusIcon = status === "success" ? "✅" : status === "error" ? "⚠️" : "⏳";
   const statusTitle =
     status === "success" ? "카카오톡 확인 완료" : status === "error" ? "카카오톡 확인 실패" : "카카오톡 확인중";
 
-  // [2026-08-21 사장님 지시] 파란 임시 테마 → 루루동이 브랜드 시안(KakaoStartPage 0597a61과 동일 계열:
-  //   버건디 #7B2D43 + 흰→연핑크 그라데이션 카드 + R×TALK 로고 칩)으로 표시만 변경.
-  //   문구도 "카카오" → "카카오톡"으로 통일. 로그인 로직·저장·이동 흐름은 무변경.
+  // [2026-10-22 손님화면 리뉴얼 — 진입 화면] DESIGN.md 기준(흰 바탕·검정 글자·로즈 없음·그림자 없음·이모지 → 선 아이콘)으로 모양만 변경.
+  //   문구·로그인 로직·저장·이동 흐름 무변경.
+  const statusIcon =
+    status === "success" ? (
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    ) : status === "error" ? (
+      <>
+        <path d="M12 7v6" />
+        <path d="M12 16.5v.5" />
+      </>
+    ) : (
+      <>
+        <circle cx="12" cy="12" r="8" />
+        <path d="M12 8v4l2.5 2" />
+      </>
+    );
   return (
-    <main className="min-h-screen bg-[#FBF8F9] px-2 py-4 text-[#151923] sm:px-4">
-      <section className="mx-auto flex min-h-[calc(100svh-32px)] w-full max-w-[560px] items-center">
-        <section
-          className="w-full -translate-y-[4vh] overflow-hidden rounded-[34px] p-5 text-center"
-          style={{ background: "linear-gradient(to bottom, #ffffff, #F5E6EB)", border: "1px solid #D9C5CC", boxShadow: "0 22px 55px rgba(123,45,67,0.13)" }}
-        >
-          {/* R × TALK 로고 칩 — 시작화면과 동일한 브랜드 표기 */}
-          <div className="mx-auto flex w-fit items-center justify-center gap-3 rounded-full px-4 py-2" style={{ background: "rgba(255,255,255,0.9)", border: "1px solid #D9C5CC" }}>
-            <div className="flex h-9 w-9 items-center justify-center rounded-[13px] text-[17px] font-black text-white" style={{ background: "#7B2D43" }}>R</div>
-            <div className="text-[20px] font-black text-[#bbb]">×</div>
-            <div className="flex h-9 w-9 items-center justify-center rounded-[13px] bg-[#fee500] text-[13px] font-black text-[#241b17]">TALK</div>
-          </div>
-
-          <div className="mx-auto mt-6 flex h-16 w-16 items-center justify-center rounded-[24px] text-[32px]" style={{ background: "#F9EDF1", border: "1px solid #E8D5DD" }}>
+    <main className="min-h-screen bg-white px-4 py-6" style={{ color: "#111111" }}>
+      <section className="mx-auto flex min-h-[calc(100svh-48px)] w-full max-w-[430px] flex-col items-center justify-center text-center">
+        <p className="text-[15px] font-bold">🏠 루루동이 집구석 LIVE</p>
+        <div className="mt-6 flex h-16 w-16 items-center justify-center rounded-full" style={{ background: "#F5F5F5" }}>
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke={status === "error" ? "#D30005" : "#111111"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             {statusIcon}
+          </svg>
+        </div>
+
+        <h1 className="mt-5 text-[24px] font-bold leading-[1.3]" style={{ wordBreak: "keep-all" }}>
+          {statusTitle}
+        </h1>
+
+        <p className="mt-3 text-[16px] leading-[1.5]" style={{ color: "#39393B", wordBreak: "keep-all" }}>
+          {message}
+        </p>
+
+        {status === "loading" && (
+          <div className="mt-5 h-1 w-full max-w-[240px] overflow-hidden rounded-full" style={{ background: "#E5E5E5" }}>
+            <div className="h-1 w-2/3 animate-pulse rounded-full" style={{ background: "#111111" }} />
           </div>
+        )}
 
-          <p className="mt-5 text-[13px] font-black tracking-[-0.04em]" style={{ color: "#7B2D43" }}>
-            루루동이 LIVE
-          </p>
-
-          <h1 className="mt-2 break-keep text-[30px] font-black leading-tight tracking-[-0.08em] text-slate-950">
-            {statusTitle}
-          </h1>
-
-          <p className="mt-3 break-keep text-[15px] font-bold leading-relaxed tracking-[-0.04em] text-slate-600">
-            {message}
-          </p>
-
-          {status === "loading" && (
-            <div className="mt-5 overflow-hidden rounded-full" style={{ background: "#F0E4E9" }}>
-              <div className="h-2 w-2/3 animate-pulse rounded-full" style={{ background: "#7B2D43" }} />
-            </div>
-          )}
-
-          {status === "error" && (
-            <Link
-              href="/"
-              className="mt-5 flex min-h-[52px] w-full items-center justify-center rounded-[18px] px-4 py-3 text-[16px] font-black tracking-[-0.05em] text-white"
-              style={{ background: "#7B2D43" }}
-            >
-              처음 화면으로 돌아가기
-            </Link>
-          )}
-        </section>
+        {status === "error" && (
+          <Link
+            href="/"
+            className="mt-6 flex h-[52px] w-full items-center justify-center rounded-full px-4 text-[16px] font-semibold text-white"
+            style={{ background: "#111111" }}
+          >
+            처음 화면으로 돌아가기
+          </Link>
+        )}
       </section>
     </main>
   );
