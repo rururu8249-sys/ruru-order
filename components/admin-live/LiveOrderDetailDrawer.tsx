@@ -1313,7 +1313,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       }
       showAdminToast("수동 입금확인 처리됐습니다.", "success");
       await onAfterStatusChange?.();
-      onClose?.();
+      // [2026-10-21 사장님 요청] 처리 후에도 주문상세 창을 닫지 않는다(바뀐 상태를 바로 확인)
     } finally {
       setManualConfirmAction(false);
     }
@@ -1371,7 +1371,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       showAdminToast(nextStatus === "카드결제완료" ? "카드결제완료 처리됐습니다." : "카드미결제로 되돌렸습니다.", "success");
 
       await onAfterStatusChange?.();
-      onClose?.();
+      // [2026-10-21 사장님 요청] 처리 후에도 주문상세 창을 닫지 않는다
     } finally {
       setCardStatusAction("");
     }

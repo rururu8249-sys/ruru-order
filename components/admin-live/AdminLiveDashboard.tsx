@@ -1355,7 +1355,8 @@ export default function AdminLiveDashboard() {
   useEffect(() => {
     if (!filteredOrders.length) {
       setSelectedOrderId("");
-      setDrawer(current => current.kind === "order" ? {kind: "closed"} : current);
+      // [2026-10-21 사장님 요청] 목록이 잠깐 비거나(새로고침 중) 처리 후 필터에서 빠져도 주문상세 창은 닫지 않는다.
+      //   (예전엔 여기서 창을 닫아 「저절로 꺼짐」 — 입금확인 취소·차단 등 처리 뒤 필터 결과가 0이 되면 닫혔다)
       return;
     }
 
@@ -1365,8 +1366,16 @@ export default function AdminLiveDashboard() {
     });
   }, [filteredOrders]);
 
+  // [2026-10-21] 주문상세가 열린 동안 목록을 다시 불러오는 사이(잠깐 비거나 그 주문이 아직 안 들어옴)에도
+  //   마지막으로 본 그 주문을 계속 보여준다 → 창이 비거나 닫히지 않게(표시만).
+  const lastDrawerOrderRef = useRef<LiveOrder | null>(null);
   const selectedOrder = useMemo(() => {
-    return resolveDrawerOrder(drawer, orders, filteredOrders, selectedOrderId);
+    const found = resolveDrawerOrder(drawer, orders, filteredOrders, selectedOrderId);
+    if (drawer.kind === "order") {
+      if (found) lastDrawerOrderRef.current = found;
+      else if (lastDrawerOrderRef.current?.id === drawer.orderId) return lastDrawerOrderRef.current;
+    }
+    return found;
   }, [drawer, orders, filteredOrders, selectedOrderId]);
 
   const closeOrderDetail = () => {

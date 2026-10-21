@@ -183,7 +183,8 @@ export function useLiveOrderCancelRestore({
       }
 
       await onAfterStatusChange?.();
-      onClose?.();
+      // [2026-10-21 사장님 요청] 주문 취소·복구 뒤에도 주문상세 창을 닫지 않는다(바뀐 상태 확인·이어서 처리)
+      void onClose;
     } finally {
       setSavingAction("");
     }
