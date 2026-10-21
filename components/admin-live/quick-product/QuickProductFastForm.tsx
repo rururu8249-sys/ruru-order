@@ -3074,7 +3074,8 @@ export default function QuickProductFastForm({
                   <div>
                     {v2Row("고객 노출", isVisible ? "손님 주문서에 보임" : "숨김 — 손님에게 안 보임", v2Switch(isVisible, () => setIsVisible((v) => !v), "고객 노출"))}
                     {v2Row("무료나눔", freeProductEnabled ? "0원 — 손님에게 선물" : "끔", v2Switch(freeProductEnabled, () => setFreeProductEnabled((v) => !v), "무료나눔"))}
-                    {v2Row("세부상품명 손님 직접입력", customerDetailInputUnavailable ? "세부상품 선택형에는 못 씀" : "손님이 적은 글이 상품명이 됨 · 송장·물건챙기기에 그 이름", v2Switch(!customerDetailInputUnavailable && customerDetailInputEnabled, () => setCustomerDetailInputEnabled((v) => !v), "세부상품명 손님 직접입력", customerDetailInputUnavailable))}
+                    {/* [2026-10-21 a2-7] DB 실측: 이 토글을 켠 상품 1개(상품번호 직접 적기 8개·90일 주문 324건과 겹침 0). 새 폼에선 이미 켜진 상품에만 보여 끌 수 있게 — 새로 켜는 길은 없앰(저장 로직 무변경) */}
+                    {customerDetailInputEnabled && v2Row("세부상품명 손님 직접입력", customerDetailInputUnavailable ? "세부상품 선택형에는 못 씀" : "손님이 적은 글이 상품명이 됨 · 송장·물건챙기기에 그 이름", v2Switch(!customerDetailInputUnavailable && customerDetailInputEnabled, () => setCustomerDetailInputEnabled((v) => !v), "세부상품명 손님 직접입력", customerDetailInputUnavailable))}
                   </div>
                 </div>
               ) : null}
