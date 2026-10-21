@@ -166,6 +166,7 @@ size:
 - 페이지: /order(쇼핑·주문서), /myorder(주문내역), /notice(공지).
 - 바텀시트(CustomerBottomSheet): 주문서 확인 · 주소 검색 · 옵션 고르기 · 상품 직접 입력 · 주문 방법 · 방송 알림(half) · 문의하기(half).
 - 별도 창: 회원정보 수정 · 주문 조회 · 입금 안내 · 사이즈 실측표 · 포인트 선물 팝업 · 확인창(CustomerDialog) · 구매 동의 · 사이트 알림 팝업 · 토스트 · 접속 차단 안내.
+- 진입 화면(2026-10-22 적용): 카카오 로그인 시작(/) · 로그인 확인(/auth/kakao/callback) · 유튜브 닉네임 입력 창 — 흰 바탕·「🏠 루루동이 집구석 LIVE」·검정 알약 52px, 카카오 버튼만 카카오 노란색.
 - 공용 부품: CustomerTopNav(주문내역·공지 머리말) · CustomerPressButton · SheetGrabber · OrderPriceSummaryBox · ProductPhotoCarousel · ProductDiscountLabel.
 - 실측 현황(손님 화면 파일 전체): 로즈 계열 색 205곳 · 13px 미만 글씨 205곳 · 이모지 208곳 · 그림자 55곳 — 리뉴얼 단계마다 해당 화면 것을 정리.
 
