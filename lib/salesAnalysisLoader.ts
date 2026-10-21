@@ -5,7 +5,7 @@ import type { OrderRow } from './admin-v2/types';
 // Do not download addresses, bank details, audit histories or inventory records for analytics.
 const SALES_FIELDS='id,order_group_id,order_lookup_code,broadcast_id,created_at,youtube_nickname,customer_name,customer_phone,phone,product_id,product_name,color,size,qty,product_price,adjusted_product_price,total_price,adjusted_total_price,final_amount,refund_amount,shipping_fee,adjusted_shipping_fee,vat_amount,payment_method,admin_order_status_v2,order_manage_status,order_status,shipped_prev_status,is_deleted,is_permanently_deleted,is_test_order,exclude_from_settlement,event_gift_winner_id';
 
-export type SalesBroadcast = {id:string; title:string; started_at:string};
+export type SalesBroadcast = {id:string; title:string; started_at:string; ended_at?:string|null};
 export type SalesAnalysisSnapshot = {
   broadcasts: SalesBroadcast[];
   orders: OrderRow[];
@@ -27,7 +27,7 @@ export async function loadSalesAnalysisSnapshot(db: SupabaseClient, isCurrent: (
       if(data.length<1000) return rows;
     }
   }
-  const broadcastRows=await pages('broadcasts','id,public_title,started_at');
+  const broadcastRows=await pages('broadcasts','id,public_title,started_at,ended_at');
   // Keep all statuses until grouping: removing an individual row can change a mixed legacy group.
   const orders=await pages('orders',SALES_FIELDS);
   const truthy=(value:unknown)=>[true,'true','t',1,'1'].includes(value as never);
@@ -57,5 +57,5 @@ export async function loadSalesAnalysisSnapshot(db: SupabaseClient, isCurrent: (
     if(!Array.isArray(data)) throw new Error('Incomplete product response');
     products.push(...data);
   }
-  return {broadcasts:broadcastRows.map(row=>({id:String(row.id),title:String(row.public_title||'제목 없음'),started_at:String(row.started_at||'')})).sort((a,b)=>(Date.parse(b.started_at)||0)-(Date.parse(a.started_at)||0)),orders:orders as unknown as OrderRow[],products};
+  return {broadcasts:broadcastRows.map(row=>({id:String(row.id),title:String(row.public_title||'제목 없음'),started_at:String(row.started_at||''),ended_at:row.ended_at?String(row.ended_at):null})).sort((a,b)=>(Date.parse(b.started_at)||0)-(Date.parse(a.started_at)||0)),orders:orders as unknown as OrderRow[],products};
 }

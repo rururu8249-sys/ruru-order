@@ -44,9 +44,9 @@ const isBlockedValue = (v: unknown) => ["true", "t", "y", "1"].includes(String(v
 const INTENT_PROMPT = `너는 쇼핑몰 관리자의 검색 요청을 해석한다. 사장님 문장에서 무엇을 찾는지만 JSON 으로 답한다.
 - 손님/주문자/닉네임/이름을 찾는 말이면 {"intent":"customer","name":"<손님 이름이나 닉네임 그대로>","product":""}
 - 상품/물건/챙기기/옵션/누가 무슨 상품을 샀는지 묻는 말이면 {"intent":"product","name":"","product":"<상품 이름 그대로>"}
-- 숫자(매출·순위)를 묻는 말이면 {"intent":"stats","name":"","product":"","stat":"<top_products|top_buyers|summary>","period":"<기간>","date":"<YYYY-MM-DD 또는 빈칸>"}
-  · top_products = 뭐가 잘 나갔는지/많이 팔린 상품, top_buyers = 누가 많이 샀는지, summary = 매출·주문 수·미입금
-  · 기간: today(오늘) yesterday(어제) last_7_days(최근 일주일) this_week(이번 주) last_week(지난주) this_month(이번 달) last_month(지난달) last_broadcast(지난·최근·어제 방송) date(특정 날짜, date 칸에 날짜) all(전체). 기간 말이 없으면 today.
+- 숫자(매출·순위)를 묻는 말이면 {"intent":"stats","name":"","product":"","stat":"<top_products|top_buyers|top_days|bottom_days|summary>","period":"<기간>","date":"<YYYY-MM-DD 또는 빈칸>"}
+  · top_products = 뭐가 잘 나갔는지/많이 팔린 상품, top_buyers = 누가 많이 샀는지, top_days = 어느 날(날짜·방송)에 제일 많이 팔렸는지/매출 많이 나온 날, bottom_days = 매출 제일 적었던 날/안 팔린 날, summary = 매출·주문 수·미입금(순위 아님)
+  · 기간: today(오늘) yesterday(어제) last_7_days(최근 일주일) this_week(이번 주) last_week(지난주) this_month(이번 달) last_month(지난달) last_3_months(최근 3개월) last_broadcast(지난·최근·어제 방송) date(특정 날짜, date 칸에 날짜) all(전체·지금까지). 기간 말이 없거나 「이 기간」처럼 가리키기만 하면 period 는 빈칸 "".
   · 오늘 날짜(한국): {{TODAY}}
 - 모르겠으면 {"intent":"unknown","name":"","product":""}
 이름·상품명은 사장님이 쓴 글자를 고치지 말고 그대로 옮긴다(오타도 그대로). 단 이름 뒤 조사·호칭(이라는, 님, 씨, 이/가/은/는)과 날짜·「챙길」 같은 말은 뺀다. 설명 없이 JSON 하나만.
@@ -480,8 +480,10 @@ export async function POST(request: NextRequest) {
     if (intent.intent === "stats") {
       // [AI-2] 숫자 질문 — 판매분석과 같은 스냅샷·같은 계산(lib/salesQuestion). 읽기만.
       const snapshot = await loadSalesAnalysisSnapshot(supabase, () => true);
-      const period = resolvePeriod(intent.period || "today", Date.now(), { date: intent.date, broadcasts: snapshot.broadcasts });
-      const answer = computeSalesAnswer(snapshot.orders, period, 10);
+      // [10/22 실측] 기간 말이 없으면 화면 칩(최근 3개월/전체)을 기간으로(예전엔 오늘·AI 가 all 로 답하면 전체 기간이 나왔음)
+      const periodKey = intent.period || (range === "all" ? "all" : "last_3_months");
+      const period = resolvePeriod(periodKey, Date.now(), { date: intent.date, broadcasts: snapshot.broadcasts });
+      const answer = computeSalesAnswer(snapshot.orders, period, 10, snapshot.broadcasts);
       const productById = new Map(snapshot.products.map((p) => [String(p.id), p]));
       const topProducts = answer.topProducts.map((p) => {
         const product = productById.get(p.productId);

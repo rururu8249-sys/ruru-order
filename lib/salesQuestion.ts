@@ -75,6 +75,7 @@ export function resolvePeriod(
       const end = key === "this_week" ? today + DAY : monday;
       return range(start, end, `${key === "this_week" ? "이번 주" : "지난주"} ${kstLabel(start)}~${kstLabel(end - DAY)}`);
     }
+    case "last_3_months": return range(today - 89 * DAY, today + DAY, `최근 3개월 ${kstLabel(today - 89 * DAY)}~${kstLabel(today)}`);
     case "this_month":
     case "last_month": {
       const d = new Date(today + KST);
@@ -124,10 +125,16 @@ export type SalesAnswer = {
   unpaidAmount: number;
   topProducts: { name: string; productId: string; qty: number; price: number; sales: number; option: string }[];
   topBuyers: { key: string; nickname: string; name: string; orderCount: number; qty: number; amount: number }[];
+  /** [10/22] 날짜별 순위(한국 날짜, 결제금액 많은 순) — 「어느 날 제일 많이 팔렸어?」 */
+  topDays: SalesDay[];
+  bottomDays: SalesDay[];
 };
+/** 날짜 한 줄: 방송 있으면 「방송 제목 · 시작~종료 · N시간」, 없으면 「쇼핑몰(방송 없는 날)」 */
+export type SalesDay = { date: string; label: string; amount: number; orderCount: number; qty: number; broadcastTitle: string; timeRange: string; hours: number | null; shopOnly: boolean };
 
 /** 기간 안 주문(판매분석과 같은 제외·묶기·결제완료 판정)으로 숫자 계산 */
-export function computeSalesAnswer(orders: OrderRow[], period: ResolvedPeriod, topN = 10): SalesAnswer {
+export function computeSalesAnswer(orders: OrderRow[], period: ResolvedPeriod, topN = 10, broadcasts: { id: string; title: string; started_at?: string; ended_at?: string | null }[] = []): SalesAnswer {
+  const bcById = new Map(broadcasts.map((b) => [String(b.id), b]));
   const scoped = orders.filter((row) => salesVisibleRow(row) && rowInPeriod(row, period));
   const byChannel = new Map<string, OrderRow[]>();
   for (const row of scoped) {
@@ -167,6 +174,36 @@ export function computeSalesAnswer(orders: OrderRow[], period: ResolvedPeriod, t
   }
   const buyers = [...buyerMap.values()].sort((a, b) => b.amount - a.amount);
 
+  // 날짜별(한국 날짜) 묶기 — 주문 시각 기준, 그 날 방송 제목은 첫 주문 줄의 방송으로
+  const dayMap = new Map<string, SalesDay & { bcIds: Set<string> }>();
+  for (const order of paidOrders) {
+    const first = originals.get(String(order.items[0]?.id ?? ""));
+    const t = Date.parse(String(first?.created_at || ""));
+    if (!Number.isFinite(t)) continue;
+    const mid = kstMidnight(t);
+    const d = new Date(mid + KST);
+    const date = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+    const cur = dayMap.get(date) || { date, label: kstLabel(mid), amount: 0, orderCount: 0, qty: 0, broadcastTitle: "", timeRange: "", hours: null, shopOnly: true, bcIds: new Set<string>() };
+    cur.amount += order.totalAmount;
+    cur.orderCount += 1;
+    cur.qty += order.items.reduce((s, it) => s + it.qty, 0);
+    if (first?.broadcast_id != null) cur.bcIds.add(String(first.broadcast_id));
+    dayMap.set(date, cur);
+  }
+  const hm = (ms: number) => { const d = new Date(ms + KST); return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`; };
+  const days: SalesDay[] = [...dayMap.values()].map(({ bcIds, ...day }) => {
+    const bcs = [...bcIds].map((id) => bcById.get(id)).filter((b): b is NonNullable<typeof b> => !!b);
+    if (bcs.length === 0) return { ...day, shopOnly: true, broadcastTitle: "쇼핑몰(방송 없는 날)" };
+    const b = bcs[0];
+    const st = Date.parse(String(b.started_at || ""));
+    const en = b.ended_at ? Date.parse(String(b.ended_at)) : NaN;
+    const hours = Number.isFinite(st) && Number.isFinite(en) && en > st ? Math.round(((en - st) / 3600000) * 10) / 10 : null;
+    const timeRange = Number.isFinite(st) ? `${hm(st)}~${Number.isFinite(en) ? hm(en) : "진행 중"}` : "";
+    return { ...day, shopOnly: false, broadcastTitle: bcs.map((x) => x.title).join(" · "), timeRange, hours };
+  });
+  const daysDesc = [...days].sort((a, b) => b.amount - a.amount);
+  const daysAsc = [...days].sort((a, b) => a.amount - b.amount);
+
   return {
     amount: paidOrders.reduce((s, o) => s + o.totalAmount, 0),
     productAmount: products.reduce((s, p) => s + p.sales, 0),
@@ -181,5 +218,7 @@ export function computeSalesAnswer(orders: OrderRow[], period: ResolvedPeriod, t
       .map((p) => ({ name: p.name, productId: p.productId, qty: p.qty, price: p.price, sales: p.sales, option: p.option })),
     // 전화번호는 화면에 안 보냄(키는 순번으로 바꿔 보냄)
     topBuyers: buyers.slice(0, topN).map((b, i) => ({ ...b, key: `b${i}` })),
+    topDays: daysDesc.slice(0, topN),
+    bottomDays: daysAsc.slice(0, topN),
   };
 }

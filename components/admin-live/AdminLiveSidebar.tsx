@@ -234,7 +234,7 @@ export default function AdminLiveSidebar({
               onClick={() => { onOpenAssistant(); onCloseNav?.(); }}
               className="mb-1.5 flex h-10 w-full items-center justify-center rounded-xl bg-ink text-[13px] font-bold text-white transition active:scale-[0.98]"
             >
-              비서
+              AI 비서
             </button>
           ) : null}
           <div className="grid grid-cols-2 gap-1.5">

@@ -229,10 +229,11 @@ export function parseIntentJson(text: string): AssistantIntent | null {
     if (intent === "stats") {
       // 숫자 질문: 정해진 값만 받는다(이상한 값이면 null → 규칙 해석으로)
       if (!STAT_KINDS.includes(obj.stat as StatKind)) return null;
-      const period = PERIOD_KEYS.includes(obj.period as PeriodKey) ? (obj.period as PeriodKey) : "today";
+      // [10/22] 기간 말이 없으면 period 비움(화면 칩 최근 3개월/전체로 정함). 모르는 값도 비움
+      const period = PERIOD_KEYS.includes(obj.period as PeriodKey) ? (obj.period as PeriodKey) : undefined;
       const date = /^\d{4}-\d{2}-\d{2}$/.test(String(obj.date ?? "")) ? String(obj.date) : undefined;
       if (period === "date" && !date) return null;
-      return { intent, name: "", product: "", stat: obj.stat as StatKind, period, ...(date ? { date } : {}) };
+      return { intent, name: "", product: "", stat: obj.stat as StatKind, ...(period ? { period } : {}), ...(date ? { date } : {}) };
     }
     if (intent === "customer" && !name) return null;
     if (intent === "product" && !product) return null;

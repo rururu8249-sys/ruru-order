@@ -48,7 +48,7 @@ t('지난 방송 = 가장 최근 시작한 방송의 주문 전부', () => {
 });
 
 const row = (id, o) => ({
-  id, order_group_id: o.g, order_lookup_code: o.g, broadcast_id: o.b ?? 1018, created_at: o.at ?? at('2026-10-22T01:00:00'),
+  id, order_group_id: o.g, order_lookup_code: o.g, broadcast_id: 'b' in o ? o.b : 1018, created_at: o.at ?? at('2026-10-22T01:00:00'),
   youtube_nickname: o.nick, customer_name: o.name, customer_phone: o.phone, product_id: o.pid ?? '677', product_name: o.p,
   color: o.color ?? '', size: o.size ?? '', qty: o.qty ?? 1, product_price: o.price, adjusted_product_price: o.price * (o.qty ?? 1),
   final_amount: o.total, total_price: o.total, adjusted_total_price: o.total, shipping_fee: 0,
@@ -115,7 +115,30 @@ t('AI 응답 검사(정해진 값만)', () => {
   assert.deepEqual(ai.parseIntentJson('{"intent":"stats","stat":"top_buyers","period":"yesterday"}'), { intent: 'stats', name: '', product: '', stat: 'top_buyers', period: 'yesterday' });
   assert.equal(ai.parseIntentJson('{"intent":"stats","stat":"hack","period":"today"}'), null);
   assert.equal(ai.parseIntentJson('{"intent":"stats","stat":"summary","period":"date","date":""}'), null);
-  assert.equal(ai.parseIntentJson('{"intent":"stats","stat":"summary","period":"nope"}').period, 'today');
+  // [10/22] 기간 말 없음·모르는 값 → period 비움(화면 칩으로 정함)
+  assert.equal(ai.parseIntentJson('{"intent":"stats","stat":"summary","period":"nope"}').period, undefined);
+  assert.equal(ai.parseIntentJson('{"intent":"stats","stat":"top_days","period":""}').stat, 'top_days');
+  assert.deepEqual(pq.parseStatQuestion('이 기간동안 최대 매출이 많이 나온 날은?', NOW), { stat: 'top_days' });
+  assert.deepEqual(pq.parseStatQuestion('어느 날 제일 많이 팔렸어', NOW), { stat: 'top_days' });
+  assert.deepEqual(pq.parseStatQuestion('이기간동안 매출이 제일 적었던 때는?', NOW), { stat: 'bottom_days' });
+  assert.deepEqual(pq.parseStatQuestion('최근 3개월 매출', NOW), { stat: 'summary', period: 'last_3_months' });
+  assert.deepEqual(pq.parseStatQuestion('뭐 잘 나갔어?', NOW), { stat: 'top_products' });
 });
 
 console.log(`ALL PASS sales question (${n})`);
+
+t('[10/22] 날짜 순위 — 방송 제목·시작~종료·시간, 쇼핑몰만 있는 날, 최근 3개월·적은 순', () => {
+  const bc = [{ id: '1018', title: '신발 방송', started_at: at('2026-10-21T20:00:00'), ended_at: at('2026-10-21T23:30:00') }];
+  const shop = row(10, { g: 'S', b: null, nick: '쇼핑몰손님', name: '쇼', phone: '01011110009', p: '니트', qty: 1, price: 10000, total: 10000, st: '자동입금확인', at: at('2026-10-15T12:00:00') });
+  const a = sq.computeSalesAnswer([...orders, shop], sq.resolvePeriod('last_3_months', NOW), 10, bc);
+  assert.ok(a.topDays.length >= 3);
+  assert.equal(a.topDays[0].date, '2026-10-22');
+  assert.equal(a.topDays[0].broadcastTitle, '신발 방송');
+  assert.equal(a.topDays[0].timeRange, '20:00~23:30');
+  assert.equal(a.topDays[0].hours, 3.5);
+  const shopDay = a.topDays.find((d) => d.date === '2026-10-15');
+  assert.equal(shopDay.shopOnly, true);
+  assert.equal(a.bottomDays[0].date, '2026-10-15');
+  assert.ok(sq.resolvePeriod('last_3_months', NOW).label.startsWith('최근 3개월'));
+});
+console.log('day ranking ok');

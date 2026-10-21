@@ -71,8 +71,9 @@ type Result =
   | ({ kind: "stats"; via: string; query: string } & StatsResult);
 
 // [AI-2] 숫자 질문 답 — 판매분석과 같은 계산(서버 lib/salesQuestion)
+type SalesDayRow = { date: string; label: string; amount: number; orderCount: number; qty: number; broadcastTitle: string; timeRange: string; hours: number | null; shopOnly: boolean };
 type StatsResult = {
-  stat: "top_products" | "top_buyers" | "summary";
+  stat: "top_products" | "top_buyers" | "top_days" | "bottom_days" | "summary";
   periodLabel: string;
   amount: number;
   orderCount: number;
@@ -82,6 +83,8 @@ type StatsResult = {
   unpaidAmount: number;
   topProducts: { name: string; productId: string; qty: number; price: number; sales: number; option: string; photo: string }[];
   topBuyers: { key: string; nickname: string; name: string; orderCount: number; qty: number; amount: number }[];
+  topDays: SalesDayRow[];
+  bottomDays: SalesDayRow[];
 };
 
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
@@ -117,12 +120,17 @@ function StatusBadges({ paymentLabel, paymentCode, shippingLabel }: { paymentLab
 const STAT_TITLE: Record<StatsResult["stat"], string> = {
   top_products: "잘 나간 상품",
   top_buyers: "많이 산 손님",
+  top_days: "매출 많이 나온 날",
+  bottom_days: "매출 적었던 날",
   summary: "매출",
 };
 
 function StatsAnswer({ r, onShowInOrders }: { r: StatsResult; onShowInOrders: (keyword: string) => void }) {
-  const showProducts = r.stat !== "top_buyers";
-  const showBuyers = r.stat !== "top_products";
+  // [10/22 사장님] 물은 것만 보여준다 — 매출(summary)은 숫자 4칸만, 순위는 그 종류만
+  const showProducts = r.stat === "top_products";
+  const showBuyers = r.stat === "top_buyers";
+  const showDays = r.stat === "top_days" || r.stat === "bottom_days";
+  const dayRows = r.stat === "bottom_days" ? r.bottomDays || [] : r.topDays || [];
   return (
     <section className="space-y-3">
       <div>
@@ -163,6 +171,30 @@ function StatsAnswer({ r, onShowInOrders }: { r: StatsResult; onShowInOrders: (k
                     <span className="block text-[13px] font-bold text-ink tabular-nums">{p.qty}개</span>
                     <span className="block text-[12px] text-ink-mute tabular-nums">{won(p.sales)}</span>
                   </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      ) : null}
+
+      {showDays ? (
+        <div className="space-y-1.5">
+          <h4 className="text-[14px] font-bold text-ink">날짜 순위</h4>
+          {dayRows.length === 0 ? (
+            <p className="rounded-xl border border-line bg-surface p-4 text-[13px] text-ink-soft">이 기간에 결제완료된 주문이 없어요. 기간을 바꿔 물어봐 주세요.</p>
+          ) : (
+            <ol className="divide-y divide-line rounded-xl border border-line bg-surface">
+              {dayRows.map((d, i) => (
+                <li key={d.date} className="grid grid-cols-[20px_1fr_auto] items-center gap-2 px-2.5 py-2">
+                  <span className="text-right text-[13px] font-bold text-ink-mute tabular-nums">{i + 1}</span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-[13px] font-semibold text-ink">{d.date.slice(0, 4)}.{d.label}<span className="font-normal text-ink-soft"> · {d.broadcastTitle}</span></span>
+                    <span className="block text-[12px] text-ink-mute tabular-nums">
+                      {d.shopOnly ? "방송 없이 쇼핑몰 주문만" : `방송 ${d.timeRange}${d.hours != null ? ` · ${d.hours}시간` : ""}`} · 주문 {d.orderCount}건 · {d.qty}개
+                    </span>
+                  </span>
+                  <span className="text-right text-[13px] font-bold text-ink tabular-nums">{won(d.amount)}</span>
                 </li>
               ))}
             </ol>
@@ -248,9 +280,9 @@ export default function AdminLiveAssistantDrawer({
   }
 
   return (
-    <AdminLiveSideDrawer title="비서" width={560} onClose={onClose}>
+    <AdminLiveSideDrawer title="AI 비서" width={560} onClose={onClose}>
       <div className="space-y-3 p-4">
-        <div role="tablist" aria-label="비서 화면" className="-mt-1 flex flex-wrap gap-x-4 border-b border-line">
+        <div role="tablist" aria-label="AI 비서 화면" className="-mt-1 flex flex-wrap gap-x-4 border-b border-line">
           {([["ask", "물어보기"], ["memo", "메모함"], ["reply", "응대 문구"], ["seo", "유튜브 SEO"]] as ["ask" | "memo" | "reply" | "seo", string][]).map(([k, label]) => (
             <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
               className={`-mb-px h-10 border-b-2 px-1 text-[14px] font-bold transition focus-visible:outline-2 focus-visible:outline-ink ${tab === k ? "border-ink text-ink" : "border-transparent text-ink-mute hover:text-ink"}`}>
@@ -291,12 +323,9 @@ export default function AdminLiveAssistantDrawer({
           </button>
         </form>
 
+        {/* [10/22 사장님] 「자동·손님·상품」 칩 삭제 — 항상 자동 해석(mode 는 메모함 「손님 ○○ 찾기」에서만 customer 로 씀). 기간 칩만 남김 */}
         <div className="flex flex-wrap items-center gap-1.5">
-          {([["auto", "자동"], ["customer", "손님"], ["product", "상품"]] as [Mode, string][]).map(([k, label]) => (
-            <button key={k} type="button" aria-pressed={mode === k} className={chipClass(mode === k)}
-              onClick={() => { setMode(k); if (result && text.trim()) void run(range, k); }}>{label}</button>
-          ))}
-          <span className="mx-1 h-5 w-px bg-line" aria-hidden />
+          <span className="text-[12px] text-ink-mute">기간</span>
           {([["3m", "최근 3개월"], ["all", "전체"]] as [Range, string][]).map(([k, label]) => (
             <button key={k} type="button" aria-pressed={range === k} className={chipClass(range === k)}
               onClick={() => { setRange(k); if (result && text.trim()) void run(k, mode); }}>{label}</button>
