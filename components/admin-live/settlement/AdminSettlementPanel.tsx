@@ -78,7 +78,7 @@ function getEffectiveSettlementPeriod(startDate: string, endDate: string) {
   return {
     startDate: getMonthStartKey(todayKey),
     endDate: todayKey,
-    label: "기간 미설정 · 이번 달 자동조회",
+    label: "이번 달(기간 안 고름)",
   };
 }
 

@@ -302,7 +302,7 @@ export default function SettlementMoneyFlowDashboard({
               </select>
             </label>
 
-            <div className="flex h-9 items-center rounded-xl border border-line bg-info-bg px-3 text-sm font-black text-info-tx">
+            <div className="flex h-9 items-center rounded-xl border border-line bg-surface-2 px-3 text-sm font-black text-ink-soft">
               {effectivePeriodLabel}
             </div>
 

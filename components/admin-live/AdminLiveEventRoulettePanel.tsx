@@ -1487,12 +1487,12 @@ export default function AdminLiveEventRoulettePanel({
               {/* 헤더 */}
               <div style={{ display: "flex", alignItems: "center", marginBottom: "12px" }}>
                 {/* [2026-09-20 폰 화면 깨짐] 「◆ 이\n벤트」로 잘렸다 → 줄바꿈 금지 */}
-                <span style={{ fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>◆ 이벤트</span>
+                <span style={{ fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>이벤트</span>
                 <span style={{ marginLeft: "auto", display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap" }}>
                   {/* [2026-09-08] 탭 순서 = 실제 쓰는 순서(서바이벌·달리기 최다). 테스트/운영 토글은 삭제 — 「테스트로 해보기」 버튼으로 */}
                   <AdminLiveEventTabs active={eventTab} disabled={publishingRoster || spinning} onSelect={(tab) => { setEventTab(tab); setCurrentEvent(null); setSpinning(false); setCenterWinner(""); }} />
                   <span style={{ width: "1px", height: "18px", background: "var(--bd)", margin: "0 4px" }} />
-                  <button className="btn" disabled={publishingRoster || spinning} style={{ height: "auto", padding: "4px 8px" }} onClick={() => { void resetEvent(); }}>↺ 초기화</button>
+                  <button className="btn" disabled={publishingRoster || spinning} style={{ height: "auto", padding: "4px 8px" }} onClick={() => { void resetEvent(); }}>초기화</button>
                   {embedded ? null : <button className="btn" style={{ height: "auto", padding: "4px 8px" }} onClick={closePanel}>✕</button>}
                 </span>
               </div>
