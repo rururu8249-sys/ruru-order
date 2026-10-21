@@ -81,20 +81,57 @@ function sameDepositKey(item: {
   ].join("|");
 }
 
+// [2026-10-21 계좌 2개] 조회할 계좌 목록: 서버 기본 계좌 + 설정(shop_bank_config_v1)에 «켜진» 계좌. 숫자만·중복 제거.
+//   설정을 못 읽거나 비어 있으면 [""] → fetchBankdaTransactions 가 예전처럼 BANKDA_ACCOUNT_NUM 하나만 묻는다.
+async function resolveBankdaAccountNums(supabase: ReturnType<typeof getSupabaseAdmin>): Promise<string[]> {
+  const nums = new Set<string>();
+  const envNum = String(process.env.BANKDA_ACCOUNT_NUM || "").replace(/[^0-9]/g, "");
+  if (envNum) nums.add(envNum);
+  try {
+    const { data } = await supabase.from("settings").select("value").eq("key", "shop_bank_config_v1").maybeSingle();
+    const raw = (data as { value?: unknown } | null)?.value;
+    const cfg = typeof raw === "string" ? JSON.parse(raw) : raw;
+    const accounts = Array.isArray((cfg as { accounts?: unknown })?.accounts) ? (cfg as { accounts: unknown[] }).accounts : [];
+    for (const a of accounts) {
+      const acc = a as { enabled?: unknown; bankAccount?: unknown };
+      if (acc?.enabled === false) continue;
+      const n = String(acc?.bankAccount ?? "").replace(/[^0-9]/g, "");
+      if (n) nums.add(n);
+    }
+  } catch (error) {
+    console.warn("[bankda] 입금계좌 설정 읽기 실패 — 기본 계좌만 조회", error);
+  }
+  return nums.size > 0 ? [...nums] : [""];
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = getSupabaseAdmin();
     const body = await request.json().catch(() => null);
 
-    const { deposits, rawCount, raw } = await withTimeout(
-      fetchBankdaTransactions({
-        datefrom: body?.datefrom,
-        dateto: body?.dateto,
-        accountnum: body?.accountnum,
-      }),
+    // [2026-10-21 계좌 2개] 뱅크다는 «한 번에 계좌 1개»만 돌려준다(accountnum).
+    //   손님 안내 계좌가 2개(설정 shop_bank_config_v1)가 되면서 추가 계좌(농협) 입금이 안 들어오던 것 →
+    //   요청에 accountnum 이 없으면: 서버 기본 계좌(BANKDA_ACCOUNT_NUM) + 설정에 켜진 계좌를 «차례로» 묻고 합친다.
+    //   아래 저장·중복판정·자동매칭 로직은 그대로(받아온 목록만 합쳐짐). 설정을 못 읽으면 예전처럼 기본 계좌 1개만.
+    const accountNums = body?.accountnum
+      ? [String(body.accountnum)]
+      : await resolveBankdaAccountNums(supabase);
+    const fetched = await withTimeout(
+      Promise.all(
+        accountNums.map((accountnum) =>
+          fetchBankdaTransactions({
+            datefrom: body?.datefrom,
+            dateto: body?.dateto,
+            accountnum: accountnum || undefined,
+          }),
+        ),
+      ),
       BANKDA_SYNC_TIMEOUT_MS,
       "뱅크다 조회가 25초 이상 지연되어 중단했습니다. 잠시 후 다시 조회해주세요."
     );
+    const deposits = fetched.flatMap((f) => f.deposits);
+    const rawCount = fetched.reduce((sum, f) => sum + Number(f.rawCount || 0), 0);
+    const raw = fetched[0]?.raw;
 
     const bankdaDescription = String((raw as any)?.response?.description || "");
     if (body?.dry_run === true) {
