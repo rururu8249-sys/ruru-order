@@ -66,7 +66,7 @@ function depNameScore(dep: any, order: LiveOrder): number {
 }
 
 export default function LiveFloatingMatchPanel({
-  deposits, orders, onClose, onMatched, onSearchFilter,
+  deposits, orders, onMatched, onSearchFilter,
   selectedOrderForMatch, onClearSelectedOrder,
   initialDepositId = null, initialSearch = "",
 }: Props) {
@@ -75,7 +75,8 @@ export default function LiveFloatingMatchPanel({
   const today = new Date().toISOString().slice(0, 10);
   const [calFrom, setCalFrom] = useState(today.slice(0, 7) + "-01");
   const [calTo,   setCalTo]   = useState(today);
-  const [showAll, setShowAll] = useState(false);
+  // [2026-10-21 입금 통합] 「미매칭만/전체보기」 토글은 창 위 「입금매칭 / 입금내역」 칩이 대신한다 → 여기선 항상 미매칭만
+  const [showAll] = useState(false);
   const [search, setSearch]   = useState(initialSearch);
   const [selectedDepIds, setSelectedDepIds] = useState<Set<number>>(() => new Set(initialDepositId != null && Number.isFinite(Number(initialDepositId)) ? [Number(initialDepositId)] : []));
   const [matchSaving, setMatchSaving] = useState(false);
@@ -129,11 +130,7 @@ export default function LiveFloatingMatchPanel({
     return Array.from(map.entries());
   }, [filtered]);
 
-  // 미매칭 건수
-  const unmatchedCount = useMemo(
-    () => (deposits as any[]).filter(d => isUnmatchedLiveDeposit(d)).length,
-    [deposits]
-  );
+  // (미매칭 건수는 창 위 「입금매칭 N」 칩이 보여준다 — 대시보드에서 같은 판정 isUnmatchedLiveDeposit 으로 센다)
 
   // 브라우징 모드: 전체 orders 기준 추천 (금액 정확일치 + 이름점수≥80)
   function findBestOrder(dep: any): LiveOrder | null {
@@ -251,126 +248,88 @@ export default function LiveFloatingMatchPanel({
     { key: "all",     label: "전체" },
   ];
 
+  // [2026-10-21 입금 통합] 모양만 DESIGN-ADMIN 기준(칩 36·검정 선택·주버튼 1개). 위 판정·API 호출 줄은 그대로.
+  const chip = (on: boolean) =>
+    `h-9 shrink-0 rounded-full border px-3 text-[13px] font-semibold transition ${on ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink hover:bg-surface-2"}`;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--color-surface)" }}>
+    <div className="flex h-full min-h-0 flex-1 flex-col bg-surface">
 
-      {/* 헤더 */}
-      <div style={{ padding: "12px 12px 0", flexShrink: 0, borderBottom: "1px solid var(--color-surface-2)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-          <span style={{ fontSize: 13, fontWeight: 800 }}>입금매칭</span>
-          <span style={{ background: "var(--color-rose-deep)", color: "#fff", borderRadius: 20, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>
-            미매칭 {unmatchedCount}건
-          </span>
-          <button onClick={onClose} style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--color-ink-mute)", fontSize: 18, cursor: "pointer", lineHeight: 1 }}>✕</button>
-        </div>
-
-        {/* 기간 탭 */}
-        <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
+      {/* 기간 · 검색 */}
+      <div className="shrink-0 space-y-2 border-b border-line px-3 py-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           {PERIOD_TABS.map(t => (
-            <button key={t.key} onClick={() => { setPeriod(t.key); setCalOpen(false); }}
-              style={{
-                padding: "4px 8px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer",
-                border: `1px solid ${period === t.key && !calOpen ? "var(--color-rose-deep)" : "var(--color-line)"}`,
-                background: period === t.key && !calOpen ? "var(--color-rose-deep)" : "var(--color-surface)",
-                color: period === t.key && !calOpen ? "#fff" : "var(--color-ink-soft)",
-              }}>{t.label}</button>
+            <button key={t.key} type="button" aria-pressed={period === t.key && !calOpen}
+              onClick={() => { setPeriod(t.key); setCalOpen(false); }}
+              className={chip(period === t.key && !calOpen)}>{t.label}</button>
           ))}
-          <div style={{ position: "relative" }}>
-            <button onClick={() => setCalOpen(v => !v)}
-              style={{
-                padding: "4px 8px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer",
-                border: `1px solid var(--color-rose-deep)`,
-                background: calOpen ? "var(--color-rose-deep)" : "var(--color-surface)",
-                color: calOpen ? "#fff" : "var(--color-rose-deep)",
-              }}>직접선택</button>
+          <div className="relative">
+            <button type="button" aria-pressed={calOpen || period === "custom"} onClick={() => setCalOpen(v => !v)}
+              className={chip(calOpen || period === "custom")}>기간 선택</button>
             {calOpen && (
-              <div style={{
-                position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 300,
-                background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: 8,
-                boxShadow: "0 8px 24px rgba(0,0,0,0.13)", padding: 12, width: 240,
-              }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-ink-soft)", marginBottom: 6 }}>기간 선택</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <input type="date" value={calFrom} onChange={e => setCalFrom(e.target.value)}
-                    style={{ flex: 1, border: "1px solid var(--color-line)", borderRadius: 8, padding: "4px 6px", fontSize: 12, outline: "none" }} />
-                  <span style={{ color: "var(--color-ink-mute)", fontSize: 12 }}>~</span>
-                  <input type="date" value={calTo} onChange={e => setCalTo(e.target.value)}
-                    style={{ flex: 1, border: "1px solid var(--color-line)", borderRadius: 8, padding: "4px 6px", fontSize: 12, outline: "none" }} />
+              <div className="absolute right-0 top-[calc(100%+4px)] z-30 w-64 rounded-xl border border-line bg-surface p-3 shadow-[0_8px_24px_rgba(0,0,0,.08)]">
+                <div className="flex items-center gap-1.5">
+                  <input type="date" aria-label="시작일" value={calFrom} onChange={e => setCalFrom(e.target.value)}
+                    className="h-9 min-w-0 flex-1 rounded-lg border border-line px-2 text-[13px]" />
+                  <span className="text-[13px] text-ink-mute">~</span>
+                  <input type="date" aria-label="종료일" value={calTo} onChange={e => setCalTo(e.target.value)}
+                    className="h-9 min-w-0 flex-1 rounded-lg border border-line px-2 text-[13px]" />
                 </div>
-                <button onClick={() => { setPeriod("custom"); setCalOpen(false); }}
-                  style={{ marginTop: 8, width: "100%", background: "var(--color-rose-deep)", color: "#fff", border: "none", borderRadius: 8, padding: "8px 0", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                  적용
-                </button>
+                <button type="button" onClick={() => { setPeriod("custom"); setCalOpen(false); }}
+                  className="mt-2 h-9 w-full rounded-lg bg-ink text-[13px] font-bold text-white">적용</button>
               </div>
             )}
           </div>
         </div>
-
-        {/* 미매칭만/전체 토글 + 검색 */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center" }}>
-          <button onClick={() => setShowAll(v => !v)}
-            style={{
-              padding: "4px 8px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer",
-              border: `1px solid ${showAll ? "var(--color-line)" : "var(--color-rose-deep)"}`,
-              background: showAll ? "var(--color-surface-2)" : "var(--color-rose-soft)",
-              color: showAll ? "var(--color-ink-soft)" : "var(--color-rose-deep)",
-              flexShrink: 0,
-            }}>{showAll ? "전체보기" : "미매칭만"}</button>
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="입금자명 · 금액"
-            style={{ flex: 1, border: "1px solid var(--color-line)", borderRadius: 8, padding: "6px 8px", fontSize: 12, outline: "none", background: "var(--color-surface-2)" }} />
-        </div>
+        <input value={search} onChange={e => setSearch(e.target.value)} aria-label="입금자명 또는 금액 검색"
+          placeholder="입금자명 · 금액 검색"
+          className="h-9 w-full rounded-lg border border-line bg-surface px-3 text-[13px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-ink" />
       </div>
 
-      {/* 매칭 모드 안내 */}
+      {/* 주문을 골라서 열었을 때: 연결할 주문 + 확정 버튼(스크롤해도 항상 보임) */}
       {matchMode && selectedOrderForMatch && (
-        <div style={{ padding: "8px 12px", background: "var(--color-rose-soft)", borderBottom: "1px solid var(--color-rose-soft)", fontSize: 11, color: "var(--color-rose-deep)", fontWeight: 700, flexShrink: 0 }}>
-          <strong>{selectedOrderForMatch.nickname ?? selectedOrderForMatch.name}</strong>
-          {" · "}{won(expectedAmount)} 주문에 연결할 입금 선택
-          <button onClick={() => { onClearSelectedOrder?.(); setSelectedDepIds(new Set()); }}
-            style={{ marginLeft: 8, background: "none", border: "none", color: "var(--color-ink-mute)", fontSize: 12, cursor: "pointer" }}>✕</button>
-        </div>
-      )}
-
-      {/* 매칭 모드 확정 버튼 (상단 고정 — 스크롤해도 항상 보임) */}
-      {matchMode && (
-        <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--color-surface-2)", display: "flex", flexDirection: "column", gap: 6, flexShrink: 0, background: "var(--color-surface)" }}>
-          {selDeps.length > 0 && (
-            <div style={{ fontSize: 11, fontWeight: 700, color: selTotal === expectedAmount ? "var(--color-ok-tx)" : "var(--color-danger-tx)", textAlign: "center", marginBottom: 2 }}>
-              선택 합계 {won(selTotal)} {selTotal === expectedAmount ? "✓ 일치" : `✗ 불일치 (주문 ${won(expectedAmount)})`}
+        <div className="shrink-0 space-y-2 border-b border-line bg-surface-2 px-3 py-2">
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="text-[12px] font-semibold text-ink-mute">연결할 주문</div>
+              <div className="truncate text-[14px] font-bold text-ink">
+                {selectedOrderForMatch.nickname ?? selectedOrderForMatch.name} · <span className="tabular-nums">{won(expectedAmount)}</span>
+              </div>
             </div>
-          )}
-          <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={handleConfirmWithDeposit} disabled={!canConfirm || matchSaving}
-              style={{
-                flex: 1, background: canConfirm ? "var(--color-ok-tx)" : "var(--color-ink-mute)", color: "#fff", border: "none",
-                borderRadius: 8, padding: "12px 6px", fontSize: 12, fontWeight: 800,
-                cursor: canConfirm ? "pointer" : "not-allowed",
-              }}>
-              {matchSaving ? "처리중…" : "선택 후 입금확인"}
+            <button type="button" onClick={() => { onClearSelectedOrder?.(); setSelectedDepIds(new Set()); }}
+              className="h-9 shrink-0 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2">주문 빼기</button>
+          </div>
+          <div className={`text-[13px] font-semibold ${selDeps.length === 0 ? "text-ink-mute" : selTotal === expectedAmount ? "text-ok-tx" : "text-danger-tx"}`}>
+            {selDeps.length === 0
+              ? "아래에서 이 주문의 입금을 고르세요"
+              : selTotal === expectedAmount
+                ? `고른 입금 ${won(selTotal)} · 주문 금액과 같아요`
+                : `고른 입금 ${won(selTotal)} · 주문 금액과 달라요`}
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={handleConfirmWithDeposit} disabled={!canConfirm || matchSaving}
+              className="h-10 flex-1 rounded-lg bg-ink text-[14px] font-bold text-white disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-mute">
+              {matchSaving ? "처리 중…" : "입금확인"}
             </button>
-            <button onClick={handleConfirmWithoutDeposit} disabled={matchSaving}
-              style={{
-                flex: 1, background: "var(--color-rose-deep)", color: "#fff", border: "none",
-                borderRadius: 8, padding: "12px 6px", fontSize: 12, fontWeight: 800,
-                cursor: matchSaving ? "not-allowed" : "pointer",
-              }}>
-              금액 무시하고 수동확인
+            <button type="button" onClick={handleConfirmWithoutDeposit} disabled={matchSaving}
+              title="입금 기록 없이 이 주문을 입금확인으로 바꿔요(금액 확인 안 함)"
+              className="h-10 shrink-0 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50">
+              입금 없이 확인
             </button>
           </div>
         </div>
       )}
 
-      {/* 입금 리스트 */}
-      <div style={{ flex: 1, overflowY: "auto" }}>
+      {/* 입금 목록 */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {grouped.length === 0 && (
-          <div style={{ padding: 24, textAlign: "center", color: "var(--color-ink-mute)", fontSize: 12 }}>
-            {showAll ? "입금 없음" : "미매칭 입금 없음"}
+          <div className="p-6 text-center text-[13px] text-ink-mute">
+            {showAll ? "입금 없음" : "연결 안 된 입금이 없어요"}
           </div>
         )}
         {grouped.map(([dateLabel, deps]) => (
           <div key={dateLabel}>
-            <div style={{ padding: "8px 12px", fontSize: 11, fontWeight: 800, color: "var(--color-ink-mute)", background: "var(--color-surface-2)", borderBottom: "1px solid var(--color-surface-2)", position: "sticky", top: 0, zIndex: 1 }}>
+            <div className="sticky top-0 z-[1] border-b border-line bg-surface-2 px-3 py-1.5 text-[12px] font-semibold text-ink-mute">
               {dateLabel}
             </div>
             {deps.map((dep: any) => {
@@ -380,81 +339,62 @@ export default function LiveFloatingMatchPanel({
               const rec = matchMode ? isRecommended(dep) : !!findBestOrder(dep);
               const bestOrder = !matchMode ? findBestOrder(dep) : null;
               const diff = matchMode ? Number(dep.amount ?? 0) - expectedAmount : 0;
+              const selectable = matchMode && !isMatched;
 
               return (
                 <div key={depId}
-                  onClick={() => { if (matchMode && !isMatched) toggleDep(depId); }}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    padding: "8px 12px", borderBottom: "1px solid var(--color-surface-2)",
-                    cursor: matchMode && !isMatched ? "pointer" : "default",
-                    background: checked ? "var(--color-rose-soft)" : rec && !isMatched ? "var(--color-ok-bg)" : "transparent",
-                    opacity: isMatched ? 0.45 : 1,
-                    transition: "background 0.08s",
-                  }}>
+                  onClick={() => { if (selectable) toggleDep(depId); }}
+                  role={selectable ? "checkbox" : undefined}
+                  aria-checked={selectable ? checked : undefined}
+                  tabIndex={selectable ? 0 : undefined}
+                  onKeyDown={selectable ? (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggleDep(depId); } } : undefined}
+                  className={`flex items-center gap-2.5 border-b border-line px-3 py-2 ${selectable ? "cursor-pointer" : ""} ${checked ? "bg-surface-2" : ""} ${isMatched ? "opacity-50" : ""}`}>
 
-                  {/* 체크박스 (매칭 모드 + 미매칭만) */}
-                  {matchMode && !isMatched && (
-                    <div style={{
-                      width: 17, height: 17, border: `2px solid ${checked ? "var(--color-rose-deep)" : "var(--color-line)"}`,
-                      borderRadius: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-                      background: checked ? "var(--color-rose-deep)" : "var(--color-surface)", fontSize: 11, color: "#fff", fontWeight: 800,
-                    }}>{checked ? "✓" : ""}</div>
+                  {/* 체크 (주문을 골라 열었을 때 + 미매칭만) */}
+                  {selectable && (
+                    <div className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border-2 text-[11px] font-bold text-white ${checked ? "border-ink bg-ink" : "border-line bg-surface"}`}>{checked ? "✓" : ""}</div>
                   )}
 
                   {/* 입금 정보 */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-ink)" }}>{dep.depositor_name ?? "—"}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate text-[14px] font-bold text-ink">{dep.depositor_name ?? "-"}</span>
                       {isMatched && (
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-ok-tx)", background: "var(--color-ok-bg)", borderRadius: 4, padding: "1px 4px" }}>
-                          매칭완료
-                        </span>
+                        <span className="shrink-0 rounded px-1.5 text-[11px] font-semibold text-ok-tx bg-ok-bg">매칭완료</span>
                       )}
                       {!isMatched && rec && (
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-ok-tx)", background: "var(--color-ok-bg)", borderRadius: 4, padding: "1px 4px" }}>
-                          추천
-                        </span>
-                      )}
-                      {!isMatched && rec && matchMode && (
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-ink)", background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: 4, padding: "1px 4px" }}>
-                          금액일치
-                        </span>
+                        <span className="shrink-0 rounded px-1.5 text-[11px] font-semibold text-ok-tx bg-ok-bg">추천</span>
                       )}
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--color-ink-mute)" }}>
-                      {dep.deposited_time ?? ""}
-                    </div>
+                    <div className="text-[12px] text-ink-mute">{dep.deposited_time ?? ""}</div>
+                    {/* 추천 연결 대상 — 누르기 전에 어느 주문에 붙는지 보이게(표시만) */}
+                    {bestOrder && !isMatched && (
+                      <div className="mt-0.5 truncate text-[12px] font-semibold text-ink-soft">
+                        → {bestOrder.nickname || bestOrder.name || "-"}{bestOrder.name && bestOrder.nickname && bestOrder.name !== bestOrder.nickname ? ` (${bestOrder.name})` : ""} 주문
+                      </div>
+                    )}
                   </div>
 
-                  {/* 금액 */}
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 800 }}>{won(Number(dep.amount ?? 0))}</div>
+                  {/* 금액 · 버튼 */}
+                  <div className="shrink-0 text-right">
+                    <div className="text-[14px] font-bold tabular-nums text-ink">{won(Number(dep.amount ?? 0))}</div>
                     {matchMode && !isMatched && diff !== 0 && (
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-danger-tx)" }}>
+                      <div className="text-[12px] font-semibold tabular-nums text-danger-tx">
                         {diff > 0 ? "+" : ""}{Number(diff).toLocaleString("ko-KR")}
                       </div>
                     )}
                     {matchMode && !isMatched && diff === 0 && (
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-ok-tx)" }}>±0</div>
+                      <div className="text-[12px] font-semibold text-ok-tx">금액 같음</div>
                     )}
-                    {/* 브라우징 모드: 즉시 매칭 버튼 */}
                     {!matchMode && !isMatched && bestOrder && (
-                      <button onClick={e => { e.stopPropagation(); confirmDepositToOrder(dep, bestOrder); }}
+                      <button type="button" onClick={e => { e.stopPropagation(); confirmDepositToOrder(dep, bestOrder); }}
                         disabled={matchSaving}
-                        style={{
-                          marginTop: 4, background: "var(--color-ink)", color: "#fff", border: "none",
-                          borderRadius: 8, padding: "4px 8px", fontSize: 11, fontWeight: 700,
-                          cursor: "pointer",
-                        }}>매칭</button>
+                        className="mt-1 h-8 rounded-lg bg-ink px-3 text-[13px] font-bold text-white disabled:opacity-50">연결</button>
                     )}
                     {!matchMode && !isMatched && !bestOrder && (
-                      <button onClick={e => { e.stopPropagation(); onSearchFilter(dep.depositor_name ?? ""); }}
-                        style={{
-                          marginTop: 4, background: "var(--color-surface-2)", color: "var(--color-ink-soft)", border: "1px solid var(--color-line)",
-                          borderRadius: 8, padding: "4px 8px", fontSize: 11, fontWeight: 700,
-                          cursor: "pointer",
-                        }}>확인필요</button>
+                      <button type="button" onClick={e => { e.stopPropagation(); onSearchFilter(dep.depositor_name ?? ""); }}
+                        title="뒤 주문표를 이 입금자명으로 검색해요"
+                        className="mt-1 h-8 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2">주문 찾기</button>
                     )}
                   </div>
                 </div>

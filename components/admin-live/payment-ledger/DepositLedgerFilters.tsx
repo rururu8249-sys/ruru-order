@@ -43,17 +43,18 @@ export default function DepositLedgerFilters({
   appliedToDate,
 }: Props) {
   if (compact) return <section className="space-y-2 py-2">
-    <input aria-label="입금자명 또는 금액 검색" value={keyword} onChange={event => onKeywordChange(event.target.value)} placeholder="입금자명 / 금액 검색" className="min-h-11 w-full rounded-xl border border-line bg-surface px-3 text-sm text-ink md:min-h-9" />
-    <div className="flex flex-wrap gap-1" aria-label="입금 상태 필터">
-      {STATUS_FILTERS.map(value => <button key={value} type="button" aria-pressed={statusFilter === value} onClick={() => onStatusFilterChange(value)} className={`min-h-11 rounded-full border px-3 text-xs font-bold md:min-h-9 ${chipClass(statusFilter === value,value)}`}>{value === "전체" ? "전체" : depositLedgerStatusLabel(value)}</button>)}
+    <input aria-label="입금자명 또는 금액 검색" value={keyword} onChange={event => onKeywordChange(event.target.value)} placeholder="입금자명 · 금액 검색" className="h-9 w-full rounded-lg border border-line bg-surface px-3 text-[13px] text-ink" />
+    {/* [2026-10-21 입금 통합] 칩 = DESIGN-ADMIN(36·고른 것 검정) */}
+    <div className="flex flex-wrap gap-1.5" aria-label="입금 상태 필터">
+      {STATUS_FILTERS.map(value => <button key={value} type="button" aria-pressed={statusFilter === value} onClick={() => onStatusFilterChange(value)} className={`h-9 rounded-full border px-3 text-[13px] font-semibold ${statusFilter === value ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink hover:bg-surface-2"}`}>{value === "전체" ? "전체" : depositLedgerStatusLabel(value)}</button>)}
     </div>
-    <details className="rounded-xl border border-line px-3 py-2 text-xs font-bold text-ink-soft">
+    <details className="rounded-lg border border-line px-3 py-2 text-[13px] font-semibold text-ink-soft">
       <summary className="cursor-pointer">기간 {appliedFromDate} ~ {appliedToDate} · 변경</summary>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <input aria-label="입금 조회 시작일" type="date" value={fromDate} onChange={event=>onFromDateChange(event.target.value)} className="min-h-11 min-w-0 rounded-xl border border-line bg-surface px-2 md:min-h-9" />
         <input aria-label="입금 조회 종료일" type="date" value={toDate} onChange={event=>onToDateChange(event.target.value)} className="min-h-11 min-w-0 rounded-xl border border-line bg-surface px-2 md:min-h-9" />
-        <button type="button" onClick={onApplyDate} className="min-h-11 rounded-xl bg-rose-deep px-3 text-white md:min-h-9">조회</button>
-        <button type="button" onClick={onReset} className="min-h-11 rounded-xl border border-line px-3 md:min-h-9">초기화</button>
+        <button type="button" onClick={onApplyDate} className="h-9 rounded-lg bg-ink px-3 text-white">조회</button>
+        <button type="button" onClick={onReset} className="h-9 rounded-lg border border-line px-3">초기화</button>
       </div>
     </details>
   </section>;

@@ -53,7 +53,7 @@ export const ADMIN_LIVE_SUB_TABS: Record<AdminLiveTopMenuKey, AdminLiveSubTab[]>
   // [2026-09-09 사장님 요청] 이벤트를 방송 → 주문·입금 안으로 옮겼다
   orders: [
     { key: "orders", label: "실시간 주문" },
-    { key: "payments", label: "입금내역" },
+    { key: "payments", label: "입금" },
     { key: "settlement", label: "정산" },
     { key: "sales", label: "판매분석" },
     { key: "event", label: "이벤트" },

@@ -48,7 +48,7 @@ console.log('PASS deposit race, failure, inline detail and preserved filters');
 requests.length=0;
 await act(async()=>{tree=Renderer.create(React.createElement(Panel,{deposits:[a],presentation:'drawer'}));});
 await respond(requests[0],[a]);
-await act(async()=>{void tree.root.findAllByType('button').find(n=>n.children.join('')==='입금내역 새로고침').props.onClick();});
+await act(async()=>{void tree.root.findAllByType('button').find(n=>n.children.join('')==='새로고침').props.onClick();});
 const sync=requests[1];
 await act(async()=>f().props.onFromDateChange('2026-01-01'));
 await act(async()=>f().props.onApplyDate());

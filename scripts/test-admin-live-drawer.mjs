@@ -5,7 +5,7 @@ import {createUiLoader} from './admin-ui-test-loader.mjs';
 import { resolveAdminLiveDestination, transitionAdminLiveDrawer, resolveDrawerOrder } from '../components/admin-live/adminLiveDrawerState.ts';
 import { ADMIN_LIVE_ALL_MENU_KEYS } from '../components/admin-live/adminLiveMenu.ts';
 
-assert.deepEqual(resolveAdminLiveDestination('payments'), {screen:'orders', drawer:{kind:'deposits'}});
+assert.deepEqual(resolveAdminLiveDestination('payments'), {screen:'orders', drawer:{kind:'match',orderId:null}});
 for (const key of ADMIN_LIVE_ALL_MENU_KEYS.filter(key => key !== 'payments')) {
   assert.deepEqual(resolveAdminLiveDestination(key), {screen:key, drawer:{kind:'closed'}});
 }

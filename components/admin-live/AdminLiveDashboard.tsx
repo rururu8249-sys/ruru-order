@@ -37,9 +37,10 @@ import LiveBroadcastEndSummaryModal, { type LiveBroadcastEndMission, type LiveBr
 // [2026-09-08 4단계-B] 방송 시작 확인창(미션 설정 포함) + 콘솔 미션 게이지
 import LiveBroadcastStartModal, { type BroadcastStartConfirmInput } from "./LiveBroadcastStartModal";
 import LiveMissionGauge from "./LiveMissionGauge";
-import LiveOrderTable, { type LiveOrderFilters } from "./LiveOrderTable";
+import LiveOrderTable, { isUnmatchedLiveDeposit, type LiveOrderFilters } from "./LiveOrderTable";
 import LiveOrderDetailDrawer from "./LiveOrderDetailDrawer";
 import LiveFloatingMatchPanel from "./LiveFloatingMatchPanel";
+import AdminLiveDepositModeChips from "./AdminLiveDepositModeChips";
 import {
   activateBroadcast,
   endAdminLiveBroadcast,
@@ -692,6 +693,9 @@ export default function AdminLiveDashboard() {
   const [selectedOrderId, setSelectedOrderId] = useState<string>("");
   const orderDetailOpen = drawer.kind === "order";
   const matchPanelOpen = drawer.kind === "match";
+  // [2026-10-21 입금 통합] 입금매칭·입금내역 = 같은 「입금」 창(칩으로 전환)
+  const depositDrawerOpen = drawer.kind === "match" || drawer.kind === "deposits";
+  const unmatchedDepositCount = useMemo(() => (deposits as any[]).filter((d) => isUnmatchedLiveDeposit(d)).length, [deposits]);
   const [selectedOrderForMatch, setSelectedOrderForMatch] = useState<LiveOrder | null>(null);
   const [videoRatio, setVideoRatio] = useState<VideoRatio>("vertical");
   const [loadError, setLoadError] = useState("");
@@ -1093,7 +1097,7 @@ export default function AdminLiveDashboard() {
   }, []);
 
   useEffect(() => {
-    replacePanelInUrl(drawer.kind === "deposits" ? "payments" : activeMenu);
+    replacePanelInUrl(drawer.kind === "deposits" || drawer.kind === "match" ? "payments" : activeMenu);
   }, [activeMenu, drawer.kind]);
 
   useEffect(() => {
@@ -1374,6 +1378,19 @@ export default function AdminLiveDashboard() {
     setSelectedOrderForMatch(order);
     setDrawer({kind: "match", orderId: order.id});
   };
+
+  // [2026-10-21 입금 통합] 「입금」 창 맨 위 칩(입금매칭 N / 입금내역) — 화면 전환만
+  const depositModeChips = (
+    <AdminLiveDepositModeChips
+      mode={drawer.kind === "deposits" ? "ledger" : "match"}
+      unmatchedCount={unmatchedDepositCount}
+      onChange={(mode) => {
+        // 고른 주문(selectedOrderForMatch)은 그대로 두고 칩만 바꾼다
+        if (mode === "ledger") { setMatchInitial(null); setDrawer({kind: "deposits"}); }
+        else setDrawer({kind: "match", orderId: selectedOrderForMatch?.id ?? null});
+      }}
+    />
+  );
 
   const refreshAfterManualMatch = async () => {
     await loadOrders({ silent: true });
@@ -1667,7 +1684,7 @@ export default function AdminLiveDashboard() {
                     <>
                     <select
                       aria-label={`${activeTopMenu.label} 화면 선택`}
-                      value={drawer.kind==='deposits'?'payments':activeMenu==='reports'?'sales':activeMenu==='customers'?`customers:${customersActiveTab}`:activeMenu}
+                      value={depositDrawerOpen?'payments':activeMenu==='reports'?'sales':activeMenu==='customers'?`customers:${customersActiveTab}`:activeMenu}
                       onChange={event=>{
                         const v = event.target.value;
                         if (v.startsWith("customers:")) { setCustomersInitialTab(v.slice(10) as "members" | "issues" | "loyalty" | "link"); setCustomersOpenTabAt(Date.now()); setActiveMenu("customers"); return; }
@@ -1679,7 +1696,7 @@ export default function AdminLiveDashboard() {
                     </select>
                     <div className="hidden min-w-0 items-center gap-1 overflow-x-auto md:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                       {activeSubTabs.map((tab) => {
-                        const active = drawer.kind === "deposits" ? tab.key === "payments"
+                        const active = depositDrawerOpen ? tab.key === "payments"
                           : tab.custTab ? (activeMenu === "customers" && customersActiveTab === tab.custTab)
                           : tab.key === (activeMenu==='reports'?'sales':activeMenu);
                         // [2026-10-21 a3-2] 고객 탭 배지(미해결 이슈·계정 잇기 대기) — 패널 안 탭바가 숨겨져 여기서 보여준다
@@ -1706,20 +1723,7 @@ export default function AdminLiveDashboard() {
                     </>
                   ) : null}
                 </div>
-                {activeMenu === "orders" ? (
-                  <div className="flex items-center gap-1.5 pb-1.5">
-                    <button
-                      type="button"
-                      onClick={() => { setSelectedOrderForMatch(null); setDrawer(current => transitionAdminLiveDrawer(current, {kind: "match", orderId: null})); }}
-                      className={[
-                        "rounded-lg border px-2.5 py-1.5 text-[13px] font-bold transition",
-                        matchPanelOpen ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink hover:bg-surface-2",
-                      ].join(" ")}
-                    >
-                      {matchPanelOpen ? "입금매칭 닫기" : "입금매칭 열기"}
-                    </button>
-                  </div>
-                ) : null}
+                {/* [2026-10-21 입금 통합] 머리줄 「입금매칭 열기」 버튼 삭제 — 「입금」 탭 하나로 연다 */}
               </div>
 
               {loadError && activeMenu === "orders" ? (
@@ -1914,20 +1918,23 @@ export default function AdminLiveDashboard() {
 
           {/* 주문상세 / 입금매칭 — 우측 오버레이 드로어(슬라이드인, 위로 떠서 표를 밀지 않음). 단일 슬롯. */}
           {drawer.kind !== "closed" ? (
-              <AdminLiveSideDrawer title={drawer.kind === "deposits" ? "입금내역" : drawer.kind === "match" ? "입금매칭" : "주문상세"}
-                width={drawer.kind === "deposits" ? 560 : 420}
-                onClose={() => { setDrawer({kind: "closed"}); setSelectedOrderForMatch(null); }}>
-                {drawer.kind === "deposits" ? <div className="p-3"><AdminLivePaymentPanel presentation="drawer" deposits={deposits} orderGroups={orderGroups} onRefresh={loadDepositsFromServer} onBankdaSync={syncBankdaDepositsOnly}
+              <AdminLiveSideDrawer title={depositDrawerOpen ? "입금" : "주문상세"}
+                width={depositDrawerOpen ? 480 : 420}
+                onClose={() => { setDrawer({kind: "closed"}); setSelectedOrderForMatch(null); setMatchInitial(null); }}>
+                {drawer.kind === "deposits" ? <>{depositModeChips}<div className="p-3"><AdminLivePaymentPanel presentation="drawer" deposits={deposits} orderGroups={orderGroups} onRefresh={loadDepositsFromServer} onBankdaSync={syncBankdaDepositsOnly}
                   onOpenMatch={(row) => {
                     // [a4-3] 입금내역(조회) → 입금매칭(처리): 주문 선택 없이, 이 입금을 체크한 채 연다. 매칭 API·판정은 입금매칭 창 그대로.
                     const id = Number(row?.id);
                     setMatchInitial({ depositId: Number.isFinite(id) ? id : null, search: String(row?.depositor_name ?? "").trim() });
                     setSelectedOrderForMatch(null);
-                    // 입금매칭 창의 「확인필요」 버튼과 같은 동작: 뒤 주문표를 입금자명으로 검색해 주문을 바로 고르게
+                    // 입금매칭 창의 「주문 찾기」 버튼과 같은 동작: 뒤 주문표를 입금자명으로 검색해 주문을 바로 고르게
                     const name = String(row?.depositor_name ?? "").trim();
                     if (name) setFilters((prev) => ({ ...prev, keyword: name }));
                     setDrawer((current) => transitionAdminLiveDrawer(current, { kind: "match", orderId: null }));
-                  }} /></div> : matchPanelOpen ? (
+                  }} /></div></> : matchPanelOpen ? (
+                  <div className="flex h-full min-h-0 flex-col">
+                  {depositModeChips}
+                  <div className="flex min-h-0 flex-1 flex-col">
                   <LiveFloatingMatchPanel
                     key={matchInitial ? `dep-${matchInitial.depositId ?? "x"}` : "match"}
                     initialDepositId={matchInitial?.depositId ?? null}
@@ -1940,6 +1947,8 @@ export default function AdminLiveDashboard() {
                     selectedOrderForMatch={selectedOrderForMatch}
                     onClearSelectedOrder={() => setSelectedOrderForMatch(null)}
                   />
+                  </div>
+                  </div>
                 ) : selectedOrder && orderDetailOpen ? (
                   <LiveOrderDetailDrawer
                     order={selectedOrder}

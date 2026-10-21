@@ -283,7 +283,7 @@ export default function PaymentMatchPanel({ deposits: depositsFromParent, presen
       <div hidden={compact && selectedDeposit !== null}>
       <section className={compact ? "flex items-center justify-between gap-2 py-1" : "flex flex-col gap-4 rounded-2xl border border-line bg-gradient-to-br from-surface via-surface to-surface-2 p-6 shadow-sm lg:flex-row lg:items-center lg:justify-between"}>
         <div>
-          {compact ? <span className="text-xs font-bold text-ink-mute">조회·상세 확인</span> : <h1 className="text-2xl font-black tracking-tight text-ink">입금내역</h1>}
+          {compact ? <span className="text-[13px] font-semibold text-ink-mute">은행 입금 기록 · 조회 전용</span> : <h1 className="text-2xl font-black tracking-tight text-ink">입금내역</h1>}
 
           <p hidden={compact} className="mt-2 text-sm font-bold text-ink-soft">
             새마을금고 계좌에 들어온 입금을 뱅크다가 자동으로 모아 온 기록입니다. 주문과 연결된 내용은 「보기」에서 확인합니다.
@@ -294,9 +294,9 @@ export default function PaymentMatchPanel({ deposits: depositsFromParent, presen
           type="button"
           onClick={refreshBankdaDeposits}
           disabled={syncing || loading || refreshing}
-          className={compact ? "min-h-11 rounded-xl border border-line px-3 text-xs font-black text-ink md:min-h-9 disabled:opacity-50" : "h-13 shrink-0 rounded-2xl bg-rose-deep px-6 py-4 text-sm font-black text-white shadow-2xl transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-surface-3"}
+          className={compact ? "h-9 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-50" : "h-13 shrink-0 rounded-2xl bg-rose-deep px-6 py-4 text-sm font-black text-white shadow-2xl transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-surface-3"}
         >
-          {syncing ? "새로고침 중..." : refreshing ? "최신 확인 중..." : "입금내역 새로고침"}
+          {syncing ? "새로고침 중..." : refreshing ? "최신 확인 중..." : compact ? "새로고침" : "입금내역 새로고침"}
         </button>
       </section>
 

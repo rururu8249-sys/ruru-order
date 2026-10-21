@@ -7,7 +7,8 @@ export type AdminLiveDrawerState =
   | { kind: "deposits" };
 
 export function resolveAdminLiveDestination(menu: AdminLiveMenuKey): { screen: AdminLiveMenuKey; drawer: AdminLiveDrawerState } {
-  return menu === "payments" ? { screen: "orders", drawer: { kind: "deposits" } } : { screen: menu, drawer: { kind: "closed" } };
+  // [2026-10-21 입금 통합] 「입금」 탭 = 주문 화면 위 오른쪽 「입금」 창을 입금매칭(처리)부터 연다. 입금내역은 창 안 칩으로.
+  return menu === "payments" ? { screen: "orders", drawer: { kind: "match", orderId: null } } : { screen: menu, drawer: { kind: "closed" } };
 }
 
 export function transitionAdminLiveDrawer(current: AdminLiveDrawerState, next: AdminLiveDrawerState): AdminLiveDrawerState {
