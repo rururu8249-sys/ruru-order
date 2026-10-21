@@ -23,6 +23,9 @@ type Props = {
   onSearchFilter: (keyword: string) => void;
   selectedOrderForMatch?: LiveOrder | null;
   onClearSelectedOrder?: () => void;
+  /** [2026-10-21 a4-3] 입금내역 상세에서 열 때 — 그 입금을 미리 체크하고 입금자명으로 검색(창 열릴 때 1번만) */
+  initialDepositId?: number | null;
+  initialSearch?: string;
 };
 
 type Period = "today" | "7days" | "30days" | "all" | "custom";
@@ -65,6 +68,7 @@ function depNameScore(dep: any, order: LiveOrder): number {
 export default function LiveFloatingMatchPanel({
   deposits, orders, onClose, onMatched, onSearchFilter,
   selectedOrderForMatch, onClearSelectedOrder,
+  initialDepositId = null, initialSearch = "",
 }: Props) {
   const [period, setPeriod] = useState<Period>("all");
   const [calOpen, setCalOpen] = useState(false);
@@ -72,8 +76,8 @@ export default function LiveFloatingMatchPanel({
   const [calFrom, setCalFrom] = useState(today.slice(0, 7) + "-01");
   const [calTo,   setCalTo]   = useState(today);
   const [showAll, setShowAll] = useState(false);
-  const [search, setSearch]   = useState("");
-  const [selectedDepIds, setSelectedDepIds] = useState<Set<number>>(new Set());
+  const [search, setSearch]   = useState(initialSearch);
+  const [selectedDepIds, setSelectedDepIds] = useState<Set<number>>(() => new Set(initialDepositId != null && Number.isFinite(Number(initialDepositId)) ? [Number(initialDepositId)] : []));
   const [matchSaving, setMatchSaving] = useState(false);
 
   const matchMode = !!selectedOrderForMatch;

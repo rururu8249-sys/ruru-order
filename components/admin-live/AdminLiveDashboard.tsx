@@ -563,6 +563,8 @@ export default function AdminLiveDashboard() {
   const [drawer, setDrawer] = useState<AdminLiveDrawerState>(() => resolveAdminLiveDestination(readMenuFromUrl()).drawer);
   // [2026-10-21 a4-1] 방송 관리 창(제목·URL·방송 화면 공지·알림 발송·상품 카드·쇼핑몰 열림) — 사이드바 방송 카드 「방송 관리」로 연다
   const [broadcastManageOpen, setBroadcastManageOpen] = useState<boolean>(() => readBroadcastManageFromUrl());
+  // [2026-10-21 a4-3] 입금내역 상세 → 입금매칭 창을 그 입금으로 열 때 넘길 값(열 때 1번 읽고 닫으면 비움)
+  const [matchInitial, setMatchInitial] = useState<{ depositId: number | null; search: string } | null>(null);
   const settingsGuardRef=useRef<null|(()=>Promise<boolean>)>(null);
   const registerSettingsGuard=useCallback((guard:null|(()=>Promise<boolean>))=>{settingsGuardRef.current=guard;},[]);
   const setActiveMenu = (menu: AdminLiveMenuKey) => {
@@ -1915,11 +1917,24 @@ export default function AdminLiveDashboard() {
               <AdminLiveSideDrawer title={drawer.kind === "deposits" ? "입금내역" : drawer.kind === "match" ? "입금매칭" : "주문상세"}
                 width={drawer.kind === "deposits" ? 560 : 420}
                 onClose={() => { setDrawer({kind: "closed"}); setSelectedOrderForMatch(null); }}>
-                {drawer.kind === "deposits" ? <div className="p-3"><AdminLivePaymentPanel presentation="drawer" deposits={deposits} orderGroups={orderGroups} onRefresh={loadDepositsFromServer} onBankdaSync={syncBankdaDepositsOnly} /></div> : matchPanelOpen ? (
+                {drawer.kind === "deposits" ? <div className="p-3"><AdminLivePaymentPanel presentation="drawer" deposits={deposits} orderGroups={orderGroups} onRefresh={loadDepositsFromServer} onBankdaSync={syncBankdaDepositsOnly}
+                  onOpenMatch={(row) => {
+                    // [a4-3] 입금내역(조회) → 입금매칭(처리): 주문 선택 없이, 이 입금을 체크한 채 연다. 매칭 API·판정은 입금매칭 창 그대로.
+                    const id = Number(row?.id);
+                    setMatchInitial({ depositId: Number.isFinite(id) ? id : null, search: String(row?.depositor_name ?? "").trim() });
+                    setSelectedOrderForMatch(null);
+                    // 입금매칭 창의 「확인필요」 버튼과 같은 동작: 뒤 주문표를 입금자명으로 검색해 주문을 바로 고르게
+                    const name = String(row?.depositor_name ?? "").trim();
+                    if (name) setFilters((prev) => ({ ...prev, keyword: name }));
+                    setDrawer((current) => transitionAdminLiveDrawer(current, { kind: "match", orderId: null }));
+                  }} /></div> : matchPanelOpen ? (
                   <LiveFloatingMatchPanel
+                    key={matchInitial ? `dep-${matchInitial.depositId ?? "x"}` : "match"}
+                    initialDepositId={matchInitial?.depositId ?? null}
+                    initialSearch={matchInitial?.search ?? ""}
                     deposits={deposits}
                     orders={filteredOrders}
-                    onClose={() => { setDrawer({kind: "closed"}); setSelectedOrderForMatch(null); }}
+                    onClose={() => { setDrawer({kind: "closed"}); setSelectedOrderForMatch(null); setMatchInitial(null); }}
                     onMatched={refreshAfterManualMatch}
                     onSearchFilter={(keyword) => setFilters((prev) => ({ ...prev, keyword }))}
                     selectedOrderForMatch={selectedOrderForMatch}

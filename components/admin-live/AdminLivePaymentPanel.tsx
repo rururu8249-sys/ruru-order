@@ -26,6 +26,8 @@ type Props = {
   onRefresh?: () => Promise<void> | void;
   onBankdaSync?: () => Promise<BankdaSyncResult | void> | void;
   presentation?: "page" | "drawer";
+  /** [2026-10-21 a4-3] 입금 상세 → 입금매칭 창 열기(이 입금으로) */
+  onOpenMatch?: (row: { id?: unknown; depositor_name?: unknown }) => void;
 };
 
 export default function AdminLivePaymentPanel({
@@ -34,6 +36,7 @@ export default function AdminLivePaymentPanel({
   onRefresh,
   onBankdaSync,
   presentation = "page",
+  onOpenMatch,
 }: Props) {
   const syncBankdaAndRefresh = async () => {
     if (onBankdaSync) {
@@ -106,6 +109,7 @@ export default function AdminLivePaymentPanel({
       onSyncBankdaDeposits={syncBankdaAndRefresh}
       variant="admin-live"
       presentation={presentation}
+      onOpenMatch={onOpenMatch}
     />
   );
 }

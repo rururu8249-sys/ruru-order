@@ -18,6 +18,8 @@ type Props = {
   row: RawDepositRow | null;
   onClose: () => void;
   presentation?: "modal" | "inline";
+  /** [2026-10-21 a4-3] 아직 주문과 안 맞은 입금 → 입금매칭 창을 이 입금으로 연다(매칭 로직은 그 창 그대로) */
+  onOpenMatch?: (row: RawDepositRow) => void;
 };
 
 function DetailLine({
@@ -67,7 +69,7 @@ function guideText(status: LedgerStatus) {
   };
 }
 
-export default function DepositDetailModal({ row, onClose, presentation = "modal" }: Props) {
+export default function DepositDetailModal({ row, onClose, presentation = "modal", onOpenMatch }: Props) {
   if (!row) return null;
 
   const status = getDepositStatus(row);
@@ -134,11 +136,21 @@ export default function DepositDetailModal({ row, onClose, presentation = "modal
         </div>
 
         <div className="shrink-0 border-t border-line-soft bg-surface px-6 py-4 shadow-sm">
-          <div className="flex justify-end">
+          <div className="flex items-center justify-end gap-2">
+            {/* [2026-10-21 a4-3] 입금내역(조회) → 입금매칭(처리) 입구. 매칭 자체는 입금매칭 창의 기존 API 그대로 */}
+            {onOpenMatch && status !== "확인완료" ? (
+              <button
+                type="button"
+                onClick={() => onOpenMatch(row)}
+                className="h-10 rounded-lg bg-ink px-4 text-[13px] font-bold text-white transition"
+              >
+                입금매칭에서 주문 연결
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={onClose}
-              className="rounded-2xl bg-rose-deep px-7 py-3 text-sm font-black text-white shadow-sm transition hover:opacity-90"
+              className="h-10 rounded-lg border border-line bg-surface px-4 text-[13px] font-bold text-ink transition hover:bg-surface-2"
             >
               {presentation === "inline" ? "목록으로" : "확인"}
             </button>

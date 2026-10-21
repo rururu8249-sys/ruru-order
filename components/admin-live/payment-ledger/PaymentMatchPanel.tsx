@@ -32,6 +32,8 @@ type Props = {
   deposits?: readonly unknown[];
   orderGroups?: readonly unknown[];
   onSyncBankdaDeposits?: () => Promise<void> | void;
+  /** [2026-10-21 a4-3] 상세의 「입금매칭에서 주문 연결」 */
+  onOpenMatch?: (row: RawDepositRow) => void;
   variant?: string;
   presentation?: "page" | "drawer";
 };
@@ -59,7 +61,7 @@ function todayStart() {
   return now.getTime();
 }
 
-export default function PaymentMatchPanel({ deposits: depositsFromParent, presentation = "page" }: Props) {
+export default function PaymentMatchPanel({ deposits: depositsFromParent, presentation = "page", onOpenMatch }: Props) {
   const compact = presentation === "drawer";
   // 부모가 준 목록으로 바로 그린다(빈 배열이면 서버 응답을 기다린다)
   const parentRows = useMemo(
@@ -339,7 +341,7 @@ export default function PaymentMatchPanel({ deposits: depositsFromParent, presen
       ) : <p className="py-4 text-sm text-ink-soft">입금내역을 확인하지 못했습니다. 새로고침으로 다시 시도해 주세요.</p>}
       </div>
 
-      <div data-deposit-detail><DepositDetailModal presentation={compact ? "inline" : "modal"} row={selectedDeposit} onClose={() => setSelectedDeposit(null)} /></div>
+      <div data-deposit-detail><DepositDetailModal presentation={compact ? "inline" : "modal"} row={selectedDeposit} onClose={() => setSelectedDeposit(null)} onOpenMatch={onOpenMatch ? (row) => { setSelectedDeposit(null); onOpenMatch(row); } : undefined} /></div>
     </div>
   );
 }
