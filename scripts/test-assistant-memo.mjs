@@ -6,7 +6,7 @@ process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://fake';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'fake';
 
 let tableExists = true;
-const db = { admin_assistant_memos: [] };
+const db = { admin_assistant_memos: [], customers: [{ youtube_nickname: '행복나무3899', customer_name: '박행복' }, { youtube_nickname: '홍길동-f2h', customer_name: '홍길동' }], products: [{ product_name: '다이슨 에어랩' }, { product_name: '폴로 자켓' }] };
 let seq = 0;
 const uuid = () => `00000000-0000-4000-8000-${String(++seq).padStart(12, '0')}`;
 function query(table) {
@@ -123,6 +123,14 @@ await t('AI 정리: 원문 먼저 저장 + 번호는 가려서 보냄', async ()
   const todo = db.admin_assistant_memos.find((m) => m.kind === 'todo');
   assert.equal(todo.body, '홍길동 010-9999-8888 교환 연락'); // 되돌림
   assert.ok(todo.parent_id);
+});
+
+await t('손님·상품 칸 바로잡기(DB 이름과 대조)', async () => {
+  globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"items":[{"kind":"todo","text":"행복나무 금요일까지 환불 처리","who":"","product":"행복나무"},{"kind":"product","text":"에어랩 재고 확인","who":"에어랩","product":""}]}' }] } }] }) });
+  const r = await route.POST(req({ text: '행복나무 금요일까지 환불 처리, 에어랩 재고 확인' }));
+  assert.deepEqual(r.body.items.map((i) => [i.who, i.product]), [['행복나무', null], [null, '에어랩']]);
+  // 바로잡은 줄은 목록 개수에 포함되지 않게 지움(아래 목록 시나리오 숫자 유지)
+  for (const it of r.body.items) await route.PATCH(req({ id: it.id, status: 'deleted' }));
 });
 
 await t('AI 실패 → 규칙 정리로 저장', async () => {
