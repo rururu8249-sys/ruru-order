@@ -421,7 +421,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
       <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-surface px-3 py-2">
         {([
           { key: "customer", label: "손님 화면 공지", desc: "접속 팝업 · 상시 안내" },
-          { key: "list", label: "공지사항 목록", desc: "등록 · 고정 · 순서" },
+          { key: "list", label: "공지사항", desc: "등록 · 고정 · 순서" },
           { key: "send", label: "쪽지 보내기", desc: "검색 · 여러 명 한 번에" },
           { key: "sent", label: "보낸 쪽지", desc: "읽음 확인 · 회수" },
         ] as { key: PanelTab; label: string; desc: string }[]).filter((t) => mode !== "messages" || t.key !== "customer").map((t) => (
@@ -431,9 +431,9 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
             onClick={() => setTab(t.key)}
             aria-pressed={tab === t.key}
             title={t.desc}
-            className={`min-h-11 shrink-0 whitespace-nowrap rounded-xl px-3 py-1.5 text-left transition md:min-h-9 ${tab === t.key ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"}`}
+            className={`h-9 shrink-0 whitespace-nowrap rounded-full border px-3.5 text-[13px] font-semibold transition ${tab === t.key ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink hover:bg-surface-2"}`}
           >
-            <span className="block text-[13px] font-black">{t.label}</span>
+            {t.label}
           </button>
         ))}
       </div>
@@ -448,7 +448,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
             <div className={card}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-sm font-black text-ink">상단 고정 공지</div>
+                  <div className="text-sm font-bold text-ink">상단 고정 공지</div>
                   <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
                     공지목록에서 글 하나를 선택하세요. 제목을 누르면 그 글의 상세 화면이 열립니다. 접속 팝업과는 별개입니다.
                   </div>
@@ -467,11 +467,11 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
               {linkedNoticeId ? <div className="mt-3 rounded-xl border border-line p-3">
                 <p className="font-bold text-ink">{linkedNotice?.title || "공개된 공지를 선택해 주세요."}</p>
                 <p className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap text-sm text-ink-soft">{linkedNotice?.content}</p>
-                {mode === "all" ? <button type="button" onClick={() => setTab("list")} className="mt-3 text-sm font-bold text-rose-deep">공지사항에서 내용 수정</button> : null}
+                {mode === "all" ? <button type="button" onClick={() => setTab("list")} className="mt-3 text-sm font-bold text-ink">공지사항에서 내용 수정</button> : null}
               </div> : null}
             </div>
             <details className={card}>
-              <summary className="cursor-pointer text-sm font-black text-ink">접속 팝업 설정 (상단 공지와 별개)</summary>
+              <summary className="cursor-pointer text-sm font-bold text-ink">접속 팝업 설정 (상단 공지와 별개)</summary>
               <button type="button" onClick={() => setPopupEnabled(v => !v)} className="mt-3 rounded-full border border-line px-4 py-2 text-xs font-bold">
                 {popupEnabled ? "팝업 ON" : "팝업 OFF"}
               </button>
@@ -493,7 +493,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
                   <button
                     type="button"
                     onClick={() => setPopupText((prev) => (prev.endsWith("\n") || prev === "" ? prev : prev + "\n") + "---\n")}
-                    className="shrink-0 rounded-full border border-line bg-surface px-3 py-1 text-[11px] font-black text-ink-soft"
+                    className="shrink-0 rounded-full border border-line bg-surface px-3 py-1 text-[12px] font-semibold text-ink-soft"
                   >
                     ─ 구분선 넣기
                   </button>
@@ -503,7 +503,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
                   onChange={(e) => setPopupText(e.target.value)}
                   placeholder={"예) 롱샴 7/27(월) 출고완료\n---\n향수·화장품 7/27(월)~ 업체 순차출고"}
                   rows={6}
-                  className="mt-1 w-full resize-none rounded-xl border border-line bg-surface p-3 text-sm font-bold leading-relaxed text-ink outline-none focus:border-rose-deep"
+                  className="mt-1 w-full resize-none rounded-xl border border-line bg-surface p-3 text-sm font-bold leading-relaxed text-ink outline-none focus:border-ink"
                 />
                 <span className={help}>
                   한 줄에 <b className="text-ink-soft">---</b> 만 쓰면 손님 팝업에서 그 자리에 가로 구분선이 그어집니다.
@@ -540,7 +540,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
 
             {/* 주문 최종 제출 전 구매 동의 — 접속 팝업과 별도 설정 */}
             <div className={card}>
-              <div className="text-sm font-black text-ink">주문 전 구매 동의 팝업</div>
+              <div className="text-sm font-bold text-ink">주문 전 구매 동의 팝업</div>
               <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
                 손님이 주문서를 최종 제출할 때 뜹니다. <b className="text-ink-soft">자동</b>은 실제 상품의
                 <b className="text-ink-soft"> 해외배송 배지</b>를 확인해 해당 주문에만 표시합니다.
@@ -558,16 +558,16 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
                       key={mode}
                       type="button"
                       onClick={() => setPurchaseConsent((current) => ({ ...current, mode }))}
-                      className={`rounded-xl border px-3 py-3 text-left transition ${selected ? "border-rose-deep bg-rose-soft text-rose-deep" : "border-line bg-surface text-ink-soft"}`}
+                      className={`rounded-xl border px-3 py-3 text-left transition ${selected ? "border-rose-deep bg-rose-soft text-ink" : "border-line bg-surface text-ink-soft"}`}
                     >
-                      <span className="block text-[13px] font-black">{selected ? "● " : "○ "}{title}</span>
-                      <span className="mt-1 block text-[11px] font-bold text-ink-mute">{desc}</span>
+                      <span className="block text-[13px] font-bold">{selected ? "● " : "○ "}{title}</span>
+                      <span className="mt-1 block text-[12px] font-semibold text-ink-mute">{desc}</span>
                     </button>
                   );
                 })}
               </div>
 
-              <div className="mt-3 rounded-xl border border-ok-line bg-ok-bg px-3 py-2 text-[11px] font-bold leading-5 text-ok-tx">
+              <div className="mt-3 rounded-xl border border-ok-line bg-ok-bg px-3 py-2 text-[12px] font-semibold leading-5 text-ok-tx">
                 설정을 한 번도 저장하지 않아도 기본값은 「자동 · 해외배송 상품만」입니다. 사용 안 함은 관리자가 명시적으로 선택하고 저장할 때만 적용됩니다.
               </div>
 
@@ -586,7 +586,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
                   value={purchaseConsent.text}
                   onChange={(e) => setPurchaseConsent((current) => ({ ...current, text: e.target.value }))}
                   rows={14}
-                  className="mt-1 w-full resize-y rounded-xl border border-line bg-surface p-3 text-sm font-bold leading-relaxed text-ink outline-none focus:border-rose-deep"
+                  className="mt-1 w-full resize-y rounded-xl border border-line bg-surface p-3 text-sm font-bold leading-relaxed text-ink outline-none focus:border-ink"
                 />
               </label>
 
@@ -600,17 +600,17 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
               </label>
 
               <div className="mt-3 rounded-2xl border border-line bg-surface-2 p-4">
-                <div className="text-center text-base font-black text-ink">{purchaseConsent.title}</div>
+                <div className="text-center text-base font-bold text-ink">{purchaseConsent.title}</div>
                 <div className="mt-3 max-h-52 overflow-y-auto whitespace-pre-line rounded-xl bg-surface p-3 text-[12px] font-bold leading-6 text-ink-soft">
                   {purchaseConsent.text}
                 </div>
-                <div className="mt-3 flex items-start gap-2 rounded-xl border border-rose-line bg-rose-soft px-3 py-3">
+                <div className="mt-3 flex items-start gap-2 rounded-xl border border-line bg-rose-soft px-3 py-3">
                   <span className="mt-0.5 h-4 w-4 shrink-0 rounded border border-rose-deep bg-surface" />
-                  <span className="text-[12px] font-black leading-5 text-ink">{purchaseConsent.checkboxLabel}</span>
+                  <span className="text-[12px] font-bold leading-5 text-ink">{purchaseConsent.checkboxLabel}</span>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2">
-                  <div className="rounded-xl border border-line bg-surface py-2.5 text-center text-[12px] font-black text-ink-soft">취소</div>
-                  <div className="rounded-xl bg-rose-deep py-2.5 text-center text-[12px] font-black text-white">동의하고 주문하기</div>
+                  <div className="rounded-xl border border-line bg-surface py-2.5 text-center text-[12px] font-bold text-ink-soft">취소</div>
+                  <div className="rounded-xl bg-ink py-2.5 text-center text-[12px] font-bold text-white">동의하고 주문하기</div>
                 </div>
               </div>
             </div>
@@ -620,15 +620,15 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
           {/* ─────────── 오른쪽: 미리보기 ─────────── */}
           <div className="lg:sticky lg:top-0 lg:self-start">
             <div className="rounded-xl border border-line bg-surface-2 p-4">
-              <div className="text-sm font-black text-ink">손님 화면 미리보기</div>
-              <div className="mt-1 text-[11px] font-bold text-ink-mute">저장 전 모습입니다. 실제 반영은 저장 후.</div>
+              <div className="text-sm font-bold text-ink">손님 화면 미리보기</div>
+              <div className="mt-1 text-[12px] font-semibold text-ink-mute">저장 전 모습입니다. 실제 반영은 저장 후.</div>
 
               {/* ⚠ 이 어두운 배경은 «손님 폰의 팝업 뒷배경»을 흉내낸 것 → 관리자 테마와 무관. 토큰으로 바꾸지 말 것. */}
               <div className="mt-3 rounded-2xl bg-slate-900/70 p-4">
                 {popupEnabled && previewText.trim() ? (
                   <div className="overflow-hidden rounded-2xl bg-white shadow-lg">
                     {previewTitle.trim() ? (
-                      <div className="px-4 py-2.5 text-center text-[13px] font-black text-white" style={{ background: popupColor }}>
+                      <div className="px-4 py-2.5 text-center text-[13px] font-bold text-white" style={{ background: popupColor }}>
                         {previewTitle}
                       </div>
                     ) : null}
@@ -647,10 +647,10 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
                     </div>
                     <div className="space-y-2 px-4 pb-4">
                       {popupBandUrl.trim() ? (
-                        <div className="rounded-xl bg-ok-tx py-2.5 text-center text-[13px] font-black text-white">밴드 바로가기</div>
+                        <div className="rounded-xl bg-ok-tx py-2.5 text-center text-[13px] font-bold text-white">밴드 바로가기</div>
                       ) : null}
-                      <div className="rounded-xl py-2.5 text-center text-[13px] font-black text-white" style={{ background: popupColor }}>확인</div>
-                      <div className="pt-1 text-center text-[11px] font-bold text-ink-mute">24시간 동안 열지 않기</div>
+                      <div className="rounded-xl py-2.5 text-center text-[13px] font-bold text-white" style={{ background: popupColor }}>확인</div>
+                      <div className="pt-1 text-center text-[12px] font-semibold text-ink-mute">24시간 동안 열지 않기</div>
                     </div>
                   </div>
                 ) : (
@@ -668,7 +668,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
         <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
           {/* 쓰기 */}
           <div className={`${card} lg:sticky lg:top-0 lg:self-start`}>
-            <div className="text-sm font-black text-ink">{form.id ? "공지 수정" : "새 공지"}</div>
+            <div className="text-sm font-bold text-ink">{form.id ? "공지 수정" : "새 공지"}</div>
             <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
               손님 <b className="text-ink-soft">쪽지함</b>과 <b className="text-ink-soft">공지사항 페이지</b>에 함께 나옵니다.
             </div>
@@ -685,7 +685,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
                 onChange={(e) => setForm({ ...form, content: e.target.value })}
                 rows={6}
                 placeholder="줄바꿈 그대로 손님에게 보입니다."
-                className="mt-1 w-full resize-none rounded-xl border border-line bg-surface p-3 text-sm font-bold leading-relaxed text-ink outline-none focus:border-rose-deep"
+                className="mt-1 w-full resize-none rounded-xl border border-line bg-surface p-3 text-sm font-bold leading-relaxed text-ink outline-none focus:border-ink"
               />
             </label>
 
@@ -721,7 +721,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
                 {form.id ? "수정 저장" : "공지 등록"}
               </button>
               {form.id ? (
-                <button type="button" onClick={() => setForm(EMPTY_NOTICE)} className="rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-black text-ink-soft">
+                <button type="button" onClick={() => setForm(EMPTY_NOTICE)} className="rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-bold text-ink-soft">
                   취소
                 </button>
               ) : null}
@@ -734,28 +734,27 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
               <div className={`${card} py-14 text-center text-sm font-bold text-ink-mute`}>등록된 공지가 없습니다. 위에서 제목·내용을 넣고 「공지 등록」을 눌러주세요.</div>
             ) : (
               notices.map((n, i) => (
-                <div key={n.id} className={`rounded-xl border p-4 ${n.is_visible ? "border-line bg-surface" : "border-line bg-surface-2 opacity-60"}`}>
+                <div key={n.id} className={`rounded-xl border px-4 py-3 ${n.is_visible ? "border-line bg-surface" : "border-line bg-surface-2"}`}>
                   <div className="flex items-start gap-2">
-                    <span className="text-base">{n.is_pinned ? "고정" : ""}</span>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-[14px] font-black text-ink">{n.title}</span>
-                        {n.is_pinned ? <span className="rounded-full bg-rose-deep px-2 py-0.5 text-[11px] font-black text-white">고정</span> : null}
-                        {!n.is_visible ? <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-mute">숨김</span> : null}
-                        <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-mute">{n.category || "공지"}</span>
+                        <span className="text-[14px] font-bold text-ink">{n.title}</span>
+                        {n.is_pinned ? <span className="rounded bg-ink px-1.5 py-0.5 text-[12px] font-semibold text-white">고정</span> : null}
+                        {!n.is_visible ? <span className="rounded-full border border-line px-2 py-0.5 text-[12px] font-semibold text-ink-mute">숨김</span> : null}
+                        <span className="rounded-full border border-line px-2 py-0.5 text-[12px] font-semibold text-ink-mute">{n.category || "공지"}</span>
                       </div>
-                      <p className="mt-1.5 whitespace-pre-line text-[13px] font-bold leading-6 text-ink-soft">{n.content}</p>
+                      <p className="mt-1 line-clamp-3 whitespace-pre-line text-[13px] leading-5 text-ink-soft" title={n.content}>{n.content}</p>
                     </div>
                   </div>
 
                   <div className="mt-3 flex flex-wrap gap-1.5">
-                    {n.is_visible && mode === "all" && <button type="button" aria-label={`${n.title}를 상단 공지로 선택`} disabled={!settingsReady} onClick={() => { setLinkedNoticeId(String(n.id)); setTab("customer"); }} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-rose-deep disabled:opacity-30">상단 공지로 선택</button>}
-                    <button type="button" onClick={() => moveNotice(n, "up")} disabled={i === 0 || listBusy} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft disabled:opacity-30">↑ 위로</button>
-                    <button type="button" onClick={() => moveNotice(n, "down")} disabled={i === notices.length - 1 || listBusy} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft disabled:opacity-30">↓ 아래로</button>
-                    <button type="button" onClick={() => toggleNotice(n, "is_pinned")} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft">{n.is_pinned ? "고정 풀기" : "상단 고정"}</button>
-                    <button type="button" onClick={() => toggleNotice(n, "is_visible")} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft">{n.is_visible ? "숨기기" : "공개"}</button>
-                    <button type="button" onClick={() => setForm(n)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft">수정</button>
-                    <button type="button" onClick={() => deleteNotice(n)} className="ml-auto rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-danger-tx">삭제</button>
+                    {n.is_visible && mode === "all" && <button type="button" aria-label={`${n.title}를 상단 공지로 선택`} disabled={!settingsReady} onClick={() => { setLinkedNoticeId(String(n.id)); setTab("customer"); }} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12px] font-semibold text-ink disabled:opacity-30">상단 공지로 선택</button>}
+                    <button type="button" onClick={() => moveNotice(n, "up")} disabled={i === 0 || listBusy} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12px] font-semibold text-ink-soft disabled:opacity-30">위로</button>
+                    <button type="button" onClick={() => moveNotice(n, "down")} disabled={i === notices.length - 1 || listBusy} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12px] font-semibold text-ink-soft disabled:opacity-30">아래로</button>
+                    <button type="button" onClick={() => toggleNotice(n, "is_pinned")} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12px] font-semibold text-ink-soft">{n.is_pinned ? "고정 풀기" : "상단 고정"}</button>
+                    <button type="button" onClick={() => toggleNotice(n, "is_visible")} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12px] font-semibold text-ink-soft">{n.is_visible ? "숨기기" : "공개"}</button>
+                    <button type="button" onClick={() => setForm(n)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12px] font-semibold text-ink-soft">수정</button>
+                    <button type="button" onClick={() => deleteNotice(n)} className="ml-auto rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12px] font-semibold text-danger-tx">삭제</button>
                   </div>
                 </div>
               ))
@@ -767,7 +766,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
         <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
           {/* 왼쪽: 손님 고르기 */}
           <div className={card}>
-            <div className="text-sm font-black text-ink">① 받을 손님 고르기</div>
+            <div className="text-sm font-bold text-ink">① 받을 손님 고르기</div>
             <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">닉네임 · 이름 · 전화번호 아무거나로 찾습니다.</div>
             <div className="mt-3 flex gap-2">
               <input
@@ -775,26 +774,26 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
                 onChange={(e) => setQ(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") void searchCustomers(); }}
                 placeholder="예) 루루짱  ·  임언냐  ·  01028495209"
-                className="h-10 flex-1 rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-deep"
+                className="h-10 flex-1 rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-ink"
               />
               <button type="button" onClick={() => void searchCustomers()} disabled={searching}
-                className="shrink-0 rounded-xl bg-rose-deep px-4 text-sm font-black text-white disabled:opacity-50">
+                className="shrink-0 rounded-xl bg-ink px-4 text-sm font-bold text-white disabled:opacity-50">
                 {searching ? "찾는 중" : "찾기"}
               </button>
             </div>
 
             {picked.length > 0 ? (
-              <div className="mt-3 rounded-xl border border-rose-line bg-rose-soft/40 p-2.5">
-                <div className="text-[11px] font-black text-ink-soft">받을 손님 {picked.length}명</div>
+              <div className="mt-3 rounded-xl border border-line bg-surface-2 p-2.5">
+                <div className="text-[12px] font-semibold text-ink-soft">받을 손님 {picked.length}명</div>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {picked.map((c) => (
                     <button key={c.id} type="button" onClick={() => togglePick(c)}
-                      className="rounded-full bg-rose-deep px-2.5 py-1 text-[11px] font-black text-white">
+                      className="rounded-full bg-ink px-2.5 py-1 text-[12px] font-semibold text-white">
                       {String(c.youtube_nickname || c.customer_name || "이름없음")} ✕
                     </button>
                   ))}
                 </div>
-                <button type="button" onClick={() => setPicked([])} className="mt-2 text-[11px] font-black text-ink-mute underline">전부 지우기</button>
+                <button type="button" onClick={() => setPicked([])} className="mt-2 text-[12px] font-semibold text-ink-mute underline">전부 지우기</button>
               </div>
             ) : null}
 
@@ -808,11 +807,11 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
                 const phone = String(c.customer_phone || "").replace(/[^0-9]/g, "");
                 return (
                   <button key={c.id} type="button" onClick={() => togglePick(c)} disabled={!phone}
-                    className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left transition ${on ? "border-rose-deep bg-rose-soft/60" : "border-line bg-surface"} ${!phone ? "opacity-40" : ""}`}>
+                    className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left transition ${on ? "border-ink bg-surface-2" : "border-line bg-surface"} ${!phone ? "opacity-40" : ""}`}>
                     <span className="text-sm">{on ? "✓" : ""}</span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-black text-ink">{String(c.youtube_nickname || c.customer_name || "이름없음")}</span>
-                      <span className="block text-[11px] font-bold text-ink-mute">
+                      <span className="block truncate text-[13px] font-bold text-ink">{String(c.youtube_nickname || c.customer_name || "이름없음")}</span>
+                      <span className="block text-[12px] font-semibold text-ink-mute">
                         {c.customer_name && c.youtube_nickname ? `${c.customer_name} · ` : ""}{c.customer_phone || "전화번호 없음 — 못 보냄"}
                       </span>
                     </span>
@@ -824,7 +823,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
 
           {/* 오른쪽: 내용 쓰기 */}
           <div className={card}>
-            <div className="text-sm font-black text-ink">② 보낼 내용</div>
+            <div className="text-sm font-bold text-ink">② 보낼 내용</div>
             <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
               손님이 사이트에 들어오면 팝업으로 뜨고, 놓쳐도 쪽지함에 남습니다.
             </div>
@@ -832,7 +831,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
             <div className="mt-3 flex flex-wrap gap-1.5">
               {NOTE_PRESETS.map((pre) => (
                 <button key={pre.label} type="button" onClick={() => setNoteText(pre.text)}
-                  className="rounded-full border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ink-soft hover:bg-surface-2">
+                  className="rounded-full border border-line bg-surface px-3 py-1.5 text-[12px] font-semibold text-ink-soft hover:bg-surface-2">
                   {pre.label}
                 </button>
               ))}
@@ -844,9 +843,9 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
               rows={7}
               maxLength={500}
               placeholder="자주 쓰는 문구를 누르거나 직접 쓰세요."
-              className="mt-3 w-full resize-none rounded-xl border border-line bg-surface p-3 text-sm font-bold leading-relaxed text-ink outline-none focus:border-rose-deep"
+              className="mt-3 w-full resize-none rounded-xl border border-line bg-surface p-3 text-sm font-bold leading-relaxed text-ink outline-none focus:border-ink"
             />
-            <div className="mt-1 text-right text-[11px] font-bold text-ink-mute">{noteText.length} / 500자</div>
+            <div className="mt-1 text-right text-[12px] font-semibold text-ink-mute">{noteText.length} / 500자</div>
 
             <label className="mt-2 block">
               <span className={label}>쪽지함에 남는 기간</span>
@@ -860,12 +859,10 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
             </label>
 
             <button type="button" onClick={() => void sendNotes()} disabled={sending || picked.length === 0 || !noteText.trim()}
-              className="mt-4 h-12 w-full rounded-2xl bg-rose-deep text-[14px] font-black text-white transition disabled:opacity-40">
+              className="mt-4 h-12 w-full rounded-2xl bg-ink text-[14px] font-bold text-white transition disabled:opacity-40">
               {sending ? "보내는 중…" : picked.length > 0 ? `${picked.length}명에게 보내기` : "받을 손님을 먼저 고르세요"}
             </button>
-            <div className="mt-2 rounded-xl border border-line bg-warn-bg px-3 py-2 text-[11px] font-bold leading-5 text-warn-tx">
-              같은 손님에게 같은 내용을 <b>10분 안에 또 보내면 한 번만</b> 갑니다. 실수로 두 번 눌러도 손님에게 두 번 뜨지 않습니다.
-            </div>
+            <div className="mt-2 text-[12px] leading-5 text-ink-mute">같은 내용을 10분 안에 또 보내면 한 번만 가요.</div>
           </div>
         </div>
         ) : (
@@ -873,11 +870,11 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
         <div>
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
-              <div className="text-sm font-black text-ink">보낸 쪽지</div>
+              <div className="text-sm font-bold text-ink">보낸 쪽지</div>
               <div className="mt-0.5 text-xs font-bold text-ink-mute">누구에게 · 언제 · 읽었는지. 잘못 보낸 건 회수합니다.</div>
             </div>
             <button type="button" onClick={() => void loadSent()} disabled={sentLoading}
-              className="shrink-0 rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft disabled:opacity-50">
+              className="shrink-0 rounded-xl border border-line bg-surface px-3 py-2 text-xs font-bold text-ink-soft disabled:opacity-50">
               {sentLoading ? "불러오는 중" : "새로고침"}
             </button>
           </div>
@@ -890,10 +887,10 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
             if (missedCount === 0) return null;
             return (
               <div className="mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-danger-tx bg-danger-bg/50 px-4 py-3">
-                <span className="text-[13px] font-black text-danger-tx">손님이 못 본 쪽지 {missedCount}건</span>
-                <span className="text-[11px] font-bold text-ink-soft">표시 기간이 끝나 손님 화면에서 사라졌습니다. 포인트는 이미 지급돼 있어요.</span>
+                <span className="text-[13px] font-bold text-danger-tx">손님이 못 본 쪽지 {missedCount}건</span>
+                <span className="text-[12px] font-semibold text-ink-soft">표시 기간이 끝나 손님 화면에서 사라졌습니다. 포인트는 이미 지급돼 있어요.</span>
                 <button type="button" onClick={() => void reviveAllMissed(missedCount)}
-                  className="ml-auto rounded-lg bg-rose-deep px-3 py-1.5 text-[11px] font-black text-white">
+                  className="ml-auto rounded-lg bg-ink px-3 py-1.5 text-[12px] font-semibold text-white">
                   전부 다시 띄우기
                 </button>
               </div>
@@ -915,37 +912,37 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
                 const phoneText = n.customer_phone || String(n.target_session_key || "").replace(/^phone:/, "");
                 const whoText = (n.youtube_nickname || "").trim() || (n.customer_name || "").trim();
                 return (
-                  <div key={n.id} className={`rounded-xl border p-4 ${revoked ? "border-line bg-surface-2 opacity-60" : "border-line bg-surface"}`}>
+                  <div key={n.id} className={`rounded-xl border px-4 py-3 ${revoked ? "border-line bg-surface-2" : "border-line bg-surface"}`}>
                     <div className="flex flex-wrap items-center gap-1.5">
                       {/* [2026-09-09 사장님 지적] 폰번호만 있으면 누군지 모른다 → 닉네임을 앞에 크게, 번호는 뒤에 작게 */}
-                      <span className="text-[13px] font-black text-ink">{whoText || phoneText || "대상 미상"}</span>
-                      {whoText && phoneText ? <span className="text-[11px] font-bold text-ink-mute">{phoneText}</span> : null}
+                      <span className="text-[13px] font-bold text-ink">{whoText || phoneText || "대상 미상"}</span>
+                      {whoText && phoneText ? <span className="text-[12px] font-semibold text-ink-mute">{phoneText}</span> : null}
                       {n.seen_at
-                        ? <span className="rounded-full bg-ok-bg px-2 py-0.5 text-[11px] font-black text-ok-tx">읽음</span>
-                        : <span className="rounded-full bg-[var(--color-danger-tx)] px-2 py-0.5 text-[11px] font-black text-white">안 읽음</span>}
-                      {revoked ? <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-mute">회수됨</span> : null}
+                        ? <span className="rounded-full bg-ok-bg px-2 py-0.5 text-[12px] font-semibold text-ok-tx">읽음</span>
+                        : <span className="rounded-full bg-warn-bg px-2 py-0.5 text-[12px] font-semibold text-warn-tx">안 읽음</span>}
+                      {revoked ? <span className="rounded-full border border-line px-2 py-0.5 text-[12px] font-semibold text-ink-mute">회수됨</span> : null}
                       {/* [2026-09-09] 「기간 지남」이 무슨 뜻인지 사장님이 알 수 없었다 → 결과로 쓴다.
                           · 안 읽었는데 기간이 끝났다 = 손님은 «영영 못 본다» → 빨간 경고 + 다시 띄우기
                           · 읽고 나서 끝났다 = 정상 종료 → 회색 */}
-                      {missed ? <span className="rounded-full bg-danger-bg px-2 py-0.5 text-[11px] font-black text-danger-tx">손님이 못 봄 · 이제 안 뜸</span> : null}
-                      {!revoked && expired && n.seen_at ? <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-mute">표시 끝</span> : null}
-                      {!revoked && !expired && unlimited && !n.seen_at ? <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-soft">읽을 때까지 계속 뜸</span> : null}
-                      {n.dismissed_at ? <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-black text-ink-mute">손님이 닫음</span> : null}
+                      {missed ? <span className="rounded-full bg-danger-bg px-2 py-0.5 text-[12px] font-semibold text-danger-tx">손님이 못 봄 · 이제 안 뜸</span> : null}
+                      {!revoked && expired && n.seen_at ? <span className="rounded-full border border-line px-2 py-0.5 text-[12px] font-semibold text-ink-mute">표시 끝</span> : null}
+                      {!revoked && !expired && unlimited && !n.seen_at ? <span className="rounded-full border border-line px-2 py-0.5 text-[12px] font-semibold text-ink-soft">읽을 때까지 계속 뜸</span> : null}
+                      {n.dismissed_at ? <span className="rounded-full border border-line px-2 py-0.5 text-[12px] font-semibold text-ink-mute">손님이 닫음</span> : null}
                     </div>
                     <p className="mt-1.5 whitespace-pre-line text-[13px] font-bold leading-6 text-ink-soft">{n.message}</p>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-bold text-ink-mute">
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] font-semibold text-ink-mute">
                       <span>보낸 날짜 {noteTimeText(n.created_at)}</span>
                       {n.seen_at ? <span>읽은 날짜 {noteTimeText(n.seen_at)}</span> : null}
                       {n.sent_by ? <span>보낸 사람 {n.sent_by}</span> : null}
                       {missed ? (
                         <button type="button" onClick={() => void reviveNote(n)}
-                          className="ml-auto rounded-lg bg-rose-deep px-2.5 py-1.5 text-[11px] font-black text-white">
+                          className="ml-auto rounded-lg bg-ink px-2.5 py-1.5 text-[12px] font-semibold text-white">
                           다시 띄우기
                         </button>
                       ) : null}
                       {!revoked ? (
                         <button type="button" onClick={() => void revokeNote(n)}
-                          className={`${missed ? "" : "ml-auto "}rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-danger-tx`}>
+                          className={`${missed ? "" : "ml-auto "}rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12px] font-semibold text-danger-tx`}>
                           회수
                         </button>
                       ) : null}
@@ -969,7 +966,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
             type="button"
             onClick={save}
             disabled={saving || loading || !settingsReady}
-            className="rounded-full bg-rose-deep px-6 py-2.5 text-sm font-black text-white transition disabled:opacity-50"
+            className="rounded-full bg-ink px-6 py-2.5 text-sm font-bold text-white transition disabled:opacity-50"
           >
             {saving ? "저장 중..." : "공지 저장"}
           </button>
