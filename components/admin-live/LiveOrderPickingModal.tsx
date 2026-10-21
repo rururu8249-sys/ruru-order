@@ -348,8 +348,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
   const additionalOpenQty = additionalOpenRows.reduce((sum, item) => sum + item.qty, 0);
   const additionalLateQty = additionalOpenRows.filter((item) => item.attentionKind === "late_paid" || item.attentionKind === "payment_time_missing").reduce((sum, item) => sum + item.qty, 0);
   const visibleTabs: ReadonlyArray<["standard" | "late_paid" | "repick" | "picked", string, number]> = workArea === "selected"
-    ? [["standard", "일반 챙김", tabCounts.standard], ["picked", "챙김 완료", tabCounts.picked]]
-    : [["late_paid", "결제 후 추가 챙기기", tabCounts.late_paid], ["repick", "상품 변경 · 다시 챙기기", tabCounts.repick], ["picked", "챙김 완료", tabCounts.picked]];
+    ? [["standard", "챙길 상품", tabCounts.standard], ["picked", "챙긴 상품", tabCounts.picked]]
+    : [["late_paid", "결제 후 추가 챙기기", tabCounts.late_paid], ["repick", "상품 변경 · 다시 챙기기", tabCounts.repick], ["picked", "챙긴 상품", tabCounts.picked]];
   // [㉘] 화면 목록 = 결제 상태 칩 범위(미결제 포함 가능). scopedRows(결제완료)는 숫자 계산 전용으로 그대로.
   const viewRows = panels.filter(inPayView).flatMap(panel => panel.items.map(item => ({ panel, item })));
   const inTab = ({ item }: { item: PickItem }) => {
@@ -417,13 +417,16 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
   });
   const blocked = loading || saving || loadError || exporting;
   const title = String(filterLabel || "").replace(/^방송:\s*/, "");
-  // [㉙-2] 머리 숫자 — 결제완료 기준 「남은 n / 전체 N개」 + 얇은 진행바, 다 챙기면 「✓ 다 챙김」. 미결제는 빨간 「미결제 N」 따로.
+  // [㉙-2] 머리 숫자 — 결제완료 기준 「남은 n / 전체 N개」 + 얇은 진행바, 다 챙기면 상품=「완료」 칩+전체 N개 · 옵션=「N개 완료」 회색 글자(2026-10-21). 미결제는 빨간 「미결제 N」 따로.
   const progressBlock = (p: { total: number; got: number }, unpaid: number, size: "lg" | "md", mobilePrice = "") => {
     const done = isPickingComplete(p);
     return (
       <div className={`shrink-0 text-right max-sm:w-auto ${size === "lg" ? "w-[136px]" : "w-[120px]"}`}>
         {done
-          ? <div className="whitespace-nowrap leading-tight"><span className="inline-block rounded-full bg-[var(--color-ok-tx)] px-2 py-0.5 text-[12px] font-black text-white">✓ 다 챙김</span>{/* [2026-10-21] 다 챙긴 뒤에도 총 수량이 보이게 */}<span className="ml-1.5 text-[12px] font-bold text-ink-soft tabular-nums">전체 {p.total}개</span></div>
+          // [2026-10-21 사장님] 단계별로 다르게 — 상품 머리=검정 「완료」 칩+전체 N개 · 옵션 머리=회색 글자 「N개 완료」(칩 없음) · 손님 줄=초록 「✓ 챙김 완료」 버튼
+          ? (size === "lg"
+            ? <div className="whitespace-nowrap leading-tight"><span className="inline-block rounded-full bg-ink px-2.5 py-0.5 text-[12px] font-black text-white">완료</span><span className="ml-1.5 text-[13px] font-bold text-ink tabular-nums">전체 {p.total}개</span></div>
+            : <div className="whitespace-nowrap text-[13px] font-bold leading-tight text-ink-soft tabular-nums">{p.total}개 완료</div>)
           : <div className={`whitespace-nowrap font-black leading-tight text-ink tabular-nums ${size === "lg" ? "text-[16px] max-sm:text-[14px]" : "text-[14px]"}`}>남은 {p.total - p.got} <span className="text-[12px] font-bold text-ink-soft">/ 전체 {p.total}개</span></div>}
         {!done && p.total > 0 ? <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-line max-sm:hidden"><div className="h-full rounded-full bg-[var(--color-ok-tx)]" style={{ width: `${Math.round((p.got / p.total) * 100)}%` }} /></div> : null}
         {unpaid > 0 ? <div className="text-[12px] font-bold text-[var(--color-danger-tx)] tabular-nums">미결제 {unpaid}</div> : null}
@@ -499,7 +502,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
               {sortMode === 'remaining' ? <p className="mt-2">체크 후 순서 유지 · 다시 정렬로 갱신</p> : null}
             </div>
           </details>
-          <div className="ml-auto text-right text-[12px] font-bold tabular-nums" aria-live="polite"><span className="text-rose-deep">안 챙김 {countersUnknown ? "—" : total - got}</span><span className="ml-2 text-ok-tx">챙김 {countersUnknown ? "—" : got}/{total}개</span></div>
+          <div className="ml-auto text-right text-[12px] font-bold tabular-nums" aria-live="polite"><span className="text-rose-deep">남은 {countersUnknown ? "—" : total - got}</span><span className="ml-2 text-ok-tx">챙긴 {countersUnknown ? "—" : got} / {total}개</span></div>
           <button type="button" disabled={saving || exporting} onClick={onClose} aria-label="닫기" className="h-9 w-9 shrink-0 rounded-full bg-surface-2 text-[22px] disabled:opacity-40">×</button>
         </div>
         <p aria-label="작업 범위" className={`shrink-0 break-words border-b border-line px-3 py-1 text-[11px] font-bold leading-4 text-ink-soft`}>작업 범위: {workArea === "selected" ? title : "오늘 추가 작업 · 주문서 범위 밖 결제 후 추가 및 상품 변경"} · 취소·챙기기 제외 주문 제외</p>
@@ -587,8 +590,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
                   const left = op.total - op.got;
                   // 짧게: 「베이지 / 사이즈 L」 → 「베이지/L」
                   const short = (stripNoneOptionParts(optKey) || optKey).replace(/\s*\/\s*사이즈\s*/g, "/").replace(/^사이즈\s+/, "").replace(/\s*\/\s*/g, "/");
-                  return `${short} ${op.total}${left > 0 && left < op.total ? `(남은 ${left})` : ""}`;
-                }).filter(Boolean).join(" · ");
+                  return `${short} ${op.total}개${left > 0 && left < op.total ? `(남은 ${left})` : ""}`;
+                }).filter(Boolean);
+                const optionSummaryText = optionSummary.length > 1 ? `옵션 ${optionSummary.length}개 · ${optionSummary.join(" · ")}` : "";
                 const optionPricesDiffer = new Set(group.rows.map(({ item }) => item.unitPrice || 0).filter(price => price > 0)).size > 1;
                 // sticky 가 동작하도록 section 은 overflow-clip(overflow-hidden 은 sticky 를 막는다). 머리 높이 고정: 상품 72px · 옵션 48px.
                 {/* [2026-10-21 사장님] 상품 구분이 안 보여 — 상품 머리줄은 진한 회색(bg-line)·옵션 머리줄은 흰 바탕+왼쪽 띠, 상품 사이 간격 16px */}
@@ -603,7 +607,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
                     <div className="min-w-0 flex-1">
                       <h3 title={group.title} className={`${options.size > 1 ? "truncate" : "line-clamp-2"} break-words text-[18px] font-black leading-tight text-ink max-sm:text-[16px]`}>{group.title}</h3>
                       {productPrice ? <div className="text-[12px] font-bold text-ink-soft tabular-nums max-sm:hidden">{productPrice}</div> : null}
-                      {options.size > 1 && optionSummary ? <div title={optionSummary} aria-label="옵션별 수량" className="truncate text-[12px] font-bold text-ink-soft tabular-nums">{optionSummary}</div> : null}
+                      {optionSummaryText ? <div title={optionSummaryText} aria-label="옵션별 수량" className="truncate text-[12px] font-bold text-ink-soft tabular-nums">{optionSummaryText}</div> : null}
                     </div>
                     {progressBlock(progress, unpaidQty, "lg", productPrice)}
                   </div>
@@ -640,9 +644,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-line px-3 py-1.5 max-sm:py-1">
           <div role="status" aria-live="polite" className={`text-[12px] font-bold ${loadError ? 'w-full text-[var(--color-danger-tx)]' : 'text-ink-soft'}`}>{loading ? "상태 확인 중…" : loadError ? "상태 확인 실패 · 창을 다시 열어 주세요. 체크는 잠시 막았습니다." : saving ? "저장 중…" : "저장 완료"}</div>
-          <div className="text-[11px] font-bold text-ink-mute max-sm:hidden">잘못 완료한 한 건은 해당 상품의 [챙김 완료] 버튼을 다시 눌러 되돌릴 수 있습니다.</div>
+          <div className="text-[11px] font-bold text-ink-mute max-sm:hidden">잘못 눌렀으면 그 줄의 [✓ 챙김 완료]를 다시 누르면 취소돼요.</div>
           <div className="flex gap-2">
-            {workArea === "selected" && workspaceTab === "standard" ? <button type="button" disabled={blocked || exporting || !matches.length} onClick={completeAll} aria-label="현재 목록 모두 챙김 완료" className="min-h-9 sm:min-h-[44px] rounded-lg border border-ok-tx bg-ok-bg px-3 max-sm:px-2 text-[13px] font-black text-ok-tx disabled:opacity-40"><span className="max-sm:hidden">현재 목록 모두 챙김 완료</span><span className="sm:hidden">모두 챙김</span></button> : null}
+            {workArea === "selected" && workspaceTab === "standard" ? <button type="button" disabled={blocked || exporting || !matches.length} onClick={completeAll} aria-label="남은 상품 모두 챙기기" className="min-h-9 sm:min-h-[44px] rounded-lg border border-ok-tx bg-ok-bg px-3 max-sm:px-2 text-[13px] font-black text-ok-tx disabled:opacity-40"><span className="max-sm:hidden">남은 상품 모두 챙기기</span><span className="sm:hidden">모두 챙기기</span></button> : null}
             <button type="button" disabled={blocked || exporting} onClick={runExcel} aria-label="물건챙기기 엑셀" className="min-h-9 sm:min-h-[44px] rounded-lg border border-line px-3 max-sm:px-2 text-[13px] font-bold disabled:opacity-40">{exporting ? "내보내는 중…" : <><span className="max-sm:hidden">물건챙기기 엑셀</span><span className="sm:hidden">엑셀</span></>}</button>
             <button type="button" disabled={saving || exporting} onClick={onClose} className="min-h-9 sm:min-h-[44px] rounded-lg bg-rose-deep px-4 text-[13px] font-black text-white disabled:opacity-40">닫기</button>
           </div>
