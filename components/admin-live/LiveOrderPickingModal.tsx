@@ -102,7 +102,10 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
   const [pickedIds, setPickedIds] = useState<Set<string>>(new Set());
   const [workArea, setWorkArea] = useState<"selected" | "additional">("selected");
   const [workspaceTab, setWorkspaceTab] = useState<"standard" | "late_paid" | "repick" | "picked">("standard");
-  const [viewMode, setViewMode] = useState<"batch" | "order">("batch");
+  // [2026-10-22 사장님] 「요약」 = 상품 한 줄(사진·이름·가격·총수량) + 옵션별 수량·체크 — 표 하나로 보며 챙기기. 저장은 같은 updatePicked(picked_at 만).
+  const [viewMode, setViewMode] = useState<"batch" | "order" | "summary">("batch");
+  const productView = viewMode !== "order"; // 상품별·요약은 같은 «상품 묶음»(정렬·남은 수량 기준 공유)
+  const sortKey: "batch" | "order" = productView ? "batch" : "order";
   const [sortModes, setSortModes] = useState<{ batch: "name" | "remaining"; order: "name" | "remaining" | "oldest" | "newest" }>({ batch: "name", order: "name" });
   const [sortPickedIds, setSortPickedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
@@ -322,7 +325,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
         seenItemIds.add(id);
         return [order];
       });
-      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${title} · ${payScopeLabel}`, rowOrder: viewMode === 'batch' ? 'product' : sortMode === 'oldest' ? 'time' : 'nickname', visibleItemIds: [...visibleIds], attentionItemIds: (() => { const selectedExportIds = new Set(payload.orders.flatMap(order => (order.items || []).map(item => String(item.id)))); return payload.additionalOrders.flatMap(order => (order.items || []).filter(item => classifyPickingAttention(order, item) === "repick" || !selectedExportIds.has(String(item.id))).map(item => String(item.id))); })(), exceptions: payload.exceptions, cancellations: payload.cancellations }, currentPickedIds);
+      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${title} · ${payScopeLabel}`, rowOrder: productView ? 'product' : sortMode === 'oldest' ? 'time' : 'nickname', visibleItemIds: [...visibleIds], attentionItemIds: (() => { const selectedExportIds = new Set(payload.orders.flatMap(order => (order.items || []).map(item => String(item.id)))); return payload.additionalOrders.flatMap(order => (order.items || []).filter(item => classifyPickingAttention(order, item) === "repick" || !selectedExportIds.has(String(item.id))).map(item => String(item.id))); })(), exceptions: payload.exceptions, cancellations: payload.cancellations }, currentPickedIds);
       const ids = printedIds.map(Number);
       const now = new Date().toISOString();
       for (let i = 0; i < ids.length; i += 500) {
@@ -389,24 +392,24 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
   type PickingRow = typeof allRows[number];
   const grouped = new Map<string, { title: string; subtitle: string; rows: PickingRow[] }>();
   for (const row of matches) {
-    const key = viewMode === "batch" ? (row.item.productId || row.item.productName) + "|" + row.item.productName : row.panel.key;
+    const key = productView ? (row.item.productId || row.item.productName) + "|" + row.item.productName : row.panel.key;
     const group = grouped.get(key) || {
-      title: viewMode === "batch" ? row.item.productName : row.panel.nickname,
-      subtitle: viewMode === "batch" ? "" : [row.panel.name, whenText(row.panel.when)].filter(Boolean).join(" · "),
+      title: productView ? row.item.productName : row.panel.nickname,
+      subtitle: productView ? "" : [row.panel.name, whenText(row.panel.when)].filter(Boolean).join(" · "),
       rows: [],
     };
     group.rows.push(row);
     grouped.set(key, group);
   }
   for (const group of grouped.values()) {
-    group.rows.sort((a, b) => viewMode === "batch"
+    group.rows.sort((a, b) => productView
       ? compareOrderOptions(a.item, b.item) || a.panel.nickname.localeCompare(b.panel.nickname, "ko") || ts(a.panel.when) - ts(b.panel.when)
       : a.item.productName.localeCompare(b.item.productName, "ko", {numeric:true}) || compareOrderOptions(a.item,b.item));
   }
-  const sortMode = sortModes[viewMode];
+  const sortMode = sortModes[sortKey];
   const remainingByGroup = new Map<string, number>();
   for (const row of scopedRows) {
-    const key = viewMode === 'batch' ? (row.item.productId || row.item.productName) + '|' + row.item.productName : row.panel.key;
+    const key = productView ? (row.item.productId || row.item.productName) + '|' + row.item.productName : row.panel.key;
     remainingByGroup.set(key, (remainingByGroup.get(key) || 0) + (sortPickedIds.has(row.item.id) ? 0 : row.item.qty));
   }
   const sortedGroups = [...grouped].sort(([ak, a], [bk, b]) => {
@@ -549,26 +552,31 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
         {workArea === "selected" ? null : <p className="shrink-0 border-b border-line bg-info-bg px-3 py-2 text-[12px] font-bold text-[var(--color-info-tx)]">주문서 범위와 섞이지 않는 별도 작업함입니다. 주문서 범위에 속하지 않는 종료 방송 주문 중 주문일보다 늦게(오늘) 입금확인된 미챙김 상품과, 챙김 완료 후 변경된 상품만 표시합니다. 범위 안의 늦은 입금은 「선택 방송 작업」에 「늦은 입금」 배지로 있습니다.</p>}
         {workArea === "additional" && additionalError ? <p role="alert" className="shrink-0 bg-warn-bg px-3 py-2 text-[12px] font-black text-[var(--color-danger-tx)]">오늘 추가 작업을 불러오지 못했습니다 · {additionalError}</p> : null}
         <div className="shrink-0 space-y-2 border-b border-line px-3 py-2 max-sm:space-y-1 max-sm:py-1">
-          <div aria-label="물건챙기기 목록 도구" className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 max-sm:pb-0">
-            <div className="flex shrink-0 gap-1 rounded-xl border border-line bg-surface p-1 max-sm:p-0.5">
-              {visibleTabs.map(([value, label, count]) => (
-                <button key={value} type="button" aria-label={`${label} 탭`} aria-pressed={workspaceTab === value} onClick={() => setWorkspaceTab(value)} className={`min-h-9 rounded-lg px-3 text-[12px] font-black sm:min-h-11 md:min-h-9 ${workspaceTab === value ? "bg-rose-deep text-white" : value === "late_paid" || value === "repick" ? "text-[var(--color-danger-tx)]" : "text-ink-soft"}`}>
-                  {label} <span className="tabular-nums">{countersUnknown ? "—" : count}</span>
-                </button>
-              ))}
+          {/* [2026-10-22 사장님] 가로 스크롤 없이 두 줄 — 1줄: 작업 탭 · 보기(상품별·고객별·요약) / 2줄: 결제 상태 · 정렬 · 검색(남는 폭 전부). DESIGN-ADMIN 칩 36px·고른 것 ink. */}
+          <div aria-label="물건챙기기 목록 도구" className="space-y-2 max-sm:space-y-1">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div role="group" aria-label="작업 탭" className="flex gap-1 rounded-full bg-surface-2 p-0.5">
+                {visibleTabs.map(([value, label, count]) => (
+                  <button key={value} type="button" aria-label={`${label} 탭`} aria-pressed={workspaceTab === value} onClick={() => setWorkspaceTab(value)} className={`h-9 whitespace-nowrap rounded-full px-3 text-[13px] font-semibold ${workspaceTab === value ? "bg-ink text-white" : value === "late_paid" || value === "repick" ? "text-[var(--color-danger-tx)]" : "text-ink-soft"}`}>
+                    {label} <span className="tabular-nums">{countersUnknown ? "—" : count}</span>
+                  </button>
+                ))}
+              </div>
+              <div role="group" aria-label="보기" className="flex gap-1 rounded-full bg-surface-2 p-0.5">
+                {([["batch", "상품별"], ["order", "고객별"], ["summary", "요약"]] as const).map(([mode, label]) => <button key={mode} type="button" onClick={() => setViewMode(mode)} aria-pressed={viewMode === mode} className={`h-9 whitespace-nowrap rounded-full px-3 text-[13px] font-semibold ${viewMode === mode ? "bg-ink text-white" : "text-ink-soft"}`}>{label}</button>)}
+              </div>
             </div>
-            <div className="flex shrink-0 gap-1 rounded-lg bg-surface-2 p-0.5">
-              {(["batch", "order"] as const).map(mode => <button key={mode} type="button" onClick={() => setViewMode(mode)} aria-pressed={viewMode === mode} className={`min-h-9 rounded-xl px-3 text-[13px] font-black sm:min-h-11 md:min-h-8 ${viewMode === mode ? "bg-rose-deep text-white" : "text-ink-soft"}`}>{mode === "batch" ? "상품별" : "고객별"}</button>)}
+            <div className="flex flex-wrap items-center gap-2">
+              <div role="group" aria-label="결제 상태 보기" className="flex gap-1 rounded-full bg-surface-2 p-0.5">
+                {([["paid", "결제완료만"], ["unpaid", "미결제만"], ["all", "전체"]] as const).map(([value, label]) => <button key={value} type="button" onClick={() => setPayView(value)} aria-pressed={payView === value} className={`h-9 whitespace-nowrap rounded-full px-3 text-[13px] font-semibold ${payView === value ? "bg-ink text-white" : "text-ink-soft"}`}>{label}</button>)}
+              </div>
+              <label className="w-[148px] shrink-0">
+                <span className="sr-only">정렬</span>
+                <select aria-label="정렬 방식" value={sortMode} onChange={event => {setSortModes(previous => ({...previous,[sortKey]:event.target.value})); setSortPickedIds(new Set(pickedIds));}} className="block h-9 w-full rounded-lg border border-line bg-surface px-2 text-[13px] text-ink"><option value="name">{productView ? '상품명 ㄱㄴㄷ순' : '닉네임 ㄱㄴㄷ순'}</option>{viewMode === 'order' ? <><option value="oldest">주문 오래된순</option><option value="newest">주문 최신순</option></> : null}<option value="remaining">남은 수량 많은순</option></select>
+              </label>
+              {sortMode === 'remaining' ? <button type="button" disabled={blocked} onClick={() => setSortPickedIds(new Set(pickedIds))} className="h-9 shrink-0 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink">다시 정렬</button> : null}
+              <input value={search} onChange={event => setSearch(event.target.value)} placeholder="상품번호 · 고객 검색" aria-label="상품번호 또는 고객 이름 검색" className="h-9 min-w-[140px] flex-1 rounded-lg border border-line px-3 text-[13px]" />
             </div>
-            <div role="group" aria-label="결제 상태 보기" className="flex shrink-0 gap-1 rounded-lg bg-surface-2 p-0.5">
-              {([["paid", "결제완료만"], ["unpaid", "미결제만"], ["all", "전체"]] as const).map(([value, label]) => <button key={value} type="button" onClick={() => setPayView(value)} aria-pressed={payView === value} className={`min-h-9 rounded-xl px-3 text-[13px] font-black sm:min-h-11 md:min-h-8 ${payView === value ? "bg-rose-deep text-white" : "text-ink-soft"}`}>{label}</button>)}
-            </div>
-            <label className="flex w-[180px] shrink-0 items-center text-[11px] font-bold text-ink-soft max-sm:w-[132px]">
-              <span className="sr-only">정렬</span>
-              <select aria-label="정렬 방식" value={sortMode} onChange={event => {setSortModes(previous => ({...previous,[viewMode]:event.target.value})); setSortPickedIds(new Set(pickedIds));}} className="block h-9 w-full rounded-lg border border-line bg-surface px-2 text-[13px] text-ink"><option value="name">{viewMode === 'batch' ? '상품명 ㄱㄴㄷ순' : '닉네임 ㄱㄴㄷ순'}</option>{viewMode === 'order' ? <><option value="oldest">주문 오래된순</option><option value="newest">주문 최신순</option></> : null}<option value="remaining">남은 수량 많은순</option></select>
-            </label>
-            {sortMode === 'remaining' ? <button type="button" disabled={blocked} onClick={() => setSortPickedIds(new Set(pickedIds))} className="shrink-0 text-[12px] font-bold text-rose-deep">다시 정렬</button> : null}
-            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="상품번호 · 고객 검색" aria-label="상품번호 또는 고객 이름 검색" className="h-9 min-w-[180px] max-w-[320px] flex-1 rounded-lg border border-line px-3 text-[13px]" />
           </div>
           {workspaceTab === "late_paid" ? <p className="rounded-lg bg-info-bg px-3 py-2 text-[12px] font-bold text-[var(--color-info-tx)]">주문서 범위에 속하지 않는 종료 방송 주문 중, 주문일보다 늦게(오늘) 입금확인된 미챙김 상품입니다. 지금 추가로 챙겨 주세요.</p> : null}
           {workspaceTab === "repick" ? <p className="rounded-lg bg-warn-bg px-3 py-2 text-[12px] font-bold text-[var(--color-danger-tx)]">챙김 완료 후 상품·색상·사이즈·수량이 변경됐습니다. 변경 전후를 확인하고 다시 챙겨 주세요.</p> : null}
@@ -577,8 +585,85 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
           {/* [㉚] 주문서 필터가 너무 넓으면(전체 방송·전체 기간) 목록 대신 안내만 */}
           {workArea === "selected" && scopeTooWide ? <div aria-label="범위 안내" className="py-12 text-center text-[14px] font-bold text-ink-soft">주문서에서 방송이나 날짜를 먼저 골라 주세요</div> : null}
           {!(workArea === "selected" && scopeTooWide) && !loading && !loadError && matches.length === 0 ? <div className="py-12 text-center font-bold text-ink-soft">현재 조회 조건에 맞는 상품이 없습니다.</div> : null}
-          <div className="mx-auto max-w-[760px] space-y-4 max-sm:space-y-2">
-            {sortedGroups.map(([key, group]) => {
+          {viewMode === "summary" && sortedGroups.length > 0 ? (() => {
+            // [2026-10-22 사장님] 요약 — 맨 위 전체 수량, 아래 표 하나: 상품(사진·이름·가격·총수량) → 옵션별 수량·체크.
+            //   숫자 = 결제완료 기준(상단 「남은/챙긴」과 같은 식), 미결제는 「미결제 N」 따로. 체크 = 그 옵션의 보이는 줄 전부 picked_at 저장/해제.
+            const paidOf = (rows: readonly PickingRow[]) => pickingProgress(rows.filter(({ panel }) => panel.paid).map(({ item }) => ({ qty: item.qty, pickedAt: pickedIds.has(item.id) })));
+            const unpaidOf = (rows: readonly PickingRow[]) => rows.filter(({ panel }) => !panel.paid).reduce((sum, { item }) => sum + item.qty, 0);
+            const all = paidOf(matches);
+            const allUnpaid = unpaidOf(matches);
+            const optionLabel = (optKey: string) => stripNoneOptionParts(optKey) || "옵션 없음";
+            return (
+              <div className="mx-auto max-w-[760px] space-y-3">
+                <div aria-label="요약 합계" className="grid grid-cols-3 gap-2 rounded-xl border border-line bg-surface p-3 max-sm:p-2">
+                  <div><div className="text-[12px] text-ink-soft">전체 수량</div><div className="text-[20px] font-bold text-ink tabular-nums">{all.total}개</div></div>
+                  <div><div className="text-[12px] text-ink-soft">상품</div><div className="text-[20px] font-bold text-ink tabular-nums">{sortedGroups.length}개</div></div>
+                  <div className="text-right"><div className="text-[12px] text-ink-soft">남은 수량</div><div className="text-[20px] font-bold text-ink tabular-nums">{all.total - all.got}개</div>{allUnpaid > 0 ? <div className="text-[12px] font-semibold text-[var(--color-danger-tx)] tabular-nums">미결제 {allUnpaid}개 따로</div> : null}</div>
+                </div>
+                <div role="table" aria-label="상품별 수량 요약" className="overflow-hidden rounded-xl border border-line bg-surface">
+                  <div role="row" className="grid grid-cols-[56px_minmax(0,1fr)_96px] items-center gap-3 border-b border-line bg-surface-2 px-3 py-2 text-[12px] font-semibold text-ink-soft max-sm:grid-cols-[44px_minmax(0,1fr)_72px] max-sm:gap-2">
+                    <span role="columnheader">사진</span><span role="columnheader">상품 · 옵션별 수량</span><span role="columnheader" className="text-right">총수량</span>
+                  </div>
+                  {sortedGroups.map(([key, group]) => {
+                    const photo = group.rows.map(({ item }) => itemPhoto[item.id]).find(Boolean) || "";
+                    const price = priceText(group.rows);
+                    const gp = paidOf(group.rows);
+                    const gUnpaid = unpaidOf(group.rows);
+                    const options = new Map<string, PickingRow[]>();
+                    for (const row of group.rows) {
+                      const optKey = row.item.optionText || "";
+                      options.set(optKey, [...(options.get(optKey) || []), row]);
+                    }
+                    const groupDone = gp.total > 0 && isPickingComplete(gp);
+                    return (
+                      <div role="row" key={key} className="grid grid-cols-[56px_minmax(0,1fr)_96px] gap-3 border-b border-line px-3 py-3 last:border-b-0 max-sm:grid-cols-[44px_minmax(0,1fr)_72px] max-sm:gap-2 max-sm:py-2">
+                        <div role="cell">
+                          {photo ? (
+                            <button type="button" onClick={() => setPhotoZoom(photo)} aria-label="사진 크게 보기">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={photo} alt={group.title} className="h-14 w-14 rounded-lg border border-line object-cover max-sm:h-11 max-sm:w-11" />
+                            </button>
+                          ) : <span className="block h-14 w-14 rounded-lg bg-surface-2 max-sm:h-11 max-sm:w-11" aria-hidden="true" />}
+                        </div>
+                        <div role="cell" className="min-w-0">
+                          <div className="break-words text-[14px] font-semibold leading-snug text-ink">{group.title}</div>
+                          {price ? <div className="text-[12px] text-ink-soft tabular-nums">{price}</div> : null}
+                          <ul aria-label={`${group.title} 옵션별 수량`} className="mt-2 divide-y divide-line rounded-lg border border-line">
+                            {[...options].map(([optKey, optRows]) => {
+                              const op = paidOf(optRows);
+                              const oUnpaid = unpaidOf(optRows);
+                              const ids = [...new Set(optRows.map(({ item }) => item.id))];
+                              const optDone = ids.length > 0 && ids.every((id) => pickedIds.has(id));
+                              const label = optionLabel(optKey);
+                              return (
+                                <li key={optKey || "-"} className={`flex items-center gap-2 px-2 py-1.5 ${optDone ? "bg-surface-2" : ""}`}>
+                                  <button type="button" role="checkbox" aria-checked={optDone} aria-label={`${group.title} ${label} ${optDone ? "챙김 해제" : "챙김"}`} disabled={blocked}
+                                    onClick={() => updatePicked(optDone ? ids : ids.filter((id) => !pickedRef.current.has(id)), !optDone)}
+                                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-[16px] font-bold disabled:opacity-50 ${optDone ? "border-ink bg-ink text-white" : "border-line bg-surface text-transparent"}`}>✓</button>
+                                  <span className={`min-w-0 flex-1 break-words text-[13px] ${optDone ? "text-ink-soft line-through" : "text-ink"}`}>{label}</span>
+                                  <span className="shrink-0 text-right tabular-nums">
+                                    <span className={`text-[16px] font-bold ${optDone ? "text-ink-soft" : "text-ink"}`}>{op.total}개</span>
+                                    {oUnpaid > 0 ? <span className="ml-1 text-[12px] font-semibold text-[var(--color-danger-tx)]">미결제 {oUnpaid}</span> : null}
+                                  </span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                        <div role="cell" className="text-right tabular-nums">
+                          <div className="text-[20px] font-bold text-ink">{gp.total}개</div>
+                          {groupDone ? <div className="text-[12px] font-semibold text-ok-tx">완료</div> : gp.total > 0 ? <div className="text-[12px] text-ink-soft">남은 {gp.total - gp.got}</div> : null}
+                          {gUnpaid > 0 ? <div className="text-[12px] font-semibold text-[var(--color-danger-tx)]">미결제 {gUnpaid}</div> : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })() : null}
+          <div className={`mx-auto max-w-[760px] space-y-4 max-sm:space-y-2 ${viewMode === "summary" ? "hidden" : ""}`}>
+            {viewMode === "summary" ? null : sortedGroups.map(([key, group]) => {
               // [㉘] 챙김 진행은 결제완료 줄 기준, 미결제 수량은 「미결제 N」으로 따로.
               const progress = pickingProgress(group.rows.filter(({ panel }) => panel.paid).map(({ item }) => ({ qty: item.qty, pickedAt: pickedIds.has(item.id) })));
               const unpaidQty = group.rows.filter(({ panel }) => !panel.paid).reduce((sum, { item }) => sum + item.qty, 0);

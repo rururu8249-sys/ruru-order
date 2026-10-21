@@ -104,7 +104,8 @@ function colorsOf(p: AnyProduct | null): string {
 // [2026-07-09 사장님 지침] 사이즈는 항상 "36(S)" 형태로 표시. 표시 전용 — 저장값은 안 건드림.
 // [2026-07-10 사장님 지침] 36/38/40 세 개만 괄호로 알파벳 병기(app/order/page.tsx와 동일 규칙).
 //   4·6·8·10·12, S/M/L/XL/2XL, 250 등은 원문 그대로. (문자 S를 "36(S)"로 되돌리던 오표기 제거)
-const SIZE_NUM_TO_LETTER: Record<string, string> = { "36": "S", "38": "M", "40": "L" };
+// [2026-10-22 사장님 지시] 괄호 알파벳 병기 폐지 — 사이즈는 관리자가 적은 그대로만(36·38·40·4·6·8 모두). 표시 전용.
+const SIZE_NUM_TO_LETTER: Record<string, string> = {};
 function sizeDisplayLabel(raw: unknown): string {
   const v = String(raw ?? "").trim();
   if (!v) return "";

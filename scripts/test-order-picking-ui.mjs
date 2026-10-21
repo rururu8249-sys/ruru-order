@@ -80,13 +80,14 @@ assert(!scopeLine.findAllByType('details').length,'scope is always visible outsi
 assert(scopeLine.children.join('').includes('취소·챙기기 제외 주문 제외'));
 assert.ok(scopeDetails[0].findByType('summary').children.length > 0);
 const listToolbar = tree.root.findByProps({'aria-label':'물건챙기기 목록 도구'});
-assert.match(listToolbar.props.className, /flex-nowrap/, 'desktop work controls stay on one line');
-assert.doesNotMatch(listToolbar.props.className, /flex-wrap/, 'desktop work controls do not wrap into a second line');
+// [2026-10-22 사장님] 가로 스크롤 금지 — 도구는 두 줄(작업 탭·보기 / 결제 상태·정렬·검색), 어디에도 overflow-x-auto 없음
+assert.equal(listToolbar.findAll(node => /overflow-x-auto/.test(String(node.props?.className || ''))).length + (/overflow-x-auto/.test(listToolbar.props.className) ? 1 : 0), 0, 'toolbar never scrolls sideways');
+assert.ok(listToolbar.findAllByType('button').some(node => node.children.join('') === '요약'), 'summary view lives beside product/customer views');
 assert.ok(listToolbar.findAllByType('button').some(node => node.children.join('') === '상품별'), 'product view belongs in the compact list toolbar');
 assert.ok(listToolbar.findAllByType('button').some(node => node.children.join('') === '고객별'), 'customer view belongs in the compact list toolbar');
 assert.ok(listToolbar.findAllByProps({'aria-label':'정렬 방식'}).length === 1, 'sort belongs beside the view switch');
 const compactSearch = listToolbar.findByProps({'aria-label':'상품번호 또는 고객 이름 검색'});
-assert.match(compactSearch.props.className, /max-w-\[/, 'desktop search stays compact instead of occupying a separate full row');
+assert.match(compactSearch.props.className, /flex-1/, 'search takes the remaining width of the second toolbar row');
 assert.equal(tree.root.findAll(node => node.props.role === 'status').length, 1, 'save/error feedback stays accessible');
 let release;
 gate = new Promise(resolve => {release = resolve;});

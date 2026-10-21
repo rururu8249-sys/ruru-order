@@ -997,7 +997,8 @@ function isPinnedOrderProduct(product: any, livePinnedProductId: string): boolea
 // [2026-07-10 사장님 지침] 36/38/40 세 개만 괄호로 알파벳 병기.
 //   - 4·6·8·10·12(버버리 숫자 사이즈), S/M/L/XL/2XL(문자 사이즈), 250(신발) 등은 원문 그대로 표시.
 //   - 이전엔 문자 S를 "36(S)"로 되돌려 표기해, 실제로는 S/M/L인 상품에 없는 숫자 사이즈가 보였다(버그).
-const SIZE_NUM_TO_LETTER: Record<string, string> = { "36": "S", "38": "M", "40": "L" };
+// [2026-10-22 사장님 지시] 괄호 알파벳 병기 폐지 — 사이즈는 관리자가 적은 그대로만(36·38·40·4·6·8 모두). 표시 전용.
+const SIZE_NUM_TO_LETTER: Record<string, string> = {};
 function sizeDisplayLabel(raw: unknown): string {
   const v = String(raw ?? "").trim();
   if (!v) return "";
