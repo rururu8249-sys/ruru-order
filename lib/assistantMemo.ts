@@ -23,7 +23,7 @@ function kstDateText(ms: number): string {
 }
 
 /** 전화번호·계좌번호(9자리 이상 숫자 덩어리)를 자리표로 — AI 로 개인정보가 안 가게 */
-export function maskSensitive(text: string): { masked: string; restore: (s: string) => string } {
+export function maskSensitive(text: string): { masked: string; restore: (s: string) => string; count: number } {
   const found: string[] = [];
   const masked = String(text ?? "").replace(/(?:\+?82[-\s]?)?0?1[016789][-\s.]?\d{3,4}[-\s.]?\d{4}|\d[\d\s-]{8,}\d/g, (m) => {
     const digits = m.replace(/\D/g, "");
@@ -32,7 +32,7 @@ export function maskSensitive(text: string): { masked: string; restore: (s: stri
     return `[번호${found.length}]`;
   });
   const restore = (s: string) => String(s ?? "").replace(/\[번호(\d+)\]/g, (all, n) => found[Number(n) - 1] ?? all);
-  return { masked, restore };
+  return { masked, restore, count: found.length };
 }
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];

@@ -7,7 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { callGeminiJson, type GeminiPart } from "@/lib/geminiJson";
 import { maskSensitive } from "@/lib/assistantMemo";
-import { DEFAULT_REPLY_POLICY, parseReplyJson, replyPrompt, validReplyImage } from "@/lib/assistantReply";
+import { DEFAULT_REPLY_POLICY, dropUnknownPlaceholders, parseReplyJson, replyPrompt, validReplyImage } from "@/lib/assistantReply";
 
 const TABLE = "admin_assistant_memos";
 
@@ -68,7 +68,8 @@ export async function POST(request: NextRequest) {
   try {
     const db = getSupabaseAdminClient();
     const { policy } = await readPolicy(db);
-    const { masked, restore } = maskSensitive(text);
+    const { masked, restore: restoreKnown, count } = maskSensitive(text);
+    const restore = (s: string) => dropUnknownPlaceholders(restoreKnown(s), count);
     const parts: GeminiPart[] = [{ text: replyPrompt(policy, masked, Boolean(image), Date.now()) }];
     if (image) parts.push({ inline_data: image });
     const ai = await callGeminiJson(parts, { timeoutMs: 15000, maxTokens: 1500 });

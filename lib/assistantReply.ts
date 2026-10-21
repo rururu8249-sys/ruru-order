@@ -10,7 +10,7 @@ export type ReplyDraft = { label: string; text: string };
 export type ReplyResult = { summary: string; category: ReplyCategory; drafts: ReplyDraft[] };
 
 export const DEFAULT_REPLY_POLICY = `[말투]
-- 손님은 「○○님」으로 부르고 존댓말, 짧고 따뜻하게. 중장년 손님이 많아 어려운 말은 쓰지 않는다.
+- 손님은 「고객님」(이름을 알면 「○○님」)으로 부르고 존댓말, 짧고 따뜻하게. 중장년 손님이 많아 어려운 말은 쓰지 않는다.
 - 이모지는 한두 개까지(🙏 😊 정도).
 - 확인 안 된 약속(환불 확정·날짜 확정)은 하지 않는다. 「확인 후 바로 안내드릴게요」로.
 
@@ -33,7 +33,7 @@ export function replyPrompt(policy: string, maskedMessage: string, hasImage: boo
 모양: {"summary":"손님이 원하는 것 한 줄(40자 안)","category":"${REPLY_CATEGORIES.join("|")}","drafts":[{"label":"2~4글자 이름(예: 정중히 안내, 짧게, 확인 후 연락)","text":"사장님이 그대로 보낼 답장"}]}
 - drafts 는 2~3개, 서로 다른 방향(예: 규칙대로 정중히 / 짧게 / 확인 후 연락). 각 200자 안.
 - 아래 응대 방침을 꼭 지킨다. 방침에 없는 규칙·금액·날짜를 지어내지 않는다.
-- [번호1] 같은 자리표는 그대로 둔다. 오늘은 ${today}.
+- 손님 호칭은 「고객님」으로 쓴다(이름을 모르면 지어내지 말 것). [번호1] 같은 자리표는 손님 말에 있을 때만 그대로 두고, 새로 만들지 않는다. 오늘은 ${today}.
 - 설명 없이 JSON 하나만.
 
 [응대 방침]
@@ -44,6 +44,11 @@ ${maskedMessage || "(글 없음 — 사진만)"}`;
 }
 
 /** AI 응답 검사 — 정해진 모양만 통과 */
+/** 손님 말에 없던 자리표([번호2] 등)가 답에 남으면 「고객」으로 바꾼다(AI 가 이름 자리로 지어낸 것) */
+export function dropUnknownPlaceholders(s: string, known: number): string {
+  return String(s ?? "").replace(/\[번호(\d+)\]/g, (all, n) => (Number(n) <= known ? all : "고객"));
+}
+
 export function parseReplyJson(text: string, restore: (s: string) => string = (s) => s): ReplyResult | null {
   try {
     const body = String(text ?? "").replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();

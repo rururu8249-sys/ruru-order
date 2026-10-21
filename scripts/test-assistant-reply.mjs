@@ -85,6 +85,12 @@ await t('문구 만들기: 방침 포함·번호는 가려서 보내고 답에�
   assert.equal(r.body.category, '교환');
   assert.equal(r.body.drafts.length, 2);
   assert.ok(r.body.drafts[0].text.includes('010-2222-3333'));
+  // 손님 말에 없던 자리표를 AI 가 이름 자리로 지어내면 「고객」으로(실측: 「[번호1]님」)
+  reply = '{"summary":"s","category":"배송","drafts":[{"label":"a","text":"[번호1]님 [번호2]님 안녕하세요"}]}';
+  const r2 = await route.POST(req({ text: '배송 010-2222-3333' }));
+  assert.equal(r2.body.drafts[0].text, '010-2222-3333님 고객님 안녕하세요');
+  const r3 = await route.POST(req({ text: '배송 언제 와요' }));
+  assert.equal(r3.body.drafts[0].text, '고객님 고객님 안녕하세요');
 });
 
 await t('사진: 형식·크기 검사 후 그대로 붙여 보냄', async () => {
