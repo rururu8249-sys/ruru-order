@@ -33,7 +33,7 @@ const SHOP_INFO = {
   email: "rururu8249@gmail.com",
   phone: "",
   effectiveDate: "2026년 8월 14일",
-  revisedDate: "2026년 9월 27일",
+  revisedDate: "2026년 10월 22일",
 };
 
 // 값이 있는 항목만 표 행으로 렌더링
@@ -348,6 +348,11 @@ export default function PrivacyPage() {
                 <td style={S.td}>배송 대행사</td>
                 <td style={S.td}>상품 배송 및 배송 조회</td>
               </tr>
+              <tr>
+                {/* [2026-10-22 AI 비서] 관리자 도우미 — 사장님이 입력한 문장·고른 사진만 보내고, 회원·주문 데이터베이스는 보내지 않는다. 전화·계좌번호는 보내기 전 가린다. */}
+                <td style={S.td}>Google LLC (Gemini API)</td>
+                <td style={S.td}>운영자 업무 보조(문의 내용 요약·답변 문구 작성). 운영자가 직접 입력한 문의 글·사진만 처리하며 전화번호·계좌번호는 가린 뒤 전송</td>
+              </tr>
             </tbody>
           </table>
         </section>
@@ -380,6 +385,17 @@ export default function PrivacyPage() {
                 <td style={S.td}>서비스 이용 시 네트워크를 통해 전송·보관</td>
                 <td style={S.td}>1번 항목의 수집 항목 전체(회원·주문·포인트·접속 기록)</td>
                 <td style={S.td}>데이터베이스 보관·관리 / 회원 탈퇴 또는 3번 항목의 보유 기간 종료 시까지</td>
+              </tr>
+              <tr>
+                <td style={S.td}>
+                  Google LLC
+                  <br />
+                  (policies.google.com/privacy)
+                </td>
+                <td style={S.td}>미국</td>
+                <td style={S.td}>운영자가 비서 기능을 쓸 때 네트워크를 통해 전송</td>
+                <td style={S.td}>운영자가 직접 입력한 문의 글·사진(전화번호·계좌번호 가림). 회원·주문 데이터베이스는 전송하지 않음</td>
+                <td style={S.td}>문의 요약·답변 문구 작성 / 요청 처리 시에만 일시 처리</td>
               </tr>
               <tr>
                 <td style={S.td}>
@@ -532,7 +548,8 @@ export default function PrivacyPage() {
           </p>
           <ul style={S.ul}>
             <li>{SHOP_INFO.effectiveDate} 제정·시행</li>
-            <li>{SHOP_INFO.revisedDate} 개정 — 카카오톡 간편 로그인으로 제공받는 정보(1-1), 해외 서버 보관·처리(5-1), 자동 수집 장치(9-1) 항목 추가 및 문구 정비. 이용자에게 불리하지 않은 보완 개정으로 게시한 날부터 적용합니다.</li>
+            <li>{SHOP_INFO.revisedDate} 개정 — 운영자 업무 보조 AI(Google Gemini) 처리 위탁·국외 이전 항목 추가(5, 5-1). 운영자가 직접 입력한 문의 글·사진만 전화번호·계좌번호를 가린 뒤 처리하며 회원·주문 데이터베이스는 전송하지 않습니다. 이용자에게 불리하지 않은 보완 개정으로 게시한 날부터 적용합니다.</li>
+            <li>2026년 9월 27일 개정 — 카카오톡 간편 로그인으로 제공받는 정보(1-1), 해외 서버 보관·처리(5-1), 자동 수집 장치(9-1) 항목 추가 및 문구 정비. 이용자에게 불리하지 않은 보완 개정으로 게시한 날부터 적용합니다.</li>
           </ul>
         </section>
 
