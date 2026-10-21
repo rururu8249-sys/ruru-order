@@ -61,8 +61,12 @@ export async function POST(request: NextRequest) {
   if (!(await verifyAdminSessionFromRequest(request))) return unauthorized();
   const body = await request.json().catch(() => null);
   const text = String(body?.text ?? "").trim().slice(0, 3000);
-  const image = body?.image ? validReplyImage(body.image) : null;
-  if (body?.image && !image) return NextResponse.json({ ok: false, message: "사진은 jpg·png 로 2MB 이하만 돼요." }, { status: 400 });
+  // 사진 여러 장(최대 10) — image(한 장) 도 그대로 받음
+  const rawImages: unknown[] = Array.isArray(body?.images) ? body.images : body?.image ? [body.image] : [];
+  if (rawImages.length > 10) return NextResponse.json({ ok: false, message: "사진은 한 번에 10장까지예요." }, { status: 400 });
+  const images = rawImages.map(validReplyImage);
+  if (images.some((img) => !img)) return NextResponse.json({ ok: false, message: "사진은 jpg·png 로 2MB 이하만 돼요." }, { status: 400 });
+  const image = images[0] || null;
   if (!text && !image) return NextResponse.json({ ok: false, message: "손님이 보낸 말을 붙여넣거나 사진을 골라 주세요." }, { status: 400 });
 
   try {
@@ -70,9 +74,9 @@ export async function POST(request: NextRequest) {
     const { policy } = await readPolicy(db);
     const { masked, restore: restoreKnown, count } = maskSensitive(text);
     const restore = (s: string) => dropUnknownPlaceholders(restoreKnown(s), count);
-    const parts: GeminiPart[] = [{ text: replyPrompt(policy, masked, Boolean(image), Date.now()) }];
-    if (image) parts.push({ inline_data: image });
-    const ai = await callGeminiJson(parts, { timeoutMs: 15000, maxTokens: 1500 });
+    const parts: GeminiPart[] = [{ text: replyPrompt(policy, masked, images.length, Date.now()) }];
+    for (const img of images) if (img) parts.push({ inline_data: img });
+    const ai = await callGeminiJson(parts, { timeoutMs: 15000 + images.length * 5000, maxTokens: 1500 });
     if (!ai.text) {
       return NextResponse.json({ ok: false, ai: ai.note, message: "지금은 AI 가 답을 못 만들어요. 잠시 뒤 다시 눌러 주세요." }, { status: 503 });
     }

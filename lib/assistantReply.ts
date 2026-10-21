@@ -26,10 +26,11 @@ export const DEFAULT_REPLY_POLICY = `[말투]
 
 const KST = 9 * 3600 * 1000;
 
-export function replyPrompt(policy: string, maskedMessage: string, hasImage: boolean, nowMs: number): string {
+export function replyPrompt(policy: string, maskedMessage: string, imageCount: number | boolean, nowMs: number): string {
+  const n = typeof imageCount === "number" ? imageCount : imageCount ? 1 : 0;
   const d = new Date(nowMs + KST);
   const today = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
-  return `너는 유튜브 라이브 쇼핑몰 「루루동이」 사장님의 손님 응대 도우미다. 손님이 보낸 ${hasImage ? "말과 사진(카톡 캡처·상품 사진)" : "말"}을 보고 JSON 으로만 답한다.
+  return `너는 유튜브 라이브 쇼핑몰 「루루동이」 사장님의 손님 응대 도우미다. 손님이 보낸 ${n > 0 ? `말과 사진 ${n}장(카톡 캡처·상품 사진, 순서대로 이어진 대화일 수 있음. 검게 가린 부분은 개인정보라 무시)` : "말"}을 보고 JSON 으로만 답한다.
 모양: {"summary":"손님이 원하는 것 한 줄(40자 안)","category":"${REPLY_CATEGORIES.join("|")}","drafts":[{"label":"2~4글자 이름(예: 정중히 안내, 짧게, 확인 후 연락)","text":"사장님이 그대로 보낼 답장"}]}
 - drafts 는 2~3개, 서로 다른 방향(예: 규칙대로 정중히 / 짧게 / 확인 후 연락). 각 200자 안.
 - 아래 응대 방침을 꼭 지킨다. 방침에 없는 규칙·금액·날짜를 지어내지 않는다.
@@ -40,7 +41,7 @@ export function replyPrompt(policy: string, maskedMessage: string, hasImage: boo
 ${policy}
 
 [손님이 보낸 말]
-${maskedMessage || "(글 없음 — 사진만)"}`;
+${maskedMessage || "(글 없음 — 사진만 보고 판단)"}`;
 }
 
 /** AI 응답 검사 — 정해진 모양만 통과 */
