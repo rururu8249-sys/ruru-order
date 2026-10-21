@@ -50,7 +50,7 @@ export default function LiveStatsPanel({ orders, activeBroadcastId, onOpenReport
   return (
     <div className="rounded-2xl border border-line bg-surface p-3 shadow-sm">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-black text-ink">📊 라이브 현황</span>
+        <span className="text-xs font-black text-ink">라이브 현황</span>
         <span className="flex items-center gap-1.5">
           <span className="text-[11px] font-bold text-ink-mute">이번 방송 · 실시간</span>
           {onOpenReport ? (
@@ -99,7 +99,7 @@ export default function LiveStatsPanel({ orders, activeBroadcastId, onOpenReport
 
           {/* TOP 상품 */}
           <div className="border-t border-line pt-2">
-            <div className="mb-1 text-[11px] font-black text-ink-mute">🔥 잘 나가는 상품 TOP</div>
+            <div className="mb-1 text-[11px] font-black text-ink-mute">잘 나가는 상품 TOP</div>
             {stats.top.length === 0 ? (
               <div className="py-1 text-[11px] font-bold text-ink-mute">아직 주문 없음</div>
             ) : (

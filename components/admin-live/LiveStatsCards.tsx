@@ -37,7 +37,7 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
         body: JSON.stringify({ action: "send-range-report", text }),
       });
       const j = await r.json().catch(() => null);
-      if (j?.ok) showAdminToast("📊 지금 보고 있는 조회범위 그대로 텔레그램에 보냈어요.", "success");
+      if (j?.ok) showAdminToast("지금 보고 있는 조회범위 그대로 텔레그램에 보냈어요.", "success");
       else showAdminToast("텔레그램 전송 실패\n\n" + (j?.reason || j?.error || "설정 → 텔레그램에서 봇 연결을 확인하세요"), "error");
     } catch (e) {
       showAdminToast("텔레그램 전송 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
@@ -143,8 +143,8 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
     <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-rose-line bg-surface px-4 py-2.5 text-[13px] font-black md:gap-y-1 md:text-[12px] [&>span]:max-w-full [&>span>span]:inline-block [&>span>span]:whitespace-nowrap [&>span>span]:tabular-nums">
       {/* [UI 2026-07-06] 기준 명시 — 정산 팝업(이번달 자동조회)과 숫자가 달라 헷갈리던 것 방지 */}
       {/* [2026-08-31 사장님 요청] 유치원생 기준 — 상품값과 실제 받은 돈을 나란히 크게 */}
-      <span className="text-ink-soft" title="결제완료 주문의 순수 상품금액만 합친 것 — 카드수수료·배송비·포인트 반영 전">📦 상품값 <span className="text-ink text-[13px]">{money(goodsPaid)}</span></span>
-      <span className="text-ink-soft" title="손님이 실제로 낸 돈 — 상품값 + 카드수수료 + 배송비 − 포인트 (결제완료 건만, 미입금·취소·정산제외 미포함)">💳 실제 받은 돈<span className="ml-1 text-[11px] font-bold text-ink-mute">(결제완료만 · 현재 조회범위)</span> <span className="text-ink text-[13px]">{money(paidAmount)}</span></span>
+      <span className="text-ink-soft" title="결제완료 주문의 순수 상품금액만 합친 것 — 카드수수료·배송비·포인트 반영 전">상품값 <span className="text-ink text-[13px]">{money(goodsPaid)}</span></span>
+      <span className="text-ink-soft" title="손님이 실제로 낸 돈 — 상품값 + 카드수수료 + 배송비 − 포인트 (결제완료 건만, 미입금·취소·정산제외 미포함)">실제 받은 돈<span className="ml-1 text-[11px] font-bold text-ink-mute">(결제완료만 · 현재 조회범위)</span> <span className="text-ink text-[13px]">{money(paidAmount)}</span></span>
       <span className="text-line">|</span>
       <span className="text-ink-soft" title="무통장 주문 중 입금확인된 금액">무통장 입금확인 <span className="text-ok-tx">{money(bankPaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
       <span className="text-ink-soft" title="카드 주문 중 결제완료된 금액">카드결제완료 <span className="text-ok-tx">{money(cardPaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
@@ -159,7 +159,7 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
         title="지금 화면(현재 조회범위·필터) 숫자 그대로 텔레그램으로 — 상품값·실제 받은 돈·미입금·TOP3"
         className="ml-auto shrink-0 rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft transition hover:bg-surface-2 disabled:opacity-50"
       >
-        {tgSending ? "전송 중…" : "📤 텔레그램"}
+        {tgSending ? "전송 중…" : "텔레그램"}
       </button>
     </div>
   );

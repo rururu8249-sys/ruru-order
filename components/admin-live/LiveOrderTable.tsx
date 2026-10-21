@@ -172,7 +172,7 @@ function statusBadge(order: LiveOrder, actions?: { onMatch?: () => void; onCardP
       return (
         <button type="button" title="누르면 입금매칭이 열립니다" onClick={(e) => { e.stopPropagation(); actions.onMatch?.(); }}
           style={{ ...base, ...amber, border: "1px solid var(--color-warn-tx)", cursor: "pointer" }}>
-          🔗 매칭필요
+          매칭필요
         </button>
       );
     }
@@ -183,7 +183,7 @@ function statusBadge(order: LiveOrder, actions?: { onMatch?: () => void; onCardP
       return (
         <button type="button" title="누르면 카드결제 창이 열립니다" onClick={(e) => { e.stopPropagation(); actions.onCardPay?.(); }}
           style={{ ...base, ...red, border: "1px solid var(--color-danger-tx)", cursor: "pointer" }}>
-          💳 카드미결제
+          카드미결제
         </button>
       );
     }
@@ -405,12 +405,12 @@ function PickChip({ order }: { order: LiveOrder }) {
 function InvoiceChip({ order }: { order: LiveOrder }) {
   if (!hasInvoicePrinted(order)) return null;
   const at = firstInvoicePrintedAt(order);
-  return <span title={at ? `송장 처음 출력: ${new Date(at).toLocaleString("ko-KR")}` : "송장 출력함"} className="inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-info-bg px-1.5 py-0.5 text-[11px] font-black leading-none text-[var(--color-info-tx)]">🖨 송장출력</span>;
+  return <span title={at ? `송장 처음 출력: ${new Date(at).toLocaleString("ko-KR")}` : "송장 출력함"} className="inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-info-bg px-1.5 py-0.5 text-[11px] font-black leading-none text-[var(--color-info-tx)]">송장출력</span>;
 }
 function PickingListChip({ order }: { order: LiveOrder }) {
   if (!hasPickingListPrinted(order)) return null;
   const at = firstPickingListPrintedAt(order);
-  return <span title={at ? `물건챙기기 엑셀: ${new Date(at).toLocaleString("ko-KR")}` : "물건챙기기 엑셀 받음"} className="inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] font-black leading-none text-ink-mute">📄 엑셀</span>;
+  return <span title={at ? `물건챙기기 엑셀: ${new Date(at).toLocaleString("ko-KR")}` : "물건챙기기 엑셀 받음"} className="inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] font-black leading-none text-ink-mute">엑셀</span>;
 }
 
 type Props = {
@@ -934,11 +934,11 @@ export default function LiveOrderTable({
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setExportConfirm("")}>
         <div style={{ background: "var(--color-surface)", borderRadius: "16px", padding: "24px 32px", minWidth: "340px", boxShadow: "0 8px 40px rgba(0,0,0,0.18)" }} onClick={(e) => e.stopPropagation()}>
           <div style={{ fontSize: "16px", fontWeight: 900, color: "var(--color-ink)", marginBottom: "12px" }}>
-            {exportConfirm === "rozen" ? "🚚 송장 출력" : "🛍 물건챙기기"}
+            {exportConfirm === "rozen" ? "송장 출력" : "물건챙기기"}
           </div>
           <div style={{ fontSize: "13px", color: "var(--color-ink-soft)", marginBottom: "20px", lineHeight: 1.8 }}>
             <div>현재 필터 기준: <b>{exportableOrders.length.toLocaleString("ko-KR")}건</b></div>
-            <div style={{ fontSize: "14px" }}>✅ 돈 받은 것(결제완료): <b style={{ color: "var(--color-ok-tx)", fontSize: "16px" }}>{paidOnlyExportOrders.length.toLocaleString("ko-KR")}건</b></div>
+            <div style={{ fontSize: "14px" }}>돈 받은 것(결제완료): <b style={{ color: "var(--color-ok-tx)", fontSize: "16px" }}>{paidOnlyExportOrders.length.toLocaleString("ko-KR")}건</b></div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             {/* [㉕-C] 송장 출력만: 맨 위 기본 = 아직 안 뽑은 결제완료. 그 아래 테두리 = 이미 뽑은 것까지 모두 다시. */}
@@ -947,7 +947,7 @@ export default function LiveOrderTable({
                 disabled={newInvoiceExportOrders.length === 0}
                 onClick={() => { setExportConfirm(""); void runExport("rozen", newInvoiceExportOrders, "새로 출력"); }}
                 style={{ padding: "12px 16px", borderRadius: "8px", border: "none", background: "var(--color-ok-tx)", color: "#fff", fontWeight: 800, cursor: newInvoiceExportOrders.length === 0 ? "default" : "pointer", fontSize: "14px", opacity: newInvoiceExportOrders.length === 0 ? 0.4 : 1, textAlign: "left" }}>
-                ✅ 새로 출력 (아직 안 뽑은 결제완료 {newInvoiceExportOrders.length.toLocaleString("ko-KR")}건)
+                새로 출력 (아직 안 뽑은 결제완료 {newInvoiceExportOrders.length.toLocaleString("ko-KR")}건)
                 <div style={{ fontSize: "11px", fontWeight: 600, opacity: 0.85, marginTop: "2px" }}>이미 출력했거나 출고완료된 건은 빼요</div>
               </button>
             ) : null}
@@ -962,7 +962,7 @@ export default function LiveOrderTable({
               {exportConfirm === "rozen"
                 ? <>이미 출력한 {alreadyPrintedPaidCount.toLocaleString("ko-KR")}건까지 모두 다시 출력 (결제완료 {paidOnlyExportOrders.length.toLocaleString("ko-KR")}건)
                     <div style={{ fontSize: "11px", fontWeight: 600, opacity: 0.85, marginTop: "2px" }}>이미 출력한 {alreadyPrintedPaidCount.toLocaleString("ko-KR")}건도 다시 나와요</div></>
-                : <>✅ 돈 받은 것만 출력 ({paidOnlyExportOrders.length.toLocaleString("ko-KR")}건)
+                : <>돈 받은 것만 출력 ({paidOnlyExportOrders.length.toLocaleString("ko-KR")}건)
                     <div style={{ fontSize: "11px", fontWeight: 600, opacity: 0.85, marginTop: "2px" }}>입금확인·카드결제 완료분만</div></>}
             </button>
 
@@ -1068,7 +1068,7 @@ export default function LiveOrderTable({
                 className="rounded-xl border border-info-tx bg-info-bg px-3 py-2 text-xs font-black text-[var(--color-info-tx)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                 title="선택한 결제완료 주문을 택배출고로 바꿉니다 (출고시간 기록, 손님 주문조회에 배송출발로 표시)"
               >
-                {shippedSaving === "ship" ? "처리중..." : "📦 택배출고 처리"}
+                {shippedSaving === "ship" ? "처리중..." : "택배출고 처리"}
               </button>
               <button
                 type="button"
@@ -1086,7 +1086,7 @@ export default function LiveOrderTable({
                 className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
                 title="선택한 주문의 송장출력 표시만 지웁니다 (주문·입금·출고 상태는 그대로). 재출력은 항상 가능해요."
               >
-                {unmarkingInvoice ? "지우는중..." : "🖨 송장출력 해제"}
+                {unmarkingInvoice ? "지우는중..." : "송장출력 해제"}
               </button>
             </>
           )}
@@ -1097,7 +1097,7 @@ export default function LiveOrderTable({
             className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
             title="현재 필터 조건 그대로 로젠 송장 엑셀을 내보냅니다"
           >
-            {exporting === "rozen" ? "내보내는중..." : "🚚 송장 출력"}
+            {exporting === "rozen" ? "내보내는중..." : "송장 출력"}
           </button>
 
           <button
@@ -1107,7 +1107,7 @@ export default function LiveOrderTable({
             className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
             title="물건챙기기 체크리스트 팝업을 엽니다"
           >
-            🛍 물건챙기기
+            물건챙기기
           </button>
 
           <button
@@ -1118,7 +1118,7 @@ export default function LiveOrderTable({
               ? `주문서 제출 전 장바구니 ${cartHoldSummary.cartCount}명 · 상품 ${cartHoldSummary.totalQty}개`
               : "장바구니에 담기만 하고 아직 주문서 제출 안 한 고객 목록을 봅니다"}
           >
-            <span>🛒 장바구니</span>
+            <span>장바구니</span>
             <span className="whitespace-nowrap text-[11px] text-ink-mute">
               {cartHoldSummaryReady ? `${cartHoldSummary.cartCount}명` : "확인 중"}
             </span>
@@ -1256,7 +1256,7 @@ export default function LiveOrderTable({
             onKeyDown={(event) => {
               if (event.key === "Enter") applyKeyword();
             }}
-            placeholder="🔍 닉네임·상품·금액 검색"
+            placeholder="닉네임·상품·금액 검색"
           />
 
           <button className="h-11 flex-none rounded-xl bg-rose-deep px-3 text-[12px] font-black text-white shadow-sm hover:opacity-90 active:opacity-80 active:scale-[0.95] transition-all duration-75 w-[64px] sm:w-[84px]"
@@ -1282,7 +1282,7 @@ export default function LiveOrderTable({
         {([
           ["안 챙김", workCounts.none, "none"],
           ["✓ 챙김", workCounts.done, "done"],
-          ["🖨 송장출력", workCounts.printed, "printed"],
+          ["송장출력", workCounts.printed, "printed"],
           ["택배출고", workCounts.shipped, "shipped"],
         ] as [string, number, "none" | "done" | "printed" | "shipped"][]).map(([label, n, key]) => (
           <Fragment key={key}>
@@ -1296,7 +1296,7 @@ export default function LiveOrderTable({
             </button>
           </Fragment>
         ))}
-        {workFilter === "printed" ? <span className="text-ink-mute">· 전체 선택 → 📦 택배출고 처리로 한 번에 바꿀 수 있어요</span> : null}
+        {workFilter === "printed" ? <span className="text-ink-mute">· 전체 선택 → 택배출고 처리로 한 번에 바꿀 수 있어요</span> : null}
       </div>
 
       {/* [2026-09-08] h-[1180px] 고정 → 부모가 준 높이를 채운다. 창 크기·모니터가 달라도 항상 맞음 */}
@@ -1368,7 +1368,7 @@ export default function LiveOrderTable({
                             })}
                             <button type="button" onClick={() => void copyOrderForCustomer(order)}
                               style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "2px 8px", cursor: "pointer" }}>
-                              📋 주문서 복사
+                              주문서 복사
                             </button>
                             <PickChip order={order} />
                             <InvoiceChip order={order} />
@@ -1376,7 +1376,7 @@ export default function LiveOrderTable({
                               <span className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg px-1.5 py-0.5 text-[11px] font-black leading-none ${String((order as any).shippingStatus) === "출고완료" ? "bg-info-bg text-[var(--color-info-tx)]" : "bg-surface-2 text-ink-soft"}`}>{shippingStatusLabel((order as any).shippingStatus)}</span>
                             ) : null}
                             {["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
-                              <button type="button" title="결제요청 쪽지 보내기" aria-label="결제요청 쪽지 보내기" disabled={payRequestSending === order.id} onClick={() => void sendPaymentRequest(order)} style={{ border: "none", background: "none", padding: "0 2px", fontSize: "14px", lineHeight: 1, cursor: "pointer", opacity: payRequestSending === order.id ? 0.35 : 0.75 }}>🔔</button>
+                              <button type="button" title="결제요청 쪽지 보내기" aria-label="결제요청 쪽지 보내기" disabled={payRequestSending === order.id} onClick={() => void sendPaymentRequest(order)} style={{ border: "none", background: "none", padding: "0 2px", fontSize: "14px", lineHeight: 1, cursor: "pointer", opacity: payRequestSending === order.id ? 0.35 : 0.75 }}>쪽지</button>
                             ) : null}
                           </div>
                           <span style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-danger-tx)" }}>{money(displayPayableAmount(order))}</span>
@@ -1424,7 +1424,7 @@ export default function LiveOrderTable({
                           title="이 주문서 한 건을 상세 안 열고 고객용 형식(주소·입금상태·계좌 안내 포함)으로 복사"
                           className="mt-0.5 rounded-lg border border-rose-line bg-rose-soft px-1.5 py-0.5 text-[11px] font-black text-rose-deep"
                         >
-                          📋 주문서 복사
+                          주문서 복사
                         </button>
                         {(inventoryStatusBadge(order) || testOrderBadge(order) || returnBadge(order)) && (
                           <div className="flex flex-wrap gap-1 mt-0.5">
@@ -1476,7 +1476,7 @@ export default function LiveOrderTable({
                         {order.paidAt && <div className="mt-0.5 text-[11px] text-ink-mute">{order.paidAt}</div>}
                         {["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
                           <button type="button" title="결제요청 쪽지 보내기" aria-label="결제요청 쪽지 보내기" disabled={payRequestSending === order.id} onClick={(e) => { e.stopPropagation(); void sendPaymentRequest(order); }} className="mt-0.5 rounded-full px-1 text-[14px] leading-none opacity-70 transition hover:opacity-100 hover:drop-shadow disabled:opacity-35">
-                            🔔
+                            
                           </button>
                         ) : null}
                       </div>

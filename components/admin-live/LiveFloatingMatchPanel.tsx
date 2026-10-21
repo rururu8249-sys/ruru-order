@@ -186,7 +186,7 @@ export default function LiveFloatingMatchPanel({
         body: JSON.stringify({ orderGroupId, orderIds, depositIds, clientSelectedTotalAmount }),
       });
       if (!res.ok) throw new Error(await res.text());
-      showAdminToast("입금 확인 완료 ✅", "success");
+      showAdminToast("입금 확인 완료 ", "success");
       onClearSelectedOrder?.();
       setSelectedDepIds(new Set());
       await onMatched();
@@ -208,7 +208,7 @@ export default function LiveFloatingMatchPanel({
         body: JSON.stringify({ orderGroupId, orderIds, expectedAmount: ea }),
       });
       if (!res.ok) throw new Error(await res.text());
-      showAdminToast("수동 입금확인 완료 ✅", "success");
+      showAdminToast("수동 입금확인 완료 ", "success");
       onClearSelectedOrder?.();
       setSelectedDepIds(new Set());
       await onMatched();
@@ -235,7 +235,7 @@ export default function LiveFloatingMatchPanel({
         }),
       });
       if (!res.ok) throw new Error(await res.text());
-      showAdminToast("입금 확인 완료 ✅", "success");
+      showAdminToast("입금 확인 완료 ", "success");
       await onMatched();
     } catch (e: any) {
       showAdminToast(`오류: ${e?.message ?? e}`, "error");
@@ -282,7 +282,7 @@ export default function LiveFloatingMatchPanel({
                 border: `1px solid var(--color-rose-deep)`,
                 background: calOpen ? "var(--color-rose-deep)" : "var(--color-surface)",
                 color: calOpen ? "#fff" : "var(--color-rose-deep)",
-              }}>📅 직접선택</button>
+              }}>직접선택</button>
             {calOpen && (
               <div style={{
                 position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 300,
@@ -317,7 +317,7 @@ export default function LiveFloatingMatchPanel({
               flexShrink: 0,
             }}>{showAll ? "전체보기" : "미매칭만"}</button>
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="🔍 입금자명 · 금액"
+            placeholder="입금자명 · 금액"
             style={{ flex: 1, border: "1px solid var(--color-line)", borderRadius: 8, padding: "6px 8px", fontSize: 12, outline: "none", background: "var(--color-surface-2)" }} />
         </div>
       </div>
@@ -325,7 +325,7 @@ export default function LiveFloatingMatchPanel({
       {/* 매칭 모드 안내 */}
       {matchMode && selectedOrderForMatch && (
         <div style={{ padding: "8px 12px", background: "var(--color-rose-soft)", borderBottom: "1px solid var(--color-rose-soft)", fontSize: 11, color: "var(--color-rose-deep)", fontWeight: 700, flexShrink: 0 }}>
-          🔗 <strong>{selectedOrderForMatch.nickname ?? selectedOrderForMatch.name}</strong>
+          <strong>{selectedOrderForMatch.nickname ?? selectedOrderForMatch.name}</strong>
           {" · "}{won(expectedAmount)} 주문에 연결할 입금 선택
           <button onClick={() => { onClearSelectedOrder?.(); setSelectedDepIds(new Set()); }}
             style={{ marginLeft: 8, background: "none", border: "none", color: "var(--color-ink-mute)", fontSize: 12, cursor: "pointer" }}>✕</button>
@@ -408,12 +408,12 @@ export default function LiveFloatingMatchPanel({
                       <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-ink)" }}>{dep.depositor_name ?? "—"}</span>
                       {isMatched && (
                         <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-ok-tx)", background: "var(--color-ok-bg)", borderRadius: 4, padding: "1px 4px" }}>
-                          ✅ 매칭완료
+                          매칭완료
                         </span>
                       )}
                       {!isMatched && rec && (
                         <span style={{ fontSize: 11, fontWeight: 800, color: "#fff", background: "var(--color-ok-tx)", borderRadius: 4, padding: "1px 4px" }}>
-                          ✅ 추천
+                          추천
                         </span>
                       )}
                       {!isMatched && rec && matchMode && (
