@@ -616,7 +616,6 @@ function ImagePicker({
               <img src={resolveProductImageUrl(coverImage)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
               <>
-                <span style={{ fontSize: "28px" }}>📷</span>
                 <span style={{ lineHeight: 1.3 }}>{uploading ? "업로드 중..." : <>클릭 또는<br />드래그</>}</span>
               </>
             )}
@@ -633,7 +632,7 @@ function ImagePicker({
           ) : null}
         </div>
         <label style={{ display: "inline-flex", alignItems: "center", gap: "4px", marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}>
-          📷 촬영하기
+          촬영하기
           <input type="file" accept="image/*" capture="environment" hidden onChange={handleFileChange} />
         </label>
       </div>
@@ -736,7 +735,7 @@ function ImagePicker({
         })}
       </div>
       <label style={{ display: "inline-flex", alignItems: "center", gap: "4px", marginTop: "6px", fontSize: "12px", fontWeight: 700, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}>
-        📷 촬영하기
+        촬영하기
         <input type="file" accept="image/*" capture="environment" hidden onChange={handleFileChange} />
       </label>
       <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", textAlign: "right", marginTop: "4px" }}>{value.length} / {maxFiles}</div>
@@ -2252,8 +2251,8 @@ export default function QuickProductFastForm({
                                   </span>
                                 );
                               })()}
-                              <button type="button" title={detailHidden.includes(group.detail) ? "숨김 — 누르면 노출" : "노출 중 — 누르면 숨김"} onClick={() => toggleDetailHidden(group.detail)} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: "14px", padding: 0 }}>
-                                {detailHidden.includes(group.detail) ? "🚫" : "👁"}
+                              <button type="button" title={detailHidden.includes(group.detail) ? "숨김 — 누르면 노출" : "노출 중 — 누르면 숨김"} onClick={() => toggleDetailHidden(group.detail)} style={{ border: "1px solid var(--color-line)", background: "var(--color-surface)", cursor: "pointer", fontSize: "11px", fontWeight: 700, padding: "2px 6px", borderRadius: "8px", color: "var(--color-ink)" }}>
+                                {detailHidden.includes(group.detail) ? "숨김" : "보임"}
                               </button>
                             </div>
                           ) : null}
@@ -2327,7 +2326,7 @@ export default function QuickProductFastForm({
               <div style={brandGroupActive || !legacyComboLoaded ? { ...optRow, display: "none" } : optRow}>
                 <span style={optLabel}>세부상품</span>
                 <input style={optInput} type="text" placeholder="A-1, A-2, A-3 (쉼표로 구분)" value={detailText} onChange={(e) => { setFormTouched(true); setDetailText(e.target.value); }} />
-                {!detailText.trim() ? <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-ink-mute)", whiteSpace: "nowrap" }}>🚫 사용 안 함</span> : null}
+                {!detailText.trim() ? <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-ink-mute)", whiteSpace: "nowrap" }}>사용 안 함</span> : null}
               </div>
 
               {/* 슬롯 2 — 색상 */}
@@ -2358,7 +2357,7 @@ export default function QuickProductFastForm({
                         const on = splitOptions(colorText).includes(preset);
                         return (
                           <div key={preset} onClick={() => applyColorPreset(preset)} style={presetItem(on)}>
-                            <span style={{ width: "13px", flexShrink: 0, fontWeight: 900 }}>{on ? "✓" : ""}</span>{preset === "없음" ? "🚫 사용 안 함" : preset}
+                            <span style={{ width: "13px", flexShrink: 0, fontWeight: 900 }}>{on ? "✓" : ""}</span>{preset === "없음" ? "사용 안 함" : preset}
                           </div>
                         );
                       })}
@@ -2367,8 +2366,8 @@ export default function QuickProductFastForm({
                 </div>
                 {colorText.includes("/") ? <span title="쉼표(,)만 옵션을 나눕니다. / 는 이름의 일부로 저장됩니다." style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-info-tx)", whiteSpace: "nowrap" }}>ⓘ / 는 한 이름으로 묶여요</span> : null}
                 <div style={{ display: "flex", gap: "4px", alignItems: "center", flexShrink: 0 }}>
-                  {optionModeChip(colorText.trim() === "", "✏️ 손님이 적어요", () => { setFormTouched(true); setColorText(""); })}
-                  {optionModeChip(splitOptions(colorText).length > 0 && splitOptions(colorText).every((x) => x === "없음"), "🚫 안 써요", () => { setFormTouched(true); setColorText("없음"); })}
+                  {optionModeChip(colorText.trim() === "", "손님이 적어요", () => { setFormTouched(true); setColorText(""); })}
+                  {optionModeChip(splitOptions(colorText).length > 0 && splitOptions(colorText).every((x) => x === "없음"), "안 써요", () => { setFormTouched(true); setColorText("없음"); })}
                 </div>
                 </>}
               </div>
@@ -2438,7 +2437,7 @@ export default function QuickProductFastForm({
                         const on = normalizePresetOptions(preset).some((o) => splitOptions(sizeText).includes(o));
                         return (
                           <div key={preset} onClick={() => applySizePreset(preset)} style={presetItem(on)}>
-                            <span style={{ width: "13px", flexShrink: 0, fontWeight: 900 }}>{on ? "✓" : ""}</span>{preset === "없음" ? "🚫 사용 안 함" : preset}
+                            <span style={{ width: "13px", flexShrink: 0, fontWeight: 900 }}>{on ? "✓" : ""}</span>{preset === "없음" ? "사용 안 함" : preset}
                           </div>
                         );
                       })}
@@ -2447,8 +2446,8 @@ export default function QuickProductFastForm({
                 </div>
                 {sizeText.includes("/") ? <span title="쉼표(,)만 옵션을 나눕니다. XS/S 는 한 묶음 사이즈로 저장됩니다." style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-info-tx)", whiteSpace: "nowrap" }}>ⓘ / 는 한 사이즈로 묶여요</span> : null}
                 <div style={{ display: "flex", gap: "4px", alignItems: "center", flexShrink: 0 }}>
-                  {optionModeChip(sizeText.trim() === "", "✏️ 손님이 적어요", () => { setFormTouched(true); setSizeText(""); })}
-                  {optionModeChip(splitOptions(sizeText).length > 0 && splitOptions(sizeText).every((x) => x === "없음"), "🚫 안 써요", () => { setFormTouched(true); setSizeText("없음"); })}
+                  {optionModeChip(sizeText.trim() === "", "손님이 적어요", () => { setFormTouched(true); setSizeText(""); })}
+                  {optionModeChip(splitOptions(sizeText).length > 0 && splitOptions(sizeText).every((x) => x === "없음"), "안 써요", () => { setFormTouched(true); setSizeText("없음"); })}
                 </div>
               </div>
 
@@ -2502,7 +2501,7 @@ export default function QuickProductFastForm({
                     }}
                   >
                     <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)" }}>
-                      {bulkRowBusy ? "사진 올리는 중…" : "📸 사진 몽땅 끌어놓기 — 장수만큼 줄 생성 · 파일명=상품명"}
+                      {bulkRowBusy ? "사진 올리는 중…" : "사진 몽땅 끌어놓기 — 장수만큼 줄 생성 · 파일명=상품명"}
                     </div>
                   </div>
 
@@ -2536,7 +2535,7 @@ export default function QuickProductFastForm({
                       {details.some((n) => detailHidden.includes(n)) ? (
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "8px 8px", borderBottom: "1px solid var(--color-rose-line)", background: "var(--color-rose-soft)" }}>
                           <span style={{ fontSize: "11px", fontWeight: 900, color: "var(--color-rose-deep)" }}>
-                            🚫 숨김 {details.filter((n) => detailHidden.includes(n)).length}개 — 손님에게 안 보입니다
+                            숨김 {details.filter((n) => detailHidden.includes(n)).length}개 — 손님에게 안 보입니다
                           </span>
                           <button
                             type="button"
@@ -2636,7 +2635,7 @@ export default function QuickProductFastForm({
                                     {/* 숨김 줄은 흐리게만 하면 눈에 안 띈다 — 딱지를 붙여 확실히 보이게 */}
                                     {off ? (
                                       <span style={{ display: "inline-block", marginBottom: "4px", borderRadius: "999px", background: "var(--color-danger-bg)", color: "var(--color-rose-deep)", fontSize: "11px", fontWeight: 900, padding: "2px 8px" }}>
-                                        🚫 숨김 · 손님에게 안 보임
+                                        숨김 · 손님에게 안 보임
                                       </span>
                                     ) : null}
                                     <input
@@ -2695,8 +2694,8 @@ export default function QuickProductFastForm({
                                       type="button"
                                       title={off ? "숨김 — 누르면 손님에게 보임" : "보이는 중 — 누르면 숨김"}
                                       onClick={() => { setFormTouched(true); toggleDetailHidden(name); }}
-                                      style={{ width: "28px", height: "28px", borderRadius: "8px", cursor: "pointer", fontSize: "12px", border: `1px solid ${off ? "var(--color-rose-line)" : "var(--color-ok-bg)"}`, background: off ? "var(--color-surface-2)" : "var(--color-ok-bg)", color: off ? "var(--color-ink-mute)" : "var(--color-ok-tx)" }}
-                                    >{off ? "🚫" : "👁"}</button>
+                                      style={{ height: "28px", padding: "0 8px", borderRadius: "8px", cursor: "pointer", fontSize: "11px", fontWeight: 700, border: "1px solid var(--color-line)", background: off ? "var(--color-surface-2)" : "var(--color-surface)", color: off ? "var(--color-ink-mute)" : "var(--color-ink)" }}
+                                    >{off ? "숨김" : "보임"}</button>
                                     <button
                                       type="button"
                                       title="사진·이름·가격·색상·사이즈를 창에서 자세히 수정"
@@ -2773,7 +2772,7 @@ export default function QuickProductFastForm({
               {/* 🔴 사고 방지 — 재고를 넣었는데 재고관리가 꺼져 있으면 무제한으로 저장된다 */}
               {!stockManagementEnabled && totalStock > 0 ? (
                 <div style={{ background: "var(--color-danger-bg)", border: "1px solid var(--color-danger-bg)", color: "var(--color-danger-tx)", fontSize: "12px", fontWeight: 700, borderRadius: "8px", padding: "8px 12px", marginTop: "8px", lineHeight: 1.6 }}>
-                  🔴 재고를 입력했는데 <b>재고관리가 꺼져 있어요.</b>
+                  재고를 입력했는데 <b>재고관리가 꺼져 있어요.</b>
                   <div style={{ fontWeight: 400, marginTop: "2px" }}>이대로 등록하면 <b>무제한으로 팔립니다.</b></div>
                   <button type="button" onClick={() => setStockManagementEnabled(true)} style={{ marginTop: "6px", border: "none", background: "var(--color-rose-deep)", color: "#fff", fontSize: "11px", fontWeight: 800, borderRadius: "8px", padding: "4px 12px", cursor: "pointer" }}>재고관리 켜기</button>
                 </div>
@@ -2795,7 +2794,7 @@ export default function QuickProductFastForm({
                       : <>손님은 <b>{[realColors.length ? "색상" : "", realSizes.length ? "사이즈" : ""].filter(Boolean).join(" → ")}</b>을(를) 고릅니다. (예전 &quot;색상·사이즈&quot;와 <b>완전히 같은 방식</b>)</>}
                   {details.length > 0 ? (
                     <>
-                      <br />추가금은 <b>세부상품</b>별로 넣습니다 · 👁 를 누르면 그 세부상품만 손님에게 숨겨져요.
+                      <br />추가금은 <b>세부상품</b>별로 넣습니다 · 「보임」을 누르면 그 세부상품만 손님에게 숨겨져요.
                       <br /><b>＋ 네모칸</b>을 누르면 <b>세부상품마다 사진</b>을 넣을 수 있어요 (손님이 사진 보고 고름) · 사진 위 <b>우클릭</b>하면 삭제.
                     </>
                   ) : null}
@@ -3101,7 +3100,7 @@ export default function QuickProductFastForm({
 
         {/* .modal-hd */}
         <div onMouseDown={onHeaderMouseDown} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid var(--color-line)", background: "var(--color-surface-2)", cursor: "grab", userSelect: "none" }}>
-          <h2 style={{ fontSize: "14px", fontWeight: 500, color: "var(--color-ink)", margin: 0 }}>{isEditMode ? "✎ 상품 수정" : "+ 새 상품 등록"}</h2>
+          <h2 style={{ fontSize: "14px", fontWeight: 500, color: "var(--color-ink)", margin: 0 }}>{isEditMode ? "상품 수정" : "+ 새 상품 등록"}</h2>
           <span onClick={() => { void requestClose(); }} style={{ fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>×</span>
         </div>
 
@@ -3266,7 +3265,7 @@ export default function QuickProductFastForm({
               const priceText2 = brandGroupActive
                 ? `최저가 ${lowest.toLocaleString("ko-KR")}원 부터 ~`
                 : freeProductEnabled
-                  ? "0원 · 🎁 무료나눔"
+                  ? "0원 · 무료나눔"
                   : basePrice > 0
                     ? maxPlus > 0
                       ? `${lowest.toLocaleString("ko-KR")}원 ~`
@@ -3294,13 +3293,13 @@ export default function QuickProductFastForm({
                       <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginBottom: "4px" }}>
                         {badgeTypes.includes("new") ? badgeChip("var(--color-ok-bg)", "var(--color-ok-tx)", "신상") : null}
                         {badgeTypes.includes("hot") ? badgeChip("var(--color-danger-bg)", "var(--color-danger-tx)", "급상승") : null}
-                        {badgeTypes.includes("special") ? badgeChip("var(--color-warn-bg)", "var(--color-warn-tx)", "⚡특가") : null}
+                        {badgeTypes.includes("special") ? badgeChip("var(--color-warn-bg)", "var(--color-warn-tx)", "특가") : null}
                         {badgeTypes.includes("limit") ? badgeChip("var(--color-warn-bg)", "var(--color-warn-tx)", "마감임박") : null}
-                        {badgeTypes.includes("pick") ? badgeChip("var(--color-rose-soft)", "var(--color-rose-deep)", "💖 루루픽") : null}
-                        {badgeTypes.includes("direct") ? badgeChip("var(--color-info-bg)", "var(--color-info-tx)", "🛒 바로구매") : null}
-                        {badgeTypes.includes("overseas") ? badgeChip("var(--color-ok-bg)", "var(--color-ok-tx)", "✈️ 해외배송") : null}
-                        {freeProductEnabled ? badgeChip("var(--color-ok-bg)", "var(--color-ok-tx)", "🎁 무료나눔") : null}
-                        {shippingType !== "normal" ? badgeChip("var(--color-info-bg)", "var(--color-info-tx)", "🚚 업체배송") : null}
+                        {badgeTypes.includes("pick") ? badgeChip("var(--color-rose-soft)", "var(--color-rose-deep)", "루루픽") : null}
+                        {badgeTypes.includes("direct") ? badgeChip("var(--color-info-bg)", "var(--color-info-tx)", "바로구매") : null}
+                        {badgeTypes.includes("overseas") ? badgeChip("var(--color-ok-bg)", "var(--color-ok-tx)", "해외배송") : null}
+                        {freeProductEnabled ? badgeChip("var(--color-ok-bg)", "var(--color-ok-tx)", "무료나눔") : null}
+                        {shippingType !== "normal" ? badgeChip("var(--color-info-bg)", "var(--color-info-tx)", "업체배송") : null}
                       </div>
                       <div style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {productName.trim() || "상품명을 입력하세요"}
@@ -3420,13 +3419,13 @@ export default function QuickProductFastForm({
           <div style={{ marginBottom: "12px" }}>
             <div style={sectionLabel}>상품 뱃지</div>
             <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginBottom: "6px", lineHeight: 1.6 }}>
-              손님 상품 목록에 표시되는 뱃지 · <b style={{ color: "var(--color-ok-tx)" }}>배지를 하나도 안 골라도 자동으로 붙습니다</b> — 신상(등록 7일) · 급상승(담김 많거나 판매 상위 10%) · 💖루루픽(판매 상위 3%) · 「N개 남음」(재고) · 「방송 중 N개 주문」(실시간) · 「판매 N개」 · 「재구매 N명」. 배지는 «더» 강조하고 싶을 때만 누르세요.
+              손님 상품 목록에 표시되는 뱃지 · <b style={{ color: "var(--color-ok-tx)" }}>배지를 하나도 안 골라도 자동으로 붙습니다</b> — 신상(등록 7일) · 급상승(담김 많거나 판매 상위 10%) · 루루픽(판매 상위 3%) · 「N개 남음」(재고) · 「방송 중 N개 주문」(실시간) · 「판매 N개」 · 「재구매 N명」. 배지는 «더» 강조하고 싶을 때만 누르세요.
               <br />해외배송 뱃지는 직접 골라야 붙습니다
             </div>
             <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}`}</style>
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
               {/* [2026-07-10] 해외배송 배지 추가 (표시 전용 — 배송비/배송 로직과 무관) */}
-              {([["none", "없음"], ["new", "신상"], ["hot", "급상승"], ["special", "특가"], ["limit", "⏰ 마감임박"], ["pick", "💖 루루픽"], ["overseas", "✈️ 해외배송"]] as const).map(([v, l]) => {
+              {([["none", "없음"], ["new", "신상"], ["hot", "급상승"], ["special", "특가"], ["limit", "마감임박"], ["pick", "루루픽"], ["overseas", "해외배송"]] as const).map(([v, l]) => {
                 const on = v === "none" ? badgeTypes.length === 0 : badgeTypes.includes(v);
                 return (
                   <div
@@ -3476,7 +3475,7 @@ export default function QuickProductFastForm({
           <div style={{ marginBottom: "12px" }}>
             <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", fontWeight: 800, color: freeProductEnabled ? "var(--color-ok-tx)" : "var(--color-ink)", cursor: "pointer" }}>
               <input type="checkbox" checked={freeProductEnabled} onChange={(e) => setFreeProductEnabled(e.target.checked)} style={{ accentColor: "var(--color-ok-tx)" }} />
-              🎁 무료나눔 상품 (0원 — 손님에게 선물)
+              무료나눔 상품 (0원 — 손님에게 선물)
             </label>
           </div>
 
@@ -3551,7 +3550,7 @@ export default function QuickProductFastForm({
 
         {/* footer */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: "1px solid var(--color-line)", background: "var(--color-surface-2)", flexShrink: 0 }}>
-          <div style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}><span style={{ color: "var(--color-warn-tx)" }}>⚡ 빠른등록:</span> 사진·이름·가격만 넣고 바로 — 나머지는 [자세히]에서 필요할 때만</div>
+          <div style={{ fontSize: "12px", color: "var(--color-ink-mute)" }}><span style={{ color: "var(--color-warn-tx)" }}>빠른등록:</span> 사진·이름·가격만 넣고 바로 — 나머지는 [자세히]에서 필요할 때만</div>
           <div style={{ display: "flex", gap: "8px" }}>
             <button type="button" onClick={() => { void requestClose(); }} disabled={saving} style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", fontSize: "13px", cursor: saving ? "default" : "pointer", color: "var(--color-ink)", opacity: saving ? 0.5 : 1 }}>취소</button>
             <button type="button" onClick={() => void saveProduct()} disabled={saving} style={{ padding: "8px 24px", borderRadius: "8px", background: saving ? "var(--color-line)" : isEditMode ? "var(--color-ok-tx)" : "var(--color-rose-deep)", color: "#fff", border: "none", fontSize: "13px", fontWeight: 500, cursor: saving ? "not-allowed" : "pointer" }}>{saving ? "저장 중..." : isEditMode ? "저장" : "등록"}</button>
@@ -3679,7 +3678,7 @@ export default function QuickProductFastForm({
                       <div style={{ padding: "20px 12px 0", fontSize: "12px", fontWeight: 900, color: tooLow ? "var(--color-danger-tx)" : "var(--color-rose-deep)", lineHeight: 1.5 }}>
                         {tooLow
                           ? <>대표가({base.toLocaleString("ko-KR")}원)보다<br />낮게는 못 넣습니다</>
-                          : <>💡 <b>팔 금액을 그대로</b> 적으세요<br />추가금({plusNow.toLocaleString("ko-KR")}원)은 자동 계산</>}
+                          : <><b>팔 금액을 그대로</b> 적으세요<br />추가금({plusNow.toLocaleString("ko-KR")}원)은 자동 계산</>}
                       </div>
                     </>
                   );
