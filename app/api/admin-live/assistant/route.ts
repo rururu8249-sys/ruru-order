@@ -50,7 +50,7 @@ async function askGemini(text: string): Promise<AssistantIntent | null> {
   lastAiNote = "";
   const key = process.env.GEMINI_API_KEY || "";
   if (!key) { lastAiNote = "no_key"; return null; }
-  const models = [process.env.GEMINI_MODEL, "gemini-flash-latest", "gemini-2.5-flash"].filter(Boolean) as string[];
+  const models = [process.env.GEMINI_MODEL, "gemini-flash-latest", "gemini-2.5-flash", "gemini-2.5-flash-lite"].filter(Boolean) as string[];
   // 2.5 계열은 «생각» 토큰을 먼저 써서 짧은 한도면 답 글자가 비어 온다 → 생각 끄기(thinkingBudget 0) 먼저,
   //   그 설정을 모르는 모델(400)이면 설정 없이 한 번 더.
   const configs = [
@@ -60,7 +60,7 @@ async function askGemini(text: string): Promise<AssistantIntent | null> {
   for (const model of models) {
     for (const generationConfig of configs) {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 8000);
+      const timer = setTimeout(() => controller.abort(), 6000);
       try {
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
           method: "POST",
@@ -70,7 +70,7 @@ async function askGemini(text: string): Promise<AssistantIntent | null> {
         });
         if (res.status === 404) { lastAiNote = `${model}:404`; break; } // 모델 이름이 없으면 다음 이름으로
         if (res.status === 400) { lastAiNote = `${model}:400`; continue; } // 설정을 모르면 설정 없이 다시
-        if (!res.ok) { lastAiNote = `${model}:http_${res.status}`; return null; } // 429(한도) 등은 규칙 해석으로
+        if (!res.ok) { lastAiNote = `${model}:http_${res.status}`; break; } // 503(붐빔)·429(한도) 등 → 다음 모델, 다 안 되면 규칙 해석
         const data = await res.json().catch(() => null);
         const out = data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p?.text || "").join("") || "";
         if (!out) { lastAiNote = `${model}:empty_${data?.candidates?.[0]?.finishReason || "none"}`; continue; }
