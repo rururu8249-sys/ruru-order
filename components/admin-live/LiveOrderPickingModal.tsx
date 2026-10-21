@@ -423,7 +423,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
     return (
       <div className={`shrink-0 text-right max-sm:w-auto ${size === "lg" ? "w-[136px]" : "w-[120px]"}`}>
         {done
-          ? <span className="inline-block rounded-full bg-[var(--color-ok-tx)] px-2 py-0.5 text-[12px] font-black text-white">✓ 다 챙김</span>
+          ? <div className="whitespace-nowrap leading-tight"><span className="inline-block rounded-full bg-[var(--color-ok-tx)] px-2 py-0.5 text-[12px] font-black text-white">✓ 다 챙김</span>{/* [2026-10-21] 다 챙긴 뒤에도 총 수량이 보이게 */}<span className="ml-1.5 text-[12px] font-bold text-ink-soft tabular-nums">전체 {p.total}개</span></div>
           : <div className={`whitespace-nowrap font-black leading-tight text-ink tabular-nums ${size === "lg" ? "text-[16px] max-sm:text-[14px]" : "text-[14px]"}`}>남은 {p.total - p.got} <span className="text-[12px] font-bold text-ink-soft">/ 전체 {p.total}개</span></div>}
         {!done && p.total > 0 ? <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-line max-sm:hidden"><div className="h-full rounded-full bg-[var(--color-ok-tx)]" style={{ width: `${Math.round((p.got / p.total) * 100)}%` }} /></div> : null}
         {unpaid > 0 ? <div className="text-[12px] font-bold text-[var(--color-danger-tx)] tabular-nums">미결제 {unpaid}</div> : null}
@@ -578,6 +578,13 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
                 }
                 // [㉙-2] 단가: 상품 머리엔 항상, 옵션별 단가가 다르면 옵션 머리에도.
                 const productPrice = priceText(group.rows);
+                // [2026-10-21 사장님 요청] 상품 머리줄에 옵션별 수량 요약 — 「베이지 / 사이즈 L 3 · 블랙 / 사이즈 M 2(남은 1)」. 결제완료 줄 기준(옵션 머리 숫자와 같은 식).
+                const optionSummary = [...options].map(([optKey, optRows]) => {
+                  const op = pickingProgress(optRows.filter(({ panel }) => panel.paid).map(({ item }) => ({ qty: item.qty, pickedAt: pickedIds.has(item.id) })));
+                  if (op.total <= 0) return "";
+                  const left = op.total - op.got;
+                  return `${stripNoneOptionParts(optKey) || optKey} ${op.total}${left > 0 && left < op.total ? `(남은 ${left})` : ""}`;
+                }).filter(Boolean).join(" · ");
                 const optionPricesDiffer = new Set(group.rows.map(({ item }) => item.unitPrice || 0).filter(price => price > 0)).size > 1;
                 // sticky 가 동작하도록 section 은 overflow-clip(overflow-hidden 은 sticky 를 막는다). 머리 높이 고정: 상품 72px · 옵션 48px.
                 return <section key={key} className="overflow-clip rounded-xl border border-line bg-surface">
@@ -589,8 +596,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
                       </button>
                     ) : null}
                     <div className="min-w-0 flex-1">
-                      <h3 title={group.title} className="line-clamp-2 break-words text-[18px] font-black leading-tight text-ink max-sm:text-[16px]">{group.title}</h3>
+                      <h3 title={group.title} className={`${options.size > 1 ? "truncate" : "line-clamp-2"} break-words text-[18px] font-black leading-tight text-ink max-sm:text-[16px]`}>{group.title}</h3>
                       {productPrice ? <div className="text-[12px] font-bold text-ink-soft tabular-nums max-sm:hidden">{productPrice}</div> : null}
+                      {options.size > 1 && optionSummary ? <div title={optionSummary} aria-label="옵션별 수량" className="truncate text-[12px] font-bold text-ink-soft tabular-nums">{optionSummary}</div> : null}
                     </div>
                     {progressBlock(progress, unpaidQty, "lg", productPrice)}
                   </div>
