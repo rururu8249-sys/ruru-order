@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
+import { callGeminiJson } from "@/lib/geminiJson";
 import {
   bestMatch,
   maskPhone,
@@ -60,48 +61,13 @@ function todayKstText(): string {
 let lastAiNote = "";
 
 async function askGemini(text: string): Promise<AssistantIntent | null> {
-  lastAiNote = "";
-  const key = process.env.GEMINI_API_KEY || "";
-  if (!key) { lastAiNote = "no_key"; return null; }
-  // 2026-10 Google 모델 목록 기준(2.5 계열은 「예전 사용자만」, 2.0 은 종료). 요청 해석은 가벼운 Lite 먼저.
-  const models = [process.env.GEMINI_MODEL, "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-3.6-flash", "gemini-flash-latest"].filter(Boolean) as string[];
-  // 2.5 계열은 «생각» 토큰을 먼저 써서 짧은 한도면 답 글자가 비어 온다 → 생각 끄기(thinkingBudget 0) 먼저,
-  //   (3 계열은 thinkingLevel, 2.5 계열은 thinkingBudget) 그 설정을 모르는 모델(400)이면 다음 설정·설정 없이 한 번 더.
-  const configs = [
-    { temperature: 0, responseMimeType: "application/json", maxOutputTokens: 1024, thinkingConfig: { thinkingLevel: "minimal" } },
-    { temperature: 0, responseMimeType: "application/json", maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } },
-    { temperature: 0, responseMimeType: "application/json", maxOutputTokens: 2048 },
-  ];
-  for (const model of models) {
-    for (const generationConfig of configs) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 6000);
-      try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-          body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: INTENT_PROMPT.replace("{{TODAY}}", todayKstText()) + text }] }], generationConfig }),
-          signal: controller.signal,
-        });
-        if (res.status === 404) { lastAiNote = `${model}:404`; break; } // 모델 이름이 없으면 다음 이름으로
-        if (res.status === 400) { lastAiNote = `${model}:400`; continue; } // 설정을 모르면 설정 없이 다시
-        if (!res.ok) { lastAiNote = `${model}:http_${res.status}`; break; } // 503(붐빔)·429(한도) 등 → 다음 모델, 다 안 되면 규칙 해석
-        const data = await res.json().catch(() => null);
-        const out = data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p?.text || "").join("") || "";
-        if (!out) { lastAiNote = `${model}:empty_${data?.candidates?.[0]?.finishReason || "none"}`; continue; }
-        const parsed = parseIntentJson(out);
-        if (!parsed) { lastAiNote = `${model}:bad_json`; return null; }
-        lastAiNote = model;
-        return parsed;
-      } catch (e) {
-        lastAiNote = `${model}:${e instanceof Error && e.name === "AbortError" ? "timeout" : "fetch_error"}`;
-        return null;
-      } finally {
-        clearTimeout(timer);
-      }
-    }
-  }
-  return null;
+  // 모델 고르기·생각 토큰·붐빔 처리는 lib/geminiJson 한 곳(메모함과 같이 씀)
+  const { text: out, note } = await callGeminiJson(INTENT_PROMPT.replace("{{TODAY}}", todayKstText()) + text);
+  lastAiNote = note;
+  if (!out) return null;
+  const parsed = parseIntentJson(out);
+  if (!parsed) { lastAiNote = `${note}:bad_json`; return null; }
+  return parsed;
 }
 
 // ───────────────────────── DB 읽기 ─────────────────────────

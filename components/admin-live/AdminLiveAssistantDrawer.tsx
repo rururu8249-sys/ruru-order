@@ -6,6 +6,7 @@
 
 import { useRef, useState } from "react";
 import AdminLiveSideDrawer from "./AdminLiveSideDrawer";
+import AdminLiveAssistantMemoBox from "./AdminLiveAssistantMemoBox";
 
 type Mode = "auto" | "customer" | "product";
 type Range = "3m" | "all";
@@ -217,8 +218,10 @@ export default function AdminLiveAssistantDrawer({
   const [result, setResult] = useState<Result | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  async function run(nextRange: Range = range, nextMode: Mode = mode) {
-    const q = text.trim();
+  const [tab, setTab] = useState<"ask" | "memo">("ask");
+
+  async function run(nextRange: Range = range, nextMode: Mode = mode, override?: string) {
+    const q = (override ?? text).trim();
     if (!q || loading) return;
     setLoading(true);
     setError("");
@@ -245,6 +248,22 @@ export default function AdminLiveAssistantDrawer({
   return (
     <AdminLiveSideDrawer title="비서" width={560} onClose={onClose}>
       <div className="space-y-3 p-4">
+        <div role="tablist" aria-label="비서 화면" className="-mt-1 flex gap-4 border-b border-line">
+          {([["ask", "물어보기"], ["memo", "메모함"]] as ["ask" | "memo", string][]).map(([k, label]) => (
+            <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
+              className={`-mb-px h-10 border-b-2 px-1 text-[14px] font-bold transition focus-visible:outline-2 focus-visible:outline-ink ${tab === k ? "border-ink text-ink" : "border-transparent text-ink-mute hover:text-ink"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === "memo" ? (
+          <AdminLiveAssistantMemoBox
+            onFindCustomer={(who) => { setTab("ask"); setText(who); setMode("customer"); void run(range, "customer", who); }}
+          />
+        ) : null}
+
+        {tab === "ask" ? <>
         <form
           className="flex gap-2"
           onSubmit={(e) => { e.preventDefault(); void run(); }}
@@ -395,6 +414,7 @@ export default function AdminLiveAssistantDrawer({
             )}
           </section>
         ) : null}
+        </> : null}
       </div>
     </AdminLiveSideDrawer>
   );
