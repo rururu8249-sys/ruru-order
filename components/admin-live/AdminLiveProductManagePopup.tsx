@@ -50,7 +50,12 @@ type Props = {
   headerTarget?: HTMLElement | null;
 };
 
-const BASE_CATEGORIES = ["전체", "신발", "의류", "잡화"];
+// [2026-10-21 a2-9] 분류 칩은 고정 목록이 아니라 실제 등록된 분류에서 만든다(DB 실측: 의류 454·화장품 72·없음 69·신발 50·잡화 50·향수 42 …).
+const NO_CATEGORY_KEY = "__none__";
+// [2026-10-21 a2-9] 세 탭 머리줄·검색칸·정렬 select 공통 모양(DESIGN-ADMIN: 입력·보조 36px·13/14px·검정 글자)
+const TAB_TITLE_STYLE: React.CSSProperties = { fontSize: "13px", fontWeight: 700, color: "var(--color-ink)" };
+const TAB_SEARCH_STYLE: React.CSSProperties = { width: "100%", height: "36px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 12px", margin: "0 0 8px", fontSize: "14px", fontWeight: 500, outline: "none", color: "var(--color-ink)", boxSizing: "border-box" };
+const TAB_SORT_STYLE: React.CSSProperties = { height: "36px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink)", fontSize: "13px", fontWeight: 700, padding: "0 8px", cursor: "pointer" };
 
 // --- pick helpers ---
 function pickString(row: ProductRow | null | undefined, keys: string[], fallback = "") {
@@ -204,7 +209,7 @@ const productId = (p: ProductRow) => pickString(p, ["id", "product_id"], "");
 type ProductSortKey = "manual" | "name" | "price_asc" | "price_desc" | "recent";
 const PRODUCT_SORT_OPTIONS: Array<{ key: ProductSortKey; label: string }> = [
   { key: "manual", label: "진열 순서 (드래그)" },
-  { key: "name", label: "이름 ㄱㄴㄷ순" },
+  { key: "name", label: "이름순" },
   { key: "price_asc", label: "낮은 가격순" },
   { key: "price_desc", label: "높은 가격순" },
   { key: "recent", label: "최신 등록순" },
@@ -913,7 +918,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     const q = normalizeProductSearchText(search);
     const list = brandCatalog.roots.filter((p) => {
       if (pickString(p, ["status", "product_status"], "") === "deleted") return false;
-      if (category !== "전체" && productCategory(p) !== category) return false;
+      if (category === NO_CATEGORY_KEY) { if (productCategory(p)) return false; }
+      else if (category !== "전체" && productCategory(p) !== category) return false;
       if (lowOnly) {
         const s = lowStockOf(p);
         if (s === null || s > 3) return false;
@@ -960,7 +966,23 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     setProductPageNumber(page);
   };
 
-  const categories = BASE_CATEGORIES;
+  // 분류 칩 = 실제 데이터에서(삭제 제외). 2개 이상인 분류만 칩으로(1개짜리 오타·브랜드명은 「전체」에서 검색), 분류 없는 상품이 있으면 「분류 없음」 칩.
+  const categories = useMemo(() => {
+    const count = new Map<string, number>();
+    let none = 0;
+    for (const p of brandCatalog.roots) {
+      if (pickString(p, ["status", "product_status"], "") === "deleted") continue;
+      const c = productCategory(p);
+      if (!c) { none += 1; continue; }
+      count.set(c, (count.get(c) || 0) + 1);
+    }
+    const list: Array<{ key: string; label: string }> = [{ key: "전체", label: "전체" }];
+    for (const [c, n] of [...count.entries()].sort((a, b) => b[1] - a[1])) {
+      if (n >= 2) list.push({ key: c, label: `${c} ${n}` });
+    }
+    if (none > 0) list.push({ key: NO_CATEGORY_KEY, label: `분류 없음 ${none}` });
+    return list;
+  }, [brandCatalog]);
 
   // [2026-08-13] 쇼핑몰 진열 탭 정렬 (표시 전용)
   const [shopSort, setShopSort] = useState<ProductSortKey>("manual");
@@ -1741,21 +1763,21 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             {/* 우측: 선택 방송의 진열 상품 (sort_order순, 읽기 전용) */}
             <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", border: "1px solid var(--color-line)", borderRadius: "8px", overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 12px", borderBottom: "1px solid var(--color-line)" }}>
-                <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)" }}>방송 상품 {bcProducts.length}개</span>
-                <button type="button" disabled={!bcSelId || bcBusy} onClick={openBcPicker} style={{ marginLeft: "auto", height: "36px", fontSize: "13px", fontWeight: 700, color: "#fff", background: "var(--color-ink)", border: "none", borderRadius: "8px", padding: "0 12px", cursor: !bcSelId || bcBusy ? "not-allowed" : "pointer", opacity: !bcSelId || bcBusy ? 0.5 : 1 }}>+ 담기</button>
+                <span style={TAB_TITLE_STYLE}>방송 상품 {bcProducts.length}개</span>
                 {bcSelId && bcProducts.length > 0 ? (
                   <select
                     value={bcSort}
                     onChange={(e) => setBcSort(e.target.value as ProductSortKey)}
                     title="보기 순서만 바꿈(저장 안 됨)"
-                    style={{ height: "26px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 800, padding: "0 6px", cursor: "pointer" }}
+                    style={{ ...TAB_SORT_STYLE, marginLeft: "auto" }}
                   >
                     {PRODUCT_SORT_OPTIONS.map((o) => (<option key={o.key} value={o.key}>{o.label}</option>))}
                   </select>
                 ) : null}
                 {bcSelId && bcProducts.length > 0 ? (
-                  <button type="button" disabled={bcBusy} onClick={() => { setBcCopyMode((v) => !v); setBcCopySel(new Set()); }} style={{ fontSize: "11px", fontWeight: 800, color: bcCopyMode ? "var(--color-ink-soft)" : "var(--color-rose-deep)", background: bcCopyMode ? "var(--color-surface)" : "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "4px 12px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>{bcCopyMode ? "선택 취소" : "선택 복사"}</button>
+                  <button type="button" disabled={bcBusy} onClick={() => { setBcCopyMode((v) => !v); setBcCopySel(new Set()); }} style={{ height: "36px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", background: bcCopyMode ? "var(--color-surface-2)" : "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "0 12px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>{bcCopyMode ? "선택 취소" : "선택 복사"}</button>
                 ) : null}
+                <button type="button" disabled={!bcSelId || bcBusy} onClick={openBcPicker} style={{ marginLeft: bcSelId && bcProducts.length > 0 ? undefined : "auto", height: "36px", fontSize: "13px", fontWeight: 700, color: "#fff", background: "var(--color-ink)", border: "none", borderRadius: "8px", padding: "0 12px", cursor: !bcSelId || bcBusy ? "not-allowed" : "pointer", opacity: !bcSelId || bcBusy ? 0.5 : 1 }}>+ 담기</button>
               </div>
               <div style={{ padding: "8px 12px 0" }}>
                 {/* [2026-10-03] 빠른 재사용은 한 줄 카드, 전체 진열상품은 바로 아래 큰 작업영역으로 유지한다. */}
@@ -1786,7 +1808,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     onTogglePause={() => void toggleWidgetLibraryPause()}
                   />
                 ) : null}
-                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="상품명 검색" style={{ width: "100%", height: "34px", padding: "0 8px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid var(--color-line)", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="상품명 검색" style={TAB_SEARCH_STYLE} />
                 {bcSelId && bcProducts.length > 0 && !bcDragEnabled && !bcCopyMode ? (
                   <div style={{ margin: "0 0 8px", padding: "6px 8px", borderRadius: "8px", background: "var(--color-warn-bg)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 700, lineHeight: 1.4 }}>
                     {search.trim() ? "검색 중에는 순서를 바꿀 수 없어요. 검색어를 지워주세요." : "순서를 바꾸려면 정렬을 「진열 순서 (드래그)」로 두세요. (지금은 보기만 바뀐 상태 — 저장된 순서는 그대로)"}
@@ -1937,20 +1959,20 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         ) : tab === "shop" ? (
           <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "12px 16px 16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)" }}>쇼핑몰 상품 {shopRows.length}개</span>
+              <span style={TAB_TITLE_STYLE}>쇼핑몰 상품 {shopRows.length}개</span>
               {shopRows.length > 0 ? (
                 <select
                   value={shopSort}
                   onChange={(e) => setShopSort(e.target.value as ProductSortKey)}
                   title="보기 순서만 바꿈(저장 안 됨)"
-                  style={{ marginLeft: "auto", height: "26px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 800, padding: "0 6px", cursor: "pointer" }}
+                  style={{ ...TAB_SORT_STYLE, marginLeft: "auto" }}
                 >
                   {PRODUCT_SORT_OPTIONS.map((o) => (<option key={o.key} value={o.key}>{o.label}</option>))}
                 </select>
               ) : null}
               <button type="button" disabled={shopBusy} onClick={openShopPicker} style={{ marginLeft: shopRows.length > 0 ? undefined : "auto", height: "36px", fontSize: "13px", fontWeight: 700, color: "#fff", background: "var(--color-ink)", border: "none", borderRadius: "8px", padding: "0 12px", cursor: shopBusy ? "wait" : "pointer", opacity: shopBusy ? 0.5 : 1 }}>+ 담기</button>
             </div>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="상품명 검색" style={{ width: "100%", height: "34px", padding: "0 8px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid var(--color-line)", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="상품명 검색" style={TAB_SEARCH_STYLE} />
             <div
               ref={shopScrollRef}
               onDragOver={handleShopDragAutoScroll}
@@ -2003,21 +2025,35 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
           </div>
         ) : (
           <>
+            {/* 머리줄(세 탭 공통 모양): 제목 N개 … 정렬 */}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px 8px", flexWrap: "wrap" }}>
+              <span style={TAB_TITLE_STYLE}>전체 상품 {filtered.length}개</span>
+              <select
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as "default" | "latest" | "stock_low")}
+                title="보기 순서만 바꿈(저장 안 됨)"
+                style={{ ...TAB_SORT_STYLE, marginLeft: "auto" }}
+              >
+                <option value="latest">최신 등록순</option>
+                <option value="default">저장된 순서</option>
+                <option value="stock_low">재고 적은순</option>
+              </select>
+            </div>
             {/* 검색 */}
-            <div style={{ padding: "0 16px 8px" }}>
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="상품명 검색" style={{ width: "100%", height: "36px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 12px", fontSize: "14px", fontWeight: 500, outline: "none", color: "var(--color-ink)" }} />
+            <div style={{ padding: "0 16px" }}>
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="상품명 검색" style={TAB_SEARCH_STYLE} />
             </div>
 
             {/* 카테고리 칩 */}
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", padding: "0 16px 8px" }}>
               {categories.map((c) => (
                 <button
-                  key={c}
+                  key={c.key}
                   type="button"
-                  onClick={() => setCategory(c)}
-                  style={{ ...chipBase, background: category === c ? "var(--color-rose-soft)" : "var(--color-surface)", color: category === c ? "var(--color-rose-deep)" : "var(--color-ink-soft)", borderColor: category === c ? "var(--color-rose-line)" : "var(--color-line)" }}
+                  onClick={() => setCategory(c.key)}
+                  style={{ ...chipBase, background: category === c.key ? "var(--color-rose-soft)" : "var(--color-surface)", color: category === c.key ? "var(--color-rose-deep)" : "var(--color-ink-soft)", borderColor: category === c.key ? "var(--color-rose-line)" : "var(--color-line)" }}
                 >
-                  {c}
+                  {c.label}
                 </button>
               ))}
               <button
@@ -2028,15 +2064,6 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               >
                 재고임박
               </button>
-              <select
-                value={sortKey}
-                onChange={(e) => setSortKey(e.target.value as "default" | "latest" | "stock_low")}
-                style={{ marginLeft: "auto", height: "28px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 800, padding: "0 8px", cursor: "pointer" }}
-              >
-                <option value="default">기본순</option>
-                <option value="latest">최신 등록순</option>
-                <option value="stock_low">재고 적은순</option>
-              </select>
             </div>
 
             <div style={{padding:"0 16px"}}>
