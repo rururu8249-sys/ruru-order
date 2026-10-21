@@ -29,6 +29,8 @@ type Props = {
   broadcastOn?: boolean;
   /** 「접속 기록 보기」 → 고객 › 접속 기록 화면으로 (예전엔 사이드바 안 팝업이었다) */
   onOpenVisitStats?: () => void;
+  /** [2026-10-22 AI 비서] 「비서」 창 열기 — 손님·주문·상품 찾기 */
+  onOpenAssistant?: () => void;
   /** [2026-10-21 a4-1] 방송 카드 — 「방송」 큰 메뉴를 없애고 시작·종료·관리를 여기로 */
   broadcastCard?: {
     title: string;
@@ -62,6 +64,7 @@ export default function AdminLiveSidebar({
   onExceptionBadgeClick,
   broadcastOn = false,
   onOpenVisitStats,
+  onOpenAssistant,
   broadcastCard,
 }: Props) {
   // [a4-1] 방송 중 경과 시간은 1분마다 갱신(방송 중일 때만)
@@ -216,6 +219,15 @@ export default function AdminLiveSidebar({
 
         {/* [2026-09-08] 늘 쓰는 것 — 카톡 문의 · 카드결제 (알림음은 설정 › 알림음) */}
         <section className="mt-3 shrink-0">
+          {onOpenAssistant ? (
+            <button
+              type="button"
+              onClick={() => { onOpenAssistant(); onCloseNav?.(); }}
+              className="mb-1.5 flex h-10 w-full items-center justify-center rounded-xl bg-ink text-[13px] font-bold text-white transition active:scale-[0.98]"
+            >
+              비서
+            </button>
+          ) : null}
           <div className="grid grid-cols-2 gap-1.5">
             <button
               type="button"

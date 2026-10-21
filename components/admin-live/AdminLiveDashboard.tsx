@@ -23,6 +23,7 @@ import { supabase } from "@/lib/supabase";
 import AdminLiveCustomersPanel from "./AdminLiveCustomersPanel";
 import AdminLivePaymentPanel from "./AdminLivePaymentPanel";
 import AdminLiveSideDrawer from "./AdminLiveSideDrawer";
+import AdminLiveAssistantDrawer from "./AdminLiveAssistantDrawer";
 import { resolveAdminLiveDestination, transitionAdminLiveDrawer, resolveDrawerOrder, type AdminLiveDrawerState } from "./adminLiveDrawerState";
 import AdminLiveSettlementPanel from "./AdminLiveSettlementPanel";
 import AdminLiveSettingsPanel from "./AdminLiveSettingsPanel";
@@ -563,6 +564,8 @@ export default function AdminLiveDashboard() {
   const [drawer, setDrawer] = useState<AdminLiveDrawerState>(() => resolveAdminLiveDestination(readMenuFromUrl()).drawer);
   // [2026-10-21 a4-1] 방송 관리 창(제목·URL·방송 화면 공지·알림 발송·상품 카드·쇼핑몰 열림) — 사이드바 방송 카드 「방송 관리」로 연다
   const [broadcastManageOpen, setBroadcastManageOpen] = useState<boolean>(() => readBroadcastManageFromUrl());
+  // [2026-10-22 AI 비서 1단계] 「비서」 창(손님·주문·상품 찾기, 읽기 전용)
+  const [assistantOpen, setAssistantOpen] = useState(false);
   // [2026-10-21 a4-3] 입금내역 상세 → 입금매칭 창을 그 입금으로 열 때 넘길 값(열 때 1번 읽고 닫으면 비움)
   const [matchInitial, setMatchInitial] = useState<{ depositId: number | null; search: string } | null>(null);
   const settingsGuardRef=useRef<null|(()=>Promise<boolean>)>(null);
@@ -1656,6 +1659,7 @@ export default function AdminLiveDashboard() {
           }}
           broadcastOn={Boolean(activeBroadcast)}
           onOpenVisitStats={() => { setActiveMenu("visits"); }}
+          onOpenAssistant={() => setAssistantOpen(true)}
           broadcastCard={{
             title: activeBroadcast ? broadcastTitle : "",
             startedAt: activeBroadcast?.started_at || activeBroadcast?.created_at || null,
@@ -1989,6 +1993,18 @@ export default function AdminLiveDashboard() {
 
           {/* 채팅읽기 상주 루프 — 컨트롤타워가 열려 있으면 자동으로 읽는다 (OFF면 서버가 건너뜀) */}
           <ChatOrderReaderLoop />
+
+          {assistantOpen ? (
+            <AdminLiveAssistantDrawer
+              onClose={() => setAssistantOpen(false)}
+              onShowInOrders={(keyword) => {
+                // 실시간 주문서 검색칸에 넣고 기간·방송·상태 전체로(보기 전용)
+                setActiveMenu("orders");
+                setFilters((prev) => ({ ...prev, broadcast: "all", scope: "all", date: "all", status: "all", keyword }));
+                setAssistantOpen(false);
+              }}
+            />
+          ) : null}
 
           {/* [2026-10-21 a4-1] 방송 관리 창 — 옛 「방송」 메뉴의 컨트롤타워 그대로(핸들러 동일), 자리만 창으로 */}
           {broadcastManageOpen ? (
