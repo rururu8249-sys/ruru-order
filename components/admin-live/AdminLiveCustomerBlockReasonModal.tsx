@@ -104,7 +104,8 @@ export default function AdminLiveCustomerBlockReasonModal({
   useEffect(() => {
     if (!open) return;
     const parts = parseBlockReason(defaultReason);
-    setReasonType(parts.type);
+    // [2026-10-21 사장님] 차단 1순위는 거파 → 새로 차단할 땐 거파가 미리 골라져 있게(옛 사유가 있으면 그 유형 그대로)
+    setReasonType(parts.type ?? (clean(defaultReason) ? null : "deal_break"));
     setMemo(parts.memo);
     setKeptItems(parts.items);
     setCheckedIds([]);
@@ -234,7 +235,6 @@ export default function AdminLiveCustomerBlockReasonModal({
         {/* 머리 */}
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-line px-5 py-4">
           <div className="min-w-0">
-            <div className="text-[11px] font-black tracking-[0.18em] text-danger-tx">BLOCK</div>
             <h2 className="mt-1 text-[20px] font-black tracking-[-0.03em] text-ink">차단하기</h2>
             <p className="mt-1 text-[12px] font-bold text-ink-soft">
               {clean(nickname) || "-"} · {clean(name) || "-"} · {formatPhone(phone)}
@@ -249,7 +249,12 @@ export default function AdminLiveCustomerBlockReasonModal({
           {/* ① 유형 */}
           <div className="text-[13px] font-black text-ink">① 왜 차단하나요?</div>
           <div className="mt-2 grid grid-cols-2 gap-2">
-            {BLOCK_REASON_TYPES.map((item) => {
+            {/* [2026-10-21 사장님] 유형은 「거래파기(거파)」·「직접 입력」 둘만. 옛 기록의 다른 유형(반복 미입금 등)은 그 기록을 고칠 때만 보인다.
+                저장 형식·읽기는 그대로. */}
+            {BLOCK_REASON_TYPES
+              .filter((t) => t.type === "deal_break" || t.type === "custom" || t.type === reasonType)
+              .map((t) => (t.type === "custom" ? { ...t, hint: "아래 메모에 사유 적기" } : t))
+              .map((item) => {
               const on = reasonType === item.type;
               return (
                 <button key={item.type} type="button" onClick={() => setReasonType(on ? null : item.type)} title={item.hint}

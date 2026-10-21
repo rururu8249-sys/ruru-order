@@ -1853,44 +1853,41 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               + 등록
             </button>
           </div>
-          {(order as any).returnStatus ? (
-            <div
-              role={issueLatest?.task ? "button" : undefined}
-              tabIndex={issueLatest?.task ? 0 : undefined}
-              onClick={issueLatest?.task ? () => void openExistingIssue(issueLatest.task as Record<string, unknown>) : undefined}
-              className={`rounded-lg border border-warn-tx/40 bg-warn-bg p-3 text-[12px] font-bold leading-6 text-warn-tx ${issueLatest?.task ? "cursor-pointer hover:bg-surface-2" : ""}`}
-            >
-              {/* [B4] DB 값은 「반품(환불)/반품(교환)/기타」 — 화면에서만 「환불/교환/기타」로. 사유 앞머리 "[유형] " 제거. */}
-              <span className="mr-2 rounded-lg bg-surface px-2 py-0.5 text-[11px] font-bold">{String((order as any).returnStatus).replace("반품(환불)", "환불").replace("반품(교환)", "교환")}</span>
-              {/* [2026-09-29 C] 고객이슈가 해결완료면 배지 표시 + 「반품 취소」 숨김(기록 지우기는 유지). */}
-              {issueLatest?.isResolved ? (() => { const d = new Date(issueLatest.resolvedAt); const md = Number.isFinite(d.getTime()) ? `${d.getMonth() + 1}.${d.getDate()}` : ""; return <span className="mr-2 rounded-lg bg-ok-bg px-2 py-0.5 text-[11px] font-bold text-ok-tx">해결완료{md ? ` ${md}` : ""}</span>; })() : null}
-              {Number((order as any).returnAmount || 0) > 0 ? <span className="mr-2">환불 예정/완료 {money(Number((order as any).returnAmount || 0))}</span> : null}
-              {issueLatest?.task ? <span className="float-right text-[12px] font-semibold text-ink-soft">열기 ›</span> : null}
-              {/* [⑰ B] 이슈가 있으면 그 이슈에서 대상·세부를 읽는다(표시만·orders 무접촉). 없으면 기존 return_reason. */}
-              {issueLatest?.task ? (() => {
-                const body = String((issueLatest.task as Record<string, unknown>).body ?? "");
-                const target = fieldFromIssueBody(body, "대상상품:");
-                const add = fieldFromIssueBody(body, "추가상품:");
-                const memo = splitIssueBody(body).memo.split("\n").filter(Boolean).slice(0, 2).join("\n");
-                // [⑲ D] 대상상품이 비었거나 '상품 지정 없음'이고 추가상품이 있으면 「대상:」 줄 숨김.
-                const hideTarget = add && (!target || target === "상품 지정 없음");
-                return (
-                <div className="mt-1 text-ink-soft">
-                  {hideTarget ? null : <div className="whitespace-pre-wrap">대상: {target || "상품 지정 없음"}</div>}
-                  {/* [⑱ D] 기타 이슈에 따로 추가한 관련 상품이 있으면 「추가:」 한 줄(표시만). */}
-                  {add ? <div className="mt-0.5 whitespace-pre-wrap">추가: {add}</div> : null}
-                  {memo ? <div className="mt-0.5 whitespace-pre-wrap">세부: {memo}</div> : null}
+          {(order as any).returnStatus ? (() => {
+            // [2026-10-21] 고객이슈 칸 — 베이지 경고상자 → 흰 카드(유형·상태·열기 한 줄 / 상품·메모 / 아래 작은 글자 버튼). 핸들러 그대로.
+            const typeText = String((order as any).returnStatus).replace("반품(환불)", "환불").replace("반품(교환)", "교환");
+            const tone = typeText.includes("환불") ? "bg-danger-bg text-danger-tx" : typeText.includes("교환") ? "bg-warn-bg text-warn-tx" : "bg-surface-2 text-ink-soft";
+            const task = issueLatest?.task as Record<string, unknown> | undefined;
+            const body = task ? String(task.body ?? "") : "";
+            const target = task ? fieldFromIssueBody(body, "대상상품:") : "";
+            const add = task ? fieldFromIssueBody(body, "추가상품:") : "";
+            const memo = task ? splitIssueBody(body).memo.split("\n").filter(Boolean).slice(0, 3).join("\n") : String((order as any).returnReason || "").replace(/^\[[^\]]*\]\s*/, "");
+            const hideTarget = !!add && (!target || target === "상품 지정 없음");
+            const resolvedMd = issueLatest?.isResolved ? (() => { const d = new Date(issueLatest.resolvedAt); return Number.isFinite(d.getTime()) ? `${d.getMonth() + 1}.${d.getDate()}` : ""; })() : "";
+            return (
+              <div className="rounded-xl border border-line bg-surface p-3">
+                <div className="flex items-center gap-1.5">
+                  <span className={`rounded px-1.5 py-0.5 text-[12px] font-semibold ${tone}`}>{typeText}</span>
+                  {issueLatest?.isResolved
+                    ? <span className="rounded bg-ok-bg px-1.5 py-0.5 text-[12px] font-semibold text-ok-tx">해결완료{resolvedMd ? ` ${resolvedMd}` : ""}</span>
+                    : <span className="rounded bg-warn-bg px-1.5 py-0.5 text-[12px] font-semibold text-warn-tx">미해결</span>}
+                  {Number((order as any).returnAmount || 0) > 0 ? <span className="text-[12px] text-ink-soft">환불 {money(Number((order as any).returnAmount || 0))}</span> : null}
+                  {task ? (
+                    <button type="button" onClick={() => void openExistingIssue(task)} className="ml-auto h-8 rounded-lg border border-line bg-surface px-3 text-[12px] font-semibold text-ink hover:bg-surface-2">열기</button>
+                  ) : null}
                 </div>
-                );
-              })() : (
-                <div className="mt-1 whitespace-pre-wrap text-ink-soft">{String((order as any).returnReason || "사유 없음").replace(/^\[[^\]]*\]\s*/, "")}</div>
-              )}
-              <div className="mt-1 flex items-center justify-end gap-3">
-                <button type="button" disabled={returnSaving} onClick={(e) => { e.stopPropagation(); void handleClearReturn(); }} title="기록만 지웁니다 — 정산·입금·재고 숫자는 바뀌지 않아요." className="text-[11px] font-bold text-ink-mute underline hover:text-danger-tx disabled:opacity-50">기록 지우기</button>
-                {issueLatest?.isResolved ? null : <button type="button" disabled={returnSaving} onClick={(e) => { e.stopPropagation(); handleUndoReturn(); }} className="text-[11px] font-bold text-ink-mute underline hover:text-ink disabled:opacity-50">반품 취소</button>}
+                <div className="mt-2 space-y-1 text-[13px] leading-5">
+                  {task && !hideTarget ? <div className="flex gap-2"><span className="w-8 shrink-0 text-ink-mute">상품</span><span className="min-w-0 whitespace-pre-wrap text-ink">{target || "상품 지정 없음"}</span></div> : null}
+                  {add ? <div className="flex gap-2"><span className="w-8 shrink-0 text-ink-mute">추가</span><span className="min-w-0 whitespace-pre-wrap text-ink">{add}</span></div> : null}
+                  <div className="flex gap-2"><span className="w-8 shrink-0 text-ink-mute">메모</span><span className="min-w-0 whitespace-pre-wrap text-ink">{memo || "없음"}</span></div>
+                </div>
+                <div className="mt-2 flex items-center justify-end gap-3 border-t border-line pt-2">
+                  <button type="button" disabled={returnSaving} onClick={() => void handleClearReturn()} title="기록만 지웁니다 — 정산·입금·재고 숫자는 바뀌지 않아요." className="text-[12px] text-ink-mute hover:text-ink disabled:opacity-50">기록 지우기</button>
+                  {issueLatest?.isResolved ? null : <button type="button" disabled={returnSaving} onClick={() => handleUndoReturn()} title="반품을 되돌려요(회수한 포인트 돌려줌)" className="text-[12px] text-ink-mute hover:text-ink disabled:opacity-50">반품 취소</button>}
+                </div>
               </div>
-            </div>
-          ) : (
+            );
+          })() : (
             <div className="px-1 text-[13px] text-ink-mute">없음</div>
           )}
         </section>

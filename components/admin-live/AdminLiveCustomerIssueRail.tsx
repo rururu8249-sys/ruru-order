@@ -335,9 +335,9 @@ function IssueTypeChips({
 //   ⚠ 너비를 «고정»한다. min-width 로 두면 글자 수에 따라(지우기 3자 vs 영구삭제 4자)
 //     탭마다 처리 칸 너비가 187/189/198px 로 어긋난다 — 실제로 렌더해서 재 보고 고친 값이다.
 const SUB_BTN =
-  "flex h-11 w-[64px] xl:h-8 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-[13px] xl:text-[11px] font-black transition disabled:opacity-45";
+  "flex h-11 w-[64px] xl:h-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-[13px] font-semibold transition disabled:opacity-45";
 const MAIN_BTN =
-  "flex h-11 w-[72px] xl:h-8 shrink-0 items-center justify-center rounded-lg text-[13px] xl:text-[11px] font-black transition hover:opacity-90 disabled:opacity-45";
+  "flex h-11 w-[72px] xl:h-9 shrink-0 items-center justify-center rounded-lg text-[13px] font-semibold transition hover:opacity-90 disabled:opacity-45";
 /** 버튼이 없는 칸 — 자리를 비워 두어 탭을 옮겨도 처리 칸이 안 흔들린다 */
 const SUB_BTN_SLOT = "h-8 w-[64px] shrink-0";
 
@@ -459,9 +459,9 @@ export function IssueCard({
       //   (물건챙기기의 다 챙긴 카드와 같은 방식 — bg-ok-bg)
       onClick={deleted ? undefined : () => onProcess(task)}
       data-issue-card
-      className={`relative grid ${ISSUE_GRID} items-start gap-x-3 gap-y-3 xl:gap-y-1 border-b border-line px-3 py-3 xl:py-2 transition hover:bg-surface-2 ${deleted ? "" : "cursor-pointer"} ${selected ? "bg-rose-soft/50" : done ? "bg-ok-bg/40" : ""}`}
+      className={`relative grid ${ISSUE_GRID} items-start gap-x-3 gap-y-3 xl:gap-y-1 border-b border-line px-3 py-3 xl:py-2 transition hover:bg-surface-2 ${deleted ? "" : "cursor-pointer"} ${selected ? "bg-surface-3" : ""}`}
     >
-      <span className={`absolute left-0 top-0 h-full w-1 ${done ? "bg-[var(--color-ok-tx)]" : "bg-[var(--color-danger-tx)]"}`} />
+      {/* [2026-10-21] 왼쪽 빨강/초록 띠 삭제 — 미해결 탭은 전부 빨강이라 뜻이 없었다. 해결 여부는 탭·버튼으로 */}
 
       {/* [2026-09-25 사장님] 「맨앞에 체크 박스」 — NN/g 일괄 작업 원칙: 줄 맨 앞 체크박스 + 머리줄 전체선택.
           32px 짜리 라벨로 감싸 손가락으로도 눌린다(체크박스 자체는 18px). */}
@@ -471,14 +471,14 @@ export function IssueCard({
           checked={selected}
           onChange={() => onToggleSelect?.(task)}
           aria-label={`${nickname || name || "이 건"} 선택`}
-          className="h-[18px] w-[18px] cursor-pointer accent-[var(--color-rose-deep)] outline-none focus-visible:ring-2 focus-visible:ring-rose-deep"
+          className="h-[18px] w-[18px] cursor-pointer accent-[var(--color-ink)] outline-none focus-visible:ring-2 focus-visible:ring-ink"
         />
       </label>
 
       {/* [③] 유형 60px — 배지 세로로 쌓기, 우선순위(보통 제외)는 아래 작은 배지 */}
       <div className="flex flex-wrap gap-1 self-center xl:flex-col xl:self-start">
         {issueTypes.map((type) => (
-          <span key={type} className={`w-fit rounded px-1.5 py-0.5 text-[11px] font-black ${typeTone(type)}`}>
+          <span key={type} className={`w-fit rounded px-1.5 py-0.5 text-[12px] font-semibold ${typeTone(type)}`}>
             {getIssueTypeLabel(type)}
           </span>
         ))}
@@ -497,7 +497,7 @@ export function IssueCard({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); void navigator.clipboard?.writeText(phone).then(() => showAdminToast("전화번호를 복사했어요.", "success")).catch(() => {}); }}
-              className="hover:text-rose-deep hover:underline"
+              className="hover:text-ink hover:underline"
               title="눌러서 복사"
             >
               {phone}
@@ -514,7 +514,7 @@ export function IssueCard({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); void navigator.clipboard?.writeText(orderNo).then(() => showAdminToast("주문번호를 복사했어요.", "success")).catch(() => {}); }}
-                className="hover:text-rose-deep hover:underline"
+                className="hover:text-ink hover:underline"
                 title="눌러서 복사"
               >
                 {orderNo}
@@ -571,7 +571,7 @@ export function IssueCard({
               <div className="min-w-0 flex-1">
                 <div ref={memoRef} className="xl:line-clamp-2 whitespace-pre-line break-words font-bold text-ink-soft">{memoShown}</div>
                 {memoOverflow ? (
-                  <button type="button" onClick={(e) => { e.stopPropagation(); onProcess(task); }} className="mt-0.5 text-[11px] font-black text-rose-deep hover:underline">…더보기</button>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); onProcess(task); }} className="mt-0.5 text-[12px] font-semibold text-ink-soft hover:underline">…더보기</button>
                 ) : null}
               </div>
             </div>
@@ -580,7 +580,7 @@ export function IssueCard({
           {ledgerLine ? (
             <div className="mt-0.5 flex min-w-0 items-start gap-1.5 text-[13px]">
               <span className="shrink-0 text-ink-mute" aria-hidden>처리</span>
-              <span className="min-w-0 xl:truncate font-black text-info-tx" title={ledgerLine}>{ledgerLine}</span>
+              <span className="min-w-0 xl:truncate font-semibold text-ink" title={ledgerLine}>{String(ledgerLine).replace(/📦\s?/gu, "")}</span>
             </div>
           ) : null}
           {!product && !extra && !memoShown && !ledgerLine ? <span className="font-bold text-ink-mute">내용 없음</span> : null}
@@ -627,7 +627,7 @@ export function IssueCard({
               type="button"
               onClick={() => onRestore?.(task)}
               disabled={busy}
-              className={`${MAIN_BTN} bg-[var(--color-ok-tx)] text-white`}
+              className={`${MAIN_BTN} border border-line bg-surface text-ink hover:bg-surface-2`}
             >
               {busy ? "처리중…" : "되살리기"}
             </button>
@@ -640,7 +640,7 @@ export function IssueCard({
               onClick={(e) => { e.stopPropagation(); onProcess(task); }}
               disabled={busy}
               title="열기 — 내용 보기·수정·환불/교환 기록·삭제"
-              className={`${SUB_BTN} text-ink-soft hover:bg-surface-2`}
+              className={`${SUB_BTN} text-ink hover:bg-surface-2`}
             >
               열기
             </button>
@@ -659,7 +659,7 @@ export function IssueCard({
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onResolve(task); }}
                 disabled={busy}
-                className={`${MAIN_BTN} bg-[var(--color-ok-tx)] text-white`}
+                className={`${MAIN_BTN} border border-line bg-surface text-ok-tx hover:bg-surface-2`}
               >
                 {busy ? "처리중…" : "해결완료"}
               </button>
@@ -1572,15 +1572,31 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
             (누르면 열리는 창 제목은 「고객이슈 메모 추가」다 — 버튼 이름이 창 이름과 달랐다)
             → 왼쪽에 이 화면이 뭘 하는 곳인지 한 줄, 버튼 이름도 창과 같게 맞춘다. */}
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <div className="min-w-0">
-            <div className="text-[13px] font-black text-ink">고객이슈</div>
-            <div className="text-[12px] font-bold text-ink-mute">반품·교환·문의를 적어두고 처리되면 해결완료로 넘깁니다</div>
+          {/* [2026-10-21] 상태 칩(미해결·해결·전체·삭제함)을 머리줄로 — 큰 회색 탭 상자 삭제(탭 안 탭 금지) */}
+          <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="고객이슈 상태">
+            {([
+              ["open", "미해결", openCount],
+              ["resolved", "해결", resolvedCount],
+              ["all", "전체", liveTasks.length],
+              ["deleted", "삭제함", deletedTasks.length],
+            ] as const).map(([key, label, count]) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === key}
+                onClick={() => { setActiveTab(key as IssueTab); setIssuePage(1); }}
+                className={`h-9 rounded-full border px-3.5 text-[13px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ink ${activeTab === key ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink hover:bg-surface-2"}`}
+              >
+                {label} <span className="tabular-nums">{count}</span>
+              </button>
+            ))}
           </div>
 
           <button
             type="button"
             onClick={() => setShowMemoAdd(true)}
-            className="ml-auto h-9 rounded-xl bg-rose-deep px-3 text-[12px] font-black text-white transition hover:opacity-90"
+            className="ml-auto h-9 rounded-lg bg-ink px-3.5 text-[13px] font-bold text-white transition hover:opacity-90"
           >
             + 고객이슈 등록
           </button>
@@ -1588,7 +1604,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           <button
             type="button"
             onClick={() => setReloadKey((value) => value + 1)}
-            className="h-9 rounded-xl border border-line bg-surface px-3 text-[12px] font-black text-ink-soft hover:bg-surface-2"
+            className="h-9 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2"
           >
             새로고침
           </button>
@@ -1610,31 +1626,8 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
         </div>
       ) : null}
 
-      <div className="mt-4 grid grid-cols-4 gap-1.5 rounded-2xl bg-surface-2 p-1">
-        {[
-          ["open", `미해결 ${openCount}`],
-          ["all", `전체 ${liveTasks.length}`],
-          ["resolved", `해결 ${resolvedCount}`],
-          ["deleted", `삭제함 ${deletedTasks.length}`],
-        ].map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => {
-              setActiveTab(key as IssueTab);
-              setIssuePage(1);
-            }}
-            className={`h-9 rounded-xl text-[12px] font-black outline-none focus-visible:ring-2 focus-visible:ring-rose-deep ${
-              activeTab === key ? "bg-surface text-rose-deep shadow-sm" : "text-ink-soft"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
       {/* ── 찾기 줄 — 검색 한 칸 + 유형 칩. 켜져 있으면 「초기화」가 나타난다(NN/g) ── */}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[220px] flex-1">
           
           <input
@@ -1642,7 +1635,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
             placeholder="닉네임 · 이름 · 전화 · 상품 · 주문번호 · 메모"
-            className="h-10 w-full rounded-xl border border-line bg-surface pl-9 pr-9 text-[13px] font-bold text-ink outline-none placeholder:font-semibold placeholder:text-ink-mute focus:border-rose-deep"
+            className="h-9 w-full rounded-lg border border-line bg-surface pl-3 pr-9 text-[13px] text-ink outline-none placeholder:text-ink-mute focus:border-ink"
           />
           {keyword ? (
             <button
@@ -1664,8 +1657,8 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
                 key={key || "all"}
                 type="button"
                 onClick={() => setTypeFilter(key)}
-                className={`h-10 rounded-xl px-3 text-[12px] font-black ${
-                  on ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2"
+                className={`h-9 rounded-full border px-3 text-[13px] font-semibold ${
+                  on ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink hover:bg-surface-2"
                 }`}
               >
                 {label}
@@ -1678,7 +1671,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           <button
             type="button"
             onClick={() => { setKeyword(""); setTypeFilter(""); }}
-            className="h-10 rounded-xl border border-rose-deep bg-surface px-3 text-[12px] font-black text-rose-deep hover:bg-rose-soft"
+            className="h-9 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2"
           >
             초기화
           </button>
@@ -1696,20 +1689,20 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
       {/* [2026-09-25] 일괄 작업 바 — 선택했을 때만 나타난다(NN/g ②). 표 바로 위, 「N건 선택」 + 탭에 맞는 버튼(Helios). */}
       {selectedIds.size > 0 ? (
-        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-rose-line bg-rose-soft px-3 py-2">
-          <span className="text-[12px] font-black text-rose-deep">{selectedIds.size}건 선택</span>
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface-2 px-3 py-2">
+          <span className="text-[13px] font-bold text-ink">{selectedIds.size}건 선택</span>
           {canSelectWholeTab ? (
-            <button type="button" onClick={selectWholeTab} className="h-8 rounded-lg px-2 text-[11px] font-black text-rose-deep underline underline-offset-2 hover:bg-surface">이 탭 {visibleTasks.length.toLocaleString("ko-KR")}건 전체 선택</button>
+            <button type="button" onClick={selectWholeTab} className="h-8 rounded-lg px-2 text-[12px] font-semibold text-ink underline underline-offset-2 hover:bg-surface">이 탭 {visibleTasks.length.toLocaleString("ko-KR")}건 전체 선택</button>
           ) : null}
           <button type="button" onClick={clearSelection} className="h-8 rounded-lg px-2 text-[11px] font-black text-ink-soft hover:bg-surface">선택 해제</button>
           {/* [2026-09-26] 교환·환불 건 대상 — 이체 목록 복사(계좌이체·금액 있는 건, 이때만 전체 계좌)·엑셀(계좌 뒷4만) */}
-          <button type="button" onClick={copyTransferListBulk} className="h-8 rounded-lg border border-rose-line bg-surface px-2 text-[11px] font-black text-rose-deep hover:bg-rose-soft">이체 목록 복사</button>
+          <button type="button" onClick={copyTransferListBulk} className="h-8 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-semibold text-ink hover:bg-surface-2">이체 목록 복사</button>
           <button type="button" onClick={downloadRefundExcel} className="h-8 rounded-lg border border-line bg-surface px-2 text-[11px] font-black text-ink-soft hover:bg-surface-2">엑셀</button>
           <div className="ml-auto flex items-center gap-1.5">
             {activeTab === "deleted" ? (
               <>
                 <button type="button" onClick={bulkPurge} disabled={saving} className={`${SUB_BTN} text-danger-tx hover:bg-danger-bg`}>{saving ? "처리중…" : "영구삭제"}</button>
-                <button type="button" onClick={bulkRestore} disabled={saving} className={`${MAIN_BTN} bg-[var(--color-ok-tx)] text-white`}>{saving ? "처리중…" : "되살리기"}</button>
+                <button type="button" onClick={bulkRestore} disabled={saving} className={`${MAIN_BTN} bg-ink text-white`}>{saving ? "처리중…" : "되살리기"}</button>
               </>
             ) : activeTab === "resolved" ? (
               <>
@@ -1719,7 +1712,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
             ) : (
               <>
                 <button type="button" onClick={bulkDelete} disabled={saving} className={`${SUB_BTN} text-danger-tx hover:bg-danger-bg`}>{saving ? "처리중…" : "삭제"}</button>
-                <button type="button" onClick={bulkResolve} disabled={saving} className={`${MAIN_BTN} bg-[var(--color-ok-tx)] text-white`}>{saving ? "처리중…" : "해결완료"}</button>
+                <button type="button" onClick={bulkResolve} disabled={saving} className={`${MAIN_BTN} bg-ink text-white`}>{saving ? "처리중…" : "해결완료"}</button>
               </>
             )}
           </div>
@@ -1739,7 +1732,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           </div>
         ) : (
           <div className="min-w-0 xl:min-w-[820px]">
-            <div className={`sticky top-0 z-10 grid ${ISSUE_GRID} items-center gap-x-3 border-b border-line bg-surface-2 px-3 py-2 text-[11px] font-black text-ink-mute`}>
+            <div className={`sticky top-0 z-10 grid ${ISSUE_GRID} items-center gap-x-3 border-b border-line bg-surface-2 px-3 py-2 text-[12px] font-semibold text-ink-mute`}>
               {/* 전체선택 = 이 페이지 전부. 일부만 켜져 있으면 ▪(indeterminate) */}
               <label className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg hover:bg-surface" title={allOnPageSelected ? "이 페이지 전체 선택 해제" : "이 페이지 전체 선택"}>
                 <input
@@ -1748,7 +1741,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
                   checked={allOnPageSelected}
                   onChange={toggleSelectAllOnPage}
                   aria-label="이 페이지 전체 선택"
-                  className="h-[18px] w-[18px] cursor-pointer accent-[var(--color-rose-deep)] outline-none focus-visible:ring-2 focus-visible:ring-rose-deep"
+                  className="h-[18px] w-[18px] cursor-pointer accent-[var(--color-ink)] outline-none focus-visible:ring-2 focus-visible:ring-ink"
                 />
               </label>
               <span className="xl:hidden">이 페이지 전체 선택</span>
