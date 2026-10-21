@@ -36,22 +36,9 @@ type Props = {
   onSaveFeedPin?: (text: string) => Promise<void> | void;
 };
 
-function todayLabel() {
-  return new Date().toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    weekday: "long",
-  });
-}
-
 export default function LiveHeader({
-  videoRatio,
-  onVideoRatioChange,
   activeBroadcast,
   savingBroadcast = false,
-  onStartBroadcast,
-  onEndBroadcast,
   onSaveBroadcast,
   title,
   onTitleChange,
@@ -66,7 +53,6 @@ export default function LiveHeader({
 }: Props) {
   const [titleSavedAt, setTitleSavedAt] = useState("");
   const [urlAppliedAt, setUrlAppliedAt] = useState("");
-  const [editOpen, setEditOpen] = useState(false);
 
   // [2026-09-12] 📌 위젯 고정 공지 — «주문·입금 피드» 위젯(/order-feed-widget) 맨 위 한 줄.
   //   «이번 방송»의 속성이라 broadcasts.feed_pin_text 에 둔다(유튜브 고정 메시지처럼 방송마다 하나).
@@ -77,13 +63,12 @@ export default function LiveHeader({
   const [pinText, setPinText] = useState("");
   const [pinSaving, setPinSaving] = useState(false);
   const [pinSavedAt, setPinSavedAt] = useState("");
-  // 패널을 열 때 / 방송이 바뀔 때 — 입력칸을 현재 방송의 저장값으로 맞춘다
+  // [a4-1b] 창이 열릴 때(마운트) / 방송이 바뀔 때 — 입력칸을 현재 방송의 저장값으로 맞춘다(옛 「제목·URL 수정」 접기 폐지)
   useEffect(() => {
-    if (!editOpen) return;
     setPinText(activePinText);
     setPinSavedAt("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editOpen, activeBroadcastId]);
+  }, [activeBroadcastId]);
   const savePinText = async () => {
     if (pinSaving || !activeBroadcastId || !onSaveFeedPin) return;
     setPinSaving(true);
@@ -261,209 +246,101 @@ export default function LiveHeader({
     setUrlAppliedAt(new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }));
   };
 
+  // [2026-10-21 a4-1b] 「방송 관리」 창 안 세로 폼 — DESIGN-ADMIN(보조 버튼 흰 바탕 1px·주버튼 검정·이모지 없음).
+  //   시작/종료 버튼은 사이드바 방송 카드에 있어 여기선 뺌(onStartBroadcast/onEndBroadcast 는 사이드바가 같은 함수로 호출).
+  //   저장·적용·공지·알림·토글 핸들러는 전부 그대로.
+  const fieldCls = "h-10 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-[14px] font-semibold text-ink outline-none focus:border-ink disabled:opacity-50";
+  const primaryCls = "h-10 shrink-0 rounded-lg bg-ink px-4 text-[13px] font-bold text-white transition disabled:opacity-40";
+  const secondaryCls = "h-9 rounded-lg border border-line bg-surface px-3 text-[13px] font-bold text-ink transition hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40";
   return (
-    <header className="mb-3 rounded-2xl border border-line bg-surface px-4 py-2.5 shadow-sm">
-      {/* 상단줄: 제목 + 날짜 + 상태배지 + [＋새 방송][▶방송시작][■방송종료] */}
+    <header className="space-y-4">
+      {/* 상태 + 알림 보내기 */}
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="mr-1 text-[18px] font-black tracking-tight text-rose-deep md:text-[20px]">방송 컨트롤타워</h1>
+        <span className={["h-2 w-2 rounded-full", statusLabel === "방송중" ? "bg-danger-tx" : "bg-line"].join(" ")} />
+        <span className="text-[14px] font-bold text-ink">{statusLabel === "방송중" ? "방송 중" : "방송 대기"}</span>
+        <span className="text-[13px] text-ink-mute">
+          {activeBroadcast?.started_at ? `시작 ${formatBroadcastTime(activeBroadcast.started_at)}` : "시작 전"} · 상품 {typeof productCount === "number" ? productCount : "—"}개
+        </span>
+        {activeBroadcast ? (
+          <button type="button" className={`${primaryCls} ml-auto`} onClick={openAlert} title="방송 알림톡을 보낼 손님을 고르고 발송">
+            알림 보내기
+          </button>
+        ) : null}
+      </div>
 
-        <div className="hidden h-6 w-px bg-line md:block" />
-
-        <div className="hidden text-xs font-black text-ink-soft sm:block">📅 {todayLabel()}</div>
-
-        <div
-          className={[
-            "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-black",
-            statusLabel === "방송중" ? "bg-ok-bg text-ok-tx" : "bg-warn-bg text-warn-tx",
-          ].join(" ")}
-        >
-          <span className={["h-2 w-2 rounded-full", statusLabel === "방송중" ? "bg-[var(--color-ok-tx)]" : "bg-[var(--color-warn-tx)]"].join(" ")} />
-          {statusLabel}
+      {/* 제목 · URL — 항상 펼침 */}
+      <div className="space-y-3">
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <label className="text-[13px] font-bold text-ink">방송 제목</label>
+            <span className="text-[12px] text-ink-mute">{titleSavedAt ? `저장 ${titleSavedAt}` : activeBroadcast ? "" : "방송 시작 때 정해요"}</span>
+          </div>
+          <div className="flex gap-2">
+            <input value={title} onChange={(event) => onTitleChange(event.target.value)} className={fieldCls} />
+            <button type="button" disabled={savingBroadcast || !activeBroadcast} onClick={saveCurrentBroadcast} className={primaryCls}>저장</button>
+          </div>
+        </div>
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <label className="text-[13px] font-bold text-ink">유튜브 라이브 URL</label>
+            <span className="text-[12px] text-ink-mute">{urlAppliedAt ? `적용 ${urlAppliedAt}` : "영상·채팅 연결"}</span>
+          </div>
+          <div className="flex gap-2">
+            <input value={youtubeUrl} onChange={(event) => onYoutubeUrlChange(event.target.value)} placeholder="https://www.youtube.com/watch?v=..." className={fieldCls} />
+            <button type="button" disabled={savingBroadcast || !activeBroadcast} onClick={applyYoutubeUrl} className={primaryCls}>적용</button>
+          </div>
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
-          {/* ＋새 방송은 상품 관리 팝업 > 방송 상품 탭으로 이동(중복 제거) */}
-          <button
-            type="button"
-            disabled={savingBroadcast || Boolean(activeBroadcast)}
-            onClick={() => onStartBroadcast({ title, youtubeUrl })}
-            className="h-9 rounded-xl bg-[var(--color-ok-tx)] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[var(--color-ok-tx)] disabled:bg-line disabled:text-ink-mute"
-          >
-            ▶ 방송시작
-          </button>
-          <button
-            type="button"
-            disabled={savingBroadcast || !activeBroadcast}
-            onClick={onEndBroadcast}
-            className="h-9 rounded-xl bg-[var(--color-danger-tx)] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[var(--color-danger-tx)] disabled:bg-line disabled:text-ink-mute"
-          >
-            ■ 방송종료
-          </button>
-          {activeBroadcast && (
-            <button
-              type="button"
-              className="h-9 rounded-xl bg-[var(--color-info-tx)] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[var(--color-info-tx)] disabled:bg-line disabled:text-ink-mute"
-              onClick={openAlert}
-            >
-              📣 방송알림
-            </button>
-          )}
+        {/* 방송 화면 공지 — «이번 방송» 동안 주문·입금 알림 위젯 맨 위 한 줄(60자). 비우고 저장 = 숨김. 방송 없으면 비활성 */}
+        <div>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <label className="text-[13px] font-bold text-ink">방송 화면 공지 <span className="font-normal text-ink-mute">· 알림 위젯 위 한 줄, 비우면 안 뜸</span></label>
+            <div className="flex items-center gap-2 text-[12px]">
+              {pinText.trim() ? (() => {
+                const pin = feedPinLayout(pinText);
+                const biggest = pin.fontSize >= FEED_PIN_SIZE;
+                const label = `${pin.lines === 1 ? "한 줄" : "2줄"} · 글자 ${biggest ? "제일 큼" : `${pin.fontSize}px`}`;
+                return <span className={biggest ? "text-ok-tx" : "text-warn-tx"}>{label}</span>;
+              })() : null}
+              <span className="text-ink-mute">{pinSavedAt ? `저장 ${pinSavedAt}` : activeBroadcast ? "방송 끝나면 지워짐" : "방송 시작 후"}</span>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <input
+              value={pinText}
+              maxLength={60}
+              disabled={!activeBroadcast}
+              onChange={(event) => setPinText(event.target.value)}
+              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void savePinText(); } }}
+              placeholder={activeBroadcast ? "예) 입금자명은 닉네임으로 보내주세요" : "방송을 시작한 뒤에 쓸 수 있어요"}
+              className={fieldCls}
+            />
+            <button type="button" disabled={pinSaving || !activeBroadcast} onClick={() => void savePinText()} className={primaryCls}>{pinSaving ? "저장 중…" : "저장"}</button>
+          </div>
         </div>
       </div>
 
-      {/* 압축 상태바: ● 방송명 · 상품 N개 · 시작시간 + 우측 [쇼핑몰 토글][URL 수정] */}
-      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-surface-2 px-3 py-2 text-xs font-black text-ink-soft">
-        <span className={["h-2 w-2 rounded-full", statusLabel === "방송중" ? "bg-[var(--color-ok-tx)]" : "bg-[var(--color-warn-tx)]"].join(" ")} />
-        <span className="text-ink">{title.trim() || activeBroadcast?.public_title || "방송명 미설정"}</span>
-        <span className="text-ink-mute">·</span>
-        <span>상품 {typeof productCount === "number" ? productCount : "—"}개</span>
-        <span className="text-ink-mute">·</span>
-        <span>{activeBroadcast?.started_at ? `시작 ${formatBroadcastTime(activeBroadcast.started_at)}` : "방송시작 전"}</span>
-        <span className="hidden text-ink-mute md:inline">· 주문묶음=방송 시작~종료 기준</span>
-
-        <div className="ml-auto flex items-center gap-2">
-          {/* [2026-08-31 사장님 요청] 현재 고정 상품 안내문구 재복사 — 상품관리 안 열고도 원클릭 */}
-          <button
-            type="button"
-            disabled={!activeBroadcast || copyingCurrent}
-            onClick={() => void copyCurrentProductLine()}
-            className={[
-              "h-7 rounded-lg px-2.5 text-[11px] font-black transition disabled:cursor-not-allowed disabled:opacity-40",
-              currentCopied ? "bg-[var(--color-ok-tx)] text-white" : "bg-rose-soft text-rose-deep",
-            ].join(" ")}
-            title={activeBroadcast ? "지금 고정된 상품의 채팅 안내문구를 다시 복사합니다 — 유튜브 채팅에 붙여넣기만 하세요" : "방송 중에만 사용할 수 있습니다"}
-          >
-            {copyingCurrent ? "복사 중…" : currentCopied ? "✔ 복사됨" : "📢 현재상품 복사"}
+      {/* 방송 중 도구 */}
+      <div>
+        <div className="mb-1 text-[13px] font-bold text-ink">방송 중 도구</div>
+        <div className="flex flex-wrap gap-2">
+          {/* [2026-08-31 사장님 요청] 현재 고정 상품 안내문구 재복사 */}
+          <button type="button" disabled={!activeBroadcast || copyingCurrent} onClick={() => void copyCurrentProductLine()} className={secondaryCls}
+            title={activeBroadcast ? "지금 소개 중인 상품의 채팅 안내문을 다시 복사" : "방송 중에만"}>
+            {copyingCurrent ? "복사 중…" : currentCopied ? "복사됨" : "현재 상품 안내문 복사"}
           </button>
-          {/* [2026-07-12] 위젯 상품카드 ON/OFF — 방송 중에만 활성. 카드만 숨김(위젯 투명), 배너는 PRISM 소스라 무관 */}
-          <button
-            type="button"
-            disabled={!activeBroadcast}
-            onClick={() => onToggleWidgetCard?.()}
-            className={[
-              "h-7 rounded-lg px-2.5 text-[11px] font-black transition disabled:cursor-not-allowed disabled:opacity-40",
-              widgetCardOn ? "bg-ok-bg text-ok-tx" : "bg-surface-3 text-ink-soft",
-            ].join(" ")}
-            title={activeBroadcast ? "방송 위젯의 상품카드를 켜고 끕니다 (위젯 반영 최대 20초)" : "방송 중에만 사용할 수 있습니다"}
-          >
-            📺 상품 카드 {widgetCardOn ? "ON" : "OFF"}
+          {/* [2026-07-12] 위젯 상품카드 ON/OFF — 방송 중에만. 카드만 숨김(위젯 투명) */}
+          <button type="button" disabled={!activeBroadcast} onClick={() => onToggleWidgetCard?.()} className={secondaryCls} aria-pressed={widgetCardOn}
+            title={activeBroadcast ? "방송 화면 상품 카드를 켜고 끔(반영 최대 20초)" : "방송 중에만"}>
+            상품 카드 {widgetCardOn ? "켜짐" : "꺼짐"}
           </button>
-          {/* 쇼핑몰 열기/닫기 — settings.shop_open 영속. 방송 ON 중엔 의미 없어 비활성. */}
-          <button
-            type="button"
-            disabled={Boolean(activeBroadcast)}
-            onClick={() => onToggleShopOpen?.()}
-            className={[
-              "h-7 rounded-lg px-2.5 text-[11px] font-black transition disabled:cursor-not-allowed disabled:opacity-40",
-              shopOpen ? "bg-ok-bg text-ok-tx" : "bg-surface-3 text-ink-soft",
-            ].join(" ")}
-            title={activeBroadcast ? "방송 중에는 쇼핑몰 토글을 사용할 수 없습니다" : "쇼핑몰 열기/닫기"}
-          >
-            🛍 쇼핑몰 {shopOpen ? "열림" : "닫힘"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setEditOpen((v) => !v)}
-            className="h-7 rounded-lg border border-line bg-surface px-2.5 text-[11px] font-black text-ink-soft transition hover:bg-surface-2"
-          >
-            {editOpen ? "닫기 ▲" : "제목·URL 수정 ▼"}
+          {/* 쇼핑몰 열기/닫기 — settings.shop_open 영속. 방송 중엔 비활성 */}
+          <button type="button" disabled={Boolean(activeBroadcast)} onClick={() => onToggleShopOpen?.()} className={secondaryCls} aria-pressed={shopOpen}
+            title={activeBroadcast ? "방송 중에는 바꿀 수 없어요" : "쇼핑몰 열기/닫기"}>
+            쇼핑몰 {shopOpen ? "열림" : "닫힘"}
           </button>
         </div>
       </div>
-
-      {/* 인라인 편집(접힘): 평소엔 숨김. controlled 값/onChange/저장·적용 disabled 그대로 */}
-      {editOpen ? (
-        <div className="mt-2 grid grid-cols-1 gap-2 xl:grid-cols-2">
-          <div>
-            <div className="mb-1 flex items-center justify-between">
-              <label className="text-[11px] font-black text-ink-soft">방송 제목</label>
-              <span className="text-[11px] font-bold text-ink-mute">
-                {titleSavedAt ? `저장 ${titleSavedAt}` : activeBroadcast ? "방송중" : "저장 필요"}
-              </span>
-            </div>
-            <div className="flex gap-2">
-              <input
-                value={title}
-                onChange={(event) => onTitleChange(event.target.value)}
-                className="h-9 min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-line focus:ring-2 focus:ring-rose-soft"
-              />
-              <button
-                type="button"
-                disabled={savingBroadcast || !activeBroadcast}
-                onClick={saveCurrentBroadcast}
-                className="h-9 shrink-0 rounded-xl bg-rose-deep px-3 text-xs font-black text-white transition hover:opacity-90 disabled:bg-line disabled:text-ink-mute"
-              >
-                저장
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-1 flex items-center justify-between">
-              <label className="text-[11px] font-black text-ink-soft">유튜브 라이브 URL</label>
-              <span className="text-[11px] font-bold text-ink-mute">
-                {urlAppliedAt ? `적용 ${urlAppliedAt}` : "영상/채팅 연결"}
-              </span>
-            </div>
-            <div className="flex gap-2">
-              <input
-                value={youtubeUrl}
-                onChange={(event) => onYoutubeUrlChange(event.target.value)}
-                placeholder="https://www.youtube.com/watch?v=..."
-                className="h-9 min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-line focus:ring-2 focus:ring-rose-soft"
-              />
-              <button
-                type="button"
-                disabled={savingBroadcast || !activeBroadcast}
-                onClick={applyYoutubeUrl}
-                className="h-9 shrink-0 rounded-xl bg-rose-deep px-3 text-xs font-black text-white transition hover:opacity-90 disabled:bg-line disabled:text-ink-mute"
-              >
-                적용
-              </button>
-            </div>
-          </div>
-
-          {/* [2026-09-12] 📌 위젯 고정 공지 — «이번 방송» 동안 주문·입금 알림 위젯 맨 위 한 줄(60자). 비우고 저장 = 숨김. 방송 없으면 비활성 */}
-          <div className="xl:col-span-2">
-            <div className="mb-1 flex items-center justify-between">
-              <label className="text-[11px] font-black text-ink-soft">📌 방송 화면 공지 <span className="font-bold text-ink-mute">— 주문·입금 알림 맨 아래에 뜸 · 비우면 안 뜸</span></label>
-              <div className="flex items-center gap-2">
-                {/* [2026-09-16 사장님 «몇 자 넘으면 2줄로 넘어가?»] 방송 화면 폭 실측 기준으로 지금 문구가 어떻게 뜰지 바로 보여준다.
-                    [2026-09-20] 2줄은 더 이상 «나쁜 상태»가 아니다 — 사장님 「좌우 여백 살려서 폰트도 키우라」 지침 이후
-                      길면 글자를 쪼그라뜨리는 대신 원래 크기로 2줄을 쓴다. 그래서 경고가 아니라 «있는 그대로» 알려준다. */}
-                {pinText.trim() ? (() => {
-                  const pin = feedPinLayout(pinText);
-                  const biggest = pin.fontSize >= FEED_PIN_SIZE;
-                  const label = `${pin.lines === 1 ? "한 줄" : "2줄"} · 글자 ${biggest ? "제일 큼" : `${pin.fontSize}px`}`;
-                  return biggest
-                    ? <span className="text-[11px] font-black text-ok-tx">{label}</span>
-                    : <span className="text-[11px] font-black text-warn-tx">{label} <span className="font-bold text-ink-mute">(짧게 쓰면 {FEED_PIN_SIZE}px까지 커짐)</span></span>;
-                })() : null}
-                <span className="text-[11px] font-bold text-ink-mute">{pinSavedAt ? `저장 ${pinSavedAt}` : activeBroadcast ? "방송 끝나면 자동으로 지워짐" : "방송 시작 후 쓸 수 있음"}</span>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <input
-                value={pinText}
-                maxLength={60}
-                disabled={!activeBroadcast}
-                onChange={(event) => setPinText(event.target.value)}
-                onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void savePinText(); } }}
-                placeholder={activeBroadcast ? "예) 입금자명은 닉네임으로 보내주세요 🙏 (길면 글자가 작아지며 한 줄로 맞춰짐)" : "방송을 시작한 뒤에 쓸 수 있어요 (방송마다 새로 씁니다)"}
-                className="h-9 min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-line focus:ring-2 focus:ring-rose-soft disabled:opacity-50"
-              />
-              <button
-                type="button"
-                disabled={pinSaving || !activeBroadcast}
-                onClick={() => void savePinText()}
-                className="h-9 shrink-0 rounded-xl bg-rose-deep px-3 text-xs font-black text-white transition hover:opacity-90 disabled:bg-line disabled:text-ink-mute"
-              >
-                {pinSaving ? "저장 중…" : "저장"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       {/* 방송알림 발송 모달: 대상(신청자/전체) 선택 + 이미 받은 사람 제외(증분) + 미리보기 */}
       {alertOpen && (
