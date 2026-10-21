@@ -10,6 +10,7 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = 'fake';
 const now = Date.now();
 const iso = (daysAgo) => new Date(now - daysAgo * 86400000).toISOString();
 const db = {
+  broadcasts: [{ id: 1018, public_title: '신발', started_at: iso(3) }],
   customers: [
     { id: 'c1', youtube_nickname: '홍길동-f2h', customer_name: '홍길동', kakao_nickname: '길동', customer_phone: '01011112222', kakao_id: 'k1', last_order_at: iso(2), previous_nicknames: null, is_blocked: 'N', created_at: iso(100) },
     { id: 'c2', youtube_nickname: '홍길순', customer_name: '김순이', kakao_nickname: '', customer_phone: '01033334444', kakao_id: 'k2', last_order_at: iso(40), previous_nicknames: '["옛닉"]', is_blocked: 'true', created_at: iso(90) },
@@ -142,6 +143,26 @@ await t('AI 실패 → 규칙으로 이어서 찾음', async () => {
   // 개별 상품 이름(color_options)으로도
   const r2 = await call({ text: 'PD-206', mode: 'product' });
   assert.equal(r2.body.products[0].detail, 'PD-206 브라운');
+});
+
+await t('숫자 질문(AI 해석) → 판매분석과 같은 계산', async () => {
+  aiReply = '{"intent":"stats","name":"","product":"","stat":"top_buyers","period":"all","date":""}';
+  sentToAi.length = 0;
+  const r = await call({ text: '지금까지 누가 제일 많이 샀어?' });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.kind, 'stats');
+  assert.equal(r.body.via, 'ai');
+  assert.ok(sentToAi[0].includes('오늘 날짜(한국)'));
+  // 결제완료: A1(78,000)·A3(39,000) / A2 매칭필요·A5 취소·A4 삭제 제외
+  assert.equal(r.body.orderCount, 2);
+  assert.deepEqual(r.body.topBuyers.map((b) => b.nickname), ['홍길동-f2h', '행복나무3899']);
+  assert.equal(r.body.unpaidCount, 1);
+  assert.ok(r.body.topBuyers.every((b) => !JSON.stringify(b).includes('010')));
+  // AI 없이도: 규칙 해석
+  aiReply = 'fail';
+  const r2 = await call({ text: '전체 뭐 잘 나갔어?' });
+  assert.equal(r2.body.kind, 'stats');
+  assert.equal(r2.body.topProducts[0].name, '폴로 자켓 네이비');
 });
 
 await t('읽기만 — 쓰기 호출 0', async () => {

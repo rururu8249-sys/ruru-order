@@ -10,6 +10,8 @@
 //   typo    : 자모 한두 개 틀림                                               「홍길돈」 → 「홍길동」
 //   (여러 단어) 단어가 다 들어 있으면 partial, 일부 단어만 맞으면 word        「프라다 가방」 → 「프라다 나일론백」(word)
 
+import { parseStatQuestion, PERIOD_KEYS, STAT_KINDS, type PeriodKey, type StatKind } from "./statQuestionParse";
+
 export type MatchKind = "exact" | "partial" | "choseong" | "typo" | "word";
 export const MATCH_KIND_RANK: Record<MatchKind, number> = { exact: 0, partial: 1, choseong: 2, typo: 3, word: 4 };
 export const MATCH_KIND_LABEL: Record<MatchKind, string> = {
@@ -180,19 +182,26 @@ export function maskPhone(value: unknown): string {
 }
 
 export type AssistantIntent = {
-  intent: "customer" | "product" | "unknown";
+  intent: "customer" | "product" | "stats" | "unknown";
   /** 찾을 손님 이름/닉네임 */
   name: string;
   /** 찾을 상품 이름 */
   product: string;
+  /** [AI-2] 숫자 질문: 잘 나간 상품 / 많이 산 손님 / 매출·미입금 */
+  stat?: StatKind;
+  period?: PeriodKey;
+  /** period=date 일 때 YYYY-MM-DD */
+  date?: string;
 };
 
 const PRODUCT_WORDS = /(상품|제품|챙기|챙겨|물건|옵션|사이즈|색상|컬러|재고|샀|팔렸|팔린|구매자|산\s*사람)/;
 const FILLER_WORDS = /(찾아\s*줘|찾아줘|찾아|보여\s*줘|보여줘|알려\s*줘|알려줘|정리해\s*줘|정리해줘|목록|주문한\s*사람|주문자|주문|손님|고객|님|좀|누구|최근|날짜|뭐|무슨|산\s*사람|구매자|구매|누가|샀어|샀나|샀는지|팔렸어|팔린|챙기기|챙겨\s*줘|챙겨줘|해\s*줘|해줘|있어\??|이야\??|\?)/g;
 
 /** AI 없이도 되는 간단 해석(키가 없거나 AI 호출이 실패했을 때). */
-export function parseIntentByRule(text: string): AssistantIntent {
+export function parseIntentByRule(text: string, nowMs: number = Date.now()): AssistantIntent {
   const raw = String(text ?? "").trim();
+  const stat = parseStatQuestion(raw, nowMs);
+  if (stat) return { intent: "stats", name: "", product: "", ...stat };
   const cleaned = raw.replace(FILLER_WORDS, " ").replace(/\s+/g, " ").trim();
   if (!cleaned) return { intent: "unknown", name: "", product: "" };
   if (PRODUCT_WORDS.test(raw)) {
@@ -214,9 +223,17 @@ export function parseIntentJson(text: string): AssistantIntent | null {
   try {
     const body = String(text ?? "").replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
     const obj = JSON.parse(body) as Partial<AssistantIntent>;
-    const intent = obj.intent === "customer" || obj.intent === "product" ? obj.intent : "unknown";
+    const intent = obj.intent === "customer" || obj.intent === "product" || obj.intent === "stats" ? obj.intent : "unknown";
     const name = String(obj.name ?? "").trim().slice(0, 40);
     const product = String(obj.product ?? "").trim().slice(0, 60);
+    if (intent === "stats") {
+      // 숫자 질문: 정해진 값만 받는다(이상한 값이면 null → 규칙 해석으로)
+      if (!STAT_KINDS.includes(obj.stat as StatKind)) return null;
+      const period = PERIOD_KEYS.includes(obj.period as PeriodKey) ? (obj.period as PeriodKey) : "today";
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(String(obj.date ?? "")) ? String(obj.date) : undefined;
+      if (period === "date" && !date) return null;
+      return { intent, name: "", product: "", stat: obj.stat as StatKind, period, ...(date ? { date } : {}) };
+    }
     if (intent === "customer" && !name) return null;
     if (intent === "product" && !product) return null;
     return { intent, name, product };

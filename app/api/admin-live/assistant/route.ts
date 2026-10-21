@@ -20,6 +20,9 @@ import {
 import { buildAdminLiveOrderGroups, toAdminLiveOrder } from "@/components/admin-live/liveOrderAdapter";
 import { paymentStatusLabel } from "@/lib/orderLabels";
 import type { OrderRow } from "@/lib/admin-v2/types";
+import { loadSalesAnalysisSnapshot } from "@/lib/salesAnalysisLoader";
+import { computeSalesAnswer, resolvePeriod } from "@/lib/salesQuestion";
+import { salesProductPhotos } from "@/lib/salesHistory";
 
 function getSupabaseAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
@@ -40,9 +43,18 @@ const isBlockedValue = (v: unknown) => ["true", "t", "y", "1"].includes(String(v
 const INTENT_PROMPT = `너는 쇼핑몰 관리자의 검색 요청을 해석한다. 사장님 문장에서 무엇을 찾는지만 JSON 으로 답한다.
 - 손님/주문자/닉네임/이름을 찾는 말이면 {"intent":"customer","name":"<손님 이름이나 닉네임 그대로>","product":""}
 - 상품/물건/챙기기/옵션/누가 무슨 상품을 샀는지 묻는 말이면 {"intent":"product","name":"","product":"<상품 이름 그대로>"}
+- 숫자(매출·순위)를 묻는 말이면 {"intent":"stats","name":"","product":"","stat":"<top_products|top_buyers|summary>","period":"<기간>","date":"<YYYY-MM-DD 또는 빈칸>"}
+  · top_products = 뭐가 잘 나갔는지/많이 팔린 상품, top_buyers = 누가 많이 샀는지, summary = 매출·주문 수·미입금
+  · 기간: today(오늘) yesterday(어제) last_7_days(최근 일주일) this_week(이번 주) last_week(지난주) this_month(이번 달) last_month(지난달) last_broadcast(지난·최근·어제 방송) date(특정 날짜, date 칸에 날짜) all(전체). 기간 말이 없으면 today.
+  · 오늘 날짜(한국): {{TODAY}}
 - 모르겠으면 {"intent":"unknown","name":"","product":""}
 이름·상품명은 사장님이 쓴 글자를 고치지 말고 그대로 옮긴다(오타도 그대로). 단 이름 뒤 조사·호칭(이라는, 님, 씨, 이/가/은/는)과 날짜·「챙길」 같은 말은 뺀다. 설명 없이 JSON 하나만.
 사장님 문장: `;
+
+function todayKstText(): string {
+  const d = new Date(Date.now() + 9 * 3600 * 1000);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
 
 // AI 가 안 될 때 이유(화면 디버그용·비밀값 없음): no_key / http_400 / empty / bad_json / timeout …
 let lastAiNote = "";
@@ -68,7 +80,7 @@ async function askGemini(text: string): Promise<AssistantIntent | null> {
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-          body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: INTENT_PROMPT + text }] }], generationConfig }),
+          body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: INTENT_PROMPT.replace("{{TODAY}}", todayKstText()) + text }] }], generationConfig }),
           signal: controller.signal,
         });
         if (res.status === 404) { lastAiNote = `${model}:404`; break; } // 모델 이름이 없으면 다음 이름으로
@@ -498,6 +510,18 @@ export async function POST(request: NextRequest) {
         intent = { ...intent, name: trimmed };
       }
       return NextResponse.json({ ok: true, via, ai: lastAiNote, intent, range, kind: "customer", ...result });
+    }
+    if (intent.intent === "stats") {
+      // [AI-2] 숫자 질문 — 판매분석과 같은 스냅샷·같은 계산(lib/salesQuestion). 읽기만.
+      const snapshot = await loadSalesAnalysisSnapshot(supabase, () => true);
+      const period = resolvePeriod(intent.period || "today", Date.now(), { date: intent.date, broadcasts: snapshot.broadcasts });
+      const answer = computeSalesAnswer(snapshot.orders, period, 10);
+      const productById = new Map(snapshot.products.map((p) => [String(p.id), p]));
+      const topProducts = answer.topProducts.map((p) => {
+        const product = productById.get(p.productId);
+        return { ...p, photo: product ? salesProductPhotos(p.name, product, p.productId || undefined).detail : "" };
+      });
+      return NextResponse.json({ ok: true, via, ai: lastAiNote, intent, kind: "stats", stat: intent.stat || "summary", periodLabel: period.label, ...answer, topProducts });
     }
     const result = await searchProducts(supabase, intent.product, sinceIso);
     return NextResponse.json({ ok: true, via, ai: lastAiNote, intent, range, kind: "product", ...result });

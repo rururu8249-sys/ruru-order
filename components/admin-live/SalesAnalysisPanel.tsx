@@ -4,7 +4,7 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import {supabase} from '@/lib/supabase';
 import {loadSalesAnalysisSnapshot,type SalesAnalysisSnapshot} from '@/lib/salesAnalysisLoader';
 import {aggregateSalesItems,salesProductPhotos,type SalesOptionGroup} from '@/lib/salesHistory';
-import {isCanceledStatus} from '@/lib/admin-v2/statusDisplay';
+import {salesVisibleRow} from '@/lib/salesQuestion';
 import type {OrderRow} from '@/lib/admin-v2/types';
 import {buildAdminLiveOrderGroups,toAdminLiveOrder} from './liveOrderAdapter';
 import type {LiveOrder} from './types';
@@ -14,12 +14,8 @@ const paid=new Set(['paid','auto_paid','manual_paid','card_paid']);
 const won=(value:number)=>`${value.toLocaleString('ko-KR')}원`;
 const shop='__shop__';
 const dateFormatter=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit'});
-function visibleRow(row:OrderRow) {
-  const raw=row as Record<string,unknown>;
-  const flag=(value:unknown)=>[true,'true','t',1,'1'].includes(value as never);
-  return !['is_deleted','is_permanently_deleted','is_test_order','exclude_from_settlement'].some(key=>flag(raw[key])) && raw.event_gift_winner_id==null &&
-    ![row.admin_order_status_v2,row.order_manage_status,raw.order_status].some(status=>isCanceledStatus(String(status||'')));
-}
+// [2026-10-22] 제외 규칙은 lib/salesQuestion 한 곳(AI 비서 숫자 질문과 같은 계산). 내용은 예전 그대로.
+const visibleRow=salesVisibleRow;
 const channelOf=(row:OrderRow)=>row.broadcast_id==null?shop:String(row.broadcast_id);
 
 function OptionQuantities({group}:{group:SalesOptionGroup}) {

@@ -64,7 +64,22 @@ type BuyerRow = {
 type Result =
   | { kind: "customer"; via: string; query: string; total: number; people: PersonResult[] }
   | { kind: "product"; via: string; query: string; total: number; products: ProductResult[]; buyerOrderCount: number; buyerQty: number; buyers: BuyerRow[]; buyersTruncated: boolean }
-  | { kind: "unknown"; via: string; query: string };
+  | { kind: "unknown"; via: string; query: string }
+  | ({ kind: "stats"; via: string; query: string } & StatsResult);
+
+// [AI-2] 숫자 질문 답 — 판매분석과 같은 계산(서버 lib/salesQuestion)
+type StatsResult = {
+  stat: "top_products" | "top_buyers" | "summary";
+  periodLabel: string;
+  amount: number;
+  orderCount: number;
+  buyerCount: number;
+  qty: number;
+  unpaidCount: number;
+  unpaidAmount: number;
+  topProducts: { name: string; productId: string; qty: number; price: number; sales: number; option: string; photo: string }[];
+  topBuyers: { key: string; nickname: string; name: string; orderCount: number; qty: number; amount: number }[];
+};
 
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
 function dateLabel(iso: string | null): string {
@@ -93,6 +108,91 @@ function StatusBadges({ paymentLabel, paymentCode, shippingLabel }: { paymentLab
         <span className={`inline-flex h-6 items-center rounded-lg px-2 text-[12px] font-semibold ${shippingLabel === "택배출고" ? "bg-ink text-white" : "bg-surface-2 text-ink-soft"}`}>{shippingLabel}</span>
       ) : null}
     </span>
+  );
+}
+
+const STAT_TITLE: Record<StatsResult["stat"], string> = {
+  top_products: "잘 나간 상품",
+  top_buyers: "많이 산 손님",
+  summary: "매출",
+};
+
+function StatsAnswer({ r, onShowInOrders }: { r: StatsResult; onShowInOrders: (keyword: string) => void }) {
+  const showProducts = r.stat !== "top_buyers";
+  const showBuyers = r.stat !== "top_products";
+  return (
+    <section className="space-y-3">
+      <div>
+        <h3 className="text-[16px] font-bold text-ink">{STAT_TITLE[r.stat]}</h3>
+        <p className="text-[12px] text-ink-mute">{r.periodLabel} · 결제완료 기준 · 판매분석과 같은 계산</p>
+      </div>
+      <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {([["결제금액", won(r.amount)], ["주문", `${r.orderCount}건`], ["구매자", `${r.buyerCount}명`], ["수량", `${r.qty}개`]] as [string, string][]).map(([label, value]) => (
+          <div key={label} className="rounded-xl border border-line bg-surface p-3">
+            <dt className="text-[12px] text-ink-mute">{label}</dt>
+            <dd className="mt-0.5 text-right text-[16px] font-bold text-ink tabular-nums">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      {r.unpaidCount > 0 ? (
+        <p className="text-[13px] text-warn-tx tabular-nums">미결제 {r.unpaidCount}건 · {won(r.unpaidAmount)} (미입금·매칭필요·카드미결제)</p>
+      ) : null}
+
+      {showProducts ? (
+        <div className="space-y-1.5">
+          <h4 className="text-[14px] font-bold text-ink">상품 순위</h4>
+          {r.topProducts.length === 0 ? (
+            <p className="rounded-xl border border-line bg-surface p-4 text-[13px] text-ink-soft">이 기간에 결제완료된 상품이 없어요. 기간을 바꿔 물어봐 주세요.</p>
+          ) : (
+            <ol className="divide-y divide-line rounded-xl border border-line bg-surface">
+              {r.topProducts.map((p, i) => (
+                <li key={`${p.productId}-${p.name}-${i}`} className="grid grid-cols-[20px_44px_1fr_auto] items-center gap-2 px-2.5 py-2">
+                  <span className="text-right text-[13px] font-bold text-ink-mute tabular-nums">{i + 1}</span>
+                  {p.photo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={p.photo} alt="" className="h-11 w-11 rounded-lg bg-surface-2 object-cover" loading="lazy" />
+                  ) : <span className="h-11 w-11 rounded-lg bg-surface-2" aria-hidden />}
+                  <span className="min-w-0">
+                    <span className="block truncate text-[13px] font-semibold text-ink" title={p.name}>{p.name}</span>
+                    <span className="block truncate text-[12px] text-ink-mute" title={p.option}>{p.option.split("\n").join(" · ")}</span>
+                  </span>
+                  <span className="text-right">
+                    <span className="block text-[13px] font-bold text-ink tabular-nums">{p.qty}개</span>
+                    <span className="block text-[12px] text-ink-mute tabular-nums">{won(p.sales)}</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      ) : null}
+
+      {showBuyers ? (
+        <div className="space-y-1.5">
+          <h4 className="text-[14px] font-bold text-ink">손님 순위</h4>
+          {r.topBuyers.length === 0 ? (
+            <p className="rounded-xl border border-line bg-surface p-4 text-[13px] text-ink-soft">이 기간에 결제완료한 손님이 없어요. 기간을 바꿔 물어봐 주세요.</p>
+          ) : (
+            <ol className="divide-y divide-line rounded-xl border border-line bg-surface">
+              {r.topBuyers.map((b, i) => (
+                <li key={b.key} className="grid grid-cols-[20px_1fr_auto_auto] items-center gap-2 px-2.5 py-2">
+                  <span className="text-right text-[13px] font-bold text-ink-mute tabular-nums">{i + 1}</span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-[13px] font-semibold text-ink">{b.nickname}{b.name && b.name !== b.nickname ? <span className="font-normal text-ink-soft"> · {b.name}</span> : null}</span>
+                    <span className="block text-[12px] text-ink-mute tabular-nums">주문 {b.orderCount}건 · {b.qty}개</span>
+                  </span>
+                  <span className="text-right text-[13px] font-bold text-ink tabular-nums">{won(b.amount)}</span>
+                  <button type="button" onClick={() => onShowInOrders(b.nickname !== "-" ? b.nickname : b.name)}
+                    className="h-9 rounded-lg px-2 text-[13px] font-semibold text-ink-soft transition hover:bg-surface-2">
+                    주문서
+                  </button>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -154,7 +254,7 @@ export default function AdminLiveAssistantDrawer({
             autoFocus
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="예: 홍길 주문한 사람 · 폴로자켓 산 사람"
+            placeholder="예: 홍길 주문한 사람 · 오늘 누가 많이 샀어?"
             aria-label="찾을 내용"
             className="h-10 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-[16px] text-ink outline-none placeholder:text-ink-mute focus-visible:border-ink focus-visible:ring-2 focus-visible:ring-ink md:text-[14px]"
           />
@@ -182,8 +282,10 @@ export default function AdminLiveAssistantDrawer({
         {error ? <p className="text-[13px] font-semibold text-danger-tx">{error}</p> : null}
 
         {!result && !error ? (
-          <p className="text-[12px] text-ink-mute">닉네임 일부·초성·오타도 비슷한 걸 찾아요.</p>
+          <p className="text-[12px] text-ink-mute">손님·상품 찾기, 「이번 주 뭐 잘 나갔어?」 같은 숫자 질문도 돼요.</p>
         ) : null}
+
+        {result?.kind === "stats" ? <StatsAnswer r={result} onShowInOrders={onShowInOrders} /> : null}
 
         {result?.kind === "unknown" ? (
           <p className="text-[13px] text-ink-soft">무엇을 찾을지 모르겠어요. 위에서 「손님」이나 「상품」을 고르고 다시 찾아 주세요.</p>
