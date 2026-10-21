@@ -388,7 +388,7 @@ export default function AdminLiveCustomerPointPanel({ customer }: { customer: Po
     <section className="mt-5 rounded-2xl border border-rose-line bg-rose-soft/60 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-base font-black text-ink">🪙 포인트</h3>
+          <h3 className="text-base font-black text-ink">포인트</h3>
           <p className="mt-1 text-xs font-bold text-ink-soft">
             회원별 포인트 지급/회수와 최근 이력을 확인합니다.
           </p>

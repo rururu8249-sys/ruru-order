@@ -946,7 +946,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
                       {!revoked ? (
                         <button type="button" onClick={() => void revokeNote(n)}
                           className={`${missed ? "" : "ml-auto "}rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-danger-tx`}>
-                          ↩︎ 회수
+                          회수
                         </button>
                       ) : null}
                     </div>

@@ -77,7 +77,7 @@ export default function MissionPayoutButton({ reward, onDone }: Props) {
         adminMemo: MISSION_PAYOUT_MEMO,
         customerVisible: true,
       });
-      const text = `✅ ${r.success}명 지급 완료` + (r.failed.length ? ` · ❌ ${r.failed.length}명 실패(${r.failed[0]?.reason || ""})` : "");
+      const text = `${r.success}명 지급 완료` + (r.failed.length ? ` · ${r.failed.length}명 실패(${r.failed[0]?.reason || ""})` : "");
       setDoneText(text);
       showAdminToast(text, r.failed.length ? "warning" : "success");
       onDone?.();
@@ -99,7 +99,7 @@ export default function MissionPayoutButton({ reward, onDone }: Props) {
       disabled={busy || running}
       className="rounded-2xl bg-ok-tx px-4 py-3 text-sm font-black text-white shadow-sm transition hover:opacity-90 disabled:cursor-wait disabled:opacity-50"
     >
-      {busy || running ? "지급 중..." : `🎁 구매자 전원에게 ${Number(reward).toLocaleString("ko-KR")}P 지급하기`}
+      {busy || running ? "지급 중..." : `구매자 전원에게 ${Number(reward).toLocaleString("ko-KR")}P 지급하기`}
     </button>
   );
 }

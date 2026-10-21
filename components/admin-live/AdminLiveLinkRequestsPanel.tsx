@@ -243,11 +243,11 @@ export default function AdminLiveLinkRequestsPanel() {
     <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-[14px] font-black text-ink">🔗 같은 사람 같아요 — 계정 잇기</div>
+          <div className="text-[14px] font-black text-ink">같은 사람 같아요 — 계정 잇기</div>
           <p className="mt-1 text-[12px] font-bold leading-relaxed text-ink-soft">
             손님이 카톡을 바꾸면 우리 눈엔 «새 회원»이 됩니다. 새 회원의 <b>상세주소까지</b> 예전 회원과 같으면 여기 자동으로 올라옵니다.
             <br />
-            양쪽을 보고 같은 사람이면 [🔗 합치기] 한 번 — 예전 주문·포인트가 지금 카톡으로 따라갑니다.
+            양쪽을 보고 같은 사람이면 [합치기] 한 번 — 예전 주문·포인트가 지금 카톡으로 따라갑니다.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -284,7 +284,7 @@ export default function AdminLiveLinkRequestsPanel() {
                   {isAuto(row) ? "자동 감지" : "손님 요청"}
                 </span>
                 {(row.match_reasons || []).map((reason) => (
-                  <span key={reason} className="rounded-full bg-ok-bg px-2 py-0.5 text-[11px] font-black text-ok-tx">✅ {reason}</span>
+                  <span key={reason} className="rounded-full bg-ok-bg px-2 py-0.5 text-[11px] font-black text-ok-tx">{reason}</span>
                 ))}
                 <span className="text-[12px] font-bold text-ink-mute">{when(row.created_at)}</span>
                 {row.status !== "pending" ? (
@@ -306,7 +306,7 @@ export default function AdminLiveLinkRequestsPanel() {
                     포인트 <span className="text-rose-deep">{(row.old_points ?? 0).toLocaleString("ko-KR")}P</span>
                   </div>
                   {joinAddress(row.old_address, row.old_detail_address) ? (
-                    <div className="mt-1 break-keep text-[12px] font-bold text-ink-soft">📍 {joinAddress(row.old_address, row.old_detail_address)}</div>
+                    <div className="mt-1 break-keep text-[12px] font-bold text-ink-soft">{joinAddress(row.old_address, row.old_detail_address)}</div>
                   ) : null}
                   {row.old_last_order_at ? (
                     <div className="mt-1 text-[11px] font-bold text-ink-mute">
@@ -326,7 +326,7 @@ export default function AdminLiveLinkRequestsPanel() {
                     {row.temp_nickname ? <> · 지금 이름 <span className="text-rose-deep">{row.temp_nickname}</span></> : null}
                   </div>
                   {joinAddress(row.new_address, row.new_detail_address) ? (
-                    <div className="mt-1 break-keep text-[12px] font-bold text-ink-soft">📍 {joinAddress(row.new_address, row.new_detail_address)}</div>
+                    <div className="mt-1 break-keep text-[12px] font-bold text-ink-soft">{joinAddress(row.new_address, row.new_detail_address)}</div>
                   ) : null}
                 </div>
               </div>
@@ -339,7 +339,7 @@ export default function AdminLiveLinkRequestsPanel() {
                     onClick={() => void mergeRow(row)}
                     className="rounded-lg bg-rose-deep px-3 py-2 text-[12px] font-black text-white disabled:opacity-50"
                   >
-                    {merging === row.id ? "확인 중…" : "🔗 합치기"}
+                    {merging === row.id ? "확인 중…" : "합치기"}
                   </button>
                 ) : null}
                 <button
@@ -378,7 +378,7 @@ export default function AdminLiveLinkRequestsPanel() {
               </div>
 
               <p className="mt-2 text-[11px] font-bold leading-relaxed text-ink-mute">
-                <b>[🔗 합치기]</b>를 누르면 먼저 «무엇이 어떻게 바뀌는지» 보여주고, 승인해야 실행됩니다(한 번에 처리 · 백업 남음).
+                <b>[합치기]</b>를 누르면 먼저 «무엇이 어떻게 바뀌는지» 보여주고, 승인해야 실행됩니다(한 번에 처리 · 백업 남음).
                 같은 주소에 사는 가족처럼 «다른 사람»이면 <b>[같은 사람 아님]</b>을 누르세요 — 아무것도 바뀌지 않습니다.
                 새 계정에도 주문·포인트가 있으면 자동으로 멈추니, 그때만 «병합 SQL 복사»로 직접 확인하세요.
               </p>

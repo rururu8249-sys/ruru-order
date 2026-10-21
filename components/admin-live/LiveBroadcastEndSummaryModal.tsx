@@ -139,9 +139,9 @@ export default function LiveBroadcastEndSummaryModal({ summary, onClose, onOpenS
               {summary.mission
                 ? summary.mission.achieved
                   ? summary.mission.reward > 0
-                    ? "🎯 미션 달성 — 아래에서 구매자 전원 지급"
-                    : "🎯 미션 달성 — 선물 명단은 이벤트 › 미션 탭"
-                  : `🎯 미션 미달성 (${summary.mission.pct}%) — 지급 없음`
+                    ? "미션 달성 — 아래에서 구매자 전원 지급"
+                    : "미션 달성 — 선물 명단은 이벤트 › 미션 탭"
+                  : `미션 미달성 (${summary.mission.pct}%) — 지급 없음`
                 : "미션 없음"}
             </div>
           </div>
@@ -166,7 +166,7 @@ export default function LiveBroadcastEndSummaryModal({ summary, onClose, onOpenS
           <div className={`mt-4 rounded-2xl border px-4 py-4 ${summary.mission.achieved ? "border-ok-tx/40 bg-ok-bg" : "border-line bg-surface-2"}`}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <div className="text-[11px] font-black text-ink-mute">🎯 미션 게이지</div>
+                <div className="text-[11px] font-black text-ink-mute">미션 게이지</div>
                 <div className="mt-1 text-base font-black text-ink">
                   {summary.mission.title || "오늘의 미션"} ·{" "}
                   <span className={summary.mission.achieved ? "text-ok-tx" : "text-rose-deep"}>{summary.mission.achieved ? "달성!" : "미달성"}</span>

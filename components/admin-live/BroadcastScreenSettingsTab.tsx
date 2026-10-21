@@ -62,7 +62,7 @@ function WidgetCard({
           className={`${smallBtn} flex items-center border border-line bg-surface text-ink-soft hover:bg-surface-2`}
           title="견본 열기"
         >
-          미리보기 ↗
+          미리보기
         </a>
       </div>
 

@@ -102,7 +102,7 @@ export default function LiveHeader({
       const row = bc as Record<string, unknown> | null;
       const pid = String(row?.widget_pin_product_id ?? "").trim();
       if (String(row?.widget_pin_mode || "auto") !== "pin" || !pid) {
-        showAdminToast("고정된 현재상품이 없습니다.\n\n상품 관리에서 「▶ 방송」 또는 「📌 고정」을 먼저 눌러주세요.", "warning");
+        showAdminToast("고정된 현재상품이 없습니다.\n\n상품 목록에서 「소개」를 먼저 눌러주세요.", "warning");
         return;
       }
       const { data: prow } = await supabase.from("products").select("*").eq("id", pid).maybeSingle();
@@ -222,7 +222,7 @@ export default function LiveHeader({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ broadcastId: activeBroadcast.id, mode: alertMode, selectionToken }),
       }).then((res) => res.json()).catch(() => null);
-      setAlertResult(r?.ok ? `✅ 발송 접수 ${r.successCount}명 · 즉시 실패 ${r.failCount}명 (최종 수신 결과는 SOLAPI에서 확인)` : "발송 확인 필요: " + (r?.error || "알 수 없는 오류"));
+      setAlertResult(r?.ok ? `발송 접수 ${r.successCount}명 · 즉시 실패 ${r.failCount}명 (최종 수신 결과는 SOLAPI에서 확인)` : "발송 확인 필요: " + (r?.error || "알 수 없는 오류"));
       setAlertPreview(null);
       setAlertIncluded([]);setAlertExcluded([]);
     } finally {
@@ -354,7 +354,7 @@ export default function LiveHeader({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
-              <div className="text-[14px] font-black text-ink">📣 방송알림 발송</div>
+              <div className="text-[14px] font-black text-ink">방송알림 발송</div>
               <button
                 type="button"
                 onClick={() => !alertSending && setAlertOpen(false)}

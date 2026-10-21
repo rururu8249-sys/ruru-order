@@ -844,10 +844,10 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
               {videoEmbedUrl ? "영상 연결" : "URL 대기"}
             </span>
             {liveStats?.concurrentViewers != null ? (
-              <span className="rounded-lg bg-rose-soft px-2 py-0.5 text-[11px] font-black text-rose-deep" title="동시 시청자 수">👁 {liveStats.concurrentViewers.toLocaleString("ko-KR")}</span>
+              <span className="rounded-lg bg-rose-soft px-2 py-0.5 text-[11px] font-black text-rose-deep" title="동시 시청자 수">시청 {liveStats.concurrentViewers.toLocaleString("ko-KR")}</span>
             ) : null}
             {liveStats?.likeCount != null ? (
-              <span className="rounded-lg bg-surface-2 px-2 py-0.5 text-[11px] font-black text-ink-soft" title="좋아요 수">👍 {liveStats.likeCount.toLocaleString("ko-KR")}</span>
+              <span className="rounded-lg bg-surface-2 px-2 py-0.5 text-[11px] font-black text-ink-soft" title="좋아요 수">좋아요 {liveStats.likeCount.toLocaleString("ko-KR")}</span>
             ) : null}
           </div>
           <div className="flex items-center gap-1.5">
@@ -860,9 +860,9 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
                   aria-label={videoMuted ? "방송 소리 켜기" : "방송 음소거"}
                   aria-pressed={videoMuted}
                   title={videoMuted ? "소리 켜기" : "음소거"}
-                  className="rounded-lg bg-surface-2 px-1.5 py-0.5 text-[13px] leading-none hover:bg-surface-3"
+                  className="rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] font-bold leading-none hover:bg-surface-3"
                 >
-                  {videoMuted ? "🔇" : "🔊"}
+                  {videoMuted ? "음소거" : "소리"}
                 </button>
                 <input
                   type="range"
@@ -892,7 +892,6 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
           ) : (
             <div className="absolute inset-0 flex items-center justify-center bg-surface-2">
               <div className="w-[78%] rounded-2xl bg-surface/70 p-6 text-center shadow-sm backdrop-blur">
-                <div className="text-5xl">👟</div>
                 <div className="mt-4 text-lg font-black text-ink">루루동이LIVE</div>
                 <div className="mt-2 text-xs font-bold text-ink-soft">유튜브 라이브 URL을 적용하면 방송화면이 표시됩니다.</div>
               </div>
@@ -906,7 +905,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
           <h2 className="text-sm font-black text-ink">라이브 채팅</h2>
           {chatEmbedUrl ? <div className="flex items-center gap-2 text-xs font-bold text-ink-soft">
             <button type="button" aria-label="YouTube 채팅 다시 연결" title="YouTube 채팅이 비거나 오류가 뜨면 다시 연결하세요" onClick={() => setChatRetry(value => value + 1)} className="rounded-lg border border-line px-2 py-1">재연결</button>
-            <a aria-label="YouTube 채팅 별도 창으로 열기" href={`https://www.youtube.com/live_chat?v=${videoId}&is_popout=1`} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-line px-2 py-1">새 창 ↗</a>
+            <a aria-label="YouTube 채팅 별도 창으로 열기" href={`https://www.youtube.com/live_chat?v=${videoId}&is_popout=1`} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-line px-2 py-1">새 창</a>
           </div> : <span className="text-xs font-bold text-ink-soft">URL 대기</span>}
         </div>
 
@@ -922,7 +921,6 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
           ) : (
             <div className="flex h-full items-center justify-center p-6 text-center">
               <div>
-                <div className="text-4xl">💬</div>
                 <div className="mt-3 text-sm font-black text-ink">라이브 채팅 연결 대기</div>
                 <div className="mt-2 text-xs font-bold leading-5 text-ink-mute">
                   유튜브 라이브 URL을 입력하고 적용하면<br />
@@ -938,7 +936,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
         /* 컴팩트(우측 컬럼): 지금 띄운 상품. 영상·채팅 아래(스크롤) — 남은 세로공간을 채워 빈공간 방지 */
         <div className="min-w-0 w-full shrink-0 xl:flex-1 xl:min-h-0 rounded-2xl border border-line bg-surface p-3 shadow-sm">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="truncate text-xs font-black text-ink-mute">🛍 지금 띄운 상품{liveCount > 1 ? ` · ${safeIdx + 1}/${liveCount}` : ""}</span>
+            <span className="truncate text-xs font-black text-ink-mute">지금 띄운 상품{liveCount > 1 ? ` · ${safeIdx + 1}/${liveCount}` : ""}</span>
             <div className="flex shrink-0 items-center gap-1.5">
               <button
                 type="button"
@@ -946,7 +944,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
                 title="자동순환(여러 상품을 번갈아 표시)"
                 className={["rounded-lg px-2 py-1 text-[11px] font-black transition", cycleOn ? "bg-rose-deep text-white" : "border border-line bg-surface-2 text-ink-soft hover:bg-surface-3"].join(" ")}
               >
-                {cycleOn ? "⏸ 순환 ON" : "▶ 순환"}
+                {cycleOn ? "순환 ON" : "순환"}
               </button>
               <button
                 type="button"
@@ -1021,7 +1019,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
             ].join(" ")}
             style={cycleOn ? { background: "var(--color-rose-deep)" } : undefined}
           >
-            {cycleOn ? "⏸ 자동순환 ON" : "▶ 자동순환"}
+            {cycleOn ? "자동순환 ON" : "자동순환"}
           </button>
         </div>
 
@@ -1036,7 +1034,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
               )}
               {/* LIVE 배지 + 카운터 */}
               <div className="absolute left-2 top-2 flex items-center gap-1.5 rounded-lg bg-black/55 px-2 py-0.5 text-[11px] font-black text-white">
-                <span>🔴 LIVE</span>
+                <span>LIVE</span>
                 <span className="opacity-90">{safeIdx + 1}/{liveCount}</span>
               </div>
               {/* 이전/다음 */}
@@ -1119,7 +1117,7 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
             title="OBS 위젯 주소 복사"
             className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11px] font-black text-ink-soft hover:bg-surface-2"
           >
-            🔗
+            위젯 주소
           </button>
         </div>
       </div>

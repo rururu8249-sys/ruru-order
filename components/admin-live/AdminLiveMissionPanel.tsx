@@ -394,7 +394,7 @@ export default function AdminLiveMissionPanel() {
             disabled={ending}
             style={{ width: "100%", padding: "12px", borderRadius: 12, border: "2px solid var(--color-danger-tx)", background: "var(--color-surface)", color: "var(--color-danger-tx)", fontWeight: 800, fontSize: 14, cursor: "pointer", marginBottom: 8, opacity: ending ? 0.6 : 1 }}
           >
-            {ending ? "종료 중…" : "🛑 이벤트 종료 (위젯 끄고 지급 열기)"}
+            {ending ? "종료 중…" : "이벤트 종료 (위젯 끄고 지급 열기)"}
           </button>
         ) : null}
 
@@ -417,10 +417,10 @@ export default function AdminLiveMissionPanel() {
         >
           {/* [2026-07-10] 포인트를 안 걸었으면 "지급"이라는 말이 겁나서 못 누름 → 명단 보기로 라벨 변경.
               둘 다 openPayout(읽기 전용 조회)만 호출한다. 실제 지급은 모달 안 버튼에서만. */}
-          {(prog?.reward ?? 0) > 0 ? "🎁 구매자 전원에게 지급하기" : "🎁 선물 줄 명단 보기"}
+          {(prog?.reward ?? 0) > 0 ? "구매자 전원에게 지급하기" : "선물 줄 명단 보기"}
         </button>
         {!payoutUnlocked ? (
-          <div style={{ fontSize: 12, color: "var(--color-ink-mute)", marginTop: 6 }}>※ 위 “🛑 이벤트 종료”를 누르면 지급 버튼이 열려요.</div>
+          <div style={{ fontSize: 12, color: "var(--color-ink-mute)", marginTop: 6 }}>위 「이벤트 종료」를 누르면 지급 버튼이 열려요.</div>
         ) : null}
 
         {/* 중복 지급 허용 토글 (기본 OFF=같은 사람 1회만 / ON=이미 받은 사람도 다시 지급) */}
@@ -437,7 +437,7 @@ export default function AdminLiveMissionPanel() {
       {/* 지급 내역 — 룰렛/인형뽑기 "이벤트 목록"과 동일한 인라인 목록(.row/.note/.badge/.seclabel + 기간 칩). */}
       <div style={{ marginTop: 18, borderTop: "1px solid var(--bd)", paddingTop: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-          <span className="seclabel" style={{ margin: 0 }}>🎯 미션 지급 내역 <span className="note">지난 기록</span></span>
+          <span className="seclabel" style={{ margin: 0 }}>미션 지급 내역 <span className="note">지난 기록</span></span>
           {([["today", "오늘"], ["week", "이번주"], ["month", "이번달"], ["date", "날짜선택"]] as const).map(([key, label]) => (
             <span
               key={key}
@@ -475,7 +475,7 @@ export default function AdminLiveMissionPanel() {
               {filtered.map((h, i) => (
                 <div key={`${h.when}-${i}`} className="row">
                   <span className="note" style={{ width: 120, flexShrink: 0 }}>{whenFull(h.when)}</span>
-                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>🎯 미션 · 당첨 <b>{h.nickname}</b> · 포인트 {won(h.amount)}P</span>
+                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>미션 · 당첨 <b>{h.nickname}</b> · 포인트 {won(h.amount)}P</span>
                   <span className="badge b-ok" style={{ flexShrink: 0 }}>지급완료</span>
                 </div>
               ))}
@@ -506,7 +506,7 @@ export default function AdminLiveMissionPanel() {
           <div style={{ width: "min(500px,94vw)", maxHeight: "88vh", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: 16, padding: 20 }}>
             {/* [2026-07-10] 포인트 이벤트가 아닐 수도 있음(사은품 등) → 제목·안내를 reward 유무로 분기 */}
             <div style={{ fontSize: 16, fontWeight: 800, color: "var(--color-rose-deep)", flexShrink: 0 }}>
-              {payout.reward > 0 ? "구매자 전원 포인트 지급 — 최종 확인" : "🎁 선물 줘야 할 구매자 명단"}
+              {payout.reward > 0 ? "구매자 전원 포인트 지급 — 최종 확인" : "선물 줘야 할 구매자 명단"}
             </div>
             {payout.count === 0 ? (
               payout.totalBuyers === 0 ? (
@@ -565,7 +565,7 @@ export default function AdminLiveMissionPanel() {
                 {/* [2026-07-10 사장님 지침] 포인트가 아닌 선물(사은품 등)을 주문서에 0원 행으로 얹기.
                     → 송장·물건챙기기에 함께 나와 선물을 빠뜨리지 않음. 총금액/재고/입금매칭 불변. */}
                 <div style={{ marginTop: 12, padding: "12px 12px", borderRadius: 8, border: "1.5px solid var(--color-rose-line)", background: "var(--color-surface-2)", flexShrink: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: "var(--color-rose-deep)" }}>🎁 선물을 주문서에 넣기 (포인트 아님)</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: "var(--color-rose-deep)" }}>선물을 주문서에 넣기 (포인트 아님)</div>
                   <div style={{ marginTop: 4, fontSize: 12, color: "var(--color-ink-mute)", lineHeight: 1.5 }}>
                     위 {payout.count}명의 <b>가장 최근 주문서</b>에 0원으로 추가됩니다. 총금액·재고·입금매칭은 그대로예요.
                   </div>
@@ -608,7 +608,7 @@ export default function AdminLiveMissionPanel() {
                   }}
                   style={{ flex: 1, padding: "12px", borderRadius: 8, border: "1.5px solid var(--color-rose-line)", background: "var(--color-surface)", color: "var(--color-rose-deep)", fontWeight: 800, cursor: "pointer" }}
                 >
-                  📋 명단 복사
+                  명단 복사
                 </button>
               ) : null}
               {payout.count > 0 && payout.reward > 0 ? (

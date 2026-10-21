@@ -58,7 +58,7 @@ export default function LiveMissionGauge({ broadcastOn, onOpenMission }: Props) 
     <div className={`mb-3 rounded-2xl border px-4 py-3 ${achieved ? "border-ok-tx/40 bg-ok-bg" : "border-rose-line bg-rose-soft"}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="text-sm font-black text-ink">
-          🎯 {prog.title || "오늘의 미션"}
+          {prog.title || "오늘의 미션"}
           <span className={`ml-2 text-xs font-black ${achieved ? "text-ok-tx" : "text-rose-deep"}`}>
             {achieved ? "달성! 방송 종료 때 지급 버튼이 나옵니다" : `${prog.pct}%`}
           </span>

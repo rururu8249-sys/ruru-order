@@ -79,7 +79,7 @@ export default function BroadcastSearchSelect({ options, value, onChange, todayA
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="🔍 방송명 검색"
+              placeholder="방송명 검색"
               style={{
                 width: "100%", border: "1px solid #e5e5e5", borderRadius: 8,
                 padding: "8px 8px", fontSize: 12, outline: "none",

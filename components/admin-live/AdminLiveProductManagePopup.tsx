@@ -1754,7 +1754,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   </select>
                 ) : null}
                 {bcSelId && bcProducts.length > 0 ? (
-                  <button type="button" disabled={bcBusy} onClick={() => { setBcCopyMode((v) => !v); setBcCopySel(new Set()); }} style={{ fontSize: "11px", fontWeight: 800, color: bcCopyMode ? "var(--color-ink-soft)" : "var(--color-rose-deep)", background: bcCopyMode ? "var(--color-surface)" : "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "4px 12px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>{bcCopyMode ? "✕ 선택 취소" : "☑ 선택 복사"}</button>
+                  <button type="button" disabled={bcBusy} onClick={() => { setBcCopyMode((v) => !v); setBcCopySel(new Set()); }} style={{ fontSize: "11px", fontWeight: 800, color: bcCopyMode ? "var(--color-ink-soft)" : "var(--color-rose-deep)", background: bcCopyMode ? "var(--color-surface)" : "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "4px 12px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>{bcCopyMode ? "선택 취소" : "선택 복사"}</button>
                 ) : null}
               </div>
               <div style={{ padding: "8px 12px 0" }}>
@@ -2026,7 +2026,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 title="재고관리 중이면서 재고 3개 이하인 상품만"
                 style={{ ...chipBase, background: lowOnly ? "var(--color-danger-bg)" : "var(--color-surface)", color: lowOnly ? "var(--color-danger-tx)" : "var(--color-ink-soft)", borderColor: lowOnly ? "var(--color-danger-tx)" : "var(--color-line)" }}
               >
-                🔥 재고임박
+                재고임박
               </button>
               <select
                 value={sortKey}
@@ -2091,7 +2091,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             {(() => {
                               const s = lowStockOf(p);
                               if (s === null || s > 3) return null;
-                              return <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "8px", background: "var(--color-danger-bg)", color: "var(--color-danger-tx)" }}>{s <= 0 ? "⛔ 품절" : `🔥 재고 ${s}`}</span>;
+                              return <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "8px", background: "var(--color-danger-bg)", color: "var(--color-danger-tx)" }}>{s <= 0 ? "품절" : `재고 ${s}`}</span>;
                             })()}
                           </div>
                           {/* 재고 표시 + 인라인 수정 (총재고 상품만 · 옵션 상품은 수정 폼 유도) */}
@@ -2169,7 +2169,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       </div>
                       {matchedDetails.length > 0 ? (
                         <div style={{ marginLeft: "96px", border: "1px solid var(--color-rose-line)", borderRadius: "8px", overflow: "hidden", background: "var(--color-surface)" }}>
-                          <div style={{ padding: "6px 8px", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", fontSize: "11px", fontWeight: 900 }}>{normalizedQuery && !parentNameMatched ? '🔎 세부상품 검색결과' : '연결된 세부상품'} {matchedDetails.length}개</div>
+                          <div style={{ padding: "6px 8px", background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", fontSize: "11px", fontWeight: 900 }}>{normalizedQuery && !parentNameMatched ? '세부상품 검색결과' : '연결된 세부상품'} {matchedDetails.length}개</div>
                           {matchedDetails.map((detail) => (
                             <div key={detail.detailName} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 8px", borderTop: "1px solid var(--color-line)" }}>
                               <button type="button" onClick={() => detail.image && setLightbox(detail.image)} style={{ width: "54px", height: "54px", flexShrink: 0, border: "none", borderRadius: "8px", overflow: "hidden", padding: 0, background: "var(--color-surface-2)", cursor: detail.image ? "zoom-in" : "default" }}>
@@ -2261,7 +2261,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             <div style={{ display: "flex", gap: "6px", padding: "12px 16px", borderTop: "1px solid var(--color-line)" }}>
               <button type="button" onClick={() => setWidgetSettingsOpen(false)} style={{ height: "38px", padding: "0 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink-soft)" }}>취소</button>
               <button type="button" onClick={copyWidgetUrl} style={{ height: "38px", padding: "0 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 800, cursor: "pointer", border: "1px solid " + (copied ? "var(--color-ok-tx)" : "var(--color-line)"), background: copied ? "var(--color-ok-bg)" : "var(--color-surface)", color: copied ? "var(--color-ok-tx)" : "var(--color-ink-soft)", whiteSpace: "nowrap" }}>
-                {copied ? "복사됐어요!" : "🔗 위젯 주소 복사"}
+                {copied ? "복사됐어요!" : "위젯 주소 복사"}
               </button>
               <button type="button" disabled={wsSaving || wsSelected.size === 0} onClick={wsConfirm} style={{ flex: 1, height: "38px", borderRadius: "8px", fontSize: "12px", fontWeight: 800, cursor: wsSaving || wsSelected.size === 0 ? "default" : "pointer", border: "none", background: wsSaving || wsSelected.size === 0 ? "var(--color-rose-line)" : "var(--color-rose-deep)", color: "#fff" }}>
                 {wsSaving ? "처리중…" : `선택 ${wsSelected.size}개 방송에 담기`}
@@ -2495,7 +2495,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 style={{ width: "100%", height: "40px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 12px", fontSize: "13px", fontWeight: 600, outline: "none", color: "var(--color-ink)" }}
               />
               {newBcCopyIds && newBcCopyIds.length > 0 ? (
-                <div style={{ marginTop: "8px", fontSize: "11px", fontWeight: 700, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "8px 8px" }}>☑ 선택한 상품 {newBcCopyIds.length}개가 새 방송에 그대로 담깁니다.</div>
+                <div style={{ marginTop: "8px", fontSize: "11px", fontWeight: 700, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "8px 8px" }}>선택한 상품 {newBcCopyIds.length}개가 새 방송에 그대로 담깁니다.</div>
               ) : null}
             </div>
             <div style={{ display: "flex", gap: "8px", padding: "0 16px 16px" }}>

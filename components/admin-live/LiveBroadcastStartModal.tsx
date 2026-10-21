@@ -121,7 +121,7 @@ export default function LiveBroadcastStartModal({ open, broadcastTitle, saving, 
         <div className="mt-3 rounded-2xl border border-line bg-surface p-4">
           <label className="flex cursor-pointer items-center justify-between gap-3">
             <span>
-              <span className="text-sm font-black text-ink">🎯 이번 방송 미션 게이지</span>
+              <span className="text-sm font-black text-ink">이번 방송 미션 게이지</span>
               <span className="mt-0.5 block text-xs font-bold text-ink-mute">
                 방송 화면에 목표 막대가 뜨고, 방송 종료 때 달성 여부와 지급 버튼이 나옵니다.
               </span>
@@ -204,7 +204,7 @@ export default function LiveBroadcastStartModal({ open, broadcastTitle, saving, 
             disabled={saving}
             className="rounded-2xl bg-rose-deep px-5 py-3 text-sm font-black text-white shadow-sm transition hover:opacity-90 disabled:cursor-wait disabled:opacity-50"
           >
-            {saving ? "시작 중..." : missionOn ? "▶ 방송 시작 · 미션 켜기" : "▶ 방송 시작"}
+            {saving ? "시작 중..." : missionOn ? "방송 시작 · 미션 켜기" : "방송 시작"}
           </button>
         </div>
       </div>

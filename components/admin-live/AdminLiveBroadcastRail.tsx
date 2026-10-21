@@ -43,7 +43,7 @@ export default function AdminLiveBroadcastRail({
         ].join(" ")}
         style={{ writingMode: "vertical-rl", width: 24, minHeight: 112 }}
       >
-        {open ? "▶ 접기" : `◀ 방송·채팅${broadcastOn ? " · LIVE" : ""}`}
+        {open ? "접기" : `방송·채팅${broadcastOn ? " · LIVE" : ""}`}
       </button>
 
       {/* [2026-09-08] 오른쪽에서 밀려 나오는 사이드 팝업(본문 위로 덮음). 크기는 한 가지(420px) — 「크게(2/3)」는 사장님 판단으로 삭제.
@@ -74,7 +74,7 @@ export default function AdminLiveBroadcastRail({
           </div>
           <span className="flex items-center gap-1">
             <button type="button" onClick={onToggle} className="rounded-lg px-2 py-0.5 text-[11px] font-black text-ink-mute hover:bg-surface-2 hover:text-ink">
-              접기 ▶
+              접기
             </button>
           </span>
         </div>

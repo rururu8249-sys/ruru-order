@@ -406,7 +406,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
                 disabled={deleting}
                 className="rounded-xl border border-danger-tx bg-danger-bg px-2.5 py-1.5 text-[11px] font-black text-[var(--color-danger-tx)] hover:opacity-90 disabled:opacity-50"
               >
-                {deleting ? "삭제중..." : "🗑 삭제"}
+                {deleting ? "삭제중..." : "삭제"}
               </button>
             ) : null}
             <button

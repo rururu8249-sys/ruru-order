@@ -89,7 +89,7 @@ export default function WidgetProductLibraryPanel({
 
   const liveStatusTitle = !canManageRotation
     ? manualPinLabel
-      ? `📌 ${manualPinLabel} 고정 기록`
+      ? `${manualPinLabel} 고정 기록`
       : rotation.mode === "selected"
         ? `저장된 위젯 설정 · 선택한 상품 ${rotation.targets.length}개 순환`
         : rotation.mode === "history" ? "저장된 위젯 설정 · 방송 내 고정 기록 상품 순환" : "저장된 위젯 설정 · 현재 방송 상품 전체 순환"
@@ -110,7 +110,7 @@ export default function WidgetProductLibraryPanel({
     <section className={styles.panel} aria-label="자주 사용한 상품 위젯">
       <div className={styles.header}>
         <div className={styles.headingWrap}>
-          <strong className={styles.title}>📌 상품 위젯 순환 · 고정 기록</strong>
+          <strong className={styles.title}>상품 위젯 순환 · 고정 기록</strong>
           <span className={styles.count}>{items.length}개</span>
         </div>
       </div>
@@ -133,7 +133,7 @@ export default function WidgetProductLibraryPanel({
             disabled={!canManageRotation || (rotation.mode === "selected" && rotation.targets.length === 0)}
             onClick={onTogglePause}
           >
-            {rotation.paused ? "▶ 순환 재개" : "Ⅱ 일시정지"}
+            {rotation.paused ? "순환 재개" : "일시정지"}
           </button>
         ) : null}
       </div>

@@ -268,7 +268,7 @@ export default function CustomerFullOrderHistory({ kakaoId, phone, onStats }: { 
                   <div style={{ marginTop: "4px", paddingTop: "4px", borderTop: "1px dashed var(--color-line)" }}>
                     배송비 {money(g.shipping)}{g.points > 0 ? ` · 포인트 사용 ${money(g.points)}` : ""}{g.paymentMethod ? ` · ${g.paymentMethod}` : ""} · <b style={{ color: "var(--color-ink)" }}>최종 {money(g.amount)}</b>
                   </div>
-                  {g.address ? <div>📦 {g.address}</div> : null}
+                  {g.address ? <div>{g.address}</div> : null}
                   <div style={{ color: "var(--color-ink-mute)" }}>
                     {g.broadcast ? `${g.broadcast} · ` : ""}{g.code ? `주문번호 ${g.code} · ` : ""}{g.rows.length}줄{g.kakaoLinked ? "" : " · 카카오 미연동(전화번호로 찾음)"}
                   </div>

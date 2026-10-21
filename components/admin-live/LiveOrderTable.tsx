@@ -212,7 +212,7 @@ function returnBadge(order: LiveOrder) {
   if (!s) return null;
   return (
     <span className="inline-flex shrink-0 items-center rounded-full border border-warn-tx bg-warn-bg px-2 py-0.5 text-[11px] font-black text-warn-tx" title={order.returnReason || undefined}>
-      ↩ {s}
+      {s}
     </span>
   );
 }
@@ -1077,7 +1077,7 @@ export default function LiveOrderTable({
                 className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
                 title="잘못 누른 택배출고를 해제합니다 (출고대기로 되돌림)"
               >
-                {shippedSaving === "unship" ? "해제중..." : "↩ 택배출고 해제"}
+                {shippedSaving === "unship" ? "해제중..." : "택배출고 해제"}
               </button>
               <button
                 type="button"
