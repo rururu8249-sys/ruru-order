@@ -52,6 +52,8 @@ async function fixWhoProduct(db: ReturnType<typeof getSupabaseAdminClient>, item
   }
 }
 
+// 정리된 줄만(원문 raw·응대 방침 policy 줄은 메모 목록에 안 보임)
+const ITEM_KINDS = ["todo", "customer", "product", "note"];
 const ITEM_COLUMNS = "id, created_at, kind, parent_id, body, due_date, who, product, status, done_at, organized_by";
 
 export async function GET(request: NextRequest) {
@@ -62,8 +64,8 @@ export async function GET(request: NextRequest) {
     const db = getSupabaseAdminClient();
     const since = new Date(Date.now() - 30 * 86400000).toISOString();
     const [open, done] = await Promise.all([
-      db.from(TABLE).select(ITEM_COLUMNS).neq("kind", "raw").eq("status", "open").order("created_at", { ascending: false }).limit(300),
-      db.from(TABLE).select(ITEM_COLUMNS).neq("kind", "raw").eq("status", "done").gte("done_at", since).order("done_at", { ascending: false }).limit(100),
+      db.from(TABLE).select(ITEM_COLUMNS).in("kind", ITEM_KINDS).eq("status", "open").order("created_at", { ascending: false }).limit(300),
+      db.from(TABLE).select(ITEM_COLUMNS).in("kind", ITEM_KINDS).eq("status", "done").gte("done_at", since).order("done_at", { ascending: false }).limit(100),
     ]);
     if (open.error) return tableMissing(open.error) ? setupResponse() : NextResponse.json({ ok: false, message: open.error.message }, { status: 500 });
     if (done.error) return NextResponse.json({ ok: false, message: done.error.message }, { status: 500 });
@@ -134,7 +136,7 @@ export async function PATCH(request: NextRequest) {
       .from(TABLE)
       .update({ status, done_at: status === "done" ? new Date().toISOString() : null, updated_at: new Date().toISOString() })
       .eq("id", id)
-      .neq("kind", "raw");
+      .in("kind", ITEM_KINDS);
     if (error) return tableMissing(error) ? setupResponse() : NextResponse.json({ ok: false, message: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   } catch (error) {

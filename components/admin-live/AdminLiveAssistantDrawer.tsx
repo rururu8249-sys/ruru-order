@@ -7,6 +7,7 @@
 import { useRef, useState } from "react";
 import AdminLiveSideDrawer from "./AdminLiveSideDrawer";
 import AdminLiveAssistantMemoBox from "./AdminLiveAssistantMemoBox";
+import AdminLiveAssistantReplyBox from "./AdminLiveAssistantReplyBox";
 
 type Mode = "auto" | "customer" | "product";
 type Range = "3m" | "all";
@@ -218,7 +219,7 @@ export default function AdminLiveAssistantDrawer({
   const [result, setResult] = useState<Result | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const [tab, setTab] = useState<"ask" | "memo">("ask");
+  const [tab, setTab] = useState<"ask" | "memo" | "reply">("ask");
 
   async function run(nextRange: Range = range, nextMode: Mode = mode, override?: string) {
     const q = (override ?? text).trim();
@@ -249,7 +250,7 @@ export default function AdminLiveAssistantDrawer({
     <AdminLiveSideDrawer title="비서" width={560} onClose={onClose}>
       <div className="space-y-3 p-4">
         <div role="tablist" aria-label="비서 화면" className="-mt-1 flex gap-4 border-b border-line">
-          {([["ask", "물어보기"], ["memo", "메모함"]] as ["ask" | "memo", string][]).map(([k, label]) => (
+          {([["ask", "물어보기"], ["memo", "메모함"], ["reply", "응대 문구"]] as ["ask" | "memo" | "reply", string][]).map(([k, label]) => (
             <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
               className={`-mb-px h-10 border-b-2 px-1 text-[14px] font-bold transition focus-visible:outline-2 focus-visible:outline-ink ${tab === k ? "border-ink text-ink" : "border-transparent text-ink-mute hover:text-ink"}`}>
               {label}
@@ -262,6 +263,8 @@ export default function AdminLiveAssistantDrawer({
             onFindCustomer={(who) => { setTab("ask"); setText(who); setMode("customer"); void run(range, "customer", who); }}
           />
         ) : null}
+
+        {tab === "reply" ? <AdminLiveAssistantReplyBox /> : null}
 
         {tab === "ask" ? <>
         <form

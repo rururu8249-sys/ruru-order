@@ -4,8 +4,11 @@
 //   - «생각» 토큰 때문에 답이 비지 않게 thinkingLevel(3 계열)·thinkingBudget(2.5 계열)을 차례로, 모르는 설정(400)이면 다음.
 //   - 어떤 경우에도 예외를 던지지 않는다: 실패하면 text=null + note(이유, 비밀값 없음).
 export type GeminiJsonResult = { text: string | null; note: string };
+/** 글자 또는 사진(base64) 조각 — 사진은 응대 문구(AI-4)에서만 */
+export type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
 
-export async function callGeminiJson(prompt: string, opts: { timeoutMs?: number; maxTokens?: number } = {}): Promise<GeminiJsonResult> {
+export async function callGeminiJson(prompt: string | GeminiPart[], opts: { timeoutMs?: number; maxTokens?: number } = {}): Promise<GeminiJsonResult> {
+  const parts: GeminiPart[] = typeof prompt === "string" ? [{ text: prompt }] : prompt;
   const key = process.env.GEMINI_API_KEY || "";
   if (!key) return { text: null, note: "no_key" };
   const timeoutMs = opts.timeoutMs ?? 6000;
@@ -25,7 +28,7 @@ export async function callGeminiJson(prompt: string, opts: { timeoutMs?: number;
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-          body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig }),
+          body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig }),
           signal: controller.signal,
         });
         if (res.status === 404) { note = `${model}:404`; break; } // 모델 이름이 없으면 다음 모델

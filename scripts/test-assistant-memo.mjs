@@ -17,6 +17,7 @@ function query(table) {
     update(v) { op = 'update'; payload = v; return api; },
     eq(c, v) { filters.push((r) => r[c] === v); return api; },
     neq(c, v) { filters.push((r) => r[c] !== v); return api; },
+    in(c, vs) { filters.push((r) => vs.includes(r[c])); return api; },
     gte(c, v) { filters.push((r) => String(r[c] ?? '') >= String(v)); return api; },
     order(c, o) { order = { c, asc: o?.ascending !== false }; return api; },
     limit(n) { limit = n; return api; },
