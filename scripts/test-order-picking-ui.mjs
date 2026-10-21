@@ -234,8 +234,10 @@ const counterText = () => nodeText(tree.root.findByProps({'aria-live':'polite', 
 const countersBefore = counterText();
 await act(async()=>payChip('미결제만').props.onClick());
 assert.equal(checks().length, 1, 'unpaid-only view lists only the unpaid row');
-assert.equal(checks()[0].props.disabled, true, 'unpaid rows stay view-only');
-assert.ok(text().includes('미결제 · 조회만 가능'), 'unpaid badge is kept');
+assert.equal(checks()[0].props.disabled, false, 'unpaid rows can be picked by admin judgment (2026-10-21)');
+assert.ok(text().includes('미결제'), 'unpaid badge is kept');
+// [2026-10-21] 미결제 줄 챙기기 → 실제 저장(picked_at)까지 간다
+{ const before = writes.length; await act(async()=>checks()[0].props.onClick()); assert.ok(writes.length > before, 'unpaid pick is saved'); assert.deepEqual(writes.at(-1).ids, [3], 'unpaid row id saved'); await act(async()=>checks()[0].props.onClick()); }
 assert.equal(counterText(), countersBefore, 'header counters stay paid-based');
 await act(async()=>payChip('전체').props.onClick());
 assert.equal(checks().length, 3, 'all view lists paid and unpaid rows');

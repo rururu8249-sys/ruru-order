@@ -190,7 +190,6 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
 
   // Read all eligible rows so switching filters never hides persisted completion.
   const scopedPanels = useMemo(() => panels.filter((panel) => panel.paid), [panels]);
-  const allPaidPanels = useMemo(() => allPanels.filter((panel) => panel.paid), [allPanels]);
   const scopedIds = useMemo(() => allPanels.flatMap(p => p.items.map(it => it.id)), [allPanels]);
   const idKey = scopedIds.slice().sort().join(",");
   const pickedRef = useRef(pickedIds);
@@ -249,8 +248,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
 
   const updatePicked = async (ids: string[], picked: boolean) => {
     if (busyRef.current || readingRef.current || loading || loadError || ids.length === 0) return;
-    const paidIds = new Set(allPaidPanels.flatMap(p => p.items.map(it => it.id)));
-    if (ids.some(id => !paidIds.has(id))) return;
+    // [2026-10-21 사장님] 미결제 줄도 사장님 판단으로 챙길 수 있게 — 이 창에 보이는 줄이면 결제 여부와 무관하게 저장(모르는 id 만 거부).
+    const knownIds = new Set(allPanels.flatMap(p => p.items.map(it => it.id)));
+    if (ids.some(id => !knownIds.has(id))) return;
     busyRef.current = true;
     ++readGeneration.current;
     setSaving(true);
@@ -464,14 +464,16 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
           ) : !done && item.attentionKind === "payment_time_missing" ? (
             <div className="mt-1 inline-block rounded-lg bg-info-bg px-2 py-1 text-[11px] font-black text-[var(--color-info-tx)]">카드결제 완료 · 추가로 챙겨야 합니다</div>
           ) : null}
-          {!panel.paid ? <span className="mt-1 inline-block rounded bg-warn-bg px-2 py-1 text-[12px] font-black text-[var(--color-danger-tx)]">미결제 · 조회만 가능</span> : null}
+          {/* [2026-10-21 사장님] 미결제도 사장님 판단으로 챙길 수 있게 — 버튼 막지 않음(숫자·일괄 완료·엑셀 출력 기록은 결제완료 기준 그대로) */}
+          {!panel.paid ? <span className="mt-1 inline-block rounded bg-warn-bg px-2 py-1 text-[12px] font-black text-[var(--color-danger-tx)]">미결제</span> : null}
         </div>
         <div className="text-right max-[360px]:col-span-2 max-[360px]:flex max-[360px]:items-center max-[360px]:justify-between max-[360px]:border-t max-[360px]:border-line max-[360px]:pt-1">
           {batch ? null : <div className="text-[20px] font-black text-ink">{item.qty}<span className="text-[12px]">개</span></div>}
           <button type="button" role="checkbox" aria-checked={done} aria-label={`${panel.nickname} ${item.productName} ${item.optionText} ${item.qty}개 ${done ? "챙김 해제" : "챙김"}`}
-            disabled={blocked || !panel.paid} onClick={() => updatePicked([item.id], !pickedRef.current.has(item.id))}
+            disabled={blocked} onClick={() => updatePicked([item.id], !pickedRef.current.has(item.id))}
             className={`mt-1 flex min-h-[44px] min-w-[92px] items-center justify-center gap-2 rounded-lg border-2 px-2 text-[13px] font-black max-sm:mt-0 max-sm:min-h-10 max-sm:min-w-[80px] max-sm:gap-1 max-sm:px-1 max-sm:text-[12px] disabled:opacity-50 ${done ? "border-ok-tx bg-[var(--color-ok-tx)] text-white" : "border-line bg-surface text-ink-soft"}`}>
-            <span aria-hidden="true">{done ? "✓" : "□"}</span>{done ? "챙김 완료" : item.attentionKind === "repick" ? "다시 챙김 완료" : "챙김 완료"}
+            {/* [2026-10-21 사장님] 안 챙긴 줄=「챙기기」(흰 바탕) · 챙긴 줄=「✓ 챙김 완료」(초록) — 글자가 같아 헷갈리던 것 */}
+            {done ? <><span aria-hidden="true">✓</span>챙김 완료</> : item.attentionKind === "repick" ? "다시 챙기기" : "챙기기"}
           </button>
         </div>
       </div>
@@ -563,7 +565,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
           {/* [㉚] 주문서 필터가 너무 넓으면(전체 방송·전체 기간) 목록 대신 안내만 */}
           {workArea === "selected" && scopeTooWide ? <div aria-label="범위 안내" className="py-12 text-center text-[14px] font-bold text-ink-soft">주문서에서 방송이나 날짜를 먼저 골라 주세요</div> : null}
           {!(workArea === "selected" && scopeTooWide) && !loading && !loadError && matches.length === 0 ? <div className="py-12 text-center font-bold text-ink-soft">현재 조회 조건에 맞는 상품이 없습니다.</div> : null}
-          <div className="mx-auto max-w-[760px] space-y-2 max-sm:space-y-1.5">
+          <div className="mx-auto max-w-[760px] space-y-4 max-sm:space-y-2">
             {sortedGroups.map(([key, group]) => {
               // [㉘] 챙김 진행은 결제완료 줄 기준, 미결제 수량은 「미결제 N」으로 따로.
               const progress = pickingProgress(group.rows.filter(({ panel }) => panel.paid).map(({ item }) => ({ qty: item.qty, pickedAt: pickedIds.has(item.id) })));
@@ -589,8 +591,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
                 }).filter(Boolean).join(" · ");
                 const optionPricesDiffer = new Set(group.rows.map(({ item }) => item.unitPrice || 0).filter(price => price > 0)).size > 1;
                 // sticky 가 동작하도록 section 은 overflow-clip(overflow-hidden 은 sticky 를 막는다). 머리 높이 고정: 상품 72px · 옵션 48px.
-                return <section key={key} className="overflow-clip rounded-xl border border-line bg-surface">
-                  <div className="sticky top-0 z-[2] flex h-[72px] items-center gap-3 bg-rose-soft px-3 py-1.5 max-sm:h-auto max-sm:min-h-12 max-sm:gap-2 max-sm:py-1">
+                {/* [2026-10-21 사장님] 상품 구분이 안 보여 — 상품 머리줄은 진한 회색(bg-line)·옵션 머리줄은 흰 바탕+왼쪽 띠, 상품 사이 간격 16px */}
+                return <section key={key} className="overflow-clip rounded-xl border-2 border-line bg-surface">
+                  <div className="sticky top-0 z-[2] flex h-[72px] items-center gap-3 bg-line px-3 py-1.5 max-sm:h-auto max-sm:min-h-12 max-sm:gap-2 max-sm:py-1">
                     {productPhoto ? (
                       <button type="button" onClick={() => setPhotoZoom(productPhoto)} aria-label="사진 크게 보기" className="shrink-0">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -610,7 +613,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
                     const optPhoto = optRows.map(({ item }) => itemPhoto[item.id]).find(Boolean) || "";
                     const optPrice = optionPricesDiffer ? priceText(optRows) : "";
                     return <div key={optKey} className="border-t border-line">
-                      <div className="sticky top-[72px] z-[1] max-sm:static flex h-12 max-sm:h-8 items-center gap-2 border-b border-line bg-surface-2 px-3">
+                      <div className="sticky top-[72px] z-[1] max-sm:static flex h-12 max-sm:h-8 items-center gap-2 border-b border-l-4 border-line bg-surface px-3">
                         {optPhoto && optPhoto !== productPhoto ? (
                           <button type="button" onClick={() => setPhotoZoom(optPhoto)} aria-label="사진 크게 보기" className="shrink-0">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
