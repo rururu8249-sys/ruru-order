@@ -2113,12 +2113,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             </div>
                           ) : null}
                           <div style={{ marginTop: "4px", display: "flex", gap: "4px", flexWrap: "wrap" }}>
-                            <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "8px", background: "var(--color-info-bg)", color: "var(--color-info-tx)" }}>{shippingLabel(p)}</span>
+                            <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "8px", background: "var(--color-surface-2)", color: "var(--color-ink-soft)" }}>{shippingLabel(p)}</span>
                             {productCategory(p) ? <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "8px", background: "var(--color-surface-3)", color: "var(--color-ink-soft)" }}>{productCategory(p)}</span> : null}
                             {(() => {
                               const s = lowStockOf(p);
                               if (s === null || s > 3) return null;
-                              return <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "8px", background: "var(--color-danger-bg)", color: "var(--color-danger-tx)" }}>{s <= 0 ? "품절" : `재고 ${s}`}</span>;
+                              return <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "8px", background: "var(--color-surface-2)", color: "var(--color-danger-tx)" }}>{s <= 0 ? "품절" : `재고 ${s}`}</span>;
                             })()}
                           </div>
                           {/* 재고 표시 + 인라인 수정 (총재고 상품만 · 옵션 상품은 수정 폼 유도) */}
@@ -2129,7 +2129,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                               return (
                                 <div style={{ marginTop: "4px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>
                                   재고 {m.stock.toLocaleString("ko-KR")}개
-                                  <button type="button" onClick={() => editProduct(p)} title="옵션별 재고는 수정 폼에서 변경" style={{ marginLeft: "4px", fontSize: "11px", fontWeight: 800, color: "var(--color-info-tx)", background: "var(--color-info-bg)", border: "none", borderRadius: "4px", padding: "2px 8px", cursor: "pointer" }}>옵션별 수정</button>
+                                  <button type="button" onClick={() => editProduct(p)} title="옵션별 재고는 수정 폼에서 변경" style={{ marginLeft: "4px", fontSize: "11px", fontWeight: 800, color: "var(--color-ink)", background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "2px 8px", cursor: "pointer" }}>옵션별 수정</button>
                                 </div>
                               );
                             }
@@ -2171,9 +2171,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
                         {/* 수정 / 삭제 — 오른쪽 끝 나란히 */}
                         <div style={{ display: "flex", flexDirection: "row", gap: "4px", flexShrink: 0, alignSelf: "flex-start" }}>
-                          <button type="button" onClick={() => editProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-info-tx)", background: "var(--color-info-bg)", border: "none", borderRadius: "8px", padding: "6px 12px", cursor: "pointer" }}>수정</button>
+                          <button type="button" onClick={() => editProduct(p)} style={{ height: "36px", fontSize: "12px", fontWeight: 700, color: "var(--color-ink)", background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "0 12px", cursor: "pointer" }}>수정</button>
                           <details className="relative">
-                            <summary className="min-h-9 cursor-pointer list-none rounded-xl border border-line px-2.5 py-1.5 text-xs font-bold text-ink-soft" aria-label={`${productName(p)} 더보기`}>더보기 ▾</summary>
+                            <summary className="min-h-9 cursor-pointer list-none rounded-xl border border-line px-2.5 py-1.5 text-xs font-bold text-ink" aria-label={`${productName(p)} 더보기`}>더보기</summary>
                             <div className="absolute right-0 z-20 flex min-w-28 flex-col gap-1 rounded-xl border border-line bg-surface p-1 shadow-lg">
                           {!isBrandGroupProduct(p)?<button type="button" onClick={()=>setBrandMove({source:p})} className="rounded-lg px-3 py-2 text-left text-xs font-bold text-ink">브랜드 하위로 이동</button>:null}
                           <button
@@ -2186,10 +2186,10 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                                 () => showAdminToast("복사 실패 — 직접 복사해주세요\n" + link, "warning"),
                               );
                             }}
-                            style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ok-tx)", background: "var(--color-ok-bg)", border: "none", borderRadius: "8px", padding: "6px 12px", cursor: "pointer" }}
-                          >링크</button>
-                          <button type="button" onClick={() => duplicateProduct(p)} title="이 상품 내용으로 새 상품 등록 폼 열기" style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "6px 12px", cursor: "pointer" }}>복제</button>
-                          <button type="button" onClick={() => void deleteProduct(p)} style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", border: "none", borderRadius: "8px", padding: "6px 12px", cursor: "pointer" }}>삭제</button>
+                            style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-ink)", background: "transparent", border: "none", borderRadius: "8px", padding: "8px 12px", cursor: "pointer", textAlign: "left" }}
+                          >주문 링크 복사</button>
+                          <button type="button" onClick={() => duplicateProduct(p)} title="이 상품 내용으로 새 상품 등록 폼 열기" style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-ink)", background: "transparent", border: "none", borderRadius: "8px", padding: "8px 12px", cursor: "pointer", textAlign: "left" }}>복제</button>
+                          <button type="button" onClick={() => void deleteProduct(p)} style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-danger-tx)", background: "transparent", border: "none", borderRadius: "8px", padding: "8px 12px", cursor: "pointer", textAlign: "left" }}>삭제</button>
                             </div>
                           </details>
                         </div>
@@ -2205,7 +2205,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}>
                                   <span style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-ink)" }}>{detail.detailName}</span>
-                                  {detail.hidden ? <span style={{ padding: "1px 4px", borderRadius: "4px", background: "var(--color-danger-bg)", color: "var(--color-danger-tx)", fontSize: "11px", fontWeight: 900 }}>숨김</span> : null}
+                                  {detail.hidden ? <span style={{ padding: "1px 4px", borderRadius: "4px", background: "var(--color-surface-2)", color: "var(--color-ink-mute)", fontSize: "11px", fontWeight: 700 }}>숨김</span> : null}
                                 </div>
                                 <div style={{ marginTop: "2px", fontSize: "12px", fontWeight: 900, color: "var(--color-rose-deep)" }}>{money(detail.price)}</div>
                                 {(detail.colors.length > 0 || detail.sizes.length > 0) ? <div style={{ marginTop: "2px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)" }}>{detail.colors.length > 0 ? `색상: ${detail.colors.join(", ")}` : ""}{detail.colors.length > 0 && detail.sizes.length > 0 ? " · " : ""}{detail.sizes.length > 0 ? `사이즈: ${detail.sizes.join(", ")}` : ""}</div> : null}
@@ -2214,7 +2214,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                                 const source = 'sourceProductId' in detail ? products.find(row => productId(row) === detail.sourceProductId) : p;
                                 if (source) editProduct('sourceProductId' in detail ? {...source,__linked_brand_parent:p} : source, 'sourceProductId' in detail ? '' : detail.detailName);
                                 else showAdminToast('원본 상품을 확인하지 못했습니다. 새로고침해주세요.', 'error');
-                              }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-info-tx)", background: "var(--color-info-bg)", border: "none", borderRadius: "8px", padding: "4px 8px", cursor: "pointer" }}>세부관리</button>
+                              }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-ink)", background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "4px 8px", cursor: "pointer" }}>세부관리</button>
                               {'sourceProductId' in detail?<button type="button" onClick={()=>{const source=products.find(row=>productId(row)===detail.sourceProductId);if(source)setBrandMove({source,undoParentId:String(p.id)});}} className="rounded-lg border border-line px-2 py-1 text-xs font-bold text-ink-soft">연결 되돌리기</button>:null}
                             </div>
                           ))}
