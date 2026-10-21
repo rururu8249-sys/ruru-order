@@ -6,9 +6,9 @@
 export type StatKind = "top_products" | "top_buyers" | "top_days" | "bottom_days" | "summary";
 export type PeriodKey =
   | "today" | "yesterday" | "last_7_days" | "this_week" | "last_week"
-  | "this_month" | "last_month" | "last_3_months" | "last_broadcast" | "date" | "all";
+  | "this_month" | "last_month" | "last_3_months" | "last_broadcast" | "date" | "custom" | "all";
 export const STAT_KINDS: StatKind[] = ["top_products", "top_buyers", "top_days", "bottom_days", "summary"];
-export const PERIOD_KEYS: PeriodKey[] = ["today", "yesterday", "last_7_days", "this_week", "last_week", "this_month", "last_month", "last_3_months", "last_broadcast", "date", "all"];
+export const PERIOD_KEYS: PeriodKey[] = ["today", "yesterday", "last_7_days", "this_week", "last_week", "this_month", "last_month", "last_3_months", "last_broadcast", "date", "custom", "all"];
 
 const KST = 9 * 3600 * 1000;
 

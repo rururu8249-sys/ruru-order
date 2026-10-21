@@ -69,10 +69,12 @@ let n = 0; const t = async (name, fn) => { await fn(); n++; console.log('PASS', 
 // fetch 가로채기(Gemini)
 const sentToAi = [];
 let aiReply = null;
+let aiReplyFn = null; // [AI-7] 호출마다 다른 답(프롬프트 보고 결정)
 globalThis.fetch = async (url, init) => {
   sentToAi.push(JSON.parse(init.body).contents[0].parts[0].text);
-  if (aiReply === 'fail') return { ok: false, status: 500, json: async () => ({}) };
-  return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: aiReply }] } }] }) };
+  const reply = aiReplyFn ? aiReplyFn(JSON.parse(init.body).contents[0].parts[0].text) : aiReply;
+  if (reply === 'fail') return { ok: false, status: 500, json: async () => ({}) };
+  return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: reply }] } }] }) };
 };
 
 await t('로그인 안 하면 401', async () => {
@@ -163,6 +165,27 @@ await t('숫자 질문(AI 해석) → 판매분석과 같은 계산', async () =
   const r2 = await call({ text: '전체 뭐 잘 나갔어?' });
   assert.equal(r2.body.kind, 'stats');
   assert.equal(r2.body.topProducts[0].name, '폴로 자켓 네이비');
+});
+
+await t('[AI-7] 자유 질문 — 집계표(닉네임만·전화 0)를 AI 에 주고 말 답, 숫자 질문엔 카드와 함께', async () => {
+  sentToAi.length = 0;
+  aiReplyFn = (prompt) => prompt.includes('[자료]') ? '{"answer":"제일 많이 판 날은 10.22(목)이에요."}' : '{"intent":"unknown","name":"","product":""}';
+  const r = await call({ text: '이 기간에 제일 장사 잘 된 날이 언제야?', range: 'last_3_months' });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.kind, 'chat');
+  assert.ok(r.body.answer.includes('10.22'));
+  const packPrompt = sentToAi.find((p) => p.includes('[자료]'));
+  assert.ok(packPrompt.includes('[날짜별'));
+  assert.ok(packPrompt.includes('홍길동-f2h'), '닉네임은 감');
+  assert.ok(!packPrompt.includes('010'), '전화번호 0');
+  assert.ok(!packPrompt.includes('서울'), '주소 0');
+  // 숫자 질문(stats)이면 카드 + answer 둘 다
+  aiReplyFn = (prompt) => prompt.includes('[자료]') ? '{"answer":"전체 2건이에요."}' : '{"intent":"stats","name":"","product":"","stat":"summary","period":"all","date":""}';
+  const r2 = await call({ text: '지금까지 매출 얼마야' });
+  assert.equal(r2.body.kind, 'stats');
+  assert.equal(r2.body.orderCount, 2);
+  assert.equal(r2.body.answer, '전체 2건이에요.');
+  aiReplyFn = null;
 });
 
 await t('읽기만 — 쓰기 호출 0', async () => {

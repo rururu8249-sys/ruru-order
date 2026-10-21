@@ -11,7 +11,12 @@ import AdminLiveAssistantReplyBox from "./AdminLiveAssistantReplyBox";
 import AdminLiveAssistantSeoBox from "./AdminLiveAssistantSeoBox";
 
 type Mode = "auto" | "customer" | "product";
-type Range = "3m" | "all";
+// [10/22 사장님] 기간 = 드롭다운(오늘·어제·최근 7일·이번 주·지난주·이번 달·지난달·최근 3개월·전체) + 「기간 선택」이면 달력 2칸. 서버 resolvePeriod 와 같은 키
+type Range = "today" | "yesterday" | "last_7_days" | "this_week" | "last_week" | "this_month" | "last_month" | "last_3_months" | "all" | "custom";
+const RANGE_OPTIONS: [Range, string][] = [
+  ["today", "오늘"], ["yesterday", "어제"], ["last_7_days", "최근 7일"], ["this_week", "이번 주"], ["last_week", "지난주"],
+  ["this_month", "이번 달"], ["last_month", "지난달"], ["last_3_months", "최근 3개월"], ["all", "전체"], ["custom", "기간 선택"],
+];
 
 type OrderCard = {
   orderNo: string;
@@ -68,7 +73,8 @@ type Result =
   | { kind: "customer"; via: string; query: string; total: number; people: PersonResult[] }
   | { kind: "product"; via: string; query: string; total: number; products: ProductResult[]; buyerOrderCount: number; buyerQty: number; buyers: BuyerRow[]; buyersTruncated: boolean }
   | { kind: "unknown"; via: string; query: string }
-  | ({ kind: "stats"; via: string; query: string } & StatsResult);
+  | { kind: "chat"; via: string; query: string; answer: string; periodLabel: string }
+  | ({ kind: "stats"; via: string; query: string; answer?: string | null } & StatsResult);
 
 // [AI-2] 숫자 질문 답 — 판매분석과 같은 계산(서버 lib/salesQuestion)
 type SalesDayRow = { date: string; label: string; amount: number; orderCount: number; qty: number; broadcastTitle: string; timeRange: string; hours: number | null; shopOnly: boolean };
@@ -246,13 +252,17 @@ export default function AdminLiveAssistantDrawer({
 }) {
   const [text, setText] = useState("");
   const [mode, setMode] = useState<Mode>("auto");
-  const [range, setRange] = useState<Range>("3m");
+  const [range, setRange] = useState<Range>("last_3_months");
+  const [rangeFrom, setRangeFrom] = useState("");
+  const [rangeTo, setRangeTo] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [tab, setTab] = useState<"ask" | "memo" | "reply" | "seo">("ask");
+  // [AI-7] 앞선 질문·답 6개를 같이 보내 「그중 제일 비싼 건?」 같은 이어지는 질문이 되게
+  const [history, setHistory] = useState<{ role: "user" | "assistant"; text: string }[]>([]);
 
   async function run(nextRange: Range = range, nextMode: Mode = mode, override?: string) {
     const q = (override ?? text).trim();
@@ -263,7 +273,7 @@ export default function AdminLiveAssistantDrawer({
       const res = await fetch("/api/admin-live/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: q, range: nextRange, mode: nextMode === "auto" ? undefined : nextMode }),
+        body: JSON.stringify({ text: q, range: nextRange, from: nextRange === "custom" ? rangeFrom : undefined, to: nextRange === "custom" ? rangeTo : undefined, mode: nextMode === "auto" ? undefined : nextMode, history }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.ok) {
@@ -272,6 +282,7 @@ export default function AdminLiveAssistantDrawer({
       }
       const query = data.kind === "product" ? data.intent?.product : data.intent?.name;
       setResult({ ...data, query: String(query || q) });
+      if (typeof data.answer === "string" && data.answer) setHistory((h) => [...h, { role: "user" as const, text: q }, { role: "assistant" as const, text: String(data.answer) }].slice(-6));
     } catch {
       setError("연결이 끊겼어요. 잠시 뒤 다시 눌러 주세요.");
     } finally {
@@ -324,12 +335,25 @@ export default function AdminLiveAssistantDrawer({
         </form>
 
         {/* [10/22 사장님] 「자동·손님·상품」 칩 삭제 — 항상 자동 해석(mode 는 메모함 「손님 ○○ 찾기」에서만 customer 로 씀). 기간 칩만 남김 */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[12px] text-ink-mute">기간</span>
-          {([["3m", "최근 3개월"], ["all", "전체"]] as [Range, string][]).map(([k, label]) => (
-            <button key={k} type="button" aria-pressed={range === k} className={chipClass(range === k)}
-              onClick={() => { setRange(k); if (result && text.trim()) void run(k, mode); }}>{label}</button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-1.5 text-[13px] text-ink-soft">
+            기간
+            <select value={range} aria-label="기간" onChange={(e) => { const k = e.target.value as Range; setRange(k); if (k !== "custom" && result && text.trim()) void run(k, mode); }}
+              className="h-9 rounded-lg border border-line bg-surface px-2 text-[13px] font-semibold text-ink outline-none focus-visible:border-ink focus-visible:ring-2 focus-visible:ring-ink">
+              {RANGE_OPTIONS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+            </select>
+          </label>
+          {range === "custom" ? (
+            <span className="flex flex-wrap items-center gap-1.5">
+              <input type="date" value={rangeFrom} aria-label="시작 날짜" onChange={(e) => setRangeFrom(e.target.value)}
+                className="h-9 rounded-lg border border-line bg-surface px-2 text-[13px] text-ink outline-none focus-visible:border-ink" />
+              <span className="text-[13px] text-ink-mute">~</span>
+              <input type="date" value={rangeTo} aria-label="끝 날짜" onChange={(e) => setRangeTo(e.target.value)}
+                className="h-9 rounded-lg border border-line bg-surface px-2 text-[13px] text-ink outline-none focus-visible:border-ink" />
+              <button type="button" disabled={!rangeFrom || !rangeTo || !text.trim()} onClick={() => void run("custom", mode)}
+                className="h-9 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink disabled:opacity-40">적용</button>
+            </span>
+          ) : null}
         </div>
 
         {error ? <p className="text-[13px] font-semibold text-danger-tx">{error}</p> : null}
@@ -338,10 +362,17 @@ export default function AdminLiveAssistantDrawer({
           <p className="text-[12px] text-ink-mute">손님·상품 찾기, 「이번 주 뭐 잘 나갔어?」 같은 숫자 질문도 돼요.</p>
         ) : null}
 
+        {(result?.kind === "chat" || (result?.kind === "stats" && result.answer)) ? (
+          <section className="rounded-xl border border-line bg-surface p-3">
+            <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-ink">{result.answer}</p>
+            <p className="mt-1.5 text-[12px] text-ink-mute">{result.periodLabel} · 결제완료 기준 집계표를 보고 AI 가 답했어요(손님 이름·전화는 안 보냄)</p>
+          </section>
+        ) : null}
+
         {result?.kind === "stats" ? <StatsAnswer r={result} onShowInOrders={onShowInOrders} /> : null}
 
         {result?.kind === "unknown" ? (
-          <p className="text-[13px] text-ink-soft">무엇을 찾을지 모르겠어요. 위에서 「손님」이나 「상품」을 고르고 다시 찾아 주세요.</p>
+          <p className="text-[13px] text-ink-soft">못 알아들었어요. 손님 닉네임·상품 이름, 또는 「이번 달 매출」「지난 방송 뭐 잘 나갔어」처럼 물어봐 주세요.</p>
         ) : null}
 
         {result?.kind === "customer" ? (

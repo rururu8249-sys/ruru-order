@@ -23,6 +23,8 @@ import { paymentStatusLabel } from "@/lib/orderLabels";
 import type { OrderRow } from "@/lib/admin-v2/types";
 import { loadSalesAnalysisSnapshot } from "@/lib/salesAnalysisLoader";
 import { computeSalesAnswer, resolvePeriod } from "@/lib/salesQuestion";
+import { PERIOD_KEYS, type PeriodKey } from "@/lib/statQuestionParse";
+import { buildSalesDataPack, chatPrompt, looksLikeChatQuestion, parseChatJson, type ChatTurn } from "@/lib/assistantChat";
 import { salesProductPhotos } from "@/lib/salesHistory";
 
 function getSupabaseAdminClient() {
@@ -101,11 +103,10 @@ type LightOrder = {
 const LIGHT_ORDER_COLUMNS =
   "id, created_at, youtube_nickname, customer_name, recipient_name, customer_phone, kakao_id, order_group_id, order_lookup_code, product_name, color, size, qty";
 
-function rangeStartIso(range: string): string | null {
-  if (range === "all") return null;
-  const d = new Date();
-  d.setMonth(d.getMonth() - 3);
-  return d.toISOString();
+// [10/22] 화면 기간(드롭다운·달력) → 손님·상품 찾기 시작 시각(resolvePeriod 와 같은 한국 날짜 계산). 옛 값 "3m" 도 받음
+function pickRangeKey(raw: unknown): PeriodKey {
+  if (raw === "3m") return "last_3_months";
+  return PERIOD_KEYS.includes(raw as PeriodKey) && raw !== "date" && raw !== "last_broadcast" ? (raw as PeriodKey) : "last_3_months";
 }
 
 async function fetchLightOrders(supabase: SupabaseClient, sinceIso: string | null): Promise<LightOrder[]> {
@@ -445,7 +446,10 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => null);
   const text = String(body?.text ?? "").trim().slice(0, 200);
-  const range = body?.range === "all" ? "all" : "3m";
+  const range = pickRangeKey(body?.range);
+  const rangeFrom = /^\d{4}-\d{2}-\d{2}$/.test(String(body?.from ?? "")) ? String(body.from) : undefined;
+  const rangeTo = /^\d{4}-\d{2}-\d{2}$/.test(String(body?.to ?? "")) ? String(body.to) : undefined;
+  const rangePeriod = resolvePeriod(range, Date.now(), { from: rangeFrom, to: rangeTo });
   const forced = body?.mode === "customer" || body?.mode === "product" ? body.mode : null;
   if (!text) return NextResponse.json({ ok: false, message: "찾을 내용을 입력해 주세요." }, { status: 400 });
 
@@ -458,15 +462,48 @@ export async function POST(request: NextRequest) {
   } else {
     const ai = await askGemini(text);
     if (ai && ai.intent !== "unknown") { intent = ai; via = "ai"; }
+    else if (ai && ai.intent === "unknown" && looksLikeChatQuestion(text)) intent = ai; // [AI-7] AI 가 「찾기 아님」이라 했고 질문 같으면 → 자유 질문(아래)
     else intent = parseIntentByRule(text);
   }
+  const history: ChatTurn[] = Array.isArray(body?.history)
+    ? (body.history as unknown[]).slice(-6).map((h) => {
+        const o = (h ?? {}) as { role?: unknown; text?: unknown };
+        return { role: o.role === "assistant" ? "assistant" : "user", text: String(o.text ?? "").slice(0, 1500) } as ChatTurn;
+      })
+    : [];
+
+  // [AI-7] 자유 질문 — 집계표(손님 이름·전화 없음, 닉네임만)를 AI 에 주고 말로 답한다. 숫자 질문엔 카드와 함께, 모르는 질문엔 이것만.
+  async function chatAnswer(supabaseClient: SupabaseClient, periodKeyOverride?: PeriodKey, date?: string): Promise<{ answer: string | null; periodLabel: string; snapshot: Awaited<ReturnType<typeof loadSalesAnalysisSnapshot>>; period: ReturnType<typeof resolvePeriod>; sales: ReturnType<typeof computeSalesAnswer> }> {
+    const snapshot = await loadSalesAnalysisSnapshot(supabaseClient, () => true);
+    const period = periodKeyOverride
+      ? resolvePeriod(periodKeyOverride, Date.now(), { date, broadcasts: snapshot.broadcasts })
+      : resolvePeriod(range, Date.now(), { from: rangeFrom, to: rangeTo, broadcasts: snapshot.broadcasts });
+    const sales = computeSalesAnswer(snapshot.orders, period, 80, snapshot.broadcasts);
+    const pack = buildSalesDataPack(sales, period.label);
+    const { text: out, note } = await callGeminiJson(chatPrompt(pack, history, text, Date.now()), { timeoutMs: 15000, maxTokens: 1024 });
+    lastAiNote = note;
+    return { answer: parseChatJson(out), periodLabel: period.label, snapshot, period, sales };
+  }
+
   if (intent.intent === "unknown") {
-    return NextResponse.json({ ok: true, via, ai: lastAiNote, intent, kind: "unknown" });
+    if (looksLikeChatQuestion(text)) {
+      try {
+        const r = await chatAnswer(getSupabaseAdminClient());
+        if (r.answer) return NextResponse.json({ ok: true, via: "ai", ai: lastAiNote, intent, kind: "chat", answer: r.answer, periodLabel: r.periodLabel });
+      } catch (error) {
+        console.error("[assistant] chat", error);
+      }
+    }
+    // 자유 질문도 안 되면 옛날처럼 규칙으로 손님·상품 찾기
+    const ruled = parseIntentByRule(text);
+    if (ruled.intent === "unknown") return NextResponse.json({ ok: true, via, ai: lastAiNote, intent, kind: "unknown" });
+    intent = ruled;
+    via = "rule";
   }
 
   try {
     const supabase = getSupabaseAdminClient();
-    const sinceIso = rangeStartIso(range);
+    const sinceIso = rangePeriod.fromIso;
     if (intent.intent === "customer") {
       let result = await searchCustomers(supabase, intent.name, sinceIso);
       const trimmed = trimNameParticle(intent.name);
@@ -479,17 +516,18 @@ export async function POST(request: NextRequest) {
     }
     if (intent.intent === "stats") {
       // [AI-2] 숫자 질문 — 판매분석과 같은 스냅샷·같은 계산(lib/salesQuestion). 읽기만.
-      const snapshot = await loadSalesAnalysisSnapshot(supabase, () => true);
-      // [10/22 실측] 기간 말이 없으면 화면 칩(최근 3개월/전체)을 기간으로(예전엔 오늘·AI 가 all 로 답하면 전체 기간이 나왔음)
-      const periodKey = intent.period || (range === "all" ? "all" : "last_3_months");
-      const period = resolvePeriod(periodKey, Date.now(), { date: intent.date, broadcasts: snapshot.broadcasts });
-      const answer = computeSalesAnswer(snapshot.orders, period, 10, snapshot.broadcasts);
+      // [10/22 실측] 기간 말이 없으면 화면 기간(드롭다운·달력)을 기간으로(예전엔 오늘·AI 가 all 로 답하면 전체 기간이 나왔음)
+      // [AI-7] 카드(판매분석과 같은 계산) + AI 가 집계표를 보고 쓴 말 답(answer)
+      const r = await chatAnswer(supabase, intent.period, intent.date);
+      const snapshot = r.snapshot;
+      const period = r.period;
+      const answer = { ...r.sales, topProducts: r.sales.topProducts.slice(0, 10), topBuyers: r.sales.topBuyers.slice(0, 10), topDays: r.sales.topDays.slice(0, 10), bottomDays: r.sales.bottomDays.slice(0, 10) };
       const productById = new Map(snapshot.products.map((p) => [String(p.id), p]));
       const topProducts = answer.topProducts.map((p) => {
         const product = productById.get(p.productId);
         return { ...p, photo: product ? salesProductPhotos(p.name, product, p.productId || undefined).detail : "" };
       });
-      return NextResponse.json({ ok: true, via, ai: lastAiNote, intent, kind: "stats", stat: intent.stat || "summary", periodLabel: period.label, ...answer, topProducts });
+      return NextResponse.json({ ok: true, via, ai: lastAiNote, intent, kind: "stats", stat: intent.stat || "summary", periodLabel: period.label, ...answer, topProducts, byBroadcast: undefined, answer: r.answer });
     }
     const result = await searchProducts(supabase, intent.product, sinceIso);
     return NextResponse.json({ ok: true, via, ai: lastAiNote, intent, range, kind: "product", ...result });
