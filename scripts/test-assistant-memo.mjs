@@ -93,6 +93,14 @@ await t('AI 응답 검사(정해진 모양만)', () => {
   assert.equal(lib.parseOrganizeJson('{"items":[]}'), null);
 });
 
+await t('[AI-5] 고객이슈 제안 규칙(자동 등록 없음 — 판정만)', () => {
+  assert.equal(lib.suggestIssueFromMemo({ kind: 'todo', body: '홍길동 내일 교환 연락', who: '홍길동' }).issueType, 'exchange');
+  assert.equal(lib.suggestIssueFromMemo({ kind: 'customer', body: '행복나무 환불 요청', who: null }).issueType, 'refund');
+  assert.equal(lib.suggestIssueFromMemo({ kind: 'note', body: '지퍼 불량 왔다고 함', who: null }).issueType, 'general');
+  assert.equal(lib.suggestIssueFromMemo({ kind: 'product', body: '폴로자켓 L 2개 추가 주문', who: null }), null);
+  assert.equal(lib.suggestIssueFromMemo({ kind: 'note', body: '금요일 택배 늦게 옴', who: null }), null);
+});
+
 await t('로그인 안 하면 401', async () => {
   authed = false;
   assert.equal((await route.GET({})).status, 401);

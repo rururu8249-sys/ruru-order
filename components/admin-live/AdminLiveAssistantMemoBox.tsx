@@ -5,7 +5,7 @@
 //   DESIGN-ADMIN: 주버튼 1개(「저장」) · 체크 36 · 날짜 오른쪽 · 이모지 없음 · 설명 한 줄.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { MEMO_KIND_LABEL, type MemoKind } from "@/lib/assistantMemo";
+import { MEMO_KIND_LABEL, suggestIssueFromMemo, type MemoKind } from "@/lib/assistantMemo";
 
 type MemoRow = {
   id: string;
@@ -47,6 +47,45 @@ export default function AdminLiveAssistantMemoBox({ onFindCustomer }: { onFindCu
   const [needsSetup, setNeedsSetup] = useState(false);
   const [notice, setNotice] = useState("");
   const [showDone, setShowDone] = useState(false);
+  // [AI-5] 고객이슈 등록 제안 카드 — 사장님이 [등록]을 눌러야만 기존 등록 API(admin-tasks, 포인트 무접촉) 호출
+  const [issueDraft, setIssueDraft] = useState<{ row: MemoRow; issueType: string; nickname: string; memo: string } | null>(null);
+  const [issueSaving, setIssueSaving] = useState(false);
+  const [issueNote, setIssueNote] = useState("");
+
+  async function registerIssue() {
+    if (!issueDraft || issueSaving) return;
+    const nickname = issueDraft.nickname.trim();
+    const memo = issueDraft.memo.trim();
+    if (!memo) { setIssueNote("내용을 적어 주세요."); return; }
+    setIssueSaving(true);
+    setIssueNote("");
+    try {
+      // 고객이슈 탭 「+ 고객이슈 등록」과 같은 모양(AdminLiveCustomerIssueRail.saveIssueMemo)
+      const res = await fetch("/api/admin-v2/admin-tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          task_type: issueDraft.issueType,
+          title: `[고객이슈] ${nickname || "수동메모"}`,
+          body: memo,
+          customer_name: "",
+          customer_nickname: nickname,
+          priority: "normal",
+          source: "admin-live-assistant",
+          raw_payload: { nickname, name: "", phone: "", issue_types: [issueDraft.issueType], memo, source: "admin-live-assistant", memo_id: issueDraft.row.id },
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) { setIssueNote(data?.message || "등록하지 못했어요. 고객 › 고객이슈에서 직접 등록해 주세요."); return; }
+      setIssueDraft(null);
+      setNotice("고객이슈에 등록했어요. 고객 › 고객이슈에서 확인할 수 있어요.");
+      await setStatus(issueDraft.row, "done");
+    } catch {
+      setIssueNote("연결이 끊겼어요. 다시 눌러 주세요.");
+    } finally {
+      setIssueSaving(false);
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -143,6 +182,29 @@ export default function AdminLiveAssistantMemoBox({ onFindCustomer }: { onFindCu
         {error ? <p className="text-[13px] font-semibold text-danger-tx">{error}</p> : null}
       </div>
 
+      {issueDraft ? (
+        <section className="space-y-2 rounded-xl border border-ink bg-surface p-3" aria-label="고객이슈 등록 제안">
+          <h3 className="text-[14px] font-bold text-ink">고객이슈로 등록</h3>
+          <div className="flex flex-wrap gap-1.5">
+            {([["exchange", "교환"], ["refund", "환불"], ["return", "반품"], ["general", "기타"]] as [string, string][]).map(([k, label]) => (
+              <button key={k} type="button" aria-pressed={issueDraft.issueType === k} onClick={() => setIssueDraft({ ...issueDraft, issueType: k })}
+                className={`inline-flex h-9 items-center rounded-full border px-3 text-[13px] font-semibold ${issueDraft.issueType === k ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink-soft hover:bg-surface-2"}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <input value={issueDraft.nickname} onChange={(e) => setIssueDraft({ ...issueDraft, nickname: e.target.value })} placeholder="손님 닉네임(없으면 비워도 돼요)" aria-label="손님 닉네임"
+            className="h-9 w-full rounded-lg border border-line bg-surface px-3 text-[16px] text-ink outline-none placeholder:text-ink-mute focus-visible:border-ink md:text-[14px]" />
+          <textarea value={issueDraft.memo} onChange={(e) => setIssueDraft({ ...issueDraft, memo: e.target.value })} rows={2} aria-label="이슈 내용"
+            className="w-full resize-y rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink outline-none focus-visible:border-ink md:text-[14px]" />
+          <div className="flex items-center justify-end gap-2">
+            {issueNote ? <span className="mr-auto text-[13px] text-danger-tx">{issueNote}</span> : null}
+            <button type="button" onClick={() => setIssueDraft(null)} className="h-9 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2">취소</button>
+            <button type="button" onClick={() => void registerIssue()} disabled={issueSaving} className="h-9 rounded-lg bg-ink px-3 text-[13px] font-bold text-white disabled:opacity-40">{issueSaving ? "등록 중" : "등록"}</button>
+          </div>
+        </section>
+      ) : null}
+
       {loading && rows.length === 0 ? <p className="text-[13px] text-ink-mute">불러오는 중</p> : null}
       {!loading && rows.length === 0 && !error ? (
         <p className="rounded-xl border border-line bg-surface p-4 text-[13px] text-ink-soft">남은 메모가 없어요. 위에 적고 「저장」을 눌러 주세요.</p>
@@ -152,7 +214,8 @@ export default function AdminLiveAssistantMemoBox({ onFindCustomer }: { onFindCu
         <section key={g.kind} className="space-y-1.5">
           <h3 className="text-[14px] font-bold text-ink">{MEMO_KIND_LABEL[g.kind]} <span className="font-semibold text-ink-mute tabular-nums">{g.rows.length}</span></h3>
           <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
-            {g.rows.map((r) => <MemoLine key={r.id} row={r} onToggle={() => void setStatus(r, "done")} onDelete={() => void setStatus(r, "deleted")} onFindCustomer={onFindCustomer} />)}
+            {g.rows.map((r) => <MemoLine key={r.id} row={r} onToggle={() => void setStatus(r, "done")} onDelete={() => void setStatus(r, "deleted")} onFindCustomer={onFindCustomer}
+              onSuggestIssue={(issueType) => { setIssueNote(""); setIssueDraft({ row: r, issueType, nickname: r.who || "", memo: r.body }); }} />)}
           </ul>
         </section>
       ))}
@@ -173,9 +236,10 @@ export default function AdminLiveAssistantMemoBox({ onFindCustomer }: { onFindCu
   );
 }
 
-function MemoLine({ row, onToggle, onDelete, onFindCustomer }: { row: MemoRow; onToggle: () => void; onDelete: () => void; onFindCustomer: (who: string) => void }) {
+function MemoLine({ row, onToggle, onDelete, onFindCustomer, onSuggestIssue }: { row: MemoRow; onToggle: () => void; onDelete: () => void; onFindCustomer: (who: string) => void; onSuggestIssue?: (issueType: string) => void }) {
   const isDone = row.status === "done";
   const due = isDone ? null : dueLabel(row.due_date);
+  const suggestion = !isDone && onSuggestIssue ? suggestIssueFromMemo(row) : null;
   return (
     <li className="grid grid-cols-[36px_1fr_auto] items-start gap-2 px-2.5 py-2">
       <button type="button" role="checkbox" aria-checked={isDone} aria-label={isDone ? "다시 할 일로" : "끝냄"} onClick={onToggle}
@@ -184,8 +248,13 @@ function MemoLine({ row, onToggle, onDelete, onFindCustomer }: { row: MemoRow; o
       </button>
       <span className="min-w-0 pt-1.5">
         <span className={`block break-words text-[14px] ${isDone ? "text-ink-mute line-through" : "text-ink"}`}>{row.body}</span>
-        {row.who || row.product ? (
-          <span className="mt-0.5 flex flex-wrap gap-1.5">
+        {row.who || row.product || suggestion ? (
+          <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
+            {suggestion ? (
+              <button type="button" onClick={() => onSuggestIssue?.(suggestion.issueType)} className="inline-flex h-7 items-center rounded-lg border border-line bg-surface px-2 text-[12px] font-semibold text-ink hover:bg-surface-2">
+                고객이슈 등록 · {suggestion.label}
+              </button>
+            ) : null}
             {row.who ? (
               <button type="button" onClick={() => onFindCustomer(row.who!)} className="text-[12px] font-semibold text-ink-soft underline-offset-2 hover:underline">
                 손님 {row.who} 찾기

@@ -120,3 +120,16 @@ export function organizePrompt(maskedText: string, nowMs: number): string {
 메모:
 ${maskedText}`;
 }
+
+// ───── [AI-5] 메모 줄 → 고객이슈 등록 «제안» (자동 등록 없음 — 사장님이 카드에서 [등록] 눌러야 함) ─────
+export type IssueSuggestion = { issueType: "exchange" | "refund" | "return" | "general"; label: string };
+
+/** 손님 이슈처럼 보이는 줄인지(교환·반품·환불·불량·오배송·사이즈 교환 등). 재고·입고 같은 상품 메모는 아님 */
+export function suggestIssueFromMemo(item: { kind: MemoKind; body: string; who: string | null }): IssueSuggestion | null {
+  const t = String(item.body ?? "");
+  if (/(교환)/.test(t)) return { issueType: "exchange", label: "교환" };
+  if (/(환불)/.test(t)) return { issueType: "refund", label: "환불" };
+  if (/(반품)/.test(t)) return { issueType: "return", label: "반품" };
+  if (/(불량|오배송|파손|잘못\s*감|누락|안\s*왔|못\s*받|클레임|항의|컴플레인)/.test(t)) return { issueType: "general", label: "기타" };
+  return null;
+}
