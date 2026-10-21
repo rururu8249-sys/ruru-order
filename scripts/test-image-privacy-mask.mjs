@@ -1,4 +1,4 @@
-// [2026-10-22] 캡처 사진 개인정보 가리기 판정 — 전화·계좌·주소는 가리고 날짜·가격·상품명은 안 가림
+// [2026-10-22] 캡처 사진 개인정보 가리기 판정 — 전화·계좌·주소는 가리고 날짜·시간·가격·상품명은 안 가림
 import assert from 'node:assert/strict';
 import { createUiLoader } from './admin-ui-test-loader.mjs';
 const lib = createUiLoader()('lib/imagePrivacyMask.ts');
@@ -21,6 +21,40 @@ t('주소 줄은 줄 전체 가림, 상품명 줄은 안 가림', () => {
   const boxes = lib.pickMaskBoxes([w('서울시', 0, 0), w('강남구', 0, 40), w('테헤란로', 0, 80), w('12', 0, 130), w('행복아파트', 1, 0), w('101동', 1, 60), w('202호', 1, 120), w('폴로', 2, 0), w('자켓', 2, 30), w('네이비', 2, 60)]);
   assert.deepEqual(boxes.filter((b) => b.reason === 'address').map((b) => b.y0 / 20), [0, 1]);
   assert.equal(boxes.some((b) => b.y0 === 40), false);
+});
+
+t('[10/22 실측] 카톡 주문내역 캡처 — 날짜·시간·쉼표 금액·「원」 앞 숫자는 안 가리고 괄호 전화·주소는 가림', () => {
+  const words = [
+    w('주문일:', 0, 0), w('2026.10.18', 0, 60), w('일요일', 0, 170), w('23:17', 0, 230),
+    w('주문자:', 1, 0), w('윤장훈', 1, 60), w('(010-2225-2244)', 1, 110),
+    w('주소:', 2, 0), w('(08596)', 2, 50), w('서울', 2, 120), w('금천구', 2, 150), w('벚꽃로', 2, 190), w('73', 2, 230),
+    w('1', 3, 0), w('개', 3, 20), w('ㆍ', 3, 40), w('29,000', 3, 60), w('원', 3, 130),
+    w('상품금액', 4, 0), w('198,000', 4, 90), w('원', 4, 170),
+    w('우리', 5, 0), w('1002-065-439765', 5, 30),
+    w('새마을금고', 6, 0), w('9002186993725', 6, 60),
+  ];
+  const boxes = lib.pickMaskBoxes(lib.mergeAdjacentNumberWords(words));
+  const numberLines = boxes.filter((b) => b.reason === 'number').map((b) => b.y0 / 20).sort();
+  assert.deepEqual(numberLines, [1, 2, 5, 6], '전화·우편번호·계좌 2개만');
+  // 「우리」가 「…리」 주소 단어로 잡혀 계좌 줄(5)도 주소 줄로 통째 가림 — 계좌 줄이라 더 가려도 됨
+  assert.deepEqual(boxes.filter((b) => b.reason === 'address').map((b) => b.y0 / 20), [2, 5]);
+  assert.equal(boxes.some((b) => b.y0 === 0 || b.y0 === 60 || b.y0 === 80), false, '날짜·시간·가격 줄은 안 가림');
+});
+
+t('「우리 15,000원 보냈어요」 — 가격만 있는 줄은 주소 줄로 안 가림', () => {
+  const boxes = lib.pickMaskBoxes([w('우리', 0, 0), w('15,000원', 0, 30), w('보냈어요', 0, 120), w('우리', 1, 0), w('2', 1, 30), w('개', 1, 50)]);
+  assert.equal(boxes.length, 0);
+});
+
+t('조각 계획 — 작은 캡처(756×1654)는 4배·6조각, 큰 캡처(1170×2532)는 2.6배·조각 겹침 40px', () => {
+  const a = lib.ocrStripPlan(756, 1654);
+  assert.equal(a.scale, 4);
+  assert.equal(a.strips.length, 6);
+  assert.equal(a.strips[0].sh - (a.strips[1].sy - a.strips[0].sy), 40);
+  assert.equal(a.strips.at(-1).sy + a.strips.at(-1).sh, 1654);
+  const b = lib.ocrStripPlan(1170, 2532);
+  assert.equal(b.scale, 2.6);
+  assert.ok(b.strips.length >= 5);
 });
 
 console.log(`ALL PASS image privacy mask (${n})`);

@@ -7,7 +7,7 @@
 //   DESIGN-ADMIN: 주버튼 1개(「문구 만들기」) · 보조 36 · 이모지 없음 · 설명 한 줄.
 
 import { useEffect, useRef, useState, type DragEvent, type ClipboardEvent } from "react";
-import { mergeAdjacentNumberWords, pickMaskBoxes, type OcrWord } from "@/lib/imagePrivacyMask";
+import { mergeAdjacentNumberWords, ocrStripPlan, pickMaskBoxes, type OcrWord } from "@/lib/imagePrivacyMask";
 
 type Draft = { label: string; text: string };
 type ReplyResult = { summary: string; category: string; drafts: Draft[] };
@@ -53,20 +53,34 @@ async function getOcrWorker() {
 
 /** 사진 → 줄이고 → 글자 읽고 → 개인정보 상자 검게 → base64 */
 async function prepareImage(file: File, onStage: (s: Img["status"]) => void): Promise<Omit<Img, "key" | "name">> {
-  const canvas = toCanvas(await loadImage(file));
+  const img = await loadImage(file);
+  const canvas = toCanvas(img);
   let masked = 0;
   let status: Img["status"] = "ready";
   try {
     onStage("ocr");
     const worker = await getOcrWorker();
-    const { data } = await worker.recognize(canvas, {}, { blocks: true });
+    // [10/22 실측] 원본을 키워 가로 조각으로 읽어야 대화 위에 붙은 작은 사진 속 계좌번호까지 잡힌다(1배 한 번 읽기는 놓침).
+    const { scale, strips } = ocrStripPlan(img.width, img.height);
+    const toCanvasRatio = canvas.width / img.width;
     const words: OcrWord[] = [];
     let lineNo = 0;
-    for (const block of data.blocks || []) for (const para of block.paragraphs || []) for (const line of para.lines || []) {
-      lineNo += 1;
-      for (const w of line.words || []) {
-        if (!w.text?.trim()) continue;
-        words.push({ text: w.text, x0: w.bbox.x0, y0: w.bbox.y0, x1: w.bbox.x1, y1: w.bbox.y1, line: lineNo });
+    for (const strip of strips) {
+      const part = document.createElement("canvas");
+      part.width = Math.round(img.width * scale);
+      part.height = Math.round(strip.sh * scale);
+      const pctx = part.getContext("2d");
+      if (!pctx) continue;
+      pctx.imageSmoothingQuality = "high";
+      pctx.drawImage(img, 0, strip.sy, img.width, strip.sh, 0, 0, part.width, part.height);
+      const { data } = await worker.recognize(part, {}, { blocks: true });
+      for (const block of data.blocks || []) for (const para of block.paragraphs || []) for (const line of para.lines || []) {
+        lineNo += 1;
+        for (const w of line.words || []) {
+          if (!w.text?.trim()) continue;
+          const k = toCanvasRatio / scale;
+          words.push({ text: w.text, x0: w.bbox.x0 * k, y0: (w.bbox.y0 / scale + strip.sy) * toCanvasRatio, x1: w.bbox.x1 * k, y1: (w.bbox.y1 / scale + strip.sy) * toCanvasRatio, line: lineNo });
+        }
       }
     }
     const boxes = pickMaskBoxes(mergeAdjacentNumberWords(words));
@@ -75,7 +89,8 @@ async function prepareImage(file: File, onStage: (s: Img["status"]) => void): Pr
       ctx.fillStyle = "#111111";
       for (const b of boxes) ctx.fillRect(b.x0 - 3, b.y0 - 3, b.x1 - b.x0 + 6, b.y1 - b.y0 + 6);
     }
-    masked = boxes.length;
+    // 조각이 40px 겹쳐 같은 자리가 두 번 잡힐 수 있어 개수는 자리 기준으로 센다
+    masked = new Set(boxes.map((b) => `${Math.round(b.y0 / 8)}:${Math.round(b.x0 / 8)}`)).size;
   } catch {
     status = "nomask"; // 글자 인식이 안 되면 가리지 못했다고 표시(보내기 전에 사장님이 판단)
   }
