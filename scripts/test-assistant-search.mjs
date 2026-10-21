@@ -1,6 +1,6 @@
 // [2026-10-22] AI 비서 1단계 — 대충 입력한 닉네임·상품명 찾기 규칙 시뮬레이션
 import assert from 'node:assert/strict';
-import { matchText, bestMatch, stripNicknameSuffix, toChoseong, maskPhone, parseIntentByRule, parseIntentJson, normalizeSearchText } from '../lib/assistantSearch.ts';
+import { trimNameParticle, matchText, bestMatch, stripNicknameSuffix, toChoseong, maskPhone, parseIntentByRule, parseIntentJson, normalizeSearchText } from '../lib/assistantSearch.ts';
 
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('PASS', name); };
 
@@ -51,6 +51,16 @@ t('상품명 대충', () => {
   // 상품번호: 꼬리표로 잘라 「PD」만 남거나 202↔206 오타로 섞이면 안 됨
   assert.equal(matchText('PD-206', 'PD-202 블랙'), null);
   assert.equal(matchText('PD-206', 'PD-206 브라운'), 'partial');
+});
+
+t('여러 단어·조사', () => {
+  assert.equal(matchText('프라다 가방', '프라다 나일론백'), 'word');
+  assert.equal(matchText('프라다 나일론', '프라다 나일론백 블랙'), 'partial');
+  assert.equal(matchText('구찌 가방', '프라다 나일론백'), null);
+  assert.equal(trimNameParticle('홍길이라는'), '홍길');
+  assert.equal(trimNameParticle('홍길이'), '홍길');
+  assert.equal(trimNameParticle('홍길님'), '홍길');
+  assert.equal(trimNameParticle('홍'), '홍');
 });
 
 t('전화 가리기', () => {

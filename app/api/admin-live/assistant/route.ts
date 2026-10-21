@@ -13,6 +13,7 @@ import {
   MATCH_KIND_RANK,
   parseIntentByRule,
   parseIntentJson,
+  trimNameParticle,
   type AssistantIntent,
   type MatchKind,
 } from "@/lib/assistantSearch";
@@ -40,7 +41,7 @@ const INTENT_PROMPT = `너는 쇼핑몰 관리자의 검색 요청을 해석한�
 - 손님/주문자/닉네임/이름을 찾는 말이면 {"intent":"customer","name":"<손님 이름이나 닉네임 그대로>","product":""}
 - 상품/물건/챙기기/옵션/누가 무슨 상품을 샀는지 묻는 말이면 {"intent":"product","name":"","product":"<상품 이름 그대로>"}
 - 모르겠으면 {"intent":"unknown","name":"","product":""}
-이름·상품명은 사장님이 쓴 글자를 고치지 말고 그대로 옮긴다(오타도 그대로). 설명 없이 JSON 하나만.
+이름·상품명은 사장님이 쓴 글자를 고치지 말고 그대로 옮긴다(오타도 그대로). 단 이름 뒤 조사·호칭(이라는, 님, 씨, 이/가/은/는)과 날짜·「챙길」 같은 말은 뺀다. 설명 없이 JSON 하나만.
 사장님 문장: `;
 
 // AI 가 안 될 때 이유(화면 디버그용·비밀값 없음): no_key / http_400 / empty / bad_json / timeout …
@@ -413,10 +414,13 @@ async function searchProducts(supabase: SupabaseClient, query: string, sinceIso:
   found.sort((a, b) => MATCH_KIND_RANK[a.kind] - MATCH_KIND_RANK[b.kind] || String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
 
   // 이 상품을 산 손님(주문 줄의 상품명 기준 — 오타 판정은 빼고 일치·일부 일치만, 엉뚱한 상품 섞임 방지)
-  const buyerRows = [...orders].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || ""))).filter((o) => {
+  const byTime = [...orders].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
+  let buyerRows = byTime.filter((o) => {
     const k = matchText(query, o.product_name);
     return k === "exact" || k === "partial";
   });
+  // 「프라다 가방」처럼 단어가 다 맞는 주문이 없으면 단어 일부(「프라다」)로
+  if (buyerRows.length === 0) buyerRows = byTime.filter((o) => matchText(query, o.product_name) === "word");
   const buyerGroups: string[] = [];
   const rowsByGroup = new Map<string, LightOrder[]>();
   for (const o of buyerRows) {
@@ -486,7 +490,13 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseAdminClient();
     const sinceIso = rangeStartIso(range);
     if (intent.intent === "customer") {
-      const result = await searchCustomers(supabase, intent.name, sinceIso);
+      let result = await searchCustomers(supabase, intent.name, sinceIso);
+      const trimmed = trimNameParticle(intent.name);
+      if (result.total === 0 && trimmed !== intent.name) {
+        // 「홍길이」처럼 조사가 붙어 못 찾았으면 떼고 한 번 더
+        result = await searchCustomers(supabase, trimmed, sinceIso);
+        intent = { ...intent, name: trimmed };
+      }
       return NextResponse.json({ ok: true, via, ai: lastAiNote, intent, range, kind: "customer", ...result });
     }
     const result = await searchProducts(supabase, intent.product, sinceIso);

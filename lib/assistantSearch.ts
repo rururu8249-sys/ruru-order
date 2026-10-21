@@ -8,14 +8,16 @@
 //   partial : 일부가 들어 있음                                                「홍길」 ⊂ 「홍길동-f2h」
 //   choseong: 초성만 입력                                                     「ㅎㄱㄷ」 → 「홍길동」
 //   typo    : 자모 한두 개 틀림                                               「홍길돈」 → 「홍길동」
+//   (여러 단어) 단어가 다 들어 있으면 partial, 일부 단어만 맞으면 word        「프라다 가방」 → 「프라다 나일론백」(word)
 
-export type MatchKind = "exact" | "partial" | "choseong" | "typo";
-export const MATCH_KIND_RANK: Record<MatchKind, number> = { exact: 0, partial: 1, choseong: 2, typo: 3 };
+export type MatchKind = "exact" | "partial" | "choseong" | "typo" | "word";
+export const MATCH_KIND_RANK: Record<MatchKind, number> = { exact: 0, partial: 1, choseong: 2, typo: 3, word: 4 };
 export const MATCH_KIND_LABEL: Record<MatchKind, string> = {
   exact: "일치",
   partial: "일부 일치",
   choseong: "초성",
   typo: "비슷한 글자",
+  word: "단어 일부",
 };
 
 const CHOSEONG_LIST = ["ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
@@ -103,6 +105,20 @@ function typoLimit(jamoLength: number): number {
  * 안 맞으면 null.
  */
 export function matchText(query: string, candidate: unknown): MatchKind | null {
+  const single = matchSingle(query, candidate);
+  if (single) return single;
+  // 띄어 쓴 여러 단어: 다 들어 있으면 일부 일치, 2글자 넘는 단어 하나라도 맞으면 「단어 일부」
+  const words = String(query ?? "").split(/\s+/).map(normalizeSearchText).filter((w) => w.length >= 2);
+  if (words.length < 2) return null;
+  const c = normalizeSearchText(candidate);
+  if (!c) return null;
+  const hits = words.filter((w) => c.includes(w)).length;
+  if (hits === words.length) return "partial";
+  if (hits > 0) return "word";
+  return null;
+}
+
+function matchSingle(query: string, candidate: unknown): MatchKind | null {
   const q = normalizeSearchText(query);
   const raw = String(candidate ?? "");
   const c = normalizeSearchText(raw);
@@ -184,6 +200,13 @@ export function parseIntentByRule(text: string): AssistantIntent {
     return { intent: "product", name: "", product };
   }
   return { intent: "customer", name: cleaned, product: "" };
+}
+
+/** 「홍길이라는」「홍길님」「홍길이」처럼 이름 끝에 붙은 말 떼기(찾는 결과가 없을 때 한 번 더 찾는 용도) */
+export function trimNameParticle(value: string): string {
+  const t = String(value ?? "").trim();
+  const m = t.match(/^(.{2,}?)(이라는|라는|이란|님이|님|씨|이가|이는|이를|이|가|은|는|을|를)$/);
+  return m ? m[1] : t;
 }
 
 /** AI 응답(JSON 글자)을 안전하게 읽기. 이상하면 null. */
