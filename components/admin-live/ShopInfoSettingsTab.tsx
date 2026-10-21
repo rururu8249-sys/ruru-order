@@ -8,7 +8,7 @@
 //   · 저장 후 refreshShopInfo() → 사이드바·카드결제 팝업이 새 값으로 바뀐다.
 //   · 돈 로직 없음. 입금 판정·뱅크다·정산은 이 화면과 무관.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {useSettingsDraft,type SettingsDraftProps} from "./useSettingsDraft";
 import {
   CONTACT_TYPE_LABEL,
@@ -199,7 +199,9 @@ export default function ShopInfoSettingsTab({onDraftStateChange,focusSection}:Se
   };
 
   const markSaved=useSettingsDraft({value:{contactType,contactValue,adminChatUrl,paysterUrl,bankAccounts,bankRouting},loading,saving,save,onDraftStateChange});
-  useEffect(()=>{if (!loading && focusSection) {const target=document.getElementById(`shop-setting-${focusSection}`);target?.scrollIntoView({block:"start"});target?.focus();}},[loading,focusSection]);
+  // [2026-10-22] 설정을 처음 열 때(입금계좌가 맨 위)는 스크롤 안 함 — 왼쪽 메뉴를 눌러 바뀔 때만 그 카드로. 창 밖(페이지)까지 밀리던 것 방지
+  const focusSeen=useRef(false);
+  useEffect(()=>{if (loading) return; if (!focusSeen.current) {focusSeen.current=true; return;} if (!focusSection) return; const target=document.getElementById(`shop-setting-${focusSection}`); target?.scrollIntoView({block:"start"}); target?.focus({preventScroll:true});},[loading,focusSection]);
   const hint = CONTACT_HINT[contactType];
 
   return (
@@ -210,6 +212,33 @@ export default function ShopInfoSettingsTab({onDraftStateChange,focusSection}:Se
             아직 저장한 적이 없어 코드에 적혀 있던 값이 그대로 보이고 있습니다. 내용을 확인하고 한 번 저장해 두면 이 화면 값이 기준이 됩니다.
           </div>
         ) : null}
+
+        {/* ── 입금계좌 ── */}
+        <div id="shop-setting-bank" tabIndex={-1} className={cardClass}>
+          {sectionTitle("무통장 입금계좌와 고객별 노출", "계좌 2개까지, 회원 구분별로 보여줄 계좌 선택")}
+          <BankAccountRoutingSettings
+            accounts={bankAccounts}
+            routing={bankRouting}
+            onChange={(nextAccounts, nextRouting) => {
+              setBankAccounts(nextAccounts);
+              setBankRouting(nextRouting);
+            }}
+          />
+        </div>
+        {/* ── 카드결제(페이스터) ── */}
+        <div id="shop-setting-payster" tabIndex={-1} className={cardClass}>
+          {sectionTitle("카드결제(페이스터) 주소", "페이스터 문자결제 주소")}
+          <Field label="페이스터 문자결제 페이지 주소">
+            <input
+              value={paysterUrl}
+              onChange={(e) => setPaysterUrl(e.target.value)}
+              placeholder="https://user.service.payster.co.kr/#/payment/smspayment"
+              spellCheck={false}
+              autoComplete="off"
+              className={inputClass}
+            />
+          </Field>
+        </div>
 
         {/* ── 손님 문의 방식 ── */}
         <div className={cardClass}>
@@ -268,33 +297,6 @@ export default function ShopInfoSettingsTab({onDraftStateChange,focusSection}:Se
           </div>
         </div>
 
-        {/* ── 카드결제(페이스터) ── */}
-        <div id="shop-setting-payster" tabIndex={-1} className={cardClass}>
-          {sectionTitle("카드결제(페이스터) 주소", "페이스터 문자결제 주소")}
-          <Field label="페이스터 문자결제 페이지 주소">
-            <input
-              value={paysterUrl}
-              onChange={(e) => setPaysterUrl(e.target.value)}
-              placeholder="https://user.service.payster.co.kr/#/payment/smspayment"
-              spellCheck={false}
-              autoComplete="off"
-              className={inputClass}
-            />
-          </Field>
-        </div>
-
-        {/* ── 입금계좌 ── */}
-        <div id="shop-setting-bank" tabIndex={-1} className={cardClass}>
-          {sectionTitle("무통장 입금계좌와 고객별 노출", "계좌 2개까지, 회원 구분별로 보여줄 계좌 선택")}
-          <BankAccountRoutingSettings
-            accounts={bankAccounts}
-            routing={bankRouting}
-            onChange={(nextAccounts, nextRouting) => {
-              setBankAccounts(nextAccounts);
-              setBankRouting(nextRouting);
-            }}
-          />
-        </div>
       </div>
 
       {/* 자체 저장바 — 하단 공통 저장바(운영값)와 분리. 이 탭은 API 로만 저장 */}

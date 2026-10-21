@@ -318,15 +318,6 @@ function readBroadcastManageFromUrl(): boolean {
   return new URLSearchParams(window.location.search).get("panel") === "broadcast";
 }
 
-function replacePanelInUrl(menu: AdminLiveMenuKey) {
-  if (typeof window === "undefined") return;
-
-  const url = new URL(window.location.href);
-  url.searchParams.set("panel", menu);
-
-  window.history.replaceState(null, "", `${url.pathname}?${url.searchParams.toString()}${url.hash}`);
-}
-
 
 const BROADCAST_END_PAID_STATUSES = ["paid", "auto_paid", "manual_paid", "card_paid"];
 
@@ -1098,8 +1089,15 @@ export default function AdminLiveDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // [2026-10-22 사장님 요청] 메뉴를 바꿔도 주소줄에 ?panel= 을 안 남긴다 → 새로고침·다시 열기는 항상 첫 화면(주문·입금).
+  //   ?panel= 읽기(readMenuFromUrl·옛 주소 broadcast/notice/audit)는 그대로라 링크로 여는 건 됨. 한 번 열린 뒤엔 주소에서 지운다.
   useEffect(() => {
-    replacePanelInUrl(drawer.kind === "deposits" || drawer.kind === "match" ? "payments" : activeMenu);
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("panel")) return;
+    url.searchParams.delete("panel");
+    const q = url.searchParams.toString();
+    window.history.replaceState(null, "", `${url.pathname}${q ? `?${q}` : ""}${url.hash}`);
   }, [activeMenu, drawer.kind]);
 
   useEffect(() => {

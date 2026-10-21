@@ -115,16 +115,25 @@ export default function AdminLiveSidebar({
         ].join(" ")}
       >
         <div className="mb-3 flex items-center gap-2 px-1">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-ink text-white">
-            <AdminLiveMenuIcon menu="broadcast" className="h-[17px] w-[17px]" />
-          </div>
-          <div className="min-w-0">
-            <div className="truncate text-lg font-black tracking-tight text-ink">루루동이LIVE</div>
-            <div className="flex items-center gap-1.5 text-[11px] font-bold text-ink-mute">
-              <span className={`inline-block h-2 w-2 rounded-full ${broadcastOn ? "bg-danger-tx" : "bg-line"}`} />
-              {broadcastOn ? "방송 중" : "방송 대기"}
+          {/* [2026-10-22 사장님 요청] 로고 = 홈 버튼: 첫 화면(주문·입금)으로. 메뉴 버튼과 같은 onMenuChange 경로 */}
+          <button
+            type="button"
+            onClick={() => { onMenuChange("orders"); onCloseNav?.(); }}
+            aria-label="홈으로 (주문·입금)"
+            title="홈으로"
+            className="flex min-w-0 flex-1 items-center gap-2 rounded-xl text-left outline-none transition hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ink"
+          >
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-ink text-white">
+              <AdminLiveMenuIcon menu="broadcast" className="h-[17px] w-[17px]" />
             </div>
-          </div>
+            <div className="min-w-0">
+              <div className="truncate text-lg font-black tracking-tight text-ink">루루동이LIVE</div>
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-ink-mute">
+                <span className={`inline-block h-2 w-2 rounded-full ${broadcastOn ? "bg-danger-tx" : "bg-line"}`} />
+                {broadcastOn ? "방송 중" : "방송 대기"}
+              </div>
+            </div>
+          </button>
           {/* 모바일 닫기 버튼 */}
           <button
             type="button"
