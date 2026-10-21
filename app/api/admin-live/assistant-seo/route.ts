@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     ]);
     if (bc.error || !bc.data) return NextResponse.json({ ok: false, message: "방송을 찾지 못했어요." }, { status: 404 });
     if (bp.error) return NextResponse.json({ ok: false, message: bp.error.message }, { status: 500 });
-    const b = bc.data as { id: unknown; public_title: string | null; started_at: string; ended_at: string | null; youtube_live_url: string | null };
+    const b = bc.data as { id: unknown; public_title: string | null; started_at: string | null; ended_at: string | null; youtube_live_url: string | null };
 
     const products: SeoProduct[] = ((bp.data || []) as Record<string, unknown>[])
       .sort((x, y) => Number(x.sort_order ?? 0) - Number(y.sort_order ?? 0))
@@ -64,19 +64,22 @@ export async function GET(request: NextRequest) {
       .map((p) => ({ name: String(p!.product_name || "").trim(), price: Number(p!.price) || 0, category: productCategory(p!) }))
       .filter((p) => p.name);
 
-    // 챕터: 방송 시작~종료(종료 없으면 지금) 사이 「소개」 기록
-    const endIso = b.ended_at || new Date().toISOString();
-    const { data: ccp } = await db
-      .from("chat_current_product")
-      .select("set_at, product_name, detail_name, cleared")
-      .gte("set_at", b.started_at)
-      .lte("set_at", endIso)
-      .order("set_at", { ascending: true })
-      .limit(500);
-    const chapters = buildChapters(b.started_at, b.ended_at, (ccp || []) as { set_at: string; product_name: string | null; detail_name?: string | null; cleared?: boolean | null }[]);
+    // 챕터: 방송 시작~종료(종료 없으면 지금) 사이 「소개」 기록. 아직 시작 안 한 방송(started_at 없음)은 챕터 없음.
+    let chapters: ReturnType<typeof buildChapters> = [];
+    if (b.started_at) {
+      const endIso = b.ended_at || new Date().toISOString();
+      const { data: ccp } = await db
+        .from("chat_current_product")
+        .select("set_at, product_name, detail_name, cleared")
+        .gte("set_at", b.started_at)
+        .lte("set_at", endIso)
+        .order("set_at", { ascending: true })
+        .limit(500);
+      chapters = buildChapters(b.started_at, b.ended_at, (ccp || []) as { set_at: string; product_name: string | null; detail_name?: string | null; cleared?: boolean | null }[]);
+    }
 
     const title = b.public_title || "라이브 판매";
-    const dateLabel = kstDateLabel(b.started_at);
+    const dateLabel = b.started_at ? kstDateLabel(b.started_at) : "방송 예정";
     const ai = await callGeminiJson(seoPrompt({ channel, title, dateLabel, products, extra }), { timeoutMs: 15000, maxTokens: 2500 });
     const parsed = ai.text ? parseSeoJson(ai.text) : null;
     const seo = parsed || seoByRule({ channel, title, dateLabel, products });

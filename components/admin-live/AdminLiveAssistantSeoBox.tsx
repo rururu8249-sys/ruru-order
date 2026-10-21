@@ -19,7 +19,8 @@ type Seo = {
 };
 
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
-function dateLabel(iso: string): string {
+function dateLabel(iso: string | null): string {
+  if (!iso) return "";
   const d = new Date(Date.parse(iso) + 9 * 3600 * 1000);
   if (!Number.isFinite(d.getTime())) return "";
   return `${d.getUTCMonth() + 1}.${String(d.getUTCDate()).padStart(2, "0")}(${WEEK[d.getUTCDay()]})`;
@@ -76,7 +77,7 @@ export default function AdminLiveAssistantSeoBox() {
         <select value={selected} onChange={(e) => setSelected(e.target.value)} aria-label="방송 고르기"
           className="h-10 w-full rounded-lg border border-line bg-surface px-3 text-[14px] text-ink outline-none focus-visible:border-ink focus-visible:ring-2 focus-visible:ring-ink">
           {list.length === 0 ? <option value="">불러오는 중</option> : null}
-          {list.map((b) => <option key={b.id} value={b.id}>{dateLabel(b.startedAt)} {b.title}{b.status === "on" || b.status === "ON" ? " · 방송 중" : ""}</option>)}
+          {list.map((b) => <option key={b.id} value={b.id}>{b.startedAt ? dateLabel(b.startedAt) : "예정"} {b.title}{String(b.status).toUpperCase() === "ON" ? " · 방송 중" : ""}</option>)}
         </select>
         <input value={extra} onChange={(e) => setExtra(e.target.value)} placeholder="강조할 말(선택) 예: 프라다 반값, 오늘만 무료배송" aria-label="강조할 말"
           className="h-10 w-full rounded-lg border border-line bg-surface px-3 text-[16px] text-ink outline-none placeholder:text-ink-mute focus-visible:border-ink focus-visible:ring-2 focus-visible:ring-ink md:text-[14px]" />
