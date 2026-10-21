@@ -28,7 +28,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 (없음)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
-- 2026-10-21 **[관리자 리뉴얼 a5-2] 입금매칭 창·입금 상세 색·문구 정리**(LiveFloatingMatchPanel 배지/매칭 버튼 색·DepositDetailModal 읽기전용 배지/파란 상자 삭제·안내문 1줄·DepositLinkedOrderInfo 「연결된 주문」 — 매칭 API/판정/금액 줄 변경 0) 배포 완료 HASH. 기록: 작업기록/2026-10-21_관리자_a5-2_입금매칭_입금상세_색_문구.md
+- 2026-10-21 **[관리자 리뉴얼 a5-2] 입금매칭 창·입금 상세 색·문구 정리**(LiveFloatingMatchPanel 배지/매칭 버튼 색·DepositDetailModal 읽기전용 배지/파란 상자 삭제·안내문 1줄·DepositLinkedOrderInfo 「연결된 주문」 — 매칭 API/판정/금액 줄 변경 0) 배포 완료 745936a. 기록: 작업기록/2026-10-21_관리자_a5-2_입금매칭_입금상세_색_문구.md
 - 2026-10-21 **[관리자 리뉴얼 a5-1] 주문·입금 화면 장식 이모지 정리**(LiveStatsCards·LiveOrderTable(문자열만)·LiveFloatingMatchPanel·LiveStatsPanel — 핸들러/필터/돈 판정 줄 변경 0, 🔔→「쪽지」, 텔레그램 발송 본문 이모지는 유지) 배포 완료 43973e8. 기록: 작업기록/2026-10-21_관리자_a5-1_주문입금_화면_이모지정리.md
 - 2026-10-21 **[관리자 리뉴얼 a4-3] 입금내역 상세 → 「입금매칭에서 주문 연결」 버튼(확인완료 아닌 입금만)**(DepositDetailModal·PaymentMatchPanel·AdminLivePaymentPanel prop 통과·Dashboard 핸들러·LiveFloatingMatchPanel initialDepositId/initialSearch 초기값만 — 매칭 API 호출·금액 판정 줄 변경 0) 배포 완료 d48528b: 누르면 입금매칭 창이 그 입금·입금자명 검색으로 열리고 뒤 주문표도 입금자명 검색(기존 「확인필요」와 같은 동작). 기록: 작업기록/2026-10-21_관리자_a4-2_숫자화면정리_a4-3_입금내역매칭_진단.md
 - 2026-10-21 **[관리자 리뉴얼 a2-7] 「세부상품명 손님 직접입력」 토글 — DB 실측(켠 상품 1개 · 상품번호 직접 적기 8개=90일 주문 324건 · 둘 다 0) → 새 폼에선 이미 켜진 상품에만 표시(끄기 가능), 새로 켜는 길 없앰**(QuickProductFastForm 1줄 조건·저장 로직 무변경) 배포 완료 2d6f5c6. 두 토글 통합(저장 칸 통일)은 안 함 — 주문 저장 칸이 달라 돈·송장 영향, 쓰는 상품이 1개라 실익 없음.
