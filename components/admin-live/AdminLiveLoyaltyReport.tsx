@@ -63,12 +63,10 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
   const rows = stats?.lists?.[seg] || [];
 
   const resetChecks = (data: Stats, segment: SegKey) => {
-    const lock = new Set(data.recentComebackPhones || []);
-    if (SEG_META[segment].defaultChecked) {
-      setChecked(new Set((data.lists?.[segment] || []).filter((c) => !lock.has(c.phone)).map((c) => c.phone)));
-    } else {
-      setChecked(new Set());
-    }
+    // [2026-10-21 사장님 화면 정리] 명단을 열면 «아무도 안 골라진 상태»로 — 예전엔 떠나려는 단골 210명이 전부 미리 체크돼
+    //   버튼 한 번에 210명에게 포인트가 나갈 수 있었다. 「전체 선택」은 그대로 있다.
+    void data; void segment;
+    setChecked(new Set());
   };
 
   const load = async (d: number) => {
@@ -142,7 +140,7 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
       showAdminToast(
         `포인트 지급 ${result.success}/${result.total}명 완료` +
         (result.failed.length ? `\n실패 ${result.failed.length}명: ${result.failed.slice(0, 3).map((f) => f.label).join(", ")}${result.failed.length > 3 ? " 외" : ""}` : "") +
-        (noteOk ? "\n쪽지도 보냈어요." : "\n⚠️ 쪽지 발송은 실패 — 공지·쪽지에서 다시 보내주세요."),
+        (noteOk ? "\n쪽지도 보냈어요." : "\n쪽지 발송은 실패 — 쪽지·공지사항에서 다시 보내주세요."),
         result.failed.length ? "error" : "success",
       );
       setSendOpen(false);
@@ -162,14 +160,14 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
   return (
     <div className="space-y-4">
       {/* 상단 요약 */}
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-2xl border border-line bg-surface-2 px-4 py-3">
-        <span className="text-[13px] font-black text-ink">재구매율 <b className="text-rose-deep">{stats ? `${stats.repurchaseRatePct}%` : "…"}</b></span>
-        <span className="text-[13px] font-black text-ink">단골 구매주기 <b className="text-rose-deep">{stats ? `${stats.gapDays.median}일` : "…"}</b></span>
-        <span className="text-[13px] font-black text-ink">최근 30일 방송 <b className="text-rose-deep">{stats ? `${stats.broadcastCount30d}회` : "…"}</b></span>
-        {thisMonth ? <span className="text-[13px] font-black text-ink">이번달 신규 {thisMonth.new}명 · 재구매 {thisMonth.repeat}명</span> : null}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-line bg-surface-2 px-4 py-3">
+        <span className="text-[13px] font-bold text-ink">재구매율 <b className="text-ink">{stats ? `${stats.repurchaseRatePct}%` : "…"}</b></span>
+        <span className="text-[13px] font-bold text-ink">단골 구매주기 <b className="text-ink">{stats ? `${stats.gapDays.median}일` : "…"}</b></span>
+        <span className="text-[13px] font-bold text-ink">최근 30일 방송 <b className="text-ink">{stats ? `${stats.broadcastCount30d}회` : "…"}</b></span>
+        {thisMonth ? <span className="text-[13px] font-bold text-ink">이번달 신규 {thisMonth.new}명 · 재구매 {thisMonth.repeat}명</span> : null}
         <span className="ml-auto flex items-center gap-1 text-[12px] font-bold text-ink-mute">
           기준
-          <select value={days} onChange={(e) => setDays(Number(e.target.value))} className="h-8 rounded-lg border border-line bg-surface px-2 text-[12px] font-black text-ink">
+          <select value={days} onChange={(e) => setDays(Number(e.target.value))} className="h-8 rounded-lg border border-line bg-surface px-2 text-[12px] font-bold text-ink">
             {DAY_CHOICES.map((d) => <option key={d} value={d}>{d}일</option>)}
           </select>
           동안 안 사면 「떠나려는 단골」
@@ -186,34 +184,34 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
               key={k}
               type="button"
               onClick={() => pickSeg(k)}
-              className={`rounded-2xl border p-4 text-left transition ${active ? "border-rose-deep bg-rose-soft/40 shadow-sm" : "border-line bg-surface hover:border-rose-line"}`}
+              className={`rounded-xl border p-4 text-left transition ${active ? "border-ink bg-surface" : "border-line bg-surface hover:bg-surface-2"}`}
             >
-              <div className="text-[13px] font-black text-ink-soft">{m.label}</div>
-              <div className={`mt-1 text-3xl font-black ${m.hot || active ? "text-rose-deep" : "text-ink"}`}>{(stats?.segments[k] ?? 0).toLocaleString()}<span className="ml-1 text-sm font-bold text-ink-mute">명</span></div>
+              <div className="text-[13px] font-bold text-ink-soft">{m.label}</div>
+              <div className={`mt-1 text-[24px] font-bold ${m.hot || active ? "text-ink" : "text-ink"}`}>{(stats?.segments[k] ?? 0).toLocaleString()}<span className="ml-1 text-sm font-bold text-ink-mute">명</span></div>
               <div className="mt-1 text-[11px] font-bold leading-4 text-ink-mute">{m.desc(days)}</div>
-              <div className={`mt-2 text-[11px] font-black ${active ? "text-rose-deep" : "text-ink-mute"}`}>{active ? "▾ 아래에 명단이 열려 있어요" : "누르면 명단 보기"}</div>
+              <div className={`mt-2 text-[11px] font-bold ${active ? "text-ink" : "text-ink-mute"}`}>{active ? "아래 명단 보는 중" : "누르면 명단 보기"}</div>
             </button>
           );
         })}
       </div>
 
       {/* 선택 세그먼트 명단 + 보내기 */}
-      <div className="rounded-2xl border border-rose-line bg-surface p-4">
+      <div className="rounded-xl border border-line bg-surface p-4">
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          <span className="text-[14px] font-black text-ink">{SEG_META[seg].label} 명단 <span className="text-ink-mute">({rows.length}명)</span></span>
+          <span className="text-[14px] font-bold text-ink">{SEG_META[seg].label} 명단 <span className="text-ink-mute">({rows.length}명)</span></span>
           <button
             type="button"
             onClick={() => {
               if (allChecked) setChecked(new Set());
               else setChecked(new Set(rows.filter((c) => !lockSet.has(c.phone)).map((c) => c.phone)));
             }}
-            className="rounded-lg border border-line bg-surface px-2.5 py-1 text-[12px] font-black text-ink-soft"
+            className="rounded-lg border border-line bg-surface px-2.5 py-1 text-[12px] font-bold text-ink-soft"
           >{allChecked ? "전체 해제" : "전체 선택"}</button>
           <button
             type="button"
             disabled={loading || checked.size === 0}
             onClick={() => { setNoteText(""); setSendOpen(true); }}
-            className="ml-auto rounded-xl bg-rose-deep px-4 py-2 text-[13px] font-black text-white disabled:opacity-40"
+            className="ml-auto rounded-xl bg-ink px-4 py-2 text-[13px] font-bold text-white disabled:opacity-40"
           >선택 {checked.size}명에게 포인트+쪽지 보내기</button>
         </div>
         <div className="mb-2 text-[11px] font-bold text-ink-mute">체크된 분들에게만 갑니다 · 최근 30일 안에 받은 분은 자동 제외(이미 보냄)</div>
@@ -226,7 +224,7 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
             const locked = lockSet.has(c.phone);
             const on = checked.has(c.phone);
             return (
-              <label key={`${seg}-${c.phone}-${i}`} className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${locked ? "border-line bg-surface-2 opacity-60" : on ? "border-rose-line bg-rose-soft/30" : "border-line bg-surface"}`}>
+              <label key={`${seg}-${c.phone}-${i}`} className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${locked ? "border-line bg-surface-2 opacity-60" : on ? "border-ink bg-surface-2" : "border-line bg-surface"}`}>
                 <input
                   type="checkbox"
                   checked={on}
@@ -236,15 +234,15 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
                 <button
                   type="button"
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenCustomer?.({ kakao: c.kakao || "", phone: c.phone, nick: c.nick }); }}
-                  className="min-w-0 flex-1 truncate text-left text-[13px] font-black text-ink underline decoration-dotted underline-offset-2 hover:text-rose-deep"
+                  className="min-w-0 flex-1 truncate text-left text-[13px] font-bold text-ink underline decoration-dotted underline-offset-2 hover:text-ink"
                   title="회원 상세 열기"
                 >
                   {c.nick}
                 </button>
                 <span className="text-[12px] font-bold text-ink-soft">{c.buys}회</span>
                 <span className="w-[64px] text-right text-[12px] font-bold text-ink-soft">{money(c.spend)}</span>
-                <span className="w-[86px] text-right text-[12px] font-bold text-rose-deep">{c.daysSince}일째 조용</span>
-                {locked ? <span className="text-[11px] font-black text-ink-mute">이미 보냄</span> : null}
+                <span className="w-[86px] text-right text-[12px] font-bold text-ink">{c.daysSince}일째 조용</span>
+                {locked ? <span className="text-[11px] font-bold text-ink-mute">이미 보냄</span> : null}
               </label>
             );
           })}
@@ -252,28 +250,28 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
       </div>
 
       {/* TOP 10 — 횟수순/금액순 전환 */}
-      <div className="rounded-2xl border border-line bg-surface p-4">
+      <div className="rounded-xl border border-line bg-surface p-4">
         <div className="mb-2 flex items-center gap-2">
-          <span className="text-[13px] font-black text-ink">단골 TOP 10</span>
+          <span className="text-[13px] font-bold text-ink">단골 TOP 10</span>
           <div className="ml-auto flex gap-1">
-            <button type="button" onClick={() => setTopMode("count")} className={`rounded-lg px-2.5 py-1 text-[12px] font-black ${topMode === "count" ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}>횟수순</button>
-            <button type="button" onClick={() => setTopMode("spend")} className={`rounded-lg px-2.5 py-1 text-[12px] font-black ${topMode === "spend" ? "bg-rose-deep text-white" : "border border-line bg-surface text-ink-soft"}`}>금액순</button>
+            <button type="button" onClick={() => setTopMode("count")} className={`rounded-lg px-2.5 py-1 text-[12px] font-bold ${topMode === "count" ? "bg-ink text-white" : "border border-line bg-surface text-ink-soft"}`}>횟수순</button>
+            <button type="button" onClick={() => setTopMode("spend")} className={`rounded-lg px-2.5 py-1 text-[12px] font-bold ${topMode === "spend" ? "bg-ink text-white" : "border border-line bg-surface text-ink-soft"}`}>금액순</button>
           </div>
         </div>
         <div className="space-y-1">
           {((topMode === "count" ? stats?.topCustomers : stats?.topSpenders) || []).slice(0, 10).map((t, i) => (
             <div key={`${topMode}-${t.nick}-${t.n}`} className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-1.5">
-              <span className="w-6 text-[12px] font-black text-ink-mute">{i + 1}</span>
+              <span className="w-6 text-[12px] font-bold text-ink-mute">{i + 1}</span>
               <button
                 type="button"
                 onClick={() => onOpenCustomer?.({ kakao: t.kakao || "", phone: t.phone || "", nick: t.nick })}
-                className="min-w-0 flex-1 truncate text-left text-[13px] font-black text-ink underline decoration-dotted underline-offset-2 hover:text-rose-deep"
+                className="min-w-0 flex-1 truncate text-left text-[13px] font-bold text-ink underline decoration-dotted underline-offset-2 hover:text-ink"
                 title="회원 상세 열기"
               >
                 {t.nick}
               </button>
-              <span className={`text-[12px] ${topMode === "count" ? "font-black text-rose-deep" : "font-bold text-ink-soft"}`}>{t.n}회</span>
-              <span className={`w-[80px] text-right text-[13px] ${topMode === "spend" ? "font-black text-rose-deep" : "font-bold text-ink-soft"}`}>{money(t.spend)}</span>
+              <span className={`text-[12px] ${topMode === "count" ? "font-black text-ink" : "font-bold text-ink-soft"}`}>{t.n}회</span>
+              <span className={`w-[80px] text-right text-[13px] ${topMode === "spend" ? "font-black text-ink" : "font-bold text-ink-soft"}`}>{money(t.spend)}</span>
             </div>
           ))}
         </div>
@@ -282,16 +280,16 @@ export default function AdminLiveLoyaltyReport({ onOpenCustomer }: { onOpenCusto
       {/* 보내기 모달 */}
       {sendOpen ? (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4" onClick={() => !sending && setSendOpen(false)}>
-          <div className="w-full max-w-md rounded-2xl bg-surface p-5" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 text-[14px] font-black text-ink">{SEG_META[seg].label} {checked.size}명에게 보내기</div>
-            <label className="mb-1 block text-[12px] font-black text-ink-soft">1인당 포인트</label>
-            <input value={amountText ? Number(amountText).toLocaleString("ko-KR") : ""} inputMode="numeric" onChange={(e) => setAmountText(e.target.value.replace(/[^0-9]/g, ""))} className="mb-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-[14px] font-black text-ink outline-none focus:border-rose-deep" />
+          <div className="w-full max-w-md rounded-xl bg-surface p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 text-[14px] font-bold text-ink">{SEG_META[seg].label} {checked.size}명에게 보내기</div>
+            <label className="mb-1 block text-[12px] font-bold text-ink-soft">1인당 포인트</label>
+            <input value={amountText ? Number(amountText).toLocaleString("ko-KR") : ""} inputMode="numeric" onChange={(e) => setAmountText(e.target.value.replace(/[^0-9]/g, ""))} className="mb-1 h-11 w-full rounded-xl border border-line bg-surface px-3 text-[14px] font-bold text-ink outline-none focus:border-ink" />
             <div className="mb-3 text-[11px] font-bold text-ink-mute">총 {(amountNum * checked.size).toLocaleString()}P · 업계 통상 1,000~3,000P — 기본 2,000P, 금액은 자유롭게 바꾸세요</div>
-            <label className="mb-1 block text-[12px] font-black text-ink-soft">쪽지 내용 (비우면 아래 기본 문구)</label>
-            <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder={defaultNote} rows={3} className="mb-4 w-full rounded-xl border border-line bg-surface px-3 py-2 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
+            <label className="mb-1 block text-[12px] font-bold text-ink-soft">쪽지 내용 (비우면 아래 기본 문구)</label>
+            <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder={defaultNote} rows={3} className="mb-4 w-full rounded-xl border border-line bg-surface px-3 py-2 text-[13px] font-bold text-ink outline-none focus:border-ink" />
             <div className="grid grid-cols-2 gap-2">
-              <button type="button" disabled={sending} onClick={() => setSendOpen(false)} className="h-11 rounded-xl border border-line bg-surface text-[14px] font-black text-ink-soft">취소</button>
-              <button type="button" disabled={sending} onClick={() => void doSend()} className="h-11 rounded-xl bg-rose-deep text-[14px] font-black text-white disabled:opacity-50">{sending ? (sendProgress ? `보내는 중… ${sendProgress.done}/${sendProgress.total}` : "보내는 중…") : "보내기"}</button>
+              <button type="button" disabled={sending} onClick={() => setSendOpen(false)} className="h-11 rounded-xl border border-line bg-surface text-[14px] font-bold text-ink-soft">취소</button>
+              <button type="button" disabled={sending} onClick={() => void doSend()} className="h-11 rounded-xl bg-ink text-[14px] font-bold text-white disabled:opacity-50">{sending ? (sendProgress ? `보내는 중… ${sendProgress.done}/${sendProgress.total}` : "보내는 중…") : "보내기"}</button>
             </div>
           </div>
         </div>

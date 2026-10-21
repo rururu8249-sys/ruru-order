@@ -1701,10 +1701,10 @@ export default function AdminLiveDashboard() {
                       }}
                       className="mb-2 min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-base font-bold md:hidden"
                     >
-                      {activeSubTabs.map(tab=>{ const v = tab.custTab ? `customers:${tab.custTab}` : tab.key; return <option key={v} value={v}>{tab.label}</option>; })}
+                      {activeSubTabs.filter((tab) => tab.custTab !== "link" || customersLinkPendingCount > 0 || (activeMenu === "customers" && customersActiveTab === "link")).map(tab=>{ const v = tab.custTab ? `customers:${tab.custTab}` : tab.key; return <option key={v} value={v}>{tab.label}</option>; })}
                     </select>
                     <div className="hidden min-w-0 items-center gap-1 overflow-x-auto md:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                      {activeSubTabs.map((tab) => {
+                      {activeSubTabs.filter((tab) => tab.custTab !== "link" || customersLinkPendingCount > 0 || (activeMenu === "customers" && customersActiveTab === "link")).map((tab) => {
                         const active = depositDrawerOpen ? tab.key === "payments"
                           : tab.custTab ? (activeMenu === "customers" && customersActiveTab === tab.custTab)
                           : tab.key === (activeMenu==='reports'?'sales':activeMenu);
@@ -1860,8 +1860,9 @@ export default function AdminLiveDashboard() {
                         «한 줄 띠»로 바꿨다. 미해결 0건이면 띠 자체가 안 뜬다.
                         자세한 내용은 아래 「고객이슈」 탭에서 본다(같은 내용을 두 번 안 보여준다). */}
                   {/* [2026-09-25] 「고객이슈」 탭 안에서는 아래 탭이 같은 내용을 보여주므로 위쪽 알림 띠를 숨긴다. */}
+                  {/* [2026-10-21] 노란 「미해결 고객이슈」 띠는 화면에서 숨김(맨 위 「고객이슈 N」 배지가 대신). 숫자 세기용으로만 붙여 둔다 */}
                   {customersActiveTab !== "issues" ? (
-                    <div className="shrink-0">
+                    <div className="hidden">
                       <LiveIssueRailPanel
                         variant="banner"
                         onCountChange={setOpenIssueCount}

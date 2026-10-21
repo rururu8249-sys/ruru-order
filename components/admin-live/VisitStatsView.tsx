@@ -255,14 +255,9 @@ export default function VisitStatsView({ embedded = false, state, style }: Visit
 
       {/* [2026-08-30 사장님 지적] "방문자 99명인데 방송중 144명이 무슨 말이냐"
           → 방문자는 '사람 수', 방송중/쇼핑몰은 '방문 횟수'로 단위가 달랐다. 그 차이를 명시한다. */}
-      <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--color-line)", background: "var(--color-surface-2)", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.6 }}>
-        <b>방문자 = 사람 수</b> · <b>방문 = 들어온 횟수</b> (같은 사람이 30분 넘게 끊겼다 다시 오면 1회 더)
-        <br />
-        {/* [2026-09-09] 위 「다녀간 사람 N명」과 아래 날짜별 합계가 다른 이유를 화면에서 바로 알 수 있게 */}
-        <span style={{ color: "var(--color-ink-mute)" }}>
-          ※ 아래 날짜별 <b>방문자</b>는 <b>그 날</b> 기준이라, 같은 사람이 3일 오면 <b>3번</b> 세집니다.
-          맨 위 <b>「다녀간 사람」</b>은 30일 전체에서 <b>한 사람을 한 번만</b> 셉니다 — 그래서 날짜별을 다 더한 것보다 <b>작습니다</b>.
-        </span>
+      {/* [2026-10-21] 설명 2줄 → 1줄(방문자=사람 수, 방문=횟수). 자세한 차이는 마우스를 올리면 보인다. */}
+      <div title="날짜별 방문자는 그날 기준이라 같은 사람이 3일 오면 3번 세요. 맨 위 「다녀간 사람」은 30일 동안 한 사람을 한 번만 세서 날짜별 합보다 작아요." style={{ padding: "8px 16px", borderBottom: "1px solid var(--color-line)", fontSize: "12px", color: "var(--color-ink-mute)" }}>
+        방문자 = 사람 수 · 방문 = 들어온 횟수(30분 넘게 끊겼다 다시 오면 1회 더)
       </div>
 
       <div style={{ minHeight: 0, flex: 1, overflowY: "auto", padding: "12px 16px 16px" }}>
