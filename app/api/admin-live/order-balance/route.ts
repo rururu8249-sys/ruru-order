@@ -4,6 +4,7 @@
 //   ⚠️ 이 API는 아무것도 변경하지 않는다(SELECT만). 포인트 지급은 기존
 //     /api/admin-live/customer-points(중복차단 sourceKey 포함)를 그대로 쓴다.
 
+import { parseMultiOrderGroups } from "@/lib/multiOrderDeposit";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
@@ -44,9 +45,34 @@ export async function GET(request: NextRequest) {
     // 이 주문 그룹에 연결(매칭)된 입금 합계 — 자동/수동 매칭 모두 match_order_group_id 사용
     const { data: deposits, error: depositError } = await supabase
       .from("deposits")
-      .select("id, amount")
+      .select("id, amount, confirmed_note")
       .eq("match_order_group_id", groupId);
     if (depositError) return jsonError(depositError.message || "입금내역 조회 실패", 500);
+
+    // [2026-10-21 여러 주문 합친 입금] 이 주문이 «여러 주문을 합친 입금»에 묶였으면(첫 주문이든 나머지든)
+    //   이 주문 금액과 비교하면 「더 냈어요/부족해요」가 틀리게 나온다 → 차액 계산을 끄고 묶음 정보만 돌려준다.
+    const { data: taggedDeposits } = await supabase
+      .from("deposits")
+      .select("id, amount, confirmed_note")
+      .ilike("confirmed_note", `%[groups:%${groupId}%`);
+    const multiRows = [...(Array.isArray(deposits) ? deposits : []), ...(Array.isArray(taggedDeposits) ? taggedDeposits : [])]
+      .filter((row) => parseMultiOrderGroups((row as { confirmed_note?: unknown }).confirmed_note).includes(groupId));
+    if (multiRows.length > 0) {
+      const seen = new Set<string>();
+      const uniq = multiRows.filter((row) => { const k = String((row as { id?: unknown }).id); if (seen.has(k)) return false; seen.add(k); return true; });
+      const groups = parseMultiOrderGroups((uniq[0] as { confirmed_note?: unknown }).confirmed_note);
+      return NextResponse.json({
+        ok: true,
+        depositSum: 0,
+        depositCount: 0,
+        lastRefund: null,
+        multiOrder: {
+          depositSum: uniq.reduce((sum, row) => sum + (Number((row as { amount?: unknown }).amount) || 0), 0),
+          depositCount: uniq.length,
+          orderCount: groups.length,
+        },
+      });
+    }
 
     const depositRows = Array.isArray(deposits) ? deposits : [];
     const depositSum = depositRows.reduce((sum, row) => sum + (Number((row as { amount?: unknown }).amount) || 0), 0);

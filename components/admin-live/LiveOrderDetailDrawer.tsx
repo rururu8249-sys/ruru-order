@@ -627,7 +627,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   //   입금확인된 무통장 주문: 연결된 입금액 합 vs 화면의 최종 결제금액을 자동 비교해
   //   「딱 맞아요 / 더 냈어요(→포인트 돌려주기 버튼) / 부족해요(→추가입금 쪽지 버튼)」로 알려준다.
   //   조회는 읽기 전용 API, 포인트 지급은 기존 customer-points API(중복차단 sourceKey) 재사용.
-  const [balanceInfo, setBalanceInfo] = useState<{ depositSum: number; depositCount: number; lastRefund: { amount: number; createdAt: string; sourceKey: string } | null } | null>(null);
+  const [balanceInfo, setBalanceInfo] = useState<{ depositSum: number; depositCount: number; lastRefund: { amount: number; createdAt: string; sourceKey: string } | null; multiOrder?: { depositSum: number; depositCount: number; orderCount: number } | null } | null>(null);
   const [balanceWorking, setBalanceWorking] = useState(false);
   const balanceGroupId = String((orderForView as { groupId?: string }).groupId || "");
   const balanceEligible =
@@ -647,6 +647,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           depositSum: Number(json.depositSum || 0),
           depositCount: Number(json.depositCount || 0),
           lastRefund: json.lastRefund || null,
+          multiOrder: json.multiOrder || null,
         });
       } else {
         setBalanceInfo(null);
@@ -1527,6 +1528,13 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         </div>
 
         {/* [2026-08-31 사장님 요청] 💰 돈 계산기 — 입금액 vs 주문금액 자동 비교, 버튼 한 번 처리 */}
+        {/* [2026-10-21] 여러 주문을 합친 입금에 묶인 주문 — 이 주문만으로 차액 계산하면 틀리므로 계산기 대신 안내만(버튼 없음) */}
+        {balanceEligible && balanceInfo?.multiOrder ? (
+          <div className="mt-2 rounded-lg bg-surface-2 px-3 py-2 text-[13px] leading-5 text-ink-soft">
+            주문 {balanceInfo.multiOrder.orderCount}건을 합친 입금 {money(balanceInfo.multiOrder.depositSum)}으로 함께 입금확인한 주문이에요.
+            <div className="text-[12px] text-ink-mute">입금확인 취소하면 묶인 주문이 함께 취소돼요.</div>
+          </div>
+        ) : null}
         {balanceEligible && balanceInfo && balanceInfo.depositCount > 0 ? (() => {
           const diff = balanceInfo.depositSum - balanceOrderTotal;
           const refundDone = !!balanceInfo.lastRefund && balanceInfo.lastRefund.sourceKey === balanceRefundKey;

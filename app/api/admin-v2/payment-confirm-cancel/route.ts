@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { parseMultiOrderGroups } from "@/lib/multiOrderDeposit";
 
 type AnyRow = Record<string, any>;
 
@@ -185,36 +186,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const targetOrders = orders.filter(isPaymentConfirmed);
+    let targetOrders = orders.filter(isPaymentConfirmed);
     if (targetOrders.length === 0) {
       return NextResponse.json(
         { ok: false, message: "이미 입금확인 전 상태입니다." },
         { status: 400 }
       );
     }
-
-    const plannedOrders = targetOrders.map((order) => {
-      const keepCanceled = isCanceledOrder(order);
-
-      return {
-        id: order.id,
-        order_lookup_code: order.order_lookup_code || null,
-        order_group_id: order.order_group_id || null,
-        youtube_nickname: order.youtube_nickname || null,
-        product_name: order.product_name || null,
-        before: {
-          admin_order_status_v2: order.admin_order_status_v2 || null,
-          order_manage_status: order.order_manage_status || null,
-          deposit_confirmed_at: order.deposit_confirmed_at || null,
-        },
-        after: {
-          admin_order_status_v2: keepCanceled ? order.admin_order_status_v2 || null : RESTORE_UNPAID_STATUS,
-          order_manage_status: keepCanceled ? order.order_manage_status || null : RESTORE_UNPAID_STATUS,
-          deposit_confirmed_at: null,
-        },
-        keepCanceled,
-      };
-    });
 
     const deposits: any[] = [];
     let depositError: any = null;
@@ -245,7 +223,67 @@ export async function POST(request: Request) {
       );
     }
 
-    const linkedDeposits = (deposits || []).filter((deposit) => depositLinkedToOrders(deposit, targetOrders));
+    let linkedDeposits = (deposits || []).filter((deposit) => depositLinkedToOrders(deposit, targetOrders));
+
+    // [2026-10-21 여러 주문 합친 입금] 이 주문이 «여러 주문을 합친 입금»에 묶여 있으면
+    //   묶인 다른 주문들도 함께 입금확인 취소한다(입금만 풀리고 나머지 주문은 확인으로 남는 사고 방지).
+    //   묶음 표시([groups:…])가 없는 기존 입금·주문은 아래를 그냥 지나간다(기존 동작 그대로).
+    {
+      const targetGroupIds = new Set(targetOrders.map((order) => clean(order.order_group_id)).filter(Boolean));
+      const multiDeposits = (deposits || []).filter((deposit) => {
+        const groups = parseMultiOrderGroups(deposit.confirmed_note);
+        return groups.length > 0 && (depositLinkedToOrders(deposit, targetOrders) || groups.some((g) => targetGroupIds.has(g)));
+      });
+      if (multiDeposits.length > 0) {
+        const extraGroupIds = Array.from(
+          new Set(multiDeposits.flatMap((deposit) => parseMultiOrderGroups(deposit.confirmed_note)))
+        ).filter((g) => !targetGroupIds.has(g));
+        if (extraGroupIds.length > 0) {
+          const { data: extraOrders, error: extraError } = await supabase
+            .from("orders")
+            .select("*")
+            .neq("is_deleted", true)
+            .in("order_group_id", extraGroupIds);
+          if (extraError) {
+            return NextResponse.json(
+              { ok: false, message: "함께 묶인 주문을 불러오지 못해 취소하지 않았어요: " + extraError.message },
+              { status: 500 }
+            );
+          }
+          const knownIds = new Set(targetOrders.map((order) => clean(order.id)));
+          const extraTargets = (extraOrders || []).filter(
+            (order: AnyRow) => isPaymentConfirmed(order) && !isCardOrder(order) && !knownIds.has(clean(order.id))
+          );
+          targetOrders = [...targetOrders, ...extraTargets];
+        }
+        const linkedIds = new Set(linkedDeposits.map((deposit) => clean(deposit.id)));
+        linkedDeposits = [...linkedDeposits, ...multiDeposits.filter((deposit) => !linkedIds.has(clean(deposit.id)))];
+      }
+    }
+
+    const plannedOrders = targetOrders.map((order) => {
+      const keepCanceled = isCanceledOrder(order);
+
+      return {
+        id: order.id,
+        order_lookup_code: order.order_lookup_code || null,
+        order_group_id: order.order_group_id || null,
+        youtube_nickname: order.youtube_nickname || null,
+        product_name: order.product_name || null,
+        before: {
+          admin_order_status_v2: order.admin_order_status_v2 || null,
+          order_manage_status: order.order_manage_status || null,
+          deposit_confirmed_at: order.deposit_confirmed_at || null,
+        },
+        after: {
+          admin_order_status_v2: keepCanceled ? order.admin_order_status_v2 || null : RESTORE_UNPAID_STATUS,
+          order_manage_status: keepCanceled ? order.order_manage_status || null : RESTORE_UNPAID_STATUS,
+          deposit_confirmed_at: null,
+        },
+        keepCanceled,
+      };
+    });
+
 
     const plannedDeposits = linkedDeposits.map((deposit) => ({
       id: deposit.id,

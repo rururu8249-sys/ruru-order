@@ -3,7 +3,7 @@
 // /api/admin-v2/manual-payment-match
 // /api/admin-v2/manual-payment-confirm-without-deposit
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { LiveOrder } from "./types";
 import { showAdminToast } from "@/lib/adminToast";
 import {
@@ -26,6 +26,8 @@ type Props = {
   /** [2026-10-21 a4-3] 입금내역 상세에서 열 때 — 그 입금을 미리 체크하고 입금자명으로 검색(창 열릴 때 1번만) */
   initialDepositId?: number | null;
   initialSearch?: string;
+  /** [2026-10-21 여러 주문 합친 입금] 같은 손님의 다른 미결제 주문을 찾을 전체 주문 목록(필터 무관) */
+  allOrders?: LiveOrder[];
 };
 
 type Period = "today" | "7days" | "30days" | "all" | "custom";
@@ -69,6 +71,7 @@ export default function LiveFloatingMatchPanel({
   deposits, orders, onMatched, onSearchFilter,
   selectedOrderForMatch, onClearSelectedOrder,
   initialDepositId = null, initialSearch = "",
+  allOrders,
 }: Props) {
   const [period, setPeriod] = useState<Period>("all");
   const [calOpen, setCalOpen] = useState(false);
@@ -84,10 +87,34 @@ export default function LiveFloatingMatchPanel({
   const matchMode = !!selectedOrderForMatch;
 
   // 선택된 주문 기대 금액
-  const { expectedAmount } = useMemo(() => {
+  const { expectedAmount: baseExpectedAmount } = useMemo(() => {
     if (!selectedOrderForMatch) return { expectedAmount: 0 };
     return deriveLiveOrderMatchKeys(selectedOrderForMatch);
   }, [selectedOrderForMatch]);
+
+  // [2026-10-21 여러 주문 합친 입금 — 수동 전용] 같은 손님(전화번호 또는 닉네임)의 다른 미결제 주문을 «사장님이 골라» 함께 확인.
+  //   고른 주문이 없으면 아래 금액·확정 흐름은 예전과 똑같다.
+  const [extraOrderIds, setExtraOrderIds] = useState<Set<string>>(new Set());
+  useEffect(() => { setExtraOrderIds(new Set()); }, [selectedOrderForMatch?.id]);
+  const sameCustomerOrders = useMemo(() => {
+    const sel = selectedOrderForMatch;
+    if (!sel) return [] as LiveOrder[];
+    const digits = (v: unknown) => String(v ?? "").replace(/[^0-9]/g, "");
+    const phone = digits(sel.phone);
+    const nick = String(sel.youtubeNickname || "").trim();
+    return (allOrders || orders)
+      .filter(o => o.id !== sel.id && (o.groupId || o.id) !== (sel.groupId || sel.id))
+      .filter(o => ["unpaid", "manual_match_needed"].includes(String(o.paymentStatus)))
+      .filter(o => !String(o.paymentMethod || "").includes("카드"))
+      .filter(o => (phone.length >= 8 && digits(o.phone) === phone) || (nick !== "" && String(o.youtubeNickname || "").trim() === nick))
+      .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+      .slice(0, 10);
+  }, [selectedOrderForMatch, allOrders, orders]);
+  const extraOrders = sameCustomerOrders.filter(o => extraOrderIds.has(o.id));
+  const expectedAmount = baseExpectedAmount + extraOrders.reduce((sum, o) => sum + deriveLiveOrderMatchKeys(o).expectedAmount, 0);
+  function toggleExtraOrder(id: string) {
+    setExtraOrderIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  }
 
   // 필터링된 입금 목록
   const filtered = useMemo(() => {
@@ -176,7 +203,11 @@ export default function LiveFloatingMatchPanel({
     if (!selectedOrderForMatch || matchSaving || !canConfirm) return;
     setMatchSaving(true);
     try {
-      const { orderGroupId, orderIds } = deriveLiveOrderMatchKeys(selectedOrderForMatch);
+      const { orderGroupId, orderIds: baseOrderIds } = deriveLiveOrderMatchKeys(selectedOrderForMatch);
+      // 함께 고른 주문이 있으면 그 주문 줄 id 도 보낸다(서버가 주문 그룹 2개 이상이면 금액 정확일치·미결제만 다시 검사)
+      const orderIds = extraOrders.length > 0
+        ? [...baseOrderIds, ...extraOrders.flatMap(o => deriveLiveOrderMatchKeys(o).orderIds)]
+        : baseOrderIds;
       const depositIds = selDeps.map(d => Number(d.id));
       const clientSelectedTotalAmount = selTotal;
       const res = await fetch("/api/admin-v2/manual-payment-match", {
@@ -197,7 +228,7 @@ export default function LiveFloatingMatchPanel({
 
   // 확정: 금액 무시 수동확인
   async function handleConfirmWithoutDeposit() {
-    if (!selectedOrderForMatch || matchSaving) return;
+    if (!selectedOrderForMatch || matchSaving || extraOrders.length > 0) return;
     setMatchSaving(true);
     try {
       const { orderGroupId, orderIds, expectedAmount: ea } = deriveLiveOrderMatchKeys(selectedOrderForMatch);
@@ -292,7 +323,7 @@ export default function LiveFloatingMatchPanel({
         <div className="shrink-0 space-y-2 border-b border-line bg-surface-2 px-3 py-2">
           <div className="flex items-center gap-2">
             <div className="min-w-0 flex-1">
-              <div className="text-[12px] font-semibold text-ink-mute">연결할 주문</div>
+              <div className="text-[12px] font-semibold text-ink-mute">연결할 주문{extraOrders.length > 0 ? ` ${extraOrders.length + 1}건 합계` : ""}</div>
               <div className="truncate text-[14px] font-bold text-ink">
                 {selectedOrderForMatch.nickname ?? selectedOrderForMatch.name} · <span className="tabular-nums">{won(expectedAmount)}</span>
               </div>
@@ -300,6 +331,22 @@ export default function LiveFloatingMatchPanel({
             <button type="button" onClick={() => { onClearSelectedOrder?.(); setSelectedDepIds(new Set()); }}
               className="h-9 shrink-0 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2">주문 빼기</button>
           </div>
+          {sameCustomerOrders.length > 0 && (
+            <div className="rounded-lg border border-line bg-surface px-2.5 py-2">
+              <div className="text-[12px] font-semibold text-ink-mute">같은 손님 다른 미결제 주문 · 한 번에 입금했으면 체크</div>
+              {sameCustomerOrders.map(o => {
+                const on = extraOrderIds.has(o.id);
+                const amt = deriveLiveOrderMatchKeys(o).expectedAmount;
+                return (
+                  <label key={o.id} className="mt-1 flex cursor-pointer items-center gap-2 text-[13px] text-ink">
+                    <input type="checkbox" checked={on} onChange={() => toggleExtraOrder(o.id)} className="h-4 w-4 accent-[var(--color-ink)]" />
+                    <span className="min-w-0 flex-1 truncate">{String(o.createdAt || "").slice(5, 16).replace("T", " ")} · {o.orderNo || "주문"}</span>
+                    <span className="shrink-0 font-semibold tabular-nums">{won(amt)}</span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
           <div className={`text-[13px] font-semibold ${selDeps.length === 0 ? "text-ink-mute" : selTotal === expectedAmount ? "text-ok-tx" : "text-danger-tx"}`}>
             {selDeps.length === 0
               ? "아래에서 이 주문의 입금을 고르세요"
@@ -312,7 +359,7 @@ export default function LiveFloatingMatchPanel({
               className="h-10 flex-1 rounded-lg bg-ink text-[14px] font-bold text-white disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-mute">
               {matchSaving ? "처리 중…" : "입금확인"}
             </button>
-            <button type="button" onClick={handleConfirmWithoutDeposit} disabled={matchSaving}
+            <button type="button" onClick={handleConfirmWithoutDeposit} disabled={matchSaving || extraOrders.length > 0}
               title="입금 기록 없이 이 주문을 입금확인으로 바꿔요(금액 확인 안 함)"
               className="h-10 shrink-0 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50">
               입금 없이 확인

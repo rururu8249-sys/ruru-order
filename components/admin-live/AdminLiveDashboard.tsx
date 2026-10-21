@@ -1941,6 +1941,7 @@ export default function AdminLiveDashboard() {
                     initialSearch={matchInitial?.search ?? ""}
                     deposits={deposits}
                     orders={filteredOrders}
+                    allOrders={orders}
                     onClose={() => { setDrawer({kind: "closed"}); setSelectedOrderForMatch(null); setMatchInitial(null); }}
                     onMatched={refreshAfterManualMatch}
                     onSearchFilter={(keyword) => setFilters((prev) => ({ ...prev, keyword }))}

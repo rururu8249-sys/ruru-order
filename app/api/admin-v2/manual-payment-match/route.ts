@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { isPaymentMatchExcludedOrder } from "@/lib/admin-v2/paymentMatchTestOrderGuard";
+import { buildMultiOrderNote } from "@/lib/multiOrderDeposit";
 
 function getSupabaseAdmin() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -201,9 +202,47 @@ export async function POST(request: NextRequest) {
 
     const amountDifference = selectedDepositTotal - expectedAmount;
 
+    // [2026-10-21 여러 주문 합친 입금 — 수동 전용] 주문서(주문 그룹)가 2개 이상이면 더 엄격하게:
+    //   ① 고른 입금 합계 = 주문들 합계(서버 계산) 정확히 같을 때만 ② 이미 입금확인·취소·카드 주문은 못 묶음.
+    //   주문 그룹이 1개면 아래 기존 처리 그대로(이 블록 통과).
+    const distinctGroupIds = Array.from(
+      new Set(orders.map((order) => String(order?.order_group_id || "").trim()).filter(Boolean))
+    );
+    const isMultiOrder = distinctGroupIds.length > 1;
+    if (isMultiOrder) {
+      if (selectedDepositTotal !== serverExpectedAmount) {
+        return NextResponse.json(
+          {
+            ok: false,
+            message: `여러 주문 합친 입금은 금액이 정확히 같아야 해요: 입금 ${selectedDepositTotal.toLocaleString()}원 / 주문 ${serverExpectedAmount.toLocaleString()}원`,
+          },
+          { status: 409 }
+        );
+      }
+      const statusOf = (order: any) =>
+        [order?.admin_order_status_v2, order?.order_manage_status].filter(Boolean).join(" ");
+      const blocked = orders.filter(
+        (order) =>
+          /입금확인|카드결제완료|주문취소|주문서취소|취소|환불/.test(statusOf(order)) ||
+          Boolean(order?.deposit_confirmed_at) ||
+          String(order?.payment_method || "").includes("카드")
+      );
+      if (blocked.length > 0) {
+        return NextResponse.json(
+          {
+            ok: false,
+            message: "이미 입금확인됐거나 취소·카드 주문이 섞여 있어 함께 묶을 수 없어요.",
+            blocked: { orderIds: blocked.map((order) => order.id) },
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     const nowIso = new Date().toISOString();
-    const confirmedNote =
-      depositIds.length > 1
+    const confirmedNote = isMultiOrder
+      ? buildMultiOrderNote(distinctGroupIds, depositIds.length, selectedDepositTotal)
+      : depositIds.length > 1
         ? `관리자 수동매칭 / 다중입금 ${depositIds.length}건 / 합계 ${selectedDepositTotal.toLocaleString()}원`
         : "관리자 수동매칭";
 
