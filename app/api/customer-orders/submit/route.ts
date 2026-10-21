@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server";
+import { expectedMinimumShipping, resolveShippingGroup, type ShippingGroup } from "@/lib/shippingGroups";
 import { createClient } from "@supabase/supabase-js";
 
 import { assertValidCustomerPointPhone } from "@/lib/customerPoints";
@@ -431,14 +432,9 @@ function isCanceledForSubmitShipping(status: unknown): boolean {
 // 배송그룹 판정 — 손님 화면 resolveShippingGroupFromValue(app/order/page.tsx 173행)와 동일 규칙.
 //   상품 정보(products)가 있으면 그걸 기준으로 본다. 손님이 보낸 shipping_type 을 위조해
 //   "업체배송 아님"으로 속여 배송비 한 그룹분을 빼는 걸 막기 위함.
-function resolveSubmitShippingGroup(value: unknown): "normal" | "vendor" {
-  const record = (value || {}) as AnyRow;
-  const shippingType = String(record.shipping_type ?? record.delivery_type ?? "").trim().toLowerCase();
-  const combineShipping = String(record.combine_shipping ?? "").trim().toUpperCase();
-  if (shippingType.includes("vendor") || shippingType.includes("업체") || combineShipping === "N") {
-    return "vendor";
-  }
-  return "normal";
+// [2026-10-22] 일반·업체1·업체2 세 갈래 — 손님 화면과 같은 lib/shippingGroups 함수 하나.
+function resolveSubmitShippingGroup(value: unknown): ShippingGroup {
+  return resolveShippingGroup(value);
 }
 
 async function assertShippingFeeNotSkipped(
@@ -461,7 +457,11 @@ async function assertShippingFeeNotSkipped(
     0,
     await readSubmitSettingNumber(supabase, "default_shipping_fee", 4000),
   );
-  if (baseShippingFee <= 0) return; // 사장님이 무료배송 운영 중 → 검증 안 함
+  // [2026-10-22] 업체배송비(업체1·업체2 각각) — 기본 배송비를 0원(무료배송)으로 해도 업체 상품엔 이 금액.
+  const vendorShippingFee = Math.max(
+    0,
+    await readSubmitSettingNumber(supabase, "vendor_shipping_fee", 4000),
+  );
 
   const paidShipping = orderRows.reduce((sum, row) => {
     const fee = submitNumberValue(row?.adjusted_shipping_fee ?? row?.shipping_fee, 0);
@@ -469,13 +469,18 @@ async function assertShippingFeeNotSkipped(
   }, 0);
 
   // 배송그룹(일반/업체)은 각각 배송비가 붙는다. 상품 정보 우선, 없으면(직접입력) 행 값으로 폴백.
-  const groups = new Set<string>();
+  const groups = new Set<ShippingGroup>();
   for (const row of chargeable) {
     const pid = text(row?.product_id);
     const product = pid ? catalog.get(pid) : undefined;
     groups.add(resolveSubmitShippingGroup(product ?? row));
   }
-  const expectedShipping = baseShippingFee * Math.max(1, groups.size);
+  // 갈래마다 1번씩: 일반=기본 배송비, 업체1·업체2=업체배송비(제주·산간 가산은 손님 화면만 — 서버는 최소액만 본다)
+  const expectedShipping = expectedMinimumShipping(groups, {
+    normalFee: baseShippingFee, normalRemoteFee: baseShippingFee,
+    vendorFee: vendorShippingFee, vendorRemoteFee: vendorShippingFee,
+  });
+  if (expectedShipping <= 0) return; // 이 주문서 갈래가 모두 무료(예: 일반만 담고 기본 배송비 0원) → 검증 안 함
 
   console.warn(`배송비 검증 시작: phone=${String(phone || "").replace(/[^0-9]/g, "").slice(-4)} 낸=${paidShipping} 필요=${expectedShipping} 대상줄=${chargeable.length}/${orderRows.length} 기본=${baseShippingFee}`);
 
@@ -559,7 +564,7 @@ async function assertShippingFeeNotSkipped(
   // 여기까지 = 같은 주소 이전 주문이 아예 없다 = 합배송이 성립할 수 없다
   //   → 배송그룹 수만큼 전액을 냈어야 한다. 그런데 안 냈다.
   console.warn(
-    `배송비 검증 차단: phone=${digits.slice(-4)} 낸배송비=${paidShipping} 필요=${expectedShipping}(${baseShippingFee}×${groups.size}그룹) 같은주소_이전주문=없음`,
+    `배송비 검증 차단: phone=${digits.slice(-4)} 낸배송비=${paidShipping} 필요=${expectedShipping}(갈래 ${Array.from(groups).join("+")}·일반 ${baseShippingFee}·업체 ${vendorShippingFee}) 같은주소_이전주문=없음`,
   );
   throw new Error(
     "배송비가 빠져 있어요.\n페이지를 새로고침한 뒤 다시 주문해 주세요.",

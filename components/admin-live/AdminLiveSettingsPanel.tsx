@@ -31,6 +31,8 @@ type SettingKey =
   | "card_payment_min_amount"
   | "default_shipping_fee"
   | "remote_area_shipping_fee"
+  | "vendor_shipping_fee"
+  | "vendor_remote_area_shipping_fee"
   | "point_auto_earn_enabled"
   | "point_earn_rate"
   | "cart_hold_minutes"
@@ -52,6 +54,8 @@ const SETTING_KEYS: SettingKey[] = [
   "card_payment_min_amount",
   "default_shipping_fee",
   "remote_area_shipping_fee",
+  "vendor_shipping_fee",
+  "vendor_remote_area_shipping_fee",
   "point_auto_earn_enabled",
   "point_earn_rate",
   "cart_hold_minutes",
@@ -79,6 +83,9 @@ const DEFAULTS: Record<NumericSettingKey, number> = {
   card_payment_min_amount: 100000,
   default_shipping_fee: 4000,
   remote_area_shipping_fee: 6000,
+  // [2026-10-22 사장님 지시] 업체배송비 — 일반 배송비와 따로(일반을 0원 무료배송으로 해도 업체1·업체2 상품엔 이 금액)
+  vendor_shipping_fee: 4000,
+  vendor_remote_area_shipping_fee: 7000,
   point_auto_earn_enabled: 0,
   point_earn_rate: 0,
   cart_hold_minutes: 15,
@@ -207,6 +214,8 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
   const [cardMinAmount, setCardMinAmount] = useState(formatMoneyInput(DEFAULTS.card_payment_min_amount));
   const [defaultShippingFee, setDefaultShippingFee] = useState(formatMoneyInput(DEFAULTS.default_shipping_fee));
   const [remoteShippingFee, setRemoteShippingFee] = useState(formatMoneyInput(DEFAULTS.remote_area_shipping_fee));
+  const [vendorShippingFee, setVendorShippingFee] = useState(formatMoneyInput(DEFAULTS.vendor_shipping_fee));
+  const [vendorRemoteShippingFee, setVendorRemoteShippingFee] = useState(formatMoneyInput(DEFAULTS.vendor_remote_area_shipping_fee));
   const [pointAutoEarn, setPointAutoEarn] = useState(false);
   const [pointEarnRate, setPointEarnRate] = useState(String(DEFAULTS.point_earn_rate));
   // [2026-07-13] 장바구니 선점 유지시간 (분으로 저장, 화면은 분/시간/일 선택)
@@ -247,6 +256,8 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
         setCardMinAmount(formatMoneyInput(readNumber(rows, "card_payment_min_amount")));
         setDefaultShippingFee(formatMoneyInput(readNumber(rows, "default_shipping_fee")));
         setRemoteShippingFee(formatMoneyInput(readNumber(rows, "remote_area_shipping_fee")));
+        setVendorShippingFee(formatMoneyInput(readNumber(rows, "vendor_shipping_fee")));
+        setVendorRemoteShippingFee(formatMoneyInput(readNumber(rows, "vendor_remote_area_shipping_fee")));
         setPointAutoEarn(clean(rows.find((r) => r.key === "point_auto_earn_enabled")?.value) === "true");
         setPointEarnRate(String(readNumber(rows, "point_earn_rate")));
         {
@@ -282,6 +293,8 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
     const nextCardMinAmount = Math.max(0, Math.round(toNumber(cardMinAmount)));
     const nextDefaultShippingFee = Math.max(0, Math.round(toNumber(defaultShippingFee)));
     const nextRemoteShippingFee = Math.max(nextDefaultShippingFee, Math.round(toNumber(remoteShippingFee)));
+    const nextVendorShippingFee = Math.max(0, Math.round(toNumber(vendorShippingFee)));
+    const nextVendorRemoteShippingFee = Math.max(nextVendorShippingFee, Math.round(toNumber(vendorRemoteShippingFee)));
     const nextPointEarnRate = Math.min(100, Math.max(0, toNumber(pointEarnRate)));
     // 장바구니 선점 유지시간: 분으로 환산, 10분~30일(43200분) 클램프 — API 쪽 클램프와 동일 기준
     const nextHoldMinutes = Math.min(43200, Math.max(10, Math.round(toNumber(holdAmount) * HOLD_UNIT_MULT[holdUnit])));
@@ -296,6 +309,8 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
           { key: "card_payment_min_amount", value: String(nextCardMinAmount) },
           { key: "default_shipping_fee", value: String(nextDefaultShippingFee) },
           { key: "remote_area_shipping_fee", value: String(nextRemoteShippingFee) },
+          { key: "vendor_shipping_fee", value: String(nextVendorShippingFee) },
+          { key: "vendor_remote_area_shipping_fee", value: String(nextVendorRemoteShippingFee) },
           { key: "point_auto_earn_enabled", value: pointAutoEarn ? "true" : "false" },
           { key: "point_earn_rate", value: String(nextPointEarnRate) },
           { key: "cart_hold_minutes", value: String(nextHoldMinutes) },
@@ -319,6 +334,8 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
       setCardMinAmount(formatMoneyInput(nextCardMinAmount));
       setDefaultShippingFee(formatMoneyInput(nextDefaultShippingFee));
       setRemoteShippingFee(formatMoneyInput(nextRemoteShippingFee));
+      setVendorShippingFee(formatMoneyInput(nextVendorShippingFee));
+      setVendorRemoteShippingFee(formatMoneyInput(nextVendorRemoteShippingFee));
       {
         const holdNorm = decomposeHoldMinutes(nextHoldMinutes);
         setHoldAmount(holdNorm.amount);
@@ -327,7 +344,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
 
       showAdminToast("운영 설정을 저장했습니다.", "success");
       const holdNorm = decomposeHoldMinutes(nextHoldMinutes);
-      markGlobalSaved({...globalDraft,customerCardRate:String(nextCustomerCardRate),actualCardRate:String(nextActualCardRate),cardMinAmount:formatMoneyInput(nextCardMinAmount),defaultShippingFee:formatMoneyInput(nextDefaultShippingFee),remoteShippingFee:formatMoneyInput(nextRemoteShippingFee),holdAmount:holdNorm.amount,holdUnit:holdNorm.unit});
+      markGlobalSaved({...globalDraft,customerCardRate:String(nextCustomerCardRate),actualCardRate:String(nextActualCardRate),cardMinAmount:formatMoneyInput(nextCardMinAmount),defaultShippingFee:formatMoneyInput(nextDefaultShippingFee),remoteShippingFee:formatMoneyInput(nextRemoteShippingFee),vendorShippingFee:formatMoneyInput(nextVendorShippingFee),vendorRemoteShippingFee:formatMoneyInput(nextVendorRemoteShippingFee),holdAmount:holdNorm.amount,holdUnit:holdNorm.unit});
       return true;
     } catch (error) {
       showAdminToast("설정 저장 실패\n\n"+(error instanceof Error ? error.message : String(error)),"error");
@@ -337,9 +354,9 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
     }
   };
 
-  const globalDraft={customerCardRate,actualCardRate,cardMinAmount,defaultShippingFee,remoteShippingFee,pointAutoEarn,pointEarnRate,holdAmount,holdUnit,directInputEnabled,howtoEnabled,howtoSteps,howtoWarn,finalSubmitConfirmationEnabled,productNoticeMode,productNoticeCustom};
+  const globalDraft={customerCardRate,actualCardRate,cardMinAmount,defaultShippingFee,remoteShippingFee,vendorShippingFee,vendorRemoteShippingFee,pointAutoEarn,pointEarnRate,holdAmount,holdUnit,directInputEnabled,howtoEnabled,howtoSteps,howtoWarn,finalSubmitConfirmationEnabled,productNoticeMode,productNoticeCustom};
   const markGlobalSaved=useSettingsDraft({value:globalDraft,loading,saving,save:saveSettings,onDraftStateChange:setGlobalDraftState,onDiscard:(value)=>{
-    setCustomerCardRate(value.customerCardRate);setActualCardRate(value.actualCardRate);setCardMinAmount(value.cardMinAmount);setDefaultShippingFee(value.defaultShippingFee);setRemoteShippingFee(value.remoteShippingFee);setPointAutoEarn(value.pointAutoEarn);setPointEarnRate(value.pointEarnRate);setHoldAmount(value.holdAmount);setHoldUnit(value.holdUnit);setDirectInputEnabled(value.directInputEnabled);setHowtoEnabled(value.howtoEnabled);setHowtoSteps(value.howtoSteps);setHowtoWarn(value.howtoWarn);setFinalSubmitConfirmationEnabled(value.finalSubmitConfirmationEnabled);setProductNoticeMode(value.productNoticeMode);setProductNoticeCustom(value.productNoticeCustom);
+    setCustomerCardRate(value.customerCardRate);setActualCardRate(value.actualCardRate);setCardMinAmount(value.cardMinAmount);setDefaultShippingFee(value.defaultShippingFee);setRemoteShippingFee(value.remoteShippingFee);setVendorShippingFee(value.vendorShippingFee);setVendorRemoteShippingFee(value.vendorRemoteShippingFee);setPointAutoEarn(value.pointAutoEarn);setPointEarnRate(value.pointEarnRate);setHoldAmount(value.holdAmount);setHoldUnit(value.holdUnit);setDirectInputEnabled(value.directInputEnabled);setHowtoEnabled(value.howtoEnabled);setHowtoSteps(value.howtoSteps);setHowtoWarn(value.howtoWarn);setFinalSubmitConfirmationEnabled(value.finalSubmitConfirmationEnabled);setProductNoticeMode(value.productNoticeMode);setProductNoticeCustom(value.productNoticeCustom);
   }});
   draftRef.current=GLOBAL_SAVE_TABS.includes(activeTab) ? globalDraftState : childDraft;
   const protectNavigation=useCallback(async()=>{
@@ -433,6 +450,20 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
                     value={remoteShippingFee}
                     suffix="원"
                     onChange={(value) => setRemoteShippingFee(formatMoneyInput(value))}
+                  />
+                  <SettingInput
+                    label="업체배송비"
+                    desc="업체1·업체2 상품에 업체마다 따로 붙음 · 기본 배송비를 0원으로 해도 그대로"
+                    value={vendorShippingFee}
+                    suffix="원"
+                    onChange={(value) => setVendorShippingFee(formatMoneyInput(value))}
+                  />
+                  <SettingInput
+                    label="업체배송 제주/산간"
+                    desc="업체배송비보다 낮게 저장 안 됨"
+                    value={vendorRemoteShippingFee}
+                    suffix="원"
+                    onChange={(value) => setVendorRemoteShippingFee(formatMoneyInput(value))}
                   />
                 </div>
               </div>

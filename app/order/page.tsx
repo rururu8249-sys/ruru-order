@@ -143,6 +143,7 @@ import { buildBrandOrderCatalog, resolveBrandOrderSelection, findBrandOrderProdu
 import { loadProductBrandCatalog } from "@/lib/productBrandCatalogClient";
 import CustomerSizeChartSheet from "@/components/customer/CustomerSizeChartSheet";
 import { resolveSizeChart, sizeColumnIndex } from "@/lib/sizeChart";
+import { EMPTY_PAID_SHIPPING_GROUPS, anyPaidShippingGroup, assignRowShippingFees, calculateShippingBreakdown, normalizePaidShippingGroups, resolveShippingGroup, shippingFeeByGroup, type PaidShippingGroups as PaidShippingGroupsLib } from "@/lib/shippingGroups";
 import { registeredProductEditManualPrice, registeredProductPriceMode } from "@/lib/registeredProductPricePolicy";
 import { buildCartHoldSnapshotItem } from "@/lib/cartHoldDetail";
 import { CART_SEQ_NEW, readCartSeqField } from "@/lib/cartClearMarks";
@@ -242,36 +243,9 @@ type CustomerBlockStatus = {
   message: string;
 };
 
-type PaidShippingGroups = { normal: boolean; vendor: boolean };
-
-const EMPTY_PAID_SHIPPING_GROUPS: PaidShippingGroups = { normal: false, vendor: false };
-
-const normalizePaidShippingGroups = (value: boolean | PaidShippingGroups): PaidShippingGroups => {
-  if (typeof value === "boolean") {
-    return { normal: value, vendor: value };
-  }
-
-  return {
-    normal: Boolean(value?.normal),
-    vendor: Boolean(value?.vendor),
-  };
-};
-
-const resolveShippingGroupFromValue = (value: unknown): "normal" | "vendor" => {
-  const record = (value || {}) as Record<string, unknown>;
-  const shippingType = String(record.shipping_type ?? record.delivery_type ?? "").trim().toLowerCase();
-  const combineShipping = String(record.combine_shipping ?? "").trim().toUpperCase();
-
-  if (
-    shippingType.includes("vendor") ||
-    shippingType.includes("업체") ||
-    combineShipping === "N"
-  ) {
-    return "vendor";
-  }
-
-  return "normal";
-};
+// [2026-10-22] 배송 갈래(일반·업체1·업체2)·합배송 갈래 판정·금액은 lib/shippingGroups.ts 한 곳(서버와 같은 함수).
+type PaidShippingGroups = PaidShippingGroupsLib;
+const resolveShippingGroupFromValue = resolveShippingGroup;
 
 // [2026-09-08] BANK_NAME/BANK_ACCOUNT/BANK_HOLDER 는 OrderPage 안에서 useShopInfo() 로 받는다(설정 › 상점 정보).
 
@@ -1739,6 +1713,9 @@ export default function OrderPage() {
   const [cardPaymentMinAmount, setCardPaymentMinAmount] = useState(100000);
   const [defaultShippingFee, setDefaultShippingFee] = useState(4000);
   const [remoteAreaShippingFee, setRemoteAreaShippingFee] = useState(6000);
+  // [2026-10-22] 업체배송비(업체1·업체2 각각) — 설정 「업체배송비」「업체배송 제주/산간」. 기본 배송비를 0원으로 해도 그대로.
+  const [vendorShippingFeeSetting, setVendorShippingFeeSetting] = useState(4000);
+  const [vendorRemoteShippingFeeSetting, setVendorRemoteShippingFeeSetting] = useState(7000);
   const [pointEarnRateForDisplay, setPointEarnRateForDisplay] = useState(0);
   // 접속 팝업 공지(설정에서 문구/제목/글자크기/색상/ON·OFF 수정). 밴드 바로가기 + 24시간 안 보기 + 확인.
   const [popupNoticeEnabled, setPopupNoticeEnabled] = useState(false);
@@ -1922,6 +1899,12 @@ export default function OrderPage() {
   const baseShippingFee = isRemoteAreaShippingAddress
     ? Math.max(remoteAreaShippingFee, generalShippingFee)
     : generalShippingFee;
+  const shippingFeeOfGroup = shippingFeeByGroup({
+    normalFee: generalShippingFee,
+    normalRemoteFee: remoteAreaShippingFee,
+    vendorFee: vendorShippingFeeSetting,
+    vendorRemoteFee: vendorRemoteShippingFeeSetting,
+  }, isRemoteAreaShippingAddress);
   const isVendorShippingItem = (item: Pick<OrderItem, "shipping_type" | "combine_shipping">) => {
     const shippingType = String(item.shipping_type || "").trim().toLowerCase();
 
@@ -1952,24 +1935,8 @@ export default function OrderPage() {
   ) => {
     const paidShippingGroups = normalizePaidShippingGroups(paidShippingBeforeSubmitValue);
     const chargeableItems = getChargeableShippingItems(targetItems);
-
-    const hasNormalShippingItem = chargeableItems.some(
-      (item) => resolveShippingGroupFromValue(item) === "normal",
-    );
-    const hasVendorShippingItem = chargeableItems.some(
-      (item) => resolveShippingGroupFromValue(item) === "vendor",
-    );
-
-    const normalShippingFee =
-      hasNormalShippingItem && !paidShippingGroups.normal ? baseShippingFee : 0;
-    const vendorShippingFee =
-      hasVendorShippingItem && !paidShippingGroups.vendor ? baseShippingFee : 0;
-
-    return {
-      normalShippingFee,
-      vendorShippingFee,
-      totalShippingFee: normalShippingFee + vendorShippingFee,
-    };
+    // [2026-10-22] 일반·업체1·업체2 갈래마다 1번씩(이미 낸 갈래는 0원) — lib/shippingGroups
+    return calculateShippingBreakdown(chargeableItems.map((item) => resolveShippingGroupFromValue(item)), paidShippingGroups, shippingFeeOfGroup);
   };
 
   const shippingFeeBreakdown = calculateShippingFeeBreakdown(items, paidShippingGroups);
@@ -1979,22 +1946,23 @@ export default function OrderPage() {
     (item) => resolveShippingGroupFromValue(item) === "normal",
   );
   const hasVendorShippingItemForNotice = chargeableShippingItemsForNotice.some(
-    (item) => resolveShippingGroupFromValue(item) === "vendor",
+    (item) => resolveShippingGroupFromValue(item) !== "normal",
   );
+  const paidVendorGroupForNotice = paidShippingGroups.vendor || paidShippingGroups.vendor2;
   const isFreeShippingEvent = baseShippingFee <= 0;
   const shippingNoticeText = (() => {
     if (chargeableShippingItemsForNotice.length <= 0) return "";
 
     if (shippingFee > 0) {
-      if (shippingFeeBreakdown.normalShippingFee > 0 && shippingFeeBreakdown.vendorShippingFee > 0) {
-        return `일반배송과 업체배송이 함께 있어 배송비가 각각 적용됩니다. 총 배송비 ${won(shippingFee)}입니다.`;
+      if ([shippingFeeBreakdown.normalShippingFee, shippingFeeBreakdown.vendor1ShippingFee, shippingFeeBreakdown.vendor2ShippingFee].filter((fee) => fee > 0).length >= 2) {
+        return `일반배송·업체배송이 함께 있어 배송비가 따로따로 붙어요. 총 배송비 ${won(shippingFee)}입니다.`;
       }
 
       if (shippingFeeBreakdown.vendorShippingFee > 0 && paidShippingGroups.normal) {
         return `기존 일반배송 주문과는 별도 출고되는 업체배송 상품이라 배송비 ${won(shippingFee)}이 추가 적용됩니다.`;
       }
 
-      if (shippingFeeBreakdown.normalShippingFee > 0 && paidShippingGroups.vendor) {
+      if (shippingFeeBreakdown.normalShippingFee > 0 && paidVendorGroupForNotice) {
         return `기존 업체배송 주문과는 별도 출고되는 일반배송 상품이라 배송비 ${won(shippingFee)}이 적용됩니다.`;
       }
 
@@ -2013,11 +1981,11 @@ export default function OrderPage() {
       return "무료배송 이벤트가 적용되어 이번 주문서 배송비는 0원입니다.";
     }
 
-    if (hasNormalShippingItemForNotice && hasVendorShippingItemForNotice && paidShippingGroups.normal && paidShippingGroups.vendor) {
+    if (hasNormalShippingItemForNotice && hasVendorShippingItemForNotice && paidShippingGroups.normal && paidVendorGroupForNotice) {
       return "기존 일반배송/업체배송 주문과 각각 합배송되어 이번 주문서 배송비는 0원입니다.";
     }
 
-    if (hasVendorShippingItemForNotice && paidShippingGroups.vendor && !hasNormalShippingItemForNotice) {
+    if (hasVendorShippingItemForNotice && paidVendorGroupForNotice && !hasNormalShippingItemForNotice) {
       return "기존 업체배송 주문과 합배송되어 이번 주문서 배송비는 0원입니다.";
     }
 
@@ -2025,7 +1993,7 @@ export default function OrderPage() {
       return "기존 일반배송 주문과 합배송되어 이번 주문서 배송비는 0원입니다.";
     }
 
-    if (hasVendorShippingItemForNotice && paidShippingGroups.vendor) {
+    if (hasVendorShippingItemForNotice && paidVendorGroupForNotice) {
       return "기존 업체배송 주문과 합배송되어 이번 주문서 배송비는 0원입니다.";
     }
 
@@ -2459,6 +2427,8 @@ export default function OrderPage() {
         "card_payment_min_amount",
         "default_shipping_fee",
         "remote_area_shipping_fee",
+        "vendor_shipping_fee",
+        "vendor_remote_area_shipping_fee",
         "point_auto_earn_enabled",
         "point_earn_rate",
         "direct_input_enabled",
@@ -2506,6 +2476,11 @@ export default function OrderPage() {
     setCardPaymentMinAmount(nextCardPaymentMinAmount);
     setDefaultShippingFee(nextDefaultShippingFee);
     setRemoteAreaShippingFee(nextRemoteAreaShippingFee);
+    {
+      const nextVendorFee = Math.max(0, readNumber("vendor_shipping_fee", 4000));
+      setVendorShippingFeeSetting(nextVendorFee);
+      setVendorRemoteShippingFeeSetting(Math.max(nextVendorFee, readNumber("vendor_remote_area_shipping_fee", 7000)));
+    }
     setCombineShippingSettings(parseCombineShippingSettings(data));
 
     // 포인트 자동적립 안내 문구용 (자동적립 ON + 적립률>0 일 때만 N% 표시, OFF면 0=숨김)
@@ -3180,14 +3155,14 @@ export default function OrderPage() {
     paidShippingOrders.forEach((order: any) => {
       const productId = String(order?.product_id || "").trim();
       const product = productId ? productShippingMap.get(productId) : null;
-      const group = product ? resolveShippingGroupFromValue(product) : "normal";
+      const group = product ? resolveShippingGroupFromValue(product) : "normal"; // normal / vendor(업체1) / vendor2(업체2)
 
       groups[group] = true;
     });
 
     assertCurrentRequest();
     verifiedCombineShippingSettingsRef.current = loadedSettings;
-    if (groups.normal || groups.vendor) {
+    if (anyPaidShippingGroup(groups)) {
       markPaidShippingInThisBrowser(cleanPhone, settings, addressSignature);
     }
 
@@ -3195,7 +3170,7 @@ export default function OrderPage() {
     setPaidShippingScopeKey(JSON.stringify([
       cleanPhone, addressSignature, loadedSettings.enabled, loadedSettings.startAt, loadedSettings.endAt,
     ]));
-    setAlreadyPaidShipping(groups.normal || groups.vendor);
+    setAlreadyPaidShipping(anyPaidShippingGroup(groups));
     setCombineShippingCheckError("");
     return groups;
     } catch (error) {
@@ -3208,7 +3183,7 @@ export default function OrderPage() {
   const checkAlreadyPaidShipping = async (phoneValue = customerPhone) => {
     try {
       const groups = await checkAlreadyPaidShippingGroups(phoneValue);
-      return groups.normal || groups.vendor;
+      return anyPaidShippingGroup(groups);
     } catch (error) {
       // 자동 재조회 실패는 처리하되, submitOrder는 위 검증 함수를 직접 호출하여 실패 시 저장하지 않는다.
       console.warn("합배송 자동 확인 실패", error);
@@ -5228,7 +5203,7 @@ export default function OrderPage() {
           : rawOperatorTestOrderFlags;
       const paidShippingGroupsBeforeSubmit = await checkAlreadyPaidShippingGroups(cleanPhone);
       const submitShippingRequestId = combineShippingRequestRef.current;
-      const paidShippingBeforeSubmit = paidShippingGroupsBeforeSubmit.normal || paidShippingGroupsBeforeSubmit.vendor;
+      const paidShippingBeforeSubmit = anyPaidShippingGroup(paidShippingGroupsBeforeSubmit);
       const validItems = items.filter(
         (item) =>
           item.product_name.trim() ||
@@ -5262,24 +5237,19 @@ export default function OrderPage() {
         broadcast?.public_title ||
         "현재 방송";
 
-      const chargedShippingGroups = new Set<"normal" | "vendor">();
+      // [2026-10-22] 줄마다 배송비 — 갈래(일반·업체1·업체2)마다 첫 «배송비 대상» 줄에만. 합 = appliedShippingFee(lib/shippingGroups)
+      const chargeableValidItems = new Set(getChargeableShippingItems(validItems));
+      const rowShippingFees = assignRowShippingFees(
+        validItems.map((item) => ({ group: resolveShippingGroupFromValue(item), chargeable: chargeableValidItems.has(item) })),
+        paidShippingGroupsBeforeSubmit,
+        shippingFeeOfGroup,
+      );
 
-      const orderRows = validItems.map((item) => {
+      const orderRows = validItems.map((item, rowIndex) => {
         const qty = toNumber(item.qty);
         const price = toNumber(item.product_price);
         const itemTotal = price * qty;
-        const rowShippingGroup = resolveShippingGroupFromValue(item);
-        let rowShippingFee = 0;
-
-        if (rowShippingGroup === "normal") {
-          if (!paidShippingGroupsBeforeSubmit.normal && !chargedShippingGroups.has("normal")) {
-            rowShippingFee = baseShippingFee;
-          }
-        } else if (!paidShippingGroupsBeforeSubmit.vendor && !chargedShippingGroups.has("vendor")) {
-          rowShippingFee = baseShippingFee;
-        }
-
-        chargedShippingGroups.add(rowShippingGroup);
+        const rowShippingFee = rowShippingFees[rowIndex] || 0;
         const rowCardExtra =
           paymentMethod === "카드결제"
             ? Math.round((itemTotal + rowShippingFee) * (cardRateForCustomer / 100))
@@ -5428,7 +5398,8 @@ export default function OrderPage() {
 
       const nextPaidShippingGroupsAfterSubmit: PaidShippingGroups = {
         normal: paidShippingGroupsBeforeSubmit.normal || appliedShippingFeeBreakdown.normalShippingFee > 0,
-        vendor: paidShippingGroupsBeforeSubmit.vendor || appliedShippingFeeBreakdown.vendorShippingFee > 0,
+        vendor: paidShippingGroupsBeforeSubmit.vendor || appliedShippingFeeBreakdown.vendor1ShippingFee > 0,
+        vendor2: paidShippingGroupsBeforeSubmit.vendor2 || appliedShippingFeeBreakdown.vendor2ShippingFee > 0,
       };
 
       if (appliedShippingFeeBreakdown.totalShippingFee > 0) {
@@ -5439,7 +5410,7 @@ export default function OrderPage() {
       if (submitShippingContext === combineShippingContextRef.current &&
           submitShippingRequestId === combineShippingRequestRef.current) {
         setPaidShippingGroups(nextPaidShippingGroupsAfterSubmit);
-        setAlreadyPaidShipping(nextPaidShippingGroupsAfterSubmit.normal || nextPaidShippingGroupsAfterSubmit.vendor);
+        setAlreadyPaidShipping(anyPaidShippingGroup(nextPaidShippingGroupsAfterSubmit));
       }
 
       setIsEditingCustomerInfo(false);
