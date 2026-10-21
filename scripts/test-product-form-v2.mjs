@@ -40,8 +40,11 @@ const more = r.root.findAllByType('button').find(b=>text(b).startsWith('더 보�
 assert.equal(more.props['aria-expanded'],false,'더 보기 starts closed');
 await act(async()=>more.props.onClick());
 assert.ok(r.root.findAllByType('button').some(b=>text(b)==='바로구매 가능'),'더 보기 shows instant-order choice');
+// [2026-10-21 a2-11 버그] v2 폼에서 「+ 세부상품 추가」를 누르면 세부상품 창이 떠야 한다(옛 폼 안에만 있어 안 뜨던 것)
+await act(async()=>r.root.findAllByType('button').find(b=>text(b).includes('세부상품 추가')).props.onClick());
+assert.equal(r.root.findAllByProps({role:'dialog','aria-label':'세부상품 추가'}).length,1,'v2: 세부상품 추가 dialog opens');
 await act(async()=>r.unmount());
-console.log('PASS v2 edits name/price through existing state and toggles 더 보기');
+console.log('PASS v2 edits name/price through existing state and toggles 더 보기 · opens 세부상품 추가 dialog');
 
 // 브랜드 묶음 상품은 새 배치에서도 기존 화면
 const brand = {id:9101,__catalog_edit_version:'c'.repeat(32),product_name:'브랜드',price:100,product_note:JSON.stringify({brand_group:{enabled:true,detail_options:{A:{colors:[],sizes:['M']}}}})};
