@@ -16,7 +16,7 @@ let tree;
 // [2026-10-21 a2-1] 기록(판매) 탭·엑셀 대량등록 삭제 — 예전 history 값이 와도 방송 진열로, 엑셀 버튼 없음
 await act(async()=>{tree=Renderer.create(React.createElement(Panel,{embedded:true,initialTab:'history',onClose(){}}));});
 assert.equal(labels(tree).includes('판매 기록'),false,'catalog navigation must not retain moved sales tab');
-assert.ok(labels(tree).includes('방송 진열'),'stale history tab must fall back to catalog workspace');
+assert.ok(labels(tree).includes('방송 상품'),'stale history tab must fall back to catalog workspace');
 assert.equal(JSON.stringify(tree.toJSON()).includes('판매 있는 방송'),false,'sales history view is gone');
 assert.equal(labels(tree).some(label=>label.includes('엑셀 대량등록')),false,'excel bulk import is removed');
 assert.equal(JSON.stringify(tree.toJSON()).includes('상품 관리'),false,'embedded catalog must not repeat the page title');

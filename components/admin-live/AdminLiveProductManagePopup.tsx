@@ -136,6 +136,11 @@ function parseProductNote(p: ProductRow): Record<string, unknown> {
 
 // [2026-08-31] 📢 채팅 문구 생성은 lib/chatAnnounce.ts 로 분리 — 컨트롤타워 「현재상품 복사」와 문구 공용.
 
+// [2026-10-21 a2-6] 줄 버튼 공통 모양(DESIGN-ADMIN: 보조 = 흰 바탕 1px 선, 주 = 검정, 위험 = 빨간 글자만). 32px.
+const rowBtn: React.CSSProperties = { flexShrink: 0, height: "32px", padding: "0 12px", fontSize: "12px", fontWeight: 700, color: "var(--color-ink)", background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "8px", cursor: "pointer" };
+const rowBtnPrimary: React.CSSProperties = { ...rowBtn, color: "#fff", background: "var(--color-ink)", border: "1px solid var(--color-ink)" };
+const rowBtnDanger: React.CSSProperties = { ...rowBtn, color: "var(--color-danger-tx)" };
+
 function productName(p: ProductRow) {
   return pickString(p, ["product_name", "name", "title"], "상품명 없음");
 }
@@ -289,6 +294,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [newBcTitle, setNewBcTitle] = useState("");
   // 선택 복사(지난 방송 상품 → 새 방송): product_id 순서 배열. null이면 일반 새 방송
   const [bcCopyMode, setBcCopyMode] = useState(false);
+  // [2026-10-21 a2-6] 위젯 순환·고정 기록 상자 — 85방송 중 8번만 설정한 기능이라 기본 접힘(이 화면 안에서만, 저장 안 함)
+  const [widgetBoxOpen, setWidgetBoxOpen] = useState(false);
   const [bcCopySel, setBcCopySel] = useState<Set<string>>(new Set());
   const [newBcCopyIds, setNewBcCopyIds] = useState<string[] | null>(null);
   // 상품 담기 피커
@@ -1008,6 +1015,29 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     }
   };
 
+  // [2026-10-21 a2-6] 숨기기/보이기 — products.status 판매중↔숨김 (등록 폼 「고객 노출」과 같은 값, 손님 화면 전체에서 안 보임).
+  //   판매중·숨김 두 값만 토글. 그 외(품절 등)는 건드리지 않는다. 재고·가격·주문 무접촉.
+  const [hideBusyId, setHideBusyId] = useState("");
+  const isProductHidden = (p: ProductRow) => pickString(p, ["status"], "") === "숨김";
+  const canToggleHidden = (p: ProductRow) => ["판매중", "숨김", ""].includes(pickString(p, ["status"], ""));
+  const toggleProductHidden = async (p: ProductRow) => {
+    const pid = productId(p);
+    if (!pid || hideBusyId || !canToggleHidden(p)) return;
+    const next = isProductHidden(p) ? "판매중" : "숨김";
+    setHideBusyId(pid);
+    try {
+      const { error } = await adminCatalogWrite({ table: "products", op: "update", values: { status: next }, filters: [{ type: "eq", col: "id", val: pid }] });
+      if (error) throw error;
+      showAdminToast(next === "숨김" ? "손님 화면에서 숨겼어요." : "손님 화면에 다시 보여요.", "success");
+      await loadProducts(true);
+      window.dispatchEvent(new Event("ruru-live-product-updated"));
+    } catch (e) {
+      showAdminToast((next === "숨김" ? "숨기기" : "보이기") + " 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally {
+      setHideBusyId("");
+    }
+  };
+
   const openShopPicker = () => {
     setShopPickerSel(new Set());
     setShopPickerSearch("");
@@ -1045,7 +1075,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       }
       setShopPickerOpen(false);
       window.dispatchEvent(new Event("ruru-live-product-updated"));
-      showAdminToast(`${ids.length}개 상품을 쇼핑몰에 진열했어요.`, "success");
+      showAdminToast(`${ids.length}개 상품을 쇼핑몰에 담았어요.`, "success");
     } catch (e) {
       // supabase 에러는 Error 인스턴스가 아니라 {message, code} 객체라 String(e)가 [object Object]가 된다.
       const err = e as { message?: string; code?: string };
@@ -1165,7 +1195,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const pinFromHistory = async (entry: { productId: string; detailName: string; label: string }) => {
     const row = findBroadcastProduct(entry.productId);
     if (!row) {
-      showAdminToast(`「${entry.label}」은(는) 이 방송 진열에 없어요.\n「+ 상품 담기」로 먼저 담아주세요.`, "warning");
+      showAdminToast(`「${entry.label}」은(는) 이 방송 상품 목록에 없어요.\n「+ 상품 담기」로 먼저 담아주세요.`, "warning");
       return;
     }
     let detail: DetailProduct | undefined;
@@ -1383,7 +1413,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       setRotationIds((prev) => new Set(prev).add(id));
       window.dispatchEvent(new Event("ruru-live-product-updated"));
       showAdminToast("방송 순환에 담았어요.", "success");
-    } catch (e) { showAdminToast("순환 담기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error"); }
+    } catch (e) { showAdminToast("방송에 담기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error"); }
     finally { setBusyId(""); }
   };
 
@@ -1397,7 +1427,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       setRotationIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
       window.dispatchEvent(new Event("ruru-live-product-updated"));
       showAdminToast("순환에서 뺐어요.", "success");
-    } catch (e) { showAdminToast("순환 해제 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error"); }
+    } catch (e) { showAdminToast("방송에서 빼기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error"); }
     finally { setBusyId(""); }
   };
 
@@ -1566,7 +1596,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       window.dispatchEvent(new Event("ruru-live-product-updated"));
       showAdminToast(`방송 순환에 ${toInsert.length}개 담았어요.${ids.length - toInsert.length > 0 ? ` (이미 담긴 ${ids.length - toInsert.length}개 제외)` : ""}`, "success");
       setWsSelected(new Set()); setWidgetSettingsOpen(false);
-    } catch (e) { showAdminToast("순환 담기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error"); }
+    } catch (e) { showAdminToast("방송에 담기 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error"); }
     finally { setWsSaving(false); }
   };
   const wsConfirm = () => void wsAddToRotation();
@@ -1596,7 +1626,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         {/* [2026-09-20 사장님 폰 화면 깨짐] 「방송 상\n품」처럼 탭 글자가 잘렸다 → 줄바꿈 금지 + 넘치면 가로 스크롤 */}
         {embedded && !headerTarget && <ProductToolbar tab={tab} onTab={setTab} onCreate={openCreate} />}
         {!embedded && <div style={{ display: "flex", gap: "2px", padding: "0 16px", borderBottom: "1px solid var(--color-line)", overflowX: "auto", scrollbarWidth: "none" }}>
-          {([["broadcast", "방송 진열"], ["shop", "쇼핑몰 진열"], ["products", "전체 상품"]] as const).map(([k, l]) => (
+          {([["broadcast", "방송 상품"], ["shop", "쇼핑몰 상품"], ["products", "전체 상품"]] as const).map(([k, l]) => (
             <button
               key={k}
               type="button"
@@ -1711,7 +1741,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             {/* 우측: 선택 방송의 진열 상품 (sort_order순, 읽기 전용) */}
             <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", border: "1px solid var(--color-line)", borderRadius: "8px", overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 12px", borderBottom: "1px solid var(--color-line)" }}>
-                <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)" }}>진열 상품 {bcProducts.length}개</span>
+                <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)" }}>방송 상품 {bcProducts.length}개</span>
                 <button type="button" disabled={!bcSelId || bcBusy} onClick={openBcPicker} style={{ marginLeft: "auto", height: "36px", fontSize: "13px", fontWeight: 700, color: "#fff", background: "var(--color-ink)", border: "none", borderRadius: "8px", padding: "0 12px", cursor: !bcSelId || bcBusy ? "not-allowed" : "pointer", opacity: !bcSelId || bcBusy ? 0.5 : 1 }}>+ 담기</button>
                 {bcSelId && bcProducts.length > 0 ? (
                   <select
@@ -1730,6 +1760,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               <div style={{ padding: "8px 12px 0" }}>
                 {/* [2026-10-03] 빠른 재사용은 한 줄 카드, 전체 진열상품은 바로 아래 큰 작업영역으로 유지한다. */}
                 {!bcCopyMode ? (
+                  <button type="button" onClick={() => setWidgetBoxOpen((v) => !v)} aria-expanded={widgetBoxOpen} style={{ width: "100%", display: "flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 12px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", color: "var(--color-ink)", fontSize: "13px", fontWeight: 700, cursor: "pointer", textAlign: "left" }}>
+                    <span>방송 화면 위젯 순환 · 고정 기록 {widgetLibraryItems.length}개</span>
+                    <span style={{ marginLeft: "auto", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-mute)" }}>{widgetRotation.mode === "selected" ? "원하는 상품만 순환" : widgetRotation.mode === "history" ? "고정 기록 상품만 순환" : "현재 방송 상품 전체 순환"}{widgetRotation.paused ? " · 일시정지" : ""} {widgetBoxOpen ? "▴" : "▾"}</span>
+                  </button>
+                ) : null}
+                {!bcCopyMode && widgetBoxOpen ? (
                   <WidgetProductLibraryPanel
                     items={widgetLibraryItems}
                     rotation={widgetRotation}
@@ -1753,7 +1789,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="상품명 검색" style={{ width: "100%", height: "34px", padding: "0 8px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid var(--color-line)", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
                 {bcSelId && bcProducts.length > 0 && !bcDragEnabled && !bcCopyMode ? (
                   <div style={{ margin: "0 0 8px", padding: "6px 8px", borderRadius: "8px", background: "var(--color-warn-bg)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 700, lineHeight: 1.4 }}>
-                    {search.trim() ? "🔍 검색 중에는 순서를 바꿀 수 없어요. 검색어를 지워주세요." : "↕ 순서를 바꾸려면 정렬을 「진열 순서 (드래그)」로 두세요. (지금은 보기만 바뀐 상태 — 저장된 순서는 그대로)"}
+                    {search.trim() ? "검색 중에는 순서를 바꿀 수 없어요. 검색어를 지워주세요." : "순서를 바꾸려면 정렬을 「진열 순서 (드래그)」로 두세요. (지금은 보기만 바뀐 상태 — 저장된 순서는 그대로)"}
                   </div>
                 ) : null}
               </div>
@@ -1795,7 +1831,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 return (
                   <div style={{ margin: "0 12px 8px", border: "2px solid var(--color-rose-deep)", borderRadius: "8px", background: "var(--color-rose-soft)", overflow: "hidden" }}>
                     <div style={{ padding: "4px 8px", fontSize: "11px", fontWeight: 900, color: "var(--color-rose-deep)", borderBottom: "1px solid var(--color-rose-line)" }}>
-                      {pinIsLive ? "📌 위젯 고정 중 — 손님 화면에 이 상품만 보입니다" : "📌 지난 방송에서 고정했던 기록 — 손님 화면과 무관 (해제로 정리)"}
+                      {pinIsLive ? "지금 소개 중 — 방송 화면에 이 상품만 보여요" : "지난 방송에서 소개했던 기록 — 지금 방송과 무관 (소개 끝으로 정리)"}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px" }}>
                       <span
@@ -1808,15 +1844,15 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         <div style={{ fontSize: "13px", fontWeight: 900, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pinnedTitle}</div>
                         {pinnedPrice ? <div style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-rose-deep)", marginTop: "2px" }}>{pinnedPrice}</div> : null}
                         {pinnedOption ? <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pinnedOption}</div> : null}
-                        {!pinnedRow ? <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", marginTop: "1px" }}>이 방송 진열 목록에 없는 상품입니다</div> : null}
+                        {!pinnedRow ? <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", marginTop: "1px" }}>이 방송 상품 목록에 없는 상품이에요</div> : null}
                       </div>
                       {pinnedRow ? (
                         <button
                           type="button"
                           onClick={() => void setChatCurrentAndCopy(pinnedRow, pinnedDetail)}
                           title="이 상품 안내글을 복사합니다"
-                          style={{ flexShrink: 0, fontSize: "11px", fontWeight: 900, color: "var(--color-ink-soft)", background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}
-                        >채팅</button>
+                          style={rowBtn}
+                        >안내문 복사</button>
                       ) : null}
                       {/* [2026-09-19 사장님] 「고정 상태에서는 왜 상품 수정이 안 돼?」 — 고정 상품 줄은 목록에서 빠지는데(08-29 중복 방지)
                           이 카드엔 [수정]이 없어 닿을 수 없었다. 목록 줄과 같은 editProduct. */}
@@ -1832,9 +1868,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         type="button"
                         disabled={bcPinBusy}
                         onClick={() => void clearBroadcastPin()}
-                        title="고정을 풀고 다시 자동 순환합니다"
+                        title="소개를 끝내고 방송 화면을 다시 자동 순환으로"
                         style={{ flexShrink: 0, fontSize: "11px", fontWeight: 900, color: "#fff", background: "var(--color-rose-deep)", border: "1px solid var(--color-rose-deep)", borderRadius: "8px", padding: "6px 8px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcPinBusy ? 0.6 : 1 }}
-                      >{bcPinBusy ? "해제중…" : "📌 해제"}</button>
+                      >{bcPinBusy ? "정리 중…" : "소개 끝"}</button>
                     </div>
                   </div>
                 );
@@ -1883,11 +1919,13 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             <span onClick={(e) => { e.stopPropagation(); if (img) setLightbox(img); }} style={{ width: "48px", height: "48px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: img ? "zoom-in" : "default" }}>{img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}</span>
                             <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div><div style={{ fontSize: "11px", fontWeight: 800, color: isBrandFolder ? "var(--color-ink-soft)" : "var(--color-rose-deep)", marginTop: "2px" }}>{isBrandFolder ? `브랜드 그룹 · 세부상품 ${allDetails.length}개` : productPriceLabel(p)}</div></div>
                             {isBrandFolder && !bcCopyMode ? <button type="button" onClick={(e) => { e.stopPropagation(); setBcExpanded((prev) => { const next = new Set(prev); if (next.has(pid)) next.delete(pid); else next.add(pid); return next; }); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}>{expanded ? "접기" : "세부상품"}</button> : null}
-                            {!isBrandFolder && !bcCopyMode ? <><button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void broadcastOneClick(p); }} title="고정·채팅 현재상품·문구 복사" style={{ flexShrink: 0, fontSize: "11px", fontWeight: 900, borderRadius: "8px", padding: "6px 8px", cursor: bcPinBusy ? "wait" : "pointer", color: "var(--color-ink)", background: "var(--color-surface)", border: "1px solid var(--color-line)" }}>방송</button><button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void pinBroadcastProduct(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, borderRadius: "8px", padding: "6px 8px", cursor: bcPinBusy ? "wait" : "pointer", color: parentPinned ? "#fff" : "var(--color-ink-soft)", background: parentPinned ? "var(--color-rose-deep)" : "var(--color-surface-2)", border: `1px solid ${parentPinned ? "var(--color-rose-deep)" : "var(--color-line)"}` }}>{parentPinned ? "📌 고정중" : "📌 고정"}</button><button type="button" onClick={(e) => { e.stopPropagation(); void setChatCurrentAndCopy(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}>채팅</button></> : null}
-                            <button type="button" onClick={(e) => { e.stopPropagation(); editProduct(p); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}>수정</button>
-                            <button type="button" disabled={bcBusy} onClick={(e) => { e.stopPropagation(); void removeBcProduct(pid); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "6px 8px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcBusy ? 0.6 : 1 }}>빼기</button>
+                            {/* [2026-10-21 a2-6] 줄 버튼 = [소개/소개 중][숨기기/보이기][수정][빼기]. 「방송」(고정+채팅 현재상품+안내문 복사)=소개, 📌고정·채팅 단독 버튼은 소개에 포함돼 뺌. 핸들러는 기존 그대로. */}
+                            {!isBrandFolder && !bcCopyMode ? <button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void broadcastOneClick(p); }} title="방송 화면에 이 상품만 띄우고 안내문을 복사" style={parentPinned ? rowBtnPrimary : rowBtn}>{parentPinned ? "소개 중" : "소개"}</button> : null}
+                            {!bcCopyMode ? <button type="button" disabled={hideBusyId === pid || !canToggleHidden(p)} onClick={(e) => { e.stopPropagation(); void toggleProductHidden(p); }} title={isProductHidden(p) ? "손님 화면에 다시 보이기" : "손님 화면 전체에서 숨기기(이 목록엔 남음)"} style={rowBtn}>{isProductHidden(p) ? "보이기" : "숨기기"}</button> : null}
+                            <button type="button" onClick={(e) => { e.stopPropagation(); editProduct(p); }} style={rowBtn}>수정</button>
+                            <button type="button" disabled={bcBusy} onClick={(e) => { e.stopPropagation(); void removeBcProduct(pid); }} title="이 방송 목록에서만 뺌(상품은 남음)" style={{ ...rowBtnDanger, opacity: bcBusy ? 0.6 : 1 }}>빼기</button>
                           </div>
-                          {isBrandFolder && expanded ? <div style={{ borderTop: "1px solid var(--color-line)", padding: "8px", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", gap: "6px" }}>{detailRows.filter((detail) => bcCopyMode || !isBroadcastPinned(pid, detail.detailName)).map((detail) => { const pinned=isBroadcastPinned(pid,detail.detailName); const optionText=[detail.colors.length?`색상 ${detail.colors.join(",")}`:"",detail.sizes.length?`사이즈 ${detail.sizes.join(",")}`:""].filter(Boolean).join(" · ")||"옵션 없음"; return <div key={broadcastPinKey(pid,detail.detailName)} style={{ display:"grid",gridTemplateColumns:"44px minmax(0,1fr) auto auto auto auto",gap:"8px",alignItems:"center",border:pinned?"2px solid var(--color-rose-deep)":"1px solid var(--color-line)",borderRadius:"8px",padding:"8px",background:pinned?"var(--color-rose-soft)":"var(--color-surface)" }}><button type="button" onClick={()=>detail.image&&setLightbox(detail.image)} style={{width:42,height:42,border:0,borderRadius:7,overflow:"hidden",padding:0,background:"var(--color-surface-2)"}}>{detail.image?<img src={detail.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:null}</button><div style={{minWidth:0}}><div style={{fontSize:"12px",fontWeight:900,color:"var(--color-ink)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{detail.detailName}</div><div style={{fontSize:"11px",fontWeight:800,color:"var(--color-rose-deep)",marginTop:2}}>{detail.price.toLocaleString("ko-KR")}원</div><div style={{fontSize:"11px",fontWeight:700,color:"var(--color-ink-soft)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{optionText}{detail.stockManaged&&detail.stock!==null?` · 재고 ${detail.stock}`:""}</div></div><button type="button" disabled={bcPinBusy} onClick={()=>void broadcastOneClick(p,detail)} title="고정·채팅 현재상품·문구 복사" style={{fontSize:"11px",fontWeight:900,borderRadius:6,padding:"6px 8px",color:"var(--color-ink)",background:"var(--color-surface)",border:"1px solid var(--color-line)"}}>방송</button><button type="button" disabled={bcPinBusy} onClick={()=>void pinBroadcastProduct(p,detail)} style={{fontSize:"11px",fontWeight:900,borderRadius:6,padding:"6px 8px",color:pinned?"#fff":"var(--color-ink-soft)",background:pinned?"var(--color-rose-deep)":"var(--color-surface-2)",border:`1px solid ${pinned?"var(--color-rose-deep)":"var(--color-line)"}`}}>{pinned?"고정중":"고정"}</button><button type="button" aria-label={`${detail.detailName} 수정`} onClick={(event)=>{event.stopPropagation();editProduct(p,detail.detailName);}} style={{fontSize:"11px",fontWeight:900,color:"var(--color-rose-deep)",background:"var(--color-rose-soft)",border:"1px solid var(--color-rose-line)",borderRadius:6,padding:"6px 8px",cursor:"pointer"}}>수정</button><button type="button" onClick={()=>void setChatCurrentAndCopy(p,detail)} style={{fontSize:"11px",fontWeight:900,color:"var(--color-ink-soft)",background:"var(--color-surface-2)",border:"1px solid var(--color-line)",borderRadius:6,padding:"6px 8px"}}>채팅</button></div>})}{detailRows.length>0&&detailRows.filter((detail)=>bcCopyMode||!isBroadcastPinned(pid,detail.detailName)).length===0?<div style={{padding:"8px",textAlign:"center",fontSize:"11px",fontWeight:700,color:"var(--color-ink-mute)"}}>고정 중인 상품이라 맨 위 카드에 있습니다.</div>:null}</div> : null}
+                          {isBrandFolder && expanded ? <div style={{ borderTop: "1px solid var(--color-line)", padding: "8px", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", gap: "6px" }}>{detailRows.filter((detail) => bcCopyMode || !isBroadcastPinned(pid, detail.detailName)).map((detail) => { const pinned=isBroadcastPinned(pid,detail.detailName); const optionText=[detail.colors.length?`색상 ${detail.colors.join(",")}`:"",detail.sizes.length?`사이즈 ${detail.sizes.join(",")}`:""].filter(Boolean).join(" · ")||"옵션 없음"; return <div key={broadcastPinKey(pid,detail.detailName)} style={{ display:"grid",gridTemplateColumns:"44px minmax(0,1fr) auto auto",gap:"8px",alignItems:"center",border:pinned?"2px solid var(--color-rose-deep)":"1px solid var(--color-line)",borderRadius:"8px",padding:"8px",background:pinned?"var(--color-rose-soft)":"var(--color-surface)" }}><button type="button" onClick={()=>detail.image&&setLightbox(detail.image)} style={{width:42,height:42,border:0,borderRadius:7,overflow:"hidden",padding:0,background:"var(--color-surface-2)"}}>{detail.image?<img src={detail.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:null}</button><div style={{minWidth:0}}><div style={{fontSize:"12px",fontWeight:900,color:"var(--color-ink)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{detail.detailName}</div><div style={{fontSize:"11px",fontWeight:800,color:"var(--color-rose-deep)",marginTop:2}}>{detail.price.toLocaleString("ko-KR")}원</div><div style={{fontSize:"11px",fontWeight:700,color:"var(--color-ink-soft)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{optionText}{detail.stockManaged&&detail.stock!==null?` · 재고 ${detail.stock}`:""}</div></div><button type="button" disabled={bcPinBusy} onClick={()=>void broadcastOneClick(p,detail)} title="방송 화면에 이 상품만 띄우고 안내문을 복사" style={pinned?rowBtnPrimary:rowBtn}>{pinned?"소개 중":"소개"}</button><button type="button" aria-label={`${detail.detailName} 수정`} onClick={(event)=>{event.stopPropagation();editProduct(p,detail.detailName);}} style={rowBtn}>수정</button></div>})}{detailRows.length>0&&detailRows.filter((detail)=>bcCopyMode||!isBroadcastPinned(pid,detail.detailName)).length===0?<div style={{padding:"8px",textAlign:"center",fontSize:"11px",fontWeight:700,color:"var(--color-ink-mute)"}}>고정 중인 상품이라 맨 위 카드에 있습니다.</div>:null}</div> : null}
                         </div>
                       );
                     })}
@@ -1899,7 +1937,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         ) : tab === "shop" ? (
           <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "12px 16px 16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)" }}>🛍 쇼핑몰 진열 {shopRows.length}개</span>
+              <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)" }}>쇼핑몰 상품 {shopRows.length}개</span>
               {shopRows.length > 0 ? (
                 <select
                   value={shopSort}
@@ -1910,7 +1948,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   {PRODUCT_SORT_OPTIONS.map((o) => (<option key={o.key} value={o.key}>{o.label}</option>))}
                 </select>
               ) : null}
-              <button type="button" disabled={shopBusy} onClick={openShopPicker} style={{ marginLeft: shopRows.length > 0 ? undefined : "auto", height: "36px", fontSize: "13px", fontWeight: 700, color: "#fff", background: "var(--color-ink)", border: "none", borderRadius: "8px", padding: "0 12px", cursor: shopBusy ? "wait" : "pointer", opacity: shopBusy ? 0.5 : 1 }}>+ 진열</button>
+              <button type="button" disabled={shopBusy} onClick={openShopPicker} style={{ marginLeft: shopRows.length > 0 ? undefined : "auto", height: "36px", fontSize: "13px", fontWeight: 700, color: "#fff", background: "var(--color-ink)", border: "none", borderRadius: "8px", padding: "0 12px", cursor: shopBusy ? "wait" : "pointer", opacity: shopBusy ? 0.5 : 1 }}>+ 담기</button>
             </div>
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="상품명 검색" style={{ width: "100%", height: "34px", padding: "0 8px", margin: "0 0 8px", borderRadius: "8px", border: "1px solid var(--color-line)", fontSize: "13px", boxSizing: "border-box", color: "var(--color-ink)", fontWeight: 700 }} />
             <div
@@ -1953,8 +1991,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)", marginTop: "2px" }}>{productPriceLabel(p)}</div>
                           {productCategory(p) ? <span style={{ display: "inline-block", marginTop: "4px", fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "8px", background: "var(--color-surface-3)", color: "var(--color-ink-soft)" }}>{productCategory(p)}</span> : null}
                         </div>
-                        <button type="button" onClick={() => editProduct(p)} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}>수정</button>
-                        <button type="button" disabled={shopBusy} onClick={() => void removeFromShop(pid)} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-danger-tx)", background: "var(--color-danger-bg)", border: "none", borderRadius: "8px", padding: "6px 8px", cursor: shopBusy ? "wait" : "pointer", opacity: shopBusy ? 0.6 : 1 }}>빼기</button>
+                        <button type="button" disabled={hideBusyId === pid || !canToggleHidden(p)} onClick={() => void toggleProductHidden(p)} title={isProductHidden(p) ? "손님 화면에 다시 보이기" : "손님 화면 전체에서 숨기기(이 목록엔 남음)"} style={rowBtn}>{isProductHidden(p) ? "보이기" : "숨기기"}</button>
+                        <button type="button" onClick={() => editProduct(p)} style={rowBtn}>수정</button>
+                        <button type="button" disabled={shopBusy} onClick={() => void removeFromShop(pid)} title="쇼핑몰 목록에서만 뺌(상품은 남음)" style={{ ...rowBtnDanger, opacity: shopBusy ? 0.6 : 1 }}>빼기</button>
                       </div>
                     );
                   })}
@@ -2020,7 +2059,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     const widgetStyle: React.CSSProperties = state === "rotating"
                       ? { background: "var(--color-rose-soft)", color: "var(--color-rose-deep)", border: "1px solid var(--color-rose-line)" }
                       : { background: "var(--color-rose-deep)", color: "#fff", border: "none" };
-                    const widgetText = state === "rotating" ? "▶ 순환 해제" : "▶ 순환 추가";
+                    const widgetText = state === "rotating" ? "방송에서 빼기" : "+ 방송에 담기";
                     const normalizedQuery = normalizeProductSearchText(search);
                     const parentNameMatched = normalizedQuery ? productSearchMatches(productName(p), normalizedQuery) : false;
                     const linkedDetails = (brandCatalog.detailsByParent.get(id) ?? []).filter(detail => 'sourceProductId' in detail);
@@ -2225,7 +2264,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 {copied ? "복사됐어요!" : "🔗 위젯 주소 복사"}
               </button>
               <button type="button" disabled={wsSaving || wsSelected.size === 0} onClick={wsConfirm} style={{ flex: 1, height: "38px", borderRadius: "8px", fontSize: "12px", fontWeight: 800, cursor: wsSaving || wsSelected.size === 0 ? "default" : "pointer", border: "none", background: wsSaving || wsSelected.size === 0 ? "var(--color-rose-line)" : "var(--color-rose-deep)", color: "#fff" }}>
-                {wsSaving ? "처리중…" : `선택 ${wsSelected.size}개 순환 담기`}
+                {wsSaving ? "처리중…" : `선택 ${wsSelected.size}개 방송에 담기`}
               </button>
             </div>
           </div>
@@ -2378,7 +2417,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
           <div style={{ width: "520px", maxWidth: "100%", height: "600px", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "12px", overflow: "hidden" }}>
             {/* 헤더 */}
             <div style={{ display: "flex", alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--color-line)" }}>
-              <span style={{ fontSize: "16px", fontWeight: 700, color: "var(--color-ink)" }}>쇼핑몰에 진열</span>
+              <span style={{ fontSize: "16px", fontWeight: 700, color: "var(--color-ink)" }}>쇼핑몰에 담기</span>
               <button type="button" onClick={() => setShopPickerOpen(false)} style={{ marginLeft: "auto", border: "none", background: "none", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>✕</button>
             </div>
             {/* 검색 */}
@@ -2425,7 +2464,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             {/* 푸터 */}
             <div style={{ display: "flex", gap: "8px", padding: "12px 16px", borderTop: "1px solid var(--color-line)" }}>
               <button type="button" onClick={() => setShopPickerOpen(false)} style={{ flex: 1, height: "40px", borderRadius: "8px", fontSize: "14px", fontWeight: 700, color: "var(--color-ink)", background: "var(--color-surface)", border: "1px solid var(--color-line)", cursor: "pointer" }}>닫기</button>
-              <button type="button" disabled={shopPickerSel.size === 0 || shopBusy} onClick={() => void confirmShopPick()} style={{ flex: 1, height: "40px", borderRadius: "8px", fontSize: "14px", fontWeight: 700, color: "#fff", background: "var(--color-ink)", border: "none", cursor: shopPickerSel.size === 0 || shopBusy ? "not-allowed" : "pointer", opacity: shopPickerSel.size === 0 || shopBusy ? 0.5 : 1 }}>{shopBusy ? "진열 중…" : `${shopPickerSel.size}개 진열`}</button>
+              <button type="button" disabled={shopPickerSel.size === 0 || shopBusy} onClick={() => void confirmShopPick()} style={{ flex: 1, height: "40px", borderRadius: "8px", fontSize: "14px", fontWeight: 700, color: "#fff", background: "var(--color-ink)", border: "none", cursor: shopPickerSel.size === 0 || shopBusy ? "not-allowed" : "pointer", opacity: shopPickerSel.size === 0 || shopBusy ? 0.5 : 1 }}>{shopBusy ? "담는 중…" : `${shopPickerSel.size}개 담기`}</button>
             </div>
           </div>
         </div>
