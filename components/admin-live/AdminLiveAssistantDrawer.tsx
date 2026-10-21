@@ -209,7 +209,7 @@ export default function AdminLiveAssistantDrawer({
                       {p.blocked ? <span className="inline-flex h-6 items-center rounded-lg bg-danger-bg px-2 text-[12px] font-semibold text-danger-tx">차단</span> : null}
                     </div>
                     <div className="mt-0.5 text-[12px] text-ink-mute tabular-nums">
-                      {[p.phone, p.lastOrderAt ? `마지막 주문 ${dateLabel(p.lastOrderAt)}` : "주문 없음", `주문 ${p.orderCount}건`].filter(Boolean).join(" · ")}
+                      {[p.phone, p.lastOrderAt ? `마지막 주문 ${dateLabel(p.lastOrderAt)} · 주문 ${p.orderCount}건` : "이 기간 주문 없음"].filter(Boolean).join(" · ")}
                       {p.matchedValue && p.matchedValue !== p.nickname && p.matchedValue !== p.name ? ` · ${p.matchedLabel} ${p.matchedValue}` : ""}
                     </div>
                   </div>

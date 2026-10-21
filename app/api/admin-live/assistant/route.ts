@@ -43,32 +43,47 @@ const INTENT_PROMPT = `너는 쇼핑몰 관리자의 검색 요청을 해석한�
 이름·상품명은 사장님이 쓴 글자를 고치지 말고 그대로 옮긴다(오타도 그대로). 설명 없이 JSON 하나만.
 사장님 문장: `;
 
+// AI 가 안 될 때 이유(화면 디버그용·비밀값 없음): no_key / http_400 / empty / bad_json / timeout …
+let lastAiNote = "";
+
 async function askGemini(text: string): Promise<AssistantIntent | null> {
+  lastAiNote = "";
   const key = process.env.GEMINI_API_KEY || "";
-  if (!key) return null;
+  if (!key) { lastAiNote = "no_key"; return null; }
   const models = [process.env.GEMINI_MODEL, "gemini-flash-latest", "gemini-2.5-flash"].filter(Boolean) as string[];
+  // 2.5 계열은 «생각» 토큰을 먼저 써서 짧은 한도면 답 글자가 비어 온다 → 생각 끄기(thinkingBudget 0) 먼저,
+  //   그 설정을 모르는 모델(400)이면 설정 없이 한 번 더.
+  const configs = [
+    { temperature: 0, responseMimeType: "application/json", maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } },
+    { temperature: 0, responseMimeType: "application/json", maxOutputTokens: 2048 },
+  ];
   for (const model of models) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 7000);
-    try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: INTENT_PROMPT + text }] }],
-          generationConfig: { temperature: 0, responseMimeType: "application/json", maxOutputTokens: 200 },
-        }),
-        signal: controller.signal,
-      });
-      if (res.status === 404) continue; // 모델 이름이 없으면 다음 이름으로
-      if (!res.ok) return null;
-      const data = await res.json().catch(() => null);
-      const out = data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p?.text || "").join("") || "";
-      return parseIntentJson(out);
-    } catch {
-      return null;
-    } finally {
-      clearTimeout(timer);
+    for (const generationConfig of configs) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+          body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: INTENT_PROMPT + text }] }], generationConfig }),
+          signal: controller.signal,
+        });
+        if (res.status === 404) { lastAiNote = `${model}:404`; break; } // 모델 이름이 없으면 다음 이름으로
+        if (res.status === 400) { lastAiNote = `${model}:400`; continue; } // 설정을 모르면 설정 없이 다시
+        if (!res.ok) { lastAiNote = `${model}:http_${res.status}`; return null; } // 429(한도) 등은 규칙 해석으로
+        const data = await res.json().catch(() => null);
+        const out = data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p?.text || "").join("") || "";
+        if (!out) { lastAiNote = `${model}:empty_${data?.candidates?.[0]?.finishReason || "none"}`; continue; }
+        const parsed = parseIntentJson(out);
+        if (!parsed) { lastAiNote = `${model}:bad_json`; return null; }
+        lastAiNote = model;
+        return parsed;
+      } catch (e) {
+        lastAiNote = `${model}:${e instanceof Error && e.name === "AbortError" ? "timeout" : "fetch_error"}`;
+        return null;
+      } finally {
+        clearTimeout(timer);
+      }
     }
   }
   return null;
@@ -258,7 +273,7 @@ async function searchCustomers(supabase: SupabaseClient, query: string, sinceIso
       kind: m.kind,
       matchedLabel: m.label,
       matchedValue: m.value,
-      lastOrderAt: c.last_order_at,
+      lastOrderAt: null, // customers.last_order_at 은 주문이 없어도 찍혀 있는 손님이 있어(10/22 실측) 쓰지 않고 실제 주문으로만
       groupIds: prev?.groupIds || [],
       rowIdsByGroup: prev?.rowIdsByGroup || new Map(),
     });
@@ -289,7 +304,7 @@ async function searchCustomers(supabase: SupabaseClient, query: string, sinceIso
       kind: m.kind,
       matchedLabel: m.label,
       matchedValue: m.value,
-      lastOrderAt: prev?.lastOrderAt || c?.last_order_at || null,
+      lastOrderAt: null,
       groupIds: [],
       rowIdsByGroup: new Map(),
     });
@@ -309,7 +324,7 @@ async function searchCustomers(supabase: SupabaseClient, query: string, sinceIso
     p.groupIds = ids;
     p.rowIdsByGroup = rows;
     const latest = list[0]?.created_at || null;
-    if (latest && (!p.lastOrderAt || latest > p.lastOrderAt)) p.lastOrderAt = latest;
+    p.lastOrderAt = latest;
   }
 
   const sorted = [...people.values()].sort((a, b) => {
@@ -462,7 +477,7 @@ export async function POST(request: NextRequest) {
     else intent = parseIntentByRule(text);
   }
   if (intent.intent === "unknown") {
-    return NextResponse.json({ ok: true, via, intent, kind: "unknown" });
+    return NextResponse.json({ ok: true, via, ai: lastAiNote, intent, kind: "unknown" });
   }
 
   try {
@@ -470,10 +485,10 @@ export async function POST(request: NextRequest) {
     const sinceIso = rangeStartIso(range);
     if (intent.intent === "customer") {
       const result = await searchCustomers(supabase, intent.name, sinceIso);
-      return NextResponse.json({ ok: true, via, intent, range, kind: "customer", ...result });
+      return NextResponse.json({ ok: true, via, ai: lastAiNote, intent, range, kind: "customer", ...result });
     }
     const result = await searchProducts(supabase, intent.product, sinceIso);
-    return NextResponse.json({ ok: true, via, intent, range, kind: "product", ...result });
+    return NextResponse.json({ ok: true, via, ai: lastAiNote, intent, range, kind: "product", ...result });
   } catch (error) {
     return NextResponse.json({ ok: false, message: error instanceof Error ? error.message : "찾기 실패" }, { status: 500 });
   }

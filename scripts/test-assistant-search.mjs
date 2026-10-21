@@ -63,6 +63,7 @@ t('AI 없이 해석', () => {
   assert.equal(parseIntentByRule('폴로자켓 상품 챙기기').intent, 'product');
   assert.equal(parseIntentByRule('폴로자켓 상품 챙기기').product, '폴로자켓');
   assert.equal(parseIntentByRule('  ').intent, 'unknown');
+  assert.deepEqual(parseIntentByRule('폴로 누가 샀어?'), { intent: 'product', name: '', product: '폴로' });
 });
 
 t('AI 응답 읽기', () => {
