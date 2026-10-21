@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     const now = Date.now();
     const { masked, restore } = maskSensitive(text);
     const ai = await callGeminiJson(organizePrompt(masked, now), { timeoutMs: 8000, maxTokens: 1500 });
-    let items: MemoItem[] | null = ai.text ? parseOrganizeJson(ai.text, restore) : null;
+    let items: MemoItem[] | null = ai.text ? parseOrganizeJson(ai.text, restore, now) : null;
     const organizedBy = items ? "ai" : "rule";
     if (!items) items = organizeByRule(text, now);
 

@@ -80,7 +80,10 @@ export function organizeByRule(text: string, nowMs: number): MemoItem[] {
 }
 
 /** AI 가 돌려준 JSON 검사 — 정해진 모양만 통과. 이상하면 null */
-export function parseOrganizeJson(text: string, restore: (s: string) => string = (s) => s): MemoItem[] | null {
+// AI 가 상품 칸에 «일» 이름을 넣는 경우(실측: 「교환」) — 상품 이름이 아니면 버린다
+const NOT_PRODUCT = /^(교환|반품|환불|택배|배송|발송|재고|주문|입고|연락|문의|입금|결제|사이즈|색상|옵션)$/;
+
+export function parseOrganizeJson(text: string, restore: (s: string) => string = (s) => s, nowMs: number = Date.now()): MemoItem[] | null {
   try {
     const body = String(text ?? "").replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
     const obj = JSON.parse(body) as { items?: unknown };
@@ -92,9 +95,11 @@ export function parseOrganizeJson(text: string, restore: (s: string) => string =
       const kind = MEMO_KINDS.includes(r.kind as MemoKind) ? (r.kind as MemoKind) : "note";
       const text = restore(String(r.text ?? r.body ?? "").trim()).slice(0, 300);
       if (!text) continue;
-      const due = /^\d{4}-\d{2}-\d{2}$/.test(String(r.due ?? r.due_date ?? "")) ? String(r.due ?? r.due_date) : null;
+      // 날짜는 AI 계산을 믿지 않는다(실측: 「금요일」을 하루 틀림) — 그 줄 글자에서 우리 규칙으로 계산
+      const due = parseDueWords(text, nowMs);
       const who = restore(String(r.who ?? "").trim()).slice(0, 40) || null;
-      const product = restore(String(r.product ?? "").trim()).slice(0, 60) || null;
+      const productRaw = restore(String(r.product ?? "").trim()).slice(0, 60);
+      const product = productRaw && !NOT_PRODUCT.test(productRaw) ? productRaw : null;
       items.push({ kind, body: text, due_date: due, who, product });
     }
     return items.length ? items : null;
@@ -109,7 +114,8 @@ export function organizePrompt(maskedText: string, nowMs: number): string {
   return `너는 쇼핑몰 사장님의 메모 정리 비서다. 아래 메모를 짧은 줄로 나눠 JSON 으로만 답한다.
 모양: {"items":[{"kind":"todo|customer|product|note","text":"한 줄 요약(사장님 말투 그대로, 50자 안)","due":"YYYY-MM-DD 또는 빈칸","who":"손님 이름·닉네임 또는 빈칸","product":"상품 이름 또는 빈칸"}]}
 - todo = 해야 할 일(연락·발송·확인·주문 등), customer = 손님에 대한 정보·부탁, product = 상품·재고·입고, note = 그냥 기억할 것
-- 날짜 말(오늘·내일·금요일·10월 25일)은 due 로. 오늘은 ${today}(${dow}).
+- 날짜 말(오늘·내일·금요일·10월 25일)은 text 안에 그대로 남길 것(due 는 빈칸으로 둬도 됨). 오늘은 ${today}(${dow}).
+- product 는 상품 이름만(교환·반품·택배 같은 일 이름은 넣지 말 것).
 - 없는 내용을 만들지 말 것. [번호1] 같은 자리표는 그대로 둘 것. 설명 없이 JSON 하나만.
 메모:
 ${maskedText}`;

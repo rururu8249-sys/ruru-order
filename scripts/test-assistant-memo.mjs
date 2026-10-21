@@ -81,9 +81,11 @@ await t('규칙 정리(AI 없이)', () => {
 
 await t('AI 응답 검사(정해진 모양만)', () => {
   const restore = lib.maskSensitive('010-1111-2222').restore;
-  const items = lib.parseOrganizeJson('{"items":[{"kind":"todo","text":"[번호1] 로 교환 연락","due":"2026-10-23","who":"홍길동","product":""},{"kind":"hack","text":"x"},{"kind":"note","text":""}]}', restore);
+  const items = lib.parseOrganizeJson('{"items":[{"kind":"todo","text":"[번호1] 로 내일 교환 연락","due":"2026-10-30","who":"홍길동","product":"교환"},{"kind":"hack","text":"x"},{"kind":"note","text":""}]}', restore, NOW);
   assert.equal(items.length, 2);
-  assert.equal(items[0].body, '010-1111-2222 로 교환 연락');
+  assert.equal(items[0].body, '010-1111-2222 로 내일 교환 연락');
+  assert.equal(items[0].due_date, '2026-10-23'); // AI 가 준 날짜(10-30) 대신 글자 「내일」로 계산
+  assert.equal(items[0].product, null); // 「교환」은 상품 이름 아님
   assert.equal(items[0].who, '홍길동');
   assert.equal(items[1].kind, 'note'); // 모르는 kind → 기억할 것
   assert.equal(lib.parseOrganizeJson('엉망'), null);
