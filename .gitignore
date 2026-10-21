@@ -59,3 +59,8 @@ _cowork_tmp/
 
 # Cowork(Claude) 가 내려준 결과물 폴더 — 저장소에 안 올린다
 /Claude outputs/
+
+# 클로드 스킬(작업 매뉴얼)은 공유 — 2026-10-22
+!.claude/
+.claude/*
+!.claude/skills/
