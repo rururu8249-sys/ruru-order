@@ -50,6 +50,7 @@ const INTENT_PROMPT = `너는 쇼핑몰 관리자의 검색 요청을 해석한�
   · top_products = 뭐가 잘 나갔는지/많이 팔린 상품, top_buyers = 누가 많이 샀는지, top_days = 어느 날(날짜·방송)에 제일 많이 팔렸는지/매출 많이 나온 날, bottom_days = 매출 제일 적었던 날/안 팔린 날, summary = 매출·주문 수·미입금(순위 아님)
   · 기간: today(오늘) yesterday(어제) last_7_days(최근 일주일) this_week(이번 주) last_week(지난주) this_month(이번 달) last_month(지난달) last_3_months(최근 3개월) last_broadcast(지난·최근·어제 방송) date(특정 날짜, date 칸에 날짜) all(전체·지금까지). 기간 말이 없거나 「이 기간」처럼 가리키기만 하면 period 는 빈칸 "".
   · 오늘 날짜(한국): {{TODAY}}
+- 그 외 판매·매출·방송·손님 흐름을 «비교·분석·이유·추천·요약»해 달라는 말(예: 주말이 평일보다 잘 팔려?, 왜 줄었어?, 다음 방송 뭐 팔까?, 이번 달 정리해 줘)이면 {"intent":"chat","name":"","product":""} — 손님 한 명을 찾는 게 아니면 customer 로 보내지 말 것
 - 모르겠으면 {"intent":"unknown","name":"","product":""}
 이름·상품명은 사장님이 쓴 글자를 고치지 말고 그대로 옮긴다(오타도 그대로). 단 이름 뒤 조사·호칭(이라는, 님, 씨, 이/가/은/는)과 날짜·「챙길」 같은 말은 뺀다. 설명 없이 JSON 하나만.
 사장님 문장: `;
@@ -463,6 +464,7 @@ export async function POST(request: NextRequest) {
     const ai = await askGemini(text);
     if (ai && ai.intent !== "unknown") { intent = ai; via = "ai"; }
     else if (ai && ai.intent === "unknown" && looksLikeChatQuestion(text)) intent = ai; // [AI-7] AI 가 「찾기 아님」이라 했고 질문 같으면 → 자유 질문(아래)
+    else if (ai && ai.intent === "chat") { intent = ai; via = "ai"; }
     else intent = parseIntentByRule(text);
   }
   const history: ChatTurn[] = Array.isArray(body?.history)
@@ -485,8 +487,8 @@ export async function POST(request: NextRequest) {
     return { answer: parseChatJson(out), periodLabel: period.label, snapshot, period, sales };
   }
 
-  if (intent.intent === "unknown") {
-    if (looksLikeChatQuestion(text)) {
+  if (intent.intent === "unknown" || intent.intent === "chat") {
+    if (intent.intent === "chat" || looksLikeChatQuestion(text)) {
       try {
         const r = await chatAnswer(getSupabaseAdminClient());
         if (r.answer) return NextResponse.json({ ok: true, via: "ai", ai: lastAiNote, intent, kind: "chat", answer: r.answer, periodLabel: r.periodLabel });

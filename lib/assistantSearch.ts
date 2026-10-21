@@ -182,7 +182,7 @@ export function maskPhone(value: unknown): string {
 }
 
 export type AssistantIntent = {
-  intent: "customer" | "product" | "stats" | "unknown";
+  intent: "customer" | "product" | "stats" | "chat" | "unknown";
   /** 찾을 손님 이름/닉네임 */
   name: string;
   /** 찾을 상품 이름 */
@@ -223,7 +223,7 @@ export function parseIntentJson(text: string): AssistantIntent | null {
   try {
     const body = String(text ?? "").replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
     const obj = JSON.parse(body) as Partial<AssistantIntent>;
-    const intent = obj.intent === "customer" || obj.intent === "product" || obj.intent === "stats" ? obj.intent : "unknown";
+    const intent = obj.intent === "customer" || obj.intent === "product" || obj.intent === "stats" || obj.intent === "chat" ? obj.intent : "unknown";
     const name = String(obj.name ?? "").trim().slice(0, 40);
     const product = String(obj.product ?? "").trim().slice(0, 60);
     if (intent === "stats") {
@@ -235,6 +235,7 @@ export function parseIntentJson(text: string): AssistantIntent | null {
       if (period === "date" && !date) return null;
       return { intent, name: "", product: "", stat: obj.stat as StatKind, ...(period ? { period } : {}), ...(date ? { date } : {}) };
     }
+    if (intent === "chat") return { intent, name: "", product: "" };
     if (intent === "customer" && !name) return null;
     if (intent === "product" && !product) return null;
     return { intent, name, product };
