@@ -18,12 +18,15 @@ let tree;
 await act(async()=>{tree=Renderer.create(React.createElement(Panel,{embedded:true,initialTab:'broadcast',activeBroadcastId:42,initialSearch:'NEW',onClose(){}}));});
 assert.equal(tree.root.findAllByProps({'aria-label':'NEW 수정'}).length,1,'search must find linked detail through broadcast-contained brand');
 const row=tree.root.findByProps({'aria-label':'NEW 수정'}).parent;
-await act(async()=>row.findAllByType('button').find(button=>button.children.includes('📌 고정')).props.onClick());
+// [2026-10-21 a2-6/a2-10] 「📌 고정」·「채팅」 단독 버튼은 「소개」 하나(고정 + 채팅 현재상품 + 안내문 복사)로 합쳐짐.
+await act(async()=>row.findAllByType('button').find(button=>button.children.includes('소개')).props.onClick());
 const pin=writes.find(write=>write.values?.widget_pin_mode==='pin');
 assert.deepEqual(pin.values,{widget_pin_mode:'pin',widget_pin_product_id:'2',widget_pin_detail_name:null});
-const pinnedChat=tree.root.findAllByType('button').find(button=>button.children.includes('채팅'));
-await act(async()=>pinnedChat.props.onClick());
 assert.deepEqual(chat,{productId:'2',productName:'NEW',detailName:''});
+// [a2-10] 소개 중인 세부 줄은 목록에 남고(08-29 「목록에서 뺀다」 대체) 「소개 중」 배지 + 「소개 끝」 버튼
+const pinnedRow=tree.root.findByProps({'aria-label':'NEW 수정'}).parent;
+assert.ok(pinnedRow.findAllByType('span').some(span=>span.children.includes('소개 중')),'pinned detail row shows 소개 중 badge');
+assert.ok(pinnedRow.findAllByType('button').some(button=>button.children.includes('소개 끝')),'pinned detail row offers 소개 끝');
 assert.ok(copied.includes('39,000원'));assert.equal(copied.includes('129,000원'),false);
 await act(async()=>tree.root.findAllByType('button').find(button=>button.children.includes('수정')).props.onClick({stopPropagation(){}}));
 assert.equal(edited.detail.id,2);assert.equal(edited.detail.product_name,'원본 임시');
