@@ -1393,7 +1393,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         <section className="pb-3">
           <div className="flex items-center gap-2">
-            <div className="min-w-0 flex-1 truncate text-[12px] text-ink-mute">
+            <div className="min-w-0 flex-1 text-[12px] leading-4 text-ink-mute">
               {order.orderNo || "주문번호 없음"} · {formatFullDateTime(order.createdAt, orderForView.submittedAt)}
             </div>
             <button
