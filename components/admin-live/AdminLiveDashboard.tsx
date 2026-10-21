@@ -21,7 +21,6 @@ import { primeAdminVoice, playOrderAlert, playDepositAlert } from "@/lib/adminVo
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import AdminLiveCustomersPanel from "./AdminLiveCustomersPanel";
-import AdminLiveNoticePanel from "./AdminLiveNoticePanel";
 import AdminLivePaymentPanel from "./AdminLivePaymentPanel";
 import AdminLiveSideDrawer from "./AdminLiveSideDrawer";
 import { resolveAdminLiveDestination, transitionAdminLiveDrawer, resolveDrawerOrder, type AdminLiveDrawerState } from "./adminLiveDrawerState";
@@ -1888,10 +1887,16 @@ export default function AdminLiveDashboard() {
                 </div>
               ) : null}
 
-              {/* ── 고객 › 쪽지·공지 ── */}
+              {/* ── 옛 「쪽지·공지사항」 주소(?panel=notice) → 설정 › 공지사항 [2026-10-21] ── */}
               {activeMenu === "notice" ? (
                 <div className="w-full">
-                  <AdminLiveNoticePanel mode="messages" />
+                  <AdminLiveSettingsPanel
+                    key="settings-from-notice"
+                    initialTab="notices"
+                    onOpenNotice={() => {}}
+                    onOpenEvent={() => { setActiveMenu("event"); }}
+                    onNavigationGuardChange={registerSettingsGuard}
+                  />
                 </div>
               ) : null}
 

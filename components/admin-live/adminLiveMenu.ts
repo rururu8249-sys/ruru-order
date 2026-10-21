@@ -36,8 +36,8 @@ export const ADMIN_LIVE_TOP_MENUS: AdminLiveTopMenuItem[] = [
   //   화면 키 "broadcast"·sub-tab 정의는 보존(?panel=broadcast 옛 주소 → 주문·입금 + 방송 관리 창).
   { key: "orders", label: "주문·입금", desc: "실시간 주문 · 입금내역 · 정산 · 판매분석 · 이벤트", defaultKey: "orders" },
   { key: "products", label: "상품", desc: "방송 상품 · 쇼핑몰 · 등록", defaultKey: "products" },
-  { key: "customers", label: "고객", desc: "회원 · 고객이슈 · 쪽지·공지사항 · 단골 · 접속 기록 · 계정 잇기", defaultKey: "customers" },
-  { key: "settings", label: "설정", desc: "돈·결제 · 손님 화면 · 방송·알림 · 상점", defaultKey: "settings" },
+  { key: "customers", label: "고객", desc: "회원 · 고객이슈 · 단골 · 접속 기록", defaultKey: "customers" },
+  { key: "settings", label: "설정", desc: "돈·결제 · 손님 화면(공지사항·쪽지) · 방송·알림 · 상점", defaultKey: "settings" },
 ];
 
 export type AdminLiveCustomersTab = "members" | "issues" | "loyalty" | "link";
@@ -63,7 +63,6 @@ export const ADMIN_LIVE_SUB_TABS: Record<AdminLiveTopMenuKey, AdminLiveSubTab[]>
   customers: [
     { key: "customers", label: "회원", custTab: "members" },
     { key: "customers", label: "고객이슈", custTab: "issues" },
-    { key: "notice", label: "쪽지·공지사항" },
     { key: "customers", label: "단골", custTab: "loyalty" },
     { key: "visits", label: "접속 기록" },
     { key: "customers", label: "계정 잇기", custTab: "link" },
@@ -83,7 +82,7 @@ const TOP_MENU_OF: Record<AdminLiveMenuKey, AdminLiveTopMenuKey> = {
   settlement: "orders",
   products: "products",
   customers: "customers",
-  notice: "customers",
+  notice: "settings", // [2026-10-21 사장님] 쪽지·공지사항 → 설정 › 공지사항 / 쪽지
   visits: "customers",
   settings: "settings",
   audit: "settings",

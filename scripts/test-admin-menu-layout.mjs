@@ -18,7 +18,9 @@ assert.equal(menu.topMenuOf('broadcast'),'orders','old ?panel=broadcast must lan
 // [2026-10-21 a3-2] 고객 탭은 같은 화면 키(customers)를 custTab 으로 나눠 쓴다 → 키는 중복 제거해서 비교
 const routes=[...new Set(Object.values(menu.ADMIN_LIVE_SUB_TABS).flat().map(tab=>tab.key))].sort();
 // [2026-10-21 a1-1] chatorder·audit 는 메뉴에서만 숨김(키·주소는 보존)
-assert.deepEqual(routes,menu.ADMIN_LIVE_ALL_MENU_KEYS.filter(key=>!['reports','chatorder','audit'].includes(key)).sort());
+// [2026-10-21] notice(쪽지·공지사항)는 설정 › 공지사항/쪽지 로 옮김 — 키·주소는 보존(설정으로 열림)
+assert.deepEqual(routes,menu.ADMIN_LIVE_ALL_MENU_KEYS.filter(key=>!['reports','chatorder','audit','notice'].includes(key)).sort());
+assert.equal(menu.topMenuOf('notice'),'settings');
 assert.equal(menu.isAdminLiveMenuKey('chatorder'),true);assert.equal(menu.isAdminLiveMenuKey('audit'),true);
 const Sidebar=createUiLoader({'./AdminLiveSidebarPresence':{default:()=>null},'./AdminLiveLogoutButton':{default:()=>null},'./AdminLiveCardPayPopup':{openPayster(){}},'@/lib/useShopInfo':{useShopInfo:()=>({contactType:'channel',contactValue:'https://example.com',adminChatUrl:'',paysterUrl:''})}})('components/admin-live/AdminLiveSidebar.tsx').default;
 let selected,tree;
@@ -34,7 +36,7 @@ const SettingsNav=load('components/admin-live/AdminLiveSettingsNav.tsx').default
 await act(async()=>{tree=Renderer.create(React.createElement(SettingsNav,{activeTab:'shop',onSelect:value=>selected=value}));});
 const mobileSelect=tree.root.findByProps({'aria-label':'설정 항목 선택'});
 assert.equal(mobileSelect.type,'select');
-assert.equal(tree.root.findAllByType('option').length,14,'all destinations remain available on small screens');
+assert.equal(tree.root.findAllByType('option').length,16,'all destinations remain available on small screens'); // +공지사항·쪽지(2026-10-21)
 await act(async()=>mobileSelect.props.onChange({target:{value:'합배송'}}));
 assert.deepEqual(selected,{tab:'combine'});
 await act(async()=>tree.unmount());

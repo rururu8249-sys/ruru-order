@@ -184,16 +184,18 @@ const GLOBAL_SAVE_TABS: SettingsTab[] = ["payment", "point", "order"];
 type AdminLiveSettingsPanelProps = {
   /** [2026-09-07] 「공지·쪽지 열기」 바로가기 — 대시보드가 메뉴를 바꿔 준다 */
   onOpenNotice?: () => void;
+  /** [2026-10-21] 처음 열 화면(예: 옛 「쪽지·공지사항」 주소로 들어오면 공지사항) */
+  initialTab?: SettingsTab;
   /** [2026-09-12] 「이벤트 열기」 바로가기 — 방송 화면 탭에서 이벤트 오버레이 주소를 찾아갈 때 */
   onOpenEvent?: () => void;
   onNavigationGuardChange?: (guard:null|(()=>Promise<boolean>)) => void;
 };
 
-export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNavigationGuardChange }: AdminLiveSettingsPanelProps = {}) {
+export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNavigationGuardChange, initialTab }: AdminLiveSettingsPanelProps = {}) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<SettingsTab>("shop");
-  const [focusSection,setFocusSection]=useState<"bank"|"payster"|undefined>("bank");   // [2026-10-21 a1-5] 설정 첫 화면 = 입금계좌
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab ?? "shop");
+  const [focusSection,setFocusSection]=useState<"bank"|"payster"|undefined>(initialTab && initialTab !== "shop" ? undefined : "bank");   // [2026-10-21 a1-5] 설정 첫 화면 = 입금계좌
   const [childDraft,setChildDraft]=useState<SettingsDraftState|null>(null);
   const [globalDraftState,setGlobalDraftState]=useState<SettingsDraftState|null>(null);
   const [choiceOpen,setChoiceOpen]=useState(false);
@@ -654,10 +656,10 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
                 {onOpenNotice ? (
                   <button
                     type="button"
-                    onClick={onOpenNotice}
-                    className="shrink-0 rounded-xl border border-rose-line bg-rose-soft px-3 py-2 text-xs font-black text-rose-deep transition hover:opacity-90"
+                    onClick={() => void selectDestination({ tab: "notices" })}
+                    className="shrink-0 rounded-lg border border-line bg-surface px-3 py-2 text-[13px] font-semibold text-ink transition hover:bg-surface-2"
                   >
-                    공지·쪽지 열기 ›
+                    공지사항 열기
                   </button>
                 ) : null}
               </div>
@@ -715,6 +717,9 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
 
           {/* [2026-10-21 a1-2] 손님 공지·구매동의 — 공지 패널을 설정 모드로(자체 「공지 저장」 사용, 공통 저장줄 없음) */}
           {activeTab === "notice" && <AdminLiveNoticePanel mode="settings" />}
+          {/* [2026-10-21 사장님] 고객 › 쪽지·공지사항 → 설정 › 공지사항 / 쪽지 로 옮김 */}
+          {activeTab === "notices" && <AdminLiveNoticePanel mode="board" />}
+          {activeTab === "notes" && <AdminLiveNoticePanel mode="notes" />}
 
 
           {/* ── 관리자 보안 (읽기 전용) ── */}

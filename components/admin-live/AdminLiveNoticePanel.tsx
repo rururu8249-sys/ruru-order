@@ -66,7 +66,9 @@ type PanelTab = "customer" | "list" | "send" | "sent";
 //   all      = 예전 그대로 탭 4개
 //   settings = 설정 › 손님 공지·구매동의 (손님 화면 공지 탭 + 저장바만, 탭 줄 없음)
 //   messages = 고객 › 쪽지·공지사항 (공지사항 목록·쪽지 보내기·보낸 쪽지)
-type Props = { mode?: "all" | "settings" | "messages" };
+//   board    = 설정 › 공지사항 (목록 + 새 공지/수정 창) — 2026-10-21 고객 메뉴에서 설정으로 옮김
+//   notes    = 설정 › 쪽지 (쪽지 보내기 · 보낸 쪽지)
+type Props = { mode?: "all" | "settings" | "messages" | "board" | "notes" };
 
 // 쪽지 보낼 손님 검색 결과
 type NoteCustomer = { id: number; youtube_nickname: string | null; customer_name: string | null; customer_phone: string | null };
@@ -97,7 +99,9 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
   const [popupBandUrl, setPopupBandUrl] = useState(DEFAULT_BAND_URL);
   const [purchaseConsent, setPurchaseConsent] = useState<OrderPurchaseConsentConfig>(DEFAULT_ORDER_PURCHASE_CONSENT);
 
-  const [tab, setTab] = useState<PanelTab>(mode === "messages" ? "list" : "customer");
+  const [tab, setTab] = useState<PanelTab>(mode === "messages" || mode === "board" ? "list" : mode === "notes" ? "send" : "customer");
+  // [2026-10-21] 새 공지·수정은 목록 위 창으로 연다(예전: 왼쪽에 늘 떠 있던 입력칸)
+  const [formOpen, setFormOpen] = useState(false);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [form, setForm] = useState<Notice>(EMPTY_NOTICE);
   const [listBusy, setListBusy] = useState(false);
@@ -221,6 +225,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
       }
       showAdminToast(form.id ? "공지를 수정했습니다." : "공지를 등록했습니다.", "success");
       setForm(EMPTY_NOTICE);
+      setFormOpen(false);
       await loadNotices();
     } finally {
       setListBusy(false);
@@ -417,14 +422,14 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* 탭 — 손님에게 보이는 공지 / 공지사항 목록 */}
-      {mode !== "settings" ? (
+      {mode !== "settings" && mode !== "board" ? (
       <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-surface px-3 py-2">
         {([
           { key: "customer", label: "손님 화면 공지", desc: "접속 팝업 · 상시 안내" },
           { key: "list", label: "공지사항", desc: "등록 · 고정 · 순서" },
           { key: "send", label: "쪽지 보내기", desc: "검색 · 여러 명 한 번에" },
           { key: "sent", label: "보낸 쪽지", desc: "읽음 확인 · 회수" },
-        ] as { key: PanelTab; label: string; desc: string }[]).filter((t) => mode !== "messages" || t.key !== "customer").map((t) => (
+        ] as { key: PanelTab; label: string; desc: string }[]).filter((t) => (mode !== "messages" || t.key !== "customer") && (mode !== "notes" || t.key === "send" || t.key === "sent")).map((t) => (
           <button
             key={t.key}
             type="button"
@@ -440,7 +445,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
       ) : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        {tab === "customer" && mode !== "messages" ? (
+        {tab === "customer" && mode !== "messages" && mode !== "board" && mode !== "notes" ? (
         <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
           {/* ─────────── 왼쪽: 입력 ─────────── */}
           <div className="space-y-4">
@@ -664,102 +669,90 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
           </div>
         </div>
         ) : tab === "list" ? (
-        /* ───────── 공지사항 목록 ───────── */
-        <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
-          {/* 쓰기 */}
-          <div className={`${card} lg:sticky lg:top-0 lg:self-start`}>
-            <div className="text-sm font-bold text-ink">{form.id ? "공지 수정" : "새 공지"}</div>
-            <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
-              손님 <b className="text-ink-soft">쪽지함</b>과 <b className="text-ink-soft">공지사항 페이지</b>에 함께 나옵니다.
+        /* ───────── 공지사항 목록 — [2026-10-21] 한 줄 목록 + 「새 공지」 창 ───────── */
+        <div>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <div className="min-w-0">
+              <div className="text-[16px] font-bold text-ink">공지사항 <span className="text-ink-mute">{notices.length}</span></div>
+              <div className="text-[13px] text-ink-mute">손님 쪽지함과 공지사항 페이지에 나와요. 고정한 글이 맨 위.</div>
             </div>
-
-            <label className="mt-3 block">
-              <span className={label}>제목</span>
-              <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="예) 추석 연휴 배송 안내" className={input} />
-            </label>
-
-            <label className="mt-3 block">
-              <span className={label}>내용</span>
-              <textarea
-                value={form.content}
-                onChange={(e) => setForm({ ...form, content: e.target.value })}
-                rows={6}
-                placeholder="줄바꿈 그대로 손님에게 보입니다."
-                className="mt-1 w-full resize-none rounded-xl border border-line bg-surface p-3 text-sm font-bold leading-relaxed text-ink outline-none focus:border-ink"
-              />
-            </label>
-
-            <label className="mt-3 block">
-              <span className={label}>분류</span>
-              <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="공지" className={input} />
-            </label>
-
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setForm({ ...form, is_pinned: !form.is_pinned })}
-                className={`ru-btn ru-btn-sm ${form.is_pinned ? "ru-btn-on" : ""}`}
-              >
-                {form.is_pinned ? "상단 고정" : "고정 안 함"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setForm({ ...form, is_visible: !form.is_visible })}
-                className={`ru-btn ru-btn-sm ${form.is_visible ? "ru-btn-on" : ""}`}
-              >
-                {form.is_visible ? "공개" : "숨김"}
-              </button>
-            </div>
-
-            <div className="mt-3 flex gap-2">
-              <button
-                type="button"
-                onClick={saveNotice}
-                disabled={listBusy}
-                className="ru-btn ru-btn-primary ru-btn-lg flex-1"
-              >
-                {form.id ? "수정 저장" : "공지 등록"}
-              </button>
-              {form.id ? (
-                <button type="button" onClick={() => setForm(EMPTY_NOTICE)} className="rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-bold text-ink-soft">
-                  취소
-                </button>
-              ) : null}
-            </div>
+            <button type="button" onClick={() => { setForm(EMPTY_NOTICE); setFormOpen(true); }}
+              className="ml-auto h-10 rounded-lg bg-ink px-4 text-[14px] font-bold text-white hover:opacity-90">+ 새 공지</button>
           </div>
 
-          {/* 목록 */}
-          <div className="space-y-2">
-            {notices.length === 0 ? (
-              <div className={`${card} py-14 text-center text-sm font-bold text-ink-mute`}>등록된 공지가 없습니다. 위에서 제목·내용을 넣고 「공지 등록」을 눌러주세요.</div>
-            ) : (
-              notices.map((n, i) => (
-                <div key={n.id} className={`rounded-xl border px-4 py-3 ${n.is_visible ? "border-line bg-surface" : "border-line bg-surface-2"}`}>
-                  <div className="flex items-start gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-[14px] font-bold text-ink">{n.title}</span>
-                        {n.is_pinned ? <span className="rounded bg-ink px-1.5 py-0.5 text-[12px] font-semibold text-white">고정</span> : null}
-                        {!n.is_visible ? <span className="rounded-full border border-line px-2 py-0.5 text-[12px] font-semibold text-ink-mute">숨김</span> : null}
-                        <span className="rounded-full border border-line px-2 py-0.5 text-[12px] font-semibold text-ink-mute">{n.category || "공지"}</span>
-                      </div>
-                      <p className="mt-1 line-clamp-3 whitespace-pre-line text-[13px] leading-5 text-ink-soft" title={n.content}>{n.content}</p>
+          {notices.length === 0 ? (
+            <div className="rounded-xl border border-line bg-surface py-14 text-center text-[13px] text-ink-mute">등록된 공지가 없어요. 「+ 새 공지」로 써 주세요.</div>
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-line bg-surface">
+              <div className="hidden grid-cols-[1fr_72px_72px_96px_120px] items-center gap-3 border-b border-line bg-surface-2 px-4 py-2 text-[12px] font-semibold text-ink-mute md:grid">
+                <div>제목 · 내용</div><div className="text-center">고정</div><div className="text-center">공개</div><div className="text-center">순서</div><div />
+              </div>
+              {notices.map((n, i) => (
+                <div key={n.id} className={`grid grid-cols-1 items-center gap-2 border-b border-line px-4 py-3 last:border-b-0 md:grid-cols-[1fr_72px_72px_96px_120px] md:gap-3 ${n.is_visible ? "" : "bg-surface-2"}`}>
+                  <button type="button" onClick={() => { setForm(n); setFormOpen(true); }} className="min-w-0 text-left">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate text-[14px] font-bold text-ink">{n.title}</span>
+                      <span className="shrink-0 text-[12px] text-ink-mute">{n.category || "공지"}</span>
+                    </div>
+                    <div className="truncate text-[13px] text-ink-soft" title={n.content}>{String(n.content || "").replace(/\s+/g, " ")}</div>
+                  </button>
+                  <div className="flex gap-1.5 md:contents">
+                    <button type="button" onClick={() => toggleNotice(n, "is_pinned")} aria-pressed={n.is_pinned}
+                      className={`h-8 justify-self-center rounded-full border px-3 text-[12px] font-semibold ${n.is_pinned ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink-mute hover:bg-surface-2"}`}>{n.is_pinned ? "고정" : "안 함"}</button>
+                    <button type="button" onClick={() => toggleNotice(n, "is_visible")} aria-pressed={n.is_visible}
+                      className={`h-8 justify-self-center rounded-full border px-3 text-[12px] font-semibold ${n.is_visible ? "border-line bg-surface text-ink hover:bg-surface-2" : "border-warn-tx/40 bg-warn-bg text-warn-tx"}`}>{n.is_visible ? "공개" : "숨김"}</button>
+                    <div className="flex justify-center gap-1">
+                      <button type="button" onClick={() => moveNotice(n, "up")} disabled={i === 0 || listBusy} aria-label="위로" className="h-8 rounded-lg border border-line bg-surface px-2 text-[12px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-30">위</button>
+                      <button type="button" onClick={() => moveNotice(n, "down")} disabled={i === notices.length - 1 || listBusy} aria-label="아래로" className="h-8 rounded-lg border border-line bg-surface px-2 text-[12px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-30">아래</button>
+                    </div>
+                    <div className="ml-auto flex justify-end gap-1 md:ml-0">
+                      {n.is_visible && mode === "all" && <button type="button" aria-label={`${n.title}를 상단 공지로 선택`} disabled={!settingsReady} onClick={() => { setLinkedNoticeId(String(n.id)); setTab("customer"); }} className="h-8 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-semibold text-ink disabled:opacity-30">상단 공지로</button>}
+                      <button type="button" onClick={() => { setForm(n); setFormOpen(true); }} className="h-8 rounded-lg border border-line bg-surface px-3 text-[12px] font-semibold text-ink hover:bg-surface-2">수정</button>
+                      <button type="button" onClick={() => deleteNotice(n)} className="h-8 rounded-lg border border-line bg-surface px-3 text-[12px] font-semibold text-danger-tx hover:bg-surface-2">삭제</button>
                     </div>
                   </div>
+                </div>
+              ))}
+            </div>
+          )}
 
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {n.is_visible && mode === "all" && <button type="button" aria-label={`${n.title}를 상단 공지로 선택`} disabled={!settingsReady} onClick={() => { setLinkedNoticeId(String(n.id)); setTab("customer"); }} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12px] font-semibold text-ink disabled:opacity-30">상단 공지로 선택</button>}
-                    <button type="button" onClick={() => moveNotice(n, "up")} disabled={i === 0 || listBusy} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12px] font-semibold text-ink-soft disabled:opacity-30">위로</button>
-                    <button type="button" onClick={() => moveNotice(n, "down")} disabled={i === notices.length - 1 || listBusy} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12px] font-semibold text-ink-soft disabled:opacity-30">아래로</button>
-                    <button type="button" onClick={() => toggleNotice(n, "is_pinned")} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12px] font-semibold text-ink-soft">{n.is_pinned ? "고정 풀기" : "상단 고정"}</button>
-                    <button type="button" onClick={() => toggleNotice(n, "is_visible")} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12px] font-semibold text-ink-soft">{n.is_visible ? "숨기기" : "공개"}</button>
-                    <button type="button" onClick={() => setForm(n)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12px] font-semibold text-ink-soft">수정</button>
-                    <button type="button" onClick={() => deleteNotice(n)} className="ml-auto rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12px] font-semibold text-danger-tx">삭제</button>
+          {formOpen ? (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget && !listBusy) setFormOpen(false); }}>
+              <div role="dialog" aria-modal="true" aria-label={form.id ? "공지 수정" : "새 공지"} className="flex max-h-[calc(100dvh-32px)] w-full max-w-[640px] flex-col overflow-hidden rounded-xl bg-surface shadow-[0_8px_24px_rgba(0,0,0,.08)]">
+                <div className="flex items-center justify-between border-b border-line px-5 py-3">
+                  <div className="text-[16px] font-bold text-ink">{form.id ? "공지 수정" : "새 공지"}</div>
+                  <button type="button" onClick={() => setFormOpen(false)} disabled={listBusy} aria-label="닫기" className="h-9 w-9 rounded-lg text-[18px] text-ink-mute hover:bg-surface-2">✕</button>
+                </div>
+                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+                  <label className="block">
+                    <span className="text-[13px] font-semibold text-ink-soft">제목</span>
+                    <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="예) 추석 연휴 배송 안내" className="mt-1 h-10 w-full rounded-lg border border-line bg-surface px-3 text-[14px] text-ink outline-none focus:border-ink" />
+                  </label>
+                  <label className="block">
+                    <span className="text-[13px] font-semibold text-ink-soft">내용</span>
+                    <textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} rows={12} placeholder="줄바꿈 그대로 손님에게 보여요."
+                      className="mt-1 w-full resize-y rounded-lg border border-line bg-surface p-3 text-[14px] leading-6 text-ink outline-none focus:border-ink" />
+                  </label>
+                  <div className="flex flex-wrap items-end gap-3">
+                    <label className="block w-40">
+                      <span className="text-[13px] font-semibold text-ink-soft">분류</span>
+                      <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="공지" className="mt-1 h-10 w-full rounded-lg border border-line bg-surface px-3 text-[14px] text-ink outline-none focus:border-ink" />
+                    </label>
+                    <label className="flex h-10 cursor-pointer items-center gap-2 text-[14px] text-ink">
+                      <input type="checkbox" checked={form.is_pinned} onChange={() => setForm({ ...form, is_pinned: !form.is_pinned })} className="h-4 w-4 accent-[var(--color-ink)]" />맨 위 고정
+                    </label>
+                    <label className="flex h-10 cursor-pointer items-center gap-2 text-[14px] text-ink">
+                      <input type="checkbox" checked={form.is_visible} onChange={() => setForm({ ...form, is_visible: !form.is_visible })} className="h-4 w-4 accent-[var(--color-ink)]" />손님에게 보이기
+                    </label>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+                <div className="flex justify-end gap-2 border-t border-line px-5 py-3">
+                  <button type="button" onClick={() => setFormOpen(false)} disabled={listBusy} className="h-10 rounded-lg border border-line bg-surface px-4 text-[14px] font-semibold text-ink hover:bg-surface-2">취소</button>
+                  <button type="button" onClick={saveNotice} disabled={listBusy} className="h-10 min-w-[96px] rounded-lg bg-ink px-4 text-[14px] font-bold text-white disabled:opacity-50">{listBusy ? "저장 중…" : form.id ? "저장" : "등록"}</button>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
         ) : tab === "send" ? (
         /* ───────── 쪽지 보내기 ───────── */
@@ -901,7 +894,8 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
               {sentLoading ? "불러오는 중…" : "보낸 쪽지가 없습니다. 위에서 손님을 찾아 쪽지를 보내면 여기에 쌓입니다."}
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="overflow-hidden rounded-xl border border-line bg-surface">
+              <div className="hidden grid-cols-[180px_96px_1fr_120px_150px] gap-3 border-b border-line bg-surface-2 px-4 py-2 text-[12px] font-semibold text-ink-mute md:grid"><div>받은 손님</div><div>상태</div><div>내용</div><div>보낸 날</div><div /></div>
               {sent.map((n) => {
                 const revoked = Boolean(n.revoked_at) || (!n.is_active && !n.dismissed_at);
                 const expired = new Date(n.expires_at).getTime() < Date.now();
@@ -911,40 +905,24 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
                 const missed = !revoked && expired && !n.seen_at;
                 const phoneText = n.customer_phone || String(n.target_session_key || "").replace(/^phone:/, "");
                 const whoText = (n.youtube_nickname || "").trim() || (n.customer_name || "").trim();
+                // [2026-10-21] 한 줄 목록: 누구 · 상태 · 내용 한 줄(마우스 올리면 전체) · 보낸 날 · 버튼
+                const status = revoked ? "회수됨" : missed ? "못 봄" : n.seen_at ? "읽음" : expired ? "표시 끝" : unlimited ? "읽을 때까지 뜸" : "안 읽음";
+                const tone = missed ? "bg-danger-bg text-danger-tx" : n.seen_at ? "bg-ok-bg text-ok-tx" : revoked || expired ? "bg-surface-2 text-ink-mute" : "bg-warn-bg text-warn-tx";
                 return (
-                  <div key={n.id} className={`rounded-xl border px-4 py-3 ${revoked ? "border-line bg-surface-2" : "border-line bg-surface"}`}>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {/* [2026-09-09 사장님 지적] 폰번호만 있으면 누군지 모른다 → 닉네임을 앞에 크게, 번호는 뒤에 작게 */}
-                      <span className="text-[13px] font-bold text-ink">{whoText || phoneText || "대상 미상"}</span>
-                      {whoText && phoneText ? <span className="text-[12px] font-semibold text-ink-mute">{phoneText}</span> : null}
-                      {n.seen_at
-                        ? <span className="rounded-full bg-ok-bg px-2 py-0.5 text-[12px] font-semibold text-ok-tx">읽음</span>
-                        : <span className="rounded-full bg-warn-bg px-2 py-0.5 text-[12px] font-semibold text-warn-tx">안 읽음</span>}
-                      {revoked ? <span className="rounded-full border border-line px-2 py-0.5 text-[12px] font-semibold text-ink-mute">회수됨</span> : null}
-                      {/* [2026-09-09] 「기간 지남」이 무슨 뜻인지 사장님이 알 수 없었다 → 결과로 쓴다.
-                          · 안 읽었는데 기간이 끝났다 = 손님은 «영영 못 본다» → 빨간 경고 + 다시 띄우기
-                          · 읽고 나서 끝났다 = 정상 종료 → 회색 */}
-                      {missed ? <span className="rounded-full bg-danger-bg px-2 py-0.5 text-[12px] font-semibold text-danger-tx">손님이 못 봄 · 이제 안 뜸</span> : null}
-                      {!revoked && expired && n.seen_at ? <span className="rounded-full border border-line px-2 py-0.5 text-[12px] font-semibold text-ink-mute">표시 끝</span> : null}
-                      {!revoked && !expired && unlimited && !n.seen_at ? <span className="rounded-full border border-line px-2 py-0.5 text-[12px] font-semibold text-ink-soft">읽을 때까지 계속 뜸</span> : null}
-                      {n.dismissed_at ? <span className="rounded-full border border-line px-2 py-0.5 text-[12px] font-semibold text-ink-mute">손님이 닫음</span> : null}
+                  <div key={n.id} className={`grid grid-cols-1 items-center gap-2 border-b border-line px-4 py-2.5 last:border-b-0 md:grid-cols-[180px_96px_1fr_120px_150px] md:gap-3 ${revoked ? "bg-surface-2" : ""}`}>
+                    <div className="min-w-0">
+                      <div className="truncate text-[14px] font-bold text-ink">{whoText || phoneText || "대상 미상"}</div>
+                      {whoText && phoneText ? <div className="truncate text-[12px] text-ink-mute">{phoneText}</div> : null}
                     </div>
-                    <p className="mt-1.5 whitespace-pre-line text-[13px] font-bold leading-6 text-ink-soft">{n.message}</p>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] font-semibold text-ink-mute">
-                      <span>보낸 날짜 {noteTimeText(n.created_at)}</span>
-                      {n.seen_at ? <span>읽은 날짜 {noteTimeText(n.seen_at)}</span> : null}
-                      {n.sent_by ? <span>보낸 사람 {n.sent_by}</span> : null}
+                    <div><span className={`rounded px-1.5 py-0.5 text-[12px] font-semibold ${tone}`}>{status}</span>{n.dismissed_at ? <span className="ml-1 text-[12px] text-ink-mute">닫음</span> : null}</div>
+                    <div className="truncate text-[13px] text-ink-soft" title={n.message}>{String(n.message || "").replace(/\s+/g, " ")}</div>
+                    <div className="text-[12px] text-ink-mute" title={n.seen_at ? `읽은 날짜 ${noteTimeText(n.seen_at)}` : undefined}>{noteTimeText(n.created_at)}</div>
+                    <div className="flex justify-end gap-1">
                       {missed ? (
-                        <button type="button" onClick={() => void reviveNote(n)}
-                          className="ml-auto rounded-lg bg-ink px-2.5 py-1.5 text-[12px] font-semibold text-white">
-                          다시 띄우기
-                        </button>
+                        <button type="button" onClick={() => void reviveNote(n)} className="h-8 rounded-lg bg-ink px-2.5 text-[12px] font-bold text-white">다시 띄우기</button>
                       ) : null}
                       {!revoked ? (
-                        <button type="button" onClick={() => void revokeNote(n)}
-                          className={`${missed ? "" : "ml-auto "}rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12px] font-semibold text-danger-tx`}>
-                          회수
-                        </button>
+                        <button type="button" onClick={() => void revokeNote(n)} className="h-8 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-semibold text-danger-tx hover:bg-surface-2">회수</button>
                       ) : null}
                     </div>
                   </div>
@@ -957,7 +935,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
       </div>
 
       {/* 하단 저장바 — 손님 화면 공지 탭에서만. 목록 탭은 항목마다 바로 저장된다. */}
-      {tab === "customer" && mode !== "messages" ? (
+      {tab === "customer" && mode !== "messages" && mode !== "board" && mode !== "notes" ? (
         <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-surface px-5 py-3">
           <span className="text-xs font-bold text-ink-mute">
             {loading ? "불러오는 중..." : "저장하면 손님이 새로 들어올 때부터 보입니다."}
