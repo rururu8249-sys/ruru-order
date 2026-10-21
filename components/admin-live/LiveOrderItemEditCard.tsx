@@ -202,19 +202,19 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
 
   if (editing) {
     return (
-      <div className="overflow-hidden rounded-2xl border border-rose-line bg-rose-soft/40 p-3">
+      <div className="overflow-hidden rounded-xl border-2 border-ink bg-surface p-3">
         <div className="mb-2 flex items-center justify-between">
-          <div className="text-xs font-black text-rose-deep">#{index + 1} 상품 수정</div>
+          <div className="text-[13px] font-bold text-ink">상품 {index + 1} 수정</div>
           {countText ? (
             <div className="flex flex-wrap items-center justify-end gap-1.5">
-              <span className="rounded-full bg-warn-bg px-2 py-1 text-[11px] font-black text-warn-tx">
+              <span className="rounded-full bg-warn-bg px-2 py-1 text-[11px] font-bold text-warn-tx">
                 {countText}
               </span>
               {hasChangeHistory ? (
                 <button
                   type="button"
                   onClick={() => setShowHistory((prev) => !prev)}
-                  className="rounded-full border border-warn-tx bg-surface px-2 py-1 text-[11px] font-black text-warn-tx hover:bg-warn-bg"
+                  className="rounded-full border border-warn-tx bg-surface px-2 py-1 text-[11px] font-bold text-warn-tx hover:bg-warn-bg"
                 >
                   {showHistory ? "이력닫기" : "수정이력 보기"}
                 </button>
@@ -225,11 +225,11 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
 
         <div className="grid grid-cols-1 gap-2">
           <label className="grid min-w-0 gap-1">
-            <span className="text-[11px] font-black text-ink-soft">상품명</span>
+            <span className="text-[11px] font-bold text-ink-soft">상품명</span>
             <input
               value={form.productName}
               onChange={(event) => setForm((prev) => updateForm(prev, "productName", event.target.value))}
-              className="h-10 w-full min-w-0 rounded-xl border border-line bg-surface px-3 text-sm font-bold outline-none focus:border-info-tx/35"
+              className="h-10 w-full min-w-0 rounded-lg border border-line bg-surface px-3 text-[14px] font-medium outline-none focus:border-ink"
               placeholder="상품명"
             />
           </label>
@@ -237,11 +237,11 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
           <div className="grid grid-cols-1 gap-2">
             {itemHasRealColor || showColorField ? (
             <label className="grid min-w-0 gap-1">
-              <span className="text-[11px] font-black text-ink-soft">{colorFieldLabel}</span>
+              <span className="text-[11px] font-bold text-ink-soft">{colorFieldLabel}</span>
               <input
                 value={form.color}
                 onChange={(event) => setForm((prev) => updateForm(prev, "color", event.target.value))}
-                className="h-10 w-full min-w-0 rounded-xl border border-line bg-surface px-3 text-sm font-bold outline-none focus:border-info-tx/35"
+                className="h-10 w-full min-w-0 rounded-lg border border-line bg-surface px-3 text-[14px] font-medium outline-none focus:border-ink"
                 placeholder={colorFieldLabel}
               />
             </label>
@@ -253,11 +253,11 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
 
             {itemHasRealSize || showSizeField ? (
             <label className="grid min-w-0 gap-1">
-              <span className="text-[11px] font-black text-ink-soft">사이즈</span>
+              <span className="text-[11px] font-bold text-ink-soft">사이즈</span>
               <input
                 value={form.size}
                 onChange={(event) => setForm((prev) => updateForm(prev, "size", event.target.value))}
-                className="h-10 w-full min-w-0 rounded-xl border border-line bg-surface px-3 text-sm font-bold outline-none focus:border-info-tx/35"
+                className="h-10 w-full min-w-0 rounded-lg border border-line bg-surface px-3 text-[14px] font-medium outline-none focus:border-ink"
                 placeholder="사이즈"
               />
             </label>
@@ -270,44 +270,44 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
 
           <div className="grid grid-cols-1 gap-2">
             <label className="grid min-w-0 gap-1">
-              <span className="text-[11px] font-black text-ink-soft">수량</span>
+              <span className="text-[11px] font-bold text-ink-soft">수량</span>
               <input
                 value={form.qty}
                 inputMode="numeric"
                 onChange={(event) => setForm((prev) => updateForm(prev, "qty", onlyNumber(event.target.value)))}
-                className="h-10 w-full min-w-0 rounded-xl border border-line bg-surface px-3 text-sm font-bold outline-none focus:border-info-tx/35"
+                className="h-10 w-full min-w-0 rounded-lg border border-line bg-surface px-3 text-[14px] font-medium outline-none focus:border-ink"
                 placeholder="1"
               />
             </label>
 
             <label className="grid min-w-0 gap-1">
-              <span className="text-[11px] font-black text-ink-soft">판매단가</span>
+              <span className="text-[11px] font-bold text-ink-soft">판매단가</span>
               <input
                 value={Number(form.unitPrice || 0).toLocaleString("ko-KR")}
                 inputMode="numeric"
                 onChange={(event) => setForm((prev) => updateForm(prev, "unitPrice", onlyNumber(event.target.value)))}
-                className="h-10 w-full min-w-0 rounded-xl border border-line bg-surface px-3 text-sm font-bold outline-none focus:border-info-tx/35"
+                className="h-10 w-full min-w-0 rounded-lg border border-line bg-surface px-3 text-[14px] font-medium outline-none focus:border-ink"
                 placeholder="19000"
               />
             </label>
           </div>
         </div>
 
-        <div className="mt-2 overflow-hidden rounded-xl bg-surface px-3 py-2 text-xs font-black text-ink-soft">
-          수정 후 상품금액: <span className="text-rose-deep">{money(previewProductTotal)}</span>
+        <div className="mt-2 overflow-hidden rounded-xl bg-surface px-3 py-2 text-xs font-bold text-ink-soft">
+          수정 후 상품금액: <span className="text-ink">{money(previewProductTotal)}</span>
         </div>
 
 
         {showHistory && hasChangeHistory ? (
           <div className="mt-3 rounded-2xl border border-warn-tx bg-warn-bg/50 p-3">
-            <div className="mb-2 text-[11px] font-black text-warn-tx">최근 수정이력</div>
+            <div className="mb-2 text-[11px] font-bold text-warn-tx">최근 수정이력</div>
             <div className="grid gap-2">
               {[...(item.changeHistory || [])].slice(-5).reverse().map((entry: any, historyIndex) => {
                 const line = compactChangeLine(entry);
 
                 return (
                   <div key={`${item.id}-editing-history-${historyIndex}`} className="rounded-xl bg-surface p-2 text-[11px] leading-5 text-ink-soft">
-                    <div className="mb-1 font-black text-ink-mute">
+                    <div className="mb-1 font-bold text-ink-mute">
                       {formatHistoryDate(entry?.changed_at)}
                       {entry?.product_changed ? " · 상품변경" : ""}
                       {entry?.amount_changed ? " · 금액변경" : ""}
@@ -316,7 +316,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
                       <span className="font-black text-ink-mute">전</span> {line.beforeText}
                     </div>
                     <div>
-                      <span className="font-black text-rose-deep">후</span> {line.afterText}
+                      <span className="font-bold text-ink">후</span> {line.afterText}
                     </div>
                   </div>
                 );
@@ -330,7 +330,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
             type="button"
             onClick={cancelEdit}
             disabled={saving}
-            className="h-10 rounded-xl border border-line bg-surface text-xs font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50"
+            className="h-10 rounded-lg border border-line bg-surface text-[13px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-50"
           >
             취소
           </button>
@@ -338,7 +338,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
             type="button"
             onClick={submit}
             disabled={saving || inventoryLocked}
-            className="h-10 rounded-xl bg-rose-deep text-xs font-black text-white hover:opacity-90 disabled:bg-surface-3"
+            className="h-10 rounded-lg bg-ink text-[14px] font-bold text-white disabled:bg-surface-3"
           >
             {inventoryLocked ? "수정잠금" : saving ? "저장중..." : "저장"}
           </button>
@@ -348,7 +348,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-line bg-surface p-3">
+    <div className="overflow-hidden rounded-xl border border-line bg-surface p-3">
       <div className="flex items-start gap-2">
         {imageUrl ? (
           <button
@@ -362,21 +362,21 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
           </button>
         ) : null}
         <div className="min-w-0 flex-1">
-          <div className="break-words text-sm font-black leading-5 text-ink">{getItemName(item)}</div>
+          <div className="break-words text-[14px] font-bold leading-5 text-ink">{getItemName(item)}</div>
           {optionTextView ? (
-            <div className="mt-1 whitespace-pre-line break-words text-xs font-bold leading-5 text-ink-soft">
+            <div className="mt-1 whitespace-pre-line break-words text-[13px] leading-5 text-ink-soft">
               {optionTextView}
             </div>
           ) : null}
           {countText ? (
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <span className="inline-flex rounded-full bg-warn-bg px-2 py-1 text-[11px] font-black text-warn-tx">
+              <span className="inline-flex rounded-full bg-warn-bg px-2 py-1 text-[11px] font-bold text-warn-tx">
                 {countText}
               </span>
               <button
                 type="button"
                 onClick={() => setShowHistory((prev) => !prev)}
-                className="rounded-full border border-line bg-surface px-2 py-1 text-[11px] font-black text-ink-soft hover:bg-surface-2"
+                className="rounded-full border border-line bg-surface px-2 py-1 text-[11px] font-bold text-ink-soft hover:bg-surface-2"
               >
                 {showHistory ? "이력닫기" : "수정이력 보기"}
               </button>
@@ -385,14 +385,14 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
         </div>
 
         <div className="shrink-0 text-right">
-          <div className="text-sm font-black text-ink">{Number(item.qty || 1)}개</div>
-          <div className="mt-1 text-sm font-black text-ink">{money(item.amount)}</div>
+          <div className="text-[13px] text-ink-soft">{Number(item.qty || 1)}개</div>
+          <div className="mt-0.5 text-[14px] font-bold tabular-nums text-ink">{money(item.amount)}</div>
           {(() => {
             const inventoryInfo = inventoryItemStatusInfo(item);
             if (!inventoryInfo) return null;
 
             return (
-              <div className={`mt-2 rounded-xl border px-2 py-1 text-left text-[11px] font-black leading-relaxed ${inventoryInfo.className}`}>
+              <div className={`mt-2 rounded-xl border px-2 py-1 text-left text-[11px] font-bold leading-relaxed ${inventoryInfo.className}`}>
                 <div>{inventoryInfo.label}</div>
                 <div className="mt-0.5 opacity-80">{inventoryInfo.memo}</div>
               </div>
@@ -404,7 +404,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
                 type="button"
                 onClick={onDelete}
                 disabled={deleting}
-                className="rounded-xl border border-danger-tx bg-danger-bg px-2.5 py-1.5 text-[11px] font-black text-[var(--color-danger-tx)] hover:opacity-90 disabled:opacity-50"
+                className="h-8 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-semibold text-danger-tx hover:bg-surface-2 disabled:opacity-50"
               >
                 {deleting ? "삭제중..." : "삭제"}
               </button>
@@ -414,7 +414,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
               onClick={() => setEditing(true)}
               disabled={disabled || inventoryLocked}
               title={inventoryLocked ? "재고복구완료 주문은 상품수정할 수 없습니다." : undefined}
-              className="rounded-xl bg-[var(--color-ink-soft)] px-2.5 py-1.5 text-[11px] font-black text-white hover:bg-rose-deep disabled:bg-surface-3 disabled:text-ink-mute"
+              className="h-8 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-50"
             >
               {inventoryLocked ? "수정잠금" : "수정"}
             </button>
@@ -423,14 +423,14 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
       </div>
       {showHistory && Array.isArray(item.changeHistory) && item.changeHistory.length > 0 ? (
         <div className="mt-3 rounded-2xl border border-warn-tx bg-warn-bg/50 p-3">
-          <div className="mb-2 text-[11px] font-black text-warn-tx">최근 수정이력</div>
+          <div className="mb-2 text-[11px] font-bold text-warn-tx">최근 수정이력</div>
           <div className="grid gap-2">
             {[...item.changeHistory].slice(-5).reverse().map((entry: any, historyIndex) => {
               const line = compactChangeLine(entry);
 
               return (
                 <div key={`${item.id}-history-${historyIndex}`} className="rounded-xl bg-surface p-2 text-[11px] leading-5 text-ink-soft">
-                  <div className="mb-1 font-black text-ink-mute">
+                  <div className="mb-1 font-bold text-ink-mute">
                     {formatHistoryDate(entry?.changed_at)}
                     {entry?.product_changed ? " · 상품변경" : ""}
                     {entry?.amount_changed ? " · 금액변경" : ""}
@@ -439,7 +439,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
                     <span className="font-black text-ink-mute">전</span> {line.beforeText}
                   </div>
                   <div>
-                    <span className="font-black text-rose-deep">후</span> {line.afterText}
+                    <span className="font-bold text-ink">후</span> {line.afterText}
                   </div>
                 </div>
               );

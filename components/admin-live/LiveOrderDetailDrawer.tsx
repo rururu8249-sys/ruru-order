@@ -105,15 +105,11 @@ function getPaymentStatusLabel(order: LiveOrder) {
 }
 
 function getPaymentStatusClass(order: LiveOrder) {
-  if (order.paymentStatus === "canceled") return "border-danger-tx bg-danger-bg text-danger-tx";
-  if (order.paymentStatus === "manual_match_needed") return "border-warn-tx bg-warn-bg text-warn-tx";
-  if (order.paymentStatus === "manual_paid") return "border-ok-tx bg-ok-bg text-ok-tx";
-  if (["auto_paid", "paid"].includes(order.paymentStatus)) {
-    return "border-ok-tx bg-ok-bg text-ok-tx";
-  }
-  if (order.paymentStatus === "card_paid") return "border-info-tx bg-info-bg text-info-tx";
-  if (["unpaid", "card_unpaid"].includes(order.paymentStatus)) return "border-danger-tx bg-danger-bg text-danger-tx";
-  return "border-line bg-surface-2 text-ink-soft";
+  // [2026-10-21] DESIGN-ADMIN 상태색: 미입금·매칭필요·카드미결제=주황 / 입금확인·카드결제완료=초록 / 취소 회색(표시만)
+  if (order.paymentStatus === "canceled") return "bg-surface-2 text-ink-soft";
+  if (["manual_match_needed", "unpaid", "card_unpaid"].includes(order.paymentStatus)) return "bg-warn-bg text-warn-tx";
+  if (["manual_paid", "auto_paid", "paid", "card_paid"].includes(order.paymentStatus)) return "bg-ok-bg text-ok-tx";
+  return "bg-surface-2 text-ink-soft";
 }
 
 export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClose, onAfterStatusChange }: Props) {
@@ -1383,68 +1379,207 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 
   return (
     <aside className="flex h-full min-h-0 w-full flex-col bg-surface">
-      {/* 목업 B panel-header */}
-      <header className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-3">
-        <span className="text-[14px] font-black text-ink">주문 상세</span>
-        {/* [고객용 복사 · 2026-07-22 사장님 지시] 닉네임/이름/주소/연락처/주문내역/금액을 카톡에 바로 붙여넣을 텍스트로 복사 — 읽기 전용 */}
-        <button
-          type="button"
-          onClick={() => void copyCustomerOrderSummary()}
-          className="ml-auto rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft transition hover:border-rose-deep hover:text-rose-deep"
-        >
-          고객용 복사
-        </button>
-        {["unpaid", "manual_match_needed", "card_unpaid"].includes(orderForView.paymentStatus) ? (
-          <button
-            type="button"
-            title="결제요청 쪽지 보내기"
-            aria-label="결제요청 쪽지 보내기"
-            disabled={payRequestSending}
-            onClick={() => void sendPaymentRequest()}
-            className="rounded-lg border border-line bg-surface px-2 py-0.5 text-[12px] font-bold text-ink transition hover:bg-surface-2 disabled:opacity-35"
-          >
-            쪽지
-          </button>
-        ) : null}
-        <button
-          type="button"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            onClose?.();
-          }}
-          className="text-2xl leading-none text-ink-mute transition hover:text-ink"
-          aria-label="주문상세 닫기"
-        >
-          ×
-        </button>
-      </header>
-
       {/* [2026-08-31] 상품 사진 크게 보기 — 아무 데나 누르면 닫힘 */}
       {imagePreviewUrl ? (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4" onClick={() => setImagePreviewUrl("")}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={imagePreviewUrl} alt="상품 사진 크게 보기" className="max-h-[85vh] max-w-full rounded-2xl object-contain shadow-2xl" />
-          <button type="button" onClick={() => setImagePreviewUrl("")} className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1.5 text-sm font-black text-ink">✕ 닫기</button>
+          <button type="button" onClick={() => setImagePreviewUrl("")} className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1.5 text-sm font-bold text-ink">✕ 닫기</button>
         </div>
       ) : null}
 
-      {/* 목업 B panel-body */}
+      {/* [2026-10-21 주문상세 단순화] 창 제목·닫기는 바깥 「주문상세」 창 머리 하나만 — 안쪽 중복 머리 삭제.
+          맨 위 = 주문번호·날짜 + 입금상태 + 총 결제금액 + 「고객용 복사」「쪽지」. 핸들러는 그대로. */}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        {/* 주문번호 · 날짜 */}
-        <div className="mb-2.5 text-[11px] font-bold text-ink-mute">
-          {order.orderNo || "주문번호 없음"} · {formatFullDateTime(order.createdAt, orderForView.submittedAt)}
+        <section className="pb-3">
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1 truncate text-[12px] text-ink-mute">
+              {order.orderNo || "주문번호 없음"} · {formatFullDateTime(order.createdAt, orderForView.submittedAt)}
+            </div>
+            <button
+              type="button"
+              onClick={() => void copyCustomerOrderSummary()}
+              className="h-8 shrink-0 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-semibold text-ink hover:bg-surface-2"
+            >
+              고객용 복사
+            </button>
+            {["unpaid", "manual_match_needed", "card_unpaid"].includes(orderForView.paymentStatus) ? (
+              <button
+                type="button"
+                title="결제요청 쪽지 보내기"
+                aria-label="결제요청 쪽지 보내기"
+                disabled={payRequestSending}
+                onClick={() => void sendPaymentRequest()}
+                className="h-8 shrink-0 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-35"
+              >
+                쪽지
+              </button>
+            ) : null}
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <span className={`rounded-lg px-2 py-1 text-[13px] font-bold ${getPaymentStatusClass(orderForView)}`}>
+              {getPaymentStatusLabel(orderForView)}
+            </span>
+            {orderForView.paidAt ? <span className="text-[12px] text-ink-mute">{orderForView.paidAt}</span> : null}
+            <span className="ml-auto text-[20px] font-bold tabular-nums text-ink">{money(pointUsedAmount > 0 ? finalPaymentAmount : cardPaymentExpectedTotal)}</span>
+          </div>
+        </section>
+
+
+        {paymentCancelError ? (
+          <div className="mt-2 rounded-xl border border-danger-tx bg-danger-bg px-3 py-2 text-[11px] font-bold leading-4 text-danger-tx">
+            입금확인 취소 오류: {paymentCancelError}
+          </div>
+        ) : null}
+
+        {/* [2026-10-21] 지금 할 일(입금확인·카드결제완료·입금매칭·복구) 버튼을 맨 위로 — 조건·핸들러 그대로 */}
+        {/* 액션 버튼 (목업 B action-btns: 수동입금확인 green / 입금매칭 rose / 취소 red) — 기존 조건/핸들러 그대로 */}
+        <div className="grid grid-cols-1 gap-2 empty:hidden">
+          {canChangePaymentMethod ? (
+            <button
+              type="button"
+              onClick={handleChangePaymentMethod}
+              disabled={methodChanging}
+              className="h-10 w-full rounded-lg border border-line bg-surface text-[13px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-50"
+            >
+              {methodChanging ? "계산중..." : `${nextPaymentMethod}으로 변경`}
+            </button>
+          ) : null}
+
+          {/* [E2] 「입금확인 취소」는 화면 맨 아래 「⚠ 위험 작업」 접힘으로 이동. */}
+
+          {showCardStatusActions ? (
+            <>
+              {isCardUnpaid ? (
+                <button
+                  type="button"
+                  onClick={() => handleCardPaymentStatusChange("카드결제완료", "card-paid")}
+                  disabled={Boolean(cardStatusAction)}
+                  className="h-10 w-full rounded-lg bg-ink text-[14px] font-bold text-white disabled:bg-surface-3 disabled:text-ink-mute"
+                >
+                  {cardStatusAction === "card-paid" ? "처리중..." : "카드결제완료 처리"}
+                </button>
+              ) : null}
+
+              {isCardPaid ? (
+                <>
+                  {/* [E1] 「카드결제완료 주문입니다…」 안내 문단 삭제 — 버튼 이름이 곧 설명. */}
+                  <button
+                    type="button"
+                    onClick={() => handleCardPaymentStatusChange("주문확인전", "card-unpaid")}
+                    disabled={Boolean(cardStatusAction)}
+                    className="h-10 w-full rounded-lg border border-line bg-surface text-[13px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-50"
+                  >
+                    {cardStatusAction === "card-unpaid" ? "처리중..." : "카드미결제로 되돌리기"}
+                  </button>
+                </>
+              ) : null}
+            </>
+          ) : null}
+
+          {!isCanceled && orderForView.paymentStatus === "unpaid" ? (
+            <button
+              type="button"
+              onClick={handleManualConfirm}
+              disabled={manualConfirmAction}
+              className="h-10 w-full rounded-lg bg-ink text-[14px] font-bold text-white disabled:bg-surface-3 disabled:text-ink-mute"
+            >
+              {manualConfirmAction ? "처리중..." : "수동 입금확인"}
+            </button>
+          ) : null}
+
+          {!isCanceled && orderForView.paymentStatus === "manual_match_needed" && onOpenManualMatch ? (
+            <button
+              type="button"
+              onClick={() => onOpenManualMatch(order)}
+              className="h-10 w-full rounded-lg bg-ink text-[14px] font-bold text-white disabled:bg-surface-3 disabled:text-ink-mute"
+            >
+              입금매칭에서 찾기
+            </button>
+          ) : null}
+
+          {isCanceled ? (
+            <>
+              <button
+                type="button"
+                onClick={restoreOrder}
+                disabled={Boolean(savingAction)}
+                className="h-10 w-full rounded-lg bg-ink text-[14px] font-bold text-white disabled:bg-surface-3 disabled:text-ink-mute"
+              >
+                {savingAction === "restore" ? "처리중..." : "주문서복구"}
+              </button>
+
+              {canCancelPaymentConfirm && !isCardOrder ? (
+                <>
+                  <div className="text-[12px] leading-4 text-warn-tx">취소된 주문인데 입금확인 기록이 남아 있어요. 정산에서 빼려면 아래 버튼.</div>
+                  <button
+                    type="button"
+                    onClick={handlePaymentConfirmCancel}
+                    disabled={paymentCancelAction}
+                    className="h-10 w-full rounded-lg border border-line bg-surface text-[13px] font-semibold text-warn-tx hover:bg-surface-2 disabled:opacity-50"
+                  >
+                    {paymentCancelAction ? "처리중..." : "취소주문 입금기록 정리"}
+                  </button>
+                </>
+              ) : null}
+            </>
+          ) : null /* [E2] 「주문서 자체 취소」는 화면 맨 아래 「⚠ 위험 작업」 접힘으로 이동. */}
         </div>
 
+        {/* [2026-08-31 사장님 요청] 💰 돈 계산기 — 입금액 vs 주문금액 자동 비교, 버튼 한 번 처리 */}
+        {balanceEligible && balanceInfo && balanceInfo.depositCount > 0 ? (() => {
+          const diff = balanceInfo.depositSum - balanceOrderTotal;
+          const refundDone = !!balanceInfo.lastRefund && balanceInfo.lastRefund.sourceKey === balanceRefundKey;
+          if (diff === 0) {
+            return (
+              <div className="mt-2 rounded-lg bg-ok-bg px-3 py-2 text-[13px] font-semibold leading-5 text-ok-tx">
+                받은 돈 {money(balanceInfo.depositSum)} = 주문 금액 {money(balanceOrderTotal)} — 딱 맞아요.
+              </div>
+            );
+          }
+          if (diff > 0) {
+            return (
+              <div className="mt-2 space-y-2 rounded-lg bg-warn-bg px-3 py-2.5 leading-5">
+                <div className="text-[13px] font-bold text-warn-tx">손님이 {money(diff)} 더 냈어요.</div>
+                <div className="text-[11px] font-bold text-warn-tx">받은 돈 {money(balanceInfo.depositSum)} − 주문 금액 {money(balanceOrderTotal)} = {money(diff)}</div>
+                {refundDone && balanceInfo.lastRefund ? (
+                  <div className="rounded-lg bg-ok-bg px-2.5 py-1.5 text-[12px] font-bold text-ok-tx">이미 {money(balanceInfo.lastRefund.amount)}를 포인트로 돌려줬어요.</div>
+                ) : (
+                  <>
+                    <button type="button" disabled={balanceWorking} onClick={() => void handleRefundDiffAsPoints(diff)} className="h-10 w-full rounded-lg bg-ink text-[14px] font-bold text-white disabled:bg-surface-3 disabled:text-ink-mute">
+                      {balanceWorking ? "처리 중…" : `${money(diff)} 포인트로 돌려주기`}
+                    </button>
+                    {balanceInfo.lastRefund ? (
+                      <div className="text-[11px] font-bold text-warn-tx">참고: 전에 이 주문으로 {money(balanceInfo.lastRefund.amount)}를 돌려준 기록이 있어요. 그 뒤 금액이 또 바뀐 경우에만 다시 누르세요.</div>
+                    ) : null}
+                    <div className="text-[11px] font-bold text-warn-tx">계좌로 직접 환불하실 거면 이 버튼은 누르지 마세요.</div>
+                  </>
+                )}
+              </div>
+            );
+          }
+          return (
+            <div className="mt-2 space-y-2 rounded-lg bg-danger-bg px-3 py-2.5 leading-5">
+              <div className="text-[13px] font-bold text-danger-tx">받은 돈이 {money(-diff)} 부족해요.</div>
+              <div className="text-[11px] font-bold text-danger-tx">주문 금액 {money(balanceOrderTotal)} − 받은 돈 {money(balanceInfo.depositSum)} = {money(-diff)}</div>
+              <button type="button" disabled={balanceWorking} onClick={() => void handleRequestShortageDeposit(-diff)} className="h-10 w-full rounded-lg bg-ink text-[14px] font-bold text-white disabled:bg-surface-3 disabled:text-ink-mute">
+                {balanceWorking ? "처리 중…" : `${money(-diff)} 더 입금해달라고 쪽지 보내기`}
+              </button>
+            </div>
+          );
+        })() : null}
+
+        {/* [2026-10-21] 손님 — 주소·연락처·받는 분·배송메모를 한 곳에 */}
+        <div className="mt-4 border-t border-line pt-3">
         {/* 배송주소 rose박스 + 고객정보 편집(기존 핸들러 유지) */}
         <section className="mb-3">
-          <div className="mb-1 flex items-center justify-between">
-            <div className="text-[11px] font-black text-ink-mute">배송주소</div>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-[13px] font-semibold text-ink-mute">손님</h3>
             {!isCanceled ? (
               editingCustomer ? (
-                <button type="button" onClick={() => setEditingCustomer(false)} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft">취소</button>
+                <button type="button" onClick={() => setEditingCustomer(false)} className="h-8 rounded-lg border border-line bg-surface px-3 text-[12px] font-semibold text-ink hover:bg-surface-2">취소</button>
               ) : (
-                <button type="button" onClick={startEditCustomer} className="rounded-lg border border-rose-line bg-surface px-2.5 py-1 text-[11px] font-black text-rose-deep hover:bg-rose-soft">✎ 편집</button>
+                <button type="button" onClick={startEditCustomer} className="h-8 rounded-lg border border-line bg-surface px-3 text-[12px] font-semibold text-ink hover:bg-surface-2">수정</button>
               )
             ) : null}
           </div>
@@ -1452,54 +1587,53 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           {editingCustomer ? (
             <div className="grid gap-2">
               {/* [2026-09-20 사장님 요청] 닉네임 수정 — 자동 입금확인 키라서 제일 위 + 경고줄을 붙인다. */}
-              <label className="grid gap-1 text-[11px] font-black text-ink-mute">닉네임 (유튜브)
-                <input value={editNickname} onChange={(e) => setEditNickname(e.target.value)} placeholder="은행 입금자명과 똑같이" className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
+              <label className="grid gap-1 text-[12px] font-semibold text-ink-mute">닉네임 (유튜브)
+                <input value={editNickname} onChange={(e) => setEditNickname(e.target.value)} placeholder="은행 입금자명과 똑같이" className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-ink" />
                 <span className="text-[11px] font-bold leading-4 text-warn-tx">입금자명과 글자가 같아야 자동 입금확인됩니다</span>
               </label>
               <div className="grid grid-cols-2 gap-2">
-                <label className="grid gap-1 text-[11px] font-black text-ink-mute">이름
-                  <input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
+                <label className="grid gap-1 text-[12px] font-semibold text-ink-mute">이름
+                  <input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-ink" />
                 </label>
-                <label className="grid gap-1 text-[11px] font-black text-ink-mute">전화
-                  <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} inputMode="numeric" className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
+                <label className="grid gap-1 text-[12px] font-semibold text-ink-mute">전화
+                  <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} inputMode="numeric" className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-ink" />
                 </label>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <label className="grid gap-1 text-[11px] font-black text-ink-mute">받는분 이름
-                  <input value={editRecipientName} onChange={(e) => setEditRecipientName(e.target.value)} className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
+                <label className="grid gap-1 text-[12px] font-semibold text-ink-mute">받는분 이름
+                  <input value={editRecipientName} onChange={(e) => setEditRecipientName(e.target.value)} className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-ink" />
                 </label>
-                <label className="grid gap-1 text-[11px] font-black text-ink-mute">받는분 연락처
-                  <input value={editRecipientPhone} onChange={(e) => setEditRecipientPhone(e.target.value)} inputMode="numeric" className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
+                <label className="grid gap-1 text-[12px] font-semibold text-ink-mute">받는분 연락처
+                  <input value={editRecipientPhone} onChange={(e) => setEditRecipientPhone(e.target.value)} inputMode="numeric" className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-ink" />
                 </label>
               </div>
-              <button type="button" onClick={() => { setEditRecipientName(editName.trim()); setEditRecipientPhone(editPhone.replace(/[^0-9]/g, "")); }} className="h-8 w-full rounded-lg border border-dashed border-line bg-surface text-[11px] font-black text-ink-soft hover:border-rose-deep hover:text-rose-deep">
+              <button type="button" onClick={() => { setEditRecipientName(editName.trim()); setEditRecipientPhone(editPhone.replace(/[^0-9]/g, "")); }} className="h-8 w-full rounded-lg border border-dashed border-line bg-surface text-[11px] font-bold text-ink-soft hover:bg-surface-2">
                 받는분을 주문자와 동일하게
               </button>
-              <div className="grid gap-1 text-[11px] font-black text-ink-mute">우편번호 · 주소
+              <div className="grid gap-1 text-[12px] font-semibold text-ink-mute">우편번호 · 주소
                 <div className="flex gap-2">
-                  <input value={editZipcode} onChange={(e) => setEditZipcode(e.target.value)} placeholder="우편번호" className="h-9 w-[96px] rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
-                  <button type="button" onClick={openAddressSearch} className="h-9 shrink-0 rounded-lg bg-rose-deep px-3 text-[12px] font-black text-white hover:opacity-90">주소검색</button>
+                  <input value={editZipcode} onChange={(e) => setEditZipcode(e.target.value)} placeholder="우편번호" className="h-9 w-[96px] rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-ink" />
+                  <button type="button" onClick={openAddressSearch} className="h-9 shrink-0 rounded-lg border border-line bg-surface px-3 text-[12px] font-semibold text-ink hover:bg-surface-2">주소검색</button>
                 </div>
-                <input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} placeholder="기본주소" className="mt-1 h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
-                <input value={editDetailAddress} onChange={(e) => setEditDetailAddress(e.target.value)} placeholder="상세주소" className="mt-1 h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
+                <input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} placeholder="기본주소" className="mt-1 h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-ink" />
+                <input value={editDetailAddress} onChange={(e) => setEditDetailAddress(e.target.value)} placeholder="상세주소" className="mt-1 h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-ink" />
               </div>
-              <label className="grid gap-1 text-[11px] font-black text-ink-mute">배송메모
-                <input value={editMemo} onChange={(e) => setEditMemo(e.target.value)} placeholder="배송 요청사항" className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-rose-deep" />
+              <label className="grid gap-1 text-[12px] font-semibold text-ink-mute">배송메모
+                <input value={editMemo} onChange={(e) => setEditMemo(e.target.value)} placeholder="배송 요청사항" className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-bold text-ink outline-none focus:border-ink" />
               </label>
-              <button type="button" onClick={handleSaveCustomerFields} disabled={savingCustomer} className="mt-1 h-9 w-full rounded-lg bg-[var(--color-ok-tx)] text-[13px] font-black text-white hover:bg-[var(--color-ok-tx)] disabled:bg-surface-3">
-                {savingCustomer ? "저장중..." : "고객/배송 정보 저장"}
+              <button type="button" onClick={handleSaveCustomerFields} disabled={savingCustomer} className="mt-1 h-10 w-full rounded-lg bg-ink text-[14px] font-bold text-white disabled:bg-surface-3">
+                {savingCustomer ? "저장중..." : "저장"}
               </button>
-              <div className="rounded-lg bg-warn-bg px-2.5 py-1.5 text-[11px] font-bold leading-4 text-warn-tx">상품명·옵션·금액은 아래 상품 카드에서 수정합니다. 여기선 닉네임·고객·주소·메모만 저장됩니다(배송비/합계 미변경).</div>
+              <div className="text-[12px] leading-4 text-ink-mute">상품·금액은 아래 상품에서 바꿔요.</div>
             </div>
           ) : (
-            <div className="whitespace-pre-wrap break-keep rounded-lg border border-line bg-surface-2 px-3 py-2 text-[12px] font-bold leading-5 text-ink">
+            <div className="whitespace-pre-wrap break-keep rounded-lg bg-surface-2 px-3 py-2 text-[14px] leading-5 text-ink">
               {customerAddressText || "주소 정보 없음"}
             </div>
           )}
         </section>
-
         {/* 고객정보 그리드 (목업 B: 닉네임/이름/연락처/결제방법) */}
-        <div className="mb-3 grid grid-cols-2 gap-x-3 gap-y-2.5">
+        <div className="mb-3 grid grid-cols-2 gap-x-3 gap-y-2.5 px-1">
           {/* [2026-09-20] 닉네임 «원본»을 보여준다.
               예전엔 표시용 nickname(비면 이름으로 대체)을 그대로 띄워서,
               youtube_nickname 이 «실제로 비어 있는» 주문도 이름이 닉네임인 것처럼 보였다.
@@ -1524,125 +1658,25 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             );
           })()}
         </div>
-
-        {/* 고객이슈 — 등록은 「+ 고객이슈 등록」 버튼 하나로 고객이슈 등록 모달(IssueRegisterModal)을 연다. */}
-        <section className="mt-3">
-          <div className="mb-1 flex items-center gap-2">
-            <span className="text-[11px] font-black text-ink-mute">고객이슈</span>
-            <button
-              type="button"
-              onClick={() => void openIssueRegister()}
-              className="rounded-lg border border-rose-line bg-rose-soft px-2.5 py-1 text-[11px] font-black text-rose-deep transition hover:bg-rose-line/40"
-            >
-              + 고객이슈 등록
-            </button>
-          </div>
-          {(order as any).returnStatus ? (
-            <div
-              role={issueLatest?.task ? "button" : undefined}
-              tabIndex={issueLatest?.task ? 0 : undefined}
-              onClick={issueLatest?.task ? () => void openExistingIssue(issueLatest.task as Record<string, unknown>) : undefined}
-              className={`rounded-lg border border-warn-tx/40 bg-warn-bg p-3 text-[12px] font-bold leading-6 text-warn-tx ${issueLatest?.task ? "cursor-pointer hover:bg-surface-2" : ""}`}
-            >
-              {/* [B4] DB 값은 「반품(환불)/반품(교환)/기타」 — 화면에서만 「환불/교환/기타」로. 사유 앞머리 "[유형] " 제거. */}
-              <span className="mr-2 rounded-lg bg-surface px-2 py-0.5 text-[11px] font-black">{String((order as any).returnStatus).replace("반품(환불)", "환불").replace("반품(교환)", "교환")}</span>
-              {/* [2026-09-29 C] 고객이슈가 해결완료면 배지 표시 + 「반품 취소」 숨김(기록 지우기는 유지). */}
-              {issueLatest?.isResolved ? (() => { const d = new Date(issueLatest.resolvedAt); const md = Number.isFinite(d.getTime()) ? `${d.getMonth() + 1}.${d.getDate()}` : ""; return <span className="mr-2 rounded-lg bg-ok-bg px-2 py-0.5 text-[11px] font-black text-ok-tx">✅ 해결완료{md ? ` ${md}` : ""}</span>; })() : null}
-              {Number((order as any).returnAmount || 0) > 0 ? <span className="mr-2">환불 예정/완료 {money(Number((order as any).returnAmount || 0))}</span> : null}
-              {issueLatest?.task ? <span className="float-right text-[12px] font-black text-rose-deep">열기 ›</span> : null}
-              {/* [⑰ B] 이슈가 있으면 그 이슈에서 대상·세부를 읽는다(표시만·orders 무접촉). 없으면 기존 return_reason. */}
-              {issueLatest?.task ? (() => {
-                const body = String((issueLatest.task as Record<string, unknown>).body ?? "");
-                const target = fieldFromIssueBody(body, "대상상품:");
-                const add = fieldFromIssueBody(body, "추가상품:");
-                const memo = splitIssueBody(body).memo.split("\n").filter(Boolean).slice(0, 2).join("\n");
-                // [⑲ D] 대상상품이 비었거나 '상품 지정 없음'이고 추가상품이 있으면 「대상:」 줄 숨김.
-                const hideTarget = add && (!target || target === "상품 지정 없음");
-                return (
-                <div className="mt-1 text-ink-soft">
-                  {hideTarget ? null : <div className="whitespace-pre-wrap">대상: {target || "상품 지정 없음"}</div>}
-                  {/* [⑱ D] 기타 이슈에 따로 추가한 관련 상품이 있으면 「추가:」 한 줄(표시만). */}
-                  {add ? <div className="mt-0.5 whitespace-pre-wrap">추가: {add}</div> : null}
-                  {memo ? <div className="mt-0.5 whitespace-pre-wrap">세부: {memo}</div> : null}
-                </div>
-                );
-              })() : (
-                <div className="mt-1 whitespace-pre-wrap text-ink-soft">{String((order as any).returnReason || "사유 없음").replace(/^\[[^\]]*\]\s*/, "")}</div>
-              )}
-              <div className="mt-1 flex items-center justify-end gap-3">
-                <button type="button" disabled={returnSaving} onClick={(e) => { e.stopPropagation(); void handleClearReturn(); }} title="기록만 지웁니다 — 정산·입금·재고 숫자는 바뀌지 않아요." className="text-[11px] font-black text-ink-mute underline hover:text-danger-tx disabled:opacity-50">기록 지우기</button>
-                {issueLatest?.isResolved ? null : <button type="button" disabled={returnSaving} onClick={(e) => { e.stopPropagation(); handleUndoReturn(); }} className="text-[11px] font-black text-ink-mute underline hover:text-rose-deep disabled:opacity-50">반품 취소</button>}
-              </div>
-            </div>
+        <section>
+          <div className="mb-1 text-[12px] font-semibold text-ink-mute">배송메모</div>
+          {/* [E5] 비면 회색 한 줄 */}
+          {customerDeliveryMemoText ? (
+            <div className="rounded-lg bg-surface-2 px-3 py-2 text-[13px] leading-5 text-ink">{customerDeliveryMemoText}</div>
           ) : (
-            <div className="rounded-lg bg-surface-2 p-3 text-[12px] font-bold text-ink-mute">등록된 이슈 없음</div>
+            <div className="px-1 text-[13px] text-ink-mute">없음</div>
           )}
         </section>
-
-        {/* 상태 배지 + 안내 (기존 로직) */}
-        <div className={`rounded-xl border px-3 py-2 text-xs font-black ${getPaymentStatusClass(orderForView)}`}>
-          {getPaymentStatusLabel(orderForView)}
-          {orderForView.paidAt ? <span className="ml-2 font-bold opacity-70">{orderForView.paidAt}</span> : null}
         </div>
 
-        {/* [E1] 「입금확인 주문입니다…」 안내 문단 삭제 — 버튼 이름이 곧 설명. 상태 배지·돈 계산기 유지. */}
-
-        {/* [2026-08-31 사장님 요청] 💰 돈 계산기 — 입금액 vs 주문금액 자동 비교, 버튼 한 번 처리 */}
-        {balanceEligible && balanceInfo && balanceInfo.depositCount > 0 ? (() => {
-          const diff = balanceInfo.depositSum - balanceOrderTotal;
-          const refundDone = !!balanceInfo.lastRefund && balanceInfo.lastRefund.sourceKey === balanceRefundKey;
-          if (diff === 0) {
-            return (
-              <div className="mt-2 rounded-xl border border-ok-tx/35 bg-ok-bg px-3 py-2 text-[12px] font-black leading-5 text-ok-tx">
-                받은 돈 {money(balanceInfo.depositSum)} = 주문 금액 {money(balanceOrderTotal)} — 딱 맞아요.
-              </div>
-            );
-          }
-          if (diff > 0) {
-            return (
-              <div className="mt-2 space-y-2 rounded-xl border border-warn-tx/35 bg-warn-bg px-3 py-2.5 leading-5">
-                <div className="text-[13px] font-black text-warn-tx">손님이 {money(diff)} 더 냈어요.</div>
-                <div className="text-[11px] font-bold text-warn-tx">받은 돈 {money(balanceInfo.depositSum)} − 주문 금액 {money(balanceOrderTotal)} = {money(diff)}</div>
-                {refundDone && balanceInfo.lastRefund ? (
-                  <div className="rounded-lg bg-ok-bg px-2.5 py-1.5 text-[12px] font-black text-ok-tx">이미 {money(balanceInfo.lastRefund.amount)}를 포인트로 돌려줬어요.</div>
-                ) : (
-                  <>
-                    <button type="button" disabled={balanceWorking} onClick={() => void handleRefundDiffAsPoints(diff)} className="w-full rounded-lg bg-[var(--color-warn-tx)] px-3 py-2 text-[13px] font-black text-white hover:bg-[var(--color-warn-tx)] disabled:opacity-50">
-                      {balanceWorking ? "처리 중…" : `${money(diff)} 포인트로 돌려주기`}
-                    </button>
-                    {balanceInfo.lastRefund ? (
-                      <div className="text-[11px] font-bold text-warn-tx">참고: 전에 이 주문으로 {money(balanceInfo.lastRefund.amount)}를 돌려준 기록이 있어요. 그 뒤 금액이 또 바뀐 경우에만 다시 누르세요.</div>
-                    ) : null}
-                    <div className="text-[11px] font-bold text-warn-tx">계좌로 직접 환불하실 거면 이 버튼은 누르지 마세요.</div>
-                  </>
-                )}
-              </div>
-            );
-          }
-          return (
-            <div className="mt-2 space-y-2 rounded-xl border border-danger-tx/35 bg-danger-bg px-3 py-2.5 leading-5">
-              <div className="text-[13px] font-black text-danger-tx">⚠️ 받은 돈이 {money(-diff)} 부족해요.</div>
-              <div className="text-[11px] font-bold text-danger-tx">주문 금액 {money(balanceOrderTotal)} − 받은 돈 {money(balanceInfo.depositSum)} = {money(-diff)}</div>
-              <button type="button" disabled={balanceWorking} onClick={() => void handleRequestShortageDeposit(-diff)} className="w-full rounded-lg bg-[var(--color-danger-tx)] px-3 py-2 text-[13px] font-black text-white hover:bg-[var(--color-danger-tx)] disabled:opacity-50">
-                {balanceWorking ? "처리 중…" : `${money(-diff)} 더 입금해달라고 쪽지 보내기`}
-              </button>
-            </div>
-          );
-        })() : null}
-
-        {paymentCancelError ? (
-          <div className="mt-2 rounded-xl border border-danger-tx bg-danger-bg px-3 py-2 text-[11px] font-black leading-4 text-danger-tx">
-            입금확인 취소 오류: {paymentCancelError}
-          </div>
-        ) : null}
-
+        <div className="mt-4 border-t border-line pt-3">
         {/* 주문 내역 (목업 B) */}
         <section className="mt-3">
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-[11px] font-black text-ink-mute">주문 내역 ({items.length}건)</h3>
+            <h3 className="text-[13px] font-semibold text-ink-mute">주문 상품 {items.length}</h3>
             <div className="flex items-center gap-2">
               {refreshingDetail ? (
-                <span className="rounded-full bg-rose-soft px-2 py-1 text-[11px] font-black text-rose-deep">상세정보 갱신중...</span>
+                <span className="text-[12px] text-ink-mute">갱신 중…</span>
               ) : null}
               {!isCanceled ? (
                 <>
@@ -1652,9 +1686,9 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                       setShowPicker(false);
                       setShowAddForm((v) => !v);
                     }}
-                    className="rounded-lg border border-rose-line bg-rose-soft px-2 py-1 text-[11px] font-black text-rose-deep hover:opacity-90"
+                    className="h-8 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-semibold text-ink hover:bg-surface-2"
                   >
-                    {showAddForm ? "닫기" : "+ 직접입력 추가"}
+                    {showAddForm ? "닫기" : "+ 직접입력"}
                   </button>
                   <button
                     type="button"
@@ -1662,9 +1696,9 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                       setShowAddForm(false);
                       setShowPicker((v) => !v);
                     }}
-                    className="rounded-lg border border-rose-line bg-rose-soft px-2 py-1 text-[11px] font-black text-rose-deep hover:opacity-90"
+                    className="h-8 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-semibold text-ink hover:bg-surface-2"
                   >
-                    {showPicker ? "닫기" : "+ 등록상품 추가"}
+                    {showPicker ? "닫기" : "+ 등록상품"}
                   </button>
                 </>
               ) : null}
@@ -1672,7 +1706,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           </div>
           <div className="space-y-2">
             {items.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-line"><div className="ru-empty"><div className="ru-empty-title">주문 품목이 없습니다.</div><div className="ru-empty-hint">위 「+ 등록상품 추가」 또는 「+ 직접입력 추가」로 넣어주세요.</div></div></div>
+              <div className="rounded-2xl border border-dashed border-line"><div className="ru-empty"><div className="ru-empty-title">주문 품목이 없습니다.</div><div className="ru-empty-hint">위 「+ 등록상품」 또는 「+ 직접입력」으로 넣어주세요.</div></div></div>
             ) : (
               items.map((item, index) => (
                 <LiveOrderItemEditCard
@@ -1693,26 +1727,26 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           </div>
 
           {showAddForm && !isCanceled ? (
-            <div className="mt-2 space-y-2 rounded-2xl border border-rose-line bg-rose-soft/50 p-3">
-              <div className="text-[11px] font-black text-ink-soft">직접입력 상품 추가 (재고 차감 없음)</div>
+            <div className="mt-2 space-y-2 rounded-xl border border-line bg-surface-2 p-3">
+              <div className="text-[13px] font-semibold text-ink">직접입력 상품 · 재고 안 빠짐</div>
               <input
                 value={addForm.productName}
                 onChange={(e) => setAddForm((f) => ({ ...f, productName: e.target.value }))}
                 placeholder="상품명"
-                className="w-full rounded-lg border border-line px-2 py-1.5 text-[13px] outline-none focus:border-rose-deep"
+                className="w-full rounded-lg border border-line px-2 py-1.5 text-[13px] outline-none focus:border-ink"
               />
               <div className="flex gap-2">
                 <input
                   value={addForm.color}
                   onChange={(e) => setAddForm((f) => ({ ...f, color: e.target.value }))}
                   placeholder="색상(선택)"
-                  className="flex-1 rounded-lg border border-line px-2 py-1.5 text-[13px] outline-none focus:border-rose-deep"
+                  className="flex-1 rounded-lg border border-line px-2 py-1.5 text-[13px] outline-none focus:border-ink"
                 />
                 <input
                   value={addForm.size}
                   onChange={(e) => setAddForm((f) => ({ ...f, size: e.target.value }))}
                   placeholder="사이즈(선택)"
-                  className="flex-1 rounded-lg border border-line px-2 py-1.5 text-[13px] outline-none focus:border-rose-deep"
+                  className="flex-1 rounded-lg border border-line px-2 py-1.5 text-[13px] outline-none focus:border-ink"
                 />
               </div>
               <div className="flex gap-2">
@@ -1721,21 +1755,21 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                   onChange={(e) => setAddForm((f) => ({ ...f, qty: e.target.value.replace(/[^\d]/g, "") }))}
                   inputMode="numeric"
                   placeholder="수량"
-                  className="w-20 rounded-lg border border-line px-2 py-1.5 text-[13px] outline-none focus:border-rose-deep"
+                  className="w-20 rounded-lg border border-line px-2 py-1.5 text-[13px] outline-none focus:border-ink"
                 />
                 <input
                   value={addForm.unitPrice}
                   onChange={(e) => setAddForm((f) => ({ ...f, unitPrice: e.target.value.replace(/[^\d]/g, "") }))}
                   inputMode="numeric"
                   placeholder="단가(원)"
-                  className="flex-1 rounded-lg border border-line px-2 py-1.5 text-[13px] outline-none focus:border-rose-deep"
+                  className="flex-1 rounded-lg border border-line px-2 py-1.5 text-[13px] outline-none focus:border-ink"
                 />
               </div>
               <button
                 type="button"
                 disabled={adding}
                 onClick={handleAddDirectItem}
-                className="w-full rounded-lg bg-rose-deep px-3 py-2 text-[13px] font-black text-white disabled:opacity-50"
+                className="h-10 w-full rounded-lg bg-ink px-3 text-[14px] font-bold text-white disabled:opacity-50"
               >
                 {adding ? "추가 중..." : "이 주문에 추가"}
               </button>
@@ -1753,8 +1787,8 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 
         {/* 금액 요약 (목업 B) */}
         <div className="mt-3 border-t border-line pt-2">
-          <div className="flex items-center justify-between py-1 text-[12px]"><span className="text-ink-soft">상품금액</span><span className="font-black text-ink">{money(productAmount)}</span></div>
-          <div className="flex items-center justify-between py-1 text-[12px]">
+          <div className="flex items-center justify-between py-1 text-[13px]"><span className="text-ink-soft">상품금액</span><span className="font-black text-ink">{money(productAmount)}</span></div>
+          <div className="flex items-center justify-between py-1 text-[13px]">
             <span className="text-ink-soft">배송비</span>
             <span className="flex items-center gap-1.5">
               <span className="font-black text-ink">{money(shippingFee)}</span>
@@ -1763,7 +1797,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 <button
                   type="button"
                   onClick={() => { setShipEditText(String(shippingFee)); setShipEditOpen((v) => !v); }}
-                  className="rounded-lg border border-line bg-surface px-1.5 py-0.5 text-[11px] font-black text-ink-soft hover:border-rose-deep hover:text-rose-deep"
+                  className="h-7 rounded-lg border border-line bg-surface px-2 text-[12px] font-semibold text-ink hover:bg-surface-2"
                 >
                   수정
                 </button>
@@ -1777,141 +1811,91 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 value={shipEditText === "" ? "" : Number(String(shipEditText).replace(/[^0-9]/g, "") || 0).toLocaleString("ko-KR")}
                 inputMode="numeric"
                 onChange={(event) => setShipEditText(event.target.value.replace(/[^0-9]/g, ""))}
-                className="w-24 rounded-lg border border-line px-2 py-1 text-right text-[12px] font-black outline-none focus:border-rose-deep"
+                className="w-24 rounded-lg border border-line px-2 py-1 text-right text-[12px] font-bold outline-none focus:border-ink"
                 placeholder="0"
               />
               <span className="text-[11px] text-ink-soft">원 (0원 가능)</span>
-              <button type="button" disabled={savingShipping} onClick={() => void handleSaveShippingFee()} className="ml-auto rounded-lg bg-rose-deep px-2.5 py-1 text-[11px] font-black text-white disabled:opacity-50">{savingShipping ? "저장중…" : "저장"}</button>
+              <button type="button" disabled={savingShipping} onClick={() => void handleSaveShippingFee()} className="ml-auto h-7 rounded-lg bg-ink px-2.5 text-[12px] font-bold text-white disabled:opacity-50">{savingShipping ? "저장중…" : "저장"}</button>
               <button type="button" disabled={savingShipping} onClick={() => setShipEditOpen(false)} className="rounded-lg border border-line bg-surface px-2 py-1 text-[11px] font-bold text-ink-soft">취소</button>
             </div>
           ) : null}
           {isCardPaymentDisplay && cardPaymentExtraAmount > 0 ? (
-            <div className="flex items-center justify-between py-1 text-[12px]"><span className="text-ink-soft">카드추가금</span><span className="font-black text-ink">{money(cardPaymentExtraAmount)}</span></div>
+            <div className="flex items-center justify-between py-1 text-[13px]"><span className="text-ink-soft">카드추가금</span><span className="font-black text-ink">{money(cardPaymentExtraAmount)}</span></div>
           ) : null}
           {pointUsedAmount > 0 ? (
-            <div className="flex items-center justify-between py-1 text-[12px]"><span className="text-ink-soft">포인트 사용</span><span className="font-black text-rose-deep">-{money(pointUsedAmount)}</span></div>
+            <div className="flex items-center justify-between py-1 text-[13px]"><span className="text-ink-soft">포인트 사용</span><span className="font-bold text-ink">-{money(pointUsedAmount)}</span></div>
           ) : null}
-          <div className="mt-1 flex items-center justify-between border-t border-line pt-2 text-[14px] font-black">
+          <div className="mt-1 flex items-center justify-between border-t border-line pt-2 text-[16px] font-bold">
             <span className="text-ink">{pointUsedAmount > 0 ? "최종 결제금액" : "총 결제금액"}</span>
             <span className="text-ink">{money(pointUsedAmount > 0 ? finalPaymentAmount : cardPaymentExpectedTotal)}</span>
           </div>
         </div>
-
-        {/* 액션 버튼 (목업 B action-btns: 수동입금확인 green / 입금매칭 rose / 취소 red) — 기존 조건/핸들러 그대로 */}
-        <div className="mt-4 grid grid-cols-1 gap-2 border-t border-line pt-3">
-          {canChangePaymentMethod ? (
-            <button
-              type="button"
-              onClick={handleChangePaymentMethod}
-              disabled={methodChanging}
-              className="h-10 w-full rounded-xl border border-rose-line bg-rose-soft text-[13px] font-black text-rose-deep shadow-sm hover:bg-rose-line/40 active:scale-[0.99] disabled:bg-surface-2 disabled:text-ink-mute"
-            >
-              {methodChanging ? "계산중..." : `${nextPaymentMethod}으로 변경`}
-            </button>
-          ) : null}
-
-          {/* [E2] 「입금확인 취소」는 화면 맨 아래 「⚠ 위험 작업」 접힘으로 이동. */}
-
-          {showCardStatusActions ? (
-            <>
-              {isCardUnpaid ? (
-                <button
-                  type="button"
-                  onClick={() => handleCardPaymentStatusChange("카드결제완료", "card-paid")}
-                  disabled={Boolean(cardStatusAction)}
-                  className="h-10 w-full rounded-xl bg-cardpay text-[13px] font-black text-white shadow-sm hover:bg-cardpay-hover active:scale-[0.99] disabled:bg-surface-3"
-                >
-                  {cardStatusAction === "card-paid" ? "처리중..." : "카드결제완료 처리"}
-                </button>
-              ) : null}
-
-              {isCardPaid ? (
-                <>
-                  {/* [E1] 「카드결제완료 주문입니다…」 안내 문단 삭제 — 버튼 이름이 곧 설명. */}
-                  <button
-                    type="button"
-                    onClick={() => handleCardPaymentStatusChange("주문확인전", "card-unpaid")}
-                    disabled={Boolean(cardStatusAction)}
-                    className="h-10 w-full rounded-xl border border-rose-line bg-rose-soft text-[13px] font-black text-rose-deep shadow-sm hover:opacity-90 active:scale-[0.99] disabled:bg-surface-2 disabled:text-ink-mute"
-                  >
-                    {cardStatusAction === "card-unpaid" ? "처리중..." : "카드미결제로 되돌리기"}
-                  </button>
-                </>
-              ) : null}
-            </>
-          ) : null}
-
-          {!isCanceled && orderForView.paymentStatus === "unpaid" ? (
-            <button
-              type="button"
-              onClick={handleManualConfirm}
-              disabled={manualConfirmAction}
-              className="h-10 w-full rounded-xl bg-[var(--color-ok-tx)] text-[13px] font-black text-white shadow-sm hover:bg-[var(--color-ok-tx)] active:scale-[0.99] disabled:bg-surface-3"
-            >
-              {manualConfirmAction ? "처리중..." : "수동 입금확인"}
-            </button>
-          ) : null}
-
-          {!isCanceled && orderForView.paymentStatus === "manual_match_needed" && onOpenManualMatch ? (
-            <button
-              type="button"
-              onClick={() => onOpenManualMatch(order)}
-              className="h-10 w-full rounded-xl border border-rose-line bg-rose-soft text-[13px] font-black text-rose-deep shadow-sm hover:opacity-90 active:scale-[0.99]"
-            >
-              입금 매칭에서 찾기
-            </button>
-          ) : null}
-
-          {isCanceled ? (
-            <>
-              <button
-                type="button"
-                onClick={restoreOrder}
-                disabled={Boolean(savingAction)}
-                className="h-10 w-full rounded-xl bg-rose-deep text-[13px] font-black text-white shadow-sm hover:opacity-90 active:scale-[0.99] disabled:bg-surface-3"
-              >
-                {savingAction === "restore" ? "처리중..." : "주문서복구"}
-              </button>
-
-              {canCancelPaymentConfirm && !isCardOrder ? (
-                <>
-                  <div className="rounded-xl border border-warn-tx bg-warn-bg px-3 py-2 text-[11px] font-bold leading-4 text-warn-tx">
-                    주문서는 이미 취소된 상태입니다. 다만 입금확인 기록이 남아있어 정산에서 제외하려면 [취소주문 입금기록 정리]를 사용하세요.
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handlePaymentConfirmCancel}
-                    disabled={paymentCancelAction}
-                    className="h-10 w-full rounded-xl border border-warn-tx bg-surface text-[13px] font-black text-warn-tx shadow-sm hover:bg-warn-bg active:scale-[0.99] disabled:bg-surface-2 disabled:text-ink-mute"
-                  >
-                    {paymentCancelAction ? "처리중..." : "취소주문 입금기록 정리"}
-                  </button>
-                </>
-              ) : null}
-            </>
-          ) : null /* [E2] 「주문서 자체 취소」는 화면 맨 아래 「⚠ 위험 작업」 접힘으로 이동. */}
         </div>
 
-        {/* [E2] 「이 손님 차단」은 화면 맨 아래 「⚠ 위험 작업」 접힘으로 이동. */}
-
-        <section className="mt-3">
-          <div className="mb-1 text-[11px] font-black text-ink-mute">배송메모 / 특이사항</div>
-          {/* [E5] 비면 회색 한 줄 */}
-          {customerDeliveryMemoText ? (
-            <div className="min-h-[56px] rounded-lg bg-surface-2 p-3 text-[12px] font-bold leading-6 text-ink-soft">{customerDeliveryMemoText}</div>
+        <div className="mt-4 border-t border-line pt-3">
+        {/* 고객이슈 — 등록은 「+ 고객이슈 등록」 버튼 하나로 고객이슈 등록 모달(IssueRegisterModal)을 연다. */}
+        <section>
+          <div className="mb-2 flex items-center gap-2">
+            <h3 className="text-[13px] font-semibold text-ink-mute">고객이슈</h3>
+            <button
+              type="button"
+              onClick={() => void openIssueRegister()}
+              className="ml-auto h-8 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-semibold text-ink hover:bg-surface-2"
+            >
+              + 등록
+            </button>
+          </div>
+          {(order as any).returnStatus ? (
+            <div
+              role={issueLatest?.task ? "button" : undefined}
+              tabIndex={issueLatest?.task ? 0 : undefined}
+              onClick={issueLatest?.task ? () => void openExistingIssue(issueLatest.task as Record<string, unknown>) : undefined}
+              className={`rounded-lg border border-warn-tx/40 bg-warn-bg p-3 text-[12px] font-bold leading-6 text-warn-tx ${issueLatest?.task ? "cursor-pointer hover:bg-surface-2" : ""}`}
+            >
+              {/* [B4] DB 값은 「반품(환불)/반품(교환)/기타」 — 화면에서만 「환불/교환/기타」로. 사유 앞머리 "[유형] " 제거. */}
+              <span className="mr-2 rounded-lg bg-surface px-2 py-0.5 text-[11px] font-bold">{String((order as any).returnStatus).replace("반품(환불)", "환불").replace("반품(교환)", "교환")}</span>
+              {/* [2026-09-29 C] 고객이슈가 해결완료면 배지 표시 + 「반품 취소」 숨김(기록 지우기는 유지). */}
+              {issueLatest?.isResolved ? (() => { const d = new Date(issueLatest.resolvedAt); const md = Number.isFinite(d.getTime()) ? `${d.getMonth() + 1}.${d.getDate()}` : ""; return <span className="mr-2 rounded-lg bg-ok-bg px-2 py-0.5 text-[11px] font-bold text-ok-tx">해결완료{md ? ` ${md}` : ""}</span>; })() : null}
+              {Number((order as any).returnAmount || 0) > 0 ? <span className="mr-2">환불 예정/완료 {money(Number((order as any).returnAmount || 0))}</span> : null}
+              {issueLatest?.task ? <span className="float-right text-[12px] font-semibold text-ink-soft">열기 ›</span> : null}
+              {/* [⑰ B] 이슈가 있으면 그 이슈에서 대상·세부를 읽는다(표시만·orders 무접촉). 없으면 기존 return_reason. */}
+              {issueLatest?.task ? (() => {
+                const body = String((issueLatest.task as Record<string, unknown>).body ?? "");
+                const target = fieldFromIssueBody(body, "대상상품:");
+                const add = fieldFromIssueBody(body, "추가상품:");
+                const memo = splitIssueBody(body).memo.split("\n").filter(Boolean).slice(0, 2).join("\n");
+                // [⑲ D] 대상상품이 비었거나 '상품 지정 없음'이고 추가상품이 있으면 「대상:」 줄 숨김.
+                const hideTarget = add && (!target || target === "상품 지정 없음");
+                return (
+                <div className="mt-1 text-ink-soft">
+                  {hideTarget ? null : <div className="whitespace-pre-wrap">대상: {target || "상품 지정 없음"}</div>}
+                  {/* [⑱ D] 기타 이슈에 따로 추가한 관련 상품이 있으면 「추가:」 한 줄(표시만). */}
+                  {add ? <div className="mt-0.5 whitespace-pre-wrap">추가: {add}</div> : null}
+                  {memo ? <div className="mt-0.5 whitespace-pre-wrap">세부: {memo}</div> : null}
+                </div>
+                );
+              })() : (
+                <div className="mt-1 whitespace-pre-wrap text-ink-soft">{String((order as any).returnReason || "사유 없음").replace(/^\[[^\]]*\]\s*/, "")}</div>
+              )}
+              <div className="mt-1 flex items-center justify-end gap-3">
+                <button type="button" disabled={returnSaving} onClick={(e) => { e.stopPropagation(); void handleClearReturn(); }} title="기록만 지웁니다 — 정산·입금·재고 숫자는 바뀌지 않아요." className="text-[11px] font-bold text-ink-mute underline hover:text-danger-tx disabled:opacity-50">기록 지우기</button>
+                {issueLatest?.isResolved ? null : <button type="button" disabled={returnSaving} onClick={(e) => { e.stopPropagation(); handleUndoReturn(); }} className="text-[11px] font-bold text-ink-mute underline hover:text-ink disabled:opacity-50">반품 취소</button>}
+              </div>
+            </div>
           ) : (
-            <div className="rounded-lg bg-surface-2 px-3 py-2 text-[12px] font-bold text-ink-mute">배송메모 없음</div>
+            <div className="px-1 text-[13px] text-ink-mute">없음</div>
           )}
         </section>
+        </div>
 
         {/* [E2] ⚠ 위험 작업 — 기본 접힘. 누르면 입금확인 취소·주문서 자체 취소·이 손님 차단 표시(핸들러·조건·확인창 그대로). */}
         <section className="mt-4">
-          <button type="button" onClick={() => setDangerOpen((v) => !v)} className="flex w-full items-center justify-between rounded-lg border border-line bg-surface px-3 py-2 text-[12px] font-black text-ink-mute hover:bg-surface-2">
-            <span>⚠ 위험 작업</span>
-            <span>{dangerOpen ? "▲" : "▼"}</span>
+          <button type="button" onClick={() => setDangerOpen((v) => !v)} aria-expanded={dangerOpen} className="flex h-10 w-full items-center justify-between rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink-soft hover:bg-surface-2">
+            <span>위험 작업 · 입금확인 취소 · 주문 취소 · 차단</span>
+            <span className="text-[12px] text-ink-mute">{dangerOpen ? "닫기" : "열기"}</span>
           </button>
           {dangerOpen ? (
-            <div className="mt-2 space-y-2 rounded-lg border border-danger-tx/30 bg-danger-bg/40 p-3">
+            <div className="mt-2 space-y-2 rounded-lg border border-line p-3">
               <div className="text-[11px] font-bold leading-4 text-ink-mute">되돌리기 어려운 작업이에요 — 꼭 필요할 때만 사용하세요.</div>
 
               {!isCanceled && canCancelPaymentConfirm ? (
@@ -1919,7 +1903,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                   type="button"
                   onClick={handlePaymentConfirmCancel}
                   disabled={paymentCancelAction}
-                  className="h-10 w-full rounded-xl border border-line bg-surface text-[13px] font-black text-ink shadow-sm hover:opacity-90 active:scale-[0.99] disabled:bg-surface-2 disabled:text-ink-mute"
+                  className="h-10 w-full rounded-lg border border-line bg-surface text-[13px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-50"
                 >
                   {paymentCancelAction ? "처리중..." : "입금확인 취소"}
                 </button>
@@ -1932,7 +1916,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                     type="button"
                     onClick={cancelOrder}
                     disabled={Boolean(savingAction)}
-                    className="h-10 w-full rounded-xl border border-danger-tx bg-danger-bg text-[13px] font-black text-danger-tx shadow-sm hover:opacity-90 active:scale-[0.99] disabled:bg-surface-2 disabled:text-ink-mute"
+                    className="h-10 w-full rounded-lg border border-line bg-surface text-[13px] font-semibold text-danger-tx hover:bg-surface-2 disabled:opacity-50"
                   >
                     {savingAction === "cancel" ? "처리중..." : "주문서 자체 취소"}
                   </button>
@@ -1941,7 +1925,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 
               {/* 이 손님 차단(또는 해제) — 조건·핸들러·확인창 그대로 */}
               <div className="rounded-xl border border-line bg-surface p-3">
-                <div className="text-[11px] font-black text-ink-mute">이 손님</div>
+                <div className="text-[12px] font-semibold text-ink-mute">이 손님</div>
                 {blockedNow === null ? (
                   <div className="mt-2 flex h-10 w-full items-center justify-center rounded-xl bg-surface-2 text-[12px] font-bold text-ink-mute">
                     차단 여부 확인 중…
@@ -1949,7 +1933,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 ) : blockedNow ? (
                   <>
                     <div className="mt-2 rounded-xl border border-danger-tx bg-danger-bg px-3 py-2">
-                      <div className="text-[12px] font-black text-danger-tx">이미 차단된 손님입니다</div>
+                      <div className="text-[12px] font-bold text-danger-tx">이미 차단된 손님입니다</div>
                       {blockedReason ? (
                         <pre className="mt-1 whitespace-pre-wrap break-words text-[11px] font-bold leading-4 text-danger-tx">{blockedReason}</pre>
                       ) : null}
@@ -1975,7 +1959,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                         }
                       }}
                       disabled={blockSaving}
-                      className="mt-2 h-10 w-full rounded-xl border border-line bg-surface text-[13px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50"
+                      className="mt-2 h-10 w-full rounded-xl border border-line bg-surface text-[13px] font-bold text-ink-soft hover:bg-surface-2 disabled:opacity-50"
                     >
                       {blockSaving ? "처리중…" : "차단 해제"}
                     </button>
@@ -1985,7 +1969,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                     <button
                       type="button"
                       onClick={() => { setBlockError(""); setBlockOpen(true); }}
-                      className="mt-2 h-10 w-full rounded-xl border border-danger-tx bg-surface text-[13px] font-black text-danger-tx hover:bg-danger-bg active:scale-[0.99]"
+                      className="mt-2 h-10 w-full rounded-lg border border-line bg-surface text-[13px] font-semibold text-danger-tx hover:bg-surface-2"
                     >
                       이 손님 차단 (거파 품목 고르기)
                     </button>
@@ -2074,8 +2058,8 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 function Info({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
     <div className="min-w-0">
-      <div className="text-[11px] font-black text-ink-mute">{label}</div>
-      <div className={["mt-0.5 truncate text-sm text-ink", strong ? "font-black" : "font-bold"].join(" ")}>
+      <div className="text-[12px] font-semibold text-ink-mute">{label}</div>
+      <div className={["mt-0.5 truncate text-[14px] text-ink", strong ? "font-bold" : "font-medium"].join(" ")}>
         {value}
       </div>
     </div>
