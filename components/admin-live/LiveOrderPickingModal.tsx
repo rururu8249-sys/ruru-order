@@ -583,7 +583,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
                   const op = pickingProgress(optRows.filter(({ panel }) => panel.paid).map(({ item }) => ({ qty: item.qty, pickedAt: pickedIds.has(item.id) })));
                   if (op.total <= 0) return "";
                   const left = op.total - op.got;
-                  return `${stripNoneOptionParts(optKey) || optKey} ${op.total}${left > 0 && left < op.total ? `(남은 ${left})` : ""}`;
+                  // 짧게: 「베이지 / 사이즈 L」 → 「베이지/L」
+                  const short = (stripNoneOptionParts(optKey) || optKey).replace(/\s*\/\s*사이즈\s*/g, "/").replace(/^사이즈\s+/, "").replace(/\s*\/\s*/g, "/");
+                  return `${short} ${op.total}${left > 0 && left < op.total ? `(남은 ${left})` : ""}`;
                 }).filter(Boolean).join(" · ");
                 const optionPricesDiffer = new Set(group.rows.map(({ item }) => item.unitPrice || 0).filter(price => price > 0)).size > 1;
                 // sticky 가 동작하도록 section 은 overflow-clip(overflow-hidden 은 sticky 를 막는다). 머리 높이 고정: 상품 72px · 옵션 48px.
