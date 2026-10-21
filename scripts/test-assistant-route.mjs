@@ -11,13 +11,13 @@ const now = Date.now();
 const iso = (daysAgo) => new Date(now - daysAgo * 86400000).toISOString();
 const db = {
   customers: [
-    { id: 'c1', youtube_nickname: '홍길동-f2h', customer_name: '홍길동', kakao_nickname: '길동', customer_phone: '01011112222', kakao_id: 'k1', last_order_at: iso(2), previous_nicknames: null, is_blocked: false, created_at: iso(100) },
-    { id: 'c2', youtube_nickname: '홍길순', customer_name: '김순이', kakao_nickname: '', customer_phone: '01033334444', kakao_id: 'k2', last_order_at: iso(40), previous_nicknames: '["옛닉"]', is_blocked: true, created_at: iso(90) },
+    { id: 'c1', youtube_nickname: '홍길동-f2h', customer_name: '홍길동', kakao_nickname: '길동', customer_phone: '01011112222', kakao_id: 'k1', last_order_at: iso(2), previous_nicknames: null, is_blocked: 'N', created_at: iso(100) },
+    { id: 'c2', youtube_nickname: '홍길순', customer_name: '김순이', kakao_nickname: '', customer_phone: '01033334444', kakao_id: 'k2', last_order_at: iso(40), previous_nicknames: '["옛닉"]', is_blocked: 'true', created_at: iso(90) },
     { id: 'c3', youtube_nickname: '행복나무3899', customer_name: '박행복', kakao_nickname: '', customer_phone: '01055556666', kakao_id: 'k3', last_order_at: iso(1), previous_nicknames: null, is_blocked: false, created_at: iso(80) },
   ],
   orders: [
     { id: 1, created_at: iso(10), youtube_nickname: '홍길동-f2h', customer_name: '홍길동', recipient_name: '홍길동', customer_phone: '01011112222', kakao_id: 'k1', order_group_id: 'G1', order_lookup_code: 'A1', product_name: '폴로 자켓 네이비', color: '네이비', size: 'L', qty: 2, is_deleted: false, admin_order_status_v2: '자동입금확인', payment_method: '무통장입금', product_price: 39000, final_amount: 78000 },
-    { id: 2, created_at: iso(2), youtube_nickname: '홍길동-f2h', customer_name: '홍길동', recipient_name: '홍길동', customer_phone: '01011112222', kakao_id: 'k1', order_group_id: 'G2', order_lookup_code: 'A2', product_name: '니트 가디건', color: '없음', size: 'FREE', qty: 1, is_deleted: false, admin_order_status_v2: '입금대기', payment_method: '무통장입금', product_price: 29000, final_amount: 29000 },
+    { id: 2, created_at: iso(2), youtube_nickname: '홍길동-f2h', customer_name: '홍길동', recipient_name: '홍길동', customer_phone: '01011112222', kakao_id: null, order_group_id: 'G2', order_lookup_code: 'A2', product_name: '니트 가디건', color: '없음', size: 'FREE', qty: 1, is_deleted: false, admin_order_status_v2: '입금대기', payment_method: '무통장입금', product_price: 29000, final_amount: 29000 },
     { id: 3, created_at: iso(5), youtube_nickname: '행복나무3899', customer_name: '박행복', recipient_name: '박행복', customer_phone: '01055556666', kakao_id: 'k3', order_group_id: 'G3', order_lookup_code: 'A3', product_name: '폴로 자켓 베이지', color: '베이지', size: 'M', qty: 1, is_deleted: false, admin_order_status_v2: '출고완료', shipped_prev_status: '수동입금확인', payment_method: '무통장입금', product_price: 39000, final_amount: 39000 },
     { id: 4, created_at: iso(3), youtube_nickname: '지운손님', customer_name: '삭제', recipient_name: '', customer_phone: '01099990000', kakao_id: 'k9', order_group_id: 'G4', order_lookup_code: 'A4', product_name: '폴로 자켓 네이비', color: '', size: '', qty: 5, is_deleted: true },
     { id: 5, created_at: iso(200), youtube_nickname: '홍길동-f2h', customer_name: '홍길동', recipient_name: '', customer_phone: '01011112222', kakao_id: 'k1', order_group_id: 'G5', order_lookup_code: 'A5', product_name: '옛날 상품', color: '', size: '', qty: 1, is_deleted: false, admin_order_status_v2: '주문서취소', payment_method: '무통장입금', product_price: 10000, final_amount: 10000 },
@@ -93,7 +93,9 @@ await t('키 없음 → 규칙 해석: 「홍길 주문한 사람」 → 홍길�
   assert.equal(hong.phone, '010-****-2222');
   assert.equal(hong.orderCount, 2); // 200일 전 주문은 3개월 밖
   assert.deepEqual(hong.orders.map((o) => [o.orderNo, o.paymentLabel]), [['A2', '매칭필요'], ['A1', '자동입금확인']]); // 「입금대기」 = 주문표와 같은 판정(매칭필요)
-  assert.equal(r.body.people[1].blocked, true);
+  assert.equal(hong.blocked, false); // is_blocked 「N」 은 차단 아님
+  assert.equal(r.body.people[1].blocked, true); // 「true」 글자
+  assert.equal(r.body.people.length, 2); // 카카오 id 없는 주문(전화번호만)도 같은 사람으로 묶임
   assert.equal(sentToAi.length, 0); // 키 없으면 AI 호출 없음
 });
 

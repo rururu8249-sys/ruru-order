@@ -32,6 +32,8 @@ function getSupabaseAdminClient() {
 }
 
 const digitsOnly = (v: unknown) => String(v ?? "").replace(/\D/g, "");
+// customers.is_blocked 는 글자 칸(「N」「true」「false」) — 「N」·「false」는 차단 아님
+const isBlockedValue = (v: unknown) => ["true", "t", "y", "1"].includes(String(v ?? "").trim().toLowerCase());
 
 // ───────────────────────── AI 해석 ─────────────────────────
 const INTENT_PROMPT = `너는 쇼핑몰 관리자의 검색 요청을 해석한다. 사장님 문장에서 무엇을 찾는지만 JSON 으로 답한다.
@@ -170,7 +172,7 @@ type CustomerRow = {
   kakao_id: string | null;
   last_order_at: string | null;
   previous_nicknames: unknown;
-  is_blocked: boolean | null;
+  is_blocked: boolean | string | null;
 };
 
 type Person = {
@@ -220,6 +222,20 @@ async function searchCustomers(supabase: SupabaseClient, query: string, sinceIso
 
   // 회원 기준
   const customerByKey = new Map<string, CustomerRow>();
+  // 한 사람을 카카오 id 로도, 전화번호로도 찾을 수 있게(카카오 id 없는 옛 주문은 전화번호만 있음)
+  const aliasToKey = new Map<string, string>();
+  for (const c of customers) {
+    const key = personKey(c.kakao_id, c.customer_phone);
+    if (!key) continue;
+    const phoneKey = digitsOnly(c.customer_phone) ? `p:${digitsOnly(c.customer_phone)}` : "";
+    if (!aliasToKey.has(key)) aliasToKey.set(key, key);
+    if (phoneKey && !aliasToKey.has(phoneKey)) aliasToKey.set(phoneKey, key);
+  }
+  const canonicalKey = (kakaoId: unknown, phone: unknown) => {
+    const k = String(kakaoId ?? "").trim();
+    const p = digitsOnly(phone);
+    return (k && aliasToKey.get(`k:${k}`)) || (p && aliasToKey.get(`p:${p}`)) || personKey(kakaoId, phone);
+  };
   for (const c of customers) {
     const key = personKey(c.kakao_id, c.customer_phone);
     if (!key) continue;
@@ -238,7 +254,7 @@ async function searchCustomers(supabase: SupabaseClient, query: string, sinceIso
       nickname: c.youtube_nickname || c.kakao_nickname || "-",
       name: c.customer_name || "",
       phone: maskPhone(c.customer_phone),
-      blocked: Boolean(c.is_blocked),
+      blocked: isBlockedValue(c.is_blocked),
       kind: m.kind,
       matchedLabel: m.label,
       matchedValue: m.value,
@@ -251,7 +267,7 @@ async function searchCustomers(supabase: SupabaseClient, query: string, sinceIso
   // 주문 기준(주문서에 적은 닉네임·이름·받는 분은 회원 정보와 다를 수 있다)
   const ordersByPerson = new Map<string, LightOrder[]>();
   for (const o of orders) {
-    const key = personKey(o.kakao_id, o.customer_phone);
+    const key = canonicalKey(o.kakao_id, o.customer_phone);
     if (!key) continue;
     if (!ordersByPerson.has(key)) ordersByPerson.set(key, []);
     ordersByPerson.get(key)!.push(o);
@@ -269,7 +285,7 @@ async function searchCustomers(supabase: SupabaseClient, query: string, sinceIso
       nickname: c?.youtube_nickname || o.youtube_nickname || "-",
       name: c?.customer_name || o.customer_name || "",
       phone: maskPhone(c?.customer_phone || o.customer_phone),
-      blocked: Boolean(c?.is_blocked),
+      blocked: isBlockedValue(c?.is_blocked),
       kind: m.kind,
       matchedLabel: m.label,
       matchedValue: m.value,
