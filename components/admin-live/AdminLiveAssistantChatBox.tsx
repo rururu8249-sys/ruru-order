@@ -182,13 +182,17 @@ export default function AdminLiveAssistantChatBox({ onShowInOrders, ask }: { onS
     setDone((d) => ({ ...d, [key]: res?.ok && data?.ok ? "고객이슈에 등록했어요. 고객 › 고객이슈에서 확인할 수 있어요." : `등록 못 했어요. ${data?.message || "고객 › 고객이슈에서 직접 등록해 주세요."}`.trim() }));
   }
 
+  const REVISE_CHIPS = ["좀 더 부드럽게", "짧고 단호하게", "사과는 빼고", "원칙대로 처리한다고 강조", "비용 할인 방향으로"];
+  const REVISE_RE = /^방금 답장을|다시 써|부드럽게|단호하게|사과는 빼|짧게|길게|강조/;
   // 「사례로 저장」 — 손님 말(그 카드 바로 앞 사장님 입력, 가린 그대로)·상황(분석)·최종 문구·이유 → /api/admin-live/assistant-cases(kind=case). 돈 무접촉
   function customerTextBefore(key: string): string {
     const msgId = key.replace(/-\d+$/, "");
     const idx = messages.findIndex((m) => m.id === msgId);
     for (let i = (idx < 0 ? messages.length : idx) - 1; i >= 0; i -= 1) {
       const m = messages[i];
-      if (m.role === "user" && (m.text.trim() || m.images?.length)) return m.text.trim() || `(캡처 ${m.images?.length}장 — 글자 없음)`;
+      if (m.role !== "user" || (!m.text.trim() && !m.images?.length)) continue;
+      if (REVISE_RE.test(m.text) && !m.images?.length) continue; // 「좀 더 부드럽게」 같은 수정 지시는 손님 말이 아님 → 더 앞으로
+      return m.text.trim() || `(캡처 ${m.images?.length}장 — 글자 없음)`;
     }
     return "";
   }
@@ -202,7 +206,6 @@ export default function AdminLiveAssistantChatBox({ onShowInOrders, ask }: { onS
     setDone((d) => ({ ...d, [key]: res?.ok && data?.ok ? "응대 사례로 저장했어요. 다음 비슷한 문의 때 AI 가 참고해요." : `저장 못 했어요. ${data?.message || ""}`.trim() }));
     if (res?.ok && data?.ok) setCaseEdit(null);
   }
-  const REVISE_CHIPS = ["좀 더 부드럽게", "짧고 단호하게", "사과는 빼고", "원칙대로 처리한다고 강조", "비용 할인 방향으로"];
 
   function renderCard(c: Card, key: string) {
     const note = done[key];
