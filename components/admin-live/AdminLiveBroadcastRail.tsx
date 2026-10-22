@@ -38,7 +38,7 @@ export default function AdminLiveBroadcastRail({
         aria-label={open ? "방송·채팅 접기" : "방송·채팅 펼치기"}
         title={open ? "방송·채팅 접기" : "방송·채팅 펼치기"}
         className={[
-          "fixed right-0 top-1/2 z-[45] -translate-y-1/2 rounded-l-lg border border-r-0 px-1 py-3 text-[11px] font-bold shadow-sm backdrop-blur-sm transition hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-deep",
+          "fixed right-0 top-1/2 z-[45] -translate-y-1/2 rounded-l-lg border border-r-0 px-1 py-3 text-[11px] font-bold shadow-sm backdrop-blur-sm transition hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-deep max-md:hidden", // [2026-10-22 폰] 손잡이는 PC 만 — 폰은 하단 「더보기」 › 방송 화면·채팅
           broadcastOn ? "border-danger-tx/25 bg-danger-bg/60 text-danger-tx" : "border-line bg-surface/60 text-ink-soft",
         ].join(" ")}
         style={{ writingMode: "vertical-rl", width: 24, minHeight: 112 }}

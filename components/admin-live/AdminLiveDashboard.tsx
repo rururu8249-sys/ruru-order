@@ -59,6 +59,7 @@ import type { DepositRow, OrderGroup, OrderRow } from "@/lib/admin-v2/types";
 import { ADMIN_LIVE_SUB_TABS, getAdminLiveTopMenu, isAdminLiveMenuKey, topMenuOf, type AdminLiveMenuKey } from "./adminLiveMenu";
 // [2026-09-08 5단계 · 레이아웃 B] 오른쪽 접이식 방송 레일
 import AdminLiveBroadcastRail from "./AdminLiveBroadcastRail";
+import AdminLiveBottomNav from "./AdminLiveBottomNav";
 import VisitStatsView from "./VisitStatsView";
 import type { LiveOrder } from "./types";
 import {
@@ -1658,6 +1659,7 @@ export default function AdminLiveDashboard() {
           broadcastOn={Boolean(activeBroadcast)}
           onOpenVisitStats={() => { setActiveMenu("visits"); }}
           onOpenAssistant={() => setAssistantOpen(true)}
+          onOpenRail={() => setRailOpen(true)}
           broadcastCard={{
             title: activeBroadcast ? broadcastTitle : "",
             startedAt: activeBroadcast?.started_at || activeBroadcast?.created_at || null,
@@ -1668,15 +1670,8 @@ export default function AdminLiveDashboard() {
           }}
         />
 
-        <main className="flex min-w-0 flex-1 flex-col px-3 py-3 md:px-4 md:py-3">
-          {/* 모바일 전용: 사이드바(메뉴) 여는 햄버거. 데스크탑(md+)에선 사이드바가 항상 보여 숨김 */}
-          <button
-            type="button"
-            onClick={() => setNavOpen(true)}
-            className="mb-3 inline-flex shrink-0 items-center gap-2 self-start rounded-xl border border-line bg-surface px-3 py-2 text-sm font-bold text-ink md:hidden"
-          >
-            메뉴
-          </button>
+        <main className="flex min-w-0 flex-1 flex-col px-4 pb-20 pt-3 md:px-4 md:py-3">
+          {/* [2026-10-22 폰] 햄버거 「메뉴」 버튼 삭제 — 폰은 하단 5칸 메뉴(AdminLiveBottomNav), 「더보기」가 옛 사이드바 서랍을 연다 */}
 
           {/* [2026-09-08 5단계 · 레이아웃 B] 왼쪽 = 큰 메뉴 화면(통째로 전환) / 오른쪽 = 접이식 방송·채팅 레일 */}
           {/* [2026-09-08 사장님 지적] 메뉴마다 크기가 제각각이면 안 된다.
@@ -1685,7 +1680,7 @@ export default function AdminLiveDashboard() {
             <div className="flex min-w-0 flex-1 flex-col">
               {/* 화면 제목 + 작은 탭 */}
               {/* 페이지가 스크롤해도 화면 이름·탭은 위에 붙어 있다(내용이 뒤로 지나가도 가려지지 않게 배경 지정) */}
-              <div className="sticky top-0 z-30 -mx-3 -mt-3 mb-2 flex flex-wrap items-end justify-between gap-2 border-b border-line bg-canvas px-3 pt-2 md:-mx-4 md:px-4">
+              <div className="sticky top-0 z-30 -mx-4 -mt-3 mb-2 flex flex-wrap items-end justify-between gap-2 border-b border-line bg-canvas px-4 pt-2 md:-mx-4 md:px-4">
                 {/* 모바일은 모든 하위 화면을 선택 목록으로 제공하고, 데스크톱은 기존 탭을 유지한다. */}
                 <div className={`flex w-full min-w-0 flex-wrap items-end gap-3 md:flex-nowrap ${activeMenu==='products'?'':'md:w-auto'}`}>
                   <h1 className="shrink-0 whitespace-nowrap pb-2 text-[20px] font-bold tracking-tight text-ink">{activeTopMenu.label}</h1>
@@ -1743,7 +1738,8 @@ export default function AdminLiveDashboard() {
               ) : null}
 
               {/* ▼▼ 모든 메뉴 공통 틀 — 여기 안쪽만 화면마다 다르다 ▼▼ */}
-              <div className={`w-full rounded-2xl border border-line bg-surface ${SCREEN_SHELL_HEIGHT}`}>
+              {/* [2026-10-22 폰] 폰은 판 1겹 — 바깥 틀 테두리·둥근 모서리 없음(안쪽 화면이 자기 판을 가짐) */}
+              <div className={`w-full rounded-2xl border border-line bg-surface max-md:rounded-none max-md:border-0 max-md:bg-transparent ${SCREEN_SHELL_HEIGHT}`}>
 
               {/* ── 방송 › 방송 콘솔 ── */}
               {/* [2026-10-21 a4-1] 「방송」 화면 삭제 — 컨트롤타워(LiveHeader)는 아래 방송 관리 창으로, 숫자 띠·미션은 실시간 주문에 이미 있음, 라이브 현황(LiveStatsPanel)은 판매분석 위로 */}
@@ -1932,6 +1928,16 @@ export default function AdminLiveDashboard() {
               activeBroadcastId={activeBroadcast?.id || null}
             />
           </div>
+
+          {/* [2026-10-22 폰] 하단 5칸 메뉴 — md 미만만 */}
+          <AdminLiveBottomNav
+            activeMenu={activeMenu}
+            onMenuChange={(k) => { setActiveMenu(k); setNavOpen(false); }}
+            onOpenAssistant={() => setAssistantOpen(true)}
+            onMore={() => setNavOpen(true)}
+            moreOpen={navOpen}
+            badge={exceptionBadges.needMatch + exceptionBadges.cardUnpaid}
+          />
 
           {/* 주문상세 / 입금매칭 — 우측 오버레이 드로어(슬라이드인, 위로 떠서 표를 밀지 않음). 단일 슬롯. */}
           {drawer.kind !== "closed" ? (

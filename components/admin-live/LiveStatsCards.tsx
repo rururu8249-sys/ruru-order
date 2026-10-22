@@ -25,6 +25,8 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
   // [2026-08-31 사장님 요청] 현재 시점 결산을 텔레그램으로 — 기존 「지금 결산 보내기」(설정→텔레그램)와 같은 API.
   //   방송중이면 방송 기준(시작~지금), 아니면 오늘 기준. 상품 TOP3·큰손 TOP3 포함. 읽기 전용.
   const [tgSending, setTgSending] = useState(false);
+  // [2026-10-22 폰] 숫자 띠는 폰에서 한 줄 요약(받은 돈 · 미결제) + 「펼치기」. PC 는 그대로
+  const [mobileOpen, setMobileOpen] = useState(false);
   // [2026-08-31 사장님 지적] 필터를 골라놨는데 오늘/방송 기준으로 갔다 → 지금 화면(현재 조회범위) 숫자 그대로 보낸다.
   const sendTelegramReport = async (text: string) => {
     if (tgSending) return;
@@ -139,8 +141,16 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
     return lines.join("\n");
   };
 
+  const unpaidTotal = bankUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0)+cardUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0);
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-rose-line bg-surface px-4 py-2.5 text-[13px] font-black md:gap-y-1 md:text-[12px] [&>span]:max-w-full [&>span>span]:inline-block [&>span>span]:whitespace-nowrap [&>span>span]:tabular-nums">
+    <div className="mb-3 rounded-2xl border border-rose-line bg-surface md:mb-4 md:border-0 md:p-0">
+    <button type="button" onClick={() => setMobileOpen((v) => !v)} aria-expanded={mobileOpen}
+      className="flex min-h-11 w-full items-center gap-3 px-3 text-left text-[13px] font-bold md:hidden">
+      <span className="text-ink-soft">받은 돈 <span className="text-ink tabular-nums">{money(paidAmount)}</span></span>
+      <span className="text-ink-soft">미결제 <span className="text-danger-tx tabular-nums">{money(unpaidTotal)}</span></span>
+      <span className="ml-auto text-[12px] text-ink-mute">{mobileOpen ? "접기" : "펼치기"}</span>
+    </button>
+    <div className={`${mobileOpen ? "flex" : "hidden"} flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border-rose-line bg-surface px-4 py-2.5 text-[13px] font-black max-md:border-t md:flex md:gap-y-1 md:border md:text-[12px] [&>span]:max-w-full [&>span>span]:inline-block [&>span>span]:whitespace-nowrap [&>span>span]:tabular-nums`}>
       {/* [UI 2026-07-06] 기준 명시 — 정산 팝업(이번달 자동조회)과 숫자가 달라 헷갈리던 것 방지 */}
       {/* [2026-08-31 사장님 요청] 유치원생 기준 — 상품값과 실제 받은 돈을 나란히 크게 */}
       <span className="text-ink-soft" title="결제완료 주문의 순수 상품금액만 합친 것 — 카드수수료·배송비·포인트 반영 전">상품값 <span className="text-ink text-[13px]">{money(goodsPaid)}</span></span>
@@ -161,6 +171,7 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
       >
         {tgSending ? "전송 중…" : "텔레그램"}
       </button>
+    </div>
     </div>
   );
 }

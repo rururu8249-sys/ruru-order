@@ -474,6 +474,8 @@ export default function LiveOrderTable({
   const [pageSize, setPageSize] = useState(20); // [2026-10-21 a5-6] 기본 20건(사장님)
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [isMobile, setIsMobile] = useState(false);
+  // [2026-10-22 폰] 기간·범위·상태 필터는 「필터」 버튼으로 접었다 편다(검색칸은 항상). PC 무관
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   useEffect(() => {
     const c = () => setIsMobile(typeof window !== "undefined" && window.innerWidth <= 640);
     c(); window.addEventListener("resize", c);
@@ -1037,6 +1039,7 @@ export default function LiveOrderTable({
               key={label as string}
               type="button"
               onClick={() => updateFilter("status", status as LiveOrderStatusFilter)}
+              className="max-md:min-h-10"
               style={{
                 borderRadius: "999px",
                 padding: "4px 12px",
@@ -1156,7 +1159,20 @@ export default function LiveOrderTable({
       </div>
 
 
-      <div className="mb-3 flex w-full flex-wrap items-center gap-2">
+      {/* [2026-10-22 폰] 검색 한 줄 + 「필터」 버튼(아래 필터 묶음 접기/펼치기). PC 는 안 보임 */}
+      {isMobile ? (
+        <div className="mb-2 flex items-center gap-2">
+          <input className="h-11 min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 text-[16px] font-semibold text-ink outline-none focus:border-ink"
+            inputMode="search" value={pendingKeyword} onChange={(event) => setPendingKeyword(event.target.value)}
+            onKeyDown={(event) => { if (event.key === "Enter") applyKeyword(); }} placeholder="닉네임·상품·금액 검색" />
+          <button type="button" onClick={applyKeyword} className="h-11 shrink-0 rounded-xl bg-ink px-3 text-[13px] font-bold text-white">검색</button>
+          <button type="button" onClick={() => setMobileFiltersOpen((v) => !v)} aria-expanded={mobileFiltersOpen}
+            className={`h-11 shrink-0 rounded-xl border px-3 text-[13px] font-bold ${mobileFiltersOpen || filters.date !== "all" || filters.scope !== "all" || filters.status !== "all" ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink"}`}>
+            필터
+          </button>
+        </div>
+      ) : null}
+      <div className={`mb-3 w-full flex-wrap items-center gap-2 ${isMobile && !mobileFiltersOpen ? "hidden" : "flex"}`}>
         {/* [1] 기간 */}
         <select className="h-11 w-full flex-none rounded-xl border border-line bg-surface px-2 text-[12px] font-black text-ink outline-none transition focus:border-info-tx focus:ring-4 focus:ring-info-bg sm:w-[120px]"
           value={filters.date}
@@ -1238,7 +1254,7 @@ export default function LiveOrderTable({
           <option value="shipped">택배출고</option>
         </select>
 
-        <div className="flex w-full flex-nowrap items-center gap-2 sm:w-auto sm:flex-1">
+        <div className={`flex w-full flex-nowrap items-center gap-2 sm:w-auto sm:flex-1 ${isMobile ? "hidden" : ""}`}>
           <input className="h-11 min-w-[120px] flex-1 rounded-xl border border-line bg-surface px-3 text-[12px] font-black text-ink outline-none transition focus:border-info-tx focus:ring-4 focus:ring-info-bg"
             value={pendingKeyword}
             onChange={(event) => setPendingKeyword(event.target.value)}
@@ -1262,10 +1278,13 @@ export default function LiveOrderTable({
             초기화
           </button>
         </div>
+        {isMobile ? (
+          <button type="button" onClick={() => { resetFilters(); setMobileFiltersOpen(false); }} className="h-11 w-full rounded-xl border border-line bg-surface text-[13px] font-bold text-ink-soft">필터 초기화</button>
+        ) : null}
       </div>
 
       {/* [㉕-C] 작업 현황 줄 — 결제완료 기준 챙김/송장출력/출고 진행. 숫자 누르면 그 상태만 걸러 보기(토글). */}
-      <div className="mb-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-xl bg-surface-2 px-3 py-2 text-[12px] font-black text-ink-soft">
+      <div className="mb-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-xl bg-surface-2 px-3 py-2 text-[12px] font-black text-ink-soft max-md:flex-nowrap max-md:overflow-x-auto max-md:whitespace-nowrap max-md:[scrollbar-width:none]">
         <span className="text-ink-mute">작업 현황</span>
         <span>결제완료 {workCounts.paid.toLocaleString()}</span>
         {([
@@ -1323,52 +1342,52 @@ export default function LiveOrderTable({
                 visibleOrders.map((order) => {
                   const selected = order.id === selectedOrderId;
                   if (isMobile) {
+                    // [2026-10-22 폰] 카드 3줄 고정: [체크·닉네임 이름 · 시각] / [상품 요약(2줄까지) · 금액] / [배지·챙김·복사·쪽지]. 탭=주문상세(기존 onSelectOrder)
+                    const when = (() => {
+                      const src = order.createdAt || order.submittedAt;
+                      if (!src) return "-";
+                      const d = new Date(src);
+                      if (isNaN(d.getTime())) return src;
+                      const mm = String(d.getMonth() + 1).padStart(2, "0");
+                      const dd = String(d.getDate()).padStart(2, "0");
+                      const hh = String(d.getHours()).padStart(2, "0");
+                      const mi = String(d.getMinutes()).padStart(2, "0");
+                      return `${mm}.${dd} ${hh}:${mi}`;
+                    })();
                     return (
                       <div key={order.id} onClick={() => onSelectOrder(order)}
-                        style={{ background: "var(--color-surface)", border: "1px solid #eadfe3", borderLeft: order.paymentStatus === "manual_match_needed" ? "3px solid var(--color-rose-deep)" : "1px solid #eadfe3", borderRadius: "12px", padding: "12px 12px", marginBottom: "8px", cursor: "pointer" }}>
-                        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-                          <input type="checkbox" checked={selectedOrderIds.has(String(order.id))} onChange={() => toggleSelectOrder(String(order.id))} onClick={(e) => e.stopPropagation()} style={{ width: "16px", height: "16px", accentColor: "var(--color-rose-deep)" }} />
-                          <span style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{order.nickname}</span>
-                          <span style={{ fontSize: "11px", color: "#888" }}>{order.name || ""}</span>
-                          <span style={{ marginLeft: "auto", fontSize: "11px", color: "#aaa" }}>
-                            {(() => {
-                              const src = order.createdAt || order.submittedAt;
-                              if (!src) return "-";
-                              try {
-                                const d = new Date(src);
-                                if (isNaN(d.getTime())) return src;
-                                const yy = d.getFullYear();
-                                const mm = String(d.getMonth() + 1).padStart(2, "0");
-                                const dd = String(d.getDate()).padStart(2, "0");
-                                const wd = ["일", "월", "화", "수", "목", "금", "토"][d.getDay()];
-                                const hh = String(d.getHours()).padStart(2, "0");
-                                const mi = String(d.getMinutes()).padStart(2, "0");
-                                return `${yy}.${mm}.${dd} (${wd}) ${hh}:${mi}`;
-                              } catch { return src; }
-                            })()}
-                          </span>
+                        className={`mb-2 rounded-xl border border-line bg-surface px-3 py-2.5 ${order.paymentStatus === "manual_match_needed" ? "border-l-[3px] border-l-rose-deep" : ""}`}>
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" checked={selectedOrderIds.has(String(order.id))} onChange={() => toggleSelectOrder(String(order.id))} onClick={(e) => e.stopPropagation()} className="h-5 w-5 shrink-0 accent-[var(--color-ink)]" />
+                          <span className="min-w-0 truncate text-[14px] font-bold text-ink">{order.nickname}</span>
+                          {order.name ? <span className="shrink-0 text-[13px] text-ink-soft">{order.name}</span> : null}
+                          <span className="ml-auto shrink-0 text-[12px] text-ink-mute tabular-nums">{when}</span>
                         </div>
-                        <div className="mb-2 text-sm leading-relaxed text-ink">{renderOrderSummary(order,true)}<span className="mt-1 block font-bold text-ink-soft">총 수량 {getTotalQty(order)}개</span></div>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", flexWrap: "wrap" }}>
-                          <div style={{ display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
-                            {statusBadge(order, {
-                              onMatch: onSelectForMatch ? () => onSelectForMatch(order) : undefined,
-                              onCardPay: onOpenCardPay ? () => { openPaysterRightHalf(); onOpenCardPay(order); } : undefined,
-                            })}
-                            <button type="button" onClick={() => void copyOrderForCustomer(order)}
-                              style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-rose-soft)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "2px 8px", cursor: "pointer" }}>
-                              주문서 복사
-                            </button>
-                            <PickChip order={order} />
-                            <InvoiceChip order={order} />
-                            {(order as any).shippingStatus ? (
-                              <span className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg px-1.5 py-0.5 text-[11px] font-black leading-none ${String((order as any).shippingStatus) === "출고완료" ? "bg-info-bg text-[var(--color-info-tx)]" : "bg-surface-2 text-ink-soft"}`}>{shippingStatusLabel((order as any).shippingStatus)}</span>
-                            ) : null}
-                            {["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
-                              <button type="button" title="결제요청 쪽지 보내기" aria-label="결제요청 쪽지 보내기" disabled={payRequestSending === order.id} onClick={() => void sendPaymentRequest(order)} style={{ border: "none", background: "none", padding: "0 2px", fontSize: "14px", lineHeight: 1, cursor: "pointer", opacity: payRequestSending === order.id ? 0.35 : 0.75 }}>쪽지</button>
-                            ) : null}
+                        <div className="mt-1 flex items-start gap-2">
+                          <div className="min-w-0 flex-1 text-[14px] leading-snug text-ink [&_*]:!whitespace-normal line-clamp-2">{renderOrderSummary(order,true)}</div>
+                          <div className="shrink-0 text-right">
+                            <div className="text-[16px] font-bold text-ink tabular-nums">{money(displayPayableAmount(order))}</div>
+                            <div className="text-[12px] text-ink-mute">{getTotalQty(order)}개</div>
                           </div>
-                          <span style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-danger-tx)" }}>{money(displayPayableAmount(order))}</span>
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                          {statusBadge(order, {
+                            onMatch: onSelectForMatch ? () => onSelectForMatch(order) : undefined,
+                            onCardPay: onOpenCardPay ? () => { openPaysterRightHalf(); onOpenCardPay(order); } : undefined,
+                          })}
+                          <PickChip order={order} />
+                          <InvoiceChip order={order} />
+                          {(order as any).shippingStatus ? (
+                            <span className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg px-1.5 py-0.5 text-[11px] font-black leading-none ${String((order as any).shippingStatus) === "출고완료" ? "bg-info-bg text-[var(--color-info-tx)]" : "bg-surface-2 text-ink-soft"}`}>{shippingStatusLabel((order as any).shippingStatus)}</span>
+                          ) : null}
+                          <span className="ml-auto flex items-center gap-1.5">
+                            {["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
+                              <button type="button" title="결제요청 쪽지 보내기" aria-label="결제요청 쪽지 보내기" disabled={payRequestSending === order.id} onClick={() => void sendPaymentRequest(order)}
+                                className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-bold text-ink-soft disabled:opacity-40">쪽지</button>
+                            ) : null}
+                            <button type="button" onClick={() => void copyOrderForCustomer(order)}
+                              className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-bold text-ink">주문서 복사</button>
+                          </span>
                         </div>
                       </div>
                     );

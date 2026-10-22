@@ -31,6 +31,8 @@ type Props = {
   onOpenVisitStats?: () => void;
   /** [2026-10-22 AI 비서] 「비서」 창 열기 — 손님·주문·상품 찾기 */
   onOpenAssistant?: () => void;
+  /** [2026-10-22 폰] 폰에선 오른쪽 「방송·채팅」 손잡이를 숨기므로 여기(더보기 서랍)에서 연다 */
+  onOpenRail?: () => void;
   /** [2026-10-21 a4-1] 방송 카드 — 「방송」 큰 메뉴를 없애고 시작·종료·관리를 여기로 */
   broadcastCard?: {
     title: string;
@@ -65,6 +67,7 @@ export default function AdminLiveSidebar({
   broadcastOn = false,
   onOpenVisitStats,
   onOpenAssistant,
+  onOpenRail,
   broadcastCard,
 }: Props) {
   // [a4-1] 방송 중 경과 시간은 1분마다 갱신(방송 중일 때만)
@@ -235,6 +238,15 @@ export default function AdminLiveSidebar({
               className="mb-1.5 flex h-10 w-full items-center justify-center rounded-xl bg-ink text-[13px] font-bold text-white transition active:scale-[0.98]"
             >
               AI 비서
+            </button>
+          ) : null}
+          {onOpenRail ? (
+            <button
+              type="button"
+              onClick={() => { onOpenRail(); onCloseNav?.(); }}
+              className="mb-1.5 flex h-11 w-full items-center justify-center rounded-xl border border-line bg-surface text-[13px] font-bold text-ink transition hover:bg-surface-2 active:scale-[0.98] md:hidden"
+            >
+              방송 화면·채팅{broadcastOn ? " · LIVE" : ""}
             </button>
           ) : null}
           <div className="grid grid-cols-2 gap-1.5">
