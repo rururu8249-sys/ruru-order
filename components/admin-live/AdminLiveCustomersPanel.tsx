@@ -1979,14 +1979,16 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
       ) : null}
 
       <div className={custTab === "members" ? "" : "hidden"}>
-        <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
+        <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm max-md:rounded-xl max-md:p-3 max-md:shadow-none">
           {/* [2026-09-25] 필터 한 줄 — 검색(넓게) · 고객상태 · 정렬 · 주문있는고객만 · 초기화(바뀌었을 때만). 좁으면 자연스럽게 줄바꿈. */}
-          <div className="flex flex-wrap items-center gap-2">
+          {/* [2026-10-22 폰] 검색칸은 한 줄 전체, 나머지 컨트롤은 아래 한 줄 가로 스크롤(§13). PC 는 한 줄 그대로 */}
+          <div className="flex flex-wrap items-center gap-2 max-md:flex-nowrap max-md:overflow-x-auto max-md:pb-1 max-md:[scrollbar-width:none] max-md:[&>button]:shrink-0 max-md:[&>select]:shrink-0">
             <input
               value={keyword}
               onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
               placeholder="닉네임 / 이름 / 전화번호 검색"
-              className="h-11 min-w-[200px] flex-1 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink outline-none focus-visible:border-rose-deep focus-visible:ring-2 focus-visible:ring-rose-deep"
+              inputMode="search"
+              className="h-11 min-w-[200px] flex-1 rounded-xl border border-line bg-surface px-3 text-[13px] font-black text-ink outline-none focus-visible:border-rose-deep focus-visible:ring-2 focus-visible:ring-rose-deep max-md:hidden"
             />
             <select
               value={statusFilter}
@@ -2031,8 +2033,17 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
             ) : null}
           </div>
 
+          <input
+            value={keyword}
+            onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
+            placeholder="닉네임 / 이름 / 전화번호 검색"
+            inputMode="search"
+            aria-label="고객 검색"
+            className="mt-2 h-11 w-full rounded-xl border border-line bg-surface px-3 text-[16px] font-semibold text-ink outline-none focus-visible:border-ink md:hidden"
+          />
+
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-black text-ink">고객 목록</h2>
+            <h2 className="text-lg font-black text-ink max-md:hidden">고객 목록</h2>
             <div className="text-xs font-black text-ink-mute">
               표시 {visibleCustomers.length.toLocaleString("ko-KR")}명 / 검색결과 {filteredCustomers.length.toLocaleString("ko-KR")}명
             </div>
@@ -2145,51 +2156,48 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
                 </div>
 
                 {/* ── 좁은 화면: 카드(지금 모양 유지) ── */}
+                {/* [2026-10-22 폰] 카드 2줄 고정(DESIGN-ADMIN §13): [체크·사진·닉네임 이름·배지 ·›] / [전화 · 마지막 주문 · 누적 결제 · 주문 수 · 포인트]. 카드 탭=상세. 차단/해제는 상세 창(차단 정보 상자)에서 */}
                 <div className="mt-3 flex flex-col gap-1.5 xl:hidden">
                   {visibleCustomers.map((customer) => {
                     const d = memberRowInfo(customer);
                     return (
-                      <div key={customer.key} className={`grid grid-cols-[20px_36px_minmax(0,1fr)] items-start gap-3 rounded-xl border px-3 py-3 transition-colors ${customer.blocked ? "border-line bg-danger-bg/40 shadow-[inset_4px_0_0_0_var(--color-danger-tx)]" : "border-line bg-surface hover:border-rose-line hover:bg-rose-soft/30"}`}>
-                        {d.phoneDigits ? (
-                          <input type="checkbox" checked={selectedPhones.has(d.phoneDigits)} onChange={() => toggleSelectPhone(customer.phone)} className="h-4 w-4 shrink-0 accent-rose-deep" title="일괄지급 선택" />
-                        ) : <span className="w-4 shrink-0" />}
-                        {d.hasPhoto ? (
-                          <button type="button" onClick={() => setPhotoZoom(customer.kakaoProfileImage)} className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-line" title="사진 크게 보기">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={customer.kakaoProfileImage} alt="" className="h-full w-full object-cover" loading="lazy" />
-                          </button>
-                        ) : (
-                          <button type="button" onClick={() => openDetail(customer)} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-black ${customer.blocked ? "bg-surface-3 text-ink-mute" : "bg-rose-soft text-rose-deep"}`}>{d.initial}</button>
-                        )}
-                        <button type="button" onClick={() => openDetail(customer)} className="min-w-0 flex-1 rounded text-left outline-none focus-visible:ring-2 focus-visible:ring-rose-deep">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] text-[14px] font-black text-ink">{customer.nickname || "—"}</span>
-                            {customer.name ? <span className="min-w-0 whitespace-normal break-words text-xs text-ink-mute">· {customer.name}</span> : null}
-                            {!customer.kakaoId ? <span className="shrink-0 rounded-lg bg-warn-bg px-1.5 py-0.5 text-[11px] font-black text-warn-tx" title="카카오 로그인 기록이 없는 옛 회원(전화번호만). 다시 카톡 로그인하면 자동 연결됩니다.">카카오 미연동</span> : null}
-                            {customer.unpaidCount > 0 ? <span className="shrink-0 rounded-lg bg-warn-bg px-1.5 py-0.5 text-[11px] font-black text-warn-tx" title="상세와 같은 기준 — 아직 입금 전(자동매칭 실패 포함)">미입금 {customer.unpaidCount}건</span> : null}
-                            {d.openIssues > 0 ? <span className="shrink-0 rounded-lg bg-danger-bg px-1.5 py-0.5 text-[11px] font-black text-danger-tx" title="이 회원의 미해결 고객이슈">이슈 {d.openIssues}</span> : null}
-                            {customer.liveAlertOptin === false ? <span className="shrink-0 rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] font-black text-ink-mute" title="방송 시작 알림을 받지 않는 회원">알림OFF</span> : null}
-                          </div>
-                          {customer.blocked ? (
-                            <div className="mt-0.5 min-w-0" title={d.blockTitle || "차단됨"}>
-                              <div className="flex flex-wrap items-center gap-1">
-                                <span className="shrink-0 rounded bg-[var(--color-danger-tx)] px-1.5 py-0.5 text-[13px] font-black text-white">차단{d.blockParts?.label ? ` · ${d.blockParts.label}` : ""}</span>
-                                {d.blockedAtShort ? <span className="shrink-0 text-[11px] font-bold text-ink-mute">{d.blockedAtShort}</span> : null}
-                              </div>
-                              {d.blockLine2 ? <div className="mt-0.5 break-words text-[13px] text-ink-soft">{d.blockLine2}</div> : null}
+                      <div key={customer.key} role="button" tabIndex={0} onClick={() => openDetail(customer)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(customer); } }}
+                        className={`relative min-h-11 rounded-xl border px-3 py-2.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ink ${customer.blocked ? "border-line bg-danger-bg/40" : "border-line bg-surface active:bg-surface-2"}`}>
+                        {customer.blocked ? <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 rounded-l-xl bg-danger-tx" /> : null}
+                        <div className="flex items-center gap-2">
+                          {d.phoneDigits ? (
+                            <input type="checkbox" checked={selectedPhones.has(d.phoneDigits)} onChange={() => toggleSelectPhone(customer.phone)} onClick={(e) => e.stopPropagation()} className="h-5 w-5 shrink-0 accent-ink" title="일괄지급 선택" />
+                          ) : <span className="w-5 shrink-0" />}
+                          {d.hasPhoto ? (
+                            <button type="button" onClick={(e) => { e.stopPropagation(); setPhotoZoom(customer.kakaoProfileImage); }} className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-line" title="사진 크게 보기">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={customer.kakaoProfileImage} alt="" className="h-full w-full object-cover" loading="lazy" />
+                            </button>
+                          ) : (
+                            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${customer.blocked ? "bg-surface-3 text-ink-mute" : "bg-surface-2 text-ink"}`}>{d.initial}</span>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                              <span className="min-w-0 truncate text-[14px] font-bold text-ink">{customer.nickname || "—"}</span>
+                              {customer.name ? <span className="text-[13px] text-ink-soft">{customer.name}</span> : null}
+                              {customer.blocked ? <span className="rounded bg-[var(--color-danger-tx)] px-1.5 py-0.5 text-[11px] font-bold text-white" title={d.blockTitle || "차단됨"}>차단{d.blockParts?.label ? ` · ${d.blockParts.label}` : ""}</span> : null}
+                              {customer.unpaidCount > 0 ? <span className="rounded-lg bg-warn-bg px-1.5 py-0.5 text-[11px] font-bold text-warn-tx">미입금 {customer.unpaidCount}</span> : null}
+                              {d.openIssues > 0 ? <span className="rounded-lg bg-danger-bg px-1.5 py-0.5 text-[11px] font-bold text-danger-tx">이슈 {d.openIssues}</span> : null}
+                              {customer.liveAlertOptin === false ? <span className="rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] font-bold text-ink-mute">알림OFF</span> : null}
+                              {!customer.kakaoId ? <span className="rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] font-bold text-ink-mute">카카오 미연동</span> : null}
                             </div>
-                          ) : null}
-                        </button>
-                        <dl className="col-span-3 grid grid-cols-[76px_minmax(0,1fr)] gap-x-2 gap-y-1.5 border-t border-line pt-3 text-[13px] [overflow-wrap:anywhere]">
-                          <dt className="text-ink-mute">연락처</dt><dd className="text-ink">{customer.phone ? formatPhone(customer.phone) : "-"}</dd>
-                          <dt className="text-ink-mute">마지막 주문</dt><dd className="text-ink">{d.orderTwo.line1}{d.orderTwo.line2 ? ` ${d.orderTwo.line2}` : ""}</dd>
-                          <dt className="text-ink-mute">누적 결제</dt><dd className="font-black text-ink">{money(customer.paidAmount)}</dd>
-                          <dt className="text-ink-mute">주문 수</dt><dd className="text-ink">{customer.orderCount}건</dd>
-                          {d.pts != null ? <><dt className="text-ink-mute">포인트</dt><dd className="font-bold text-rose-deep">{d.pts.toLocaleString("ko-KR")}P</dd></> : null}
-                        </dl>
-                        <div className="col-span-3 flex flex-wrap justify-end gap-2 border-t border-line pt-2">
-                          <button type="button" onClick={() => handleCustomerBlockButton(customer)} className={`min-h-11 rounded-lg px-3 text-[13px] font-black transition-colors ${customer.blocked ? "border border-line text-ink-soft hover:bg-surface-2" : "text-danger-tx hover:bg-danger-bg"}`}>{customer.blocked ? CUSTOMER_TERMS.unblock : CUSTOMER_TERMS.block}</button>
-                          <button type="button" onClick={() => openDetail(customer)} className="min-h-11 rounded-lg border border-rose-line px-4 text-[13px] font-black text-rose-deep">상세 ›</button>
+                            <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 text-[12px] text-ink-soft tabular-nums">
+                              <span>{customer.phone ? formatPhone(customer.phone) : "-"}</span>
+                              <span className="text-ink-mute">·</span>
+                              <span>주문 {d.orderTwo.line1}</span>
+                              <span className="text-ink-mute">·</span>
+                              <span className="font-bold text-ink">{money(customer.paidAmount)}</span>
+                              <span>{customer.orderCount}건</span>
+                              {d.pts != null ? <span className="font-bold text-ink">{d.pts.toLocaleString("ko-KR")}P</span> : null}
+                            </div>
+                            {customer.blocked && d.blockLine2 ? <div className="mt-0.5 truncate text-[12px] text-ink-soft">{d.blockLine2}</div> : null}
+                          </div>
+                          <span aria-hidden="true" className="shrink-0 text-[18px] text-ink-mute">›</span>
                         </div>
                       </div>
                     );

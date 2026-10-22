@@ -1062,7 +1062,7 @@ export default function LiveOrderTable({
         })}
         </div>
 
-        <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto max-md:justify-start max-md:[&>button]:h-10">
+        <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto max-md:flex-nowrap max-md:justify-start max-md:overflow-x-auto max-md:pb-1 max-md:[scrollbar-width:none] max-md:[&>button]:h-10 max-md:[&>button]:shrink-0 max-md:[&>button]:whitespace-nowrap">
           {selectedOrderIds.size > 0 && (
             <span className="text-[12px] font-black text-[var(--color-rose-deep)]">{selectedOrderIds.size}건 선택됨</span>
           )}
