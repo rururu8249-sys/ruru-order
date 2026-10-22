@@ -427,35 +427,35 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
     const d = new Date(raw.includes("T") ? raw : raw.replace(" ", "T"));
     return Number.isNaN(d.getTime()) ? "" : `${d.getMonth() + 1}/${d.getDate()}`;
   })();
-  // [5차] 헤더 아래 회색 안내 — 돈이 여기서 안 나간다는 것을 명확히.
-  // [3] 헤더 안내 한 줄 — 완료는 목록 「해결완료」에서 처리하므로 «여기서 안 나간다»만 알린다.
-  const headerNotice = isExchange
-    ? ""
-    : method === "카드취소"
-      ? "여기서 카드가 취소되지 않아요. 페이스터에서 전체 취소하세요."
-      : "여기서 돈이 나가지 않아요.";
+  // [5차 → 2026-10-22] 「여기서 돈이 안 나간다」 안내는 방법 칩 아래 한 줄(methodNote)로.
 
+  // [2026-10-22 사장님 「너무 복잡해」] DESIGN-ADMIN(2-1 문구·3 모양·4 버튼·8 폼) 기준으로 배치만 재정리.
+  //   상태·계산·저장(saveOnly·doPatch·setQty·applyPaste·copyTransferInfo)·조건은 전부 그대로 — JSX 자리와 문구만 바뀜.
+  //   순서: 유형 칩 → 상품 → 사유(환불·교환) → 금액·방법(환불) / 바꿀 옵션(교환) → 메모 → 하단 [삭제 · 닫기 · 저장]
+  const SUB_LABEL = "mb-1.5 text-[13px] font-semibold text-ink-mute";
+  const CHIP = (on: boolean) => `h-9 rounded-full border px-3 text-[13px] font-semibold ${on ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink-soft hover:bg-surface-2"}`;
+  const AMOUNT_INPUT = "h-9 w-24 rounded-lg border border-line px-2 text-right text-[14px] font-bold text-ink outline-none focus-visible:ring-2 focus-visible:ring-ink";
+  const methodNote = isExchange ? "" : method === "카드취소" ? "카드 취소는 페이스터에서 · 여기는 기록만" : method === "계좌이체" ? "이체는 은행 앱에서 · 여기는 기록만" : method === "포인트" ? "포인트 지급은 회원 상세 › 포인트 지급에서" : "환불 없이 기록만";
   return (
     <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onClick={onClose}>
-      <div className="flex h-[min(92vh,880px)] w-full max-w-[600px] flex-col overflow-hidden rounded-t-2xl border border-line bg-surface shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
-        {/* 1. 헤더 */}
-        <div className="flex items-start justify-between gap-2 border-b border-line px-6 pt-4 pb-3">
+      <div className="flex h-[min(92vh,880px)] w-full max-w-[600px] flex-col overflow-hidden rounded-t-xl bg-surface sm:rounded-xl" style={{ boxShadow: "0 8px 24px rgba(0,0,0,.08)" }} onClick={(e) => e.stopPropagation()}>
+        {/* 머리 — 제목 · 손님 한 줄 · 닫기 */}
+        <div className="flex items-start justify-between gap-2 border-b border-line px-4 pt-4 pb-3">
           <div className="min-w-0">
-            <h3 className="text-[20px] font-bold text-ink">{createMode ? "고객이슈 등록" : isEtc ? "고객이슈" : isExchange ? "교환하기" : "환불하기"}</h3>
-            <div className="mt-1 flex items-center gap-2 text-[13px] leading-5 text-ink-soft">
-              <div className="min-w-0 truncate"><span className="font-black text-ink">{clean(item.nickname) || "—"}</span>{clean(item.customer_name) ? ` · ${clean(item.customer_name)}` : ""}{orderCode ? ` · ${orderCode}` : ""}</div>
-              {orderPaymentMethod ? <span className="shrink-0 rounded-full bg-surface-2 px-2.5 py-0.5 text-[12px] font-bold text-ink-soft">{isCardOrder ? "카드" : "무통장"}</span> : null}
-              {clean(orderDate) ? <span className="shrink-0 rounded-full bg-surface-2 px-2.5 py-0.5 text-[12px] font-bold text-ink-soft">{dateShortKo(orderDate)} 주문</span> : null}
+            <h3 className="text-[20px] font-bold text-ink">{createMode ? "고객이슈 등록" : isEtc ? "기타" : isExchange ? "교환" : "환불"}</h3>
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] leading-5 text-ink-soft">
+              <span className="min-w-0 truncate"><span className="font-bold text-ink">{clean(item.nickname) || "—"}</span>{clean(item.customer_name) ? ` · ${clean(item.customer_name)}` : ""}{orderCode ? ` · ${orderCode}` : ""}</span>
+              {orderPaymentMethod ? <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[12px] font-semibold text-ink-soft">{isCardOrder ? "카드" : "무통장"}</span> : null}
+              {clean(orderDate) ? <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[12px] font-semibold text-ink-soft">{dateShortKo(orderDate)} 주문</span> : null}
             </div>
-            {openedFromOtherIssue ? <div className="mt-1 text-[12px] leading-5 text-ink-mute">같은 주문의 {repIssueDateMD ? `${repIssueDateMD} ` : ""}이슈 기록을 열었어요.</div> : null}
+            {openedFromOtherIssue ? <div className="mt-1 text-[12px] leading-5 text-ink-mute">같은 주문의 {repIssueDateMD ? `${repIssueDateMD} ` : ""}이슈 기록</div> : null}
           </div>
-          <button type="button" onClick={onClose} aria-label="닫기" className="shrink-0 rounded-full px-2 text-lg font-bold text-ink-mute hover:bg-surface-2">✕</button>
+          <button type="button" onClick={onClose} aria-label="닫기" className="h-9 w-9 shrink-0 rounded-lg text-[18px] text-ink-mute hover:bg-surface-2">×</button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-
-          {/* [⑯] 유형 — 큰 그리드 3칸(큰 글자 + 설명). 칩 바꾸면 하단이 즉시 전환된다. */}
-          <div className="mb-4 grid grid-cols-3 gap-1 rounded-2xl bg-surface-2 p-1">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          {/* 1. 유형 — 칩 3개 */}
+          <div className="mb-4 flex gap-2">
             {(["refund", "exchange", "etc"] as const).map((t) => (
               <button key={t} type="button" aria-pressed={issueType === t} onClick={() => {
                   setIssueType(t);
@@ -464,43 +464,38 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                   else if (!lines.some((l) => (sel[l.id] || 0) > 0)) setSel(Object.fromEntries(lines.map((l) => [String(l.id), Math.max(1, Number(l.qty) || 1)])));
                   if (t === "exchange") setMethod("교환재발송"); else if (t === "refund" && (method === "교환재발송" || method === "없음")) setMethod("계좌이체");
                 }}
-                className={`flex h-14 flex-col items-center justify-center gap-0.5 rounded-xl transition ${issueType === t ? "bg-ink text-white" : "text-ink-soft hover:bg-surface"}`}>
-                <span className="text-[16px] font-bold">{t === "refund" ? "환불" : t === "exchange" ? "교환" : "기타"}</span>
-                <span className="text-[11px] font-bold opacity-80">{t === "refund" ? "돈 돌려주기" : t === "exchange" ? "다른 옵션 보내기" : "요청·메모만"}</span>
+                className={CHIP(issueType === t)}>
+                {t === "refund" ? "환불" : t === "exchange" ? "교환" : "기타"}
               </button>
             ))}
           </div>
 
-          {/* 2. 상품 — 제목줄 = 라벨 + N개 선택 / 오른쪽 안내 */}
+          {/* 2. 상품 */}
           <div className="mb-4">
-            <div className="mb-1.5 flex items-center justify-between gap-2">
-              <div className="text-[13px] font-bold text-ink-mute">{isExchange ? "교환 대상 상품" : isEtc ? "관련 상품 (선택)" : "돌려받을 상품"}{selectedCount > 0 ? <span className="ml-1 text-ink">{selectedCount}개 선택</span> : null}</div>
-              <div className="shrink-0 text-[12px] font-bold text-ink-mute">{isEtc ? "선택 안 해도 돼요" : "수량까지 고르세요"}</div>
-            </div>
+            <div className={SUB_LABEL}>{isEtc ? "관련 상품 (선택)" : "상품"}{selectedCount > 0 ? <span className="ml-1 text-ink">{selectedCount}개</span> : null}</div>
             {!linesLoaded ? (
-              <div className="rounded-xl border border-line p-4 text-center text-[13px] font-bold text-ink-mute">주문 상품 불러오는 중…</div>
+              <div className="rounded-lg border border-line p-4 text-center text-[13px] text-ink-mute">주문 상품 불러오는 중…</div>
             ) : linesError ? (
-              <div className="rounded-xl border border-danger-tx/40 bg-danger-bg p-4 text-center">
-                <div className="text-[14px] font-bold text-danger-tx">주문 정보를 불러오지 못했어요.</div>
-                <button type="button" onClick={() => { setLinesLoaded(false); setLinesReloadTick((v) => v + 1); }} className="mt-2 rounded-lg border border-danger-tx/50 px-3 py-1.5 text-[14px] font-bold text-danger-tx hover:bg-danger-bg">다시 시도</button>
+              <div className="rounded-lg border border-line p-4 text-center">
+                <div className="text-[13px] font-semibold text-danger-tx">주문 정보를 불러오지 못했어요.</div>
+                <button type="button" onClick={() => { setLinesLoaded(false); setLinesReloadTick((v) => v + 1); }} className="mt-2 h-9 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2">다시 시도</button>
               </div>
             ) : matchFailed ? (
               isEtc ? (
                 /* [⑱ C1] 기타 + 주문 미연결 — 금액칸 대신 한 줄 안내(아래 「추가한 상품」으로 상품을 담는다). */
-                <div className="rounded-xl bg-surface-2 px-3.5 py-3 text-[14px] text-ink-mute">주문이 연결되지 않은 이슈예요</div>
+                <div className="rounded-lg bg-surface-2 px-3 py-2.5 text-[13px] text-ink-mute">주문이 연결되지 않은 이슈예요</div>
               ) : isExchange ? (
-                <div className="rounded-xl border border-line p-3 text-[14px] font-bold text-ink">{productText(item.product_snapshot)}</div>
+                <div className="rounded-lg border border-line p-3 text-[14px] font-bold text-ink">{productText(item.product_snapshot)}</div>
               ) : (
-                <div className="rounded-xl border border-line p-3">
+                <div className="rounded-lg border border-line p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[13px] font-bold text-ink-soft">상품 금액</span>
+                    <span className="text-[13px] font-semibold text-ink-soft">상품 금액 (직접 입력)</span>
                     <input inputMode="numeric" value={formatComma(manualBase)} onFocus={selectOnFocus} onChange={(e) => setManualBase(parseAmountInput(e.target.value))} className={`w-36 text-right ${INPUT}`} />
                   </div>
-                  <div className="mt-1 text-[13px] text-ink-mute">주문 상품을 못 찾아 직접 입력합니다.</div>
                 </div>
               )
             ) : (
-              <div className="rounded-xl border border-line">
+              <div className="rounded-lg border border-line">
                 {lines.map((l) => {
                   const picked = sel[l.id] || 0;
                   // [⑭] 기타는 상품이 1개여도 «선택»(체크박스·토글 노출·기본 미선택). 환불·교환은 1개면 항상 선택.
@@ -531,217 +526,198 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                       {/* [⑰] 한 줄 주문도 수량 조절 노출. 한 줄(비multi)은 1까지만(0 은 multi 일 때만 — 선택 해제). */}
                       {l.qty > 1 && on ? (
                         <div className="flex shrink-0 items-center gap-1">
-                          <button type="button" onClick={() => setQty(l.id, Math.max(multi ? 0 : 1, picked - 1), l.qty)} className="h-8 w-8 rounded-lg border border-line text-[14px] font-bold text-ink-soft">−</button>
-                          <span className="w-6 text-center text-[14px] font-bold text-ink">{picked}</span>
-                          <button type="button" onClick={() => setQty(l.id, picked + 1, l.qty)} className="h-8 w-8 rounded-lg border border-line text-[14px] font-bold text-ink-soft">+</button>
+                          <button type="button" aria-label="수량 줄이기" onClick={() => setQty(l.id, Math.max(multi ? 0 : 1, picked - 1), l.qty)} className="h-9 w-9 rounded-lg border border-line text-[14px] font-bold text-ink-soft">−</button>
+                          <span className="w-6 text-center text-[14px] font-bold text-ink tabular-nums">{picked}</span>
+                          <button type="button" aria-label="수량 늘리기" onClick={() => setQty(l.id, picked + 1, l.qty)} className="h-9 w-9 rounded-lg border border-line text-[14px] font-bold text-ink-soft">+</button>
                         </div>
                       ) : null}
-                      <div className={`w-20 shrink-0 pr-2 text-right text-[14px] font-bold ${on ? "text-ink" : "text-ink-mute"}`}>{formatComma(lineShown)}원</div>
+                      <div className={`w-20 shrink-0 pr-2 text-right text-[14px] font-bold tabular-nums ${on ? "text-ink" : "text-ink-mute"}`}>{formatComma(lineShown)}원</div>
                     </div>
                   );
                 })}
               </div>
             )}
             {snapshotUnmatched ? (
-              <div className="mt-2 rounded-lg border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">저장된 상품을 주문에서 못 찾았어요. 상품을 다시 선택해 주세요.</div>
+              <div className="mt-1.5 text-[12px] text-danger-tx">저장된 상품을 주문에서 못 찾았어요 — 상품을 다시 선택해 주세요.</div>
             ) : null}
             {!isExchange && pointUsed > 0 ? (
-              <div className="mt-2 rounded-lg border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">
-                이 주문은 포인트 {formatComma(pointUsed)}원 사용 — 환불액 확인 필요 (자동 차감하지 않아요)
-              </div>
+              <div className="mt-1.5 text-[12px] text-warn-tx">포인트 {formatComma(pointUsed)}원 사용 주문 — 환불액에서 자동 차감하지 않아요</div>
             ) : null}
             {/* [⑱] 기타 이슈 — 관련 상품 따로 추가(등록상품/직접). 환불·교환에선 숨김(값 유지). */}
             {isEtc ? <IssueExtraItems value={extra} onChange={setExtra} /> : null}
           </div>
 
-          {/* [⑯] 사유 · 반품 날짜 — 위치 고정(항상 렌더), 기타면 흐리게 비활성. */}
-          <section className={`mb-4 flex flex-col gap-3 rounded-2xl bg-surface-2 p-4 ${isEtc ? "pointer-events-none select-none opacity-40" : ""}`} aria-disabled={isEtc}>
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-[13px] font-bold text-ink-mute">사유 · 반품 날짜</div>
-              <div className="text-[12px] font-bold text-ink-mute">{isEtc ? "기타는 해당 없음" : "상품문제 → 반품비 0원"}</div>
+          {/* 3. 사유 · 반품 날짜 — 환불·교환만 */}
+          {!isEtc ? (
+            <div className="mb-4">
+              <div className={SUB_LABEL}>사유</div>
+              <div className="flex flex-wrap gap-2">
+                {REASON_FAULT_CHIPS.map((c) => (
+                  <button key={c.value} type="button" aria-pressed={reasonChip === c.value}
+                    onClick={() => {
+                      const next = reasonChip === c.value ? "" : c.value;
+                      setReasonChip(next); setReasonDirty(true);
+                      if (next === "상품문제") setDeductAmount(0); // 상품문제(사업자 귀책) → 반품비 차감 0(전자상거래법 18조)
+                    }}
+                    className={CHIP(reasonChip === c.value)}>
+                    {c.value}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {([["req", "반품 접수", returnRequestedOn, setReturnRequestedOn], ["recv", "물건 도착", returnReceivedOn, setReturnReceivedOn]] as const).map(([key, label, val, setVal]) => {
+                  const on = !!clean(val);
+                  return editingReturnDate === key ? (
+                    <span key={key} className="flex items-center gap-1">
+                      <input type="date" aria-label={`${label}일`} value={clean(val).slice(0, 10)} autoFocus onBlur={() => setEditingReturnDate("")} onChange={(e) => setVal(e.target.value)} className="h-9 rounded-lg border border-line px-2 text-[14px] font-bold text-ink outline-none focus-visible:ring-2 focus-visible:ring-ink" />
+                      <button type="button" onClick={() => { setVal(""); setEditingReturnDate(""); }} className="h-9 rounded-lg border border-line px-2 text-[12px] font-semibold text-ink-mute">지우기</button>
+                    </span>
+                  ) : (
+                    <button key={key} type="button" title={on ? "누르면 날짜 수정" : "누르면 오늘 날짜"} onClick={() => { if (!on) setVal(todayKST()); else setEditingReturnDate(key); }} className={CHIP(on)}>
+                      {label}{on ? ` ${dateShortKo(val)}` : ""}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <div className="grid grid-cols-3 gap-1.5">
-              {REASON_FAULT_CHIPS.map((c) => (
-                <button key={c.value} type="button"
-                  onClick={() => {
-                    const next = reasonChip === c.value ? "" : c.value;
-                    setReasonChip(next); setReasonDirty(true);
-                    if (next === "상품문제") setDeductAmount(0); // 상품문제(사업자 귀책) → 반품비 차감 0(전자상거래법 18조)
-                  }}
-                  className={`h-10 rounded-xl bg-surface text-[14px] transition ${reasonChip === c.value ? "border-2 border-ink font-bold text-ink" : "border border-line text-ink-soft"}`}>
-                  {c.value}
-                </button>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {([["req", "반품 접수일", returnRequestedOn, setReturnRequestedOn], ["recv", "물건 도착일", returnReceivedOn, setReturnReceivedOn]] as const).map(([key, label, val, setVal]) => {
-                const on = !!clean(val);
-                return (
-                  <div key={key}>
-                    <div className="mb-1 text-[12px] text-ink-mute">{label}</div>
-                    {editingReturnDate === key ? (
-                      <div className="flex items-center gap-1">
-                        <input type="date" value={clean(val).slice(0, 10)} autoFocus onBlur={() => setEditingReturnDate("")} onChange={(e) => setVal(e.target.value)} className="h-10 min-w-0 flex-1 rounded-xl border border-line px-2 text-[14px] font-bold text-ink outline-none focus-visible:ring-2 focus-visible:ring-ink" />
-                        <button type="button" onClick={() => { setVal(""); setEditingReturnDate(""); }} className="h-10 shrink-0 rounded-xl border border-line px-2 text-[12px] font-bold text-ink-mute">지우기</button>
-                      </div>
-                    ) : (
-                      <button type="button" onClick={() => { if (!on) setVal(todayKST()); else setEditingReturnDate(key); }}
-                        className="h-10 w-full rounded-xl border border-line bg-surface px-3 text-left text-[14px] outline-none focus-visible:ring-2 focus-visible:ring-ink">
-                        {on ? <span className="font-black text-ink">{dateShortKo(val)}</span> : <span className="text-ink-mute">아직 안 옴 · 누르면 오늘</span>}
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+          ) : null}
 
-          {/* [⑭] 공통 메모 — 모든 유형(기타 포함) 한 번만 렌더(환불·교환 사유 아래, 기타는 상품 아래). [⑯] placeholder 유형별. */}
-          <div className="mb-4">
-            <div className="mb-1 text-[13px] font-bold text-ink-soft">메모 (선택)</div>
-            <textarea value={issueMemo} onChange={(e) => setIssueMemo(e.target.value)}
-              placeholder={isEtc ? "예: 차콜 XL 미발송, S 1개로 출고 요청" : isExchange ? "예: 오배송 — 베이지 M 으로 재발송" : "예: 사이즈 작아서 반품"}
-              className="h-[72px] w-full resize-none rounded-xl border border-line bg-surface p-3 text-[16px] font-bold leading-6 text-ink outline-none focus-visible:ring-2 focus-visible:ring-ink" />
-          </div>
-
-          {/* [⑭] 세 번째 덩어리 — 환불·교환은 금액표·계좌·교환옵션, 기타는 안내. */}
+          {/* 4. 환불 — 금액 표 + 방법 / 교환 — 바꿀 옵션 */}
           {!isEtc ? (
           <>
           {/* [⑬ D] 등록 초안 + 환불 + 선택 있음 + 적립>0 일 때만 — 서버 order-return 안분 규칙(선택÷전체×적립)과 같은 식(표시 전용). */}
           {createMode && !isExchange && earnedPoints > 0 && selectedCount > 0 ? (
-            <div className="mb-3 rounded-lg bg-surface-2 px-3 py-2 text-[12px] font-bold text-ink">
-              환불 접수 시 선택 상품 기준 포인트 약 {won(totalLineSum > 0 ? (productSum >= totalLineSum ? earnedPoints : Math.floor(earnedPoints * productSum / totalLineSum)) : 0)} 회수 (주문 전체 적립 {won(earnedPoints)})
+            <div className="mb-3 text-[12px] text-ink-mute">
+              환불 등록 시 포인트 약 {won(totalLineSum > 0 ? (productSum >= totalLineSum ? earnedPoints : Math.floor(earnedPoints * productSum / totalLineSum)) : 0)} 회수 (이 주문 적립 {won(earnedPoints)})
             </div>
           ) : null}
 
           {!isExchange ? (
             <>
-              {/* 3. 금액 요약 표 — 차감/받을반품비 입력이 표 행 안에. 기준 줄(항상) + 상품/배송비/차감 → 환불할 금액 */}
-              {isCardCancel ? (
-                <div className="mb-3 border-t border-line pt-2">
-                  {isPartial ? <div className="pb-1 text-[13px] text-ink-mute">{lineCount}개 중 {selectedCount}개 반품 · 카드 전체 취소 후 손님과 정리</div> : null}
-                  <div className="flex items-center justify-between py-1 text-[13px]"><span className="text-ink-soft">상품금액</span><span className="font-black text-ink">{won(cardProductAmount)}</span></div>
-                  {cardExtra > 0 ? <div className="flex items-center justify-between py-1 text-[13px]"><span className="text-ink-soft">부가세({vatRatePct}%)</span><span className="font-black text-ink">{won(cardExtra)}</span></div> : null}
-                  <div className="flex items-center justify-between py-1 text-[13px]"><span className="text-ink-soft">카드 결제금액</span><span className="font-black text-ink">{won(cardTotalDisplay)}</span></div>
-                  <div className="mt-1 flex items-center justify-between border-t border-line pt-2 text-[16px] font-bold"><span className="text-ink">카드 전체 취소</span><span className="text-ink">{won(cardTotalDisplay)}</span></div>
-                  {/* 받을 반품비 = 차감 입력칸(오른쪽) */}
-                  <div className="flex items-center justify-between py-1 text-[14px] font-bold">
-                    <span className="text-ink">받을 반품비{reasonVal ? ` (${reasonVal})` : ""}</span>
-                    <span className="flex items-center gap-1">
-                      <input inputMode="numeric" value={formatComma(deductAmount)} onFocus={selectOnFocus} onChange={(e) => setDeductAmount(parseAmountInput(e.target.value))} className="h-8 w-24 rounded-lg border border-line px-2 text-right text-[14px] font-bold text-ink outline-none focus-visible:ring-2 focus-visible:ring-ink" />
-                      <span className="text-ink-mute">원</span>
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <div className="mb-3 border-t border-line pt-2">
-                  {/* 기준 줄(항상) */}
-                  <div className="pb-1 text-[12px] text-ink-mute">{baseSummaryText}</div>
-                  <div className="flex items-center justify-between py-1 text-[13px]"><span className="text-ink-soft">상품금액</span><span className="font-black text-ink">{won(productSum)}</span></div>
-                  {showShippingRow ? (
-                    <div className="py-1 text-[13px]">
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 text-ink-soft">
-                          <input type="checkbox" checked={includeShipping} onChange={(e) => { setIncludeShipping(e.target.checked); setShippingTouched(true); }} className="h-4 w-4 shrink-0 accent-[var(--color-ink)]" />
-                          배송비
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <input inputMode="numeric" value={formatComma(shipFee)} onFocus={selectOnFocus} onChange={(e) => { setShipFee(parseAmountInput(e.target.value)); setShipFeeTouched(true); }} className="h-8 w-24 rounded-lg border border-line px-2 text-right text-[14px] font-bold text-ink outline-none focus-visible:ring-2 focus-visible:ring-ink" />
-                          <span className="text-ink-mute">원</span>
-                        </span>
-                      </div>
-                      <div className="mt-0.5 text-right text-[12px] text-ink-mute">{shippingStatusText}</div>
-                    </div>
-                  ) : null}
-                  {/* 차감/반품비 = 입력칸(오른쪽). 손님 변심 → 「반품비」, 미선택 → 「차감」. 상품 문제(저장 차감 없음)면 숨김·0. */}
-                  {showDeductRow ? (
-                    <div className="flex items-center justify-between py-1 text-[13px]">
-                      <span className="text-ink-soft">{deductRowLabel}</span>
+              <div className="mb-4">
+                <div className={SUB_LABEL}>환불 금액</div>
+                {isCardCancel ? (
+                  <div className="rounded-lg border border-line px-3 py-1">
+                    {isPartial ? <div className="py-1 text-[12px] text-ink-mute">{lineCount}개 중 {selectedCount}개 반품 · 카드는 전체 취소 뒤 손님과 정리</div> : null}
+                    <div className="flex items-center justify-between py-1.5 text-[13px]"><span className="text-ink-soft">상품금액</span><span className="font-bold text-ink tabular-nums">{won(cardProductAmount)}</span></div>
+                    {cardExtra > 0 ? <div className="flex items-center justify-between py-1.5 text-[13px]"><span className="text-ink-soft">부가세({vatRatePct}%)</span><span className="font-bold text-ink tabular-nums">{won(cardExtra)}</span></div> : null}
+                    <div className="flex items-center justify-between py-1.5 text-[13px]"><span className="text-ink-soft">카드 결제금액</span><span className="font-bold text-ink tabular-nums">{won(cardTotalDisplay)}</span></div>
+                    {/* 받을 반품비 = 차감 입력칸(오른쪽) */}
+                    <div className="flex items-center justify-between py-1.5 text-[13px]">
+                      <span className="text-ink-soft">받을 반품비{reasonVal ? ` (${reasonVal})` : ""}</span>
                       <span className="flex items-center gap-1">
-                        <span className="text-danger-tx">−</span>
-                        <input inputMode="numeric" value={formatComma(deductAmount)} onFocus={selectOnFocus} onChange={(e) => setDeductAmount(parseAmountInput(e.target.value))} className="h-8 w-24 rounded-lg border border-line px-2 text-right text-[14px] font-bold text-danger-tx outline-none focus-visible:ring-2 focus-visible:ring-ink" />
+                        <input inputMode="numeric" aria-label="받을 반품비" value={formatComma(deductAmount)} onFocus={selectOnFocus} onChange={(e) => setDeductAmount(parseAmountInput(e.target.value))} className={AMOUNT_INPUT} />
                         <span className="text-ink-mute">원</span>
                       </span>
                     </div>
-                  ) : null}
-                  <div className="mt-1 flex items-center justify-between border-t border-line pt-2 text-[16px] font-bold"><span className="text-ink">환불할 금액</span><span className="text-ink text-[18px]">{won(amountFinal)}</span></div>
-                </div>
-              )}
-
-              {/* 5·6. 방법·계좌 */}
-              <div className="mb-3">
-                {method === "카드취소" ? null : method === "계좌이체" ? (
-                  <div className="rounded-xl border border-line p-3">
-                    {isCardOrder ? (
-                      <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">
-                        이 주문은 카드결제예요.
-                        <button type="button" onClick={() => setMethod("카드취소")} className="rounded border border-warn-tx/50 px-2 py-0.5 text-[13px] font-bold text-warn-tx hover:bg-warn-bg">카드취소로 바꾸기</button>
+                    <div className="flex items-center justify-between border-t border-line py-2 text-[16px] font-bold"><span className="text-ink">카드 전체 취소</span><span className="text-ink tabular-nums">{won(cardTotalDisplay)}</span></div>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-line px-3 py-1">
+                    {/* 기준 줄(항상) */}
+                    <div className="py-1 text-[12px] text-ink-mute">{baseSummaryText}</div>
+                    <div className="flex items-center justify-between py-1.5 text-[13px]"><span className="text-ink-soft">상품금액</span><span className="font-bold text-ink tabular-nums">{won(productSum)}</span></div>
+                    {showShippingRow ? (
+                      <div className="py-1.5 text-[13px]">
+                        <div className="flex items-center justify-between">
+                          <label className="flex items-center gap-1.5 text-ink-soft">
+                            <input type="checkbox" checked={includeShipping} onChange={(e) => { setIncludeShipping(e.target.checked); setShippingTouched(true); }} className="h-4 w-4 shrink-0 accent-[var(--color-ink)]" />
+                            배송비
+                          </label>
+                          <span className="flex items-center gap-1">
+                            <input inputMode="numeric" aria-label="배송비" value={formatComma(shipFee)} onFocus={selectOnFocus} onChange={(e) => { setShipFee(parseAmountInput(e.target.value)); setShipFeeTouched(true); }} className={AMOUNT_INPUT} />
+                            <span className="text-ink-mute">원</span>
+                          </span>
+                        </div>
+                        {shippingStatusText ? <div className="mt-0.5 text-right text-[12px] text-ink-mute">{shippingStatusText}</div> : null}
                       </div>
                     ) : null}
+                    {/* 차감/반품비 = 입력칸(오른쪽). 손님 변심 → 「반품비」, 미선택 → 「차감」. 상품 문제(저장 차감 없음)면 숨김·0. */}
+                    {showDeductRow ? (
+                      <div className="flex items-center justify-between py-1.5 text-[13px]">
+                        <span className="text-ink-soft">{deductRowLabel}</span>
+                        <span className="flex items-center gap-1">
+                          <span className="text-danger-tx">−</span>
+                          <input inputMode="numeric" aria-label={deductRowLabel} value={formatComma(deductAmount)} onFocus={selectOnFocus} onChange={(e) => setDeductAmount(parseAmountInput(e.target.value))} className={`${AMOUNT_INPUT} !text-danger-tx`} />
+                          <span className="text-ink-mute">원</span>
+                        </span>
+                      </div>
+                    ) : null}
+                    <div className="flex items-center justify-between border-t border-line py-2 text-[16px] font-bold"><span className="text-ink">환불할 금액</span><span className="text-[20px] text-ink tabular-nums">{won(amountFinal)}</span></div>
+                  </div>
+                )}
+              </div>
+
+              {/* 방법 — 칩 → 계좌 */}
+              <div className="mb-4">
+                <div className={SUB_LABEL}>방법</div>
+                <div className="flex flex-wrap gap-2">
+                  {(isCardOrder ? ["카드취소", "계좌이체", "포인트", "없음"] : ["계좌이체", "포인트", "없음"]).map((mth) => (
+                    <button key={mth} type="button" aria-pressed={method === mth} onClick={() => setMethod(mth)} className={CHIP(method === mth)}>
+                      {mth === "없음" ? "환불 없음" : mth}
+                    </button>
+                  ))}
+                </div>
+                {methodNote ? <div className="mt-1.5 text-[12px] text-ink-mute">{methodNote}</div> : null}
+                {method === "계좌이체" ? (
+                  <div className="mt-2">
+                    {isCardOrder ? (
+                      <div className="mb-2 flex flex-wrap items-center gap-2 text-[12px] text-warn-tx">카드결제 주문이에요.<button type="button" onClick={() => setMethod("카드취소")} className="h-7 rounded-lg border border-line bg-surface px-2 text-[12px] font-semibold text-ink hover:bg-surface-2">카드취소로</button></div>
+                    ) : null}
                     {holderExcluded ? (
-                      <div className="mb-2 rounded-lg border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">예금주가 &lsquo;{clean(item.account_holder)}&rsquo;로 잘못 저장돼 있었어요. 손님 이름으로 바꿔뒀어요. 맞으면 저장을 눌러주세요.</div>
+                      <div className="mb-2 text-[12px] text-warn-tx">예금주가 &lsquo;{clean(item.account_holder)}&rsquo;로 잘못 저장돼 있어 손님 이름으로 바꿔뒀어요 — 맞으면 저장</div>
                     ) : null}
                     {item.account_hidden ? (
-                      <div className="text-[14px] font-bold text-ink">{[bankDisplayName(bank), holder].filter(Boolean).join(" · ")}<div className="mt-1 text-[13px] font-bold text-ink-mute">완료 후 30일이 지나 계좌번호는 가려졌습니다(은행·예금주는 유지).</div></div>
+                      <div className="text-[14px] font-bold text-ink">{[bankDisplayName(bank), holder].filter(Boolean).join(" · ")}<div className="mt-1 text-[12px] text-ink-mute">완료 후 30일이 지나 계좌번호는 가려졌어요</div></div>
                     ) : (
-                      /* [6차] 항상 같은 모양 — 붙여넣기 + 3칸 + 복사(요약/펼침 토글 폐지) */
+                      /* [6차] 항상 같은 모양 — 붙여넣기 + 3칸 + 복사 */
                       <>
-                        <input value={paste} onChange={(e) => applyPaste(e.target.value)} onPaste={(e) => applyPaste(e.clipboardData.getData("text"))} placeholder="계좌 정보 붙여넣기 (예: 국민은행 123456 01 234567 홍길동)" className={`w-full ${INPUT}`} />
+                        <input value={paste} onChange={(e) => applyPaste(e.target.value)} onPaste={(e) => applyPaste(e.clipboardData.getData("text"))} aria-label="계좌 정보 붙여넣기" placeholder="계좌 붙여넣기 (예: 국민은행 123456-01-234567 홍길동)" className={`w-full ${INPUT}`} />
                         <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <select value={BANK_OPTIONS.includes(bank as typeof BANK_OPTIONS[number]) ? bank : (bank ? "기타" : "")} onChange={(e) => setBank(e.target.value === "기타" ? "" : e.target.value)} className={`w-32 ${INPUT} ${acctMissing.includes("bank") ? "ring-2 ring-warn-tx" : ""}`}>
+                          <select aria-label="은행" value={BANK_OPTIONS.includes(bank as typeof BANK_OPTIONS[number]) ? bank : (bank ? "기타" : "")} onChange={(e) => setBank(e.target.value === "기타" ? "" : e.target.value)} className={`w-32 ${INPUT} ${acctMissing.includes("bank") ? "ring-2 ring-warn-tx" : ""}`}>
                             <option value="">은행</option>
                             {BANK_OPTIONS.map((b) => <option key={b} value={b}>{bankDisplayName(b)}</option>)}
                           </select>
-                          <input value={account} onChange={(e) => setAccount(e.target.value.replace(/[^0-9]/g, ""))} onFocus={selectOnFocus} placeholder="계좌번호(숫자)" inputMode="numeric" className={`min-w-0 flex-1 ${INPUT} ${acctMissing.includes("account") ? "ring-2 ring-warn-tx" : ""}`} />
-                          <input value={holder} onChange={(e) => setHolder(e.target.value)} placeholder="예금주" className={`w-28 ${INPUT} ${acctMissing.includes("holder") || holderExcluded ? "ring-2 ring-warn-tx" : ""}`} />
-                          <button type="button" onClick={copyTransferInfo} className="shrink-0 rounded-lg border border-line bg-surface px-3 py-2 text-[14px] font-bold text-ink hover:bg-surface-2">복사</button>
+                          <input value={account} onChange={(e) => setAccount(e.target.value.replace(/[^0-9]/g, ""))} onFocus={selectOnFocus} aria-label="계좌번호" placeholder="계좌번호(숫자)" inputMode="numeric" className={`min-w-0 flex-1 ${INPUT} ${acctMissing.includes("account") ? "ring-2 ring-warn-tx" : ""}`} />
+                          <input value={holder} onChange={(e) => setHolder(e.target.value)} aria-label="예금주" placeholder="예금주" className={`w-28 ${INPUT} ${acctMissing.includes("holder") || holderExcluded ? "ring-2 ring-warn-tx" : ""}`} />
+                          <button type="button" onClick={copyTransferInfo} className="h-9 shrink-0 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2">복사</button>
                         </div>
                       </>
                     )}
                   </div>
-                ) : method === "포인트" ? (
-                  <div className="rounded-xl border border-warn-tx/40 bg-warn-bg px-3 py-2 text-[13px] font-bold text-warn-tx">포인트는 회원 상세 › 포인트 지급에서 지급하세요. 여기선 기록만 남습니다.</div>
-                ) : (
-                  <div className="rounded-xl border border-line px-3 py-2 text-[13px] font-bold text-ink-mute">환불 없이 기록만 남깁니다(금액 이동 없음).</div>
-                )}
-                {/* [⑯] 환불 방법 — segmented(밑줄 링크 폐지) */}
-                <div className={`mt-2 grid gap-1 rounded-xl bg-surface-2 p-1 ${isCardOrder ? "grid-cols-4" : "grid-cols-3"}`}>
-                  {(isCardOrder ? ["카드취소", "계좌이체", "포인트", "없음"] : ["계좌이체", "포인트", "없음"]).map((mth) => (
-                    <button key={mth} type="button" onClick={() => setMethod(mth)} className={`h-10 rounded-lg text-[13px] transition ${method === mth ? "bg-surface shadow-sm font-bold text-ink" : "text-ink-soft"}`}>
-                      {mth === "없음" ? "환불 없음" : mth === "포인트" ? "포인트로" : mth}
-                    </button>
-                  ))}
-                </div>
+                ) : null}
               </div>
             </>
           ) : (
             /* 교환: 바꿀 옵션만(송장 칸은 [A3]에서 삭제 — reship_tracking 컬럼은 저장값 보존, 표시·입력 안 함). */
-            <div className="mb-3 rounded-xl border border-line p-3">
-              <div className="text-[13px] font-bold text-ink-soft">바꿀 옵션</div>
-              <input value={exchangeOption} onChange={(e) => setExchangeOption(e.target.value)} placeholder="예: XL → 2XL" className={`mt-1 w-full ${INPUT}`} />
+            <div className="mb-4">
+              <label className={`block ${SUB_LABEL}`}>바꿀 옵션
+                <input value={exchangeOption} onChange={(e) => setExchangeOption(e.target.value)} placeholder="예: XL → 2XL" className={`mt-1.5 w-full ${INPUT}`} />
+              </label>
             </div>
           )}
-
-          {/* 다음 할 일은 저장값 있으면 회색으로만. */}
-          {nextActionSaved ? <div className="mb-1 text-[13px] text-ink-mute">다음 할 일: {nextActionSaved}</div> : null}
-
-          {isExchange ? (
-            <div className="mt-3 flex items-center gap-2 text-[13px] font-bold text-ink-mute">재고가 없으면<button type="button" onClick={() => { setIssueType("refund"); setMethod("계좌이체"); }} className="h-9 rounded-lg border border-line px-3 font-bold text-ink hover:bg-surface-2">환불로 바꾸기</button></div>
-          ) : null}
           </>
-          ) : (
-            <div className="mb-3 rounded-lg bg-surface-2 p-3 text-[13px] font-bold text-ink-mute">기타 — 환불 기록 없이 이슈만 저장돼요.</div>
-          )}
+          ) : null}
+
+          {/* 5. 메모 — 모든 유형 한 번 */}
+          <div className="mb-2">
+            <label className={`block ${SUB_LABEL}`}>메모 (선택)
+              <textarea value={issueMemo} onChange={(e) => setIssueMemo(e.target.value)}
+                placeholder={isEtc ? "예: 차콜 XL 미발송, S 1개로 출고 요청" : isExchange ? "예: 오배송 — 베이지 M 으로 재발송" : "예: 사이즈 작아서 반품"}
+                className="mt-1.5 h-[72px] w-full resize-none rounded-lg border border-line bg-surface p-3 text-[16px] leading-6 text-ink outline-none focus-visible:ring-2 focus-visible:ring-ink" />
+            </label>
+          </div>
+          {/* 다음 할 일은 저장값 있으면 회색으로만. */}
+          {nextActionSaved ? <div className="mb-1 text-[12px] text-ink-mute">다음 할 일: {nextActionSaved}</div> : null}
         </div>
 
-        {/* 9. 하단 고정 — 「저장」 하나. 완료(이체·취소·지급 등)는 목록 「해결완료」에서 처리. */}
-        {saveError ? <div className="border-t border-danger-tx/40 bg-danger-bg px-5 py-2 text-[13px] font-bold text-danger-tx">저장 실패: {saveError}</div> : null}
-        <div className="flex items-center gap-3 border-t border-line px-6 py-3.5">
-          {onDelete && !createMode ? <button type="button" disabled={saving} onClick={onDelete} className="text-[13px] font-bold text-ink-mute underline hover:text-danger-tx disabled:opacity-50">삭제</button> : null}
-          {/* [⑯] headerNotice 문구를 버튼 줄 왼쪽으로(없으면 기본 안내). */}
-          <span className="min-w-0 flex-1 truncate text-[12px] text-ink-mute">{headerNotice || "여기서 돈이 나가지 않아요"}</span>
-          <button type="button" onClick={onClose} className="h-12 shrink-0 rounded-xl border border-line px-5 text-[16px] font-bold text-ink-soft hover:bg-surface-2">취소</button>
-          <button type="button" disabled={saving || (!isEtc && !linesLoaded && !!orderCode) || (!isEtc && linesError)} onClick={saveOnly} className="h-12 min-w-[132px] shrink-0 rounded-xl bg-ink px-6 text-[16px] font-bold text-white disabled:opacity-50">{saving ? (createMode ? "등록 중…" : "저장 중…") : createMode ? (isEtc ? "이슈 등록" : isExchange ? "교환 등록" : "환불 등록") : "저장"}</button>
+        {/* 하단 고정 — [삭제] … [닫기] [저장]. 완료(이체·취소·지급 등)는 목록 「해결완료」에서. */}
+        {saveError ? <div className="border-t border-line px-4 py-2 text-[12px] text-danger-tx">저장 실패: {saveError}</div> : null}
+        <div className="flex items-center gap-2 border-t border-line px-4 py-3">
+          {onDelete && !createMode ? <button type="button" disabled={saving} onClick={onDelete} className="h-9 rounded-lg px-2 text-[13px] font-semibold text-danger-tx hover:bg-surface-2 disabled:opacity-50">삭제</button> : null}
+          <span className="flex-1" />
+          <button type="button" onClick={onClose} className="h-9 rounded-lg border border-line bg-surface px-4 text-[13px] font-semibold text-ink hover:bg-surface-2">닫기</button>
+          <button type="button" disabled={saving || (!isEtc && !linesLoaded && !!orderCode) || (!isEtc && linesError)} onClick={saveOnly} className="h-10 min-w-[112px] rounded-lg bg-ink px-5 text-[14px] font-bold text-white disabled:opacity-50">{saving ? (createMode ? "등록 중…" : "저장 중…") : createMode ? "등록" : "저장"}</button>
         </div>
       </div>
     </div>
