@@ -1680,8 +1680,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             </div>
             {/* 우측: 선택 방송의 진열 상품 (sort_order순, 읽기 전용) */}
             <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", border: "1px solid var(--color-line)", borderRadius: "8px", overflow: "hidden" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 12px", borderBottom: "1px solid var(--color-line)" }}>
-                <span style={TAB_TITLE_STYLE}>방송 상품 {bcProducts.length}개</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 12px", borderBottom: "1px solid var(--color-line)", flexWrap: isNarrow ? "wrap" : "nowrap" }}>
+                <span style={{ ...TAB_TITLE_STYLE, whiteSpace: "nowrap", flexBasis: isNarrow ? "100%" : undefined }}>방송 상품 {bcProducts.length}개</span>
                 {bcSelId && bcProducts.length > 0 ? (
                   <select
                     value={bcSort}

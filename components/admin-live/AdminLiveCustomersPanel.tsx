@@ -1888,14 +1888,14 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
 
   return (
     <div className={embedded ? "h-full w-full" : "fixed inset-0 z-40 flex items-center justify-center bg-[var(--color-ink-soft)]/40 p-4"} onClick={embedded ? undefined : (e) => { if (e.target === e.currentTarget) onClose?.(); }}>
-      <div className={embedded ? "flex h-full w-full flex-col overflow-hidden bg-surface" : "flex h-[88vh] w-full max-w-[640px] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl"}>
+      <div className={embedded ? "flex h-full w-full flex-col overflow-hidden bg-surface max-md:bg-transparent" : "flex h-[88vh] w-full max-w-[640px] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl"}>
         {embedded ? null : (
           <div className="flex items-center justify-between border-b border-rose-line px-5 py-3 shrink-0">
             <span className="text-[14px] font-black text-ink">고객</span>
             <button type="button" onClick={() => onClose?.()} className="text-ink-mute hover:text-ink text-lg leading-none">✕</button>
           </div>
         )}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-3">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-3 max-md:p-0">
           {/* [2026-09-21 사장님] 「고객 메뉴 레이아웃이 너무 별로」 — 순서를 바로잡았다.
               예전: 통계요약 → ⛔전화번호 차단 → 탭바 → 내용
                 회원 목록 보러 들어왔는데 «빨간 차단 상자»가 탭보다 먼저 눈에 들어왔다.

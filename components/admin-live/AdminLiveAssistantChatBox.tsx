@@ -493,10 +493,10 @@ export default function AdminLiveAssistantChatBox({ onShowInOrders, ask }: { onS
           ref={inputRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && window.innerWidth >= 768) { e.preventDefault(); void send(); } }} // [2026-10-22 폰] 폰 키보드 Enter 는 줄바꿈, 보내기는 버튼
           rows={2}
           aria-label="AI 비서에게 할 말"
-          placeholder="할 말을 적고 Enter (줄바꿈은 Shift+Enter). 캡처는 Ctrl+V 나 끌어다 놓기."
+          placeholder="할 말을 적고 보내기(PC 는 Enter · 줄바꿈 Shift+Enter). 캡처는 + 사진이나 Ctrl+V."
           className="w-full resize-none bg-transparent px-1 text-[16px] text-ink outline-none placeholder:text-ink-mute md:text-[14px]"
         />
         <div className="flex items-center justify-between gap-2">
@@ -505,7 +505,7 @@ export default function AdminLiveAssistantChatBox({ onShowInOrders, ask }: { onS
             <button type="button" className={SUB} onClick={() => fileRef.current?.click()} disabled={images.length >= MAX_IMAGES}>+ 사진 {images.length ? `${images.length}/${MAX_IMAGES}` : ""}</button>
             {messages.length > 0 ? <button type="button" className="h-9 rounded-lg px-2 text-[13px] font-semibold text-ink-mute hover:bg-surface-2" onClick={() => { if (window.confirm("대화 내용을 모두 지울까요? (저장된 메모·이슈는 그대로예요)")) { setMessages([]); setDone({}); } }}>화면 지우기</button> : null}
           </div>
-          <button type="button" className={MAIN} disabled={busy || ocrBusy || (!text.trim() && images.length === 0)} onClick={() => void send()}>{busy ? "보내는 중…" : "보내기"}</button>
+          <button type="button" className={`${MAIN} max-md:h-11 max-md:px-4`} disabled={busy || ocrBusy || (!text.trim() && images.length === 0)} onClick={() => void send()}>{busy ? "보내는 중…" : "보내기"}</button>
         </div>
         {error ? <p className="mt-1 text-[13px] text-warn-tx">{error}</p> : null}
       </div>
