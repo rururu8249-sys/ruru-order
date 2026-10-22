@@ -29,7 +29,7 @@ export function pickMaskBoxes(words: OcrWord[]): MaskBox[] {
     const digits = w.text.replace(/\D/g, "");
     if (digits.length < 4) return;
     // 털·무늬 사진에서 글자 인식기가 지어낸 숫자(확신도 낮음)는 가리지 않는다(실측 10/22: 버버리 자수 사진 가운데 검은 띠)
-    if (typeof w.confidence === "number" && (w.confidence < 40 || (w.confidence < 60 && digits.length < 7))) return;
+    if (typeof w.confidence === "number" && (w.confidence < 40 || (w.confidence < 75 && digits.length < 7))) return;
     if (isPlainNumberWord(w.text)) return;
     const prevWord = words[i - 1];
     if (prevWord && /^(오전|오후)$/.test(prevWord.text.trim()) && digits.length <= 4) return; // 「오전 11:47」을 OCR 이 1147 로 읽어도 시각
