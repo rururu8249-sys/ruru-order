@@ -565,7 +565,8 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                 ))}
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                {([["req", "반품 접수", returnRequestedOn, setReturnRequestedOn], ["recv", "물건 도착", returnReceivedOn, setReturnReceivedOn]] as const).map(([key, label, val, setVal]) => {
+                <span className="text-[12px] text-ink-mute">반품 날짜</span>
+                {([["req", "접수", returnRequestedOn, setReturnRequestedOn], ["recv", "도착", returnReceivedOn, setReturnReceivedOn]] as const).map(([key, label, val, setVal]) => {
                   const on = !!clean(val);
                   return editingReturnDate === key ? (
                     <span key={key} className="flex items-center gap-1">
