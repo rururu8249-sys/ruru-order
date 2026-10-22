@@ -270,6 +270,10 @@ function buildItem(row: OrderRow): LiveOrderItem {
     repickRequiredAt: row.repick_required_at ?? null,
     repickBefore: row.repick_before ?? null,
     repickResolvedAt: row.repick_resolved_at ?? null,
+    // [2026-10-22 지난 주문 가져오기] 표시·챙기기 전용
+    pickPulledAt: row.pick_pulled_at ?? null,
+    pickPulledFor: row.pick_pulled_for ?? null,
+    pickPulledReason: row.pick_pulled_reason ?? null,
   };
 }
 

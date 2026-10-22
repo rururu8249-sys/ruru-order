@@ -14,6 +14,7 @@ import { formatKoreanPhone } from "@/lib/order/phone";
 import { supabase } from "@/lib/supabase";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { pickIssueProductRows } from "@/lib/issueProductLabel";
+import PickingPullModal from "./PickingPullModal";
 import { RefundProcessModal, type LedgerDetail } from "./AdminLiveRefundLedgerPanel";
 import IssueRegisterModal, { type IssueRegisterSubmit } from "./IssueRegisterModal";
 import { productSnapshotFromItems, ledgerSummaryLine, pickPrimaryLedger, restoreSelectionFromSnapshot, listAmountParts, dateShortLabel, returnStagePrefix } from "@/lib/refundLedger";
@@ -358,6 +359,7 @@ export function IssueCard({
   isRepresentativeIssue = false,
   repIssueDate = "",
   amount = null,
+  onPull,
 }: {
   task: AdminIssueTask;
   index: number;
@@ -366,6 +368,8 @@ export function IssueCard({
   onToggleSelect?: (task: AdminIssueTask) => void;
   /** [2026-09-27 ②] 「처리」 = 줄의 주 액션(처리창 열기). 수정·환불하기·삭제가 모두 이 창 안으로. */
   onProcess: (task: AdminIssueTask) => void;
+  /** [2026-10-22] 「오늘 챙기기」 — 이 이슈의 대상 상품 줄을 오늘 주문서·송장·물건챙기기에 넣는 창 열기 */
+  onPull?: (task: AdminIssueTask) => void;
   onResolve: (task: AdminIssueTask) => void | Promise<void>;
   /** [2026-09-23] 「지운 건」 탭에서 되살리기 */
   onRestore?: (task: AdminIssueTask) => void | Promise<void>;
@@ -644,6 +648,17 @@ export function IssueCard({
             >
               열기
             </button>
+            {onPull ? (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onPull(task); }}
+                disabled={busy}
+                title="이 이슈의 상품 줄을 오늘 주문서·송장·물건챙기기에 넣기(지난 주문 표시 · 주문·금액 무변경)"
+                className={`${SUB_BTN} text-ink hover:bg-surface-2`}
+              >
+                오늘 챙기기
+              </button>
+            ) : null}
             {done ? (
               <button
                 type="button"
@@ -854,7 +869,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
   // [2026-09-26] 목록 줄합계 — 주문번호가 있는 «모든» 페이지 줄의 주문 상품을 «주문번호로 한 번에» 조회(행마다 쿼리 금지).
   //   금액 = 매칭된 줄들의 줄합계(submitRowLineTotal 서버 계산) 합. 매칭 실패 시 생략(칸 비움).
-  type OrderMeta = { lines: Array<Record<string, unknown>>; shippingFee: number; cardTotal: number; paymentMethod: string };
+  type OrderMeta = { lines: Array<Record<string, unknown>>; shippingFee: number; cardTotal: number; paymentMethod: string; orderDate: string };
   const [linesByOrder, setLinesByOrder] = useState<Record<string, OrderMeta>>({});
   const pageOrderCodesKey = Array.from(new Set(pageTasks.map((t) => extractBodyField(t, "주문번호:")).filter(Boolean))).sort().join(",");
   useEffect(() => {
@@ -865,14 +880,43 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       const res = await fetch(`/api/admin-live/order-lines?codes=${encodeURIComponent(codes.join(","))}`, { cache: "no-store" });
       const p = await res.json().catch(() => null);
       if (!alive || !p?.ok) return;
-      const byCode = (p.byCode || {}) as Record<string, { lines?: Array<Record<string, unknown>>; shippingFee?: number; cardTotal?: number; paymentMethod?: string }>;
+      const byCode = (p.byCode || {}) as Record<string, { lines?: Array<Record<string, unknown>>; shippingFee?: number; cardTotal?: number; paymentMethod?: string; orderDate?: string }>;
       const out: Record<string, OrderMeta> = {};
-      for (const [code, e] of Object.entries(byCode)) out[code] = { lines: Array.isArray(e?.lines) ? e.lines : [], shippingFee: Number(e?.shippingFee) || 0, cardTotal: Number(e?.cardTotal) || 0, paymentMethod: String(e?.paymentMethod ?? "") };
+      for (const [code, e] of Object.entries(byCode)) out[code] = { lines: Array.isArray(e?.lines) ? e.lines : [], shippingFee: Number(e?.shippingFee) || 0, cardTotal: Number(e?.cardTotal) || 0, paymentMethod: String(e?.paymentMethod ?? ""), orderDate: String(e?.orderDate ?? "") };
       setLinesByOrder(out);
     })().catch(() => { /* 실패해도 목록 정상, 금액만 생략 */ });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageOrderCodesKey]);
+
+  // [B5 → 2026-10-22 공용화] 이슈의 «대상 상품 줄» 매칭 — 목록 금액과 「오늘 챙기기」 미리 체크가 같은 규칙을 쓴다.
+  const matchIssueLines = (t: AdminIssueTask, lines: Array<Record<string, unknown>>, primary: LedgerRow | null | undefined): Array<Record<string, unknown>> => {
+    const lite = lines.map((l) => ({ id: clean(l.id), product_id: clean(l.product_id), product_name: clean(l.product_name), color: clean(l.color), size: clean(l.size), qty: Number(l.qty) || 1 }));
+    if (primary && Array.isArray(primary.product_snapshot) && primary.product_snapshot.length > 0) {
+      // 대표 기록 있으면 그 snapshot 을 «엄격 매처»(productId+이름/옵션)로 — 창과 완전히 같은 결과.
+      const restored = restoreSelectionFromSnapshot(lite, primary.product_snapshot);
+      return lines.filter((l) => (restored[clean(l.id)] || 0) > 0);
+    }
+    // 기록 없음 — raw_payload 대상상품을 «같은 엄격 매처»로(productId includes 필터는 product_id 중복 시 과다매칭).
+    const rawItems = (t.raw_payload && typeof t.raw_payload === "object" ? (t.raw_payload as { items?: unknown }).items : null);
+    const rawSnap = Array.isArray(rawItems)
+      ? rawItems.map((x) => { const o = x as Record<string, unknown>; return { productId: clean(o.productId ?? o.product_id), productName: clean(o.productName ?? o.product_name), color: clean(o.color), size: clean(o.size), qty: Number(o.qty) || 1 }; })
+      : [];
+    if (rawSnap.length > 0) {
+      const restored = restoreSelectionFromSnapshot(lite, rawSnap);
+      return lines.filter((l) => (restored[clean(l.id)] || 0) > 0);
+    }
+    return pickIssueProductRows(lines, extractBodyField(t, "대상상품:") || clean(t.related_product));
+  };
+
+  // [2026-10-22 사장님] 「오늘 챙기기」 창 — 이슈 대상 줄 미리 체크, 사유 「고객이슈 교환」. 저장은 PickingPullModal(picking-pull 라우트).
+  const [pullTask, setPullTask] = useState<AdminIssueTask | null>(null);
+  const openPull = (task: AdminIssueTask) => {
+    const code = extractBodyField(task, "주문번호:");
+    if (!code) { showAdminToast("주문번호가 없는 이슈라 가져올 주문 줄이 없어요. 주문서에서 검색해 주문상세의 「오늘 챙기기에 넣기」를 써 주세요.", "warning"); return; }
+    if (!linesByOrder[code]) { showAdminToast("주문 줄을 아직 불러오는 중이에요. 잠시 뒤 다시 눌러 주세요.", "warning"); return; }
+    setPullTask(task);
+  };
 
   // [B5] 목록 줄 금액 — 대표 기록이 있으면 그 기록 snapshot 줄합계(같은 항목집합), 없으면 raw_payload 대상상품 합계.
   const amountByTask = useMemo(() => {
@@ -883,25 +927,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       const lines = meta?.lines || [];
       if (lines.length === 0) continue;
       const primary = code ? primaryByOrder[code] : null;
-      const lite = lines.map((l) => ({ id: clean(l.id), product_id: clean(l.product_id), product_name: clean(l.product_name), color: clean(l.color), size: clean(l.size), qty: Number(l.qty) || 1 }));
-      let matched: Array<Record<string, unknown>>;
-      if (primary && Array.isArray(primary.product_snapshot) && primary.product_snapshot.length > 0) {
-        // 대표 기록 있으면 그 snapshot 을 «엄격 매처»(productId+이름/옵션)로 — 창과 완전히 같은 결과.
-        const restored = restoreSelectionFromSnapshot(lite, primary.product_snapshot);
-        matched = lines.filter((l) => (restored[clean(l.id)] || 0) > 0);
-      } else {
-        // 기록 없음 — raw_payload 대상상품을 «같은 엄격 매처»로(productId includes 필터는 product_id 중복 시 과다매칭).
-        const rawItems = (t.raw_payload && typeof t.raw_payload === "object" ? (t.raw_payload as { items?: unknown }).items : null);
-        const rawSnap = Array.isArray(rawItems)
-          ? rawItems.map((x) => { const o = x as Record<string, unknown>; return { productId: clean(o.productId ?? o.product_id), productName: clean(o.productName ?? o.product_name), color: clean(o.color), size: clean(o.size), qty: Number(o.qty) || 1 }; })
-          : [];
-        if (rawSnap.length > 0) {
-          const restored = restoreSelectionFromSnapshot(lite, rawSnap);
-          matched = lines.filter((l) => (restored[clean(l.id)] || 0) > 0);
-        } else {
-          matched = pickIssueProductRows(lines, extractBodyField(t, "대상상품:") || clean(t.related_product));
-        }
-      }
+      const matched = matchIssueLines(t, lines, primary);
       if (matched.length === 0) continue;
       map[clean(t.id)] = listAmountParts({
         productSum: matched.reduce((s, m) => s + (Number(m.lineTotal) || 0), 0),
@@ -1761,6 +1787,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
               photos={issuePhotos[taskKey(task, index)] || []}
               onPhotoZoom={setIssuePhotoPreview}
               onProcess={openProcess}
+              onPull={openPull}
               onResolve={resolveIssueTask}
               onRestore={(t) => { void restoreIssueTask(t); }}
               onUnresolve={(t) => { void restoreIssueTask(t, true).then((ok) => { if (ok) showAdminToast("미해결로 되돌렸습니다.", "success"); }); }}
@@ -1838,6 +1865,25 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
 
       {/* [2026-09-23] 상품 사진 크게 보기 — 주문상세와 같은 방식(배경 아무 데나 누르면 닫힘) */}
+      {pullTask ? (() => {
+        const code = extractBodyField(pullTask, "주문번호:");
+        const meta = linesByOrder[code];
+        const lines = meta?.lines || [];
+        const matched = new Set(matchIssueLines(pullTask, lines, primaryByOrder[code]).map((l) => clean(l.id)));
+        const typeLabel = getIssueTypes(pullTask).map(getIssueTypeLabel).filter(Boolean).join("·");
+        return (
+          <PickingPullModal
+            orderNo={code}
+            nickname={getNickname(pullTask)}
+            name={getName(pullTask)}
+            orderedAt={meta?.orderDate || null}
+            lines={lines.map((l) => ({ id: clean(l.id), productName: clean(l.product_name) || "상품", option: [clean(l.color), clean(l.size)].filter((v) => v && v !== "없음").join(" / "), qty: Number(l.qty) || 1 }))}
+            preselectIds={[...matched]}
+            defaultReason={`고객이슈${typeLabel ? ` ${typeLabel}` : ""}`}
+            onClose={() => setPullTask(null)}
+          />
+        );
+      })() : null}
       {issuePhotoPreview ? (
         <div
           className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--color-ink)]/70 p-6"

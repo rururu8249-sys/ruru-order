@@ -69,6 +69,11 @@ export type OrderRow = {
     qty?: number | null;
   } | null;
   repick_resolved_at?: string | null;
+  // [2026-10-22] 지난 주문 가져오기(표시·챙기기 전용)
+  pick_pulled_at?: string | null;
+  pick_pulled_for?: string | null;
+  pick_pulled_reason?: string | null;
+  pick_pulled_prev?: Record<string, unknown> | null;
   is_deleted: boolean | null;
 };
 

@@ -30,6 +30,7 @@ import AdminLiveSettingsPanel from "./AdminLiveSettingsPanel";
 import AdminLiveSidebar from "./AdminLiveSidebar";
 import LiveHeader from "./LiveHeader";
 import LiveStatsCards from "./LiveStatsCards";
+import { buildPulledVirtualOrders, originalOrderIdOf, pulledOrdersForDay } from "./liveOrderPickPull";
 import LiveStatsPanel from "./LiveStatsPanel";
 import SalesAnalysisPanel from "./SalesAnalysisPanel";
 import LiveIssueRailPanel from "./LiveIssueRailPanel";
@@ -869,13 +870,33 @@ export default function AdminLiveDashboard() {
             );
           };
 
+          // [2026-10-22 지난 주문 가져오기] 그날로 «가져온 줄»(pick_pulled_for=그날) + 그 줄이 속한 주문서 전체 줄.
+          //   가져온 줄만 오면 원래 주문서가 반쪽으로 보이므로 같은 묶음(order_group_id/order_lookup_code) 줄을 함께 가져온다.
+          const fetchPulledForDay = async (dateKey: string): Promise<any[]> => {
+            const pulled = await pageAll((from, to) =>
+              supabase.from("orders").select("*").neq("is_deleted", true)
+                .eq("pick_pulled_for", dateKey)
+                .order("created_at", { ascending: false }).range(from, to),
+            );
+            if (pulled.length === 0) return [];
+            const groupIds = Array.from(new Set(pulled.map((r: any) => String(r.order_group_id || "")).filter(Boolean)));
+            const codes = Array.from(new Set(pulled.filter((r: any) => !r.order_group_id).map((r: any) => String(r.order_lookup_code || "")).filter(Boolean)));
+            const siblings: any[] = [];
+            if (groupIds.length) siblings.push(...await pageAll((from, to) => supabase.from("orders").select("*").neq("is_deleted", true).in("order_group_id", groupIds).range(from, to)));
+            if (codes.length) siblings.push(...await pageAll((from, to) => supabase.from("orders").select("*").neq("is_deleted", true).in("order_lookup_code", codes).range(from, to)));
+            return [...pulled, ...siblings];
+          };
+          let pulledDayKey = "";
+
           const alwaysDate = getAlwaysOrderDateFromFilter(filters.broadcast); // "YYYY-MM-DD" | ""
           let supplemental: any[] = [];
           if (alwaysDate) {
             supplemental = await fetchDay(alwaysDate);
+            pulledDayKey = alwaysDate;
           } else if (filters.broadcast === "none") {
             const todayKey = getAlwaysOrderDateKey(new Date().toISOString());
             if (todayKey) supplemental = await fetchDay(todayKey);
+            pulledDayKey = todayKey || "";
           } else {
             // 특정 방송(current=활성 방송): broadcast_id 매칭 + 방송 시간대(started_at~ended_at/지금) 줄 — 필터 1181행과 같은 기준.
             const bc = filters.broadcast === "current"
@@ -898,7 +919,11 @@ export default function AdminLiveDashboard() {
                 );
               }
               supplemental = [...byId, ...byTime];
+              pulledDayKey = toDateKey(bc.started_at || null);
             }
+          }
+          if (pulledDayKey) {
+            try { supplemental = [...supplemental, ...await fetchPulledForDay(pulledDayKey)]; } catch { /* 가져온 줄 보충 실패는 조용히(목록은 그대로) */ }
           }
 
           if (supplemental.length > 0) {
@@ -1287,8 +1312,23 @@ export default function AdminLiveDashboard() {
   // [㉕-B] 상태 칩 숫자용 — filteredOrders 와 같은 조건에서 matchesStatus 만 뺀 목록.
   //   (상태 필터를 걸면 목록엔 그 상태만 남지만, 칩 숫자는 «상태 무관 전체»로 세야 안 무너진다)
   // [㉚] 물건챙기기 범위 = 방송·범위·기간만(상태칩·검색 무관). 표 칩 숫자(filteredOrdersForCounts)는 여기에 검색만 더 건다.
+  // [2026-10-22 지난 주문 가져오기] 가상 묶음(가져온 줄만) — 그날 주문서·송장·물건챙기기에만 붙는다. 숫자 띠·입금매칭엔 안 넣음.
+  const pulledVirtualOrders = useMemo(() => buildPulledVirtualOrders(orderGroups), [orderGroups]);
   const pickingBaseOrders = useMemo(() => {
-    return orders.filter((order) => {
+    const selectedAlwaysOrderDateForPull = getAlwaysOrderDateFromFilter(filters.broadcast);
+    const selectedBroadcastForPull =
+      filters.broadcast === "current" ? activeBroadcast : broadcasts.find((broadcast) => broadcast.id === filters.broadcast) || null;
+    const pullDayKey =
+      filters.broadcast === "all" ? ""
+        : filters.broadcast === "none" ? toDateKey(new Date().toISOString())
+          : selectedAlwaysOrderDateForPull ? selectedAlwaysOrderDateForPull
+            : selectedBroadcastForPull ? toDateKey(selectedBroadcastForPull.started_at || null) : "";
+    const pulledForScope = pulledOrdersForDay(pulledVirtualOrders, pullDayKey).filter((order) => {
+      const matchScope = filters.scope === "all" ? true : filters.scope === "shop" ? isAlwaysOrderLike(order as any) : !isAlwaysOrderLike(order as any);
+      // 날짜 필터는 «가져온 날짜» 기준(원래 주문일이 아니라 오늘 챙기는 날)
+      return matchScope && matchesDate({ ...order, createdAt: `${pullDayKey}T12:00:00+09:00` }, filters);
+    });
+    const base = orders.filter((order) => {
       const selectedAlwaysOrderDate = getAlwaysOrderDateFromFilter(filters.broadcast);
 
       const selectedBroadcast =
@@ -1325,7 +1365,8 @@ export default function AdminLiveDashboard() {
         matchesDate(order, filters)
       );
     });
-  }, [orders, filters, broadcasts, activeBroadcast]);
+    return pulledForScope.length ? [...base, ...pulledForScope] : base;
+  }, [orders, filters, broadcasts, activeBroadcast, pulledVirtualOrders]);
 
   const filteredOrdersForCounts = useMemo(() => {
     const keyword = normalizeText(filters.keyword);
@@ -1352,6 +1393,9 @@ export default function AdminLiveDashboard() {
     () => filteredOrdersForCounts.filter((order) => matchesStatus(order, filters.status)),
     [filteredOrdersForCounts, filters.status],
   );
+  // [2026-10-22] 받은 돈 띠·입금매칭·이벤트는 가상 묶음(가져온 줄) 제외 — 돈 숫자 중복 금지
+  const filteredOrdersNoPull = useMemo(() => filteredOrders.filter((order) => !order.pickPull), [filteredOrders]);
+  const toRealOrder = (order: LiveOrder): LiveOrder => (order.pickPull ? orders.find((o) => o.id === originalOrderIdOf(order)) || order : order);
 
   useEffect(() => {
     if (!filteredOrders.length) {
@@ -1756,7 +1800,7 @@ export default function AdminLiveDashboard() {
                   onRequestClose={() => { setActiveMenu("orders"); }}
                   activeBroadcastId={activeBroadcast?.id || null}
                   selectedBroadcastId={filters.broadcast === "current" ? activeBroadcast?.id || null : broadcasts.find((broadcast) => broadcast.id === filters.broadcast)?.id || null}
-                  filteredOrderGroupIds={filteredOrders.map((o) => String(o.groupId))}
+                  filteredOrderGroupIds={filteredOrdersNoPull.map((o) => String(o.groupId))}
                   onOpenCustomer={(customerRef) => {
                     const requestedAt = Date.now();
                     setEventCustomerRef(customerRef);
@@ -1783,7 +1827,7 @@ export default function AdminLiveDashboard() {
               {activeMenu === "orders" ? (
                 <div className="flex flex-col gap-3 p-4">
                   <div className="shrink-0">
-                    <LiveStatsCards orders={filteredOrders} criteriaLabel={criteriaLabel} />
+                    <LiveStatsCards orders={filteredOrdersNoPull} criteriaLabel={criteriaLabel} />
                   </div>
                   <div className="shrink-0">
                     <LiveMissionGauge
@@ -1804,7 +1848,9 @@ export default function AdminLiveDashboard() {
                       broadcastCalendar={broadcastCalendar}
                       shopOrderCalendar={shopOrderCalendar}
                       broadcastStartedAt={activeBroadcast?.started_at || activeBroadcast?.created_at || null}
-                      onSelectOrder={(order) => {
+                      onSelectOrder={(picked) => {
+                        // [2026-10-22] 가져온 줄 가상 묶음을 눌러도 «원래 주문» 상세를 연다(수정·입금은 원래 주문에서)
+                        const order = toRealOrder(picked);
                         // 사이드 패널 단일 슬롯: 주문상세 열 때 입금매칭은 닫음
                         setSelectedOrderForMatch(null);
                         setSelectedOrderId(order.id);
@@ -1812,9 +1858,9 @@ export default function AdminLiveDashboard() {
                       }}
                       onFiltersChange={setFilters}
                       onRefresh={loadOrders}
-                      onOpenManualMatch={openManualMatchForOrder}
-                      onOpenCardPay={setCardPayOrder}
-                      onSelectForMatch={(order) => { setSelectedOrderForMatch(order); setDrawer({kind: "match", orderId: order.id}); }}
+                      onOpenManualMatch={(order) => openManualMatchForOrder(toRealOrder(order))}
+                      onOpenCardPay={(order) => setCardPayOrder(toRealOrder(order))}
+                      onSelectForMatch={(picked) => { const order = toRealOrder(picked); setSelectedOrderForMatch(order); setDrawer({kind: "match", orderId: order.id}); }}
                     />
                   </div>
                 </div>
@@ -1963,7 +2009,7 @@ export default function AdminLiveDashboard() {
                     initialDepositId={matchInitial?.depositId ?? null}
                     initialSearch={matchInitial?.search ?? ""}
                     deposits={deposits}
-                    orders={filteredOrders}
+                    orders={filteredOrdersNoPull}
                     allOrders={orders}
                     onClose={() => { setDrawer({kind: "closed"}); setSelectedOrderForMatch(null); setMatchInitial(null); }}
                     onMatched={refreshAfterManualMatch}

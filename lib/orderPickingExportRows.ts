@@ -1,5 +1,6 @@
 import type { LiveOrder, LiveOrderItem } from "../components/admin-live/types";
 import { classifyPickingAttention, isPaidPickingOrder } from "./orderPickingWorkspace";
+import { kstDateKeyOf, pickPullAwayText, pickPullBadgeText, pulledForOf } from "./orderPickPull";
 
 export type PickingMainExportRow = {
   itemId: string;
@@ -10,7 +11,7 @@ export type PickingMainExportRow = {
   qty: number;
   amount: number;
   payment: string;
-  kind: "일반" | "결제 후 추가 챙기기" | "상품 변경 · 다시 챙기기";
+  kind: "일반" | "결제 후 추가 챙기기" | "상품 변경 · 다시 챙기기" | (string & {});
 };
 
 export type PickingAttentionExportRow = {
@@ -63,7 +64,13 @@ export function buildPickingExportRows(orders: readonly LiveOrder[], visibleItem
       const itemId = String(item.id);
       if (visible && !visible.has(itemId)) continue;
       const attention = attentionItems && !attentionItems.has(itemId) ? null : classifyPickingAttention(order, item);
-      const kind = attention === "repick" ? "상품 변경 · 다시 챙기기" : attention === "late_paid" || attention === "payment_time_missing" ? "결제 후 추가 챙기기" : "일반";
+      // [2026-10-22] 지난 주문 가져온 줄(가상 묶음)은 구분 칸에 「지난 주문 10.18(토) · 사유」 — 엑셀에서도 바로 알아보게
+      //   서버가 만든 주문(가상 묶음 표식 없음)은 줄의 pick_pulled_for 로 판단: 오늘로 가져온 줄=「지난 주문 …」, 다른 날로 가져간 줄=「MM.DD 로 가져감」.
+      const pulledDay = pulledForOf({ pick_pulled_for: item.pickPulledFor ?? null, pick_pulled_at: item.pickPulledAt ?? null });
+      const kind: PickingMainExportRow["kind"] = order.pickPull || (pulledDay && pulledDay === kstDateKeyOf(new Date()))
+        ? pickPullBadgeText(order.createdAt, order.pickPull?.reason ?? item.pickPulledReason)
+        : pulledDay ? pickPullAwayText(pulledDay)
+        : attention === "repick" ? "상품 변경 · 다시 챙기기" : attention === "late_paid" || attention === "payment_time_missing" ? "결제 후 추가 챙기기" : "일반";
       mainRows.push({
         itemId,
         orderedAt: formatPickingKstDateTime(order.createdAt || order.submittedAt),

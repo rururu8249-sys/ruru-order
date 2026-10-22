@@ -72,6 +72,19 @@ export type LiveOrderItem = {
     qty?: number | null;
   } | null;
   repickResolvedAt?: string | null;
+  // [2026-10-22 지난 주문 가져오기] orders.pick_pulled_* (표시·챙기기 전용, 돈 무관)
+  pickPulledAt?: string | null;
+  pickPulledFor?: string | null;
+  pickPulledReason?: string | null;
+};
+
+/** [2026-10-22] 오늘 주문서에 «가져온 줄만» 묶어 보여주는 가상 묶음 표식. 원래 주문엔 없음(undefined). */
+export type LiveOrderPickPull = {
+  pulledFor: string;
+  pulledAt: string | null;
+  reason: string;
+  /** 원래 주문 LiveOrder.id(=groupId) — 주문상세·입금매칭은 이걸로 원래 주문을 연다 */
+  originalOrderId: string;
 };
 
 export type LiveOrder = {
@@ -125,5 +138,7 @@ export type LiveOrder = {
   returnAmount?: number | null;
   /** [2026-10-22] 주문 제출 때 배정된 입금계좌 스냅샷(orders.payment_bank_* — 손님이 본 계좌). 없으면 null. 표시·복사 전용 */
   paymentBank?: { bankName: string; bankAccount: string; bankHolder: string } | null;
+  /** [2026-10-22] 지난 주문 가져오기 가상 묶음이면 채워짐(받은 돈·입금매칭 계산에서 제외) */
+  pickPull?: LiveOrderPickPull;
   items: LiveOrderItem[];
 };

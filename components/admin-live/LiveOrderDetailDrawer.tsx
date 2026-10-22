@@ -22,6 +22,8 @@ import { RefundProcessModal, type LedgerDetail } from "./AdminLiveRefundLedgerPa
 import { pickPrimaryLedger } from "@/lib/refundLedger";
 import { splitIssueBody, fieldFromIssueBody } from "@/lib/issueBodyMeta";
 import { patchIssueTask, type IssueExtraItem } from "@/lib/issueTaskPatch";
+import PickingPullModal from "./PickingPullModal";
+import { pickPullAwayText, pulledForOf } from "@/lib/orderPickPull";
 
 type Props = {
   order: LiveOrder;
@@ -479,6 +481,24 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const orderForView = localOrder;
   const items = Array.isArray(orderForView.items) ? orderForView.items : [];
   const isCanceled = isLiveOrderCanceled(orderForView);
+  // [2026-10-22 사장님] 「오늘 챙기기에 넣기」 — 지난 주문 줄을 골라 오늘 주문서·송장·물건챙기기로. 저장은 picking-pull 라우트(돈 무접촉).
+  const [pullOpen, setPullOpen] = useState(false);
+  const [unpullingId, setUnpullingId] = useState("");
+  const unpullItem = async (item: LiveOrderItem) => {
+    if (unpullingId) return;
+    if (!(await showAdminConfirm("이 줄을 오늘 챙기기에서 뺄까요?\n가져오기 전 챙김·송장 기록이 원복돼요. 주문·금액·입금은 바뀌지 않아요.", { title: "오늘 챙기기에서 빼기", confirmText: "빼기", cancelText: "그만두기" }))) return;
+    setUnpullingId(String(item.id));
+    try {
+      const res = await fetch("/api/admin-live/picking-pull", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "unpull", rowIds: [Number(item.id)] }) });
+      const payload = await res.json().catch(() => null) as { ok?: boolean; message?: string } | null;
+      if (!res.ok || !payload?.ok) throw new Error(payload?.message || "빼기에 실패했어요.");
+      setLocalOrder((prev) => ({ ...prev, items: (prev.items || []).map((it) => String(it.id) === String(item.id) ? { ...it, pickPulledAt: null, pickPulledFor: null, pickPulledReason: null } : it) }));
+      showAdminToast("오늘 챙기기에서 뺐어요.", "success");
+      await onAfterStatusChange?.();
+    } catch (error) {
+      showAdminToast(error instanceof Error ? error.message : "빼기에 실패했어요.", "error");
+    } finally { setUnpullingId(""); }
+  };
   const productAmount = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
   const shippingFee = Number(orderForView.shippingFee || 0);
 
@@ -1688,6 +1708,16 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               ) : null}
               {!isCanceled ? (
                 <>
+                  {items.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setPullOpen(true)}
+                      title="지난 주문 줄을 골라 오늘 주문서·송장·물건챙기기에 넣기(주문·금액 무변경)"
+                      className="h-8 rounded-lg border border-ink bg-ink px-2.5 text-[12px] font-semibold text-white hover:opacity-90"
+                    >
+                      오늘 챙기기에 넣기
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => {
@@ -1716,9 +1746,17 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             {items.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-line"><div className="ru-empty"><div className="ru-empty-title">주문 품목이 없습니다.</div><div className="ru-empty-hint">위 「+ 등록상품」 또는 「+ 직접입력」으로 넣어주세요.</div></div></div>
             ) : (
-              items.map((item, index) => (
+              items.map((item, index) => {
+                const pulledDay = pulledForOf({ pick_pulled_for: item.pickPulledFor ?? null, pick_pulled_at: item.pickPulledAt ?? null });
+                return (
+                <div key={`${item.id}-${index}`}>
+                  {pulledDay ? (
+                    <div className="mb-1 flex flex-wrap items-center gap-1.5 px-1">
+                      <span className="inline-flex items-center rounded-full bg-ink px-2 py-0.5 text-[11px] font-black text-white" title="이 줄은 그날 주문서·송장·물건챙기기에 「지난 주문」으로 들어가 있어요">{pickPullAwayText(pulledDay)}{item.pickPulledReason ? ` · ${item.pickPulledReason}` : ""}</span>
+                      <button type="button" disabled={unpullingId === String(item.id)} onClick={() => void unpullItem(item)} className="h-7 rounded-lg border border-line bg-surface px-2 text-[11px] font-bold text-ink-soft hover:bg-surface-2 disabled:opacity-40">{unpullingId === String(item.id) ? "빼는 중…" : "빼기"}</button>
+                    </div>
+                  ) : null}
                 <LiveOrderItemEditCard
-                  key={`${item.id}-${index}`}
                   item={item}
                   index={index}
                   disabled={isCanceled}
@@ -1730,10 +1768,23 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                   colorLabel={itemColorLabels[String(item.id)] || ""}
                   onImageClick={(url) => setImagePreviewUrl(url)}
                 />
-              ))
+                </div>
+                );
+              })
             )}
           </div>
 
+          {pullOpen ? (
+            <PickingPullModal
+              orderNo={order.orderNo || order.groupId}
+              nickname={orderForView.nickname}
+              name={orderForView.name}
+              orderedAt={order.createdAt}
+              lines={items.map((it) => ({ id: String(it.id), productName: getItemName(it), option: getItemOption(it), qty: Number(it.qty || 1), pulledFor: it.pickPulledFor ?? null, pulledAt: it.pickPulledAt ?? null }))}
+              onClose={() => setPullOpen(false)}
+              onDone={async () => { await onAfterStatusChange?.(); }}
+            />
+          ) : null}
           {showAddForm && !isCanceled ? (
             <div className="mt-2 space-y-2 rounded-xl border border-line bg-surface-2 p-3">
               <div className="text-[13px] font-semibold text-ink">직접입력 상품 · 재고 안 빠짐</div>

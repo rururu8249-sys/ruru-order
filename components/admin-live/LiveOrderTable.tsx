@@ -17,6 +17,8 @@ import { buildCustomerOrderCopyText, buildPaymentRequestNote } from "./liveOrder
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { pickingProgress, isPickingComplete, pickingScope } from "@/lib/orderPicking";
 import ProductPagination from "./ProductPagination";
+import { pickPullBadgeText, pickPullAwayText } from "@/lib/orderPickPull";
+import { pulledAwayDays } from "./liveOrderPickPull";
 
 // 총금액 표시 전용: 포인트 사용 주문은 실결제금액(상품금액 + 택배비 - 사용포인트)으로 표시한다.
 // - 단일상품: final_amount에 포인트가 이미 반영돼 기존 값과 동일(변화 없음)
@@ -205,6 +207,27 @@ function statusBadge(order: LiveOrder, actions?: { onMatch?: () => void; onCardP
     return <span style={{ ...base, ...green }} title={paymentStatusDetail("manual_paid")}>수동입금확인</span>;
   }
   return <span style={{ ...base, ...green }}>입금확인</span>;
+}
+
+// [2026-10-22 지난 주문 가져오기] 표시 전용 배지 두 가지.
+//   가상 묶음(오늘 주문서에 들어온 지난 주문 줄): 「지난 주문 10.18(토) · 고객이슈 교환」
+//   원래 주문(그 줄을 다른 날로 가져간 경우): 「10.22(목) 로 가져감」
+function pickPullBadge(order: LiveOrder) {
+  if (order.pickPull) {
+    return (
+      <span className="inline-flex shrink-0 items-center rounded-full border border-ink bg-ink px-2 py-0.5 text-[11px] font-black text-white" title={`원래 주문일 ${order.createdAt || ""} · ${order.pickPull.reason || "직접 선택"} · 오늘 챙겨서 나가는 지난 주문`}>
+        {pickPullBadgeText(order.createdAt, order.pickPull.reason)}
+      </span>
+    );
+  }
+  const days = pulledAwayDays(order);
+  if (!days.length) return null;
+  const pulledQty = (order.items || []).filter((it) => it.pickPulledFor || it.pickPulledAt).length;
+  return (
+    <span className="inline-flex shrink-0 items-center rounded-full border border-line bg-surface-2 px-2 py-0.5 text-[11px] font-bold text-ink-soft" title="이 주문의 상품 줄을 다른 날 주문서로 가져가 그날 챙겨 보냅니다">
+      {days.map(pickPullAwayText).join(" · ")}{pulledQty < (order.items || []).length ? ` (${pulledQty}줄)` : ""}
+    </span>
+  );
 }
 
 function returnBadge(order: LiveOrder) {
@@ -1374,6 +1397,7 @@ export default function LiveOrderTable({
                           </div>
                         </div>
                         <div className="mt-2 flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                          {pickPullBadge(order)}
                           {statusBadge(order, {
                             onMatch: onSelectForMatch ? () => onSelectForMatch(order) : undefined,
                             onCardPay: onOpenCardPay ? () => { openPaysterRightHalf(); onOpenCardPay(order); } : undefined,
@@ -1384,12 +1408,14 @@ export default function LiveOrderTable({
                             <span className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg px-1.5 py-0.5 text-[11px] font-black leading-none ${String((order as any).shippingStatus) === "출고완료" ? "bg-info-bg text-[var(--color-info-tx)]" : "bg-surface-2 text-ink-soft"}`}>{shippingStatusLabel((order as any).shippingStatus)}</span>
                           ) : null}
                           <span className="ml-auto flex items-center gap-1.5">
-                            {["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
+                            {!order.pickPull && ["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
                               <button type="button" title="결제요청 쪽지 보내기" aria-label="결제요청 쪽지 보내기" disabled={payRequestSending === order.id} onClick={() => void sendPaymentRequest(order)}
                                 className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-bold text-ink-soft disabled:opacity-40">쪽지</button>
                             ) : null}
+                            {order.pickPull ? null : (
                             <button type="button" onClick={() => void copyOrderForCustomer(order)}
                               className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-bold text-ink">주문서 복사</button>
+                            )}
                           </span>
                         </div>
                       </div>
@@ -1429,6 +1455,8 @@ export default function LiveOrderTable({
                             {order.nickname}
                           </button>
                         </div>
+                        {/* [2026-10-22] 지난 주문 가상 묶음(가져온 줄만)은 금액이 주문서 전체가 아니므로 복사·쪽지는 원래 주문(상세)에서 */}
+                        {order.pickPull ? null : (
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); void copyOrderForCustomer(order); }}
@@ -1437,8 +1465,10 @@ export default function LiveOrderTable({
                         >
                           주문서 복사
                         </button>
-                        {(inventoryStatusBadge(order) || testOrderBadge(order) || returnBadge(order)) && (
+                        )}
+                        {(inventoryStatusBadge(order) || testOrderBadge(order) || returnBadge(order) || pickPullBadge(order)) && (
                           <div className="flex flex-wrap gap-1 mt-0.5">
+                            {pickPullBadge(order)}
                             {inventoryStatusBadge(order)}
                             {testOrderBadge(order)}
                             {returnBadge(order)}
@@ -1485,7 +1515,7 @@ export default function LiveOrderTable({
                           onCardPay: onOpenCardPay ? () => { openPaysterRightHalf(); onOpenCardPay(order); } : undefined,
                         })}</div>
                         {order.paidAt && <div className="mt-0.5 text-[11px] text-ink-mute">{order.paidAt}</div>}
-                        {["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
+                        {!order.pickPull && ["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
                           <button type="button" title="결제요청 쪽지 보내기" aria-label="결제요청 쪽지 보내기" disabled={payRequestSending === order.id} onClick={(e) => { e.stopPropagation(); void sendPaymentRequest(order); }} className="mt-0.5 rounded-full px-1 text-[14px] leading-none opacity-70 transition hover:opacity-100 hover:drop-shadow disabled:opacity-35">
                             
                           </button>

@@ -1,4 +1,5 @@
 import { showAdminToast } from "@/lib/adminToast";
+import { isPickPullKind, pickPullBadgeText } from "@/lib/orderPickPull";
 import { formatOrderOptionText, stripNoneOptionParts } from "@/lib/orderOptionText";
 import { compareOrderOptions } from "@/lib/orderOptionSort";
 import ExcelJS from "exceljs";
@@ -105,9 +106,11 @@ function totalQty(order: LiveOrder) {
 
 function itemSummary(order: LiveOrder) {
   const items = order.items || [];
-  if (!items.length) return clean(order.orderSummary) || "상품명없음 x1개";
-  // 상품 전체 출력, 상품 사이는 #, 맨 끝에 총 개수.
-  return `${items.map(itemText).join(" # ")} (총 ${totalQty(order)}개)`;
+  // [2026-10-22 지난 주문 가져오기] 가져온 줄 묶음이면 상품명 맨 앞에 「[지난 주문 10.18(토) · 사유]」 — 송장에서도 바로 알아보게
+  const pullMark = order.pickPull ? `[${pickPullBadgeText(order.createdAt, order.pickPull.reason)}] ` : "";
+  if (!items.length) return pullMark + (clean(order.orderSummary) || "상품명없음 x1개");
+  // 상품 전체 출력, 상품 사이는 #. [2026-10-22 사장님] 맨 끝 「(총 N개)」는 뺀다 — 로젠 상품명 칸에 자꾸 끼어 거슬림(총수량은 관리자확인용 시트 칸에 따로 있음).
+  return `${pullMark}${items.map(itemText).join(" # ")}`;
 }
 
 // 수하인명/닉네임 칼럼 + 주소 뒤 "/닉네임" 에 쓰는 표시 이름: 유튜브 닉네임 우선(운영자가 방송 시청자와 매칭하는 기준).
@@ -501,12 +504,14 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
       ];
       if (hasUnpaid) row.push(unpaid ? "미입금" : "완료");
       const attention = attentionByItemId.get(String(item.id));
+      // [2026-10-22] 지난 주문 가져온 줄은 본 시트에 남기고 비고 칸에 「지난 주문 10.18(토) · 사유」(추가 작업 시트로 안 보냄)
+      const pullKind = isPickPullKind(built.kind) ? built.kind : "";
       row.push(attention?.kind === "상품 변경 · 다시 챙기기"
         ? `이전 주문 상품 변경 · 다시 챙기기\n변경 전: ${attention.before || "기록 없음"}\n변경 후: ${attention.current}`
-        : attention ? "결제 후 추가 챙기기" : "");
+        : attention ? "결제 후 추가 챙기기" : pullKind);
       const picked = pickedIds ? pickedIds.has(String(item.id)) : Boolean(item.pickedAt) && built.kind !== "상품 변경 · 다시 챙기기";
       row.push(picked ? "✓" : "");
-      keyedRows.push({ row, unpaid, attention: built.kind !== "일반", product: itemName(item), color: clean(item.color), size: clean(item.size), time: orderTime(order) });
+      keyedRows.push({ row, unpaid, attention: built.kind !== "일반" && !pullKind, product: itemName(item), color: clean(item.color), size: clean(item.size), time: orderTime(order) });
     });
   });
 

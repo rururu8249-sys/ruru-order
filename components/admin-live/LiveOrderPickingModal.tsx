@@ -19,13 +19,14 @@ import { showAdminToast } from "@/lib/adminToast";
 import type { LiveOrder, LiveOrderItem } from "./types";
 import { exportLiveOrdersForPicking } from "./adminLiveOrderExcelExport";
 import { classifyPickingAttention, type PickingAttentionKind } from "@/lib/orderPickingWorkspace";
+import { pickPullBadgeText, pickPullAwayText, pulledForOf } from "@/lib/orderPickPull";
 
 // [㉚] 범위 = 주문서(LiveOrderTable)에서 지금 고른 필터(방송·기간·범위)의 주문 그대로(orders). 창 안 방송 선택은 없다.
 //   scopeTooWide = 주문서 필터가 전체 방송·전체 기간처럼 너무 넓을 때(목록 대신 안내만).
 type Props = { orders: LiveOrder[]; filterLabel: string; scopeTooWide?: boolean; onClose: () => void };
 
 // [2026-07-13 사장님 지침] amount = 주문에 저장된 상품금액(표시 전용, 재계산 안 함)
-type PickItem = { id: string; productId: string; text: string; productName: string; optionText: string; color: string; size: string; qty: number; amount: number; unitPrice?: number; attentionKind: PickingAttentionKind; latePaid?: boolean; repickBefore?: LiveOrderItem["repickBefore"]; attentionAt?: string | null };
+type PickItem = { id: string; productId: string; text: string; productName: string; optionText: string; color: string; size: string; qty: number; amount: number; unitPrice?: number; attentionKind: PickingAttentionKind; latePaid?: boolean; repickBefore?: LiveOrderItem["repickBefore"]; attentionAt?: string | null; /** [2026-10-22] 지난 주문 가져온 줄 배지(가상 묶음) */ pull?: string; /** 원래 주문에서 다른 날로 가져간 줄 배지 */ pullAway?: string };
 type Panel = { key: string; nickname: string; name: string; phone: string; search: string; paid: boolean; when: string; items: PickItem[]; totalQty: number };
 // [2026-09-20 사장님 요청] 상품별 = 상품(총 N개) → 그 밑에 옵션(색상/사이즈)별 N개. 옵션은 색상 가나다 → 사이즈 순.
 
@@ -86,6 +87,9 @@ function buildPanels(orderList: readonly LiveOrder[], attentionSource: boolean):
             // [㉙-0] 표시 전용 「늦은 입금」 배지 — 주문일보다 늦은 날 입금확인(자정 넘긴 방송 포함). 분류·목록 이동엔 안 쓴다.
             latePaid: classifyPickingAttention(o, { ...it, pickedAt: null }) === "late_paid",
             repickBefore: it.repickBefore, attentionAt: it.repickRequiredAt || o.paidAtFull,
+            // [2026-10-22 지난 주문 가져오기] 표시 전용 배지 — 챙김 저장·숫자 계산엔 안 쓴다
+            pull: o.pickPull ? pickPullBadgeText(o.createdAt, o.pickPull.reason) : undefined,
+            pullAway: !o.pickPull && (it.pickPulledFor || it.pickPulledAt) ? pickPullAwayText(pulledForOf({ pick_pulled_for: it.pickPulledFor ?? null, pick_pulled_at: it.pickPulledAt ?? null })) : undefined,
           };
         });
     const totalQty = items.reduce((sum, item) => sum + (Number.isFinite(item.qty) ? item.qty : 1), 0);
@@ -118,8 +122,29 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
   const [showDropped, setShowDropped] = useState(false);
   const [sessionCompletedIds, setSessionCompletedIds] = useState<Set<string>>(new Set());
 
-  const activeSelectedOrders = orders;
+  // [2026-10-22 지난 주문 가져오기] 이 창에서 「빼기」 한 줄은 다시 불러오기 전까지 목록에서 뺀다(표시만, 닫으면 onRefresh 로 실데이터 반영)
+  const [removedPullIds, setRemovedPullIds] = useState<Set<string>>(new Set());
+  const [unpulling, setUnpulling] = useState("");
+  const activeSelectedOrders = useMemo(() => removedPullIds.size === 0 ? orders : orders.flatMap((o) => {
+    if (!o.pickPull) return [o];
+    const items = (o.items || []).filter((it) => !removedPullIds.has(String(it.id)));
+    return items.length ? [{ ...o, items }] : [];
+  }), [orders, removedPullIds]);
   const activeAdditionalOrders = additionalWorkspaceOrders;
+  const unpullRow = async (itemId: string) => {
+    if (unpulling) return;
+    if (!(await showAdminConfirm("이 줄을 오늘 챙기기에서 뺄까요?\n원래 방송 날짜 주문서로만 돌아가고, 가져오기 전 챙김·송장 기록이 원복돼요. 주문·금액·입금은 바뀌지 않아요.", { title: "오늘 챙기기에서 빼기", confirmText: "빼기", cancelText: "그만두기" }))) return;
+    setUnpulling(itemId);
+    try {
+      const res = await fetch("/api/admin-live/picking-pull", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "unpull", rowIds: [Number(itemId)] }) });
+      const payload = await res.json().catch(() => null) as { ok?: boolean; message?: string; updated?: number[] } | null;
+      if (!res.ok || !payload?.ok) throw new Error(payload?.message || "빼기에 실패했어요.");
+      setRemovedPullIds((prev) => new Set(prev).add(itemId));
+      showAdminToast("오늘 챙기기에서 뺐어요. 원래 방송 날짜 주문서에서 볼 수 있어요.", "success");
+    } catch (error) {
+      showAdminToast(error instanceof Error ? error.message : "빼기에 실패했어요.", "error");
+    } finally { setUnpulling(""); }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -466,6 +491,14 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
           {batch ? null : <div className="break-words text-sm font-black text-rose-deep">{item.optionText || "기본 옵션"}</div>}
           <div className={batch ? "break-words text-[14px] font-bold text-ink max-sm:text-[13px] max-sm:leading-snug" : "mt-1 text-[12px] font-bold text-ink-soft"}>{panel.nickname}{panel.name && panel.name !== panel.nickname ? ` · ${panel.name}` : ""} · 주문 #{item.id}{batch && item.attentionKind === null && item.latePaid ? <span className="ml-1.5 inline-block sm:hidden rounded bg-info-bg px-1.5 align-middle text-[11px] font-black leading-[18px] text-[var(--color-info-tx)]">늦은 입금</span> : null}</div>
           {item.attentionKind === null && item.latePaid ? <span className={`mt-1 inline-block ${batch ? "max-sm:hidden" : ""} rounded bg-info-bg px-1.5 py-0.5 text-[11px] font-black text-[var(--color-info-tx)]`}>늦은 입금</span> : null}
+          {item.pull ? (
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <span className="inline-block rounded-full bg-ink px-2 py-0.5 text-[11px] font-black text-white" title="지난 방송 주문 줄을 오늘 챙겨서 내보냅니다">{item.pull}</span>
+              <button type="button" disabled={unpulling === item.id} onClick={() => void unpullRow(item.id)} className="h-7 rounded-lg border border-line bg-surface px-2 text-[11px] font-bold text-ink-soft hover:bg-surface-2 disabled:opacity-40" title="오늘 챙기기에서 빼고 원래 방송 날짜로 돌려보냅니다">{unpulling === item.id ? "빼는 중…" : "빼기"}</button>
+            </div>
+          ) : item.pullAway ? (
+            <span className="mt-1 inline-block rounded-full border border-line bg-surface-2 px-2 py-0.5 text-[11px] font-bold text-ink-soft" title="이 줄은 다른 날 주문서로 가져가 그날 챙깁니다">{item.pullAway}</span>
+          ) : null}
           {!done && item.attentionKind === "repick" ? (
             <div className="mt-1 rounded-lg bg-warn-bg px-2 py-1 text-[11px] font-black text-[var(--color-danger-tx)]">
               상품 변경 · 다시 챙기기 · {[
