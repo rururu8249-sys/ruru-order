@@ -70,7 +70,8 @@ type IssueTab = "open" | "all" | "resolved" | "deleted";
 
 
 // [2026-09-26] 고객이슈 표의 «단 하나의» grid 템플릿 — 머리글·모든 줄이 이 상수를 그대로 써서 칸이 어긋나지 않는다.
-const ISSUE_GRID = "grid-cols-[36px_minmax(0,1fr)] xl:grid-cols-[36px_60px_184px_1fr_124px_142px]";
+// [2026-10-22] 처리 칸 142 → 224px: 「열기(64)·오늘 챙기기(76)·해결완료(72)」 + 간격 6×2 — 세 버튼이 잘리지 않게
+const ISSUE_GRID = "grid-cols-[36px_minmax(0,1fr)] xl:grid-cols-[36px_60px_184px_1fr_124px_224px]";
 
 // [2026-09-26] 교환·환불 처리 대상인 이슈인가 — task_type(exchange/return/refund) 또는 유형 칩(교환/반품/환불).
 //   이 줄에만 「환불 처리」 버튼·장부 요약을 붙인다.
@@ -618,6 +619,7 @@ export function IssueCard({
         {deleted ? (
           <>
             <span className={SUB_BTN_SLOT} />
+            <span className="h-8 w-[76px] shrink-0" />
             <button
               type="button"
               onClick={() => onPurge?.(task)}
@@ -654,7 +656,7 @@ export function IssueCard({
                 onClick={(e) => { e.stopPropagation(); onPull(task); }}
                 disabled={busy}
                 title="이 이슈의 상품 줄을 오늘 주문서·송장·물건챙기기에 넣기(지난 주문 표시 · 주문·금액 무변경)"
-                className={`${SUB_BTN} text-ink hover:bg-surface-2`}
+                className={`${SUB_BTN} !w-[76px] whitespace-nowrap text-ink hover:bg-surface-2`}
               >
                 오늘 챙기기
               </button>
