@@ -1881,14 +1881,15 @@ export default function QuickProductFastForm({
     }
 
     // [2026-08-10 0단계 · 사고 방지] 재고를 입력해 놓고 재고관리가 꺼져 있으면 무제한 판매로 저장된다.
-    //   지금까지 경고가 없어 오버셀 사고 경로가 됐다 → 저장 자체를 막는다.
+    //   [2026-10-22 사장님 요청] 숫자를 지우지 않고도 끌 수 있게 «막기» → «확인창»으로. 손님 화면·주문 RPC·장바구니 선점 RPC 는
+    //   stock_management_enabled 가 true 아닐 때 재고를 안 세므로 숫자가 남아 있어도 무제한 판매로 일관됨. 재고 계산·저장 형식 무변경.
     if (!stockManagementEnabled) {
       const enteredStock = stockMode === "option"
         ? resolvedVariantRows.reduce((sum, row) => sum + Number(row.stock || 0), 0)
         : moneyNumber(totalStockText);
       if (enteredStock > 0) {
-        showAdminToast("재고를 입력했는데 '재고관리'가 꺼져 있어요.\n이대로 등록하면 재고와 상관없이 무제한으로 팔립니다.\n\n재고관리를 켜거나, 재고를 0으로 비워주세요.", "error");
-        return;
+        const go = typeof window !== "undefined" && window.confirm(`재고 숫자(${enteredStock.toLocaleString()}개)가 남아 있는데 '옵션별 재고 관리'가 꺼져 있어요.\n이대로 저장하면 재고와 상관없이 무제한으로 팔려요(숫자는 그대로 보관돼 다시 켜면 그대로 써요).\n\n이대로 저장할까요?`);
+        if (!go) return;
       }
     }
 
