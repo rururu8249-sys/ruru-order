@@ -210,6 +210,19 @@ export async function POST(request: NextRequest) {
     console.error("[assistant-chat]", error);
   }
 
+  // 사장님이 답장·문구를 달라고 했는데 AI 가 말로만 「답장 제안」 하고 propose_reply 를 안 불렀으면 한 번 더 재촉(실측 10/22)
+  if (answer && !cards.some((c) => c.kind === "reply") && /(답장|응대|문구|뭐라고\s*(답|보내))/.test(last.text) && !toolLog.includes("propose_reply")) {
+    try {
+      contents.push({ role: "model", parts: [{ text: answer }] });
+      contents.push({ role: "user", parts: [{ text: "답장 초안은 글로 쓰지 말고 반드시 propose_reply 도구를 불러 카드로 만들어라. 위 확인 내용은 그대로 두고 도구만 호출." }] });
+      const again = await callGeminiChat(contents, { tools: AGENT_TOOLS, systemInstruction: system, timeoutMs: 20000, maxTokens: 2048 });
+      const calls = (again.parts || []).filter((p): p is { functionCall: { name: string; args?: Record<string, unknown> } } => "functionCall" in p);
+      for (const c of calls) if (c.functionCall.name === "propose_reply") await runTool(c.functionCall.name, c.functionCall.args);
+    } catch (error) {
+      console.error("[assistant-chat retry]", error);
+    }
+  }
+
   if (!answer && cards.length === 0) {
     return NextResponse.json({ ok: true, answer: "지금 AI 가 답을 못 만들었어요. 잠시 뒤 다시 말해 주세요.", cards, tools: toolLog, ai: note, failed: true });
   }

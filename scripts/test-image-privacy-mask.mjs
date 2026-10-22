@@ -81,3 +81,10 @@ t('[10/22] 확신도 낮은 숫자(털 무늬에서 지어낸 글자)는 안 가
   assert.deepEqual(boxes.map((b) => b.y0 / 30), [1, 2]);
 });
 console.log('confidence ok');
+
+t('[10/22] 「자크를 4-5번은 다시 껏다가」 는 주소 아님 · 「서울시 강남구 12-3」 은 주소', () => {
+  const W = (text, i, line) => ({ text, x0: i * 60, y0: line * 30, x1: i * 60 + 50, y1: line * 30 + 20, line });
+  const boxes = lib.pickMaskBoxes([W('자크를', 0, 0), W('4-5번은', 1, 0), W('다시', 2, 0), W('껏다가', 3, 0), W('서울시', 0, 1), W('강남구', 1, 1), W('12-3', 2, 1), W('혹시', 0, 2), W('230', 1, 2)]);
+  assert.deepEqual(boxes.map((b) => [b.reason, b.y0 / 30]), [['address', 1]]);
+});
+console.log('weak-addr ok');

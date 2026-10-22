@@ -44,10 +44,14 @@ export function pickMaskBoxes(words: OcrWord[]): MaskBox[] {
   for (const line of byLine.values()) {
     // 「230으로」「2번으로」 같은 조사 «으로»는 길 이름이 아니다(실측 10/22: 사이즈·횟수가 주소로 가려짐)
     //   OCR 이 「230 으로」로 쪼개면 「으로」 홀로, 「2개면」은 「…면」 — 전부 주소 아님
-    const addrCount = line.filter((w) => { const t = w.text.trim(); if (typeof w.confidence === "number" && w.confidence < 50) return false; return ADDRESS_WORD.test(t) && !/(으로|번으로|쪽으로)$/.test(t) && !/^(으로|로|길)$/.test(t) && !/^\d+(개|번|명|장|매|회|켤레)[가-힣]*$/.test(t); }).length;
+    const isAddrWord = (w: OcrWord) => { const t = w.text.trim(); if (typeof w.confidence === "number" && w.confidence < 50) return false; return ADDRESS_WORD.test(t) && !/(으로|번으로|쪽으로)$/.test(t) && !/^(으로|로|길)$/.test(t) && !/^\d+(개|번|명|장|매|회|켤레)[가-힣]*$/.test(t); };
+    // 「다시」「혹시」「잠시」처럼 시·군·구 로 끝나는 보통 말은 «약한» 주소 단어 — 혼자 숫자와 있어도 주소로 안 봄(실측 10/22: 「자크를 4-5번은 다시」 줄 가려짐)
+    const isWeakAddrWord = (w: OcrWord) => /^[가-힣]{1,6}(시|군|구)$/.test(w.text.trim()) && !/(특별시|광역시|자치시)$/.test(w.text.trim());
+    const strongCount = line.filter((w) => isAddrWord(w) && !isWeakAddrWord(w)).length;
+    const addrCount = line.filter(isAddrWord).length;
     // 「15,000원」「1개」 같은 가격·수량은 숫자로 안 쳐서(「우리 15,000원 보냈어요」 줄이 통째로 가려지지 않게)
     const hasNumber = line.some((w, i) => /\d/.test(w.text) && !isPlainNumberWord(w.text) && !(line[i + 1] && UNIT_AFTER.test(line[i + 1].text.trim())));
-    if (addrCount >= 2 || (addrCount >= 1 && hasNumber)) {
+    if (addrCount >= 2 || (strongCount >= 1 && hasNumber)) {
       const x0 = Math.min(...line.map((w) => w.x0)), y0 = Math.min(...line.map((w) => w.y0));
       const x1 = Math.max(...line.map((w) => w.x1)), y1 = Math.max(...line.map((w) => w.y1));
       boxes.push({ x0, y0, x1, y1, reason: "address" });
