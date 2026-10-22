@@ -44,7 +44,7 @@ export default function AdminLiveAssistantPolicyBox() {
         {defaultPolicy && policy !== defaultPolicy ? (
           <button type="button" onClick={() => setPolicy(defaultPolicy)} className="h-9 rounded-lg px-2 text-[13px] font-semibold text-ink-mute hover:bg-surface-2">기본으로</button>
         ) : null}
-        {note ? <span className="text-[13px] text-ink-soft">{note}</span> : null}
+        {note ? <span className="text-[13px] text-ink-soft">{note}</span> : policy.trim() && policy === saved ? <span className="text-[13px] text-ink-mute">저장된 방침과 같아요 — 고칠 게 있으면 바꾼 뒤 저장</span> : null}
       </div>
     </div>
   );
