@@ -29,6 +29,8 @@ export function pickMaskBoxes(words: OcrWord[]): MaskBox[] {
     const digits = w.text.replace(/\D/g, "");
     if (digits.length < 4) return;
     if (isPlainNumberWord(w.text)) return;
+    const prevWord = words[i - 1];
+    if (prevWord && /^(오전|오후)$/.test(prevWord.text.trim()) && digits.length <= 4) return; // 「오전 11:47」을 OCR 이 1147 로 읽어도 시각
     const next = words[i + 1];
     const sameLine = next && (w.line === undefined || next.line === undefined || next.line === w.line);
     if (sameLine && UNIT_AFTER.test(next.text.trim()) && /^[\d,.]+$/.test(w.text.trim())) return;
@@ -39,7 +41,8 @@ export function pickMaskBoxes(words: OcrWord[]): MaskBox[] {
   words.forEach((w, i) => { const k = w.line ?? i; byLine.set(k, [...(byLine.get(k) || []), w]); });
   for (const line of byLine.values()) {
     // 「230으로」「2번으로」 같은 조사 «으로»는 길 이름이 아니다(실측 10/22: 사이즈·횟수가 주소로 가려짐)
-    const addrCount = line.filter((w) => { const t = w.text.trim(); return ADDRESS_WORD.test(t) && !/(으로|번으로|쪽으로)$/.test(t); }).length;
+    //   OCR 이 「230 으로」로 쪼개면 「으로」 홀로, 「2개면」은 「…면」 — 전부 주소 아님
+    const addrCount = line.filter((w) => { const t = w.text.trim(); return ADDRESS_WORD.test(t) && !/(으로|번으로|쪽으로)$/.test(t) && !/^(으로|로|길)$/.test(t) && !/^\d+(개|번|명|장|매|회|켤레)[가-힣]*$/.test(t); }).length;
     // 「15,000원」「1개」 같은 가격·수량은 숫자로 안 쳐서(「우리 15,000원 보냈어요」 줄이 통째로 가려지지 않게)
     const hasNumber = line.some((w, i) => /\d/.test(w.text) && !isPlainNumberWord(w.text) && !(line[i + 1] && UNIT_AFTER.test(line[i + 1].text.trim())));
     if (addrCount >= 2 || (addrCount >= 1 && hasNumber)) {
