@@ -38,7 +38,8 @@ export function pickMaskBoxes(words: OcrWord[]): MaskBox[] {
   const byLine = new Map<number, OcrWord[]>();
   words.forEach((w, i) => { const k = w.line ?? i; byLine.set(k, [...(byLine.get(k) || []), w]); });
   for (const line of byLine.values()) {
-    const addrCount = line.filter((w) => ADDRESS_WORD.test(w.text.trim())).length;
+    // 「230으로」「2번으로」 같은 조사 «으로»는 길 이름이 아니다(실측 10/22: 사이즈·횟수가 주소로 가려짐)
+    const addrCount = line.filter((w) => { const t = w.text.trim(); return ADDRESS_WORD.test(t) && !/(으로|번으로|쪽으로)$/.test(t); }).length;
     // 「15,000원」「1개」 같은 가격·수량은 숫자로 안 쳐서(「우리 15,000원 보냈어요」 줄이 통째로 가려지지 않게)
     const hasNumber = line.some((w, i) => /\d/.test(w.text) && !isPlainNumberWord(w.text) && !(line[i + 1] && UNIT_AFTER.test(line[i + 1].text.trim())));
     if (addrCount >= 2 || (addrCount >= 1 && hasNumber)) {

@@ -58,3 +58,16 @@ t('조각 계획 — 작은 캡처(756×1654)는 4배·6조각, 큰 캡처(1170�
 });
 
 console.log(`ALL PASS image privacy mask (${n})`);
+
+t('[10/22] 「230으로 보내주세요」「2번으로 나눠서」 는 주소 아님 · 계좌는 가림', () => {
+  const W = (text, i, line) => ({ text, x0: i * 60, y0: line * 30, x1: i * 60 + 50, y1: line * 30 + 20, line });
+  const words = [
+    W('그럼...', 0, 0), W('230으로', 1, 0), W('보내주세요', 2, 0),
+    W('송금드렸습니다', 0, 1), W('2번으로', 1, 1), W('나눠져서', 2, 1),
+    W('9002', 0, 2), W('1869', 1, 2), W('93725', 2, 2), W('새마을금고', 3, 2),
+  ];
+  const boxes = lib.pickMaskBoxes(lib.mergeAdjacentNumberWords(words));
+  assert.equal(boxes.filter((b) => b.reason === 'address').length, 0);
+  assert.equal(boxes.filter((b) => b.reason === 'number').length, 1);
+});
+console.log('size-word ok');
