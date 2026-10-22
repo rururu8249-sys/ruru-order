@@ -995,7 +995,7 @@ export default function LiveOrderTable({
     ) : null}
     <section className="ru-screen rounded-2xl border border-line bg-surface p-4 shadow-sm">
       <div className="mb-3 flex shrink-0 flex-wrap items-center gap-2">
-        <h2 className="ru-t-title mr-2">실시간 주문서</h2>
+        <h2 className="ru-t-title mr-2 max-md:hidden">실시간 주문서</h2>
         {/* [안내 2026-07-06] 방송묶음 컷이 걸려 있을 때 뭘 보고 있는지 명시 — 지난 주문 찾다가 헤매는 것 방지 */}
         {broadcastStartedAt && filters.broadcast === "current" && filters.date === "all" ? (
           <span className="rounded-full bg-rose-soft px-2.5 py-1 text-[11px] font-black text-rose-deep" title="지난 주문을 보려면 기간이나 방송 필터를 바꿔주세요">
@@ -1003,6 +1003,8 @@ export default function LiveOrderTable({
           </span>
         ) : null}
 
+        {/* [2026-10-22 폰] 상태 칩은 한 줄 가로 스크롤(DESIGN-ADMIN §13). PC 는 줄바꿈 그대로 */}
+        <div className="flex flex-wrap items-center gap-2 max-md:w-full max-md:flex-nowrap max-md:overflow-x-auto max-md:pb-1 max-md:[scrollbar-width:none] max-md:[&>button]:shrink-0 max-md:[&>button]:whitespace-nowrap">
         {[
           ["전체", counts.total, "all", "rose"],
           ["결제완료", counts.paid, "paid", "green"],
@@ -1058,8 +1060,9 @@ export default function LiveOrderTable({
             </button>
           );
         })}
+        </div>
 
-        <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+        <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto max-md:justify-start max-md:[&>button]:h-10">
           {selectedOrderIds.size > 0 && (
             <span className="text-[12px] font-black text-[var(--color-rose-deep)]">{selectedOrderIds.size}건 선택됨</span>
           )}
