@@ -5,10 +5,10 @@
 // [10/22 실측 보정] top_days = 「어느 날 제일 많이 팔렸어?」(날짜별 순위) · 기간 말이 없으면 period 비움(호출한 쪽이 칩 「최근 3개월/전체」로 정함)
 export type StatKind = "top_products" | "top_buyers" | "top_days" | "bottom_days" | "summary";
 export type PeriodKey =
-  | "today" | "yesterday" | "last_7_days" | "this_week" | "last_week"
+  | "today" | "yesterday" | "last_7_days" | "last_30_days" | "this_week" | "last_week"
   | "this_month" | "last_month" | "last_3_months" | "last_broadcast" | "date" | "custom" | "all";
 export const STAT_KINDS: StatKind[] = ["top_products", "top_buyers", "top_days", "bottom_days", "summary"];
-export const PERIOD_KEYS: PeriodKey[] = ["today", "yesterday", "last_7_days", "this_week", "last_week", "this_month", "last_month", "last_3_months", "last_broadcast", "date", "custom", "all"];
+export const PERIOD_KEYS: PeriodKey[] = ["today", "yesterday", "last_7_days", "last_30_days", "this_week", "last_week", "this_month", "last_month", "last_3_months", "last_broadcast", "date", "custom", "all"];
 
 const KST = 9 * 3600 * 1000;
 
@@ -34,6 +34,7 @@ export function parsePeriodWords(t: string, nowMs: number): { period?: PeriodKey
   if (/(지난\s*주|저번\s*주)/.test(t)) return { period: "last_week" };
   if (/(이번\s*주|금주)/.test(t)) return { period: "this_week" };
   if (/(일주일|7일)/.test(t)) return { period: "last_7_days" };
+  if (/(30일|한\s*달간|최근\s*한\s*달)/.test(t)) return { period: "last_30_days" };
   if (/(지난\s*달|저번\s*달)/.test(t)) return { period: "last_month" };
   if (/(3\s*개월|세\s*달|석\s*달|90일)/.test(t)) return { period: "last_3_months" };
   if (/(이번\s*달|이달)/.test(t)) return { period: "this_month" };

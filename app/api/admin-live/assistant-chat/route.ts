@@ -36,7 +36,7 @@ const MAX_TURNS = 5;
 
 function pickRange(raw: unknown): PeriodKey {
   if (raw === "3m") return "last_3_months";
-  return PERIOD_KEYS.includes(raw as PeriodKey) && raw !== "date" && raw !== "last_broadcast" ? (raw as PeriodKey) : "last_3_months";
+  return PERIOD_KEYS.includes(raw as PeriodKey) && raw !== "date" && raw !== "last_broadcast" ? (raw as PeriodKey) : "last_30_days";
 }
 
 /** 화면 카드엔 가린 전화 그대로, AI 에는 전화 빼고 */
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
       }
       case "propose_seo": {
         const titles = Array.isArray(args?.titles) ? (args!.titles as unknown[]).map((t) => String(t).slice(0, 100)).filter(Boolean).slice(0, 3) : [];
-        const tags = Array.isArray(args?.tags) ? (args!.tags as unknown[]).map((t) => String(t).replace(/^#/, "").trim()).filter(Boolean).slice(0, 30) : [];
+        const tags = Array.isArray(args?.tags) ? (args!.tags as unknown[]).map((t) => String(t).replace(/^#/, "").trim()).filter(Boolean).slice(0, 9) : []; // 태그 10개 미만(사장님 10/22)
         const description = argStr(args, "description", 3000);
         if (!titles.length || !description) return { error: "제목·설명이 비었어요" };
         cards.push({ kind: "seo", broadcastId: argStr(args, "broadcastId", 40), titles, description, tags });

@@ -10,11 +10,9 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
 import { MAX_IMAGES, prepareImage, type PreparedImage } from "./assistantImagePrep";
 
-export type ChatRange = "today" | "yesterday" | "last_7_days" | "this_week" | "last_week" | "this_month" | "last_month" | "last_3_months" | "all" | "custom";
-export const CHAT_RANGE_OPTIONS: [ChatRange, string][] = [
-  ["today", "오늘"], ["yesterday", "어제"], ["last_7_days", "최근 7일"], ["this_week", "이번 주"], ["last_week", "지난주"],
-  ["this_month", "이번 달"], ["last_month", "지난달"], ["last_3_months", "최근 3개월"], ["all", "전체"], ["custom", "기간 선택"],
-];
+export type ChatRange = "today" | "last_7_days" | "last_30_days" | "custom";
+// [10/22 사장님] 기간 = 오늘·일주일·최근 30일·기간 선택 4개만(말로 한 기간이 우선)
+export const CHAT_RANGE_OPTIONS: [ChatRange, string][] = [["today", "오늘"], ["last_7_days", "일주일"], ["last_30_days", "최근 30일"], ["custom", "기간 선택"]];
 
 type OrderCard = { orderNo: string; createdAt: string | null; summary: string; amount: number; paymentLabel: string; paymentCode: string; shippingLabel: string; paymentMethod: string };
 type Person = { key: string; nickname: string; name: string; phone: string; blocked: boolean; match: string; lastOrderAt: string | null; orderCount: number; orders: OrderCard[] };
@@ -70,7 +68,7 @@ export default function AdminLiveAssistantChatBox({ onShowInOrders, ask }: { onS
   const [zoom, setZoom] = useState<Img | null>(null);
   const [text, setText] = useState("");
   const [images, setImages] = useState<Img[]>([]);
-  const [range, setRange] = useState<ChatRange>("last_3_months");
+  const [range, setRange] = useState<ChatRange>("last_30_days");
   const [rangeFrom, setRangeFrom] = useState("");
   const [rangeTo, setRangeTo] = useState("");
   const [busy, setBusy] = useState(false);
@@ -310,7 +308,7 @@ export default function AdminLiveAssistantChatBox({ onShowInOrders, ask }: { onS
       );
     }
     if (c.kind === "seo") {
-      const tagText = c.tags.map((t) => `#${t}`).join(" ");
+      const tagText = c.tags.join(", "); // 유튜브 태그 칸용: # 없는 낱말, 쉼표
       return (
         <div key={key} className="space-y-2">
           <article className="rounded-xl border border-line bg-surface p-3">
@@ -333,7 +331,7 @@ export default function AdminLiveAssistantChatBox({ onShowInOrders, ask }: { onS
           </article>
           <article className="rounded-xl border border-line bg-surface p-3">
             <div className="flex items-center justify-between gap-2">
-              <h4 className="text-[13px] font-bold text-ink-soft">태그 {c.tags.length}개</h4>
+              <h4 className="text-[13px] font-bold text-ink-soft">태그 {c.tags.length}개 <span className="font-normal text-ink-mute">(유튜브 태그 칸에 붙여넣기)</span></h4>
               <button type="button" className={SUB} onClick={() => void copy(`${key}-g`, c.tags.join(", "))}>{copied === `${key}-g` ? "복사됨" : "복사"}</button>
             </div>
             <p className="mt-1 break-words text-[13px] text-ink">{tagText}</p>

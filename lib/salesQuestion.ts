@@ -67,6 +67,7 @@ export function resolvePeriod(
     case "today": return range(today, today + DAY, `오늘 ${kstLabel(today)}`);
     case "yesterday": return range(today - DAY, today, `어제 ${kstLabel(today - DAY)}`);
     case "last_7_days": return range(today - 6 * DAY, today + DAY, `최근 7일 ${kstLabel(today - 6 * DAY)}~${kstLabel(today)}`);
+    case "last_30_days": return range(today - 29 * DAY, today + DAY, `최근 30일 ${kstLabel(today - 29 * DAY)}~${kstLabel(today)}`);
     case "this_week":
     case "last_week": {
       const dow = new Date(today + KST).getUTCDay(); // 0=일

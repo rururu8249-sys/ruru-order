@@ -10,12 +10,12 @@ export const AGENT_TOOLS: GeminiToolDecl[] = [
   {
     name: "find_customer",
     description: "손님(닉네임·이름·주문자·받는 분)을 찾아 최근 주문·입금 상태를 본다. 손님 이야기가 나오면 먼저 이걸로 누구인지 확인한다.",
-    parameters: { type: "OBJECT", properties: { query: { type: "STRING", description: "닉네임이나 이름 그대로(조사 떼고)" }, range: { type: "STRING", description: "last_3_months(기본) 또는 all" } }, required: ["query"] },
+    parameters: { type: "OBJECT", properties: { query: { type: "STRING", description: "닉네임이나 이름 그대로(조사 떼고)" }, range: { type: "STRING", description: "화면 기간(기본) 또는 all(전체 기간)" } }, required: ["query"] },
   },
   {
     name: "find_product",
     description: "상품을 이름으로 찾아 산 손님·수량을 본다.",
-    parameters: { type: "OBJECT", properties: { query: { type: "STRING" }, range: { type: "STRING", description: "last_3_months(기본) 또는 all" } }, required: ["query"] },
+    parameters: { type: "OBJECT", properties: { query: { type: "STRING" }, range: { type: "STRING", description: "화면 기간(기본) 또는 all(전체 기간)" } }, required: ["query"] },
   },
   {
     name: "sales_stats",
@@ -23,7 +23,7 @@ export const AGENT_TOOLS: GeminiToolDecl[] = [
     parameters: {
       type: "OBJECT",
       properties: {
-        period: { type: "STRING", description: "today|yesterday|last_7_days|this_week|last_week|this_month|last_month|last_3_months|last_broadcast|date|custom|all. 사장님이 기간을 안 말했으면 화면 기간(context.range)을 그대로" },
+        period: { type: "STRING", description: "today|yesterday|last_7_days|last_30_days|this_week|last_week|this_month|last_month|last_3_months|last_broadcast|date|custom|all. 사장님이 기간을 안 말했으면 화면 기간(context.range)을 그대로" },
         date: { type: "STRING", description: "period=date 일 때 YYYY-MM-DD" },
         from: { type: "STRING", description: "period=custom 시작 YYYY-MM-DD" },
         to: { type: "STRING", description: "period=custom 끝 YYYY-MM-DD" },
@@ -102,7 +102,7 @@ export function agentSystemPrompt(nowMs: number, rangeLabel: string): string {
 - 등록·저장은 propose_* 도구로 «제안»만 한다. 실제 저장은 사장님이 카드 버튼을 눌러야 된다. 제안한 뒤엔 "아래 카드에서 확인하고 눌러 주세요" 정도로 짧게.
 - 고객이슈 등록 제안(propose_issue)은 손님이 한 명으로 특정된 뒤에만. 특정 안 되면 먼저 묻는다.
 - 손님에게 보낼 답장은 get_reply_policy 를 보고 방침대로 propose_reply 로 2~3안. 확인 안 된 약속(환불 확정·날짜 확정)은 하지 않는다.
-- 유튜브 제목·설명·태그는 broadcast_products 를 본 뒤(결과의 recentBroadcasts 에서 사장님이 말한 날짜·제목의 방송을 고르고, 다른 방송이면 그 id 로 한 번 더) propose_seo 로. chapters 가 있으면 설명란 맨 끝에 「타임라인」 아래 그대로 붙인다. 제목은 앞 40자 안에 핵심 상품·브랜드·숫자(가격·개수)·「라이브/라방」, 이모지 1~2개 허용(이 경우만), 과장·없는 혜택 금지. 설명란은 첫 2줄이 검색·미리보기에 보이니 핵심 요약+무엇을 얼마에, 그 다음 대표 상품 8~12개(가격), 주문 방법은 반드시 이 한 줄 그대로 「주문은 고정 댓글의 주문서 링크에서 유튜브 닉네임으로 작성 → 안내 계좌로 입금(채팅·문자 주문 아님)」, 해시태그 5~8개. 태그(tags 배열)는 «반드시 15~25개» — 브랜드명·상품 종류·「라이브커머스」「쇼핑라이브」「○○ 라방」「○○ 특가」 같은 검색어 조합, 해시태그와 별개로 더 많이.
+- 유튜브 제목·설명·태그는 broadcast_products 를 본 뒤(결과의 recentBroadcasts 에서 사장님이 말한 날짜·제목의 방송을 고르고, 다른 방송이면 그 id 로 한 번 더) propose_seo 로. 유튜브 검색 규칙(2026): 제목 = 앞 40자 안에 핵심 검색어(브랜드·상품 종류)+숫자(가격·개수)+「라이브/라방」, 이모지 1~2개 허용(이 경우만), 과장·없는 혜택 금지. 설명란(description) = 상품명·가격 나열이 아니라 «검색되는 글»: ①첫 1~2줄(100~160자, 미리보기·검색 결과에 보이는 부분) = 핵심 검색어가 들어간 한 줄 요약 + 누가 보면 좋은지(예: 50대 엄마 데일리룩, 브랜드 정품 특가) ②이 방송에서 뭘 다루는지 2~3줄(브랜드·종류·가격대·사이즈·병행수입 정품 같은 특징을 자연스러운 문장으로, 검색어를 문장 안에) ③대표 상품 5~8개(「· 브랜드 상품명 가격 — 한마디 설명」) ④주문 방법 한 줄 그대로 「주문은 고정 댓글의 주문서 링크에서 유튜브 닉네임으로 작성 → 안내 계좌로 입금(채팅·문자 주문 아님)」 ⑤구독·알림 설정 요청 한 줄(다음 방송 요일·시간이 있으면 같이) ⑥chapters 가 있으면 「타임라인」 아래 그대로(00:00 줄 형식 유지) ⑦맨 마지막 줄 해시태그 3~5개(#단어 형태, 띄어쓰기로 구분, 설명란 끝에만). 전체 600~1,000자, 같은 말 반복·검색어 쌓기 금지. 태그(tags 배열) = 해시태그와 별개의 유튜브 「태그」 칸용 «# 없는 낱말» 6~9개(10개 미만): 브랜드명·상품 종류·「라이브커머스」·「루루동이」·흔한 오타/띄어쓰기 변형 1~2개. 손님 이름·전화는 절대 넣지 않는다.
 - 돈·입금확인·정산·주문상태는 바꿀 수 없다. 그런 요청이면 "그건 주문·입금 화면에서 직접 하셔야 해요"라고 안내한다.
 - 사진이 오면 사진 속 대화·주문서를 읽고 똑같이 처리한다(검게 가린 곳은 개인정보라 무시). 카톡 캡처 맨 위 머리줄의 「닉네임/이름」(예: jhwanjhk/김정환)이 그 손님이다 — find_customer 는 그 «이름 전체»(김정환)로 먼저, 안 나오면 닉네임 전체(jhwanjhk)로. 말풍선 옆 짧은 글자(JH 같은 두 글자)로 찾지 않는다. 결과에 exactCount 가 1이면 그 손님으로 확정한다.
 - 답은 일반 글로(마크다운 **굵게**·# 제목 쓰지 않음, 줄바꿈과 「1. 」 번호만).
