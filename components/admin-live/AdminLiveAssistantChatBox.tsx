@@ -23,7 +23,7 @@ type Card =
   | { kind: "products"; products: ProductHit[]; buyers: Buyer[] }
   | { kind: "memo"; text: string }
   | { kind: "issue"; issueType: "exchange" | "refund" | "return" | "general"; nickname: string; name: string; orderNo: string; memo: string }
-  | { kind: "reply"; category: string; summary: string; drafts: { label: string; text: string }[] }
+  | { kind: "reply"; category: string; summary: string; analysis: string; cautions: string; ownerCheck: string; drafts: { label: string; text: string }[] }
   | { kind: "seo"; broadcastId: string; titles: string[]; description: string; tags: string[] };
 
 type Img = PreparedImage & { key: string; name: string };
@@ -75,6 +75,7 @@ export default function AdminLiveAssistantChatBox({ onShowInOrders, ask }: { onS
   const [error, setError] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [copied, setCopied] = useState("");
+  const [caseEdit, setCaseEdit] = useState<{ key: string; reply: string; reason: string } | null>(null); // 「사례로 저장」 입력 중인 카드
   const [done, setDoneState] = useState<Record<string, string>>(() => chatStore.done); // 카드 버튼 결과 메시지
   const setDone = (next: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>)) =>
     setDoneState((prev) => { const v = typeof next === "function" ? next(prev) : next; chatStore.done = v; return v; });
@@ -180,6 +181,28 @@ export default function AdminLiveAssistantChatBox({ onShowInOrders, ask }: { onS
     const data = await res?.json().catch(() => null);
     setDone((d) => ({ ...d, [key]: res?.ok && data?.ok ? "고객이슈에 등록했어요. 고객 › 고객이슈에서 확인할 수 있어요." : `등록 못 했어요. ${data?.message || "고객 › 고객이슈에서 직접 등록해 주세요."}`.trim() }));
   }
+
+  // 「사례로 저장」 — 손님 말(그 카드 바로 앞 사장님 입력, 가린 그대로)·상황(분석)·최종 문구·이유 → /api/admin-live/assistant-cases(kind=case). 돈 무접촉
+  function customerTextBefore(key: string): string {
+    const msgId = key.replace(/-\d+$/, "");
+    const idx = messages.findIndex((m) => m.id === msgId);
+    for (let i = (idx < 0 ? messages.length : idx) - 1; i >= 0; i -= 1) {
+      const m = messages[i];
+      if (m.role === "user" && (m.text.trim() || m.images?.length)) return m.text.trim() || `(캡처 ${m.images?.length}장 — 글자 없음)`;
+    }
+    return "";
+  }
+  async function saveCase(key: string, c: Extract<Card, { kind: "reply" }>, reply: string, reason: string) {
+    setDone((d) => ({ ...d, [key]: "저장 중…" }));
+    const res = await fetch("/api/admin-live/assistant-cases", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category: c.category, customer: customerTextBefore(key), situation: [c.summary, c.analysis].filter(Boolean).join("\n"), reply, reason }),
+    }).catch(() => null);
+    const data = await res?.json().catch(() => null);
+    setDone((d) => ({ ...d, [key]: res?.ok && data?.ok ? "응대 사례로 저장했어요. 다음 비슷한 문의 때 AI 가 참고해요." : `저장 못 했어요. ${data?.message || ""}`.trim() }));
+    if (res?.ok && data?.ok) setCaseEdit(null);
+  }
+  const REVISE_CHIPS = ["좀 더 부드럽게", "짧고 단호하게", "사과는 빼고", "원칙대로 처리한다고 강조", "비용 할인 방향으로"];
 
   function renderCard(c: Card, key: string) {
     const note = done[key];
@@ -288,22 +311,55 @@ export default function AdminLiveAssistantChatBox({ onShowInOrders, ask }: { onS
       );
     }
     if (c.kind === "reply") {
+      const editing = caseEdit?.key === key ? caseEdit : null;
       return (
         <div key={key} className="space-y-2">
           <div className="flex flex-wrap items-center gap-1.5">
             {c.category ? <span className="inline-flex h-6 items-center rounded-lg bg-surface-2 px-2 text-[12px] font-semibold text-ink-soft">{c.category}</span> : null}
+            {c.ownerCheck ? <span className="inline-flex h-6 items-center rounded-lg bg-warn-bg px-2 text-[12px] font-semibold text-warn-tx" title={c.ownerCheck}>사장님 결정 필요</span> : <span className="inline-flex h-6 items-center rounded-lg bg-surface-2 px-2 text-[12px] font-semibold text-ink-mute">방침으로 바로 답 가능</span>}
             {c.summary ? <span className="text-[13px] text-ink-soft">{c.summary}</span> : null}
           </div>
+          {c.analysis || c.cautions || c.ownerCheck ? (
+            <article className="rounded-xl bg-surface-2 p-3">
+              <h4 className="text-[13px] font-bold text-ink-soft">상황 분석 · 추천 대응</h4>
+              {c.analysis ? <p className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-ink">{c.analysis}</p> : null}
+              {c.ownerCheck ? <p className="mt-1.5 text-[13px] text-warn-tx"><span className="font-semibold">사장님이 정할 것</span> · {c.ownerCheck}</p> : null}
+              {c.cautions ? <p className="mt-1.5 whitespace-pre-wrap break-words text-[13px] text-ink-soft"><span className="font-semibold text-ink">주의·확인</span> · {c.cautions}</p> : null}
+            </article>
+          ) : null}
           {c.drafts.map((d, i) => (
             <article key={i} className="rounded-xl border border-line bg-surface p-3">
               <div className="flex items-center justify-between gap-2">
-                <h4 className="text-[13px] font-bold text-ink-soft">{d.label}</h4>
-                <button type="button" className={SUB} onClick={() => void copy(`${key}-${i}`, d.text)}>{copied === `${key}-${i}` ? "복사됨" : "복사"}</button>
+                <h4 className="text-[13px] font-bold text-ink-soft">{c.drafts.length > 1 ? d.label : "손님에게 보낼 답장"}</h4>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <button type="button" className={SUB} disabled={!!editing} onClick={() => setCaseEdit({ key, reply: d.text, reason: "" })}>사례로 저장</button>
+                  <button type="button" className={MAIN} onClick={() => void copy(`${key}-${i}`, d.text)}>{copied === `${key}-${i}` ? "복사됨" : "복사"}</button>
+                </div>
               </div>
-              <p className="mt-1 whitespace-pre-wrap break-words text-[14px] text-ink">{d.text}</p>
+              <p className="mt-1 whitespace-pre-wrap break-words text-[14px] leading-relaxed text-ink">{d.text}</p>
             </article>
           ))}
-          <p className="text-[12px] text-ink-mute">보내는 건 사장님이 복사해서 직접 해요.</p>
+          {editing ? (
+            <article className="rounded-xl border border-line bg-surface p-3">
+              <h4 className="text-[13px] font-bold text-ink-soft">응대 사례로 저장</h4>
+              <p className="mt-0.5 text-[12px] text-ink-mute">실제로 보낸 문구로 고쳐서 저장하세요. 전화·계좌 번호는 자동으로 가려요. 다음 비슷한 문의 때 AI 가 참고해요.</p>
+              <textarea value={editing.reply} onChange={(e) => setCaseEdit({ ...editing, reply: e.target.value })} rows={4} aria-label="실제로 보낸 답장"
+                className="mt-2 w-full resize-y rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink outline-none focus-visible:border-ink md:text-[13px]" />
+              <input value={editing.reason} onChange={(e) => setCaseEdit({ ...editing, reason: e.target.value })} placeholder="이 답을 고른 이유(선택) 예: 사전 고지된 사이즈 추천 기준이라 원칙대로" aria-label="이 답을 고른 이유"
+                className="mt-2 h-10 w-full rounded-lg border border-line bg-surface px-3 text-[16px] text-ink outline-none focus-visible:border-ink md:text-[13px]" />
+              <div className="mt-2 flex items-center gap-2">
+                <button type="button" className={MAIN} disabled={!editing.reply.trim() || note === "저장 중…"} onClick={() => void saveCase(key, c, editing.reply, editing.reason)}>저장</button>
+                <button type="button" className={SUB} onClick={() => setCaseEdit(null)}>취소</button>
+              </div>
+            </article>
+          ) : null}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {REVISE_CHIPS.map((chip) => (
+              <button key={chip} type="button" disabled={busy} onClick={() => void sendText(`방금 답장을 ${chip} 다시 써 줘`)}
+                className="h-8 rounded-lg border border-line bg-surface px-2.5 text-[13px] font-semibold text-ink transition hover:bg-surface-2 disabled:opacity-40">{chip}</button>
+            ))}
+          </div>
+          <p className="text-[12px] text-ink-mute">{note ? note : "보내는 건 사장님이 복사해서 직접 해요. 칩을 누르면 그 방향으로 다시 써요."}</p>
         </div>
       );
     }

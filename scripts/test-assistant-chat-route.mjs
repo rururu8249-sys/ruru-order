@@ -164,10 +164,62 @@ await t('AI 실패하면 안내만(failed)', async () => {
   assert.match(r.body.answer, /다시/);
 });
 
-await t('도구만 계속 부르면 5번에서 멈춤', async () => {
-  const loop = Array.from({ length: 8 }, () => [{ functionCall: { name: 'list_memos', args: {} } }]);
+await t('도구만 계속 부르면 6번에서 멈춤', async () => {
+  const loop = Array.from({ length: 9 }, () => [{ functionCall: { name: 'list_memos', args: {} } }]);
   const r = await run(loop, { messages: [{ role: 'user', text: '메모' }] });
-  assert.equal(r.body.tools.length, 5);
+  assert.equal(r.body.tools.length, 6);
+});
+
+// ── [9단계] 응대 실장 — 사이즈 추천 항의: 방침·사례 읽고 propose_reply(분석·ownerCheck·답장 1개) 카드, 쓰기 0
+db.admin_assistant_memos.push({ id: 'case1', kind: 'case', who: '사이즈', status: 'open', created_at: iso(5), updated_at: iso(5),
+  body: JSON.stringify({ customer: '사이즈 추천대로 샀는데 작아요 교환비 왜 내요', situation: '사이즈 추천 참고용 고지', reply: '방송 중 사이즈 안내는 참고용이라 교환은 사전 안내대로 진행돼요.', reason: '원칙대로', policy: '', outcome: '' }) });
+await t('응대: 사이즈 항의 → get_reply_policy + list_cases(같은 분류 사례) → 분석·사장님 결정·답장 카드', async () => {
+  const r = await run([
+    [{ functionCall: { name: 'find_customer', args: { query: '홍길동' } } }],
+    [{ functionCall: { name: 'get_reply_policy', args: {} } }, { functionCall: { name: 'list_cases', args: { category: '사이즈' } } }],
+    [{ functionCall: { name: 'propose_reply', args: { category: '사이즈', summary: '교환비 면제를 기대하는 것으로 보여요', analysis: '사이즈 추천은 참고용으로 고지됨. 안내 오류가 없었다면 원칙대로.', cautions: '방송 중 실제로 "딱 맞는다"고 단정했는지 확인', ownerCheck: '교환비 면제 여부', drafts: [{ label: '답장', text: '사이즈가 맞지 않아 아쉬우셨겠어요. 방송 중 사이즈 안내는 참고용으로 말씀드리고 있어서 교환은 사전 안내 기준대로 진행돼요. 받으신 그대로 재포장해서 문 앞에 두시면 교환 접수 도와드릴게요.' }] } } }],
+    [{ text: '아래 카드에서 확인해 주세요.' }],
+  ], { messages: [{ role: 'user', text: '홍길동이 사이즈 추천대로 샀는데 작다고 교환비 왜 내냐고 해. 답장 만들어 줘' }] });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.deepEqual(r.body.tools, ['find_customer', 'get_reply_policy', 'list_cases', 'propose_reply']);
+  const card = r.body.cards.find((c) => c.kind === 'reply');
+  assert.equal(card.ownerCheck, '교환비 면제 여부');
+  assert.match(card.analysis, /참고용/);
+  assert.equal(card.drafts.length, 1);
+  // list_cases 응답에 같은 분류 사례가 갔고, 번호·전화는 없음
+  const sent = allSent();
+  assert.match(sent, /사이즈 추천대로 샀는데/);
+  assert.match(sent, /그대로 복사하지 말고/);
+  assert.equal(sent.includes('1111'), false);
+  assert.equal(writeCalls, 0); // 사례 저장은 카드 버튼(assistant-cases)에서만
+  // 시스템 지시문에 실장 규칙·수정 지시 규칙
+  const sys = JSON.parse(sentBodies[0]).systemInstruction.parts[0].text;
+  assert.match(sys, /고객관리 실장/); assert.match(sys, /더 부드럽게/); assert.match(sys, /법적 권리/);
+});
+
+await t('응대: 「좀 더 부드럽게」 후속 — 앞 대화가 그대로 가고 propose_reply 만 다시', async () => {
+  const r = await run([
+    [{ functionCall: { name: 'propose_reply', args: { category: '사이즈', summary: '교환비', analysis: '같은 상황', drafts: [{ label: '답장', text: '고객님, 사이즈가 맞지 않아 많이 아쉬우셨겠어요. 교환은 사전 안내 기준대로 도와드릴게요.' }] } } }],
+    [{ text: '부드럽게 바꿨어요.' }],
+  ], { messages: [
+    { role: 'user', text: '홍길동이 사이즈 추천대로 샀는데 작다고 교환비 왜 내냐고 해. 답장 만들어 줘' },
+    { role: 'assistant', text: '아래 카드에서 확인해 주세요.' },
+    { role: 'user', text: '방금 답장을 좀 더 부드럽게 다시 써 줘' },
+  ] });
+  assert.deepEqual(r.body.tools, ['propose_reply']);
+  const contents = JSON.parse(sentBodies[0]).contents;
+  assert.equal(contents.length >= 3, true); // 앞 대화 포함
+  assert.match(contents[0].parts[0].text, /교환비 왜 내냐/);
+  assert.equal(r.body.cards.find((c) => c.kind === 'reply').ownerCheck, '');
+});
+
+await t('응대: 수정 지시인데 AI 가 말로만 답하면 propose_reply 재촉', async () => {
+  const r = await run([
+    [{ text: '네, 더 부드럽게 쓰면 이렇습니다: 고객님 아쉬우셨겠어요.' }],
+    [{ functionCall: { name: 'propose_reply', args: { category: '사이즈', summary: 's', analysis: 'a', drafts: [{ label: '답장', text: '고객님 아쉬우셨겠어요.' }] } } }],
+    [{ text: '카드로 드렸어요.' }],
+  ], { messages: [{ role: 'user', text: '방금 답장을 좀 더 부드럽게 다시 써 줘' }] });
+  assert.equal(r.body.cards.some((c) => c.kind === 'reply'), true);
 });
 
 console.log(`ALL PASS assistant chat route (${n})`);

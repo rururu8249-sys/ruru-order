@@ -13,6 +13,7 @@ import { loadSalesAnalysisSnapshot } from "@/lib/salesAnalysisLoader";
 import { computeSalesAnswer, resolvePeriod } from "@/lib/salesQuestion";
 import { PERIOD_KEYS, type PeriodKey } from "@/lib/statQuestionParse";
 import { buildSalesDataPack } from "@/lib/assistantChat";
+import { casesForAi } from "@/lib/assistantCases";
 import { DEFAULT_REPLY_POLICY, validReplyImage } from "@/lib/assistantReply";
 import { buildChapters, chaptersText, kstDateLabel } from "@/lib/broadcastSeo";
 
@@ -29,10 +30,10 @@ export type AgentCard =
   | { kind: "products"; products: unknown[]; buyers: unknown[] }
   | { kind: "memo"; text: string }
   | { kind: "issue"; issueType: "exchange" | "refund" | "return" | "general"; nickname: string; name: string; orderNo: string; memo: string }
-  | { kind: "reply"; category: string; summary: string; drafts: { label: string; text: string }[] }
+  | { kind: "reply"; category: string; summary: string; analysis: string; cautions: string; ownerCheck: string; drafts: { label: string; text: string }[] }
   | { kind: "seo"; broadcastId: string; titles: string[]; description: string; tags: string[] };
 
-const MAX_TURNS = 5;
+const MAX_TURNS = 6; // 응대 = find_customer → get_reply_policy → list_cases → propose_reply(+되물음 1)
 
 function pickRange(raw: unknown): PeriodKey {
   if (raw === "3m") return "last_3_months";
@@ -158,10 +159,15 @@ export async function POST(request: NextRequest) {
         return { shown: true, note: "고객이슈 등록 카드를 보여줬다. 사장님이 등록 버튼을 누르면 등록된다." };
       }
       case "propose_reply": {
-        const drafts = Array.isArray(args?.drafts) ? (args!.drafts as Record<string, unknown>[]).slice(0, 3).map((d) => ({ label: String(d?.label ?? "안").slice(0, 20), text: String(d?.text ?? "").slice(0, 600) })).filter((d) => d.text) : [];
-        if (!drafts.length) return { error: "초안이 비었어요" };
-        cards.push({ kind: "reply", category: argStr(args, "category", 20), summary: argStr(args, "summary", 80), drafts });
-        return { shown: true, note: "답장 초안 카드를 보여줬다(복사 버튼)." };
+        const drafts = Array.isArray(args?.drafts) ? (args!.drafts as Record<string, unknown>[]).slice(0, 2).map((d) => ({ label: String(d?.label ?? "답장").slice(0, 20), text: String(d?.text ?? "").slice(0, 800) })).filter((d) => d.text) : [];
+        if (!drafts.length) return { error: "답장이 비었어요" };
+        cards.push({ kind: "reply", category: argStr(args, "category", 20), summary: argStr(args, "summary", 120), analysis: argStr(args, "analysis", 1200), cautions: argStr(args, "cautions", 600), ownerCheck: argStr(args, "ownerCheck", 200), drafts });
+        return { shown: true, note: "응대 카드(분석·최종 답장·복사·수정 칩·사례 저장)를 보여줬다. 답은 한두 줄로 짧게." };
+      }
+      case "list_cases": {
+        const { data } = await db.from("admin_assistant_memos").select("who, body, created_at").eq("kind", "case").eq("status", "open").order("created_at", { ascending: false }).limit(60);
+        const cases = casesForAi((data || []) as { who: string | null; body: string; created_at: string }[], argStr(args, "category", 20));
+        return { cases, note: cases.length ? "참고만 — 그대로 복사하지 말고 지금 상황·방침으로 다시 판단한다." : "저장된 사례 없음" };
       }
       case "propose_seo": {
         const titles = Array.isArray(args?.titles) ? (args!.titles as unknown[]).map((t) => String(t).slice(0, 100)).filter(Boolean).slice(0, 3) : [];
@@ -211,7 +217,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 사장님이 답장·문구를 달라고 했는데 AI 가 말로만 「답장 제안」 하고 propose_reply 를 안 불렀으면 한 번 더 재촉(실측 10/22)
-  if (answer && !cards.some((c) => c.kind === "reply") && /(답장|응대|문구|뭐라고\s*(답|보내))/.test(last.text) && !toolLog.includes("propose_reply")) {
+  if (answer && !cards.some((c) => c.kind === "reply") && /(답장|응대|문구|뭐라고\s*(답|보내)|부드럽게|단호하게|사과는 빼고|강조|할인 방향|다시 써)/.test(last.text) && !toolLog.includes("propose_reply")) {
     try {
       contents.push({ role: "model", parts: [{ text: answer }] });
       contents.push({ role: "user", parts: [{ text: "답장 초안은 글로 쓰지 말고 반드시 propose_reply 도구를 불러 카드로 만들어라. 위 확인 내용은 그대로 두고 도구만 호출." }] });
