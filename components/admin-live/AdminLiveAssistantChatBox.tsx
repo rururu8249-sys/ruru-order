@@ -24,7 +24,7 @@ type Card =
   | { kind: "memo"; text: string }
   | { kind: "issue"; issueType: "exchange" | "refund" | "return" | "general"; nickname: string; name: string; orderNo: string; memo: string }
   | { kind: "reply"; category: string; summary: string; analysis: string; cautions: string; ownerCheck: string; drafts: { label: string; text: string }[] }
-  | { kind: "seo"; broadcastId: string; titles: string[]; description: string; tags: string[] };
+  | { kind: "seo"; broadcastId: string; titles: string[]; description: string; tags: string[]; pinnedComment?: string };
 
 type Img = PreparedImage & { key: string; name: string };
 type Msg = { id: string; role: "user" | "assistant"; text: string; images?: Img[]; cards?: Card[]; failed?: boolean };
@@ -395,6 +395,15 @@ export default function AdminLiveAssistantChatBox({ onShowInOrders, ask }: { onS
             </div>
             <p className="mt-1 break-words text-[13px] text-ink">{tagText}</p>
           </article>
+          {c.pinnedComment ? (
+            <article className="rounded-xl border border-line bg-surface p-3">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-[13px] font-bold text-ink-soft">고정 댓글 <span className="font-normal text-ink-mute">([주문서 링크] 자리에 링크 넣기)</span></h4>
+                <button type="button" className={SUB} onClick={() => void copy(`${key}-p`, c.pinnedComment || "")}>{copied === `${key}-p` ? "복사됨" : "복사"}</button>
+              </div>
+              <p className="mt-1 whitespace-pre-wrap break-words text-[13px] text-ink">{c.pinnedComment}</p>
+            </article>
+          ) : null}
         </div>
       );
     }

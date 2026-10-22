@@ -31,7 +31,7 @@ export type AgentCard =
   | { kind: "memo"; text: string }
   | { kind: "issue"; issueType: "exchange" | "refund" | "return" | "general"; nickname: string; name: string; orderNo: string; memo: string }
   | { kind: "reply"; category: string; summary: string; analysis: string; cautions: string; ownerCheck: string; drafts: { label: string; text: string }[] }
-  | { kind: "seo"; broadcastId: string; titles: string[]; description: string; tags: string[] };
+  | { kind: "seo"; broadcastId: string; titles: string[]; description: string; tags: string[]; pinnedComment: string };
 
 const MAX_TURNS = 6; // 응대 = find_customer → get_reply_policy → list_cases → propose_reply(+되물음 1)
 
@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
         const tags = Array.isArray(args?.tags) ? (args!.tags as unknown[]).map((t) => String(t).replace(/^#/, "").trim()).filter(Boolean).slice(0, 9) : []; // 태그 10개 미만(사장님 10/22)
         const description = argStr(args, "description", 3000);
         if (!titles.length || !description) return { error: "제목·설명이 비었어요" };
-        cards.push({ kind: "seo", broadcastId: argStr(args, "broadcastId", 40), titles, description, tags });
+        cards.push({ kind: "seo", broadcastId: argStr(args, "broadcastId", 40), titles, description, tags, pinnedComment: argStr(args, "pinnedComment", 600) });
         return { shown: true, note: "유튜브 SEO 카드를 보여줬다(복사 버튼)." };
       }
       default:

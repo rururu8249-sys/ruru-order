@@ -150,12 +150,13 @@ await t('propose_memo 카드 + list_memos', async () => {
 await t('broadcast_products + propose_seo', async () => {
   const r = await run([
     [{ functionCall: { name: 'broadcast_products', args: {} } }],
-    [{ functionCall: { name: 'propose_seo', args: { broadcastId: '1018', titles: ['폴로 자켓 3만원대 라방'], description: '첫 줄 요약', tags: ['#폴로', '라이브커머스'] } } }],
+    [{ functionCall: { name: 'propose_seo', args: { broadcastId: '1018', titles: ['폴로 자켓 3만원대 라방'], description: '첫 줄 요약', tags: ['#폴로', '라이브커머스'], pinnedComment: '[주문서 링크]\n1. 폴로 자켓 39,000원' } } }],
     [{ text: '아래 카드에서 복사하세요.' }],
   ], { messages: [{ role: 'user', text: '지난 방송 유튜브 제목 뽑아줘' }] });
   const seo = r.body.cards.find((c) => c.kind === 'seo');
   assert.deepEqual(seo.tags, ['폴로', '라이브커머스']);
   assert.equal(seo.titles[0], '폴로 자켓 3만원대 라방');
+  assert.match(seo.pinnedComment, /^\[주문서 링크\]/); // 고정 댓글(ai-seo 유튜브 규칙 10/22)
 });
 
 await t('AI 실패하면 안내만(failed)', async () => {
