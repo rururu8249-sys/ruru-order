@@ -698,7 +698,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     const phone = String(orderForView.phone || "").replace(/[^0-9]/g, "");
     if (!phone) { showAdminToast("전화번호가 없는 주문이라 쪽지를 보낼 수 없어요.", "error"); return; }
     const nick = String(orderForView.nickname || orderForView.name || "고객").trim();
-    const note = buildExtraDepositRequestNote(nick, shortage);
+    const note = buildExtraDepositRequestNote(nick, shortage, order);
     if (!(await showAdminConfirm(`${nick}님께 아래 쪽지를 보낼까요?\n\n${note.message}`, { title: "추가입금 요청 쪽지", confirmText: "보내기" }))) return;
     if (balanceWorking) return;
     setBalanceWorking(true);

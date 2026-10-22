@@ -384,6 +384,14 @@ export function toAdminLiveOrder(group: OrderGroup): LiveOrder {
     returnStatus: (first as any).return_status || null,
     returnReason: (first as any).return_reason || null,
     returnAmount: Number((first as any).return_amount || 0) || 0,
+    // [2026-10-22] 손님이 주문서에서 본 입금계좌(10-01 라우팅 스냅샷). 세 칸 다 있을 때만. 복사·쪽지 문구 전용(돈 계산 무관)
+    paymentBank: (() => {
+      const r = first as any;
+      const bankName = String(r.payment_bank_name || "").trim();
+      const bankAccount = String(r.payment_bank_account || "").trim();
+      const bankHolder = String(r.payment_bank_holder || "").trim();
+      return bankName && bankAccount && bankHolder ? { bankName, bankAccount, bankHolder } : null;
+    })(),
     items,
   };
 }

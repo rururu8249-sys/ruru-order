@@ -52,3 +52,27 @@ await act(async()=>{r=TestRenderer.create(React.createElement(Form,{activeBroadc
 assert.equal(r.root.findAllByProps({id:'v2-product-name'}).length,0,'brand group keeps the existing form');
 await act(async()=>r.unmount());
 console.log('PASS brand group product keeps the existing form under ?preview=a2');
+
+// [2026-10-22] 재고 숫자가 있는 상품에서 「옵션별 재고 관리」를 끄고 저장 — 막히지 않고 확인창(취소=저장 안 함 / 확인=저장·숫자 보관)
+{
+  window.location.search='?preview=a2';
+  for (const answer of [false, true]) {
+    saved = undefined; let asked = '';
+    window.confirm = (msg) => { asked = String(msg); return answer; };
+    let r2; await act(async()=>{r2=TestRenderer.create(React.createElement(Form,{activeBroadcastId:null,initialProduct:product}));});
+    const sw = r2.root.findAllByType('button').find(b=>b.props.role==='switch' && b.props['aria-label']==='옵션별 재고 관리');
+    assert.equal(sw.props['aria-checked'], true, 'starts ON for a stock-managed product');
+    await act(async()=>sw.props.onClick());
+    await act(async()=>r2.root.findAllByType('button').find(b=>text(b)==='저장').props.onClick());
+    assert.match(asked, /재고 숫자\(3개\)/, 'confirm names the remaining stock count');
+    if (!answer) { assert.equal(saved, undefined, 'cancel → nothing saved'); }
+    else {
+      const note = JSON.parse(saved.values.product_note);
+      assert.equal(note.stock_management_enabled, false, 'saved with stock management OFF');
+      assert.equal(note.stock_variants.reduce((s,v)=>s+v.stock,0), 3, 'stock numbers kept in note');
+    }
+    await act(async()=>r2.unmount());
+  }
+  delete window.confirm;
+  console.log('PASS stock toggle OFF with numbers: confirm cancel=no save / ok=saved with numbers kept');
+}

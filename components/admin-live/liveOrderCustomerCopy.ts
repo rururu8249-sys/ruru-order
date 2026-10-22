@@ -7,7 +7,21 @@ import { formatOrderOptionText } from "@/lib/orderOptionText";
 import { formatKoreanPhone } from "@/lib/order/phone";
 // [2026-09-08] 입금계좌 문구는 설정 › 상점 정보에서 온다(하드코딩 제거). 아직 못 읽었으면 예전 값.
 import { bankLine } from "@/lib/shopInfo";
+import type { ShopInfo } from "@/lib/shopInfo";
 import { getShopInfoSnapshot } from "@/lib/useShopInfo";
+
+// [2026-10-22 사장님 요청] 복사·쪽지의 입금계좌 = ①그 주문에 배정돼 손님이 본 계좌(orders.payment_bank_* 스냅샷)
+//   → ②없으면(옛 주문) 설정 라우팅이 «전체 공통»으로 가리키는 계좌 → ③그것도 없으면 기존 계좌.
+//   전에는 항상 ③(기존 계좌)만 써서 설정을 농협으로 바꿔도 복사 문구는 하나은행이던 것. 표시·문구 전용(돈 무관).
+export function bankLineForOrder(order: Pick<LiveOrder, "paymentBank"> | null | undefined, info: ShopInfo = getShopInfoSnapshot()): string {
+  const snap = order?.paymentBank;
+  if (snap && snap.bankName && snap.bankAccount && snap.bankHolder) return bankLine(snap);
+  if (info.bankRouting?.mode === "all") {
+    const acc = (info.bankAccounts || []).find((a) => a.id === info.bankRouting.allAccountId && a.enabled);
+    if (acc) return bankLine(acc);
+  }
+  return bankLine(info);
+}
 
 function money(value: unknown) {
   return `${Number(value || 0).toLocaleString()}원`;
@@ -131,7 +145,7 @@ export function buildCustomerOrderCopyText(orderForView: LiveOrder, rawOrder?: L
     } else if (ps === "unpaid" || ps === "manual_match_needed") {
       lines.push("");
       // 계좌는 설정 › 상점 정보 값(손님 주문서와 같은 곳에서 읽음)
-      lines.push(`💳 입금계좌: ${bankLine(getShopInfoSnapshot())}`);
+      lines.push(`💳 입금계좌: ${bankLineForOrder(o)}`);
       lines.push(`입금하실 금액: ${money(payableTotal)}`);
       lines.push("※ 입금 확인은 보통 10분, 늦어도 30분 안에 완료돼요. 이미 입금하셨다면 조금만 기다려주세요 🙂");
     } else if (ps === "card_unpaid") {
@@ -168,15 +182,15 @@ export function buildPaymentRequestNote(order: LiveOrder): { title: string; mess
   return {
     title: "💳 입금 안내",
     // 계좌는 설정 › 상점 정보 값
-    message: `${nick}님, 주문서 잘 받았어요! 아직 입금 확인 전이에요.\n\n💳 입금계좌: ${bankLine(getShopInfoSnapshot())}\n입금하실 금액: ${money(payableTotal)}\n\n※ 이미 입금하셨다면 확인까지 보통 10분, 늦어도 30분 걸려요. 조금만 기다려주세요 🙂`,
+    message: `${nick}님, 주문서 잘 받았어요! 아직 입금 확인 전이에요.\n\n💳 입금계좌: ${bankLineForOrder(order)}\n입금하실 금액: ${money(payableTotal)}\n\n※ 이미 입금하셨다면 확인까지 보통 10분, 늦어도 30분 걸려요. 조금만 기다려주세요 🙂`,
   };
 }
 
 // [2026-08-31 사장님 요청 · 돈 계산기] 주문 금액이 바뀌어 입금이 부족할 때 보내는 추가입금 쪽지.
 //   계좌는 설정 › 상점 정보 값.
-export function buildExtraDepositRequestNote(nick: string, shortage: number): { title: string; message: string } {
+export function buildExtraDepositRequestNote(nick: string, shortage: number, order?: Pick<LiveOrder, "paymentBank"> | null): { title: string; message: string } {
   return {
     title: "💳 추가 입금 안내",
-    message: `${nick}님, 주문 내용이 바뀌어서 금액이 조금 달라졌어요.\n\n더 입금하실 금액: ${money(shortage)}\n💳 입금계좌: ${bankLine(getShopInfoSnapshot())}\n\n입금해주시면 바로 확인해드릴게요 🙂`,
+    message: `${nick}님, 주문 내용이 바뀌어서 금액이 조금 달라졌어요.\n\n더 입금하실 금액: ${money(shortage)}\n💳 입금계좌: ${bankLineForOrder(order)}\n\n입금해주시면 바로 확인해드릴게요 🙂`,
   };
 }

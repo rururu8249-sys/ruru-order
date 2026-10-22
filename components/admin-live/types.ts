@@ -123,5 +123,7 @@ export type LiveOrder = {
   returnStatus?: string | null;
   returnReason?: string | null;
   returnAmount?: number | null;
+  /** [2026-10-22] 주문 제출 때 배정된 입금계좌 스냅샷(orders.payment_bank_* — 손님이 본 계좌). 없으면 null. 표시·복사 전용 */
+  paymentBank?: { bankName: string; bankAccount: string; bankHolder: string } | null;
   items: LiveOrderItem[];
 };
