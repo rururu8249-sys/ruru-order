@@ -33,6 +33,11 @@ export default function AdminLiveAssistantDrawer({
               {label}
             </button>
           ))}
+          {/* 비서 답이 답답할 때 — 사장님이 따로 쓰는 챗GPT 를 새 탭으로(사장님 요청 10/22 12:14). 조용한 보조 버튼, 오른쪽 끝 */}
+          <a href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer"
+            className="-mb-px ml-auto inline-flex h-10 items-center px-1 text-[13px] font-semibold text-ink-mute transition hover:text-ink focus-visible:outline-2 focus-visible:outline-ink">
+            챗GPT 열기 ↗
+          </a>
         </div>
         {/* 대화는 탭을 옮겨도 살아 있게(display 만 끔) */}
         <div className={tab === "chat" ? "" : "hidden"}>
