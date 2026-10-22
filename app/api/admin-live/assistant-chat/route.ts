@@ -83,8 +83,11 @@ export async function POST(request: NextRequest) {
         const since = argStr(args, "range") === "all" ? null : rangePeriod.fromIso;
         let r = await searchCustomers(db, q, since);
         if (r.total === 0 && since) r = await searchCustomers(db, q, null);
-        if (r.people.length) cards.push({ kind: "customers", people: r.people.slice(0, 8) });
-        return { total: r.total, people: customersForAi(r.people) };
+        // 화면 카드: 정확히 맞는 손님이 있으면 그 사람(들)만, 없으면 위 5명(사장님 10/22: 「너무 광범위」)
+        const exact = (r.people as { matchKind?: string }[]).filter((p) => p.matchKind === "exact");
+        const shown = exact.length ? exact.slice(0, 5) : r.people.slice(0, 5);
+        if (shown.length) cards.push({ kind: "customers", people: shown });
+        return { total: r.total, exactCount: exact.length, people: customersForAi(exact.length ? exact : r.people) };
       }
       case "find_product": {
         const q = argStr(args, "query", 80);

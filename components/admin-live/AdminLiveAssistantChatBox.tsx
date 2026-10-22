@@ -57,11 +57,17 @@ function Badges({ paymentLabel, paymentCode, shippingLabel }: { paymentLabel: st
   );
 }
 
+// 대화는 창을 닫았다 열어도 남게 모듈 메모리에 둔다(브라우저 저장소 아님 — 새로고침하면 비워짐). 「화면 지우기」로만 비움.
+const chatStore: { messages: Msg[]; done: Record<string, string> } = { messages: [], done: {} };
+
 const SUB = "h-9 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink transition hover:bg-surface-2 disabled:opacity-40";
 const MAIN = "h-9 rounded-lg bg-ink px-3 text-[13px] font-semibold text-white transition hover:opacity-90 disabled:opacity-40";
 
 export default function AdminLiveAssistantChatBox({ onShowInOrders, ask }: { onShowInOrders: (keyword: string) => void; ask?: { n: number; text: string } | null }) {
-  const [messages, setMessages] = useState<Msg[]>([]);
+  const [messages, setMessagesState] = useState<Msg[]>(() => chatStore.messages);
+  const setMessages = (next: Msg[] | ((prev: Msg[]) => Msg[])) =>
+    setMessagesState((prev) => { const v = typeof next === "function" ? next(prev) : next; chatStore.messages = v; return v; });
+  const [zoom, setZoom] = useState<Img | null>(null);
   const [text, setText] = useState("");
   const [images, setImages] = useState<Img[]>([]);
   const [range, setRange] = useState<ChatRange>("last_3_months");
@@ -71,7 +77,9 @@ export default function AdminLiveAssistantChatBox({ onShowInOrders, ask }: { onS
   const [error, setError] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [copied, setCopied] = useState("");
-  const [done, setDone] = useState<Record<string, string>>({}); // 카드 버튼 결과 메시지
+  const [done, setDoneState] = useState<Record<string, string>>(() => chatStore.done); // 카드 버튼 결과 메시지
+  const setDone = (next: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>)) =>
+    setDoneState((prev) => { const v = typeof next === "function" ? next(prev) : next; chatStore.done = v; return v; });
   const fileRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -373,8 +381,11 @@ export default function AdminLiveAssistantChatBox({ onShowInOrders, ask }: { onS
               {m.images?.length ? (
                 <div className="flex flex-wrap gap-1">
                   {m.images.map((im) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img key={im.key} src={im.preview} alt="" className="h-16 w-16 rounded-lg object-cover" />
+                    <button key={im.key} type="button" onClick={() => setZoom(im)} aria-label="보낸 사진 크게 보기(가린 상태 확인)" className="relative h-16 w-16 overflow-hidden rounded-lg">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={im.preview} alt="" className="h-16 w-16 object-cover" />
+                      {im.masked > 0 ? <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-center text-[11px] font-semibold text-white">{im.masked}곳 가림</span> : null}
+                    </button>
                   ))}
                 </div>
               ) : null}
@@ -400,8 +411,10 @@ export default function AdminLiveAssistantChatBox({ onShowInOrders, ask }: { onS
             {images.map((im) => (
               <div key={im.key} className="relative h-16 w-16">
                 {im.preview ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={im.preview} alt="" className="h-16 w-16 rounded-lg object-cover" />
+                  <button type="button" onClick={() => setZoom(im)} aria-label="사진 크게 보기" className="h-16 w-16 overflow-hidden rounded-lg">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={im.preview} alt="" className="h-16 w-16 object-cover" />
+                  </button>
                 ) : <span className="flex h-16 w-16 items-center justify-center rounded-lg bg-surface-2 text-[11px] text-ink-mute">가리는 중</span>}
                 <button type="button" aria-label="사진 빼기" onClick={() => setImages((prev) => prev.filter((x) => x.key !== im.key))}
                   className="absolute -right-1 -top-1 h-5 w-5 rounded-full bg-ink text-[11px] font-bold leading-5 text-white">×</button>
@@ -424,12 +437,20 @@ export default function AdminLiveAssistantChatBox({ onShowInOrders, ask }: { onS
           <div className="flex items-center gap-2">
             <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { void addFiles(e.target.files); e.target.value = ""; }} />
             <button type="button" className={SUB} onClick={() => fileRef.current?.click()} disabled={images.length >= MAX_IMAGES}>+ 사진 {images.length ? `${images.length}/${MAX_IMAGES}` : ""}</button>
-            {messages.length > 0 ? <button type="button" className="h-9 rounded-lg px-2 text-[13px] font-semibold text-ink-mute hover:bg-surface-2" onClick={() => { setMessages([]); setDone({}); }}>새 대화</button> : null}
+            {messages.length > 0 ? <button type="button" className="h-9 rounded-lg px-2 text-[13px] font-semibold text-ink-mute hover:bg-surface-2" onClick={() => { if (window.confirm("대화 내용을 모두 지울까요? (저장된 메모·이슈는 그대로예요)")) { setMessages([]); setDone({}); } }}>화면 지우기</button> : null}
           </div>
           <button type="button" className={MAIN} disabled={busy || ocrBusy || (!text.trim() && images.length === 0)} onClick={() => void send()}>{busy ? "보내는 중…" : "보내기"}</button>
         </div>
         {error ? <p className="mt-1 text-[13px] text-warn-tx">{error}</p> : null}
       </div>
+
+      {zoom ? (
+        <div role="dialog" aria-label="사진 크게 보기" className="fixed inset-0 z-[80] flex flex-col items-center justify-center bg-black/80 p-4" onClick={() => setZoom(null)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={zoom.preview} alt="" className="max-h-[85vh] max-w-full object-contain" onClick={(e) => e.stopPropagation()} />
+          <p className="mt-2 text-[13px] text-white">{zoom.masked > 0 ? `${zoom.masked}곳 검게 가림 · 이 모습 그대로 AI 에 갔어요` : "가린 곳 없음 · 이 모습 그대로 AI 에 갔어요"} · 누르면 닫힘</p>
+        </div>
+      ) : null}
     </div>
   );
 }
