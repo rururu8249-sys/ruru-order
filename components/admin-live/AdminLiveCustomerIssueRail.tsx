@@ -1092,6 +1092,13 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
   useEffect(() => { if (selectAllRef.current) selectAllRef.current.indeterminate = someOnPageSelected; }, [someOnPageSelected]);
 
   /** 한 건 처리 함수들 — 확인창·알림·새로고침 없이 «서버 호출만». 일괄 루프가 쓴다. */
+  // [2026-10-22 사장님] 삭제 연동 — 이슈를 삭제함으로 옮긴 뒤 주문의 반품 기록 메모(orders.return_*)도 정리(최신 이슈일 때만·포인트 무접촉).
+  //   실패해도 삭제는 이미 됐으므로 조용히(주문상세 「기록 지우기」로 수습 가능).
+  const clearOrderReturnRecord = async (id: string) => {
+    try {
+      await fetch("/api/admin-live/order-return/clear-record", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ taskId: id }) });
+    } catch { /* 표시 기록 정리 실패는 무시 */ }
+  };
   const patchOne = async (id: string, body: Record<string, unknown>) => {
     const res = await fetch("/api/admin-v2/admin-tasks", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...body }) });
     const payload = await res.json().catch(() => null);
@@ -1149,7 +1156,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
       { title: "일괄 삭제", confirmText: `${items.length}건 삭제`, cancelText: "그만두기", tone: "warning" },
     );
     if (!ok) return;
-    await runBulk(items, "삭제", (id) => patchOne(id, { action: "hide", resolved_note: "고객관리에서 일괄 삭제" }));
+    await runBulk(items, "삭제", async (id) => { const ok = await patchOne(id, { action: "hide", resolved_note: "고객관리에서 일괄 삭제" }); if (ok) await clearOrderReturnRecord(id); return ok; });
   };
   const bulkRestore = async () => {
     const items = selectedTasks.filter(isDeleted);
@@ -1543,10 +1550,11 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
     const who = getNickname(task) || getName(task) || "이 고객";
 
-    // [2026-09-27 사장님 확정] 「삭제」 = 이슈 카드만 「삭제함」으로 이동. 포인트·주문 반품 기록은 절대 안 건드린다.
+    // [2026-09-27 사장님 확정] 「삭제」 = 이슈 카드만 「삭제함」으로 이동. 포인트는 절대 안 건드린다.
     //   반품을 없던 일로 되돌리기(포인트 반환)는 주문상세의 「반품 취소」에서만.
+    // [2026-10-22 사장님] 주문상세의 반품 기록 «메모»(orders.return_*)는 같이 정리(표시 전용 칸·최신 이슈일 때만).
     const ok = await showAdminConfirm(
-      `${who} 님의 고객이슈를 삭제할까요?\n\n「삭제함」 탭으로 옮겨져서 언제든 되살릴 수 있어요.`,
+      `${who} 님의 고객이슈를 삭제할까요?\n\n「삭제함」 탭으로 옮겨져서 언제든 되살릴 수 있어요.\n주문상세의 반품 기록 표시도 같이 지워져요(포인트는 그대로).`,
       { title: "고객이슈 삭제", confirmText: "삭제", cancelText: "그만두기", tone: "warning" },
     );
     if (!ok) return;
@@ -1564,6 +1572,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
         return;
       }
 
+      await clearOrderReturnRecord(id); // [2026-10-22] 주문상세 반품 기록 메모도 함께(포인트 무접촉)
       setIssuePage(1);
       setReloadKey((value) => value + 1);
       window.dispatchEvent(new Event("ruru-admin-task-updated"));

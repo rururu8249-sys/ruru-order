@@ -23,6 +23,8 @@ type Props = {
   onImageClick?: (url: string) => void;
   // [2026-09-03 사장님 요청] 칸 제목 상품(예: 상품번호)이면 색상 칸 라벨을 그 제목으로 — 표시 전용
   colorLabel?: string;
+  // [2026-10-22 사장님] 환불·반품 이슈 대상 줄 — 상품명 취소선 + 빨간 라벨(표시 전용·수정/저장 무관)
+  issueMark?: { label: string; strike: boolean; resolved?: boolean } | null;
 };
 
 function money(value: unknown) {
@@ -163,7 +165,7 @@ function updateForm<K extends keyof LiveOrderItemEditForm>(
   };
 }
 
-export default function LiveOrderItemEditCard({ item, index, disabled = false, onAfterSave, canDelete = false, deleting = false, onDelete, imageUrl = null, onImageClick, colorLabel = "" }: Props) {
+export default function LiveOrderItemEditCard({ item, index, disabled = false, onAfterSave, canDelete = false, deleting = false, onDelete, imageUrl = null, onImageClick, colorLabel = "", issueMark = null }: Props) {
   const [editing, setEditing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [form, setForm] = useState(() => createInitialLiveOrderItemEditForm(item));
@@ -362,9 +364,12 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
           </button>
         ) : null}
         <div className="min-w-0 flex-1">
-          <div className="break-words text-[14px] font-bold leading-5 text-ink">{getItemName(item)}</div>
+          <div className={`break-words text-[14px] font-bold leading-5 ${issueMark?.strike ? "line-through text-ink-mute" : "text-ink"}`}>
+            {issueMark ? <span className={`mr-1.5 inline-block rounded px-1.5 py-0.5 align-middle text-[11px] font-black no-underline ${issueMark.label === "교환" ? "bg-warn-bg text-warn-tx" : "bg-danger-bg text-danger-tx"}`} style={{ textDecoration: "none" }}>{issueMark.label}{issueMark.resolved ? " 완료" : ""}</span> : null}
+            {getItemName(item)}
+          </div>
           {optionTextView ? (
-            <div className="mt-1 whitespace-pre-line break-words text-[13px] leading-5 text-ink-soft">
+            <div className={`mt-1 whitespace-pre-line break-words text-[13px] leading-5 ${issueMark?.strike ? "line-through text-ink-mute" : "text-ink-soft"}`}>
               {optionTextView}
             </div>
           ) : null}

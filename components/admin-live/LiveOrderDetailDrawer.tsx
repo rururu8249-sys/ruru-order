@@ -24,6 +24,7 @@ import { splitIssueBody, fieldFromIssueBody } from "@/lib/issueBodyMeta";
 import { patchIssueTask, type IssueExtraItem } from "@/lib/issueTaskPatch";
 import PickingPullModal from "./PickingPullModal";
 import { pickPullAwayText, pulledForOf } from "@/lib/orderPickPull";
+import { issueMarkKind, issueTargetItemIds, isStrikeKind, targetTextFromReturnReason, type IssueMarkKind } from "@/lib/orderIssueMarks";
 
 type Props = {
   order: LiveOrder;
@@ -481,6 +482,16 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const orderForView = localOrder;
   const items = Array.isArray(orderForView.items) ? orderForView.items : [];
   const isCanceled = isLiveOrderCanceled(orderForView);
+  // [2026-10-22 사장님] 환불·반품 이슈 대상 줄 취소선(표시 전용) — 이슈 카드(최신·삭제 아님) 기준, 없으면 return_reason 「대상:」 글자.
+  const issueMarks = (() => {
+    const task = issueLatest?.task as Record<string, unknown> | null | undefined;
+    const returnStatus = String((order as any).returnStatus ?? "");
+    if (!task && !returnStatus) return { kind: null as IssueMarkKind | null, ids: new Set<string>() };
+    const kind = issueMarkKind({ task_type: task?.task_type, raw_payload: task?.raw_payload, returnStatus });
+    const targetText = task ? fieldFromIssueBody(String(task.body ?? ""), "대상상품:") : targetTextFromReturnReason((order as any).returnReason);
+    const ids = issueTargetItemIds(items.map((it) => ({ id: String(it.id), productId: it.productId, productName: it.productName, color: it.color, size: it.size, qty: it.qty })), { raw_payload: task?.raw_payload, targetText });
+    return { kind, ids: new Set(ids) };
+  })();
   // [2026-10-22 사장님] 「오늘 챙기기에 넣기」 — 지난 주문 줄을 골라 오늘 주문서·송장·물건챙기기로. 저장은 picking-pull 라우트(돈 무접촉).
   const [pullOpen, setPullOpen] = useState(false);
   const [unpullingId, setUnpullingId] = useState("");
@@ -1187,23 +1198,37 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     setIssueProcessItem(item);
   };
 
-  // 기록 지우기 — 기존 동작 유지(return_* 컬럼만 null). 포인트/이슈는 건드리지 않는다.
+  // 기록 지우기 — return_* 컬럼 null(기존) + [2026-10-22 사장님] 이 주문의 고객이슈 카드도 「삭제함」으로(되살릴 수 있음).
+  //   포인트는 건드리지 않는다(포인트 되돌림은 「반품 취소」만).
   const handleClearReturn = async () => {
     if (returnSaving) return;
-    if (!(await showAdminConfirm("반품/교환 기록을 지울까요?\n\n(이미 회수된 포인트나 등록된 고객이슈는 되돌리지 않습니다)"))) return;
+    const latestTaskId = String((issueLatest?.task as Record<string, unknown> | null)?.id ?? "").trim();
+    if (!(await showAdminConfirm("반품/교환 기록을 지울까요?\n\n고객이슈 탭의 이 이슈도 「삭제함」으로 옮겨져요(되살릴 수 있어요).\n이미 회수된 포인트는 되돌리지 않습니다."))) return;
     const rowIds = items.map((item) => Number(item.id)).filter((id) => Number.isFinite(id) && id > 0);
-    if (rowIds.length === 0) return;
+    if (rowIds.length === 0 && !latestTaskId) return;
     setReturnSaving(true);
     try {
-      const { error } = await supabase
-        .from("orders")
-        .update({ return_status: null, return_reason: null, return_amount: null, return_updated_at: null })
-        .in("id", rowIds);
-      if (error) {
-        showAdminToast("기록 지우기 실패\n\n" + error.message, "error");
-        return;
+      if (rowIds.length > 0) {
+        const { error } = await supabase
+          .from("orders")
+          .update({ return_status: null, return_reason: null, return_amount: null, return_updated_at: null })
+          .in("id", rowIds);
+        if (error) {
+          showAdminToast("기록 지우기 실패\n\n" + error.message, "error");
+          return;
+        }
       }
-      showAdminToast("반품/교환 기록을 지웠습니다.", "success");
+      let issueNote = "";
+      if (latestTaskId) {
+        try {
+          const res = await fetch("/api/admin-v2/admin-tasks", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: latestTaskId, action: "hide", resolved_note: "주문상세 기록 지우기" }) });
+          const payload = await res.json().catch(() => null);
+          issueNote = res.ok && payload?.ok ? " 고객이슈도 삭제함으로 옮겼어요." : " (고객이슈 카드는 못 옮겼어요 — 고객이슈 탭에서 삭제해 주세요)";
+          if (res.ok && payload?.ok) window.dispatchEvent(new Event("ruru-admin-task-updated"));
+        } catch { issueNote = " (고객이슈 카드는 못 옮겼어요 — 고객이슈 탭에서 삭제해 주세요)"; }
+      }
+      showAdminToast("반품/교환 기록을 지웠습니다." + issueNote, "success");
+      setFindTaskTick((v) => v + 1);
       await onAfterStatusChange?.();
     } finally {
       setReturnSaving(false);
@@ -1759,6 +1784,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 <LiveOrderItemEditCard
                   item={item}
                   index={index}
+                  issueMark={issueMarks.kind && issueMarks.ids.has(String(item.id)) ? { label: issueMarks.kind, strike: isStrikeKind(issueMarks.kind), resolved: !!issueLatest?.isResolved } : null}
                   disabled={isCanceled}
                   onAfterSave={handleItemSaved}
                   canDelete={!isCanceled && items.length > 1}
@@ -1904,9 +1930,12 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               + 등록
             </button>
           </div>
-          {(order as any).returnStatus ? (() => {
+          {((order as any).returnStatus || issueLatest?.task) ? (() => {
             // [2026-10-21] 고객이슈 칸 — 베이지 경고상자 → 흰 카드(유형·상태·열기 한 줄 / 상품·메모 / 아래 작은 글자 버튼). 핸들러 그대로.
-            const typeText = String((order as any).returnStatus).replace("반품(환불)", "환불").replace("반품(교환)", "교환");
+            // [2026-10-22] 이슈 카드가 살아 있으면(되살림 등) return_* 메모가 비어도 보여주고, 유형은 이슈 기준으로.
+            const typeText = (order as any).returnStatus
+              ? String((order as any).returnStatus).replace("반품(환불)", "환불").replace("반품(교환)", "교환")
+              : issueMarkKind({ task_type: (issueLatest?.task as Record<string, unknown> | null)?.task_type, raw_payload: (issueLatest?.task as Record<string, unknown> | null)?.raw_payload });
             const tone = typeText.includes("환불") ? "bg-danger-bg text-danger-tx" : typeText.includes("교환") ? "bg-warn-bg text-warn-tx" : "bg-surface-2 text-ink-soft";
             const task = issueLatest?.task as Record<string, unknown> | undefined;
             const body = task ? String(task.body ?? "") : "";

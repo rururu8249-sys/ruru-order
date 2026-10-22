@@ -19,6 +19,7 @@ import { pickingProgress, isPickingComplete, pickingScope } from "@/lib/orderPic
 import ProductPagination from "./ProductPagination";
 import { pickPullBadgeText, pickPullAwayText } from "@/lib/orderPickPull";
 import { pulledAwayDays } from "./liveOrderPickPull";
+import { issueMarkKind, issueTargetItemIds, isStrikeKind, targetTextFromReturnReason } from "@/lib/orderIssueMarks";
 
 // 총금액 표시 전용: 포인트 사용 주문은 실결제금액(상품금액 + 택배비 - 사용포인트)으로 표시한다.
 // - 단일상품: final_amount에 포인트가 이미 반영돼 기존 값과 동일(변화 없음)
@@ -145,10 +146,20 @@ function renderOrderSummary(order: LiveOrder, wrap = false) {
   const firstPart = parts[0] || "-";
   const restCount = hiddenCount + Math.max(0, parts.length - 1);
   const fullText = [...parts].join(", ") + (hiddenCount > 0 ? ` 외 ${hiddenCount}개` : "");
+  // [2026-10-22 사장님] 환불·반품 기록이 있는 주문은 그 대상 줄에 취소선(표시 전용) — 첫 상품이 대상이면 줄 긋고, 대상이 뒤에 숨은 상품이면 빨간 라벨로 알림(유형 배지는 닉네임 칸 returnBadge 가 이미 표시)
+  const mark = (() => {
+    const returnStatus = String((order as any).returnStatus ?? "");
+    if (!returnStatus) return null;
+    const kind = issueMarkKind({ returnStatus });
+    const ids = new Set(issueTargetItemIds((order.items || []).map((it) => ({ id: String(it.id), productId: it.productId, productName: it.productName, color: it.color, size: it.size, qty: it.qty })), { targetText: targetTextFromReturnReason((order as any).returnReason) }));
+    if (ids.size === 0) return null;
+    return { kind, strikeFirst: isStrikeKind(kind) && ids.has(String(order.items?.[0]?.id ?? "")), count: ids.size };
+  })();
 
   return (
     <span className={wrap ? "inline-flex min-w-0 max-w-full flex-wrap items-start gap-x-2 gap-y-1 whitespace-normal" : "inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap"} title={fullText}>
-      <span className={wrap ? "min-w-0 break-words [overflow-wrap:anywhere]" : "truncate"}>{firstPart}</span>
+      {mark && !mark.strikeFirst ? <span className={`inline-block shrink-0 rounded px-1 text-[11px] font-black leading-[18px] ${mark.kind === "교환" ? "bg-warn-bg text-warn-tx" : "bg-danger-bg text-danger-tx"}`}>{mark.kind}{mark.count > 1 ? ` ${mark.count}` : ""}</span> : null}
+      <span className={`${wrap ? "min-w-0 break-words [overflow-wrap:anywhere]" : "truncate"}${mark?.strikeFirst ? " line-through text-ink-mute" : ""}`}>{firstPart}</span>
       {restCount > 0 && (
         <span className="shrink-0 font-black text-ink-soft">외 {restCount}개</span>
       )}
