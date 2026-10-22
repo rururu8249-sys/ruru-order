@@ -437,6 +437,32 @@ productRows=[];
 globalThis.fetch=originalFetch;
 await act(async()=>tree.unmount());
 
+// [2026-10-22 22:15 사장님] 요약 보기 — 숫자 = 미결제 포함 총수량 + 「(미결제 N)」. 남은/챙긴은 결제완료 기준 그대로.
+{
+  const optItem=(id,qty,size)=>({...item(id,qty,size),productId:'p9',productName:'니트'});
+  const sumFixture=[
+    order(60,'paid',[optItem(60,5,'M')]), order(61,'unpaid',[optItem(61,2,'M')]),
+    order(62,'unpaid',[optItem(62,1,'L')]),
+  ];
+  for (const id of [60,61,62]) rows.set(id,{id,picked_at:null});
+  await act(async()=>{tree=Renderer.create(React.createElement(Modal,{orders:sumFixture,filterLabel:'요약 시험',onClose(){}}));});
+  await act(async()=>tree.root.findByProps({'aria-label':'결제 상태 보기'}).findAllByType('button').find(n=>n.children.join('')==='전체').props.onClick());
+  await act(async()=>tree.root.findAllByType('button').find(n=>n.children.join('')==='요약').props.onClick());
+  const t=text();
+  const li=tree.root.findAllByType('li');
+  const liText=li.map(n=>nodeText(n));
+  assert.ok(liText.some(x=>x.includes('사이즈 M') && x.includes('7개') && x.includes('(미결제 2)')), `option M shows paid+unpaid total 7 with (미결제 2): ${liText.join(' | ')}`);
+  assert.ok(liText.some(x=>x.includes('사이즈 L') && x.includes('1개') && x.includes('(미결제 1)')), 'option L (unpaid only) shows 1개 (미결제 1), not 0개');
+  assert.ok(!liText.some(x=>/\b5개/.test(x) || /\b0개/.test(x)), 'no paid-only numbers remain on option rows');
+  const totalCell=tree.root.findAll(n=>n.type==='div' && n.props.role==='cell' && nodeText(n).includes('(미결제 3)'));
+  assert.equal(totalCell.length,1,'product total cell shows (미결제 3)');
+  assert.ok(nodeText(totalCell[0]).includes('8개') && nodeText(totalCell[0]).includes('남은 5'),'product total = 8개(5+3), 남은 5 stays paid-based');
+  const top=nodeText(tree.root.findByProps({'aria-label':'요약 합계'}));
+  assert.ok(top.includes('8개') && top.includes('미결제 3개 포함') && top.includes('남은 수량5개') && top.includes('결제완료 기준'), `summary totals include unpaid: ${top}`);
+  { const all=nodeText(tree.root); assert.ok(all.includes('남은 5') && all.includes('챙긴 0 / 5개'), 'header counters stay paid-based (남은 5 · 챙긴 0 / 5개)'); }
+  await act(async()=>tree.unmount());
+  console.log('summary view counts: option 7개(미결제 2)·1개(미결제 1), product 8개(미결제 3)·남은 5, top 8개·미결제 3개 포함 — PASS');
+}
 const modalSource=fs.readFileSync(path.join(root,'components/admin-live/LiveOrderPickingModal.tsx'),'utf8');
 globalThis.Date = SystemDate;
 // Opening from all orders must preserve the current list, not submit an
