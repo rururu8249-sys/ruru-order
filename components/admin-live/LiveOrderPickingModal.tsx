@@ -587,7 +587,7 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
           {!(workArea === "selected" && scopeTooWide) && !loading && !loadError && matches.length === 0 ? <div className="py-12 text-center font-bold text-ink-soft">현재 조회 조건에 맞는 상품이 없습니다.</div> : null}
           {viewMode === "summary" && sortedGroups.length > 0 ? (() => {
             // [2026-10-22 사장님] 요약 — 맨 위 전체 수량, 아래 표 하나: 상품(사진·이름·가격·총수량) → 옵션별 수량·체크.
-            //   숫자 = 결제완료 기준(상단 「남은/챙긴」과 같은 식), 미결제는 「미결제 N」 따로. 체크 = 그 옵션의 보이는 줄 전부 picked_at 저장/해제.
+            //   [2026-10-22 22:15 사장님] 숫자 = «미결제 포함 총수량», 옆에 「(미결제 N)」 — 앞 숫자에 포함인지 헷갈리던 것. 남은/챙긴은 결제완료 기준 그대로. 체크 = 그 옵션의 보이는 줄 전부 picked_at 저장/해제.
             const paidOf = (rows: readonly PickingRow[]) => pickingProgress(rows.filter(({ panel }) => panel.paid).map(({ item }) => ({ qty: item.qty, pickedAt: pickedIds.has(item.id) })));
             const unpaidOf = (rows: readonly PickingRow[]) => rows.filter(({ panel }) => !panel.paid).reduce((sum, { item }) => sum + item.qty, 0);
             const all = paidOf(matches);
@@ -596,9 +596,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
             return (
               <div className="mx-auto max-w-[760px] space-y-3">
                 <div aria-label="요약 합계" className="grid grid-cols-3 gap-2 rounded-xl border border-line bg-surface p-3 max-sm:p-2">
-                  <div><div className="text-[12px] text-ink-soft">전체 수량</div><div className="text-[20px] font-bold text-ink tabular-nums">{all.total}개</div></div>
+                  <div><div className="text-[12px] text-ink-soft">전체 수량</div><div className="text-[20px] font-bold text-ink tabular-nums">{all.total + allUnpaid}개</div>{allUnpaid > 0 ? <div className="text-[12px] font-semibold text-[var(--color-danger-tx)] tabular-nums">미결제 {allUnpaid}개 포함</div> : null}</div>
                   <div><div className="text-[12px] text-ink-soft">상품</div><div className="text-[20px] font-bold text-ink tabular-nums">{sortedGroups.length}개</div></div>
-                  <div className="text-right"><div className="text-[12px] text-ink-soft">남은 수량</div><div className="text-[20px] font-bold text-ink tabular-nums">{all.total - all.got}개</div>{allUnpaid > 0 ? <div className="text-[12px] font-semibold text-[var(--color-danger-tx)] tabular-nums">미결제 {allUnpaid}개 따로</div> : null}</div>
+                  <div className="text-right"><div className="text-[12px] text-ink-soft">남은 수량</div><div className="text-[20px] font-bold text-ink tabular-nums">{all.total - all.got}개</div><div className="text-[12px] text-ink-soft">결제완료 기준</div></div>
                 </div>
                 <div role="table" aria-label="상품별 수량 요약" className="overflow-hidden rounded-xl border border-line bg-surface">
                   <div role="row" className="grid grid-cols-[56px_minmax(0,1fr)_96px] items-center gap-3 border-b border-line bg-surface-2 px-3 py-2 text-[12px] font-semibold text-ink-soft max-sm:grid-cols-[44px_minmax(0,1fr)_72px] max-sm:gap-2">
@@ -642,8 +642,8 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
                                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-[16px] font-bold disabled:opacity-50 ${optDone ? "border-ink bg-ink text-white" : "border-line bg-surface text-transparent"}`}>✓</button>
                                   <span className={`min-w-0 flex-1 break-words text-[13px] ${optDone ? "text-ink-soft line-through" : "text-ink"}`}>{label}</span>
                                   <span className="shrink-0 text-right tabular-nums">
-                                    <span className={`text-[16px] font-bold ${optDone ? "text-ink-soft" : "text-ink"}`}>{op.total}개</span>
-                                    {oUnpaid > 0 ? <span className="ml-1 text-[12px] font-semibold text-[var(--color-danger-tx)]">미결제 {oUnpaid}</span> : null}
+                                    <span className={`text-[16px] font-bold ${optDone ? "text-ink-soft" : "text-ink"}`}>{op.total + oUnpaid}개</span>
+                                    {oUnpaid > 0 ? <span className="ml-1 text-[12px] font-semibold text-[var(--color-danger-tx)]">(미결제 {oUnpaid})</span> : null}
                                   </span>
                                 </li>
                               );
@@ -651,9 +651,9 @@ export default function LiveOrderPickingModal({ orders, filterLabel, scopeTooWid
                           </ul>
                         </div>
                         <div role="cell" className="text-right tabular-nums">
-                          <div className="text-[20px] font-bold text-ink">{gp.total}개</div>
+                          <div className="text-[20px] font-bold text-ink">{gp.total + gUnpaid}개</div>
                           {groupDone ? <div className="text-[12px] font-semibold text-ok-tx">완료</div> : gp.total > 0 ? <div className="text-[12px] text-ink-soft">남은 {gp.total - gp.got}</div> : null}
-                          {gUnpaid > 0 ? <div className="text-[12px] font-semibold text-[var(--color-danger-tx)]">미결제 {gUnpaid}</div> : null}
+                          {gUnpaid > 0 ? <div className="text-[12px] font-semibold text-[var(--color-danger-tx)]">(미결제 {gUnpaid})</div> : null}
                         </div>
                       </div>
                     );
