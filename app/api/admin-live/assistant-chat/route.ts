@@ -106,8 +106,8 @@ export async function POST(request: NextRequest) {
         return { periodLabel: period.label, table: pack };
       }
       case "list_memos": {
-        const { data } = await db.from("admin_assistant_memos").select("id, kind, body, due_on, who, product, created_at").in("kind", ["todo", "customer", "product", "note"]).eq("status", "open").order("created_at", { ascending: false }).limit(100);
-        return { memos: (data || []).map((m) => ({ kind: m.kind, text: m.body, due: m.due_on, who: m.who, product: m.product, at: m.created_at })) };
+        const { data } = await db.from("admin_assistant_memos").select("id, kind, body, due_date, who, product, created_at").in("kind", ["todo", "customer", "product", "note"]).eq("status", "open").order("created_at", { ascending: false }).limit(100);
+        return { memos: (data || []).map((m) => ({ kind: m.kind, text: m.body, due: m.due_date, who: m.who, product: m.product, at: m.created_at })) };
       }
       case "get_reply_policy": {
         const { data } = await db.from("admin_assistant_memos").select("body").eq("kind", "policy").eq("status", "open").order("updated_at", { ascending: false }).limit(1);

@@ -22,7 +22,7 @@ const db = {
     { id: 2, created_at: iso(2), youtube_nickname: '홍길동-f2h', customer_name: '홍길동', recipient_name: '홍길동', customer_phone: '01011112222', kakao_id: null, order_group_id: 'G2', order_lookup_code: 'A2', broadcast_id: 1018, product_name: '니트 가디건', color: '없음', size: 'FREE', qty: 1, is_deleted: false, admin_order_status_v2: '입금대기', order_manage_status: '', payment_method: '무통장입금', product_price: 29000, adjusted_product_price: 29000, final_amount: 29000, total_price: 29000, shipping_fee: 0 },
   ],
   products: [{ id: 677, product_name: '폴로 자켓', color_options: ['네이비'], price: 39000, created_at: iso(12), status: '판매중', main_image_url: null, image_url: null, external_image_url: null }],
-  admin_assistant_memos: [{ id: 'm1', kind: 'todo', body: '목요일 송장 출력', due_on: null, who: null, product: null, status: 'open', created_at: iso(1), updated_at: iso(1) }],
+  admin_assistant_memos: [{ id: 'm1', kind: 'todo', body: '목요일 송장 출력', due_date: null, who: null, product: null, status: 'open', created_at: iso(1), updated_at: iso(1) }],
 };
 let writeCalls = 0;
 function query(table) {
