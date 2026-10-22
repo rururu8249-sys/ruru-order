@@ -30,6 +30,7 @@ import AdminLiveSettingsPanel from "./AdminLiveSettingsPanel";
 import AdminLiveSidebar from "./AdminLiveSidebar";
 import LiveHeader from "./LiveHeader";
 import LiveStatsCards from "./LiveStatsCards";
+import TelegramReportSendModal from "./TelegramReportSendModal";
 import { buildPulledVirtualOrders, originalOrderIdOf, pulledOrdersForDay } from "./liveOrderPickPull";
 import LiveStatsPanel from "./LiveStatsPanel";
 import SalesAnalysisPanel from "./SalesAnalysisPanel";
@@ -710,6 +711,21 @@ export default function AdminLiveDashboard() {
     typeof window !== "undefined" && !!window.sessionStorage.getItem(LIVE_ORDERS_FILTERS_KEY)
   );
   const [broadcastEndSummary, setBroadcastEndSummary] = useState<LiveBroadcastEndSummary | null>(null);
+  // [2026-10-22] 방송 종료 뒤 텔레그램 결산 보내기 창(포인트 사용금액 직접 입력 가능)
+  const [tgEndModal, setTgEndModal] = useState<{ title: string; pointUsedActual: number } | null>(null);
+  const [tgEndSending, setTgEndSending] = useState(false);
+  const sendEndReport = async (pointUsedManual: number | null) => {
+    if (tgEndSending) return;
+    setTgEndSending(true);
+    try {
+      const r = await fetch("/api/admin-live/telegram", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "send-report", auto: true, pointUsedManual }) });
+      const j = await r.json().catch(() => null);
+      if (j?.ok) { showAdminToast("방송 결산을 텔레그램으로 보냈어요.", "success"); setTgEndModal(null); }
+      else showAdminToast("텔레그램 전송 실패\n\n" + (j?.reason || j?.error || "설정 › 텔레그램에서 봇 연결을 확인하세요"), "error");
+    } catch (e) {
+      showAdminToast("텔레그램 전송 실패\n\n" + (e instanceof Error ? e.message : String(e)), "error");
+    } finally { setTgEndSending(false); }
+  };
   // [2026-09-08] 방송 시작 확인창 — 헤더의 제목·URL 을 받아 두었다가 확인 시 시작한다
   const [broadcastStartDraft, setBroadcastStartDraft] = useState<{ title: string; youtubeUrl?: string } | null>(null);
 
@@ -1647,12 +1663,18 @@ export default function AdminLiveDashboard() {
       await loadOrders();
       setBroadcastEndSummary(summary);
 
-      // 방송 종료 → 텔레그램 결산 자동 발송(곁다리·실패해도 종료엔 영향 없음). 토글/연결은 서버에서 판단.
-      void fetch("/api/admin-live/telegram", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "send-report", auto: true }),
-      }).catch(() => {});
+      // 방송 종료 → 텔레그램 결산(곁다리·실패해도 종료엔 영향 없음).
+      // [2026-10-22 사장님] 보내기 전 작은 창에서 포인트 사용금액을 직접 넣을 수 있게(비우면 실제값). 자동발송 토글이 꺼져 있으면 창도 안 띄움.
+      void (async () => {
+        try {
+          const st = await fetch("/api/admin-live/telegram", { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+          if (!st?.ok || st.reportOnEnd === false) return;
+          const bc = activeBroadcast;
+          const paidInBroadcast = orders.filter((o) => (o.broadcastId === bc.id || isOrderInsideBroadcastTime(o.createdAt, bc)) && !o.pickPull && o.paymentStatus !== "canceled" && ["paid", "auto_paid", "manual_paid", "card_paid"].includes(o.paymentStatus));
+          const pointUsedActual = paidInBroadcast.reduce((sum, o) => sum + Math.max(0, Number(o.pointUsedAmount || 0)), 0);
+          setTgEndModal({ title: bc.public_title || "방송", pointUsedActual });
+        } catch { /* 결산 창 못 띄워도 종료엔 영향 없음 */ }
+      })();
     } catch (error) {
       showAdminToast("방송종료 실패\n\n" + (error instanceof Error ? error.message : String(error)), "error");
     } finally {
@@ -2091,6 +2113,16 @@ export default function AdminLiveDashboard() {
             onConfirm={confirmStartBroadcast}
           />
 
+          {tgEndModal ? (
+            <TelegramReportSendModal
+              title="방송 결산 텔레그램"
+              scopeLabel={`${tgEndModal.title} · 방송 시작~종료`}
+              pointUsedActual={tgEndModal.pointUsedActual}
+              sending={tgEndSending}
+              onClose={() => setTgEndModal(null)}
+              onSend={sendEndReport}
+            />
+          ) : null}
           {broadcastEndSummary ? (
             <LiveBroadcastEndSummaryModal
               summary={broadcastEndSummary}

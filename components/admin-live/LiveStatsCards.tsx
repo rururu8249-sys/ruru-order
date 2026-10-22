@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { LiveOrder } from "./types";
 import { showAdminToast } from "@/lib/adminToast";
+import TelegramReportSendModal from "./TelegramReportSendModal";
+import { formatSettlementReport } from "@/lib/telegramReportFormat";
 
 type Props = {
   orders: LiveOrder[];
@@ -27,6 +29,8 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
   const [tgSending, setTgSending] = useState(false);
   // [2026-10-22 폰] 숫자 띠는 폰에서 한 줄 요약(받은 돈 · 미결제) + 「펼치기」. PC 는 그대로
   const [mobileOpen, setMobileOpen] = useState(false);
+  // [2026-10-22 사장님] 보내기 전 포인트 사용금액 직접 입력 창
+  const [tgModalOpen, setTgModalOpen] = useState(false);
   // [2026-08-31 사장님 지적] 필터를 골라놨는데 오늘/방송 기준으로 갔다 → 지금 화면(현재 조회범위) 숫자 그대로 보낸다.
   const sendTelegramReport = async (text: string) => {
     if (tgSending) return;
@@ -105,40 +109,36 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
     },
   ];
 
-  // 지금 화면 숫자 그대로 만드는 보고 텍스트 (심플 — 사장님 확정 스타일)
-  const buildRangeReportText = () => {
+  // 지금 화면 숫자 그대로 만드는 보고 텍스트 — [2026-10-22] 문구는 lib/telegramReportFormat(방송 종료 결산과 같은 형식)
+  const pointUsedActual = paidOrders.reduce((s2, o) => s2 + Math.max(0, Number(o.pointUsedAmount || 0)), 0);
+  const buildRangeReportText = (pointUsedManual: number | null) => {
     const bankUnpaidSum = bankUnpaid.reduce((s2, o) => s2 + Number(o.totalAmount || 0), 0);
     const cardUnpaidSum = cardUnpaid.reduce((s2, o) => s2 + Number(o.totalAmount || 0), 0);
-    // 잘나간 상품 TOP3 (결제완료 · 수량)
+    // 상품별 판매개수(결제완료 · 상품명 기준 · 이벤트 선물 제외)
     const qtyByProduct = new Map<string, number>();
-    const spentByCustomer = new Map<string, number>();
     for (const o of paidOrders) {
-      const items = Array.isArray(o.items) ? o.items : [];
-      for (const it of items) {
+      for (const it of Array.isArray(o.items) ? o.items : []) {
+        if (it.eventGiftWinnerId) continue;
         const name = String(it.productName || "").trim() || "상품";
         qtyByProduct.set(name, (qtyByProduct.get(name) || 0) + (Number(it.qty) || 1));
       }
-      const nick = String(o.nickname || o.name || "").trim() || "이름없음";
-      spentByCustomer.set(nick, (spentByCustomer.get(nick) || 0) + Number(o.totalAmount || 0));
     }
-    const top3 = [...qtyByProduct.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
-    const big3 = [...spentByCustomer.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
-    const lines = [
-      `📊 조회범위 보고 — ${criteriaLabel}`,
-      "",
-      `📦 상품값 ${money(goodsPaid)}`,
-      `💳 실제 받은 돈 ${money(paidAmount)} · ${paidOrders.length}건`,
-      `⏳ 미입금 ${money(bankUnpaidSum + cardUnpaidSum)} (무통장 ${bankUnpaid.length}건 · 카드 ${cardUnpaid.length}건)`,
-    ];
-    if (top3.length > 0) {
-      lines.push("", "🏆 잘나간 상품 TOP3");
-      top3.forEach(([name, qty], i) => lines.push(`${i + 1}. ${name} — ${qty}개`));
-    }
-    if (big3.length > 0) {
-      lines.push("", "🧑 큰손 TOP3");
-      big3.forEach(([nick, amt], i) => lines.push(`${i + 1}. ${nick} — ${money(amt)}`));
-    }
-    return lines.join("\n");
+    return formatSettlementReport({
+      kind: "조회범위 보고",
+      title: criteriaLabel,
+      when: "",
+      paidSum: paidAmount,
+      paidCount: paidOrders.length,
+      bankPaidSum: bankPaid.reduce((s2, o) => s2 + Number(o.totalAmount || 0), 0),
+      cardPaidSum: cardPaid.reduce((s2, o) => s2 + Number(o.totalAmount || 0), 0),
+      goodsSum: goodsPaid,
+      pointUsedActual,
+      pointUsedManual,
+      unpaidSum: bankUnpaidSum + cardUnpaidSum,
+      unpaidBankCount: bankUnpaid.length,
+      unpaidCardCount: cardUnpaid.length,
+      products: [...qtyByProduct.entries()].map(([name, qty]) => ({ name, qty })),
+    });
   };
 
   const unpaidTotal = bankUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0)+cardUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0);
@@ -162,11 +162,21 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
       <span className="text-ink-soft" title="무통장 주문 중 미입금·매칭필요 금액">미입금 <span className="text-warn-tx">{money(bankUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
       <span className="text-ink-soft">카드미결제 <span className="text-warn-tx">{money(cardUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
       <span className="text-ink-soft" title="미입금 + 카드미결제 — 아직 못 받은 돈 전체">미결제 합계 <span className="text-danger-tx">{money(bankUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0)+cardUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0))}</span></span>
+      {tgModalOpen ? (
+        <TelegramReportSendModal
+          title="텔레그램 보고"
+          scopeLabel={criteriaLabel}
+          pointUsedActual={pointUsedActual}
+          sending={tgSending}
+          onClose={() => setTgModalOpen(false)}
+          onSend={async (manual) => { await sendTelegramReport(buildRangeReportText(manual)); setTgModalOpen(false); }}
+        />
+      ) : null}
       <button
         type="button"
         disabled={tgSending}
-        onClick={() => void sendTelegramReport(buildRangeReportText())}
-        title="지금 화면(현재 조회범위·필터) 숫자 그대로 텔레그램으로 — 상품값·실제 받은 돈·미입금·TOP3"
+        onClick={() => setTgModalOpen(true)}
+        title="지금 화면(현재 조회범위·필터) 숫자 그대로 텔레그램으로 — 매출·상품값·포인트·미결제·상품별 판매개수"
         className="ml-auto shrink-0 rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft transition hover:bg-surface-2 disabled:opacity-50"
       >
         {tgSending ? "전송 중…" : "텔레그램"}

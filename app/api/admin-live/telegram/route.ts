@@ -52,7 +52,10 @@ export async function POST(request: NextRequest) {
       if (auto && !(await readReportOnEnd())) {
         return NextResponse.json({ ok: false, skipped: true, reason: "방송 종료 자동발송 꺼짐" });
       }
-      const text = await buildTodayReport();
+      // [2026-10-22 사장님] 포인트 사용금액 수동 입력(숫자) — 없으면 실제 사용금액
+      const rawManual = (body as any)?.pointUsedManual;
+      const pointUsedManual = rawManual === null || rawManual === undefined || rawManual === "" ? null : Number(rawManual);
+      const text = await buildTodayReport({ pointUsedManual: pointUsedManual != null && Number.isFinite(pointUsedManual) && pointUsedManual >= 0 ? pointUsedManual : null });
       const r = await sendTelegram(text, { forceEvenIfDisabled: !auto });
       return NextResponse.json({ ok: r.ok, skipped: r.skipped, reason: r.reason, preview: text });
     }

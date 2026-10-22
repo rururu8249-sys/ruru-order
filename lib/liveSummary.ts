@@ -66,6 +66,10 @@ export type LiveSummary = {
   buyerRanking: RankBuyer[];
   issues: IssueRow[];
   topBuyer: RankBuyer | null;
+  // [2026-10-22 텔레그램 결산] 결제완료 기준 상품값 합·포인트 사용 합·상품별 수량 전체(많이 팔린 순, 10개 제한 없음)
+  goodsSum: number;
+  pointUsedSum: number;
+  productAll: RankProduct[];
 };
 
 type Group = {
@@ -285,7 +289,11 @@ export async function computeLiveSummary(mode: "broadcast" | "today"): Promise<L
       prodMap.set(name, cur);
     }
   }
-  const productRanking = [...prodMap.values()].sort((a, b) => b.qty - a.qty || b.amount - a.amount).slice(0, 10);
+  const productAll = [...prodMap.values()].sort((a, b) => b.qty - a.qty || b.amount - a.amount);
+  const productRanking = productAll.slice(0, 10);
+  // 상품값 합(이벤트 선물 줄 제외·productAll 과 같은 기준) · 포인트 사용 합(결제완료 줄의 point_used_amount)
+  const goodsSum = productAll.reduce((s, p) => s + p.amount, 0);
+  const pointUsedSum = paid.reduce((s, g) => s + g.rows.reduce((t, r) => t + Math.max(0, num(r.point_used_amount)), 0), 0);
 
   // 구매자 랭킹(전화번호로 합산, 결제완료)
   const buyerMap = new Map<string, RankBuyer>();
@@ -330,5 +338,8 @@ export async function computeLiveSummary(mode: "broadcast" | "today"): Promise<L
     buyerRanking,
     issues,
     topBuyer: buyerRanking[0] || null,
+    goodsSum,
+    pointUsedSum,
+    productAll,
   };
 }

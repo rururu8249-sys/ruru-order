@@ -107,7 +107,7 @@ export async function detectChatIdFromUpdates(): Promise<{
     if (!res.ok || !j?.ok) {
       const d = String(j?.description || `HTTP ${res.status}`);
       // 웹훅이 걸려 있으면 getUpdates가 막힘 — 안내
-      return { ok: false, reason: d.includes("webhook") ? "봇에 웹훅이 설정돼 있어 자동탐지가 막혔어요(보통 없음)." : d };
+      return { ok: false, reason: d.includes("webhook") ? "봇에 웹훅이 설정돼 있어 자동탐지가 막혔어요(보통 없음)." : explainTelegramError(d) };
     }
     const updates: any[] = Array.isArray(j.result) ? j.result : [];
     const chats = new Map<string, string>();
@@ -139,6 +139,17 @@ export async function detectChatIdFromUpdates(): Promise<{
   } catch (e: any) {
     return { ok: false, reason: String(e?.message || e) };
   }
+}
+
+// [2026-10-22 실측] 모든 수신자가 「Not Found」 = 봇 토큰이 틀렸거나 BotFather 에서 바뀐 것(텔레그램이 404) —
+//   사장님이 바로 알 수 있게 한국어로. 그 외 메시지는 그대로.
+export function explainTelegramError(raw: string): string {
+  const text = String(raw || "");
+  if (!text) return "";
+  if (/Not Found/i.test(text) && !/chat not found/i.test(text)) return "봇 토큰이 맞지 않아요 — 설정 › 방송·알림 › 텔레그램에서 BotFather 토큰을 다시 저장하세요";
+  if (/chat not found/i.test(text)) return "받는 사람(chat id)을 찾지 못했어요 — 봇에 /start 를 보낸 뒤 「자동 탐지」를 눌러주세요";
+  if (/can't parse entities/i.test(text)) return "문구에 특수문자가 있어 텔레그램이 거부했어요(다시 시도)";
+  return text;
 }
 
 // 메시지 발송. 실패해도 throw 하지 않음({ok:false}). 설정 없거나 꺼져있으면 skip.
@@ -179,5 +190,5 @@ export async function sendTelegram(
     }
   }
   if (anyOk) return { ok: true, reason: errs.length ? `일부 실패: ${errs.join("; ")}` : undefined };
-  return { ok: false, reason: errs.join("; ") || "발송 실패" };
+  return { ok: false, reason: explainTelegramError(errs.join("; ")) || "발송 실패" };
 }
