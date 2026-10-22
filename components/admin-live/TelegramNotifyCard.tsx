@@ -19,6 +19,9 @@ export default function TelegramNotifyCard({onDraftStateChange}:SettingsDraftPro
   // 서버에 «저장된» 토글 값 (화면 값과 달라지면 「아직 저장 안 됨」 표시)
   const [savedToggles, setSavedToggles] = useState<{ enabled: boolean; reportOnEnd: boolean } | null>(null);
   const [testing, setTesting] = useState(false);
+  // [2026-10-23] 저장된 토큰 힌트(봇 번호만)·모양 문제 — 토큰이 틀려 전송이 안 되던 것을 화면에서 바로 알게
+  const [tokenHint, setTokenHint] = useState("");
+  const [tokenFormatIssue, setTokenFormatIssue] = useState("");
 
   const loadStatus = async () => {
     try {
@@ -30,6 +33,8 @@ export default function TelegramNotifyCard({onDraftStateChange}:SettingsDraftPro
         setChatIdSet(!!j.chatIdSet);
         setRecipientCount(Number(j.recipientCount || 0));
         setReportOnEnd(j.reportOnEnd !== false);
+        setTokenHint(String(j.tokenHint || ""));
+        setTokenFormatIssue(String(j.tokenFormatIssue || ""));
         // 저장된 값 기억 — 체크박스를 바꿨는데 저장 안 한 상태를 화면에 알려주기 위해
         setSavedToggles({ enabled: j.enabled !== false, reportOnEnd: j.reportOnEnd !== false });
       }
@@ -57,7 +62,7 @@ export default function TelegramNotifyCard({onDraftStateChange}:SettingsDraftPro
         body: JSON.stringify(body),
       });
       const j = await r.json();
-      if (r.ok && j.ok) showAdminToast("텔레그램 설정을 저장했습니다.", "success");
+      if (r.ok && j.ok) showAdminToast(j.botName ? `텔레그램 설정을 저장했습니다. 봇 ${j.botName} 연결 확인됐어요.` : "텔레그램 설정을 저장했습니다.", "success");
       else showAdminToast("저장 실패\n\n" + (j.error || ""), "error");
       if (r.ok && j.ok) {
         setBotToken("");
@@ -91,7 +96,7 @@ export default function TelegramNotifyCard({onDraftStateChange}:SettingsDraftPro
         showAdminToast(`연결됐어요${j.name ? ` — ${j.name}` : ""} (번호 ${j.chatId}). 이제 테스트 보내기를 눌러보세요.`, "success");
         loadStatus();
       } else {
-        showAdminToast(`아직 못 찾았어요 — ② 봇에게 말을 한 번 보냈는지 확인한 뒤 다시 눌러주세요.\n\n(${j.reason || j.error || "응답 없음"})`, "error");
+        showAdminToast(j.tokenInvalid ? `봇 토큰부터 고쳐야 해요.\n\n${j.reason}` : `아직 못 찾았어요 — ② 봇에게 말을 한 번 보냈는지 확인한 뒤 다시 눌러주세요.\n\n(${j.reason || j.error || "응답 없음"})`, "error");
       }
     } catch (e: any) {
       showAdminToast("실패\n\n" + (e?.message || e), "error");
@@ -147,7 +152,8 @@ export default function TelegramNotifyCard({onDraftStateChange}:SettingsDraftPro
       </div>
 
       <div className={`rounded-xl border border-line px-3 py-2 text-xs font-black ${connected ? "bg-ok-bg text-ok-tx" : "bg-warn-bg text-warn-tx"}`}>
-        {connected ? `연결됨 · 받는 사람 ${recipientCount}명` : "연결 안 됨"}
+        {connected ? `저장됨 · 받는 사람 ${recipientCount}명${tokenHint ? ` · ${tokenHint}` : ""}` : "연결 안 됨"}
+        {tokenFormatIssue ? <div className="mt-1 font-semibold text-danger-tx">저장된 토큰 문제: {tokenFormatIssue}</div> : null}
       </div>
 
       {/* ① 봇 토큰 */}

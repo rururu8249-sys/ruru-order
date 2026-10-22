@@ -37,3 +37,11 @@ assert.match(explainTelegramError('7176683355: Not Found; 7894355184: Not Found'
 assert.match(explainTelegramError('123: Bad Request: chat not found'), /chat id/);
 assert.equal(explainTelegramError('123: Forbidden: bot was blocked by the user'), '123: Forbidden: bot was blocked by the user');
 console.log('test-telegram-report-format: ok');
+// [2026-10-23] 토큰 모양 검사
+const { telegramTokenFormatIssue, telegramTokenHint } = load('lib/telegram.ts');
+assert.equal(telegramTokenFormatIssue('7123456789:AAHabcdefghijklmnopqrstuvwxyz0123456789'), '');
+assert.match(telegramTokenFormatIssue('bot7123456789:AAHabcdefghijklmnopqrstuvwxyz0123456789'), /bot/);
+assert.match(telegramTokenFormatIssue('7123456789:AAHabc defghijklmnopqrstuvwxyz0123456789'), /공백/);
+assert.match(telegramTokenFormatIssue('abc'), /모양/);
+assert.equal(telegramTokenHint('7123456789:AAHx'), '봇 번호 7123456789');
+console.log('token format: ok');

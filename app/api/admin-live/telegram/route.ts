@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import {
+  checkTelegramBotToken,
   detectChatIdFromUpdates,
   getTelegramStatus,
   readReportOnEnd,
@@ -34,13 +35,20 @@ export async function POST(request: NextRequest) {
 
   try {
     if (action === "save") {
+      // [2026-10-23] 토큰을 새로 넣으면 저장 전에 텔레그램(getMe)으로 확인 — 틀린 토큰이 조용히 저장돼 「전송 안 됨」으로만 보이던 것 방지
+      let botName = "";
+      if (typeof (body as any)?.botToken === "string" && String((body as any).botToken).trim()) {
+        const check = await checkTelegramBotToken(String((body as any).botToken));
+        if (!check.ok) return NextResponse.json({ ok: false, error: `봇 토큰 확인 실패 — ${check.reason}` }, { status: 400 });
+        botName = check.botName || "";
+      }
       await saveTelegramConfig({
         botToken: typeof (body as any)?.botToken === "string" ? (body as any).botToken : undefined,
         chatId: typeof (body as any)?.chatId === "string" ? (body as any).chatId : undefined,
         enabled: typeof (body as any)?.enabled === "boolean" ? (body as any).enabled : undefined,
       });
       if (typeof (body as any)?.reportOnEnd === "boolean") await writeReportOnEnd((body as any).reportOnEnd);
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true, botName });
     }
     if (action === "detect-chat") {
       const r = await detectChatIdFromUpdates();

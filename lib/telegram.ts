@@ -78,10 +78,41 @@ export async function writeReportOnEnd(on: boolean): Promise<void> {
   }
 }
 
-export async function getTelegramStatus(): Promise<{ connected: boolean; enabled: boolean; chatIdSet: boolean; recipientCount: number }> {
+/** 토큰 모양(숫자:영문숫자) — 공백·따옴표·「bot」 접두어 등 흔한 실수 잡기 */
+export function telegramTokenFormatIssue(token: string): string {
+  const t = String(token ?? "");
+  if (!t.trim()) return "토큰이 비어 있어요";
+  if (/\s/.test(t.trim())) return "토큰 안에 공백·줄바꿈이 섞였어요(한 줄로 붙여넣기)";
+  if (/^bot/i.test(t.trim())) return "앞의 「bot」 글자는 빼고 숫자부터 넣어주세요";
+  if (!/^\d{6,12}:[A-Za-z0-9_-]{30,}$/.test(t.trim())) return "토큰 모양이 달라요(예: 7123456789:AAH… — BotFather 「API Token」 그대로)";
+  return "";
+}
+
+/** 토큰 힌트(비밀 아님 — 콜론 앞 봇 번호만) */
+export function telegramTokenHint(token: string): string {
+  const head = String(token ?? "").trim().split(":")[0] || "";
+  return head ? `봇 번호 ${head}` : "";
+}
+
+/** 텔레그램 getMe 로 토큰 실제 확인 — 봇 이름 돌려줌. 404 Not Found = 토큰이 틀리거나 BotFather 에서 바뀜. */
+export async function checkTelegramBotToken(token: string): Promise<{ ok: boolean; botName?: string; reason?: string }> {
+  const formatIssue = telegramTokenFormatIssue(token);
+  if (formatIssue) return { ok: false, reason: formatIssue };
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token.trim()}/getMe`);
+    const j: any = await res.json().catch(() => ({}));
+    if (res.ok && j?.ok) return { ok: true, botName: String(j.result?.username ? `@${j.result.username}` : j.result?.first_name || "") };
+    const d = String(j?.description || `HTTP ${res.status}`);
+    return { ok: false, reason: /Not Found|Unauthorized/i.test(d) ? `텔레그램이 이 토큰을 모릅니다(${telegramTokenHint(token)}) — BotFather 에서 Revoke 됐거나 다른 봇 토큰이에요. /mybots › API Token 을 다시 복사하세요` : d };
+  } catch (e: any) {
+    return { ok: false, reason: String(e?.message || e) };
+  }
+}
+
+export async function getTelegramStatus(): Promise<{ connected: boolean; enabled: boolean; chatIdSet: boolean; recipientCount: number; tokenHint: string; tokenFormatIssue: string }> {
   const cfg = await readTelegramConfig();
   const ids = parseChatIds(cfg.chatId);
-  return { connected: !!cfg.botToken && ids.length > 0, enabled: cfg.enabled, chatIdSet: ids.length > 0, recipientCount: ids.length };
+  return { connected: !!cfg.botToken && ids.length > 0, enabled: cfg.enabled, chatIdSet: ids.length > 0, recipientCount: ids.length, tokenHint: telegramTokenHint(cfg.botToken), tokenFormatIssue: cfg.botToken ? telegramTokenFormatIssue(cfg.botToken) : "" };
 }
 
 // 봇에 /start(또는 아무 메시지) 보낸 기록(getUpdates)에서 실제 chat id를 읽어와 저장한다.
@@ -92,6 +123,7 @@ export async function detectChatIdFromUpdates(): Promise<{
   name?: string;
   candidates?: { id: string; name: string }[];
   reason?: string;
+  tokenInvalid?: boolean;
 }> {
   let cfg: TelegramConfig;
   try {
@@ -100,6 +132,9 @@ export async function detectChatIdFromUpdates(): Promise<{
     return { ok: false, reason: String(e?.message || e) };
   }
   if (!cfg.botToken) return { ok: false, reason: "봇 토큰을 먼저 저장하세요." };
+  // [2026-10-23] 토큰부터 확인(getMe) — 토큰이 틀리면 /start 를 아무리 보내도 소용없으니 그걸 먼저 알린다
+  const tokenCheck = await checkTelegramBotToken(cfg.botToken);
+  if (!tokenCheck.ok) return { ok: false, reason: tokenCheck.reason, tokenInvalid: true } as any;
 
   try {
     const res = await fetch(`https://api.telegram.org/bot${cfg.botToken}/getUpdates`);
