@@ -47,3 +47,61 @@ export async function callGeminiJson(prompt: string | GeminiPart[], opts: { time
   }
   return { text: null, note };
 }
+
+// ───────────────────────── [2026-10-22 AI 비서 8단계] 도구 호출(function calling) ─────────────────────────
+/** 대화 한 칸: role user/model, parts 는 text·inline_data·functionCall·functionResponse */
+export type GeminiContent = { role: "user" | "model"; parts: GeminiAnyPart[] };
+export type GeminiAnyPart =
+  | { text: string }
+  | { inline_data: { mime_type: string; data: string } }
+  | { functionCall: { name: string; args?: Record<string, unknown> } }
+  | { functionResponse: { name: string; response: Record<string, unknown> } };
+export type GeminiToolDecl = { name: string; description: string; parameters?: Record<string, unknown> };
+export type GeminiChatResult = { parts: GeminiAnyPart[] | null; note: string };
+
+/** 도구 선언과 대화 전체를 보내고, 모델이 돌려준 조각(글/도구 호출)을 그대로 받는다. 예외 없음(실패 = parts null + note). */
+export async function callGeminiChat(
+  contents: GeminiContent[],
+  opts: { tools?: GeminiToolDecl[]; systemInstruction?: string; timeoutMs?: number; maxTokens?: number } = {},
+): Promise<GeminiChatResult> {
+  const key = process.env.GEMINI_API_KEY || "";
+  if (!key) return { parts: null, note: "no_key" };
+  const timeoutMs = opts.timeoutMs ?? 20000;
+  const maxTokens = opts.maxTokens ?? 1536;
+  const models = [process.env.GEMINI_MODEL, "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-3.6-flash", "gemini-flash-latest"].filter(Boolean) as string[];
+  const configs = [
+    { temperature: 0.2, maxOutputTokens: maxTokens, thinkingConfig: { thinkingLevel: "minimal" } },
+    { temperature: 0.2, maxOutputTokens: maxTokens, thinkingConfig: { thinkingBudget: 0 } },
+    { temperature: 0.2, maxOutputTokens: maxTokens * 2 },
+  ];
+  let note = "";
+  for (const model of models) {
+    for (const generationConfig of configs) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const body: Record<string, unknown> = { contents, generationConfig };
+        if (opts.systemInstruction) body.systemInstruction = { parts: [{ text: opts.systemInstruction }] };
+        if (opts.tools && opts.tools.length > 0) body.tools = [{ functionDeclarations: opts.tools }];
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+        if (res.status === 404) { note = `${model}:404`; break; }
+        if (res.status === 400) { note = `${model}:400`; continue; }
+        if (!res.ok) { note = `${model}:http_${res.status}`; break; }
+        const data = await res.json().catch(() => null);
+        const parts = (data?.candidates?.[0]?.content?.parts || []) as GeminiAnyPart[];
+        if (!parts.length) { note = `${model}:empty_${data?.candidates?.[0]?.finishReason || "none"}`; continue; }
+        return { parts, note: model };
+      } catch (e) {
+        return { parts: null, note: `${model}:${e instanceof Error && e.name === "AbortError" ? "timeout" : "fetch_error"}` };
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+  }
+  return { parts: null, note };
+}
