@@ -73,7 +73,7 @@ export async function prepareImage(file: File, onStage: (s: Img["status"]) => vo
         for (const w of line.words || []) {
           if (!w.text?.trim()) continue;
           const k = toCanvasRatio / scale;
-          words.push({ text: w.text, x0: w.bbox.x0 * k, y0: (w.bbox.y0 / scale + strip.sy) * toCanvasRatio, x1: w.bbox.x1 * k, y1: (w.bbox.y1 / scale + strip.sy) * toCanvasRatio, line: lineNo });
+          words.push({ text: w.text, x0: w.bbox.x0 * k, y0: (w.bbox.y0 / scale + strip.sy) * toCanvasRatio, x1: w.bbox.x1 * k, y1: (w.bbox.y1 / scale + strip.sy) * toCanvasRatio, line: lineNo, confidence: typeof w.confidence === "number" ? w.confidence : undefined });
         }
       }
     }

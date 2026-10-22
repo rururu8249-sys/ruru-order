@@ -5,7 +5,7 @@
 //   안 가리는 것(실측 보정 10/22): 날짜 2026.10.18 · 시간 23:17 · 쉼표 금액 29,000 · 「원/개/년/월/일」 바로 앞 숫자 — 가격·날짜는 응대에 필요.
 //   못 가리는 것: 이름·닉네임(일반 단어와 구분 불가) — 화면에 안내.
 
-export type OcrWord = { text: string; x0: number; y0: number; x1: number; y1: number; line?: number };
+export type OcrWord = { text: string; x0: number; y0: number; x1: number; y1: number; line?: number; confidence?: number };
 export type MaskBox = { x0: number; y0: number; x1: number; y1: number; reason: "number" | "address" };
 
 const ADDRESS_WORD = /(특별시|광역시|자치시|자치도|[가-힣]{1,6}(시|군|구)$|[가-힣]{1,8}(동|읍|면|리)$|[가-힣0-9]{1,10}(로|길)$|아파트|빌라|오피스텔|\d+동$|\d+호$|번지)/;
@@ -28,6 +28,8 @@ export function pickMaskBoxes(words: OcrWord[]): MaskBox[] {
   words.forEach((w, i) => {
     const digits = w.text.replace(/\D/g, "");
     if (digits.length < 4) return;
+    // 털·무늬 사진에서 글자 인식기가 지어낸 숫자(확신도 낮음)는 가리지 않는다(실측 10/22: 버버리 자수 사진 가운데 검은 띠)
+    if (typeof w.confidence === "number" && (w.confidence < 40 || (w.confidence < 60 && digits.length < 7))) return;
     if (isPlainNumberWord(w.text)) return;
     const prevWord = words[i - 1];
     if (prevWord && /^(오전|오후)$/.test(prevWord.text.trim()) && digits.length <= 4) return; // 「오전 11:47」을 OCR 이 1147 로 읽어도 시각
@@ -42,7 +44,7 @@ export function pickMaskBoxes(words: OcrWord[]): MaskBox[] {
   for (const line of byLine.values()) {
     // 「230으로」「2번으로」 같은 조사 «으로»는 길 이름이 아니다(실측 10/22: 사이즈·횟수가 주소로 가려짐)
     //   OCR 이 「230 으로」로 쪼개면 「으로」 홀로, 「2개면」은 「…면」 — 전부 주소 아님
-    const addrCount = line.filter((w) => { const t = w.text.trim(); return ADDRESS_WORD.test(t) && !/(으로|번으로|쪽으로)$/.test(t) && !/^(으로|로|길)$/.test(t) && !/^\d+(개|번|명|장|매|회|켤레)[가-힣]*$/.test(t); }).length;
+    const addrCount = line.filter((w) => { const t = w.text.trim(); if (typeof w.confidence === "number" && w.confidence < 50) return false; return ADDRESS_WORD.test(t) && !/(으로|번으로|쪽으로)$/.test(t) && !/^(으로|로|길)$/.test(t) && !/^\d+(개|번|명|장|매|회|켤레)[가-힣]*$/.test(t); }).length;
     // 「15,000원」「1개」 같은 가격·수량은 숫자로 안 쳐서(「우리 15,000원 보냈어요」 줄이 통째로 가려지지 않게)
     const hasNumber = line.some((w, i) => /\d/.test(w.text) && !isPlainNumberWord(w.text) && !(line[i + 1] && UNIT_AFTER.test(line[i + 1].text.trim())));
     if (addrCount >= 2 || (addrCount >= 1 && hasNumber)) {

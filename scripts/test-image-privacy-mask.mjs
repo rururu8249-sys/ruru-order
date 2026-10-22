@@ -74,3 +74,10 @@ t('[10/22] 「230으로 보내주세요」「2번으로 나눠서」 는 주소 
   assert.equal(boxes.filter((b) => b.reason === 'number').length, 1);
 });
 console.log('size-word ok');
+
+t('[10/22] 확신도 낮은 숫자(털 무늬에서 지어낸 글자)는 안 가림 · 확신도 높은 계좌는 가림', () => {
+  const W = (text, i, line, confidence) => ({ text, x0: i * 60, y0: line * 30, x1: i * 60 + 50, y1: line * 30 + 20, line, confidence });
+  const boxes = lib.pickMaskBoxes([W('1l7l1', 0, 0, 22), W('4567', 1, 0, 55), W('9002186993725', 0, 1, 88), W('01012345678', 0, 2, 45)]);
+  assert.deepEqual(boxes.map((b) => b.y0 / 30), [1, 2]);
+});
+console.log('confidence ok');
