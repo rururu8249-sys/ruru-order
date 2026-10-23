@@ -100,7 +100,7 @@ assert.ok(text().includes('미결제 2 · 지난 주문 1개 포함'), '같은 �
 assert.ok(text().includes('다른 출고로 넘긴 상품 1개는 여기서 뺐어요'));
 assert.ok(!text().includes('넘겨받'), '어색한 「넘겨받음」 문구 없음');
 // 챙길 = 결제완료 3+1+1(지난)+1(블랙M 7) = 6
-assert.ok(text().includes('더 챙길 6개') && text().includes('챙긴 0 / 주문 6'), '머리는 «더 챙길 N개»가 크게');
+assert.ok(text().includes('챙겨야 할 남은 수량 6개') && text().includes('챙긴 0 / 총 주문수량 6'), '머리는 «더 챙길 N개»가 크게');
 assert.ok(/\d+건 한꺼번에 체크/.test(text()), '옵션 줄 한 번에 체크(결제완료·안 챙긴 것만, 2건 이상일 때만)');
 assert.ok(!text().includes('개 챙김'), '옛 「남은 n개 챙김」 문구 없음');
 const nodeText = (n) => typeof n === 'string' ? n : (n.children || []).map(nodeText).join('');
@@ -145,7 +145,7 @@ await act(async () => { await rowBtn('고객6').props.onClick(); });
 assert.deepEqual(writes.at(-1).ids.map(String), ['7']);
 // 요약 = 손님 이름 없이 옵션별 개수
 await act(async () => tabs[0].props.onClick());
-assert.ok(text().includes('색상사이즈주문 수량더 챙길 수량') && text().includes('레드S7개') && !text().includes('고객1'), '요약 = 색상|사이즈|개수|남은 표, 손님 이름 없음');
+assert.ok(text().includes('색상사이즈총 주문수량챙겨야 할 남은 수량') && text().includes('레드S7개') && !text().includes('고객1'), '요약 = 색상|사이즈|개수|남은 표, 손님 이름 없음');
 // 전부 해제 — 확인 뒤 보이는 챙긴 줄만 false
 const un = tree.root.findAll(n => n.type === 'button' && nodeText0(n) === '전부 해제')[0];
 await act(async () => { await un.props.onClick(); });

@@ -421,7 +421,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
             <div className="mt-3">
               <div className="flex items-end justify-between gap-2">
                 <div className="tabular-nums">{loading ? <span className="text-[16px] font-bold text-ink">확인 중…</span> : remainPaid > 0
-                  ? <><span className="text-[20px] font-bold text-ink">더 챙길 {remainPaid}개</span><span className="ml-2 text-[13px] font-semibold text-ink-soft">챙긴 {gotPaid} / 주문 {totalPaid}</span></>
+                  ? <><span className="text-[20px] font-bold text-ink">챙겨야 할 남은 수량 {remainPaid}개</span><span className="ml-2 text-[13px] font-semibold text-ink-soft">챙긴 {gotPaid} / 총 주문수량 {totalPaid}</span></>
                   : <span className="text-[20px] font-bold text-ok-tx">{totalPaid > 0 ? `✓ 다 챙겼어요 · ${totalPaid}개` : "챙길 상품 없음"}</span>}</div>
                 <div className="text-[13px] text-ink-soft tabular-nums">{unpaidQty ? <span className="font-semibold text-danger-tx">미결제 {unpaidQty}개 따로</span> : null}</div>
               </div>
@@ -472,10 +472,10 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                         <span className={`min-w-0 break-words text-[14px] font-bold ${c.done ? "text-ink-mute" : "text-ink"}`}>{g.name}</span>
                         <span className="shrink-0 text-[16px] font-bold text-ink tabular-nums">총 {c.all}개</span>
                       </div>
-                      {/* [15:18 사장님 「S 8 · M 5 저따위 말고 — 색상·사이즈·개수 구분 확실히」] 옵션마다 한 줄: 색상 | 사이즈 | 주문 수량 | 더 챙길 수량(16:25 「개수·남은」 뜻 모호 → 피킹표 표준 주문 수량/남은 수량) */}
+                      {/* [15:18 사장님 「S 8 · M 5 저따위 말고 — 색상·사이즈·개수 구분 확실히」] 옵션마다 한 줄: 색상 | 사이즈 | 주문 수량 | 총 주문수량 | 챙겨야 할 남은 수량(16:28 사장님 확정, 16:25 「개수·남은」 뜻 모호 → 피킹표 표준 주문 수량/남은 수량) */}
                       <div className="mt-1.5 overflow-hidden rounded-lg border border-line">
-                        <div className="grid grid-cols-[minmax(0,1fr)_56px_64px_80px] bg-surface-2 px-2 py-1 text-[12px] font-semibold text-ink-mute">
-                          <span>색상</span><span>사이즈</span><span className="text-right">주문 수량</span><span className="text-right">더 챙길 수량</span>
+                        <div className="grid grid-cols-[minmax(0,1fr)_52px_64px_84px] bg-surface-2 px-2 py-1 text-[12px] font-semibold text-ink-mute">
+                          <span>색상</span><span>사이즈</span><span className="text-right leading-tight">총 주문수량</span><span className="text-right leading-tight">챙겨야 할 남은 수량</span>
                         </div>
                         {g.options.map((rows) => {
                           const oc = countLine(rows);
@@ -485,7 +485,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                           const size = stripNoneOptionParts(rows[0].size) || (rows[0].color || rows[0].size ? "-" : (rows[0].optionText || "-"));
                           return (
                             <div key={optionKey(rows[0])} className={`border-t border-line px-2 py-1.5 ${oc.done ? "bg-surface-2" : ""}`}>
-                              <div className="grid grid-cols-[minmax(0,1fr)_56px_64px_80px] items-center">
+                              <div className="grid grid-cols-[minmax(0,1fr)_52px_64px_84px] items-center">
                                 <span className={`min-w-0 break-words text-[14px] font-semibold ${oc.done ? "text-ink-mute" : "text-ink"}`}>{color}</span>
                                 <span className={`text-[14px] font-bold ${oc.done ? "text-ink-mute" : "text-ink"}`}>{size}</span>
                                 <span className={`text-right text-[16px] font-bold tabular-nums ${oc.done ? "text-ink-mute" : "text-ink"}`}>{oc.all}개</span>
@@ -513,7 +513,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                 <div key={gKey} className="mb-2 flex w-full items-center gap-2 rounded-xl border border-line bg-surface py-1 pl-3 pr-1">
                   {c.done ? <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-ink text-white" aria-hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5 10 17.5 19 7" /></svg></span> : null}
                   <span className={`min-w-0 flex-1 truncate text-[14px] font-semibold ${c.done ? "text-ink-mute" : "text-ink"}`}>{g.name}</span>
-                  <span className={`shrink-0 text-[13px] font-semibold tabular-nums ${c.done ? "text-ink-mute" : "text-danger-tx"}`}>{c.done ? `${c.total}개 다 챙김` : `더 챙길 ${c.total - c.got}개`}</span>
+                  <span className={`shrink-0 text-[13px] font-semibold tabular-nums ${c.done ? "text-ink-mute" : "text-danger-tx"}`}>{c.done ? `${c.total}개 다 챙김` : `챙겨야 할 남은 수량 ${c.total - c.got}개`}</span>
                   {foldButton(gKey)}
                 </div>
               );
@@ -577,7 +577,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                 <div key={head.customerKey} className="mb-2 flex w-full items-center gap-2 rounded-xl border border-line bg-surface py-1 pl-3 pr-1">
                   {c.done ? <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-ink text-white" aria-hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5 10 17.5 19 7" /></svg></span> : null}
                   <span className={`min-w-0 flex-1 truncate text-[14px] font-semibold ${c.done ? "text-ink-mute" : "text-ink"}`}>{head.nickname}{head.name && head.name !== head.nickname ? ` ${head.name}` : ""}</span>
-                  <span className={`shrink-0 text-[13px] font-semibold tabular-nums ${c.done ? "text-ink-mute" : "text-danger-tx"}`}>{c.done ? `${c.total}개 다 챙김` : `더 챙길 ${c.total - c.got}개`}</span>
+                  <span className={`shrink-0 text-[13px] font-semibold tabular-nums ${c.done ? "text-ink-mute" : "text-danger-tx"}`}>{c.done ? `${c.total}개 다 챙김` : `챙겨야 할 남은 수량 ${c.total - c.got}개`}</span>
                   {foldButton(head.customerKey)}
                 </div>
               );
