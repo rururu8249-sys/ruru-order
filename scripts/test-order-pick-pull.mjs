@@ -1,23 +1,37 @@
-// [2026-10-22] 「지난 주문 가져오기」 시뮬레이션 — 넣기 → 오늘 주문서 가상 묶음 → 송장·챙기기 엑셀 표기 → 빼기 원복.
+// [2026-10-22 → 10-23 «출고 넘기기»] 시뮬레이션 — 넣기 → 오늘 주문서 가상 묶음 → 송장·챙기기 엑셀 표기 → 빼기 원복.
 //   돈·입금·정산 숫자 불변(가상 묶음은 숫자 띠에 안 들어감) · 원래 주문은 그대로(줄에 「가져감」 배지만).
 import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
 import {createUiLoader} from './admin-ui-test-loader.mjs';
 
 const lib = createUiLoader()('lib/orderPickPull.ts');
-const { parsePickPullRequest, pickPullBadgeText, pickPullAwayText, restoreFromPrev, isPickPullKind, shortDateWithWeekday, pulledForOf } = lib;
+const { parsePickPullRequest, pickPullBadgeText, pickPullAwayText, restoreFromPrev, isPickPullKind, shortDateWithWeekday, pulledForOf, pickPullMatchesView, pullTargetLabelForBroadcast, pullTargetLabelForDate } = lib;
 
 // ── 1. 순수 함수 ──
 assert.equal(shortDateWithWeekday('2026-10-18'), '10.18(일)');
 assert.equal(shortDateWithWeekday('2026-10-17T15:30:00+09:00'), '10.17(토)');
-assert.equal(pickPullBadgeText('2026-10-17T15:30:00+09:00', '고객이슈 교환'), '지난 주문 10.17(토) · 고객이슈 교환');
-assert.equal(pickPullBadgeText(null, ''), '지난 주문');
-assert.equal(pickPullAwayText('2026-10-22'), '10.22(목) 로 가져감');
+assert.equal(pickPullBadgeText('2026-10-17T15:30:00+09:00', '고객이슈 교환'), '넘겨받은 주문 10.17(토) · 고객이슈 교환');
+assert.equal(pickPullBadgeText(null, ''), '넘겨받은 주문');
+assert.equal(pickPullAwayText('2026-10-22'), '10.22(목) 출고로 넘김');
+assert.equal(pickPullAwayText('2026-10-22', '10.22(목) 남녀공용의류'), '10.22(목) 남녀공용의류 출고로 넘김');
+assert.equal(pullTargetLabelForBroadcast('남녀공용의류', '2026-10-22T11:00:00Z'), '10.22(목) 남녀공용의류');
+assert.equal(pullTargetLabelForDate('2026-10-23'), '10.23(금) 쇼핑몰 주문');
+// 보이는 곳: 방송으로 넘긴 건 그 방송에서만 / 날짜로 넘긴 건 그 날짜 쇼핑몰에서만 / 옛 기록은 날짜로(그날 시작 방송 포함)
+const bcView = { kind: 'broadcast', broadcastId: 'B22', startedDay: '2026-10-22' };
+assert.ok(pickPullMatchesView({ pulledFor: '2026-10-22', broadcastId: 'B22', target: 'x' }, bcView));
+assert.ok(!pickPullMatchesView({ pulledFor: '2026-10-22', broadcastId: 'B21', target: 'x' }, bcView));
+assert.ok(!pickPullMatchesView({ pulledFor: '2026-10-22', broadcastId: 'B22', target: 'x' }, { kind: 'date', day: '2026-10-22' }), '방송으로 넘긴 건 쇼핑몰 날짜 화면엔 안 붙음');
+assert.ok(pickPullMatchesView({ pulledFor: '2026-10-23', broadcastId: '', target: '10.23(금) 쇼핑몰 주문' }, { kind: 'date', day: '2026-10-23' }));
+assert.ok(!pickPullMatchesView({ pulledFor: '2026-10-22', broadcastId: '', target: '10.22(목) 쇼핑몰 주문' }, bcView), '쇼핑몰 날짜로 넘긴 건 방송엔 안 붙음');
+assert.ok(pickPullMatchesView({ pulledFor: '2026-10-22' }, bcView) && !pickPullMatchesView({ pulledFor: '2026-10-23' }, bcView), '옛 기록=날짜');
+assert.ok(!pickPullMatchesView({ pulledFor: '2026-10-22', broadcastId: 'B22' }, { kind: 'none' }));
 assert.equal(pulledForOf({ pick_pulled_for: '2026-10-22' }), '2026-10-22');
 assert.equal(pulledForOf({ pick_pulled_at: '2026-10-22T23:50:00+09:00' }), '2026-10-22'); // KST 날짜
 assert.equal(pulledForOf({}), '');
-assert.ok(isPickPullKind('지난 주문 10.17(토) · 늦게 입고') && isPickPullKind('10.22(목) 로 가져감') && !isPickPullKind('일반') && !isPickPullKind('결제 후 추가 챙기기'));
-assert.deepEqual(parsePickPullRequest({ action: 'pull', rowIds: ['12', 12, 13, 'x', 0], reason: '  늦게   입고 ' }), { action: 'pull', rowIds: [12, 13], reason: '늦게 입고' });
+assert.ok(isPickPullKind('넘겨받은 주문 10.17(토) · 늦게 입고') && isPickPullKind('10.22(목) 남녀공용의류 출고로 넘김') && isPickPullKind('지난 주문 10.17(토)') && !isPickPullKind('일반') && !isPickPullKind('결제 후 추가 챙기기'));
+assert.deepEqual(parsePickPullRequest({ action: 'pull', rowIds: ['12', 12, 13, 'x', 0], reason: '  늦게   입고 ', target: { type: 'broadcast', broadcastId: 'B22' } }), { action: 'pull', rowIds: [12, 13], reason: '늦게 입고', target: { type: 'broadcast', broadcastId: 'B22' } });
+assert.throws(() => parsePickPullRequest({ action: 'pull', rowIds: [1] }), /어느 출고/, '넘길 곳 없으면 거부');
+assert.throws(() => parsePickPullRequest({ action: 'pull', rowIds: [1], target: { type: 'date', date: '10/23' } }), /올바르지/);
 assert.equal(parsePickPullRequest({ action: 'unpull', rowIds: [5] }).reason, '직접 선택');
 assert.throws(() => parsePickPullRequest({ action: 'pull', rowIds: [] }), /골라/);
 assert.throws(() => parsePickPullRequest({ action: 'delete', rowIds: [1] }), /종류/);
@@ -44,7 +58,7 @@ assert.equal(v.id, 'G1#pull:2026-10-22');
 assert.equal(v.groupId, 'G1');
 assert.equal(v.orderNo, 'G1');
 assert.deepEqual(v.items.map((it) => it.id), ['2'], '가상 묶음엔 가져온 줄만');
-assert.deepEqual(v.pickPull, { pulledFor: '2026-10-22', pulledAt: '2026-10-22T09:00:00+09:00', reason: '고객이슈 교환', originalOrderId: 'G1' });
+assert.deepEqual(v.pickPull, { pulledFor: '2026-10-22', pulledAt: '2026-10-22T09:00:00+09:00', reason: '고객이슈 교환', broadcastId: '', target: '', originalOrderId: 'G1' });
 assert.equal(v.shippingStatus, null, '원래 출고완료였어도 가져온 줄은 다시 나가는 줄(송장 새로 출력 대상)');
 assert.equal(v.createdAt, original.createdAt, '주문일은 원래 날짜 그대로(복사·변경 없음)');
 assert.equal(pull.originalOrderIdOf(v), 'G1');
@@ -54,6 +68,14 @@ assert.equal(pull.pulledOrdersForDay(virtual, '2026-10-22').length, 1);
 assert.equal(pull.pulledOrdersForDay(virtual, '2026-10-21').length, 0);
 assert.equal(pull.pulledOrdersForDay(virtual, '').length, 0, '전체보기엔 안 붙음(원래 주문이 이미 보이므로 중복 금지)');
 assert.equal(pull.buildPulledVirtualOrders(adapter.buildAdminLiveOrderGroups([row(1), row(3)])).length, 0, '가져온 줄 없으면 가상 묶음 없음');
+// 방송으로 넘긴 줄 — 사장님 10/23 사례(10.11 주문 → 10.22 시작 방송, 넘긴 날은 10.23)
+const bcRows = [row(1), row(2, { pick_pulled_at: '2026-10-23T13:30:00+09:00', pick_pulled_for: '2026-10-22', pick_pulled_broadcast_id: 'B22', pick_pulled_target: '10.22(목) 남녀공용의류', pick_pulled_reason: '늦게 입고' })];
+const bcGroups = adapter.buildAdminLiveOrderGroups(bcRows);
+const bcVirtual = pull.buildPulledVirtualOrders(bcGroups);
+assert.equal(bcVirtual[0].id, 'G1#pull:bcB22');
+assert.equal(pull.pulledOrdersForView(bcVirtual, { kind: 'broadcast', broadcastId: 'B22', startedDay: '2026-10-22' }).length, 1, '그 방송 주문서에 보임');
+assert.equal(pull.pulledOrdersForView(bcVirtual, { kind: 'date', day: '2026-10-23' }).length, 0, '누른 날짜(쇼핑몰) 화면엔 안 보임');
+assert.deepEqual(pull.pulledAwayTargets(adapter.toAdminLiveOrder(bcGroups[0])), ['10.22(목) 남녀공용의류']);
 
 // 받은 돈 숫자: 가상 묶음을 뺀 목록 = 원래 그대로(LiveStatsCards 는 filteredOrdersNoPull 만 받음)
 const today = [...originals, ...virtual];
@@ -68,18 +90,18 @@ const excel = createUiLoader({ exceljs: { default: ExcelJS }, '@/lib/adminToast'
 const loadWb = async () => { const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await blob.arrayBuffer()); return wb; };
 await excel.exportLiveOrdersForRosen([{ ...v, address: '서울시', detailAddress: '1동', zipcode: '01234' }, { ...original, address: '서울시', detailAddress: '1동', zipcode: '01234' }], { filterLabel: '오늘' });
 const rosen = (await loadWb()).getWorksheet('주소통합_제목필터');
-assert.match(String(rosen.getCell('I2').value), /^\[지난 주문 10\.17\(토\) · 고객이슈 교환\] 상품2/, '송장 상품명 맨 앞 지난 주문 표식');
+assert.match(String(rosen.getCell('I2').value), /^\[넘겨받은 주문 10\.17\(토\) · 고객이슈 교환\] 상품2/, '송장 상품명 맨 앞 지난 주문 표식');
 assert.doesNotMatch(String(rosen.getCell('I2').value), /총 \d+개/, '사장님 요청: (총 N개) 없음');
-assert.doesNotMatch(String(rosen.getCell('I3').value), /총 \d+개|지난 주문/);
+assert.doesNotMatch(String(rosen.getCell('I3').value), /총 \d+개|넘겨받은 주문/);
 await excel.exportLiveOrdersForPicking([v], { filterLabel: '오늘' });
 const picking = (await loadWb()).getWorksheet('물건챙기기');
 assert.equal(picking.rowCount, 2, '가져온 줄은 본 시트에(추가 작업 시트로 안 보냄)');
 assert.equal(picking.getCell('C2').value, '상품2');
-assert.equal(picking.getCell('H2').value, '지난 주문 10.17(토) · 고객이슈 교환');
+assert.equal(picking.getCell('H2').value, '넘겨받은 주문 10.17(토) · 고객이슈 교환');
 // 원래 주문(가져간 날 아님) 쪽 엑셀은 그 줄 비고에 「10.22(목) 로 가져감」 — 단 오늘이 10.22 라면 「지난 주문」 로 읽히므로 오늘이 아닌 날짜로 검사
 const pullRows = createUiLoader()('lib/orderPickingExportRows.ts');
 const awayRows = pullRows.buildPickingExportRows([{ ...original, items: [{ ...original.items[1], pickPulledFor: '2020-01-02', pickPulledAt: '2020-01-02T00:00:00Z' }] }]);
-assert.equal(awayRows.mainRows[0].kind, '01.02(목) 로 가져감');
+assert.equal(awayRows.mainRows[0].kind, '01.02(목) 출고로 넘김');
 
 // ── 4. 서버 라우트 시뮬 — pull: 기록 보관·비움 / 취소 줄 건너뜀 / 다시 pull 해도 prev 유지 / unpull 원복 ──
 const db = new Map([
@@ -87,36 +109,40 @@ const db = new Map([
   [2, { id: 2, is_deleted: false, admin_order_status_v2: '주문취소', order_manage_status: '주문취소', picked_at: null, collected_at: null, invoice_printed_at: null, pick_pulled_at: null, pick_pulled_for: null, pick_pulled_reason: null, pick_pulled_prev: null, total_price: 5000 }],
 ]);
 const touched = new Set();
-const fakeClient = { from(table) { assert.equal(table, 'orders'); return {
+const fakeClient = { from(table) { if (table === 'broadcasts') return { select() { return { eq(_c, id) { return { maybeSingle: () => Promise.resolve({ data: id === 'B22' ? { id: 'B22', public_title: '남녀공용의류', started_at: '2026-10-22T11:00:00Z', created_at: null } : null, error: null }) }; } }; } }; assert.equal(table, 'orders'); return {
   select() { return { in(_col, ids) { return Promise.resolve({ data: ids.map((id) => db.get(id)).filter(Boolean).map((r) => ({ ...r })), error: null }); } }; },
   update(patch) { return { eq(_col, id) { for (const k of Object.keys(patch)) touched.add(k); Object.assign(db.get(id), patch); return Promise.resolve({ error: null }); } }; },
 }; } };
 process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://x'; process.env.SUPABASE_SERVICE_ROLE_KEY = 'k';
 const route = createUiLoader({ '@supabase/supabase-js': { createClient: () => fakeClient }, '@/lib/admin-auth': { verifyAdminSessionFromRequest: async () => true }, 'next/server': { NextResponse: { json: (body, init) => ({ body, status: init?.status ?? 200 }) } } })('app/api/admin-live/picking-pull/route.ts');
 const call = async (body) => route.POST({ json: async () => body });
-let res = await call({ action: 'pull', rowIds: [1, 2, 99], reason: '늦게 입고' });
+let res = await call({ action: 'pull', rowIds: [1, 2, 99], reason: '늦게 입고', target: { type: 'broadcast', broadcastId: 'B22' } });
 assert.equal(res.status, 200);
 assert.deepEqual(res.body.updated, [1]);
 assert.deepEqual(res.body.skipped.map((s) => s.why).sort(), ['줄을 찾지 못함', '취소된 주문']);
 const r1 = db.get(1);
 assert.equal(r1.pick_pulled_reason, '늦게 입고');
-assert.match(r1.pick_pulled_for, /^\d{4}-\d{2}-\d{2}$/);
+assert.equal(r1.pick_pulled_for, '2026-10-22', '방송 시작 날짜(누른 날짜 아님)');
+assert.equal(r1.pick_pulled_broadcast_id, 'B22'); assert.equal(r1.pick_pulled_target, '10.22(목) 남녀공용의류', '이름은 서버가 방송 표에서');
+assert.equal(res.body.target, '10.22(목) 남녀공용의류');
+assert.equal((await call({ action: 'pull', rowIds: [1], target: { type: 'broadcast', broadcastId: 'NONE' } })).status, 400, '없는 방송 거부');
 assert.equal(r1.picked_at, null); assert.equal(r1.invoice_printed_at, null);
 assert.deepEqual(r1.pick_pulled_prev, { picked_at: '2026-10-17T18:00:00Z', collected_at: null, invoice_printed_at: '2026-10-17T19:00:00Z' });
 assert.equal(db.get(2).pick_pulled_at, null, '취소 줄 무변경');
 // 다시 pull — 사유만 바뀌고 prev 는 처음 것 유지
-res = await call({ action: 'pull', rowIds: [1], reason: '사이즈 교환' });
+res = await call({ action: 'pull', rowIds: [1], reason: '사이즈 교환', target: { type: 'date', date: '2026-10-23' } });
+assert.equal(db.get(1).pick_pulled_broadcast_id, null); assert.equal(db.get(1).pick_pulled_for, '2026-10-23'); assert.equal(db.get(1).pick_pulled_target, '10.23(금) 쇼핑몰 주문');
 assert.equal(db.get(1).pick_pulled_reason, '사이즈 교환');
 assert.equal(db.get(1).pick_pulled_prev.picked_at, '2026-10-17T18:00:00Z');
 // unpull — 원복
 res = await call({ action: 'unpull', rowIds: [1, 2] });
 assert.deepEqual(res.body.updated, [1]);
-assert.equal(res.body.skipped[0].why, '가져온 줄이 아님');
+assert.equal(res.body.skipped[0].why, '넘긴 줄이 아님');
 assert.equal(db.get(1).pick_pulled_at, null); assert.equal(db.get(1).pick_pulled_for, null); assert.equal(db.get(1).pick_pulled_prev, null);
 assert.equal(db.get(1).picked_at, '2026-10-17T18:00:00Z'); assert.equal(db.get(1).invoice_printed_at, '2026-10-17T19:00:00Z');
 assert.equal(db.get(1).total_price, 30000, '금액 무접촉');
 // 건드린 칸 = 챙김·송장 기록 + pick_pulled_* 뿐 (돈·상태·입금 칸 0)
-assert.deepEqual([...touched].sort(), ['collected_at', 'invoice_printed_at', 'pick_pulled_at', 'pick_pulled_for', 'pick_pulled_prev', 'pick_pulled_reason', 'picked_at']);
+assert.deepEqual([...touched].sort(), ['collected_at', 'invoice_printed_at', 'pick_pulled_at', 'pick_pulled_broadcast_id', 'pick_pulled_for', 'pick_pulled_prev', 'pick_pulled_reason', 'pick_pulled_target', 'picked_at']);
 res = await call({ action: 'pull', rowIds: [] });
 assert.equal(res.status, 400);
 const noAuth = createUiLoader({ '@supabase/supabase-js': { createClient: () => fakeClient }, '@/lib/admin-auth': { verifyAdminSessionFromRequest: async () => false }, 'next/server': { NextResponse: { json: (body, init) => ({ body, status: init?.status ?? 200 }) } } })('app/api/admin-live/picking-pull/route.ts');

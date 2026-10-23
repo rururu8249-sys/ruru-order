@@ -70,7 +70,7 @@ type IssueTab = "open" | "all" | "resolved" | "deleted";
 
 
 // [2026-09-26] 고객이슈 표의 «단 하나의» grid 템플릿 — 머리글·모든 줄이 이 상수를 그대로 써서 칸이 어긋나지 않는다.
-// [2026-10-22] 처리 칸 142 → 224px: 「열기(64)·오늘 챙기기(76)·해결완료(72)」 + 간격 6×2 — 세 버튼이 잘리지 않게
+// [2026-10-22] 처리 칸 142 → 224px: 「열기(64)·출고 넘기기(76)·해결완료(72)」 + 간격 6×2 — 세 버튼이 잘리지 않게
 const ISSUE_GRID = "grid-cols-[36px_minmax(0,1fr)] xl:grid-cols-[36px_60px_184px_1fr_124px_224px]";
 
 // [2026-09-26] 교환·환불 처리 대상인 이슈인가 — task_type(exchange/return/refund) 또는 유형 칩(교환/반품/환불).
@@ -655,10 +655,10 @@ export function IssueCard({
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onPull(task); }}
                 disabled={busy}
-                title="이 이슈의 상품 줄을 오늘 주문서·송장·물건챙기기에 넣기(지난 주문 표시 · 주문·금액 무변경)"
+                title="이 이슈 상품을 다른 방송·날짜 출고 때 같이 챙기고 송장 뽑기(주문·금액 무변경)"
                 className={`${SUB_BTN} !w-[76px] whitespace-nowrap text-ink hover:bg-surface-2`}
               >
-                오늘 챙기기
+                출고 넘기기
               </button>
             ) : null}
             {done ? (
@@ -911,11 +911,11 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
     return pickIssueProductRows(lines, extractBodyField(t, "대상상품:") || clean(t.related_product));
   };
 
-  // [2026-10-22 사장님] 「오늘 챙기기」 창 — 이슈 대상 줄 미리 체크, 사유 「고객이슈 교환」. 저장은 PickingPullModal(picking-pull 라우트).
+  // [2026-10-22 사장님] 「출고 넘기기」 창(2026-10-23 이름 변경) — 이슈 대상 줄 미리 체크, 교환이면 사유 「교환 재발송」. 저장은 PickingPullModal(picking-pull 라우트).
   const [pullTask, setPullTask] = useState<AdminIssueTask | null>(null);
   const openPull = (task: AdminIssueTask) => {
     const code = extractBodyField(task, "주문번호:");
-    if (!code) { showAdminToast("주문번호가 없는 이슈라 가져올 주문 줄이 없어요. 주문서에서 검색해 주문상세의 「오늘 챙기기에 넣기」를 써 주세요.", "warning"); return; }
+    if (!code) { showAdminToast("주문번호가 없는 이슈라 넘길 주문 상품이 없어요. 주문서에서 검색해 주문상세의 「출고 넘기기」를 써 주세요.", "warning"); return; }
     if (!linesByOrder[code]) { showAdminToast("주문 줄을 아직 불러오는 중이에요. 잠시 뒤 다시 눌러 주세요.", "warning"); return; }
     setPullTask(task);
   };
@@ -1890,7 +1890,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
             orderedAt={meta?.orderDate || null}
             lines={lines.map((l) => ({ id: clean(l.id), productName: clean(l.product_name) || "상품", option: [clean(l.color), clean(l.size)].filter((v) => v && v !== "없음").join(" / "), qty: Number(l.qty) || 1 }))}
             preselectIds={[...matched]}
-            defaultReason={`고객이슈${typeLabel ? ` ${typeLabel}` : ""}`}
+            defaultReason={typeLabel === "교환" ? "교환 재발송" : `고객이슈${typeLabel ? ` ${typeLabel}` : ""}`}
             onClose={() => setPullTask(null)}
           />
         );

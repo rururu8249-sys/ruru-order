@@ -74,6 +74,8 @@ export type OrderRow = {
   pick_pulled_for?: string | null;
   pick_pulled_reason?: string | null;
   pick_pulled_prev?: Record<string, unknown> | null;
+  pick_pulled_broadcast_id?: string | null;
+  pick_pulled_target?: string | null;
   is_deleted: boolean | null;
 };
 

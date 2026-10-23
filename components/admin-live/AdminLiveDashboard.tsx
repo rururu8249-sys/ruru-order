@@ -31,7 +31,8 @@ import AdminLiveSidebar from "./AdminLiveSidebar";
 import LiveHeader from "./LiveHeader";
 import LiveStatsCards from "./LiveStatsCards";
 import TelegramReportSendModal from "./TelegramReportSendModal";
-import { buildPulledVirtualOrders, originalOrderIdOf, pulledOrdersForDay } from "./liveOrderPickPull";
+import { buildPulledVirtualOrders, originalOrderIdOf, pulledOrdersForView } from "./liveOrderPickPull";
+import type { PickPullView } from "@/lib/orderPickPull";
 import LiveStatsPanel from "./LiveStatsPanel";
 import SalesAnalysisPanel from "./SalesAnalysisPanel";
 import LiveIssueRailPanel from "./LiveIssueRailPanel";
@@ -888,12 +889,15 @@ export default function AdminLiveDashboard() {
 
           // [2026-10-22 지난 주문 가져오기] 그날로 «가져온 줄»(pick_pulled_for=그날) + 그 줄이 속한 주문서 전체 줄.
           //   가져온 줄만 오면 원래 주문서가 반쪽으로 보이므로 같은 묶음(order_group_id/order_lookup_code) 줄을 함께 가져온다.
-          const fetchPulledForDay = async (dateKey: string): Promise<any[]> => {
-            const pulled = await pageAll((from, to) =>
-              supabase.from("orders").select("*").neq("is_deleted", true)
-                .eq("pick_pulled_for", dateKey)
-                .order("created_at", { ascending: false }).range(from, to),
-            );
+          // [2026-10-23 출고 넘기기] 방송으로 넘긴 줄은 pick_pulled_broadcast_id 로도 찾는다.
+          const fetchPulledForDay = async (dateKey: string, broadcastId = ""): Promise<any[]> => {
+            const pulled = await pageAll((from, to) => {
+              const q = supabase.from("orders").select("*").neq("is_deleted", true);
+              const scoped = broadcastId
+                ? q.or(`pick_pulled_broadcast_id.eq.${broadcastId},pick_pulled_for.eq.${dateKey}`)
+                : q.eq("pick_pulled_for", dateKey);
+              return scoped.order("created_at", { ascending: false }).range(from, to);
+            });
             if (pulled.length === 0) return [];
             const groupIds = Array.from(new Set(pulled.map((r: any) => String(r.order_group_id || "")).filter(Boolean)));
             const codes = Array.from(new Set(pulled.filter((r: any) => !r.order_group_id).map((r: any) => String(r.order_lookup_code || "")).filter(Boolean)));
@@ -903,6 +907,7 @@ export default function AdminLiveDashboard() {
             return [...pulled, ...siblings];
           };
           let pulledDayKey = "";
+          let pulledBroadcastId = "";
 
           const alwaysDate = getAlwaysOrderDateFromFilter(filters.broadcast); // "YYYY-MM-DD" | ""
           let supplemental: any[] = [];
@@ -936,10 +941,11 @@ export default function AdminLiveDashboard() {
               }
               supplemental = [...byId, ...byTime];
               pulledDayKey = toDateKey(bc.started_at || null);
+              pulledBroadcastId = String(bc.id || "");
             }
           }
           if (pulledDayKey) {
-            try { supplemental = [...supplemental, ...await fetchPulledForDay(pulledDayKey)]; } catch { /* 가져온 줄 보충 실패는 조용히(목록은 그대로) */ }
+            try { supplemental = [...supplemental, ...await fetchPulledForDay(pulledDayKey, pulledBroadcastId)]; } catch { /* 가져온 줄 보충 실패는 조용히(목록은 그대로) */ }
           }
 
           if (supplemental.length > 0) {
@@ -1334,14 +1340,18 @@ export default function AdminLiveDashboard() {
     const selectedAlwaysOrderDateForPull = getAlwaysOrderDateFromFilter(filters.broadcast);
     const selectedBroadcastForPull =
       filters.broadcast === "current" ? activeBroadcast : broadcasts.find((broadcast) => broadcast.id === filters.broadcast) || null;
-    const pullDayKey =
-      filters.broadcast === "all" ? ""
-        : filters.broadcast === "none" ? toDateKey(new Date().toISOString())
-          : selectedAlwaysOrderDateForPull ? selectedAlwaysOrderDateForPull
-            : selectedBroadcastForPull ? toDateKey(selectedBroadcastForPull.started_at || null) : "";
-    const pulledForScope = pulledOrdersForDay(pulledVirtualOrders, pullDayKey).filter((order) => {
-      const matchScope = filters.scope === "all" ? true : filters.scope === "shop" ? isAlwaysOrderLike(order as any) : !isAlwaysOrderLike(order as any);
-      // 날짜 필터는 «가져온 날짜» 기준(원래 주문일이 아니라 오늘 챙기는 날)
+    // [2026-10-23 출고 넘기기] 방송으로 보면 «그 방송으로 넘긴 것», 쇼핑몰 날짜로 보면 «그 날짜로 넘긴 것»
+    const pullView: PickPullView =
+      filters.broadcast === "all" ? { kind: "none" }
+        : filters.broadcast === "none" ? { kind: "date", day: toDateKey(new Date().toISOString()) }
+          : selectedAlwaysOrderDateForPull ? { kind: "date", day: selectedAlwaysOrderDateForPull }
+            : selectedBroadcastForPull ? { kind: "broadcast", broadcastId: String(selectedBroadcastForPull.id), startedDay: toDateKey(selectedBroadcastForPull.started_at || null) }
+              : { kind: "none" };
+    const pullDayKey = pullView.kind === "date" ? pullView.day : pullView.kind === "broadcast" ? pullView.startedDay : "";
+    const pulledForScope = pulledOrdersForView(pulledVirtualOrders, pullView).filter((order) => {
+      // 범위(방송/쇼핑몰)는 원래 주문이 아니라 «넘긴 곳» 기준 — 쇼핑몰 주문을 방송 출고로 넘겼으면 방송 범위에 보인다
+      const matchScope = filters.scope === "all" ? true : filters.scope === "shop" ? pullView.kind === "date" : pullView.kind === "broadcast";
+      // 날짜 필터는 «넘긴 날짜» 기준(원래 주문일이 아니라 그 출고 날)
       return matchScope && matchesDate({ ...order, createdAt: `${pullDayKey}T12:00:00+09:00` }, filters);
     });
     const base = orders.filter((order) => {

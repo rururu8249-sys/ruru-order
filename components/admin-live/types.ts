@@ -76,6 +76,9 @@ export type LiveOrderItem = {
   pickPulledAt?: string | null;
   pickPulledFor?: string | null;
   pickPulledReason?: string | null;
+  /** [2026-10-23] 출고 넘기기 — 넘긴 방송 id(쇼핑몰 날짜면 없음)·넘긴 곳 이름 */
+  pickPulledBroadcastId?: string | null;
+  pickPulledTarget?: string | null;
 };
 
 /** [2026-10-22] 오늘 주문서에 «가져온 줄만» 묶어 보여주는 가상 묶음 표식. 원래 주문엔 없음(undefined). */
@@ -83,6 +86,9 @@ export type LiveOrderPickPull = {
   pulledFor: string;
   pulledAt: string | null;
   reason: string;
+  /** [2026-10-23] 넘긴 방송 id(쇼핑몰 날짜면 "") · 넘긴 곳 이름 */
+  broadcastId?: string;
+  target?: string;
   /** 원래 주문 LiveOrder.id(=groupId) — 주문상세·입금매칭은 이걸로 원래 주문을 연다 */
   originalOrderId: string;
 };

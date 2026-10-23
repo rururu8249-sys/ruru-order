@@ -274,6 +274,8 @@ function buildItem(row: OrderRow): LiveOrderItem {
     pickPulledAt: row.pick_pulled_at ?? null,
     pickPulledFor: row.pick_pulled_for ?? null,
     pickPulledReason: row.pick_pulled_reason ?? null,
+    pickPulledBroadcastId: row.pick_pulled_broadcast_id ?? null,
+    pickPulledTarget: row.pick_pulled_target ?? null,
   };
 }
 

@@ -41,17 +41,42 @@ export function shortDateWithWeekday(value: string | null | undefined): string {
   return `${String(m).padStart(2, "0")}.${String(d).padStart(2, "0")}(${WEEKDAY_KO[dow]})`;
 }
 
-/** 주문서·송장·챙기기에 붙는 한 줄: 「지난 주문 10.18(토) · 고객이슈 교환」 */
+// [2026-10-23 사장님 「헷갈려 죽겠어」] 이름을 «출고 넘기기»로 통일.
+//   받는 쪽(넘겨받은 출고의 주문서·송장·챙기기): 「넘겨받은 주문 10.11(토) · 늦게 입고」
+//   보낸 쪽(원래 주문):                       「10.22(목) 남녀공용의류 출고로 넘김」
+
+/** 받는 쪽 한 줄: 「넘겨받은 주문 10.11(토) · 사유」 */
 export function pickPullBadgeText(originalCreatedAt: string | null | undefined, reason: string | null | undefined): string {
   const when = shortDateWithWeekday(originalCreatedAt);
   const why = String(reason ?? "").trim();
-  return ["지난 주문" + (when ? ` ${when}` : ""), why].filter(Boolean).join(" · ");
+  return ["넘겨받은 주문" + (when ? ` ${when}` : ""), why].filter(Boolean).join(" · ");
 }
 
-/** 원래 방송 화면에서: 「10.22(목) 로 가져감」 */
-export function pickPullAwayText(pulledFor: string | null | undefined): string {
-  const when = shortDateWithWeekday(pulledFor);
-  return when ? `${when} 로 가져감` : "가져감";
+/** 보낸 쪽 한 줄: 「10.22(목) 남녀공용의류 출고로 넘김」 — 대상 이름이 없으면(옛 기록) 날짜로 */
+export function pickPullAwayText(pulledFor: string | null | undefined, targetLabel?: string | null): string {
+  const label = String(targetLabel ?? "").trim() || shortDateWithWeekday(pulledFor);
+  return label ? `${label} 출고로 넘김` : "출고 넘김";
+}
+
+/** 넘길 곳 이름 — 방송: 「10.22(목) 남녀공용의류」 / 쇼핑몰 날짜: 「10.23(금) 쇼핑몰 주문」 */
+export function pullTargetLabelForBroadcast(title: string | null | undefined, startedAt: string | null | undefined): string {
+  return [shortDateWithWeekday(startedAt), String(title ?? "").trim() || "방송"].filter(Boolean).join(" ");
+}
+export function pullTargetLabelForDate(dateKey: string): string {
+  return `${shortDateWithWeekday(dateKey)} 쇼핑몰 주문`;
+}
+
+export type PickPullView = { kind: "broadcast"; broadcastId: string; startedDay: string } | { kind: "date"; day: string } | { kind: "none" };
+
+/** 넘겨받은 묶음이 지금 보는 주문서(방송/쇼핑몰 날짜)에 붙는지.
+ *  방송: 그 방송으로 넘긴 것. 쇼핑몰 날짜: 방송 아닌 그 날짜로 넘긴 것.
+ *  옛 기록(대상 방송·이름 없음)은 예전처럼 날짜로 — 그 날짜 쇼핑몰 화면과 그날 시작한 방송에 붙는다. */
+export function pickPullMatchesView(pull: { pulledFor: string; broadcastId?: string | null; target?: string | null }, view: PickPullView): boolean {
+  if (view.kind === "none") return false;
+  const bc = String(pull.broadcastId ?? "").trim();
+  const legacy = !bc && !String(pull.target ?? "").trim();
+  if (view.kind === "broadcast") return bc ? bc === view.broadcastId : legacy && Boolean(view.startedDay) && pull.pulledFor === view.startedDay;
+  return !bc && pull.pulledFor === view.day;
 }
 
 /** 줄이 «가져온 줄»인지(가져온 날짜가 있으면 참 — 챙겼든 안 챙겼든 그날 주문서에 남는다) */
@@ -68,8 +93,10 @@ export function pulledForOf(row: { pick_pulled_for?: string | null; pick_pulled_
 }
 
 /** 가져오기 요청 검사 — 행 id 숫자만, 사유 1~80자(없으면 기본값) */
-export function parsePickPullRequest(input: unknown): { action: "pull" | "unpull"; rowIds: number[]; reason: string } {
-  const value = (input ?? {}) as { action?: unknown; rowIds?: unknown; reason?: unknown };
+export type PickPullTarget = { type: "broadcast"; broadcastId: string } | { type: "date"; date: string };
+
+export function parsePickPullRequest(input: unknown): { action: "pull" | "unpull"; rowIds: number[]; reason: string; target: PickPullTarget | null } {
+  const value = (input ?? {}) as { action?: unknown; rowIds?: unknown; reason?: unknown; target?: unknown };
   const action = value.action === "unpull" ? "unpull" : value.action === "pull" ? "pull" : null;
   if (!action) throw new Error("요청 종류가 올바르지 않습니다.");
   const rowIds = Array.isArray(value.rowIds)
@@ -78,7 +105,13 @@ export function parsePickPullRequest(input: unknown): { action: "pull" | "unpull
   if (rowIds.length === 0) throw new Error("가져올 상품 줄을 골라 주세요.");
   if (rowIds.length > 200) throw new Error("한 번에 200줄까지만 가져올 수 있습니다.");
   const reason = String(value.reason ?? "").replace(/\s+/g, " ").trim().slice(0, 80) || "직접 선택";
-  return { action, rowIds, reason };
+  const t = (value.target ?? null) as { type?: unknown; broadcastId?: unknown; date?: unknown } | null;
+  let target: PickPullTarget | null = null;
+  if (t && t.type === "broadcast" && String(t.broadcastId ?? "").trim()) target = { type: "broadcast", broadcastId: String(t.broadcastId).trim().slice(0, 64) };
+  else if (t && t.type === "date" && /^\d{4}-\d{2}-\d{2}$/.test(String(t.date ?? ""))) target = { type: "date", date: String(t.date) };
+  else if (t) throw new Error("넘길 곳(방송·날짜)이 올바르지 않습니다.");
+  if (action === "pull" && !target) throw new Error("어느 출고로 넘길지 골라 주세요.");
+  return { action, rowIds, reason, target };
 }
 
 /** 「빼기」 원복 값 — prev 가 없으면 아무것도 되돌리지 않는다(null 유지) */
@@ -91,5 +124,5 @@ export function restoreFromPrev(prev: unknown): PickPullPrev {
 /** 엑셀 구분 칸 값이 가져오기 표식인지(「지난 주문 …」/「… 로 가져감」) — 물건챙기기 엑셀에서 본 시트에 남긴다 */
 export function isPickPullKind(kind: string | null | undefined): boolean {
   const k = String(kind ?? "");
-  return k.startsWith("지난 주문") || k.endsWith("로 가져감") || k === "가져감";
+  return k.startsWith("넘겨받은 주문") || k.endsWith("출고로 넘김") || k === "출고 넘김" || k.startsWith("지난 주문") || k.endsWith("로 가져감") || k === "가져감";
 }

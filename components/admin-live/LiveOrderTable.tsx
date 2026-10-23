@@ -18,7 +18,7 @@ import { showAdminConfirm } from "@/lib/adminConfirm";
 import { pickingProgress, isPickingComplete, pickingScope } from "@/lib/orderPicking";
 import ProductPagination from "./ProductPagination";
 import { pickPullBadgeText, pickPullAwayText } from "@/lib/orderPickPull";
-import { pulledAwayDays } from "./liveOrderPickPull";
+import { pulledAwayTargets } from "./liveOrderPickPull";
 import { issueMarkKind, issueTargetItemIds, isStrikeKind, targetTextFromReturnReason } from "@/lib/orderIssueMarks";
 
 // 총금액 표시 전용: 포인트 사용 주문은 실결제금액(상품금액 + 택배비 - 사용포인트)으로 표시한다.
@@ -220,23 +220,23 @@ function statusBadge(order: LiveOrder, actions?: { onMatch?: () => void; onCardP
   return <span style={{ ...base, ...green }}>입금확인</span>;
 }
 
-// [2026-10-22 지난 주문 가져오기] 표시 전용 배지 두 가지.
-//   가상 묶음(오늘 주문서에 들어온 지난 주문 줄): 「지난 주문 10.18(토) · 고객이슈 교환」
-//   원래 주문(그 줄을 다른 날로 가져간 경우): 「10.22(목) 로 가져감」
+// [2026-10-22 → 2026-10-23 «출고 넘기기»] 표시 전용 배지 두 가지.
+//   받는 쪽(넘겨받은 묶음): 「넘겨받은 주문 10.11(토) · 늦게 입고」
+//   보낸 쪽(원래 주문):    「10.22(목) 남녀공용의류 출고로 넘김」
 function pickPullBadge(order: LiveOrder) {
   if (order.pickPull) {
     return (
-      <span className="inline-flex shrink-0 items-center rounded-full border border-ink bg-ink px-2 py-0.5 text-[11px] font-black text-white" title={`원래 주문일 ${order.createdAt || ""} · ${order.pickPull.reason || "직접 선택"} · 오늘 챙겨서 나가는 지난 주문`}>
+      <span className="inline-flex shrink-0 items-center rounded-full border border-ink bg-ink px-2 py-0.5 text-[11px] font-black text-white" title={`원래 주문일 ${order.createdAt || ""} · ${order.pickPull.reason || "직접 선택"} · 이 출고 때 같이 챙겨 보내는 주문(금액은 원래 주문에)`}>
         {pickPullBadgeText(order.createdAt, order.pickPull.reason)}
       </span>
     );
   }
-  const days = pulledAwayDays(order);
-  if (!days.length) return null;
+  const targets = pulledAwayTargets(order);
+  if (!targets.length) return null;
   const pulledQty = (order.items || []).filter((it) => it.pickPulledFor || it.pickPulledAt).length;
   return (
-    <span className="inline-flex shrink-0 items-center rounded-full border border-line bg-surface-2 px-2 py-0.5 text-[11px] font-bold text-ink-soft" title="이 주문의 상품 줄을 다른 날 주문서로 가져가 그날 챙겨 보냅니다">
-      {days.map(pickPullAwayText).join(" · ")}{pulledQty < (order.items || []).length ? ` (${pulledQty}줄)` : ""}
+    <span className="inline-flex shrink-0 items-center rounded-full border border-line bg-surface-2 px-2 py-0.5 text-[11px] font-bold text-ink-soft" title="이 주문 상품을 다른 출고로 넘겨 그때 챙겨 보냅니다">
+      {targets.map((t) => pickPullAwayText(/^\d{4}-\d{2}-\d{2}$/.test(t) ? t : "", /^\d{4}-\d{2}-\d{2}$/.test(t) ? "" : t)).join(" · ")}{pulledQty < (order.items || []).length ? ` (${pulledQty}개)` : ""}
     </span>
   );
 }

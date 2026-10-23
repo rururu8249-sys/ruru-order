@@ -106,7 +106,7 @@ function totalQty(order: LiveOrder) {
 
 function itemSummary(order: LiveOrder) {
   const items = order.items || [];
-  // [2026-10-22 지난 주문 가져오기] 가져온 줄 묶음이면 상품명 맨 앞에 「[지난 주문 10.18(토) · 사유]」 — 송장에서도 바로 알아보게
+  // [2026-10-22 → 10-23 출고 넘기기] 넘겨받은 묶음이면 상품명 맨 앞에 「[넘겨받은 주문 10.18(토) · 사유]」 — 송장에서도 바로 알아보게
   const pullMark = order.pickPull ? `[${pickPullBadgeText(order.createdAt, order.pickPull.reason)}] ` : "";
   if (!items.length) return pullMark + (clean(order.orderSummary) || "상품명없음 x1개");
   // 상품 전체 출력, 상품 사이는 #. [2026-10-22 사장님] 맨 끝 「(총 N개)」는 뺀다 — 로젠 상품명 칸에 자꾸 끼어 거슬림(총수량은 관리자확인용 시트 칸에 따로 있음).
@@ -504,7 +504,7 @@ export async function exportLiveOrdersForPicking(orders: LiveOrder[], meta: Expo
       ];
       if (hasUnpaid) row.push(unpaid ? "미입금" : "완료");
       const attention = attentionByItemId.get(String(item.id));
-      // [2026-10-22] 지난 주문 가져온 줄은 본 시트에 남기고 비고 칸에 「지난 주문 10.18(토) · 사유」(추가 작업 시트로 안 보냄)
+      // [2026-10-22 → 10-23] 넘겨받은 줄은 본 시트에 남기고 비고 칸에 「넘겨받은 주문 10.18(토) · 사유」(추가 작업 시트로 안 보냄)
       const pullKind = isPickPullKind(built.kind) ? built.kind : "";
       row.push(attention?.kind === "상품 변경 · 다시 챙기기"
         ? `이전 주문 상품 변경 · 다시 챙기기\n변경 전: ${attention.before || "기록 없음"}\n변경 후: ${attention.current}`
