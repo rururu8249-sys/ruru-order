@@ -61,7 +61,7 @@ import { brandWordmarkThumbnail, normalizeBrandKorean, productNameThumbnail, pro
 import { toOptionList } from "@/lib/optionSplit";
 import { widgetPinnedProductId } from "@/lib/widgetPinState";
 // [2026-09-22] 상품 주문 안내 문구 — 문구 원문은 lib 한 곳에서만 정한다(관리자 설정과 같은 파일)
-import { resolveProductNoticePresentationFor, effectiveProductNoticeMode, isInstantOrderProduct } from "@/lib/productOrderNotice";
+import { resolveProductNoticePresentationFor, effectiveProductNoticeMode, isInstantOrderProduct, INSTANT_CARD_BADGE } from "@/lib/productOrderNotice";
 import {
   CUSTOMER_SESSION_VERSION_KEY,
   YOUTUBE_NICKNAME_CONFIRM_VERSION_KEY,
@@ -120,7 +120,7 @@ import {
 } from "@/lib/finalSubmitConfirmation";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { compareMixOrder, mixSeedForToday } from "@/lib/productMixOrder";
-import { pickCardBadgesS6, pickVisibleBadges, BADGE_INFO_KEYS, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_MIN_BUYERS, TOP_SELLER_RANK_PCT, POPULAR_RANK_PCT, HOLDING_MIN_PEOPLE } from "@/lib/productBadgePriority";
+import { pickCardBadgesS6, cardBadgeTone, pickVisibleBadges, BADGE_INFO_KEYS, SOLD_RECENT_MIN_QTY, REPEAT_BADGE_MIN_BUYERS, TOP_SELLER_RANK_PCT, POPULAR_RANK_PCT, HOLDING_MIN_PEOPLE } from "@/lib/productBadgePriority";
 import ProductColorRowV2 from "@/components/customer/ProductColorRowV2";
 import { colorNameSwatch, isLightSwatch, resolveColorDisplay } from "@/lib/colorNameSwatch";
 import { restyleV2 } from "@/lib/customerUiV2Restyle";
@@ -3896,7 +3896,7 @@ export default function OrderPage() {
     });
   }, [broadcastProducts, groupBuyQuickProductsFromCatalog, broadcast?.status, broadcast?.widget_pin_mode, broadcast?.widget_pin_product_id]);
   // [㊺-3] 첫 화면 «지금 바로 주문 가능» 숫자 — 품절 아님 + 바로구매 기준(카드·옵션창과 같은 isInstantOrderProduct). 표시 전용.
-  const instantReadyCount = useMemo(() => quickGroupBuyProducts.filter((p) => !isSoldOutOrderProduct(p) && isInstantOrderProduct((parseProductSuggestionNote((p as any).product_note) as Record<string, unknown> | null)?.order_notice_mode, Array.isArray((p as any).badge_types) && (p as any).badge_types.length ? (p as any).badge_types : [(p as any).badge_type], productNoticeGlobal.mode)).length, [quickGroupBuyProducts, productNoticeGlobal.mode]);
+  const instantReadyCount = useMemo(() => quickGroupBuyProducts.filter((p) => !isSoldOutOrderProduct(p) && isInstantOrderProduct((parseProductSuggestionNote((p as any).product_note) as Record<string, unknown> | null)?.order_notice_mode, Array.isArray((p as any).badge_types) && (p as any).badge_types.length ? (p as any).badge_types : [(p as any).badge_type], productNoticeGlobal.mode, (p as any).in_shop)).length, [quickGroupBuyProducts, productNoticeGlobal.mode]);
 
   // ============ [재고 홀드] 담는 즉시 서버에 예약(15분) — 다른 고객 화면·품절 판정에 즉시 차감 반영 ============
   // ⚠️ 진짜 재고 차감/복구는 기존 제출 RPC·취소 복구가 단일 소유(무변경). 이 예약은 표시용 선점 전용이라
@@ -7304,7 +7304,7 @@ export default function OrderPage() {
                                 /* [2026-07-23 사장님 지시] 업체배송 상품 카드 배지 — 표시 전용(배송비 계산과 무관) */
                                 { key: "company", on: productDeliveryLabel(product) === "업체배송", text: "🚚 업체배송", node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#EEF2FA", color: "#3B5BA5" }}>🚚 업체배송</span> },
                                 /* 바로구매 — 사장님 지침대로 방송 켜짐/꺼짐과 무관하게 항상 표시(정보 배지, 개수 제한 밖) */
-                                { key: "direct", on: isInstantOrderProduct((parseProductSuggestionNote(product.product_note) as Record<string, unknown> | null)?.order_notice_mode, badges, productNoticeGlobal.mode), text: "🛒 바로구매", node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#E8F0FE", color: "#1D4ED8" }}>🛒 바로구매</span> },
+                                { key: "direct", on: isInstantOrderProduct((parseProductSuggestionNote(product.product_note) as Record<string, unknown> | null)?.order_notice_mode, badges, productNoticeGlobal.mode, (product as any).in_shop), text: INSTANT_CARD_BADGE, node: <span style={{ borderRadius: "4px", fontSize: "10px", fontWeight: 700, padding: "2px 6px", background: "#E8F0FE", color: "#1D4ED8" }}>🛒 {INSTANT_CARD_BADGE}</span> },
                               ];
                               // [㉜] 새 모양 배지 — 흰 알약+hairline 13px(「특가」만 빨간 글자), 줄당 최대 3개(정보 배지 먼저, 남는 자리에 마케팅).
                               //   「N개 남음」은 배지가 아니라 가격 근처 글씨로(lowTextV2). 어떤 배지를 켤지 판정은 위 그대로.
@@ -7315,7 +7315,8 @@ export default function OrderPage() {
                                 if (sold || textBadges.length === 0) return null;
                                 return (
                                   <div style={{ display: "flex", gap: "8px", marginBottom: "4px", flexWrap: "wrap" }}>
-                                    {textBadges.map((b) => <span key={b.key} style={{ fontSize: "13px", fontWeight: 600, lineHeight: 1.4, color: (b.key === "special" || b.key === "limit") ? "#D30005" : "#111111" }}>{stripDecorativeEmojiV2(String(b.text))}</span>)}
+                                    {/* [2026-10-23 사장님] 배지마다 색 — 연한 바탕+진한 글씨 알약(cardBadgeTone). 반짝임·움직임 없음(읽기 어려움·접근성) */}
+                                    {textBadges.map((b) => { const tone = cardBadgeTone(b.key); return <span key={b.key} style={{ fontSize: "13px", fontWeight: 700, lineHeight: 1.4, color: tone.color, background: tone.bg, borderRadius: "4px", padding: "1px 6px" }}>{stripDecorativeEmojiV2(String(b.text))}</span>; })}
                                   </div>
                                 );
                               }
@@ -8165,6 +8166,7 @@ export default function OrderPage() {
               productCustom: optionNoticeNote.order_notice_custom,
               globalMode: productNoticeGlobal.mode,
               globalCustom: productNoticeGlobal.custom,
+              inShop: (registeredOptionSelectProduct as any).in_shop,
             });
             return (
           <CustomerBottomSheet
@@ -8690,7 +8692,7 @@ export default function OrderPage() {
                       )}
                       {!uiV2 && registeredOptionColorChoices.length > 4 && registeredOptionColorSwatches[registeredOptionColor] ? <ProductColorSwatches value={{[registeredOptionColor]:registeredOptionColorSwatches[registeredOptionColor]}}/> : null}
                       {/* [2026-08-28 P0-4] 문구가 사라질 때 아래 버튼이 위로 밀려 오클릭이 나던 문제 → 자리를 항상 잡아둔다 */}
-                      <div data-order-option-missing={!registeredOptionColor.trim() ? "true" : undefined} style={sv({ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" })}>{!registeredOptionColor.trim() ? "색상을 선택해 주세요" : ""}</div>
+                      <div data-order-option-missing={!registeredOptionColor.trim() ? "true" : undefined} style={sv({ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" })}>{!registeredOptionColor.trim() && registeredOptionAttempted ? "색상을 선택해 주세요" : ""}</div>
                     </div>
                   ) : null}
 
@@ -8754,7 +8756,7 @@ export default function OrderPage() {
                         </select>
                       )}
                       {/* [2026-08-28 P0-4] 문구가 사라질 때 아래 버튼이 위로 밀려 오클릭이 나던 문제 → 자리를 항상 잡아둔다 */}
-                      <div data-order-option-missing={!registeredOptionSize.trim() ? "true" : undefined} style={sv({ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" })}>{!registeredOptionSize.trim() ? "사이즈를 선택해 주세요" : ""}</div>
+                      <div data-order-option-missing={!registeredOptionSize.trim() ? "true" : undefined} style={sv({ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" })}>{!registeredOptionSize.trim() && registeredOptionAttempted ? "사이즈를 선택해 주세요" : ""}</div>
                       {/* [2026-09-20 사장님] 치수 칩 — 사이즈를 고르면 그 사이즈 열의 앞 3개 치수(가슴단면 57 …)를 바로 보여준다.
                           원천은 사이즈 실측표(size_charts) 그대로, 전체 표는 「사이즈 실측 보기」. 표시 전용. */}
                       {registeredOptionSizeChart && registeredOptionSize.trim() ? (() => {
@@ -8789,7 +8791,7 @@ export default function OrderPage() {
                       </div>
                       <input value={registeredOptionSize} onChange={(e) => setRegisteredOptionSize(e.target.value)} placeholder="사이즈를 적어주세요 (예: 66, 프리)" style={sv({ height: "46px", width: "100%", boxSizing: "border-box", borderRadius: "14px", border: !registeredOptionSize.trim() ? "2px dashed #E2B64D" : "1.5px solid #E8E2DD", background: !registeredOptionSize.trim() ? "#FFFDF5" : "#fff", padding: "0 14px", fontSize: "15px", fontWeight: 700, color: "#222", outline: "none" })} />
                       {/* [2026-08-28 P0-4] 문구가 사라질 때 아래 버튼이 위로 밀려 오클릭이 나던 문제 → 자리를 항상 잡아둔다 */}
-                      <div data-order-option-missing={!registeredOptionSize.trim() ? "true" : undefined} style={sv({ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" })}>{!registeredOptionSize.trim() ? "사이즈를 입력해 주세요" : ""}</div>
+                      <div data-order-option-missing={!registeredOptionSize.trim() ? "true" : undefined} style={sv({ marginTop: "6px", minHeight: "18px", fontSize: "12px", fontWeight: 700, color: registeredOptionAttempted ? "#C0392B" : "#817379" })}>{!registeredOptionSize.trim() && registeredOptionAttempted ? "사이즈를 입력해 주세요" : ""}</div>
                     </div>
                   ) : null}
 

@@ -284,24 +284,20 @@ export default function CustomerPaymentGuideBottomSheet({
             </section>
           )}
 
-          {/* 주문완료 = 참여도 최고점 — 알림 신청·앱 추가는 한 줄 버튼 2개로만 */}
-          {isOrderComplete && (onLiveAlertRequest || !isStandaloneApp) && (
+          {/* 주문완료 = 참여도 최고점 — 알림 신청·앱 추가는 한 줄 버튼 2개로만
+              [2026-10-23 사장님] 「방송 알림 받는 중」 상태 칸 삭제(누를 것도 아닌데 버튼처럼 보임) · 홈 화면 추가는 무엇인지 알아보게 문장으로 */}
+          {isOrderComplete && ((onLiveAlertRequest && !liveAlertOptin) || !isStandaloneApp) && (
             <section style={s5({ marginTop: "12px" })}>
-              <div style={s5({ display: "grid", gridTemplateColumns: onLiveAlertRequest && !isStandaloneApp ? "1fr 1fr" : "1fr", gap: "8px" })}>
-                {onLiveAlertRequest ? (
-                  liveAlertOptin ? (
-                    <div style={s5({ minHeight: "44px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "12px", background: "#E1F5EE", border: "1px solid #C7EBDD", padding: "0 10px", fontSize: "12.5px", fontWeight: 800, color: "#0F6E56", textAlign: "center", wordBreak: "keep-all" })}>
-                      {v5 ? "방송 알림 받는 중" : "🔔 방송 알림 받는 중"}
-                    </div>
-                  ) : (
-                    <button type="button" disabled={liveAlertSaving} onClick={onLiveAlertRequest} style={s5({ minHeight: "44px", borderRadius: "12px", border: "1px solid #D9C5CC", background: "#fff", padding: "0 10px", fontSize: "12.5px", fontWeight: 800, color: "#7B2D43", cursor: "pointer" })}>
-                      {liveAlertSaving ? "신청 중..." : v5 ? "방송 알림 받기" : "🔔 방송 알림 받기"}
-                    </button>
-                  )
+              <div style={s5({ display: "grid", gridTemplateColumns: "1fr", gap: "8px" })}>
+                {onLiveAlertRequest && !liveAlertOptin ? (
+                  <button type="button" disabled={liveAlertSaving} onClick={onLiveAlertRequest} style={s5({ minHeight: "44px", borderRadius: "12px", border: "1px solid #D9C5CC", background: "#fff", padding: "0 10px", fontSize: "12.5px", fontWeight: 800, color: "#7B2D43", cursor: "pointer" })}>
+                    {liveAlertSaving ? "신청 중..." : v5 ? "방송 알림 받기" : "🔔 방송 알림 받기"}
+                  </button>
                 ) : null}
                 {!isStandaloneApp ? (
-                  <button type="button" onClick={handleInstallClick} style={s5({ minHeight: "44px", borderRadius: "12px", border: "1px solid #D9C5CC", background: "#fff", padding: "0 10px", fontSize: "12.5px", fontWeight: 800, color: "#7B2D43", cursor: "pointer" })}>
-                    {v5 ? "홈 화면에 추가" : "📲 홈 화면에 추가"}
+                  <button type="button" onClick={handleInstallClick} style={s5({ minHeight: "52px", borderRadius: "12px", border: "1px solid #D9C5CC", background: "#fff", padding: "8px 12px", fontSize: "14px", fontWeight: 800, color: "#7B2D43", cursor: "pointer", lineHeight: 1.35, wordBreak: "keep-all" })}>
+                    {v5 ? "휴대폰 홈 화면에 루루동이 주문서 바로가기 만들기" : "📲 휴대폰 홈 화면에 루루동이 주문서 바로가기 만들기"}
+                    <span style={s5({ display: "block", marginTop: "2px", fontSize: "12px", fontWeight: 600, color: "#8A7A7D" })}>다음부터 아이콘 한 번 누르면 바로 주문서가 열려요</span>
                   </button>
                 ) : null}
               </div>

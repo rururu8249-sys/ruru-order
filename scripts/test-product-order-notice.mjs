@@ -109,12 +109,12 @@ console.log("✅ product order notice (두 줄) OK");
 
   assert.deepEqual(
     resolveProductNoticePresentationFor({ globalMode: "instant" }),
-    { badge: "바로 구매 가능", message: "" },
+    { badge: "지금 바로 주문돼요", message: "" },
     "바로 구매 상태는 가격 옆에 한눈에 읽히는 배지로 보여야 한다",
   );
   assert.deepEqual(
     resolveProductNoticePresentationFor({ globalMode: "live_only" }),
-    { badge: "방송 접수 후 구매 가능", message: "" },
+    { badge: "방송에서 접수한 분만 주문", message: "" },
     "방송 접수가 필요한 상품은 조건이 분명해야 한다",
   );
   assert.deepEqual(resolveProductNoticePresentationFor({ globalMode: "off" }), { badge: "", message: "" });
@@ -128,8 +128,12 @@ console.log("✅ product order notice (두 줄) OK");
   // 상품별 설정이 전체 기본값보다 먼저인 기존 규칙을 배지에서도 지킨다.
   assert.deepEqual(
     resolveProductNoticePresentationFor({ productMode: "instant", globalMode: "live_only" }),
-    { badge: "바로 구매 가능", message: "" },
+    { badge: "지금 바로 주문돼요", message: "" },
   );
+}
+{
+  const { resolveProductNoticePresentationFor: r2 } = await import("../lib/productOrderNotice.ts");
+  assert.deepEqual(r2({ productMode: "live_only", globalMode: "live_only", inShop: true }), { badge: "지금 바로 주문돼요", message: "" }, "쇼핑몰 진열 = 바로 주문");
 }
 console.log("✅ product order notice (가격 옆 배지) OK");
 
@@ -142,4 +146,7 @@ assert.equal(isInstantOrderProduct("inherit", ["direct"], "live_only"), true);
 assert.equal(isInstantOrderProduct("inherit", [], "live_only"), false);
 assert.equal(isInstantOrderProduct("inherit", [], "instant"), true);
 assert.equal(isInstantOrderProduct("live_only", ["direct"], "instant"), false);
+// [2026-10-23] 쇼핑몰 진열 상품은 설정과 무관하게 무조건 바로 주문
+assert.equal(isInstantOrderProduct("live_only", [], "live_only", true), true);
+assert.equal(isInstantOrderProduct("inherit", [], "live_only", false), false);
 console.log("✅ ㊺-2 바로구매 기준 하나로 OK");

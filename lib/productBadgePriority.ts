@@ -145,3 +145,23 @@ export function pickCardBadgesS6(activeKeys: BadgeKey[], max = 2): BadgeKey[] {
   const rest = Array.from(pickVisibleBadges(uniq.filter((k) => !head.includes(k as (typeof CARD_BADGE_HEAD_S6)[number])), 99));
   return [...head, ...rest].slice(0, Math.max(0, max));
 }
+
+// [2026-10-23 사장님 「배지 단어마다 색깔 달라야 눈에 띔」] 상품 카드 배지 = 종류마다 연한 바탕 + 진한 글씨 알약(13px).
+//   반짝임·움직임은 넣지 않는다 — 깜빡이는 글씨는 읽기 어렵고(중장년 손님) 웹 접근성 기준(WCAG 2.2.2·2.3.1)에도 걸린다.
+//   쿠팡(로켓배송 파랑)·무신사(단독·쿠폰 색 구분)처럼 «색으로 종류 구분»만. 대비 4.5:1 이상 색만 씀.
+export const CARD_BADGE_TONE: Record<string, { color: string; bg: string }> = {
+  special: { color: "#D30005", bg: "#FDECEC" },   // 특가 — 빨강
+  limit: { color: "#FFFFFF", bg: "#D30005" },     // 마감임박 — 빨강 바탕(가장 급함)
+  direct: { color: "#0B6B3A", bg: "#E5F4EC" },    // 바로 주문 — 초록
+  new: { color: "#1D4ED8", bg: "#EAF0FF" },       // 신상 — 파랑
+  company: { color: "#8A4B00", bg: "#FFF1DC" },   // 업체배송 — 갈색
+  overseas: { color: "#6B2FA3", bg: "#F3ECFB" },  // 해외배송 — 보라
+  freeship: { color: "#0E6274", bg: "#E3F3F6" },  // 무료배송 — 청록
+  hot: { color: "#B53A00", bg: "#FFEDE3" },       // 인기 — 주황
+  trending: { color: "#B53A00", bg: "#FFEDE3" },  // 급상승 — 주황
+  pick: { color: "#9C1C5B", bg: "#FCE8F1" },      // 루루픽 — 자주
+  free: { color: "#0B6B3A", bg: "#E5F4EC" },      // 무료나눔 — 초록
+};
+export function cardBadgeTone(key: string): { color: string; bg: string } {
+  return CARD_BADGE_TONE[key] || { color: "#39393B", bg: "#F0F0F0" };
+}

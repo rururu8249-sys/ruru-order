@@ -3,7 +3,8 @@ import type { MetadataRoute } from "next";
 // [2026-09-20] 손님 폰 홈 화면 설치(PWA) 설정.
 //   근거: MDN 「Define your app icons」 + web app manifest 스펙 + evilmartians 「How to Favicon in 2026」(직접 확인).
 //   아이콘 파일은 app/ 폴더 규칙(favicon.ico · icon.svg · apple-icon.png)으로 자동 연결되고,
-//   설치 아이콘(192/512/maskable)은 예전 루루동이 로고 그대로 — 이미 설치한 손님의 아이콘이 안 바뀐다.
+//   [2026-10-23 사장님] 홈 화면 아이콘 = 새 루루동이 로고(옷걸이 RD·종이 바탕). 192/512/maskable(안전영역 82%)·apple-icon 180·favicon 모두 같은 그림.
+//   이미 추가한 손님: 안드로이드 크롬은 며칠 안에 새 아이콘으로 자동 갱신, 아이폰은 지우고 다시 추가해야 바뀐다.
 export default function manifest(): MetadataRoute.Manifest {
   return {
     // id 를 고정해야 start_url 을 바꿔도 «같은 앱»으로 인식돼 중복 설치가 안 생긴다(W3C manifest id)

@@ -133,13 +133,16 @@ export function resolveProductNoticePresentationFor(input: {
   productCustom?: unknown;
   globalMode?: unknown;
   globalCustom?: unknown;
+  /** [2026-10-23] 쇼핑몰 진열 상품(in_shop)은 설정 없이도 무조건 바로 주문 */
+  inShop?: unknown;
 }): ProductNoticePresentation {
+  if (input.inShop === true) return { badge: INSTANT_BADGE_TEXT, message: "" };
   const productMode = parseProductNoticeProductMode(input.productMode);
   const mode = productMode === "inherit" ? parseProductNoticeMode(input.globalMode) : productMode;
   const custom = productMode === "inherit" ? input.globalCustom : input.productCustom;
 
-  if (mode === "instant") return { badge: "바로 구매 가능", message: "" };
-  if (mode === "live_only") return { badge: "방송 접수 후 구매 가능", message: "" };
+  if (mode === "instant") return { badge: INSTANT_BADGE_TEXT, message: "" };
+  if (mode === "live_only") return { badge: "방송에서 접수한 분만 주문", message: "" };
   if (mode === "custom") return { badge: "", message: resolveProductOrderNotice(mode, custom) };
   return { badge: "", message: "" };
 }
@@ -151,7 +154,12 @@ export function effectiveProductNoticeMode(productMode: unknown, badgeTypes: unk
   const list = Array.isArray(badgeTypes) ? badgeTypes : [badgeTypes];
   return list.map((x) => String(x ?? "").trim().toLowerCase()).includes("direct") ? "instant" : "inherit";
 }
-export function isInstantOrderProduct(productMode: unknown, badgeTypes: unknown, globalMode: unknown): boolean {
+// [2026-10-23 사장님 「난독증 손님도 알아듣게」] 옵션창 가격 옆 = 「지금 바로 주문돼요」, 상품 카드 배지 = 「바로 주문」
+export const INSTANT_BADGE_TEXT = "지금 바로 주문돼요";
+export const INSTANT_CARD_BADGE = "바로 주문";
+/** 바로 주문 상품인지 — [2026-10-23] 쇼핑몰 진열(in_shop=true) 상품은 설정과 무관하게 무조건 바로 주문 */
+export function isInstantOrderProduct(productMode: unknown, badgeTypes: unknown, globalMode: unknown, inShop?: unknown): boolean {
+  if (inShop === true) return true;
   const m = effectiveProductNoticeMode(productMode, badgeTypes);
   return m === "inherit" ? parseProductNoticeMode(globalMode) === "instant" : m === "instant";
 }
