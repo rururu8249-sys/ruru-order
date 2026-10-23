@@ -414,6 +414,29 @@ export function transferCopyText(bankName: string, account: unknown, holder: unk
   return [s(bankName), s(account).replace(/[^0-9]/g, ""), isExcludedHolder(holder) ? "" : s(holder), amt > 0 ? `${amt.toLocaleString("ko-KR")}원` : ""].filter(Boolean).join(" ");
 }
 
+/** [2026-10-23 14:44 사장님 「내용도 같이 복사돼야지 — 무슨 상품·왜 환불인지」] 이체정보 + 내용 여러 줄.
+ *  1줄 = 은행 앱에 붙여넣는 이체정보, 그 아래 = 누구·주문번호 / 상품 / 사유 / 금액 계산. 빈 줄은 뺀다. */
+export function transferCopyBlock(d: { bankName: string; account: unknown; holder: unknown; amount: unknown; nickname?: unknown; name?: unknown; orderCode?: unknown; products?: unknown; memo?: unknown; base?: unknown; deduct?: unknown; shipping?: unknown }): string {
+  const s = (v: unknown) => String(v ?? "").trim();
+  const n = (v: unknown) => Math.max(0, Math.round(Number(v)) || 0);
+  const won = (v: number) => `${v.toLocaleString("ko-KR")}원`;
+  const who = [s(d.nickname), s(d.name) && s(d.name) !== s(d.nickname) ? `(${s(d.name)})` : ""].join("");
+  const amt = n(d.amount);
+  const deduct = n(d.deduct);
+  const base = n(d.base) || amt + deduct;
+  const ship = n(d.shipping);
+  const calc = deduct > 0 || ship > 0
+    ? `${won(base - ship)}${ship > 0 ? ` + 배송비 ${won(ship)}` : ""}${deduct > 0 ? ` − 차감 ${won(deduct)}` : ""} = ${won(amt)}`
+    : `환불 ${won(amt)}`;
+  return [
+    transferCopyText(d.bankName, d.account, d.holder, amt),
+    [who, s(d.orderCode)].filter(Boolean).join(" · "),
+    s(d.products),
+    s(d.memo),
+    calc,
+  ].filter(Boolean).join("\n");
+}
+
 /** [2026-10-23 사장님 「자주 쓰는 내용 드롭다운」] 실제 고객이슈 180일 메모를 세어 많이 쓴 것부터.
  *  reason 이 있으면 환불 사유 칩도 같이 맞춘다(품절·불량 = 상품문제 → 반품비 0). pull=true 면 등록 뒤 출고 넘기기 창을 연다. */
 export type IssueMemoPreset = { label: string; memo: string; reason?: "단순변심" | "상품문제" | "기타"; pull?: boolean };

@@ -15,6 +15,7 @@ import {
   REASON_FAULT_CHIPS,
   ISSUE_MEMO_PRESETS,
   transferCopyText,
+  transferCopyBlock,
   reasonChipFromStored,
   type ReasonChip,
   buildKakaoCopy,
@@ -433,9 +434,11 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
 
   // [2026-10-23] 은행 앱용 이체정보 한 줄(목록 줄의 「이체정보 복사」와 같은 글자)
   const copyTransferShort = async () => {
-    const text = transferCopyText(bankDisplayName(bank), account, holder, amountFinal);
     if (!account) { showAdminToast("계좌번호를 먼저 넣어 주세요.", "warning"); return; }
-    try { await navigator.clipboard.writeText(text); showAdminToast(`이체정보 복사했어요\n${text}`, "success"); }
+    // [14:44 사장님] 이체정보 + 누구·상품·사유·금액 계산까지 여러 줄로
+    const products = lines.filter((l) => (sel[l.id] || 0) > 0).map((l) => `${l.product_name}${optLabel(l.color, l.size) ? `(${optLabel(l.color, l.size)})` : ""}×${sel[l.id]}`).join(", ");
+    const text = transferCopyBlock({ bankName: bankDisplayName(bank), account, holder, amount: amountFinal, nickname: item.nickname, name: item.customer_name, orderCode, products, memo: issueMemo, base: productSum + shipIncludedAmount, deduct: deductTotal, shipping: shipIncludedAmount });
+    try { await navigator.clipboard.writeText(text); showAdminToast(`이체정보·내용 복사했어요\n${text}`, "success"); }
     catch { showAdminToast("복사 실패:\n" + text, "warning"); }
   };
 
