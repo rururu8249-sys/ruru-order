@@ -93,7 +93,8 @@ assert.ok(text().includes('미결제 2 · 지난 주문 1개 포함'), '같은 �
 assert.ok(text().includes('다른 출고로 넘긴 상품 1개는 여기서 뺐어요'));
 assert.ok(!text().includes('넘겨받'), '어색한 「넘겨받음」 문구 없음');
 // 챙길 = 결제완료 3+1+1(지난)+1(블랙M 7) = 6
-assert.ok(text().includes('챙길 6개'), text().slice(0, 400));
+assert.ok(text().includes('남은 6개') && text().includes('챙긴 0 / 전체 6'), '머리는 «남은 N개»가 크게');
+assert.ok(text().includes('남은 5개 챙김'), '옵션 줄 한 번에 챙기기(결제완료·안 챙긴 것만)');
 const nodeText = (n) => typeof n === 'string' ? n : (n.children || []).map(nodeText).join('');
 const rowBtn = nick => tree.root.findAll(n => n.type === 'button' && n.props['aria-pressed'] !== undefined && nodeText(n).includes(nick))[0];
 await act(async () => { await rowBtn('고객1').props.onClick(); });
@@ -111,4 +112,18 @@ writes.length = 0;
 const all = tree.root.findAll(n => n.type === 'button' && n.children.join('') === '모두 챙김')[0];
 await act(async () => { await all.props.onClick(); });
 assert.deepEqual(writes.at(-1).ids.map(String).sort(), ['2','5','7'], '미결제(3)·이미 챙긴(1) 제외');
+// 환불 이슈 걸린 줄 — 숫자에서 빠지고 「환불 · 챙기지 마세요」
+const issueRows = mod.buildPickRows([order(11, 'paid', [it(21, 1, '레드', 'S'), it(22, 1, '블랙', 'M')], {returnStatus: '반품(환불)', returnReason: '[반품(환불)] 대상: 알로 부츠컷팬츠(블랙/M)×1'})], 'scope').rows;
+assert.equal(issueRows.find(r => r.id === '22').skip, true);
+assert.equal(issueRows.find(r => r.id === '21').skip, undefined, '대상 아닌 줄은 그대로');
+assert.equal(mod.includedNote(issueRows.filter(r => r.color === '블랙')), '환불 1개 빼고');
+// 옵션 「남은 n개 챙김」 → 그 옵션의 결제완료·안 챙긴 줄만 저장, 다 챙긴 상품은 한 줄로 접힘
+await act(async () => tabs[0].props.onClick());
+// 블랙/M 상품은 다 챙겨서 한 줄로 접혀 있다 → 눌러 펼치고 고객6 체크를 풀었다가 옵션 버튼으로 다시
+assert.ok(text().includes('6개 다 챙김'), '다 챙긴 상품은 한 줄로 접힘');
+await act(async () => tree.root.findAll(n => n.type === 'button' && nodeText(n).includes('6개 다 챙김'))[0].props.onClick());
+await act(async () => { await rowBtn('고객6').props.onClick(); });
+const optBtn = tree.root.findAll(n => n.type === 'button' && nodeText(n) === '남은 1개 챙김')[0];
+await act(async () => { await optBtn.props.onClick(); });
+assert.deepEqual(writes.at(-1).ids.map(String), ['7']);
 console.log('test-picking-panel: ok');

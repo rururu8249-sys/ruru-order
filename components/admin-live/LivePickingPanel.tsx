@@ -23,6 +23,7 @@ import type { LiveOrder, LiveOrderItem } from "./types";
 import { exportLiveOrdersForPicking } from "./adminLiveOrderExcelExport";
 import { classifyPickingAttention } from "@/lib/orderPickingWorkspace";
 import { pulledForOf, shortDateWithWeekday } from "@/lib/orderPickPull";
+import { issueMarkKind, issueTargetItemIds, isStrikeKind, targetTextFromReturnReason } from "@/lib/orderIssueMarks";
 
 type Props = { orders: LiveOrder[]; filterLabel: string; scopeTooWide?: boolean; onClose: () => void };
 
@@ -49,6 +50,9 @@ export type PickRow = {
   before?: string;
   /** 지난 주문 줄은 「넘기기 취소」 가능 */
   pulled?: boolean;
+  /** [10-23 14:47] 고객이슈가 걸린 줄 — 환불·반품이면 skip(챙기지 않음·숫자에서 빠짐), 교환은 표시만 */
+  issue?: "환불" | "반품" | "교환";
+  skip?: boolean;
 };
 
 const PAID = ["paid", "auto_paid", "manual_paid", "card_paid"];
@@ -68,6 +72,11 @@ export function buildPickRows(orders: readonly LiveOrder[], source: "scope" | "e
     const when = clean(o.createdAt) || clean(o.submittedAt);
     const customerKey = String(o.groupId || o.id);
     const items: LiveOrderItem[] = Array.isArray(o.items) && o.items.length ? o.items : [{ id: String(o.id), productName: clean(o.orderSummary) || "상품", optionText: "", qty: 1 } as LiveOrderItem];
+    // 고객이슈(주문상세에서 등록한 환불·반품·교환) 대상 줄 — 대상 글자로 엄격 매칭, 못 고르면 표시 안 함(엉뚱한 줄 금지)
+    const markKind = issueMarkKind({ returnStatus: o.returnStatus });
+    const markIds = markKind && markKind !== "기타" && o.returnReason
+      ? new Set(issueTargetItemIds(items.map((x) => ({ id: String(x.id), productId: clean(x.productId), productName: clean(x.productName), color: clean(x.color), size: clean(x.size), qty: Number(x.qty) || 1 })), { targetText: targetTextFromReturnReason(o.returnReason) }))
+      : new Set<string>();
     for (const it of items) {
       // 원래 주문에서 다른 출고로 넘긴 줄 — 그 출고에서 챙긴다(여기선 빼야 두 번 안 싼다)
       if (!o.pickPull && pulledForOf({ pick_pulled_for: it.pickPulledFor ?? null, pick_pulled_at: it.pickPulledAt ?? null })) { movedAway += Math.max(1, Number(it.qty) || 1); continue; }
@@ -87,6 +96,7 @@ export function buildPickRows(orders: readonly LiveOrder[], source: "scope" | "e
         optionText: formatOrderOptionText(it.color, it.size) || stripNoneOptionParts(it.optionText),
         qty: Math.max(1, Number(it.qty) || 1), unitPrice: Number(it.unitPrice || 0),
         kind, tag, before: before || undefined, pulled: Boolean(o.pickPull),
+        ...(markIds.has(String(it.id)) ? { issue: markKind as "환불" | "반품" | "교환", skip: isStrikeKind(markKind) } : {}),
       });
     }
   }
@@ -104,9 +114,11 @@ export function mergePickRows(scope: PickRow[], extra: PickRow[]): PickRow[] {
 export function includedNote(rows: readonly PickRow[]): string {
   const sum = (f: (r: PickRow) => boolean) => rows.filter(f).reduce((s, r) => s + r.qty, 0);
   const parts: string[] = [];
-  const unpaid = sum((r) => !r.paid);
+  const unpaid = sum((r) => !r.paid && !r.skip);
   if (unpaid) parts.push(`미결제 ${unpaid}`);
-  for (const k of ["past", "late", "repick"] as const) { const n = sum((r) => r.kind === k); if (n) parts.push(`${KIND_LABEL[k]} ${n}개 포함`); }
+  for (const k of ["past", "late", "repick"] as const) { const n = sum((r) => r.kind === k && !r.skip); if (n) parts.push(`${KIND_LABEL[k]} ${n}개 포함`); }
+  const skipped = sum((r) => Boolean(r.skip));
+  if (skipped) parts.push(`환불 ${skipped}개 빼고`);
   return parts.join(" · ");
 }
 
@@ -122,6 +134,8 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const [photoZoom, setPhotoZoom] = useState("");
   const [exporting, setExporting] = useState(false);
+  // 다 챙긴 상품은 한 줄로 접는다(남은 것만 눈에 띄게) — 눌러서 펼친 상품만 열어 둠
+  const [openDone, setOpenDone] = useState<Set<string>>(new Set());
 
   // 오늘 추가 작업(범위 밖 늦은 입금·다시 챙기기) — 서버에서 한 번
   useEffect(() => {
@@ -223,10 +237,11 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
   }, [photoIds]);
 
   // ── 숫자 ──
-  const paidRows = allRows.filter((r) => r.paid);
+  const paidRows = allRows.filter((r) => r.paid && !r.skip);
   const totalPaid = paidRows.reduce((s, r) => s + r.qty, 0);
   const gotPaid = paidRows.filter((r) => picked.has(r.id)).reduce((s, r) => s + r.qty, 0);
-  const unpaidQty = allRows.filter((r) => !r.paid).reduce((s, r) => s + r.qty, 0);
+  const unpaidQty = allRows.filter((r) => !r.paid && !r.skip).reduce((s, r) => s + r.qty, 0);
+  const remainPaid = totalPaid - gotPaid;
   const pct = totalPaid > 0 ? Math.round((gotPaid / totalPaid) * 100) : 0;
 
   const q = search.trim();
@@ -257,10 +272,10 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
   }, [shown]);
 
   const countLine = (rows: readonly PickRow[]) => {
-    const paid = rows.filter((r) => r.paid);
+    const paid = rows.filter((r) => r.paid && !r.skip);
     const total = paid.reduce((s, r) => s + r.qty, 0);
     const got = paid.filter((r) => picked.has(r.id)).reduce((s, r) => s + r.qty, 0);
-    return { all: rows.reduce((s, r) => s + r.qty, 0), total, got, done: total > 0 && got >= total };
+    return { all: rows.filter((r) => !r.skip).reduce((s, r) => s + r.qty, 0), total, got, done: total > 0 && got >= total, open: paid.filter((r) => !picked.has(r.id)) };
   };
 
   const unpull = async (r: PickRow) => {
@@ -275,7 +290,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
   };
 
   const pickAll = async () => {
-    const targets = shown.filter((r) => r.paid && r.kind !== "repick" && !picked.has(r.id));
+    const targets = shown.filter((r) => r.paid && !r.skip && r.kind !== "repick" && !picked.has(r.id));
     if (!targets.length) { showAdminToast("모두 챙겼어요.", "success"); return; }
     const qty = targets.reduce((s, r) => s + r.qty, 0);
     if (!(await showAdminConfirm(`지금 보이는 결제완료 상품 ${qty}개를 모두 챙김으로 표시할까요?\n미결제·다시 챙기기 상품은 빼요. 주문·입금·출고 상태는 바뀌지 않아요.`, { title: "모두 챙김", confirmText: "모두 챙김", cancelText: "그만두기" }))) return;
@@ -312,7 +327,8 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
   };
 
   // ── 그리기 ──
-  const tagOf = (r: PickRow) => r.kind === "normal" ? null : (
+  const tagOf = (r: PickRow) => (<>{r.issue === "교환" ? <span className="shrink-0 rounded px-1.5 py-0.5 text-[12px] font-semibold text-warn-tx ring-1 ring-warn-tx/40">교환 이슈</span> : null}{kindTag(r)}</>);
+  const kindTag = (r: PickRow) => r.kind === "normal" ? null : (
     <span className={`shrink-0 rounded px-1.5 py-0.5 text-[12px] font-semibold ${r.kind === "repick" ? "bg-warn-bg text-warn-tx" : "bg-ink text-white"}`}>{r.tag}</span>
   );
   const checkBox = (on: boolean) => (
@@ -330,6 +346,16 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
   // 한 줄(손님 줄 또는 상품 줄) — 줄 전체가 챙김 버튼(44px+)
   const lineButton = (r: PickRow, children: React.ReactNode) => {
     const on = picked.has(r.id);
+    if (r.skip) {
+      // 환불·반품 이슈가 걸린 줄 — 누를 수 없고 숫자에서 빠진다
+      return (
+        <div key={r.id} className="flex min-h-[52px] items-center gap-3 border-t border-line bg-surface px-3 py-2 first:border-t-0">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 border-danger-tx text-[13px] font-bold text-danger-tx" aria-hidden>×</span>
+          <span className="min-w-0 flex-1 text-ink-mute line-through">{children}</span>
+          <span className="shrink-0 rounded px-1.5 py-0.5 text-[12px] font-bold text-danger-tx ring-1 ring-danger-tx/40">{r.issue} · 챙기지 마세요</span>
+        </div>
+      );
+    }
     return (
       <div key={r.id} className={`flex items-center gap-2 border-t border-line first:border-t-0 ${on ? "bg-surface-2" : "bg-surface"}`}>
         <button type="button" disabled={blocked} onClick={() => void setPickedFor([r.id], !on)} aria-pressed={on} className="flex min-h-[52px] min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left disabled:cursor-wait">
@@ -357,7 +383,9 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
           {!scopeTooWide ? (
             <div className="mt-3">
               <div className="flex items-end justify-between gap-2">
-                <div className="text-[16px] font-bold text-ink tabular-nums">{loading ? "확인 중…" : <>챙긴 {gotPaid} <span className="text-ink-mute">/ 챙길 {totalPaid}개</span></>}</div>
+                <div className="tabular-nums">{loading ? <span className="text-[16px] font-bold text-ink">확인 중…</span> : remainPaid > 0
+                  ? <><span className="text-[20px] font-bold text-ink">남은 {remainPaid}개</span><span className="ml-2 text-[13px] font-semibold text-ink-soft">챙긴 {gotPaid} / 전체 {totalPaid}</span></>
+                  : <span className="text-[20px] font-bold text-ok-tx">{totalPaid > 0 ? `✓ 다 챙겼어요 · ${totalPaid}개` : "챙길 상품 없음"}</span>}</div>
                 <div className="text-[13px] text-ink-soft tabular-nums">{unpaidQty ? <span className="font-semibold text-danger-tx">미결제 {unpaidQty}개 따로</span> : null}</div>
               </div>
               <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-line"><div className="h-full rounded-full bg-ink transition-[width]" style={{ width: `${pct}%` }} /></div>
@@ -378,6 +406,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
           <label className="mt-2 flex w-fit cursor-pointer items-center gap-2 text-[13px] font-semibold text-ink-soft">
             <input type="checkbox" checked={openOnly} onChange={(e) => setOpenOnly(e.target.checked)} className="h-4 w-4 accent-[var(--color-ink)]" />안 챙긴 것만
           </label>
+          {q ? <p className="mt-1.5 text-[12px] font-semibold text-warn-tx">검색 중이라 일부만 보여요 — 다 챙겼는지는 검색어를 지우고 확인하세요</p> : null}
         </div>
 
         {/* 목록 */}
@@ -388,8 +417,18 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
           {!scopeTooWide && view === "product" ? productGroups.map((g) => {
             const all = g.options.flat();
             const c = countLine(all);
+            const gKey = g.name + "|" + g.options[0][0].productId;
+            if (c.done && !openDone.has(gKey)) {
+              return (
+                <button key={gKey} type="button" onClick={() => setOpenDone((prev) => new Set(prev).add(gKey))} className="mb-2 flex w-full items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2.5 text-left">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-ink text-white" aria-hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5 10 17.5 19 7" /></svg></span>
+                  <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-ink-mute">{g.name}</span>
+                  <span className="shrink-0 text-[13px] font-semibold text-ink-mute tabular-nums">{c.total}개 다 챙김</span>
+                </button>
+              );
+            }
             return (
-              <section key={g.name + g.options[0][0].productId} className="mb-3 overflow-hidden rounded-xl border border-line bg-surface">
+              <section key={gKey} className="mb-3 overflow-hidden rounded-xl border border-line bg-surface">
                 <div className="flex items-center gap-3 px-3 py-3">
                   {photoOf(g.photo, 56)}
                   <div className="min-w-0 flex-1">
@@ -409,7 +448,9 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                           <span className="ml-2 text-[16px] font-bold text-ink tabular-nums">{oc.all}개</span>
                           {note ? <span className="ml-1.5 text-[13px] font-semibold text-ink-soft">({note})</span> : null}
                         </span>
-                        <span className="shrink-0 text-[13px] font-semibold text-ink-soft tabular-nums">{oc.done ? "다 챙김" : `${oc.got}/${oc.total}`}</span>
+                        {oc.done ? <span className="shrink-0 text-[13px] font-semibold text-ink-mute">다 챙김</span>
+                          : oc.open.length > 0 ? <button type="button" disabled={blocked} onClick={() => void setPickedFor(oc.open.map((r) => r.id), true)} className="h-9 shrink-0 rounded-lg border border-ink bg-surface px-3 text-[13px] font-bold text-ink disabled:opacity-40">남은 {oc.open.reduce((sum, r) => sum + r.qty, 0)}개 챙김</button>
+                          : <span className="shrink-0 text-[13px] text-ink-mute">{oc.got}/{oc.total}</span>}
                       </div>
                       <div className="pl-3">
                         {rows.map((r) => lineButton(r, <>
@@ -432,6 +473,15 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
           {!scopeTooWide && view === "customer" ? customerGroups.map((rows) => {
             const c = countLine(rows);
             const head = rows[0];
+            if (c.done && !openDone.has(head.customerKey)) {
+              return (
+                <button key={head.customerKey} type="button" onClick={() => setOpenDone((prev) => new Set(prev).add(head.customerKey))} className="mb-2 flex w-full items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2.5 text-left">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-ink text-white" aria-hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5 10 17.5 19 7" /></svg></span>
+                  <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-ink-mute">{head.nickname}{head.name && head.name !== head.nickname ? ` ${head.name}` : ""}</span>
+                  <span className="shrink-0 text-[13px] font-semibold text-ink-mute tabular-nums">{c.total}개 다 챙김</span>
+                </button>
+              );
+            }
             return (
               <section key={head.customerKey} className="mb-3 overflow-hidden rounded-xl border border-line bg-surface">
                 <div className="flex items-center gap-2 px-3 py-3">
