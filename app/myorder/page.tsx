@@ -34,6 +34,7 @@ import MyOrderEmptyState from "@/components/myorder/MyOrderEmptyState";
 import MyOrderPagination from "@/components/myorder/MyOrderPagination";
 // [2026-09-08] 표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import { useGuideBank, useShopInfo } from "@/lib/useShopInfo";
+import { pendingOrderGuideBank } from "@/lib/shopInfo";
 import { useCustomerUiStage } from "@/lib/useCustomerUiStage";
 
 const FOOTER_TEXT = "© since 2024 루루동이 | All Rights Reserved.";
@@ -163,19 +164,10 @@ export default function MyOrderPage() {
   //   예전엔 무조건 기존 계좌라, 노출 방식으로 농협을 골라도 여기만 새마을로 나왔다. 표시·복사 전용(입금 판정과 무관).
   const guideBank = useGuideBank();
   const GUIDE_BANK = { id: "primary" as const, bankName: guideBank?.bankName || shopInfo.bankName, bankAccount: guideBank?.bankAccount || shopInfo.bankAccount, bankHolder: guideBank?.bankHolder || shopInfo.bankHolder };
-  const pendingOrderBank = (() => {
-    for (const o of orders) {
-      if (myOrderFilterOf(myOrderStatusLabel(o)) !== "입금대기") continue;
-      const bn = String(o?.payment_bank_name || "").trim();
-      const ba = String(o?.payment_bank_account || "").trim();
-      const bh = String(o?.payment_bank_holder || "").trim();
-      if (bn && ba && bh) return { bankName: bn, bankAccount: ba, bankHolder: bh };
-    }
-    return null;
-  })();
-  const BANK_NAME = pendingOrderBank?.bankName || GUIDE_BANK.bankName;
-  const BANK_ACCOUNT = pendingOrderBank?.bankAccount || GUIDE_BANK.bankAccount;
-  const BANK_HOLDER = pendingOrderBank?.bankHolder || GUIDE_BANK.bankHolder;
+  const shownBank = pendingOrderGuideBank(orders, GUIDE_BANK, (o) => myOrderFilterOf(myOrderStatusLabel(o)) === "입금대기");
+  const BANK_NAME = shownBank.bankName;
+  const BANK_ACCOUNT = shownBank.bankAccount;
+  const BANK_HOLDER = shownBank.bankHolder;
   const [orderPage, setOrderPage] = useState(1);
   const [orderFilter, setOrderFilter] = useState<MyOrderFilter>("전체");
   const [searched, setSearched] = useState(false);

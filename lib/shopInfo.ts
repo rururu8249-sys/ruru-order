@@ -425,6 +425,22 @@ export function guideBankAccount(info: Pick<ShopInfo, "bankName" | "bankAccount"
   return { id: "primary", bankName: info.bankName, bankAccount: info.bankAccount, bankHolder: info.bankHolder };
 }
 
+/** [2026-10-23] 주문조회 「입금 계좌 보기」 계좌 — ①입금 기다리는 최근 주문에 기록된 계좌(손님이 실제 안내받은 계좌) ②없으면 안내 계좌(guide). 표시·복사 전용. */
+export function pendingOrderGuideBank(
+  orders: readonly any[],
+  guide: { bankName: string; bankAccount: string; bankHolder: string },
+  isPending: (order: any) => boolean,
+): { bankName: string; bankAccount: string; bankHolder: string; fromOrder: boolean } {
+  for (const o of orders || []) {
+    if (!isPending(o)) continue;
+    const bn = String(o?.payment_bank_name || "").trim();
+    const ba = String(o?.payment_bank_account || "").trim();
+    const bh = String(o?.payment_bank_holder || "").trim();
+    if (bn && ba && bh) return { bankName: bn, bankAccount: ba, bankHolder: bh, fromOrder: true };
+  }
+  return { bankName: guide.bankName, bankAccount: guide.bankAccount, bankHolder: guide.bankHolder, fromOrder: false };
+}
+
 /** "새마을금고 9002186993725 (유혜원)" 꼴 — 쪽지·복사 문구용 */
 export function bankLine(info: Pick<ShopInfo, "bankName" | "bankAccount" | "bankHolder"> | ShopBankAccount): string {
   return `${info.bankName} ${info.bankAccount} (${info.bankHolder})`;
