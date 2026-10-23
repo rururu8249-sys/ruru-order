@@ -24,6 +24,7 @@ import { splitIssueBody, fieldFromIssueBody } from "@/lib/issueBodyMeta";
 import { patchIssueTask, type IssueExtraItem } from "@/lib/issueTaskPatch";
 import PickingPullModal from "./PickingPullModal";
 import { pickPullAwayText, pulledForOf } from "@/lib/orderPickPull";
+import { fetchExchangeMarks } from "@/lib/exchangeMarks";
 import { issueMarkKind, issueTargetItemIds, isStrikeKind, targetTextFromReturnReason, type IssueMarkKind } from "@/lib/orderIssueMarks";
 
 type Props = {
@@ -495,6 +496,15 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   })();
   // [2026-10-22 사장님] 지난 주문 줄을 다른 출고로 — [2026-10-23] «출고 넘기기»(넘길 방송·날짜를 고름). 저장은 picking-pull 라우트(돈 무접촉).
   const [pullOpen, setPullOpen] = useState(false);
+  // [2026-10-23 14:57] 진행 중 교환 — 상품 카드 위에 「교환: A XS → S」(고객이슈 처리창에서 고른 바꿀 상품)
+  const [exchangeMarks, setExchangeMarks] = useState<Map<string, string>>(new Map());
+  const exchangeCode = String(order.orderNo || order.groupId || "");
+  useEffect(() => {
+    let alive = true;
+    if (!exchangeCode) return;
+    void fetchExchangeMarks([exchangeCode]).then((m) => { if (alive) setExchangeMarks(m); });
+    return () => { alive = false; };
+  }, [exchangeCode, findTaskTick]);
   const [unpullingId, setUnpullingId] = useState("");
   const unpullItem = async (item: LiveOrderItem) => {
     if (unpullingId) return;
@@ -1776,6 +1786,9 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 const pulledDay = pulledForOf({ pick_pulled_for: item.pickPulledFor ?? null, pick_pulled_at: item.pickPulledAt ?? null });
                 return (
                 <div key={`${item.id}-${index}`}>
+                  {exchangeMarks.get(String(item.id)) ? (
+                    <div className="mb-1 px-1 text-[13px] font-bold text-warn-tx">{exchangeMarks.get(String(item.id))}</div>
+                  ) : null}
                   {pulledDay ? (
                     <div className="mb-1 flex flex-wrap items-center gap-1.5 px-1">
                       <span className="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-[12px] font-semibold text-ink" title="이 상품은 넘긴 곳의 주문서·송장·물건챙기기에 「지난 주문」으로 들어가 있어요">{pickPullAwayText(pulledDay, item.pickPulledTarget)}{item.pickPulledReason ? ` · ${item.pickPulledReason}` : ""}</span>

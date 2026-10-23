@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import type { LiveOrder } from "./types";
 import { exportLiveOrdersForPicking, exportLiveOrdersForRosen } from "./adminLiveOrderExcelExport";
 import LivePickingPanel from "./LivePickingPanel";
+import { fetchExchangeMarks } from "@/lib/exchangeMarks";
 import LiveCartHoldsModal from "./LiveCartHoldsModal";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
@@ -939,7 +940,9 @@ export default function LiveOrderTable({
     setExporting(kind);
     try {
       if (kind === "rozen") {
-        await exportLiveOrdersForRosen(orders, { filterLabel });
+        // [2026-10-23] 진행 중 교환은 송장 상품명에 「[교환: A XS → S]」 — 바뀐 걸 송장에서도 알아보게
+        const exchangeByItemId = await fetchExchangeMarks(orders.map((o) => String(o.orderNo || o.groupId || "")));
+        await exportLiveOrdersForRosen(orders, { filterLabel, exchangeByItemId });
         // [㉕-C] 송장 출력 기록 — 송장제외 아닌 주문의 invoice_printed_at 을 «처음 출력 시각»으로만 채운다(재출력 막지 않음).
         try {
           const ids = orders.filter((o) => o.excludeFromShipping !== true).map((o) => Number(o.id)).filter((n) => Number.isFinite(n) && n > 0);

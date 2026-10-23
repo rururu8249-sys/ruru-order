@@ -23,6 +23,7 @@ import type { LiveOrder, LiveOrderItem } from "./types";
 import { exportLiveOrdersForPicking } from "./adminLiveOrderExcelExport";
 import { classifyPickingAttention } from "@/lib/orderPickingWorkspace";
 import { pulledForOf, shortDateWithWeekday } from "@/lib/orderPickPull";
+import { fetchExchangeMarks } from "@/lib/exchangeMarks";
 import { issueMarkKind, issueTargetItemIds, isStrikeKind, targetTextFromReturnReason } from "@/lib/orderIssueMarks";
 
 type Props = { orders: LiveOrder[]; filterLabel: string; scopeTooWide?: boolean; onClose: () => void };
@@ -31,6 +32,8 @@ type Props = { orders: LiveOrder[]; filterLabel: string; scopeTooWide?: boolean;
 export type PickKind = "normal" | "past" | "late" | "repick";
 export type PickRow = {
   id: string;
+  /** 주문번호(교환 표식 조회용) */
+  orderNo?: string;
   customerKey: string;
   nickname: string;
   name: string;
@@ -90,7 +93,7 @@ export function buildPickRows(orders: readonly LiveOrder[], source: "scope" | "e
       }
       const before = it.repickBefore ? [clean(it.repickBefore.product_name), formatOrderOptionText(it.repickBefore.color, it.repickBefore.size)].filter(Boolean).join(" ") : "";
       rows.push({
-        id: String(it.id), customerKey, nickname, name, when, paid,
+        id: String(it.id), orderNo: clean(o.orderNo || o.groupId), customerKey, nickname, name, when, paid,
         productId: clean(it.productId), productName: clean(it.productName) || "상품",
         color: clean(it.color), size: clean(it.size),
         optionText: formatOrderOptionText(it.color, it.size) || stripNoneOptionParts(it.optionText),
@@ -155,6 +158,16 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
   const extraBuilt = useMemo(() => buildPickRows(scopeTooWide ? [] : extraOrders, "extra"), [extraOrders, scopeTooWide]);
   const allRows = useMemo(() => mergePickRows(scopeBuilt.rows, extraBuilt.rows).filter((r) => !removedIds.has(r.id)), [scopeBuilt, extraBuilt, removedIds]);
   const movedAway = scopeBuilt.movedAway;
+  // [14:57 사장님] 진행 중 교환 — 바꿀 상품을 줄에 크게(챙길 때 바뀐 걸로 챙기게)
+  const [exchange, setExchange] = useState<Map<string, string>>(new Map());
+  const codeKey = useMemo(() => Array.from(new Set(allRows.map((r) => r.orderNo || "").filter(Boolean))).sort().join(","), [allRows]);
+  useEffect(() => {
+    let alive = true;
+    if (!codeKey) return;
+    void fetchExchangeMarks(codeKey.split(",")).then((m) => { if (alive) setExchange(m); });
+    return () => { alive = false; };
+  }, [codeKey]);
+  const exLine = (r: PickRow) => exchange.get(r.id) ? <span className="mt-0.5 block text-[13px] font-bold text-warn-tx">{exchange.get(r.id)} — 바뀐 걸로 챙기세요</span> : null;
 
   // ── 챙김 상태(서버 picked_at) 읽기·쓰기 — 예전 창과 같은 규칙: 읽기 끝나기 전·저장 중엔 못 누름, 실패하면 서버 값으로 되돌림 ──
   const idKey = useMemo(() => allRows.map((r) => r.id).sort().join(","), [allRows]);
@@ -462,6 +475,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                               {tagOf(r)}
                             </span>
                             {r.before ? <span className="mt-0.5 block text-[12px] text-warn-tx">변경 전: {r.before}</span> : null}
+                            {exLine(r)}
                           </>))}
                       </div>
                     </div>
@@ -498,6 +512,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                         <span className="block break-words text-[14px] font-semibold leading-snug">{r.productName}</span>
                         <span className="flex flex-wrap items-center gap-1.5 text-[13px] text-ink-soft">{r.optionText || "옵션 없음"}{tagOf(r)}</span>
                         {r.before ? <span className="block text-[12px] text-warn-tx">변경 전: {r.before}</span> : null}
+                        {exLine(r)}
                       </span>
                     </span>
                   </>))}

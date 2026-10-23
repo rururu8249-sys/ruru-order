@@ -9,6 +9,8 @@ import { buildPickingExportRows, type PickingAttentionExportRow } from "@/lib/or
 
 type ExportMeta = {
   filterLabel: string;
+  /** [2026-10-23] 진행 중 교환 — 주문 행 id → 「교환: A XS → S」(lib/exchangeMarks). 송장 상품명에 붙인다 */
+  exchangeByItemId?: Map<string, string>;
   // [2026-09-20] 물건챙기기 엑셀 줄 순서 — 팝업 화면과 같게. product: 상품명→색상→사이즈→시간 / nickname: 닉네임→시간 / time: 시간
   rowOrder?: "product" | "nickname" | "time";
   visibleItemIds?: string[];
@@ -104,13 +106,15 @@ function totalQty(order: LiveOrder) {
   return (order.items || []).reduce((sum, item) => sum + itemQty(item), 0);
 }
 
-function itemSummary(order: LiveOrder) {
+// 송장 만들 때만 잠깐 담아 두는 교환 표식(exportLiveOrdersForRosen 안에서 넣고 끝나면 비움)
+let rosenExchange: Map<string, string> | undefined;
+function itemSummary(order: LiveOrder, exchange: Map<string, string> | undefined = rosenExchange) {
   const items = order.items || [];
   // [2026-10-22 → 10-23 출고 넘기기] 넘겨받은 묶음이면 상품명 맨 앞에 「[넘겨받은 주문 10.18(토) · 사유]」 — 송장에서도 바로 알아보게
   const pullMark = order.pickPull ? `[${pickPullBadgeText(order.createdAt, order.pickPull.reason)}] ` : "";
   if (!items.length) return pullMark + (clean(order.orderSummary) || "상품명없음 x1개");
   // 상품 전체 출력, 상품 사이는 #. [2026-10-22 사장님] 맨 끝 「(총 N개)」는 뺀다 — 로젠 상품명 칸에 자꾸 끼어 거슬림(총수량은 관리자확인용 시트 칸에 따로 있음).
-  return `${pullMark}${items.map(itemText).join(" # ")}`;
+  return `${pullMark}${items.map((it) => { const ex = exchange?.get(String(it.id)); return ex ? `${itemText(it)} [${ex}]` : itemText(it); }).join(" # ")}`;
 }
 
 // 수하인명/닉네임 칼럼 + 주소 뒤 "/닉네임" 에 쓰는 표시 이름: 유튜브 닉네임 우선(운영자가 방송 시청자와 매칭하는 기준).
@@ -393,6 +397,11 @@ function isPickingExportExcluded(order: LiveOrder) {
 }
 
 export async function exportLiveOrdersForRosen(orders: LiveOrder[], meta: ExportMeta) {
+  rosenExchange = meta.exchangeByItemId;
+  try { await exportLiveOrdersForRosenInner(orders, meta); } finally { rosenExchange = undefined; }
+}
+
+async function exportLiveOrdersForRosenInner(orders: LiveOrder[], meta: ExportMeta) {
   const exportOrders = orders.filter((order) => !isRosenExportExcluded(order));
 
   if (!exportOrders.length) {

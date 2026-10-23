@@ -799,7 +799,8 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
               const from = lines.find((l) => (sel[l.id] || 0) > 0);
               const fromOpt = from ? optLabel(from.color, from.size) : "";
               const toOpt = optLabel(inp.color, inp.size);
-              const fromTxt = from ? (exPicker === "same" ? (fromOpt || from.product_name) : [from.product_name, fromOpt].filter(Boolean).join(" ")) : "";
+              // [14:57 사장님] 송장·챙기기에서도 알아보게 상품 이름까지 — 「아크네스튜디오 청바지 XS → S」 / 다른 상품이면 「A XS → B M」
+              const fromTxt = from ? [from.product_name, fromOpt].filter(Boolean).join(" ") : "";
               const toTxt = exPicker === "same" ? (toOpt || inp.productName) : [inp.productName, toOpt].filter(Boolean).join(" ");
               setExchangeOption(fromTxt ? `${fromTxt} → ${toTxt}` : toTxt);
               return true;
