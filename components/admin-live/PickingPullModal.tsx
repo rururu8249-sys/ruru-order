@@ -58,6 +58,7 @@ export default function PickingPullModal({ orderNo, nickname, name, orderedAt, l
   const [broadcasts, setBroadcasts] = useState<BroadcastOption[] | null>(null);
   const [target, setTarget] = useState<string>(""); // "bc:<id>" | "date"
   const [shopDate, setShopDate] = useState(todayKey);
+  const [showAllBroadcasts, setShowAllBroadcasts] = useState(false);
   useEffect(() => {
     let alive = true;
     void (async () => {
@@ -130,7 +131,7 @@ export default function PickingPullModal({ orderNo, nickname, name, orderedAt, l
           <div className="mt-4 text-[13px] font-semibold text-ink">어느 출고에 넣을까요?</div>
           <div className="mt-2 space-y-1.5">
             {broadcasts === null ? <div className="px-1 py-2 text-[13px] text-ink-mute">방송 목록을 불러오는 중…</div> : null}
-            {(broadcasts || []).map((b) => {
+            {(broadcasts || []).filter((b, i) => showAllBroadcasts || i < 4 || target === `bc:${b.id}`).map((b) => {
               const on = target === `bc:${b.id}`;
               return (
                 <button key={b.id} type="button" onClick={() => setTarget(`bc:${b.id}`)} className={rowCls(on)} aria-pressed={on}>
@@ -140,6 +141,9 @@ export default function PickingPullModal({ orderNo, nickname, name, orderedAt, l
                 </button>
               );
             })}
+            {(broadcasts || []).length > 4 && !showAllBroadcasts ? (
+              <button type="button" onClick={() => setShowAllBroadcasts(true)} className="h-9 px-1 text-[13px] font-semibold text-ink-soft">이전 방송 더 보기</button>
+            ) : null}
             <div className={rowCls(target === "date")} onClick={() => setTarget("date")} role="button" aria-pressed={target === "date"}>
               <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${target === "date" ? "border-ink" : "border-line"}`}>{target === "date" ? <span className="h-2.5 w-2.5 rounded-full bg-ink" /> : null}</span>
               <span className="shrink-0 text-[14px] font-semibold text-ink">쇼핑몰 주문</span>
