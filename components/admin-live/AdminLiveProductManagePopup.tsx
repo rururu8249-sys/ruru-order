@@ -1687,7 +1687,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     value={bcSort}
                     onChange={(e) => setBcSort(e.target.value as ProductSortKey)}
                     title="보기 순서만 바꿈(저장 안 됨)"
-                    style={{ ...TAB_SORT_STYLE, marginLeft: "auto" }}
+                    style={{ ...TAB_SORT_STYLE, ...(isNarrow ? { flex: 1, minWidth: 0 } : { marginLeft: "auto" }) }}
                   >
                     {PRODUCT_SORT_OPTIONS.map((o) => (<option key={o.key} value={o.key}>{o.label}</option>))}
                   </select>
@@ -1711,7 +1711,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       disabled={!rotationLive}
                       title={rotationLive ? "방송 화면 위젯에 순환시킬 상품 범위" : "진행 중인 방송에서만 바꿀 수 있어요"}
                       onChange={(e) => { const v = e.target.value; if (v === "all") void rotationUseAll(); else if (v === "selected") void rotationAddChecked(); }}
-                      style={{ ...TAB_SORT_STYLE, opacity: rotationLive ? 1 : 0.5, cursor: rotationLive ? "pointer" : "not-allowed" }}
+                      style={{ ...TAB_SORT_STYLE, ...(isNarrow ? { flex: 1, minWidth: 0 } : {}), opacity: rotationLive ? 1 : 0.5, cursor: rotationLive ? "pointer" : "not-allowed" }}
                     >
                       <option value="all">전체 상품 {bcAllPids.length}개</option>
                       <option value="selected" disabled={widgetRotation.mode !== "selected" && bcRotSel.size === 0}>{widgetRotation.mode === "selected" ? `체크한 상품만 ${rotationSelectedCount}개` : bcRotSel.size > 0 ? `체크한 상품만 ${bcRotSel.size}개` : "체크한 상품만 (먼저 체크)"}</option>
@@ -1887,13 +1887,13 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         ) : tab === "shop" ? (
           <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "12px 16px 16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px", flexWrap: "wrap" }}>
-              <span style={TAB_TITLE_STYLE}>쇼핑몰 상품 {shopRows.length}개</span>
+              <span style={{ ...TAB_TITLE_STYLE, flexBasis: isNarrow ? "100%" : undefined }}>쇼핑몰 상품 {shopRows.length}개</span>
               {shopRows.length > 0 ? (
                 <select
                   value={shopSort}
                   onChange={(e) => setShopSort(e.target.value as ProductSortKey)}
                   title="보기 순서만 바꿈(저장 안 됨)"
-                  style={{ ...TAB_SORT_STYLE, marginLeft: "auto" }}
+                  style={{ ...TAB_SORT_STYLE, ...(isNarrow ? { flex: 1, minWidth: 0 } : { marginLeft: "auto" }) }}
                 >
                   {PRODUCT_SORT_OPTIONS.map((o) => (<option key={o.key} value={o.key}>{o.label}</option>))}
                 </select>
@@ -1924,7 +1924,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         onDragOver={(e) => { e.preventDefault(); if (shopDragOver !== i) setShopDragOver(i); }}
                         onDrop={(e) => { e.preventDefault(); if (shopDragPid) reorderShopByPid(shopDragPid, pid); setShopDragPid(null); setShopDragOver(null); }}
                         onDragEnd={() => { setShopDragPid(null); setShopDragOver(null); }}
-                        style={{ display: "flex", alignItems: "center", gap: "8px", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "8px", background: shopDragPid !== null && shopDragOver === i && shopDragPid !== pid ? "var(--color-warn-bg)" : "var(--color-surface)", opacity: shopDragPid === pid ? 0.4 : 1, boxShadow: shopDragPid !== null && shopDragOver === i && shopDragPid !== pid ? "inset 0 2px 0 var(--color-rose-deep)" : undefined, cursor: !shopDragEnabled ? "default" : "grab" }}
+                        style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: isNarrow ? "wrap" : "nowrap", rowGap: isNarrow ? "8px" : undefined, border: "1px solid var(--color-line)", borderRadius: "8px", padding: "8px", background: shopDragPid !== null && shopDragOver === i && shopDragPid !== pid ? "var(--color-warn-bg)" : "var(--color-surface)", opacity: shopDragPid === pid ? 0.4 : 1, boxShadow: shopDragPid !== null && shopDragOver === i && shopDragPid !== pid ? "inset 0 2px 0 var(--color-rose-deep)" : undefined, cursor: !shopDragEnabled ? "default" : "grab" }}
                       >
                         {/* 드래그 핸들 */}
                         <span style={{ flexShrink: 0, fontSize: "14px", color: "var(--color-ink-mute)", userSelect: "none" }} title="드래그로 순서 변경">⠿</span>
@@ -1936,8 +1936,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         >
                           {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
                         </span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
+                        <div style={{ flex: 1, minWidth: isNarrow ? "50%" : 0 }}>
+                          <div style={isNarrow ? { fontSize: "14px", fontWeight: 700, color: "var(--color-ink)", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", wordBreak: "break-word" } : { fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
                           <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)", marginTop: "2px" }}>{productPriceLabel(p)}</div>
                           {productCategory(p) ? <span style={{ display: "inline-block", marginTop: "4px", fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "8px", background: "var(--color-surface-3)", color: "var(--color-ink-soft)" }}>{productCategory(p)}</span> : null}
                         </div>

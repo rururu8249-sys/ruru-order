@@ -161,8 +161,9 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   //   저장 시 서버(/api/admin-live/order-return)가 기록 + 고객이슈 자동등록 + (환불) 적립 포인트 회수까지 처리(회수 규칙 불변).
   const [issueRegisterOpen, setIssueRegisterOpen] = useState(false);
   const [issueEarnedPoints, setIssueEarnedPoints] = useState(0);
-  // [E2] 위험 작업(입금확인 취소·주문서 자체 취소·손님 차단)은 화면 맨 아래 접힌 한 줄로 — 실수 방지(2클릭 마찰).
-  const [dangerOpen, setDangerOpen] = useState(false);
+  // [E2] 위험 작업(입금확인 취소·주문서 자체 취소·손님 차단)은 화면 맨 아래 한 곳.
+  //   [2026-10-23 사장님 「열기 귀찮아 그냥 열어놔」] 접힘 폐지 — 항상 펼침(각 버튼의 확인창은 그대로).
+  const dangerOpen = true;
   // [2026-09-29 C] 이 주문 반품 이슈의 해결 여부(배지·「반품 취소」 숨김용) + task 원본(같은 처리창으로 열기용). 조회 실패는 무시.
   const [issueLatest, setIssueLatest] = useState<{ isResolved: boolean; resolvedAt: string; task: Record<string, unknown> | null } | null>(null);
   const [findTaskTick, setFindTaskTick] = useState(0);
@@ -1973,12 +1974,9 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         </section>
         </div>
 
-        {/* [E2] ⚠ 위험 작업 — 기본 접힘. 누르면 입금확인 취소·주문서 자체 취소·이 손님 차단 표시(핸들러·조건·확인창 그대로). */}
+        {/* [E2] 위험 작업 — 항상 펼침(2026-10-23). 입금확인 취소·주문서 자체 취소·이 손님 차단(핸들러·조건·확인창 그대로). */}
         <section className="mt-4">
-          <button type="button" onClick={() => setDangerOpen((v) => !v)} aria-expanded={dangerOpen} className="flex h-10 w-full items-center justify-between rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink-soft hover:bg-surface-2">
-            <span>위험 작업 · 입금확인 취소 · 주문 취소 · 차단</span>
-            <span className="text-[12px] text-ink-mute">{dangerOpen ? "닫기" : "열기"}</span>
-          </button>
+          <div className="px-1 text-[13px] font-semibold text-ink-soft">위험 작업</div>
           {dangerOpen ? (
             <div className="mt-2 space-y-2 rounded-lg border border-line p-3">
               <div className="text-[11px] font-bold leading-4 text-ink-mute">되돌리기 어려운 작업이에요 — 꼭 필요할 때만 사용하세요.</div>
