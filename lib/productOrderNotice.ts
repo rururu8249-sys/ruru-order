@@ -142,7 +142,7 @@ export function resolveProductNoticePresentationFor(input: {
   const custom = productMode === "inherit" ? input.globalCustom : input.productCustom;
 
   if (mode === "instant") return { badge: INSTANT_BADGE_TEXT, message: "" };
-  if (mode === "live_only") return { badge: "방송에서 접수한 분만 주문", message: "" };
+  if (mode === "live_only") return { badge: LIVE_ONLY_NOTICE_TEXT, message: "" };
   if (mode === "custom") return { badge: "", message: resolveProductOrderNotice(mode, custom) };
   return { badge: "", message: "" };
 }
@@ -156,9 +156,9 @@ export function effectiveProductNoticeMode(productMode: unknown, badgeTypes: unk
 }
 // [2026-10-23 사장님 「난독증 손님도 알아듣게」·15:50 「주문돼요」는 «방송 접수 후 바로 주문하라»로 헷갈림]
 // 옵션창 가격 옆·안내 줄 = 「바로 주문 가능」(16:02 「지금」 겹침 정리). 카드 배지는 16:06부터 예외(방송 접수 상품)에만.
-export const INSTANT_BADGE_TEXT = "바로 주문 가능"; // 16:02 「지금·바로」 겹침 → 카드·옵션창·안내 줄 모두 같은 말
-/** [16:06] 카드 배지는 예외(방송에서 접수해야 사는 상품)에만 */
-export const LIVE_ONLY_CARD_BADGE = "방송 접수 후 주문";
+// [16:11 사장님] 카드 배지는 다 빼고, 옵션창 상품명 바로 아래 빨간 한 줄로만 알린다.
+export const INSTANT_BADGE_TEXT = "방송 접수 없이 바로 구매 가능!";
+export const LIVE_ONLY_NOTICE_TEXT = "방송 접수 완료 후 구매 가능!";
 export const INSTANT_CARD_BADGE = "바로 주문 가능";
 /** 바로 주문 상품인지 — [2026-10-23] 쇼핑몰 진열(in_shop=true) 상품은 설정과 무관하게 무조건 바로 주문 */
 export function isInstantOrderProduct(productMode: unknown, badgeTypes: unknown, globalMode: unknown, inShop?: unknown): boolean {

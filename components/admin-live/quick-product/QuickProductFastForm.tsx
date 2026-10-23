@@ -3739,7 +3739,7 @@ export default function QuickProductFastForm({
                     <button type="button" aria-pressed={!instant} style={btn(!instant)} onClick={() => { setFormTouched(true); setOrderNoticeMode("live_only"); setBadgeTypes((prev) => prev.filter((x) => x !== "direct")); }}>방송 접수 후 구매</button>
                   </div>
                   <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--color-ink-mute)" }}>
-                    {instant ? "방송 접수 없이 바로 주문할 수 있어요 · 손님 카드에 「바로 주문」 표시" : "방송에서 접수한 분만 주문할 수 있어요"}
+                    {instant ? "손님 옵션창에 「방송 접수 없이 바로 구매 가능!」" : "손님 옵션창에 「방송 접수 완료 후 구매 가능!」"}
                   </div>
                   <div style={{ marginTop: "2px", fontSize: "11px", color: "var(--color-ink-mute)" }}>쇼핑몰에 진열한 상품은 이 설정과 상관없이 항상 「바로 주문」이에요</div>
                 </>
