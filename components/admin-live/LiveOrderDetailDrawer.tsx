@@ -1778,7 +1778,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 <div key={`${item.id}-${index}`}>
                   {pulledDay ? (
                     <div className="mb-1 flex flex-wrap items-center gap-1.5 px-1">
-                      <span className="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-[12px] font-semibold text-ink" title="이 상품은 넘긴 곳의 주문서·송장·물건챙기기에 「넘겨받은 주문」으로 들어가 있어요">{pickPullAwayText(pulledDay, item.pickPulledTarget)}{item.pickPulledReason ? ` · ${item.pickPulledReason}` : ""}</span>
+                      <span className="inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-[12px] font-semibold text-ink" title="이 상품은 넘긴 곳의 주문서·송장·물건챙기기에 「지난 주문」으로 들어가 있어요">{pickPullAwayText(pulledDay, item.pickPulledTarget)}{item.pickPulledReason ? ` · ${item.pickPulledReason}` : ""}</span>
                       <button type="button" disabled={unpullingId === String(item.id)} onClick={() => void unpullItem(item)} className="h-7 rounded-lg border border-line bg-surface px-2 text-[12px] font-semibold text-ink-soft hover:bg-surface-2 disabled:opacity-40">{unpullingId === String(item.id) ? "취소 중…" : "넘기기 취소"}</button>
                     </div>
                   ) : null}

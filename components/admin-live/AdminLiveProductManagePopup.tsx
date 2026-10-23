@@ -156,6 +156,16 @@ const HIDDEN_EYE_ICON = (
   </svg>
 );
 
+// [2026-10-23 사장님 「보이기·숨기기를 눈 그림으로, 방송·쇼핑몰 둘 다 같게」] 줄 버튼 하나 = 지금 상태 그림.
+//   보이는 중 = 눈 / 숨김 = 눈 + 빨간 사선. 누르면 바뀜(저장 함수 toggleProductHidden 그대로).
+const SHOWN_EYE_ICON = (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: "var(--color-ink)" }}>
+    <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+const eyeBtn = (hidden: boolean): React.CSSProperties => ({ flexShrink: 0, width: "40px", height: "32px", display: "inline-flex", alignItems: "center", justifyContent: "center", background: hidden ? "var(--color-surface-2)" : "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "8px", cursor: "pointer", padding: 0 });
+
 function productName(p: ProductRow) {
   return pickString(p, ["product_name", "name", "title"], "상품명 없음");
 }
@@ -1863,7 +1873,6 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             {bcCopyMode ? <input type="checkbox" checked={bcCopySel.has(pid)} onChange={() => toggleBcCopyPick(pid)} onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, width: "16px", height: "16px", accentColor: "var(--color-rose-deep)", cursor: "pointer" }} /> : <span style={{ flexShrink: 0, fontSize: "14px", color: bcDragEnabled ? "var(--color-ink-mute)" : "var(--color-line)", userSelect: "none" }}>⠿</span>}
                             {!bcCopyMode ? <input type="checkbox" aria-label={`${productName(p)} 순환 체크`} checked={bcRotSel.has(pid)} onChange={() => toggleRotSel(pid)} onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, width: "16px", height: "16px", accentColor: "var(--color-ink)", cursor: "pointer" }} /> : null}
                             <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", width: "20px", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
-                            {rowHidden ? <span title="손님 화면에서 숨긴 상품" aria-label="숨김" style={{ flexShrink: 0, display: "inline-flex" }}>{HIDDEN_EYE_ICON}</span> : null}
                             <span onClick={(e) => { e.stopPropagation(); if (img) setLightbox(img); }} style={{ width: "48px", height: "48px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: img ? "zoom-in" : "default", opacity: rowHidden ? 0.45 : 1 }}>{img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}</span>
                             <div style={{ flex: 1, minWidth: isNarrow ? "50%" : 0, opacity: rowHidden ? 0.55 : 1 }}><div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}><span style={isNarrow ? { fontSize: "14px", fontWeight: 700, color: "var(--color-ink)", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", wordBreak: "break-word" } : { fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</span>{rowRotBadge ? <span style={rowRotBadge === "소개 중" ? ROT_BADGE_LIVE : rowRotBadge === "순환" ? ROT_BADGE_ON : ROT_BADGE_OFF}>{rowRotBadge}</span> : null}</div><div style={{ fontSize: "11px", fontWeight: 800, color: isBrandFolder ? "var(--color-ink-soft)" : "var(--color-rose-deep)", marginTop: "2px" }}>{isBrandFolder ? `브랜드 그룹 · 세부상품 ${allDetails.length}개` : productPriceLabel(p)}</div></div>
                             {isBrandFolder && !bcCopyMode ? <button type="button" onClick={(e) => { e.stopPropagation(); setBcExpanded((prev) => { const next = new Set(prev); if (next.has(pid)) next.delete(pid); else next.add(pid); return next; }); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}>{expanded ? "접기" : "세부상품"}</button> : null}
@@ -1871,7 +1880,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             {!isBrandFolder && !bcCopyMode ? (parentPinned
                               ? <button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void clearBroadcastPin(); }} title="소개를 끝내고 방송 화면을 다시 자동 순환으로" style={rowBtnPrimary}>{bcPinBusy ? "정리 중…" : "소개 끝"}</button>
                               : <button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void broadcastOneClick(p); }} title="방송 화면에 이 상품만 띄우고 안내문을 복사" style={rowBtn}>소개</button>) : null}
-                            {!bcCopyMode ? <button type="button" disabled={hideBusyId === pid || !canToggleHidden(p)} onClick={(e) => { e.stopPropagation(); void toggleProductHidden(p); }} title={isProductHidden(p) ? "손님 화면에 다시 보이기" : "손님 화면 전체에서 숨기기(이 목록엔 남음)"} style={rowBtn}>{isProductHidden(p) ? "보이기" : "숨기기"}</button> : null}
+                            {!bcCopyMode ? <button type="button" disabled={hideBusyId === pid || !canToggleHidden(p)} onClick={(e) => { e.stopPropagation(); void toggleProductHidden(p); }} title={rowHidden ? "숨김 — 누르면 손님 화면에 다시 보여요" : "보이는 중 — 누르면 손님 화면에서 숨겨요(이 목록엔 남음)"} aria-label={rowHidden ? "숨김 상품, 누르면 보이기" : "보이는 상품, 누르면 숨기기"} aria-pressed={rowHidden} style={{ ...eyeBtn(rowHidden), opacity: hideBusyId === pid ? 0.5 : 1 }}>{rowHidden ? HIDDEN_EYE_ICON : SHOWN_EYE_ICON}</button> : null}
                             <button type="button" onClick={(e) => { e.stopPropagation(); editProduct(p); }} style={rowBtn}>수정</button>
                             <button type="button" disabled={bcBusy} onClick={(e) => { e.stopPropagation(); void removeBcProduct(pid); }} title="이 방송 목록에서만 뺌(상품은 남음)" style={{ ...rowBtnDanger, opacity: bcBusy ? 0.6 : 1 }}>빼기</button>
                           </div>
@@ -1932,16 +1941,16 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         <span
                           onClick={(e) => { e.stopPropagation(); if (img) setLightbox(img); }}
                           title={img ? "클릭하면 크게 보기" : undefined}
-                          style={{ width: "56px", height: "56px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: img ? "zoom-in" : "default" }}
+                          style={{ width: "56px", height: "56px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: img ? "zoom-in" : "default", opacity: isProductHidden(p) ? 0.45 : 1 }}
                         >
                           {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
                         </span>
-                        <div style={{ flex: 1, minWidth: isNarrow ? "50%" : 0 }}>
+                        <div style={{ flex: 1, minWidth: isNarrow ? "50%" : 0, opacity: isProductHidden(p) ? 0.55 : 1 }}>
                           <div style={isNarrow ? { fontSize: "14px", fontWeight: 700, color: "var(--color-ink)", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", wordBreak: "break-word" } : { fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
                           <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-rose-deep)", marginTop: "2px" }}>{productPriceLabel(p)}</div>
                           {productCategory(p) ? <span style={{ display: "inline-block", marginTop: "4px", fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "8px", background: "var(--color-surface-3)", color: "var(--color-ink-soft)" }}>{productCategory(p)}</span> : null}
                         </div>
-                        <button type="button" disabled={hideBusyId === pid || !canToggleHidden(p)} onClick={() => void toggleProductHidden(p)} title={isProductHidden(p) ? "손님 화면에 다시 보이기" : "손님 화면 전체에서 숨기기(이 목록엔 남음)"} style={rowBtn}>{isProductHidden(p) ? "보이기" : "숨기기"}</button>
+                        <button type="button" disabled={hideBusyId === pid || !canToggleHidden(p)} onClick={() => void toggleProductHidden(p)} title={isProductHidden(p) ? "숨김 — 누르면 손님 화면에 다시 보여요" : "보이는 중 — 누르면 손님 화면에서 숨겨요(이 목록엔 남음)"} aria-label={isProductHidden(p) ? "숨김 상품, 누르면 보이기" : "보이는 상품, 누르면 숨기기"} aria-pressed={isProductHidden(p)} style={{ ...eyeBtn(isProductHidden(p)), opacity: hideBusyId === pid ? 0.5 : 1 }}>{isProductHidden(p) ? HIDDEN_EYE_ICON : SHOWN_EYE_ICON}</button>
                         <button type="button" onClick={() => editProduct(p)} style={rowBtn}>수정</button>
                         <button type="button" disabled={shopBusy} onClick={() => void removeFromShop(pid)} title="쇼핑몰 목록에서만 뺌(상품은 남음)" style={{ ...rowBtnDanger, opacity: shopBusy ? 0.6 : 1 }}>빼기</button>
                       </div>

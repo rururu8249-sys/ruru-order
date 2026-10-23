@@ -10,8 +10,8 @@ const { parsePickPullRequest, pickPullBadgeText, pickPullAwayText, restoreFromPr
 // ── 1. 순수 함수 ──
 assert.equal(shortDateWithWeekday('2026-10-18'), '10.18(일)');
 assert.equal(shortDateWithWeekday('2026-10-17T15:30:00+09:00'), '10.17(토)');
-assert.equal(pickPullBadgeText('2026-10-17T15:30:00+09:00', '고객이슈 교환'), '넘겨받은 주문 10.17(토) · 고객이슈 교환');
-assert.equal(pickPullBadgeText(null, ''), '넘겨받은 주문');
+assert.equal(pickPullBadgeText('2026-10-17T15:30:00+09:00', '고객이슈 교환'), '지난 주문 10.17(토) · 고객이슈 교환');
+assert.equal(pickPullBadgeText(null, ''), '지난 주문');
 assert.equal(pickPullAwayText('2026-10-22'), '10.22(목) 출고로 넘김');
 assert.equal(pickPullAwayText('2026-10-22', '10.22(목) 남녀공용의류'), '10.22(목) 남녀공용의류 출고로 넘김');
 assert.equal(pullTargetLabelForBroadcast('남녀공용의류', '2026-10-22T11:00:00Z'), '10.22(목) 남녀공용의류');
@@ -90,14 +90,14 @@ const excel = createUiLoader({ exceljs: { default: ExcelJS }, '@/lib/adminToast'
 const loadWb = async () => { const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await blob.arrayBuffer()); return wb; };
 await excel.exportLiveOrdersForRosen([{ ...v, address: '서울시', detailAddress: '1동', zipcode: '01234' }, { ...original, address: '서울시', detailAddress: '1동', zipcode: '01234' }], { filterLabel: '오늘' });
 const rosen = (await loadWb()).getWorksheet('주소통합_제목필터');
-assert.match(String(rosen.getCell('I2').value), /^\[넘겨받은 주문 10\.17\(토\) · 고객이슈 교환\] 상품2/, '송장 상품명 맨 앞 지난 주문 표식');
+assert.match(String(rosen.getCell('I2').value), /^\[지난 주문 10\.17\(토\) · 고객이슈 교환\] 상품2/, '송장 상품명 맨 앞 지난 주문 표식');
 assert.doesNotMatch(String(rosen.getCell('I2').value), /총 \d+개/, '사장님 요청: (총 N개) 없음');
-assert.doesNotMatch(String(rosen.getCell('I3').value), /총 \d+개|넘겨받은 주문/);
+assert.doesNotMatch(String(rosen.getCell('I3').value), /총 \d+개|지난 주문/);
 await excel.exportLiveOrdersForPicking([v], { filterLabel: '오늘' });
 const picking = (await loadWb()).getWorksheet('물건챙기기');
 assert.equal(picking.rowCount, 2, '가져온 줄은 본 시트에(추가 작업 시트로 안 보냄)');
 assert.equal(picking.getCell('C2').value, '상품2');
-assert.equal(picking.getCell('H2').value, '넘겨받은 주문 10.17(토) · 고객이슈 교환');
+assert.equal(picking.getCell('H2').value, '지난 주문 10.17(토) · 고객이슈 교환');
 // 원래 주문(가져간 날 아님) 쪽 엑셀은 그 줄 비고에 「10.22(목) 로 가져감」 — 단 오늘이 10.22 라면 「지난 주문」 로 읽히므로 오늘이 아닌 날짜로 검사
 const pullRows = createUiLoader()('lib/orderPickingExportRows.ts');
 const awayRows = pullRows.buildPickingExportRows([{ ...original, items: [{ ...original.items[1], pickPulledFor: '2020-01-02', pickPulledAt: '2020-01-02T00:00:00Z' }] }]);

@@ -103,7 +103,7 @@ export default function PickingPullModal({ orderNo, nickname, name, orderedAt, l
       const updated = Array.isArray(payload.updated) ? payload.updated : [];
       const skipped = Array.isArray(payload.skipped) ? payload.skipped : [];
       if (updated.length === 0) throw new Error(skipped[0]?.why ? `넘기지 못했어요: ${skipped[0].why}` : "넘긴 상품이 없어요.");
-      showAdminToast(`${updated.length}개를 ${payload.target || targetLabel} 출고로 넘겼어요.${skipped.length ? ` (${skipped.length}개 제외: ${skipped[0].why})` : ""}\n그 주문서·송장·물건챙기기에 「넘겨받은 주문」으로 보여요.`, "success");
+      showAdminToast(`${updated.length}개를 ${payload.target || targetLabel} 출고로 넘겼어요.${skipped.length ? ` (${skipped.length}개 제외: ${skipped[0].why})` : ""}\n그 주문서·송장·물건챙기기에 「지난 주문」으로 보여요.`, "success");
       await onDone?.(updated);
       onClose();
     } catch (error) {

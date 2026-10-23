@@ -42,14 +42,14 @@ export function shortDateWithWeekday(value: string | null | undefined): string {
 }
 
 // [2026-10-23 사장님 「헷갈려 죽겠어」] 이름을 «출고 넘기기»로 통일.
-//   받는 쪽(넘겨받은 출고의 주문서·송장·챙기기): 「넘겨받은 주문 10.11(토) · 늦게 입고」
+//   받는 쪽(넘긴 출고의 주문서·송장·챙기기): 「지난 주문 10.11(토) · 늦게 입고」 (10-23 14:32 사장님 — 「넘겨받은」 어색 → 「지난 주문」)
 //   보낸 쪽(원래 주문):                       「10.22(목) 남녀공용의류 출고로 넘김」
 
-/** 받는 쪽 한 줄: 「넘겨받은 주문 10.11(토) · 사유」 */
+/** 받는 쪽 한 줄: 「지난 주문 10.11(토) · 사유」 */
 export function pickPullBadgeText(originalCreatedAt: string | null | undefined, reason: string | null | undefined): string {
   const when = shortDateWithWeekday(originalCreatedAt);
   const why = String(reason ?? "").trim();
-  return ["넘겨받은 주문" + (when ? ` ${when}` : ""), why].filter(Boolean).join(" · ");
+  return ["지난 주문" + (when ? ` ${when}` : ""), why].filter(Boolean).join(" · ");
 }
 
 /** 보낸 쪽 한 줄: 「10.22(목) 남녀공용의류 출고로 넘김」 — 대상 이름이 없으면(옛 기록) 날짜로 */
