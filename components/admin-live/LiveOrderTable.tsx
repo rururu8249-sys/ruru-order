@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LiveOrder } from "./types";
 import { exportLiveOrdersForPicking, exportLiveOrdersForRosen } from "./adminLiveOrderExcelExport";
-import LiveOrderPickingModal from "./LiveOrderPickingModal";
+import LivePickingPanel from "./LivePickingPanel";
 import LiveCartHoldsModal from "./LiveCartHoldsModal";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
@@ -965,7 +965,7 @@ export default function LiveOrderTable({
     {cartHoldsOpen ? <LiveCartHoldsModal onClose={() => { setCartHoldsOpen(false); void refreshCartHoldSummary(); }} /> : null}
 
     {pickingOpen ? (
-          <LiveOrderPickingModal orders={pickingScopeTooWide ? [] : pickingModalSourceOrders.filter(order => pickingOrderIds.has(String(order.id)))} filterLabel={pickingScopeLabel} scopeTooWide={pickingScopeTooWide} onClose={() => { setPickingOpen(false); void onRefresh?.(); }} />
+          <LivePickingPanel orders={pickingScopeTooWide ? [] : pickingModalSourceOrders.filter(order => pickingOrderIds.has(String(order.id)))} filterLabel={pickingScopeLabel} scopeTooWide={pickingScopeTooWide} onClose={() => { setPickingOpen(false); void onRefresh?.(); }} />
     ) : null}
     {exportConfirm !== "" ? (
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setExportConfirm("")}>
