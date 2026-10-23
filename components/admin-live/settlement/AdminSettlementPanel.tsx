@@ -332,8 +332,8 @@ export default function AdminSettlementPanel({
       ["총지출", moneyText(-numberValue(stats.totalExpense)), "", "카드 수수료 + 창고/기타 지출"],
       ["아직 못 받은 금액", moneyText(stats.unpaidAmount), "", "실수익 계산 제외"],
       ["현재 실수익", moneyText(stats.netAmount), "", "결제완료 매출 + 추가 정산 수익 - 카드 수수료 - 창고/기타 지출"],
-      ["상품 원가(자동)", moneyText(-numberValue(stats.productCostAmount)), countText(stats.productCostRowCount), `주문 시점 원가 × 수량(원가 없는 ${stats.productCostMissingCount}건 제외)`],
-      ["원가 뺀 남는 돈", moneyText(stats.netAfterProductCost), "", "현재 실수익 - 상품 원가(자동)"],
+      ["상품 입금가(자동)", moneyText(-numberValue(stats.productCostAmount)), countText(stats.productCostRowCount), `주문 시점 입금가 × 수량(입금가 없는 ${stats.productCostMissingCount}건 제외)`],
+      ["입금가 뺀 남는 돈", moneyText(stats.netAfterProductCost), "", "현재 실수익 - 상품 입금가(자동)"],
       [],
       ["2. 일자별 정산 내역"],
       [

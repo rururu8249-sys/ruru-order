@@ -135,7 +135,7 @@ await act(async () => { await optBtn.props.onClick(); });
 assert.deepEqual(writes.at(-1).ids.map(String), ['7']);
 // 요약 = 손님 이름 없이 옵션별 개수
 await act(async () => tabs[0].props.onClick());
-assert.ok(text().includes('레드 / 사이즈 S 7') && !text().includes('고객1'), '요약엔 손님 이름 없음');
+assert.ok(text().includes('색상사이즈개수남은') && text().includes('레드S7개') && !text().includes('고객1'), '요약 = 색상|사이즈|개수|남은 표, 손님 이름 없음');
 // 전부 해제 — 확인 뒤 보이는 챙긴 줄만 false
 const un = tree.root.findAll(n => n.type === 'button' && nodeText0(n) === '전부 해제')[0];
 await act(async () => { await un.props.onClick(); });

@@ -461,17 +461,27 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                         <span className={`min-w-0 break-words text-[14px] font-bold ${c.done ? "text-ink-mute" : "text-ink"}`}>{g.name}</span>
                         <span className="shrink-0 text-[16px] font-bold text-ink tabular-nums">{c.all}개</span>
                       </div>
-                      <div className="mt-1 flex flex-wrap gap-1.5">
+                      {/* [15:18 사장님 「S 8 · M 5 저따위 말고 — 색상·사이즈·개수 구분 확실히」] 옵션마다 한 줄: 색상 | 사이즈 | 개수 | 남은 */}
+                      <div className="mt-1.5 overflow-hidden rounded-lg border border-line">
+                        <div className="grid grid-cols-[minmax(0,1fr)_72px_64px_72px] bg-surface-2 px-2 py-1 text-[12px] font-semibold text-ink-mute">
+                          <span>색상</span><span>사이즈</span><span className="text-right">개수</span><span className="text-right">남은</span>
+                        </div>
                         {g.options.map((rows) => {
                           const oc = countLine(rows);
                           const note = includedNote(rows);
                           const left = oc.total - oc.got;
+                          const color = stripNoneOptionParts(rows[0].color) || "-";
+                          const size = stripNoneOptionParts(rows[0].size) || (rows[0].color || rows[0].size ? "-" : (rows[0].optionText || "-"));
                           return (
-                            <span key={optionKey(rows[0])} className={`rounded-lg border px-2 py-1 text-[13px] tabular-nums ${oc.done ? "border-line text-ink-mute line-through" : "border-ink text-ink"}`}>
-                              <b>{rows[0].optionText || "옵션 없음"} {oc.all}</b>
-                              {note ? <span className="ml-1 text-ink-soft">({note})</span> : null}
-                              {!oc.done && left > 0 && left < oc.total ? <span className="ml-1 font-semibold text-danger-tx">남은 {left}</span> : null}
-                            </span>
+                            <div key={optionKey(rows[0])} className={`border-t border-line px-2 py-1.5 ${oc.done ? "bg-surface-2" : ""}`}>
+                              <div className="grid grid-cols-[minmax(0,1fr)_72px_64px_72px] items-center">
+                                <span className={`min-w-0 break-words text-[14px] font-semibold ${oc.done ? "text-ink-mute" : "text-ink"}`}>{color}</span>
+                                <span className={`text-[14px] font-bold ${oc.done ? "text-ink-mute" : "text-ink"}`}>{size}</span>
+                                <span className={`text-right text-[16px] font-bold tabular-nums ${oc.done ? "text-ink-mute" : "text-ink"}`}>{oc.all}개</span>
+                                <span className={`text-right text-[13px] font-bold tabular-nums ${oc.done ? "text-ok-tx" : left > 0 ? "text-danger-tx" : "text-ink-mute"}`}>{oc.done ? "✓ 다 챙김" : `${left}개`}</span>
+                              </div>
+                              {note ? <div className="mt-0.5 text-[12px] font-semibold text-ink-soft">{note}</div> : null}
+                            </div>
                           );
                         })}
                       </div>
@@ -513,9 +523,14 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                     <div key={optionKey(rows[0])} className="border-t border-line">
                       <div className={`flex items-center gap-2 px-3 py-2 ${oc.done ? "bg-surface-2" : "bg-surface"}`}>
                         <span className="min-w-0 flex-1">
-                          <span className={`text-[16px] font-bold ${oc.done ? "text-ink-mute line-through" : "text-ink"}`}>{opt}</span>
-                          <span className="ml-2 text-[16px] font-bold text-ink tabular-nums">{oc.all}개</span>
-                          {note ? <span className="ml-1.5 text-[13px] font-semibold text-ink-soft">({note})</span> : null}
+                          {/* 색상 · 사이즈를 따로 칸으로(사장님 15:18 「구분 확실히」) */}
+                          <span className={`flex flex-wrap items-center gap-1.5 ${oc.done ? "opacity-50" : ""}`}>
+                            {stripNoneOptionParts(rows[0].color) ? <span className="rounded-lg border border-line px-2 py-0.5 text-[14px] font-semibold text-ink"><span className="mr-1 text-[12px] text-ink-mute">색상</span>{stripNoneOptionParts(rows[0].color)}</span> : null}
+                            {stripNoneOptionParts(rows[0].size) ? <span className="rounded-lg border border-line px-2 py-0.5 text-[14px] font-bold text-ink"><span className="mr-1 text-[12px] font-semibold text-ink-mute">사이즈</span>{stripNoneOptionParts(rows[0].size)}</span> : null}
+                            {!stripNoneOptionParts(rows[0].color) && !stripNoneOptionParts(rows[0].size) ? <span className="text-[14px] font-semibold text-ink">{opt}</span> : null}
+                            <span className="text-[18px] font-bold text-ink tabular-nums">{oc.all}개</span>
+                          </span>
+                          {note ? <span className="mt-0.5 block text-[12px] font-semibold text-ink-soft">{note}</span> : null}
                         </span>
                         {oc.done ? <span className="shrink-0 text-[13px] font-semibold text-ink-mute">다 챙김</span>
                           : oc.open.length > 0 ? <button type="button" disabled={blocked} onClick={() => void setPickedFor(oc.open.map((r) => r.id), true)} className="h-9 shrink-0 rounded-lg border border-ink bg-surface px-3 text-[13px] font-bold text-ink disabled:opacity-40">남은 {oc.open.reduce((sum, r) => sum + r.qty, 0)}개 챙김</button>

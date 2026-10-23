@@ -2043,7 +2043,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         {/* 정보 */}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</div>
-                          <div style={{ marginTop: "4px", fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{productPriceLabel(p)}{(() => { const c = Number(parseProductNote(p).cost_price); return Number.isFinite(c) && c > 0 ? <span style={{ marginLeft: "8px", fontSize: "12px", fontWeight: 600, color: "var(--color-ink-mute)" }}>원가 {Math.round(c).toLocaleString("ko-KR")}원</span> : null; })()}</div>
+                          <div style={{ marginTop: "4px", fontSize: "14px", fontWeight: 800, color: "var(--color-rose-deep)" }}>{productPriceLabel(p)}{(() => { const c = Number(parseProductNote(p).cost_price); return Number.isFinite(c) && c > 0 ? <span style={{ marginLeft: "8px", fontSize: "12px", fontWeight: 600, color: "var(--color-ink-mute)" }}>입금가 {Math.round(c).toLocaleString("ko-KR")}원</span> : null; })()}</div>
                           {createdAtLabel ? (
                             <div style={{ marginTop: "4px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", fontVariantNumeric: "tabular-nums" }}>
                               등록일시 {createdAtLabel}

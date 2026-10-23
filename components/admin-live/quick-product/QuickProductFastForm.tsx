@@ -3097,7 +3097,7 @@ export default function QuickProductFastForm({
 
             {/* [a2-3 2026-10-21] 원가 — 손님 화면엔 안 나옴. 정산 「상품 원가(자동)」에 주문 시점 값으로 들어감 */}
             <section className={v2Section}>
-              <label className={v2Label} htmlFor="v2-product-cost">원가 <span className="text-[12px] font-normal text-ink-mute">(선택)</span></label>
+              <label className={v2Label} htmlFor="v2-product-cost">입금가 <span className="text-[12px] font-normal text-ink-mute">(선택)</span></label>
               <div className="relative">
                 <input
                   id="v2-product-cost"
@@ -3110,7 +3110,7 @@ export default function QuickProductFastForm({
                 />
                 <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-ink-mute">원</span>
               </div>
-              <div className={v2Hint}>창고 입금가 1개 기준 · 손님에겐 안 보임 · 정산 「원가 뺀 남는 돈」 계산에 씀</div>
+              <div className={v2Hint}>창고(업체)에 내는 1개 값 · 손님에겐 안 보임 · 정산 「입금가 뺀 남는 돈」에 씀</div>
             </section>
 
             <section className={v2Section}>
@@ -3390,7 +3390,7 @@ export default function QuickProductFastForm({
                 ) : null}
                 {!brandGroupActive ? (
                   <div style={{ marginTop: "8px" }}>
-                    <label style={fieldLabel}>원가 <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(선택 · 창고 입금가 1개 기준 · 손님에겐 안 보임)</span></label>
+                    <label style={fieldLabel}>입금가 <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--color-ink-mute)" }}>(선택 · 창고에 내는 1개 값 · 손님에겐 안 보임)</span></label>
                     <div style={{ position: "relative" }}>
                       <input style={{ ...fieldInput, paddingRight: "32px" }} type="text" inputMode="numeric" placeholder="미입력" value={costText} onChange={(e) => { setFormTouched(true); setCostText(formatNumberWithComma(e.target.value)); }} />
                       <span style={{ position: "absolute", right: "11px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", color: "var(--color-ink-mute)", pointerEvents: "none" }}>원</span>
