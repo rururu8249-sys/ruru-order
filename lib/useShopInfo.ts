@@ -86,3 +86,38 @@ export function useShopInfo(): ShopInfo {
 
   return info;
 }
+
+// [2026-10-23] 주문에 기록된 계좌가 없을 때 손님에게 보여줄 계좌(설정 「고객별 계좌 노출 방식」) — 서버가 한 벌만 돌려준다.
+//   못 받으면 null → 화면은 예전처럼 기존 계좌(shopInfo.bankName…)를 쓴다.
+export type GuideBank = { bankName: string; bankAccount: string; bankHolder: string };
+let guideCache: GuideBank | null = null;
+let guideInflight: Promise<GuideBank | null> | null = null;
+async function loadGuideBank(): Promise<GuideBank | null> {
+  if (guideCache) return guideCache;
+  if (guideInflight) return guideInflight;
+  guideInflight = (async () => {
+    try {
+      const res = await fetch("/api/shop-guide-bank", { cache: "no-store" });
+      const json = await res.json().catch(() => null);
+      const a = json?.ok ? json.account : null;
+      if (a && a.bankName && a.bankAccount && a.bankHolder) {
+        guideCache = { bankName: String(a.bankName), bankAccount: String(a.bankAccount), bankHolder: String(a.bankHolder) };
+      }
+      return guideCache;
+    } catch {
+      return null;
+    } finally {
+      guideInflight = null;
+    }
+  })();
+  return guideInflight;
+}
+export function useGuideBank(): GuideBank | null {
+  const [g, setG] = useState<GuideBank | null>(() => guideCache);
+  useEffect(() => {
+    let alive = true;
+    loadGuideBank().then((v) => { if (alive && v) setG(v); });
+    return () => { alive = false; };
+  }, []);
+  return g;
+}

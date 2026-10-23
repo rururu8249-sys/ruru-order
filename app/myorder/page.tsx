@@ -33,7 +33,7 @@ import MyOrderResultCard from "@/components/myorder/MyOrderResultCard";
 import MyOrderEmptyState from "@/components/myorder/MyOrderEmptyState";
 import MyOrderPagination from "@/components/myorder/MyOrderPagination";
 // [2026-09-08] 표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
-import { useShopInfo } from "@/lib/useShopInfo";
+import { useGuideBank, useShopInfo } from "@/lib/useShopInfo";
 import { useCustomerUiStage } from "@/lib/useCustomerUiStage";
 
 const FOOTER_TEXT = "© since 2024 루루동이 | All Rights Reserved.";
@@ -137,9 +137,6 @@ const blockCustomerCopyEvents = () => {
 export default function MyOrderPage() {
   // [2026-09-08] 손님에게 보여주는 입금계좌 — 설정 › 상점 정보. 표시·복사 전용(입금 판정과 무관).
   const shopInfo = useShopInfo();
-  const BANK_NAME = shopInfo.bankName;
-  const BANK_ACCOUNT = shopInfo.bankAccount;
-  const BANK_HOLDER = shopInfo.bankHolder;
   // [㉜ 4단계] 주문내역 새 모양 — ?preview=s4 (기본값 UI_PREVIEW_DEFAULTS.s4). ?ui=v1 손님은 예전 그대로. 표시 전용.
   const v2 = useCustomerUiStage("s4");
   const [customerName, setCustomerName] = useState("");
@@ -162,6 +159,23 @@ export default function MyOrderPage() {
 
   const [phone, setPhone] = useState("");
   const [orders, setOrders] = useState<any[]>([]);
+  // [2026-10-23] 「입금 계좌 보기」 = ①입금 기다리는 최근 주문에 기록된 계좌(손님이 실제 안내받은 계좌) ②없으면 설정 「고객별 계좌 노출 방식」 계좌.
+  //   예전엔 무조건 기존 계좌라, 노출 방식으로 농협을 골라도 여기만 새마을로 나왔다. 표시·복사 전용(입금 판정과 무관).
+  const guideBank = useGuideBank();
+  const GUIDE_BANK = { id: "primary" as const, bankName: guideBank?.bankName || shopInfo.bankName, bankAccount: guideBank?.bankAccount || shopInfo.bankAccount, bankHolder: guideBank?.bankHolder || shopInfo.bankHolder };
+  const pendingOrderBank = (() => {
+    for (const o of orders) {
+      if (myOrderFilterOf(myOrderStatusLabel(o)) !== "입금대기") continue;
+      const bn = String(o?.payment_bank_name || "").trim();
+      const ba = String(o?.payment_bank_account || "").trim();
+      const bh = String(o?.payment_bank_holder || "").trim();
+      if (bn && ba && bh) return { bankName: bn, bankAccount: ba, bankHolder: bh };
+    }
+    return null;
+  })();
+  const BANK_NAME = pendingOrderBank?.bankName || GUIDE_BANK.bankName;
+  const BANK_ACCOUNT = pendingOrderBank?.bankAccount || GUIDE_BANK.bankAccount;
+  const BANK_HOLDER = pendingOrderBank?.bankHolder || GUIDE_BANK.bankHolder;
   const [orderPage, setOrderPage] = useState(1);
   const [orderFilter, setOrderFilter] = useState<MyOrderFilter>("전체");
   const [searched, setSearched] = useState(false);

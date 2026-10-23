@@ -131,7 +131,7 @@ import CartAddFeedbackV2 from "@/components/customer/CartAddFeedbackV2";
 import LiveBadgeCompactV2 from "@/components/customer/LiveBadgeCompactV2";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import ShopContactLink from "@/components/customer/ShopContactLink";
-import { useShopInfo } from "@/lib/useShopInfo";
+import { useGuideBank, useShopInfo } from "@/lib/useShopInfo";
 import {
   parseOrderBankRoutingResult,
   resolveOrderGroupBankAccount,
@@ -1383,9 +1383,12 @@ function normalizeOrderProductRow(product: any): BroadcastProduct {
 export default function OrderPage() {
   // [2026-09-08] 손님에게 보여주는 입금계좌 — 설정 › 상점 정보. 표시·복사 전용(입금 판정과 무관).
   const shopInfo = useShopInfo();
-  const BANK_NAME = shopInfo.bankName;
-  const BANK_ACCOUNT = shopInfo.bankAccount;
-  const BANK_HOLDER = shopInfo.bankHolder;
+  // [2026-10-23] 주문에 기록된 계좌가 없을 때 보여줄 계좌 = 설정 「고객별 계좌 노출 방식」(예전엔 무조건 기존 계좌)
+  const guideBank = useGuideBank();
+  const GUIDE_BANK = { id: "primary" as const, bankName: guideBank?.bankName || shopInfo.bankName, bankAccount: guideBank?.bankAccount || shopInfo.bankAccount, bankHolder: guideBank?.bankHolder || shopInfo.bankHolder };
+  const BANK_NAME = GUIDE_BANK.bankName;
+  const BANK_ACCOUNT = GUIDE_BANK.bankAccount;
+  const BANK_HOLDER = GUIDE_BANK.bankHolder;
   const [isEditMode, setIsEditMode] = useState(false);
   const [broadcast, setBroadcast] = useState<any | null>(null);
   // [2026-09-20] 원래 5811행에 있던 파생값을 여기로 올렸다(값·식 동일).
@@ -5447,7 +5450,7 @@ export default function OrderPage() {
   };
 
   const activePaymentBankAccount: OrderBankAccountSnapshot = historicalPaymentBankAccount || done?.bankAccount || {
-    id: "primary",
+    id: GUIDE_BANK.id,
     bankName: BANK_NAME,
     bankAccount: BANK_ACCOUNT,
     bankHolder: BANK_HOLDER,
@@ -5704,7 +5707,7 @@ export default function OrderPage() {
       const head = rows[0];
       const status = ruruOrderLookupStatus(head);
       const groupBank = resolveOrderGroupBankAccount(rows, {
-        id: "primary",
+        id: GUIDE_BANK.id,
         bankName: BANK_NAME,
         bankAccount: BANK_ACCOUNT,
         bankHolder: BANK_HOLDER,

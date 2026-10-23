@@ -412,6 +412,19 @@ export function validateShopInfo(input: Partial<Record<keyof ShopInfo, unknown>>
 
 // ───────────── 손님 화면 문구 ─────────────
 
+/**
+ * [2026-10-23] 주문에 기록된 계좌가 없을 때 손님에게 안내할 계좌 = 설정 「고객별 계좌 노출 방식」.
+ *   전체 동일 → 그 계좌 / 기존·첫 주문 구분 → 기존회원 계좌(대부분 손님). 꺼졌거나 없으면 기존 계좌.
+ *   주문서 제출 때 실제 배정은 서버(submit)가 하고 주문에 기록한다 — 여기는 «기록 없을 때 보여줄 계좌»만.
+ */
+export function guideBankAccount(info: Pick<ShopInfo, "bankName" | "bankAccount" | "bankHolder" | "bankAccounts" | "bankRouting">): { id: ShopBankAccountId; bankName: string; bankAccount: string; bankHolder: string } {
+  const routing = info.bankRouting;
+  const wantId = routing?.mode === "all" ? routing.allAccountId : routing?.existingAccountId;
+  const hit = (info.bankAccounts || []).find((a) => a.id === wantId && a.enabled !== false && a.bankName && a.bankAccount && a.bankHolder);
+  if (hit) return { id: hit.id, bankName: hit.bankName, bankAccount: hit.bankAccount, bankHolder: hit.bankHolder };
+  return { id: "primary", bankName: info.bankName, bankAccount: info.bankAccount, bankHolder: info.bankHolder };
+}
+
 /** "새마을금고 9002186993725 (유혜원)" 꼴 — 쪽지·복사 문구용 */
 export function bankLine(info: Pick<ShopInfo, "bankName" | "bankAccount" | "bankHolder"> | ShopBankAccount): string {
   return `${info.bankName} ${info.bankAccount} (${info.bankHolder})`;
