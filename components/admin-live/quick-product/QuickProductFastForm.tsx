@@ -3142,6 +3142,8 @@ export default function QuickProductFastForm({
                   <div className={v2Hint}>{sizeText.trim() === "" ? "쉼표로 구분 · 비우면 손님이 적음" : "쉼표로 구분"}</div>
                 </div>
               </div>
+              {/* [2026-10-23] 새 배치에 빠져 있던 「색상 표시」(손님 카드 색 점) — 옛 폼과 같은 부품·같은 저장(colorSwatches → product_note.color_swatches). 「브라이트」처럼 이름으로 색을 모르는 색상은 여기서 직접·사진에서 고름 */}
+              {!colorOff ? <ColorSwatchEditor labels={colors} value={colorSwatches} onChange={next=>{setFormTouched(true);setColorSwatches(next);}} /> : null}
             </section>
 
             <section className={v2Section}>
