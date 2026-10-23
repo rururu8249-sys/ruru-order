@@ -7,6 +7,10 @@ assert.equal(colorNameSwatch('블랙'), '#111111');
 assert.equal(colorNameSwatch(' Black '), '#111111');
 assert.equal(colorNameSwatch('아이보리'), '#FFFBEA');
 assert.equal(colorNameSwatch('라이트 그레이'), '#C9C9CB');
+assert.equal(colorNameSwatch('크림(베이지)'), '#F6EBCB');
+assert.equal(colorNameSwatch('크림 (베이지)'), '#F6EBCB');
+assert.equal(colorNameSwatch('밀크티(베이지)'), '#D8C3A0');
+assert.equal(colorNameSwatch('GY-1(블랙)'), null);
 // 코드 같은 이름·섞인 이름·없음은 색을 지어내지 않는다(글씨 칩)
 for (const name of ['GY-1(바게트)', 'H-3', '블랙/화이트 스트라이프', '없음', '', '기본']) assert.equal(colorNameSwatch(name), null, name);
 // 밝은 색은 테두리

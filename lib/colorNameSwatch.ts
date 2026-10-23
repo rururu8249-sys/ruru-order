@@ -47,7 +47,16 @@ const keyOf = (name: unknown) => String(name ?? "").trim().toLowerCase().replace
 export function colorNameSwatch(name: unknown): string | null {
   const key = keyOf(name);
   if (!key || key === "없음" || key === "기본") return null;
-  return NAME_TO_HEX[key] ?? null;
+  const exact = NAME_TO_HEX[key];
+  if (exact) return exact;
+  // [2026-10-23] 「크림(베이지)」처럼 «색 이름(색 이름)» — 앞 이름 먼저, 모르면 괄호 안 이름.
+  //   코드 같은 앞 이름(숫자 포함, 「GY-1(블랙)」)은 지금처럼 글씨 칩.
+  const m = /^([^()]+)\(([^()]+)\)$/.exec(key);
+  if (!m) return null;
+  const [, outer, inner] = m;
+  if (NAME_TO_HEX[outer]) return NAME_TO_HEX[outer];
+  if (/\d/.test(outer)) return null;
+  return NAME_TO_HEX[inner] ?? null;
 }
 
 /** 밝은 색(흰 바탕에서 안 보이는 색) — 색 점에 hairline 테두리를 붙일지 판단. */
