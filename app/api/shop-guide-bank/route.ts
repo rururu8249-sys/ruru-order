@@ -4,7 +4,7 @@
 //   읽기 전용. 주문·입금 판정·뱅크다·정산은 읽지도 쓰지도 않는다.
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { guideBankAccount, parseShopInfo, SHOP_INFO_KEYS } from "@/lib/shopInfo";
+import { acceptedAccountDigits, guideBankAccount, parseShopInfo, SHOP_INFO_KEYS } from "@/lib/shopInfo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,9 +17,11 @@ export async function GET() {
     const sb = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
     const { data, error } = await sb.from("settings").select("key,value").in("key", [...SHOP_INFO_KEYS]);
     if (error) return NextResponse.json({ ok: false }, { status: 500 });
-    const g = guideBankAccount(parseShopInfo((data || []) as Array<{ key: string; value: unknown }>));
+    const info = parseShopInfo((data || []) as Array<{ key: string; value: unknown }>);
+    const g = guideBankAccount(info);
+    // [2026-10-24] accepted = 지금 입금받는 계좌 번호(숫자만). 주문에 옛 계좌(새마을)가 기록돼 있으면 손님 화면이 이걸 보고 지금 계좌로 바꿔 보여준다.
     return NextResponse.json(
-      { ok: true, account: { bankName: g.bankName, bankAccount: g.bankAccount, bankHolder: g.bankHolder } },
+      { ok: true, account: { bankName: g.bankName, bankAccount: g.bankAccount, bankHolder: g.bankHolder }, accepted: acceptedAccountDigits(info) },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch {

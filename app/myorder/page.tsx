@@ -164,7 +164,7 @@ export default function MyOrderPage() {
   //   예전엔 무조건 기존 계좌라, 노출 방식으로 농협을 골라도 여기만 새마을로 나왔다. 표시·복사 전용(입금 판정과 무관).
   const guideBank = useGuideBank();
   const GUIDE_BANK = { id: "primary" as const, bankName: guideBank?.bankName || shopInfo.bankName, bankAccount: guideBank?.bankAccount || shopInfo.bankAccount, bankHolder: guideBank?.bankHolder || shopInfo.bankHolder };
-  const shownBank = pendingOrderGuideBank(orders, GUIDE_BANK, (o) => myOrderFilterOf(myOrderStatusLabel(o)) === "입금대기");
+  const shownBank = pendingOrderGuideBank(orders, GUIDE_BANK, (o) => myOrderFilterOf(myOrderStatusLabel(o)) === "입금대기", guideBank?.accepted);
   const BANK_NAME = shownBank.bankName;
   const BANK_ACCOUNT = shownBank.bankAccount;
   const BANK_HOLDER = shownBank.bankHolder;

@@ -6,7 +6,7 @@ import type { LiveOrder } from "./types";
 import { formatOrderOptionText } from "@/lib/orderOptionText";
 import { formatKoreanPhone } from "@/lib/order/phone";
 // [2026-09-08] 입금계좌 문구는 설정 › 상점 정보에서 온다(하드코딩 제거). 아직 못 읽었으면 예전 값.
-import { bankLine } from "@/lib/shopInfo";
+import { acceptedAccountDigits, bankLine, guideBankAccount, isAcceptedBankAccount } from "@/lib/shopInfo";
 import type { ShopInfo } from "@/lib/shopInfo";
 import { getShopInfoSnapshot } from "@/lib/useShopInfo";
 
@@ -15,12 +15,9 @@ import { getShopInfoSnapshot } from "@/lib/useShopInfo";
 //   전에는 항상 ③(기존 계좌)만 써서 설정을 농협으로 바꿔도 복사 문구는 하나은행이던 것. 표시·문구 전용(돈 무관).
 export function bankLineForOrder(order: Pick<LiveOrder, "paymentBank"> | null | undefined, info: ShopInfo = getShopInfoSnapshot()): string {
   const snap = order?.paymentBank;
-  if (snap && snap.bankName && snap.bankAccount && snap.bankHolder) return bankLine(snap);
-  if (info.bankRouting?.mode === "all") {
-    const acc = (info.bankAccounts || []).find((a) => a.id === info.bankRouting.allAccountId && a.enabled);
-    if (acc) return bankLine(acc);
-  }
-  return bankLine(info);
+  // [2026-10-24] 기록된 계좌가 지금 입금받는 계좌가 아니면(새마을 — 사장님 「이제 입금 못 받아」) 지금 안내 계좌로.
+  if (snap && snap.bankName && snap.bankAccount && snap.bankHolder && isAcceptedBankAccount(snap, acceptedAccountDigits(info))) return bankLine(snap);
+  return bankLine(guideBankAccount(info));
 }
 
 function money(value: unknown) {

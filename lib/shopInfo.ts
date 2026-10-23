@@ -425,18 +425,39 @@ export function guideBankAccount(info: Pick<ShopInfo, "bankName" | "bankAccount"
   return { id: "primary", bankName: info.bankName, bankAccount: info.bankAccount, bankHolder: info.bankHolder };
 }
 
+/** [2026-10-24] 지금 입금받는 계좌 번호들(숫자만) — 설정에 켜져 있는 계좌. 「새마을로 이제 입금 못 받아」(사장님) 대비:
+ *  주문에 옛 계좌가 기록돼 있어도 여기 없으면 손님·쪽지엔 지금 계좌를 보여준다. 표시 전용. */
+export function acceptedAccountDigits(info: Pick<ShopInfo, "bankName" | "bankAccount" | "bankHolder" | "bankAccounts">): string[] {
+  const out = new Set<string>();
+  const list = (info.bankAccounts && info.bankAccounts.length ? info.bankAccounts : [{ id: "primary", enabled: true, bankName: info.bankName, bankAccount: info.bankAccount, bankHolder: info.bankHolder } as ShopBankAccount]);
+  for (const a of list) {
+    if (a.enabled === false || !a.bankName || !a.bankHolder) continue;
+    const d = String(a.bankAccount || "").replace(/\D/g, "");
+    if (d) out.add(d);
+  }
+  return [...out];
+}
+
+/** 계좌가 지금 입금받는 계좌인지. 목록을 모르면(못 읽음) true — 예전처럼 기록 그대로. */
+export function isAcceptedBankAccount(account: { bankAccount?: string | null } | null | undefined, accepted: readonly string[] | null | undefined): boolean {
+  if (!accepted || accepted.length === 0) return true;
+  const d = String(account?.bankAccount || "").replace(/\D/g, "");
+  return !!d && accepted.includes(d);
+}
+
 /** [2026-10-23] 주문조회 「입금 계좌 보기」 계좌 — ①입금 기다리는 최근 주문에 기록된 계좌(손님이 실제 안내받은 계좌) ②없으면 안내 계좌(guide). 표시·복사 전용. */
 export function pendingOrderGuideBank(
   orders: readonly any[],
   guide: { bankName: string; bankAccount: string; bankHolder: string },
   isPending: (order: any) => boolean,
+  accepted?: readonly string[] | null,
 ): { bankName: string; bankAccount: string; bankHolder: string; fromOrder: boolean } {
   for (const o of orders || []) {
     if (!isPending(o)) continue;
     const bn = String(o?.payment_bank_name || "").trim();
     const ba = String(o?.payment_bank_account || "").trim();
     const bh = String(o?.payment_bank_holder || "").trim();
-    if (bn && ba && bh) return { bankName: bn, bankAccount: ba, bankHolder: bh, fromOrder: true };
+    if (bn && ba && bh && isAcceptedBankAccount({ bankAccount: ba }, accepted)) return { bankName: bn, bankAccount: ba, bankHolder: bh, fromOrder: true };
   }
   return { bankName: guide.bankName, bankAccount: guide.bankAccount, bankHolder: guide.bankHolder, fromOrder: false };
 }

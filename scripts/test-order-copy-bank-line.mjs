@@ -8,8 +8,13 @@ let info = mk({});
 const mod = createUiLoader({'@/lib/useShopInfo':{getShopInfoSnapshot:()=>info}})('components/admin-live/liveOrderCustomerCopy.ts');
 const {bankLineForOrder, buildCustomerOrderCopyText, buildPaymentRequestNote, buildExtraDepositRequestNote} = mod;
 
-// ① 스냅샷이 있으면 설정과 무관하게 그 계좌
-assert.equal(bankLineForOrder({paymentBank:{bankName:'농협',bankAccount:'301-9',bankHolder:'루루'}}), '농협 301-9 (루루)');
+// ① 스냅샷이 «지금 받는 계좌»면 설정과 무관하게 그 계좌
+assert.equal(bankLineForOrder({paymentBank:{bankName:'농협',bankAccount:'301-0000-1111-11',bankHolder:'루루'}}), '농협 301-0000-1111-11 (루루)');
+// ①-2 [2026-10-24] 스냅샷이 지금 안 받는 계좌(예: 옛 새마을)면 지금 안내 계좌로 — 「새마을로 이제 입금 못 받아」
+assert.equal(bankLineForOrder({paymentBank:{bankName:'새마을금고',bankAccount:'9002186993725',bankHolder:'유혜원'}}), '하나은행 111-222-333333 (루루)');
+info = mk({mode:'split', existingAccountId:'secondary'});
+assert.equal(bankLineForOrder({paymentBank:{bankName:'새마을금고',bankAccount:'9002186993725',bankHolder:'유혜원'}}), '농협 301-0000-1111-11 (루루)');
+info = mk({});
 // ② 스냅샷 없음 + 전체공통=추가계좌(농협) → 농협
 info = mk({mode:'all', allAccountId:'secondary'});
 assert.equal(bankLineForOrder({paymentBank:null}), '농협 301-0000-1111-11 (루루)');

@@ -29,7 +29,7 @@ const sim = (orders) => pendingOrderGuideBank(orders, guide, isPending);
 assert.equal(sim([{ ...대기 }]).bankName, "NH농협은행");
 // ② 새 주문(농협 기록) → 농협
 assert.equal(sim([{ ...대기, ...농협기록 }]).bankName, "NH농협은행");
-// ③ 어제 새마을로 안내받고 아직 입금 안 한 주문 → 손님이 본 새마을 그대로(엉뚱한 계좌로 바뀌지 않게)
+// ③ 받는 계좌 목록을 모를 때(서버 실패)만 기록 그대로 — 목록을 알면 ⑨처럼 농협으로 바뀜
 assert.deepEqual(sim([{ ...대기, ...새마을기록 }]), { bankName: "새마을금고", bankAccount: "9002186993725", bankHolder: "유혜원", fromOrder: true });
 // ④ 취소·입금확인 주문의 새마을 기록은 무시 → 농협
 assert.equal(sim([{ ...취소, ...새마을기록 }, { ...확인, ...새마을기록 }]).bankName, "NH농협은행");
@@ -47,3 +47,19 @@ assert.equal(guideBankAccount(liveNow).bankName, "NH농협은행");
 assert.equal(guideBankAccount({ ...liveNow, bankAccounts: [S2] }).bankName, "NH농협은행");
 void parseShopInfo;
 console.log("customer screen simulation (8 cases): ok");
+
+// ── [2026-10-24] 새마을 기록 강제 차단: 주문에 새마을이 기록돼 있어도 지금 받는 계좌가 아니면 농협 ──
+import { acceptedAccountDigits, isAcceptedBankAccount } from "../lib/shopInfo.ts";
+const acceptedNow = acceptedAccountDigits(liveNow);
+assert.deepEqual(acceptedNow, ["302946432205" + "1"]);
+assert.equal(isAcceptedBankAccount({ bankAccount: "9002186993725" }, acceptedNow), false, "새마을 = 못 받는 계좌");
+assert.equal(isAcceptedBankAccount({ bankAccount: "302-9464-3220-51" }, acceptedNow), true);
+assert.equal(isAcceptedBankAccount({ bankAccount: "9002186993725" }, []), true, "목록 모르면 기록 그대로");
+const guideNow = guideBankAccount(liveNow);
+const simNow = (orders) => pendingOrderGuideBank(orders, guideNow, isPending, acceptedNow);
+// ⑨ 어제 새마을로 안내받은 입금대기 주문 → 이제 농협(강제)
+assert.equal(simNow([{ ...대기, ...새마을기록 }]).bankName, "NH농협은행");
+assert.equal(simNow([{ ...대기, ...새마을기록 }]).fromOrder, false);
+// ⑩ 농협 기록 주문 → 그 기록 그대로
+assert.equal(simNow([{ ...대기, ...농협기록 }]).fromOrder, true);
+console.log("새마을 강제 차단 시뮬레이션: ok");

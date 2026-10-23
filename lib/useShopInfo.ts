@@ -89,7 +89,7 @@ export function useShopInfo(): ShopInfo {
 
 // [2026-10-23] 주문에 기록된 계좌가 없을 때 손님에게 보여줄 계좌(설정 「고객별 계좌 노출 방식」) — 서버가 한 벌만 돌려준다.
 //   못 받으면 null → 화면은 예전처럼 기존 계좌(shopInfo.bankName…)를 쓴다.
-export type GuideBank = { bankName: string; bankAccount: string; bankHolder: string };
+export type GuideBank = { bankName: string; bankAccount: string; bankHolder: string; accepted: string[] };
 let guideCache: GuideBank | null = null;
 let guideInflight: Promise<GuideBank | null> | null = null;
 async function loadGuideBank(): Promise<GuideBank | null> {
@@ -101,7 +101,8 @@ async function loadGuideBank(): Promise<GuideBank | null> {
       const json = await res.json().catch(() => null);
       const a = json?.ok ? json.account : null;
       if (a && a.bankName && a.bankAccount && a.bankHolder) {
-        guideCache = { bankName: String(a.bankName), bankAccount: String(a.bankAccount), bankHolder: String(a.bankHolder) };
+        const accepted = Array.isArray(json?.accepted) ? json.accepted.map((v: unknown) => String(v).replace(/\D/g, "")).filter(Boolean) : [];
+        guideCache = { bankName: String(a.bankName), bankAccount: String(a.bankAccount), bankHolder: String(a.bankHolder), accepted };
       }
       return guideCache;
     } catch {

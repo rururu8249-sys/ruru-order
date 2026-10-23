@@ -132,6 +132,7 @@ import LiveBadgeCompactV2 from "@/components/customer/LiveBadgeCompactV2";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import ShopContactLink from "@/components/customer/ShopContactLink";
 import { useGuideBank, useShopInfo } from "@/lib/useShopInfo";
+import { isAcceptedBankAccount } from "@/lib/shopInfo";
 import {
   parseOrderBankRoutingResult,
   resolveOrderGroupBankAccount,
@@ -5449,7 +5450,10 @@ export default function OrderPage() {
     await handleSubmitOrderClick({ allowMissingDetailAddress: true });
   };
 
-  const activePaymentBankAccount: OrderBankAccountSnapshot = historicalPaymentBankAccount || done?.bankAccount || {
+  // [2026-10-24] 기록된 계좌가 지금 입금받는 계좌가 아니면(예: 새마을 — 사장님 「이제 입금 못 받아」) 지금 안내 계좌로. 표시·복사 전용.
+  const recordedPaymentBank = historicalPaymentBankAccount || done?.bankAccount || null;
+  const activePaymentBankAccount: OrderBankAccountSnapshot =
+    recordedPaymentBank && isAcceptedBankAccount(recordedPaymentBank, guideBank?.accepted) ? recordedPaymentBank : {
     id: GUIDE_BANK.id,
     bankName: BANK_NAME,
     bankAccount: BANK_ACCOUNT,
