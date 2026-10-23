@@ -66,10 +66,10 @@ export function parseDueWords(text: string, nowMs: number): string | null {
 const TODO_WORDS = /(해야|하기|확인|연락|보내|발송|전화|문의|답장|챙기|주문하|사입|입고|환불|교환|반품|처리|까지|해주|해 주|올리|등록)/;
 const PRODUCT_WORDS = /(재고|입고|품절|사입|추가\s*주문|사이즈|색상|컬러|상품)/;
 
-/** AI 없이 정리: 줄·쉼표·「그리고」로 나눠서 분류 */
+/** AI 없이 정리: «줄»로만 나눠서 분류 — [2026-10-23 사장님] 쉼표로 쪼개면 「몽상가8277, 몽몽이」 같은 한 문장이 갈라져 헷갈림 */
 export function organizeByRule(text: string, nowMs: number): MemoItem[] {
   const parts = String(text ?? "")
-    .split(/\n|,|，|·|;|\s그리고\s/)
+    .split(/\n/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
   return parts.slice(0, 20).map((body) => {
@@ -108,12 +108,30 @@ export function parseOrganizeJson(text: string, restore: (s: string) => string =
   }
 }
 
+/** [2026-10-23 15:14 사장님 「문장이 하나인데 멋대로 3개로 나눠 헷갈려」] 한 줄로 적은 메모는 한 장으로.
+ *  여러 건은 사장님이 «줄을 바꿔» 적은 경우에만 나뉜다. AI 가 한 줄을 여러 개로 쪼개 오면 합친다:
+ *  내용 = 사장님 원문 그대로, 손님·상품 = AI 가 찾은 첫 값, 종류 = 할 일 > 손님 > 상품 > 기억할 것. */
+export function mergeSingleLine(raw: string, items: MemoItem[], nowMs: number = Date.now()): MemoItem[] {
+  const lines = String(raw ?? "").split(/\n/).map((x) => x.trim()).filter(Boolean);
+  if (items.length <= lines.length) return items;
+  if (lines.length !== 1) return items;
+  const body = lines[0].slice(0, 300);
+  const order: MemoKind[] = ["todo", "customer", "product", "note"];
+  const kind = order.find((k) => items.some((it) => it.kind === k)) || "note";
+  const who = items.map((it) => it.who).filter(Boolean)[0] || null;
+  const product = items.map((it) => it.product).filter(Boolean)[0] || null;
+  return [{ kind, body, due_date: parseDueWords(body, nowMs), who, product }];
+}
+
 export function organizePrompt(maskedText: string, nowMs: number): string {
   const today = kstDateText(nowMs);
   const dow = WEEKDAYS[new Date(nowMs + KST).getUTCDay()];
-  return `너는 쇼핑몰 사장님의 메모 정리 비서다. 아래 메모를 짧은 줄로 나눠 JSON 으로만 답한다.
-모양: {"items":[{"kind":"todo|customer|product|note","text":"한 줄 요약(사장님 말투 그대로, 50자 안)","due":"YYYY-MM-DD 또는 빈칸","who":"손님 이름·닉네임 또는 빈칸","product":"상품 이름 또는 빈칸"}]}
+  return `너는 쇼핑몰 사장님의 메모 정리 비서다. 아래 메모를 정리해 JSON 으로만 답한다.
+- 사장님이 «줄을 바꿔» 적은 줄마다 item 하나. 한 줄 안의 내용은 절대 여러 item 으로 나누지 말 것(쉼표가 있어도 한 이야기다).
+- 「닉네임 ○○」「○○님」처럼 적힌 손님은 who 에(여러 이름이면 쉼표로 함께), 상품 번호·이름은 product 에.
+모양: {"items":[{"kind":"todo|customer|product|note","text":"그 줄을 다듬은 한 문장(사장님 말투 그대로, 100자 안)","due":"YYYY-MM-DD 또는 빈칸","who":"손님 이름·닉네임 또는 빈칸","product":"상품 이름 또는 빈칸"}]}
 - todo = 해야 할 일(연락·발송·확인·주문 등), customer = 손님에 대한 정보·부탁, product = 상품·재고·입고, note = 그냥 기억할 것
+- text 는 그 줄을 보기 좋게 다듬은 한 문장(손님·상품·내용이 다 들어가게, 빠뜨리지 말 것).
 - 날짜 말(오늘·내일·금요일·10월 25일)은 text 안에 그대로 남길 것(due 는 빈칸으로 둬도 됨). 오늘은 ${today}(${dow}).
 - product 는 상품 이름만(교환·반품·택배 같은 일 이름은 넣지 말 것).
 - 없는 내용을 만들지 말 것. [번호1] 같은 자리표는 그대로 둘 것. 설명 없이 JSON 하나만.

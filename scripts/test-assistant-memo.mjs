@@ -74,10 +74,26 @@ await t('날짜 말(한국 날짜)', () => {
 });
 
 await t('규칙 정리(AI 없이)', () => {
-  const items = lib.organizeByRule('홍길동 내일 교환 연락, 폴로자켓 L 2개 재고 추가 주문, 금요일 택배 늦게 옴\n행복나무 단골', NOW);
-  assert.equal(items.length, 4);
-  assert.deepEqual(items.map((i) => i.kind), ['todo', 'product', 'todo', 'note']);
+  // [2026-10-23 사장님] 줄로만 나눔 — 쉼표가 있어도 한 줄은 한 장
+  const items = lib.organizeByRule('홍길동 내일 교환 연락, 폴로자켓 L 2개\n행복나무 단골', NOW);
+  assert.equal(items.length, 2);
+  assert.deepEqual(items.map((i) => i.kind), ['todo', 'note']);
   assert.equal(items[0].due_date, '2026-10-23');
+});
+
+await t('한 줄 메모를 AI 가 쪼개 오면 한 장으로 합침(사장님 15:14 사례)', () => {
+  const raw = '닉네임 -몽상가8277, 몽몽이 BB-95 해외상품 주문건 하자 컴플레인 올 수 도있으니 기억할것';
+  const split = [
+    { kind: 'todo', body: 'BB-95 해외상품 주문건', due_date: null, who: null, product: 'BB-95' },
+    { kind: 'customer', body: '닉네임 -몽상가8277, 몽몽이', due_date: null, who: '몽상가8277, 몽몽이', product: null },
+    { kind: 'note', body: '하자 컴플레인 올 수 도있으니 기억할것', due_date: null, who: null, product: null },
+  ];
+  const merged = lib.mergeSingleLine(raw, split, NOW);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].body, raw, '내용 = 사장님 원문 그대로');
+  assert.equal(merged[0].who, '몽상가8277, 몽몽이'); assert.equal(merged[0].product, 'BB-95');
+  // 두 줄이면 그대로(사장님이 줄 바꿔 쓴 건 따로)
+  assert.equal(lib.mergeSingleLine('a\nb', split.slice(0, 2), NOW).length, 2);
 });
 
 await t('AI 응답 검사(정해진 모양만)', () => {
@@ -130,13 +146,14 @@ await t('AI 정리: 원문 먼저 저장 + 번호는 가려서 보냄', async ()
   assert.equal(db.admin_assistant_memos.filter((m) => m.kind === 'raw').length, 1);
   assert.equal(db.admin_assistant_memos.find((m) => m.kind === 'raw').body.includes('010-9999-8888'), true); // 원문은 그대로
   const todo = db.admin_assistant_memos.find((m) => m.kind === 'todo');
-  assert.equal(todo.body, '홍길동 010-9999-8888 교환 연락'); // 되돌림
+  assert.equal(todo.body, '홍길동 010-9999-8888 내일 교환 연락, 폴로자켓 L 2개 추가 주문'); // 한 줄은 한 장(원문 그대로·번호 되돌림)
+  assert.equal(db.admin_assistant_memos.filter((m) => m.parent_id === todo.parent_id && m.kind !== 'raw').length, 1, '쪼개지 않음');
   assert.ok(todo.parent_id);
 });
 
 await t('손님·상품 칸 바로잡기(DB 이름과 대조)', async () => {
   globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"items":[{"kind":"todo","text":"행복나무 금요일까지 환불 처리","who":"","product":"행복나무"},{"kind":"product","text":"에어랩 재고 확인","who":"에어랩","product":""}]}' }] } }] }) });
-  const r = await route.POST(req({ text: '행복나무 금요일까지 환불 처리, 에어랩 재고 확인' }));
+  const r = await route.POST(req({ text: '행복나무 금요일까지 환불 처리\n에어랩 재고 확인' }));
   assert.deepEqual(r.body.items.map((i) => [i.who, i.product]), [['행복나무', null], [null, '에어랩']]);
   // 바로잡은 줄은 목록 개수에 포함되지 않게 지움(아래 목록 시나리오 숫자 유지)
   for (const it of r.body.items) await route.PATCH(req({ id: it.id, status: 'deleted' }));
@@ -144,7 +161,7 @@ await t('손님·상품 칸 바로잡기(DB 이름과 대조)', async () => {
 
 await t('AI 실패 → 규칙 정리로 저장', async () => {
   globalThis.fetch = async () => ({ ok: false, status: 503, json: async () => ({}) });
-  const r = await route.POST(req({ text: '금요일 택배 늦게 옴, 다이슨 재고 확인' }));
+  const r = await route.POST(req({ text: '금요일 택배 늦게 옴\n다이슨 재고 확인' }));
   assert.equal(r.body.organizedBy, 'rule');
   assert.equal(r.body.items.length, 2);
 });
@@ -152,17 +169,17 @@ await t('AI 실패 → 규칙 정리로 저장', async () => {
 await t('목록·끝냄·되돌림·삭제', async () => {
   let g = await route.GET({});
   assert.equal(g.status, 200);
-  assert.equal(g.body.open.length, 4);
+  assert.equal(g.body.open.length, 3); // 한 줄 메모 1장 + 규칙 2장
   assert.ok(g.body.open.every((m) => m.kind !== 'raw'));
   const id = g.body.open[0].id;
   assert.equal((await route.PATCH(req({ id, status: 'done' }))).status, 200);
   g = await route.GET({});
-  assert.equal(g.body.open.length, 3);
+  assert.equal(g.body.open.length, 2);
   assert.equal(g.body.done.length, 1);
   await route.PATCH(req({ id, status: 'open' }));
   await route.PATCH(req({ id, status: 'deleted' }));
   g = await route.GET({});
-  assert.equal(g.body.open.length, 3);
+  assert.equal(g.body.open.length, 2);
   assert.equal(g.body.done.length, 0);
   // 원문(raw)은 PATCH 로 못 바꿈
   const rawId = db.admin_assistant_memos.find((m) => m.kind === 'raw').id;

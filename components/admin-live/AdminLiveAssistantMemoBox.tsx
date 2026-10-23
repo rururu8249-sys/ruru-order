@@ -168,11 +168,11 @@ export default function AdminLiveAssistantMemoBox({ onFindCustomer }: { onFindCu
           onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void save(); } }}
           rows={3}
           aria-label="메모"
-          placeholder="예: 홍길동 내일 교환 연락, 폴로자켓 L 2개 더 주문, 금요일 택배 늦게 옴"
+          placeholder={"예: 몽상가8277(몽몽이) BB-95 해외상품 — 하자 컴플레인 올 수 있으니 기억\n홍길동 내일 교환 연락"}
           className="w-full resize-y rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink outline-none placeholder:text-ink-mute focus-visible:border-ink focus-visible:ring-2 focus-visible:ring-ink md:text-[14px]"
         />
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[12px] text-ink-mute">생각나는 대로 적으면 줄로 나눠 정리해요.</span>
+          <span className="text-[12px] text-ink-mute">한 줄 = 메모 한 장이에요. 다른 건은 줄을 바꿔서 적어 주세요.</span>
           <button type="button" onClick={() => void save()} disabled={saving || !draft.trim()}
             className="h-10 shrink-0 rounded-lg bg-ink px-4 text-[14px] font-bold text-white transition disabled:opacity-40">
             {saving ? "정리 중" : "저장"}

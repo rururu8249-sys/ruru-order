@@ -8,7 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { callGeminiJson } from "@/lib/geminiJson";
 import { matchText } from "@/lib/assistantSearch";
-import { maskSensitive, organizeByRule, organizePrompt, parseOrganizeJson, type MemoItem } from "@/lib/assistantMemo";
+import { maskSensitive, mergeSingleLine, organizeByRule, organizePrompt, parseOrganizeJson, type MemoItem } from "@/lib/assistantMemo";
 
 const TABLE = "admin_assistant_memos";
 
@@ -97,6 +97,7 @@ export async function POST(request: NextRequest) {
     let items: MemoItem[] | null = ai.text ? parseOrganizeJson(ai.text, restore, now) : null;
     const organizedBy = items ? "ai" : "rule";
     if (!items) items = organizeByRule(text, now);
+    items = mergeSingleLine(text, items, now); // [10-23] 한 줄 메모는 한 장으로
     items = await fixWhoProduct(db, items);
 
     const rows = items.map((it) => ({
