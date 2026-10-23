@@ -407,6 +407,36 @@ export function ledgerSummaryLine(li: LedgerSummaryInput | null | undefined, ban
 
 export type RefundAdjustment = { label: string; amount: number };
 
+/** [2026-10-23] 은행 앱에 붙여넣는 이체정보 한 줄: 「국민은행 46130204112708 홍채윤 69,000원」 — 목록·처리창 공용 */
+export function transferCopyText(bankName: string, account: unknown, holder: unknown, amount: unknown): string {
+  const s = (v: unknown) => String(v ?? "").trim();
+  const amt = Math.round(Number(amount)) || 0;
+  return [s(bankName), s(account).replace(/[^0-9]/g, ""), isExcludedHolder(holder) ? "" : s(holder), amt > 0 ? `${amt.toLocaleString("ko-KR")}원` : ""].filter(Boolean).join(" ");
+}
+
+/** [2026-10-23 사장님 「자주 쓰는 내용 드롭다운」] 실제 고객이슈 180일 메모를 세어 많이 쓴 것부터.
+ *  reason 이 있으면 환불 사유 칩도 같이 맞춘다(품절·불량 = 상품문제 → 반품비 0). pull=true 면 등록 뒤 출고 넘기기 창을 연다. */
+export type IssueMemoPreset = { label: string; memo: string; reason?: "단순변심" | "상품문제" | "기타"; pull?: boolean };
+export const ISSUE_MEMO_PRESETS: Record<"refund" | "exchange" | "etc", IssueMemoPreset[]> = {
+  refund: [
+    { label: "품절 상품 환불", memo: "품절 상품 환불", reason: "상품문제" },
+    { label: "물건 챙기기 전 환불", memo: "물건 챙기기 전 환불", reason: "단순변심" },
+    { label: "카드 취소 요청", memo: "카드 취소 요청", reason: "단순변심" },
+    { label: "불량·하자", memo: "불량·하자 환불", reason: "상품문제" },
+  ],
+  exchange: [
+    { label: "사이즈 교환", memo: "사이즈 교환" },
+    { label: "색상 교환", memo: "색상 교환" },
+    { label: "불량 교환", memo: "불량 교환" },
+  ],
+  etc: [
+    { label: "빠진 상품 챙겨서 출고", memo: "빠진 상품 챙겨서 출고", pull: true },
+    { label: "주문 상품 챙겨서 출고", memo: "주문 상품 챙겨서 출고", pull: true },
+    { label: "품절 상품 구해서 출고", memo: "품절 상품 구해서 출고", pull: true },
+    { label: "재발송 대기", memo: "재발송 대기" },
+  ],
+};
+
 export function isValidStage(v: unknown): v is RefundStage {
   return typeof v === "string" && (REFUND_STAGES as readonly string[]).includes(v);
 }

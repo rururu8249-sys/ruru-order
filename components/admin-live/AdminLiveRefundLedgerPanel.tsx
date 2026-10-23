@@ -8,9 +8,13 @@ import { useEffect, useState } from "react";
 import { showAdminToast } from "@/lib/adminToast";
 import { patchIssueTask, type IssueExtraItem } from "@/lib/issueTaskPatch";
 import IssueExtraItems from "./IssueExtraItems";
+import LiveOrderRegisteredProductPicker from "./LiveOrderRegisteredProductPicker";
+import PickingPullModal from "./PickingPullModal";
 import { parseBankAccount, bankDisplayName, isExcludedHolder } from "@/lib/parseBankAccount";
 import {
   REASON_FAULT_CHIPS,
+  ISSUE_MEMO_PRESETS,
+  transferCopyText,
   reasonChipFromStored,
   type ReasonChip,
   buildKakaoCopy,
@@ -107,6 +111,11 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
   const [extra, setExtra] = useState<IssueExtraItem[]>(extraInitial); // [⑱] 기타 이슈에 따로 추가한 관련 상품
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  // [2026-10-23 사장님] 자주 쓰는 내용 칩 · 교환 «바꿀 상품» 고르기 · 기타 «출고 넘기기» 이어서
+  const [presetLabel, setPresetLabel] = useState("");
+  const [exPicker, setExPicker] = useState<"" | "same" | "other">("");
+  const [pullOpen, setPullOpen] = useState(false);
+  const wantPull = issueType === "etc" && Boolean(ISSUE_MEMO_PRESETS.etc.find((x) => x.label === presetLabel)?.pull);
 
   // 계좌 — [6차] 항상 3칸 표시(요약/펼침 토글 폐지). 옛 예금주가 제외단어(입니다 등)면
   //   손님 이름으로 «프리필»하고 노란 테두리+안내(저장 눌러야 DB 반영). 자동 저장 안 함.
@@ -368,6 +377,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
             await patchIssueTask(t, { issueTypeKey: "general", memo: issueMemo, extraItems: extra });
           } catch { /* 보강 실패해도 이슈는 등록됨 */ }
         }
+        if (wantPull && lines.length > 0) { showAdminToast("등록됐어요 — 이어서 넘길 출고를 골라 주세요", "success"); setPullOpen(true); return; }
         onSaved(); return;
       }
       const okLedger = await doPatch({ admin_task_id: created.taskId });
@@ -383,7 +393,10 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
       if (!okIssue) { setSaveError("고객이슈 저장에 실패했어요. 다시 시도해 주세요."); showAdminToast("고객이슈 저장 실패", "error"); return; }
     }
     // 2) 기타면 환불 기록은 만들지도 바꾸지도 않는다(💳 은 유형이 general 이라 목록에서 자동 숨김).
-    if (isEtc) { showAdminToast("저장됐어요", "success"); onSaved(); return; }
+    if (isEtc) {
+      if (wantPull && lines.length > 0) { showAdminToast("저장됐어요 — 이어서 넘길 출고를 골라 주세요", "success"); setPullOpen(true); return; }
+      showAdminToast("저장됐어요", "success"); onSaved(); return;
+    }
     // 3) 환불/교환 기록(refund-ledger) 저장.
     const okLedger = await doPatch({});
     if (!okLedger) { showAdminToast("고객이슈는 저장됐지만 환불 기록 저장에 실패했어요. 환불 부분을 다시 저장해 주세요.", "warning"); return; }
@@ -415,6 +428,14 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
       bankName: bankDisplayName(bank), account, holder,
     });
     try { await navigator.clipboard.writeText(text); showAdminToast("환불 안내 복사했어요 (카톡 붙여넣기)", "success"); }
+    catch { showAdminToast("복사 실패:\n" + text, "warning"); }
+  };
+
+  // [2026-10-23] 은행 앱용 이체정보 한 줄(목록 줄의 「이체정보 복사」와 같은 글자)
+  const copyTransferShort = async () => {
+    const text = transferCopyText(bankDisplayName(bank), account, holder, amountFinal);
+    if (!account) { showAdminToast("계좌번호를 먼저 넣어 주세요.", "warning"); return; }
+    try { await navigator.clipboard.writeText(text); showAdminToast(`이체정보 복사했어요\n${text}`, "success"); }
     catch { showAdminToast("복사 실패:\n" + text, "warning"); }
   };
 
@@ -459,6 +480,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
             {(["refund", "exchange", "etc"] as const).map((t) => (
               <button key={t} type="button" aria-pressed={issueType === t} onClick={() => {
                   setIssueType(t);
+                  setPresetLabel("");
                   // [⑭] 기타로 바꾸면 선택 비움(관련 상품은 «선택»). 환불·교환으로 바꿀 때 선택이 0개면 전체 체크(반품 기본).
                   if (t === "etc") setSel({});
                   else if (!lines.some((l) => (sel[l.id] || 0) > 0)) setSel(Object.fromEntries(lines.map((l) => [String(l.id), Math.max(1, Number(l.qty) || 1)])));
@@ -468,6 +490,26 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                 {t === "refund" ? "환불" : t === "exchange" ? "교환" : "기타"}
               </button>
             ))}
+          </div>
+
+          {/* 1-1. 자주 쓰는 내용 — 실제 이슈 메모를 세어 많은 것부터. 누르면 메모가 채워지고(환불은 사유도), 직접 고쳐도 된다 */}
+          <div className="mb-4">
+            <div className={SUB_LABEL}>자주 쓰는 내용</div>
+            <div className="flex flex-wrap gap-2">
+              {ISSUE_MEMO_PRESETS[issueType].map((p) => (
+                <button key={p.label} type="button" aria-pressed={presetLabel === p.label} onClick={() => {
+                    const prevPreset = ISSUE_MEMO_PRESETS[issueType].find((x) => x.label === presetLabel);
+                    const cur = clean(issueMemo);
+                    setIssueMemo(!cur || (prevPreset && cur === prevPreset.memo) ? p.memo : `${p.memo} · ${cur}`);
+                    setPresetLabel(p.label);
+                    if (p.reason && issueType === "refund") { setReasonChip(p.reason); setReasonDirty(true); if (p.reason === "상품문제") setDeductAmount(0); }
+                  }}
+                  className={CHIP(presetLabel === p.label)}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            {wantPull ? <div className="mt-1.5 text-[12px] text-ink-mute">등록하면 넘길 출고(방송·날짜)를 고르는 창이 바로 떠요</div> : null}
           </div>
 
           {/* 2. 상품 */}
@@ -671,30 +713,52 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                     {item.account_hidden ? (
                       <div className="text-[14px] font-bold text-ink">{[bankDisplayName(bank), holder].filter(Boolean).join(" · ")}<div className="mt-1 text-[12px] text-ink-mute">완료 후 30일이 지나 계좌번호는 가려졌어요</div></div>
                     ) : (
-                      /* [6차] 항상 같은 모양 — 붙여넣기 + 3칸 + 복사 */
-                      <>
-                        <input value={paste} onChange={(e) => applyPaste(e.target.value)} onPaste={(e) => applyPaste(e.clipboardData.getData("text"))} aria-label="계좌 정보 붙여넣기" placeholder="계좌 붙여넣기 (예: 국민은행 123456-01-234567 홍길동)" className={`w-full ${INPUT}`} />
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <select aria-label="은행" value={BANK_OPTIONS.includes(bank as typeof BANK_OPTIONS[number]) ? bank : (bank ? "기타" : "")} onChange={(e) => setBank(e.target.value === "기타" ? "" : e.target.value)} className={`w-32 ${INPUT} ${acctMissing.includes("bank") ? "ring-2 ring-warn-tx" : ""}`}>
-                            <option value="">은행</option>
-                            {BANK_OPTIONS.map((b) => <option key={b} value={b}>{bankDisplayName(b)}</option>)}
-                          </select>
-                          <input value={account} onChange={(e) => setAccount(e.target.value.replace(/[^0-9]/g, ""))} onFocus={selectOnFocus} aria-label="계좌번호" placeholder="계좌번호(숫자)" inputMode="numeric" className={`min-w-0 flex-1 ${INPUT} ${acctMissing.includes("account") ? "ring-2 ring-warn-tx" : ""}`} />
-                          <input value={holder} onChange={(e) => setHolder(e.target.value)} aria-label="예금주" placeholder="예금주" className={`w-28 ${INPUT} ${acctMissing.includes("holder") || holderExcluded ? "ring-2 ring-warn-tx" : ""}`} />
-                          <button type="button" onClick={copyTransferInfo} className="h-9 shrink-0 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2">복사</button>
+                      /* [2026-10-23 사장님 「계좌 칸 제대로」] 붙여넣기 한 칸 → 은행·계좌번호·예금주가 채워지고, 못 읽은 칸만 주황 표시.
+                         복사는 두 가지: 이체정보(은행 앱용 한 줄) / 카톡 안내(손님에게 보낼 여러 줄). 저장·인식 함수(applyPaste) 그대로. */
+                      <div className="rounded-lg border border-line p-3">
+                        <textarea value={paste} onChange={(e) => applyPaste(e.target.value)} onPaste={(e) => { e.preventDefault(); applyPaste(e.clipboardData.getData("text")); }} rows={2} aria-label="계좌 정보 붙여넣기" placeholder="손님이 보낸 계좌를 그대로 붙여넣으세요&#10;(예: 국민 46130204112708 홍채윤)" className="w-full resize-none rounded-lg border border-dashed border-line bg-surface-2 p-2.5 text-[16px] leading-6 text-ink outline-none focus-visible:ring-2 focus-visible:ring-ink" />
+                        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-[132px_1fr_112px]">
+                          <label className="grid gap-1 text-[12px] font-semibold text-ink-mute">은행
+                            <select value={BANK_OPTIONS.includes(bank as typeof BANK_OPTIONS[number]) ? bank : (bank ? "기타" : "")} onChange={(e) => setBank(e.target.value === "기타" ? "" : e.target.value)} className={`${INPUT} ${acctMissing.includes("bank") ? "ring-2 ring-warn-tx" : ""}`}>
+                              <option value="">선택</option>
+                              {BANK_OPTIONS.map((b) => <option key={b} value={b}>{bankDisplayName(b)}</option>)}
+                            </select>
+                          </label>
+                          <label className="grid gap-1 text-[12px] font-semibold text-ink-mute">계좌번호
+                            <input value={account} onChange={(e) => setAccount(e.target.value.replace(/[^0-9]/g, ""))} onFocus={selectOnFocus} placeholder="숫자만" inputMode="numeric" className={`min-w-0 tabular-nums ${INPUT} ${acctMissing.includes("account") ? "ring-2 ring-warn-tx" : ""}`} />
+                          </label>
+                          <label className="grid gap-1 text-[12px] font-semibold text-ink-mute">예금주
+                            <input value={holder} onChange={(e) => setHolder(e.target.value)} placeholder="이름" className={`min-w-0 ${INPUT} ${acctMissing.includes("holder") || holderExcluded ? "ring-2 ring-warn-tx" : ""}`} />
+                          </label>
                         </div>
-                      </>
+                        {acctMissing.length > 0 ? <div className="mt-1.5 text-[12px] text-warn-tx">주황 칸을 확인해 주세요{acctMissing.includes("holder") ? " — 예금주는 손님 이름으로 채워 뒀어요" : ""}</div> : null}
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <button type="button" onClick={() => void copyTransferShort()} className="h-10 rounded-lg bg-ink px-4 text-[14px] font-bold text-white">이체정보 복사</button>
+                          <button type="button" onClick={copyTransferInfo} className="h-10 rounded-lg border border-line bg-surface px-3 text-[14px] font-semibold text-ink hover:bg-surface-2">카톡 안내 복사</button>
+                          {account ? <span className="min-w-0 truncate text-[12px] text-ink-mute">{transferCopyText(bankDisplayName(bank), account, holder, amountFinal)}</span> : null}
+                        </div>
+                      </div>
                     )}
                   </div>
                 ) : null}
               </div>
             </>
           ) : (
-            /* 교환: 바꿀 옵션만(송장 칸은 [A3]에서 삭제 — reship_tracking 컬럼은 저장값 보존, 표시·입력 안 함). */
+            /* [2026-10-23 사장님] 교환 — «무엇으로 바꿀까요?» 같은 상품 다른 옵션 / 다른 등록상품을 골라 exchange_option 에 「원래 → 새 상품」으로 기록(재고·주문 무접촉).
+               송장 칸은 [A3]에서 삭제(reship_tracking 저장값 보존). */
             <div className="mb-4">
-              <label className={`block ${SUB_LABEL}`}>바꿀 옵션
-                <input value={exchangeOption} onChange={(e) => setExchangeOption(e.target.value)} placeholder="예: XL → 2XL" className={`mt-1.5 w-full ${INPUT}`} />
-              </label>
+              <div className={SUB_LABEL}>무엇으로 바꿀까요?</div>
+              {exchangeOption ? (
+                <div className="mb-2 flex items-center gap-2 rounded-lg border border-ink px-3 py-2.5">
+                  <span className="min-w-0 flex-1 text-[14px] font-bold text-ink">{exchangeOption}</span>
+                  <button type="button" onClick={() => setExchangeOption("")} className="h-8 shrink-0 rounded-lg px-2 text-[13px] font-semibold text-ink-soft hover:bg-surface-2">지우기</button>
+                </div>
+              ) : null}
+              <div className="flex flex-wrap gap-2">
+                <button type="button" disabled={selectedCount === 0} onClick={() => setExPicker("same")} className="h-10 rounded-lg border border-line bg-surface px-3 text-[14px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-40">같은 상품 · 옵션 바꾸기</button>
+                <button type="button" onClick={() => setExPicker("other")} className="h-10 rounded-lg border border-line bg-surface px-3 text-[14px] font-semibold text-ink hover:bg-surface-2">다른 상품으로</button>
+              </div>
+              <input value={exchangeOption} onChange={(e) => setExchangeOption(e.target.value)} placeholder="직접 적기 (예: 블랙/XL → 블랙/2XL)" className={`mt-2 w-full ${INPUT} !font-normal`} />
             </div>
           )}
           </>
@@ -718,8 +782,40 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
           {onDelete && !createMode ? <button type="button" disabled={saving} onClick={onDelete} className="h-9 rounded-lg px-2 text-[13px] font-semibold text-danger-tx hover:bg-surface-2 disabled:opacity-50">삭제</button> : null}
           <span className="flex-1" />
           <button type="button" onClick={onClose} className="h-9 rounded-lg border border-line bg-surface px-4 text-[13px] font-semibold text-ink hover:bg-surface-2">닫기</button>
-          <button type="button" disabled={saving || (!isEtc && !linesLoaded && !!orderCode) || (!isEtc && linesError)} onClick={saveOnly} className="h-10 min-w-[112px] rounded-lg bg-ink px-5 text-[14px] font-bold text-white disabled:opacity-50">{saving ? (createMode ? "등록 중…" : "저장 중…") : createMode ? "등록" : "저장"}</button>
+          <button type="button" disabled={saving || (!isEtc && !linesLoaded && !!orderCode) || (!isEtc && linesError)} onClick={saveOnly} className="h-10 min-w-[112px] rounded-lg bg-ink px-5 text-[14px] font-bold text-white disabled:opacity-50">{saving ? (createMode ? "등록 중…" : "저장 중…") : createMode ? (wantPull ? "등록하고 출고 넘기기" : "등록") : (wantPull ? "저장하고 출고 넘기기" : "저장")}</button>
         </div>
+        {/* [2026-10-23] 교환 «바꿀 상품» 고르기 — 등록상품 창을 기록용으로만 재사용(재고·주문 무접촉, onAdd 는 글자만 만든다) */}
+        {exPicker ? (
+          <LiveOrderRegisteredProductPicker
+            adding={false}
+            title={exPicker === "same" ? "같은 상품 · 바꿀 옵션 고르기" : "바꿀 상품 고르기"}
+            confirmLabel="이걸로 교환"
+            initialSearch={exPicker === "same" ? (lines.find((l) => (sel[l.id] || 0) > 0)?.product_name || "") : ""}
+            onClose={() => setExPicker("")}
+            onAdd={async (inp) => {
+              const from = lines.find((l) => (sel[l.id] || 0) > 0);
+              const fromOpt = from ? optLabel(from.color, from.size) : "";
+              const toOpt = optLabel(inp.color, inp.size);
+              const fromTxt = from ? (exPicker === "same" ? (fromOpt || from.product_name) : [from.product_name, fromOpt].filter(Boolean).join(" ")) : "";
+              const toTxt = exPicker === "same" ? (toOpt || inp.productName) : [inp.productName, toOpt].filter(Boolean).join(" ");
+              setExchangeOption(fromTxt ? `${fromTxt} → ${toTxt}` : toTxt);
+              return true;
+            }}
+          />
+        ) : null}
+        {/* [2026-10-23] 기타 «챙겨서 출고» — 등록 뒤 출고 넘기기 창(고른 상품 미리 체크). 닫으면 처리 창도 닫는다 */}
+        {pullOpen ? (
+          <PickingPullModal
+            orderNo={orderCode}
+            nickname={clean(item.nickname)}
+            name={clean(item.customer_name)}
+            orderedAt={orderDate || null}
+            lines={lines.map((l) => ({ id: String(l.id), productName: l.product_name, option: optLabel(l.color, l.size), qty: Number(l.qty) || 1 }))}
+            preselectIds={lines.filter((l) => (sel[l.id] || 0) > 0).map((l) => String(l.id))}
+            defaultReason={clean(issueMemo).slice(0, 40) || "빠진 상품 재발송"}
+            onClose={() => { setPullOpen(false); onSaved(); }}
+          />
+        ) : null}
       </div>
     </div>
   );

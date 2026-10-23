@@ -183,12 +183,14 @@ type Props = {
   adding: boolean;
   title?: string;
   confirmLabel?: string;
+  /** [2026-10-23] 처음 검색어(교환 — 같은 상품 옵션 바꾸기) */
+  initialSearch?: string;
 };
 
-export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, adding, title = "등록상품 추가 (재고 차감)", confirmLabel = "이 주문에 추가 (재고 차감)" }: Props) {
+export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, adding, title = "등록상품 추가 (재고 차감)", confirmLabel = "이 주문에 추가 (재고 차감)", initialSearch = "" }: Props) {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch);
   const [selectedId, setSelectedId] = useState("");
   const [color, setColor] = useState("");
   const [size, setSize] = useState("");

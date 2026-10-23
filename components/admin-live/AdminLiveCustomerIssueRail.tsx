@@ -17,7 +17,7 @@ import { pickIssueProductRows } from "@/lib/issueProductLabel";
 import PickingPullModal from "./PickingPullModal";
 import { RefundProcessModal, type LedgerDetail } from "./AdminLiveRefundLedgerPanel";
 import IssueRegisterModal, { type IssueRegisterSubmit } from "./IssueRegisterModal";
-import { productSnapshotFromItems, ledgerSummaryLine, pickPrimaryLedger, restoreSelectionFromSnapshot, listAmountParts, dateShortLabel, returnStagePrefix } from "@/lib/refundLedger";
+import { productSnapshotFromItems, ledgerSummaryLine, pickPrimaryLedger, restoreSelectionFromSnapshot, listAmountParts, dateShortLabel, returnStagePrefix, transferCopyText } from "@/lib/refundLedger";
 
 // [2026-09-26] refund_ledger 목록 요약 행(대표 선택·표시용). 같은 주문에 여러 개면 pickPrimaryLedger 로 1개.
 type LedgerRow = {
@@ -411,6 +411,14 @@ export function IssueCard({
     const md = Number.isNaN(d.getTime()) ? "" : `${d.getMonth() + 1}/${d.getDate()}`;
     return [rp, `같은 주문 — ${md ? `${md} ` : ""}이슈에서 처리 중`].filter(Boolean).join(" · ");
   })();
+  // [2026-10-23 사장님 「환불건은 안 열어보고 밖에서 바로 복사」] 미완료·계좌이체·금액·계좌번호 있는 대표 기록만
+  const transferText = (() => {
+    if (!isRefund || !isRepresentativeIssue || !ledgerInfo) return "";
+    const st = clean(ledgerInfo.stage);
+    if (clean(ledgerInfo.done_at) || st === "완료" || st === "거절·취소") return "";
+    if (clean(ledgerInfo.method) !== "계좌이체" || !(Number(ledgerInfo.amount_final) > 0) || !clean(ledgerInfo.account_number)) return "";
+    return transferCopyText(bankDisplayName(clean(ledgerInfo.bank)), ledgerInfo.account_number, ledgerInfo.account_holder, ledgerInfo.amount_final);
+  })();
   // 반품/교환 등록으로 만들어진 건인가 — 지울 때 포인트·반품기록까지 되돌려야 한다
   const issueTypes = getIssueTypes(task);
   const nickname = getNickname(task);
@@ -586,6 +594,9 @@ export function IssueCard({
             <div className="mt-0.5 flex min-w-0 items-start gap-1.5 text-[13px]">
               <span className="shrink-0 text-ink-mute" aria-hidden>처리</span>
               <span className="min-w-0 xl:truncate font-semibold text-ink" title={ledgerLine}>{String(ledgerLine).replace(/📦\s?/gu, "")}</span>
+              {transferText ? (
+                <button type="button" onClick={async (e) => { e.stopPropagation(); try { await navigator.clipboard.writeText(transferText); showAdminToast(`이체정보 복사했어요\n${transferText}`, "success"); } catch { showAdminToast("복사 실패:\n" + transferText, "warning"); } }} title={transferText} className="h-7 shrink-0 rounded-lg border border-line bg-surface px-2 text-[12px] font-semibold text-ink hover:bg-surface-2">이체정보 복사</button>
+              ) : null}
             </div>
           ) : null}
           {!product && !extra && !memoShown && !ledgerLine ? <span className="font-bold text-ink-mute">내용 없음</span> : null}
