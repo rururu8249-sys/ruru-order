@@ -465,17 +465,20 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
               {productGroups.map((g) => {
                 const c = countLine(g.options.flat());
                 return (
-                  <div key={g.name + "|" + g.options[0][0].productId} className={`flex gap-3 border-t border-line px-3 py-2.5 first:border-t-0 ${c.done ? "bg-surface-2" : ""}`}>
-                    {photoOf(g.photo, 44)}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-2">
+                  <div key={g.name + "|" + g.options[0][0].productId} className={`border-t border-line px-3 py-2.5 first:border-t-0 ${c.done ? "bg-surface-2" : ""}`}>
+                    {/* [23:04 사장님] 사진·상품명 줄 아래로 표를 내려 가로 전체를 씀(칸 넓게) */}
+                    <div className="flex items-center gap-3">
+                      {photoOf(g.photo, 44)}
+                      <div className="flex min-w-0 flex-1 items-baseline justify-between gap-2">
                         <span className={`min-w-0 break-words text-[14px] font-bold ${c.done ? "text-ink-mute" : "text-ink"}`}>{g.name}</span>
                         <span className="shrink-0 text-[16px] font-bold text-ink tabular-nums">총 {c.all}개</span>
                       </div>
+                    </div>
+                    <div>
                       {/* [15:18 사장님 「S 8 · M 5 저따위 말고 — 색상·사이즈·개수 구분 확실히」] 옵션마다 한 줄: 색상 | 사이즈 | 주문 수량 | 총 주문수량 | 챙겨야 할 남은 수량(16:28 사장님 확정, 16:25 「개수·남은」 뜻 모호 → 피킹표 표준 주문 수량/남은 수량) */}
-                      <div className="mt-1.5 overflow-hidden rounded-lg border border-line">
-                        <div className="grid grid-cols-[minmax(0,1fr)_52px_64px_84px] bg-surface-2 px-2 py-1 text-[12px] font-semibold text-ink-mute">
-                          <span>색상</span><span>사이즈</span><span className="text-right leading-tight">총 주문수량</span><span className="text-right leading-tight">챙겨야 할 남은 수량</span>
+                      <div className="mt-2 overflow-hidden rounded-lg border border-line">
+                        <div className="grid grid-cols-[minmax(0,1fr)_64px_88px_112px] gap-x-4 bg-surface-2 px-3 py-1.5 text-[12px] font-semibold text-ink-mute">
+                          <span>색상</span><span>사이즈</span><span className="text-right leading-tight break-keep">총 주문수량</span><span className="text-right leading-tight break-keep">챙겨야 할 남은 수량</span>
                         </div>
                         {g.options.map((rows) => {
                           const oc = countLine(rows);
@@ -484,8 +487,8 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                           const color = stripNoneOptionParts(rows[0].color) || "-";
                           const size = stripNoneOptionParts(rows[0].size) || (rows[0].color || rows[0].size ? "-" : (rows[0].optionText || "-"));
                           return (
-                            <div key={optionKey(rows[0])} className={`border-t border-line px-2 py-1.5 ${oc.done ? "bg-surface-2" : ""}`}>
-                              <div className="grid grid-cols-[minmax(0,1fr)_52px_64px_84px] items-center">
+                            <div key={optionKey(rows[0])} className={`border-t border-line px-3 py-1.5 ${oc.done ? "bg-surface-2" : ""}`}>
+                              <div className="grid grid-cols-[minmax(0,1fr)_64px_88px_112px] gap-x-4 items-center">
                                 <span className={`min-w-0 break-words text-[14px] font-semibold ${oc.done ? "text-ink-mute" : "text-ink"}`}>{color}</span>
                                 <span className={`text-[14px] font-bold ${oc.done ? "text-ink-mute" : "text-ink"}`}>{size}</span>
                                 <span className={`text-right text-[16px] font-bold tabular-nums ${oc.done ? "text-ink-mute" : "text-ink"}`}>{oc.all}개</span>
