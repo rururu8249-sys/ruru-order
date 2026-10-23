@@ -139,8 +139,16 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const [photoZoom, setPhotoZoom] = useState("");
   const [exporting, setExporting] = useState(false);
-  // 다 챙긴 상품은 한 줄로 접는다(남은 것만 눈에 띄게) — 눌러서 펼친 상품만 열어 둠
-  const [openDone, setOpenDone] = useState<Set<string>>(new Set());
+  // [16:21 사장님] 다 챙겨도 저절로 접히거나 아래로 옮기지 않는다(그 자리 그대로).
+  //   접기·펼치기는 사장님이 카드 머리의 「접기/펼치기」로 직접 — 둘 다 언제든 가능.
+  const [folded, setFolded] = useState<Set<string>>(new Set());
+  const toggleFold = (key: string) => setFolded((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
+  const foldButton = (key: string) => (
+    <button type="button" onClick={() => toggleFold(key)} aria-expanded={!folded.has(key)} className="flex h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-[13px] font-semibold text-ink-soft hover:bg-surface-2">
+      {folded.has(key) ? "펼치기" : "접기"}
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: folded.has(key) ? "none" : "rotate(180deg)" }}><path d="m6 9 6 6 6-6" /></svg>
+    </button>
+  );
 
   // 오늘 추가 작업(범위 밖 늦은 입금·다시 챙기기) — 서버에서 한 번
   useEffect(() => {
@@ -384,11 +392,14 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
     }
     return (
       <div key={r.id} className={`flex items-center gap-2 border-t border-line first:border-t-0 ${on ? "bg-surface-2" : "bg-surface"}`}>
-        <button type="button" disabled={blocked} onClick={() => void setPickedFor([r.id], !on)} aria-pressed={on} className="flex min-h-[52px] min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left disabled:cursor-wait">
-          {checkBox(on)}
+        {/* 체크는 □ 칸만 눌러야 된다(줄 나머지는 안 눌림) — 누르는 범위는 칸 둘레 44px */}
+        <div className="flex min-h-[52px] min-w-0 flex-1 items-center gap-2 py-2 pl-1 pr-3">
+          <button type="button" disabled={blocked} onClick={() => void setPickedFor([r.id], !on)} aria-pressed={on} aria-label={on ? "챙김 해제" : "챙김"} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg disabled:cursor-wait">
+            {checkBox(on)}
+          </button>
           <span className={`min-w-0 flex-1 ${on ? "text-ink-mute" : "text-ink"}`}>{children}</span>
           <span className={`shrink-0 text-[16px] font-bold tabular-nums ${on ? "text-ink-mute" : r.qty > 1 ? "text-danger-tx" : "text-ink"}`}>{r.qty}개</span>
-        </button>
+        </div>
         {r.pulled ? <button type="button" onClick={() => void unpull(r)} className="mr-2 h-8 shrink-0 rounded-lg border border-line px-2 text-[12px] font-semibold text-ink-soft hover:bg-surface-2">넘기기 취소</button> : null}
       </div>
     );
@@ -410,7 +421,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
             <div className="mt-3">
               <div className="flex items-end justify-between gap-2">
                 <div className="tabular-nums">{loading ? <span className="text-[16px] font-bold text-ink">확인 중…</span> : remainPaid > 0
-                  ? <><span className="text-[20px] font-bold text-ink">남은 {remainPaid}개</span><span className="ml-2 text-[13px] font-semibold text-ink-soft">챙긴 {gotPaid} / 전체 {totalPaid}</span></>
+                  ? <><span className="text-[20px] font-bold text-ink">더 챙길 {remainPaid}개</span><span className="ml-2 text-[13px] font-semibold text-ink-soft">챙긴 {gotPaid} / 주문 {totalPaid}</span></>
                   : <span className="text-[20px] font-bold text-ok-tx">{totalPaid > 0 ? `✓ 다 챙겼어요 · ${totalPaid}개` : "챙길 상품 없음"}</span>}</div>
                 <div className="text-[13px] text-ink-soft tabular-nums">{unpaidQty ? <span className="font-semibold text-danger-tx">미결제 {unpaidQty}개 따로</span> : null}</div>
               </div>
@@ -451,7 +462,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
           {/* [15:11 사장님] 요약 = 업체에서 한 번에 집어 오는 피킹표 — 손님 이름 없이 상품 총개수·옵션별 개수·포함 내역·남은 개수만 */}
           {!scopeTooWide && view === "summary" ? (
             <div className="overflow-hidden rounded-xl border border-line bg-surface">
-              {[...productGroups].sort((a, b) => Number(countLine(a.options.flat()).done) - Number(countLine(b.options.flat()).done)).map((g) => {
+              {productGroups.map((g) => {
                 const c = countLine(g.options.flat());
                 return (
                   <div key={g.name + "|" + g.options[0][0].productId} className={`flex gap-3 border-t border-line px-3 py-2.5 first:border-t-0 ${c.done ? "bg-surface-2" : ""}`}>
@@ -459,12 +470,12 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-2">
                         <span className={`min-w-0 break-words text-[14px] font-bold ${c.done ? "text-ink-mute" : "text-ink"}`}>{g.name}</span>
-                        <span className="shrink-0 text-[16px] font-bold text-ink tabular-nums">{c.all}개</span>
+                        <span className="shrink-0 text-[16px] font-bold text-ink tabular-nums">총 {c.all}개</span>
                       </div>
-                      {/* [15:18 사장님 「S 8 · M 5 저따위 말고 — 색상·사이즈·개수 구분 확실히」] 옵션마다 한 줄: 색상 | 사이즈 | 개수 | 남은 */}
+                      {/* [15:18 사장님 「S 8 · M 5 저따위 말고 — 색상·사이즈·개수 구분 확실히」] 옵션마다 한 줄: 색상 | 사이즈 | 주문 수량 | 더 챙길 수량(16:25 「개수·남은」 뜻 모호 → 피킹표 표준 주문 수량/남은 수량) */}
                       <div className="mt-1.5 overflow-hidden rounded-lg border border-line">
-                        <div className="grid grid-cols-[minmax(0,1fr)_72px_64px_72px] bg-surface-2 px-2 py-1 text-[12px] font-semibold text-ink-mute">
-                          <span>색상</span><span>사이즈</span><span className="text-right">개수</span><span className="text-right">남은</span>
+                        <div className="grid grid-cols-[minmax(0,1fr)_56px_64px_80px] bg-surface-2 px-2 py-1 text-[12px] font-semibold text-ink-mute">
+                          <span>색상</span><span>사이즈</span><span className="text-right">주문 수량</span><span className="text-right">더 챙길 수량</span>
                         </div>
                         {g.options.map((rows) => {
                           const oc = countLine(rows);
@@ -474,7 +485,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                           const size = stripNoneOptionParts(rows[0].size) || (rows[0].color || rows[0].size ? "-" : (rows[0].optionText || "-"));
                           return (
                             <div key={optionKey(rows[0])} className={`border-t border-line px-2 py-1.5 ${oc.done ? "bg-surface-2" : ""}`}>
-                              <div className="grid grid-cols-[minmax(0,1fr)_72px_64px_72px] items-center">
+                              <div className="grid grid-cols-[minmax(0,1fr)_56px_64px_80px] items-center">
                                 <span className={`min-w-0 break-words text-[14px] font-semibold ${oc.done ? "text-ink-mute" : "text-ink"}`}>{color}</span>
                                 <span className={`text-[14px] font-bold ${oc.done ? "text-ink-mute" : "text-ink"}`}>{size}</span>
                                 <span className={`text-right text-[16px] font-bold tabular-nums ${oc.done ? "text-ink-mute" : "text-ink"}`}>{oc.all}개</span>
@@ -492,18 +503,19 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
             </div>
           ) : null}
 
-          {/* 남은 게 있는 상품이 위, 다 챙긴 상품(한 줄로 접힘)은 아래 — 할 일만 위에 보이게 */}
-          {!scopeTooWide && view === "product" ? [...productGroups].sort((a, b) => Number(countLine(a.options.flat()).done) - Number(countLine(b.options.flat()).done)).map((g) => {
+          {/* 순서는 그대로(다 챙겨도 안 움직임), 접기는 사장님이 직접 */}
+          {!scopeTooWide && view === "product" ? productGroups.map((g) => {
             const all = g.options.flat();
             const c = countLine(all);
             const gKey = g.name + "|" + g.options[0][0].productId;
-            if (c.done && !openDone.has(gKey)) {
+            if (folded.has(gKey)) {
               return (
-                <button key={gKey} type="button" onClick={() => setOpenDone((prev) => new Set(prev).add(gKey))} className="mb-2 flex w-full items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2.5 text-left">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-ink text-white" aria-hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5 10 17.5 19 7" /></svg></span>
-                  <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-ink-mute">{g.name}</span>
-                  <span className="shrink-0 text-[13px] font-semibold text-ink-mute tabular-nums">{c.total}개 다 챙김</span>
-                </button>
+                <div key={gKey} className="mb-2 flex w-full items-center gap-2 rounded-xl border border-line bg-surface py-1 pl-3 pr-1">
+                  {c.done ? <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-ink text-white" aria-hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5 10 17.5 19 7" /></svg></span> : null}
+                  <span className={`min-w-0 flex-1 truncate text-[14px] font-semibold ${c.done ? "text-ink-mute" : "text-ink"}`}>{g.name}</span>
+                  <span className={`shrink-0 text-[13px] font-semibold tabular-nums ${c.done ? "text-ink-mute" : "text-danger-tx"}`}>{c.done ? `${c.total}개 다 챙김` : `더 챙길 ${c.total - c.got}개`}</span>
+                  {foldButton(gKey)}
+                </div>
               );
             }
             return (
@@ -514,6 +526,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                     <h3 className="break-words text-[16px] font-bold leading-snug text-ink">{g.name}</h3>
                     <div className="mt-0.5 text-[13px] text-ink-soft tabular-nums">총 {c.all}개{c.done ? " · 다 챙김" : c.total ? ` · 챙긴 ${c.got}/${c.total}` : ""}</div>
                   </div>
+                  {foldButton(gKey)}
                 </div>
                 {g.options.map((rows) => {
                   const oc = countLine(rows);
@@ -533,7 +546,8 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                           {note ? <span className="mt-0.5 block text-[12px] font-semibold text-ink-soft">{note}</span> : null}
                         </span>
                         {oc.done ? <span className="shrink-0 text-[13px] font-semibold text-ink-mute">다 챙김</span>
-                          : oc.open.length > 0 ? <button type="button" disabled={blocked} onClick={() => void setPickedFor(oc.open.map((r) => r.id), true)} className="h-9 shrink-0 rounded-lg border border-ink bg-surface px-3 text-[13px] font-bold text-ink disabled:opacity-40">남은 {oc.open.reduce((sum, r) => sum + r.qty, 0)}개 챙김</button>
+                          : oc.open.length > 1 ? <button type="button" disabled={blocked} onClick={() => void setPickedFor(oc.open.map((r) => r.id), true)} className="h-9 shrink-0 rounded-lg border border-ink bg-surface px-3 text-[13px] font-bold text-ink disabled:opacity-40">{oc.open.length}건 한꺼번에 체크</button>
+                          : oc.open.length === 1 ? null
                           : <span className="shrink-0 text-[13px] text-ink-mute">{oc.got}/{oc.total}</span>}
                       </div>
                       <div className="pl-3">
@@ -555,16 +569,17 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
             );
           }) : null}
 
-          {!scopeTooWide && view === "customer" ? [...customerGroups].sort((a, b) => Number(countLine(a).done) - Number(countLine(b).done)).map((rows) => {
+          {!scopeTooWide && view === "customer" ? customerGroups.map((rows) => {
             const c = countLine(rows);
             const head = rows[0];
-            if (c.done && !openDone.has(head.customerKey)) {
+            if (folded.has(head.customerKey)) {
               return (
-                <button key={head.customerKey} type="button" onClick={() => setOpenDone((prev) => new Set(prev).add(head.customerKey))} className="mb-2 flex w-full items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2.5 text-left">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-ink text-white" aria-hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5 10 17.5 19 7" /></svg></span>
-                  <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-ink-mute">{head.nickname}{head.name && head.name !== head.nickname ? ` ${head.name}` : ""}</span>
-                  <span className="shrink-0 text-[13px] font-semibold text-ink-mute tabular-nums">{c.total}개 다 챙김</span>
-                </button>
+                <div key={head.customerKey} className="mb-2 flex w-full items-center gap-2 rounded-xl border border-line bg-surface py-1 pl-3 pr-1">
+                  {c.done ? <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-ink text-white" aria-hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5 10 17.5 19 7" /></svg></span> : null}
+                  <span className={`min-w-0 flex-1 truncate text-[14px] font-semibold ${c.done ? "text-ink-mute" : "text-ink"}`}>{head.nickname}{head.name && head.name !== head.nickname ? ` ${head.name}` : ""}</span>
+                  <span className={`shrink-0 text-[13px] font-semibold tabular-nums ${c.done ? "text-ink-mute" : "text-danger-tx"}`}>{c.done ? `${c.total}개 다 챙김` : `더 챙길 ${c.total - c.got}개`}</span>
+                  {foldButton(head.customerKey)}
+                </div>
               );
             }
             return (
@@ -574,6 +589,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                     <h3 className="truncate text-[16px] font-bold text-ink">{head.nickname}{head.name && head.name !== head.nickname ? <span className="ml-1.5 text-[14px] font-semibold text-ink-soft">{head.name}</span> : null}</h3>
                     <div className="mt-0.5 text-[13px] text-ink-soft tabular-nums">상품 {c.all}개{c.done ? " · 다 챙김" : c.total ? ` · 챙긴 ${c.got}/${c.total}` : ""}{!head.paid ? " · 미결제" : ""}</div>
                   </div>
+                  {foldButton(head.customerKey)}
                 </div>
                 {rows.map((r) => lineButton(r, <>
                     <span className="flex min-w-0 items-center gap-2">
