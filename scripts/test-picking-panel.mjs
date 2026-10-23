@@ -88,7 +88,14 @@ await act(async () => { await new Promise(r => setTimeout(r, 0)); });
 const flat = (n) => n == null ? '' : typeof n === 'string' ? n : Array.isArray(n) ? n.map(flat).join('') : flat(n.children);
 const text = () => flat(tree.toJSON());
 const tabs = tree.root.findAll(n => n.type === 'button' && n.props.role === 'tab');
-assert.deepEqual(tabs.map(t => t.children.join('')), ['상품별', '고객별'], '보기는 두 개뿐');
+assert.deepEqual(tabs.map(t => t.children.join('')), ['요약', '상품별', '고객별']);
+const nodeText0 = (n) => typeof n === 'string' ? n : (n.children || []).map(nodeText0).join('');
+const chip = (label) => tree.root.findAll(n => n.type === 'button' && n.props['aria-pressed'] !== undefined && nodeText0(n).startsWith(label))[0];
+assert.equal(nodeText0(chip('결제완료')), '결제완료 6'); assert.equal(chip('결제완료').props['aria-pressed'], true, '기본은 결제완료');
+assert.equal(nodeText0(chip('미결제')), '미결제 2'); assert.equal(nodeText0(chip('전체')), '전체 8');
+assert.ok(!text().includes('고객3'), '기본(결제완료)엔 미결제 손님 안 보임');
+await act(async () => chip('전체').props.onClick());
+assert.ok(text().includes('미결제 상품이 섞여 보여요'));
 assert.ok(text().includes('미결제 2 · 지난 주문 1개 포함'), '같은 상품·옵션 줄 안에 지난 주문 포함 표시');
 assert.ok(text().includes('다른 출고로 넘긴 상품 1개는 여기서 뺐어요'));
 assert.ok(!text().includes('넘겨받'), '어색한 「넘겨받음」 문구 없음');
@@ -105,7 +112,7 @@ assert.equal(rowBtn('고객1').props['aria-pressed'], true);
 await act(async () => { await rowBtn('고객3').props.onClick(); });
 assert.equal(writes.at(-1).ids.map(String).join(), '3');
 // 고객별 보기
-await act(async () => tabs[1].props.onClick());
+await act(async () => tabs[2].props.onClick());
 assert.ok(text().includes('고객9') || text().includes('지난 주문 10.11(일)'), '고객별에도 지난 주문 표시');
 // 모두 챙김 = 결제완료·안 챙긴 것만
 writes.length = 0;
@@ -118,7 +125,7 @@ assert.equal(issueRows.find(r => r.id === '22').skip, true);
 assert.equal(issueRows.find(r => r.id === '21').skip, undefined, '대상 아닌 줄은 그대로');
 assert.equal(mod.includedNote(issueRows.filter(r => r.color === '블랙')), '환불 1개 빼고');
 // 옵션 「남은 n개 챙김」 → 그 옵션의 결제완료·안 챙긴 줄만 저장, 다 챙긴 상품은 한 줄로 접힘
-await act(async () => tabs[0].props.onClick());
+await act(async () => tabs[1].props.onClick());
 // 블랙/M 상품은 다 챙겨서 한 줄로 접혀 있다 → 눌러 펼치고 고객6 체크를 풀었다가 옵션 버튼으로 다시
 assert.ok(text().includes('6개 다 챙김'), '다 챙긴 상품은 한 줄로 접힘');
 await act(async () => tree.root.findAll(n => n.type === 'button' && nodeText(n).includes('6개 다 챙김'))[0].props.onClick());
@@ -126,4 +133,11 @@ await act(async () => { await rowBtn('고객6').props.onClick(); });
 const optBtn = tree.root.findAll(n => n.type === 'button' && nodeText(n) === '남은 1개 챙김')[0];
 await act(async () => { await optBtn.props.onClick(); });
 assert.deepEqual(writes.at(-1).ids.map(String), ['7']);
+// 요약 = 손님 이름 없이 옵션별 개수
+await act(async () => tabs[0].props.onClick());
+assert.ok(text().includes('레드 / 사이즈 S 7') && !text().includes('고객1'), '요약엔 손님 이름 없음');
+// 전부 해제 — 확인 뒤 보이는 챙긴 줄만 false
+const un = tree.root.findAll(n => n.type === 'button' && nodeText0(n) === '전부 해제')[0];
+await act(async () => { await un.props.onClick(); });
+assert.equal(writes.at(-1).payload.picked_at, null, '해제 = picked_at 비움');
 console.log('test-picking-panel: ok');

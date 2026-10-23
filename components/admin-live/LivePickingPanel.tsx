@@ -129,7 +129,9 @@ const productKey = (r: PickRow) => `${r.productId || ""}|${r.productName}`;
 const optionKey = (r: PickRow) => `${r.color}|${r.size}|${r.optionText}`;
 
 export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = false, onClose }: Props) {
-  const [view, setView] = useState<"product" | "customer">("product");
+  const [view, setView] = useState<"summary" | "product" | "customer">("product");
+  // [15:11 사장님] 결제 분류 — 기본 «결제완료»(미결제까지 같이 챙기는 실수 방지). 숫자는 수량.
+  const [payView, setPayView] = useState<"paid" | "unpaid" | "all">("paid");
   const [search, setSearch] = useState("");
   const [openOnly, setOpenOnly] = useState(false);
   const [extraOrders, setExtraOrders] = useState<LiveOrder[]>([]);
@@ -258,7 +260,9 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
   const pct = totalPaid > 0 ? Math.round((gotPaid / totalPaid) * 100) : 0;
 
   const q = search.trim();
-  const shown = allRows.filter((r) => (!q || productSearchMatches([r.nickname, r.name, r.productName, r.optionText].join(" "), q)) && (!openOnly || !picked.has(r.id)));
+  const payQty = (f: (r: PickRow) => boolean) => allRows.filter((r) => !r.skip && f(r)).reduce((sum, r) => sum + r.qty, 0);
+  const payCounts = { paid: payQty((r) => r.paid), unpaid: payQty((r) => !r.paid), all: payQty(() => true) };
+  const shown = allRows.filter((r) => (payView === "all" || (payView === "paid" ? r.paid : !r.paid)) && (!q || productSearchMatches([r.nickname, r.name, r.productName, r.optionText].join(" "), q)) && (!openOnly || !picked.has(r.id)));
 
   // 상품별: 상품 → 옵션 → 손님 줄
   const productGroups = useMemo(() => {
@@ -308,6 +312,15 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
     const qty = targets.reduce((s, r) => s + r.qty, 0);
     if (!(await showAdminConfirm(`지금 보이는 결제완료 상품 ${qty}개를 모두 챙김으로 표시할까요?\n미결제·다시 챙기기 상품은 빼요. 주문·입금·출고 상태는 바뀌지 않아요.`, { title: "모두 챙김", confirmText: "모두 챙김", cancelText: "그만두기" }))) return;
     await setPickedFor(targets.map((r) => r.id), true);
+  };
+
+  // [15:11 사장님] 챙김 전부 해제 — 실수하면 챙긴 기록이 다 지워지므로 개수 확인창 + 작은 글자 버튼
+  const unpickAll = async () => {
+    const targets = shown.filter((r) => picked.has(r.id));
+    if (!targets.length) { showAdminToast("해제할 챙김이 없어요.", "warning"); return; }
+    const qty = targets.reduce((sum, r) => sum + r.qty, 0);
+    if (!(await showAdminConfirm(`지금 보이는 챙긴 상품 ${qty}개를 모두 «안 챙김»으로 되돌릴까요?\n그동안 체크한 기록이 지워져요. 주문·입금은 바뀌지 않아요.`, { title: "챙김 전부 해제", confirmText: "전부 해제", cancelText: "그만두기", tone: "warning" }))) return;
+    await setPickedFor(targets.map((r) => r.id), false);
   };
 
   const runExcel = async () => {
@@ -410,22 +423,64 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
           {/* 보기 · 검색 · 안 챙긴 것만 */}
           <div className="mt-3 flex items-center gap-2">
             <div className="flex shrink-0 rounded-lg border border-line p-0.5" role="tablist">
-              {(["product", "customer"] as const).map((v) => (
-                <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => setView(v)} className={`h-9 rounded-lg px-3 text-[14px] font-semibold ${view === v ? "bg-ink text-white" : "text-ink-soft"}`}>{v === "product" ? "상품별" : "고객별"}</button>
+              {(["summary", "product", "customer"] as const).map((v) => (
+                <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => setView(v)} className={`h-9 rounded-lg px-3 text-[14px] font-semibold ${view === v ? "bg-ink text-white" : "text-ink-soft"}`}>{v === "summary" ? "요약" : v === "product" ? "상품별" : "고객별"}</button>
               ))}
             </div>
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="상품·닉네임 검색" className="h-10 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-[16px] text-ink" />
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {(["paid", "unpaid", "all"] as const).map((k) => (
+              <button key={k} type="button" aria-pressed={payView === k} onClick={() => setPayView(k)} className={`h-9 rounded-full border px-3 text-[13px] font-semibold tabular-nums ${payView === k ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink-soft"}`}>
+                {k === "paid" ? "결제완료" : k === "unpaid" ? "미결제" : "전체"} {payCounts[k]}
+              </button>
+            ))}
           </div>
           <label className="mt-2 flex w-fit cursor-pointer items-center gap-2 text-[13px] font-semibold text-ink-soft">
             <input type="checkbox" checked={openOnly} onChange={(e) => setOpenOnly(e.target.checked)} className="h-4 w-4 accent-[var(--color-ink)]" />안 챙긴 것만
           </label>
           {q ? <p className="mt-1.5 text-[12px] font-semibold text-warn-tx">검색 중이라 일부만 보여요 — 다 챙겼는지는 검색어를 지우고 확인하세요</p> : null}
+          {payView !== "paid" ? <p className="mt-1.5 text-[12px] font-semibold text-danger-tx">미결제 상품이 섞여 보여요 — 입금 확인 전엔 챙기지 마세요</p> : null}
         </div>
 
         {/* 목록 */}
         <div className="min-h-0 flex-1 overflow-y-auto bg-surface-2 px-3 py-3">
           {scopeTooWide ? <div className="py-16 text-center text-[14px] font-semibold text-ink-soft">주문서에서 방송이나 날짜를 먼저 골라 주세요</div> : null}
           {!scopeTooWide && !loading && shown.length === 0 ? <div className="py-16 text-center text-[14px] font-semibold text-ink-soft">{allRows.length ? "다 챙겼어요" : "챙길 상품이 없어요"}</div> : null}
+
+          {/* [15:11 사장님] 요약 = 업체에서 한 번에 집어 오는 피킹표 — 손님 이름 없이 상품 총개수·옵션별 개수·포함 내역·남은 개수만 */}
+          {!scopeTooWide && view === "summary" ? (
+            <div className="overflow-hidden rounded-xl border border-line bg-surface">
+              {[...productGroups].sort((a, b) => Number(countLine(a.options.flat()).done) - Number(countLine(b.options.flat()).done)).map((g) => {
+                const c = countLine(g.options.flat());
+                return (
+                  <div key={g.name + "|" + g.options[0][0].productId} className={`flex gap-3 border-t border-line px-3 py-2.5 first:border-t-0 ${c.done ? "bg-surface-2" : ""}`}>
+                    {photoOf(g.photo, 44)}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className={`min-w-0 break-words text-[14px] font-bold ${c.done ? "text-ink-mute" : "text-ink"}`}>{g.name}</span>
+                        <span className="shrink-0 text-[16px] font-bold text-ink tabular-nums">{c.all}개</span>
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {g.options.map((rows) => {
+                          const oc = countLine(rows);
+                          const note = includedNote(rows);
+                          const left = oc.total - oc.got;
+                          return (
+                            <span key={optionKey(rows[0])} className={`rounded-lg border px-2 py-1 text-[13px] tabular-nums ${oc.done ? "border-line text-ink-mute line-through" : "border-ink text-ink"}`}>
+                              <b>{rows[0].optionText || "옵션 없음"} {oc.all}</b>
+                              {note ? <span className="ml-1 text-ink-soft">({note})</span> : null}
+                              {!oc.done && left > 0 && left < oc.total ? <span className="ml-1 font-semibold text-danger-tx">남은 {left}</span> : null}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
 
           {/* 남은 게 있는 상품이 위, 다 챙긴 상품(한 줄로 접힘)은 아래 — 할 일만 위에 보이게 */}
           {!scopeTooWide && view === "product" ? [...productGroups].sort((a, b) => Number(countLine(a.options.flat()).done) - Number(countLine(b.options.flat()).done)).map((g) => {
@@ -524,6 +579,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
         {/* 아래 */}
         <div className="flex items-center gap-2 border-t border-line px-4 py-3" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
           <button type="button" disabled={blocked || exporting || scopeTooWide} onClick={() => void runExcel()} className="h-10 rounded-lg border border-line bg-surface px-3 text-[14px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-40">{exporting ? "만드는 중…" : "엑셀"}</button>
+          <button type="button" disabled={blocked || scopeTooWide} onClick={() => void unpickAll()} className="h-10 rounded-lg px-2 text-[13px] font-semibold text-ink-mute hover:bg-surface-2 disabled:opacity-40">전부 해제</button>
           <span className="flex-1" />
           <button type="button" onClick={onClose} className="h-10 rounded-lg border border-line bg-surface px-4 text-[14px] font-semibold text-ink">닫기</button>
           <button type="button" disabled={blocked || scopeTooWide} onClick={() => void pickAll()} className="h-10 rounded-lg bg-ink px-4 text-[14px] font-bold text-white disabled:opacity-40">모두 챙김</button>
