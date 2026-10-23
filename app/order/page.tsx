@@ -61,7 +61,7 @@ import { brandWordmarkThumbnail, normalizeBrandKorean, productNameThumbnail, pro
 import { toOptionList } from "@/lib/optionSplit";
 import { widgetPinnedProductId } from "@/lib/widgetPinState";
 // [2026-09-22] 상품 주문 안내 문구 — 문구 원문은 lib 한 곳에서만 정한다(관리자 설정과 같은 파일)
-import { resolveProductNoticePresentationFor, effectiveProductNoticeMode, isInstantOrderProduct, INSTANT_CARD_BADGE } from "@/lib/productOrderNotice";
+import { resolveProductNoticePresentationFor, effectiveProductNoticeMode, isInstantOrderProduct, INSTANT_CARD_BADGE, LIVE_ONLY_CARD_BADGE } from "@/lib/productOrderNotice";
 import {
   CUSTOMER_SESSION_VERSION_KEY,
   YOUTUBE_NICKNAME_CONFIRM_VERSION_KEY,
@@ -6708,7 +6708,7 @@ export default function OrderPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <span style={{ flexShrink: 0, fontSize: "15px" }}>{uiS5 ? <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="M5 8h14l-1 12H6z" /><path d="M9 8V6.5a3 3 0 0 1 6 0V8" /></svg> : "🛍"}</span>
                 <div style={uiV2 ? { minWidth: 0, flex: 1, fontSize: "14px", fontWeight: 600, lineHeight: 1.5, ...(uiS7 ? { wordBreak: "keep-all" as const } : {}) } : { minWidth: 0, flex: 1, fontSize: "12.5px", fontWeight: 800, lineHeight: 1.45 }}>
-                  방송 전이에요{productListState === "loading" || instantReadyCount > 0 ? <> · 아래 상품{productListState === "loading" ? "은" : ` ${instantReadyCount}개는`} <b>지금 바로 주문</b> 가능</> : null}
+                  방송 전이에요{productListState === "loading" || instantReadyCount > 0 ? <> · 아래 상품{productListState === "loading" ? "은" : ` ${instantReadyCount}개는`} <b>바로 주문</b> 가능</> : null}
                   {nextLiveText ? <div style={uiV2 ? { fontSize: "13px", fontWeight: 400, color: "#707072" } : { fontSize: "11.5px", fontWeight: 700, opacity: 0.88 }}>다음 라이브 · {nextLiveText}</div> : null}
                 </div>
                 <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flexShrink: 0, height: "40px", padding: "0 12px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" } : { flexShrink: 0, height: "30px", padding: "0 10px", border: "1px solid rgba(255,255,255,0.45)", borderRadius: "999px", background: "rgba(255,255,255,0.14)", color: "#fff", fontSize: "11px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>{uiS5 ? "알림 받는 중 ✓" : "🔔 알림 받는 중 ✓"}</button>
@@ -6721,7 +6721,7 @@ export default function OrderPage() {
               <div style={uiV2 ? { display: "flex", alignItems: "center", gap: "8px", background: "#F5F5F5", borderRadius: "16px", padding: "10px 14px", color: "#111111" } : { display: "flex", alignItems: "center", gap: "8px", background: "linear-gradient(135deg,#7A1E47,#9A3560)", borderRadius: "14px", padding: "10px 13px", color: "#fff" }}>
                 <span style={{ flexShrink: 0, fontSize: "15px" }}>{uiS5 ? <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="M5 8h14l-1 12H6z" /><path d="M9 8V6.5a3 3 0 0 1 6 0V8" /></svg> : "🛍"}</span>
                 <div style={uiV2 ? { minWidth: 0, flex: 1, fontSize: "14px", fontWeight: 600, lineHeight: 1.5, ...(uiS7 ? { wordBreak: "keep-all" as const } : {}) } : { minWidth: 0, flex: 1, fontSize: "12.5px", fontWeight: 800, lineHeight: 1.45 }}>
-                  방송 전이에요{productListState === "loading" || instantReadyCount > 0 ? <> · 아래 상품{productListState === "loading" ? "은" : ` ${instantReadyCount}개는`} <b>지금 바로 주문</b> 가능</> : null}
+                  방송 전이에요{productListState === "loading" || instantReadyCount > 0 ? <> · 아래 상품{productListState === "loading" ? "은" : ` ${instantReadyCount}개는`} <b>바로 주문</b> 가능</> : null}
                   {nextLiveText ? <div style={uiV2 ? { fontSize: "13px", fontWeight: 400, color: "#707072" } : { fontSize: "11.5px", fontWeight: 700, opacity: 0.88 }}>다음 라이브 · {nextLiveText}</div> : null}
                 </div>
                 <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flexShrink: 0, height: "40px", padding: "0 12px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" } : { flexShrink: 0, height: "30px", padding: "0 10px", border: "1px solid rgba(255,255,255,0.45)", borderRadius: "999px", background: "rgba(255,255,255,0.14)", color: "#fff", fontSize: "11px", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>{uiS5 ? "알림 받는 중 ✓" : "🔔 알림 받는 중 ✓"}</button>
@@ -7309,8 +7309,14 @@ export default function OrderPage() {
                               // [㉜] 새 모양 배지 — 흰 알약+hairline 13px(「특가」만 빨간 글자), 줄당 최대 3개(정보 배지 먼저, 남는 자리에 마케팅).
                               //   「N개 남음」은 배지가 아니라 가격 근처 글씨로(lowTextV2). 어떤 배지를 켤지 판정은 위 그대로.
                               if (uiS6) {
-                                const pick = pickCardBadgesS6(all.filter((b) => b.on).map((b) => b.key));
-                                const byKey = new Map(all.map((b) => [b.key, b] as const));
+                                // [2026-10-23 16:06 사장님 「쇼핑몰 모드면 다 바로 구매 가능한데 일부에만 배지 붙은 게 이상」]
+                                //   배지는 «예외»에만 단다(Baymard: 대부분에 붙으면 신호가 사라짐). 바로 주문 상품이 기본이라 카드엔 안 붙이고,
+                                //   방송에서 접수해야 사는 상품에만 「방송 접수 후 주문」(회색). 2개 제한에 밀려 일부만 붙던 문제도 같이 없어짐.
+                                const liveOnlyCard = !all.some((b) => b.key === "direct" && b.on);
+                                const markKeys = all.filter((b) => b.on && b.key !== "direct").map((b) => b.key);
+                                const pick = liveOnlyCard ? ["liveonly", ...pickCardBadgesS6(markKeys, 1)] : pickCardBadgesS6(markKeys);
+                                const byKey = new Map<string, { key: string; text?: string }>(all.map((b) => [b.key, b] as const));
+                                byKey.set("liveonly", { key: "liveonly", text: LIVE_ONLY_CARD_BADGE });
                                 const textBadges = pick.map((k) => byKey.get(k)).filter((b): b is NonNullable<typeof b> => Boolean(b && b.text));
                                 if (sold || textBadges.length === 0) return null;
                                 return (
@@ -8229,7 +8235,7 @@ export default function OrderPage() {
                 {!registeredOptionHeroCollapsed && optionNoticePresentation.badge ? (
                   <span
                     data-product-order-notice-badge
-                    style={sv({ flexShrink: 0, height: "22px", display: "inline-flex", alignItems: "center", border: "1px solid #E8CDD7", borderRadius: "999px", background: "#F8E9EE", padding: "0 7px", color: "#7A1E47", fontSize: "10.5px", fontWeight: 900, lineHeight: 1, letterSpacing: "-0.02em" })}
+                    style={uiV2 ? { flexShrink: 0, fontSize: "13px", fontWeight: 700, lineHeight: 1.4, color: "#39393B", background: "#F0F0F0", borderRadius: "4px", padding: "1px 6px", whiteSpace: "nowrap" } : sv({ flexShrink: 0, height: "22px", display: "inline-flex", alignItems: "center", border: "1px solid #E8CDD7", borderRadius: "999px", background: "#F8E9EE", padding: "0 7px", color: "#7A1E47", fontSize: "10.5px", fontWeight: 900, lineHeight: 1, letterSpacing: "-0.02em" })}
                   >{optionNoticePresentation.badge}</span>
                 ) : null}
               </div>
@@ -8281,7 +8287,7 @@ export default function OrderPage() {
                   </section>
                 ) : null}
 
-                <div data-product-order-footer-summary style={sv({ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "8px 18px" })}>
+                <div data-product-order-footer-summary style={uiV2 ? { flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", background: "#fff", padding: "0 0 12px" } : sv({ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "8px 18px" })}>
                   {registeredOptionDetailSelected ? (
                     <>
                       <div style={sv({ display: "flex", flexDirection: "column", minWidth: 0 })}>
@@ -8325,7 +8331,7 @@ export default function OrderPage() {
                   )}
                 </div>
 
-                <div data-product-order-footer-action style={sv({ flexShrink: 0, display: "grid", gridTemplateColumns: "1fr", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "8px 18px calc(10px + env(safe-area-inset-bottom))" })}>
+                <div data-product-order-footer-action style={uiV2 ? { flexShrink: 0, display: "grid", gridTemplateColumns: "1fr", background: "#fff", padding: 0 } : sv({ flexShrink: 0, display: "grid", gridTemplateColumns: "1fr", borderTop: "1px solid #F0EAE0", background: "#fff", padding: "8px 18px calc(10px + env(safe-area-inset-bottom))" })}>
                   {registeredOptionShowBrandDoneOnly ? (
                     <button type="button" onClick={closeRegisteredOptionSelectSheet} style={uiV2 ? { width: "100%", height: "52px", borderRadius: "9999px", border: "none", background: "#111111", fontSize: "16px", fontWeight: 600, color: "#FFFFFF", cursor: "pointer" } : { height: "44px", borderRadius: "14px", border: "none", background: "#7A1E47", fontSize: "14px", fontWeight: 800, color: "#fff", cursor: "pointer" }}>상품 선택 완료 · 총 {registeredOptionBrandCartCount}개</button>
                   ) : (

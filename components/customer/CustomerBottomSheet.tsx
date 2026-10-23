@@ -301,7 +301,7 @@ export default function CustomerBottomSheet({
         </div>
 
         {footer ? (
-          <div style={{ flexShrink: 0, padding: "12px 16px calc(14px + env(safe-area-inset-bottom))", borderTop: "1px solid #F0EAE0", background: "#fff" }}>
+          <div style={{ flexShrink: 0, padding: "12px 16px calc(14px + env(safe-area-inset-bottom))", borderTop: tone === "v2" ? "1px solid #E5E5E5" : "1px solid #F0EAE0", background: "#fff" }}>
             {footer}
           </div>
         ) : null}

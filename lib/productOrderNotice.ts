@@ -155,8 +155,10 @@ export function effectiveProductNoticeMode(productMode: unknown, badgeTypes: unk
   return list.map((x) => String(x ?? "").trim().toLowerCase()).includes("direct") ? "instant" : "inherit";
 }
 // [2026-10-23 사장님 「난독증 손님도 알아듣게」·15:50 「주문돼요」는 «방송 접수 후 바로 주문하라»로 헷갈림]
-// 옵션창 가격 옆 = 「지금 바로 주문 가능」, 상품 카드 배지 = 「바로 주문 가능」(«가능» = 손님이 할 수 있다는 뜻이 분명)
-export const INSTANT_BADGE_TEXT = "지금 바로 주문 가능";
+// 옵션창 가격 옆·안내 줄 = 「바로 주문 가능」(16:02 「지금」 겹침 정리). 카드 배지는 16:06부터 예외(방송 접수 상품)에만.
+export const INSTANT_BADGE_TEXT = "바로 주문 가능"; // 16:02 「지금·바로」 겹침 → 카드·옵션창·안내 줄 모두 같은 말
+/** [16:06] 카드 배지는 예외(방송에서 접수해야 사는 상품)에만 */
+export const LIVE_ONLY_CARD_BADGE = "방송 접수 후 주문";
 export const INSTANT_CARD_BADGE = "바로 주문 가능";
 /** 바로 주문 상품인지 — [2026-10-23] 쇼핑몰 진열(in_shop=true) 상품은 설정과 무관하게 무조건 바로 주문 */
 export function isInstantOrderProduct(productMode: unknown, badgeTypes: unknown, globalMode: unknown, inShop?: unknown): boolean {
