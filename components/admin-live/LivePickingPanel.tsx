@@ -414,7 +414,8 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
           {scopeTooWide ? <div className="py-16 text-center text-[14px] font-semibold text-ink-soft">주문서에서 방송이나 날짜를 먼저 골라 주세요</div> : null}
           {!scopeTooWide && !loading && shown.length === 0 ? <div className="py-16 text-center text-[14px] font-semibold text-ink-soft">{allRows.length ? "다 챙겼어요" : "챙길 상품이 없어요"}</div> : null}
 
-          {!scopeTooWide && view === "product" ? productGroups.map((g) => {
+          {/* 남은 게 있는 상품이 위, 다 챙긴 상품(한 줄로 접힘)은 아래 — 할 일만 위에 보이게 */}
+          {!scopeTooWide && view === "product" ? [...productGroups].sort((a, b) => Number(countLine(a.options.flat()).done) - Number(countLine(b.options.flat()).done)).map((g) => {
             const all = g.options.flat();
             const c = countLine(all);
             const gKey = g.name + "|" + g.options[0][0].productId;
@@ -470,7 +471,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
             );
           }) : null}
 
-          {!scopeTooWide && view === "customer" ? customerGroups.map((rows) => {
+          {!scopeTooWide && view === "customer" ? [...customerGroups].sort((a, b) => Number(countLine(a).done) - Number(countLine(b).done)).map((rows) => {
             const c = countLine(rows);
             const head = rows[0];
             if (c.done && !openDone.has(head.customerKey)) {
