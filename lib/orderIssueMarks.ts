@@ -4,7 +4,7 @@
 import { restoreSelectionFromSnapshot } from "./refundLedger";
 import { pickIssueProductRows } from "./issueProductLabel";
 
-export type IssueMarkKind = "환불" | "반품" | "교환" | "기타";
+export type IssueMarkKind = "환불" | "반품" | "교환" | "출고" | "기타";
 
 type MarkItem = { id: string; productId?: string | null; productName?: string; color?: string; size?: string; qty?: number };
 
@@ -16,6 +16,7 @@ export function issueMarkKind(input: { task_type?: unknown; raw_payload?: unknow
   if (type === "refund") return "환불";
   if (type === "return") return "반품";
   if (type === "exchange") return "교환";
+  if (type === "shipping") return "출고"; // [2026-10-25] 출고 이슈(누락 상품 픽업 후 출고 등) — 취소선 없음
   const chips = input.raw_payload && typeof input.raw_payload === "object" ? (input.raw_payload as { issue_types?: unknown }).issue_types : null;
   const chipText = Array.isArray(chips) ? chips.map(clean).join(" ") : "";
   const status = clean(input.returnStatus);
@@ -23,6 +24,7 @@ export function issueMarkKind(input: { task_type?: unknown; raw_payload?: unknow
   if (text.includes("환불")) return "환불";
   if (text.includes("교환")) return "교환";
   if (text.includes("반품")) return "반품";
+  if (text.includes("출고") || text.includes("shipping")) return "출고";
   return "기타";
 }
 

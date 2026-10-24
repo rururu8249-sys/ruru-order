@@ -159,7 +159,7 @@ function renderOrderSummary(order: LiveOrder, wrap = false) {
 
   return (
     <span className={wrap ? "inline-flex min-w-0 max-w-full flex-wrap items-start gap-x-2 gap-y-1 whitespace-normal" : "inline-flex min-w-0 max-w-full items-center gap-2 overflow-hidden whitespace-nowrap"} title={fullText}>
-      {mark && !mark.strikeFirst ? <span className={`inline-block shrink-0 rounded px-1 text-[11px] font-black leading-[18px] ${mark.kind === "교환" ? "bg-warn-bg text-warn-tx" : "bg-danger-bg text-danger-tx"}`}>{mark.kind}{mark.count > 1 ? ` ${mark.count}` : ""}</span> : null}
+      {mark && !mark.strikeFirst ? <span className={`inline-block shrink-0 rounded px-1 text-[11px] font-black leading-[18px] ${mark.kind === "교환" ? "bg-warn-bg text-warn-tx" : mark.kind === "출고" ? "bg-surface-2 text-ink-soft" : "bg-danger-bg text-danger-tx"}`}>{mark.kind}{mark.count > 1 ? ` ${mark.count}` : ""}</span> : null}
       <span className={`${wrap ? "min-w-0 break-words [overflow-wrap:anywhere]" : "truncate"}${mark?.strikeFirst ? " line-through text-ink-mute" : ""}`}>{firstPart}</span>
       {restCount > 0 && (
         <span className="shrink-0 font-black text-ink-soft">외 {restCount}개</span>

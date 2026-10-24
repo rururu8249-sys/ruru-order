@@ -51,6 +51,22 @@ await test('partial quantity uses line total once: 10000 of 30000 earns a 100-po
   assert.equal(rpcCalls[0].name,'reclaim_order_return_points');
   assert.equal(rpcCalls[0].payload.p_amount,100);
 });
+await test('[2026-10-25] 출고(ship) = 기록·이슈만: return_status 출고 · task_type shipping · 포인트 무접촉',async()=>{
+  const {body,writes,rpcCalls}=await run({mode:'ship'});
+  assert.equal(body.ok,true);
+  assert.equal(rpcCalls.length,0,'출고는 포인트 회수 RPC 를 부르지 않는다');
+  assert.equal(writes.filter(w=>w.table.startsWith('customer_point_')).length,0);
+  const ord=writes.find(w=>w.table==='orders'&&w.action==='update');
+  assert.equal(ord.payload.return_status,'출고');
+  const task=writes.find(w=>w.table==='admin_tasks'&&w.action==='insert');
+  assert.equal(task.payload.task_type,'shipping');
+  assert.match(task.payload.body,/이슈유형: 출고/);
+});
+await test('[2026-10-25] 모르는 유형은 거부',async()=>{
+  const {body,writes}=await run({mode:'nope'});
+  assert.notEqual(body.ok,true);
+  assert.equal(writes.length,0);
+});
 await test('explicit zero line amount does not fall back to list price',async()=>{
   const {body,writes}=await run({zero:true});
   assert.equal(body.reclaimed,0);

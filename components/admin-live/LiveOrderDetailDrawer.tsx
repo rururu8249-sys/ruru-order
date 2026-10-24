@@ -1148,8 +1148,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
-        // [2026-10-25] 출고는 서버엔 «기타»로 등록(포인트·환불 무관) → 처리창이 바로 유형을 출고(shipping)로 고침
-        body: JSON.stringify({ mode: data.issueType === "ship" ? "etc" : data.issueType, refRowId, rowIds, detail: data.memo.trim(), rowQty: data.rowQty || {} }),
+        body: JSON.stringify({ mode: data.issueType, refRowId, rowIds, detail: data.memo.trim(), rowQty: data.rowQty || {} }),
       }).then((r) => r.json()).catch(() => null);
 
       if (!res?.ok) {

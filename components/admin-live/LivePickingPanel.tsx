@@ -77,7 +77,7 @@ export function buildPickRows(orders: readonly LiveOrder[], source: "scope" | "e
     const items: LiveOrderItem[] = Array.isArray(o.items) && o.items.length ? o.items : [{ id: String(o.id), productName: clean(o.orderSummary) || "상품", optionText: "", qty: 1 } as LiveOrderItem];
     // 고객이슈(주문상세에서 등록한 환불·반품·교환) 대상 줄 — 대상 글자로 엄격 매칭, 못 고르면 표시 안 함(엉뚱한 줄 금지)
     const markKind = issueMarkKind({ returnStatus: o.returnStatus });
-    const markIds = markKind && markKind !== "기타" && o.returnReason
+    const markIds = markKind && markKind !== "기타" && markKind !== "출고" && o.returnReason
       ? new Set(issueTargetItemIds(items.map((x) => ({ id: String(x.id), productId: clean(x.productId), productName: clean(x.productName), color: clean(x.color), size: clean(x.size), qty: Number(x.qty) || 1 })), { targetText: targetTextFromReturnReason(o.returnReason) }))
       : new Set<string>();
     for (const it of items) {

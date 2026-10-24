@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     if (!session) return jsonError("관리자 로그인이 필요합니다.", 401);
 
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-    const mode = text(body.mode); // "refund" | "exchange" | "etc"(기타 — 기록+이슈 등록만, 포인트 회수 없음)
+    const mode = text(body.mode); // "refund" | "exchange" | "ship"(출고) | "etc"(기타) — 출고·기타는 기록+이슈 등록만, 포인트 회수 없음
     const refRowId = num(body.refRowId);
     const selectedRowIds = Array.isArray(body.rowIds)
       ? (body.rowIds as unknown[]).map((v) => num(v)).filter((v) => v > 0)
@@ -66,9 +66,9 @@ export async function POST(request: NextRequest) {
         : null;
     const detail = text(body.detail).slice(0, 1000);
 
-    if (mode !== "refund" && mode !== "exchange" && mode !== "etc") return jsonError("유형(환불/교환/기타)을 선택해주세요.");
+    if (mode !== "refund" && mode !== "exchange" && mode !== "ship" && mode !== "etc") return jsonError("유형(환불/교환/출고/기타)을 선택해주세요.");
     if (!refRowId) return jsonError("기준 주문 행이 없습니다.");
-    if (mode !== "etc" && selectedRowIds.length === 0) return jsonError("반품할 상품을 1개 이상 선택해주세요."); // [⑭] 기타는 0개 허용
+    if (mode !== "etc" && mode !== "ship" && selectedRowIds.length === 0) return jsonError("반품할 상품을 1개 이상 선택해주세요."); // [⑭] 기타·출고는 0개 허용
 
     const sb = admin();
 
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
 
     const groupRowIds = new Set(groupRows.map((r) => num(r.id)));
     const selected = groupRows.filter((r) => selectedRowIds.includes(num(r.id)));
-    if ((mode !== "etc" && selected.length === 0) || !selectedRowIds.every((id) => groupRowIds.has(id))) {
+    if ((mode !== "etc" && mode !== "ship" && selected.length === 0) || !selectedRowIds.every((id) => groupRowIds.has(id))) {
       return jsonError("선택한 상품이 이 주문그룹의 상품과 일치하지 않습니다.");
     }
 
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
     const nm = text(first.customer_name);
     const phone = digitsOnly(first.customer_phone);
     const orderNo = text(first.order_lookup_code);
-    const modeLabel = mode === "refund" ? "반품(환불)" : mode === "exchange" ? "반품(교환)" : "기타";
+    const modeLabel = mode === "refund" ? "반품(환불)" : mode === "exchange" ? "반품(교환)" : mode === "ship" ? "출고" : "기타";
     // [2026-09-29] 고른 수량(rowQty)이 있으면 대상상품·raw_payload 수량을 그 값으로(1..원래수량 클램프).
     const selectedForText = selected.map((r) => {
       const key = String(r.id ?? "");
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
       .join("\n");
 
     const { data: taskRow, error: taskErr } = await sb.from("admin_tasks").insert({
-      task_type: mode === "refund" ? "refund" : mode === "exchange" ? "exchange" : "general",
+      task_type: mode === "refund" ? "refund" : mode === "exchange" ? "exchange" : mode === "ship" ? "shipping" : "general", // [2026-10-25] 출고 = shipping(admin-tasks 가 받는 값)
       title: issueTitle,
       body: issueBody,
       customer_name: nm || null,
