@@ -12,8 +12,11 @@ import LiveOrderRegisteredProductPicker from "./LiveOrderRegisteredProductPicker
 import PickingPullModal from "./PickingPullModal";
 import { parseBankAccount, bankDisplayName, isExcludedHolder } from "@/lib/parseBankAccount";
 import {
-  REASON_FAULT_CHIPS,
   ISSUE_MEMO_PRESETS,
+  issueKindFromTaskTypes,
+  issueKindTaskType,
+  presetFromSaved,
+  type IssueKind,
   transferCopyText,
   transferCopyBlock,
   reasonChipFromStored,
@@ -87,19 +90,18 @@ function productText(snapshot: LedgerListRow["product_snapshot"]) {
     .join(", ");
 }
 
+const ISSUE_KINDS: readonly IssueKind[] = ["refund", "exchange", "ship", "etc"];
+const ISSUE_KIND_LABEL: Record<IssueKind, string> = { refund: "환불", exchange: "교환", ship: "출고", etc: "기타" };
+
 // ── 시안 ③ 처리 창 ──
-export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssue = false, repIssueDate = "", issueTypesInitial = [], issueBodyMemo = "", onSaveIssue, onDelete, createMode = false, earnedPoints = 0, extraInitial = [], onCreateIssue }: { item: LedgerDetail; onClose: () => void; onSaved: () => void; openedFromOtherIssue?: boolean; repIssueDate?: string; issueTypesInitial?: string[]; issueBodyMemo?: string; onSaveIssue?: (d: { issueType: "refund" | "exchange" | "etc"; memo: string; items?: Array<{ productId: string; productName: string; color: string; size: string; qty: number }>; extraItems?: IssueExtraItem[] }) => Promise<boolean>; onDelete?: () => void; createMode?: boolean; earnedPoints?: number; extraInitial?: IssueExtraItem[]; onCreateIssue?: (d: { issueType: "refund" | "exchange" | "etc"; memo: string; selectedRowIds: number[]; rowQty: Record<string, number> }) => Promise<{ taskId: string } | null> }) {
+export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssue = false, repIssueDate = "", issueTypesInitial = [], issueBodyMemo = "", onSaveIssue, onDelete, createMode = false, earnedPoints = 0, extraInitial = [], onCreateIssue }: { item: LedgerDetail; onClose: () => void; onSaved: () => void; openedFromOtherIssue?: boolean; repIssueDate?: string; issueTypesInitial?: string[]; issueBodyMemo?: string; onSaveIssue?: (d: { issueType: IssueKind; memo: string; items?: Array<{ productId: string; productName: string; color: string; size: string; qty: number }>; extraItems?: IssueExtraItem[] }) => Promise<boolean>; onDelete?: () => void; createMode?: boolean; earnedPoints?: number; extraInitial?: IssueExtraItem[]; onCreateIssue?: (d: { issueType: IssueKind; memo: string; selectedRowIds: number[]; rowQty: Record<string, number> }) => Promise<{ taskId: string } | null> }) {
   const orderCode = clean(item.order_lookup_code);
   // [2026-09-27 ②] 유형 칩(환불/교환/기타) — 이 하나가 kind·하단 전환을 정한다. 기타는 하단 없음(admin-tasks 만 저장).
-  const initIssueType: "refund" | "exchange" | "etc" = (() => {
-    const t = (issueTypesInitial || []).map((x) => String(x).toLowerCase());
-    if (t.includes("exchange")) return "exchange";
-    if (t.includes("refund") || t.includes("return")) return "refund";
-    if (t.includes("general")) return "etc";
-    return item.kind === "교환" ? "exchange" : "refund";
-  })();
-  const [issueType, setIssueType] = useState<"refund" | "exchange" | "etc">(initIssueType);
-  const isEtc = issueType === "etc";
+  // [2026-10-25] 출고(ship) 추가 — 환불 기록 없는 유형(기타·출고)은 isEtc 로 같이 다룬다(금액·계좌 칸 없음).
+  const initIssueType: IssueKind = issueKindFromTaskTypes(issueTypesInitial || [], item.kind);
+  const [issueType, setIssueType] = useState<IssueKind>(initIssueType);
+  const isShip = issueType === "ship";
+  const isEtc = issueType === "etc" || isShip;
   const kind = issueType === "exchange" ? "교환" : "반품";
   const isExchange = kind === "교환";
 
@@ -113,10 +115,10 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   // [2026-10-23 사장님] 자주 쓰는 내용 칩 · 교환 «바꿀 상품» 고르기 · 기타 «출고 넘기기» 이어서
-  const [presetLabel, setPresetLabel] = useState("");
+  const [presetLabel, setPresetLabel] = useState(() => presetFromSaved(initIssueType, issueBodyMemo, item.reason));
   const [exPicker, setExPicker] = useState<"" | "same" | "other">("");
   const [pullOpen, setPullOpen] = useState(false);
-  const wantPull = issueType === "etc" && Boolean(ISSUE_MEMO_PRESETS.etc.find((x) => x.label === presetLabel)?.pull);
+  const wantPull = isShip; // [2026-10-25] 출고 = 저장 뒤 출고 넘기기 창
 
   // 계좌 — [6차] 항상 3칸 표시(요약/펼침 토글 폐지). 옛 예금주가 제외단어(입니다 등)면
   //   손님 이름으로 «프리필»하고 노란 테두리+안내(저장 눌러야 DB 반영). 자동 저장 안 함.
@@ -363,6 +365,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
       const chosen = lines.filter((l) => (sel[l.id] || 0) > 0);
       const ids = chosen.map((l) => Number(l.id)).filter((n) => n > 0);
       if (!isEtc && ids.length === 0) { showAdminToast("대상 상품을 1개 이상 선택해주세요.", "warning"); return; } // [⑭] 기타는 0개 허용
+      if (isShip && lines.length > 0 && ids.length === 0) { showAdminToast("출고할 상품을 골라 주세요.", "warning"); return; }
       const rowQty = Object.fromEntries(chosen.map((l) => [String(l.id), sel[l.id]])); // [⑯] 고른 수량 → 서버 회수 비율
       setSaving(true);
       const created = await onCreateIssue?.({ issueType, memo: issueMemo, selectedRowIds: ids, rowQty });
@@ -370,12 +373,12 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
       if (!created?.taskId) return;                       // 실패 토스트는 onCreateIssue 쪽에서
       if (isEtc) {
         // [⑱] 기타 + 추가 상품이 있으면 방금 만든 이슈(taskId)에 extra_items 를 보강(order-return 서버 무변경).
-        if (extra.length > 0) {
+        if (extra.length > 0 || isShip) {
           try {
             const fr = await fetch(`/api/admin-live/order-return/find-task?orderCode=${encodeURIComponent(orderCode)}`, { cache: "no-store" });
             const fp = await fr.json().catch(() => null);
             const t = (fp?.ok && fp.latest?.task) ? fp.latest.task : { id: created.taskId, body: "" };
-            await patchIssueTask(t, { issueTypeKey: "general", memo: issueMemo, extraItems: extra });
+            await patchIssueTask(t, { issueTypeKey: issueKindTaskType(issueType), memo: issueMemo, extraItems: extra }); // 출고면 유형을 shipping 으로
           } catch { /* 보강 실패해도 이슈는 등록됨 */ }
         }
         if (wantPull && lines.length > 0) { showAdminToast("등록됐어요 — 이어서 넘길 출고를 골라 주세요", "success"); setPullOpen(true); return; }
@@ -387,6 +390,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
     }
     // 1) 고객이슈(admin-tasks) 저장 — 기존 수정 경로(메타줄 보존). 호출은 rail 이 넘긴 onSaveIssue.
     //   [⑰] 이슈의 대상상품·수량은 «화면 선택»과 같아야 하므로 유형 상관없이 items 를 넘긴다(환불·교환 기록은 doPatch 가 별도 저장).
+    if (isShip && lines.length > 0 && !lines.some((l) => (sel[l.id] || 0) > 0)) { showAdminToast("출고할 상품을 골라 주세요.", "warning"); return; }
     if (onSaveIssue) {
       const items = lines.filter((l) => (sel[l.id] || 0) > 0).map((l) => ({ productId: String(l.product_id ?? ""), productName: l.product_name, color: l.color || "", size: l.size || "", qty: sel[l.id] }));
       // [⑱] 기타일 때만 추가 상품(extra) 저장. 환불·교환은 화면에서 숨기므로 넘기지 않음(값 보존).
@@ -466,7 +470,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
         {/* 머리 — 제목 · 손님 한 줄 · 닫기 */}
         <div className="flex items-start justify-between gap-2 border-b border-line px-4 pt-4 pb-3">
           <div className="min-w-0">
-            <h3 className="text-[20px] font-bold text-ink">{createMode ? "고객이슈 등록" : isEtc ? "기타" : isExchange ? "교환" : "환불"}</h3>
+            <h3 className="text-[20px] font-bold text-ink">{createMode ? "고객이슈 등록" : ISSUE_KIND_LABEL[issueType]}</h3>
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] leading-5 text-ink-soft">
               <span className="min-w-0 truncate"><span className="font-bold text-ink">{clean(item.nickname) || "—"}</span>{clean(item.customer_name) ? ` · ${clean(item.customer_name)}` : ""}{orderCode ? ` · ${orderCode}` : ""}</span>
               {orderPaymentMethod ? <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[12px] font-semibold text-ink-soft">{isCardOrder ? "카드" : "무통장"}</span> : null}
@@ -478,46 +482,30 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-          {/* 1. 유형 — 칩 3개 */}
-          <div className="mb-4 flex gap-2">
-            {(["refund", "exchange", "etc"] as const).map((t) => (
-              <button key={t} type="button" aria-pressed={issueType === t} onClick={() => {
+          {/* 1. 유형 — [2026-10-25] 4칸 한 줄(환불·교환·출고·기타). 아래 칩(사유)과 모양을 달리해 «무엇을 할지»가 먼저 보이게 */}
+          <div role="radiogroup" aria-label="유형" className="mb-5 grid grid-cols-4 gap-1 rounded-lg bg-surface-2 p-1">
+            {ISSUE_KINDS.map((t) => (
+              <button key={t} type="button" role="radio" aria-checked={issueType === t} onClick={() => {
+                  if (t === issueType) return;
                   setIssueType(t);
                   setPresetLabel("");
-                  // [⑭] 기타로 바꾸면 선택 비움(관련 상품은 «선택»). 환불·교환으로 바꿀 때 선택이 0개면 전체 체크(반품 기본).
-                  if (t === "etc") setSel({});
+                  // [⑭] 기타·출고로 바꾸면 선택 비움(고른 것만 대상). 환불·교환으로 바꿀 때 선택이 0개면 전체 체크(반품 기본).
+                  if (t === "etc" || t === "ship") setSel({});
                   else if (!lines.some((l) => (sel[l.id] || 0) > 0)) setSel(Object.fromEntries(lines.map((l) => [String(l.id), Math.max(1, Number(l.qty) || 1)])));
                   if (t === "exchange") setMethod("교환재발송"); else if (t === "refund" && (method === "교환재발송" || method === "없음")) setMethod("계좌이체");
                 }}
-                className={CHIP(issueType === t)}>
-                {t === "refund" ? "환불" : t === "exchange" ? "교환" : "기타"}
+                className={`h-9 rounded-lg text-[14px] font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink ${issueType === t ? "bg-ink text-white" : "text-ink-soft hover:bg-surface"}`}>
+                {ISSUE_KIND_LABEL[t]}
               </button>
             ))}
           </div>
 
-          {/* 1-1. 자주 쓰는 내용 — 실제 이슈 메모를 세어 많은 것부터. 누르면 메모가 채워지고(환불은 사유도), 직접 고쳐도 된다 */}
-          <div className="mb-4">
-            <div className={SUB_LABEL}>자주 쓰는 내용</div>
-            <div className="flex flex-wrap gap-2">
-              {ISSUE_MEMO_PRESETS[issueType].map((p) => (
-                <button key={p.label} type="button" aria-pressed={presetLabel === p.label} onClick={() => {
-                    const prevPreset = ISSUE_MEMO_PRESETS[issueType].find((x) => x.label === presetLabel);
-                    const cur = clean(issueMemo);
-                    setIssueMemo(!cur || (prevPreset && cur === prevPreset.memo) ? p.memo : `${p.memo} · ${cur}`);
-                    setPresetLabel(p.label);
-                    if (p.reason && issueType === "refund") { setReasonChip(p.reason); setReasonDirty(true); if (p.reason === "상품문제") setDeductAmount(0); }
-                  }}
-                  className={CHIP(presetLabel === p.label)}>
-                  {p.label}
-                </button>
-              ))}
-            </div>
-            {wantPull ? <div className="mt-1.5 text-[12px] text-ink-mute">등록하면 넘길 출고(방송·날짜)를 고르는 창이 바로 떠요</div> : null}
-          </div>
-
           {/* 2. 상품 */}
           <div className="mb-4">
-            <div className={SUB_LABEL}>{isEtc ? "관련 상품 (선택)" : "상품"}{selectedCount > 0 ? <span className="ml-1 text-ink">{selectedCount}개</span> : null}</div>
+            <div className="mb-1.5 flex items-baseline justify-between gap-2">
+              <span className="text-[13px] font-semibold text-ink-mute">{isShip ? "출고할 상품" : issueType === "etc" ? "관련 상품 (선택)" : isExchange ? "교환할 상품" : "돌려받을 상품"}</span>
+              {linesLoaded && !linesError && !matchFailed && (lines.length > 1 || isEtc) ? <span className="text-[12px] tabular-nums text-ink-mute">{lines.length}개 중 <b className="font-bold text-ink">{selectedCount}개</b> 선택</span> : null}
+            </div>
             {!linesLoaded ? (
               <div className="rounded-lg border border-line p-4 text-center text-[13px] text-ink-mute">주문 상품 불러오는 중…</div>
             ) : linesError ? (
@@ -554,7 +542,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                         type="button"
                         onClick={multi ? () => setQty(l.id, on ? 0 : l.qty, l.qty) : undefined}
                         aria-label={multi ? "이 상품 선택" : undefined}
-                        className={`flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left outline-none ${multi ? "focus-visible:ring-2 focus-visible:ring-ink" : "cursor-default"}`}
+                        className={`flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left outline-none ${multi ? "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink" : "cursor-default"}`}
                       >
                         {multi ? (
                           <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[13px] ${on ? "border-ink bg-ink text-white" : "border-line bg-surface text-transparent"}`}>✓</span>
@@ -592,24 +580,45 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
             {isEtc ? <IssueExtraItems value={extra} onChange={setExtra} /> : null}
           </div>
 
-          {/* 3. 사유 · 반품 날짜 — 환불·교환만 */}
-          {!isEtc ? (
-            <div className="mb-4">
-              <div className={SUB_LABEL}>사유</div>
+          {/* 3. 사유 — [2026-10-25 사장님 「자주 쓰는 내용·사유 중복」] 칩 한 줄로 합침. 칩 하나가 메모 첫머리 + 사유(반품비 판정)를 같이 정한다.
+               reason 값(단순변심/상품문제/기타)·반품비 규칙은 예전 사유 칩과 같다. 기타 유형은 사유 없음. */}
+          {issueType !== "etc" ? (
+            <div className="mb-5">
+              <div className={SUB_LABEL}>{isShip ? "출고 이유" : "사유"}</div>
               <div className="flex flex-wrap gap-2">
-                {REASON_FAULT_CHIPS.map((c) => (
-                  <button key={c.value} type="button" aria-pressed={reasonChip === c.value}
-                    onClick={() => {
-                      const next = reasonChip === c.value ? "" : c.value;
-                      setReasonChip(next); setReasonDirty(true);
-                      if (next === "상품문제") setDeductAmount(0); // 상품문제(사업자 귀책) → 반품비 차감 0(전자상거래법 18조)
-                    }}
-                    className={CHIP(reasonChip === c.value)}>
-                    {c.value}
-                  </button>
-                ))}
+                {ISSUE_MEMO_PRESETS[issueType].map((p) => {
+                  const on = presetLabel === p.label;
+                  return (
+                    <button key={p.label} type="button" aria-pressed={on} onClick={() => {
+                        const list = ISSUE_MEMO_PRESETS[issueType];
+                        const prev = list.find((x) => x.label === presetLabel);
+                        const cur = clean(issueMemo);
+                        const curIsPrev = Boolean(prev?.memo) && cur === prev?.memo;
+                        if (on) { // 다시 누르면 해제 — 칩이 채운 메모만 지우고, 사유도 비운다
+                          setPresetLabel("");
+                          if (curIsPrev) setIssueMemo("");
+                          if (p.reason && !isEtc) { setReasonChip(""); setReasonDirty(true); }
+                          return;
+                        }
+                        if (p.memo) setIssueMemo(!cur || curIsPrev ? p.memo : `${p.memo} · ${cur}`);
+                        else if (curIsPrev) setIssueMemo("");
+                        setPresetLabel(p.label);
+                        if (p.reason && !isEtc) {
+                          setReasonChip(p.reason); setReasonDirty(true);
+                          if (p.reason === "상품문제") setDeductAmount(0); // 상품문제(사업자 귀책) → 반품비 차감 0(전자상거래법 18조)
+                        }
+                      }}
+                      className={CHIP(on)}>
+                      {p.label}
+                    </button>
+                  );
+                })}
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
+              {!isEtc && !presetLabel && reasonChip ? <div className="mt-1.5 text-[12px] text-ink-mute">저장된 사유: {reasonChip}</div> : null}
+              {isShip ? <div className="mt-1.5 text-[12px] text-ink-mute">{createMode ? "등록" : "저장"}하면 넘길 출고(방송·날짜)를 고르는 창이 떠요</div> : null}
+              {/* 반품 날짜 — 환불·교환만. 사유 칩과 헷갈리지 않게 칩(동그란 알약) 대신 날짜 칸 모양(8px) */}
+              {!isEtc ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span className="text-[12px] text-ink-mute">반품 날짜</span>
                 {([["req", "접수", returnRequestedOn, setReturnRequestedOn], ["recv", "도착", returnReceivedOn, setReturnReceivedOn]] as const).map(([key, label, val, setVal]) => {
                   const on = !!clean(val);
@@ -619,12 +628,14 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                       <button type="button" onClick={() => { setVal(""); setEditingReturnDate(""); }} className="h-9 rounded-lg border border-line px-2 text-[12px] font-semibold text-ink-mute">지우기</button>
                     </span>
                   ) : (
-                    <button key={key} type="button" title={on ? "누르면 날짜 수정" : "누르면 오늘 날짜"} onClick={() => { if (!on) setVal(todayKST()); else setEditingReturnDate(key); }} className={CHIP(on)}>
-                      {label}{on ? ` ${dateShortKo(val)}` : ""}
+                    <button key={key} type="button" title={on ? "누르면 날짜 수정" : "누르면 오늘 날짜"} onClick={() => { if (!on) setVal(todayKST()); else setEditingReturnDate(key); }}
+                      className={`h-9 rounded-lg border px-3 text-[13px] tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ink ${on ? "border-ink bg-surface font-bold text-ink" : "border-dashed border-line bg-surface font-semibold text-ink-mute hover:bg-surface-2"}`}>
+                      {label}{on ? ` ${dateShortKo(val)}` : " +"}
                     </button>
                   );
                 })}
               </div>
+              ) : null}
             </div>
           ) : null}
 

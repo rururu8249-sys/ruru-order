@@ -17,7 +17,7 @@ import { pickIssueProductRows } from "@/lib/issueProductLabel";
 import PickingPullModal from "./PickingPullModal";
 import { RefundProcessModal, type LedgerDetail } from "./AdminLiveRefundLedgerPanel";
 import IssueRegisterModal, { type IssueRegisterSubmit } from "./IssueRegisterModal";
-import { productSnapshotFromItems, ledgerSummaryLine, pickPrimaryLedger, restoreSelectionFromSnapshot, listAmountParts, dateShortLabel, returnStagePrefix, transferCopyBlock } from "@/lib/refundLedger";
+import { issueKindTaskType, productSnapshotFromItems, ledgerSummaryLine, pickPrimaryLedger, restoreSelectionFromSnapshot, listAmountParts, dateShortLabel, returnStagePrefix, transferCopyBlock } from "@/lib/refundLedger";
 
 // [2026-09-26] refund_ledger 목록 요약 행(대표 선택·표시용). 같은 주문에 여러 개면 pickPrimaryLedger 로 1개.
 type LedgerRow = {
@@ -88,6 +88,7 @@ const ISSUE_TYPE_OPTIONS: Array<[string, string]> = [
   ["refund", "환불"],
   ["purchase", "구매"],
   ["bad_customer", "진상"],
+  ["shipping", "출고"],
   ["general", "기타"],
 ];
 
@@ -1835,7 +1836,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
           issueBodyMemo={processTask ? getFullMemo(processTask) : ""}
           extraInitial={processTask ? (((processTask.raw_payload as Record<string, unknown> | null)?.extra_items as IssueExtraItem[]) || []) : []}
           onSaveIssue={processTask ? async ({ issueType, memo, items, extraItems }) => {
-            const key = issueType === "refund" ? "refund" : issueType === "exchange" ? "exchange" : "general";
+            const key = issueKindTaskType(issueType);
             return patchIssueFields(processTask, key, memo, items, extraItems);
           } : undefined}
           onDelete={processTask ? () => { const t = processTask; setRefundModalItem(null); setProcessTask(null); void deleteIssueTask(t); } : undefined}

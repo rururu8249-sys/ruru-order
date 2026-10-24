@@ -19,7 +19,7 @@ import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import AdminLiveCustomerBlockReasonModal from "./AdminLiveCustomerBlockReasonModal";
 import { requestAdminCustomerBlock } from "@/lib/adminCustomerBlock";
 import { RefundProcessModal, type LedgerDetail } from "./AdminLiveRefundLedgerPanel";
-import { pickPrimaryLedger } from "@/lib/refundLedger";
+import { issueKindTaskType, pickPrimaryLedger } from "@/lib/refundLedger";
 import { splitIssueBody, fieldFromIssueBody } from "@/lib/issueBodyMeta";
 import { patchIssueTask, type IssueExtraItem } from "@/lib/issueTaskPatch";
 import PickingPullModal from "./PickingPullModal";
@@ -1129,7 +1129,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   // [⑬] 처리창 초안 모드 제출 → 기존 order-return 등록 그대로 호출(환불이면 서버가 포인트 회수 — 회수 규칙 불변).
   //   생성된 taskId 를 돌려주면 처리창이 그 taskId 로 refund-ledger 를 이어서 저장한다.
   const createIssueFromOrder = async (
-    data: { issueType: "refund" | "exchange" | "etc"; memo: string; selectedRowIds: number[]; rowQty?: Record<string, number> },
+    data: { issueType: "refund" | "exchange" | "ship" | "etc"; memo: string; selectedRowIds: number[]; rowQty?: Record<string, number> },
   ): Promise<{ taskId: string } | null> => {
     if (returnSaving) return null;
     const refRowId = Number(items[0]?.id);
@@ -1138,7 +1138,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       showAdminToast("기준 주문 행을 찾지 못했습니다.", "warning");
       return null;
     }
-    if (data.issueType !== "etc" && rowIds.length === 0) { // [⑯] 기타는 0개 허용
+    if (data.issueType !== "etc" && data.issueType !== "ship" && rowIds.length === 0) { // [⑯] 기타·출고는 0개 허용(출고는 처리창에서 따로 검사)
       showAdminToast("대상 상품을 1개 이상 선택해주세요.", "warning");
       return null;
     }
@@ -1148,7 +1148,8 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
-        body: JSON.stringify({ mode: data.issueType, refRowId, rowIds, detail: data.memo.trim(), rowQty: data.rowQty || {} }),
+        // [2026-10-25] 출고는 서버엔 «기타»로 등록(포인트·환불 무관) → 처리창이 바로 유형을 출고(shipping)로 고침
+        body: JSON.stringify({ mode: data.issueType === "ship" ? "etc" : data.issueType, refRowId, rowIds, detail: data.memo.trim(), rowQty: data.rowQty || {} }),
       }).then((r) => r.json()).catch(() => null);
 
       if (!res?.ok) {
@@ -1162,7 +1163,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
       }
 
       // [B3] 토스트는 화면 라벨(환불/교환/기타)로 — res.modeLabel(반품…) 대신.
-      const modeLabel = data.issueType === "refund" ? "환불" : data.issueType === "exchange" ? "교환" : "기타";
+      const modeLabel = data.issueType === "refund" ? "환불" : data.issueType === "exchange" ? "교환" : data.issueType === "ship" ? "출고" : "기타";
       const lines = [`${modeLabel} 이슈 등록 완료`];
       if (res.issueRegistered) lines.push("고객이슈 자동 등록됨");
       if (Number(res.reclaimed) > 0) {
@@ -2137,7 +2138,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           issueBodyMemo={splitIssueBody(String(issueProcessTask.body ?? "")).memo}
           extraInitial={((issueProcessTask.raw_payload as Record<string, unknown> | null)?.extra_items as IssueExtraItem[]) || []}
           onSaveIssue={async ({ issueType, memo, items, extraItems }) => {
-            const issueTypeKey = issueType === "refund" ? "refund" : issueType === "exchange" ? "exchange" : "general";
+            const issueTypeKey = issueKindTaskType(issueType);
             const r = await patchIssueTask(issueProcessTask, { issueTypeKey, memo, items, extraItems });
             if (!r.ok) showAdminToast("고객이슈 저장 실패\n\n" + (r.message || "알 수 없는 오류"), "error");
             return r.ok;

@@ -437,28 +437,61 @@ export function transferCopyBlock(d: { bankName: string; account: unknown; holde
   ].filter(Boolean).join("\n");
 }
 
-/** [2026-10-23 사장님 「자주 쓰는 내용 드롭다운」] 실제 고객이슈 180일 메모를 세어 많이 쓴 것부터.
- *  reason 이 있으면 환불 사유 칩도 같이 맞춘다(품절·불량 = 상품문제 → 반품비 0). pull=true 면 등록 뒤 출고 넘기기 창을 연다. */
-export type IssueMemoPreset = { label: string; memo: string; reason?: "단순변심" | "상품문제" | "기타"; pull?: boolean };
-export const ISSUE_MEMO_PRESETS: Record<"refund" | "exchange" | "etc", IssueMemoPreset[]> = {
+/** [2026-10-25 사장님 「자주 쓰는 내용·사유 중복 — 하나로」] 고객이슈 창의 «사유» 칩 한 줄.
+ *  칩 하나가 ①메모 첫머리(memo) ②환불·교환 사유(reason — 상품문제면 반품비 0, 단순변심이면 반품비 칸) 둘 다 정한다.
+ *  reason 값·뜻은 예전 사유 칩(단순변심/상품문제/기타)과 같다 — 금액 계산 무변경. 출고·기타는 사유 칸이 없다(환불 기록 없음).
+ *  ship = 출고(빠진 상품·주문 상품을 챙겨서 내보내기) — 저장하면 출고 넘기기 창이 이어서 뜬다. */
+export type IssueKind = "refund" | "exchange" | "ship" | "etc";
+export type IssueMemoPreset = { label: string; memo: string; reason?: "단순변심" | "상품문제" | "기타" };
+export const ISSUE_MEMO_PRESETS: Record<IssueKind, IssueMemoPreset[]> = {
   refund: [
-    { label: "품절 상품 환불", memo: "품절 상품 환불", reason: "상품문제" },
-    { label: "물건 챙기기 전 환불", memo: "물건 챙기기 전 환불", reason: "단순변심" },
-    { label: "카드 취소 요청", memo: "카드 취소 요청", reason: "단순변심" },
+    { label: "단순변심", memo: "단순변심 환불", reason: "단순변심" },
+    { label: "품절", memo: "품절 상품 환불", reason: "상품문제" },
+    { label: "챙기기 전 취소", memo: "물건 챙기기 전 환불", reason: "단순변심" },
     { label: "불량·하자", memo: "불량·하자 환불", reason: "상품문제" },
+    { label: "오배송", memo: "오배송 환불", reason: "상품문제" },
+    { label: "기타", memo: "", reason: "기타" },
   ],
   exchange: [
-    { label: "사이즈 교환", memo: "사이즈 교환" },
-    { label: "색상 교환", memo: "색상 교환" },
-    { label: "불량 교환", memo: "불량 교환" },
+    { label: "사이즈", memo: "사이즈 교환", reason: "단순변심" },
+    { label: "색상", memo: "색상 교환", reason: "단순변심" },
+    { label: "불량", memo: "불량 교환", reason: "상품문제" },
+    { label: "오배송", memo: "오배송 교환", reason: "상품문제" },
+    { label: "기타", memo: "", reason: "기타" },
   ],
-  etc: [
-    { label: "빠진 상품 챙겨서 출고", memo: "빠진 상품 챙겨서 출고", pull: true },
-    { label: "주문 상품 챙겨서 출고", memo: "주문 상품 챙겨서 출고", pull: true },
-    { label: "품절 상품 구해서 출고", memo: "품절 상품 구해서 출고", pull: true },
-    { label: "재발송 대기", memo: "재발송 대기" },
+  ship: [
+    { label: "빠진 상품", memo: "빠진 상품 챙겨서 출고" },
+    { label: "주문 상품 챙겨서", memo: "주문 상품 챙겨서 출고" },
+    { label: "품절 상품 구해서", memo: "품절 상품 구해서 출고" },
+    { label: "재발송", memo: "재발송" },
   ],
+  etc: [],
 };
+
+/** 다시 열 때 어떤 사유 칩이 눌려 있었는지 — 메모 첫 줄이 칩 문구로 시작하면 그 칩, 아니면 저장된 사유와 이름이 같은 칩(단순변심·기타). 못 고르면 "". */
+export function presetFromSaved(kind: IssueKind, memo: unknown, reason: unknown): string {
+  const list = ISSUE_MEMO_PRESETS[kind] || [];
+  const first = String(memo ?? "").split("\n")[0].trim();
+  const byMemo = first ? list.find((p) => p.memo && (first === p.memo || first.startsWith(`${p.memo} · `))) : undefined;
+  if (byMemo) return byMemo.label;
+  const r = String(reason ?? "").trim();
+  const byReason = r ? list.find((p) => p.label === r && p.reason === r) : undefined;
+  return byReason ? byReason.label : "";
+}
+
+/** 고객이슈 유형 → admin_tasks.task_type (shipping 은 서버가 이미 받는 값 — DB 변경 없음). */
+export function issueKindTaskType(kind: IssueKind): string {
+  return kind === "refund" ? "refund" : kind === "exchange" ? "exchange" : kind === "ship" ? "shipping" : "general";
+}
+/** admin_tasks 유형들 → 창의 유형. */
+export function issueKindFromTaskTypes(types: readonly unknown[], fallbackKind?: string): IssueKind {
+  const t = (types || []).map((x) => String(x ?? "").trim().toLowerCase());
+  if (t.includes("exchange")) return "exchange";
+  if (t.includes("refund") || t.includes("return")) return "refund";
+  if (t.includes("shipping")) return "ship";
+  if (t.includes("general")) return "etc";
+  return fallbackKind === "교환" ? "exchange" : "refund";
+}
 
 export function isValidStage(v: unknown): v is RefundStage {
   return typeof v === "string" && (REFUND_STAGES as readonly string[]).includes(v);

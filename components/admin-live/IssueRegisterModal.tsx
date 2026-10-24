@@ -13,7 +13,7 @@ export type CustomerIssueCustomerOption = { key: string; nickname: string; name:
 
 // 유형 라벨 — 고객이슈 유형과 «동일 문자열» 공유(환불/교환/반품/기타).
 export const ISSUE_TYPE_LABEL: Record<string, string> = {
-  refund: "환불", exchange: "교환", return: "반품", general: "기타", etc: "기타",
+  refund: "환불", exchange: "교환", return: "반품", shipping: "출고", ship: "출고", general: "기타", etc: "기타",
 };
 // 탭 등록·편집 셀렉터가 보여주는 유형(진상/구매 제외).
 export const REGISTER_TYPE_OPTIONS: Array<[string, string]> = [

@@ -12,6 +12,7 @@ eq(issueFilterBucket({ task_type: "refund" }), "return_refund", "환불");
 eq(issueFilterBucket({ task_type: "bad_customer" }), "etc", "진상→기타");
 eq(issueFilterBucket({ task_type: "purchase" }), "etc", "구매→기타");
 eq(issueFilterBucket({ task_type: "general" }), "etc", "기타→기타");
+eq(issueFilterBucket({ task_type: "shipping" }), "shipping", "출고→출고");
 eq(issueFilterBucket({ task_type: "" }), "etc", "칩없음→기타");
 eq(issueFilterBucket({}), "etc", "필드없음→기타");
 

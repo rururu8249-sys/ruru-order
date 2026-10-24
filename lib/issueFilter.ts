@@ -10,13 +10,14 @@ export function issueRawTypes(task: { task_type?: unknown; taskTypes?: unknown }
   return all.length > 0 ? all : ["general"];
 }
 
-export type IssueFilterBucket = "exchange" | "return_refund" | "etc";
+export type IssueFilterBucket = "exchange" | "return_refund" | "shipping" | "etc";
 
 /** 이슈 → 필터 버킷. 교환 > 반품·환불 > 기타 순으로 판정(둘 다면 교환). */
 export function issueFilterBucket(task: { task_type?: unknown; taskTypes?: unknown }): IssueFilterBucket {
   const t = issueRawTypes(task);
   if (t.includes("exchange")) return "exchange";
   if (t.some((x) => x === "return" || x === "refund")) return "return_refund";
+  if (t.includes("shipping")) return "shipping"; // [2026-10-25] 출고(빠진 상품·주문 상품 챙겨서 출고)
   return "etc"; // 진상(bad_customer)·구매(purchase)·기타(general)·그 외 전부
 }
 
@@ -31,5 +32,6 @@ export const ISSUE_FILTER_CHIPS: Array<[string, string]> = [
   ["", "전체"],
   ["exchange", "교환"],
   ["return_refund", "반품·환불"],
+  ["shipping", "출고"],
   ["etc", "기타"],
 ];
