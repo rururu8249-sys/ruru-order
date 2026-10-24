@@ -9,7 +9,6 @@ import { showAdminToast } from "@/lib/adminToast";
 import { patchIssueTask, type IssueExtraItem } from "@/lib/issueTaskPatch";
 import IssueExtraItems from "./IssueExtraItems";
 import LiveOrderRegisteredProductPicker from "./LiveOrderRegisteredProductPicker";
-import PickingPullModal from "./PickingPullModal";
 import { parseBankAccount, bankDisplayName, isExcludedHolder } from "@/lib/parseBankAccount";
 import {
   ISSUE_MEMO_PRESETS,
@@ -117,8 +116,6 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
   // [2026-10-23 사장님] 자주 쓰는 내용 칩 · 교환 «바꿀 상품» 고르기 · 기타 «출고 넘기기» 이어서
   const [presetLabel, setPresetLabel] = useState(() => presetFromSaved(initIssueType, issueBodyMemo, item.reason));
   const [exPicker, setExPicker] = useState<"" | "same" | "other">("");
-  const [pullOpen, setPullOpen] = useState(false);
-  const wantPull = isShip; // [2026-10-25] 출고 = 저장 뒤 출고 넘기기 창
 
   // 계좌 — [6차] 항상 3칸 표시(요약/펼침 토글 폐지). 옛 예금주가 제외단어(입니다 등)면
   //   손님 이름으로 «프리필»하고 노란 테두리+안내(저장 눌러야 DB 반영). 자동 저장 안 함.
@@ -365,7 +362,6 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
       const chosen = lines.filter((l) => (sel[l.id] || 0) > 0);
       const ids = chosen.map((l) => Number(l.id)).filter((n) => n > 0);
       if (!isEtc && ids.length === 0) { showAdminToast("대상 상품을 1개 이상 선택해주세요.", "warning"); return; } // [⑭] 기타는 0개 허용
-      if (isShip && lines.length > 0 && ids.length === 0) { showAdminToast("출고할 상품을 골라 주세요.", "warning"); return; }
       const rowQty = Object.fromEntries(chosen.map((l) => [String(l.id), sel[l.id]])); // [⑯] 고른 수량 → 서버 회수 비율
       setSaving(true);
       const created = await onCreateIssue?.({ issueType, memo: issueMemo, selectedRowIds: ids, rowQty });
@@ -381,7 +377,6 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
             await patchIssueTask(t, { issueTypeKey: issueKindTaskType(issueType), memo: issueMemo, extraItems: extra }); // 출고면 유형을 shipping 으로
           } catch { /* 보강 실패해도 이슈는 등록됨 */ }
         }
-        if (wantPull && lines.length > 0) { showAdminToast("등록됐어요 — 이어서 넘길 출고를 골라 주세요", "success"); setPullOpen(true); return; }
         onSaved(); return;
       }
       const okLedger = await doPatch({ admin_task_id: created.taskId });
@@ -390,16 +385,14 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
     }
     // 1) 고객이슈(admin-tasks) 저장 — 기존 수정 경로(메타줄 보존). 호출은 rail 이 넘긴 onSaveIssue.
     //   [⑰] 이슈의 대상상품·수량은 «화면 선택»과 같아야 하므로 유형 상관없이 items 를 넘긴다(환불·교환 기록은 doPatch 가 별도 저장).
-    if (isShip && lines.length > 0 && !lines.some((l) => (sel[l.id] || 0) > 0)) { showAdminToast("출고할 상품을 골라 주세요.", "warning"); return; }
     if (onSaveIssue) {
       const items = lines.filter((l) => (sel[l.id] || 0) > 0).map((l) => ({ productId: String(l.product_id ?? ""), productName: l.product_name, color: l.color || "", size: l.size || "", qty: sel[l.id] }));
       // [⑱] 기타일 때만 추가 상품(extra) 저장. 환불·교환은 화면에서 숨기므로 넘기지 않음(값 보존).
-      const okIssue = await onSaveIssue({ issueType, memo: issueMemo, items, extraItems: issueType === "etc" ? extra : undefined });
+      const okIssue = await onSaveIssue({ issueType, memo: issueMemo, items, extraItems: isEtc ? extra : undefined });
       if (!okIssue) { setSaveError("고객이슈 저장에 실패했어요. 다시 시도해 주세요."); showAdminToast("고객이슈 저장 실패", "error"); return; }
     }
     // 2) 기타면 환불 기록은 만들지도 바꾸지도 않는다(💳 은 유형이 general 이라 목록에서 자동 숨김).
     if (isEtc) {
-      if (wantPull && lines.length > 0) { showAdminToast("저장됐어요 — 이어서 넘길 출고를 골라 주세요", "success"); setPullOpen(true); return; }
       showAdminToast("저장됐어요", "success"); onSaved(); return;
     }
     // 3) 환불/교환 기록(refund-ledger) 저장.
@@ -503,7 +496,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
           {/* 2. 상품 */}
           <div className="mb-4">
             <div className="mb-1.5 flex items-baseline justify-between gap-2">
-              <span className="text-[13px] font-semibold text-ink-mute">{isShip ? "출고할 상품" : issueType === "etc" ? "관련 상품 (선택)" : isExchange ? "교환할 상품" : "돌려받을 상품"}</span>
+              <span className="text-[13px] font-semibold text-ink-mute">{isShip ? "출고할 상품 (선택)" : issueType === "etc" ? "관련 상품 (선택)" : isExchange ? "교환할 상품" : "돌려받을 상품"}</span>
               {linesLoaded && !linesError && !matchFailed && (lines.length > 1 || isEtc) ? <span className="text-[12px] tabular-nums text-ink-mute">{lines.length}개 중 <b className="font-bold text-ink">{selectedCount}개</b> 선택</span> : null}
             </div>
             {!linesLoaded ? (
@@ -577,7 +570,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
               <div className="mt-1.5 text-[12px] text-warn-tx">포인트 {formatComma(pointUsed)}원 사용 주문 — 환불액에서 자동 차감하지 않아요</div>
             ) : null}
             {/* [⑱] 기타 이슈 — 관련 상품 따로 추가(등록상품/직접). 환불·교환에선 숨김(값 유지). */}
-            {issueType === "etc" ? <IssueExtraItems value={extra} onChange={setExtra} /> : null}
+            {isEtc ? <IssueExtraItems value={extra} onChange={setExtra} /> : null}
           </div>
 
           {/* 3. 사유 — [2026-10-25 사장님 「자주 쓰는 내용·사유 중복」] 칩 한 줄로 합침. 칩 하나가 메모 첫머리 + 사유(반품비 판정)를 같이 정한다.
@@ -615,7 +608,6 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                 })}
               </div>
               {!isEtc && !presetLabel && reasonChip ? <div className="mt-1.5 text-[12px] text-ink-mute">저장된 사유: {reasonChip}</div> : null}
-              {isShip ? <div className="mt-1.5 text-[12px] text-ink-mute">{createMode ? "등록" : "저장"}하면 넘길 출고(방송·날짜)를 고르는 창이 떠요</div> : null}
               {/* 반품 날짜 — 환불·교환만. 사유 칩과 헷갈리지 않게 칩(동그란 알약) 대신 날짜 칸 모양(8px) */}
               {!isEtc ? (
               <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -794,7 +786,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
           {onDelete && !createMode ? <button type="button" disabled={saving} onClick={onDelete} className="h-9 rounded-lg px-2 text-[13px] font-semibold text-danger-tx hover:bg-surface-2 disabled:opacity-50">삭제</button> : null}
           <span className="flex-1" />
           <button type="button" onClick={onClose} className="h-9 rounded-lg border border-line bg-surface px-4 text-[13px] font-semibold text-ink hover:bg-surface-2">닫기</button>
-          <button type="button" disabled={saving || (!isEtc && !linesLoaded && !!orderCode) || (!isEtc && linesError)} onClick={saveOnly} className="h-10 min-w-[112px] rounded-lg bg-ink px-5 text-[14px] font-bold text-white disabled:opacity-50">{saving ? (createMode ? "등록 중…" : "저장 중…") : createMode ? (wantPull ? "등록하고 출고 넘기기" : "등록") : (wantPull ? "저장하고 출고 넘기기" : "저장")}</button>
+          <button type="button" disabled={saving || (!isEtc && !linesLoaded && !!orderCode) || (!isEtc && linesError)} onClick={saveOnly} className="h-10 min-w-[112px] rounded-lg bg-ink px-5 text-[14px] font-bold text-white disabled:opacity-50">{saving ? (createMode ? "등록 중…" : "저장 중…") : createMode ? "등록" : "저장"}</button>
         </div>
         {/* [2026-10-23] 교환 «바꿀 상품» 고르기 — 등록상품 창을 기록용으로만 재사용(재고·주문 무접촉, onAdd 는 글자만 만든다) */}
         {exPicker ? (
@@ -814,19 +806,6 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
               setExchangeOption(fromTxt ? `${fromTxt} → ${toTxt}` : toTxt);
               return true;
             }}
-          />
-        ) : null}
-        {/* [2026-10-23] 기타 «챙겨서 출고» — 등록 뒤 출고 넘기기 창(고른 상품 미리 체크). 닫으면 처리 창도 닫는다 */}
-        {pullOpen ? (
-          <PickingPullModal
-            orderNo={orderCode}
-            nickname={clean(item.nickname)}
-            name={clean(item.customer_name)}
-            orderedAt={orderDate || null}
-            lines={lines.map((l) => ({ id: String(l.id), productName: l.product_name, option: optLabel(l.color, l.size), qty: Number(l.qty) || 1 }))}
-            preselectIds={lines.filter((l) => (sel[l.id] || 0) > 0).map((l) => String(l.id))}
-            defaultReason={clean(issueMemo).slice(0, 40) || "빠진 상품 재발송"}
-            onClose={() => { setPullOpen(false); onSaved(); }}
           />
         ) : null}
       </div>

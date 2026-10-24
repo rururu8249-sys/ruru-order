@@ -440,7 +440,7 @@ export function transferCopyBlock(d: { bankName: string; account: unknown; holde
 /** [2026-10-25 사장님 「자주 쓰는 내용·사유 중복 — 하나로」] 고객이슈 창의 «사유» 칩 한 줄.
  *  칩 하나가 ①메모 첫머리(memo) ②환불·교환 사유(reason — 상품문제면 반품비 0, 단순변심이면 반품비 칸) 둘 다 정한다.
  *  reason 값·뜻은 예전 사유 칩(단순변심/상품문제/기타)과 같다 — 금액 계산 무변경. 출고·기타는 사유 칸이 없다(환불 기록 없음).
- *  ship = 출고(빠진 상품·주문 상품을 챙겨서 내보내기) — 저장하면 출고 넘기기 창이 이어서 뜬다. */
+ *  ship = 출고(누락 상품 픽업 후 출고·추가 주문건 확인) — 저장만 한다(출고 넘기기는 따로). */
 export type IssueKind = "refund" | "exchange" | "ship" | "etc";
 export type IssueMemoPreset = { label: string; memo: string; reason?: "단순변심" | "상품문제" | "기타" };
 export const ISSUE_MEMO_PRESETS: Record<IssueKind, IssueMemoPreset[]> = {
@@ -459,9 +459,10 @@ export const ISSUE_MEMO_PRESETS: Record<IssueKind, IssueMemoPreset[]> = {
     { label: "오배송", memo: "오배송 교환", reason: "상품문제" },
     { label: "기타", memo: "", reason: "기타" },
   ],
+  // [2026-10-25 08:36 사장님] 출고 이슈 = «확인이 먼저인 기록»(누락 상품은 픽업 후 출고, 추가 주문건은 확인부터). 저장만 — 출고 넘기기는 목록·주문상세 버튼으로 따로.
   ship: [
-    { label: "빠진 상품", memo: "빠진 상품 챙겨서 출고" },
-    { label: "주문 상품 챙겨서", memo: "주문 상품 챙겨서 출고" },
+    { label: "누락 상품", memo: "누락 상품 — 픽업 후 출고" },
+    { label: "추가 주문", memo: "추가 주문건 — 확인 먼저" },
     { label: "품절 상품 구해서", memo: "품절 상품 구해서 출고" },
     { label: "재발송", memo: "재발송" },
   ],
