@@ -22,6 +22,8 @@ assert.equal(presetFromSaved('refund', '품절 상품 환불 · 손님 연락됨
 assert.equal(presetFromSaved('refund', '사이즈 작아서 반품', '단순변심'), '단순변심', '메모가 칩 문구가 아니면 사유 이름이 같은 칩');
 assert.equal(presetFromSaved('refund', '사이즈 작아서 반품', '상품문제'), '', '상품문제는 어느 칩인지 모르면 안 고름(금액 판정은 저장값 그대로)');
 assert.equal(presetFromSaved('exchange', '사이즈 교환', '단순변심'), '사이즈');
+assert.equal(presetFromSaved('exchange', '팔 왼쪽 오른쪽 단면cm가 다름 불량 교환', '상품문제'), '불량', '메모 낱말 + 사유가 맞으면 그 칩(사장님 10/25 화면 사례)');
+assert.equal(presetFromSaved('refund', '불량인 줄 알았는데 단순 변심', '단순변심'), '단순변심', '낱말이 있어도 사유가 다르면 그 칩 아님');
 assert.equal(presetFromSaved('ship', '빠진 상품 챙겨서 출고', ''), '빠진 상품');
 assert.equal(presetFromSaved('etc', '아무 메모', ''), '');
 // 출고 = admin_tasks.task_type shipping (서버가 이미 받는 값)

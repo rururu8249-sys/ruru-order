@@ -394,7 +394,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
     if (onSaveIssue) {
       const items = lines.filter((l) => (sel[l.id] || 0) > 0).map((l) => ({ productId: String(l.product_id ?? ""), productName: l.product_name, color: l.color || "", size: l.size || "", qty: sel[l.id] }));
       // [⑱] 기타일 때만 추가 상품(extra) 저장. 환불·교환은 화면에서 숨기므로 넘기지 않음(값 보존).
-      const okIssue = await onSaveIssue({ issueType, memo: issueMemo, items, extraItems: isEtc ? extra : undefined });
+      const okIssue = await onSaveIssue({ issueType, memo: issueMemo, items, extraItems: issueType === "etc" ? extra : undefined });
       if (!okIssue) { setSaveError("고객이슈 저장에 실패했어요. 다시 시도해 주세요."); showAdminToast("고객이슈 저장 실패", "error"); return; }
     }
     // 2) 기타면 환불 기록은 만들지도 바꾸지도 않는다(💳 은 유형이 general 이라 목록에서 자동 숨김).
@@ -577,7 +577,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
               <div className="mt-1.5 text-[12px] text-warn-tx">포인트 {formatComma(pointUsed)}원 사용 주문 — 환불액에서 자동 차감하지 않아요</div>
             ) : null}
             {/* [⑱] 기타 이슈 — 관련 상품 따로 추가(등록상품/직접). 환불·교환에선 숨김(값 유지). */}
-            {isEtc ? <IssueExtraItems value={extra} onChange={setExtra} /> : null}
+            {issueType === "etc" ? <IssueExtraItems value={extra} onChange={setExtra} /> : null}
           </div>
 
           {/* 3. 사유 — [2026-10-25 사장님 「자주 쓰는 내용·사유 중복」] 칩 한 줄로 합침. 칩 하나가 메모 첫머리 + 사유(반품비 판정)를 같이 정한다.
@@ -762,17 +762,15 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                송장 칸은 [A3]에서 삭제(reship_tracking 저장값 보존). */
             <div className="mb-4">
               <div className={SUB_LABEL}>무엇으로 바꿀까요?</div>
-              {exchangeOption ? (
-                <div className="mb-2 flex items-center gap-2 rounded-lg border border-ink px-3 py-2.5">
-                  <span className="min-w-0 flex-1 text-[14px] font-bold text-ink">{exchangeOption}</span>
-                  <button type="button" onClick={() => setExchangeOption("")} className="h-8 shrink-0 rounded-lg px-2 text-[13px] font-semibold text-ink-soft hover:bg-surface-2">지우기</button>
-                </div>
-              ) : null}
+              {/* [2026-10-25] 고른 값이 상자와 입력칸에 두 번 보이던 것 → 입력칸 하나(고르면 여기에 채워지고, 직접 고쳐도 됨) */}
               <div className="flex flex-wrap gap-2">
                 <button type="button" disabled={selectedCount === 0} onClick={() => setExPicker("same")} className="h-10 rounded-lg border border-line bg-surface px-3 text-[14px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-40">같은 상품 · 옵션 바꾸기</button>
                 <button type="button" onClick={() => setExPicker("other")} className="h-10 rounded-lg border border-line bg-surface px-3 text-[14px] font-semibold text-ink hover:bg-surface-2">다른 상품으로</button>
               </div>
-              <input value={exchangeOption} onChange={(e) => setExchangeOption(e.target.value)} placeholder="직접 적기 (예: 블랙/XL → 블랙/2XL)" className={`mt-2 w-full ${INPUT} !font-normal`} />
+              <div className="relative mt-2">
+                <input value={exchangeOption} onChange={(e) => setExchangeOption(e.target.value)} aria-label="바꿀 상품" placeholder="고르거나 직접 적기 (예: 블랙/XL → 블랙/2XL)" className={`w-full pr-16 ${INPUT} ${exchangeOption ? "!border-ink" : "!font-normal"}`} />
+                {exchangeOption ? <button type="button" onClick={() => setExchangeOption("")} className="absolute top-1/2 right-1.5 h-8 -translate-y-1/2 rounded-lg px-2 text-[13px] font-semibold text-ink-mute hover:bg-surface-2">지우기</button> : null}
+              </div>
             </div>
           )}
           </>

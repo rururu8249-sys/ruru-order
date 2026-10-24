@@ -476,7 +476,10 @@ export function presetFromSaved(kind: IssueKind, memo: unknown, reason: unknown)
   if (byMemo) return byMemo.label;
   const r = String(reason ?? "").trim();
   const byReason = r ? list.find((p) => p.label === r && p.reason === r) : undefined;
-  return byReason ? byReason.label : "";
+  if (byReason) return byReason.label;
+  // 메모에 칩 낱말(불량·오배송·품절·사이즈·색상…)이 들어 있고 사유도 맞으면 그 칩(예: 「팔 단면이 다름 불량 교환」 + 상품문제 → 불량)
+  const byWord = first ? list.find((p) => (!r || p.reason === r) && p.label !== "기타" && first.includes(p.label.split("·")[0].split(" ")[0])) : undefined;
+  return byWord ? byWord.label : "";
 }
 
 /** 고객이슈 유형 → admin_tasks.task_type (shipping 은 서버가 이미 받는 값 — DB 변경 없음). */
