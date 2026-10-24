@@ -365,7 +365,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
         ) : null}
         <div className="min-w-0 flex-1">
           <div className={`break-words text-[14px] font-bold leading-5 ${issueMark?.strike ? "line-through text-ink-mute" : "text-ink"}`}>
-            {issueMark ? <span className={`mr-1.5 inline-block rounded px-1.5 py-0.5 align-middle text-[11px] font-black no-underline ${issueMark.label === "교환" ? "bg-warn-bg text-warn-tx" : "bg-danger-bg text-danger-tx"}`} style={{ textDecoration: "none" }}>{issueMark.label}{issueMark.resolved ? " 완료" : ""}</span> : null}
+            {issueMark ? <span className={`mr-1.5 inline-block rounded px-1.5 py-0.5 align-middle text-[11px] font-black no-underline ${issueMark.label === "교환" ? "bg-warn-bg text-warn-tx" : issueMark.label === "출고" || issueMark.label === "기타" ? "bg-surface-2 text-ink-soft" : "bg-danger-bg text-danger-tx"}`} style={{ textDecoration: "none" }}>{issueMark.label}{issueMark.resolved ? " 완료" : ""}</span> : null}
             {getItemName(item)}
           </div>
           {optionTextView ? (
