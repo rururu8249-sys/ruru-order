@@ -315,8 +315,8 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
     }).filter((x): x is { label: string; n: number } => Boolean(x));
     if (!parts.length) return null;
     return (
-      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[16px] font-semibold text-white">
-        {parts.map((p, i) => <span key={i} className="whitespace-nowrap">{p.label} <span className="font-bold tabular-nums">{p.n}개</span></span>)}
+      <div className="mt-1 text-[13px] font-semibold leading-snug text-white/85">
+        {parts.map((p, i) => <span key={i}>{i > 0 ? ", " : ""}<span className="whitespace-nowrap">{p.label} <span className="tabular-nums">{p.n}개</span></span></span>)}
       </div>
     );
   };
