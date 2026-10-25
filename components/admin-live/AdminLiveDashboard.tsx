@@ -1444,6 +1444,8 @@ export default function AdminLiveDashboard() {
       .filter((order) => !order.pickPull),
     [filteredOrders, orders],
   );
+  // [2026-10-25] 이 화면에 «옮겨 온» 주문(원래 주문 id) — 숫자 띠 괄호 표시용
+  const movedInIds = useMemo(() => new Set(filteredOrders.filter((o) => o.pickPull?.whole).map((o) => originalOrderIdOf(o))), [filteredOrders]);
   const toRealOrder = (order: LiveOrder): LiveOrder => (order.pickPull ? orders.find((o) => o.id === originalOrderIdOf(order)) || order : order);
 
   useEffect(() => {
@@ -1882,7 +1884,7 @@ export default function AdminLiveDashboard() {
               {activeMenu === "orders" ? (
                 <div className="flex flex-col gap-3 p-4 max-md:px-0 max-md:pt-1">{/* [2026-10-25 폰] 판 1겹 — 바깥 main 여백 16 만 */}
                   <div className="shrink-0">
-                    <LiveStatsCards orders={filteredOrdersNoPull} criteriaLabel={criteriaLabel} />
+                    <LiveStatsCards orders={filteredOrdersNoPull} criteriaLabel={criteriaLabel} movedInIds={movedInIds} />
                   </div>
                   <div className="shrink-0">
                     <LiveMissionGauge
