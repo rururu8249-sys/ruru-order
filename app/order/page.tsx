@@ -1473,7 +1473,10 @@ export default function OrderPage() {
   const [previewPc, setPreviewPc] = useState<boolean>(UI_PREVIEW_DEFAULTS.pc);
   const isDesktopWidth = useIsDesktop();
   const uiPc = uiS7 && previewPc && isDesktopWidth;
-  const pageMax = uiPc ? "1120px" : "560px";
+  // [2026-10-25 PC 오른쪽 담은 상품 칸] 폭 1312 이상이면 상품 4열, 그보다 좁으면 3열(오른쪽 칸 320px 자리).
+  const isWidePcWidth = useIsDesktop(1312);
+  const pcCols = isWidePcWidth ? 4 : 3;
+  const pageMax = uiPc ? "1280px" : "560px";
   // PC 모양: 아래 꽉 찬 장바구니 바 → 가운데 떠 있는 바(아래 메뉴가 위로 올라가서 바닥에서 24px)
   const withPcBar = (style: CSSProperties): CSSProperties => (uiPc
     ? { ...style, left: "50%", right: "auto", transform: "translateX(-50%)", width: "min(560px, calc(100% - 32px))", bottom: "24px", borderRadius: "16px", border: "1px solid #E5E5E5", boxShadow: "0 8px 24px rgba(0,0,0,0.10)" }
@@ -6553,6 +6556,70 @@ export default function OrderPage() {
     }
   };
 
+  // [2026-10-25 사장님 「PC는 오른쪽에 담은 상품 쫙 — 마켓오리진처럼」] PC 모양에서만 상품 목록 오른쪽에 붙어 다니는 칸.
+  //   보여주기 + 기존 버튼만: 삭제 = 주문서 시트와 같은 guardChatItem→removeItem, 「주문서 확인」 = 하단 바와 같은 setOrderSheetOpen.
+  //   담기·선점·금액 계산·제출 무접촉(합계는 하단 바와 같은 식, 표시만).
+  const openOrderSheetFromPanel = () => {
+    setOrderSheetOpen(true);
+    window.setTimeout(() => document.getElementById("orderSheetSection")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+  };
+  const renderPcCartPanel = () => {
+    const panelTotal = selectedItemEntries.reduce((sum, { item }) => sum + toNumber(item.product_price) * toNumber(item.qty), 0);
+    const panelQty = selectedItemEntries.reduce((sum, { item }) => sum + toNumber(item.qty), 0);
+    const empty = selectedItemEntries.length === 0;
+    return (
+      <aside aria-label="담은 상품" style={{ width: "320px", flexShrink: 0, position: "sticky", top: "84px", alignSelf: "flex-start", border: "1px solid #E5E5E5", borderRadius: "16px", background: "#FFFFFF", display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 108px)" }}>
+        <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid #E5E5E5", display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "8px" }}>
+          <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: "#111111" }}>담은 상품</h2>
+          {!empty ? <span style={{ fontSize: "13px", color: "#707072" }}>{selectedItemEntries.length}종 · {panelQty}개</span> : null}
+        </div>
+        {empty ? (
+          <div style={{ padding: "32px 16px", textAlign: "center" }}>
+            <p style={{ margin: 0, fontSize: "15px", fontWeight: 600, color: "#111111" }}>아직 담은 상품이 없어요</p>
+            <p style={{ margin: "6px 0 0", fontSize: "13px", color: "#707072", lineHeight: 1.6 }}>상품의 [+ 담기]를 눌러 담아 주세요.</p>
+            {isBroadcastOn && chatUiEnabled && chatShowFind ? (
+              <button type="button" onClick={() => { setChatFindOpen(true); openOrderSheetFromPanel(); }} style={{ marginTop: "16px", minHeight: "40px", padding: "0 16px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", fontSize: "14px", fontWeight: 600, color: "#111111", cursor: "pointer", fontFamily: "inherit" }}>채팅주문 하셨나요?</button>
+            ) : null}
+          </div>
+        ) : (
+          <>
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+              {selectedItemEntries.map(({ item, index }) => {
+                const matched = findMatchedBroadcastProduct(item, broadcastProducts);
+                const imageUrl = matched ? pickOrderProductImageUrl(matched) : getOrderItemImageUrl(item);
+                const optionText = [normalizeEmptyProductOptionValue(item.color), normalizeEmptyProductOptionValue(item.size)].filter(Boolean).join(" / ");
+                const qty = toNumber(item.qty);
+                return (
+                  <div key={`pc-cart-${index}`} style={{ display: "flex", gap: "12px", padding: "12px 16px", borderBottom: "1px solid #F0F0F0" }}>
+                    <div style={{ width: "56px", height: "56px", flexShrink: 0, background: "#F5F5F5", overflow: "hidden" }}>
+                      {imageUrl ? <img src={imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "15px", fontWeight: 600, color: "#111111", lineHeight: 1.35, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "keep-all" }}>{item.product_name}</div>
+                      {optionText ? <div style={{ marginTop: "2px", fontSize: "13px", color: "#707072" }}>{optionText}</div> : null}
+                      <div style={{ marginTop: "4px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                        <span style={{ fontSize: "13px", color: "#707072" }}>{qty}개 · <b style={{ fontSize: "15px", fontWeight: 700, color: "#111111" }}>{(toNumber(item.product_price) * qty).toLocaleString()}원</b></span>
+                        <button type="button" onClick={() => guardChatItem(item, `${item.product_name} · ${qty}개 삭제`, "삭제할게요", () => removeItem(index))} aria-label={`${item.product_name} 삭제`} style={{ minHeight: "32px", padding: "0 8px", border: "none", background: "transparent", fontSize: "13px", color: "#707072", textDecoration: "underline", cursor: "pointer", fontFamily: "inherit" }}>삭제</button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ padding: "16px", borderTop: "1px solid #E5E5E5" }}>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+                <span style={{ fontSize: "15px", color: "#111111" }}>상품 금액</span>
+                <span style={{ fontSize: "20px", fontWeight: 700, color: "#111111" }}>{panelTotal.toLocaleString()}원</span>
+              </div>
+              <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#707072" }}>배송비는 주문서에서 계산돼요.</p>
+              <button type="button" onClick={openOrderSheetFromPanel} style={{ marginTop: "12px", width: "100%", minHeight: "52px", border: "none", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "16px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>주문서 확인</button>
+            </div>
+          </>
+        )}
+      </aside>
+    );
+  };
+
   // [2026-09-20] 상단 띠(공지·밴드)가 하나라도 떠 있는지 — 앱설치 배너를 접는 판단에만 쓴다. 표시 전용.
   const noticeStripOn = Boolean(hasSavedInfo && topNoticeId && topNoticeTitle.trim());
   const bandStripOn = Boolean(hasSavedInfo && popupBandUrl);
@@ -6957,7 +7024,8 @@ export default function OrderPage() {
             //   상품 수(방송 담긴분/카탈로그 ≤ 80)라 한 번에 렌더해도 가벼움.
             const visibleItems = sorted;
             return (
-              <section id="ruru-shop-top" style={{ margin: "12px auto 0", width: "100%", maxWidth: pageMax, scrollMarginTop: "70px", paddingBottom: "calc(150px + env(safe-area-inset-bottom))" }}>
+              <section id="ruru-shop-top" style={uiPc ? { margin: "12px auto 0", width: "100%", maxWidth: pageMax, scrollMarginTop: "70px", paddingBottom: "48px", display: "flex", alignItems: "flex-start", gap: "32px" } : { margin: "12px auto 0", width: "100%", maxWidth: pageMax, scrollMarginTop: "70px", paddingBottom: "calc(150px + env(safe-area-inset-bottom))" }}>
+                <div style={uiPc ? { flex: 1, minWidth: 0 } : undefined}>
                 <input
                   value={productSearchText}
                   onChange={(e) => { setProductSearchText(e.target.value); setProductPage(1); setVisibleProductCount(10); }}
@@ -7083,7 +7151,7 @@ export default function OrderPage() {
                   <div style={uiV2 ? { marginTop: "14px", padding: "26px", textAlign: "center", color: "#707072", fontSize: "15px", fontWeight: 400 } : { marginTop: "14px", padding: "26px", textAlign: "center", color: "#999", fontSize: "14px", fontWeight: 700 }}>찾는 상품이 없어요. 아래 직접 입력으로 담아 주세요.</div>
                 ) : (
                   <div style={uiV2 ? (listView === "grid"
-                    ? { marginTop: "12px", display: "grid", gridTemplateColumns: uiPc ? "repeat(4, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))", gap: uiPc ? "48px 16px" : "44px 8px", alignItems: "stretch" }
+                    ? { marginTop: "12px", display: "grid", gridTemplateColumns: uiPc ? `repeat(${pcCols}, minmax(0, 1fr))` : "repeat(2, minmax(0, 1fr))", gap: uiPc ? "48px 16px" : "44px 8px", alignItems: "stretch" }
                     : uiPc ? { marginTop: "8px", display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", columnGap: "32px" } : { marginTop: "8px", display: "flex", flexDirection: "column" }) : listView === "grid"
                     ? { marginTop: "10px", display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px", alignItems: "stretch" }
                     : { marginTop: "8px", display: "flex", flexDirection: "column" }}>
@@ -7542,6 +7610,8 @@ export default function OrderPage() {
                 {directInputEnabled ? (
                   <button type="button" onClick={openDirectInputSheet} style={uiV2 ? { marginTop: "12px", width: "100%", minHeight: "48px", border: "1px solid #CACACB", background: "#FFFFFF", borderRadius: "9999px", padding: "0 16px", fontSize: "15px", fontWeight: 600, color: "#111111", cursor: "pointer" } : { marginTop: "12px", width: "100%", border: "1px solid #D9C5CC", background: "#fff", borderRadius: "14px", padding: "13px", fontSize: "14px", fontWeight: 800, color: "#7A1E47", cursor: "pointer" }}>+ 상품을 못 찾으셨나요? 직접 입력하기</button>
                 ) : null}
+                </div>
+                {uiPc ? renderPcCartPanel() : null}
               </section>
             );
           })()}
@@ -9074,6 +9144,7 @@ export default function OrderPage() {
           {!orderSheetOpen && (
           <>
             {(() => {
+              if (uiPc) return null; // [2026-10-25] PC 는 오른쪽 「담은 상품」 칸이 대신함
               const cartCount = items.filter((it) => it.product_name.trim()).length;
               const isEmpty = cartCount === 0;
               const cartTotal = items.reduce((sum, it) => {
