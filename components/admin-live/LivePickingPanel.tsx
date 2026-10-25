@@ -143,8 +143,9 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
   //   접기·펼치기는 사장님이 카드 머리의 「접기/펼치기」로 직접 — 둘 다 언제든 가능.
   const [folded, setFolded] = useState<Set<string>>(new Set());
   const toggleFold = (key: string) => setFolded((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
-  const foldButton = (key: string) => (
-    <button type="button" onClick={() => toggleFold(key)} aria-expanded={!folded.has(key)} className="flex h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-[13px] font-semibold text-ink-soft hover:bg-surface-2">
+  // [10-25 사장님 「상품명 줄 눈에 확 띄게」] 머리 띠가 검정이면 글자도 흰색
+  const foldButton = (key: string, dark = false) => (
+    <button type="button" onClick={() => toggleFold(key)} aria-expanded={!folded.has(key)} className={`flex h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-[13px] font-semibold ${dark ? "text-white/80 hover:bg-white/10" : "text-ink-soft hover:bg-surface-2"}`}>
       {folded.has(key) ? "펼치기" : "접기"}
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: folded.has(key) ? "none" : "rotate(180deg)" }}><path d="m6 9 6 6 6-6" /></svg>
     </button>
@@ -461,20 +462,21 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
 
           {/* [15:11 사장님] 요약 = 업체에서 한 번에 집어 오는 피킹표 — 손님 이름 없이 상품 총개수·옵션별 개수·포함 내역·남은 개수만 */}
           {!scopeTooWide && view === "summary" ? (
-            <div className="overflow-hidden rounded-xl border border-line bg-surface">
+            <div className="space-y-3">
               {productGroups.map((g) => {
                 const c = countLine(g.options.flat());
                 return (
-                  <div key={g.name + "|" + g.options[0][0].productId} className={`border-t border-line px-3 py-2.5 first:border-t-0 ${c.done ? "bg-surface-2" : ""}`}>
-                    {/* [23:04 사장님] 사진·상품명 줄 아래로 표를 내려 가로 전체를 씀(칸 넓게) */}
-                    <div className="flex items-center gap-3">
+                  <section key={g.name + "|" + g.options[0][0].productId} className="overflow-clip rounded-xl border border-line bg-surface">
+                    {/* [23:04 사장님] 사진·상품명 줄 아래로 표를 내려 가로 전체를 씀(칸 넓게)
+                        [10-25 사장님 「상품명 줄 눈에 확 띄게」] 상품명 줄 = 검정 띠·흰 글자 18px, 스크롤해도 위에 붙음. 다 챙기면 회색 띠 */}
+                    <div className={`sticky top-0 z-10 flex items-center gap-3 px-3 py-2.5 ${c.done ? "bg-line text-ink-soft" : "bg-ink text-white"}`}>
                       {photoOf(g.photo, 44)}
                       <div className="flex min-w-0 flex-1 items-baseline justify-between gap-2">
-                        <span className={`min-w-0 break-words text-[14px] font-bold ${c.done ? "text-ink-mute" : "text-ink"}`}>{g.name}</span>
-                        <span className="shrink-0 text-[16px] font-bold text-ink tabular-nums">총 {c.all}개</span>
+                        <span className="min-w-0 break-words text-[18px] font-bold leading-snug">{g.name}</span>
+                        <span className="shrink-0 text-[16px] font-bold tabular-nums">{c.done ? "✓ " : ""}총 {c.all}개</span>
                       </div>
                     </div>
-                    <div>
+                    <div className="px-3 pb-2.5">
                       {/* [15:18 사장님 「S 8 · M 5 저따위 말고 — 색상·사이즈·개수 구분 확실히」] 옵션마다 한 줄: 색상 | 사이즈 | 주문 수량 | 총 주문수량 | 챙겨야 할 남은 수량(16:28 사장님 확정, 16:25 「개수·남은」 뜻 모호 → 피킹표 표준 주문 수량/남은 수량) */}
                       <div className="mt-2 overflow-hidden rounded-lg border border-line">
                         <div className="grid grid-cols-[minmax(0,1fr)_64px_88px_112px] gap-x-4 bg-surface-2 px-3 py-1.5 text-[12px] font-semibold text-ink-mute">
@@ -500,7 +502,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                         })}
                       </div>
                     </div>
-                  </div>
+                  </section>
                 );
               })}
             </div>
@@ -513,23 +515,24 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
             const gKey = g.name + "|" + g.options[0][0].productId;
             if (folded.has(gKey)) {
               return (
-                <div key={gKey} className="mb-2 flex w-full items-center gap-2 rounded-xl border border-line bg-surface py-1 pl-3 pr-1">
+                <div key={gKey} className={`mb-2 flex w-full items-center gap-2 rounded-xl py-1 pl-3 pr-1 ${c.done ? "border border-line bg-surface" : "bg-ink"}`}>
                   {c.done ? <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-ink text-white" aria-hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5 10 17.5 19 7" /></svg></span> : null}
-                  <span className={`min-w-0 flex-1 truncate text-[14px] font-semibold ${c.done ? "text-ink-mute" : "text-ink"}`}>{g.name}</span>
-                  <span className={`shrink-0 text-[13px] font-semibold tabular-nums ${c.done ? "text-ink-mute" : "text-danger-tx"}`}>{c.done ? `${c.total}개 다 챙김` : `챙겨야 할 남은 수량 ${c.total - c.got}개`}</span>
-                  {foldButton(gKey)}
+                  <span className={`min-w-0 flex-1 truncate text-[16px] font-bold ${c.done ? "text-ink-mute" : "text-white"}`}>{g.name}</span>
+                  <span className={`shrink-0 text-[13px] font-bold tabular-nums ${c.done ? "text-ink-mute" : "text-white"}`}>{c.done ? `${c.total}개 다 챙김` : `챙겨야 할 남은 수량 ${c.total - c.got}개`}</span>
+                  {foldButton(gKey, !c.done)}
                 </div>
               );
             }
             return (
-              <section key={gKey} className="mb-3 overflow-hidden rounded-xl border border-line bg-surface">
-                <div className="flex items-center gap-3 px-3 py-3">
+              <section key={gKey} className="mb-4 overflow-clip rounded-xl border border-line bg-surface">
+                {/* [10-25 사장님 「상품명 줄 눈에 확 띄게」] 검정 띠·흰 글자 18px·스크롤해도 위에 붙음, 다 챙기면 회색 띠 */}
+                <div className={`sticky top-0 z-10 flex items-center gap-3 px-3 py-3 ${c.done ? "bg-line" : "bg-ink"}`}>
                   {photoOf(g.photo, 56)}
                   <div className="min-w-0 flex-1">
-                    <h3 className="break-words text-[16px] font-bold leading-snug text-ink">{g.name}</h3>
-                    <div className="mt-0.5 text-[13px] text-ink-soft tabular-nums">총 {c.all}개{c.done ? " · 다 챙김" : c.total ? ` · 챙긴 ${c.got}/${c.total}` : ""}</div>
+                    <h3 className={`break-words text-[18px] font-bold leading-snug ${c.done ? "text-ink-soft" : "text-white"}`}>{g.name}</h3>
+                    <div className={`mt-0.5 text-[13px] tabular-nums ${c.done ? "text-ink-soft" : "text-white/75"}`}>총 {c.all}개{c.done ? " · 다 챙김" : c.total ? ` · 챙긴 ${c.got}/${c.total}` : ""}</div>
                   </div>
-                  {foldButton(gKey)}
+                  {foldButton(gKey, !c.done)}
                 </div>
                 {g.options.map((rows) => {
                   const oc = countLine(rows);

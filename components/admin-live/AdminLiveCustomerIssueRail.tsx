@@ -491,7 +491,7 @@ export function IssueCard({
       </label>
 
       {/* [③] 유형 60px — 배지 세로로 쌓기, 우선순위(보통 제외)는 아래 작은 배지 */}
-      <div className="flex flex-wrap gap-1 self-center xl:flex-col xl:self-start">
+      <div className="flex flex-wrap gap-1 self-center max-md:hidden xl:flex-col xl:self-start">
         {issueTypes.map((type) => (
           <span key={type} className={`w-fit rounded px-1.5 py-0.5 text-[12px] font-semibold ${typeTone(type)}`}>
             {getIssueTypeLabel(type)}
@@ -503,8 +503,15 @@ export function IssueCard({
       </div>
 
       {/* [③] 고객 184px — 닉네임 / 이름·전화 / 등록일·주문번호 세 줄 */}
-      <div className="col-span-2 min-w-0 [overflow-wrap:anywhere] xl:col-span-1">
-        <div className="text-[14px] xl:truncate xl:text-[13px] font-black text-ink" title={nickname}>{nickname || "-"}</div>
+      <div className="col-span-2 min-w-0 [overflow-wrap:anywhere] max-md:col-span-1 xl:col-span-1">
+        {/* [10-25 폰] 유형 배지를 닉네임 줄 앞으로(따로 한 줄 쓰지 않게) */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {issueTypes.map((type) => (
+            <span key={type} className={`w-fit rounded px-1.5 py-0.5 text-[12px] font-semibold md:hidden ${typeTone(type)}`}>{getIssueTypeLabel(type)}</span>
+          ))}
+          {priority !== "보통" ? <span className="w-fit rounded bg-surface-2 px-1.5 py-0.5 text-[12px] font-bold text-ink-soft md:hidden">{priority}</span> : null}
+          <div className="text-[14px] xl:truncate xl:text-[13px] font-black text-ink" title={nickname}>{nickname || "-"}</div>
+        </div>
         <div className="text-[12px] xl:truncate text-ink-soft">
           <span title={name}>{name || "-"}</span>
           <span className="text-ink-mute"> · </span>

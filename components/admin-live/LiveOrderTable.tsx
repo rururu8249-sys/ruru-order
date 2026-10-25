@@ -1207,7 +1207,7 @@ export default function LiveOrderTable({
             onKeyDown={(event) => { if (event.key === "Enter") applyKeyword(); }} placeholder="닉네임·상품·금액 검색" />
           <button type="button" onClick={applyKeyword} className="h-11 shrink-0 rounded-xl bg-ink px-3 text-[13px] font-bold text-white">검색</button>
           <button type="button" onClick={() => setMobileFiltersOpen((v) => !v)} aria-expanded={mobileFiltersOpen}
-            className={`h-11 shrink-0 rounded-xl border px-3 text-[13px] font-bold ${mobileFiltersOpen || filters.date !== "all" || filters.scope !== "all" || filters.status !== "all" ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink"}`}>
+            className={`h-11 shrink-0 rounded-xl border px-3 text-[13px] font-bold ${mobileFiltersOpen || workFilter || filters.date !== "all" || filters.scope !== "all" || filters.status !== "all" ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink"}`}>
             필터
           </button>
         </div>
@@ -1324,7 +1324,8 @@ export default function LiveOrderTable({
       </div>
 
       {/* [㉕-C] 작업 현황 줄 — 결제완료 기준 챙김/송장출력/출고 진행. 숫자 누르면 그 상태만 걸러 보기(토글). */}
-      <div className="mb-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-xl bg-surface-2 px-3 py-2 text-[12px] font-black text-ink-soft max-md:flex-nowrap max-md:overflow-x-auto max-md:whitespace-nowrap max-md:[scrollbar-width:none]">
+      {/* [10-25 폰] 첫 주문이 화면 중간에서 시작하던 것 — 폰에선 「필터」를 열었거나 작업 현황으로 거르는 중일 때만 보임 */}
+      <div className={`mb-2 ${isMobile && !mobileFiltersOpen && !workFilter ? "hidden" : "flex"} flex-wrap items-center gap-x-2.5 gap-y-1 rounded-xl bg-surface-2 px-3 py-2 text-[12px] font-black text-ink-soft max-md:flex-nowrap max-md:overflow-x-auto max-md:whitespace-nowrap max-md:[scrollbar-width:none]`}>
         <span className="text-ink-mute">작업 현황</span>
         <span>결제완료 {workCounts.paid.toLocaleString()}</span>
         {([
