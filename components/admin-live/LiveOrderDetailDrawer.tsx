@@ -1705,7 +1705,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
               사장님이 그 사실을 화면에서 바로 알아야 한다 — 「매칭필요」의 흔한 원인. */}
           <Info label="닉네임" value={clean((orderForView as any).youtubeNickname) || "(없음 · 자동 입금확인 안 됨)"} strong />
           <Info label="이름(주문자)" value={order.name || "-"} />
-          <Info label="연락처(주문자)" value={orderForView.phone || "-"} />
+          <Info label="연락처(주문자)" value={orderForView.phone || "-"} tel />
           <Info label="결제방법" value={orderForView.paymentMethod || "-"} />
           {/* [E4] 받는 분이 주문자와 같으면 두 칸 대신 한 칸으로. */}
           {(() => {
@@ -1717,7 +1717,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
             return (
               <>
                 <Info label="받는 분(배송)" value={rName || order.name || "-"} strong />
-                <Info label="받는분 연락처" value={rPhone || orderForView.phone || "-"} />
+                <Info label="받는분 연락처" value={rPhone || orderForView.phone || "-"} tel />
               </>
             );
           })()}
@@ -2151,13 +2151,26 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
 }
 
 
-function Info({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+function Info({ label, value, strong = false, tel = false }: { label: string; value: string; strong?: boolean; tel?: boolean }) {
+  // [2026-10-25] 폰에서 연락처를 누르면 바로 전화 — 표시만(값 그대로, 하이픈만 넣어 보여줌).
+  const digits = tel ? String(value || "").replace(/\D/g, "") : "";
+  const telOk = digits.length >= 9 && digits.length <= 12;
+  const shown = telOk && digits.length === 11 ? `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}` : value;
   return (
     <div className="min-w-0">
       <div className="text-[12px] font-semibold text-ink-mute">{label}</div>
-      <div className={["mt-0.5 truncate text-[14px] text-ink", strong ? "font-bold" : "font-medium"].join(" ")}>
-        {value}
-      </div>
+      {telOk ? (
+        <a
+          href={`tel:${digits}`}
+          className={["mt-0.5 inline-flex min-h-8 items-center truncate text-[14px] text-ink underline decoration-line underline-offset-4", strong ? "font-bold" : "font-medium"].join(" ")}
+        >
+          {shown}
+        </a>
+      ) : (
+        <div className={["mt-0.5 truncate text-[14px] text-ink", strong ? "font-bold" : "font-medium"].join(" ")}>
+          {value}
+        </div>
+      )}
     </div>
   );
 }

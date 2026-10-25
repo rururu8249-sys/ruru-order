@@ -1932,7 +1932,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
           {custTab === "members" ? (
             <>
               {/* [2026-09-26] 요약(전체·정상·차단·관리필요) 한 줄 + 오른쪽 「전화번호 차단」 버튼(접이식 줄 대체) */}
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-xl bg-rose-soft/40 px-4 py-2.5 text-[12px] font-black text-ink-soft">
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-xl bg-rose-soft/40 px-4 py-2.5 max-md:bg-transparent max-md:px-0 max-md:py-1 text-[12px] font-black text-ink-soft">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span>전체 <span className="text-ink">{customers.length.toLocaleString("ko-KR")}</span></span>
                   <span className="text-ink-mute">·</span>

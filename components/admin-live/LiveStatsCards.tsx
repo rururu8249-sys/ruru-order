@@ -143,7 +143,7 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
 
   const unpaidTotal = bankUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0)+cardUnpaid.reduce((s,o)=>s+Number(o.totalAmount||0),0);
   return (
-    <div className="mb-3 rounded-2xl border border-rose-line bg-surface md:mb-4 md:border-0 md:p-0">
+    <div className="mb-1 rounded-2xl border border-rose-line bg-surface md:mb-4 md:border-0 md:p-0">
     <button type="button" onClick={() => setMobileOpen((v) => !v)} aria-expanded={mobileOpen}
       className="flex min-h-11 w-full items-center gap-3 px-3 text-left text-[13px] font-bold md:hidden">
       <span className="text-ink-soft">받은 돈 <span className="text-ink tabular-nums">{money(paidAmount)}</span></span>
