@@ -76,3 +76,17 @@ console.log('PASS brand group product keeps the existing form under ?preview=a2'
   delete window.confirm;
   console.log('PASS stock toggle OFF with numbers: confirm cancel=no save / ok=saved with numbers kept');
 }
+
+// [2026-10-25] 새 배치에 「한눈에 정보」 칩 칸 — 기존 칩이 보이고, 지우고 저장하면 spec_chips 가 빠짐
+{
+  window.location.search='?preview=a2';
+  let r; await act(async()=>{r=TestRenderer.create(React.createElement(Form,{activeBroadcastId:null,initialProduct:product}));});
+  const chipInput = r.root.findByProps({id:'v2-spec-chips'});
+  assert.equal(chipInput.props.value,'소가죽','v2 form shows existing spec chips');
+  await act(async()=>chipInput.props.onChange({target:{value:''}}));
+  await act(async()=>r.root.findAllByType('button').find(b=>text(b)==='저장').props.onClick());
+  const note = JSON.parse(saved.values.product_note);
+  assert.equal(note.spec_chips, undefined, 'clearing chips removes spec_chips');
+  await act(async()=>r.unmount());
+  console.log('PASS v2 spec chips field shows and clears');
+}

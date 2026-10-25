@@ -3153,6 +3153,29 @@ export default function QuickProductFastForm({
               {stockGrid}
             </section>
 
+            {/* [2026-10-25 사장님] 새 배치에 빠져 있던 「한눈에 정보」 칩 — 옛 폼과 같은 state·저장(specChipsText → product_note.spec_chips, 비우면 키 생략). 손님 옵션 창 사진 아래 칩 */}
+            <section className={v2Section}>
+              <label className={v2Label} htmlFor="v2-spec-chips">한눈에 정보 (선택)</label>
+              <input
+                id="v2-spec-chips"
+                value={specChipsText}
+                onChange={(e) => { setFormTouched(true); setSpecChipsText(e.target.value); }}
+                placeholder="쉼표로 구분 · 예: 면 100%, 블랙 S~M 품절"
+                className={v2Input}
+              />
+              {(() => {
+                const chips = normalizeSpecChips(specChipsText);
+                return (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {chips.map((c) => (
+                      <span key={c} className="rounded-full bg-surface-2 px-2 py-1 text-[12px] font-semibold text-ink [overflow-wrap:anywhere]">{c}</span>
+                    ))}
+                    <span className="text-[12px] text-ink-mute">{chips.length === 0 ? "손님 옵션 창 사진 아래에 보여요 · 지우면 안 보여요" : `${chips.length}개 · 손님 옵션 창에 보여요 · 지우려면 글자를 지우고 저장`}</span>
+                  </div>
+                );
+              })()}
+            </section>
+
             <section className={v2Section}>
               <span className={v2Label}>분류</span>
               <div className="flex flex-wrap gap-2">
