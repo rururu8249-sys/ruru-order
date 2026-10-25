@@ -162,6 +162,7 @@ PC 는 그대로, 폰에서만 이 절이 우선한다. 핸들러·돈 로직 �
 - **입력** 전화·금액은 `inputMode="numeric"`, 검색은 `inputMode="search"`, 글자 16px(iOS 확대 방지). 키보드가 올라오면 입력칸이 보이게(`scrollIntoView`), 바닥 고정 버튼은 키보드 위로.
 - **드로어·창** 폰은 전체 폭·전체 높이, 머리 44 + 「닫기」 왼쪽, 바닥 고정 주버튼 52. 바깥 클릭 닫기는 그대로(0.6초 규칙).
 - **이미지** 썸네일 56, 누르면 크게. 사진 없는 칸은 회색 빈칸(깨진 아이콘 금지).
+- **(2026-10-25 보강) 판 1겹 실제 규칙** 바깥 여백 16은 `main` 이 준다 — 그 안 화면 틀(Dashboard 감싸개·section·ru-screen-scroll)은 폰에서 `max-md:px-0 border-0 rounded-none bg-transparent shadow-none` 으로 걷는다. 설정 화면은 globals.css `[data-settings-scroll]` 규칙(맨 바깥 rounded-2xl 상자만 걷고 아래 구분선, 안쪽 상자는 카드 유지). 연락처는 누르면 전화(`tel:` 링크, 하이픈 표시). 고객이슈 카드 금액은 한 줄(「금액 25,000원 · 내역」), 사진은 내용 옆.
 - **검수** 매 단계 390·360 프레임 실측(가로 넘침·버튼 높이·한 화면 줄 수) → push → 사장님 실폰 확인 전엔 「완료」 안 씀(verification-before-completion 규칙: 증거 없이 완료 선언 금지).
 
 
