@@ -540,7 +540,7 @@ export function IssueCard({
       </div>
 
       {/* [③] 내용 1fr — 📦 상품 1줄 / 💬 메모 2줄(넘치면 더보기) / 💳 상태 1줄. 셋 다 없으면 「내용 없음」 */}
-      <div data-issue-content className="col-span-2 flex min-w-0 flex-col items-start gap-2 xl:col-span-1 xl:flex-row">
+      <div data-issue-content className="col-span-2 flex min-w-0 flex-col items-start gap-2 max-md:flex-row xl:col-span-1 xl:flex-row">
         {/* 상품 사진 — 최대 3장, 누르면 크게(줄 클릭과 분리) */}
         {photos.length > 0 ? (
           <div className="flex shrink-0 gap-1">
