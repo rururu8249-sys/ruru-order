@@ -1979,7 +1979,7 @@ export default function AdminLiveCustomersPanel({ orders, onClose, initialTab = 
       ) : null}
 
       <div className={custTab === "members" ? "" : "hidden"}>
-        <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm max-md:rounded-xl max-md:p-3 max-md:shadow-none">
+        <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:p-0 max-md:shadow-none">
           {/* [2026-09-25] 필터 한 줄 — 검색(넓게) · 고객상태 · 정렬 · 주문있는고객만 · 초기화(바뀌었을 때만). 좁으면 자연스럽게 줄바꿈. */}
           {/* [2026-10-22 폰] 검색칸은 한 줄 전체, 나머지 컨트롤은 아래 한 줄 가로 스크롤(§13). PC 는 한 줄 그대로 */}
           <div className="flex flex-wrap items-center gap-2 max-md:flex-nowrap max-md:overflow-x-auto max-md:pb-1 max-md:[scrollbar-width:none] max-md:[&>button]:shrink-0 max-md:[&>select]:shrink-0">

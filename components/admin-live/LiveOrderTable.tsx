@@ -1030,7 +1030,7 @@ export default function LiveOrderTable({
         </div>
       </div>
     ) : null}
-    <section className="ru-screen rounded-2xl border border-line bg-surface p-4 shadow-sm">
+    <section className="ru-screen rounded-2xl border border-line bg-surface p-4 shadow-sm max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:p-0 max-md:shadow-none">
       <div className="mb-3 flex shrink-0 flex-wrap items-center gap-2">
         <h2 className="ru-t-title mr-2 max-md:hidden">실시간 주문서</h2>
         {/* [안내 2026-07-06] 방송묶음 컷이 걸려 있을 때 뭘 보고 있는지 명시 — 지난 주문 찾다가 헤매는 것 방지 */}
@@ -1348,7 +1348,7 @@ export default function LiveOrderTable({
       </div>
 
       {/* [2026-09-08] h-[1180px] 고정 → 부모가 준 높이를 채운다. 창 크기·모니터가 달라도 항상 맞음 */}
-      <div className="ru-screen-scroll rounded-xl border border-line">
+      <div className="ru-screen-scroll rounded-xl border border-line max-md:rounded-none max-md:border-0">
             {/* 헤더 행 (모바일 카드형에선 숨김) */}
             {!isMobile && (
             /* [2026-08-29] 방송 중 아래로 스크롤하면 제목줄이 사라져 어느 칸이 금액인지 헷갈리던 문제.

@@ -1857,7 +1857,7 @@ export default function AdminLiveDashboard() {
 
               {/* ── 주문·입금 › 실시간 주문 ── */}
               {activeMenu === "orders" ? (
-                <div className="flex flex-col gap-3 p-4">
+                <div className="flex flex-col gap-3 p-4 max-md:px-0 max-md:pt-1">{/* [2026-10-25 폰] 판 1겹 — 바깥 main 여백 16 만 */}
                   <div className="shrink-0">
                     <LiveStatsCards orders={filteredOrdersNoPull} criteriaLabel={criteriaLabel} />
                   </div>
@@ -1929,7 +1929,7 @@ export default function AdminLiveDashboard() {
 
               {/* ── 고객 › 회원·이슈·단골 ── */}
               {activeMenu === "customers" ? (
-                <div className="flex h-full flex-col gap-3 p-4">
+                <div className="flex h-full flex-col gap-3 p-4 max-md:px-0 max-md:pt-1">
                   {/* [2026-09-08] 방송 콘솔에 있던 「고객이슈」 요약 — 사람에 관한 건 고객 메뉴로
                       [2026-09-21 사장님] 「맨 위에 떠서 레이아웃이 이상함」 — 세로로 길던 레일을
                         «한 줄 띠»로 바꿨다. 미해결 0건이면 띠 자체가 안 뜬다.

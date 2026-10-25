@@ -1591,7 +1591,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         </div>}
 
         {tab === "broadcast" ? (
-          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: isNarrow ? "column" : "row", gap: "12px", padding: "12px 16px 16px" }}>
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: isNarrow ? "column" : "row", gap: "12px", padding: isNarrow ? "8px 0 16px" : "12px 16px 16px" }}>
             {/* 좌측: 방송 목록 */}
             <div style={{ width: isNarrow ? "100%" : "260px", flexShrink: 0, ...(isNarrow && bcListOpen ? { maxHeight: "210px" } : {}), display: "flex", flexDirection: "column", border: "1px solid var(--color-line)", borderRadius: "8px", overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 12px", borderBottom: "1px solid var(--color-line)" }}>
@@ -1689,7 +1689,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             )}
             </div>
             {/* 우측: 선택 방송의 진열 상품 (sort_order순, 읽기 전용) */}
-            <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", border: "1px solid var(--color-line)", borderRadius: "8px", overflow: "hidden" }}>
+            <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", border: isNarrow ? "none" : "1px solid var(--color-line)", borderRadius: "8px", overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 12px", borderBottom: "1px solid var(--color-line)", flexWrap: isNarrow ? "wrap" : "nowrap" }}>
                 <span style={{ ...TAB_TITLE_STYLE, whiteSpace: "nowrap", flexBasis: isNarrow ? "100%" : undefined }}>방송 상품 {bcProducts.length}개</span>
                 {bcSelId && bcProducts.length > 0 ? (
@@ -1894,7 +1894,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
             </div>
           </div>
         ) : tab === "shop" ? (
-          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "12px 16px 16px" }}>
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: isNarrow ? "8px 0 16px" : "12px 16px 16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px", flexWrap: "wrap" }}>
               <span style={{ ...TAB_TITLE_STYLE, flexBasis: isNarrow ? "100%" : undefined }}>쇼핑몰 상품 {shopRows.length}개</span>
               {shopRows.length > 0 ? (
@@ -1963,7 +1963,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         ) : (
           <>
             {/* 머리줄(세 탭 공통 모양): 제목 N개 … 정렬 */}
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px 8px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: isNarrow ? "8px 0" : "12px 16px 8px", flexWrap: "wrap" }}>
               <span style={TAB_TITLE_STYLE}>전체 상품 {filtered.length}개</span>
               <select
                 value={sortKey}
@@ -1977,12 +1977,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               </select>
             </div>
             {/* 검색 */}
-            <div style={{ padding: "0 16px" }}>
+            <div style={{ padding: isNarrow ? "0" : "0 16px" }}>
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="상품명 검색" style={TAB_SEARCH_STYLE} />
             </div>
 
             {/* 카테고리 칩 */}
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", padding: "0 16px 8px" }}>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", padding: isNarrow ? "0 0 8px" : "0 16px 8px" }}>
               {categories.map((c) => (
                 <button
                   key={c.key}
@@ -2007,7 +2007,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               {!loading ? <ProductPagination {...productPagination} size={productPageSize} label="상품 목록 상단 페이지 이동" onPage={changeProductPage} onSize={setProductPageSize} /> : null}
             </div>
             {/* 상품 목록 (페이지별 표시) */}
-            <div ref={productListScrollRef} style={{ flex: 1, minHeight: "400px", overflowY: "auto", padding: "0 16px 16px" }}>
+            <div ref={productListScrollRef} style={{ flex: 1, minHeight: "400px", overflowY: "auto", padding: isNarrow ? "0 0 16px" : "0 16px 16px" }}>
               {loading ? (
                 <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700 }}>불러오는 중…</div>
               ) : visible.length === 0 ? (
