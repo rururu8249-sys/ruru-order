@@ -88,88 +88,65 @@ await act(async () => { await new Promise(r => setTimeout(r, 0)); });
 const flat = (n) => n == null ? '' : typeof n === 'string' ? n : Array.isArray(n) ? n.map(flat).join('') : flat(n.children);
 const text = () => flat(tree.toJSON());
 const tabs = tree.root.findAll(n => n.type === 'button' && n.props.role === 'tab');
-assert.deepEqual(tabs.map(t => t.children.join('')), ['한 장씩', '요약', '상품별', '고객별']);
-assert.equal(tabs[0].props['aria-selected'], true, '기본 보기 = 한 장씩');
-// [10-25] 한 장씩 — 한 화면에 손님 하나, ‹ › 끝없이 돈다, 체크하면 다음 장
-const pageNo = () => { const m = text().match(/(\d+) \/ (\d+)안 챙긴 장/); return m ? [Number(m[1]), Number(m[2])] : null; };
-const navBtn = (l) => tree.root.findAll(n => n.type === 'button' && n.props['aria-label'] === l)[0];
-assert.deepEqual(pageNo(), [1, 4], '결제완료 4장(1·2·5·7)');
-await act(async () => navBtn('이전').props.onClick());
-assert.deepEqual(pageNo(), [4, 4], '처음에서 이전 = 마지막(순환)');
-await act(async () => navBtn('다음').props.onClick());
-assert.deepEqual(pageNo(), [1, 4], '마지막에서 다음 = 처음(순환)');
-const cardBtn = () => tree.root.findAll(n => n.type === 'button' && (n.props['aria-label'] === '챙김' || n.props['aria-label'] === '챙김 해제'))[0];
-assert.equal(tree.root.findAll(n => n.type === 'button' && n.props['aria-label'] === '챙김').length, 1, '한 장에 체크 버튼 하나(손님 하나)');
-const firstCardText = text();
-await act(async () => { await cardBtn().props.onClick(); });
-const firstId = writes.at(-1).ids.map(String).join();
-assert.equal(writes.at(-1).payload.picked_at != null, true, '한 장씩 체크 = picked_at 저장');
-assert.deepEqual(pageNo(), [2, 4], '체크하면 다음 장');
-assert.notEqual(text(), firstCardText);
-await act(async () => navBtn('이전').props.onClick());
-await act(async () => { await cardBtn().props.onClick(); });
-assert.equal(writes.at(-1).ids.map(String).join(), firstId); assert.equal(writes.at(-1).payload.picked_at, null, '다시 누르면 해제');
-assert.deepEqual(pageNo(), [1, 4], '해제는 그 장에 머묾');
-await act(async () => tabs[2].props.onClick());
-const nodeText0 = (n) => typeof n === 'string' ? n : (n.children || []).map(nodeText0).join('');
-const chip = (label) => tree.root.findAll(n => n.type === 'button' && n.props['aria-pressed'] !== undefined && nodeText0(n).startsWith(label))[0];
-assert.equal(nodeText0(chip('결제완료')), '결제완료 6'); assert.equal(chip('결제완료').props['aria-pressed'], true, '기본은 결제완료');
-assert.equal(nodeText0(chip('미결제')), '미결제 2'); assert.equal(nodeText0(chip('전체')), '전체 8');
-assert.ok(!text().includes('고객3'), '기본(결제완료)엔 미결제 손님 안 보임');
-await act(async () => chip('전체').props.onClick());
-assert.ok(text().includes('미결제 상품이 섞여 보여요'));
-assert.ok(text().includes('미결제 2 · 지난 주문 1개 포함'), '같은 상품·옵션 줄 안에 지난 주문 포함 표시');
-assert.ok(text().includes('다른 출고로 넘긴 상품 1개는 여기서 뺐어요'));
-assert.ok(!text().includes('넘겨받'), '어색한 「넘겨받음」 문구 없음');
-// 챙길 = 결제완료 3+1+1(지난)+1(블랙M 7) = 6
-assert.ok(text().includes('챙겨야 할 남은 수량 6개') && text().includes('챙긴 0 / 총 주문수량 6'), '머리는 «더 챙길 N개»가 크게');
-assert.ok(/\d+건 한꺼번에 체크/.test(text()), '옵션 줄 한 번에 체크(결제완료·안 챙긴 것만, 2건 이상일 때만)');
-assert.ok(!text().includes('개 챙김'), '옛 「남은 n개 챙김」 문구 없음');
+assert.deepEqual(tabs.map(t => t.children.join('')), ['상품별', '손님별'], '보기는 상품별·손님별 두 개뿐');
+assert.equal(tabs[0].props['aria-selected'], true, '기본 = 상품별');
 const nodeText = (n) => typeof n === 'string' ? n : (n.children || []).map(nodeText).join('');
-// [16:21] 체크는 □ 칸 버튼만 — 줄(이름 쪽)은 눌러도 아무 일 없음
-const rowBtn = nick => tree.root.findAll(n => n.type === 'button' && (n.props['aria-label'] === '챙김' || n.props['aria-label'] === '챙김 해제') && nodeText(n.parent).includes(nick))[0];
-assert.equal(rowBtn('고객1').parent.props.onClick, undefined, '줄 전체는 눌러도 체크 안 됨');
-assert.ok(!nodeText(rowBtn('고객1')).includes('고객1'), '체크 버튼 안엔 이름이 없음(칸만)');
+const btn = (f) => tree.root.findAll(n => n.type === 'button' && f(n));
+const byText = (t) => btn(n => nodeText(n) === t)[0];
+const byLabel = (l) => btn(n => n.props['aria-label'] === l)[0];
+const counter = () => nodeText(byLabel('전체 목록'));
+// 머리: 결제완료 3+1+1(지난)+1(블랙M 7) = 6, 미결제는 따로
+assert.ok(text().includes('챙겨야 할 남은 수량 6개') && text().includes('챙긴 0 / 총 주문수량 6'));
+assert.ok(text().includes('미결제 2개 따로 · 보기'), '미결제는 한 줄로 따로');
+assert.ok(!text().includes('고객3'), '기본엔 미결제 손님 안 보임');
+assert.ok(!text().includes('요약') && !text().includes('안 챙긴 것만') && !text().includes('접기'), '옛 요약·안 챙긴 것만·접기 없음');
+assert.ok(text().includes('다른 출고로 넘긴 상품 1개는 여기서 뺐어요'));
+assert.equal(counter(), '상품 1 / 1전체 목록', '상품별 한 장 = 상품 하나');
+await act(async () => btn(n => nodeText(n).startsWith('미결제 2개 따로'))[0].props.onClick());
+assert.ok(text().includes('고객3') && text().includes('입금 확인 전엔 챙기지 마세요'), '보기 누르면 미결제 섞여 보임 + 경고');
+assert.ok(text().includes('미결제 2 · 지난 주문 1개 포함'), '같은 옵션 줄 안에 지난 주문 포함 표시');
+assert.ok(!text().includes('넘겨받'), '어색한 「넘겨받음」 문구 없음');
+// 줄 체크는 □ 칸만 — 줄은 눌러도 아무 일 없음
+const rowBtn = nick => btn(n => (n.props['aria-label'] === '챙김' || n.props['aria-label'] === '챙김 해제') && nodeText(n.parent).includes(nick))[0];
+assert.equal(rowBtn('고객1').parent.props.onClick, undefined);
 await act(async () => { await rowBtn('고객1').props.onClick(); });
 assert.equal(writes.at(-1).ids.map(String).join(), '1', 'picked_at 저장은 그 줄만');
-assert.ok(rows.get(1).picked_at, '서버 값이 바뀐 뒤 완료 표시');
 assert.equal(rowBtn('고객1').props['aria-pressed'], true);
-// 미결제 줄도 사장님 판단으로 챙길 수 있음(2026-10-21 규칙 유지)
 await act(async () => { await rowBtn('고객3').props.onClick(); });
-assert.equal(writes.at(-1).ids.map(String).join(), '3');
-// 고객별 보기
-await act(async () => tabs[3].props.onClick());
-assert.ok(text().includes('고객9') || text().includes('지난 주문 10.11(일)'), '고객별에도 지난 주문 표시');
+assert.equal(writes.at(-1).ids.map(String).join(), '3', '미결제 줄도 사장님 판단으로 직접 체크 가능');
+// 큰 버튼 = 이 상품의 결제완료·안 챙긴 것만(미결제·이미 챙긴 것 제외)
+const pageBtn = () => btn(n => /^이 (상품|손님) 남은 \d+개 다 챙김$/.test(nodeText(n)))[0];
+assert.equal(nodeText(pageBtn()), '이 상품 남은 3개 다 챙김');
+await act(async () => { await pageBtn().props.onClick(); });
+assert.deepEqual(writes.at(-1).ids.map(String).sort(), ['2','5','7']);
+assert.ok(text().includes('✓ 다 챙겼어요'), '다 챙기면 그 장에 남아 「다 챙겼어요」');
+// 손님별 = 한 장에 손님 하나, 끝없이 돈다
+await act(async () => tabs[1].props.onClick());
+assert.equal(counter(), '손님 1 / 5전체 목록');
+await act(async () => byLabel('이전').props.onClick());
+assert.equal(counter(), '손님 5 / 5전체 목록', '처음에서 이전 = 마지막');
+await act(async () => byLabel('다음').props.onClick());
+assert.equal(counter(), '손님 1 / 5전체 목록', '마지막에서 다음 = 처음');
+// 전부 해제 — 확인 뒤 챙긴 줄만 false
+await act(async () => { await byText('전부 해제').props.onClick(); });
+assert.equal(writes.at(-1).payload.picked_at, null, '해제 = picked_at 비움');
+// 손님 다 챙김 → 다음 «남은» 손님 장으로
+assert.equal(nodeText(pageBtn()), '이 손님 남은 3개 다 챙김', '고객1 3개');
+await act(async () => { await pageBtn().props.onClick(); });
+assert.deepEqual(writes.at(-1).ids.map(String), ['1']);
+assert.equal(counter(), '손님 2 / 5전체 목록', '다 챙기면 다음 장으로');
+// 전체 목록 → 눌러서 그 장으로
+await act(async () => byLabel('전체 목록').props.onClick());
+assert.ok(text().includes('전체 목록 · 손님 5명'));
+const listItem = btn(n => nodeText(n).startsWith('4고객6'))[0];
+await act(async () => listItem.props.onClick());
+assert.equal(counter(), '손님 4 / 5전체 목록', '목록에서 누르면 그 장');
 // 모두 챙김 = 결제완료·안 챙긴 것만
-writes.length = 0;
-const all = tree.root.findAll(n => n.type === 'button' && n.children.join('') === '모두 챙김')[0];
-await act(async () => { await all.props.onClick(); });
+await act(async () => { await byText('모두 챙김').props.onClick(); });
 assert.deepEqual(writes.at(-1).ids.map(String).sort(), ['2','5','7'], '미결제(3)·이미 챙긴(1) 제외');
 // 환불 이슈 걸린 줄 — 숫자에서 빠지고 「환불 · 챙기지 마세요」
 const issueRows = mod.buildPickRows([order(11, 'paid', [it(21, 1, '레드', 'S'), it(22, 1, '블랙', 'M')], {returnStatus: '반품(환불)', returnReason: '[반품(환불)] 대상: 알로 부츠컷팬츠(블랙/M)×1'})], 'scope').rows;
 assert.equal(issueRows.find(r => r.id === '22').skip, true);
 assert.equal(issueRows.find(r => r.id === '21').skip, undefined, '대상 아닌 줄은 그대로');
 assert.equal(mod.includedNote(issueRows.filter(r => r.color === '블랙')), '환불 1개 빼고');
-// [16:21] 다 챙겨도 저절로 접히거나 아래로 옮기지 않음 — 접기·펼치기는 직접
-await act(async () => tabs[2].props.onClick());
-assert.ok(!text().includes('6개 다 챙김'), '다 챙긴 상품도 저절로 접히지 않음');
-const foldBtns = () => tree.root.findAll(n => n.type === 'button' && n.props['aria-expanded'] !== undefined);
-const firstName = text();
-await act(async () => foldBtns()[0].props.onClick());
-assert.equal(foldBtns()[0].props['aria-expanded'], false, '접기 누르면 접힘');
-await act(async () => foldBtns()[0].props.onClick());
-assert.equal(foldBtns()[0].props['aria-expanded'], true, '펼치기 누르면 다시 펼쳐짐');
-assert.equal(text(), firstName, '접었다 펴도 순서·내용 그대로');
-// 블랙/M(1건)에서 고객6 체크를 풀면 → 1건이라 한꺼번에 버튼 없이 칸으로만 체크
-await act(async () => { await rowBtn('고객6').props.onClick(); });
-assert.ok(!text().includes('1건 한꺼번에 체크'), '1건일 땐 한꺼번에 버튼 안 보임');
-await act(async () => { await rowBtn('고객6').props.onClick(); });
-assert.deepEqual(writes.at(-1).ids.map(String), ['7']);
-// 요약 = 손님 이름 없이 옵션별 개수
-await act(async () => tabs[1].props.onClick());
-assert.ok(text().includes('색상사이즈총 주문수량챙겨야 할 남은 수량') && text().includes('레드S7개') && !text().includes('고객1'), '요약 = 색상|사이즈|개수|남은 표, 손님 이름 없음');
-// 전부 해제 — 확인 뒤 보이는 챙긴 줄만 false
-const un = tree.root.findAll(n => n.type === 'button' && nodeText0(n) === '전부 해제')[0];
-await act(async () => { await un.props.onClick(); });
-assert.equal(writes.at(-1).payload.picked_at, null, '해제 = picked_at 비움');
 console.log('test-picking-panel: ok');
