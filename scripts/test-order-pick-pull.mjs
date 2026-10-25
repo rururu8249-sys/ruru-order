@@ -77,6 +77,44 @@ assert.equal(pull.pulledOrdersForView(bcVirtual, { kind: 'broadcast', broadcastI
 assert.equal(pull.pulledOrdersForView(bcVirtual, { kind: 'date', day: '2026-10-23' }).length, 0, '누른 날짜(쇼핑몰) 화면엔 안 보임');
 assert.deepEqual(pull.pulledAwayTargets(adapter.toAdminLiveOrder(bcGroups[0])), ['10.22(목) 남녀공용의류']);
 
+// [2026-10-25 완전 이동] 주문서 «전부»를 넘기면 옮긴 주문 — 원래 금액·상품 그대로, 원래 자리에선 빠짐
+{
+  const mv = { pick_pulled_at: '2026-10-25T22:30:00+09:00', pick_pulled_for: '2026-10-25', pick_pulled_broadcast_id: 'B25', pick_pulled_target: '10.25(일) 남녀공용의류', pick_pulled_reason: '직접 선택' };
+  // 취소된 줄은 넘기지 않으므로 «살아 있는 줄 전부»로 판정
+  const wRows = [row(1, mv), row(2, mv), row(3, { admin_order_status_v2: '주문취소', order_manage_status: '주문취소' })];
+  const wGroups = adapter.buildAdminLiveOrderGroups(wRows);
+  assert.equal(pull.isWholeMovedGroup(wGroups[0]), true, '살아 있는 줄 전부 같은 곳으로 → 옮긴 주문');
+  assert.deepEqual([...pull.wholeMovedGroupIds(wGroups)], ['G1']);
+  const wOrig = adapter.toAdminLiveOrder(wGroups[0]);
+  const wVirtual = pull.buildPulledVirtualOrders(wGroups);
+  assert.equal(wVirtual.length, 1);
+  assert.equal(wVirtual[0].pickPull.whole, true);
+  assert.equal(wVirtual[0].id, 'G1#pull:bcB25');
+  assert.equal(wVirtual[0].totalAmount, wOrig.totalAmount, '옮긴 주문 금액 = 원래 주문 금액');
+  assert.deepEqual(wVirtual[0].rowIds, wOrig.rowIds, '같은 주문 줄(입금·출고 기록이 같은 줄에)');
+  assert.deepEqual(wVirtual[0].items.map((it) => it.id), wOrig.items.map((it) => it.id));
+  assert.equal(pull.pulledOrdersForView(wVirtual, { kind: 'broadcast', broadcastId: 'B25', startedDay: '2026-10-25' }).length, 1, '옮긴 곳 화면에 보임');
+  // 일부만 넘기면 지금처럼(옮긴 주문 아님)
+  const partGroups = adapter.buildAdminLiveOrderGroups([row(1, mv), row(2)]);
+  assert.equal(pull.isWholeMovedGroup(partGroups[0]), false, '일부만 넘기면 옮긴 주문 아님');
+  assert.equal(pull.buildPulledVirtualOrders(partGroups)[0].pickPull.whole, undefined);
+  // 다른 곳으로 나눠 넘기면 옮긴 주문 아님
+  const splitGroups = adapter.buildAdminLiveOrderGroups([row(1, mv), row(2, { ...mv, pick_pulled_broadcast_id: 'B26', pick_pulled_for: '2026-10-26' })]);
+  assert.equal(pull.isWholeMovedGroup(splitGroups[0]), false, '두 곳으로 나눠 넘기면 옮긴 주문 아님');
+  // 받은 돈: 화면 목록(원래 자리 빠짐 + 옮긴 주문은 원래 주문으로 바꿔 셈) — 같은 화면이면 한 번만
+  const moved = pull.wholeMovedGroupIds(wGroups);
+  const sameView = [wOrig, ...wVirtual].filter((o) => o.pickPull || !moved.has(String(o.id)));
+  const counted = sameView.map((o) => (o.pickPull?.whole ? wOrig : o)).filter((o) => !o.pickPull);
+  assert.equal(counted.length, 1, '같은 방송으로 옮겨도 한 줄·한 번만 셈(맑은하늘 두 줄 사례)');
+  assert.equal(counted[0].id, 'G1', '셀 때는 원래 주문(입금매칭·주문상세가 원래 주문으로)');
+  assert.equal(lib.pickPullMovedFromText('10.22(목) 남녀공용의류', '늦게 입고'), '10.22(목) 남녀공용의류에서 옮김 · 늦게 입고');
+  assert.equal(lib.pickPullMovedToText('2026-10-25', '10.25(일) 남녀공용의류'), '10.25(일) 남녀공용의류로 옮김');
+  assert.equal(lib.pickPullMovedToText('', '10.26(월) 쇼핑몰 주문'), '10.26(월) 쇼핑몰 주문으로 옮김');
+  // 송장: 옮긴 주문은 일반 주문처럼(상품명 앞 [지난 주문] 표시 없음) — 아래 엑셀 블록에서 확인
+  globalThis.__wholeVirtual = wVirtual[0];
+  console.log('PASS 완전 이동(주문서 전부 넘김) 판정·금액 동일·한 번만 셈·문구');
+}
+
 // 받은 돈 숫자: 가상 묶음을 뺀 목록 = 원래 그대로(LiveStatsCards 는 filteredOrdersNoPull 만 받음)
 const today = [...originals, ...virtual];
 const noPull = today.filter((o) => !o.pickPull);
@@ -93,6 +131,8 @@ const rosen = (await loadWb()).getWorksheet('주소통합_제목필터');
 assert.match(String(rosen.getCell('I2').value), /^\[지난 주문 10\.17\(토\) · 고객이슈 교환\] 상품2/, '송장 상품명 맨 앞 지난 주문 표식');
 assert.doesNotMatch(String(rosen.getCell('I2').value), /총 \d+개/, '사장님 요청: (총 N개) 없음');
 assert.doesNotMatch(String(rosen.getCell('I3').value), /총 \d+개|지난 주문/);
+await excel.exportLiveOrdersForRosen([{ ...globalThis.__wholeVirtual, address: '서울시', detailAddress: '1동', zipcode: '01234' }], { filterLabel: '오늘' });
+assert.doesNotMatch(String((await loadWb()).getWorksheet('주소통합_제목필터').getCell('I2').value), /지난 주문|옮김/, '옮긴 주문 송장은 일반 주문처럼(앞 표식 없음)');
 await excel.exportLiveOrdersForPicking([v], { filterLabel: '오늘' });
 const picking = (await loadWb()).getWorksheet('물건챙기기');
 assert.equal(picking.rowCount, 2, '가져온 줄은 본 시트에(추가 작업 시트로 안 보냄)');

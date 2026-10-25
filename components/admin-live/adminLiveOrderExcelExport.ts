@@ -111,7 +111,7 @@ let rosenExchange: Map<string, string> | undefined;
 function itemSummary(order: LiveOrder, exchange: Map<string, string> | undefined = rosenExchange) {
   const items = order.items || [];
   // [2026-10-22 → 10-23 출고 넘기기] 넘겨받은 묶음이면 상품명 맨 앞에 「[넘겨받은 주문 10.18(토) · 사유]」 — 송장에서도 바로 알아보게
-  const pullMark = order.pickPull ? `[${pickPullBadgeText(order.createdAt, order.pickPull.reason)}] ` : "";
+  const pullMark = order.pickPull && !order.pickPull.whole ? `[${pickPullBadgeText(order.createdAt, order.pickPull.reason)}] ` : "";
   if (!items.length) return pullMark + (clean(order.orderSummary) || "상품명없음 x1개");
   // 상품 전체 출력, 상품 사이는 #. [2026-10-22 사장님] 맨 끝 「(총 N개)」는 뺀다 — 로젠 상품명 칸에 자꾸 끼어 거슬림(총수량은 관리자확인용 시트 칸에 따로 있음).
   return `${pullMark}${items.map((it) => { const ex = exchange?.get(String(it.id)); return ex ? `${itemText(it)} [${ex}]` : itemText(it); }).join(" # ")}`;

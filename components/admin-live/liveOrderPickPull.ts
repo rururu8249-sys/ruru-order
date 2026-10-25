@@ -6,6 +6,7 @@ import type { OrderGroup } from "@/lib/admin-v2/types";
 import type { LiveOrder } from "./types";
 import { buildAdminLiveOrderGroups, toAdminLiveOrder } from "./liveOrderAdapter";
 import { pickPullMatchesView, pulledForOf, type PickPullView } from "@/lib/orderPickPull";
+import { isCanceledStatus } from "@/lib/admin-v2/statusDisplay";
 
 export const PICK_PULL_ID_MARK = "#pull:";
 
@@ -20,9 +21,53 @@ export function originalOrderIdOf(order: Pick<LiveOrder, "id" | "pickPull">): st
 
 const clean = (v: unknown) => String(v ?? "").trim();
 
+const isActiveRow = (row: OrderGroup["rows"][number]) =>
+  (row as any).is_deleted !== true && !isCanceledStatus((row as any).admin_order_status_v2) && !isCanceledStatus((row as any).order_manage_status);
+const pullKeyOf = (row: OrderGroup["rows"][number]) => {
+  const day = pulledForOf(row);
+  return day ? `${clean(row.pick_pulled_broadcast_id)}|${day}` : "";
+};
+
+/** [2026-10-25 사장님 「복사 말고 완전 이동」] 주문서의 «살아 있는 줄 전부»가 같은 곳으로 넘어갔으면 «옮긴 주문».
+ *  옮긴 주문은 원래 방송/날짜 화면에서 빠지고, 넘긴 곳에만 일반 주문처럼 한 번 보인다(받은 돈 띠도 그쪽에서 센다).
+ *  DB 의 주문 날짜·방송·금액은 그대로 — 화면에서 어디에 보이느냐만 바뀐다. 일부 줄만 넘겼으면 지금처럼(원래 주문 + 넘긴 줄 묶음). */
+export function isWholeMovedGroup(group: Pick<OrderGroup, "rows">): boolean {
+  const active = group.rows.filter(isActiveRow);
+  if (!active.length) return false;
+  const key = pullKeyOf(active[0]);
+  return Boolean(key) && active.every((row) => pullKeyOf(row) === key);
+}
+
+/** 옮긴 주문(원래 주문 id = groupId) 모음 — 방송/날짜 화면에서 원래 자리를 빼는 데 쓴다 */
+export function wholeMovedGroupIds(groups: readonly OrderGroup[]): Set<string> {
+  const out = new Set<string>();
+  for (const group of groups) if (isWholeMovedGroup(group)) out.add(String(group.groupId));
+  return out;
+}
+
 export function buildPulledVirtualOrders(groups: readonly OrderGroup[]): LiveOrder[] {
   const out: LiveOrder[] = [];
   for (const group of groups) {
+    if (isWholeMovedGroup(group)) {
+      // 옮긴 주문은 주문서 전체(취소 줄 포함)로 만들어 원래 주문과 금액·상품이 똑같게
+      const first = group.rows.filter(isActiveRow)[0];
+      const day = pulledForOf(first);
+      const broadcastId = clean(first.pick_pulled_broadcast_id);
+      out.push({
+        ...toAdminLiveOrder(group),
+        id: pulledVirtualOrderId(group.groupId, day, broadcastId),
+        pickPull: {
+          pulledFor: day,
+          pulledAt: first.pick_pulled_at ?? null,
+          reason: clean(first.pick_pulled_reason),
+          broadcastId,
+          target: clean(first.pick_pulled_target),
+          originalOrderId: group.groupId,
+          whole: true,
+        },
+      });
+      continue;
+    }
     const byTarget = new Map<string, OrderGroup["rows"]>();
     for (const row of group.rows) {
       const day = pulledForOf(row);

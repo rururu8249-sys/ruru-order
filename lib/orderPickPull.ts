@@ -58,6 +58,23 @@ export function pickPullAwayText(pulledFor: string | null | undefined, targetLab
   return label ? `${label} 출고로 넘김` : "출고 넘김";
 }
 
+/** [2026-10-25 완전 이동] 옮겨 온 쪽: 「10.22(목) 남녀공용의류에서 옮김 · 사유」 */
+export function pickPullMovedFromText(fromLabel: string | null | undefined, reason: string | null | undefined): string {
+  const from = String(fromLabel ?? "").trim();
+  const why = String(reason ?? "").trim();
+  return [from ? `${from}에서 옮김` : "옮겨 온 주문", why].filter(Boolean).join(" · ");
+}
+
+/** [2026-10-25 완전 이동] 원래 주문(전체보기): 「10.25(일) 남녀공용의류로 옮김」 */
+export function pickPullMovedToText(pulledFor: string | null | undefined, targetLabel?: string | null): string {
+  const label = String(targetLabel ?? "").trim() || shortDateWithWeekday(pulledFor);
+  if (!label) return "옮김";
+  // 받침 있으면 「으로」, 없거나 ㄹ 받침이면 「로」(한글 아닌 끝 글자는 「로」)
+  const code = label.charCodeAt(label.length - 1) - 0xac00;
+  const jong = code >= 0 && code < 11172 ? code % 28 : 0;
+  return `${label}${jong && jong !== 8 ? "으로" : "로"} 옮김`;
+}
+
 /** 넘길 곳 이름 — 방송: 「10.22(목) 남녀공용의류」 / 쇼핑몰 날짜: 「10.23(금) 쇼핑몰 주문」 */
 export function pullTargetLabelForBroadcast(title: string | null | undefined, startedAt: string | null | undefined): string {
   return [shortDateWithWeekday(startedAt), String(title ?? "").trim() || "방송"].filter(Boolean).join(" ");

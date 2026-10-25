@@ -91,6 +91,10 @@ export type LiveOrderPickPull = {
   target?: string;
   /** 원래 주문 LiveOrder.id(=groupId) — 주문상세·입금매칭은 이걸로 원래 주문을 연다 */
   originalOrderId: string;
+  /** [2026-10-25] 주문서 전부를 옮김 — 원래 자리에서 빠지고 여기서 일반 주문처럼(받은 돈도 여기서) */
+  whole?: boolean;
+  /** 옮기기 전 자리 이름(「10.22(목) 남녀공용의류」) — 표시용 */
+  fromLabel?: string;
 };
 
 export type LiveOrder = {

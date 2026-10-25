@@ -18,7 +18,7 @@ import { buildCustomerOrderCopyText, buildPaymentRequestNote } from "./liveOrder
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { pickingProgress, isPickingComplete, pickingScope } from "@/lib/orderPicking";
 import ProductPagination from "./ProductPagination";
-import { pickPullBadgeText, pickPullAwayText } from "@/lib/orderPickPull";
+import { pickPullBadgeText, pickPullAwayText, pickPullMovedFromText, pickPullMovedToText } from "@/lib/orderPickPull";
 import { pulledAwayTargets } from "./liveOrderPickPull";
 import { issueMarkKind, issueTargetItemIds, isStrikeKind, targetTextFromReturnReason } from "@/lib/orderIssueMarks";
 
@@ -225,6 +225,14 @@ function statusBadge(order: LiveOrder, actions?: { onMatch?: () => void; onCardP
 //   받는 쪽(넘겨받은 묶음): 「넘겨받은 주문 10.11(토) · 늦게 입고」
 //   보낸 쪽(원래 주문):    「10.22(목) 남녀공용의류 출고로 넘김」
 function pickPullBadge(order: LiveOrder) {
+  // [2026-10-25 완전 이동] 주문서 전부를 옮긴 주문 — 옮겨 온 곳에선 「○○에서 옮김」(원래 자리엔 안 보임)
+  if (order.pickPull?.whole) {
+    return (
+      <span className="inline-flex shrink-0 items-center rounded-full border border-line bg-surface-2 px-2 py-0.5 text-[11px] font-bold text-ink-soft" title={`원래 주문일 ${order.createdAt || ""} · 이 주문은 여기로 옮겨 왔어요(원래 자리 화면에선 빠짐)`}>
+        {pickPullMovedFromText(order.pickPull.fromLabel, order.pickPull.reason)}
+      </span>
+    );
+  }
   if (order.pickPull) {
     return (
       <span className="inline-flex shrink-0 items-center rounded-full border border-ink bg-ink px-2 py-0.5 text-[11px] font-black text-white" title={`원래 주문일 ${order.createdAt || ""} · ${order.pickPull.reason || "직접 선택"} · 이 출고 때 같이 챙겨 보내는 주문(금액은 원래 주문에)`}>
@@ -235,9 +243,12 @@ function pickPullBadge(order: LiveOrder) {
   const targets = pulledAwayTargets(order);
   if (!targets.length) return null;
   const pulledQty = (order.items || []).filter((it) => it.pickPulledFor || it.pickPulledAt).length;
+  const movedWhole = targets.length === 1 && pulledQty >= (order.items || []).length;
   return (
     <span className="inline-flex shrink-0 items-center rounded-full border border-line bg-surface-2 px-2 py-0.5 text-[11px] font-bold text-ink-soft" title="이 주문 상품을 다른 출고로 넘겨 그때 챙겨 보냅니다">
-      {targets.map((t) => pickPullAwayText(/^\d{4}-\d{2}-\d{2}$/.test(t) ? t : "", /^\d{4}-\d{2}-\d{2}$/.test(t) ? "" : t)).join(" · ")}{pulledQty < (order.items || []).length ? ` (${pulledQty}개)` : ""}
+      {movedWhole
+        ? pickPullMovedToText(/^\d{4}-\d{2}-\d{2}$/.test(targets[0]) ? targets[0] : "", /^\d{4}-\d{2}-\d{2}$/.test(targets[0]) ? "" : targets[0])
+        : <>{targets.map((t) => pickPullAwayText(/^\d{4}-\d{2}-\d{2}$/.test(t) ? t : "", /^\d{4}-\d{2}-\d{2}$/.test(t) ? "" : t)).join(" · ")}{pulledQty < (order.items || []).length ? ` (${pulledQty}개)` : ""}</>}
     </span>
   );
 }
@@ -1423,11 +1434,11 @@ export default function LiveOrderTable({
                             <span className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg px-1.5 py-0.5 text-[11px] font-black leading-none ${String((order as any).shippingStatus) === "출고완료" ? "bg-info-bg text-[var(--color-info-tx)]" : "bg-surface-2 text-ink-soft"}`}>{shippingStatusLabel((order as any).shippingStatus)}</span>
                           ) : null}
                           <span className="ml-auto flex items-center gap-1.5">
-                            {!order.pickPull && ["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
+                            {!(order.pickPull && !order.pickPull.whole) && ["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
                               <button type="button" title="결제요청 쪽지 보내기" aria-label="결제요청 쪽지 보내기" disabled={payRequestSending === order.id} onClick={() => void sendPaymentRequest(order)}
                                 className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-bold text-ink-soft disabled:opacity-40">쪽지</button>
                             ) : null}
-                            {order.pickPull ? null : (
+                            {order.pickPull && !order.pickPull.whole ? null : (
                             <button type="button" onClick={() => void copyOrderForCustomer(order)}
                               className="h-9 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-bold text-ink">주문서 복사</button>
                             )}
@@ -1471,7 +1482,7 @@ export default function LiveOrderTable({
                           </button>
                         </div>
                         {/* [2026-10-22] 지난 주문 가상 묶음(가져온 줄만)은 금액이 주문서 전체가 아니므로 복사·쪽지는 원래 주문(상세)에서 */}
-                        {order.pickPull ? null : (
+                        {order.pickPull && !order.pickPull.whole ? null : (
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); void copyOrderForCustomer(order); }}
@@ -1530,7 +1541,7 @@ export default function LiveOrderTable({
                           onCardPay: onOpenCardPay ? () => { openPaysterRightHalf(); onOpenCardPay(order); } : undefined,
                         })}</div>
                         {order.paidAt && <div className="mt-0.5 text-[11px] text-ink-mute">{order.paidAt}</div>}
-                        {!order.pickPull && ["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
+                        {!(order.pickPull && !order.pickPull.whole) && ["unpaid", "manual_match_needed", "card_unpaid"].includes(order.paymentStatus) ? (
                           <button type="button" title="결제요청 쪽지 보내기" aria-label="결제요청 쪽지 보내기" disabled={payRequestSending === order.id} onClick={(e) => { e.stopPropagation(); void sendPaymentRequest(order); }} className="mt-0.5 rounded-full px-1 text-[14px] leading-none opacity-70 transition hover:opacity-100 hover:drop-shadow disabled:opacity-35">
                             
                           </button>

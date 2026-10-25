@@ -31,8 +31,8 @@ import AdminLiveSidebar from "./AdminLiveSidebar";
 import LiveHeader from "./LiveHeader";
 import LiveStatsCards from "./LiveStatsCards";
 import TelegramReportSendModal from "./TelegramReportSendModal";
-import { buildPulledVirtualOrders, originalOrderIdOf, pulledOrdersForView } from "./liveOrderPickPull";
-import type { PickPullView } from "@/lib/orderPickPull";
+import { buildPulledVirtualOrders, originalOrderIdOf, pulledOrdersForView, wholeMovedGroupIds } from "./liveOrderPickPull";
+import { pullTargetLabelForBroadcast, pullTargetLabelForDate, type PickPullView } from "@/lib/orderPickPull";
 import LiveStatsPanel from "./LiveStatsPanel";
 import SalesAnalysisPanel from "./SalesAnalysisPanel";
 import LiveIssueRailPanel from "./LiveIssueRailPanel";
@@ -1335,7 +1335,20 @@ export default function AdminLiveDashboard() {
   //   (상태 필터를 걸면 목록엔 그 상태만 남지만, 칩 숫자는 «상태 무관 전체»로 세야 안 무너진다)
   // [㉚] 물건챙기기 범위 = 방송·범위·기간만(상태칩·검색 무관). 표 칩 숫자(filteredOrdersForCounts)는 여기에 검색만 더 건다.
   // [2026-10-22 지난 주문 가져오기] 가상 묶음(가져온 줄만) — 그날 주문서·송장·물건챙기기에만 붙는다. 숫자 띠·입금매칭엔 안 넣음.
-  const pulledVirtualOrders = useMemo(() => buildPulledVirtualOrders(orderGroups), [orderGroups]);
+  const pulledVirtualOrders = useMemo(() => {
+    const list = buildPulledVirtualOrders(orderGroups);
+    // [2026-10-25] 옮긴 주문엔 «어디서 옮겼는지» 이름 — 원래 방송(없으면 쇼핑몰 주문 날짜)
+    return list.map((order) => {
+      if (!order.pickPull?.whole) return order;
+      const bc = order.broadcastId ? broadcasts.find((b) => String(b.id) === String(order.broadcastId)) : null;
+      const fromLabel = bc
+        ? pullTargetLabelForBroadcast((bc as any).public_title || (bc as any).title, (bc as any).started_at || (bc as any).created_at || null)
+        : pullTargetLabelForDate(toDateKey(order.createdAt));
+      return { ...order, pickPull: { ...order.pickPull, fromLabel } };
+    });
+  }, [orderGroups, broadcasts]);
+  // [2026-10-25] 주문서 전부를 옮긴 주문 — 방송/날짜 화면에서 원래 자리를 뺀다(전체보기엔 그대로)
+  const wholeMovedIds = useMemo(() => wholeMovedGroupIds(orderGroups), [orderGroups]);
   const pickingBaseOrders = useMemo(() => {
     const selectedAlwaysOrderDateForPull = getAlwaysOrderDateFromFilter(filters.broadcast);
     const selectedBroadcastForPull =
@@ -1385,14 +1398,18 @@ export default function AdminLiveDashboard() {
             ? isAlwaysOrderLike(order as any)
             : !isAlwaysOrderLike(order as any);
 
+      // [2026-10-25 완전 이동] 옮긴 주문은 원래 방송/날짜 화면에서 빠진다(옮긴 곳에서만 보임)
+      const movedAway = pullView.kind !== "none" && wholeMovedIds.has(String(order.id));
+
       return (
+        !movedAway &&
         matchBroadcast &&
         matchScope &&
         matchesDate(order, filters)
       );
     });
     return pulledForScope.length ? [...base, ...pulledForScope] : base;
-  }, [orders, filters, broadcasts, activeBroadcast, pulledVirtualOrders]);
+  }, [orders, filters, broadcasts, activeBroadcast, pulledVirtualOrders, wholeMovedIds]);
 
   const filteredOrdersForCounts = useMemo(() => {
     const keyword = normalizeText(filters.keyword);
@@ -1420,7 +1437,13 @@ export default function AdminLiveDashboard() {
     [filteredOrdersForCounts, filters.status],
   );
   // [2026-10-22] 받은 돈 띠·입금매칭·이벤트는 가상 묶음(가져온 줄) 제외 — 돈 숫자 중복 금지
-  const filteredOrdersNoPull = useMemo(() => filteredOrders.filter((order) => !order.pickPull), [filteredOrders]);
+  //   [2026-10-25] 단 «옮긴 주문»(주문서 전부 이동)은 옮긴 곳에서 원래 주문 그대로 센다 — 원래 자리에선 빠지므로 한 번만 셈
+  const filteredOrdersNoPull = useMemo(
+    () => filteredOrders
+      .map((order) => (order.pickPull?.whole ? orders.find((o) => o.id === originalOrderIdOf(order)) || order : order))
+      .filter((order) => !order.pickPull),
+    [filteredOrders, orders],
+  );
   const toRealOrder = (order: LiveOrder): LiveOrder => (order.pickPull ? orders.find((o) => o.id === originalOrderIdOf(order)) || order : order);
 
   useEffect(() => {
