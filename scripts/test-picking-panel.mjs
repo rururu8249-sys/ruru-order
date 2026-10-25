@@ -88,7 +88,29 @@ await act(async () => { await new Promise(r => setTimeout(r, 0)); });
 const flat = (n) => n == null ? '' : typeof n === 'string' ? n : Array.isArray(n) ? n.map(flat).join('') : flat(n.children);
 const text = () => flat(tree.toJSON());
 const tabs = tree.root.findAll(n => n.type === 'button' && n.props.role === 'tab');
-assert.deepEqual(tabs.map(t => t.children.join('')), ['요약', '상품별', '고객별']);
+assert.deepEqual(tabs.map(t => t.children.join('')), ['한 장씩', '요약', '상품별', '고객별']);
+assert.equal(tabs[0].props['aria-selected'], true, '기본 보기 = 한 장씩');
+// [10-25] 한 장씩 — 한 화면에 손님 하나, ‹ › 끝없이 돈다, 체크하면 다음 장
+const pageNo = () => { const m = text().match(/(\d+) \/ (\d+)안 챙긴 장/); return m ? [Number(m[1]), Number(m[2])] : null; };
+const navBtn = (l) => tree.root.findAll(n => n.type === 'button' && n.props['aria-label'] === l)[0];
+assert.deepEqual(pageNo(), [1, 4], '결제완료 4장(1·2·5·7)');
+await act(async () => navBtn('이전').props.onClick());
+assert.deepEqual(pageNo(), [4, 4], '처음에서 이전 = 마지막(순환)');
+await act(async () => navBtn('다음').props.onClick());
+assert.deepEqual(pageNo(), [1, 4], '마지막에서 다음 = 처음(순환)');
+const cardBtn = () => tree.root.findAll(n => n.type === 'button' && (n.props['aria-label'] === '챙김' || n.props['aria-label'] === '챙김 해제'))[0];
+assert.equal(tree.root.findAll(n => n.type === 'button' && n.props['aria-label'] === '챙김').length, 1, '한 장에 체크 버튼 하나(손님 하나)');
+const firstCardText = text();
+await act(async () => { await cardBtn().props.onClick(); });
+const firstId = writes.at(-1).ids.map(String).join();
+assert.equal(writes.at(-1).payload.picked_at != null, true, '한 장씩 체크 = picked_at 저장');
+assert.deepEqual(pageNo(), [2, 4], '체크하면 다음 장');
+assert.notEqual(text(), firstCardText);
+await act(async () => navBtn('이전').props.onClick());
+await act(async () => { await cardBtn().props.onClick(); });
+assert.equal(writes.at(-1).ids.map(String).join(), firstId); assert.equal(writes.at(-1).payload.picked_at, null, '다시 누르면 해제');
+assert.deepEqual(pageNo(), [1, 4], '해제는 그 장에 머묾');
+await act(async () => tabs[2].props.onClick());
 const nodeText0 = (n) => typeof n === 'string' ? n : (n.children || []).map(nodeText0).join('');
 const chip = (label) => tree.root.findAll(n => n.type === 'button' && n.props['aria-pressed'] !== undefined && nodeText0(n).startsWith(label))[0];
 assert.equal(nodeText0(chip('결제완료')), '결제완료 6'); assert.equal(chip('결제완료').props['aria-pressed'], true, '기본은 결제완료');
@@ -116,7 +138,7 @@ assert.equal(rowBtn('고객1').props['aria-pressed'], true);
 await act(async () => { await rowBtn('고객3').props.onClick(); });
 assert.equal(writes.at(-1).ids.map(String).join(), '3');
 // 고객별 보기
-await act(async () => tabs[2].props.onClick());
+await act(async () => tabs[3].props.onClick());
 assert.ok(text().includes('고객9') || text().includes('지난 주문 10.11(일)'), '고객별에도 지난 주문 표시');
 // 모두 챙김 = 결제완료·안 챙긴 것만
 writes.length = 0;
@@ -129,7 +151,7 @@ assert.equal(issueRows.find(r => r.id === '22').skip, true);
 assert.equal(issueRows.find(r => r.id === '21').skip, undefined, '대상 아닌 줄은 그대로');
 assert.equal(mod.includedNote(issueRows.filter(r => r.color === '블랙')), '환불 1개 빼고');
 // [16:21] 다 챙겨도 저절로 접히거나 아래로 옮기지 않음 — 접기·펼치기는 직접
-await act(async () => tabs[1].props.onClick());
+await act(async () => tabs[2].props.onClick());
 assert.ok(!text().includes('6개 다 챙김'), '다 챙긴 상품도 저절로 접히지 않음');
 const foldBtns = () => tree.root.findAll(n => n.type === 'button' && n.props['aria-expanded'] !== undefined);
 const firstName = text();
@@ -144,7 +166,7 @@ assert.ok(!text().includes('1건 한꺼번에 체크'), '1건일 땐 한꺼번�
 await act(async () => { await rowBtn('고객6').props.onClick(); });
 assert.deepEqual(writes.at(-1).ids.map(String), ['7']);
 // 요약 = 손님 이름 없이 옵션별 개수
-await act(async () => tabs[0].props.onClick());
+await act(async () => tabs[1].props.onClick());
 assert.ok(text().includes('색상사이즈총 주문수량챙겨야 할 남은 수량') && text().includes('레드S7개') && !text().includes('고객1'), '요약 = 색상|사이즈|개수|남은 표, 손님 이름 없음');
 // 전부 해제 — 확인 뒤 보이는 챙긴 줄만 false
 const un = tree.root.findAll(n => n.type === 'button' && nodeText0(n) === '전부 해제')[0];

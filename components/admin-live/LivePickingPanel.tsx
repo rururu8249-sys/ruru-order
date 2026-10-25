@@ -129,7 +129,11 @@ const productKey = (r: PickRow) => `${r.productId || ""}|${r.productName}`;
 const optionKey = (r: PickRow) => `${r.color}|${r.size}|${r.optionText}`;
 
 export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = false, onClose }: Props) {
-  const [view, setView] = useState<"summary" | "product" | "customer">("product");
+  // [10-25 20:16 사장님 「한 페이지에 한 상품·한 사람 — 넘기면서, 폰은 손가락으로 좌우·끝없이 돌게」] 기본 보기 = 한 장씩
+  const [view, setView] = useState<"card" | "summary" | "product" | "customer">("card");
+  const [cardIdx, setCardIdx] = useState(0);
+  const touchRef = useRef<{ x: number; y: number; horiz: boolean | null } | null>(null);
+  const [dragDx, setDragDx] = useState(0);
   // [15:11 사장님] 결제 분류 — 기본 «결제완료»(미결제까지 같이 챙기는 실수 방지). 숫자는 수량.
   const [payView, setPayView] = useState<"paid" | "unpaid" | "all">("paid");
   const [search, setSearch] = useState("");
@@ -290,12 +294,32 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
     }));
   }, [shown, photos]);
 
+  // 한 장씩: 상품별 순서(상품 → 옵션 → 손님) 그대로 한 줄씩
+  const cards = useMemo(() => productGroups.flatMap((g) => g.options.flat()), [productGroups]);
+  const cardCount = cards.length;
+  const curIdx = cardCount ? ((cardIdx % cardCount) + cardCount) % cardCount : 0;
+  // 끝없이 돈다 — 마지막 다음은 처음, 처음 이전은 마지막
+  const goCard = (step: number) => { if (cardCount) setCardIdx((curIdx + step + cardCount) % cardCount); };
+
   // 고객별: 손님(주문서) → 상품 줄
   const customerGroups = useMemo(() => {
     const map = new Map<string, PickRow[]>();
     for (const r of shown) { const list = map.get(r.customerKey) || []; list.push(r); map.set(r.customerKey, list); }
     return [...map.values()].map((rows) => rows.sort((a, b) => a.productName.localeCompare(b.productName, "ko", { numeric: true }) || compareOrderOptions(a, b))).sort((a, b) => a[0].nickname.localeCompare(b[0].nickname, "ko"));
   }, [shown]);
+
+  // PC: ← → 키로도 넘김(검색칸에 쓰는 중엔 안 움직임)
+  useEffect(() => {
+    if (view !== "card" || typeof window === "undefined") return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      if (e.key === "ArrowRight") goCard(1);
+      else if (e.key === "ArrowLeft") goCard(-1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   const countLine = (rows: readonly PickRow[]) => {
     const paid = rows.filter((r) => r.paid && !r.skip);
@@ -366,7 +390,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
         return items.length ? [{ ...o, items }] : [];
       });
       const extraIds = new Set(allRows.filter((r) => r.kind === "late" || r.kind === "repick").map((r) => r.id));
-      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${String(filterLabel || "").replace(/^방송:\s*/, "")} · 물건챙기기`, rowOrder: view === "product" ? "product" : "nickname", visibleItemIds: [...visible], attentionItemIds: [...extraIds], exceptions: p.exceptions, cancellations: p.cancellations }, new Set(picked));
+      await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${String(filterLabel || "").replace(/^방송:\s*/, "")} · 물건챙기기`, rowOrder: view === "product" || view === "card" ? "product" : "nickname", visibleItemIds: [...visible], attentionItemIds: [...extraIds], exceptions: p.exceptions, cancellations: p.cancellations }, new Set(picked));
       const printed = paidRows.map((r) => Number(r.id));
       const now = new Date().toISOString();
       for (let i = 0; i < printed.length; i += 500) {
@@ -452,8 +476,8 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
           {/* 보기 · 검색 · 안 챙긴 것만 */}
           <div className="mt-3 flex items-center gap-2">
             <div className="flex shrink-0 rounded-lg border border-line p-0.5" role="tablist">
-              {(["summary", "product", "customer"] as const).map((v) => (
-                <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => setView(v)} className={`h-9 rounded-lg px-3 text-[14px] font-semibold ${view === v ? "bg-ink text-white" : "text-ink-soft"}`}>{v === "summary" ? "요약" : v === "product" ? "상품별" : "고객별"}</button>
+              {(["card", "summary", "product", "customer"] as const).map((v) => (
+                <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => setView(v)} className={`h-9 rounded-lg px-2.5 text-[14px] font-semibold sm:px-3 ${view === v ? "bg-ink text-white" : "text-ink-soft"}`}>{v === "card" ? "한 장씩" : v === "summary" ? "요약" : v === "product" ? "상품별" : "고객별"}</button>
               ))}
             </div>
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="상품·닉네임 검색" className="h-10 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-[16px] text-ink" />
@@ -527,6 +551,94 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
               })}
             </div>
           ) : null}
+
+
+          {/* [10-25 20:16 사장님] 한 장씩 — 한 화면에 상품 하나·손님 하나. 좌우로 밀거나 ‹ › 로 넘김, 끝없이 돈다.
+              체크하면 다음 장으로(「안 챙긴 것만」을 켜 두면 챙긴 장이 빠지면서 자연히 다음 장). 저장은 다른 보기와 같은 picked_at 한 칸. */}
+          {!scopeTooWide && view === "card" && cardCount > 0 ? (() => {
+            const r = cards[curIdx];
+            const on = picked.has(r.id);
+            const g = productGroups.find((x) => productKey(x.options[0][0]) === productKey(r));
+            const sameOpt = g?.options.find((rows) => optionKey(rows[0]) === optionKey(r)) || [r];
+            const pos = sameOpt.findIndex((x) => x.id === r.id) + 1;
+            const color = stripNoneOptionParts(r.color);
+            const size = stripNoneOptionParts(r.size);
+            const photo = photos[r.id] || g?.photo;
+            const onPick = async () => {
+              const next = !on;
+              await setPickedFor([r.id], next);
+              // 저장이 실제로 됐을 때만 다음 장으로(실패하면 그 장에 머묾)
+              if (next && pickedRef.current.has(r.id) && !openOnly && cardCount > 1) setCardIdx((curIdx + 1) % cardCount);
+            };
+            return (
+              <div
+                className="mx-auto max-w-[480px] select-none"
+                style={{ touchAction: "pan-y", transform: dragDx ? `translateX(${dragDx}px)` : undefined, transition: dragDx ? "none" : "transform .18s ease-out" }}
+                onTouchStart={(e) => { const t = e.touches[0]; touchRef.current = { x: t.clientX, y: t.clientY, horiz: null }; }}
+                onTouchMove={(e) => {
+                  const s0 = touchRef.current; if (!s0) return;
+                  const t = e.touches[0]; const dx = t.clientX - s0.x; const dy = t.clientY - s0.y;
+                  if (s0.horiz === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) s0.horiz = Math.abs(dx) > Math.abs(dy);
+                  if (s0.horiz) setDragDx(dx);
+                }}
+                onTouchEnd={() => {
+                  const s0 = touchRef.current; touchRef.current = null;
+                  const dx = dragDx; setDragDx(0);
+                  if (s0?.horiz && Math.abs(dx) > 50) goCard(dx < 0 ? 1 : -1);
+                }}
+                onTouchCancel={() => { touchRef.current = null; setDragDx(0); }}
+              >
+                <section className={`overflow-hidden rounded-xl border-2 ${on ? "border-line bg-surface-2" : "border-ink bg-surface"}`}>
+                  {/* 상품 */}
+                  <div className="bg-ink px-4 py-3 text-white">
+                    <div className="text-[13px] font-semibold text-white/70 tabular-nums">{g ? `이 상품 총 ${countLine(g.options.flat()).all}개 · 이 옵션 ${countLine(sameOpt).all}개 중 ${pos}번째 손님` : ""}</div>
+                    <h3 className="mt-0.5 break-words text-[20px] font-bold leading-snug">{r.productName}</h3>
+                  </div>
+                  <div className="flex gap-3 px-4 pt-4">
+                    {photo ? (
+                      <button type="button" onClick={() => setPhotoZoom(photo)} className="h-[120px] w-[120px] shrink-0 overflow-hidden rounded-lg border border-line" aria-label="사진 크게 보기">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={photo} alt="" className="h-full w-full object-cover" draggable={false} />
+                      </button>
+                    ) : <span className="h-[120px] w-[120px] shrink-0 rounded-lg bg-surface-2" />}
+                    <div className="min-w-0 flex-1 space-y-2">
+                      {color ? <div className="text-[13px] font-semibold text-ink-mute">색상<div className="break-words text-[20px] font-bold text-ink">{color}</div></div> : null}
+                      {size ? <div className="text-[13px] font-semibold text-ink-mute">사이즈<div className="break-words text-[20px] font-bold text-ink">{size}</div></div> : null}
+                      {!color && !size ? <div className="break-words text-[20px] font-bold text-ink">{r.optionText || "옵션 없음"}</div> : null}
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-baseline justify-between gap-2 px-4">
+                    <span className="text-[13px] font-semibold text-ink-mute">챙길 수량</span>
+                    <span className={`text-[32px] font-bold leading-none tabular-nums ${r.qty > 1 ? "text-danger-tx" : "text-ink"}`}>{r.qty}개</span>
+                  </div>
+                  {/* 손님 */}
+                  <div className="mx-4 mt-3 rounded-lg bg-surface-2 px-3 py-2.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="break-words text-[18px] font-bold text-ink">{r.nickname}</span>
+                      {r.name && r.name !== r.nickname ? <span className="text-[14px] font-semibold text-ink-soft">{r.name}</span> : null}
+                      {!r.paid ? <span className="rounded px-1.5 py-0.5 text-[12px] font-semibold text-danger-tx ring-1 ring-danger-tx/40">미결제</span> : null}
+                      {tagOf(r)}
+                    </div>
+                    {r.before ? <div className="mt-1 text-[13px] text-warn-tx">변경 전: {r.before}</div> : null}
+                    {exLine(r)}
+                  </div>
+                  {/* 체크 */}
+                  <div className="px-4 pt-3 pb-4">
+                    {r.skip ? (
+                      <div className="flex h-14 items-center justify-center rounded-lg border-2 border-danger-tx text-[16px] font-bold text-danger-tx">{r.issue} · 챙기지 마세요</div>
+                    ) : (
+                      <button type="button" disabled={blocked} onClick={() => void onPick()} aria-pressed={on} aria-label={on ? "챙김 해제" : "챙김"}
+                        className={`flex h-14 w-full items-center justify-center gap-2 rounded-lg text-[18px] font-bold disabled:cursor-wait disabled:opacity-60 ${on ? "border-2 border-line bg-surface text-ink-soft" : "bg-ink text-white"}`}>
+                        {on ? <>✓ 챙김 완료<span className="text-[13px] font-semibold">(누르면 해제)</span></> : "챙겼어요"}
+                      </button>
+                    )}
+                    {r.pulled ? <button type="button" onClick={() => void unpull(r)} className="mt-2 h-9 w-full rounded-lg border border-line text-[13px] font-semibold text-ink-soft">넘기기 취소</button> : null}
+                  </div>
+                </section>
+                <p className="mt-2 text-center text-[12px] text-ink-mute">좌우로 밀어서 넘겨요 · 끝에서 처음으로 돌아가요</p>
+              </div>
+            );
+          })() : null}
 
           {/* 순서는 그대로(다 챙겨도 안 움직임), 접기는 사장님이 직접 */}
           {!scopeTooWide && view === "product" ? productGroups.map((g) => {
@@ -636,6 +748,23 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
             );
           }) : null}
         </div>
+
+
+        {/* 한 장씩 — 넘기기 줄(폰에서도 엄지가 닿는 아래쪽) */}
+        {!scopeTooWide && view === "card" && cardCount > 0 ? (
+          <div className="flex items-center gap-2 border-t border-line bg-surface px-4 py-2">
+            <button type="button" onClick={() => goCard(-1)} aria-label="이전" className="flex h-12 w-14 items-center justify-center rounded-lg border border-line text-ink hover:bg-surface-2">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6" /></svg>
+            </button>
+            <div className="min-w-0 flex-1 text-center tabular-nums">
+              <div className="text-[18px] font-bold text-ink">{curIdx + 1} / {cardCount}</div>
+              <div className="text-[12px] text-ink-mute">안 챙긴 장 {cards.filter((x) => !x.skip && !picked.has(x.id)).length}개</div>
+            </div>
+            <button type="button" onClick={() => goCard(1)} aria-label="다음" className="flex h-12 w-14 items-center justify-center rounded-lg bg-ink text-white">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+            </button>
+          </div>
+        ) : null}
 
         {/* 아래 */}
         <div className="flex items-center gap-2 border-t border-line px-4 py-3" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
