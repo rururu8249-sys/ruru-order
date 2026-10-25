@@ -6156,7 +6156,15 @@ export default function OrderPage() {
                 { key: "me", label: "내정보", onClick: () => openCustomerInfoEditBottomSheet() },
               ].map((tab) => (
                 <button key={tab.key} type="button" onClick={tab.onClick}
-                  style={{ position: "relative", display: "inline-flex", alignItems: "center", height: "40px", padding: (Number((tab as { badge?: number }).badge) || 0) > 0 ? "0 26px 0 14px" : "0 14px", borderRadius: "9999px", border: "none", background: "none", cursor: "pointer", fontSize: "15px", fontWeight: 600, color: "#111111", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                  style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: "6px", height: "40px", padding: (Number((tab as { badge?: number }).badge) || 0) > 0 ? "0 26px 0 14px" : "0 14px", borderRadius: "9999px", border: "none", background: "none", cursor: "pointer", fontSize: "15px", fontWeight: 600, color: "#111111", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                  {/* 폰 아래 메뉴와 같은 선 아이콘(사장님 11:11 「아이콘 왜 사라졌어」) */}
+                  <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block", flexShrink: 0 }}>
+                    {tab.key === "home" ? <><path d="M4 11l8-7 8 7" /><path d="M6 10v10h12V10" /></>
+                      : tab.key === "notice" ? <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></>
+                      : tab.key === "orders" ? <><path d="M4 8l8-4 8 4v8l-8 4-8-4z" /><path d="M4 8l8 4 8-4M12 12v8" /></>
+                      : tab.key === "inquiry" ? <><path d="M4 6.5h16v9H9l-5 3.5z" /></>
+                      : <><circle cx="12" cy="8.5" r="3.5" /><path d="M5 20c1-3.5 3.8-5 7-5s6 1.5 7 5" /></>}
+                  </svg>
                   {tab.label}
                   <CustomerNoteUnreadBadge count={Number((tab as { badge?: number }).badge) || 0} offset={{ top: 2, right: 0 }} />
                 </button>
