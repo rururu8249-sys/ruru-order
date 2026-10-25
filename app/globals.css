@@ -481,3 +481,18 @@ body {
   .ru-photo-nav-prev { left: 8px; }
   .ru-photo-nav-next { right: 8px; }
 }
+
+/* [2026-10-25] 관리자 폰 — 설정 화면 판 1겹(DESIGN-ADMIN §13).
+   바깥 카드(맨 위 rounded-2xl 상자)만 테두리·안쪽 여백을 걷고 아래 구분선으로 나눈다.
+   그 안의 상자(계좌 1·2 같은 묶음)는 그대로 카드로 남는다. PC(768 이상) 무변경. */
+@media (max-width: 767.98px) {
+  [data-settings-scroll] { padding-left: 0; padding-right: 0; }
+  [data-settings-scroll] :is(div, section).rounded-2xl.border:not([data-settings-scroll] .rounded-2xl *) {
+    border-width: 0 0 1px 0;
+    border-radius: 0;
+    padding-left: 0;
+    padding-right: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+}

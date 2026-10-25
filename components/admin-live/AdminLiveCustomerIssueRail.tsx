@@ -474,7 +474,7 @@ export function IssueCard({
       //   (물건챙기기의 다 챙긴 카드와 같은 방식 — bg-ok-bg)
       onClick={deleted ? undefined : () => onProcess(task)}
       data-issue-card
-      className={`relative grid ${ISSUE_GRID} items-start gap-x-3 gap-y-3 xl:gap-y-1 border-b border-line px-3 py-3 xl:py-2 transition hover:bg-surface-2 ${deleted ? "" : "cursor-pointer"} ${selected ? "bg-surface-3" : ""}`}
+      className={`relative grid ${ISSUE_GRID} items-start gap-x-3 gap-y-3 max-md:gap-y-2 xl:gap-y-1 border-b border-line px-3 py-3 max-md:px-1 xl:py-2 transition hover:bg-surface-2 ${deleted ? "" : "cursor-pointer"} ${selected ? "bg-surface-3" : ""}`}
     >
       {/* [2026-10-21] 왼쪽 빨강/초록 띠 삭제 — 미해결 탭은 전부 빨강이라 뜻이 없었다. 해결 여부는 탭·버튼으로 */}
 
@@ -606,8 +606,8 @@ export function IssueCard({
       </div>
 
       {/* [③] 금액 124px — head(합계) 굵게 / sub(내역) 작게, 오른쪽 정렬·tabular. 없으면 「—」 */}
-      <div className="col-span-2 min-w-0 border-t border-line pt-2 text-right xl:col-span-1 xl:border-0 xl:pt-0 [font-variant-numeric:tabular-nums]">
-        <div className="text-[12px] text-ink-soft xl:hidden">금액</div>
+      <div className="col-span-2 min-w-0 border-t border-line pt-2 text-right max-md:flex max-md:flex-wrap max-md:items-baseline max-md:gap-x-2 max-md:border-0 max-md:pt-0 max-md:text-left xl:col-span-1 xl:border-0 xl:pt-0 [font-variant-numeric:tabular-nums]">
+        <div className="text-[12px] text-ink-soft max-md:text-ink-mute xl:hidden">금액</div>
         {amount ? (
           <>
             <div className="text-[14px] font-black text-ink">{amount.head}</div>
@@ -1771,7 +1771,7 @@ export default function AdminLiveCustomerIssueRail({ customerOptions = [] }: Pro
 
       {/* [2026-09-21] 표 머리글 — 어느 칸이 무엇인지 한 번만 적어두면 줄마다 「닉네임:」 같은 라벨이 필요 없다.
           예전 카드가 길었던 이유의 절반이 줄마다 반복되던 라벨이었다. */}
-      <div className={`${selectedIds.size > 0 ? "mt-2" : "mt-4"} min-h-0 flex-1 overflow-y-auto overflow-x-auto rounded-xl border border-line`}>
+      <div className={`${selectedIds.size > 0 ? "mt-2" : "mt-4"} min-h-0 flex-1 overflow-y-auto overflow-x-auto rounded-xl border border-line max-md:rounded-none max-md:border-x-0`}>
         {loading ? (
           <div className="bg-surface-2 p-6 text-center text-sm font-black text-ink-mute">
             고객이슈 불러오는 중...

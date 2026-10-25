@@ -394,7 +394,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
 
       {/* 우측 내용 */}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="flex-1 space-y-4 overflow-y-auto p-3 md:p-5">
+        <div data-settings-scroll className="flex-1 space-y-4 overflow-y-auto p-3 md:p-5">
           {/* ── 상점 정보 (자체 저장: /api/admin-live/shop-info) ── */}
           {activeTab === "shop" && <ShopInfoSettingsTab onDraftStateChange={setChildDraft} focusSection={focusSection} />}
 
