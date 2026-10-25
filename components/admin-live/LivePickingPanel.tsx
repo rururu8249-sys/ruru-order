@@ -479,7 +479,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                     <div className="px-3 pb-2.5">
                       {/* [15:18 사장님 「S 8 · M 5 저따위 말고 — 색상·사이즈·개수 구분 확실히」] 옵션마다 한 줄: 색상 | 사이즈 | 주문 수량 | 총 주문수량 | 챙겨야 할 남은 수량(16:28 사장님 확정, 16:25 「개수·남은」 뜻 모호 → 피킹표 표준 주문 수량/남은 수량) */}
                       <div className="mt-2 overflow-hidden rounded-lg border border-line">
-                        <div className="grid grid-cols-[minmax(0,1fr)_64px_88px_112px] gap-x-4 bg-surface-2 px-3 py-1.5 text-[12px] font-semibold text-ink-mute">
+                        <div className="grid grid-cols-[minmax(0,1fr)_48px_64px_80px] gap-x-2 sm:grid-cols-[minmax(0,1fr)_64px_88px_112px] sm:gap-x-4 bg-surface-2 px-3 py-1.5 text-[12px] font-semibold text-ink-mute">
                           <span>색상</span><span>사이즈</span><span className="text-right leading-tight break-keep">총 주문수량</span><span className="text-right leading-tight break-keep">챙겨야 할 남은 수량</span>
                         </div>
                         {g.options.map((rows) => {
@@ -490,7 +490,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                           const size = stripNoneOptionParts(rows[0].size) || (rows[0].color || rows[0].size ? "-" : (rows[0].optionText || "-"));
                           return (
                             <div key={optionKey(rows[0])} className={`border-t border-line px-3 py-1.5 ${oc.done ? "bg-surface-2" : ""}`}>
-                              <div className="grid grid-cols-[minmax(0,1fr)_64px_88px_112px] gap-x-4 items-center">
+                              <div className="grid grid-cols-[minmax(0,1fr)_48px_64px_80px] gap-x-2 sm:grid-cols-[minmax(0,1fr)_64px_88px_112px] sm:gap-x-4 items-center">
                                 <span className={`min-w-0 break-words text-[14px] font-semibold ${oc.done ? "text-ink-mute" : "text-ink"}`}>{color}</span>
                                 <span className={`text-[14px] font-bold ${oc.done ? "text-ink-mute" : "text-ink"}`}>{size}</span>
                                 <span className={`text-right text-[16px] font-bold tabular-nums ${oc.done ? "text-ink-mute" : "text-ink"}`}>{oc.all}개</span>
