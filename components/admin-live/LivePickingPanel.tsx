@@ -304,6 +304,23 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
     return { all: rows.filter((r) => !r.skip).reduce((s, r) => s + r.qty, 0), total, got, done: total > 0 && got >= total, open: paid.filter((r) => !picked.has(r.id)) };
   };
 
+  // [10-25 사장님 「옵션별 수량 몇 개인지 요약」] 상품 머리줄 한 줄: 「블랙/L 1 · 화이트/M 2」 — 표시 전용(숫자는 옵션 줄과 같은 countLine.all)
+  const optionSummaryLine = (options: readonly (readonly PickRow[])[]) => {
+    const parts = options.map((rows) => {
+      const color = stripNoneOptionParts(rows[0].color);
+      const size = stripNoneOptionParts(rows[0].size);
+      const label = [color, size].filter(Boolean).join("/") || (rows[0].optionText || "").trim();
+      const n = countLine(rows).all;
+      return label && n > 0 ? { label, n } : null;
+    }).filter((x): x is { label: string; n: number } => Boolean(x));
+    if (!parts.length) return null;
+    return (
+      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[16px] font-semibold text-white">
+        {parts.map((p, i) => <span key={i} className="whitespace-nowrap">{p.label} <span className="font-bold tabular-nums">{p.n}개</span></span>)}
+      </div>
+    );
+  };
+
   const unpull = async (r: PickRow) => {
     if (!(await showAdminConfirm("이 상품의 출고 넘기기를 취소할까요?\n이 출고에서 빠지고 원래 주문으로만 남아요. 주문·금액·입금은 바뀌지 않아요.", { title: "넘기기 취소", confirmText: "넘기기 취소", cancelText: "그만두기" }))) return;
     try {
@@ -469,11 +486,14 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                   <section key={g.name + "|" + g.options[0][0].productId} className="overflow-clip rounded-xl border border-line bg-surface">
                     {/* [23:04 사장님] 사진·상품명 줄 아래로 표를 내려 가로 전체를 씀(칸 넓게)
                         [10-25 사장님 「상품명 줄 눈에 확 띄게」] 상품명 줄 = 검정 띠·흰 글자 18px, 스크롤해도 위에 붙음. 다 챙기면 회색 띠 */}
-                    <div className={`sticky top-0 z-10 flex items-center gap-3 px-3 py-2.5 ${c.done ? "bg-line text-ink-soft" : "bg-ink text-white"}`}>
+                    <div className="sticky top-0 z-10 flex items-center gap-3 bg-ink px-3 py-2.5 text-white">
                       {photoOf(g.photo, 44)}
-                      <div className="flex min-w-0 flex-1 items-baseline justify-between gap-2">
-                        <span className="min-w-0 break-words text-[18px] font-bold leading-snug">{g.name}</span>
-                        <span className="shrink-0 text-[16px] font-bold tabular-nums">{c.done ? "✓ " : ""}총 {c.all}개</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="min-w-0 break-words text-[18px] font-bold leading-snug">{g.name}</span>
+                          <span className="shrink-0 text-[16px] font-bold tabular-nums">{c.done ? "✓ " : ""}총 {c.all}개</span>
+                        </div>
+                        {optionSummaryLine(g.options)}
                       </div>
                     </div>
                     <div className="px-3 pb-2.5">
@@ -515,24 +535,28 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
             const gKey = g.name + "|" + g.options[0][0].productId;
             if (folded.has(gKey)) {
               return (
-                <div key={gKey} className={`mb-2 flex w-full items-center gap-2 rounded-xl py-1 pl-3 pr-1 ${c.done ? "border border-line bg-surface" : "bg-ink"}`}>
-                  {c.done ? <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-ink text-white" aria-hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5 10 17.5 19 7" /></svg></span> : null}
-                  <span className={`min-w-0 flex-1 truncate text-[16px] font-bold ${c.done ? "text-ink-mute" : "text-white"}`}>{g.name}</span>
-                  <span className={`shrink-0 text-[13px] font-bold tabular-nums ${c.done ? "text-ink-mute" : "text-white"}`}>{c.done ? `${c.total}개 다 챙김` : `챙겨야 할 남은 수량 ${c.total - c.got}개`}</span>
-                  {foldButton(gKey, !c.done)}
+                <div key={gKey} className="mb-2 flex w-full items-center gap-2 rounded-xl bg-ink py-1 pl-3 pr-1">
+                  {c.done ? <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-white text-ink" aria-hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5 10 17.5 19 7" /></svg></span> : null}
+                  <span className="min-w-0 flex-1 truncate text-[16px] font-bold text-white">{g.name}</span>
+                  <span className="shrink-0 text-[13px] font-bold tabular-nums text-white">{c.done ? `${c.total}개 다 챙김` : `챙겨야 할 남은 수량 ${c.total - c.got}개`}</span>
+                  {foldButton(gKey, true)}
                 </div>
               );
             }
             return (
               <section key={gKey} className="mb-4 overflow-clip rounded-xl border border-line bg-surface">
                 {/* [10-25 사장님 「상품명 줄 눈에 확 띄게」] 검정 띠·흰 글자 18px·스크롤해도 위에 붙음, 다 챙기면 회색 띠 */}
-                <div className={`sticky top-0 z-10 flex items-center gap-3 px-3 py-3 ${c.done ? "bg-line" : "bg-ink"}`}>
+                <div className="sticky top-0 z-10 flex items-center gap-3 bg-ink px-3 py-3">
                   {photoOf(g.photo, 56)}
                   <div className="min-w-0 flex-1">
-                    <h3 className={`break-words text-[18px] font-bold leading-snug ${c.done ? "text-ink-soft" : "text-white"}`}>{g.name}</h3>
-                    <div className={`mt-0.5 text-[13px] tabular-nums ${c.done ? "text-ink-soft" : "text-white/75"}`}>총 {c.all}개{c.done ? " · 다 챙김" : c.total ? ` · 챙긴 ${c.got}/${c.total}` : ""}</div>
+                    <h3 className="break-words text-[18px] font-bold leading-snug text-white">{g.name}</h3>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[13px] tabular-nums text-white/75">
+                      <span>총 {c.all}개{c.done ? "" : c.total ? ` · 챙긴 ${c.got}/${c.total}` : ""}</span>
+                      {c.done ? <span className="rounded bg-white px-1.5 py-0.5 text-[12px] font-bold text-ink">✓ 다 챙김</span> : null}
+                    </div>
+                    {optionSummaryLine(g.options)}
                   </div>
-                  {foldButton(gKey, !c.done)}
+                  {foldButton(gKey, true)}
                 </div>
                 {g.options.map((rows) => {
                   const oc = countLine(rows);
