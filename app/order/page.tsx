@@ -125,6 +125,7 @@ import ProductColorRowV2 from "@/components/customer/ProductColorRowV2";
 import { colorNameSwatch, isLightSwatch, resolveColorDisplay } from "@/lib/colorNameSwatch";
 import { restyleV2 } from "@/lib/customerUiV2Restyle";
 import { readCustomerUiPreview, resolveCustomerUiV2, UI_PREVIEW_DEFAULTS, UI_V2_DEFAULT, UI_V2_STORAGE_KEY } from "@/lib/customerUiSwitch";
+import { useIsDesktop } from "@/lib/useIsDesktop";
 import { restyleClassV2, stripDecorativeEmojiV2 } from "@/lib/customerUiV2Restyle";
 import { CUSTOMER_ORDER_FILTERS, cleanCustomerOptionValue, orderLookupStatusView } from "@/lib/customerOrderStatusView";
 import CartAddFeedbackV2 from "@/components/customer/CartAddFeedbackV2";
@@ -1467,6 +1468,16 @@ export default function OrderPage() {
   // [㊶ 7단계] 첫 화면 다듬기(좌우 여백 16px 한 줄·포인트 칩·작게/크게·정렬 테두리·낱말 줄바꿈) — ?preview=s7 (기본값 UI_PREVIEW_DEFAULTS.s7)
   const [previewS7, setPreviewS7] = useState<boolean>(UI_PREVIEW_DEFAULTS.s7);
   const uiS7 = uiV2 && previewS7;
+  // [2026-10-25 사장님 「PC로 들어오면 PC 모양」] 화면 폭 1024px 이상 + ?preview=pc(기본값 UI_PREVIEW_DEFAULTS.pc)일 때만 PC 모양.
+  //   폰(폭 1024 미만)은 이 값과 무관하게 지금 화면 그대로. 모양만 — 담기·장바구니·금액·주문 제출 무관.
+  const [previewPc, setPreviewPc] = useState<boolean>(UI_PREVIEW_DEFAULTS.pc);
+  const isDesktopWidth = useIsDesktop();
+  const uiPc = uiS7 && previewPc && isDesktopWidth;
+  const pageMax = uiPc ? "1120px" : "560px";
+  // PC 모양: 아래 꽉 찬 장바구니 바 → 가운데 떠 있는 바(아래 메뉴가 위로 올라가서 바닥에서 24px)
+  const withPcBar = (style: CSSProperties): CSSProperties => (uiPc
+    ? { ...style, left: "50%", right: "auto", transform: "translateX(-50%)", width: "min(560px, calc(100% - 32px))", bottom: "24px", borderRadius: "16px", border: "1px solid #E5E5E5", boxShadow: "0 8px 24px rgba(0,0,0,0.10)" }
+    : style);
   useEffect(() => {
     try {
       const decision = resolveCustomerUiV2(new URLSearchParams(window.location.search).get("ui"), window.localStorage.getItem(UI_V2_STORAGE_KEY), UI_V2_DEFAULT);
@@ -1477,6 +1488,7 @@ export default function OrderPage() {
     setPreviewS5(readCustomerUiPreview("s5"));
     setPreviewS6(readCustomerUiPreview("s6"));
     setPreviewS7(readCustomerUiPreview("s7"));
+    setPreviewPc(readCustomerUiPreview("pc"));
   }, []);
   // [㉜ 2단계] 옵션 창 등 스타일이 많은 화면의 새 모양 정리(로즈→흑백·13px 미만→13px) — 스위치 꺼지면 원래 스타일 그대로.
   const sv = (style: CSSProperties | undefined): CSSProperties | undefined => (uiV2 ? restyleV2(style) : style);
@@ -6114,7 +6126,7 @@ export default function OrderPage() {
 
     return (
       <header style={uiS7 ? { position: "sticky", top: 0, zIndex: 30, background: "#FFFFFF", borderBottom: "1px solid #E5E5E5", padding: "10px 16px", margin: "0 -16px" } : uiV2 ? { position: "sticky", top: 0, zIndex: 30, background: "#FFFFFF", borderBottom: "1px solid #E5E5E5", padding: "10px 16px" } : { position: "sticky", top: 0, zIndex: 30, background: "#fff", borderBottom: "1px solid #E8E2DD", padding: "10px 12px" }}>
-        <div style={{ margin: "0 auto", width: "100%", maxWidth: "560px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
+        <div style={{ margin: "0 auto", width: "100%", maxWidth: pageMax, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
             {/* [2026-08-12 리뉴얼 1단계] 로고 — 집(대문) 아이콘 + 「루루동이 / 집구석 LIVE」 워드마크.
                 방송 중이면 LIVE 배지가 빨갛게, 아니면 차분한 로즈. 클릭 동작(/order)은 기존과 동일. */}
@@ -6132,6 +6144,25 @@ export default function OrderPage() {
             </Link>
             <span style={uiV2 ? { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "14px", fontWeight: 600, color: "#111111" } : { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "14px", fontWeight: 800, color: "#7A1E47" }}>{uiS5 ? null : "👋 "}{safeGreetingName}님!</span>
           </div>
+
+          {/* [2026-10-25 PC 모양] 아래 5칸 메뉴를 맨 위 로고 옆으로(폰은 지금처럼 아래). 누르면 아래 메뉴와 같은 동작 */}
+          {uiPc ? (
+            <nav aria-label="손님 메뉴" style={{ display: "flex", alignItems: "center", gap: "4px", flex: 1, justifyContent: "center" }}>
+              {[
+                { key: "home", label: "홈", onClick: () => window.scrollTo({ top: 0, behavior: "smooth" }) },
+                { key: "notice", label: "공지·쪽지", badge: noteUnread, onClick: () => { window.dispatchEvent(new Event("ruru-open-notice-box")); } },
+                { key: "orders", label: "주문내역", onClick: () => openOrderLookupBottomSheet() },
+                { key: "inquiry", label: "문의", onClick: () => setInquirySheetOpen(true) },
+                { key: "me", label: "내정보", onClick: () => openCustomerInfoEditBottomSheet() },
+              ].map((tab) => (
+                <button key={tab.key} type="button" onClick={tab.onClick}
+                  style={{ position: "relative", display: "inline-flex", alignItems: "center", height: "40px", padding: (Number((tab as { badge?: number }).badge) || 0) > 0 ? "0 26px 0 14px" : "0 14px", borderRadius: "9999px", border: "none", background: "none", cursor: "pointer", fontSize: "15px", fontWeight: 600, color: "#111111", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                  {tab.label}
+                  <CustomerNoteUnreadBadge count={Number((tab as { badge?: number }).badge) || 0} offset={{ top: 2, right: 0 }} />
+                </button>
+              ))}
+            </nav>
+          ) : null}
 
           <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
             <div style={uiS7 ? { display: "inline-flex", alignItems: "center", gap: "5px", height: "36px", padding: "0 14px", borderRadius: "9999px", border: "none", background: "#F5F5F5", fontSize: "15px", fontWeight: 700, color: "#111111", whiteSpace: "nowrap" } : uiV2 ? { display: "inline-flex", alignItems: "center", gap: "5px", height: "38px", padding: "0 14px", borderRadius: "9999px", border: "1px solid #CACACB", background: "#F5F5F5", fontSize: "14px", fontWeight: 600, color: "#111111", whiteSpace: "nowrap" } : { display: "inline-flex", alignItems: "center", gap: "5px", height: "38px", padding: "0 13px", borderRadius: "99px", border: "1px solid #E7C9D4", background: "#F9EEF3", fontSize: "13px", fontWeight: 800, color: "#7A1E47", whiteSpace: "nowrap" }}>
@@ -6520,7 +6551,7 @@ export default function OrderPage() {
   const topStripOn = noticeStripOn || bandStripOn;
 
   return (
-    <OrderPageShell tone={uiV2 ? "v2" : undefined} edge16={uiS7}>
+    <OrderPageShell tone={uiV2 ? "v2" : undefined} edge16={uiS7} wide={uiPc}>
       <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}.ruru-cat-scroll::-webkit-scrollbar{display:none}`}</style>
       {hasSavedInfo && <TopCustomerNav />}
       {/* [2026-09-20 실측] 손님 첫 화면에서 상품이 보이기까지 상단 «껍데기»가 388px였다.
@@ -6540,7 +6571,7 @@ export default function OrderPage() {
       {/* [㊴] 6단계: 공지는 아래 방송 상태 상자 안 한 줄로 옮김 — 상자가 아직 없을 때(방송 정보 로딩 전)만 이 띠를 그대로 둔다 */}
       {noticeStripOn && !(uiS6 && broadcastLoaded) ? (
         <div style={uiV2 ? { background: "#F5F5F5", color: "#111111", borderBottom: "1px solid #E5E5E5" } : { background: popupNoticeColor, color: "#fff" }}>
-          <div style={{ margin: "0 auto", width: "100%", maxWidth: "560px", display: "flex", alignItems: "center", gap: "8px", padding: "7px 12px" }}>
+          <div style={{ margin: "0 auto", width: "100%", maxWidth: pageMax, display: "flex", alignItems: "center", gap: "8px", padding: "7px 12px" }}>
             <span style={{ flexShrink: 0, fontSize: "14px" }}>{uiS5 ? <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="M4 10v4h3l6 4V6L7 10z" /><path d="M16.5 9.5a3.5 3.5 0 0 1 0 5" /></svg> : "📢"}</span>
             <button
               type="button"
@@ -6571,7 +6602,7 @@ export default function OrderPage() {
             target="_blank"
             rel="noreferrer"
             onClick={openBandInApp}
-            style={{ margin: "0 auto", width: "100%", maxWidth: "560px", display: "flex", alignItems: "center", gap: "8px", padding: "6px 12px", textDecoration: "none" }}
+            style={{ margin: "0 auto", width: "100%", maxWidth: pageMax, display: "flex", alignItems: "center", gap: "8px", padding: "6px 12px", textDecoration: "none" }}
           >
             <span style={{ flexShrink: 0, fontSize: "16px" }}>{uiS5 ? <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="M4 6.5h16v9H9l-5 3.5z" /></svg> : "🟢"}</span>
             {/* [2026-08-31 사장님 지적] 방송 알림은 사이트 자체 기능 — 밴드는 밴드대로 소개한다 */}
@@ -6695,7 +6726,7 @@ export default function OrderPage() {
           손님이 유튜브 앱에서 방송을 보다 이 페이지로 오면 폰이 알아서 미니플레이어(PIP)를 띄운다.
           우리 페이지는 주문에만 집중: 방송 OFF=예고 배너 / 방송 ON=검은 스트립 2줄. */}
       {hasSavedInfo && broadcastLoaded ? (
-        <section style={{ margin: "8px auto 0", width: "100%", maxWidth: "560px", padding: uiS7 ? "0 0 12px" : "0 14px 12px" }}>
+        <section style={{ margin: "8px auto 0", width: "100%", maxWidth: pageMax, padding: uiS7 ? "0 0 12px" : "0 14px 12px" }}>
           {!isBroadcastOn ? (
             /* [2026-09-20] 방송 전 카드 — 166px였다. 하는 일이 ①상태 알림 ②방송알림 신청 두 개인데,
                  이미 알림을 신청한 손님에게는 ②가 «알림 받는 중 ✓» 라는 40px짜리 표시로만 남아 자리만 먹었다.
@@ -6825,7 +6856,7 @@ export default function OrderPage() {
             // 쇼핑몰 닫힘(방송 OFF + shop_open=false)이면 그리드 대신 준비중 안내. 방송 ON이면 무관(항상 그리드).
             if (broadcastLoaded && productListState === "ready" && !isBroadcastOn && !shopOpen) {
               return (
-                <section style={{ margin: "12px auto 0", width: "100%", maxWidth: "560px" }}>
+                <section style={{ margin: "12px auto 0", width: "100%", maxWidth: pageMax }}>
                   <div style={s5s({ padding: "44px 26px", textAlign: "center", color: "#7A1E47", fontSize: "16px", fontWeight: 800, border: "1px solid #D9C5CC", borderRadius: "16px", background: "#fff", lineHeight: 1.8 })}>
                     {uiS5 ? "쇼핑몰 준비 중입니다" : "🛍 쇼핑몰 준비 중입니다"}
                     <div style={s5s({ marginTop: "6px", fontSize: "13px", fontWeight: 600, color: "#6E655E" })}>잠시 후 다시 찾아 주세요.</div>
@@ -6834,7 +6865,7 @@ export default function OrderPage() {
               );
             }
             if (productListState === "error") {
-              return <section role="alert" style={{ margin: "12px auto", maxWidth: "560px", padding: "30px 20px", textAlign: "center", background: "#fff", borderRadius: "16px" }}>
+              return <section role="alert" style={{ margin: "12px auto", maxWidth: pageMax, padding: "30px 20px", textAlign: "center", background: "#fff", borderRadius: "16px" }}>
                 <p>상품을 불러오지 못했습니다. 다시 시도해 주세요.</p>
                 <button type="button" onClick={() => { void loadBroadcast().catch(() => { setProductListState("error"); setBroadcastLoaded(true); }); }} style={uiV2 ? { marginTop: "12px", height: "48px", padding: "0 24px", borderRadius: "9999px", border: "none", background: "#111111", color: "#FFFFFF", fontSize: "16px", fontWeight: 600 } : { marginTop: "12px", padding: "12px 20px", borderRadius: "10px", background: "#7A1E47", color: "#fff", fontWeight: 700 }}>다시 불러오기</button>
               </section>;
@@ -6842,7 +6873,7 @@ export default function OrderPage() {
             // Broadcast metadata alone is not enough: wait for the active mode's products.
             if (!broadcastLoaded || productListState === "loading") {
               return (
-                <section style={{ margin: "12px auto 0", width: "100%", maxWidth: "560px" }}>
+                <section style={{ margin: "12px auto 0", width: "100%", maxWidth: pageMax }}>
                   <div style={uiV2 ? { padding: "44px 26px", textAlign: "center", color: "#707072", fontSize: "15px", fontWeight: 400, border: "1px solid #E5E5E5", borderRadius: "16px", background: "#FFFFFF" } : { padding: "44px 26px", textAlign: "center", color: "#7A1E47", fontSize: "14px", fontWeight: 700, border: "1px solid #D9C5CC", borderRadius: "16px", background: "#fff" }}>
                     상품을 불러오는 중…
                   </div>
@@ -6918,7 +6949,7 @@ export default function OrderPage() {
             //   상품 수(방송 담긴분/카탈로그 ≤ 80)라 한 번에 렌더해도 가벼움.
             const visibleItems = sorted;
             return (
-              <section id="ruru-shop-top" style={{ margin: "12px auto 0", width: "100%", maxWidth: "560px", scrollMarginTop: "70px", paddingBottom: "calc(150px + env(safe-area-inset-bottom))" }}>
+              <section id="ruru-shop-top" style={{ margin: "12px auto 0", width: "100%", maxWidth: pageMax, scrollMarginTop: "70px", paddingBottom: "calc(150px + env(safe-area-inset-bottom))" }}>
                 <input
                   value={productSearchText}
                   onChange={(e) => { setProductSearchText(e.target.value); setProductPage(1); setVisibleProductCount(10); }}
@@ -7044,8 +7075,8 @@ export default function OrderPage() {
                   <div style={uiV2 ? { marginTop: "14px", padding: "26px", textAlign: "center", color: "#707072", fontSize: "15px", fontWeight: 400 } : { marginTop: "14px", padding: "26px", textAlign: "center", color: "#999", fontSize: "14px", fontWeight: 700 }}>찾는 상품이 없어요. 아래 직접 입력으로 담아 주세요.</div>
                 ) : (
                   <div style={uiV2 ? (listView === "grid"
-                    ? { marginTop: "12px", display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "44px 8px", alignItems: "stretch" }
-                    : { marginTop: "8px", display: "flex", flexDirection: "column" }) : listView === "grid"
+                    ? { marginTop: "12px", display: "grid", gridTemplateColumns: uiPc ? "repeat(4, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))", gap: uiPc ? "48px 16px" : "44px 8px", alignItems: "stretch" }
+                    : uiPc ? { marginTop: "8px", display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", columnGap: "32px" } : { marginTop: "8px", display: "flex", flexDirection: "column" }) : listView === "grid"
                     ? { marginTop: "10px", display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px", alignItems: "stretch" }
                     : { marginTop: "8px", display: "flex", flexDirection: "column" }}>
                     {visibleItems.map((product) => {
@@ -9051,11 +9082,11 @@ export default function OrderPage() {
                   isBroadcastOn && chatUiEnabled && chatShowFind ? (
                     <button type="button"
                       onClick={() => { setChatFindOpen(true); setOrderSheetOpen(true); window.setTimeout(() => document.getElementById("orderSheetSection")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}
-                      style={uiV2 ? { position: "fixed", left: 0, right: 0, bottom: "calc(68px + env(safe-area-inset-bottom))", zIndex: 39, background: "#FFFFFF", border: "none", borderTop: "1px solid #E5E5E5", padding: "14px 16px", textAlign: "center", fontSize: "15px", fontWeight: 400, color: "#707072", fontFamily: "inherit", cursor: "pointer" } : { position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, background: "rgba(122,30,71,0.10)", backdropFilter: "blur(2.5px)", WebkitBackdropFilter: "blur(2.5px)", border: "1px solid rgba(122,30,71,0.22)", borderRadius: "12px", padding: "9px 14px", textAlign: "center", fontSize: "12px", fontWeight: 800, color: "#7A1E47", fontFamily: "inherit", cursor: "pointer" }}>
+                      style={uiV2 ? withPcBar({ position: "fixed", left: 0, right: 0, bottom: "calc(68px + env(safe-area-inset-bottom))", zIndex: 39, background: "#FFFFFF", border: "none", borderTop: "1px solid #E5E5E5", padding: "14px 16px", textAlign: "center", fontSize: "15px", fontWeight: 400, color: "#707072", fontFamily: "inherit", cursor: "pointer" }) : { position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, background: "rgba(122,30,71,0.10)", backdropFilter: "blur(2.5px)", WebkitBackdropFilter: "blur(2.5px)", border: "1px solid rgba(122,30,71,0.22)", borderRadius: "12px", padding: "9px 14px", textAlign: "center", fontSize: "12px", fontWeight: 800, color: "#7A1E47", fontFamily: "inherit", cursor: "pointer" }}>
                       {uiS5 ? "담은 상품이 없어요 · 채팅주문 하셨나요?" : "🛒 담은 상품이 없어요 · 💬 채팅주문 하셨나요?"}
                     </button>
                   ) : (
-                    <div style={uiV2 ? { position: "fixed", left: 0, right: 0, bottom: "calc(68px + env(safe-area-inset-bottom))", zIndex: 39, background: "#FFFFFF", border: "none", borderTop: "1px solid #E5E5E5", padding: "14px 16px", textAlign: "center", fontSize: "15px", fontWeight: 400, color: "#707072", fontFamily: "inherit", pointerEvents: "none" } : { position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, background: "rgba(122,30,71,0.10)", backdropFilter: "blur(2.5px)", WebkitBackdropFilter: "blur(2.5px)", border: "1px solid rgba(122,30,71,0.22)", borderRadius: "12px", padding: "9px 14px", textAlign: "center", fontSize: "12px", fontWeight: 800, color: "#7A1E47", pointerEvents: "none" }}>
+                    <div style={uiV2 ? withPcBar({ position: "fixed", left: 0, right: 0, bottom: "calc(68px + env(safe-area-inset-bottom))", zIndex: 39, background: "#FFFFFF", border: "none", borderTop: "1px solid #E5E5E5", padding: "14px 16px", textAlign: "center", fontSize: "15px", fontWeight: 400, color: "#707072", fontFamily: "inherit", pointerEvents: "none" }) : { position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, background: "rgba(122,30,71,0.10)", backdropFilter: "blur(2.5px)", WebkitBackdropFilter: "blur(2.5px)", border: "1px solid rgba(122,30,71,0.22)", borderRadius: "12px", padding: "9px 14px", textAlign: "center", fontSize: "12px", fontWeight: 800, color: "#7A1E47", pointerEvents: "none" }}>
                       {uiS5 ? "담은 상품이 없어요" : "🛒 담은 상품이 없어요"}
                     </div>
                   )
@@ -9065,7 +9096,7 @@ export default function OrderPage() {
                 <button
                   type="button"
                   onClick={() => { setOrderSheetOpen(true); window.setTimeout(() => document.getElementById("orderSheetSection")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}
-                  style={uiV2 ? { position: "fixed", left: 0, right: 0, bottom: "calc(68px + env(safe-area-inset-bottom))", zIndex: 39, display: "flex", alignItems: "center", gap: "12px", background: "#FFFFFF", border: "none", borderTop: "1px solid #E5E5E5", padding: "10px 16px", boxShadow: "0 -4px 12px rgba(0,0,0,0.06)", cursor: "pointer", fontFamily: "inherit" } : { position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, display: "flex", alignItems: "center", gap: "10px", background: "#7A1E47", border: "none", borderRadius: "15px", padding: "11px 14px", boxShadow: "0 8px 22px rgba(122,30,71,0.35)", cursor: "pointer" }}
+                  style={uiV2 ? withPcBar({ position: "fixed", left: 0, right: 0, bottom: "calc(68px + env(safe-area-inset-bottom))", zIndex: 39, display: "flex", alignItems: "center", gap: "12px", background: "#FFFFFF", border: "none", borderTop: "1px solid #E5E5E5", padding: "10px 16px", boxShadow: "0 -4px 12px rgba(0,0,0,0.06)", cursor: "pointer", fontFamily: "inherit" }) : { position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, display: "flex", alignItems: "center", gap: "10px", background: "#7A1E47", border: "none", borderRadius: "15px", padding: "11px 14px", boxShadow: "0 8px 22px rgba(122,30,71,0.35)", cursor: "pointer" }}
                 >
                   {uiV2 ? (
                     <>
@@ -9086,7 +9117,7 @@ export default function OrderPage() {
               );
             })()}
 
-            <nav style={uiV2 ? { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 40, height: "calc(68px + env(safe-area-inset-bottom))", paddingBottom: "env(safe-area-inset-bottom)", background: "#FFFFFF", borderTop: "1px solid #E5E5E5", display: "grid", gridTemplateColumns: "repeat(5,1fr)" } : { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 40, height: "calc(68px + env(safe-area-inset-bottom))", paddingBottom: "env(safe-area-inset-bottom)", background: "#fff", borderTop: "1px solid #EFE6DE", display: "grid", gridTemplateColumns: "repeat(5,1fr)" }}>
+            {uiPc ? null : <nav style={uiV2 ? { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 40, height: "calc(68px + env(safe-area-inset-bottom))", paddingBottom: "env(safe-area-inset-bottom)", background: "#FFFFFF", borderTop: "1px solid #E5E5E5", display: "grid", gridTemplateColumns: "repeat(5,1fr)" } : { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 40, height: "calc(68px + env(safe-area-inset-bottom))", paddingBottom: "env(safe-area-inset-bottom)", background: "#fff", borderTop: "1px solid #EFE6DE", display: "grid", gridTemplateColumns: "repeat(5,1fr)" }}>
               {[
                 { key: "home", label: "홈", icon: "🏠", onClick: () => window.scrollTo({ top: 0, behavior: "smooth" }) },
                 // [2026-08-30 사장님 요청] 하단에 쪽지함 진입점. 공지와 쪽지를 한 곳에서 본다.
@@ -9117,7 +9148,7 @@ export default function OrderPage() {
                   {tab.label}
                 </button>
               ))}
-            </nav>
+            </nav>}
           </>
           )}
         </>
