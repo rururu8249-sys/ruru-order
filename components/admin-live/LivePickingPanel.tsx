@@ -12,6 +12,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatOrderOptionText, stripNoneOptionParts } from "@/lib/orderOptionText";
+import { colorNameSwatch, isLightSwatch } from "@/lib/colorNameSwatch";
 import { savePicking } from "@/lib/orderPicking";
 import { productSearchMatches } from "@/lib/productSearch";
 import { compareOrderOptions } from "@/lib/orderOptionSort";
@@ -425,7 +426,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
     <span className={`shrink-0 rounded px-1.5 py-0.5 text-[12px] font-semibold ${r.kind === "repick" ? "bg-warn-bg text-warn-tx" : "bg-ink text-white"}`}>{r.tag}</span>
   );
   const checkBox = (on: boolean) => (
-    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 ${on ? "border-ink bg-ink text-white" : "border-line bg-surface"}`} aria-hidden>
+    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 ${on ? "border-ok-tx bg-ok-tx text-white" : "border-ink-mute bg-surface"}`} aria-hidden>
       {on ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5 10 17.5 19 7" /></svg> : null}
     </span>
   );
@@ -450,7 +451,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
       );
     }
     return (
-      <div key={r.id} className={`flex items-center gap-2 border-t border-line first:border-t-0 ${on ? "bg-surface-2" : "bg-surface"}`}>
+      <div key={r.id} className={`flex items-center gap-2 border-t border-line first:border-t-0 ${on ? "bg-ok-bg" : "bg-surface"}`}>
         {/* 체크는 □ 칸만 눌러야 된다(줄 나머지는 안 눌림) — 누르는 범위는 칸 둘레 44px */}
         <div className="flex min-h-[52px] min-w-0 flex-1 items-center gap-2 py-2 pl-1 pr-3">
           <button type="button" disabled={blocked} onClick={() => void setPickedFor([r.id], !on)} aria-pressed={on} aria-label={on ? "챙김 해제" : "챙김"} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg disabled:cursor-wait">
@@ -468,6 +469,12 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
   const onPickPage = () => { if (page) void pickPage(page); };
   const unpaidAll = allRows.filter((r) => !r.paid && !r.skip).reduce((sum, r) => sum + r.qty, 0);
 
+  // 색 이름이면 실제 색 점(모르는 이름은 점 없이 글씨만)
+  const swatchDot = (name: string) => {
+    const hex = colorNameSwatch(name);
+    if (!hex) return null;
+    return <span aria-hidden className="inline-block h-3.5 w-3.5 shrink-0 rounded-full" style={{ background: hex, boxShadow: isLightSwatch(hex) ? "inset 0 0 0 1px rgba(0,0,0,.25)" : undefined }} />;
+  };
   // 옵션 머리 줄(상품별 장)
   const optionHead = (rows: PickRow[]) => {
     const oc = countLine(rows);
@@ -475,17 +482,18 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
     const color = stripNoneOptionParts(rows[0].color);
     const size = stripNoneOptionParts(rows[0].size);
     return (
-      <div className={`flex items-center gap-2 border-t border-line px-3 py-2 ${oc.done ? "bg-surface-2" : "bg-surface"}`}>
+      // [10-25 21:16 사장님 「색상 넣어서 구분 쉽게」] 옵션 머리 = 파란 띠(챙길 옵션) / 초록 띠(다 챙김), 색상 칸엔 실제 색 점
+      <div className={`flex items-center gap-2 border-t px-3 py-2 ${oc.done ? "border-ok-tx/30 bg-ok-bg" : "border-info-tx/30 bg-info-bg"}`}>
         <span className="min-w-0 flex-1">
-          <span className={`flex flex-wrap items-center gap-1.5 ${oc.done ? "opacity-50" : ""}`}>
-            {color ? <span className="rounded-lg border border-line px-2 py-0.5 text-[14px] font-semibold text-ink"><span className="mr-1 text-[12px] text-ink-mute">색상</span>{color}</span> : null}
-            {size ? <span className="rounded-lg border border-line px-2 py-0.5 text-[14px] font-bold text-ink"><span className="mr-1 text-[12px] font-semibold text-ink-mute">사이즈</span>{size}</span> : null}
+          <span className="flex flex-wrap items-center gap-1.5">
+            {color ? <span className="flex items-center gap-1.5 rounded-lg bg-surface px-2 py-0.5 text-[14px] font-semibold text-ink">{swatchDot(color)}<span className="text-[12px] text-ink-mute">색상</span>{color}</span> : null}
+            {size ? <span className="rounded-lg bg-surface px-2 py-0.5 text-[14px] font-bold text-ink"><span className="mr-1 text-[12px] font-semibold text-ink-mute">사이즈</span>{size}</span> : null}
             {!color && !size ? <span className="text-[14px] font-semibold text-ink">{rows[0].optionText || "옵션 없음"}</span> : null}
-            <span className="text-[18px] font-bold text-ink tabular-nums">{oc.all}개</span>
+            <span className={`text-[18px] font-bold tabular-nums ${oc.done ? "text-ok-tx" : "text-info-tx"}`}>{oc.all}개</span>
           </span>
           {note ? <span className="mt-0.5 block text-[12px] font-semibold text-ink-soft">{note}</span> : null}
         </span>
-        {oc.done ? <span className="shrink-0 text-[13px] font-semibold text-ink-mute">다 챙김</span> : null}
+        {oc.done ? <span className="shrink-0 text-[13px] font-bold text-ok-tx">✓ 다 챙김</span> : <span className="shrink-0 text-[13px] font-bold text-info-tx tabular-nums">남은 {oc.total - oc.got}개</span>}
       </div>
     );
   };
@@ -504,7 +512,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
       {photoOf(photos[r.id], 40)}
       <span className="min-w-0">
         <span className="block break-words text-[14px] font-semibold leading-snug">{r.productName}</span>
-        <span className="flex flex-wrap items-center gap-1.5 text-[13px] text-ink-soft">{r.optionText || "옵션 없음"}{!r.paid ? <span className="rounded px-1.5 py-0.5 text-[12px] font-semibold text-danger-tx ring-1 ring-danger-tx/40">미결제</span> : null}{tagOf(r)}</span>
+        <span className="flex flex-wrap items-center gap-1.5 text-[13px] text-ink-soft">{stripNoneOptionParts(r.color) ? swatchDot(stripNoneOptionParts(r.color)) : null}{r.optionText || "옵션 없음"}{!r.paid ? <span className="rounded px-1.5 py-0.5 text-[12px] font-semibold text-danger-tx ring-1 ring-danger-tx/40">미결제</span> : null}{tagOf(r)}</span>
         {r.before ? <span className="block text-[12px] text-warn-tx">변경 전: {r.before}</span> : null}
         {exLine(r)}
       </span>
