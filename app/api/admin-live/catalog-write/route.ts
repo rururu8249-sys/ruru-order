@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
+import { ensureBroadcastStockBase, ensureStockFlowBase, logAdminStockEdits, productIdsFromWrite, readProductStockRows, writeTouchesStock } from "@/lib/stockFlowServer";
 
 // 관리자 전용 카탈로그 쓰기 프록시.
 //   목적(보안): products / broadcasts / broadcast_products 의 쓰기(insert/update/delete/upsert)를
@@ -67,6 +68,29 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getServiceClient();
+    // [2026-10-26 재고 흐름] 관리자가 재고를 고치면 저장 전후를 비교해 «기록만» 남긴다(저장 자체는 아래 그대로).
+    const who = String((session as any)?.sub || "admin");
+    const stockIds = table === "products" && (op === "update" || op === "upsert") && writeTouchesStock(body?.values)
+      ? productIdsFromWrite(Array.isArray(body?.filters) ? body!.filters : [], body?.values) : [];
+    const stockBefore = stockIds.length ? await readProductStockRows(supabase, stockIds) : null;
+    const afterWrite = async (data: any) => {
+      try {
+        if (stockBefore && stockBefore.size) await logAdminStockEdits(supabase, stockBefore, await readProductStockRows(supabase, stockIds), who);
+        if (table === "broadcasts" && op !== "delete" && body?.values && !Array.isArray(body.values) && (body.values as any).status === "ON") {
+          const bid = String((Array.isArray(data) ? data[0]?.id : data?.id) ?? "");
+          if (bid) await ensureBroadcastStockBase(supabase, bid);
+        }
+        if (table === "broadcast_products" && op === "insert") {
+          const list = (Array.isArray(body?.values) ? body!.values : [body?.values]) as any[];
+          const byBc = new Map<string, string[]>();
+          for (const v of list) { const b = String(v?.broadcast_id ?? ""); if (b) byBc.set(b, [...(byBc.get(b) || []), String(v?.product_id ?? "")]); }
+          for (const [b, pids] of byBc) {
+            const { data: bc } = await supabase.from("broadcasts").select("status").eq("id", b).limit(1);
+            if (String((bc as any)?.[0]?.status || "").toUpperCase() === "ON") await ensureStockFlowBase(supabase, `bc:${b}`, pids);
+          }
+        }
+      } catch { /* 기록 실패는 무시 */ }
+    };
     if(body?.expectedVersion !== undefined) {
       const filters=Array.isArray(body.filters)?body.filters:[];
       const id=filters.length===1 && filters[0].type==='eq' && filters[0].col==='id' ? String(filters[0].val) : '';
@@ -75,6 +99,7 @@ export async function POST(request: NextRequest) {
       }
       const {data,error}=await supabase.rpc('product_catalog_update',{p_id:id,p_version:body.expectedVersion,p_values:body.values});
       if(error) return NextResponse.json({data:null,error:{message:error.code==='42703'?error.message:'상품이 변경되어 저장하지 않았습니다. 최신 상품을 다시 열어 확인해주세요.'}},{status:['40001','23505'].includes(error.code)?409:400});
+      await afterWrite(data);
       return NextResponse.json({data:body.single?{id:data.id}:data,error:null});
     }
     let query: any = supabase.from(table);
@@ -108,6 +133,7 @@ export async function POST(request: NextRequest) {
       }
       return NextResponse.json({ data: null, error: { message: error.message } }, { status: 200 });
     }
+    await afterWrite(data);
     return NextResponse.json({ data: data ?? null, error: null });
   } catch (e: any) {
     return NextResponse.json(

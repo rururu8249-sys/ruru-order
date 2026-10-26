@@ -28,6 +28,8 @@ import ProductPagination from "./ProductPagination";
 import ProductToolbar from "./ProductToolbar";
 import { resolveBrandCatalog, resolveAdminBrandTarget, searchBrandDetails, type BrandProductLink } from "@/lib/productBrandLinks";
 import ProductBrandMoveDialog from "./ProductBrandMoveDialog";
+import StockFlowModal, { type StockFlowProduct } from "./StockFlowModal";
+import { kstDateKey } from "@/lib/orderPickingWorkspace";
 
 type ProductRow = Record<string, unknown>;
 
@@ -224,6 +226,7 @@ function productCategory(p: ProductRow) {
 }
 
 const productId = (p: ProductRow) => pickString(p, ["id", "product_id"], "");
+const toStockFlowProduct = (p: ProductRow): StockFlowProduct => ({ id: productId(p), name: productName(p), image: mainImage(p) || undefined });
 
 // [2026-08-13] 목록 정렬 — 화면 표시 순서만 바꾼다. 저장(sort_order/mall_sort_order)은 안 건드림.
 type ProductSortKey = "manual" | "name" | "price_asc" | "price_desc" | "recent";
@@ -280,6 +283,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [productPageNumber, setProductPageNumber] = useState(1);
   const [productPageSize, setProductPageSize] = useState(20);
   const [lightbox, setLightbox] = useState("");
+  // [2026-10-26] 재고 흐름 창(시작 → 추가·수정 → 판매 → 지금) — 보기 전용
+  const [stockFlow, setStockFlow] = useState<{ scope: string; title: string; products: StockFlowProduct[]; focusId?: string } | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   const [copied, setCopied] = useState(false);
   const [busyId, setBusyId] = useState("");
@@ -667,6 +672,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     if (idx <= 0) return bcProducts;
     const copy = [...bcProducts]; const [top] = copy.splice(idx, 1); return [top, ...copy];
   }, [bcProducts, bcWidgetPin.mode, bcWidgetPin.productId, bcSort]);
+
+  const openBcStockFlow = (focusId?: string) => {
+    if (!bcSelId) return;
+    const b = bcList.find((x) => x.id === bcSelId);
+    setStockFlow({ scope: `bc:${bcSelId}`, title: b?.title || "방송", products: bcProductsView.map(toStockFlowProduct), focusId });
+  };
 
   // [2026-09-25] 방송 목록 기간 + 이름 검색 필터 — 표시 전용. bcList 원본은 그대로 두고 렌더만 거른다.
   //   [사장님 요청] 지금 선택된 방송·방송 중(ON)인 방송은 기간/검색 필터와 상관없이 «항상 맨 위»에 고정.
@@ -1702,6 +1713,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     {PRODUCT_SORT_OPTIONS.map((o) => (<option key={o.key} value={o.key}>{o.label}</option>))}
                   </select>
                 ) : null}
+                {bcSelId && bcProducts.length > 0 && !bcCopyMode ? (
+                  <button type="button" onClick={() => openBcStockFlow()} title="방송 시작 재고 → 추가·수정 → 판매 → 지금" style={{ height: "36px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "0 12px", cursor: "pointer", whiteSpace: "nowrap" }}>재고 흐름</button>
+                ) : null}
                 {bcSelId && bcProducts.length > 0 ? (
                   <button type="button" disabled={bcBusy} onClick={() => { setBcCopyMode((v) => !v); setBcCopySel(new Set()); }} style={{ height: "36px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", background: bcCopyMode ? "var(--color-surface-2)" : "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "0 12px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcBusy ? 0.5 : 1 }}>{bcCopyMode ? "선택 취소" : "선택 복사"}</button>
                 ) : null}
@@ -1882,6 +1896,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                               : <button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void broadcastOneClick(p); }} title="방송 화면에 이 상품만 띄우고 안내문을 복사" style={rowBtn}>소개</button>) : null}
                             {!bcCopyMode ? <button type="button" disabled={hideBusyId === pid || !canToggleHidden(p)} onClick={(e) => { e.stopPropagation(); void toggleProductHidden(p); }} title={rowHidden ? "숨김 — 누르면 손님 화면에 다시 보여요" : "보이는 중 — 누르면 손님 화면에서 숨겨요(이 목록엔 남음)"} aria-label={rowHidden ? "숨김 상품, 누르면 보이기" : "보이는 상품, 누르면 숨기기"} aria-pressed={rowHidden} style={{ ...eyeBtn(rowHidden), opacity: hideBusyId === pid ? 0.5 : 1 }}>{rowHidden ? HIDDEN_EYE_ICON : SHOWN_EYE_ICON}</button> : null}
                             <button type="button" onClick={(e) => { e.stopPropagation(); editProduct(p); }} style={rowBtn}>수정</button>
+                            {!bcCopyMode ? <button type="button" onClick={(e) => { e.stopPropagation(); openBcStockFlow(pid); }} title="이 상품 재고 흐름" style={rowBtn}>재고</button> : null}
                             <button type="button" disabled={bcBusy} onClick={(e) => { e.stopPropagation(); void removeBcProduct(pid); }} title="이 방송 목록에서만 뺌(상품은 남음)" style={{ ...rowBtnDanger, opacity: bcBusy ? 0.6 : 1 }}>빼기</button>
                           </div>
                           {isBrandFolder && expanded ? <div style={{ borderTop: "1px solid var(--color-line)", padding: "8px", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", gap: "6px" }}>{detailRows.map((detail) => { const pinned=isBroadcastPinned(pid,detail.detailName); const optionText=[detail.colors.length?`색상 ${detail.colors.join(",")}`:"",detail.sizes.length?`사이즈 ${detail.sizes.join(",")}`:""].filter(Boolean).join(" · ")||"옵션 없음"; return <div key={broadcastPinKey(pid,detail.detailName)} style={{ display:"grid",gridTemplateColumns:"44px minmax(0,1fr) auto auto",gap:"8px",alignItems:"center",border:pinned?"2px solid var(--color-rose-deep)":"1px solid var(--color-line)",borderRadius:"8px",padding:"8px",background:pinned?"var(--color-rose-soft)":"var(--color-surface)" }}><button type="button" onClick={()=>detail.image&&setLightbox(detail.image)} style={{width:42,height:42,border:0,borderRadius:7,overflow:"hidden",padding:0,background:"var(--color-surface-2)"}}>{detail.image?<img src={detail.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:null}</button><div style={{minWidth:0}}><div style={{display:"flex",alignItems:"center",gap:"6px",minWidth:0}}><span style={{fontSize:"12px",fontWeight:900,color:"var(--color-ink)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{detail.detailName}</span>{pinned?<span style={ROT_BADGE_LIVE}>소개 중</span>:null}</div><div style={{fontSize:"11px",fontWeight:800,color:"var(--color-rose-deep)",marginTop:2}}>{detail.price.toLocaleString("ko-KR")}원</div><div style={{fontSize:"11px",fontWeight:700,color:"var(--color-ink-soft)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{optionText}{detail.stockManaged&&detail.stock!==null?` · 재고 ${detail.stock}`:""}</div></div>{pinned?<button type="button" disabled={bcPinBusy} onClick={()=>void clearBroadcastPin()} title="소개를 끝내고 방송 화면을 다시 자동 순환으로" style={rowBtnPrimary}>{bcPinBusy?"정리 중…":"소개 끝"}</button>:<button type="button" disabled={bcPinBusy} onClick={()=>void broadcastOneClick(p,detail)} title="방송 화면에 이 상품만 띄우고 안내문을 복사" style={rowBtn}>소개</button>}<button type="button" aria-label={`${detail.detailName} 수정`} onClick={(event)=>{event.stopPropagation();editProduct(p,detail.detailName);}} style={rowBtn}>수정</button></div>})}</div> : null}
@@ -1906,6 +1921,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 >
                   {PRODUCT_SORT_OPTIONS.map((o) => (<option key={o.key} value={o.key}>{o.label}</option>))}
                 </select>
+              ) : null}
+              {shopRows.length > 0 ? (
+                <button type="button" onClick={() => setStockFlow({ scope: `day:${kstDateKey(new Date())}`, title: `쇼핑몰 · 오늘 ${kstDateKey(new Date())}`, products: shopRows.map(toStockFlowProduct) })} title="오늘 0시 재고 → 추가·수정 → 판매 → 지금" style={{ height: "36px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "0 12px", cursor: "pointer", whiteSpace: "nowrap" }}>재고 흐름</button>
               ) : null}
               <button type="button" disabled={shopBusy} onClick={openShopPicker} style={{ marginLeft: shopRows.length > 0 ? undefined : "auto", height: "36px", fontSize: "13px", fontWeight: 700, color: "#fff", background: "var(--color-ink)", border: "none", borderRadius: "8px", padding: "0 12px", cursor: shopBusy ? "wait" : "pointer", opacity: shopBusy ? 0.5 : 1 }}>+ 담기</button>
             </div>
@@ -2237,6 +2255,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
       {/* 사진 확대 lightbox */}
       {brandMove?<ProductBrandMoveDialog source={brandMove.source} brands={products.filter(isBrandGroupProduct)} undoParentId={brandMove.undoParentId} onClose={()=>setBrandMove(null)} onMoved={()=>{setBrandMove(null);void loadProducts();}} />:null}
+      {stockFlow ? <StockFlowModal scope={stockFlow.scope} title={stockFlow.title} products={stockFlow.products} focusId={stockFlow.focusId} onClose={() => setStockFlow(null)} /> : null}
       {lightbox ? (
         <div
           onClick={() => setLightbox("")}
