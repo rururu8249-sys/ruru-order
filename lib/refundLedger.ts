@@ -442,44 +442,45 @@ export function transferCopyBlock(d: { bankName: string; account: unknown; holde
  *  reason 값·뜻은 예전 사유 칩(단순변심/상품문제/기타)과 같다 — 금액 계산 무변경. 출고·기타는 사유 칸이 없다(환불 기록 없음).
  *  ship = 출고(누락 상품 픽업 후 출고·추가 주문건 확인) — 저장만 한다(출고 넘기기는 따로). */
 export type IssueKind = "refund" | "exchange" | "ship" | "etc";
-export type IssueMemoPreset = { label: string; memo: string; reason?: "단순변심" | "상품문제" | "기타" };
+export type IssueMemoPreset = { label: string; memo: string; reason?: "단순변심" | "상품문제" | "기타"; /** 예전 칩이 남긴 메모 첫머리 — 다시 열 때 이 칩으로 보여 준다 */ alias?: string[] };
+// [2026-10-26 사장님 확정] 환불 6 · 교환 4 · 출고 3. reason(반품비 판정)은 예전 칩과 같은 뜻으로 이어 붙임 — 금액 계산 무변경.
 export const ISSUE_MEMO_PRESETS: Record<IssueKind, IssueMemoPreset[]> = {
   refund: [
     { label: "단순변심", memo: "단순변심 환불", reason: "단순변심" },
-    { label: "품절", memo: "품절 상품 환불", reason: "상품문제" },
-    { label: "챙기기 전 취소", memo: "물건 챙기기 전 환불", reason: "단순변심" },
-    { label: "불량·하자", memo: "불량·하자 환불", reason: "상품문제" },
+    { label: "품절상품주문", memo: "품절 상품 환불", reason: "상품문제" },
+    { label: "주문취소", memo: "주문 취소 환불", reason: "단순변심", alias: ["물건 챙기기 전 환불"] },
+    { label: "상품불량", memo: "상품불량 환불", reason: "상품문제", alias: ["불량·하자 환불"] },
     { label: "오배송", memo: "오배송 환불", reason: "상품문제" },
     { label: "기타", memo: "", reason: "기타" },
   ],
   exchange: [
-    { label: "사이즈", memo: "사이즈 교환", reason: "단순변심" },
-    { label: "색상", memo: "색상 교환", reason: "단순변심" },
-    { label: "불량", memo: "불량 교환", reason: "상품문제" },
+    { label: "단순변심", memo: "단순변심 교환", reason: "단순변심", alias: ["사이즈 교환", "색상 교환"] },
+    { label: "상품불량", memo: "상품불량 교환", reason: "상품문제", alias: ["불량 교환"] },
     { label: "오배송", memo: "오배송 교환", reason: "상품문제" },
     { label: "기타", memo: "", reason: "기타" },
   ],
-  // [2026-10-25 08:36 사장님] 출고 이슈 = «확인이 먼저인 기록»(누락 상품은 픽업 후 출고, 추가 주문건은 확인부터). 저장만 — 출고 넘기기는 목록·주문상세 버튼으로 따로.
+  // 출고 이슈 = «확인이 먼저인 기록». 저장만 — 출고 넘기기는 목록·주문상세 버튼으로 따로.
   ship: [
-    { label: "누락 상품", memo: "누락 상품 — 픽업 후 출고" },
-    { label: "추가 주문", memo: "추가 주문건 — 확인 먼저" },
-    { label: "품절 상품 구해서", memo: "품절 상품 구해서 출고" },
-    { label: "재발송", memo: "재발송" },
+    { label: "방종후 주문건", memo: "방송 종료 후 주문건" },
+    { label: "추가주문", memo: "추가 주문건", alias: ["추가 주문건 — 확인 먼저"] },
+    { label: "기타", memo: "" },
   ],
   etc: [],
 };
 
-/** 다시 열 때 어떤 사유 칩이 눌려 있었는지 — 메모 첫 줄이 칩 문구로 시작하면 그 칩, 아니면 저장된 사유와 이름이 같은 칩(단순변심·기타). 못 고르면 "". */
+/** 다시 열 때 어떤 사유 칩이 눌려 있었는지 — 메모 첫 줄이 칩 문구(또는 예전 문구)로 시작하면 그 칩, 아니면 저장된 사유와 이름이 같은 칩(단순변심·기타). 못 고르면 "". */
 export function presetFromSaved(kind: IssueKind, memo: unknown, reason: unknown): string {
   const list = ISSUE_MEMO_PRESETS[kind] || [];
   const first = String(memo ?? "").split("\n")[0].trim();
-  const byMemo = first ? list.find((p) => p.memo && (first === p.memo || first.startsWith(`${p.memo} · `))) : undefined;
+  const starts = (m: string) => Boolean(m) && (first === m || first.startsWith(`${m} · `));
+  const byMemo = first ? list.find((p) => starts(p.memo) || (p.alias || []).some(starts)) : undefined;
   if (byMemo) return byMemo.label;
   const r = String(reason ?? "").trim();
   const byReason = r ? list.find((p) => p.label === r && p.reason === r) : undefined;
   if (byReason) return byReason.label;
-  // 메모에 칩 낱말(불량·오배송·품절·사이즈·색상…)이 들어 있고 사유도 맞으면 그 칩(예: 「팔 단면이 다름 불량 교환」 + 상품문제 → 불량)
-  const byWord = first ? list.find((p) => (!r || p.reason === r) && p.label !== "기타" && first.includes(p.label.split("·")[0].split(" ")[0])) : undefined;
+  // 메모에 칩 낱말(불량·오배송·품절…)이 들어 있고 사유도 맞으면 그 칩(예: 「팔 단면이 다름 불량 교환」 + 상품문제 → 상품불량)
+  const WORDS: Record<string, string[]> = { 상품불량: ["불량", "하자"], 품절상품주문: ["품절"], 오배송: ["오배송"], 주문취소: ["취소"], 단순변심: ["변심", "사이즈", "색상"] };
+  const byWord = first ? list.find((p) => (!r || p.reason === r) && p.label !== "기타" && (WORDS[p.label] || [p.label]).some((w) => first.includes(w))) : undefined;
   return byWord ? byWord.label : "";
 }
 

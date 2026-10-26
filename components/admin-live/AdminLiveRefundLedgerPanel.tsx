@@ -457,6 +457,17 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
   const CHIP = (on: boolean) => `h-9 rounded-full border px-3 text-[13px] font-semibold ${on ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink-soft hover:bg-surface-2"}`;
   const AMOUNT_INPUT = "h-9 w-24 rounded-lg border border-line px-2 text-right text-[14px] font-bold text-ink outline-none focus-visible:ring-2 focus-visible:ring-ink";
   const methodNote = isExchange ? "" : method === "카드취소" ? "카드 취소는 페이스터에서 · 여기는 기록만" : method === "계좌이체" ? "이체는 은행 앱에서 · 여기는 기록만" : method === "포인트" ? "포인트 지급은 회원 상세 › 포인트 지급에서" : "환불 없이 기록만";
+  // [2026-10-26 사장님] 메모 칸 — 환불·교환·출고는 사유 칩 바로 아래, 기타는 상품 아래
+  const memoBlock = (
+    <div className="mb-2">
+      <label className={`block ${SUB_LABEL}`}>메모 (선택)
+        <textarea value={issueMemo} onChange={(e) => setIssueMemo(e.target.value)}
+          placeholder={presetLabel === "기타" ? "기타 사유를 적어 주세요" : isShip ? "예: 방송 끝나고 주문 — 이번 출고에 같이" : issueType === "etc" ? "예: 차콜 XL 미발송, S 1개로 출고 요청" : isExchange ? "예: 오배송 — 베이지 M 으로 재발송" : "예: 사이즈 작아서 반품"}
+          className="mt-1.5 h-[72px] w-full resize-none rounded-lg border border-line bg-surface p-3 text-[16px] leading-6 text-ink outline-none focus-visible:ring-2 focus-visible:ring-ink" />
+      </label>
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onClick={onClose}>
       <div className="flex h-[min(92vh,880px)] w-full max-w-[600px] flex-col overflow-hidden rounded-t-xl bg-surface sm:rounded-xl" style={{ boxShadow: "0 8px 24px rgba(0,0,0,.08)" }} onClick={(e) => e.stopPropagation()}>
@@ -608,6 +619,8 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
                 })}
               </div>
               {!isEtc && !presetLabel && reasonChip ? <div className="mt-1.5 text-[12px] text-ink-mute">저장된 사유: {reasonChip}</div> : null}
+              {/* [2026-10-26 사장님] 메모는 사유 칩 바로 아래 */}
+              <div className="mt-3">{memoBlock}</div>
               {/* 반품 날짜 — 환불·교환만. 사유 칩과 헷갈리지 않게 칩(동그란 알약) 대신 날짜 칸 모양(8px) */}
               {!isEtc ? (
               <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -768,14 +781,8 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
           </>
           ) : null}
 
-          {/* 5. 메모 — 모든 유형 한 번 */}
-          <div className="mb-2">
-            <label className={`block ${SUB_LABEL}`}>메모 (선택)
-              <textarea value={issueMemo} onChange={(e) => setIssueMemo(e.target.value)}
-                placeholder={isEtc ? "예: 차콜 XL 미발송, S 1개로 출고 요청" : isExchange ? "예: 오배송 — 베이지 M 으로 재발송" : "예: 사이즈 작아서 반품"}
-                className="mt-1.5 h-[72px] w-full resize-none rounded-lg border border-line bg-surface p-3 text-[16px] leading-6 text-ink outline-none focus-visible:ring-2 focus-visible:ring-ink" />
-            </label>
-          </div>
+          {/* 5. 메모 — 기타 유형만 여기(사유 칩이 없어서). 환불·교환·출고는 사유 칩 바로 아래(2026-10-26 사장님) */}
+          {issueType === "etc" ? memoBlock : null}
           {/* 다음 할 일은 저장값 있으면 회색으로만. */}
           {nextActionSaved ? <div className="mb-1 text-[12px] text-ink-mute">다음 할 일: {nextActionSaved}</div> : null}
         </div>

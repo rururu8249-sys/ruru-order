@@ -9,23 +9,30 @@ assert.equal(transferCopyText('', '123', '', 0), '123');
 for (const k of ['refund', 'exchange', 'ship']) assert.ok(ISSUE_MEMO_PRESETS[k].length >= 3, k);
 assert.equal(ISSUE_MEMO_PRESETS.etc.length, 0, '기타는 사유 칩 없음');
 for (const k of ['refund', 'exchange']) assert.ok(ISSUE_MEMO_PRESETS[k].every((p) => ['단순변심', '상품문제', '기타'].includes(p.reason)), `${k} 칩은 사유도 맞춤`);
-assert.ok(ISSUE_MEMO_PRESETS.ship.every((p) => !p.reason && p.memo), '출고 칩 = 메모만');
+assert.ok(ISSUE_MEMO_PRESETS.ship.every((p) => !p.reason), '출고 칩 = 사유 없음');
 for (const k of ['refund', 'exchange', 'ship']) { const labels = ISSUE_MEMO_PRESETS[k].map((p) => p.label); assert.equal(new Set(labels).size, labels.length, `${k} 칩 이름 중복 없음`); }
 // 예전 칩의 반품비 판정 그대로: 품절·불량·오배송 = 상품문제(반품비 0), 단순변심·사이즈·색상 = 단순변심(반품비 칸)
 const R = (k, l) => ISSUE_MEMO_PRESETS[k].find((p) => p.label === l).reason;
-assert.equal(R('refund', '품절'), '상품문제'); assert.equal(R('refund', '불량·하자'), '상품문제'); assert.equal(R('refund', '단순변심'), '단순변심'); assert.equal(R('refund', '챙기기 전 취소'), '단순변심');
-assert.equal(R('exchange', '사이즈'), '단순변심'); assert.equal(R('exchange', '불량'), '상품문제'); assert.equal(R('exchange', '오배송'), '상품문제');
+// [2026-10-26] 사장님 확정 칩 이름
+assert.deepEqual(ISSUE_MEMO_PRESETS.refund.map((p) => p.label), ['단순변심', '품절상품주문', '주문취소', '상품불량', '오배송', '기타']);
+assert.deepEqual(ISSUE_MEMO_PRESETS.exchange.map((p) => p.label), ['단순변심', '상품불량', '오배송', '기타']);
+assert.deepEqual(ISSUE_MEMO_PRESETS.ship.map((p) => p.label), ['방종후 주문건', '추가주문', '기타']);
+assert.equal(R('refund', '품절상품주문'), '상품문제'); assert.equal(R('refund', '상품불량'), '상품문제'); assert.equal(R('refund', '오배송'), '상품문제'); assert.equal(R('refund', '단순변심'), '단순변심'); assert.equal(R('refund', '주문취소'), '단순변심');
+assert.equal(R('exchange', '단순변심'), '단순변심'); assert.equal(R('exchange', '상품불량'), '상품문제'); assert.equal(R('exchange', '오배송'), '상품문제');
 // 다시 열 때 눌린 칩 고르기
 const { presetFromSaved, issueKindTaskType, issueKindFromTaskTypes } = createUiLoader()('lib/refundLedger.ts');
-assert.equal(presetFromSaved('refund', '품절 상품 환불', '상품문제'), '품절');
-assert.equal(presetFromSaved('refund', '품절 상품 환불 · 손님 연락됨\n둘째 줄', '상품문제'), '품절', '칩 문구 뒤에 덧붙인 메모');
+assert.equal(presetFromSaved('refund', '품절 상품 환불', '상품문제'), '품절상품주문');
+assert.equal(presetFromSaved('refund', '품절 상품 환불 · 손님 연락됨\n둘째 줄', '상품문제'), '품절상품주문', '칩 문구 뒤에 덧붙인 메모');
 assert.equal(presetFromSaved('refund', '사이즈 작아서 반품', '단순변심'), '단순변심', '메모가 칩 문구가 아니면 사유 이름이 같은 칩');
 assert.equal(presetFromSaved('refund', '사이즈 작아서 반품', '상품문제'), '', '상품문제는 어느 칩인지 모르면 안 고름(금액 판정은 저장값 그대로)');
-assert.equal(presetFromSaved('exchange', '사이즈 교환', '단순변심'), '사이즈');
-assert.equal(presetFromSaved('exchange', '팔 왼쪽 오른쪽 단면cm가 다름 불량 교환', '상품문제'), '불량', '메모 낱말 + 사유가 맞으면 그 칩(사장님 10/25 화면 사례)');
+assert.equal(presetFromSaved('exchange', '사이즈 교환', '단순변심'), '단순변심', '예전 사이즈 칩 → 단순변심');
+assert.equal(presetFromSaved('refund', '물건 챙기기 전 환불', '단순변심'), '주문취소', '예전 챙기기 전 취소 칩');
+assert.equal(presetFromSaved('refund', '불량·하자 환불', '상품문제'), '상품불량', '예전 불량·하자 칩');
+assert.equal(presetFromSaved('exchange', '팔 왼쪽 오른쪽 단면cm가 다름 불량 교환', '상품문제'), '상품불량', '메모 낱말 + 사유가 맞으면 그 칩(사장님 10/25 화면 사례)');
 assert.equal(presetFromSaved('refund', '불량인 줄 알았는데 단순 변심', '단순변심'), '단순변심', '낱말이 있어도 사유가 다르면 그 칩 아님');
-assert.equal(presetFromSaved('ship', '누락 상품 — 픽업 후 출고', ''), '누락 상품');
-assert.equal(presetFromSaved('ship', '추가 주문건 — 확인 먼저 · 니트 S', ''), '추가 주문');
+assert.equal(presetFromSaved('ship', '방송 종료 후 주문건', ''), '방종후 주문건');
+assert.equal(presetFromSaved('ship', '누락 상품 — 픽업 후 출고', ''), '', '예전 누락 칩은 이제 없음 — 메모로만 보임');
+assert.equal(presetFromSaved('ship', '추가 주문건 — 확인 먼저 · 니트 S', ''), '추가주문');
 assert.equal(presetFromSaved('etc', '아무 메모', ''), '');
 // 출고 = admin_tasks.task_type shipping (서버가 이미 받는 값)
 assert.equal(issueKindTaskType('ship'), 'shipping'); assert.equal(issueKindTaskType('etc'), 'general'); assert.equal(issueKindTaskType('refund'), 'refund'); assert.equal(issueKindTaskType('exchange'), 'exchange');
