@@ -577,7 +577,7 @@ export function RefundProcessModal({ item, onClose, onSaved, openedFromOtherIssu
             {snapshotUnmatched ? (
               <div className="mt-1.5 text-[12px] text-danger-tx">저장된 상품을 주문에서 못 찾았어요 — 상품을 다시 선택해 주세요.</div>
             ) : null}
-            {!isExchange && pointUsed > 0 ? (
+            {!isExchange && !isEtc && pointUsed > 0 ? (
               <div className="mt-1.5 text-[12px] text-warn-tx">포인트 {formatComma(pointUsed)}원 사용 주문 — 환불액에서 자동 차감하지 않아요</div>
             ) : null}
             {/* [⑱] 기타 이슈 — 관련 상품 따로 추가(등록상품/직접). 환불·교환에선 숨김(값 유지). */}
