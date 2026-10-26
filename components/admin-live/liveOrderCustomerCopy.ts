@@ -183,6 +183,35 @@ export function buildPaymentRequestNote(order: LiveOrder): { title: string; mess
   };
 }
 
+// [2026-10-26] 결제요청 쪽지와 같이 보내는 카톡 알림톡(입금 안내) 변수 — 무통장 미입금만. 카드 미결제는 결제 링크가
+//   이미 카톡으로 가서 안 보냄. 금액·계좌는 위 쪽지와 같은 값(표시 전용). 템플릿 ID 가 없으면 서버가 쪽지만 보낸다.
+export function buildPaymentRequestKakao(order: LiveOrder): { kind: "unpaid"; vars: Record<string, string> } | null {
+  const ps = String(order.paymentStatus || "");
+  if (["paid", "auto_paid", "manual_paid", "card_paid", "canceled", "card_unpaid"].includes(ps)) return null;
+  const { payableTotal } = computeAmounts(order);
+  return {
+    kind: "unpaid",
+    vars: {
+      닉네임: String(order.nickname || order.name || "고객").trim(),
+      주문번호: String(order.orderNo || "").trim(),
+      금액: money(payableTotal),
+      계좌: bankLineForOrder(order),
+    },
+  };
+}
+
+/** 쪽지 + 카톡 결과 토스트 문구 */
+export function paymentRequestToast(who: string, kakao: { status?: string; sent?: number } | null | undefined): string {
+  const base = `${who}님께 결제요청 쪽지를 보냈어요.`;
+  if (!kakao) return base;
+  if (kakao.status === "sent" && Number(kakao.sent) > 0) return `${who}님께 결제요청 쪽지 + 카톡 알림을 보냈어요.`;
+  if (kakao.status === "not_configured") return base;
+  if (kakao.status === "no_phone") return `${base}
+카톡은 휴대폰 번호가 아니라 못 보냈어요.`;
+  return `${base}
+카톡 알림은 실패했어요(설정 › 카톡 알림 확인).`;
+}
+
 // [2026-08-31 사장님 요청 · 돈 계산기] 주문 금액이 바뀌어 입금이 부족할 때 보내는 추가입금 쪽지.
 //   계좌는 설정 › 상점 정보 값.
 export function buildExtraDepositRequestNote(nick: string, shortage: number, order?: Pick<LiveOrder, "paymentBank"> | null): { title: string; message: string } {

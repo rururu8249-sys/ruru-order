@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { sendKakaoNotify } from "@/lib/kakaoNotifyServer";
+import { cartProductSummary } from "@/lib/kakaoNotify";
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { checkoutReminderCopy } from "@/lib/cartHoldDetail";
@@ -286,16 +288,23 @@ async function sendReminders(supabase: ReturnType<typeof getSupabaseAdmin>, requ
   const nowIso = new Date().toISOString();
   const { data: holdRows, error } = await supabase
     .from("cart_reservations")
-    .select("session_key,customer_phone,expires_at")
+    .select("*")
     .in("session_key", keys)
     .gt("expires_at", nowIso)
     .limit(4000);
   if (error) throw new Error(error.message);
 
   const targets = new Map<string, { phone: string | null; expiresAt: string }>();
+  // [2026-10-26] 카톡 알림톡 변수용(닉네임·상품 이름) — 읽기만
+  const kakaoInfo = new Map<string, { nickname: string; products: string[] }>();
   for (const row of (holdRows || []) as Record<string, unknown>[]) {
     const key = cleanKey(row.session_key);
     if (!key) continue;
+    const info = kakaoInfo.get(key) || { nickname: "", products: [] };
+    info.nickname = info.nickname || String(row.nickname ?? "").trim();
+    const pname = String(row.product_name ?? "").trim() || String(row.detail_name ?? "").trim();
+    if (pname) info.products.push(pname);
+    kakaoInfo.set(key, info);
     const expiresAt = String(row.expires_at ?? "");
     const prev = targets.get(key);
     if (!prev || new Date(expiresAt).getTime() < new Date(prev.expiresAt).getTime()) {
@@ -329,7 +338,19 @@ async function sendReminders(supabase: ReturnType<typeof getSupabaseAdmin>, requ
     const { error: insertError } = await supabase.from("customer_site_alerts").insert(rows);
     if (insertError) throw new Error(insertError.message);
   }
-  return { sent: rows.length, skipped: keys.length - rows.length };
+  // [2026-10-26 사장님 「사이트 닫으면 모른다」] 쪽지가 새로 간 손님에게만 카톡 알림톡(주문서 제출 안내)도 — 템플릿 ID 설정돼 있을 때만.
+  //   2분 안 중복은 위에서 이미 빠짐. 실패해도 쪽지는 그대로.
+  let kakao: { status: string; sent: number; message?: string } | undefined;
+  if (rows.length > 0) {
+    const kakaoTargets = rows.filter((r) => r.customer_phone).map((r) => {
+      const info = kakaoInfo.get(r.target_session_key) || { nickname: "", products: [] };
+      return { phone: r.customer_phone, vars: { 닉네임: info.nickname || "고객", 상품: cartProductSummary(info.products) || "방송 상품" } };
+    });
+    kakao = kakaoTargets.length
+      ? await sendKakaoNotify(supabase, "cart", kakaoTargets, sentBy).catch((e) => ({ status: "fail", sent: 0, message: String(e?.message ?? e) }))
+      : { status: "no_phone", sent: 0 };
+  }
+  return { sent: rows.length, skipped: keys.length - rows.length, kakao };
 }
 
 // [㉛] 관리자 비우기 = 영구 비움 기록(cart_clear_marks). 세션키 + 그 세션의 kakao_id(우선)·전화로 기록해

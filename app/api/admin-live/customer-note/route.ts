@@ -32,6 +32,7 @@ import {
   targetSessionKeyOf,
   type CleanTarget,
 } from "@/lib/customerNote";
+import { sendKakaoNotify } from "@/lib/kakaoNotifyServer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -132,7 +133,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, message: "쪽지 저장 실패: " + error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, sent: (inserted || []).length, skipped, hours, sourceKeyMissing });
+    // [2026-10-26 사장님 「사이트 닫으면 모른다」] 결제요청 쪽지면 카톡 알림톡도 같이(템플릿 ID 설정돼 있을 때만).
+    //   쪽지가 «새로» 저장된 경우에만 — 중복 쪽지(10분)면 위에서 이미 돌아가 카톡도 안 감. 실패해도 쪽지 성공은 그대로.
+    let kakao: { status: string; sent: number; message?: string } | undefined;
+    const kakaoReq = body.kakao as { kind?: unknown; vars?: unknown } | undefined;
+    if (kakaoReq && kakaoReq.kind === "unpaid" && targets.length === 1 && (inserted || []).length > 0) {
+      const vars = (kakaoReq.vars && typeof kakaoReq.vars === "object" ? kakaoReq.vars : {}) as Record<string, unknown>;
+      kakao = await sendKakaoNotify(sb, "unpaid", [{ phone: targets[0].phone, vars }], sentBy).catch((e) => ({ status: "fail", sent: 0, message: String(e?.message ?? e) }));
+    }
+
+    return NextResponse.json({ ok: true, sent: (inserted || []).length, skipped, hours, sourceKeyMissing, kakao });
   } catch (e) {
     return NextResponse.json({ ok: false, message: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }

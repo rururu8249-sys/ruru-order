@@ -14,7 +14,7 @@ import { useLiveOrderItemAdd, createInitialLiveOrderItemAddForm, type LiveOrderI
 import { useLiveOrderItemDelete } from "./useLiveOrderItemDelete";
 import LiveOrderRegisteredProductPicker from "./LiveOrderRegisteredProductPicker";
 import LiveOrderDangerActionGuide from "./LiveOrderDangerActionGuide";
-import { buildCustomerOrderCopyText, buildExtraDepositRequestNote, buildPaymentRequestNote } from "./liveOrderCustomerCopy";
+import { buildCustomerOrderCopyText, buildExtraDepositRequestNote, buildPaymentRequestNote, buildPaymentRequestKakao, paymentRequestToast } from "./liveOrderCustomerCopy";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import AdminLiveCustomerBlockReasonModal from "./AdminLiveCustomerBlockReasonModal";
 import { requestAdminCustomerBlock } from "@/lib/adminCustomerBlock";
@@ -1298,10 +1298,10 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     if (payRequestSending) return;
     setPayRequestSending(true);
     try {
-      const res = await fetch("/api/admin-live/customer-note", { method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store", body: JSON.stringify({ phone, title: note.title, message: note.message }) });
+      const res = await fetch("/api/admin-live/customer-note", { method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store", body: JSON.stringify({ phone, title: note.title, message: note.message, kakao: buildPaymentRequestKakao(orderForView) ?? undefined }) });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.ok) { showAdminToast("결제요청 쪽지 실패\n\n" + (json?.message || `요청 실패(${res.status})`), "error"); return; }
-      showAdminToast(json.duplicate || Number(json.sent) === 0 ? "조금 전에 이미 같은 쪽지를 보냈어요." : `${orderForView.nickname || orderForView.name}님께 결제요청 쪽지를 보냈어요.`, "success");
+      showAdminToast(json.duplicate || Number(json.sent) === 0 ? "조금 전에 이미 같은 쪽지를 보냈어요." : paymentRequestToast(orderForView.nickname || orderForView.name, json.kakao), "success");
     } finally { setPayRequestSending(false); }
   };
 
