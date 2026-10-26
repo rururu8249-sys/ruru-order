@@ -44,4 +44,6 @@ assert.match(telegramTokenFormatIssue('bot7123456789:AAHabcdefghijklmnopqrstuvwx
 assert.match(telegramTokenFormatIssue('7123456789:AAHabc defghijklmnopqrstuvwxyz0123456789'), /공백/);
 assert.match(telegramTokenFormatIssue('abc'), /모양/);
 assert.equal(telegramTokenHint('7123456789:AAHx'), '봇 번호 7123456789');
+assert.equal(telegramTokenHint('mypassword!@()'), '', '토큰 모양 아니면 힌트에 값 안 보임');
+assert.equal(telegramTokenHint(''), '');
 console.log('token format: ok');

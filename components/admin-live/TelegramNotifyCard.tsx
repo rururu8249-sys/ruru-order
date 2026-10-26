@@ -153,7 +153,7 @@ export default function TelegramNotifyCard({onDraftStateChange}:SettingsDraftPro
 
       <div className={`rounded-xl border border-line px-3 py-2 text-xs font-black ${connected ? "bg-ok-bg text-ok-tx" : "bg-warn-bg text-warn-tx"}`}>
         {connected ? `저장됨 · 받는 사람 ${recipientCount}명${tokenHint ? ` · ${tokenHint}` : ""}` : "연결 안 됨"}
-        {tokenFormatIssue ? <div className="mt-1 font-semibold text-danger-tx">저장된 토큰 문제: {tokenFormatIssue}</div> : null}
+        {tokenFormatIssue ? <div className="mt-1 font-semibold text-danger-tx">저장된 값이 봇 토큰이 아니에요(브라우저가 로그인 비밀번호를 자동으로 채워 저장된 것으로 보여요). BotFather 토큰을 아래 칸에 붙여넣고 저장하면 바뀌어요.</div> : null}
       </div>
 
       {/* ① 봇 토큰 */}
@@ -166,7 +166,16 @@ export default function TelegramNotifyCard({onDraftStateChange}:SettingsDraftPro
           <input
             value={botToken}
             onChange={(e) => setBotToken(e.target.value)}
-            type="password"
+            // [2026-10-27] type="password" 였더니 브라우저가 관리자 로그인 비밀번호를 여기 «자동으로 채워» 저장됐음(옆 설정 검색칸엔 아이디).
+            //   → 일반 글자 칸 + 자동 채우기 끔. 봇 토큰은 관리자만 보는 화면이라 보여도 됨(붙여넣은 값을 눈으로 확인 가능).
+            type="text"
+            name="telegram-bot-token"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            data-1p-ignore
+            data-lpignore="true"
             placeholder={connected ? "저장됨 — 바꿀 때만 입력" : "예: 7xxxxxx:AAH..."}
             className="h-10 min-w-[240px] flex-1 rounded-xl border border-line bg-surface px-3 text-sm font-bold text-ink outline-none focus:border-rose-deep"
           />

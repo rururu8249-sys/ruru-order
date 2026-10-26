@@ -90,7 +90,10 @@ export function telegramTokenFormatIssue(token: string): string {
 
 /** 토큰 힌트(비밀 아님 — 콜론 앞 봇 번호만) */
 export function telegramTokenHint(token: string): string {
-  const head = String(token ?? "").trim().split(":")[0] || "";
+  // [2026-10-27] 토큰 모양이 아니면(예: 자동 채워진 비밀번호) 아무것도 보여주지 않음 — 비밀번호가 화면에 그대로 나오던 것 수정
+  const t = String(token ?? "").trim();
+  if (!/^\d{6,12}:/.test(t)) return "";
+  const head = t.split(":")[0] || "";
   return head ? `봇 번호 ${head}` : "";
 }
 

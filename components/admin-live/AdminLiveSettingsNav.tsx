@@ -9,7 +9,7 @@ export default function AdminLiveSettingsNav({activeTab,section,onSelect}:{activ
     <select aria-label="설정 항목 선택" value={selectedLabel} onChange={event=>{const item=SETTINGS_NAV_GROUPS.flatMap(group=>group.items).find(item=>item.label===event.target.value);if(item)onSelect(item.destination);}} className="min-h-11 w-full rounded-xl border border-line bg-surface px-2 text-xs font-bold text-ink md:hidden">
       {SETTINGS_NAV_GROUPS.map(group=><optgroup key={group.id} label={group.label}>{group.items.map(item=><option key={item.label} value={item.label}>{item.label}</option>)}</optgroup>)}
     </select>
-    <input aria-label="설정 항목 검색" value={query} onChange={event=>setQuery(event.target.value)} placeholder="설정 검색" className="min-h-11 w-full rounded-xl border border-line bg-surface px-2 text-xs text-ink md:min-h-9" />
+    <input type="search" name="settings-nav-search" autoComplete="off" data-1p-ignore data-lpignore="true" aria-label="설정 항목 검색" value={query} onChange={event=>setQuery(event.target.value)} placeholder="설정 검색" className="min-h-11 w-full rounded-xl border border-line bg-surface px-2 text-xs text-ink md:min-h-9" />
     {query.trim() ? <div>{searchSettingsNavigation(query).map(itemButton)}{searchSettingsNavigation(query).length===0 ? <p className="p-2 text-xs text-ink-mute">검색 결과 없음</p> : null}</div> : <div className="hidden md:block">{SETTINGS_NAV_GROUPS.map(group=><div key={group.id}>
       <p className="px-2 py-1 text-[11px] font-black text-ink-mute">{group.label}</p>
       <div>{group.items.map(itemButton)}</div>
