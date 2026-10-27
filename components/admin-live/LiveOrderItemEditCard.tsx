@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatOrderOptionText, stripNoneOptionParts } from "@/lib/orderOptionText";
+import { supabase } from "@/lib/supabase";
+import { choiceExists, normChoice, readOrderItemOptionChoices, sizesForColor, type OrderItemOptionChoices } from "@/lib/orderItemOptionChoices";
 import type { LiveOrderItem } from "./types";
 import {
   createInitialLiveOrderItemEditForm,
@@ -29,6 +31,11 @@ type Props = {
 
 function money(value: unknown) {
   return `${Number(value || 0).toLocaleString("ko-KR")}원`;
+}
+
+function eulReul(word: string) {
+  const code = String(word || "").trim().slice(-1).charCodeAt(0);
+  return code >= 0xac00 && code <= 0xd7a3 && (code - 0xac00) % 28 > 0 ? "을" : "를";
 }
 
 function clean(value: unknown) {
@@ -186,6 +193,22 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
   const itemHasRealSize = formatOrderOptionText("없음", item.size) !== "";
   const [showColorField, setShowColorField] = useState(false);
   const [showSizeField, setShowSizeField] = useState(false);
+  // [2026-10-27] 색상·사이즈는 그 상품의 지금 재고표에서 고르기 — 오타·옛 옵션 이름으로 저장되는 것 방지.
+  //   못 읽거나(직접입력·브랜드 묶음·조합형·재고관리 OFF) 「직접 입력」을 누르면 예전 입력칸.
+  const [choices, setChoices] = useState<OrderItemOptionChoices | null>(null);
+  const [manualOption, setManualOption] = useState(false);
+  useEffect(() => {
+    if (!editing || !item.productId) return;
+    let alive = true;
+    void (async () => {
+      const { data } = await supabase.from("products").select("id,product_note").eq("id", Number(item.productId)).maybeSingle();
+      if (alive) setChoices(readOrderItemOptionChoices(data as { product_note?: unknown } | null));
+    })();
+    return () => { alive = false; };
+  }, [editing, item.productId]);
+  const pickMode = Boolean(choices) && !manualOption;
+  const currentMissing = Boolean(choices) && !choiceExists(choices as OrderItemOptionChoices, item.color, item.size);
+  const pickedOk = !pickMode || choiceExists(choices as OrderItemOptionChoices, form.color, form.size);
   const optionTextView = (() => {
     const base = getOptionText(item);
     if (!base) return "";
@@ -194,10 +217,12 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
 
   const cancelEdit = () => {
     setForm(createInitialLiveOrderItemEditForm(item));
+    setManualOption(false);
     setEditing(false);
   };
 
   const submit = async () => {
+    if (!pickedOk) return;
     const ok = await saveItem({ item, form });
     if (ok) setEditing(false);
   };
@@ -206,7 +231,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
     return (
       <div className="overflow-hidden rounded-xl border-2 border-ink bg-surface p-3">
         <div className="mb-2 flex items-center justify-between">
-          <div className="text-[13px] font-bold text-ink">상품 {index + 1} 수정</div>
+          <div className="text-[13px] font-bold text-ink">상품 {index + 1} 수정{pickMode ? " — 바꿀 옵션을 고르세요" : ""}</div>
           {countText ? (
             <div className="flex flex-wrap items-center justify-end gap-1.5">
               <span className="rounded-full bg-warn-bg px-2 py-1 text-[11px] font-bold text-warn-tx">
@@ -236,6 +261,57 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
             />
           </label>
 
+          {pickMode && choices ? (
+            <div className="grid grid-cols-1 gap-2">
+              {currentMissing ? (
+                <p className="rounded-lg bg-warn-bg px-3 py-2 text-[13px] font-semibold text-warn-tx">
+                  지금 옵션 「{formatOrderOptionText(item.color, item.size) || "없음"}」은 상품에 없어요(이름이 바뀌었을 수 있어요). 아래에서 지금 옵션으로 골라 주세요.
+                </p>
+              ) : null}
+              {choices.hasColor ? (
+                <label className="grid min-w-0 gap-1">
+                  <span className="text-[13px] font-semibold text-ink-soft">{colorFieldLabel}</span>
+                  <select
+                    value={choices.colors.includes(normChoice(form.color)) ? normChoice(form.color) : ""}
+                    onChange={(event) => {
+                      const color = event.target.value;
+                      const sizes = sizesForColor(choices, color);
+                      setForm((prev) => {
+                        const keepSize = sizes.some((r) => r.size === normChoice(prev.size));
+                        return { ...prev, color, size: choices.hasSize ? (keepSize ? normChoice(prev.size) : sizes.length === 1 ? sizes[0].size : "") : "" };
+                      });
+                    }}
+                    className="h-11 w-full min-w-0 rounded-lg border border-line bg-surface px-3 text-[16px] font-medium text-ink outline-none focus:border-ink"
+                  >
+                    <option value="">{colorFieldLabel}{eulReul(colorFieldLabel)} 고르세요</option>
+                    {choices.colors.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </label>
+              ) : null}
+              {choices.hasSize ? (() => {
+                const sizes = choices.hasColor ? sizesForColor(choices, form.color) : choices.rows.filter((r) => r.size && !r.color);
+                const disabledSize = choices.hasColor && !normChoice(form.color);
+                return (
+                  <label className="grid min-w-0 gap-1">
+                    <span className="text-[13px] font-semibold text-ink-soft">사이즈</span>
+                    <select
+                      value={sizes.some((r) => r.size === normChoice(form.size)) ? normChoice(form.size) : ""}
+                      disabled={disabledSize}
+                      onChange={(event) => setForm((prev) => updateForm(prev, "size", event.target.value))}
+                      className="h-11 w-full min-w-0 rounded-lg border border-line bg-surface px-3 text-[16px] font-medium text-ink outline-none focus:border-ink disabled:bg-surface-2 disabled:text-ink-mute"
+                    >
+                      <option value="">{disabledSize ? `${colorFieldLabel}부터 고르세요` : "사이즈를 고르세요"}</option>
+                      {sizes.map((r) => <option key={r.size} value={r.size}>{r.size} · 재고 {r.stock}</option>)}
+                    </select>
+                  </label>
+                );
+              })() : null}
+              {!pickedOk ? <p className="text-[13px] text-warn-tx">옵션을 골라야 저장돼요.</p> : null}
+              <button type="button" onClick={() => setManualOption(true)} className="w-fit text-[13px] font-semibold text-ink-mute underline underline-offset-2 hover:text-ink">
+                직접 입력
+              </button>
+            </div>
+          ) : (
           <div className="grid grid-cols-1 gap-2">
             {itemHasRealColor || showColorField ? (
             <label className="grid min-w-0 gap-1">
@@ -269,6 +345,12 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
             </button>
             )}
           </div>
+          )}
+          {choices && manualOption ? (
+            <button type="button" onClick={() => { setManualOption(false); setForm((prev) => ({ ...prev, color: item.color || "", size: item.size || "" })); }} className="w-fit text-[13px] font-semibold text-ink-mute underline underline-offset-2 hover:text-ink">
+              목록에서 고르기
+            </button>
+          ) : null}
 
           <div className="grid grid-cols-1 gap-2">
             <label className="grid min-w-0 gap-1">
@@ -339,7 +421,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
           <button
             type="button"
             onClick={submit}
-            disabled={saving || inventoryLocked}
+            disabled={saving || inventoryLocked || !pickedOk}
             className="h-10 rounded-lg bg-ink text-[14px] font-bold text-white disabled:bg-surface-3"
           >
             {inventoryLocked ? "수정잠금" : saving ? "저장중..." : "저장"}

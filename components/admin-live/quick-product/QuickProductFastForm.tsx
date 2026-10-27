@@ -33,6 +33,7 @@ import BrandDetailInfoEditor from './BrandDetailInfoEditor';
 import ColorSwatchEditor from './ColorSwatchEditor';
 import {readProductColorSwatches, retainColorSwatches, type ColorSwatchMap} from '@/lib/productColorSwatches';
 import { readAdminUiPreview } from "@/lib/adminUiSwitch";
+import { detectOptionRenames, mergeOptionRenames } from "@/lib/optionRenames";
 
 type ProductRow = Record<string, unknown>;
 
@@ -2019,6 +2020,15 @@ export default function QuickProductFastForm({
             }
           : {}),
         ...(optionAxesPayload ? { option_axes: optionAxesPayload, combo_detail_values: exposedDetails } : {}),
+        // [2026-10-27] 옵션 이름만 바꾼 기록 — 옛 이름 주문을 고치거나 취소할 때 재고 RPC 가 지금 이름 줄을 찾는다(없으면 키 생략)
+        ...(() => {
+          const renames = mergeOptionRenames(
+            (initialProductNote as { option_renames?: unknown } | null)?.option_renames,
+            isEditMode ? detectOptionRenames(initialProductNote?.stock_variants || [], variantStockPayload) : [],
+            variantStockPayload,
+          );
+          return renames.length > 0 ? { option_renames: renames } : {};
+        })(),
       });
 
       // [2026-09-03] 새 상품 + 뱃지 미선택 → ⚡특가/💖루루픽 중 «랜덤 1개» 자동으로 붙이던 것 — 삭제.

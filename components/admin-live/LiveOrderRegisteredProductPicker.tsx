@@ -187,7 +187,7 @@ type Props = {
   initialSearch?: string;
 };
 
-export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, adding, title = "등록상품 추가 (재고 차감)", confirmLabel = "이 주문에 추가 (재고 차감)", initialSearch = "" }: Props) {
+export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, adding, title = "추가할 상품을 고르세요", confirmLabel = "이 주문에 추가 (재고 차감)", initialSearch = "" }: Props) {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState(initialSearch);
