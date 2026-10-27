@@ -1,4 +1,7 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { isSettledDeposit, settledReason } from "@/lib/depositSettle";
+import { showAdminConfirm } from "@/lib/adminConfirm";
+import { showAdminToast } from "@/lib/adminToast";
 import type { LedgerStatus, RawDepositRow } from "./depositLedgerTypes";
 import { depositLedgerStatusLabel } from "@/lib/orderLabels";
 import DepositLinkedOrderInfo from "./DepositLinkedOrderInfo";
@@ -20,6 +23,8 @@ type Props = {
   presentation?: "modal" | "inline";
   /** [2026-10-21 a4-3] 아직 주문과 안 맞은 입금 → 입금매칭 창을 이 입금으로 연다(매칭 로직은 그 창 그대로) */
   onOpenMatch?: (row: RawDepositRow) => void;
+  /** [2026-10-27] 「정리」한 입금을 되돌린 뒤(목록 다시 불러오기) */
+  onUnsettled?: () => void | Promise<void>;
 };
 
 function DetailLine({
@@ -69,11 +74,39 @@ function guideText(status: LedgerStatus) {
   };
 }
 
-export default function DepositDetailModal({ row, onClose, presentation = "modal", onOpenMatch }: Props) {
+export default function DepositDetailModal({ row, onClose, presentation = "modal", onOpenMatch, onUnsettled }: Props) {
+  const [undoing, setUndoing] = useState(false);
   if (!row) return null;
 
   const status = getDepositStatus(row);
-  const guide = guideText(status);
+  // [2026-10-27] 「정리」한 입금(주문과 상관없음) — 안내 문구를 바꾸고 되돌리기 버튼
+  const settled = isSettledDeposit(row as Record<string, unknown>);
+  const guide = settled
+    ? {
+        title: `정리한 입금이에요 · ${settledReason(row as Record<string, unknown>)}`,
+        body: "주문과 상관없는 입금이라 입금매칭 목록에서 뺐어요. 잘못 정리했으면 「정리 취소」를 누르세요.",
+        className: "border-line bg-surface-2 text-ink",
+      }
+    : guideText(status);
+  const undoSettle = async () => {
+    if (undoing) return;
+    if (!(await showAdminConfirm("이 입금의 정리를 취소할까요?\n다시 입금매칭 목록에 나와요.", { title: "정리 취소", confirmText: "정리 취소" }))) return;
+    setUndoing(true);
+    try {
+      const res = await fetch("/api/admin-live/deposit-settle", {
+        method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store",
+        body: JSON.stringify({ depositId: Number((row as { id?: unknown }).id), undo: true }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) throw new Error(json?.message || `요청 실패(${res.status})`);
+      showAdminToast("정리를 취소했어요. 입금매칭 목록에 다시 나와요.", "success");
+      await onUnsettled?.();
+    } catch (e) {
+      showAdminToast(`정리 취소 실패: ${e instanceof Error ? e.message : String(e)}`, "error");
+    } finally {
+      setUndoing(false);
+    }
+  };
   const depositorName = getDepositName(row) || "-";
   const amount = getDepositAmount(row);
 
@@ -131,6 +164,16 @@ export default function DepositDetailModal({ row, onClose, presentation = "modal
         <div className="shrink-0 border-t border-line-soft bg-surface px-6 py-4 shadow-sm">
           <div className="flex items-center justify-end gap-2">
             {/* [2026-10-21 a4-3] 입금내역(조회) → 입금매칭(처리) 입구. 매칭 자체는 입금매칭 창의 기존 API 그대로 */}
+            {settled ? (
+              <button
+                type="button"
+                disabled={undoing}
+                onClick={() => void undoSettle()}
+                className="h-10 rounded-lg border border-line bg-surface px-4 text-[13px] font-bold text-ink transition hover:bg-surface-2 disabled:opacity-50"
+              >
+                {undoing ? "처리 중…" : "정리 취소"}
+              </button>
+            ) : null}
             {onOpenMatch && status !== "확인완료" ? (
               <button
                 type="button"

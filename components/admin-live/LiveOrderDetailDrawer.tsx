@@ -1616,7 +1616,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                     {balanceInfo.lastRefund ? (
                       <div className="text-[11px] font-bold text-warn-tx">참고: 전에 이 주문으로 {money(balanceInfo.lastRefund.amount)}를 돌려준 기록이 있어요. 그 뒤 금액이 또 바뀐 경우에만 다시 누르세요.</div>
                     ) : null}
-                    <div className="text-[11px] font-bold text-warn-tx">계좌로 직접 환불하실 거면 이 버튼은 누르지 마세요.</div>
+                    <div className="text-[11px] font-bold text-warn-tx">계좌로 돌려주실 땐 이 버튼 대신 아래 「고객이슈」 › 「+ 등록」에서 환불로 등록하세요.</div>
                   </>
                 )}
               </div>

@@ -341,7 +341,7 @@ export default function PaymentMatchPanel({ deposits: depositsFromParent, presen
       ) : <p className="py-4 text-sm text-ink-soft">입금내역을 확인하지 못했습니다. 새로고침으로 다시 시도해 주세요.</p>}
       </div>
 
-      <div data-deposit-detail><DepositDetailModal presentation={compact ? "inline" : "modal"} row={selectedDeposit} onClose={() => setSelectedDeposit(null)} onOpenMatch={onOpenMatch ? (row) => { setSelectedDeposit(null); onOpenMatch(row); } : undefined} /></div>
+      <div data-deposit-detail><DepositDetailModal presentation={compact ? "inline" : "modal"} row={selectedDeposit} onClose={() => setSelectedDeposit(null)} onOpenMatch={onOpenMatch ? (row) => { setSelectedDeposit(null); onOpenMatch(row); } : undefined} onUnsettled={async () => { setSelectedDeposit(null); await loadDeposits({ background: true }); }} /></div>
     </div>
   );
 }

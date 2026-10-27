@@ -6,6 +6,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { LiveOrder } from "./types";
 import { showAdminToast } from "@/lib/adminToast";
+import { showAdminConfirm } from "@/lib/adminConfirm";
+import { DEPOSIT_SETTLE_REASONS, depositMatchDecision } from "@/lib/depositSettle";
 import {
   deriveLiveOrderMatchKeys,
   isUnmatchedLiveDeposit,
@@ -83,6 +85,8 @@ export default function LiveFloatingMatchPanel({
   const [search, setSearch]   = useState(initialSearch);
   const [selectedDepIds, setSelectedDepIds] = useState<Set<number>>(() => new Set(initialDepositId != null && Number.isFinite(Number(initialDepositId)) ? [Number(initialDepositId)] : []));
   const [matchSaving, setMatchSaving] = useState(false);
+  // [2026-10-27] 입금 「정리」 — 주문과 상관없는 입금(인증·중복·환불 끝)을 목록에서 빼기. 이유 고르는 줄을 연 입금 id
+  const [settleOpenId, setSettleOpenId] = useState<number | null>(null);
 
   const matchMode = !!selectedOrderForMatch;
 
@@ -196,11 +200,22 @@ export default function LiveFloatingMatchPanel({
   // 선택 합계
   const selDeps = filtered.filter(d => selectedDepIds.has(Number(d.id)));
   const selTotal = selDeps.reduce((s, d) => s + Number(d.amount ?? 0), 0);
-  const canConfirm = matchMode && selDeps.length > 0 && selTotal === expectedAmount;
+  // [2026-10-27] 주문서 1개 + 입금이 더 많으면(손님이 더 냄) 확인창 뒤 연결 허용 — 차액은 주문상세에서 포인트/환불.
+  //   입금이 적거나 여러 주문 묶음이면 지금처럼 딱 맞아야 함(서버 manual-payment-match 도 여러 주문은 정확일치 검사).
+  const matchDecision = depositMatchDecision(selTotal, expectedAmount, extraOrders.length > 0);
+  const canConfirm = matchMode && selDeps.length > 0 && matchDecision !== "blocked";
 
   // 확정: 입금 연결 (선택 합계 === 주문금액일 때만)
   async function handleConfirmWithDeposit() {
     if (!selectedOrderForMatch || matchSaving || !canConfirm) return;
+    if (matchDecision === "over") {
+      const extra = selTotal - expectedAmount;
+      const ok = await showAdminConfirm(
+        `입금 ${won(selTotal)}이 주문 금액 ${won(expectedAmount)}보다 ${won(extra)} 많아요.\n\n이 입금으로 입금확인할까요?\n남는 ${won(extra)}은 주문상세에서 포인트로 돌려주거나 계좌로 환불하세요.`,
+        { title: "손님이 더 낸 입금", confirmText: "입금확인" },
+      );
+      if (!ok) return;
+    }
     setMatchSaving(true);
     try {
       const { orderGroupId, orderIds: baseOrderIds } = deriveLiveOrderMatchKeys(selectedOrderForMatch);
@@ -243,6 +258,32 @@ export default function LiveFloatingMatchPanel({
       await onMatched();
     } catch (e: any) {
       showAdminToast(`오류: ${e?.message ?? e}`, "error");
+    } finally {
+      setMatchSaving(false);
+    }
+  }
+
+  // [2026-10-27] 입금 정리 — deposits.match_status 처리완료 + 「정리: 이유」만 (주문·금액·정산 무접촉, 입금내역 상세에서 되돌리기)
+  async function settleDeposit(dep: any, reason: string) {
+    if (matchSaving) return;
+    const ok = await showAdminConfirm(
+      `${dep.depositor_name ?? "-"} ${won(Number(dep.amount ?? 0))} 입금을 「${reason}」(으)로 정리할까요?\n\n입금매칭 목록에서 빠지고, 입금내역에는 남아요. 입금내역 상세에서 되돌릴 수 있어요.`,
+      { title: "입금 정리", confirmText: "정리" },
+    );
+    if (!ok) return;
+    setMatchSaving(true);
+    try {
+      const res = await fetch("/api/admin-live/deposit-settle", {
+        method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store",
+        body: JSON.stringify({ depositId: Number(dep.id), reason }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) throw new Error(json?.message || `요청 실패(${res.status})`);
+      showAdminToast("입금을 정리했어요", "success");
+      setSettleOpenId(null);
+      await onMatched();
+    } catch (e: any) {
+      showAdminToast(`정리 실패: ${e?.message ?? e}`, "error");
     } finally {
       setMatchSaving(false);
     }
@@ -347,12 +388,16 @@ export default function LiveFloatingMatchPanel({
               })}
             </div>
           )}
-          <div className={`text-[13px] font-semibold ${selDeps.length === 0 ? "text-ink-mute" : selTotal === expectedAmount ? "text-ok-tx" : "text-danger-tx"}`}>
+          <div className={`text-[13px] font-semibold ${selDeps.length === 0 ? "text-ink-mute" : matchDecision === "exact" ? "text-ok-tx" : matchDecision === "over" ? "text-warn-tx" : "text-danger-tx"}`}>
             {selDeps.length === 0
               ? "아래에서 이 주문의 입금을 고르세요"
-              : selTotal === expectedAmount
+              : matchDecision === "exact"
                 ? `고른 입금 ${won(selTotal)} · 주문 금액과 같아요`
-                : `고른 입금 ${won(selTotal)} · 주문 금액과 달라요`}
+                : matchDecision === "over"
+                  ? `고른 입금 ${won(selTotal)} · ${won(selTotal - expectedAmount)} 더 냈어요 — 입금확인 뒤 주문상세에서 포인트로 돌려주세요`
+                  : selTotal < expectedAmount
+                    ? `고른 입금 ${won(selTotal)} · ${won(expectedAmount - selTotal)} 부족해요 — 더 입금받거나 주문 금액을 고친 뒤 확인`
+                    : `고른 입금 ${won(selTotal)} · 여러 주문을 묶을 땐 금액이 딱 맞아야 해요`}
           </div>
           <div className="flex gap-2">
             <button type="button" onClick={handleConfirmWithDeposit} disabled={!canConfirm || matchSaving}
@@ -396,7 +441,7 @@ export default function LiveFloatingMatchPanel({
                   aria-checked={selectable ? checked : undefined}
                   tabIndex={selectable ? 0 : undefined}
                   onKeyDown={selectable ? (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggleDep(depId); } } : undefined}
-                  className={`flex items-center gap-2.5 border-b border-line px-3 py-2 ${selectable ? "cursor-pointer" : ""} ${checked ? "bg-surface-2" : ""} ${isMatched ? "opacity-50" : ""}`}>
+                  className={`flex flex-wrap items-center gap-2.5 border-b border-line px-3 py-2 ${selectable ? "cursor-pointer" : ""} ${checked ? "bg-surface-2" : ""} ${isMatched ? "opacity-50" : ""}`}>
 
                   {/* 체크 (주문을 골라 열었을 때 + 미매칭만) */}
                   {selectable && (
@@ -444,7 +489,24 @@ export default function LiveFloatingMatchPanel({
                         title="뒤 주문표를 이 입금자명으로 검색해요"
                         className="mt-1 h-8 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2">주문 찾기</button>
                     )}
+                    {!matchMode && !isMatched && (
+                      <button type="button" onClick={e => { e.stopPropagation(); setSettleOpenId(settleOpenId === depId ? null : depId); }}
+                        aria-expanded={settleOpenId === depId}
+                        title="주문과 상관없는 입금(인증·중복·환불 끝)을 목록에서 빼요"
+                        className="ml-1 mt-1 h-8 rounded-lg px-2 text-[13px] font-semibold text-ink-mute hover:bg-surface-2 hover:text-ink">정리</button>
+                    )}
                   </div>
+                  {settleOpenId === depId && !matchMode && !isMatched && (
+                    <div className="basis-full" onClick={e => e.stopPropagation()}>
+                      <div className="mt-1 text-[12px] font-semibold text-ink-mute">정리 이유</div>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {DEPOSIT_SETTLE_REASONS.map(r => (
+                          <button key={r} type="button" disabled={matchSaving} onClick={() => void settleDeposit(dep, r)}
+                            className="h-9 rounded-full border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-50">{r}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
