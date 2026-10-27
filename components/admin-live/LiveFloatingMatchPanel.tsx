@@ -87,6 +87,8 @@ export default function LiveFloatingMatchPanel({
   const [matchSaving, setMatchSaving] = useState(false);
   // [2026-10-27] 입금 「정리」 — 주문과 상관없는 입금(인증·중복·환불 끝)을 목록에서 빼기. 이유 고르는 줄을 연 입금 id
   const [settleOpenId, setSettleOpenId] = useState<number | null>(null);
+  // [2026-10-27 사장님 「전체 정리 버튼」] 지금 보이는 목록 한 번에 정리 — 이유 고르는 줄 열림
+  const [bulkSettleOpen, setBulkSettleOpen] = useState(false);
 
   const matchMode = !!selectedOrderForMatch;
 
@@ -289,6 +291,48 @@ export default function LiveFloatingMatchPanel({
     }
   }
 
+  // [2026-10-27] 전체 정리 — 지금 목록(기간·검색 적용)에서 «주문이 있을 수 있는 입금»은 빼고 정리.
+  //   빼는 것: 연결 추천 주문이 있는 입금 + 같은 이름(점수 80↑) 미입금 무통장 주문이 있는 입금.
+  function hasPossibleOrder(dep: any): boolean {
+    if (findBestOrder(dep)) return true;
+    return (allOrders || orders).some(o =>
+      ["unpaid", "manual_match_needed"].includes(String(o.paymentStatus)) &&
+      !String(o.paymentMethod || "").includes("카드") &&
+      depNameScore(dep, o) >= 80);
+  }
+  const bulkTargets = useMemo(() => filtered.filter(d => isUnmatchedLiveDeposit(d) && !hasPossibleOrder(d)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, orders, allOrders]);
+  const bulkKept = filtered.filter(d => isUnmatchedLiveDeposit(d)).length - bulkTargets.length;
+
+  async function settleAll(reason: string) {
+    if (matchSaving || bulkTargets.length === 0) return;
+    const total = bulkTargets.reduce((sum, d) => sum + Number(d.amount ?? 0), 0);
+    const ok = await showAdminConfirm(
+      `지금 보이는 입금 ${bulkTargets.length}건(합계 ${won(total)})을 「${reason}」(으)로 정리할까요?` +
+      (bulkKept > 0 ? `\n\n같은 이름 미입금 주문이 있는 ${bulkKept}건은 빼고 남겨 둬요.` : "") +
+      `\n\n입금매칭 목록에서 빠지고, 입금내역에는 남아요. 입금내역 상세에서 한 건씩 되돌릴 수 있어요.`,
+      { title: "전체 정리", confirmText: `${bulkTargets.length}건 정리` },
+    );
+    if (!ok) return;
+    setMatchSaving(true);
+    try {
+      const res = await fetch("/api/admin-live/deposit-settle", {
+        method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store",
+        body: JSON.stringify({ depositIds: bulkTargets.map(d => Number(d.id)), reason }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) throw new Error(json?.message || `요청 실패(${res.status})`);
+      showAdminToast(`입금 ${json.settled}건을 정리했어요${json.skipped ? ` · ${json.skipped}건은 그 사이 처리돼 건너뜀` : ""}`, "success");
+      setBulkSettleOpen(false);
+      await onMatched();
+    } catch (e: any) {
+      showAdminToast(`정리 실패: ${e?.message ?? e}`, "error");
+    } finally {
+      setMatchSaving(false);
+    }
+  }
+
   // 브라우징 모드: 입금 1건 즉시 확정 (findBestOrder가 금액 정확일치만 후보로 줌)
   async function confirmDepositToOrder(dep: any, order: LiveOrder) {
     if (matchSaving) return;
@@ -410,6 +454,35 @@ export default function LiveFloatingMatchPanel({
               입금 없이 확인
             </button>
           </div>
+        </div>
+      )}
+
+      {/* [2026-10-27] 전체 정리 — 주문을 고르지 않았을 때만 */}
+      {!matchMode && filtered.length > 0 && (
+        <div className="shrink-0 border-b border-line px-3 py-2">
+          <div className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 text-[12px] text-ink-mute">
+              {bulkTargets.length > 0
+                ? `주문 없는 입금 ${bulkTargets.length}건${bulkKept > 0 ? ` · 주문 있을 수 있는 ${bulkKept}건 제외` : ""}`
+                : "모두 같은 이름 미입금 주문이 있어요 — 한 건씩 확인하세요"}
+            </span>
+            <button type="button" onClick={() => setBulkSettleOpen(v => !v)} disabled={matchSaving || bulkTargets.length === 0}
+              aria-expanded={bulkSettleOpen}
+              className="h-9 shrink-0 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50">
+              전체 정리
+            </button>
+          </div>
+          {bulkSettleOpen && bulkTargets.length > 0 && (
+            <div className="mt-2">
+              <div className="text-[12px] font-semibold text-ink-mute">정리 이유</div>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {DEPOSIT_SETTLE_REASONS.map(r => (
+                  <button key={r} type="button" disabled={matchSaving} onClick={() => void settleAll(r)}
+                    className="h-9 rounded-full border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-50">{r}</button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

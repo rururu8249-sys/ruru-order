@@ -40,6 +40,34 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => null);
+    // [2026-10-27 사장님 「전체 정리 버튼」] 여러 입금 한 번에 — depositIds 배열(최대 500). 규칙은 한 건 정리와 같다.
+    if (Array.isArray(body?.depositIds)) {
+      const reasonAll = String(body?.reason || "").trim();
+      if (!DEPOSIT_SETTLE_REASONS.includes(reasonAll as (typeof DEPOSIT_SETTLE_REASONS)[number])) {
+        return jsonError("정리 이유를 골라 주세요.");
+      }
+      const ids = Array.from(new Set((body.depositIds as unknown[]).map(Number).filter((n) => Number.isFinite(n) && n > 0)));
+      if (ids.length === 0) return jsonError("정리할 입금이 없습니다.");
+      if (ids.length > 500) return jsonError("한 번에 500건까지만 정리할 수 있어요.");
+      const supabaseAll = getSupabaseAdminClient();
+      const { data: rows, error: readAllError } = await supabaseAll
+        .from("deposits")
+        .select("id, match_status, match_order_group_id, match_customer_id, confirmed_at, confirmed_note")
+        .in("id", ids);
+      if (readAllError) return jsonError(readAllError.message || "입금 조회 실패", 500);
+      const okIds = (Array.isArray(rows) ? rows : []).filter((r) => isSettleableDeposit(r)).map((r) => Number(r.id));
+      if (okIds.length === 0) return NextResponse.json({ ok: true, settled: 0, skipped: ids.length });
+      const { data: updatedAll, error: updateAllError } = await supabaseAll
+        .from("deposits")
+        .update({ match_status: DEPOSIT_SETTLE_STATUS, confirmed_note: `${DEPOSIT_SETTLE_PREFIX}${reasonAll}` })
+        .in("id", okIds)
+        .is("match_order_group_id", null)
+        .is("confirmed_at", null)
+        .select("id");
+      if (updateAllError) return jsonError(updateAllError.message || "정리 실패", 500);
+      const settled = Array.isArray(updatedAll) ? updatedAll.length : 0;
+      return NextResponse.json({ ok: true, settled, skipped: ids.length - settled });
+    }
     const depositId = Number(body?.depositId);
     const undo = body?.undo === true;
     const reason = String(body?.reason || "").trim();

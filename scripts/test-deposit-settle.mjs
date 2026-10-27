@@ -40,11 +40,12 @@ async function run(row, body, opts={}) {
   const db={from(table){
     assert.equal(table,'deposits','deposits 외 테이블 금지');
     let action='select',payload,filters=[];
-    const q={select(){return q;},eq(k,v){filters.push(['eq',k,v]);return q;},is(k,v){filters.push(['is',k,v]);return q;},
+    const q={select(){return q;},eq(k,v){filters.push(['eq',k,v]);return q;},is(k,v){filters.push(['is',k,v]);return q;},in(k,v){filters.push(['in',k,v]);return q;},
       update(p){action='update';payload=p;return q;},maybeSingle(){return exec();},then(res,rej){return exec().then(res,rej);}};
     async function exec(){
       if(action==='select') return {data:row,error:null};
       writes.push({payload,filters});
+      if(Array.isArray(row)){const inF=filters.find(f=>f[0]==='in');return {data:opts.raced?[]:inF[2].map(id=>({id})),error:null};}
       return {data:opts.raced?[]:[{id:row?.id}],error:null};
     }
     return q;
@@ -85,6 +86,21 @@ assert.deepEqual(r.writes[0].payload,{match_status:'미확인',confirmed_note:nu
 // 수동매칭으로 처리완료인 입금은 되돌리기 거절
 r=await run({id:11,match_status:'처리완료',confirmed_note:'관리자 수동매칭'}, {depositId:11,undo:true});
 assert.equal(r.status,409); assert.equal(r.writes.length,0);
+
+// 전체 정리 — 정리 가능한 입금만, 바뀌는 칸 2개
+r=await run([{id:1,match_status:'미확인'},{id:2,match_status:''},{id:3,match_status:'수동입금확인',match_order_group_id:'G1',confirmed_at:'x'}], {depositIds:[1,2,3],reason:'기타'});
+assert.equal(r.status,200); assert.equal(r.json.settled,2); assert.equal(r.json.skipped,1);
+assert.deepEqual(Object.keys(r.writes[0].payload).sort(), ['confirmed_note','match_status']);
+assert.deepEqual(r.writes[0].filters.find(f=>f[0]==='in')[2],[1,2]);
+assert.ok(r.writes[0].filters.some(([op,k])=>op==='is'&&k==='confirmed_at'));
+r=await run([], {depositIds:[1],reason:'아무거나'});
+assert.equal(r.status,400); assert.equal(r.writes.length,0);
+r=await run([{id:3,match_status:'처리완료',confirmed_note:'정리: 기타'}], {depositIds:[3],reason:'기타'});
+assert.equal(r.json.settled,0); assert.equal(r.writes.length,0);
+r=await run([], {depositIds:[1],reason:'기타'}, {noAuth:true});
+assert.equal(r.status,401);
+const panelSrc=fs.readFileSync('components/admin-live/LiveFloatingMatchPanel.tsx','utf8');
+assert.match(panelSrc, /filtered\.filter\(d => isUnmatchedLiveDeposit\(d\) && !hasPossibleOrder\(d\)\)/, '전체 정리는 주문 있을 수 있는 입금 제외');
 
 // 매칭 화면: 초과 입금은 확인창을 거쳐야 함(소스 확인)
 const panel=fs.readFileSync('components/admin-live/LiveFloatingMatchPanel.tsx','utf8');
