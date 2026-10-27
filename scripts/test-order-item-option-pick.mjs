@@ -42,6 +42,8 @@ await act(async () => { btn('수정').props.onClick(); });
 await act(async () => {});
 let text = txt(tree.root);
 assert.ok(text.includes('지금 옵션 「색상 차콜 핑크셔츠 · 사이즈 M」은 상품에 없어요') || text.includes('은 상품에 없어요'), '옛 옵션 경고');
+assert.ok(text.includes('다른 상품으로 바꾸려면 이 줄을 삭제하고'), '등록상품은 상품명 잠금');
+assert.equal(tree.root.findAll((n) => n.type === 'input' && n.props.placeholder === '상품명').length, 0);
 let selects = tree.root.findAllByType('select');
 assert.equal(selects.length, 2);
 assert.deepEqual(selects[0].findAllByType('option').map(txt), ['색상을 고르세요', '블랙 핑크하트', '차콜 핑크하트']);

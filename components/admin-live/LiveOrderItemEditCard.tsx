@@ -251,6 +251,14 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
         </div>
 
         <div className="grid grid-cols-1 gap-2">
+          {choices ? (
+            // [2026-10-27] 등록상품은 재고가 «이 상품»에서 움직여서 상품명을 바꾸면 다른 상품 이름에 이 상품 재고가 빠진다 → 잠금
+            <div className="grid min-w-0 gap-1">
+              <span className="text-[13px] font-semibold text-ink-soft">상품명</span>
+              <div className="flex min-h-11 items-center rounded-lg bg-surface-2 px-3 text-[16px] font-medium text-ink">{form.productName || "상품명 없음"}</div>
+              <span className="text-[13px] text-ink-mute">다른 상품으로 바꾸려면 이 줄을 삭제하고 「+ 등록상품」으로 추가하세요.</span>
+            </div>
+          ) : (
           <label className="grid min-w-0 gap-1">
             <span className="text-[11px] font-bold text-ink-soft">상품명</span>
             <input
@@ -260,6 +268,7 @@ export default function LiveOrderItemEditCard({ item, index, disabled = false, o
               placeholder="상품명"
             />
           </label>
+          )}
 
           {pickMode && choices ? (
             <div className="grid grid-cols-1 gap-2">

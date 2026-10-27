@@ -208,4 +208,44 @@ const sql = fs.readFileSync("supabase/sql/hotfix/option_rename_guard_20261027.sq
   await db.exec(fs.readFileSync("supabase/sql/hotfix/comme_cardigan_merge_shirt_20261027.sql", "utf8"));
   console.log("꼼데 정리 OK");
 }
+// ── 상품 삭제 때 배송비 보존(delete_item_keep_shipping_20261027.sql) ──
+{
+  const shipSql = fs.readFileSync("supabase/sql/hotfix/delete_item_keep_shipping_20261027.sql", "utf8");
+  const { db, q } = await makeDb();
+  await seed(q);
+  // 주문서 G1: 1번 줄에 배송비 4,000(총액 포함), 2번 줄은 상품만 / 포인트 1,000 사용(1번 줄)
+  await q(`update public.orders set shipping_fee = 4000, adjusted_shipping_fee = 4000, total_price = 59000, adjusted_total_price = 59000, final_amount = 58000, point_used_amount = 1000 where id = 1`);
+  const groupSum = async (g) => (await q(`select coalesce(sum(coalesce(adjusted_shipping_fee, shipping_fee, 0)),0)::int ship, coalesce(sum(adjusted_total_price),0)::int total, coalesce(sum(final_amount),0)::int fin, coalesce(sum(point_used_amount),0)::int pts from public.orders where order_group_id = $1`, [g]))[0];
+  // 패치 전: 배송비 줄 삭제하면 배송비 사라짐(재현)
+  {
+    const { db: db0, q: q0 } = await makeDb();
+    await seed(q0);
+    await q0(`update public.orders set shipping_fee = 4000, adjusted_shipping_fee = 4000, total_price = 59000, adjusted_total_price = 59000, final_amount = 59000 where id = 2`);
+    await q0(`select public.admin_delete_order_item(2)`);
+    assert.equal((await q0(`select coalesce(sum(coalesce(adjusted_shipping_fee, shipping_fee, 0)),0)::int s from public.orders where order_group_id = 'G1'`))[0].s, 0, "패치 전: 배송비 사라짐");
+    void db0;
+  }
+  await db.exec(sql);
+  await db.exec(shipSql);
+  await db.exec(shipSql); // 두 번 돌려도 안전
+  await edit(q, 1, "차콜 핑크하트", "M"); // 옛 옵션 → 지금 옵션(삭제 가능 상태로)
+  const before = await groupSum("G1");
+  await q(`select public.admin_delete_order_item(1)`);
+  const after = await groupSum("G1");
+  assert.equal(after.ship, 4000, "배송비 남는 줄로 옮김");
+  assert.equal(after.pts, before.pts, "포인트 그대로(남는 줄로 이관)");
+  assert.equal(after.total, before.total - 55000, "총액은 지운 상품값만 줄어듦");
+  assert.equal(after.fin, before.fin - 55000, "결제 금액도 상품값만 줄어듦");
+  const r2 = (await q(`select shipping_fee, adjusted_shipping_fee, adjusted_total_price, final_amount, point_used_amount from public.orders where id = 2`))[0];
+  assert.deepEqual([r2.shipping_fee, r2.adjusted_shipping_fee, r2.adjusted_total_price, r2.final_amount, r2.point_used_amount], [4000, 4000, 59000, 58000, 1000]);
+  // 배송비 없는 줄 삭제는 예전과 같음
+  await q(`insert into public.orders (id, order_group_id, product_id, product_name, color, size, qty, product_price, adjusted_product_price, shipping_fee, vat_amount, total_price, adjusted_total_price, final_amount, inventory_deduction_status, inventory_deducted_at)
+    values (7, 'G1', 793, '꼼데 가디건', '블랙 핑크하트', 'M', 1, 55000, 55000, 0, 0, 55000, 55000, 55000, 'deducted_option', now())`);
+  const b2 = await groupSum("G1");
+  await q(`select public.admin_delete_order_item(7)`);
+  const a2 = await groupSum("G1");
+  assert.deepEqual([a2.ship, a2.total], [b2.ship, b2.total - 55000]);
+  console.log("배송비 보존 OK");
+}
 console.log("test-option-rename-guard OK");
+
