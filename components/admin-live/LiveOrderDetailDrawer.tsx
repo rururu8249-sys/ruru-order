@@ -377,6 +377,13 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     const paidWarning = paidLikeStatuses.includes(String((localOrder as { paymentStatus?: string }).paymentStatus || ""))
       ? "\n\n⚠️ 이미 입금/결제 확인된 주문입니다. 배송비를 바꾸면 확인된 입금액과 총액이 달라질 수 있으니 금액 차이를 꼭 확인하세요."
       : "";
+    // [2026-10-28] 쓴 포인트가 새 주문 총액보다 커지면 남는 포인트는 어느 줄에도 못 빠진다(DB 트리거가 옮길 곳이 없음) → 미리 알림
+    const pointUsedTotal = Number((localOrder as { pointUsedAmount?: unknown }).pointUsedAmount || 0) || 0;
+    const productTotalNow = (Array.isArray(localOrder.items) ? localOrder.items : []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const pointOverflow = pointUsedTotal - (productTotalNow + newFee);
+    const pointWarning = pointOverflow > 0
+      ? `\n\n⚠️ 이 주문에 쓴 포인트 ${pointUsedTotal.toLocaleString("ko-KR")}원이 새 주문 금액보다 ${pointOverflow.toLocaleString("ko-KR")}원 많아요. 남는 포인트를 손님에게 돌려줄지 확인하세요.`
+      : "";
 
     const ok = await showAdminConfirm(
       [
@@ -385,7 +392,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
         `현재 배송비: ${currentFee.toLocaleString("ko-KR")}원 → 새 배송비: ${newFee.toLocaleString("ko-KR")}원`,
         "총 결제예정금액과 입금매칭 기대금액이 새 배송비 기준으로 다시 계산됩니다.",
         "변경 전 값은 수정이력에 누적됩니다.",
-      ].join("\n") + paidWarning,
+      ].join("\n") + paidWarning + pointWarning,
     );
     if (!ok) return;
 
