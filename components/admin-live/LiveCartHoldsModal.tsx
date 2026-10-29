@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { kakaoResultNote } from "@/lib/kakaoNotify";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { formatKoreanPhone } from "@/lib/order/phone";
 import ProductPagination from "./ProductPagination";
+import { useAdminModalFocus } from "./useAdminModalFocus";
 
 type Props = { onClose: () => void };
 type Hold = {
@@ -57,6 +58,10 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const panelRef = useRef<HTMLDivElement>(null);
+  useAdminModalFocus(panelRef, onClose);
+  const [openedAt] = useState(() => Date.now());
+  const downOnBackdropRef = useRef(false);
 
   const load = async () => {
     setLoading(true);
@@ -127,7 +132,6 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
   const safePage=Math.min(page,pageCount);
   const pageStart=(safePage-1)*pageSize;
   const pageGroups=groups.slice(pageStart,pageStart+pageSize);
-  useEffect(()=>{ setPage(1); },[search,customerFilter,sortKey,scopeAll,pageSize]);
   const totalQty=groups.reduce((s,g)=>s+g.totalQty,0);
   // [2026-09-28] 요약용 — 담긴 금액 합계·30분 내 만료 그룹 수(30분 이하=danger).
   const grandKnown=groups.reduce((s,g)=>s+g.items.reduce((ss,it)=>ss+(it.unitPrice!==null?it.unitPrice*it.qty:0),0),0);
@@ -167,57 +171,66 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
     setClearing("__all__"); try { const res=await fetch("/api/admin-live/cart-holds",{method:"POST",headers:{"Content-Type":"application/json"},cache:"no-store",body:JSON.stringify({action:"clear-all",sessionKeys:groups.map(g=>g.sessionKey)})}); const json=await res.json().catch(()=>null); if(!res.ok||!json?.ok){showAdminToast("전체 비우기 실패\n\n"+(json?.error?.message||`요청 실패(${res.status})`),"error");return;} showAdminToast(`장바구니 ${Number(json.cleared)||0}개를 비웠습니다.`); await load(); } finally { setClearing(""); }
   };
 
-  const btnSub="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface px-3 text-[13px] font-bold text-ink hover:bg-surface-2 disabled:opacity-50 max-sm:h-11";
-  const btnDanger="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface px-3 text-[13px] font-bold text-danger-tx hover:bg-surface-2 disabled:opacity-50 max-sm:h-11";
-  const selectCls="h-9 min-w-0 rounded-lg border border-line bg-surface px-2 text-[13px] font-bold text-ink max-sm:h-11 max-sm:flex-1";
+  // [2026-10-29 DESIGN-ADMIN §4·§5·§7·§13] 손님 장바구니 «목록»이라 오른쪽 창(폭 720·폰 전체). 주버튼 1개(전체 알림), 보조 36, 위험 = 빨간 글자.
+  const btnSub="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface px-3 text-[14px] text-ink hover:bg-surface-2 disabled:opacity-50 max-md:h-11";
+  const btnDanger="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface px-3 text-[14px] text-danger-tx hover:bg-surface-2 disabled:opacity-50 max-md:h-11";
+  const btnMain="inline-flex h-10 shrink-0 items-center justify-center rounded-lg bg-ink px-4 text-[14px] font-semibold text-white disabled:opacity-50 max-md:h-[52px] max-md:w-full";
+  const selectCls="h-9 min-w-0 rounded-lg border border-line bg-surface px-2 text-[14px] text-ink max-md:h-11 max-md:flex-1";
 
-  return <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4 max-sm:p-0" onClick={onClose}>
-    {imagePreviewUrl?<div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 p-4" onClick={(e)=>{e.stopPropagation();setImagePreviewUrl("");}}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={imagePreviewUrl} alt="상품 사진 크게 보기" className="max-h-[85vh] max-w-full rounded-xl object-contain"/><button type="button" onClick={(e)=>{e.stopPropagation();setImagePreviewUrl("");}} className="absolute right-4 top-4 inline-flex h-9 items-center rounded-lg bg-surface px-3 text-[13px] font-bold text-ink">닫기</button></div>:null}
-    <div className="flex max-h-[90vh] w-full max-w-[880px] flex-col overflow-hidden rounded-xl bg-surface shadow-[0_8px_24px_rgba(0,0,0,.08)] max-sm:h-full max-sm:max-h-none max-sm:rounded-none" onClick={(e)=>e.stopPropagation()}>
-      {/* 머리: 제목 + 보조 버튼 */}
-      <div className="flex items-center justify-between gap-2 border-b border-line px-5 py-4 max-sm:px-4">
-        <div className="min-w-0">
-          <div className="text-[20px] font-bold text-ink">장바구니</div>
-          <div className="mt-0.5 text-[13px] text-ink-mute">담기만 하고 주문서를 아직 안 낸 손님</div>
+  return <>
+    {/* 바깥 클릭 닫기 = 열린 지 0.6초 뒤 + 바깥에서 누르기 시작했을 때만(주문상세·입금 창과 같은 규칙) */}
+    <button type="button" aria-label="장바구니 창 닫기" tabIndex={-1}
+      onMouseDown={()=>{downOnBackdropRef.current=true;}}
+      onClick={()=>{const ok=downOnBackdropRef.current&&Date.now()-openedAt>600; downOnBackdropRef.current=false; if(ok) onClose();}}
+      className="fixed inset-0 z-[120] bg-black/30"/>
+    {imagePreviewUrl?<div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/70 p-4" onClick={()=>setImagePreviewUrl("")}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={imagePreviewUrl} alt="상품 사진 크게 보기" className="max-h-[85vh] max-w-full rounded-xl object-contain"/><button type="button" onClick={()=>setImagePreviewUrl("")} className="absolute right-4 top-4 inline-flex h-9 items-center rounded-lg bg-surface px-3 text-[14px] text-ink">닫기</button></div>:null}
+    <aside ref={panelRef} role="dialog" aria-modal="true" aria-label="장바구니" tabIndex={-1}
+      className="fixed inset-y-0 right-0 z-[130] flex w-full max-w-[720px] flex-col bg-surface outline-none"
+      style={{boxShadow:"0 8px 24px rgba(0,0,0,.08)"}}>
+      {/* 머리: 제목 20/700 · 보조 버튼(폰은 「닫기」 왼쪽) */}
+      <div className="flex shrink-0 items-center gap-2 border-b border-line px-6 py-4 max-md:h-[52px] max-md:px-4 max-md:py-0">
+        <button type="button" onClick={onClose} className={`${btnSub} md:hidden`}>닫기</button>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-[20px] font-bold text-ink max-md:text-[16px]">장바구니</h2>
+          <div className="text-[12px] text-ink-mute max-md:hidden">담기만 하고 주문서를 안 낸 손님</div>
         </div>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={()=>void load()} disabled={loading} className={btnSub}>{loading?"불러오는 중":"새로고침"}</button>
-          <button type="button" onClick={onClose} className={btnSub}>닫기</button>
-        </div>
+        <button type="button" onClick={()=>void load()} disabled={loading} className={btnSub}>{loading?"불러오는 중":"새로고침"}</button>
+        <button type="button" onClick={onClose} className={`${btnSub} max-md:hidden`}>닫기</button>
       </div>
 
-      {/* 숫자 한 줄 + 범위 */}
-      <div className="border-b border-line px-5 py-3 max-sm:px-4">
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[13px] text-ink-soft tabular-nums">
-          <span>손님 <b className="text-[14px] font-bold text-ink">{groups.length}명</b></span>
-          <span>수량 <b className="text-[14px] font-bold text-ink">{totalQty}개</b></span>
-          <span>담긴 금액 <b className="text-[14px] font-bold text-ink">{won(grandKnown)}</b></span>
-          {soonCount>0?<span className="font-bold text-danger-tx">30분 안에 만료 {soonCount}명</span>:null}
+      {/* 요약 숫자 + 범위 */}
+      <div className="shrink-0 border-b border-line px-6 py-3 max-md:px-4">
+        <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 tabular-nums">
+          <span className="text-[12px] text-ink-mute">손님 <span className="text-[20px] font-bold text-ink">{groups.length}</span>명</span>
+          <span className="text-[12px] text-ink-mute">수량 <span className="text-[20px] font-bold text-ink">{totalQty}</span>개</span>
+          <span className="text-[12px] text-ink-mute">담긴 금액 <span className="text-[20px] font-bold text-ink">{grandKnown.toLocaleString("ko-KR")}</span>원</span>
+          {soonCount>0?<span className="text-[13px] font-semibold text-danger-tx">30분 안에 만료 {soonCount}명</span>:null}
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-ink-mute">
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-ink-mute">
           {scopeAll
-            ?<><span>지난 장바구니까지 전부 보는 중</span><button type="button" onClick={()=>setScopeAll(false)} className="font-bold text-ink underline underline-offset-2">지금 방송만 보기</button></>
+            ?<><span>지난 장바구니까지 보는 중</span><button type="button" onClick={()=>{setScopeAll(false);setPage(1);}} className="font-semibold text-ink underline underline-offset-2">지금 방송만</button></>
             :scopeInfo.scope==="broadcast"
-              ?<><span>지금 방송{scopeInfo.broadcastTitle?` 「${scopeInfo.broadcastTitle}」`:""} 상품만 보는 중</span><button type="button" onClick={()=>setScopeAll(true)} className="font-bold text-ink underline underline-offset-2">지난 것까지 보기</button></>
+              ?<><span>지금 방송{scopeInfo.broadcastTitle?` 「${scopeInfo.broadcastTitle}」`:""} 상품만 보는 중</span><button type="button" onClick={()=>{setScopeAll(true);setPage(1);}} className="font-semibold text-ink underline underline-offset-2">지난 것까지</button></>
               :<span>전체 장바구니</span>}
         </div>
       </div>
 
-      {/* 필터 한 줄 + 전체 작업(주버튼 1개) */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-surface-2 px-5 py-2.5 max-sm:px-4">
-        <input type="search" value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="닉네임·이름·전화·상품 검색" aria-label="장바구니 검색" className="h-9 min-w-0 flex-1 basis-[200px] rounded-lg border border-line bg-surface px-3 text-[13px] text-ink max-sm:h-11 max-sm:basis-full"/>
-        <select value={customerFilter} onChange={(e)=>setCustomerFilter(e.target.value as CustomerFilter)} className={selectCls} aria-label="고객 구분 필터"><option value="all">회원 전체</option><option value="first">첫 주문·주문 없음</option><option value="existing">기존회원</option><option value="unknown">확인 불가</option></select>
-        <select value={sortKey} onChange={(e)=>setSortKey(e.target.value as SortKey)} className={selectCls} aria-label="담김 목록 정렬">{SORT_OPTIONS.map(opt=><option key={opt.value} value={opt.value}>{opt.label}</option>)}</select>
-        {groups.length>0?<div className="ml-auto flex items-center gap-2 max-sm:ml-0 max-sm:w-full">
-          <button type="button" disabled={Boolean(clearing)} onClick={()=>void clearAll()} className={`${btnDanger} max-sm:flex-1`}>{clearing==="__all__"?"비우는 중":`${groups.length}명 전부 비우기`}</button>
-          <button type="button" disabled={Boolean(reminding)} onClick={()=>void remindAll()} className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg bg-ink px-3 text-[13px] font-bold text-white disabled:opacity-50 max-sm:h-11 max-sm:flex-1">{reminding==="__all__"?"보내는 중":`${groups.length}명에게 주문 확인 알림`}</button>
+      {/* 필터 한 줄 + 전체 작업 */}
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-surface-2 px-6 py-2.5 max-md:px-4">
+        <input type="search" value={search} onChange={(e)=>{setSearch(e.target.value);setPage(1);}} placeholder="닉네임·이름·전화·상품 검색" aria-label="장바구니 검색" className="h-9 min-w-0 flex-1 basis-[200px] rounded-lg border border-line bg-surface px-3 text-[14px] text-ink max-md:h-11 max-md:basis-full"/>
+        <select value={customerFilter} onChange={(e)=>{setCustomerFilter(e.target.value as CustomerFilter);setPage(1);}} className={selectCls} aria-label="고객 구분 필터"><option value="all">회원 전체</option><option value="first">첫 주문·주문 없음</option><option value="existing">기존회원</option><option value="unknown">확인 불가</option></select>
+        <select value={sortKey} onChange={(e)=>{setSortKey(e.target.value as SortKey);setPage(1);}} className={selectCls} aria-label="담김 목록 정렬">{SORT_OPTIONS.map(opt=><option key={opt.value} value={opt.value}>{opt.label}</option>)}</select>
+        {search.trim()||customerFilter!=="all"||sortKey!=="added"?<button type="button" onClick={()=>{setSearch("");setCustomerFilter("all");setSortKey("added");setPage(1);}} className={btnSub}>초기화</button>:null}
+        {groups.length>0?<div className="ml-auto flex items-center gap-2 max-md:hidden">
+          <button type="button" disabled={Boolean(clearing)} onClick={()=>void clearAll()} className={btnDanger}>{clearing==="__all__"?"비우는 중":"전체 비우기"}</button>
+          <button type="button" disabled={Boolean(reminding)} onClick={()=>void remindAll()} className={btnMain}>{reminding==="__all__"?"보내는 중":"전체 알림"}</button>
         </div>:null}
       </div>
 
       {/* 목록 */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 max-sm:px-3">
-        {loading&&holds.length===0?<div className="py-12 text-center text-[13px] text-ink-mute">불러오는 중…</div>
-        :groups.length===0?<div className="py-12 text-center text-[13px] text-ink-mute">{search.trim()?"검색에 맞는 장바구니가 없어요. 검색어를 지우거나 다른 이름으로 찾아 보세요.":"담기만 하고 주문서를 안 낸 손님이 없어요. 손님이 상품을 담으면 여기에 바로 나와요."}</div>
+      <div data-admin-drawer-scroll className="min-h-0 flex-1 overflow-y-auto bg-canvas px-6 py-4 max-md:px-3">
+        {loading&&holds.length===0?<div className="py-12 text-center text-[14px] text-ink-mute">불러오는 중…</div>
+        :groups.length===0?<div className="py-12 text-center text-[14px] text-ink-mute">{search.trim()?"검색에 맞는 장바구니가 없어요. 검색어를 지우거나 다른 이름으로 찾아 보세요.":"담기만 하고 주문서를 안 낸 손님이 없어요. 손님이 상품을 담으면 여기에 바로 나와요."}</div>
         :<div className="space-y-3">{pageGroups.map(g=>{
           const presentations=g.items.map(it=>cartHoldPresentation({productName:it.productName,fallbackProductName:it.fallbackProductName,color:it.color,size:it.size,qty:it.qty,unitPrice:it.unitPrice,legacySnapshot:it.legacySnapshot}));
           const knownTotal=presentations.reduce((s,p)=>s+(p.rowTotal??0),0); const unknown=presentations.some(p=>p.rowTotal===null);
@@ -230,51 +243,55 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
           const member=customerStatus(g); const meta=groupMeta[g.sessionKey];
           return <section key={g.sessionKey} className="overflow-hidden rounded-xl border border-line bg-surface">
             {/* 손님 줄 */}
-            <div className="border-b border-line px-4 py-3 max-sm:px-3">
+            <div className="border-b border-line px-4 py-3 max-md:px-3">
               <div className="flex items-start gap-3">
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-baseline gap-x-2">
-                    <span className="text-[14px] font-bold text-ink">{groupLabel(g)}</span>
-                    {g.phone?<span className="text-[13px] text-ink-mute tabular-nums">{phoneFmt(g.phone)}</span>:null}
-                    <span className={`rounded-full px-2 py-0.5 text-[13px] font-bold ${member.cls}`}>{member.label}</span>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="break-words text-[14px] font-semibold text-ink">{groupLabel(g)}</span>
+                    {g.phone?<a href={`tel:${String(g.phone).replace(/\D/g,"")}`} className="text-[13px] text-ink-mute tabular-nums">{phoneFmt(g.phone)}</a>:null}
+                    <span className={`inline-flex h-6 items-center rounded-lg px-2 text-[12px] font-semibold ${member.cls}`}>{member.label}</span>
                   </div>
-                  <div className="mt-1 text-[13px] text-ink-mute">{meta2.join(" · ")}</div>
+                  <div className="mt-1 text-[12px] text-ink-mute">{meta2.join(" · ")}</div>
                 </div>
                 <div className="w-[96px] shrink-0 text-right">
-                  <div className={`text-[13px] font-bold ${remainCls}`}>{tl.remainText}</div>
+                  <div className={`text-[13px] font-semibold ${remainCls}`}>{tl.remainText}</div>
                   <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-line"><div className={`h-full rounded-full ${barCls}`} style={{width:`${Math.round(tl.progress*100)}%`}}/></div>
                 </div>
               </div>
             </div>
             {/* 담은 상품 */}
-            <div className="divide-y divide-line">{g.items.map((it,i)=>{const p=presentations[i]; const img=holdImages[`${String(it.productId||"").trim()}|${String(it.detailName||"").trim()}`]||""; const itExp=new Date(it.expiresAt).getTime(); const showExp=Number.isFinite(itExp)&&itExp-g.minExpires>=5*60000; return <div key={i} className="grid grid-cols-[48px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 max-sm:px-3">
+            <div className="divide-y divide-line">{g.items.map((it,i)=>{const p=presentations[i]; const img=holdImages[`${String(it.productId||"").trim()}|${String(it.detailName||"").trim()}`]||""; const itExp=new Date(it.expiresAt).getTime(); const showExp=Number.isFinite(itExp)&&itExp-g.minExpires>=5*60000; return <div key={i} className="grid grid-cols-[48px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 max-md:px-3">
               {img?<button type="button" title="사진 크게 보기" onClick={()=>setImagePreviewUrl(img)} className="h-12 w-12 overflow-hidden rounded-lg border border-line bg-surface-2">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={img} alt="" loading="lazy" className="h-full w-full object-cover"/></button>:<span className="h-12 w-12 rounded-lg border border-line bg-surface-2" aria-hidden="true"/>}
               <div className="min-w-0">
-                <div className="break-words text-[14px] font-bold leading-5 text-ink">{p.title}</div>
-                <div className="mt-0.5 text-[13px] text-ink-mute">{p.optionText||"옵션 없음"}{showExp?` · 만료 ${hhmm(itExp)}`:""}</div>
-                {p.legacySnapshot?<div className="mt-0.5 text-[13px] text-warn-tx">예전 담김 기록 · 세부상품/당시 금액 없음</div>:null}
+                <div className="break-words text-[13px] font-semibold leading-5 text-ink">{p.title}</div>
+                <div className="mt-0.5 text-[12px] text-ink-mute">{p.optionText||"옵션 없음"}{showExp?` · 만료 ${hhmm(itExp)}`:""}</div>
+                {p.legacySnapshot?<div className="mt-0.5 text-[12px] text-warn-tx">예전 담김 기록 · 세부상품/당시 금액 없음</div>:null}
               </div>
               <div className="text-right tabular-nums">
-                <div className="text-[14px] font-bold text-ink">{p.qty}개</div>
-                {p.unitPrice!==null?<div className="mt-0.5 text-[13px] text-ink-soft">{p.qty>1?`${won(p.unitPrice)} × ${p.qty} = ${won(p.rowTotal||0)}`:won(p.unitPrice)}</div>:<div className="mt-0.5 text-[13px] text-ink-mute">금액 기록 없음</div>}
+                <div className="text-[13px] font-semibold text-ink">{p.qty}개</div>
+                {p.unitPrice!==null?<div className="mt-0.5 text-[12px] text-ink-soft">{p.qty>1?`${won(p.unitPrice)} × ${p.qty} = ${won(p.rowTotal||0)}`:won(p.unitPrice)}</div>:<div className="mt-0.5 text-[12px] text-ink-mute">금액 기록 없음</div>}
               </div>
             </div>})}</div>
             {/* 아래 줄: 금액 · 계좌 · 작업 */}
-            <div className="flex flex-wrap items-center gap-2 border-t border-line bg-surface-2 px-4 py-2.5 max-sm:px-3">
-              <span className="text-[13px] text-ink-soft tabular-nums">담긴 금액 <b className="text-[14px] font-bold text-ink">{won(knownTotal)}{unknown?" + 기록 없음":""}</b></span>
-              <label className="flex min-w-[220px] flex-1 items-center gap-2 text-[13px] text-ink-soft max-sm:basis-full"><span className="shrink-0">계좌</span><select aria-label={`${groupLabel(g)} 장바구니 계좌`} value={meta?.overrideAccount?`active:${meta.overrideAccount.id}`:"default"} disabled={assigningAccount===g.sessionKey} onChange={(e)=>void setBankOverride(g,e.target.value)} className={`${selectCls} flex-1`}><option value="default">기본 계좌 설정 사용</option>{meta?.overrideAccount?<option value={`active:${meta.overrideAccount.id}`}>지금 지정 · {meta.overrideAccount.bankName} {meta.overrideAccount.bankAccount} · 예금주 {meta.overrideAccount.bankHolder}</option>:null}{bankAccounts.map(account=><option key={account.id} value={account.id}>{account.label} · {account.bankName} {account.bankAccount} · 예금주 {account.bankHolder}</option>)}</select></label>
-              <div className="flex items-center gap-2 max-sm:w-full">
-                <button type="button" disabled={Boolean(reminding)} onClick={()=>void remind(g)} className={`${btnSub} max-sm:flex-1`}>{reminding===g.sessionKey?"보내는 중":"주문 확인 알림"}</button>
-                <button type="button" disabled={clearing===g.sessionKey} onClick={()=>void clearSession(g)} className={`${btnDanger} max-sm:flex-1`}>{clearing===g.sessionKey?"비우는 중":"비우기"}</button>
+            <div className="flex flex-wrap items-center gap-2 border-t border-line bg-surface-2 px-4 py-2.5 max-md:px-3">
+              <span className="text-[12px] text-ink-mute tabular-nums">담긴 금액 <span className="text-[14px] font-semibold text-ink">{won(knownTotal)}{unknown?" + 기록 없음":""}</span></span>
+              <label className="flex min-w-[220px] flex-1 items-center gap-2 text-[12px] text-ink-mute max-md:basis-full"><span className="shrink-0">계좌</span><select aria-label={`${groupLabel(g)} 장바구니 계좌`} value={meta?.overrideAccount?`active:${meta.overrideAccount.id}`:"default"} disabled={assigningAccount===g.sessionKey} onChange={(e)=>void setBankOverride(g,e.target.value)} className={`${selectCls} flex-1`}><option value="default">기본 계좌 설정 사용</option>{meta?.overrideAccount?<option value={`active:${meta.overrideAccount.id}`}>지금 지정 · {meta.overrideAccount.bankName} {meta.overrideAccount.bankAccount} · 예금주 {meta.overrideAccount.bankHolder}</option>:null}{bankAccounts.map(account=><option key={account.id} value={account.id}>{account.label} · {account.bankName} {account.bankAccount} · 예금주 {account.bankHolder}</option>)}</select></label>
+              <div className="flex items-center gap-2 max-md:w-full">
+                <button type="button" disabled={Boolean(reminding)} onClick={()=>void remind(g)} className={`${btnSub} max-md:flex-1`}>{reminding===g.sessionKey?"보내는 중":"주문 확인 알림"}</button>
+                <button type="button" disabled={clearing===g.sessionKey} onClick={()=>void clearSession(g)} className={`${btnDanger} max-md:flex-1`}>{clearing===g.sessionKey?"비우는 중":"비우기"}</button>
               </div>
             </div>
           </section>;})}</div>}
       </div>
 
-      {/* 페이지 넘김(주문서·상품 목록과 같은 부품) */}
-      {groups.length>0?<div className="border-t border-line px-5 max-sm:px-4">
-        <ProductPagination page={safePage} pageCount={pageCount} total={groups.length} start={pageStart+1} end={Math.min(groups.length,pageStart+pageSize)} size={pageSize} label="장바구니 페이지 이동" unit="명" sizes={[10,20,50]} onPage={(n)=>setPage(n)} onSize={setPageSize}/>
+      {/* 아래: 페이지 넘김(주문서·상품 목록과 같은 부품) + 폰은 전체 작업 버튼 */}
+      {groups.length>0?<div className="shrink-0 border-t border-line bg-surface px-6 max-md:px-4 max-md:pb-[calc(8px+env(safe-area-inset-bottom))]">
+        <ProductPagination page={safePage} pageCount={pageCount} total={groups.length} start={pageStart+1} end={Math.min(groups.length,pageStart+pageSize)} size={pageSize} label="장바구니 페이지 이동" unit="명" sizes={[10,20,50]} onPage={(n)=>setPage(n)} onSize={(n)=>{setPageSize(n);setPage(1);}}/>
+        <div className="flex gap-2 md:hidden">
+          <button type="button" disabled={Boolean(clearing)} onClick={()=>void clearAll()} className={`${btnDanger} h-[52px] flex-1`}>{clearing==="__all__"?"비우는 중":"전체 비우기"}</button>
+          <button type="button" disabled={Boolean(reminding)} onClick={()=>void remindAll()} className={`${btnMain} flex-[2]`}>{reminding==="__all__"?"보내는 중":"전체 알림"}</button>
+        </div>
       </div>:null}
-    </div>
-  </div>;
+    </aside>
+  </>;
 }
