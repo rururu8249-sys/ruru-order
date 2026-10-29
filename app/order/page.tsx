@@ -3832,30 +3832,6 @@ export default function OrderPage() {
     });
   }, [customerPointBalance, totalAmount]);
 
-  const filteredBroadcastProducts = useMemo(() => {
-    const suggestionProducts = [...groupBuyQuickProductsFromCatalog, ...broadcastProducts];
-
-    return suggestionProducts
-      .filter((product) => product && product.product_name.trim())
-      .filter((product) => productSuggestionEnabled(product))
-      .filter((product) => productMatchesSuggestion(product, productSearchText))
-      .slice(0, 6);
-  }, [broadcastProducts, groupBuyQuickProductsFromCatalog, productSearchText]);
-
-  const topSearchMatches = useMemo(() => {
-    const query = topProductSearchText.trim();
-
-    if (!query) return [];
-
-    const suggestionProducts = [...groupBuyQuickProductsFromCatalog, ...broadcastProducts];
-
-    return suggestionProducts
-      .filter((product) => product && product.product_name.trim())
-      .filter((product) => productSuggestionEnabled(product))
-      .filter((product) => productMatchesSuggestion(product, query))
-      .slice(0, 6);
-  }, [broadcastProducts, groupBuyQuickProductsFromCatalog, topProductSearchText]);
-
   const quickGroupBuyProducts = useMemo(() => {
     // 두 모드 절대 안 섞임:
     // - 방송 모드(ON): 방송에 담은 broadcast_products만 노출. 카탈로그(in_shop 포함) 전부 제외.
@@ -3914,6 +3890,17 @@ export default function OrderPage() {
       return String(b.created_at || b.updated_at || b.id).localeCompare(String(a.created_at || a.updated_at || a.id));
     });
   }, [broadcastProducts, groupBuyQuickProductsFromCatalog, broadcast?.status, broadcast?.widget_pin_mode, broadcast?.widget_pin_product_id]);
+
+  // [2026-10-29 사장님 「롱샴 노출 안 했는데 왜 장바구니에?」] 직접 입력 창 「혹시 이 상품인가요?」 추천은
+  //   «지금 손님 화면에 보이는 상품»(quickGroupBuyProducts — 방송 ON=방송 상품, OFF=쇼핑몰 진열)에서만 고른다.
+  //   예전엔 숨김 포함 전체 카탈로그(1,000개)에서 골라, 손님이 아무 이름이나 적으면 안 판 지 오래된 상품이 연결돼 장바구니에 담겼다.
+  const filteredBroadcastProducts = useMemo(() => {
+    return quickGroupBuyProducts
+      .filter((product) => product && product.product_name.trim())
+      .filter((product) => productSuggestionEnabled(product))
+      .filter((product) => productMatchesSuggestion(product, productSearchText))
+      .slice(0, 6);
+  }, [quickGroupBuyProducts, productSearchText]);
   // [㊺-3] 첫 화면 «지금 바로 주문 가능» 숫자 — 품절 아님 + 바로구매 기준(카드·옵션창과 같은 isInstantOrderProduct). 표시 전용.
   const instantReadyCount = useMemo(() => quickGroupBuyProducts.filter((p) => !isSoldOutOrderProduct(p) && isInstantOrderProduct((parseProductSuggestionNote((p as any).product_note) as Record<string, unknown> | null)?.order_notice_mode, Array.isArray((p as any).badge_types) && (p as any).badge_types.length ? (p as any).badge_types : [(p as any).badge_type], productNoticeGlobal.mode, (p as any).in_shop)).length, [quickGroupBuyProducts, productNoticeGlobal.mode]);
 

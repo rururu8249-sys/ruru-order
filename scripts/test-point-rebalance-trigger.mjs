@@ -12,7 +12,8 @@ async function makeDb() {
   await db.exec(`
 create role anon; create role authenticated;
 create table public.orders (
-  id bigint primary key, order_group_id text, total_price int, adjusted_total_price int, final_amount int,
+  -- 운영 칼럼 타입 그대로(2026-10-29 information_schema 실측): adjusted_total_price numeric · final_amount bigint
+  id bigint primary key, order_group_id text, total_price int, adjusted_total_price numeric, final_amount bigint,
   point_used_amount int, point_used_at timestamptz, point_refunded_amount int, point_refunded_at timestamptz,
   admin_order_status_v2 text, order_manage_status text, is_deleted boolean, adjusted_shipping_fee int);
 `);
@@ -24,7 +25,7 @@ const row = async (q, id) => (await q(`select point_used_amount pt, final_amount
 
 // 클라이언트 배송비 수정과 같은 UPDATE (줄 총액 재계산 + final = greatest(0, 총액 − 그 줄 포인트))
 const shippingEdit = (q, id, newTotal) =>
-  q(`update orders set adjusted_shipping_fee=0, adjusted_total_price=$2, total_price=$2, final_amount=greatest(0,$2-coalesce(point_used_amount,0)) where id=$1`, [id, newTotal]);
+  q(`update orders set adjusted_shipping_fee=0, adjusted_total_price=$2::int, total_price=$2::int, final_amount=greatest(0,$2::int-coalesce(point_used_amount,0)) where id=$1`, [id, newTotal]);
 
 async function seedHdouble(q) {
   await q(`insert into orders values
@@ -113,6 +114,22 @@ async function seedHdouble(q) {
   assert.deepEqual(await row(q, 1), { pt: 15000, fa: 0 }, "INSERT 엔 안 돎");
   await q(`update orders set admin_order_status_v2='입금확인' where id=1`);
   assert.deepEqual(await row(q, 2), { pt: 0, fa: 20000 }, "상태만 바꾸면 안 돎");
+}
+
+// 7-1) 운영 RPC 와 같은 UPDATE 모양(2026-10-29 운영 함수 본문 실측)
+//   결제수단 변경 RPC: final = greatest(0, 상품+배송비+카드추가금 − 포인트) / 재고연동 상품수정 RPC: final = greatest(0, 새 총액 − 포인트)
+{
+  const { db, q } = await makeDb();
+  await db.exec(PATCH);
+  // 카드 → 무통장: 카드추가금 2,730 빠지며 첫 줄 총액 41,730 → 39,000, 포인트 40,000
+  await q(`insert into orders values
+    (1,'E',41730,41730,1730,40000,now(),0,null,'미설정',null,false,0),
+    (2,'E',39000,39000,39000,0,null,0,null,'미설정',null,false,0)`);
+  await q(`update orders set total_price=39000, adjusted_total_price=39000, final_amount=greatest(0, 39000 - coalesce(point_used_amount,0)) where id=1`);
+  assert.deepEqual(await sums(q, "E"), { pt: 40000, fa: 38000 }, "결제수단 변경 뒤에도 38,000");
+  // 상품 수정: 첫 줄 상품을 싼 걸로(30,000) 바꿈
+  await q(`update orders set total_price=30000, adjusted_total_price=30000, final_amount=greatest(0, 30000 - coalesce(point_used_amount,0)) where id=1`);
+  assert.deepEqual(await sums(q, "E"), { pt: 40000, fa: 29000 }, "상품 수정 뒤 = 총액 69,000 − 포인트 40,000");
 }
 
 // 8) 되돌리기

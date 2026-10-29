@@ -8,6 +8,7 @@ import { cartHoldPresentation, cartHoldTimeline } from "@/lib/cartHoldDetail";
 import { supabase } from "@/lib/supabase";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { formatKoreanPhone } from "@/lib/order/phone";
+import ProductPagination from "./ProductPagination";
 
 type Props = { onClose: () => void };
 type Hold = {
@@ -52,6 +53,10 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
   // [2026-08-31 사장님 요청] 사진 등록된 상품은 작은 사진 표시 + 클릭 확대 — 주문상세와 같은 방식(표시 전용)
   const [holdImages, setHoldImages] = useState<Record<string, string>>({});
   const [imagePreviewUrl, setImagePreviewUrl] = useState("");
+  // [2026-10-29 사장님 「페이지 네이션으로 구분·UI/UX 개선」] 손님 장바구니 N명씩 페이지 + 검색(닉네임·이름·전화·상품명). 표시만.
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const load = async () => {
     setLoading(true);
@@ -113,9 +118,16 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
       if (!g.phone && h.phone) g.phone=h.phone; if (!g.nickname && h.nickname) g.nickname=h.nickname; if (!g.name && h.name) g.name=h.name; map.set(h.sessionKey,g);
     }
     const matchesCustomer=(g:Group)=>{ const meta=groupMeta[g.sessionKey]; if(customerFilter==="all")return true; if(!meta)return customerFilter==="unknown"; if(customerFilter==="existing")return meta.validOrderCount>0; if(customerFilter==="first")return meta.validOrderCount===0; return false; };
-    const list=Array.from(map.values()).filter(matchesCustomer); const nameOf=(g:Group)=>(g.nickname||g.name||g.phone||"").toString();
+    const q=search.trim().toLowerCase().replace(/[\s-]/g,"");
+    const matchesSearch=(g:Group)=>{ if(!q)return true; const hay=[g.nickname,g.name,g.phone,...g.items.flatMap(it=>[it.productName,it.fallbackProductName,it.detailName])].map(v=>String(v||"").toLowerCase().replace(/[\s-]/g,"")).join("|"); return hay.includes(q); };
+    const list=Array.from(map.values()).filter(matchesCustomer).filter(matchesSearch); const nameOf=(g:Group)=>(g.nickname||g.name||g.phone||"").toString();
     return list.sort((a,b)=> sortKey==="added"?b.maxCreated-a.maxCreated:sortKey==="recent"?b.maxSynced-a.maxSynced:sortKey==="qty"?b.totalQty-a.totalQty||a.minExpires-b.minExpires:sortKey==="name"?nameOf(a).localeCompare(nameOf(b),"ko"):a.minExpires-b.minExpires);
-  },[holds,now,sortKey,customerFilter,groupMeta]);
+  },[holds,now,sortKey,customerFilter,groupMeta,search]);
+  const pageCount=Math.max(1,Math.ceil(groups.length/pageSize));
+  const safePage=Math.min(page,pageCount);
+  const pageStart=(safePage-1)*pageSize;
+  const pageGroups=groups.slice(pageStart,pageStart+pageSize);
+  useEffect(()=>{ setPage(1); },[search,customerFilter,sortKey,scopeAll,pageSize]);
   const totalQty=groups.reduce((s,g)=>s+g.totalQty,0);
   // [2026-09-28] 요약용 — 담긴 금액 합계·30분 내 만료 그룹 수(30분 이하=danger).
   const grandKnown=groups.reduce((s,g)=>s+g.items.reduce((ss,it)=>ss+(it.unitPrice!==null?it.unitPrice*it.qty:0),0),0);
@@ -155,52 +167,114 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
     setClearing("__all__"); try { const res=await fetch("/api/admin-live/cart-holds",{method:"POST",headers:{"Content-Type":"application/json"},cache:"no-store",body:JSON.stringify({action:"clear-all",sessionKeys:groups.map(g=>g.sessionKey)})}); const json=await res.json().catch(()=>null); if(!res.ok||!json?.ok){showAdminToast("전체 비우기 실패\n\n"+(json?.error?.message||`요청 실패(${res.status})`),"error");return;} showAdminToast(`장바구니 ${Number(json.cleared)||0}개를 비웠습니다.`); await load(); } finally { setClearing(""); }
   };
 
-  return <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-    {imagePreviewUrl?<div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 p-4" onClick={(e)=>{e.stopPropagation();setImagePreviewUrl("");}}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={imagePreviewUrl} alt="상품 사진 크게 보기" className="max-h-[85vh] max-w-full rounded-2xl object-contain shadow-2xl"/><button type="button" onClick={(e)=>{e.stopPropagation();setImagePreviewUrl("");}} className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1.5 text-sm font-black text-ink">✕ 닫기</button></div>:null}
-    <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl" onClick={(e)=>e.stopPropagation()}>
-      <div className="flex items-center justify-between border-b border-line px-5 py-4">
-        <div className="text-[14px] font-black text-ink">장바구니 <span className="text-ink-mute">(주문서 제출 전)</span></div>
-        <div className="flex items-center gap-2"><button type="button" onClick={()=>void load()} disabled={loading} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-black text-ink-soft hover:bg-surface-2 disabled:opacity-50">{loading?"불러오는중":"새로고침"}</button><button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-[14px] font-black text-ink-mute hover:text-ink">✕</button></div>
-      </div>
-      <div className="border-b border-line bg-surface-2 px-5 py-2 text-xs font-black text-ink-soft">
-        <div className="flex flex-wrap items-center gap-2"><div className="w-full min-w-0 sm:w-auto sm:flex-1">장바구니 {groups.length}개 · 수량 {totalQty}개 · 담긴 금액 {won(grandKnown)}{soonCount>0?<span className="ml-1 text-danger-tx"> · ⚠ 30분 내 만료 {soonCount}개</span>:null}</div>
-          {groups.length>0?<button type="button" disabled={Boolean(reminding)} onClick={()=>void remindAll()} className="shrink-0 rounded-lg bg-[var(--color-rose-deep)] px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-50">{reminding==="__all__"?"알림 전송중":"전체 주문 확인 알림"}</button>:null}
-          {groups.length>0?<button type="button" disabled={Boolean(clearing)} onClick={()=>void clearAll()} className="shrink-0 rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-black text-ink-soft hover:bg-danger-bg hover:text-danger-tx disabled:opacity-50">{clearing==="__all__"?"비우는중":"전체 비우기"}</button>:null}
-          <select value={customerFilter} onChange={(e)=>setCustomerFilter(e.target.value as CustomerFilter)} className="min-w-0 rounded-lg border border-line bg-surface px-2 py-1 text-[11px] font-black text-ink-soft max-sm:h-10 max-sm:flex-1 sm:shrink-0" aria-label="고객 구분 필터"><option value="all">회원 전체</option><option value="first">첫 주문·주문 없음</option><option value="existing">기존회원</option><option value="unknown">확인 불가</option></select>
-          <select value={sortKey} onChange={(e)=>setSortKey(e.target.value as SortKey)} className="min-w-0 rounded-lg border border-line bg-surface px-2 py-1 text-[11px] font-black text-ink-soft max-sm:h-10 max-sm:flex-1 sm:shrink-0" aria-label="담김 목록 정렬">{SORT_OPTIONS.map(opt=><option key={opt.value} value={opt.value}>{opt.label}</option>)}</select>
+  const btnSub="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface px-3 text-[13px] font-bold text-ink hover:bg-surface-2 disabled:opacity-50 max-sm:h-11";
+  const btnDanger="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface px-3 text-[13px] font-bold text-danger-tx hover:bg-surface-2 disabled:opacity-50 max-sm:h-11";
+  const selectCls="h-9 min-w-0 rounded-lg border border-line bg-surface px-2 text-[13px] font-bold text-ink max-sm:h-11 max-sm:flex-1";
+
+  return <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4 max-sm:p-0" onClick={onClose}>
+    {imagePreviewUrl?<div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 p-4" onClick={(e)=>{e.stopPropagation();setImagePreviewUrl("");}}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={imagePreviewUrl} alt="상품 사진 크게 보기" className="max-h-[85vh] max-w-full rounded-xl object-contain"/><button type="button" onClick={(e)=>{e.stopPropagation();setImagePreviewUrl("");}} className="absolute right-4 top-4 inline-flex h-9 items-center rounded-lg bg-surface px-3 text-[13px] font-bold text-ink">닫기</button></div>:null}
+    <div className="flex max-h-[90vh] w-full max-w-[880px] flex-col overflow-hidden rounded-xl bg-surface shadow-[0_8px_24px_rgba(0,0,0,.08)] max-sm:h-full max-sm:max-h-none max-sm:rounded-none" onClick={(e)=>e.stopPropagation()}>
+      {/* 머리: 제목 + 보조 버튼 */}
+      <div className="flex items-center justify-between gap-2 border-b border-line px-5 py-4 max-sm:px-4">
+        <div className="min-w-0">
+          <div className="text-[20px] font-bold text-ink">장바구니</div>
+          <div className="mt-0.5 text-[13px] text-ink-mute">담기만 하고 주문서를 아직 안 낸 손님</div>
         </div>
-        {scopeAll?<div className="mt-1 flex items-center gap-2 text-ink-mute"><span>지난 장바구니까지 전체 표시 중</span><button type="button" onClick={()=>setScopeAll(false)} className="rounded-lg border border-line bg-surface px-2 py-0.5 text-[11px] font-black">현재 방송만 보기</button></div>:scopeInfo.scope==="broadcast"?<div className="mt-1 flex items-center gap-2 text-ink-mute"><span>현재 방송{scopeInfo.broadcastTitle?`(${scopeInfo.broadcastTitle})`:""} 상품 장바구니만 표시 중</span><button type="button" onClick={()=>setScopeAll(true)} className="rounded-lg border border-line bg-surface px-2 py-0.5 text-[11px] font-black">지난 것까지 보기</button></div>:null}
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={()=>void load()} disabled={loading} className={btnSub}>{loading?"불러오는 중":"새로고침"}</button>
+          <button type="button" onClick={onClose} className={btnSub}>닫기</button>
+        </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">{loading&&holds.length===0?<div className="py-10 text-center text-xs font-black text-ink-mute">불러오는 중...</div>:groups.length===0?<div className="py-10 text-center text-xs font-black text-ink-mute">담기만 하고 제출 안 한 고객이 없습니다. 방송 중 장바구니에 담으면 여기에 나옵니다.</div>:<div className="space-y-3">{groups.map(g=>{
-        const presentations=g.items.map(it=>cartHoldPresentation({productName:it.productName,fallbackProductName:it.fallbackProductName,color:it.color,size:it.size,qty:it.qty,unitPrice:it.unitPrice,legacySnapshot:it.legacySnapshot}));
-        const knownTotal=presentations.reduce((s,p)=>s+(p.rowTotal??0),0); const unknown=presentations.some(p=>p.rowTotal===null);
-        // [2026-09-28] 남은시간 배지·진행막대(cartHoldTimeline). danger=빨강·warn=주황·ok=회색.
-        const tl=cartHoldTimeline({createdAtMs:g.minCreated,expiresAtMs:g.minExpires,nowMs:now});
-        const badgeCls=tl.level==="danger"?"bg-danger-bg text-danger-tx":tl.level==="warn"?"bg-warn-bg text-warn-tx":"bg-surface-2 text-ink-soft";
-        const barCls=tl.level==="danger"?"bg-danger-tx":tl.level==="warn"?"bg-warn-tx":"bg-ink-soft";
-        // 2번째 줄: 담음 → 만료 · 마지막 접속 · 알림(있을 때만)
-        const line2:string[]=[`담음 ${createdText(g.minCreated)} → 만료 ${createdText(g.minExpires)}`];
-        if(g.maxSynced>0) line2.push(`마지막 접속 ${createdText(g.maxSynced)}`);
-        const a=alerts[g.sessionKey]; if(a?.sentAt){const sent=new Date(a.sentAt).getTime(); line2.push(`알림 ${createdText(sent)} ${a.seenAt?"봄":"보냄(안 봄)"}`);}
-        const member=customerStatus(g); const meta=groupMeta[g.sessionKey];
-        return <div key={g.sessionKey} className="overflow-hidden rounded-2xl border border-line">
-          <div className="bg-surface-2 px-3 py-2">
-            <div className="flex items-start gap-2">
-              <span className="min-w-0 flex-1 text-[13px] font-black text-ink">{groupLabel(g)}{g.phone?<span className="ml-1.5 text-[11px] font-bold text-ink-mute">{phoneFmt(g.phone)}</span>:null}</span>
-              <span className="shrink-0 text-right">
-                <span className={`inline-block rounded-lg px-2 py-0.5 text-[11px] font-black ${badgeCls}`}>{tl.remainText}</span>
-                <span className="mt-1 block h-1 w-full overflow-hidden rounded-full bg-line"><span className={`block h-full rounded-full ${barCls}`} style={{width:`${Math.round(tl.progress*100)}%`}}/></span>
-              </span>
+
+      {/* 숫자 한 줄 + 범위 */}
+      <div className="border-b border-line px-5 py-3 max-sm:px-4">
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[13px] text-ink-soft tabular-nums">
+          <span>손님 <b className="text-[14px] font-bold text-ink">{groups.length}명</b></span>
+          <span>수량 <b className="text-[14px] font-bold text-ink">{totalQty}개</b></span>
+          <span>담긴 금액 <b className="text-[14px] font-bold text-ink">{won(grandKnown)}</b></span>
+          {soonCount>0?<span className="font-bold text-danger-tx">30분 안에 만료 {soonCount}명</span>:null}
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-ink-mute">
+          {scopeAll
+            ?<><span>지난 장바구니까지 전부 보는 중</span><button type="button" onClick={()=>setScopeAll(false)} className="font-bold text-ink underline underline-offset-2">지금 방송만 보기</button></>
+            :scopeInfo.scope==="broadcast"
+              ?<><span>지금 방송{scopeInfo.broadcastTitle?` 「${scopeInfo.broadcastTitle}」`:""} 상품만 보는 중</span><button type="button" onClick={()=>setScopeAll(true)} className="font-bold text-ink underline underline-offset-2">지난 것까지 보기</button></>
+              :<span>전체 장바구니</span>}
+        </div>
+      </div>
+
+      {/* 필터 한 줄 + 전체 작업(주버튼 1개) */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-surface-2 px-5 py-2.5 max-sm:px-4">
+        <input type="search" value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="닉네임·이름·전화·상품 검색" aria-label="장바구니 검색" className="h-9 min-w-0 flex-1 basis-[200px] rounded-lg border border-line bg-surface px-3 text-[13px] text-ink max-sm:h-11 max-sm:basis-full"/>
+        <select value={customerFilter} onChange={(e)=>setCustomerFilter(e.target.value as CustomerFilter)} className={selectCls} aria-label="고객 구분 필터"><option value="all">회원 전체</option><option value="first">첫 주문·주문 없음</option><option value="existing">기존회원</option><option value="unknown">확인 불가</option></select>
+        <select value={sortKey} onChange={(e)=>setSortKey(e.target.value as SortKey)} className={selectCls} aria-label="담김 목록 정렬">{SORT_OPTIONS.map(opt=><option key={opt.value} value={opt.value}>{opt.label}</option>)}</select>
+        {groups.length>0?<div className="ml-auto flex items-center gap-2 max-sm:ml-0 max-sm:w-full">
+          <button type="button" disabled={Boolean(clearing)} onClick={()=>void clearAll()} className={`${btnDanger} max-sm:flex-1`}>{clearing==="__all__"?"비우는 중":`${groups.length}명 전부 비우기`}</button>
+          <button type="button" disabled={Boolean(reminding)} onClick={()=>void remindAll()} className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg bg-ink px-3 text-[13px] font-bold text-white disabled:opacity-50 max-sm:h-11 max-sm:flex-1">{reminding==="__all__"?"보내는 중":`${groups.length}명에게 주문 확인 알림`}</button>
+        </div>:null}
+      </div>
+
+      {/* 목록 */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 max-sm:px-3">
+        {loading&&holds.length===0?<div className="py-12 text-center text-[13px] text-ink-mute">불러오는 중…</div>
+        :groups.length===0?<div className="py-12 text-center text-[13px] text-ink-mute">{search.trim()?"검색에 맞는 장바구니가 없어요. 검색어를 지우거나 다른 이름으로 찾아 보세요.":"담기만 하고 주문서를 안 낸 손님이 없어요. 손님이 상품을 담으면 여기에 바로 나와요."}</div>
+        :<div className="space-y-3">{pageGroups.map(g=>{
+          const presentations=g.items.map(it=>cartHoldPresentation({productName:it.productName,fallbackProductName:it.fallbackProductName,color:it.color,size:it.size,qty:it.qty,unitPrice:it.unitPrice,legacySnapshot:it.legacySnapshot}));
+          const knownTotal=presentations.reduce((s,p)=>s+(p.rowTotal??0),0); const unknown=presentations.some(p=>p.rowTotal===null);
+          const tl=cartHoldTimeline({createdAtMs:g.minCreated,expiresAtMs:g.minExpires,nowMs:now});
+          const remainCls=tl.level==="danger"?"text-danger-tx":tl.level==="warn"?"text-warn-tx":"text-ink-soft";
+          const barCls=tl.level==="danger"?"bg-danger-tx":tl.level==="warn"?"bg-warn-tx":"bg-ink-mute";
+          const meta2:string[]=[`담음 ${createdText(g.minCreated)}`,`만료 ${createdText(g.minExpires)}`];
+          if(g.maxSynced>0) meta2.push(`마지막 접속 ${createdText(g.maxSynced)}`);
+          const a=alerts[g.sessionKey]; if(a?.sentAt){const sent=new Date(a.sentAt).getTime(); meta2.push(`알림 ${createdText(sent)} ${a.seenAt?"봄":"안 봄"}`);}
+          const member=customerStatus(g); const meta=groupMeta[g.sessionKey];
+          return <section key={g.sessionKey} className="overflow-hidden rounded-xl border border-line bg-surface">
+            {/* 손님 줄 */}
+            <div className="border-b border-line px-4 py-3 max-sm:px-3">
+              <div className="flex items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="text-[14px] font-bold text-ink">{groupLabel(g)}</span>
+                    {g.phone?<span className="text-[13px] text-ink-mute tabular-nums">{phoneFmt(g.phone)}</span>:null}
+                    <span className={`rounded-full px-2 py-0.5 text-[13px] font-bold ${member.cls}`}>{member.label}</span>
+                  </div>
+                  <div className="mt-1 text-[13px] text-ink-mute">{meta2.join(" · ")}</div>
+                </div>
+                <div className="w-[96px] shrink-0 text-right">
+                  <div className={`text-[13px] font-bold ${remainCls}`}>{tl.remainText}</div>
+                  <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-line"><div className={`h-full rounded-full ${barCls}`} style={{width:`${Math.round(tl.progress*100)}%`}}/></div>
+                </div>
+              </div>
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-bold text-ink-mute"><span className={`rounded-full px-1.5 py-0.5 font-black ${member.cls}`}>{member.label}</span><span>{line2.join(" · ")}</span></div>
-          </div>
-          <div className="divide-y divide-line">{g.items.map((it,i)=>{const p=presentations[i]; const img=holdImages[`${String(it.productId||"").trim()}|${String(it.detailName||"").trim()}`]||""; const itExp=new Date(it.expiresAt).getTime(); const showExp=Number.isFinite(itExp)&&itExp-g.minExpires>=5*60000; return <div key={i} className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-3 px-3 py-2.5">{img?<button type="button" title="사진 크게 보기" onClick={()=>setImagePreviewUrl(img)} className="h-11 w-11 shrink-0 self-center overflow-hidden rounded-lg border border-line bg-surface-2">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={img} alt="" loading="lazy" className="h-full w-full object-cover"/></button>:<span className="h-11 w-11 shrink-0 self-center rounded-lg border border-line bg-surface-2 text-center text-[11px] leading-[44px] text-ink-mute">사진 없음</span>}<div className="min-w-0"><div className="break-words text-[13px] font-black leading-5 text-ink">{p.title}</div>{p.optionText||showExp?<div className="mt-0.5 text-[11px] font-bold text-ink-mute">{p.optionText?`옵션 · ${p.optionText}`:"옵션 없음"}{showExp?` · 만료 ${hhmm(itExp)}`:""}</div>:null}{p.legacySnapshot?<div className="mt-0.5 text-[11px] font-bold text-warn-tx">예전 담김 기록 · 세부상품/당시금액 기록 없음</div>:null}</div><div className="text-right"><div className="text-[13px] font-black text-ink">{p.qty}개</div>{p.unitPrice!==null?<><div className="mt-0.5 text-[11px] font-bold text-ink-soft">개당 {won(p.unitPrice)}</div>{p.qty>1?<div className="text-[11px] font-black text-[var(--color-rose-deep)]">합계 {won(p.rowTotal||0)}</div>:null}</>:<div className="mt-0.5 text-[11px] font-bold text-ink-mute">금액 미기록</div>}</div></div>})}</div>
-          <div className="flex flex-wrap items-center gap-2 border-t border-line bg-white px-3 py-2 text-[11px] font-black"><span className="min-w-0 flex-1"><span className="text-ink-mute">담긴 금액</span> <span className="text-[var(--color-rose-deep)]">{won(knownTotal)}{unknown?" + 미기록":""}</span></span>
-            <label className="flex min-w-[260px] flex-1 items-center gap-2 text-ink-soft"><span className="shrink-0">이 장바구니 계좌</span><select aria-label={`${groupLabel(g)} 장바구니 계좌`} value={meta?.overrideAccount?`active:${meta.overrideAccount.id}`:"default"} disabled={assigningAccount===g.sessionKey} onChange={(e)=>void setBankOverride(g,e.target.value)} className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 py-1 text-[11px] font-black text-ink"><option value="default">기본 계좌 설정 사용</option>{meta?.overrideAccount?<option value={`active:${meta.overrideAccount.id}`}>현재 지정 · {meta.overrideAccount.bankName} {meta.overrideAccount.bankAccount} · 예금주 {meta.overrideAccount.bankHolder}</option>:null}{bankAccounts.map(account=><option key={account.id} value={account.id}>{account.label} · {account.bankName} {account.bankAccount} · 예금주 {account.bankHolder}</option>)}</select></label>
-            <button type="button" disabled={Boolean(reminding)} onClick={()=>void remind(g)} className="shrink-0 rounded-lg border border-[var(--color-rose-deep)]/20 bg-white px-2 py-1 text-[11px] font-black text-[var(--color-rose-deep)] disabled:opacity-50">{reminding===g.sessionKey?"전송중":"주문 확인 알림"}</button>
-            <button type="button" disabled={clearing===g.sessionKey} onClick={()=>void clearSession(g)} className="shrink-0 rounded-lg border border-line bg-surface px-2 py-1 text-[11px] font-black text-ink-soft hover:bg-danger-bg hover:text-danger-tx disabled:opacity-50">{clearing===g.sessionKey?"비우는중":"비우기"}</button>
-          </div>
-        </div>})}</div>}</div>
+            {/* 담은 상품 */}
+            <div className="divide-y divide-line">{g.items.map((it,i)=>{const p=presentations[i]; const img=holdImages[`${String(it.productId||"").trim()}|${String(it.detailName||"").trim()}`]||""; const itExp=new Date(it.expiresAt).getTime(); const showExp=Number.isFinite(itExp)&&itExp-g.minExpires>=5*60000; return <div key={i} className="grid grid-cols-[48px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 max-sm:px-3">
+              {img?<button type="button" title="사진 크게 보기" onClick={()=>setImagePreviewUrl(img)} className="h-12 w-12 overflow-hidden rounded-lg border border-line bg-surface-2">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={img} alt="" loading="lazy" className="h-full w-full object-cover"/></button>:<span className="h-12 w-12 rounded-lg border border-line bg-surface-2" aria-hidden="true"/>}
+              <div className="min-w-0">
+                <div className="break-words text-[14px] font-bold leading-5 text-ink">{p.title}</div>
+                <div className="mt-0.5 text-[13px] text-ink-mute">{p.optionText||"옵션 없음"}{showExp?` · 만료 ${hhmm(itExp)}`:""}</div>
+                {p.legacySnapshot?<div className="mt-0.5 text-[13px] text-warn-tx">예전 담김 기록 · 세부상품/당시 금액 없음</div>:null}
+              </div>
+              <div className="text-right tabular-nums">
+                <div className="text-[14px] font-bold text-ink">{p.qty}개</div>
+                {p.unitPrice!==null?<div className="mt-0.5 text-[13px] text-ink-soft">{p.qty>1?`${won(p.unitPrice)} × ${p.qty} = ${won(p.rowTotal||0)}`:won(p.unitPrice)}</div>:<div className="mt-0.5 text-[13px] text-ink-mute">금액 기록 없음</div>}
+              </div>
+            </div>})}</div>
+            {/* 아래 줄: 금액 · 계좌 · 작업 */}
+            <div className="flex flex-wrap items-center gap-2 border-t border-line bg-surface-2 px-4 py-2.5 max-sm:px-3">
+              <span className="text-[13px] text-ink-soft tabular-nums">담긴 금액 <b className="text-[14px] font-bold text-ink">{won(knownTotal)}{unknown?" + 기록 없음":""}</b></span>
+              <label className="flex min-w-[220px] flex-1 items-center gap-2 text-[13px] text-ink-soft max-sm:basis-full"><span className="shrink-0">계좌</span><select aria-label={`${groupLabel(g)} 장바구니 계좌`} value={meta?.overrideAccount?`active:${meta.overrideAccount.id}`:"default"} disabled={assigningAccount===g.sessionKey} onChange={(e)=>void setBankOverride(g,e.target.value)} className={`${selectCls} flex-1`}><option value="default">기본 계좌 설정 사용</option>{meta?.overrideAccount?<option value={`active:${meta.overrideAccount.id}`}>지금 지정 · {meta.overrideAccount.bankName} {meta.overrideAccount.bankAccount} · 예금주 {meta.overrideAccount.bankHolder}</option>:null}{bankAccounts.map(account=><option key={account.id} value={account.id}>{account.label} · {account.bankName} {account.bankAccount} · 예금주 {account.bankHolder}</option>)}</select></label>
+              <div className="flex items-center gap-2 max-sm:w-full">
+                <button type="button" disabled={Boolean(reminding)} onClick={()=>void remind(g)} className={`${btnSub} max-sm:flex-1`}>{reminding===g.sessionKey?"보내는 중":"주문 확인 알림"}</button>
+                <button type="button" disabled={clearing===g.sessionKey} onClick={()=>void clearSession(g)} className={`${btnDanger} max-sm:flex-1`}>{clearing===g.sessionKey?"비우는 중":"비우기"}</button>
+              </div>
+            </div>
+          </section>;})}</div>}
+      </div>
+
+      {/* 페이지 넘김(주문서·상품 목록과 같은 부품) */}
+      {groups.length>0?<div className="border-t border-line px-5 max-sm:px-4">
+        <ProductPagination page={safePage} pageCount={pageCount} total={groups.length} start={pageStart+1} end={Math.min(groups.length,pageStart+pageSize)} size={pageSize} label="장바구니 페이지 이동" unit="명" sizes={[10,20,50]} onPage={(n)=>setPage(n)} onSize={setPageSize}/>
+      </div>:null}
     </div>
   </div>;
 }
