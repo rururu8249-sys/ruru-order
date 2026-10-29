@@ -145,7 +145,7 @@ import { buildBrandOrderCatalog, resolveBrandOrderSelection, findBrandOrderProdu
 import { loadProductBrandCatalog } from "@/lib/productBrandCatalogClient";
 import CustomerSizeChartSheet from "@/components/customer/CustomerSizeChartSheet";
 import { resolveSizeChart, sizeColumnIndex } from "@/lib/sizeChart";
-import { EMPTY_PAID_SHIPPING_GROUPS, anyPaidShippingGroup, assignRowShippingFees, calculateShippingBreakdown, normalizePaidShippingGroups, resolveShippingGroup, shippingFeeByGroup, type PaidShippingGroups as PaidShippingGroupsLib } from "@/lib/shippingGroups";
+import { EMPTY_PAID_SHIPPING_GROUPS, anyPaidShippingGroup, hasOverseasBadge, assignRowShippingFees, calculateShippingBreakdown, normalizePaidShippingGroups, resolveShippingGroup, shippingFeeByGroup, type PaidShippingGroups as PaidShippingGroupsLib, type ShippingGroup } from "@/lib/shippingGroups";
 import { registeredProductEditManualPrice, registeredProductPriceMode } from "@/lib/registeredProductPricePolicy";
 import { buildCartHoldSnapshotItem } from "@/lib/cartHoldDetail";
 import { CART_SEQ_NEW, readCartSeqField } from "@/lib/cartClearMarks";
@@ -1735,6 +1735,8 @@ export default function OrderPage() {
   // [2026-10-22] 업체배송비(업체1·업체2 각각) — 설정 「업체배송비」「업체배송 제주/산간」. 기본 배송비를 0원으로 해도 그대로.
   const [vendorShippingFeeSetting, setVendorShippingFeeSetting] = useState(4000);
   const [vendorRemoteShippingFeeSetting, setVendorRemoteShippingFeeSetting] = useState(7000);
+  // [2026-10-29] 해외배송비 — 0원(기본)이면 해외배송 상품도 예전처럼 그 상품의 배송 갈래(일반/업체)를 따른다.
+  const [overseasShippingFeeSetting, setOverseasShippingFeeSetting] = useState(0);
   const [pointEarnRateForDisplay, setPointEarnRateForDisplay] = useState(0);
   // 접속 팝업 공지(설정에서 문구/제목/글자크기/색상/ON·OFF 수정). 밴드 바로가기 + 24시간 안 보기 + 확인.
   const [popupNoticeEnabled, setPopupNoticeEnabled] = useState(false);
@@ -1923,7 +1925,45 @@ export default function OrderPage() {
     normalRemoteFee: remoteAreaShippingFee,
     vendorFee: vendorShippingFeeSetting,
     vendorRemoteFee: vendorRemoteShippingFeeSetting,
+    overseasFee: overseasShippingFeeSetting,
   }, isRemoteAreaShippingAddress);
+  // [2026-10-29] 해외배송 갈래 — 해외배송비 > 0 이고 «상품 정보»에 해외배송 배지가 있을 때만.
+  //   장바구니 줄엔 배지가 없어서 product_id 로 상품 목록(방송·카탈로그·부족분 조회)에서 찾는다.
+  //   서버(submit)도 products 배지로 같은 판정 → 손님 화면 금액과 서버 검사가 같다.
+  const overseasShippingOn = overseasShippingFeeSetting > 0;
+  // 상품 목록에 없는(옛 임시 장바구니 등) 담은 상품은 배지만 따로 읽어 둔다 — 못 읽으면 예전 갈래(서버도 같은 상품 배지라 안 맞으면 제출 때 안내).
+  const [extraOverseasProductIds, setExtraOverseasProductIds] = useState<string[]>([]);
+  const cartProductIdsKey = items.map((item) => String(item.product_id || "").trim()).filter(Boolean).sort().join(",");
+  useEffect(() => {
+    if (!overseasShippingOn || !cartProductIdsKey) return;
+    const known = new Set([...broadcastProducts, ...groupBuyQuickProductsFromCatalog].map((p) => String(p.id)));
+    const missing = Array.from(new Set(cartProductIdsKey.split(","))).filter((id) => /^[0-9]+$/.test(id) && !known.has(id));
+    if (missing.length === 0) return;
+    let alive = true;
+    void (async () => {
+      const { data, error } = await supabase.from("products").select("id, badge_type, badge_types").in("id", missing.map(Number));
+      if (!alive || error || !data) return;
+      const found = (data as Record<string, unknown>[]).filter((p) => hasOverseasBadge(p)).map((p) => String(p.id));
+      setExtraOverseasProductIds((prev) => {
+        const next = Array.from(new Set([...prev, ...found]));
+        return next.length === prev.length ? prev : next;
+      });
+    })();
+    return () => { alive = false; };
+  }, [overseasShippingOn, cartProductIdsKey, broadcastProducts, groupBuyQuickProductsFromCatalog]);
+  const overseasProductIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const product of [...broadcastProducts, ...groupBuyQuickProductsFromCatalog]) {
+      if (hasOverseasBadge(product)) ids.add(String(product.id));
+    }
+    for (const id of extraOverseasProductIds) ids.add(id);
+    return ids;
+  }, [broadcastProducts, groupBuyQuickProductsFromCatalog, extraOverseasProductIds]);
+  const shippingGroupOf = (value: unknown): ShippingGroup => {
+    const productId = String((value as { product_id?: unknown; id?: unknown })?.product_id ?? "").trim();
+    const overseas = overseasShippingOn && (hasOverseasBadge(value) || (productId !== "" && overseasProductIds.has(productId)));
+    return resolveShippingGroup(value, overseas);
+  };
   const isVendorShippingItem = (item: Pick<OrderItem, "shipping_type" | "combine_shipping">) => {
     const shippingType = String(item.shipping_type || "").trim().toLowerCase();
 
@@ -1955,17 +1995,20 @@ export default function OrderPage() {
     const paidShippingGroups = normalizePaidShippingGroups(paidShippingBeforeSubmitValue);
     const chargeableItems = getChargeableShippingItems(targetItems);
     // [2026-10-22] 일반·업체1·업체2 갈래마다 1번씩(이미 낸 갈래는 0원) — lib/shippingGroups
-    return calculateShippingBreakdown(chargeableItems.map((item) => resolveShippingGroupFromValue(item)), paidShippingGroups, shippingFeeOfGroup);
+    return calculateShippingBreakdown(chargeableItems.map((item) => shippingGroupOf(item)), paidShippingGroups, shippingFeeOfGroup);
   };
 
   const shippingFeeBreakdown = calculateShippingFeeBreakdown(items, paidShippingGroups);
   const shippingFee = shippingFeeBreakdown.totalShippingFee;
   const chargeableShippingItemsForNotice = getChargeableShippingItems(items);
   const hasNormalShippingItemForNotice = chargeableShippingItemsForNotice.some(
-    (item) => resolveShippingGroupFromValue(item) === "normal",
+    (item) => shippingGroupOf(item) === "normal",
   );
   const hasVendorShippingItemForNotice = chargeableShippingItemsForNotice.some(
-    (item) => resolveShippingGroupFromValue(item) !== "normal",
+    (item) => { const g = shippingGroupOf(item); return g === "vendor" || g === "vendor2"; },
+  );
+  const hasOverseasShippingItemForNotice = chargeableShippingItemsForNotice.some(
+    (item) => shippingGroupOf(item) === "overseas",
   );
   const paidVendorGroupForNotice = paidShippingGroups.vendor || paidShippingGroups.vendor2;
   const isFreeShippingEvent = baseShippingFee <= 0;
@@ -1973,6 +2016,14 @@ export default function OrderPage() {
     if (chargeableShippingItemsForNotice.length <= 0) return "";
 
     if (shippingFee > 0) {
+      if (shippingFeeBreakdown.overseasShippingFee > 0 && shippingFeeBreakdown.overseasShippingFee < shippingFee) {
+        return `해외배송 상품은 따로 출고돼 배송비가 따로 붙어요. 총 배송비 ${won(shippingFee)}입니다.`;
+      }
+
+      if (shippingFeeBreakdown.overseasShippingFee > 0) {
+        return `해외배송 상품 배송비 ${won(shippingFee)}이 적용됩니다.`;
+      }
+
       if ([shippingFeeBreakdown.normalShippingFee, shippingFeeBreakdown.vendor1ShippingFee, shippingFeeBreakdown.vendor2ShippingFee].filter((fee) => fee > 0).length >= 2) {
         return `일반배송·업체배송이 함께 있어 배송비가 따로따로 붙어요. 총 배송비 ${won(shippingFee)}입니다.`;
       }
@@ -1994,6 +2045,10 @@ export default function OrderPage() {
       }
 
       return ""; // [㊽] 바로 아래 금액표 「배송비」와 중복 — 기본 경우만 숨김(업체배송·제주·별도출고 안내는 유지). 계산 무변경
+    }
+
+    if (hasOverseasShippingItemForNotice && paidShippingGroups.overseas && !hasNormalShippingItemForNotice && !hasVendorShippingItemForNotice) {
+      return "기존 해외배송 주문과 합배송되어 이번 주문서 배송비는 0원입니다.";
     }
 
     if (isFreeShippingEvent) {
@@ -2448,6 +2503,7 @@ export default function OrderPage() {
         "remote_area_shipping_fee",
         "vendor_shipping_fee",
         "vendor_remote_area_shipping_fee",
+        "overseas_shipping_fee",
         "point_auto_earn_enabled",
         "point_earn_rate",
         "direct_input_enabled",
@@ -2499,6 +2555,7 @@ export default function OrderPage() {
       const nextVendorFee = Math.max(0, readNumber("vendor_shipping_fee", 4000));
       setVendorShippingFeeSetting(nextVendorFee);
       setVendorRemoteShippingFeeSetting(Math.max(nextVendorFee, readNumber("vendor_remote_area_shipping_fee", 7000)));
+      setOverseasShippingFeeSetting(Math.max(0, readNumber("overseas_shipping_fee", 0)));
     }
     setCombineShippingSettings(parseCombineShippingSettings(data));
 
@@ -3156,7 +3213,7 @@ export default function OrderPage() {
     if (productIds.length > 0) {
       const { data: products, error: productError } = await supabase
         .from("products")
-        .select("id, shipping_type, combine_shipping, product_type")
+        .select("id, shipping_type, combine_shipping, product_type, badge_type, badge_types")
         .in("id", productIds);
 
       if (productError) {
@@ -3174,7 +3231,8 @@ export default function OrderPage() {
     paidShippingOrders.forEach((order: any) => {
       const productId = String(order?.product_id || "").trim();
       const product = productId ? productShippingMap.get(productId) : null;
-      const group = product ? resolveShippingGroupFromValue(product) : "normal"; // normal / vendor(업체1) / vendor2(업체2)
+      // normal / vendor(업체1) / vendor2(업체2) / overseas(해외배송비 > 0 이고 해외배송 배지)
+      const group = product ? resolveShippingGroup(product, overseasShippingOn && hasOverseasBadge(product)) : "normal";
 
       groups[group] = true;
     });
@@ -5246,7 +5304,7 @@ export default function OrderPage() {
       // [2026-10-22] 줄마다 배송비 — 갈래(일반·업체1·업체2)마다 첫 «배송비 대상» 줄에만. 합 = appliedShippingFee(lib/shippingGroups)
       const chargeableValidItems = new Set(getChargeableShippingItems(validItems));
       const rowShippingFees = assignRowShippingFees(
-        validItems.map((item) => ({ group: resolveShippingGroupFromValue(item), chargeable: chargeableValidItems.has(item) })),
+        validItems.map((item) => ({ group: shippingGroupOf(item), chargeable: chargeableValidItems.has(item) })),
         paidShippingGroupsBeforeSubmit,
         shippingFeeOfGroup,
       );
@@ -5406,6 +5464,7 @@ export default function OrderPage() {
         normal: paidShippingGroupsBeforeSubmit.normal || appliedShippingFeeBreakdown.normalShippingFee > 0,
         vendor: paidShippingGroupsBeforeSubmit.vendor || appliedShippingFeeBreakdown.vendor1ShippingFee > 0,
         vendor2: paidShippingGroupsBeforeSubmit.vendor2 || appliedShippingFeeBreakdown.vendor2ShippingFee > 0,
+        overseas: paidShippingGroupsBeforeSubmit.overseas || appliedShippingFeeBreakdown.overseasShippingFee > 0,
       };
 
       if (appliedShippingFeeBreakdown.totalShippingFee > 0) {

@@ -31,7 +31,7 @@ t('10/18 사례: 기본 배송비 0원(무료배송)이어도 업체 상품엔 �
 
 t('제주·산간: 일반 7,000 / 업체 7,000 (설정값)', () => {
   const f = shippingFeeByGroup(S(4000), true);
-  assert.deepEqual(f, { normal: 7000, vendor: 7000, vendor2: 7000 });
+  assert.deepEqual(f, { normal: 7000, vendor: 7000, vendor2: 7000, overseas: 0 });
   const f0 = shippingFeeByGroup(S(0), true);
   assert.equal(calculateShippingBreakdown(['vendor2'], EMPTY_PAID_SHIPPING_GROUPS, f0).totalShippingFee, 7000);
 });

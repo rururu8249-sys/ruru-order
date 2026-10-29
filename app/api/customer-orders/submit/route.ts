@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server";
-import { expectedMinimumShipping, resolveShippingGroup, type ShippingGroup } from "@/lib/shippingGroups";
+import { expectedMinimumShipping, hasOverseasBadge, resolveShippingGroup, type ShippingGroup } from "@/lib/shippingGroups";
 import { createClient } from "@supabase/supabase-js";
 
 import { assertValidCustomerPointPhone } from "@/lib/customerPoints";
@@ -433,8 +433,9 @@ function isCanceledForSubmitShipping(status: unknown): boolean {
 //   상품 정보(products)가 있으면 그걸 기준으로 본다. 손님이 보낸 shipping_type 을 위조해
 //   "업체배송 아님"으로 속여 배송비 한 그룹분을 빼는 걸 막기 위함.
 // [2026-10-22] 일반·업체1·업체2 세 갈래 — 손님 화면과 같은 lib/shippingGroups 함수 하나.
-function resolveSubmitShippingGroup(value: unknown): ShippingGroup {
-  return resolveShippingGroup(value);
+// [2026-10-29] 해외배송비(설정 > 0)를 따로 받을 때는 해외배송 배지 상품을 해외배송 갈래로 — 배지는 products(서버 값)로만 본다.
+function resolveSubmitShippingGroup(value: unknown, overseasFeeOn = false): ShippingGroup {
+  return resolveShippingGroup(value, overseasFeeOn && hasOverseasBadge(value));
 }
 
 async function assertShippingFeeNotSkipped(
@@ -462,6 +463,11 @@ async function assertShippingFeeNotSkipped(
     0,
     await readSubmitSettingNumber(supabase, "vendor_shipping_fee", 4000),
   );
+  // [2026-10-29] 해외배송비 — 0원(기본)이면 해외배송 갈래 없음(예전 그대로).
+  const overseasShippingFee = Math.max(
+    0,
+    await readSubmitSettingNumber(supabase, "overseas_shipping_fee", 0),
+  );
 
   const paidShipping = orderRows.reduce((sum, row) => {
     const fee = submitNumberValue(row?.adjusted_shipping_fee ?? row?.shipping_fee, 0);
@@ -473,12 +479,14 @@ async function assertShippingFeeNotSkipped(
   for (const row of chargeable) {
     const pid = text(row?.product_id);
     const product = pid ? catalog.get(pid) : undefined;
-    groups.add(resolveSubmitShippingGroup(product ?? row));
+    // 해외배송 배지는 상품 정보(products)가 있을 때만 인정 — 직접입력 줄은 예전 규칙
+    groups.add(product ? resolveSubmitShippingGroup(product, overseasShippingFee > 0) : resolveSubmitShippingGroup(row));
   }
   // 갈래마다 1번씩: 일반=기본 배송비, 업체1·업체2=업체배송비(제주·산간 가산은 손님 화면만 — 서버는 최소액만 본다)
   const expectedShipping = expectedMinimumShipping(groups, {
     normalFee: baseShippingFee, normalRemoteFee: baseShippingFee,
     vendorFee: vendorShippingFee, vendorRemoteFee: vendorShippingFee,
+    overseasFee: overseasShippingFee,
   });
   if (expectedShipping <= 0) return; // 이 주문서 갈래가 모두 무료(예: 일반만 담고 기본 배송비 0원) → 검증 안 함
 
