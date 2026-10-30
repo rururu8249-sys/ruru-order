@@ -39,8 +39,11 @@ t('업체배송으로 등록된 해외배송 상품도 해외배송 갈래(배�
   assert.equal(grp({ shipping_type: 'vendor', badge_types: ['overseas'] }, 5000), 'overseas');
 });
 
-t('제주·산간이어도 해외배송비는 같은 금액', () => {
+t('제주·산간: 해외배송 제주/산간 금액(없으면 해외배송비와 같음·더 낮게는 안 됨)', () => {
   assert.equal(shippingFeeByGroup(S(5000), true).overseas, 5000);
+  assert.equal(shippingFeeByGroup({ ...S(5000), overseasRemoteFee: 8000 }, true).overseas, 8000);
+  assert.equal(shippingFeeByGroup({ ...S(5000), overseasRemoteFee: 8000 }, false).overseas, 5000);
+  assert.equal(shippingFeeByGroup({ ...S(5000), overseasRemoteFee: 3000 }, true).overseas, 5000);
 });
 
 t('합배송: 이미 해외배송비 낸 기간 안 추가 해외배송 주문 = 0원, 일반은 따로', () => {
@@ -67,6 +70,7 @@ t('연결: 손님 화면·서버·관리자 설정이 같은 키를 쓴다', () 
   const route = fs.readFileSync('app/api/customer-orders/submit/route.ts', 'utf8');
   const admin = fs.readFileSync('components/admin-live/AdminLiveSettingsPanel.tsx', 'utf8');
   for (const src of [page, route, admin]) assert.match(src, /overseas_shipping_fee/);
+  for (const src of [page, admin]) assert.match(src, /overseas_remote_area_shipping_fee/);
   assert.match(route, /resolveSubmitShippingGroup\(product, overseasShippingFee > 0\)/);
   assert.match(page, /select\("id, shipping_type, combine_shipping, product_type, badge_type, badge_types"\)/); // 합배송 판정도 배지를 읽어야
   assert.doesNotMatch(page, /resolveShippingGroupFromValue\(item\)/); // 장바구니 줄은 모두 shippingGroupOf 로

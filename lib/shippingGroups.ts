@@ -52,7 +52,8 @@ export type ShippingFeeSettings = {
   normalRemoteFee: number;  // 제주/산간 배송비
   vendorFee: number;        // 업체배송비
   vendorRemoteFee: number;  // 업체배송 제주/산간
-  overseasFee?: number;     // 해외배송비(제주·산간 구분 없음) — 없으면 0
+  overseasFee?: number;     // 해외배송비 — 없으면 0
+  overseasRemoteFee?: number; // 해외배송 제주/산간 — 없으면 해외배송비와 같음
 };
 
 /** 배송지에 따라 갈래별 1회 금액. 제주·산간은 일반 금액보다 낮아지지 않게(설정 화면 저장 규칙과 같음). */
@@ -61,7 +62,8 @@ export function shippingFeeByGroup(settings: ShippingFeeSettings, isRemote: bool
   const vendor = Math.max(0, Number(settings.vendorFee) || 0);
   const normalFee = isRemote ? Math.max(normal, Math.max(0, Number(settings.normalRemoteFee) || 0)) : normal;
   const vendorFee = isRemote ? Math.max(vendor, Math.max(0, Number(settings.vendorRemoteFee) || 0)) : vendor;
-  const overseasFee = Math.max(0, Number(settings.overseasFee) || 0);
+  const overseas = Math.max(0, Number(settings.overseasFee) || 0);
+  const overseasFee = isRemote ? Math.max(overseas, Math.max(0, Number(settings.overseasRemoteFee) || 0)) : overseas;
   return { normal: normalFee, vendor: vendorFee, vendor2: vendorFee, overseas: overseasFee };
 }
 

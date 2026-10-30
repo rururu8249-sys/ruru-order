@@ -1737,6 +1737,7 @@ export default function OrderPage() {
   const [vendorRemoteShippingFeeSetting, setVendorRemoteShippingFeeSetting] = useState(7000);
   // [2026-10-29] 해외배송비 — 0원(기본)이면 해외배송 상품도 예전처럼 그 상품의 배송 갈래(일반/업체)를 따른다.
   const [overseasShippingFeeSetting, setOverseasShippingFeeSetting] = useState(0);
+  const [overseasRemoteShippingFeeSetting, setOverseasRemoteShippingFeeSetting] = useState(0);
   const [pointEarnRateForDisplay, setPointEarnRateForDisplay] = useState(0);
   // 접속 팝업 공지(설정에서 문구/제목/글자크기/색상/ON·OFF 수정). 밴드 바로가기 + 24시간 안 보기 + 확인.
   const [popupNoticeEnabled, setPopupNoticeEnabled] = useState(false);
@@ -1926,6 +1927,7 @@ export default function OrderPage() {
     vendorFee: vendorShippingFeeSetting,
     vendorRemoteFee: vendorRemoteShippingFeeSetting,
     overseasFee: overseasShippingFeeSetting,
+    overseasRemoteFee: overseasRemoteShippingFeeSetting,
   }, isRemoteAreaShippingAddress);
   // [2026-10-29] 해외배송 갈래 — 해외배송비 > 0 이고 «상품 정보»에 해외배송 배지가 있을 때만.
   //   장바구니 줄엔 배지가 없어서 product_id 로 상품 목록(방송·카탈로그·부족분 조회)에서 찾는다.
@@ -2504,6 +2506,7 @@ export default function OrderPage() {
         "vendor_shipping_fee",
         "vendor_remote_area_shipping_fee",
         "overseas_shipping_fee",
+        "overseas_remote_area_shipping_fee",
         "point_auto_earn_enabled",
         "point_earn_rate",
         "direct_input_enabled",
@@ -2555,7 +2558,10 @@ export default function OrderPage() {
       const nextVendorFee = Math.max(0, readNumber("vendor_shipping_fee", 4000));
       setVendorShippingFeeSetting(nextVendorFee);
       setVendorRemoteShippingFeeSetting(Math.max(nextVendorFee, readNumber("vendor_remote_area_shipping_fee", 7000)));
-      setOverseasShippingFeeSetting(Math.max(0, readNumber("overseas_shipping_fee", 0)));
+      const nextOverseasFee = Math.max(0, readNumber("overseas_shipping_fee", 0));
+      setOverseasShippingFeeSetting(nextOverseasFee);
+      // 해외배송 제주/산간 — 저장 안 했으면 해외배송비와 같은 금액, 해외배송비보다 낮게는 안 함
+      setOverseasRemoteShippingFeeSetting(Math.max(nextOverseasFee, readNumber("overseas_remote_area_shipping_fee", nextOverseasFee)));
     }
     setCombineShippingSettings(parseCombineShippingSettings(data));
 
