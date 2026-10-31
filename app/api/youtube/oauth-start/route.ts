@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
   url.searchParams.set("response_type", "code");
   url.searchParams.set("scope", YOUTUBE_OAUTH_SCOPE);
   url.searchParams.set("access_type", "offline");
-  url.searchParams.set("prompt", "consent");
+  url.searchParams.set("prompt", "consent select_account"); // 2026-10-31 계정 고르기 화면 항상 — 봇 계정 바꿀 때 다른 구글 계정 선택 가능
   url.searchParams.set("state", state);
 
   const res = NextResponse.redirect(url.toString());
