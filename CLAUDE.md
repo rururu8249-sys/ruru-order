@@ -28,7 +28,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 (없음)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
-- 2026-10-31 **[유튜브 앱 바로 열기 짧은 주소 /youtube(사장님 23:07 「유튜브앱으로 바로 열리는 링크」)]** 신규 app/youtube(page·YoutubeOpener, 공개·noindex) — 안드로이드 intent(앱 없으면 인터넷 주소)·아이폰 youtube://(1.5초 안 넘어가면 인터넷)·PC 인터넷 주소로 루루동이2 채널 홈 자동 이동 + 「유튜브 앱에서 열기」 버튼. 카톡채널 광고·설명란에 https://ruru-order.vercel.app/youtube 사용, 채널 바뀌면 CHANNEL 한 줄만. 돈·주문 무접촉. tsc 0·build(BANKDA 2). 배포 완료 HASH
+- 2026-10-31 **[유튜브 앱 바로 열기 짧은 주소 /youtube(사장님 23:07 「유튜브앱으로 바로 열리는 링크」)]** 신규 app/youtube(page·YoutubeOpener, 공개·noindex) — 안드로이드 intent(앱 없으면 인터넷 주소)·아이폰 youtube://(1.5초 안 넘어가면 인터넷)·PC 인터넷 주소로 루루동이2 채널 홈 자동 이동 + 「유튜브 앱에서 열기」 버튼. 카톡채널 광고·설명란에 https://ruru-order.vercel.app/youtube 사용, 채널 바뀌면 CHANNEL 한 줄만. 돈·주문 무접촉. tsc 0·build(BANKDA 2). 배포 완료 4261139
 - 2026-10-31 **[/yt-test 시험 페이지 삭제]** 사장님 안드로이드 폰에서 intent 버튼 → 유튜브 앱 루루동이2 채널 홈 정상 확인(22:37). 아이폰은 시험 기기 없음 — 알림톡 iOS 칸은 youtube://www.youtube.com/channel/UC8jr9s1rZBEIPPTBPAwYE5A 권장. 배포 완료 b0467c1
 - 2026-10-31 **[유튜브 알림톡 버튼 시험 페이지 /yt-test(사장님 22:30 「앱 열기 하면 오류」)]** 신규 app/yt-test/page.tsx(표시 전용·noindex) — 알림톡 앱링크 버튼과 같은 주소(안드로이드 intent:// · 아이폰 youtube:// · https 비교) 3개, 새 채널 UC8jr9s1rZBEIPPTBPAwYE5A?si=… 고정. 승인 전에 폰에서 버튼 동작 확인용, 끝나면 지워도 됨. 돈·주문 무접촉. tsc 0·build(BANKDA 2). 배포 완료 9996425
 - 2026-10-31 **[유튜브 봇 계정 바꾸기 — 연결 때 계정 고르기 화면 항상(사장님 20:48 「rumarket8249@gmail.com 으로 주문 채팅글」)]** app/api/youtube/oauth-start prompt 「consent select_account」 — 설정 › 유튜브 「다시 연결」 누르면 구글 계정 고르는 화면이 꼭 떠서 다른 계정으로 연결 가능(전엔 브라우저에 로그인된 계정으로 바로 넘어갈 수 있었음). 저장(refresh token 1개 교체)·채팅 쓰기·읽기 무변경. 계정 로그인은 사장님. tsc 0·build(BANKDA 2). 배포 완료 569cee7
