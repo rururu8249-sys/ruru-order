@@ -28,6 +28,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 (없음)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-10-31 **[/yt-test 시험 페이지 삭제]** 사장님 안드로이드 폰에서 intent 버튼 → 유튜브 앱 루루동이2 채널 홈 정상 확인(22:37). 아이폰은 시험 기기 없음 — 알림톡 iOS 칸은 youtube://www.youtube.com/channel/UC8jr9s1rZBEIPPTBPAwYE5A 권장. 배포 완료 HASH
 - 2026-10-31 **[유튜브 알림톡 버튼 시험 페이지 /yt-test(사장님 22:30 「앱 열기 하면 오류」)]** 신규 app/yt-test/page.tsx(표시 전용·noindex) — 알림톡 앱링크 버튼과 같은 주소(안드로이드 intent:// · 아이폰 youtube:// · https 비교) 3개, 새 채널 UC8jr9s1rZBEIPPTBPAwYE5A?si=… 고정. 승인 전에 폰에서 버튼 동작 확인용, 끝나면 지워도 됨. 돈·주문 무접촉. tsc 0·build(BANKDA 2). 배포 완료 9996425
 - 2026-10-31 **[유튜브 봇 계정 바꾸기 — 연결 때 계정 고르기 화면 항상(사장님 20:48 「rumarket8249@gmail.com 으로 주문 채팅글」)]** app/api/youtube/oauth-start prompt 「consent select_account」 — 설정 › 유튜브 「다시 연결」 누르면 구글 계정 고르는 화면이 꼭 떠서 다른 계정으로 연결 가능(전엔 브라우저에 로그인된 계정으로 바로 넘어갈 수 있었음). 저장(refresh token 1개 교체)·채팅 쓰기·읽기 무변경. 계정 로그인은 사장님. tsc 0·build(BANKDA 2). 배포 완료 569cee7
 - 2026-10-31 **[손님 주문 화면 「유튜브 채널」 링크 → 새 채널(사장님 20:38 새 채널 시작)]** app/order/page.tsx 링크 주소만 UC8jr9s1rZBEIPPTBPAwYE5A 로(옛 UCBbrUWUnHvq5Ldpxgy5GdMw — 사이트에 옛 채널 주소 남은 곳 이것뿐). 채팅 주문알림 글·채팅 읽기는 방송 시작 때 넣는 라이브 주소로 채팅방을 찾아 채널 무관(코드 무변경), 위젯은 DB 기준이라 무관. 방송 알림 새 템플릿 2개(방송 시작·채널 변경 안내) SOLAPI 검수 중 — 승인 ID 받으면 연결. tsc 0·build(BANKDA 2). 배포 완료 bf85886
