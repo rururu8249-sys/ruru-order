@@ -25,6 +25,26 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(100);
     if (error) return NextResponse.json({ ok: false, message: error.message, rows: [] }, { status: 200 });
+    // 이 손님이 구독 무배로 낸 주문서 수(orders.subscribe_free_ship_at — 칸이 없으면 0)
+    const kakaoIds = Array.from(new Set((data || []).map((r) => String(r.kakao_id || "")).filter(Boolean)));
+    const orderCount = new Map<string, number>();
+    if (kakaoIds.length) {
+      const { data: od, error: oe } = await supabase
+        .from("orders")
+        .select("kakao_id, order_group_id")
+        .in("kakao_id", kakaoIds)
+        .not("subscribe_free_ship_at", "is", null)
+        .limit(5000);
+      if (!oe) {
+        const seen = new Set<string>();
+        for (const o of od || []) {
+          const key = `${o.kakao_id}|${o.order_group_id}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          orderCount.set(String(o.kakao_id), (orderCount.get(String(o.kakao_id)) || 0) + 1);
+        }
+      }
+    }
     const rows = await Promise.all(
       (data || []).map(async (row) => {
         let imageUrl = "";
@@ -33,7 +53,7 @@ export async function GET(request: NextRequest) {
           imageUrl = signed?.signedUrl || "";
         }
         const phone = String(row.customer_phone || "");
-        return { ...row, image_path: undefined, customer_phone: phone ? `${phone.slice(0, 3)}-****-${phone.slice(-4)}` : "", imageUrl };
+        return { ...row, image_path: undefined, customer_phone: phone ? `${phone.slice(0, 3)}-****-${phone.slice(-4)}` : "", imageUrl, orderCount: row.status === "verified" ? orderCount.get(String(row.kakao_id)) || 0 : 0 };
       }),
     );
     return NextResponse.json({ ok: true, rows });

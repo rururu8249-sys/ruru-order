@@ -20,3 +20,6 @@ create index if not exists subscribe_verifications_created_idx on public.subscri
 alter table public.subscribe_verifications enable row level security;
 
 -- 확인: select count(*) from public.subscribe_verifications;
+
+-- 2026-11-01 추가: 구독 인증 무료배송으로 들어온 주문 표시(관리자 주문서 「구독 무배」 배지용 · 표시 전용)
+alter table public.orders add column if not exists subscribe_free_ship_at timestamptz;

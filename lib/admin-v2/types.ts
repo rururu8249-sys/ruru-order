@@ -76,6 +76,7 @@ export type OrderRow = {
   pick_pulled_prev?: Record<string, unknown> | null;
   pick_pulled_broadcast_id?: string | null;
   pick_pulled_target?: string | null;
+  subscribe_free_ship_at?: string | null; // 2026-11-01 구독 인증 무료배송 표시(표시 전용)
   is_deleted: boolean | null;
 };
 

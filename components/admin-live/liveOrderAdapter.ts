@@ -276,6 +276,7 @@ function buildItem(row: OrderRow): LiveOrderItem {
     pickPulledReason: row.pick_pulled_reason ?? null,
     pickPulledBroadcastId: row.pick_pulled_broadcast_id ?? null,
     pickPulledTarget: row.pick_pulled_target ?? null,
+    subscribeFreeShipAt: row.subscribe_free_ship_at ?? null,
   };
 }
 

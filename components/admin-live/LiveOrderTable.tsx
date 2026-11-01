@@ -253,6 +253,16 @@ function pickPullBadge(order: LiveOrder) {
   );
 }
 
+// [2026-11-01] 구독 인증 무료배송 주문(표시 전용 — 배송비 계산은 손님 화면·서버가 이미 끝냄)
+function subscribeBadge(order: LiveOrder) {
+  if (!(order.items || []).some((it) => it.subscribeFreeShipAt)) return null;
+  return (
+    <span className="inline-flex shrink-0 items-center rounded-full border border-ok-tx bg-ok-bg px-2 py-0.5 text-[11px] font-bold text-ok-tx" title="유튜브 구독 인증으로 배송비 무료 적용된 주문 — 캡처는 설정 › 결제·배송 › 구독 인증 무료배송 기록에서">
+      구독 무배
+    </span>
+  );
+}
+
 function returnBadge(order: LiveOrder) {
   // 반품/교환 기록 배지 (기록 전용 표시 — 정산/입금/상태 판정 무관)
   const s = String(order.returnStatus || "").trim();
@@ -1424,6 +1434,7 @@ export default function LiveOrderTable({
                         </div>
                         <div className="mt-2 flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                           {pickPullBadge(order)}
+                          {subscribeBadge(order)}
                           {statusBadge(order, {
                             onMatch: onSelectForMatch ? () => onSelectForMatch(order) : undefined,
                             onCardPay: onOpenCardPay ? () => { openPaysterRightHalf(); onOpenCardPay(order); } : undefined,
@@ -1492,9 +1503,10 @@ export default function LiveOrderTable({
                           주문서 복사
                         </button>
                         )}
-                        {(inventoryStatusBadge(order) || testOrderBadge(order) || returnBadge(order) || pickPullBadge(order)) && (
+                        {(inventoryStatusBadge(order) || testOrderBadge(order) || returnBadge(order) || pickPullBadge(order) || subscribeBadge(order)) && (
                           <div className="flex flex-wrap gap-1 mt-0.5">
                             {pickPullBadge(order)}
+                            {subscribeBadge(order)}
                             {inventoryStatusBadge(order)}
                             {testOrderBadge(order)}
                             {returnBadge(order)}

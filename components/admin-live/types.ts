@@ -79,6 +79,8 @@ export type LiveOrderItem = {
   /** [2026-10-23] 출고 넘기기 — 넘긴 방송 id(쇼핑몰 날짜면 없음)·넘긴 곳 이름 */
   pickPulledBroadcastId?: string | null;
   pickPulledTarget?: string | null;
+  /** [2026-11-01] 구독 인증 무료배송으로 들어온 주문 줄(표시 전용) */
+  subscribeFreeShipAt?: string | null;
 };
 
 /** [2026-10-22] 오늘 주문서에 «가져온 줄만» 묶어 보여주는 가상 묶음 표식. 원래 주문엔 없음(undefined). */

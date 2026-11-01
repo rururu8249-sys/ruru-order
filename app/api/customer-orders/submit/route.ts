@@ -872,6 +872,22 @@ export async function POST(request: NextRequest) {
       console.warn("제출 후 장바구니 비움 기록 실패(주문은 정상):", (markCleanupError as Error)?.message);
     }
 
+    // [2026-11-01] 구독 인증 무료배송 표시 — 혜택 켠 시간 + 인증된 손님 주문이면 주문 줄에 시각만 찍는다(표시 전용).
+    //   금액·상태 칸 무접촉. 칸이 없거나(SQL 전) 실패해도 주문 성공 응답 유지.
+    try {
+      const waiverForMark = await activeSubscribeWaiverFor(supabase, kakaoId);
+      const groupIdForMark = text((orderRows[0] as AnyRow | undefined)?.order_group_id);
+      if (waiverForMark && groupIdForMark) {
+        const { error: subMarkError } = await supabase
+          .from("orders")
+          .update({ subscribe_free_ship_at: new Date().toISOString() })
+          .eq("order_group_id", groupIdForMark);
+        if (subMarkError) console.warn("구독 무배 표시 실패(주문은 정상):", subMarkError.message);
+      }
+    } catch (subMarkCatch) {
+      console.warn("구독 무배 표시 실패(주문은 정상):", (subMarkCatch as Error)?.message);
+    }
+
     // 유튜브 라이브 채팅 자동 게시(자동알림 ON일 때만). 주문 저장 완료 후 응답과 별개로 실행 →
     //   - after()로 응답 보낸 뒤 실행하므로 주문 제출 속도/성공에 영향 0.
     //   - postLiveChatMessage는 throw하지 않고 notify OFF면 내부에서 스킵. 실패해도 주문과 무관.

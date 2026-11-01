@@ -29,7 +29,9 @@ type Row = {
   ai_note: string | null;
   created_at: string;
   imageUrl: string;
+  orderCount?: number;
 };
+type ListFilter = "all" | "verified" | "rejected" | "canceled";
 
 // ISO → <input type="datetime-local"> 값(이 브라우저 시간 기준)
 const toLocalInput = (iso: string) => {
@@ -56,6 +58,8 @@ export default function SubscribeFreeShipSettingsCard() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [listError, setListError] = useState("");
   const [zoom, setZoom] = useState("");
+  const [listFilter, setListFilter] = useState<ListFilter>("all");
+  const [listSearch, setListSearch] = useState("");
 
   useEffect(() => {
     void (async () => {
@@ -210,13 +214,25 @@ export default function SubscribeFreeShipSettingsCard() {
 
       <div className="mt-4 border-t border-line pt-4">
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-bold text-ink">인증 기록 {rows ? `${rows.length}건` : ""}</span>
+          <span className="text-sm font-bold text-ink">인증 기록</span>
           <button type="button" onClick={() => void loadRows()} className="h-8 rounded-full border border-line px-3 text-xs font-semibold text-ink-soft">새로고침</button>
+        </div>
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          {(["all", "verified", "rejected", "canceled"] as ListFilter[]).map((f) => {
+            const n = (rows || []).filter((r) => f === "all" || r.status === f).length;
+            const label = f === "all" ? "전체" : statusLabel(f);
+            return (
+              <button key={f} type="button" aria-pressed={listFilter === f} onClick={() => setListFilter(f)} className={`h-8 rounded-full px-3 text-xs font-semibold ${listFilter === f ? "bg-ink text-white" : "border border-line text-ink-soft"}`}>
+                {label} {n}
+              </button>
+            );
+          })}
+          <input value={listSearch} onChange={(e) => setListSearch(e.target.value)} placeholder="닉네임·전화 뒷자리" className="h-8 min-w-[140px] flex-1 rounded-full border border-line bg-surface px-3 text-xs" />
         </div>
         {listError ? <div className="mb-2 text-xs text-warn-tx">{listError}</div> : null}
         {rows && rows.length === 0 && !listError ? <div className="text-xs text-ink-mute">아직 인증 기록이 없어요</div> : null}
         <div className="grid gap-2">
-          {(rows || []).map((r) => (
+          {(rows || []).filter((r) => (listFilter === "all" || r.status === listFilter) && (!listSearch.trim() || `${r.youtube_nickname || ""} ${r.customer_phone}`.toLowerCase().includes(listSearch.trim().toLowerCase()))).map((r) => (
             <div key={r.id} className="flex items-center gap-3 rounded-xl border border-line p-2">
               {r.imageUrl ? (
                 <button type="button" onClick={() => setZoom(r.imageUrl)} className="shrink-0" aria-label="캡처 크게 보기">
@@ -230,6 +246,7 @@ export default function SubscribeFreeShipSettingsCard() {
                   <span className="text-xs text-ink-mute">{r.customer_phone}</span>
                   <span className={`rounded-full px-2 text-xs font-semibold ${r.status === "verified" ? "bg-ok-bg text-ok-tx" : "bg-surface-2 text-ink-mute"}`}>{statusLabel(r.status)}</span>
                   <span className="text-xs text-ink-mute">{shortTime(r.created_at)}</span>
+                  {r.orderCount ? <span className="text-xs font-semibold text-ink-soft">구독 무배 주문 {r.orderCount}건</span> : null}
                 </div>
                 <div className="truncate text-xs text-ink-mute">{r.reason || r.ai_note || ""}</div>
               </div>
