@@ -11,8 +11,13 @@ export async function GET(request: NextRequest) {
     const { data: on } = await db.from("broadcasts").select("id,public_title,status,started_at").eq("status", "ON").limit(3);
     const { data: shop } = await db.from("products").select("id,status,is_visible").eq("in_shop", true).limit(500);
     const exposed = await readExposedProductIds(db);
+    const { data: around } = await db.from("broadcasts").select("id,public_title,status,started_at,ended_at").gte("ended_at", "2026-11-01T00:00:00Z").order("started_at", { ascending: false }).limit(10);
+    const { data: lastBc } = await db.from("broadcasts").select("id,public_title,status,started_at,ended_at").not("started_at", "is", null).order("started_at", { ascending: false }).limit(5);
+    const { data: p807 } = await db.from("products").select("id,product_name,status,in_shop,is_visible").eq("id", 807).maybeSingle();
+    const { count: catalogCount } = await db.from("products").select("id", { count: "exact", head: true }).not("status", "in", "(숨김,deleted)");
+    const { data: shopLog } = await db.from("settings").select("key,value").in("key", ["shop_open"]);
     const { data: holds } = await db.from("cart_reservations").select("product_id,product_name,created_at").gt("expires_at", new Date().toISOString()).limit(2000);
     const notExposed = exposed ? (holds || []).filter((h: any) => !exposed.has(String(h.product_id))) : [];
-    return NextResponse.json({ on, shopCount: (shop || []).length, exposedCount: exposed ? exposed.size : "null(제한없음)", has807: exposed ? exposed.has("807") : null, activeHolds: (holds || []).length, notExposedHolds: notExposed.map((h: any) => `${h.product_id} ${h.product_name} ${h.created_at}`) });
+    return NextResponse.json({ around, lastBc, p807, catalogCount, shopLog, on, shopCount: (shop || []).length, exposedCount: exposed ? exposed.size : "null(제한없음)", has807: exposed ? exposed.has("807") : null, activeHolds: (holds || []).length, notExposedHolds: notExposed.map((h: any) => `${h.product_id} ${h.product_name} ${h.created_at}`) });
   } catch (e) { return NextResponse.json({ fatal: String(e) }); }
 }
