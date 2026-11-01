@@ -20,6 +20,8 @@ export async function GET(request: NextRequest) {
     try { const r = await db0.storage.listBuckets(); out.list = r.error ? r.error.message : (r.data || []).map((x) => x.name); } catch (e) { out.listThrow = String(e); }
     try { const r = await db0.storage.createBucket("admin-private", { public: false }); out.create = r.error ? r.error.message : "ok"; } catch (e) { out.createThrow = String(e); }
     try { const r = await readLiveAlertBlocks(db0); out.read = r.length; } catch (e) { out.readThrow = String(e); }
+    try { const r = await db0.storage.from("admin-private").upload("zz-probe.json", new Blob(["{}"], { type: "application/json" }), { upsert: true, contentType: "application/json" }); out.upload = r.error ? `${r.error.message}` : "ok"; } catch (e) { out.uploadThrow = String(e); }
+    try { const list = await readLiveAlertBlocks(db0); await writeLiveAlertBlocks(db0, list); out.write = "ok"; out.readAfter = (await readLiveAlertBlocks(db0)).length; } catch (e) { out.writeThrow = String(e); }
     try { const t = await createAdminSession(getAdminAuthConfig().loginId || "admin"); out.session = t.length > 10; } catch (e) { out.sessionThrow = String(e); }
     return NextResponse.json(out);
   }
@@ -29,7 +31,8 @@ export async function GET(request: NextRequest) {
     return new NextResponse(await data.text(), { headers: { "content-type": "application/json" } });
   }
   const started = Date.now();
-  await save({ running: true, startedAt: new Date().toISOString() });
+  try { await save({ running: true, startedAt: new Date().toISOString() }); } catch (e) { return NextResponse.json({ saveThrow: String(e) }); }
+  if (request.nextUrl.searchParams.get("m") === "sync") { try { return await run(request); } catch (e) { return NextResponse.json({ runThrow: String(e) }); } }
   after(async () => {
     try {
       const res = await run(request);
