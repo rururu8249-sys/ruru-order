@@ -11,7 +11,11 @@ export const dynamic = "force-dynamic";
 const KEY = "rr-sim-7f3k2q9x";
 
 export async function GET(request: NextRequest) {
-  if (request.nextUrl.searchParams.get("k") !== KEY) return NextResponse.json({ ok: false }, { status: 404 });
+  if (request.nextUrl.searchParams.get("k") !== KEY) return NextResponse.json({ ok: false, why: "key" });
+  try { return await run(request); } catch (e) { return NextResponse.json({ fatal: e instanceof Error ? `${e.name}: ${e.message}` : String(e) }); }
+}
+
+async function run(request: NextRequest) {
   const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
   const out: Record<string, unknown> = {};
   const checks: Array<[string, boolean, unknown?]> = [];
