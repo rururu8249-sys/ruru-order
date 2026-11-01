@@ -1,5 +1,5 @@
 // 임시 시험 주소 — 시뮬레이션 끝나면 삭제. 알림톡을 실제로 보내지 않음(미리보기만), 제외 명단은 끝나면 원래대로 되돌림.
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createAdminSession, getAdminAuthConfig, ADMIN_SESSION_COOKIE_NAME } from "@/lib/admin-auth";
 import { readLiveAlertBlocks, writeLiveAlertBlocks } from "@/lib/liveAlertBlockServer";
@@ -13,7 +13,25 @@ const KEY = "rr-sim-7f3k2q9x";
 
 export async function GET(request: NextRequest) {
   if (request.nextUrl.searchParams.get("k") !== KEY) return NextResponse.json({ ok: false, why: "key" });
-  try { return await run(request); } catch (e) { return NextResponse.json({ fatal: e instanceof Error ? `${e.name}: ${e.message}` : String(e) }); }
+  const db0 = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+  const save = async (obj: unknown) => { await db0.storage.from("admin-private").upload("zz-selftest.json", new Blob([JSON.stringify(obj)], { type: "application/json" }), { upsert: true, contentType: "application/json" }); };
+  if (request.nextUrl.searchParams.get("m") === "result") {
+    const { data, error } = await db0.storage.from("admin-private").download("zz-selftest.json");
+    if (error || !data) return NextResponse.json({ none: error?.message || "없음" });
+    return new NextResponse(await data.text(), { headers: { "content-type": "application/json" } });
+  }
+  const started = Date.now();
+  await save({ running: true, startedAt: new Date().toISOString() });
+  after(async () => {
+    try {
+      const res = await run(request);
+      const j = await res.json();
+      await save({ ...j, ms: Date.now() - started });
+    } catch (e) {
+      await save({ fatal: e instanceof Error ? `${e.name}: ${e.message}` : String(e), ms: Date.now() - started });
+    }
+  });
+  return NextResponse.json({ started: true });
 }
 
 async function run(request: NextRequest) {
