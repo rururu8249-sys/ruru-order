@@ -14,7 +14,7 @@ const KEY = "rr-sim-7f3k2q9x";
 export async function GET(request: NextRequest) {
   if (request.nextUrl.searchParams.get("k") !== KEY) return NextResponse.json({ ok: false, why: "key" });
   const db0 = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
-  const save = async (obj: unknown) => { await db0.storage.from("admin-private").upload("zz-selftest.json", new Blob([JSON.stringify(obj)], { type: "application/json" }), { upsert: true, contentType: "application/json" }); };
+  const save = async (obj: unknown) => { await db0.storage.createBucket("admin-private", { public: false }).catch(() => null); await db0.storage.from("admin-private").upload("zz-selftest.json", new Blob([JSON.stringify(obj)], { type: "application/json" }), { upsert: true, contentType: "application/json" }); };
   if (request.nextUrl.searchParams.get("m") === "result") {
     const { data, error } = await db0.storage.from("admin-private").download("zz-selftest.json");
     if (error || !data) return NextResponse.json({ none: error?.message || "없음" });
