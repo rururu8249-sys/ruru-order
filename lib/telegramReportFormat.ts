@@ -1,6 +1,6 @@
 // [2026-10-22 사장님] 텔레그램 결산 문구 — 한 곳. 방송 종료 자동(서버 liveSummary)·수동 「텔레그램」 버튼(화면 조회범위) 둘 다 이 형식.
 //   「정말 직관적이고 심플하게」: 매출 → 상품값 → 포인트 사용 → 미결제 → 상품별 판매개수 → 월 누적.
-//   포인트 사용금액은 사장님이 수동으로 넣으면 그 값(「(직접 입력)」 표시), 안 넣으면 실제 사용금액.
+//   포인트 사용금액은 사장님이 수동으로 넣으면 그 값(표시는 같은 「포인트 사용」), 안 넣으면 실제 사용금액.
 //   HTML parse_mode 라 상품명·방송명의 < > & 는 반드시 이스케이프(안 하면 텔레그램이 거부).
 
 export type SettlementReportData = {
@@ -43,7 +43,7 @@ export function formatSettlementReport(d: SettlementReportData): string {
   L.push(`　무통장 ${won(d.bankPaidSum)} · 카드 ${won(d.cardPaidSum)}`);
   L.push(`📦 상품값 ${won(d.goodsSum)}`);
   const manual = d.pointUsedManual != null && Number.isFinite(Number(d.pointUsedManual));
-  L.push(`🪙 포인트 사용 ${won(manual ? Number(d.pointUsedManual) : d.pointUsedActual)}${manual ? " (직접 입력)" : ""}`);
+  L.push(`🪙 포인트 사용 ${won(manual ? Number(d.pointUsedManual) : d.pointUsedActual)}`);
   const unpaidCnt = d.unpaidBankCount + d.unpaidCardCount;
   L.push(unpaidCnt > 0 ? `⏳ 미결제 ${won(d.unpaidSum)} · ${unpaidCnt}건 (무통장 ${d.unpaidBankCount} · 카드 ${d.unpaidCardCount})` : "⏳ 미결제 없음");
 

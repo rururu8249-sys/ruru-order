@@ -14,9 +14,10 @@ assert.match(t, /🏆 <b>상품별 판매<\/b> · 총 42개 · 2종\n1\. 폴로 
 assert.match(t, /🗓 10월 누적 25,000,000원$/);
 assert.doesNotMatch(t, /<셔츠>|<공용>/, 'HTML 괄호가 그대로 남으면 텔레그램이 거부');
 // 수동 포인트
-assert.match(formatSettlementReport({ ...base, pointUsedManual: 50000 }), /🪙 포인트 사용 50,000원 \(직접 입력\)/);
+assert.match(formatSettlementReport({ ...base, pointUsedManual: 50000 }), /🪙 포인트 사용 50,000원/);
+assert.doesNotMatch(formatSettlementReport({ ...base, pointUsedManual: 50000 }), /직접 입력/, '텔레그램 글엔 직접 입력 표시 없음');
 assert.match(formatSettlementReport({ ...base, pointUsedManual: null }), /🪙 포인트 사용 12,000원\n/);
-assert.match(formatSettlementReport({ ...base, pointUsedManual: 0 }), /🪙 포인트 사용 0원 \(직접 입력\)/, '0원도 직접 입력으로 인정');
+assert.match(formatSettlementReport({ ...base, pointUsedManual: 0 }), /🪙 포인트 사용 0원/, '0원도 직접 입력으로 인정');
 // 미결제 없음 · 월 누적 없음(조회범위 보고)
 const r2 = formatSettlementReport({ ...base, unpaidSum: 0, unpaidBankCount: 0, unpaidCardCount: 0, monthLabel: undefined, monthSum: undefined, when: '' });
 assert.match(r2, /⏳ 미결제 없음/); assert.doesNotMatch(r2, /누적/);
@@ -31,7 +32,7 @@ assert.equal(escapeTelegramHtml('a<b>&c'), 'a&lt;b&gt;&amp;c');
 const sum = { scope: 'broadcast', title: '테스트방송', startedAt: '2026-10-22T11:00:00.000Z', endedAt: '2026-10-22T14:40:00.000Z', live: false, paidSum: 100, paidCount: 1, bankPaidSum: 100, cardPaidSum: 0, goodsSum: 90, pointUsedSum: 10, unpaidBankSum: 0, unpaidCardSum: 0, unpaidBankCount: 0, unpaidCardCount: 0, productAll: [{ name: 'A', qty: 2, amount: 90 }], monthLabel: '10월', monthSum: 100 };
 assert.match(formatReport(sum), /^📊 <b>결산<\/b> · 테스트방송\n⏹ /);
 assert.match(formatReport({ ...sum, live: true }), /^📊 <b>중간보고<\/b>[\s\S]*~ 지금/);
-assert.match(formatReport(sum, { pointUsedManual: 7 }), /포인트 사용 7원 \(직접 입력\)/);
+assert.match(formatReport(sum, { pointUsedManual: 7 }), /포인트 사용 7원/);
 // 오류 한국어
 assert.match(explainTelegramError('7176683355: Not Found; 7894355184: Not Found'), /봇 토큰이 맞지 않아요/);
 assert.match(explainTelegramError('123: Bad Request: chat not found'), /chat id/);
