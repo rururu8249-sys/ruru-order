@@ -1,46 +1,31 @@
 "use client";
 // 2026-10-31 신규 — /youtube 짧은 주소: 누르면 폰을 보고 유튜브 앱 «루루동이2 채널 홈»으로 넘김.
-// 안드로이드 = intent(앱 없으면 인터넷 주소로), 아이폰 = youtube://(1.5초 안에 안 넘어가면 인터넷 주소), PC = 인터넷 주소.
-// 표시·이동 전용. 돈/주문/입금/배송 로직 무관. 채널 바뀌면 CHANNEL 한 줄만 바꾸면 됨.
+// 주소·이동 규칙은 lib/youtubeChannelLink 한 곳(손님 화면 채널 변경 안내 팝업과 공용).
+// 표시·이동 전용. 돈/주문/입금/배송 로직 무관.
 
 import { useEffect, useState } from "react";
-
-const CHANNEL = "youtube.com/channel/UC8jr9s1rZBEIPPTBPAwYE5A?si=P8OAzC4y2XTFCgag";
-const WEB_URL = `https://${CHANNEL}`;
-const ANDROID_URL = `intent://${CHANNEL}#Intent;package=com.google.android.youtube;scheme=https;S.browser_fallback_url=${encodeURIComponent(WEB_URL)};end`;
-const IOS_URL = `youtube://${CHANNEL}`;
-
-type Device = "android" | "ios" | "pc";
-
-function detectDevice(ua: string): Device {
-  if (/android/i.test(ua)) return "android";
-  if (/iphone|ipad|ipod/i.test(ua)) return "ios";
-  // iPadOS 13+ 는 맥처럼 보임
-  if (/macintosh/i.test(ua) && typeof navigator !== "undefined" && navigator.maxTouchPoints > 1) return "ios";
-  return "pc";
-}
-
-function appUrlFor(device: Device): string {
-  if (device === "android") return ANDROID_URL;
-  if (device === "ios") return IOS_URL;
-  return WEB_URL;
-}
+import {
+  YOUTUBE_CHANNEL_WEB_URL,
+  detectYoutubeDevice,
+  youtubeChannelUrlFor,
+  type YoutubeDevice,
+} from "@/lib/youtubeChannelLink";
 
 export default function YoutubeOpener() {
-  const [device, setDevice] = useState<Device | null>(null);
+  const [device, setDevice] = useState<YoutubeDevice | null>(null);
 
   useEffect(() => {
-    const d = detectDevice(navigator.userAgent || "");
+    const d = detectYoutubeDevice(navigator.userAgent || "", navigator.maxTouchPoints || 0);
     setDevice(d);
     if (d === "pc") {
-      window.location.replace(WEB_URL);
+      window.location.replace(YOUTUBE_CHANNEL_WEB_URL);
       return;
     }
-    window.location.href = appUrlFor(d);
+    window.location.href = youtubeChannelUrlFor(d);
     if (d === "ios") {
       // 앱이 열리면 화면이 가려져 타이머가 멈춤 → 그대로 보이면 앱이 없는 것
       const timer = window.setTimeout(() => {
-        if (document.visibilityState === "visible") window.location.href = WEB_URL;
+        if (document.visibilityState === "visible") window.location.href = YOUTUBE_CHANNEL_WEB_URL;
       }, 1500);
       return () => window.clearTimeout(timer);
     }
@@ -67,7 +52,7 @@ export default function YoutubeOpener() {
         안 넘어가면 아래 버튼을 눌러 주세요.
       </p>
       <a
-        href={device ? appUrlFor(device) : WEB_URL}
+        href={device ? youtubeChannelUrlFor(device) : YOUTUBE_CHANNEL_WEB_URL}
         style={{
           display: "flex",
           alignItems: "center",
@@ -86,7 +71,7 @@ export default function YoutubeOpener() {
         유튜브 앱에서 열기
       </a>
       <a
-        href={WEB_URL}
+        href={YOUTUBE_CHANNEL_WEB_URL}
         style={{
           marginTop: "16px",
           fontSize: "14px",

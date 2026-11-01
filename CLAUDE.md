@@ -28,6 +28,7 @@ git push로 작업을 배포할 때마다, 반드시 이 파일의 "## 진행상
 (없음)
 
 ## 진행상황 (최신이 맨 위 · push할 때마다 갱신)
+- 2026-11-01 **[손님 화면 유튜브 채널 변경 안내 팝업(사장님 11:48)]** 신규 components/customer/YoutubeChannelNoticePopup — 주문서 접속(로그인 손님) 때 「유튜브 채널이 바뀌었어요 · 새 채널(루루동이2)·구독·알림 설정」 + 「새 채널 바로가기」(유튜브 앱 채널 홈, /youtube 와 같은 규칙 lib/youtubeChannelLink 로 합침)·「닫기」(이번 접속만)·「다시 보지 않기」. 바로가기/다시 보지 않기 누르면 다시 안 뜸(브라우저 저장소 편의값). 접속 공지·주문 방법·구매 동의 창이 닫힌 뒤에 뜸. 켜기/끄기 = 설정 › 손님 공지 「유튜브 채널 변경 안내 팝업」(settings youtube_channel_notice_enabled, 없으면 켜짐·설정 못 읽으면 안 뜸). 돈·주문 무접촉. tsc 0·guard 3(기존)·build(BANKDA 2)·폰 390 렌더 확인. 배포 완료 HASH
 - 2026-10-31 **[유튜브 앱 바로 열기 짧은 주소 /youtube(사장님 23:07 「유튜브앱으로 바로 열리는 링크」)]** 신규 app/youtube(page·YoutubeOpener, 공개·noindex) — 안드로이드 intent(앱 없으면 인터넷 주소)·아이폰 youtube://(1.5초 안 넘어가면 인터넷)·PC 인터넷 주소로 루루동이2 채널 홈 자동 이동 + 「유튜브 앱에서 열기」 버튼. 카톡채널 광고·설명란에 https://ruru-order.vercel.app/youtube 사용, 채널 바뀌면 CHANNEL 한 줄만. 돈·주문 무접촉. tsc 0·build(BANKDA 2). 배포 완료 4261139
 - 2026-10-31 **[/yt-test 시험 페이지 삭제]** 사장님 안드로이드 폰에서 intent 버튼 → 유튜브 앱 루루동이2 채널 홈 정상 확인(22:37). 아이폰은 시험 기기 없음 — 알림톡 iOS 칸은 youtube://www.youtube.com/channel/UC8jr9s1rZBEIPPTBPAwYE5A 권장. 배포 완료 b0467c1
 - 2026-10-31 **[유튜브 알림톡 버튼 시험 페이지 /yt-test(사장님 22:30 「앱 열기 하면 오류」)]** 신규 app/yt-test/page.tsx(표시 전용·noindex) — 알림톡 앱링크 버튼과 같은 주소(안드로이드 intent:// · 아이폰 youtube:// · https 비교) 3개, 새 채널 UC8jr9s1rZBEIPPTBPAwYE5A?si=… 고정. 승인 전에 폰에서 버튼 동작 확인용, 끝나면 지워도 됨. 돈·주문 무접촉. tsc 0·build(BANKDA 2). 배포 완료 9996425

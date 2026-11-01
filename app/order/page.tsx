@@ -128,6 +128,7 @@ import { readCustomerUiPreview, resolveCustomerUiV2, UI_PREVIEW_DEFAULTS, UI_V2_
 import { useIsDesktop } from "@/lib/useIsDesktop";
 import { restyleClassV2, stripDecorativeEmojiV2 } from "@/lib/customerUiV2Restyle";
 import { CUSTOMER_ORDER_FILTERS, cleanCustomerOptionValue, orderLookupStatusView } from "@/lib/customerOrderStatusView";
+import YoutubeChannelNoticePopup from "@/components/customer/YoutubeChannelNoticePopup";
 import CartAddFeedbackV2 from "@/components/customer/CartAddFeedbackV2";
 import LiveBadgeCompactV2 from "@/components/customer/LiveBadgeCompactV2";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
@@ -1766,6 +1767,8 @@ export default function OrderPage() {
     } catch { /* 기본 링크 동작 유지 */ }
   };
   const [popupOpen, setPopupOpen] = useState(false);
+  // [2026-11-01] 유튜브 채널 변경 안내 팝업 — settings youtube_channel_notice_enabled(없으면 켜짐, "false" 면 끔). 설정을 못 읽으면 안 뜸.
+  const [youtubeChannelNoticeOn, setYoutubeChannelNoticeOn] = useState(false);
   const [purchaseConsentConfig, setPurchaseConsentConfig] = useState<OrderPurchaseConsentConfig>(DEFAULT_ORDER_PURCHASE_CONSENT);
   const [purchaseConsentOpen, setPurchaseConsentOpen] = useState(false);
   const [checkingPurchaseConsent, setCheckingPurchaseConsent] = useState(false);
@@ -2520,6 +2523,7 @@ export default function OrderPage() {
         "popup_notice_fontsize",
         "popup_notice_color",
         "popup_band_url",
+        "youtube_channel_notice_enabled",
         FINAL_SUBMIT_CONFIRMATION_KEY,
         ...ORDER_PURCHASE_CONSENT_KEYS,
         "product_notice_mode",
@@ -2615,6 +2619,7 @@ export default function OrderPage() {
     setPopupNoticeText(pText);
     setPopupNoticeBarLine(noticeSource.bar);
     setPopupBandUrl(pBand);
+    setYoutubeChannelNoticeOn(String((data || []).find((i: any) => i.key === "youtube_channel_notice_enabled")?.value ?? "").trim() !== "false");
     setPopupNoticeTitle(pTitle);
     setTopNoticeId(noticeSource.linked && noticeSource.available ? Number((data || []).find((i: any) => i.key === CUSTOMER_NOTICE_ID_KEY)?.value) : null);
     setTopNoticeTitle(noticeSource.linked && noticeSource.available ? noticeSource.title : "");
@@ -6837,6 +6842,12 @@ export default function OrderPage() {
           </div>
         </div>
       ) : null}
+
+      {/* [2026-11-01] 유튜브 채널 변경 안내 — 다른 팝업(접속 공지·주문 방법·구매 동의)이 닫힌 뒤에 뜬다. */}
+      <YoutubeChannelNoticePopup
+        enabled={youtubeChannelNoticeOn && hasSavedInfo}
+        blocked={popupOpen || howToOpen || purchaseConsentOpen}
+      />
 
       {purchaseConsentOpen ? (
         <OrderPurchaseConsentModal

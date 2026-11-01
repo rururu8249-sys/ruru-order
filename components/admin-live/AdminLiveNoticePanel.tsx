@@ -38,6 +38,7 @@ const NOTICE_KEYS = [
   "popup_notice_fontsize",
   "popup_notice_color",
   "popup_band_url",
+  "youtube_channel_notice_enabled",
   ...ORDER_PURCHASE_CONSENT_KEYS,
 ] as const;
 
@@ -97,6 +98,8 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
   // ⚠ 이 값은 settings(popup_notice_color)로 저장돼 손님 화면에 그대로 쓰인다 → 관리자 CSS 변수 금지, 실제 색값만.
   const [popupColor, setPopupColor] = useState("#7B2D43");
   const [popupBandUrl, setPopupBandUrl] = useState(DEFAULT_BAND_URL);
+  // [2026-11-01] 유튜브 채널 변경 안내 팝업 — 저장값 없으면 켜짐(손님 화면과 같은 규칙)
+  const [youtubeNoticeOn, setYoutubeNoticeOn] = useState(true);
   const [purchaseConsent, setPurchaseConsent] = useState<OrderPurchaseConsentConfig>(DEFAULT_ORDER_PURCHASE_CONSENT);
 
   const [tab, setTab] = useState<PanelTab>(mode === "messages" || mode === "board" ? "list" : mode === "notes" ? "send" : "customer");
@@ -140,6 +143,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
         setPopupFont(clean(get("popup_notice_fontsize")) || "normal");
         setPopupColor(clean(get("popup_notice_color")) || "#7B2D43");
         setPopupBandUrl(clean(get("popup_band_url")) || DEFAULT_BAND_URL);
+        setYoutubeNoticeOn(clean(get("youtube_channel_notice_enabled")) !== "false");
         setPurchaseConsent(parseOrderPurchaseConsentSettings(rows));
         setSettingsReady(true);
       } finally {
@@ -167,6 +171,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
           { key: "popup_notice_fontsize", value: popupFont },
           { key: "popup_notice_color", value: popupColor },
           { key: "popup_band_url", value: popupBandUrl.trim() },
+          { key: "youtube_channel_notice_enabled", value: youtubeNoticeOn ? "true" : "false" },
           ...toOrderPurchaseConsentRows(purchaseConsent),
         ],
         { onConflict: "key" },
@@ -474,6 +479,17 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
                 <p className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap text-sm text-ink-soft">{linkedNotice?.content}</p>
                 {mode === "all" ? <button type="button" onClick={() => setTab("list")} className="mt-3 text-sm font-bold text-ink">공지사항에서 내용 수정</button> : null}
               </div> : null}
+            </div>
+            <div className={card}>
+              <div className="flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-bold text-ink">유튜브 채널 변경 안내 팝업</div>
+                  <div className="mt-1 text-xs font-bold text-ink-mute">손님이 들어오면 새 채널 바로가기 창이 떠요. 바로가기·다시 보지 않기를 누른 손님에겐 다시 안 떠요.</div>
+                </div>
+                <button type="button" onClick={() => setYoutubeNoticeOn(v => !v)} disabled={!settingsReady} className="shrink-0 rounded-full border border-line px-4 py-2 text-xs font-bold">
+                  {youtubeNoticeOn ? "팝업 ON" : "팝업 OFF"}
+                </button>
+              </div>
             </div>
             <details className={card}>
               <summary className="cursor-pointer text-sm font-bold text-ink">접속 팝업 설정 (상단 공지와 별개)</summary>
