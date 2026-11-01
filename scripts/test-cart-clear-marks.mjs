@@ -8,7 +8,7 @@ process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://fake';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'fake';
 
 // ── 메모리 DB ──────────────────────────────────────────────
-const db = { cart_reservations: [], settings: [], cart_clear_marks: [], products: [], cart_bank_account_overrides: [] };
+const db = { cart_reservations: [], settings: [], cart_clear_marks: [], products: [], cart_bank_account_overrides: [], broadcasts: [], broadcast_products: [], product_brand_links: [] };
 let marksTableMissing = false;
 let idSeq = 1, markSeq = 0;
 const clone = (v) => JSON.parse(JSON.stringify(v));
@@ -59,7 +59,7 @@ function query(table) {
     if (order) hit = [...hit].sort((a, b) => (String(a[order.c]) < String(b[order.c]) ? -1 : String(a[order.c]) > String(b[order.c]) ? 1 : 0) * (order.asc ? 1 : -1));
     if (order?.c === 'seq') hit = [...hit].sort((a, b) => (a.seq - b.seq) * (order.asc ? 1 : -1));
     if (limit != null) hit = hit.slice(0, limit);
-    return { data: single ? (clone(hit[0]) ?? null) : clone(hit), error: null };
+    return { data: single ? (hit[0] ? clone(hit[0]) : null) : clone(hit), error: null };
   }
   return api;
 }
@@ -269,6 +269,39 @@ reset();
   add(A, 56); const claim = await sync(A);
   assert.equal(claim.cartSeq, null); assert.equal(A.items.length, 1); assert.equal(holdsOf('sessionNoTb').length, 1);
   pass.push('6) 비움 기록 표가 없을 때 — 기존 동작 그대로(주문·담기 안 막힘)');
+}
+
+// ── 7) [2026-11-02] 지금 손님 화면에 없는 상품 — 새로 담기만 거절, 이미 담은 줄은 그대로 ──
+reset();
+{
+  db.products.push({ id: '70', status: '판매중', is_visible: true, product_note: '{}' }, { id: '71', status: '판매중', is_visible: false, product_note: '{}' });
+  db.broadcasts.push({ id: 'bcOn', status: 'ON', started_at: new Date().toISOString() });
+  db.broadcast_products.push({ broadcast_id: 'bcOn', product_id: '56' }, { broadcast_id: 'bcOn', product_id: '57' }, { broadcast_id: 'bcOn', product_id: '71' }, { broadcast_id: 'bcOld', product_id: '70' });
+  db.product_brand_links.push({ source_id: '80', parent_id: '57' });
+  const A = tab({ session: 'sessionExpo', phone: '01011112222' });
+  add(A, 56); add(A, 80); add(A, 70); add(A, 71);
+  const claim = await sync(A);
+  assert.deepEqual(A.items.map((it) => it.product_id).sort(), ['56', '80'], 'only exposed (and brand-linked source) products can be newly added');
+  const unl = (claim.results || []).filter((r) => r.unlisted);
+  assert.deepEqual(unl.map((r) => r.productId).sort(), ['70', '71']);
+  assert.equal(claim.allOk, false);
+  assert.deepEqual(holdsOf('sessionExpo').map((r) => r.product_id).sort(), ['56', '80']);
+  // 이미 담은 상품을 방송에서 빼도(방송 끝·내림) 담아 둔 줄은 유지
+  db.broadcast_products = db.broadcast_products.filter((r) => r.product_id !== '56');
+  await sync(A);
+  assert.deepEqual(A.items.map((it) => it.product_id).sort(), ['56', '80'], 'already-held line stays after the product is taken down');
+  // 방송 OFF + 쇼핑몰 진열 있음 → 진열 상품만
+  db.broadcasts[0].status = 'OFF';
+  db.products.find((p) => p.id === '58').in_shop = true; db.products.find((p) => p.id === '58').status = '판매중';
+  const B = tab({ session: 'sessionExpo2', phone: '01011113333' });
+  add(B, 58); add(B, 57); await sync(B);
+  assert.deepEqual(B.items.map((it) => it.product_id), ['58'], 'shop mode: only in_shop products');
+  // 방송 OFF + 진열 0개 → 손님 화면이 전체 상품을 보여 주므로 제한 없음
+  db.products.find((p) => p.id === '58').in_shop = false;
+  const C = tab({ session: 'sessionExpo3', phone: '01011114444' });
+  add(C, 57); add(C, 70); await sync(C);
+  assert.equal(C.items.length, 2, 'no shop products → no restriction');
+  pass.push('7) 지금 안 보이는 상품 — 새로 담기 거절(방송 ON=방송 상품·브랜드 연결 포함, OFF=진열 상품, 진열 0개=제한 없음), 이미 담은 줄 유지');
 }
 
 // ── 순수 함수 ──

@@ -3959,7 +3959,8 @@ export default function OrderPage() {
       if (catalogForGrid.length === 0) catalogForGrid = groupBuyQuickProductsFromCatalog;
     }
 
-    const mergedProducts = [...catalogForGrid, ...broadcastProducts];
+    // [2026-11-02] 방송이 꺼진 뒤(화면 열어 둔 채) 지난 방송 상품이 쇼핑몰 목록에 섞이지 않게 — OFF 면 방송 상품 빼기
+    const mergedProducts = broadcastOn ? broadcastProducts : catalogForGrid;
 
     // [2026-09-20] 「지금 방송에서 고정한 상품」 — broadcasts.widget_pin_* 가 정답지다.
     //   예전 products.is_pinned 는 관리자가 더 이상 쓰지 않는 죽은 값이라 뺐다.
@@ -4156,6 +4157,12 @@ export default function OrderPage() {
         : [];
       if (droppedRows.length > 0) {
         setItems((prev) => prev.filter((it) => !droppedRows.some((r: any) => String(r.productId) === String(it.product_id) && normR(r.color) === normR(it.color) && normR(r.size) === normR(it.size))));
+        // [2026-11-02] 지금 판매 중이 아닌 상품(지난 방송·내린 상품)을 새로 담으려 한 줄 — 빼고 알려 준다
+        const unlistedRows = droppedRows.filter((r: any) => r.unlisted === true);
+        if (unlistedRows.length > 0) {
+          const names = Array.from(new Set(unlistedRows.map((r: any) => String(r.productName || "").trim()).filter(Boolean))).slice(0, 3).join(", ");
+          showCustomerNotice(`${names ? `${names} — ` : ""}지금 판매 중인 상품이 아니라 장바구니에서 뺐어요. 화면을 새로고침해 주세요.`);
+        }
         const noticeRows = droppedRows.filter((r: any) => r.expired === true && r.silent !== true);
         if (noticeRows.length > 0) {
           const noticeSeq = Number(claim.clearedSeq) || 0;

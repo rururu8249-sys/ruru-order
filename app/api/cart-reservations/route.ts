@@ -6,6 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import { buildCartHoldSnapshotItem } from "@/lib/cartHoldDetail";
 import { CART_SEQ_NEW, cartClearNeedsNotice, cartItemClearedBy, normCartOpt, type CartClearMark, type CartIdentity } from "@/lib/cartClearMarks";
 import { sweepExpiredCartHolds } from "@/lib/cartHoldSweep";
+import { readExposedProductIds } from "@/lib/cartExposureServer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -246,6 +247,25 @@ export async function POST(request: NextRequest) {
         return false;
       });
     }
+    // [2026-11-02] 지금 손님 화면에 없는 상품은 «새로» 담지 못하게 — 이미 담아 둔 줄(이 세션 선점 있음)은 그대로 둔다
+    //   (방송이 끝나거나 상품을 내려도 이미 담은 손님 장바구니는 안 건드림 · ㉛ 결정 유지).
+    //   열어 둔 지난 방송 화면·옛 임시 장바구니에서 다시 담기는 것만 막는다. 판정 못 하면 막지 않음.
+    const unlistedResults: Array<Record<string, unknown>> = [];
+    if (items.length > 0) {
+      const exposed = await readExposedProductIds(supabase);
+      if (exposed && items.some((r: ReturnType<typeof buildCartHoldSnapshotItem>) => !exposed.has(r.productId))) {
+        const { data: heldRows, error: heldError } = await supabase.from("cart_reservations").select("product_id,color,size").eq("session_key", sessionKey).limit(MAX_ITEMS * 2);
+        if (!heldError) {
+          const held = new Set(((heldRows || []) as Array<Record<string, unknown>>).map((h) => keyOf({ productId: String(h.product_id ?? "").trim(), color: String(h.color ?? ""), size: String(h.size ?? "") })));
+          items = items.filter((r: ReturnType<typeof buildCartHoldSnapshotItem>) => {
+            if (exposed.has(r.productId) || held.has(keyOf(r))) return true;
+            unlistedResults.push({ productId: r.productId, productName: r.productName, color: r.color, size: r.size, requested: r.qty, ok: false, unavailable: true, unlisted: true, available: 0 });
+            return false;
+          });
+        }
+      }
+    }
+
     try {
       const rk = `cart_revoke_${sessionKey}`.slice(0, 250);
       const { data: rv } = await supabase.from("settings").select("value").eq("key", rk).limit(1).maybeSingle();
@@ -290,12 +310,12 @@ export async function POST(request: NextRequest) {
     const bankAccountOverride = await currentBankOverride(supabase, sessionKey);
     if (items.length === 0) await cancelActiveBankOverrides(supabase, sessionKey);
 
-    const allResults = [...rpcResults, ...clearedResults];
+    const allResults = [...rpcResults, ...clearedResults, ...unlistedResults];
     return NextResponse.json({
       ok: true,
       reserved: items.length,
       holdMinutes,
-      allOk: (data as any)?.allOk !== false && clearedResults.length === 0,
+      allOk: (data as any)?.allOk !== false && clearedResults.length === 0 && unlistedResults.length === 0,
       results: allResults,
       bankAccountOverride,
       // [㉛] 손님 화면이 새로 담는 상품에 붙일 번호 · 이번에 거절을 일으킨 비움 기록 번호(안내 1번만 띄우는 기준)
