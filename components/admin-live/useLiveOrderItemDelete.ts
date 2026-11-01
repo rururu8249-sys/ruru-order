@@ -10,6 +10,19 @@ import { showAdminToast } from "@/lib/adminToast";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 
+/** [2026-11-01] 확인창 없이 RPC 만 부른다 — 「일부 취소 · 카드 다시 결제」 창이 자기 확인창을 쓰려고 뺀 것. 부르는 RPC·인자는 아래 훅과 같다. */
+export async function deleteOrderItemRow(rowId: number, memo: string): Promise<{ ok: boolean; message: string; restored: boolean; pointMoved: number }> {
+  const { data, error } = await (supabase as any).rpc("admin_delete_order_item", {
+    p_order_id: rowId,
+    p_admin_memo: memo,
+  });
+  const res = (data || {}) as any;
+  if (error || res?.ok !== true) {
+    return { ok: false, message: String(error?.message || res?.message || "알 수 없는 오류"), restored: false, pointMoved: 0 };
+  }
+  return { ok: true, message: "", restored: Boolean(res.restored), pointMoved: Number(res.point_moved || 0) };
+}
+
 export function useLiveOrderItemDelete(onAfter?: () => void | Promise<void>) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -33,18 +46,14 @@ export function useLiveOrderItemDelete(onAfter?: () => void | Promise<void>) {
 
     setDeletingId(String(rowId));
     try {
-      const { data, error } = await (supabase as any).rpc("admin_delete_order_item", {
-        p_order_id: rowId,
-        p_admin_memo: "admin-live 주문상세 상품삭제",
-      });
-      const res = (data || {}) as any;
+      const res = await deleteOrderItemRow(rowId, "admin-live 주문상세 상품삭제");
 
-      if (error || res?.ok !== true) {
-        showAdminToast("상품 삭제 실패\n\n" + (error?.message || res?.message || "알 수 없는 오류"), "error");
+      if (!res.ok) {
+        showAdminToast("상품 삭제 실패\n\n" + res.message, "error");
         return false;
       }
 
-      const movedPoint = Number(res.point_moved || 0);
+      const movedPoint = res.pointMoved;
       const parts = ["상품을 삭제했습니다."];
       if (res.restored) parts.push("재고 복구 완료.");
       if (movedPoint > 0) parts.push(`포인트 ${movedPoint.toLocaleString()}원은 남은 상품으로 옮겼습니다.`);

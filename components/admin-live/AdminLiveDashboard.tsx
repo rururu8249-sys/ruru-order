@@ -2082,6 +2082,7 @@ export default function AdminLiveDashboard() {
                     onOpenManualMatch={openManualMatchForOrder}
                     onClose={closeOrderDetail}
                     onAfterStatusChange={() => loadOrders({ silent: true })}
+                    onOpenCardPay={(o) => setCardPayOrder(o)}
                   />
                 ) : null}
               </AdminLiveSideDrawer>

@@ -25,6 +25,7 @@ import { patchIssueTask, type IssueExtraItem } from "@/lib/issueTaskPatch";
 import PickingPullModal from "./PickingPullModal";
 import { pickPullAwayText, pulledForOf } from "@/lib/orderPickPull";
 import { fetchExchangeMarks } from "@/lib/exchangeMarks";
+import CardRepayModal from "./CardRepayModal";
 import { issueMarkKind, issueTargetItemIds, isStrikeKind, targetTextFromReturnReason, type IssueMarkKind } from "@/lib/orderIssueMarks";
 
 type Props = {
@@ -32,6 +33,8 @@ type Props = {
   onOpenManualMatch?: (order: LiveOrder) => void;
   onClose?: () => void;
   onAfterStatusChange?: () => void | Promise<void>;
+  /** [2026-11-01] 「일부 취소 · 카드 다시 결제」 뒤 카드결제 창(복사창+페이스터) 열기 */
+  onOpenCardPay?: (order: LiveOrder) => void;
 };
 
 function money(value: unknown) {
@@ -116,7 +119,7 @@ function getPaymentStatusClass(order: LiveOrder) {
   return "bg-surface-2 text-ink-soft";
 }
 
-export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClose, onAfterStatusChange }: Props) {
+export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClose, onAfterStatusChange, onOpenCardPay }: Props) {
   // [2026-09-22 사장님 요청] 거파는 «주문을 보다가» 일어난다 → 이 화면에서 바로 차단.
   //   모달이 이 주문의 품목을 미리 체크해 띄운다. 저장은 회원목록과 같은 함수(lib/adminCustomerBlock.ts).
   const [blockOpen, setBlockOpen] = useState(false);
@@ -129,6 +132,8 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const [blockedReason, setBlockedReason] = useState("");
   const [blockCheckTick, setBlockCheckTick] = useState(0);
   const [cardStatusAction, setCardStatusAction] = useState<"" | "card-paid" | "card-unpaid">("");
+  // [2026-11-01] 카드 주문 일부 취소 → 남은 상품만 다시 결제
+  const [repayOpen, setRepayOpen] = useState(false);
   const [paymentCancelAction, setPaymentCancelAction] = useState(false);
   const [methodChanging, setMethodChanging] = useState(false);
   const [paymentCancelError, setPaymentCancelError] = useState("");
@@ -1538,6 +1543,18 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                   </button>
                 </>
               ) : null}
+
+              {/* [2026-11-01] 상품 하나 취소 → 페이스터 전체 취소 → 남은 상품만 다시 결제 */}
+              {items.length > 1 && onOpenCardPay ? (
+                <button
+                  type="button"
+                  onClick={() => setRepayOpen(true)}
+                  disabled={Boolean(cardStatusAction)}
+                  className="h-10 w-full rounded-lg border border-line bg-surface text-[13px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-50"
+                >
+                  일부 취소 · 카드 다시 결제
+                </button>
+              ) : null}
             </>
           ) : null}
 
@@ -2151,6 +2168,19 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
           }}
           onClose={() => { setIssueProcessItem(null); setIssueProcessTask(null); }}
           onSaved={async () => { setIssueProcessItem(null); setIssueProcessTask(null); setFindTaskTick((v) => v + 1); window.dispatchEvent(new Event("ruru-admin-task-updated")); await onAfterStatusChange?.(); }}
+        />
+      ) : null}
+      {repayOpen && onOpenCardPay ? (
+        <CardRepayModal
+          order={orderForView}
+          defaultRemoveIds={issueMarks.kind && isStrikeKind(issueMarks.kind) ? issueMarks.ids : new Set<string>()}
+          onClose={() => setRepayOpen(false)}
+          onReady={(next) => {
+            setRepayOpen(false);
+            setLocalOrder(next);
+            onOpenCardPay(next);
+          }}
+          onAfterChange={onAfterStatusChange}
         />
       ) : null}
     </aside>
