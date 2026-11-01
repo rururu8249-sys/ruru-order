@@ -8,6 +8,7 @@ import { GET as blockGET, POST as blockPOST } from "@/app/api/admin-live/live-al
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 const KEY = "rr-sim-7f3k2q9x";
 
 export async function GET(request: NextRequest) {
