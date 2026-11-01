@@ -8,6 +8,7 @@ import { submitRowLineTotal, submitRowUnitPriceForCheck } from "@/lib/submitRowP
 import { buildYoutubeOrderAnnouncementMessages } from "@/lib/orderYoutubeAnnouncement";
 import { buildCartHoldSnapshotItem, missingCartHoldRows } from "@/lib/cartHoldDetail";
 import { koreanPhoneVariants } from "@/lib/order/phone";
+import { activeSubscribeWaiverFor } from "@/lib/subscribeFreeShipServer";
 import { shippingAddressKey } from "@/lib/shippingAddressKey";
 import {
   canonicalCustomerDetailProductName,
@@ -495,6 +496,23 @@ async function assertShippingFeeNotSkipped(
   // 합배송이면 한 그룹분이 빠질 수 있으므로, 여기서는 "전액 냈으면 바로 통과"만 본다.
   //   (정상 주문 대부분이 여기서 끝 → 이전 주문 조회 0회 = 방송 중 DB 부하 증가 없음)
   if (paidShipping >= expectedShipping) return;
+
+  // [2026-11-01] 구독 인증 무료배송 — 사장님이 켠 시간 + 이 카카오 계정 인증됨이면, 고른 갈래는 최소 배송비에서 뺀다.
+  //   (제주·산간 추가금은 원래 서버 최소액에 안 들어가므로 여기선 갈래만 0원으로.) 못 읽으면 null → 예전 검사 그대로.
+  const subscribeWaiver = await activeSubscribeWaiverFor(supabase, kakaoId);
+  if (subscribeWaiver) {
+    const waived = new Set(subscribeWaiver.groups);
+    const expectedAfterWaiver = expectedMinimumShipping(
+      Array.from(groups).filter((g) => !waived.has(g)),
+      {
+        normalFee: baseShippingFee, normalRemoteFee: baseShippingFee,
+        vendorFee: vendorShippingFee, vendorRemoteFee: vendorShippingFee,
+        overseasFee: overseasShippingFee,
+      },
+    );
+    console.warn(`배송비 검증: 구독 인증 무료배송 적용 필요=${expectedAfterWaiver} 낸=${paidShipping}`);
+    if (paidShipping >= expectedAfterWaiver) return;
+  }
 
   // 여기까지 왔다 = 배송비를 안 냈거나 모자람. 합배송이 성립할 수 있는지만 본다.
   const signature = shippingAddressKey(

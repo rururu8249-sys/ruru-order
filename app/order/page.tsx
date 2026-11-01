@@ -130,6 +130,8 @@ import { restyleClassV2, stripDecorativeEmojiV2 } from "@/lib/customerUiV2Restyl
 import { CUSTOMER_ORDER_FILTERS, cleanCustomerOptionValue, orderLookupStatusView } from "@/lib/customerOrderStatusView";
 import PromoPopup from "@/components/customer/PromoPopup";
 import { PROMO_POPUP_KEY, PROMO_POPUP_LEGACY_KEY, parsePromoPopup, type PromoPopupConfig } from "@/lib/promoPopup";
+import SubscribeFreeShipCard from "@/components/customer/SubscribeFreeShipCard";
+import { DEFAULT_SUBSCRIBE_FREE_SHIP, SUBSCRIBE_FREE_SHIP_KEY, SUBSCRIBE_GROUP_LABEL, applySubscribeWaiver, isSubscribeFreeShipActive, parseSubscribeFreeShip, type SubscribeFreeShipConfig } from "@/lib/subscribeFreeShip";
 import CartAddFeedbackV2 from "@/components/customer/CartAddFeedbackV2";
 import LiveBadgeCompactV2 from "@/components/customer/LiveBadgeCompactV2";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
@@ -1740,6 +1742,11 @@ export default function OrderPage() {
   // [2026-10-29] 해외배송비 — 0원(기본)이면 해외배송 상품도 예전처럼 그 상품의 배송 갈래(일반/업체)를 따른다.
   const [overseasShippingFeeSetting, setOverseasShippingFeeSetting] = useState(0);
   const [overseasRemoteShippingFeeSetting, setOverseasRemoteShippingFeeSetting] = useState(0);
+  // [2026-11-01] 구독 인증 무료배송 — 설정(사장님이 켠 시간) + 이 카카오 계정 인증 여부. 못 읽으면 꺼짐.
+  const [subscribeConfig, setSubscribeConfig] = useState<SubscribeFreeShipConfig>(DEFAULT_SUBSCRIBE_FREE_SHIP);
+  const [subscribeVerified, setSubscribeVerified] = useState(false);
+  const [subscribeNow, setSubscribeNow] = useState(() => Date.now());
+  const [subscribeDetailOpen, setSubscribeDetailOpen] = useState(false);
   const [pointEarnRateForDisplay, setPointEarnRateForDisplay] = useState(0);
   // 접속 팝업 공지(설정에서 문구/제목/글자크기/색상/ON·OFF 수정). 밴드 바로가기 + 24시간 안 보기 + 확인.
   const [popupNoticeEnabled, setPopupNoticeEnabled] = useState(false);
@@ -1925,14 +1932,39 @@ export default function OrderPage() {
   const baseShippingFee = isRemoteAreaShippingAddress
     ? Math.max(remoteAreaShippingFee, generalShippingFee)
     : generalShippingFee;
-  const shippingFeeOfGroup = shippingFeeByGroup({
+  const shippingFeeSettingsForGroups = {
     normalFee: generalShippingFee,
     normalRemoteFee: remoteAreaShippingFee,
     vendorFee: vendorShippingFeeSetting,
     vendorRemoteFee: vendorRemoteShippingFeeSetting,
     overseasFee: overseasShippingFeeSetting,
     overseasRemoteFee: overseasRemoteShippingFeeSetting,
-  }, isRemoteAreaShippingAddress);
+  };
+  const shippingFeeOfGroupBeforeSubscribe = shippingFeeByGroup(shippingFeeSettingsForGroups, isRemoteAreaShippingAddress);
+  // [2026-11-01] 구독 인증 무료배송 — 켠 시간 안 + 인증된 손님이면 고른 갈래만 0원(제주 추가금은 설정 따라). 서버(submit)도 같은 lib 로 다시 확인.
+  const subscribeFreeShipActive = isSubscribeFreeShipActive(subscribeConfig, new Date(subscribeNow));
+  const subscribeWaiverOn = subscribeFreeShipActive && subscribeVerified;
+  const shippingFeeOfGroup = subscribeWaiverOn
+    ? applySubscribeWaiver(shippingFeeOfGroupBeforeSubscribe, shippingFeeByGroup(shippingFeeSettingsForGroups, false), subscribeConfig)
+    : shippingFeeOfGroupBeforeSubscribe;
+  const subscribeGroupsText = subscribeConfig.groups.map((g) => SUBSCRIBE_GROUP_LABEL[g]).join("·");
+  const subscribeKakaoId = typeof window !== "undefined" ? (localStorage.getItem("ruru_kakao_id") || "").trim() : "";
+  // 켠 시간이 지나면 저절로 꺼지게 1분마다 시각만 갱신(설정이 켜져 있을 때만)
+  useEffect(() => {
+    if (!subscribeConfig.enabled) return;
+    const timer = window.setInterval(() => setSubscribeNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, [subscribeConfig.enabled]);
+  // 이 카카오 계정이 이미 인증돼 있는지(혜택이 켜져 있을 때만 물어봄)
+  useEffect(() => {
+    if (!subscribeFreeShipActive || !subscribeKakaoId || subscribeVerified) return;
+    let alive = true;
+    void fetch(`/api/subscribe-verify?kakao_id=${encodeURIComponent(subscribeKakaoId)}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => { if (alive && j?.verified === true) setSubscribeVerified(true); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [subscribeFreeShipActive, subscribeKakaoId, subscribeVerified]);
   // [2026-10-29] 해외배송 갈래 — 해외배송비 > 0 이고 «상품 정보»에 해외배송 배지가 있을 때만.
   //   장바구니 줄엔 배지가 없어서 product_id 로 상품 목록(방송·카탈로그·부족분 조회)에서 찾는다.
   //   서버(submit)도 products 배지로 같은 판정 → 손님 화면 금액과 서버 검사가 같다.
@@ -2006,6 +2038,15 @@ export default function OrderPage() {
 
   const shippingFeeBreakdown = calculateShippingFeeBreakdown(items, paidShippingGroups);
   const shippingFee = shippingFeeBreakdown.totalShippingFee;
+  // [2026-11-01] 구독 인증으로 빠진 배송비(표시용) — 같은 갈래·같은 합배송 기준, 금액만 인증 전 값으로
+  const shippingFeeBeforeSubscribe = subscribeWaiverOn
+    ? calculateShippingBreakdown(
+        getChargeableShippingItems(items).map((item) => shippingGroupOf(item)),
+        normalizePaidShippingGroups(paidShippingGroups),
+        shippingFeeOfGroupBeforeSubscribe,
+      ).totalShippingFee
+    : shippingFee;
+  const subscribeWaivedAmount = Math.max(0, shippingFeeBeforeSubscribe - shippingFee);
   const chargeableShippingItemsForNotice = getChargeableShippingItems(items);
   const hasNormalShippingItemForNotice = chargeableShippingItemsForNotice.some(
     (item) => shippingGroupOf(item) === "normal",
@@ -2526,6 +2567,7 @@ export default function OrderPage() {
         "popup_band_url",
         PROMO_POPUP_KEY,
         PROMO_POPUP_LEGACY_KEY,
+        SUBSCRIBE_FREE_SHIP_KEY,
         FINAL_SUBMIT_CONFIRMATION_KEY,
         ...ORDER_PURCHASE_CONSENT_KEYS,
         "product_notice_mode",
@@ -2570,6 +2612,7 @@ export default function OrderPage() {
       setOverseasRemoteShippingFeeSetting(Math.max(nextOverseasFee, readNumber("overseas_remote_area_shipping_fee", nextOverseasFee)));
     }
     setCombineShippingSettings(parseCombineShippingSettings(data));
+    setSubscribeConfig(parseSubscribeFreeShip(data || []));
 
     // 포인트 자동적립 안내 문구용 (자동적립 ON + 적립률>0 일 때만 N% 표시, OFF면 0=숨김)
     const pointAutoEarnEnabled =
@@ -6957,7 +7000,39 @@ export default function OrderPage() {
               </div>
             </div>
           )}
+          {subscribeFreeShipActive ? (
+            <SubscribeFreeShipCard
+              variant="strip"
+              channelName={subscribeConfig.channelName}
+              exampleUrl={subscribeConfig.exampleUrl}
+              groupsText={subscribeGroupsText}
+              verified={subscribeVerified}
+              kakaoId={subscribeKakaoId}
+              onVerified={() => setSubscribeVerified(true)}
+              onOpenDetail={() => setSubscribeDetailOpen(true)}
+            />
+          ) : null}
         </section>
+      ) : null}
+
+      {/* [2026-11-01] 첫 화면 「구독 인증하면 배송비 무료」 한 줄을 누르면 — 주문서 확인과 같은 카드를 창으로 */}
+      {subscribeDetailOpen && subscribeFreeShipActive ? (
+        <div role="dialog" aria-label="구독 인증 무료배송" onClick={() => setSubscribeDetailOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", maxHeight: "90vh", overflowY: "auto", background: "#FFFFFF", borderRadius: "16px 16px 0 0", padding: "16px 16px calc(16px + env(safe-area-inset-bottom))" }}>
+            <SubscribeFreeShipCard
+              variant="card"
+              channelName={subscribeConfig.channelName}
+              exampleUrl={subscribeConfig.exampleUrl}
+              groupsText={subscribeGroupsText}
+              verified={subscribeVerified}
+              kakaoId={subscribeKakaoId}
+              customerPhone={customerPhone}
+              youtubeNickname={youtubeNickname}
+              onVerified={() => setSubscribeVerified(true)}
+            />
+            <button type="button" onClick={() => setSubscribeDetailOpen(false)} style={{ marginTop: "12px", width: "100%", height: "48px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>닫기</button>
+          </div>
+        </div>
       ) : null}
 
       {!isAutoLoggedIn && (isEditingCustomerInfo || customerMode === "new") && (
@@ -8067,11 +8142,30 @@ export default function OrderPage() {
                 </div>
               )}
 
+              {subscribeFreeShipActive ? (
+                <div style={{ marginBottom: "12px" }}>
+                  <SubscribeFreeShipCard
+                    variant="card"
+                    channelName={subscribeConfig.channelName}
+                    exampleUrl={subscribeConfig.exampleUrl}
+                    groupsText={subscribeGroupsText}
+                    verified={subscribeVerified}
+                    waivedAmount={subscribeWaivedAmount}
+                    kakaoId={subscribeKakaoId}
+                    customerPhone={customerPhone}
+                    youtubeNickname={youtubeNickname}
+                    onVerified={() => setSubscribeVerified(true)}
+                  />
+                </div>
+              ) : null}
+
               <div data-ruru-price-summary-wrapper="flat">
                 <OrderPriceSummaryBox
                   tone={uiS3 ? "v2" : undefined}
                   productAmount={productAmount}
                   shippingFee={shippingFee}
+                  shippingWaivedFrom={subscribeWaivedAmount > 0 ? shippingFeeBeforeSubscribe : undefined}
+                  shippingWaivedLabel="구독 인증 무료배송"
                   cardExtra={cardExtra}
                   totalAmount={totalAmount}
                   paymentMethod={paymentMethod === "카드결제" ? "카드결제" : "무통장입금"}

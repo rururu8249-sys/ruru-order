@@ -23,6 +23,9 @@ type OrderPriceSummaryBoxProps = {
   onUseAllPoints?: () => void;
   /** [㉜ 3단계] 새 모양(DESIGN.md) — 없으면 기존 모양 그대로. 표시만, 값·계산 무관. */
   tone?: "v2";
+  /** [2026-11-01] 구독 인증 무료배송 — 빠지기 전 배송비(있으면 지운 선으로 보여 줌). 표시만. */
+  shippingWaivedFrom?: number;
+  shippingWaivedLabel?: string;
 };
 
 const won = (value: number) => `${Number(value || 0).toLocaleString()}원`;
@@ -44,6 +47,8 @@ export default function OrderPriceSummaryBox({
   onPointUseInputChange,
   onUseAllPoints,
   tone,
+  shippingWaivedFrom,
+  shippingWaivedLabel,
 }: OrderPriceSummaryBoxProps) {
   const v2 = tone === "v2";
   const t = (style: CSSProperties): CSSProperties => (v2 ? (restyleV2(style) as CSSProperties) : style);
@@ -65,8 +70,16 @@ export default function OrderPriceSummaryBox({
 
         <div style={t({ ...rowStyle, marginTop: "10px" })}>
           <span>배송비</span>
-          <span style={v2 ? { color: "#111111", fontWeight: 600 } : { color: "#333" }}>{won(shippingFee)}</span>
+          <span style={v2 ? { color: "#111111", fontWeight: 600 } : { color: "#333" }}>
+            {shippingWaivedFrom && shippingWaivedFrom > shippingFee ? (
+              <s style={{ marginRight: "6px", color: "#9E9EA0", fontWeight: 400 }}>{Number(shippingWaivedFrom).toLocaleString()}</s>
+            ) : null}
+            {won(shippingFee)}
+          </span>
         </div>
+        {shippingWaivedFrom && shippingWaivedFrom > shippingFee && shippingWaivedLabel ? (
+          <div style={{ marginTop: "2px", textAlign: "right", fontSize: "13px", fontWeight: 600, color: "#007D48" }}>{shippingWaivedLabel}</div>
+        ) : null}
 
         {paymentMethod === "카드결제" ? (
           <div style={t({ ...rowStyle, marginTop: "10px", color: "#7B2D43" })}>

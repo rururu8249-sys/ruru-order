@@ -9,6 +9,7 @@ import {useSettingsDraft,type SettingsDraftState} from "./useSettingsDraft";
 import YoutubeNotifyCard from "./YoutubeNotifyCard";
 import TelegramNotifyCard from "./TelegramNotifyCard";
 import KakaoNotifyCard from "./KakaoNotifyCard";
+import SubscribeFreeShipSettingsCard from "./SubscribeFreeShipSettingsCard";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
 // [2026-09-22] 상품 주문 안내 문구 — 문구 원문·기본값은 한 곳(lib)에서만 정한다
@@ -500,6 +501,9 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
                   />
                 </div>
               </div>
+
+              {/* [2026-11-01] 구독 인증 무료배송 — 자체 저장(위 배송비 저장과 따로) */}
+              <SubscribeFreeShipSettingsCard />
             </>
           )}
 
