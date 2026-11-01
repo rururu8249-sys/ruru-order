@@ -2952,6 +2952,24 @@ export default function OrderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [broadcast?.status, broadcast?.id]);
 
+  // [2026-11-02 사장님 「등록 안 된 상품을 어떻게 장바구니에 담아」] 방송 OFF 화면을 열어 둔 손님 — 새 방송이 켜지면 1분 안에
+  //   방송 상품 화면으로 바꾼다(전엔 새로고침 전까지 쇼핑몰/전체 상품이 그대로 남아 방송에 없는 상품을 담을 수 있었음).
+  //   읽기 전용 1건 조회·탭이 보일 때만. 주문/돈 로직 무관.
+  useEffect(() => {
+    if (!broadcastLoaded) return;
+    const on = String(broadcast?.status || "").toUpperCase() === "ON";
+    if (on) return;
+    const t = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      void (async () => {
+        const { data: live } = await supabase.from("broadcasts").select("id").eq("status", "ON").limit(1).maybeSingle();
+        if (live?.id) void loadBroadcast();
+      })();
+    }, 60000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [broadcast?.status, broadcastLoaded]);
+
   const loadBroadcastProducts = async (broadcastId: string | number) => {
     const { data, error } = await supabase
       .from("broadcast_products")
