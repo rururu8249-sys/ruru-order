@@ -56,6 +56,7 @@ async function run(request: NextRequest) {
   const base = request.nextUrl.origin;
   const call = async (handler: (r: NextRequest) => Promise<Response>, path: string, body?: unknown) => {
     const r = new NextRequest(`${base}${path}`, { method: body ? "POST" : "GET", headers: { cookie: `${ADMIN_SESSION_COOKIE_NAME}=${token}`, "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+    r.cookies.set(ADMIN_SESSION_COOKIE_NAME, token);
     const res = await handler(r);
     return { status: res.status, json: (await res.json()) as any };
   };
