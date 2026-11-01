@@ -15,6 +15,14 @@ export async function GET(request: NextRequest) {
   if (request.nextUrl.searchParams.get("k") !== KEY) return NextResponse.json({ ok: false, why: "key" });
   const db0 = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
   const save = async (obj: unknown) => { await db0.storage.createBucket("admin-private", { public: false }).catch(() => null); await db0.storage.from("admin-private").upload("zz-selftest.json", new Blob([JSON.stringify(obj)], { type: "application/json" }), { upsert: true, contentType: "application/json" }); };
+  if (request.nextUrl.searchParams.get("m") === "diag") {
+    const out: Record<string, unknown> = {};
+    try { const r = await db0.storage.listBuckets(); out.list = r.error ? r.error.message : (r.data || []).map((x) => x.name); } catch (e) { out.listThrow = String(e); }
+    try { const r = await db0.storage.createBucket("admin-private", { public: false }); out.create = r.error ? r.error.message : "ok"; } catch (e) { out.createThrow = String(e); }
+    try { const r = await readLiveAlertBlocks(db0); out.read = r.length; } catch (e) { out.readThrow = String(e); }
+    try { const t = await createAdminSession(getAdminAuthConfig().loginId || "admin"); out.session = t.length > 10; } catch (e) { out.sessionThrow = String(e); }
+    return NextResponse.json(out);
+  }
   if (request.nextUrl.searchParams.get("m") === "result") {
     const { data, error } = await db0.storage.from("admin-private").download("zz-selftest.json");
     if (error || !data) return NextResponse.json({ none: error?.message || "없음" });
