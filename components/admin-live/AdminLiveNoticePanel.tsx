@@ -19,6 +19,8 @@ import { NOTE_PRESETS, safeSearchTerm } from "@/lib/customerNotePresets";
 import { noteTimeText } from "@/lib/noteTime";
 import { noticeBarLine } from "@/lib/noticeBar";
 import { CUSTOMER_NOTICE_ID_KEY } from "@/lib/customerNoticeSource";
+import PromoPopupEditor from "@/components/admin-live/PromoPopupEditor";
+import { DEFAULT_PROMO_POPUP, PROMO_POPUP_KEY, PROMO_POPUP_LEGACY_KEY, parsePromoPopup, serializePromoPopup, type PromoPopupConfig } from "@/lib/promoPopup";
 import {
   DEFAULT_ORDER_PURCHASE_CONSENT,
   ORDER_PURCHASE_CONSENT_KEYS,
@@ -38,7 +40,8 @@ const NOTICE_KEYS = [
   "popup_notice_fontsize",
   "popup_notice_color",
   "popup_band_url",
-  "youtube_channel_notice_enabled",
+  PROMO_POPUP_KEY,
+  PROMO_POPUP_LEGACY_KEY,
   ...ORDER_PURCHASE_CONSENT_KEYS,
 ] as const;
 
@@ -98,8 +101,9 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
   // ⚠ 이 값은 settings(popup_notice_color)로 저장돼 손님 화면에 그대로 쓰인다 → 관리자 CSS 변수 금지, 실제 색값만.
   const [popupColor, setPopupColor] = useState("#7B2D43");
   const [popupBandUrl, setPopupBandUrl] = useState(DEFAULT_BAND_URL);
-  // [2026-11-01] 유튜브 채널 변경 안내 팝업 — 저장값 없으면 켜짐(손님 화면과 같은 규칙)
-  const [youtubeNoticeOn, setYoutubeNoticeOn] = useState(true);
+  // [2026-11-01] 안내 팝업(유튜브 채널 변경 등) — settings promo_popup_v1. savedPromo = 마지막 저장본(내용 바뀜 판단용)
+  const [promo, setPromo] = useState<PromoPopupConfig>(DEFAULT_PROMO_POPUP);
+  const [savedPromo, setSavedPromo] = useState<PromoPopupConfig>(DEFAULT_PROMO_POPUP);
   const [purchaseConsent, setPurchaseConsent] = useState<OrderPurchaseConsentConfig>(DEFAULT_ORDER_PURCHASE_CONSENT);
 
   const [tab, setTab] = useState<PanelTab>(mode === "messages" || mode === "board" ? "list" : mode === "notes" ? "send" : "customer");
@@ -143,7 +147,9 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
         setPopupFont(clean(get("popup_notice_fontsize")) || "normal");
         setPopupColor(clean(get("popup_notice_color")) || "#7B2D43");
         setPopupBandUrl(clean(get("popup_band_url")) || DEFAULT_BAND_URL);
-        setYoutubeNoticeOn(clean(get("youtube_channel_notice_enabled")) !== "false");
+        const promoLoaded = parsePromoPopup(rows);
+        setPromo(promoLoaded);
+        setSavedPromo(promoLoaded);
         setPurchaseConsent(parseOrderPurchaseConsentSettings(rows));
         setSettingsReady(true);
       } finally {
@@ -159,6 +165,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
       showAdminToast("연결할 공개 공지를 확인해 주세요. 삭제되거나 비공개인 공지는 연결할 수 없습니다.", "error");
       return;
     }
+    const promoText = serializePromoPopup(promo, savedPromo, Date.now());
     setSaving(true);
     try {
       const { error } = await supabase.from("settings").upsert(
@@ -171,7 +178,7 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
           { key: "popup_notice_fontsize", value: popupFont },
           { key: "popup_notice_color", value: popupColor },
           { key: "popup_band_url", value: popupBandUrl.trim() },
-          { key: "youtube_channel_notice_enabled", value: youtubeNoticeOn ? "true" : "false" },
+          { key: PROMO_POPUP_KEY, value: promoText },
           ...toOrderPurchaseConsentRows(purchaseConsent),
         ],
         { onConflict: "key" },
@@ -180,6 +187,9 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
         showAdminToast("공지 저장 실패\n\n" + error.message, "error");
         return;
       }
+      const promoSaved = parsePromoPopup([{ key: PROMO_POPUP_KEY, value: promoText }]);
+      setPromo(promoSaved);
+      setSavedPromo(promoSaved);
       showAdminToast("공지를 저장했습니다. 손님이 새로 들어오면 보입니다.", "success");
     } finally {
       setSaving(false);
@@ -481,15 +491,9 @@ export default function AdminLiveNoticePanel({ mode = "all" }: Props = {}) {
               </div> : null}
             </div>
             <div className={card}>
-              <div className="flex items-center gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-bold text-ink">유튜브 채널 변경 안내 팝업</div>
-                  <div className="mt-1 text-xs font-bold text-ink-mute">손님이 들어오면 새 채널 바로가기 창이 떠요. 바로가기·다시 보지 않기를 누른 손님에겐 다시 안 떠요.</div>
-                </div>
-                <button type="button" onClick={() => setYoutubeNoticeOn(v => !v)} disabled={!settingsReady} className="shrink-0 rounded-full border border-line px-4 py-2 text-xs font-bold">
-                  {youtubeNoticeOn ? "팝업 ON" : "팝업 OFF"}
-                </button>
-              </div>
+              <div className="text-sm font-bold text-ink">안내 팝업</div>
+              <div className="mb-3 mt-1 text-xs font-bold text-ink-mute">손님이 들어오면 떠요. 버튼을 누르거나 「24시간 동안 열지 않기」를 누른 손님은 24시간 안 떠요. 내용을 바꿔 저장하면 모두에게 다시 떠요.</div>
+              <PromoPopupEditor value={promo} onChange={setPromo} disabled={!settingsReady} />
             </div>
             <details className={card}>
               <summary className="cursor-pointer text-sm font-bold text-ink">접속 팝업 설정 (상단 공지와 별개)</summary>
