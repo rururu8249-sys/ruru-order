@@ -4,6 +4,7 @@ import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { SolapiMessageService } from "solapi";
 import { createHmac } from "node:crypto";
 import { selectAlertRecipients, sealAlertSelection, readAlertSelection, ALERT_SELECTION_POLICY } from "@/lib/liveAlertSelection";
+import { readLiveAlertBlockPhones } from "@/lib/liveAlertBlockServer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -75,6 +76,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // [2026-11-01] 사장님이 «계속 제외»한 회원 — 어느 모드에서도 후보에서 뺀다. 못 읽으면 안 보낸다.
+    let blocked: Set<string>;
+    try { blocked = await readLiveAlertBlockPhones(supabase); }
+    catch { return NextResponse.json({ok:false,error:"발송 제외 명단을 읽지 못했습니다. 발송하지 않았습니다."},{status:503}); }
+    const blockedHit = new Set<string>();
+    const customerIdByPhone = new Map<string, string>();
+
     // 후보 회원(모드별) — 전화번호 + 이름(미리보기용)
     const candidates = new Map<string, string>(); // phone -> name
     const customerRows: any[] = [];
@@ -83,9 +91,11 @@ export async function POST(request: NextRequest) {
       const { data, error } = await q;
       if (error) return NextResponse.json({ ok: false, error: `고객 조회 실패: ${error.message}` }, { status: 500 });
       if (!data || data.length === 0) break;
-      customerRows.push(...data);
       for (const row of data) {
         const p = normalizePhone((row as any).customer_phone);
+        if (blocked.has(p)) { if (mode === "all" || row.live_alert_optin === true) blockedHit.add(p); continue; }
+        customerRows.push(row);
+        if (p && !customerIdByPhone.has(p)) customerIdByPhone.set(p, String((row as any).id ?? ""));
         if (/^01[016789]\d{7,8}$/.test(p) && (mode === "all" || row.live_alert_optin === true) && !candidates.has(p)) candidates.set(p, String((row as any).customer_name ?? ""));
       }
       if (data.length < 1000) break;
@@ -106,6 +116,8 @@ export async function POST(request: NextRequest) {
         if(!Array.isArray(ids)||ids.length>10000||ids.some((id:unknown)=>typeof id!=="string"||id.length>100))return NextResponse.json({ok:false,error:"잘못된 회원 선택입니다."},{status:400});
         ids.forEach((id:string)=>set.add(id));
       }
+      // 계속 제외된 회원은 «직접 포함»해도 빠진다(오류 대신 조용히 뺌)
+      for(const p of blocked)manualIds.delete(memberId(p));
     }
     if(mode==="priority"&&dryRun){
       const limit=Number(body.limit),orderDays=Number(body.orderDays),recentDays=Number(body.recentDays);
@@ -125,7 +137,7 @@ export async function POST(request: NextRequest) {
       if(pinned.length>limit||pinned.filter(p=>p.orderDays===0).length>cap)return NextResponse.json({ok:false,error:"최대 인원 또는 최근 주문 없는 회원 5% 제한을 초과합니다. 먼저 제외하거나 인원을 늘려주세요."},{status:409});
       if(body.selectionToken){
         let previous;
-        try{previous=readAlertSelection(String(body.selectionToken),apiSecret,broadcastId,actor,Date.now());if(previous.mode!==mode||previous.policy!==ALERT_SELECTION_POLICY)throw new Error("선정 기준이 변경되었습니다. 명단을 다시 확인해 주세요.");}
+        try{previous=readAlertSelection(String(body.selectionToken),apiSecret,broadcastId,actor,Date.now());if(previous.mode!==mode||previous.policy!==ALERT_SELECTION_POLICY)throw new Error("선정 기준이 변경되었습니다. 명단을 다시 확인해 주세요.");previous.phones=previous.phones.filter(p=>!blocked.has(p));}
         catch(error){return NextResponse.json({ok:false,error:error instanceof Error?error.message:"명단 확인 실패"},{status:409});}
         const byPhone=new Map(members.map(p=>[p.phone,p]));
         if(previous.phones.some(p=>!byPhone.has(p)))return NextResponse.json({ok:false,error:"동의 또는 발송 이력이 변경되었습니다. 명단을 다시 확인해 주세요."},{status:409});
@@ -146,7 +158,7 @@ export async function POST(request: NextRequest) {
       const byId=new Map(members.map(p=>[memberId(p.phone),p]));
       if([...manualIds].some(id=>!byId.has(id)||excludedIds.has(id)))return NextResponse.json({ok:false,error:"추가할 수 없는 회원입니다. 알림 동의와 발송 이력을 확인해 주세요."},{status:409});
       if(body.selectionToken){
-        try{const previous=readAlertSelection(String(body.selectionToken),apiSecret,broadcastId,actor,Date.now());if(previous.mode!==mode||previous.phones.some(p=>!targets.includes(p)))throw new Error("동의 또는 발송 이력이 변경되었습니다. 명단을 다시 확인해 주세요.");targets=previous.phones;}
+        try{const previous=readAlertSelection(String(body.selectionToken),apiSecret,broadcastId,actor,Date.now());previous.phones=previous.phones.filter(p=>!blocked.has(p));if(previous.mode!==mode||previous.phones.some(p=>!targets.includes(p)))throw new Error("동의 또는 발송 이력이 변경되었습니다. 명단을 다시 확인해 주세요.");targets=previous.phones;}
         catch(error){return NextResponse.json({ok:false,error:error instanceof Error?error.message:"명단 확인 실패"},{status:409});}
       }
       targets=[...new Set([...targets.filter(p=>!excludedIds.has(memberId(p))),...[...manualIds].map(id=>byId.get(id)!.phone)])];
@@ -156,6 +168,8 @@ export async function POST(request: NextRequest) {
       try{manifest=readAlertSelection(String(body.selectionToken||""),apiSecret,broadcastId,actor,Date.now());if(manifest.mode!==mode)throw new Error("발송 설정이 변경되었습니다. 명단을 다시 확인해 주세요.");}
       catch(error){return NextResponse.json({ok:false,error:error instanceof Error?error.message:"명단 확인 실패"},{status:409});}
       if(mode==="priority"&&manifest.policy!==ALERT_SELECTION_POLICY)return NextResponse.json({ok:false,error:"선정 기준이 변경되었습니다. 대상 선정 / 다시 뽑기를 눌러 명단을 확인해 주세요. 발송하지 않았습니다."},{status:409});
+      // 미리보기 뒤에 «계속 제외»된 회원은 빼고 보낸다(다른 사람으로 채우지 않음)
+      manifest.phones=manifest.phones.filter(p=>!blocked.has(p));
       const eligible=new Set(targets);
       // Never replace removed recipients with newly selected people behind the operator's back.
       if(manifest.phones.some(p=>!eligible.has(p)))return NextResponse.json({ok:false,error:"동의 또는 발송 이력이 변경되었습니다. 명단을 다시 확인해 주세요."},{status:409});
@@ -170,7 +184,7 @@ export async function POST(request: NextRequest) {
       const details=new Map(selected.map(s=>[s.phone,s]));
       const sample = targets.map((p) => {
         const detail=details.get(p);
-        return {id:memberId(p),manual:manualIds.has(memberId(p)),name:candidates.get(p)||"",phone:maskPhone(p),...(detail?{orderDays:detail.orderDays,recent:detail.recent}:{})};
+        return {id:memberId(p),cid:customerIdByPhone.get(p)||"",manual:manualIds.has(memberId(p)),name:candidates.get(p)||"",phone:maskPhone(p),...(detail?{orderDays:detail.orderDays,recent:detail.recent}:{})};
       });
       const selectionToken=sealAlertSelection({broadcastId,actor,mode,policy:ALERT_SELECTION_POLICY,phones:targets,expires:Date.now()+15*60000},apiSecret);
       const selectionGroups=mode==="priority"?{
@@ -179,7 +193,7 @@ export async function POST(request: NextRequest) {
         noRecentOrders:selected.filter(p=>p.orderDays===0).length,
         noRecentOrdersMax:Math.floor(Number(body.limit)/20),
       }:undefined;
-      return NextResponse.json({ ok: true, dryRun: true, mode, candidateCount, receivedCount, targetCount, sample, selectionToken, selectionGroups, members:members.map(p=>({id:memberId(p.phone),name:p.name,phone:maskPhone(p.phone),orderDays:p.orderDays,recent:p.recent})) });
+      return NextResponse.json({ ok: true, dryRun: true, mode, candidateCount, receivedCount, blockedCount: blockedHit.size, targetCount, sample, selectionToken, selectionGroups, members:members.map(p=>({id:memberId(p.phone),cid:customerIdByPhone.get(p.phone)||"",name:p.name,phone:maskPhone(p.phone),orderDays:p.orderDays,recent:p.recent})) });
     }
 
     if (targetCount === 0) {

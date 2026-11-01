@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import {createUiLoader} from './admin-ui-test-loader.mjs';
 for(const key of ['SOLAPI_API_KEY','SOLAPI_API_SECRET','SOLAPI_PF_ID','SOLAPI_TEMPLATE_ID','SOLAPI_SENDER','NEXT_PUBLIC_SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'])process.env[key]='test';
-let sent=[],writes=[],received=[],off=false,readError=false;
+let sent=[],writes=[],received=[],off=false,readError=false,blockedPhones=[],blockReadError=false;
 const customers=[1,2].map(n=>({id:n,customer_phone:`0100000000${n}`,customer_name:`고객${n}`,live_alert_optin:true,live_alert_optin_at:new Date().toISOString()}));
 const orders=customers.map(c=>({customer_phone:c.customer_phone,created_at:new Date().toISOString()}));
 const db={from(table){let mutation=false,rows=[];const q={select(){return q},eq(){return q},gte(){return q},order(){return q},range(){return q},maybeSingle(){return Promise.resolve({data:{id:'broadcast',status:'ON'}})},upsert(value){mutation=true;rows=value;writes.push(value);return q},insert(value){writes.push(value);return Promise.resolve({error:null})},then(resolve,reject){return Promise.resolve(mutation?{data:rows.filter(r=>!received.includes(r.customer_phone)),error:null}:{data:table==='customers'?customers.map(c=>({...c,live_alert_optin:off?false:true})):table==='orders'?orders:table==='live_alert_recipients'?received.map(customer_phone=>({customer_phone})):[],error:readError?{message:'unavailable'}:null}).then(resolve,reject)}};return q}};
-const {POST}=createUiLoader({'@/lib/admin-auth':{verifyAdminSessionFromRequest:async()=>({sub:'admin'})},'@supabase/supabase-js':{createClient:()=>db},solapi:{SolapiMessageService:class{async send(messages){sent.push(...messages);return {failedMessageList:[]}}}}})('app/api/admin-live/live-alert-send/route.ts');
+const {POST}=createUiLoader({'@/lib/admin-auth':{verifyAdminSessionFromRequest:async()=>({sub:'admin'})},'@supabase/supabase-js':{createClient:()=>db},'@/lib/liveAlertBlockServer':{readLiveAlertBlockPhones:async()=>{if(blockReadError)throw new Error('x');return new Set(blockedPhones)}},solapi:{SolapiMessageService:class{async send(messages){sent.push(...messages);return {failedMessageList:[]}}}}})('app/api/admin-live/live-alert-send/route.ts');
 async function call(body){const response=await POST({json:async()=>({broadcastId:'broadcast',mode:'priority',...body})});return {status:response.status,...await response.json()}}
 const preview=await call({dryRun:true,limit:1,orderDays:90,recentDays:30});
 assert.equal(preview.members?.length,2,'all opted-in unsent members are searchable, not just selected sample');
@@ -47,4 +47,33 @@ const result=await call({selectionToken:edited.selectionToken});assert.equal(res
 assert.deepEqual(sent.map(m=>m.to),readAlertSelection(edited.selectionToken,'test','broadcast','admin',Date.now()).phones,'provider receives exact edited manifest');
 received=[sent[0].to];assert.equal((await call({selectionToken:edited.selectionToken})).status,409);assert.equal(sent.length,1);
 assert.equal((await call({dryRun:true,limit:0,orderDays:90,recentDays:30})).status,400);
+// [2026-11-01] 계속 제외 명단
+received=[];
+for(const mode of ['optin','all','priority']){
+  blockedPhones=['01000000001'];
+  const p=await call({mode,dryRun:true,limit:5,orderDays:90,recentDays:30});
+  assert.equal(p.ok,true,mode);
+  assert.ok(!p.sample.some(m=>m.name==='고객1'),mode+': blocked member not in send list');
+  assert.ok(!p.members.some(m=>m.name==='고객1'),mode+': blocked member not addable');
+  assert.equal(p.blockedCount,1,mode+': blocked count shown');
+  assert.ok(p.sample.every(m=>typeof m.cid==='string'),mode+': cid for 계속 제외 button');
+  blockedPhones=[];
+}
+{const all=await call({mode:'all',dryRun:true});
+ const id1=all.sample.find(m=>m.name==='고객1').id;
+ blockedPhones=['01000000001'];
+ const pinned=await call({mode:'all',dryRun:true,includeIds:[id1],excludeIds:[]});
+ assert.equal(pinned.ok,true,'manual include of blocked member is ignored, not an error');
+ assert.ok(!pinned.sample.some(m=>m.name==='고객1'));
+ const kept=await call({mode:'all',dryRun:true,selectionToken:all.selectionToken,includeIds:[],excludeIds:[]});
+ assert.equal(kept.ok,true,'old token still usable after block');assert.ok(!kept.sample.some(m=>m.name==='고객1'));
+ blockedPhones=[];
+ const before=sent.length;
+ blockedPhones=['01000000001'];
+ const r=await call({mode:'all',selectionToken:all.selectionToken});
+ assert.equal(r.ok,true);assert.ok(!sent.slice(before).some(m=>m.to==='01000000001'),'blocked after preview is skipped at send');
+ assert.equal(sent.length-before,1,'no backfill');
+ blockedPhones=[];received=[];
+ blockReadError=true;const fail=await call({mode:'optin',dryRun:true});assert.equal(fail.status,503,'block list unreadable = stop');blockReadError=false;
+}
 console.log('PASS API preview without sends/writes, exact recipient count, signed selection, consent recheck, fail-closed history, duplicate exclusion, SMS fallback disabled (mock provider only)');

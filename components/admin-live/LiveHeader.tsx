@@ -11,7 +11,9 @@ import { buildDetailChatLine, detailProducts } from "@/lib/productDetailModel";
 import { feedPinLayout, FEED_PIN_SIZE } from "@/lib/feedText";
 
 type VideoRatio = "vertical" | "wide" | "auto";
-type AlertMember = { id: string; name: string; phone: string; orderDays?: number; recent?: boolean; manual?: boolean };
+type AlertMember = { id: string; cid?: string; name: string; phone: string; orderDays?: number; recent?: boolean; manual?: boolean };
+type AlertBlockItem = { id: string; customerId: string; name: string; nickname: string; phone: string; at: string };
+type AlertBlockResult = { customerId: string; name: string; nickname: string; phone: string; optin: boolean | null; blocked: boolean };
 
 type Props = {
   videoRatio: VideoRatio;
@@ -137,13 +139,20 @@ export default function LiveHeader({
   const [alertExcluded, setAlertExcluded] = useState<string[]>([]);
   const [alertSearch, setAlertSearch] = useState("");
   const [alertSort, setAlertSort] = useState("name");
-  const [alertList, setAlertList] = useState<"selected" | "members" | "excluded">("selected");
+  const [alertList, setAlertList] = useState<"selected" | "members" | "excluded" | "blocked">("selected");
+  // [2026-11-01 사장님] «계속 제외» — 해제할 때까지 모든 방송알림에서 빠지는 회원(서버 비공개 저장소)
+  const [blockItems, setBlockItems] = useState<AlertBlockItem[]>([]);
+  const [blockQuery, setBlockQuery] = useState("");
+  const [blockResults, setBlockResults] = useState<AlertBlockResult[]>([]);
+  const [blockSearching, setBlockSearching] = useState(false);
+  const [blockBusy, setBlockBusy] = useState(false);
+  const [blockLoadError, setBlockLoadError] = useState("");
   const alertBusy = useRef(false);
-  useEffect(() => { alertRequest.current++; setAlertPreview(null); setAlertPreviewLoading(false); setAlertIncluded([]); setAlertExcluded([]); setAlertResult(""); }, [activeBroadcast?.id]);
   const [alertPreview, setAlertPreview] = useState<any>(null);
   const [alertPreviewLoading, setAlertPreviewLoading] = useState(false);
   const [alertSending, setAlertSending] = useState(false);
   const [alertResult, setAlertResult] = useState("");
+  useEffect(() => { alertRequest.current++; setAlertPreview(null); setAlertPreviewLoading(false); setAlertIncluded([]); setAlertExcluded([]); setAlertResult(""); }, [activeBroadcast?.id]);
 
   const loadAlertPreview = async (mode: "priority" | "optin" | "all", edits?: {includeIds:string[];excludeIds:string[];selectionToken?:string}) => {
     if (!activeBroadcast || alertSending || alertBusy.current) return;
@@ -166,9 +175,66 @@ export default function LiveHeader({
     }
   };
 
+  const loadBlocks = async () => {
+    try {
+      const r = await fetch("/api/admin-live/live-alert-block", { cache: "no-store" }).then((res) => res.json()).catch(() => null);
+      if (r?.ok) { setBlockItems(r.items || []); setBlockLoadError(""); }
+      else setBlockLoadError("계속 제외 명단을 못 불러왔어요. 창을 다시 열어 주세요.");
+    } catch { setBlockLoadError("계속 제외 명단을 못 불러왔어요. 창을 다시 열어 주세요."); }
+  };
+  const blockSearchSeq = useRef(0);
+  const blockSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchBlockCustomers = (value: string) => {
+    setBlockQuery(value);
+    const q = value.trim();
+    const seq = ++blockSearchSeq.current;
+    if (blockSearchTimer.current) clearTimeout(blockSearchTimer.current);
+    if (!q) { setBlockResults([]); setBlockSearching(false); return; }
+    setBlockSearching(true);
+    blockSearchTimer.current = setTimeout(async () => {
+      const r = await fetch(`/api/admin-live/live-alert-block?q=${encodeURIComponent(q)}`, { cache: "no-store" }).then((res) => res.json()).catch(() => null);
+      if (seq !== blockSearchSeq.current) return;
+      setBlockResults(r?.ok ? r.results || [] : []);
+      if (r?.ok) setBlockItems(r.items || []);
+      setBlockSearching(false);
+    }, 300);
+  };
+  // 계속 제외를 바꾸면 명단을 다시 받는다(단골 모드는 뽑은 명단 유지, 나머지는 새로 계산)
+  const refreshAfterBlock = () => {
+    if (alertMode === "priority") {
+      if (alertPreview?.selectionToken) void loadAlertPreview("priority", { includeIds: alertIncluded, excludeIds: alertExcluded, selectionToken: alertPreview.selectionToken });
+    } else void loadAlertPreview(alertMode, { includeIds: alertIncluded, excludeIds: alertExcluded });
+  };
+  const addBlock = async (customerIds: string[], label?: string) => {
+    if (blockBusy || alertSending || !customerIds.length) return;
+    setBlockBusy(true);
+    try {
+      const r = await fetch("/api/admin-live/live-alert-block", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "add", customerIds }) }).then((res) => res.json()).catch(() => null);
+      if (!r?.ok) { showAdminToast("계속 제외 실패\n\n" + (r?.message || "다시 눌러 주세요."), "error"); return; }
+      setBlockItems(r.items || []);
+      setBlockResults((rows) => rows.map((x) => (customerIds.includes(x.customerId) ? { ...x, blocked: true } : x)));
+      showAdminToast(`${label || "회원"} 계속 제외`, "success");
+      refreshAfterBlock();
+    } finally { setBlockBusy(false); }
+  };
+  const removeBlock = async (ids: string[], label?: string) => {
+    if (blockBusy || alertSending || !ids.length) return;
+    setBlockBusy(true);
+    try {
+      const r = await fetch("/api/admin-live/live-alert-block", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "remove", ids }) }).then((res) => res.json()).catch(() => null);
+      if (!r?.ok) { showAdminToast("해제 실패\n\n" + (r?.message || "다시 눌러 주세요."), "error"); return; }
+      setBlockItems(r.items || []);
+      setBlockResults((rows) => rows.map((x) => (r.items || []).some((b: AlertBlockItem) => b.customerId === x.customerId) ? x : { ...x, blocked: false }));
+      showAdminToast(`${label || "회원"} 제외 해제`, "success");
+      refreshAfterBlock();
+    } finally { setBlockBusy(false); }
+  };
+
   const openAlert = () => {
     if (!activeBroadcast || alertBusy.current) return;
     setAlertOpen(true);
+    searchBlockCustomers("");
+    void loadBlocks();
     setAlertList("selected");setAlertSearch("");
     setAlertMode("priority");
     if(alertMode!=="priority"){
@@ -342,143 +408,182 @@ export default function LiveHeader({
         </div>
       </div>
 
-      {/* 방송알림 발송 모달: 대상(신청자/전체) 선택 + 이미 받은 사람 제외(증분) + 미리보기 */}
+      {/* 방송알림 발송 창 — 대상 고르기 · 받을 사람 수 · 명단(발송/회원 추가/이번만 제외/계속 제외) · 발송 (2026-11-01 DESIGN-ADMIN 기준 다시 그림) */}
       {alertOpen && (
         <div
-          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/40 p-4"
+          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/40 p-4 max-md:p-0"
           onClick={() => !alertSending && setAlertOpen(false)}
         >
           <div
             role="dialog" aria-modal="true" aria-label="방송알림 발송"
-            className="w-full max-w-[960px] max-h-[calc(100dvh-32px)] overflow-y-auto rounded-2xl bg-surface p-4 sm:p-6 shadow-xl"
+            className="flex w-full max-w-[960px] max-h-[calc(100dvh-32px)] flex-col overflow-hidden rounded-xl bg-surface shadow-[0_8px_24px_rgba(0,0,0,0.08)] max-md:h-[100dvh] max-md:max-h-none max-md:rounded-none"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-3 flex items-center justify-between">
-              <div className="text-[14px] font-black text-ink">방송알림 발송</div>
-              <button
-                type="button"
-                onClick={() => !alertSending && setAlertOpen(false)}
-                className="rounded-lg px-2 py-1 text-sm font-black text-ink-mute hover:bg-surface-2"
-              >
-                ✕
-              </button>
+            {/* 머리 */}
+            <div className="flex h-14 shrink-0 items-center justify-between border-b border-line px-4 sm:px-6">
+              <div className="text-base font-bold text-ink">방송알림 발송</div>
+              <button type="button" onClick={() => !alertSending && setAlertOpen(false)} className="h-9 rounded-lg px-3 text-sm text-ink-mute hover:bg-surface-2 max-md:h-11">닫기</button>
             </div>
 
-            {/* 대상 선택 */}
-            <div className="mb-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <button type="button" disabled={alertSending} onClick={() => changeAlertMode("priority")} className={`h-10 rounded-xl text-sm font-black border border-line ${alertMode === "priority" ? "bg-info-tx text-white" : "text-ink-soft"}`}>단골 · 최근 신청자 랜덤</button>
-              <button
-                type="button"
-                disabled={alertSending || alertPreviewLoading} onClick={() => changeAlertMode("optin")}
-                className={[
-                  "h-10 rounded-xl text-sm font-black transition",
-                  alertMode === "optin" ? "bg-[var(--color-info-tx)] text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2",
-                ].join(" ")}
-              >
-                알림 신청자만
-              </button>
-              <button
-                type="button"
-                disabled={alertSending || alertPreviewLoading} onClick={() => changeAlertMode("all")}
-                className={[
-                  "h-10 rounded-xl text-sm font-black transition",
-                  alertMode === "all" ? "bg-[var(--color-danger-tx)] text-white" : "border border-line bg-surface text-ink-soft hover:bg-surface-2",
-                ].join(" ")}
-              >
-                전체 회원 ⚠️
-              </button>
-            </div>
-
-            {alertMode === "priority" && <div className="mb-4 rounded-xl border border-line p-3">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {([
-                  ["발송 인원 (최대)", alertLimit, setAlertLimit, 10000],
-                  ["최근 주문 조회 기간 (일)", alertOrderDays, setAlertOrderDays, 365],
-                  ["최근 알림 신청 기간 (일)", alertRecentDays, setAlertRecentDays, 365],
-                ] as const).map(([label, value, setter, max]) => <label key={label} className="text-sm font-bold text-ink">{label}<input type="number" min={1} max={max} step={1} disabled={alertSending} value={value} onChange={e => { setter(e.target.value); alertRequest.current++; setAlertPreview(null); setAlertPreviewLoading(false); }} className="mt-1 w-full rounded-lg border border-line px-3 py-2" /></label>)}
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+              {/* 받을 사람 고르기 */}
+              <div className="text-[13px] font-semibold text-ink">받을 사람</div>
+              <div role="group" aria-label="받을 사람" className="mt-2 flex gap-2 overflow-x-auto [scrollbar-width:none]">
+                {([["priority", "단골·최근 신청자"], ["optin", "알림 신청자"], ["all", "전체 회원"]] as const).map(([value, label]) => (
+                  <button key={value} type="button" aria-pressed={alertMode === value} disabled={alertSending || alertPreviewLoading} onClick={() => changeAlertMode(value)}
+                    className={`h-9 shrink-0 whitespace-nowrap rounded-full border px-4 text-sm font-semibold transition max-md:h-11 max-md:px-3 ${alertMode === value ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink hover:bg-surface-2"}`}>
+                    {label}
+                  </button>
+                ))}
               </div>
-              <p className="mt-2 text-sm text-ink-soft">알림 ON 회원 중 최근 주문일이 많은 단골과 주문을 시작한 최근 알림 신청자를 중심으로 랜덤 선정합니다. 주문일이 많을수록 우선합니다. 조회 기간 내 주문이 없는 최근 신청자는 입력 인원의 최대 5%만 포함하며, 소수점은 버립니다. 주문 회원이 부족해도 이 제한을 넘어 채우지 않습니다.</p>
-              <button type="button" disabled={alertSending || alertPreviewLoading} onClick={() => void loadAlertPreview("priority")} className="mt-3 rounded-lg border border-line px-4 py-2 font-bold">{alertPreviewLoading ? "선정 중…" : "대상 선정 / 다시 뽑기"}</button>
-            </div>}
+              {alertMode === "all" && <p className="mt-2 text-xs font-semibold text-danger-tx">알림 신청 안 한 회원도 받아요. 카카오 채널 제재 위험이 있어요.</p>}
 
-            {alertMode === "all" && (
-              <div className="mb-3 rounded-xl border border-danger-tx/35 bg-danger-bg px-3 py-2 text-[12px] font-bold text-danger-tx">
-                ⚠️ 신청 안 한 회원에게도 발송합니다. 동의 미확인자 발송은 카카오 알림톡 채널이 제재/차단될 수 있어요.
-              </div>
-            )}
-
-            {/* 미리보기 */}
-            <div className="mb-3 rounded-xl bg-surface-2 px-3 py-2.5 text-[13px] font-bold text-ink">
-              {alertPreviewLoading ? (
-                <div className="text-ink-mute">대상 계산 중…</div>
-              ) : alertPreview ? (
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <span>후보 <b className="text-ink">{alertPreview.candidateCount}</b>명</span>
-                  <span className="text-ink-mute">·</span>
-                  <span>발송 처리 이력 <b className="text-ink">{alertPreview.receivedCount}</b>명</span>
-                  <span className="text-ink-mute">·</span>
-                  <span className="text-info-tx">이번에 받을 <b>{alertPreview.targetCount}</b>명</span>
-                </div>
-              ) : (
-                <div className="text-ink-mute">{alertResult ? "발송 결과는 아래 안내를 확인해 주세요." : "대상 없음"}</div>
-              )}
-            </div>
-
-            {alertMode === "priority" && alertPreview?.selectionGroups && <div aria-label="선정 그룹별 인원" className="mb-3 grid grid-cols-1 sm:grid-cols-3 gap-2 rounded-xl border border-line px-3 py-3 text-sm font-bold text-ink">
-              <span>단골 {alertPreview.selectionGroups.frequent}명 <small className="block text-ink-mute">최근 주문일 2일 이상</small></span>
-              <span>주문 시작 회원 {alertPreview.selectionGroups.newBuyer}명 <small className="block text-ink-mute">최근 주문일 1일 · 수동 포함도 집계</small></span>
-              <span>최근 주문 없음 {alertPreview.selectionGroups.noRecentOrders}명 / 최대 {alertPreview.selectionGroups.noRecentOrdersMax}명 <small className="block text-ink-mute">수동 포함도 입력 인원의 5% 이내</small></span>
-            </div>}
-
-            {alertPreview && <div className="mb-3 rounded-xl border border-line p-3">
-              <div className="flex flex-wrap gap-2 mb-3">
-                {([["selected","선정 명단"],["members","회원 추가"],["excluded","제외 명단"]] as const).map(([value,label])=><button key={value} type="button" disabled={alertSending || alertPreviewLoading} onClick={()=>setAlertList(value)} className={`rounded-lg border px-3 py-2 text-sm font-bold ${alertList===value?"bg-info-tx text-white":"border-line text-ink"}`}>{label}</button>)}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-[1fr_220px] gap-2">
-                <input aria-label="명단 검색" type="search" value={alertSearch} onChange={e=>setAlertSearch(e.target.value)} placeholder="회원 이름 또는 전화번호 뒤 4자리 검색" className="w-full rounded-lg border border-line px-3 py-2 text-sm" />
-                <select aria-label="명단 정렬" value={alertSort} onChange={e=>setAlertSort(e.target.value)} className="rounded-lg border border-line px-3 py-2 text-sm"><option value="name">이름 가나다순</option><option value="orders">최근 주문일 수 많은순</option><option value="group">수동 포함 우선</option></select>
-              </div>
-              <p className="mt-2 text-sm font-bold text-ink">전체 선정 {alertPreview.targetCount}명 · 검색 결과 {visibleAlertMembers.length}명 · 수동 포함 {alertIncluded.length}명 · 제외 {alertExcluded.length}명</p>
-              <p className="mt-1 text-xs text-ink-soft">검색·정렬은 표시만 바꿉니다. 발송은 전체 선정 명단에 진행합니다. 직접 포함·제외한 회원은 다시 뽑아도 유지됩니다. 회원 추가는 알림 ON·발송 이력 없는 회원만 가능합니다.</p>
-            </div>}
-
-            {alertPreview ? (
-              <div className="mb-3 max-h-[min(52dvh,480px)] overflow-auto rounded-xl border border-line">
-                <div className="sticky top-0 bg-surface-2 px-3 py-1.5 text-[11px] font-black text-ink-soft">
-                  {alertList==="selected"?"이번 발송 명단":alertList==="members"?"추가 가능한 회원":"이번 명단에서 제외한 회원"} · {visibleAlertMembers.length}명 표시
-                </div>
-                <ul className="grid grid-cols-1 sm:grid-cols-2">
-                  {visibleAlertMembers.map((s, i) => (
-                    <li key={s.id} className="flex items-center justify-between gap-2 border-b border-line px-3 py-3 text-sm font-bold text-ink">
-                      <span className="min-w-0 break-words">{i + 1}. {s.name || "(이름없음)"}{(s.manual||alertIncluded.includes(s.id))&&<small className="ml-1 text-info-tx">직접 포함</small>}{s.orderDays !== undefined && <small className="block text-ink-mute">주문 {s.orderDays}일{s.recent ? " · 최근 신청" : ""}</small>}<small className="block text-ink-mute">{s.phone}</small></span>
-                      {alertList==="selected"||alertPreview.sample.some((p:AlertMember)=>p.id===s.id)?<button type="button" disabled={alertSending||alertPreviewLoading} onClick={()=>editAlertMember(s.id,false)} className="shrink-0 rounded-lg border border-line px-3 py-2 text-danger-tx">제외</button>:<button type="button" disabled={alertSending||alertPreviewLoading} onClick={()=>editAlertMember(s.id,true)} className="shrink-0 rounded-lg border border-line px-3 py-2 text-info-tx">{alertList==="excluded"?"다시 포함":"포함"}</button>}
-                    </li>
+              {alertMode === "priority" && (
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {([
+                    ["최대 인원", alertLimit, setAlertLimit, 10000],
+                    ["주문 조회(일)", alertOrderDays, setAlertOrderDays, 365],
+                    ["신청 조회(일)", alertRecentDays, setAlertRecentDays, 365],
+                  ] as const).map(([label, value, setter, max]) => (
+                    <label key={label} className="text-[13px] font-semibold text-ink">{label}
+                      <input type="number" inputMode="numeric" min={1} max={max} step={1} disabled={alertSending} value={value}
+                        onChange={e => { setter(e.target.value); alertRequest.current++; setAlertPreview(null); setAlertPreviewLoading(false); }}
+                        className="mt-1 h-9 w-full rounded-lg border border-line px-3 text-sm font-normal tabular-nums max-md:h-11 max-md:text-base" />
+                    </label>
                   ))}
-                </ul>
-                {!visibleAlertMembers.length&&<p className="p-4 text-sm text-ink-mute">표시할 회원이 없습니다.</p>}
+                  <p className="col-span-3 text-xs text-ink-mute">주문 많은 단골 먼저 · 주문 없는 신청자는 최대 인원의 5%까지</p>
+                </div>
+              )}
+
+              {/* 받을 사람 수 */}
+              <div className="mt-4 rounded-xl bg-surface-2 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs text-ink-mute">이번에 받을 사람</div>
+                    <div className="text-xl font-bold tabular-nums text-ink">{alertPreviewLoading ? "계산 중…" : alertPreview ? `${Number(alertPreview.targetCount || 0).toLocaleString()}명` : "—"}</div>
+                  </div>
+                  {alertMode === "priority" && (
+                    <button type="button" disabled={alertSending || alertPreviewLoading} onClick={() => void loadAlertPreview("priority")} className="h-9 shrink-0 rounded-lg border border-line bg-surface px-3 text-sm text-ink hover:bg-surface-2 max-md:h-11">{alertPreviewLoading ? "뽑는 중…" : "다시 뽑기"}</button>
+                  )}
+                </div>
+                {alertPreview && !alertPreviewLoading && (
+                  <div className="mt-1 text-xs tabular-nums text-ink-mute">
+                    후보 {Number(alertPreview.candidateCount || 0).toLocaleString()} · 이미 받음 {Number(alertPreview.receivedCount || 0).toLocaleString()} · 계속 제외 {Number(alertPreview.blockedCount || 0).toLocaleString()}
+                  </div>
+                )}
               </div>
-            ) : null}
+              {alertMode === "priority" && alertPreview?.selectionGroups && (
+                <div aria-label="선정 그룹별 인원" className="mt-2 text-xs tabular-nums text-ink-soft">
+                  단골 {alertPreview.selectionGroups.frequent}명 · 첫 주문 {alertPreview.selectionGroups.newBuyer}명 · 최근 주문 없음 {alertPreview.selectionGroups.noRecentOrders}명 / 최대 {alertPreview.selectionGroups.noRecentOrdersMax}명
+                </div>
+              )}
 
-            {alertResult && !alertPreviewLoading && (
-              <div className="mb-3 text-[13px] font-black text-ink">{alertResult}</div>
-            )}
+              {/* 명단 */}
+              <div role="tablist" aria-label="명단" className="mt-5 flex gap-4 overflow-x-auto border-b border-line [scrollbar-width:none]">
+                {([
+                  ["selected", `발송 명단${alertPreview ? ` ${alertPreview.targetCount}` : ""}`],
+                  ["members", "회원 추가"],
+                  ["excluded", `이번만 제외${alertExcluded.length ? ` ${alertExcluded.length}` : ""}`],
+                  ["blocked", `계속 제외${blockItems.length ? ` ${blockItems.length}` : ""}`],
+                ] as const).map(([value, label]) => (
+                  <button key={value} type="button" role="tab" aria-selected={alertList === value} disabled={alertSending} onClick={() => setAlertList(value)}
+                    className={`-mb-px h-10 shrink-0 whitespace-nowrap border-b-2 text-sm tabular-nums max-md:h-11 ${alertList === value ? "border-ink font-bold text-ink" : "border-transparent text-ink-mute hover:text-ink"}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
 
-            {/* 발송 버튼 */}
-            <button
-              type="button"
-              disabled={alertSending || alertPreviewLoading || !alertPreview || Number(alertPreview?.targetCount || 0) === 0}
-              onClick={sendAlert}
-              className={[
-                "h-11 w-full rounded-xl text-sm font-black text-white transition disabled:bg-line disabled:text-ink-mute",
-                alertMode === "all" ? "bg-[var(--color-danger-tx)] hover:bg-[var(--color-danger-tx)]" : "bg-[var(--color-info-tx)] hover:bg-[var(--color-info-tx)]",
-              ].join(" ")}
-            >
-              {alertSending
-                ? "발송 중…"
-                : Number(alertPreview?.targetCount || 0) > 0
-                  ? `${alertPreview.targetCount}명에게 발송`
-                  : "받을 사람 없음"}
-            </button>
+              {alertList !== "blocked" ? (
+                <>
+                  <div className="mt-3 grid grid-cols-[1fr_180px] gap-2 max-sm:grid-cols-[1fr_128px]">
+                    <input aria-label="명단 검색" type="search" inputMode="search" value={alertSearch} onChange={e => setAlertSearch(e.target.value)} placeholder="이름 · 전화 뒤 4자리" className="h-9 w-full rounded-lg border border-line px-3 text-sm max-md:h-11 max-md:text-base" />
+                    <select aria-label="명단 정렬" value={alertSort} onChange={e => setAlertSort(e.target.value)} className="h-9 rounded-lg border border-line px-3 text-sm max-md:h-11"><option value="name">이름순</option><option value="orders">주문 많은순</option><option value="group">직접 포함 먼저</option></select>
+                  </div>
+                  {alertPreview ? (
+                    <ul className="mt-2 grid grid-cols-1 border-t border-line sm:grid-cols-2">
+                      {visibleAlertMembers.map((s, i) => {
+                        const inSend = alertList === "selected" || alertPreview.sample.some((p: AlertMember) => p.id === s.id);
+                        return (
+                          <li key={s.id} className="flex min-h-[56px] items-center justify-between gap-2 border-b border-line px-1 py-2 sm:odd:pr-3 sm:even:pl-3">
+                            <span className="min-w-0 break-words">
+                              <span className="text-[13px] font-semibold text-ink">{i + 1}. {s.name || "(이름없음)"}</span>
+                              {(s.manual || alertIncluded.includes(s.id)) && <span className="ml-1.5 rounded-lg bg-surface-2 px-1.5 py-0.5 text-[11px] font-semibold text-ink-soft">직접 포함</span>}
+                              <span className="block text-xs tabular-nums text-ink-mute">{s.phone}{s.orderDays !== undefined ? ` · 주문 ${s.orderDays}일` : ""}{s.recent ? " · 최근 신청" : ""}</span>
+                            </span>
+                            <span className="flex shrink-0 gap-1.5">
+                              {inSend ? (
+                                <>
+                                  <button type="button" disabled={alertSending || alertPreviewLoading} onClick={() => editAlertMember(s.id, false)} className="h-9 rounded-lg border border-line px-3 text-sm text-danger-tx hover:bg-surface-2 max-md:h-11">제외</button>
+                                  {s.cid ? <button type="button" disabled={alertSending || alertPreviewLoading || blockBusy} onClick={() => void addBlock([s.cid as string], s.name)} className="h-9 rounded-lg px-2 text-sm text-ink-mute hover:bg-surface-2 max-md:h-11">계속 제외</button> : null}
+                                </>
+                              ) : (
+                                <button type="button" disabled={alertSending || alertPreviewLoading} onClick={() => editAlertMember(s.id, true)} className="h-9 rounded-lg border border-line px-3 text-sm text-ink hover:bg-surface-2 max-md:h-11">{alertList === "excluded" ? "다시 포함" : "포함"}</button>
+                              )}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : null}
+                  {alertPreview && !visibleAlertMembers.length && <p className="py-6 text-center text-sm text-ink-mute">{alertSearch ? "검색 결과가 없어요. 다른 이름으로 찾아 보세요." : alertList === "excluded" ? "이번만 제외한 회원이 없어요. 발송 명단에서 「제외」를 누르면 여기 모여요." : "표시할 회원이 없어요. 위에서 다른 받을 사람을 골라 보세요."}</p>}
+                  {!alertPreview && !alertPreviewLoading && <p className="py-6 text-center text-sm text-ink-mute">{alertMode === "priority" ? "「다시 뽑기」를 눌러 명단을 만드세요." : "명단을 불러오지 못했어요."}</p>}
+                </>
+              ) : (
+                <>
+                  <p className="mt-3 text-xs text-ink-mute">해제할 때까지 모든 방송알림에서 빠져요.</p>
+                  <input aria-label="계속 제외 회원 찾기" type="search" inputMode="search" value={blockQuery} onChange={e => searchBlockCustomers(e.target.value)} placeholder="회원 찾기 · 이름 · 닉네임 · 전화 뒤 4자리" className="mt-2 h-9 w-full rounded-lg border border-line px-3 text-sm max-md:h-11 max-md:text-base" />
+                  {blockQuery.trim() ? (
+                    <ul aria-label="회원 찾기 결과" className="mt-2 rounded-xl border border-line">
+                      {blockResults.map((r) => (
+                        <li key={r.customerId} className="flex min-h-[52px] items-center justify-between gap-2 border-b border-line px-3 py-2 last:border-b-0">
+                          <span className="min-w-0 break-words">
+                            <span className="text-[13px] font-semibold text-ink">{r.nickname || r.name || "(이름없음)"}</span>
+                            {r.nickname && r.name ? <span className="ml-1 text-xs text-ink-mute">{r.name}</span> : null}
+                            <span className="block text-xs tabular-nums text-ink-mute">{r.phone}{r.optin === true ? " · 알림 신청" : r.optin === false ? " · 알림 끔" : ""}</span>
+                          </span>
+                          {r.blocked ? <span className="shrink-0 text-xs text-ink-mute">제외 중</span> : (
+                            <button type="button" disabled={blockBusy} onClick={() => void addBlock([r.customerId], r.nickname || r.name)} className="h-9 shrink-0 rounded-lg border border-line px-3 text-sm text-danger-tx hover:bg-surface-2 max-md:h-11">계속 제외</button>
+                          )}
+                        </li>
+                      ))}
+                      {!blockResults.length && <li className="p-4 text-center text-sm text-ink-mute">{blockSearching ? "찾는 중…" : "찾는 회원이 없어요. 다른 글자로 찾아 보세요."}</li>}
+                    </ul>
+                  ) : null}
+                  <div className="mt-4 text-[13px] font-semibold text-ink">제외 중 {blockItems.length}명</div>
+                  <ul aria-label="계속 제외 명단" className="mt-2 grid grid-cols-1 border-t border-line sm:grid-cols-2">
+                    {blockItems.map((b) => (
+                      <li key={b.id} className="flex min-h-[52px] items-center justify-between gap-2 border-b border-line px-1 py-2 sm:odd:pr-3 sm:even:pl-3">
+                        <span className="min-w-0 break-words">
+                          <span className="text-[13px] font-semibold text-ink">{b.nickname || b.name || "(이름없음)"}</span>
+                          {b.nickname && b.name ? <span className="ml-1 text-xs text-ink-mute">{b.name}</span> : null}
+                          <span className="block text-xs tabular-nums text-ink-mute">{b.phone}{b.at ? ` · ${new Date(b.at).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" })} 제외` : ""}</span>
+                        </span>
+                        <button type="button" disabled={blockBusy} onClick={() => void removeBlock([b.id], b.nickname || b.name)} className="h-9 shrink-0 rounded-lg border border-line px-3 text-sm text-ink hover:bg-surface-2 max-md:h-11">해제</button>
+                      </li>
+                    ))}
+                  </ul>
+                  {!blockItems.length && <p className="py-6 text-center text-sm text-ink-mute">{blockLoadError || "계속 제외한 회원이 없어요. 위 검색칸에서 회원을 찾아 넣으세요."}</p>}
+                </>
+              )}
+
+              {alertResult && !alertPreviewLoading && <div className="mt-4 text-[13px] font-semibold text-ink">{alertResult}</div>}
+            </div>
+
+            {/* 바닥: 발송 */}
+            <div className="shrink-0 border-t border-line px-4 py-3 sm:px-6 max-md:pb-[calc(12px+env(safe-area-inset-bottom))]">
+              <button
+                type="button"
+                disabled={alertSending || alertPreviewLoading || !alertPreview || Number(alertPreview?.targetCount || 0) === 0}
+                onClick={sendAlert}
+                className="h-10 w-full rounded-lg bg-ink text-sm font-bold text-white tabular-nums transition disabled:bg-line disabled:text-ink-mute max-md:h-[52px] max-md:text-base"
+              >
+                {alertSending
+                  ? "발송 중…"
+                  : Number(alertPreview?.targetCount || 0) > 0
+                    ? `${alertPreview.targetCount}명에게 발송`
+                    : "받을 사람 없음"}
+              </button>
+            </div>
           </div>
         </div>
       )}
