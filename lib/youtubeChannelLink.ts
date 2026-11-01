@@ -7,6 +7,19 @@ export const YOUTUBE_CHANNEL = "youtube.com/channel/UC8jr9s1rZBEIPPTBPAwYE5A?si=
 export const YOUTUBE_CHANNEL_WEB_URL = `https://${YOUTUBE_CHANNEL}`;
 const ANDROID_URL = `intent://${YOUTUBE_CHANNEL}#Intent;package=com.google.android.youtube;scheme=https;S.browser_fallback_url=${encodeURIComponent(YOUTUBE_CHANNEL_WEB_URL)};end`;
 const IOS_URL = `youtube://${YOUTUBE_CHANNEL}`;
+/** [2026-11-01] 자동으로 넘길 때만 — 인터넷 주소 대신(fallback 없이) 실패하면 우리 안내 화면에 그대로 머문다.
+ *  (카톡 안 브라우저가 앱 대신 fallback 인터넷 주소를 열어 버리던 것 — 사장님 16:40) */
+export const YOUTUBE_ANDROID_INTENT_NO_FALLBACK = `intent://${YOUTUBE_CHANNEL}#Intent;package=com.google.android.youtube;scheme=https;end`;
+
+/** 카카오톡 안 브라우저인지(유저에이전트에 KAKAOTALK) */
+export function isKakaoInAppBrowser(ua: string): boolean {
+  return /kakaotalk/i.test(ua);
+}
+
+/** 카톡 안 브라우저 → 폰 기본 브라우저(크롬 등)로 이 주소 열기(카카오 제공 주소) */
+export function kakaoOpenExternalUrl(url: string): string {
+  return `kakaotalk://web/openExternal?url=${encodeURIComponent(url)}`;
+}
 
 export type YoutubeDevice = "android" | "ios" | "pc";
 
