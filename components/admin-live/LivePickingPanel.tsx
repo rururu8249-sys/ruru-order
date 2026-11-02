@@ -311,7 +311,8 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
     const unpaidLeft = live.filter((r) => !r.paid && !picked.has(r.id)).reduce((s, r) => s + r.qty, 0);
     return { all: total, total, got, unpaid, unpaidLeft, done: total > 0 && got >= total };
   };
-  const withUnpaid = (n: number, u: number) => (u > 0 ? `${n}개 (미결제 ${u})` : `${n}개`);
+  // [11-03 사장님 「산수 안 하게」] 미결제가 섞이면 결제완료·미결제를 둘 다 적는다
+  const withUnpaid = (n: number, u: number) => (u > 0 ? `${n}개 (결제완료 ${n - u} · 미결제 ${u})` : `${n}개`);
 
   // ── 장(페이지) ──
   type Page = { key: string; title: string; sub: string; photo: string; rows: PickRow[]; options?: PickRow[][] };
@@ -545,7 +546,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                   <div className="rounded-lg bg-surface-2 px-3 py-2">
                     <div className="text-[12px] font-semibold text-ink-soft">총 주문</div>
                     <div className="text-[20px] font-bold text-ink">{totalAll}개</div>
-                    {unpaidAll > 0 ? <div className="text-[12px] font-semibold text-danger-tx">(미결제 {unpaidAll})</div> : null}
+                    {unpaidAll > 0 ? <div className="text-[13px] font-semibold leading-snug"><span className="text-ink">결제완료 {totalAll - unpaidAll}</span><span className="text-ink-mute"> · </span><span className="text-danger-tx">미결제 {unpaidAll}</span></div> : null}
                   </div>
                   <div className="rounded-lg bg-surface-2 px-3 py-2">
                     <div className="text-[12px] font-semibold text-ink-soft">챙김</div>
@@ -554,7 +555,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                   <div className={`rounded-lg px-3 py-2 ${remainAll > 0 ? "bg-ink text-white" : "bg-ok-bg text-ok-tx"}`}>
                     <div className={`text-[12px] font-semibold ${remainAll > 0 ? "text-white/80" : ""}`}>남은 것</div>
                     <div className="text-[20px] font-bold">{totalAll === 0 ? "없음" : remainAll > 0 ? `${remainAll}개` : "✓ 다 챙김"}</div>
-                    {remainAll > 0 && unpaidLeftAll > 0 ? <div className="text-[12px] font-semibold text-white/80">(미결제 {unpaidLeftAll})</div> : null}
+                    {remainAll > 0 && unpaidLeftAll > 0 ? <div className="text-[13px] font-semibold leading-snug text-white/90">결제완료 {remainAll - unpaidLeftAll} · 미결제 {unpaidLeftAll}</div> : null}
                   </div>
                 </div>
               )}
