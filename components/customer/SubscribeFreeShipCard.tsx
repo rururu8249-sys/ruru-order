@@ -4,7 +4,7 @@
 //   · 캡처를 올리면 /api/subscribe-verify 가 AI 로 「채널 이름 + 그 채널의 구독중」을 확인 → 인증 기록만 남김.
 //   · 배송비 계산은 하지 않는다(부모가 인증 결과로 다시 계산, 서버도 다시 확인). 표시·업로드 전용.
 //   · DESIGN.md: 흰 바탕·검정 알약 주버튼·13px 이상·로즈 없음.
-import { useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { SUBSCRIBE_EXAMPLE_PC } from "@/lib/subscribeFreeShip";
 
 type Props = {
@@ -21,9 +21,13 @@ type Props = {
   customerPhone?: string;
   youtubeNickname?: string;
   onVerified: () => void;
+  /** card 만: 처음엔 검정 한 줄(배송비 N원 무료 받기)로 접어 두고 누르면 단계가 펼쳐짐 — 주문서에서 담은 상품·받는 곳을 밀어내지 않게 */
+  collapsible?: boolean;
   /** strip 을 눌렀을 때 — 부모가 카드 창을 연다 */
   onOpenDetail?: () => void;
 };
+
+export const SUBSCRIBE_CARD_OPEN_EVENT = "ruru-subscribe-card-open";
 
 const C = { ink: "#111111", mute: "#707072", line: "#E5E5E5", soft: "#F5F5F5", ok: "#007D48", okBg: "#E8F5EE", bad: "#D30005" };
 
@@ -56,6 +60,18 @@ export default function SubscribeFreeShipCard(props: Props) {
   const [reason, setReason] = useState("");
   const [zoom, setZoom] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const [open, setOpen] = useState(!props.collapsible);
+  const rootRef = useRef<HTMLDivElement>(null);
+  // 금액표 위 「인증하러 가기」 → 이 카드를 펼치고 화면에 보이게
+  useEffect(() => {
+    if (!props.collapsible) return;
+    const onOpen = () => {
+      setOpen(true);
+      window.setTimeout(() => rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    };
+    window.addEventListener(SUBSCRIBE_CARD_OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(SUBSCRIBE_CARD_OPEN_EVENT, onOpen);
+  }, [props.collapsible]);
 
   if (variant === "strip") {
     return (
@@ -121,10 +137,34 @@ export default function SubscribeFreeShipCard(props: Props) {
   );
   const stepText: CSSProperties = { fontSize: "16px", fontWeight: 600, lineHeight: 1.45, color: C.ink, wordBreak: "keep-all" };
 
+  if (!open) {
+    return (
+      <div ref={rootRef} data-subscribe-card="true">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-expanded={false}
+          style={{ width: "100%", minHeight: "64px", display: "flex", alignItems: "center", gap: "12px", padding: "12px 12px 12px 16px", border: "none", borderRadius: "12px", background: C.ink, color: "#FFFFFF", textAlign: "left", cursor: "pointer", fontFamily: "inherit", wordBreak: "keep-all" }}
+        >
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: "block", fontSize: "18px", fontWeight: 700, lineHeight: 1.35 }}>{potentialAmount > 0 ? `배송비 ${potentialAmount.toLocaleString()}원 무료` : "배송비 무료"}</span>
+            <span style={{ display: "block", marginTop: "2px", fontSize: "14px", fontWeight: 400, lineHeight: 1.45, color: "#E5E5E5" }}>유튜브 구독 인증만 하면 돼요</span>
+          </span>
+          <span style={{ flexShrink: 0, height: "40px", padding: "0 14px", display: "flex", alignItems: "center", borderRadius: "9999px", background: "#FFFFFF", color: C.ink, fontSize: "15px", fontWeight: 700 }}>인증하기</span>
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div data-subscribe-card="true" style={{ border: `2px solid ${C.ink}`, borderRadius: "12px", padding: "16px", background: "#FFFFFF", color: C.ink }}>
-      <div style={{ fontSize: "20px", fontWeight: 700, lineHeight: 1.35, wordBreak: "keep-all" }}>
-        {potentialAmount > 0 ? <>배송비 <span style={{ color: C.bad }}>{potentialAmount.toLocaleString()}원</span> 무료 받기</> : <>배송비 무료 받기</>}
+    <div ref={rootRef} data-subscribe-card="true" style={{ border: `2px solid ${C.ink}`, borderRadius: "12px", padding: "16px", background: "#FFFFFF", color: C.ink }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+        <div style={{ flex: 1, minWidth: 0, fontSize: "20px", fontWeight: 700, lineHeight: 1.35, wordBreak: "keep-all" }}>
+          {potentialAmount > 0 ? <>배송비 <span style={{ color: C.bad }}>{potentialAmount.toLocaleString()}원</span> 무료 받기</> : <>배송비 무료 받기</>}
+        </div>
+        {props.collapsible ? (
+          <button type="button" onClick={() => setOpen(false)} aria-expanded={true} style={{ flexShrink: 0, height: "40px", padding: "0 12px", border: `1px solid ${C.line}`, borderRadius: "9999px", background: "#FFFFFF", color: C.mute, fontSize: "14px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>접기</button>
+        ) : null}
       </div>
       <div style={{ marginTop: "4px", fontSize: "15px", color: "#39393B", lineHeight: 1.5, wordBreak: "keep-all" }}>
         유튜브 「{channelName}」 구독하고 캡처 한 장만 올리면 돼요. ({groupsText})
@@ -149,7 +189,7 @@ export default function SubscribeFreeShipCard(props: Props) {
               {[{ src: exampleUrl, label: "폰 화면", pos: "center 70%" }, { src: pcExample, label: "PC 화면", pos: "left 92%" }].map((ex) => (
                 <button key={ex.label} type="button" onClick={() => setZoom(ex.src)} aria-label={`${ex.label} 예시 크게 보기`} style={{ flex: 1, minWidth: 0, padding: 0, border: `1px solid ${C.line}`, borderRadius: "8px", background: C.soft, overflow: "hidden", cursor: "zoom-in", fontFamily: "inherit" }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={ex.src} alt={`구독중 캡처 예시 (${ex.label})`} style={{ display: "block", width: "100%", height: "96px", objectFit: "cover", objectPosition: ex.pos }} />
+                  <img src={ex.src} alt={`구독중 캡처 예시 (${ex.label})`} style={{ display: "block", width: "100%", height: "120px", objectFit: "cover", objectPosition: ex.pos }} />
                   <span style={{ display: "block", padding: "4px 0", fontSize: "13px", fontWeight: 600, color: C.ink }}>{ex.label} · 크게 보기</span>
                 </button>
               ))}

@@ -130,7 +130,7 @@ import { restyleClassV2, stripDecorativeEmojiV2 } from "@/lib/customerUiV2Restyl
 import { CUSTOMER_ORDER_FILTERS, cleanCustomerOptionValue, orderLookupStatusView } from "@/lib/customerOrderStatusView";
 import PromoPopup from "@/components/customer/PromoPopup";
 import { PROMO_POPUP_KEY, PROMO_POPUP_LEGACY_KEY, parsePromoPopup, type PromoPopupConfig } from "@/lib/promoPopup";
-import SubscribeFreeShipCard from "@/components/customer/SubscribeFreeShipCard";
+import SubscribeFreeShipCard, { SUBSCRIBE_CARD_OPEN_EVENT } from "@/components/customer/SubscribeFreeShipCard";
 import { DEFAULT_SUBSCRIBE_FREE_SHIP, SUBSCRIBE_FREE_SHIP_KEY, SUBSCRIBE_GROUP_LABEL, applySubscribeWaiver, isSubscribeFreeShipActive, parseSubscribeFreeShip, type SubscribeFreeShipConfig } from "@/lib/subscribeFreeShip";
 import CartAddFeedbackV2 from "@/components/customer/CartAddFeedbackV2";
 import LiveBadgeCompactV2 from "@/components/customer/LiveBadgeCompactV2";
@@ -7896,6 +7896,7 @@ export default function OrderPage() {
                       verified={subscribeVerified}
                       waivedAmount={subscribeWaivedAmount}
                       potentialAmount={subscribePotentialAmount}
+                      collapsible
                       kakaoId={subscribeKakaoId}
                       customerPhone={customerPhone}
                       youtubeNickname={youtubeNickname}
@@ -8197,7 +8198,7 @@ export default function OrderPage() {
               {subscribeFreeShipActive && !subscribeVerified && subscribePotentialAmount > 0 ? (
                 <button
                   type="button"
-                  onClick={() => document.querySelector<HTMLElement>('[data-subscribe-card="true"]')?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  onClick={() => window.dispatchEvent(new Event(SUBSCRIBE_CARD_OPEN_EVENT))}
                   style={{ marginBottom: "12px", width: "100%", minHeight: "44px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "10px 14px", border: "1px solid #111111", borderRadius: "8px", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, textAlign: "left", cursor: "pointer", fontFamily: "inherit", wordBreak: "keep-all" }}
                 >
                   <span>구독 인증하면 배송비 <b style={{ color: "#D30005", fontWeight: 700 }}>{subscribePotentialAmount.toLocaleString()}원</b> 빠져요</span>
