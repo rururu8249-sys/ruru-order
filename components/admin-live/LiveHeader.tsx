@@ -153,8 +153,29 @@ export default function LiveHeader({
   const [alertSending, setAlertSending] = useState(false);
   const [alertResult, setAlertResult] = useState("");
   // [2026-11-02 사장님 「알림톡 뭐로 쏠지 정해서」] 보낼 템플릿 — 설정 › 카톡 알림에 저장한 목록에서 고름
-  const [alertTemplates, setAlertTemplates] = useState<{ id: string; name: string }[]>([]);
+  const [alertTemplates, setAlertTemplates] = useState<{ id: string; name: string; fromEnv?: boolean }[]>([]);
   const [alertTemplateId, setAlertTemplateId] = useState("");
+  const [tplAddOpen, setTplAddOpen] = useState(false);
+  const [tplAddName, setTplAddName] = useState("");
+  const [tplAddId, setTplAddId] = useState("");
+  const [tplAddSaving, setTplAddSaving] = useState(false);
+  // 발송 창에서 바로 템플릿 추가(설정 › 카톡 알림 › 방송 알림 템플릿과 같은 저장) → 추가한 것을 기본·선택으로
+  const addAlertTemplate = async () => {
+    const id = tplAddId.trim();
+    const name = tplAddName.trim() || id;
+    if (!id || tplAddSaving) return;
+    setTplAddSaving(true);
+    try {
+      const list = [...alertTemplates.filter((t: { id: string; fromEnv?: boolean }) => !t.fromEnv && t.id !== id).map((t) => ({ id: t.id, name: t.name })), { id, name }];
+      const r = await fetch("/api/admin-live/live-alert-templates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "save", list, defaultId: id }) });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) { showAdminToast("템플릿 추가 실패\n\n" + (j?.message || `요청 실패(${r.status})`), "error"); return; }
+      setAlertTemplates(Array.isArray(j.templates) ? j.templates : []);
+      setAlertTemplateId(id);
+      setTplAddOpen(false); setTplAddName(""); setTplAddId("");
+      showAdminToast(`「${name}」 추가했어요. 이걸로 보내요.`, "success");
+    } finally { setTplAddSaving(false); }
+  };
   useEffect(() => {
     if (!alertOpen) return;
     let alive = true;
@@ -290,10 +311,10 @@ export default function LiveHeader({
     setAlertSending(true);
     try {
     if (alertMode === "all") {
-      const okAll = await showAdminConfirm(`신청 안 한 회원까지 ${count}명에게 발송합니다.\n동의 미확인자 발송은 카카오 채널 제재 위험이 있습니다.\n정말 보낼까요?`, { title: "전체 발송", confirmText: "전체 발송", cancelText: "취소", tone: "danger" });
+      const okAll = await showAdminConfirm(`신청 안 한 회원까지 ${count}명에게 발송합니다.\n보낼 알림톡: ${alertTemplates.find((t) => t.id === alertTemplateId)?.name || "기본"}\n동의 미확인자 발송은 카카오 채널 제재 위험이 있습니다.\n정말 보낼까요?`, { title: "전체 발송", confirmText: "전체 발송", cancelText: "취소", tone: "danger" });
       if (!okAll) return;
     } else {
-      const okSend = await showAdminConfirm(`${count}명에게 방송알림을 발송합니다.${alertTemplates.length > 1 ? `\n템플릿: ${alertTemplates.find((t) => t.id === alertTemplateId)?.name || "기본"}` : ""}\n계속할까요?`, { title: "방송알림 발송", confirmText: "발송", cancelText: "취소", tone: "info" });
+      const okSend = await showAdminConfirm(`${count}명에게 방송알림을 발송합니다.\n보낼 알림톡: ${alertTemplates.find((t) => t.id === alertTemplateId)?.name || "기본"}\n계속할까요?`, { title: "방송알림 발송", confirmText: "발송", cancelText: "취소", tone: "info" });
       if (!okSend) return;
     }
     setAlertResult("");
@@ -440,16 +461,27 @@ export default function LiveHeader({
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-              {/* 보낼 알림톡 템플릿 */}
-              {alertTemplates.length > 1 && (
-                <label className="mb-4 flex items-center gap-3">
+              {/* 보낼 알림톡 템플릿 — 하나뿐이어도 늘 보임(어떤 문구로 나가는지 발송 전에 확인) */}
+              <div className="mb-4">
+                <label className="flex items-center gap-3">
                   <span className="shrink-0 text-[13px] font-semibold text-ink">보낼 알림톡</span>
-                  <select value={alertTemplateId} disabled={alertSending} onChange={(e) => setAlertTemplateId(e.target.value)}
+                  <select value={alertTemplateId} disabled={alertSending || alertTemplates.length === 0} onChange={(e) => setAlertTemplateId(e.target.value)}
                     className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ink max-md:h-11 max-md:text-base sm:max-w-[320px]">
+                    {alertTemplates.length === 0 ? <option value="">불러오는 중…</option> : null}
                     {alertTemplates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 </label>
-              )}
+                {!tplAddOpen ? (
+                  <button type="button" disabled={alertSending} onClick={() => setTplAddOpen(true)} className="mt-1 text-xs font-semibold text-ink underline disabled:opacity-40">+ 알림톡 템플릿 추가</button>
+                ) : (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <input value={tplAddName} onChange={(e) => setTplAddName(e.target.value)} placeholder="이름 (예: 방송시작 알림2)" className="h-9 w-44 min-w-0 rounded-lg border border-line bg-surface px-3 text-[16px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-ink max-md:h-11" />
+                    <input value={tplAddId} onChange={(e) => setTplAddId(e.target.value.trim())} placeholder="템플릿 ID (SOLAPI ⋮ › 템플릿 ID 복사)" className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-[16px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-ink max-md:h-11" />
+                    <button type="button" disabled={!tplAddId.trim() || tplAddSaving} onClick={() => void addAlertTemplate()} className="h-9 rounded-lg bg-ink px-3 text-sm font-bold text-white disabled:opacity-40 max-md:h-11">{tplAddSaving ? "저장 중…" : "추가"}</button>
+                    <button type="button" onClick={() => setTplAddOpen(false)} className="h-9 rounded-lg px-2 text-sm text-ink-mute max-md:h-11">닫기</button>
+                  </div>
+                )}
+              </div>
               {/* 받을 사람 고르기 */}
               <div className="text-[13px] font-semibold text-ink">받을 사람</div>
               <div role="group" aria-label="받을 사람" className="mt-2 flex gap-2 overflow-x-auto [scrollbar-width:none]">
