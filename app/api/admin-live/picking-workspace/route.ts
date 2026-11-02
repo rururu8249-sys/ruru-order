@@ -63,12 +63,31 @@ export async function POST(request: NextRequest) {
         if (page.length < 1000) return result;
       }
     };
-    const [selectedRows, paidTodayRows, repickRows, recentCardWithoutTimeRows] = await Promise.all([
+    const [selectedRows, paidTodayRows, repickRowsAll, recentCardWithoutTimeRows] = await Promise.all([
       loadPickingWorkspaceRows(source, broadcastIds),
       readAllSafetyRows("paid_today"),
       readAllSafetyRows("repick"),
       readAllSafetyRows("recent_card_without_time"),
     ]);
+    // [2026-11-03 사장님 「고객이슈에 있는 거 아니면 굳이 띄우지 마」] 「다시 챙기기」(상품 바꾼 뒤 챙김 풀린 줄)는
+    //   그 주문에 «아직 안 끝난 고객이슈»(본문 「주문번호: 코드」, 해결·삭제 아님)가 있을 때만 추가 작업으로 띄운다.
+    //   주문·챙김 기록은 그대로(표시 대상만 거름). 고객이슈를 못 읽으면 예전처럼 다 띄운다.
+    let repickRows = repickRowsAll;
+    if (repickRowsAll.length > 0) {
+      const { data: openTasks, error: taskErr } = await supabase
+        .from("admin_tasks")
+        .select("body, status, resolved_at")
+        .not("status", "in", "(done,deleted)")
+        .is("resolved_at", null)
+        .limit(2000);
+      if (!taskErr) {
+        const bodies = ((openTasks || []) as { body?: unknown }[]).map((t) => String(t.body || ""));
+        repickRows = repickRowsAll.filter((row) => {
+          const code = String(row.order_lookup_code || "").trim();
+          return code !== "" && bodies.some((b) => b.includes(`주문번호: ${code}`));
+        });
+      }
+    }
     // “현재 목록으로” has no broadcast selection: refresh precisely those rows,
     // not every order belonging to the same customer or surrounding dates.
     if (broadcastIds.length === 0 && input.includeExceptions === true) {

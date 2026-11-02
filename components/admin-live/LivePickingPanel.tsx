@@ -142,8 +142,8 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
   const touchRef = useRef<{ x: number; y: number; horiz: boolean | null } | null>(null);
   const [dragDx, setDragDx] = useState(0);
   const bodyRef = useRef<HTMLDivElement | null>(null);
-  // 기본 «결제완료»(미결제까지 같이 챙기는 실수 방지) — 미결제는 사장님이 「보기」를 눌렀을 때만 섞어 보여 줌
-  const [showUnpaid, setShowUnpaid] = useState(false);
+  // [2026-11-03 사장님 「돈 안 받았어도 챙겨야 할 때가 있다, 총 몇 개 옆에 (미결제 N)」] 기본 = 미결제도 같이 보임(줄마다 빨간 「미결제」), 「미결제 숨기기」로 뺄 수 있음
+  const [showUnpaid, setShowUnpaid] = useState(true);
   const [search, setSearch] = useState("");
   const [extraOrders, setExtraOrders] = useState<LiveOrder[]>([]);
   const [extraError, setExtraError] = useState("");
@@ -263,12 +263,14 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photoIds]);
 
-  // ── 숫자 ──
-  const paidRows = allRows.filter((r) => r.paid && !r.skip);
-  const totalPaid = paidRows.reduce((s, r) => s + r.qty, 0);
-  const gotPaid = paidRows.filter((r) => picked.has(r.id)).reduce((s, r) => s + r.qty, 0);
-  const remainPaid = totalPaid - gotPaid;
-  const pct = totalPaid > 0 ? Math.round((gotPaid / totalPaid) * 100) : 0;
+  // ── 숫자 ── (표시 전용) 총·챙김·남은 = 미결제 포함, 미결제 몫은 괄호로 따로
+  const liveRows = allRows.filter((r) => !r.skip);
+  const qtyOf = (rows: readonly PickRow[]) => rows.reduce((s, r) => s + r.qty, 0);
+  const totalAll = qtyOf(liveRows);
+  const gotAll = qtyOf(liveRows.filter((r) => picked.has(r.id)));
+  const remainAll = totalAll - gotAll;
+  const unpaidLeftAll = qtyOf(liveRows.filter((r) => !r.paid && !picked.has(r.id)));
+  const pct = totalAll > 0 ? Math.round((gotAll / totalAll) * 100) : 0;
 
   const q = search.trim();
   // 장(페이지)은 검색과 무관 — 검색은 「전체 목록」 안에서만(장 번호가 흔들리지 않게)
@@ -300,12 +302,16 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
   }, [shown]);
 
 
+  // 장·옵션 숫자 — 미결제 포함(total·got), 미결제 몫은 unpaid·unpaidLeft 로 괄호 표시
   const countLine = (rows: readonly PickRow[]) => {
-    const paid = rows.filter((r) => r.paid && !r.skip);
-    const total = paid.reduce((s, r) => s + r.qty, 0);
-    const got = paid.filter((r) => picked.has(r.id)).reduce((s, r) => s + r.qty, 0);
-    return { all: rows.filter((r) => !r.skip).reduce((s, r) => s + r.qty, 0), total, got, done: total > 0 && got >= total, open: paid.filter((r) => !picked.has(r.id)) };
+    const live = rows.filter((r) => !r.skip);
+    const total = live.reduce((s, r) => s + r.qty, 0);
+    const got = live.filter((r) => picked.has(r.id)).reduce((s, r) => s + r.qty, 0);
+    const unpaid = live.filter((r) => !r.paid).reduce((s, r) => s + r.qty, 0);
+    const unpaidLeft = live.filter((r) => !r.paid && !picked.has(r.id)).reduce((s, r) => s + r.qty, 0);
+    return { all: total, total, got, unpaid, unpaidLeft, done: total > 0 && got >= total };
   };
+  const withUnpaid = (n: number, u: number) => (u > 0 ? `${n}개 (미결제 ${u})` : `${n}개`);
 
   // ── 장(페이지) ──
   type Page = { key: string; title: string; sub: string; photo: string; rows: PickRow[]; options?: PickRow[][] };
@@ -409,7 +415,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
       });
       const extraIds = new Set(allRows.filter((r) => r.kind === "late" || r.kind === "repick").map((r) => r.id));
       await exportLiveOrdersForPicking(exportOrders, { filterLabel: `${String(filterLabel || "").replace(/^방송:\s*/, "")} · 물건챙기기`, rowOrder: view === "product" ? "product" : "nickname", visibleItemIds: [...visible], attentionItemIds: [...extraIds], exceptions: p.exceptions, cancellations: p.cancellations }, new Set(picked));
-      const printed = paidRows.map((r) => Number(r.id));
+      const printed = liveRows.filter((r) => r.paid).map((r) => Number(r.id));
       const now = new Date().toISOString();
       for (let i = 0; i < printed.length; i += 500) {
         const { error } = await supabase.from("orders").update({ picking_list_printed_at: now }).is("picking_list_printed_at", null).in("id", printed.slice(i, i + 500));
@@ -493,7 +499,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
           </span>
           {note ? <span className="mt-0.5 block text-[12px] font-semibold text-ink-soft">{note}</span> : null}
         </span>
-        {oc.done ? <span className="shrink-0 text-[13px] font-bold text-ok-tx">✓ 다 챙김</span> : <span className="shrink-0 text-[13px] font-bold text-info-tx tabular-nums">남은 {oc.total - oc.got}개</span>}
+        {oc.done ? <span className="shrink-0 text-[13px] font-bold text-ok-tx">✓ 다 챙김</span> : <span className="shrink-0 text-[13px] font-bold text-info-tx tabular-nums">남은 {withUnpaid(oc.total - oc.got, oc.unpaidLeft)}</span>}
       </div>
     );
   };
@@ -537,27 +543,29 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
               {loading ? <div className="text-[16px] font-bold text-ink">확인 중…</div> : (
                 <div className="grid grid-cols-3 gap-2 tabular-nums">
                   <div className="rounded-lg bg-surface-2 px-3 py-2">
-                    <div className="text-[12px] font-semibold text-ink-soft">결제완료</div>
-                    <div className="text-[20px] font-bold text-ink">{totalPaid}개</div>
+                    <div className="text-[12px] font-semibold text-ink-soft">총 주문</div>
+                    <div className="text-[20px] font-bold text-ink">{totalAll}개</div>
+                    {unpaidAll > 0 ? <div className="text-[12px] font-semibold text-danger-tx">(미결제 {unpaidAll})</div> : null}
                   </div>
                   <div className="rounded-lg bg-surface-2 px-3 py-2">
                     <div className="text-[12px] font-semibold text-ink-soft">챙김</div>
-                    <div className="text-[20px] font-bold text-ink">{gotPaid}개</div>
+                    <div className="text-[20px] font-bold text-ink">{gotAll}개</div>
                   </div>
-                  <div className={`rounded-lg px-3 py-2 ${remainPaid > 0 ? "bg-ink text-white" : "bg-ok-bg text-ok-tx"}`}>
-                    <div className={`text-[12px] font-semibold ${remainPaid > 0 ? "text-white/80" : ""}`}>남은 것</div>
-                    <div className="text-[20px] font-bold">{totalPaid === 0 ? "없음" : remainPaid > 0 ? `${remainPaid}개` : "✓ 다 챙김"}</div>
+                  <div className={`rounded-lg px-3 py-2 ${remainAll > 0 ? "bg-ink text-white" : "bg-ok-bg text-ok-tx"}`}>
+                    <div className={`text-[12px] font-semibold ${remainAll > 0 ? "text-white/80" : ""}`}>남은 것</div>
+                    <div className="text-[20px] font-bold">{totalAll === 0 ? "없음" : remainAll > 0 ? `${remainAll}개` : "✓ 다 챙김"}</div>
+                    {remainAll > 0 && unpaidLeftAll > 0 ? <div className="text-[12px] font-semibold text-white/80">(미결제 {unpaidLeftAll})</div> : null}
                   </div>
                 </div>
               )}
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line"><div className="h-full rounded-full bg-ink transition-[width]" style={{ width: `${pct}%` }} /></div>
               {unpaidAll > 0 ? (
-                <div className={`mt-2 flex items-center justify-between gap-2 rounded-lg px-3 py-2 ${showUnpaid ? "bg-danger-bg" : "bg-surface-2"}`}>
-                  <span className={`min-w-0 text-[13px] font-semibold ${showUnpaid ? "text-danger-tx" : "text-ink-soft"}`}>
-                    {showUnpaid ? `미결제 ${unpaidAll}개도 목록에 보여요 — 입금 확인 전엔 챙기지 마세요` : `미결제 ${unpaidAll}개(미입금·카드 미결제)는 위 숫자에 안 들어가요`}
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <span className="min-w-0 text-[13px] font-semibold text-ink-soft">
+                    {showUnpaid ? <>미결제는 줄마다 <span className="text-danger-tx">빨간 「미결제」</span> 표시 — 돈 받기 전이에요</> : `미결제 ${unpaidAll}개는 목록에서 숨겼어요`}
                   </span>
-                  <button type="button" aria-pressed={showUnpaid} onClick={() => setShowUnpaid((v) => !v)} className="h-9 shrink-0 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink">
-                    {showUnpaid ? "숨기기" : "보기"}
+                  <button type="button" aria-pressed={!showUnpaid} onClick={() => setShowUnpaid((v) => !v)} className="h-9 shrink-0 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink">
+                    {showUnpaid ? "미결제 숨기기" : "미결제 보기"}
                   </button>
                 </div>
               ) : null}
@@ -591,7 +599,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
         {/* 한 장 */}
         <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto bg-surface-2 px-3 py-3">
           {scopeTooWide ? <div className="py-16 text-center text-[14px] font-semibold text-ink-soft">주문서에서 방송이나 날짜를 먼저 골라 주세요</div> : null}
-          {!scopeTooWide && !loading && !page ? <div className="py-16 text-center text-[14px] font-semibold text-ink-soft">챙길 상품이 없어요<span className="mt-1 block text-[13px] font-normal">주문서에서 다른 방송이나 날짜를 골라 보세요{unpaidAll > 0 ? " · 위 「미결제 보기」로 미결제를 볼 수 있어요" : ""}</span></div> : null}
+          {!scopeTooWide && !loading && !page ? <div className="py-16 text-center text-[14px] font-semibold text-ink-soft">챙길 상품이 없어요<span className="mt-1 block text-[13px] font-normal">주문서에서 다른 방송이나 날짜를 골라 보세요{!showUnpaid && unpaidAll > 0 ? " · 위 「미결제 보기」로 미결제를 볼 수 있어요" : ""}</span></div> : null}
           {!scopeTooWide && page ? (() => {
             const c = countLine(page.rows);
             const targets = bulkTargets(page.rows);
@@ -622,7 +630,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                     <div className="min-w-0 flex-1">
                       <h3 className="break-words text-[18px] font-bold leading-snug text-white">{page.title}{page.sub ? <span className="ml-1.5 text-[14px] font-semibold text-white/75">{page.sub}</span> : null}</h3>
                       <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[13px] tabular-nums text-white/75">
-                        <span>{view === "product" ? `총 ${c.all}개` : `상품 ${c.all}개`}{c.done ? "" : c.total ? ` · 챙긴 ${c.got}/${c.total}` : ""}</span>
+                        <span>{view === "product" ? `총 ${withUnpaid(c.all, c.unpaid)}` : `상품 ${withUnpaid(c.all, c.unpaid)}`}{c.done ? "" : c.total ? ` · 챙긴 ${c.got}/${c.total}` : ""}</span>
                         {c.done ? <span className="rounded bg-white px-1.5 py-0.5 text-[12px] font-bold text-ink">✓ 다 챙김</span> : null}
                       </div>
                       {view === "product" && page.options ? optionSummaryLine(page.options) : null}
@@ -694,7 +702,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
               {q && !pages.some((pg) => pg.rows.some((r) => productSearchMatches([r.nickname, r.name, r.productName, r.optionText].join(" "), q))) ? (
-                <div className="py-12 text-center text-[14px] font-semibold text-ink-soft">「{q}」 찾는 결과가 없어요{!showUnpaid && unpaidAll > 0 ? <span className="mt-1 block text-[13px] font-normal">미결제 주문은 위 「보기」를 눌러야 함께 찾아져요</span> : null}</div>
+                <div className="py-12 text-center text-[14px] font-semibold text-ink-soft">「{q}」 찾는 결과가 없어요{!showUnpaid && unpaidAll > 0 ? <span className="mt-1 block text-[13px] font-normal">미결제 주문은 위 「미결제 보기」를 눌러야 함께 찾아져요</span> : null}</div>
               ) : null}
               {pages.map((pg, i) => {
                 if (q && !pg.rows.some((r) => productSearchMatches([r.nickname, r.name, r.productName, r.optionText].join(" "), q))) return null;
@@ -708,7 +716,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                       <span className={`block break-words text-[16px] font-bold leading-snug ${pc.done ? "text-ink-mute" : "text-ink"}`}>{pg.title}{pg.sub ? <span className="ml-1.5 text-[13px] font-semibold text-ink-soft">{pg.sub}</span> : null}</span>
                       {view === "product" && pg.options ? optionSummaryLine(pg.options, false) : null}
                     </span>
-                    <span className={`shrink-0 text-[13px] font-bold tabular-nums ${pc.done ? "text-ok-tx" : left > 0 ? "text-danger-tx" : "text-ink-mute"}`}>{pc.done ? "✓ 다 챙김" : left > 0 ? `남은 ${left}개` : `${pc.all}개`}</span>
+                    <span className={`shrink-0 text-[13px] font-bold tabular-nums ${pc.done ? "text-ok-tx" : left > 0 ? "text-danger-tx" : "text-ink-mute"}`}>{pc.done ? "✓ 다 챙김" : left > 0 ? `남은 ${withUnpaid(left, pc.unpaidLeft)}` : `${pc.all}개`}</span>
                   </button>
                 );
               })}
