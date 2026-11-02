@@ -125,6 +125,17 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
         qtyByProduct.set(name, (qtyByProduct.get(name) || 0) + (Number(it.qty) || 1));
       }
     }
+    // [2026-11-02] 구매 TOP 3 — 같은 손님 = 카카오 계정, 없으면 전화(결제완료·결제 금액 순)
+    const buyerMap = new Map<string, { name: string; sum: number; count: number; qty: number }>();
+    for (const o of paidOrders) {
+      const key = String(o.kakao_id || "").trim() ? `k:${String(o.kakao_id).trim()}` : String(o.phone || "").replace(/[^0-9]/g, "") ? `p:${String(o.phone).replace(/[^0-9]/g, "")}` : "";
+      if (!key) continue;
+      const cur = buyerMap.get(key) || { name: String(o.nickname || o.name || "고객"), sum: 0, count: 0, qty: 0 };
+      cur.sum += Number(o.totalAmount || 0);
+      cur.count += 1;
+      cur.qty += (Array.isArray(o.items) ? o.items : []).reduce((t, it) => t + (it.eventGiftWinnerId ? 0 : Number(it.qty) || 1), 0);
+      buyerMap.set(key, cur);
+    }
     return formatSettlementReport({
       kind: "조회범위 보고",
       title: criteriaLabel,
@@ -139,7 +150,10 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
       unpaidSum: bankUnpaidSum + cardUnpaidSum,
       unpaidBankCount: bankUnpaid.length,
       unpaidCardCount: cardUnpaid.length,
+      bankPaidCount: bankPaid.length,
+      cardPaidCount: cardPaid.length,
       products: [...qtyByProduct.entries()].map(([name, qty]) => ({ name, qty })),
+      buyers: [...buyerMap.values()].sort((a, b) => b.sum - a.sum).slice(0, 3),
     });
   };
 

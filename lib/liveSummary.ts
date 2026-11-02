@@ -40,7 +40,7 @@ function rowProductAmount(r: Record<string, unknown>): number {
 
 export type DayRow = { label: string; sum: number; cnt: number };
 export type RankProduct = { name: string; qty: number; amount: number };
-export type RankBuyer = { name: string; sum: number; count: number };
+export type RankBuyer = { name: string; sum: number; count: number; qty?: number };
 export type IssueRow = { type: string; nick: string };
 
 export type LiveSummary = {
@@ -70,10 +70,21 @@ export type LiveSummary = {
   goodsSum: number;
   pointUsedSum: number;
   productAll: RankProduct[];
+  // [2026-11-02 텔레그램 결산 재설계] 결제완료 건수(무통장/카드)·카드 수수료·입금가·구매 TOP3 — 읽기 계산만
+  bankPaidCount: number;
+  cardPaidCount: number;
+  cardFeeRate: number;
+  cardFeeSum: number;
+  productCostSum: number;
+  costedQty: number;
+  costMissingQty: number;
+  buyerTop: RankBuyer[];
 };
 
 type Group = {
   phone: string;
+  /** 손님 식별(카카오 계정 우선 — 없으면 전화) */
+  who: string;
   name: string;
   method: string;
   amount: number;
@@ -123,14 +134,16 @@ function monthKstRange(): { start: string; end: string; label: string } {
 }
 
 type ScopeBc = { title: string; startedAt: string; endedAt: string; live: boolean } | null;
-async function fetchScopeBroadcast(sb: SupabaseClient): Promise<ScopeBc> {
+async function fetchScopeBroadcast(sb: SupabaseClient, broadcastId?: string): Promise<ScopeBc> {
   try {
     // ⚠️ broadcasts 방송이름 컬럼은 public_title(= title 없음). title 넣으면 쿼리 전체 에러.
-    const { data } = await sb
+    let q = sb
       .from("broadcasts")
       .select("id,public_title,started_at,ended_at,status,is_deleted")
       .order("started_at", { ascending: false })
       .limit(10);
+    if (broadcastId) q = q.eq("id", broadcastId);
+    const { data } = await q;
     const list = ((Array.isArray(data) ? data : []) as Record<string, unknown>[]).filter((b) => b.is_deleted !== true && b.started_at);
     if (list.length === 0) return null;
     const on = list.find((b) => String(b.status || "").toUpperCase() === "ON");
@@ -146,21 +159,25 @@ async function fetchScopeBroadcast(sb: SupabaseClient): Promise<ScopeBc> {
   }
 }
 
-async function fetchOrders(sb: SupabaseClient, start: string, end: string): Promise<Record<string, unknown>[]> {
-  const cols =
-    "id,order_group_id,order_lookup_code,customer_phone,youtube_nickname,customer_name,payment_method,qty,product_name,product_price,adjusted_product_price,total_price,adjusted_total_price,final_amount,admin_order_status_v2,order_manage_status,is_test_order,created_at,event_gift_winner_id";
+const MONTH_COLS =
+  "id,order_group_id,order_lookup_code,customer_phone,youtube_nickname,customer_name,payment_method,qty,product_name,product_price,adjusted_product_price,total_price,adjusted_total_price,final_amount,admin_order_status_v2,order_manage_status,is_test_order,created_at,event_gift_winner_id";
+
+// [2026-11-02] 방송 범위는 «*» — 포인트 사용(point_used_amount)·입금가(cost_price_snapshot)·카드 수수료 칸까지(전엔 point_used_amount 를 안 읽어 포인트 사용이 늘 0원).
+//   읽기 실패는 숨기지 않고 throw(빈 결산을 보내지 않게).
+async function fetchOrders(sb: SupabaseClient, start: string, end: string, cols: string = MONTH_COLS): Promise<Record<string, unknown>[]> {
   const all: Record<string, unknown>[] = [];
   const size = 1000;
   let from = 0;
   for (let p = 0; p < 30; p++) {
-    const { data } = await sb
+    const { data, error } = await sb
       .from("orders")
       .select(cols)
       .gte("created_at", start)
       .lte("created_at", end)
       .order("created_at", { ascending: true })
       .range(from, from + size - 1);
-    const rows = (Array.isArray(data) ? data : []) as Record<string, unknown>[];
+    if (error) throw new Error(`주문을 못 읽었어요: ${error.message}`);
+    const rows = (Array.isArray(data) ? data : []) as unknown as Record<string, unknown>[];
     all.push(...rows);
     if (rows.length < size) break;
     from += size;
@@ -180,10 +197,12 @@ function groupOrders(rows: Record<string, unknown>[]): Group[] {
   for (const list of map.values()) {
     const sorted = [...list].sort((a, b) => num(a.id) - num(b.id));
     const first = sorted[0];
+    const kakao = String(sorted.find((r) => present(r.kakao_id))?.kakao_id ?? "").trim();
     let amount = sorted.reduce((s, r) => s + num(r.final_amount), 0);
     if (amount === 0) amount = sorted.reduce((s, r) => s + num(r.adjusted_total_price ?? r.total_price), 0);
     groups.push({
       phone: String(first.customer_phone ?? "").replace(/[^0-9]/g, ""),
+      who: kakao ? `k:${kakao}` : "",
       name: String(first.youtube_nickname || first.customer_name || "고객").trim(),
       method: String(first.payment_method || ""),
       amount,
@@ -225,7 +244,34 @@ async function fetchOpenIssues(sb: SupabaseClient): Promise<IssueRow[]> {
 }
 
 // mode: "broadcast"(현재 방송 시간창, 없으면 오늘) / "today"(오늘 0~24시)
-export async function computeLiveSummary(mode: "broadcast" | "today"): Promise<LiveSummary> {
+async function readCardFeeRate(sb: SupabaseClient): Promise<number> {
+  try {
+    const { data } = await sb.from("settings").select("value").eq("key", "actual_card_fee_rate").maybeSingle();
+    const n = Number((data as Record<string, unknown> | null)?.value);
+    return Number.isFinite(n) && n >= 0 && n <= 20 ? n : 7;
+  } catch {
+    return 7;
+  }
+}
+
+/** 정산 화면과 같은 규칙 — 카드 줄의 저장된 수수료가 있으면 그 값, 없으면 (그 줄 적용률 || 설정 실제 카드 수수료율) × 줄 금액 */
+export function rowCardFee(r: Record<string, unknown>, fallbackRate: number): number {
+  const stored = num(r.actual_card_fee_amount) || num(r.card_fee_amount) || num(r.actual_card_fee);
+  if (stored > 0) return stored;
+  const rate = num(r.actual_card_fee_rate_applied) || fallbackRate;
+  const amount = num(r.final_amount) > 0 ? num(r.final_amount) : Math.max(0, num(r.adjusted_total_price ?? r.total_price) - num(r.refund_amount));
+  return Math.round(amount * (rate / 100));
+}
+
+/** 입금가(주문 시점 1개 값) — 없음·0 이하·숫자 아님은 null */
+export function rowCostPrice(r: Record<string, unknown>): number | null {
+  const v = r.cost_price_snapshot;
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+}
+
+export async function computeLiveSummary(mode: "broadcast" | "today", opts?: { broadcastId?: string }): Promise<LiveSummary> {
   const sb = svc();
 
   let start: string;
@@ -236,7 +282,7 @@ export async function computeLiveSummary(mode: "broadcast" | "today"): Promise<L
   let endedAt = "";
   let live = false;
 
-  const bc = mode === "broadcast" ? await fetchScopeBroadcast(sb) : null;
+  const bc = mode === "broadcast" ? await fetchScopeBroadcast(sb, opts?.broadcastId) : null;
   if (mode === "broadcast" && bc) {
     scope = "broadcast";
     startedAt = bc.startedAt;
@@ -253,7 +299,7 @@ export async function computeLiveSummary(mode: "broadcast" | "today"): Promise<L
     title = t.label;
   }
 
-  const allGroups = groupOrders(await fetchOrders(sb, start, end)).filter((g) => !g.isTest);
+  const allGroups = groupOrders(await fetchOrders(sb, start, end, "*")).filter((g) => !g.isTest);
   const active = allGroups.filter((g) => !g.canceled);
   const paid = active.filter((g) => g.paid);
 
@@ -295,17 +341,41 @@ export async function computeLiveSummary(mode: "broadcast" | "today"): Promise<L
   const goodsSum = productAll.reduce((s, p) => s + p.amount, 0);
   const pointUsedSum = paid.reduce((s, g) => s + g.rows.reduce((t, r) => t + Math.max(0, num(r.point_used_amount)), 0), 0);
 
-  // 구매자 랭킹(전화번호로 합산, 결제완료)
+  // 구매자 랭킹(결제완료) — 같은 손님 = 카카오 계정, 없으면 전화번호(고객 식별 원칙)
   const buyerMap = new Map<string, RankBuyer>();
   for (const g of paid) {
-    if (!g.phone) continue;
-    const cur = buyerMap.get(g.phone) || { name: g.name, sum: 0, count: 0 };
+    const key = g.who || (g.phone ? `p:${g.phone}` : "");
+    if (!key) continue;
+    const cur = buyerMap.get(key) || { name: g.name, sum: 0, count: 0, qty: 0 };
     cur.sum += g.amount;
     cur.count += 1;
+    cur.qty = (cur.qty || 0) + g.rows.reduce((t, r) => t + (r.event_gift_winner_id ? 0 : num(r.qty) || 1), 0);
     cur.name = g.name;
-    buyerMap.set(g.phone, cur);
+    buyerMap.set(key, cur);
   }
   const buyerRanking = [...buyerMap.values()].sort((a, b) => b.sum - a.sum).slice(0, 10);
+
+  // [2026-11-02] 카드 수수료·입금가(결제완료 줄만, 이벤트 선물 줄은 입금가 셈에서 뺌) — 읽기 계산만
+  const cardFeeRate = await readCardFeeRate(sb);
+  let cardFeeSum = 0;
+  let productCostSum = 0;
+  let costedQty = 0;
+  let costMissingQty = 0;
+  for (const g of paid) {
+    for (const r of g.rows) {
+      if (g.method === "카드결제") cardFeeSum += rowCardFee(r, cardFeeRate);
+      if (r.event_gift_winner_id) continue;
+      const qty = Math.max(1, num(r.qty) || 1);
+      const cost = rowCostPrice(r);
+      if (cost === null) costMissingQty += qty;
+      else {
+        productCostSum += cost * qty;
+        costedQty += qty;
+      }
+    }
+  }
+  const bankPaidCount = paid.filter((g) => g.method === "무통장입금").length;
+  const cardPaidCount = paid.filter((g) => g.method === "카드결제").length;
 
   // 이번 달 총매출(범위 무관)
   const mr = monthKstRange();
@@ -341,5 +411,13 @@ export async function computeLiveSummary(mode: "broadcast" | "today"): Promise<L
     goodsSum,
     pointUsedSum,
     productAll,
+    bankPaidCount,
+    cardPaidCount,
+    cardFeeRate,
+    cardFeeSum,
+    productCostSum,
+    costedQty,
+    costMissingQty,
+    buyerTop: buyerRanking.slice(0, 3),
   };
 }
