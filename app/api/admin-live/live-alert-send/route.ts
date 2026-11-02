@@ -5,6 +5,7 @@ import { SolapiMessageService } from "solapi";
 import { createHmac } from "node:crypto";
 import { selectAlertRecipients, sealAlertSelection, readAlertSelection, ALERT_SELECTION_POLICY } from "@/lib/liveAlertSelection";
 import { readLiveAlertBlockPhones } from "@/lib/liveAlertBlockServer";
+import { LIVE_ALERT_TEMPLATES_KEY, parseLiveAlertTemplates, resolveLiveAlertTemplateId } from "@/lib/liveAlertTemplates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,10 +40,10 @@ export async function POST(request: NextRequest) {
     const apiKey = process.env.SOLAPI_API_KEY;
     const apiSecret = process.env.SOLAPI_API_SECRET;
     const pfId = process.env.SOLAPI_PF_ID;
-    const templateId = process.env.SOLAPI_TEMPLATE_ID;
+    const envTemplateId = process.env.SOLAPI_TEMPLATE_ID;
     const sender = process.env.SOLAPI_SENDER;
-    if (!apiKey || !apiSecret || !pfId || !templateId || !sender) {
-      return NextResponse.json({ ok: false, error: "SOLAPI 환경변수 누락(KEY/SECRET/PF_ID/TEMPLATE_ID/SENDER)" }, { status: 500 });
+    if (!apiKey || !apiSecret || !pfId || !sender) {
+      return NextResponse.json({ ok: false, error: "SOLAPI 환경변수 누락(KEY/SECRET/PF_ID/SENDER)" }, { status: 500 });
     }
 
     const body = await request.json().catch(() => ({} as any));
@@ -53,6 +54,12 @@ export async function POST(request: NextRequest) {
     if (!broadcastId) return NextResponse.json({ok:false,error:"현재 방송을 선택해 주세요."},{status:400});
 
     const supabase = getSupabaseAdmin();
+    // [2026-11-02] 발송 창에서 고른 템플릿 — 저장된 목록(+ Vercel 기존 템플릿)에 있는 것만. 안 고르면 기본값.
+    //   설정을 못 읽으면 예전처럼 Vercel 템플릿만(고른 다른 ID 는 목록 확인이 안 되니 거절).
+    let tplRaw:unknown=null;
+    try{const {data:tplRows}=await supabase.from("settings").select("value").eq("key",LIVE_ALERT_TEMPLATES_KEY).limit(1);tplRaw=Array.isArray(tplRows)&&tplRows[0]?tplRows[0].value:null;}catch{tplRaw=null;}
+    const templateId=resolveLiveAlertTemplateId(parseLiveAlertTemplates(tplRaw),envTemplateId,body?.templateId);
+    if(!templateId)return NextResponse.json({ok:false,error:"알림톡 템플릿을 확인할 수 없어요. 설정 › 카톡 알림 › 방송 알림 템플릿을 확인해 주세요. 발송하지 않았습니다."},{status:400});
     const {data:broadcast,error:broadcastError}=await supabase.from("broadcasts").select("id,status").eq("id",broadcastId).maybeSingle();
     if(broadcastError||!broadcast||String(broadcast.status).toUpperCase()!=="ON")return NextResponse.json({ok:false,error:"진행 중인 방송을 확인할 수 없습니다. 발송하지 않았습니다."},{status:409});
 

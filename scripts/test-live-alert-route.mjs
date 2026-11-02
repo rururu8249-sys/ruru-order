@@ -76,4 +76,14 @@ for(const mode of ['optin','all','priority']){
  blockedPhones=[];received=[];
  blockReadError=true;const fail=await call({mode:'optin',dryRun:true});assert.equal(fail.status,503,'block list unreadable = stop');blockReadError=false;
 }
+// [2026-11-02] 발송 창에서 고른 템플릿 — 기존(Vercel) 고르면 그 ID, 목록에 없는 ID 는 안 보냄
+{
+ received=[];blockedPhones=[];
+ const p=await call({mode:'optin',dryRun:true});
+ const b=sent.length;
+ const forged=await call({mode:'optin',selectionToken:p.selectionToken,templateId:'KA01TP_FORGED'});
+ assert.equal(forged.status,400,'unknown template rejected');assert.equal(sent.length,b,'nothing sent');
+ const okEnv=await call({mode:'optin',selectionToken:p.selectionToken,templateId:'test'});
+ assert.equal(okEnv.ok,true);assert.ok(sent.slice(b).every(m=>m.kakaoOptions.templateId==='test'),'chosen env template used');
+}
 console.log('PASS API preview without sends/writes, exact recipient count, signed selection, consent recheck, fail-closed history, duplicate exclusion, SMS fallback disabled (mock provider only)');

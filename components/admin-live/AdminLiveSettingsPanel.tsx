@@ -9,6 +9,7 @@ import {useSettingsDraft,type SettingsDraftState} from "./useSettingsDraft";
 import YoutubeNotifyCard from "./YoutubeNotifyCard";
 import TelegramNotifyCard from "./TelegramNotifyCard";
 import KakaoNotifyCard from "./KakaoNotifyCard";
+import LiveAlertTemplateCard from "./LiveAlertTemplateCard";
 import SubscribeFreeShipSettingsCard from "./SubscribeFreeShipSettingsCard";
 import { supabase } from "@/lib/supabase";
 import { showAdminToast } from "@/lib/adminToast";
@@ -782,7 +783,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
           {activeTab === "youtube" && <YoutubeNotifyCard onDraftStateChange={setChildDraft} />}
 
           {activeTab === "telegram" && <TelegramNotifyCard onDraftStateChange={setChildDraft} />}
-          {activeTab === "kakao" && <KakaoNotifyCard onDraftStateChange={setChildDraft} />}
+          {activeTab === "kakao" && <><LiveAlertTemplateCard /><KakaoNotifyCard onDraftStateChange={setChildDraft} /></>}
 
           {/* [2026-10-21 a1-2] 손님 공지·구매동의 — 공지 패널을 설정 모드로(자체 「공지 저장」 사용, 공통 저장줄 없음) */}
           {activeTab === "notice" && <AdminLiveNoticePanel mode="settings" />}

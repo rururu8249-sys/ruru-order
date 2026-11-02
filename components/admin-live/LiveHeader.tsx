@@ -152,6 +152,20 @@ export default function LiveHeader({
   const [alertPreviewLoading, setAlertPreviewLoading] = useState(false);
   const [alertSending, setAlertSending] = useState(false);
   const [alertResult, setAlertResult] = useState("");
+  // [2026-11-02 사장님 「알림톡 뭐로 쏠지 정해서」] 보낼 템플릿 — 설정 › 카톡 알림에 저장한 목록에서 고름
+  const [alertTemplates, setAlertTemplates] = useState<{ id: string; name: string }[]>([]);
+  const [alertTemplateId, setAlertTemplateId] = useState("");
+  useEffect(() => {
+    if (!alertOpen) return;
+    let alive = true;
+    fetch("/api/admin-live/live-alert-templates", { cache: "no-store" }).then((r) => r.json()).then((j) => {
+      if (!alive || !j?.ok) return;
+      const list = Array.isArray(j.templates) ? j.templates : [];
+      setAlertTemplates(list);
+      setAlertTemplateId((cur) => (cur && list.some((t: { id: string }) => t.id === cur) ? cur : String(j.defaultId || list[0]?.id || "")));
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [alertOpen]);
   useEffect(() => { alertRequest.current++; setAlertPreview(null); setAlertPreviewLoading(false); setAlertIncluded([]); setAlertExcluded([]); setAlertResult(""); }, [activeBroadcast?.id]);
 
   const loadAlertPreview = async (mode: "priority" | "optin" | "all", edits?: {includeIds:string[];excludeIds:string[];selectionToken?:string}) => {
@@ -279,14 +293,14 @@ export default function LiveHeader({
       const okAll = await showAdminConfirm(`신청 안 한 회원까지 ${count}명에게 발송합니다.\n동의 미확인자 발송은 카카오 채널 제재 위험이 있습니다.\n정말 보낼까요?`, { title: "전체 발송", confirmText: "전체 발송", cancelText: "취소", tone: "danger" });
       if (!okAll) return;
     } else {
-      const okSend = await showAdminConfirm(`${count}명에게 방송알림을 발송합니다. 계속할까요?`, { title: "방송알림 발송", confirmText: "발송", cancelText: "취소", tone: "info" });
+      const okSend = await showAdminConfirm(`${count}명에게 방송알림을 발송합니다.${alertTemplates.length > 1 ? `\n템플릿: ${alertTemplates.find((t) => t.id === alertTemplateId)?.name || "기본"}` : ""}\n계속할까요?`, { title: "방송알림 발송", confirmText: "발송", cancelText: "취소", tone: "info" });
       if (!okSend) return;
     }
     setAlertResult("");
       const r = await fetch("/api/admin-live/live-alert-send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ broadcastId: activeBroadcast.id, mode: alertMode, selectionToken }),
+        body: JSON.stringify({ broadcastId: activeBroadcast.id, mode: alertMode, selectionToken, templateId: alertTemplateId || undefined }),
       }).then((res) => res.json()).catch(() => null);
       setAlertResult(r?.ok ? `발송 접수 ${r.successCount}명 · 즉시 실패 ${r.failCount}명 (최종 수신 결과는 SOLAPI에서 확인)` : "발송 확인 필요: " + (r?.error || "알 수 없는 오류"));
       setAlertPreview(null);
@@ -426,6 +440,16 @@ export default function LiveHeader({
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+              {/* 보낼 알림톡 템플릿 */}
+              {alertTemplates.length > 1 && (
+                <label className="mb-4 flex items-center gap-3">
+                  <span className="shrink-0 text-[13px] font-semibold text-ink">보낼 알림톡</span>
+                  <select value={alertTemplateId} disabled={alertSending} onChange={(e) => setAlertTemplateId(e.target.value)}
+                    className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ink max-md:h-11 max-md:text-base sm:max-w-[320px]">
+                    {alertTemplates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </label>
+              )}
               {/* 받을 사람 고르기 */}
               <div className="text-[13px] font-semibold text-ink">받을 사람</div>
               <div role="group" aria-label="받을 사람" className="mt-2 flex gap-2 overflow-x-auto [scrollbar-width:none]">
