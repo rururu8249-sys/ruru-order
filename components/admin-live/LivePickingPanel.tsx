@@ -530,19 +530,19 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
     <div className="fixed inset-0 z-[110] flex justify-end bg-black/30" onClick={onClose}>
       <aside className="relative flex h-full w-full max-w-[600px] flex-col bg-surface" style={{ boxShadow: "-8px 0 24px rgba(0,0,0,.08)" }} onClick={(e) => e.stopPropagation()} role="dialog" aria-label="물건챙기기">
         {/* 머리 — 남은 개수 · 보기 두 개 */}
-        <div className="border-b border-line px-4 pt-3 pb-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <h2 className="text-[20px] font-bold text-ink">물건챙기기</h2>
-              <p className="mt-0.5 truncate text-[13px] text-ink-soft">{String(filterLabel || "").replace(/^방송:\s*/, "") || "주문서 범위"}</p>
+        <div className="border-b border-line px-4 pt-3 pb-3 max-sm:px-3 max-sm:pt-2 max-sm:pb-2">
+          <div className="flex items-start justify-between gap-2 max-sm:items-center">
+            <div className="min-w-0 max-sm:flex max-sm:items-baseline max-sm:gap-2">
+              <h2 className="shrink-0 text-[20px] font-bold text-ink max-sm:text-[18px]">물건챙기기</h2>
+              <p className="mt-0.5 truncate text-[13px] text-ink-soft max-sm:mt-0 max-sm:text-[12px]">{String(filterLabel || "").replace(/^방송:\s*/, "") || "주문서 범위"}</p>
             </div>
             <button type="button" onClick={onClose} aria-label="닫기" className="h-10 w-10 shrink-0 rounded-lg text-[22px] text-ink-soft hover:bg-surface-2">×</button>
           </div>
           {!scopeTooWide ? (
-            <div className="mt-3">
+            <div className="mt-3 flex flex-col max-sm:mt-1.5">
               {/* [2026-11-03 사장님 「18개가 미입금 포함이야?」] 숫자 3칸(결제완료·챙김·남은) + 미입금은 따로 한 줄 — 숫자 계산 무변경 */}
-              {loading ? <div className="text-[16px] font-bold text-ink">확인 중…</div> : (
-                <div className="grid grid-cols-3 gap-2 tabular-nums">
+              {loading ? <div className="text-[16px] font-bold text-ink max-sm:hidden">확인 중…</div> : (
+                <div className="grid grid-cols-3 gap-2 tabular-nums max-sm:hidden">
                   <div className="rounded-lg bg-surface-2 px-3 py-2">
                     <div className="text-[12px] font-semibold text-ink-soft">총 주문</div>
                     <div className="text-[20px] font-bold text-ink">{totalAll}개</div>
@@ -559,42 +559,62 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
                   </div>
                 </div>
               )}
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line"><div className="h-full rounded-full bg-ink transition-[width]" style={{ width: `${pct}%` }} /></div>
-              {unpaidAll > 0 ? (
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <span className="min-w-0 text-[13px] font-semibold text-ink-soft">
-                    {showUnpaid ? <>미결제는 줄마다 <span className="text-danger-tx">빨간 「미결제」</span> 표시 — 돈 받기 전이에요</> : `미결제 ${unpaidAll}개는 목록에서 숨겼어요`}
-                  </span>
-                  <button type="button" aria-pressed={!showUnpaid} onClick={() => setShowUnpaid((v) => !v)} className="h-9 shrink-0 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink">
-                    {showUnpaid ? "미결제 숨기기" : "미결제 보기"}
-                  </button>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line max-sm:order-2 max-sm:mt-1.5"><div className="h-full rounded-full bg-ink transition-[width]" style={{ width: `${pct}%` }} /></div>
+              {/* [2026-11-03 사장님 「폰에서 머리가 너무 많이 잡아먹음」] 폰은 숫자 3칸 대신 한 줄 요약 + 미결제 버튼 같은 줄 */}
+              <div className={`mt-2 flex items-center justify-between gap-2 max-sm:order-1 max-sm:mt-0 ${unpaidAll > 0 ? "" : "sm:hidden"}`}>
+                <div className="min-w-0 tabular-nums sm:hidden">
+                  {loading ? <div className="text-[16px] font-bold text-ink">확인 중…</div> : (
+                    <>
+                      <div className="truncate text-[16px] font-bold text-ink">
+                        {totalAll === 0 ? "챙길 것 없음" : remainAll > 0 ? `남은 ${remainAll}개` : <span className="text-ok-tx">✓ 다 챙김</span>}
+                        <span className="text-[13px] font-semibold text-ink-soft"> · 챙김 {gotAll} / 총 {totalAll}</span>
+                      </div>
+                      {unpaidAll > 0 ? (
+                        <div className="truncate text-[12px] font-semibold text-ink-soft">
+                          {showUnpaid ? (remainAll > 0 ? <>남은 것 결제완료 {remainAll - unpaidLeftAll} · <span className="text-danger-tx">미결제 {unpaidLeftAll}</span></> : <>총 결제완료 {totalAll - unpaidAll} · <span className="text-danger-tx">미결제 {unpaidAll}</span></>) : `미결제 ${unpaidAll}개 숨김`}
+                        </div>
+                      ) : null}
+                    </>
+                  )}
                 </div>
-              ) : null}
-              {movedAway > 0 ? <p className="mt-1.5 text-[12px] text-ink-mute">다른 출고로 넘긴 상품 {movedAway}개는 여기서 뺐어요</p> : null}
-              {extraError ? <p className="mt-1.5 text-[12px] text-danger-tx">늦은 입금·다시 챙기기를 못 불러왔어요 — 닫았다 다시 열어 주세요</p> : null}
-              {loadError ? <p className="mt-1.5 text-[12px] text-danger-tx">챙김 상태를 확인하지 못했어요 — 닫았다 다시 열어 주세요(그동안 체크 막아 둠)</p> : null}
+                {unpaidAll > 0 ? (
+                  <>
+                    <span className="min-w-0 text-[13px] font-semibold text-ink-soft max-sm:hidden">
+                      {showUnpaid ? <>미결제는 줄마다 <span className="text-danger-tx">빨간 「미결제」</span> 표시 — 돈 받기 전이에요</> : `미결제 ${unpaidAll}개는 목록에서 숨겼어요`}
+                    </span>
+                    <button type="button" aria-pressed={!showUnpaid} onClick={() => setShowUnpaid((v) => !v)} className="h-9 shrink-0 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink max-sm:px-2.5">
+                      {showUnpaid ? "미결제 숨기기" : "미결제 보기"}
+                    </button>
+                  </>
+                ) : null}
+              </div>
+              {movedAway > 0 ? <p className="mt-1.5 max-sm:order-3 max-sm:mt-1 text-[12px] text-ink-mute">다른 출고로 넘긴 상품 {movedAway}개는 여기서 뺐어요</p> : null}
+              {extraError ? <p className="mt-1.5 max-sm:order-3 max-sm:mt-1 text-[12px] text-danger-tx">늦은 입금·다시 챙기기를 못 불러왔어요 — 닫았다 다시 열어 주세요</p> : null}
+              {loadError ? <p className="mt-1.5 max-sm:order-3 max-sm:mt-1 text-[12px] text-danger-tx">챙김 상태를 확인하지 못했어요 — 닫았다 다시 열어 주세요(그동안 체크 막아 둠)</p> : null}
             </div>
           ) : null}
-          <div className="mt-3 grid grid-cols-2 rounded-lg border border-line p-0.5" role="tablist">
+          <div className="mt-3 flex flex-col gap-2 max-sm:mt-2 max-sm:flex-row max-sm:items-center">
+          <div className="grid grid-cols-2 rounded-lg border border-line p-0.5 max-sm:w-[128px] max-sm:shrink-0" role="tablist">
             {(["product", "customer"] as const).map((v) => (
-              <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => { setView(v); setListOpen(false); }} className={`h-10 rounded-lg text-[16px] font-semibold ${view === v ? "bg-ink text-white" : "text-ink-soft"}`}>{v === "product" ? "상품별" : "손님별"}</button>
+              <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => { setView(v); setListOpen(false); }} className={`h-10 rounded-lg text-[16px] font-semibold max-sm:h-9 max-sm:text-[14px] ${view === v ? "bg-ink text-white" : "text-ink-soft"}`}>{v === "product" ? "상품별" : "손님별"}</button>
             ))}
           </div>
           {/* [2026-11-03 사장님 「검색 가능한 칸」] 늘 보이는 검색칸 — 글자를 넣으면 맞는 상품/손님 목록이 열리고, 누르면 그 장으로 */}
           {!scopeTooWide ? (
-            <div className="relative mt-2">
+            <div className="relative min-w-0 flex-1">
               <svg aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-mute" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
               <input
                 type="search"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); if (e.target.value.trim()) setListOpen(true); }}
                 onFocus={() => { if (search.trim()) setListOpen(true); }}
-                placeholder={view === "product" ? "상품·옵션·닉네임으로 찾기" : "닉네임·이름·상품으로 찾기"}
+                placeholder={view === "product" ? "상품·닉네임 찾기" : "닉네임·상품 찾기"}
                 aria-label="물건챙기기 검색"
-                className="h-11 w-full rounded-lg border border-line bg-surface pl-10 pr-3 text-[16px] text-ink"
+                className="h-11 w-full rounded-lg border border-line bg-surface pl-10 pr-3 text-[16px] text-ink max-sm:h-10 max-sm:pl-9"
               />
             </div>
           ) : null}
+          </div>
         </div>
 
         {/* 한 장 */}
