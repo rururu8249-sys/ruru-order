@@ -689,9 +689,10 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
             <button type="button" onClick={() => goPage(-1)} aria-label="이전" className="flex h-12 w-14 items-center justify-center rounded-lg border border-line text-ink hover:bg-surface-2">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6" /></svg>
             </button>
-            <button type="button" onClick={() => setListOpen(true)} className="flex h-12 min-w-0 flex-1 flex-col items-center justify-center rounded-lg hover:bg-surface-2" aria-label="전체 목록">
-              <span className="text-[16px] font-bold tabular-nums text-ink">{view === "product" ? "상품" : "손님"} {curIdx + 1} / {pageCount}</span>
-              <span className="text-[12px] font-semibold text-ink-soft underline underline-offset-2">전체 목록</span>
+            <button type="button" onClick={() => setListOpen(true)} className="flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center rounded-lg py-1 hover:bg-surface-2" aria-label="전체 목록">
+              {/* [2026-11-03 사장님 「내리다 보면 무슨 상품인지 헷갈려」] 늘 보이는 넘기기 줄에 지금 장의 상품명 / 손님 이름 */}
+              <span className="line-clamp-2 w-full break-keep text-center text-[14px] font-bold leading-tight text-ink">{page ? (page.sub ? `${page.title} · ${page.sub}` : page.title) : ""}</span>
+              <span className="text-[12px] font-semibold tabular-nums text-ink-soft">{view === "product" ? "상품" : "손님"} {curIdx + 1} / {pageCount} · <span className="underline underline-offset-2">전체 목록</span></span>
             </button>
             <button type="button" onClick={() => goPage(1)} aria-label="다음" className="flex h-12 w-14 items-center justify-center rounded-lg bg-ink text-white">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
