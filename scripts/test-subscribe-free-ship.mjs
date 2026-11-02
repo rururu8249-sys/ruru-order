@@ -21,7 +21,8 @@ const cfg = parseSubscribeFreeShip([{ key: SUBSCRIBE_FREE_SHIP_KEY, value: JSON.
   groups: ["normal", "vendor", "모름"], waiveRemote: false, channelName: "나야루루", exampleUrl: "javascript:alert(1)",
 }) }]);
 assert.deepEqual(cfg.groups, ["normal", "vendor"]);
-assert.equal(cfg.exampleUrl, "/subscribe-example.jpg"); // 이상한 주소는 기본 사진
+assert.equal(cfg.exampleUrl, "/subscribe-example-v2.jpg"); // 이상한 주소는 기본 사진
+assert.equal(parseSubscribeFreeShip(JSON.stringify({ exampleUrl: "/subscribe-example.jpg" })).exampleUrl, "/subscribe-example-v2.jpg"); // 옛 기본 사진 → 새 사진
 
 // 시간 창
 assert.equal(isSubscribeFreeShipActive(cfg, new Date("2026-11-01T12:00:00Z")), true);

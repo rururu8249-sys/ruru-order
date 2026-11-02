@@ -2047,6 +2047,14 @@ export default function OrderPage() {
       ).totalShippingFee
     : shippingFee;
   const subscribeWaivedAmount = Math.max(0, shippingFeeBeforeSubscribe - shippingFee);
+  // [2026-11-02] 인증 전 손님에게 「배송비 N원 무료」를 보여 주려고만 계산(표시 전용 — 금액표·제출 금액에 안 씀)
+  const subscribePotentialAmount = subscribeFreeShipActive && !subscribeVerified
+    ? Math.max(0, shippingFee - calculateShippingBreakdown(
+        getChargeableShippingItems(items).map((item) => shippingGroupOf(item)),
+        normalizePaidShippingGroups(paidShippingGroups),
+        applySubscribeWaiver(shippingFeeOfGroupBeforeSubscribe, shippingFeeByGroup(shippingFeeSettingsForGroups, false), subscribeConfig),
+      ).totalShippingFee)
+    : 0;
   const chargeableShippingItemsForNotice = getChargeableShippingItems(items);
   const hasNormalShippingItemForNotice = chargeableShippingItemsForNotice.some(
     (item) => shippingGroupOf(item) === "normal",
@@ -7877,6 +7885,24 @@ export default function OrderPage() {
               </>
             )}
           >
+                {/* [2026-11-02 사장님 「구독인증이 안 보여 — 놓치고 어제 주문도 깎아 달라」] 구독 인증 카드를 주문서 맨 위(받는 곳 위)로 — 스크롤 안 해도 보이게 */}
+                {subscribeFreeShipActive && selectedItemEntries.length > 0 ? (
+                  <div style={{ padding: "16px 16px 0" }}>
+                    <SubscribeFreeShipCard
+                      variant="card"
+                      channelName={subscribeConfig.channelName}
+                      exampleUrl={subscribeConfig.exampleUrl}
+                      groupsText={subscribeGroupsText}
+                      verified={subscribeVerified}
+                      waivedAmount={subscribeWaivedAmount}
+                      potentialAmount={subscribePotentialAmount}
+                      kakaoId={subscribeKakaoId}
+                      customerPhone={customerPhone}
+                      youtubeNickname={youtubeNickname}
+                      onVerified={() => setSubscribeVerified(true)}
+                    />
+                  </div>
+                ) : null}
                 {/* 🚚 배송지 카드 */}
                 {/* [2026-09-20 사장님 「난독증도 이해하게 심플하게」] 배송지 = 받는 분·연락처 한 줄 + 주소 한 줄. 닉네임은 결제(입금자명) 줄로 옮김. */}
                 <div style={uiS3 ? { margin: 0, border: "none", borderBottom: "1px solid #E5E5E5", borderRadius: 0, padding: "16px", background: "#FFFFFF" } : { margin: "12px 16px 0", border: "1px solid #E5E1DC", borderRadius: "12px", padding: "12px 14px", background: "#FAF8F6" }}>
@@ -8167,21 +8193,16 @@ export default function OrderPage() {
                 </div>
               )}
 
-              {subscribeFreeShipActive ? (
-                <div style={{ marginBottom: "12px" }}>
-                  <SubscribeFreeShipCard
-                    variant="card"
-                    channelName={subscribeConfig.channelName}
-                    exampleUrl={subscribeConfig.exampleUrl}
-                    groupsText={subscribeGroupsText}
-                    verified={subscribeVerified}
-                    waivedAmount={subscribeWaivedAmount}
-                    kakaoId={subscribeKakaoId}
-                    customerPhone={customerPhone}
-                    youtubeNickname={youtubeNickname}
-                    onVerified={() => setSubscribeVerified(true)}
-                  />
-                </div>
+              {/* [2026-11-02 사장님 「구독인증이 안 보여」] 카드는 주문서 맨 위로 옮김 — 금액표 위엔 인증 전일 때 한 줄 안내(누르면 위 카드로) */}
+              {subscribeFreeShipActive && !subscribeVerified && subscribePotentialAmount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => document.querySelector<HTMLElement>('[data-subscribe-card="true"]')?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  style={{ marginBottom: "12px", width: "100%", minHeight: "44px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "10px 14px", border: "1px solid #111111", borderRadius: "8px", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, textAlign: "left", cursor: "pointer", fontFamily: "inherit", wordBreak: "keep-all" }}
+                >
+                  <span>구독 인증하면 배송비 <b style={{ color: "#D30005", fontWeight: 700 }}>{subscribePotentialAmount.toLocaleString()}원</b> 빠져요</span>
+                  <span style={{ flexShrink: 0, fontSize: "14px", textDecoration: "underline", textUnderlineOffset: "3px" }}>인증하러 가기</span>
+                </button>
               ) : null}
 
               <div data-ruru-price-summary-wrapper="flat">

@@ -15,7 +15,11 @@ export const SUBSCRIBE_GROUP_LABEL: Record<ShippingGroup, string> = {
 };
 const ALL_GROUPS: ShippingGroup[] = ["normal", "vendor", "vendor2", "overseas"];
 export const DEFAULT_SUBSCRIBE_CHANNEL = "나야루루";
-export const DEFAULT_SUBSCRIBE_EXAMPLE = "/subscribe-example.jpg";
+// [2026-11-02] 새 채널 화면(RURU 배너)으로 교체 — 파일 이름을 바꿔 옛 사진이 캐시에 남지 않게. 옛 기본 주소로 저장된 설정도 새 사진으로.
+export const DEFAULT_SUBSCRIBE_EXAMPLE = "/subscribe-example-v2.jpg";
+const OLD_DEFAULT_SUBSCRIBE_EXAMPLE = "/subscribe-example.jpg";
+/** PC 화면 캡처 예시(고정 사진) — 폰 예시와 같이 보여 준다 */
+export const SUBSCRIBE_EXAMPLE_PC = "/subscribe-example-pc.jpg";
 
 export type SubscribeFreeShipConfig = {
   enabled: boolean;
@@ -74,7 +78,7 @@ export function parseSubscribeFreeShip(input: unknown): SubscribeFreeShipConfig 
     groups,
     waiveRemote: r.waiveRemote === true,
     channelName: String(r.channelName ?? "").trim().slice(0, 40) || DEFAULT_SUBSCRIBE_CHANNEL,
-    exampleUrl: /^(https:\/\/|\/)/.test(exampleUrl) ? exampleUrl : DEFAULT_SUBSCRIBE_EXAMPLE,
+    exampleUrl: /^(https:\/\/|\/)/.test(exampleUrl) && exampleUrl !== OLD_DEFAULT_SUBSCRIBE_EXAMPLE ? exampleUrl : DEFAULT_SUBSCRIBE_EXAMPLE,
   };
 }
 
