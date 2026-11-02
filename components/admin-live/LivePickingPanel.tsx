@@ -533,14 +533,33 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
           </div>
           {!scopeTooWide ? (
             <div className="mt-3">
-              <div className="tabular-nums">{loading ? <span className="text-[16px] font-bold text-ink">확인 중…</span> : remainPaid > 0
-                ? <><span className="text-[20px] font-bold text-ink">챙겨야 할 남은 수량 {remainPaid}개</span><span className="ml-2 text-[13px] font-semibold text-ink-soft">챙긴 {gotPaid} / 총 주문수량 {totalPaid}</span></>
-                : <span className="text-[20px] font-bold text-ok-tx">{totalPaid > 0 ? `✓ 다 챙겼어요 · ${totalPaid}개` : "챙길 상품 없음"}</span>}</div>
-              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-line"><div className="h-full rounded-full bg-ink transition-[width]" style={{ width: `${pct}%` }} /></div>
+              {/* [2026-11-03 사장님 「18개가 미입금 포함이야?」] 숫자 3칸(결제완료·챙김·남은) + 미입금은 따로 한 줄 — 숫자 계산 무변경 */}
+              {loading ? <div className="text-[16px] font-bold text-ink">확인 중…</div> : (
+                <div className="grid grid-cols-3 gap-2 tabular-nums">
+                  <div className="rounded-lg bg-surface-2 px-3 py-2">
+                    <div className="text-[12px] font-semibold text-ink-soft">결제완료</div>
+                    <div className="text-[20px] font-bold text-ink">{totalPaid}개</div>
+                  </div>
+                  <div className="rounded-lg bg-surface-2 px-3 py-2">
+                    <div className="text-[12px] font-semibold text-ink-soft">챙김</div>
+                    <div className="text-[20px] font-bold text-ink">{gotPaid}개</div>
+                  </div>
+                  <div className={`rounded-lg px-3 py-2 ${remainPaid > 0 ? "bg-ink text-white" : "bg-ok-bg text-ok-tx"}`}>
+                    <div className={`text-[12px] font-semibold ${remainPaid > 0 ? "text-white/80" : ""}`}>남은 것</div>
+                    <div className="text-[20px] font-bold">{totalPaid === 0 ? "없음" : remainPaid > 0 ? `${remainPaid}개` : "✓ 다 챙김"}</div>
+                  </div>
+                </div>
+              )}
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line"><div className="h-full rounded-full bg-ink transition-[width]" style={{ width: `${pct}%` }} /></div>
               {unpaidAll > 0 ? (
-                <button type="button" aria-pressed={showUnpaid} onClick={() => setShowUnpaid((v) => !v)} className="mt-1.5 text-[13px] font-semibold text-danger-tx underline-offset-2 hover:underline">
-                  {showUnpaid ? `미결제 ${unpaidAll}개 섞여 보여요 — 입금 확인 전엔 챙기지 마세요 · 숨기기` : `미결제 ${unpaidAll}개 따로 · 보기`}
-                </button>
+                <div className={`mt-2 flex items-center justify-between gap-2 rounded-lg px-3 py-2 ${showUnpaid ? "bg-danger-bg" : "bg-surface-2"}`}>
+                  <span className={`min-w-0 text-[13px] font-semibold ${showUnpaid ? "text-danger-tx" : "text-ink-soft"}`}>
+                    {showUnpaid ? `미결제 ${unpaidAll}개도 목록에 보여요 — 입금 확인 전엔 챙기지 마세요` : `미결제 ${unpaidAll}개(미입금·카드 미결제)는 위 숫자에 안 들어가요`}
+                  </span>
+                  <button type="button" aria-pressed={showUnpaid} onClick={() => setShowUnpaid((v) => !v)} className="h-9 shrink-0 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink">
+                    {showUnpaid ? "숨기기" : "보기"}
+                  </button>
+                </div>
               ) : null}
               {movedAway > 0 ? <p className="mt-1.5 text-[12px] text-ink-mute">다른 출고로 넘긴 상품 {movedAway}개는 여기서 뺐어요</p> : null}
               {extraError ? <p className="mt-1.5 text-[12px] text-danger-tx">늦은 입금·다시 챙기기를 못 불러왔어요 — 닫았다 다시 열어 주세요</p> : null}
@@ -552,6 +571,21 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
               <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => { setView(v); setListOpen(false); }} className={`h-10 rounded-lg text-[16px] font-semibold ${view === v ? "bg-ink text-white" : "text-ink-soft"}`}>{v === "product" ? "상품별" : "손님별"}</button>
             ))}
           </div>
+          {/* [2026-11-03 사장님 「검색 가능한 칸」] 늘 보이는 검색칸 — 글자를 넣으면 맞는 상품/손님 목록이 열리고, 누르면 그 장으로 */}
+          {!scopeTooWide ? (
+            <div className="relative mt-2">
+              <svg aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-mute" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); if (e.target.value.trim()) setListOpen(true); }}
+                onFocus={() => { if (search.trim()) setListOpen(true); }}
+                placeholder={view === "product" ? "상품·옵션·닉네임으로 찾기" : "닉네임·이름·상품으로 찾기"}
+                aria-label="물건챙기기 검색"
+                className="h-11 w-full rounded-lg border border-line bg-surface pl-10 pr-3 text-[16px] text-ink"
+              />
+            </div>
+          ) : null}
         </div>
 
         {/* 한 장 */}
@@ -653,9 +687,15 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
               <button type="button" onClick={() => setListOpen(false)} aria-label="목록 닫기" className="h-10 w-10 rounded-lg text-[22px] text-ink-soft hover:bg-surface-2">×</button>
             </div>
             <div className="px-4 pt-3">
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={view === "product" ? "상품·옵션·닉네임 검색" : "닉네임·이름·상품 검색"} className="h-10 w-full rounded-lg border border-line bg-surface px-3 text-[16px] text-ink" />
+              <div className="flex gap-2">
+                <input type="search" autoFocus={!!q} value={search} onChange={(e) => setSearch(e.target.value)} placeholder={view === "product" ? "상품·옵션·닉네임 검색" : "닉네임·이름·상품 검색"} className="h-10 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-[16px] text-ink" />
+                {q ? <button type="button" onClick={() => setSearch("")} className="h-10 shrink-0 rounded-lg border border-line px-3 text-[13px] font-semibold text-ink-soft">지우기</button> : null}
+              </div>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+              {q && !pages.some((pg) => pg.rows.some((r) => productSearchMatches([r.nickname, r.name, r.productName, r.optionText].join(" "), q))) ? (
+                <div className="py-12 text-center text-[14px] font-semibold text-ink-soft">「{q}」 찾는 결과가 없어요{!showUnpaid && unpaidAll > 0 ? <span className="mt-1 block text-[13px] font-normal">미결제 주문은 위 「보기」를 눌러야 함께 찾아져요</span> : null}</div>
+              ) : null}
               {pages.map((pg, i) => {
                 if (q && !pg.rows.some((r) => productSearchMatches([r.nickname, r.name, r.productName, r.optionText].join(" "), q))) return null;
                 const pc = countLine(pg.rows);

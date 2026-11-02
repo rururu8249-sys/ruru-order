@@ -96,13 +96,13 @@ const byText = (t) => btn(n => nodeText(n) === t)[0];
 const byLabel = (l) => btn(n => n.props['aria-label'] === l)[0];
 const counter = () => nodeText(byLabel('전체 목록'));
 // 머리: 결제완료 3+1+1(지난)+1(블랙M 7) = 6, 미결제는 따로
-assert.ok(text().includes('챙겨야 할 남은 수량 6개') && text().includes('챙긴 0 / 총 주문수량 6'));
-assert.ok(text().includes('미결제 2개 따로 · 보기'), '미결제는 한 줄로 따로');
+assert.ok(text().includes('결제완료6개') && text().includes('챙김0개') && text().includes('남은 것6개'), '숫자 3칸 = 결제완료 기준');
+assert.ok(text().includes('미결제 2개(미입금·카드 미결제)는 위 숫자에 안 들어가요'), '미결제는 숫자에 안 넣고 따로 한 줄');
 assert.ok(!text().includes('고객3'), '기본엔 미결제 손님 안 보임');
 assert.ok(!text().includes('요약') && !text().includes('안 챙긴 것만') && !text().includes('접기'), '옛 요약·안 챙긴 것만·접기 없음');
 assert.ok(text().includes('다른 출고로 넘긴 상품 1개는 여기서 뺐어요'));
 assert.equal(counter(), '상품 1 / 1전체 목록', '상품별 한 장 = 상품 하나');
-await act(async () => btn(n => nodeText(n).startsWith('미결제 2개 따로'))[0].props.onClick());
+await act(async () => btn(n => n.props['aria-pressed'] === false && nodeText(n) === '보기')[0].props.onClick());
 assert.ok(text().includes('고객3') && text().includes('입금 확인 전엔 챙기지 마세요'), '보기 누르면 미결제 섞여 보임 + 경고');
 assert.ok(text().includes('미결제 2 · 지난 주문 1개 포함'), '같은 옵션 줄 안에 지난 주문 포함 표시');
 assert.ok(!text().includes('넘겨받'), '어색한 「넘겨받음」 문구 없음');
@@ -141,6 +141,15 @@ assert.ok(text().includes('전체 목록 · 손님 5명'));
 const listItem = btn(n => nodeText(n).startsWith('4고객6'))[0];
 await act(async () => listItem.props.onClick());
 assert.equal(counter(), '손님 4 / 5전체 목록', '목록에서 누르면 그 장');
+// 늘 보이는 검색칸 — 글자 넣으면 목록이 열리고 맞는 손님만, 없으면 「결과가 없어요」
+const searchBox = () => tree.root.findAll(n => n.type === 'input' && n.props['aria-label'] === '물건챙기기 검색')[0];
+await act(async () => searchBox().props.onChange({ target: { value: '고객6' } }));
+assert.ok(text().includes('전체 목록 · 손님 5명') && text().includes('고객6'), '검색하면 목록이 열림');
+assert.ok(!btn(n => nodeText(n).startsWith('1고객1'))[0], '안 맞는 손님은 빠짐');
+await act(async () => searchBox().props.onChange({ target: { value: '없는이름zz' } }));
+assert.ok(text().includes('찾는 결과가 없어요'));
+await act(async () => searchBox().props.onChange({ target: { value: '' } }));
+await act(async () => byLabel('목록 닫기').props.onClick());
 // 모두 챙김 = 결제완료·안 챙긴 것만
 await act(async () => { await byText('모두 챙김').props.onClick(); });
 assert.deepEqual(writes.at(-1).ids.map(String).sort(), ['2','5','7'], '미결제(3)·이미 챙긴(1) 제외');
