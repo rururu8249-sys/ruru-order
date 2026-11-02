@@ -148,6 +148,8 @@ export default function LiveStatsCards({ orders, criteriaLabel = "최근 주문 
       pointUsedActual,
       pointUsedManual,
       unpaidSum: bankUnpaidSum + cardUnpaidSum,
+      unpaidBankSum: bankUnpaidSum,
+      unpaidCardSum: cardUnpaidSum,
       unpaidBankCount: bankUnpaid.length,
       unpaidCardCount: cardUnpaid.length,
       bankPaidCount: bankPaid.length,

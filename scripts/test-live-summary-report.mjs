@@ -1,5 +1,5 @@
 // [2026-11-02] 텔레그램 방송 결산 — 실제 lib/liveSummary 계산을 가짜 DB 로 돌린 시뮬레이션
-//   매출·무통장/카드 건수·포인트 사용(전엔 칸을 안 읽어 0원)·카드 수수료·입금가·순수익·구매 TOP3(카카오 계정 기준)·취소/테스트 제외
+//   매출·무통장/카드 건수·포인트 사용(전엔 칸을 안 읽어 0원)·구매 TOP3(카카오 계정 기준)·취소/테스트 제외
 import assert from 'node:assert/strict';
 import { createUiLoader } from './admin-ui-test-loader.mjs';
 
@@ -73,17 +73,8 @@ assert.deepEqual(s.productAll.map((p) => [p.name, p.qty]), [['알로 기모 맨�
 
 const text = formatReport(s);
 assert.match(text, /^📊 <b>결산<\/b> · 남녀공용의류\n⏹ 2026\.11\.01\(일\) 20:04 ~ 23:58 · 3시간 54분\n/);
-assert.match(text, /💰 매출 <b>122,000원<\/b> · 3건\n━/, '입금가 없는 상품이 있으면 순수익 숨김');
-assert.doesNotMatch(text, /순수익/);
-assert.match(text, /포인트 사용 3,000원 \(매출에서 이미 빠짐\)/);
-assert.match(text, /⏳ 미결제 <b>40,000원<\/b> · 1건 \(무통장 1\)/);
-// 입금가를 전부 넣은 날 → 순수익 표시
-for (const r of db.orders) if (!r.event_gift_winner_id && r.cost_price_snapshot == null) r.cost_price_snapshot = 5000;
-const sAll = await computeLiveSummary('broadcast', { broadcastId: 'bc1' });
-assert.equal(sAll.costMissingQty, 0);
-const tAll = formatReport(sAll);
-assert.match(tAll, /💵 순수익 <b>/);
-console.log('--- 입금가 다 넣은 날 ---\n' + tAll.split('\n').slice(0, 6).join('\n').replace(/<\/?b>/g, ''));
+assert.match(text, /💰 매출 <b>122,000원<\/b> · 3건\n━━━━━━━━━━━━━━\n· 무통장입금 97,000원 \(2건\)\n· 카드결제완료 25,000원 \(1건\)\n· 미입금 40,000원 \(1건\)\n· 카드미결제 0원 \(0건\)\n· 포인트 사용 3,000원\n/);
+assert.doesNotMatch(text, /순수익|상품 가격|입금가/, '순수익 빼라(사장님 11/02)');
 assert.match(text, /🥇 행복나무 <b>105,000원<\/b> \(2건 · 4개\)\n🥈 몽실/);
 console.log('--- 시뮬레이션 결산 글 ---\n' + text.replace(/<\/?b>/g, ''));
 
