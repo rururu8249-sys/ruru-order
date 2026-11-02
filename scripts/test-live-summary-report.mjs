@@ -73,10 +73,17 @@ assert.deepEqual(s.productAll.map((p) => [p.name, p.qty]), [['알로 기모 맨�
 
 const text = formatReport(s);
 assert.match(text, /^📊 <b>결산<\/b> · 남녀공용의류\n⏹ 2026\.11\.01\(일\) 20:04 ~ 23:58 · 3시간 54분\n/);
-assert.match(text, /💰 매출 <b>122,000원<\/b> · 3건\n💵 순수익 <b>90,250원<\/b>/, '122,000 − 30,000 − 1,750');
+assert.match(text, /💰 매출 <b>122,000원<\/b> · 3건\n━/, '입금가 없는 상품이 있으면 순수익 숨김');
+assert.doesNotMatch(text, /순수익/);
 assert.match(text, /포인트 사용 3,000원 \(매출에서 이미 빠짐\)/);
 assert.match(text, /⏳ 미결제 <b>40,000원<\/b> · 1건 \(무통장 1\)/);
-assert.match(text, /⚠ 입금가 없는 상품 2개는 안 뺐어요/);
+// 입금가를 전부 넣은 날 → 순수익 표시
+for (const r of db.orders) if (!r.event_gift_winner_id && r.cost_price_snapshot == null) r.cost_price_snapshot = 5000;
+const sAll = await computeLiveSummary('broadcast', { broadcastId: 'bc1' });
+assert.equal(sAll.costMissingQty, 0);
+const tAll = formatReport(sAll);
+assert.match(tAll, /💵 순수익 <b>/);
+console.log('--- 입금가 다 넣은 날 ---\n' + tAll.split('\n').slice(0, 6).join('\n').replace(/<\/?b>/g, ''));
 assert.match(text, /🥇 행복나무 <b>105,000원<\/b> \(2건 · 4개\)\n🥈 몽실/);
 console.log('--- 시뮬레이션 결산 글 ---\n' + text.replace(/<\/?b>/g, ''));
 

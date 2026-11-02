@@ -11,7 +11,7 @@ const t = formatSettlementReport(base);
 assert.match(t, /^📊 <b>결산<\/b> · 남녀 &lt;공용&gt; &amp; 의류\n/);
 assert.match(t, /💰 매출 <b>2,345,000원<\/b> · 58건\n━/);
 assert.doesNotMatch(t, /순수익/, '재료 없으면(수동 버튼) 순수익 칸 없음');
-assert.match(t, /<b>💳 받은 돈<\/b>\n· 무통장 1,800,000원\n· 카드 545,000원\n· 포인트 사용 12,000원 \(매출에서 이미 빠짐\)\n· 상품값 2,200,000원\n⏳ 미결제 <b>489,000원<\/b> · 3건 \(무통장 3\)/);
+assert.match(t, /<b>💳 받은 돈<\/b>\n· 무통장 1,800,000원\n· 카드 545,000원\n· 포인트 사용 12,000원 \(매출에서 이미 빠짐\)\n· 상품 가격 합 2,200,000원 \(배송비·카드추가금 빼고\)\n⏳ 미결제 <b>489,000원<\/b> · 3건 \(무통장 3\)/);
 assert.match(t, /<b>🏆 상품별 판매<\/b> · 총 42개 · 2종\n1\. 폴로 &lt;셔츠&gt; <b>30개<\/b>\n2\. 꼼데 쭈리바지 <b>12개<\/b>/, '많이 팔린 순 · 0개 제외 · 이스케이프');
 assert.match(t, /🗓 10월 누적 매출 25,000,000원$/);
 assert.doesNotMatch(t, /<셔츠>|<공용>/, 'HTML 괄호가 그대로 남으면 텔레그램이 거부');
@@ -41,16 +41,17 @@ assert.match(explainTelegramError('123: Bad Request: chat not found'), /chat id/
 assert.equal(explainTelegramError('123: Forbidden: bot was blocked by the user'), '123: Forbidden: bot was blocked by the user');
 // [2026-11-02] 순수익·건수·구매 TOP3
 const full = formatSettlementReport({ ...base, bankPaidCount: 50, cardPaidCount: 8,
-  profit: { cardFeeRate: 7, cardFeeSum: 38150, productCostSum: 1200000, costedQty: 40, costMissingQty: 2 },
+  profit: { cardFeeRate: 7, cardFeeSum: 38150, productCostSum: 1200000, costedQty: 42, costMissingQty: 0 },
   buyers: [{ name: '행복<나무>', sum: 300000, count: 2, qty: 5 }, { name: '딸기야', sum: 200000, count: 1, qty: 3 }, { name: '몽실', sum: 100000, count: 1 }, { name: '넷째', sum: 50000, count: 1 }] });
 assert.match(full, /💵 순수익 <b>1,106,850원<\/b>/, '2,345,000 − 1,200,000 − 38,150');
 assert.match(full, /· 무통장 1,800,000원 \(50건\)\n· 카드 545,000원 \(8건\)/);
-assert.match(full, /<b>🧮 순수익 계산<\/b>\n  매출 2,345,000\n− 입금가 1,200,000 \(40개\)\n− 카드 수수료 38,150 \(7%\)\n= <b>1,106,850원<\/b>\n⚠ 입금가 없는 상품 2개는 안 뺐어요/);
+assert.match(full, /<b>🧮 순수익 계산<\/b>\n  매출 2,345,000\n− 입금가 1,200,000 \(42개\)\n− 카드 수수료 38,150 \(7%\)\n= <b>1,106,850원<\/b>\n※ 택배비/);
 assert.match(full, /<b>👑 구매 TOP 3<\/b>\n🥇 행복&lt;나무&gt; <b>300,000원<\/b> \(2건 · 5개\)\n🥈 딸기야 <b>200,000원<\/b> \(1건 · 3개\)\n🥉 몽실 <b>100,000원<\/b> \(1건\)/);
 assert.doesNotMatch(full, /넷째/, 'TOP 3 만');
 const noCost = formatSettlementReport({ ...base, profit: { cardFeeRate: 7, cardFeeSum: 38150, productCostSum: 0, costedQty: 0, costMissingQty: 42 } });
-assert.match(noCost, /💵 순수익 — 입금가가 입력된 상품이 없어 계산 못 했어요/);
-assert.match(noCost, /= <b>2,306,850원<\/b> \(입금가 빼기 전\)\n⚠ 입금가 없는 상품 42개는 안 뺐어요/);
+assert.doesNotMatch(noCost, /순수익/, '입금가 하나도 없으면 순수익 칸째 숨김');
+const partCost = formatSettlementReport({ ...base, profit: { cardFeeRate: 7, cardFeeSum: 1, productCostSum: 10000, costedQty: 12, costMissingQty: 25 } });
+assert.doesNotMatch(partCost, /순수익|입금가/, '입금가 일부만 있어도 숨김(틀린 순수익 안 보냄)');
 // 모든 품목 — 긴 이름 80종도 한 메시지(4096자) 안
 const long80 = Array.from({ length: 80 }, (_, i) => ({ name: `아주아주긴상품이름입니다정말길어요${i}`, qty: 90 - i }));
 const r80 = formatSettlementReport({ ...base, products: long80, buyers: full ? [{ name: 'a', sum: 1, count: 1 }] : [], profit: { cardFeeRate: 7, cardFeeSum: 1, productCostSum: 1, costedQty: 1, costMissingQty: 1 } });

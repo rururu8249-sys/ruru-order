@@ -68,11 +68,10 @@ export function formatSettlementReport(d: SettlementReportData): string {
 
   // ① 한눈에: 얼마 팔고 얼마 남았나
   L.push(`💰 매출 <b>${won(d.paidSum)}</b> · ${d.paidCount}건`);
+  // [2026-11-02 사장님 「입금가는 쓰는 날도 있고 아닌 날도」] 판 상품 «전부» 입금가가 있을 때만 순수익을 보여 준다(하나라도 없으면 칸째 숨김)
   const profit = reportNetProfit(d);
-  const hasCost = Boolean(d.profit && d.profit.costedQty > 0);
-  if (d.profit) {
-    L.push(hasCost ? `💵 순수익 <b>${won(profit ?? 0)}</b>` : "💵 순수익 — 입금가가 입력된 상품이 없어 계산 못 했어요");
-  }
+  const showProfit = Boolean(d.profit && d.profit.costedQty > 0 && d.profit.costMissingQty === 0);
+  if (showProfit) L.push(`💵 순수익 <b>${won(profit ?? 0)}</b>`);
   L.push(line);
 
   // ② 받은 돈
@@ -84,7 +83,7 @@ export function formatSettlementReport(d: SettlementReportData): string {
   const manual = d.pointUsedManual != null && Number.isFinite(Number(d.pointUsedManual));
   const point = manual ? Number(d.pointUsedManual) : d.pointUsedActual;
   L.push(`· 포인트 사용 ${won(point)}${point > 0 ? " (매출에서 이미 빠짐)" : ""}`);
-  L.push(`· 상품값 ${won(d.goodsSum)}`);
+  L.push(`· 상품 가격 합 ${won(d.goodsSum)} (배송비·카드추가금 빼고)`);
   const unpaidCnt = d.unpaidBankCount + d.unpaidCardCount;
   const parts: string[] = [];
   if (d.unpaidBankCount > 0) parts.push(`무통장 ${d.unpaidBankCount}`);
@@ -92,14 +91,13 @@ export function formatSettlementReport(d: SettlementReportData): string {
   L.push(unpaidCnt > 0 ? `⏳ 미결제 <b>${won(d.unpaidSum)}</b> · ${unpaidCnt}건 (${parts.join(" · ")})` : "⏳ 미결제 없음");
 
   // ③ 순수익 계산
-  if (d.profit) {
+  if (showProfit && d.profit) {
     const p = d.profit;
     L.push("", "<b>🧮 순수익 계산</b>");
     L.push(`  매출 ${n0(d.paidSum)}`);
-    L.push(`− 입금가 ${n0(p.productCostSum)}${p.costedQty > 0 ? ` (${p.costedQty}개)` : ""}`);
+    L.push(`− 입금가 ${n0(p.productCostSum)} (${p.costedQty}개)`);
     L.push(`− 카드 수수료 ${n0(p.cardFeeSum)} (${p.cardFeeRate}%)`);
-    L.push(`= <b>${won(hasCost ? profit ?? 0 : d.paidSum - p.cardFeeSum)}</b>${hasCost ? "" : " (입금가 빼기 전)"}`);
-    if (p.costMissingQty > 0) L.push(`⚠ 입금가 없는 상품 ${p.costMissingQty}개는 안 뺐어요`);
+    L.push(`= <b>${won(profit ?? 0)}</b>`);
     L.push("※ 택배비·기타 지출은 안 뺀 금액");
   }
 
