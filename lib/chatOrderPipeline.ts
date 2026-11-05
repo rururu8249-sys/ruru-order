@@ -161,7 +161,7 @@ export async function parsePendingChatOrders(
     const BOT_NAMES = new Set(["nightbot", "streamlabs", "streamelements", "루루쇼핑", "루루동이주문봇", "주문_폭주",
       "루루실장", "루루동이", "루루사장", "루루언니"]);
     // 우리 봇 채널 고정값 — 설정 저장이 비어 있어도 항상 차단 (2026-08-14 사장님 확인)
-    const KNOWN_BOT_CHANNELS = new Set(["UC8jr9s1rZBEIPPTBPAwYE5A", "UCdBYg0tDtLZnpvz8v1NKURA"]);
+    const KNOWN_BOT_CHANNELS = new Set(["UC8jr9s1rZBEIPPTBPAwYE5A"]);
     // 본문에 봇 이름이 들어간 채팅("스트롱필은요 주문폭주님")은 봇에게 말 거는 대화 — 주문 아님 (2026-08-14 실채팅 오인)
     const BOT_CALL_NAMES = ["주문폭주", "루루동이주문봇", "루루쇼핑님", "나이트봇", "nightbot"];
 

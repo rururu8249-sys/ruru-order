@@ -1,9 +1,9 @@
 // lib/youtubeChannelLink.ts
 // 2026-11-01 — 루루동이 유튜브 채널(루루동이2) 주소와 «유튜브 앱으로 열기» 규칙 한 곳.
-// [2026-11-05 루루동이3 채널로 바꿈] /youtube 짧은 주소 페이지와 손님 화면 채널 변경 안내 팝업이 같이 쓴다. 채널 바뀌면 CHANNEL 한 줄만.
+// /youtube 짧은 주소 페이지와 손님 화면 채널 변경 안내 팝업이 같이 쓴다. 채널 바뀌면 CHANNEL 한 줄만.
 // 표시·이동 전용. 돈/주문/입금/배송 로직 무관.
 
-export const YOUTUBE_CHANNEL = "youtube.com/channel/UCdBYg0tDtLZnpvz8v1NKURA";
+export const YOUTUBE_CHANNEL = "youtube.com/channel/UC8jr9s1rZBEIPPTBPAwYE5A?si=P8OAzC4y2XTFCgag";
 export const YOUTUBE_CHANNEL_WEB_URL = `https://${YOUTUBE_CHANNEL}`;
 const ANDROID_URL = `intent://${YOUTUBE_CHANNEL}#Intent;package=com.google.android.youtube;scheme=https;S.browser_fallback_url=${encodeURIComponent(YOUTUBE_CHANNEL_WEB_URL)};end`;
 const IOS_URL = `youtube://${YOUTUBE_CHANNEL}`;

@@ -188,7 +188,7 @@ export default function PromoPopupEditor({
               <button type="button" onClick={() => set({ buttons: [...value.buttons, { label: "", url: "" }] })} className={chip(false)}>
                 + 버튼 추가
               </button>
-              {!value.buttons.some((b) => b.url.includes("UCdBYg0tDtLZnpvz8v1NKURA")) ? (
+              {!value.buttons.some((b) => b.url.includes("UC8jr9s1rZBEIPPTBPAwYE5A")) ? (
                 <button
                   type="button"
                   onClick={() => set({ buttons: [...value.buttons, { label: "새 채널 바로가기", url: YOUTUBE_CHANNEL_WEB_URL }] })}

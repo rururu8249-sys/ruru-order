@@ -9532,7 +9532,7 @@ export default function OrderPage() {
               {/* [2026-09-20 사장님] 「카톡채널처럼 한 줄씩」 — 유튜브·밴드·인스타도 카톡 버튼과 같은 높이·폭의 한 줄 버튼. 링크 주소는 그대로. */}
               <div style={s5s({ display: "grid", gap: "8px" })}>
                 {([
-                  { href: "https://www.youtube.com/channel/UCdBYg0tDtLZnpvz8v1NKURA", icon: "▶️", label: "유튜브 채널" },
+                  { href: "https://www.youtube.com/channel/UC8jr9s1rZBEIPPTBPAwYE5A", icon: "▶️", label: "유튜브 채널" },
                   { href: "https://band.us/@ruru8249", icon: "🎵", label: "밴드 (택배 송장 확인)" },
                   { href: "https://www.instagram.com/ruru8249_?igsh=MXR3Z2xnYmI1cG0ybQ==", icon: "📷", label: "인스타그램" },
                 ] as const).map((link) => (
