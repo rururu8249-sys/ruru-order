@@ -85,16 +85,34 @@ const CARD_FIXED_H_CONST = 200 + 120;
 // 주문성공(초록) / 입금·카드완료(파랑) 알림 배너
 type ToastItem = { icon: string; title: string; name: string; detail: string; tone: "green" | "blue" };
 
-// [2026-11-05 사장님] 닉네임은 가리지(마스킹) 않고, 너무 길면 뒤를 자른다(카드 폭 200 기준 10글자).
+// [2026-11-05 사장님] 닉네임은 가리지(마스킹) 않고, 너무 길면 뒤를 자른다(스티커 폭 기준 7글자 넘으면 6글자+…, 뒤 「님」은 항상 보이게).
 function clipNick(raw: string): string {
   const chars = Array.from(String(raw || "").trim());
   if (chars.length === 0) return "손님";
-  return chars.length > 10 ? `${chars.slice(0, 9).join("")}…` : chars.join("");
+  return chars.length > 7 ? `${chars.slice(0, 6).join("")}…` : chars.join("");
 }
 
 // [2026-11-05 사장님 «구아바 참고, 베낀 티는 안 나게»] 주문·결제 소식 = 카드 위에 붙는 «스티커».
 //   흰 스티커가 살짝 기울어 톡 붙고, 위에 색 띠(주문 완료=초록 / 결제 완료=파랑) + 닉네임 크게 + 아래 한 줄(상품명·금액).
 //   표시 전용 — 어떤 주문을 띄울지(구독·중복 가드)는 그대로.
+function ConfettiBurst({ burstKey }: { burstKey: number }) {
+  return (
+    <div key={burstKey} aria-hidden data-ruru-widget-confetti style={{ position: "absolute", left: "50%", top: "50%", width: 0, height: 0, pointerEvents: "none" }}>
+      {CONFETTI_PIECES.map((p, i) => (
+        <span
+          key={i}
+          style={{
+            position: "absolute", width: `${p.size}px`, height: `${p.size}px`,
+            borderRadius: p.round ? "50%" : "2px", background: p.color,
+            ["--tx" as any]: p.tx, ["--ty" as any]: p.ty, ["--r" as any]: p.r,
+            animation: `ruruConfetti ${p.dur}s ease-out forwards`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function ToastSticker({ toast, standalone }: { toast: ToastItem; standalone?: boolean }) {
   const tagBg = toast.tone === "green" ? "#16A34A" : "#2563EB";
   return (
@@ -136,7 +154,7 @@ function ToastSticker({ toast, standalone }: { toast: ToastItem; standalone?: bo
           {toast.title}
         </div>
         <div style={{ padding: "8px 10px 9px" }}>
-          <div style={{ fontSize: "20px", fontWeight: 900, lineHeight: 1.15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <div style={{ fontSize: Array.from(toast.name).length <= 6 ? "20px" : Array.from(toast.name).length <= 8 ? "17px" : "14px", fontWeight: 900, lineHeight: 1.15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {toast.name}
           </div>
           {toast.detail ? (
@@ -866,6 +884,7 @@ export default function ProductWidgetClient() {
                     background: "rgba(0,0,0,0.22)", animation: "ruruDimIn 0.3s ease-out both",
                   }}
                 >
+                  {confettiOn ? <ConfettiBurst burstKey={confettiKey} /> : null}
                   <ToastSticker toast={currentToast} />
                 </div>
                 <span
@@ -883,31 +902,17 @@ export default function ProductWidgetClient() {
           </div>
         ) : currentToast ? (
           // 띄운 상품이 없을 때도 주문/결제 소식은 보이게(카드 없이 스티커만)
-          <div style={{ padding: "6px 4px" }}>
+          <div style={{ position: "relative", zIndex: 1, padding: "6px 4px" }}>
             <ToastSticker toast={currentToast} standalone />
           </div>
         ) : null}
 
         {/* 폭죽 — 카드 밖(앵커)에서 터뜨려야 카드 overflow:hidden 에 안 잘리고 시원하게 퍼진다.
             주문성공/입금완료/카드결제완료 어떤 알림이든 1회 재생(표시 전용). */}
-        {confettiOn ? (
-          <div key={confettiKey} style={{ position: "absolute", left: "50%", top: "31%", width: 0, height: 0, pointerEvents: "none", zIndex: 9 }}>
-            {CONFETTI_PIECES.map((p, i) => (
-              <span
-                key={i}
-                style={{
-                  position: "absolute",
-                  width: `${p.size}px`,
-                  height: `${p.size}px`,
-                  borderRadius: p.round ? "50%" : "2px",
-                  background: p.color,
-                  ["--tx" as any]: p.tx,
-                  ["--ty" as any]: p.ty,
-                  ["--r" as any]: p.r,
-                  animation: `ruruConfetti ${p.dur}s ease-out forwards`,
-                }}
-              />
-            ))}
+        {/* 카드가 없을 때만 앵커에서 폭죽(카드가 있으면 스티커 «뒤»에서 터져 글자를 안 가린다) */}
+        {confettiOn && !current ? (
+          <div style={{ position: "absolute", left: "50%", top: "50%", width: 0, height: 0, pointerEvents: "none", zIndex: 0 }}>
+            <ConfettiBurst burstKey={confettiKey} />
           </div>
         ) : null}
       </div>
@@ -949,7 +954,7 @@ export default function ProductWidgetClient() {
         @keyframes ruruLiveDot { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
         @media (prefers-reduced-motion: reduce) {
           [data-ruru-widget-card], [data-ruru-widget-sticker], [data-ruru-widget-burst], [data-ruru-widget-flash], [data-ruru-widget-live-dot] { animation: none !important; }
-          [data-ruru-widget-burst] { display: none; }
+          [data-ruru-widget-burst], [data-ruru-widget-confetti] { display: none; }
         }
       `}</style>
     </div>
