@@ -50,11 +50,8 @@ export default function PromoPopupCard({ cfg, onButton, onClose, onHide24 }: Pro
             key={i}
             type="button"
             onClick={() => onButton(i)}
-            style={
-              i === 0
-                ? { height: "52px", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", border: "none", fontSize: "16px", fontWeight: 700, cursor: "pointer" }
-                : { height: "52px", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", border: "1.5px solid #111111", fontSize: "16px", fontWeight: 700, cursor: "pointer" }
-            }
+            // [2026-11-05] 버튼은 모두 같은 검정(사장님 — 두 채널 다 눈에 띄게). 닫기만 회색 테두리.
+            style={{ height: "52px", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", border: "none", fontSize: "16px", fontWeight: 700, cursor: "pointer" }}
           >
             {b.label}
           </button>
