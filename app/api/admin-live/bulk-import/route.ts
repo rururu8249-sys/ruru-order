@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const rows: Record<string, unknown>[] = [];
     for (let from = 0; ; from += 1000) {
       const { data, error } = await sb.from("products")
-        .select("id, product_name, price, stock, status, color_options, size_options, detail_image_urls, image_url, product_note, product_type, in_shop, badge_types, shipping_type")
+        .select("*")
         .order("id").range(from, from + 999);
       if (error) throw error;
       rows.push(...(data || []));
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     }
     const brands = rows.filter((r) => String(r.status || "") !== "deleted" && (noteOf(r.product_note).brand_group as Record<string, unknown> | undefined)?.enabled === true)
       .map((r) => ({ ...r, product_note: noteOf(r.product_note) }));
-    const { data: bcs, error: bErr } = await sb.from("broadcasts").select("id, title, status, started_at, created_at").ilike("title", `%${title}%`).order("created_at", { ascending: false }).limit(5);
+    const { data: bcs, error: bErr } = await sb.from("broadcasts").select("*").ilike("title", `%${title}%`).limit(5);
     if (bErr) throw bErr;
     const links: Record<string, unknown[]> = {};
     for (const b of bcs || []) {
@@ -44,6 +44,6 @@ export async function GET(request: NextRequest) {
     }
     return NextResponse.json({ brands, broadcasts: bcs, links, productCount: rows.length }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
+    return NextResponse.json({ error: e instanceof Error ? e.message : JSON.stringify(e) }, { status: 500 });
   }
 }
