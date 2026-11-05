@@ -178,3 +178,73 @@ export function blankBrandRowFrom(template: Row, brandKo: string, brandEn: strin
     product_note: typeof template.product_note === "string" ? JSON.stringify(note) : note,
   };
 }
+
+/** 세부상품 한 개의 지금 값(실제 판매가·사이즈·사진·구분) — 다른 묶음으로 옮길 때 씀. */
+export function readBrandDetail(row: Row, name: string): ImportItem | null {
+  const note = noteObject(row.product_note);
+  const group = rec(note.brand_group);
+  const opt = rec(rec(group.detail_options)[name]);
+  const sizes = strs(opt.sizes);
+  if (!sizes.length) return null;
+  const photo = strs(rec(note.detail_photo_sets)[name])[0] || String(rec(note.detail_photos)[name] || "");
+  return {
+    code: name,
+    title: name,
+    price: Math.max(0, Number(row.price) || 0) + Math.max(0, Math.floor(Number(rec(note.option_pricing)[name]) || 0)),
+    sizes,
+    category: String(rec(group.detail_categories)[name] || ""),
+    photoUrl: photo,
+  };
+}
+
+/** 세부상품 빼기 — 남는 세부상품의 실제 판매가는 그대로(바뀌면 throw). */
+export function removeDetailsFromBrandRow(row: Row, names: string[]): MergeResult {
+  const note = noteObject(row.product_note);
+  const group = rec(note.brand_group);
+  const pricing = rec(note.option_pricing);
+  const axisDetails = (Array.isArray(note.option_axes) ? (note.option_axes as Row[]) : []).find((a) => a.key === "detail");
+  const oldDetails = uniq([...strs(axisDetails?.values), ...Object.keys(pricing)]);
+  const removed = oldDetails.filter((d) => names.includes(d));
+  if (removed.length !== names.length) throw new Error(`${row.product_name}: 뺄 세부상품을 못 찾았어요`);
+  const kept = oldDetails.filter((d) => !removed.includes(d));
+  if (!kept.length) throw new Error(`${row.product_name}: 세부상품이 하나도 안 남아요`);
+  const base = Math.max(0, Number(row.price) || 0);
+  const actual = new Map(kept.map((d) => [d, base + Math.max(0, Math.floor(Number(pricing[d]) || 0))]));
+  const newBase = Math.min(...[...actual.values()].filter((p) => p > 0));
+  const newPricing: Record<string, number> = {};
+  for (const [n, p] of actual) newPricing[n] = p - newBase;
+  for (const d of kept) if (newBase + newPricing[d] !== actual.get(d)) throw new Error(`${row.product_name}: ${d} 판매가가 바뀝니다. 중단`);
+  const drop = (r: Record<string, unknown>) => { for (const d of removed) delete r[d]; return r; };
+  const options = drop(rec(group.detail_options));
+  const hidden = strs(note.combo_hidden).filter((d) => !removed.includes(d));
+  const allColors = uniq(kept.flatMap((d) => strs(rec(options[d]).colors)));
+  const allSizes = uniq(kept.flatMap((d) => strs(rec(options[d]).sizes)));
+  const removedUrls = new Set(removed.flatMap((d) => strs(rec(note.detail_photo_sets)[d])));
+  const merged: Row = {
+    ...note,
+    stock_variants: (Array.isArray(note.stock_variants) ? (note.stock_variants as Row[]) : []).filter((v) => !removed.some((d) => String(v.color || "") === d || String(v.color || "").startsWith(d + " / "))),
+    option_pricing: newPricing,
+    detail_photos: drop(rec(note.detail_photos)),
+    detail_photo_sets: drop(rec(note.detail_photo_sets)),
+    combo_hidden: hidden,
+    option_axes: [
+      { key: "detail", label: "세부상품", values: kept },
+      ...(allColors.length ? [{ key: "color", label: "색상", values: allColors }] : []),
+      ...(allSizes.length ? [{ key: "size", label: "사이즈", values: allSizes }] : []),
+    ],
+    combo_detail_values: kept.filter((d) => !hidden.includes(d)),
+    brand_group: { ...group, detail_options: options, detail_categories: drop(rec(group.detail_categories)) },
+  };
+  return {
+    values: { price: newBase, color_options: kept, size_options: allSizes, detail_image_urls: strs(row.detail_image_urls).filter((u) => !removedUrls.has(u)), product_note: typeof row.product_note === "string" ? JSON.stringify(merged) : merged },
+    removed, added: [], basePriceBefore: base, basePriceAfter: newBase, untouchedChecked: kept.length, finalDetails: kept.length,
+  };
+}
+
+/** 세부상품 구분(패딩·의류…) 비우기 — 손님 화면 구분 칩이 안 보이게. 값만 비우고 다른 칸은 그대로. */
+export function clearDetailCategories(row: Row): unknown {
+  const note = noteObject(row.product_note);
+  const group = rec(note.brand_group);
+  const merged = { ...note, brand_group: { ...group, detail_categories: {} } };
+  return typeof row.product_note === "string" ? JSON.stringify(merged) : merged;
+}

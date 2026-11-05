@@ -59,6 +59,76 @@ export async function POST(request: NextRequest) {
   if (!(await verifyAdminSessionFromRequest(request))) return NextResponse.json({ error: "관리자 로그인이 필요합니다." }, { status: 401 });
   try {
     const body = await request.json().catch(() => ({}));
+    // [2026-11-05] 브랜드 묶음 썸네일 바꾸기 — products.image_url 한 칸만 쓴다(옛 주소는 응답에 돌려줌 = 되돌리기용).
+    if (body?.mode === "thumb") {
+      const dir = String(body?.dir || "");
+      if (!/^\/_import\/[a-z0-9_-]+\/$/i.test(dir)) return NextResponse.json({ error: "dir 확인" }, { status: 400 });
+      const list = (Array.isArray(body?.items) ? body.items : []) as { id: number; file: string }[];
+      if (!list.length || list.some((x) => !(Number(x.id) > 0) || !/^[a-z0-9_-]+\.jpg$/i.test(String(x.file)))) return NextResponse.json({ error: "items 확인" }, { status: 400 });
+      const sb = db();
+      const origin = request.nextUrl.origin;
+      const now = new Date();
+      const done: { id: number; oldUrl: string | null; newUrl: string }[] = [];
+      for (const x of list) {
+        const { data: row, error: re } = await sb.from("products").select("id, image_url").eq("id", x.id).single();
+        if (re || !row) throw new Error(`상품 ${x.id} 없음`);
+        const res = await fetch(origin + dir + x.file, { cache: "no-store" });
+        if (!res.ok) throw new Error(`사진 못 읽음 ${x.file}`);
+        const key = `products/cover/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-brand-${x.id}.jpg`;
+        const { error: ue } = await sb.storage.from("product-images").upload(key, new Uint8Array(await res.arrayBuffer()), { contentType: "image/jpeg", upsert: false });
+        if (ue) throw new Error(`사진 올리기 실패 ${x.file}: ${ue.message}`);
+        const newUrl = sb.storage.from("product-images").getPublicUrl(key).data.publicUrl;
+        const { error: pe } = await sb.from("products").update({ image_url: newUrl }).eq("id", x.id);
+        if (pe) throw new Error(`상품 ${x.id} 저장 실패: ${pe.message}`);
+        done.push({ id: x.id, oldUrl: (row.image_url as string | null) ?? null, newUrl });
+      }
+      return NextResponse.json({ mode: "thumb", done });
+    }
+    // [2026-11-05] 세부상품을 다른 브랜드 묶음으로 옮기기(예: 기타브랜드 MX-1 → 막스마라). run 아니면 계산만.
+    if (body?.mode === "movedetail") {
+      const from = Number(body?.from), to = Number(body?.to);
+      const name = String(body?.name || ""), newName = String(body?.newName || name);
+      if (!(from > 0) || !(to > 0) || !name || newName.includes("/")) return NextResponse.json({ error: "from/to/name 확인" }, { status: 400 });
+      const sb = db();
+      const lib = await import("@/lib/bulkImportMerge");
+      const { data: rows, error } = await sb.from("products").select("*").in("id", [from, to]);
+      if (error) throw error;
+      const src = (rows || []).find((r) => Number(r.id) === from), dst = (rows || []).find((r) => Number(r.id) === to);
+      if (!src || !dst) throw new Error("상품 없음");
+      const item = lib.readBrandDetail(src, name);
+      if (!item || !item.photoUrl) throw new Error(`${name}: 사이즈·사진을 못 읽음`);
+      const rm = lib.removeDetailsFromBrandRow(src, [name]);
+      const add = lib.mergeImportIntoBrandRow(dst, [{ ...item, code: newName, title: newName, category: "" }]);
+      const { data: ord } = await sb.from("orders").select("id, status, payment_status").eq("product_id", from).ilike("product_name", `%${name.replace(/[%_]/g, "")}%`).limit(50);
+      const { data: holds } = await sb.from("cart_reservations").select("id").eq("product_id", from).limit(50);
+      const info = { item, srcBase: [rm.basePriceBefore, rm.basePriceAfter], dstBase: [add.basePriceBefore, add.basePriceAfter], srcKept: rm.untouchedChecked, dstChecked: add.untouchedChecked, pastOrders: (ord || []).length, holdsOnSource: (holds || []).length };
+      if (body?.run !== true) return NextResponse.json({ mode: "movedetail", check: true, ...info });
+      const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
+      const { error: be } = await sb.storage.from("admin-private").upload(`backups/move-detail-${stamp}.json`, new Blob([JSON.stringify({ rows })], { type: "application/json" }), { contentType: "application/json", upsert: false });
+      if (be) throw new Error("백업 실패 — 안 옮김: " + be.message);
+      const { error: e1 } = await sb.from("products").update(add.values).eq("id", to);
+      if (e1) throw new Error("넣기 실패(아무것도 안 바뀜): " + e1.message);
+      const { error: e2 } = await sb.from("products").update(rm.values).eq("id", from);
+      if (e2) throw new Error("넣기는 됐는데 원래 묶음에서 빼기 실패: " + e2.message);
+      return NextResponse.json({ mode: "movedetail", done: true, backup: `admin-private/backups/move-detail-${stamp}.json`, ...info });
+    }
+    // [2026-11-05] 세부상품 구분(패딩·의류) 비우기 — 손님 화면 구분 칩 없애기. 백업 후 product_note 의 detail_categories 만 비움.
+    if (body?.mode === "clearcat") {
+      const ids = (Array.isArray(body?.ids) ? body.ids : []).map(Number).filter((n: number) => n > 0);
+      if (!ids.length) return NextResponse.json({ error: "ids 확인" }, { status: 400 });
+      const sb = db();
+      const { clearDetailCategories } = await import("@/lib/bulkImportMerge");
+      const { data: rows, error } = await sb.from("products").select("id, product_note").in("id", ids);
+      if (error) throw error;
+      const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
+      const { error: be } = await sb.storage.from("admin-private").upload(`backups/clear-cat-${stamp}.json`, new Blob([JSON.stringify({ rows })], { type: "application/json" }), { contentType: "application/json", upsert: false });
+      if (be) throw new Error("백업 실패 — 안 바꿈: " + be.message);
+      for (const r of rows || []) {
+        const { error: ue } = await sb.from("products").update({ product_note: clearDetailCategories(r) }).eq("id", r.id);
+        if (ue) throw new Error(`${r.id} 저장 실패: ${ue.message}`);
+      }
+      return NextResponse.json({ mode: "clearcat", done: (rows || []).length, backup: `admin-private/backups/clear-cat-${stamp}.json` });
+    }
     const mode = body?.mode === "run" ? "run" : "check";
     const planPath = String(body?.plan || "");
     const broadcastId = String(body?.broadcastId || "");
@@ -122,7 +192,7 @@ export async function POST(request: NextRequest) {
         row = { ...blankBrandRowFrom(template as Record<string, unknown>, "막스마라", "MaxMara"), id: "NEW" };
       } else row = byId.get(t)!;
       const withUrls = [];
-      for (const it of list) withUrls.push({ code: it.code, title: it.title, price: it.price, sizes: it.sizes, category: it.category, photoUrl: await upload(it.images[0], it.code) });
+      for (const it of list) withUrls.push({ code: it.code, title: it.title, price: it.price, sizes: it.sizes, category: "", photoUrl: await upload(it.images[0], it.code) });
       const m = mergeImportIntoBrandRow(row, withUrls);
       let id = String(row.id);
       if (mode === "run") {

@@ -23,3 +23,16 @@ const blank = blankBrandRowFrom(row, '막스마라', 'MaxMara');
 const r2 = mergeImportIntoBrandRow({ ...blank, id: 0 }, [{ code: 'MX-101', title: 'MX-101 브라운', price: 420000, sizes: ['S'], category: '패딩', photoUrl: 'm' }]);
 assert.equal(r2.basePriceAfter, 420000);
 console.log('test-bulk-import-merge: ok');
+
+// [11-05] 옮기기·구분 비우기
+{
+  const lib = await import('../lib/bulkImportMerge.ts');
+  const row = { id: 1, product_name: 'A', price: 100, detail_image_urls: ['u1','u2'], product_note: { brand_group: { enabled: true, detail_options: { X: { colors: ['없음'], sizes: ['M'] }, Y: { colors: ['없음'], sizes: ['S','M'] } }, detail_categories: { X: '패딩', Y: '의류' } }, option_pricing: { X: 0, Y: 50 }, option_axes: [{ key: 'detail', values: ['X','Y'] }], detail_photo_sets: { X: ['u1'], Y: ['u2'] }, stock_variants: [{ color: 'X / 없음', size: 'M' }, { color: 'Y / 없음', size: 'S' }] } };
+  const it = lib.readBrandDetail(row, 'X');
+  if (it.price !== 100 || it.photoUrl !== 'u1' || it.sizes.join() !== 'M') throw new Error('readBrandDetail');
+  const r = lib.removeDetailsFromBrandRow(row, ['X']);
+  if (r.values.price !== 150 || r.values.product_note.option_pricing.Y !== 0 || r.values.color_options.join() !== 'Y' || r.values.detail_image_urls.join() !== 'u2') throw new Error('remove keeps Y price 150');
+  let threw = false; try { lib.removeDetailsFromBrandRow(row, ['Z']); } catch { threw = true; } if (!threw) throw new Error('missing name must throw');
+  const c = lib.clearDetailCategories(row); if (Object.keys(c.brand_group.detail_categories).length || !c.brand_group.detail_options.X) throw new Error('clearcat');
+  console.log('test-bulk-import-merge move/clear: ok');
+}
