@@ -5,6 +5,7 @@ import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 // [2026-11-05] 해외 엑셀 일괄등록용 읽기 전용 확인 주소 — 관리자만, 쓰기 없음.
 //   브랜드 묶음 상품(product_note.brand_group.enabled)과 대상 방송 연결 상태를 돌려준다.
 export const dynamic = "force-dynamic";
+export const maxDuration = 300; // 사진 193장 올리기
 
 function db() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
@@ -102,7 +103,13 @@ export async function POST(request: NextRequest) {
 
     if (mode === "run") {
       const backup = JSON.stringify({ at: stamp, rows: rows || [] });
-      const { error: be } = await sb.storage.from("product-images").upload(`backups/bulk-import-${stamp}.json`, new TextEncoder().encode(backup), { contentType: "application/json", upsert: false });
+      // 사진 저장소는 JSON 을 안 받음 → 비공개 저장소(admin-private, 방송알림 제외 명단과 같은 곳)
+      const { data: bk, error: gbe } = await sb.storage.getBucket("admin-private");
+      if (gbe || !bk) {
+        const { error: cbe } = await sb.storage.createBucket("admin-private", { public: false, fileSizeLimit: 2 * 1024 * 1024 });
+        if (cbe && !String(cbe.message || "").toLowerCase().includes("already")) throw new Error("백업 저장소 만들기 실패 — 등록 안 함: " + cbe.message);
+      }
+      const { error: be } = await sb.storage.from("admin-private").upload(`backups/bulk-import-${stamp}.json`, new Blob([backup], { type: "application/json" }), { contentType: "application/json", upsert: false });
       if (be) throw new Error("백업 저장 실패 — 등록 안 함: " + be.message);
     }
 
@@ -145,7 +152,7 @@ export async function POST(request: NextRequest) {
       }
       linked = links.length;
     }
-    return NextResponse.json({ mode, items: items.length, summary, linked, backup: mode === "run" ? `backups/bulk-import-${stamp}.json` : null });
+    return NextResponse.json({ mode, items: items.length, summary, linked, backup: mode === "run" ? `admin-private/backups/bulk-import-${stamp}.json` : null });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : JSON.stringify(e) }, { status: 500 });
   }
