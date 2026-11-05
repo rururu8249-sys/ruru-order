@@ -6762,7 +6762,7 @@ export default function OrderPage() {
 
   return (
     <OrderPageShell tone={uiV2 ? "v2" : undefined} edge16={uiS7} wide={uiPc}>
-      <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}.ruru-cat-scroll::-webkit-scrollbar{display:none}`}</style>
+      <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}.ruru-cat-scroll::-webkit-scrollbar{display:none}@keyframes ruruLivePing{0%{transform:scale(1);opacity:.6}100%{transform:scale(2.8);opacity:0}}@keyframes ruruNudge{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}@media (prefers-reduced-motion: reduce){.ruru-live-ping,.ruru-nudge-arrow{animation:none!important}}`}</style>
       {hasSavedInfo && <TopCustomerNav />}
       {/* [2026-09-20 실측] 손님 첫 화면에서 상품이 보이기까지 상단 «껍데기»가 388px였다.
           (헤더 59 + 앱설치 47 + 공지 41 + 밴드 40 + 방송카드 166 + 검색·정렬·배송비 ~130)
@@ -7019,7 +7019,13 @@ export default function OrderPage() {
                 </div>
               ) : null}
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
-                <span style={uiV2 ? { width: "9px", height: "9px", borderRadius: "50%", background: "#FFFFFF", flexShrink: 0, animation: "shimmer 1.2s ease-in-out infinite" } : { width: "9px", height: "9px", borderRadius: "50%", background: "#E8340A", flexShrink: 0, animation: "shimmer 1.2s ease-in-out infinite" }} />
+                {/* [2026-11-05 사장님 「라이브 중일 때 움직이는 모습」 — 구아바 참고] 새 모양: 빨간 점 + 퍼져 나가는 물결(동작 줄이기 설정이면 멈춤). 표시만 */}
+                {uiV2 ? (
+                  <span aria-hidden="true" style={{ position: "relative", width: "10px", height: "10px", flexShrink: 0 }}>
+                    <span className="ruru-live-ping" style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "#FF3B30", animation: "ruruLivePing 1.4s ease-out infinite" }} />
+                    <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "#FF3B30" }} />
+                  </span>
+                ) : <span style={{ width: "9px", height: "9px", borderRadius: "50%", background: "#E8340A", flexShrink: 0, animation: "shimmer 1.2s ease-in-out infinite" }} />}
                 <span style={{ fontSize: "14px", fontWeight: 900 }}>라이브 방송 중!</span>
                 <span style={uiV2 ? { marginLeft: "auto", fontSize: "13px", fontWeight: 400, opacity: 0.8 } : { marginLeft: "auto", fontSize: "11.5px", fontWeight: 700, opacity: 0.75 }}>
                   {String(broadcast?.broadcast_public_title || broadcast?.public_title || "").trim() || "루루동이 라이브"}
@@ -9371,9 +9377,20 @@ export default function OrderPage() {
                       {uiS5 ? "담은 상품이 없어요 · 채팅주문 하셨나요?" : "🛒 담은 상품이 없어요 · 💬 채팅주문 하셨나요?"}
                     </button>
                   ) : (
-                    <div style={uiV2 ? withPcBar({ position: "fixed", left: 0, right: 0, bottom: "calc(68px + env(safe-area-inset-bottom))", zIndex: 39, background: "#FFFFFF", border: "none", borderTop: "1px solid #E5E5E5", padding: "14px 16px", textAlign: "center", fontSize: "15px", fontWeight: 400, color: "#707072", fontFamily: "inherit", pointerEvents: "none" }) : { position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, background: "rgba(122,30,71,0.10)", backdropFilter: "blur(2.5px)", WebkitBackdropFilter: "blur(2.5px)", border: "1px solid rgba(122,30,71,0.22)", borderRadius: "12px", padding: "9px 14px", textAlign: "center", fontSize: "12px", fontWeight: 800, color: "#7A1E47", pointerEvents: "none" }}>
-                      {uiS5 ? "담은 상품이 없어요" : "🛒 담은 상품이 없어요"}
+                  uiV2 ? (
+                    /* [2026-11-05 사장님 — 구아바 참고] 빈 장바구니 = 가운데 떠 있는 안내 알약. 누르면 상품 목록 맨 위로.
+                       방송 중엔 화살표가 위아래로 살짝 움직임(동작 줄이기 설정이면 멈춤). 담기·장바구니 로직 무접촉 */
+                    <button type="button"
+                      onClick={() => document.getElementById("ruru-shop-top")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                      style={{ position: "fixed", left: "50%", transform: "translateX(-50%)", bottom: "calc(80px + env(safe-area-inset-bottom))", zIndex: 39, display: "inline-flex", alignItems: "center", gap: "8px", height: "48px", padding: "0 20px", borderRadius: "9999px", background: "#FFFFFF", border: "1px solid #E5E5E5", boxShadow: "0 4px 16px rgba(0,0,0,0.12)", color: "#111111", fontSize: "15px", fontWeight: 600, whiteSpace: "nowrap", fontFamily: "inherit", cursor: "pointer" }}>
+                      <svg className="ruru-nudge-arrow" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block", animation: isBroadcastOn ? "ruruNudge 1.2s ease-in-out infinite" : "none" }}><path d="M12 19V5" /><path d="M6 11l6-6 6 6" /></svg>
+                      마음에 드는 상품을 담아주세요
+                    </button>
+                  ) : (
+                    <div style={{ position: "fixed", left: "10px", right: "10px", bottom: "calc(70px + env(safe-area-inset-bottom))", zIndex: 39, background: "rgba(122,30,71,0.10)", backdropFilter: "blur(2.5px)", WebkitBackdropFilter: "blur(2.5px)", border: "1px solid rgba(122,30,71,0.22)", borderRadius: "12px", padding: "9px 14px", textAlign: "center", fontSize: "12px", fontWeight: 800, color: "#7A1E47", pointerEvents: "none" }}>
+                      🛒 담은 상품이 없어요
                     </div>
+                  )
                   )
                 );
               }
