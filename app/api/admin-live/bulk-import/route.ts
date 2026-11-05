@@ -112,6 +112,61 @@ export async function POST(request: NextRequest) {
       if (e2) throw new Error("넣기는 됐는데 원래 묶음에서 빼기 실패: " + e2.message);
       return NextResponse.json({ mode: "movedetail", done: true, backup: `admin-private/backups/move-detail-${stamp}.json`, ...info });
     }
+    // [2026-11-05] 세부상품 사진 바꾸기(예전 사진 한자 정리) — 지금 칸의 주소가 oldUrl 과 같을 때만 바꿈. run 아니면 계산만.
+    if (body?.mode === "replacephoto") {
+      const dir = String(body?.dir || "");
+      if (!/^\/_import\/[a-z0-9_-]+\/$/i.test(dir)) return NextResponse.json({ error: "dir 확인" }, { status: 400 });
+      const list = (Array.isArray(body?.items) ? body.items : []) as { id: number; name: string; index: number; oldUrl: string; file: string }[];
+      if (!list.length || list.some((x) => !(Number(x.id) > 0) || !x.name || !(Number(x.index) >= 0) || !x.oldUrl || !/^[a-z0-9_-]+\.jpg$/i.test(String(x.file)))) return NextResponse.json({ error: "items 확인" }, { status: 400 });
+      const run = body?.run === true;
+      const sb = db();
+      const { noteObject } = await import("@/lib/bulkImportMerge");
+      const ids = [...new Set(list.map((x) => Number(x.id)))];
+      const { data: rows, error } = await sb.from("products").select("*").in("id", ids);
+      if (error) throw error;
+      const problems: string[] = [];
+      for (const x of list) {
+        const r = (rows || []).find((p) => Number(p.id) === Number(x.id));
+        const set = r ? noteObject(r.product_note).detail_photo_sets as Record<string, string[]> | undefined : undefined;
+        if (!set || set[x.name]?.[x.index] !== x.oldUrl) problems.push(`${x.id} ${x.name} ${x.index}`);
+      }
+      if (problems.length) return NextResponse.json({ error: "지금 사진 주소가 달라요 — 안 바꿈", problems }, { status: 409 });
+      if (!run) return NextResponse.json({ mode: "replacephoto", check: true, items: list.length, rows: ids.length });
+      const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
+      const { error: be } = await sb.storage.from("admin-private").upload(`backups/replace-photo-${stamp}.json`, new Blob([JSON.stringify({ rows })], { type: "application/json" }), { contentType: "application/json", upsert: false });
+      if (be) throw new Error("백업 실패 — 안 바꿈: " + be.message);
+      const now = new Date();
+      const uploaded = new Map<string, string>();
+      for (const file of [...new Set(list.map((x) => x.file))]) {
+        const res = await fetch(request.nextUrl.origin + dir + file, { cache: "no-store" });
+        if (!res.ok) throw new Error(`사진 못 읽음 ${file}`);
+        const key = `products/detail/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-ko-${file}`;
+        const { error: ue } = await sb.storage.from("product-images").upload(key, new Uint8Array(await res.arrayBuffer()), { contentType: "image/jpeg", upsert: false });
+        if (ue) throw new Error(`사진 올리기 실패 ${file}: ${ue.message}`);
+        uploaded.set(file, sb.storage.from("product-images").getPublicUrl(key).data.publicUrl);
+      }
+      const changed: { id: number; name: string; oldUrl: string; newUrl: string }[] = [];
+      for (const id of ids) {
+        const r = (rows || []).find((p) => Number(p.id) === id)!;
+        const note = noteObject(r.product_note);
+        const sets = { ...(note.detail_photo_sets as Record<string, string[]>) };
+        const photos = { ...((note.detail_photos as Record<string, string>) || {}) };
+        const swap = new Map<string, string>();
+        for (const x of list.filter((y) => Number(y.id) === id)) {
+          const nu = uploaded.get(x.file)!;
+          const arr = [...sets[x.name]]; arr[x.index] = nu;
+          sets[x.name] = [...new Set(arr)];
+          if (photos[x.name] === x.oldUrl) photos[x.name] = nu;
+          swap.set(x.oldUrl, nu);
+          changed.push({ id, name: x.name, oldUrl: x.oldUrl, newUrl: nu });
+        }
+        const urls = [...new Set((Array.isArray(r.detail_image_urls) ? r.detail_image_urls as string[] : []).map((u) => swap.get(u) || u))];
+        const merged = { ...note, detail_photo_sets: sets, detail_photos: photos };
+        const { error: pe } = await sb.from("products").update({ product_note: typeof r.product_note === "string" ? JSON.stringify(merged) : merged, detail_image_urls: urls }).eq("id", id);
+        if (pe) throw new Error(`${id} 저장 실패: ${pe.message}`);
+      }
+      return NextResponse.json({ mode: "replacephoto", done: changed.length, backup: `admin-private/backups/replace-photo-${stamp}.json`, changed });
+    }
     // [2026-11-05] 세부상품 구분(패딩·의류) 비우기 — 손님 화면 구분 칩 없애기. 백업 후 product_note 의 detail_categories 만 비움.
     if (body?.mode === "clearcat") {
       const ids = (Array.isArray(body?.ids) ? body.ids : []).map(Number).filter((n: number) => n > 0);
