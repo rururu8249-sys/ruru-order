@@ -6268,15 +6268,24 @@ export default function OrderPage() {
           <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
             {/* [2026-08-12 리뉴얼 1단계] 로고 — 집(대문) 아이콘 + 「루루동이 / 집구석 LIVE」 워드마크.
                 방송 중이면 LIVE 배지가 빨갛게, 아니면 차분한 로즈. 클릭 동작(/order)은 기존과 동일. */}
-            <Link href="/order" style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "3px", textDecoration: "none" }}>
+            <Link href="/order" style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: uiV2 && isBroadcastOn ? "10px" : "3px", textDecoration: "none" }}>
               {/* [2026-08-30 사장님 요청] 직접 그린 집 아이콘이 어설퍼서 표준 집 이모지(🏠)로 교체.
                   기기(아이폰/안드로이드/윈도우)마다 그림이 조금씩 다르게 나오는 건 이모지 특성이다. */}
-              <span style={{ fontSize: "25px", lineHeight: 1, display: "block" }} aria-hidden>🏠</span>
+              {uiV2 && isBroadcastOn ? (
+                /* [2026-11-05 사장님 「라이브 중일 때 깜빡깜빡」 — 구아바 참고] 방송 중이면 로고 둘레 빨간 테두리 + 물결 두 겹이 퍼져 나감.
+                   크기는 그대로 34px(머리말 높이 안 바뀜). 동작 줄이기 설정이면 멈춤. 표시만 */
+                <span aria-hidden style={{ position: "relative", width: "34px", height: "34px", flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                  <span className="ruru-live-ring" style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "2px solid #FF3B30", animation: "ruruLiveRing 1.6s ease-out infinite" }} />
+                  <span className="ruru-live-ring" style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "2px solid #FF3B30", animation: "ruruLiveRing 1.6s ease-out 0.8s infinite" }} />
+                  <span style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "2px solid #FF3B30", background: "#FFFFFF" }} />
+                  <span style={{ position: "relative", fontSize: "19px", lineHeight: 1, display: "block" }}>🏠</span>
+                </span>
+              ) : <span style={{ fontSize: "25px", lineHeight: 1, display: "block" }} aria-hidden>🏠</span>}
               <span style={{ lineHeight: 1.05 }}>
                 <span style={uiV2 ? { display: "block", fontSize: "16px", fontWeight: 700, letterSpacing: "-0.02em", color: "#111111" } : { display: "block", fontSize: "15.5px", fontWeight: 900, letterSpacing: "-0.02em", color: "#7A1E47" }}>루루동이</span>
                 <span style={uiV2 ? { display: "flex", alignItems: "center", gap: "4px", marginTop: "2px", fontSize: "13px", fontWeight: 600, color: "#707072" } : { display: "flex", alignItems: "center", gap: "3px", marginTop: "2px", fontSize: "10px", fontWeight: 800, color: "#A8807F" }}>
                   집구석
-                  <span style={uiV2 ? { fontSize: "13px", fontWeight: 700, color: broadcast ? "#D30005" : "#707072", letterSpacing: "0.02em" } : { fontSize: "8.5px", fontWeight: 900, color: "#fff", background: broadcast ? "#E8340A" : "#B98A9C", borderRadius: "4px", padding: "1px 4px", letterSpacing: "0.05em" }}>LIVE</span>
+                  <span className={uiV2 && isBroadcastOn ? "ruru-live-blink" : undefined} style={uiV2 && isBroadcastOn ? { fontSize: "13px", fontWeight: 700, color: "#FFFFFF", background: "#FF3B30", borderRadius: "9999px", padding: "0 7px", letterSpacing: "0.04em", animation: "ruruLiveBlink 1.2s ease-in-out infinite" } : uiV2 ? { fontSize: "13px", fontWeight: 700, color: broadcast ? "#D30005" : "#707072", letterSpacing: "0.02em" } : { fontSize: "8.5px", fontWeight: 900, color: "#fff", background: broadcast ? "#E8340A" : "#B98A9C", borderRadius: "4px", padding: "1px 4px", letterSpacing: "0.05em" }}>LIVE</span>
                 </span>
               </span>
             </Link>
@@ -6762,7 +6771,7 @@ export default function OrderPage() {
 
   return (
     <OrderPageShell tone={uiV2 ? "v2" : undefined} edge16={uiS7} wide={uiPc}>
-      <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}.ruru-cat-scroll::-webkit-scrollbar{display:none}@keyframes ruruLivePing{0%{transform:scale(1);opacity:.6}100%{transform:scale(2.8);opacity:0}}@keyframes ruruNudge{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}@media (prefers-reduced-motion: reduce){.ruru-live-ping,.ruru-nudge-arrow{animation:none!important}}`}</style>
+      <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:0.6}}.ruru-cat-scroll::-webkit-scrollbar{display:none}@keyframes ruruLivePing{0%{transform:scale(1);opacity:.6}100%{transform:scale(2.8);opacity:0}}@keyframes ruruNudge{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}@keyframes ruruLiveRing{0%{transform:scale(1);opacity:.8}100%{transform:scale(1.7);opacity:0}}@keyframes ruruLiveBlink{0%,100%{opacity:1}50%{opacity:.45}}@media (prefers-reduced-motion: reduce){.ruru-live-ping,.ruru-nudge-arrow,.ruru-live-ring,.ruru-live-blink{animation:none!important}}`}</style>
       {hasSavedInfo && <TopCustomerNav />}
       {/* [2026-09-20 실측] 손님 첫 화면에서 상품이 보이기까지 상단 «껍데기»가 388px였다.
           (헤더 59 + 앱설치 47 + 공지 41 + 밴드 40 + 방송카드 166 + 검색·정렬·배송비 ~130)
