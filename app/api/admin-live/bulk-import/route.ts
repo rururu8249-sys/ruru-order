@@ -35,8 +35,9 @@ export async function GET(request: NextRequest) {
     }
     const brands = rows.filter((r) => String(r.status || "") !== "deleted" && (noteOf(r.product_note).brand_group as Record<string, unknown> | undefined)?.enabled === true)
       .map((r) => ({ ...r, product_note: noteOf(r.product_note) }));
-    const { data: bcs, error: bErr } = await sb.from("broadcasts").select("*").ilike("title", `%${title}%`).limit(5);
+    const { data: allBc, error: bErr } = await sb.from("broadcasts").select("*").order("id", { ascending: false }).limit(80);
     if (bErr) throw bErr;
+    const bcs = (allBc || []).filter((b) => Object.values(b).some((v) => typeof v === "string" && v.includes(title))).slice(0, 5);
     const links: Record<string, unknown[]> = {};
     for (const b of bcs || []) {
       const { data } = await sb.from("broadcast_products").select("product_id, sort_order, is_visible").eq("broadcast_id", b.id);
