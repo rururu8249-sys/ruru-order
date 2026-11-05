@@ -164,4 +164,23 @@ const issueRows = mod.buildPickRows([order(11, 'paid', [it(21, 1, '레드', 'S')
 assert.equal(issueRows.find(r => r.id === '22').skip, true);
 assert.equal(issueRows.find(r => r.id === '21').skip, undefined, '대상 아닌 줄은 그대로');
 assert.equal(mod.includedNote(issueRows.filter(r => r.color === '블랙')), '환불 1개 빼고');
+// [2026-11-05] 선택 모드 — 주문서에서 체크한 주문만, 서버 추가 작업 안 부름, 머리에 「선택한 주문 N건」
+{
+  let calls = 0; const prevFetch = globalThis.fetch;
+  globalThis.fetch = async (...a) => { if (String(a[0]).includes('picking-workspace')) calls += 1; return prevFetch(...a); };
+  const lateOnly = [order(9, 'paid', [it(31, 2, '아이보리', 'L')])];
+  exportAdditional = [order(8, 'paid', [it(8, 1, '레드', 'S')], {createdAt: '2026-10-20T10:00:00Z', paidAtFull: '2026-10-23T10:00:00Z'})];
+  let t2;
+  await act(async () => { t2 = Renderer.create(React.createElement(Panel, {orders: lateOnly, filterLabel: '선택한 주문 1건', selectedCount: 1, onClose() {}})); });
+  await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+  const txt = flat(t2.toJSON());
+  assert.equal(calls, 0, '선택 모드는 서버 추가 작업을 안 부른다');
+  assert.ok(txt.includes('선택한 주문 1건') && txt.includes('주문서에서 체크한 주문만'), '머리 = 선택한 주문 N건');
+  assert.ok(txt.includes('총 2개') && !txt.includes('고객8'), '체크한 주문만 보이고 범위 밖 늦은 입금은 안 붙음');
+  globalThis.fetch = prevFetch; exportAdditional = [];
+  // 범위가 너무 넓고 선택도 없으면 = 안내
+  let t3;
+  await act(async () => { t3 = Renderer.create(React.createElement(Panel, {orders: [], filterLabel: '', scopeTooWide: true, onClose() {}})); });
+  assert.ok(flat(t3.toJSON()).includes('주문서에서 주문을 체크하거나, 방송·날짜를 골라 주세요'));
+}
 console.log('test-picking-panel: ok');

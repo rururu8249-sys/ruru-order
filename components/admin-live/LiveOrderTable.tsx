@@ -580,6 +580,8 @@ export default function LiveOrderTable({
   // Keep the opened work batch visible even when a live completion changes workFilter.
   // Resolve current order data by ID, so cancellations/payment updates still apply.
   const [pickingOrderIds, setPickingOrderIds] = useState<Set<string>>(new Set());
+  // [2026-11-05 사장님 「선택한 주문서만 체크해서 물건챙기기」] 연 순간 체크한 주문이 있으면 그 주문만(필터·기간 무관), 없으면 필터 범위.
+  const [pickingSelectedOrders, setPickingSelectedOrders] = useState<LiveOrder[] | null>(null);
   // [2026-07-13] 담김 현황(장바구니 선점) 팝업 — 표시 전용, 주문/돈 로직 무관
   const [cartHoldsOpen, setCartHoldsOpen] = useState(false);
   const [cartHoldSummary, setCartHoldSummary] = useState({ cartCount: 0, totalQty: 0 });
@@ -816,6 +818,8 @@ export default function LiveOrderTable({
     setSelectedOrderIds((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   };
   const selectedExportOrders = orders.filter((o) => selectedOrderIds.has(String(o.id)) && o.paymentStatus !== "canceled");
+  // 물건챙기기 «선택 모드» 대상 — 체크한 주문 그대로(취소 줄도 넘겨 창의 「취소/제외」 대조에 쓰고, 목록에선 창이 뺀다).
+  const pickingSelectedFromTable = useMemo(() => orders.filter((o) => selectedOrderIds.has(String(o.id))), [orders, selectedOrderIds]);
 
   const updateFilter = <K extends keyof LiveOrderFilters>(key: K, value: LiveOrderFilters[K]) => {
     onFiltersChange({
@@ -989,7 +993,11 @@ export default function LiveOrderTable({
     {cartHoldsOpen ? <LiveCartHoldsModal onClose={() => { setCartHoldsOpen(false); void refreshCartHoldSummary(); }} /> : null}
 
     {pickingOpen ? (
-          <LivePickingPanel orders={pickingScopeTooWide ? [] : pickingModalSourceOrders.filter(order => pickingOrderIds.has(String(order.id)))} filterLabel={pickingScopeLabel} scopeTooWide={pickingScopeTooWide} onClose={() => { setPickingOpen(false); void onRefresh?.(); }} />
+          pickingSelectedOrders ? (
+            <LivePickingPanel orders={pickingSelectedOrders} filterLabel={`선택한 주문 ${pickingSelectedOrders.length}건`} selectedCount={pickingSelectedOrders.length} onClose={() => { setPickingOpen(false); setPickingSelectedOrders(null); void onRefresh?.(); }} />
+          ) : (
+            <LivePickingPanel orders={pickingScopeTooWide ? [] : pickingModalSourceOrders.filter(order => pickingOrderIds.has(String(order.id)))} filterLabel={pickingScopeLabel} scopeTooWide={pickingScopeTooWide} onClose={() => { setPickingOpen(false); void onRefresh?.(); }} />
+          )
     ) : null}
     {exportConfirm !== "" ? (
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setExportConfirm("")}>
@@ -1167,12 +1175,19 @@ export default function LiveOrderTable({
 
           <button
             type="button"
-            onClick={() => { setPickingOrderIds(new Set(pickingScopeTooWide ? [] : pickingModalSourceOrders.map(order => String(order.id)))); setPickingOpen(true); }}
-            disabled={!pickingScopeTooWide && pickingScopeOrders.length === 0}
-            className="rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
-            title="물건챙기기 체크리스트 팝업을 엽니다"
+            onClick={() => {
+              if (pickingSelectedFromTable.length > 0) { setPickingSelectedOrders(pickingSelectedFromTable); setPickingOpen(true); return; }
+              setPickingSelectedOrders(null);
+              setPickingOrderIds(new Set(pickingScopeTooWide ? [] : pickingModalSourceOrders.map(order => String(order.id)))); setPickingOpen(true);
+            }}
+            disabled={pickingSelectedFromTable.length === 0 && !pickingScopeTooWide && pickingScopeOrders.length === 0}
+            aria-label={pickingSelectedFromTable.length > 0 ? `물건챙기기 — 선택한 주문 ${pickingSelectedFromTable.length}건` : "물건챙기기 — 주문서 범위"}
+            className={pickingSelectedFromTable.length > 0
+              ? "rounded-xl border-2 border-ink bg-surface px-3 py-2 text-xs font-black text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
+              : "rounded-xl border border-line bg-surface px-3 py-2 text-xs font-black text-ink-soft hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"}
+            title={pickingSelectedFromTable.length > 0 ? "체크한 주문만 챙겨요(필터·기간과 상관없이)" : "주문서 필터 범위를 챙겨요 · 주문을 체크하면 그 주문만"}
           >
-            물건챙기기
+            {pickingSelectedFromTable.length > 0 ? `물건챙기기 · 선택 ${pickingSelectedFromTable.length}건` : "물건챙기기"}
           </button>
 
           <button

@@ -27,7 +27,7 @@ import { pulledForOf, shortDateWithWeekday } from "@/lib/orderPickPull";
 import { fetchExchangeMarks } from "@/lib/exchangeMarks";
 import { issueMarkKind, issueTargetItemIds, isStrikeKind, targetTextFromReturnReason } from "@/lib/orderIssueMarks";
 
-type Props = { orders: LiveOrder[]; filterLabel: string; scopeTooWide?: boolean; onClose: () => void };
+type Props = { orders: LiveOrder[]; filterLabel: string; scopeTooWide?: boolean; selectedCount?: number; onClose: () => void };
 
 /** 줄 종류 — normal(이 출고 주문) · past(지난 주문을 이 출고로 넘김) · late(범위 밖 늦은 입금) · repick(상품 변경 뒤 다시 챙기기) */
 export type PickKind = "normal" | "past" | "late" | "repick";
@@ -129,7 +129,9 @@ export function includedNote(rows: readonly PickRow[]): string {
 const productKey = (r: PickRow) => `${r.productId || ""}|${r.productName}`;
 const optionKey = (r: PickRow) => `${r.color}|${r.size}|${r.optionText}`;
 
-export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = false, onClose }: Props) {
+export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = false, selectedCount = 0, onClose }: Props) {
+  // [2026-11-05] 선택 모드 = 주문서에서 체크한 주문만(필터·기간 무관). 서버 «오늘 추가 작업»(범위 밖 늦은 입금·다시 챙기기)은 안 붙인다 — 고른 주문만 보이게.
+  const selectionMode = selectedCount > 0;
   // [10-25 20:51 사장님 「응」 — 물건챙기기 한 번에 다시 설계]
   //   보기는 «상품별»(한 장 = 상품 하나 → 옵션 → 누구에게 몇 개) · «손님별»(한 장 = 손님 하나 → 그 손님 물건 전부) 두 개뿐.
   //   ‹ › 버튼·손가락 좌우 밀기·PC ← → 키로 넘김, 끝에서 처음으로 끝없이 돈다.
@@ -153,6 +155,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
 
   // 오늘 추가 작업(범위 밖 늦은 입금·다시 챙기기) — 서버에서 한 번
   useEffect(() => {
+    if (selectionMode) return;
     let alive = true;
     void (async () => {
       try {
@@ -163,7 +166,7 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
       } catch (e) { if (alive) setExtraError(e instanceof Error ? e.message : "추가 작업을 불러오지 못했어요."); }
     })();
     return () => { alive = false; };
-  }, []);
+  }, [selectionMode]);
 
   const scopeBuilt = useMemo(() => buildPickRows(scopeTooWide ? [] : orders, "scope"), [orders, scopeTooWide]);
   const extraBuilt = useMemo(() => buildPickRows(scopeTooWide ? [] : extraOrders, "extra"), [extraOrders, scopeTooWide]);
@@ -534,7 +537,9 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
           <div className="flex items-start justify-between gap-2 max-sm:items-center">
             <div className="min-w-0 max-sm:flex max-sm:items-baseline max-sm:gap-2">
               <h2 className="shrink-0 text-[20px] font-bold text-ink max-sm:text-[18px]">물건챙기기</h2>
-              <p className="mt-0.5 truncate text-[13px] text-ink-soft max-sm:mt-0 max-sm:text-[12px]">{String(filterLabel || "").replace(/^방송:\s*/, "") || "주문서 범위"}</p>
+              {selectionMode
+                ? <p className="mt-0.5 truncate text-[13px] font-semibold text-ink max-sm:mt-0 max-sm:text-[12px]">선택한 주문 {selectedCount}건<span className="font-normal text-ink-soft"> · 주문서에서 체크한 주문만</span></p>
+                : <p className="mt-0.5 truncate text-[13px] text-ink-soft max-sm:mt-0 max-sm:text-[12px]">{String(filterLabel || "").replace(/^방송:\s*/, "") || "주문서 범위"}</p>}
             </div>
             <button type="button" onClick={onClose} aria-label="닫기" className="h-10 w-10 shrink-0 rounded-lg text-[22px] text-ink-soft hover:bg-surface-2">×</button>
           </div>
@@ -619,8 +624,8 @@ export default function LivePickingPanel({ orders, filterLabel, scopeTooWide = f
 
         {/* 한 장 */}
         <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto bg-surface-2 px-3 py-3">
-          {scopeTooWide ? <div className="py-16 text-center text-[14px] font-semibold text-ink-soft">주문서에서 방송이나 날짜를 먼저 골라 주세요</div> : null}
-          {!scopeTooWide && !loading && !page ? <div className="py-16 text-center text-[14px] font-semibold text-ink-soft">챙길 상품이 없어요<span className="mt-1 block text-[13px] font-normal">주문서에서 다른 방송이나 날짜를 골라 보세요{!showUnpaid && unpaidAll > 0 ? " · 위 「미결제 보기」로 미결제를 볼 수 있어요" : ""}</span></div> : null}
+          {scopeTooWide ? <div className="py-16 text-center text-[14px] font-semibold text-ink-soft">챙길 주문을 정해 주세요<span className="mt-1 block text-[13px] font-normal">주문서에서 주문을 체크하거나, 방송·날짜를 골라 주세요</span></div> : null}
+          {!scopeTooWide && !loading && !page ? <div className="py-16 text-center text-[14px] font-semibold text-ink-soft">챙길 상품이 없어요<span className="mt-1 block text-[13px] font-normal">{selectionMode ? "체크한 주문이 취소됐거나 상품이 없어요" : "주문서에서 다른 방송이나 날짜를 골라 보세요"}{!showUnpaid && unpaidAll > 0 ? " · 위 「미결제 보기」로 미결제를 볼 수 있어요" : ""}</span></div> : null}
           {!scopeTooWide && page ? (() => {
             const c = countLine(page.rows);
             const targets = bulkTargets(page.rows);
