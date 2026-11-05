@@ -3,7 +3,7 @@
 // 방송 위젯 (OBS 브라우저 소스용) — 시안 6번.
 // - 고정 상품(products.is_pinned): 카드 1개 좌하단 표시(📌)
 // - 순환 상품(활성 방송 broadcast_products): 몇 초마다 스르륵 자동 전환
-// - 주문 들어오면 "🛒 ○○님 주문!" 2~3초 표시 후 사라짐 (orders INSERT 실시간)
+// - 주문 들어오면 «주문 완료», 입금확인·카드결제완료면 «결제 완료» 스티커가 카드 위에 3초 (orders 실시간, 2026-11-05 기본 켬)
 // - 배경 투명(크로마키). 읽기 전용 — 돈/주문 로직 건드리지 않음.
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -84,6 +84,71 @@ const CARD_FIXED_H_CONST = 200 + 120;
 
 // 주문성공(초록) / 입금·카드완료(파랑) 알림 배너
 type ToastItem = { icon: string; title: string; name: string; detail: string; tone: "green" | "blue" };
+
+// [2026-11-05 사장님] 닉네임은 가리지(마스킹) 않고, 너무 길면 뒤를 자른다(카드 폭 200 기준 10글자).
+function clipNick(raw: string): string {
+  const chars = Array.from(String(raw || "").trim());
+  if (chars.length === 0) return "손님";
+  return chars.length > 10 ? `${chars.slice(0, 9).join("")}…` : chars.join("");
+}
+
+// [2026-11-05 사장님 «구아바 참고, 베낀 티는 안 나게»] 주문·결제 소식 = 카드 위에 붙는 «스티커».
+//   흰 스티커가 살짝 기울어 톡 붙고, 위에 색 띠(주문 완료=초록 / 결제 완료=파랑) + 닉네임 크게 + 아래 한 줄(상품명·금액).
+//   표시 전용 — 어떤 주문을 띄울지(구독·중복 가드)는 그대로.
+function ToastSticker({ toast, standalone }: { toast: ToastItem; standalone?: boolean }) {
+  const tagBg = toast.tone === "green" ? "#16A34A" : "#2563EB";
+  return (
+    <div
+      data-ruru-widget-sticker
+      style={{
+        position: "relative",
+        width: standalone ? "100%" : "86%",
+        transform: "rotate(-3deg)",
+        animation: "ruruStickerIn 0.55s cubic-bezier(0.18,0.89,0.32,1.28) both",
+      }}
+    >
+      {/* 뒤에서 한 번 퍼지는 빛 고리 */}
+      <span
+        aria-hidden
+        data-ruru-widget-burst
+        style={{
+          position: "absolute", left: "50%", top: "50%", width: "120px", height: "120px", marginLeft: "-60px", marginTop: "-60px",
+          borderRadius: "50%", border: `3px solid ${tagBg}`, opacity: 0,
+          animation: "ruruStickerBurst 0.9s ease-out 0.1s both",
+        }}
+      />
+      <div
+        style={{
+          position: "relative", background: "#FFFFFF", borderRadius: "14px", overflow: "hidden",
+          boxShadow: "0 6px 18px rgba(0,0,0,0.35)", textAlign: "center", color: "#111111",
+        }}
+      >
+        <div
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: "5px",
+            background: tagBg, color: "#FFFFFF", fontSize: "13px", fontWeight: 900, lineHeight: 1, padding: "6px 8px",
+            letterSpacing: "0.02em",
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M5 12.5l4.5 4.5L19 7.5" />
+          </svg>
+          {toast.title}
+        </div>
+        <div style={{ padding: "8px 10px 9px" }}>
+          <div style={{ fontSize: "20px", fontWeight: 900, lineHeight: 1.15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {toast.name}
+          </div>
+          {toast.detail ? (
+            <div style={{ marginTop: "4px", fontSize: "12px", fontWeight: 800, lineHeight: 1.2, color: "#555555", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {toast.detail}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // 고객 주문서 주소 — QR로 그린다(파일 불필요, 항상 최신)
 
@@ -292,16 +357,15 @@ export default function ProductWidgetClient() {
   // [2026-09-11] ?preview=1 — 방송이 없어도 «사진 있는 최근 상품» 한 장을 띄워 위젯 모양을 미리 본다(읽기 전용).
   //   PRISM 에 소스를 붙일 때 크기·위치를 맞추는 용도. 실제 방송 중엔 붙이지 않는다(방송 목록이 우선).
   const [previewMode, setPreviewMode] = useState(false);
-  // [2026-09-13 사장님] 주문/입금/카드 말풍선은 이 위젯에선 «기본 OFF». 그 소식은 «주문·입금 알림» 위젯(/order-feed-widget)이 보여준다.
-  //   두 위젯을 같이 띄우면 같은 알림이 두 번 뜨고, 사장님이 «?toast=0 을 붙여라»는 설명을 이해할 수 없다고 하셔서
-  //   주소 옵션을 없앴다. 예전처럼 여기서도 띄우고 싶으면 주소 뒤에 ?toast=1 (설정 화면엔 안 적음).
-  //   재고 즉시 갱신은 그대로 돈다. 표시만 끈다.
-  const toastOffRef = useRef(true);
+  // [2026-09-13] 주문/입금 말풍선을 이 위젯에선 기본 OFF 로 뒀다가,
+  // [2026-11-05 사장님 «주문 완료·결제 완료도 상품 위젯에 띄우자, 알림 위젯은 켤 때만 나오니 그냥 두자»] 다시 «기본 켬».
+  //   상품 상관없이 모든 주문이 뜬다(사장님 선택). 끄고 싶을 때만 주소 뒤에 ?toast=0 (설정 화면엔 안 적음).
+  const toastOffRef = useRef(false);
   useEffect(() => {
     try {
       const q = new URLSearchParams(window.location.search);
       setPreviewMode(q.get("preview") === "1");
-      toastOffRef.current = q.get("toast") !== "1";
+      toastOffRef.current = q.get("toast") === "0";
     } catch { setPreviewMode(false); }
   }, []);
 
@@ -438,7 +502,7 @@ export default function ProductWidgetClient() {
 
   // 실시간 이벤트 토스트: 주문(INSERT) / 입금확인·카드결제완료(UPDATE). 실제 컬럼명 기준.
   useEffect(() => {
-    const nick = (row: AnyProduct) => String(row?.youtube_nickname || row?.nickname || row?.customer_name || "손님").trim();
+    const nick = (row: AnyProduct) => clipNick(String(row?.youtube_nickname || row?.nickname || row?.customer_name || "손님"));
     // 주문 row의 실제 금액 컬럼: submit route가 final_amount(=total_price=adjusted_total_price)에 합계를 저장. total_amount는 인서트에 없어 0원이 떴음.
     const amount = (row: AnyProduct) =>
       (Number(row?.final_amount ?? row?.total_amount ?? row?.totalAmount ?? row?.total_price ?? row?.adjusted_total_price ?? 0) || 0).toLocaleString("ko-KR");
@@ -470,7 +534,7 @@ export default function ProductWidgetClient() {
         if (seenRef.current.has(key)) return; // 한 주문(여러 상품행) 중복 방지
         seenRef.current.add(key);
         // 주문성공: "무엇을" 샀는지가 핵심 → 상품명. (입금완료는 "얼마" → 금액)
-        push({ icon: "🎉", title: "주문성공!", name: `${nick(row)}님`, detail: pname(row), tone: "green" });
+        push({ icon: "", title: "주문 완료", name: `${nick(row)}님`, detail: pname(row), tone: "green" });
       })
       // B·C. 입금 확인(자동/수동) / D. 카드 결제 완료
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, (payload) => {
@@ -487,7 +551,7 @@ export default function ProductWidgetClient() {
           const key = `dep:${groupKey(row)}`;
           if (!seenRef.current.has(key)) {
             seenRef.current.add(key);
-            push({ icon: "💰", title: "입금완료!", name: `${nick(row)}님`, detail: `${amount(row)}원`, tone: "blue" });
+            push({ icon: "", title: "결제 완료", name: `${nick(row)}님`, detail: `${amount(row)}원`, tone: "blue" });
           }
         }
 
@@ -496,7 +560,7 @@ export default function ProductWidgetClient() {
           const key = `card:${groupKey(row)}`;
           if (!seenRef.current.has(key)) {
             seenRef.current.add(key);
-            push({ icon: "💳", title: "카드결제완료!", name: `${nick(row)}님`, detail: `${amount(row)}원`, tone: "blue" });
+            push({ icon: "", title: "결제 완료", name: `${nick(row)}님`, detail: `${amount(row)}원`, tone: "blue" });
           }
         }
       })
@@ -512,6 +576,20 @@ export default function ProductWidgetClient() {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  // [2026-11-05] ?preview=1 에서는 가짜 소식(주문 완료 → 결제 완료)을 번갈아 띄워 스티커 모양을 미리 본다. 실제 주문과 무관.
+  useEffect(() => {
+    if (!previewMode || toastOffRef.current) return;
+    const demo: ToastItem[] = [
+      { icon: "", title: "주문 완료", name: `${clipNick("루루맛최고")}님`, detail: "미리보기 상품", tone: "green" },
+      { icon: "", title: "결제 완료", name: `${clipNick("닉네임이아주아주긴손님입니다")}님`, detail: "59,000원", tone: "blue" },
+    ];
+    let i = 0;
+    const fire = () => { setToastQueue((q) => [...q, demo[i % demo.length]]); i += 1; };
+    const first = window.setTimeout(fire, 1200);
+    const timer = window.setInterval(fire, 5000);
+    return () => { window.clearTimeout(first); window.clearInterval(timer); };
+  }, [previewMode]);
 
   // 큐에서 다음 토스트 꺼내기: 표시 중이 아니고 대기열이 있으면 하나 꺼낸다.
   useEffect(() => {
@@ -761,71 +839,59 @@ export default function ProductWidgetClient() {
               </div>
             </div>
 
-            {/* 주문성공(초록) / 입금·카드완료(파랑) 알림 — 3초 자동 소멸.
-                반투명 위에 흰 글씨를 얹으면 뭉개지므로 불투명 배경 + 흰 테두리 + 상세는 흰 알약으로. */}
-            {currentToast ? (
-              <div
+            {/* [2026-11-05] 판매 중 표시 — 사진 왼쪽 위 빨간 알약, 점이 숨 쉬듯 깜빡(품절이면 안 보임) */}
+            {!soldOut ? (
+              <span
+                data-ruru-widget-live
                 style={{
-                  position: "absolute", inset: 0, zIndex: 5,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  padding: "8px", background: "rgba(0,0,0,0.34)",
-                  animation: "ruruToastPop 0.5s cubic-bezier(0.18,0.89,0.32,1.28)",
+                  position: "absolute", top: "7px", left: "7px", zIndex: 3,
+                  display: "inline-flex", alignItems: "center", gap: "5px",
+                  background: "#FF3B30", color: "#FFFFFF", borderRadius: "999px", padding: "4px 8px 4px 7px",
+                  fontSize: "11px", fontWeight: 900, lineHeight: 1, letterSpacing: "0.02em",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.25)",
                 }}
               >
+                <span data-ruru-widget-live-dot style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#FFFFFF", animation: "ruruLiveDot 1.2s ease-in-out infinite" }} />
+                판매 중
+              </span>
+            ) : null}
+
+            {/* 주문 완료(초록) / 결제 완료(파랑) 스티커 — 3초 자동 소멸. 사진칸 가운데에 붙고, 카드 테두리가 그 색으로 한 번 번쩍 */}
+            {currentToast ? (
+              <>
                 <div
                   style={{
-                    width: "100%", borderRadius: "10px", padding: "9px 8px", textAlign: "center",
-                    background: currentToast.tone === "green" ? "#16a34a" : "#1d4ed8",
-                    border: "2px solid #fff",
-                    color: "#fff",
+                    position: "absolute", left: 0, right: 0, top: 0, height: `${CARD}px`, zIndex: 5,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: "rgba(0,0,0,0.22)", animation: "ruruDimIn 0.3s ease-out both",
                   }}
                 >
-                  <div style={{ fontSize: "14px", fontWeight: 900, lineHeight: 1.1 }}>
-                    {currentToast.icon} {currentToast.title}
-                  </div>
-                  <div style={{ marginTop: "2px", fontSize: "18px", fontWeight: 900, lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {currentToast.name}
-                  </div>
-                  {currentToast.detail ? (
-                    <div
-                      style={{
-                        marginTop: "4px", display: "inline-block", maxWidth: "100%",
-                        fontSize: "12px", fontWeight: 900,
-                        color: currentToast.tone === "green" ? "#0b3d1e" : "#0b2a5e",
-                        background: "#fff", borderRadius: "999px", padding: "3px 9px",
-                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                      }}
-                    >
-                      {currentToast.detail}
-                    </div>
-                  ) : null}
+                  <ToastSticker toast={currentToast} />
                 </div>
-              </div>
+                <span
+                  aria-hidden
+                  data-ruru-widget-flash
+                  style={{
+                    position: "absolute", inset: 0, zIndex: 6, borderRadius: "10px", pointerEvents: "none",
+                    border: `3px solid ${currentToast.tone === "green" ? "#22C55E" : "#3B82F6"}`,
+                    animation: "ruruRingFlash 1.4s ease-out both",
+                  }}
+                />
+              </>
             ) : null}
 
           </div>
         ) : currentToast ? (
-          // 띄운 상품이 없을 때도 주문/입금 알림은 보이게(카드 없이 배너만)
-          <div
-            style={{
-              background: currentToast.tone === "green" ? "#16a34a" : "#1d4ed8",
-              border: "2px solid #fff",
-              borderRadius: "10px", padding: "9px 10px", color: "#fff", textAlign: "center",
-              animation: "ruruToastPop 0.5s cubic-bezier(0.18,0.89,0.32,1.28)",
-            }}
-          >
-            <div style={{ fontSize: "14px", fontWeight: 900, lineHeight: 1.1 }}>{currentToast.icon} {currentToast.title}</div>
-            <div style={{ marginTop: "2px", fontSize: "18px", fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentToast.name}</div>
-            {currentToast.detail ? (
-              <div style={{ marginTop: "4px", display: "inline-block", maxWidth: "100%", fontSize: "12px", fontWeight: 900, color: currentToast.tone === "green" ? "#0b3d1e" : "#0b2a5e", background: "#fff", borderRadius: "999px", padding: "3px 9px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentToast.detail}</div>
-            ) : null}
+          // 띄운 상품이 없을 때도 주문/결제 소식은 보이게(카드 없이 스티커만)
+          <div style={{ padding: "6px 4px" }}>
+            <ToastSticker toast={currentToast} standalone />
           </div>
         ) : null}
 
         {/* 폭죽 — 카드 밖(앵커)에서 터뜨려야 카드 overflow:hidden 에 안 잘리고 시원하게 퍼진다.
             주문성공/입금완료/카드결제완료 어떤 알림이든 1회 재생(표시 전용). */}
         {confettiOn ? (
-          <div key={confettiKey} style={{ position: "absolute", left: "50%", top: "62%", width: 0, height: 0, pointerEvents: "none", zIndex: 9 }}>
+          <div key={confettiKey} style={{ position: "absolute", left: "50%", top: "31%", width: 0, height: 0, pointerEvents: "none", zIndex: 9 }}>
             {CONFETTI_PIECES.map((p, i) => (
               <span
                 key={i}
@@ -863,8 +929,27 @@ export default function ProductWidgetClient() {
           0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
           100% { transform: translate(var(--tx), var(--ty)) rotate(var(--r)); opacity: 0; }
         }
+        @keyframes ruruStickerIn {
+          0% { opacity: 0; transform: rotate(-12deg) scale(0.6); }
+          60% { opacity: 1; transform: rotate(1deg) scale(1.06); }
+          100% { opacity: 1; transform: rotate(-3deg) scale(1); }
+        }
+        @keyframes ruruStickerBurst {
+          0% { opacity: 0.9; transform: scale(0.4); }
+          100% { opacity: 0; transform: scale(1.9); }
+        }
+        @keyframes ruruDimIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes ruruRingFlash {
+          0% { opacity: 0; }
+          15% { opacity: 1; }
+          45% { opacity: 0.35; }
+          65% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+        @keyframes ruruLiveDot { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
         @media (prefers-reduced-motion: reduce) {
-          [data-ruru-widget-card] { animation: none !important; }
+          [data-ruru-widget-card], [data-ruru-widget-sticker], [data-ruru-widget-burst], [data-ruru-widget-flash], [data-ruru-widget-live-dot] { animation: none !important; }
+          [data-ruru-widget-burst] { display: none; }
         }
       `}</style>
     </div>
