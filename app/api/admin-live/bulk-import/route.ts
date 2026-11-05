@@ -112,6 +112,53 @@ export async function POST(request: NextRequest) {
       if (e2) throw new Error("넣기는 됐는데 원래 묶음에서 빼기 실패: " + e2.message);
       return NextResponse.json({ mode: "movedetail", done: true, backup: `admin-private/backups/move-detail-${stamp}.json`, ...info });
     }
+    // [2026-11-05] 묶음 나누기 — 한 묶음(예: 기타브랜드)의 같은 브랜드 세부상품 여러 개를 새 브랜드 묶음으로 옮기고 방송에 연결.
+    //   실제 판매가·사이즈·사진 그대로(이름만 newName), 남는 세부상품 판매가 고정 검사. run 아니면 계산만.
+    if (body?.mode === "splitbrand") {
+      const from = Number(body?.from);
+      const brandKo = String(body?.brandKo || "").trim(), brandEn = String(body?.brandEn || "").trim();
+      const broadcastId = String(body?.broadcastId || "");
+      const moves = (Array.isArray(body?.moves) ? body.moves : []) as { name: string; newName: string }[];
+      if (!(from > 0) || !brandKo || moves.length < 1 || moves.some((m) => !m?.name || !m?.newName || String(m.newName).includes("/"))) return NextResponse.json({ error: "from/brandKo/moves 확인" }, { status: 400 });
+      if (!/^[0-9a-f-]{36}$/.test(broadcastId)) return NextResponse.json({ error: "방송 id 확인" }, { status: 400 });
+      const sb = db();
+      const lib = await import("@/lib/bulkImportMerge");
+      const { data: src, error } = await sb.from("products").select("*").eq("id", from).single();
+      if (error || !src) throw new Error("원래 묶음 없음");
+      const items = moves.map((m) => {
+        const it = lib.readBrandDetail(src, m.name);
+        if (!it || !it.photoUrl) throw new Error(`${m.name}: 사이즈·사진을 못 읽음`);
+        return { ...it, code: m.newName, title: m.newName, category: "" };
+      });
+      const rm = lib.removeDetailsFromBrandRow(src, moves.map((m) => m.name));
+      const blank = lib.blankBrandRowFrom(src, brandKo, brandEn || brandKo);
+      const add = lib.mergeImportIntoBrandRow(blank, items);
+      const names = moves.map((m) => m.name);
+      const { data: ord } = await sb.from("orders").select("id, product_name").eq("product_id", from).limit(2000);
+      const pastOrders = (ord || []).filter((o) => names.some((n) => String(o.product_name || "").includes(n))).length;
+      const { data: holds } = await sb.from("cart_reservations").select("id, color").eq("product_id", from).limit(500);
+      const holdsOnMoved = (holds || []).filter((h) => names.some((n) => String(h.color || "").startsWith(n))).length;
+      const info = { brandKo, items: items.map((i) => ({ title: i.title, price: i.price, sizes: i.sizes })), srcBase: [rm.basePriceBefore, rm.basePriceAfter], srcKept: rm.untouchedChecked, newBase: add.basePriceAfter, pastOrders, holdsOnMoved };
+      if (body?.run !== true) return NextResponse.json({ mode: "splitbrand", check: true, ...info });
+      if (holdsOnMoved > 0) return NextResponse.json({ error: `장바구니에 담긴 줄 ${holdsOnMoved}개 — 안 옮김` }, { status: 409 });
+      const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
+      const { error: be } = await sb.storage.from("admin-private").upload(`backups/split-brand-${stamp}.json`, new Blob([JSON.stringify({ src })], { type: "application/json" }), { contentType: "application/json", upsert: false });
+      if (be) throw new Error("백업 실패 — 안 옮김: " + be.message);
+      const { data: created, error: ie } = await sb.from("products").insert({ ...blank, ...add.values }).select("id").single();
+      if (ie || !created) throw new Error("새 묶음 만들기 실패(아무것도 안 바뀜): " + (ie?.message || ""));
+      const newId = Number(created.id);
+      const { error: e2 } = await sb.from("products").update(rm.values).eq("id", from);
+      if (e2) {
+        await sb.from("products").delete().eq("id", newId);
+        throw new Error("원래 묶음에서 빼기 실패 — 새 묶음 지움: " + e2.message);
+      }
+      const { data: have } = await sb.from("broadcast_products").select("product_id, sort_order").eq("broadcast_id", broadcastId);
+      const srcLink = (have || []).find((h) => Number(h.product_id) === from);
+      const sort = srcLink ? Number(srcLink.sort_order) || 0 : Math.max(0, ...(have || []).map((h) => Number(h.sort_order) || 0)) + 1;
+      const { error: le } = await sb.from("broadcast_products").insert({ broadcast_id: broadcastId, product_id: newId, sort_order: sort, is_visible: true });
+      if (le) throw new Error(`새 묶음(${newId})은 만들고 옮겼는데 방송 연결 실패: ` + le.message);
+      return NextResponse.json({ mode: "splitbrand", done: true, newId, backup: `admin-private/backups/split-brand-${stamp}.json`, ...info });
+    }
     // [2026-11-05] 세부상품 사진 바꾸기(예전 사진 한자 정리) — 지금 칸의 주소가 oldUrl 과 같을 때만 바꿈. run 아니면 계산만.
     if (body?.mode === "replacephoto") {
       const dir = String(body?.dir || "");
