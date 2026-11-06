@@ -149,12 +149,12 @@ const rowBtnDanger: React.CSSProperties = { ...rowBtn, color: "var(--color-dange
 // [2026-10-21 a2-10] 방송 상품 줄 상태 배지(DESIGN-ADMIN §5: 12/600·높이 24·8px). 소개 중=검정 바탕 흰 글자, 순환=중립, 순환 제외=연한 글자.
 const ROT_BADGE_BASE: React.CSSProperties = { flexShrink: 0, display: "inline-flex", alignItems: "center", height: "24px", padding: "0 8px", borderRadius: "8px", fontSize: "12px", fontWeight: 600, whiteSpace: "nowrap" };
 const ROT_BADGE_LIVE: React.CSSProperties = { ...ROT_BADGE_BASE, color: "#fff", background: "var(--color-ink)" };
-// 「화면 나옴」 = 검정 바탕(켜짐), 일부만 = 검정 테두리, 「화면 안 나옴」 = 흐린 회색 테두리
+// 「순환 중 ✓」 = 검정 바탕, 일부만 = 검정 테두리, 「순환 넣기」 = 흰 바탕 보통 버튼
 const screenBtn = (on: boolean, partly: boolean): React.CSSProperties => on
   ? { ...rowBtnPrimary, minWidth: "92px" }
   : partly
     ? { ...rowBtn, minWidth: "92px", border: "1px solid var(--color-ink)" }
-    : { ...rowBtn, minWidth: "92px", color: "var(--color-ink-mute)" };
+    : { ...rowBtn, minWidth: "92px" };
 // [2026-10-21 a2-10 사장님] 숨긴 상품은 「눈 + 빨간 사선」 선 아이콘(이모지 금지)
 const HIDDEN_EYE_ICON = (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: "var(--color-ink-mute)" }}>
@@ -1320,26 +1320,23 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     if (details.length === 0) return sum + (rotationIncludedPids.has(pid) ? 1 : 0);
     return sum + details.filter((detail) => isDetailRotating(pid, detail)).length;
   }, 0);
-  // [2026-11-06 사장님 「뭐가 돌고 있는지 알기 힘들어」] 지금 방송 화면에 나오는 상품 이름(목록 순서)
-  const onScreenNames: string[] = widgetRotation.mode === "all" ? [] : bcAllPids.flatMap((pid) => {
-    const details = rotationDetailsOfRow(pid);
-    if (details.length === 0) {
-      const row = bcProducts.find((r) => productId(r) === pid);
-      return rotationIncludedPids.has(pid) && row ? [productName(row)] : [];
-    }
-    return details.filter((detail) => isDetailRotating(pid, detail)).map((detail) => detail.detailName);
-  });
   const onScreenFilterOn = onScreenOnly && widgetRotation.mode !== "all";
   const rotationAllowedIds = () => new Set(bcAllPids.flatMap(rotationPidsForRow));
   // [2026-11-06 사장님 「말이 어렵다, 실무에서 쓰기 쉽게」] 체크박스+넣기/빼기 두 단계 → 줄마다 「화면 나옴/안 나옴」 버튼 한 번으로 바로 저장.
   const saveRotationTargets = async (targets: WidgetProductTarget[], doneMessage: string) => {
     const allowed = rotationAllowedIds();
     const clean = dedupeRotationTargets(targets).filter((t) => allowed.has(String(t.productId)));
+    if (rotBusy) return;
     if (clean.length === 0) {
-      showAdminToast("화면에 나올 상품이 하나도 없어요. 하나는 남겨 주세요.", "warning");
+      // 고른 것을 다 빼면 = 고른 상품 없음 = 방송 상품 전부 순환
+      setRotBusy(true);
+      try {
+        if (await saveWidgetRotation({ mode: "all", paused: widgetRotation.paused, targets: [] })) showAdminToast("고른 상품이 없어서 방송 상품 전부가 돌아가요.", "success");
+      } finally {
+        setRotBusy(false);
+      }
       return;
     }
-    if (rotBusy) return;
     setRotBusy(true);
     try {
       if (await saveWidgetRotation({ mode: "selected", paused: widgetRotation.paused, targets: clean })) showAdminToast(doneMessage, "success");
@@ -1351,15 +1348,16 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     if (rotBusy) return;
     setRotBusy(true);
     try {
-      if (await saveWidgetRotation({ mode: "all", paused: widgetRotation.paused, targets: [] })) showAdminToast("방송 상품 전부 화면에 나와요.", "success");
+      if (await saveWidgetRotation({ mode: "all", paused: widgetRotation.paused, targets: [] })) showAdminToast("고른 상품을 모두 뺐어요. 방송 상품 전부가 돌아가요.", "success");
     } finally {
       setRotBusy(false);
     }
   };
   const rowTargets = (pid: string): WidgetProductTarget[] => rotationPidsForRow(pid).map((id) => ({ productId: id, detailName: "" }));
-  const currentBaseForAdd = (): WidgetProductTarget[] => widgetRotation.mode === "all" ? bcAllPids.flatMap(rowTargets) : currentRotationTargets;
+  // [2026-11-06 사장님 「순환시키고 싶은 상품 선택하면 그 상품만」] 아무것도 안 고른 상태(전부 순환)에서 하나 넣으면 → 그것만 도는 새 목록으로 시작
+  const currentBaseForAdd = (): WidgetProductTarget[] => widgetRotation.mode === "all" ? [] : currentRotationTargets;
   const showOnScreen = (adds: WidgetProductTarget[], label: string) =>
-    saveRotationTargets([...currentBaseForAdd(), ...adds], `화면에 나와요: ${label}`);
+    saveRotationTargets([...currentBaseForAdd(), ...adds], widgetRotation.mode === "all" ? `이제 이 상품만 돌아요: ${label}` : `순환에 넣었어요: ${label}`);
   const hideFromScreen = (rowPids: string[], details: RotationDetailRef[], label: string) =>
     saveRotationTargets(
       removeRotationTargets(
@@ -1368,7 +1366,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         details,
         (pid) => rotationDetailsOfRow(pid).filter((detail) => !("sourceProductId" in detail)).map((detail) => detail.detailName),
       ),
-      `화면에서 뺐어요: ${label}`,
+      `순환에서 뺐어요: ${label}`,
     );
   // 묶음 줄 버튼: 세부상품이 하나라도 빠져 있으면 → 전부 나오게, 전부 나오는 중이면 → 전부 빼기
   const toggleRowOnScreen = (p: ProductRow, onCount: number, total: number) => {
@@ -1377,11 +1375,28 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     if (fullyOn) return hideFromScreen([pid], [], productName(p));
     return showOnScreen(rowTargets(pid), productName(p));
   };
+  const isDetailPicked = (pid: string, detail: { detailName: string }) => widgetRotation.mode !== "all" && isDetailRotating(pid, detail);
   const toggleDetailOnScreen = (pid: string, detail: { detailName: string }) => {
     const ref = rotationDetailRef(pid, detail);
-    if (isDetailRotating(pid, detail)) return hideFromScreen([], [ref], detail.detailName);
+    if (isDetailPicked(pid, detail)) return hideFromScreen([], [ref], detail.detailName);
     return showOnScreen([detailRotationTarget(ref)], detail.detailName);
   };
+  // 위 칸 「순환 중인 상품」 — 묶음이 전부 들어 있으면 한 칸(「막스마라 전체 34개」), 일부면 세부상품마다 한 칸
+  type RotChip = { key: string; label: string; img: string; remove: () => void };
+  const rotationChips: RotChip[] = widgetRotation.mode === "all" ? [] : bcAllPids.flatMap((pid): RotChip[] => {
+    const row = bcProducts.find((r) => productId(r) === pid);
+    if (!row) return [];
+    const details = rotationDetailsOfRow(pid);
+    if (details.length === 0) {
+      return rotationIncludedPids.has(pid) ? [{ key: pid, label: productName(row), img: mainImage(row), remove: () => void hideFromScreen([pid], [], productName(row)) }] : [];
+    }
+    const on = details.filter((detail) => isDetailRotating(pid, detail));
+    if (on.length === 0) return [];
+    if (on.length === details.length && details.length > 1) {
+      return [{ key: pid, label: `${productName(row)} 전체 ${details.length}개`, img: mainImage(row), remove: () => void hideFromScreen([pid], [], productName(row)) }];
+    }
+    return on.map((detail) => ({ key: `${pid}|${detail.detailName}`, label: detail.detailName, img: detail.image || "", remove: () => void hideFromScreen([], [rotationDetailRef(pid, detail)], detail.detailName) }));
+  });
 
   const toggleWidgetLibraryPause = async () => {
     const next = { ...widgetRotation, paused: !widgetRotation.paused };
@@ -1838,24 +1853,33 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               <div style={{ padding: "8px 12px 0" }}>
                 {/* [2026-10-21 a2-10] 위젯 순환 = 한 줄 메뉴 + 줄 체크박스. 옛 「순환·고정 기록」 큰 상자(WidgetProductLibraryPanel) 는 이 탭에서 뺌(파일 보존). */}
                 {!bcCopyMode && bcSelId && bcProducts.length > 0 ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", margin: "0 0 8px" }}>
-                    <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--color-ink)" }}>방송 화면</span>
-                    <span style={{ fontSize: "13px", fontWeight: 600, color: widgetRotation.paused ? "var(--color-danger-tx)" : "var(--color-ink-soft)" }}>
-                      {!rotationLive ? "방송을 켜면 바꿀 수 있어요" : widgetRotation.paused ? "멈춤 · 지금 상품에 머물러 있어요" : widgetRotation.mode === "all" ? `전부 ${rotationSelectedCount}개가 돌아가며 나와요` : `고른 ${rotationSelectedCount}개만 돌아가며 나와요`}
-                    </span>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginLeft: "auto" }}>
-                      {widgetRotation.mode !== "all" ? <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void rotationUseAll()} title="고른 것을 풀고 방송 상품 전부 다시 돌아가며 나오게" style={{ ...rowBtnPrimary, height: "36px", opacity: rotationLive ? 1 : 0.5 }}>고른 것 해제</button> : null}
-                      <button type="button" disabled={!rotationLive} onClick={() => void toggleWidgetLibraryPause()} style={{ ...(widgetRotation.paused ? rowBtnPrimary : rowBtn), height: "36px", opacity: rotationLive ? 1 : 0.5, cursor: rotationLive ? "pointer" : "not-allowed" }}>{widgetRotation.paused ? "다시 돌리기" : "멈춤"}</button>
+                  <div style={{ margin: "0 0 8px", padding: "12px", border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                      <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--color-ink)" }}>방송 화면 순환</span>
+                      <span style={{ fontSize: "13px", fontWeight: 600, color: widgetRotation.paused ? "var(--color-danger-tx)" : "var(--color-ink-soft)" }}>
+                        {!rotationLive ? "방송을 켜면 바꿀 수 있어요" : widgetRotation.paused ? "멈춤 · 지금 상품에 머물러 있어요" : widgetRotation.mode === "all" ? "고른 상품이 없어서 방송 상품 전부가 돌아가요" : `고른 상품 ${rotationSelectedCount}개만 돌아가요`}
+                      </span>
+                      <button type="button" disabled={!rotationLive} onClick={() => void toggleWidgetLibraryPause()} style={{ ...(widgetRotation.paused ? rowBtnPrimary : rowBtn), height: "36px", marginLeft: "auto", opacity: rotationLive ? 1 : 0.5, cursor: rotationLive ? "pointer" : "not-allowed" }}>{widgetRotation.paused ? "다시 돌리기" : "멈춤"}</button>
                     </div>
-                  </div>
-                ) : null}
-                {!bcCopyMode && bcSelId && bcProducts.length > 0 && widgetRotation.mode !== "all" ? (
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "8px", margin: "0 0 8px", padding: "8px 12px", background: "var(--color-surface-2)", borderRadius: "8px" }}>
-                    <div style={{ flex: 1, minWidth: 0, fontSize: "13px", fontWeight: 600, color: "var(--color-ink)", lineHeight: 1.6, wordBreak: "keep-all" }}>
-                      <span style={{ fontWeight: 700 }}>지금 나오는 상품 {onScreenNames.length}개 </span>
-                      <span style={{ color: "var(--color-ink-soft)" }}>{onScreenNames.length === 0 ? "없음" : onScreenNames.slice(0, 8).join(" · ") + (onScreenNames.length > 8 ? ` 외 ${onScreenNames.length - 8}개` : "")}</span>
-                    </div>
-                    <button type="button" aria-pressed={onScreenOnly} onClick={() => setOnScreenOnly((v) => !v)} style={{ ...(onScreenOnly ? rowBtnPrimary : rowBtn), height: "32px" }}>{onScreenOnly ? "전체 보기" : "나오는 것만 보기"}</button>
+                    {widgetRotation.mode === "all" ? (
+                      <div style={{ marginTop: "8px", fontSize: "13px", fontWeight: 600, color: "var(--color-ink-soft)" }}>아래 상품 줄의 「순환 넣기」를 누르면 그 상품만 돌아요.</div>
+                    ) : (
+                      <>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px", maxHeight: "176px", overflowY: "auto" }}>
+                          {rotationChips.map((chip) => (
+                            <span key={chip.key} style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 4px 0 4px", border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface-2)", maxWidth: "100%" }}>
+                              {chip.img ? <img src={chip.img} alt="" style={{ width: "28px", height: "28px", borderRadius: "4px", objectFit: "cover", flexShrink: 0 }} /> : null}
+                              <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chip.label}</span>
+                              <button type="button" disabled={!rotationLive || rotBusy} onClick={chip.remove} aria-label={`${chip.label} 순환에서 빼기`} title="순환에서 빼기" style={{ width: "28px", height: "28px", flexShrink: 0, border: 0, borderRadius: "4px", background: "transparent", color: "var(--color-ink-soft)", fontSize: "16px", fontWeight: 700, cursor: rotationLive ? "pointer" : "not-allowed" }}>✕</button>
+                            </span>
+                          ))}
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
+                          <button type="button" aria-pressed={onScreenOnly} onClick={() => setOnScreenOnly((v) => !v)} style={{ ...(onScreenOnly ? rowBtnPrimary : rowBtn), height: "36px" }}>{onScreenOnly ? "전체 상품 보기" : "순환 중인 것만 보기"}</button>
+                          <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void rotationUseAll()} title="고른 상품을 모두 빼고 방송 상품 전부가 돌게" style={{ ...rowBtn, height: "36px", color: "var(--color-danger-tx)", marginLeft: "auto", opacity: rotationLive ? 1 : 0.5 }}>모두 빼기</button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ) : null}
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="상품명 검색" style={TAB_SEARCH_STYLE} />
@@ -1979,8 +2003,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       const rowHidden = isProductHidden(p);
                       const rotDetailOn = isBrandFolder && widgetRotation.mode !== "all" ? allDetails.filter((detail) => isDetailRotating(pid, detail)).length : 0;
                       const rowRotBadge = parentPinned ? "소개 중" : "";
-                      const rowOnCount = widgetRotation.mode === "all" ? allDetails.length : rotDetailOn;
-                      const rowFullyOn = widgetRotation.mode === "all" || (isBrandFolder ? rotDetailOn === allDetails.length : rotationIncludedPids.has(pid));
+                      const rowOnCount = rotDetailOn;
+                      const rowFullyOn = widgetRotation.mode !== "all" && (isBrandFolder ? rotDetailOn === allDetails.length : rotationIncludedPids.has(pid));
                       const rowPartly = isBrandFolder && !rowFullyOn && rowOnCount > 0;
                       return (
                         <div key={pid || i} draggable={bcDragEnabled}
@@ -2001,13 +2025,13 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             {!isBrandFolder && !bcCopyMode ? (parentPinned
                               ? <button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void clearBroadcastPin(); }} title="소개를 끝내고 방송 화면을 다시 자동 순환으로" style={rowBtnPrimary}>{bcPinBusy ? "정리 중…" : "소개 끝"}</button>
                               : <button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void broadcastOneClick(p); }} title="방송 화면에 이 상품만 띄우고 안내문을 복사" style={rowBtn}>소개</button>) : null}
-                            {!bcCopyMode ? <button type="button" disabled={!rotationLive || rotBusy} aria-pressed={rowFullyOn} onClick={(e) => { e.stopPropagation(); void toggleRowOnScreen(p, rowOnCount, allDetails.length); }} title={!rotationLive ? "방송을 켜면 바꿀 수 있어요" : rowFullyOn ? "누르면 방송 화면에서 빠져요" : "누르면 방송 화면에 나와요"} style={{ ...screenBtn(rowFullyOn, rowPartly), opacity: rotationLive ? 1 : 0.5 }}>{rowFullyOn ? "화면 나옴" : rowPartly ? `${rowOnCount}/${allDetails.length} 나옴` : "화면 안 나옴"}</button> : null}
+                            {!bcCopyMode ? <button type="button" disabled={!rotationLive || rotBusy} aria-pressed={rowFullyOn} onClick={(e) => { e.stopPropagation(); void toggleRowOnScreen(p, rowOnCount, allDetails.length); }} title={!rotationLive ? "방송을 켜면 바꿀 수 있어요" : rowFullyOn ? "누르면 순환에서 빠져요" : isBrandFolder ? "누르면 이 묶음 전부 순환에 들어가요" : "누르면 순환에 들어가요"} style={{ ...screenBtn(rowFullyOn, rowPartly), opacity: rotationLive ? 1 : 0.5 }}>{rowFullyOn ? "순환 중 ✓" : rowPartly ? `순환 ${rowOnCount}/${allDetails.length}` : isBrandFolder ? "전체 순환 넣기" : "순환 넣기"}</button> : null}
                             {!bcCopyMode ? <button type="button" disabled={hideBusyId === pid || !canToggleHidden(p)} onClick={(e) => { e.stopPropagation(); void toggleProductHidden(p); }} title={rowHidden ? "숨김 — 누르면 손님 화면에 다시 보여요" : "보이는 중 — 누르면 손님 화면에서 숨겨요(이 목록엔 남음)"} aria-label={rowHidden ? "숨김 상품, 누르면 보이기" : "보이는 상품, 누르면 숨기기"} aria-pressed={rowHidden} style={{ ...eyeBtn(rowHidden), opacity: hideBusyId === pid ? 0.5 : 1 }}>{rowHidden ? HIDDEN_EYE_ICON : SHOWN_EYE_ICON}</button> : null}
                             <button type="button" onClick={(e) => { e.stopPropagation(); editProduct(p); }} style={rowBtn}>수정</button>
                             {!bcCopyMode ? <button type="button" onClick={(e) => { e.stopPropagation(); openBcStockFlow(pid); }} title="이 상품 재고 흐름" style={rowBtn}>재고</button> : null}
                             <button type="button" disabled={bcBusy} onClick={(e) => { e.stopPropagation(); void removeBcProduct(pid); }} title="이 방송 목록에서만 뺌(상품은 남음)" style={{ ...rowBtnDanger, opacity: bcBusy ? 0.6 : 1 }}>빼기</button>
                           </div>
-                          {isBrandFolder && expanded ? <div style={{ borderTop: "1px solid var(--color-line)", padding: "8px", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", gap: "6px" }}>{detailRows.map((detail) => { const pinned=isBroadcastPinned(pid,detail.detailName); const optionText=[detail.colors.length?`색상 ${detail.colors.join(",")}`:"",detail.sizes.length?`사이즈 ${detail.sizes.join(",")}`:""].filter(Boolean).join(" · ")||"옵션 없음"; const detailOn = isDetailRotating(pid, detail); return <div key={broadcastPinKey(pid,detail.detailName)} style={{ display:"grid",gridTemplateColumns:bcCopyMode?"44px minmax(0,1fr) auto auto":"44px minmax(0,1fr) auto auto auto",gap:"8px",alignItems:"center",border:pinned?"2px solid var(--color-rose-deep)":"1px solid var(--color-line)",borderRadius:"8px",padding:"8px",background:pinned?"var(--color-rose-soft)":"var(--color-surface)" }}><button type="button" onClick={()=>detail.image&&setLightbox(detail.image)} style={{width:42,height:42,border:0,borderRadius:7,overflow:"hidden",padding:0,background:"var(--color-surface-2)"}}>{detail.image?<img src={detail.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:null}</button><div style={{minWidth:0}}><div style={{display:"flex",alignItems:"center",gap:"6px",minWidth:0}}><span style={{fontSize:"12px",fontWeight:900,color:"var(--color-ink)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{detail.detailName}</span>{pinned?<span style={ROT_BADGE_LIVE}>소개 중</span>:null}</div><div style={{fontSize:"11px",fontWeight:800,color:"var(--color-rose-deep)",marginTop:2}}>{detail.price.toLocaleString("ko-KR")}원</div><div style={{fontSize:"11px",fontWeight:700,color:"var(--color-ink-soft)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{optionText}{detail.stockManaged&&detail.stock!==null?` · 재고 ${detail.stock}`:""}</div></div>{!bcCopyMode?<button type="button" disabled={!rotationLive||rotBusy} aria-pressed={detailOn} onClick={()=>void toggleDetailOnScreen(pid,detail)} title={!rotationLive?"방송을 켜면 바꿀 수 있어요":detailOn?"누르면 방송 화면에서 빠져요":"누르면 방송 화면에 나와요"} style={{...screenBtn(detailOn,false),opacity:rotationLive?1:0.5}}>{detailOn?"화면 나옴":"화면 안 나옴"}</button>:null}{pinned?<button type="button" disabled={bcPinBusy} onClick={()=>void clearBroadcastPin()} title="소개를 끝내고 방송 화면을 다시 자동 순환으로" style={rowBtnPrimary}>{bcPinBusy?"정리 중…":"소개 끝"}</button>:<button type="button" disabled={bcPinBusy} onClick={()=>void broadcastOneClick(p,detail)} title="방송 화면에 이 상품만 띄우고 안내문을 복사" style={rowBtn}>소개</button>}<button type="button" aria-label={`${detail.detailName} 수정`} onClick={(event)=>{event.stopPropagation();editProduct(p,detail.detailName);}} style={rowBtn}>수정</button></div>})}</div> : null}
+                          {isBrandFolder && expanded ? <div style={{ borderTop: "1px solid var(--color-line)", padding: "8px", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", gap: "6px" }}>{detailRows.map((detail) => { const pinned=isBroadcastPinned(pid,detail.detailName); const optionText=[detail.colors.length?`색상 ${detail.colors.join(",")}`:"",detail.sizes.length?`사이즈 ${detail.sizes.join(",")}`:""].filter(Boolean).join(" · ")||"옵션 없음"; const detailOn = isDetailPicked(pid, detail); return <div key={broadcastPinKey(pid,detail.detailName)} style={{ display:"grid",gridTemplateColumns:bcCopyMode?"44px minmax(0,1fr) auto auto":"44px minmax(0,1fr) auto auto auto",gap:"8px",alignItems:"center",border:pinned?"2px solid var(--color-rose-deep)":"1px solid var(--color-line)",borderRadius:"8px",padding:"8px",background:pinned?"var(--color-rose-soft)":"var(--color-surface)" }}><button type="button" onClick={()=>detail.image&&setLightbox(detail.image)} style={{width:42,height:42,border:0,borderRadius:7,overflow:"hidden",padding:0,background:"var(--color-surface-2)"}}>{detail.image?<img src={detail.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:null}</button><div style={{minWidth:0}}><div style={{display:"flex",alignItems:"center",gap:"6px",minWidth:0}}><span style={{fontSize:"12px",fontWeight:900,color:"var(--color-ink)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{detail.detailName}</span>{pinned?<span style={ROT_BADGE_LIVE}>소개 중</span>:null}</div><div style={{fontSize:"11px",fontWeight:800,color:"var(--color-rose-deep)",marginTop:2}}>{detail.price.toLocaleString("ko-KR")}원</div><div style={{fontSize:"11px",fontWeight:700,color:"var(--color-ink-soft)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{optionText}{detail.stockManaged&&detail.stock!==null?` · 재고 ${detail.stock}`:""}</div></div>{!bcCopyMode?<button type="button" disabled={!rotationLive||rotBusy} aria-pressed={detailOn} onClick={()=>void toggleDetailOnScreen(pid,detail)} title={!rotationLive?"방송을 켜면 바꿀 수 있어요":detailOn?"누르면 순환에서 빠져요":"누르면 순환에 들어가요"} style={{...screenBtn(detailOn,false),opacity:rotationLive?1:0.5}}>{detailOn?"순환 중 ✓":"순환 넣기"}</button>:null}{pinned?<button type="button" disabled={bcPinBusy} onClick={()=>void clearBroadcastPin()} title="소개를 끝내고 방송 화면을 다시 자동 순환으로" style={rowBtnPrimary}>{bcPinBusy?"정리 중…":"소개 끝"}</button>:<button type="button" disabled={bcPinBusy} onClick={()=>void broadcastOneClick(p,detail)} title="방송 화면에 이 상품만 띄우고 안내문을 복사" style={rowBtn}>소개</button>}<button type="button" aria-label={`${detail.detailName} 수정`} onClick={(event)=>{event.stopPropagation();editProduct(p,detail.detailName);}} style={rowBtn}>수정</button></div>})}</div> : null}
                         </div>
                       );
                     })}
