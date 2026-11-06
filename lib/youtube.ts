@@ -273,6 +273,26 @@ export async function resolveLiveChatId(sb: SupabaseClient, accessToken: string)
   return "";
 }
 
+// [2026-11-06] 하루 한도 아끼기 — 같은 방송(영상)이면 찾아 둔 채팅방 번호를 다시 쓴다(글 하나에 1씩 아낌).
+//   방송 URL 이 바뀌거나 저장값이 비면 새로 찾는다. 글 올리기 실패 시엔 위에서 저장값을 비우고 다시 찾는다.
+async function cachedLiveChatId(sb: SupabaseClient, accessToken: string): Promise<string> {
+  try {
+    const videoId = extractVideoId(await readActiveBroadcastLiveUrl(sb));
+    if (videoId) {
+      const [cachedVideo, cachedChat] = await Promise.all([readSetting(sb, SETTING_LIVE_VIDEO_ID), readSetting(sb, SETTING_LIVE_CHAT_ID)]);
+      if (cachedVideo === videoId && cachedChat) return cachedChat;
+    }
+    const chatId = await resolveLiveChatId(sb, accessToken);
+    if (chatId && videoId) {
+      await writeSetting(sb, SETTING_LIVE_VIDEO_ID, videoId);
+      await writeSetting(sb, SETTING_LIVE_CHAT_ID, chatId);
+    }
+    return chatId;
+  } catch {
+    return resolveLiveChatId(sb, accessToken);
+  }
+}
+
 export type PostResult = { ok: boolean; skipped?: boolean; reason?: string };
 
 // ---- 채팅 글 1건 작성 (핵심) ----
@@ -323,7 +343,7 @@ export async function postLiveChatMessage(messageText: string, opts?: { forceEve
     const accessToken = await getAccessToken(refreshToken);
     // [2026-08-14] 호출측이 chatId를 이미 알고 있으면 그대로 쓴다(채팅봇 테스트 URL 모드).
     //   없을 때만 기존 3순위 해석 — 기존 알림 동작 무변경.
-    let liveChatId = String(opts?.liveChatId || "").trim() || (await resolveLiveChatId(sb, accessToken));
+    let liveChatId = String(opts?.liveChatId || "").trim() || (await cachedLiveChatId(sb, accessToken));
     if (!liveChatId) return { ok: false, skipped: true, reason: "활성 라이브 채팅을 찾지 못함(라이브 URL 확인)" };
 
     const postOnce = async (chatId: string) => {
@@ -363,7 +383,7 @@ export async function postLiveChatMessage(messageText: string, opts?: { forceEve
       if (e1.reason.includes("liveChatNotFound") || e1.reason.includes("liveChatEnded") || e1.status === 404 || e1.status === 403) {
         // 캐시된 chatId가 만료(이전 방송)일 수 있음 → 캐시 비우고 1회 재조회 후 재시도
         await writeSetting(sb, SETTING_LIVE_CHAT_ID, "");
-        liveChatId = await resolveLiveChatId(sb, accessToken);
+        liveChatId = await cachedLiveChatId(sb, accessToken);
         if (!liveChatId) return { ok: false, reason: "활성 라이브 채팅 없음(재조회 실패)" };
         res = await postOnce(liveChatId);
         if (!res.ok) {

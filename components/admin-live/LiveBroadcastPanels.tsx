@@ -352,7 +352,8 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
       } catch { /* 무시 */ }
     };
     load();
-    const t = setInterval(load, 25000);
+    // [2026-11-06] 유튜브 하루 한도 아끼기 — 25초 → 60초(시청자 수 확인 한 번에 1씩 씀)
+    const t = setInterval(load, 60000);
     return () => { alive = false; clearInterval(t); };
   }, []);
   const [liveIdx, setLiveIdx] = useState(0);

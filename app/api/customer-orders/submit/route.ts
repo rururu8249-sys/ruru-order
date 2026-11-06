@@ -26,6 +26,9 @@ import {
 } from "@/lib/orderPurchaseConsent";
 import { purchaseLimitProductSelect } from "@/lib/orderSchemaQueries";
 
+// [2026-11-06] 주문 알림 채팅을 20초 묶어 올리느라 응답 뒤 작업(after)이 길어짐 — 응답 속도와는 무관.
+export const maxDuration = 60;
+
 export const dynamic = "force-dynamic";
 
 type AnyRow = Record<string, any>;
@@ -896,12 +899,23 @@ export async function POST(request: NextRequest) {
         const rows = normalizedSubmit.orderRows;
         // YouTube 실시간 채팅은 메시지당 200자 제한. 180자로 여유를 두고 분할한다.
         // 모든 상품/옵션/색상/사이즈/수량/상품별 금액을 생략 없이 보낸다("외 N개" 축약 금지).
-        const messages = buildYoutubeOrderAnnouncementMessages({
-          nickname: youtubeNickname || customerName,
-          rows,
-          maxChars: 180,
-        });
-        const { postLiveChatMessage } = await import("@/lib/youtube");
+        // [2026-11-06] 하루 한도 아끼기 — 주문마다 바로 올리지 않고 대기열에 넣은 뒤 20초 묶어 한 줄로(lib/orderChatBatch).
+        //   대기열 저장이 실패하면 예전처럼 이 주문만 바로 올린다.
+        const { postLiveChatMessage, getServiceClient } = await import("@/lib/youtube");
+        const batch = await import("@/lib/orderChatBatch");
+        const db = getServiceClient();
+        const queued = await batch.enqueueOrderChat(db, batch.orderChatEntry(youtubeNickname || customerName, rows, Date.now()));
+        if (!queued) {
+          const messages = buildYoutubeOrderAnnouncementMessages({ nickname: youtubeNickname || customerName, rows, maxChars: 180 });
+          for (let i = 0; i < messages.length; i += 1) {
+            await postLiveChatMessage(messages[i]);
+            if (i < messages.length - 1) await new Promise((resolve) => setTimeout(resolve, 3000));
+          }
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, batch.ORDER_CHAT_BATCH_MS));
+        const due = await batch.takeDueOrderChats(db, Date.now());
+        const messages = batch.buildOrderChatBatchMessages(due);
         for (let i = 0; i < messages.length; i += 1) {
           await postLiveChatMessage(messages[i]);
           if (i < messages.length - 1) await new Promise((resolve) => setTimeout(resolve, 3000));
