@@ -14,6 +14,7 @@ import { resolveBroadcastBrandProducts } from "@/lib/productBrandLinks";
 import { loadProductBrandCatalog } from "@/lib/productBrandCatalogClient";
 import { splitOptionText } from "@/lib/optionSplit";
 import { compressSizeList } from "@/lib/sizeRange";
+import { cleanProductNameForFeed } from "@/lib/feedText";
 import {
   parseWidgetRotation,
   parseWidgetHistory,
@@ -83,7 +84,7 @@ const GLASS_BG = "rgba(20, 17, 24, 0.42)";   // 사진 빈칸 + 글자 띠 공�
 const CARD_FIXED_H_CONST = 200 + 120;
 
 // 주문성공(초록) / 입금·카드완료(파랑) 알림 배너
-type ToastItem = { icon: string; title: string; name: string; detail: string; tone: "green" | "blue" };
+type ToastItem = { icon: string; title: string; name: string; detail: string; tone: "green" | "blue"; amount?: string };
 
 // [2026-11-05 사장님] 닉네임은 가리지(마스킹) 않고, 너무 길면 뒤를 자른다(스티커 폭 기준 7글자 넘으면 6글자+…, 뒤 「님」은 항상 보이게).
 function clipNick(raw: string): string {
@@ -195,9 +196,12 @@ function ToastSticker({ toast, standalone }: { toast: ToastItem; standalone?: bo
             {toast.name}
           </div>
           {toast.detail ? (
-            <div style={{ marginTop: "4px", fontSize: "12px", fontWeight: 800, lineHeight: 1.2, color: "#555555", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <div style={{ marginTop: "4px", fontSize: "13px", fontWeight: 800, lineHeight: 1.25, color: "#444444", wordBreak: "keep-all", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
               {toast.detail}
             </div>
+          ) : null}
+          {toast.amount ? (
+            <div style={{ marginTop: "3px", fontSize: "16px", fontWeight: 900, lineHeight: 1.1, color: "#2563EB" }}>{toast.amount}</div>
           ) : null}
         </div>
       </div>
@@ -558,9 +562,7 @@ export default function ProductWidgetClient() {
   // 실시간 이벤트 토스트: 주문(INSERT) / 입금확인·카드결제완료(UPDATE). 실제 컬럼명 기준.
   useEffect(() => {
     const nick = (row: AnyProduct) => clipNick(String(row?.youtube_nickname || row?.nickname || row?.customer_name || "손님"));
-    // 주문 row의 실제 금액 컬럼: submit route가 final_amount(=total_price=adjusted_total_price)에 합계를 저장. total_amount는 인서트에 없어 0원이 떴음.
-    const amount = (row: AnyProduct) =>
-      (Number(row?.final_amount ?? row?.total_amount ?? row?.totalAmount ?? row?.total_price ?? row?.adjusted_total_price ?? 0) || 0).toLocaleString("ko-KR");
+    // 주문 row의 실제 금액 컬럼: final_amount(=total_price=adjusted_total_price). 결제완료 금액은 아래 sumAmount 가 주문서 줄을 합친다.
     const pname = (row: AnyProduct) => String(row?.product_name || row?.name || "상품").trim();
     // 입금/카드 상태가 기록되는 실제 컬럼들
     const statusOf = (row: AnyProduct) => String(row?.admin_order_status_v2 || row?.order_manage_status || row?.deposit_status || "").trim();
@@ -579,17 +581,47 @@ export default function ProductWidgetClient() {
       }, 400);
     };
 
+    // [2026-11-06 사장님 «주문완료엔 상품명·옵션, 결제완료엔 상품명·옵션·금액 간략하게»]
+    //   한 주문서의 상품 줄은 거의 동시에 여러 번 들어오므로 0.6초 모아서 한 번만 띄운다.
+    //   보여주는 글: 「첫 상품명 블랙/L 외 N종」 + (결제완료만) 합계 금액. 표시 전용 — 금액 계산·상태 판정 무변경.
+    const optOf = (row: AnyProduct) =>
+      [row?.color, row?.size]
+        .map((v) => String(v ?? "").replace(/사이즈\s*/g, "").trim())
+        .filter((v) => v && !EMPTY_OPTION_WORDS.has(v.toLowerCase()))
+        .join("/");
+    const itemLine = (rows: AnyProduct[]) => {
+      if (rows.length === 0) return "";
+      const first = rows[0];
+      const label = `${cleanProductNameForFeed(pname(first))}${optOf(first) ? ` ${optOf(first)}` : ""}`;
+      return rows.length > 1 ? `${label} 외 ${rows.length - 1}종` : label;
+    };
+    const sumAmount = (rows: AnyProduct[]) =>
+      rows.reduce((t, r) => t + (Number(r?.final_amount ?? r?.total_amount ?? r?.total_price ?? r?.adjusted_total_price ?? 0) || 0), 0);
+    const buffers = new Map<string, { rows: AnyProduct[]; timer: number }>();
+    const collect = (key: string, row: AnyProduct, make: (rows: AnyProduct[]) => ToastItem) => {
+      const open = buffers.get(key);
+      if (open) {
+        if (!open.rows.some((r) => String(r?.id) === String(row?.id))) open.rows.push(row);
+        return;
+      }
+      if (seenRef.current.has(key)) return; // 한 주문(여러 상품행) 중복 방지
+      seenRef.current.add(key);
+      const entry = { rows: [row], timer: 0 };
+      entry.timer = window.setTimeout(() => { buffers.delete(key); push(make(entry.rows)); }, 600);
+      buffers.set(key, entry);
+    };
+    const paidToast = (rows: AnyProduct[]): ToastItem => ({
+      icon: "", title: "결제완료", name: `${nick(rows[0])}님`, detail: itemLine(rows),
+      amount: `${sumAmount(rows).toLocaleString("ko-KR")}원`, tone: "blue",
+    });
+
     const channel = supabase
       .channel("ruru-product-widget-events")
       // A. 주문서 작성 완료
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, (payload) => {
         const row = (payload.new || {}) as AnyProduct;
         scheduleStockReload(); // 재고 즉시 갱신(중복 토스트 가드보다 먼저 — 상품행마다 재고가 줄기 때문)
-        const key = `ins:${groupKey(row)}`;
-        if (seenRef.current.has(key)) return; // 한 주문(여러 상품행) 중복 방지
-        seenRef.current.add(key);
-        // 주문성공: "무엇을" 샀는지가 핵심 → 상품명. (입금완료는 "얼마" → 금액)
-        push({ icon: "", title: "주문완료", name: `${nick(row)}님`, detail: pname(row), tone: "green" });
+        collect(`ins:${groupKey(row)}`, row, (rows) => ({ icon: "", title: "주문완료", name: `${nick(rows[0])}님`, detail: itemLine(rows), tone: "green" }));
       })
       // B·C. 입금 확인(자동/수동) / D. 카드 결제 완료
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, (payload) => {
@@ -603,20 +635,12 @@ export default function ProductWidgetClient() {
 
         // B·C. 입금확인 (자동입금확인/수동입금확인/입금확인)
         if (/입금확인/.test(status) && !/입금확인/.test(oldStatus)) {
-          const key = `dep:${groupKey(row)}`;
-          if (!seenRef.current.has(key)) {
-            seenRef.current.add(key);
-            push({ icon: "", title: "결제완료", name: `${nick(row)}님`, detail: `${amount(row)}원`, tone: "blue" });
-          }
+          collect(`dep:${groupKey(row)}`, row, paidToast);
         }
 
         // D. 카드 결제 완료
         if (status === "카드결제완료" && oldStatus !== "카드결제완료") {
-          const key = `card:${groupKey(row)}`;
-          if (!seenRef.current.has(key)) {
-            seenRef.current.add(key);
-            push({ icon: "", title: "결제완료", name: `${nick(row)}님`, detail: `${amount(row)}원`, tone: "blue" });
-          }
+          collect(`card:${groupKey(row)}`, row, paidToast);
         }
       })
       // [2026-07-12 사장님 지침] 즉각 반영 — 20초 폴링을 기다리지 않고 실시간으로 다시 읽는다.
@@ -628,6 +652,7 @@ export default function ProductWidgetClient() {
       .subscribe();
     return () => {
       if (reloadTimer) window.clearTimeout(reloadTimer);
+      buffers.forEach((b) => window.clearTimeout(b.timer));
       supabase.removeChannel(channel);
     };
   }, []);
@@ -636,8 +661,8 @@ export default function ProductWidgetClient() {
   useEffect(() => {
     if (!previewMode || toastOffRef.current) return;
     const demo: ToastItem[] = [
-      { icon: "", title: "주문완료", name: `${clipNick("예시손님")}님`, detail: "예시 상품명", tone: "green" },
-      { icon: "", title: "결제완료", name: `${clipNick("닉네임이아주아주긴손님입니다")}님`, detail: "59,000원", tone: "blue" },
+      { icon: "", title: "주문완료", name: `${clipNick("예시손님")}님`, detail: "예시 니트 가디건 블랙/M", tone: "green" },
+      { icon: "", title: "결제완료", name: `${clipNick("닉네임이아주아주긴손님입니다")}님`, detail: "예시 니트 가디건 블랙/M 외 1종", amount: "59,000원", tone: "blue" },
     ];
     let i = 0;
     const fire = () => { setToastQueue((q) => [...q, demo[i % demo.length]]); i += 1; };
