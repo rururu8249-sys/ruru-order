@@ -98,17 +98,19 @@ function clipNick(raw: string): string {
 //   표시 전용 — 어떤 주문을 띄울지(구독·중복 가드)는 그대로.
 // [2026-11-06 사장님 «폭죽은 잠깐 터지고 끝»] 폭죽을 길고 화려하게: ①가운데서 두 번 터짐(0초·0.35초, 두 번째는 좌우 반대로)
 //   ②위에서 색종이가 2.5초 동안 쏟아짐 ③조각마다 반짝반짝 깜빡임. 카드 밖으로는 안 나간다(카드가 잘라 줌).
-const CONFETTI_RAIN = Array.from({ length: 22 }, (_, i) => {
-  const colors = ["#FF3B30", "#FFD93D", "#22C55E", "#3B82F6", "#FF8AD8", "#FFFFFF", "#A855F7", "#FF9F0A"];
+// [2026-11-07 사장님 «과하게 화려한 것 말고 예쁘고 깔끔하게»] 반짝 깜빡임·빛 번짐을 빼고, 금색·흰색·연분홍 리본 조각이
+//   천천히(약 3~4초) 흔들리며 내려온다. 가운데 터짐은 한 번만.
+const CONFETTI_RAIN = Array.from({ length: 18 }, (_, i) => {
+  const colors = ["#F5C24B", "#FFFFFF", "#FFB3C7", "#F5C24B", "#FFFFFF", "#9FD8B4"];
   return {
-    left: `${(i * 37) % 100}%`,
-    size: 7 + ((i * 5) % 6),
+    left: `${(i * 37 + 5) % 96}%`,
+    size: 6 + ((i * 5) % 3),
     color: colors[i % colors.length],
-    round: i % 3 === 0,
-    delay: ((i * 0.13) % 1.2).toFixed(2),
-    dur: (1.6 + ((i * 7) % 9) / 10).toFixed(2),
-    drift: `${((i % 2 ? 1 : -1) * (10 + ((i * 11) % 30)))}px`,
-    spin: `${(i % 2 ? 1 : -1) * (360 + i * 40)}deg`,
+    round: i % 4 === 0,
+    delay: ((i * 0.17) % 1.6).toFixed(2),
+    dur: (2.8 + ((i * 7) % 10) / 10).toFixed(2),
+    drift: `${((i % 2 ? 1 : -1) * (12 + ((i * 11) % 24)))}px`,
+    spin: `${(i % 2 ? 1 : -1) * (180 + i * 20)}deg`,
   };
 });
 function ConfettiBurst({ burstKey }: { burstKey: number }) {
@@ -119,9 +121,8 @@ function ConfettiBurst({ burstKey }: { burstKey: number }) {
         style={{
           position: "absolute", width: `${p.size + 2}px`, height: `${p.size + 2}px`,
           borderRadius: p.round ? "50%" : "2px", background: p.color,
-          boxShadow: `0 0 6px ${p.color}`,
           ["--tx" as any]: mirror ? `calc(${p.tx} * -1)` : p.tx, ["--ty" as any]: p.ty, ["--r" as any]: p.r,
-          animation: `ruruConfetti ${(p.dur + 0.6).toFixed(2)}s cubic-bezier(0.15,0.7,0.3,1) ${delay}s both, ruruTwinkle 0.3s steps(2) ${delay}s infinite`,
+          animation: `ruruConfetti ${(p.dur + 0.9).toFixed(2)}s cubic-bezier(0.15,0.7,0.3,1) ${delay}s both`,
         }}
       />
     ));
@@ -129,16 +130,15 @@ function ConfettiBurst({ burstKey }: { burstKey: number }) {
     <div key={burstKey} aria-hidden data-ruru-widget-confetti style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
       <div style={{ position: "absolute", left: "50%", top: "50%", width: 0, height: 0 }}>
         {wave(false, 0)}
-        {wave(true, 0.35)}
       </div>
       {CONFETTI_RAIN.map((c, i) => (
         <span
           key={`r${i}`}
           style={{
-            position: "absolute", top: "-12px", left: c.left, width: `${c.size}px`, height: `${c.round ? c.size : c.size * 1.6}px`,
-            borderRadius: c.round ? "50%" : "2px", background: c.color, boxShadow: `0 0 5px ${c.color}`,
+            position: "absolute", top: "-12px", left: c.left, width: `${c.size}px`, height: `${c.round ? c.size : c.size * 2}px`,
+            borderRadius: c.round ? "50%" : "2px", background: c.color, opacity: 0.95,
             ["--dx" as any]: c.drift, ["--spin" as any]: c.spin,
-            animation: `ruruConfettiRain ${c.dur}s linear ${c.delay}s both, ruruTwinkle 0.35s steps(2) ${c.delay}s infinite`,
+            animation: `ruruConfettiRain ${c.dur}s ease-in-out ${c.delay}s both`,
           }}
         />
       ))}
@@ -155,7 +155,8 @@ function ToastSticker({ toast, standalone }: { toast: ToastItem; standalone?: bo
         position: "relative",
         width: standalone ? "100%" : "86%",
         transform: "rotate(-5deg)",
-        animation: "ruruStickerIn 0.6s cubic-bezier(0.18,0.89,0.32,1.28) both, ruruStickerWiggle 0.5s ease-in-out 0.65s 2",
+        // [2026-11-07] 흔들기 빼고 톡 붙은 뒤 가만히 — 사라질 때만 0.5초 부드럽게
+        animation: `ruruStickerIn 0.55s cubic-bezier(0.18,0.89,0.32,1.2) both, ruruStickerOut 0.5s ease-in ${(TOAST_SHOW_MS - 500) / 1000}s forwards`,
       }}
     >
       {/* [2026-11-06 사장님 «예수님처럼 빛만 비쳐»] 노란 별 모양 판·빛줄기는 뺐다 — 빛 고리 한 번만 남기고, 대신 폭죽을 크게 */}
@@ -353,6 +354,10 @@ function isAvailableWidgetProduct(p: AnyProduct | null): boolean {
   return status !== "deleted" && status !== "숨김" && !isSoldOutWidgetProduct(p);
 }
 
+// [2026-11-07 사장님 «고개 돌리는 순간 사라짐»] 스티커 3초 → 6초. 기다리는 소식이 쌓여 있으면 4.5초로(밀리지 않게).
+const TOAST_SHOW_MS = 6000;
+const TOAST_SHOW_BUSY_MS = 4500;
+
 // 주문성공/입금완료/카드결제완료 폭죽(표시 전용) — 카드 밖에서 사방으로 시원하게 퍼진다.
 //   [2026-07-09] 방송에서 잘 보이도록 입자 14 → 26개, 크기·비산거리 확대.
 const CONFETTI_PIECES = [
@@ -394,6 +399,7 @@ export default function ProductWidgetClient() {
   // [2026-07-06] 문자열 → 구조화(제목/닉네임/내용): 상품 카드를 살짝 덮는 축하 오버레이로 표시
   const [toastQueue, setToastQueue] = useState<ToastItem[]>([]);
   const [currentToast, setCurrentToast] = useState<ToastItem | null>(null);
+  const toastBusyRef = useRef(false);
   const seenRef = useRef<Set<string>>(new Set());
   // 입금확인 폭죽(표시 전용). key 증가로 애니메이션 재시작, on으로 1회 표시.
   const [confettiKey, setConfettiKey] = useState(0);
@@ -675,19 +681,20 @@ export default function ProductWidgetClient() {
   useEffect(() => {
     if (!previewMode || toastOffRef.current) return;
     const demo: ToastItem[] = [
-      { icon: "", title: "주문완료", name: `${clipNick("예시손님")}님`, detail: "예시 니트 가디건 블랙/M", tone: "green" },
+      { icon: "", title: "주문완료", name: `${clipNick("예시")}님`, detail: "예시 니트 가디건 블랙/M", tone: "green" },
       { icon: "", title: "결제완료", name: `${clipNick("닉네임이아주아주긴손님입니다")}님`, detail: "예시 니트 가디건 블랙/M 외 1종", tone: "blue" },
     ];
     let i = 0;
     const fire = () => { setToastQueue((q) => [...q, demo[i % demo.length]]); i += 1; };
     const first = window.setTimeout(fire, 1200);
-    const timer = window.setInterval(fire, 5000);
+    const timer = window.setInterval(fire, TOAST_SHOW_MS + 2000);
     return () => { window.clearTimeout(first); window.clearInterval(timer); };
   }, [previewMode]);
 
   // 큐에서 다음 토스트 꺼내기: 표시 중이 아니고 대기열이 있으면 하나 꺼낸다.
   useEffect(() => {
     if (currentToast || toastQueue.length === 0) return;
+    toastBusyRef.current = toastQueue.length > 1;
     setCurrentToast(toastQueue[0]);
     setToastQueue((q) => q.slice(1));
     // 어떤 토스트든(주문/입금확인/카드결제) 새로 표시되는 순간 폭죽 1회(표시 전용 — 큐/판정/금액 로직 무관)
@@ -699,14 +706,14 @@ export default function ProductWidgetClient() {
   // 큐 변경으로 재실행되며 타이머가 즉시 clear되던 버그 수정. 3초 후 사라지고 다음 큐로 넘어감)
   useEffect(() => {
     if (!currentToast) return;
-    const t = window.setTimeout(() => setCurrentToast(null), 3000);
+    const t = window.setTimeout(() => setCurrentToast(null), toastBusyRef.current ? TOAST_SHOW_BUSY_MS : TOAST_SHOW_MS);
     return () => window.clearTimeout(t);
   }, [currentToast]);
 
   // 폭죽 1회 재생 후 종료(1.4초). confettiKey가 바뀔 때마다 타이머 재무장.
   useEffect(() => {
     if (!confettiOn) return;
-    const t = window.setTimeout(() => setConfettiOn(false), 3400);
+    const t = window.setTimeout(() => setConfettiOn(false), 5200);
     return () => window.clearTimeout(t);
   }, [confettiKey, confettiOn]);
 
@@ -814,7 +821,7 @@ export default function ProductWidgetClient() {
               <div data-ruru-widget-photo style={{ position: "relative", flex: `1 1 ${CARD}px`, minHeight: 0, width: "100%", background: GLASS_BG, overflow: "hidden" }}>
                 {/* [2026-11-06 사장님 «저 사이만 밝다»] 어둡게 하는 막을 사진칸 «전체»에 깐다(예전엔 위 200px만 덮어 아래 띠가 밝게 남았음) */}
                 {currentToast ? (
-                  <span aria-hidden style={{ position: "absolute", inset: 0, zIndex: 4, pointerEvents: "none", background: "rgba(0,0,0,0.22)", animation: "ruruDimIn 0.3s ease-out both" }} />
+                  <span aria-hidden style={{ position: "absolute", inset: 0, zIndex: 4, pointerEvents: "none", background: "rgba(0,0,0,0.22)", animation: `ruruDimIn 0.3s ease-out both, ruruDimOut 0.5s ease-in ${((toastBusyRef.current ? TOAST_SHOW_BUSY_MS : TOAST_SHOW_MS) - 500) / 1000}s forwards` }} />
                 ) : null}
                 {/* [2026-09-19 사장님 «위아래 빈 공간이 거슬린다»] 사진 비율이 틀과 안 맞을 때 생기던 반투명 빈칸을
                     «같은 사진을 흐리게 키운 것»으로 채운다(쇼핑앱 상세 사진과 같은 방식). 틀은 고정, 사진은 안 잘리고, 빈칸은 없다. */}
@@ -966,7 +973,7 @@ export default function ProductWidgetClient() {
               </span>
             ) : null}
 
-            {/* 주문 완료(초록) / 결제 완료(파랑) 스티커 — 3초 자동 소멸. 사진칸 가운데에 붙고, 카드 테두리가 그 색으로 한 번 번쩍 */}
+            {/* 주문 완료(초록) / 결제 완료(파랑) 스티커 — 6초(쌓이면 4.5초) 뒤 부드럽게 사라짐. 사진칸 가운데에 붙고, 카드 테두리가 그 색으로 한 번 번쩍 */}
             {currentToast ? (
               <>
                 <div
@@ -984,7 +991,7 @@ export default function ProductWidgetClient() {
                   style={{
                     position: "absolute", inset: 0, zIndex: 6, borderRadius: "10px", pointerEvents: "none",
                     border: `3px solid ${currentToast.tone === "green" ? "#22C55E" : "#3B82F6"}`,
-                    animation: "ruruRingFlash 1.4s ease-out both",
+                    animation: `ruruRingFlash ${toastBusyRef.current ? TOAST_SHOW_BUSY_MS / 1000 : TOAST_SHOW_MS / 1000}s ease-out both`,
                   }}
                 />
               </>
@@ -1035,22 +1042,21 @@ export default function ProductWidgetClient() {
           0% { opacity: 0.9; transform: scale(0.4); }
           100% { opacity: 0; transform: scale(1.9); }
         }
-        @keyframes ruruStickerWiggle { 0%, 100% { transform: rotate(-5deg); } 30% { transform: rotate(-9deg) scale(1.03); } 70% { transform: rotate(-1deg); } }
         @property --ruru-ang { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
         @keyframes ruruRainbowSpin { to { --ruru-ang: 360deg; } }
         @keyframes ruruRainbowGlint { 0%, 100% { filter: brightness(1) saturate(1.1); } 50% { filter: brightness(1.45) saturate(1.4); } }
-        @keyframes ruruConfettiRain { 0% { opacity: 1; transform: translate(0, 0) rotate(0deg); } 85% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), 230px) rotate(var(--spin)); } }
-        @keyframes ruruTwinkle { 0% { filter: brightness(1.6); } 100% { filter: brightness(0.75); } }
+        @keyframes ruruConfettiRain { 0% { opacity: 0; transform: translate(0, 0) rotate(0deg); } 8% { opacity: 1; } 50% { transform: translate(calc(var(--dx) * -1), 120px) rotate(calc(var(--spin) / 2)); } 85% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), 240px) rotate(var(--spin)); } }
         @keyframes ruruStickerShine { from { transform: translateX(-120%); } to { transform: translateX(320%); } }
         @keyframes ruruPricePulse { 0%, 70%, 100% { transform: scale(1); } 82% { transform: scale(1.08); } 90% { transform: scale(0.98); } }
         @keyframes ruruDimIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes ruruRingFlash {
           0% { opacity: 0; }
-          15% { opacity: 1; }
-          45% { opacity: 0.35; }
-          65% { opacity: 1; }
+          6% { opacity: 1; }
+          90% { opacity: 1; }
           100% { opacity: 0; }
         }
+        @keyframes ruruDimOut { to { opacity: 0; } }
+        @keyframes ruruStickerOut { to { opacity: 0; transform: rotate(-3deg) scale(0.96); } }
         @keyframes ruruLiveDot { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
         @media (prefers-reduced-motion: reduce) {
           [data-ruru-widget-card], [data-ruru-widget-sticker], [data-ruru-widget-burst], [data-ruru-widget-flash], [data-ruru-widget-live-dot], [data-ruru-widget-price], [data-ruru-widget-rainbow] { animation: none !important; }
