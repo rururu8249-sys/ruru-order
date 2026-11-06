@@ -1407,6 +1407,13 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     await saveRotationTargets(checkedTargets(), `체크한 ${n}개만 순환해요.`);
     clearRotCheck();
   };
+  // [2026-11-06 사장님 「일부 순환 중에 추가하면 기존 순환이 다 사라짐」] 지금 도는 목록은 두고 체크한 것만 더함
+  const addCheckedToRotation = async () => {
+    if (rotCheckCount === 0) return;
+    const n = rotCheckCount;
+    await saveRotationTargets(dedupeRotationTargets([...currentBaseForAdd(), ...checkedTargets()]), `체크한 ${n}개를 순환에 추가했어요.`);
+    clearRotCheck();
+  };
   const removeCheckedFromRotation = async () => {
     if (rotCheckCount === 0 || widgetRotation.mode === "all") return;
     const n = rotCheckCount;
@@ -1909,7 +1916,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 {!bcCopyMode && rotCheckCount > 0 ? (
                   <div style={{ position: "sticky", top: 0, zIndex: 2, display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", margin: "0 0 8px", padding: "8px 12px", borderRadius: "8px", background: "var(--color-ink)" }}>
                     <span style={{ fontSize: "13px", fontWeight: 700, color: "#fff" }}>{rotCheckCount}개 체크</span>
-                    <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void rotateOnlyChecked()} style={{ ...rowBtn, height: "36px", marginLeft: "auto", opacity: rotationLive ? 1 : 0.5 }}>체크한 것만 순환</button>
+                    {widgetRotation.mode !== "all" ? <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void addCheckedToRotation()} style={{ ...rowBtn, height: "36px", marginLeft: "auto", opacity: rotationLive ? 1 : 0.5 }}>체크한 것 순환에 추가</button> : null}
+                    <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void rotateOnlyChecked()} style={{ ...rowBtn, height: "36px", marginLeft: widgetRotation.mode !== "all" ? undefined : "auto", opacity: rotationLive ? 1 : 0.5 }}>체크한 것만 순환</button>
                     {widgetRotation.mode !== "all" ? <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void removeCheckedFromRotation()} style={{ ...rowBtn, height: "36px", color: "var(--color-danger-tx)", opacity: rotationLive ? 1 : 0.5 }}>체크한 것 순환에서 빼기</button> : null}
                     <button type="button" onClick={clearRotCheck} style={{ ...rowBtn, height: "36px", background: "transparent", color: "#fff", border: "1px solid #fff" }}>체크 해제</button>
                   </div>

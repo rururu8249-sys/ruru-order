@@ -43,6 +43,11 @@ assert.ok(tree.root.findAll(n=>n.type==='span'&&n.children.join('')==='전부 �
 await act(async()=>{const c=checks();c[c.length-1].props.onChange();});
 await act(async()=>btns('체크한 것 순환에서 빼기')[0].props.onClick());
 assert.deepEqual(savedRotation.targets,[{productId:'1',detailName:''}],'checked detail removed from rotation');
+// 일부만 도는 중 → 체크한 것 순환에 추가 = 기존 목록 유지 + 더함
+await act(async()=>{const c=checks();c[c.length-1].props.onChange();});
+await act(async()=>btns('체크한 것 순환에 추가')[0].props.onClick());
+assert.deepEqual(new Set(savedRotation.targets.map(t=>t.productId)),new Set(['1','2']),'add keeps existing and appends checked');
+assert.equal(savedRotation.mode,'selected');
 // 묶음 줄 체크 → 체크한 것만 순환
 await act(async()=>checks()[0].props.onChange());
 await act(async()=>btns('체크한 것만 순환')[0].props.onClick());
