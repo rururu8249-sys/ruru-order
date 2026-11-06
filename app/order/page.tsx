@@ -5109,7 +5109,8 @@ export default function OrderPage() {
       const patch = {
         live_alert_optin: next,
         live_alert_optin_at: next ? new Date().toISOString() : null,
-        live_alert_optin_source: next ? "order_rail" : null,
+        // [2026-11-06] 손님이 직접 끈 것을 남겨 둔다(관리자가 OFF 회원을 일괄로 켤 때 이 사람은 빼려고). 이 칸을 읽는 다른 곳 없음.
+        live_alert_optin_source: next ? "order_rail" : "customer_off",
       };
       // [2026-08-31 계정분리 근본차단] 카카오 계정으로 먼저 찾는다.
       const kakaoIdForAlert = (() => {
