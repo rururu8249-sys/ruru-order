@@ -562,7 +562,7 @@ export default function ProductWidgetClient() {
   // 실시간 이벤트 토스트: 주문(INSERT) / 입금확인·카드결제완료(UPDATE). 실제 컬럼명 기준.
   useEffect(() => {
     const nick = (row: AnyProduct) => clipNick(String(row?.youtube_nickname || row?.nickname || row?.customer_name || "손님"));
-    // 주문 row의 실제 금액 컬럼: final_amount(=total_price=adjusted_total_price). 결제완료 금액은 아래 sumAmount 가 주문서 줄을 합친다.
+    // [2026-11-06 사장님] 결제완료 스티커에 금액은 안 띄운다(닉네임+상품명·옵션만) — 누가 얼마 썼는지 방송에 안 나가게.
     const pname = (row: AnyProduct) => String(row?.product_name || row?.name || "상품").trim();
     // 입금/카드 상태가 기록되는 실제 컬럼들
     const statusOf = (row: AnyProduct) => String(row?.admin_order_status_v2 || row?.order_manage_status || row?.deposit_status || "").trim();
@@ -583,7 +583,7 @@ export default function ProductWidgetClient() {
 
     // [2026-11-06 사장님 «주문완료엔 상품명·옵션, 결제완료엔 상품명·옵션·금액 간략하게»]
     //   한 주문서의 상품 줄은 거의 동시에 여러 번 들어오므로 0.6초 모아서 한 번만 띄운다.
-    //   보여주는 글: 「첫 상품명 블랙/L 외 N종」 + (결제완료만) 합계 금액. 표시 전용 — 금액 계산·상태 판정 무변경.
+    //   보여주는 글: 「첫 상품명 블랙/L 외 N종」(주문완료·결제완료 같음, 금액은 안 띄움). 표시 전용 — 상태 판정 무변경.
     const optOf = (row: AnyProduct) =>
       [row?.color, row?.size]
         .map((v) => String(v ?? "").replace(/사이즈\s*/g, "").trim())
@@ -595,8 +595,6 @@ export default function ProductWidgetClient() {
       const label = `${cleanProductNameForFeed(pname(first))}${optOf(first) ? ` ${optOf(first)}` : ""}`;
       return rows.length > 1 ? `${label} 외 ${rows.length - 1}종` : label;
     };
-    const sumAmount = (rows: AnyProduct[]) =>
-      rows.reduce((t, r) => t + (Number(r?.final_amount ?? r?.total_amount ?? r?.total_price ?? r?.adjusted_total_price ?? 0) || 0), 0);
     const buffers = new Map<string, { rows: AnyProduct[]; timer: number }>();
     const collect = (key: string, row: AnyProduct, make: (rows: AnyProduct[]) => ToastItem) => {
       const open = buffers.get(key);
@@ -611,8 +609,7 @@ export default function ProductWidgetClient() {
       buffers.set(key, entry);
     };
     const paidToast = (rows: AnyProduct[]): ToastItem => ({
-      icon: "", title: "결제완료", name: `${nick(rows[0])}님`, detail: itemLine(rows),
-      amount: `${sumAmount(rows).toLocaleString("ko-KR")}원`, tone: "blue",
+      icon: "", title: "결제완료", name: `${nick(rows[0])}님`, detail: itemLine(rows), tone: "blue",
     });
 
     const channel = supabase
@@ -662,7 +659,7 @@ export default function ProductWidgetClient() {
     if (!previewMode || toastOffRef.current) return;
     const demo: ToastItem[] = [
       { icon: "", title: "주문완료", name: `${clipNick("예시손님")}님`, detail: "예시 니트 가디건 블랙/M", tone: "green" },
-      { icon: "", title: "결제완료", name: `${clipNick("닉네임이아주아주긴손님입니다")}님`, detail: "예시 니트 가디건 블랙/M 외 1종", amount: "59,000원", tone: "blue" },
+      { icon: "", title: "결제완료", name: `${clipNick("닉네임이아주아주긴손님입니다")}님`, detail: "예시 니트 가디건 블랙/M 외 1종", tone: "blue" },
     ];
     let i = 0;
     const fire = () => { setToastQueue((q) => [...q, demo[i % demo.length]]); i += 1; };
