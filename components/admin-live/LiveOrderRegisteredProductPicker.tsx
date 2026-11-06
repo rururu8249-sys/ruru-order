@@ -17,6 +17,7 @@ import { detailProducts } from "@/lib/productDetailModel";
 import type { LiveOrderRegisteredAddInput } from "./useLiveOrderItemAdd";
 import { toOptionList } from "@/lib/optionSplit";
 import { normalizeProductSearchText, productSearchMatches } from "@/lib/productSearch";
+import { registerBrandAliasesFromProducts } from "@/lib/brandSearchAliases";
 
 type ProductRow = Record<string, unknown>;
 type OptionField = "color" | "size";
@@ -234,6 +235,8 @@ export default function LiveOrderRegisteredProductPicker({ onAdd, onClose, addin
     return map;
   }, [products]);
 
+  // [2026-11-06] 대충 검색(샤넬202·샤202 → CH-202) — 브랜드↔상품번호 연결표 등록. 검색 전용.
+  useMemo(() => registerBrandAliasesFromProducts(products as unknown[]), [products]);
   // [⑳ B] 공백·하이픈 무시 검색(Rail searchKey 와 같은 규칙) — '폴로자켓' = '폴로 자켓'
   const visibleProducts = useMemo(() => {
     const q = normalizeProductSearchText(search);

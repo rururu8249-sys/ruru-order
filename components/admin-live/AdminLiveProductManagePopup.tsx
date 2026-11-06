@@ -23,6 +23,7 @@ import {
 } from "@/lib/widgetProductLibrary";
 import { splitOptionText } from "@/lib/optionSplit";
 import { normalizeProductSearchText, productSearchMatches } from "@/lib/productSearch";
+import { registerBrandAliasesFromProducts } from "@/lib/brandSearchAliases";
 import { productPage } from "@/lib/productPagination";
 import ProductPagination from "./ProductPagination";
 import ProductToolbar from "./ProductToolbar";
@@ -275,6 +276,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [brandLinks, setBrandLinks] = useState<BrandProductLink[]>([]);
   const [brandMove, setBrandMove] = useState<{source:ProductRow;undoParentId?:string}|null>(null);
   const brandCatalog = useMemo(() => resolveBrandCatalog(products, brandLinks), [products, brandLinks]);
+  // [2026-11-06] 대충 검색(샤넬202·샤202 → CH-202) — 브랜드↔상품번호 연결표 등록. 검색 전용.
+  useMemo(() => registerBrandAliasesFromProducts(products as unknown[]), [products]);
   const [rotationIds, setRotationIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<ProductManageTab>(initialTab === "shop" || initialTab === "products" ? initialTab : "broadcast");   // 예전 기록(history) 탭 값이 와도 방송 진열로

@@ -44,6 +44,7 @@ const normalizeEmptyProductOptionValue = (value: unknown) => {
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { normalizeProductSearchText, productSearchMatches } from "@/lib/productSearch";
+import { registerBrandAliasesFromProducts } from "@/lib/brandSearchAliases";
 import { HOWTO_DEFAULT, parseHowtoSteps } from "@/lib/howto";
 import { supabase } from "@/lib/supabase";
 import { isRemoteAreaAddress } from "@/lib/order/shippingAddress";
@@ -4031,6 +4032,8 @@ export default function OrderPage() {
       return String(b.created_at || b.updated_at || b.id).localeCompare(String(a.created_at || a.updated_at || a.id));
     });
   }, [broadcastProducts, groupBuyQuickProductsFromCatalog, broadcast?.status, broadcast?.widget_pin_mode, broadcast?.widget_pin_product_id]);
+  // [2026-11-06] 대충 검색(샤넬202·샤202 → CH-202) — 지금 보이는 묶음 상품으로 브랜드↔상품번호 연결표 등록. 검색 전용.
+  useMemo(() => registerBrandAliasesFromProducts(quickGroupBuyProducts as unknown[]), [quickGroupBuyProducts]);
 
   // [2026-10-29 사장님 「롱샴 노출 안 했는데 왜 장바구니에?」] 직접 입력 창 「혹시 이 상품인가요?」 추천은
   //   «지금 손님 화면에 보이는 상품»(quickGroupBuyProducts — 방송 ON=방송 상품, OFF=쇼핑몰 진열)에서만 고른다.
