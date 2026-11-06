@@ -3,6 +3,7 @@ import DiscountDisplayEditor from './DiscountDisplayEditor';
 import {resolveProductDiscount,renameDiscountDetail,type DiscountDisplay,type DiscountSetting} from '@/lib/productDiscount';
 
 import { ChangeEvent, type CSSProperties, DragEvent, type MouseEvent as ReactMouseEvent, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabase";
 import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import { showAdminToast } from "@/lib/adminToast";
@@ -906,6 +907,9 @@ export default function QuickProductFastForm({
   const [bulkNamesOpen, setBulkNamesOpen] = useState(false);
   const [bulkNamesText, setBulkNamesText] = useState("");
   const [rowDropTarget, setRowDropTarget] = useState("");
+  // [2026-11-06 사장님 「세부상품 사진 클릭하면 왜 확대 안 돼」] 사진 있는 줄은 누르면 크게 보기(여러 장 넘기기),
+  //   사진 추가·대표사진 빼기는 크게 보기 창 안 버튼으로. 사진 없는 줄은 예전처럼 누르면 사진 고르기. 끌어놓기·우클릭 그대로.
+  const [detailZoom, setDetailZoom] = useState<{ name: string; idx: number } | null>(null);
   const bulkRowPhotoInputRef = useRef<HTMLInputElement | null>(null);
   // [2026-09-03 화면 통합] 단품/묶음 갈래 선택 제거 — 세부상품을 추가하면 자동으로 묶음이 된다.
   //   (스마트스토어 방식: 미리 고르지 않고, 옵션을 넣으면 옵션상품) 저장 로직은 기존 그대로.
@@ -2610,8 +2614,11 @@ export default function QuickProductFastForm({
                                 >
                                   <td style={{ padding: "6px 8px" }}>
                                     <div
-                                      title="사진 끌어놓기 · 클릭하면 여러 장 고르기 · 우클릭하면 대표사진 빼기"
-                                      onClick={() => { bulkDetailPhotoTargetRef.current = name; bulkDetailPhotoInputRef.current?.click(); }}
+                                      title={thumbnail ? "누르면 크게 보기 · 사진 끌어놓기 · 우클릭하면 대표사진 빼기" : "누르면 사진 고르기 · 사진 끌어놓기"}
+                                      onClick={() => {
+                                        if (thumbnail) { setDetailZoom({ name, idx: 0 }); return; }
+                                        bulkDetailPhotoTargetRef.current = name; bulkDetailPhotoInputRef.current?.click();
+                                      }}
                                       onContextMenu={(event) => {
                                         event.preventDefault();
                                         if (!thumbnail) return;
@@ -2730,6 +2737,62 @@ export default function QuickProductFastForm({
                           </tbody>
                         </table>
                       </div>
+                      {detailZoom && typeof document !== "undefined" ? (() => {
+                        const zName = detailZoom.name;
+                        const zPhotos = (brandGroupDetailPhotoSets[zName] || (detailPhotos[zName] ? [detailPhotos[zName]] : [])).filter(Boolean);
+                        if (zPhotos.length === 0) return null;
+                        const zIdx = ((detailZoom.idx % zPhotos.length) + zPhotos.length) % zPhotos.length;
+                        const go = (d: number) => setDetailZoom({ name: zName, idx: zIdx + d });
+                        const btn: CSSProperties = { height: "40px", padding: "0 16px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "#fff", color: "var(--color-ink)", fontSize: "14px", fontWeight: 700, cursor: "pointer" };
+                        const arrow: CSSProperties = { position: "absolute", top: "50%", transform: "translateY(-50%)", width: "44px", height: "44px", borderRadius: "999px", border: "none", background: "rgba(0,0,0,0.55)", color: "#fff", fontSize: "24px", cursor: "pointer" };
+                        return createPortal(
+                          <div
+                            role="dialog"
+                            aria-label={`${zName} 사진 크게 보기`}
+                            tabIndex={-1}
+                            ref={(el) => el?.focus()}
+                            onClick={() => setDetailZoom(null)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Escape") setDetailZoom(null);
+                              if (event.key === "ArrowLeft" && zPhotos.length > 1) go(-1);
+                              if (event.key === "ArrowRight" && zPhotos.length > 1) go(1);
+                            }}
+                            style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,0,0,0.78)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", padding: "16px", outline: "none" }}
+                          >
+                            <div onClick={(event) => event.stopPropagation()} style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              <img src={resolveProductImageUrl(zPhotos[zIdx])} alt={zName} style={{ maxWidth: "90vw", maxHeight: "72vh", objectFit: "contain", borderRadius: "8px", background: "#fff" }} />
+                              {zPhotos.length > 1 ? (
+                                <>
+                                  <button type="button" aria-label="이전 사진" onClick={() => go(-1)} style={{ ...arrow, left: "8px" }}>‹</button>
+                                  <button type="button" aria-label="다음 사진" onClick={() => go(1)} style={{ ...arrow, right: "8px" }}>›</button>
+                                </>
+                              ) : null}
+                            </div>
+                            <div onClick={(event) => event.stopPropagation()} style={{ color: "#fff", fontSize: "14px", fontWeight: 700, textAlign: "center" }}>
+                              {zName}{zPhotos.length > 1 ? ` · ${zIdx + 1} / ${zPhotos.length}` : ""}{zIdx === 0 ? " · 대표사진" : ""}
+                            </div>
+                            <div onClick={(event) => event.stopPropagation()} style={{ display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "center" }}>
+                              <button
+                                type="button"
+                                style={btn}
+                                onClick={() => { bulkDetailPhotoTargetRef.current = zName; setDetailZoom(null); bulkDetailPhotoInputRef.current?.click(); }}
+                              >사진 추가</button>
+                              <button
+                                type="button"
+                                style={{ ...btn, color: "var(--color-danger-tx)" }}
+                                onClick={() => {
+                                  void (async () => {
+                                    const ok = await showAdminConfirm(`"${zName}" 대표사진을 뺄까요?`, { title: "사진 빼기", confirmText: "빼기", cancelText: "취소", tone: "danger" });
+                                    if (ok) { removeDetailPhoto(zName); setDetailZoom(null); }
+                                  })();
+                                }}
+                              >대표사진 빼기</button>
+                              <button type="button" style={{ ...btn, background: "#111", color: "#fff", border: "none" }} onClick={() => setDetailZoom(null)}>닫기</button>
+                            </div>
+                          </div>,
+                          document.body,
+                        );
+                      })() : null}
 
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center", padding: "8px 8px", borderTop: "1px solid var(--color-rose-line)", background: "var(--color-rose-soft)" }}>
                         <button
