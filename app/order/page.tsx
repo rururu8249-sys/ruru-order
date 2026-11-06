@@ -1092,8 +1092,14 @@ function readComboInfoOrderProduct(product: unknown): { names: string[]; pricing
   // [3단] color_options 자리는 "색상"이 차지하므로 세부상품 목록은 combo_detail_values 에서 읽는다.
   const axes3 = readOrderAxes3(product);
   if (axes3) {
-    const maxPlus3 = axes3.detailNames.reduce((m, n) => Math.max(m, Number(pricing[n] || 0)), 0);
-    return { names: axes3.detailNames, pricing, maxPlus: maxPlus3 };
+    // [2026-11-07 사장님 「엑셀에 없는 초코바나나가 왜 보여」] 관리자가 숨긴 세부상품(combo_hidden)은 손님 목록에서 뺀다.
+    //   예전엔 combo_detail_values 를 그대로 보여 줘서, 상품 폼 저장 없이 숨김만 바뀐 묶음은 숨긴 세부상품이 계속 보였다.
+    //   다 숨겨져 비면 예전 그대로(묶음 자체 노출 판단은 상품 상태가 함) — 표시 전용, 금액·재고 무접촉.
+    const hidden3 = new Set(Array.isArray((note as any)?.combo_hidden) ? (note as any).combo_hidden.map((x: any) => String(x ?? "").trim()) : []);
+    const visible3 = axes3.detailNames.filter((n) => !hidden3.has(n));
+    const names3 = visible3.length > 0 ? visible3 : axes3.detailNames;
+    const maxPlus3 = names3.reduce((m, n) => Math.max(m, Number(pricing[n] || 0)), 0);
+    return { names: names3, pricing, maxPlus: maxPlus3 };
   }
   // 노출 세부상품 = color_options (숨김 처리된 세부상품은 stock_variants에만 존재)
   const rawList = (product as any)?.color_options;
