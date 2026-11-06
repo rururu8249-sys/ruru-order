@@ -96,17 +96,49 @@ function clipNick(raw: string): string {
 // [2026-11-05 사장님 «구아바 참고, 베낀 티는 안 나게»] 주문·결제 소식 = 카드 위에 붙는 «스티커».
 //   흰 스티커가 살짝 기울어 톡 붙고, 위에 색 띠(주문 완료=초록 / 결제 완료=파랑) + 닉네임 크게 + 아래 한 줄(상품명·금액).
 //   표시 전용 — 어떤 주문을 띄울지(구독·중복 가드)는 그대로.
+// [2026-11-06 사장님 «폭죽은 잠깐 터지고 끝»] 폭죽을 길고 화려하게: ①가운데서 두 번 터짐(0초·0.35초, 두 번째는 좌우 반대로)
+//   ②위에서 색종이가 2.5초 동안 쏟아짐 ③조각마다 반짝반짝 깜빡임. 카드 밖으로는 안 나간다(카드가 잘라 줌).
+const CONFETTI_RAIN = Array.from({ length: 22 }, (_, i) => {
+  const colors = ["#FF3B30", "#FFD93D", "#22C55E", "#3B82F6", "#FF8AD8", "#FFFFFF", "#A855F7", "#FF9F0A"];
+  return {
+    left: `${(i * 37) % 100}%`,
+    size: 7 + ((i * 5) % 6),
+    color: colors[i % colors.length],
+    round: i % 3 === 0,
+    delay: ((i * 0.13) % 1.2).toFixed(2),
+    dur: (1.6 + ((i * 7) % 9) / 10).toFixed(2),
+    drift: `${((i % 2 ? 1 : -1) * (10 + ((i * 11) % 30)))}px`,
+    spin: `${(i % 2 ? 1 : -1) * (360 + i * 40)}deg`,
+  };
+});
 function ConfettiBurst({ burstKey }: { burstKey: number }) {
+  const wave = (mirror: boolean, delay: number) =>
+    CONFETTI_PIECES.map((p, i) => (
+      <span
+        key={`${mirror ? "b" : "a"}${i}`}
+        style={{
+          position: "absolute", width: `${p.size + 2}px`, height: `${p.size + 2}px`,
+          borderRadius: p.round ? "50%" : "2px", background: p.color,
+          boxShadow: `0 0 6px ${p.color}`,
+          ["--tx" as any]: mirror ? `calc(${p.tx} * -1)` : p.tx, ["--ty" as any]: p.ty, ["--r" as any]: p.r,
+          animation: `ruruConfetti ${(p.dur + 0.6).toFixed(2)}s cubic-bezier(0.15,0.7,0.3,1) ${delay}s both, ruruTwinkle 0.3s steps(2) ${delay}s infinite`,
+        }}
+      />
+    ));
   return (
-    <div key={burstKey} aria-hidden data-ruru-widget-confetti style={{ position: "absolute", left: "50%", top: "50%", width: 0, height: 0, pointerEvents: "none" }}>
-      {CONFETTI_PIECES.map((p, i) => (
+    <div key={burstKey} aria-hidden data-ruru-widget-confetti style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+      <div style={{ position: "absolute", left: "50%", top: "50%", width: 0, height: 0 }}>
+        {wave(false, 0)}
+        {wave(true, 0.35)}
+      </div>
+      {CONFETTI_RAIN.map((c, i) => (
         <span
-          key={i}
+          key={`r${i}`}
           style={{
-            position: "absolute", width: `${p.size}px`, height: `${p.size}px`,
-            borderRadius: p.round ? "50%" : "2px", background: p.color,
-            ["--tx" as any]: p.tx, ["--ty" as any]: p.ty, ["--r" as any]: p.r,
-            animation: `ruruConfetti ${p.dur}s ease-out forwards`,
+            position: "absolute", top: "-12px", left: c.left, width: `${c.size}px`, height: `${c.round ? c.size : c.size * 1.6}px`,
+            borderRadius: c.round ? "50%" : "2px", background: c.color, boxShadow: `0 0 5px ${c.color}`,
+            ["--dx" as any]: c.drift, ["--spin" as any]: c.spin,
+            animation: `ruruConfettiRain ${c.dur}s linear ${c.delay}s both, ruruTwinkle 0.35s steps(2) ${c.delay}s infinite`,
           }}
         />
       ))}
@@ -126,18 +158,8 @@ function ToastSticker({ toast, standalone }: { toast: ToastItem; standalone?: bo
         animation: "ruruStickerIn 0.6s cubic-bezier(0.18,0.89,0.32,1.28) both, ruruStickerWiggle 0.5s ease-in-out 0.65s 2",
       }}
     >
-      {/* [2026-11-06 사장님 «효과가 빵빵 터지게»] 뒤에서 도는 노란 별 모양 판 + 빛 고리 두 겹 + 사방으로 튀는 빛줄기 12개 */}
-      <span
-        aria-hidden
-        data-ruru-widget-burst
-        style={{
-          position: "absolute", left: "50%", top: "50%", width: "190px", height: "190px", marginLeft: "-95px", marginTop: "-95px",
-          background: "conic-gradient(from 0deg, #FFD93D 0 15deg, transparent 15deg 30deg, #FFD93D 30deg 45deg, transparent 45deg 60deg, #FFD93D 60deg 75deg, transparent 75deg 90deg, #FFD93D 90deg 105deg, transparent 105deg 120deg, #FFD93D 120deg 135deg, transparent 135deg 150deg, #FFD93D 150deg 165deg, transparent 165deg 180deg, #FFD93D 180deg 195deg, transparent 195deg 210deg, #FFD93D 210deg 225deg, transparent 225deg 240deg, #FFD93D 240deg 255deg, transparent 255deg 270deg, #FFD93D 270deg 285deg, transparent 285deg 300deg, #FFD93D 300deg 315deg, transparent 315deg 330deg, #FFD93D 330deg 345deg, transparent 345deg 360deg)",
-          WebkitMaskImage: "radial-gradient(circle, #000 30%, transparent 70%)", maskImage: "radial-gradient(circle, #000 30%, transparent 70%)",
-          animation: "ruruSunburst 3s linear both",
-        }}
-      />
-      {[0, 0.25].map((d) => (
+      {/* [2026-11-06 사장님 «예수님처럼 빛만 비쳐»] 노란 별 모양 판·빛줄기는 뺐다 — 빛 고리 한 번만 남기고, 대신 폭죽을 크게 */}
+      {[0].map((d) => (
         <span
           key={d}
           aria-hidden
@@ -149,20 +171,6 @@ function ToastSticker({ toast, standalone }: { toast: ToastItem; standalone?: bo
           }}
         />
       ))}
-      <span aria-hidden data-ruru-widget-burst style={{ position: "absolute", left: "50%", top: "50%", width: 0, height: 0 }}>
-        {Array.from({ length: 12 }).map((_, i) => (
-          <span
-            key={i}
-            style={{
-              position: "absolute", left: "-2px", top: "-2px", width: "4px", height: "22px", borderRadius: "2px",
-              background: i % 2 ? "#FFD93D" : "#FFFFFF",
-              ["--a" as any]: `${i * 30}deg`,
-              transformOrigin: "2px 2px",
-              animation: "ruruSparkRay 0.7s ease-out 0.15s both",
-            }}
-          />
-        ))}
-      </span>
       <div
         style={{
           position: "relative", background: "#FFFFFF", borderRadius: "14px", overflow: "hidden",
@@ -182,11 +190,11 @@ function ToastSticker({ toast, standalone }: { toast: ToastItem; standalone?: bo
         <div
           style={{
             display: "flex", alignItems: "center", justifyContent: "center", gap: "5px",
-            background: tagBg, color: "#FFFFFF", fontSize: "13px", fontWeight: 900, lineHeight: 1, padding: "6px 8px",
+            background: tagBg, color: "#FFFFFF", fontSize: "18px", fontWeight: 900, lineHeight: 1, padding: "7px 8px",
             letterSpacing: "0.02em",
           }}
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M5 12.5l4.5 4.5L19 7.5" />
           </svg>
           {toast.title}
@@ -196,9 +204,18 @@ function ToastSticker({ toast, standalone }: { toast: ToastItem; standalone?: bo
             {toast.name}
           </div>
           {toast.detail ? (
-            <div style={{ marginTop: "4px", fontSize: "13px", fontWeight: 800, lineHeight: 1.25, color: "#444444", wordBreak: "keep-all", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-              {toast.detail}
-            </div>
+            // [2026-11-06 사장님 «외 몇종 다음줄로 안 넘어가게, 상품은 한 줄»] 상품명만 말줄임, 「외 N종」은 늘 보이게 한 줄
+            (() => {
+              const m = toast.detail.match(/^(.*?)(\s외\s\d+종)$/);
+              const main = m ? m[1] : toast.detail;
+              const tail = m ? m[2] : "";
+              return (
+                <div style={{ marginTop: "4px", display: "flex", justifyContent: "center", fontSize: "13px", fontWeight: 800, lineHeight: 1.25, color: "#444444", whiteSpace: "nowrap", minWidth: 0 }}>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{main}</span>
+                  {tail ? <span style={{ flexShrink: 0 }}>{tail}</span> : null}
+                </div>
+              );
+            })()
           ) : null}
           {toast.amount ? (
             <div style={{ marginTop: "3px", fontSize: "16px", fontWeight: 900, lineHeight: 1.1, color: "#2563EB" }}>{toast.amount}</div>
@@ -689,7 +706,7 @@ export default function ProductWidgetClient() {
   // 폭죽 1회 재생 후 종료(1.4초). confettiKey가 바뀔 때마다 타이머 재무장.
   useEffect(() => {
     if (!confettiOn) return;
-    const t = window.setTimeout(() => setConfettiOn(false), 1400);
+    const t = window.setTimeout(() => setConfettiOn(false), 3400);
     return () => window.clearTimeout(t);
   }, [confettiKey, confettiOn]);
 
@@ -772,6 +789,19 @@ export default function ProductWidgetClient() {
                 : "ruruWidgetIn 0.34s cubic-bezier(0.22, 1, 0.36, 1)",
             }}
           >
+            {/* [2026-11-06 사장님 «평상시엔 테두리가 무지개처럼 반짝이며 돌아가게»] 카드 테두리 3px 무지개가 계속 돈다(주문·결제 땐 그 위에 초록/파랑 번쩍) */}
+            <span
+              aria-hidden
+              data-ruru-widget-rainbow
+              style={{
+                position: "absolute", inset: 0, zIndex: 5, borderRadius: "10px", padding: "3px", pointerEvents: "none",
+                background: "conic-gradient(from var(--ruru-ang), #FF3B30, #FF9F0A, #FFD93D, #22C55E, #3B82F6, #A855F7, #FF3B8A, #FF3B30)",
+                WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+                WebkitMaskComposite: "xor",
+                mask: "linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0)",
+                animation: "ruruRainbowSpin 3s linear infinite, ruruRainbowGlint 1.2s ease-in-out infinite",
+              }}
+            />
             {/* 사진칸 — [2026-09-11 사장님 지적 «사진이 잘린다·글자가 사진을 덮는다»]
                 · 사진은 자기 비율 그대로 안 잘리게(contain). 비율이 안 맞아 남는 자리는 «같은 사진을 흐리게 키운 것»으로 채운다 → 빈칸 없음(09-19).
                 · 글자 띠는 이 칸 «아래»에 붙는다 → 사진은 한 픽셀도 안 가려진다. */}
@@ -968,7 +998,7 @@ export default function ProductWidgetClient() {
             주문성공/입금완료/카드결제완료 어떤 알림이든 1회 재생(표시 전용). */}
         {/* 카드가 없을 때만 앵커에서 폭죽(카드가 있으면 스티커 «뒤»에서 터져 글자를 안 가린다) */}
         {confettiOn && !current ? (
-          <div style={{ position: "absolute", left: "50%", top: "50%", width: 0, height: 0, pointerEvents: "none", zIndex: 0 }}>
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0 }}>
             <ConfettiBurst burstKey={confettiKey} />
           </div>
         ) : null}
@@ -988,8 +1018,9 @@ export default function ProductWidgetClient() {
           100% { opacity: 1; transform: scale(1) translateY(0); }
         }
         @keyframes ruruConfetti {
-          0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
-          100% { transform: translate(var(--tx), var(--ty)) rotate(var(--r)); opacity: 0; }
+          0% { transform: translate(0, 0) rotate(0deg) scale(0.6); opacity: 1; }
+          70% { opacity: 1; }
+          100% { transform: translate(var(--tx), calc(var(--ty) + 40px)) rotate(var(--r)) scale(1); opacity: 0; }
         }
         @keyframes ruruStickerIn {
           0% { opacity: 0; transform: rotate(-12deg) scale(0.6); }
@@ -1001,8 +1032,11 @@ export default function ProductWidgetClient() {
           100% { opacity: 0; transform: scale(1.9); }
         }
         @keyframes ruruStickerWiggle { 0%, 100% { transform: rotate(-5deg); } 30% { transform: rotate(-9deg) scale(1.03); } 70% { transform: rotate(-1deg); } }
-        @keyframes ruruSunburst { 0% { opacity: 0; transform: scale(0.3) rotate(0deg); } 15% { opacity: 0.95; transform: scale(1) rotate(20deg); } 80% { opacity: 0.8; transform: scale(1) rotate(120deg); } 100% { opacity: 0; transform: scale(1.1) rotate(150deg); } }
-        @keyframes ruruSparkRay { 0% { opacity: 0; transform: rotate(var(--a)) translateY(-20px) scaleY(0.3); } 30% { opacity: 1; } 100% { opacity: 0; transform: rotate(var(--a)) translateY(-95px) scaleY(1); } }
+        @property --ruru-ang { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+        @keyframes ruruRainbowSpin { to { --ruru-ang: 360deg; } }
+        @keyframes ruruRainbowGlint { 0%, 100% { filter: brightness(1) saturate(1.1); } 50% { filter: brightness(1.45) saturate(1.4); } }
+        @keyframes ruruConfettiRain { 0% { opacity: 1; transform: translate(0, 0) rotate(0deg); } 85% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), 230px) rotate(var(--spin)); } }
+        @keyframes ruruTwinkle { 0% { filter: brightness(1.6); } 100% { filter: brightness(0.75); } }
         @keyframes ruruStickerShine { from { transform: translateX(-120%); } to { transform: translateX(320%); } }
         @keyframes ruruPricePulse { 0%, 70%, 100% { transform: scale(1); } 82% { transform: scale(1.08); } 90% { transform: scale(0.98); } }
         @keyframes ruruDimIn { from { opacity: 0; } to { opacity: 1; } }
@@ -1015,7 +1049,7 @@ export default function ProductWidgetClient() {
         }
         @keyframes ruruLiveDot { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
         @media (prefers-reduced-motion: reduce) {
-          [data-ruru-widget-card], [data-ruru-widget-sticker], [data-ruru-widget-burst], [data-ruru-widget-flash], [data-ruru-widget-live-dot], [data-ruru-widget-price] { animation: none !important; }
+          [data-ruru-widget-card], [data-ruru-widget-sticker], [data-ruru-widget-burst], [data-ruru-widget-flash], [data-ruru-widget-live-dot], [data-ruru-widget-price], [data-ruru-widget-rainbow] { animation: none !important; }
           [data-ruru-widget-burst], [data-ruru-widget-confetti] { display: none; }
         }
       `}</style>
