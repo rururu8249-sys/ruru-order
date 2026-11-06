@@ -33,15 +33,23 @@ assert.equal(edited.detail.id,2);assert.equal(edited.detail.product_name,'원본
 // [a2-10] 브랜드 줄(1) 체크 → 「체크한 것만 순환」 = 부모 1 + 연결 세부상품 원래 id 2 를 함께 저장
 let savedRotation=null;
 globalThis.fetch=async(url,options)=>{if(String(url)==='/api/chat-orders/current')chat=JSON.parse(options.body);if(String(url).includes('widget-library')&&options?.body){const b=JSON.parse(options.body);if(b.action==='saveRotation'){savedRotation=b.rotation;return {ok:true,json:async()=>({ok:true,rotation:b.rotation})};}}return {ok:true,json:async()=>String(url).includes('product-brand-catalog')?{links}:{ok:true,history:[],rotation:{mode:'all',paused:false,targets:[]}}};};
-// [2026-11-06] 고르면 그것만 순환: 전부 도는 상태에서 「순환 넣기」 → 그 상품만, 묶음 「전체 순환 넣기」 → 부모+원래 id, ✕ 로 다 빼면 전부 순환으로
+// [2026-11-06] 전체 상품 순환 · 이 브랜드만 순환 · 체크한 것만 순환 · 체크한 것 순환에서 빼기
 const btns=(label)=>tree.root.findAllByType('button').filter(button=>button.children.includes(label));
-await act(async()=>btns('전체 순환 넣기')[0].props.onClick({stopPropagation(){}}));
-assert.deepEqual(savedRotation,{mode:'selected',paused:false,targets:[{productId:'1',detailName:''},{productId:'2',detailName:''}]},'bundle button from all-mode starts a list with parent + linked source ids');
-assert.ok(btns('순환 중 ✓').length>=1,'row shows 순환 중 ✓ after save');
-const chipRemove=tree.root.findAll(n=>n.type==='button'&&typeof n.props['aria-label']==='string'&&n.props['aria-label'].endsWith('순환에서 빼기'));
-assert.ok(chipRemove.length>=1,'chip box lists rotating product');
-await act(async()=>chipRemove[0].props.onClick());
-assert.equal(savedRotation.mode,'all','removing the last pick goes back to rotating everything');
+const checks=()=>tree.root.findAll(n=>n.type==='input'&&n.props.type==='checkbox'&&String(n.props['aria-label']||'').endsWith(' 체크'));
+await act(async()=>btns('이 브랜드만 순환')[0].props.onClick({stopPropagation(){}}));
+assert.deepEqual(savedRotation,{mode:'selected',paused:false,targets:[{productId:'1',detailName:''},{productId:'2',detailName:''}]},'brand-only = parent + linked source ids');
+assert.ok(tree.root.findAll(n=>n.type==='span'&&n.children.join('')==='전부 순환 중').length>=1,'row shows 전부 순환 중');
+// 세부상품 체크 → 체크한 것 순환에서 빼기
+await act(async()=>{const c=checks();c[c.length-1].props.onChange();});
+await act(async()=>btns('체크한 것 순환에서 빼기')[0].props.onClick());
+assert.deepEqual(savedRotation.targets,[{productId:'1',detailName:''}],'checked detail removed from rotation');
+// 묶음 줄 체크 → 체크한 것만 순환
+await act(async()=>checks()[0].props.onChange());
+await act(async()=>btns('체크한 것만 순환')[0].props.onClick());
+assert.deepEqual(new Set(savedRotation.targets.map(t=>t.productId)),new Set(['1','2']),'checked-only replaces list');
+// 전체 상품 순환
+await act(async()=>btns('전체 상품 순환')[0].props.onClick());
+assert.equal(savedRotation.mode,'all','전체 상품 순환 = all mode');
 await act(async()=>tree.unmount());
 console.log('PASS rendered linked broadcast search, pin, chat, rotation targets and original editor identity');
 // A stale list row must never initialize the stock editor: fetch row + version together.
