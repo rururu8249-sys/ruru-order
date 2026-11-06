@@ -23,7 +23,8 @@ export type WidgetLibraryRequest =
   | { action: "merge"; entries: WidgetHistoryEntry[] }
   | { action: "record"; target: WidgetProductTarget; label: string }
   | { action: "remove"; target: WidgetProductTarget }
-  | { action: "saveRotation"; broadcastId: string; rotation: WidgetRotationConfig };
+  | { action: "saveRotation"; broadcastId: string; rotation: WidgetRotationConfig }
+  | { action: "renameRotationDetail"; productId: string; renames: { from: string; to: string }[] };
 
 const DEFAULT_ROTATION: WidgetRotationConfig = { mode: "all", paused: false, targets: [] };
 
@@ -280,6 +281,17 @@ export function parseWidgetLibraryRequest(value: unknown): WidgetLibraryRequest 
     const broadcastId = String(body.broadcastId || "").trim();
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(broadcastId)) return null;
     return { action, broadcastId, rotation: parseWidgetRotation(body.rotation) };
+  }
+  if (action === "renameRotationDetail") {
+    const productId = String(body.productId || "").trim().slice(0, 100);
+    const renames = (Array.isArray(body.renames) ? body.renames : [])
+      .slice(0, 200)
+      .map((r) => {
+        const o = objectValue(r);
+        return { from: String(o?.from || "").trim().slice(0, 200), to: String(o?.to || "").trim().slice(0, 200) };
+      })
+      .filter((r) => r.from && r.to && r.from !== r.to);
+    return productId && renames.length > 0 ? { action, productId, renames } : null;
   }
   return null;
 }

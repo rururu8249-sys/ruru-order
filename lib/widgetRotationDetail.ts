@@ -59,3 +59,32 @@ export function removeRotationTargets(
   }
   return dedupeRotationTargets(next);
 }
+
+export type DetailRename = { from: string; to: string };
+
+/**
+ * [2026-11-07 사장님 「순환 중인 상품 수정하고 나면 한개 빼고 다 순환에서 풀림」]
+ * 상품 폼에서 세부상품 이름을 바꾸면 순환 타겟({pid, 옛 이름})이 더는 맞지 않아 빠졌다.
+ * 바꾼 순서대로 이름을 따라가게 한다(A→B 다음 B→C 면 A 는 C). 묶음 전체({pid,""})·다른 상품 타겟은 그대로.
+ */
+export function renameRotationTargets(
+  targets: WidgetProductTarget[],
+  productId: string,
+  renames: DetailRename[],
+): { targets: WidgetProductTarget[]; changed: boolean } {
+  const pid = String(productId || "").trim();
+  let changed = false;
+  let next = targets.map((t) => ({ productId: String(t.productId || "").trim(), detailName: String(t.detailName || "").trim() }));
+  if (!pid) return { targets: dedupeRotationTargets(next), changed };
+  for (const r of renames) {
+    const from = String(r?.from || "").trim();
+    const to = String(r?.to || "").trim();
+    if (!from || !to || from === to) continue;
+    next = next.map((t) => {
+      if (t.productId !== pid || t.detailName !== from) return t;
+      changed = true;
+      return { productId: pid, detailName: to };
+    });
+  }
+  return { targets: dedupeRotationTargets(next), changed };
+}

@@ -13,6 +13,7 @@ import {
   widgetRotationSettingKey,
   type WidgetHistoryEntry,
 } from "@/lib/widgetProductLibrary";
+import { renameRotationTargets } from "@/lib/widgetRotationDetail";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -87,6 +88,22 @@ export async function POST(request: NextRequest) {
     if (parsed.action === "saveRotation") {
       await writeSetting(sb, widgetRotationSettingKey(parsed.broadcastId), parsed.rotation);
       return NextResponse.json({ ok: true, rotation: parsed.rotation });
+    }
+
+    if (parsed.action === "renameRotationDetail") {
+      // 세부상품 이름을 바꾼 상품이 들어 있는 모든 방송 순환 목록에서 옛 이름 → 새 이름(고른 상품만 도는 방송만).
+      const { data, error } = await sb.from("settings").select("key, value").like("key", "widget_rotation_%");
+      if (error) throw new Error(error.message);
+      let updated = 0;
+      for (const row of (data || []) as { key: string; value: unknown }[]) {
+        const rotation = parseWidgetRotation(row.value);
+        if (rotation.mode !== "selected" || rotation.targets.length === 0) continue;
+        const result = renameRotationTargets(rotation.targets, parsed.productId, parsed.renames);
+        if (!result.changed) continue;
+        await writeSetting(sb, row.key, { ...rotation, targets: result.targets });
+        updated += 1;
+      }
+      return NextResponse.json({ ok: true, updated });
     }
 
     const current = await readHistory(sb);

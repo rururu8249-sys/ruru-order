@@ -33,3 +33,22 @@ assert.deepEqual(R.detailRotationTarget({ pid: "751", detailName: "X", sourceId:
 // 5) 중복 제거
 assert.equal(R.dedupeRotationTargets([{ productId: "1", detailName: "a" }, { productId: "1", detailName: "a " }]).length, 1);
 console.log("✅ widget-rotation-detail 통과");
+
+// [2026-11-07] 세부상품 이름 바꾸면 순환 타겟도 따라감(묶음 전체·다른 상품 그대로, A→B→C 연쇄)
+{
+  const base = [
+    { productId: "751", detailName: "BB-501 연베이지" },
+    { productId: "751", detailName: "BB-502 찐베이지" },
+    { productId: "745", detailName: "BB-501 연베이지" },
+    { productId: "760", detailName: "" },
+  ];
+  const r1 = R.renameRotationTargets(base, "751", [{ from: "BB-501 연베이지", to: "BB-501 베이지" }, { from: "BB-501 베이지", to: "BB-501 아이보리" }]);
+  assert.equal(r1.changed, true);
+  assert.deepEqual(r1.targets.map((t) => `${t.productId}|${t.detailName}`).sort(), ["745|BB-501 연베이지", "751|BB-501 아이보리", "751|BB-502 찐베이지", "760|"].sort());
+  const r2 = R.renameRotationTargets(base, "999", [{ from: "BB-501 연베이지", to: "X" }]);
+  assert.equal(r2.changed, false);
+  const p = W.parseWidgetLibraryRequest({ action: "renameRotationDetail", productId: "751", renames: [{ from: "a", to: "b" }, { from: "c", to: "c" }] });
+  assert.deepEqual(p, { action: "renameRotationDetail", productId: "751", renames: [{ from: "a", to: "b" }] });
+  assert.equal(W.parseWidgetLibraryRequest({ action: "renameRotationDetail", productId: "751", renames: [] }), null);
+  console.log("ok rename follow");
+}

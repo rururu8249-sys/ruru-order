@@ -558,6 +558,16 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, bcSelId]);
 
+  // [2026-11-07] 상품 폼에서 세부상품 이름을 바꿔 순환 목록이 서버에서 고쳐지면 다시 읽음(옛 이름으로 덮어쓰지 않게).
+  useEffect(() => {
+    if (tab !== "broadcast") return;
+    const targetId = bcSelId;
+    const onRotation = () => void loadWidgetLibrary(targetId);
+    window.addEventListener("ruru-widget-rotation-updated", onRotation);
+    return () => window.removeEventListener("ruru-widget-rotation-updated", onRotation);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, bcSelId]);
+
   // 현재 탭을 부모(Dashboard)에 보고 → 닫힘/재오픈 사이 탭 위치 보존
   useEffect(() => {
     onTabChange?.(tab);

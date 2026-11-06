@@ -1655,12 +1655,15 @@ export default function QuickProductFastForm({
   };
 
   // 세부상품 이름 바꾸기 — 이름이 재고 키의 앞부분이라 관련된 곳을 전부 같이 옮겨야 한다.
+  // [2026-11-07] 이번 수정에서 바꾼 세부상품 이름 — 저장되면 위젯 순환 목록도 새 이름으로 따라가게.
+  const detailRenamesRef = useRef<{ from: string; to: string }[]>([]);
   const renameDetailEverywhere = (oldName: string, rawNext: string) => {
     const result = renameDetailState(collectDetailState(), oldName, rawNext);
     if (!result.ok) {
       if (result.reason !== "같은 이름입니다") showAdminToast(result.reason, "error");
       return false;
     }
+    detailRenamesRef.current.push({ from: oldName.trim(), to: normalizeBrandKorean(rawNext.trim()) });
     applyDetailState(result.state);
     setDiscountDisplay(prev=>renameDiscountDetail(prev,oldName,normalizeBrandKorean(rawNext.trim())));
     setDetailColorSwatches(prev=>{const next={...prev};delete next[oldName];if(Object.hasOwn(prev,oldName))next[normalizeBrandKorean(rawNext.trim())]=prev[oldName];return next;});
@@ -2104,6 +2107,22 @@ export default function QuickProductFastForm({
             "상품은 저장됐지만 방송 연결은 실패했습니다.\n\n" + linkError.message,
             "error",
           );
+        }
+      }
+
+      const savedRenames = detailRenamesRef.current.splice(0);
+      if (isEditMode && savedRenames.length > 0) {
+        // 순환 목록 이름 맞추기 — 실패해도 상품 저장은 이미 끝남(안내만).
+        try {
+          const res = await fetch("/api/admin-live/widget-library", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "renameRotationDetail", productId: editingProductId, renames: savedRenames }),
+          });
+          if (!res.ok) throw new Error(String(res.status));
+          window.dispatchEvent(new Event("ruru-widget-rotation-updated"));
+        } catch {
+          showAdminToast("상품은 저장됐어요. 위젯 순환 목록의 바뀐 이름은 맞추지 못했어요 — 순환에서 다시 체크해 주세요.", "warning");
         }
       }
 
