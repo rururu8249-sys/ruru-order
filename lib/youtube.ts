@@ -325,7 +325,7 @@ export async function fetchYoutubeLiveStats(): Promise<{ concurrentViewers: numb
   }
 }
 
-export async function postLiveChatMessage(messageText: string, opts?: { forceEvenIfDisabled?: boolean; liveChatId?: string }): Promise<PostResult> {
+export async function postLiveChatMessage(messageText: string, opts?: { forceEvenIfDisabled?: boolean; liveChatId?: string; noFallback?: boolean }): Promise<PostResult> {
   try {
     const text = String(messageText || "").trim().slice(0, 200);
     if (!text) return { ok: false, reason: "빈 메시지" };
@@ -380,6 +380,10 @@ export async function postLiveChatMessage(messageText: string, opts?: { forceEve
     if (!res.ok) {
       const e1 = await readErr(res);
       console.error("[youtube] insert#1 fail", { status: e1.status, statusText: e1.statusText, reason: e1.reason, message: e1.message, chatId: liveChatId, raw: e1.raw.slice(0, 300), wwwAuth: e1.hdr["www-authenticate"] });
+      // [2026-11-06] 두 번째 채널 글은 실패해도 메인 채팅방으로 다시 찾지 않는다(엉뚱한 채팅방에 올라가는 것 방지).
+      if (opts?.noFallback) {
+        return { ok: false, reason: `발송실패 status=${e1.status} ${e1.reason || e1.message || e1.statusText}`.trim() };
+      }
       if (e1.reason.includes("liveChatNotFound") || e1.reason.includes("liveChatEnded") || e1.status === 404 || e1.status === 403) {
         // 캐시된 chatId가 만료(이전 방송)일 수 있음 → 캐시 비우고 1회 재조회 후 재시도
         await writeSetting(sb, SETTING_LIVE_CHAT_ID, "");
@@ -408,6 +412,96 @@ export async function postLiveChatMessage(messageText: string, opts?: { forceEve
   } catch (e: any) {
     return { ok: false, reason: String(e?.message || e) };
   }
+}
+
+// ───────── [2026-11-06 사장님 「두 채널 다 채팅 주문글 안내」] 두 번째 채널(동시 방송) ─────────
+//   방송 관리에 «두 번째 채널 라이브 URL» 을 넣으면 주문 알림 채팅만 그 채널에도 올린다.
+//   관리자 화면의 영상·채팅·시청자 수·채팅 주문 읽기는 메인 URL 그대로(화면 두 개 안 생김).
+//   저장 = settings 한 칸(JSON). 지금 켜진 방송 id 와 같을 때만 씀 → 방송이 바뀌면 저절로 안 씀.
+export const SETTING_SECOND_LIVE = "youtube_second_live_v1";
+export type SecondLive = { broadcastId: string; url: string; videoId: string; chatId: string };
+
+export function parseSecondLive(raw: unknown): SecondLive | null {
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  try {
+    const v = JSON.parse(raw);
+    if (!v || typeof v !== "object") return null;
+    const broadcastId = String(v.broadcastId ?? "").trim();
+    const url = String(v.url ?? "").trim();
+    const videoId = extractVideoId(String(v.videoId ?? "")) || extractVideoId(url);
+    if (!broadcastId || !videoId) return null;
+    return { broadcastId, url, videoId, chatId: String(v.chatId ?? "").trim() };
+  } catch {
+    return null;
+  }
+}
+
+export async function readActiveBroadcastId(sb: SupabaseClient): Promise<string> {
+  const { data } = await sb
+    .from("broadcasts")
+    .select("id")
+    .eq("status", "ON")
+    .neq("is_deleted", true)
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data ? String((data as { id?: unknown }).id ?? "").trim() : "";
+}
+
+/** 그 영상의 «지금 채팅방» 번호만(소유자 방송 찾기 같은 다른 길은 안 씀 — 메인 채팅방 잡는 것 방지). 1 사용. */
+export async function resolveVideoLiveChatId(accessToken: string, videoId: string): Promise<string> {
+  if (!videoId) return "";
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=${encodeURIComponent(videoId)}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const json = (await res.json().catch(() => ({}))) as { items?: { liveStreamingDetails?: { activeLiveChatId?: string } }[] };
+    return String(json?.items?.[0]?.liveStreamingDetails?.activeLiveChatId || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+/** 지금 방송의 두 번째 채널 설정(없거나 다른 방송 것이면 null) */
+export async function readSecondLive(sb: SupabaseClient): Promise<SecondLive | null> {
+  const cfg = parseSecondLive(await readSetting(sb, SETTING_SECOND_LIVE));
+  if (!cfg) return null;
+  const active = await readActiveBroadcastId(sb);
+  return active && active === cfg.broadcastId ? cfg : null;
+}
+
+/** 두 번째 채널 채팅에 글 한 줄. 설정 없으면 skipped. 실패해도 throw 안 함. */
+export async function postSecondLiveChat(messageText: string): Promise<PostResult> {
+  try {
+    const sb = getServiceClient();
+    const cfg = await readSecondLive(sb);
+    if (!cfg) return { ok: false, skipped: true, reason: "두 번째 채널 없음" };
+    const mainVideo = extractVideoId(await readActiveBroadcastLiveUrl(sb));
+    if (mainVideo && mainVideo === cfg.videoId) return { ok: false, skipped: true, reason: "메인과 같은 영상" };
+    let chatId = cfg.chatId;
+    if (!chatId) {
+      const refreshToken = await readRefreshToken(sb);
+      if (!refreshToken) return { ok: false, skipped: true, reason: "유튜브 미연결" };
+      chatId = await resolveVideoLiveChatId(await getAccessToken(refreshToken), cfg.videoId);
+      if (!chatId) return { ok: false, skipped: true, reason: "두 번째 채널 채팅방 못 찾음" };
+      await writeSetting(sb, SETTING_SECOND_LIVE, JSON.stringify({ ...cfg, chatId }));
+    }
+    const result = await postLiveChatMessage(messageText, { liveChatId: chatId, noFallback: true });
+    // 채팅방이 끝났거나 바뀌었으면 번호를 비워 다음 글 때 한 번만 다시 찾는다
+    if (!result.ok && !result.skipped) await writeSetting(sb, SETTING_SECOND_LIVE, JSON.stringify({ ...cfg, chatId: "" }));
+    return result;
+  } catch (e) {
+    return { ok: false, reason: String((e as Error)?.message || e) };
+  }
+}
+
+/** 주문 알림 — 메인 채팅 + (있으면) 두 번째 채널 채팅에 같은 글 */
+export async function postOrderChatEverywhere(messageText: string): Promise<{ main: PostResult; second: PostResult }> {
+  const main = await postLiveChatMessage(messageText);
+  // 알림 OFF 면 두 번째도 안 올림
+  const second = main.skipped && main.reason === "알림 OFF" ? { ok: false, skipped: true, reason: "알림 OFF" } : await postSecondLiveChat(messageText);
+  return { main, second };
 }
 
 // 문구 템플릿에 닉네임/주문요약/금액 채우기.

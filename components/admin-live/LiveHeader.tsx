@@ -87,6 +87,38 @@ export default function LiveHeader({
     }
   };
 
+  // [2026-11-06 사장님 「두 채널 다 채팅 주문글」·「방송화면 두 개면 정신없다」] 두 번째 채널 라이브 URL —
+  //   주문 알림 채팅만 거기에도 올린다. 영상·채팅 화면은 위 메인 URL 하나 그대로. 이번 방송 동안만(방송 바뀌면 안 씀).
+  const [secondUrl, setSecondUrl] = useState("");
+  const [secondSaving, setSecondSaving] = useState(false);
+  const [secondState, setSecondState] = useState("");
+  useEffect(() => {
+    if (!activeBroadcastId) return;
+    let alive = true;
+    fetch("/api/admin-live/second-live", { cache: "no-store" }).then((r) => r.json()).then((j) => {
+      if (!alive || !j?.ok) return;
+      setSecondUrl(String(j.url || ""));
+      setSecondState(j.url ? (j.chatFound ? "두 채널에 올라가는 중" : "채팅방 찾는 중") : "");
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [activeBroadcastId]);
+  const saveSecondUrl = async () => {
+    if (secondSaving || !activeBroadcastId) return;
+    setSecondSaving(true);
+    try {
+      const r = await fetch("/api/admin-live/second-live", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: secondUrl.trim() }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j?.ok) { showAdminToast(String(j?.message || "저장 실패"), "error"); return; }
+      setSecondUrl(String(j.url || ""));
+      setSecondState(j.url ? (j.chatFound ? "두 채널에 올라가는 중" : "채팅방 찾는 중") : "");
+      showAdminToast(String(j.message || "저장했어요."), j.url && !j.chatFound ? "warning" : "success");
+    } catch {
+      showAdminToast("두 번째 채널 저장에 실패했어요.", "error");
+    } finally {
+      setSecondSaving(false);
+    }
+  };
+
   // [2026-08-31 사장님 요청] 지금 고정된 상품의 채팅 안내문구를 어디서든 재복사 —
   //   상품관리 📢 채팅 버튼과 같은 문구(lib/chatAnnounce 공용). 복사만 한다(채팅봇 현재상품·고정은 안 건드림).
   //   중간에 다른 걸 복사해서 클립보드가 날아가도 여기서 한 번에 되살린다.
@@ -389,6 +421,17 @@ export default function LiveHeader({
           <div className="flex gap-2">
             <input value={youtubeUrl} onChange={(event) => onYoutubeUrlChange(event.target.value)} placeholder="https://www.youtube.com/watch?v=..." className={fieldCls} />
             <button type="button" disabled={savingBroadcast || !activeBroadcast} onClick={applyYoutubeUrl} className={primaryCls}>적용</button>
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <label className="text-[13px] font-bold text-ink">두 번째 채널 라이브 URL <span className="font-normal text-ink-mute">· 주문 알림 채팅만, 화면엔 안 나옴</span></label>
+            <span className="shrink-0 text-[12px] text-ink-mute">{secondState || (activeBroadcast ? "동시 방송 때만" : "방송 시작 후")}</span>
+          </div>
+          <div className="flex gap-2">
+            <input value={secondUrl} disabled={!activeBroadcast} onChange={(event) => setSecondUrl(event.target.value)} placeholder={activeBroadcast ? "다른 채널 라이브 주소 · 비우고 적용하면 끔" : "방송을 시작한 뒤에 쓸 수 있어요"} className={fieldCls} />
+            <button type="button" disabled={secondSaving || !activeBroadcast} onClick={() => void saveSecondUrl()} className={primaryCls}>{secondSaving ? "적용 중…" : "적용"}</button>
           </div>
         </div>
 

@@ -43,11 +43,11 @@ export async function GET(request: NextRequest) {
   // [2026-11-06] 주문 알림 묶음 대기열 안전망 — 주문 쪽에서 못 올리고 남은 묶음(20초 지난 것)을 여기서 올린다.
   try {
     const batch = await import("@/lib/orderChatBatch");
-    const { postLiveChatMessage } = await import("@/lib/youtube");
+    const { postOrderChatEverywhere } = await import("@/lib/youtube");
     const due = await batch.takeDueOrderChats(sbAdmin(), Date.now());
     const msgs = batch.buildOrderChatBatchMessages(due);
     for (let i = 0; i < msgs.length; i += 1) {
-      await postLiveChatMessage(msgs[i]);
+      await postOrderChatEverywhere(msgs[i]);
       if (i < msgs.length - 1) await sleep(3000);
     }
   } catch { /* 주문 알림 실패는 채팅 읽기와 무관 */ }
