@@ -190,11 +190,11 @@ function ToastSticker({ toast, standalone }: { toast: ToastItem; standalone?: bo
         <div
           style={{
             display: "flex", alignItems: "center", justifyContent: "center", gap: "5px",
-            background: tagBg, color: "#FFFFFF", fontSize: "18px", fontWeight: 900, lineHeight: 1, padding: "7px 8px",
+            background: tagBg, color: "#FFFFFF", fontSize: "20px", fontWeight: 900, lineHeight: 1, padding: "7px 8px",
             letterSpacing: "0.02em",
           }}
         >
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M5 12.5l4.5 4.5L19 7.5" />
           </svg>
           {toast.title}
@@ -789,17 +789,18 @@ export default function ProductWidgetClient() {
                 : "ruruWidgetIn 0.34s cubic-bezier(0.22, 1, 0.36, 1)",
             }}
           >
-            {/* [2026-11-06 사장님 «평상시엔 테두리가 무지개처럼 반짝이며 돌아가게»] 카드 테두리 3px 무지개가 계속 돈다(주문·결제 땐 그 위에 초록/파랑 번쩍) */}
+            {/* [2026-11-06 사장님 «평상시에도 테두리가 반짝이며 돌게» → 13:27 참고 영상처럼] 테두리에 빛 한 줄기(분홍→노랑)가 계속 돈다(주문·결제 땐 그 위에 초록/파랑 번쩍) */}
             <span
               aria-hidden
               data-ruru-widget-rainbow
               style={{
                 position: "absolute", inset: 0, zIndex: 5, borderRadius: "10px", padding: "3px", pointerEvents: "none",
-                background: "conic-gradient(from var(--ruru-ang), #FF3B30, #FF9F0A, #FFD93D, #22C55E, #3B82F6, #A855F7, #FF3B8A, #FF3B30)",
+                // 무지개 전체 대신 «빛 한 줄기»가 둘레를 돈다(분홍→노랑→흰 끝) — 상품 사진에서 눈을 안 뺏게
+                background: "conic-gradient(from var(--ruru-ang), transparent 0deg 250deg, rgba(255,138,216,0.15) 262deg, #FF8AD8 305deg, #FFD93D 345deg, #FFFFFF 357deg, transparent 360deg)",
                 WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
                 WebkitMaskComposite: "xor",
                 mask: "linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0)",
-                animation: "ruruRainbowSpin 3s linear infinite, ruruRainbowGlint 1.2s ease-in-out infinite",
+                animation: "ruruRainbowSpin 2.6s linear infinite, ruruRainbowGlint 1.3s ease-in-out infinite",
               }}
             />
             {/* 사진칸 — [2026-09-11 사장님 지적 «사진이 잘린다·글자가 사진을 덮는다»]
