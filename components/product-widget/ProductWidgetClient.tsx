@@ -121,26 +121,63 @@ function ToastSticker({ toast, standalone }: { toast: ToastItem; standalone?: bo
       style={{
         position: "relative",
         width: standalone ? "100%" : "86%",
-        transform: "rotate(-3deg)",
-        animation: "ruruStickerIn 0.55s cubic-bezier(0.18,0.89,0.32,1.28) both",
+        transform: "rotate(-5deg)",
+        animation: "ruruStickerIn 0.6s cubic-bezier(0.18,0.89,0.32,1.28) both, ruruStickerWiggle 0.5s ease-in-out 0.65s 2",
       }}
     >
-      {/* 뒤에서 한 번 퍼지는 빛 고리 */}
+      {/* [2026-11-06 사장님 «효과가 빵빵 터지게»] 뒤에서 도는 노란 별 모양 판 + 빛 고리 두 겹 + 사방으로 튀는 빛줄기 12개 */}
       <span
         aria-hidden
         data-ruru-widget-burst
         style={{
-          position: "absolute", left: "50%", top: "50%", width: "120px", height: "120px", marginLeft: "-60px", marginTop: "-60px",
-          borderRadius: "50%", border: `3px solid ${tagBg}`, opacity: 0,
-          animation: "ruruStickerBurst 0.9s ease-out 0.1s both",
+          position: "absolute", left: "50%", top: "50%", width: "190px", height: "190px", marginLeft: "-95px", marginTop: "-95px",
+          background: "conic-gradient(from 0deg, #FFD93D 0 15deg, transparent 15deg 30deg, #FFD93D 30deg 45deg, transparent 45deg 60deg, #FFD93D 60deg 75deg, transparent 75deg 90deg, #FFD93D 90deg 105deg, transparent 105deg 120deg, #FFD93D 120deg 135deg, transparent 135deg 150deg, #FFD93D 150deg 165deg, transparent 165deg 180deg, #FFD93D 180deg 195deg, transparent 195deg 210deg, #FFD93D 210deg 225deg, transparent 225deg 240deg, #FFD93D 240deg 255deg, transparent 255deg 270deg, #FFD93D 270deg 285deg, transparent 285deg 300deg, #FFD93D 300deg 315deg, transparent 315deg 330deg, #FFD93D 330deg 345deg, transparent 345deg 360deg)",
+          WebkitMaskImage: "radial-gradient(circle, #000 30%, transparent 70%)", maskImage: "radial-gradient(circle, #000 30%, transparent 70%)",
+          animation: "ruruSunburst 3s linear both",
         }}
       />
+      {[0, 0.25].map((d) => (
+        <span
+          key={d}
+          aria-hidden
+          data-ruru-widget-burst
+          style={{
+            position: "absolute", left: "50%", top: "50%", width: "120px", height: "120px", marginLeft: "-60px", marginTop: "-60px",
+            borderRadius: "50%", border: `4px solid ${d ? "#FFD93D" : tagBg}`, opacity: 0,
+            animation: `ruruStickerBurst 0.9s ease-out ${0.1 + d}s both`,
+          }}
+        />
+      ))}
+      <span aria-hidden data-ruru-widget-burst style={{ position: "absolute", left: "50%", top: "50%", width: 0, height: 0 }}>
+        {Array.from({ length: 12 }).map((_, i) => (
+          <span
+            key={i}
+            style={{
+              position: "absolute", left: "-2px", top: "-2px", width: "4px", height: "22px", borderRadius: "2px",
+              background: i % 2 ? "#FFD93D" : "#FFFFFF",
+              ["--a" as any]: `${i * 30}deg`,
+              transformOrigin: "2px 2px",
+              animation: "ruruSparkRay 0.7s ease-out 0.15s both",
+            }}
+          />
+        ))}
+      </span>
       <div
         style={{
           position: "relative", background: "#FFFFFF", borderRadius: "14px", overflow: "hidden",
           boxShadow: "0 6px 18px rgba(0,0,0,0.35)", textAlign: "center", color: "#111111",
         }}
       >
+        {/* 스티커 위를 한 번 쓱 지나가는 빛 */}
+        <span
+          aria-hidden
+          data-ruru-widget-burst
+          style={{
+            position: "absolute", top: 0, bottom: 0, left: 0, width: "40%", zIndex: 1, pointerEvents: "none",
+            background: "linear-gradient(105deg, transparent 0%, rgba(255,255,255,0.85) 50%, transparent 100%)",
+            animation: "ruruStickerShine 0.9s ease-out 0.5s both",
+          }}
+        />
         <div
           style={{
             display: "flex", alignItems: "center", justifyContent: "center", gap: "5px",
@@ -552,7 +589,7 @@ export default function ProductWidgetClient() {
         if (seenRef.current.has(key)) return; // 한 주문(여러 상품행) 중복 방지
         seenRef.current.add(key);
         // 주문성공: "무엇을" 샀는지가 핵심 → 상품명. (입금완료는 "얼마" → 금액)
-        push({ icon: "", title: "주문 완료", name: `${nick(row)}님`, detail: pname(row), tone: "green" });
+        push({ icon: "", title: "주문완료", name: `${nick(row)}님`, detail: pname(row), tone: "green" });
       })
       // B·C. 입금 확인(자동/수동) / D. 카드 결제 완료
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, (payload) => {
@@ -569,7 +606,7 @@ export default function ProductWidgetClient() {
           const key = `dep:${groupKey(row)}`;
           if (!seenRef.current.has(key)) {
             seenRef.current.add(key);
-            push({ icon: "", title: "결제 완료", name: `${nick(row)}님`, detail: `${amount(row)}원`, tone: "blue" });
+            push({ icon: "", title: "결제완료", name: `${nick(row)}님`, detail: `${amount(row)}원`, tone: "blue" });
           }
         }
 
@@ -578,7 +615,7 @@ export default function ProductWidgetClient() {
           const key = `card:${groupKey(row)}`;
           if (!seenRef.current.has(key)) {
             seenRef.current.add(key);
-            push({ icon: "", title: "결제 완료", name: `${nick(row)}님`, detail: `${amount(row)}원`, tone: "blue" });
+            push({ icon: "", title: "결제완료", name: `${nick(row)}님`, detail: `${amount(row)}원`, tone: "blue" });
           }
         }
       })
@@ -599,8 +636,8 @@ export default function ProductWidgetClient() {
   useEffect(() => {
     if (!previewMode || toastOffRef.current) return;
     const demo: ToastItem[] = [
-      { icon: "", title: "주문 완료", name: `${clipNick("루루맛최고")}님`, detail: "미리보기 상품", tone: "green" },
-      { icon: "", title: "결제 완료", name: `${clipNick("닉네임이아주아주긴손님입니다")}님`, detail: "59,000원", tone: "blue" },
+      { icon: "", title: "주문완료", name: `${clipNick("예시손님")}님`, detail: "예시 상품명", tone: "green" },
+      { icon: "", title: "결제완료", name: `${clipNick("닉네임이아주아주긴손님입니다")}님`, detail: "59,000원", tone: "blue" },
     ];
     let i = 0;
     const fire = () => { setToastQueue((q) => [...q, demo[i % demo.length]]); i += 1; };
@@ -749,9 +786,7 @@ export default function ProductWidgetClient() {
             {/* [2026-07-09] 상품이 가려져서 하단 어두운 그라데이션 제거.
                 대신 글씨에 검정 아웃라인(다방향 text-shadow)을 둘러 배경 없이도 또렷하게 읽히게 함. */}
 
-            {pinned ? (
-              <span style={{ position: "absolute", top: "7px", right: "8px", zIndex: 3, fontSize: "15px" }}>📌</span>
-            ) : null}
+            {/* [2026-11-06 사장님] 오른쪽 위 📌 표시 삭제(고정 기능은 그대로) */}
 
             {/* 품절 오버레이 — 고객페이지와 동일 기준. 주문/입금 배너(zIndex 5)는 이 위에 뜬다. */}
             {soldOut ? (
@@ -800,7 +835,7 @@ export default function ProductWidgetClient() {
                 // [2026-09-12 사장님 결정] 띠 50% — 방송 화면이 더 비친다. 흰 글자가 밝은 배경(흰 옷·밝은 벽)에서도 읽히게
                 //   글자마다 옅은 그림자(SOFT_TEXT)를 얹는다(예전 2px 검정 테두리보다 훨씬 옅음).
                 //   계산: 검정 50% 위 흰 글자 = 밝은 배경에서 대비 약 3.6:1(기준 4.5:1 미달) → 그림자로 보완. 74%였을 땐 약 9:1.
-                background: "rgba(12,18,28,0.86)",
+                background: "rgba(12,18,28,0.6)", // [2026-11-06 사장님 «너무 시커매»] 0.86 → 0.6
                 borderTop: "1px solid rgba(255,255,255,0.14)",
                 textShadow: SOFT_TEXT,
               }}
@@ -849,7 +884,7 @@ export default function ProductWidgetClient() {
                 >
                   {stock || "·"}
                 </span>
-                <span data-ruru-widget-price style={{ fontSize: "22px", fontWeight: 900, lineHeight: 1, color: "#FFE59A", whiteSpace: "nowrap" }}>
+                <span data-ruru-widget-price style={{ display: "inline-block", fontSize: "22px", fontWeight: 900, lineHeight: 1, color: "#FFE59A", whiteSpace: "nowrap", transformOrigin: "right center", animation: "ruruPricePulse 2.4s ease-in-out infinite" }}>
                   {priceOf(current).toLocaleString("ko-KR")}
                   {/* [2026-07-23] 조합형 + 추가금 옵션 존재 시 "원~" — 고객 주문페이지 카드와 동일 규칙. 평소 상품은 "원" 그대로. */}
                   <span style={{ fontSize: "13px", fontWeight: 800, marginLeft: "1px" }}>{comboInfo && comboInfo.maxPlus > 0 ? "원~" : "원"}</span>
@@ -870,7 +905,7 @@ export default function ProductWidgetClient() {
                 }}
               >
                 <span data-ruru-widget-live-dot style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#FFFFFF", animation: "ruruLiveDot 1.2s ease-in-out infinite" }} />
-                판매 중
+                판매중
               </span>
             ) : null}
 
@@ -943,6 +978,11 @@ export default function ProductWidgetClient() {
           0% { opacity: 0.9; transform: scale(0.4); }
           100% { opacity: 0; transform: scale(1.9); }
         }
+        @keyframes ruruStickerWiggle { 0%, 100% { transform: rotate(-5deg); } 30% { transform: rotate(-9deg) scale(1.03); } 70% { transform: rotate(-1deg); } }
+        @keyframes ruruSunburst { 0% { opacity: 0; transform: scale(0.3) rotate(0deg); } 15% { opacity: 0.95; transform: scale(1) rotate(20deg); } 80% { opacity: 0.8; transform: scale(1) rotate(120deg); } 100% { opacity: 0; transform: scale(1.1) rotate(150deg); } }
+        @keyframes ruruSparkRay { 0% { opacity: 0; transform: rotate(var(--a)) translateY(-20px) scaleY(0.3); } 30% { opacity: 1; } 100% { opacity: 0; transform: rotate(var(--a)) translateY(-95px) scaleY(1); } }
+        @keyframes ruruStickerShine { from { transform: translateX(-120%); } to { transform: translateX(320%); } }
+        @keyframes ruruPricePulse { 0%, 70%, 100% { transform: scale(1); } 82% { transform: scale(1.08); } 90% { transform: scale(0.98); } }
         @keyframes ruruDimIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes ruruRingFlash {
           0% { opacity: 0; }
@@ -953,7 +993,7 @@ export default function ProductWidgetClient() {
         }
         @keyframes ruruLiveDot { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
         @media (prefers-reduced-motion: reduce) {
-          [data-ruru-widget-card], [data-ruru-widget-sticker], [data-ruru-widget-burst], [data-ruru-widget-flash], [data-ruru-widget-live-dot] { animation: none !important; }
+          [data-ruru-widget-card], [data-ruru-widget-sticker], [data-ruru-widget-burst], [data-ruru-widget-flash], [data-ruru-widget-live-dot], [data-ruru-widget-price] { animation: none !important; }
           [data-ruru-widget-burst], [data-ruru-widget-confetti] { display: none; }
         }
       `}</style>
