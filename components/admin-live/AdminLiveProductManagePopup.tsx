@@ -729,7 +729,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       if (q && !b.title.toLowerCase().includes(q)) return false;
       if (bcDateFilter === "all") return true;
       const t = new Date(b.started_at).getTime();
-      if (Number.isNaN(t)) return false; // 날짜 없는 방송은 기간 필터에선 숨김(전체에서만 보임)
+      if (Number.isNaN(t)) return true; // [2026-11-06 사장님 «새 방송 제목이 사라짐»] 아직 안 켠 새 방송(날짜 없음)은 기간과 상관없이 늘 보인다
       return t >= fromTs && t <= toTs;
     };
     // 고정(선택·ON)은 bcList 순서(started_at 내림차순) 그대로 맨 위, 나머지는 필터 통과분만.
