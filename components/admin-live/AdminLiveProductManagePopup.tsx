@@ -1844,7 +1844,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       {!rotationLive ? "방송을 켜면 바꿀 수 있어요" : widgetRotation.paused ? "멈춤 · 지금 상품에 머물러 있어요" : widgetRotation.mode === "all" ? `전부 ${rotationSelectedCount}개가 돌아가며 나와요` : `고른 ${rotationSelectedCount}개만 돌아가며 나와요`}
                     </span>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px", marginLeft: "auto" }}>
-                      {widgetRotation.mode !== "all" ? <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void rotationUseAll()} style={{ ...rowBtn, height: "36px", opacity: rotationLive ? 1 : 0.5 }}>전부 나오게</button> : null}
+                      {widgetRotation.mode !== "all" ? <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void rotationUseAll()} title="고른 것을 풀고 방송 상품 전부 다시 돌아가며 나오게" style={{ ...rowBtnPrimary, height: "36px", opacity: rotationLive ? 1 : 0.5 }}>고른 것 해제</button> : null}
                       <button type="button" disabled={!rotationLive} onClick={() => void toggleWidgetLibraryPause()} style={{ ...(widgetRotation.paused ? rowBtnPrimary : rowBtn), height: "36px", opacity: rotationLive ? 1 : 0.5, cursor: rotationLive ? "pointer" : "not-allowed" }}>{widgetRotation.paused ? "다시 돌리기" : "멈춤"}</button>
                     </div>
                   </div>
