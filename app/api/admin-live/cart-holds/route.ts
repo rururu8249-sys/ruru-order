@@ -7,6 +7,7 @@ import { checkoutReminderCopy } from "@/lib/cartHoldDetail";
 import { parseShopInfo, SHOP_INFO_KEYS, type ShopBankAccountId } from "@/lib/shopInfo";
 import { buildCartHoldSummary } from "@/lib/cartHoldSummary";
 import { sweepExpiredCartHolds } from "@/lib/cartHoldSweep";
+import { extendedHoldExpiry } from "@/lib/cartHoldExtend";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -423,6 +424,39 @@ export async function POST(request: NextRequest) {
       const requested = action === "remind" ? [body?.sessionKey] : (Array.isArray(body?.sessionKeys) ? body.sessionKeys : []);
       const result = await sendReminders(supabase, requested, String((session as any)?.username || (session as any)?.id || "admin").slice(0, 80));
       return NextResponse.json({ ok: true, ...result });
+    }
+
+    // [2026-11-06] 지금 유지시간 설정을 이미 담긴 장바구니에도 적용(늘리기만). sessionKey 하나 / sessionKeys 여러 개 / 없으면 전체.
+    if (action === "apply-hold") {
+      const { data: hs } = await supabase.from("settings").select("value").eq("key", "cart_hold_minutes").maybeSingle();
+      const minutes = Math.min(43200, Math.max(10, Math.round(Number((hs as any)?.value) || 15)));
+      const one = cleanKey(body?.sessionKey);
+      const keys = one ? [one] : Array.from(new Set(((Array.isArray(body?.sessionKeys) ? body.sessionKeys : []) as unknown[]).map(cleanKey).filter((k) => k.length >= 6))).slice(0, 250);
+      const now = new Date();
+      let q = supabase.from("cart_reservations").select("id,session_key,created_at,expires_at").gt("expires_at", now.toISOString()).limit(2000);
+      if (keys.length > 0) q = q.in("session_key", keys);
+      const { data: rows, error: readError } = await q;
+      if (readError) return NextResponse.json({ ok: false, error: { message: readError.message } }, { status: 500 });
+      let extended = 0;
+      const sessionMax = new Map<string, string>();
+      for (const row of (rows || []) as Array<Record<string, unknown>>) {
+        const next = extendedHoldExpiry(row.created_at, row.expires_at, minutes, now);
+        if (!next) continue;
+        const { data: done, error } = await supabase.from("cart_reservations").update({ expires_at: next })
+          .eq("id", row.id as any).eq("expires_at", row.expires_at as any).select("id");
+        if (error) return NextResponse.json({ ok: false, extended, error: { message: error.message } }, { status: 500 });
+        if ((done || []).length > 0) {
+          extended += 1;
+          const sk = String(row.session_key ?? "");
+          if (!sessionMax.has(sk) || sessionMax.get(sk)! < next) sessionMax.set(sk, next);
+        }
+      }
+      // 장바구니에 지정해 둔 입금 계좌도 같이 늘림(안 늘리면 옛 만료 시각에 지정이 풀림)
+      for (const [sk, next] of sessionMax) {
+        await supabase.from("cart_bank_account_overrides").update({ cart_expires_at: next })
+          .eq("session_key", sk).eq("status", "active").lt("cart_expires_at", next);
+      }
+      return NextResponse.json({ ok: true, extended, sessions: sessionMax.size, minutes });
     }
 
     // [2026-08-31 사장님 요청] 일괄 비우기 — clear 와 동일 로직을 여러 세션에 적용 (표시용 선점만, 재고·주문·돈 무접촉)

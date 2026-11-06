@@ -41,6 +41,7 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState("");
   const [reminding, setReminding] = useState("");
+  const [extending, setExtending] = useState("");
   const [assigningAccount, setAssigningAccount] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const [scopeAll, setScopeAll] = useState(false);
@@ -154,6 +155,10 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
   const clearSession=async(g:Group)=>{
     if (!(await showAdminConfirm(`${groupLabel(g)}님의 장바구니(${g.totalQty}개)를 비울까요?\n\n손님 화면의 담긴 상품도 함께 사라지고, 다른 고객 화면의 남은 수량이 즉시 복구됩니다. (실제 재고·주문에는 영향 없음)`))) return;
     setClearing(g.sessionKey); try { const res=await fetch("/api/admin-live/cart-holds",{method:"POST",headers:{"Content-Type":"application/json"},cache:"no-store",body:JSON.stringify({action:"clear",sessionKey:g.sessionKey})}); const json=await res.json().catch(()=>null); if(!res.ok||!json?.ok){showAdminToast("장바구니 비우기 실패\n\n"+(json?.error?.message||`요청 실패(${res.status})`),"error");return;} showAdminToast("장바구니를 비웠습니다."); await load(); } finally { setClearing(""); }
+  };
+  // [2026-11-06] 지금 유지시간 설정을 이 장바구니에도 적용(늘리기만) — 설정을 바꾸기 전에 담은 손님용
+  const extendHold=async(g:Group)=>{
+    setExtending(g.sessionKey); try { const res=await fetch("/api/admin-live/cart-holds",{method:"POST",headers:{"Content-Type":"application/json"},cache:"no-store",body:JSON.stringify({action:"apply-hold",sessionKey:g.sessionKey})}); const json=await res.json().catch(()=>null); if(!res.ok||!json?.ok){showAdminToast("시간 늘리기 실패\n\n"+(json?.error?.message||`요청 실패(${res.status})`),"error");return;} showAdminToast(Number(json.extended)>0?`${groupLabel(g)}님 장바구니를 지금 설정 시간으로 늘렸어요.`:"이미 지금 설정 시간이에요."); await load(); } finally { setExtending(""); }
   };
   const remind=async(g:Group)=>{
     setReminding(g.sessionKey); try { const res=await fetch("/api/admin-live/cart-holds",{method:"POST",headers:{"Content-Type":"application/json"},cache:"no-store",body:JSON.stringify({action:"remind",sessionKey:g.sessionKey})}); const json=await res.json().catch(()=>null); if(!res.ok||!json?.ok){showAdminToast("주문 확인 알림 실패\n\n"+(json?.error?.message||`요청 실패(${res.status})`),"error");return;} showAdminToast(json.sent>0?`${groupLabel(g)}님께 주문 확인 알림을 보냈습니다.${kakaoResultNote(json.kakao)}`:"최근에 이미 알림을 보냈어요. 잠시 후 다시 보낼 수 있습니다."); await load(); } finally { setReminding(""); }
@@ -277,6 +282,7 @@ export default function LiveCartHoldsModal({ onClose }: Props) {
               <span className="text-[12px] text-ink-mute tabular-nums">담긴 금액 <span className="text-[14px] font-semibold text-ink">{won(knownTotal)}{unknown?" + 기록 없음":""}</span></span>
               <label className="flex min-w-[220px] flex-1 items-center gap-2 text-[12px] text-ink-mute max-md:basis-full"><span className="shrink-0">계좌</span><select aria-label={`${groupLabel(g)} 장바구니 계좌`} value={meta?.overrideAccount?`active:${meta.overrideAccount.id}`:"default"} disabled={assigningAccount===g.sessionKey} onChange={(e)=>void setBankOverride(g,e.target.value)} className={`${selectCls} flex-1`}><option value="default">기본 계좌 설정 사용</option>{meta?.overrideAccount?<option value={`active:${meta.overrideAccount.id}`}>지금 지정 · {meta.overrideAccount.bankName} {meta.overrideAccount.bankAccount} · 예금주 {meta.overrideAccount.bankHolder}</option>:null}{bankAccounts.map(account=><option key={account.id} value={account.id}>{account.label} · {account.bankName} {account.bankAccount} · 예금주 {account.bankHolder}</option>)}</select></label>
               <div className="flex items-center gap-2 max-md:w-full">
+                <button type="button" disabled={extending===g.sessionKey} onClick={()=>void extendHold(g)} title="지금 설정한 유지시간을 이 장바구니에도 적용(늘리기만)" className={`${btnSub} max-md:flex-1`}>{extending===g.sessionKey?"늘리는 중":"시간 늘리기"}</button>
                 <button type="button" disabled={Boolean(reminding)} onClick={()=>void remind(g)} className={`${btnSub} max-md:flex-1`}>{reminding===g.sessionKey?"보내는 중":"주문 확인 알림"}</button>
                 <button type="button" disabled={clearing===g.sessionKey} onClick={()=>void clearSession(g)} className={`${btnDanger} max-md:flex-1`}>{clearing===g.sessionKey?"비우는 중":"비우기"}</button>
               </div>

@@ -364,6 +364,11 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
       }
 
       showAdminToast("운영 설정을 저장했습니다.", "success");
+      // [2026-11-06] 장바구니 유지시간을 늘렸으면 이미 담긴 장바구니에도 적용(늘리기만 · 실패해도 설정 저장은 그대로)
+      void fetch("/api/admin-live/cart-holds", { method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store", body: JSON.stringify({ action: "apply-hold" }) })
+        .then((res) => res.json().catch(() => null))
+        .then((json) => { if (json?.ok && Number(json.sessions) > 0) showAdminToast(`이미 담긴 장바구니 ${Number(json.sessions)}명도 새 유지시간으로 늘렸어요.`, "success"); })
+        .catch(() => {});
       const holdNorm = decomposeHoldMinutes(nextHoldMinutes);
       markGlobalSaved({...globalDraft,customerCardRate:String(nextCustomerCardRate),actualCardRate:String(nextActualCardRate),cardMinAmount:formatMoneyInput(nextCardMinAmount),defaultShippingFee:formatMoneyInput(nextDefaultShippingFee),remoteShippingFee:formatMoneyInput(nextRemoteShippingFee),vendorShippingFee:formatMoneyInput(nextVendorShippingFee),vendorRemoteShippingFee:formatMoneyInput(nextVendorRemoteShippingFee),overseasShippingFee:formatMoneyInput(nextOverseasShippingFee),overseasRemoteShippingFee:formatMoneyInput(nextOverseasRemoteShippingFee),holdAmount:holdNorm.amount,holdUnit:holdNorm.unit});
       return true;
