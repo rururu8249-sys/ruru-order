@@ -353,6 +353,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [shopPickerOpen, setShopPickerOpen] = useState(false);
   const [shopPickerSel, setShopPickerSel] = useState<Set<string>>(new Set());
   const [shopPickerSearch, setShopPickerSearch] = useState("");
+  // [2026-11-07 사장님 「쇼핑몰 모드는 지난 방송 상품 그대로 가져오는 기능 없다」] 진열 창도 지난 방송 골라 그 상품만 보기(읽기 전용)
+  const [shopPickerFromBcId, setShopPickerFromBcId] = useState("");
+  const [shopPickerFromIds, setShopPickerFromIds] = useState<Set<string> | null>(null);
   // 드래그 순서변경
   const [shopDragPid, setShopDragPid] = useState<string | null>(null);
   const [shopDragOver, setShopDragOver] = useState<number | null>(null);
@@ -1127,9 +1130,26 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     }
   };
 
+  const changeShopPickerFrom = async (bid: string) => {
+    setShopPickerFromBcId(bid);
+    if (!bid) {
+      setShopPickerFromIds(null);
+      return;
+    }
+    setShopPickerFromIds(new Set());
+    const { data } = await supabase
+      .from("broadcast_products")
+      .select("product_id")
+      .eq("broadcast_id", bid);
+    setShopPickerFromIds(new Set(((data as { product_id: unknown }[]) || []).map((r) => String(r.product_id))));
+  };
+
   const openShopPicker = () => {
     setShopPickerSel(new Set());
     setShopPickerSearch("");
+    setShopPickerFromBcId("");
+    setShopPickerFromIds(null);
+    if (bcList.length === 0) void loadBroadcastList(); // 쇼핑몰 탭에서 바로 열면 방송 목록이 아직 없음(읽기만)
     setShopPickerOpen(true);
   };
 
@@ -2593,8 +2613,29 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               <span style={{ fontSize: "16px", fontWeight: 700, color: "var(--color-ink)" }}>쇼핑몰에 담기</span>
               <button type="button" onClick={() => setShopPickerOpen(false)} style={{ marginLeft: "auto", border: "none", background: "none", fontSize: "20px", color: "var(--color-ink-mute)", cursor: "pointer", lineHeight: 1 }}>✕</button>
             </div>
-            {/* 검색 */}
-            <div style={{ padding: "12px 16px 8px" }}>
+            {/* 지난 방송 + 검색 */}
+            <div style={{ padding: "12px 16px 8px", display: "flex", flexDirection: "column", gap: "8px" }}>
+              <select
+                value={shopPickerFromBcId}
+                onChange={(e) => void changeShopPickerFrom(e.target.value)}
+                style={{ alignSelf: "flex-start", height: "36px", borderRadius: "999px", border: "1px solid " + (shopPickerFromBcId ? "var(--color-ink)" : "var(--color-line)"), padding: "0 12px", fontSize: "13px", fontWeight: 700, outline: "none", color: "var(--color-ink)", background: "var(--color-surface)", maxWidth: "100%" }}
+              >
+                <option value="">지난 방송 상품 불러오기</option>
+                {bcList.map((b) => {
+                  const d = new Date(b.started_at);
+                  const dateLabel = Number.isNaN(d.getTime()) ? "" : ` (${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")})`;
+                  return <option key={b.id} value={b.id}>{b.title}{dateLabel}</option>;
+                })}
+                {bcHiddenList.length > 0 ? (
+                  <optgroup label="숨긴 방송">
+                    {bcHiddenList.map((b) => {
+                      const d = new Date(b.started_at);
+                      const dateLabel = Number.isNaN(d.getTime()) ? "" : ` (${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")})`;
+                      return <option key={`h-${b.id}`} value={b.id}>{b.title}{dateLabel} · 숨김</option>;
+                    })}
+                  </optgroup>
+                ) : null}
+              </select>
               <input value={shopPickerSearch} onChange={(e) => setShopPickerSearch(e.target.value)} placeholder="상품명 검색" style={{ width: "100%", height: "36px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 12px", fontSize: "14px", fontWeight: 500, outline: "none", color: "var(--color-ink)" }} />
             </div>
             {/* 목록 */}
@@ -2603,15 +2644,23 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 const q = normalizeProductSearchText(shopPickerSearch);
                 const pickList = products.filter((p) => {
                   if (pickString(p, ["status"], "") === "deleted") return false;
+                  if (shopPickerFromBcId && shopPickerFromIds && !shopPickerFromIds.has(productId(p))) return false;
                   // [2026-07-23] 조합형 세부상품명 검색 허용(평소 상품 무변경)
                   if (q && !productSearchMatches(productName(p), q) && !comboNamesMatch(p, shopPickerSearch)) return false;
                   return true;
                 });
+                if (pickList.length === 0 && shopPickerFromBcId) {
+                  return <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div>그 방송에 담았던 상품이 없어요</div><div style={{ fontSize: "12px", marginTop: "4px" }}>다른 방송을 고르거나 「지난 방송 상품 불러오기」로 되돌려 주세요</div></div>;
+                }
                 if (pickList.length === 0) {
                   return <div style={{ textAlign: "center", padding: "32px 12px", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 700, lineHeight: 1.7 }}><div style={{ fontWeight: 700, color: "var(--color-ink-soft)" }}>상품 없음</div><div style={{ fontSize: "12px", marginTop: "4px" }}>「+ 상품 등록」으로 먼저 만들어 주세요</div></div>;
                 }
+                const shopSelectableIds = pickList.map((p) => productId(p)).filter((pid) => pid && !shopAddedIds.has(pid));
                 return (
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    {shopPickerFromBcId && shopSelectableIds.length > 0 ? (
+                      <button type="button" onClick={() => setShopPickerSel((prev) => new Set([...prev, ...shopSelectableIds]))} style={{ alignSelf: "flex-start", height: "36px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", background: "var(--color-surface)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "0 12px", cursor: "pointer" }}>{shopSelectableIds.length}개 모두 선택</button>
+                    ) : null}
                     {pickList.map((p, i) => {
                       const pid = productId(p);
                       const already = shopAddedIds.has(pid);
