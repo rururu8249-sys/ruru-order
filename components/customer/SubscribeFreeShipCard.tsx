@@ -5,7 +5,7 @@
 //   · 배송비 계산은 하지 않는다(부모가 인증 결과로 다시 계산, 서버도 다시 확인). 표시·업로드 전용.
 //   · DESIGN.md: 흰 바탕·검정 알약 주버튼·13px 이상·로즈 없음.
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { SUBSCRIBE_EXAMPLE_PC } from "@/lib/subscribeFreeShip";
+import { SUBSCRIBE_EXAMPLE_PC, subscribeChannelLabel } from "@/lib/subscribeFreeShip";
 
 type Props = {
   variant: "card" | "strip";
@@ -167,7 +167,7 @@ export default function SubscribeFreeShipCard(props: Props) {
         ) : null}
       </div>
       <div style={{ marginTop: "4px", fontSize: "15px", color: "#39393B", lineHeight: 1.5, wordBreak: "keep-all" }}>
-        유튜브 「{channelName}」 구독하고 캡처 한 장만 올리면 돼요. ({groupsText})
+        유튜브 {subscribeChannelLabel(channelName)} 구독하고 캡처 한 장만 올리면 돼요. ({groupsText})
       </div>
 
       <ol style={{ listStyle: "none", margin: "14px 0 0", padding: 0, display: "flex", flexDirection: "column", gap: "14px" }}>

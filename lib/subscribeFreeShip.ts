@@ -77,7 +77,7 @@ export function parseSubscribeFreeShip(input: unknown): SubscribeFreeShipConfig 
     endAt: validTime(r.endAt),
     groups,
     waiveRemote: r.waiveRemote === true,
-    channelName: String(r.channelName ?? "").trim().slice(0, 40) || DEFAULT_SUBSCRIBE_CHANNEL,
+    channelName: String(r.channelName ?? "").trim().slice(0, 80) || DEFAULT_SUBSCRIBE_CHANNEL,
     exampleUrl: /^(https:\/\/|\/)/.test(exampleUrl) && exampleUrl !== OLD_DEFAULT_SUBSCRIBE_EXAMPLE ? exampleUrl : DEFAULT_SUBSCRIBE_EXAMPLE,
   };
 }
@@ -113,10 +113,21 @@ export function waivedShippingAmount(before: number, after: number): number {
 }
 
 // ───────── AI 판정 ─────────
+// [2026-11-06 사장님 「루루동이#3 채널도 인증 사진으로」] 채널 이름 칸에 쉼표로 여러 개 — 그중 하나면 통과.
+export function subscribeChannelList(channelName: string): string[] {
+  const list = String(channelName || "").split(/[,，\n]|\s또는\s/).map((v) => v.trim()).filter(Boolean);
+  return list.length ? [...new Set(list)] : [DEFAULT_SUBSCRIBE_CHANNEL];
+}
+
+/** 손님 화면 표시 — 「나야루루」 또는 「루루동이#3」 */
+export function subscribeChannelLabel(channelName: string): string {
+  return subscribeChannelList(channelName).map((c) => `「${c}」`).join(" 또는 ");
+}
+
 export function buildSubscribeCheckPrompt(channelName: string): string {
   return [
     "이 사진은 손님이 올린 휴대폰 화면 캡처다. 아래를 확인해 JSON 으로만 답해라.",
-    `확인할 채널 이름: 「${channelName}」`,
+    `확인할 채널 이름(이 중 하나면 됨): ${subscribeChannelLabel(channelName)}`,
     "1) 유튜브 앱/사이트 화면인가?",
     "2) 화면에 보이는 채널 이름(또는 @핸들)을 글자 그대로 적어라. 여러 개면 「구독중」 버튼과 붙어 있는 채널 이름.",
     "3) 그 채널 이름 바로 아래나 바로 옆에 붙은 구독 버튼의 글자를 그대로 적어라(예: 구독중, 구독, Subscribed, Subscribe).",
@@ -135,7 +146,7 @@ export type SubscribeAiJudge = {
   note?: string;
 };
 
-const norm = (s: string) => String(s || "").replace(/[\s@·_\-.]/g, "").toLowerCase();
+const norm = (s: string) => String(s || "").replace(/[\s@·_\-.#]/g, "").toLowerCase();
 
 /** AI 답 → 통과 여부 + 손님에게 보여 줄 이유. 통과 판단은 코드가 한다(AI 의 «통과» 한마디를 믿지 않음). */
 export function judgeSubscribeShot(
@@ -146,15 +157,16 @@ export function judgeSubscribeShot(
   if (ai.is_youtube === false) return { ok: false, reason: "유튜브 화면 캡처를 올려 주세요." };
   if (ai.clear === false) return { ok: false, reason: "글자가 잘 안 보여요. 채널 이름과 「구독중」이 또렷하게 나오게 다시 찍어 주세요." };
   const seen = norm(ai.channel_name || "");
-  const want = norm(channelName);
-  if (!seen || !want || !seen.includes(want)) {
-    return { ok: false, reason: `「${channelName}」 채널 이름이 안 보여요. 채널 이름과 「구독중」이 같이 나오게 찍어 주세요.` };
+  const label = subscribeChannelLabel(channelName);
+  const wants = subscribeChannelList(channelName).map(norm).filter(Boolean);
+  if (!seen || !wants.some((want) => seen.includes(want))) {
+    return { ok: false, reason: `${label} 채널 이름이 안 보여요. 채널 이름과 「구독중」이 같이 나오게 찍어 주세요.` };
   }
   const button = norm(ai.button_text || "");
   const subscribed = button.includes("구독중") || button.includes("subscribed");
   if (!subscribed) return { ok: false, reason: "「구독중」이 안 보여요. 구독 버튼을 누른 뒤 다시 찍어 주세요." };
   if (ai.button_belongs === false) {
-    return { ok: false, reason: `「구독중」이 「${channelName}」 채널 것인지 안 보여요. 채널 이름 바로 아래 「구독중」이 나오게 찍어 주세요.` };
+    return { ok: false, reason: `「구독중」이 ${label} 채널 것인지 안 보여요. 채널 이름 바로 아래 「구독중」이 나오게 찍어 주세요.` };
   }
   return { ok: true, reason: "" };
 }

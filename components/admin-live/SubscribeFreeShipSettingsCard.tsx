@@ -184,7 +184,7 @@ export default function SubscribeFreeShipSettingsCard() {
         </div>
 
         <label className="block">
-          <span className="mb-1 block text-[13px] font-semibold text-ink">캡처에 보여야 하는 채널 이름</span>
+          <span className="mb-1 block text-[13px] font-semibold text-ink">캡처에 보여야 하는 채널 이름 <span className="font-normal text-ink-mute">· 여러 채널이면 쉼표로 (예: 나야루루, 루루동이#3)</span></span>
           <input value={cfg.channelName} onChange={(e) => set({ channelName: e.target.value })} className="h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm" />
         </label>
 

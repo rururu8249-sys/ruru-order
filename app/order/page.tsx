@@ -45,6 +45,7 @@ import Link from "next/link";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { normalizeProductSearchText, productSearchMatches } from "@/lib/productSearch";
 import { registerBrandAliasesFromProducts } from "@/lib/brandSearchAliases";
+import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { HOWTO_DEFAULT, parseHowtoSteps } from "@/lib/howto";
 import { supabase } from "@/lib/supabase";
 import { isRemoteAreaAddress } from "@/lib/order/shippingAddress";
@@ -933,6 +934,19 @@ const normalizeDetailImages = (value: unknown): string[] => {
     : (typeof value === "string" ? (() => { try { const p = JSON.parse(value); return Array.isArray(p) ? p : [value]; } catch { return [value]; } })() : []);
   return arr.map((v) => readOrderProductImageValue(v)).filter(Boolean);
 };
+
+// [2026-11-06 사장님 「담으면 세부상품 사진이 아니라 브랜드 썸네일이 나와」] 브랜드 묶음 상품이면
+//   주문 줄 이름(세부상품명)으로 그 세부상품 사진을 찾는다(관리자 화면과 같은 lib/orderItemPhoto 규칙). 못 찾으면 예전처럼 대표사진.
+//   표시 전용 — 담기·재고·금액 무관.
+function orderItemDisplayImage(product: any, item: { product_name?: unknown; color?: unknown }): string {
+  if (product) {
+    try {
+      const r = resolveOrderItemPhoto(product as Record<string, unknown>, { productName: item.product_name, color: item.color });
+      if (r.source === "detail" && r.url) return r.url;
+    } catch { /* 예전 규칙으로 */ }
+  }
+  return product ? pickOrderProductImageUrl(product) : "";
+}
 
 function pickOrderProductImageUrl(product: any): string {
   return (
@@ -6733,7 +6747,7 @@ export default function OrderPage() {
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
               {selectedItemEntries.map(({ item, index }) => {
                 const matched = findMatchedBroadcastProduct(item, broadcastProducts);
-                const imageUrl = matched ? pickOrderProductImageUrl(matched) : getOrderItemImageUrl(item);
+                const imageUrl = matched ? orderItemDisplayImage(matched, item) : getOrderItemImageUrl(item);
                 const optionText = [normalizeEmptyProductOptionValue(item.color), normalizeEmptyProductOptionValue(item.size)].filter(Boolean).join(" / ");
                 const qty = toNumber(item.qty);
                 return (
@@ -8007,7 +8021,7 @@ export default function OrderPage() {
                   const matchedRegisteredProduct = findMatchedBroadcastProduct(item, broadcastProducts);
                   const itemIsRegisteredProduct = Boolean(item.product_id || matchedRegisteredProduct);
                   const imageUrl = matchedRegisteredProduct
-                    ? pickOrderProductImageUrl(matchedRegisteredProduct)
+                    ? orderItemDisplayImage(matchedRegisteredProduct, item)
                     : getOrderItemImageUrl(item);
                   // [2026-08-28 P0-3] 손님 화면에 "없음"을 찍지 않는다. 값이 있는 옵션만 이어붙인다.
                   // item.color/item.size 저장값은 그대로 — 재고키·주문저장·송장 로직 무변경(표시 전용).
@@ -8434,7 +8448,7 @@ export default function OrderPage() {
                 nonce={cartFxNonce}
                 productName={String(added?.product_name || "상품")}
                 optionText={opts ? `${opts} · ${qtyText}` : qtyText}
-                image={addedProduct ? pickOrderProductImageUrl(addedProduct) : ""}
+                image={addedProduct ? orderItemDisplayImage(addedProduct, { product_name: added?.product_name, color: added?.color }) : ""}
               />
             );
           })() : null}
