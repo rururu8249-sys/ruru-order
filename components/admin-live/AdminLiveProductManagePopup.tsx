@@ -299,6 +299,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   // 방송 상품 탭(broadcast)
   const [bcList, setBcList] = useState<Array<{ id: string; title: string; started_at: string; status: string }>>([]);
   const [bcSelId, setBcSelId] = useState("");
+  // [2026-11-06 사장님 «방송 숨겼더니 뭘 담았는지 모르겠다»] 숨긴 방송도 따로 들고 있다가 「숨긴 방송」 펼침·되살리기·담기 창 «지난 방송»에서 쓴다
+  const [bcHiddenList, setBcHiddenList] = useState<Array<{ id: string; title: string; started_at: string; status: string }>>([]);
+  const [bcHiddenOpen, setBcHiddenOpen] = useState(false);
   const [bcProducts, setBcProducts] = useState<ProductRow[]>([]);
   const [bcLoading, setBcLoading] = useState(false);
   const [bcBusy, setBcBusy] = useState(false);
@@ -570,13 +573,24 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
         .neq("is_deleted", true)
         .order("started_at", { ascending: false })
         .limit(120);
-      const list = ((data as Array<Record<string, unknown>>) || []).map((b) => ({
+      const toItem = (b: Record<string, unknown>) => ({
         id: String(b.id),
         title: String(b.public_title || "제목 없음"),
         started_at: String(b.started_at || ""),
         status: String(b.status || ""),
-      }));
+      });
+      const list = ((data as Array<Record<string, unknown>>) || []).map(toItem);
       setBcList(list);
+      // 숨긴 방송(읽기만) — 못 읽어도 목록은 그대로
+      try {
+        const { data: hid } = await supabase
+          .from("broadcasts")
+          .select("id, public_title, started_at, status")
+          .eq("is_deleted", true)
+          .order("started_at", { ascending: false })
+          .limit(60);
+        setBcHiddenList(((hid as Array<Record<string, unknown>>) || []).map(toItem));
+      } catch { /* 숨긴 방송 못 읽어도 무시 */ }
       setBcSelId((cur) => {
         if (preferId && list.some((b) => b.id === preferId)) return preferId;
         if (cur && list.some((b) => b.id === cur)) return cur;
@@ -643,6 +657,24 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     } catch (e) {
       const err = e as { message?: string; code?: string };
       showAdminToast("방송 숨기기 실패\n\n" + (err?.message ?? err?.code ?? "알 수 없는 오류"), "error");
+    } finally {
+      setBcBusy(false);
+    }
+  };
+
+  // 숨긴 방송 되살리기: is_deleted=false 만 update(숨기기의 반대)
+  const handleRestoreBroadcast = async (b: { id: string; title: string }) => {
+    if (bcBusy) return;
+    setBcBusy(true);
+    try {
+      const { error } = await adminCatalogWrite({ table: "broadcasts", op: "update", values: { is_deleted: false }, filters: [{ type: "eq", col: "id", val: b.id }] });
+      if (error) throw error;
+      await loadBroadcastList(b.id);
+      window.dispatchEvent(new Event("ruru-broadcast-list-updated"));
+      showAdminToast(`'${b.title}' 방송을 다시 목록에 넣었어요`, "success");
+    } catch (e) {
+      const err = e as { message?: string; code?: string };
+      showAdminToast("방송 되살리기 실패\n\n" + (err?.message ?? err?.code ?? "알 수 없는 오류"), "error");
     } finally {
       setBcBusy(false);
     }
@@ -1696,6 +1728,26 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     );
                   })
                 )}
+                {bcHiddenList.length > 0 ? (
+                  <div style={{ borderTop: "1px solid var(--color-line)" }}>
+                    <button type="button" onClick={() => setBcHiddenOpen((v) => !v)} style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", border: "none", background: "var(--color-surface-2)", cursor: "pointer", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-soft)" }}>
+                      숨긴 방송 {bcHiddenList.length}개 {bcHiddenOpen ? "접기" : "보기"}
+                    </button>
+                    {bcHiddenOpen ? bcHiddenList.map((b) => {
+                      const d = new Date(b.started_at);
+                      const dateLabel = Number.isNaN(d.getTime()) ? "-" : `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+                      return (
+                        <div key={b.id} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 12px", borderBottom: "1px solid var(--color-line)", background: "var(--color-surface)" }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-ink-mute)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</div>
+                            <div style={{ fontSize: "11px", color: "var(--color-ink-mute)", marginTop: "2px" }}>{dateLabel}</div>
+                          </div>
+                          <button type="button" disabled={bcBusy} onClick={() => void handleRestoreBroadcast(b)} style={{ flexShrink: 0, height: "28px", padding: "0 12px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)", fontSize: "12px", fontWeight: 700, color: "var(--color-ink)", cursor: bcBusy ? "default" : "pointer" }}>되살리기</button>
+                        </div>
+                      );
+                    }) : null}
+                  </div>
+                ) : null}
               </div>
             )}
             </div>
@@ -2329,6 +2381,15 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   const dateLabel = Number.isNaN(d.getTime()) ? "" : ` (${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")})`;
                   return <option key={b.id} value={b.id}>{b.title}{dateLabel}</option>;
                 })}
+                {bcHiddenList.length > 0 ? (
+                  <optgroup label="숨긴 방송">
+                    {bcHiddenList.filter((b) => b.id !== bcSelId).map((b) => {
+                      const d = new Date(b.started_at);
+                      const dateLabel = Number.isNaN(d.getTime()) ? "" : ` (${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")})`;
+                      return <option key={`h-${b.id}`} value={b.id}>{b.title}{dateLabel} · 숨김</option>;
+                    })}
+                  </optgroup>
+                ) : null}
               </select>
               </div>
               <input value={bcPickerSearch} onChange={(e) => setBcPickerSearch(e.target.value)} placeholder="상품명 검색" style={{ width: "100%", height: "36px", borderRadius: "8px", border: "1px solid var(--color-line)", padding: "0 12px", fontSize: "14px", fontWeight: 500, outline: "none", color: "var(--color-ink)" }} />
