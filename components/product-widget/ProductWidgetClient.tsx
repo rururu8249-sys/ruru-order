@@ -812,6 +812,10 @@ export default function ProductWidgetClient() {
                 그 전에 올린 사진(비율 제각각)은 아래 «흐린 같은 사진»이 남는 자리를 메운다. */}
             {img ? (
               <div data-ruru-widget-photo style={{ position: "relative", flex: `1 1 ${CARD}px`, minHeight: 0, width: "100%", background: GLASS_BG, overflow: "hidden" }}>
+                {/* [2026-11-06 사장님 «저 사이만 밝다»] 어둡게 하는 막을 사진칸 «전체»에 깐다(예전엔 위 200px만 덮어 아래 띠가 밝게 남았음) */}
+                {currentToast ? (
+                  <span aria-hidden style={{ position: "absolute", inset: 0, zIndex: 4, pointerEvents: "none", background: "rgba(0,0,0,0.22)", animation: "ruruDimIn 0.3s ease-out both" }} />
+                ) : null}
                 {/* [2026-09-19 사장님 «위아래 빈 공간이 거슬린다»] 사진 비율이 틀과 안 맞을 때 생기던 반투명 빈칸을
                     «같은 사진을 흐리게 키운 것»으로 채운다(쇼핑앱 상세 사진과 같은 방식). 틀은 고정, 사진은 안 잘리고, 빈칸은 없다. */}
                 <img
@@ -969,7 +973,6 @@ export default function ProductWidgetClient() {
                   style={{
                     position: "absolute", left: 0, right: 0, top: 0, height: `${CARD}px`, zIndex: 5,
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    background: "rgba(0,0,0,0.22)", animation: "ruruDimIn 0.3s ease-out both",
                   }}
                 >
                   {confettiOn ? <ConfettiBurst burstKey={confettiKey} /> : null}
