@@ -25,6 +25,7 @@ import { splitOptionText } from "@/lib/optionSplit";
 import { normalizeProductSearchText, productSearchMatches } from "@/lib/productSearch";
 import { registerBrandAliasesFromProducts } from "@/lib/brandSearchAliases";
 import { productPage } from "@/lib/productPagination";
+import { dedupeRotationTargets, detailInRotation, detailRotationTarget, removeRotationTargets, type RotationDetailRef } from "@/lib/widgetRotationDetail";
 import ProductPagination from "./ProductPagination";
 import ProductToolbar from "./ProductToolbar";
 import { resolveBrandCatalog, resolveAdminBrandTarget, searchBrandDetails, type BrandProductLink } from "@/lib/productBrandLinks";
@@ -320,6 +321,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const [widgetRotation, setWidgetRotation] = useState<WidgetRotationConfig>({ mode: "all", paused: false, targets: [] });
   // [2026-10-21 a2-10] 방송 상품 줄 체크(순환 넣기/빼기용) — 이 화면 안에서만, 저장 안 함
   const [bcRotSel, setBcRotSel] = useState<Set<string>>(new Set());
+  const [bcRotDetailSel, setBcRotDetailSel] = useState<Map<string, RotationDetailRef>>(new Map());
   const widgetLibraryLoadSeqRef = useRef(0);
   const [bcWidgetPin, setBcWidgetPin] = useState<{ mode: "auto" | "pin"; productId: string; detailName: string }>({ mode: "auto", productId: "", detailName: "" });
   const [bcExpanded, setBcExpanded] = useState<Set<string>>(new Set());
@@ -1278,11 +1280,16 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
       .filter(Boolean);
     return [pid, ...linked];
   };
+  // [2026-11-06 사장님 「세부상품 중에 골라서 그 상품만 순환」] 지금 순환 타겟 목록(세부상품 이름 포함). 「전체」면 빈 목록.
+  const currentRotationTargets = useMemo<WidgetProductTarget[]>(() => {
+    if (widgetRotation.mode === "selected") return widgetRotation.targets;
+    if (widgetRotation.mode === "history") return widgetHistory.map((entry) => ({ productId: String(entry.productId), detailName: String(entry.detailName || "") }));
+    return [];
+  }, [widgetHistory, widgetRotation]);
   const rotationTargetPids = useMemo<Set<string>>(() => {
     if (widgetRotation.mode === "all") return new Set(bcAllPids);
-    if (widgetRotation.mode === "history") return new Set(widgetHistory.map((entry) => String(entry.productId)));
-    return new Set(widgetRotation.targets.map((target) => String(target.productId)));
-  }, [bcAllPids, widgetHistory, widgetRotation]);
+    return new Set(currentRotationTargets.map((target) => String(target.productId)));
+  }, [bcAllPids, currentRotationTargets, widgetRotation.mode]);
   // 줄 기준 「순환 포함」 = 그 줄 id 또는 그 줄에 묶인 세부상품 id 가 타겟에 있으면
   const rotationIncludedPids = useMemo<Set<string>>(() => {
     const out = new Set<string>();
@@ -1290,39 +1297,78 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bcAllPids, rotationTargetPids, brandCatalog]);
+  // 줄의 세부상품(숨김 제외) — 목록에 보이는 것과 같은 규칙
+  const rotationDetailsOfRow = (pid: string) => {
+    const row = bcProducts.find((r) => productId(r) === pid);
+    return (brandCatalog.detailsByParent.get(pid) ?? (row ? detailProducts(row, { includeHidden: false }) : [])).filter((detail) => !detail.hidden);
+  };
+  const rotationDetailRef = (pid: string, detail: { detailName: string }): RotationDetailRef => ({
+    pid,
+    detailName: detail.detailName,
+    sourceId: "sourceProductId" in detail ? String((detail as { sourceProductId?: unknown }).sourceProductId ?? "") : "",
+  });
+  const isDetailRotating = (pid: string, detail: { detailName: string }) =>
+    widgetRotation.mode === "all" || detailInRotation(currentRotationTargets, rotationDetailRef(pid, detail));
   const rotationLive = Boolean(widgetPinTargetBroadcastId(bcSelId, activeBroadcastId));
-  const rotationSelectedCount = widgetRotation.mode === "all" ? bcAllPids.length : bcAllPids.filter((pid) => rotationIncludedPids.has(pid)).length;
-  const saveRotationPids = async (pids: string[], doneMessage: string) => {
-    const unique = [...new Set(pids.filter((pid) => bcAllPids.includes(pid)).flatMap(rotationPidsForRow))];
-    if (unique.length === 0) {
+  // 「체크한 상품만 N개」 = 실제로 도는 상품 수(브랜드 묶음은 순환에 든 세부상품 수)
+  const rotationSelectedCount = widgetRotation.mode === "all" ? bcAllPids.length : bcAllPids.reduce((sum, pid) => {
+    const details = rotationDetailsOfRow(pid);
+    if (details.length === 0) return sum + (rotationIncludedPids.has(pid) ? 1 : 0);
+    return sum + details.filter((detail) => isDetailRotating(pid, detail)).length;
+  }, 0);
+  const rotationAllowedIds = () => new Set(bcAllPids.flatMap(rotationPidsForRow));
+  const rotationCheckedCount = bcRotSel.size + bcRotDetailSel.size;
+  const clearRotChecks = () => { setBcRotSel(new Set()); setBcRotDetailSel(new Map()); };
+  const saveRotationTargets = async (targets: WidgetProductTarget[], doneMessage: string) => {
+    const allowed = rotationAllowedIds();
+    const clean = dedupeRotationTargets(targets).filter((t) => allowed.has(String(t.productId)));
+    if (clean.length === 0) {
       showAdminToast("순환할 상품이 하나도 없어요. 최소 1개는 남겨 주세요.", "warning");
       return;
     }
-    const targets: WidgetProductTarget[] = unique.map((pid) => ({ productId: pid, detailName: "" }));
-    if (await saveWidgetRotation({ mode: "selected", paused: widgetRotation.paused, targets })) {
-      setBcRotSel(new Set());
+    if (await saveWidgetRotation({ mode: "selected", paused: widgetRotation.paused, targets: clean })) {
+      clearRotChecks();
       showAdminToast(doneMessage, "success");
     }
   };
   const rotationUseAll = async () => {
     if (await saveWidgetRotation({ mode: "all", paused: widgetRotation.paused, targets: [] })) {
-      setBcRotSel(new Set());
+      clearRotChecks();
       showAdminToast("이 방송에 담긴 상품 전체를 순환합니다.", "success");
     }
   };
+  const checkedRotationTargets = (): WidgetProductTarget[] => [
+    ...[...bcRotSel].filter((pid) => bcAllPids.includes(pid)).flatMap(rotationPidsForRow).map((id) => ({ productId: id, detailName: "" })),
+    ...[...bcRotDetailSel.values()].map(detailRotationTarget),
+  ];
   const rotationAddChecked = async () => {
-    const checked = [...bcRotSel];
-    if (checked.length === 0) return;
-    if (widgetRotation.mode === "all") { await saveRotationPids(checked, `체크한 ${checked.length}개만 순환합니다.`); return; }
-    await saveRotationPids([...rotationIncludedPids, ...checked], `순환에 ${checked.length}개 넣었어요.`);
+    const count = rotationCheckedCount;
+    if (count === 0) return;
+    if (widgetRotation.mode === "all") { await saveRotationTargets(checkedRotationTargets(), `체크한 ${count}개만 순환합니다.`); return; }
+    await saveRotationTargets([...currentRotationTargets, ...checkedRotationTargets()], `순환에 ${count}개 넣었어요.`);
   };
   const rotationRemoveChecked = async () => {
-    const checked = new Set(bcRotSel);
-    if (checked.size === 0) return;
-    const drop = new Set([...checked].flatMap(rotationPidsForRow));
-    await saveRotationPids(bcAllPids.filter((pid) => rotationIncludedPids.has(pid) && !drop.has(pid)), `순환에서 ${checked.size}개 뺐어요.`);
+    const count = rotationCheckedCount;
+    if (count === 0) return;
+    const base = widgetRotation.mode === "all"
+      ? bcAllPids.flatMap(rotationPidsForRow).map((id) => ({ productId: id, detailName: "" }))
+      : currentRotationTargets;
+    const next = removeRotationTargets(
+      base,
+      [...bcRotSel].flatMap(rotationPidsForRow),
+      [...bcRotDetailSel.values()],
+      (pid) => rotationDetailsOfRow(pid).filter((detail) => !("sourceProductId" in detail)).map((detail) => detail.detailName),
+    );
+    await saveRotationTargets(next, `순환에서 ${count}개 뺐어요.`);
   };
   const toggleRotSel = (pid: string) => setBcRotSel((prev) => { const next = new Set(prev); if (next.has(pid)) next.delete(pid); else next.add(pid); return next; });
+  const rotDetailKey = (pid: string, name: string) => `${pid}\u0001${name}`;
+  const toggleRotDetailSel = (pid: string, detail: { detailName: string }) => setBcRotDetailSel((prev) => {
+    const next = new Map(prev);
+    const key = rotDetailKey(pid, detail.detailName);
+    if (next.has(key)) next.delete(key); else next.set(key, rotationDetailRef(pid, detail));
+    return next;
+  });
 
   const toggleWidgetLibraryPause = async () => {
     const next = { ...widgetRotation, paused: !widgetRotation.paused };
@@ -1781,7 +1827,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 {!bcCopyMode && bcSelId && bcProducts.length > 0 ? (
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", margin: "0 0 8px" }}>
                     <label style={{ display: "flex", alignItems: "center", gap: "6px", height: "36px", fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", cursor: "pointer", userSelect: "none" }}>
-                      <input type="checkbox" checked={bcAllPids.length > 0 && bcRotSel.size === bcAllPids.length} onChange={(e) => setBcRotSel(e.target.checked ? new Set(bcAllPids) : new Set())} style={{ width: "16px", height: "16px", accentColor: "var(--color-ink)", cursor: "pointer" }} />
+                      <input type="checkbox" checked={bcAllPids.length > 0 && bcRotSel.size === bcAllPids.length} onChange={(e) => { setBcRotSel(e.target.checked ? new Set(bcAllPids) : new Set()); setBcRotDetailSel(new Map()); }} style={{ width: "16px", height: "16px", accentColor: "var(--color-ink)", cursor: "pointer" }} />
                       전체
                     </label>
                     <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--color-ink-soft)" }}>방송 화면 순환</span>
@@ -1793,17 +1839,17 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       style={{ ...TAB_SORT_STYLE, ...(isNarrow ? { flex: 1, minWidth: 0 } : {}), opacity: rotationLive ? 1 : 0.5, cursor: rotationLive ? "pointer" : "not-allowed" }}
                     >
                       <option value="all">전체 상품 {bcAllPids.length}개</option>
-                      <option value="selected" disabled={widgetRotation.mode !== "selected" && bcRotSel.size === 0}>{widgetRotation.mode === "selected" ? `체크한 상품만 ${rotationSelectedCount}개` : bcRotSel.size > 0 ? `체크한 상품만 ${bcRotSel.size}개` : "체크한 상품만 (먼저 체크)"}</option>
+                      <option value="selected" disabled={widgetRotation.mode !== "selected" && rotationCheckedCount === 0}>{widgetRotation.mode === "selected" ? `체크한 상품만 ${rotationSelectedCount}개` : rotationCheckedCount > 0 ? `체크한 상품만 ${rotationCheckedCount}개` : "체크한 상품만 (먼저 체크)"}</option>
                       {widgetRotation.mode === "history" ? <option value="history">소개했던 상품만 {rotationSelectedCount}개 (예전 설정)</option> : null}
                     </select>
                     <button type="button" disabled={!rotationLive} onClick={() => void toggleWidgetLibraryPause()} title={widgetRotation.paused ? "순환을 다시 돌립니다" : "순환을 잠시 멈춥니다(지금 상품에 머묾)"} style={{ ...rowBtn, height: "36px", opacity: rotationLive ? 1 : 0.5, cursor: rotationLive ? "pointer" : "not-allowed" }}>{widgetRotation.paused ? "순환 재개" : "순환 멈춤"}</button>
                     {widgetRotation.paused ? <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-danger-tx)" }}>멈춤 상태</span> : null}
-                    {bcRotSel.size > 0 ? (
+                    {rotationCheckedCount > 0 ? (
                       <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", marginLeft: "auto" }}>
-                        <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--color-ink)" }}>{bcRotSel.size}개 체크</span>
+                        <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--color-ink)" }}>{rotationCheckedCount}개 체크</span>
                         <button type="button" disabled={!rotationLive} onClick={() => void rotationAddChecked()} style={{ ...rowBtnPrimary, opacity: rotationLive ? 1 : 0.5 }}>{widgetRotation.mode === "all" ? "체크한 것만 순환" : "순환에 넣기"}</button>
                         <button type="button" disabled={!rotationLive} onClick={() => void rotationRemoveChecked()} style={{ ...rowBtn, opacity: rotationLive ? 1 : 0.5 }}>순환에서 빼기</button>
-                        <button type="button" onClick={() => setBcRotSel(new Set())} style={rowBtn}>체크 해제</button>
+                        <button type="button" onClick={clearRotChecks} style={rowBtn}>체크 해제</button>
                       </div>
                     ) : (
                       widgetHistory.length > 0 ? <button type="button" onClick={() => setBcRotSel(new Set(bcAllPids.filter((pid) => widgetHistory.some((entry) => String(entry.productId) === pid))))} title="전에 「소개」를 눌렀던 상품을 전부 체크" style={{ ...rowBtn, marginLeft: "auto" }}>소개했던 상품 체크</button> : null
@@ -1928,7 +1974,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       // [2026-10-21 a2-10 사장님] 「해당 상품줄에 고정중·순환중 표시가 보이게」 — 08-29 「목록에서 뺀다」 규칙은 이걸로 대체.
                       //   맨 위 소개 카드(안내문 복사·소개 끝)는 그대로, 줄에도 「소개 중」 배지 + 버튼은 「소개 끝」.
                       const rowHidden = isProductHidden(p);
-                      const rowRotBadge = parentPinned ? "소개 중" : widgetRotation.mode === "all" ? "" : rotationIncludedPids.has(pid) ? "순환" : "순환 제외";
+                      const rotDetailOn = isBrandFolder && widgetRotation.mode !== "all" ? allDetails.filter((detail) => isDetailRotating(pid, detail)).length : 0;
+                      const rowRotBadge = parentPinned ? "소개 중" : widgetRotation.mode === "all" ? "" : isBrandFolder ? (rotDetailOn === 0 ? "순환 제외" : rotDetailOn === allDetails.length ? "순환" : `순환 ${rotDetailOn}/${allDetails.length}`) : rotationIncludedPids.has(pid) ? "순환" : "순환 제외";
                       return (
                         <div key={pid || i} draggable={bcDragEnabled}
                           onClick={bcCopyMode && pid ? () => toggleBcCopyPick(pid) : undefined}
@@ -1943,7 +1990,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             {!bcCopyMode ? <input type="checkbox" aria-label={`${productName(p)} 순환 체크`} checked={bcRotSel.has(pid)} onChange={() => toggleRotSel(pid)} onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, width: "16px", height: "16px", accentColor: "var(--color-ink)", cursor: "pointer" }} /> : null}
                             <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", width: "20px", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
                             <span onClick={(e) => { e.stopPropagation(); if (img) setLightbox(img); }} style={{ width: "48px", height: "48px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: img ? "zoom-in" : "default", opacity: rowHidden ? 0.45 : 1 }}>{img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}</span>
-                            <div style={{ flex: 1, minWidth: isNarrow ? "50%" : 0, opacity: rowHidden ? 0.55 : 1 }}><div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}><span style={isNarrow ? { fontSize: "14px", fontWeight: 700, color: "var(--color-ink)", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", wordBreak: "break-word" } : { fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</span>{rowRotBadge ? <span style={rowRotBadge === "소개 중" ? ROT_BADGE_LIVE : rowRotBadge === "순환" ? ROT_BADGE_ON : ROT_BADGE_OFF}>{rowRotBadge}</span> : null}</div><div style={{ fontSize: "11px", fontWeight: 800, color: isBrandFolder ? "var(--color-ink-soft)" : "var(--color-rose-deep)", marginTop: "2px" }}>{isBrandFolder ? `브랜드 그룹 · 세부상품 ${allDetails.length}개` : productPriceLabel(p)}</div></div>
+                            <div style={{ flex: 1, minWidth: isNarrow ? "50%" : 0, opacity: rowHidden ? 0.55 : 1 }}><div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}><span style={isNarrow ? { fontSize: "14px", fontWeight: 700, color: "var(--color-ink)", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", wordBreak: "break-word" } : { fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</span>{rowRotBadge ? <span style={rowRotBadge === "소개 중" ? ROT_BADGE_LIVE : rowRotBadge.startsWith("순환 ") && rowRotBadge !== "순환 제외" ? ROT_BADGE_ON : rowRotBadge === "순환" ? ROT_BADGE_ON : ROT_BADGE_OFF}>{rowRotBadge}</span> : null}</div><div style={{ fontSize: "11px", fontWeight: 800, color: isBrandFolder ? "var(--color-ink-soft)" : "var(--color-rose-deep)", marginTop: "2px" }}>{isBrandFolder ? `브랜드 그룹 · 세부상품 ${allDetails.length}개` : productPriceLabel(p)}</div></div>
                             {isBrandFolder && !bcCopyMode ? <button type="button" onClick={(e) => { e.stopPropagation(); setBcExpanded((prev) => { const next = new Set(prev); if (next.has(pid)) next.delete(pid); else next.add(pid); return next; }); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}>{expanded ? "접기" : "세부상품"}</button> : null}
                             {/* [2026-10-21 a2-6] 줄 버튼 = [소개/소개 중][숨기기/보이기][수정][빼기]. 「방송」(고정+채팅 현재상품+안내문 복사)=소개, 📌고정·채팅 단독 버튼은 소개에 포함돼 뺌. 핸들러는 기존 그대로. */}
                             {!isBrandFolder && !bcCopyMode ? (parentPinned
@@ -1954,7 +2001,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             {!bcCopyMode ? <button type="button" onClick={(e) => { e.stopPropagation(); openBcStockFlow(pid); }} title="이 상품 재고 흐름" style={rowBtn}>재고</button> : null}
                             <button type="button" disabled={bcBusy} onClick={(e) => { e.stopPropagation(); void removeBcProduct(pid); }} title="이 방송 목록에서만 뺌(상품은 남음)" style={{ ...rowBtnDanger, opacity: bcBusy ? 0.6 : 1 }}>빼기</button>
                           </div>
-                          {isBrandFolder && expanded ? <div style={{ borderTop: "1px solid var(--color-line)", padding: "8px", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", gap: "6px" }}>{detailRows.map((detail) => { const pinned=isBroadcastPinned(pid,detail.detailName); const optionText=[detail.colors.length?`색상 ${detail.colors.join(",")}`:"",detail.sizes.length?`사이즈 ${detail.sizes.join(",")}`:""].filter(Boolean).join(" · ")||"옵션 없음"; return <div key={broadcastPinKey(pid,detail.detailName)} style={{ display:"grid",gridTemplateColumns:"44px minmax(0,1fr) auto auto",gap:"8px",alignItems:"center",border:pinned?"2px solid var(--color-rose-deep)":"1px solid var(--color-line)",borderRadius:"8px",padding:"8px",background:pinned?"var(--color-rose-soft)":"var(--color-surface)" }}><button type="button" onClick={()=>detail.image&&setLightbox(detail.image)} style={{width:42,height:42,border:0,borderRadius:7,overflow:"hidden",padding:0,background:"var(--color-surface-2)"}}>{detail.image?<img src={detail.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:null}</button><div style={{minWidth:0}}><div style={{display:"flex",alignItems:"center",gap:"6px",minWidth:0}}><span style={{fontSize:"12px",fontWeight:900,color:"var(--color-ink)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{detail.detailName}</span>{pinned?<span style={ROT_BADGE_LIVE}>소개 중</span>:null}</div><div style={{fontSize:"11px",fontWeight:800,color:"var(--color-rose-deep)",marginTop:2}}>{detail.price.toLocaleString("ko-KR")}원</div><div style={{fontSize:"11px",fontWeight:700,color:"var(--color-ink-soft)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{optionText}{detail.stockManaged&&detail.stock!==null?` · 재고 ${detail.stock}`:""}</div></div>{pinned?<button type="button" disabled={bcPinBusy} onClick={()=>void clearBroadcastPin()} title="소개를 끝내고 방송 화면을 다시 자동 순환으로" style={rowBtnPrimary}>{bcPinBusy?"정리 중…":"소개 끝"}</button>:<button type="button" disabled={bcPinBusy} onClick={()=>void broadcastOneClick(p,detail)} title="방송 화면에 이 상품만 띄우고 안내문을 복사" style={rowBtn}>소개</button>}<button type="button" aria-label={`${detail.detailName} 수정`} onClick={(event)=>{event.stopPropagation();editProduct(p,detail.detailName);}} style={rowBtn}>수정</button></div>})}</div> : null}
+                          {isBrandFolder && expanded ? <div style={{ borderTop: "1px solid var(--color-line)", padding: "8px", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", gap: "6px" }}>{detailRows.map((detail) => { const pinned=isBroadcastPinned(pid,detail.detailName); const optionText=[detail.colors.length?`색상 ${detail.colors.join(",")}`:"",detail.sizes.length?`사이즈 ${detail.sizes.join(",")}`:""].filter(Boolean).join(" · ")||"옵션 없음"; const detailRot = widgetRotation.mode === "all" ? "" : isDetailRotating(pid, detail) ? "순환" : "순환 제외"; return <div key={broadcastPinKey(pid,detail.detailName)} style={{ display:"grid",gridTemplateColumns:bcCopyMode?"44px minmax(0,1fr) auto auto":"16px 44px minmax(0,1fr) auto auto",gap:"8px",alignItems:"center",border:pinned?"2px solid var(--color-rose-deep)":"1px solid var(--color-line)",borderRadius:"8px",padding:"8px",background:pinned?"var(--color-rose-soft)":"var(--color-surface)" }}>{!bcCopyMode?<input type="checkbox" aria-label={`${detail.detailName} 순환 체크`} checked={bcRotDetailSel.has(rotDetailKey(pid,detail.detailName))} onChange={()=>toggleRotDetailSel(pid,detail)} onClick={(e)=>e.stopPropagation()} style={{width:"16px",height:"16px",accentColor:"var(--color-ink)",cursor:"pointer"}}/>:null}<button type="button" onClick={()=>detail.image&&setLightbox(detail.image)} style={{width:42,height:42,border:0,borderRadius:7,overflow:"hidden",padding:0,background:"var(--color-surface-2)"}}>{detail.image?<img src={detail.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:null}</button><div style={{minWidth:0}}><div style={{display:"flex",alignItems:"center",gap:"6px",minWidth:0}}><span style={{fontSize:"12px",fontWeight:900,color:"var(--color-ink)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{detail.detailName}</span>{pinned?<span style={ROT_BADGE_LIVE}>소개 중</span>:detailRot?<span style={detailRot==="순환"?ROT_BADGE_ON:ROT_BADGE_OFF}>{detailRot}</span>:null}</div><div style={{fontSize:"11px",fontWeight:800,color:"var(--color-rose-deep)",marginTop:2}}>{detail.price.toLocaleString("ko-KR")}원</div><div style={{fontSize:"11px",fontWeight:700,color:"var(--color-ink-soft)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{optionText}{detail.stockManaged&&detail.stock!==null?` · 재고 ${detail.stock}`:""}</div></div>{pinned?<button type="button" disabled={bcPinBusy} onClick={()=>void clearBroadcastPin()} title="소개를 끝내고 방송 화면을 다시 자동 순환으로" style={rowBtnPrimary}>{bcPinBusy?"정리 중…":"소개 끝"}</button>:<button type="button" disabled={bcPinBusy} onClick={()=>void broadcastOneClick(p,detail)} title="방송 화면에 이 상품만 띄우고 안내문을 복사" style={rowBtn}>소개</button>}<button type="button" aria-label={`${detail.detailName} 수정`} onClick={(event)=>{event.stopPropagation();editProduct(p,detail.detailName);}} style={rowBtn}>수정</button></div>})}</div> : null}
                         </div>
                       );
                     })}
