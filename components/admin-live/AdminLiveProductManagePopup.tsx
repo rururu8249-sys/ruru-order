@@ -1346,7 +1346,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     if (rotBusy) return;
     setRotBusy(true);
     try {
-      if (await saveWidgetRotation({ mode: "all", paused: widgetRotation.paused, targets: [] })) showAdminToast("고른 상품을 모두 뺐어요. 방송 상품 전부가 돌아가요.", "success");
+      if (await saveWidgetRotation({ mode: "all", paused: widgetRotation.paused, targets: [] })) showAdminToast("순환 목록을 비웠어요. 방송 상품 전부가 돌아가요.", "success");
     } finally {
       setRotBusy(false);
     }
@@ -1900,6 +1900,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
                           <button type="button" aria-pressed={onScreenOnly} onClick={() => setOnScreenOnly((v) => !v)} style={{ ...(onScreenOnly ? rowBtnPrimary : rowBtn), height: "36px" }}>{onScreenOnly ? "전체 상품 보기" : "순환 중인 것만 보기"}</button>
+                          <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void rotationUseAll()} title="순환 목록을 비우고 방송 상품 전부가 돌게" style={{ ...rowBtn, height: "36px", marginLeft: "auto", color: "var(--color-danger-tx)", opacity: rotationLive ? 1 : 0.5 }}>순환 목록 비우기 ({rotationChips.length}칸)</button>
                         </div>
                       </>
                     )}
