@@ -16,13 +16,13 @@ function admin() {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-async function readIds(sb: ReturnType<typeof admin>) {
+async function readCfg(sb: ReturnType<typeof admin>) {
   const { data } = await sb.from("settings").select("value").eq("key", VISIT_EXCLUDE_KEY).limit(1);
   return parseExcludeSetting(Array.isArray(data) && data[0] ? data[0].value : null);
 }
 
-async function writeIds(sb: ReturnType<typeof admin>, ids: number[]) {
-  const value = JSON.stringify({ customerIds: ids });
+async function writeCfg(sb: ReturnType<typeof admin>, cfg: { customerIds: number[]; nicknames: string[] }) {
+  const value = JSON.stringify(cfg);
   const { data: ex } = await sb.from("settings").select("key").eq("key", VISIT_EXCLUDE_KEY).limit(1);
   const res = Array.isArray(ex) && ex.length > 0
     ? await sb.from("settings").update({ value }).eq("key", VISIT_EXCLUDE_KEY)
@@ -56,8 +56,8 @@ export async function GET(request: NextRequest) {
       }));
       return NextResponse.json({ ok: true, found: list });
     }
-    const list = await loadExcludedCustomers(sb);
-    return NextResponse.json({ ok: true, list });
+    const v = await loadExcludedCustomers(sb);
+    return NextResponse.json({ ok: true, list: v.list, nicknames: v.nicknames });
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, message: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }
@@ -68,22 +68,31 @@ export async function POST(request: NextRequest) {
   if (!session) return NextResponse.json({ ok: false, message: "관리자 로그인이 필요합니다." }, { status: 401 });
   try {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-    const id = Number(body.customerId);
-    if (!Number.isFinite(id) || id <= 0) return NextResponse.json({ ok: false, message: "회원을 골라 주세요." }, { status: 400 });
     const sb = admin();
-    const ids = await readIds(sb);
-    if (body.action === "add") {
-      const { data } = await sb.from("customers").select("id").eq("id", id).limit(1);
-      if (!Array.isArray(data) || data.length === 0) return NextResponse.json({ ok: false, message: "그 회원을 못 찾았어요." }, { status: 404 });
-      if (!ids.includes(id)) await writeIds(sb, [...ids, id]);
-    } else if (body.action === "remove") {
-      const cur = await loadExcludedCustomers(sb);
-      if (cur.find((c) => c.id === id)?.auto) return NextResponse.json({ ok: false, message: "운영자 테스트 번호 계정은 자동으로 빠져요. 여기서는 뺄 수 없어요." }, { status: 400 });
-      await writeIds(sb, ids.filter((x) => x !== id));
+    const cfg = await readCfg(sb);
+    const action = String(body.action ?? "");
+    if (action === "add-nick" || action === "remove-nick") {
+      const nick = String(body.nickname ?? "").trim();
+      if (!nick) return NextResponse.json({ ok: false, message: "닉네임을 적어 주세요." }, { status: 400 });
+      const nicknames = action === "add-nick" ? Array.from(new Set([...cfg.nicknames, nick])) : cfg.nicknames.filter((x) => x !== nick);
+      await writeCfg(sb, { ...cfg, nicknames });
     } else {
-      return NextResponse.json({ ok: false, message: "알 수 없는 요청이에요." }, { status: 400 });
+      const id = Number(body.customerId);
+      if (!Number.isFinite(id) || id <= 0) return NextResponse.json({ ok: false, message: "회원을 골라 주세요." }, { status: 400 });
+      if (action === "add") {
+        const { data } = await sb.from("customers").select("id").eq("id", id).limit(1);
+        if (!Array.isArray(data) || data.length === 0) return NextResponse.json({ ok: false, message: "그 회원을 못 찾았어요." }, { status: 404 });
+        if (!cfg.customerIds.includes(id)) await writeCfg(sb, { ...cfg, customerIds: [...cfg.customerIds, id] });
+      } else if (action === "remove") {
+        const cur = await loadExcludedCustomers(sb);
+        if (cur.list.find((c) => c.id === id)?.auto) return NextResponse.json({ ok: false, message: "운영자 테스트 번호 계정은 자동으로 빠져요. 여기서는 뺄 수 없어요." }, { status: 400 });
+        await writeCfg(sb, { ...cfg, customerIds: cfg.customerIds.filter((x) => x !== id) });
+      } else {
+        return NextResponse.json({ ok: false, message: "알 수 없는 요청이에요." }, { status: 400 });
+      }
     }
-    return NextResponse.json({ ok: true, list: await loadExcludedCustomers(sb) });
+    const v = await loadExcludedCustomers(sb);
+    return NextResponse.json({ ok: true, list: v.list, nicknames: v.nicknames });
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, message: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }

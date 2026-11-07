@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
     let rows = visits.rows;
     try {
       const excluded = await loadExcludedCustomers(supabase);
-      const names = new Set(excluded.flatMap((c) => c.names));
+      const names = excluded.allNames;
       if (names.size > 0) {
         const keys = new Set<string>();
         for (const r of rows) {
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
         }
         rows = rows.filter((r) => !names.has(String(r.nickname || "").trim()) && !keys.has(String(r.visitor_key || "")));
       }
-      excludedCount = excluded.length;
+      excludedCount = excluded.list.length + excluded.nicknames.length;
     } catch {
       /* 제외 목록 못 읽으면 그냥 전부 */
     }

@@ -227,6 +227,8 @@ type FoundRow = { id: number; nickname: string; kakaoName: string; name: string;
 
 function ExcludeModal({ onClose, onChanged }: { onClose: () => void; onChanged: () => void }) {
   const [list, setList] = useState<ExcludedRow[] | null>(null);
+  const [nicks, setNicks] = useState<string[]>([]);
+  const [nickInput, setNickInput] = useState("");
   const [q, setQ] = useState("");
   const [found, setFound] = useState<FoundRow[]>([]);
   const [busy, setBusy] = useState(false);
@@ -235,8 +237,8 @@ function ExcludeModal({ onClose, onChanged }: { onClose: () => void; onChanged: 
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin-live/visit-stats-exclude", { cache: "no-store" });
-    const j = (await res.json().catch(() => null)) as { ok?: boolean; list?: ExcludedRow[]; message?: string } | null;
-    if (j?.ok) setList(j.list || []); else { setList([]); setMsg(j?.message || "목록을 못 불러왔어요."); }
+    const j = (await res.json().catch(() => null)) as { ok?: boolean; list?: ExcludedRow[]; nicknames?: string[]; message?: string } | null;
+    if (j?.ok) { setList(j.list || []); setNicks(j.nicknames || []); } else { setList([]); setMsg(j?.message || "목록을 못 불러왔어요."); }
   }, []);
   useEffect(() => { void load(); }, [load]);
 
@@ -258,12 +260,12 @@ function ExcludeModal({ onClose, onChanged }: { onClose: () => void; onChanged: 
     } finally { setBusy(false); }
   }, [q]);
 
-  const act = useCallback(async (action: "add" | "remove", customerId: number) => {
+  const act = useCallback(async (action: "add" | "remove" | "add-nick" | "remove-nick", customerId?: number, nickname?: string) => {
     setBusy(true); setMsg("");
     try {
-      const res = await fetch("/api/admin-live/visit-stats-exclude", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, customerId }) });
-      const j = (await res.json().catch(() => null)) as { ok?: boolean; list?: ExcludedRow[]; message?: string } | null;
-      if (j?.ok) { setList(j.list || []); changed.current = true; if (action === "add") { setFound([]); setQ(""); } }
+      const res = await fetch("/api/admin-live/visit-stats-exclude", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, customerId, nickname }) });
+      const j = (await res.json().catch(() => null)) as { ok?: boolean; list?: ExcludedRow[]; nicknames?: string[]; message?: string } | null;
+      if (j?.ok) { setList(j.list || []); setNicks(j.nicknames || []); changed.current = true; if (action === "add") { setFound([]); setQ(""); } if (action === "add-nick") setNickInput(""); }
       else setMsg(j?.message || "저장하지 못했어요.");
     } finally { setBusy(false); }
   }, []);
@@ -296,7 +298,7 @@ function ExcludeModal({ onClose, onChanged }: { onClose: () => void; onChanged: 
                 <li key={c.id} className="flex items-center gap-3 py-2.5">
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[14px] font-semibold text-ink">{c.nickname} <span className="font-normal text-ink-mute">· 끝 {c.phoneTail || "-"}</span></div>
-                    {c.names.length > 1 ? <div className="truncate text-[12px] text-ink-mute">예전 닉네임: {c.names.filter((x) => x !== c.nickname).join(", ")}</div> : null}
+                    {c.names.length > 1 ? <div className="text-[12px] text-ink-mute">같이 빼는 닉네임: {c.names.filter((x) => x !== c.nickname).join(", ")}</div> : null}
                   </div>
                   {c.auto ? (
                     <span className="shrink-0 text-[12px] text-ink-mute">운영자 테스트 번호</span>
@@ -308,8 +310,23 @@ function ExcludeModal({ onClose, onChanged }: { onClose: () => void; onChanged: 
             </ul>
           )}
 
+          {nicks.length > 0 ? (
+            <div className="mt-3 border-t border-line pt-3">
+              <div className="mb-1 text-[12px] text-ink-mute">직접 적은 닉네임</div>
+              <div className="flex flex-wrap gap-1.5">
+                {nicks.map((x) => (
+                  <span key={x} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-line bg-surface-2 px-3 text-[13px] text-ink">
+                    {x}
+                    <button type="button" disabled={busy} aria-label={`${x} 빼기 취소`} onClick={() => void act("remove-nick", undefined, x)} className="text-ink-mute hover:text-danger-tx">×</button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           <div className="mt-5 border-t border-line pt-4">
             <div className="mb-2 text-[13px] font-semibold text-ink">계정 추가</div>
+            <div className="mb-2 text-[12px] text-ink-mute">회원으로 넣으면 그 계정이 주문 때 썼던 닉네임까지 같이 빠져요.</div>
             <div className="flex gap-2">
               <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void search(); }}
                 placeholder="닉네임·카톡 이름·이름" className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-[14px] text-ink outline-none focus-visible:border-ink max-md:h-11" />
@@ -333,6 +350,14 @@ function ExcludeModal({ onClose, onChanged }: { onClose: () => void; onChanged: 
               </ul>
             ) : null}
             {msg ? <div className="mt-2 text-[12px] text-warn-tx">{msg}</div> : null}
+
+            <div className="mt-4 text-[13px] font-semibold text-ink">닉네임만 직접 추가</div>
+            <div className="mb-2 text-[12px] text-ink-mute">회원을 못 찾을 때. 접속 기록에 남은 닉네임 글자 그대로 적어 주세요.</div>
+            <div className="flex gap-2">
+              <input value={nickInput} onChange={(e) => setNickInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && nickInput.trim()) void act("add-nick", undefined, nickInput.trim()); }}
+                placeholder="닉네임" className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-[14px] text-ink outline-none focus-visible:border-ink max-md:h-11" />
+              <button type="button" onClick={() => void act("add-nick", undefined, nickInput.trim())} disabled={busy || !nickInput.trim()} className={btnSub}>빼기</button>
+            </div>
           </div>
         </div>
       </div>
