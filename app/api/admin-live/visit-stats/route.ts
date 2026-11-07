@@ -1,23 +1,26 @@
 // [2026-08-29 사장님 요청] 접속 기록 — 날짜별 · 방송별 집계 (읽기 전용)
+// [2026-11-07 사장님 「1인당 1회만 유효 카운트 · 실무에서 보기 쉽게」] 전면 손봄
+//   · 30일 기록을 «전부» 읽는다(예전엔 1,000줄만 읽혀 5일치만 보였음 — 실측 13,791줄)
+//   · 사람 = 닉네임 기준(폰 2대도 1명), 비회원은 브라우저 1개 = 1명  (lib/visitStatsAgg)
+//   · 처음 온 사람(customers.first_login_at) · 주문한 사람(orders, 취소·테스트 제외)도 같이 센다
 //
 // 안전
-//   · SELECT 만 한다. 아무것도 쓰지 않는다.
+//   · SELECT 만 한다. 아무것도 쓰지 않는다. (visitor_visits · customers · orders · broadcasts 읽기)
 //   · 관리자 세션이 있어야 한다.
 //   · public.visitor_visits 표가 아직 없으면 available:false 로 조용히 응답한다.
-//   · 주문 / 입금 / 정산 / 배송 데이터는 읽지도 않는다.
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
+import { aggregateVisits, seoulDate, type OrderMark, type VisitRow } from "@/lib/visitStatsAgg";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const DAYS = 30;
-const ROW_LIMIT = 20000;
-// [2026-08-29 사장님 요청] "기록에 닉네임이 왜 없냐" → 날짜/방송마다 누가 왔는지 같이 내려준다.
-//   화면이 감당할 수 있게 한 줄당 최근 120명까지만.
-const NAMES_PER_ROW = 120;
+const PAGE = 1000;
+const MAX_ROWS = 60000;
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -26,11 +29,35 @@ function getSupabaseAdmin() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-// 한국 날짜(YYYY-MM-DD) — 방송이 자정을 넘겨도 "그날 방송"으로 묶이게 서울 기준으로 자른다.
-function seoulDate(iso: string) {
-  const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return "";
-  return new Date(t + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+// 1,000줄씩 끝까지 읽기(supabase 기본 상한이 1,000줄)
+async function readAll<T>(build: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>): Promise<{ rows: T[]; error: unknown }> {
+  const out: T[] = [];
+  for (let from = 0; from < MAX_ROWS; from += PAGE) {
+    const { data, error } = await build(from, from + PAGE - 1);
+    if (error) return { rows: out, error };
+    const chunk = (Array.isArray(data) ? data : []) as T[];
+    out.push(...chunk);
+    if (chunk.length < PAGE) break;
+  }
+  return { rows: out, error: null };
+}
+
+function isCanceled(r: Record<string, unknown>) {
+  return String(r.admin_order_status_v2 || "").includes("취소") || String(r.order_manage_status || "").includes("취소");
+}
+
+async function loadFirstDays(sb: SupabaseClient, nicks: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  for (let i = 0; i < nicks.length; i += 200) {
+    const part = nicks.slice(i, i + 200);
+    const { data } = await sb.from("customers").select("youtube_nickname, first_login_at, created_at").in("youtube_nickname", part);
+    for (const c of (data || []) as Array<Record<string, unknown>>) {
+      const nick = String(c.youtube_nickname || "").trim();
+      const at = String(c.first_login_at || c.created_at || "");
+      if (nick && at && !out.has(nick)) out.set(nick, seoulDate(at));
+    }
+  }
+  return out;
 }
 
 export async function GET(request: NextRequest) {
@@ -41,143 +68,64 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseAdmin();
     const since = new Date(Date.now() - DAYS * 24 * 60 * 60 * 1000).toISOString();
 
-    const { data, error } = await supabase
-      .from("visitor_visits")
-      .select("visitor_key, nickname, page_type, broadcast_id, shop_mode, started_at, last_seen_at, ip")
-      .gte("started_at", since)
-      .order("started_at", { ascending: false })
-      .limit(ROW_LIMIT);
-
-    if (error) {
-      // 표가 아직 없음 — 화면에서 "표를 만들어 주세요" 안내를 띄우게 한다.
+    const visits = await readAll<VisitRow>((from, to) =>
+      supabase
+        .from("visitor_visits")
+        .select("visitor_key, nickname, broadcast_id, shop_mode, started_at, last_seen_at, ip")
+        .gte("started_at", since)
+        .order("started_at", { ascending: false })
+        .range(from, to)
+    );
+    if (visits.error) {
       return NextResponse.json({ ok: true, available: false, daily: [], broadcasts: [], totals: null });
     }
+    const rows = visits.rows;
 
-    const rows = (data || []) as Array<Record<string, unknown>>;
+    // 닉네임 모음 → 처음 로그인한 날
+    const nickSet = new Set<string>();
+    for (const r of rows) {
+      const n = String(r.nickname || "").trim();
+      if (n) nickSet.add(n);
+    }
+    const firstDayByNick = await loadFirstDays(supabase, Array.from(nickSet));
 
-    // [2026-08-30] 같은 사람인데 어떤 방문에는 이름이 있고 어떤 방문에는 없다.
-    //   (사이트를 연 순간엔 로그인 전이라 이름이 없고, 로그인 뒤 방문에는 이름이 있다)
-    //   → visitor_key 하나당 "알려진 이름"을 30일 전체에서 먼저 모아두고,
-    //     이름이 비어 있던 방문에도 그 이름을 붙인다. 그래야 비회원으로 잘못 세지 않는다.
-    const nameByVisitor = new Map<string, string>();
-    for (const row of rows) {
-      const key = String(row.visitor_key ?? "").trim();
-      const nick = String(row.nickname ?? "").trim();
-      if (!key || !nick) continue;
-      const before = nameByVisitor.get(key);
-      // 나중 기록(rows 는 최신순)보다 먼저 담긴 값을 유지 = 가장 최근에 쓴 이름
-      if (!before) nameByVisitor.set(key, nick);
+    // 주문한 사람(읽기만 · 취소·테스트·삭제 제외)
+    const orderRows = await readAll<Record<string, unknown>>((from, to) =>
+      supabase
+        .from("orders")
+        .select("youtube_nickname, created_at, broadcast_id, admin_order_status_v2, order_manage_status, is_test_order, is_deleted")
+        .gte("created_at", since)
+        .range(from, to)
+    );
+    const orders: OrderMark[] = [];
+    for (const o of orderRows.rows) {
+      if (o.is_deleted === true || o.is_test_order === true || isCanceled(o)) continue;
+      const nick = String(o.youtube_nickname || "").trim();
+      if (!nick) continue;
+      orders.push({ nickname: nick, date: seoulDate(String(o.created_at || "")), broadcastId: o.broadcast_id ? String(o.broadcast_id) : "" });
     }
 
-    // 방문자 한 명(visitor_key)당 한 줄. 이름은 있으면 쓰고, 없으면 "비회원".
-    type Person = { name: string; visits: number; lastAt: string; live: boolean; ip: string };
-    type DayBucket = { visitors: Set<string>; visits: number; live: number; shop: number; people: Map<string, Person> };
-    type BcBucket = { visitors: Set<string>; visits: number; firstAt: string; people: Map<string, Person> };
-
-    const dailyMap = new Map<string, DayBucket>();
-    const bcMap = new Map<string, BcBucket>();
-    const allVisitors = new Set<string>();
-
-    const addPerson = (people: Map<string, Person>, key: string, name: string, lastAt: string, live: boolean, ip: string) => {
-      const before = people.get(key);
-      if (!before) {
-        people.set(key, { name, visits: 1, lastAt, live, ip });
-        return;
-      }
-      before.visits += 1;
-      if (lastAt > before.lastAt) before.lastAt = lastAt;
-      if (live) before.live = true;
-      // 나중에 닉네임을 적은 방문이 있으면 그걸 쓴다 (처음엔 비회원이었다가 로그인하는 경우)
-      if (name !== "비회원" && before.name === "비회원") before.name = name;
-      // IP 는 가장 최근 값 유지(rows 최신순 → 먼저 담긴 게 최신). 비어 있으면 채운다.
-      if (!before.ip && ip) before.ip = ip;
-    };
-
-    for (const row of rows) {
-      const key = String(row.visitor_key ?? "").trim();
-      const startedAt = String(row.started_at ?? "");
-      const date = seoulDate(startedAt);
-      if (!key || !date) continue;
-      allVisitors.add(key);
-
-      const name = String(row.nickname ?? "").trim() || nameByVisitor.get(key) || "비회원";
-      const lastAt = String(row.last_seen_at ?? "") || startedAt;
-      const isLive = String(row.shop_mode ?? "") === "live";
-      const ip = String(row.ip ?? "").trim();
-
-      const day = dailyMap.get(date)
-        || { visitors: new Set<string>(), visits: 0, live: 0, shop: 0, people: new Map<string, Person>() };
-      day.visitors.add(key);
-      day.visits += 1;
-      if (isLive) day.live += 1; else day.shop += 1;
-      addPerson(day.people, key, name, lastAt, isLive, ip);
-      dailyMap.set(date, day);
-
-      const bid = row.broadcast_id != null ? String(row.broadcast_id) : "";
-      if (bid) {
-        const bc = bcMap.get(bid)
-          || { visitors: new Set<string>(), visits: 0, firstAt: startedAt, people: new Map<string, Person>() };
-        bc.visitors.add(key);
-        bc.visits += 1;
-        if (startedAt < bc.firstAt) bc.firstAt = startedAt;
-        addPerson(bc.people, key, name, lastAt, isLive, ip);
-        bcMap.set(bid, bc);
-      }
-    }
-
-    // 최근에 온 사람부터 (실무에서 "방금 누가 왔나"를 먼저 보게 된다)
-    const namesOf = (people: Map<string, Person>) =>
-      Array.from(people.values())
-        .sort((a, b) => (a.lastAt < b.lastAt ? 1 : -1))
-        .slice(0, NAMES_PER_ROW)
-        .map((p) => ({ name: p.name, visits: p.visits, lastAt: p.lastAt, live: p.live, ip: p.ip }));
-
-    // 방송 제목 붙이기 (없어도 집계는 그대로 나온다)
-    const bcIds = Array.from(bcMap.keys()).slice(0, 60);
+    // 방송 제목·시작 시각
+    const bcIds = Array.from(new Set(rows.map((r) => (r.broadcast_id ? String(r.broadcast_id) : "")).filter(Boolean))).slice(0, 80);
     const titles = new Map<string, string>();
+    const starts = new Map<string, string>();
     if (bcIds.length > 0) {
-      const { data: bcs } = await supabase
-        .from("broadcasts")
-        .select("id, public_title, started_at")
-        .in("id", bcIds);
+      const { data: bcs } = await supabase.from("broadcasts").select("id, public_title, started_at").in("id", bcIds);
       for (const b of (bcs || []) as Array<Record<string, unknown>>) {
         titles.set(String(b.id), String(b.public_title ?? "").trim());
+        if (b.started_at) starts.set(String(b.id), String(b.started_at));
       }
     }
 
-    const daily = Array.from(dailyMap.entries())
-      .map(([date, v]) => ({
-        date,
-        visitors: v.visitors.size,
-        visits: v.visits,
-        live: v.live,
-        shop: v.shop,
-        names: namesOf(v.people),
-        namesCapped: v.people.size > NAMES_PER_ROW,
-      }))
-      .sort((a, b) => (a.date < b.date ? 1 : -1))
-      .slice(0, DAYS);
-
-    const broadcasts = Array.from(bcMap.entries())
-      .map(([id, v]) => ({
-        broadcastId: id,
-        title: titles.get(id) || `방송 ${id}`,
-        visitors: v.visitors.size,
-        visits: v.visits,
-        startedAt: v.firstAt,
-        names: namesOf(v.people),
-        namesCapped: v.people.size > NAMES_PER_ROW,
-      }))
-      .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))
-      .slice(0, 30);
+    const agg = aggregateVisits({ rows, firstDayByNick, orders, broadcastStart: starts });
 
     return NextResponse.json({
       ok: true,
       available: true,
       days: DAYS,
-      totals: { visitors: allVisitors.size, visits: rows.length, capped: rows.length >= ROW_LIMIT },
-      daily,
-      broadcasts,
+      totals: { visitors: agg.totalVisitors, visits: agg.totalVisits, capped: rows.length >= MAX_ROWS },
+      daily: agg.daily.slice(0, DAYS),
+      broadcasts: agg.broadcasts.slice(0, 40).map((b) => ({ ...b, title: titles.get(b.broadcastId) || `방송 ${b.broadcastId.slice(0, 8)}` })),
     });
   } catch (error) {
     return NextResponse.json(

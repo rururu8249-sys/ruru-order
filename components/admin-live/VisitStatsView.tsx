@@ -1,76 +1,237 @@
 "use client";
 
-// [2026-09-08 리팩터] 접속 기록(날짜별·방송별) 화면을 접속자 위젯(AdminLiveSidebarPresence)에서 분리
-//
-//   왜: 같은 화면을 (a) 사이드바 접속자 위젯의 팝업 안에서도, (b) 관리자 페이지 안에 직접 박아서도
-//       쓸 수 있게 하려고. 표/탭/펼침 마크업과 동작은 원본 그대로 옮겼다(기능 추가·변경 없음).
-//
-// 안전
-//   · 읽기 전용. /api/admin-live/visit-stats GET 만 부른다.
-//   · 주문 / 입금 / 정산 / 배송 / 재고 데이터는 건드리지 않는다.
-//
-// 쓰는 법
-//   · 페이지 안에 직접:      <VisitStatsView embedded />            → 제목·요약·새로고침 줄까지 스스로 그리고, 마운트 때 1회 불러온다.
-//   · 팝업(모달) 안에서:     const vs = useVisitStats();             → 팝업 헤더가 요약(최근 N일 · 방문자 N명)을 보여줘야 하므로
-//                            <VisitStatsView state={vs} />           상태를 바깥이 들고 넘긴다. 이때는 헤더 없이 본문만 그린다(불러오기도 바깥이 호출).
+// 접속 기록(날짜별·방송별) 화면 — 읽기 전용. /api/admin-live/visit-stats GET 만 부른다.
+// [2026-11-07 사장님 「1인당 1회만 유효 카운트 · 칸 사이가 허허벌판 · 사이드 패널로」] 전면 재작성
+//   · 사람 = 닉네임 기준 1명(중복 포함 횟수는 괄호), 비회원 = 브라우저 1개
+//   · 위: 요약 숫자 4칸(방문자·처음 온 사람·방송 중·주문한 사람) · 표는 왼쪽에 좁게
+//   · 줄 누르면 오른쪽 드로어(폭 720): 칩(전체·주문함·주문 안 함·처음·비회원)·검색·사람 표
+//   · 주문 / 입금 / 정산 / 배송 / 재고 데이터는 건드리지 않는다(표시 전용).
 
-import { Fragment, useCallback, useEffect, useState, type CSSProperties } from "react";
-
-export type VisitPerson = { name: string; visits: number; lastAt: string; live: boolean; ip?: string };
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import type { BroadcastBucket, DailyBucket, VisitPerson } from "@/lib/visitStatsAgg";
 
 export type VisitStats = {
   ok?: boolean;
   available?: boolean;
   days?: number;
   totals?: { visitors: number; visits: number; capped: boolean } | null;
-  daily?: Array<{ date: string; visitors: number; visits: number; live: number; shop: number; names?: VisitPerson[]; namesCapped?: boolean }>;
-  broadcasts?: Array<{ broadcastId: string; title: string; visitors: number; visits: number; startedAt: string; names?: VisitPerson[]; namesCapped?: boolean }>;
+  daily?: DailyBucket[];
+  broadcasts?: Array<BroadcastBucket & { title: string }>;
 };
 
-export type VisitStatsTab = "date" | "broadcast";
+type Tab = "date" | "broadcast";
+type Chip = "all" | "ordered" | "notOrdered" | "new" | "guest";
 
-export type VisitStatsState = {
-  stats: VisitStats | null;
-  loading: boolean;
-  reload: () => Promise<void>;
-  tab: VisitStatsTab;
-  setTab: (tab: VisitStatsTab) => void;
-  openRows: Record<string, boolean>;
-  toggleRow: (key: string) => void;
-};
+const n = (v: number) => (v || 0).toLocaleString("ko-KR");
 
-// 한국시간으로 "08-29 22:58" — 접속 기록 표에서 마지막 접속 시각을 보여준다.
 export function seoulStamp(iso: string) {
   const t = Date.parse(iso);
   if (!Number.isFinite(t)) return "-";
   const d = new Date(t + 9 * 60 * 60 * 1000);
-  const p2 = (n: number) => String(n).padStart(2, "0");
+  const p2 = (x: number) => String(x).padStart(2, "0");
   return `${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())} ${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}`;
 }
 
-// 팝업 헤더 / 내장 헤더가 똑같이 쓰는 요약 문구
-// [2026-09-09 사장님 지적] 「대충 봐도 500명 넘는 거 같은데 484명? 뭔소리야?」
-//   원인: 이 숫자는 30일 «전체»에서 같은 사람을 한 번만 센 값이고(visit-stats/route.ts:178 allVisitors.size),
-//   아래 날짜별 숫자는 «그 날» 기준이라 같은 사람이 여러 날 오면 날마다 세진다. 그래서 합계가 더 크다.
-//   → 숫자만 보고 오해하지 않게 문구에 「서로 다른 사람」을 박아 둔다.
-export function visitStatsSummaryText(stats: VisitStats | null) {
-  return `최근 ${stats?.days ?? 30}일 · 다녀간 사람 ${(stats?.totals?.visitors ?? 0).toLocaleString("ko-KR")}명`;
+function dayLabel(date: string) {
+  const d = new Date(`${date}T00:00:00+09:00`);
+  const w = ["일", "월", "화", "수", "목", "금", "토"][d.getDay()] || "";
+  return `${date.slice(5).replace("-", ".")}(${w})`;
 }
 
-// 접속 기록 상태(데이터 + 탭 + 펼친 줄). 불러오기는 자동으로 하지 않는다 — 호출하는 쪽이 reload() 를 부른다.
-//   (팝업은 "접속 기록 보기" 버튼을 눌렀을 때만 불러야 하므로.)
-export function useVisitStats(): VisitStatsState {
+function pct(a: number, b: number) {
+  if (!b) return "-";
+  return `${Math.round((a / b) * 100)}%`;
+}
+
+type Bucket = { key: string; title: string; sub: string } & Pick<DailyBucket, "visitors" | "visits" | "newcomers" | "liveVisitors" | "buyers" | "people" | "peopleCapped">;
+
+const btnSub = "inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface px-3 text-[14px] text-ink hover:bg-surface-2 disabled:opacity-50 max-md:h-11";
+const chipCls = (on: boolean) => `inline-flex h-9 shrink-0 items-center gap-1 rounded-full border px-3 text-[13px] tabular-nums ${on ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink hover:bg-surface-2"}`;
+
+// ── 요약 숫자 4칸 ────────────────────────────────────────────────────────
+function Summary({ b }: { b: Bucket }) {
+  const cells = [
+    { label: "방문자", value: `${n(b.visitors)}명`, sub: `중복 포함 ${n(b.visits)}회` },
+    { label: "처음 온 사람", value: `${n(b.newcomers)}명`, sub: "" },
+    { label: "방송 중 들어온 사람", value: `${n(b.liveVisitors)}명`, sub: "" },
+    { label: "주문한 사람", value: `${n(b.buyers)}명`, sub: `방문자 중 ${pct(b.buyers, b.visitors)}` },
+  ];
+  return (
+    <div className="grid grid-cols-4 gap-2 max-md:grid-cols-2">
+      {cells.map((c) => (
+        <div key={c.label} className="rounded-xl bg-surface-2 px-4 py-3">
+          <div className="text-[12px] text-ink-mute">{c.label}</div>
+          <div className="mt-0.5 text-[20px] font-bold tabular-nums text-ink">{c.value}</div>
+          {c.sub ? <div className="text-[12px] tabular-nums text-ink-mute">{c.sub}</div> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── 오른쪽 드로어: 그날(그 방송)에 누가 왔었나 ──────────────────────────
+function PeopleDrawer({ b, onClose }: { b: Bucket; onClose: () => void }) {
+  const [chip, setChip] = useState<Chip>("all");
+  const [q, setQ] = useState("");
+  const [openedAt] = useState(() => Date.now());
+  const downOnBackdrop = useRef(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const counts = useMemo(() => {
+    const p = b.people;
+    return {
+      all: p.length,
+      ordered: p.filter((x) => x.ordered).length,
+      notOrdered: p.filter((x) => x.member && !x.ordered).length,
+      new: p.filter((x) => x.isNew).length,
+      guest: p.filter((x) => !x.member).length,
+    };
+  }, [b.people]);
+
+  const list = useMemo(() => {
+    const kw = q.trim().toLowerCase();
+    return b.people.filter((p) => {
+      if (chip === "ordered" && !p.ordered) return false;
+      if (chip === "notOrdered" && (!p.member || p.ordered)) return false;
+      if (chip === "new" && !p.isNew) return false;
+      if (chip === "guest" && p.member) return false;
+      if (kw && !p.name.toLowerCase().includes(kw) && !(p.ip || "").includes(kw)) return false;
+      return true;
+    });
+  }, [b.people, chip, q]);
+
+  // 같은 IP 로 들어온 다른 닉네임(장난 다계정·한 사람 여러 닉 파악 보조)
+  const ipNames = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const p of b.people) {
+      const ip = (p.ip || "").trim();
+      if (!ip) continue;
+      const arr = m.get(ip);
+      if (arr) arr.push(p.name); else m.set(ip, [p.name]);
+    }
+    return m;
+  }, [b.people]);
+
+  const chips: Array<[Chip, string, number]> = [
+    ["all", "전체", counts.all],
+    ["ordered", "주문함", counts.ordered],
+    ["notOrdered", "주문 안 함", counts.notOrdered],
+    ["new", "처음", counts.new],
+    ["guest", "비회원", counts.guest],
+  ];
+
+  return (
+    <>
+      <button
+        type="button" aria-label="접속 기록 창 닫기" tabIndex={-1}
+        onMouseDown={() => { downOnBackdrop.current = true; }}
+        onClick={() => { const ok = downOnBackdrop.current && Date.now() - openedAt > 600; downOnBackdrop.current = false; if (ok) onClose(); }}
+        className="fixed inset-0 z-[120] bg-black/30"
+      />
+      <aside role="dialog" aria-modal="true" aria-label={b.title}
+        className="fixed inset-y-0 right-0 z-[130] flex w-full max-w-[720px] flex-col bg-surface outline-none"
+        style={{ boxShadow: "0 8px 24px rgba(0,0,0,.08)" }}>
+        <div className="flex shrink-0 items-center gap-2 border-b border-line px-6 py-4 max-md:h-[52px] max-md:px-4 max-md:py-0">
+          <button type="button" onClick={onClose} className={`${btnSub} md:hidden`}>닫기</button>
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-[20px] font-bold text-ink max-md:text-[16px]">{b.title}</h2>
+            <div className="text-[12px] text-ink-mute max-md:hidden">{b.sub}</div>
+          </div>
+          <button type="button" onClick={onClose} className={`${btnSub} max-md:hidden`}>닫기</button>
+        </div>
+
+        <div className="shrink-0 border-b border-line px-6 py-3 max-md:px-4">
+          <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 tabular-nums">
+            <span className="text-[12px] text-ink-mute">방문자 <span className="text-[20px] font-bold text-ink">{n(b.visitors)}</span>명 <span>(중복 포함 {n(b.visits)}회)</span></span>
+            <span className="text-[12px] text-ink-mute">주문 <span className="text-[20px] font-bold text-ink">{n(b.buyers)}</span>명 · {pct(b.buyers, b.visitors)}</span>
+          </div>
+          <div className="mt-2 flex gap-2 overflow-x-auto [scrollbar-width:none]">
+            {chips.map(([k, label, c]) => (
+              <button key={k} type="button" onClick={() => setChip(k)} className={chipCls(chip === k)}>
+                {label} <span className={chip === k ? "text-white/80" : "text-ink-mute"}>{c}</span>
+              </button>
+            ))}
+          </div>
+          <input
+            value={q} onChange={(e) => setQ(e.target.value)} placeholder="닉네임·IP 검색" inputMode="search"
+            className="mt-2 h-9 w-full rounded-lg border border-line bg-surface px-3 text-[14px] text-ink outline-none focus-visible:border-ink max-md:h-11 max-md:text-[16px]"
+          />
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {list.length === 0 ? (
+            <div className="px-6 py-10 text-center text-[13px] text-ink-mute">해당하는 사람이 없어요. 다른 칩을 눌러 보세요.</div>
+          ) : (
+            <table className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
+              <colgroup>
+                <col style={{ width: 36 }} /><col /><col style={{ width: 56 }} /><col style={{ width: 64 }} /><col style={{ width: 96 }} />
+              </colgroup>
+              <thead>
+                <tr className="bg-surface-2 text-[12px] text-ink-mute">
+                  <th className="sticky top-0 bg-surface-2 py-2 text-center font-normal">#</th>
+                  <th className="sticky top-0 bg-surface-2 py-2 pl-2 text-left font-normal">닉네임</th>
+                  <th className="sticky top-0 bg-surface-2 py-2 pr-3 text-right font-normal">방문</th>
+                  <th className="sticky top-0 bg-surface-2 py-2 text-center font-normal">주문</th>
+                  <th className="sticky top-0 bg-surface-2 py-2 pr-4 text-right font-normal">마지막 접속</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((p, i) => {
+                  const ip = (p.ip || "").trim();
+                  const same = ip ? (ipNames.get(ip) || []).filter((x) => x !== p.name) : [];
+                  return (
+                    <tr key={`${p.name}-${i}`} className="border-t border-line text-[13px] hover:bg-surface-2">
+                      <td className="py-2 text-center text-[12px] tabular-nums text-ink-mute">{i + 1}</td>
+                      <td className="min-w-0 py-2 pl-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${p.live ? "bg-danger-tx" : "bg-line"}`} title={p.live ? "방송 중 접속" : "쇼핑몰 접속"} />
+                          <span className={`truncate font-semibold ${p.member ? "text-ink" : "text-ink-mute"}`}>{p.name}</span>
+                          {p.isNew ? <span className="inline-flex h-5 items-center rounded-md bg-info-bg px-1.5 text-[11px] font-semibold text-info-tx">처음</span> : null}
+                        </div>
+                        {ip ? (
+                          <div className={`truncate text-[12px] ${same.length ? "text-warn-tx" : "text-ink-mute"}`} title={same.length ? `같은 IP: ${same.join(", ")}` : ip}>
+                            {ip}{same.length ? ` · ${same[0]}${same.length > 1 ? ` 외 ${same.length - 1}명` : ""}과 같은 인터넷 주소` : ""}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td className={`py-2 pr-3 text-right tabular-nums ${p.visits > 1 ? "text-ink" : "text-ink-mute"}`}>{p.visits}</td>
+                      <td className="py-2 text-center">
+                        {p.ordered ? <span className="inline-flex h-6 items-center rounded-lg bg-ok-bg px-2 text-[12px] font-semibold text-ok-tx">주문</span> : <span className="text-ink-mute">-</span>}
+                      </td>
+                      <td className="py-2 pr-4 text-right text-[12px] tabular-nums text-ink-soft">{seoulStamp(p.lastAt)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div className="shrink-0 border-t border-line px-6 py-2 text-[12px] text-ink-mute max-md:px-4">
+          {n(list.length)}명 표시 · 빨간 점 = 방송 중 접속{b.peopleCapped ? " · 최근 400명까지만" : ""}
+        </div>
+      </aside>
+    </>
+  );
+}
+
+// ── 본 화면 ──────────────────────────────────────────────────────────────
+type Props = { embedded?: boolean; style?: CSSProperties };
+
+export default function VisitStatsView({ style }: Props) {
   const [stats, setStats] = useState<VisitStats | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState<VisitStatsTab>("date");
-  // 날짜/방송 줄을 누르면 그날(그 방송에) 누가 왔었는지 펼친다.
-  const [openRows, setOpenRows] = useState<Record<string, boolean>>({});
-  const toggleRow = useCallback((key: string) => setOpenRows((prev) => ({ ...prev, [key]: !prev[key] })), []);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<Tab>("date");
+  const [openKey, setOpenKey] = useState<string>("");
 
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin-live/visit-stats", { method: "GET", cache: "no-store" });
+      const res = await fetch("/api/admin-live/visit-stats", { cache: "no-store" });
       const payload = (await res.json().catch(() => null)) as VisitStats | null;
       setStats(payload?.ok ? payload : { ok: false });
     } catch {
@@ -79,284 +240,98 @@ export function useVisitStats(): VisitStatsState {
       setLoading(false);
     }
   }, []);
+  useEffect(() => { void reload(); }, [reload]);
 
-  return { stats, loading, reload, tab, setTab, openRows, toggleRow };
-}
+  const buckets: Bucket[] = useMemo(() => {
+    if (tab === "date") {
+      return (stats?.daily || []).map((d) => ({ key: `d:${d.date}`, title: dayLabel(d.date), sub: d.date, ...d }));
+    }
+    return (stats?.broadcasts || []).map((b) => ({ ...b, key: `b:${b.broadcastId}`, title: b.title, sub: seoulStamp(b.startedAt) + " 시작" }));
+  }, [stats, tab]);
 
-// [2026-08-29 사장님 지시] 칩(알약)으로 흩뿌려 놓으니 지저분하다 → 엑셀표처럼 정렬한다.
-//   날짜/방송 줄 아래에 펼쳐지는 "누가 왔었나" 표
-function nameList(people: VisitPerson[] | undefined, capped: boolean | undefined, colSpan: number) {
+  const top = buckets[0];
+  const opened = buckets.find((b) => b.key === openKey) || null;
+  const close = useCallback(() => setOpenKey(""), []);
+
+  const th = "py-2 text-[12px] font-normal text-ink-mute whitespace-nowrap";
+  const tdNum = "py-2 text-right tabular-nums text-[13px]";
+
   return (
-    <tr>
-      <td colSpan={colSpan} style={{ padding: "0 6px 12px" }}>
-        {!people || people.length === 0 ? (
-          <div style={{ padding: "12px", borderRadius: "8px", background: "var(--color-surface-2)", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-mute)", textAlign: "center" }}>
-            이름이 남은 방문자가 없습니다.
-          </div>
-        ) : (
-          <div style={{ border: "1px solid var(--color-line)", borderRadius: "8px", overflow: "hidden", background: "var(--color-surface)" }}>
-            <div style={{ maxHeight: "300px", overflowY: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
-                <colgroup>
-                  <col style={{ width: "34px" }} />
-                  <col />
-                  <col style={{ width: "58px" }} />
-                  <col style={{ width: "96px" }} />
-                </colgroup>
-                <thead>
-                  <tr style={{ background: "var(--color-surface-2)" }}>
-                    {[
-                      { label: "#", align: "center" as const },
-                      { label: "닉네임", align: "left" as const },
-                      { label: "방문", align: "right" as const },
-                      { label: "마지막 접속", align: "right" as const },
-                    ].map((h) => (
-                      <th
-                        key={h.label}
-                        style={{
-                          position: "sticky", top: 0, zIndex: 1,
-                          background: "var(--color-surface-2)",
-                          textAlign: h.align, padding: "8px 8px",
-                          fontSize: "11px", fontWeight: 900, whiteSpace: "nowrap",
-                          color: "var(--color-ink-mute)",
-                          borderBottom: "1px solid var(--color-line)",
-                        }}
-                      >{h.label}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {(() => {
-                    // [2026-09-07] 같은 IP 가 이 목록에 2명 이상이면 표시(장난 다계정·같은 사람 여러 닉 파악 보조)
-                    // [2026-09-09 사장님 지적] 「같은 IP라는게 대체 뭐가 누구랑 같다는건데? 겁나 불친절하네」
-                    //   → 경고만 띄우고 «상대가 누군지»를 안 알려줬다. 같은 IP 를 쓰는 닉네임을 그대로 적어 준다.
-                    const ipNames = new Map<string, string[]>();
-                    for (const pp of people) {
-                      const v = String(pp.ip || "").trim();
-                      if (!v) continue;
-                      const arr = ipNames.get(v);
-                      if (arr) arr.push(pp.name); else ipNames.set(v, [pp.name]);
-                    }
-                    return people.map((p, i) => {
-                    const ip = String(p.ip || "").trim();
-                    const sameIpNames = ip ? (ipNames.get(ip) || []).filter((n) => n !== p.name) : [];
-                    const ipDup = sameIpNames.length > 0;
-                    // 「마이쮸-yumyum 님과 같음」 / 3명 이상이면 「… 외 2명과 같음」
-                    const sameIpText = !ipDup
-                      ? ""
-                      : sameIpNames.length === 1
-                        ? `${sameIpNames[0]} 님과 같은 인터넷 주소`
-                        : `${sameIpNames[0]} 님 외 ${sameIpNames.length - 1}명과 같은 인터넷 주소`;
-                    return (
-                    <tr
-                      key={`${p.name}-${i}`}
-                      style={{ background: i % 2 === 1 ? "var(--color-surface-2)" : "transparent" }}
-                      title={`${p.name} · ${p.visits}번 방문 · 마지막 ${seoulStamp(p.lastAt)}${ip ? ` · IP ${ip}` : ""}${ipDup ? ` · 같은 IP: ${sameIpNames.join(", ")}` : ""}`}
-                    >
-                      <td style={{ padding: "6px 8px", textAlign: "center", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)", fontVariantNumeric: "tabular-nums" }}>
-                        {i + 1}
-                      </td>
-                      <td style={{ padding: "6px 8px", fontSize: "12px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        <span
-                          title={p.live ? "방송 중 접속" : "쇼핑몰 모드 접속"}
-                          style={{
-                            display: "inline-block", width: "6px", height: "6px", borderRadius: "50%",
-                            marginRight: "6px", verticalAlign: "middle",
-                            background: p.live ? "var(--color-rose-deep)" : "var(--color-line)",
-                          }}
-                        />
-                        {p.name}
-                        {ip ? (
-                          <span style={{ display: "block", marginLeft: "12px", fontSize: "11px", fontWeight: 700, color: ipDup ? "var(--color-warn-tx)" : "var(--color-ink-mute)", overflow: "hidden", textOverflow: "ellipsis" }}>
-                            {ip}
-                            {ipDup ? (
-                              <span style={{ display: "block" }} title={sameIpNames.join(", ")}>{sameIpText}</span>
-                            ) : null}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td style={{ padding: "6px 8px", textAlign: "right", fontSize: "12px", fontWeight: 800, color: p.visits > 1 ? "var(--color-ink)" : "var(--color-ink-mute)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
-                        {p.visits}
-                      </td>
-                      <td style={{ padding: "6px 8px", textAlign: "right", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-soft)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
-                        {seoulStamp(p.lastAt)}
-                      </td>
-                    </tr>
-                    );
-                  });
-                  })()}
-                </tbody>
-              </table>
-            </div>
-            <div style={{ padding: "8px 8px", borderTop: "1px solid var(--color-line)", background: "var(--color-surface-2)", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>
-              총 {people.length.toLocaleString("ko-KR")}명 · 최근 접속 순 · 빨간 점 = 방송 중 접속
-              {capped ? " · 최근 120명까지만" : ""}
-            </div>
-          </div>
-        )}
-      </td>
-    </tr>
-  );
-}
+    <div className="flex min-h-0 flex-col" style={style}>
+      <div className="flex shrink-0 items-center gap-3 border-b border-line px-6 py-4 max-md:px-4">
+        <h2 className="text-[20px] font-bold text-ink">접속 기록</h2>
+        <span className="ml-auto text-[12px] tabular-nums text-ink-mute">
+          최근 {stats?.days ?? 30}일 · 다녀간 사람 {n(stats?.totals?.visitors ?? 0)}명
+        </span>
+        <button type="button" onClick={() => void reload()} disabled={loading} className={btnSub}>{loading ? "불러오는 중" : "새로고침"}</button>
+      </div>
 
-type VisitStatsViewProps = {
-  /** true 면 페이지 안에 직접 박는 형태 — 제목·요약·새로고침 줄을 스스로 그린다. */
-  embedded?: boolean;
-  /** 바깥(팝업 헤더)이 같은 stats 를 보여줘야 할 때 useVisitStats() 결과를 넘긴다. 없으면 스스로 들고 마운트 때 1회 불러온다. */
-  state?: VisitStatsState;
-  /** embedded 일 때 바깥 상자 스타일(높이 제한 등). */
-  style?: CSSProperties;
-};
-
-export default function VisitStatsView({ embedded = false, state, style }: VisitStatsViewProps) {
-  // 바깥이 state 를 넘기면 그걸 쓰고, 아니면 스스로 든다(훅은 조건부로 못 부르므로 항상 만든다).
-  const own = useVisitStats();
-  const s = state ?? own;
-  const usesOwn = !state;
-  const ownReload = own.reload;
-
-  // 스스로 드는 경우에만 마운트 때 1회 불러온다.
-  useEffect(() => {
-    if (usesOwn) void ownReload();
-  }, [usesOwn, ownReload]);
-
-  const { stats, loading, tab, setTab, openRows, toggleRow } = s;
-
-  const body = loading ? (
-    <div style={{ padding: "48px 16px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "var(--color-ink-mute)" }}>불러오는 중…</div>
-  ) : stats?.available === false ? (
-    <div style={{ padding: "32px 24px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "var(--color-ink-soft)", lineHeight: 1.9 }}>
-      아직 접속 기록을 저장할 준비가 안 되어 있습니다.
-      <br />
-      <span style={{ color: "var(--color-ink-mute)" }}>
-        개발자에게 알려주세요. (visitor_visits 표 없음 — docs/인수인계_관리자설정.md)
-      </span>
-    </div>
-  ) : !stats?.ok ? (
-    <div style={{ padding: "40px 16px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "var(--color-ink-mute)" }}>기록을 불러오지 못했습니다.</div>
-  ) : (
-    <>
-      <div style={{ display: "flex", gap: "6px", padding: "8px 16px", borderBottom: "1px solid var(--color-line)" }}>
-        {([["date", "날짜별"], ["broadcast", "방송별"]] as const).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setTab(key)}
-            style={{
-              border: tab === key ? "none" : "1px solid var(--color-line)",
-              borderRadius: "999px", padding: "6px 12px", cursor: "pointer",
-              fontSize: "12px", fontWeight: 900, whiteSpace: "nowrap",
-              background: tab === key ? "var(--color-rose-deep)" : "var(--color-surface)",
-              color: tab === key ? "#fff" : "var(--color-ink-soft)",
-            }}
-          >{label}</button>
+      <div className="flex shrink-0 gap-4 border-b border-line px-6 max-md:px-4">
+        {([["date", "날짜별"], ["broadcast", "방송별"]] as const).map(([k, label]) => (
+          <button key={k} type="button" onClick={() => setTab(k)}
+            className={`-mb-px h-10 border-b-2 px-1 text-[14px] ${tab === k ? "border-ink font-semibold text-ink" : "border-transparent text-ink-mute"}`}>
+            {label}
+          </button>
         ))}
       </div>
 
-      {/* [2026-08-30 사장님 지적] "방문자 99명인데 방송중 144명이 무슨 말이냐"
-          → 방문자는 '사람 수', 방송중/쇼핑몰은 '방문 횟수'로 단위가 달랐다. 그 차이를 명시한다. */}
-      {/* [2026-10-21] 설명 2줄 → 1줄(방문자=사람 수, 방문=횟수). 자세한 차이는 마우스를 올리면 보인다. */}
-      <div title="날짜별 방문자는 그날 기준이라 같은 사람이 3일 오면 3번 세요. 맨 위 「다녀간 사람」은 30일 동안 한 사람을 한 번만 세서 날짜별 합보다 작아요." style={{ padding: "8px 16px", borderBottom: "1px solid var(--color-line)", fontSize: "12px", color: "var(--color-ink-mute)" }}>
-        방문자 = 사람 수 · 방문 = 들어온 횟수(30분 넘게 끊겼다 다시 오면 1회 더)
-      </div>
-
-      <div style={{ minHeight: 0, flex: 1, overflowY: "auto", padding: "12px 16px 16px" }}>
-        {tab === "date" ? (
-          (stats.daily || []).length === 0 ? (
-            <div style={{ padding: "32px 8px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "var(--color-ink-mute)" }}>아직 쌓인 기록이 없습니다. 손님이 주문서에 들어오면 여기에 쌓입니다.</div>
-          ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  {["날짜", "방문자", "방송중 방문", "쇼핑몰 방문"].map((h, i) => (
-                    <th key={h} style={{ textAlign: i === 0 ? "left" : "right", fontSize: "11px", fontWeight: 900, color: "var(--color-ink-mute)", padding: "0 6px 8px", whiteSpace: "nowrap" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {(stats.daily || []).map((d) => (
-                  <Fragment key={d.date}>
-                  <tr
-                    onClick={() => toggleRow(`d:${d.date}`)}
-                    style={{ borderTop: "1px solid var(--color-line)", cursor: "pointer" }}
-                    title="누르면 그날 누가 왔었는지 펼쳐집니다"
-                  >
-                    <td style={{ padding: "8px 6px", fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", whiteSpace: "nowrap" }}>
-                      <span style={{ marginRight: "4px", fontSize: "11px", color: "var(--color-ink-mute)" }}>{openRows[`d:${d.date}`] ? "▾" : "▸"}</span>
-                      {d.date}
-                    </td>
-                    <td style={{ padding: "8px 6px", textAlign: "right", fontSize: "14px", fontWeight: 900, color: "var(--color-rose-deep)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{d.visitors.toLocaleString("ko-KR")}<span style={{ fontSize: "11px", fontWeight: 800, opacity: 0.75 }}>명</span></td>
-                    <td style={{ padding: "8px 6px", textAlign: "right", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-soft)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{d.live.toLocaleString("ko-KR")}<span style={{ fontSize: "11px", fontWeight: 800, opacity: 0.7 }}>회</span></td>
-                    <td style={{ padding: "8px 6px", textAlign: "right", fontSize: "12px", fontWeight: 700, color: "var(--color-ink-soft)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{d.shop.toLocaleString("ko-KR")}<span style={{ fontSize: "11px", fontWeight: 800, opacity: 0.7 }}>회</span></td>
-                  </tr>
-                  {openRows[`d:${d.date}`] ? nameList(d.names, d.namesCapped, 4) : null}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-          )
-        ) : (stats.broadcasts || []).length === 0 ? (
-          <div style={{ padding: "32px 8px", textAlign: "center", fontSize: "13px", fontWeight: 700, color: "var(--color-ink-mute)", lineHeight: 1.8 }}>
-            아직 방송별 기록이 없습니다.
-            <br /><span style={{ fontSize: "12px" }}>방송을 켜둔 동안 들어온 손님부터 쌓입니다.</span>
-          </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 max-md:px-4">
+        {loading ? (
+          <div className="py-12 text-center text-[13px] text-ink-mute">불러오는 중…</div>
+        ) : stats?.available === false ? (
+          <div className="py-12 text-center text-[13px] text-ink-mute">접속 기록 표(visitor_visits)가 없어요. 개발자에게 알려 주세요.</div>
+        ) : !stats?.ok ? (
+          <div className="py-12 text-center text-[13px] text-ink-mute">기록을 불러오지 못했어요. 새로고침을 눌러 주세요.</div>
+        ) : buckets.length === 0 ? (
+          <div className="py-12 text-center text-[13px] text-ink-mute">아직 기록이 없어요. 손님이 주문서에 들어오면 쌓여요.</div>
         ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                {["방송", "방문자"].map((h, i) => (
-                  <th key={h} style={{ textAlign: i === 0 ? "left" : "right", fontSize: "11px", fontWeight: 900, color: "var(--color-ink-mute)", padding: "0 6px 8px", whiteSpace: "nowrap" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {(stats.broadcasts || []).map((b) => (
-                <Fragment key={b.broadcastId}>
-                <tr
-                  onClick={() => toggleRow(`b:${b.broadcastId}`)}
-                  style={{ borderTop: "1px solid var(--color-line)", cursor: "pointer" }}
-                  title="누르면 그 방송에 누가 왔었는지 펼쳐집니다"
-                >
-                  <td style={{ padding: "8px 6px" }}>
-                    <div style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "320px" }}>
-                      <span style={{ marginRight: "4px", fontSize: "11px", color: "var(--color-ink-mute)" }}>{openRows[`b:${b.broadcastId}`] ? "▾" : "▸"}</span>
-                      {b.title}
-                    </div>
-                    <div style={{ marginTop: "2px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>{String(b.startedAt).slice(0, 16).replace("T", " ")}</div>
-                  </td>
-                  <td style={{ padding: "8px 6px", textAlign: "right", fontSize: "14px", fontWeight: 900, color: "var(--color-rose-deep)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{b.visitors.toLocaleString("ko-KR")}명<div style={{ marginTop: "2px", fontSize: "11px", fontWeight: 700, color: "var(--color-ink-mute)" }}>방문 {b.visits.toLocaleString("ko-KR")}회</div></td>
-                </tr>
-                {openRows[`b:${b.broadcastId}`] ? nameList(b.names, b.namesCapped, 2) : null}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
+          <div className="max-w-[760px]">
+            {top ? (
+              <>
+                <div className="mb-2 text-[13px] text-ink-soft">{tab === "date" ? "오늘" : "최근 방송"} · {top.title}</div>
+                <Summary b={top} />
+              </>
+            ) : null}
+
+            <div className="mt-4 overflow-hidden rounded-xl border border-line">
+              <table className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
+                <colgroup>
+                  <col style={{ width: tab === "date" ? 120 : undefined }} />
+                  <col style={{ width: 150 }} /><col style={{ width: 72 }} /><col style={{ width: 80 }} /><col style={{ width: 72 }} /><col style={{ width: 72 }} />
+                </colgroup>
+                <thead>
+                  <tr className="bg-surface-2">
+                    <th className={`${th} pl-4 text-left`}>{tab === "date" ? "날짜" : "방송"}</th>
+                    <th className={`${th} pr-3 text-right`}>방문자 <span className="text-[11px]">(중복 포함)</span></th>
+                    <th className={`${th} pr-3 text-right`}>처음</th>
+                    <th className={`${th} pr-3 text-right`}>방송 중</th>
+                    <th className={`${th} pr-3 text-right`}>주문</th>
+                    <th className={`${th} pr-4 text-right`}>주문율</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {buckets.map((b) => (
+                    <tr key={b.key} onClick={() => setOpenKey(b.key)} className="h-10 cursor-pointer border-t border-line hover:bg-surface-2" title="누르면 누가 왔는지 보여요">
+                      <td className="min-w-0 pl-4 text-[13px] font-semibold text-ink">
+                        <div className="truncate">{b.title}</div>
+                        {tab === "broadcast" ? <div className="truncate text-[12px] font-normal text-ink-mute">{b.sub}</div> : null}
+                      </td>
+                      <td className={`${tdNum} pr-3 font-semibold text-ink`}>{n(b.visitors)}명 <span className="font-normal text-ink-mute">({n(b.visits)}회)</span></td>
+                      <td className={`${tdNum} pr-3 ${b.newcomers ? "text-info-tx" : "text-ink-mute"}`}>{n(b.newcomers)}</td>
+                      <td className={`${tdNum} pr-3 text-ink-soft`}>{n(b.liveVisitors)}</td>
+                      <td className={`${tdNum} pr-3 ${b.buyers ? "text-ok-tx" : "text-ink-mute"}`}>{n(b.buyers)}</td>
+                      <td className={`${tdNum} pr-4 text-ink-soft`}>{pct(b.buyers, b.visitors)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-2 text-[12px] text-ink-mute">방문자 = 닉네임 기준 1명(폰 2대여도 1명) · 괄호 = 들어온 횟수 · 줄을 누르면 사람 목록</div>
+          </div>
         )}
       </div>
-    </>
-  );
 
-  // 팝업 안에서는 감싸는 상자 없이(Fragment) 그대로 내보낸다 —
-  //   팝업 상자가 flex column 이라 표 영역(flex:1 / overflowY:auto)이 그 직계 자식이어야 스크롤이 맞는다.
-  if (!embedded) return body;
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: 0, ...style }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", borderBottom: "1px solid var(--color-line)" }}>
-        <span style={{ fontSize: "14px", fontWeight: 900, color: "var(--color-ink)", whiteSpace: "nowrap" }}>접속 기록</span>
-        <span style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 800, color: "var(--color-ink-mute)", whiteSpace: "nowrap" }}>
-          {visitStatsSummaryText(stats)}
-        </span>
-        <button
-          type="button"
-          onClick={() => void s.reload()}
-          disabled={loading}
-          title="지금 다시 불러오기"
-          aria-label="새로고침"
-          style={{ border: "1px solid var(--color-line)", borderRadius: "8px", background: "transparent", cursor: loading ? "default" : "pointer", padding: "4px 8px", fontSize: "11px", fontWeight: 900, lineHeight: 1.4, color: "var(--color-ink-mute)" }}
-        >↻</button>
-      </div>
-      {body}
+      {opened ? <PeopleDrawer b={opened} onClose={close} /> : null}
     </div>
   );
 }
