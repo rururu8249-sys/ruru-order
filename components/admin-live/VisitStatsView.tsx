@@ -110,7 +110,7 @@ function PeopleDrawer({ b, onClose }: { b: Bucket; onClose: () => void }) {
     const m = new Map<string, string[]>();
     for (const p of b.people) {
       const ip = (p.ip || "").trim();
-      if (!ip) continue;
+      if (!ip || !p.member) continue; // 비회원은 이름이 없어 «누구와 같은지» 알려 줄 게 없음
       const arr = m.get(ip);
       if (arr) arr.push(p.name); else m.set(ip, [p.name]);
     }
@@ -259,7 +259,7 @@ export default function VisitStatsView({ style }: Props) {
   return (
     <div className="flex min-h-0 flex-col" style={style}>
       <div className="flex shrink-0 items-center gap-3 border-b border-line px-6 py-4 max-md:px-4">
-        <h2 className="text-[20px] font-bold text-ink">접속 기록</h2>
+        <h2 className="whitespace-nowrap text-[20px] font-bold text-ink">접속 기록</h2>
         <span className="ml-auto text-[12px] tabular-nums text-ink-mute">
           최근 {stats?.days ?? 30}일 · 다녀간 사람 {n(stats?.totals?.visitors ?? 0)}명
         </span>
@@ -295,18 +295,14 @@ export default function VisitStatsView({ style }: Props) {
 
             <div className="mt-4 overflow-hidden rounded-xl border border-line">
               <table className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
-                <colgroup>
-                  <col style={{ width: tab === "date" ? 120 : undefined }} />
-                  <col style={{ width: 150 }} /><col style={{ width: 72 }} /><col style={{ width: 80 }} /><col style={{ width: 72 }} /><col style={{ width: 72 }} />
-                </colgroup>
                 <thead>
                   <tr className="bg-surface-2">
-                    <th className={`${th} pl-4 text-left`}>{tab === "date" ? "날짜" : "방송"}</th>
-                    <th className={`${th} pr-3 text-right`}>방문자 <span className="text-[11px]">(중복 포함)</span></th>
-                    <th className={`${th} pr-3 text-right`}>처음</th>
-                    <th className={`${th} pr-3 text-right`}>방송 중</th>
-                    <th className={`${th} pr-3 text-right`}>주문</th>
-                    <th className={`${th} pr-4 text-right`}>주문율</th>
+                    <th className={`${th} pl-4 text-left ${tab === "date" ? "w-[120px] max-md:w-[96px]" : ""}`}>{tab === "date" ? "날짜" : "방송"}</th>
+                    <th className={`${th} w-[150px] pr-3 text-right max-md:w-[120px]`}>방문자 <span className="text-[11px]">(중복 포함)</span></th>
+                    <th className={`${th} w-[72px] pr-3 text-right max-md:hidden`}>처음</th>
+                    <th className={`${th} w-[80px] pr-3 text-right max-md:hidden`}>방송 중</th>
+                    <th className={`${th} w-[72px] pr-3 text-right max-md:w-[56px] max-md:pr-4`}>주문</th>
+                    <th className={`${th} w-[72px] pr-4 text-right max-md:hidden`}>주문율</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -316,11 +312,11 @@ export default function VisitStatsView({ style }: Props) {
                         <div className="truncate">{b.title}</div>
                         {tab === "broadcast" ? <div className="truncate text-[12px] font-normal text-ink-mute">{b.sub}</div> : null}
                       </td>
-                      <td className={`${tdNum} pr-3 font-semibold text-ink`}>{n(b.visitors)}명 <span className="font-normal text-ink-mute">({n(b.visits)}회)</span></td>
-                      <td className={`${tdNum} pr-3 ${b.newcomers ? "text-info-tx" : "text-ink-mute"}`}>{n(b.newcomers)}</td>
-                      <td className={`${tdNum} pr-3 text-ink-soft`}>{n(b.liveVisitors)}</td>
-                      <td className={`${tdNum} pr-3 ${b.buyers ? "text-ok-tx" : "text-ink-mute"}`}>{n(b.buyers)}</td>
-                      <td className={`${tdNum} pr-4 text-ink-soft`}>{pct(b.buyers, b.visitors)}</td>
+                      <td className={`${tdNum} pr-3 font-semibold text-ink`}>{n(b.visitors)}명 <span className="font-normal text-ink-mute max-md:block max-md:text-[12px]">({n(b.visits)}회)</span></td>
+                      <td className={`${tdNum} pr-3 max-md:hidden ${b.newcomers ? "text-info-tx" : "text-ink-mute"}`}>{n(b.newcomers)}</td>
+                      <td className={`${tdNum} pr-3 text-ink-soft max-md:hidden`}>{n(b.liveVisitors)}</td>
+                      <td className={`${tdNum} pr-3 max-md:pr-4 ${b.buyers ? "text-ok-tx" : "text-ink-mute"}`}>{n(b.buyers)}</td>
+                      <td className={`${tdNum} pr-4 text-ink-soft max-md:hidden`}>{pct(b.buyers, b.visitors)}</td>
                     </tr>
                   ))}
                 </tbody>
