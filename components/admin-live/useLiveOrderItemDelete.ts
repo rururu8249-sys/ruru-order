@@ -25,7 +25,9 @@ export async function deleteOrderItemRow(
       body: JSON.stringify({ rowId, kind: record?.kind || "delete", cardTotalBefore: record?.cardTotalBefore ?? null, memo }),
     });
     const p = await r.json().catch(() => null);
-    if (!r.ok || p?.ok !== true) {
+    if (p?.code === "NO_TABLE") {
+      // 기록 표를 아직 안 만듦(SQL 실행 전) — 예전과 똑같이 지우기만 한다
+    } else if (!r.ok || p?.ok !== true) {
       return { ok: false, message: `빼기 전에 기록을 남기지 못해 멈췄어요: ${String(p?.message || r.status)}`, restored: false, pointMoved: 0 };
     }
     recordId = Number(p.id) || null;

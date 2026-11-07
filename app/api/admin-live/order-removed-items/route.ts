@@ -13,6 +13,8 @@ function admin() {
 }
 
 const clean = (v: unknown) => String(v ?? "").trim();
+// 표를 아직 안 만들었을 때(SQL 실행 전) — 삭제는 예전처럼 진행되게 따로 알려 준다
+const isNoTable = (m: unknown) => /does not exist|42P01|schema cache|Could not find the table/i.test(String(m || ""));
 const SNAPSHOT_KEYS = [
   "product_name", "color", "size", "qty", "product_price", "adjusted_product_price", "vat_amount", "card_extra_amount",
   "total_price", "adjusted_total_price", "final_amount", "shipping_fee", "adjusted_shipping_fee", "point_used_amount",
@@ -29,7 +31,10 @@ export async function GET(request: NextRequest) {
     let q = admin().from("order_removed_items").select("id, order_id, kind, snapshot, card_total_before, memo, removed_at, created_at").order("id", { ascending: true }).limit(50);
     q = code && groupId ? q.or(`order_lookup_code.eq.${code},order_group_id.eq.${groupId}`) : code ? q.eq("order_lookup_code", code) : q.eq("order_group_id", groupId);
     const { data, error } = await q;
-    if (error) return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    if (error) {
+      if (isNoTable(error.message)) return NextResponse.json({ ok: true, items: [] });
+      return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    }
     return NextResponse.json({ ok: true, items: data || [] });
   } catch (e) {
     return NextResponse.json({ ok: false, message: String((e as Error)?.message || e) }, { status: 500 });
@@ -65,7 +70,10 @@ export async function POST(request: NextRequest) {
       })
       .select("id")
       .maybeSingle();
-    if (insErr) return NextResponse.json({ ok: false, message: insErr.message }, { status: 500 });
+    if (insErr) {
+      if (isNoTable(insErr.message)) return NextResponse.json({ ok: false, code: "NO_TABLE", message: insErr.message }, { status: 503 });
+      return NextResponse.json({ ok: false, message: insErr.message }, { status: 500 });
+    }
     return NextResponse.json({ ok: true, id: (saved as { id?: number } | null)?.id ?? null });
   } catch (e) {
     return NextResponse.json({ ok: false, message: String((e as Error)?.message || e) }, { status: 500 });
