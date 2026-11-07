@@ -15,6 +15,7 @@ export type VisitStats = {
   available?: boolean;
   days?: number;
   totals?: { visitors: number; visits: number; capped: boolean } | null;
+  excludedCount?: number;
   daily?: DailyBucket[];
   broadcasts?: Array<BroadcastBucket & { title: string }>;
 };
@@ -219,6 +220,126 @@ function PeopleDrawer({ b, onClose }: { b: Bucket; onClose: () => void }) {
   );
 }
 
+// ── 제외 계정 창: 사장님 계정(루루동이·루루실장…)은 접속 기록에서 뺀다 ─────────
+//   [2026-11-07] 닉네임이 아니라 회원(카카오 계정)으로 기억해 닉네임이 바뀌어도 따라감.
+type ExcludedRow = { id: number; nickname: string; phoneTail: string; auto: boolean; names: string[] };
+type FoundRow = { id: number; nickname: string; kakaoName: string; name: string; phoneTail: string };
+
+function ExcludeModal({ onClose, onChanged }: { onClose: () => void; onChanged: () => void }) {
+  const [list, setList] = useState<ExcludedRow[] | null>(null);
+  const [q, setQ] = useState("");
+  const [found, setFound] = useState<FoundRow[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const changed = useRef(false);
+
+  const load = useCallback(async () => {
+    const res = await fetch("/api/admin-live/visit-stats-exclude", { cache: "no-store" });
+    const j = (await res.json().catch(() => null)) as { ok?: boolean; list?: ExcludedRow[]; message?: string } | null;
+    if (j?.ok) setList(j.list || []); else { setList([]); setMsg(j?.message || "목록을 못 불러왔어요."); }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const search = useCallback(async () => {
+    const kw = q.trim();
+    if (!kw) { setFound([]); return; }
+    setBusy(true); setMsg("");
+    try {
+      const res = await fetch(`/api/admin-live/visit-stats-exclude?q=${encodeURIComponent(kw)}`, { cache: "no-store" });
+      const j = (await res.json().catch(() => null)) as { ok?: boolean; found?: FoundRow[]; message?: string } | null;
+      if (j?.ok) { setFound(j.found || []); if ((j.found || []).length === 0) setMsg("그 이름의 회원이 없어요."); }
+      else setMsg(j?.message || "찾지 못했어요.");
+    } finally { setBusy(false); }
+  }, [q]);
+
+  const act = useCallback(async (action: "add" | "remove", customerId: number) => {
+    setBusy(true); setMsg("");
+    try {
+      const res = await fetch("/api/admin-live/visit-stats-exclude", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, customerId }) });
+      const j = (await res.json().catch(() => null)) as { ok?: boolean; list?: ExcludedRow[]; message?: string } | null;
+      if (j?.ok) { setList(j.list || []); changed.current = true; if (action === "add") { setFound([]); setQ(""); } }
+      else setMsg(j?.message || "저장하지 못했어요.");
+    } finally { setBusy(false); }
+  }, []);
+
+  const close = () => { if (changed.current) onChanged(); onClose(); };
+  const inList = new Set((list || []).map((x) => x.id));
+
+  return (
+    <>
+      <button type="button" aria-label="닫기" tabIndex={-1} onClick={close} className="fixed inset-0 z-[120] bg-black/30" />
+      <div role="dialog" aria-modal="true" aria-label="접속 기록 제외 계정"
+        className="fixed left-1/2 top-1/2 z-[130] flex max-h-[min(88vh,640px)] w-[min(92vw,520px)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl bg-surface"
+        style={{ boxShadow: "0 8px 24px rgba(0,0,0,.08)" }}>
+        <div className="flex shrink-0 items-center gap-2 border-b border-line px-5 py-4">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[20px] font-bold text-ink">접속 기록에서 빼는 계정</h2>
+            <div className="text-[12px] text-ink-mute">사장님·직원 계정. 닉네임을 바꿔도 같은 사람으로 보고 계속 빼요.</div>
+          </div>
+          <button type="button" onClick={close} className={btnSub}>닫기</button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          {list === null ? (
+            <div className="py-6 text-center text-[13px] text-ink-mute">불러오는 중…</div>
+          ) : list.length === 0 ? (
+            <div className="py-6 text-center text-[13px] text-ink-mute">빼는 계정이 없어요.</div>
+          ) : (
+            <ul className="divide-y divide-line">
+              {list.map((c) => (
+                <li key={c.id} className="flex items-center gap-3 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[14px] font-semibold text-ink">{c.nickname} <span className="font-normal text-ink-mute">· 끝 {c.phoneTail || "-"}</span></div>
+                    {c.names.length > 1 ? <div className="truncate text-[12px] text-ink-mute">예전 닉네임: {c.names.filter((x) => x !== c.nickname).join(", ")}</div> : null}
+                  </div>
+                  {c.auto ? (
+                    <span className="shrink-0 text-[12px] text-ink-mute">운영자 테스트 번호</span>
+                  ) : (
+                    <button type="button" disabled={busy} onClick={() => void act("remove", c.id)} className="shrink-0 text-[13px] text-danger-tx hover:underline disabled:opacity-50">빼기 취소</button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="mt-5 border-t border-line pt-4">
+            <div className="mb-2 text-[13px] font-semibold text-ink">계정 추가</div>
+            <div className="flex gap-2">
+              <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void search(); }}
+                placeholder="닉네임·카톡 이름·이름" className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-[14px] text-ink outline-none focus-visible:border-ink max-md:h-11" />
+              <button type="button" onClick={() => void search()} disabled={busy || !q.trim()} className={btnSub}>찾기</button>
+            </div>
+            {found.length > 0 ? (
+              <ul className="mt-2 divide-y divide-line rounded-lg border border-line">
+                {found.map((f) => (
+                  <li key={f.id} className="flex items-center gap-3 px-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[14px] text-ink">{f.nickname}</div>
+                      <div className="truncate text-[12px] text-ink-mute">{[f.kakaoName && `카톡 ${f.kakaoName}`, f.name, f.phoneTail && `끝 ${f.phoneTail}`].filter(Boolean).join(" · ")}</div>
+                    </div>
+                    {inList.has(f.id) ? (
+                      <span className="shrink-0 text-[12px] text-ink-mute">이미 빼는 중</span>
+                    ) : (
+                      <button type="button" disabled={busy} onClick={() => void act("add", f.id)} className="inline-flex h-8 shrink-0 items-center rounded-lg bg-ink px-3 text-[13px] text-white disabled:opacity-50">빼기</button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {msg ? <div className="mt-2 text-[12px] text-warn-tx">{msg}</div> : null}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── 본 화면 ──────────────────────────────────────────────────────────────
 type Props = { embedded?: boolean; style?: CSSProperties };
 
@@ -227,6 +348,7 @@ export default function VisitStatsView({ style }: Props) {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("date");
   const [openKey, setOpenKey] = useState<string>("");
+  const [excludeOpen, setExcludeOpen] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -263,6 +385,7 @@ export default function VisitStatsView({ style }: Props) {
         <span className="ml-auto text-[12px] tabular-nums text-ink-mute">
           최근 {stats?.days ?? 30}일 · 다녀간 사람 {n(stats?.totals?.visitors ?? 0)}명
         </span>
+        <button type="button" onClick={() => setExcludeOpen(true)} className={btnSub}>제외 계정 {n(stats?.excludedCount ?? 0)}</button>
         <button type="button" onClick={() => void reload()} disabled={loading} className={btnSub}>{loading ? "불러오는 중" : "새로고침"}</button>
       </div>
 
@@ -328,6 +451,7 @@ export default function VisitStatsView({ style }: Props) {
       </div>
 
       {opened ? <PeopleDrawer b={opened} onClose={close} /> : null}
+      {excludeOpen ? <ExcludeModal onClose={() => setExcludeOpen(false)} onChanged={() => void reload()} /> : null}
     </div>
   );
 }

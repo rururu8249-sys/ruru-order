@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { aggregateVisits, seoulDate, type OrderMark, type VisitRow } from "@/lib/visitStatsAgg";
+import { loadExcludedCustomers } from "@/lib/visitStatsExclude";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -102,7 +103,26 @@ export async function GET(request: NextRequest) {
     if (visits.error) {
       return NextResponse.json({ ok: true, available: false, daily: [], broadcasts: [], totals: null });
     }
-    const rows = visits.rows;
+
+    // [2026-11-07] 사장님 계정(운영자 테스트 번호 + 직접 넣은 회원) 접속은 뺀다 — 닉네임이 바뀌어도 회원 기준이라 따라감.
+    //   그 회원의 지금·예전 닉네임으로 남은 줄 + 그 닉네임을 한 번이라도 쓴 브라우저(visitor_key)의 줄 전부 제외.
+    //   목록 못 읽으면(표 없음 등) 예전처럼 전부 보여 준다.
+    let excludedCount = 0;
+    let rows = visits.rows;
+    try {
+      const excluded = await loadExcludedCustomers(supabase);
+      const names = new Set(excluded.flatMap((c) => c.names));
+      if (names.size > 0) {
+        const keys = new Set<string>();
+        for (const r of rows) {
+          if (names.has(String(r.nickname || "").trim()) && r.visitor_key) keys.add(String(r.visitor_key));
+        }
+        rows = rows.filter((r) => !names.has(String(r.nickname || "").trim()) && !keys.has(String(r.visitor_key || "")));
+      }
+      excludedCount = excluded.length;
+    } catch {
+      /* 제외 목록 못 읽으면 그냥 전부 */
+    }
 
     // 닉네임 모음 → 처음 로그인한 날
     const nickSet = new Set<string>();
@@ -139,7 +159,8 @@ export async function GET(request: NextRequest) {
       ok: true,
       available: true,
       days: DAYS,
-      totals: { visitors: agg.totalVisitors, visits: agg.totalVisits, capped: rows.length >= MAX_ROWS },
+      totals: { visitors: agg.totalVisitors, visits: agg.totalVisits, capped: visits.rows.length >= MAX_ROWS },
+      excludedCount,
       daily: agg.daily.slice(0, DAYS),
       broadcasts: agg.broadcasts.slice(0, 40).map((b) => ({ ...b, title: titles.get(b.broadcastId) || `방송 ${b.broadcastId.slice(0, 8)}` })),
     });
