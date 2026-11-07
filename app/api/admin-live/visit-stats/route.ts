@@ -29,15 +29,22 @@ function getSupabaseAdmin() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-// 1,000줄씩 끝까지 읽기(supabase 기본 상한이 1,000줄)
-async function readAll<T>(build: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>): Promise<{ rows: T[]; error: unknown }> {
+// 1,000줄씩 끝까지 읽기(supabase 기본 상한이 1,000줄) — 줄 수를 먼저 세고 나머지 쪽은 «동시에» 읽는다(18초 → 수 초)
+async function readAll<T>(
+  count: () => PromiseLike<{ count: number | null; error: unknown }>,
+  build: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>
+): Promise<{ rows: T[]; error: unknown }> {
+  const c = await count();
+  if (c.error) return { rows: [], error: c.error };
+  const total = Math.min(Number(c.count || 0), MAX_ROWS);
+  const pages: Array<[number, number]> = [];
+  for (let from = 0; from < total; from += PAGE) pages.push([from, Math.min(from + PAGE, total) - 1]);
+  if (pages.length === 0) return { rows: [], error: null };
+  const results = await Promise.all(pages.map(([f, t]) => build(f, t)));
   const out: T[] = [];
-  for (let from = 0; from < MAX_ROWS; from += PAGE) {
-    const { data, error } = await build(from, from + PAGE - 1);
-    if (error) return { rows: out, error };
-    const chunk = (Array.isArray(data) ? data : []) as T[];
-    out.push(...chunk);
-    if (chunk.length < PAGE) break;
+  for (const r of results) {
+    if (r.error) return { rows: out, error: r.error };
+    out.push(...((Array.isArray(r.data) ? r.data : []) as T[]));
   }
   return { rows: out, error: null };
 }
@@ -48,9 +55,10 @@ function isCanceled(r: Record<string, unknown>) {
 
 async function loadFirstDays(sb: SupabaseClient, nicks: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
-  for (let i = 0; i < nicks.length; i += 200) {
-    const part = nicks.slice(i, i + 200);
-    const { data } = await sb.from("customers").select("youtube_nickname, first_login_at, created_at").in("youtube_nickname", part);
+  const parts: string[][] = [];
+  for (let i = 0; i < nicks.length; i += 200) parts.push(nicks.slice(i, i + 200));
+  const results = await Promise.all(parts.map((part) => sb.from("customers").select("youtube_nickname, first_login_at, created_at").in("youtube_nickname", part)));
+  for (const { data } of results) {
     for (const c of (data || []) as Array<Record<string, unknown>>) {
       const nick = String(c.youtube_nickname || "").trim();
       const at = String(c.first_login_at || c.created_at || "");
@@ -68,14 +76,29 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseAdmin();
     const since = new Date(Date.now() - DAYS * 24 * 60 * 60 * 1000).toISOString();
 
-    const visits = await readAll<VisitRow>((from, to) =>
-      supabase
-        .from("visitor_visits")
-        .select("visitor_key, nickname, broadcast_id, shop_mode, started_at, last_seen_at, ip")
-        .gte("started_at", since)
-        .order("started_at", { ascending: false })
-        .range(from, to)
-    );
+    // 접속 기록과 주문(읽기만)을 동시에 읽는다
+    const [visits, orderRows] = await Promise.all([
+      readAll<VisitRow>(
+        () => supabase.from("visitor_visits").select("id", { count: "exact", head: true }).gte("started_at", since),
+        (from, to) =>
+          supabase
+            .from("visitor_visits")
+            .select("visitor_key, nickname, broadcast_id, shop_mode, started_at, last_seen_at, ip")
+            .gte("started_at", since)
+            .order("started_at", { ascending: false })
+            .range(from, to)
+      ),
+      readAll<Record<string, unknown>>(
+        () => supabase.from("orders").select("id", { count: "exact", head: true }).gte("created_at", since),
+        (from, to) =>
+          supabase
+            .from("orders")
+            .select("youtube_nickname, created_at, broadcast_id, admin_order_status_v2, order_manage_status, is_test_order, is_deleted")
+            .gte("created_at", since)
+            .order("id", { ascending: false })
+            .range(from, to)
+      ),
+    ]);
     if (visits.error) {
       return NextResponse.json({ ok: true, available: false, daily: [], broadcasts: [], totals: null });
     }
@@ -89,14 +112,7 @@ export async function GET(request: NextRequest) {
     }
     const firstDayByNick = await loadFirstDays(supabase, Array.from(nickSet));
 
-    // 주문한 사람(읽기만 · 취소·테스트·삭제 제외)
-    const orderRows = await readAll<Record<string, unknown>>((from, to) =>
-      supabase
-        .from("orders")
-        .select("youtube_nickname, created_at, broadcast_id, admin_order_status_v2, order_manage_status, is_test_order, is_deleted")
-        .gte("created_at", since)
-        .range(from, to)
-    );
+    // 주문한 사람(취소·테스트·삭제 제외)
     const orders: OrderMark[] = [];
     for (const o of orderRows.rows) {
       if (o.is_deleted === true || o.is_test_order === true || isCanceled(o)) continue;
