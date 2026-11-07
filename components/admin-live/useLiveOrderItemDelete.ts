@@ -11,13 +11,35 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 /** [2026-11-01] 확인창 없이 RPC 만 부른다 — 「일부 취소 · 카드 다시 결제」 창이 자기 확인창을 쓰려고 뺀 것. 부르는 RPC·인자는 아래 훅과 같다. */
-export async function deleteOrderItemRow(rowId: number, memo: string): Promise<{ ok: boolean; message: string; restored: boolean; pointMoved: number }> {
+export async function deleteOrderItemRow(
+  rowId: number,
+  memo: string,
+  record?: { kind?: "card_repay" | "delete"; cardTotalBefore?: number }
+): Promise<{ ok: boolean; message: string; restored: boolean; pointMoved: number }> {
+  // [2026-11-07] 지우기 «직전»에 그 줄 사본을 남긴다(주문상세에 줄 그어 보이게). 사본을 못 남기면 지우지 않는다.
+  let recordId: number | null = null;
+  try {
+    const r = await fetch("/api/admin-live/order-removed-items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rowId, kind: record?.kind || "delete", cardTotalBefore: record?.cardTotalBefore ?? null, memo }),
+    });
+    const p = await r.json().catch(() => null);
+    if (!r.ok || p?.ok !== true) {
+      return { ok: false, message: `빼기 전에 기록을 남기지 못해 멈췄어요: ${String(p?.message || r.status)}`, restored: false, pointMoved: 0 };
+    }
+    recordId = Number(p.id) || null;
+  } catch (e) {
+    return { ok: false, message: `빼기 전에 기록을 남기지 못해 멈췄어요: ${String((e as Error)?.message || e)}`, restored: false, pointMoved: 0 };
+  }
   const { data, error } = await (supabase as any).rpc("admin_delete_order_item", {
     p_order_id: rowId,
     p_admin_memo: memo,
   });
   const res = (data || {}) as any;
   if (error || res?.ok !== true) {
+    // 줄이 안 지워졌으니 방금 남긴 사본은 지운다(실패해도 화면은 남은 줄과 겹치는 사본을 안 보여 줌)
+    if (recordId) void fetch(`/api/admin-live/order-removed-items?id=${recordId}`, { method: "DELETE" }).catch(() => {});
     return { ok: false, message: String(error?.message || res?.message || "알 수 없는 오류"), restored: false, pointMoved: 0 };
   }
   return { ok: true, message: "", restored: Boolean(res.restored), pointMoved: Number(res.point_moved || 0) };

@@ -87,7 +87,7 @@ export default function CardRepayModal({ order, defaultRemoveIds, onClose, onRea
     let removed = 0;
     try {
       for (const it of removeList) {
-        const res = await deleteOrderItemRow(Number(it.id), "admin-live 카드 다시 결제 — 상품 빼기");
+        const res = await deleteOrderItemRow(Number(it.id), "admin-live 카드 다시 결제 — 상품 빼기", { kind: "card_repay", cardTotalBefore: plan.originalTotal });
         if (!res.ok) {
           setRunError(`「${it.productName || "상품"}」 빼기 실패: ${res.message}${removed > 0 ? ` (앞의 ${removed}개는 이미 뺐어요)` : ""}`);
           return;

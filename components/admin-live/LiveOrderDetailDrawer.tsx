@@ -199,6 +199,30 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order, findTaskTick]);
 
+  // [2026-11-07] 지운 상품 줄 기록(결제취소·삭제) — 표시 전용, 금액 계산에 안 들어감
+  const [removedItems, setRemovedItems] = useState<Array<{ id: number; order_id: number; kind: string; snapshot: Record<string, unknown>; card_total_before: number | null; removed_at: string | null; memo: string | null }>>([]);
+  const [removedTick, setRemovedTick] = useState(0);
+  useEffect(() => {
+    const oo = order as Record<string, unknown>;
+    const code = String((order as LiveOrder).orderNo || oo.order_lookup_code || "").trim();
+    const gid = String((order as { groupId?: string }).groupId || oo.order_group_id || "").trim();
+    if (!code && !gid) { setRemovedItems([]); return; }
+    let alive = true;
+    (async () => {
+      try {
+        const qs = new URLSearchParams();
+        if (code) qs.set("code", code);
+        if (gid) qs.set("groupId", gid);
+        const r = await fetch(`/api/admin-live/order-removed-items?${qs.toString()}`, { cache: "no-store" });
+        const p = await r.json().catch(() => null);
+        if (!alive) return;
+        setRemovedItems(p?.ok && Array.isArray(p.items) ? p.items : []);
+      } catch { /* 조회 실패는 무시 */ }
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order, removedTick]);
+
   const handleItemSaved = async (result: LiveOrderItemEditSaveResult) => {
     setRefreshingDetail(true);
 
@@ -254,6 +278,7 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
   const handleDeleteItem = async (item: LiveOrderItem) => {
     const ok = await deleteItem(Number(item.id), clean(item.productName) || "상품");
     if (!ok) return;
+    setRemovedTick((t) => t + 1);
 
     setRefreshingDetail(true);
     try {
@@ -1836,6 +1861,46 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                 );
               })
             )}
+            {(() => {
+              // [2026-11-07] 지운 상품 줄 — 줄 긋고 「결제취소/삭제」 표시(금액 합계에는 안 들어감). 아직 남아 있는 줄의 기록은 숨김.
+              const live = new Set(items.map((it) => String(it.id)));
+              const gone = removedItems.filter((r) => !live.has(String(r.order_id)));
+              if (gone.length === 0) return null;
+              return gone.map((r) => {
+                const sn = r.snapshot || {};
+                const name = clean(sn.product_name) || "상품";
+                const opt = [clean(sn.color), clean(sn.size)].filter((v) => v && v !== "없음").join(" / ");
+                const qty = Number(sn.qty || 1);
+                const total = Number(sn.final_amount ?? sn.total_price ?? 0);
+                const goods = Number(sn.adjusted_product_price ?? sn.product_price ?? 0);
+                const card = r.kind === "card_repay";
+                const d = r.removed_at ? new Date(r.removed_at) : null;
+                const md = d && Number.isFinite(d.getTime()) ? `${d.getMonth() + 1}.${d.getDate()}` : "";
+                return (
+                  <div key={`removed-${r.id}`} className="rounded-2xl border border-dashed border-line bg-surface-2 px-3 py-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="inline-flex items-center rounded-lg bg-danger-bg px-2 py-0.5 text-[12px] font-semibold text-danger-tx">{card ? "결제취소" : "삭제"}</span>
+                          <span className="text-[14px] font-semibold text-ink-mute line-through">{name}</span>
+                        </div>
+                        {opt ? <div className="mt-0.5 text-[13px] text-ink-mute line-through">{opt}</div> : null}
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="text-[13px] text-ink-mute">{qty}개</div>
+                        <div className="text-[14px] font-semibold text-ink-mute line-through tabular-nums">{money(total)}</div>
+                      </div>
+                    </div>
+                    <div className="mt-1 text-[12px] text-ink-mute">
+                      {card ? "카드 다시 결제하며 뺀 상품" : "주문에서 삭제한 상품"}
+                      {goods > 0 && goods !== total ? ` · 상품 ${money(goods)}` : ""}
+                      {card && Number(r.card_total_before || 0) > 0 ? ` · 처음 카드결제 ${money(r.card_total_before)}` : ""}
+                      {md ? ` · ${md}` : ""}
+                    </div>
+                  </div>
+                );
+              });
+            })()}
           </div>
 
           {pullOpen ? (
