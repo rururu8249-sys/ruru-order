@@ -1891,11 +1891,14 @@ export default function LiveOrderDetailDrawer({ order, onOpenManualMatch, onClos
                         <div className="text-[14px] font-semibold text-ink-mute line-through tabular-nums">{money(total)}</div>
                       </div>
                     </div>
-                    <div className="mt-1 text-[12px] text-ink-mute">
-                      {card ? "카드 다시 결제하며 뺀 상품" : "주문에서 삭제한 상품"}
-                      {goods > 0 && goods !== total ? ` · 상품 ${money(goods)}` : ""}
-                      {card && Number(r.card_total_before || 0) > 0 ? ` · 처음 카드결제 ${money(r.card_total_before)}` : ""}
-                      {md ? ` · ${md}` : ""}
+                    <div className="mt-1 space-y-0.5 text-[12px] text-ink-mute">
+                      <div>{card ? "카드 결제를 취소하고 뺀 상품" : "주문에서 삭제한 상품"}{md ? ` · ${md}` : ""}</div>
+                      {goods > 0 && goods < total ? (
+                        <div className="tabular-nums">상품값 {money(goods)} + 카드추가금 {money(total - goods)} = {money(total)}</div>
+                      ) : null}
+                      {card && Number(r.card_total_before || 0) > 0 ? (
+                        <div className="tabular-nums">처음 카드결제 금액 {money(r.card_total_before)} (이 상품 포함)</div>
+                      ) : null}
                     </div>
                   </div>
                 );
