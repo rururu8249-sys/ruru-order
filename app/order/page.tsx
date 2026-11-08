@@ -8583,7 +8583,7 @@ export default function OrderPage() {
             subtitle={(
               <div style={sv({ minWidth: 0, display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px" })}>
                 {/* [16:11 사장님] 상품명 바로 아래 빨간 한 줄 — 「방송 접수 없이 바로 구매 가능!」/「방송 접수 완료 후 구매 가능!」(새 모양) */}
-                {uiV2 && !registeredOptionHeroCollapsed && optionNoticePresentation.badge ? (
+                {uiV2 && (!registeredOptionHeroCollapsed || registeredOptionBrandPickStage) && optionNoticePresentation.badge ? (
                   <div data-product-order-notice-line style={{ flexBasis: "100%", fontSize: "15px", fontWeight: 700, lineHeight: 1.4, color: "#D30005", wordBreak: "keep-all" }}>{optionNoticePresentation.badge}</div>
                 ) : null}
                 {(!registeredOptionComboInfo || registeredOptionDetail) && <ProductDiscountLabel tone={uiV2 ? "v2" : undefined} note={registeredOptionSelectProduct.product_note} actualPrice={registeredOptionUnitPrice} detail={registeredOptionDetail} />}
@@ -8997,7 +8997,7 @@ export default function OrderPage() {
                           return { selected, remain, soldOut, plus, priceView, gallery: gallery.length ? gallery : [autoCover], cover: gallery[0] || autoCover, hasRealPhoto: Boolean(gallery[0]), knownColor, code: detailCode(name) };
                         };
                         // [2026-11-08 사장님] 브랜드 고르기 단계 = 세부상품 줄을 «작게 보기 카드»처럼 크게(사진 104px·이름 15/700·가격 16/700),
-                        //   사진 위 「크게」 는 줄 버튼의 «형제»(버튼 안 버튼 금지)로 그 상품 사진만 확대. 품절·「N개 남음」(10개 이하) 표시.
+                        //   사진 자리 투명 버튼(줄 버튼의 «형제», 버튼 안 버튼 금지)으로 그 상품 사진만 확대. 품절·「N개 남음」(10개 이하) 표시.
                         if (registeredOptionBrandPickStage) {
                           const brandTitle = String(registeredOptionSelectProduct?.product_name ?? "");
                           return (
@@ -9019,8 +9019,9 @@ export default function OrderPage() {
                                       {/* [2026-11-08 사장님 「선택 버튼 같은 게 있어야」] 누르는 곳 표시 — 줄 자체가 버튼이라 글자 알약(span)으로. 품절은 회색 「품절」 */}
                                       <span aria-hidden="true" style={{ flexShrink: 0, alignSelf: "center", height: "40px", lineHeight: "40px", padding: "0 16px", borderRadius: "999px", background: m.soldOut ? "#E5E5E5" : "#111111", color: m.soldOut ? "#707072" : "#fff", fontSize: "15px", fontWeight: 600 }}>{m.soldOut ? "품절" : "선택"}</span>
                                     </button>
+                                    {/* [2026-11-08 사장님 「크게 글자 말고 사진 누르면 커지게」] 사진 자리(8px 안쪽 104×104)에 투명 버튼을 덮어 사진 어디를 눌러도 확대 */}
                                     {m.hasRealPhoto && !m.soldOut ? (
-                                      <button type="button" onClick={(e)=>{ e.stopPropagation(); openLightbox(m.gallery[0], m.gallery, label); }} aria-label={`${label} 사진 크게 보기`} style={{ position:"absolute", left:"12px", top:"84px", height:"24px", padding:"0 8px", borderRadius:"999px", border:"none", background:"rgba(0,0,0,0.72)", color:"#fff", fontSize:"11px", fontWeight:700, lineHeight:"24px" }}>크게</button>
+                                      <button type="button" onClick={(e)=>{ e.stopPropagation(); openLightbox(m.gallery[0], m.gallery, label); }} aria-label={`${label} 사진 크게 보기`} style={{ position:"absolute", left:"8px", top:"8px", width:"104px", height:"104px", padding:0, border:"none", borderRadius:"8px", background:"transparent", cursor:"zoom-in" }} />
                                     ) : null}
                                   </div>
                                 );
