@@ -1412,6 +1412,9 @@ export default function QuickProductFastForm({
       return false;
     }
     const isNewDetail = !oldName;
+    // [2026-11-08 사장님 「MC-315 상품명 수정했더니 순환에서 사라짐」] 세부상품 창에서 이름을 바꿔도 순환 목록이 따라가게 기록
+    //   (표 인라인 수정(renameDetailEverywhere)만 기록하고 이 창은 안 하고 있었음).
+    if (!isNewDetail && nextName !== oldName) detailRenamesRef.current.push({ from: oldName.trim(), to: nextName });
     // [2026-09-03 사장님 확정] 본문·표와 같은 방식: 색상/사이즈를 쉼표로 적으면 조합은 자동 생성.
     //   (표 인라인 수정(setDetailAxisValues)과 동일 규칙 — 기존 수량은 아래에서 조합 키로 살린다)
     const colorsList = unique(splitOptions(brandDetailEditDraft.colorsText)).filter((v) => v && v !== "없음");

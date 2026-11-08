@@ -1981,8 +1981,12 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     )}
                   </div>
                 ) : null}
+                {/* [2026-11-08 사장님 「체크하면 화면이 순간 내려감」] 체크 전에도 같은 높이 자리를 두어 목록이 안 밀리게 */}
+                {!bcCopyMode && rotCheckCount === 0 ? (
+                  <div style={{ display: "flex", alignItems: "center", minHeight: "52px", margin: "0 0 8px", padding: "8px 12px", borderRadius: "8px", border: "1px dashed var(--color-line)", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 600 }}>줄의 체크박스를 체크하면 여기서 순환에 넣거나 빼고, 안내글을 복사할 수 있어요</div>
+                ) : null}
                 {!bcCopyMode && rotCheckCount > 0 ? (
-                  <div style={{ position: "sticky", top: 0, zIndex: 2, display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", margin: "0 0 8px", padding: "8px 12px", borderRadius: "8px", background: "var(--color-ink)" }}>
+                  <div style={{ position: "sticky", top: 0, zIndex: 2, display: "flex", alignItems: "center", minHeight: "52px", gap: "6px", flexWrap: "wrap", margin: "0 0 8px", padding: "8px 12px", borderRadius: "8px", background: "var(--color-ink)" }}>
                     <span style={{ fontSize: "13px", fontWeight: 700, color: "#fff" }}>{rotCheckCount}개 체크</span>
                     {widgetRotation.mode !== "all" ? <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void addCheckedToRotation()} style={{ ...rowBtn, height: "36px", marginLeft: "auto", opacity: rotationLive ? 1 : 0.5 }}>체크한 것 순환에 추가</button> : null}
                     <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void rotateOnlyChecked()} style={{ ...rowBtn, height: "36px", marginLeft: widgetRotation.mode !== "all" ? undefined : "auto", opacity: rotationLive ? 1 : 0.5 }}>체크한 것만 순환</button>
