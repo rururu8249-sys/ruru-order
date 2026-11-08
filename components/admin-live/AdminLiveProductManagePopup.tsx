@@ -1415,6 +1415,43 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
   // [2026-11-06 사장님 「전체 상품 순환 · 해당 브랜드만 순환 · 체크한 것만 순환 · 체크한 것 중 빼기」] 버튼 이름 = 하는 일
   const rotCheckCount = rotChecked.size + rotCheckedDetails.size;
+
+  // [2026-11-08 사장님 「순환 중인 상품 안내글 채팅창에 복사·붙여넣기 버튼 / 세부상품도 안내글 복사」]
+  //   «소개»와 달리 현재상품 지정·방송 화면 고정 없이 «글만» 복사한다. 한 줄 = 「✅ 상품명 / 금액 / 색상 / 사이즈」(소개 문구와 같은 함수).
+  const announceLine = (p: ProductRow, detail?: DetailProduct) =>
+    `✅ ${detail ? buildDetailChatLine(detail) : buildChatAnnounceText(p).replace(/[\r\n]+/g, " ").trim()}`;
+  const copyAnnounceLines = async (lines: string[], what: string) => {
+    const uniq = Array.from(new Set(lines.filter(Boolean)));
+    if (uniq.length === 0) { showAdminToast(`${what} 안내글이 없어요.`, "error"); return; }
+    try {
+      await copyTextToClipboard(uniq.join("\n"));
+      showAdminToast(uniq.length === 1 ? "안내글 1줄 복사됐어요 — 채팅창에 붙여 넣으세요." : `안내글 ${uniq.length}줄 복사됐어요 — 유튜브 채팅은 한 번에 한 줄씩 붙여 넣으세요.`, "success");
+    } catch { showAdminToast("복사하지 못했어요.", "error"); }
+  };
+  // 지금 순환 중인 상품 전부(세부상품은 한 줄씩)
+  const rotationAnnounceLines = (): string[] => bcAllPids.flatMap((pid) => {
+    const row = bcProducts.find((r) => productId(r) === pid);
+    if (!row) return [];
+    const details = rotationDetailsOfRow(pid);
+    if (details.length === 0) return rotationIncludedPids.has(pid) ? [announceLine(row)] : [];
+    return details.filter((detail) => isDetailRotating(pid, detail)).map((detail) => announceLine(row, detail));
+  });
+  // 체크한 것(줄 체크 = 그 상품, 묶음이면 세부상품 전부 / 세부상품 체크 = 그 줄)
+  const checkedAnnounceLines = (): string[] => {
+    const out: string[] = [];
+    for (const pid of rotChecked) {
+      const row = bcProducts.find((r) => productId(r) === pid);
+      if (!row) continue;
+      const details = rotationDetailsOfRow(pid);
+      if (details.length === 0) out.push(announceLine(row)); else for (const d of details) out.push(announceLine(row, d));
+    }
+    for (const ref of rotCheckedDetails.values()) {
+      const row = bcProducts.find((r) => productId(r) === ref.pid);
+      const detail = row ? rotationDetailsOfRow(ref.pid).find((d) => d.detailName === ref.detailName) : undefined;
+      if (row && detail) out.push(announceLine(row, detail));
+    }
+    return out;
+  };
   const clearRotCheck = () => { setRotChecked(new Set()); setRotCheckedDetails(new Map()); };
   const rotDetailKey = (pid: string, name: string) => `${pid}\u0001${name}`;
   const toggleRotRowCheck = (pid: string) => setRotChecked((prev) => { const next = new Set(prev); if (next.has(pid)) next.delete(pid); else next.add(pid); return next; });
@@ -1937,6 +1974,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
                           <button type="button" aria-pressed={onScreenOnly} onClick={() => setOnScreenOnly((v) => !v)} style={{ ...(onScreenOnly ? rowBtnPrimary : rowBtn), height: "36px" }}>{onScreenOnly ? "전체 상품 보기" : "순환 중인 것만 보기"}</button>
+                          <button type="button" onClick={() => void copyAnnounceLines(rotationAnnounceLines(), "순환 중인 상품")} title="순환 중인 상품의 상품명·옵션·금액 안내글을 복사(채팅창에 붙여 넣기)" style={{ ...rowBtn, height: "36px" }}>순환 상품 안내글 복사 ({rotationAnnounceLines().length}줄)</button>
                           <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void rotationUseAll()} title="순환 목록을 비우고 방송 상품 전부가 돌게" style={{ ...rowBtn, height: "36px", marginLeft: "auto", color: "var(--color-danger-tx)", opacity: rotationLive ? 1 : 0.5 }}>순환 목록 비우기 ({rotationChips.length}칸)</button>
                         </div>
                       </>
@@ -1949,6 +1987,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                     {widgetRotation.mode !== "all" ? <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void addCheckedToRotation()} style={{ ...rowBtn, height: "36px", marginLeft: "auto", opacity: rotationLive ? 1 : 0.5 }}>체크한 것 순환에 추가</button> : null}
                     <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void rotateOnlyChecked()} style={{ ...rowBtn, height: "36px", marginLeft: widgetRotation.mode !== "all" ? undefined : "auto", opacity: rotationLive ? 1 : 0.5 }}>체크한 것만 순환</button>
                     {widgetRotation.mode !== "all" ? <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void removeCheckedFromRotation()} style={{ ...rowBtn, height: "36px", color: "var(--color-danger-tx)", opacity: rotationLive ? 1 : 0.5 }}>체크한 것 순환에서 빼기</button> : null}
+                    <button type="button" onClick={() => void copyAnnounceLines(checkedAnnounceLines(), "체크한 상품")} title="체크한 상품의 상품명·옵션·금액 안내글을 복사" style={{ ...rowBtn, height: "36px" }}>체크한 것 안내글 복사</button>
                     <button type="button" onClick={clearRotCheck} style={{ ...rowBtn, height: "36px", background: "transparent", color: "#fff", border: "1px solid #fff" }}>체크 해제</button>
                   </div>
                 ) : null}
@@ -2094,13 +2133,14 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                             {!isBrandFolder && !bcCopyMode ? (parentPinned
                               ? <button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void clearBroadcastPin(); }} title="소개를 끝내고 방송 화면을 다시 자동 순환으로" style={rowBtnPrimary}>{bcPinBusy ? "정리 중…" : "소개 끝"}</button>
                               : <button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void broadcastOneClick(p); }} title="방송 화면에 이 상품만 띄우고 안내문을 복사" style={rowBtn}>소개</button>) : null}
+                            {!isBrandFolder && !bcCopyMode ? <button type="button" onClick={(e) => { e.stopPropagation(); void copyAnnounceLines([announceLine(p)], "이 상품"); }} title="방송 화면은 그대로 두고 안내글만 복사(채팅창에 붙여 넣기)" style={rowBtn}>안내글 복사</button> : null}
                             {!bcCopyMode && isBrandFolder ? <button type="button" disabled={!rotationLive || rotBusy} onClick={(e) => { e.stopPropagation(); void rotateOnlyBrand(p); }} title={rotationLive ? "이 브랜드 상품만 방송 화면에 돌아가게" : "방송을 켜면 바꿀 수 있어요"} style={{ ...rowBtn, opacity: rotationLive ? 1 : 0.5 }}>이 브랜드만 순환</button> : null}
                             {!bcCopyMode ? <button type="button" disabled={hideBusyId === pid || !canToggleHidden(p)} onClick={(e) => { e.stopPropagation(); void toggleProductHidden(p); }} title={rowHidden ? "숨김 — 누르면 손님 화면에 다시 보여요" : "보이는 중 — 누르면 손님 화면에서 숨겨요(이 목록엔 남음)"} aria-label={rowHidden ? "숨김 상품, 누르면 보이기" : "보이는 상품, 누르면 숨기기"} aria-pressed={rowHidden} style={{ ...eyeBtn(rowHidden), opacity: hideBusyId === pid ? 0.5 : 1 }}>{rowHidden ? HIDDEN_EYE_ICON : SHOWN_EYE_ICON}</button> : null}
                             <button type="button" onClick={(e) => { e.stopPropagation(); editProduct(p); }} style={rowBtn}>수정</button>
                             {!bcCopyMode ? <button type="button" onClick={(e) => { e.stopPropagation(); openBcStockFlow(pid); }} title="이 상품 재고 흐름" style={rowBtn}>재고</button> : null}
                             <button type="button" disabled={bcBusy} onClick={(e) => { e.stopPropagation(); void removeBcProduct(pid); }} title="이 방송 목록에서만 뺌(상품은 남음)" style={{ ...rowBtnDanger, opacity: bcBusy ? 0.6 : 1 }}>빼기</button>
                           </div>
-                          {isBrandFolder && expanded ? <div style={{ borderTop: "1px solid var(--color-line)", padding: "8px", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", gap: "6px" }}>{detailRows.map((detail) => { const pinned=isBroadcastPinned(pid,detail.detailName); const optionText=[detail.colors.length?`색상 ${detail.colors.join(",")}`:"",detail.sizes.length?`사이즈 ${detail.sizes.join(",")}`:""].filter(Boolean).join(" · ")||"옵션 없음"; const detailOn = isDetailPicked(pid, detail); return <div key={broadcastPinKey(pid,detail.detailName)} style={{ display:"grid",gridTemplateColumns:bcCopyMode?"44px minmax(0,1fr) auto auto":"20px 44px minmax(0,1fr) auto auto",gap:"8px",alignItems:"center",border:pinned?"2px solid var(--color-rose-deep)":"1px solid var(--color-line)",borderRadius:"8px",padding:"8px",background:pinned?"var(--color-rose-soft)":"var(--color-surface)" }}>{!bcCopyMode?<input type="checkbox" aria-label={`${detail.detailName} 체크`} checked={rotCheckedDetails.has(rotDetailKey(pid,detail.detailName))} onChange={()=>toggleRotDetailCheck(pid,detail)} onClick={(e)=>e.stopPropagation()} style={{width:"20px",height:"20px",accentColor:"var(--color-ink)",cursor:"pointer"}}/>:null}<button type="button" onClick={()=>detail.image&&setLightbox(detail.image)} style={{width:42,height:42,border:0,borderRadius:7,overflow:"hidden",padding:0,background:"var(--color-surface-2)"}}>{detail.image?<img src={detail.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:null}</button><div style={{minWidth:0}}><div style={{display:"flex",alignItems:"center",gap:"6px",minWidth:0}}><span style={{fontSize:"12px",fontWeight:900,color:"var(--color-ink)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{detail.detailName}</span>{pinned?<span style={ROT_BADGE_LIVE}>소개 중</span>:detailOn?<span style={ROT_BADGE_ON_SCREEN}>순환 중</span>:null}</div><div style={{fontSize:"11px",fontWeight:800,color:"var(--color-rose-deep)",marginTop:2}}>{detail.price.toLocaleString("ko-KR")}원</div><div style={{fontSize:"11px",fontWeight:700,color:"var(--color-ink-soft)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{optionText}{detail.stockManaged&&detail.stock!==null?` · 재고 ${detail.stock}`:""}</div></div>{pinned?<button type="button" disabled={bcPinBusy} onClick={()=>void clearBroadcastPin()} title="소개를 끝내고 방송 화면을 다시 자동 순환으로" style={rowBtnPrimary}>{bcPinBusy?"정리 중…":"소개 끝"}</button>:<button type="button" disabled={bcPinBusy} onClick={()=>void broadcastOneClick(p,detail)} title="방송 화면에 이 상품만 띄우고 안내문을 복사" style={rowBtn}>소개</button>}<button type="button" aria-label={`${detail.detailName} 수정`} onClick={(event)=>{event.stopPropagation();editProduct(p,detail.detailName);}} style={rowBtn}>수정</button></div>})}</div> : null}
+                          {isBrandFolder && expanded ? <div style={{ borderTop: "1px solid var(--color-line)", padding: "8px", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", gap: "6px" }}>{detailRows.map((detail) => { const pinned=isBroadcastPinned(pid,detail.detailName); const optionText=[detail.colors.length?`색상 ${detail.colors.join(",")}`:"",detail.sizes.length?`사이즈 ${detail.sizes.join(",")}`:""].filter(Boolean).join(" · ")||"옵션 없음"; const detailOn = isDetailPicked(pid, detail); return <div key={broadcastPinKey(pid,detail.detailName)} style={{ display:"grid",gridTemplateColumns:bcCopyMode?"44px minmax(0,1fr) auto auto":"20px 44px minmax(0,1fr) auto auto auto",gap:"8px",alignItems:"center",border:pinned?"2px solid var(--color-rose-deep)":"1px solid var(--color-line)",borderRadius:"8px",padding:"8px",background:pinned?"var(--color-rose-soft)":"var(--color-surface)" }}>{!bcCopyMode?<input type="checkbox" aria-label={`${detail.detailName} 체크`} checked={rotCheckedDetails.has(rotDetailKey(pid,detail.detailName))} onChange={()=>toggleRotDetailCheck(pid,detail)} onClick={(e)=>e.stopPropagation()} style={{width:"20px",height:"20px",accentColor:"var(--color-ink)",cursor:"pointer"}}/>:null}<button type="button" onClick={()=>detail.image&&setLightbox(detail.image)} style={{width:42,height:42,border:0,borderRadius:7,overflow:"hidden",padding:0,background:"var(--color-surface-2)"}}>{detail.image?<img src={detail.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:null}</button><div style={{minWidth:0}}><div style={{display:"flex",alignItems:"center",gap:"6px",minWidth:0}}><span style={{fontSize:"12px",fontWeight:900,color:"var(--color-ink)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{detail.detailName}</span>{pinned?<span style={ROT_BADGE_LIVE}>소개 중</span>:detailOn?<span style={ROT_BADGE_ON_SCREEN}>순환 중</span>:null}</div><div style={{fontSize:"11px",fontWeight:800,color:"var(--color-rose-deep)",marginTop:2}}>{detail.price.toLocaleString("ko-KR")}원</div><div style={{fontSize:"11px",fontWeight:700,color:"var(--color-ink-soft)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{optionText}{detail.stockManaged&&detail.stock!==null?` · 재고 ${detail.stock}`:""}</div></div>{pinned?<button type="button" disabled={bcPinBusy} onClick={()=>void clearBroadcastPin()} title="소개를 끝내고 방송 화면을 다시 자동 순환으로" style={rowBtnPrimary}>{bcPinBusy?"정리 중…":"소개 끝"}</button>:<button type="button" disabled={bcPinBusy} onClick={()=>void broadcastOneClick(p,detail)} title="방송 화면에 이 상품만 띄우고 안내문을 복사" style={rowBtn}>소개</button>}{!bcCopyMode?<button type="button" onClick={(e)=>{e.stopPropagation();void copyAnnounceLines([announceLine(p,detail)],"이 상품");}} title="방송 화면은 그대로 두고 안내글만 복사(채팅창에 붙여 넣기)" style={rowBtn}>안내글 복사</button>:null}<button type="button" aria-label={`${detail.detailName} 수정`} onClick={(event)=>{event.stopPropagation();editProduct(p,detail.detailName);}} style={rowBtn}>수정</button></div>})}</div> : null}
                         </div>
                       );
                     })}
