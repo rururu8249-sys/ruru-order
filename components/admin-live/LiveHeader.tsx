@@ -355,7 +355,8 @@ export default function LiveHeader({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ broadcastId: activeBroadcast.id, mode: alertMode, selectionToken, templateId: alertTemplateId || undefined }),
       }).then((res) => res.json()).catch(() => null);
-      setAlertResult(r?.ok ? `발송 접수 ${r.successCount}명 · 즉시 실패 ${r.failCount}명 (최종 수신 결과는 SOLAPI에서 확인)` : "발송 확인 필요: " + (r?.error || "알 수 없는 오류"));
+      // [2026-11-08] 실패하면 이유를 그대로(잔액 부족 등) — 서버가 실패한 사람을 「이미 받음」에서 빼 두니 다시 뽑기 → 발송으로 재시도
+      setAlertResult(r?.ok ? `발송 접수 ${r.successCount}명 · 즉시 실패 ${r.failCount}명 (최종 수신 결과는 SOLAPI에서 확인)${r?.error ? ` · ${r.error}` : ""}` : "발송 실패: " + (r?.error || "알 수 없는 오류"));
       setAlertPreview(null);
       setAlertIncluded([]);setAlertExcluded([]);
     } finally {

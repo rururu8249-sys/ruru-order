@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import {createUiLoader} from './admin-ui-test-loader.mjs';
 for(const key of ['SOLAPI_API_KEY','SOLAPI_API_SECRET','SOLAPI_PF_ID','SOLAPI_TEMPLATE_ID','SOLAPI_SENDER','NEXT_PUBLIC_SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'])process.env[key]='test';
-let sent=[],writes=[],received=[],off=false,readError=false,blockedPhones=[],blockReadError=false;
+let sent=[],writes=[],received=[],off=false,readError=false,blockedPhones=[],blockReadError=false,sendError='',updates=[],deletes=[];
 const customers=[1,2].map(n=>({id:n,customer_phone:`0100000000${n}`,customer_name:`고객${n}`,live_alert_optin:true,live_alert_optin_at:new Date().toISOString()}));
 const orders=customers.map(c=>({customer_phone:c.customer_phone,created_at:new Date().toISOString()}));
-const db={from(table){let mutation=false,rows=[];const q={select(){return q},eq(){return q},gte(){return q},order(){return q},range(){return q},maybeSingle(){return Promise.resolve({data:{id:'broadcast',status:'ON'}})},upsert(value){mutation=true;rows=value;writes.push(value);return q},insert(value){writes.push(value);return Promise.resolve({error:null})},then(resolve,reject){return Promise.resolve(mutation?{data:rows.filter(r=>!received.includes(r.customer_phone)),error:null}:{data:table==='customers'?customers.map(c=>({...c,live_alert_optin:off?false:true})):table==='orders'?orders:table==='live_alert_recipients'?received.map(customer_phone=>({customer_phone})):[],error:readError?{message:'unavailable'}:null}).then(resolve,reject)}};return q}};
-const {POST}=createUiLoader({'@/lib/admin-auth':{verifyAdminSessionFromRequest:async()=>({sub:'admin'})},'@supabase/supabase-js':{createClient:()=>db},'@/lib/liveAlertBlockServer':{readLiveAlertBlockPhones:async()=>{if(blockReadError)throw new Error('x');return new Set(blockedPhones)}},solapi:{SolapiMessageService:class{async send(messages){sent.push(...messages);return {failedMessageList:[]}}}}})('app/api/admin-live/live-alert-send/route.ts');
+const db={from(table){let mutation=false,rows=[];const q={select(){return q},eq(){return q},gte(){return q},lt(){return q},in(){return q},delete(){deletes.push(table);return q},update(v){updates.push(v);return q},order(){return q},range(){return q},maybeSingle(){return Promise.resolve({data:{id:'broadcast',status:'ON'}})},upsert(value){mutation=true;rows=value;writes.push(value);return q},insert(value){writes.push(value);return Promise.resolve({error:null})},then(resolve,reject){return Promise.resolve(mutation?{data:rows.filter(r=>!received.includes(r.customer_phone)),error:null}:{data:table==='customers'?customers.map(c=>({...c,live_alert_optin:off?false:true})):table==='orders'?orders:table==='live_alert_recipients'?received.map(customer_phone=>({customer_phone})):[],error:readError?{message:'unavailable'}:null}).then(resolve,reject)}};return q}};
+const {POST}=createUiLoader({'@/lib/admin-auth':{verifyAdminSessionFromRequest:async()=>({sub:'admin'})},'@supabase/supabase-js':{createClient:()=>db},'@/lib/liveAlertBlockServer':{readLiveAlertBlockPhones:async()=>{if(blockReadError)throw new Error('x');return new Set(blockedPhones)}},solapi:{SolapiMessageService:class{async send(messages){if(sendError)throw new Error(sendError);sent.push(...messages);return {failedMessageList:[]}}}}})('app/api/admin-live/live-alert-send/route.ts');
 async function call(body){const response=await POST({json:async()=>({broadcastId:'broadcast',mode:'priority',...body})});return {status:response.status,...await response.json()}}
 const preview=await call({dryRun:true,limit:1,orderDays:90,recentDays:30});
 assert.equal(preview.members?.length,2,'all opted-in unsent members are searchable, not just selected sample');
@@ -85,5 +85,17 @@ for(const mode of ['optin','all','priority']){
  assert.equal(forged.status,400,'unknown template rejected');assert.equal(sent.length,b,'nothing sent');
  const okEnv=await call({mode:'optin',selectionToken:p.selectionToken,templateId:'test'});
  assert.equal(okEnv.ok,true);assert.ok(sent.slice(b).every(m=>m.kakaoOptions.templateId==='test'),'chosen env template used');
+}
+// [2026-11-08] 솔라피 잔액 부족 → 예약 줄을 fail 로 바꾸고(「이미 받음」에서 빠짐), 사람이 알아들을 이유를 돌려준다
+{
+ received=[];const p=await call({mode:'optin',dryRun:true});assert.equal(p.ok,true);
+ sendError='NotEnoughBalance: 보유 잔액이 부족하여 발송에 실패하였습니다. [차감금액: 53885, 보유잔액: 0]';
+ const before=sent.length;updates=[];deletes=[];
+ const r=await call({mode:'optin',selectionToken:p.selectionToken});
+ assert.equal(r.ok,false,'잔액 부족이면 실패');assert.equal(sent.length,before,'아무도 안 보냄');
+ assert.ok(/잔액/.test(r.error)&&/다시 뽑기/.test(r.error),'잔액 부족 안내+재시도 방법: '+r.error);
+ assert.ok(updates.some(u=>u.status==='fail'),'예약 줄을 fail 로 갱신');
+ assert.ok(deletes.filter(t=>t==='live_alert_recipients').length>=2,'발송 전 fail·오래된 pending 정리');
+ sendError='';
 }
 console.log('PASS API preview without sends/writes, exact recipient count, signed selection, consent recheck, fail-closed history, duplicate exclusion, SMS fallback disabled (mock provider only)');

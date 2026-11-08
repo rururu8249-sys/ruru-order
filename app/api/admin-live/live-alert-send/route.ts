@@ -64,6 +64,8 @@ export async function POST(request: NextRequest) {
     if(broadcastError||!broadcast||String(broadcast.status).toUpperCase()!=="ON")return NextResponse.json({ok:false,error:"진행 중인 방송을 확인할 수 없습니다. 발송하지 않았습니다."},{status:409});
 
     // 이 방송에서 이미 받은 사람(성공 기록) — 증분 발송을 위해 제외 목록으로 사용
+    // [2026-11-08 사장님 「솔라피 잔액 부족으로 실패했는데 다시 보낼 수가 없다」] 실패(fail)·예약만 남은(pending) 줄은
+    //   «받은 사람»이 아니다 → status=success 만 센다. (예전엔 전부 세서 실패한 4,145명이 「이미 받음」으로 잠겼음)
     const received = new Set<string>();
     if (broadcastId) {
       for (let from = 0; ; from += 1000) {
@@ -71,6 +73,7 @@ export async function POST(request: NextRequest) {
           .from("live_alert_recipients")
           .select("customer_phone")
           .eq("broadcast_id", broadcastId)
+          .eq("status", "success")
           .order("id")
           .range(from, from + 999);
         if (error) return NextResponse.json({ok:false,error:"중복 발송 기록을 확인하지 못했습니다. 발송하지 않았습니다."},{status:503});
@@ -216,6 +219,14 @@ export async function POST(request: NextRequest) {
 
     // Unique broadcast/phone rows reserve delivery before contacting SOLAPI.
     // Retries and concurrent clicks cannot submit the same recipient twice.
+    // [2026-11-08] 예전 실패(fail)·3분 넘게 남은 예약(pending — 서버가 중간에 죽은 흔적) 줄은 지워서 다시 보낼 수 있게.
+    //   방금 생긴 pending(동시 클릭)은 그대로 둬 중복 발송을 막는다.
+    {
+      const stale = new Date(Date.now() - 3 * 60 * 1000).toISOString();
+      const { error: e1 } = await supabase.from("live_alert_recipients").delete().eq("broadcast_id", broadcastId).eq("status", "fail");
+      const { error: e2 } = await supabase.from("live_alert_recipients").delete().eq("broadcast_id", broadcastId).eq("status", "pending").lt("sent_at", stale);
+      if (e1 || e2) return NextResponse.json({ok:false,error:"예전 실패 기록을 정리하지 못했습니다. 발송하지 않았습니다."},{status:503});
+    }
     const claimedPhones:string[]=[];
     for(let i=0;i<targets.length;i+=500){
       const {data:claimed,error:claimError}=await supabase.from("live_alert_recipients").upsert(targets.slice(i,i+500).map(p=>({broadcast_id:broadcastId,customer_phone:p,status:"pending"})),{onConflict:"broadcast_id,customer_phone",ignoreDuplicates:true}).select("customer_phone");
@@ -258,6 +269,19 @@ export async function POST(request: NextRequest) {
     const failCount = claimedPhones.length - successCount;
     if (status !== "fail") status = failCount === 0 ? "success" : successCount === 0 ? "fail" : "partial";
 
+    // [2026-11-08] 못 보낸 사람은 status=fail 로 남긴다(기록은 남고, 다음 발송 때 다시 보낼 수 있음)
+    if (broadcastId && failedPhones.size > 0) {
+      const failList = Array.from(failedPhones);
+      for (let i = 0; i < failList.length; i += 500) {
+        const { error: failErr } = await supabase
+          .from("live_alert_recipients")
+          .update({ status: "fail" })
+          .eq("broadcast_id", broadcastId)
+          .in("customer_phone", failList.slice(i, i + 500));
+        if (failErr) console.warn("[live-alert] 실패 기록 갱신 실패:", failErr.message);
+      }
+    }
+
     // 성공한 수신자 기록(증분 발송 근거). 중복은 무시(유니크 인덱스 + ignoreDuplicates). broadcastId 있을 때만.
     if (broadcastId && successPhones.length > 0) {
       for (let i = 0; i < successPhones.length; i += 1000) {
@@ -287,7 +311,14 @@ export async function POST(request: NextRequest) {
       raw_result: rawResults,
     });
 
-    return NextResponse.json({ ok: status !== "fail", mode, targetCount:claimedPhones.length, successCount, failCount, status, error: status==="fail" ? "접수 여부를 확정하지 못했습니다. 중복 방지를 위해 예약을 유지합니다. SOLAPI 내역 확인 후 처리해 주세요." : undefined });
+    const failHint = /NotEnoughBalance|잔액/i.test(memo)
+      ? `솔라피 잔액이 부족해서 한 명도 못 보냈어요. 솔라피에서 충전한 뒤 「다시 뽑기」 → 발송하면 같은 명단에 다시 보내요. (${memo.replace(/^NotEnoughBalance:\s*/,"").slice(0,120)})`
+      : status === "fail"
+        ? `발송이 실패했어요: ${memo || "솔라피가 전부 실패로 돌려줬어요"}. 실패한 사람은 「이미 받음」에서 빠지니 원인 해결 후 「다시 뽑기」 → 발송하면 돼요.`
+        : status === "partial"
+          ? `${failCount}명은 못 보냈어요(실패한 사람은 다음 발송 때 다시 보낼 수 있어요).`
+          : undefined;
+    return NextResponse.json({ ok: status !== "fail", mode, targetCount:claimedPhones.length, successCount, failCount, status, error: failHint });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 });
   }
