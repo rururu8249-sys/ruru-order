@@ -9016,6 +9016,8 @@ export default function OrderPage() {
                                         <b style={sv({display:'block',fontSize:16,fontWeight:700,color:'#111111'})}>{m.priceView.actualLabel}</b>
                                         {fewLeft ? <span style={{ fontSize: "13px", fontWeight: 700, color: "#D30005" }}>{m.remain}개 남음</span> : null}
                                       </span>
+                                      {/* [2026-11-08 사장님 「선택 버튼 같은 게 있어야」] 누르는 곳 표시 — 줄 자체가 버튼이라 글자 알약(span)으로. 품절은 회색 「품절」 */}
+                                      <span aria-hidden="true" style={{ flexShrink: 0, alignSelf: "center", height: "40px", lineHeight: "40px", padding: "0 16px", borderRadius: "999px", background: m.soldOut ? "#E5E5E5" : "#111111", color: m.soldOut ? "#707072" : "#fff", fontSize: "15px", fontWeight: 600 }}>{m.soldOut ? "품절" : "선택"}</span>
                                     </button>
                                     {m.hasRealPhoto && !m.soldOut ? (
                                       <button type="button" onClick={(e)=>{ e.stopPropagation(); openLightbox(m.gallery[0], m.gallery, label); }} aria-label={`${label} 사진 크게 보기`} style={{ position:"absolute", left:"12px", top:"84px", height:"24px", padding:"0 8px", borderRadius:"999px", border:"none", background:"rgba(0,0,0,0.72)", color:"#fff", fontSize:"11px", fontWeight:700, lineHeight:"24px" }}>크게</button>
