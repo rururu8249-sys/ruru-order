@@ -6413,6 +6413,10 @@ export default function OrderPage() {
   })();
   // [2026-08-10 3단] 이 상품이 3단인지 + 재고 조회에 쓸 실제 color 키("세부상품 / 색상")
   const registeredOptionAxes3 = registeredOptionSelectProduct ? readOrderAxes3(registeredOptionSelectProduct) : null;
+  // [2026-11-08 사장님 「브랜드 묶음은 로고 크게 말고 세부상품을 크게」] 브랜드 묶음에서 세부상품을 «고르기 전» 단계.
+  //   머리 = 작은 로고 44px + 브랜드 이름 20/700 + 「세부상품 N가지 · 최저가」, 위 큰 대표사진은 안 그리고 세부상품 줄 사진을 104px 로.
+  //   세부상품을 고르면 예전처럼 그 상품 사진이 위에 크게 나온다. 표시만 — 담기·선점·금액 무접촉.
+  const registeredOptionBrandPickStage = Boolean(registeredOptionBrandGroup && registeredOptionAxes3 && !registeredOptionDetail.trim());
   // [2026-09-11 manysell 실측 흡수] 지금 고른 색상·사이즈로 «담을 수 있는 수량» — 재고연동 상품만(재고 − 다른 손님 홀드).
   //   수량 칸 밑 「최대 N개」 표시와 [+] 상한에 같이 쓴다. 표시·입력 상한 전용 — 실제 차감은 제출 RPC 그대로.
   //   (예전 [+] 상한은 홀드를 안 빼서 품절 표시와 어긋날 수 있었다 → 품절 판정(isSoldOutColorSize)과 같은 계산으로 맞춤)
@@ -8547,7 +8551,8 @@ export default function OrderPage() {
               const collapsed = event.currentTarget.scrollTop > 200;
               if (collapsed !== registeredOptionHeroCollapsed) setRegisteredOptionHeroCollapsed(collapsed);
             }}
-            headerLeft={registeredOptionHeroCollapsed ? (() => {
+            headerLeft={registeredOptionHeroCollapsed || registeredOptionBrandPickStage ? (() => {
+              const compactLogo = registeredOptionBrandPickStage; // [2026-11-08] 브랜드 고르기 단계 = 44px 로고(확대 없음)
               return (
                 <>
                     {(() => {
@@ -8558,7 +8563,7 @@ export default function OrderPage() {
                       //   대신 «지금 보는 사진 / 더 있음 / 확대»를 표시로 알린다.
                       const defaultHeroPhoto = registeredOptionBrandDetailPhotos[0] || registeredOptionComboPhotos[registeredOptionDetail] || pickOrderProductImageUrl(registeredOptionSelectProduct);
                       const selectedPhoto = registeredOptionHeroPhoto || defaultHeroPhoto;
-                      return <div onClick={() => { if (selectedPhoto) openLightbox(selectedPhoto, registeredOptionAllImages, registeredOptionPhotoTitle); }} style={sv({ position: "relative", width: "64px", height: "64px", flexShrink: 0, borderRadius: "14px", overflow: "hidden", background: "#F0EBE8", cursor: selectedPhoto ? "zoom-in" : "default" })}>
+                      return <div onClick={() => { if (selectedPhoto && !compactLogo) openLightbox(selectedPhoto, registeredOptionAllImages, registeredOptionPhotoTitle); }} style={sv({ position: "relative", width: compactLogo ? "44px" : "64px", height: compactLogo ? "44px" : "64px", flexShrink: 0, borderRadius: compactLogo ? "10px" : "14px", overflow: "hidden", background: "#F0EBE8", cursor: selectedPhoto ? "zoom-in" : "default" })}>
                       {selectedPhoto ? (
                         <img src={selectedPhoto} alt={registeredOptionDetail || registeredOptionSelectProduct.product_name} style={sv({ width: "100%", height: "100%", objectFit: "cover" })} />
                       ) : registeredOptionBrandGroup ? (
@@ -8568,13 +8573,13 @@ export default function OrderPage() {
                         </div>
                       ) : null}
                       {/* [2026-09-09] 「눌러도 되는지 몰랐다」 → 확대 신호를 사진 위에 붙인다 (모바일엔 마우스 커서가 없다) */}
-                      {selectedPhoto ? <span style={sv({ position: "absolute", right: "4px", bottom: "4px", borderRadius: "999px", background: "rgba(0,0,0,0.72)", padding: "3px 7px", color: "#fff", fontSize: "10px", fontWeight: 900, lineHeight: 1 })}>{uiV2 ? "크게" : "🔍 크게"}</span> : null}
+                      {selectedPhoto && !compactLogo ? <span style={sv({ position: "absolute", right: "4px", bottom: "4px", borderRadius: "999px", background: "rgba(0,0,0,0.72)", padding: "3px 7px", color: "#fff", fontSize: "10px", fontWeight: 900, lineHeight: 1 })}>{uiV2 ? "크게" : "🔍 크게"}</span> : null}
                     </div>;
                     })()}
                 </>
               );
             })() : undefined}
-            title={registeredOptionDetail || registeredOptionSelectProduct.product_name}
+            title={registeredOptionBrandPickStage ? <span style={{ fontSize: "20px", fontWeight: 700 }}>{registeredOptionSelectProduct.product_name}</span> : (registeredOptionDetail || registeredOptionSelectProduct.product_name)}
             subtitle={(
               <div style={sv({ minWidth: 0, display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px" })}>
                 {/* [16:11 사장님] 상품명 바로 아래 빨간 한 줄 — 「방송 접수 없이 바로 구매 가능!」/「방송 접수 완료 후 구매 가능!」(새 모양) */}
@@ -8583,6 +8588,7 @@ export default function OrderPage() {
                 ) : null}
                 {(!registeredOptionComboInfo || registeredOptionDetail) && <ProductDiscountLabel tone={uiV2 ? "v2" : undefined} note={registeredOptionSelectProduct.product_note} actualPrice={registeredOptionUnitPrice} detail={registeredOptionDetail} />}
                 {registeredOptionBrandGroup && registeredOptionDetail ? <span style={sv({ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 700, color: "#8A8A8A" })}>{registeredOptionBrandGroup.brandKo} ·</span> : null}
+                {registeredOptionBrandPickStage && registeredOptionComboInfo ? <span style={sv({ flexShrink: 0, fontSize: "13px", fontWeight: 600, color: "#707072" })}>세부상품 {registeredOptionComboInfo.names.length}가지 ·</span> : null}
                 <span style={sv({ flexShrink: 0, fontSize: "15px", fontWeight: 800, color: "#7A1E47" })}>
                         {registeredOptionComboInfo
                           ? (registeredOptionBrandGroup ? registeredOptionDetail.trim() : registeredOptionColor.trim())
@@ -8746,9 +8752,9 @@ export default function OrderPage() {
                 {(() => {
                   const defaultHeroPhoto = registeredOptionBrandDetailPhotos[0] || registeredOptionComboPhotos[registeredOptionDetail] || pickOrderProductImageUrl(registeredOptionSelectProduct);
                   const selectedPhoto = registeredOptionHeroPhoto || defaultHeroPhoto;
-                  if (!selectedPhoto) return null;
+                  if (!selectedPhoto || registeredOptionBrandPickStage) return null; // [2026-11-08] 브랜드 고르기 단계는 로고 대표사진 생략
                   return (
-                    <div style={sv({ margin: "12px 0 6px" })}>
+                    <div style={sv({ margin: registeredOptionBrandPickStage ? "0" : "12px 0 6px" })}>
                       <ProductPhotoCarousel
                         tone={uiV2 ? "v2" : undefined}
                         images={registeredOptionAllImages}
@@ -8848,7 +8854,7 @@ export default function OrderPage() {
                           return v ? Number(v.stock ?? 0) <= 0 : false;
                         }).length;
                         return (
-                          <div style={sv({ marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" })}>
+                          <div style={sv({ marginTop: registeredOptionBrandPickStage ? "12px" : undefined, marginBottom: "8px", fontSize: "14px", fontWeight: 800, color: "#333" })}>
                             {registeredOptionAxes3 ? `1단계 · ${registeredOptionAxes3.detailLabel}` : "종류"} 선택{" "}
                             <span style={sv({ fontSize: "12px", fontWeight: 700, color: "#6E655E" })}>
                               {soldCount > 0 ? `(판매중 ${total - soldCount}가지 · 품절 ${soldCount}가지)` : `(${total}가지)`}
@@ -8987,8 +8993,38 @@ export default function OrderPage() {
                           const priceView = detailPricePresentation(registeredOptionPrice, plus);
                           // [2026-09-03 사장님 요청] 세부상품도 사진 없으면 이름 인식 자동 그림 → 글자 카드 (표시 전용)
                           const autoCover = gallery[0] ? "" : (productAutoThumbUrl(name, "") || productNameThumbnail(name));
-                          return { selected, remain, soldOut, plus, priceView, gallery: gallery.length ? gallery : [autoCover], cover: gallery[0] || autoCover, knownColor, code: detailCode(name) };
+                          return { selected, remain, soldOut, plus, priceView, gallery: gallery.length ? gallery : [autoCover], cover: gallery[0] || autoCover, hasRealPhoto: Boolean(gallery[0]), knownColor, code: detailCode(name) };
                         };
+                        // [2026-11-08 사장님] 브랜드 고르기 단계 = 세부상품 줄을 «작게 보기 카드»처럼 크게(사진 104px·이름 15/700·가격 16/700),
+                        //   사진 위 「크게」 는 줄 버튼의 «형제»(버튼 안 버튼 금지)로 그 상품 사진만 확대. 품절·「N개 남음」(10개 이하) 표시.
+                        if (registeredOptionBrandPickStage) {
+                          const brandTitle = String(registeredOptionSelectProduct?.product_name ?? "");
+                          return (
+                            <div data-brand-pick-list style={sv({ display: "grid", gap: "12px" })}>
+                              {entries.map((entry) => {
+                                const name=entry.name, m=metaOf(name);
+                                const label = orderDetailDisplayName(brandTitle, name);
+                                const fewLeft = m.remain !== null && m.remain > 0 && m.remain <= 10;
+                                return (
+                                  <div key={name} style={sv({ position: "relative" })}>
+                                    <button type="button" onClick={()=>chooseDetail(name,m.soldOut)} disabled={m.soldOut} aria-label={`${label} ${m.priceView.actualLabel}${m.soldOut ? " 품절" : ""}`} style={sv({display:"flex",alignItems:"center",gap:"12px",width:"100%",padding:"8px",border:"1px solid #F0EAE0",borderRadius:"12px",background:"#FFFDFB",opacity:m.soldOut?.45:1,textAlign:"left"})}>
+                                      {m.cover?<span style={sv({position:"relative",width:104,height:104,flexShrink:0,borderRadius:8,overflow:"hidden",background:"#F5F5F5"})}><img src={m.cover} alt="" loading="lazy" decoding="async" style={sv({width:104,height:104,objectFit:"cover"})}/>{m.soldOut?<span style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.45)",color:"#fff",fontSize:"15px",fontWeight:700}}>품절</span>:null}</span>:null}
+                                      <span style={sv({flex:1,minWidth:0,display:"flex",flexDirection:"column",gap:"4px"})}>
+                                        <span style={sv({fontSize:15,fontWeight:700,color:'#111111',lineHeight:1.35,overflowWrap:'anywhere'})}>{label}</span>
+                                        {!m.selected&&<ProductDiscountLabel tone={uiV2 ? "v2" : undefined} note={registeredOptionSelectProduct.product_note} actualPrice={registeredOptionPrice+m.plus} detail={name}/>}
+                                        <b style={sv({display:'block',fontSize:16,fontWeight:700,color:'#111111'})}>{m.priceView.actualLabel}</b>
+                                        {fewLeft ? <span style={{ fontSize: "13px", fontWeight: 700, color: "#D30005" }}>{m.remain}개 남음</span> : null}
+                                      </span>
+                                    </button>
+                                    {m.hasRealPhoto && !m.soldOut ? (
+                                      <button type="button" onClick={(e)=>{ e.stopPropagation(); openLightbox(m.gallery[0], m.gallery, label); }} aria-label={`${label} 사진 크게 보기`} style={{ position:"absolute", left:"12px", top:"84px", height:"24px", padding:"0 8px", borderRadius:"999px", border:"none", background:"rgba(0,0,0,0.72)", color:"#fff", fontSize:"11px", fontWeight:700, lineHeight:"24px" }}>크게</button>
+                                    ) : null}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        }
                         return (
                           <div style={sv({ display: "grid", gap: "9px" })}>
                             {entries.map((entry) => {
