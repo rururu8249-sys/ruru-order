@@ -19,6 +19,12 @@ assert.equal(edited.targetCount,1);assert.equal(edited.sample[0].id,otherId);ass
 assert.equal((await call({...settings,selectionToken:edited.selectionToken,includeIds:[otherId,selectedId]})).status,409,'adding above max does not silently evict');
 const redrawn=await call({...settings,includeIds:[otherId],excludeIds:[selectedId]});
 assert.equal(redrawn.sample[0].id,otherId,'pin survives redraw');
+// [2026-11-08] 제외 → 다시 뽑기(꽉 참) → 「다시 포함」: 오류 대신 자동 회원 맨 뒤를 빼고 자리를 만든다
+const refilled=await call({...settings,excludeIds:[selectedId],includeIds:[]});
+assert.equal(refilled.targetCount,1);assert.equal(refilled.sample[0].id,otherId,'redraw after exclusion fills the seat with the next member');
+const reincluded=await call({...settings,selectionToken:refilled.selectionToken,includeIds:[selectedId],excludeIds:[]});
+assert.equal(reincluded.status,200,'re-including at capacity must not fail');
+assert.equal(reincluded.targetCount,1);assert.equal(reincluded.sample[0].id,selectedId);assert.equal(reincluded.sample[0].manual,true,'re-included member is pinned, auto member evicted');
 assert.equal((await call({...settings,includeIds:['forged']})).status,409);
 assert.equal(sent.length,0);assert.equal(writes.length,0,'editing remains read-only');
 const zeroCustomer={id:3,customer_phone:'01000000003',customer_name:'무주문',live_alert_optin:true,live_alert_optin_at:new Date().toISOString()};

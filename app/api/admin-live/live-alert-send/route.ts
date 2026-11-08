@@ -152,6 +152,11 @@ export async function POST(request: NextRequest) {
         const byPhone=new Map(members.map(p=>[p.phone,p]));
         if(previous.phones.some(p=>!byPhone.has(p)))return NextResponse.json({ok:false,error:"동의 또는 발송 이력이 변경되었습니다. 명단을 다시 확인해 주세요."},{status:409});
         selected=previous.phones.filter(p=>!excludedIds.has(memberId(p))&&!manualIds.has(memberId(p))).map(p=>byPhone.get(p)!);
+        // [2026-11-08 사장님 「제외했다가 다시 포함 누르는데 왜 그대로야」] 제외 뒤 「다시 뽑기」로 명단이 다시 꽉 찼을 때
+        //   「다시 포함」하면 1명 넘침 → 오류 대신 자동으로 뽑힌 맨 뒤(우선순위 낮은) 회원을 빼서 자리를 만든다. 직접 넣은 사람은 안 뺀다.
+        const zeroOf=(list:typeof selected)=>list.filter(p=>p.orderDays===0).length;
+        while(pinned.length+selected.length>limit&&selected.length)selected.pop();
+        while(zeroOf(pinned)+zeroOf(selected)>cap){const i=selected.map(p=>p.orderDays===0).lastIndexOf(true);if(i<0)break;selected.splice(i,1);}
         selected=[...pinned,...selected];
       }else{
         const blocked=new Set([...received,...members.filter(p=>excludedIds.has(memberId(p.phone))||manualIds.has(memberId(p.phone))).map(p=>p.phone)]);
