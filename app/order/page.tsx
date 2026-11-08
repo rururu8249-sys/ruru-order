@@ -8588,8 +8588,9 @@ export default function OrderPage() {
                 ) : null}
                 {(!registeredOptionComboInfo || registeredOptionDetail) && <ProductDiscountLabel tone={uiV2 ? "v2" : undefined} note={registeredOptionSelectProduct.product_note} actualPrice={registeredOptionUnitPrice} detail={registeredOptionDetail} />}
                 {registeredOptionBrandGroup && registeredOptionDetail ? <span style={sv({ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px", fontWeight: 700, color: "#8A8A8A" })}>{registeredOptionBrandGroup.brandKo} ·</span> : null}
-                {registeredOptionBrandPickStage && registeredOptionComboInfo ? <span style={sv({ flexShrink: 0, fontSize: "13px", fontWeight: 600, color: "#707072" })}>세부상품 {registeredOptionComboInfo.names.length}가지 ·</span> : null}
-                <span style={sv({ flexShrink: 0, fontSize: "15px", fontWeight: 800, color: "#7A1E47" })}>
+                {/* [2026-11-08] 브랜드 고르기 단계: 「세부상품 N가지 · 최저가 …」 한 줄(13/600 회색)을 빨간 안내 «위»에 */}
+                {registeredOptionBrandPickStage && registeredOptionComboInfo ? <span style={{ order: -1, flexBasis: "100%", fontSize: "13px", fontWeight: 600, color: "#707072", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>세부상품 {registeredOptionComboInfo.names.length}가지 · 최저가 {won(registeredOptionPrice)} 부터 ~</span> : null}
+                {registeredOptionBrandPickStage ? null : <span style={sv({ flexShrink: 0, fontSize: "15px", fontWeight: 800, color: "#7A1E47" })}>
                         {registeredOptionComboInfo
                           ? (registeredOptionBrandGroup ? registeredOptionDetail.trim() : registeredOptionColor.trim())
                             ? won(registeredOptionUnitPrice)
@@ -8601,7 +8602,7 @@ export default function OrderPage() {
                             : registeredOptionSelectProduct && isFreeOrderProduct(registeredOptionSelectProduct)
                               ? (uiV2 ? "0원 · 무료나눔" : "0원 · 🎁 무료나눔")
                               : "가격 직접입력"}
-                </span>
+                </span>}
                 {!uiV2 && !registeredOptionHeroCollapsed && optionNoticePresentation.badge ? (
                   <span
                     data-product-order-notice-badge
