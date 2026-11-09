@@ -183,7 +183,7 @@ export default function LiveWatchView(props: Props) {
         title={`${title || "라이브 방송"} 영상`}
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
         allowFullScreen
-        style={{ position: "absolute", left: 0, right: 0, top: "calc(60px + env(safe-area-inset-top))", bottom: "calc(76px + env(safe-area-inset-bottom))", width: "100%", border: 0, background: "#000000" }}
+        style={{ position: "absolute", left: 0, right: 0, top: "calc(60px + env(safe-area-inset-top))", width: "100%", height: "calc(100% - 136px - env(safe-area-inset-top) - env(safe-area-inset-bottom))", border: 0, background: "#000000" }}
       />
 
       {/* 위 줄 — LIVE·제목 / 쇼핑몰처럼 보기 */}
