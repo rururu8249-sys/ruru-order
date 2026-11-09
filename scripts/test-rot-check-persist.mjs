@@ -21,7 +21,7 @@ const checks=(t)=>t.root.findAll(n=>n.type==='input'&&n.props.type==='checkbox'&
 const checkOf=(t,label)=>checks(t).find(c=>c.props['aria-label']===label);
 let tree=await mount();
 // 묶음 펼치기(세부상품 줄 보이게) — 묶음 줄 버튼에 「펼치기」 역할이 있으면 누르고, 없으면 이미 펼쳐진 것
-const expand=async(t)=>{const b=t.root.findAllByType('button').find(b=>b.children.includes('세부상품'));if(b)await act(async()=>b.props.onClick({stopPropagation(){}}));};
+const expand=async(t)=>{const b=t.root.findAllByType('button').find(b=>String(b.props['aria-label']||'').endsWith('세부상품 펼치기'));if(b)await act(async()=>b.props.onClick({stopPropagation(){}}));};
 await expand(tree);
 assert.ok(checkOf(tree,'A 체크'),'detail A checkbox visible');
 await act(async()=>checkOf(tree,'A 체크').props.onChange());
@@ -36,7 +36,7 @@ products[0].product_note.brand_group.detail_options={A2:{sizes:['M']},B:{sizes:[
 await act(async()=>{window.dispatchEvent(new CustomEvent('ruru-widget-rotation-renamed',{detail:{productId:'1',renames:[{from:'A',to:'A2'}]}}));window.dispatchEvent(new Event('ruru-live-product-updated'));});
 assert.equal(checkOf(tree,'A2 체크')?.props.checked,true,'renamed detail stays checked');
 // 체크한 것만 순환 → 새 이름으로 저장
-const btn=tree.root.findAllByType('button').find(b=>b.children.includes('체크한 것만 순환'));
+const btn=tree.root.findAllByType('button').find(b=>b.children.includes('이것만 순환')&&b.props.title?.includes('체크한'));
 await act(async()=>btn.props.onClick({stopPropagation(){}}));
 assert.deepEqual(savedRotation.targets,[{productId:'1',detailName:'A2'}]);
 console.log('PASS rot check persists across reopen and follows renames');

@@ -32,6 +32,7 @@ import { resolveBrandCatalog, resolveAdminBrandTarget, searchBrandDetails, type 
 import ProductBrandMoveDialog from "./ProductBrandMoveDialog";
 import StockFlowModal, { type StockFlowProduct } from "./StockFlowModal";
 import { kstDateKey } from "@/lib/orderPickingWorkspace";
+import RowMoreMenu, { type RowMoreMenuItem } from "./RowMoreMenu";
 
 // [2026-11-09 사장님 「수정하고 나면 체크한 게 풀림」] 줄 체크는 창(컴포넌트) 안 state 였는데, 「수정」을 누르면
 //   창을 닫고(onClose) 폼을 연 뒤 다시 열어서 매번 비워졌다. 체크를 창 밖(모듈 메모리)에 두어 다시 열어도 남게.
@@ -357,6 +358,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     return () => window.removeEventListener("ruru-widget-rotation-renamed", onRenamed);
   }, []);
   const [onScreenOnly, setOnScreenOnly] = useState(false);
+  // [2026-11-09] 「순환 목록 N」 펼침(칩 목록·전체 상품 순환·안내글 복사) — 기본 접힘
+  const [rotListOpen, setRotListOpen] = useState(false);
   const widgetLibraryLoadSeqRef = useRef(0);
   const [bcWidgetPin, setBcWidgetPin] = useState<{ mode: "auto" | "pin"; productId: string; detailName: string }>({ mode: "auto", productId: "", detailName: "" });
   const [bcExpanded, setBcExpanded] = useState<Set<string>>(new Set());
@@ -1384,23 +1387,26 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const onScreenFilterOn = onScreenOnly && widgetRotation.mode !== "all";
   const rotationAllowedIds = () => new Set(bcAllPids.flatMap(rotationPidsForRow));
   // [2026-11-06 사장님 「말이 어렵다, 실무에서 쓰기 쉽게」] 체크박스+넣기/빼기 두 단계 → 줄마다 「화면 나옴/안 나옴」 버튼 한 번으로 바로 저장.
-  const saveRotationTargets = async (targets: WidgetProductTarget[], doneMessage: string) => {
+  const saveRotationTargets = async (targets: WidgetProductTarget[], doneMessage: string): Promise<boolean> => {
     const allowed = rotationAllowedIds();
     const clean = dedupeRotationTargets(targets).filter((t) => allowed.has(String(t.productId)));
-    if (rotBusy) return;
+    if (rotBusy) return false;
     if (clean.length === 0) {
       // 고른 것을 다 빼면 = 고른 상품 없음 = 방송 상품 전부 순환
       setRotBusy(true);
       try {
-        if (await saveWidgetRotation({ mode: "all", paused: widgetRotation.paused, targets: [] })) showAdminToast("고른 상품이 없어서 방송 상품 전부가 돌아가요.", "success");
+        const ok = await saveWidgetRotation({ mode: "all", paused: widgetRotation.paused, targets: [] });
+        if (ok) showAdminToast("고른 상품이 없어서 방송 상품 전부가 돌아가요.", "success");
+        return ok;
       } finally {
         setRotBusy(false);
       }
-      return;
     }
     setRotBusy(true);
     try {
-      if (await saveWidgetRotation({ mode: "selected", paused: widgetRotation.paused, targets: clean })) showAdminToast(doneMessage, "success");
+      const ok = await saveWidgetRotation({ mode: "selected", paused: widgetRotation.paused, targets: clean });
+      if (ok) showAdminToast(doneMessage, "success");
+      return ok;
     } finally {
       setRotBusy(false);
     }
@@ -1448,6 +1454,38 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
 
   // [2026-11-06 사장님 「전체 상품 순환 · 해당 브랜드만 순환 · 체크한 것만 순환 · 체크한 것 중 빼기」] 버튼 이름 = 하는 일
   const rotCheckCount = rotChecked.size + rotCheckedDetails.size;
+  // [2026-11-09] 체크한 것이 전부 이미 돌고 있으면 띠 버튼은 「순환에서 빼기」, 아니면 「순환에 넣기」
+  const checkedAllRotating = widgetRotation.mode !== "all" && rotCheckCount > 0
+    && [...rotChecked].every((pid) => { const ds = rotationDetailsOfRow(pid); return ds.length === 0 ? rotationIncludedPids.has(pid) : ds.every((d) => isDetailRotating(pid, d)); })
+    && [...rotCheckedDetails.values()].every((ref) => { const d = rotationDetailsOfRow(ref.pid).find((x) => x.detailName === ref.detailName); return d ? isDetailRotating(ref.pid, d) : false; });
+  // [2026-11-09 사장님 「소개 빼고 순환에 넣기 버튼 — 중복 기능」] 줄 주동작 = 순환에 넣기(+채팅 안내글 복사) / 순환에서 빼기. 저장은 saveRotationTargets·hideFromScreen 그대로.
+  const rowRotationState = (pid: string): "all" | "on" | "part" | "off" => {
+    if (widgetRotation.mode === "all") return "all";
+    const details = rotationDetailsOfRow(pid);
+    if (details.length === 0) return rotationIncludedPids.has(pid) ? "on" : "off";
+    const on = details.filter((d) => isDetailRotating(pid, d)).length;
+    return on === 0 ? "off" : on === details.length ? "on" : "part";
+  };
+  const addRowToRotation = async (p: ProductRow, detail?: DetailProduct) => {
+    const pid = productId(p);
+    const label = detail ? detail.detailName : productName(p);
+    const targets = detail ? [detailRotationTarget(rotationDetailRef(pid, detail))] : rowTargets(pid);
+    const rowDetails = detail ? [] : rotationDetailsOfRow(pid);
+    const lines = detail ? [announceLine(p, detail)] : rowDetails.length ? rowDetails.map((d) => announceLine(p, d)) : [announceLine(p)];
+    const wasAll = widgetRotation.mode === "all";
+    const ok = await saveRotationTargets(dedupeRotationTargets([...currentBaseForAdd(), ...targets]), wasAll ? `${label}만 순환해요.` : `순환에 넣었어요: ${label}`);
+    if (!ok) return;
+    try {
+      await copyTextToClipboard(Array.from(new Set(lines.filter(Boolean))).join("\n"));
+      showAdminToast(`${wasAll ? `${label}만 순환` : "순환에 넣음"} · 안내글 ${lines.length}줄 복사됐어요 — 채팅창에 붙여 넣으세요.`, "success");
+    } catch {
+      showAdminToast("순환에는 넣었지만 안내글 복사는 못 했어요. 「⋯ › 안내글만 복사」를 눌러 주세요.", "error");
+    }
+  };
+  const removeRowFromRotation = (p: ProductRow, detail?: DetailProduct) => {
+    const pid = productId(p);
+    return detail ? hideFromScreen([], [rotationDetailRef(pid, detail)], detail.detailName) : hideFromScreen([pid], [], productName(p));
+  };
 
   // [2026-11-08 사장님 「순환 중인 상품 안내글 채팅창에 복사·붙여넣기 버튼 / 세부상품도 안내글 복사」]
   //   «소개»와 달리 현재상품 지정·방송 화면 고정 없이 «글만» 복사한다. 한 줄 = 「✅ 상품명 / 금액 / 색상 / 사이즈」(소개 문구와 같은 함수).
@@ -1982,57 +2020,57 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 <button type="button" disabled={!bcSelId || bcBusy} onClick={openBcPicker} style={{ marginLeft: bcSelId && bcProducts.length > 0 ? undefined : "auto", height: "36px", fontSize: "13px", fontWeight: 700, color: "#fff", background: "var(--color-ink)", border: "none", borderRadius: "8px", padding: "0 12px", cursor: !bcSelId || bcBusy ? "not-allowed" : "pointer", opacity: !bcSelId || bcBusy ? 0.5 : 1 }}>+ 담기</button>
               </div>
               <div style={{ padding: "8px 12px 0" }}>
-                {/* [2026-10-21 a2-10] 위젯 순환 = 한 줄 메뉴 + 줄 체크박스. 옛 「순환·고정 기록」 큰 상자(WidgetProductLibraryPanel) 는 이 탭에서 뺌(파일 보존). */}
+                {/* [2026-11-09 사장님 「방송 중 소개·복사·순환이 불편, 버튼이 많다」] 띠 하나(44px) = 체크 없음: 순환 상태·순환 목록·멈춤 / 체크 있음: 체크 동작 3개.
+                    같은 자리라 체크해도 목록이 안 밀린다(11/08 점선 자리 대체). 저장 함수는 11/06 것 그대로(saveRotationTargets·rotationUseAll·toggleWidgetLibraryPause). */}
                 {!bcCopyMode && bcSelId && bcProducts.length > 0 ? (
-                  <div style={{ margin: "0 0 8px", padding: "12px", border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                      <button type="button" disabled={!rotationLive || rotBusy || widgetRotation.mode === "all"} onClick={() => void rotationUseAll()} style={{ ...(widgetRotation.mode === "all" ? rowBtnPrimary : rowBtn), height: "36px", opacity: rotationLive ? 1 : 0.5 }}>{widgetRotation.mode === "all" ? "전체 상품 순환 중" : "전체 상품 순환"}</button>
-                      <span style={{ fontSize: "13px", fontWeight: 600, color: widgetRotation.paused ? "var(--color-danger-tx)" : "var(--color-ink-soft)" }}>
-                        {!rotationLive ? "방송을 켜면 바꿀 수 있어요" : widgetRotation.paused ? "멈춤 · 지금 상품에 머물러 있어요" : widgetRotation.mode === "all" ? "방송 상품 전부가 돌아가요" : `지금 ${rotationSelectedCount}개만 돌아가요`}
-                      </span>
-                      <button type="button" disabled={!rotationLive} onClick={() => void toggleWidgetLibraryPause()} style={{ ...(widgetRotation.paused ? rowBtnPrimary : rowBtn), height: "36px", marginLeft: "auto", opacity: rotationLive ? 1 : 0.5, cursor: rotationLive ? "pointer" : "not-allowed" }}>{widgetRotation.paused ? "다시 돌리기" : "멈춤"}</button>
+                  rotCheckCount > 0 ? (
+                    <div role="toolbar" aria-label="체크한 상품 동작" style={{ display: "flex", alignItems: "center", gap: "6px", minHeight: "44px", margin: "0 0 8px", padding: "4px 8px", borderRadius: "8px", background: "var(--color-ink)", flexWrap: isNarrow ? "wrap" : "nowrap" }}>
+                      <span style={{ fontSize: "13px", fontWeight: 700, color: "#fff", whiteSpace: "nowrap" }}>{rotCheckCount}개 체크</span>
+                      {checkedAllRotating
+                        ? <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void removeCheckedFromRotation()} style={{ ...rowBtn, height: "36px", color: "var(--color-danger-tx)", opacity: rotationLive ? 1 : 0.5 }}>순환에서 빼기</button>
+                        : widgetRotation.mode !== "all"
+                          ? <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void addCheckedToRotation()} title="지금 도는 목록은 두고 체크한 것만 더해요" style={{ ...rowBtn, height: "36px", opacity: rotationLive ? 1 : 0.5 }}>순환에 넣기</button>
+                          : null}
+                      <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void rotateOnlyChecked()} title="체크한 것만 돌고 나머지는 안 돌아요" style={{ ...rowBtn, height: "36px", opacity: rotationLive ? 1 : 0.5 }}>이것만 순환</button>
+                      <button type="button" onClick={() => void copyAnnounceLines(checkedAnnounceLines(), "체크한 상품")} title="체크한 상품의 상품명·옵션·금액 안내글을 복사" style={{ ...rowBtn, height: "36px" }}>안내글 복사</button>
+                      <button type="button" onClick={clearRotCheck} aria-label="체크 해제" title="체크 해제" style={{ ...rowBtn, height: "36px", width: "36px", padding: 0, marginLeft: "auto", background: "transparent", color: "#fff", border: "1px solid rgba(255,255,255,0.6)", fontSize: "16px", lineHeight: 1 }}>✕</button>
                     </div>
-                    {widgetRotation.mode === "all" ? (
-                      <div style={{ marginTop: "8px", fontSize: "13px", fontWeight: 600, color: "var(--color-ink-soft)" }}>브랜드 줄 「이 브랜드만 순환」 또는 상품을 체크하고 「체크한 것만 순환」</div>
-                    ) : (
-                      <>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px", maxHeight: "176px", overflowY: "auto" }}>
-                          {rotationChips.map((chip) => (
-                            <span key={chip.key} style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 4px 0 4px", border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface-2)", maxWidth: "100%" }}>
-                              {chip.img ? <img src={chip.img} alt="" style={{ width: "28px", height: "28px", borderRadius: "4px", objectFit: "cover", flexShrink: 0 }} /> : null}
-                              <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chip.label}</span>
-                              <button type="button" disabled={!rotationLive || rotBusy} onClick={chip.remove} aria-label={`${chip.label} 순환에서 빼기`} title="순환에서 빼기" style={{ width: "28px", height: "28px", flexShrink: 0, border: 0, borderRadius: "4px", background: "transparent", color: "var(--color-ink-soft)", fontSize: "16px", fontWeight: 700, cursor: rotationLive ? "pointer" : "not-allowed" }}>✕</button>
-                            </span>
-                          ))}
+                  ) : (
+                    <>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", minHeight: "44px", margin: "0 0 8px", padding: "4px 8px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)" }}>
+                        <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", whiteSpace: "nowrap" }}>방송 화면</span>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: "13px", fontWeight: 600, color: widgetRotation.paused ? "var(--color-danger-tx)" : "var(--color-ink-soft)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {!rotationLive ? "방송을 켜면 순환을 바꿀 수 있어요" : widgetRotation.paused ? "멈춤 · 지금 상품에 머물러 있어요" : widgetRotation.mode === "all" ? "방송 상품 전부가 돌아가요" : `지금 ${rotationSelectedCount}개만 돌아가요`}
+                        </span>
+                        {widgetRotation.mode !== "all" ? (
+                          <button type="button" aria-expanded={rotListOpen} onClick={() => setRotListOpen((v) => !v)} title="지금 돌아가는 상품 목록" style={{ ...(rotListOpen ? rowBtnPrimary : rowBtn), height: "36px" }}>{`순환 목록 ${rotationChips.length}`}</button>
+                        ) : null}
+                        <button type="button" disabled={!rotationLive} onClick={() => void toggleWidgetLibraryPause()} style={{ ...(widgetRotation.paused ? rowBtnPrimary : rowBtn), height: "36px", opacity: rotationLive ? 1 : 0.5, cursor: rotationLive ? "pointer" : "not-allowed" }}>{widgetRotation.paused ? "다시 돌리기" : "멈춤"}</button>
+                      </div>
+                      {rotListOpen && widgetRotation.mode !== "all" ? (
+                        <div style={{ margin: "-4px 0 8px", padding: "8px", border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface-2)" }}>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", maxHeight: "176px", overflowY: "auto" }}>
+                            {rotationChips.map((chip) => (
+                              <span key={chip.key} style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 4px 0 4px", border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", maxWidth: "100%" }}>
+                                {chip.img ? <img src={chip.img} alt="" style={{ width: "28px", height: "28px", borderRadius: "4px", objectFit: "cover", flexShrink: 0 }} /> : null}
+                                <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chip.label}</span>
+                                <button type="button" disabled={!rotationLive || rotBusy} onClick={chip.remove} aria-label={`${chip.label} 순환에서 빼기`} title="순환에서 빼기" style={{ width: "28px", height: "28px", flexShrink: 0, border: 0, borderRadius: "8px", background: "transparent", color: "var(--color-ink-mute)", fontSize: "16px", lineHeight: 1, cursor: rotationLive ? "pointer" : "not-allowed" }}>✕</button>
+                              </span>
+                            ))}
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
+                            <button type="button" aria-pressed={onScreenOnly} onClick={() => setOnScreenOnly((v) => !v)} style={{ ...(onScreenOnly ? rowBtnPrimary : rowBtn), height: "36px" }}>{onScreenOnly ? "전체 상품 보기" : "순환 중인 것만 보기"}</button>
+                            <button type="button" onClick={() => void copyAnnounceLines(rotationAnnounceLines(), "순환 중인 상품")} title="순환 중인 상품 전부의 안내글을 복사(채팅창에 붙여 넣기)" style={{ ...rowBtn, height: "36px" }}>{`안내글 복사 ${rotationAnnounceLines().length}줄`}</button>
+                            <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void rotationUseAll()} title="순환 목록을 비우고 방송 상품 전부가 돌게" style={{ ...rowBtn, height: "36px", marginLeft: "auto", color: "var(--color-danger-tx)", opacity: rotationLive ? 1 : 0.5 }}>전체 상품 순환</button>
+                          </div>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
-                          <button type="button" aria-pressed={onScreenOnly} onClick={() => setOnScreenOnly((v) => !v)} style={{ ...(onScreenOnly ? rowBtnPrimary : rowBtn), height: "36px" }}>{onScreenOnly ? "전체 상품 보기" : "순환 중인 것만 보기"}</button>
-                          <button type="button" onClick={() => void copyAnnounceLines(rotationAnnounceLines(), "순환 중인 상품")} title="순환 중인 상품의 상품명·옵션·금액 안내글을 복사(채팅창에 붙여 넣기)" style={{ ...rowBtn, height: "36px" }}>순환 상품 안내글 복사 ({rotationAnnounceLines().length}줄)</button>
-                          <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void rotationUseAll()} title="순환 목록을 비우고 방송 상품 전부가 돌게" style={{ ...rowBtn, height: "36px", marginLeft: "auto", color: "var(--color-danger-tx)", opacity: rotationLive ? 1 : 0.5 }}>순환 목록 비우기 ({rotationChips.length}칸)</button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ) : null}
-                {/* [2026-11-08 사장님 「체크하면 화면이 순간 내려감」] 체크 전에도 같은 높이 자리를 두어 목록이 안 밀리게 */}
-                {!bcCopyMode && rotCheckCount === 0 ? (
-                  <div style={{ display: "flex", alignItems: "center", minHeight: "52px", margin: "0 0 8px", padding: "8px 12px", borderRadius: "8px", border: "1px dashed var(--color-line)", color: "var(--color-ink-mute)", fontSize: "13px", fontWeight: 600 }}>줄의 체크박스를 체크하면 여기서 순환에 넣거나 빼고, 안내글을 복사할 수 있어요</div>
-                ) : null}
-                {!bcCopyMode && rotCheckCount > 0 ? (
-                  <div style={{ position: "sticky", top: 0, zIndex: 2, display: "flex", alignItems: "center", minHeight: "52px", gap: "6px", flexWrap: "wrap", margin: "0 0 8px", padding: "8px 12px", borderRadius: "8px", background: "var(--color-ink)" }}>
-                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#fff" }}>{rotCheckCount}개 체크</span>
-                    {widgetRotation.mode !== "all" ? <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void addCheckedToRotation()} style={{ ...rowBtn, height: "36px", marginLeft: "auto", opacity: rotationLive ? 1 : 0.5 }}>체크한 것 순환에 추가</button> : null}
-                    <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void rotateOnlyChecked()} style={{ ...rowBtn, height: "36px", marginLeft: widgetRotation.mode !== "all" ? undefined : "auto", opacity: rotationLive ? 1 : 0.5 }}>체크한 것만 순환</button>
-                    {widgetRotation.mode !== "all" ? <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void removeCheckedFromRotation()} style={{ ...rowBtn, height: "36px", color: "var(--color-danger-tx)", opacity: rotationLive ? 1 : 0.5 }}>체크한 것 순환에서 빼기</button> : null}
-                    <button type="button" onClick={() => void copyAnnounceLines(checkedAnnounceLines(), "체크한 상품")} title="체크한 상품의 상품명·옵션·금액 안내글을 복사" style={{ ...rowBtn, height: "36px" }}>체크한 것 안내글 복사</button>
-                    <button type="button" onClick={clearRotCheck} style={{ ...rowBtn, height: "36px", background: "transparent", color: "#fff", border: "1px solid #fff" }}>체크 해제</button>
-                  </div>
+                      ) : null}
+                    </>
+                  )
                 ) : null}
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="상품명 검색" style={TAB_SEARCH_STYLE} />
-                {bcSelId && bcProducts.length > 0 && !bcDragEnabled && !bcCopyMode ? (
-                  <div style={{ margin: "0 0 8px", padding: "6px 8px", borderRadius: "8px", background: "var(--color-warn-bg)", color: "var(--color-ink-soft)", fontSize: "11px", fontWeight: 700, lineHeight: 1.4 }}>
-                    {search.trim() ? "검색 중에는 순서를 바꿀 수 없어요. 검색어를 지워주세요." : "순서를 바꾸려면 정렬을 「진열 순서 (드래그)」로 두세요. (지금은 보기만 바뀐 상태 — 저장된 순서는 그대로)"}
-                  </div>
+                {bcSelId && bcProducts.length > 0 && !bcCopyMode && bcSort === "manual" && search.trim() ? (
+                  <div style={{ margin: "-4px 0 8px", fontSize: "12px", fontWeight: 600, color: "var(--color-ink-soft)" }}>검색 중에는 순서를 바꿀 수 없어요</div>
                 ) : null}
               </div>
               {bcCopyMode ? (
@@ -2049,9 +2087,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                   <button type="button" disabled={bcCopySel.size === 0 || bcBusy} onClick={openNewBcWithCopy} style={{ marginLeft: "auto", fontSize: "12px", fontWeight: 800, color: "#fff", background: "var(--color-rose-deep)", border: "none", borderRadius: "8px", padding: "6px 12px", cursor: bcCopySel.size === 0 || bcBusy ? "not-allowed" : "pointer", opacity: bcCopySel.size === 0 || bcBusy ? 0.5 : 1 }}>선택 {bcCopySel.size}개 → 새 방송으로 복사</button>
                 </div>
               ) : null}
-              {/* [2026-08-29 사장님 지시] 고정 중일 때 글씨로만 알려주니, 해제하려면 검색어를 다시 쳐서
-                  그 상품을 찾아 내려가야 했다. → 고정된 상품을 여기에 그대로 보여주고
-                  [📢 채팅] [📌 해제] 를 바로 누를 수 있게 한다. 검색 중이어도 항상 보인다. */}
+              {/* [2026-08-29 사장님 지시] 소개 중인 상품은 늘 맨 위 카드에(검색 중이어도). [2026-11-09] DESIGN-ADMIN 색(검정 테두리·연회색)·버튼 [안내글 복사][소개 끝] 둘만 — 수정은 줄 「⋯」에서. */}
               {(() => {
                 if (bcWidgetPin.mode !== "pin") {
                   return null;
@@ -2071,9 +2107,9 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                 // [2026-09-19] 지난 방송(OFF)에 남은 고정은 손님 화면과 무관 — 위젯은 ON 방송 고정값만 읽는다. 문구로 거짓말하지 않는다.
                 const pinIsLive = Boolean(widgetPinTargetBroadcastId(bcSelId, activeBroadcastId));
                 return (
-                  <div style={{ margin: "0 12px 8px", border: "2px solid var(--color-rose-deep)", borderRadius: "8px", background: "var(--color-rose-soft)", overflow: "hidden" }}>
-                    <div style={{ padding: "4px 8px", fontSize: "11px", fontWeight: 900, color: "var(--color-rose-deep)", borderBottom: "1px solid var(--color-rose-line)" }}>
-                      {pinIsLive ? "지금 소개 중 — 방송 화면에 이 상품만 보여요" : "지난 방송에서 소개했던 기록 — 지금 방송과 무관 (소개 끝으로 정리)"}
+                  <div style={{ margin: "0 12px 8px", border: "2px solid var(--color-ink)", borderRadius: "8px", background: "var(--color-surface-2)", overflow: "hidden" }}>
+                    <div style={{ padding: "4px 8px", fontSize: "12px", fontWeight: 700, color: pinIsLive ? "var(--color-ink)" : "var(--color-danger-tx)", borderBottom: "1px solid var(--color-line)" }}>
+                      {pinIsLive ? "지금 소개 중 · 방송 화면에 이 상품만 보여요" : "지난 방송의 소개 기록 · 지금 방송과 무관 — 소개 끝으로 정리"}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px" }}>
                       <span
@@ -2083,36 +2119,15 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         {pinnedImg ? <img src={pinnedImg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
                       </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: "13px", fontWeight: 900, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pinnedTitle}</div>
-                        {pinnedPrice ? <div style={{ fontSize: "12px", fontWeight: 900, color: "var(--color-rose-deep)", marginTop: "2px" }}>{pinnedPrice}</div> : null}
-                        {pinnedOption ? <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pinnedOption}</div> : null}
-                        {!pinnedRow ? <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", marginTop: "1px" }}>이 방송 상품 목록에 없는 상품이에요</div> : null}
+                        <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pinnedTitle}</div>
+                        {pinnedPrice ? <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-ink)", marginTop: "2px" }}>{pinnedPrice}</div> : null}
+                        {pinnedOption ? <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-ink-soft)", marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pinnedOption}</div> : null}
+                        {!pinnedRow ? <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-ink-soft)", marginTop: "1px" }}>이 방송 상품 목록에 없는 상품이에요</div> : null}
                       </div>
                       {pinnedRow ? (
-                        <button
-                          type="button"
-                          onClick={() => void setChatCurrentAndCopy(pinnedRow, pinnedDetail)}
-                          title="이 상품 안내글을 복사합니다"
-                          style={rowBtn}
-                        >안내문 복사</button>
+                        <button type="button" onClick={() => void setChatCurrentAndCopy(pinnedRow, pinnedDetail)} title="이 상품 안내글을 복사합니다" style={{ ...rowBtn, height: "36px" }}>안내글 복사</button>
                       ) : null}
-                      {/* [2026-09-19 사장님] 「고정 상태에서는 왜 상품 수정이 안 돼?」 — 고정 상품 줄은 목록에서 빠지는데(08-29 중복 방지)
-                          이 카드엔 [수정]이 없어 닿을 수 없었다. 목록 줄과 같은 editProduct. */}
-                      {pinnedRow ? (
-                        <button
-                          type="button"
-                          onClick={() => editProduct(pinnedRow)}
-                          title="이 상품 정보를 수정합니다"
-                          style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-rose-deep)", background: "var(--color-surface)", border: "1px solid var(--color-rose-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}
-                        >수정</button>
-                      ) : null}
-                      <button
-                        type="button"
-                        disabled={bcPinBusy}
-                        onClick={() => void clearBroadcastPin()}
-                        title="소개를 끝내고 방송 화면을 다시 자동 순환으로"
-                        style={{ flexShrink: 0, fontSize: "11px", fontWeight: 900, color: "#fff", background: "var(--color-rose-deep)", border: "1px solid var(--color-rose-deep)", borderRadius: "8px", padding: "6px 8px", cursor: bcPinBusy ? "wait" : "pointer", opacity: bcPinBusy ? 0.6 : 1 }}
-                      >{bcPinBusy ? "정리 중…" : "소개 끝"}</button>
+                      <button type="button" disabled={bcPinBusy} onClick={() => void clearBroadcastPin()} title="소개를 끝내고 방송 화면을 다시 자동 순환으로" style={{ ...rowBtnPrimary, height: "36px", opacity: bcPinBusy ? 0.6 : 1, cursor: bcPinBusy ? "wait" : "pointer" }}>{bcPinBusy ? "정리 중…" : "소개 끝"}</button>
                     </div>
                   </div>
                 );
@@ -2145,39 +2160,103 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       const detailRows = onScreenFilterOn ? detailRowsAll.filter((detail) => isDetailRotating(pid, detail)) : detailRowsAll;
                       const parentPinned = !isBrandFolder && isBroadcastPinned(pid, "");
                       // [2026-10-21 a2-10 사장님] 「해당 상품줄에 고정중·순환중 표시가 보이게」 — 08-29 「목록에서 뺀다」 규칙은 이걸로 대체.
-                      //   맨 위 소개 카드(안내문 복사·소개 끝)는 그대로, 줄에도 「소개 중」 배지 + 버튼은 「소개 끝」.
                       const rowHidden = isProductHidden(p);
                       const rotDetailOn = isBrandFolder && widgetRotation.mode !== "all" ? allDetails.filter((detail) => isDetailRotating(pid, detail)).length : 0;
                       const rowRotBadge = parentPinned ? "소개 중" : "";
                       const rowRotText = widgetRotation.mode === "all" ? "" : isBrandFolder ? (rotDetailOn === 0 ? "" : rotDetailOn === allDetails.length ? "전부 순환 중" : `${rotDetailOn}개 순환 중`) : rotationIncludedPids.has(pid) ? "순환 중" : "";
+                      // [2026-11-09 사장님 「버튼이 많아 불편 · 소개 빼고 순환에 넣기 버튼」] 줄 = 주동작 1개(순환에 넣기+안내글 복사 / 순환에서 빼기 / 이것만 순환) + 「⋯」(소개·안내글만 복사·수정·재고·숨기기·빼기). 핸들러는 전부 기존 것.
+                      const btnH = isNarrow ? 44 : 32;
+                      const actBtn = (primary: boolean): React.CSSProperties => ({ ...(primary ? rowBtnPrimary : rowBtn), height: `${btnH}px`, minHeight: `${btnH}px`, opacity: rotationLive ? 1 : 0.5, cursor: rotationLive ? "pointer" : "not-allowed" });
+                      const rowRot = rowRotationState(pid);
+                      const rotLabel = rowRot === "all" ? "이것만 순환" : rowRot === "on" ? "순환에서 빼기" : "순환에 넣기";
+                      const toggleExpand = () => setBcExpanded((prev) => { const next = new Set(prev); if (next.has(pid)) next.delete(pid); else next.add(pid); return next; });
+                      const commonMore: RowMoreMenuItem[] = [
+                        { label: "수정", ariaLabel: `${productName(p)} 수정`, onClick: () => editProduct(p) },
+                        { label: "재고", title: "이 상품 재고 흐름", onClick: () => openBcStockFlow(pid) },
+                        { label: rowHidden ? "보이기" : "숨기기", title: rowHidden ? "숨김 — 누르면 손님 화면에 다시 보여요" : "보이는 상품 — 누르면 손님 화면에서 숨겨요", disabled: hideBusyId === pid || !canToggleHidden(p), onClick: () => void toggleProductHidden(p) },
+                        { label: "빼기", danger: true, disabled: bcBusy, title: "이 방송 목록에서만 뺌(상품은 남음)", onClick: () => void removeBcProduct(pid) },
+                      ];
+                      const moreItems: RowMoreMenuItem[] = isBrandFolder
+                        ? [
+                            { label: "이 브랜드만 순환", title: rotationLive ? "이 브랜드 상품만 방송 화면에 돌아가게(다른 건 안 돎)" : "방송을 켜면 바꿀 수 있어요", disabled: !rotationLive || rotBusy, onClick: () => void rotateOnlyBrand(p) },
+                            ...commonMore,
+                          ]
+                        : [
+                            parentPinned
+                              ? { label: "소개 끝", title: "소개를 끝내고 방송 화면을 다시 자동 순환으로", disabled: bcPinBusy, onClick: () => void clearBroadcastPin() }
+                              : { label: "소개", title: "방송 화면에 이 상품만 띄우고 안내글을 복사", disabled: bcPinBusy, onClick: () => void broadcastOneClick(p) },
+                            { label: "안내글만 복사", title: "방송 화면은 그대로 두고 안내글만 복사(채팅창에 붙여 넣기)", onClick: () => void copyAnnounceLines([announceLine(p)], "이 상품") },
+                            ...commonMore,
+                          ];
                       return (
                         <div key={pid || i} draggable={bcDragEnabled}
-                          onClick={bcCopyMode && pid ? () => toggleBcCopyPick(pid) : undefined}
+                          onClick={bcCopyMode && pid ? () => toggleBcCopyPick(pid) : isBrandFolder ? toggleExpand : undefined}
                           onDragStart={() => { setBcDragPid(pid); setBcDragOver(i); }}
                           onDragOver={(e) => { e.preventDefault(); if (bcDragOver !== i) setBcDragOver(i); }}
                           onDrop={(e) => { e.preventDefault(); if (bcDragPid) reorderBcByPid(bcDragPid, pid); setBcDragPid(null); setBcDragOver(null); }}
                           onDragEnd={() => { setBcDragPid(null); setBcDragOver(null); }}
-                          style={{ border: bcCopyMode && bcCopySel.has(pid) ? "1px solid var(--color-rose-deep)" : "1px solid var(--color-line)", borderRadius: "8px", background: bcCopyMode && bcCopySel.has(pid) ? "var(--color-rose-soft)" : bcDragPid !== null && bcDragOver === i && bcDragPid !== pid ? "var(--color-warn-bg)" : "var(--color-surface)", opacity: bcDragPid === pid ? 0.4 : 1, overflow: "hidden", cursor: bcCopyMode ? "pointer" : !bcDragEnabled ? "default" : "grab" }}>
-                          {/* [2026-10-22 폰] 좁은 화면은 줄바꿈 허용 — 1줄 [끌기·체크·번호·사진·상품명(2줄)·가격] / 2줄 [버튼들]. PC 는 한 줄 그대로 */}
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px", flexWrap: isNarrow ? "wrap" : "nowrap", rowGap: isNarrow ? "8px" : undefined }}>
-                            {bcCopyMode ? <input type="checkbox" checked={bcCopySel.has(pid)} onChange={() => toggleBcCopyPick(pid)} onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, width: "16px", height: "16px", accentColor: "var(--color-rose-deep)", cursor: "pointer" }} /> : <span style={{ flexShrink: 0, fontSize: "14px", color: bcDragEnabled ? "var(--color-ink-mute)" : "var(--color-line)", userSelect: "none" }}>⠿</span>}
+                          style={{ border: bcCopyMode && bcCopySel.has(pid) ? "2px solid var(--color-ink)" : parentPinned ? "2px solid var(--color-ink)" : "1px solid var(--color-line)", borderRadius: "8px", background: bcCopyMode && bcCopySel.has(pid) ? "var(--color-surface-2)" : bcDragPid !== null && bcDragOver === i && bcDragPid !== pid ? "var(--color-warn-bg)" : "var(--color-surface)", opacity: bcDragPid === pid ? 0.4 : 1, overflow: "hidden", cursor: bcCopyMode || isBrandFolder ? "pointer" : !bcDragEnabled ? "default" : "grab" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px", minHeight: "56px" }}>
+                            {bcCopyMode ? <input type="checkbox" checked={bcCopySel.has(pid)} onChange={() => toggleBcCopyPick(pid)} onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, width: "20px", height: "20px", accentColor: "var(--color-ink)", cursor: "pointer" }} /> : <span aria-hidden="true" style={{ flexShrink: 0, fontSize: "14px", color: bcDragEnabled ? "var(--color-ink-mute)" : "var(--color-line)", userSelect: "none" }}>⠿</span>}
                             {!bcCopyMode ? <input type="checkbox" aria-label={`${productName(p)} 체크`} checked={rotChecked.has(pid)} onChange={() => toggleRotRowCheck(pid)} onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, width: "20px", height: "20px", accentColor: "var(--color-ink)", cursor: "pointer" }} /> : null}
-                            <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", width: "20px", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
+                            <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-ink-soft)", width: "20px", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
                             <span onClick={(e) => { e.stopPropagation(); if (img) setLightbox(img); }} style={{ width: "48px", height: "48px", flexShrink: 0, borderRadius: "8px", overflow: "hidden", background: "var(--color-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: img ? "zoom-in" : "default", opacity: rowHidden ? 0.45 : 1 }}>{img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}</span>
-                            <div style={{ flex: 1, minWidth: isNarrow ? "50%" : 0, opacity: rowHidden ? 0.55 : 1 }}><div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}><span style={isNarrow ? { fontSize: "14px", fontWeight: 700, color: "var(--color-ink)", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", wordBreak: "break-word" } : { fontSize: "13px", fontWeight: 800, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</span>{rowRotBadge ? <span style={ROT_BADGE_LIVE}>{rowRotBadge}</span> : null}{rowRotText ? <span style={ROT_BADGE_ON_SCREEN}>{rowRotText}</span> : null}</div><div style={{ fontSize: "11px", fontWeight: 800, color: isBrandFolder ? "var(--color-ink-soft)" : "var(--color-rose-deep)", marginTop: "2px" }}>{isBrandFolder ? `브랜드 그룹 · 세부상품 ${allDetails.length}개` : productPriceLabel(p)}</div></div>
-                            {isBrandFolder && !bcCopyMode ? <button type="button" onClick={(e) => { e.stopPropagation(); setBcExpanded((prev) => { const next = new Set(prev); if (next.has(pid)) next.delete(pid); else next.add(pid); return next; }); }} style={{ flexShrink: 0, fontSize: "11px", fontWeight: 800, color: "var(--color-ink-soft)", background: "var(--color-surface-2)", border: "1px solid var(--color-line)", borderRadius: "8px", padding: "6px 8px", cursor: "pointer" }}>{expanded ? "접기" : "세부상품"}</button> : null}
-                            {/* [2026-10-21 a2-6] 줄 버튼 = [소개/소개 중][숨기기/보이기][수정][빼기]. 「방송」(고정+채팅 현재상품+안내문 복사)=소개, 📌고정·채팅 단독 버튼은 소개에 포함돼 뺌. 핸들러는 기존 그대로. */}
-                            {!isBrandFolder && !bcCopyMode ? (parentPinned
-                              ? <button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void clearBroadcastPin(); }} title="소개를 끝내고 방송 화면을 다시 자동 순환으로" style={rowBtnPrimary}>{bcPinBusy ? "정리 중…" : "소개 끝"}</button>
-                              : <button type="button" disabled={bcPinBusy} onClick={(e) => { e.stopPropagation(); void broadcastOneClick(p); }} title="방송 화면에 이 상품만 띄우고 안내문을 복사" style={rowBtn}>소개</button>) : null}
-                            {!isBrandFolder && !bcCopyMode ? <button type="button" onClick={(e) => { e.stopPropagation(); void copyAnnounceLines([announceLine(p)], "이 상품"); }} title="방송 화면은 그대로 두고 안내글만 복사(채팅창에 붙여 넣기)" style={rowBtn}>안내글 복사</button> : null}
-                            {!bcCopyMode && isBrandFolder ? <button type="button" disabled={!rotationLive || rotBusy} onClick={(e) => { e.stopPropagation(); void rotateOnlyBrand(p); }} title={rotationLive ? "이 브랜드 상품만 방송 화면에 돌아가게" : "방송을 켜면 바꿀 수 있어요"} style={{ ...rowBtn, opacity: rotationLive ? 1 : 0.5 }}>이 브랜드만 순환</button> : null}
-                            {!bcCopyMode ? <button type="button" disabled={hideBusyId === pid || !canToggleHidden(p)} onClick={(e) => { e.stopPropagation(); void toggleProductHidden(p); }} title={rowHidden ? "숨김 — 누르면 손님 화면에 다시 보여요" : "보이는 중 — 누르면 손님 화면에서 숨겨요(이 목록엔 남음)"} aria-label={rowHidden ? "숨김 상품, 누르면 보이기" : "보이는 상품, 누르면 숨기기"} aria-pressed={rowHidden} style={{ ...eyeBtn(rowHidden), opacity: hideBusyId === pid ? 0.5 : 1 }}>{rowHidden ? HIDDEN_EYE_ICON : SHOWN_EYE_ICON}</button> : null}
-                            <button type="button" onClick={(e) => { e.stopPropagation(); editProduct(p); }} style={rowBtn}>수정</button>
-                            {!bcCopyMode ? <button type="button" onClick={(e) => { e.stopPropagation(); openBcStockFlow(pid); }} title="이 상품 재고 흐름" style={rowBtn}>재고</button> : null}
-                            <button type="button" disabled={bcBusy} onClick={(e) => { e.stopPropagation(); void removeBcProduct(pid); }} title="이 방송 목록에서만 뺌(상품은 남음)" style={{ ...rowBtnDanger, opacity: bcBusy ? 0.6 : 1 }}>빼기</button>
+                            <div style={{ flex: 1, minWidth: 0, opacity: rowHidden ? 0.55 : 1 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
+                                {isBrandFolder && !bcCopyMode ? (
+                                  <button type="button" aria-expanded={expanded} aria-label={`${productName(p)} 세부상품 ${expanded ? "접기" : "펼치기"}`} onClick={(e) => { e.stopPropagation(); toggleExpand(); }} style={{ display: "inline-flex", alignItems: "center", gap: "6px", minWidth: 0, padding: 0, border: 0, background: "transparent", cursor: "pointer", textAlign: "left" }}>
+                                    <span style={{ fontSize: isNarrow ? "14px" : "13px", fontWeight: 700, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</span>
+                                    <span aria-hidden="true" style={{ fontSize: "11px", color: "var(--color-ink-mute)", flexShrink: 0 }}>{expanded ? "▴" : "▾"}</span>
+                                  </button>
+                                ) : (
+                                  <span style={{ fontSize: isNarrow ? "14px" : "13px", fontWeight: 700, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{productName(p)}</span>
+                                )}
+                                {rowRotBadge ? <span style={ROT_BADGE_LIVE}>{rowRotBadge}</span> : null}
+                                {rowRotText ? <span style={ROT_BADGE_ON_SCREEN}>{rowRotText}</span> : null}
+                                {rowHidden ? <span style={{ ...ROT_BADGE_BASE, color: "var(--color-ink-mute)", background: "var(--color-surface-2)" }}>숨김</span> : null}
+                              </div>
+                              <div style={{ fontSize: "12px", fontWeight: isBrandFolder ? 600 : 700, color: isBrandFolder ? "var(--color-ink-soft)" : "var(--color-ink)", marginTop: "2px" }}>{isBrandFolder ? `세부상품 ${allDetails.length}개` : productPriceLabel(p)}</div>
+                            </div>
+                            {!bcCopyMode ? (
+                              <button type="button" disabled={!rotationLive || rotBusy} onClick={(e) => { e.stopPropagation(); if (rowRot === "on") void removeRowFromRotation(p); else void addRowToRotation(p); }} title={!rotationLive ? "방송을 켜면 바꿀 수 있어요" : rowRot === "on" ? "방송 화면 순환에서 뺌" : "방송 화면 순환에 넣고 채팅 안내글을 복사"} style={actBtn(rowRot === "on")}>{rotLabel}</button>
+                            ) : null}
+                            {!bcCopyMode ? <RowMoreMenu name={productName(p)} items={moreItems} size={btnH} /> : null}
                           </div>
-                          {isBrandFolder && expanded ? <div style={{ borderTop: "1px solid var(--color-line)", padding: "8px", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", gap: "6px" }}>{detailRows.map((detail) => { const pinned=isBroadcastPinned(pid,detail.detailName); const optionText=[detail.colors.length?`색상 ${detail.colors.join(",")}`:"",detail.sizes.length?`사이즈 ${detail.sizes.join(",")}`:""].filter(Boolean).join(" · ")||"옵션 없음"; const detailOn = isDetailPicked(pid, detail); return <div key={broadcastPinKey(pid,detail.detailName)} style={{ display:"grid",gridTemplateColumns:bcCopyMode?"44px minmax(0,1fr) auto auto":"20px 44px minmax(0,1fr) auto auto auto",gap:"8px",alignItems:"center",border:pinned?"2px solid var(--color-rose-deep)":"1px solid var(--color-line)",borderRadius:"8px",padding:"8px",background:pinned?"var(--color-rose-soft)":"var(--color-surface)" }}>{!bcCopyMode?<input type="checkbox" aria-label={`${detail.detailName} 체크`} checked={rotCheckedDetails.has(rotDetailKey(pid,detail.detailName))} onChange={()=>toggleRotDetailCheck(pid,detail)} onClick={(e)=>e.stopPropagation()} style={{width:"20px",height:"20px",accentColor:"var(--color-ink)",cursor:"pointer"}}/>:null}<button type="button" onClick={()=>detail.image&&setLightbox(detail.image)} style={{width:42,height:42,border:0,borderRadius:7,overflow:"hidden",padding:0,background:"var(--color-surface-2)"}}>{detail.image?<img src={detail.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:null}</button><div style={{minWidth:0}}><div style={{display:"flex",alignItems:"center",gap:"6px",minWidth:0}}><span style={{fontSize:"12px",fontWeight:900,color:"var(--color-ink)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{detail.detailName}</span>{pinned?<span style={ROT_BADGE_LIVE}>소개 중</span>:detailOn?<span style={ROT_BADGE_ON_SCREEN}>순환 중</span>:null}</div><div style={{fontSize:"11px",fontWeight:800,color:"var(--color-rose-deep)",marginTop:2}}>{detail.price.toLocaleString("ko-KR")}원</div><div style={{fontSize:"11px",fontWeight:700,color:"var(--color-ink-soft)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{optionText}{detail.stockManaged&&detail.stock!==null?` · 재고 ${detail.stock}`:""}</div></div>{pinned?<button type="button" disabled={bcPinBusy} onClick={()=>void clearBroadcastPin()} title="소개를 끝내고 방송 화면을 다시 자동 순환으로" style={rowBtnPrimary}>{bcPinBusy?"정리 중…":"소개 끝"}</button>:<button type="button" disabled={bcPinBusy} onClick={()=>void broadcastOneClick(p,detail)} title="방송 화면에 이 상품만 띄우고 안내문을 복사" style={rowBtn}>소개</button>}{!bcCopyMode?<button type="button" onClick={(e)=>{e.stopPropagation();void copyAnnounceLines([announceLine(p,detail)],"이 상품");}} title="방송 화면은 그대로 두고 안내글만 복사(채팅창에 붙여 넣기)" style={rowBtn}>안내글 복사</button>:null}<button type="button" aria-label={`${detail.detailName} 수정`} onClick={(event)=>{event.stopPropagation();editProduct(p,detail.detailName);}} style={rowBtn}>수정</button></div>})}</div> : null}
+                          {isBrandFolder && expanded ? (
+                            <div onClick={(e) => e.stopPropagation()} style={{ borderTop: "1px solid var(--color-line)", padding: "8px", background: "var(--color-surface-2)", display: "flex", flexDirection: "column", gap: "6px", cursor: "default" }}>
+                              {detailRows.map((detail) => {
+                                const pinned = isBroadcastPinned(pid, detail.detailName);
+                                const optionText = [detail.colors.length ? `색상 ${detail.colors.join(",")}` : "", detail.sizes.length ? `사이즈 ${detail.sizes.join(",")}` : ""].filter(Boolean).join(" · ") || "옵션 없음";
+                                const detailOn = isDetailPicked(pid, detail);
+                                const detailRotLabel = widgetRotation.mode === "all" ? "이것만 순환" : detailOn ? "순환에서 빼기" : "순환에 넣기";
+                                const detailMore: RowMoreMenuItem[] = [
+                                  pinned
+                                    ? { label: "소개 끝", title: "소개를 끝내고 방송 화면을 다시 자동 순환으로", disabled: bcPinBusy, onClick: () => void clearBroadcastPin() }
+                                    : { label: "소개", title: "방송 화면에 이 상품만 띄우고 안내글을 복사", disabled: bcPinBusy, onClick: () => void broadcastOneClick(p, detail) },
+                                  { label: "안내글만 복사", title: "방송 화면은 그대로 두고 안내글만 복사(채팅창에 붙여 넣기)", onClick: () => void copyAnnounceLines([announceLine(p, detail)], "이 상품") },
+                                  { label: "수정", ariaLabel: `${detail.detailName} 수정`, onClick: () => editProduct(p, detail.detailName) },
+                                ];
+                                return (
+                                  <div key={broadcastPinKey(pid, detail.detailName)} style={{ display: "flex", alignItems: "center", gap: "8px", border: pinned ? "2px solid var(--color-ink)" : "1px solid var(--color-line)", borderRadius: "8px", padding: pinned ? "7px" : "8px", background: "var(--color-surface)", minHeight: "56px" }}>
+                                    {!bcCopyMode ? <input type="checkbox" aria-label={`${detail.detailName} 체크`} checked={rotCheckedDetails.has(rotDetailKey(pid, detail.detailName))} onChange={() => toggleRotDetailCheck(pid, detail)} onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, width: "20px", height: "20px", accentColor: "var(--color-ink)", cursor: "pointer" }} /> : null}
+                                    <button type="button" aria-label={`${detail.detailName} 사진 크게 보기`} onClick={() => detail.image && setLightbox(detail.image)} style={{ width: 42, height: 42, flexShrink: 0, border: 0, borderRadius: 7, overflow: "hidden", padding: 0, background: "var(--color-surface-2)", cursor: detail.image ? "zoom-in" : "default" }}>{detail.image ? <img src={detail.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}</button>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
+                                        <span style={{ fontSize: isNarrow ? "14px" : "13px", fontWeight: 700, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{detail.detailName}</span>
+                                        {pinned ? <span style={ROT_BADGE_LIVE}>소개 중</span> : detailOn ? <span style={ROT_BADGE_ON_SCREEN}>순환 중</span> : null}
+                                      </div>
+                                      <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-ink)", marginTop: 2 }}>{detail.price.toLocaleString("ko-KR")}원</div>
+                                      <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-ink-soft)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{optionText}{detail.stockManaged && detail.stock !== null ? ` · 재고 ${detail.stock}` : ""}</div>
+                                    </div>
+                                    {!bcCopyMode ? (
+                                      <button type="button" disabled={!rotationLive || rotBusy} onClick={(e) => { e.stopPropagation(); if (detailOn) void removeRowFromRotation(p, detail); else void addRowToRotation(p, detail); }} title={!rotationLive ? "방송을 켜면 바꿀 수 있어요" : detailOn ? "방송 화면 순환에서 뺌" : "방송 화면 순환에 넣고 채팅 안내글을 복사"} style={actBtn(detailOn)}>{detailRotLabel}</button>
+                                    ) : null}
+                                    {!bcCopyMode ? <RowMoreMenu name={detail.detailName} items={detailMore} size={btnH} /> : null}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : null}
                         </div>
                       );
                     })}
