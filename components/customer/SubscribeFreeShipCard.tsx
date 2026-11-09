@@ -148,7 +148,7 @@ export default function SubscribeFreeShipCard(props: Props) {
         >
           <span style={{ flex: 1, minWidth: 0 }}>
             <span style={{ display: "block", fontSize: "18px", fontWeight: 700, lineHeight: 1.35 }}>{potentialAmount > 0 ? `배송비 ${potentialAmount.toLocaleString()}원 무료` : "배송비 무료"}</span>
-            <span style={{ display: "block", marginTop: "2px", fontSize: "14px", fontWeight: 400, lineHeight: 1.45, color: "#E5E5E5" }}>유튜브 구독 인증만 하면 돼요</span>
+            <span style={{ display: "block", marginTop: "2px", fontSize: "14px", fontWeight: 400, lineHeight: 1.45, color: "#E5E5E5" }}>유튜브 구독 화면을 캡처해 올리면 돼요</span>
           </span>
           <span style={{ flexShrink: 0, height: "40px", padding: "0 14px", display: "flex", alignItems: "center", borderRadius: "9999px", background: "#FFFFFF", color: C.ink, fontSize: "15px", fontWeight: 700 }}>인증하기</span>
         </button>
@@ -215,7 +215,7 @@ export default function SubscribeFreeShipCard(props: Props) {
       {state === "fail" && reason ? (
         <div role="alert" style={{ marginTop: "10px", fontSize: "14px", fontWeight: 600, color: C.bad, lineHeight: 1.5, wordBreak: "keep-all" }}>{reason}</div>
       ) : null}
-      <div style={{ marginTop: "12px", fontSize: "13px", color: C.mute, lineHeight: 1.5, wordBreak: "keep-all" }}>주문서 제출 전에 인증해야 배송비가 빠져요. 안 해도 주문은 돼요.</div>
+      <div style={{ marginTop: "12px", fontSize: "13px", color: C.mute, lineHeight: 1.5, wordBreak: "keep-all" }}>주문서 제출 전에 인증해야 배송비가 빠져요. 인증 안 해도 주문은 그대로 돼요.</div>
 
       {zoom ? (
         <div role="dialog" aria-label="예시 사진" onClick={() => setZoom("")} style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.8)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "16px" }}>

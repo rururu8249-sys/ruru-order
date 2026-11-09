@@ -142,7 +142,7 @@ import { restyleClassV2, stripDecorativeEmojiV2 } from "@/lib/customerUiV2Restyl
 import { CUSTOMER_ORDER_FILTERS, cleanCustomerOptionValue, orderLookupStatusView } from "@/lib/customerOrderStatusView";
 import PromoPopup from "@/components/customer/PromoPopup";
 import { PROMO_POPUP_KEY, PROMO_POPUP_LEGACY_KEY, parsePromoPopup, type PromoPopupConfig } from "@/lib/promoPopup";
-import SubscribeFreeShipCard, { SUBSCRIBE_CARD_OPEN_EVENT } from "@/components/customer/SubscribeFreeShipCard";
+import SubscribeFreeShipCard from "@/components/customer/SubscribeFreeShipCard";
 import { DEFAULT_SUBSCRIBE_FREE_SHIP, SUBSCRIBE_FREE_SHIP_KEY, SUBSCRIBE_GROUP_LABEL, applySubscribeWaiver, isSubscribeFreeShipActive, parseSubscribeFreeShip, type SubscribeFreeShipConfig } from "@/lib/subscribeFreeShip";
 import CartAddFeedbackV2 from "@/components/customer/CartAddFeedbackV2";
 import LiveBadgeCompactV2 from "@/components/customer/LiveBadgeCompactV2";
@@ -8715,17 +8715,7 @@ export default function OrderPage() {
                 </div>
               )}
 
-              {/* [2026-11-02 사장님 「구독인증이 안 보여」] 카드는 주문서 맨 위로 옮김 — 금액표 위엔 인증 전일 때 한 줄 안내(누르면 위 카드로) */}
-              {subscribeFreeShipActive && !subscribeVerified && subscribePotentialAmount > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => window.dispatchEvent(new Event(SUBSCRIBE_CARD_OPEN_EVENT))}
-                  style={{ marginBottom: "12px", width: "100%", minHeight: "44px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "10px 14px", border: "1px solid #111111", borderRadius: "8px", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, textAlign: "left", cursor: "pointer", fontFamily: "inherit", wordBreak: "keep-all" }}
-                >
-                  <span>구독 인증하면 배송비 <b style={{ color: "#D30005", fontWeight: 700 }}>{subscribePotentialAmount.toLocaleString()}원</b> 빠져요</span>
-                  <span style={{ flexShrink: 0, fontSize: "14px", textDecoration: "underline", textUnderlineOffset: "3px" }}>인증하러 가기</span>
-                </button>
-              ) : null}
+              {/* [2026-11-10 08:06 사장님] 금액표 위 「구독 인증하면 배송비 N원 빠져요」 줄 삭제 — 주문서 맨 위 카드와 같은 말이라 중복 */}
 
               <div data-ruru-price-summary-wrapper="flat">
                 <OrderPriceSummaryBox
