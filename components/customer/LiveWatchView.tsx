@@ -21,6 +21,8 @@ export type LiveWatchPinned = {
   imageUrl: string;
   priceText: string;
   soldOut: boolean;
+  /** 세부상품을 아직 안 고른 브랜드 묶음 — 버튼 「상품 선택」 */
+  brand?: boolean;
 };
 
 export type LiveWatchOrderToast = { key: string; nickname: string };
@@ -142,13 +144,13 @@ export default function LiveWatchView(props: Props) {
         <div role="status" aria-atomic="true" style={{ minHeight: "32px", display: "flex" }}>
           {latestToast ? (
             <span key={latestToast.key} className="ruru-live-watch-toast" style={{ display: "inline-flex", alignItems: "center", height: "32px", maxWidth: "100%", padding: "0 12px", borderRadius: "9999px", background: "rgba(0,0,0,0.55)", fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {latestToast.nickname}님이 주문했어요
+              {latestToast.nickname}님 주문 감사합니다
             </span>
           ) : null}
         </div>
         {pinned ? (
           <div style={{ pointerEvents: "auto", background: "#FFFFFF", color: "#111111", borderRadius: "12px", padding: "10px", display: "flex", alignItems: "center", gap: "10px" }}>
-            <button type="button" onClick={() => props.onOpenProduct(pinned.productId, pinned.detailName || undefined)} aria-label={`${pinned.name} 옵션 보기`} style={{ width: "64px", height: "64px", flexShrink: 0, padding: 0, border: "none", background: "#F5F5F5", cursor: "pointer", overflow: "hidden" }}>
+            <button type="button" onClick={() => props.onOpenProduct(pinned.productId, pinned.detailName || undefined)} aria-label={`${pinned.name} ${pinned.brand ? "상품 선택" : "담기"}`} style={{ width: "64px", height: "64px", flexShrink: 0, padding: 0, border: "none", background: "#F5F5F5", cursor: "pointer", overflow: "hidden" }}>
               {pinned.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={pinned.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
@@ -160,7 +162,7 @@ export default function LiveWatchView(props: Props) {
               <span style={{ fontSize: "15px", fontWeight: 700 }}>{pinned.priceText}</span>
             </div>
             <button type="button" disabled={pinned.soldOut} onClick={() => props.onOpenProduct(pinned.productId, pinned.detailName || undefined)} style={{ flexShrink: 0, height: "44px", padding: "0 16px", border: "none", borderRadius: "9999px", background: pinned.soldOut ? "#E5E5E5" : "#111111", color: pinned.soldOut ? "#707072" : "#FFFFFF", fontSize: "15px", fontWeight: 600, fontFamily: "inherit", cursor: pinned.soldOut ? "default" : "pointer" }}>
-              {pinned.soldOut ? "품절" : "옵션 보기"}
+              {pinned.soldOut ? "품절" : pinned.brand ? "상품 선택" : "담기"}
             </button>
           </div>
         ) : null}
@@ -188,7 +190,10 @@ export default function LiveWatchView(props: Props) {
         <div role="dialog" aria-modal="true" aria-label="방송 상품" onClick={() => setListOpen(false)} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "flex-end" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", margin: "0 auto", height: "72dvh", background: "#FFFFFF", color: "#111111", borderRadius: "16px 16px 0 0", display: "flex", flexDirection: "column" }}>
             <div style={{ padding: "8px 8px 8px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: "17px", fontWeight: 700 }}>방송 상품 {items.length}개</span>
+              <span style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
+                <span style={{ fontSize: "17px", fontWeight: 700 }}>방송 상품</span>
+                <span style={{ fontSize: "13px", fontWeight: 600, color: "#707072" }}>총 {items.length}개</span>
+              </span>
               <button type="button" onClick={() => setListOpen(false)} aria-label="닫기" style={{ width: "44px", height: "44px", border: "none", borderRadius: "9999px", background: "#F5F5F5", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><IconClose /></button>
             </div>
             <div style={{ padding: "0 16px 8px" }}>
@@ -196,7 +201,7 @@ export default function LiveWatchView(props: Props) {
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="상품 이름·번호로 찾기"
+                placeholder="상품명 검색"
                 aria-label="방송 상품 찾기"
                 style={{ width: "100%", boxSizing: "border-box", height: "48px", padding: "0 16px", border: "1px solid #E5E5E5", borderRadius: "9999px", fontSize: "16px", fontFamily: "inherit", outline: "none", color: "#111111", background: "#FFFFFF" }}
               />
@@ -204,9 +209,10 @@ export default function LiveWatchView(props: Props) {
             <div style={{ flex: 1, overflowY: "auto", padding: "0 16px calc(16px + env(safe-area-inset-bottom))" }}>
               {listItems.length === 0 ? (
                 <div style={{ padding: "32px 0", textAlign: "center", fontSize: "15px", color: "#707072" }}>{query ? "찾는 상품이 없어요" : "방송 상품이 아직 없어요"}</div>
-              ) : listItems.map((it) => (
+              ) : listItems.map((it) => { const no = items.findIndex((x) => x.id === it.id) + 1; return (
                 <div key={it.id} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderBottom: "1px solid #E5E5E5" }}>
-                  <button type="button" onClick={() => { if (!it.soldOut) { setListOpen(false); props.onOpenProduct(it.id); } }} aria-label={`${it.name} 옵션 보기`} style={{ width: "64px", height: "64px", flexShrink: 0, padding: 0, border: "none", background: "#F5F5F5", overflow: "hidden", cursor: it.soldOut ? "default" : "pointer", position: "relative" }}>
+                  <button type="button" onClick={() => { if (!it.soldOut) { setListOpen(false); props.onOpenProduct(it.id); } }} aria-label={`${no}번 ${it.name} ${it.brand ? "상품 선택" : "담기"}`} style={{ width: "64px", height: "64px", flexShrink: 0, padding: 0, border: "none", background: "#F5F5F5", overflow: "hidden", cursor: it.soldOut ? "default" : "pointer", position: "relative" }}>
+                    <span aria-hidden="true" style={{ position: "absolute", top: 0, left: 0, zIndex: 1, minWidth: "22px", height: "20px", padding: "0 5px", boxSizing: "border-box", background: "rgba(0,0,0,0.7)", color: "#FFFFFF", fontSize: "13px", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{no}</span>
                     {it.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={it.imageUrl} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
@@ -218,10 +224,10 @@ export default function LiveWatchView(props: Props) {
                     <span style={{ fontSize: "15px", fontWeight: 700 }}>{it.priceText}</span>
                   </div>
                   <button type="button" disabled={it.soldOut} onClick={() => { setListOpen(false); props.onOpenProduct(it.id); }} style={{ flexShrink: 0, height: "40px", minWidth: "64px", padding: "0 14px", border: "none", borderRadius: "9999px", background: it.soldOut ? "#E5E5E5" : "#111111", color: it.soldOut ? "#707072" : "#FFFFFF", fontSize: "14px", fontWeight: 600, fontFamily: "inherit", cursor: it.soldOut ? "default" : "pointer" }}>
-                    {it.soldOut ? "품절" : "담기"}
+                    {it.soldOut ? "품절" : it.brand ? "상품 선택" : "담기"}
                   </button>
                 </div>
-              ))}
+              ); })}
             </div>
           </div>
         </div>
@@ -234,7 +240,7 @@ export default function LiveWatchView(props: Props) {
             <div style={{ fontSize: "20px", fontWeight: 700, marginBottom: "16px" }}>방송 보면서 바로 담아요</div>
             {[
               ["1", "방송을 보다가 마음에 드는 상품이 나오면"],
-              ["2", "아래 「옵션 보기」나 상품 목록에서 담고"],
+              ["2", "아래 상품 카드나 상품 목록에서 담고"],
               ["3", "「주문서 확인」을 눌러 주문하면 끝"],
             ].map(([n, t]) => (
               <div key={n} style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>

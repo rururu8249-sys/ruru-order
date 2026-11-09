@@ -6507,6 +6507,7 @@ export default function OrderPage() {
         priceText: brand ? `최저가 ${won(price)}부터` : won(price),
         soldOut: isSoldOutOrderProduct(product),
         pinned: Boolean(livePinnedProductId) && String(product.id ?? "") === livePinnedProductId,
+        brand: Boolean(brand),
       };
     }).filter((it) => it.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -6536,6 +6537,7 @@ export default function OrderPage() {
       imageUrl: pickOrderProductImageUrl(shownProduct) || pickOrderProductImageUrl(product),
       priceText: won(Number(shownProduct.price || product.price || 0)),
       soldOut: isSoldOutOrderProduct(product),
+      brand: Boolean(readBrandGroupOrderProduct(product)) && !detail,
     };
   })();
   const liveWatchCartCount = items.filter((it) => it.product_name.trim()).length;
