@@ -198,6 +198,8 @@ export default function LiveHeader({
   const [alertMode, setAlertMode] = useState<"priority" | "optin" | "all">("priority");
   // [2026-11-09] 같은 방송을 쉬었다 다시 시작할 때 «오늘 다시 알림» — 이 방송 알림을 이미 받은 사람에게도 한 번 더(오늘 한 번까지)
   const [alertAgain, setAlertAgain] = useState(false);
+  // 발송이 끝나면(성공·실패 모두) 명단을 다시 받는다 — 예전엔 「명단을 불러오지 못했어요」로 멈춰 다시 보낼 수가 없었음(사장님 11/9 20:44)
+  const [alertReloadTick, setAlertReloadTick] = useState(0);
   const [alertLimit, setAlertLimit] = useState("300");
   const [alertOrderDays, setAlertOrderDays] = useState("90");
   const [alertRecentDays, setAlertRecentDays] = useState("30");
@@ -404,8 +406,14 @@ export default function LiveHeader({
     } finally {
       alertBusy.current=false;
       setAlertSending(false);
+      setAlertReloadTick((t) => t + 1);
     }
   };
+
+  useEffect(() => {
+    if (alertReloadTick > 0 && alertOpen && !alertSending) void loadAlertPreview(alertMode, { includeIds: [], excludeIds: [] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alertReloadTick, alertSending]);
 
   const statusLabel = useMemo(() => {
     if (activeBroadcast) return "방송중";
@@ -691,7 +699,7 @@ export default function LiveHeader({
                     </ul>
                   ) : null}
                   {alertPreview && !visibleAlertMembers.length && <p className="py-6 text-center text-sm text-ink-mute">{alertSearch ? "검색 결과가 없어요. 다른 이름으로 찾아 보세요." : alertList === "excluded" ? "이번만 제외한 회원이 없어요. 발송 명단에서 「제외」를 누르면 여기 모여요." : "표시할 회원이 없어요. 위에서 다른 받을 사람을 골라 보세요."}</p>}
-                  {!alertPreview && !alertPreviewLoading && <p className="py-6 text-center text-sm text-ink-mute">{alertMode === "priority" ? "「다시 뽑기」를 눌러 명단을 만드세요." : "명단을 불러오지 못했어요."}</p>}
+                  {!alertPreview && !alertPreviewLoading && <p className="py-6 text-center text-sm text-ink-mute">{alertMode === "priority" ? "「다시 뽑기」를 눌러 명단을 만드세요." : <>명단이 비어 있어요. <button type="button" disabled={alertSending} onClick={() => void loadAlertPreview(alertMode, { includeIds: [], excludeIds: [] })} className="ml-1 font-semibold text-ink underline">다시 불러오기</button></>}</p>}
                 </>
               ) : (
                 <>

@@ -1,3 +1,4 @@
+import { affordableAlertCount } from "@/lib/solapiBalanceFit";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
@@ -267,10 +268,34 @@ export async function POST(request: NextRequest) {
         }
       }
     } catch (e: any) {
-      status = "fail";
-      memo = String(e?.message ?? e).slice(0, 500);
-      for (const p of claimedPhones) failedPhones.add(p);
-      rawResults.push({ error: memo });
+      const firstErr = String(e?.message ?? e).slice(0, 500);
+      // [2026-11-09 사장님 「돈이 모자라면 금액에 맞게 발송해줘」] 잔액 부족이면 지금 돈으로 보낼 수 있는 만큼(명단 앞쪽=우선순위 순)만 한 번 더 보낸다.
+      const fit = affordableAlertCount(firstErr, messages.length);
+      if (fit > 0 && fit < messages.length) {
+        const order = new Map(targets.map((p, i) => [p, i] as const));
+        const part = [...messages].sort((a, b) => (order.get(a.to) ?? 1e9) - (order.get(b.to) ?? 1e9)).slice(0, fit);
+        const sentSet = new Set(part.map((m) => m.to));
+        try {
+          const r: any = await messageService.send(part as any);
+          rawResults.push({ error: firstErr }, r);
+          for (const p of claimedPhones) if (!sentSet.has(p)) failedPhones.add(p);
+          for (const f of Array.isArray(r?.failedMessageList) ? r.failedMessageList : []) {
+            const fp = normalizePhone((f as any)?.to);
+            if (fp) failedPhones.add(fp);
+          }
+          memo = `잔액에 맞춰 ${fit}명만 보냄 · 처음 시도: ${firstErr}`.slice(0, 500);
+        } catch (e2: any) {
+          status = "fail";
+          memo = String(e2?.message ?? e2).slice(0, 500);
+          for (const p of claimedPhones) failedPhones.add(p);
+          rawResults.push({ error: firstErr }, { error: memo });
+        }
+      } else {
+        status = "fail";
+        memo = firstErr;
+        for (const p of claimedPhones) failedPhones.add(p);
+        rawResults.push({ error: memo });
+      }
     }
 
     const successPhones = claimedPhones.filter((p) => !failedPhones.has(p));
@@ -320,7 +345,10 @@ export async function POST(request: NextRequest) {
       raw_result: rawResults,
     });
 
-    const failHint = /NotEnoughBalance|잔액/i.test(memo)
+    const fitHint = /^잔액에 맞춰 (\d+)명만 보냄/.exec(memo);
+    const failHint = fitHint
+      ? `솔라피 돈이 모자라서 지금 돈에 맞춰 ${successCount.toLocaleString()}명에게만 보냈어요(솔라피는 부가세 10%를 더해서 빼 가요). 못 받은 ${failCount.toLocaleString()}명은 충전한 뒤 같은 창에서 다시 발송하면 받아요.`
+      : /NotEnoughBalance|잔액/i.test(memo)
       ? `솔라피 잔액이 부족해서 한 명도 못 보냈어요. 솔라피에서 충전한 뒤 「다시 뽑기」 → 발송하면 같은 명단에 다시 보내요. (${memo.replace(/^NotEnoughBalance:\s*/,"").slice(0,120)})`
       : status === "fail"
         ? `발송이 실패했어요: ${memo || "솔라피가 전부 실패로 돌려줬어요"}. 실패한 사람은 「이미 받음」에서 빠지니 원인 해결 후 「다시 뽑기」 → 발송하면 돼요.`
