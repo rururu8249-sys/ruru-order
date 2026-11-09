@@ -12,6 +12,7 @@ import { feedPinLayout, FEED_PIN_SIZE } from "@/lib/feedText";
 import { LIVE_PAUSED_TEXT_KEY, LIVE_PAUSED_TEXT_DEFAULT, LIVE_PAUSED_TEXT_MAX } from "@/lib/livePausedText";
 import { LIVE_WATCH_KEY, LIVE_WATCH_DEFAULT, parseLiveWatchSetting, serializeLiveWatchSetting, type LiveWatchSetting } from "@/lib/liveWatch";
 import { LIVE_CHAT_KEY, LIVE_CHAT_DEFAULT, parseLiveChatSetting, serializeLiveChatSetting, type LiveChatSetting } from "@/lib/liveChat";
+import { LIVE_CHAT_BOT_KEY, LIVE_CHAT_BOT_DEFAULT, LIVE_CHAT_BOT_DEFAULT_FAQS, parseLiveChatBotSetting, serializeLiveChatBotSetting, type LiveChatBotSetting } from "@/lib/liveChatBot";
 
 type VideoRatio = "vertical" | "wide" | "auto";
 type AlertMember = { id: string; cid?: string; name: string; phone: string; orderDays?: number; recent?: boolean; manual?: boolean };
@@ -168,6 +169,42 @@ export default function LiveHeader({
       setLiveChatSaving(false);
     }
   };
+
+  // [2026-11-10] 루루동이AI(사이트 채팅 자동 안내) 설정 — live_chat_bot_v1. 자주 묻는 말은 방송마다 고쳐 저장
+  const [bot, setBot] = useState<LiveChatBotSetting>(LIVE_CHAT_BOT_DEFAULT);
+  const [botFaqDraft, setBotFaqDraft] = useState<{ words: string; answer: string }[]>([]);
+  const [botSaving, setBotSaving] = useState(false);
+  const [botFaqOpen, setBotFaqOpen] = useState(false);
+  const toFaqDraft = (st: LiveChatBotSetting) => st.faqs.map((f) => ({ words: f.words.join(", "), answer: f.answer }));
+  useEffect(() => {
+    let alive = true;
+    supabase.from("settings").select("value").eq("key", LIVE_CHAT_BOT_KEY).maybeSingle().then(({ data }) => {
+      if (!alive) return;
+      const st = parseLiveChatBotSetting(data?.value);
+      setBot(st);
+      setBotFaqDraft(toFaqDraft(st));
+    });
+    return () => { alive = false; };
+  }, []);
+  const saveBot = async (next: LiveChatBotSetting, okText: string) => {
+    if (botSaving) return;
+    const prev = bot;
+    const clean = parseLiveChatBotSetting(next);
+    setBot(clean);
+    setBotSaving(true);
+    try {
+      const { error } = await supabase.from("settings").upsert([{ key: LIVE_CHAT_BOT_KEY, value: serializeLiveChatBotSetting(clean) }], { onConflict: "key" });
+      if (error) throw error;
+      setBotFaqDraft(toFaqDraft(clean));
+      showAdminToast(okText, "success");
+    } catch {
+      setBot(prev);
+      showAdminToast("루루동이AI 설정 저장에 실패했어요.", "error");
+    } finally {
+      setBotSaving(false);
+    }
+  };
+  const botFaqChanged = JSON.stringify(botFaqDraft) !== JSON.stringify(toFaqDraft(bot));
 
   const savePausedText = async () => {
     if (pausedSaving) return;
@@ -627,6 +664,46 @@ export default function LiveHeader({
                 <button type="button" disabled={liveChatSaving || liveChatWords === liveChat.words.join(", ")} onClick={() => void saveLiveChat({ ...liveChat, words: liveChatWords.split(/[,\n]/) }, "금지어를 저장했어요.")} className={primaryCls}>저장</button>
               </div>
             </>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* [2026-11-10] 루루동이AI — 사이트 채팅 자동 안내(상품번호·상품 이름 → 상품 안내 / 자주 묻는 말 → 정해진 답) */}
+      {liveWatch.audience !== "off" && liveChat.enabled ? (
+        <div>
+          <div className="mb-1 text-[13px] font-bold text-ink">루루동이AI <span className="font-normal text-ink-mute">· 사이트 채팅 자동 안내</span></div>
+          <div className="flex flex-wrap items-center gap-2">
+            {([[true, "켬"], [false, "끔"]] as const).map(([v, label]) => (
+              <button key={label} type="button" disabled={botSaving} aria-pressed={bot.enabled === v} onClick={() => void saveBot({ ...bot, enabled: v }, v ? "루루동이AI를 켰어요." : "루루동이AI를 껐어요.")}
+                className={bot.enabled === v ? "h-9 rounded-full bg-ink px-3 text-[13px] font-bold text-white disabled:opacity-50" : "h-9 rounded-full border border-line bg-surface px-3 text-[13px] font-bold text-ink hover:bg-surface-2 disabled:opacity-50"}>{label}</button>
+            ))}
+            {bot.enabled ? (
+              <button type="button" disabled={botSaving} aria-pressed={bot.product} onClick={() => void saveBot({ ...bot, product: !bot.product }, bot.product ? "상품 안내를 껐어요." : "상품 안내를 켰어요.")}
+                className={bot.product ? "h-9 rounded-full bg-ink px-3 text-[13px] font-bold text-white disabled:opacity-50" : "h-9 rounded-full border border-line bg-surface px-3 text-[13px] font-bold text-ink hover:bg-surface-2 disabled:opacity-50"}>상품 안내 {bot.product ? "켬" : "끔"}</button>
+            ) : null}
+            {bot.enabled ? (
+              <button type="button" aria-expanded={botFaqOpen} onClick={() => setBotFaqOpen((v) => !v)} className="h-9 rounded-full border border-line bg-surface px-3 text-[13px] font-bold text-ink hover:bg-surface-2">자주 묻는 말 {bot.faqs.length}개 {botFaqOpen ? "닫기" : "고치기"}</button>
+            ) : null}
+          </div>
+          <div className="mt-1 text-[12px] text-ink-mute">손님이 상품번호(509)를 치거나 상품 이름+「얼마·사이즈·주문·?」을 치면 그 상품이 하나일 때만 안내해요. 같은 안내는 1분에 한 번.</div>
+          {bot.enabled && botFaqOpen ? (
+            <div className="mt-2 flex flex-col gap-2">
+              <div className="text-[12px] text-ink-mute">방송마다 바뀌는 내용(합배송·배송일 등)은 방송 시작 전에 고쳐 저장하세요. 낱말은 쉼표로 — 손님 글에 그 낱말이 있으면 답해요.</div>
+              {botFaqDraft.map((f, i) => (
+                <div key={i} className="rounded-lg border border-line p-2">
+                  <div className="flex gap-2">
+                    <input value={f.words} onChange={(e) => setBotFaqDraft((d) => d.map((x, j) => (j === i ? { ...x, words: e.target.value } : x)))} placeholder="낱말 · 예: 계좌, 계좌번호" aria-label={`자주 묻는 말 ${i + 1} 낱말`} className={fieldCls} />
+                    <button type="button" onClick={() => setBotFaqDraft((d) => d.filter((_, j) => j !== i))} className="h-10 shrink-0 rounded-lg border border-line px-3 text-[13px] font-bold text-danger">빼기</button>
+                  </div>
+                  <textarea value={f.answer} onChange={(e) => setBotFaqDraft((d) => d.map((x, j) => (j === i ? { ...x, answer: e.target.value.slice(0, 200) } : x)))} rows={2} placeholder="답 · 200자까지" aria-label={`자주 묻는 말 ${i + 1} 답`} className="mt-2 w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink outline-none focus:border-ink" />
+                </div>
+              ))}
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => setBotFaqDraft((d) => [...d, { words: "", answer: "" }])} className="h-10 rounded-lg border border-line px-3 text-[13px] font-bold text-ink">+ 추가</button>
+                <button type="button" onClick={() => setBotFaqDraft(LIVE_CHAT_BOT_DEFAULT_FAQS.map((f) => ({ words: f.words.join(", "), answer: f.answer })))} className="h-10 rounded-lg border border-line px-3 text-[13px] font-bold text-ink">기본으로</button>
+                <button type="button" disabled={botSaving || !botFaqChanged} onClick={() => void saveBot({ ...bot, faqs: botFaqDraft.map((x) => ({ words: x.words.split(/[,\n]/), answer: x.answer })) }, "자주 묻는 말을 저장했어요.")} className={primaryCls}>저장</button>
+              </div>
+            </div>
           ) : null}
         </div>
       ) : null}

@@ -15,6 +15,7 @@ import {
 } from "@/lib/liveWatch";
 import { isKakaoInAppBrowser } from "@/lib/youtubeChannelLink";
 import { openOrderInExternalBrowser } from "@/components/customer/KakaoExternalOpen";
+import { parseBotRef } from "@/lib/liveChatBot";
 import { LIVE_CHAT_MAX_LEN, chatColors, type LiveChatAction, type LiveChatMessage, type LiveChatPenalty } from "@/lib/liveChat";
 
 export type LiveWatchPinned = {
@@ -103,6 +104,10 @@ const MenuIcon = ({ k }: { k: string }) => {
 // 닉네임 뒤 표시 — 금색 왕관(총관리자) / 분홍 왕관 / R 동그라미(채팅 관리자). 우리 가게 표시라 직접 그림.
 function ChatBadge({ badge }: { badge: LiveChatMessage["badge"] }) {
   if (!badge) return null;
+  if (badge === "bot") {
+    // 루루동이AI — 손님 글과 헷갈리지 않게 파란 「AI」 표시
+    return <span aria-label="루루동이 자동 안내" style={{ display: "inline-flex", alignItems: "center", verticalAlign: "0.1em", margin: "0 4px 0 4px", height: "1.15em", padding: "0 0.35em", borderRadius: "9999px", background: "#3B82F6", color: "#FFFFFF", fontSize: "0.72em", fontWeight: 800, textShadow: "none", lineHeight: 1 }}>AI</span>;
+  }
   const st = { display: "inline-block", verticalAlign: "-0.18em", margin: "0 4px 0 2px", width: "1.15em", height: "1.15em", flexShrink: 0 } as const;
   if (badge === "mod") {
     return (
@@ -192,6 +197,7 @@ export default function LiveWatchView(props: Props) {
   // ── 사이트 채팅 ──
   const chat = props.chat ?? null;
   const [composeOpen, setComposeOpen] = useState(false);
+  const downAt = useRef<{ x: number; y: number } | null>(null);
   // [04:55 사장님] 채팅 쓰는 중 폰 «뒤로» → 사이트에서 나가지 말고 쓰기 창만 닫고 방송 화면으로.
   //   쓰기 창을 열 때 방문 기록을 하나 쌓아 두고, 뒤로가 오면 그 기록만 지우며 창을 닫음.
   useEffect(() => {
@@ -615,24 +621,38 @@ export default function LiveWatchView(props: Props) {
             onScroll={onChatScroll}
             style={{ pointerEvents: "none", overscrollBehavior: "contain", maxHeight: CHAT_HEIGHTS[chatView.height], overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "8px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", padding: "16px 0 0 4px", boxSizing: "border-box", width: "100%" }}
           >
-            {chat.messages.map((m) => { const color = chatColorMap.get(m.id) || "#FFFFFF"; return (
+            {chat.messages.map((m) => { const color = chatColorMap.get(m.id) || "#FFFFFF";
+              // 루루동이AI — 이 화면에만 끼운 알림 줄(번호가 소수)은 관리 창 없음 / 상품 안내 줄은 누르면 그 상품 옵션 창
+              const localLine = !Number.isInteger(m.id);
+              const canMod = chat.canModerate && !localLine;
+              const botProduct = m.badge === "bot" ? parseBotRef(m.botRef) : null;
+              return (
               <div
                 key={m.id}
-                onPointerDown={chat.canModerate ? () => startPress(m) : undefined}
-                onPointerUp={chat.canModerate ? endPress : undefined}
-                onPointerLeave={chat.canModerate ? endPress : undefined}
-                onPointerCancel={chat.canModerate ? endPress : undefined}
-                onContextMenu={chat.canModerate ? (e) => { e.preventDefault(); setModTarget(m); } : undefined}
-                style={{ pointerEvents: "auto", touchAction: "pan-y", display: "flex", alignItems: "flex-start", gap: "8px", maxWidth: "100%", color, fontSize: CHAT_SIZES[chatView.size], fontWeight: chatView.bold ? 700 : 500, lineHeight: 1.45, wordBreak: "break-word", textShadow: CHAT_TEXT_SHADOW, userSelect: chat.canModerate ? "none" : "auto", WebkitUserSelect: chat.canModerate ? "none" : "auto" }}
+                onPointerDown={(e) => { downAt.current = { x: e.clientX, y: e.clientY }; if (canMod) startPress(m); }}
+                onPointerUp={canMod ? endPress : undefined}
+                onPointerLeave={canMod ? endPress : undefined}
+                onPointerCancel={canMod ? endPress : undefined}
+                onContextMenu={canMod ? (e) => { e.preventDefault(); setModTarget(m); } : undefined}
+                onClick={botProduct ? (e) => {
+                  const d = downAt.current;
+                  if (modTarget || (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8)) return; // 길게 누름·끌기는 열지 않음
+                  props.onOpenProduct(botProduct.productId, botProduct.detailName || undefined);
+                } : undefined}
+                role={botProduct ? "button" : undefined}
+                style={{ cursor: botProduct ? "pointer" : undefined, pointerEvents: "auto", touchAction: "pan-y", display: "flex", alignItems: "flex-start", gap: "8px", maxWidth: "100%", color, fontSize: CHAT_SIZES[chatView.size], fontWeight: chatView.bold ? 700 : 500, lineHeight: 1.45, wordBreak: "break-word", textShadow: CHAT_TEXT_SHADOW, userSelect: chat.canModerate ? "none" : "auto", WebkitUserSelect: chat.canModerate ? "none" : "auto" }}
               >
                 {/* 유튜브처럼 [사진][닉네임 · 표시 · 글] — 글이 길어 다음 줄로 가면 사진 밑이 아니라 닉네임 시작 자리에 맞춰 내려감.
                     상자 없이 글자만 — 닉네임과 글은 같은 색(사람마다 정해진 색, 바로 위 다른 사람과는 절대 같은 색 안 됨).
                     관리자는 글 줄을 길게 누르면 관리 창(고정은 왕관 두 사람만) */}
-                <ChatAvatar src={m.avatar} nick={m.nickname} color={color} />
+                <ChatAvatar src={m.badge === "bot" ? "/icon-192.png" : m.avatar} nick={m.nickname} color={color} />
                 <span style={{ minWidth: 0, flex: 1 }}>
                   <span style={{ fontWeight: 800 }}>{m.nickname}</span>
                   <ChatBadge badge={m.badge} />
                   <span style={{ marginLeft: m.badge ? "4px" : "8px" }}>{m.body}</span>
+                  {botProduct ? (
+                    <span style={{ display: "inline-flex", alignItems: "center", marginLeft: "8px", height: "24px", padding: "0 10px", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 700, textShadow: "none", verticalAlign: "middle", whiteSpace: "nowrap" }}>담기 ›</span>
+                  ) : null}
                 </span>
               </div>
             ); })}

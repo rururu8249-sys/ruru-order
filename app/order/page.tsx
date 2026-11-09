@@ -42,7 +42,7 @@ const normalizeEmptyProductOptionValue = (value: unknown) => {
 
 
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { normalizeProductSearchText, productSearchMatches } from "@/lib/productSearch";
 import { LIVE_PAUSED_TEXT_KEY, LIVE_PAUSED_TEXT_DEFAULT, resolveLivePausedText } from "@/lib/livePausedText";
 import { LIVE_WATCH_KEY, LIVE_WATCH_DEFAULT, parseLiveWatchSetting, chatBadgeOf, isChatOwnerPhone, youtubeVideoIdFromUrl, canUseLiveWatch, initialLiveView, liveWatchViewKey, type LiveWatchSetting, type LiveWatchItem } from "@/lib/liveWatch";
@@ -50,6 +50,7 @@ import LiveWatchView, { type LiveWatchOrderToast, type LiveWatchPinned } from "@
 import { subscribeLiveEvents } from "@/lib/liveEvents";
 import { cleanKakaoPhotoUrl } from "@/lib/kakaoPhoto";
 import { isPenaltyAction, mergeChat, parseChatMessage, type LiveChatAction, type LiveChatMessage } from "@/lib/liveChat";
+import { LIVE_CHAT_BOT_NICK, orderThanksText, cardLinkText, paidThanksText, isCardOrderRow, becamePaid, CART_NEXT_STEP_TEXT } from "@/lib/liveChatBot";
 import { openYoutubeChannel } from "@/lib/youtubeChannelLink";
 import { setPresenceActivity, readPresenceEvents } from "@/lib/presenceActivity";
 import { registerBrandAliasesFromProducts } from "@/lib/brandSearchAliases";
@@ -1460,6 +1461,20 @@ export default function OrderPage() {
   const [liveChatNotice, setLiveChatNotice] = useState("");
   const [liveChatPinned, setLiveChatPinned] = useState<LiveChatMessage | null>(null);
   const [liveChatEnabled, setLiveChatEnabled] = useState(false);
+  // 주문 소식 처리(효과 안)에서 지금 채팅이 켜졌는지 보려고
+  const liveChatEnabledRef = useRef(false);
+  useEffect(() => { liveChatEnabledRef.current = liveChatEnabled; }, [liveChatEnabled]);
+  // [2026-11-10] 루루동이AI 알림 글(이 화면에만 끼워 넣는 줄 — DB 안 씀). 번호 = 지금 마지막 글 번호 + 소수점 → 다음 진짜 글보다 앞에 섬
+  const liveLocalSeq = useRef(0);
+  const liveCartHintFor = useRef("");
+  const addLiveBotLine = useCallback((bid: string, text: string, ref: string) => {
+    setLiveChatMessages((prev) => {
+      const maxId = prev.reduce((m, x) => (x.id < 9_000_000_000_000 ? Math.max(m, Math.floor(x.id)) : m), 0);
+      liveLocalSeq.current = (liveLocalSeq.current % 400) + 1;
+      const line: LiveChatMessage = { id: maxId + 0.5 + liveLocalSeq.current / 1000, broadcastId: bid, nickname: LIVE_CHAT_BOT_NICK, body: text, createdAt: new Date().toISOString(), hidden: false, badge: "bot", pinned: false, botRef: ref, avatar: "" };
+      return mergeChat(prev, [line]);
+    });
+  }, []);
   const [productListState, setProductListState] = useState<"loading" | "ready" | "error">("loading");
   const [broadcastProducts, setBroadcastProducts] = useState<BroadcastProduct[]>([]);
   const [groupBuyQuickProductsFromCatalog, setGroupBuyQuickProductsFromCatalog] = useState<BroadcastProduct[]>([]);
@@ -4564,6 +4579,11 @@ export default function OrderPage() {
       // [2026-08-31 사장님 요청] 접속자 옆 "지금 보는 상품" — 담는 순간의 상품명을 접속 신호에 얹는다(표시 전용, 10분 유효)
       try { window.localStorage.setItem("ruru_viewing_product", JSON.stringify({ name: String(clampedItem?.product_name || "").trim().slice(0, 80), at: Date.now() })); } catch { /* 무시 */ }
       setPresenceActivity("cart", String(clampedItem?.product_name || "").trim()); // [2026-11-09] 「담았어요 · 상품명」
+      // [2026-11-10 사장님 05:14] 방송 화면 채팅에 «다음 할 일» 안내 — 담은 본인 화면에만, 방송마다 한 번(다른 손님에겐 안 보임)
+      if (liveWatchShown && liveChatEnabledRef.current && broadcast?.id && liveCartHintFor.current !== String(broadcast.id)) {
+        liveCartHintFor.current = String(broadcast.id);
+        addLiveBotLine(String(broadcast.id), CART_NEXT_STEP_TEXT, "local:cart");
+      }
     }
   };
 
@@ -6521,6 +6541,7 @@ export default function OrderPage() {
     let timer: ReturnType<typeof setTimeout> | null = null;
     let lastAt = 0;
     const seenGroups = new Set<string>();
+    const orderBuf = new Map<string, Record<string, unknown>[]>();
     const refetchBroadcast = () => {
       if (timer) return;
       const wait = Math.max(800, 3000 - (Date.now() - lastAt));
@@ -6560,8 +6581,23 @@ export default function OrderPage() {
         else setLiveChatPinned((prev) => (prev && prev.id === m.id ? null : prev));
       },
       onOrder: (e) => {
-        if (e.type !== "INSERT") return;
         const n = e.new as Record<string, unknown>;
+        if (e.type === "UPDATE") {
+          // 결제 완료(입금확인·카드결제완료로 바뀐 순간) — 주문서 하나에 한 번
+          if (!liveChatEnabledRef.current || n.is_test_order === true || n.is_deleted === true) return;
+          if (n.broadcast_id != null && String(n.broadcast_id) !== String(bid)) return;
+          if (!becamePaid(n, (e.old || {}) as Record<string, unknown>)) return;
+          const pkey = `paid:${String(n.order_group_id ?? n.id ?? "")}`;
+          if (!String(n.youtube_nickname ?? "").trim() || seenGroups.has(pkey)) return;
+          seenGroups.add(pkey);
+          addLiveBotLine(String(bid), paidThanksText([n]), `local:${pkey}`);
+          return;
+        }
+        if (e.type !== "INSERT") return;
+        // 같은 주문서의 다른 상품 줄 — 모으는 중이면 더함
+        const gk = String(n.order_group_id ?? n.id ?? "");
+        const buf = orderBuf.get(gk);
+        if (buf) { buf.push(n); return; }
         if (n.is_test_order === true || n.is_deleted === true) return;
         if (n.broadcast_id != null && String(n.broadcast_id) !== String(bid)) return;
         const nick = String(n.youtube_nickname ?? "").trim();
@@ -6569,6 +6605,17 @@ export default function OrderPage() {
         const key = String(n.order_group_id ?? n.id ?? "");
         if (key && seenGroups.has(key)) return;
         if (key) seenGroups.add(key);
+        // [2026-11-10 사장님 05:14] 채팅이 켜져 있으면 알림 칸 대신 채팅에 루루동이AI 글로(주문서 줄을 0.6초 모아 한 줄)
+        if (liveChatEnabledRef.current) {
+          const rows: Record<string, unknown>[] = [n];
+          orderBuf.set(key, rows);
+          window.setTimeout(() => {
+            orderBuf.delete(key);
+            addLiveBotLine(String(bid), orderThanksText(rows), `local:order:${key}`);
+            if (rows.some(isCardOrderRow)) addLiveBotLine(String(bid), cardLinkText(rows), `local:card:${key}`);
+          }, 600);
+          return;
+        }
         const shown = nick.length > 8 ? `${nick.slice(0, 7)}…` : nick;
         const toast = { key: `${key}-${Date.now()}`, nickname: shown };
         setLiveOrderToasts((prev) => [...prev.slice(-4), toast]);
@@ -8175,7 +8222,7 @@ export default function OrderPage() {
                 onSend: async (body) => {
                   // 누르자마자 화면에 먼저 띄움(임시 번호) — 서버 답이 오면 진짜 글로 바꿈, 실패하면 뺌
                   const tempId = 9_000_000_000_000 + Date.now();
-                  const temp: LiveChatMessage = { id: tempId, broadcastId: String(broadcast.id), nickname: youtubeNickname.trim(), body, createdAt: new Date().toISOString(), hidden: false, badge: chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) ?? (operatorTestAccount !== null ? "mod" : null), pinned: false, avatar: (() => { try { return cleanKakaoPhotoUrl(window.localStorage.getItem("ruru_kakao_profile_image")); } catch { return ""; } })() };
+                  const temp: LiveChatMessage = { id: tempId, broadcastId: String(broadcast.id), nickname: youtubeNickname.trim(), body, createdAt: new Date().toISOString(), hidden: false, badge: chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) ?? (operatorTestAccount !== null ? "mod" : null), pinned: false, botRef: "", avatar: (() => { try { return cleanKakaoPhotoUrl(window.localStorage.getItem("ruru_kakao_profile_image")); } catch { return ""; } })() };
                   setLiveChatMessages((prev) => mergeChat(prev, [temp]));
                   const dropTemp = () => setLiveChatMessages((prev) => prev.filter((x) => x.id !== tempId));
                   try {

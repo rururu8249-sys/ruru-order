@@ -37,6 +37,7 @@ begin
           'order_manage_status', n->'order_manage_status',
           'deposit_status', n->'deposit_status',
           'is_test_order', n->'is_test_order',
+          'payment_method', n->'payment_method',
           'is_deleted', n->'is_deleted'
         ),
         'old', jsonb_build_object(

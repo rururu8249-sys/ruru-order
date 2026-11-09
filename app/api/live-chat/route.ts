@@ -4,7 +4,8 @@
 //   POST { kakao_id, bc, body } → 글 쓰기. 닉네임은 손님이 보낸 값이 아니라 회원 표(customers)의 유튜브 닉네임.
 //   표 live_chat_messages / live_chat_bans 만 쓴다(supabase/sql/live_chat.sql). 주문·돈·포인트 무접촉.
 //   새 글은 DB 트리거가 소식(Broadcast)으로 모두에게 보낸다.
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import { runLiveChatBot } from "@/lib/liveChatBotServer";
 import { getServiceClient } from "@/lib/youtube";
 import {
   LIVE_CHAT_DEFAULT_WORDS,
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
     const sb = getServiceClient();
     const setting = await readSetting(sb);
     if (!setting.enabled) return NextResponse.json({ ok: true, enabled: false, notice: "", messages: [], pinned: null });
-    const cols = "id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, avatar_url";
+    const cols = "id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, avatar_url, bot_ref";
     const [listRes, pinRes] = await Promise.all([
       sb.from("live_chat_messages").select(cols).eq("broadcast_id", bc).is("hidden_at", null).order("id", { ascending: false }).limit(LIVE_CHAT_RECENT),
       sb.from("live_chat_messages").select(cols).eq("broadcast_id", bc).is("hidden_at", null).not("pinned_at", "is", null).order("pinned_at", { ascending: false }).limit(1).maybeSingle(),
@@ -104,9 +105,11 @@ export async function POST(request: NextRequest) {
     const { data: ins, error } = await sb
       .from("live_chat_messages")
       .insert({ broadcast_id: bc, kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body: masked.text, badge: role.badge ?? null, avatar_url: cleanKakaoPhotoUrl(c.kakao_profile_image) || null })
-      .select("id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, avatar_url")
+      .select("id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, avatar_url, bot_ref")
       .single();
     if (error) return fail("못 보냈어요. 다시 눌러 주세요.", 500);
+    // [2026-11-10] 루루동이AI — 응답을 보낸 «뒤»에 상품 안내·자주 묻는 말(손님 글 쓰기를 늦추지 않음, 실패해도 무관)
+    after(() => runLiveChatBot(sb, bc, masked.text));
     return NextResponse.json({ ok: true, message: parseChatMessage(ins) });
   } catch {
     return fail("못 보냈어요. 다시 눌러 주세요.", 500);

@@ -8,6 +8,9 @@ alter table public.live_chat_messages add column if not exists badge text;
 alter table public.live_chat_messages add column if not exists pinned_at timestamptz;
 -- [2026-11-10 04:1x] 닉네임 앞 카카오 프로필 사진(글 쓸 때 회원 표에서 복사)
 alter table public.live_chat_messages add column if not exists avatar_url text;
+-- [2026-11-10 05:1x] 루루동이AI 봇 글 표시 — p:상품id|세부상품(누르면 옵션 창) / f:자주 묻는 말. 같은 안내 1분 안 다시 안 올림
+alter table public.live_chat_messages add column if not exists bot_ref text;
+create index if not exists live_chat_messages_bot_idx on public.live_chat_messages (broadcast_id, bot_ref, created_at desc) where bot_ref is not null;
 create index if not exists live_chat_messages_pin_idx on public.live_chat_messages (broadcast_id, pinned_at desc) where pinned_at is not null;
 
 create or replace function public.ruru_live_chat_event()
@@ -29,6 +32,7 @@ begin
         'hidden', NEW.hidden_at is not null,
         'badge', NEW.badge,
         'avatar_url', NEW.avatar_url,
+        'bot_ref', NEW.bot_ref,
         'pinned', NEW.pinned_at is not null and NEW.hidden_at is null
       ),
       'chat',
