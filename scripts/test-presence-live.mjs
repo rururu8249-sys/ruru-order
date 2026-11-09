@@ -11,7 +11,7 @@ const iso = (msAgo) => new Date(now - msAgo).toISOString();
 const rows = [
   // 임현아: 카카오 계정으로 붙음 — 닉네임은 바뀌었어도(옛 주문 닉 「임현아」·지금 신호 「현아」) 장바구니·주문이 따라옴
   { id: "p1", visitor_key: "k1", nickname: "현아", kakao_id: "K1", page_type: "order_form", last_seen_at: iso(20_000), activity: "option", activity_label: "PD-202 가방", activity_at: iso(30_000),
-    activity_log: [ { k: "search", l: "프라다", at: now - 120_000 }, { k: "option", l: "PD-202 가방", at: now - 90_000 }, { k: "color", l: "블랙", at: now - 80_000 }, { k: "qty", l: "2", at: now - 70_000 }, { k: "hack", l: "x", at: now - 60_000 }, { k: "cart", l: "PD-202 가방", at: now - 50_000 }, { k: "cart", l: "PD-202 가방", at: now - 49_500 }, { k: "option", l: "PD-202 가방", at: now - 30_000 }, { k: "sheet", l: "", at: now - 4 * 3600_000 } ] },
+    activity_log: [ { k: "search", l: "프라다", at: now - 120_000 }, { k: "option", l: "PD-202 가방", at: now - 90_000 }, { k: "color", l: "블랙", at: now - 80_000 }, { k: "qty", l: "2", at: now - 70_000 }, { k: "hack", l: "x", at: now - 60_000 }, { k: "cart", l: "PD-202 가방", at: now - 50_000 }, { k: "cart", l: "PD-202 가방", at: now - 42_000 }, { k: "option", l: "PD-202 가방", at: now - 30_000 }, { k: "sheet", l: "", at: now - 4 * 3600_000 } ] },
   // 핑크링: 옛 신호(kakao_id 없음) → 닉네임 글자로 폴백
   { id: "p2", visitor_key: "k2", nickname: "핑크링", page_type: "order_form", last_seen_at: iso(31_000), activity: "sheet", activity_at: iso(5_000) },
   // 로그인 전 비회원
@@ -94,7 +94,9 @@ assert.deepEqual(filterLiveVisitors(list, "all", "임현").map((v) => v.id), ["p
 assert.deepEqual(by.p1.timeline.map((e) => e.text), [
   "옵션 고르는 중 · PD-202 가방", "담았어요 · PD-202 가방", "수량 2개", "색상 블랙 고름", "옵션 고르는 중 · PD-202 가방", "검색 「프라다」",
 ]);
-assert.equal(by.p1.timeline[1].at, now - 49_500, "연속 중복은 나중 시각으로 합침");
+assert.equal(by.p1.timeline[1].at, now - 42_000, "10초 안 연속 중복은 나중 시각으로 합침");
+assert.equal(normalizePresenceEvents([{ k: "size", l: "3", at: now - 20_000 }, { k: "size", l: "3", at: now - 9_000 }], now).length, 2, "11초 간격은 둘 다");
+assert.equal(normalizePresenceEvents([{ k: "size", l: "3", at: now - 20_000 }, { k: "size", l: "3", at: now - 12_000 }], now).length, 1, "8초 간격은 하나로");
 assert.deepEqual(by.p3.timeline, []);
 // 동작 목록 정리(서버 쓰기와 같은 함수): 30개 상한·미래 시각 제외
 const many = Array.from({ length: 40 }, (_, i) => ({ k: "search", l: `q${i}`, at: now - (40 - i) * 10_000 }));

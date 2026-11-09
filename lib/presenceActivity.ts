@@ -34,6 +34,8 @@ export const PRESENCE_ACTIVITY_MAX_AGE_MS = 10 * 60 * 1000;
 export const PRESENCE_LOG_MAX = 30;
 export const PRESENCE_LOG_MAX_AGE_MS = 3 * 60 * 60 * 1000;
 export const PRESENCE_ACTIVITY_LABEL_MAX = 80;
+/** 같은 동작(종류+라벨)이 이 시간 안에 또 오면 한 줄로 합침 */
+export const PRESENCE_LOG_DEDUP_MS = 10 * 1000;
 
 const KIND_SET = new Set<string>(PRESENCE_ACTIVITY_KINDS);
 const cutLabel = (v: unknown) => String(v ?? "").trim().slice(0, PRESENCE_ACTIVITY_LABEL_MAX);
@@ -47,7 +49,7 @@ export function normalizePresenceActivity(raw: unknown): PresenceActivity | null
   return { kind: kind as PresenceActivityKind, label: cutLabel(o.label), at: Number.isFinite(at) ? at : 0 };
 }
 
-/** 신호로 온 동작 목록 정리(서버·테스트 공용): 종류 화이트리스트·라벨 80자·시각 숫자·최근 30개·시각 오름차순·같은 동작 연속 중복 제거 */
+/** 신호로 온 동작 목록 정리(서버·테스트 공용): 종류 화이트리스트·라벨 80자·시각 숫자·최근 30개·시각 오름차순·같은 동작 10초 안 연속 중복 제거 */
 export function normalizePresenceEvents(raw: unknown, now = Date.now()): PresenceEvent[] {
   if (!Array.isArray(raw)) return [];
   const out: PresenceEvent[] = [];
@@ -64,7 +66,8 @@ export function normalizePresenceEvents(raw: unknown, now = Date.now()): Presenc
   const dedup: PresenceEvent[] = [];
   for (const e of out) {
     const prev = dedup[dedup.length - 1];
-    if (prev && prev.k === e.k && prev.l === e.l && e.at - prev.at < 2000) { prev.at = e.at; continue; }
+    // 같은 동작이 10초 안에 또 오면 하나로(사이즈 3 → 사이즈 3 두 번 눌림 등) — 사장님 18:34
+    if (prev && prev.k === e.k && prev.l === e.l && e.at - prev.at < PRESENCE_LOG_DEDUP_MS) { prev.at = e.at; continue; }
     dedup.push(e);
   }
   return dedup.slice(-PRESENCE_LOG_MAX);
