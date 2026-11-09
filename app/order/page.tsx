@@ -46,7 +46,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { normalizeProductSearchText, productSearchMatches } from "@/lib/productSearch";
 import { LIVE_PAUSED_TEXT_KEY, LIVE_PAUSED_TEXT_DEFAULT, resolveLivePausedText } from "@/lib/livePausedText";
 import { openYoutubeChannel } from "@/lib/youtubeChannelLink";
-import { setPresenceActivity } from "@/lib/presenceActivity";
+import { setPresenceActivity, readPresenceEvents } from "@/lib/presenceActivity";
 import { registerBrandAliasesFromProducts } from "@/lib/brandSearchAliases";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { HOWTO_DEFAULT, parseHowtoSteps } from "@/lib/howto";
@@ -1623,8 +1623,16 @@ export default function OrderPage() {
   const [nicknameCopyDone, setNicknameCopyDone] = useState(false);
   const [paymentGuideOpen, setPaymentGuideOpen] = useState(false);
   const [orderSheetOpen, setOrderSheetOpen] = useState(false);
-  // [2026-11-09] 주문서 확인 창이 열리면 관리자 「지금 접속」에 「주문서 확인 중」(신호만)
-  useEffect(() => { if (orderSheetOpen) setPresenceActivity("sheet"); }, [orderSheetOpen]);
+  // [2026-11-09] 주문서 확인 창이 열리면 관리자 「지금 접속」에 「주문서 확인 중」, 제출 없이 닫으면 「주문서 닫음」(신호만 — 주문 로직 무관)
+  const orderSheetWasOpenRef = useRef(false);
+  useEffect(() => {
+    if (orderSheetOpen) { orderSheetWasOpenRef.current = true; setPresenceActivity("sheet"); return; }
+    if (!orderSheetWasOpenRef.current) return;
+    orderSheetWasOpenRef.current = false;
+    const last = readPresenceEvents().slice(-1)[0];
+    if (last && last.k === "submitted" && Date.now() - last.at < 5000) return; // 제출로 닫힌 건 「주문 완료」만
+    setPresenceActivity("sheet_close");
+  }, [orderSheetOpen]);
   const [finalSubmitAcknowledged, setFinalSubmitAcknowledged] = useState(false);
   const [finalSubmitConfirmationEnabled, setFinalSubmitConfirmationEnabled] = useState(true);
   const finalSubmitReady = finalSubmitConfirmationReady(finalSubmitConfirmationEnabled, finalSubmitAcknowledged);
@@ -1876,6 +1884,19 @@ export default function OrderPage() {
   const [livePausedText, setLivePausedText] = useState(LIVE_PAUSED_TEXT_DEFAULT);
   // [2026-08-10 3단] 세부상품(1번 축) 선택값. 3단이 아닌 상품에서는 사용하지 않음(기존 동작 무변경).
   const [registeredOptionDetail, setRegisteredOptionDetail] = useState("");
+  // [2026-11-09 사장님 「일거수 일투족」] 옵션 창에서 고른 세부상품·색상·사이즈·수량을 관리자 「지금 접속」 타임라인에(신호만 — 담기·가격·재고 로직 무관).
+  //   빈값(창 열 때 초기화)·수량 1(기본)은 안 보냄. 값이 state 로 바뀐 뒤에만 기록하니 핸들러는 손대지 않는다.
+  useEffect(() => { if (registeredOptionSelectProduct && registeredOptionDetail.trim()) setPresenceActivity("detail", registeredOptionDetail.trim()); }, [registeredOptionDetail, registeredOptionSelectProduct]);
+  useEffect(() => { if (registeredOptionSelectProduct && registeredOptionColor.trim()) setPresenceActivity("color", registeredOptionColor.trim()); }, [registeredOptionColor, registeredOptionSelectProduct]);
+  useEffect(() => { if (registeredOptionSelectProduct && registeredOptionSize.trim()) setPresenceActivity("size", registeredOptionSize.trim()); }, [registeredOptionSize, registeredOptionSelectProduct]);
+  useEffect(() => { if (registeredOptionSelectProduct && registeredOptionQty !== 1) setPresenceActivity("qty", String(registeredOptionQty)); }, [registeredOptionQty, registeredOptionSelectProduct]);
+  // 상품 검색어 — 타이핑이 0.8초 멈추면 한 번(글자마다 안 보냄)
+  useEffect(() => {
+    const q = productSearchText.trim();
+    if (!q) return;
+    const t = window.setTimeout(() => setPresenceActivity("search", q), 800);
+    return () => window.clearTimeout(t);
+  }, [productSearchText]);
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
   const [duplicateWarningPendingAction, setDuplicateWarningPendingAction] = useState<(() => void) | null>(null);
 
@@ -5006,6 +5027,7 @@ export default function OrderPage() {
 
   const removeItem = (index: number) => {
     setFinalSubmitAcknowledged(false);
+    setPresenceActivity("cart_remove", String(items[index]?.product_name || "").trim()); // [2026-11-09] 관리자 「지금 접속」 표시용(신호만)
     setItems((prev) => {
       const next = prev.filter((_, itemIndex) => itemIndex !== index);
       return next.length > 0 ? next : [{ ...emptyItem }];

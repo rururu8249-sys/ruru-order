@@ -5,7 +5,7 @@
 //   돈·주문 상태를 바꾸는 코드 없음. 결제 판정은 PAID_STATUS_VALUES(관리자 화면과 같은 값) 읽기만.
 
 import { PAID_STATUS_VALUES } from "@/lib/admin-v2/statusDisplay";
-import { presenceStatusText, PRESENCE_ACTIVITY_MAX_AGE_MS } from "@/lib/presenceActivity";
+import { presenceStatusText, presenceActivityText, normalizePresenceEvents, PRESENCE_ACTIVITY_MAX_AGE_MS } from "@/lib/presenceActivity";
 
 const PAID = new Set(PAID_STATUS_VALUES);
 const clean = (v: unknown) => String(v ?? "").trim();
@@ -27,6 +27,8 @@ export type LiveVisitor = {
   /** 사람말 한 줄 — 「옵션 고르는 중 · PD-202」 「주문서 확인 중」 「상품 보는 중」 … */
   status: string;
   activity: { kind: string; label: string; at: number } | null;
+  /** [2026-11-09] 최근 동작 타임라인(최신이 앞·최대 30개) — 「18:02 옵션 고르는 중 · PD-202」 … */
+  timeline: Array<{ kind: string; label: string; at: number; text: string }>;
   lastSeenAt: string;
   cart: { count: number; qty: number; amount: number; unknownPrice: boolean; items: Array<{ name: string; qty: number }> };
   orders: { count: number; paid: number; unpaid: number; amount: number; items: Array<{ name: string; status: "paid" | "unpaid" | "canceled"; amount: number; at: string }> };
@@ -43,6 +45,18 @@ export function pageLabel(pageType: string) {
 function isPaid(o: OrderRow) { return PAID.has(clean(o.admin_order_status_v2)) || PAID.has(clean(o.order_manage_status)); }
 function isCanceled(o: OrderRow) { return clean(o.admin_order_status_v2).includes("취소") || clean(o.order_manage_status).includes("취소"); }
 const nickKey = (v: unknown) => clean(v).toLowerCase();
+
+/** [2026-11-09 ③ 사장님 「관리자 개인계정이 굳이 노출될 필요가」] 관리자 화면 줄 + 접속 기록 「제외 계정」(카카오 계정·닉네임)의 줄을 뺀다(목록·숫자 둘 다). 순수. */
+export function excludePresenceRows(rows: PresenceRow[], ex: { kakaoIds?: Iterable<string>; names?: Iterable<string> }): PresenceRow[] {
+  const kakao = new Set(Array.from(ex.kakaoIds || []).map(clean).filter(Boolean));
+  const names = new Set(Array.from(ex.names || []).map(clean).filter(Boolean));
+  return rows.filter((r) => {
+    if (clean(r.page_type) === "admin") return false;
+    if (kakao.size && kakao.has(clean(r.kakao_id))) return false;
+    if (names.size && names.has(clean(r.nickname))) return false;
+    return true;
+  });
+}
 
 export function buildLiveVisitors(args: {
   rows: PresenceRow[];
@@ -97,6 +111,7 @@ export function buildLiveVisitors(args: {
     const activityAt = row.activity_at ? Date.parse(clean(row.activity_at)) : 0;
     const activity = activityKind ? { kind: activityKind, label: clean(row.activity_label), at: Number.isFinite(activityAt) ? activityAt : 0 } : null;
     const liveActivity = activity && activity.at && now - activity.at <= PRESENCE_ACTIVITY_MAX_AGE_MS ? activity : null;
+    const timeline = normalizePresenceEvents(row.activity_log, now).reverse().map((e) => ({ kind: e.k, label: e.l, at: e.at, text: presenceActivityText(e.k, e.l) }));
 
     const cartRows = (kakaoId && cartByKakao.get(kakaoId)) || (nickname && cartByNick.get(nickKey(nickname))) || [];
     let cartQty = 0, cartAmount = 0, unknownPrice = false;
@@ -134,6 +149,7 @@ export function buildLiveVisitors(args: {
       pageLabel: pageLabel(pageType),
       status: presenceStatusText({ pageType, pageLabel: pageLabel(pageType), activity: liveActivity, now }),
       activity: liveActivity,
+      timeline,
       lastSeenAt: clean(row.last_seen_at),
       cart: { count: cartRows.length, qty: cartQty, amount: cartAmount, unknownPrice, items: cartItems },
       orders: { count: ordGroups.filter((g) => !isCanceled(g.rows[0])).length, paid, unpaid, amount, items: orderItems },

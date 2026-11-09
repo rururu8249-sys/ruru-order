@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from "react";
 import { usePathname } from "next/navigation";
-import { PRESENCE_ACTIVITY_EVENT, readPresenceActivity } from "@/lib/presenceActivity";
+import { PRESENCE_ACTIVITY_EVENT, readPresenceActivity, readPresenceEvents } from "@/lib/presenceActivity";
 
 function getOrCreateVisitorKey() {
   if (typeof window === "undefined") return "";
@@ -92,6 +92,8 @@ export default function PresenceHeartbeat() {
             viewingProduct: getViewingProduct(),
             kakaoId: getKakaoId(),
             activity: readPresenceActivity(),
+            // [2026-11-09] 최근 동작 목록(최근 30개·3시간) — 같은 신호에 실어 보내 요청 수는 그대로
+            events: readPresenceEvents(),
           }),
         });
       } catch {

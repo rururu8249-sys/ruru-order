@@ -60,7 +60,7 @@ export function namesOfCustomer(c: Record<string, unknown>): string[] {
   return Array.from(out);
 }
 
-export type ExcludeView = { list: ExcludedCustomer[]; nicknames: string[]; allNames: Set<string> };
+export type ExcludeView = { list: ExcludedCustomer[]; nicknames: string[]; allNames: Set<string>; /** [2026-11-09] 제외 회원의 카카오 계정(「지금 접속」이 kakao_id 로 뺄 때) */ kakaoIds: string[] };
 
 export async function loadExcludedCustomers(sb: SupabaseClient): Promise<ExcludeView> {
   const [{ data: setting }, { data: tests }] = await Promise.all([
@@ -112,5 +112,5 @@ export async function loadExcludedCustomers(sb: SupabaseClient): Promise<Exclude
   const list = Array.from(map.values()).sort((a, b) => (a.auto === b.auto ? a.id - b.id : a.auto ? -1 : 1));
   const allNames = new Set<string>(cfg.nicknames);
   for (const c of list) for (const n of c.names) allNames.add(n);
-  return { list, nicknames: cfg.nicknames, allNames };
+  return { list, nicknames: cfg.nicknames, allNames, kakaoIds: Array.from(kakaoOf.keys()) };
 }

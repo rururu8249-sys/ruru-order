@@ -2,15 +2,16 @@
 import assert from "node:assert/strict";
 import { createUiLoader } from "./admin-ui-test-loader.mjs";
 const load = createUiLoader();
-const { buildLiveVisitors, summarizeLiveVisitors, filterLiveVisitors, sortLiveVisitors } = load("lib/presenceLive.ts");
-const { presenceActivityText, presenceStatusText, normalizePresenceActivity, PRESENCE_ACTIVITY_MAX_AGE_MS } = load("lib/presenceActivity.ts");
+const { buildLiveVisitors, summarizeLiveVisitors, filterLiveVisitors, sortLiveVisitors, excludePresenceRows } = load("lib/presenceLive.ts");
+const { presenceActivityText, presenceStatusText, normalizePresenceActivity, normalizePresenceEvents, PRESENCE_ACTIVITY_MAX_AGE_MS } = load("lib/presenceActivity.ts");
 
 const now = Date.parse("2026-11-09T05:00:00Z");
 const iso = (msAgo) => new Date(now - msAgo).toISOString();
 
 const rows = [
   // 임현아: 카카오 계정으로 붙음 — 닉네임은 바뀌었어도(옛 주문 닉 「임현아」·지금 신호 「현아」) 장바구니·주문이 따라옴
-  { id: "p1", visitor_key: "k1", nickname: "현아", kakao_id: "K1", page_type: "order_form", last_seen_at: iso(20_000), activity: "option", activity_label: "PD-202 가방", activity_at: iso(30_000) },
+  { id: "p1", visitor_key: "k1", nickname: "현아", kakao_id: "K1", page_type: "order_form", last_seen_at: iso(20_000), activity: "option", activity_label: "PD-202 가방", activity_at: iso(30_000),
+    activity_log: [ { k: "search", l: "프라다", at: now - 120_000 }, { k: "option", l: "PD-202 가방", at: now - 90_000 }, { k: "color", l: "블랙", at: now - 80_000 }, { k: "qty", l: "2", at: now - 70_000 }, { k: "hack", l: "x", at: now - 60_000 }, { k: "cart", l: "PD-202 가방", at: now - 50_000 }, { k: "cart", l: "PD-202 가방", at: now - 49_500 }, { k: "option", l: "PD-202 가방", at: now - 30_000 }, { k: "sheet", l: "", at: now - 4 * 3600_000 } ] },
   // 핑크링: 옛 신호(kakao_id 없음) → 닉네임 글자로 폴백
   { id: "p2", visitor_key: "k2", nickname: "핑크링", page_type: "order_form", last_seen_at: iso(31_000), activity: "sheet", activity_at: iso(5_000) },
   // 로그인 전 비회원
@@ -88,4 +89,23 @@ assert.deepEqual(filterLiveVisitors(list, "cart", "").map((v) => v.id), ["p1", "
 assert.deepEqual(filterLiveVisitors(list, "ordered", "").map((v) => v.id), ["p1", "p2"]);
 assert.deepEqual(filterLiveVisitors(list, "guest", "").map((v) => v.id), ["p3"]);
 assert.deepEqual(filterLiveVisitors(list, "all", "임현").map((v) => v.id), ["p1"]); // 이름으로도 검색
+
+// [2026-11-09 ②] 타임라인 — 최신이 앞, 모르는 종류 제외, 2초 안 같은 동작 하나로, 3시간 넘은 건 제외
+assert.deepEqual(by.p1.timeline.map((e) => e.text), [
+  "옵션 고르는 중 · PD-202 가방", "담았어요 · PD-202 가방", "수량 2개", "색상 블랙 고름", "옵션 고르는 중 · PD-202 가방", "검색 「프라다」",
+]);
+assert.equal(by.p1.timeline[1].at, now - 49_500, "연속 중복은 나중 시각으로 합침");
+assert.deepEqual(by.p3.timeline, []);
+// 동작 목록 정리(서버 쓰기와 같은 함수): 30개 상한·미래 시각 제외
+const many = Array.from({ length: 40 }, (_, i) => ({ k: "search", l: `q${i}`, at: now - (40 - i) * 10_000 }));
+assert.equal(normalizePresenceEvents(many, now).length, 30);
+assert.equal(normalizePresenceEvents([{ k: "cart", l: "a", at: now + 120_000 }], now).length, 0);
+assert.equal(normalizePresenceEvents("nope", now).length, 0);
+assert.equal(presenceActivityText("cart_remove", "BB-1"), "장바구니에서 뺌 · BB-1");
+assert.equal(presenceActivityText("sheet_close", ""), "주문서 닫음(제출 안 함)");
+
+// [2026-11-09 ③] 관리자·제외 계정 빼기 — 관리자 화면 줄(p4), 제외 카카오(K5), 제외 닉네임(핑크링)
+const kept = excludePresenceRows(rows, { kakaoIds: ["K5"], names: ["핑크링"] }).map((r) => r.id);
+assert.deepEqual(kept, ["p1", "p3"]);
+assert.deepEqual(excludePresenceRows(rows, {}).map((r) => r.id), ["p1", "p2", "p3", "p5"], "목록 없어도 관리자 줄은 뺌");
 console.log("PASS presence-live");

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { writePresence } from "@/lib/presenceWrite";
-import { buildLiveVisitors, summarizeLiveVisitors, type CustomerRow, type CartRow, type OrderRow } from "@/lib/presenceLive";
+import { buildLiveVisitors, summarizeLiveVisitors, excludePresenceRows, type CustomerRow, type CartRow, type OrderRow } from "@/lib/presenceLive";
+import { loadExcludedCustomers } from "@/lib/visitStatsExclude";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,7 @@ export async function GET() {
 
     // [2026-11-09] kakao_id·activity* 포함(visitor_presence_activity.sql) — 칸이 아직 없으면 옛 select 로 폴백(viewing_product 도 같은 방식)
     const selects = [
+      "id, visitor_key, nickname, page_type, last_seen_at, viewing_product, kakao_id, activity, activity_label, activity_at, activity_log",
       "id, visitor_key, nickname, page_type, last_seen_at, viewing_product, kakao_id, activity, activity_label, activity_at",
       "id, visitor_key, nickname, page_type, last_seen_at, viewing_product",
       "id, visitor_key, nickname, page_type, last_seen_at",
@@ -74,7 +76,17 @@ export async function GET() {
       return NextResponse.json({ ok: true, available: false, total: 0, byType: { orderForm: 0, orderLookup: 0, admin: 0, others: 0 }, visitors: [] });
     }
 
-    const allRows = (data || []) as Array<Record<string, unknown>>;
+    const rawRows = (data || []) as Array<Record<string, unknown>>;
+    // [2026-11-09 ③] 관리자 화면 줄 + 접속 기록 「제외 계정」(사장님 계정 — 카카오 계정·닉네임 전부)은 목록·숫자에서 뺀다. 목록 못 읽으면 관리자 줄만 뺌.
+    let excludeKakao: string[] = [];
+    let excludeNames: string[] = [];
+    try {
+      const ex = await loadExcludedCustomers(supabase);
+      excludeKakao = ex.kakaoIds;
+      excludeNames = Array.from(ex.allNames);
+    } catch { /* 제외 목록 못 읽음 → 관리자 줄만 */ }
+    const allRows = excludePresenceRows(rawRows, { kakaoIds: excludeKakao, names: excludeNames });
+    const removed = rawRows.length - allRows.length;
     const listedRows = allRows.slice(0, 60);
 
     // [2026-11-09] 회원·장바구니·오늘(이번 방송) 주문을 붙인다 — 읽기 SELECT 3~4개(목록 60명 기준), 실패하면 그 정보만 빈 값.
@@ -124,8 +136,9 @@ export async function GET() {
       else byType.others += 1;
     });
 
-    const total = Number.isFinite(totalCount as number) && (totalCount as number) >= visitors.length
-      ? (totalCount as number)
+    // 총 인원 = count 에서 뺀 줄(관리자·제외 계정) 만큼 빼기(500줄 넘게 읽었을 때도 숫자 유지)
+    const total = Number.isFinite(totalCount as number) && (totalCount as number) - removed >= visitors.length
+      ? (totalCount as number) - removed
       : visitors.length;
 
     return NextResponse.json({ ok: true, available: true, total, listed: visitors.length, byType, summary: summarizeLiveVisitors(visitors, total), since, visitors });

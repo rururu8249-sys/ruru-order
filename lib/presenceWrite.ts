@@ -12,7 +12,7 @@
 //    주문 · 입금 · 정산 · 배송 · 재고 · 포인트는 전혀 건드리지 않는다.
 
 import { createClient } from "@supabase/supabase-js";
-import { normalizePresenceActivity } from "@/lib/presenceActivity";
+import { normalizePresenceActivity, normalizePresenceEvents } from "@/lib/presenceActivity";
 
 export function getPresenceSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -44,6 +44,8 @@ export function normalizePresenceInput(body: Record<string, unknown>) {
     kakaoId: /^[A-Za-z0-9_-]{1,40}$/.test(clean(body.kakaoId)) ? clean(body.kakaoId) : "",
     // [2026-11-09] 지금 하는 일(종류 화이트리스트·라벨 80자·시각) — 표시 전용
     activity: normalizePresenceActivity(body.activity),
+    // [2026-11-09] 최근 동작 목록(종류 화이트리스트·30개·3시간) — 사람당 한 칸(activity_log JSON)에 덮어씀
+    events: normalizePresenceEvents(body.events),
   };
 }
 
@@ -200,14 +202,20 @@ export async function writePresence(
   // [2026-08-31] viewing_product 는 새 칸 — SQL 실행 전 배포돼도 접속 신호가 죽지 않게,
   //   "칸 없음" 오류면 그 값만 빼고 한 번 더 저장한다. (customer-note 의 배포 순서 사고 방지 패턴)
   // [2026-11-09] kakao_id·activity* 는 새 칸(visitor_presence_activity.sql) — 칸 없으면 그 값들을 빼고 한 번 더(접속 신호가 죽지 않게).
-  const activityRow = input.activity
+  const activityRow: { activity: string | null; activity_label: string | null; activity_at: string | null } = input.activity
     ? { activity: input.activity.kind, activity_label: input.activity.label || null, activity_at: new Date(input.activity.at || Date.now()).toISOString() }
     : { activity: null, activity_label: null, activity_at: null };
   const isMissingCol = (e: unknown) => /column .* does not exist|could not find the .* column|PGRST204|42703/i.test(String((e as { message?: unknown })?.message ?? ""));
+  const fullRow = { ...baseRow, viewing_product: input.viewingProduct || null, kakao_id: input.kakaoId || null, ...activityRow };
   let { error } = await supabase.from("visitor_presence").upsert(
-    { ...baseRow, viewing_product: input.viewingProduct || null, kakao_id: input.kakaoId || null, ...activityRow },
+    { ...fullRow, activity_log: input.events.length ? input.events : null },
     { onConflict: "visitor_key" },
   );
+  if (error && isMissingCol(error)) {
+    // activity_log 칸만 아직 없을 때(SQL 일부만 실행) → 목록만 빼고
+    const retry0 = await supabase.from("visitor_presence").upsert(fullRow, { onConflict: "visitor_key" });
+    error = retry0.error;
+  }
   if (error && isMissingCol(error)) {
     const retry1 = await supabase.from("visitor_presence").upsert({ ...baseRow, viewing_product: input.viewingProduct || null }, { onConflict: "visitor_key" });
     error = retry1.error;

@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { BroadcastBucket, DailyBucket, VisitPerson } from "@/lib/visitStatsAgg";
+import LivePresenceList, { type LivePresencePayload } from "./LivePresenceList";
 
 export type VisitStats = {
   ok?: boolean;
@@ -20,7 +21,9 @@ export type VisitStats = {
   broadcasts?: Array<BroadcastBucket & { title: string }>;
 };
 
-type Tab = "date" | "broadcast";
+// [2026-11-09 사장님 「접속 기록을 같이」] 첫 탭 「지금 접속」 = 실시간(누가 뭐 하는 중·타임라인), 그 뒤 날짜별·방송별 기록 — 한 화면에서.
+type Tab = "live" | "date" | "broadcast";
+const LIVE_POLL_MS = 20000;
 type Chip = "all" | "ordered" | "notOrdered" | "new" | "guest";
 
 const n = (v: number) => (v || 0).toLocaleString("ko-KR");
@@ -371,9 +374,29 @@ type Props = { embedded?: boolean; style?: CSSProperties };
 export default function VisitStatsView({ style }: Props) {
   const [stats, setStats] = useState<VisitStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<Tab>("date");
+  const [tab, setTab] = useState<Tab>("live");
   const [openKey, setOpenKey] = useState<string>("");
   const [excludeOpen, setExcludeOpen] = useState(false);
+
+  // [2026-11-09] 「지금 접속」 — 20초마다 /api/admin-live/presence GET(읽기 전용). 탭이 live 일 때만 돈다.
+  const [live, setLive] = useState<LivePresencePayload | null>(null);
+  const [liveRefreshing, setLiveRefreshing] = useState(false);
+  const loadLive = useCallback(async (manual?: boolean) => {
+    if (manual) setLiveRefreshing(true);
+    try {
+      const res = await fetch("/api/admin-live/presence", { cache: "no-store" });
+      const payload = (await res.json().catch(() => null)) as LivePresencePayload | null;
+      if (payload?.ok) setLive(payload);
+    } catch { /* 보조 기능 — 실패 무시 */ } finally {
+      if (manual) window.setTimeout(() => setLiveRefreshing(false), 350);
+    }
+  }, []);
+  useEffect(() => {
+    if (tab !== "live") return;
+    void loadLive();
+    const t = window.setInterval(() => { void loadLive(); }, LIVE_POLL_MS);
+    return () => window.clearInterval(t);
+  }, [tab, loadLive]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -415,7 +438,7 @@ export default function VisitStatsView({ style }: Props) {
       </div>
 
       <div className="flex shrink-0 gap-4 border-b border-line px-6 max-md:px-4">
-        {([["date", "날짜별"], ["broadcast", "방송별"]] as const).map(([k, label]) => (
+        {([["live", live?.total != null ? `지금 접속 ${n(live.total)}` : "지금 접속"], ["date", "날짜별"], ["broadcast", "방송별"]] as const).map(([k, label]) => (
           <button key={k} type="button" onClick={() => setTab(k)}
             className={`-mb-px h-10 border-b-2 px-1 text-[14px] ${tab === k ? "border-ink font-semibold text-ink" : "border-transparent text-ink-mute"}`}>
             {label}
@@ -424,7 +447,9 @@ export default function VisitStatsView({ style }: Props) {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 max-md:px-4">
-        {loading ? (
+        {tab === "live" ? (
+          <LivePresenceList data={live} refreshing={liveRefreshing} onRefresh={() => void loadLive(true)} />
+        ) : loading ? (
           <div className="py-12 text-center text-[13px] text-ink-mute">불러오는 중…</div>
         ) : stats?.available === false ? (
           <div className="py-12 text-center text-[13px] text-ink-mute">접속 기록 표(visitor_visits)가 없어요. 개발자에게 알려 주세요.</div>
