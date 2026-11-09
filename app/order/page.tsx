@@ -44,6 +44,8 @@ const normalizeEmptyProductOptionValue = (value: unknown) => {
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { normalizeProductSearchText, productSearchMatches } from "@/lib/productSearch";
+import { LIVE_PAUSED_TEXT_KEY, LIVE_PAUSED_TEXT_DEFAULT, resolveLivePausedText } from "@/lib/livePausedText";
+import { openYoutubeChannel } from "@/lib/youtubeChannelLink";
 import { registerBrandAliasesFromProducts } from "@/lib/brandSearchAliases";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { HOWTO_DEFAULT, parseHowtoSteps } from "@/lib/howto";
@@ -1867,6 +1869,8 @@ export default function OrderPage() {
   const [registeredOptionDetailCategory, setRegisteredOptionDetailCategory] = useState("전체");
   // [2026-08-12 리뉴얼 2단계] 다음 방송 일시 — settings.next_live_text 를 그대로 보여준다(없으면 안 뜸).
   const [nextLiveText, setNextLiveText] = useState("");
+  // [2026-11-09] 「잠시 쉬는 중」 문구 — settings live_paused_text(기본값 있음), 표시만
+  const [livePausedText, setLivePausedText] = useState(LIVE_PAUSED_TEXT_DEFAULT);
   // [2026-08-10 3단] 세부상품(1번 축) 선택값. 3단이 아닌 상품에서는 사용하지 않음(기존 동작 무변경).
   const [registeredOptionDetail, setRegisteredOptionDetail] = useState("");
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
@@ -2923,6 +2927,13 @@ export default function OrderPage() {
       .eq("key", "next_live_text")
       .maybeSingle();
 
+    // [2026-11-09] 「잠시 쉬는 중」 문구(사장님이 방송 관리에서 바꿈) — 없거나 실패하면 기본 문구
+    const pausedTextRequest = supabase
+      .from("settings")
+      .select("value")
+      .eq("key", LIVE_PAUSED_TEXT_KEY)
+      .maybeSingle();
+
     const broadcastRequest = supabase
       .from("broadcasts")
       .select("*")
@@ -2930,9 +2941,10 @@ export default function OrderPage() {
       .order("started_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    const [{ data: shopSetting }, { data: nextLiveSetting }, { data, error }] = await Promise.all([shopRequest, nextLiveRequest, broadcastRequest]);
+    const [{ data: shopSetting }, { data: nextLiveSetting }, { data: pausedTextSetting }, { data, error }] = await Promise.all([shopRequest, nextLiveRequest, pausedTextRequest, broadcastRequest]);
     setShopOpen(String(shopSetting?.value ?? "").trim().toLowerCase() !== "false");
     setNextLiveText(String(nextLiveSetting?.value ?? "").trim());
+    setLivePausedText(resolveLivePausedText(pausedTextSetting?.value));
 
     if (error) {
       console.log("방송정보 불러오기 오류", error.message);
@@ -7073,16 +7085,27 @@ export default function OrderPage() {
                     <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "#FF3B30" }} />
                   </span>
                 ) : <span style={{ width: "9px", height: "9px", borderRadius: "50%", background: "#E8340A", flexShrink: 0, animation: "shimmer 1.2s ease-in-out infinite" }} />}
-                <span style={{ fontSize: "14px", fontWeight: 900 }}>{isBroadcastPaused ? "잠시 쉬는 중 · 곧 다시 시작해요" : "라이브 방송 중!"}</span>
+                <span style={{ fontSize: "14px", fontWeight: 900 }}>{isBroadcastPaused ? livePausedText : "라이브 방송 중!"}</span>
                 <span style={uiV2 ? { marginLeft: "auto", fontSize: "13px", fontWeight: 400, opacity: 0.8 } : { marginLeft: "auto", fontSize: "11.5px", fontWeight: 700, opacity: 0.75 }}>
                   {String(broadcast?.broadcast_public_title || broadcast?.public_title || "").trim() || "루루동이 라이브"}
                 </span>
               </div>
+              {isBroadcastPaused ? (
+                /* [2026-11-09 13:58 사장님 「쉬는 중인데 상품 바로 구매 가능 멘트가 왜 없나」] 방송 상품·담기·주문은 그대로라 손님에게 알려 준다(방송 전 상자와 같은 말투) */
+                <div style={uiV2 ? { fontSize: "14px", fontWeight: 400, lineHeight: 1.5, opacity: 0.9, marginTop: "-4px", marginBottom: "10px", wordBreak: "keep-all" as const } : { fontSize: "12.5px", fontWeight: 700, opacity: 0.9, marginTop: "-4px", marginBottom: "10px" }}>
+                  아래 방송 상품은 <b>지금도 주문</b>하실 수 있어요
+                </div>
+              ) : null}
               <div style={{ display: "flex", gap: "8px" }}>
                 <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flex: 1, height: "44px", border: "1px solid rgba(255,255,255,0.5)", borderRadius: "9999px", background: "transparent", color: "#FFFFFF", fontSize: "14px", fontWeight: 600, cursor: "pointer" } : { flex: 1, height: "40px", border: "1.5px solid rgba(255,255,255,0.5)", borderRadius: "11px", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: "12.5px", fontWeight: 800, cursor: "pointer" }}>
                   {liveAlertOptin ? (uiS5 ? "알림 받는 중 ✓" : "🔔 알림 받는 중 ✓") : (uiS5 ? "다음방송 알림받기" : "🔔 다음방송 알림받기")}
                 </button>
+                {isBroadcastPaused ? (
+                  /* [2026-11-09 13:58 사장님 「쉬는 중일 땐 방송 보러가기가 아니라 유튜브 채널 바로가기」] 쉬는 중엔 채널 홈(앱)으로 — /youtube 와 같은 규칙 */
+                  <button type="button" onClick={() => openYoutubeChannel()} style={uiV2 ? { flex: 1, height: "44px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, cursor: "pointer" } : { flex: 1, height: "40px", border: "none", borderRadius: "11px", background: "#FF0033", color: "#fff", fontSize: "12.5px", fontWeight: 900, cursor: "pointer" }}>▶ 유튜브 채널 바로가기</button>
+                ) : (
                 <button type="button" disabled={!broadcastYoutubeUrl} onClick={() => openYoutubeApp(broadcastYoutubeUrl)} style={uiV2 ? { flex: 1, height: "44px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, cursor: broadcastYoutubeUrl ? "pointer" : "default", opacity: broadcastYoutubeUrl ? 1 : 0.6 } : { flex: 1, height: "40px", border: "none", borderRadius: "11px", background: broadcastYoutubeUrl ? "#FF0033" : "#5A4048", color: "#fff", fontSize: "12.5px", fontWeight: 900, cursor: broadcastYoutubeUrl ? "pointer" : "default", opacity: broadcastYoutubeUrl ? 1 : 0.6 }}>▶ 방송 보러가기</button>
+                )}
               </div>
             </div>
           )}

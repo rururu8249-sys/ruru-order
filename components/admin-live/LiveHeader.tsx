@@ -9,6 +9,7 @@ import { showAdminConfirm } from "@/lib/adminConfirm";
 import { buildChatAnnounceText } from "@/lib/chatAnnounce";
 import { buildDetailChatLine, detailProducts } from "@/lib/productDetailModel";
 import { feedPinLayout, FEED_PIN_SIZE } from "@/lib/feedText";
+import { LIVE_PAUSED_TEXT_KEY, LIVE_PAUSED_TEXT_DEFAULT, LIVE_PAUSED_TEXT_MAX } from "@/lib/livePausedText";
 
 type VideoRatio = "vertical" | "wide" | "auto";
 type AlertMember = { id: string; cid?: string; name: string; phone: string; orderDays?: number; recent?: boolean; manual?: boolean };
@@ -84,6 +85,38 @@ export default function LiveHeader({
       showAdminToast("위젯 고정 공지 저장에 실패했어요.", "error");
     } finally {
       setPinSaving(false);
+    }
+  };
+
+  // [2026-11-09 사장님 13:55 「잠시 쉬는 중 문구 내가 수정할 수 있게」] 손님 화면 「잠시 쉬는 중」 문구 — settings live_paused_text(방송과 무관한 상시 설정, 비우면 기본 문구).
+  //   저장은 손님 공지 설정과 같은 settings upsert(한 키만). 손님 화면은 loadBroadcast 가 읽는다(돈·주문 무관, 표시만).
+  const [pausedText, setPausedText] = useState("");
+  const [pausedTextSaved, setPausedTextSaved] = useState("");
+  const [pausedSaving, setPausedSaving] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    supabase.from("settings").select("value").eq("key", LIVE_PAUSED_TEXT_KEY).maybeSingle().then(({ data }) => {
+      if (!alive) return;
+      const v = String(data?.value ?? "").trim();
+      setPausedText(v);
+      setPausedTextSaved(v);
+    });
+    return () => { alive = false; };
+  }, []);
+  const savePausedText = async () => {
+    if (pausedSaving) return;
+    setPausedSaving(true);
+    try {
+      const value = pausedText.trim().slice(0, LIVE_PAUSED_TEXT_MAX);
+      const { error } = await supabase.from("settings").upsert([{ key: LIVE_PAUSED_TEXT_KEY, value }], { onConflict: "key" });
+      if (error) throw error;
+      setPausedText(value);
+      setPausedTextSaved(value);
+      showAdminToast(value ? "「잠시 쉬는 중」 문구를 저장했어요. 손님 화면에 45초 안에 반영돼요." : "문구를 비워 기본 문구로 돌아가요.", "success");
+    } catch {
+      showAdminToast("문구 저장에 실패했어요.", "error");
+    } finally {
+      setPausedSaving(false);
     }
   };
 
@@ -462,6 +495,25 @@ export default function LiveHeader({
             />
             <button type="button" disabled={pinSaving || !activeBroadcast} onClick={() => void savePinText()} className={primaryCls}>{pinSaving ? "저장 중…" : "저장"}</button>
           </div>
+        </div>
+      </div>
+
+      {/* [2026-11-09] 손님 화면 「잠시 쉬는 중」 문구 — 사이드바 「잠시 멈춤」 누르면 방송 상자에 나오는 글. 상시 설정(방송 끝나도 유지) */}
+      <div>
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <label className="text-[13px] font-bold text-ink">잠시 쉬는 중 문구 <span className="font-normal text-ink-mute">· 「잠시 멈춤」 때 손님 방송 상자에 나오는 글</span></label>
+          <span className="shrink-0 text-[12px] text-ink-mute">{pausedText.trim() !== pausedTextSaved ? "저장 안 됨" : "비우면 기본 문구"}</span>
+        </div>
+        <div className="flex gap-2">
+          <input
+            value={pausedText}
+            maxLength={LIVE_PAUSED_TEXT_MAX}
+            onChange={(event) => setPausedText(event.target.value)}
+            onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void savePausedText(); } }}
+            placeholder={LIVE_PAUSED_TEXT_DEFAULT}
+            className={fieldCls}
+          />
+          <button type="button" disabled={pausedSaving || pausedText.trim() === pausedTextSaved} onClick={() => void savePausedText()} className={primaryCls}>{pausedSaving ? "저장 중…" : "저장"}</button>
         </div>
       </div>
 
