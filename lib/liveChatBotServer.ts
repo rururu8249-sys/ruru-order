@@ -38,7 +38,6 @@ function productCandidates(row: Record<string, unknown>): BotCandidate[] {
       line: buildDetailChatLine(d),
       soldOut: d.stockManaged && d.stock !== null && d.stock <= 0,
       sizes: d.sizes,
-      groupName: String(row.product_name ?? "").trim(),
     }));
   }
   const note = parseProductNote(row);

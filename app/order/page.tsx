@@ -1467,6 +1467,7 @@ export default function OrderPage() {
   const [liveChatCanEmoji, setLiveChatCanEmoji] = useState(false);
   // [2026-11-10] 방송 화면 왼쪽 위 시청자 수(유튜브 동시 시청자, 30초마다 읽음)
   const [liveViewers, setLiveViewers] = useState<number | null>(null);
+  const [liveSiteViewers, setLiveSiteViewers] = useState<number | null>(null);
   // 주문 소식 처리(효과 안)에서 지금 채팅이 켜졌는지 보려고
   const liveChatEnabledRef = useRef(false);
   useEffect(() => { liveChatEnabledRef.current = liveChatEnabled; }, [liveChatEnabled]);
@@ -6579,6 +6580,7 @@ export default function OrderPage() {
       try {
         const j = await fetch(`/api/live-viewers?bc=${encodeURIComponent(String(bid))}`).then((r) => r.json());
         setLiveViewers(j && Number.isFinite(Number(j.viewers)) && j.viewers != null ? Number(j.viewers) : null);
+        setLiveSiteViewers(j && Number.isFinite(Number(j.site)) && j.site != null ? Number(j.site) : null);
       } catch { /* 숫자 못 읽으면 그대로 */ }
     };
     void loadViewers();
@@ -8225,6 +8227,8 @@ export default function OrderPage() {
               paused={isBroadcastPaused}
               pausedText={livePausedText}
               viewers={liveViewers}
+              siteViewers={liveSiteViewers}
+              showSiteViewers={operatorTestAccount !== null || chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) !== null}
               pinned={liveWatchPinned}
               items={liveWatchItems}
               cartCount={liveWatchCartCount}

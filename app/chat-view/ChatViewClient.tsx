@@ -28,6 +28,8 @@ export default function ChatViewClient() {
   const [list, setList] = useState<LiveChatMessage[]>([]);
   const [emojis, setEmojis] = useState<ChatEmoji[]>([]);
   const [sizeIdx, setSizeIdx] = useState(1);
+  // [07:18 사장님] 유튜브 시청자 수·사이트 접속 수 — 각 칸 제목 옆(30초마다)
+  const [counts, setCounts] = useState<{ yt: number | null; site: number | null }>({ yt: null, site: null });
   const emojiMap = useMemo(() => emojiMapOf(emojis), [emojis]);
   const boxRef = useRef<HTMLDivElement | null>(null);
   const stick = useRef(true);
@@ -92,6 +94,19 @@ export default function ChatViewClient() {
     return () => { alive = false; off(); window.clearInterval(t1); window.clearInterval(t2); };
   }, [bcId]);
 
+  useEffect(() => {
+    if (!bcId) return;
+    let alive = true;
+    const load = () => fetch(`/api/live-viewers?bc=${encodeURIComponent(bcId)}`).then((r) => r.json()).then((j) => {
+      if (!alive || !j?.ok) return;
+      const n = (v: unknown) => (v != null && Number.isFinite(Number(v)) ? Number(v) : null);
+      setCounts({ yt: n(j.viewers), site: n(j.site) });
+    }).catch(() => {});
+    load();
+    const t = window.setInterval(load, 30000);
+    return () => { alive = false; window.clearInterval(t); };
+  }, [bcId]);
+
   // 맨 아래 보고 있으면 새 글 따라 내려감
   useEffect(() => {
     const el = boxRef.current;
@@ -121,6 +136,7 @@ export default function ChatViewClient() {
         <header style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", borderBottom: "1px solid #E5E5E5" }}>
           <span aria-hidden="true" style={{ width: "10px", height: "10px", borderRadius: "9999px", background: "#FF0000" }} />
           <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 800 }}>유튜브 채팅</h2>
+          {bc ? <span style={{ marginLeft: "auto", fontSize: "18px", fontWeight: 700, color: "#4B4B4D" }}>시청자 {counts.yt != null ? `${counts.yt.toLocaleString("ko-KR")}명` : "-"}</span> : null}
         </header>
         <div style={{ flex: 1, minHeight: 0 }}>
           {ytSrc ? (
@@ -138,6 +154,7 @@ export default function ChatViewClient() {
         <header style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px 10px 16px", borderBottom: "1px solid #E5E5E5" }}>
           <span aria-hidden="true" style={{ width: "10px", height: "10px", borderRadius: "9999px", background: "#111111" }} />
           <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 800, flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>사이트 채팅</h2>
+          {bc ? <span style={{ fontSize: "18px", fontWeight: 700, color: "#4B4B4D", whiteSpace: "nowrap" }}>접속 {counts.site != null ? `${counts.site.toLocaleString("ko-KR")}명` : "-"}</span> : null}
           {bc?.paused ? <span style={{ fontSize: "14px", fontWeight: 700, color: "#707072" }}>쉬는 중</span> : null}
           <button type="button" onClick={() => changeSize(-1)} aria-label="글자 작게" style={{ width: "44px", height: "40px", border: "1px solid #E5E5E5", borderRadius: "8px", background: "#FFFFFF", fontSize: "15px", fontWeight: 700 }}>가-</button>
           <button type="button" onClick={() => changeSize(1)} aria-label="글자 크게" style={{ width: "44px", height: "40px", border: "1px solid #E5E5E5", borderRadius: "8px", background: "#FFFFFF", fontSize: "18px", fontWeight: 700 }}>가+</button>

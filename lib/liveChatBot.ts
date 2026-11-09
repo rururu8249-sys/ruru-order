@@ -116,9 +116,9 @@ function words(body: string): string[] {
 
 export type BotProductPick = { cand: BotCandidate; by: "code" | "name" };
 
-/** [2026-11-10 07:06 사장님 「다이슨·에어랩 쳐도 안내가 안 나옴」]
- *  짧은 글(낱말 1~2개, 15글자 이하)에 상품 이름만 쓴 경우 — 묻는 말이 없어도 안내.
- *  맞는 상품이 3개 이하일 때만(너무 흔한 말은 안 함). 세부상품이 여럿 맞는 묶음은 묶음 한 줄(누르면 옵션 창에서 고름). */
+/** [2026-11-10 07:06·07:20 사장님] 짧은 글(낱말 1~2개, 15글자 이하)에 상품 이름만 — 「에어랩」.
+ *  약속한 규칙 그대로: 맞는 상품이 «딱 하나»일 때만 안내(세부상품 하나까지 정확히). 둘 이상 맞으면(「다이슨」「프라다」) 안 함.
+ *  색 이름·「예뻐요」 같은 흔한 말은 상품 이름으로 안 봄. */
 const SHORT_COMMON = new Set(["블랙", "화이트", "베이지", "네이비", "그레이", "회색", "검정", "흰색", "핑크", "레드", "블루", "브라운", "아이보리", "카키", "차콜", "크림", "오트밀", "연베이지", "카멜", "그린", "옐로우", "퍼플", "와인", "프리", "free", "사이즈", "예뻐요", "예쁘다", "이뻐요", "대박", "좋아요", "감사", "감사합니다", "안녕", "안녕하세요", "하이", "ㅋㅋ", "ㅎㅎ", "언니", "루루", "루루동이", "명품", "가방", "신발", "옷", "니트", "코트", "패딩", "자켓", "셔츠", "바지", "치마"]);
 export type BotShortPick = { productId: string; detailName: string; text: string };
 export function pickProductsForShortChat(body: string, cands: BotCandidate[]): BotShortPick[] {
@@ -127,26 +127,12 @@ export function pickProductsForShortChat(body: string, cands: BotCandidate[]): B
   const ws = words(body).map((w) => normalizeProductSearchText(w)).filter((w) => w.length >= 2);
   if (ws.length < 1 || ws.length > 2) return [];
   if (ws.some((w) => SHORT_COMMON.has(w))) return []; // 「블랙」「예뻐요」 같은 흔한 말은 상품 이름으로 안 봄
-  const groups = new Map<string, BotCandidate[]>();
-  for (const c of cands) {
-    const hay = [...c.texts, c.groupName || ""].map((t) => normalizeProductSearchText(t)).join("|");
-    if (!ws.every((w) => hay.includes(w))) continue;
-    const list = groups.get(c.productId) || [];
-    list.push(c);
-    groups.set(c.productId, list);
-  }
-  if (groups.size === 0 || groups.size > 3) return [];
-  const out: BotShortPick[] = [];
-  for (const [pid, list] of groups) {
-    if (list.length === 1) {
-      out.push({ productId: pid, detailName: list[0].detailName, text: productBotText(list[0]) });
-    } else {
-      const name = list[0].groupName || list[0].texts[0] || "";
-      const open = list.filter((c) => !c.soldOut).length;
-      out.push({ productId: pid, detailName: "", text: `${name} — 세부상품 ${list.length}가지${open < list.length ? ` (품절 ${list.length - open})` : ""} · 담기 눌러 골라 주세요`.slice(0, LIVE_CHAT_BOT_MAX_LEN) });
-    }
-  }
-  return out;
+  const hits = cands.filter((c) => {
+    const hay = c.texts.map((t) => normalizeProductSearchText(t)).join("|");
+    return ws.every((w) => hay.includes(w));
+  });
+  if (hits.length !== 1) return [];
+  return [{ productId: hits[0].productId, detailName: hits[0].detailName, text: productBotText(hits[0]) }];
 }
 
 /** 손님 글 → 안내할 상품 하나(없거나 둘 이상이면 null) */
