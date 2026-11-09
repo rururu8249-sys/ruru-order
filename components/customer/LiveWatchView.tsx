@@ -250,6 +250,50 @@ export default function LiveWatchView(props: Props) {
     pressTimer.current = window.setTimeout(() => setModTarget(m), 500);
   };
   const endPress = () => { if (pressTimer.current) { window.clearTimeout(pressTimer.current); pressTimer.current = null; } };
+
+  // ── 카톡 안 브라우저가 «페이지 스크롤»로 알아듣지 않게 ──
+  //   손가락을 끌면 카톡 브라우저가 위 주소창·아래 ←→ 줄을 꺼내며 화면이 줄어들었다(사장님 영상 11/10 02:46).
+  //   ①채팅 칸은 브라우저 스크롤 대신 우리가 직접 위아래로 움직인다(touchmove 막고 scrollTop 만 바꿈)
+  //   ②그 밖의 방송 화면(위·아래 띠 등)도 끌기는 막는다 — 단 상품 목록처럼 원래 내려 보는 칸(data-live-scroll)은 그대로
+  //   ③끌기 시작하면 길게 누르기(관리) 취소 — 올려 보다가 관리 창이 뜨지 않게
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    let startY = 0;
+    let startTop = 0;
+    let inChat: HTMLElement | null = null;
+    let moved = false;
+    const onStart = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!t) return;
+      startY = t.clientY;
+      moved = false;
+      const box = chatBoxRef.current;
+      inChat = box && e.target instanceof Node && box.contains(e.target) ? box : null;
+      startTop = inChat ? inChat.scrollTop : 0;
+    };
+    const onMove = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!t) return;
+      const dy = t.clientY - startY;
+      if (!moved && Math.abs(dy) > 8) { moved = true; endPress(); }
+      if (inChat) {
+        inChat.scrollTop = startTop - dy;
+        if (e.cancelable) e.preventDefault();
+        return;
+      }
+      const target = e.target instanceof Element ? e.target : null;
+      if (target && target.closest("[data-live-scroll]")) return;
+      if (e.cancelable) e.preventDefault();
+    };
+    root.addEventListener("touchstart", onStart, { passive: true });
+    root.addEventListener("touchmove", onMove, { passive: false });
+    return () => {
+      root.removeEventListener("touchstart", onStart);
+      root.removeEventListener("touchmove", onMove);
+    };
+  }, []);
   const moderate = async (action: LiveChatPenalty) => {
     if (!chat || !modTarget) return;
     if (action === "ban" && !banConfirm) { setBanConfirm(true); return; }
@@ -320,6 +364,7 @@ export default function LiveWatchView(props: Props) {
 
   return (
     <div
+      ref={rootRef}
       role="region"
       aria-label="방송 보며 주문"
       style={{ position: "fixed", inset: 0, zIndex: 60, background: "#000000", color: "#FFFFFF", overflow: "hidden", fontFamily: "inherit", overscrollBehavior: "none" }}
@@ -627,7 +672,7 @@ export default function LiveWatchView(props: Props) {
                 style={{ width: "100%", boxSizing: "border-box", height: "48px", padding: "0 16px", border: "1px solid #E5E5E5", borderRadius: "9999px", fontSize: "16px", fontFamily: "inherit", outline: "none", color: "#111111", background: "#FFFFFF" }}
               />
             </div>
-            <div style={{ flex: 1, overflowY: "auto", padding: "0 16px calc(16px + env(safe-area-inset-bottom))" }}>
+            <div data-live-scroll="1" style={{ flex: 1, overflowY: "auto", overscrollBehavior: "contain", padding: "0 16px calc(16px + env(safe-area-inset-bottom))" }}>
               {listItems.length === 0 ? (
                 <div style={{ padding: "32px 0", textAlign: "center", fontSize: "15px", color: "#707072" }}>{query ? "찾는 상품이 없어요" : "방송 상품이 아직 없어요"}</div>
               ) : listItems.map((it) => { const no = items.findIndex((x) => x.id === it.id) + 1; return (
