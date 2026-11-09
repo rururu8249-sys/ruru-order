@@ -10,6 +10,7 @@ import {buildAdminLiveOrderGroups,toAdminLiveOrder} from './liveOrderAdapter';
 import type {LiveOrder} from './types';
 import {showAdminToast} from '@/lib/adminToast';
 import LiveAlertEffectCard from './LiveAlertEffectCard';
+import BroadcastFlowView from './BroadcastFlowView';
 
 const paid=new Set(['paid','auto_paid','manual_paid','card_paid']);
 const won=(value:number)=>`${value.toLocaleString('ko-KR')}원`;
@@ -149,8 +150,8 @@ export default function SalesAnalysisPanel({initialBroadcastId}:{initialBroadcas
           <section className="rounded-xl border border-line bg-surface p-4" aria-label="선택 방송 판매 품목">
             <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-lg font-extrabold">{selectedEntry!.title}</h3><p className="mt-1 text-sm text-ink-soft">상품별 판매 현황 · 색상과 사이즈별 수량을 함께 확인하세요.</p><button className={`${control} mt-2`} onClick={copyAnalysis}>분석 복사</button></div><div className="text-right"><p className="text-xs text-ink-soft">상품금액 합계</p><p className="text-xl font-extrabold text-rose-deep">{won(products.reduce((sum,item)=>sum+item.sales,0))}</p><p className="text-xs text-ink-soft">판매수량 {sold.reduce((sum,item)=>sum+item.qty,0)}개 · 배송비·결제 부가금액 제외</p></div></div>
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{[['결제금액',won(paidOrders.reduce((sum,order)=>sum+order.totalAmount,0))],['구매자',`${buyers.length}명`],['주문건수',`${paidOrders.length}건`],['판매수량',`${sold.reduce((sum,item)=>sum+item.qty,0)}개`]].map(([label,value])=><div key={label} className="rounded-lg bg-surface-2 p-3"><p className="text-xs text-ink-soft">{label}</p><p className="mt-1 font-extrabold">{value}</p></div>)}</div>
-            <div className="mt-4 flex gap-2 border-b border-line pb-3" aria-label="상세 분석 보기">{[['products','상품·옵션별'],['buyers','구매자별']].map(([key,label])=><button key={key} aria-pressed={detailView===key} onClick={()=>setDetailView(key)} className={`rounded-lg px-4 py-2 text-sm font-bold ${detailView===key?'bg-rose-deep text-white':'bg-surface-2 text-ink-soft'}`}>{label}</button>)}</div>
-            {detailView==='products'?<>
+            <div className="mt-4 flex gap-2 border-b border-line pb-3" aria-label="상세 분석 보기">{[['products','상품·옵션별'],['buyers','구매자별'],...(selectedEntry?.started_at?[['flow','방송 흐름']]:[])].map(([key,label])=><button key={key} aria-pressed={detailView===key} onClick={()=>setDetailView(key)} className={`rounded-lg px-4 py-2 text-sm font-bold ${detailView===key?'bg-rose-deep text-white':'bg-surface-2 text-ink-soft'}`}>{label}</button>)}</div>
+            {detailView==='flow'&&selectedEntry?.started_at?<BroadcastFlowView broadcastId={selectedEntry.id}/>:detailView==='products'?<>
             <div className="mt-4 flex flex-wrap gap-2" aria-label="상품 분류 필터"><button className={control} aria-pressed={category==='all'} onClick={()=>setCategory('all')}>전체 분류</button>{categories.map(c=><button key={c.name} className={`${control} ${category===c.name?'border-rose-line bg-rose-soft':''}`} aria-pressed={category===c.name} onClick={()=>setCategory(c.name)}>{c.name} · {c.qty}개 · {won(c.amount)}</button>)}</div>
             <div className="my-4 flex flex-wrap gap-2"><input className={`${control} min-w-0 basis-full sm:basis-auto flex-1`} aria-label="판매 상품·옵션 검색" placeholder="상품명·색상·사이즈 검색" value={productSearch} onChange={e=>setProductSearch(e.target.value)}/><select className={control} aria-label="상품 정렬" value={productSort} onChange={e=>setProductSort(e.target.value)}><option value="sales">상품금액순</option><option value="qty">판매수량순</option><option value="name">상품명순</option></select></div>
             <div className="overflow-x-auto rounded-lg border border-line" role="region" aria-label="상품별 판매 현황 표" tabIndex={0}>
