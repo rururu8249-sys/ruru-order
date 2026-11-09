@@ -13,7 +13,7 @@ import {
   youtubeEmbedUrl,
   type LiveWatchItem,
 } from "@/lib/liveWatch";
-import { LIVE_CHAT_MAX_LEN, type LiveChatMessage, type LiveChatPenalty } from "@/lib/liveChat";
+import { LIVE_CHAT_MAX_LEN, chatColors, type LiveChatAction, type LiveChatMessage, type LiveChatPenalty } from "@/lib/liveChat";
 
 export type LiveWatchPinned = {
   productId: string;
@@ -54,7 +54,11 @@ type Props = {
     /** 관리자(시험 계정·허용 번호) — 글을 길게 누르면 지우기·금지 */
     canModerate: boolean;
     onSend: (body: string) => Promise<{ ok: boolean; message?: string }>;
-    onModerate: (messageId: number, action: LiveChatPenalty) => Promise<{ ok: boolean; message?: string }>;
+    /** 고정 댓글(없으면 null) */
+    pinned: LiveChatMessage | null;
+    /** 총관리자 — 길게 눌러 채팅 관리자 지정·해제 */
+    canGrant: boolean;
+    onModerate: (messageId: number, action: LiveChatAction) => Promise<{ ok: boolean; message?: string }>;
   } | null;
 };
 
@@ -92,13 +96,28 @@ const MenuIcon = ({ k }: { k: string }) => {
   if (k === "inquiry") return <svg aria-hidden="true" {...p}><path d="M4 5h16v11H9l-5 4z" /></svg>;
   return <svg aria-hidden="true" {...p}><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></svg>;
 };
-// 닉네임마다 다른 색(같은 사람은 늘 같은 색) — 어두운 영상 위에서 잘 보이는 밝은 색만
-const NICK_COLORS = ["#FFD43B", "#8CE99A", "#74C0FC", "#FFA8C5", "#B197FC", "#FFA94D", "#63E6BE", "#FF8787", "#C0EB75", "#99E9F2"];
-function nicknameColor(nick: string): string {
-  let h = 0;
-  for (const ch of String(nick || "")) h = (h * 31 + ch.codePointAt(0)!) >>> 0;
-  return NICK_COLORS[h % NICK_COLORS.length];
+// 닉네임 뒤 표시 — 금색 왕관(총관리자) / 분홍 왕관 / R 동그라미(채팅 관리자). 우리 가게 표시라 직접 그림.
+function ChatBadge({ badge }: { badge: LiveChatMessage["badge"] }) {
+  if (!badge) return null;
+  const st = { display: "inline-block", verticalAlign: "-0.18em", margin: "0 4px 0 2px", width: "1.15em", height: "1.15em", flexShrink: 0 } as const;
+  if (badge === "mod") {
+    return (
+      <svg aria-label="채팅 관리자" role="img" viewBox="0 0 20 20" style={st}>
+        <circle cx="10" cy="10" r="9" fill="#E8587A" stroke="#FFFFFF" strokeWidth="1.2" />
+        <text x="10" y="14.4" textAnchor="middle" fontSize="12" fontWeight="800" fill="#FFFFFF" fontFamily="sans-serif">R</text>
+      </svg>
+    );
+  }
+  const fill = badge === "crown_pink" ? "#FF7EB0" : "#F5C242";
+  return (
+    <svg aria-label="총관리자" role="img" viewBox="0 0 20 20" style={st}>
+      <path d="M2 14.5 L3 5.5 L7 9.5 L10 3.5 L13 9.5 L17 5.5 L18 14.5 Z" fill={fill} stroke="#000000" strokeOpacity="0.35" strokeWidth="0.8" />
+      <rect x="2" y="15" width="16" height="2.4" rx="0.6" fill={fill} />
+    </svg>
+  );
 }
+// 글자를 상자 없이 영상 위에 바로 — 어떤 화면에서도 읽히게 진한 그림자
+const CHAT_TEXT_SHADOW = "0 0 2px #000, 0 1px 2px #000, 0 0 6px rgba(0,0,0,0.7)";
 const IconClose = ({ color = "#111111" }: { color?: string }) => (
   <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M6 6l12 12M18 6L6 18" /></svg>
 );
@@ -209,6 +228,7 @@ export default function LiveWatchView(props: Props) {
   const chatBoxRef = useRef<HTMLDivElement | null>(null);
   const pressTimer = useRef<number | null>(null);
   const chatCount = chat?.messages.length ?? 0;
+  const chatColorMap = useMemo(() => chatColors(chat?.messages ?? []), [chat?.messages]);
   // 지난 글을 올려 보는 중이면 새 글이 와도 끌어내리지 않는다 — 대신 「새 글 보기」
   const [chatAtBottom, setChatAtBottom] = useState(true);
   const chatAtBottomRef = useRef(true);
@@ -296,7 +316,7 @@ export default function LiveWatchView(props: Props) {
       root.removeEventListener("touchmove", onMove);
     };
   }, []);
-  const moderate = async (action: LiveChatPenalty) => {
+  const moderate = async (action: LiveChatAction) => {
     if (!chat || !modTarget) return;
     if (action === "ban" && !banConfirm) { setBanConfirm(true); return; }
     const id = modTarget.id;
@@ -436,6 +456,24 @@ export default function LiveWatchView(props: Props) {
             <span style={{ color: "#FFD43B", marginRight: "6px" }}>공지</span>{chat.notice}
           </div>
         ) : null}
+        {chat && chat.pinned ? (
+          <div
+            onPointerDown={chat.canModerate ? () => startPress(chat.pinned!) : undefined}
+            onPointerUp={chat.canModerate ? endPress : undefined}
+            onPointerLeave={chat.canModerate ? endPress : undefined}
+            onPointerCancel={chat.canModerate ? endPress : undefined}
+            onContextMenu={chat.canModerate ? (e) => { e.preventDefault(); setModTarget(chat.pinned); } : undefined}
+            style={{ pointerEvents: chat.canModerate ? "auto" : "none", alignSelf: "flex-start", width: "82%", boxSizing: "border-box", padding: "8px 12px", borderRadius: "12px", background: "rgba(0,0,0,0.55)", fontSize: CHAT_SIZES[chatView.size], lineHeight: 1.45, wordBreak: "break-word", userSelect: "none", WebkitUserSelect: "none" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", fontWeight: 700, color: "#FFFFFF", opacity: 0.85, marginBottom: "2px" }}>
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.2"><path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7" /></svg>
+              고정 댓글
+            </div>
+            <span style={{ fontWeight: 700, color: "#FFFFFF" }}>{chat.pinned.nickname}</span>
+            <ChatBadge badge={chat.pinned.badge} />
+            <span style={{ marginLeft: chat.pinned.badge ? 0 : "6px", color: "#FFFFFF", fontWeight: chatView.bold ? 700 : 500 }}>{chat.pinned.body}</span>
+          </div>
+        ) : null}
         {chat && chat.messages.length > 0 ? (
           <div
             ref={chatBoxRef}
@@ -443,25 +481,27 @@ export default function LiveWatchView(props: Props) {
             aria-label="채팅"
             aria-live="polite"
             onScroll={onChatScroll}
-            style={{ pointerEvents: "none", overscrollBehavior: "contain", maxHeight: CHAT_HEIGHTS[chatView.height], overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "4px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", paddingTop: "16px", width: "82%" }}
+            style={{ pointerEvents: "none", overscrollBehavior: "contain", maxHeight: CHAT_HEIGHTS[chatView.height], overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "6px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", paddingTop: "16px", width: "82%" }}
           >
-            {chat.messages.map((m) => (
+            {chat.messages.map((m) => { const color = chatColorMap.get(m.id) || "#FFFFFF"; return (
               <div
                 key={m.id}
-                style={{ pointerEvents: "auto", touchAction: "pan-y", alignSelf: "flex-start", maxWidth: "100%", padding: "4px 10px", borderRadius: "12px", background: "rgba(0,0,0,0.35)", fontSize: CHAT_SIZES[chatView.size], fontWeight: chatView.bold ? 700 : 400, lineHeight: 1.45, wordBreak: "break-word", textShadow: "0 1px 2px rgba(0,0,0,0.6)", userSelect: chat.canModerate ? "none" : "auto", WebkitUserSelect: chat.canModerate ? "none" : "auto" }}
+                style={{ pointerEvents: "auto", touchAction: "pan-y", alignSelf: "flex-start", maxWidth: "100%", color, fontSize: CHAT_SIZES[chatView.size], fontWeight: chatView.bold ? 700 : 500, lineHeight: 1.45, wordBreak: "break-word", textShadow: CHAT_TEXT_SHADOW, userSelect: chat.canModerate ? "none" : "auto", WebkitUserSelect: chat.canModerate ? "none" : "auto" }}
               >
-                {/* 채팅 줄은 터치가 그대로 영상(유튜브 막대)으로 지나감. 관리자만 «닉네임»을 길게 누르면 관리 창 */}
+                {/* 상자 없이 글자만 — 닉네임과 글은 같은 색(사람마다 정해진 색, 바로 위 다른 사람과는 절대 같은 색 안 됨).
+                    채팅 줄은 터치가 그대로 영상(유튜브 막대)으로 지나감. 관리자만 «닉네임»을 길게 누르면 관리 창 */}
                 <span
                   onPointerDown={chat.canModerate ? () => startPress(m) : undefined}
                   onPointerUp={chat.canModerate ? endPress : undefined}
                   onPointerLeave={chat.canModerate ? endPress : undefined}
                   onPointerCancel={chat.canModerate ? endPress : undefined}
                   onContextMenu={chat.canModerate ? (e) => { e.preventDefault(); setModTarget(m); } : undefined}
-                  style={{ fontWeight: 700, color: nicknameColor(m.nickname), marginRight: "6px" }}
+                  style={{ fontWeight: 800 }}
                 >{m.nickname}</span>
-                <span>{m.body}</span>
+                <ChatBadge badge={m.badge} />
+                <span style={{ marginLeft: m.badge ? 0 : "6px" }}>{m.body}</span>
               </div>
-            ))}
+            ); })}
           </div>
         ) : null}
         {chat && chat.messages.length > 0 && !chatAtBottom ? (
@@ -629,8 +669,17 @@ export default function LiveWatchView(props: Props) {
       {modTarget && chat ? (
         <div role="dialog" aria-modal="true" aria-label="채팅 관리" onClick={() => { setModTarget(null); setBanConfirm(false); }} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z + 2, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "flex-end" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: "#FFFFFF", color: "#111111", borderRadius: "16px 16px 0 0", padding: "16px 16px calc(16px + env(safe-area-inset-bottom))" }}>
-            <div style={{ fontSize: "15px", fontWeight: 700, marginBottom: "4px" }}>{modTarget.nickname}</div>
+            <div style={{ fontSize: "15px", fontWeight: 700, marginBottom: "4px", display: "flex", alignItems: "center" }}>{modTarget.nickname}<ChatBadge badge={modTarget.badge} /></div>
             <div style={{ fontSize: "14px", color: "#707072", marginBottom: "12px", wordBreak: "break-word" }}>{modTarget.body}</div>
+            {!banConfirm ? (() => {
+              const isPinned = chat.pinned?.id === modTarget.id;
+              const isOwnerTarget = modTarget.badge === "crown" || modTarget.badge === "crown_pink";
+              const rows: [LiveChatAction, string][] = [[isPinned ? "unpin" : "pin", isPinned ? "고정 해제" : "이 글 맨 위에 고정"]];
+              if (chat.canGrant && !isOwnerTarget) rows.push(modTarget.badge === "mod" ? ["revoke", "채팅 관리자에서 해제"] : ["grant", "채팅 관리자로 지정"]);
+              return rows.map(([a, label]) => (
+                <button key={a} type="button" onClick={() => void moderate(a)} style={{ width: "100%", height: "52px", marginBottom: "8px", border: "1px solid #E5E5E5", borderRadius: "12px", background: "#FFFFFF", color: "#111111", fontSize: "16px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>{label}</button>
+              ));
+            })() : null}
             {([
               ["hide", "글 지우기"],
               ["mute30s", "지우고 30초 금지"],

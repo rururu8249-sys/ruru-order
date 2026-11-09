@@ -6,12 +6,12 @@ const load = createUiLoader({});
 const L = load("lib/liveWatch.ts");
 
 // 설정: 이상한 값은 꺼짐
-assert.deepEqual(L.parseLiveWatchSetting(null), { audience: "off", firstView: "live", phones: [], mods: [] });
-assert.deepEqual(L.parseLiveWatchSetting("{broken"), { audience: "off", firstView: "live", phones: [], mods: [] });
-assert.deepEqual(L.parseLiveWatchSetting('{"audience":"admin","firstView":"shop"}'), { audience: "admin", firstView: "shop", phones: [], mods: [] });
-assert.deepEqual(L.parseLiveWatchSetting({ audience: "all" }), { audience: "all", firstView: "live", phones: [], mods: [] });
-assert.deepEqual(L.parseLiveWatchSetting({ audience: "ALL" }), { audience: "off", firstView: "live", phones: [], mods: [] });
-assert.equal(L.serializeLiveWatchSetting({ audience: "all", firstView: "shop", junk: 1 }), '{"audience":"all","firstView":"shop","phones":[],"mods":[]}');
+assert.deepEqual(L.parseLiveWatchSetting(null), { audience: "off", firstView: "live", phones: [], mods: [], owners: [] });
+assert.deepEqual(L.parseLiveWatchSetting("{broken"), { audience: "off", firstView: "live", phones: [], mods: [], owners: [] });
+assert.deepEqual(L.parseLiveWatchSetting('{"audience":"admin","firstView":"shop"}'), { audience: "admin", firstView: "shop", phones: [], mods: [], owners: [] });
+assert.deepEqual(L.parseLiveWatchSetting({ audience: "all" }), { audience: "all", firstView: "live", phones: [], mods: [], owners: [] });
+assert.deepEqual(L.parseLiveWatchSetting({ audience: "ALL" }), { audience: "off", firstView: "live", phones: [], mods: [], owners: [] });
+assert.equal(L.serializeLiveWatchSetting({ audience: "all", firstView: "shop", junk: 1 }), '{"audience":"all","firstView":"shop","phones":[],"mods":[],"owners":[]}');
 
 // 유튜브 주소
 const id = "dQw4w9WgXcQ";

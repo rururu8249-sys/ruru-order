@@ -96,6 +96,12 @@ export function maskBannedWords(body: string, words: string[]): { text: string; 
 
 /** 금지 시간 고르기 — 관리자가 길게 눌러 고르는 것 */
 export type LiveChatPenalty = "hide" | "mute30s" | "mute5m" | "ban";
+/** 길게 눌러 하는 일 전체 — 지우기·금지(위) + 고정·고정 해제(채팅 관리자) + 채팅 관리자 지정·해제(총관리자만) */
+export type LiveChatAction = LiveChatPenalty | "pin" | "unpin" | "grant" | "revoke";
+export const LIVE_CHAT_ACTIONS: LiveChatAction[] = ["hide", "mute30s", "mute5m", "ban", "pin", "unpin", "grant", "revoke"];
+export function isPenaltyAction(a: LiveChatAction): a is LiveChatPenalty {
+  return a === "hide" || a === "mute30s" || a === "mute5m" || a === "ban";
+}
 export function penaltyUntil(p: LiveChatPenalty, now = Date.now()): string | null | undefined {
   if (p === "mute30s") return new Date(now + 30 * 1000).toISOString();
   if (p === "mute5m") return new Date(now + 5 * 60 * 1000).toISOString();
@@ -126,6 +132,10 @@ export type LiveChatMessage = {
   body: string;
   createdAt: string;
   hidden: boolean;
+  /** 닉네임 뒤 표시(글 쓸 때 정해짐) — crown 금색 왕관 / crown_pink 분홍 왕관 / mod R 동그라미 */
+  badge: "crown" | "crown_pink" | "mod" | null;
+  /** 고정 댓글 */
+  pinned: boolean;
 };
 
 /** 서버 줄 또는 소식(Broadcast) → 화면용 글. 모양이 이상하면 null. */
@@ -143,7 +153,32 @@ export function parseChatMessage(raw: unknown): LiveChatMessage | null {
     body: hidden ? "" : String(p.body ?? "").slice(0, LIVE_CHAT_MAX_LEN),
     createdAt: String(p.created_at ?? p.createdAt ?? ""),
     hidden,
+    badge: p.badge === "crown" || p.badge === "crown_pink" || p.badge === "mod" ? p.badge : null,
+    pinned: !hidden && (p.pinned === true || Boolean(p.pinned_at)),
   };
+}
+
+/** 채팅 글 색 — 밝은 색 10개. 사람마다 정해진 색(닉네임으로 계산)이지만,
+ *  바로 위 글이 «다른 사람인데 같은 색»이면 다음 색으로 밀어 위아래가 절대 겹치지 않게. 글 번호 → 색. */
+export const CHAT_COLORS = ["#FFD43B", "#8CE99A", "#74C0FC", "#FFA8C5", "#B197FC", "#FFA94D", "#63E6BE", "#FF8787", "#C0EB75", "#99E9F2"];
+export function chatBaseColorIndex(nick: string): number {
+  let h = 0;
+  for (const ch of String(nick || "")) h = (h * 31 + ch.codePointAt(0)!) >>> 0;
+  return h % CHAT_COLORS.length;
+}
+export function chatColors(list: { id: number; nickname: string }[]): Map<number, string> {
+  const out = new Map<number, string>();
+  let prevNick = "";
+  let prevIdx = -1;
+  for (const m of list) {
+    let idx = chatBaseColorIndex(m.nickname);
+    if (m.nickname === prevNick && prevIdx >= 0) idx = prevIdx; // 같은 사람이 이어 쓰면 같은 색
+    else if (idx === prevIdx) idx = (idx + 1) % CHAT_COLORS.length; // 다른 사람인데 겹치면 다음 색
+    out.set(m.id, CHAT_COLORS[idx]);
+    prevNick = m.nickname;
+    prevIdx = idx;
+  }
+  return out;
 }
 
 /** 목록에 새 글 합치기 — 같은 번호는 바꾸고, 지운 글은 빼고, 번호 순, 최근 N개만 */

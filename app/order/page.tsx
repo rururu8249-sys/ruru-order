@@ -45,10 +45,10 @@ import Link from "next/link";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { normalizeProductSearchText, productSearchMatches } from "@/lib/productSearch";
 import { LIVE_PAUSED_TEXT_KEY, LIVE_PAUSED_TEXT_DEFAULT, resolveLivePausedText } from "@/lib/livePausedText";
-import { LIVE_WATCH_KEY, LIVE_WATCH_DEFAULT, parseLiveWatchSetting, youtubeVideoIdFromUrl, canUseLiveWatch, initialLiveView, liveWatchViewKey, type LiveWatchSetting, type LiveWatchItem } from "@/lib/liveWatch";
+import { LIVE_WATCH_KEY, LIVE_WATCH_DEFAULT, parseLiveWatchSetting, chatBadgeOf, isChatOwnerPhone, youtubeVideoIdFromUrl, canUseLiveWatch, initialLiveView, liveWatchViewKey, type LiveWatchSetting, type LiveWatchItem } from "@/lib/liveWatch";
 import LiveWatchView, { type LiveWatchOrderToast, type LiveWatchPinned } from "@/components/customer/LiveWatchView";
 import { subscribeLiveEvents } from "@/lib/liveEvents";
-import { mergeChat, parseChatMessage, type LiveChatMessage, type LiveChatPenalty } from "@/lib/liveChat";
+import { isPenaltyAction, mergeChat, parseChatMessage, type LiveChatAction, type LiveChatMessage } from "@/lib/liveChat";
 import { openYoutubeChannel } from "@/lib/youtubeChannelLink";
 import { setPresenceActivity, readPresenceEvents } from "@/lib/presenceActivity";
 import { registerBrandAliasesFromProducts } from "@/lib/brandSearchAliases";
@@ -1457,6 +1457,7 @@ export default function OrderPage() {
   // [2026-11-10 ③] 사이트 채팅(방송 보며 주문 화면 안에서만)
   const [liveChatMessages, setLiveChatMessages] = useState<LiveChatMessage[]>([]);
   const [liveChatNotice, setLiveChatNotice] = useState("");
+  const [liveChatPinned, setLiveChatPinned] = useState<LiveChatMessage | null>(null);
   const [liveChatEnabled, setLiveChatEnabled] = useState(false);
   const [productListState, setProductListState] = useState<"loading" | "ready" | "error">("loading");
   const [broadcastProducts, setBroadcastProducts] = useState<BroadcastProduct[]>([]);
@@ -6542,6 +6543,8 @@ export default function OrderPage() {
         setLiveChatNotice(String(json.notice ?? ""));
         const list = (Array.isArray(json.messages) ? json.messages : []).map(parseChatMessage).filter(Boolean) as LiveChatMessage[];
         setLiveChatMessages((prev) => mergeChat(prev.filter((x) => x.broadcastId === String(bid)), list));
+        const pin = json.pinned ? parseChatMessage(json.pinned) : null;
+        setLiveChatPinned(pin && pin.broadcastId === String(bid) ? pin : null);
       } catch { /* 채팅 못 읽어도 방송·주문은 그대로 */ }
     })();
     const off = subscribeLiveEvents(supabase, {
@@ -6551,6 +6554,9 @@ export default function OrderPage() {
         if (!m || m.broadcastId !== String(bid)) return;
         if (m.hidden) setLiveChatMessages((prev) => prev.filter((x) => x.id !== m.id));
         else setLiveChatMessages((prev) => mergeChat(prev, [m]));
+        // 고정 댓글 — 고정되면 그 글로, 그 글이 고정 해제·지워지면 비움
+        if (m.pinned) setLiveChatPinned(m);
+        else setLiveChatPinned((prev) => (prev && prev.id === m.id ? null : prev));
       },
       onOrder: (e) => {
         if (e.type !== "INSERT") return;
@@ -8160,12 +8166,14 @@ export default function OrderPage() {
               chat={liveChatEnabled && broadcast?.id ? {
                 messages: liveChatMessages,
                 notice: liveChatNotice,
+                pinned: liveChatPinned,
+                canGrant: isChatOwnerPhone(liveWatchSetting, normalizePhone(customerPhone)),
                 canWrite: Boolean(readLiveChatKakaoId()) && Boolean(youtubeNickname.trim()),
-                canModerate: operatorTestAccount !== null || liveWatchSetting.mods.includes(normalizePhone(customerPhone)),
+                canModerate: operatorTestAccount !== null || chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) !== null,
                 onSend: async (body) => {
                   // 누르자마자 화면에 먼저 띄움(임시 번호) — 서버 답이 오면 진짜 글로 바꿈, 실패하면 뺌
                   const tempId = 9_000_000_000_000 + Date.now();
-                  const temp: LiveChatMessage = { id: tempId, broadcastId: String(broadcast.id), nickname: youtubeNickname.trim(), body, createdAt: new Date().toISOString(), hidden: false };
+                  const temp: LiveChatMessage = { id: tempId, broadcastId: String(broadcast.id), nickname: youtubeNickname.trim(), body, createdAt: new Date().toISOString(), hidden: false, badge: chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) ?? (operatorTestAccount !== null ? "mod" : null), pinned: false };
                   setLiveChatMessages((prev) => mergeChat(prev, [temp]));
                   const dropTemp = () => setLiveChatMessages((prev) => prev.filter((x) => x.id !== tempId));
                   try {
@@ -8178,11 +8186,20 @@ export default function OrderPage() {
                     return { ok: Boolean(json?.ok), message: json?.message && typeof json.message === "string" ? json.message : undefined };
                   } catch { dropTemp(); return { ok: false, message: "못 보냈어요. 다시 눌러 주세요." }; }
                 },
-                onModerate: async (messageId: number, action: LiveChatPenalty) => {
+                onModerate: async (messageId: number, action: LiveChatAction) => {
                   try {
                     const res = await fetch("/api/live-chat", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kakao_id: readLiveChatKakaoId(), messageId, action }) });
                     const json = await res.json().catch(() => null);
-                    if (json?.ok) setLiveChatMessages((prev) => prev.filter((x) => x.id !== messageId));
+                    if (json?.ok && isPenaltyAction(action)) {
+                      setLiveChatMessages((prev) => prev.filter((x) => x.id !== messageId));
+                      setLiveChatPinned((prev) => (prev && prev.id === messageId ? null : prev));
+                    }
+                    if (json?.ok && action === "unpin") setLiveChatPinned((prev) => (prev && prev.id === messageId ? null : prev));
+                    if (json?.ok && action === "pin") setLiveChatPinned((prev) => liveChatMessages.find((x) => x.id === messageId) ?? prev);
+                    if (json?.ok && (action === "grant" || action === "revoke")) {
+                      // 설정이 바뀌었으니 다시 읽음(내 화면의 관리자 표시 계산용)
+                      void supabase.from("settings").select("value").eq("key", LIVE_WATCH_KEY).maybeSingle().then(({ data }) => setLiveWatchSetting(parseLiveWatchSetting(data?.value)));
+                    }
                     return { ok: Boolean(json?.ok), message: String(json?.message || "") };
                   } catch { return { ok: false, message: "처리 못 했어요." }; }
                 },

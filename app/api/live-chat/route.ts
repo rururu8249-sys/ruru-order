@@ -17,9 +17,11 @@ import {
   maskBannedWords,
   parseChatMessage,
   parseLiveChatSetting,
-  type LiveChatPenalty,
+  LIVE_CHAT_ACTIONS,
+  isPenaltyAction,
+  type LiveChatAction,
 } from "@/lib/liveChat";
-import { LIVE_CHAT_PENALTIES, isChatModeratorKakao, moderateChatMessage } from "@/lib/liveChatServer";
+import { chatRoleOfKakao, moderateChatMessage, pinChatMessage, setChatManager } from "@/lib/liveChatServer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,17 +45,15 @@ export async function GET(request: NextRequest) {
   try {
     const sb = getServiceClient();
     const setting = await readSetting(sb);
-    if (!setting.enabled) return NextResponse.json({ ok: true, enabled: false, notice: "", messages: [] });
-    const { data, error } = await sb
-      .from("live_chat_messages")
-      .select("id, broadcast_id, nickname, body, created_at, hidden_at")
-      .eq("broadcast_id", bc)
-      .is("hidden_at", null)
-      .order("id", { ascending: false })
-      .limit(LIVE_CHAT_RECENT);
-    if (error) return fail("채팅을 못 불러왔어요.", 500);
-    const messages = (data ?? []).map(parseChatMessage).filter(Boolean).reverse();
-    return NextResponse.json({ ok: true, enabled: true, notice: setting.notice, messages });
+    if (!setting.enabled) return NextResponse.json({ ok: true, enabled: false, notice: "", messages: [], pinned: null });
+    const cols = "id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at";
+    const [listRes, pinRes] = await Promise.all([
+      sb.from("live_chat_messages").select(cols).eq("broadcast_id", bc).is("hidden_at", null).order("id", { ascending: false }).limit(LIVE_CHAT_RECENT),
+      sb.from("live_chat_messages").select(cols).eq("broadcast_id", bc).is("hidden_at", null).not("pinned_at", "is", null).order("pinned_at", { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    if (listRes.error) return fail("채팅을 못 불러왔어요.", 500);
+    const messages = (listRes.data ?? []).map(parseChatMessage).filter(Boolean).reverse();
+    return NextResponse.json({ ok: true, enabled: true, notice: setting.notice, messages, pinned: pinRes.data ? parseChatMessage(pinRes.data) : null });
   } catch {
     return fail("채팅을 못 불러왔어요.", 500);
   }
@@ -71,8 +71,9 @@ export async function POST(request: NextRequest) {
 
     const sb = getServiceClient();
     // 빠르게 — 서로 상관없는 읽기는 한꺼번에
-    const [setting, bcRes, custRes, bansRes, lastRes] = await Promise.all([
+    const [setting, role, bcRes, custRes, bansRes, lastRes] = await Promise.all([
       readSetting(sb),
+      chatRoleOfKakao(sb, kakaoId).catch(() => ({ badge: null })),
       sb.from("broadcasts").select("id, status").eq("id", bc).maybeSingle(),
       sb.from("customers").select("id, youtube_nickname, is_blocked").eq("kakao_id", kakaoId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       sb.from("live_chat_bans").select("until_at, lifted_at").eq("kakao_id", kakaoId).is("lifted_at", null).order("id", { ascending: false }).limit(5),
@@ -101,8 +102,8 @@ export async function POST(request: NextRequest) {
     const masked = maskBannedWords(body, [...LIVE_CHAT_DEFAULT_WORDS, ...setting.words]);
     const { data: ins, error } = await sb
       .from("live_chat_messages")
-      .insert({ broadcast_id: bc, kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body: masked.text })
-      .select("id, broadcast_id, nickname, body, created_at, hidden_at")
+      .insert({ broadcast_id: bc, kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body: masked.text, badge: role.badge ?? null })
+      .select("id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at")
       .single();
     if (error) return fail("못 보냈어요. 다시 눌러 주세요.", 500);
     return NextResponse.json({ ok: true, message: parseChatMessage(ins) });
@@ -111,18 +112,28 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PATCH { kakao_id, messageId, action } — 방송 화면에서 관리자(시험 계정·허용 번호)가 글을 길게 눌러 지우기·금지
+// PATCH { kakao_id, messageId, action } — 방송 화면에서 길게 눌러
+//   지우기·금지·고정·고정 해제 = 채팅 관리자(총관리자·시험 계정·mods) / 채팅 관리자 지정·해제 = 총관리자만
 export async function PATCH(request: NextRequest) {
   try {
     const raw = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const kakaoId = String(raw.kakao_id ?? "").trim().slice(0, 64);
     const messageId = Number(raw.messageId);
-    const action = String(raw.action ?? "") as LiveChatPenalty;
-    if (!LIVE_CHAT_PENALTIES.includes(action)) return fail("모르는 동작이에요.");
+    const action = String(raw.action ?? "") as LiveChatAction;
+    if (!LIVE_CHAT_ACTIONS.includes(action)) return fail("모르는 동작이에요.");
     if (!(Number.isFinite(messageId) && messageId > 0)) return fail("글 번호가 없어요.");
     const sb = getServiceClient();
-    if (!(await isChatModeratorKakao(sb, kakaoId))) return fail("관리자만 할 수 있어요.", 403);
-    const r = await moderateChatMessage(sb, messageId, action);
+    const role = await chatRoleOfKakao(sb, kakaoId);
+    if (!role.isMod) return fail("관리자만 할 수 있어요.", 403);
+    let r: { ok: boolean; message: string; status?: number };
+    if (action === "grant" || action === "revoke") {
+      if (!role.isOwner) return fail("총관리자만 할 수 있어요.", 403);
+      r = await setChatManager(sb, messageId, action === "grant");
+    } else if (action === "pin" || action === "unpin") {
+      r = await pinChatMessage(sb, messageId, action === "pin");
+    } else if (isPenaltyAction(action)) {
+      r = await moderateChatMessage(sb, messageId, action);
+    } else return fail("모르는 동작이에요.");
     return NextResponse.json({ ok: r.ok, message: r.message }, { status: r.ok ? 200 : r.status || 500 });
   } catch {
     return fail("처리 못 했어요.", 500);

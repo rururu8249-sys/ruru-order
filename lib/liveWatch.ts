@@ -17,26 +17,58 @@ export type LiveWatchSetting = {
   phones: string[];
   /** 채팅 관리(글 지우기·금지·차단)까지 할 수 있는 전화번호 — 관리자 시험 계정 표는 따로 늘 가능 */
   mods: string[];
+  /** [2026-11-10] 총관리자 — 채팅 관리 + 다른 손님을 채팅 관리자로 지정·해제. badge = 닉네임 뒤 표시 */
+  owners: LiveChatOwner[];
 };
 
-export const LIVE_WATCH_DEFAULT: LiveWatchSetting = { audience: "off", firstView: "live", phones: [], mods: [] };
+/** 채팅 닉네임 뒤 표시 — crown: 금색 왕관 / crown_pink: 분홍 왕관 / mod: R 동그라미(채팅 관리자) */
+export type LiveChatBadge = "crown" | "crown_pink" | "mod";
+export type LiveChatOwner = { phone: string; badge: LiveChatBadge };
+export const LIVE_CHAT_BADGES: LiveChatBadge[] = ["crown", "crown_pink", "mod"];
+
+export const LIVE_WATCH_DEFAULT: LiveWatchSetting = { audience: "off", firstView: "live", phones: [], mods: [], owners: [] };
 
 /** settings 값(JSON 글자 또는 객체) → 설정. 이상하면 기본값(꺼짐). */
 export function parseLiveWatchSetting(raw: unknown): LiveWatchSetting {
   let v: unknown = raw;
   if (typeof v === "string") {
     const t = v.trim();
-    if (!t) return { ...LIVE_WATCH_DEFAULT, phones: [], mods: [] };
-    try { v = JSON.parse(t); } catch { return { ...LIVE_WATCH_DEFAULT, phones: [], mods: [] }; }
+    if (!t) return { ...LIVE_WATCH_DEFAULT, phones: [], mods: [], owners: [] };
+    try { v = JSON.parse(t); } catch { return { ...LIVE_WATCH_DEFAULT, phones: [], mods: [], owners: [] }; }
   }
-  if (!v || typeof v !== "object") return { ...LIVE_WATCH_DEFAULT, phones: [], mods: [] };
+  if (!v || typeof v !== "object") return { ...LIVE_WATCH_DEFAULT, phones: [], mods: [], owners: [] };
   const o = v as Record<string, unknown>;
   const audience: LiveWatchAudience = o.audience === "all" ? "all" : o.audience === "admin" ? "admin" : "off";
   const firstView: LiveWatchFirstView = o.firstView === "shop" ? "shop" : "live";
   const digits = (arr: unknown) => Array.isArray(arr)
     ? Array.from(new Set(arr.map((x) => String(x ?? "").replace(/[^0-9]/g, "")).filter((x) => x.length >= 9)))
     : [];
-  return { audience, firstView, phones: digits(o.phones), mods: digits(o.mods) };
+  const owners: LiveChatOwner[] = [];
+  if (Array.isArray(o.owners)) {
+    for (const x of o.owners) {
+      const r = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
+      const phone = String(r.phone ?? "").replace(/[^0-9]/g, "");
+      if (phone.length < 9 || owners.some((w) => w.phone === phone)) continue;
+      const badge = LIVE_CHAT_BADGES.includes(r.badge as LiveChatBadge) ? (r.badge as LiveChatBadge) : "mod";
+      owners.push({ phone, badge });
+    }
+  }
+  return { audience, firstView, phones: digits(o.phones), mods: digits(o.mods), owners };
+}
+
+/** 이 번호의 채팅 표시 — 총관리자면 그 표시, 채팅 관리자(mods)면 R, 아니면 null */
+export function chatBadgeOf(setting: LiveWatchSetting, phone: string): LiveChatBadge | null {
+  const ph = String(phone ?? "").replace(/[^0-9]/g, "");
+  if (!ph) return null;
+  const owner = setting.owners.find((w) => w.phone === ph);
+  if (owner) return owner.badge;
+  return setting.mods.includes(ph) ? "mod" : null;
+}
+
+/** 총관리자인지(채팅 관리자 지정·해제 가능) */
+export function isChatOwnerPhone(setting: LiveWatchSetting, phone: string): boolean {
+  const ph = String(phone ?? "").replace(/[^0-9]/g, "");
+  return Boolean(ph) && setting.owners.some((w) => w.phone === ph);
 }
 
 export function serializeLiveWatchSetting(s: LiveWatchSetting): string {
