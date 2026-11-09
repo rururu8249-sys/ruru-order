@@ -306,12 +306,8 @@ export default function LiveWatchView(props: Props) {
     setChatHint(r.message || (r.ok ? "처리했어요." : "처리 못 했어요."));
   };
 
-  // 방송 화면이 떠 있는 동안 뒤 주문서가 같이 스크롤되지 않게
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
-  }, []);
+  // [2026-11-10 사장님 「방송 화면 닫고 나오면 스크롤 안 먹힘」] 여기 있던 두 번째 body 잠금은 지움 —
+  //   위 잠금(html·body)과 겹쳐 닫을 때 «잠긴 값»으로 되돌려 쇼핑몰 화면 스크롤이 계속 막혔다. 잠금은 위 하나만.
 
   const sendToPlayer = (cmd: string) => {
     try { iframeRef.current?.contentWindow?.postMessage(cmd, "https://www.youtube.com"); } catch { /* 플레이어 준비 전이면 무시 */ }
