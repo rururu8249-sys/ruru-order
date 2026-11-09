@@ -5,7 +5,7 @@
 //   이 화면은 «보여 주기·고르기»만 한다. 담기·장바구니·주문서·결제는 부모(주문 페이지)의 기존 함수가 그대로 처리한다.
 //   z-index 60: 아래 메뉴(40)·장바구니 바(39) 위, 옵션 창·주문서 창(100) 아래 → 옵션 창이 방송 위로 올라온다.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   LIVE_WATCH_GUIDE_SEEN_KEY,
   liveWatchList,
@@ -41,6 +41,8 @@ type Props = {
   onOpenProduct: (productId: string, detailName?: string) => void;
   onOpenCart: () => void;
   onSwitchToShop: () => void;
+  /** 처음 쓰는 법 창이 열렸는지 — 다른 안내 팝업이 그동안 기다리게 */
+  onGuideOpenChange?: (open: boolean) => void;
   /** 오른쪽 세로 메뉴(공지·주문내역·내정보·문의) — 주문서 아래 메뉴와 같은 동작 */
   menu?: { key: string; label: string; badge?: number; onClick: () => void }[];
   /** [2026-11-10 ③] 사이트 채팅 — 없으면(꺼짐) 채팅 줄·입력 안 보임 */
@@ -68,8 +70,8 @@ function writeGuideSeen() {
 const IconGridDark = () => (
   <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="2"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg>
 );
-const IconSound = () => (
-  <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="2"><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="M16 9a4 4 0 010 6" /></svg>
+const IconSoundOff = () => (
+  <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2"><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="M16 9l6 6M22 9l-6 6" /></svg>
 );
 const IconChat = () => (
   <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="1.8"><path d="M4 5h16v11H9l-5 4z" /></svg>
@@ -106,6 +108,20 @@ export default function LiveWatchView(props: Props) {
   const embedSrc = useMemo(() => youtubeEmbedUrl(videoId, typeof window !== "undefined" ? window.location.origin : undefined, { controls: true }), [videoId]);
 
   useEffect(() => { setGuideOpen(!readGuideSeen()); }, []);
+  const onGuideOpenChange = props.onGuideOpenChange;
+  useEffect(() => { onGuideOpenChange?.(guideOpen); }, [guideOpen, onGuideOpenChange]);
+  // 방송 화면이 떠 있는 동안 뒤 쇼핑몰 화면이 밀려 올라오지 않게(폰에서 꾹 눌러 올리면 아래 메뉴가 튀어나오던 것)
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prev = [html.style.overflow, body.style.overflow, html.style.overscrollBehavior, body.style.overscrollBehavior];
+    html.style.overflow = "hidden"; body.style.overflow = "hidden";
+    html.style.overscrollBehavior = "none"; body.style.overscrollBehavior = "none";
+    return () => {
+      html.style.overflow = prev[0]; body.style.overflow = prev[1];
+      html.style.overscrollBehavior = prev[2]; body.style.overscrollBehavior = prev[3];
+    };
+  }, []);
 
   // ── 사이트 채팅 ──
   const chat = props.chat ?? null;
@@ -215,7 +231,7 @@ export default function LiveWatchView(props: Props) {
     <div
       role="region"
       aria-label="방송 보며 주문"
-      style={{ position: "fixed", inset: 0, zIndex: 60, background: "#000000", color: "#FFFFFF", overflow: "hidden", fontFamily: "inherit" }}
+      style={{ position: "fixed", inset: 0, zIndex: 60, background: "#000000", color: "#FFFFFF", overflow: "hidden", fontFamily: "inherit", overscrollBehavior: "none" }}
     >
       {/* 영상 — 화면 전체 */}
       <iframe
@@ -271,10 +287,10 @@ export default function LiveWatchView(props: Props) {
           <IconSoundOn />
         </button>
       ) : null}
-      {/* 소리 켜기 — 폰은 소리 꺼진 채로만 자동 재생된다(브라우저 규칙) */}
+      {/* 소리 켜기 — 폰은 소리 꺼진 채로만 자동 재생된다(브라우저 규칙). 그림만(스피커에 X) */}
       {muted ? (
-        <button type="button" onClick={turnSoundOn} style={{ position: "absolute", left: "16px", top: "calc(68px + env(safe-area-inset-top))", height: "44px", padding: "0 18px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", whiteSpace: "nowrap" }}>
-          <IconSound />소리 켜기
+        <button type="button" onClick={turnSoundOn} aria-label="소리 켜기" style={{ position: "absolute", left: "16px", top: "calc(68px + env(safe-area-inset-top))", width: "44px", height: "44px", border: "1px solid rgba(255,255,255,0.5)", borderRadius: "9999px", background: "rgba(0,0,0,0.4)", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+          <IconSoundOff />
         </button>
       ) : null}
 
@@ -288,7 +304,14 @@ export default function LiveWatchView(props: Props) {
       ) : null}
 
       {/* 아래쪽 — 채팅 · 주문 알림 · 소개 중 상품 카드(돌려보기 중엔 숨김 — 유튜브 막대를 가리지 않게) */}
-      <div style={{ display: "flex", position: "absolute", left: "16px", right: "16px", bottom: "calc(84px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: "none" }}>
+      <div style={{ display: "flex", position: "absolute", left: "16px", right: "16px", bottom: "calc(80px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: "none" }}>
+        {latestToast ? (
+          <div role="status" aria-atomic="true" style={{ display: "flex" }}>
+            <span key={latestToast.key} className="ruru-live-watch-toast" style={{ display: "inline-flex", alignItems: "center", height: "32px", maxWidth: "100%", padding: "0 12px", borderRadius: "9999px", background: "rgba(0,0,0,0.55)", fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {latestToast.nickname}님 구매 감사합니다
+            </span>
+          </div>
+        ) : null}
         {chat && chat.notice ? (
           <div style={{ alignSelf: "flex-start", maxWidth: "100%", padding: "6px 12px", borderRadius: "12px", background: "rgba(0,0,0,0.6)", fontSize: "13px", fontWeight: 600, lineHeight: 1.45 }}>
             <span style={{ color: "#FFD43B", marginRight: "6px" }}>공지</span>{chat.notice}
@@ -321,13 +344,6 @@ export default function LiveWatchView(props: Props) {
             ))}
           </div>
         ) : null}
-        <div role="status" aria-atomic="true" style={{ minHeight: "32px", display: "flex" }}>
-          {latestToast ? (
-            <span key={latestToast.key} className="ruru-live-watch-toast" style={{ display: "inline-flex", alignItems: "center", height: "32px", maxWidth: "100%", padding: "0 12px", borderRadius: "9999px", background: "rgba(0,0,0,0.55)", fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {latestToast.nickname}님 구매 감사합니다
-            </span>
-          ) : null}
-        </div>
         {pinned ? (
           <div style={{ pointerEvents: "auto", background: "#FFFFFF", color: "#111111", borderRadius: "12px", padding: "10px", display: "flex", alignItems: "center", gap: "10px" }}>
             <button type="button" onClick={() => props.onOpenProduct(pinned.productId, pinned.detailName || undefined)} aria-label={`${pinned.name} 상품 선택`} style={{ width: "64px", height: "64px", flexShrink: 0, padding: 0, border: "none", background: "#F5F5F5", cursor: "pointer", overflow: "hidden" }}>
@@ -350,8 +366,8 @@ export default function LiveWatchView(props: Props) {
 
       {/* 맨 아래 줄 — [상품 목록] [주문서 확인] */}
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "12px 16px calc(12px + env(safe-area-inset-bottom))", display: "flex", alignItems: "center", gap: "8px", background: "#000000" }}>
-        <button type="button" onClick={() => setListOpen(true)} aria-label={`상품 ${items.length}개 보기`} style={{ flexShrink: 0, height: "52px", padding: "0 14px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 700, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: "6px", cursor: "pointer", whiteSpace: "nowrap" }}>
-          <IconGridDark />상품 {items.length}
+        <button type="button" onClick={() => setListOpen(true)} aria-label={`상품 ${items.length}개 보기`} style={{ flexShrink: 0, height: "52px", padding: "0 16px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 700, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", whiteSpace: "nowrap" }}>
+          <IconGridDark /><span style={{ fontSize: "16px" }}>{items.length}</span>
         </button>
         {chat && chat.canWrite ? (
           <button type="button" onClick={() => setComposeOpen(true)} style={{ flex: 1, minWidth: 0, height: "52px", border: "1px solid rgba(255,255,255,0.4)", borderRadius: "9999px", background: "rgba(0,0,0,0.25)", color: "#E5E5E5", fontSize: "15px", fontWeight: 500, fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "8px", padding: "0 16px", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden" }}>
@@ -477,17 +493,17 @@ export default function LiveWatchView(props: Props) {
         <div role="dialog" aria-modal="true" aria-label="방송 보며 주문하는 법" style={{ position: "fixed", inset: 0, zIndex: SHEET_Z + 1, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
           <div style={{ width: "100%", maxWidth: "360px", background: "#FFFFFF", color: "#111111", borderRadius: "16px", padding: "24px 20px 20px" }}>
             <div style={{ fontSize: "20px", fontWeight: 700, marginBottom: "16px" }}>방송 보면서 바로 담아요</div>
-            {[
-              ["1", "방송을 보다가 마음에 드는 상품이 나오면"],
-              ["2", "왼쪽 아래 「상품」 버튼 → 「상품 선택」으로 담고"],
-              ["3", "담으면 생기는 「주문서」 버튼을 눌러 주문하면 끝"],
-            ].map(([n, t]) => (
+            {([
+              ["1", <>방송에서 마음에 드는 상품이 나오면</>],
+              ["2", <>왼쪽 아래 <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", height: "26px", padding: "0 8px", borderRadius: "9999px", border: "1px solid #E5E5E5", verticalAlign: "middle", fontSize: "14px", fontWeight: 700 }}><IconGridDark />{items.length}</span> 를 눌러 상품 목록을 열고, 그 상품의 「상품 선택」으로 옵션을 골라 담아요</>],
+              ["3", <>담으면 아래에 생기는 「주문서」를 눌러 주문하면 끝</>],
+            ] as [string, ReactNode][]).map(([n, t]) => (
               <div key={n} style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>
                 <span aria-hidden="true" style={{ width: "28px", height: "28px", flexShrink: 0, borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "14px", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{n}</span>
                 <span style={{ fontSize: "16px", lineHeight: 1.5, paddingTop: "2px" }}>{t}</span>
               </div>
             ))}
-            <div style={{ fontSize: "13px", color: "#707072", lineHeight: 1.5, margin: "4px 0 16px" }}>오른쪽 위 「방송 화면 닫기」를 누르면 상품을 사진으로 크게 볼 수 있어요.</div>
+            <div style={{ fontSize: "13px", color: "#707072", lineHeight: 1.5, margin: "4px 0 16px" }}>채팅은 아래 「메시지 입력」, 소리는 왼쪽 위 스피커를 눌러요. 상품을 사진으로 크게 보려면 오른쪽 위 「방송 화면 닫기」.</div>
             <button type="button" onClick={closeGuide} style={{ width: "100%", height: "52px", border: "none", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "16px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>시작하기</button>
           </div>
         </div>

@@ -1446,6 +1446,13 @@ export default function OrderPage() {
   // [2026-11-09] 「방송 보며 주문」 — 설정·손님이 고른 화면(null = 아직 안 정함)·「OO님이 주문했어요」 알림
   const [liveWatchSetting, setLiveWatchSetting] = useState<LiveWatchSetting>(LIVE_WATCH_DEFAULT);
   const [liveViewOn, setLiveViewOn] = useState<boolean | null>(null);
+  // [2026-11-10] 방송 화면 «쓰는 법» 창이 떠 있는 동안 다른 안내 팝업은 기다린다
+  const [liveGuideOpen, setLiveGuideOpen] = useState(false);
+  // [2026-11-10] 지난번 방송 화면으로 봤던 손님은 쇼핑몰 화면이 먼저 번쩍 보이지 않게, 정해질 때까지 검은 화면(최대 4초)
+  const [liveBootCover, setLiveBootCover] = useState(false);
+  useLayoutEffect(() => {
+    try { if (window.localStorage.getItem("ruru_live_watch_boot") === "1") setLiveBootCover(true); } catch { /* 무시 */ }
+  }, []);
   const [liveOrderToasts, setLiveOrderToasts] = useState<LiveWatchOrderToast[]>([]);
   // [2026-11-10 ③] 사이트 채팅(방송 보며 주문 화면 안에서만)
   const [liveChatMessages, setLiveChatMessages] = useState<LiveChatMessage[]>([]);
@@ -6454,6 +6461,20 @@ export default function OrderPage() {
     viewerPhone: customerPhone,
   });
   const liveWatchShown = liveWatchUsable && liveViewOn === true;
+  // 검은 화면은: 방송 화면이 뜨면 / 쇼핑몰 화면으로 정해지면 / 방송이 꺼져 있으면 / 4초 지나면 걷는다
+  useEffect(() => {
+    if (!liveBootCover) return;
+    const t = window.setTimeout(() => setLiveBootCover(false), 4000);
+    return () => window.clearTimeout(t);
+  }, [liveBootCover]);
+  useEffect(() => {
+    if (!liveBootCover) return;
+    if (liveWatchShown || liveViewOn === false || (broadcastLoaded && !isBroadcastOn)) setLiveBootCover(false);
+    if (broadcastLoaded && !isBroadcastOn) { try { window.localStorage.removeItem("ruru_live_watch_boot"); } catch { /* 무시 */ } }
+  }, [liveBootCover, liveWatchShown, liveViewOn, broadcastLoaded, isBroadcastOn]);
+  useEffect(() => {
+    if (liveWatchShown) { try { window.localStorage.setItem("ruru_live_watch_boot", "1"); } catch { /* 무시 */ } }
+  }, [liveWatchShown]);
   // 방송이 바뀌면 손님이 고른 화면도 새로 정한다
   useEffect(() => { setLiveViewOn(null); }, [broadcast?.id]);
   useEffect(() => {
@@ -6465,6 +6486,7 @@ export default function OrderPage() {
   const chooseLiveView = (on: boolean) => {
     setLiveViewOn(on);
     try { window.sessionStorage.setItem(liveWatchViewKey(broadcast?.id), on ? "live" : "shop"); } catch { /* 기억 못 해도 화면은 바뀜 */ }
+    try { if (on) window.localStorage.setItem("ruru_live_watch_boot", "1"); else window.localStorage.removeItem("ruru_live_watch_boot"); } catch { /* 무시 */ }
     if (!on) window.scrollTo({ top: 0 });
   };
   // 방송 화면이 떠 있을 때만: 관리자가 「소개」를 바꾸면 곧바로(소식 받기 — DB 다시 읽기는 방송 한 줄만, 3초에 한 번까지),
@@ -7088,7 +7110,7 @@ export default function OrderPage() {
       ) : null}
 
       {/* 접속 팝업 공지 — 카톡 로그인 후 주문서 첫 화면에 표시. 밴드 바로가기 + 24시간 안 보기 + 확인. 모든 모바일 대응. */}
-      {popupOpen && hasSavedInfo ? (
+      {popupOpen && hasSavedInfo && !liveWatchShown && !liveBootCover ? (
         <div
           onClick={() => setPopupOpen(false)}
           style={s5s({ position: "fixed", inset: 0, zIndex: 3000, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" })}
@@ -7185,7 +7207,7 @@ export default function OrderPage() {
       {/* [2026-11-01] 안내 팝업 — 다른 팝업(접속 공지·주문 방법·구매 동의)이 닫힌 뒤에 뜬다. */}
       <PromoPopup
         cfg={hasSavedInfo ? promoPopupConfig : null}
-        blocked={popupOpen || howToOpen || purchaseConsentOpen}
+        blocked={(popupOpen && !liveWatchShown) || (howToOpen && !liveWatchShown) || purchaseConsentOpen || (liveWatchShown && liveGuideOpen) || liveBootCover}
       />
 
       {purchaseConsentOpen ? (
@@ -8079,6 +8101,9 @@ export default function OrderPage() {
           })()}
 
           {/* [2026-11-09] 「방송 보며 주문」 화면 — 옵션 창·주문서 창(z 100)은 이 위로 올라온다 */}
+          {liveBootCover && !liveWatchShown ? (
+            <div role="status" aria-label="방송 화면 여는 중" style={{ position: "fixed", inset: 0, zIndex: 60, background: "#000000", color: "#E5E5E5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px" }}>방송 화면 여는 중…</div>
+          ) : null}
           {liveWatchShown ? (
             <LiveWatchView
               videoId={liveWatchVideoId}
@@ -8093,6 +8118,7 @@ export default function OrderPage() {
               onOpenProduct={openLiveWatchProduct}
               onOpenCart={() => setOrderSheetOpen(true)}
               onSwitchToShop={() => chooseLiveView(false)}
+              onGuideOpenChange={setLiveGuideOpen}
               menu={[
                 { key: "notice", label: "공지", badge: noteUnread, onClick: () => { window.dispatchEvent(new Event("ruru-open-notice-box")); } },
                 { key: "orders", label: "주문내역", onClick: () => openOrderLookupBottomSheet() },
@@ -9793,7 +9819,7 @@ export default function OrderPage() {
               );
             })()}
 
-            {uiPc ? null : <nav style={uiV2 ? { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 40, height: "calc(68px + env(safe-area-inset-bottom))", paddingBottom: "env(safe-area-inset-bottom)", background: "#FFFFFF", borderTop: "1px solid #E5E5E5", display: "grid", gridTemplateColumns: "repeat(5,1fr)" } : { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 40, height: "calc(68px + env(safe-area-inset-bottom))", paddingBottom: "env(safe-area-inset-bottom)", background: "#fff", borderTop: "1px solid #EFE6DE", display: "grid", gridTemplateColumns: "repeat(5,1fr)" }}>
+            {uiPc || liveWatchShown ? null : <nav style={uiV2 ? { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 40, height: "calc(68px + env(safe-area-inset-bottom))", paddingBottom: "env(safe-area-inset-bottom)", background: "#FFFFFF", borderTop: "1px solid #E5E5E5", display: "grid", gridTemplateColumns: "repeat(5,1fr)" } : { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 40, height: "calc(68px + env(safe-area-inset-bottom))", paddingBottom: "env(safe-area-inset-bottom)", background: "#fff", borderTop: "1px solid #EFE6DE", display: "grid", gridTemplateColumns: "repeat(5,1fr)" }}>
               {[
                 { key: "home", label: "홈", icon: "🏠", onClick: () => window.scrollTo({ top: 0, behavior: "smooth" }) },
                 // [2026-08-30 사장님 요청] 하단에 쪽지함 진입점. 공지와 쪽지를 한 곳에서 본다.
@@ -9830,7 +9856,7 @@ export default function OrderPage() {
         </>
       )}
 
-        {howToOpen ? (
+        {howToOpen && !liveWatchShown && !liveBootCover ? (
           <CustomerBottomSheet tone={uiS5 ? "v2" : undefined}
             open
             onClose={() => setHowToOpen(false)}
