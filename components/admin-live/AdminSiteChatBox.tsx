@@ -32,6 +32,14 @@ export default function AdminSiteChatBox({ broadcastId }: { broadcastId: string 
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
+  // [07:06 사장님] 마우스만 올려도 메뉴가 떠서 불편 → 글을 «눌러야» 고정·지우기·30초·5분·차단 메뉴(다시 누르면 닫힘)
+  const [menuId, setMenuId] = useState<number | null>(null);
+  useEffect(() => {
+    if (menuId == null) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setMenuId(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuId]);
   const boxRef = useRef<HTMLDivElement | null>(null);
   // 이모티콘 — 채팅 그림 + 관리자 글에 넣기(관리자는 늘 쓸 수 있음)
   const [emojis, setEmojis] = useState<ChatEmoji[]>([]);
@@ -149,7 +157,8 @@ export default function AdminSiteChatBox({ broadcastId }: { broadcastId: string 
         {loadError ? <div className="p-3 text-[13px] text-danger-tx">{loadError}</div> : null}
         {!loadError && list.length === 0 ? <div className="p-6 text-center text-[13px] text-ink-mute">아직 글이 없어요. 아래 칸에 쓰면 손님 화면에 바로 올라가요.</div> : null}
         {list.map((m) => (
-          <div key={m.id} className="group relative flex items-start gap-2 rounded-lg px-1.5 py-1 hover:bg-surface-2">
+          <div key={m.id} onClick={() => { if (m.badge !== "bot") setMenuId((v) => (v === m.id ? null : m.id)); }}
+            className={`relative flex items-start gap-2 rounded-lg px-1.5 py-1 ${m.badge === "bot" ? "" : "cursor-pointer"} ${menuId === m.id ? "bg-surface-2" : ""}`}>
             {m.badge === "bot" ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src="/ruru-ai-avatar.png" alt="" className="mt-0.5 h-6 w-6 shrink-0 rounded-full object-cover" />
@@ -165,8 +174,8 @@ export default function AdminSiteChatBox({ broadcastId }: { broadcastId: string 
               <span className="break-words"><ChatBodyView body={m.body} emojis={emojiMap} /></span>
               <span className="ml-1 text-[11px] text-ink-mute">{timeText(m.createdAt)}</span>
             </div>
-            {m.badge === "bot" ? null : (
-              <div className="absolute right-1 top-0.5 hidden gap-1 rounded-lg border border-line bg-surface p-0.5 shadow-sm group-hover:flex group-focus-within:flex">
+            {m.badge === "bot" || menuId !== m.id ? null : (
+              <div onClick={(e) => e.stopPropagation()} className="absolute right-1 top-0.5 z-10 flex gap-1 rounded-lg border border-line bg-surface p-0.5 shadow-sm">
                 {([
                   [pinned?.id === m.id ? "unpin" : "pin", pinned?.id === m.id ? "고정 해제" : "고정"],
                   ["hide", "지우기"],
@@ -174,7 +183,7 @@ export default function AdminSiteChatBox({ broadcastId }: { broadcastId: string 
                   ["mute5m", "5분"],
                   ["ban", "차단"],
                 ] as const).map(([a, label]) => (
-                  <button key={a} type="button" disabled={busyId === m.id} onClick={() => void act(m, a)}
+                  <button key={a} type="button" disabled={busyId === m.id} onClick={() => { setMenuId(null); void act(m, a); }}
                     className={`h-7 rounded-lg px-2 text-[12px] font-bold hover:bg-surface-2 disabled:opacity-40 ${a === "ban" ? "text-danger-tx" : "text-ink"}`}>{label}</button>
                 ))}
               </div>

@@ -15,6 +15,7 @@ import {
   parseLiveChatBotSetting,
   pickFaq,
   pickProductForChat,
+  pickProductsForShortChat,
   productBotText,
   type BotCandidate,
 } from "@/lib/liveChatBot";
@@ -37,6 +38,7 @@ function productCandidates(row: Record<string, unknown>): BotCandidate[] {
       line: buildDetailChatLine(d),
       soldOut: d.stockManaged && d.stock !== null && d.stock <= 0,
       sizes: d.sizes,
+      groupName: String(row.product_name ?? "").trim(),
     }));
   }
   const note = parseProductNote(row);
@@ -97,6 +99,7 @@ export async function runLiveChatBot(sb: SupabaseClient, bc: string, body: strin
       const cands = await loadCandidates(sb, bc);
       const pick = pickProductForChat(body, cands);
       if (pick) await postBot(sb, bc, botRefOfProduct(pick.cand), productBotText(pick.cand));
+      else for (const sp of pickProductsForShortChat(body, cands)) await postBot(sb, bc, botRefOfProduct(sp), sp.text);
     }
     const faq = pickFaq(body, setting.faqs);
     if (faq) await postBot(sb, bc, botRefOfFaq(faq.faq), faq.faq.answer);

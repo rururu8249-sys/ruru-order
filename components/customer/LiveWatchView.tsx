@@ -38,6 +38,8 @@ type Props = {
   title: string;
   paused: boolean;
   pausedText: string;
+  /** [2026-11-10] 유튜브 동시 시청자 수(1분마다 갱신) — 없으면 숫자 안 보임 */
+  viewers?: number | null;
   pinned: LiveWatchPinned | null;
   items: LiveWatchItem[];
   cartCount: number;
@@ -580,8 +582,17 @@ export default function LiveWatchView(props: Props) {
       <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, top: 0, height: "calc(100% - 84px - env(safe-area-inset-bottom))", pointerEvents: "none", background: "rgba(0,0,0,0.45)", opacity: seekMode ? 1 : 0, transition: "opacity 0.2s" }} />
       <div data-live-seek={seekMode ? "1" : "0"} style={{ position: "absolute", left: 0, right: 0, top: 0, padding: "calc(8px + env(safe-area-inset-top)) 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", background: "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0))", pointerEvents: "none", opacity: seekMode ? 0 : 1, transition: "opacity 0.2s" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "28px", padding: "0 10px", borderRadius: "9999px", background: paused ? "#707072" : "#D30005", fontSize: "13px", fontWeight: 700, flexShrink: 0 }}>
-            <span aria-hidden="true" style={{ width: "6px", height: "6px", borderRadius: "9999px", background: "#FFFFFF" }} />{paused ? "쉬는 중" : "LIVE"}
+          {/* [07:05 사장님] LIVE + 시청자 수(유튜브 동시 시청자) — 오늘만셀러처럼 한 알약 */}
+          <span aria-label={props.viewers != null ? `${paused ? "쉬는 중" : "라이브"} · 시청자 ${props.viewers}명` : undefined} style={{ display: "inline-flex", alignItems: "stretch", height: "28px", borderRadius: "9999px", overflow: "hidden", fontSize: "13px", fontWeight: 700, flexShrink: 0 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "0 10px", background: paused ? "#707072" : "#D30005" }}>
+              <span aria-hidden="true" style={{ width: "6px", height: "6px", borderRadius: "9999px", background: "#FFFFFF" }} />{paused ? "쉬는 중" : "LIVE"}
+            </span>
+            {props.viewers != null ? (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "0 10px 0 8px", background: "rgba(0,0,0,0.5)" }}>
+                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></svg>
+                {props.viewers.toLocaleString("ko-KR")}
+              </span>
+            ) : null}
           </span>
           <span style={{ fontSize: "15px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title || "라이브 방송"}</span>
         </div>

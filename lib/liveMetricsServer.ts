@@ -10,6 +10,7 @@ import { appendSample, extractCodes, liveMetricsKey, minuteIso, parseSamples, ro
 type TickResult = { ok: boolean; skipped?: boolean; reason?: string; broadcastId?: string; sample?: LiveSample };
 
 const CHAT_PT_PREFIX = "live_metrics_chat_pt:";
+export const LIVE_VIEWERS_NOW_KEY = "live_viewers_now";
 
 export async function recordLiveMetricsTick(nowMs = Date.now()): Promise<TickResult> {
   try {
@@ -97,6 +98,8 @@ export async function recordLiveMetricsTick(nowMs = Date.now()): Promise<TickRes
 
     const sample: LiveSample = { t, v: viewers, l: likes, s: site, c: chat, k: codes, r: rot };
     await writeSetting(sb, key, JSON.stringify(appendSample(list, sample)));
+    // [2026-11-10] 손님 방송 화면 왼쪽 위 「LIVE 시청자수」용 — 지금 숫자 한 줄(작게, 손님이 30초마다 읽음)
+    try { await writeSetting(sb, LIVE_VIEWERS_NOW_KEY, JSON.stringify({ bc: broadcastId, v: viewers, s: site, t: new Date(nowMs).toISOString() })); } catch { /* 무시 */ }
     return { ok: true, broadcastId, sample };
   } catch (e) {
     return { ok: false, reason: String((e as Error)?.message ?? e) };

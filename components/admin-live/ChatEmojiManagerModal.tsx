@@ -332,7 +332,7 @@ export default function ChatEmojiManagerModal({ open, onClose, onChanged }: { op
             <>
               {/* 손님 화면에서 보이는 크기 */}
               <div className="rounded-lg bg-[#111111] px-4 py-3 text-[16px] leading-[1.45] text-white">
-                <div className="mb-1 text-[12px] text-white/60">손님 화면에 보이는 크기 — 글자와 섞으면 글자 2배 높이, 이모티콘만 보내면 더 크게</div>
+                <div className="mb-1 text-[12px] text-white/60">손님 화면에 보이는 크기 — 유튜브처럼 늘 같은 크기(글자 2배 높이)</div>
                 {sample ? (
                   <>
                     <div><span className="font-extrabold text-[#FFD43B]">루루실장</span> <span className="text-[#FFD43B]"><ChatBodyView body={`오늘도 와 주셔서 감사해요 \uE000${sample.id}:${sample.name}\uE001`} emojis={emojiMapOf(s.items)} /></span></div>

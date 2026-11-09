@@ -1465,6 +1465,8 @@ export default function OrderPage() {
   // [2026-11-10] 채팅 이모티콘 — 켜진 목록(그림 그리기) + 이 손님이 쓸 수 있는지(서버 판정)
   const [liveChatEmojis, setLiveChatEmojis] = useState<ChatEmoji[]>([]);
   const [liveChatCanEmoji, setLiveChatCanEmoji] = useState(false);
+  // [2026-11-10] 방송 화면 왼쪽 위 시청자 수(유튜브 동시 시청자, 30초마다 읽음)
+  const [liveViewers, setLiveViewers] = useState<number | null>(null);
   // 주문 소식 처리(효과 안)에서 지금 채팅이 켜졌는지 보려고
   const liveChatEnabledRef = useRef(false);
   useEffect(() => { liveChatEnabledRef.current = liveChatEnabled; }, [liveChatEnabled]);
@@ -6573,6 +6575,14 @@ export default function OrderPage() {
     };
     void loadEmojis();
     const emojiTimer = window.setInterval(() => { if (document.visibilityState === "visible") void loadEmojis(); }, 180000);
+    const loadViewers = async () => {
+      try {
+        const j = await fetch(`/api/live-viewers?bc=${encodeURIComponent(String(bid))}`).then((r) => r.json());
+        setLiveViewers(j && Number.isFinite(Number(j.viewers)) && j.viewers != null ? Number(j.viewers) : null);
+      } catch { /* 숫자 못 읽으면 그대로 */ }
+    };
+    void loadViewers();
+    const viewersTimer = window.setInterval(() => { if (document.visibilityState === "visible") void loadViewers(); }, 30000);
     // 사이트 채팅 — 처음 한 번 최근 글 읽고, 그 뒤는 소식으로만
     void (async () => {
       try {
@@ -6640,7 +6650,7 @@ export default function OrderPage() {
         window.setTimeout(() => setLiveOrderToasts((prev) => prev.filter((t) => t.key !== toast.key)), 4000);
       },
     });
-    return () => { if (timer) clearTimeout(timer); window.clearInterval(emojiTimer); off(); };
+    return () => { if (timer) clearTimeout(timer); window.clearInterval(emojiTimer); window.clearInterval(viewersTimer); off(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveWatchShown, broadcast?.id]);
   // 방송 화면 상품 목록 — 지금 손님 화면에 보이는 방송 상품과 같은 목록(같은 순서)
@@ -8214,6 +8224,7 @@ export default function OrderPage() {
               title={String(broadcast?.broadcast_public_title || broadcast?.public_title || "").trim() || "루루동이 라이브"}
               paused={isBroadcastPaused}
               pausedText={livePausedText}
+              viewers={liveViewers}
               pinned={liveWatchPinned}
               items={liveWatchItems}
               cartCount={liveWatchCartCount}

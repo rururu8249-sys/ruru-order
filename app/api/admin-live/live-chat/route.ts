@@ -6,7 +6,8 @@
 //   POST { action: "post", bc, body }  → [2026-11-10 사장님 05:54] 관리자 PC 에서 글 쓰기 — 총관리자(금색 왕관) 회원 이름으로 올라감
 //   POST { action: "pin"|"unpin", messageId } → 고정 댓글
 //   표 live_chat_messages / live_chat_bans 만 쓴다. 주문·돈·고객 차단(customers.is_blocked) 무접촉.
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import { runLiveChatBot } from "@/lib/liveChatBotServer";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { getServiceClient } from "@/lib/youtube";
 import { encodeEmojiTokens } from "@/lib/liveChatEmoji";
@@ -102,6 +103,9 @@ export async function POST(request: NextRequest) {
         badge: owner.badge, avatar_url: cleanKakaoPhotoUrl(c?.kakao_profile_image) || null,
       }).select(MSG_COLS).single();
       if (error) return fail("못 보냈어요. 다시 눌러 주세요.", 500);
+      // 관리자 PC 글에도 루루동이 자동 안내(손님 글과 같은 규칙 · 이모티콘 빼고 글자만)
+      const botText = body.replace(/:[^:\s]{1,10}:/g, " ").replace(/\s+/g, " ").trim();
+      if (botText) after(() => runLiveChatBot(sb, bc, botText));
       return NextResponse.json({ ok: true, message: parseChatMessage(ins) });
     }
 
