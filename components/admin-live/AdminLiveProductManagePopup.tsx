@@ -358,8 +358,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
     return () => window.removeEventListener("ruru-widget-rotation-renamed", onRenamed);
   }, []);
   const [onScreenOnly, setOnScreenOnly] = useState(false);
-  // [2026-11-09] 「순환 목록 N」 펼침(칩 목록·전체 상품 순환·안내글 복사) — 기본 접힘
-  const [rotListOpen, setRotListOpen] = useState(false);
+  // [2026-11-09 사장님 20:46 「순환 중 여러 개여도 특정 상품만 골라서 안내글 복사」] 순환 목록 칩을 누르면 고름 → 「고른 N개 안내글 복사」
+  const [rotChipPick, setRotChipPick] = useState<Set<string>>(() => new Set());
   const widgetLibraryLoadSeqRef = useRef(0);
   const [bcWidgetPin, setBcWidgetPin] = useState<{ mode: "auto" | "pin"; productId: string; detailName: string }>({ mode: "auto", productId: "", detailName: "" });
   const [bcExpanded, setBcExpanded] = useState<Set<string>>(new Set());
@@ -1436,20 +1436,20 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
   const isDetailPicked = (pid: string, detail: { detailName: string }) => widgetRotation.mode !== "all" && isDetailRotating(pid, detail);
 
   // 위 칸 「순환 중인 상품」 — 묶음이 전부 들어 있으면 한 칸(「막스마라 전체 34개」), 일부면 세부상품마다 한 칸
-  type RotChip = { key: string; label: string; img: string; remove: () => void };
+  type RotChip = { key: string; label: string; img: string; remove: () => void; lines: () => string[] };
   const rotationChips: RotChip[] = widgetRotation.mode === "all" ? [] : bcAllPids.flatMap((pid): RotChip[] => {
     const row = bcProducts.find((r) => productId(r) === pid);
     if (!row) return [];
     const details = rotationDetailsOfRow(pid);
     if (details.length === 0) {
-      return rotationIncludedPids.has(pid) ? [{ key: pid, label: productName(row), img: mainImage(row), remove: () => void hideFromScreen([pid], [], productName(row)) }] : [];
+      return rotationIncludedPids.has(pid) ? [{ key: pid, label: productName(row), img: mainImage(row), remove: () => void hideFromScreen([pid], [], productName(row)), lines: () => [announceLine(row)] }] : [];
     }
     const on = details.filter((detail) => isDetailRotating(pid, detail));
     if (on.length === 0) return [];
     if (on.length === details.length && details.length > 1) {
-      return [{ key: pid, label: `${productName(row)} 전체 ${details.length}개`, img: mainImage(row), remove: () => void hideFromScreen([pid], [], productName(row)) }];
+      return [{ key: pid, label: `${productName(row)} 전체 ${details.length}개`, img: mainImage(row), remove: () => void hideFromScreen([pid], [], productName(row)), lines: () => on.map((d) => announceLine(row, d)) }];
     }
-    return on.map((detail) => ({ key: `${pid}|${detail.detailName}`, label: detail.detailName, img: detail.image || "", remove: () => void hideFromScreen([], [rotationDetailRef(pid, detail)], detail.detailName) }));
+    return on.map((detail) => ({ key: `${pid}|${detail.detailName}`, label: detail.detailName, img: detail.image || "", remove: () => void hideFromScreen([], [rotationDetailRef(pid, detail)], detail.detailName), lines: () => [announceLine(row, detail)] }));
   });
 
   // [2026-11-06 사장님 「전체 상품 순환 · 해당 브랜드만 순환 · 체크한 것만 순환 · 체크한 것 중 빼기」] 버튼 이름 = 하는 일
@@ -2043,28 +2043,27 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           {!rotationLive ? "방송을 켜면 순환을 바꿀 수 있어요" : widgetRotation.paused ? "멈춤 · 지금 상품에 머물러 있어요" : widgetRotation.mode === "all" ? "방송 상품 전부가 돌아가요" : `지금 ${rotationSelectedCount}개만 돌아가요`}
                         </span>
                         {widgetRotation.mode !== "all" ? (
-                          <button type="button" aria-expanded={rotListOpen} onClick={() => setRotListOpen((v) => !v)} title="지금 돌아가는 상품 목록" style={{ ...(rotListOpen ? rowBtnPrimary : rowBtn), height: "36px" }}>{`순환 목록 ${rotationChips.length}`}</button>
+                          <button type="button" disabled={!rotationLive || rotBusy} onClick={() => { setRotChipPick(new Set()); void rotationUseAll(); }} title="순환 목록을 비우고 방송 상품 전부가 돌게 해요" style={{ ...rowBtn, height: "36px", opacity: rotationLive ? 1 : 0.5 }}>전체 상품 순환</button>
                         ) : null}
                         <button type="button" disabled={!rotationLive} onClick={() => void toggleWidgetLibraryPause()} style={{ ...(widgetRotation.paused ? rowBtnPrimary : rowBtn), height: "36px", opacity: rotationLive ? 1 : 0.5, cursor: rotationLive ? "pointer" : "not-allowed" }}>{widgetRotation.paused ? "다시 돌리기" : "멈춤"}</button>
                       </div>
-                      {rotListOpen && widgetRotation.mode !== "all" ? (
-                        <div style={{ margin: "-4px 0 8px", padding: "8px", border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface-2)" }}>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", maxHeight: "176px", overflowY: "auto" }}>
+                      {widgetRotation.mode !== "all" && rotationChips.length > 0 ? (() => {
+                        const picked = rotationChips.filter((c) => rotChipPick.has(c.key));
+                        return (
+                          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px", margin: "-4px 0 8px" }}>
                             {rotationChips.map((chip) => (
-                              <span key={chip.key} style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "36px", padding: "0 4px 0 4px", border: "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", maxWidth: "100%" }}>
-                                {chip.img ? <img src={chip.img} alt="" style={{ width: "28px", height: "28px", borderRadius: "4px", objectFit: "cover", flexShrink: 0 }} /> : null}
-                                <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chip.label}</span>
+                              <span key={chip.key} style={{ display: "inline-flex", alignItems: "center", gap: "2px", height: "36px", padding: "0 4px", border: rotChipPick.has(chip.key) ? "2px solid var(--color-ink)" : "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", maxWidth: "100%" }}>
+                                <button type="button" aria-pressed={rotChipPick.has(chip.key)} title="누르면 고름 — 고른 것만 안내글 복사" onClick={() => setRotChipPick((prev) => { const n = new Set(prev); if (n.has(chip.key)) n.delete(chip.key); else n.add(chip.key); return n; })} style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "32px", padding: "0 2px", border: 0, background: "transparent", cursor: "pointer", minWidth: 0 }}>
+                                  {chip.img ? <img src={chip.img} alt="" style={{ width: "28px", height: "28px", borderRadius: "4px", objectFit: "cover", flexShrink: 0 }} /> : null}
+                                  <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{rotChipPick.has(chip.key) ? "✓ " : ""}{chip.label}</span>
+                                </button>
                                 <button type="button" disabled={!rotationLive || rotBusy} onClick={chip.remove} aria-label={`${chip.label} 순환에서 빼기`} title="순환에서 빼기" style={{ width: "28px", height: "28px", flexShrink: 0, border: 0, borderRadius: "8px", background: "transparent", color: "var(--color-ink-mute)", fontSize: "16px", lineHeight: 1, cursor: rotationLive ? "pointer" : "not-allowed" }}>✕</button>
                               </span>
                             ))}
+                            <button type="button" onClick={() => { void copyAnnounceLines(picked.length ? picked.flatMap((c) => c.lines()) : rotationAnnounceLines(), picked.length ? "고른 상품" : "순환 중인 상품"); }} title="칩을 누르면 고른 것만, 안 고르면 전부 복사" style={{ ...rowBtn, height: "36px", marginLeft: "auto" }}>{picked.length ? `고른 ${picked.length}개 안내글 복사` : "안내글 복사"}</button>
                           </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
-                            <button type="button" aria-pressed={onScreenOnly} onClick={() => setOnScreenOnly((v) => !v)} style={{ ...(onScreenOnly ? rowBtnPrimary : rowBtn), height: "36px" }}>{onScreenOnly ? "전체 상품 보기" : "순환 중인 것만 보기"}</button>
-                            <button type="button" onClick={() => void copyAnnounceLines(rotationAnnounceLines(), "순환 중인 상품")} title="순환 중인 상품 전부의 안내글을 복사(채팅창에 붙여 넣기)" style={{ ...rowBtn, height: "36px" }}>{`안내글 복사 ${rotationAnnounceLines().length}줄`}</button>
-                            <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void rotationUseAll()} title="순환 목록을 비우고 방송 상품 전부가 돌게" style={{ ...rowBtn, height: "36px", marginLeft: "auto", color: "var(--color-danger-tx)", opacity: rotationLive ? 1 : 0.5 }}>전체 상품 순환</button>
-                          </div>
-                        </div>
-                      ) : null}
+                        );
+                      })() : null}
                     </>
                   )
                 ) : null}
