@@ -166,7 +166,7 @@ export default function LiveWatchView(props: Props) {
     try { iframeRef.current?.contentWindow?.postMessage(cmd, "https://www.youtube.com"); } catch { /* 플레이어 준비 전이면 무시 */ }
   };
   // ── 돌려보다가 「실시간으로 돌아가기」 ──
-  //   유튜브 플레이어가 보내 주는 재생 정보(infoDelivery)로 «지금 방송보다 30초 넘게 뒤» 또는 «멈춤»이면 버튼을 띄운다.
+  //   유튜브 플레이어가 보내 주는 재생 정보(infoDelivery)로 «재생 중인데 지금 방송보다 30초 넘게 뒤»일 때만 버튼을 띄운다.
   //   누르면 영상을 다시 불러 지금 방송으로(가장 확실한 방법). 정보가 안 오면 버튼도 안 뜬다(유튜브 막대의 「라이브」로도 돌아갈 수 있음).
   const [reloadKey, setReloadKey] = useState(0);
   const [behindLive, setBehindLive] = useState(false);
@@ -182,7 +182,8 @@ export default function LiveWatchView(props: Props) {
       if (typeof info.currentTime === "number") cur.t = info.currentTime;
       if (typeof info.duration === "number") cur.d = info.duration;
       if (typeof info.playerState === "number") cur.state = info.playerState;
-      const behind = cur.state === 2 || (cur.d > 0 && cur.t > 0 && cur.d - cur.t > 30);
+      // 막대를 움직여 지난 장면을 볼 때만(재생 중·30초 넘게 뒤). 멈춤·오류·끝난 방송엔 안 띄움
+      const behind = cur.state === 1 && cur.d > 0 && cur.t > 0 && cur.d - cur.t > 30;
       setBehindLive((prev) => (prev === behind ? prev : behind));
     };
     window.addEventListener("message", onMsg);
@@ -260,7 +261,7 @@ export default function LiveWatchView(props: Props) {
       {/* 돌려보는 중 → 지금 방송으로 */}
       {behindLive ? (
         <button type="button" onClick={backToLive} style={{ position: "absolute", left: "50%", top: "calc(124px + env(safe-area-inset-top))", transform: "translateX(-50%)", height: "44px", padding: "0 16px", border: "none", borderRadius: "9999px", background: "#D30005", color: "#FFFFFF", fontSize: "15px", fontWeight: 700, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", whiteSpace: "nowrap", zIndex: 1 }}>
-          <span aria-hidden="true" style={{ width: "8px", height: "8px", borderRadius: "9999px", background: "#FFFFFF" }} />실시간으로 돌아가기
+          <span aria-hidden="true" style={{ width: "8px", height: "8px", borderRadius: "9999px", background: "#FFFFFF" }} />실시간 화면으로 돌아가기
         </button>
       ) : null}
 
