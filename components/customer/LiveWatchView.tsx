@@ -292,20 +292,37 @@ export default function LiveWatchView(props: Props) {
   // [2026-11-10 04:17 사장님] 화면 빈 곳(영상)을 누르면 «돌려보기 모드» — 채팅·카드가 흐려지고 손가락이 그대로 유튜브 막대로 감.
   //   영상은 유튜브 화면(다른 사이트)이라 누른 걸 직접 못 듣는다 → 누르면 그 화면으로 «포커스»가 넘어가는 순간(창 blur)을 보고 안다.
   //   4초 동안 더 안 누르면 원래대로. 다음 누름도 알아채려고 포커스를 우리 화면으로 바로 돌려 놓는다.
+  //   [04:33 보정] 돌려보기 중 한 번 더 빈 곳을 누르면 바로 원래대로(유튜브 앱처럼). 막대를 끌거나 멈춤/재생을 누른 것과 구별하려고
+  //   누른 뒤 1.2초 동안 재생 위치·상태가 «건너뛰었는지» 본다 — 건너뛰었으면 막대 조작(돌려보기 유지), 그대로면 빈 곳 누름(원래대로).
   const [seekMode, setSeekMode] = useState(false);
+  const seekModeRef = useRef(false);
+  useEffect(() => { seekModeRef.current = seekMode; }, [seekMode]);
   useEffect(() => {
     let timer = 0;
+    let check = 0;
+    const SEEK_MS = 3500;
+    const restart = () => { if (timer) window.clearTimeout(timer); timer = window.setTimeout(() => setSeekMode(false), SEEK_MS); };
     const onBlur = () => {
       window.setTimeout(() => {
         if (document.activeElement !== iframeRef.current) return;
-        setSeekMode(true);
-        if (timer) window.clearTimeout(timer);
-        timer = window.setTimeout(() => setSeekMode(false), 4000);
         window.setTimeout(() => { try { rootRef.current?.focus({ preventScroll: true }); } catch { /* 무시 */ } }, 150);
+        if (!seekModeRef.current) { setSeekMode(true); restart(); return; }
+        // 돌려보기 중 또 누름 — 막대 조작인지 빈 곳 누름인지 1.2초 뒤에 판단
+        const snap = { t: playerInfo.current.t, state: playerInfo.current.state, at: Date.now() };
+        restart();
+        if (check) window.clearTimeout(check);
+        check = window.setTimeout(() => {
+          const cur = playerInfo.current;
+          const elapsed = (Date.now() - snap.at) / 1000;
+          const expected = snap.state === 1 ? snap.t + elapsed : snap.t;
+          const jumped = Math.abs(cur.t - expected) > 2.5 || cur.state !== snap.state;
+          if (jumped) restart();
+          else { if (timer) window.clearTimeout(timer); setSeekMode(false); }
+        }, 1200);
       }, 0);
     };
     window.addEventListener("blur", onBlur);
-    return () => { window.removeEventListener("blur", onBlur); if (timer) window.clearTimeout(timer); };
+    return () => { window.removeEventListener("blur", onBlur); if (timer) window.clearTimeout(timer); if (check) window.clearTimeout(check); };
   }, []);
   // 실시간 채팅에서 인사하기(유튜브처럼) — 이 방송에서 아직 글을 안 쓴 손님에게 한 번, 1분 지나면 저절로 숨김
   const greetKey = `ruru_live_greet_${videoId}`;
@@ -506,7 +523,9 @@ export default function LiveWatchView(props: Props) {
       />
 
       {/* 위 줄 — LIVE·제목 / 방송 화면 닫기(→ 상품 사진으로 보는 화면) */}
-      <div style={{ position: "absolute", left: 0, right: 0, top: 0, padding: "calc(8px + env(safe-area-inset-top)) 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", background: "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0))", pointerEvents: "none" }}>
+      {/* 돌려보기 중 — 영상 위쪽을 반투명 검정으로 어둡게(아래 유튜브 막대 자리는 밝게 남김) */}
+      <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, top: 0, height: "calc(100% - 84px - env(safe-area-inset-bottom))", pointerEvents: "none", background: "linear-gradient(rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.5) calc(100% - 120px), rgba(0,0,0,0) calc(100% - 64px))", opacity: seekMode ? 1 : 0, transition: "opacity 0.2s" }} />
+      <div data-live-seek={seekMode ? "1" : "0"} style={{ position: "absolute", left: 0, right: 0, top: 0, padding: "calc(8px + env(safe-area-inset-top)) 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", background: "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0))", pointerEvents: "none", opacity: seekMode ? 0 : 1, transition: "opacity 0.2s" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "28px", padding: "0 10px", borderRadius: "9999px", background: paused ? "#707072" : "#D30005", fontSize: "13px", fontWeight: 700, flexShrink: 0 }}>
             <span aria-hidden="true" style={{ width: "6px", height: "6px", borderRadius: "9999px", background: "#FFFFFF" }} />{paused ? "쉬는 중" : "LIVE"}
@@ -533,7 +552,7 @@ export default function LiveWatchView(props: Props) {
 
 
       {/* 돌려보는 중 → 지금 방송으로 */}
-      {behindLive ? (
+      {behindLive && !seekMode ? (
         <button type="button" onClick={backToLive} style={{ position: "absolute", left: "50%", top: "calc(124px + env(safe-area-inset-top))", transform: "translateX(-50%)", height: "44px", padding: "0 16px", border: "none", borderRadius: "9999px", background: "#D30005", color: "#FFFFFF", fontSize: "15px", fontWeight: 700, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", whiteSpace: "nowrap", zIndex: 1 }}>
           <span aria-hidden="true" style={{ width: "8px", height: "8px", borderRadius: "9999px", background: "#FFFFFF" }} />실시간 화면으로 돌아가기
         </button>
@@ -551,7 +570,7 @@ export default function LiveWatchView(props: Props) {
       {/* 아래쪽 — 채팅 · 주문 알림 · 소개 중 상품 카드(돌려보기 중엔 숨김 — 유튜브 막대를 가리지 않게) */}
       {/* 돌려보기 모드 — 안의 모든 것이 손가락을 막지 않게(유튜브 막대로 그대로) */}
       <style>{`[data-live-seek="1"], [data-live-seek="1"] * { pointer-events: none !important; }`}</style>
-      <div data-live-seek={seekMode ? "1" : "0"} style={{ display: focus ? "none" : "flex", position: "absolute", left: "16px", right: "16px", bottom: "calc(90px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: "none", opacity: seekMode ? 0.25 : 1, transition: "opacity 0.2s" }}>
+      <div data-live-seek={seekMode ? "1" : "0"} style={{ display: focus ? "none" : "flex", position: "absolute", left: "16px", right: "16px", bottom: "calc(90px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: "none", opacity: seekMode ? 0.06 : 1, transition: "opacity 0.2s" }}>
         {latestToast ? (
           <div role="status" aria-atomic="true" style={{ display: "flex" }}>
             <span key={latestToast.key} className="ruru-live-watch-toast" style={{ display: "inline-flex", alignItems: "center", height: "32px", maxWidth: "100%", padding: "0 12px", borderRadius: "9999px", background: "rgba(0,0,0,0.55)", fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
