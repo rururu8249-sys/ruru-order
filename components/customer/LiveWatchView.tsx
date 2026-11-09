@@ -168,6 +168,9 @@ export default function LiveWatchView(props: Props) {
         style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0, background: "#000000" }}
       />
 
+      {/* 영상 위 투명 막 — 손님이 영상을 눌러 멈추거나 돌려보지 못하게(늘 지금 방송). 누르면 다시 재생만 */}
+      <div aria-hidden="true" onClick={() => sendToPlayer(youtubeCommand("playVideo"))} style={{ position: "absolute", inset: 0, background: "transparent" }} />
+
       {/* 위 줄 — LIVE·제목 / 쇼핑몰처럼 보기 */}
       <div style={{ position: "absolute", left: 0, right: 0, top: 0, padding: "calc(8px + env(safe-area-inset-top)) 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", background: "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0))" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>

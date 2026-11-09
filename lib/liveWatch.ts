@@ -70,7 +70,11 @@ export function youtubeEmbedUrl(videoId: string, origin?: string): string {
     rel: "0",
     modestbranding: "1",
     enablejsapi: "1",
-    controls: "1",
+    // [2026-11-10] 유튜브 자체 막대(돌려보기)·전체화면·제목줄 숨김 — 우리 위·아래 띠와 겹치고, 손님이 지난 장면으로 가 버리지 않게
+    controls: "0",
+    fs: "0",
+    disablekb: "1",
+    iv_load_policy: "3",
   });
   if (origin) p.set("origin", origin);
   return `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?${p.toString()}`;
