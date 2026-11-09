@@ -138,6 +138,7 @@ function BarBtn(props: { label: string; badge?: number; badgeRed?: boolean; onCl
 
 export default function LiveWatchView(props: Props) {
   const { videoId, title, paused, pausedText, pinned, items, cartCount, cartTotalText, orderToasts } = props;
+  const noticeBadge = props.menu?.find((m) => m.key === "notice")?.badge || 0;
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [muted, setMuted] = useState(true);
   const [listOpen, setListOpen] = useState(false);
@@ -492,7 +493,7 @@ export default function LiveWatchView(props: Props) {
         ) : null}
       </div>
 
-      {/* 맨 아래 줄 — 오늘만셀러처럼 [상품 사진(숫자)] [메시지 입력] [공유][공지][주문서][더보기] */}
+      {/* 맨 아래 줄 — 오늘만셀러처럼 [상품 사진(숫자)] [채팅 입력(크게)] [주문서][더보기(새 공지 숫자)] — 공지·공유는 더보기 안 */}
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "8px 12px calc(8px + env(safe-area-inset-bottom))", display: "flex", alignItems: "center", gap: "8px", background: "#000000" }}>
         {/* 오늘만셀러처럼 — 지금 소개 중(없으면 첫) 상품 사진 + 오른쪽 위 숫자(고를 수 있는 상품 수, 세부상품까지) */}
         <button type="button" onClick={() => setListOpen(true)} aria-label={`방송 상품 목록 보기 (${totalCount}개)`} style={{ position: "relative", flexShrink: 0, width: "52px", height: "52px", padding: 0, border: "2px solid #FFFFFF", borderRadius: "12px", background: "#F5F5F5", fontFamily: "inherit", cursor: "pointer" }}>
@@ -505,20 +506,15 @@ export default function LiveWatchView(props: Props) {
           <span aria-hidden="true" style={{ position: "absolute", top: "-8px", right: "-8px", minWidth: "24px", height: "24px", padding: "0 6px", boxSizing: "border-box", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 700, lineHeight: "24px", textAlign: "center", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)" }}>{totalCount > 999 ? "999+" : totalCount}</span>
         </button>
         {chat && chat.canWrite && !focus ? (
-          <button type="button" onClick={() => setComposeOpen(true)} style={{ flex: 1, minWidth: "72px", height: "44px", border: "none", borderRadius: "9999px", background: "rgba(255,255,255,0.14)", color: "#E5E5E5", fontSize: "15px", fontWeight: 500, fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", padding: "0 14px", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden" }}>
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>메시지 입력..</span>
+          <button type="button" onClick={() => setComposeOpen(true)} style={{ flex: 1, minWidth: "112px", height: "52px", border: "1.5px solid rgba(255,255,255,0.55)", borderRadius: "9999px", background: "rgba(255,255,255,0.18)", color: "#FFFFFF", fontSize: "16px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", padding: "0 14px", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden" }}>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>채팅 입력</span>
           </button>
         ) : <span style={{ flex: 1 }} />}
-        {focus ? null : <>
-        <BarBtn label="공지" badge={props.menu?.find((m) => m.key === "notice")?.badge || 0} onClick={() => props.menu?.find((m) => m.key === "notice")?.onClick()}>
-          <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M3 10v4a1 1 0 001 1h2l1 5h3l-1-5h1l8 4V5l-8 4H4a1 1 0 00-1 1z" /></svg>
-        </BarBtn>
-        </>}
         <BarBtn label="주문서" badge={cartCount} badgeRed onClick={props.onOpenCart}>
           <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M6 8h12l1 13H5zM9 8V7a3 3 0 016 0v1" stroke="#FFFFFF" strokeWidth="1.6" strokeLinejoin="round" /></svg>
         </BarBtn>
         {focus ? null : (
-        <BarBtn label="더보기" onClick={() => setMoreOpen(true)}>
+        <BarBtn label="더보기" badge={noticeBadge} badgeRed onClick={() => setMoreOpen(true)}>
           <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="#FFFFFF"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
         </BarBtn>
         )}
@@ -529,14 +525,16 @@ export default function LiveWatchView(props: Props) {
         <div role="dialog" aria-modal="true" aria-label="더보기" onClick={() => setMoreOpen(false)} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z, background: "rgba(0,0,0,0.55)" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", right: "12px", bottom: "calc(84px + env(safe-area-inset-bottom))", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
             {[
-              ...(props.menu || []).filter((m) => m.key !== "notice").map((m) => ({ key: m.key, label: m.key === "inquiry" ? "문의하기" : m.label, onClick: m.onClick })),
+              ...(props.menu || []).map((m) => ({ key: m.key, label: m.key === "inquiry" ? "문의하기" : m.key === "notice" ? "공지·쪽지" : m.label, onClick: m.onClick, badge: m.key === "notice" ? noticeBadge : 0 })),
               { key: "share", label: "공유하기", onClick: shareLive },
               { key: "chatview", label: "채팅 설정", onClick: () => setChatViewOpen(true) },
               { key: "guide", label: "사용 방법", onClick: () => setGuideOpen(true) },
               ...(standalone ? [] : [{ key: "install", label: "앱 설치", onClick: installApp }]),
             ].map((m) => (
               <button key={m.key} type="button" onClick={() => { setMoreOpen(false); m.onClick(); }} style={{ display: "flex", alignItems: "center", gap: "12px", minHeight: "52px", padding: "0 4px 0 16px", border: "none", background: "transparent", color: "#FFFFFF", fontSize: "15px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer", textShadow: "0 1px 3px rgba(0,0,0,0.7)" }}>
-                <span>{m.label}</span><MenuIcon k={m.key} />
+                <span>{m.label}</span>
+                {"badge" in m && m.badge ? <span aria-label={`새 글 ${m.badge}개`} style={{ minWidth: "22px", height: "22px", padding: "0 6px", boxSizing: "border-box", borderRadius: "9999px", background: "#D30005", color: "#FFFFFF", fontSize: "13px", fontWeight: 700, lineHeight: "22px", textAlign: "center", textShadow: "none" }}>{m.badge > 99 ? "99+" : m.badge}</span> : null}
+                <MenuIcon k={m.key} />
               </button>
             ))}
             <button type="button" onClick={() => setMoreOpen(false)} aria-label="더보기 닫기" style={{ display: "flex", alignItems: "center", gap: "12px", minHeight: "52px", padding: "0 4px 0 16px", border: "none", background: "transparent", color: "#FFFFFF", fontSize: "15px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer" }}>
@@ -618,7 +616,7 @@ export default function LiveWatchView(props: Props) {
               autoFocus
               value={draft}
               onChange={(e) => setDraft(e.target.value.slice(0, LIVE_CHAT_MAX_LEN))}
-              placeholder="메시지 입력"
+              placeholder="채팅 입력"
               aria-label="채팅 메시지"
               enterKeyHint="send"
               maxLength={LIVE_CHAT_MAX_LEN}

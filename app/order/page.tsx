@@ -8155,7 +8155,7 @@ export default function OrderPage() {
                   setLiveChatMessages((prev) => mergeChat(prev, [temp]));
                   const dropTemp = () => setLiveChatMessages((prev) => prev.filter((x) => x.id !== tempId));
                   try {
-                    const res = await fetch("/api/live-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kakao_id: readLiveChatKakaoId(), bc: String(broadcast.id), body }) });
+                    const res = await fetch("/api/live-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kakao_id: readLiveChatKakaoId(), bc: String(broadcast.id), body, phone: customerPhone, nickname: youtubeNickname.trim() }) });
                     const json = await res.json().catch(() => null);
                     if (json?.ok && json.message) {
                       const m = parseChatMessage(json.message);

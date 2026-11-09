@@ -85,7 +85,18 @@ export async function POST(request: NextRequest) {
     if (!bcRow || String(bcRow.status ?? "") !== "ON") return fail("방송 중에만 쓸 수 있어요.", 403);
 
     // 닉네임은 회원 표에서(카카오 계정 기준, 최신 1줄)
-    const c = custRes.data as { id?: string; youtube_nickname?: string; is_blocked?: unknown } | null;
+    let c = custRes.data as { id?: string; youtube_nickname?: string; is_blocked?: unknown } | null;
+    // [2026-11-10] 다른 카카오 계정으로 로그인한 회원(로그인은 전화번호로 같은 회원을 찾아 들여보냄)도 쓰게 —
+    //   카카오 번호로 못 찾으면 «전화번호 + 닉네임이 둘 다 맞는» 회원 줄을 씀(로그인과 같은 폴백, 닉네임까지 맞아야 함).
+    if (!c) {
+      const digits = String(raw.phone ?? "").replace(/[^0-9]/g, "").slice(0, 11);
+      const nick = String(raw.nickname ?? "").trim().slice(0, 40);
+      if (/^0\d{9,10}$/.test(digits) && nick) {
+        const dashed = digits.length === 11 ? `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}` : `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+        const { data: byPhone } = await sb.from("customers").select("id, youtube_nickname, is_blocked").in("customer_phone", [digits, dashed]).eq("youtube_nickname", nick).order("created_at", { ascending: false }).limit(1).maybeSingle();
+        c = (byPhone as typeof c) ?? null;
+      }
+    }
     const nickname = String(c?.youtube_nickname ?? "").trim().slice(0, 40);
     if (!c || !nickname) return fail("닉네임을 먼저 정해 주세요.", 403);
     if (isBlockedValue(c.is_blocked)) return fail("채팅을 쓸 수 없어요.", 403);
