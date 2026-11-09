@@ -284,9 +284,49 @@ export default function LiveWatchView(props: Props) {
     setSending(true);
     setDraft("");
     setComposeOpen(false);
+    closeGreet();
     const r = await chat.onSend(body).catch(() => ({ ok: false, message: "못 보냈어요. 다시 눌러 주세요." }));
     setSending(false);
     if (!r.ok) { setDraft(body); setChatHint(r.message || "못 보냈어요."); }
+  };
+  // [2026-11-10 04:17 사장님] 화면 빈 곳(영상)을 누르면 «돌려보기 모드» — 채팅·카드가 흐려지고 손가락이 그대로 유튜브 막대로 감.
+  //   영상은 유튜브 화면(다른 사이트)이라 누른 걸 직접 못 듣는다 → 누르면 그 화면으로 «포커스»가 넘어가는 순간(창 blur)을 보고 안다.
+  //   4초 동안 더 안 누르면 원래대로. 다음 누름도 알아채려고 포커스를 우리 화면으로 바로 돌려 놓는다.
+  const [seekMode, setSeekMode] = useState(false);
+  useEffect(() => {
+    let timer = 0;
+    const onBlur = () => {
+      window.setTimeout(() => {
+        if (document.activeElement !== iframeRef.current) return;
+        setSeekMode(true);
+        if (timer) window.clearTimeout(timer);
+        timer = window.setTimeout(() => setSeekMode(false), 4000);
+        window.setTimeout(() => { try { rootRef.current?.focus({ preventScroll: true }); } catch { /* 무시 */ } }, 150);
+      }, 0);
+    };
+    window.addEventListener("blur", onBlur);
+    return () => { window.removeEventListener("blur", onBlur); if (timer) window.clearTimeout(timer); };
+  }, []);
+  // 실시간 채팅에서 인사하기(유튜브처럼) — 이 방송에서 아직 글을 안 쓴 손님에게 한 번, 1분 지나면 저절로 숨김
+  const greetKey = `ruru_live_greet_${videoId}`;
+  const [greetOpen, setGreetOpen] = useState(false);
+  useEffect(() => {
+    let done = false;
+    try { done = window.localStorage.getItem(greetKey) === "1"; } catch { /* 무시 */ }
+    if (done) return;
+    const t1 = window.setTimeout(() => setGreetOpen(true), 1500);
+    const t2 = window.setTimeout(() => setGreetOpen(false), 61500);
+    return () => { window.clearTimeout(t1); window.clearTimeout(t2); };
+  }, [greetKey]);
+  const closeGreet = () => {
+    setGreetOpen(false);
+    try { window.localStorage.setItem(greetKey, "1"); } catch { /* 무시 */ }
+  };
+  const sendGreet = async () => {
+    if (!chat) return;
+    closeGreet();
+    const r = await chat.onSend("👋").catch(() => ({ ok: false, message: "못 보냈어요." }));
+    if (!r.ok) setChatHint(r.message || "못 보냈어요.");
   };
   const startPress = (m: LiveChatMessage) => {
     if (!chat?.canModerate) return;
@@ -448,9 +488,10 @@ export default function LiveWatchView(props: Props) {
   return (
     <div
       ref={rootRef}
+      tabIndex={-1}
       role="region"
       aria-label="방송 보며 주문"
-      style={{ position: "fixed", inset: 0, zIndex: 60, background: "#000000", color: "#FFFFFF", overflow: "hidden", fontFamily: "inherit", overscrollBehavior: "none" }}
+      style={{ position: "fixed", inset: 0, zIndex: 60, background: "#000000", color: "#FFFFFF", overflow: "hidden", fontFamily: "inherit", overscrollBehavior: "none", outline: "none" }}
     >
       {/* 영상 — 화면 전체 */}
       <iframe
@@ -508,7 +549,9 @@ export default function LiveWatchView(props: Props) {
       ) : null}
 
       {/* 아래쪽 — 채팅 · 주문 알림 · 소개 중 상품 카드(돌려보기 중엔 숨김 — 유튜브 막대를 가리지 않게) */}
-      <div style={{ display: focus ? "none" : "flex", position: "absolute", left: "16px", right: "16px", bottom: "calc(90px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: "none" }}>
+      {/* 돌려보기 모드 — 안의 모든 것이 손가락을 막지 않게(유튜브 막대로 그대로) */}
+      <style>{`[data-live-seek="1"], [data-live-seek="1"] * { pointer-events: none !important; }`}</style>
+      <div data-live-seek={seekMode ? "1" : "0"} style={{ display: focus ? "none" : "flex", position: "absolute", left: "16px", right: "16px", bottom: "calc(90px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: "none", opacity: seekMode ? 0.25 : 1, transition: "opacity 0.2s" }}>
         {latestToast ? (
           <div role="status" aria-atomic="true" style={{ display: "flex" }}>
             <span key={latestToast.key} className="ruru-live-watch-toast" style={{ display: "inline-flex", alignItems: "center", height: "32px", maxWidth: "100%", padding: "0 12px", borderRadius: "9999px", background: "rgba(0,0,0,0.55)", fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -582,6 +625,15 @@ export default function LiveWatchView(props: Props) {
               {chat.pinned.nickname}<ChatBadge badge={chat.pinned.badge} />
             </span>
             <span style={{ flex: 1, minWidth: 0, fontWeight: chatView.bold ? 700 : 500, ...(pinOpen ? { wordBreak: "break-word" } : { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }) }}>{chat.pinned.body}</span>
+          </div>
+        ) : null}
+        {chat && chat.canWrite && greetOpen ? (
+          // 실시간 채팅에서 인사하기 — 「보내기」 = 👋 한 번 보냄
+          <div style={{ pointerEvents: "auto", display: "flex", alignItems: "center", gap: "10px", width: "100%", boxSizing: "border-box", minHeight: "48px", padding: "6px 8px 6px 14px", borderRadius: "14px", background: "rgba(28,28,28,0.88)", color: "#FFFFFF" }}>
+            <span aria-hidden="true" style={{ fontSize: "20px", lineHeight: 1 }}>👋</span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>실시간 채팅에서 인사하기</span>
+            <button type="button" onClick={() => void sendGreet()} style={{ flexShrink: 0, height: "36px", padding: "0 14px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer" }}>보내기</button>
+            <button type="button" onClick={closeGreet} aria-label="인사하기 닫기" style={{ flexShrink: 0, width: "36px", height: "36px", border: "none", borderRadius: "9999px", background: "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}><IconClose color="#FFFFFF" /></button>
           </div>
         ) : null}
         {pinned ? (
