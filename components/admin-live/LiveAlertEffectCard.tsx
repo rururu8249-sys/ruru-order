@@ -12,9 +12,12 @@ type Row = {
   segments: { sendAt: number; alerted: Seg; notAlerted: Seg; joinedAfter: Seg; unknownVisitors: number } | null;
 };
 type Seg = { people: number; visited: number; buyers: number; paidSum: number };
+type TplSend = { key: string; templateId: string; templateName: string; title: string; sentAt: number; people: number; visited: number; siteBefore: number; siteAfter: number };
+type TplSum = { templateId: string; templateName: string; sends: number; people: number; visited: number; rate: number; firstAt: number; lastAt: number };
 
 const won = (n: number) => `${Math.round(n).toLocaleString("ko-KR")}원`;
 const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 1000) / 10}%` : "-");
+const md = (ms: number) => new Date(ms).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric" });
 const day = (iso: string) => (iso ? new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "2-digit", day: "2-digit", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false }) : "");
 
 export default function LiveAlertEffectCard() {
@@ -22,6 +25,10 @@ export default function LiveAlertEffectCard() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
+  // [2026-11-09 사장님 「1번 알림톡이 사이트 접속이 더 많은 것 같다」] 알림톡 종류별 — 보낸 뒤 30분 안에 사이트 들어온 비율
+  const [tpl, setTpl] = useState<{ templates: TplSum[]; sends: TplSend[] } | null>(null);
+  const [tplErr, setTplErr] = useState("");
+  const [tplSendsOpen, setTplSendsOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true); setErr("");
@@ -31,6 +38,13 @@ export default function LiveAlertEffectCard() {
       if (!res.ok || !j.ok) throw new Error(j.error || "불러오지 못했어요");
       setRows(j.rows || []);
     } catch (e) { setErr(String((e as Error).message || e)); } finally { setLoading(false); }
+    try {
+      setTplErr("");
+      const r2 = await fetch("/api/admin-live/live-alert-by-template?days=60", { cache: "no-store" });
+      const j2 = await r2.json();
+      if (!r2.ok || !j2.ok) throw new Error(j2.error || "알림톡 종류별을 못 불러왔어요");
+      setTpl({ templates: j2.templates || [], sends: j2.sends || [] });
+    } catch (e) { setTplErr(String((e as Error).message || e)); }
   }, []);
   useEffect(() => { if (open && rows === null && !loading) void load(); }, [open, rows, loading, load]);
 
@@ -78,6 +92,51 @@ export default function LiveAlertEffectCard() {
               ))}
             </div>
           )}
+          <div className="mt-4 rounded-lg border border-line p-3">
+            <div className="text-[14px] font-bold text-ink">알림톡 종류별 비교 · 최근 60일</div>
+            <p className="mt-0.5 text-[12px] text-ink-mute">받은 사람 중 «보낸 뒤 30분 안에» 사이트를 새로 연 사람 비율(닉네임으로 맞춘 숫자)</p>
+            {tplErr ? <p role="alert" className="mt-2 text-[13px] text-danger-tx">{tplErr}</p> : !tpl ? <p className="mt-2 text-[13px] text-ink-mute">세는 중…</p> : tpl.templates.length === 0 ? <p className="mt-2 text-[13px] text-ink-mute">비교할 발송 기록이 없어요.</p> : (
+              <>
+                <div className="mt-2 overflow-x-auto">
+                  <table className="w-full min-w-[520px] text-[13px] tabular-nums">
+                    <thead><tr className="text-left text-[12px] text-ink-mute"><th className="py-1 font-normal">알림톡</th><th className="py-1 text-right font-normal">보낸 횟수</th><th className="py-1 text-right font-normal">받은 사람</th><th className="py-1 text-right font-normal">30분 안 사이트</th><th className="py-1 text-right font-normal">쓴 기간</th></tr></thead>
+                    <tbody>
+                      {tpl.templates.map((t) => (
+                        <tr key={t.templateId} className="border-t border-line">
+                          <td className="py-1.5 text-ink">{t.templateName}</td>
+                          <td className="py-1.5 text-right">{t.sends}번</td>
+                          <td className="py-1.5 text-right">{t.people.toLocaleString("ko-KR")}명</td>
+                          <td className="py-1.5 text-right font-semibold text-ink">{t.visited.toLocaleString("ko-KR")}명 <span className="text-[12px] font-normal text-ink-mute">{t.rate}%</span></td>
+                          <td className="py-1.5 text-right text-[12px] text-ink-mute">{md(t.firstAt)} ~ {md(t.lastAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <button type="button" aria-expanded={tplSendsOpen} onClick={() => setTplSendsOpen((v) => !v)} className="mt-2 h-9 rounded-lg border border-line bg-surface px-3 text-[13px] text-ink">{tplSendsOpen ? "발송별 접기" : `발송별 보기 (${tpl.sends.length}번)`}</button>
+                {tplSendsOpen ? (
+                  <div className="mt-2 overflow-x-auto">
+                    <table className="w-full min-w-[640px] text-[13px] tabular-nums">
+                      <thead><tr className="text-left text-[12px] text-ink-mute"><th className="py-1 font-normal">보낸 때</th><th className="py-1 font-normal">방송</th><th className="py-1 font-normal">알림톡</th><th className="py-1 text-right font-normal">받은 사람</th><th className="py-1 text-right font-normal">30분 안 사이트</th><th className="py-1 text-right font-normal">사이트 새 접속 전→후 30분</th></tr></thead>
+                      <tbody>
+                        {tpl.sends.map((s) => (
+                          <tr key={s.key} className="border-t border-line">
+                            <td className="py-1.5 text-ink">{day(new Date(s.sentAt).toISOString())}</td>
+                            <td className="py-1.5 text-ink">{s.title}</td>
+                            <td className="py-1.5 text-ink-soft">{s.templateName}</td>
+                            <td className="py-1.5 text-right">{s.people.toLocaleString("ko-KR")}명</td>
+                            <td className="py-1.5 text-right">{s.visited}명 <span className="text-[12px] text-ink-mute">{pct(s.visited, s.people)}</span></td>
+                            <td className="py-1.5 text-right">{s.siteBefore} → {s.siteAfter}명</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
+                <p className="mt-2 text-[12px] text-ink-mute">· 받은 사람 수·방송 날짜·시간대가 달라서 이 차이가 전부 알림톡 문구 때문이라고는 못 해요. 같은 종류를 여러 번 보낸 합계로 보세요.</p>
+              </>
+            )}
+          </div>
           <ul className="mt-3 grid gap-0.5 text-[12px] text-ink-mute">
             <li>· 보는 법: 「알림 받은 회원」과 「회원인데 알림 못 받음」의 비율 차이가 알림 효과에 가장 가까운 숫자예요. 다만 못 받은 쪽엔 알림을 직접 끈 사람이 섞여 있어 원래 덜 오는 쪽일 수 있어요(효과가 실제보다 크게 보일 수 있음).</li>
             <li>· 이 숫자로 알 수 없는 것: 유튜브 앱으로 방송을 봤는지(유튜브가 알려 주지 않아요).</li>
