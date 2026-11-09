@@ -64,3 +64,38 @@ export function computeAlertEffect(args: {
     alertedPaidSum: alertedPaid.reduce((s, g) => s + g.amount, 0),
   };
 }
+
+// [2026-11-09 19:53 사장님 「알림톡 쏠 때 가입돼 있던 사람인지로 나눠서라도 최대한」]
+//   알림 보낸 시각 기준으로 회원을 세 무리로 나눔 → 무리마다 «사이트 들어온 비율»·«주문한 비율» 비교.
+//   ①알림 받은 회원 ②알림 보낼 때 이미 회원이었지만 못 받은 사람(알림 끔·차단·제외·인원 제한)
+//   ③알림 보낸 뒤 새로 가입한 사람. ①과 ②의 차이가 «알림 효과에 가장 가까운 숫자»(②는 알림을 끈 사람이 섞여 원래 덜 오는 쪽일 수 있음).
+export type SegmentPerson = { phone: string; kakao: string; nicks: string[]; joinedAt: number; alerted: boolean };
+export type SegmentStat = { people: number; visited: number; buyers: number; paidSum: number };
+export type AlertSegments = {
+  sendAt: number;
+  alerted: SegmentStat;
+  notAlerted: SegmentStat;
+  joinedAfter: SegmentStat;
+  unknownVisitors: number; // 닉네임이 회원과 안 맞는 접속(로그인 전·닉네임 다름)
+};
+
+export function computeAlertSegments(args: { people: SegmentPerson[]; sendAt: number; groups: EffectGroup[]; visitNicks: Set<string> }): AlertSegments {
+  const active = args.groups.filter((g) => !g.canceled && !g.isTest);
+  const blank = (): SegmentStat => ({ people: 0, visited: 0, buyers: 0, paidSum: 0 });
+  const seg = { alerted: blank(), notAlerted: blank(), joinedAfter: blank() };
+  const knownNicks = new Set<string>();
+  for (const p of args.people) {
+    const key = p.alerted ? "alerted" : p.joinedAt && p.joinedAt > args.sendAt ? "joinedAfter" : "notAlerted";
+    const st = seg[key];
+    st.people++;
+    const nicks = p.nicks.map(normNick).filter(Boolean);
+    nicks.forEach((n) => knownNicks.add(n));
+    if (nicks.some((n) => args.visitNicks.has(n))) st.visited++;
+    const mine = active.filter((g) => (p.phone && g.phone === p.phone) || (p.kakao && g.who === `k:${p.kakao}`));
+    if (mine.length) st.buyers++;
+    st.paidSum += mine.filter((g) => g.paid).reduce((s, g) => s + g.amount, 0);
+  }
+  let unknownVisitors = 0;
+  for (const n of args.visitNicks) if (!knownNicks.has(n)) unknownVisitors++;
+  return { sendAt: args.sendAt, ...seg, unknownVisitors };
+}

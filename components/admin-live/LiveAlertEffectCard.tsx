@@ -9,7 +9,9 @@ type Row = {
   broadcastId: string; title: string; startedAt: string; endedAt: string;
   alerted: number; cost: number; siteVisitors: number; alertedVisited: number;
   buyers: number; alertedBuyers: number; alertedPaidBuyers: number; paidSum: number; alertedPaidSum: number;
+  segments: { sendAt: number; alerted: Seg; notAlerted: Seg; joinedAfter: Seg; unknownVisitors: number } | null;
 };
+type Seg = { people: number; visited: number; buyers: number; paidSum: number };
 
 const won = (n: number) => `${Math.round(n).toLocaleString("ko-KR")}원`;
 const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 1000) / 10}%` : "-");
@@ -52,18 +54,33 @@ export default function LiveAlertEffectCard() {
                     <span className="text-[14px] font-bold text-ink">{r.title}</span>
                     <span className="text-[12px] tabular-nums text-ink-mute">{day(r.startedAt)}{r.endedAt ? ` ~ ${day(r.endedAt)}` : " · 방송 중"}</span>
                   </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-[13px] tabular-nums sm:grid-cols-4">
-                    <div className="rounded-lg bg-surface-2 p-2"><div className="text-[12px] text-ink-mute">알림 받은 사람</div><div className="text-[16px] font-bold text-ink">{r.alerted.toLocaleString("ko-KR")}명</div><div className="text-[12px] text-ink-mute">비용 약 {won(r.cost)}</div></div>
-                    <div className="rounded-lg bg-surface-2 p-2"><div className="text-[12px] text-ink-mute">그중 사이트 들어옴</div><div className="text-[16px] font-bold text-ink">{r.alertedVisited.toLocaleString("ko-KR")}명 <span className="text-[12px] font-normal text-ink-mute">({pct(r.alertedVisited, r.alerted)})</span></div><div className="text-[12px] text-ink-mute">방송 시간 전체 {r.siteVisitors.toLocaleString("ko-KR")}명</div></div>
-                    <div className="rounded-lg bg-surface-2 p-2"><div className="text-[12px] text-ink-mute">그중 주문함</div><div className="text-[16px] font-bold text-ink">{r.alertedBuyers.toLocaleString("ko-KR")}명 <span className="text-[12px] font-normal text-ink-mute">({pct(r.alertedBuyers, r.alerted)})</span></div><div className="text-[12px] text-ink-mute">방송 주문한 사람 {r.buyers}명 중 {pct(r.alertedBuyers, r.buyers)}</div></div>
-                    <div className="rounded-lg bg-surface-2 p-2"><div className="text-[12px] text-ink-mute">그 사람들 결제완료</div><div className="text-[16px] font-bold text-ink">{won(r.alertedPaidSum)}</div><div className="text-[12px] text-ink-mute">방송 결제 {won(r.paidSum)} 중 {pct(r.alertedPaidSum, r.paidSum)}</div></div>
-                  </div>
+                  <div className="mt-1 text-[12px] tabular-nums text-ink-mute">알림 보낸 시각 {r.segments ? day(new Date(r.segments.sendAt).toISOString()) : "-"} · 알림 {r.alerted.toLocaleString("ko-KR")}명 · 비용 약 {won(r.cost)} · 방송 결제 {won(r.paidSum)}</div>
+                  {r.segments ? (
+                    <div className="mt-2 overflow-x-auto">
+                      <table className="w-full min-w-[520px] text-[13px] tabular-nums">
+                        <thead><tr className="text-left text-[12px] text-ink-mute"><th className="py-1 font-normal">알림 보낼 때 기준</th><th className="py-1 text-right font-normal">사람</th><th className="py-1 text-right font-normal">사이트 들어옴</th><th className="py-1 text-right font-normal">주문함</th><th className="py-1 text-right font-normal">결제완료</th></tr></thead>
+                        <tbody>
+                          {([["알림 받은 회원", r.segments.alerted, true], ["회원인데 알림 못 받음", r.segments.notAlerted, false], ["알림 뒤 새로 가입", r.segments.joinedAfter, false]] as Array<[string, Seg, boolean]>).map(([label, g, strong]) => (
+                            <tr key={label} className="border-t border-line">
+                              <td className={`py-1.5 ${strong ? "font-semibold text-ink" : "text-ink"}`}>{label}</td>
+                              <td className="py-1.5 text-right">{g.people.toLocaleString("ko-KR")}명</td>
+                              <td className="py-1.5 text-right">{g.visited.toLocaleString("ko-KR")}명 <span className="text-[12px] text-ink-mute">{pct(g.visited, g.people)}</span></td>
+                              <td className="py-1.5 text-right">{g.buyers.toLocaleString("ko-KR")}명 <span className="text-[12px] text-ink-mute">{pct(g.buyers, g.people)}</span></td>
+                              <td className="py-1.5 text-right tabular-nums">{won(g.paidSum)}</td>
+                            </tr>
+                          ))}
+                          <tr className="border-t border-line text-ink-mute"><td className="py-1.5">회원과 안 맞는 접속</td><td /><td className="py-1.5 text-right">{r.segments.unknownVisitors.toLocaleString("ko-KR")}명</td><td /><td /></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
           )}
           <ul className="mt-3 grid gap-0.5 text-[12px] text-ink-mute">
-            <li>· 이 숫자로 알 수 없는 것: 유튜브 앱으로 방송을 봤는지(유튜브가 알려 주지 않아요), 알림 «때문에» 왔는지(알림 없이도 왔을 단골일 수 있어요).</li>
+            <li>· 보는 법: 「알림 받은 회원」과 「회원인데 알림 못 받음」의 비율 차이가 알림 효과에 가장 가까운 숫자예요. 다만 못 받은 쪽엔 알림을 직접 끈 사람이 섞여 있어 원래 덜 오는 쪽일 수 있어요(효과가 실제보다 크게 보일 수 있음).</li>
+            <li>· 이 숫자로 알 수 없는 것: 유튜브 앱으로 방송을 봤는지(유튜브가 알려 주지 않아요).</li>
             <li>· 「사이트 들어옴」은 그 방송 시간에 닉네임이 남은 접속만 맞춘 숫자예요. 로그인 전에 나갔거나 닉네임이 바뀐 사람은 빠져서 실제보다 적게 나올 수 있어요.</li>
             <li>· 주문·결제는 방송 시작~종료 시각 주문, 취소·테스트 제외, 결제완료 기준(텔레그램 결산과 같은 기준). 비용은 1명당 약 13원(11/8 솔라피 청구 기준)으로 셈.</li>
           </ul>

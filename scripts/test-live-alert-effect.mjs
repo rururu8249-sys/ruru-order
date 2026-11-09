@@ -28,3 +28,27 @@ assert.equal(r.alertedPaidBuyers, 1);
 assert.equal(r.paidSum, 110000);
 assert.equal(r.alertedPaidSum, 70000);
 console.log("test-live-alert-effect PASS");
+
+// 알림 보낸 시각 기준 세 무리
+{
+  const { computeAlertSegments } = createUiLoader()("lib/liveAlertEffect.ts");
+  const sendAt = 1000;
+  const people = [
+    { phone: "01011112222", kakao: "k1", nicks: ["루루 언니"], joinedAt: 10, alerted: true },
+    { phone: "01033334444", kakao: "", nicks: ["보라"], joinedAt: 10, alerted: true },
+    { phone: "01055556666", kakao: "", nicks: ["못받음"], joinedAt: 10, alerted: false },     // 회원인데 못 받음·접속O·주문O
+    { phone: "01066667777", kakao: "", nicks: ["조용"], joinedAt: 0, alerted: false },        // 가입 시각 모름 → 못 받음 쪽
+    { phone: "01088889999", kakao: "k9", nicks: ["새손님"], joinedAt: 2000, alerted: false }, // 알림 뒤 가입·주문O
+  ];
+  const groups = [
+    { phone: "01011112222", who: "k:k1", amount: 50000, paid: true, canceled: false, isTest: false },
+    { phone: "01055556666", who: "", amount: 30000, paid: false, canceled: false, isTest: false },
+    { phone: "01000000000", who: "k:k9", amount: 20000, paid: true, canceled: false, isTest: false },
+  ];
+  const seg = computeAlertSegments({ people, sendAt, groups, visitNicks: new Set(["루루언니", "못받음", "남남"].map(normNick)) });
+  assert.deepEqual(seg.alerted, { people: 2, visited: 1, buyers: 1, paidSum: 50000 });
+  assert.deepEqual(seg.notAlerted, { people: 2, visited: 1, buyers: 1, paidSum: 0 });
+  assert.deepEqual(seg.joinedAfter, { people: 1, visited: 0, buyers: 1, paidSum: 20000 });
+  assert.equal(seg.unknownVisitors, 1);
+  console.log("test-live-alert-effect segments PASS");
+}

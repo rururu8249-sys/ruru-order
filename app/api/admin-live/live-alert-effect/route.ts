@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { fetchOrders, groupOrders, MONTH_COLS } from "@/lib/liveSummary";
-import { computeAlertEffect, normNick, type AlertedPerson, type AlertEffect } from "@/lib/liveAlertEffect";
+import { computeAlertEffect, computeAlertSegments, normNick, type AlertedPerson, type AlertEffect, type AlertSegments, type SegmentPerson } from "@/lib/liveAlertEffect";
 
 export const maxDuration = 60;
 
@@ -30,7 +30,7 @@ async function readPaged<T>(make: (from: number, to: number) => PromiseLike<{ da
   return out;
 }
 
-export type AlertEffectRow = AlertEffect & { broadcastId: string; title: string; startedAt: string; endedAt: string };
+export type AlertEffectRow = AlertEffect & { broadcastId: string; title: string; startedAt: string; endedAt: string; segments: AlertSegments | null };
 
 export async function GET(request: NextRequest) {
   try {
@@ -58,6 +58,9 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => String(b.started_at).localeCompare(String(a.started_at)))
       .slice(0, limit);
 
+    // 회원 전부(가입 시각·닉네임) — 한 번만 읽음. 「알림 보낼 때 이미 회원이었나」 판정용
+    const allCustomers = await readPaged<Record<string, unknown>>((f, t) => sb.from("customers").select("kakao_id,customer_phone,youtube_nickname,created_at,first_login_at").order("created_at", { ascending: true }).range(f, t));
+
     const rows: AlertEffectRow[] = [];
     for (const b of list) {
       const id = String(b.id);
@@ -66,8 +69,10 @@ export async function GET(request: NextRequest) {
       const end = live || !b.ended_at ? new Date().toISOString() : String(b.ended_at);
 
       // 2) 받은 사람(성공만)
-      const rec = await readPaged<{ customer_phone: string }>((f, t) => sb.from("live_alert_recipients").select("customer_phone").eq("broadcast_id", id).eq("status", "success").range(f, t));
+      const rec = await readPaged<{ customer_phone: string; sent_at: string }>((f, t) => sb.from("live_alert_recipients").select("customer_phone,sent_at").eq("broadcast_id", id).eq("status", "success").range(f, t));
       const phones = [...new Set(rec.map((r) => digits(r.customer_phone)).filter(Boolean))];
+      const sendTimes = rec.map((r) => Date.parse(r.sent_at)).filter((n) => Number.isFinite(n));
+      const sendAt = sendTimes.length ? Math.min(...sendTimes) : Date.parse(start);
 
       // 3) 받은 사람의 카카오 계정·지금 닉네임
       const info = new Map<string, { kakao: string; nicks: string[] }>();
@@ -95,7 +100,23 @@ export async function GET(request: NextRequest) {
       const visits = await readPaged<{ nickname: string | null; page_type: string | null }>((f, t) => sb.from("visitor_visits").select("nickname,page_type").lte("started_at", end).gte("last_seen_at", start).not("nickname", "is", null).range(f, t));
       const visitNicks = new Set(visits.filter((v) => v.page_type !== "admin").map((v) => normNick(v.nickname)).filter(Boolean));
 
+      // 7) 알림 보낸 시각 기준 세 무리(방송 끝난 뒤 가입한 사람은 뺌)
+      const endMs = Date.parse(end);
+      const phoneSet = new Set(phones);
+      const orderNicksByPhone = new Map<string, string[]>();
+      for (const g of groups) if (g.phone && g.name) orderNicksByPhone.set(g.phone, [...(orderNicksByPhone.get(g.phone) || []), g.name]);
+      const people: SegmentPerson[] = [];
+      for (const c of allCustomers) {
+        const p = digits(c.customer_phone);
+        const joined = Date.parse(String(c.first_login_at || c.created_at || ""));
+        const joinedAt = Number.isFinite(joined) ? joined : 0;
+        if (joinedAt && joinedAt > endMs) continue;
+        people.push({ phone: p, kakao: String(c.kakao_id || ""), nicks: [String(c.youtube_nickname || ""), ...(orderNicksByPhone.get(p) || [])], joinedAt, alerted: !!p && phoneSet.has(p) });
+      }
+      const segments = computeAlertSegments({ people, sendAt, groups, visitNicks });
+
       rows.push({
+        segments,
         broadcastId: id,
         title: String(b.public_title || "방송"),
         startedAt: start,
