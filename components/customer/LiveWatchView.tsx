@@ -84,6 +84,10 @@ const MenuIcon = ({ k }: { k: string }) => {
   const p = { width: 22, height: 22, viewBox: "0 0 24 24", fill: "none", stroke: "#FFFFFF", strokeWidth: 1.8 } as const;
   if (k === "notice") return <svg aria-hidden="true" {...p}><rect x="3" y="5" width="18" height="14" rx="1" /><path d="M3 7l9 6 9-6" /></svg>;
   if (k === "orders") return <svg aria-hidden="true" {...p}><path d="M12 3l8 4v10l-8 4-8-4V7z" /><path d="M4 7l8 4 8-4M12 11v10" /></svg>;
+  if (k === "chatview") return <svg aria-hidden="true" {...p}><path d="M3 6h10M8 6v13M13 11h8M17 11v8" /></svg>;
+  if (k === "install") return <svg aria-hidden="true" {...p}><rect x="7" y="2.5" width="10" height="19" rx="2" /><path d="M12 7v7M9 11l3 3 3-3" /></svg>;
+  if (k === "guide") return <svg aria-hidden="true" {...p}><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 114 2c-1 .6-1.5 1.2-1.5 2.3" /><path d="M12 17h.01" /></svg>;
+  if (k === "close") return <svg aria-hidden="true" {...p}><path d="M5 15l7-7 7 7" /></svg>;
   if (k === "inquiry") return <svg aria-hidden="true" {...p}><path d="M4 5h16v11H9l-5 4z" /></svg>;
   return <svg aria-hidden="true" {...p}><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></svg>;
 };
@@ -97,6 +101,39 @@ function nicknameColor(nick: string): string {
 const IconClose = ({ color = "#111111" }: { color?: string }) => (
   <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M6 6l12 12M18 6L6 18" /></svg>
 );
+
+// 채팅 설정(이 폰에만 기억) — 글자 크기·굵게·채팅창 높이
+type ChatView = { size: "base" | "mid" | "big"; bold: boolean; height: "base" | "low" | "high" };
+const CHAT_VIEW_KEY = "ruru_live_chat_view_v1";
+const CHAT_VIEW_DEFAULT: ChatView = { size: "base", bold: false, height: "base" };
+const CHAT_SIZES: Record<ChatView["size"], string> = { base: "14px", mid: "16px", big: "18px" };
+const CHAT_HEIGHTS: Record<ChatView["height"], string> = { base: "24dvh", low: "14dvh", high: "36dvh" };
+function readChatView(): ChatView {
+  try {
+    const o = JSON.parse(window.localStorage.getItem(CHAT_VIEW_KEY) || "{}") as Partial<ChatView>;
+    return {
+      size: o.size === "mid" || o.size === "big" ? o.size : "base",
+      bold: o.bold === true,
+      height: o.height === "low" || o.height === "high" ? o.height : "base",
+    };
+  } catch { return CHAT_VIEW_DEFAULT; }
+}
+
+// 맨 아래 동그란 버튼(그림 + 아래 글자) — 오늘만셀러처럼
+function BarBtn(props: { label: string; badge?: number; badgeRed?: boolean; onClick: () => void; children: ReactNode }) {
+  const n = props.badge || 0;
+  return (
+    <button type="button" onClick={props.onClick} aria-label={n > 0 ? `${props.label} ${n}개` : props.label} style={{ flexShrink: 0, width: "44px", padding: 0, border: "none", background: "transparent", color: "#FFFFFF", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: "pointer" }}>
+      <span style={{ position: "relative", width: "40px", height: "40px", borderRadius: "9999px", background: "rgba(255,255,255,0.14)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+        {props.children}
+        {n > 0 ? (
+          <span aria-hidden="true" style={{ position: "absolute", top: "-6px", right: "-8px", minWidth: "20px", height: "20px", padding: "0 5px", boxSizing: "border-box", borderRadius: "9999px", background: props.badgeRed ? "#D30005" : "#FFFFFF", color: props.badgeRed ? "#FFFFFF" : "#111111", fontSize: "13px", fontWeight: 700, lineHeight: "20px", textAlign: "center" }}>{n > 99 ? "99+" : n}</span>
+        ) : null}
+      </span>
+      <span style={{ fontSize: "13px", fontWeight: 600, lineHeight: 1 }}>{props.label}</span>
+    </button>
+  );
+}
 
 export default function LiveWatchView(props: Props) {
   const { videoId, title, paused, pausedText, pinned, items, cartCount, cartTotalText, orderToasts } = props;
@@ -130,6 +167,41 @@ export default function LiveWatchView(props: Props) {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [chatHint, setChatHint] = useState("");
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [focus, setFocus] = useState(false);
+  const [chatViewOpen, setChatViewOpen] = useState(false);
+  const [installHintOpen, setInstallHintOpen] = useState(false);
+  const [chatView, setChatView] = useState<ChatView>(CHAT_VIEW_DEFAULT);
+  const [standalone, setStandalone] = useState(false);
+  useEffect(() => {
+    setChatView(readChatView());
+    try { setStandalone(window.matchMedia("(display-mode: standalone)").matches || (navigator as unknown as { standalone?: boolean }).standalone === true); } catch { /* 무시 */ }
+  }, []);
+  const updateChatView = (patch: Partial<ChatView>) => {
+    setChatView((prev) => {
+      const next = { ...prev, ...patch };
+      try { window.localStorage.setItem(CHAT_VIEW_KEY, JSON.stringify(next)); } catch { /* 기억 못 해도 지금 화면엔 적용 */ }
+      return next;
+    });
+  };
+  // 앱 설치 — 설치 창을 띄울 수 있으면 바로(PWAInstallBanner 가 모아 둔 것), 아니면 방법 안내
+  const installApp = async () => {
+    const w = window as unknown as { __ruruPwaPrompt?: { prompt: () => void; userChoice: Promise<unknown> } | null };
+    const ev = w.__ruruPwaPrompt;
+    if (ev) {
+      try { ev.prompt(); await ev.userChoice; w.__ruruPwaPrompt = null; return; } catch { /* 아래 안내로 */ }
+    }
+    setInstallHintOpen(true);
+  };
+  // 공유 — 폰 공유 창(카톡 등), 안 되면 주소 복사
+  const shareLive = async () => {
+    const url = `${window.location.origin}/order`;
+    const nav = navigator as Navigator & { share?: (d: { title?: string; text?: string; url?: string }) => Promise<void> };
+    if (typeof nav.share === "function") {
+      try { await nav.share({ title: "루루동이 라이브", text: `${title || "루루동이 라이브"} 방송 중이에요`, url }); return; } catch { return; }
+    }
+    try { await navigator.clipboard.writeText(url); setChatHint("주소를 복사했어요. 카톡에 붙여 넣어 보내 주세요."); } catch { setChatHint(url); }
+  };
   const [modTarget, setModTarget] = useState<LiveChatMessage | null>(null);
   const [banConfirm, setBanConfirm] = useState(false);
   const chatBoxRef = useRef<HTMLDivElement | null>(null);
@@ -261,7 +333,7 @@ export default function LiveWatchView(props: Props) {
         title={`${title || "라이브 방송"} 영상`}
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
         allowFullScreen
-        style={{ position: "absolute", left: 0, right: 0, top: 0, width: "100%", height: "calc(100% - 76px - env(safe-area-inset-bottom))", border: 0, background: "#000000" }}
+        style={{ position: "absolute", left: 0, right: 0, top: 0, width: "100%", height: "calc(100% - 84px - env(safe-area-inset-bottom))", border: 0, background: "#000000" }}
       />
 
       {/* 위 줄 — LIVE·제목 / 방송 화면 닫기(→ 상품 사진으로 보는 화면) */}
@@ -274,6 +346,10 @@ export default function LiveWatchView(props: Props) {
         </div>
           {/* 오른쪽 위 — 오늘만셀러처럼 그림만: 새로고침 · 소리 · 닫기(X = 상품 사진으로 보는 쇼핑몰 화면) */}
           <div style={{ display: "flex", alignItems: "center", flexShrink: 0, pointerEvents: "auto", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))" }}>
+            {/* 집중모드 — 채팅·버튼을 숨기고 방송만(오늘만셀러 눈 그림) */}
+            <button type="button" onClick={() => { const next = !focus; setFocus(next); setChatHint(next ? "집중모드 — 채팅을 숨겼어요. 눈을 다시 누르면 보여요." : "채팅을 다시 보여 드려요."); }} aria-label={focus ? "집중모드 끄기" : "집중모드 켜기"} aria-pressed={focus} style={TOP_ICON_BTN}>
+              <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" />{focus ? <path d="M4 4l16 16" /> : null}</svg>
+            </button>
             <button type="button" onClick={backToLive} aria-label="방송 새로고침" style={TOP_ICON_BTN}>
               <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 11a8 8 0 00-14.3-4.9L4 8" /><path d="M4 4v4h4" /><path d="M4 13a8 8 0 0014.3 4.9L20 16" /><path d="M20 20v-4h-4" /></svg>
             </button>
@@ -286,21 +362,6 @@ export default function LiveWatchView(props: Props) {
           </div>
       </div>
 
-
-      {/* 오른쪽 세로 메뉴 — 공지·주문내역·내정보·문의(오늘만셀러처럼). 돌려보기 중엔 숨김 */}
-      {props.menu && props.menu.length > 0 ? (
-        <nav aria-label="메뉴" style={{ position: "absolute", right: "8px", top: "calc(124px + env(safe-area-inset-top))", display: "flex", flexDirection: "column", gap: "4px" }}>
-          {props.menu.map((m) => (
-            <button key={m.key} type="button" onClick={m.onClick} style={{ position: "relative", width: "60px", minHeight: "56px", padding: "6px 0", border: "none", background: "transparent", color: "#FFFFFF", fontSize: "13px", fontWeight: 600, fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: "pointer", textShadow: "0 1px 3px rgba(0,0,0,0.7)", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))" }}>
-              <MenuIcon k={m.key} />
-              <span>{m.label}</span>
-              {m.badge && m.badge > 0 ? (
-                <span aria-label={`안 읽은 ${m.badge}개`} style={{ position: "absolute", top: "2px", right: "10px", minWidth: "18px", height: "18px", padding: "0 4px", boxSizing: "border-box", borderRadius: "9999px", background: "#D30005", color: "#FFFFFF", fontSize: "13px", fontWeight: 700, lineHeight: "18px", textAlign: "center", textShadow: "none" }}>{m.badge > 9 ? "9+" : m.badge}</span>
-              ) : null}
-            </button>
-          ))}
-        </nav>
-      ) : null}
 
       {/* 돌려보는 중 → 지금 방송으로 */}
       {behindLive ? (
@@ -319,7 +380,7 @@ export default function LiveWatchView(props: Props) {
       ) : null}
 
       {/* 아래쪽 — 채팅 · 주문 알림 · 소개 중 상품 카드(돌려보기 중엔 숨김 — 유튜브 막대를 가리지 않게) */}
-      <div style={{ display: "flex", position: "absolute", left: "16px", right: "16px", bottom: "calc(80px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: "none" }}>
+      <div style={{ display: focus ? "none" : "flex", position: "absolute", left: "16px", right: "16px", bottom: "calc(90px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: "none" }}>
         {latestToast ? (
           <div role="status" aria-atomic="true" style={{ display: "flex" }}>
             <span key={latestToast.key} className="ruru-live-watch-toast" style={{ display: "inline-flex", alignItems: "center", height: "32px", maxWidth: "100%", padding: "0 12px", borderRadius: "9999px", background: "rgba(0,0,0,0.55)", fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -339,12 +400,12 @@ export default function LiveWatchView(props: Props) {
             aria-label="채팅"
             aria-live="polite"
             onScroll={onChatScroll}
-            style={{ pointerEvents: "none", overscrollBehavior: "contain", maxHeight: "24dvh", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "4px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", paddingTop: "16px", width: "82%" }}
+            style={{ pointerEvents: "none", overscrollBehavior: "contain", maxHeight: CHAT_HEIGHTS[chatView.height], overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "4px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", paddingTop: "16px", width: "82%" }}
           >
             {chat.messages.map((m) => (
               <div
                 key={m.id}
-                style={{ pointerEvents: "auto", touchAction: "pan-y", alignSelf: "flex-start", maxWidth: "100%", padding: "4px 10px", borderRadius: "12px", background: "rgba(0,0,0,0.35)", fontSize: "14px", lineHeight: 1.45, wordBreak: "break-word", textShadow: "0 1px 2px rgba(0,0,0,0.6)", userSelect: chat.canModerate ? "none" : "auto", WebkitUserSelect: chat.canModerate ? "none" : "auto" }}
+                style={{ pointerEvents: "auto", touchAction: "pan-y", alignSelf: "flex-start", maxWidth: "100%", padding: "4px 10px", borderRadius: "12px", background: "rgba(0,0,0,0.35)", fontSize: CHAT_SIZES[chatView.size], fontWeight: chatView.bold ? 700 : 400, lineHeight: 1.45, wordBreak: "break-word", textShadow: "0 1px 2px rgba(0,0,0,0.6)", userSelect: chat.canModerate ? "none" : "auto", WebkitUserSelect: chat.canModerate ? "none" : "auto" }}
               >
                 {/* 채팅 줄은 터치가 그대로 영상(유튜브 막대)으로 지나감. 관리자만 «닉네임»을 길게 누르면 관리 창 */}
                 <span
@@ -385,8 +446,8 @@ export default function LiveWatchView(props: Props) {
         ) : null}
       </div>
 
-      {/* 맨 아래 줄 — [상품 목록] [주문서 확인] */}
-      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "12px 16px calc(12px + env(safe-area-inset-bottom))", display: "flex", alignItems: "center", gap: "8px", background: "#000000" }}>
+      {/* 맨 아래 줄 — 오늘만셀러처럼 [상품 사진(숫자)] [메시지 입력] [공유][공지][주문서][더보기] */}
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "8px 12px calc(8px + env(safe-area-inset-bottom))", display: "flex", alignItems: "center", gap: "8px", background: "#000000" }}>
         {/* 오늘만셀러처럼 — 지금 소개 중(없으면 첫) 상품 사진 + 오른쪽 위 숫자(고를 수 있는 상품 수, 세부상품까지) */}
         <button type="button" onClick={() => setListOpen(true)} aria-label={`방송 상품 목록 보기 (${totalCount}개)`} style={{ position: "relative", flexShrink: 0, width: "52px", height: "52px", padding: 0, border: "2px solid #FFFFFF", borderRadius: "12px", background: "#F5F5F5", fontFamily: "inherit", cursor: "pointer" }}>
           {thumbUrl ? (
@@ -397,32 +458,106 @@ export default function LiveWatchView(props: Props) {
           )}
           <span aria-hidden="true" style={{ position: "absolute", top: "-8px", right: "-8px", minWidth: "24px", height: "24px", padding: "0 6px", boxSizing: "border-box", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 700, lineHeight: "24px", textAlign: "center", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)" }}>{totalCount > 999 ? "999+" : totalCount}</span>
         </button>
-        {chat && chat.canWrite ? (
-          <button type="button" onClick={() => setComposeOpen(true)} style={{ flex: 1, minWidth: 0, height: "52px", border: "1px solid rgba(255,255,255,0.4)", borderRadius: "9999px", background: "rgba(0,0,0,0.25)", color: "#E5E5E5", fontSize: "15px", fontWeight: 500, fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "8px", padding: "0 16px", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden" }}>
-            <IconChat /><span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>메시지 입력</span>
+        {chat && chat.canWrite && !focus ? (
+          <button type="button" onClick={() => setComposeOpen(true)} style={{ flex: 1, minWidth: 0, height: "44px", border: "none", borderRadius: "9999px", background: "rgba(255,255,255,0.14)", color: "#E5E5E5", fontSize: "15px", fontWeight: 500, fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", padding: "0 14px", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden" }}>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>메시지 입력..</span>
           </button>
-        ) : null}
-        {cartCount > 0 ? (
-          <button type="button" onClick={props.onOpenCart} aria-label={chat && chat.canWrite ? `주문서 ${cartCount}개 보기` : undefined} style={chat && chat.canWrite ? { position: "relative", flex: "0 0 auto", width: "52px", height: "52px", padding: 0, border: "none", borderRadius: "9999px", background: "#FFFFFF", fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" } : { flex: 1, minWidth: 0, height: "52px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px", whiteSpace: "nowrap", padding: "0 16px" }}>
-            {chat && chat.canWrite ? (
-              <>
-                <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="2" strokeLinejoin="round"><path d="M3 4h2l2.2 10.2a1 1 0 001 .8h9.4a1 1 0 001-.8L20 8H6.2" /><circle cx="9" cy="19.5" r="1.3" /><circle cx="17" cy="19.5" r="1.3" /></svg>
-                <span role="status" aria-atomic="true" style={{ position: "absolute", top: "-4px", right: "-4px", minWidth: "22px", height: "22px", padding: "0 6px", boxSizing: "border-box", borderRadius: "9999px", background: "#D30005", color: "#FFFFFF", fontSize: "13px", fontWeight: 700, lineHeight: "22px", textAlign: "center", border: "2px solid #000000" }}>{cartCount > 99 ? "99+" : cartCount}</span>
-              </>
-            ) : (
-              <><span role="status" aria-atomic="true">{cartCount}개 · {cartTotalText}</span><span aria-hidden="true">·</span><span>주문서 확인</span></>
-            )}
-          </button>
-        ) : chat && chat.canWrite ? null : (
-          <button type="button" onClick={() => setListOpen(true)} style={{ flex: 1, minWidth: 0, height: "52px", border: "1px solid rgba(255,255,255,0.4)", borderRadius: "9999px", background: "transparent", color: "#FFFFFF", fontSize: "15px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", padding: "0 16px" }}>
-            방송에서 주문한 상품을 담아 주세요
-          </button>
+        ) : <span style={{ flex: 1 }} />}
+        {focus ? null : <>
+        <BarBtn label="공유" onClick={shareLive}>
+          <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M14 5v4C7 10 4 14 3 20c2.5-3.5 6-5 11-5v4l7-7z" /></svg>
+        </BarBtn>
+        <BarBtn label="공지" badge={props.menu?.find((m) => m.key === "notice")?.badge || 0} onClick={() => props.menu?.find((m) => m.key === "notice")?.onClick()}>
+          <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M3 10v4a1 1 0 001 1h2l1 5h3l-1-5h1l8 4V5l-8 4H4a1 1 0 00-1 1z" /></svg>
+        </BarBtn>
+        </>}
+        <BarBtn label="주문서" badge={cartCount} badgeRed onClick={props.onOpenCart}>
+          <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M6 8h12l1 13H5zM9 8V7a3 3 0 016 0v1" stroke="#FFFFFF" strokeWidth="1.6" strokeLinejoin="round" /></svg>
+        </BarBtn>
+        {focus ? null : (
+        <BarBtn label="더보기" onClick={() => setMoreOpen(true)}>
+          <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="#FFFFFF"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
+        </BarBtn>
         )}
       </div>
 
+      {/* 더보기 — 오늘만셀러처럼 오른쪽 아래에서 위로 펼쳐지는 메뉴 */}
+      {moreOpen ? (
+        <div role="dialog" aria-modal="true" aria-label="더보기" onClick={() => setMoreOpen(false)} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z, background: "rgba(0,0,0,0.55)" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", right: "12px", bottom: "calc(84px + env(safe-area-inset-bottom))", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+            {[
+              ...(props.menu || []).filter((m) => m.key !== "notice").map((m) => ({ key: m.key, label: m.key === "inquiry" ? "문의하기" : m.label, onClick: m.onClick })),
+              { key: "chatview", label: "채팅 설정", onClick: () => setChatViewOpen(true) },
+              { key: "guide", label: "사용 방법", onClick: () => setGuideOpen(true) },
+              ...(standalone ? [] : [{ key: "install", label: "앱 설치", onClick: installApp }]),
+            ].map((m) => (
+              <button key={m.key} type="button" onClick={() => { setMoreOpen(false); m.onClick(); }} style={{ display: "flex", alignItems: "center", gap: "12px", minHeight: "52px", padding: "0 4px 0 16px", border: "none", background: "transparent", color: "#FFFFFF", fontSize: "15px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer", textShadow: "0 1px 3px rgba(0,0,0,0.7)" }}>
+                <span>{m.label}</span><MenuIcon k={m.key} />
+              </button>
+            ))}
+            <button type="button" onClick={() => setMoreOpen(false)} aria-label="더보기 닫기" style={{ display: "flex", alignItems: "center", gap: "12px", minHeight: "52px", padding: "0 4px 0 16px", border: "none", background: "transparent", color: "#FFFFFF", fontSize: "15px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer" }}>
+              <span>닫기</span><MenuIcon k="close" />
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* 채팅 설정 — 글자 크기·굵게·채팅창 높이(이 폰에만 기억) */}
+      {chatViewOpen ? (
+        <div role="dialog" aria-modal="true" aria-label="채팅 설정" onClick={() => setChatViewOpen(false)} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "calc(16px + env(safe-area-inset-top)) 16px 16px" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "440px", background: "#FFFFFF", color: "#111111", borderRadius: "16px", padding: "20px" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px", marginBottom: "16px" }}>
+              <div>
+                <div style={{ fontSize: "20px", fontWeight: 700 }}>채팅 설정</div>
+                <div style={{ fontSize: "13px", color: "#707072", marginTop: "4px" }}>방송 중 채팅 글을 보기 편하게 바꿔요.</div>
+              </div>
+              <button type="button" onClick={() => setChatViewOpen(false)} aria-label="닫기" style={{ width: "40px", height: "40px", border: "none", borderRadius: "9999px", background: "#F5F5F5", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}><IconClose /></button>
+            </div>
+            {([
+              ["글자 크기", "size", [["base", "기본"], ["mid", "중간"], ["big", "크게"]]],
+              ["채팅창 높이", "height", [["base", "기본"], ["low", "낮게"], ["high", "높게"]]],
+            ] as const).map(([label, field, opts]) => (
+              <div key={field} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", minHeight: "52px" }}>
+                <span style={{ fontSize: "16px", fontWeight: 600 }}>{label}</span>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  {opts.map(([v, t]) => {
+                    const on = chatView[field] === v;
+                    return (
+                      <button key={v} type="button" aria-pressed={on} onClick={() => updateChatView({ [field]: v } as Partial<ChatView>)} style={{ height: "40px", minWidth: "56px", padding: "0 12px", borderRadius: "9999px", border: on ? "2px solid #111111" : "1px solid #E5E5E5", background: "#FFFFFF", color: on ? "#111111" : "#707072", fontSize: "14px", fontWeight: on ? 700 : 500, fontFamily: "inherit", cursor: "pointer" }}>{t}</button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", minHeight: "52px" }}>
+              <span style={{ fontSize: "16px", fontWeight: 600 }}>굵게</span>
+              <button type="button" role="switch" aria-checked={chatView.bold} aria-label="채팅 글 굵게" onClick={() => updateChatView({ bold: !chatView.bold })} style={{ position: "relative", width: "52px", height: "32px", border: "none", borderRadius: "9999px", background: chatView.bold ? "#111111" : "#E5E5E5", cursor: "pointer", padding: 0 }}>
+                <span aria-hidden="true" style={{ position: "absolute", top: "3px", left: chatView.bold ? "23px" : "3px", width: "26px", height: "26px", borderRadius: "9999px", background: "#FFFFFF", transition: "left 0.15s" }} />
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* 앱 설치 안내(설치 창을 못 띄우는 폰) */}
+      {installHintOpen ? (
+        <div role="dialog" aria-modal="true" aria-label="앱 설치" onClick={() => setInstallHintOpen(false)} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "360px", background: "#FFFFFF", color: "#111111", borderRadius: "16px", padding: "24px 20px 20px" }}>
+            <div style={{ fontSize: "20px", fontWeight: 700, marginBottom: "12px" }}>휴대폰 홈 화면에 루루동이 추가</div>
+            <div style={{ fontSize: "16px", lineHeight: 1.6 }}>
+              다음부터 아이콘 한 번 누르면 바로 열려요.<br /><br />
+              <b>아이폰</b>: 사파리 아래 <b>공유</b> 버튼 → <b>홈 화면에 추가</b><br />
+              <b>안드로이드</b>: 크롬 오른쪽 위 <b>⋮</b> → <b>홈 화면에 추가</b>
+            </div>
+            <div style={{ fontSize: "13px", color: "#707072", lineHeight: 1.5, marginTop: "12px" }}>카카오톡 안에서 열었으면, 오른쪽 위 메뉴에서 «다른 브라우저로 열기» 뒤에 해 주세요.</div>
+            <button type="button" onClick={() => setInstallHintOpen(false)} style={{ width: "100%", height: "52px", marginTop: "20px", border: "none", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "16px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>확인</button>
+          </div>
+        </div>
+      ) : null}
+
       {/* 채팅 안내(보냄 실패·금지 등) */}
       {chatHint ? (
-        <div role="status" style={{ position: "absolute", left: "16px", right: "16px", bottom: "calc(84px + env(safe-area-inset-bottom))", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 2 }}>
+        <div role="status" style={{ position: "absolute", left: "16px", right: "16px", bottom: "calc(90px + env(safe-area-inset-bottom))", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 2 }}>
           <span style={{ padding: "8px 14px", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "14px", fontWeight: 600 }}>{chatHint}</span>
         </div>
       ) : null}
