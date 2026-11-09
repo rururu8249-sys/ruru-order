@@ -231,6 +231,8 @@ export default function LiveWatchView(props: Props) {
   //   키보드가 뜨면 카톡 안 브라우저가 화면 높이를 줄여 채팅 줄·쉬는 중 글이 «찌그러져» 겹쳐 보이고, 키보드가 내려가는 동안 그게 보였다 «툭» 원래대로.
   //   [08:17 사장님 「보내기 누르니 방송 화면이 사라지고 소리만」] 처음엔 방송 화면 높이를 고정했는데(frozenH) 그 뒤 이 증상이 보고돼 되돌림.
   //   → 화면 크기는 브라우저 그대로 두고, 쓰기 창이 열린 동안·키보드가 다 내려갈 때까지(최대 0.8초) 채팅 줄·쉬는 중 글만 잠깐 숨겼다가 부드럽게 다시 보임.
+  //   [08:31 사장님 「보내면 글자 튕김·스프링 느낌 그대로」] 채팅 줄을 숨겼다 다시 보이는 게 «깜빡·튕김»으로 보여 채팅 줄은 늘 그대로 두고,
+  //   겹쳐 보이던 «쉬는 중 글»만 숨김(채팅은 아래에 붙어 키보드와 같이 내려감).
   const [settling, setSettling] = useState(false);
   useEffect(() => {
     if (composeOpen) { setSettling(true); return; }
@@ -381,10 +383,16 @@ export default function LiveWatchView(props: Props) {
     const restart = () => { if (timer) window.clearTimeout(timer); timer = window.setTimeout(() => setSeekMode(false), SEEK_MS); };
     // 재생 위치가 건너뛰었다는 소식(막대를 끌어 놓음) → 돌려보기 화면 다시/유지
     seekPokeRef.current = () => { if (check) window.clearTimeout(check); setSeekMode(true); restart(); };
+    // [08:31 사장님 「들어가고 초반 24초쯤 빈 곳 눌러도 막대 안 나옴」] 원인: 화면에 들어온 직후엔 창(window)이 아직 포커스를 안 가져
+    //   유튜브를 눌러도 창 blur 소식이 안 옴 → 돌려보기 화면이 안 켜지고 유튜브 막대가 채팅 밑에 가려 있었음.
+    //   들어오자마자 우리 화면에 포커스를 주고, blur 가 안 와도 0.3초마다 «유튜브가 포커스를 가졌는지» 직접 확인.
+    let handling = false;
     const onBlur = () => {
+      if (handling) return;
       window.setTimeout(() => {
         if (document.activeElement !== iframeRef.current) return;
-        window.setTimeout(() => { try { rootRef.current?.focus({ preventScroll: true }); } catch { /* 무시 */ } }, 150);
+        handling = true;
+        window.setTimeout(() => { handling = false; try { rootRef.current?.focus({ preventScroll: true }); } catch { /* 무시 */ } }, 150);
         if (!seekModeRef.current) { setSeekMode(true); restart(); return; }
         // [05:38 사장님 「다시 누르면 글씨가 늦게 나타남」] 돌려보기 중 또 누르면 바로 원래대로(기다리지 않음).
         //   막대를 끌어 놓은 거였으면 재생 위치가 건너뛴 소식(seekPokeRef)이 와서 다시 돌려보기 화면이 됨.
@@ -394,7 +402,9 @@ export default function LiveWatchView(props: Props) {
       }, 0);
     };
     window.addEventListener("blur", onBlur);
-    return () => { window.removeEventListener("blur", onBlur); if (timer) window.clearTimeout(timer); if (check) window.clearTimeout(check); };
+    try { rootRef.current?.focus({ preventScroll: true }); } catch { /* 무시 */ }
+    const poll = window.setInterval(() => { if (!handling && document.activeElement === iframeRef.current) onBlur(); }, 300);
+    return () => { window.removeEventListener("blur", onBlur); window.clearInterval(poll); if (timer) window.clearTimeout(timer); if (check) window.clearTimeout(check); };
   }, []);
   // 실시간 채팅에서 인사하기(유튜브처럼)
   //   [07:42 사장님 「한 번 나오고 안 나옴 · 유튜브와 같게」] 원인: 기록을 «유튜브 영상 번호»로 해서, 같은 라이브 주소를 계속 쓰면
@@ -683,7 +693,7 @@ export default function LiveWatchView(props: Props) {
       {/* 돌려보기 모드 — 안의 모든 것이 손가락을 막지 않게(유튜브 막대로 그대로) */}
       <style>{`[data-live-seek="1"], [data-live-seek="1"] * { pointer-events: none !important; }`}</style>
       <style>{`html, body { overflow: hidden !important; overscroll-behavior: none !important; }`}</style>
-      <div data-live-seek={seekMode ? "1" : "0"} style={{ display: focus ? "none" : "flex", position: "absolute", left: "16px", right: "16px", bottom: "calc(90px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: "none", opacity: settling ? 0 : seekMode ? 0.06 : 1, transition: "opacity 0.2s" }}>
+      <div data-live-seek={seekMode ? "1" : "0"} style={{ display: focus ? "none" : "flex", position: "absolute", left: "16px", right: "16px", bottom: "calc(90px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: "none", opacity: seekMode ? 0.06 : 1, transition: "opacity 0.2s" }}>
         {latestToast ? (
           <div role="status" aria-atomic="true" style={{ display: "flex" }}>
             <span key={latestToast.key} className="ruru-live-watch-toast" style={{ display: "inline-flex", alignItems: "center", height: "32px", maxWidth: "100%", padding: "0 12px", borderRadius: "9999px", background: "rgba(0,0,0,0.55)", fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
