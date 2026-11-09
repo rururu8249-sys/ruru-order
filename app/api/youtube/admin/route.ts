@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import {
   getConnectionStatus,
+  getYoutubeDiag,
   saveNotifySettings,
   postLiveChatMessage,
 } from "@/lib/youtube";
@@ -13,6 +14,11 @@ export async function GET(request: NextRequest) {
   const session = await verifyAdminSessionFromRequest(request);
   if (!session) return NextResponse.json({ ok: false, error: "관리자 로그인이 필요합니다." }, { status: 401 });
   const status = await getConnectionStatus();
+  // [2026-11-09] ?diag=1 → 연결된 구글 계정이 «어느 채널»인지·이 방송을 소유자로 읽히는지(읽기만). 방송 중 제목 바꾸기 가능 여부 확인용.
+  if (request.nextUrl.searchParams.get("diag") === "1") {
+    const diag = await getYoutubeDiag();
+    return NextResponse.json({ ok: true, ...status, diag });
+  }
   return NextResponse.json({ ok: true, ...status });
 }
 
