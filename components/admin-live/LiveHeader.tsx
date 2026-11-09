@@ -11,6 +11,7 @@ import { buildDetailChatLine, detailProducts } from "@/lib/productDetailModel";
 import { feedPinLayout, FEED_PIN_SIZE } from "@/lib/feedText";
 import { LIVE_PAUSED_TEXT_KEY, LIVE_PAUSED_TEXT_DEFAULT, LIVE_PAUSED_TEXT_MAX } from "@/lib/livePausedText";
 import { LIVE_WATCH_KEY, LIVE_WATCH_DEFAULT, parseLiveWatchSetting, serializeLiveWatchSetting, type LiveWatchSetting } from "@/lib/liveWatch";
+import { LIVE_CHAT_KEY, LIVE_CHAT_DEFAULT, parseLiveChatSetting, serializeLiveChatSetting, type LiveChatSetting } from "@/lib/liveChat";
 
 type VideoRatio = "vertical" | "wide" | "auto";
 type AlertMember = { id: string; cid?: string; name: string; phone: string; orderDays?: number; recent?: boolean; manual?: boolean };
@@ -129,6 +130,42 @@ export default function LiveHeader({
       showAdminToast("설정 저장에 실패했어요.", "error");
     } finally {
       setLiveWatchSaving(false);
+    }
+  };
+
+  // [2026-11-10 ③] 사이트 채팅 설정(live_chat_v1) — 켜기·고정 공지·더 막을 말
+  const [liveChat, setLiveChat] = useState<LiveChatSetting>(LIVE_CHAT_DEFAULT);
+  const [liveChatNotice, setLiveChatNoticeDraft] = useState("");
+  const [liveChatWords, setLiveChatWordsDraft] = useState("");
+  const [liveChatSaving, setLiveChatSaving] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    supabase.from("settings").select("value").eq("key", LIVE_CHAT_KEY).maybeSingle().then(({ data }) => {
+      if (!alive) return;
+      const st = parseLiveChatSetting(data?.value);
+      setLiveChat(st);
+      setLiveChatNoticeDraft(st.notice);
+      setLiveChatWordsDraft(st.words.join(", "));
+    });
+    return () => { alive = false; };
+  }, []);
+  const saveLiveChat = async (next: LiveChatSetting, okText: string) => {
+    if (liveChatSaving) return;
+    const prev = liveChat;
+    const clean = parseLiveChatSetting(next);
+    setLiveChat(clean);
+    setLiveChatSaving(true);
+    try {
+      const { error } = await supabase.from("settings").upsert([{ key: LIVE_CHAT_KEY, value: serializeLiveChatSetting(clean) }], { onConflict: "key" });
+      if (error) throw error;
+      setLiveChatNoticeDraft(clean.notice);
+      setLiveChatWordsDraft(clean.words.join(", "));
+      showAdminToast(okText, "success");
+    } catch {
+      setLiveChat(prev);
+      showAdminToast("채팅 설정 저장에 실패했어요.", "error");
+    } finally {
+      setLiveChatSaving(false);
     }
   };
 
@@ -567,6 +604,32 @@ export default function LiveHeader({
           </div>
         ) : null}
       </div>
+
+      {/* [2026-11-10 ③] 사이트 채팅 — 방송 보며 주문 화면 안에서만 보임 */}
+      {liveWatch.audience !== "off" ? (
+        <div>
+          <div className="mb-1 text-[13px] font-bold text-ink">사이트 채팅 <span className="font-normal text-ink-mute">· 방송 보며 주문 화면 안 채팅(유튜브 채팅과 따로)</span></div>
+          <div className="flex flex-wrap items-center gap-2">
+            {([[true, "켬"], [false, "끔"]] as const).map(([v, label]) => (
+              <button key={label} type="button" disabled={liveChatSaving} aria-pressed={liveChat.enabled === v} onClick={() => void saveLiveChat({ ...liveChat, enabled: v }, v ? "사이트 채팅을 켰어요." : "사이트 채팅을 껐어요.")}
+                className={liveChat.enabled === v ? "h-9 rounded-full bg-ink px-3 text-[13px] font-bold text-white disabled:opacity-50" : "h-9 rounded-full border border-line bg-surface px-3 text-[13px] font-bold text-ink hover:bg-surface-2 disabled:opacity-50"}>{label}</button>
+            ))}
+            <span className="text-[13px] text-ink-mute">손님 글을 길게 누르면 지우기·금지</span>
+          </div>
+          {liveChat.enabled ? (
+            <>
+              <div className="mt-2 flex gap-2">
+                <input value={liveChatNotice} onChange={(e) => setLiveChatNoticeDraft(e.target.value.slice(0, 120))} placeholder="채팅 고정 공지 · 비우면 안 보임" aria-label="채팅 고정 공지" className={fieldCls} />
+                <button type="button" disabled={liveChatSaving || liveChatNotice.trim() === liveChat.notice} onClick={() => void saveLiveChat({ ...liveChat, notice: liveChatNotice }, "채팅 공지를 저장했어요. 손님 화면을 새로고침하면 나와요.")} className={primaryCls}>저장</button>
+              </div>
+              <div className="mt-2 flex gap-2">
+                <input value={liveChatWords} onChange={(e) => setLiveChatWordsDraft(e.target.value)} placeholder="더 막을 말 · 쉼표로 (욕설은 기본으로 막혀요)" aria-label="채팅 금지어" className={fieldCls} />
+                <button type="button" disabled={liveChatSaving || liveChatWords === liveChat.words.join(", ")} onClick={() => void saveLiveChat({ ...liveChat, words: liveChatWords.split(/[,\n]/) }, "금지어를 저장했어요.")} className={primaryCls}>저장</button>
+              </div>
+            </>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* [2026-11-09] 손님 화면 「잠시 쉬는 중」 문구 — 사이드바 「잠시 멈춤」 누르면 방송 상자에 나오는 글. 상시 설정(방송 끝나도 유지) */}
       <div>

@@ -48,6 +48,7 @@ import { LIVE_PAUSED_TEXT_KEY, LIVE_PAUSED_TEXT_DEFAULT, resolveLivePausedText }
 import { LIVE_WATCH_KEY, LIVE_WATCH_DEFAULT, parseLiveWatchSetting, youtubeVideoIdFromUrl, canUseLiveWatch, initialLiveView, liveWatchViewKey, type LiveWatchSetting, type LiveWatchItem } from "@/lib/liveWatch";
 import LiveWatchView, { type LiveWatchOrderToast, type LiveWatchPinned } from "@/components/customer/LiveWatchView";
 import { subscribeLiveEvents } from "@/lib/liveEvents";
+import { mergeChat, parseChatMessage, type LiveChatMessage, type LiveChatPenalty } from "@/lib/liveChat";
 import { openYoutubeChannel } from "@/lib/youtubeChannelLink";
 import { setPresenceActivity, readPresenceEvents } from "@/lib/presenceActivity";
 import { registerBrandAliasesFromProducts } from "@/lib/brandSearchAliases";
@@ -1446,6 +1447,10 @@ export default function OrderPage() {
   const [liveWatchSetting, setLiveWatchSetting] = useState<LiveWatchSetting>(LIVE_WATCH_DEFAULT);
   const [liveViewOn, setLiveViewOn] = useState<boolean | null>(null);
   const [liveOrderToasts, setLiveOrderToasts] = useState<LiveWatchOrderToast[]>([]);
+  // [2026-11-10 ③] 사이트 채팅(방송 보며 주문 화면 안에서만)
+  const [liveChatMessages, setLiveChatMessages] = useState<LiveChatMessage[]>([]);
+  const [liveChatNotice, setLiveChatNotice] = useState("");
+  const [liveChatEnabled, setLiveChatEnabled] = useState(false);
   const [productListState, setProductListState] = useState<"loading" | "ready" | "error">("loading");
   const [broadcastProducts, setBroadcastProducts] = useState<BroadcastProduct[]>([]);
   const [groupBuyQuickProductsFromCatalog, setGroupBuyQuickProductsFromCatalog] = useState<BroadcastProduct[]>([]);
@@ -6430,6 +6435,7 @@ export default function OrderPage() {
   //   방송 영상 위에서 고르고 담는 화면. 담기·옵션 창·주문서는 아래 기존 함수를 그대로 부른다(돈·주문 로직 무접촉).
   //   관리자 설정(live_watch_v1): 꺼짐 / 관리자 시험 계정만 / 모든 손님, 처음 화면(방송/쇼핑몰).
   const liveWatchVideoId = youtubeVideoIdFromUrl(broadcastYoutubeUrl);
+  const readLiveChatKakaoId = () => { try { return String(window.localStorage.getItem("ruru_kakao_id") || "").trim(); } catch { return ""; } };
   const liveWatchUsable = canUseLiveWatch({
     setting: liveWatchSetting,
     broadcastOn: isBroadcastOn,
@@ -6473,8 +6479,26 @@ export default function OrderPage() {
         })();
       }, wait);
     };
+    // 사이트 채팅 — 처음 한 번 최근 글 읽고, 그 뒤는 소식으로만
+    void (async () => {
+      try {
+        const res = await fetch(`/api/live-chat?bc=${encodeURIComponent(String(bid))}`, { cache: "no-store" });
+        const json = await res.json().catch(() => null);
+        if (!json?.ok) return;
+        setLiveChatEnabled(json.enabled === true);
+        setLiveChatNotice(String(json.notice ?? ""));
+        const list = (Array.isArray(json.messages) ? json.messages : []).map(parseChatMessage).filter(Boolean) as LiveChatMessage[];
+        setLiveChatMessages((prev) => mergeChat(prev.filter((x) => x.broadcastId === String(bid)), list));
+      } catch { /* 채팅 못 읽어도 방송·주문은 그대로 */ }
+    })();
     const off = subscribeLiveEvents(supabase, {
       onCatalog: (e) => { if (e.table === "broadcasts") refetchBroadcast(); },
+      onChat: (payload) => {
+        const m = parseChatMessage(payload);
+        if (!m || m.broadcastId !== String(bid)) return;
+        if (m.hidden) setLiveChatMessages((prev) => prev.filter((x) => x.id !== m.id));
+        else setLiveChatMessages((prev) => mergeChat(prev, [m]));
+      },
       onOrder: (e) => {
         if (e.type !== "INSERT") return;
         const n = e.new as Record<string, unknown>;
@@ -8058,6 +8082,31 @@ export default function OrderPage() {
               onOpenProduct={openLiveWatchProduct}
               onOpenCart={() => setOrderSheetOpen(true)}
               onSwitchToShop={() => chooseLiveView(false)}
+              chat={liveChatEnabled && broadcast?.id ? {
+                messages: liveChatMessages,
+                notice: liveChatNotice,
+                canWrite: Boolean(readLiveChatKakaoId()) && Boolean(youtubeNickname.trim()),
+                canModerate: operatorTestAccount !== null || liveWatchSetting.phones.includes(normalizePhone(customerPhone)),
+                onSend: async (body) => {
+                  try {
+                    const res = await fetch("/api/live-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kakao_id: readLiveChatKakaoId(), bc: String(broadcast.id), body }) });
+                    const json = await res.json().catch(() => null);
+                    if (json?.ok && json.message) {
+                      const m = parseChatMessage(json.message);
+                      if (m) setLiveChatMessages((prev) => mergeChat(prev, [m]));
+                    }
+                    return { ok: Boolean(json?.ok), message: json?.message && typeof json.message === "string" ? json.message : undefined };
+                  } catch { return { ok: false, message: "못 보냈어요. 다시 눌러 주세요." }; }
+                },
+                onModerate: async (messageId: number, action: LiveChatPenalty) => {
+                  try {
+                    const res = await fetch("/api/live-chat", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kakao_id: readLiveChatKakaoId(), messageId, action }) });
+                    const json = await res.json().catch(() => null);
+                    if (json?.ok) setLiveChatMessages((prev) => prev.filter((x) => x.id !== messageId));
+                    return { ok: Boolean(json?.ok), message: String(json?.message || "") };
+                  } catch { return { ok: false, message: "처리 못 했어요." }; }
+                },
+              } : null}
             />
           ) : null}
 

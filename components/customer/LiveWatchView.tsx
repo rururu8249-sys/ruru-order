@@ -13,6 +13,7 @@ import {
   youtubeEmbedUrl,
   type LiveWatchItem,
 } from "@/lib/liveWatch";
+import { LIVE_CHAT_MAX_LEN, type LiveChatMessage, type LiveChatPenalty } from "@/lib/liveChat";
 
 export type LiveWatchPinned = {
   productId: string;
@@ -40,6 +41,17 @@ type Props = {
   onOpenProduct: (productId: string, detailName?: string) => void;
   onOpenCart: () => void;
   onSwitchToShop: () => void;
+  /** [2026-11-10 ③] 사이트 채팅 — 없으면(꺼짐) 채팅 줄·입력 안 보임 */
+  chat?: {
+    messages: LiveChatMessage[];
+    notice: string;
+    /** 로그인(카카오)·닉네임 있는 손님만 쓰기 */
+    canWrite: boolean;
+    /** 관리자(시험 계정·허용 번호) — 글을 길게 누르면 지우기·금지 */
+    canModerate: boolean;
+    onSend: (body: string) => Promise<{ ok: boolean; message?: string }>;
+    onModerate: (messageId: number, action: LiveChatPenalty) => Promise<{ ok: boolean; message?: string }>;
+  } | null;
 };
 
 const SHEET_Z = 70;
@@ -57,6 +69,9 @@ const IconGrid = () => (
 const IconSound = () => (
   <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="2"><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="M16 9a4 4 0 010 6" /></svg>
 );
+const IconChat = () => (
+  <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="1.8"><path d="M4 5h16v11H9l-5 4z" /></svg>
+);
 const IconClose = ({ color = "#111111" }: { color?: string }) => (
   <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M6 6l12 12M18 6L6 18" /></svg>
 );
@@ -71,6 +86,49 @@ export default function LiveWatchView(props: Props) {
   const embedSrc = useMemo(() => youtubeEmbedUrl(videoId, typeof window !== "undefined" ? window.location.origin : undefined), [videoId]);
 
   useEffect(() => { setGuideOpen(!readGuideSeen()); }, []);
+
+  // ── 사이트 채팅 ──
+  const chat = props.chat ?? null;
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const [chatHint, setChatHint] = useState("");
+  const [modTarget, setModTarget] = useState<LiveChatMessage | null>(null);
+  const chatBoxRef = useRef<HTMLDivElement | null>(null);
+  const pressTimer = useRef<number | null>(null);
+  const chatCount = chat?.messages.length ?? 0;
+  useEffect(() => {
+    const el = chatBoxRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [chatCount]);
+  useEffect(() => {
+    if (!chatHint) return;
+    const t = window.setTimeout(() => setChatHint(""), 3000);
+    return () => window.clearTimeout(t);
+  }, [chatHint]);
+  const sendChat = async () => {
+    if (!chat || sending) return;
+    const body = draft.trim();
+    if (!body) return;
+    setSending(true);
+    const r = await chat.onSend(body).catch(() => ({ ok: false, message: "못 보냈어요. 다시 눌러 주세요." }));
+    setSending(false);
+    if (r.ok) { setDraft(""); setComposeOpen(false); }
+    else setChatHint(r.message || "못 보냈어요.");
+  };
+  const startPress = (m: LiveChatMessage) => {
+    if (!chat?.canModerate) return;
+    if (pressTimer.current) window.clearTimeout(pressTimer.current);
+    pressTimer.current = window.setTimeout(() => setModTarget(m), 500);
+  };
+  const endPress = () => { if (pressTimer.current) { window.clearTimeout(pressTimer.current); pressTimer.current = null; } };
+  const moderate = async (action: LiveChatPenalty) => {
+    if (!chat || !modTarget) return;
+    const id = modTarget.id;
+    setModTarget(null);
+    const r = await chat.onModerate(id, action).catch(() => ({ ok: false, message: "처리 못 했어요." }));
+    setChatHint(r.message || (r.ok ? "처리했어요." : "처리 못 했어요."));
+  };
 
   // 방송 화면이 떠 있는 동안 뒤 주문서가 같이 스크롤되지 않게
   useEffect(() => {
@@ -139,8 +197,37 @@ export default function LiveWatchView(props: Props) {
         </div>
       ) : null}
 
-      {/* 아래쪽 — 주문 알림 · 소개 중 상품 카드 */}
+      {/* 아래쪽 — 채팅 · 주문 알림 · 소개 중 상품 카드 */}
       <div style={{ position: "absolute", left: "16px", right: "16px", bottom: "calc(88px + env(safe-area-inset-bottom))", display: "flex", flexDirection: "column", gap: "8px", pointerEvents: "none" }}>
+        {chat && chat.notice ? (
+          <div style={{ alignSelf: "flex-start", maxWidth: "100%", padding: "6px 12px", borderRadius: "12px", background: "rgba(0,0,0,0.6)", fontSize: "13px", fontWeight: 600, lineHeight: 1.45 }}>
+            <span style={{ color: "#FFD43B", marginRight: "6px" }}>공지</span>{chat.notice}
+          </div>
+        ) : null}
+        {chat && chat.messages.length > 0 ? (
+          <div
+            ref={chatBoxRef}
+            role="log"
+            aria-label="채팅"
+            aria-live="polite"
+            style={{ pointerEvents: "auto", maxHeight: "24dvh", overflowY: "auto", display: "flex", flexDirection: "column", gap: "4px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", paddingTop: "16px", width: "82%" }}
+          >
+            {chat.messages.map((m) => (
+              <div
+                key={m.id}
+                onPointerDown={() => startPress(m)}
+                onPointerUp={endPress}
+                onPointerLeave={endPress}
+                onPointerCancel={endPress}
+                onContextMenu={(e) => { if (chat.canModerate) { e.preventDefault(); setModTarget(m); } }}
+                style={{ alignSelf: "flex-start", maxWidth: "100%", padding: "4px 10px", borderRadius: "12px", background: "rgba(0,0,0,0.35)", fontSize: "14px", lineHeight: 1.45, wordBreak: "break-word", textShadow: "0 1px 2px rgba(0,0,0,0.6)", userSelect: chat.canModerate ? "none" : "auto", WebkitUserSelect: chat.canModerate ? "none" : "auto" }}
+              >
+                <span style={{ fontWeight: 700, color: "#E5E5E5", marginRight: "6px" }}>{m.nickname}</span>
+                <span>{m.body}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
         <div role="status" aria-atomic="true" style={{ minHeight: "32px", display: "flex" }}>
           {latestToast ? (
             <span key={latestToast.key} className="ruru-live-watch-toast" style={{ display: "inline-flex", alignItems: "center", height: "32px", maxWidth: "100%", padding: "0 12px", borderRadius: "9999px", background: "rgba(0,0,0,0.55)", fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -174,16 +261,76 @@ export default function LiveWatchView(props: Props) {
           <IconGrid />
           <span aria-hidden="true" style={{ position: "absolute", top: "-6px", right: "-6px", minWidth: "22px", height: "22px", padding: "0 5px", boxSizing: "border-box", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{items.length}</span>
         </button>
-        {cartCount > 0 ? (
-          <button type="button" onClick={props.onOpenCart} style={{ flex: 1, minWidth: 0, height: "52px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px", whiteSpace: "nowrap" }}>
-            <span role="status" aria-atomic="true">{cartCount}개 · {cartTotalText}</span><span aria-hidden="true">·</span><span>주문서 확인</span>
+        {chat && chat.canWrite ? (
+          <button type="button" onClick={() => setComposeOpen(true)} style={{ flex: 1, minWidth: 0, height: "52px", border: "1px solid rgba(255,255,255,0.4)", borderRadius: "9999px", background: "rgba(0,0,0,0.25)", color: "#E5E5E5", fontSize: "15px", fontWeight: 500, fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "8px", padding: "0 16px", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden" }}>
+            <IconChat /><span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>메시지 입력</span>
           </button>
-        ) : (
+        ) : null}
+        {cartCount > 0 ? (
+          <button type="button" onClick={props.onOpenCart} style={{ flex: chat && chat.canWrite ? "0 0 auto" : 1, minWidth: 0, height: "52px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px", whiteSpace: "nowrap", padding: "0 16px" }}>
+            {chat && chat.canWrite ? (
+              <span role="status" aria-atomic="true">주문서 {cartCount}개</span>
+            ) : (
+              <><span role="status" aria-atomic="true">{cartCount}개 · {cartTotalText}</span><span aria-hidden="true">·</span><span>주문서 확인</span></>
+            )}
+          </button>
+        ) : chat && chat.canWrite ? null : (
           <button type="button" onClick={() => setListOpen(true)} style={{ flex: 1, minWidth: 0, height: "52px", border: "1px solid rgba(255,255,255,0.4)", borderRadius: "9999px", background: "transparent", color: "#FFFFFF", fontSize: "15px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", padding: "0 16px" }}>
             방송에서 주문한 상품을 담아 주세요
           </button>
         )}
       </div>
+
+      {/* 채팅 안내(보냄 실패·금지 등) */}
+      {chatHint ? (
+        <div role="status" style={{ position: "absolute", left: "16px", right: "16px", bottom: "calc(88px + env(safe-area-inset-bottom))", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 2 }}>
+          <span style={{ padding: "8px 14px", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "14px", fontWeight: 600 }}>{chatHint}</span>
+        </div>
+      ) : null}
+
+      {/* 채팅 쓰기 줄 */}
+      {composeOpen && chat ? (
+        <div role="dialog" aria-modal="true" aria-label="채팅 쓰기" onClick={() => setComposeOpen(false)} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "flex-end" }}>
+          <form
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => { e.preventDefault(); void sendChat(); }}
+            style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: "#FFFFFF", padding: "12px 16px calc(12px + env(safe-area-inset-bottom))", display: "flex", gap: "8px", alignItems: "center", borderRadius: "16px 16px 0 0" }}
+          >
+            <input
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value.slice(0, LIVE_CHAT_MAX_LEN))}
+              placeholder="메시지 입력"
+              aria-label="채팅 메시지"
+              enterKeyHint="send"
+              maxLength={LIVE_CHAT_MAX_LEN}
+              style={{ flex: 1, minWidth: 0, height: "48px", padding: "0 16px", border: "1px solid #E5E5E5", borderRadius: "9999px", fontSize: "16px", fontFamily: "inherit", outline: "none", color: "#111111", background: "#FFFFFF" }}
+            />
+            <button type="submit" disabled={sending || !draft.trim()} style={{ flexShrink: 0, height: "48px", padding: "0 18px", border: "none", borderRadius: "9999px", background: sending || !draft.trim() ? "#E5E5E5" : "#111111", color: sending || !draft.trim() ? "#707072" : "#FFFFFF", fontSize: "15px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>
+              {sending ? "보내는 중" : "보내기"}
+            </button>
+          </form>
+        </div>
+      ) : null}
+
+      {/* 관리자 — 글 길게 누르면 */}
+      {modTarget && chat ? (
+        <div role="dialog" aria-modal="true" aria-label="채팅 관리" onClick={() => setModTarget(null)} style={{ position: "fixed", inset: 0, zIndex: SHEET_Z + 2, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "flex-end" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", margin: "0 auto", background: "#FFFFFF", color: "#111111", borderRadius: "16px 16px 0 0", padding: "16px 16px calc(16px + env(safe-area-inset-bottom))" }}>
+            <div style={{ fontSize: "15px", fontWeight: 700, marginBottom: "4px" }}>{modTarget.nickname}</div>
+            <div style={{ fontSize: "14px", color: "#707072", marginBottom: "12px", wordBreak: "break-word" }}>{modTarget.body}</div>
+            {([
+              ["hide", "글 지우기"],
+              ["mute30s", "지우고 30초 금지"],
+              ["mute5m", "지우고 5분 금지"],
+              ["ban", "지우고 채팅 차단"],
+            ] as [LiveChatPenalty, string][]).map(([a, label]) => (
+              <button key={a} type="button" onClick={() => void moderate(a)} style={{ width: "100%", height: "52px", marginBottom: "8px", border: "1px solid #E5E5E5", borderRadius: "12px", background: "#FFFFFF", color: a === "ban" ? "#D30005" : "#111111", fontSize: "16px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>{label}</button>
+            ))}
+            <button type="button" onClick={() => setModTarget(null)} style={{ width: "100%", height: "52px", border: "none", borderRadius: "12px", background: "#F5F5F5", color: "#111111", fontSize: "16px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>취소</button>
+          </div>
+        </div>
+      ) : null}
 
       {/* 상품 목록 창 */}
       {listOpen ? (

@@ -28,7 +28,12 @@ export function parseLiveOrderEvent(raw: unknown): LiveOrderEvent | null {
 
 export function subscribeLiveEvents(
   supabase: SupabaseClient,
-  handlers: { onOrder?: (e: LiveOrderEvent) => void; onCatalog?: (e: LiveCatalogEvent) => void },
+  handlers: {
+    onOrder?: (e: LiveOrderEvent) => void;
+    onCatalog?: (e: LiveCatalogEvent) => void;
+    /** [2026-11-10] 사이트 채팅 — 이벤트 'chat'(supabase/sql/live_chat.sql). 받은 그대로 넘김(lib/liveChat parseChatMessage 로 읽기) */
+    onChat?: (payload: unknown) => void;
+  },
 ): () => void {
   const channel = supabase.channel(LIVE_EVENTS_TOPIC, { config: { broadcast: { self: false }, private: false } });
   if (handlers.onOrder) {
@@ -41,6 +46,11 @@ export function subscribeLiveEvents(
     channel.on("broadcast", { event: "catalog" }, (msg: { payload?: unknown }) => {
       const p = (msg?.payload && typeof msg.payload === "object" ? msg.payload : {}) as Record<string, unknown>;
       handlers.onCatalog?.({ table: String(p.table ?? ""), type: String(p.type ?? "") });
+    });
+  }
+  if (handlers.onChat) {
+    channel.on("broadcast", { event: "chat" }, (msg: { payload?: unknown }) => {
+      handlers.onChat?.(msg?.payload);
     });
   }
   channel.subscribe();
