@@ -191,9 +191,18 @@ export function chatColors(list: { id: number; nickname: string }[]): Map<number
 }
 
 /** 목록에 새 글 합치기 — 같은 번호는 바꾸고, 지운 글은 빼고, 번호 순, 최근 N개만 */
+/** 보내자마자 화면에 먼저 띄우는 임시 글 번호(이 값 이상) */
+export const CHAT_TEMP_ID_BASE = 9_000_000_000_000;
 export function mergeChat(list: LiveChatMessage[], incoming: LiveChatMessage[], keep = 80): LiveChatMessage[] {
+  // [2026-11-10 08:50 사장님 「글씨가 복제됐다 사라지고 튕김」] 서버 소식이 보낸 사람 답보다 먼저 오면
+  //   임시 글 + 진짜 글이 잠깐 두 줄로 보이고, 그사이 온 다른 글(자동 안내)이 임시 글 위로 끼었다가 순서가 바뀌었음.
+  //   → 진짜 글(같은 닉네임·같은 내용)이 들어오는 순간 그 임시 글을 바로 뺌.
+  const real = incoming.filter((m) => m.id < CHAT_TEMP_ID_BASE);
   const map = new Map<number, LiveChatMessage>();
-  for (const m of list) map.set(m.id, m);
+  for (const m of list) {
+    if (m.id >= CHAT_TEMP_ID_BASE && real.some((r) => r.nickname === m.nickname && r.body === m.body)) continue;
+    map.set(m.id, m);
+  }
   for (const m of incoming) map.set(m.id, m);
   return Array.from(map.values())
     .filter((m) => !m.hidden)

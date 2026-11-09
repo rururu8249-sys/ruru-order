@@ -54,4 +54,17 @@ list = C.mergeChat(list, [hid]);
 assert.deepEqual(list.map((m) => m.id), [2]);
 assert.equal(C.mergeChat([], Array.from({ length: 100 }, (_, i) => C.parseChatMessage({ id: i + 1, broadcast_id: "b", nickname: "n", body: "x" })), 80).length, 80);
 
+// 임시 글은 진짜 글(같은 닉네임·내용)이 오면 바로 빠짐 — 두 줄로 보이거나 순서가 튀지 않게
+const tmp = { ...C.parseChatMessage({ id: 1, broadcast_id: "b", nickname: "루루", body: "ㅁ" }), id: C.CHAT_TEMP_ID_BASE + 5 };
+let l2 = C.mergeChat([b], [tmp]);
+assert.deepEqual(l2.map((m) => m.id), [2, C.CHAT_TEMP_ID_BASE + 5]);
+const bot = C.parseChatMessage({ id: 4, broadcast_id: "b", nickname: "루루동이", body: "안내" });
+const realMine = C.parseChatMessage({ id: 3, broadcast_id: "b", nickname: "루루", body: "ㅁ" });
+l2 = C.mergeChat(l2, [realMine]);
+assert.deepEqual(l2.map((m) => m.id), [2, 3]);
+l2 = C.mergeChat(l2, [bot]);
+assert.deepEqual(l2.map((m) => m.id), [2, 3, 4]);
+// 다른 사람의 같은 글은 내 임시 글을 안 뺌
+assert.equal(C.mergeChat([tmp], [C.parseChatMessage({ id: 9, broadcast_id: "b", nickname: "남", body: "ㅁ" })]).length, 2);
+
 console.log("live-chat: 통과");

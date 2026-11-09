@@ -49,7 +49,7 @@ import { LIVE_WATCH_KEY, LIVE_WATCH_DEFAULT, parseLiveWatchSetting, chatBadgeOf,
 import LiveWatchView, { type LiveWatchOrderToast, type LiveWatchPinned } from "@/components/customer/LiveWatchView";
 import { subscribeLiveEvents } from "@/lib/liveEvents";
 import { cleanKakaoPhotoUrl } from "@/lib/kakaoPhoto";
-import { isPenaltyAction, mergeChat, parseChatMessage, type LiveChatAction, type LiveChatMessage } from "@/lib/liveChat";
+import { CHAT_TEMP_ID_BASE, isPenaltyAction, mergeChat, parseChatMessage, type LiveChatAction, type LiveChatMessage } from "@/lib/liveChat";
 import { encodeEmojiTokens, type ChatEmoji } from "@/lib/liveChatEmoji";
 import { LIVE_CHAT_BOT_NICK, orderThanksText, cardLinkText, paidThanksText, isCardOrderRow, becamePaid, CART_NEXT_STEP_TEXT, orderItemLine, cartOwnerTag, cartRefOwner } from "@/lib/liveChatBot";
 import { openYoutubeChannel } from "@/lib/youtubeChannelLink";
@@ -8272,7 +8272,7 @@ export default function OrderPage() {
                 canEmoji: liveChatCanEmoji,
                 onSend: async (body) => {
                   // 누르자마자 화면에 먼저 띄움(임시 번호) — 서버 답이 오면 진짜 글로 바꿈, 실패하면 뺌
-                  const tempId = 9_000_000_000_000 + Date.now();
+                  const tempId = CHAT_TEMP_ID_BASE + Date.now();
                   const temp: LiveChatMessage = { id: tempId, broadcastId: String(broadcast.id), nickname: youtubeNickname.trim(), body: liveChatCanEmoji ? encodeEmojiTokens(body, liveChatEmojis).text : body, createdAt: new Date().toISOString(), hidden: false, badge: chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) ?? (operatorTestAccount !== null ? "mod" : null), pinned: false, botRef: "", avatar: (() => { try { return cleanKakaoPhotoUrl(window.localStorage.getItem("ruru_kakao_profile_image")); } catch { return ""; } })() };
                   setLiveChatMessages((prev) => mergeChat(prev, [temp]));
                   const dropTemp = () => setLiveChatMessages((prev) => prev.filter((x) => x.id !== tempId));

@@ -153,7 +153,8 @@ function ChatAvatar({ src, nick, color }: { src: string; nick: string; color: st
   return <span aria-hidden="true" style={{ ...box, display: "inline-flex", alignItems: "center", justifyContent: "center", background: color, color: "#111111", fontSize: "12px", fontWeight: 700, textShadow: "none" }}>{ch}</span>;
 }
 // 글자를 상자 없이 영상 위에 바로 — 어떤 화면에서도 읽히게 진한 그림자
-const CHAT_TEXT_SHADOW = "0 0 2px rgba(0,0,0,0.9), 0 1px 3px rgba(0,0,0,0.6)";
+// [08:50 사장님 「닉네임 흐리멍텅·블러 같다」] 번지는 그림자 대신 1px 또렷한 테두리 그림자
+const CHAT_TEXT_SHADOW = "0 0 1px rgba(0,0,0,0.9), 0 1px 1px rgba(0,0,0,0.85)";
 const IconClose = ({ color = "#111111" }: { color?: string }) => (
   <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M6 6l12 12M18 6L6 18" /></svg>
 );
@@ -163,7 +164,7 @@ type ChatView = { size: "base" | "mid" | "big"; bold: boolean; height: "base" | 
 const CHAT_VIEW_KEY = "ruru_live_chat_view_v1";
 const CHAT_VIEW_DEFAULT: ChatView = { size: "base", bold: false, height: "base" };
 // [2026-11-10 04:09] 기본 15px — 유튜브 앱 채팅 글자와 비슷하게(사장님 「유튜브랑 비슷하게」)
-// [08:39 사장님 「유튜브 라이브 채팅과 글자 크기·굵기·줄 간격·여백 모두 같게」] 유튜브 앱 라이브 채팅 기준: 글자 14 · 줄 높이 20 · 줄 사이 8 · 사진 24 · 사진과 이름 사이 12 · 이름 흐린 흰색(보통 굵기) · 글 흰색
+// [08:39 사장님 「유튜브 라이브 채팅과 글자 크기·굵기·줄 간격·여백 모두 같게」] 유튜브 앱 라이브 채팅 기준: 글자 14 · 줄 높이 20 · 줄 사이 8 · 사진 24 · 사진과 이름 사이 12 · 닉네임·글은 사람마다 정해진 색(08:50 다시)
 const CHAT_SIZES: Record<ChatView["size"], string> = { base: "14px", mid: "16px", big: "18px" };
 const CHAT_LINE_H: Record<ChatView["size"], string> = { base: "20px", mid: "22px", big: "25px" };
 const CHAT_HEIGHTS: Record<ChatView["height"], string> = { base: "24dvh", low: "14dvh", high: "36dvh" };
@@ -236,6 +237,17 @@ export default function LiveWatchView(props: Props) {
   //   [08:31 사장님 「보내면 글자 튕김·스프링 느낌 그대로」] 채팅 줄을 숨겼다 다시 보이는 게 «깜빡·튕김»으로 보여 채팅 줄은 늘 그대로 두고,
   //   겹쳐 보이던 «쉬는 중 글»만 숨김(채팅은 아래에 붙어 키보드와 같이 내려감).
   const [settling, setSettling] = useState(false);
+  // [08:52 사장님 「방송 화면 좌우 여백이 남아, 베젤처럼」] 키보드가 뜨면 화면 높이가 줄어 세로 영상이 높이에 맞춰 작아지고
+  //   좌우에 검은 띠가 생겼음. → 영상(iframe)만 키보드 뜨기 전 높이를 유지(화면 틀은 그대로라 화면이 밀리지 않음) — 유튜브 앱처럼
+  //   키보드가 영상 아래쪽을 덮을 뿐 영상 크기는 그대로.
+  const videoBaseH = useRef(0);
+  useEffect(() => {
+    const keep = () => { if (!composeOpen && !settling) videoBaseH.current = window.innerHeight; };
+    keep();
+    window.addEventListener("resize", keep);
+    return () => window.removeEventListener("resize", keep);
+  }, [composeOpen, settling]);
+  const freezeVideo = (composeOpen || settling) && videoBaseH.current > 0;
   useEffect(() => {
     if (composeOpen) { setSettling(true); return; }
     if (!settling) return;
@@ -630,7 +642,7 @@ export default function LiveWatchView(props: Props) {
         title={`${title || "라이브 방송"} 영상`}
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
         allowFullScreen
-        style={{ position: "absolute", left: 0, right: 0, top: 0, width: "100%", height: "calc(100% - 84px - env(safe-area-inset-bottom))", border: 0, background: "#000000" }}
+        style={{ position: "absolute", left: 0, right: 0, top: 0, width: "100%", height: freezeVideo ? `calc(${videoBaseH.current}px - 84px - env(safe-area-inset-bottom))` : "calc(100% - 84px - env(safe-area-inset-bottom))", border: 0, background: "#000000" }}
       />
 
       {/* 위 줄 — LIVE·제목 / 방송 화면 닫기(→ 상품 사진으로 보는 화면) */}
@@ -747,14 +759,14 @@ export default function LiveWatchView(props: Props) {
                   props.onOpenProduct(botProduct.productId, botProduct.detailName || undefined);
                 } : undefined}
                 role={botProduct ? "button" : undefined}
-                style={{ cursor: botProduct ? "pointer" : undefined, pointerEvents: "auto", touchAction: "pan-y", display: "flex", alignItems: "flex-start", gap: "12px", maxWidth: "100%", color: "#FFFFFF", fontSize: CHAT_SIZES[chatView.size], fontWeight: chatView.bold ? 700 : 400, letterSpacing: "normal", lineHeight: CHAT_LINE_H[chatView.size], wordBreak: "break-word", textShadow: CHAT_TEXT_SHADOW, userSelect: chat.canModerate ? "none" : "auto", WebkitUserSelect: chat.canModerate ? "none" : "auto" }}
+                style={{ cursor: botProduct ? "pointer" : undefined, pointerEvents: "auto", touchAction: "pan-y", display: "flex", alignItems: "flex-start", gap: "12px", maxWidth: "100%", color, fontSize: CHAT_SIZES[chatView.size], fontWeight: chatView.bold ? 700 : 500, WebkitFontSmoothing: "antialiased", letterSpacing: "normal", lineHeight: CHAT_LINE_H[chatView.size], wordBreak: "break-word", textShadow: CHAT_TEXT_SHADOW, userSelect: chat.canModerate ? "none" : "auto", WebkitUserSelect: chat.canModerate ? "none" : "auto" }}
               >
                 {/* 유튜브처럼 [사진][닉네임 · 표시 · 글] — 글이 길어 다음 줄로 가면 사진 밑이 아니라 닉네임 시작 자리에 맞춰 내려감.
                     상자 없이 글자만 — 닉네임과 글은 같은 색(사람마다 정해진 색, 바로 위 다른 사람과는 절대 같은 색 안 됨).
                     관리자는 글 줄을 길게 누르면 관리 창(고정은 왕관 두 사람만) */}
                 <ChatAvatar src={m.badge === "bot" ? "/ruru-ai-avatar.png" : m.avatar} nick={m.nickname} color={color} />
                 <span style={{ minWidth: 0, flex: 1 }}>
-                  <span style={{ fontWeight: 500, color: "rgba(255,255,255,0.7)" }}>{m.nickname}</span>
+                  <span style={{ fontWeight: 700 }}>{m.nickname}</span>
                   <ChatBadge badge={m.badge} />
                   <span style={{ marginLeft: m.badge ? "4px" : "10px" }}><ChatBodyView body={m.body} emojis={emojiMap} /></span>
                   {botProduct ? (
