@@ -6381,6 +6381,16 @@ export default function OrderPage() {
               </span>
             </Link>
             <span style={uiV2 ? { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "14px", fontWeight: 600, color: "#111111" } : { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "14px", fontWeight: 800, color: "#7A1E47" }}>{uiS5 ? null : "👋 "}{safeGreetingName}님!</span>
+            {/* [2026-11-10 사장님 「알림 받는 중을 닉네임 옆 종 모양으로」] 누르면 기존 방송 알림 창(켜기·끄기 + 동의 안내) — 저장 함수 그대로 */}
+            {uiV2 ? (
+              <button type="button" onClick={() => setAlertSheetOpen(true)} aria-label={liveAlertOptin ? "방송 알림 받는 중 · 끄기" : "방송 알림 꺼짐 · 켜기"} style={{ flexShrink: 0, width: "40px", height: "40px", marginLeft: "-4px", border: "none", borderRadius: "9999px", background: "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative" }}>
+                {liveAlertOptin ? (
+                  <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="#111111" stroke="#111111" strokeWidth="1.6"><path d="M6 10a6 6 0 0112 0v4l2 3H4l2-3z" /><path d="M10 20a2 2 0 004 0" fill="none" /></svg>
+                ) : (
+                  <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9E9EA0" strokeWidth="1.8"><path d="M6 10a6 6 0 0112 0v4l2 3H4l2-3z" /><path d="M10 20a2 2 0 004 0" /><path d="M3 3l18 18" /></svg>
+                )}
+              </button>
+            ) : null}
           </div>
 
           {/* [2026-10-25 PC 모양] 아래 5칸 메뉴를 맨 위 로고 옆으로(폰은 지금처럼 아래). 누르면 아래 메뉴와 같은 동작 */}
@@ -7298,7 +7308,8 @@ export default function OrderPage() {
                   방송 보면서 주문하기
                 </button>
               ) : null}
-              <div style={{ display: "flex", gap: "8px" }}>
+              {/* [2026-11-10 사장님] 「방송 보면서 주문하기」가 보이는 손님에겐 알림·「방송 보러가기」(유튜브) 줄을 숨김 — 알림은 위 닉네임 옆 종, 코드는 그대로 둠 */}
+              <div style={{ display: liveWatchUsable && uiV2 ? "none" : "flex", gap: "8px" }}>
                 <button type="button" onClick={() => setAlertSheetOpen(true)} style={uiV2 ? { flex: 1, height: "44px", border: "1px solid rgba(255,255,255,0.5)", borderRadius: "9999px", background: "transparent", color: "#FFFFFF", fontSize: "14px", fontWeight: 600, cursor: "pointer" } : { flex: 1, height: "40px", border: "1.5px solid rgba(255,255,255,0.5)", borderRadius: "11px", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: "12.5px", fontWeight: 800, cursor: "pointer" }}>
                   {liveAlertOptin ? (uiS5 ? "알림 받는 중 ✓" : "🔔 알림 받는 중 ✓") : (uiS5 ? "다음방송 알림받기" : "🔔 다음방송 알림받기")}
                 </button>
