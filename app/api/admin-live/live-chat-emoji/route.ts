@@ -139,7 +139,24 @@ export async function POST(request: NextRequest) {
       if (!/^image\/(png|webp|jpeg)$/.test(file.type)) return fail("PNG·WEBP·JPG 만 올릴 수 있어요.");
       if (file.size > EMOJI_MAX_BYTES) return fail("1MB 이하로 줄여서 올려 주세요.");
       const setting = await readEmojiSetting(sb);
-      if (setting.items.length >= EMOJI_MAX_ITEMS) return fail(`이모티콘은 ${EMOJI_MAX_ITEMS}개까지예요.`);
+      // 그림 바꾸기(같은 아이디 유지 — 이미 보낸 채팅 글에도 새 그림이 나옴)
+      const replaceId = String(form.get("replaceId") || "");
+      const replacing = replaceId ? setting.items.find((e) => e.id === replaceId) : undefined;
+      if (replaceId && !replacing) return fail("바꿀 이모티콘을 못 찾았어요.", 404);
+      if (!replacing && setting.items.length >= EMOJI_MAX_ITEMS) return fail(`이모티콘은 ${EMOJI_MAX_ITEMS}개까지예요.`);
+      if (replacing) {
+        const ext2 = file.type === "image/webp" ? "webp" : file.type === "image/png" ? "png" : "jpg";
+        const path2 = `live-emoji/${replacing.id}-${Date.now().toString(36)}.${ext2}`;
+        const { error: e2 } = await sb.storage.from(EMOJI_PUBLIC_BUCKET).upload(path2, file, { contentType: file.type, upsert: false, cacheControl: "31536000" });
+        if (e2) return fail(`사진을 못 올렸어요: ${e2.message}`, 500);
+        const url2 = sb.storage.from(EMOJI_PUBLIC_BUCKET).getPublicUrl(path2).data.publicUrl;
+        const latest = await readEmojiSetting(sb);
+        const next = { ...latest, items: latest.items.map((e) => (e.id === replacing.id ? { ...e, url: url2 } : e)) };
+        await saveSetting(sb, next);
+        const oldPath = storagePathOf(replacing.url);
+        if (oldPath) await sb.storage.from(EMOJI_PUBLIC_BUCKET).remove([oldPath]).catch(() => null);
+        return NextResponse.json({ ok: true, setting: parseChatEmojiSetting(next) });
+      }
       const id = newEmojiId();
       const ext = file.type === "image/webp" ? "webp" : file.type === "image/png" ? "png" : "jpg";
       const path = `live-emoji/${id}.${ext}`;

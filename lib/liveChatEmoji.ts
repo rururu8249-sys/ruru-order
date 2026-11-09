@@ -10,8 +10,8 @@ export const LIVE_CHAT_EMOJI_KEY = "live_chat_emoji_v1";
 export const EMOJI_MAX_PER_MSG = 5;
 /** 이모티콘 개수 상한 */
 export const EMOJI_MAX_ITEMS = 60;
-/** 저장 그림 크기(정사각형) — 채팅엔 글자 높이(약 24px)로 나오고, 선명한 화면(2~3배)에서도 또렷하게 */
-export const EMOJI_PIXELS = 128;
+/** 저장 그림 긴 쪽 크기 — 여백을 잘라 꽉 채운 그림. 이모티콘만 보낸 글은 크게(약 56px) 나오니 폰 3배 화면에서도 또렷하게 256 */
+export const EMOJI_PIXELS = 256;
 /** 올릴 때 파일 크기 상한(유튜브와 같은 1MB) — 브라우저가 줄여서 보내므로 보통 30KB 안팎 */
 export const EMOJI_MAX_BYTES = 1024 * 1024;
 /** 사장님 지정(11/10 06:29) — 이 번호는 규칙과 상관없이 늘 쓸 수 있음 */

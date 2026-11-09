@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { showAdminToast } from "@/lib/adminToast";
+import { ChatBodyView, emojiMapOf } from "@/components/customer/ChatBodyView";
 import {
   EMOJI_MAX_BYTES,
   EMOJI_MAX_ITEMS,
@@ -26,7 +27,10 @@ type State = { setting: ChatEmojiSetting; allow: Person[]; deny: Person[]; owner
 const API = "/api/admin-live/live-chat-emoji";
 const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
 
-/** 사진 → 128×128 투명 바탕 정사각형(비율 유지, 가운데). WEBP 가 되면 WEBP, 아니면 PNG. */
+/** 사진 → 채팅 이모티콘 그림.
+ *  [06:57 사장님 「글씨가 안 보여, 너무 작아」] ①네 귀퉁이가 흰 바탕이면 바탕만 투명하게(스티커 흰 테두리는 남음)
+ *  ②둘레 빈 여백을 잘라 그림이 칸을 꽉 채우게 ③긴 쪽 EMOJI_PIXELS(256) — 가로로 긴 글씨 스티커는 가로로 긴 그대로(최대 3:1).
+ *  WEBP 가 되면 WEBP, 아니면 PNG. */
 async function shrinkImage(file: File): Promise<Blob> {
   const src: CanvasImageSource & { width: number; height: number } = await (async () => {
     if (typeof createImageBitmap === "function") {
@@ -42,38 +46,81 @@ async function shrinkImage(file: File): Promise<Blob> {
       URL.revokeObjectURL(url);
     }
   })();
-  const w = src.width;
-  const h = src.height;
-  if (!w || !h) throw new Error("사진을 못 읽었어요.");
-  // 큰 사진은 반씩 줄여 가며(한 번에 줄이면 테두리가 깨짐)
-  let cur: CanvasImageSource = src;
-  let cw = w;
-  let ch = h;
-  const fit = EMOJI_PIXELS / Math.max(w, h);
-  const tw = Math.max(1, Math.round(w * fit));
-  const th = Math.max(1, Math.round(h * fit));
-  while (cw / 2 > tw && ch / 2 > th) {
+  // 너무 큰 원본은 먼저 긴 쪽 1024 로(계산 빠르게)
+  const pre = Math.min(1, 1024 / Math.max(src.width, src.height));
+  const W = Math.max(1, Math.round(src.width * pre));
+  const H = Math.max(1, Math.round(src.height * pre));
+  if (!W || !H) throw new Error("사진을 못 읽었어요.");
+  const work = document.createElement("canvas");
+  work.width = W;
+  work.height = H;
+  const wctx = work.getContext("2d", { willReadFrequently: true });
+  if (!wctx) throw new Error("사진을 못 줄였어요.");
+  wctx.imageSmoothingQuality = "high";
+  wctx.drawImage(src, 0, 0, W, H);
+  const img = wctx.getImageData(0, 0, W, H);
+  const d = img.data;
+  // ① 귀퉁이 넷이 모두 거의 흰색(불투명)이면 — 둘레에서 이어진 흰 바탕만 투명하게
+  const isWhite = (i: number) => d[i + 3] > 200 && d[i] > 240 && d[i + 1] > 240 && d[i + 2] > 240;
+  const corners = [0, (W - 1) * 4, (H - 1) * W * 4, ((H - 1) * W + W - 1) * 4];
+  if (corners.every(isWhite)) {
+    const seen = new Uint8Array(W * H);
+    const stack: number[] = [];
+    for (let x = 0; x < W; x++) { stack.push(x, (H - 1) * W + x); }
+    for (let y = 0; y < H; y++) { stack.push(y * W, y * W + W - 1); }
+    while (stack.length) {
+      const p = stack.pop()!;
+      if (seen[p]) continue;
+      seen[p] = 1;
+      if (!isWhite(p * 4)) continue;
+      d[p * 4 + 3] = 0;
+      const x = p % W;
+      if (x > 0) stack.push(p - 1);
+      if (x < W - 1) stack.push(p + 1);
+      if (p >= W) stack.push(p - W);
+      if (p < W * (H - 1)) stack.push(p + W);
+    }
+    wctx.putImageData(img, 0, 0);
+  }
+  // ② 빈 여백 자르기(거의 투명한 곳)
+  let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (d[(y * W + x) * 4 + 3] > 12) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  }
+  if (x1 < 0) { x0 = 0; y0 = 0; x1 = W - 1; y1 = H - 1; }
+  const pad = Math.round(Math.max(x1 - x0, y1 - y0) * 0.02);
+  x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(W - 1, x1 + pad); y1 = Math.min(H - 1, y1 + pad);
+  let cw = x1 - x0 + 1;
+  let chh = y1 - y0 + 1;
+  // ③ 너무 가늘고 긴 그림은 3:1 까지만(넘치면 투명 여백으로 채움)
+  let outW = cw, outH = chh;
+  if (outW > outH * 3) outH = Math.ceil(outW / 3);
+  if (outH > outW * 3) outW = Math.ceil(outH / 3);
+  const scale = Math.min(1, EMOJI_PIXELS / Math.max(outW, outH));
+  const fw = Math.max(1, Math.round(outW * scale));
+  const fh = Math.max(1, Math.round(outH * scale));
+  // 반씩 줄여 가며(한 번에 줄이면 테두리가 깨짐)
+  const dw = Math.max(1, Math.round((x1 - x0 + 1) * scale));
+  const dh = Math.max(1, Math.round((y1 - y0 + 1) * scale));
+  let cur: CanvasImageSource = work;
+  let sx = x0, sy = y0;
+  while (cw / 2 > dw && chh / 2 > dh) {
     const c = document.createElement("canvas");
     c.width = Math.round(cw / 2);
-    c.height = Math.round(ch / 2);
+    c.height = Math.round(chh / 2);
     const x = c.getContext("2d");
     if (!x) break;
-    x.imageSmoothingEnabled = true;
     x.imageSmoothingQuality = "high";
-    x.drawImage(cur, 0, 0, c.width, c.height);
-    cur = c;
-    cw = c.width;
-    ch = c.height;
+    x.drawImage(cur, sx, sy, cw, chh, 0, 0, c.width, c.height);
+    cur = c; sx = 0; sy = 0; cw = c.width; chh = c.height;
   }
   const out = document.createElement("canvas");
-  out.width = EMOJI_PIXELS;
-  out.height = EMOJI_PIXELS;
+  out.width = fw;
+  out.height = fh;
   const ctx = out.getContext("2d");
   if (!ctx) throw new Error("사진을 못 줄였어요.");
-  ctx.clearRect(0, 0, EMOJI_PIXELS, EMOJI_PIXELS);
-  ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(cur, Math.round((EMOJI_PIXELS - tw) / 2), Math.round((EMOJI_PIXELS - th) / 2), tw, th);
+  ctx.drawImage(cur, sx, sy, cw, chh, Math.round((fw - dw) / 2), Math.round((fh - dh) / 2), dw, dh);
   const toBlob = (type: string, q?: number) => new Promise<Blob | null>((res) => out.toBlob(res, type, q));
   let blob = await toBlob("image/webp", 0.92);
   if (!blob || blob.type !== "image/webp") blob = await toBlob("image/png");
@@ -285,12 +332,12 @@ export default function ChatEmojiManagerModal({ open, onClose, onChanged }: { op
             <>
               {/* 손님 화면에서 보이는 크기 */}
               <div className="rounded-lg bg-[#111111] px-4 py-3 text-[16px] leading-[1.45] text-white">
-                <div className="mb-1 text-[12px] text-white/60">손님 화면에 보이는 크기(글자 한 줄 높이 · 유튜브 멤버십 이모티콘과 같음)</div>
-                <span className="font-extrabold text-[#FFD43B]">루루실장</span>
-                <span className="ml-2 text-[#FFD43B]">오늘도 와 주셔서 감사해요</span>
+                <div className="mb-1 text-[12px] text-white/60">손님 화면에 보이는 크기 — 글자와 섞으면 글자 2배 높이, 이모티콘만 보내면 더 크게</div>
                 {sample ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={sample.url} alt="" className="mx-[1px] inline-block h-[1.6em] w-[1.6em] object-contain align-middle" style={{ marginTop: "-0.2em" }} />
+                  <>
+                    <div><span className="font-extrabold text-[#FFD43B]">루루실장</span> <span className="text-[#FFD43B]"><ChatBodyView body={`오늘도 와 주셔서 감사해요 \uE000${sample.id}:${sample.name}\uE001`} emojis={emojiMapOf(s.items)} /></span></div>
+                    <div className="mt-1"><span className="mr-2 align-top font-extrabold text-[#FFD43B]">루루실장</span><ChatBodyView body={`\uE000${sample.id}:${sample.name}\uE001`} emojis={emojiMapOf(s.items)} /></div>
+                  </>
                 ) : <span className="ml-1 text-white/50">(이모티콘을 올리면 여기 보여요)</span>}
               </div>
 
@@ -304,7 +351,7 @@ export default function ChatEmojiManagerModal({ open, onClose, onChanged }: { op
                     <button type="button" disabled={Boolean(uploading) || busy} onClick={() => fileRef.current?.click()} className="h-9 rounded-lg bg-ink px-4 text-[13px] font-bold text-white disabled:opacity-40">+ 이모티콘 추가</button>
                   </div>
                 </div>
-                <p className="mb-3 text-[12px] text-ink-mute">여러 장 한 번에 · 사진 크기 상관없이 {EMOJI_PIXELS}×{EMOJI_PIXELS} 로 줄여 저장(한 장 수십 KB) · 정사각형이 가장 예뻐요</p>
+                <p className="mb-3 text-[12px] text-ink-mute">여러 장 한 번에 · 흰 바탕은 투명하게, 둘레 빈 여백은 잘라서 그림이 꽉 차게 · 긴 쪽 {EMOJI_PIXELS}px 로 줄여 저장(한 장 수십 KB)</p>
                 {s.items.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-line p-6 text-center text-[13px] text-ink-mute">아직 이모티콘이 없어요. 「+ 이모티콘 추가」로 사진을 올려 주세요.</div>
                 ) : (
