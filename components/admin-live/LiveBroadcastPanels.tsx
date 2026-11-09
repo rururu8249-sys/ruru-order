@@ -6,6 +6,7 @@ import { showAdminToast } from "@/lib/adminToast";
 import { useEffect, useMemo, useState } from "react";
 import Script from "next/script";
 import { useAdminYoutubePlayer } from "./useAdminYoutubePlayer";
+import AdminSiteChatBox from "./AdminSiteChatBox";
 import { supabase } from "@/lib/supabase";
 import { adminCatalogWrite } from "@/lib/adminCatalogWrite";
 import type { CustomerRow } from "@/lib/admin-v2/types";
@@ -464,6 +465,12 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
   const [taskPage, setTaskPage] = useState(1);
   const [embedDomain, setEmbedDomain] = useState("");
   const [chatRetry, setChatRetry] = useState(0);
+  // [2026-11-10 사장님 05:54] 채팅 칸 탭 — 사이트 채팅(기본) / 유튜브 채팅. 유튜브 칸은 숨겨도 그대로 둠(다시 로드 안 되게). 고른 탭은 이 브라우저만 기억.
+  const [chatTab, setChatTab] = useState<"site" | "youtube">("site");
+  useEffect(() => {
+    try { if (window.localStorage.getItem("ruru_admin_chat_tab") === "youtube") setChatTab("youtube"); } catch { /* 무시 */ }
+  }, []);
+  const pickChatTab = (t: "site" | "youtube") => { setChatTab(t); try { window.localStorage.setItem("ruru_admin_chat_tab", t); } catch { /* 무시 */ } };
 
   const [customerKeyword, setCustomerKeyword] = useState("");
   const [customerResults, setCustomerResults] = useState<CustomerRow[]>([]);
@@ -902,15 +909,25 @@ export default function LiveBroadcastPanels({ videoRatio, youtubeUrl, activeBroa
       </div>
 
       <div className={`min-w-0 rounded-2xl border border-line bg-surface p-3.5 shadow-sm flex flex-col ${isCol ? "min-h-[240px] w-full flex-[6_1_0%]" : "h-[420px]"}`} style={isCol ? undefined : { flex: "3 1 0%" }}>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-black text-ink">라이브 채팅</h2>
-          {chatEmbedUrl ? <div className="flex items-center gap-2 text-xs font-bold text-ink-soft">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div role="tablist" aria-label="채팅 고르기" className="flex gap-4 border-b border-line">
+            {([["site", "사이트 채팅"], ["youtube", "유튜브 채팅"]] as const).map(([t, label]) => (
+              <button key={t} type="button" role="tab" aria-selected={chatTab === t} onClick={() => pickChatTab(t)}
+                className={`-mb-px h-9 border-b-2 text-[14px] font-bold ${chatTab === t ? "border-ink text-ink" : "border-transparent text-ink-mute hover:text-ink"}`}>{label}</button>
+            ))}
+          </div>
+          {chatTab !== "youtube" ? null : chatEmbedUrl ? <div className="flex items-center gap-2 text-xs font-bold text-ink-soft">
             <button type="button" aria-label="YouTube 채팅 다시 연결" title="YouTube 채팅이 비거나 오류가 뜨면 다시 연결하세요" onClick={() => setChatRetry(value => value + 1)} className="rounded-lg border border-line px-2 py-1">재연결</button>
             <a aria-label="YouTube 채팅 별도 창으로 열기" href={`https://www.youtube.com/live_chat?v=${videoId}&is_popout=1`} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-line px-2 py-1">새 창</a>
           </div> : <span className="text-xs font-bold text-ink-soft">URL 대기</span>}
         </div>
 
-        <div className="flex-1 min-h-0 overflow-hidden rounded-2xl border border-line bg-surface-2" style={chatEmbedUrl ? { background: "var(--color-surface)" } : undefined}>
+        {chatTab === "site" ? (
+          <div className="flex-1 min-h-0 overflow-hidden rounded-2xl border border-line bg-surface">
+            <AdminSiteChatBox broadcastId={activeBroadcastId ? String(activeBroadcastId) : null} />
+          </div>
+        ) : null}
+        <div className={`flex-1 min-h-0 overflow-hidden rounded-2xl border border-line bg-surface-2${chatTab === "youtube" ? "" : " hidden"}`} style={chatEmbedUrl ? { background: "var(--color-surface)" } : undefined}>
           {chatEmbedUrl ? (
             <iframe
               key={`${videoId}:${chatRetry}`}

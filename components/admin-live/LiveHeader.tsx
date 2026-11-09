@@ -8,7 +8,6 @@ import { showAdminToast } from "@/lib/adminToast";
 import { showAdminConfirm } from "@/lib/adminConfirm";
 import { buildChatAnnounceText } from "@/lib/chatAnnounce";
 import { buildDetailChatLine, detailProducts } from "@/lib/productDetailModel";
-import { feedPinLayout, FEED_PIN_SIZE } from "@/lib/feedText";
 import { LIVE_PAUSED_TEXT_KEY, LIVE_PAUSED_TEXT_DEFAULT, LIVE_PAUSED_TEXT_MAX } from "@/lib/livePausedText";
 import { LIVE_WATCH_KEY, LIVE_WATCH_DEFAULT, parseLiveWatchSetting, serializeLiveWatchSetting, type LiveWatchSetting } from "@/lib/liveWatch";
 import { LIVE_CHAT_KEY, LIVE_CHAT_DEFAULT, parseLiveChatSetting, serializeLiveChatSetting, type LiveChatSetting } from "@/lib/liveChat";
@@ -60,37 +59,8 @@ export default function LiveHeader({
   const [titleSavedAt, setTitleSavedAt] = useState("");
   const [urlAppliedAt, setUrlAppliedAt] = useState("");
 
-  // [2026-09-12] 📌 위젯 고정 공지 — «주문·입금 피드» 위젯(/order-feed-widget) 맨 위 한 줄.
-  //   «이번 방송»의 속성이라 broadcasts.feed_pin_text 에 둔다(유튜브 고정 메시지처럼 방송마다 하나).
-  //   → 방송이 끝나면 같이 끝나고, 다음 방송은 빈칸에서 시작(지난 방송 공지가 새어나가지 않음).
-  //   저장은 부모(onSaveFeedPin → catalog-write 서버 경로). 위젯은 broadcasts 실시간이라 저장 즉시 반영. 표시 전용(돈·주문 무관).
   const activeBroadcastId = activeBroadcast?.id ?? "";
-  const activePinText = String(activeBroadcast?.feed_pin_text ?? "");
-  const [pinText, setPinText] = useState("");
-  const [pinSaving, setPinSaving] = useState(false);
-  const [pinSavedAt, setPinSavedAt] = useState("");
-  // [a4-1b] 창이 열릴 때(마운트) / 방송이 바뀔 때 — 입력칸을 현재 방송의 저장값으로 맞춘다(옛 「제목·URL 수정」 접기 폐지)
-  useEffect(() => {
-    setPinText(activePinText);
-    setPinSavedAt("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeBroadcastId]);
-  const savePinText = async () => {
-    if (pinSaving || !activeBroadcastId || !onSaveFeedPin) return;
-    setPinSaving(true);
-    try {
-      const value = pinText.trim().slice(0, 60);
-      await onSaveFeedPin(value);
-      setPinText(value);
-      setPinSavedAt(new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }));
-      showAdminToast(value ? "위젯 고정 공지를 저장했습니다. 방송 화면에 바로 뜹니다." : "위젯 고정 공지를 지웠습니다.", "success");
-    } catch {
-      showAdminToast("위젯 고정 공지 저장에 실패했어요.", "error");
-    } finally {
-      setPinSaving(false);
-    }
-  };
-
+  // [2026-11-10] 「방송 화면 공지」(broadcasts.feed_pin_text) 입력칸 삭제 — 띄우던 주문·입금 알림 위젯이 11/09 폐지돼 어디에도 안 나왔음. 저장값·onSaveFeedPin 은 그대로 둠.
   // [2026-11-09 사장님 13:55 「잠시 쉬는 중 문구 내가 수정할 수 있게」] 손님 화면 「잠시 쉬는 중」 문구 — settings live_paused_text(방송과 무관한 상시 설정, 비우면 기본 문구).
   //   저장은 손님 공지 설정과 같은 settings upsert(한 키만). 손님 화면은 loadBroadcast 가 읽는다(돈·주문 무관, 표시만).
   const [pausedText, setPausedText] = useState("");
@@ -131,6 +101,53 @@ export default function LiveHeader({
       showAdminToast("설정 저장에 실패했어요.", "error");
     } finally {
       setLiveWatchSaving(false);
+    }
+  };
+
+  // [2026-11-10 사장님 05:54] 시험 손님(베타테스터) — 「시험 손님만」일 때 보이는 손님. 넣기·빼기는 서버(live-watch-testers)가 phones 한 칸만 바꿈.
+  type Tester = { key: string; phone: string; nickname: string; name: string };
+  type TesterResult = Tester & { tester: boolean };
+  const [testers, setTesters] = useState<Tester[]>([]);
+  const [testerQuery, setTesterQuery] = useState("");
+  const [testerResults, setTesterResults] = useState<TesterResult[]>([]);
+  const [testerSearching, setTesterSearching] = useState(false);
+  const [testerBusy, setTesterBusy] = useState(false);
+  const testerSeq = useRef(0);
+  const testerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/admin-live/live-watch-testers", { cache: "no-store" }).then((r) => r.json()).then((r) => { if (alive && r?.ok) setTesters(r.items || []); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const searchTesters = (value: string) => {
+    setTesterQuery(value);
+    const q = value.trim();
+    const seq = ++testerSeq.current;
+    if (testerTimer.current) clearTimeout(testerTimer.current);
+    if (!q) { setTesterResults([]); setTesterSearching(false); return; }
+    setTesterSearching(true);
+    testerTimer.current = setTimeout(async () => {
+      const r = await fetch(`/api/admin-live/live-watch-testers?q=${encodeURIComponent(q)}`, { cache: "no-store" }).then((res) => res.json()).catch(() => null);
+      if (seq !== testerSeq.current) return;
+      setTesterResults(r?.ok ? r.results || [] : []);
+      setTesterSearching(false);
+    }, 300);
+  };
+  const setTester = async (key: string, add: boolean, label: string) => {
+    if (testerBusy) return;
+    setTesterBusy(true);
+    try {
+      const r = await fetch("/api/admin-live/live-watch-testers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key, add }) }).then((res) => res.json());
+      if (!r?.ok) { showAdminToast(r?.message || "저장 못 했어요.", "error"); return; }
+      const items = (r.items || []) as Tester[];
+      setTesters(items);
+      setLiveWatch((prev) => ({ ...prev, phones: items.map((t) => t.key) })); // 다른 설정 저장 때 옛 명단으로 덮지 않게
+      setTesterResults((prev) => prev.map((x) => (x.key === key ? { ...x, tester: add } : x)));
+      showAdminToast(add ? `${label || "손님"}님을 시험 손님에 넣었어요.` : `${label || "손님"}님을 뺐어요.`, "success");
+    } catch {
+      showAdminToast("저장 못 했어요.", "error");
+    } finally {
+      setTesterBusy(false);
     }
   };
 
@@ -228,6 +245,7 @@ export default function LiveHeader({
   const [secondUrl, setSecondUrl] = useState("");
   const [secondSaving, setSecondSaving] = useState(false);
   const [secondState, setSecondState] = useState("");
+  const [secondOpen, setSecondOpen] = useState(false);
   useEffect(() => {
     if (!activeBroadcastId) return;
     let alive = true;
@@ -537,217 +555,215 @@ export default function LiveHeader({
     setUrlAppliedAt(new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }));
   };
 
-  // [2026-10-21 a4-1b] 「방송 관리」 창 안 세로 폼 — DESIGN-ADMIN(보조 버튼 흰 바탕 1px·주버튼 검정·이모지 없음).
-  //   시작/종료 버튼은 사이드바 방송 카드에 있어 여기선 뺌(onStartBroadcast/onEndBroadcast 는 사이드바가 같은 함수로 호출).
-  //   저장·적용·공지·알림·토글 핸들러는 전부 그대로.
-  const fieldCls = "h-10 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-[14px] font-semibold text-ink outline-none focus:border-ink disabled:opacity-50";
+  // [2026-11-10 사장님 05:54 「방송관리 정신 사납다 — 필요 없는 것 지우고 예쁘게」] 방송 관리 창 다시 정리.
+  //   묶음 4개(방송 / 방송 보며 주문 / 사이트 채팅 / 루루동이 자동 안내) + 기타(쉬는 중 문구·도구). 켬/끔은 오른쪽 스위치 하나.
+  //   저장 버튼은 «고친 게 있을 때만» 보임. 「방송 화면 공지」 칸은 뺌(그 공지를 띄우던 주문·입금 알림 위젯이 11/09 폐지돼 어디에도 안 나왔음).
+  //   저장·적용·알림·토글 함수는 전부 그대로.
+  const fieldCls = "h-10 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-[14px] text-ink outline-none focus:border-ink disabled:bg-surface-2 disabled:text-ink-mute";
   const primaryCls = "h-10 shrink-0 rounded-lg bg-ink px-4 text-[13px] font-bold text-white transition disabled:opacity-40";
   const secondaryCls = "h-9 rounded-lg border border-line bg-surface px-3 text-[13px] font-bold text-ink transition hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40";
+  const sectionCls = "border-t border-line pt-5";
+  const titleCls = "text-[16px] font-bold text-ink";
+  const subCls = "mt-0.5 text-[13px] text-ink-mute";
+  const watchOn = liveWatch.audience !== "off";
+  const chatOn = watchOn && liveChat.enabled;
   return (
-    <header className="space-y-4">
+    <header className="space-y-5">
       {/* 상태 + 알림 보내기 */}
       <div className="flex flex-wrap items-center gap-2">
         <span className={["h-2 w-2 rounded-full", statusLabel === "방송중" ? "bg-danger-tx" : "bg-line"].join(" ")} />
-        <span className="text-[14px] font-bold text-ink">{statusLabel === "방송중" ? "방송 중" : "방송 대기"}</span>
+        <span className="text-[16px] font-bold text-ink">{statusLabel === "방송중" ? "방송 중" : "방송 대기"}</span>
         <span className="text-[13px] text-ink-mute">
-          {activeBroadcast?.started_at ? `시작 ${formatBroadcastTime(activeBroadcast.started_at)}` : "시작 전"} · 상품 {typeof productCount === "number" ? productCount : "—"}개
+          {activeBroadcast?.started_at ? `${formatBroadcastTime(activeBroadcast.started_at)} 시작` : "시작 전"} · 상품 {typeof productCount === "number" ? productCount : "—"}개
         </span>
         {activeBroadcast ? (
-          <button type="button" className={`${primaryCls} ml-auto`} onClick={openAlert} title="방송 알림톡을 보낼 손님을 고르고 발송">
-            알림 보내기
-          </button>
+          <button type="button" className={`${primaryCls} ml-auto`} onClick={openAlert} title="방송 알림톡을 보낼 손님을 고르고 발송">알림 보내기</button>
         ) : null}
       </div>
 
-      {/* 제목 · URL — 항상 펼침 */}
-      <div className="space-y-3">
-        <div>
-          <div className="mb-1 flex items-center justify-between">
-            <label className="text-[13px] font-bold text-ink">방송 제목</label>
-            <span className="text-[12px] text-ink-mute">{titleSavedAt ? `저장 ${titleSavedAt}` : activeBroadcast ? "" : "방송 시작 때 정해요"}</span>
-          </div>
-          <div className="flex gap-2">
-            <input value={title} onChange={(event) => onTitleChange(event.target.value)} className={fieldCls} />
+      {/* ① 방송 — 제목·라이브 주소 */}
+      <section className={sectionCls}>
+        <h3 className={titleCls}>방송</h3>
+        <div className="mt-3 space-y-3">
+          <FormRow label="제목" hint={titleSavedAt ? `저장 ${titleSavedAt}` : ""}>
+            <input value={title} onChange={(event) => onTitleChange(event.target.value)} disabled={!activeBroadcast} placeholder={activeBroadcast ? "" : "방송 시작 때 정해요"} className={fieldCls} />
             <button type="button" disabled={savingBroadcast || !activeBroadcast} onClick={saveCurrentBroadcast} className={primaryCls}>저장</button>
-          </div>
-        </div>
-        <div>
-          <div className="mb-1 flex items-center justify-between">
-            <label className="text-[13px] font-bold text-ink">유튜브 라이브 URL</label>
-            <span className="text-[12px] text-ink-mute">{urlAppliedAt ? `적용 ${urlAppliedAt}` : "영상·채팅 연결"}</span>
-          </div>
-          <div className="flex gap-2">
-            <input value={youtubeUrl} onChange={(event) => onYoutubeUrlChange(event.target.value)} placeholder="https://www.youtube.com/watch?v=..." className={fieldCls} />
+          </FormRow>
+          <FormRow label="유튜브 라이브 주소" hint={urlAppliedAt ? `적용 ${urlAppliedAt}` : ""}>
+            <input value={youtubeUrl} onChange={(event) => onYoutubeUrlChange(event.target.value)} disabled={!activeBroadcast} placeholder="https://www.youtube.com/watch?v=..." className={fieldCls} />
             <button type="button" disabled={savingBroadcast || !activeBroadcast} onClick={applyYoutubeUrl} className={primaryCls}>적용</button>
-          </div>
+          </FormRow>
+          {secondOpen || secondUrl.trim() ? (
+            <FormRow label="두 번째 채널 주소" hint={secondState || "주문 알림 채팅만 같이 올림 · 비우고 적용하면 끔"}>
+              <input value={secondUrl} disabled={!activeBroadcast} onChange={(event) => setSecondUrl(event.target.value)} placeholder="동시 방송하는 다른 채널 라이브 주소" className={fieldCls} />
+              <button type="button" disabled={secondSaving || !activeBroadcast} onClick={() => void saveSecondUrl()} className={primaryCls}>{secondSaving ? "적용 중…" : "적용"}</button>
+            </FormRow>
+          ) : (
+            <button type="button" disabled={!activeBroadcast} onClick={() => setSecondOpen(true)} className="text-[13px] font-bold text-ink-soft underline-offset-2 hover:underline disabled:opacity-40">+ 두 번째 채널 동시 방송</button>
+          )}
         </div>
+      </section>
 
-        <div>
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <label className="text-[13px] font-bold text-ink">두 번째 채널 라이브 URL <span className="font-normal text-ink-mute">· 주문 알림 채팅만, 화면엔 안 나옴</span></label>
-            <span className="shrink-0 text-[12px] text-ink-mute">{secondState || (activeBroadcast ? "동시 방송 때만" : "방송 시작 후")}</span>
-          </div>
-          <div className="flex gap-2">
-            <input value={secondUrl} disabled={!activeBroadcast} onChange={(event) => setSecondUrl(event.target.value)} placeholder={activeBroadcast ? "다른 채널 라이브 주소 · 비우고 적용하면 끔" : "방송을 시작한 뒤에 쓸 수 있어요"} className={fieldCls} />
-            <button type="button" disabled={secondSaving || !activeBroadcast} onClick={() => void saveSecondUrl()} className={primaryCls}>{secondSaving ? "적용 중…" : "적용"}</button>
-          </div>
-        </div>
-
-        {/* 방송 화면 공지 — «이번 방송» 동안 주문·입금 알림 위젯 맨 위 한 줄(60자). 비우고 저장 = 숨김. 방송 없으면 비활성 */}
-        <div>
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <label className="text-[13px] font-bold text-ink">방송 화면 공지 <span className="font-normal text-ink-mute">· 알림 위젯 위 한 줄, 비우면 안 뜸</span></label>
-            <div className="flex items-center gap-2 text-[12px]">
-              {pinText.trim() ? (() => {
-                const pin = feedPinLayout(pinText);
-                const biggest = pin.fontSize >= FEED_PIN_SIZE;
-                const label = `${pin.lines === 1 ? "한 줄" : "2줄"} · 글자 ${biggest ? "제일 큼" : `${pin.fontSize}px`}`;
-                return <span className={biggest ? "text-ok-tx" : "text-warn-tx"}>{label}</span>;
-              })() : null}
-              <span className="text-ink-mute">{pinSavedAt ? `저장 ${pinSavedAt}` : activeBroadcast ? "방송 끝나면 지워짐" : "방송 시작 후"}</span>
+      {/* ② 방송 보며 주문 — 누구에게·처음 화면·시험 손님 */}
+      <section className={sectionCls}>
+        <h3 className={titleCls}>방송 보며 주문</h3>
+        <p className={subCls}>손님 주문서에서 방송 영상을 보며 바로 담기</p>
+        <div className="mt-3 space-y-3">
+          <OptionRow label="보이는 손님">
+            <Segmented value={liveWatch.audience} disabled={liveWatchSaving} options={[["off", "끔"], ["admin", "시험 손님만"], ["all", "모든 손님"]]} onChange={(v) => void saveLiveWatch({ ...liveWatch, audience: v })} />
+          </OptionRow>
+          {watchOn ? (
+            <OptionRow label="처음 화면">
+              <Segmented value={liveWatch.firstView} disabled={liveWatchSaving} options={[["live", "방송 화면"], ["shop", "쇼핑몰 화면"]]} onChange={(v) => void saveLiveWatch({ ...liveWatch, firstView: v })} />
+            </OptionRow>
+          ) : null}
+          {liveWatch.audience === "admin" ? (
+            <div className="rounded-xl bg-surface-2 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[14px] font-bold text-ink">시험 손님 {testers.length}명</span>
+                <span className="text-[12px] text-ink-mute">관리자 시험 계정은 늘 포함 · 잠시 멈춤 중에도 시험 가능</span>
+              </div>
+              {testers.length ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {testers.map((t) => (
+                    <span key={t.key} className="inline-flex h-9 items-center gap-1 rounded-full border border-line bg-surface pl-3 pr-1 text-[13px] text-ink">
+                      <b className="font-bold">{t.nickname || t.name || "회원 아님"}</b>
+                      <span className="text-ink-mute">{t.phone.slice(-4)}</span>
+                      <button type="button" disabled={testerBusy} onClick={() => void setTester(t.key, false, t.nickname || t.name)} aria-label={`${t.nickname || t.name} 빼기`} className="flex h-7 w-7 items-center justify-center rounded-full text-ink-mute hover:bg-surface-2 hover:text-ink">
+                        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              <input value={testerQuery} onChange={(e) => searchTesters(e.target.value)} type="search" placeholder="시험 손님 추가 · 닉네임 · 이름 · 전화 뒤 4자리" aria-label="시험 손님 찾기" className={`${fieldCls} mt-2 w-full`} />
+              {testerQuery.trim() ? (
+                <ul className="mt-1 max-h-56 overflow-y-auto rounded-lg border border-line bg-surface">
+                  {testerSearching ? <li className="px-3 py-2 text-[13px] text-ink-mute">찾는 중…</li> : null}
+                  {!testerSearching && testerResults.length === 0 ? <li className="px-3 py-2 text-[13px] text-ink-mute">맞는 회원이 없어요</li> : null}
+                  {testerResults.map((r) => (
+                    <li key={r.key} className="flex items-center gap-2 border-b border-line px-3 py-2 last:border-b-0">
+                      <span className="min-w-0 flex-1 truncate text-[14px] text-ink"><b className="font-bold">{r.nickname || "-"}</b> <span className="text-ink-soft">{r.name}</span> <span className="text-[12px] text-ink-mute">{r.phone}</span></span>
+                      {r.tester ? <span className="text-[12px] font-bold text-ink-mute">넣음</span> : (
+                        <button type="button" disabled={testerBusy} onClick={() => void setTester(r.key, true, r.nickname || r.name)} className={secondaryCls}>넣기</button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
-          </div>
-          <div className="flex gap-2">
-            <input
-              value={pinText}
-              maxLength={60}
-              disabled={!activeBroadcast}
-              onChange={(event) => setPinText(event.target.value)}
-              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void savePinText(); } }}
-              placeholder={activeBroadcast ? "예) 입금자명은 닉네임으로 보내주세요" : "방송을 시작한 뒤에 쓸 수 있어요"}
-              className={fieldCls}
-            />
-            <button type="button" disabled={pinSaving || !activeBroadcast} onClick={() => void savePinText()} className={primaryCls}>{pinSaving ? "저장 중…" : "저장"}</button>
-          </div>
+          ) : null}
         </div>
-      </div>
+      </section>
 
-      {/* [2026-11-09] 「방송 보며 주문」 — 손님 주문서에서 유튜브 방송을 보면서 담기(라이브 URL 이 있을 때만 나옴) */}
-      <div>
-        <div className="mb-1 text-[13px] font-bold text-ink">방송 보며 주문 <span className="font-normal text-ink-mute">· 손님 주문서에서 방송 영상을 보며 바로 담기</span></div>
-        <div className="flex flex-wrap items-center gap-2">
-          {([["off", "끔"], ["admin", "관리자 시험 계정만"], ["all", "모든 손님"]] as const).map(([v, label]) => (
-            <button key={v} type="button" disabled={liveWatchSaving} aria-pressed={liveWatch.audience === v} onClick={() => void saveLiveWatch({ ...liveWatch, audience: v })}
-              className={liveWatch.audience === v ? "h-9 rounded-full bg-ink px-3 text-[13px] font-bold text-white disabled:opacity-50" : "h-9 rounded-full border border-line bg-surface px-3 text-[13px] font-bold text-ink hover:bg-surface-2 disabled:opacity-50"}>{label}</button>
-          ))}
-        </div>
-        {liveWatch.audience !== "off" ? (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className="text-[13px] text-ink-soft">처음 화면</span>
-            {([["live", "방송 화면"], ["shop", "쇼핑몰 화면"]] as const).map(([v, label]) => (
-              <button key={v} type="button" disabled={liveWatchSaving} aria-pressed={liveWatch.firstView === v} onClick={() => void saveLiveWatch({ ...liveWatch, firstView: v })}
-                className={liveWatch.firstView === v ? "h-9 rounded-full bg-ink px-3 text-[13px] font-bold text-white disabled:opacity-50" : "h-9 rounded-full border border-line bg-surface px-3 text-[13px] font-bold text-ink hover:bg-surface-2 disabled:opacity-50"}>{label}</button>
-            ))}
-          </div>
-        ) : null}
-      </div>
-
-      {/* [2026-11-10 ③] 사이트 채팅 — 방송 보며 주문 화면 안에서만 보임 */}
-      {liveWatch.audience !== "off" ? (
-        <div>
-          <div className="mb-1 text-[13px] font-bold text-ink">사이트 채팅 <span className="font-normal text-ink-mute">· 방송 보며 주문 화면 안 채팅(유튜브 채팅과 따로)</span></div>
-          <div className="flex flex-wrap items-center gap-2">
-            {([[true, "켬"], [false, "끔"]] as const).map(([v, label]) => (
-              <button key={label} type="button" disabled={liveChatSaving} aria-pressed={liveChat.enabled === v} onClick={() => void saveLiveChat({ ...liveChat, enabled: v }, v ? "사이트 채팅을 켰어요." : "사이트 채팅을 껐어요.")}
-                className={liveChat.enabled === v ? "h-9 rounded-full bg-ink px-3 text-[13px] font-bold text-white disabled:opacity-50" : "h-9 rounded-full border border-line bg-surface px-3 text-[13px] font-bold text-ink hover:bg-surface-2 disabled:opacity-50"}>{label}</button>
-            ))}
-            <span className="text-[13px] text-ink-mute">손님 글을 길게 누르면 지우기·금지</span>
+      {/* ③ 사이트 채팅 — 방송 보며 주문 화면 안에서만 */}
+      {watchOn ? (
+        <section className={sectionCls}>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className={titleCls}>사이트 채팅</h3>
+              <p className={subCls}>방송 화면 안 채팅 · 관리자 PC 오른쪽 「방송·채팅」 칸에서 보고 관리</p>
+            </div>
+            <Switch on={liveChat.enabled} disabled={liveChatSaving} label="사이트 채팅" onChange={(v) => void saveLiveChat({ ...liveChat, enabled: v }, v ? "사이트 채팅을 켰어요." : "사이트 채팅을 껐어요.")} />
           </div>
           {liveChat.enabled ? (
-            <>
-              <div className="mt-2 flex gap-2">
-                <input value={liveChatNotice} onChange={(e) => setLiveChatNoticeDraft(e.target.value.slice(0, 120))} placeholder="채팅 고정 공지 · 비우면 안 보임" aria-label="채팅 고정 공지" className={fieldCls} />
-                <button type="button" disabled={liveChatSaving || liveChatNotice.trim() === liveChat.notice} onClick={() => void saveLiveChat({ ...liveChat, notice: liveChatNotice }, "채팅 공지를 저장했어요. 손님 화면을 새로고침하면 나와요.")} className={primaryCls}>저장</button>
-              </div>
-              <div className="mt-2 flex gap-2">
-                <input value={liveChatWords} onChange={(e) => setLiveChatWordsDraft(e.target.value)} placeholder="더 막을 말 · 쉼표로 (욕설은 기본으로 막혀요)" aria-label="채팅 금지어" className={fieldCls} />
-                <button type="button" disabled={liveChatSaving || liveChatWords === liveChat.words.join(", ")} onClick={() => void saveLiveChat({ ...liveChat, words: liveChatWords.split(/[,\n]/) }, "금지어를 저장했어요.")} className={primaryCls}>저장</button>
-              </div>
-            </>
+            <div className="mt-3 space-y-3">
+              <FormRow label="채팅 공지" hint="채팅 글 바로 위 노란 「공지」 한 줄 · 비우면 안 보임">
+                <input value={liveChatNotice} onChange={(e) => setLiveChatNoticeDraft(e.target.value.slice(0, 120))} placeholder="예) 입금자명은 닉네임으로 보내주세요" aria-label="채팅 공지" className={fieldCls} />
+                {liveChatNotice.trim() !== liveChat.notice ? <button type="button" disabled={liveChatSaving} onClick={() => void saveLiveChat({ ...liveChat, notice: liveChatNotice }, "채팅 공지를 저장했어요.")} className={primaryCls}>저장</button> : null}
+              </FormRow>
+              <FormRow label="더 막을 말" hint="쉼표로 · 욕설은 기본으로 막혀요">
+                <input value={liveChatWords} onChange={(e) => setLiveChatWordsDraft(e.target.value)} placeholder="예) 당근, 번개장터" aria-label="채팅 금지어" className={fieldCls} />
+                {liveChatWords !== liveChat.words.join(", ") ? <button type="button" disabled={liveChatSaving} onClick={() => void saveLiveChat({ ...liveChat, words: liveChatWords.split(/[,\n]/) }, "금지어를 저장했어요.")} className={primaryCls}>저장</button> : null}
+              </FormRow>
+            </div>
           ) : null}
-        </div>
+        </section>
       ) : null}
 
-      {/* [2026-11-10] 루루동이AI — 사이트 채팅 자동 안내(상품번호·상품 이름 → 상품 안내 / 자주 묻는 말 → 정해진 답) */}
-      {liveWatch.audience !== "off" && liveChat.enabled ? (
-        <div>
-          <div className="mb-1 text-[13px] font-bold text-ink">루루동이AI <span className="font-normal text-ink-mute">· 사이트 채팅 자동 안내</span></div>
-          <div className="flex flex-wrap items-center gap-2">
-            {([[true, "켬"], [false, "끔"]] as const).map(([v, label]) => (
-              <button key={label} type="button" disabled={botSaving} aria-pressed={bot.enabled === v} onClick={() => void saveBot({ ...bot, enabled: v }, v ? "루루동이AI를 켰어요." : "루루동이AI를 껐어요.")}
-                className={bot.enabled === v ? "h-9 rounded-full bg-ink px-3 text-[13px] font-bold text-white disabled:opacity-50" : "h-9 rounded-full border border-line bg-surface px-3 text-[13px] font-bold text-ink hover:bg-surface-2 disabled:opacity-50"}>{label}</button>
-            ))}
-            {bot.enabled ? (
-              <button type="button" disabled={botSaving} aria-pressed={bot.product} onClick={() => void saveBot({ ...bot, product: !bot.product }, bot.product ? "상품 안내를 껐어요." : "상품 안내를 켰어요.")}
-                className={bot.product ? "h-9 rounded-full bg-ink px-3 text-[13px] font-bold text-white disabled:opacity-50" : "h-9 rounded-full border border-line bg-surface px-3 text-[13px] font-bold text-ink hover:bg-surface-2 disabled:opacity-50"}>상품 안내 {bot.product ? "켬" : "끔"}</button>
-            ) : null}
-            {bot.enabled ? (
-              <button type="button" aria-expanded={botFaqOpen} onClick={() => setBotFaqOpen((v) => !v)} className="h-9 rounded-full border border-line bg-surface px-3 text-[13px] font-bold text-ink hover:bg-surface-2">자주 묻는 말 {bot.faqs.length}개 {botFaqOpen ? "닫기" : "고치기"}</button>
-            ) : null}
+      {/* ④ 루루동이 자동 안내 */}
+      {chatOn ? (
+        <section className={sectionCls}>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className={titleCls}>루루동이 자동 안내</h3>
+              <p className={subCls}>손님 채팅에 상품번호·자주 묻는 말이 나오면 자동으로 답해요</p>
+            </div>
+            <Switch on={bot.enabled} disabled={botSaving} label="루루동이 자동 안내" onChange={(v) => void saveBot({ ...bot, enabled: v }, v ? "자동 안내를 켰어요." : "자동 안내를 껐어요.")} />
           </div>
-          <div className="mt-1 text-[12px] text-ink-mute">손님이 상품번호(509)를 치거나 상품 이름+「얼마·사이즈·주문·?」을 치면 그 상품이 하나일 때만 안내해요. 같은 안내는 1분에 한 번.</div>
-          {bot.enabled && botFaqOpen ? (
-            <div className="mt-2 flex flex-col gap-2">
-              <div className="text-[12px] text-ink-mute">방송마다 바뀌는 내용(합배송·배송일 등)은 방송 시작 전에 고쳐 저장하세요. 낱말은 쉼표로 — 손님 글에 그 낱말이 있으면 답해요.</div>
-              {botFaqDraft.map((f, i) => (
-                <div key={i} className="rounded-lg border border-line p-2">
-                  <div className="flex gap-2">
-                    <input value={f.words} onChange={(e) => setBotFaqDraft((d) => d.map((x, j) => (j === i ? { ...x, words: e.target.value } : x)))} placeholder="낱말 · 예: 계좌, 계좌번호" aria-label={`자주 묻는 말 ${i + 1} 낱말`} className={fieldCls} />
-                    <button type="button" onClick={() => setBotFaqDraft((d) => d.filter((_, j) => j !== i))} className="h-10 shrink-0 rounded-lg border border-line px-3 text-[13px] font-bold text-danger">빼기</button>
-                  </div>
-                  <textarea value={f.answer} onChange={(e) => setBotFaqDraft((d) => d.map((x, j) => (j === i ? { ...x, answer: e.target.value.slice(0, 200) } : x)))} rows={2} placeholder="답 · 200자까지" aria-label={`자주 묻는 말 ${i + 1} 답`} className="mt-2 w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink outline-none focus:border-ink" />
+          {bot.enabled ? (
+            <div className="mt-3 divide-y divide-line rounded-xl border border-line">
+              <div className="flex items-center justify-between gap-3 px-3 py-3">
+                <div>
+                  <div className="text-[14px] font-bold text-ink">상품 안내</div>
+                  <div className="text-[12px] text-ink-mute">상품번호(509)나 상품 이름+「얼마·사이즈·?」 → 그 상품이 하나일 때만</div>
                 </div>
-              ))}
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => setBotFaqDraft((d) => [...d, { words: "", answer: "" }])} className="h-10 rounded-lg border border-line px-3 text-[13px] font-bold text-ink">+ 추가</button>
-                <button type="button" onClick={() => setBotFaqDraft(LIVE_CHAT_BOT_DEFAULT_FAQS.map((f) => ({ words: f.words.join(", "), answer: f.answer })))} className="h-10 rounded-lg border border-line px-3 text-[13px] font-bold text-ink">기본으로</button>
-                <button type="button" disabled={botSaving || !botFaqChanged} onClick={() => void saveBot({ ...bot, faqs: botFaqDraft.map((x) => ({ words: x.words.split(/[,\n]/), answer: x.answer })) }, "자주 묻는 말을 저장했어요.")} className={primaryCls}>저장</button>
+                <Switch on={bot.product} disabled={botSaving} label="상품 안내" onChange={(v) => void saveBot({ ...bot, product: v }, v ? "상품 안내를 켰어요." : "상품 안내를 껐어요.")} />
+              </div>
+              <div className="px-3 py-3">
+                <button type="button" aria-expanded={botFaqOpen} onClick={() => setBotFaqOpen((v) => !v)} className="flex w-full items-center justify-between gap-3 text-left">
+                  <span>
+                    <span className="block text-[14px] font-bold text-ink">자주 묻는 말 {bot.faqs.length}개</span>
+                    <span className="block text-[12px] text-ink-mute">방송마다 바뀌는 내용(합배송·배송일)은 방송 전에 고쳐 저장</span>
+                  </span>
+                  <span className="shrink-0 text-[13px] font-bold text-ink">{botFaqOpen ? "닫기" : "고치기"}</span>
+                </button>
+                {botFaqOpen ? (
+                  <div className="mt-3 space-y-2">
+                    {botFaqDraft.map((f, i) => (
+                      <div key={i} className="rounded-lg bg-surface-2 p-2">
+                        <div className="flex items-center gap-2">
+                          <span className="w-10 shrink-0 text-[12px] font-bold text-ink-mute">낱말</span>
+                          <input value={f.words} onChange={(e) => setBotFaqDraft((d) => d.map((x, j) => (j === i ? { ...x, words: e.target.value } : x)))} placeholder="쉼표로 · 예: 계좌, 계좌번호" aria-label={`자주 묻는 말 ${i + 1} 낱말`} className={fieldCls} />
+                          <button type="button" onClick={() => setBotFaqDraft((d) => d.filter((_, j) => j !== i))} aria-label={`자주 묻는 말 ${i + 1} 빼기`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-ink-mute hover:bg-surface hover:text-danger-tx">
+                            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                          </button>
+                        </div>
+                        <div className="mt-2 flex items-start gap-2">
+                          <span className="mt-2.5 w-10 shrink-0 text-[12px] font-bold text-ink-mute">답</span>
+                          <textarea value={f.answer} onChange={(e) => setBotFaqDraft((d) => d.map((x, j) => (j === i ? { ...x, answer: e.target.value.slice(0, 200) } : x)))} rows={2} placeholder="200자까지" aria-label={`자주 묻는 말 ${i + 1} 답`} className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink outline-none focus:border-ink" />
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button type="button" onClick={() => setBotFaqDraft((d) => [...d, { words: "", answer: "" }])} className={secondaryCls}>+ 추가</button>
+                      <button type="button" onClick={() => setBotFaqDraft(LIVE_CHAT_BOT_DEFAULT_FAQS.map((f) => ({ words: f.words.join(", "), answer: f.answer })))} className="h-9 px-2 text-[13px] font-bold text-ink-mute hover:text-ink">기본으로</button>
+                      {botFaqChanged ? <button type="button" disabled={botSaving} onClick={() => void saveBot({ ...bot, faqs: botFaqDraft.map((x) => ({ words: x.words.split(/[,\n]/), answer: x.answer })) }, "자주 묻는 말을 저장했어요.")} className={`${primaryCls} ml-auto`}>저장</button> : null}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : null}
-        </div>
+        </section>
       ) : null}
 
-      {/* [2026-11-09] 손님 화면 「잠시 쉬는 중」 문구 — 사이드바 「잠시 멈춤」 누르면 방송 상자에 나오는 글. 상시 설정(방송 끝나도 유지) */}
-      <div>
-        <div className="mb-1 flex items-center justify-between gap-2">
-          <label className="text-[13px] font-bold text-ink">잠시 쉬는 중 문구 <span className="font-normal text-ink-mute">· 「잠시 멈춤」 때 손님 방송 상자에 나오는 글</span></label>
-          <span className="shrink-0 text-[12px] text-ink-mute">{pausedText.trim() !== pausedTextSaved ? "저장 안 됨" : "비우면 기본 문구"}</span>
+      {/* ⑤ 기타 — 잠시 쉬는 중 문구 · 방송 중 도구 */}
+      <section className={sectionCls}>
+        <h3 className={titleCls}>기타</h3>
+        <div className="mt-3 space-y-3">
+          <FormRow label="잠시 쉬는 중 문구" hint={pausedText.trim() !== pausedTextSaved ? "저장 안 됨" : "「잠시 멈춤」 때 손님 화면에 나와요 · 비우면 기본 문구"}>
+            <input value={pausedText} maxLength={LIVE_PAUSED_TEXT_MAX} onChange={(event) => setPausedText(event.target.value)}
+              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void savePausedText(); } }}
+              placeholder={LIVE_PAUSED_TEXT_DEFAULT} className={fieldCls} />
+            {pausedText.trim() !== pausedTextSaved ? <button type="button" disabled={pausedSaving} onClick={() => void savePausedText()} className={primaryCls}>{pausedSaving ? "저장 중…" : "저장"}</button> : null}
+          </FormRow>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" disabled={!activeBroadcast || copyingCurrent} onClick={() => void copyCurrentProductLine()} className={secondaryCls}
+              title={activeBroadcast ? "지금 소개 중인 상품의 채팅 안내문을 다시 복사" : "방송 중에만"}>
+              {copyingCurrent ? "복사 중…" : currentCopied ? "복사됨" : "소개 중 상품 안내문 복사"}
+            </button>
+            <button type="button" disabled={!activeBroadcast} onClick={() => onToggleWidgetCard?.()} className={secondaryCls} aria-pressed={widgetCardOn}
+              title={activeBroadcast ? "방송 화면 상품 카드를 켜고 끔(반영 최대 20초)" : "방송 중에만"}>
+              방송 화면 상품 카드 {widgetCardOn ? "켜짐" : "꺼짐"}
+            </button>
+            <button type="button" disabled={Boolean(activeBroadcast)} onClick={() => onToggleShopOpen?.()} className={secondaryCls} aria-pressed={shopOpen}
+              title={activeBroadcast ? "방송 중에는 바꿀 수 없어요" : "쇼핑몰 열기/닫기"}>
+              쇼핑몰 {shopOpen ? "열림" : "닫힘"}
+            </button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <input
-            value={pausedText}
-            maxLength={LIVE_PAUSED_TEXT_MAX}
-            onChange={(event) => setPausedText(event.target.value)}
-            onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void savePausedText(); } }}
-            placeholder={LIVE_PAUSED_TEXT_DEFAULT}
-            className={fieldCls}
-          />
-          <button type="button" disabled={pausedSaving || pausedText.trim() === pausedTextSaved} onClick={() => void savePausedText()} className={primaryCls}>{pausedSaving ? "저장 중…" : "저장"}</button>
-        </div>
-      </div>
-
-      {/* 방송 중 도구 */}
-      <div>
-        <div className="mb-1 text-[13px] font-bold text-ink">방송 중 도구</div>
-        <div className="flex flex-wrap gap-2">
-          {/* [2026-08-31 사장님 요청] 현재 고정 상품 안내문구 재복사 */}
-          <button type="button" disabled={!activeBroadcast || copyingCurrent} onClick={() => void copyCurrentProductLine()} className={secondaryCls}
-            title={activeBroadcast ? "지금 소개 중인 상품의 채팅 안내문을 다시 복사" : "방송 중에만"}>
-            {copyingCurrent ? "복사 중…" : currentCopied ? "복사됨" : "현재 상품 안내문 복사"}
-          </button>
-          {/* [2026-07-12] 위젯 상품카드 ON/OFF — 방송 중에만. 카드만 숨김(위젯 투명) */}
-          <button type="button" disabled={!activeBroadcast} onClick={() => onToggleWidgetCard?.()} className={secondaryCls} aria-pressed={widgetCardOn}
-            title={activeBroadcast ? "방송 화면 상품 카드를 켜고 끔(반영 최대 20초)" : "방송 중에만"}>
-            상품 카드 {widgetCardOn ? "켜짐" : "꺼짐"}
-          </button>
-          {/* 쇼핑몰 열기/닫기 — settings.shop_open 영속. 방송 중엔 비활성 */}
-          <button type="button" disabled={Boolean(activeBroadcast)} onClick={() => onToggleShopOpen?.()} className={secondaryCls} aria-pressed={shopOpen}
-            title={activeBroadcast ? "방송 중에는 바꿀 수 없어요" : "쇼핑몰 열기/닫기"}>
-            쇼핑몰 {shopOpen ? "열림" : "닫힘"}
-          </button>
-        </div>
-      </div>
+      </section>
 
       {/* 방송알림 발송 창 — 대상 고르기 · 받을 사람 수 · 명단(발송/회원 추가/이번만 제외/계속 제외) · 발송 (2026-11-01 DESIGN-ADMIN 기준 다시 그림) */}
       {alertOpen && (
@@ -975,5 +991,47 @@ export default function LiveHeader({
         </div>
       )}
     </header>
+  );
+}
+
+// [2026-11-10] 방송 관리 창 작은 부품 — 표시만
+function FormRow({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="mb-1 flex items-baseline justify-between gap-2">
+        <span className="text-[13px] font-bold text-ink">{label}</span>
+        {hint ? <span className="min-w-0 truncate text-[12px] text-ink-mute">{hint}</span> : null}
+      </div>
+      <div className="flex gap-2">{children}</div>
+    </div>
+  );
+}
+
+function OptionRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <span className="text-[13px] font-bold text-ink">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function Segmented<T extends string>({ value, options, onChange, disabled }: { value: T; options: ReadonlyArray<readonly [T, string]>; onChange: (v: T) => void; disabled?: boolean }) {
+  return (
+    <div role="radiogroup" className="inline-flex rounded-lg bg-surface-2 p-1">
+      {options.map(([v, label]) => (
+        <button key={v} type="button" role="radio" aria-checked={value === v} disabled={disabled} onClick={() => value !== v && onChange(v)}
+          className={`h-8 rounded-md px-3 text-[13px] font-bold transition disabled:opacity-50 ${value === v ? "bg-surface text-ink shadow-[0_1px_2px_rgba(0,0,0,0.08)]" : "text-ink-mute hover:text-ink"}`}>{label}</button>
+      ))}
+    </div>
+  );
+}
+
+function Switch({ on, onChange, disabled, label }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean; label: string }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} aria-label={label} disabled={disabled} onClick={() => onChange(!on)}
+      className={`relative h-7 w-12 shrink-0 rounded-full transition disabled:opacity-50 ${on ? "bg-ink" : "bg-line"}`}>
+      <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.2)] transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
+    </button>
   );
 }

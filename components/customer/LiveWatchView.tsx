@@ -580,7 +580,7 @@ export default function LiveWatchView(props: Props) {
 
       {/* 잠시 쉬는 중 — 주문은 그대로 */}
       {paused ? (
-        <div role="status" style={{ position: "absolute", left: "16px", right: "16px", top: "40%", textAlign: "center" }}>
+        <div role="status" style={{ position: "absolute", left: "16px", right: "16px", top: "40%", textAlign: "center", pointerEvents: "none" }}>
           <span style={{ display: "inline-block", padding: "12px 18px", borderRadius: "12px", background: "rgba(0,0,0,0.6)", fontSize: "15px", fontWeight: 600, lineHeight: 1.5 }}>
             {pausedText}<br /><span style={{ fontSize: "13px", fontWeight: 400, color: "#E5E5E5" }}>상품은 지금도 담을 수 있어요</span>
           </span>

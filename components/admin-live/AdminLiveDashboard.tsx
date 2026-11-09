@@ -1137,6 +1137,10 @@ export default function AdminLiveDashboard() {
           scheduleReload(payload);
         }
       },
+      // [2026-11-10] 사이트 채팅 소식 → 오른쪽 채팅 칸(AdminSiteChatBox)으로 넘김(같은 소식 연결 하나로)
+      onChat: (p) => {
+        try { window.dispatchEvent(new CustomEvent("ruru-live-chat", { detail: p })); } catch { /* 무시 */ }
+      },
     });
     return () => {
       if (debounce) clearTimeout(debounce);
