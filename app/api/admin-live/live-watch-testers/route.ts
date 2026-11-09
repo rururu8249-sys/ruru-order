@@ -29,9 +29,32 @@ async function describe(sb: ReturnType<typeof getServiceClient>, phones: string[
     const { data } = await sb.from("customers").select("customer_phone, customer_name, youtube_nickname, kakao_nickname, kakao_profile_image").in("customer_phone", all).order("created_at", { ascending: true });
     for (const r of (data ?? []) as Cust[]) byPhone.set(digits(r.customer_phone), r);
   }
+  // [2026-11-10 06:07] 회원 표에 지금 그 번호가 없으면(번호를 바꾼 회원·관리자 예전 번호) 그 번호로 들어온 주문의 닉네임·이름으로 보여 줌
+  const missing = phones.filter((p) => !byPhone.has(p));
+  const byOrder = new Map<string, { nickname: string; name: string }>();
+  if (missing.length) {
+    const vs = Array.from(new Set(missing.flatMap((p) => [p, ...koreanPhoneVariants(p)])));
+    const { data } = await sb.from("orders").select("customer_phone, youtube_nickname, customer_name, created_at").in("customer_phone", vs).order("created_at", { ascending: false }).limit(200);
+    for (const r of (data ?? []) as Array<{ customer_phone?: string; youtube_nickname?: string; customer_name?: string }>) {
+      const k = digits(r.customer_phone);
+      const prev = byOrder.get(k);
+      if (!prev) byOrder.set(k, { nickname: String(r.youtube_nickname || ""), name: String(r.customer_name || "") });
+      else if (!prev.nickname && r.youtube_nickname) prev.nickname = String(r.youtube_nickname);
+    }
+  }
+  const { data: ops } = await sb.from("operator_test_accounts").select("customer_phone").eq("is_active", true);
+  const opSet = new Set(((ops ?? []) as Array<{ customer_phone?: string }>).map((o) => digits(o.customer_phone)));
   return phones.map((p) => {
     const c = byPhone.get(p);
-    return { key: p, phone: mask(p), nickname: String(c?.youtube_nickname || c?.kakao_nickname || ""), name: String(c?.customer_name || ""), member: Boolean(c) };
+    const o = byOrder.get(p);
+    return {
+      key: p,
+      phone: mask(p),
+      nickname: String(c?.youtube_nickname || c?.kakao_nickname || o?.nickname || ""),
+      name: String(c?.customer_name || o?.name || ""),
+      member: Boolean(c),
+      op: opSet.has(p),
+    };
   });
 }
 

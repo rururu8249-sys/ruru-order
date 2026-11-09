@@ -105,7 +105,7 @@ export default function LiveHeader({
   };
 
   // [2026-11-10 사장님 05:54] 시험 손님(베타테스터) — 「시험 손님만」일 때 보이는 손님. 넣기·빼기는 서버(live-watch-testers)가 phones 한 칸만 바꿈.
-  type Tester = { key: string; phone: string; nickname: string; name: string };
+  type Tester = { key: string; phone: string; nickname: string; name: string; op?: boolean };
   type TesterResult = Tester & { tester: boolean };
   const [testers, setTesters] = useState<Tester[]>([]);
   const [testerQuery, setTesterQuery] = useState("");
@@ -627,8 +627,10 @@ export default function LiveHeader({
                 <div className="mt-2 flex flex-wrap gap-2">
                   {testers.map((t) => (
                     <span key={t.key} className="inline-flex h-9 items-center gap-1 rounded-full border border-line bg-surface pl-3 pr-1 text-[13px] text-ink">
-                      <b className="font-bold">{t.nickname || t.name || "회원 아님"}</b>
+                      <b className="font-bold">{t.nickname || t.name || "이름 없음"}</b>
+                      {t.nickname && t.name ? <span className="text-ink-soft">{t.name}</span> : null}
                       <span className="text-ink-mute">{t.phone.slice(-4)}</span>
+                      {t.op ? <span className="rounded bg-surface-2 px-1 text-[11px] font-bold text-ink-soft">관리자 번호</span> : null}
                       <button type="button" disabled={testerBusy} onClick={() => void setTester(t.key, false, t.nickname || t.name)} aria-label={`${t.nickname || t.name} 빼기`} className="flex h-7 w-7 items-center justify-center rounded-full text-ink-mute hover:bg-surface-2 hover:text-ink">
                         <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
                       </button>
