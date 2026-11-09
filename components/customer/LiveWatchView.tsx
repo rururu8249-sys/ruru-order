@@ -86,6 +86,7 @@ const MenuIcon = ({ k }: { k: string }) => {
   if (k === "orders") return <svg aria-hidden="true" {...p}><path d="M12 3l8 4v10l-8 4-8-4V7z" /><path d="M4 7l8 4 8-4M12 11v10" /></svg>;
   if (k === "chatview") return <svg aria-hidden="true" {...p}><path d="M3 6h10M8 6v13M13 11h8M17 11v8" /></svg>;
   if (k === "install") return <svg aria-hidden="true" {...p}><rect x="7" y="2.5" width="10" height="19" rx="2" /><path d="M12 7v7M9 11l3 3 3-3" /></svg>;
+  if (k === "share") return <svg aria-hidden="true" {...p}><path d="M14 5v4C7 10 4 14 3 20c2.5-3.5 6-5 11-5v4l7-7z" /></svg>;
   if (k === "guide") return <svg aria-hidden="true" {...p}><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 114 2c-1 .6-1.5 1.2-1.5 2.3" /><path d="M12 17h.01" /></svg>;
   if (k === "close") return <svg aria-hidden="true" {...p}><path d="M5 15l7-7 7 7" /></svg>;
   if (k === "inquiry") return <svg aria-hidden="true" {...p}><path d="M4 5h16v11H9l-5 4z" /></svg>;
@@ -504,14 +505,11 @@ export default function LiveWatchView(props: Props) {
           <span aria-hidden="true" style={{ position: "absolute", top: "-8px", right: "-8px", minWidth: "24px", height: "24px", padding: "0 6px", boxSizing: "border-box", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 700, lineHeight: "24px", textAlign: "center", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)" }}>{totalCount > 999 ? "999+" : totalCount}</span>
         </button>
         {chat && chat.canWrite && !focus ? (
-          <button type="button" onClick={() => setComposeOpen(true)} style={{ flex: 1, minWidth: 0, height: "44px", border: "none", borderRadius: "9999px", background: "rgba(255,255,255,0.14)", color: "#E5E5E5", fontSize: "15px", fontWeight: 500, fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", padding: "0 14px", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden" }}>
+          <button type="button" onClick={() => setComposeOpen(true)} style={{ flex: 1, minWidth: "72px", height: "44px", border: "none", borderRadius: "9999px", background: "rgba(255,255,255,0.14)", color: "#E5E5E5", fontSize: "15px", fontWeight: 500, fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", padding: "0 14px", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden" }}>
             <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>메시지 입력..</span>
           </button>
         ) : <span style={{ flex: 1 }} />}
         {focus ? null : <>
-        <BarBtn label="공유" onClick={shareLive}>
-          <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M14 5v4C7 10 4 14 3 20c2.5-3.5 6-5 11-5v4l7-7z" /></svg>
-        </BarBtn>
         <BarBtn label="공지" badge={props.menu?.find((m) => m.key === "notice")?.badge || 0} onClick={() => props.menu?.find((m) => m.key === "notice")?.onClick()}>
           <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M3 10v4a1 1 0 001 1h2l1 5h3l-1-5h1l8 4V5l-8 4H4a1 1 0 00-1 1z" /></svg>
         </BarBtn>
@@ -532,6 +530,7 @@ export default function LiveWatchView(props: Props) {
           <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", right: "12px", bottom: "calc(84px + env(safe-area-inset-bottom))", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
             {[
               ...(props.menu || []).filter((m) => m.key !== "notice").map((m) => ({ key: m.key, label: m.key === "inquiry" ? "문의하기" : m.label, onClick: m.onClick })),
+              { key: "share", label: "공유하기", onClick: shareLive },
               { key: "chatview", label: "채팅 설정", onClick: () => setChatViewOpen(true) },
               { key: "guide", label: "사용 방법", onClick: () => setGuideOpen(true) },
               ...(standalone ? [] : [{ key: "install", label: "앱 설치", onClick: installApp }]),
