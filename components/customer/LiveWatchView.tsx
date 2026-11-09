@@ -84,9 +84,6 @@ const MenuIcon = ({ k }: { k: string }) => {
   if (k === "inquiry") return <svg aria-hidden="true" {...p}><path d="M4 5h16v11H9l-5 4z" /></svg>;
   return <svg aria-hidden="true" {...p}><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></svg>;
 };
-const IconRewind = () => (
-  <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2"><path d="M11 6l-7 6 7 6z" /><path d="M20 6l-7 6 7 6z" /></svg>
-);
 const IconClose = ({ color = "#111111" }: { color?: string }) => (
   <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><path d="M6 6l12 12M18 6L6 18" /></svg>
 );
@@ -98,10 +95,8 @@ export default function LiveWatchView(props: Props) {
   const [listOpen, setListOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [guideOpen, setGuideOpen] = useState(false);
-  // 「돌려보기」 — 누르면 유튜브 막대가 보이는 화면으로 바꿔 지난 장면을 볼 수 있다(채팅·소개 카드는 잠시 숨김). 「실시간으로」 누르면 다시 지금 방송.
-  const [rewind, setRewind] = useState(false);
-  const embedSrc = useMemo(() => youtubeEmbedUrl(videoId, typeof window !== "undefined" ? window.location.origin : undefined, { controls: rewind }), [videoId, rewind]);
-  const switchRewind = (on: boolean) => { setRewind(on); setMuted(true); };
+  // 영상을 누르면 유튜브 막대(돌려보기)가 나온다. 막대가 우리 위·아래 띠·채팅에 안 가리게 영상 칸을 띠 사이에만 둔다.
+  const embedSrc = useMemo(() => youtubeEmbedUrl(videoId, typeof window !== "undefined" ? window.location.origin : undefined, { controls: true }), [videoId]);
 
   useEffect(() => { setGuideOpen(!readGuideSeen()); }, []);
 
@@ -183,49 +178,30 @@ export default function LiveWatchView(props: Props) {
       {/* 영상 — 화면 전체 */}
       <iframe
         ref={iframeRef}
-        key={`${videoId}-${rewind ? "r" : "l"}`}
+        key={videoId}
         src={embedSrc}
         title={`${title || "라이브 방송"} 영상`}
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
         allowFullScreen
-        style={rewind
-          ? { position: "absolute", left: 0, right: 0, top: "calc(60px + env(safe-area-inset-top))", bottom: "calc(76px + env(safe-area-inset-bottom))", width: "100%", border: 0, background: "#000000" }
-          : { position: "absolute", inset: 0, width: "100%", height: "100%", border: 0, background: "#000000" }}
+        style={{ position: "absolute", left: 0, right: 0, top: "calc(60px + env(safe-area-inset-top))", bottom: "calc(76px + env(safe-area-inset-bottom))", width: "100%", border: 0, background: "#000000" }}
       />
 
-      {/* 영상 위 투명 막 — 평소엔 영상을 눌러도 멈추지 않게(늘 지금 방송). 누르면 다시 재생만. 돌려보기 중엔 없음 */}
-      {!rewind ? (
-        <div aria-hidden="true" onClick={() => sendToPlayer(youtubeCommand("playVideo"))} style={{ position: "absolute", inset: 0, background: "transparent" }} />
-      ) : null}
-
       {/* 위 줄 — LIVE·제목 / 쇼핑몰처럼 보기 */}
-      <div style={{ position: "absolute", left: 0, right: 0, top: 0, padding: "calc(8px + env(safe-area-inset-top)) 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", background: "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0))" }}>
+      <div style={{ position: "absolute", left: 0, right: 0, top: 0, padding: "calc(8px + env(safe-area-inset-top)) 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", background: "#000000" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "28px", padding: "0 10px", borderRadius: "9999px", background: paused ? "#707072" : "#D30005", fontSize: "13px", fontWeight: 700, flexShrink: 0 }}>
             <span aria-hidden="true" style={{ width: "6px", height: "6px", borderRadius: "9999px", background: "#FFFFFF" }} />{paused ? "쉬는 중" : "LIVE"}
           </span>
           <span style={{ fontSize: "15px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title || "라이브 방송"}</span>
         </div>
-        {rewind ? (
-          <button type="button" onClick={() => switchRewind(false)} style={{ flexShrink: 0, height: "44px", padding: "0 14px", border: "none", borderRadius: "9999px", background: "#D30005", color: "#FFFFFF", fontSize: "14px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}>
-            <span aria-hidden="true" style={{ width: "6px", height: "6px", borderRadius: "9999px", background: "#FFFFFF" }} />실시간으로
-          </button>
-        ) : (
           <button type="button" onClick={props.onSwitchToShop} style={{ flexShrink: 0, height: "44px", padding: "0 14px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>
             쇼핑몰처럼 보기
           </button>
-        )}
       </div>
 
-      {/* 돌려보기 — 지난 장면 보기 */}
-      {!rewind ? (
-        <button type="button" onClick={() => switchRewind(true)} style={{ position: "absolute", right: "16px", top: "calc(68px + env(safe-area-inset-top))", height: "44px", padding: "0 14px", border: "1px solid rgba(255,255,255,0.5)", borderRadius: "9999px", background: "rgba(0,0,0,0.4)", color: "#FFFFFF", fontSize: "14px", fontWeight: 600, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: "6px", cursor: "pointer", whiteSpace: "nowrap" }}>
-          <IconRewind />돌려보기
-        </button>
-      ) : null}
 
       {/* 오른쪽 세로 메뉴 — 공지·주문내역·내정보·문의(오늘만셀러처럼). 돌려보기 중엔 숨김 */}
-      {!rewind && props.menu && props.menu.length > 0 ? (
+      {props.menu && props.menu.length > 0 ? (
         <nav aria-label="메뉴" style={{ position: "absolute", right: "8px", top: "calc(124px + env(safe-area-inset-top))", display: "flex", flexDirection: "column", gap: "4px" }}>
           {props.menu.map((m) => (
             <button key={m.key} type="button" onClick={m.onClick} style={{ position: "relative", width: "60px", minHeight: "56px", padding: "6px 0", border: "none", background: "transparent", color: "#FFFFFF", fontSize: "13px", fontWeight: 600, fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: "pointer", textShadow: "0 1px 3px rgba(0,0,0,0.7)", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))" }}>
@@ -262,7 +238,7 @@ export default function LiveWatchView(props: Props) {
       ) : null}
 
       {/* 아래쪽 — 채팅 · 주문 알림 · 소개 중 상품 카드(돌려보기 중엔 숨김 — 유튜브 막대를 가리지 않게) */}
-      <div style={{ display: rewind ? "none" : "flex", position: "absolute", left: "16px", right: "16px", bottom: "calc(88px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: "none" }}>
+      <div style={{ display: "flex", position: "absolute", left: "16px", right: "16px", bottom: "calc(128px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: "none" }}>
         {chat && chat.notice ? (
           <div style={{ alignSelf: "flex-start", maxWidth: "100%", padding: "6px 12px", borderRadius: "12px", background: "rgba(0,0,0,0.6)", fontSize: "13px", fontWeight: 600, lineHeight: 1.45 }}>
             <span style={{ color: "#FFD43B", marginRight: "6px" }}>공지</span>{chat.notice}
@@ -320,7 +296,7 @@ export default function LiveWatchView(props: Props) {
       </div>
 
       {/* 맨 아래 줄 — [상품 목록] [주문서 확인] */}
-      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "12px 16px calc(12px + env(safe-area-inset-bottom))", display: "flex", alignItems: "center", gap: "8px", background: "rgba(0,0,0,0.55)" }}>
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "12px 16px calc(12px + env(safe-area-inset-bottom))", display: "flex", alignItems: "center", gap: "8px", background: "#000000" }}>
         <button type="button" onClick={() => setListOpen(true)} aria-label={`방송 상품 ${items.length}개 보기`} style={{ position: "relative", width: "52px", height: "52px", flexShrink: 0, border: "none", borderRadius: "12px", background: "rgba(255,255,255,0.18)", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
           <IconGrid />
           <span aria-hidden="true" style={{ position: "absolute", top: "-6px", right: "-6px", minWidth: "22px", height: "22px", padding: "0 5px", boxSizing: "border-box", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{items.length}</span>
@@ -347,7 +323,7 @@ export default function LiveWatchView(props: Props) {
 
       {/* 채팅 안내(보냄 실패·금지 등) */}
       {chatHint ? (
-        <div role="status" style={{ position: "absolute", left: "16px", right: "16px", bottom: "calc(88px + env(safe-area-inset-bottom))", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 2 }}>
+        <div role="status" style={{ position: "absolute", left: "16px", right: "16px", bottom: "calc(128px + env(safe-area-inset-bottom))", display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 2 }}>
           <span style={{ padding: "8px 14px", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "14px", fontWeight: 600 }}>{chatHint}</span>
         </div>
       ) : null}
