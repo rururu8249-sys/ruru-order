@@ -146,7 +146,7 @@ import LiveBadgeCompactV2 from "@/components/customer/LiveBadgeCompactV2";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import ShopContactLink from "@/components/customer/ShopContactLink";
 import { useGuideBank, useShopInfo } from "@/lib/useShopInfo";
-import { contactHref, isAcceptedBankAccount } from "@/lib/shopInfo";
+import { isAcceptedBankAccount } from "@/lib/shopInfo";
 import {
   parseOrderBankRoutingResult,
   resolveOrderGroupBankAccount,
@@ -8140,8 +8140,7 @@ export default function OrderPage() {
                 { key: "notice", label: "공지", badge: noteUnread, onClick: () => { window.dispatchEvent(new Event("ruru-open-notice-box")); } },
                 { key: "orders", label: "주문내역", onClick: () => openOrderLookupBottomSheet() },
                 { key: "me", label: "내정보", onClick: () => openCustomerInfoEditBottomSheet() },
-                { key: "inquiry", label: "문의", onClick: () => { const href = contactHref(shopInfo); if (href) window.open(href, "_blank", "noopener"); else setInquirySheetOpen(true); } },
-                { key: "youtube", label: "유튜브", onClick: () => openYoutubeChannel() },
+                { key: "inquiry", label: "문의", onClick: () => setInquirySheetOpen(true) },
               ]}
               chat={liveChatEnabled && broadcast?.id ? {
                 messages: liveChatMessages,
@@ -9951,18 +9950,16 @@ export default function OrderPage() {
               {/* [2026-09-08] 문의 방식(채널/오픈채팅/카카오톡 ID)은 설정 › 상점 정보에서 정한다. 겉모습은 그대로. */}
               <ShopContactLink
                 labelForm="long"
-                style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "center", gap: "8px", padding: "15px 12px", borderRadius: "12px", border: "none", background: "#FEE500", textDecoration: "none", marginBottom: "8px" }}
+                style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "center", gap: "10px", padding: "13px 12px", borderRadius: "12px", border: "none", background: "#F5F5F5", textDecoration: "none", marginBottom: "8px" }}
               >
                 {({ label }) => (
                   <>
-                    {/* 카카오톡 말풍선 아이콘(노란 배경 + 갈색 말풍선 = 카카오 공식 조합) */}
-                    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden focusable="false">
-                      <path
-                        fill="#3C1E1E"
-                        d="M12 3C6.9 3 2.8 6.3 2.8 10.3c0 2.6 1.7 4.9 4.3 6.2-.2.7-.7 2.5-.8 2.9 0 0 0 .2.1.2h.2c.3-.1 2.7-1.8 3.4-2.3.6.1 1.3.2 2 .2 5.1 0 9.2-3.3 9.2-7.2S17.1 3 12 3z"
-                      />
+                    {/* [2026-11-10 사장님] 네 버튼 같은 모양 — 각자 색 로고만. 카카오 = 노란 네모 + 갈색 말풍선 */}
+                    <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden focusable="false">
+                      <rect width="26" height="26" rx="7" fill="#FEE500" />
+                      <path fill="#3C1E1E" d="M13 6.5c-4.1 0-7.4 2.6-7.4 5.8 0 2.1 1.4 3.9 3.5 4.9-.15.55-.55 2-.63 2.3 0 0 0 .16.08.16h.16c.24-.08 2.2-1.45 2.75-1.85.5.08 1 .12 1.55.12 4.1 0 7.4-2.6 7.4-5.8S17.1 6.5 13 6.5z" />
                     </svg>
-                    <span style={{ fontSize: "15px", color: "#3C1E1E", fontWeight: 800 }}>{label}</span>
+                    <span style={{ fontSize: "15px", color: "#111111", fontWeight: 700 }}>{label}</span>
                   </>
                 )}
               </ShopContactLink>
@@ -9973,15 +9970,28 @@ export default function OrderPage() {
                   { href: "https://band.us/@ruru8249", icon: "🎵", label: "밴드 (택배 송장 확인)" },
                   { href: "https://www.instagram.com/ruru8249_?igsh=MXR3Z2xnYmI1cG0ybQ==", icon: "📷", label: "인스타그램" },
                 ] as const).map((link) => (
-                  <a key={link.href} href={link.href} target="_blank" rel="noreferrer" style={s5s({ display: "flex", width: "100%", alignItems: "center", justifyContent: "center", gap: "8px", padding: "15px 12px", borderRadius: "12px", background: "#F5F3F0", textDecoration: "none" })}>
-                    <span style={s5s({ fontSize: "18px" })}>{uiS5 ? (
-                      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
-                        {link.href.includes("youtube") ? <><rect x="3" y="6" width="18" height="12" rx="3" /><path d="M10.5 9.5v5l4-2.5z" /></>
-                          : link.href.includes("instagram") ? <><rect x="4" y="4" width="16" height="16" rx="4.5" /><circle cx="12" cy="12" r="3.5" /><path d="M16.8 7.2h.01" /></>
-                          : <><path d="M4 6.5h16v9H9l-5 3.5z" /></>}
-                      </svg>
-                    ) : link.icon}</span>
-                    <span style={s5s({ fontSize: "15px", color: "#3F3438", fontWeight: 800 })}>{link.label}</span>
+                  <a key={link.href} href={link.href} target="_blank" rel="noreferrer" style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "center", gap: "10px", padding: "13px 12px", borderRadius: "12px", background: "#F5F5F5", textDecoration: "none" }}>
+                    {/* [2026-11-10 사장님] 각 서비스 색 로고(유튜브 빨강·밴드 초록 b·인스타 무지개) */}
+                    <svg aria-hidden="true" width="26" height="26" viewBox="0 0 26 26" style={{ display: "block", flexShrink: 0 }}>
+                      {link.href.includes("youtube") ? (
+                        <><rect x="1" y="5" width="24" height="16" rx="5" fill="#FF0000" /><path d="M10.5 9.5v7l6-3.5z" fill="#FFFFFF" /></>
+                      ) : link.href.includes("instagram") ? (
+                        <>
+                          <defs>
+                            <radialGradient id="ruru-ig-grad" cx="0.3" cy="1.07" r="1.2">
+                              <stop offset="0" stopColor="#FFDD55" /><stop offset="0.1" stopColor="#FFDD55" /><stop offset="0.5" stopColor="#FF543E" /><stop offset="1" stopColor="#C837AB" />
+                            </radialGradient>
+                          </defs>
+                          <rect width="26" height="26" rx="7" fill="url(#ruru-ig-grad)" />
+                          <rect x="6" y="6" width="14" height="14" rx="4" fill="none" stroke="#FFFFFF" strokeWidth="1.8" />
+                          <circle cx="13" cy="13" r="3.3" fill="none" stroke="#FFFFFF" strokeWidth="1.8" />
+                          <circle cx="17.3" cy="8.7" r="1.1" fill="#FFFFFF" />
+                        </>
+                      ) : (
+                        <><rect width="26" height="26" rx="7" fill="#06C755" /><text x="13" y="19" textAnchor="middle" fontSize="17" fontWeight="800" fill="#FFFFFF" fontFamily="Arial, Helvetica, sans-serif">b</text></>
+                      )}
+                    </svg>
+                    <span style={{ fontSize: "15px", color: "#111111", fontWeight: 700 }}>{link.label}</span>
                   </a>
                 ))}
               </div>

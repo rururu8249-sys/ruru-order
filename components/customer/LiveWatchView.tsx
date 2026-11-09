@@ -83,7 +83,6 @@ const MenuIcon = ({ k }: { k: string }) => {
   const p = { width: 22, height: 22, viewBox: "0 0 24 24", fill: "none", stroke: "#FFFFFF", strokeWidth: 1.8 } as const;
   if (k === "notice") return <svg aria-hidden="true" {...p}><rect x="3" y="5" width="18" height="14" rx="1" /><path d="M3 7l9 6 9-6" /></svg>;
   if (k === "orders") return <svg aria-hidden="true" {...p}><path d="M12 3l8 4v10l-8 4-8-4V7z" /><path d="M4 7l8 4 8-4M12 11v10" /></svg>;
-  if (k === "youtube") return <svg aria-hidden="true" {...p}><rect x="2.5" y="5.5" width="19" height="13" rx="4" /><path d="M10 9.5v5l4.5-2.5z" fill="#FFFFFF" /></svg>;
   if (k === "inquiry") return <svg aria-hidden="true" {...p}><path d="M4 5h16v11H9l-5 4z" /></svg>;
   return <svg aria-hidden="true" {...p}><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></svg>;
 };
@@ -135,9 +134,25 @@ export default function LiveWatchView(props: Props) {
   const chatBoxRef = useRef<HTMLDivElement | null>(null);
   const pressTimer = useRef<number | null>(null);
   const chatCount = chat?.messages.length ?? 0;
-  useEffect(() => {
+  // 지난 글을 올려 보는 중이면 새 글이 와도 끌어내리지 않는다 — 대신 「새 글 보기」
+  const [chatAtBottom, setChatAtBottom] = useState(true);
+  const chatAtBottomRef = useRef(true);
+  const onChatScroll = () => {
+    const el = chatBoxRef.current;
+    if (!el) return;
+    const at = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+    chatAtBottomRef.current = at;
+    setChatAtBottom(at);
+  };
+  const chatToBottom = () => {
     const el = chatBoxRef.current;
     if (el) el.scrollTop = el.scrollHeight;
+    chatAtBottomRef.current = true;
+    setChatAtBottom(true);
+  };
+  useEffect(() => {
+    const el = chatBoxRef.current;
+    if (el && chatAtBottomRef.current) el.scrollTop = el.scrollHeight;
   }, [chatCount]);
   useEffect(() => {
     if (!chatHint) return;
@@ -324,12 +339,13 @@ export default function LiveWatchView(props: Props) {
             role="log"
             aria-label="채팅"
             aria-live="polite"
-            style={{ pointerEvents: "none", maxHeight: "24dvh", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "4px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", paddingTop: "16px", width: "82%" }}
+            onScroll={onChatScroll}
+            style={{ pointerEvents: "none", overscrollBehavior: "contain", maxHeight: "24dvh", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "4px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", paddingTop: "16px", width: "82%" }}
           >
             {chat.messages.map((m) => (
               <div
                 key={m.id}
-                style={{ alignSelf: "flex-start", maxWidth: "100%", padding: "4px 10px", borderRadius: "12px", background: "rgba(0,0,0,0.35)", fontSize: "14px", lineHeight: 1.45, wordBreak: "break-word", textShadow: "0 1px 2px rgba(0,0,0,0.6)", userSelect: chat.canModerate ? "none" : "auto", WebkitUserSelect: chat.canModerate ? "none" : "auto" }}
+                style={{ pointerEvents: "auto", touchAction: "pan-y", alignSelf: "flex-start", maxWidth: "100%", padding: "4px 10px", borderRadius: "12px", background: "rgba(0,0,0,0.35)", fontSize: "14px", lineHeight: 1.45, wordBreak: "break-word", textShadow: "0 1px 2px rgba(0,0,0,0.6)", userSelect: chat.canModerate ? "none" : "auto", WebkitUserSelect: chat.canModerate ? "none" : "auto" }}
               >
                 {/* 채팅 줄은 터치가 그대로 영상(유튜브 막대)으로 지나감. 관리자만 «닉네임»을 길게 누르면 관리 창 */}
                 <span
@@ -338,12 +354,17 @@ export default function LiveWatchView(props: Props) {
                   onPointerLeave={chat.canModerate ? endPress : undefined}
                   onPointerCancel={chat.canModerate ? endPress : undefined}
                   onContextMenu={chat.canModerate ? (e) => { e.preventDefault(); setModTarget(m); } : undefined}
-                  style={{ fontWeight: 700, color: nicknameColor(m.nickname), marginRight: "6px", pointerEvents: chat.canModerate ? "auto" : "none" }}
+                  style={{ fontWeight: 700, color: nicknameColor(m.nickname), marginRight: "6px" }}
                 >{m.nickname}</span>
                 <span>{m.body}</span>
               </div>
             ))}
           </div>
+        ) : null}
+        {chat && chat.messages.length > 0 && !chatAtBottom ? (
+          <button type="button" onClick={chatToBottom} style={{ pointerEvents: "auto", alignSelf: "flex-start", height: "32px", padding: "0 12px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer" }}>
+            새 글 보기 ↓
+          </button>
         ) : null}
         {pinned ? (
           <div style={{ pointerEvents: "auto", background: "#FFFFFF", color: "#111111", borderRadius: "12px", padding: "10px", display: "flex", alignItems: "center", gap: "10px" }}>
