@@ -24,7 +24,7 @@ export default function LiveAlertEffectCard() {
   const load = useCallback(async () => {
     setLoading(true); setErr("");
     try {
-      const res = await fetch("/api/admin-live/live-alert-effect?limit=6", { cache: "no-store" });
+      const res = await fetch("/api/admin-live/live-alert-effect?limit=4", { cache: "no-store" });
       const j = await res.json();
       if (!res.ok || !j.ok) throw new Error(j.error || "불러오지 못했어요");
       setRows(j.rows || []);
@@ -44,7 +44,7 @@ export default function LiveAlertEffectCard() {
       </div>
       {open ? (
         <div className="mt-3">
-          {err ? <p role="alert" className="text-[13px] text-danger-tx">{err}</p> : rows === null ? <p className="text-[13px] text-ink-mute">방송마다 세는 중이에요(방송 하나에 몇 초씩 걸려요)…</p> : rows.length === 0 ? <p className="text-[13px] text-ink-mute">알림을 보낸 방송이 아직 없어요.</p> : (
+          {err ? <p role="alert" className="text-[13px] text-danger-tx">{err}</p> : rows === null ? <p className="text-[13px] text-ink-mute">최근 방송 4개를 세는 중이에요(30초~1분 걸려요)…</p> : rows.length === 0 ? <p className="text-[13px] text-ink-mute">알림을 보낸 방송이 아직 없어요.</p> : (
             <div className="grid gap-3">
               {rows.map((r) => (
                 <div key={r.broadcastId} className="rounded-lg border border-line p-3">
