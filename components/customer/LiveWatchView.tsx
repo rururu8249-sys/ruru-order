@@ -13,7 +13,8 @@ import {
   youtubeEmbedUrl,
   type LiveWatchItem,
 } from "@/lib/liveWatch";
-import { isKakaoInAppBrowser, kakaoOpenExternalUrl } from "@/lib/youtubeChannelLink";
+import { isKakaoInAppBrowser } from "@/lib/youtubeChannelLink";
+import { openOrderInExternalBrowser } from "@/components/customer/KakaoExternalOpen";
 import { LIVE_CHAT_MAX_LEN, chatColors, type LiveChatAction, type LiveChatMessage, type LiveChatPenalty } from "@/lib/liveChat";
 
 export type LiveWatchPinned = {
@@ -191,6 +192,19 @@ export default function LiveWatchView(props: Props) {
   // ── 사이트 채팅 ──
   const chat = props.chat ?? null;
   const [composeOpen, setComposeOpen] = useState(false);
+  // [04:55 사장님] 채팅 쓰는 중 폰 «뒤로» → 사이트에서 나가지 말고 쓰기 창만 닫고 방송 화면으로.
+  //   쓰기 창을 열 때 방문 기록을 하나 쌓아 두고, 뒤로가 오면 그 기록만 지우며 창을 닫음.
+  useEffect(() => {
+    if (!composeOpen) return;
+    try { window.history.pushState({ ...(window.history.state || {}), ruruCompose: 1 }, ""); } catch { return; }
+    const onPop = () => setComposeOpen(false);
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      // 뒤로 말고 다른 방법(보내기·바깥 누르기)으로 닫았으면 쌓아 둔 기록을 치움
+      try { if (window.history.state && window.history.state.ruruCompose) window.history.back(); } catch { /* 무시 */ }
+    };
+  }, [composeOpen]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [chatHint, setChatHint] = useState("");
@@ -216,7 +230,7 @@ export default function LiveWatchView(props: Props) {
     // [2026-11-10 04:09] 카톡 채널에서 연 화면(카톡 안 브라우저)은 앱 설치가 안 됨 → 폰 기본 브라우저(크롬·삼성인터넷·사파리)로 이 화면을 열어 줌.
     //   거기서 다시 「앱 설치」를 누르면 설치 창이 뜬다. (카카오가 제공하는 주소 kakaotalk://web/openExternal)
     if (isKakaoInAppBrowser(navigator.userAgent)) {
-      window.location.href = kakaoOpenExternalUrl(`${window.location.origin}/order`);
+      openOrderInExternalBrowser("/order"); // 로그인 정보 같이 넘김 → 다시 로그인 안 해도 됨
       return;
     }
     const w = window as unknown as { __ruruPwaPrompt?: { prompt: () => void; userChoice: Promise<unknown> } | null };

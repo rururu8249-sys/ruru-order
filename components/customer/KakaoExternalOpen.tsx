@@ -52,6 +52,18 @@ if (typeof window !== "undefined" && !isKakaoInAppBrowser(window.navigator.userA
   try { applyHandoff(); } catch { /* 무시 */ }
 }
 
+/** 카톡 안 → 인터넷 앱으로 이 주소 열기(로그인 정보 같이). 「앱 설치」 버튼이 씀 */
+export function openOrderInExternalBrowser(path = "/order") {
+  const u = new URL(path, window.location.origin);
+  const ho = buildHandoff();
+  const target = ho ? `${u.toString()}#${HANDOFF_KEY}=${ho}` : u.toString();
+  window.location.href = kakaoOpenExternalUrl(target);
+}
+
+// [04:55 사장님 결정 위임] 링크를 열 때마다 저절로 인터넷 앱으로 넘기는 건 끔 — 중장년 손님에겐 화면이 갑자기 다른 앱으로 바뀌는 게 더 헷갈림.
+//   이제 «앱을 깔고 싶은 손님»만 「앱 설치」를 누를 때 넘어감(로그인 정보 같이). 다시 켜려면 AUTO_OPEN = true.
+const AUTO_OPEN = false;
+
 export default function KakaoExternalOpen() {
   const [shown, setShown] = useState(false);
   const target = () => {
@@ -64,7 +76,7 @@ export default function KakaoExternalOpen() {
   const open = () => { window.location.href = kakaoOpenExternalUrl(target()); };
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!isKakaoInAppBrowser(navigator.userAgent)) return;
+    if (!AUTO_OPEN || !isKakaoInAppBrowser(navigator.userAgent)) return;
     if (new URLSearchParams(window.location.search).get("inapp") === "1") return;
     let tried = false;
     try { tried = window.sessionStorage.getItem(TRIED_KEY) === "1"; } catch { /* 무시 */ }
