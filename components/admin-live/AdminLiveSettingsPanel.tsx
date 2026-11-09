@@ -44,6 +44,7 @@ type SettingKey =
   | "direct_input_enabled"
   | "howto_enabled"
   | "howto_steps"
+  | "howto_audience"
   | "final_submit_confirmation_enabled"
   | "product_notice_mode"
   | "product_notice_custom";
@@ -69,6 +70,7 @@ const SETTING_KEYS: SettingKey[] = [
   "direct_input_enabled",
   "howto_enabled",
   "howto_steps",
+  "howto_audience",
   FINAL_SUBMIT_CONFIRMATION_KEY,
   "product_notice_mode",
   "product_notice_custom",
@@ -79,6 +81,7 @@ type NumericSettingKey = Exclude<
   | "direct_input_enabled"
   | "howto_enabled"
   | "howto_steps"
+  | "howto_audience"
   | "final_submit_confirmation_enabled"
   | "product_notice_mode"
   | "product_notice_custom"
@@ -238,6 +241,8 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
   //   같은 키를 두 화면이 저장하면 한쪽이 다른 쪽을 되돌려버려서, 여기서는 아예 뺐다.
   // [2026-07-10] 주문 방법 팝업 — 켜고/끄기 + 내용 수정
   const [howtoEnabled, setHowtoEnabled] = useState(true);
+  // [2026-11-10] 주문 방법 팝업 대상 — new = 처음 온 손님만(한 번 닫으면 다시 안 뜸) / all = 모든 손님(닫으면 24시간 안 뜸)
+  const [howtoAudience, setHowtoAudience] = useState<"new" | "all">("new");
   const [howtoSteps, setHowtoSteps] = useState(HOWTO_DEFAULT.steps);
   const [howtoWarn, setHowtoWarn] = useState(HOWTO_DEFAULT.warn);
   const [finalSubmitConfirmationEnabled, setFinalSubmitConfirmationEnabled] = useState(true);
@@ -284,6 +289,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
         }
         setDirectInputEnabled(clean(rows.find((r) => r.key === "direct_input_enabled")?.value || "true") !== "false");
         setHowtoEnabled(clean(rows.find((r) => r.key === "howto_enabled")?.value || "true") !== "false");
+        setHowtoAudience(clean(rows.find((r) => r.key === "howto_audience")?.value || "new") === "all" ? "all" : "new");
         setFinalSubmitConfirmationEnabled(parseFinalSubmitConfirmationEnabled(rows));
         {
           const cfg = parseHowtoSteps(rows.find((r) => r.key === "howto_steps")?.value);
@@ -337,6 +343,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
           { key: "cart_hold_minutes", value: String(nextHoldMinutes) },
           { key: "direct_input_enabled", value: directInputEnabled ? "true" : "false" },
           { key: "howto_enabled", value: howtoEnabled ? "true" : "false" },
+          { key: "howto_audience", value: howtoAudience },
           { key: "howto_steps", value: JSON.stringify({ steps: howtoSteps, warn: howtoWarn }) },
           toFinalSubmitConfirmationRow(finalSubmitConfirmationEnabled),
           { key: "product_notice_mode", value: productNoticeMode },
@@ -380,9 +387,9 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
     }
   };
 
-  const globalDraft={customerCardRate,actualCardRate,cardMinAmount,defaultShippingFee,remoteShippingFee,vendorShippingFee,vendorRemoteShippingFee,overseasShippingFee,overseasRemoteShippingFee,pointAutoEarn,pointEarnRate,holdAmount,holdUnit,directInputEnabled,howtoEnabled,howtoSteps,howtoWarn,finalSubmitConfirmationEnabled,productNoticeMode,productNoticeCustom};
+  const globalDraft={customerCardRate,actualCardRate,cardMinAmount,defaultShippingFee,remoteShippingFee,vendorShippingFee,vendorRemoteShippingFee,overseasShippingFee,overseasRemoteShippingFee,pointAutoEarn,pointEarnRate,holdAmount,holdUnit,directInputEnabled,howtoEnabled,howtoAudience,howtoSteps,howtoWarn,finalSubmitConfirmationEnabled,productNoticeMode,productNoticeCustom};
   const markGlobalSaved=useSettingsDraft({value:globalDraft,loading,saving,save:saveSettings,onDraftStateChange:setGlobalDraftState,onDiscard:(value)=>{
-    setCustomerCardRate(value.customerCardRate);setActualCardRate(value.actualCardRate);setCardMinAmount(value.cardMinAmount);setDefaultShippingFee(value.defaultShippingFee);setRemoteShippingFee(value.remoteShippingFee);setVendorShippingFee(value.vendorShippingFee);setVendorRemoteShippingFee(value.vendorRemoteShippingFee);setOverseasShippingFee(value.overseasShippingFee);setOverseasRemoteShippingFee(value.overseasRemoteShippingFee);setPointAutoEarn(value.pointAutoEarn);setPointEarnRate(value.pointEarnRate);setHoldAmount(value.holdAmount);setHoldUnit(value.holdUnit);setDirectInputEnabled(value.directInputEnabled);setHowtoEnabled(value.howtoEnabled);setHowtoSteps(value.howtoSteps);setHowtoWarn(value.howtoWarn);setFinalSubmitConfirmationEnabled(value.finalSubmitConfirmationEnabled);setProductNoticeMode(value.productNoticeMode);setProductNoticeCustom(value.productNoticeCustom);
+    setCustomerCardRate(value.customerCardRate);setActualCardRate(value.actualCardRate);setCardMinAmount(value.cardMinAmount);setDefaultShippingFee(value.defaultShippingFee);setRemoteShippingFee(value.remoteShippingFee);setVendorShippingFee(value.vendorShippingFee);setVendorRemoteShippingFee(value.vendorRemoteShippingFee);setOverseasShippingFee(value.overseasShippingFee);setOverseasRemoteShippingFee(value.overseasRemoteShippingFee);setPointAutoEarn(value.pointAutoEarn);setPointEarnRate(value.pointEarnRate);setHoldAmount(value.holdAmount);setHoldUnit(value.holdUnit);setDirectInputEnabled(value.directInputEnabled);setHowtoEnabled(value.howtoEnabled);setHowtoAudience(value.howtoAudience);setHowtoSteps(value.howtoSteps);setHowtoWarn(value.howtoWarn);setFinalSubmitConfirmationEnabled(value.finalSubmitConfirmationEnabled);setProductNoticeMode(value.productNoticeMode);setProductNoticeCustom(value.productNoticeCustom);
   }});
   draftRef.current=GLOBAL_SAVE_TABS.includes(activeTab) ? globalDraftState : childDraft;
   const protectNavigation=useCallback(async()=>{
@@ -590,7 +597,7 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
                   <div>
                     <div className="text-sm font-black text-ink">주문 방법 팝업</div>
                     <div className="mt-1 text-xs font-bold leading-5 text-ink-mute">
-                      손님이 주문서에 접속하면 바로 뜹니다. 끄면 아예 안 뜹니다.
+                      {howtoAudience === "new" ? "처음 온 손님에게만 한 번 뜹니다. 닫으면 다시 안 뜹니다." : "모든 손님에게 뜹니다. 손님이 닫으면 24시간 안 뜹니다."}
                     </div>
                   </div>
                   <button
@@ -603,6 +610,22 @@ export default function AdminLiveSettingsPanel({ onOpenNotice, onOpenEvent, onNa
                     {howtoEnabled ? "켜짐" : "꺼짐"}
                   </button>
                 </div>
+
+                {howtoEnabled ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {([["new", "처음 온 손님만"], ["all", "모든 손님"]] as const).map(([v, label]) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setHowtoAudience(v)}
+                        aria-pressed={howtoAudience === v}
+                        className={`h-9 rounded-full px-4 text-xs font-black ${howtoAudience === v ? "bg-ink text-white" : "border border-line bg-surface text-ink-mute"}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
 
                 {howtoEnabled ? (
                   <div className="mt-3 space-y-3">

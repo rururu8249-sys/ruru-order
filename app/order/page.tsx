@@ -146,7 +146,7 @@ import LiveBadgeCompactV2 from "@/components/customer/LiveBadgeCompactV2";
 // [2026-09-08] 문의 방식·표시용 입금계좌는 설정 › 상점 정보에서 온다(하드코딩 제거). 못 읽으면 예전 값 그대로.
 import ShopContactLink from "@/components/customer/ShopContactLink";
 import { useGuideBank, useShopInfo } from "@/lib/useShopInfo";
-import { isAcceptedBankAccount } from "@/lib/shopInfo";
+import { contactHref, isAcceptedBankAccount } from "@/lib/shopInfo";
 import {
   parseOrderBankRoutingResult,
   resolveOrderGroupBankAccount,
@@ -1677,6 +1677,15 @@ export default function OrderPage() {
   // [2026-07-10] 주문 방법 팝업 — 관리자 설정(howto_enabled)이 켜져 있을 때만 뜬다.
   //   설정을 읽기 전엔 안 띄운다(꺼둔 상태로 깜빡이는 것 방지). loadOrderSettings에서 연다.
   const [howToOpen, setHowToOpen] = useState(false);
+  const [howToNewOnly, setHowToNewOnly] = useState(true);
+  // 처음 온 손님만 모드면 어떻게 닫든 그 폰에선 다시 안 뜬다
+  const closeHowTo = (hideDay: boolean) => {
+    try {
+      if (howToNewOnly) localStorage.setItem("ruru_howto_done", "1");
+      else if (hideDay) localStorage.setItem("ruru_howto_hide_until", String(Date.now() + 86400000));
+    } catch { /* 저장 못 해도 창은 닫힘 */ }
+    setHowToOpen(false);
+  };
   const [howToSteps, setHowToSteps] = useState(HOWTO_DEFAULT.steps);
   const [howToWarn, setHowToWarn] = useState(HOWTO_DEFAULT.warn);
   // [2026-07-10] 상품 목록 정렬(표시 전용). 기본순 = 고정 상품 우선 + 방송 진열 순서(기존 동작)
@@ -2640,6 +2649,7 @@ export default function OrderPage() {
         "direct_input_enabled",
         "howto_enabled",
         "howto_steps",
+        "howto_audience",
         "popup_notice_enabled",
         CUSTOMER_NOTICE_ID_KEY,
         "popup_notice_title",
@@ -2717,11 +2727,18 @@ export default function OrderPage() {
     const howtoCfg = parseHowtoSteps((data || []).find((i: any) => i.key === "howto_steps")?.value);
     setHowToSteps(howtoCfg.steps);
     setHowToWarn(howtoCfg.warn);
+    // [2026-11-10] 대상(howto_audience): new(기본) = 처음 온 손님만 — 한 번 닫으면 그 폰에선 다시 안 뜸 / all = 닫으면 24시간 안 뜸
+    const howtoNewOnly = String((data || []).find((i: any) => i.key === "howto_audience")?.value || "new").trim() !== "all";
+    setHowToNewOnly(howtoNewOnly);
     if (howtoOn) {
       let hidden = false;
       try {
-        const hideUntil = Number(localStorage.getItem("ruru_howto_hide_until") || "0");
-        hidden = Number.isFinite(hideUntil) && Date.now() < hideUntil;
+        if (howtoNewOnly) {
+          hidden = localStorage.getItem("ruru_howto_done") === "1";
+        } else {
+          const hideUntil = Number(localStorage.getItem("ruru_howto_hide_until") || "0");
+          hidden = Number.isFinite(hideUntil) && Date.now() < hideUntil;
+        }
       } catch {
         hidden = false;
       }
@@ -8123,7 +8140,8 @@ export default function OrderPage() {
                 { key: "notice", label: "공지", badge: noteUnread, onClick: () => { window.dispatchEvent(new Event("ruru-open-notice-box")); } },
                 { key: "orders", label: "주문내역", onClick: () => openOrderLookupBottomSheet() },
                 { key: "me", label: "내정보", onClick: () => openCustomerInfoEditBottomSheet() },
-                { key: "inquiry", label: "문의", onClick: () => setInquirySheetOpen(true) },
+                { key: "inquiry", label: "문의", onClick: () => { const href = contactHref(shopInfo); if (href) window.open(href, "_blank", "noopener"); else setInquirySheetOpen(true); } },
+                { key: "youtube", label: "유튜브", onClick: () => openYoutubeChannel() },
               ]}
               chat={liveChatEnabled && broadcast?.id ? {
                 messages: liveChatMessages,
@@ -9859,10 +9877,10 @@ export default function OrderPage() {
         {howToOpen && !liveWatchShown && !liveBootCover ? (
           <CustomerBottomSheet tone={uiS5 ? "v2" : undefined}
             open
-            onClose={() => setHowToOpen(false)}
+            onClose={() => closeHowTo(false)}
             title={uiS5 ? "주문 방법" : "📌 주문 방법"}
             bodyPadding="4px 0 16px"
-            footer={<button type="button" onClick={() => setHowToOpen(false)} style={s5s(csPrimaryButtonStyle(true))}>확인</button>}
+            footer={<button type="button" onClick={() => closeHowTo(false)} style={s5s(csPrimaryButtonStyle(true))}>확인</button>}
           >
               {/* [2026-07-10] 3단계 내용은 관리자 설정(howto_steps)에서 수정. 설정이 없으면 기본 문구. */}
               <div style={s5s({ padding: "0 20px" })}>
@@ -9884,15 +9902,17 @@ export default function OrderPage() {
               </div>
 
               {/* [2026-09-20] 「확인」은 푸터(풀폭 1개)로. 「오늘 하루 열지 않기」는 본문 끝 글자 버튼. */}
+              {howToNewOnly ? null : (
               <div style={s5s({ padding: "16px 20px 0", textAlign: "center" })}>
                 <button
                   type="button"
-                  onClick={() => { localStorage.setItem("ruru_howto_hide_until", String(Date.now() + 86400000)); setHowToOpen(false); }}
+                  onClick={() => closeHowTo(true)}
                   style={s5s({ border: "none", background: "none", fontSize: "13px", fontWeight: 700, color: "#6E655E", textDecoration: "underline", cursor: "pointer", padding: "8px" })}
                 >
                   오늘 하루 열지 않기
                 </button>
               </div>
+              )}
           </CustomerBottomSheet>
         ) : null}
 
