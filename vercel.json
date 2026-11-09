@@ -1,7 +1,9 @@
 {
   "functions": {
     "app/api/product-brand-catalog/route.ts": {
-      "regions": ["sin1"]
+      "regions": [
+        "sin1"
+      ]
     }
   },
   "crons": [
@@ -20,6 +22,10 @@
     {
       "path": "/api/cron/cart-holds-sweep",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/live-metrics",
+      "schedule": "* * * * *"
     }
   ]
 }
