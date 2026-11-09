@@ -159,12 +159,12 @@ async function fetchScopeBroadcast(sb: SupabaseClient, broadcastId?: string): Pr
   }
 }
 
-const MONTH_COLS =
+export const MONTH_COLS =
   "id,order_group_id,order_lookup_code,customer_phone,youtube_nickname,customer_name,payment_method,qty,product_name,product_price,adjusted_product_price,total_price,adjusted_total_price,final_amount,admin_order_status_v2,order_manage_status,is_test_order,created_at,event_gift_winner_id";
 
 // [2026-11-02] 방송 범위는 «*» — 포인트 사용(point_used_amount)·입금가(cost_price_snapshot)·카드 수수료 칸까지(전엔 point_used_amount 를 안 읽어 포인트 사용이 늘 0원).
 //   읽기 실패는 숨기지 않고 throw(빈 결산을 보내지 않게).
-async function fetchOrders(sb: SupabaseClient, start: string, end: string, cols: string = MONTH_COLS): Promise<Record<string, unknown>[]> {
+export async function fetchOrders(sb: SupabaseClient, start: string, end: string, cols: string = MONTH_COLS): Promise<Record<string, unknown>[]> {
   const all: Record<string, unknown>[] = [];
   const size = 1000;
   let from = 0;
@@ -185,7 +185,7 @@ async function fetchOrders(sb: SupabaseClient, start: string, end: string, cols:
   return all;
 }
 
-function groupOrders(rows: Record<string, unknown>[]): Group[] {
+export function groupOrders(rows: Record<string, unknown>[]): Group[] {
   const map = new Map<string, Record<string, unknown>[]>();
   for (const r of rows) {
     const gid = String(r.order_group_id || r.order_lookup_code || r.id || "");

@@ -9,6 +9,7 @@ import type {OrderRow} from '@/lib/admin-v2/types';
 import {buildAdminLiveOrderGroups,toAdminLiveOrder} from './liveOrderAdapter';
 import type {LiveOrder} from './types';
 import {showAdminToast} from '@/lib/adminToast';
+import LiveAlertEffectCard from './LiveAlertEffectCard';
 
 const paid=new Set(['paid','auto_paid','manual_paid','card_paid']);
 const won=(value:number)=>`${value.toLocaleString('ko-KR')}원`;
@@ -136,6 +137,7 @@ export default function SalesAnalysisPanel({initialBroadcastId}:{initialBroadcas
       <select aria-label="판매 월" className={control} value={month} onChange={e=>setMonth(e.target.value)}><option value="all">전체 월</option>{Array.from({length:12},(_,i)=><option key={i} value={i+1}>{i+1}월</option>)}</select>
       <input aria-label="방송명 검색" placeholder="방송명 검색" className={`${control} min-w-0 basis-full sm:basis-auto flex-1`} value={search} onChange={e=>setSearch(e.target.value)}/>
     </div>
+    <LiveAlertEffectCard/>
     <p className="text-xs text-ink-soft">결제완료 기준 · 취소·삭제·테스트·선물 제외. 방송은 시작일, 쇼핑몰은 주문일 기준입니다. 주문건수는 주문서 수, 품목 수는 주문서 안의 상품 줄 수입니다.</p>
     {error?<div role="alert" className="rounded-xl border border-line p-8 text-center"><p>판매분석을 불러오지 못했습니다.</p><p className="mt-2 text-sm">일부 주문만 합산하지 않습니다. 다시 불러오기를 눌러 주세요.</p><button className={`${control} mt-4`} onClick={refreshAnalysis}>다시 불러오기</button></div>:!model||!snapshot?<p role="status" className="p-8 text-center">판매분석을 불러오는 중…</p>:<>
       <p className="text-sm font-bold">조회 조건 전체 합계 · {model.list.length}개 판매 경로</p>
