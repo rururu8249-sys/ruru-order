@@ -544,7 +544,9 @@ export default function LiveWatchView(props: Props) {
   //   누르면 영상을 다시 불러 지금 방송으로(가장 확실한 방법). 정보가 안 오면 버튼도 안 뜬다(유튜브 막대의 「라이브」로도 돌아갈 수 있음).
   const [reloadKey, setReloadKey] = useState(0);
   const [behindLive, setBehindLive] = useState(false);
-  const playerInfo = useRef<{ t: number; d: number; state: number }>({ t: 0, d: 0, state: -1 });
+  // [08:35 사장님 「녹화 영상인데 왜 실시간으로 돌아가기가 떠」] 녹화 영상은 길이(duration) 전체가 끝이라 늘 «30초 넘게 뒤»로 잡혔음.
+  //   이제 «진짜 라이브»일 때만: 유튜브가 알려 주는 isLive, 또는 영상 길이가 시간 따라 계속 늘어날 때(라이브는 길이가 자람).
+  const playerInfo = useRef<{ t: number; d: number; state: number; live: boolean; d0: number; d0at: number }>({ t: 0, d: 0, state: -1, live: false, d0: 0, d0at: 0 });
   const lastTick = useRef<{ t: number; at: number; state: number }>({ t: 0, at: 0, state: -1 });
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
@@ -565,10 +567,17 @@ export default function LiveWatchView(props: Props) {
         lastTick.current = { t: info.currentTime, at: now, state: typeof info.playerState === "number" ? info.playerState : cur.state };
         cur.t = info.currentTime;
       }
-      if (typeof info.duration === "number") cur.d = info.duration;
+      if (typeof info.duration === "number") {
+        cur.d = info.duration;
+        const nowMs = Date.now();
+        if (!cur.d0at) { cur.d0 = info.duration; cur.d0at = nowMs; }
+        else if (nowMs - cur.d0at > 4000 && info.duration - cur.d0 >= 2) cur.live = true; // 4초 넘게 지나 길이가 2초 넘게 늘었음 = 라이브
+      }
+      const vd = info.videoData as { isLive?: unknown } | undefined;
+      if (vd && vd.isLive === true) cur.live = true;
       if (typeof info.playerState === "number") cur.state = info.playerState;
       // 막대를 움직여 지난 장면을 볼 때만(재생 중·30초 넘게 뒤). 멈춤·오류·끝난 방송엔 안 띄움
-      const behind = cur.state === 1 && cur.d > 0 && cur.t > 0 && cur.d - cur.t > 30;
+      const behind = cur.live && cur.state === 1 && cur.d > 0 && cur.t > 0 && cur.d - cur.t > 30;
       setBehindLive((prev) => (prev === behind ? prev : behind));
     };
     window.addEventListener("message", onMsg);
@@ -580,7 +589,7 @@ export default function LiveWatchView(props: Props) {
     [300, 1500, 4000].forEach((ms) => window.setTimeout(() => sendToPlayer(JSON.stringify({ event: "listening", id: 1, channel: "widget" })), ms));
   };
   const backToLive = () => {
-    playerInfo.current = { t: 0, d: 0, state: -1 };
+    playerInfo.current = { t: 0, d: 0, state: -1, live: false, d0: 0, d0at: 0 };
     lastTick.current = { t: 0, at: 0, state: -1 };
     setBehindLive(false);
     setMuted(true);
@@ -674,9 +683,10 @@ export default function LiveWatchView(props: Props) {
 
 
       {/* 돌려보는 중 → 지금 방송으로 */}
-      {behindLive && !seekMode ? (
-        <button type="button" onClick={backToLive} style={{ position: "absolute", left: "50%", top: "calc(124px + env(safe-area-inset-top))", transform: "translateX(-50%)", height: "44px", padding: "0 16px", border: "none", borderRadius: "9999px", background: "#D30005", color: "#FFFFFF", fontSize: "15px", fontWeight: 700, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", whiteSpace: "nowrap", zIndex: 1 }}>
-          <span aria-hidden="true" style={{ width: "8px", height: "8px", borderRadius: "9999px", background: "#FFFFFF" }} />실시간 화면으로 돌아가기
+      {/* 실시간 스트림으로 건너뛰기 — 유튜브 라이브처럼 오른쪽 아래 흰 알약(돌려보기 중에도 보임) */}
+      {behindLive ? (
+        <button type="button" onClick={backToLive} style={{ position: "absolute", right: "12px", bottom: "calc(140px + env(safe-area-inset-bottom))", height: "40px", padding: "0 16px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", whiteSpace: "nowrap", zIndex: 2, boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }}>
+          <svg aria-hidden="true" width="18" height="14" viewBox="0 0 18 14" fill="#111111"><path d="M0 0l8 7-8 7zM9 0l8 7-8 7z" /></svg>실시간 스트림으로 건너뛰기
         </button>
       ) : null}
 
