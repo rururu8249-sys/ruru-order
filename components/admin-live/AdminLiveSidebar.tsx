@@ -41,6 +41,9 @@ type Props = {
     onStart: () => void;
     onEnd: () => void;
     onManage: () => void;
+    /** [2026-11-09] 잠시 쉬는 중(방송 ON 그대로·표시만) */
+    paused?: boolean;
+    onTogglePause?: () => void;
   };
 };
 
@@ -210,12 +213,16 @@ export default function AdminLiveSidebar({
         {broadcastCard ? (
           <section className="mt-3 shrink-0 rounded-xl border border-line bg-surface p-3">
             <div className="flex items-center gap-2">
-              <span className={`inline-block h-2 w-2 rounded-full ${broadcastOn ? "bg-danger-tx" : "bg-line"}`} />
-              <span className="text-[13px] font-bold text-ink">{broadcastOn ? "방송 중" : "방송 대기"}</span>
+              <span className={`inline-block h-2 w-2 rounded-full ${broadcastOn && !broadcastCard.paused ? "bg-danger-tx" : "bg-line"}`} />
+              <span className="text-[13px] font-bold text-ink">{broadcastOn ? (broadcastCard.paused ? "잠시 쉬는 중" : "방송 중") : "방송 대기"}</span>
               {broadcastOn ? <span className="ml-auto text-[12px] font-semibold text-ink-mute">{elapsedLabel(broadcastCard.startedAt, nowMs)}</span> : null}
             </div>
             {broadcastOn && broadcastCard.title ? <div className="mt-1 truncate text-[13px] font-semibold text-ink-soft" title={broadcastCard.title}>{broadcastCard.title}</div> : null}
-            <div className="mt-2 grid grid-cols-2 gap-1.5">
+            {/* [2026-11-09 사장님 「껐다 켰다 귀찮다」] 방송 중엔 [잠시 멈춤 ↔ 다시 시작][방송 종료][방송 관리] 세 칸. 멈춤은 status 안 바꿈(표시만) */}
+            <div className={`mt-2 grid gap-1.5 ${broadcastOn && broadcastCard.onTogglePause ? "grid-cols-3" : "grid-cols-2"}`}>
+              {broadcastOn && broadcastCard.onTogglePause ? (
+                <button type="button" disabled={broadcastCard.saving} onClick={() => broadcastCard.onTogglePause?.()} title={broadcastCard.paused ? "손님 화면에 다시 「라이브 방송 중」" : "방송은 켜 둔 채 손님 화면에 「잠시 쉬는 중」(상품·주문 그대로)"} className={broadcastCard.paused ? "h-9 rounded-lg bg-ink text-[13px] font-bold text-white transition disabled:opacity-50" : "h-9 rounded-lg border border-line bg-surface text-[13px] font-bold text-ink transition hover:bg-surface-2 disabled:opacity-50"}>{broadcastCard.paused ? "다시 시작" : "잠시 멈춤"}</button>
+              ) : null}
               {broadcastOn ? (
                 <button type="button" disabled={broadcastCard.saving} onClick={() => { broadcastCard.onEnd(); onCloseNav?.(); }} className="h-9 rounded-lg border border-line bg-surface text-[13px] font-bold text-danger-tx transition hover:bg-surface-2 disabled:opacity-50">방송 종료</button>
               ) : (

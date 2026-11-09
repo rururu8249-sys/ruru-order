@@ -22,7 +22,17 @@ export type AdminLiveBroadcast = {
   // [2026-09-13] 방송별 📢 상품 안내 — 「📢 채팅」 버튼이 쓰는 한 줄 + 띄운 시각(위젯이 30초만 표시)
   feed_notice_text?: string | null;
   feed_notice_at?: string | null;
+  // [2026-11-09 사장님 「방송 대기중 기능」] 잠시 쉬는 중 시각. 값이 있으면 방송은 ON 그대로(상품·주문·위젯 그대로)인데 손님 화면·관리자 카드만 「잠시 쉬는 중」. NULL=방송 중
+  paused_at?: string | null;
 };
+
+// 잠시 쉬는 중 판정 — 방송 ON + paused_at 이 이번 방송 시작 뒤(옛 방송에 남은 값은 무시 → 시작·종료 때 칸을 안 건드려도 됨. 칸이 아직 없는 DB 에서도 시작·종료가 안 막힘)
+export function isBroadcastPausedNow(b: { status?: string | null; paused_at?: string | null; started_at?: string | null } | null | undefined): boolean {
+  if (!b || String(b.status || "").toUpperCase() !== "ON" || !b.paused_at) return false;
+  const paused = new Date(b.paused_at).getTime();
+  const started = b.started_at ? new Date(b.started_at).getTime() : 0;
+  return Number.isFinite(paused) && paused >= started;
+}
 
 export type StartBroadcastInput = {
   title: string;
@@ -223,6 +233,24 @@ export async function updateAdminLiveBroadcast(input: UpdateBroadcastInput) {
 
 // [2026-07-12 사장님 지침] 위젯 상품카드 ON/OFF — 방송 중 위젯의 상품카드만 숨기고 싶을 때.
 //   broadcasts.widget_card_enabled 한 컬럼만 갱신. 방송 상태·정산/주문/돈 로직 무접촉.
+// [2026-11-09 사장님 「껐다 켰다 귀찮다 — 방송 대기중」] 잠시 멈춤/다시 시작 = broadcasts.paused_at 한 칸만(시각/NULL).
+//   방송 status 는 ON 그대로라 장바구니 담기·채팅 주문·위젯·알림·돈 로직은 아무것도 안 바뀐다. 손님 화면·관리자 카드 표시만.
+export async function setBroadcastPaused(broadcastId: string, paused: boolean) {
+  if (!broadcastId) {
+    throw new Error("방송 ID가 없습니다.");
+  }
+  const { data, error } = await adminCatalogWrite({
+    table: "broadcasts",
+    op: "update",
+    values: { paused_at: paused ? new Date().toISOString() : null },
+    filters: [{ type: "eq", col: "id", val: broadcastId }],
+    select: "*",
+    single: true,
+  });
+  if (error) throw error;
+  return data as AdminLiveBroadcast;
+}
+
 export async function setBroadcastWidgetCard(broadcastId: string, enabled: boolean) {
   if (!broadcastId) {
     throw new Error("방송 ID가 없습니다.");

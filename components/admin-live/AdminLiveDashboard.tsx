@@ -52,6 +52,8 @@ import {
   isOrderInsideBroadcastTime,
   loadAdminLiveBroadcasts,
   setBroadcastWidgetCard,
+  setBroadcastPaused,
+  isBroadcastPausedNow,
   setBroadcastFeedPin,
   setShopOpen,
   startAdminLiveBroadcast,
@@ -1245,6 +1247,22 @@ export default function AdminLiveDashboard() {
     }
   };
 
+  // [2026-11-09 사장님 「방송 대기중 기능」] 잠시 멈춤/다시 시작 — broadcasts.paused_at 한 칸(낙관적 + 실패 롤백). 방송 ON 은 그대로.
+  const broadcastPaused = isBroadcastPausedNow(activeBroadcast);
+  const handleTogglePaused = async () => {
+    if (!activeBroadcast?.id) return;
+    const prevValue = activeBroadcast.paused_at ?? null;
+    const nextValue = broadcastPaused ? null : new Date().toISOString();
+    setBroadcasts((prev) => prev.map((b) => (b.id === activeBroadcast.id ? { ...b, paused_at: nextValue } : b)));
+    try {
+      await setBroadcastPaused(activeBroadcast.id, !broadcastPaused);
+      showAdminToast(broadcastPaused ? "방송을 다시 시작했어요. 손님 화면에 「라이브 방송 중」으로 보여요." : "잠시 쉬는 중으로 바꿨어요. 상품·주문은 그대로예요.", "success");
+    } catch {
+      setBroadcasts((prev) => prev.map((b) => (b.id === activeBroadcast.id ? { ...b, paused_at: prevValue } : b)));
+      showAdminToast("방송 상태 저장에 실패했어요. (DB 에 paused_at 칸이 없으면 supabase/sql/broadcasts_paused_at.sql 실행 필요)", "error");
+    }
+  };
+
   // [2026-09-12] 방송별 📌 고정 공지 저장 — broadcasts.feed_pin_text (서버 경로). 위젯은 broadcasts 실시간으로 바로 반영.
   const handleSaveFeedPin = async (text: string) => {
     if (!activeBroadcast?.id) throw new Error("방송 중에만 저장할 수 있습니다.");
@@ -1768,6 +1786,8 @@ export default function AdminLiveDashboard() {
             onStart: () => { void startBroadcast({ title: broadcastTitle, youtubeUrl: broadcastYoutubeUrl }); },
             onEnd: () => { void endBroadcast(); },
             onManage: () => setBroadcastManageOpen(true),
+            paused: broadcastPaused,
+            onTogglePause: () => { void handleTogglePaused(); },
           }}
         />
 

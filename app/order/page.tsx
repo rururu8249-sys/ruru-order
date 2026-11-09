@@ -1423,6 +1423,13 @@ export default function OrderPage() {
   //   선언이 한참 아래라 «used before its declaration» 타입 오류가 났다.
   //   같은 식을 두 군데 복사하면 나중에 한쪽만 고쳐지는 사고가 나므로 선언을 올려 하나로 유지한다.
   const isBroadcastOn = String(broadcast?.status || "").toUpperCase() === "ON";
+  // [2026-11-09 사장님 「방송 대기중 기능」] 방송은 ON 그대로(상품·담기·주문 그대로)인데 잠시 쉬는 중 — 표시만 바꾼다(빨간 점·깜빡임 멈춤, 문구)
+  const isBroadcastPaused = (() => {
+    if (!isBroadcastOn || !broadcast?.paused_at) return false;
+    const paused = new Date(String(broadcast.paused_at)).getTime();
+    const started = broadcast?.started_at ? new Date(String(broadcast.started_at)).getTime() : 0;
+    return Number.isFinite(paused) && paused >= started; // 옛 방송에 남은 값은 무시(관리자 isBroadcastPausedNow 와 같은 규칙)
+  })();
   // [2026-09-20] 지금 방송에서 📌 고정한 상품 id — 카드 배지·정렬이 같이 본다.
   //   broadcasts 를 select("*") 로 이미 읽고 있어 질의가 늘지 않는다.
   const livePinnedProductId = isBroadcastOn ? widgetPinnedProductId(broadcast as any) : "";
@@ -2970,7 +2977,7 @@ export default function OrderPage() {
       void (async () => {
         const { data: fresh } = await supabase
           .from("broadcasts")
-          .select("id,status,widget_pin_mode,widget_pin_product_id,widget_pin_detail_name")
+          .select("*") // [2026-11-09] paused_at 포함(칸이 아직 없는 DB 에서도 조회가 안 깨지게 * — 기본키 1건)
           .eq("id", bid)
           .maybeSingle();
         if (!fresh) return;
@@ -6295,7 +6302,7 @@ export default function OrderPage() {
             <Link href="/order" style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: uiV2 && isBroadcastOn ? "10px" : "3px", textDecoration: "none" }}>
               {/* [2026-08-30 사장님 요청] 직접 그린 집 아이콘이 어설퍼서 표준 집 이모지(🏠)로 교체.
                   기기(아이폰/안드로이드/윈도우)마다 그림이 조금씩 다르게 나오는 건 이모지 특성이다. */}
-              {uiV2 && isBroadcastOn ? (
+              {uiV2 && isBroadcastOn && !isBroadcastPaused ? (
                 /* [2026-11-05 사장님 「라이브 중일 때 깜빡깜빡」 — 구아바 참고] 방송 중이면 로고 둘레 빨간 테두리 + 물결 두 겹이 퍼져 나감.
                    크기는 그대로 34px(머리말 높이 안 바뀜). 동작 줄이기 설정이면 멈춤. 표시만 */
                 <span aria-hidden style={{ position: "relative", width: "34px", height: "34px", flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
@@ -6309,7 +6316,7 @@ export default function OrderPage() {
                 <span style={uiV2 ? { display: "block", fontSize: "16px", fontWeight: 700, letterSpacing: "-0.02em", color: "#111111" } : { display: "block", fontSize: "15.5px", fontWeight: 900, letterSpacing: "-0.02em", color: "#7A1E47" }}>루루동이</span>
                 <span style={uiV2 ? { display: "flex", alignItems: "center", gap: "4px", marginTop: "2px", fontSize: "13px", fontWeight: 600, color: "#707072" } : { display: "flex", alignItems: "center", gap: "3px", marginTop: "2px", fontSize: "10px", fontWeight: 800, color: "#A8807F" }}>
                   집구석
-                  <span className={uiV2 && isBroadcastOn ? "ruru-live-blink" : undefined} style={uiV2 && isBroadcastOn ? { fontSize: "13px", fontWeight: 700, color: "#FFFFFF", background: "#FF3B30", borderRadius: "9999px", padding: "0 7px", letterSpacing: "0.04em", animation: "ruruLiveBlink 1.2s ease-in-out infinite" } : uiV2 ? { fontSize: "13px", fontWeight: 700, color: broadcast ? "#D30005" : "#707072", letterSpacing: "0.02em" } : { fontSize: "8.5px", fontWeight: 900, color: "#fff", background: broadcast ? "#E8340A" : "#B98A9C", borderRadius: "4px", padding: "1px 4px", letterSpacing: "0.05em" }}>LIVE</span>
+                  <span className={uiV2 && isBroadcastOn && !isBroadcastPaused ? "ruru-live-blink" : undefined} style={uiV2 && isBroadcastOn && !isBroadcastPaused ? { fontSize: "13px", fontWeight: 700, color: "#FFFFFF", background: "#FF3B30", borderRadius: "9999px", padding: "0 7px", letterSpacing: "0.04em", animation: "ruruLiveBlink 1.2s ease-in-out infinite" } : uiV2 && isBroadcastPaused ? { fontSize: "13px", fontWeight: 700, color: "#FFFFFF", background: "#9A9A9C", borderRadius: "9999px", padding: "0 7px", letterSpacing: "0.04em" } : uiV2 ? { fontSize: "13px", fontWeight: 700, color: broadcast ? "#D30005" : "#707072", letterSpacing: "0.02em" } : { fontSize: "8.5px", fontWeight: 900, color: "#fff", background: broadcast ? "#E8340A" : "#B98A9C", borderRadius: "4px", padding: "1px 4px", letterSpacing: "0.05em" }}>LIVE</span>
                 </span>
               </span>
             </Link>
@@ -7057,13 +7064,16 @@ export default function OrderPage() {
               ) : null}
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
                 {/* [2026-11-05 사장님 「라이브 중일 때 움직이는 모습」 — 구아바 참고] 새 모양: 빨간 점 + 퍼져 나가는 물결(동작 줄이기 설정이면 멈춤). 표시만 */}
-                {uiV2 ? (
+                {isBroadcastPaused ? (
+                  /* [2026-11-09] 잠시 쉬는 중 — 회색 점(물결 없음). 상품·주문은 그대로 */
+                  <span aria-hidden="true" style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#9A9A9C", flexShrink: 0 }} />
+                ) : uiV2 ? (
                   <span aria-hidden="true" style={{ position: "relative", width: "10px", height: "10px", flexShrink: 0 }}>
                     <span className="ruru-live-ping" style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "#FF3B30", animation: "ruruLivePing 1.4s ease-out infinite" }} />
                     <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "#FF3B30" }} />
                   </span>
                 ) : <span style={{ width: "9px", height: "9px", borderRadius: "50%", background: "#E8340A", flexShrink: 0, animation: "shimmer 1.2s ease-in-out infinite" }} />}
-                <span style={{ fontSize: "14px", fontWeight: 900 }}>라이브 방송 중!</span>
+                <span style={{ fontSize: "14px", fontWeight: 900 }}>{isBroadcastPaused ? "잠시 쉬는 중 · 곧 다시 시작해요" : "라이브 방송 중!"}</span>
                 <span style={uiV2 ? { marginLeft: "auto", fontSize: "13px", fontWeight: 400, opacity: 0.8 } : { marginLeft: "auto", fontSize: "11.5px", fontWeight: 700, opacity: 0.75 }}>
                   {String(broadcast?.broadcast_public_title || broadcast?.public_title || "").trim() || "루루동이 라이브"}
                 </span>
