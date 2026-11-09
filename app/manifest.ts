@@ -4,6 +4,7 @@ import type { MetadataRoute } from "next";
 //   근거: MDN 「Define your app icons」 + web app manifest 스펙 + evilmartians 「How to Favicon in 2026」(직접 확인).
 //   아이콘 파일은 app/ 폴더 규칙(favicon.ico · icon.svg · apple-icon.png)으로 자동 연결되고,
 //   [2026-10-23 사장님] 홈 화면 아이콘 = 새 루루동이 로고(옷걸이 RD·종이 바탕). 192/512/maskable(안전영역 82%)·apple-icon 180·favicon 모두 같은 그림.
+//   [2026-11-10 사장님] 아이콘 = RURU 자수 로고(RURUDONGi#2). 파일 이름을 icon-v2-* 로 바꿔 크롬이 «바뀐 아이콘»으로 알아보게.
 //   이미 추가한 손님: 안드로이드 크롬은 며칠 안에 새 아이콘으로 자동 갱신, 아이폰은 지우고 다시 추가해야 바뀐다.
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -26,15 +27,15 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#FFFFFF",
     categories: ["shopping"],
     icons: [
-      { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-      { src: "/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: "/icon-v2-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/icon-v2-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/icon-v2-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
     // 홈 화면 아이콘을 길게 누르면 나오는 바로가기
     shortcuts: [
-      { name: "주문하기", short_name: "주문", url: "/order", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
-      { name: "주문조회", short_name: "주문조회", url: "/myorder", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
-      { name: "공지·쪽지", short_name: "공지", url: "/notice", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
+      { name: "주문하기", short_name: "주문", url: "/order", icons: [{ src: "/icon-v2-192.png", sizes: "192x192" }] },
+      { name: "주문조회", short_name: "주문조회", url: "/myorder", icons: [{ src: "/icon-v2-192.png", sizes: "192x192" }] },
+      { name: "공지·쪽지", short_name: "공지", url: "/notice", icons: [{ src: "/icon-v2-192.png", sizes: "192x192" }] },
     ],
   };
 }

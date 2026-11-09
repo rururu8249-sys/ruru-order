@@ -645,7 +645,7 @@ export default function LiveWatchView(props: Props) {
                 {/* 유튜브처럼 [사진][닉네임 · 표시 · 글] — 글이 길어 다음 줄로 가면 사진 밑이 아니라 닉네임 시작 자리에 맞춰 내려감.
                     상자 없이 글자만 — 닉네임과 글은 같은 색(사람마다 정해진 색, 바로 위 다른 사람과는 절대 같은 색 안 됨).
                     관리자는 글 줄을 길게 누르면 관리 창(고정은 왕관 두 사람만) */}
-                <ChatAvatar src={m.badge === "bot" ? "/icon-192.png" : m.avatar} nick={m.nickname} color={color} />
+                <ChatAvatar src={m.badge === "bot" ? "/ruru-ai-avatar.png" : m.avatar} nick={m.nickname} color={color} />
                 <span style={{ minWidth: 0, flex: 1 }}>
                   <span style={{ fontWeight: 800 }}>{m.nickname}</span>
                   <ChatBadge badge={m.badge} />

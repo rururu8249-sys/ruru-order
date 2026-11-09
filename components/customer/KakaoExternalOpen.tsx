@@ -124,7 +124,7 @@ export default function KakaoExternalOpen() {
       <div role="dialog" aria-modal="true" aria-label="루루동이 앱 설치" style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center", fontFamily: "inherit" }}>
         <div style={{ width: "100%", maxWidth: "480px", boxSizing: "border-box", background: "#FFFFFF", color: "#111111", borderRadius: "20px 20px 0 0", padding: "24px 16px calc(20px + env(safe-area-inset-bottom))", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", textAlign: "center" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icon-192.png" alt="" width={64} height={64} style={{ borderRadius: "16px" }} />
+          <img src="/icon-v2-192.png" alt="" width={64} height={64} style={{ borderRadius: "16px" }} />
           <div style={{ fontSize: "20px", fontWeight: 700 }}>루루동이 앱 설치</div>
           {isIos ? (
             <div style={{ fontSize: "15px", color: "#707072", lineHeight: 1.6 }}>아래 가운데 <b style={{ color: "#111111" }}>공유 버튼(네모에 위 화살표)</b>을 누르고<br /><b style={{ color: "#111111" }}>「홈 화면에 추가」</b>를 눌러 주세요.</div>

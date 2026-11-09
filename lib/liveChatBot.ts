@@ -8,7 +8,7 @@ import { cleanProductNameForFeed } from "@/lib/feedText";
 
 
 export const LIVE_CHAT_BOT_KEY = "live_chat_bot_v1";
-export const LIVE_CHAT_BOT_NICK = "루루동이AI";
+export const LIVE_CHAT_BOT_NICK = "루루동이";
 /** 봇 글의 kakao_id 자리(진짜 손님 계정과 안 겹침) */
 export const LIVE_CHAT_BOT_KAKAO = "bot:ruru";
 /** 같은 상품·같은 답은 이 시간 안에 다시 안 올림(도배 방지) */
