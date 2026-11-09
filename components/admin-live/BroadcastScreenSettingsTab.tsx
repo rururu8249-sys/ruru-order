@@ -82,14 +82,13 @@ export default function BroadcastScreenSettingsTab({ onOpenEvent }: Props) {
   }, []);
 
   const productUrl = origin ? `${origin}/product-widget` : "";
-  const feedUrl = origin ? `${origin}/order-feed-widget` : "";
 
   return (
     <div className="space-y-4">
       <div className={cardClass}>
         <h2 className="text-base font-black text-ink">방송 화면에 띄우는 위젯</h2>
         <p className="mt-1 text-[13px] font-bold leading-6 text-ink-soft">
-          위젯은 <b className="text-ink">2개</b>이고 각각 주소가 하나씩 있습니다. 프리즘에서 <b className="text-ink">소스 추가 › 브라우저 소스</b>를 누르고
+          위젯은 <b className="text-ink">상품 카드 1개</b>입니다(주문완료·결제완료 스티커도 여기서 떠요). 프리즘에서 <b className="text-ink">소스 추가 › 브라우저 소스</b>를 누르고
           주소를 붙여넣은 뒤, 폭·높이를 아래 숫자로 적으면 끝입니다. 배경은 저절로 투명하게 나오고, 위치는 프리즘 화면에서 끌어서 정합니다.
           <b className="text-ink">네모 크기가 곧 위젯 크기</b>입니다 — 네모를 키우면 그 비율로 커지고, 줄이면 작아집니다. 여기서 저장할 것은 없습니다.
         </p>
@@ -104,17 +103,6 @@ export default function BroadcastScreenSettingsTab({ onOpenEvent }: Props) {
         w={280}
         h={448}
         where="세로 방송 기준, 오른쪽 위 추천"
-      />
-
-      <WidgetCard
-        icon=""
-        title="주문·입금 알림"
-        what="주문·입금 알림이 뜨는 띠"
-        url={feedUrl}
-        previewUrl={origin ? `${origin}/order-feed-widget?preview=1` : ""}
-        w={880}
-        h={300}
-        where="채팅창 바로 위에 맞추기"
       />
 
       <div className={cardClass}>

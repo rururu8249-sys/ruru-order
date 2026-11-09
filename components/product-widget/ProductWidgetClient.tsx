@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { subscribeLiveEvents } from "@/lib/liveEvents";
 import { resolveProductImageUrl } from "@/components/admin-live/quick-product/productImageUrl";
 import { getActiveBroadcast, loadAdminLiveBroadcasts } from "@/components/admin-live/liveBroadcastController";
 import { resolveBroadcastBrandProducts } from "@/lib/productBrandLinks";
@@ -471,14 +472,19 @@ export default function ProductWidgetClient() {
     let alive = true;
     const load = async () => {
       try {
-        const list: AnyProduct[] = [];
-        for (let offset = 0; ; offset += 1000) {
-          const { data, error } = await supabase.from("products").select("*").order("id").range(offset, offset + 999);
-          if (error) throw error;
-          const page = (data || []) as AnyProduct[];
-          list.push(...page);
-          if (page.length < 1000) break;
-        }
+        // [2026-11-09 DB CPU 줄이기] 상품 전체(약 750개·모든 칸)를 20초마다 읽던 것 → 미리보기(방송 없음)일 때만 읽는다.
+        //   방송 중 카드는 원래부터 loadProductBrandCatalog(이번 방송 상품) 결과만 썼다(list 는 미리보기 표본용).
+        const loadAllProducts = async () => {
+          const list: AnyProduct[] = [];
+          for (let offset = 0; ; offset += 1000) {
+            const { data, error } = await supabase.from("products").select("*").order("id").range(offset, offset + 999);
+            if (error) throw error;
+            const page = (data || []) as AnyProduct[];
+            list.push(...page);
+            if (page.length < 1000) break;
+          }
+          return list;
+        };
 
         const broadcasts = await loadAdminLiveBroadcasts();
         const active = getActiveBroadcast(broadcasts);
@@ -546,6 +552,7 @@ export default function ProductWidgetClient() {
           setPinned(null);
           // 미리보기: 활성 방송이 없을 때만, 사진 있는 최근 상품 1개(품절 아닌 것)를 고정처럼 띄운다
           if (previewMode) {
+            const list = await loadAllProducts();
             const sample = [...list]
               .filter((x) => imageOf(x) && isAvailableWidgetProduct(x))
               .sort((a, b) => String(b?.created_at || "").localeCompare(String(a?.created_at || "")))[0] || null;
@@ -635,16 +642,15 @@ export default function ProductWidgetClient() {
       icon: "", title: "결제완료", name: `${nick(rows[0])}님`, detail: itemLine(rows), tone: "blue",
     });
 
-    const channel = supabase
-      .channel("ruru-product-widget-events")
-      // A. 주문서 작성 완료
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, (payload) => {
+    // [2026-11-09] DB CPU 줄이기 — postgres_changes(표 지켜보기) 대신 DB 트리거가 보내는 «소식»(lib/liveEvents)을 듣는다.
+    //   payload 모양({new, old})은 예전과 같아서 아래 판정·스티커 코드는 그대로.
+    const onOrderInsert = (payload: { new: AnyProduct }) => {
         const row = (payload.new || {}) as AnyProduct;
         scheduleStockReload(); // 재고 즉시 갱신(중복 토스트 가드보다 먼저 — 상품행마다 재고가 줄기 때문)
         collect(`ins:${groupKey(row)}`, row, (rows) => ({ icon: "", title: "주문완료", name: `${nick(rows[0])}님`, detail: itemLine(rows), tone: "green" }));
-      })
-      // B·C. 입금 확인(자동/수동) / D. 카드 결제 완료
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, (payload) => {
+    };
+    // B·C. 입금 확인(자동/수동) / D. 카드 결제 완료
+    const onOrderUpdate = (payload: { new: AnyProduct; old: AnyProduct }) => {
         const row = (payload.new || {}) as AnyProduct;
         const oldRow = (payload.old || {}) as AnyProduct;
         const status = statusOf(row);
@@ -662,18 +668,21 @@ export default function ProductWidgetClient() {
         if (status === "카드결제완료" && oldStatus !== "카드결제완료") {
           collect(`card:${groupKey(row)}`, row, paidToast);
         }
-      })
-      // [2026-07-12 사장님 지침] 즉각 반영 — 20초 폴링을 기다리지 않고 실시간으로 다시 읽는다.
-      //   E. 상품 변경(고정/해제·재고·이미지) F. 방송 진열 변경(담기/빼기/순서) G. 방송 변경(위젯 토글·시작/종료).
-      //   공용 0.4초 디바운스(scheduleStockReload) 재사용. 실시간이 안 와도 기존 20초 폴링이 백업으로 그대로 동작.
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "products" }, () => scheduleStockReload())
-      .on("postgres_changes", { event: "*", schema: "public", table: "broadcast_products" }, () => scheduleStockReload())
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "broadcasts" }, () => scheduleStockReload())
-      .subscribe();
+    };
+    // [2026-07-12 사장님 지침] 즉각 반영 — 20초 폴링을 기다리지 않고 바로 다시 읽는다.
+    //   E. 상품 변경(고정/해제·재고·이미지) F. 방송 진열 변경(담기/빼기/순서) G. 방송 변경(위젯 토글·시작/종료)
+    //   = 'catalog' 소식. 공용 0.4초 디바운스(scheduleStockReload) 재사용. 소식이 안 와도 기존 20초 폴링이 백업.
+    const unsubscribe = subscribeLiveEvents(supabase, {
+      onOrder: (e) => {
+        if (e.type === "INSERT") onOrderInsert({ new: e.new as AnyProduct });
+        else if (e.type === "UPDATE") onOrderUpdate({ new: e.new as AnyProduct, old: e.old as AnyProduct });
+      },
+      onCatalog: () => scheduleStockReload(),
+    });
     return () => {
       if (reloadTimer) window.clearTimeout(reloadTimer);
       buffers.forEach((b) => window.clearTimeout(b.timer));
-      supabase.removeChannel(channel);
+      unsubscribe();
     };
   }, []);
 

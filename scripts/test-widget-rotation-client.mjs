@@ -44,7 +44,8 @@ for (mode of ['all','history','selected']) {
   ranges.length=0;
   await act(async()=>{tree=Renderer.create(React.createElement(Client));});
   const rendered=()=>JSON.stringify(tree.toJSON());
-  assert.deepEqual(ranges,[[0,999],[1000,1999]],'all registered products must paginate past 1000');
+  // [2026-11-09 DB CPU 줄이기] 방송 중엔 상품 전체를 안 읽는다(이번 방송 상품만 product-brand-catalog 로) — 전체 읽기는 미리보기(방송 없음)만
+  assert.deepEqual(ranges,[],'active broadcast must not page the whole products table');
   if(mode==='all'){
     assert(rendered().includes('상품-1'));
     await act(async()=>intervals.get(5000)());

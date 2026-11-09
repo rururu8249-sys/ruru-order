@@ -20,6 +20,7 @@ import { showAdminToast } from "@/lib/adminToast";
 import { primeAdminVoice, playOrderAlert, playDepositAlert } from "@/lib/adminVoice";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
+import { subscribeLiveEvents } from "@/lib/liveEvents";
 import AdminLiveCustomersPanel from "./AdminLiveCustomersPanel";
 import AdminLivePaymentPanel from "./AdminLivePaymentPanel";
 import AdminLiveSideDrawer from "./AdminLiveSideDrawer";
@@ -1124,17 +1125,22 @@ export default function AdminLiveDashboard() {
         /* 소리 실패 시 무시 */
       }
     };
-    const channel = supabase
-      .channel("ruru-admin-live-orders-realtime")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, (payload: any) => {
-        playNewOrderTone(payload);
-        scheduleReload(payload);
-      })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, (payload: any) => scheduleReload(payload))
-      .subscribe();
+    // [2026-11-09] DB CPU 줄이기 — postgres_changes 대신 DB 트리거 «소식»(lib/liveEvents). payload 모양({new, old}) 같음.
+    //   소식엔 id·order_group_id 가 있어 띵동(주문서당 1번)·바뀐 id만 다시 읽기는 예전 그대로.
+    const unsubscribe = subscribeLiveEvents(supabase, {
+      onOrder: (e) => {
+        const payload = { new: e.new, old: e.old };
+        if (e.type === "INSERT") {
+          playNewOrderTone(payload);
+          scheduleReload(payload);
+        } else {
+          scheduleReload(payload);
+        }
+      },
+    });
     return () => {
       if (debounce) clearTimeout(debounce);
-      supabase.removeChannel(channel);
+      unsubscribe();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
