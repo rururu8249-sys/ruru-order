@@ -321,18 +321,11 @@ export default function LiveWatchView(props: Props) {
         if (document.activeElement !== iframeRef.current) return;
         window.setTimeout(() => { try { rootRef.current?.focus({ preventScroll: true }); } catch { /* 무시 */ } }, 150);
         if (!seekModeRef.current) { setSeekMode(true); restart(); return; }
-        // 돌려보기 중 또 누름 — 막대 조작인지 빈 곳 누름인지 1.2초 뒤에 판단
-        const snap = { t: playerInfo.current.t, state: playerInfo.current.state, at: Date.now() };
-        restart();
+        // [05:38 사장님 「다시 누르면 글씨가 늦게 나타남」] 돌려보기 중 또 누르면 바로 원래대로(기다리지 않음).
+        //   막대를 끌어 놓은 거였으면 재생 위치가 건너뛴 소식(seekPokeRef)이 와서 다시 돌려보기 화면이 됨.
+        if (timer) window.clearTimeout(timer);
         if (check) window.clearTimeout(check);
-        check = window.setTimeout(() => {
-          const cur = playerInfo.current;
-          const elapsed = (Date.now() - snap.at) / 1000;
-          const expected = snap.state === 1 ? snap.t + elapsed : snap.t;
-          const jumped = Math.abs(cur.t - expected) > 2.5 || cur.state !== snap.state;
-          if (jumped) restart();
-          else { if (timer) window.clearTimeout(timer); setSeekMode(false); }
-        }, 1200);
+        setSeekMode(false);
       }, 0);
     };
     window.addEventListener("blur", onBlur);
