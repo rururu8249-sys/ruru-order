@@ -285,12 +285,18 @@ export async function POST(request: NextRequest) {
     //     · 10자리 미만 값은 collectKnownPhoneDigits에서 이미 버린다.
     //   금액/입금/정산/배송/주문상태/포인트 값은 하나도 건드리지 않는다(orders.kakao_id 컬럼 1개만 채움).
     //   실패해도 로그인은 그대로 성공 처리한다.
+    // [2026-11-10] 회원의 «정본» 카카오 번호 — 전화번호로 찾은 회원이 이미 다른 카카오 번호를 갖고 있으면 그 번호.
+    //   (사장님 실측: 같은 번호 010-9999-2420 에 카카오 계정 두 개 → 로그인은 같은 회원인데 폰엔 다른 번호가 저장돼
+    //    카카오 번호로 회원을 찾는 곳(채팅·정보수정·구매제한·구독인증 등)에서 «회원 없음»이 됐다)
+    //   손님 폰은 응답의 server_kakao_id 로 저장값을 맞춘다. 회원 줄의 kakao_id 는 예전처럼 비어 있을 때만 채운다.
+    const canonicalKakaoId = cleanText(existing?.kakao_id) || kakaoId;
+
     if (kakaoId) {
       try {
         const { data: linkedOrderRows } = await supabase
           .from("orders")
           .select("customer_phone")
-          .eq("kakao_id", kakaoId)
+          .eq("kakao_id", canonicalKakaoId)
           .limit(500);
 
         // 번호 개수 상한(20) — 쿼리 길이 폭주 방지. 앞쪽이 우선순위(현재번호 → 프로필 → 변경이력 → 연결주문).
@@ -318,7 +324,7 @@ export async function POST(request: NextRequest) {
             owners: Array.isArray(phoneOwnerRows)
               ? (phoneOwnerRows as Array<{ customer_phone?: unknown; kakao_id?: unknown }>)
               : [],
-            kakaoId,
+            kakaoId: canonicalKakaoId,
           });
           const backfillVariants = Array.from(
             new Set(allowedDigits.flatMap((digits) => makePhoneVariants(digits)))
@@ -327,7 +333,7 @@ export async function POST(request: NextRequest) {
           if (backfillVariants.length > 0) {
             const { error: orderBackfillError } = await supabase
               .from("orders")
-              .update({ kakao_id: kakaoId })
+              .update({ kakao_id: canonicalKakaoId })
               .is("kakao_id", null)
               .in("customer_phone", backfillVariants);
             if (orderBackfillError) {
@@ -511,6 +517,8 @@ export async function POST(request: NextRequest) {
         needs_nickname_confirm: needsNicknameConfirm,
         // 서버가 기억하는 정답 닉네임 — 손님 폰이 이 값으로 자기 저장값을 맞춘다
         server_youtube_nickname: cleanText(updateData.youtube_nickname as string | undefined) || cleanText(existing.youtube_nickname),
+        // [2026-11-10] 회원의 정본 카카오 번호 — 손님 폰이 이 값으로 저장값을 맞춘다
+        server_kakao_id: canonicalKakaoId || null,
         // [2026-09-11] 남이 쓰는 이름이라 저장하지 않았다 → 손님 화면이 관문/갈림길을 띄운다
         nickname_taken: nicknameTaken,
       });

@@ -3637,7 +3637,7 @@ export default function OrderPage() {
       // [2026-08-30] 이 API 는 회원의 customer_phone 을 옮긴다.
       //   반쪽짜리 번호가 절대 들어가면 안 된다(계정분리 사고). 완성된 번호만 보낸다.
       if (!cleanNick || !isOrderablePhone(phone)) return;
-      const dedupeKey = `ruru_nick_synced_${phone}_${cleanNick}`;
+      const dedupeKey = `ruru_nick_synced_v2_${phone}_${cleanNick}`;
       if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(dedupeKey)) return;
       const res = await fetch("/api/customer-login-sync", {
         method: "POST",
@@ -3664,6 +3664,10 @@ export default function OrderPage() {
           setNicknameConflict(cleanNick);
           return;
         }
+        // [2026-11-10] 같은 번호의 회원에 «다른 카카오 계정»으로 들어온 경우 — 회원의 원래 카카오 번호로 맞춘다.
+        //   (사이트 곳곳이 카카오 번호로 회원을 찾기 때문 — 채팅·정보수정·구매제한·구독인증 등)
+        const serverKakao = String(json?.server_kakao_id || "").trim();
+        if (serverKakao && typeof localStorage !== "undefined" && localStorage.getItem("ruru_kakao_id") !== serverKakao) localStorage.setItem("ruru_kakao_id", serverKakao);
         const serverNick = String(json?.server_youtube_nickname || "").trim();
         if (serverNick && serverNick !== cleanNick) {
           setYoutubeNickname(serverNick);
@@ -8155,7 +8159,7 @@ export default function OrderPage() {
                   setLiveChatMessages((prev) => mergeChat(prev, [temp]));
                   const dropTemp = () => setLiveChatMessages((prev) => prev.filter((x) => x.id !== tempId));
                   try {
-                    const res = await fetch("/api/live-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kakao_id: readLiveChatKakaoId(), bc: String(broadcast.id), body, phone: customerPhone, nickname: youtubeNickname.trim() }) });
+                    const res = await fetch("/api/live-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kakao_id: readLiveChatKakaoId(), bc: String(broadcast.id), body }) });
                     const json = await res.json().catch(() => null);
                     if (json?.ok && json.message) {
                       const m = parseChatMessage(json.message);

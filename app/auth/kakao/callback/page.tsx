@@ -99,6 +99,9 @@ export default function KakaoCallbackPage() {
             if (syncData?.needs_nickname_confirm) localStorage.setItem("ruru_nickname_reconfirm", "1");
             else localStorage.removeItem("ruru_nickname_reconfirm");
             // [2026-08-31] 서버가 기억하는 닉네임이 정답 — 관리자가 바꾼 이름을 폰에도 반영
+            // [2026-11-10] 전화번호로 찾은 회원의 카카오 번호가 다르면(같은 번호·다른 카카오 계정) 회원의 원래 번호로 맞춘다
+            const serverKakao = String(syncData?.server_kakao_id || "").trim();
+            if (serverKakao) localStorage.setItem("ruru_kakao_id", serverKakao);
             const serverNick = String(syncData?.server_youtube_nickname || "").trim();
             if (serverNick) localStorage.setItem("ruru_youtube_nickname", serverNick);
           } catch { /* 무시 */ }
