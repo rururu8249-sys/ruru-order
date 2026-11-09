@@ -1,7 +1,7 @@
 // [2026-11-10] 사이트 채팅 이모티콘 — 서버 공용(service_role 로만 부른다).
 //   설정 읽기·직접 넣은/막은 손님 명단(비공개 저장소)·누적 구매 금액(읽기만)·쓸 수 있는지 판정.
 //   누적 구매 = 결제 끝난 주문 줄만(상태가 입금확인·카드결제완료·출고 등 — 판매분석과 같은 결제완료 목록, 취소·테스트·삭제 제외).
-//   사람 = 카카오 계정(kakao_id), 카카오 계정이 안 찍힌 옛 주문은 지금 전화번호로.
+//   사람 = 카카오 계정(kakao_id) 주문 + 지금 전화번호로 들어온 주문(겹치면 한 번).
 //   주문·돈·포인트 쓰기 없음.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { MONTH_COLS } from "@/lib/liveSummary";
@@ -80,7 +80,8 @@ export async function paidTotalOf(sb: SupabaseClient, who: { kakaoId?: string; p
   if (k) ors.push(`kakao_id.eq.${k}`);
   if (phoneOk(p)) {
     const vs = Array.from(new Set([p, ...koreanPhoneVariants(p)])).map((v) => `"${v}"`).join(",");
-    ors.push(k ? `and(kakao_id.is.null,customer_phone.in.(${vs}))` : `customer_phone.in.(${vs})`);
+    // 지금 전화번호로 들어온 주문은 카카오 계정이 달라도 같은 손님(카카오 계정을 둘 쓰던 손님 — 로그인이 전화번호로 같은 회원에 들여보냄)
+    ors.push(`customer_phone.in.(${vs})`);
   }
   if (!ors.length) return 0;
   const rows: Record<string, unknown>[] = [];
