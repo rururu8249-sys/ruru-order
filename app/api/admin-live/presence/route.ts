@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { writePresence } from "@/lib/presenceWrite";
+import { buildLiveVisitors, summarizeLiveVisitors, type CustomerRow, type CartRow, type OrderRow } from "@/lib/presenceLive";
 
 export const dynamic = "force-dynamic";
 
@@ -25,12 +26,11 @@ function clean(value: unknown) {
   return String(value ?? "").trim();
 }
 
-function pageLabel(pageType: string) {
-  if (pageType === "order_form") return "주문서 작성중";
-  if (pageType === "order_lookup") return "주문조회";
-  if (pageType === "group_buy") return "공구상품";
-  if (pageType === "admin") return "관리자";
-  return "사이트 접속";
+// KST 오늘 0시(ISO) — 방송 꺼진 날의 주문 범위
+function kstTodayStartIso(now: number) {
+  const kst = new Date(now + 9 * 60 * 60 * 1000);
+  const y = kst.getUTCFullYear(), m = kst.getUTCMonth(), d = kst.getUTCDate();
+  return new Date(Date.UTC(y, m, d) - 9 * 60 * 60 * 1000).toISOString();
 }
 
 // [2026-08-29 사장님 요청] 왼쪽 사이드바에서 "지금 몇 명 들어와 있는지" 바로 보이게.
@@ -39,7 +39,8 @@ function pageLabel(pageType: string) {
 export async function GET() {
   try {
     const supabase = getSupabase();
-    const activeSince = new Date(Date.now() - 1000 * 120).toISOString();
+    const now = Date.now();
+    const activeSince = new Date(now - 1000 * 120).toISOString();
 
     // [2026-08-29] 접속자가 100명이 넘어도 숫자는 정확해야 한다.
     //   → 총 인원은 count 로 세고, 목록은 최근 60명만 가져온다(화면에 다 못 넣으므로).
@@ -48,21 +49,24 @@ export async function GET() {
       .select("id", { count: "exact", head: true })
       .gte("last_seen_at", activeSince);
 
-    // [2026-08-31] viewing_product(지금 담은 상품) 포함 — 칸이 아직 없으면(SQL 전) 옛 select 로 폴백
-    let { data, error } = await supabase
-      .from("visitor_presence")
-      .select("id, visitor_key, nickname, page_type, last_seen_at, viewing_product")
-      .gte("last_seen_at", activeSince)
-      .order("last_seen_at", { ascending: false })
-      .limit(500);   // 분류(주문서/조회/기타) 숫자를 정확히 세기 위해 넉넉히 읽고, 목록은 아래에서 자른다
-    if (error && /column .* does not exist|42703/i.test(String(error.message ?? ""))) {
-      const retry = await supabase
+    // [2026-11-09] kakao_id·activity* 포함(visitor_presence_activity.sql) — 칸이 아직 없으면 옛 select 로 폴백(viewing_product 도 같은 방식)
+    const selects = [
+      "id, visitor_key, nickname, page_type, last_seen_at, viewing_product, kakao_id, activity, activity_label, activity_at",
+      "id, visitor_key, nickname, page_type, last_seen_at, viewing_product",
+      "id, visitor_key, nickname, page_type, last_seen_at",
+    ];
+    let data: Array<Record<string, unknown>> | null = null;
+    let error: { message?: string } | null = null;
+    for (const sel of selects) {
+      const r = await supabase
         .from("visitor_presence")
-        .select("id, visitor_key, nickname, page_type, last_seen_at")
+        .select(sel)
         .gte("last_seen_at", activeSince)
         .order("last_seen_at", { ascending: false })
-        .limit(500);
-      data = (retry.data ?? null) as typeof data; error = retry.error;
+        .limit(500);   // 분류(주문서/조회/기타) 숫자를 정확히 세기 위해 넉넉히 읽고, 목록은 아래에서 자른다
+      data = (r.data ?? null) as Array<Record<string, unknown>> | null;
+      error = r.error;
+      if (!error || !/column .* does not exist|could not find the .* column|PGRST204|42703/i.test(String(error.message ?? ""))) break;
     }
 
     if (error) {
@@ -71,14 +75,44 @@ export async function GET() {
     }
 
     const allRows = (data || []) as Array<Record<string, unknown>>;
-    const visitors = allRows.slice(0, 60).map((row) => ({
-      id: String(row.id),
-      nickname: clean(row.nickname) || "비회원 방문자",
-      pageType: clean(row.page_type) || "page",
-      pageLabel: pageLabel(clean(row.page_type) || "page"),
-      lastSeenAt: clean(row.last_seen_at),
-      viewingProduct: clean((row as { viewing_product?: unknown }).viewing_product),
-    }));
+    const listedRows = allRows.slice(0, 60);
+
+    // [2026-11-09] 회원·장바구니·오늘(이번 방송) 주문을 붙인다 — 읽기 SELECT 3~4개(목록 60명 기준), 실패하면 그 정보만 빈 값.
+    const kakaoIds = Array.from(new Set(listedRows.map((r) => clean(r.kakao_id)).filter(Boolean)));
+    const nicks = Array.from(new Set(listedRows.map((r) => clean(r.nickname)).filter(Boolean)));
+    const nowIso = new Date(now).toISOString();
+    // 주문 범위: 방송 켜져 있으면 그 방송 시작부터, 아니면 오늘(KST) 0시부터
+    let since = kstTodayStartIso(now);
+    try {
+      const { data: bc } = await supabase.from("broadcasts").select("started_at,status,is_deleted").order("started_at", { ascending: false }).limit(20);
+      const on = ((bc || []) as Array<Record<string, unknown>>).find((b) => b.is_deleted !== true && String(b.status || "").toUpperCase() === "ON");
+      if (on?.started_at) since = String(on.started_at);
+    } catch { /* 범위는 오늘로 */ }
+
+    const [custRes, cartRes, ordKakaoRes, ordNickRes] = await Promise.all([
+      (kakaoIds.length || nicks.length)
+        ? supabase.from("customers").select("kakao_id,youtube_nickname,customer_name,customer_phone,is_blocked")
+            .or([kakaoIds.length ? `kakao_id.in.(${kakaoIds.map((v) => `"${v}"`).join(",")})` : "", nicks.length ? `youtube_nickname.in.(${nicks.map((v) => `"${v.replace(/"/g, "")}"`).join(",")})` : ""].filter(Boolean).join(","))
+            .limit(300)
+        : Promise.resolve({ data: [] as unknown[], error: null }),
+      supabase.from("cart_reservations").select("kakao_id,nickname,qty,unit_price,product_name,detail_name,expires_at").gt("expires_at", nowIso).limit(2000),
+      kakaoIds.length
+        ? supabase.from("orders").select("id,order_group_id,kakao_id,youtube_nickname,admin_order_status_v2,order_manage_status,final_amount,total_price,created_at,is_deleted,is_test_order,product_name").gte("created_at", since).in("kakao_id", kakaoIds).limit(2000)
+        : Promise.resolve({ data: [] as unknown[], error: null }),
+      nicks.length
+        ? supabase.from("orders").select("id,order_group_id,kakao_id,youtube_nickname,admin_order_status_v2,order_manage_status,final_amount,total_price,created_at,is_deleted,is_test_order,product_name").gte("created_at", since).in("youtube_nickname", nicks).limit(2000)
+        : Promise.resolve({ data: [] as unknown[], error: null }),
+    ]);
+    const ordersMerged = new Map<string, OrderRow>();
+    for (const o of [...((ordKakaoRes.data || []) as OrderRow[]), ...((ordNickRes.data || []) as OrderRow[])]) ordersMerged.set(String(o.id), o);
+
+    const visitors = buildLiveVisitors({
+      rows: listedRows,
+      customers: (custRes.data || []) as CustomerRow[],
+      carts: (cartRes.data || []) as CartRow[],
+      orders: Array.from(ordersMerged.values()),
+      now,
+    });
 
     // 분류 숫자는 읽어온 전체(최대 500)로 센다 — 목록은 60명만 보여줘도 숫자는 맞아야 한다.
     const byType = { orderForm: 0, orderLookup: 0, admin: 0, others: 0 };
@@ -94,7 +128,7 @@ export async function GET() {
       ? (totalCount as number)
       : visitors.length;
 
-    return NextResponse.json({ ok: true, available: true, total, listed: visitors.length, byType, visitors });
+    return NextResponse.json({ ok: true, available: true, total, listed: visitors.length, byType, summary: summarizeLiveVisitors(visitors, total), since, visitors });
   } catch (error) {
     return NextResponse.json(
       { ok: false, message: error instanceof Error ? error.message : String(error) },

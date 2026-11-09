@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo } from "react";
 import { usePathname } from "next/navigation";
+import { PRESENCE_ACTIVITY_EVENT, readPresenceActivity } from "@/lib/presenceActivity";
 
 function getOrCreateVisitorKey() {
   if (typeof window === "undefined") return "";
@@ -41,6 +42,12 @@ function getViewingProduct() {
     if (!at || Date.now() - at > 10 * 60 * 1000) return "";
     return String(parsed?.name || "").trim().slice(0, 80);
   } catch { return ""; }
+}
+
+// [2026-11-09] 카카오 계정(고객 식별 키) — 관리자 「지금 접속」이 장바구니·오늘 주문을 정확히 붙이려고. 로그인 전엔 빈값.
+function getKakaoId() {
+  if (typeof window === "undefined") return "";
+  try { return String(window.localStorage.getItem("ruru_kakao_id") || "").trim(); } catch { return ""; }
 }
 
 function detectPageType(pathname: string) {
@@ -83,6 +90,8 @@ export default function PresenceHeartbeat() {
             path: pathname,
             nickname: getNickname(),
             viewingProduct: getViewingProduct(),
+            kakaoId: getKakaoId(),
+            activity: readPresenceActivity(),
           }),
         });
       } catch {
@@ -93,9 +102,21 @@ export default function PresenceHeartbeat() {
     void send();
     const timer = window.setInterval(send, 30000);
 
+    // [2026-11-09] 손님이 옵션 창을 열거나 담거나 주문서를 열면 30초를 기다리지 않고 바로 알린다(3초에 한 번으로 묶음 — 요청 폭주 방지).
+    let lastQuick = 0;
+    let quickTimer: number | null = null;
+    const onActivity = () => {
+      const wait = Math.max(0, 3000 - (Date.now() - lastQuick));
+      if (quickTimer !== null) return;
+      quickTimer = window.setTimeout(() => { quickTimer = null; lastQuick = Date.now(); void send(); }, wait);
+    };
+    window.addEventListener(PRESENCE_ACTIVITY_EVENT, onActivity);
+
     return () => {
       stopped = true;
       window.clearInterval(timer);
+      if (quickTimer !== null) window.clearTimeout(quickTimer);
+      window.removeEventListener(PRESENCE_ACTIVITY_EVENT, onActivity);
     };
   }, [pathname, pageType]);
 

@@ -46,6 +46,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { normalizeProductSearchText, productSearchMatches } from "@/lib/productSearch";
 import { LIVE_PAUSED_TEXT_KEY, LIVE_PAUSED_TEXT_DEFAULT, resolveLivePausedText } from "@/lib/livePausedText";
 import { openYoutubeChannel } from "@/lib/youtubeChannelLink";
+import { setPresenceActivity } from "@/lib/presenceActivity";
 import { registerBrandAliasesFromProducts } from "@/lib/brandSearchAliases";
 import { resolveOrderItemPhoto } from "@/lib/orderItemPhoto";
 import { HOWTO_DEFAULT, parseHowtoSteps } from "@/lib/howto";
@@ -1622,6 +1623,8 @@ export default function OrderPage() {
   const [nicknameCopyDone, setNicknameCopyDone] = useState(false);
   const [paymentGuideOpen, setPaymentGuideOpen] = useState(false);
   const [orderSheetOpen, setOrderSheetOpen] = useState(false);
+  // [2026-11-09] 주문서 확인 창이 열리면 관리자 「지금 접속」에 「주문서 확인 중」(신호만)
+  useEffect(() => { if (orderSheetOpen) setPresenceActivity("sheet"); }, [orderSheetOpen]);
   const [finalSubmitAcknowledged, setFinalSubmitAcknowledged] = useState(false);
   const [finalSubmitConfirmationEnabled, setFinalSubmitConfirmationEnabled] = useState(true);
   const finalSubmitReady = finalSubmitConfirmationReady(finalSubmitConfirmationEnabled, finalSubmitAcknowledged);
@@ -4489,6 +4492,7 @@ export default function OrderPage() {
       setCartAddedItem(clampedItem); setCartAddedOpen(true);
       // [2026-08-31 사장님 요청] 접속자 옆 "지금 보는 상품" — 담는 순간의 상품명을 접속 신호에 얹는다(표시 전용, 10분 유효)
       try { window.localStorage.setItem("ruru_viewing_product", JSON.stringify({ name: String(clampedItem?.product_name || "").trim().slice(0, 80), at: Date.now() })); } catch { /* 무시 */ }
+      setPresenceActivity("cart", String(clampedItem?.product_name || "").trim()); // [2026-11-09] 「담았어요 · 상품명」
     }
   };
 
@@ -4732,6 +4736,7 @@ export default function OrderPage() {
   //   값이 없으면 예전과 완전히 같다(기존 호출부 무변경).
   const openRegisteredOptionSelectSheet = (product: BroadcastProduct, preselectDetail?: string) => {
     void fetchCartReservations(); // 담기 직전 — 다른 고객이 방금 담은 것까지 반영해 품절을 정확히 보여준다
+    setPresenceActivity("option", String(product?.product_name || "").trim()); // [2026-11-09] 관리자 「지금 접속」 표시용(신호만)
     setRegisteredOptionSelectProduct(product);
     setRegisteredOptionColor("");
     setRegisteredOptionSize("");
@@ -5583,6 +5588,7 @@ export default function OrderPage() {
 
       setPaymentGuideOpen(true);
       setOrderSheetOpen(false);
+      setPresenceActivity("submitted"); // [2026-11-09] 관리자 「지금 접속」 표시용(신호만 — 주문 저장과 무관)
 
       clearOrderDraftData();
 

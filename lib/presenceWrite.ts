@@ -12,6 +12,7 @@
 //    주문 · 입금 · 정산 · 배송 · 재고 · 포인트는 전혀 건드리지 않는다.
 
 import { createClient } from "@supabase/supabase-js";
+import { normalizePresenceActivity } from "@/lib/presenceActivity";
 
 export function getPresenceSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -39,6 +40,10 @@ export function normalizePresenceInput(body: Record<string, unknown>) {
     nickname: clean(body.nickname).slice(0, 40),
     // [2026-08-31] 손님이 마지막으로 담은 상품(표시 전용) — 기존 30초 신호에 얹혀 와서 요청 증가 없음
     viewingProduct: clean(body.viewingProduct).slice(0, 80),
+    // [2026-11-09] 카카오 계정(고객 식별 키) — 관리자 「지금 접속」이 장바구니·오늘 주문을 정확히 붙이려고. 글자·숫자만 40자.
+    kakaoId: /^[A-Za-z0-9_-]{1,40}$/.test(clean(body.kakaoId)) ? clean(body.kakaoId) : "",
+    // [2026-11-09] 지금 하는 일(종류 화이트리스트·라벨 80자·시각) — 표시 전용
+    activity: normalizePresenceActivity(body.activity),
   };
 }
 
@@ -194,11 +199,20 @@ export async function writePresence(
 
   // [2026-08-31] viewing_product 는 새 칸 — SQL 실행 전 배포돼도 접속 신호가 죽지 않게,
   //   "칸 없음" 오류면 그 값만 빼고 한 번 더 저장한다. (customer-note 의 배포 순서 사고 방지 패턴)
+  // [2026-11-09] kakao_id·activity* 는 새 칸(visitor_presence_activity.sql) — 칸 없으면 그 값들을 빼고 한 번 더(접속 신호가 죽지 않게).
+  const activityRow = input.activity
+    ? { activity: input.activity.kind, activity_label: input.activity.label || null, activity_at: new Date(input.activity.at || Date.now()).toISOString() }
+    : { activity: null, activity_label: null, activity_at: null };
+  const isMissingCol = (e: unknown) => /column .* does not exist|could not find the .* column|PGRST204|42703/i.test(String((e as { message?: unknown })?.message ?? ""));
   let { error } = await supabase.from("visitor_presence").upsert(
-    { ...baseRow, viewing_product: input.viewingProduct || null },
+    { ...baseRow, viewing_product: input.viewingProduct || null, kakao_id: input.kakaoId || null, ...activityRow },
     { onConflict: "visitor_key" },
   );
-  if (error && /column .* does not exist|could not find the .* column|PGRST204|42703/i.test(String(error.message ?? ""))) {
+  if (error && isMissingCol(error)) {
+    const retry1 = await supabase.from("visitor_presence").upsert({ ...baseRow, viewing_product: input.viewingProduct || null }, { onConflict: "visitor_key" });
+    error = retry1.error;
+  }
+  if (error && isMissingCol(error)) {
     const retry = await supabase.from("visitor_presence").upsert(baseRow, { onConflict: "visitor_key" });
     error = retry.error;
   }
