@@ -230,7 +230,7 @@ export default function LiveWatchView(props: Props) {
     // [2026-11-10 04:09] 카톡 채널에서 연 화면(카톡 안 브라우저)은 앱 설치가 안 됨 → 폰 기본 브라우저(크롬·삼성인터넷·사파리)로 이 화면을 열어 줌.
     //   거기서 다시 「앱 설치」를 누르면 설치 창이 뜬다. (카카오가 제공하는 주소 kakaotalk://web/openExternal)
     if (isKakaoInAppBrowser(navigator.userAgent)) {
-      openOrderInExternalBrowser("/order"); // 로그인 정보 같이 넘김 → 다시 로그인 안 해도 됨
+      openOrderInExternalBrowser("/order", true); // 로그인 정보 같이 넘김 + 넘어가자마자 「설치하기」 창 → 다시 로그인 안 해도 됨
       return;
     }
     const w = window as unknown as { __ruruPwaPrompt?: { prompt: () => void; userChoice: Promise<unknown> } | null };
