@@ -1,10 +1,13 @@
 // [2026-11-10] 사이트 채팅 이모티콘 — 서버 공용(service_role 로만 부른다).
 //   설정 읽기·직접 넣은/막은 손님 명단(비공개 저장소)·누적 구매 금액(읽기만)·쓸 수 있는지 판정.
-//   누적 구매 = 결제 끝난 주문만(판매분석·결산과 같은 규칙: lib/liveSummary groupOrders — 첫 줄 상태가 결제완료, 취소·테스트 제외).
+//   누적 구매 = 결제 끝난 주문 줄만(상태가 입금확인·카드결제완료·출고 등 — 판매분석과 같은 결제완료 목록, 취소·테스트·삭제 제외).
 //   사람 = 카카오 계정(kakao_id), 카카오 계정이 안 찍힌 옛 주문은 지금 전화번호로.
 //   주문·돈·포인트 쓰기 없음.
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { groupOrders, MONTH_COLS } from "@/lib/liveSummary";
+import { MONTH_COLS } from "@/lib/liveSummary";
+import { PAID_STATUS_VALUES } from "@/lib/admin-v2/statusDisplay";
+
+const PAID = new Set(PAID_STATUS_VALUES);
 import { koreanPhoneVariants } from "@/lib/order/phone";
 import { LIVE_WATCH_KEY, parseLiveWatchSetting } from "@/lib/liveWatch";
 import {
@@ -90,9 +93,18 @@ export async function paidTotalOf(sb: SupabaseClient, who: { kakaoId?: string; p
     rows.push(...list.filter((r) => r.is_deleted !== true));
     if (list.length < 1000) break;
   }
-  return groupOrders(rows)
-    .filter((g) => g.paid && !g.canceled && !g.isTest)
-    .reduce((s, g) => s + g.amount, 0);
+  // 줄마다 — 결제완료 상태인 줄만(같은 주문서 안에서 한 상품만 취소된 경우도 남은 상품은 셈). 테스트·삭제 제외.
+  let sum = 0;
+  for (const r of rows) {
+    if (r.is_test_order === true) continue;
+    const a = String(r.admin_order_status_v2 || "").trim();
+    const b = String(r.order_manage_status || "").trim();
+    if (a.includes("취소") || b.includes("취소")) continue;
+    if (!PAID.has(a) && !PAID.has(b)) continue;
+    const v = Number(r.final_amount ?? r.adjusted_total_price ?? r.total_price ?? 0);
+    if (Number.isFinite(v) && v > 0) sum += v;
+  }
+  return sum;
 }
 
 export function sinceOf(setting: ChatEmojiSetting): string | null {

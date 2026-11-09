@@ -59,6 +59,18 @@ async function describe(sb: Sb, phones: string[], setting: ChatEmojiSetting, lis
   const { data } = await sb.from("customers").select("customer_phone, customer_name, youtube_nickname, kakao_nickname, kakao_id").in("customer_phone", all).order("created_at", { ascending: true });
   const byPhone = new Map<string, { customer_name?: string; youtube_nickname?: string; kakao_nickname?: string; kakao_id?: string }>();
   for (const r of (data ?? []) as Array<{ customer_phone?: string; customer_name?: string; youtube_nickname?: string; kakao_nickname?: string; kakao_id?: string }>) byPhone.set(digits(r.customer_phone), r);
+  // 회원 표에 지금 그 번호가 없으면(번호 바꾼 회원·관리자 다른 번호) 그 번호로 들어온 주문의 닉네임·이름으로
+  const missing = uniq.filter((p) => !byPhone.has(p));
+  if (missing.length) {
+    const vs = Array.from(new Set(missing.flatMap((p) => [p, ...koreanPhoneVariants(p)])));
+    const { data: od } = await sb.from("orders").select("customer_phone, youtube_nickname, customer_name").in("customer_phone", vs).order("created_at", { ascending: false }).limit(200);
+    for (const r of (od ?? []) as Array<{ customer_phone?: string; youtube_nickname?: string; customer_name?: string }>) {
+      const k = digits(r.customer_phone);
+      const prev = byPhone.get(k);
+      if (!prev) byPhone.set(k, { youtube_nickname: String(r.youtube_nickname || ""), customer_name: String(r.customer_name || "") });
+      else if (!prev.youtube_nickname && r.youtube_nickname) prev.youtube_nickname = String(r.youtube_nickname);
+    }
+  }
   const since = sinceOf(setting);
   return Promise.all(uniq.map(async (p) => {
     const c = byPhone.get(p);
