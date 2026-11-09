@@ -7488,6 +7488,12 @@ export default function OrderPage() {
       {subscribeDetailOpen && subscribeFreeShipActive ? (
         <div role="dialog" aria-label="구독 인증 무료배송" onClick={() => setSubscribeDetailOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "560px", maxHeight: "90vh", overflowY: "auto", background: "#FFFFFF", borderRadius: "16px 16px 0 0", padding: "16px 16px calc(16px + env(safe-area-inset-bottom))" }}>
+            {/* [08:22 사장님] 맨 아래 「닫기」 대신 오른쪽 위 X — 내려도 늘 보이게(높이 0 칸에 붙여 둠) */}
+            <div style={{ position: "sticky", top: 0, height: 0, zIndex: 1, display: "flex", justifyContent: "flex-end" }}>
+              <button type="button" aria-label="닫기" onClick={() => setSubscribeDetailOpen(false)} style={{ marginTop: "8px", marginRight: "8px", width: "40px", height: "40px", border: "none", borderRadius: "9999px", background: "#F5F5F5", color: "#111111", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+                <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+              </button>
+            </div>
             <SubscribeFreeShipCard
               variant="card"
               channelName={subscribeConfig.channelName}
@@ -7499,7 +7505,6 @@ export default function OrderPage() {
               youtubeNickname={youtubeNickname}
               onVerified={() => setSubscribeVerified(true)}
             />
-            <button type="button" onClick={() => setSubscribeDetailOpen(false)} style={{ marginTop: "12px", width: "100%", height: "48px", border: "1px solid #CACACB", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>닫기</button>
           </div>
         </div>
       ) : null}
