@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createUiLoader } from "./admin-ui-test-loader.mjs";
-const { parseSolapiBalanceError, affordableAlertCount } = createUiLoader()("lib/solapiBalanceFit.ts");
+const { parseSolapiBalanceError, affordableAlertCount, alertFitSummary } = createUiLoader()("lib/solapiBalanceFit.ts");
 const msg = "NotEnoughBalance: 보유 잔액이 부족하여 발송에 실패하였습니다. [차감금액: 54145, 보유잔액: 0, 보유포인트: 0, 보유예치금: 55514.5]";
 assert.deepEqual(parseSolapiBalanceError(msg), { charge: 54145, balance: 0, point: 0, deposit: 55514.5 });
 const n = affordableAlertCount(msg, 4165);
@@ -8,4 +8,11 @@ const n = affordableAlertCount(msg, 4165);
 assert.equal(n, 3843);
 assert.ok(n * 13 * 1.1 <= 55514.5);
 assert.equal(affordableAlertCount("다른 오류", 100), 0);
-console.log("test-solapi-balance-fit PASS");
+// 11/9 실제: 4,165명 시도 → 3,843명 보냄
+const f = alertFitSummary(msg, 4165, 3843);
+assert.equal(f.perPersonWon, 14.3);
+assert.equal(f.notSent, 322);
+assert.equal(f.needWon, 4605);
+assert.equal(f.depositAfterEst, 560);
+assert.equal(alertFitSummary("다른 오류", 10, 5), null);
+console.log("test-solapi-balance-fit PASS", f);

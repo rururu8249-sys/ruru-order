@@ -1,4 +1,4 @@
-import { affordableAlertCount } from "@/lib/solapiBalanceFit";
+import { affordableAlertCount, alertFitSummary } from "@/lib/solapiBalanceFit";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
@@ -256,6 +256,7 @@ export async function POST(request: NextRequest) {
     let status = "success";
     let memo = "";
     const rawResults: any[] = [];
+    let fitErr = "";
     try {
       for (let i = 0; i < messages.length; i += 10000) {
         const part = messages.slice(i, i + 10000);
@@ -284,6 +285,7 @@ export async function POST(request: NextRequest) {
             if (fp) failedPhones.add(fp);
           }
           memo = `잔액에 맞춰 ${fit}명만 보냄 · 처음 시도: ${firstErr}`.slice(0, 500);
+          fitErr = firstErr;
         } catch (e2: any) {
           status = "fail";
           memo = String(e2?.message ?? e2).slice(0, 500);
@@ -355,7 +357,8 @@ export async function POST(request: NextRequest) {
         : status === "partial"
           ? `${failCount}명은 못 보냈어요(실패한 사람은 다음 발송 때 다시 보낼 수 있어요).`
           : undefined;
-    return NextResponse.json({ ok: status !== "fail", mode, targetCount:claimedPhones.length, successCount, failCount, status, error: failHint });
+    const fitInfo = fitErr ? alertFitSummary(fitErr, claimedPhones.length, successCount) : null;
+    return NextResponse.json({ ok: status !== "fail", mode, targetCount:claimedPhones.length, successCount, failCount, status, error: failHint, fit: fitInfo });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 });
   }

@@ -221,6 +221,9 @@ export default function LiveHeader({
   const [alertPreviewLoading, setAlertPreviewLoading] = useState(false);
   const [alertSending, setAlertSending] = useState(false);
   const [alertResult, setAlertResult] = useState("");
+  // [2026-11-09 사장님 「금액 맞춰 발송한 거 같은데 결과를 제대로 출력해」] 발송 결과는 명단 다시 불러와도 안 지워지게 따로 둠
+  type AlertSendReport = { at: number; ok: boolean; target: number; success: number; fail: number; error: string; fit: { perPersonWon: number; notSent: number; needWon: number; depositBefore: number; depositAfterEst: number } | null };
+  const [alertLastSend, setAlertLastSend] = useState<AlertSendReport | null>(null);
   // [2026-11-02 사장님 「알림톡 뭐로 쏠지 정해서」] 보낼 템플릿 — 설정 › 카톡 알림에 저장한 목록에서 고름
   const [alertTemplates, setAlertTemplates] = useState<{ id: string; name: string; fromEnv?: boolean }[]>([]);
   const [alertTemplateId, setAlertTemplateId] = useState("");
@@ -256,7 +259,7 @@ export default function LiveHeader({
     }).catch(() => {});
     return () => { alive = false; };
   }, [alertOpen]);
-  useEffect(() => { alertRequest.current++; setAlertPreview(null); setAlertPreviewLoading(false); setAlertIncluded([]); setAlertExcluded([]); setAlertResult(""); }, [activeBroadcast?.id]);
+  useEffect(() => { alertRequest.current++; setAlertPreview(null); setAlertPreviewLoading(false); setAlertIncluded([]); setAlertExcluded([]); setAlertResult(""); setAlertLastSend(null); }, [activeBroadcast?.id]);
 
   const loadAlertPreview = async (mode: "priority" | "optin" | "all", edits?: {includeIds:string[];excludeIds:string[];selectionToken?:string}) => {
     if (!activeBroadcast || alertSending || alertBusy.current) return;
@@ -400,7 +403,8 @@ export default function LiveHeader({
         body: JSON.stringify({ broadcastId: activeBroadcast.id, again: alertAgain, mode: alertMode, selectionToken, templateId: alertTemplateId || undefined }),
       }).then((res) => res.json()).catch(() => null);
       // [2026-11-08] 실패하면 이유를 그대로(잔액 부족 등) — 서버가 실패한 사람을 「이미 받음」에서 빼 두니 다시 뽑기 → 발송으로 재시도
-      setAlertResult(r?.ok ? `발송 접수 ${r.successCount}명 · 즉시 실패 ${r.failCount}명 (최종 수신 결과는 SOLAPI에서 확인)${r?.error ? ` · ${r.error}` : ""}` : "발송 실패: " + (r?.error || "알 수 없는 오류"));
+      setAlertResult(r?.ok ? "" : "발송 실패: " + (r?.error || "알 수 없는 오류"));
+      setAlertLastSend({ at: Date.now(), ok: !!r?.ok, target: Number(r?.targetCount) || 0, success: Number(r?.successCount) || 0, fail: Number(r?.failCount) || 0, error: String(r?.error || (r ? "" : "응답 없음(네트워크)")), fit: r?.fit || null });
       setAlertPreview(null);
       setAlertIncluded([]);setAlertExcluded([]);
     } finally {
@@ -628,6 +632,27 @@ export default function LiveHeader({
                 <input type="checkbox" checked={alertAgain} disabled={alertSending} onChange={(e) => { setAlertAgain(e.target.checked); alertRequest.current++; setAlertPreview(null); setAlertPreviewLoading(false); setAlertIncluded([]); setAlertExcluded([]); }} className="h-4 w-4 accent-black" />
                 <span><b className="font-semibold">오늘 다시 알림</b> · 이 방송 알림을 이미 받은 사람에게도 한 번 더 보내요(쉬었다 다시 시작할 때, 오늘 한 번까지)</span>
               </label>
+              {alertLastSend ? (
+                <div role="status" className={`mt-4 rounded-xl border-2 px-4 py-3 ${alertLastSend.success > 0 ? "border-ink" : "border-danger"}`}>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <b className="text-[16px] text-ink">방금 발송 결과</b>
+                    <span className="text-[12px] tabular-nums text-ink-mute">{new Date(alertLastSend.at).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}</span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-3 gap-2 text-center tabular-nums">
+                    <div><div className="text-[12px] text-ink-mute">보내려던 사람</div><div className="text-[20px] font-bold text-ink">{alertLastSend.target.toLocaleString()}명</div></div>
+                    <div><div className="text-[12px] text-ink-mute">보냄</div><div className="text-[20px] font-bold text-ink">{alertLastSend.success.toLocaleString()}명</div></div>
+                    <div><div className="text-[12px] text-ink-mute">못 보냄</div><div className={`text-[20px] font-bold ${alertLastSend.fail > 0 ? "text-danger-tx" : "text-ink"}`}>{alertLastSend.fail.toLocaleString()}명</div></div>
+                  </div>
+                  {alertLastSend.fit ? (
+                    <ul className="mt-2 grid gap-0.5 text-[13px] text-ink">
+                      <li>· 솔라피 예치금이 모자라서, 우선순위 앞쪽부터 돈에 맞는 {alertLastSend.success.toLocaleString()}명만 보냈어요.</li>
+                      <li className="tabular-nums">· 1명당 약 {alertLastSend.fit.perPersonWon.toLocaleString()}원(부가세 포함) · 발송 전 예치금 {Math.round(alertLastSend.fit.depositBefore).toLocaleString()}원 → 남은 예치금 약 {alertLastSend.fit.depositAfterEst.toLocaleString()}원</li>
+                      <li className="tabular-nums font-semibold">· 못 받은 {alertLastSend.fit.notSent.toLocaleString()}명에게 보내려면 약 {alertLastSend.fit.needWon.toLocaleString()}원 충전 → 아래 「발송」을 한 번 더 누르면 그 사람들만 받아요.</li>
+                    </ul>
+                  ) : alertLastSend.error ? <p className="mt-2 text-[13px] text-ink">{alertLastSend.error}</p> : null}
+                  <p className="mt-1 text-[12px] text-ink-mute">«보냄»은 솔라피가 접수한 숫자예요. 카톡이 실제로 도착했는지는 솔라피 발송 내역에서 확인돼요.</p>
+                </div>
+              ) : null}
               {/* 받을 사람 수 */}
               <div className="mt-4 rounded-xl bg-surface-2 px-4 py-3">
                 <div className="flex items-center justify-between gap-3">

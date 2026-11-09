@@ -20,3 +20,13 @@ export function affordableAlertCount(msg: string, triedCount: number): number {
   const money = p.balance + p.deposit;
   return Math.max(0, Math.floor((money / perPersonWithVat) * 0.99));
 }
+
+/** 잔액 맞춤 발송 뒤 사장님께 보여 줄 숫자(1명 요금·남은 사람 보내는 데 필요한 돈·발송 뒤 남은 예치금 추정). */
+export function alertFitSummary(msg: string, triedCount: number, sentCount: number): { perPersonWon: number; notSent: number; needWon: number; depositBefore: number; depositAfterEst: number } | null {
+  const p = parseSolapiBalanceError(msg);
+  if (!p || triedCount <= 0) return null;
+  const perPersonWon = Math.round((p.charge / triedCount) * 1.1 * 10) / 10;
+  const notSent = Math.max(0, triedCount - sentCount);
+  const money = p.balance + p.deposit;
+  return { perPersonWon, notSent, needWon: Math.ceil(notSent * perPersonWon), depositBefore: money, depositAfterEst: Math.max(0, Math.round(money - sentCount * perPersonWon)) };
+}
