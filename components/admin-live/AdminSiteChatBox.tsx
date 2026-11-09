@@ -3,7 +3,7 @@
 // components/admin-live/AdminSiteChatBox.tsx
 // [2026-11-10 사장님 05:54 「관리자 PC 오른쪽 채팅 칸에서 사이트 채팅을 보고 관리」]
 //   오른쪽 「방송·채팅」 칸의 «사이트 채팅» 탭. 읽기 = /api/admin-live/live-chat?bc= (관리자만) + 새 글은 소식(window 'ruru-live-chat').
-//   글쓰기 = 총관리자(금색 왕관) 회원 이름으로. 글에 마우스를 올리면 고정·지우기·30초·5분·차단.
+//   글쓰기 = 총관리자(금색 왕관) 회원 이름으로. 글에 마우스를 올리면 고정·채팅 삭제·5분 채팅 금지·접속 차단.
 //   주문·돈·포인트 무접촉(채팅 표만).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { showAdminConfirm } from "@/lib/adminConfirm";
@@ -32,7 +32,7 @@ export default function AdminSiteChatBox({ broadcastId }: { broadcastId: string 
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
-  // [07:06 사장님] 마우스만 올려도 메뉴가 떠서 불편 → 글을 «눌러야» 고정·지우기·30초·5분·차단 메뉴(다시 누르면 닫힘)
+  // [07:06 사장님] 마우스만 올려도 메뉴가 떠서 불편 → 글을 «눌러야» 고정·채팅 삭제·5분 채팅 금지·접속 차단 메뉴(다시 누르면 닫힘)
   const [menuId, setMenuId] = useState<number | null>(null);
   useEffect(() => {
     if (menuId == null) return;
@@ -178,10 +178,9 @@ export default function AdminSiteChatBox({ broadcastId }: { broadcastId: string 
               <div onClick={(e) => e.stopPropagation()} className="absolute right-1 top-0.5 z-10 flex gap-1 rounded-lg border border-line bg-surface p-0.5 shadow-sm">
                 {([
                   [pinned?.id === m.id ? "unpin" : "pin", pinned?.id === m.id ? "고정 해제" : "고정"],
-                  ["hide", "지우기"],
-                  ["mute30s", "30초"],
-                  ["mute5m", "5분"],
-                  ["ban", "차단"],
+                  ["hide", "채팅 삭제"],
+                  ["mute5m", "5분 채팅 금지"],
+                  ["ban", "접속 차단"],
                 ] as const).map(([a, label]) => (
                   <button key={a} type="button" disabled={busyId === m.id} onClick={() => { setMenuId(null); void act(m, a); }}
                     className={`h-7 rounded-lg px-2 text-[12px] font-bold hover:bg-surface-2 disabled:opacity-40 ${a === "ban" ? "text-danger-tx" : "text-ink"}`}>{label}</button>

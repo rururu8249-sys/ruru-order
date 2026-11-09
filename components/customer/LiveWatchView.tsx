@@ -978,10 +978,10 @@ export default function LiveWatchView(props: Props) {
               ));
             })() : null}
             {([
-              ["hide", "글 지우기"],
-              ["mute30s", "지우고 30초 금지"],
-              ["mute5m", "지우고 5분 금지"],
-              ["ban", banConfirm ? "정말 차단하기 · 사이트에 못 들어와요" : "지우고 사이트 접속 차단"],
+              // [07:35 사장님] 30초 금지 없앰 · 문구 = 유튜브(삭제·시간 제한·숨기기)처럼 «채팅 삭제»를 앞에
+              ["hide", "채팅 삭제"],
+              ["mute5m", "채팅 삭제 · 5분 채팅 금지"],
+              ["ban", banConfirm ? "정말 차단할까요? 사이트에 다시 못 들어와요" : "채팅 삭제 · 사이트 접속 차단"],
             ] as [LiveChatPenalty, string][]).filter(([a]) => !banConfirm || a === "ban").map(([a, label]) => (
               <button key={a} type="button" onClick={() => void moderate(a)} style={{ width: "100%", height: "52px", marginBottom: "8px", border: "1px solid #E5E5E5", borderRadius: "12px", background: "#FFFFFF", color: a === "ban" ? "#D30005" : "#111111", fontSize: "16px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>{label}</button>
             ))}
