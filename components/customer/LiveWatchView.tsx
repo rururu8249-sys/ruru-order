@@ -565,7 +565,7 @@ export default function LiveWatchView(props: Props) {
           </div>
         ) : null}
         {chat && chat.messages.length > 0 ? (
-          <div style={{ position: "relative", width: "86%" }}>
+          <div style={{ position: "relative", width: "100%" }}>
           <div
             ref={chatBoxRef}
             role="log"
