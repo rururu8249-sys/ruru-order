@@ -228,22 +228,28 @@ export default function LiveWatchView(props: Props) {
     };
   }, [composeOpen]);
   // [2026-11-10 08:04 사장님 영상 「채팅 쓰면 순간 겹쳐지며 위아래로 올라갔다 내려감」] 원인 실측(영상 한 장씩):
-  //   키보드가 뜨면 카톡 안 브라우저가 화면 높이를 줄여 방송 화면(채팅 줄·쉬는 중 글·영상)이 키보드 위로 «찌그러져» 겹쳐 보이고,
-  //   보내기 뒤 키보드가 내려가는 동안 그 찌그러진 화면이 잠깐 보였다가 원래 높이로 «툭» 내려앉음.
-  //   → 쓰기 창이 열려 있는 동안·키보드가 다 내려갈 때까지 방송 화면 높이를 열기 전 높이로 고정(쓰기 창 자체는 지금처럼 키보드 위).
-  const [frozenH, setFrozenH] = useState<number | null>(null);
+  //   키보드가 뜨면 카톡 안 브라우저가 화면 높이를 줄여 채팅 줄·쉬는 중 글이 «찌그러져» 겹쳐 보이고, 키보드가 내려가는 동안 그게 보였다 «툭» 원래대로.
+  //   [08:17 사장님 「보내기 누르니 방송 화면이 사라지고 소리만」] 처음엔 방송 화면 높이를 고정했는데(frozenH) 그 뒤 이 증상이 보고돼 되돌림.
+  //   → 화면 크기는 브라우저 그대로 두고, 쓰기 창이 열린 동안·키보드가 다 내려갈 때까지(최대 0.8초) 채팅 줄·쉬는 중 글만 잠깐 숨겼다가 부드럽게 다시 보임.
+  const [settling, setSettling] = useState(false);
   useEffect(() => {
-    if (composeOpen || frozenH == null) return;
-    // 창이 닫힘 → 화면 높이가 원래대로 돌아오면(또는 1초 지나면) 고정 풂
+    if (composeOpen) { setSettling(true); return; }
+    if (!settling) return;
     const vv = window.visualViewport;
-    const done = () => setFrozenH(null);
-    const check = () => { if (window.innerHeight >= frozenH - 4) done(); };
-    const t = window.setTimeout(done, 1000);
+    let start = 0;
+    const done = () => {
+      setSettling(false);
+      // 키보드 때문에 문서가 밀려 있으면 제자리로(방송 화면이 화면 밖으로 밀린 채 남지 않게)
+      try { if (window.scrollY !== 0) window.scrollTo(0, 0); } catch { /* 무시 */ }
+    };
+    const base = window.innerHeight;
+    const check = () => { if (window.innerHeight > base + 40 || (vv && vv.height >= window.innerHeight - 4 && Date.now() - start > 250)) done(); };
+    start = Date.now();
+    const t = window.setTimeout(done, 800);
     window.addEventListener("resize", check);
     vv?.addEventListener("resize", check);
-    check();
     return () => { window.clearTimeout(t); window.removeEventListener("resize", check); vv?.removeEventListener("resize", check); };
-  }, [composeOpen, frozenH]);
+  }, [composeOpen, settling]);
   const [draft, setDraft] = useState("");
   // [2026-11-10] 이모티콘 — 입력칸 오른쪽 웃는 얼굴(쓸 수 있는 손님만) → 키보드 자리에 이모티콘 판
   const emojiItems = useMemo(() => chat?.emojis ?? [], [chat?.emojis]);
@@ -268,9 +274,6 @@ export default function LiveWatchView(props: Props) {
     setComposeHint("");
   };
   const openCompose = (withEmoji: boolean) => {
-    // [08:04] 키보드가 올라오기 «전» 방송 화면 높이를 붙잡아 둠(아래 frozenH 설명)
-    const h = rootRef.current?.getBoundingClientRect().height ?? 0;
-    if (h > 200) setFrozenH(Math.round(h));
     setEmojiOpen(withEmoji && canEmoji); setComposeHint(""); setComposeOpen(true);
   };
   useEffect(() => { if (!composeHint) return; const t = window.setTimeout(() => setComposeHint(""), 2500); return () => window.clearTimeout(t); }, [composeHint]);
@@ -595,7 +598,7 @@ export default function LiveWatchView(props: Props) {
       aria-label="방송 보며 주문"
       // [07:32 사장님] 채팅 그림(이모티콘·프로필)을 꾹 눌러도 «이미지 저장» 창이 안 뜨게 — 그림에서만 막음(글자 입력칸 붙여넣기는 그대로)
       onContextMenu={(e) => { if ((e.target as HTMLElement | null)?.tagName === "IMG") e.preventDefault(); }}
-      style={{ WebkitTouchCallout: "none", position: "fixed", inset: 0, ...(frozenH != null ? { bottom: "auto", height: `${frozenH}px` } : {}), zIndex: 60, background: "#000000", color: "#FFFFFF", overflow: "hidden", fontFamily: "inherit", overscrollBehavior: "none", outline: "none" }}
+      style={{ WebkitTouchCallout: "none", position: "fixed", inset: 0, zIndex: 60, background: "#000000", color: "#FFFFFF", overflow: "hidden", fontFamily: "inherit", overscrollBehavior: "none", outline: "none" }}
     >
       {/* 영상 — 화면 전체 */}
       <iframe
@@ -669,7 +672,7 @@ export default function LiveWatchView(props: Props) {
 
       {/* 잠시 쉬는 중 — 주문은 그대로 */}
       {paused ? (
-        <div role="status" style={{ position: "absolute", left: "16px", right: "16px", top: "40%", textAlign: "center", pointerEvents: "none" }}>
+        <div role="status" style={{ position: "absolute", left: "16px", right: "16px", top: "40%", textAlign: "center", pointerEvents: "none", opacity: settling ? 0 : 1, transition: "opacity 0.2s" }}>
           <span style={{ display: "inline-block", padding: "12px 18px", borderRadius: "12px", background: "rgba(0,0,0,0.6)", fontSize: "15px", fontWeight: 600, lineHeight: 1.5 }}>
             {pausedText}<br /><span style={{ fontSize: "13px", fontWeight: 400, color: "#E5E5E5" }}>상품은 지금도 담을 수 있어요</span>
           </span>
@@ -680,7 +683,7 @@ export default function LiveWatchView(props: Props) {
       {/* 돌려보기 모드 — 안의 모든 것이 손가락을 막지 않게(유튜브 막대로 그대로) */}
       <style>{`[data-live-seek="1"], [data-live-seek="1"] * { pointer-events: none !important; }`}</style>
       <style>{`html, body { overflow: hidden !important; overscroll-behavior: none !important; }`}</style>
-      <div data-live-seek={seekMode ? "1" : "0"} style={{ display: focus ? "none" : "flex", position: "absolute", left: "16px", right: "16px", bottom: "calc(90px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: "none", opacity: seekMode ? 0.06 : 1, transition: "opacity 0.2s" }}>
+      <div data-live-seek={seekMode ? "1" : "0"} style={{ display: focus ? "none" : "flex", position: "absolute", left: "16px", right: "16px", bottom: "calc(90px + env(safe-area-inset-bottom))", flexDirection: "column", gap: "8px", pointerEvents: "none", opacity: settling ? 0 : seekMode ? 0.06 : 1, transition: "opacity 0.2s" }}>
         {latestToast ? (
           <div role="status" aria-atomic="true" style={{ display: "flex" }}>
             <span key={latestToast.key} className="ruru-live-watch-toast" style={{ display: "inline-flex", alignItems: "center", height: "32px", maxWidth: "100%", padding: "0 12px", borderRadius: "9999px", background: "rgba(0,0,0,0.55)", fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>

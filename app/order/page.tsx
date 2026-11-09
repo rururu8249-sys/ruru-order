@@ -7444,7 +7444,8 @@ export default function OrderPage() {
               {isBroadcastPaused ? (
                 /* [2026-11-09 13:58 사장님 「쉬는 중인데 상품 바로 구매 가능 멘트가 왜 없나」] 방송 상품·담기·주문은 그대로라 손님에게 알려 준다(방송 전 상자와 같은 말투) */
                 <div style={uiV2 ? { fontSize: "14px", fontWeight: 400, lineHeight: 1.5, opacity: 0.9, marginTop: "-4px", marginBottom: "10px", wordBreak: "keep-all" as const } : { fontSize: "12.5px", fontWeight: 700, opacity: 0.9, marginTop: "-4px", marginBottom: "10px" }}>
-                  아래 방송 상품은 <b>지금도 주문</b>하실 수 있어요
+                  {/* [08:18 사장님] 「아래 상품들은 바로 구매 가능」 — 하나면 「상품은」, 여럿이면 「상품들은」 */}
+                  아래 {quickGroupBuyProducts.length === 1 ? "상품은" : "상품들은"} <b>지금 바로 구매</b>할 수 있어요
                 </div>
               ) : null}
               {/* [2026-11-09] 「방송 보며 주문」 — 쇼핑몰 화면에서 방송 화면으로 돌아가기(설정이 켜졌고 영상 주소가 있을 때만) */}
