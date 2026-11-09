@@ -2022,9 +2022,10 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
               <div style={{ padding: "8px 12px 0" }}>
                 {/* [2026-11-09 사장님 「방송 중 소개·복사·순환이 불편, 버튼이 많다」] 띠 하나(44px) = 체크 없음: 순환 상태·순환 목록·멈춤 / 체크 있음: 체크 동작 3개.
                     같은 자리라 체크해도 목록이 안 밀린다(11/08 점선 자리 대체). 저장 함수는 11/06 것 그대로(saveRotationTargets·rotationUseAll·toggleWidgetLibraryPause). */}
-                {!bcCopyMode && bcSelId && bcProducts.length > 0 ? (
-                  rotCheckCount > 0 ? (
-                    <div role="toolbar" aria-label="체크한 상품 동작" style={{ display: "flex", alignItems: "center", gap: "6px", minHeight: "44px", margin: "0 0 8px", padding: "4px 8px", borderRadius: "8px", background: "var(--color-ink)", flexWrap: isNarrow ? "wrap" : "nowrap" }}>
+                {/* [2026-11-09 21:12 사장님 「체크하면 순환 목록·전체 해제가 안 보인다」] 순환 띠·칩은 늘 보이고,
+                    체크 동작은 화면 아래에 떠 있는 띠(fixed)로 — 목록도 안 밀리고 순환 목록도 안 가림 */}
+                {!bcCopyMode && bcSelId && bcProducts.length > 0 && rotCheckCount > 0 ? (
+                    <div role="toolbar" aria-label="체크한 상품 동작" style={{ position: "fixed", left: "50%", bottom: "16px", transform: "translateX(-50%)", zIndex: 80, width: "min(720px, calc(100vw - 32px))", display: "flex", alignItems: "center", gap: "6px", minHeight: "52px", padding: "6px 8px", borderRadius: "12px", background: "var(--color-ink)", boxShadow: "0 8px 24px rgba(0,0,0,0.25)", flexWrap: isNarrow ? "wrap" : "nowrap" }}>
                       <span style={{ fontSize: "13px", fontWeight: 700, color: "#fff", whiteSpace: "nowrap" }}>{rotCheckCount}개 체크</span>
                       {checkedAllRotating
                         ? <button type="button" disabled={!rotationLive || rotBusy} onClick={() => void removeCheckedFromRotation()} style={{ ...rowBtn, height: "36px", color: "var(--color-danger-tx)", opacity: rotationLive ? 1 : 0.5 }}>순환에서 빼기</button>
@@ -2035,7 +2036,8 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                       <button type="button" onClick={() => void copyAnnounceLines(checkedAnnounceLines(), "체크한 상품")} title="체크한 상품의 상품명·옵션·금액 안내글을 복사" style={{ ...rowBtn, height: "36px" }}>안내글 복사</button>
                       <button type="button" onClick={clearRotCheck} aria-label="체크 해제" title="체크 해제" style={{ ...rowBtn, height: "36px", width: "36px", padding: 0, marginLeft: "auto", background: "transparent", color: "#fff", border: "1px solid rgba(255,255,255,0.6)", fontSize: "16px", lineHeight: 1 }}>✕</button>
                     </div>
-                  ) : (
+                ) : null}
+                {!bcCopyMode && bcSelId && bcProducts.length > 0 ? (
                     <>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", minHeight: "44px", margin: "0 0 8px", padding: "4px 8px", borderRadius: "8px", border: "1px solid var(--color-line)", background: "var(--color-surface)" }}>
                         <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", whiteSpace: "nowrap" }}>방송 화면</span>
@@ -2043,7 +2045,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                           {!rotationLive ? "방송을 켜면 순환을 바꿀 수 있어요" : widgetRotation.paused ? "멈춤 · 지금 상품에 머물러 있어요" : widgetRotation.mode === "all" ? "방송 상품 전부가 돌아가요" : `지금 ${rotationSelectedCount}개만 돌아가요`}
                         </span>
                         {widgetRotation.mode !== "all" ? (
-                          <button type="button" disabled={!rotationLive || rotBusy} onClick={() => { setRotChipPick(new Set()); void rotationUseAll(); }} title="순환 목록을 비우고 방송 상품 전부가 돌게 해요" style={{ ...rowBtn, height: "36px", opacity: rotationLive ? 1 : 0.5 }}>전체 상품 순환</button>
+                          <button type="button" disabled={!rotationLive || rotBusy} onClick={() => { setRotChipPick(new Set()); void rotationUseAll(); }} title="순환 목록을 한 번에 비우고 방송 상품 전부가 돌게 해요" style={{ ...rowBtn, height: "36px", color: "var(--color-danger-tx)", opacity: rotationLive ? 1 : 0.5 }}>{`순환 전부 해제 ${rotationChips.length}개`}</button>
                         ) : null}
                         <button type="button" disabled={!rotationLive} onClick={() => void toggleWidgetLibraryPause()} style={{ ...(widgetRotation.paused ? rowBtnPrimary : rowBtn), height: "36px", opacity: rotationLive ? 1 : 0.5, cursor: rotationLive ? "pointer" : "not-allowed" }}>{widgetRotation.paused ? "다시 돌리기" : "멈춤"}</button>
                       </div>
@@ -2051,6 +2053,7 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         const picked = rotationChips.filter((c) => rotChipPick.has(c.key));
                         return (
                           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px", margin: "-4px 0 8px" }}>
+                            <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--color-ink)", whiteSpace: "nowrap" }}>지금 도는 상품</span>
                             {rotationChips.map((chip) => (
                               <span key={chip.key} style={{ display: "inline-flex", alignItems: "center", gap: "2px", height: "36px", padding: "0 4px", border: rotChipPick.has(chip.key) ? "2px solid var(--color-ink)" : "1px solid var(--color-line)", borderRadius: "8px", background: "var(--color-surface)", maxWidth: "100%" }}>
                                 <button type="button" aria-pressed={rotChipPick.has(chip.key)} title="누르면 고름 — 고른 것만 안내글 복사" onClick={() => setRotChipPick((prev) => { const n = new Set(prev); if (n.has(chip.key)) n.delete(chip.key); else n.add(chip.key); return n; })} style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "32px", padding: "0 2px", border: 0, background: "transparent", cursor: "pointer", minWidth: 0 }}>
@@ -2065,7 +2068,6 @@ export default function AdminLiveProductManagePopup({ activeBroadcastId, onClose
                         );
                       })() : null}
                     </>
-                  )
                 ) : null}
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="상품명 검색" style={TAB_SEARCH_STYLE} />
                 {bcSelId && bcProducts.length > 0 && !bcCopyMode && bcSort === "manual" && search.trim() ? (

@@ -61,7 +61,7 @@ await act(async()=>btns('이것만 순환').find(b=>b.props.title?.includes('체
 assert.deepEqual(new Set(savedRotation.targets.map(t=>t.productId)),new Set(['1','2']),'checked-only replaces list');
 // [2026-11-09] 고른 것만 돌 땐 띠에 「전체 상품 순환」 바로(펼치기 없음) · 칩 바로 보임
 assert.ok(!tree.root.findAllByType('button').some(b=>String(b.children[0]).startsWith('순환 목록')),'순환 목록 펼치기 버튼 없음');
-await act(async()=>btns('전체 상품 순환')[0].props.onClick());
+await act(async()=>tree.root.findAllByType('button').find(b=>String(b.children[0]).startsWith('순환 전부 해제')).props.onClick());
 assert.equal(savedRotation.mode,'all','전체 상품 순환 = all mode');
 // [2026-11-09] 줄 주동작: 전부 도는 중 → 세부 줄 「이것만 순환」 = 그 줄만 저장 + 안내글 복사
 copied='';
