@@ -11,16 +11,60 @@ const TRIED_KEY = "ruru_kakao_ext_tried";
 let openedThisPage = false;
 export function kakaoExternalOpening(): boolean { return openedThisPage; }
 
+// [04:42 사장님 「밖 브라우저에서 카톡 로그인 또 하면 불편」] 로그인 정보 넘겨주기.
+//   손님 로그인 상태는 이 폰 브라우저 저장소(ruru_ 로 시작하는 값)뿐이라, 카톡 안 저장소 값을 주소 «#» 뒤에 실어 밖 브라우저로 넘긴다.
+//   # 뒤는 서버로 안 감(기록 안 남음). 밖 브라우저는 받자마자 저장하고 주소에서 지운 뒤 새로 고침. 2분 지난 값은 안 씀.
+const HANDOFF_KEY = "ruru_handoff";
+const HANDOFF_SKIP = new Set([TRIED_KEY]);
+function buildHandoff(): string {
+  const data: Record<string, string> = {};
+  try {
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const k = window.localStorage.key(i) || "";
+      if (!k.startsWith("ruru_") || HANDOFF_SKIP.has(k)) continue;
+      const v = window.localStorage.getItem(k) || "";
+      if (v.length > 1500) continue; // 장바구니처럼 큰 값은 빼고(장바구니는 서버에서 다시 맞춤)
+      data[k] = v;
+    }
+  } catch { return ""; }
+  if (!data.ruru_kakao_id) return "";
+  return encodeURIComponent(JSON.stringify({ exp: Date.now() + 120000, data }));
+}
+// 밖 브라우저 쪽: 주소 # 에 넘겨받은 값이 있으면 저장하고 주소에서 지움.
+//   화면 코드가 저장소를 읽기 «전에» 해야 해서(로그인 안 됨 → 첫 화면으로 보내 버리는 코드보다 먼저) 이 파일이 불려 올 때 바로 한다.
+function applyHandoff(): boolean {
+  const h = window.location.hash || "";
+  const m = h.match(new RegExp(`${HANDOFF_KEY}=([^&]+)`));
+  if (!m) return false;
+  const clean = window.location.pathname + window.location.search;
+  try {
+    const parsed = JSON.parse(decodeURIComponent(m[1])) as { exp?: number; data?: Record<string, string> };
+    if (parsed && typeof parsed.exp === "number" && parsed.exp > Date.now() && parsed.data && parsed.data.ruru_kakao_id) {
+      Object.entries(parsed.data).forEach(([k, v]) => { if (k.startsWith("ruru_") && typeof v === "string") window.localStorage.setItem(k, v); });
+    }
+  } catch { /* 무시 — 그냥 깨끗한 주소로 */ }
+  try { window.history.replaceState(window.history.state, "", clean); } catch { /* 무시 */ }
+  return true;
+}
+
+// 이 파일이 불려 오는 순간(화면 그리기 전) 한 번
+if (typeof window !== "undefined" && !isKakaoInAppBrowser(window.navigator.userAgent)) {
+  try { applyHandoff(); } catch { /* 무시 */ }
+}
+
 export default function KakaoExternalOpen() {
   const [shown, setShown] = useState(false);
   const target = () => {
     const u = new URL(window.location.href);
     u.searchParams.delete("inapp");
-    return u.toString();
+    u.hash = "";
+    const ho = buildHandoff();
+    return ho ? `${u.toString()}#${HANDOFF_KEY}=${ho}` : u.toString();
   };
   const open = () => { window.location.href = kakaoOpenExternalUrl(target()); };
   useEffect(() => {
-    if (typeof window === "undefined" || !isKakaoInAppBrowser(navigator.userAgent)) return;
+    if (typeof window === "undefined") return;
+    if (!isKakaoInAppBrowser(navigator.userAgent)) return;
     if (new URLSearchParams(window.location.search).get("inapp") === "1") return;
     let tried = false;
     try { tried = window.sessionStorage.getItem(TRIED_KEY) === "1"; } catch { /* 무시 */ }

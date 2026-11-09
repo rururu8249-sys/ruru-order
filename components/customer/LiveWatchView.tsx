@@ -296,12 +296,15 @@ export default function LiveWatchView(props: Props) {
   //   누른 뒤 1.2초 동안 재생 위치·상태가 «건너뛰었는지» 본다 — 건너뛰었으면 막대 조작(돌려보기 유지), 그대로면 빈 곳 누름(원래대로).
   const [seekMode, setSeekMode] = useState(false);
   const seekModeRef = useRef(false);
+  const seekPokeRef = useRef<() => void>(() => {});
   useEffect(() => { seekModeRef.current = seekMode; }, [seekMode]);
   useEffect(() => {
     let timer = 0;
     let check = 0;
     const SEEK_MS = 3500;
     const restart = () => { if (timer) window.clearTimeout(timer); timer = window.setTimeout(() => setSeekMode(false), SEEK_MS); };
+    // 재생 위치가 건너뛰었다는 소식(막대를 끌어 놓음) → 돌려보기 화면 다시/유지
+    seekPokeRef.current = () => { if (check) window.clearTimeout(check); setSeekMode(true); restart(); };
     const onBlur = () => {
       window.setTimeout(() => {
         if (document.activeElement !== iframeRef.current) return;
@@ -460,6 +463,7 @@ export default function LiveWatchView(props: Props) {
   const [reloadKey, setReloadKey] = useState(0);
   const [behindLive, setBehindLive] = useState(false);
   const playerInfo = useRef<{ t: number; d: number; state: number }>({ t: 0, d: 0, state: -1 });
+  const lastTick = useRef<{ t: number; at: number; state: number }>({ t: 0, at: 0, state: -1 });
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
       if (!String(e.origin || "").includes("youtube.com")) return;
@@ -468,7 +472,17 @@ export default function LiveWatchView(props: Props) {
       if (!data || data.event !== "infoDelivery" || !data.info) return;
       const info = data.info;
       const cur = playerInfo.current;
-      if (typeof info.currentTime === "number") cur.t = info.currentTime;
+      if (typeof info.currentTime === "number") {
+        // 막대로 건너뛴 걸 알아채기 — 예상 위치에서 3초 넘게 벗어나면 돌려보기 화면(채팅 흐리게)
+        const now = Date.now();
+        const last = lastTick.current;
+        if (last.at > 0 && last.t > 0) {
+          const expected = last.state === 1 ? last.t + (now - last.at) / 1000 : last.t;
+          if (Math.abs(info.currentTime - expected) > 3) seekPokeRef.current();
+        }
+        lastTick.current = { t: info.currentTime, at: now, state: typeof info.playerState === "number" ? info.playerState : cur.state };
+        cur.t = info.currentTime;
+      }
       if (typeof info.duration === "number") cur.d = info.duration;
       if (typeof info.playerState === "number") cur.state = info.playerState;
       // 막대를 움직여 지난 장면을 볼 때만(재생 중·30초 넘게 뒤). 멈춤·오류·끝난 방송엔 안 띄움
@@ -479,11 +493,13 @@ export default function LiveWatchView(props: Props) {
     return () => window.removeEventListener("message", onMsg);
   }, []);
   const listenPlayer = () => {
+    lastTick.current = { t: 0, at: 0, state: -1 };
     // 플레이어에게 «재생 정보 보내 줘» 요청(몇 번 시도 — 준비가 늦을 수 있음)
     [300, 1500, 4000].forEach((ms) => window.setTimeout(() => sendToPlayer(JSON.stringify({ event: "listening", id: 1, channel: "widget" })), ms));
   };
   const backToLive = () => {
     playerInfo.current = { t: 0, d: 0, state: -1 };
+    lastTick.current = { t: 0, at: 0, state: -1 };
     setBehindLive(false);
     setMuted(true);
     setReloadKey((k) => k + 1);
@@ -523,8 +539,8 @@ export default function LiveWatchView(props: Props) {
       />
 
       {/* 위 줄 — LIVE·제목 / 방송 화면 닫기(→ 상품 사진으로 보는 화면) */}
-      {/* 돌려보기 중 — 영상 위쪽을 반투명 검정으로 어둡게(아래 유튜브 막대 자리는 밝게 남김) */}
-      <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, top: 0, height: "calc(100% - 84px - env(safe-area-inset-bottom))", pointerEvents: "none", background: "linear-gradient(rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.5) calc(100% - 120px), rgba(0,0,0,0) calc(100% - 64px))", opacity: seekMode ? 1 : 0, transition: "opacity 0.2s" }} />
+      {/* 돌려보기 중 — 영상 전체를 반투명 검정으로 어둡게(유튜브 막대는 빨강·흰색이라 그대로 보임) */}
+      <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, top: 0, height: "calc(100% - 84px - env(safe-area-inset-bottom))", pointerEvents: "none", background: "rgba(0,0,0,0.45)", opacity: seekMode ? 1 : 0, transition: "opacity 0.2s" }} />
       <div data-live-seek={seekMode ? "1" : "0"} style={{ position: "absolute", left: 0, right: 0, top: 0, padding: "calc(8px + env(safe-area-inset-top)) 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", background: "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0))", pointerEvents: "none", opacity: seekMode ? 0 : 1, transition: "opacity 0.2s" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "28px", padding: "0 10px", borderRadius: "9999px", background: paused ? "#707072" : "#D30005", fontSize: "13px", fontWeight: 700, flexShrink: 0 }}>
