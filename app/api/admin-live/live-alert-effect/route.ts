@@ -38,9 +38,10 @@ export async function GET(request: NextRequest) {
     if (!session) return NextResponse.json({ ok: false, error: "권한 없음" }, { status: 401 });
     const sb = svc();
     const limit = Math.min(10, Math.max(1, Number(request.nextUrl.searchParams.get("limit")) || 6));
+    const offset = Math.min(200, Math.max(0, Number(request.nextUrl.searchParams.get("offset")) || 0));
 
     // 1) 알림 보낸 방송(발송 기록 성공 수 합)
-    const { data: logs, error: logErr } = await sb.from("live_alert_logs").select("broadcast_id,success_count,created_at").not("broadcast_id", "is", null).order("created_at", { ascending: false }).limit(300);
+    const { data: logs, error: logErr } = await sb.from("live_alert_logs").select("broadcast_id,success_count,created_at").not("broadcast_id", "is", null).order("created_at", { ascending: false }).limit(1000);
     if (logErr) throw new Error(`발송 기록을 못 읽었어요: ${logErr.message}`);
     const sentBy = new Map<string, number>();
     for (const l of (logs || []) as Record<string, unknown>[]) {
@@ -51,12 +52,12 @@ export async function GET(request: NextRequest) {
     const ids = [...sentBy.entries()].filter(([, n]) => n > 0).map(([id]) => id);
     if (ids.length === 0) return NextResponse.json({ ok: true, rows: [] });
 
-    const { data: bcs, error: bcErr } = await sb.from("broadcasts").select("id,public_title,started_at,ended_at,status").in("id", ids.slice(0, 60));
+    const { data: bcs, error: bcErr } = await sb.from("broadcasts").select("id,public_title,started_at,ended_at,status").in("id", ids.slice(0, 200));
     if (bcErr) throw new Error(`방송을 못 읽었어요: ${bcErr.message}`);
     const list = ((bcs || []) as Record<string, unknown>[])
       .filter((b) => b.started_at)
       .sort((a, b) => String(b.started_at).localeCompare(String(a.started_at)))
-      .slice(0, limit);
+      .slice(offset, offset + limit);
 
     // 회원 전부(가입 시각·닉네임) — 한 번만 읽음. 「알림 보낼 때 이미 회원이었나」 판정용
     const allCustomers = await readPaged<Record<string, unknown>>((f, t) => sb.from("customers").select("kakao_id,customer_phone,youtube_nickname,created_at,first_login_at").order("created_at", { ascending: true }).range(f, t));
