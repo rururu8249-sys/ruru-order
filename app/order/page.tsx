@@ -8228,7 +8228,7 @@ export default function OrderPage() {
               pausedText={livePausedText}
               viewers={liveViewers}
               siteViewers={liveSiteViewers}
-              showSiteViewers={operatorTestAccount !== null || chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) !== null}
+              showSiteViewers
               pinned={liveWatchPinned}
               items={liveWatchItems}
               cartCount={liveWatchCartCount}

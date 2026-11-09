@@ -40,7 +40,7 @@ type Props = {
   pausedText: string;
   /** [2026-11-10] 유튜브 동시 시청자 수(1분마다 갱신) — 없으면 숫자 안 보임 */
   viewers?: number | null;
-  /** [07:18 사장님] 사이트 접속 수(최근 2분) — 관리자 계정 화면에만 같이 보임 */
+  /** [07:18·07:28 사장님] 사이트 접속 수(최근 2분) — 유튜브 숫자와 같이 모든 손님에게 */
   siteViewers?: number | null;
   showSiteViewers?: boolean;
   pinned: LiveWatchPinned | null;
@@ -591,7 +591,7 @@ export default function LiveWatchView(props: Props) {
               <span aria-hidden="true" style={{ width: "6px", height: "6px", borderRadius: "9999px", background: "#FFFFFF" }} />{paused ? "쉬는 중" : "LIVE"}
             </span>
             {props.showSiteViewers ? (
-              // 관리자 계정 — 유튜브 시청자·사이트 접속 둘 다(유튜브 빨간 재생 그림 / 사이트 = 폰 그림)
+              // 유튜브 시청자·사이트 접속 둘 다(유튜브 빨간 재생 그림 / 사이트 = 폰 그림) — 모든 손님
               <span style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "0 10px 0 8px", background: "rgba(0,0,0,0.5)" }}>
                 <span aria-label={`유튜브 시청자 ${props.viewers ?? "-"}명`} style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
                   <svg aria-hidden="true" width="16" height="12" viewBox="0 0 16 12"><rect width="16" height="12" rx="3" fill="#FF0000" /><path d="M6.5 3.5v5l4-2.5z" fill="#FFFFFF" /></svg>
