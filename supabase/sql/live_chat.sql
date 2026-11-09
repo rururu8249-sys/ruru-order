@@ -11,7 +11,7 @@ create table if not exists public.live_chat_messages (
   id bigserial primary key,
   broadcast_id uuid not null,
   kakao_id text not null,
-  customer_id uuid,
+  customer_id bigint,          -- customers.id(숫자)
   nickname text not null,
   body text not null,
   created_at timestamptz not null default now(),
