@@ -122,6 +122,8 @@ export type LiveWatchItem = {
   pinned: boolean;
   /** 브랜드 묶음(세부상품 고르기) — 버튼 「상품 선택」, 아니면 「담기」(쇼핑몰 카드와 같은 말) */
   brand?: boolean;
+  /** 손님이 실제로 고를 수 있는 상품 수(브랜드 묶음 = 세부상품 수, 아니면 1) — 상품 목록 버튼 숫자 */
+  count?: number;
 };
 
 const norm = (s: string) => String(s || "").toLowerCase().replace(/[\s\-_/·.]/g, "");

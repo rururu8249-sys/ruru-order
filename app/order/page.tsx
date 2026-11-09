@@ -6581,6 +6581,7 @@ export default function OrderPage() {
         soldOut: isSoldOutOrderProduct(product),
         pinned: Boolean(livePinnedProductId) && String(product.id ?? "") === livePinnedProductId,
         brand: Boolean(brand),
+        count: brand ? Math.max(1, readComboInfoOrderProduct(product)?.names.length || 1) : 1,
       };
     }).filter((it) => it.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps

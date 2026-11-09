@@ -70,14 +70,15 @@ function writeGuideSeen() {
 const IconGridDark = () => (
   <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="2"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg>
 );
+const TOP_ICON_BTN = { width: "44px", height: "44px", padding: 0, border: "none", background: "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" } as const;
 const IconSoundOff = () => (
-  <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2"><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="M16 9l6 6M22 9l-6 6" /></svg>
+  <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2"><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="M16 9l6 6M22 9l-6 6" /></svg>
 );
 const IconChat = () => (
   <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="1.8"><path d="M4 5h16v11H9l-5 4z" /></svg>
 );
 const IconSoundOn = () => (
-  <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2"><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="M16 9a4 4 0 010 6" /><path d="M19 6a8 8 0 010 12" /></svg>
+  <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2"><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="M16 9a4 4 0 010 6" /><path d="M19 6a8 8 0 010 12" /></svg>
 );
 const MenuIcon = ({ k }: { k: string }) => {
   const p = { width: 22, height: 22, viewBox: "0 0 24 24", fill: "none", stroke: "#FFFFFF", strokeWidth: 1.8 } as const;
@@ -239,6 +240,8 @@ export default function LiveWatchView(props: Props) {
   };
 
   const listItems = useMemo(() => liveWatchList(items, query), [items, query]);
+  const totalCount = useMemo(() => items.reduce((n, it) => n + (it.count && it.count > 0 ? it.count : 1), 0), [items]);
+  const thumbUrl = (pinned?.imageUrl || items.find((it) => it.pinned)?.imageUrl || items.find((it) => it.imageUrl)?.imageUrl || "");
   const latestToast = orderToasts.length > 0 ? orderToasts[orderToasts.length - 1] : null;
 
   const closeGuide = () => { writeGuideSeen(); setGuideOpen(false); };
@@ -269,9 +272,18 @@ export default function LiveWatchView(props: Props) {
           </span>
           <span style={{ fontSize: "15px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title || "라이브 방송"}</span>
         </div>
-          <button type="button" onClick={props.onSwitchToShop} style={{ pointerEvents: "auto", flexShrink: 0, height: "44px", padding: "0 14px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>
-            방송 화면 닫기
-          </button>
+          {/* 오른쪽 위 — 오늘만셀러처럼 그림만: 새로고침 · 소리 · 닫기(X = 상품 사진으로 보는 쇼핑몰 화면) */}
+          <div style={{ display: "flex", alignItems: "center", flexShrink: 0, pointerEvents: "auto", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))" }}>
+            <button type="button" onClick={backToLive} aria-label="방송 새로고침" style={TOP_ICON_BTN}>
+              <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 11a8 8 0 00-14.3-4.9L4 8" /><path d="M4 4v4h4" /><path d="M4 13a8 8 0 0014.3 4.9L20 16" /><path d="M20 20v-4h-4" /></svg>
+            </button>
+            <button type="button" onClick={muted ? turnSoundOn : () => { sendToPlayer(youtubeCommand("mute")); setMuted(true); }} aria-label={muted ? "소리 켜기" : "소리 끄기"} aria-pressed={!muted} style={TOP_ICON_BTN}>
+              {muted ? <IconSoundOff /> : <IconSoundOn />}
+            </button>
+            <button type="button" onClick={props.onSwitchToShop} aria-label="방송 화면 닫기" style={TOP_ICON_BTN}>
+              <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+            </button>
+          </div>
       </div>
 
 
@@ -294,19 +306,6 @@ export default function LiveWatchView(props: Props) {
       {behindLive ? (
         <button type="button" onClick={backToLive} style={{ position: "absolute", left: "50%", top: "calc(124px + env(safe-area-inset-top))", transform: "translateX(-50%)", height: "44px", padding: "0 16px", border: "none", borderRadius: "9999px", background: "#D30005", color: "#FFFFFF", fontSize: "15px", fontWeight: 700, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", whiteSpace: "nowrap", zIndex: 1 }}>
           <span aria-hidden="true" style={{ width: "8px", height: "8px", borderRadius: "9999px", background: "#FFFFFF" }} />실시간 화면으로 돌아가기
-        </button>
-      ) : null}
-
-      {/* 소리 끄기 — 켠 뒤엔 작은 스피커 버튼 */}
-      {!muted ? (
-        <button type="button" onClick={() => { sendToPlayer(youtubeCommand("mute")); setMuted(true); }} aria-label="소리 끄기" style={{ position: "absolute", left: "16px", top: "calc(68px + env(safe-area-inset-top))", width: "44px", height: "44px", border: "1px solid rgba(255,255,255,0.5)", borderRadius: "9999px", background: "rgba(0,0,0,0.4)", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-          <IconSoundOn />
-        </button>
-      ) : null}
-      {/* 소리 켜기 — 폰은 소리 꺼진 채로만 자동 재생된다(브라우저 규칙). 그림만(스피커에 X) */}
-      {muted ? (
-        <button type="button" onClick={turnSoundOn} aria-label="소리 켜기" style={{ position: "absolute", left: "16px", top: "calc(68px + env(safe-area-inset-top))", width: "44px", height: "44px", border: "1px solid rgba(255,255,255,0.5)", borderRadius: "9999px", background: "rgba(0,0,0,0.4)", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-          <IconSoundOff />
         </button>
       ) : null}
 
@@ -388,8 +387,15 @@ export default function LiveWatchView(props: Props) {
 
       {/* 맨 아래 줄 — [상품 목록] [주문서 확인] */}
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "12px 16px calc(12px + env(safe-area-inset-bottom))", display: "flex", alignItems: "center", gap: "8px", background: "#000000" }}>
-        <button type="button" onClick={() => setListOpen(true)} aria-label={`상품 ${items.length}개 보기`} style={{ flexShrink: 0, height: "52px", padding: "0 16px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 700, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", whiteSpace: "nowrap" }}>
-          <IconGridDark /><span style={{ fontSize: "16px" }}>{items.length}</span>
+        {/* 오늘만셀러처럼 — 지금 소개 중(없으면 첫) 상품 사진 + 오른쪽 위 숫자(고를 수 있는 상품 수, 세부상품까지) */}
+        <button type="button" onClick={() => setListOpen(true)} aria-label={`방송 상품 목록 보기 (${totalCount}개)`} style={{ position: "relative", flexShrink: 0, width: "52px", height: "52px", padding: 0, border: "2px solid #FFFFFF", borderRadius: "12px", background: "#F5F5F5", fontFamily: "inherit", cursor: "pointer" }}>
+          {thumbUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={thumbUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: "10px" }} />
+          ) : (
+            <span style={{ display: "flex", width: "100%", height: "100%", alignItems: "center", justifyContent: "center" }}><IconGridDark /></span>
+          )}
+          <span aria-hidden="true" style={{ position: "absolute", top: "-8px", right: "-8px", minWidth: "24px", height: "24px", padding: "0 6px", boxSizing: "border-box", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "13px", fontWeight: 700, lineHeight: "24px", textAlign: "center", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)" }}>{totalCount > 999 ? "999+" : totalCount}</span>
         </button>
         {chat && chat.canWrite ? (
           <button type="button" onClick={() => setComposeOpen(true)} style={{ flex: 1, minWidth: 0, height: "52px", border: "1px solid rgba(255,255,255,0.4)", borderRadius: "9999px", background: "rgba(0,0,0,0.25)", color: "#E5E5E5", fontSize: "15px", fontWeight: 500, fontFamily: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "8px", padding: "0 16px", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden" }}>
@@ -472,7 +478,7 @@ export default function LiveWatchView(props: Props) {
             <div style={{ padding: "8px 8px 8px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
                 <span style={{ fontSize: "17px", fontWeight: 700 }}>방송 상품</span>
-                <span style={{ fontSize: "13px", fontWeight: 600, color: "#707072" }}>총 {items.length}개</span>
+                <span style={{ fontSize: "13px", fontWeight: 600, color: "#707072" }}>총 {totalCount}개</span>
               </span>
               <button type="button" onClick={() => setListOpen(false)} aria-label="닫기" style={{ width: "44px", height: "44px", border: "none", borderRadius: "9999px", background: "#F5F5F5", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><IconClose /></button>
             </div>
@@ -520,7 +526,7 @@ export default function LiveWatchView(props: Props) {
             <div style={{ fontSize: "20px", fontWeight: 700, marginBottom: "16px" }}>방송 보면서 바로 담아요</div>
             {([
               ["1", <>방송에서 마음에 드는 상품이 나오면</>],
-              ["2", <>왼쪽 아래 <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", height: "26px", padding: "0 8px", borderRadius: "9999px", border: "1px solid #E5E5E5", verticalAlign: "middle", fontSize: "14px", fontWeight: 700 }}><IconGridDark />{items.length}</span> 를 눌러 상품 목록을 열고, 그 상품의 「상품 선택」으로 옵션을 골라 담아요</>],
+              ["2", <>왼쪽 아래 <b>상품 사진(숫자)</b>을 누르면 방송 상품이 다 나와요. 그 상품의 「상품 선택」으로 옵션을 골라 담아요</>],
               ["3", <>담으면 오른쪽 아래 장바구니(숫자)가 생겨요. 눌러서 주문서를 내면 끝</>],
             ] as [string, ReactNode][]).map(([n, t]) => (
               <div key={n} style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>
@@ -528,7 +534,7 @@ export default function LiveWatchView(props: Props) {
                 <span style={{ fontSize: "16px", lineHeight: 1.5, paddingTop: "2px" }}>{t}</span>
               </div>
             ))}
-            <div style={{ fontSize: "13px", color: "#707072", lineHeight: 1.5, margin: "4px 0 16px" }}>채팅은 아래 「메시지 입력」, 소리는 왼쪽 위 스피커를 눌러요. 상품을 사진으로 크게 보려면 오른쪽 위 「방송 화면 닫기」.</div>
+            <div style={{ fontSize: "13px", color: "#707072", lineHeight: 1.5, margin: "4px 0 16px" }}>소리는 오른쪽 위 스피커, 화면이 멈추면 오른쪽 위 새로고침. ✕ 를 누르면 방송 없이 상품 사진으로 크게 볼 수 있어요.</div>
             <button type="button" onClick={closeGuide} style={{ width: "100%", height: "52px", border: "none", borderRadius: "9999px", background: "#111111", color: "#FFFFFF", fontSize: "16px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>시작하기</button>
           </div>
         </div>
