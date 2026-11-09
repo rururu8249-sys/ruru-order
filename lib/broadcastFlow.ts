@@ -202,14 +202,18 @@ export function buildBroadcastFlow(input: FlowInput): FlowResult {
     if (withV.length) {
       const peak = withV.reduce((a, b) => ((b.s!.v as number) > (a.s!.v as number) ? b : a));
       const seg = segments.find((s) => peak.at >= s.from && peak.at < s.to);
-      const after = Math.round((peak.at - start) / MIN);
-      findings.push(`시청자가 가장 많았던 때: ${hm(peak.at)} · ${peak.s!.v}명 (방송 시작 ${after}분 뒤${seg && seg.kind !== "unknown" ? ` · 그때 보여 준 상품: ${seg.label}` : ""})`);
+      // 쉬었다 다시 켠 방송(오전·저녁)은 «이어진 기록»의 시작부터 센다 — 기록이 20분 넘게 끊긴 곳이 새 시작
+      let runStart = withV[0].at;
+      for (let i = 1; i < withV.length && withV[i].at <= peak.at; i++) if (withV[i].at - withV[i - 1].at > 20 * MIN) runStart = withV[i].at;
+      const resumed = runStart - start > 30 * MIN;
+      const after = Math.round((peak.at - runStart) / MIN);
+      findings.push(`시청자가 가장 많았던 때: ${hm(peak.at)} · ${peak.s!.v}명 (${resumed ? `${hm(runStart)} 다시 시작` : "방송 시작"} ${after}분 뒤${seg && seg.kind !== "unknown" ? ` · 그때 보여 준 상품: ${seg.label}` : ""})`);
       const drops = segments.filter((s) => s.kind !== "unknown" && s.minutes >= 3 && s.viewerStart !== null && s.viewerEnd !== null).sort((a, b) => ((a.viewerEnd! - a.viewerStart!) - (b.viewerEnd! - b.viewerStart!)));
       const worst = drops[0];
       if (worst && worst.viewerEnd! < worst.viewerStart!) findings.push(`시청자가 가장 많이 빠진 상품 구간: ${worst.label} (${hm(worst.from)}~${hm(worst.to)} · ${worst.viewerStart}명 → ${worst.viewerEnd}명)`);
       const best = drops[drops.length - 1];
       if (best && best.viewerEnd! > best.viewerStart!) findings.push(`시청자가 가장 많이 늘어난 상품 구간: ${best.label} (${hm(best.from)}~${hm(best.to)} · ${best.viewerStart}명 → ${best.viewerEnd}명)`);
-      if (after > 0) nextSteps.push(`시청자는 방송 시작 ${after}분 뒤에 가장 많았어요. 다음 방송은 제일 자신 있는 상품을 그 시간대에 보여 주세요.`);
+      if (after > 0) nextSteps.push(`시청자는 ${resumed ? "다시 시작하고" : "방송 시작하고"} ${after}분 뒤에 가장 많았어요. 다음 방송은 제일 자신 있는 상품을 그 시간대에 보여 주세요.`);
     }
     const chatTop = products.filter((p) => p.chatMentions > 0).sort((a, b) => b.chatMentions - a.chatMentions).slice(0, 3);
     if (chatTop.length) findings.push(`채팅에 가장 많이 나온 상품번호: ${chatTop.map((p) => `${p.code} ${p.chatMentions}번`).join(" · ")}`);
