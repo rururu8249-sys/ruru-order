@@ -125,7 +125,8 @@ export function brandQueryVariants(normalizedQuery: string): string[] {
     const ok = isLatin ? head.length >= 3 : true;
     if (ok) {
       for (const entry of brandAliasRegistry.values()) {
-        const hit = [...entry.names].some((n) => n.startsWith(head));
+        // [2026-11-10 사장님 「라다509 도 걸려야」] 앞 글자부터가 아니어도 — 한글 2글자↑·영어 3글자↑가 브랜드 이름 안에 있으면
+        const hit = [...entry.names].some((n) => n.startsWith(head) || (head.length >= (isLatin ? 3 : 2) && n.includes(head)));
         if (!hit) continue;
         for (const code of entry.codes) if (code !== head) out.add(code + rest);
       }

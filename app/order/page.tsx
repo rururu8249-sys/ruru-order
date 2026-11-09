@@ -6586,6 +6586,13 @@ export default function OrderPage() {
         pinned: Boolean(livePinnedProductId) && String(product.id ?? "") === livePinnedProductId,
         brand: Boolean(brand),
         count: brand ? Math.max(1, readComboInfoOrderProduct(product)?.names.length || 1) : 1,
+        // [2026-11-10] 주문서 검색과 같은 말로 찾기 — 상품명·관리자 검색어, 브랜드 묶음은 세부상품까지
+        searchTexts: [String(product.product_name || ""), ...productSuggestionKeywords(product)].filter(Boolean),
+        details: brand ? (readComboInfoOrderProduct(product)?.names || []).map((dn) => {
+          let shown: BroadcastProduct = product;
+          try { shown = resolveBrandOrderSelection(product as unknown as Record<string, unknown>, dn) as unknown as BroadcastProduct; } catch { shown = product; }
+          return { name: dn, imageUrl: pickOrderProductImageUrl(shown) || pickOrderProductImageUrl(product), priceText: won(Number(shown.price || product.price || 0)), soldOut: isSoldOutOrderProduct(shown) };
+        }) : undefined,
       };
     }).filter((it) => it.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps

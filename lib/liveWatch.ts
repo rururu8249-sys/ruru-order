@@ -1,3 +1,4 @@
+import { productSearchMatches } from "@/lib/productSearch";
 // [2026-11-09] 「방송 보며 주문」 ②단계 — 손님 주문서에서 유튜브 방송을 보면서 바로 담기.
 //   이 파일은 «순수 계산»만: 설정 읽기, 유튜브 주소 → 영상 번호, 누구에게 보여 줄지, 상품 목록 정렬·검색.
 //   돈·주문·장바구니 계산은 없다(담기·주문서는 주문 페이지의 기존 함수를 그대로 부른다).
@@ -124,16 +125,37 @@ export type LiveWatchItem = {
   brand?: boolean;
   /** 손님이 실제로 고를 수 있는 상품 수(브랜드 묶음 = 세부상품 수, 아니면 1) — 상품 목록 버튼 숫자 */
   count?: number;
+  /** 검색에 쓰는 말(상품명 + 관리자가 넣은 검색어) — 주문서 검색과 같은 말 */
+  searchTexts?: string[];
+  /** 브랜드 묶음의 세부상품(검색하면 한 줄씩 바로 나옴) */
+  details?: Array<{ name: string; imageUrl: string; priceText: string; soldOut: boolean }>;
+  /** 세부상품 줄이면 그 이름 — 누르면 그 세부상품이 골라진 채로 열림 */
+  detailName?: string;
 };
 
-const norm = (s: string) => String(s || "").toLowerCase().replace(/[\s\-_/·.]/g, "");
-
-/** 상품 목록 창 — 소개 중인 상품 맨 위, 나머지는 받은 순서. 검색은 띄어쓰기·하이픈 무시. */
+/**
+ * 상품 목록 창 — 소개 중인 상품 맨 위, 나머지는 받은 순서.
+ * [2026-11-10 사장님 「프509·pd509·프라509 다 걸려야」] 검색은 주문서 검색과 «같은 함수»(productSearchMatches —
+ *   띄어쓰기·하이픈 무시, 브랜드 이름 → 상품번호 앞 글자). 브랜드 묶음은 세부상품 이름도 보고,
+ *   맞는 세부상품은 한 줄씩 바로 보여 준다(누르면 그 세부상품이 골라진 채로 열림).
+ */
 export function liveWatchList(items: LiveWatchItem[], query: string): LiveWatchItem[] {
-  const q = norm(query);
-  const filtered = q ? items.filter((it) => norm(it.name).includes(q)) : items.slice();
-  const pinned = filtered.filter((it) => it.pinned);
-  const rest = filtered.filter((it) => !it.pinned);
+  const q = String(query || "").trim();
+  let out: LiveWatchItem[];
+  if (!q) out = items.slice();
+  else {
+    out = [];
+    for (const it of items) {
+      const texts = it.searchTexts && it.searchTexts.length ? it.searchTexts : [it.name];
+      const selfHit = texts.some((t) => productSearchMatches(t, q));
+      const hitDetails = (it.details || []).filter((d) => productSearchMatches(d.name, q));
+      if (hitDetails.length > 0 && !selfHit) {
+        for (const d of hitDetails) out.push({ ...it, name: d.name, imageUrl: d.imageUrl || it.imageUrl, priceText: d.priceText, soldOut: d.soldOut, brand: false, count: 1, detailName: d.name, details: undefined });
+      } else if (selfHit || hitDetails.length > 0) out.push(it);
+    }
+  }
+  const pinned = out.filter((it) => it.pinned && !it.detailName);
+  const rest = out.filter((it) => !(it.pinned && !it.detailName));
   return [...pinned, ...rest];
 }
 
