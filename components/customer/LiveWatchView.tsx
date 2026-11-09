@@ -299,19 +299,22 @@ export default function LiveWatchView(props: Props) {
             role="log"
             aria-label="채팅"
             aria-live="polite"
-            style={{ pointerEvents: chat.canModerate ? "auto" : "none", maxHeight: "24dvh", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "4px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", paddingTop: "16px", width: "82%" }}
+            style={{ pointerEvents: "none", maxHeight: "24dvh", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "4px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", paddingTop: "16px", width: "82%" }}
           >
             {chat.messages.map((m) => (
               <div
                 key={m.id}
-                onPointerDown={() => startPress(m)}
-                onPointerUp={endPress}
-                onPointerLeave={endPress}
-                onPointerCancel={endPress}
-                onContextMenu={(e) => { if (chat.canModerate) { e.preventDefault(); setModTarget(m); } }}
                 style={{ alignSelf: "flex-start", maxWidth: "100%", padding: "4px 10px", borderRadius: "12px", background: "rgba(0,0,0,0.35)", fontSize: "14px", lineHeight: 1.45, wordBreak: "break-word", textShadow: "0 1px 2px rgba(0,0,0,0.6)", userSelect: chat.canModerate ? "none" : "auto", WebkitUserSelect: chat.canModerate ? "none" : "auto" }}
               >
-                <span style={{ fontWeight: 700, color: nicknameColor(m.nickname), marginRight: "6px" }}>{m.nickname}</span>
+                {/* 채팅 줄은 터치가 그대로 영상(유튜브 막대)으로 지나감. 관리자만 «닉네임»을 길게 누르면 관리 창 */}
+                <span
+                  onPointerDown={chat.canModerate ? () => startPress(m) : undefined}
+                  onPointerUp={chat.canModerate ? endPress : undefined}
+                  onPointerLeave={chat.canModerate ? endPress : undefined}
+                  onPointerCancel={chat.canModerate ? endPress : undefined}
+                  onContextMenu={chat.canModerate ? (e) => { e.preventDefault(); setModTarget(m); } : undefined}
+                  style={{ fontWeight: 700, color: nicknameColor(m.nickname), marginRight: "6px", pointerEvents: chat.canModerate ? "auto" : "none" }}
+                >{m.nickname}</span>
                 <span>{m.body}</span>
               </div>
             ))}
