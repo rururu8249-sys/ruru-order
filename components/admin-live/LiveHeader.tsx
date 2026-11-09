@@ -11,6 +11,8 @@ import { buildDetailChatLine, detailProducts } from "@/lib/productDetailModel";
 import { LIVE_PAUSED_TEXT_KEY, LIVE_PAUSED_TEXT_DEFAULT, LIVE_PAUSED_TEXT_MAX } from "@/lib/livePausedText";
 import { LIVE_WATCH_KEY, LIVE_WATCH_DEFAULT, parseLiveWatchSetting, serializeLiveWatchSetting, type LiveWatchSetting } from "@/lib/liveWatch";
 import { LIVE_CHAT_KEY, LIVE_CHAT_DEFAULT, parseLiveChatSetting, serializeLiveChatSetting, type LiveChatSetting } from "@/lib/liveChat";
+import { LIVE_CHAT_EMOJI_KEY, emojiAccessText, parseChatEmojiSetting, type ChatEmojiSetting } from "@/lib/liveChatEmoji";
+import ChatEmojiManagerModal from "./ChatEmojiManagerModal";
 import { LIVE_CHAT_BOT_KEY, LIVE_CHAT_BOT_DEFAULT, LIVE_CHAT_BOT_DEFAULT_FAQS, parseLiveChatBotSetting, serializeLiveChatBotSetting, type LiveChatBotSetting } from "@/lib/liveChatBot";
 
 type VideoRatio = "vertical" | "wide" | "auto";
@@ -186,6 +188,15 @@ export default function LiveHeader({
       setLiveChatSaving(false);
     }
   };
+
+  // [2026-11-10 06:26] 채팅 이모티콘 — 요약 한 줄 + 관리 창(ChatEmojiManagerModal)
+  const [emojiSetting, setEmojiSetting] = useState<ChatEmojiSetting | null>(null);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    supabase.from("settings").select("value").eq("key", LIVE_CHAT_EMOJI_KEY).maybeSingle().then(({ data }) => { if (alive) setEmojiSetting(parseChatEmojiSetting(data?.value)); });
+    return () => { alive = false; };
+  }, []);
 
   // [2026-11-10] 루루동이AI(사이트 채팅 자동 안내) 설정 — live_chat_bot_v1. 자주 묻는 말은 방송마다 고쳐 저장
   const [bot, setBot] = useState<LiveChatBotSetting>(LIVE_CHAT_BOT_DEFAULT);
@@ -678,10 +689,19 @@ export default function LiveHeader({
                 <input value={liveChatWords} onChange={(e) => setLiveChatWordsDraft(e.target.value)} placeholder="예) 당근, 번개장터" aria-label="채팅 금지어" className={fieldCls} />
                 {liveChatWords !== liveChat.words.join(", ") ? <button type="button" disabled={liveChatSaving} onClick={() => void saveLiveChat({ ...liveChat, words: liveChatWords.split(/[,\n]/) }, "금지어를 저장했어요.")} className={primaryCls}>저장</button> : null}
               </FormRow>
+              <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2">
+                <div className="min-w-0">
+                  <div className="text-[13px] font-bold text-ink">채팅 이모티콘 <span className="text-ink-mute">{emojiSetting ? `${emojiSetting.items.filter((e) => e.on).length}개` : ""}</span></div>
+                  <div className="truncate text-[12px] text-ink-mute">{emojiSetting ? `쓸 수 있는 손님: ${emojiAccessText(emojiSetting)}` : "불러오는 중…"}</div>
+                </div>
+                <button type="button" onClick={() => setEmojiOpen(true)} className="h-9 shrink-0 rounded-lg border border-line bg-surface px-4 text-[13px] font-bold text-ink hover:bg-surface-2">관리</button>
+              </div>
             </div>
           ) : null}
         </section>
       ) : null}
+
+      <ChatEmojiManagerModal open={emojiOpen} onClose={() => setEmojiOpen(false)} onChanged={setEmojiSetting} />
 
       {/* ④ 루루동이 자동 안내 */}
       {chatOn ? (

@@ -61,6 +61,8 @@ export function serializeLiveChatSetting(s: LiveChatSetting): string {
 export function cleanChatBody(raw: unknown): string {
   return String(raw ?? "")
     .replace(/[\u0000-\u001F\u007F\u200B-\u200F\u2028\u2029\uFEFF]/g, " ")
+    // [2026-11-10] 이모티콘 표식 글자(\uE000~\uF8FF)는 서버만 만든다 — 손님 글에서는 지움
+    .replace(/[\uE000-\uF8FF]/g, "")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, LIVE_CHAT_MAX_LEN);
@@ -154,7 +156,8 @@ export function parseChatMessage(raw: unknown): LiveChatMessage | null {
     id,
     broadcastId,
     nickname: String(p.nickname ?? "").slice(0, 40) || "손님",
-    body: hidden ? "" : String(p.body ?? "").slice(0, p.badge === "bot" ? 300 : LIVE_CHAT_MAX_LEN),
+    // 이모티콘 표식(한 개 최대 20글자)이 들어가 100글자를 넘을 수 있어 300까지
+    body: hidden ? "" : String(p.body ?? "").slice(0, 300),
     createdAt: String(p.created_at ?? p.createdAt ?? ""),
     hidden,
     badge: p.badge === "crown" || p.badge === "crown_pink" || p.badge === "mod" || p.badge === "bot" ? p.badge : null,

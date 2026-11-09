@@ -9,6 +9,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminSessionFromRequest } from "@/lib/admin-auth";
 import { getServiceClient } from "@/lib/youtube";
+import { encodeEmojiTokens } from "@/lib/liveChatEmoji";
+import { readEmojiSetting } from "@/lib/liveChatEmojiServer";
 import { banActive, cleanChatBody, parseChatMessage, type LiveChatPenalty } from "@/lib/liveChat";
 import { LIVE_CHAT_PENALTIES, moderateChatMessage, pinChatMessage } from "@/lib/liveChatServer";
 import { LIVE_WATCH_KEY, parseLiveWatchSetting } from "@/lib/liveWatch";
@@ -94,7 +96,9 @@ export async function POST(request: NextRequest) {
       const c = cust as { id?: string; kakao_id?: string; youtube_nickname?: string; kakao_nickname?: string; kakao_profile_image?: string } | null;
       const nickname = String(c?.youtube_nickname || c?.kakao_nickname || "루루동이").trim().slice(0, 40);
       const { data: ins, error } = await sb.from("live_chat_messages").insert({
-        broadcast_id: bc, kakao_id: String(c?.kakao_id || "admin:owner"), customer_id: c?.id ?? null, nickname, body,
+        broadcast_id: bc, kakao_id: String(c?.kakao_id || "admin:owner"), customer_id: c?.id ?? null, nickname,
+        // 관리자 글은 이모티콘 늘 됨(«:이름:» → 그림)
+        body: await readEmojiSetting(sb).then((es) => encodeEmojiTokens(body, es.items).text).catch(() => body),
         badge: owner.badge, avatar_url: cleanKakaoPhotoUrl(c?.kakao_profile_image) || null,
       }).select(MSG_COLS).single();
       if (error) return fail("못 보냈어요. 다시 눌러 주세요.", 500);

@@ -50,6 +50,7 @@ import LiveWatchView, { type LiveWatchOrderToast, type LiveWatchPinned } from "@
 import { subscribeLiveEvents } from "@/lib/liveEvents";
 import { cleanKakaoPhotoUrl } from "@/lib/kakaoPhoto";
 import { isPenaltyAction, mergeChat, parseChatMessage, type LiveChatAction, type LiveChatMessage } from "@/lib/liveChat";
+import { encodeEmojiTokens, type ChatEmoji } from "@/lib/liveChatEmoji";
 import { LIVE_CHAT_BOT_NICK, orderThanksText, cardLinkText, paidThanksText, isCardOrderRow, becamePaid, CART_NEXT_STEP_TEXT } from "@/lib/liveChatBot";
 import { openYoutubeChannel } from "@/lib/youtubeChannelLink";
 import { setPresenceActivity, readPresenceEvents } from "@/lib/presenceActivity";
@@ -1461,6 +1462,9 @@ export default function OrderPage() {
   const [liveChatNotice, setLiveChatNotice] = useState("");
   const [liveChatPinned, setLiveChatPinned] = useState<LiveChatMessage | null>(null);
   const [liveChatEnabled, setLiveChatEnabled] = useState(false);
+  // [2026-11-10] 채팅 이모티콘 — 켜진 목록(그림 그리기) + 이 손님이 쓸 수 있는지(서버 판정)
+  const [liveChatEmojis, setLiveChatEmojis] = useState<ChatEmoji[]>([]);
+  const [liveChatCanEmoji, setLiveChatCanEmoji] = useState(false);
   // 주문 소식 처리(효과 안)에서 지금 채팅이 켜졌는지 보려고
   const liveChatEnabledRef = useRef(false);
   useEffect(() => { liveChatEnabledRef.current = liveChatEnabled; }, [liveChatEnabled]);
@@ -6555,6 +6559,20 @@ export default function OrderPage() {
         })();
       }, wait);
     };
+    // 채팅 이모티콘 — 처음 한 번 + 3분마다(관리자가 새로 올린 것 반영)
+    const loadEmojis = async () => {
+      try {
+        let kid = "";
+        try { kid = String(window.localStorage.getItem("ruru_kakao_id") || "").trim(); } catch { /* 무시 */ }
+        const res = await fetch(`/api/live-chat/emoji${kid ? `?kakao_id=${encodeURIComponent(kid)}` : ""}`, { cache: "no-store" });
+        const json = await res.json().catch(() => null);
+        if (!json?.ok) return;
+        setLiveChatEmojis(Array.isArray(json.items) ? json.items : []);
+        setLiveChatCanEmoji(json.canUse === true);
+      } catch { /* 이모티콘 못 읽어도 채팅은 그대로(글자로 보임) */ }
+    };
+    void loadEmojis();
+    const emojiTimer = window.setInterval(() => { if (document.visibilityState === "visible") void loadEmojis(); }, 180000);
     // 사이트 채팅 — 처음 한 번 최근 글 읽고, 그 뒤는 소식으로만
     void (async () => {
       try {
@@ -6622,7 +6640,7 @@ export default function OrderPage() {
         window.setTimeout(() => setLiveOrderToasts((prev) => prev.filter((t) => t.key !== toast.key)), 4000);
       },
     });
-    return () => { if (timer) clearTimeout(timer); off(); };
+    return () => { if (timer) clearTimeout(timer); window.clearInterval(emojiTimer); off(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveWatchShown, broadcast?.id]);
   // 방송 화면 상품 목록 — 지금 손님 화면에 보이는 방송 상품과 같은 목록(같은 순서)
@@ -8219,10 +8237,12 @@ export default function OrderPage() {
                 canPin: ["crown", "crown_pink"].includes(String(chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) ?? "")),
                 canWrite: Boolean(readLiveChatKakaoId()) && Boolean(youtubeNickname.trim()),
                 canModerate: operatorTestAccount !== null || chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) !== null,
+                emojis: liveChatEmojis,
+                canEmoji: liveChatCanEmoji,
                 onSend: async (body) => {
                   // 누르자마자 화면에 먼저 띄움(임시 번호) — 서버 답이 오면 진짜 글로 바꿈, 실패하면 뺌
                   const tempId = 9_000_000_000_000 + Date.now();
-                  const temp: LiveChatMessage = { id: tempId, broadcastId: String(broadcast.id), nickname: youtubeNickname.trim(), body, createdAt: new Date().toISOString(), hidden: false, badge: chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) ?? (operatorTestAccount !== null ? "mod" : null), pinned: false, botRef: "", avatar: (() => { try { return cleanKakaoPhotoUrl(window.localStorage.getItem("ruru_kakao_profile_image")); } catch { return ""; } })() };
+                  const temp: LiveChatMessage = { id: tempId, broadcastId: String(broadcast.id), nickname: youtubeNickname.trim(), body: liveChatCanEmoji ? encodeEmojiTokens(body, liveChatEmojis).text : body, createdAt: new Date().toISOString(), hidden: false, badge: chatBadgeOf(liveWatchSetting, normalizePhone(customerPhone)) ?? (operatorTestAccount !== null ? "mod" : null), pinned: false, botRef: "", avatar: (() => { try { return cleanKakaoPhotoUrl(window.localStorage.getItem("ruru_kakao_profile_image")); } catch { return ""; } })() };
                   setLiveChatMessages((prev) => mergeChat(prev, [temp]));
                   const dropTemp = () => setLiveChatMessages((prev) => prev.filter((x) => x.id !== tempId));
                   try {

@@ -23,6 +23,8 @@ import {
   type LiveChatAction,
 } from "@/lib/liveChat";
 import { cleanKakaoPhotoUrl } from "@/lib/kakaoPhoto";
+import { chatBodyWithoutEmoji, encodeEmojiTokens } from "@/lib/liveChatEmoji";
+import { canUseChatEmoji, readEmojiSetting } from "@/lib/liveChatEmojiServer";
 import { chatRoleOfKakao, moderateChatMessage, pinChatMessage, setChatManager } from "@/lib/liveChatServer";
 
 export const runtime = "nodejs";
@@ -102,14 +104,26 @@ export async function POST(request: NextRequest) {
     if (Number.isFinite(lastAt) && Date.now() - lastAt < LIVE_CHAT_MIN_GAP_MS) return fail("조금 천천히 써 주세요.", 429);
 
     const masked = maskBannedWords(body, [...LIVE_CHAT_DEFAULT_WORDS, ...setting.words]);
+    // [2026-11-10] 이모티콘 — «:이름:» 이 있고 쓸 수 있는 손님이면 그림 표식으로(아니면 글자 그대로)
+    let finalBody = masked.text;
+    if (/:[^:\s]{1,10}:/.test(finalBody)) {
+      try {
+        const emojiSetting = await readEmojiSetting(sb);
+        if (emojiSetting.items.some((e) => e.on) && (await canUseChatEmoji(sb, kakaoId, emojiSetting))) {
+          finalBody = encodeEmojiTokens(finalBody, emojiSetting.items).text;
+        }
+      } catch { /* 이모티콘 확인 실패 — 글자 그대로 */ }
+    }
     const { data: ins, error } = await sb
       .from("live_chat_messages")
-      .insert({ broadcast_id: bc, kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body: masked.text, badge: role.badge ?? null, avatar_url: cleanKakaoPhotoUrl(c.kakao_profile_image) || null })
+      .insert({ broadcast_id: bc, kakao_id: kakaoId, customer_id: c.id ?? null, nickname, body: finalBody, badge: role.badge ?? null, avatar_url: cleanKakaoPhotoUrl(c.kakao_profile_image) || null })
       .select("id, broadcast_id, nickname, body, created_at, hidden_at, badge, pinned_at, avatar_url, bot_ref")
       .single();
     if (error) return fail("못 보냈어요. 다시 눌러 주세요.", 500);
     // [2026-11-10] 루루동이AI — 응답을 보낸 «뒤»에 상품 안내·자주 묻는 말(손님 글 쓰기를 늦추지 않음, 실패해도 무관)
-    after(() => runLiveChatBot(sb, bc, masked.text));
+    //   이모티콘은 빼고 글자만 봄(이모티콘만 보낸 글이면 안내 안 함)
+    const botText = chatBodyWithoutEmoji(finalBody);
+    if (botText) after(() => runLiveChatBot(sb, bc, botText));
     return NextResponse.json({ ok: true, message: parseChatMessage(ins) });
   } catch {
     return fail("못 보냈어요. 다시 눌러 주세요.", 500);
