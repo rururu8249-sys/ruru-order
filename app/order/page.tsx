@@ -6435,6 +6435,7 @@ export default function OrderPage() {
     broadcastOn: isBroadcastOn,
     videoId: liveWatchVideoId,
     isAdminViewer: operatorTestAccount !== null,
+    viewerPhone: customerPhone,
   });
   const liveWatchShown = liveWatchUsable && liveViewOn === true;
   // 방송이 바뀌면 손님이 고른 화면도 새로 정한다

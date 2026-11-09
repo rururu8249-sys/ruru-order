@@ -12,23 +12,28 @@ export type LiveWatchFirstView = "live" | "shop";
 export type LiveWatchSetting = {
   audience: LiveWatchAudience;
   firstView: LiveWatchFirstView;
+  /** 「관리자 시험 계정만」일 때 시험 계정 표 밖에서도 보이게 할 전화번호(숫자만) — 주문·정산 영향 없음 */
+  phones: string[];
 };
 
-export const LIVE_WATCH_DEFAULT: LiveWatchSetting = { audience: "off", firstView: "live" };
+export const LIVE_WATCH_DEFAULT: LiveWatchSetting = { audience: "off", firstView: "live", phones: [] };
 
 /** settings 값(JSON 글자 또는 객체) → 설정. 이상하면 기본값(꺼짐). */
 export function parseLiveWatchSetting(raw: unknown): LiveWatchSetting {
   let v: unknown = raw;
   if (typeof v === "string") {
     const t = v.trim();
-    if (!t) return { ...LIVE_WATCH_DEFAULT };
-    try { v = JSON.parse(t); } catch { return { ...LIVE_WATCH_DEFAULT }; }
+    if (!t) return { ...LIVE_WATCH_DEFAULT, phones: [] };
+    try { v = JSON.parse(t); } catch { return { ...LIVE_WATCH_DEFAULT, phones: [] }; }
   }
-  if (!v || typeof v !== "object") return { ...LIVE_WATCH_DEFAULT };
+  if (!v || typeof v !== "object") return { ...LIVE_WATCH_DEFAULT, phones: [] };
   const o = v as Record<string, unknown>;
   const audience: LiveWatchAudience = o.audience === "all" ? "all" : o.audience === "admin" ? "admin" : "off";
   const firstView: LiveWatchFirstView = o.firstView === "shop" ? "shop" : "live";
-  return { audience, firstView };
+  const phones = Array.isArray(o.phones)
+    ? Array.from(new Set(o.phones.map((x) => String(x ?? "").replace(/[^0-9]/g, "")).filter((x) => x.length >= 9)))
+    : [];
+  return { audience, firstView, phones };
 }
 
 export function serializeLiveWatchSetting(s: LiveWatchSetting): string {
@@ -82,10 +87,16 @@ export function canUseLiveWatch(opts: {
   broadcastOn: boolean;
   videoId: string;
   isAdminViewer: boolean;
+  /** 지금 로그인한 손님 전화번호(있으면) */
+  viewerPhone?: string;
 }): boolean {
   if (!opts.broadcastOn || !opts.videoId) return false;
   if (opts.setting.audience === "all") return true;
-  if (opts.setting.audience === "admin") return opts.isAdminViewer;
+  if (opts.setting.audience === "admin") {
+    if (opts.isAdminViewer) return true;
+    const ph = String(opts.viewerPhone ?? "").replace(/[^0-9]/g, "");
+    return Boolean(ph) && opts.setting.phones.includes(ph);
+  }
   return false;
 }
 
