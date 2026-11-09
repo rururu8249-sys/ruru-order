@@ -250,7 +250,7 @@ export default function LiveWatchView(props: Props) {
             role="log"
             aria-label="채팅"
             aria-live="polite"
-            style={{ pointerEvents: "auto", maxHeight: "24dvh", overflowY: "auto", display: "flex", flexDirection: "column", gap: "4px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", paddingTop: "16px", width: "82%" }}
+            style={{ pointerEvents: "auto", maxHeight: "24dvh", overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "4px", maskImage: "linear-gradient(transparent, #000 24px)", WebkitMaskImage: "linear-gradient(transparent, #000 24px)", paddingTop: "16px", width: "82%" }}
           >
             {chat.messages.map((m) => (
               <div
