@@ -51,7 +51,7 @@ import { subscribeLiveEvents } from "@/lib/liveEvents";
 import { cleanKakaoPhotoUrl } from "@/lib/kakaoPhoto";
 import { isPenaltyAction, mergeChat, parseChatMessage, type LiveChatAction, type LiveChatMessage } from "@/lib/liveChat";
 import { encodeEmojiTokens, type ChatEmoji } from "@/lib/liveChatEmoji";
-import { LIVE_CHAT_BOT_NICK, orderThanksText, cardLinkText, paidThanksText, isCardOrderRow, becamePaid, CART_NEXT_STEP_TEXT } from "@/lib/liveChatBot";
+import { LIVE_CHAT_BOT_NICK, orderThanksText, cardLinkText, paidThanksText, isCardOrderRow, becamePaid, CART_NEXT_STEP_TEXT, orderItemLine } from "@/lib/liveChatBot";
 import { openYoutubeChannel } from "@/lib/youtubeChannelLink";
 import { setPresenceActivity, readPresenceEvents } from "@/lib/presenceActivity";
 import { registerBrandAliasesFromProducts } from "@/lib/brandSearchAliases";
@@ -1474,6 +1474,8 @@ export default function OrderPage() {
   // [2026-11-10] 루루동이AI 알림 글(이 화면에만 끼워 넣는 줄 — DB 안 씀). 번호 = 지금 마지막 글 번호 + 소수점 → 다음 진짜 글보다 앞에 섬
   const liveLocalSeq = useRef(0);
   const liveCartHintFor = useRef("");
+  // [07:46] 내가 방금 담은 상품(c:상품id|이름 → 담은 시각) — 서버 «장바구니 담음» 공개 글을 내 화면에선 숨기려고
+  const ownCartRefs = useRef(new Map<string, number>());
   const addLiveBotLine = useCallback((bid: string, text: string, ref: string) => {
     setLiveChatMessages((prev) => {
       const maxId = prev.reduce((m, x) => (x.id < 9_000_000_000_000 ? Math.max(m, Math.floor(x.id)) : m), 0);
@@ -4586,10 +4588,20 @@ export default function OrderPage() {
       // [2026-08-31 사장님 요청] 접속자 옆 "지금 보는 상품" — 담는 순간의 상품명을 접속 신호에 얹는다(표시 전용, 10분 유효)
       try { window.localStorage.setItem("ruru_viewing_product", JSON.stringify({ name: String(clampedItem?.product_name || "").trim().slice(0, 80), at: Date.now() })); } catch { /* 무시 */ }
       setPresenceActivity("cart", String(clampedItem?.product_name || "").trim()); // [2026-11-09] 「담았어요 · 상품명」
-      // [2026-11-10 사장님 05:14] 방송 화면 채팅에 «다음 할 일» 안내 — 담은 본인 화면에만, 방송마다 한 번(다른 손님에겐 안 보임)
-      if (liveWatchShown && liveChatEnabledRef.current && broadcast?.id && liveCartHintFor.current !== String(broadcast.id)) {
-        liveCartHintFor.current = String(broadcast.id);
-        addLiveBotLine(String(broadcast.id), CART_NEXT_STEP_TEXT, "local:cart");
+      // [2026-11-10 사장님 05:14·07:46] 방송 화면 채팅 «장바구니 담김!» — 담은 본인 화면에만.
+      //   방송마다 처음 한 번은 다음 할 일까지 길게, 그 뒤엔 「장바구니 담김! 상품 옵션」 짧게.
+      //   서버가 모두에게 올리는 «OO님 장바구니 담음» 글은 담은 본인 화면에선 숨김(같은 말 두 번 안 나오게 — ownCartRefs).
+      if (liveWatchShown && liveChatEnabledRef.current && broadcast?.id) {
+        const pid = String(clampedItem?.product_id ?? "").trim();
+        const pname = String(clampedItem?.product_name ?? "").trim();
+        if (pid) { const at = Date.now(); ownCartRefs.current.set(`c:${pid}|${pname}`, at); ownCartRefs.current.set(`c:${pid}|`, at); }
+        if (liveCartHintFor.current !== String(broadcast.id)) {
+          liveCartHintFor.current = String(broadcast.id);
+          addLiveBotLine(String(broadcast.id), CART_NEXT_STEP_TEXT, "local:cart");
+        } else {
+          const label = orderItemLine([{ product_name: pname, color: clampedItem?.color, size: clampedItem?.size }]);
+          addLiveBotLine(String(broadcast.id), `장바구니 담김!${label ? ` ${label}` : ""}`, `local:cart:${Date.now()}`);
+        }
       }
     }
   };
@@ -8246,7 +8258,13 @@ export default function OrderPage() {
                 { key: "inquiry", label: "문의", onClick: () => setInquirySheetOpen(true) },
               ]}
               chat={liveChatEnabled && broadcast?.id ? {
-                messages: liveChatMessages,
+                messages: liveChatMessages.filter((m) => {
+                  if (!m.botRef || !m.botRef.startsWith("c:")) return true;
+                  const at = ownCartRefs.current.get(m.botRef);
+                  if (!at) return true;
+                  const t = new Date(m.createdAt).getTime();
+                  return !(Number.isFinite(t) && t >= at - 60_000 && t <= at + 180_000); // 폰 시계가 조금 틀려도 맞게 넉넉히
+                }),
                 notice: liveChatNotice,
                 pinned: liveChatPinned,
                 canGrant: isChatOwnerPhone(liveWatchSetting, normalizePhone(customerPhone)),
