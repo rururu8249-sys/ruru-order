@@ -10,6 +10,7 @@ import {
   LIVE_CHAT_BOT_KEY,
   LIVE_CHAT_BOT_NICK,
   botRefOfCart,
+  cartOwnerTag,
   cartAnnounceText,
   maskChatNick,
   parseLiveChatBotSetting,
@@ -72,7 +73,7 @@ export async function announceNewCartLines(sb: SupabaseClient, input: { sessionK
       const size = cand.sizes.length ? (cand.sizes.includes(line.size) ? line.size : "") : (OPT_OK.test(line.size) ? line.size : "");
       const color = OPT_OK.test(line.color) ? line.color : "";
       seenItem.set(key, now);
-      items.push({ name: cand.name || cand.detailName || line.productName, color, size, price: trustedCartPrice(line.unitPrice, cand), ref: botRefOfCart(cand) });
+      items.push({ name: cand.name || cand.detailName || line.productName, color, size, price: trustedCartPrice(line.unitPrice, cand), ref: botRefOfCart(cand, cartOwnerTag(input.sessionKey)) });
     }
     sweep(seenItem, SAME_ITEM_MS);
     if (!items.length) return;

@@ -190,13 +190,28 @@ export function botRefOfFaq(faq: LiveChatFaq): string {
   return `f:${faq.words.join(",")}`.slice(0, 300);
 }
 /** [07:39] 장바구니 담음 알림 — c:상품id|세부상품(누르면 다른 손님도 그 상품 옵션 창). 상품 안내(p:)와 쉬는 시간을 따로 센다 */
-export function botRefOfCart(c: Pick<BotCandidate, "productId" | "detailName">): string {
-  return `c:${c.productId}|${c.detailName}`.slice(0, 300);
+//   [08:10 사장님 「담은 사람한테도 공통 문구가 왜 나와」] 담은 사람 표식 = 그 화면 장바구니 열쇠(무작위)의 짧은 지문(owner tag).
+//   c:지문~상품id|세부상품 — 담은 사람 화면은 자기 지문이 붙은 공개 글을 숨기고 개인 문구만 보여 줌(시계·시간 비교 없이 정확).
+export function cartOwnerTag(sessionKey: string): string {
+  let h = 0x811c9dc5;
+  const s = `ruru-cart:${String(sessionKey ?? "")}`;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(16).padStart(8, "0");
+}
+export function botRefOfCart(c: Pick<BotCandidate, "productId" | "detailName">, ownerTag = ""): string {
+  return `c:${ownerTag ? `${ownerTag}~` : ""}${c.productId}|${c.detailName}`.slice(0, 300);
+}
+/** 장바구니 알림 글의 담은 사람 지문(없으면 "") */
+export function cartRefOwner(ref: unknown): string {
+  const s = String(ref ?? "");
+  if (!s.startsWith("c:")) return "";
+  const m = /^c:([0-9a-f]{8})~/.exec(s);
+  return m ? m[1] : "";
 }
 export function parseBotRef(ref: unknown): { productId: string; detailName: string } | null {
   const s = String(ref ?? "");
   if (!s.startsWith("p:") && !s.startsWith("c:")) return null;
-  const body = s.slice(2);
+  const body = s.startsWith("c:") ? s.slice(2).replace(/^[0-9a-f]{8}~/, "") : s.slice(2);
   const bar = body.indexOf("|");
   const productId = (bar >= 0 ? body.slice(0, bar) : body).trim();
   const detailName = bar >= 0 ? body.slice(bar + 1).trim() : "";

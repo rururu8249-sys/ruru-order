@@ -23,3 +23,14 @@ assert.deepEqual(parseBotRef(botRefOfCart({ productId: "677", detailName: "PD-20
 assert.equal(parseLiveChatBotSetting("").cart, true);
 assert.equal(parseLiveChatBotSetting(JSON.stringify({ cart: false })).cart, false);
 console.log("test-live-cart-announce 통과");
+// [08:10] 담은 사람 지문 — 같은 장바구니 열쇠면 같은 지문, 다르면 다름, 담기 버튼은 그대로
+{
+  const L = createUiLoader({})("lib/liveChatBot.ts");
+  const a = L.cartOwnerTag("sess-aaaaaa"), b = L.cartOwnerTag("sess-bbbbbb");
+  assert.match(a, /^[0-9a-f]{8}$/); assert.notEqual(a, b); assert.equal(a, L.cartOwnerTag("sess-aaaaaa"));
+  const ref = L.botRefOfCart({ productId: "818", detailName: "MC-322" }, a);
+  assert.equal(L.cartRefOwner(ref), a);
+  assert.deepEqual(L.parseBotRef(ref), { productId: "818", detailName: "MC-322" });
+  assert.equal(L.cartRefOwner("p:818|MC-322"), "");
+  console.log("cart owner tag 통과");
+}
