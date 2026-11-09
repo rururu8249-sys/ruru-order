@@ -628,12 +628,14 @@ export default function LiveWatchView(props: Props) {
           </div>
         ) : null}
         {chat && chat.canWrite && greetOpen ? (
-          // 실시간 채팅에서 인사하기 — 「보내기」 = 👋 한 번 보냄
-          <div style={{ pointerEvents: "auto", display: "flex", alignItems: "center", gap: "10px", width: "100%", boxSizing: "border-box", minHeight: "48px", padding: "6px 8px 6px 14px", borderRadius: "14px", background: "rgba(28,28,28,0.88)", color: "#FFFFFF" }}>
-            <span aria-hidden="true" style={{ fontSize: "20px", lineHeight: 1 }}>👋</span>
-            <span style={{ flex: 1, minWidth: 0, fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>실시간 채팅에서 인사하기</span>
-            <button type="button" onClick={() => void sendGreet()} style={{ flexShrink: 0, height: "36px", padding: "0 14px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "14px", fontWeight: 700, fontFamily: "inherit", cursor: "pointer" }}>보내기</button>
-            <button type="button" onClick={closeGreet} aria-label="인사하기 닫기" style={{ flexShrink: 0, width: "36px", height: "36px", border: "none", borderRadius: "9999px", background: "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}><IconClose color="#FFFFFF" /></button>
+          // 실시간 채팅에서 인사하기 — 유튜브 앱과 같은 모양: [손 흔드는 그림] 글 … [보내기 흰 알약]. 「보내기」 = 👋 한 번 보냄
+          <div style={{ pointerEvents: "auto", display: "flex", alignItems: "center", gap: "12px", width: "100%", boxSizing: "border-box", minHeight: "52px", padding: "8px 8px 8px 14px", borderRadius: "12px", background: "rgba(40,40,40,0.82)", color: "#FFFFFF" }}>
+            <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transform: "rotate(-18deg)" }}>
+              <path d="M18 11V6a2 2 0 0 0-4 0" /><path d="M14 10V4a2 2 0 0 0-4 0v2" /><path d="M10 10.5V6a2 2 0 0 0-4 0v8" />
+              <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+            </svg>
+            <span style={{ flex: 1, minWidth: 0, fontSize: "15px", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>실시간 채팅에서 인사하기</span>
+            <button type="button" onClick={() => void sendGreet()} style={{ flexShrink: 0, height: "36px", padding: "0 16px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#0F0F0F", fontSize: "14px", fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>보내기</button>
           </div>
         ) : null}
         {pinned ? (
