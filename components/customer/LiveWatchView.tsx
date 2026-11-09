@@ -144,7 +144,7 @@ export default function LiveWatchView(props: Props) {
         <div role="status" aria-atomic="true" style={{ minHeight: "32px", display: "flex" }}>
           {latestToast ? (
             <span key={latestToast.key} className="ruru-live-watch-toast" style={{ display: "inline-flex", alignItems: "center", height: "32px", maxWidth: "100%", padding: "0 12px", borderRadius: "9999px", background: "rgba(0,0,0,0.55)", fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {latestToast.nickname}님 주문 감사합니다
+              {latestToast.nickname}님 구매 감사합니다
             </span>
           ) : null}
         </div>
