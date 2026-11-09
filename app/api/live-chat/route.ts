@@ -70,46 +70,32 @@ export async function POST(request: NextRequest) {
     if (!body) return fail("내용을 적어 주세요.");
 
     const sb = getServiceClient();
-    const setting = await readSetting(sb);
+    // 빠르게 — 서로 상관없는 읽기는 한꺼번에
+    const [setting, bcRes, custRes, bansRes, lastRes] = await Promise.all([
+      readSetting(sb),
+      sb.from("broadcasts").select("id, status").eq("id", bc).maybeSingle(),
+      sb.from("customers").select("id, youtube_nickname, is_blocked").eq("kakao_id", kakaoId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      sb.from("live_chat_bans").select("until_at, lifted_at").eq("kakao_id", kakaoId).is("lifted_at", null).order("id", { ascending: false }).limit(5),
+      sb.from("live_chat_messages").select("created_at").eq("kakao_id", kakaoId).order("id", { ascending: false }).limit(1).maybeSingle(),
+    ]);
     if (!setting.enabled) return fail("지금은 채팅을 쓸 수 없어요.", 403);
 
     // 방송이 켜져 있을 때만
-    const { data: bcRow } = await sb.from("broadcasts").select("id, status").eq("id", bc).maybeSingle();
-    if (!bcRow || String((bcRow as { status?: unknown }).status ?? "") !== "ON") return fail("방송 중에만 쓸 수 있어요.", 403);
+    const bcRow = bcRes.data as { status?: unknown } | null;
+    if (!bcRow || String(bcRow.status ?? "") !== "ON") return fail("방송 중에만 쓸 수 있어요.", 403);
 
     // 닉네임은 회원 표에서(카카오 계정 기준, 최신 1줄)
-    const { data: cust } = await sb
-      .from("customers")
-      .select("id, youtube_nickname, is_blocked")
-      .eq("kakao_id", kakaoId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const c = cust as { id?: string; youtube_nickname?: string; is_blocked?: unknown } | null;
+    const c = custRes.data as { id?: string; youtube_nickname?: string; is_blocked?: unknown } | null;
     const nickname = String(c?.youtube_nickname ?? "").trim().slice(0, 40);
     if (!c || !nickname) return fail("닉네임을 먼저 정해 주세요.", 403);
     if (isBlockedValue(c.is_blocked)) return fail("채팅을 쓸 수 없어요.", 403);
 
     // 금지(잠깐 금지·차단)
-    const { data: bans } = await sb
-      .from("live_chat_bans")
-      .select("until_at, lifted_at")
-      .eq("kakao_id", kakaoId)
-      .is("lifted_at", null)
-      .order("id", { ascending: false })
-      .limit(5);
-    const active = (bans ?? []).find((b) => banActive(b as { until_at?: string | null; lifted_at?: string | null }));
+    const active = (bansRes.data ?? []).find((b) => banActive(b as { until_at?: string | null; lifted_at?: string | null }));
     if (active) return fail(banMessage(active as { until_at?: string | null }), 403);
 
     // 너무 빨리 연달아 쓰기 막기
-    const { data: last } = await sb
-      .from("live_chat_messages")
-      .select("created_at")
-      .eq("kakao_id", kakaoId)
-      .order("id", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const lastAt = Date.parse(String((last as { created_at?: string } | null)?.created_at ?? ""));
+    const lastAt = Date.parse(String((lastRes.data as { created_at?: string } | null)?.created_at ?? ""));
     if (Number.isFinite(lastAt) && Date.now() - lastAt < LIVE_CHAT_MIN_GAP_MS) return fail("조금 천천히 써 주세요.", 429);
 
     const masked = maskBannedWords(body, [...LIVE_CHAT_DEFAULT_WORDS, ...setting.words]);

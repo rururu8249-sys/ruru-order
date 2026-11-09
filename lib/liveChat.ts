@@ -5,7 +5,7 @@
 export const LIVE_CHAT_KEY = "live_chat_v1";
 export const LIVE_CHAT_MAX_LEN = 100;
 /** 한 사람이 다음 글을 쓰기까지 기다리는 시간 */
-export const LIVE_CHAT_MIN_GAP_MS = 2000;
+export const LIVE_CHAT_MIN_GAP_MS = 1000;
 /** 처음 열 때 불러오는 글 수 */
 export const LIVE_CHAT_RECENT = 50;
 

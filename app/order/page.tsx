@@ -8082,21 +8082,32 @@ export default function OrderPage() {
               onOpenProduct={openLiveWatchProduct}
               onOpenCart={() => setOrderSheetOpen(true)}
               onSwitchToShop={() => chooseLiveView(false)}
+              menu={[
+                { key: "notice", label: "공지", badge: noteUnread, onClick: () => { window.dispatchEvent(new Event("ruru-open-notice-box")); } },
+                { key: "orders", label: "주문내역", onClick: () => openOrderLookupBottomSheet() },
+                { key: "me", label: "내정보", onClick: () => openCustomerInfoEditBottomSheet() },
+                { key: "inquiry", label: "문의", onClick: () => setInquirySheetOpen(true) },
+              ]}
               chat={liveChatEnabled && broadcast?.id ? {
                 messages: liveChatMessages,
                 notice: liveChatNotice,
                 canWrite: Boolean(readLiveChatKakaoId()) && Boolean(youtubeNickname.trim()),
                 canModerate: operatorTestAccount !== null || liveWatchSetting.phones.includes(normalizePhone(customerPhone)),
                 onSend: async (body) => {
+                  // 누르자마자 화면에 먼저 띄움(임시 번호) — 서버 답이 오면 진짜 글로 바꿈, 실패하면 뺌
+                  const tempId = 9_000_000_000_000 + Date.now();
+                  const temp: LiveChatMessage = { id: tempId, broadcastId: String(broadcast.id), nickname: youtubeNickname.trim(), body, createdAt: new Date().toISOString(), hidden: false };
+                  setLiveChatMessages((prev) => mergeChat(prev, [temp]));
+                  const dropTemp = () => setLiveChatMessages((prev) => prev.filter((x) => x.id !== tempId));
                   try {
                     const res = await fetch("/api/live-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kakao_id: readLiveChatKakaoId(), bc: String(broadcast.id), body }) });
                     const json = await res.json().catch(() => null);
                     if (json?.ok && json.message) {
                       const m = parseChatMessage(json.message);
-                      if (m) setLiveChatMessages((prev) => mergeChat(prev, [m]));
-                    }
+                      setLiveChatMessages((prev) => mergeChat(prev.filter((x) => x.id !== tempId), m ? [m] : []));
+                    } else dropTemp();
                     return { ok: Boolean(json?.ok), message: json?.message && typeof json.message === "string" ? json.message : undefined };
-                  } catch { return { ok: false, message: "못 보냈어요. 다시 눌러 주세요." }; }
+                  } catch { dropTemp(); return { ok: false, message: "못 보냈어요. 다시 눌러 주세요." }; }
                 },
                 onModerate: async (messageId: number, action: LiveChatPenalty) => {
                   try {

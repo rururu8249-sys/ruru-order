@@ -41,6 +41,8 @@ type Props = {
   onOpenProduct: (productId: string, detailName?: string) => void;
   onOpenCart: () => void;
   onSwitchToShop: () => void;
+  /** 오른쪽 세로 메뉴(공지·주문내역·내정보·문의) — 주문서 아래 메뉴와 같은 동작 */
+  menu?: { key: string; label: string; badge?: number; onClick: () => void }[];
   /** [2026-11-10 ③] 사이트 채팅 — 없으면(꺼짐) 채팅 줄·입력 안 보임 */
   chat?: {
     messages: LiveChatMessage[];
@@ -72,6 +74,16 @@ const IconSound = () => (
 const IconChat = () => (
   <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="1.8"><path d="M4 5h16v11H9l-5 4z" /></svg>
 );
+const IconSoundOn = () => (
+  <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2"><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="M16 9a4 4 0 010 6" /><path d="M19 6a8 8 0 010 12" /></svg>
+);
+const MenuIcon = ({ k }: { k: string }) => {
+  const p = { width: 22, height: 22, viewBox: "0 0 24 24", fill: "none", stroke: "#FFFFFF", strokeWidth: 1.8 } as const;
+  if (k === "notice") return <svg aria-hidden="true" {...p}><rect x="3" y="5" width="18" height="14" rx="1" /><path d="M3 7l9 6 9-6" /></svg>;
+  if (k === "orders") return <svg aria-hidden="true" {...p}><path d="M12 3l8 4v10l-8 4-8-4V7z" /><path d="M4 7l8 4 8-4M12 11v10" /></svg>;
+  if (k === "inquiry") return <svg aria-hidden="true" {...p}><path d="M4 5h16v11H9l-5 4z" /></svg>;
+  return <svg aria-hidden="true" {...p}><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></svg>;
+};
 const IconRewind = () => (
   <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2"><path d="M11 6l-7 6 7 6z" /><path d="M20 6l-7 6 7 6z" /></svg>
 );
@@ -117,11 +129,13 @@ export default function LiveWatchView(props: Props) {
     if (!chat || sending) return;
     const body = draft.trim();
     if (!body) return;
+    // 누르자마자 창 닫고 글을 바로 띄운다(부모가 먼저 화면에 넣음). 실패하면 글을 되돌려 놓고 안내.
     setSending(true);
+    setDraft("");
+    setComposeOpen(false);
     const r = await chat.onSend(body).catch(() => ({ ok: false, message: "못 보냈어요. 다시 눌러 주세요." }));
     setSending(false);
-    if (r.ok) { setDraft(""); setComposeOpen(false); }
-    else setChatHint(r.message || "못 보냈어요.");
+    if (!r.ok) { setDraft(body); setChatHint(r.message || "못 보냈어요."); }
   };
   const startPress = (m: LiveChatMessage) => {
     if (!chat?.canModerate) return;
@@ -210,6 +224,27 @@ export default function LiveWatchView(props: Props) {
         </button>
       ) : null}
 
+      {/* 오른쪽 세로 메뉴 — 공지·주문내역·내정보·문의(오늘만셀러처럼). 돌려보기 중엔 숨김 */}
+      {!rewind && props.menu && props.menu.length > 0 ? (
+        <nav aria-label="메뉴" style={{ position: "absolute", right: "8px", top: "calc(124px + env(safe-area-inset-top))", display: "flex", flexDirection: "column", gap: "4px" }}>
+          {props.menu.map((m) => (
+            <button key={m.key} type="button" onClick={m.onClick} style={{ position: "relative", width: "60px", minHeight: "56px", padding: "6px 0", border: "none", background: "transparent", color: "#FFFFFF", fontSize: "13px", fontWeight: 600, fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", cursor: "pointer", textShadow: "0 1px 3px rgba(0,0,0,0.7)", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))" }}>
+              <MenuIcon k={m.key} />
+              <span>{m.label}</span>
+              {m.badge && m.badge > 0 ? (
+                <span aria-label={`안 읽은 ${m.badge}개`} style={{ position: "absolute", top: "2px", right: "10px", minWidth: "18px", height: "18px", padding: "0 4px", boxSizing: "border-box", borderRadius: "9999px", background: "#D30005", color: "#FFFFFF", fontSize: "13px", fontWeight: 700, lineHeight: "18px", textAlign: "center", textShadow: "none" }}>{m.badge > 9 ? "9+" : m.badge}</span>
+              ) : null}
+            </button>
+          ))}
+        </nav>
+      ) : null}
+
+      {/* 소리 끄기 — 켠 뒤엔 작은 스피커 버튼 */}
+      {!muted ? (
+        <button type="button" onClick={() => { sendToPlayer(youtubeCommand("mute")); setMuted(true); }} aria-label="소리 끄기" style={{ position: "absolute", left: "16px", top: "calc(68px + env(safe-area-inset-top))", width: "44px", height: "44px", border: "1px solid rgba(255,255,255,0.5)", borderRadius: "9999px", background: "rgba(0,0,0,0.4)", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+          <IconSoundOn />
+        </button>
+      ) : null}
       {/* 소리 켜기 — 폰은 소리 꺼진 채로만 자동 재생된다(브라우저 규칙) */}
       {muted ? (
         <button type="button" onClick={turnSoundOn} style={{ position: "absolute", left: "16px", top: "calc(68px + env(safe-area-inset-top))", height: "44px", padding: "0 18px", border: "none", borderRadius: "9999px", background: "#FFFFFF", color: "#111111", fontSize: "15px", fontWeight: 600, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", whiteSpace: "nowrap" }}>
